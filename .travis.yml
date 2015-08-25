@@ -10,6 +10,10 @@ notifications:
 language: c
 
 env:
+    global:
+        # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+        #   via the "travis encrypt" command using the project repo's public key
+        - secure: "oMOf5biEDDYzHLptLiSObZvoAclFZRyA0zg4FlOoLyFK8VrQKWSj/crdWdhwIl9TY/ZatEp4j3yFfH4PnGFAhoJrcnpshfSpeAmKFQx0xeWSgNospGHz9cQRIVbl/XR6m22pD2JinyiCd9Qw6aQ2QwQv+xEYLR7ro/qav+7MKis0hjyUnxPw/zS4x0PDXGAyQgGe2x0h8vikqEkuXgCSUQ4sBu8oLC/O/gnJZ+Zu+NnlipE9U14aVildNSQqgB8DSCLJrpyhHpDRs4APS5fsT/EBay2rm+g9mxa9CvskGvA7g+zDhh620VIMCpT2MUTjaMfN7C5nh3eIeNq6/FsY7SrMh6Mr3AGzjnlxTmWu0p+eHKCAVWn/VJSfuweHhJStrJU7HQztmCsQxWf+s5atpAok/QgBs8fIcmRYH/w5t1vyEZQXyA1SSgbg/DrXbiuPPLShD/lDyInmhWurlkhDfBws14UlNvmVexsEe9HqfcD4Ojid7g6kMpMlPt03qQkRMcgzDHzHH4wY3r85SQF8qV/FPbacngUCojogYAQ+FgwCMV0x+JjOTVi1fJU7dYLZsIX9YczORYRphSMT1B20G8EvCKkzmGBeI9l/ozYwks5zcCuQSqR3U9CB6/0wUNcdXFdfafihWQqa3Y3Uk55O7lkOAcm1dCqHr5PimpVXrjk="
     matrix:
         # Linux x86, release
         - OS_ID=0.4.4 REL=1
@@ -43,7 +47,14 @@ addons:
             - gcc-mingw-w64-i686
             - gcc-mingw-w64-x86-64
             - mingw-w64
-
+    coverity_scan:
+        project:
+            name: "metaeducation/ren-c"
+            description: "Library for embedding a Rebol interpreter into C codebases"
+        notification_email: zeng.shixin@gmail.com
+        build_command_prepend: "export CC=\\\"${TOOLS}${CC}${REL+ -DNDEBUG}\\\""
+        build_command: "bash make/coverity-scan-build.sh"
+        branch_pattern: coverity_scan
 
 install:
     # Fetch a Rebol bootstrap binary, which is needed for building Rebol.
