@@ -118,14 +118,13 @@
 	REBSER *words;
 	REBVAL *value;
 
-	//DISABLE_GC;
-	words = Make_Block(len + 1); // size + room for SELF
-	frame = Make_Block(len + 1);
-	//ENABLE_GC;
+	words = Make_Array(len + 1); // size + room for SELF
+	frame = Make_Array(len + 1);
+
 	// Note: cannot use Append_Frame for first word.
-	value = Alloc_Tail_Blk(frame);
+	value = Alloc_Tail_Array(frame);
 	SET_FRAME(value, 0, words);
-	value = Alloc_Tail_Blk(words);
+	value = Alloc_Tail_Array(words);
 	Val_Init_Word_Typed(
 		value, REB_WORD, has_self ? SYM_SELF : SYM_NOT_USED, ALL_64
 	);
@@ -149,8 +148,11 @@
 
 	// Expand or copy WORDS block:
 	if (copy) {
-		FRM_WORD_SERIES(frame) = Copy_Expand_Block(words, delta);
-	} else {
+		REBOOL managed = SERIES_GET_FLAG(FRM_WORD_SERIES(frame), SER_MANAGED);
+		FRM_WORD_SERIES(frame) = Copy_Array_Extra_Shallow(words, delta);
+		if (managed) MANAGE_SERIES(FRM_WORD_SERIES(frame));
+	}
+	else {
 		Extend_Series(words, delta);
 		BLK_TERM(words);
 	}
@@ -244,7 +246,7 @@
 		return FRM_WORD_SERIES(prior);
 	}
 
-	prior = Copy_Series(BUF_WORDS);
+	prior = Copy_Array_Shallow(BUF_WORDS);
 	RESET_TAIL(BUF_WORDS);  // allow reuse
 
 	CHECK_BIND_TABLE;
@@ -373,7 +375,7 @@
 		) {
 			REBVAL *word;
 			binds[VAL_WORD_CANON(value)] = 1;
-			word = Alloc_Tail_Blk(BUF_WORDS);
+			word = Alloc_Tail_Array(BUF_WORDS);
 			Val_Init_Word_Unbound(word, REB_WORD, VAL_WORD_SYM(value));
 		}
 		else if (ANY_EVAL_BLOCK(value) && (modes & BIND_DEEP))
@@ -407,7 +409,9 @@
 	for (value = BLK_HEAD(BUF_WORDS); NOT_END(value); value++)
 		binds[VAL_WORD_CANON(value)] = 0;
 
-	series = Copy_Series_Part(BUF_WORDS, start, SERIES_TAIL(BUF_WORDS) - start);
+	series = Copy_Array_At_Max_Shallow(
+		BUF_WORDS, start, SERIES_TAIL(BUF_WORDS) - start
+	);
 	RESET_TAIL(BUF_WORDS);  // allow reuse
 
 	CHECK_BIND_TABLE;
@@ -425,7 +429,7 @@
 ***********************************************************************/
 {
 	REBINT len = SERIES_TAIL(words);
-	REBSER *frame = Make_Block(len);
+	REBSER *frame = Make_Array(len);
 	REBVAL *value = BLK_HEAD(frame);
 
 	SET_FRAME(value, spec, words);
@@ -467,29 +471,53 @@
 	PG_Reb_Stats->Objects++;
 
 	if (!value || IS_END(value)) {
-		object = parent
-			? Copy_Block_Values(parent, 0, SERIES_TAIL(parent), TS_CLONE)
-			: Make_Frame(0, TRUE);
-	} else {
+		if (parent) {
+			object = Copy_Array_Core_Managed(
+				parent, 0, SERIES_TAIL(parent), TRUE, TS_CLONE
+			);
+		}
+		else {
+			object = Make_Frame(0, TRUE);
+			MANAGE_FRAME(object);
+		}
+	}
+	else {
 		words = Collect_Frame(parent, &value[0], BIND_ONLY); // GC safe
 		object = Create_Frame(words, 0); // GC safe
 		if (parent) {
 			if (Reb_Opts->watch_obj_copy)
 				Debug_Fmt(cs_cast(BOOT_STR(RS_WATCH, 2)), SERIES_TAIL(parent) - 1, FRM_WORD_SERIES(object));
 
-			// Copy parent values:
+			// Bitwise copy parent values (will have bits fixed by Clonify)
 			memcpy(
 				FRM_VALUES(object) + 1,
 				FRM_VALUES(parent) + 1,
 				(SERIES_TAIL(parent) - 1) * sizeof(REBVAL)
 			);
 
-			// Deep copy blocks and strings:
-			Copy_Deep_Values(object, 1, SERIES_TAIL(object), TS_CLONE);
+			// For values we copied that were blocks and strings, replace
+			// their series components with deep copies of themselves:
+			Clonify_Values_Len_Managed(
+				BLK_SKIP(object, 1), SERIES_TAIL(object) - 1, TRUE, TS_CLONE
+			);
+
+			// The *word series* might have been reused from the parent,
+			// based on whether any words were added, or we could have gotten
+			// a fresh one back.  Force our invariant here (as the screws
+			// tighten...)
+			ENSURE_SERIES_MANAGED(FRM_WORD_SERIES(object));
+			MANAGE_SERIES(object);
 		}
+		else {
+			MANAGE_FRAME(object);
+		}
+
+		assert(words == FRM_WORD_SERIES(object));
 	}
 
-	//Dump_Frame(object);
+	assert(SERIES_GET_FLAG(object, SER_MANAGED));
+	assert(SERIES_GET_FLAG(FRM_WORD_SERIES(object), SER_MANAGED));
+	ASSERT_FRAME(object);
 	return object;
 }
 
@@ -536,12 +564,12 @@
 	REBCNT n;
 
 	n = (mode & 4) ? 0 : 1;
-	block = Make_Block(SERIES_TAIL(frame) * (n + 1));
+	block = Make_Array(SERIES_TAIL(frame) * (n + 1));
 
 	for (; n < SERIES_TAIL(frame); n++) {
 		if (!VAL_GET_EXT(words + n, EXT_WORD_HIDE)) {
 			if (mode & 1) {
-				value = Alloc_Tail_Blk(block);
+				value = Alloc_Tail_Array(block);
 				if (mode & 2) {
 					VAL_SET(value, REB_SET_WORD);
 					VAL_SET_OPT(value, OPT_VALUE_LINE);
@@ -610,7 +638,7 @@
 	if (spec && IS_BLOCK(spec))
 		frame = Construct_Object(obj, VAL_BLK_DATA(spec), FALSE);
 	else
-		frame = CLONE_OBJECT(obj);
+		frame = Copy_Array_Shallow(obj);
 
 	return frame;
 }
@@ -645,9 +673,9 @@
 	);
 
 	// Allocate child (now that we know the correct size):
-	wrds = Copy_Series(BUF_WORDS);
-	child = Make_Block(SERIES_TAIL(wrds));
-	value = Alloc_Tail_Blk(child);
+	wrds = Copy_Array_Shallow(BUF_WORDS);
+	child = Make_Array(SERIES_TAIL(wrds));
+	value = Alloc_Tail_Array(child);
 	VAL_SET(value, REB_FRAME);
 	VAL_FRM_WORDS(value) = wrds;
 	VAL_FRM_SPEC(value) = 0;
@@ -673,7 +701,9 @@
 	BLK_TERM(child);
 
 	// Deep copy the child
-	Copy_Deep_Values(child, 1, SERIES_TAIL(child), TS_CLONE);
+	Clonify_Values_Len_Managed(
+		BLK_SKIP(child, 1), SERIES_TAIL(child) - 1, TRUE, TS_CLONE
+	);
 
 	// Rebind the child
 	Rebind_Block(parent1, child, BLK_SKIP(child, 1), REBIND_FUNC);
@@ -1413,7 +1443,7 @@
 ***********************************************************************/
 {
 	// Temporary block used while scanning for frame words:
-	Set_Root_Series(TASK_BUF_WORDS, Make_Block(100), "word cache"); // just holds words, no GC
+	Set_Root_Series(TASK_BUF_WORDS, Make_Array(100), "word cache"); // just holds words, no GC
 }
 
 

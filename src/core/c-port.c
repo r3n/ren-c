@@ -494,8 +494,8 @@ SCHEME_ACTIONS *Scheme_Actions;	// Initial Global (not threaded)
 	// The scheme uses a native actor:
 	if (Scheme_Actions[n].fun) {
 		// Hand build a native function used to reach native scheme actors.
-		REBSER *ser = Make_Block(1);
-		act = Alloc_Tail_Blk(ser);
+		REBSER *ser = Make_Array(1);
+		act = Alloc_Tail_Array(ser);
 
 		Val_Init_Word_Typed(
 			act,
@@ -514,7 +514,10 @@ SCHEME_ACTIONS *Scheme_Actions;	// Initial Global (not threaded)
 		// could be made at startup.
 		VAL_FUNC_SPEC(actor) = ser;
 		VAL_FUNC_WORDS(actor) = ser;
+		MANAGE_SERIES(ser);
+
 		VAL_FUNC_CODE(actor) = (REBFUN)(Scheme_Actions[n].fun);
+
 		VAL_SET(actor, REB_NATIVE);
 		return R_TRUE;
 	}

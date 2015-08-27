@@ -241,7 +241,7 @@ static REBSER *make_binary(REBVAL *arg, REBOOL make)
 
 	case REB_BLOCK:
 		// Join_Binary returns a shared buffer, so produce a copy:
-		ser = Copy_Series(Join_Binary(arg));
+		ser = Copy_Sequence(Join_Binary(arg));
 		break;
 
 	// MAKE/TO BINARY! <tuple!>
@@ -423,7 +423,7 @@ static REBSER *make_binary(REBVAL *arg, REBOOL make)
 
 	if (pvs->setval) return PE_BAD_SET;
 
-	ser = Copy_Series_Value(pvs->value);
+	ser = Copy_Sequence_At_Position(pvs->value);
 
 	n = SERIES_TAIL(ser);
 	if (n > 0) c = GET_ANY_CHAR(ser, n-1);
@@ -456,7 +456,7 @@ static REBSER *make_binary(REBVAL *arg, REBOOL make)
 ***********************************************************************/
 {
 	REBVAL	*value = D_ARG(1);
-	REBVAL  *arg = D_ARG(2);
+	REBVAL  *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
 	REBINT	index;
 	REBINT	tail;
 	REBINT	len;
@@ -496,6 +496,7 @@ static REBSER *make_binary(REBVAL *arg, REBOOL make)
 		if (IS_BINARY(value)) SET_FLAG(args, AN_SERIES); // special purpose
 		if (D_REF(AN_PART)) SET_FLAG(args, AN_PART);
 		index = Modify_String(action, VAL_SERIES(value), index, arg, args, len, D_REF(AN_DUP) ? Int32(D_ARG(AN_COUNT)) : 1);
+		ENSURE_SERIES_MANAGED(VAL_SERIES(value));
 		VAL_INDEX(value) = index;
 		break;
 

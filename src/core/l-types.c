@@ -628,6 +628,8 @@ end_date:
 	if (!at) return 0;
 	VAL_TAIL(value) = (REBCNT)(str - VAL_BIN(value));
 
+	MANAGE_SERIES(VAL_SERIES(value));
+
 	return cp;
 }
 
@@ -668,6 +670,9 @@ end_date:
 	}
 	*str = 0;
 	VAL_TAIL(value) = (REBCNT)(str - VAL_BIN(value));
+
+	// All scanned code is assumed to be managed
+	MANAGE_SERIES(VAL_SERIES(value));
 	return cp;
 }
 
@@ -779,6 +784,10 @@ end_date:
 	VAL_SERIES(value) = Append_UTF8(0, cp, len);
 	VAL_INDEX(value) = 0;
 
+	// We hand it over to management by the GC, but don't run the GC before
+	// the source has been scanned and put somewhere safe!
+	MANAGE_SERIES(VAL_SERIES(value));
+
 	if (VAL_BYTE_SIZE(value)) {
 		n = Deline_Bytes(VAL_BIN(value), VAL_LEN(value));
 	} else {
@@ -821,8 +830,7 @@ end_date:
 	REBSER *series;
 	REBYTE quote;
 
-	series = Make_Block(16);
-	//DISABLE_GC;
+	series = Make_Array(16);
 
 	while (len > 0) {
 		// Look for tag, gathering text as we go:
@@ -857,7 +865,6 @@ end_date:
 		// Note: if final tag does not end, then it is treated as text.
 	}
 	if (cp != bp) Append_Markup(series, REB_STRING, bp, cp - bp);
-	//ENABLE_GC;
 
 	return series;
 }
@@ -976,26 +983,26 @@ end_date:
 					// Does it already use a block?
 					if (IS_BLOCK(val+1)) {
 						// Block of values already exists:
-						val = Alloc_Tail_Blk(VAL_SERIES(val+1));
+						val = Alloc_Tail_Array(VAL_SERIES(val+1));
 						SET_NONE(val);
 					}
 					else {
 						// Create new block for values:
 						REBVAL *val2;
-						ser = Make_Block(2);
-						val2 = Alloc_Tail_Blk(ser); // prior value
+						ser = Make_Array(2);
+						val2 = Alloc_Tail_Array(ser); // prior value
 						*val2 = val[1];
 						Val_Init_Block(val + 1, ser);
-						val = Alloc_Tail_Blk(ser); // for new value
+						val = Alloc_Tail_Array(ser); // for new value
 						SET_NONE(val);
 					}
 					break;
 				}
 			}
 			if (IS_END(val)) {
-				val = Alloc_Tail_Blk(blk); // add new word
+				val = Alloc_Tail_Array(blk); // add new word
 				Val_Init_Word_Unbound(val, REB_SET_WORD, sym);
-				val = Alloc_Tail_Blk(blk); // for new value
+				val = Alloc_Tail_Array(blk); // for new value
 				SET_NONE(val);
 			}
 		}

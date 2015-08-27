@@ -37,8 +37,17 @@ extern void reb_qsort(void *a, size_t n, size_t es, cmp_t *cmp);
 
 /***********************************************************************
 **
-*/	REBINT CT_Block(REBVAL *a, REBVAL *b, REBINT mode)
+*/	REBINT CT_Array(REBVAL *a, REBVAL *b, REBINT mode)
 /*
+**	"Compare Type" dispatcher for the following types:
+**
+**		CT_Block(REBVAL *a, REBVAL *b, REBINT mode)
+**		CT_Paren(REBVAL *a, REBVAL *b, REBINT mode)
+**		CT_Path(REBVAL *a, REBVAL *b, REBINT mode)
+**		CT_Set_Path(REBVAL *a, REBVAL *b, REBINT mode)
+**		CT_Get_Path(REBVAL *a, REBVAL *b, REBINT mode)
+**		CT_Lit_Path(REBVAL *a, REBVAL *b, REBINT mode)
+**
 ***********************************************************************/
 {
 	REBINT num;
@@ -61,8 +70,17 @@ static void No_Nones(REBVAL *arg) {
 
 /***********************************************************************
 **
-*/	REBFLG MT_Block(REBVAL *out, REBVAL *data, REBCNT type)
+*/	REBFLG MT_Array(REBVAL *out, REBVAL *data, REBCNT type)
 /*
+**	"Make Type" dispatcher for the following subtypes:
+**
+**		MT_Block(REBVAL *out, REBVAL *data, REBCNT type)
+**		MT_Paren(REBVAL *out, REBVAL *data, REBCNT type)
+**		MT_Path(REBVAL *out, REBVAL *data, REBCNT type)
+**		MT_Set_Path(REBVAL *out, REBVAL *data, REBCNT type)
+**		MT_Get_Path(REBVAL *out, REBVAL *data, REBCNT type)
+**		MT_Lit_Path(REBVAL *out, REBVAL *data, REBCNT type)
+**
 ***********************************************************************/
 {
 	REBCNT i;
@@ -182,92 +200,6 @@ static void No_Nones(REBVAL *arg) {
 
 /***********************************************************************
 **
-*/	void Modify_Blockx(struct Reb_Call *call_, REBCNT action, REBVAL *block, REBVAL *arg)
-/*
-**		Actions: INSERT, APPEND, CHANGE
-**
-**		block [block!] {Series at point to insert}
-**		value [any-type!] {The value to insert}
-**		/part {Limits to a given length or position.}
-**		limit [number! series! pair!]
-**		/only {Inserts a series as a series.}
-**		/dup {Duplicates the insert a specified number of times.}
-**		count [number! pair!]
-**
-**	Add:
-**		Handle insert [] () case
-**		What does insert () [] do?
-**		/deep option for cloning subcontents?
-**
-***********************************************************************/
-{
-	REBSER *series = VAL_SERIES(block);
-	REBCNT index = VAL_INDEX(block);
-	REBCNT tail  = VAL_TAIL(block);
-	REBFLG only  = D_REF(AN_ONLY);
-	REBCNT rlen;  // length to be removed
-	REBCNT ilen  = 1;  // length to be inserted
-	REBINT cnt   = 1;  // DUP count
-	REBCNT size;
-	REBFLG is_blk = FALSE; // arg is a block not a value
-
-	// Length of target (may modify index): (arg can be anything)
-	rlen = Partial1((action == A_CHANGE) ? block : arg, D_ARG(AN_LIMIT));
-
-	index = VAL_INDEX(block);
-	if (action == A_APPEND || index > tail) index = tail;
-
-	// Check /PART, compute LEN:
-	if (!only && ANY_BLOCK(arg)) {
-		is_blk = TRUE; // arg is a block
-		// Are we modifying ourselves? If so, copy arg block first:
-		if (series == VAL_SERIES(arg))  {
-			VAL_SERIES(arg) = Copy_Block(VAL_SERIES(arg), VAL_INDEX(arg));
-			VAL_INDEX(arg) = 0;
-		}
-		// Length of insertion:
-		ilen = (action != A_CHANGE && D_REF(AN_PART)) ? rlen : VAL_LEN(arg);
-	}
-
-	// Get /DUP count:
-	if (D_REF(AN_DUP)) {
-		cnt = Int32(D_ARG(AN_COUNT));
-		if (cnt <= 0) return; // no changes
-	}
-
-	// Total to insert:
-	size = cnt * ilen;
-
-	if (action != A_CHANGE) {
-		// Always expand series for INSERT and APPEND actions:
-		Expand_Series(series, index, size);
-	} else {
-		if (size > rlen)
-			Expand_Series(series, index, size-rlen);
-		else if (size < rlen && D_REF(AN_PART))
-			Remove_Series(series, index, rlen-size);
-		else if (size + index > tail) {
-			EXPAND_SERIES_TAIL(series, size - (tail - index));
-		}
-	}
-
-	if (is_blk) arg = VAL_BLK_DATA(arg);
-
-	// For dup count:
-	VAL_INDEX(block) = (action == A_APPEND) ? 0 : size + index;
-
-	index *= SERIES_WIDE(series); // loop invariant
-	ilen *= SERIES_WIDE(series);   // loop invariant
-	for (; cnt > 0; cnt--) {
-		memcpy(series->data + index, (REBYTE *)arg, ilen);
-		index += ilen;
-	}
-	BLK_TERM(series);
-}
-
-
-/***********************************************************************
-**
 */	void Make_Block_Type(REBFLG make, REBVAL *value, REBVAL *arg)
 /*
 **		Value can be:
@@ -296,7 +228,7 @@ static void No_Nones(REBVAL *arg) {
 		len = VAL_BLK_LEN(arg);
 		if (len > 0 && type >= REB_PATH && type <= REB_LIT_PATH)
 			No_Nones(arg);
-		ser = Copy_Values(VAL_BLK_DATA(arg), len);
+		ser = Copy_Values_Len_Shallow(VAL_BLK_DATA(arg), len);
 		goto done;
 	}
 
@@ -328,7 +260,7 @@ static void No_Nones(REBVAL *arg) {
 	}
 
 //	if (make && IS_NONE(arg)) {
-//		ser = Make_Block(0);
+//		ser = Make_Array(0);
 //		goto done;
 //	}
 
@@ -342,13 +274,13 @@ static void No_Nones(REBVAL *arg) {
 		// make block! 10
 		if (IS_INTEGER(arg) || IS_DECIMAL(arg)) {
 			len = Int32s(arg, 0);
-			Val_Init_Series(value, type, Make_Block(len));
+			Val_Init_Series(value, type, Make_Array(len));
 			return;
 		}
 		Trap_Arg(arg);
 	}
 
-	ser = Copy_Values(arg, 1);
+	ser = Copy_Values_Len_Shallow(arg, 1);
 
 done:
 	Val_Init_Series(value, type, ser);
@@ -560,8 +492,17 @@ static struct {
 
 /***********************************************************************
 **
-*/	REBINT PD_Block(REBPVS *pvs)
+*/	REBINT PD_Array(REBPVS *pvs)
 /*
+**	Path dispatch for the following types:
+**
+**		PD_Block(REBPVS *pvs)
+**		PD_Paren(REBPVS *pvs)
+**		PD_Path(REBPVS *pvs)
+**		PD_Get_Path(REBPVS *pvs)
+**		PD_Set_Path(REBPVS *pvs)
+**		PD_Lit_Path(REBPVS *pvs)
+**
 ***********************************************************************/
 {
 	REBINT n = 0;
@@ -614,12 +555,21 @@ static struct {
 
 /***********************************************************************
 **
-*/	REBTYPE(Block)
+*/	REBTYPE(Array)
 /*
+**	Implementation of type dispatch of the following:
+**
+**		REBTYPE(Block)
+**		REBTYPE(Paren)
+**		REBTYPE(Path)
+**		REBTYPE(Get_Path)
+**		REBTYPE(Set_Path)
+**		REBTYPE(Lit_Path)
+**
 ***********************************************************************/
 {
 	REBVAL	*value = D_ARG(1);
-	REBVAL  *arg = D_ARG(2);
+	REBVAL  *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
 	REBSER  *ser;
 	REBINT	index;
 	REBINT	tail;
@@ -721,7 +671,7 @@ pick_it:
 			len = Partial1(value, D_ARG(3));
 			if (len == 0) {
 zero_blk:
-				Val_Init_Block(D_OUT, Make_Block(0));
+				Val_Init_Block(D_OUT, Make_Array(0));
 				return R_OUT;
 			}
 		} else
@@ -737,7 +687,7 @@ zero_blk:
 
 		// if no /part, just return value, else return block:
 		if (!D_REF(2)) *D_OUT = BLK_HEAD(ser)[index];
-		else Val_Init_Block(D_OUT, Copy_Block_Len(ser, index, len));
+		else Val_Init_Block(D_OUT, Copy_Array_At_Max_Shallow(ser, index, len));
 		Remove_Series(ser, index, len);
 		return R_OUT;
 
@@ -781,7 +731,7 @@ zero_blk:
 		args = 0;
 		if (D_REF(AN_ONLY)) SET_FLAG(args, AN_ONLY);
 		if (D_REF(AN_PART)) SET_FLAG(args, AN_PART);
-		index = Modify_Block(action, ser, index, arg, args, len, D_REF(AN_DUP) ? Int32(D_ARG(AN_COUNT)) : 1);
+		index = Modify_Array(action, ser, index, arg, args, len, D_REF(AN_DUP) ? Int32(D_ARG(AN_COUNT)) : 1);
 		VAL_INDEX(value) = index;
 		break;
 
@@ -798,17 +748,10 @@ zero_blk:
 	//-- Creation:
 
 	case A_COPY: // /PART len /DEEP /TYPES kinds
-#if 0
-		args = D_REF(ARG_COPY_DEEP) ? COPY_ALL : 0;
-		len = Partial1(value, D_ARG(ARG_COPY_LIMIT));
-		index = (REBINT)VAL_INDEX(value);
-//		VAL_SERIES(value) = (len > 0) ? Copy_Block_Deep(ser, index, len, args) : Make_Block(0);
-		VAL_INDEX(value) = 0;
-#else
 	{
 		REBU64 types = 0;
 		if (D_REF(ARG_COPY_DEEP)) {
-			types |= CP_DEEP | (D_REF(ARG_COPY_TYPES) ? 0 : TS_STD_SERIES);
+			types |= D_REF(ARG_COPY_TYPES) ? 0 : TS_STD_SERIES;
 		}
 		if D_REF(ARG_COPY_TYPES) {
 			arg = D_ARG(ARG_COPY_KINDS);
@@ -816,10 +759,15 @@ zero_blk:
 			else types |= VAL_TYPESET(arg);
 		}
 		len = Partial1(value, D_ARG(ARG_COPY_LIMIT));
-		VAL_SERIES(value) = Copy_Block_Values(ser, VAL_INDEX(value), VAL_INDEX(value)+len, types);
+		VAL_SERIES(value) = Copy_Array_Core_Managed(
+			ser,
+			VAL_INDEX(value),
+			VAL_INDEX(value) + len,
+			D_REF(ARG_COPY_DEEP),
+			types
+		);
 		VAL_INDEX(value) = 0;
 	}
-#endif
 		break;
 
 	//-- Special actions:
@@ -896,10 +844,10 @@ is_none:
 }
 
 
-#ifndef NDEBUG
+#if !defined(NDEBUG)
 /***********************************************************************
 **
-*/	void Assert_Blk_Core(const REBSER *series, REBOOL typed_words)
+*/	void Assert_Array_Core(const REBSER *series, REBOOL typed_words)
 /*
 ***********************************************************************/
 {
@@ -909,7 +857,7 @@ is_none:
 	if (SERIES_FREED(series))
 		Panic_Series(series);
 
-	if (!IS_BLOCK_SERIES(series))
+	if (!Is_Array_Series(series))
 		Panic_Series(series);
 
 	for (len = 0; len < series->tail; len++) {

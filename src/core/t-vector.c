@@ -210,7 +210,7 @@ void Set_Vector_Row(REBSER *ser, REBVAL *blk)
 		Trap_Arg_DEAD_END(vect);
 	}
 
-	ser = Make_Block(len);
+	ser = Make_Array(len);
 	val = BLK_HEAD(ser);
 	for (n = VAL_INDEX(vect); n < VAL_TAIL(vect); n++, val++) {
 		VAL_SET(val, (type >= VTSF08) ? REB_DECIMAL : REB_INTEGER);
@@ -430,6 +430,8 @@ void Set_Vector_Row(REBSER *ser, REBVAL *blk)
 	if (iblk) Set_Vector_Row(vect, iblk);
 
 	VAL_SERIES(value) = vect;
+	MANAGE_SERIES(vect);
+
 	// index set earlier
 
 	return value;
@@ -542,7 +544,7 @@ void Set_Vector_Row(REBSER *ser, REBVAL *blk)
 ***********************************************************************/
 {
 	REBVAL *value = D_ARG(1);
-	REBVAL *arg = D_ARG(2);
+	REBVAL *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
 	REBINT type;
 	REBINT size;
 	REBSER *vect;
@@ -599,7 +601,7 @@ void Set_Vector_Row(REBSER *ser, REBVAL *blk)
 		return R_OUT;
 
 	case A_COPY:
-		ser = Copy_Series(vect);
+		ser = Copy_Sequence(vect);
 		ser->extra.size = vect->extra.size; // attributes
 		Val_Init_Vector(value, ser);
 		break;

@@ -208,6 +208,11 @@ const REBCNT Gob_Flag_Words[] = {
 		LABEL_SERIES(GOB_PANE(gob), "gob pane");
 		GOB_TAIL(gob) = count;
 		index = 0;
+
+		// !!! A GOB_PANE could theoretically be MKS_UNTRACKED and manually
+		// memory managed, if that made sense.  Does it?
+
+		MANAGE_SERIES(GOB_PANE(gob));
 	}
 	else {
 		if (change) {
@@ -270,7 +275,7 @@ const REBCNT Gob_Flag_Words[] = {
 	if (len == -1 || (len + index) > GOB_TAIL(gob)) len = GOB_TAIL(gob) - index;
 	if (len < 0) len = 0;
 
-	ser = Make_Block(len);
+	ser = Make_Array(len);
 	ser->tail = len;
 	val = BLK_HEAD(ser);
 	gp = GOB_HEAD(gob);
@@ -293,11 +298,11 @@ const REBCNT Gob_Flag_Words[] = {
 	REBVAL *val;
 	REBINT i;
 
-	ser = Make_Block(3);
+	ser = Make_Array(3);
 
 	for (i = 0; Gob_Flag_Words[i]; i += 2) {
 		if (GET_GOB_FLAG(gob, Gob_Flag_Words[i+1])) {
-			val = Alloc_Tail_Blk(ser);
+			val = Alloc_Tail_Array(ser);
 			Val_Init_Word_Unbound(val, REB_WORD, Gob_Flag_Words[i]);
 		}
 	}
@@ -548,7 +553,7 @@ const REBCNT Gob_Flag_Words[] = {
 		if (GOB_PANE(gob))
 			Val_Init_Block(val, Pane_To_Block(gob, 0, -1));
 		else
-			Val_Init_Block(val, Make_Block(0));
+			Val_Init_Block(val, Make_Array(0));
 		break;
 
 	case SYM_PARENT:
@@ -622,7 +627,7 @@ is_none:
 **
 ***********************************************************************/
 {
-	REBSER *ser = Make_Block(10);
+	REBSER *ser = Make_Array(10);
 	REBVAL *val;
 	REBINT words[6] = {SYM_OFFSET, SYM_SIZE, SYM_ALPHA, 0};
 	REBVAL *vals[6];
@@ -631,9 +636,9 @@ is_none:
 	REBCNT sym;
 
 	for (n = 0; words[n]; n++) {
-		val = Alloc_Tail_Blk(ser);
+		val = Alloc_Tail_Array(ser);
 		Val_Init_Word_Unbound(val, REB_SET_WORD, words[n]);
-		vals[n] = Alloc_Tail_Blk(ser);
+		vals[n] = Alloc_Tail_Array(ser);
 		SET_NONE(vals[n]);
 	}
 
@@ -644,8 +649,8 @@ is_none:
 	if (!GOB_TYPE(gob)) return ser;
 
 	if (GOB_CONTENT(gob)) {
-		val1 = Alloc_Tail_Blk(ser);
-		val = Alloc_Tail_Blk(ser);
+		val1 = Alloc_Tail_Array(ser);
+		val = Alloc_Tail_Array(ser);
 		switch (GOB_TYPE(gob)) {
 		case GOBT_COLOR:
 			sym = SYM_COLOR;
@@ -740,18 +745,15 @@ is_none:
 /*
 ***********************************************************************/
 {
-	REBVAL *val;
-	REBVAL *arg;
-	REBGOB *gob;
+	REBVAL *val = D_ARG(1);
+	REBVAL *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
+	REBGOB *gob = NULL;
 	REBGOB *ngob;
 	REBCNT index;
 	REBCNT tail;
 	REBCNT len;
 
-	arg = D_ARG(2);
-	val = D_OUT;
-	*val = *D_ARG(1);
-	gob = 0;
+	*D_OUT = *val;
 
 	if (IS_GOB(val)) {
 		gob = VAL_GOB(val);
@@ -766,7 +768,6 @@ is_none:
 
 	case A_MAKE:
 		ngob = Make_Gob();
-		val = D_ARG(1);
 
 		// Clone an existing GOB:
 		if (IS_GOB(val)) {	// local variable "gob" is valid
@@ -854,9 +855,9 @@ is_none:
 		if (index + len > tail) len = tail - index;
 		if (index >= tail) goto is_none;
 		if (!D_REF(2)) { // just one value
-			VAL_SET(val, REB_GOB);
-			VAL_GOB(val) = *GOB_SKIP(gob, index);
-			VAL_GOB_INDEX(val) = 0;
+			VAL_SET(D_OUT, REB_GOB);
+			VAL_GOB(D_OUT) = *GOB_SKIP(gob, index);
+			VAL_GOB_INDEX(D_OUT) = 0;
 			Remove_Gobs(gob, index, 1);
 			return R_OUT;
 		} else {
@@ -900,12 +901,12 @@ is_none:
 		goto is_false;
 
 	case A_INDEX_OF:
-		SET_INTEGER(val, index+1);
+		SET_INTEGER(D_OUT, index + 1);
 		break;
 
 	case A_LENGTH:
 		index = (tail > index) ? tail - index : 0;
-		SET_INTEGER(val, index);
+		SET_INTEGER(D_OUT, index);
 		break;
 
 	case A_FIND:
@@ -930,9 +931,9 @@ is_none:
 	return R_OUT;
 
 set_index:
-	VAL_SET(val, REB_GOB);
-	VAL_GOB(val) = gob;
-	VAL_GOB_INDEX(val) = index;
+	VAL_SET(D_OUT, REB_GOB);
+	VAL_GOB(D_OUT) = gob;
+	VAL_GOB_INDEX(D_OUT) = index;
 	return R_OUT;
 
 is_none:

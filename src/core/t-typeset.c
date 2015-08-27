@@ -40,15 +40,15 @@
 {
 	1, 0, // First (0th) typeset is not valid
 	SYM_ANY_TYPEX,     ((REBU64)1<<REB_MAX)-2, // do not include END!
-   	SYM_ANY_WORDX,     TS_WORD,
+	SYM_ANY_WORDX,     TS_WORD,
 	SYM_ANY_PATHX,     TS_PATH,
-   	SYM_ANY_FUNCTIONX, TS_FUNCTION,
-   	SYM_NUMBERX,       TS_NUMBER,
-   	SYM_SCALARX,       TS_SCALAR,
-   	SYM_SERIESX,       TS_SERIES,
-   	SYM_ANY_STRINGX,   TS_STRING,
-   	SYM_ANY_OBJECTX,   TS_OBJECT,
-   	SYM_ANY_BLOCKX,    TS_BLOCK,
+	SYM_ANY_FUNCTIONX, TS_FUNCTION,
+	SYM_NUMBERX,       TS_NUMBER,
+	SYM_SCALARX,       TS_SCALAR,
+	SYM_SERIESX,       TS_SERIES,
+	SYM_ANY_STRINGX,   TS_STRING,
+	SYM_ANY_OBJECTX,   TS_OBJECT,
+	SYM_ANY_ARRAYX,    TS_ARRAY,
 	0, 0
 };
 
@@ -77,10 +77,10 @@
 	REBVAL *value;
 	REBINT n;
 
-	Set_Root_Series(ROOT_TYPESETS, Make_Block(40), "typeset presets");
+	Set_Root_Series(ROOT_TYPESETS, Make_Array(40), "typeset presets");
 
 	for (n = 0; Typesets[n]; n += 2) {
-		value = Alloc_Tail_Blk(VAL_SERIES(ROOT_TYPESETS));
+		value = Alloc_Tail_Array(VAL_SERIES(ROOT_TYPESETS));
 		VAL_SET(value, REB_TYPESET);
 		VAL_TYPESET(value) = Typesets[n+1];
 		if (Typesets[n] > 1)
@@ -115,7 +115,7 @@
 				TYPE_SET(value, VAL_WORD_SYM(block)-1);
 				continue;
 			} // Special typeset symbols:
-			else if (sym >= SYM_ANY_TYPEX && sym <= SYM_ANY_BLOCKX)
+			else if (sym >= SYM_ANY_TYPEX && sym < SYM_DATATYPES)
 				val = BLK_SKIP(types, sym - SYM_ANY_TYPEX + 1);
 		}
 		if (!val) val = block;
@@ -194,12 +194,12 @@
 		if (TYPE_CHECK(tset, n)) size++;
 	}
 
-	block = Make_Block(size);
+	block = Make_Array(size);
 
 	// Convert bits to types:
 	for (n = 0; n < REB_MAX; n++) {
 		if (TYPE_CHECK(tset, n)) {
-			value = Alloc_Tail_Blk(block);
+			value = Alloc_Tail_Array(block);
 			Set_Datatype(value, n);
 		}
 	}
@@ -214,7 +214,7 @@
 ***********************************************************************/
 {
 	REBVAL *val = D_ARG(1);
-	REBVAL *arg = D_ARG(2);
+	REBVAL *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
 
 	switch (action) {
 

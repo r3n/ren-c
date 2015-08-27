@@ -173,7 +173,7 @@ static const char *Dia_Fmt = "DELECT - cmd: %s length: %d missed: %d total: %d";
 		break;
 
 	case REB_PATH: {
-		const REBVAL *value_const;
+		const REBVAL *value_const = value;
 		if (Do_Path(&safe, &value_const, 0)) return 0;
 		DS_PUSH(&safe);
 		value = DS_TOP;
@@ -280,7 +280,7 @@ again:
 
 		// Make room for it in the output block:
 		if (IS_END(outp)) {
-			outp = Alloc_Tail_Blk(dia->out);
+			outp = Alloc_Tail_Array(dia->out);
 			SET_NONE(outp);
 		} else if (!IS_NONE(outp)) {
 			// There's already an arg in this slot, so skip it...
@@ -289,7 +289,7 @@ again:
 			// Look for first empty slot:
 			while (NOT_END(outp) && !IS_NONE(outp)) outp++;
 			if (IS_END(outp)) {
-				outp = Alloc_Tail_Blk(dia->out);
+				outp = Alloc_Tail_Array(dia->out);
 				SET_NONE(outp);
 			}
 		}
@@ -394,7 +394,7 @@ again:
 
 	// Insert command word:
 	if (!GET_FLAG(dia->flags, RDIA_NO_CMD)) {
-		val = Alloc_Tail_Blk(dia->out);
+		val = Alloc_Tail_Array(dia->out);
 		Val_Init_Word(
 			val,
 			GET_FLAG(dia->flags, RDIA_LIT_CMD) ? REB_LIT_WORD : REB_WORD,
@@ -424,7 +424,7 @@ again:
 	// If not enough args, pad with NONE values:
 	if (dia->cmd > 1) {
 		for (n = SERIES_TAIL(dia->out); n < size; n++) {
-			REBVAL *temp = Alloc_Tail_Blk(dia->out);
+			REBVAL *temp = Alloc_Tail_Array(dia->out);
 			SET_NONE(temp);
 		}
 	}
@@ -511,9 +511,11 @@ again:
 
 	if (*index >= SERIES_TAIL(block)) return 0; // end of block
 
-	DISABLE_GC; // Avoid GC during Dialect (prevents unknown crash problem)
+	// !!! This used to say "Avoid GC during Dialect (prevents unknown
+	// crash problem)".  To the extent DELECT is still used, this unknown
+	// crash problem should be resolved...not the GC disabled.
 
-	if (!*out) *out = Make_Block(25);
+	if (!*out) *out = Make_Array(25);
 
 	dia.dialect = dialect;
 	dia.args = block;
@@ -534,8 +536,6 @@ again:
 
 	if (n < 0) return n; //error
 	*index = dia.argi;
-
-	ENABLE_GC;
 
 	return dia.cmd;
 }

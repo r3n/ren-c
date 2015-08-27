@@ -601,8 +601,6 @@
 	REBSER *ser;
 	REBCNT len = 0;
 
-	//DISABLE_GC;
-
 	assert(errnum != 0);
 
 	ss->errors++;
@@ -633,11 +631,10 @@
 
 	if (relax) {
 		*relax = error;
-		//ENABLE_GC;
 		return;
 	}
 
-	Do_Error(&error); // ENABLE_GC implied
+	Do_Error(&error);
 	DEAD_END_VOID;
 }
 
@@ -1501,11 +1498,16 @@ exit_block:
 	#endif
 
 	len = emitbuf->tail;
-	block = Copy_Values(BLK_SKIP(emitbuf, begin), len - begin);
+	block = Copy_Values_Len_Shallow(BLK_SKIP(emitbuf, begin), len - begin);
 	LABEL_SERIES(block, "scan block");
+
 	emitbuf->tail = begin;
 //!!!!	if (value) VAL_OPTS(BLK_TAIL(block)) = VAL_OPTS(value); // save NEWLINE marker
 
+	// All scanned code is expected to be managed by the GC (because walking
+	// the tree after constructing it to add the "manage GC" bit would be
+	// too expensive, and we don't load source and free it manually anyway)
+	MANAGE_SERIES(block);
 	return block;
 }
 
@@ -1599,7 +1601,7 @@ exit_block:
 /*
 ***********************************************************************/
 {
-	Set_Root_Series(TASK_BUF_EMIT, Make_Block(511), "emit block");
+	Set_Root_Series(TASK_BUF_EMIT, Make_Array(511), "emit block");
 	Set_Root_Series(TASK_BUF_UTF8, Make_Unicode(1020), "utf8 buffer");
 }
 

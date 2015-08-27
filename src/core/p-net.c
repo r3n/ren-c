@@ -50,7 +50,8 @@ enum Transport_Types {
 
 	if (!info || !IS_OBJECT(info)) Trap_Port(RE_INVALID_SPEC, port, -10);
 
-	obj = CLONE_OBJECT(VAL_OBJ_FRAME(info));
+	obj = Copy_Array_Shallow(VAL_OBJ_FRAME(info));
+	MANAGE_SERIES(obj);
 
 	Val_Init_Object(ret, obj);
 	Set_Tuple(
@@ -86,7 +87,7 @@ enum Transport_Types {
 	nsock->next = 0;
 
 	// Create a new port using ACCEPT request passed by sock->common.sock:
-	port = Copy_Block(port, 0);
+	port = Copy_Array_Shallow(port);
 	SET_PORT(out, port);	// Also for GC protect
 	SET_NONE(OFV(port, STD_PORT_DATA)); // just to be sure.
 	SET_NONE(OFV(port, STD_PORT_STATE)); // just to be sure.
@@ -117,7 +118,7 @@ enum Transport_Types {
 	Validate_Port(port, action);
 
 	*D_OUT = *D_ARG(1);
-	arg = D_ARG(2);
+	arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
 	refs = 0;
 
 	sock = cast(REBREQ*, Use_Port_State(port, RDI_NET, sizeof(*sock)));

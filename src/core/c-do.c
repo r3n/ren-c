@@ -328,7 +328,13 @@ void Trace_Arg(REBINT num, const REBVAL *arg, const REBVAL *path)
 	} else pvs.value = pvs.path; //Trap2_DEAD_END(RE_INVALID_PATH, pvs.orig, pvs.path);
 
 	// Start evaluation of path:
-	if (Path_Dispatch[VAL_TYPE(pvs.value)]) {
+	if (IS_END(pvs.path + 1)) {
+		// If it was a single element path, return the value rather than
+		// try to dispatch it (would cause a crash at time of writing)
+		//
+		// !!! Is this the desired behavior, or should it be an error?
+	}
+	else if (Path_Dispatch[VAL_TYPE(pvs.value)]) {
 		Next_Path(&pvs);
 		// Check for errors:
 		if (NOT_END(pvs.path+1) && !ANY_FUNC(pvs.value)) {
@@ -336,7 +342,7 @@ void Trace_Arg(REBINT num, const REBVAL *arg, const REBVAL *path)
 			Trap2_DEAD_END(RE_INVALID_PATH, pvs.orig, pvs.path);
 		}
 	}
-	else if (NOT_END(pvs.path+1) && !ANY_FUNC(pvs.value))
+	else if (!ANY_FUNC(pvs.value))
 		Trap2_DEAD_END(RE_BAD_PATH_TYPE, pvs.orig, Of_Type(pvs.value));
 
 	// If SET then we don't return anything
@@ -418,7 +424,7 @@ void Trace_Arg(REBINT num, const REBVAL *arg, const REBVAL *path)
 	const REBVAL *func = DSF_FUNC(call);
 	REBSER *words = VAL_FUNC_WORDS(func);
 	REBVAL *param = VAL_FUNC_PARAM(func, 1);
-	REBVAL *arg = DSF_ARG(call, 1);
+	REBVAL *arg = DSF_NUM_ARGS(call) > 0 ? DSF_ARG(call, 1) : NULL;
 
 	REBOOL lookahead;
 
@@ -521,6 +527,8 @@ more_path:
 			Trap_Arg_DEAD_END(param);
 		}
 
+		ASSERT_VALUE_MANAGED(arg);
+
 		// If word is typed, verify correct argument datatype:
 		if (!TYPE_CHECK(param, VAL_TYPE(arg)))
 			Trap3_DEAD_END(RE_EXPECT_ARG, DSF_LABEL(call), param, Of_Type(arg));
@@ -600,6 +608,14 @@ return_index:
 #if !defined(NDEBUG)
 	REBINT dsp_precall = DSP;
 
+	// We keep track of the head of the list of series that are not tracked
+	// by garbage collection at the outset of the call.  Then we ensure that
+	// when the call is finished, no accumulation has happened.  So all
+	// newly allocated series should either be (a) freed or (b) delegated
+	// to management by the GC...else they'd represent a leak
+	//
+	REBSER *manuals = GC_Manuals;
+
 	const REBYTE *label_str = Get_Word_Name(DSF_LABEL(call));
 #endif
 
@@ -648,12 +664,18 @@ return_index:
 	// over the trash that we put in the return slot before the call.
 	assert(!IS_TRASH(out));
 
+	assert(VAL_TYPE(out) < REB_MAX); // cheap check
+
+	ASSERT_VALUE_MANAGED(out);
+
 #if !defined(NDEBUG)
 	assert(DSP >= dsp_precall);
 	if (DSP > dsp_precall) {
 		PROBE_MSG(DSF_WHERE(call), "UNBALANCED STACK TRAP!!!");
 		Panic(RP_MISC);
 	}
+
+	MANUALS_LEAK_CHECK(manuals, cs_cast(label_str));
 #endif
 
 	SET_DSF(dsf_precall);
@@ -707,6 +729,8 @@ return_index:
 	//
 	assert(!IN_DATA_STACK(out));
 
+	assert(SERIES_GET_FLAG(block, SER_MANAGED));
+
 do_at_index:
 	assert(index != END_FLAG && index != THROWN_FLAG);
 	SET_TRASH_SAFE(out);
@@ -736,6 +760,7 @@ do_at_index:
 
 	value = BLK_SKIP(block, index);
 	assert(!THROWN(value));
+	ASSERT_VALUE_MANAGED(value);
 
 	if (Trace_Flags) Trace_Line(block, index, value);
 
@@ -1014,6 +1039,7 @@ return_index:
 	assert(!IS_TRASH(out));
 	assert((index == THROWN_FLAG) == THROWN(out));
 	assert(index != END_FLAG || index >= BLK_LEN(block));
+	assert(VAL_TYPE(out) < REB_MAX); // cheap check
 	return index;
 }
 
@@ -1169,10 +1195,6 @@ finished:
 		else if (VAL_TYPE(val) == type) DS_PUSH(val);
 		// !!! check stack size
 	}
-
-	//block = Copy_Values(DS_Base + start, DSP - start + 1);
-	//DSP = start;
-	//return block;
 }
 
 
@@ -1265,7 +1287,8 @@ finished:
 				if (ANY_BLOCK(value)) {
 					// compose [copy/(orig) (copy)] => [copy/(orig) (copy)]
 					// !!! path and second paren are copies, first paren isn't
-					VAL_SERIES(DS_TOP) = Copy_Block(VAL_SERIES(value), 0);
+					VAL_SERIES(DS_TOP) = Copy_Array_Shallow(VAL_SERIES(value));
+					MANAGE_SERIES(VAL_SERIES(DS_TOP));
 				}
 			}
 		}
@@ -1331,8 +1354,11 @@ finished:
 
 	// Gather arguments:
 
-	arg = DSF_ARG(call, 1);
-	param = VAL_FUNC_PARAM(func, 1);
+	arg = DSF_NUM_ARGS(call) > 0 ? DSF_ARG(call, 1) : END_VALUE;
+	if (VAL_FUNC_NUM_PARAMS(func) > 0)
+		param = VAL_FUNC_PARAM(func, 1);
+	else
+		param = END_VALUE;
 
 	while (index < BLK_LEN(block)) {
 		if (!too_many && IS_END(param)) {

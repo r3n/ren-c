@@ -142,7 +142,7 @@ static int Check_Char_Range(REBVAL *val, REBINT limit)
 
 			if (IS_CONDITIONAL_FALSE(D_OUT)) {
 				// !!! Only copies 3 values (and flaky), see CC#2231
-				Val_Init_Block(D_OUT, Copy_Block_Len(block, i, 3));
+				Val_Init_Block(D_OUT, Copy_Array_At_Max_Shallow(block, i, 3));
 				Trap1_DEAD_END(RE_ASSERT_FAILED, D_OUT);
 			}
 		}
@@ -232,9 +232,10 @@ static int Check_Char_Range(REBVAL *val, REBINT limit)
 
 	// Get context from a word, object (or port);
 	arg = D_ARG(2);
-	if (IS_OBJECT(arg) || IS_MODULE(arg) || IS_PORT(arg))
+	if (ANY_OBJECT(arg))
 		frame = VAL_OBJ_FRAME(arg);
-	else { // word
+	else {
+		assert(ANY_WORD(arg));
 		rel = (VAL_WORD_INDEX(arg) < 0);
 		frame = VAL_WORD_FRAME(arg);
 		if (!frame) Trap1_DEAD_END(RE_NOT_DEFINED, arg);
@@ -259,8 +260,9 @@ static int Check_Char_Range(REBVAL *val, REBINT limit)
 	}
 
 	// Copy block if necessary (/copy):
-	blk = D_REF(3) ? Clone_Block_Value(arg) : VAL_SERIES(arg);
-//	if (D_REF(3)) blk = Copy_Block_Deep(blk, VAL_INDEX(arg), VAL_TAIL(arg), COPY_DEEP);
+	blk = D_REF(3)
+		? Copy_Array_At_Deep_Managed(VAL_SERIES(arg), VAL_INDEX(arg))
+		: VAL_SERIES(arg);
 
 	Val_Init_Block_Index(D_OUT, blk, D_REF(3) ? 0 : VAL_INDEX(arg));
 
@@ -372,7 +374,7 @@ static int Check_Char_Range(REBVAL *val, REBINT limit)
 	}
 	else if (IS_OBJECT(word)) {
 		Assert_Public_Object(word);
-		Val_Init_Block(D_OUT, Copy_Block(VAL_OBJ_FRAME(word), 1));
+		Val_Init_Block(D_OUT, Copy_Array_At_Shallow(VAL_OBJ_FRAME(word), 1));
 	}
 	else *D_OUT = *word; // all other values
 
@@ -795,11 +797,11 @@ static int Check_Char_Range(REBVAL *val, REBINT limit)
 	REBSER *blk;
 	REBVAL *val;
 
-	blk = Make_Block(2);
+	blk = Make_Array(2);
 	Val_Init_Block(out, blk);
-	val = Alloc_Tail_Blk(blk);
+	val = Alloc_Tail_Array(blk);
 	SET_GOB(val, gob);
-	val = Alloc_Tail_Blk(blk);
+	val = Alloc_Tail_Array(blk);
 	VAL_SET(val, REB_PAIR);
 	VAL_PAIR_X(val) = x;
 	VAL_PAIR_Y(val) = y;

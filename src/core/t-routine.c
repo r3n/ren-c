@@ -444,7 +444,7 @@ static REBOOL rebol_type_to_ffi(const REBVAL *out, const REBVAL *elem, REBCNT id
 			default:
 				return FALSE;
 		}
-		temp = Alloc_Tail_Blk(VAL_ROUTINE_FFI_ARG_STRUCTS(out));
+		temp = Alloc_Tail_Array(VAL_ROUTINE_FFI_ARG_STRUCTS(out));
 		SET_NONE(temp);
 	}
 	else if (IS_STRUCT(elem)) {
@@ -461,7 +461,7 @@ static REBOOL rebol_type_to_ffi(const REBVAL *out, const REBVAL *elem, REBCNT id
 		if (idx == 0) {
 			to = BLK_HEAD(VAL_ROUTINE_FFI_ARG_STRUCTS(out));
 		} else {
-			to = Alloc_Tail_Blk(VAL_ROUTINE_FFI_ARG_STRUCTS(out));
+			to = Alloc_Tail_Array(VAL_ROUTINE_FFI_ARG_STRUCTS(out));
 		}
 		Copy_Struct_Val(elem, to); //for callback and return value
 	} else {
@@ -588,7 +588,7 @@ static void *arg_to_ffi(const REBVAL *rot, REBVAL *arg, REBCNT idx, void **ptrs)
 				Copy_Struct(&VAL_ROUTINE_RVALUE(rot), &VAL_STRUCT(arg));
 			} else {
 				if (IS_STRUCT(arg)) {
-					VAL_STRUCT_DATA_BIN(arg) = Copy_Series(VAL_STRUCT_DATA_BIN(arg));
+					VAL_STRUCT_DATA_BIN(arg) = Copy_Sequence(VAL_STRUCT_DATA_BIN(arg));
 				} else {
 					Trap3_DEAD_END(RE_EXPECT_ARG, DSF_LABEL(DSF), BLK_SKIP(rebol_args, idx), arg);
 				}
@@ -740,14 +740,10 @@ static void ffi_to_rebol(REBRIN *rin,
 	}
 
 	/* ser is NULL if the routine takes no arguments */
-	if (ser != NULL) {
-		SAVE_SERIES(ser); //protect from GC
+	if (ser)
 		ffi_args = (void **) SERIES_DATA(ser);
 
-	}
-
 	ffi_args_ptrs = Make_Series(SERIES_TAIL(VAL_ROUTINE_FFI_ARG_TYPES(rot)), sizeof(void *), MKS_NONE); // must be big enough
-	SAVE_SERIES(ffi_args_ptrs);
 
 	if (ROUTINE_GET_FLAG(VAL_ROUTINE_INFO(rot), ROUTINE_VARARGS)) {
 		REBCNT j = 1;
@@ -755,7 +751,7 @@ static void ffi_to_rebol(REBRIN *rin,
 		/* reset SERIES_TAIL */
 		SERIES_TAIL(VAL_ROUTINE_FFI_ARG_TYPES(rot)) = n_fixed + 1;
 
-		VAL_ROUTINE_ALL_ARGS(rot) = Copy_Series(VAL_ROUTINE_FIXED_ARGS(rot));
+		VAL_ROUTINE_ALL_ARGS(rot) = Copy_Sequence(VAL_ROUTINE_FIXED_ARGS(rot));
 
 		for (i = 1, j = 1; i < SERIES_TAIL(VAL_SERIES(varargs)) + 1; i ++, j ++) {
 			REBVAL *reb_arg = VAL_BLK_SKIP(varargs, i - 1);
@@ -774,7 +770,7 @@ static void ffi_to_rebol(REBRIN *rin,
 				if (!IS_BLOCK(reb_type)) {
 					Trap_Arg(reb_type);
 				}
-				v = Alloc_Tail_Blk(VAL_ROUTINE_ALL_ARGS(rot));
+				v = Alloc_Tail_Array(VAL_ROUTINE_ALL_ARGS(rot));
 				Val_Init_Word_Typed(v, REB_WORD, SYM_ELLIPSIS, 0); //FIXME, be clear
 				EXPAND_SERIES_TAIL(VAL_ROUTINE_FFI_ARG_TYPES(rot), 1);
 
@@ -814,10 +810,9 @@ static void ffi_to_rebol(REBRIN *rin,
 			 rvalue,
 			 ffi_args);
 
-	UNSAVE_SERIES(ffi_args_ptrs);
-	if (ser != NULL) {
-		UNSAVE_SERIES(ser);
-	}
+	Free_Series(ffi_args_ptrs);
+
+	if (ser) Free_Series(ser);
 
 	ffi_to_rebol(VAL_ROUTINE_INFO(rot), ((ffi_type**)SERIES_DATA(VAL_ROUTINE_FFI_ARG_TYPES(rot)))[0], rvalue, ret);
 }
@@ -852,7 +847,7 @@ static void process_type_block(const REBVAL *out, REBVAL *blk, REBCNT n)
 			REBVAL* tmp;
 
 			//lock the series to make BLK_HEAD permanent
-			ser = Make_Series(2, sizeof(REBVAL), MKS_BLOCK | MKS_LOCK);
+			ser = Make_Series(2, sizeof(REBVAL), MKS_ARRAY | MKS_LOCK);
 			SAVE_SERIES(ser);
 			tmp = BLK_HEAD(ser);
 
@@ -890,15 +885,16 @@ static void callback_dispatcher(ffi_cif *cif, void *ret, void **args, void *user
 	REBVAL *elem;
 	REBVAL safe;
 
-	ser = Make_Block(1 + cif->nargs);
+	ser = Make_Array(1 + cif->nargs);
+	MANAGE_SERIES(ser);
 	SAVE_SERIES(ser);
 
-	elem = Alloc_Tail_Blk(ser);
+	elem = Alloc_Tail_Array(ser);
 	SET_TYPE(elem, REB_FUNCTION);
 	VAL_FUNC(elem) = RIN_FUNC(rin);
 
 	for (i = 0; i < cif->nargs; i ++) {
-		elem = Alloc_Tail_Blk(ser);
+		elem = Alloc_Tail_Array(ser);
 		switch (cif->arg_types[i]->type) {
 			case FFI_TYPE_UINT8:
 				SET_INTEGER(elem, *(u8*)args[i]);
@@ -1033,18 +1029,18 @@ static void callback_dispatcher(ffi_cif *cif, void *ret, void **args, void *user
 
 #define N_ARGS 8
 
-	VAL_ROUTINE_SPEC(out) = Copy_Series(VAL_SERIES(data));
+	VAL_ROUTINE_SPEC(out) = Copy_Array_Shallow(VAL_SERIES(data));
 	VAL_ROUTINE_FFI_ARG_TYPES(out) =
 		Make_Series(N_ARGS, sizeof(ffi_type*), MKS_NONE);
-	VAL_ROUTINE_ARGS(out) = Make_Block(N_ARGS);
+	VAL_ROUTINE_ARGS(out) = Make_Array(N_ARGS);
 
 	// first word is ignored, see Do_Args in c-do.c
-	temp = Alloc_Tail_Blk(VAL_ROUTINE_ARGS(out));
+	temp = Alloc_Tail_Array(VAL_ROUTINE_ARGS(out));
 	Val_Init_Word_Typed(temp, REB_WORD, 0, 0);
 
-	VAL_ROUTINE_FFI_ARG_STRUCTS(out) = Make_Block(N_ARGS);
+	VAL_ROUTINE_FFI_ARG_STRUCTS(out) = Make_Array(N_ARGS);
 	// reserve for returning struct
-	temp = Alloc_Tail_Blk(VAL_ROUTINE_FFI_ARG_STRUCTS(out));
+	temp = Alloc_Tail_Array(VAL_ROUTINE_FFI_ARG_STRUCTS(out));
 	SET_NONE(temp); // should this be SET_TRASH(), e.g. write-only location?
 
 	VAL_ROUTINE_ABI(out) = FFI_DEFAULT_ABI;
@@ -1060,6 +1056,21 @@ static void callback_dispatcher(ffi_cif *cif, void *ret, void **args, void *user
 	init_type_map();
 
 	blk = VAL_BLK_DATA(data);
+
+	// For all series we created, we must either free them or hand them over
+	// to be managed by the garbage collector.  (They will be invisible to
+	// the GC prior to giving them over via Manage_Series.)  On the plus
+	// side of making them managed up-front, the GC is responsible for
+	// freeing them if there is an error.  On the downside: if any DO
+	// operation were to run, the series would be candidates for GC if
+	// they are not linked somehow into the transitive closure of the roots.
+	//
+	ENSURE_SERIES_MANAGED(VAL_ROUTINE_SPEC(out)); // probably already managed
+	MANAGE_SERIES(VAL_ROUTINE_FFI_ARG_TYPES(out));
+	MANAGE_SERIES(VAL_ROUTINE_ARGS(out));
+	MANAGE_SERIES(VAL_ROUTINE_FFI_ARG_STRUCTS(out));
+	MANAGE_SERIES(VAL_ROUTINE_EXTRA_MEM(out));
+
 	if (type == REB_ROUTINE) {
 		REBINT fn_idx = 0;
 		REBVAL lib;
@@ -1101,14 +1112,12 @@ static void callback_dispatcher(ffi_cif *cif, void *ret, void **args, void *user
 			if (!VAL_ROUTINE_LIB(out)) {
 				Trap_Arg_DEAD_END(&lib);
 				//RL_Print("lib is not open\n");
-				ret = FALSE;
 			}
 			TERM_SERIES(VAL_SERIES(&blk[fn_idx]));
 			func = OS_FIND_FUNCTION(LIB_FD(VAL_ROUTINE_LIB(out)), s_cast(VAL_DATA(&blk[fn_idx])));
 			if (!func) {
 				Trap_Arg_DEAD_END(&blk[fn_idx]);
 				//printf("Couldn't find function: %s\n", VAL_DATA(&blk[2]));
-				ret = FALSE;
 			} else {
 				VAL_ROUTINE_FUNCPTR(out) = func;
 			}
@@ -1150,9 +1159,9 @@ static void callback_dispatcher(ffi_cif *cif, void *ret, void **args, void *user
 						}
 						ROUTINE_SET_FLAG(VAL_ROUTINE_INFO(out), ROUTINE_VARARGS);
 						//Change the argument list to be a block
-						VAL_ROUTINE_FIXED_ARGS(out) = Copy_Series(VAL_ROUTINE_ARGS(out));
+						VAL_ROUTINE_FIXED_ARGS(out) = Copy_Sequence(VAL_ROUTINE_ARGS(out));
 						Remove_Series(VAL_ROUTINE_ARGS(out), 1, SERIES_TAIL(VAL_ROUTINE_ARGS(out)));
-						v = Alloc_Tail_Blk(VAL_ROUTINE_ARGS(out));
+						v = Alloc_Tail_Array(VAL_ROUTINE_ARGS(out));
 						Val_Init_Word_Typed(v, REB_WORD, SYM_VARARGS, TYPESET(REB_BLOCK));
 					} else {
 						REBVAL *v = NULL;
@@ -1160,7 +1169,7 @@ static void callback_dispatcher(ffi_cif *cif, void *ret, void **args, void *user
 							//... has to be the last argument
 							Trap_Arg_DEAD_END(blk);
 						}
-						v = Alloc_Tail_Blk(VAL_ROUTINE_ARGS(out));
+						v = Alloc_Tail_Array(VAL_ROUTINE_ARGS(out));
 						Val_Init_Word_Typed(v, REB_WORD, VAL_WORD_SYM(blk), 0);
 						EXPAND_SERIES_TAIL(VAL_ROUTINE_FFI_ARG_TYPES(out), 1);
 
@@ -1333,7 +1342,9 @@ static void callback_dispatcher(ffi_cif *cif, void *ret, void **args, void *user
 				REBINT n = VAL_WORD_CANON(arg); // zero on error
 				switch (n) {
 					case SYM_SPEC:
-						Val_Init_Block(ret, Clone_Block(VAL_ROUTINE_SPEC(val)));
+						Val_Init_Block(
+							ret, Copy_Array_Deep_Managed(VAL_ROUTINE_SPEC(val))
+						);
 						Unbind_Values_Deep(VAL_BLK_HEAD(val));
 						break;
 					case SYM_ADDR:
@@ -1380,7 +1391,9 @@ static void callback_dispatcher(ffi_cif *cif, void *ret, void **args, void *user
 				REBINT n = VAL_WORD_CANON(arg); // zero on error
 				switch (n) {
 					case SYM_SPEC:
-						Val_Init_Block(ret, Clone_Block(VAL_ROUTINE_SPEC(val)));
+						Val_Init_Block(
+							ret, Copy_Array_Deep_Managed(VAL_ROUTINE_SPEC(val))
+						);
 						Unbind_Values_Deep(VAL_BLK_HEAD(val));
 						break;
 					case SYM_ADDR:

@@ -255,6 +255,9 @@ extern int Do_Callback(REBSER *obj, u32 name, RXIARG *args, RXIARG *result);
 			OS_EXIT(status);
 			DEAD_END;
 		}
+
+		Trap_Thrown(&out);
+		DEAD_END;
 	}
 
 	DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
@@ -323,12 +326,12 @@ extern int Do_Callback(REBSER *obj, u32 name, RXIARG *args, RXIARG *result);
 	value = BLK_SKIP(Sys_Context, SYS_CTX_BOOT_EXTS);
 	if (IS_BLOCK(value)) ser = VAL_SERIES(value);
 	else {
-		ser = Make_Block(2);
+		ser = Make_Array(2);
 		Val_Init_Block(value, ser);
 	}
-	value = Alloc_Tail_Blk(ser);
+	value = Alloc_Tail_Array(ser);
 	Val_Init_Binary(value, Copy_Bytes(source, -1)); // UTF-8
-	value = Alloc_Tail_Blk(ser);
+	value = Alloc_Tail_Array(ser);
 	SET_HANDLE_CODE(value, cast(CFUNC*, call));
 
 	return Extension_Lib();
@@ -735,7 +738,10 @@ extern int Do_Callback(REBSER *obj, u32 name, RXIARG *args, RXIARG *result);
 **
 */ RL_API void *RL_Make_Block(u32 size)
 /*
-**	Allocate a new block.
+**	Allocate a series suitable for storing Rebol values.  This series
+**	can be used as a backing store for a BLOCK!, but also for any
+**	other Rebol Array type (PAREN!, PATH!, GET-PATH!, SET-PATH!, or
+**	LIT-PATH!).
 **
 **	Returns:
 **		A pointer to a block series.
@@ -751,7 +757,7 @@ extern int Do_Callback(REBSER *obj, u32 name, RXIARG *args, RXIARG *result);
 **
 ***********************************************************************/
 {
-	return Make_Block(size);
+	return Make_Array(size);
 }
 
 
@@ -777,7 +783,13 @@ extern int Do_Callback(REBSER *obj, u32 name, RXIARG *args, RXIARG *result);
 **
 ***********************************************************************/
 {
-	return unicode ? Make_Unicode(size) : Make_Binary(size);
+	REBSER *result = unicode ? Make_Unicode(size) : Make_Binary(size);
+
+	// !!! Assume client does not have Free_Series() or MANAGE_SERIES()
+	// APIs, so the series we give back must be managed.  But how can
+	// we be sure they get what usage they needed before the GC happens?
+	MANAGE_SERIES(result);
+	return result;
 }
 
 

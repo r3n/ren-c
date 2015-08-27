@@ -63,6 +63,10 @@ PVAR REB_OPTS *Reb_Opts;
 	PVAR REBOOL PG_Legacy;			// Need to check for old operation modes
 #endif
 
+// A REB_END value, which comes in handy if you ever need the address of
+// an end for a noop to pass to a routine expecting an end-terminated series
+PVAR REBVAL PG_End_Val;
+
 // This signal word should be thread-local, but it will not work
 // when implemented that way. Needs research!!!!
 PVAR REBCNT	Eval_Signals;	// Signal flags
@@ -86,10 +90,22 @@ TVAR REBOOL	GC_Active;		// TRUE when recycle is enabled (set by RECYCLE func)
 TVAR REBSER	*GC_Protect;	// A stack of protected series (removed by pop)
 PVAR REBSER	*GC_Mark_Stack; // Series pending to mark their reachables as live
 TVAR REBSER	*GC_Series;		// An array of protected series (removed by address)
-TVAR REBSER	**GC_Infants;	// A small list of last N series created (nursery)
-TVAR REBINT	GC_Last_Infant;	// Index to last infant above (circular)
 TVAR REBFLG GC_Stay_Dirty;  // Do not free memory, fill it with 0xBB
 TVAR REBSER **Prior_Expand;	// Track prior series expansions (acceleration)
+
+#if !defined(NDEBUG)
+	// In the debug build, the REBSERs can be linked as a doubly linked
+	// list so that we can keep track of the series that are manually
+	// memory managed.  That is to say: all the series that have been
+	// allocated with Make_Series() but have not been handed to the
+	// garbage collector via MANAGE_SERIES().
+	//
+	// These manually-managed series must either be freed with Free_Series()
+	// or handed over to the GC at certain synchronized points, else they
+	// would represent a memory leak in the release build.
+
+	TVAR REBSER *GC_Manuals;	// Manually memory managed (not by GC)
+#endif
 
 TVAR REBUPT Stack_Limit;	// Limit address for CPU stack.
 

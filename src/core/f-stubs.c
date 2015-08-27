@@ -443,7 +443,9 @@
 /*
 ***********************************************************************/
 {
-	return CLONE_OBJECT(VAL_OBJ_FRAME(Get_System(SYS_STANDARD, index)));
+	return Copy_Array_Shallow(
+		VAL_OBJ_FRAME(Get_System(SYS_STANDARD, index))
+	);
 }
 
 
@@ -470,6 +472,7 @@
 **
 ***********************************************************************/
 {
+	ENSURE_SERIES_MANAGED(series);
 
 	VAL_SET(value, type);
 	VAL_SERIES(value) = series;
@@ -498,7 +501,7 @@
 /*
 ***********************************************************************/
 {
-	ASSERT_FRAME(series);
+	ENSURE_FRAME_MANAGED(series);
 
 	VAL_SET(value, REB_OBJECT);
 	VAL_OBJ_FRAME(value) = series;
@@ -754,7 +757,7 @@
 
 	len = VAL_LEN(value);
 	wide = SERIES_WIDE(src);
-	ser = Make_Series(len, wide, IS_BLOCK_SERIES(src) ? MKS_BLOCK : MKS_NONE);
+	ser = Make_Series(len, wide, Is_Array_Series(src) ? MKS_ARRAY : MKS_NONE);
 
 	memcpy(ser->data, src->data + (VAL_INDEX(value) * wide), len * wide);
 	ser->tail = len;
@@ -778,7 +781,7 @@
 	for (; NOT_END(val); val++) if (IS_SET_WORD(val)) cnt++;
 	val = val2;
 
-	ser = Make_Block(cnt);
+	ser = Make_Array(cnt);
 	val2 = BLK_HEAD(ser);
 	for (; NOT_END(val); val++) {
 		if (IS_SET_WORD(val))

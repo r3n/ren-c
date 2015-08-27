@@ -168,9 +168,9 @@ x*/	void RXI_To_Block(RXIFRM *frm, REBVAL *out) {
 	REBVAL *val;
 	REBCNT len;
 
-	blk = Make_Block(len = RXA_COUNT(frm));
+	blk = Make_Array(len = RXA_COUNT(frm));
 	for (n = 1; n <= len; n++) {
-		val = Alloc_Tail_Blk(blk);
+		val = Alloc_Tail_Array(blk);
 		RXI_To_Value(val, frm->args[n], RXA_TYPE(frm, n));
 	}
 	Val_Init_Block(out, blk);
@@ -324,7 +324,8 @@ typedef REBYTE *(INFO_FUNC)(REBINT opts, void *lib);
 
 		if (!IS_FILE(val)) Trap_Arg_DEAD_END(val);
 
-		name = Val_Str_To_OS(val);
+		// !!! By passing NULL we don't get backing series to protect!
+		name = Val_Str_To_OS_Managed(NULL, val);
 
 		// Try to load the DLL file:
 		if (!(dll = OS_OPEN_LIBRARY(name, &error))) {
@@ -362,7 +363,11 @@ typedef REBYTE *(INFO_FUNC)(REBINT opts, void *lib);
 
 	// Extension return: dll, info, filename
 	obj = VAL_OBJ_FRAME(Get_System(SYS_STANDARD, STD_EXTENSION));
-	obj = CLONE_OBJECT(obj);
+	obj = Copy_Array_Shallow(obj);
+
+	// Shallow copy means we reuse STD_EXTENSION's word list, which is
+	// already managed.  We manage our copy to match.
+	MANAGE_SERIES(obj);
 	Val_Init_Object(D_OUT, obj);
 
 	// Set extension fields needed:
@@ -405,7 +410,8 @@ typedef REBYTE *(INFO_FUNC)(REBINT opts, void *lib);
 	) Trap1(RE_BAD_EXTENSION, def);
 
 	// make command! [[arg-spec] handle cmd-index]
-	VAL_FUNC_BODY(value) = Copy_Block_Len(VAL_SERIES(def), 1, 2);
+	VAL_FUNC_BODY(value) = Copy_Array_At_Max_Shallow(VAL_SERIES(def), 1, 2);
+	MANAGE_SERIES(VAL_FUNC_BODY(value));
 
 	// Check for valid command arg datatypes:
 	args++; // skip self

@@ -46,6 +46,31 @@ offset?: :offset-of
 sign?: :sign-of
 
 
+; The distinctions between Rebol's types is important to articulate.
+; So using the term "BLOCK" generically to mean any composite
+; series--as well as specificially the bracketed block type--is a
+; recipe for confusion.
+;
+; Importantly: it also makes it difficult to get one's bearings
+; in the C sources.  It's hard to find where exactly the bits are in
+; play that make something a bracketed block...or if that's what you
+; are dealing with at all.  Hence some unique name for the typeclass
+; is needed.
+;
+; The search for a new word for the ANY-BLOCK! superclass went on for
+; a long time.  LIST! was looking like it might have to be the winner,
+; until ARRAY! was deemed more fitting.  The notion that a "Rebol
+; Array" contains "Rebol Values" that can be elements of any type
+; (including other arrays) separates it from the other series classes
+; which can only contain one type of element (codepoints for strings,
+; bytes for binaries, numbers for vector).  In the future those may
+; have more unification under a typeclass of their own, but ARRAY!
+; is for BLOCK!, PAREN!, PATH!, GET-PATH!, SET-PATH!, and LIT-PATH!
+
+any-block!: :any-array!
+any-block?: :any-array?
+
+
 ; !!! These have not been renamed yet, because of questions over what they
 ; actually return.  CONTEXT-OF was a candidate, however the current behavior
 ; of just returning TRUE from BIND? when the word is linked to a function

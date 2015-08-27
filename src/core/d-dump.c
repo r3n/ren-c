@@ -53,7 +53,7 @@
 		SERIES_REST(series),
 		SERIES_FLAGS(series)
 	);
-	if (IS_BLOCK_SERIES(series)) {
+	if (Is_Array_Series(series)) {
 		Dump_Values(BLK_HEAD(series), SERIES_TAIL(series));
 	} else
 		Dump_Bytes(series->data, (SERIES_TAIL(series)+1) * SERIES_WIDE(series));
@@ -179,11 +179,9 @@
 	nums[10] = GC_Ballast;
 	nums[11] = GC_Disabled;
 	nums[12] = SERIES_TAIL(GC_Protect);
-	nums[13] = GC_Last_Infant;
+	nums[13] = 0; // Was GC_Last_Infant
 
-	DISABLE_GC;
 	for (n = 0; n < 14; n++) Debug_Fmt(cs_cast(BOOT_STR(RS_DUMP, n)), nums[n]);
-	ENABLE_GC;
 }
 
 

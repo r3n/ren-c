@@ -79,6 +79,7 @@ typedef struct Reb_Series REBSER;
 
 // Clear type identifier:
 #define SET_END(v)			VAL_SET(v, 0)
+#define END_VALUE			&PG_End_Val
 
 // Value option flags:
 enum {
@@ -464,6 +465,14 @@ typedef struct Reb_Tuple {
 #if !defined(NDEBUG)
 	REBINT *guard; // intentionally alloc'd and freed for use by Panic_Series
 #endif
+
+// These links are used to make a list in the debug build to track the series
+// which have not been handed over to MANAGE_SERIES(), and thus can represent
+// a leak in the release build.  (See GC_Manuals declaration for details.)
+#if !defined(NDEBUG)
+	struct Reb_Series *next;
+	struct Reb_Series *prev;
+#endif
 };
 
 #define SERIES_TAIL(s)	 ((s)->tail)
@@ -536,8 +545,8 @@ enum {
 	SER_KEEP		= 1 << 1,	// don't garbage collect even if unreferenced
 	SER_LOCK		= 1 << 2,	// size is locked (do not expand it)
 	SER_EXTERNAL	= 1 << 3,	// ->data is external, don't free() on GC
-	SER_FLAG_4		= 1 << 4,	// UNUSED: was SER_FREE, but free if wide = 0
-	SER_BLOCK		= 1 << 5,	// is sizeof(REBVAL) wide and has valid values
+	SER_MANAGED		= 1 << 4,	// series is managed by garbage collection
+	SER_ARRAY		= 1 << 5,	// is sizeof(REBVAL) wide and has valid values
 	SER_PROT		= 1 << 6,	// protected from modification
 	SER_POWER_OF_2	= 1 << 7	// true alloc size is rounded to power of 2
 };
@@ -546,11 +555,10 @@ enum {
 #define SERIES_CLR_FLAG(s, f) cast(void, (SERIES_FLAGS(s) &= ~((f) << 8)))
 #define SERIES_GET_FLAG(s, f) (0 != (SERIES_FLAGS(s) & ((f) << 8)))
 
-#define	IS_FREEABLE(s)    !SERIES_GET_FLAG(s, SER_MARK|SER_KEEP)
 #define KEEP_SERIES(s,l)  do {SERIES_SET_FLAG(s, SER_KEEP); LABEL_SERIES(s,l);} while(0)
 #define LOCK_SERIES(s)    SERIES_SET_FLAG(s, SER_LOCK)
 #define IS_LOCK_SERIES(s) SERIES_GET_FLAG(s, SER_LOCK)
-#define IS_BLOCK_SERIES(s) SERIES_GET_FLAG((s), SER_BLOCK)
+#define Is_Array_Series(s) SERIES_GET_FLAG((s), SER_ARRAY)
 #define PROTECT_SERIES(s) SERIES_SET_FLAG(s, SER_PROT)
 #define UNPROTECT_SERIES(s)  SERIES_CLR_FLAG(s, SER_PROT)
 #define IS_PROTECT_SERIES(s) SERIES_GET_FLAG(s, SER_PROT)
@@ -574,8 +582,8 @@ enum {
 #else
 	#define ASSERT_SERIES(s) \
 		do { \
-			if (IS_BLOCK_SERIES(series)) \
-				ASSERT_BLK(series); \
+			if (Is_Array_Series(series)) \
+				ASSERT_ARRAY(series); \
 			else \
 				ASSERT_SERIES_TERM(series); \
 		} while (0)
@@ -622,7 +630,7 @@ struct Reb_Position
 // and sometimes were not.  They could be done without a function call, but
 // that would then make them unsafe to use with side-effects:
 //
-//     Val_Init_Block(Alloc_Tail_Blk(parent), child);
+//     Val_Init_Block(Alloc_Tail_Array(parent), child);
 //
 // The repetitition of the value parameter would lead to the allocation
 // running multiple times.  Hence we Caps_Words_With_Underscore to name
@@ -649,6 +657,23 @@ struct Reb_Position
 
 #define Val_Init_Block(v,s) \
 	Val_Init_Block_Index((v), (s), 0)
+
+
+#define Copy_Array_Shallow(a) \
+	Copy_Array_At_Shallow((a), 0)
+
+#define Copy_Array_Deep_Managed(a) \
+	Copy_Array_At_Deep_Managed((a), 0)
+
+#define Copy_Array_At_Shallow(a,i) \
+	Copy_Array_At_Extra_Shallow((a), (i), 0)
+
+#define Copy_Array_Extra_Shallow(a,e) \
+	Copy_Array_At_Extra_Shallow((a), 0, (e))
+
+
+#define Append_Value(a,v) \
+	(*Alloc_Tail_Array((a)) = *(v), NOOP)
 
 
 /***********************************************************************
@@ -845,11 +870,11 @@ struct Reb_Position
 #define IS_EMPTY(v)		(VAL_INDEX(v) >= VAL_TAIL(v))
 
 #ifdef NDEBUG
-	#define ASSERT_BLK(s) cast(void, 0)
-	#define ASSERT_TYPED_WORDS_BLOCK(s) cast(void, 0)
+	#define ASSERT_ARRAY(s) cast(void, 0)
+	#define ASSERT_TYPED_WORDS_ARRAY(s) cast(void, 0)
 #else
-	#define ASSERT_BLK(s) Assert_Blk_Core(s, FALSE)
-	#define ASSERT_TYPED_WORDS_BLOCK(s) Assert_Blk_Core(s, TRUE)
+	#define ASSERT_ARRAY(s) Assert_Array_Core(s, FALSE)
+	#define ASSERT_TYPED_WORDS_ARRAY(s) Assert_Array_Core(s, TRUE)
 #endif
 
 
@@ -1033,7 +1058,6 @@ struct Reb_Object {
 #define VAL_OBJ_WORDS(v)	FRM_WORD_SERIES((v)->data.object.frame)
 #define VAL_OBJ_WORD(v,n)	BLK_SKIP(VAL_OBJ_WORDS(v), (n))
 //#define VAL_OBJ_SPEC(v)		((v)->data.object.spec)
-#define	CLONE_OBJECT(c)		Copy_Series(c)
 
 #ifdef NDEBUG
 	#define ASSERT_FRAME(f) cast(void, 0)
@@ -1234,7 +1258,7 @@ struct Reb_Function {
 	BLK_SKIP(VAL_FUNC_WORDS(v), FIRST_PARAM_INDEX + (p) - 1)
 
 #define VAL_FUNC_NUM_PARAMS(v) \
-	(SERIES_TAIL(VAL_FUNC_WORDS(v)) - FIRST_PARAM_INDEX - 1)
+	(SERIES_TAIL(VAL_FUNC_WORDS(v)) - FIRST_PARAM_INDEX)
 
 #define VAL_FUNC_RETURN_WORD(v) \
 	coming@soon

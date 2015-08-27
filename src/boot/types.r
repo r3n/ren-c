@@ -55,16 +55,16 @@ url         string      +		f*      file	*		[series string]
 tag         string      +		+       *		*		[series string]
 
 bitset      bitset      *		*       *		*		-
-image       image       +		+       *		*		series
-vector      vector      -		-       *		*		series
+image       image       +		+       *		*		[series]
+vector      vector      -		-       *		*		[series]
 
-block       block       *		f*      *		*		[series block]
-paren       block       *		f*      *		*		[series block]
+block       array       *		f*      *		*		[series array]
+paren       array       *		f*      *		*		[series array]
 
-path        block       *		*       *		*		[series block path]
-set-path    block       *		*       *		*		[series block path]
-get-path    block       *		*       *		*		[series block path]
-lit-path    block       *		*       *		*		[series block path]
+path        array       *		*       *		*		[series path array]
+set-path    array       *		*       *		*		[series path array]
+get-path    array       *		*       *		*		[series path array]
+lit-path    array       *		*       *		*		[series path array]
 
 map         map         +		f*      *		*		-
 

@@ -132,7 +132,7 @@ static REBOOL get_scalar(const REBSTU *stu,
 	for (i = 0; i < SERIES_TAIL(stu->fields); i ++, field ++) {
 		if (VAL_WORD_CANON(word) == VAL_SYM_CANON(BLK_SKIP(PG_Word_Table.series, field->sym))) {
 			if (field->array) {
-				REBSER *ser = Make_Block(field->dimension);
+				REBSER *ser = Make_Array(field->dimension);
 				REBCNT n = 0;
 				for (n = 0; n < field->dimension; n ++) {
 					REBVAL elem;
@@ -169,23 +169,30 @@ static REBOOL get_scalar(const REBSTU *stu,
 **
 ***********************************************************************/
 {
-	REBSER *ser = Make_Block(10);
+	REBSER *ser = Make_Array(10);
 	struct Struct_Field *field = (struct Struct_Field*) SERIES_DATA(stu->fields);
 	REBCNT i;
+
+	// We are building a recursive structure.  So if we did not hand each
+	// sub-series over to the GC then a single Free_Series() would not know
+	// how to free them all.  There would have to be a specialized walk to
+	// free the resulting structure.  Hence, don't invoke the GC until the
+	// root series being returned is done being used or is safe from GC!
+	MANAGE_SERIES(ser);
 
 	for(i = 0; i < SERIES_TAIL(stu->fields); i ++, field ++) {
 		REBVAL *val = NULL;
 		REBVAL *type_blk = NULL;
 
 		/* required field name */
-		val = Alloc_Tail_Blk(ser);
+		val = Alloc_Tail_Array(ser);
 		Val_Init_Word_Unbound(val, REB_SET_WORD, field->sym);
 
 		/* required type */
-		type_blk = Alloc_Tail_Blk(ser);
-		Val_Init_Block(type_blk, Make_Block(1));
+		type_blk = Alloc_Tail_Array(ser);
+		Val_Init_Block(type_blk, Make_Array(1));
 
-		val = Alloc_Tail_Blk(VAL_SERIES(type_blk));
+		val = Alloc_Tail_Array(VAL_SERIES(type_blk));
 		if (field->type == STRUCT_TYPE_STRUCT) {
 			REBVAL *nested = NULL;
 			DS_PUSH_NONE;
@@ -193,7 +200,7 @@ static REBOOL get_scalar(const REBSTU *stu,
 
 			Val_Init_Word_Unbound(val, REB_WORD, SYM_STRUCT_TYPE);
 			get_scalar(stu, field, 0, nested);
-			val = Alloc_Tail_Blk(VAL_SERIES(type_blk));
+			val = Alloc_Tail_Array(VAL_SERIES(type_blk));
 			Val_Init_Block(val, Struct_To_Block(&VAL_STRUCT(nested)));
 
 			DS_DROP;
@@ -202,27 +209,27 @@ static REBOOL get_scalar(const REBSTU *stu,
 
 		/* optional dimension */
 		if (field->dimension > 1) {
-			REBSER *dim = Make_Block(1);
+			REBSER *dim = Make_Array(1);
 			REBVAL *dv = NULL;
-			val = Alloc_Tail_Blk(VAL_SERIES(type_blk));
+			val = Alloc_Tail_Array(VAL_SERIES(type_blk));
 			Val_Init_Block(val, dim);
 
-			dv = Alloc_Tail_Blk(dim);
+			dv = Alloc_Tail_Array(dim);
 			SET_INTEGER(dv, field->dimension);
 		}
 
 		/* optional initialization */
 		if (field->dimension > 1) {
-			REBSER *dim = Make_Block(1);
+			REBSER *dim = Make_Array(1);
 			REBCNT n = 0;
-			val = Alloc_Tail_Blk(ser);
+			val = Alloc_Tail_Array(ser);
 			Val_Init_Block(val, dim);
 			for (n = 0; n < field->dimension; n ++) {
-				REBVAL *dv = Alloc_Tail_Blk(dim);
+				REBVAL *dv = Alloc_Tail_Array(dim);
 				get_scalar(stu, field, n, dv);
 			}
 		} else {
-			val = Alloc_Tail_Blk(ser);
+			val = Alloc_Tail_Array(ser);
 			get_scalar(stu, field, 0, val);
 		}
 	}
@@ -464,7 +471,7 @@ static void set_ext_storage (REBVAL *out, REBINT raw_size, REBUPT raw_addr)
 	ser = Make_Series(
 		SERIES_LEN(data_ser), // counts terminator, though a "LEN" shouldn't!
 		SERIES_WIDE(data_ser),
-		IS_BLOCK_SERIES(data_ser) ? (MKS_BLOCK | MKS_EXTERNAL) : MKS_EXTERNAL
+		Is_Array_Series(data_ser) ? (MKS_ARRAY | MKS_EXTERNAL) : MKS_EXTERNAL
 	);
 
 	ser->data = (REBYTE*)raw_addr;
@@ -609,6 +616,7 @@ static REBOOL parse_field_type(struct Struct_Field *field, REBVAL *spec, REBVAL 
 	VAL_STRUCT_FIELDS(out) = Make_Series(
 		max_fields, sizeof(struct Struct_Field), MKS_NONE
 	);
+	MANAGE_SERIES(VAL_STRUCT_FIELDS(out));
 
 	if (IS_BLOCK(data)) {
 		//Reduce_Block_No_Set(VAL_SERIES(data), 0, NULL);
@@ -623,7 +631,7 @@ static REBOOL parse_field_type(struct Struct_Field *field, REBVAL *spec, REBVAL 
 		REBUPT raw_addr = 0;
 		REBCNT alignment = 0;
 
-		VAL_STRUCT_SPEC(out) = Copy_Series(VAL_SERIES(data));
+		VAL_STRUCT_SPEC(out) = Copy_Array_Shallow(VAL_SERIES(data));
 		VAL_STRUCT_DATA(out) = Make_Series(
 			1, sizeof(struct Struct_Data), MKS_NONE
 		);
@@ -631,6 +639,12 @@ static REBOOL parse_field_type(struct Struct_Field *field, REBVAL *spec, REBVAL 
 
 		VAL_STRUCT_DATA_BIN(out) = Make_Series(max_fields << 2, 1, MKS_NONE);
 		VAL_STRUCT_OFFSET(out) = 0;
+
+		// We tell the GC to manage this series, but it will not cause a
+		// synchronous garbage collect.  Still, when's the right time?
+		ENSURE_SERIES_MANAGED(VAL_STRUCT_SPEC(out));
+		MANAGE_SERIES(VAL_STRUCT_DATA(out));
+		MANAGE_SERIES(VAL_STRUCT_DATA_BIN(out));
 
 		/* set type early such that GC will handle it correctly, i.e, not collect series in the struct */
 		SET_TYPE(out, REB_STRUCT);
@@ -774,7 +788,20 @@ static REBOOL parse_field_type(struct Struct_Field *field, REBVAL *spec, REBVAL 
 
 		if (raw_addr) {
 			set_ext_storage(out, raw_size, raw_addr);
+			// The above creates VAL_STRUCT_DATA_BIN and it's not managed
+			MANAGE_SERIES(VAL_STRUCT_DATA_BIN(out));
 		}
+		else {
+			// Might be already managed?  (It's better if we're certain...)
+			ENSURE_SERIES_MANAGED(VAL_STRUCT_DATA_BIN(out));
+		}
+
+		// For every series we create, we must either free it or hand it over
+		// to the GC to manage.
+
+		ENSURE_SERIES_MANAGED(VAL_STRUCT_FIELDS(out)); // managed already?
+		ENSURE_SERIES_MANAGED(VAL_STRUCT_SPEC(out)); // managed already?
+		ENSURE_SERIES_MANAGED(VAL_STRUCT_DATA(out)); // managed already?
 
 		return TRUE;
 	}
@@ -883,8 +910,8 @@ failed:
 	dst->fields = src->fields;
 
 	/* writable field */
-	dst->data = Copy_Series(src->data);
-	STRUCT_DATA_BIN(dst) = Copy_Series(STRUCT_DATA_BIN(src));
+	dst->data = Copy_Sequence(src->data);
+	STRUCT_DATA_BIN(dst) = Copy_Sequence(STRUCT_DATA_BIN(src));
 }
 
 /***********************************************************************
@@ -1035,10 +1062,12 @@ static void init_fields(REBVAL *ret, REBVAL *spec)
 				REBINT n = VAL_WORD_CANON(arg); // zero on error
 				switch (n) {
 					case SYM_VALUES:
-						Val_Init_Binary(ret, Copy_Series_Part(VAL_STRUCT_DATA_BIN(val), VAL_STRUCT_OFFSET(val), VAL_STRUCT_LEN(val)));
+						Val_Init_Binary(ret, Copy_Sequence_At_Len(VAL_STRUCT_DATA_BIN(val), VAL_STRUCT_OFFSET(val), VAL_STRUCT_LEN(val)));
 						break;
 					case SYM_SPEC:
-						Val_Init_Block(ret, Clone_Block(VAL_STRUCT_SPEC(val)));
+						Val_Init_Block(
+							ret, Copy_Array_Deep_Managed(VAL_STRUCT_SPEC(val))
+						);
 						Unbind_Values_Deep(VAL_BLK_HEAD(val));
 						break;
 					case SYM_ADDR:

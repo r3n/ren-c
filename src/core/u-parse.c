@@ -655,12 +655,13 @@ bad_target:
 	}
 
 	// Copy the value into its own block:
-	newparse.series = Make_Block(1);
+	newparse.series = Make_Array(1);
 	SAVE_SERIES(newparse.series);
 	Append_Value(newparse.series, &value);
 	newparse.type = REB_BLOCK;
 	newparse.flags = parse->flags;
 	newparse.result = 0;
+	newparse.out = parse->out;
 
 	n = (Parse_Next_Block(&newparse, 0, item, 0) != NOT_FOUND) ? index : NOT_FOUND;
 	UNSAVE_SERIES(newparse.series);
@@ -1136,7 +1137,7 @@ post:
 						&temp,
 						parse->type,
 						IS_BLOCK_INPUT(parse)
-							? Copy_Block_Len(series, begin, count)
+							? Copy_Array_At_Max_Shallow(series, begin, count)
 							: Copy_String(series, begin, count) // condenses;
 					);
 					Set_Var(word, &temp);
@@ -1170,7 +1171,7 @@ post:
 						parse->out,
 						parse->type,
 						IS_BLOCK_INPUT(parse)
-							? Copy_Block_Len(series, begin, count)
+							? Copy_Array_At_Max_Shallow(series, begin, count)
 							: Copy_String(series, begin, count) // condenses
 					);
 
@@ -1197,7 +1198,7 @@ post:
 					if (IS_UNSET(item)) Trap1_DEAD_END(RE_NO_VALUE, rules-1);
 					if (IS_END(item)) goto bad_end;
 					if (IS_BLOCK_INPUT(parse)) {
-						index = Modify_Block(GET_FLAG(flags, PF_CHANGE) ? A_CHANGE : A_INSERT,
+						index = Modify_Array(GET_FLAG(flags, PF_CHANGE) ? A_CHANGE : A_INSERT,
 								series, begin, item, cmd, count, 1);
 						if (IS_LIT_WORD(item)) SET_TYPE(BLK_SKIP(series, index-1), REB_WORD);
 					}
@@ -1260,12 +1261,12 @@ bad_end:
 	// case-insensitive bytes for ASCII characters
 	if (IS_BINARY(input)) opts |= PF_CASE;
 
+	assert(IS_TRASH(D_OUT));
+
 	parse.series = VAL_SERIES(input);
 	parse.type = VAL_TYPE(input);
 	parse.flags = cased ? AM_FIND_CASE : 0;
 	parse.result = 0;
-
-	assert(IS_TRASH(D_OUT));
 	parse.out = D_OUT;
 
 	PUSH_TRAP(&error, &state);

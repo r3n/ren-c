@@ -66,7 +66,7 @@
 		name = Copy_OS_Str(file.special.file.path, len);
 		if (GET_FLAG(file.modes, RFM_DIR))
 			SET_ANY_CHAR(name, name->tail-1, '/');
-		Val_Init_File(Alloc_Tail_Blk(files), name);
+		Val_Init_File(Alloc_Tail_Array(files), name);
 	}
 
 	if (result < 0 && dir->error != -RFE_OPEN_FAIL
@@ -202,16 +202,26 @@
 		args = Find_Refines(call_, ALL_READ_REFS);
 		if (!IS_BLOCK(state)) {		// !!! ignores /SKIP and /PART, for now
 			Init_Dir_Path(&dir, path, 1, POL_READ);
-			Val_Init_Block(state, Make_Block(7)); // initial guess
+			Val_Init_Block(state, Make_Array(7)); // initial guess
 			result = Read_Dir(&dir, VAL_SERIES(state));
 			///OS_FREE(dir.file.path);
 			if (result < 0) Trap_Port_DEAD_END(RE_CANNOT_OPEN, port, dir.error);
 			*D_OUT = *state;
 			SET_NONE(state);
-		} else {
-			len = VAL_BLK_LEN(state);
-			// !!? Why does this need to copy the block??
-			Val_Init_Block(D_OUT, Copy_Block_Values(VAL_SERIES(state), 0, len, TS_STRING));
+		}
+		else {
+			// !!! This copies the strings in the block, shallowly.  What is
+			// the purpose of doing this?  Why copy at all?
+			Val_Init_Block(
+				D_OUT,
+				Copy_Array_Core_Managed(
+					VAL_SERIES(state),
+					0,
+					VAL_BLK_LEN(state),
+					FALSE, // !deep
+					TS_STRING
+				)
+			);
 		}
 		break;
 
@@ -223,7 +233,10 @@ create:
 		result = OS_DO_DEVICE(&dir, RDC_CREATE);
 		///OS_FREE(dir.file.path);
 		if (result < 0) Trap1_DEAD_END(RE_NO_CREATE, path);
-		if (action == A_CREATE) return R_ARG2;
+		if (action == A_CREATE) {
+			// !!! Used to return R_ARG2, but create is single arity.  :-/
+			return R_ARG1;
+		}
 		SET_NONE(state);
 		break;
 
@@ -251,7 +264,8 @@ create:
 		result = OS_DO_DEVICE(&dir, RDC_DELETE);
 		///OS_FREE(dir.file.path);
 		if (result < 0) Trap1_DEAD_END(RE_NO_DELETE, path);
-		return R_ARG2;
+		// !!! Returned R_ARG2 before, but there is no second argument :-/
+		return R_ARG1;
 
 	case A_OPEN:
 		// !! If open fails, what if user does a READ w/o checking for error?
@@ -260,7 +274,7 @@ create:
 		args = Find_Refines(call_, ALL_OPEN_REFS);
 		if (args & AM_OPEN_NEW) goto create;
 		//if (args & ~AM_OPEN_READ) Trap1_DEAD_END(RE_INVALID_SPEC, path);
-		Val_Init_Block(state, Make_Block(7));
+		Val_Init_Block(state, Make_Array(7));
 		Init_Dir_Path(&dir, path, 1, POL_READ);
 		result = Read_Dir(&dir, VAL_SERIES(state));
 		///OS_FREE(dir.file.path);

@@ -165,7 +165,7 @@ REBREQ *req;		//!!! move this global
 	if (!IS_OBJECT(spec)) Trap1_DEAD_END(RE_INVALID_SPEC, spec);
 
 	// Get or setup internal state data:
-	if (!IS_BLOCK(state)) Val_Init_Block(state, Make_Block(EVENTS_CHUNK - 1));
+	if (!IS_BLOCK(state)) Val_Init_Block(state, Make_Array(EVENTS_CHUNK - 1));
 
 	switch (action) {
 
@@ -185,7 +185,7 @@ REBREQ *req;		//!!! move this global
 act_blk:
 		save_port = *D_ARG(1); // save for return
 		*D_ARG(1) = *state;
-		result = T_Block(call_, action);
+		result = T_Array(call_, action);
 		SET_SIGNAL(SIG_EVENT_PORT);
 		if (action == A_INSERT || action == A_APPEND || action == A_REMOVE) {
 			*D_OUT = save_port;

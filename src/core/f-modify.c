@@ -32,7 +32,7 @@
 
 /***********************************************************************
 **
-*/	REBCNT Modify_Block(REBCNT action, REBSER *dst_ser, REBCNT dst_idx, const REBVAL *src_val, REBCNT flags, REBINT dst_len, REBINT dups)
+*/	REBCNT Modify_Array(REBCNT action, REBSER *dst_ser, REBCNT dst_idx, const REBVAL *src_val, REBCNT flags, REBINT dst_len, REBINT dups)
 /*
 **		action: INSERT, APPEND, CHANGE
 **
@@ -51,6 +51,10 @@
 	REBINT ilen  = 1;	// length to be inserted
 	REBINT size;		// total to insert
 
+#if !defined(NDEBUG)
+	REBINT index;
+#endif
+
 	if (dups < 0) return (action == A_APPEND) ? 0 : dst_idx;
 	if (action == A_APPEND || dst_idx > tail) dst_idx = tail;
 
@@ -64,7 +68,7 @@
 
 		// Are we modifying ourselves? If so, copy src_val block first:
 		if (dst_ser == VAL_SERIES(src_val)) {
-			REBSER *series = Copy_Block(
+			REBSER *series = Copy_Array_At_Shallow(
 				VAL_SERIES(src_val), VAL_INDEX(src_val)
 			);
 			src_val = BLK_HEAD(series);
@@ -90,6 +94,13 @@
 	}
 
 	tail = (action == A_APPEND) ? 0 : size + dst_idx;
+
+#if !defined(NDEBUG)
+	for (index = 0; index < ilen; index++) {
+		if (SERIES_GET_FLAG(dst_ser, SER_MANAGED))
+			ASSERT_VALUE_MANAGED(&src_val[index]);
+	}
+#endif
 
 	dst_idx *= SERIES_WIDE(dst_ser); // loop invariant
 	ilen  *= SERIES_WIDE(dst_ser); // loop invariant
@@ -183,7 +194,7 @@
 	// (Note: It may be possible to optimize special cases like append !!)
 	if (dst_ser == src_ser) {
 		assert(!needs_free);
-		src_ser = Copy_Series_Part(src_ser, src_idx, src_len);
+		src_ser = Copy_Sequence_At_Len(src_ser, src_idx, src_len);
 		needs_free = TRUE;
 		src_idx = 0;
 	}

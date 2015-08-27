@@ -66,11 +66,11 @@
 	REBVAL *value;
 	REBVAL *word;
 
-	block = Make_Block(SERIES_TAIL(words));
+	block = Make_Array(SERIES_TAIL(words));
 	word = BLK_SKIP(words, 1);
 
 	for (n = 1; n < SERIES_TAIL(words); word++, n++) {
-		value = Alloc_Tail_Blk(block);
+		value = Alloc_Tail_Array(block);
 		VAL_SET(value, VAL_TYPE(word));
 		VAL_WORD_SYM(value) = VAL_BIND_SYM(word);
 		UNBIND_WORD(value);
@@ -95,11 +95,11 @@
 	REBVAL *value;
 	REBVAL *word;
 
-	block = Make_Block(SERIES_TAIL(words));
+	block = Make_Array(SERIES_TAIL(words));
 	word = BLK_SKIP(words, 1);
 
 	for (n = 1; n < SERIES_TAIL(words); word++, n++) {
-		value = Alloc_Tail_Blk(block);
+		value = Alloc_Tail_Array(block);
 		VAL_SET(value, VAL_TYPE(word));
 		VAL_WORD_SYM(value) = VAL_BIND_SYM(word);
 		UNBIND_WORD(value);
@@ -130,6 +130,7 @@
 
 	blk = BLK_HEAD(block);
 	words = Collect_Frame(NULL, blk, BIND_ALL | BIND_NO_DUP | BIND_NO_SELF);
+	MANAGE_SERIES(words);
 
 	// !!! needs more checks
 	for (; NOT_END(blk); blk++) {
@@ -208,6 +209,7 @@
 {
 	REBYTE exts;
 	//Print("Make_Native: %s spec %d", Get_Sym_Name(type+1), SERIES_TAIL(spec));
+	ENSURE_SERIES_MANAGED(spec);
 	VAL_FUNC_SPEC(value) = spec;
 	VAL_FUNC_WORDS(value) = Check_Func_Spec(spec, &exts);
 
@@ -269,8 +271,10 @@
 
 	if (!args || ((spec = VAL_BLK_HEAD(args)) && IS_END(spec))) {
 		body = 0;
-		if (IS_FUNCTION(value) || IS_CLOSURE(value))
-			VAL_FUNC_WORDS(value) = Copy_Block(VAL_FUNC_WORDS(value), 0);
+		if (IS_FUNCTION(value) || IS_CLOSURE(value)) {
+			VAL_FUNC_WORDS(value) = Copy_Array_Shallow(VAL_FUNC_WORDS(value));
+			MANAGE_SERIES(VAL_FUNC_WORDS(value));
+		}
 	} else {
 		body = VAL_BLK_SKIP(args, 1);
 		// Spec given, must be block or *
@@ -285,7 +289,8 @@
 			assert(exts == 0);
 		} else {
 			if (!IS_STAR(spec)) return FALSE;
-			VAL_FUNC_WORDS(value) = Copy_Block(VAL_FUNC_WORDS(value), 0);
+			VAL_FUNC_WORDS(value) = Copy_Array_Shallow(VAL_FUNC_WORDS(value));
+			MANAGE_SERIES(VAL_FUNC_WORDS(value));
 		}
 	}
 
@@ -297,30 +302,13 @@
 	}
 	// No body, use prototype:
 	else if (IS_FUNCTION(value) || IS_CLOSURE(value))
-		VAL_FUNC_BODY(value) = Clone_Block(VAL_FUNC_BODY(value));
+		VAL_FUNC_BODY(value) = Copy_Array_Deep_Managed(VAL_FUNC_BODY(value));
 
 	// Rebind function words:
 	if (IS_FUNCTION(value) || IS_CLOSURE(value))
 		Bind_Relative(VAL_FUNC_WORDS(value), VAL_FUNC_WORDS(value), VAL_FUNC_BODY(value));
 
 	return TRUE;
-}
-
-
-/***********************************************************************
-**
-*/	void Clone_Function(REBVAL *value, REBVAL *func)
-/*
-***********************************************************************/
-{
-	REBSER *src_frame = VAL_FUNC_WORDS(func);
-
-	VAL_FUNC_SPEC(value) = VAL_FUNC_SPEC(func);
-	VAL_FUNC_BODY(value) = Clone_Block(VAL_FUNC_BODY(func));
-	VAL_FUNC_WORDS(value) = Copy_Block(src_frame, 0);
-	// VAL_FUNC_BODY(value) = Clone_Block(VAL_FUNC_BODY(func));
-	VAL_FUNC_BODY(value) = Copy_Block_Values(VAL_FUNC_BODY(func), 0, SERIES_TAIL(VAL_FUNC_BODY(func)), TS_CLONE);
-	Rebind_Block(src_frame, VAL_FUNC_WORDS(value), BLK_HEAD(VAL_FUNC_BODY(value)), 0);
 }
 
 
@@ -461,17 +449,11 @@
 	REBCNT word_index;
 
 	Eval_Functions++;
-	//DISABLE_GC;
-
-	// Clone the body of the closure to allow us to rebind words inside
-	// of it so that they point specifically to the instances for this
-	// invocation.  (Costly, but that is the mechanics of words.)
-	body = Clone_Block(VAL_FUNC_BODY(func));
 
 	// Copy stack frame variables as the closure object.  The +1 is for
 	// SELF, as the REB_END is already accounted for by Make_Blk.
 
-	frame = Make_Block(DSF->num_vars + 1);
+	frame = Make_Array(DSF->num_vars + 1);
 	value = BLK_HEAD(frame);
 
 	assert(DSF->num_vars == VAL_FUNC_NUM_WORDS(func));
@@ -484,16 +466,31 @@
 
 	frame->tail = word_index;
 	TERM_SERIES(frame);
+
+	// We do not Manage_Frame, because we are reusing a word series here
+	// that has already been managed...only manage the outer series
+	assert(SERIES_GET_FLAG(FRM_WORD_SERIES(frame), SER_MANAGED));
+	MANAGE_SERIES(frame);
+
 	ASSERT_FRAME(frame);
 
 	// !!! For *today*, no option for function/closure to have a SELF
 	// referring to their function or closure values.
 	assert(VAL_WORD_SYM(BLK_HEAD(VAL_FUNC_WORDS(func))) == SYM_NOT_USED);
 
-	// Rebind the body to the new context (deeply):
+	// Clone the body of the closure to allow us to rebind words inside
+	// of it so that they point specifically to the instances for this
+	// invocation.  (Costly, but that is the mechanics of words.)
+	//
+	body = Copy_Array_Deep_Managed(VAL_FUNC_BODY(func));
 	Rebind_Block(VAL_FUNC_WORDS(func), frame, BLK_HEAD(body), REBIND_TYPE);
 
+	// Protect the body from garbage collection during the course of the
+	// execution.  (We could also protect it by stowing it in the call
+	// frame's copy of the closure value, which we might think of as its
+	// "archetype", but it may be valuable to keep that as-is.)
 	SAVE_SERIES(body);
+
 	if (Do_Block_Throws(out, body, 0)) {
 		if (
 			IS_WORD(out) &&
@@ -503,8 +500,12 @@
 				TAKE_THROWN_ARG(out, out);
 		}
 	}
+
+	// References to parts of the closure's copied body may still be
+	// extant, but we no longer need to hold this reference on it
 	UNSAVE_SERIES(body);
 }
+
 
 /***********************************************************************
 **
@@ -513,8 +514,11 @@
  */
 {
 	//RL_Print("%s, %d\n", __func__, __LINE__);
-	REBSER *args = Copy_Values(
-		DSF_ARG(DSF, 1), SERIES_TAIL(VAL_FUNC_WORDS(routine)) - 1
+	REBSER *args = Copy_Values_Len_Shallow(
+		DSF_NUM_ARGS(DSF) > 0 ? DSF_ARG(DSF, 1) : NULL,
+		DSF_NUM_ARGS(DSF)
 	);
+	assert(VAL_FUNC_NUM_PARAMS(routine) == DSF_NUM_ARGS(DSF));
 	Call_Routine(routine, args, DSF_OUT(DSF));
+	Free_Series(args);
 }

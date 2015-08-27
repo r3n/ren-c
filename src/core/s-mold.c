@@ -586,7 +586,7 @@ static void Mold_Block_Series(REB_MOLD *mold, REBSER *series, REBCNT index, cons
 			return;
 		}
 	}
-	value = Alloc_Tail_Blk(MOLD_LOOP);
+	value = Alloc_Tail_Array(MOLD_LOOP);
 	Val_Init_Block(value, series);
 
 	if (sep[1]) {
@@ -1443,7 +1443,7 @@ return_balanced:
 	REBYTE c;
 	const REBYTE *dc;
 
-	Set_Root_Series(TASK_MOLD_LOOP, Make_Block(size/10), "mold loop");
+	Set_Root_Series(TASK_MOLD_LOOP, Make_Array(size/10), "mold loop");
 	Set_Root_Series(TASK_BUF_MOLD, Make_Unicode(size), "mold buffer");
 
 	// Create quoted char escape table:

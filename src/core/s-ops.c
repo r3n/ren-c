@@ -757,7 +757,7 @@ static REBYTE seed_str[SEED_LEN] = {
 		c = GET_ANY_CHAR(str, idx);
 		if (c == LF || c == CR) {
 			out = Copy_String(str, start, idx - start);
-			val = Alloc_Tail_Blk(ser);
+			val = Alloc_Tail_Array(ser);
 			Val_Init_String(val, out);
 			VAL_SET_OPT(val, OPT_VALUE_LINE);
 			idx++;
@@ -770,10 +770,10 @@ static REBYTE seed_str[SEED_LEN] = {
 	// Possible remainder (no terminator)
 	if (idx > start) {
 		out = Copy_String(str, start, idx - start);
-		val = Alloc_Tail_Blk(ser);
+		val = Alloc_Tail_Array(ser);
 		Val_Init_String(val, out);
 		VAL_SET_OPT(val, OPT_VALUE_LINE);
 	}
 
-	return Copy_Block(ser, 0);
+	return Copy_Array_Shallow(ser);
 }

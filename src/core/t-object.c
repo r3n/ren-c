@@ -295,7 +295,7 @@ static REBSER *Trim_Object(REBSER *obj)
 ***********************************************************************/
 {
 	REBVAL *value = D_ARG(1);
-	REBVAL *arg = D_ARG(2);
+	REBVAL *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
 	REBINT n;
 	REBVAL *val;
 	REBSER *obj, *src_obj;
@@ -365,6 +365,7 @@ static REBSER *Trim_Object(REBSER *obj)
 			if (IS_NUMBER(arg)) {
 				n = Int32s(arg, 0);
 				obj = Make_Frame(n, TRUE);
+				MANAGE_FRAME(obj);
 				break; // returns obj
 			}
 
@@ -386,7 +387,9 @@ static REBSER *Trim_Object(REBSER *obj)
 
 			// make parent none | []
 			if (IS_NONE(arg) || (IS_BLOCK(arg) && IS_EMPTY(arg))) {
-				obj = Copy_Block_Values(src_obj, 0, SERIES_TAIL(src_obj), TS_CLONE);
+				obj = Copy_Array_Core_Managed(
+					src_obj, 0, SERIES_TAIL(src_obj), TRUE, TS_CLONE
+				);
 				Rebind_Frame(src_obj, obj);
 				break;	// returns obj
 			}
@@ -407,6 +410,7 @@ static REBSER *Trim_Object(REBSER *obj)
 			// make parent-object object
 			if (IS_OBJECT(arg)) {
 				obj = Merge_Frames(src_obj, VAL_OBJ_FRAME(arg));
+				MANAGE_FRAME(obj);
 				break; // returns obj
 			}
 		}
@@ -472,15 +476,22 @@ static REBSER *Trim_Object(REBSER *obj)
 		REBU64 types = 0;
 		if (D_REF(ARG_COPY_PART)) Trap_DEAD_END(RE_BAD_REFINES);
 		if (D_REF(ARG_COPY_DEEP)) {
-			types |= CP_DEEP | (D_REF(ARG_COPY_TYPES) ? 0 : TS_STD_SERIES);
+			types |= D_REF(ARG_COPY_TYPES) ? 0 : TS_STD_SERIES;
 		}
-		if D_REF(ARG_COPY_TYPES) {
+		if (D_REF(ARG_COPY_TYPES)) {
 			arg = D_ARG(ARG_COPY_KINDS);
 			if (IS_DATATYPE(arg)) types |= TYPESET(VAL_TYPE_KIND(arg));
 			else types |= VAL_TYPESET(arg);
 		}
-		VAL_OBJ_FRAME(value) = obj = Copy_Block(VAL_OBJ_FRAME(value), 0);
-		if (types != 0) Copy_Deep_Values(obj, 1, SERIES_TAIL(obj), types);
+		VAL_OBJ_FRAME(value) = obj = Copy_Array_Shallow(VAL_OBJ_FRAME(value));
+		if (types != 0) {
+			Clonify_Values_Len_Managed(
+				BLK_SKIP(obj, 1),
+				SERIES_TAIL(obj) - 1,
+				D_REF(ARG_COPY_DEEP),
+				types
+			);
+		}
 		break; // returns value
 	}
 	case A_SELECT:
@@ -609,9 +620,8 @@ REBVAL *Get_Obj_Mods(REBFRM *frame, REBVAL **inter_block)
 	REBVAL *obj  = D_ARG(1);
 	REBVAL *words, *val;
 	REBFRM *frm  = VAL_OBJ_FRAME(obj);
-	REBSER *ser  = Make_Block(2);
+	REBSER *ser  = Make_Array(2);
 	REBOOL clear = D_REF(2);
-	//DISABLE_GC;
 
 	val   = BLK_HEAD(frm->values);
 	words = BLK_HEAD(frm->words);
@@ -621,13 +631,12 @@ REBVAL *Get_Obj_Mods(REBFRM *frame, REBVAL **inter_block)
 			if (clear) VAL_FLAGS(val) |= FLAGS_CLEAN;
 		}
 	if (!STR_LEN(ser)) {
-		ENABLE_GC;
 		goto is_none;
 	}
 
 	Bind_Values_Shallow(BLK_HEAD(ser), frm);
 	VAL_SERIES(Temp_Blk_Value) = ser;
-	//ENABLE_GC;
+
 	return Temp_Blk_Value;
 }
 #endif

@@ -87,7 +87,7 @@ enum {
 		if (GET_FLAG(flags, SOP_BOTH)) i += VAL_LEN(val2);
 		retser = BUF_EMIT;			// use preallocated shared block
 		Resize_Series(retser, i);
-		hret = Make_Hash_Array(i);	// allocated
+		hret = Make_Hash_Sequence(i);	// allocated
 
 		// Optimization note: !!
 		// This code could be optimized for small blocks by not hashing them
@@ -124,7 +124,7 @@ enum {
 		if (hret)
 			Free_Series(hret);
 
-		Val_Init_Block(D_OUT, Copy_Series(retser));
+		Val_Init_Block(D_OUT, Copy_Array_Shallow(retser));
 		RESET_TAIL(retser); // required - allow reuse
 
 		break;

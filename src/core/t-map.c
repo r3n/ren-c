@@ -78,10 +78,10 @@
 **
 ***********************************************************************/
 {
-	REBSER *blk = Make_Block(size*2);
+	REBSER *blk = Make_Array(size * 2);
 	REBSER *ser = 0;
 
-	if (size >= MIN_DICT) ser = Make_Hash_Array(size);
+	if (size >= MIN_DICT) ser = Make_Hash_Sequence(size);
 
 	blk->extra.series = ser;
 
@@ -228,11 +228,9 @@
 			else if (ANY_BINSTR(key)) {
 				for (n = 0; n < series->tail; n += 2, v += 2) {
 					if (VAL_TYPE(key) == VAL_TYPE(v) && 0 == Compare_String_Vals(key, v, (REBOOL)!IS_BINARY(v))) {
-						if (val) {
+						if (val)
 							*++v = *val;
-//							VAL_SERIES(v) = Copy_Series_Value(val);
-//							VAL_INDEX(v) = 0;
-						}
+
 						return n/2+1;
 					}
 				}
@@ -257,13 +255,14 @@
 
 			if (!val) return 0;
 			Append_Value(series, key);
-			Append_Value(series, val); // no Copy_Series_Value(val) on strings
+			Append_Value(series, val); // does not copy value, e.g. if string
 			return series->tail/2;
 		}
 
 		// Add hash table:
 		//Print("hash added %d", series->tail);
-		series->extra.series = hser = Make_Hash_Array(series->tail);
+		series->extra.series = hser = Make_Hash_Sequence(series->tail);
+		MANAGE_SERIES(hser);
 		Rehash_Hash(series);
 	}
 
@@ -288,7 +287,7 @@
 
 	// Create new entry:
 	Append_Value(series, key);
-	Append_Value(series, val);  // no Copy_Series_Value(val) on strings
+	Append_Value(series, val);  // does not copy value, e.g. if string
 
 	return (hashes[hash] = series->tail/2);
 }
@@ -400,7 +399,7 @@
 	}
 
 	// Copy entries to new block:
-	blk = Make_Block(cnt * ((what == 0) ? 2 : 1));
+	blk = Make_Array(cnt * ((what == 0) ? 2 : 1));
 	out = BLK_HEAD(blk);
 	for (val = BLK_HEAD(mapser); NOT_END(val) && NOT_END(val+1); val += 2) {
 		if (!IS_NONE(val+1)) {
@@ -426,7 +425,7 @@
 	REBSER *ser = 0;
 	REBCNT size = SERIES_TAIL(blk);
 
-	if (size >= MIN_DICT) ser = Make_Hash_Array(size);
+	if (size >= MIN_DICT) ser = Make_Hash_Sequence(size);
 	blk->extra.series = ser;
 	Rehash_Hash(blk);
 }
@@ -483,7 +482,7 @@
 ***********************************************************************/
 {
 	REBVAL *val = D_ARG(1);
-	REBVAL *arg = D_ARG(2);
+	REBVAL *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
 	REBINT n;
 	REBSER *series;
 
