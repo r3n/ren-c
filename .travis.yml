@@ -21,12 +21,6 @@ compiler:
 
 
 env:
-    global:
-        #
-        # COVERITY_SCAN_TOKEN=$COVERITY_SCAN_TOKEN
-        #
-        -secure: "oDfldczkNQ9sXnI4JmL5XMHDyKWBwOj6ZdTuZkcEzJ9gfJl2wuqWWAeOTt6ErWc9q3hdhbb3UudvPCmaU2dK37WUsHZRtx30ddEhp8kJwz1DdLGjlnV+2PVJ4qLrausxDpVMHuB4vBdgVj9r16lZ0c/ezGs2QJae/mb2OAO8WLTUBcA8qhyGBFK8ywho5eX7LltLV/kkHqgKSY6bYAzCc/8zFj3cttP5dqMmig1Kb9dlruM2e8yMyoF8c0fLyVd//KUyynI43gaUtTGaM+YNqixqjNauVTa9LOSOAjzxedPDrWe81A3tsXVxGGXzr7zDeKvSZrtlQgjosLofXxT4NcQSHewYhM3zG/t2L9e480af+9FA9WD9EYk0Y0utwGJk7ld//8Fk6wcrCPVUUzwerI7Y0ftOFq1hUeFrpFrriCPOf5zrxF9NvqWL2XtU9ppW7m2LwRet7guOfUx2ULBosMkDYNv7k4vTAAs3iF1e4vXFygzPN1v2apKyEr5/dLndNJZFUxNoCYhtFjGBR7wfZ5lnc6fSsdy0lNVmIas/q+UuDCv3C8hyPWarexClt5ohLTtztzgbhsFEtKWViJcYma/LasmZhLfseNtBq6Z7aGj2Qfk0zABU/fB37+K1zDTI9upgUD3dt/YNi9kQ7LCwMtFy7Oc6uT2oxebapHYjRJE="
-
     matrix:
         # Linux x86, release
         #
@@ -49,6 +43,11 @@ env:
         - OS_ID=0.3.40 TOOLS=x86_64-w64-mingw32-
 
     global:
+        #
+        # COVERITY_SCAN_TOKEN=$COVERITY_SCAN_TOKEN
+        #
+        -secure: "oDfldczkNQ9sXnI4JmL5XMHDyKWBwOj6ZdTuZkcEzJ9gfJl2wuqWWAeOTt6ErWc9q3hdhbb3UudvPCmaU2dK37WUsHZRtx30ddEhp8kJwz1DdLGjlnV+2PVJ4qLrausxDpVMHuB4vBdgVj9r16lZ0c/ezGs2QJae/mb2OAO8WLTUBcA8qhyGBFK8ywho5eX7LltLV/kkHqgKSY6bYAzCc/8zFj3cttP5dqMmig1Kb9dlruM2e8yMyoF8c0fLyVd//KUyynI43gaUtTGaM+YNqixqjNauVTa9LOSOAjzxedPDrWe81A3tsXVxGGXzr7zDeKvSZrtlQgjosLofXxT4NcQSHewYhM3zG/t2L9e480af+9FA9WD9EYk0Y0utwGJk7ld//8Fk6wcrCPVUUzwerI7Y0ftOFq1hUeFrpFrriCPOf5zrxF9NvqWL2XtU9ppW7m2LwRet7guOfUx2ULBosMkDYNv7k4vTAAs3iF1e4vXFygzPN1v2apKyEr5/dLndNJZFUxNoCYhtFjGBR7wfZ5lnc6fSsdy0lNVmIas/q+UuDCv3C8hyPWarexClt5ohLTtztzgbhsFEtKWViJcYma/LasmZhLfseNtBq6Z7aGj2Qfk0zABU/fB37+K1zDTI9upgUD3dt/YNi9kQ7LCwMtFy7Oc6uT2oxebapHYjRJE="
+
         #
         # travis encrypt AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
         #
