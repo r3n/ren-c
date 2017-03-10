@@ -1,281 +1,564 @@
-/***********************************************************************
-**
-**  REBOL [R3] Language Interpreter and Run-time Environment
-**
-**  Copyright 2012 REBOL Technologies
-**  REBOL is a trademark of REBOL Technologies
-**
-**  Licensed under the Apache License, Version 2.0 (the "License");
-**  you may not use this file except in compliance with the License.
-**  You may obtain a copy of the License at
-**
-**  http://www.apache.org/licenses/LICENSE-2.0
-**
-**  Unless required by applicable law or agreed to in writing, software
-**  distributed under the License is distributed on an "AS IS" BASIS,
-**  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**  See the License for the specific language governing permissions and
-**  limitations under the License.
-**
-************************************************************************
-**
-**  Module:  t-integer.c
-**  Summary: integer datatype
-**  Section: datatypes
-**  Author:  Carl Sassenrath
-**  Notes:
-**
-***********************************************************************/
+//
+//  File: %t-integer.c
+//  Summary: "integer datatype"
+//  Section: datatypes
+//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  Homepage: https://github.com/metaeducation/ren-c/
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Copyright 2012 REBOL Technologies
+// Copyright 2012-2017 Rebol Open Source Contributors
+// REBOL is a trademark of REBOL Technologies
+//
+// See README.md and CREDITS.md for more information.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
 
 #include "sys-core.h"
 #include "sys-deci-funcs.h"
 #include "sys-int-funcs.h"
 
 
-/***********************************************************************
-**
-*/	REBINT CT_Integer(REBVAL *a, REBVAL *b, REBINT mode)
-/*
-***********************************************************************/
+//
+//  CT_Integer: C
+//
+REBINT CT_Integer(const RELVAL *a, const RELVAL *b, REBINT mode)
 {
-	if (mode >= 0)  return (VAL_INT64(a) == VAL_INT64(b));
-	if (mode == -1) return (VAL_INT64(a) >= VAL_INT64(b));
-	return (VAL_INT64(a) > VAL_INT64(b));
+    if (mode >= 0)  return (VAL_INT64(a) == VAL_INT64(b));
+    if (mode == -1) return (VAL_INT64(a) >= VAL_INT64(b));
+    return (VAL_INT64(a) > VAL_INT64(b));
 }
 
 
-/***********************************************************************
-**
-*/	REBTYPE(Integer)
-/*
-***********************************************************************/
+//
+//  MAKE_Integer: C
+//
+void MAKE_Integer(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
-	REBVAL *val = D_ARG(1);
-	REBVAL *val2 = DS_ARGC > 1 ? D_ARG(2) : NULL;
-	REBI64 num;
-	REBI64 arg;
-	REBCNT n;
+    assert(kind == REB_INTEGER);
 
-	REBI64 p;
-	REBU64 a, b; // for overflow detection
-	REBCNT a1, a0, b1, b0;
-	REBFLG sgn;
-	REBI64 anum;
+    if (IS_LOGIC(arg)) {
+        //
+        // !!! Due to Rebol's policies on conditional truth and falsehood,
+        // it refuses to say TO FALSE is 0.  MAKE has shades of meaning
+        // that are more "dialected", e.g. MAKE BLOCK! 10 creates a block
+        // with capacity 10 and not literally `[10]` (or a block with ten
+        // NONE! values in it).  Under that liberal umbrella it decides
+        // that it will make an integer 0 out of FALSE due to it having
+        // fewer seeming "rules" than TO would.
 
-	num = VAL_INT64(val);
+        if (VAL_LOGIC(arg))
+            SET_INTEGER(out, 1);
+        else
+            SET_INTEGER(out, 0);
 
-	if (IS_BINARY_ACT(action)) {
+        // !!! The same principle could suggest MAKE is not bound by
+        // the "reversibility" requirement and hence could interpret
+        // binaries unsigned by default.  Before getting things any
+        // weirder should probably leave it as is.
+    }
+    else {
+        // use signed logic by default (use TO-INTEGER/UNSIGNED to force
+        // unsigned interpretation or error if that doesn't make sense)
 
-		if (IS_INTEGER(val2)) arg = VAL_INT64(val2);
-		else if (IS_CHAR(val2)) arg = VAL_CHAR(val2);
-		else {
-			// Decimal or other numeric second argument:
-			n = 0; // use to flag special case
-			switch(action) {
-			// Anything added to an integer is same as adding the integer:
-			case A_ADD:
-			case A_MULTIPLY:
-				// Swap parameter order:
-				*D_OUT = *val2;  // Use as temp workspace
-				*val2 = *val;
-				*val = *D_OUT;
-				return Value_Dispatch[VAL_TYPE(val)](call_, action);
+        Value_To_Int64(out, arg, FALSE);
+    }
+}
 
-			// Only type valid to subtract from, divide into, is decimal/money:
-			case A_SUBTRACT:
-				n = 1;
-				/* fall through */
-			case A_DIVIDE:
-			case A_REMAINDER:
-			case A_POWER:
-				if (IS_DECIMAL(val2) | IS_PERCENT(val2)) {
-					SET_DECIMAL(val, (REBDEC)num); // convert main arg
-					return T_Decimal(call_, action);
-				}
-				if (IS_MONEY(val2)) {
-					VAL_MONEY_AMOUNT(val) = int_to_deci(VAL_INT64(val));
-					VAL_SET(val, REB_MONEY);
-					return T_Money(call_, action);
-				}
-				if (n > 0) {
-					if (IS_TIME(val2)) {
-						VAL_TIME(val) = SEC_TIME(VAL_INT64(val));
-						SET_TYPE(val, REB_TIME);
-						return T_Time(call_, action);
-					}
-					if (IS_DATE(val2)) return T_Date(call_, action);
-				}
-			}
-			Trap_Math_Args(REB_INTEGER, action);
-		}
-	}
 
-	switch (action) {
+//
+//  TO_Integer: C
+//
+void TO_Integer(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
+{
+    assert(kind == REB_INTEGER);
 
-	case A_ADD:
-		if (REB_I64_ADD_OF(num, arg, &anum)) Trap_DEAD_END(RE_OVERFLOW);
-		num = anum;
-		break;
+    // use signed logic by default (use TO-INTEGER/UNSIGNED to force
+    // unsigned interpretation or error if that doesn't make sense)
 
-	case A_SUBTRACT:
-		if (REB_I64_SUB_OF(num, arg, &anum)) Trap_DEAD_END(RE_OVERFLOW);
-		num = anum;
-		break;
+    Value_To_Int64(out, arg, FALSE);
+}
 
-	case A_MULTIPLY:
-		if (REB_I64_MUL_OF(num, arg, &p)) Trap_DEAD_END(RE_OVERFLOW);
-		num = p;
-		break;
 
-	case A_DIVIDE:
-		if (arg == 0) Trap_DEAD_END(RE_ZERO_DIVIDE);
-		if (num == MIN_I64 && arg == -1) Trap_DEAD_END(RE_OVERFLOW);
-		if (num % arg == 0) {
-			num = num / arg;
-			break;
-		}
-		// Fall thru
+//
+//  Value_To_Int64: C
+//
+// Interpret `value` as a 64-bit integer and return it in `out`.
+//
+// If `no_sign` is TRUE then use that to inform an ambiguous conversion
+// (e.g. TO-INTEGER/UNSIGNED #{FF} is 255 instead of -1).  However, it
+// won't contradict the sign of unambiguous source.  So the string "-1"
+// will raise an error if you try to convert it unsigned.  (For this,
+// use `abs to-integer "-1"` and not `to-integer/unsigned "-1"`.)
+//
+// Because Rebol's INTEGER! uses a signed REBI64 and not an unsigned
+// REBU64, a request for unsigned interpretation is limited to using
+// 63 of those bits.  A range error will be thrown otherwise.
+//
+// If a type is added or removed, update REBNATIVE(to_integer)'s spec
+//
+void Value_To_Int64(REBVAL *out, const REBVAL *value, REBOOL no_sign)
+{
+    // !!! Code extracted from REBTYPE(Integer)'s A_MAKE and A_TO cases
+    // Use SWITCH instead of IF chain? (was written w/ANY_STR test)
 
-	case A_POWER:
-		SET_DECIMAL(val, (REBDEC)num);
-		SET_DECIMAL(val2, (REBDEC)arg);
-		return T_Decimal(call_, action);
+    if (IS_INTEGER(value)) {
+        Move_Value(out, value);
+        goto check_sign;
+    }
+    if (IS_DECIMAL(value) || IS_PERCENT(value)) {
+        if (VAL_DECIMAL(value) < MIN_D64 || VAL_DECIMAL(value) >= MAX_D64)
+            fail (Error(RE_OVERFLOW));
 
-	case A_REMAINDER:
-		if (arg == 0) Trap_DEAD_END(RE_ZERO_DIVIDE);
-		num = REM2(num, arg);
-		break;
+        SET_INTEGER(out, cast(REBI64, VAL_DECIMAL(value)));
+        goto check_sign;
+    }
+    else if (IS_MONEY(value)) {
+        SET_INTEGER(out, deci_to_int(VAL_MONEY_AMOUNT(value)));
+        goto check_sign;
+    }
+    else if (IS_BINARY(value)) { // must be before ANY_STRING() test...
 
-	case A_AND: num &= arg; break;
-	case A_OR:  num |= arg; break;
-	case A_XOR: num ^= arg; break;
+        // Rebol3 creates 8-byte big endian for signed 64-bit integers.
+        // Rebol2 created 4-byte big endian for signed 32-bit integers.
+        //
+        // Values originating in file formats from other systems vary widely.
+        // Note that in C the default interpretation of single bytes in most
+        // implementations of a `char` is signed.
+        //
+        // We assume big-Endian for decoding (clients can REVERSE if they
+        // want little-Endian).  Also by default assume that any missing
+        // sign-extended to 64-bits based on the most significant byte
+        //
+        //     #{01020304} => #{0000000001020304}
+        //     #{DECAFBAD} => #{FFFFFFFFDECAFBAD}
+        //
+        // To override this interpretation and always generate an unsigned
+        // result, pass in `no_sign`.  (Used by TO-INTEGER/UNSIGNED)
+        //
+        // If under these rules a number cannot be represented within the
+        // numeric range of the system's INTEGER!, it will error.  This
+        // attempts to "future-proof" for other integer sizes and as an
+        // interface could support BigNums in the future.
 
-	case A_NEGATE:
-		if (num == MIN_I64) Trap_DEAD_END(RE_OVERFLOW);
-		num = -num;
-		break;
+        REBYTE *bp = VAL_BIN_AT(value);
+        REBCNT n = VAL_LEN_AT(value);
+        REBOOL negative;
+        REBINT fill;
 
-	case A_COMPLEMENT: num = ~num; break;
+    #if !defined(NDEBUG)
+        //
+        // This is what R3-Alpha did.
+        //
+        if (LEGACY(OPTIONS_FOREVER_64_BIT_INTS)) {
+            REBI64 i = 0;
+            if (n > sizeof(REBI64)) n = sizeof(REBI64);
+            for (; n; n--, bp++)
+                i = cast(REBI64, (cast(REBU64, i) << 8) | *bp);
 
-	case A_ABSOLUTE:
-		if (num == MIN_I64) Trap_DEAD_END(RE_OVERFLOW);
-		if (num < 0) num = -num;
-		break;
+            SET_INTEGER(out, i);
 
-	case A_EVENQ: num = ~num;
-	case A_ODDQ: DECIDE(num & 1);
+            // There was no TO-INTEGER/UNSIGNED in R3-Alpha, so even if
+            // running in compatibility mode we can check the sign if used.
+            //
+            goto check_sign;
+        }
+    #endif
 
-	case A_ROUND:
-		val2 = D_ARG(3);
-		n = Get_Round_Flags(call_);
-		if (D_REF(2)) { // to
-			if (IS_MONEY(val2)) {
-				VAL_MONEY_AMOUNT(D_OUT) = Round_Deci(
-					int_to_deci(num), n, VAL_MONEY_AMOUNT(val2)
-				);
-				SET_TYPE(D_OUT, REB_MONEY);
-				return R_OUT;
-			}
-			if (IS_DECIMAL(val2) || IS_PERCENT(val2)) {
-				VAL_DECIMAL(D_OUT) = Round_Dec((REBDEC)num, n, VAL_DECIMAL(val2));
-				SET_TYPE(D_OUT, VAL_TYPE(val2));
-				return R_OUT;
-			}
-			if (IS_TIME(val2)) Trap_Arg_DEAD_END(val2);
-			arg = VAL_INT64(val2);
-		}
-		else arg = 0L;
-		num = Round_Int(num, n, arg);
-		break;
+        if (n == 0) {
+            //
+            // !!! Should #{} empty binary be 0 or error?  (Historically, 0)
+            //
+            SET_INTEGER(out, 0);
+            return;
+        }
 
-	case A_RANDOM:
-		if (D_REF(2)) { // seed
-			Set_Random(num);
-			return R_UNSET;
-		}
-		if (num == 0) break;
-		num = Random_Range(num, (REBOOL)D_REF(3));	//!!! 64 bits
-#ifdef OLD_METHOD
-		if (num < 0)  num = -(1 + (REBI64)(arg % -num));
-		else	      num =   1 + (REBI64)(arg % num);
-#endif
-		break;
+        // default signedness interpretation to high-bit of first byte, but
+        // override if the function was called with `no_sign`
+        //
+        negative = no_sign ? FALSE : LOGICAL(*bp >= 0x80);
 
-	case A_MAKE:
-	case A_TO:
-		val = D_ARG(2);
-		if (IS_DECIMAL(val) || IS_PERCENT(val)) {
-			if (VAL_DECIMAL(val) < MIN_D64 || VAL_DECIMAL(val) >= MAX_D64)
-				Trap_DEAD_END(RE_OVERFLOW);
-			num = (REBI64)VAL_DECIMAL(val);
-		}
-		else if (IS_INTEGER(val))
-			num = VAL_INT64(val);
-		else if (IS_MONEY(val))
-			num = deci_to_int(VAL_MONEY_AMOUNT(val));
-		else if (IS_ISSUE(val)) {
-			const REBYTE *bp = Get_Word_Name(val);
-			REBCNT len;
-			len = LEN_BYTES(bp);
-			n = MIN(MAX_HEX_LEN, len);
-			if (Scan_Hex(bp, &num, n, n) == 0) goto is_bad;
-		}
-		else if (IS_BINARY(val)) { // must be before STRING!
-			REBYTE	*bp;
-			n = VAL_LEN(val);
-			if (n > sizeof(REBI64)) n = sizeof(REBI64);
-			num = 0;
-			for (bp = VAL_BIN_DATA(val); n; n--, bp++)
-				num = (num << 8) | *bp;
-		}
-		else if (ANY_STR(val)) {
-			REBYTE *bp;
-			REBCNT len;
-			bp = Qualify_String(val, VAL_LEN(val), &len, FALSE);
-			if (memchr(bp, '.', len)
-			   	|| memchr(bp, 'e', len)
-			   	|| memchr(bp, 'E', len)) {
-				if (Scan_Decimal(bp, len, D_OUT, TRUE)) {
-					double v = VAL_DECIMAL(D_OUT);
-					if (v < MAX_D64 && v >= MIN_D64) {
-						num = (REBI64)v;
-					} else {
-						Trap_DEAD_END(RE_OVERFLOW);
-					}
-					break;
-				}
-			}
-			if (Scan_Integer(bp, len, D_OUT))
-				return R_OUT;
-			goto is_bad;
-		}
-		else if (IS_LOGIC(val)) {
-			// No integer is uniquely representative of true, so TO conversions reject
-			// integer-to-logic conversions.  MAKE is more liberal and constructs true
-			// to 1 and false to 0.
-			if (action != A_MAKE) goto is_bad;
-			num = VAL_LOGIC(val) ? 1 : 0;
-		}
-		else if (IS_CHAR(val))
-			num = VAL_CHAR(val);
-		// else if (IS_NONE(val)) num = 0;
-		else if (IS_TIME (val)) num = SECS_IN(VAL_TIME(val));
-		else goto is_bad;
-		break;
+        // Consume any leading 0x00 bytes (or 0xFF if negative)
+        //
+        while (n != 0 && *bp == (negative ? 0xFF : 0x00)) {
+            ++bp;
+            --n;
+        }
 
-	default:
-		Trap_Action_DEAD_END(REB_INTEGER, action);
-	}
+        // If we were consuming 0xFFs and passed to a byte that didn't have
+        // its high bit set, we overstepped our bounds!  Go back one.
+        //
+        if (negative && n > 0 && *bp < 0x80) {
+            --bp;
+            ++n;
+        }
 
-	SET_INTEGER(D_OUT, num);
-	return R_OUT;
+        // All 0x00 bytes must mean 0 (or all 0xFF means -1 if negative)
+        //
+        if (n == 0) {
+            if (negative) {
+                assert(!no_sign);
+                SET_INTEGER(out, -1);
+            } else
+                SET_INTEGER(out, 0);
+            return;
+        }
 
-is_bad:
-	Trap_Make_DEAD_END(REB_INTEGER, val);
+        // Not using BigNums (yet) so max representation is 8 bytes after
+        // leading 0x00 or 0xFF stripped away
+        //
+        if (n > 8)
+            fail (Error(RE_OUT_OF_RANGE, value));
 
-is_false:
-	return R_FALSE;
+        REBI64 i = 0;
 
-is_true:
-	return R_TRUE;
+        // Pad out to make sure any missing upper bytes match sign
+        for (fill = n; fill < 8; fill++)
+            i = cast(REBI64,
+                (cast(REBU64, i) << 8) | (negative ? 0xFF : 0x00)
+            );
+
+        // Use binary data bytes to fill in the up-to-8 lower bytes
+        //
+        while (n != 0) {
+            i = cast(REBI64, (cast(REBU64, i) << 8) | *bp);
+            bp++;
+            n--;
+        }
+
+        if (no_sign && i < 0) {
+            //
+            // bits may become signed via shift due to 63-bit limit
+            //
+            fail (Error(RE_OUT_OF_RANGE, value));
+        }
+
+        SET_INTEGER(out, i);
+        return;
+    }
+    else if (IS_ISSUE(value)) {
+        //
+        // Like converting a binary, except uses a string of codepoints
+        // from the word name conversion.  Does not allow for signed
+        // interpretations, e.g. #FFFF => 65535, not -1.  Unsigned makes
+        // more sense as these would be hexes likely typed in by users,
+        // who rarely do 2s-complement math in their head.
+
+        const REBYTE *bp = VAL_WORD_HEAD(value);
+        REBCNT len = LEN_BYTES(bp);
+
+        if (len > MAX_HEX_LEN) {
+            // Lacks BINARY!'s accommodation of leading 00s or FFs
+            fail (Error(RE_OUT_OF_RANGE, value));
+        }
+
+        if (!Scan_Hex(out, bp, len, len))
+            fail (Error_Bad_Make(REB_INTEGER, value));
+
+        // !!! Unlike binary, always assumes unsigned (should it?).  Yet still
+        // might run afoul of 64-bit range limit.
+        //
+        if (VAL_INT64(out) < 0)
+            fail (Error(RE_OUT_OF_RANGE, value));
+
+        return;
+    }
+    else if (ANY_STRING(value)) {
+        REBCNT len;
+        REBYTE *bp = Temp_Byte_Chars_May_Fail(
+            value, VAL_LEN_AT(value), &len, FALSE
+        );
+        if (
+            memchr(bp, '.', len)
+            || memchr(bp, 'e', len)
+            || memchr(bp, 'E', len)
+        ) {
+            DECLARE_LOCAL (d);
+            if (Scan_Decimal(d, bp, len, TRUE)) {
+                if (VAL_DECIMAL(d) < MAX_I64 && VAL_DECIMAL(d) >= MIN_I64) {
+                    SET_INTEGER(out, cast(REBI64, VAL_DECIMAL(d)));
+                    goto check_sign;
+                }
+
+                fail (Error(RE_OVERFLOW));
+            }
+        }
+        if (Scan_Integer(out, bp, len))
+            goto check_sign;
+
+        fail (Error_Bad_Make(REB_INTEGER, value));
+    }
+    else if (IS_LOGIC(value)) {
+        //
+        // Rebol's choice is that no integer is uniquely representative of
+        // "falsehood" condition, e.g. `if 0 [print "this prints"]`.  So to
+        // say TO FALSE is 0 would be disingenuous.
+        //
+        fail (Error_Bad_Make(REB_INTEGER, value));
+    }
+    else if (IS_CHAR(value)) {
+        SET_INTEGER(out, VAL_CHAR(value)); // always unsigned
+        return;
+    }
+    else if (IS_TIME(value)) {
+        SET_INTEGER(out, SECS_IN(VAL_TIME(value))); // always unsigned
+        return;
+    }
+    else
+        fail (Error_Bad_Make(REB_INTEGER, value));
+
+check_sign:
+    if (no_sign && VAL_INT64(out) < 0)
+        fail (Error(RE_POSITIVE));
+}
+
+
+//
+//  to-integer: native [
+//
+//  {Synonym of TO INTEGER! when used without refinements, adds /UNSIGNED.}
+//
+//      value [
+//      integer! decimal! percent! money! char! time!
+//      issue! binary! any-string!
+//      ]
+//      /unsigned
+//      {For BINARY! interpret as unsigned, otherwise error if signed.}
+//  ]
+//
+REBNATIVE(to_integer)
+{
+    INCLUDE_PARAMS_OF_TO_INTEGER;
+
+    Value_To_Int64(D_OUT, ARG(value), REF(unsigned));
+
+    return R_OUT;
+}
+
+
+//
+//  REBTYPE: C
+//
+REBTYPE(Integer)
+{
+    REBVAL *val = D_ARG(1);
+    REBVAL *val2 = D_ARGC > 1 ? D_ARG(2) : NULL;
+    REBI64 num;
+    REBI64 arg;
+    REBCNT n;
+
+    REBI64 p;
+    REBI64 anum;
+
+    num = VAL_INT64(val);
+
+    // !!! This used to rely on IS_BINARY_ACT, which is no longer available
+    // in the symbol based dispatch.  Consider doing another way.
+    //
+    if (
+        action == SYM_ADD
+        || action == SYM_SUBTRACT
+        || action == SYM_MULTIPLY
+        || action == SYM_DIVIDE
+        || action == SYM_POWER
+        || action == SYM_AND_T
+        || action == SYM_OR_T
+        || action == SYM_XOR_T
+        || action == SYM_REMAINDER
+    ){
+        if (IS_INTEGER(val2)) arg = VAL_INT64(val2);
+        else if (IS_CHAR(val2)) arg = VAL_CHAR(val2);
+        else {
+            // Decimal or other numeric second argument:
+            n = 0; // use to flag special case
+            switch(action) {
+            // Anything added to an integer is same as adding the integer:
+            case SYM_ADD:
+            case SYM_MULTIPLY:
+                // Swap parameter order:
+                Move_Value(D_OUT, val2);  // Use as temp workspace
+                Move_Value(val2, val);
+                Move_Value(val, D_OUT);
+                return Value_Dispatch[VAL_TYPE(val)](frame_, action);
+
+            // Only type valid to subtract from, divide into, is decimal/money:
+            case SYM_SUBTRACT:
+                n = 1;
+                /* fall through */
+            case SYM_DIVIDE:
+            case SYM_REMAINDER:
+            case SYM_POWER:
+                if (IS_DECIMAL(val2) || IS_PERCENT(val2)) {
+                    SET_DECIMAL(val, (REBDEC)num); // convert main arg
+                    return T_Decimal(frame_, action);
+                }
+                if (IS_MONEY(val2)) {
+                    SET_MONEY(val, int_to_deci(VAL_INT64(val)));
+                    return T_Money(frame_, action);
+                }
+                if (n > 0) {
+                    if (IS_TIME(val2)) {
+                        VAL_TIME(val) = SEC_TIME(VAL_INT64(val));
+                        VAL_SET_TYPE_BITS(val, REB_TIME);
+                        return T_Time(frame_, action);
+                    }
+                    if (IS_DATE(val2)) return T_Date(frame_, action);
+                }
+            }
+            fail (Error_Math_Args(REB_INTEGER, action));
+        }
+    }
+
+    switch (action) {
+
+    case SYM_COPY:
+        Move_Value(D_OUT, val);
+        return R_OUT;
+
+    case SYM_ADD:
+        if (REB_I64_ADD_OF(num, arg, &anum)) fail (Error(RE_OVERFLOW));
+        num = anum;
+        break;
+
+    case SYM_SUBTRACT:
+        if (REB_I64_SUB_OF(num, arg, &anum)) fail (Error(RE_OVERFLOW));
+        num = anum;
+        break;
+
+    case SYM_MULTIPLY:
+        if (REB_I64_MUL_OF(num, arg, &p)) fail (Error(RE_OVERFLOW));
+        num = p;
+        break;
+
+    case SYM_DIVIDE:
+        if (arg == 0)
+            fail (Error(RE_ZERO_DIVIDE));
+        if (num == MIN_I64 && arg == -1)
+            fail (Error(RE_OVERFLOW));
+        if (num % arg == 0) {
+            num = num / arg;
+            break;
+        }
+        // Fall thru
+
+    case SYM_POWER:
+        SET_DECIMAL(val, (REBDEC)num);
+        SET_DECIMAL(val2, (REBDEC)arg);
+        return T_Decimal(frame_, action);
+
+    case SYM_REMAINDER:
+        if (arg == 0) fail (Error(RE_ZERO_DIVIDE));
+        num = (arg != -1) ? (num % arg) : 0; // !!! was macro called REM2 (?)
+        break;
+
+    case SYM_AND_T:
+        num &= arg;
+        break;
+
+    case SYM_OR_T:
+        num |= arg;
+        break;
+
+    case SYM_XOR_T:
+        num ^= arg;
+        break;
+
+    case SYM_NEGATE:
+        if (num == MIN_I64) fail (Error(RE_OVERFLOW));
+        num = -num;
+        break;
+
+    case SYM_COMPLEMENT:
+        num = ~num;
+        break;
+
+    case SYM_ABSOLUTE:
+        if (num == MIN_I64) fail (Error(RE_OVERFLOW));
+        if (num < 0) num = -num;
+        break;
+
+    case SYM_EVEN_Q:
+        num = ~num;
+    case SYM_ODD_Q:
+        if (num & 1)
+            return R_TRUE;
+        return R_FALSE;
+
+    case SYM_ROUND: {
+        INCLUDE_PARAMS_OF_ROUND;
+
+        UNUSED(PAR(value));
+
+        REBFLGS flags = (
+            (REF(to) ? RF_TO : 0)
+            | (REF(even) ? RF_EVEN : 0)
+            | (REF(down) ? RF_DOWN : 0)
+            | (REF(half_down) ? RF_HALF_DOWN : 0)
+            | (REF(floor) ? RF_FLOOR : 0)
+            | (REF(ceiling) ? RF_CEILING : 0)
+            | (REF(half_ceiling) ? RF_HALF_CEILING : 0)
+        );
+
+        val2 = ARG(scale);
+        if (REF(to)) {
+            if (IS_MONEY(val2)) {
+                SET_MONEY(D_OUT, Round_Deci(
+                    int_to_deci(num), flags, VAL_MONEY_AMOUNT(val2)
+                ));
+                return R_OUT;
+            }
+            if (IS_DECIMAL(val2) || IS_PERCENT(val2)) {
+                REBDEC dec = Round_Dec(
+                    cast(REBDEC, num), flags, VAL_DECIMAL(val2)
+                );
+                VAL_RESET_HEADER(D_OUT, VAL_TYPE(val2));
+                VAL_DECIMAL(D_OUT) = dec;
+                return R_OUT;
+            }
+            if (IS_TIME(val2))
+                fail (Error_Invalid_Arg(val2));
+            arg = VAL_INT64(val2);
+        }
+        else
+            arg = 0L;
+        num = Round_Int(num, flags, arg);
+        break; }
+
+    case SYM_RANDOM: {
+        INCLUDE_PARAMS_OF_RANDOM;
+
+        UNUSED(PAR(value));
+
+        if (REF(only))
+            fail (Error(RE_BAD_REFINES));
+
+        if (REF(seed)) {
+            Set_Random(num);
+            return R_VOID;
+        }
+        if (num == 0)
+            break;
+        num = Random_Range(num, REF(secure));  // !!! 64 bits
+        break; }
+
+    default:
+        fail (Error_Illegal_Action(REB_INTEGER, action));
+    }
+
+    SET_INTEGER(D_OUT, num);
+    return R_OUT;
 }

@@ -1,17 +1,19 @@
 REBOL [
-	System: "REBOL [R3] Language Interpreter and Run-time Environment"
-	Title: "Make Reb-Lib related files"
-	Rights: {
-		Copyright 2012 REBOL Technologies
-		REBOL is a trademark of REBOL Technologies
-	}
-	License: {
-		Licensed under the Apache License, Version 2.0
-		See: http://www.apache.org/licenses/LICENSE-2.0
-	}
-	Author: "Carl Sassenrath"
-	Needs: 2.100.100
+    System: "REBOL [R3] Language Interpreter and Run-time Environment"
+    Title: "Make Reb-Lib related files"
+    Rights: {
+        Copyright 2012 REBOL Technologies
+        Copyright 2012-2017 Rebol Open Source Contributors
+        REBOL is a trademark of REBOL Technologies
+    }
+    License: {
+        Licensed under the Apache License, Version 2.0
+        See: http://www.apache.org/licenses/LICENSE-2.0
+    }
+    Needs: 2.100.100
 ]
+
+do %common.r
 
 print "--- Make Reb-Lib Headers ---"
 
@@ -25,200 +27,126 @@ src-dir: %../core/
 reb-lib: src-dir/a-lib.c
 ext-lib: src-dir/f-extension.c
 
-out-dir: %../include/
+args: parse-args system/options/args
+output-dir: to file! any [args/OUTDIR %../]
+output-dir: fix-win32-path output-dir
+out-dir: output-dir/include
+mkdir/deep out-dir
+
 reb-ext-lib:  out-dir/reb-lib.h   ; for Host usage
 reb-ext-defs: out-dir/reb-lib-lib.h  ; for REBOL usage
 
 ver: load %../boot/version.r
 
 do %common.r
+do %common-parsers.r
 
 do %form-header.r
 
 ;-----------------------------------------------------------------------------
 ;-----------------------------------------------------------------------------
 
-cnt: 0
+proto-count: 0
 
-xlib: make string! 20000
-rlib: make string! 1000
-mlib: make string! 1000
-dlib: make string! 1000
-cmts: make string! 1000
-xsum: make string! 1000
+xlib-buffer: make string! 20000
+rlib-buffer: make string! 1000
+mlib-buffer: make string! 1000
+dlib-buffer: make string! 1000
+xsum-buffer: make string! 1000
 
-emit:  func [d] [append repend xlib d newline]
-remit: func [d] [append repend rlib d newline]
-demit: func [d] [append repend dlib d newline]
-cemit: func [d] [append repend cmts d newline]
-memit: func [d /nol] [
-	repend mlib d
-	if not nol [append mlib newline]
+emit: func [d] [append adjoin xlib-buffer d newline]
+emit-rlib: func [d] [append adjoin rlib-buffer d newline]
+emit-dlib: func [d] [append adjoin dlib-buffer d newline]
+emit-mlib: proc [d /nol] [
+    adjoin mlib-buffer d
+    if not nol [append mlib-buffer newline]
 ]
 
 count: func [s c /local n] [
-	if find ["()" "(void)"] s [return "()"]
-	out: copy "(a"
-	n: 1
-	while [s: find/tail s c][
-		repend out [#"," #"a" + n]
-		n: n + 1
-	]
-	append out ")"
+    if find ["()" "(void)"] s [return "()"]
+    out: copy "(a"
+    n: 1
+    while [s: find/tail s c][
+        adjoin out [#"," #"a" + n]
+        n: n + 1
+    ]
+    append out ")"
 ]
 
-in-sub: func [str pat /local f] [
-	all [
-		f: find cmt pat ":"
-		insert f "^/:"
-		f: find next f newline
-		remove f
-		insert f " - "
-	]
-]
-
-gen-doc: func [fspec spec cmt] [
-	replace/all cmt "**" "  "
-	replace/all cmt "/*" "  "
-	replace/all cmt "*/" "  "
-	trim cmt
-	append cmt newline
-
-	insert find cmt "Arguments:" "^/:"
-	bb: beg: find/tail cmt "Arguments:"
-	insert any [find bb "notes:" tail bb] newline
-	while [
-		all [
-			beg: find beg " - "
-			positive? offset-of beg any [find beg "notes:" tail beg]
-		]
-	][
-		insert beg </tt>
-		insert find/tail/reverse beg newline {<br><tt class=word>}
-		beg: find/tail beg " - "
-	]
-
-	beg: insert bb { - } ;<div style="white-space: pre;">}
-	remove find beg newline
-	remove/part find beg "<br>" 4 ; extra <br>
-
-	remove find cmt "^/Returns:"
-	in-sub cmt "Returns:"
-	in-sub cmt "Notes:"
-
-	insert cmt reduce [
-		":Function: - " <tt class=word> spec </tt>
-		"^/^/:Summary: - "
-	]
-	cemit ["===" fspec newline newline cmt]
+in-sub: func [text pattern /local position] [
+    all [
+        position: find text pattern ":"
+        insert position "^/:"
+        position: find next position newline
+        remove position
+        insert position " - "
+    ]
 ]
 
 pads: func [start col] [
-	col: col - offset-of start tail start
-	head insert/dup clear "" #" " col
+    str: copy ""
+    col: col - offset-of start tail start
+    head insert/dup str #" " col
 ]
 
-func-header: [
-	[
-		;-- WARNING: as written this means you can't use RL_API in a comment
-		;-- or this will screw up... more rigor needed.
+emit-proto: proc [
+    proto
+] [
 
-		thru "RL_API "
-		copy spec to newline skip
-		["/*" copy cmt thru "*/" | none]
-		(
-			if all [
-				spec
-				trim spec
-				fn: find spec preface
-				find spec #"("
-			][
-				emit ["RL_API " spec ";"] ;    // " the-file]
-				append xsum spec
-				p1: copy/part spec fn
-				p3: find fn #"("
-				p2: copy/part fn p3
-				p2u: uppercase copy p2
-				p2l: lowercase copy find/tail p2 preface
-				demit [tab p2 ","]
-				remit [tab p1 "(*" p2l ")" p3 ";"]
-				args: count p3 #","
-				m: tail mlib
-				memit/nol ["#define " p2u args]
-				memit [pads m 35 " RL->" p2l args]
-				if w: find cmt "****" [append clear w "*/"]
-				memit ["/*^/**^-" spec "^/**" cmt newline]
+    if all [
+        proto
+        trim proto
+        pos.id: find proto preface
+        find proto #"("
+    ] [
+        emit ["RL_API " proto ";"] ;    // " the-file]
+        append xsum-buffer proto
+        fn.declarations: copy/part proto pos.id
+        pos.lparen: find pos.id #"("
+        fn.name: copy/part pos.id pos.lparen
+        fn.name.upper: uppercase copy fn.name
+        fn.name.lower: lowercase copy find/tail fn.name preface
 
-				gen-doc p2 spec cmt
-				cnt: cnt + 1
-			]
-		)
-		newline
-		[
-			"/*" ; must be in func header section, not file banner
-			any [
-				thru "**"
-				[#" " | #"^-"]
-				copy line thru newline
-			]
-			thru "*/"
-			|
-			none
-		]
-	]
-]
+        emit-dlib [spaced-tab fn.name ","]
 
-write-if: func [file data] [
-	if data <> attempt [to string! read file][ ;R3
-		print ["UPDATE:" file]
-		write file data
-	]
+        emit-rlib [
+            spaced-tab fn.declarations "(*" fn.name.lower ")" pos.lparen ";"
+        ]
+
+        args: count pos.lparen #","
+        mlib.tail: tail mlib-buffer
+        emit-mlib/nol ["#define " fn.name.upper args]
+        emit-mlib [pads mlib.tail 35 " RL->" fn.name.lower args]
+
+        comment-text: proto-parser/notes
+        encode-lines comment-text {**} { }
+
+        emit-mlib [
+            "/*" newline
+            "**" space space proto newline
+            "**" newline
+            comment-text
+            "*/" newline
+        ]
+
+        proto-count: proto-count + 1
+    ]
 ]
 
 process: func [file] [
-	if verbose [?? file]
-	data: to string! read the-file: file ;R3
-	parse data [
-		any func-header
-	]
+    if verbose [probe [file]]
+    data: read the-file: file
+    data: to-string data
+
+    proto-parser/proto-prefix: "RL_API "
+    proto-parser/emit-proto: :emit-proto
+    proto-parser/process data
 ]
 
 ;-----------------------------------------------------------------------------
 
-remit {
+emit-rlib {
 typedef struct rebol_ext_api ^{}
-
-cemit [{Host/Extension API
-
-=r3
-
-=*Updated for A} ver/3 { on } now/date {
-
-=*Describes the functions of reb-lib, the REBOL API (both the DLL and extension library.)
-
-=!This document is auto-generated and changes should not be made within this wiki.
-
-=note WARNING: PRELIMINARY Documentation
-
-=*This API is under development and subject to change. Various functions may be moved, removed, renamed, enhanced, etc.
-
-Also note: the formatting of this document will be enhanced in future revisions.
-
-=/note
-
-==Concept
-
-The REBOL API provides common API functions needed by the Host-Kit and also by
-REBOL extension modules. This interface is commonly referred to as "reb-lib".
-
-There are two methods of linking to this code:
-
-*Direct calls as you would use functions within any DLL.
-
-*Indirect calls through a set of macros (that use a structure pointer to the library.)
-
-==Functions
-}]
 
 ;-----------------------------------------------------------------------------
 
@@ -227,7 +155,7 @@ process ext-lib
 
 ;-----------------------------------------------------------------------------
 
-remit "} RL_LIB;"
+emit-rlib "} RL_LIB;"
 
 out: to-string reduce [
 form-header/gen "REBOL Host and Extension API" %reb-lib.r %make-reb-lib.r
@@ -238,35 +166,15 @@ form-header/gen "REBOL Host and Extension API" %reb-lib.r %make-reb-lib.r
 #define RL_REV } ver/2 {
 #define RL_UPD } ver/3 {
 
-// Compatiblity with the lib requires that structs are aligned using the same
-// method. This is concrete, not abstract. The macro below uses struct
-// sizes to inform the developer that something is wrong.
-#if defined(__LP64__) || defined(__LLP64__)
-
-#ifdef HAS_POSIX_SIGNAL
-	#define CHECK_STRUCT_ALIGN (sizeof(REBREQ) == 196 && sizeof(REBEVT) == 16)
-#else
-	#define CHECK_STRUCT_ALIGN (sizeof(REBREQ) == 100 && sizeof(REBEVT) == 16)
-#endif //HAS_POSIX_SIGNAL
-
-#else // !defined(__LP64__) && !defined(__LLP64__)
-
-#ifdef HAS_POSIX_SIGNAL
-	#define CHECK_STRUCT_ALIGN (sizeof(REBREQ) == 180 && sizeof(REBEVT) == 12)
-#else
-	#define CHECK_STRUCT_ALIGN (sizeof(REBREQ) == 80 && sizeof(REBEVT) == 12)
-#endif //HAS_POSIX_SIGNAL
-
-#endif
 
 // Function entry points for reb-lib (used for MACROS below):}
-rlib
+rlib-buffer
 {
 // Extension entry point functions:
 #ifdef TO_WINDOWS
-	#define RXIEXT __declspec(dllexport)
+    #define RXIEXT __declspec(dllexport)
 #else
-	#define RXIEXT extern
+    #define RXIEXT extern
 #endif
 
 #ifdef __cplusplus
@@ -275,7 +183,7 @@ extern "C" ^{
 
 RXIEXT const char *RX_Init(int opts, RL_LIB *lib);
 RXIEXT int RX_Quit(int opts);
-RXIEXT int RX_Call(int cmd, RXIFRM *frm, void *data);
+RXIEXT int RX_Call(int cmd, const REBVAL *frm, void *data);
 
 // The macros below will require this base pointer:
 extern RL_LIB *RL;  // is passed to the RX_Init() function
@@ -283,7 +191,7 @@ extern RL_LIB *RL;  // is passed to the RX_Init() function
 // Macros to access reb-lib functions (from non-linked extensions):
 
 }
-mlib
+mlib-buffer
 {
 
 #define RL_MAKE_BINARY(s) RL_MAKE_STRING(s, FALSE)
@@ -291,7 +199,7 @@ mlib
 #ifndef REB_EXT // not extension lib, use direct calls to r3lib
 
 }
-xlib
+xlib-buffer
 {
 #endif // REB_EXT
 
@@ -302,7 +210,7 @@ xlib
 }
 ]
 
-write-if reb-ext-lib out
+write reb-ext-lib out
 
 ;-----------------------------------------------------------------------------
 
@@ -310,14 +218,12 @@ out: to-string reduce [
 form-header/gen "REBOL Host/Extension API" %reb-lib-lib.r %make-reb-lib.r
 {RL_LIB Ext_Lib = ^{
 }
-dlib
+dlib-buffer
 {^};
 }
 ]
 
-write-if reb-ext-defs out
-
-write-if %../reb-lib-doc.txt cmts
+write reb-ext-defs out
 
 ;ask "Done"
 print "   "

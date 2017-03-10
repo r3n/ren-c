@@ -1,73 +1,143 @@
 REBOL [
-	System: "REBOL [R3] Language Interpreter and Run-time Environment"
-	Title: "REBOL 3 Mezzanine: Function Helpers"
-	Rights: {
-		Copyright 2012 REBOL Technologies
-		REBOL is a trademark of REBOL Technologies
-	}
-	License: {
-		Licensed under the Apache License, Version 2.0
-		See: http://www.apache.org/licenses/LICENSE-2.0
-	}
+    System: "REBOL [R3] Language Interpreter and Run-time Environment"
+    Title: "REBOL 3 Mezzanine: Function Helpers"
+    Rights: {
+        Copyright 2012 REBOL Technologies
+        REBOL is a trademark of REBOL Technologies
+    }
+    License: {
+        Licensed under the Apache License, Version 2.0
+        See: http://www.apache.org/licenses/LICENSE-2.0
+    }
 ]
 
-clos: func [
-	{Defines a closure function.}
-	spec [block!] {Help string (opt) followed by arg words (and opt type and string)}
-	body [block!] {The body block of the function}
-][
-	make closure! copy/deep reduce [spec body]
-]
-
-closure: func [
-	{Defines a closure function with all set-words as locals.}
-	spec [block!] {Help string (opt) followed by arg words (and opt type and string)}
-	body [block!] {The body block of the function}
-	/with {Define or use a persistent object (self)}
-	object [object! block! map!] {The object or spec}
-	/extern words [block!] {These words are not local}
-][
-	; Copy the spec and add /local to the end if not found
-	unless find spec: copy/deep spec /local [append spec [
-		/local ; In a block so the generated source gets the newlines
-	]]
-	; Make a full copy of the body, to allow reuse of the original
-	body: copy/deep body
-	; Collect all set-words in the body as words to be used as locals, and add
-	; them to the spec. Don't include the words already in the spec or object.
-	insert find/tail spec /local collect-words/deep/set/ignore body either with [
-		; Make our own local object if a premade one is not provided
-		unless object? object [object: make object! object]
-		bind body object  ; Bind any object words found in the body
-		; Ignore the words in the spec and those in the object. The spec needs
-		; to be copied since the object words shouldn't be added to the locals.
-		append append append copy spec 'self words-of object words ; ignore 'self too
-	][
-		; Don't include the words in the spec, or any extern words.
-		either extern [append copy spec words] [spec]
-	]
-	make closure! reduce [spec body]
-]
-
-has: func [
-	{A shortcut to define a function that has local variables but no arguments.}
-	vars [block!] {List of words that are local to the function}
-	body [block!] {The body block of the function}
-][
-	make function! reduce [head insert copy/deep vars /local copy/deep body]
-]
 
 map: func [
-	{Make a map value (hashed associative block).}
-	val
+    {Make a map value (hashed associative block).}
+    val
 ][
-	make map! :val
+    make map! :val
 ]
 
-task: func [
-	{Creates a task.}
-	spec [block!] {Name or spec block}
-	body [block!] {The body block of the task}
+
+body-of: function [
+    value [any-value!]
 ][
-	make task! copy/deep reduce [spec body]
+    body: reflect :value 'body
+    unless function? :value [return body]
+
+    ; FUNCTION! has a number of special tricks for its implementation, where
+    ; the body information is not what you could just pass to MAKE FUNCTION!
+    ; and get equivalent behavior.  The goal of this usermode code is to
+    ; build simulated equivalants that *could* be passed to MAKE FUNCTION!.
+    ;
+    switch func-class-of :value [
+        1 [
+            ; Native.  The actual "body of" is a function pointer, which
+            ; is currently rendered as a HANDLE!.
+            ;
+            ; !!! Near-term-future feature: native bodies able to provide
+            ; equivalent user-mode code, if provided via native/body
+
+            remark: [
+                comment {Native code, implemented in C (this body is fake)}
+            ]
+
+            either block? body [
+                body: compose [
+                    (remark)
+                    (body)
+                ]
+            ][
+                body: compose [
+                    (remark)
+                    do-native (body) <...>
+                ]
+            ]
+
+            body
+        ]
+
+        2 [
+            ; Usermode-written function (like this one is!) via MAKE FUNCTION!
+            ; so just give back the body as-is.
+            ;
+            ; Note: The body given back here may be fake if it's a PROC or
+            ; FUNC...though that level of fakeness is more tightly integrated
+            ; into the dispatch than the other fakes here.  It's needed for
+            ; efficient definitional returns, but pains were taken to ensure
+            ; that this could indeed be done by equivalent user mode code.
+
+            body
+        ]
+
+        3 [
+            ; Action.  Currently action bodies are numbers, because the
+            ; `switch` statement in C that implements type-specific actions
+            ; isn't able to switch on the function's identity (via paramlist)
+
+            compose [
+                comment {Type-Specific action method (internal, ATM)}
+                do-action (body) <...>
+            ]
+        ]
+
+        4 [
+            ; Command.  These are a historical extension mechanism, used to
+            ; make native routines that are built with the extension API
+            ; (as opposed to Ren-C).
+
+            compose [
+                comment {Rebol Lib (RL_Api) Extension (made by make-command)}
+                do-command (body) <...>
+            ]
+        ]
+
+        5 [
+            ; FFI Routine...likely to become user function.
+
+            compose [
+                comment {FFI Bridge to C Function (via make-routine)}
+                do-routine (body) <...>
+            ]
+        ]
+
+        6 [
+            ; FFI Callback...likely to be folded in as an internal mechanism
+            ; in the FFI for calling ordinary user functions.
+
+            append copy [
+                comment {FFI C thunk for Rebol Function (via make-callback)}
+            ] body
+        ]
+
+        7 [
+            ; Function Specialization.  These are partially (or fully) filled
+            ; frames that EVAL automatically, by being stuffed in FUNCTION!
+            ;
+            ; Currently the low-level spec of these functions is just a single
+            ; element series of the name of what is specialized.
+            ;
+            ; !!! It would be possible to inject commentary information on
+            ; the specialized fields for what they meant, by taking it that
+            ; from the original function's spec and putting it inline with
+            ; the specialization assignment.
+
+            spec-with-word: reflect :value 'spec
+            assert [word? first spec-with-word]
+
+            compose [
+                comment (
+                    spaced [
+                        {Specialization of}
+                        first spec-with-word
+                        {(this body is fake)}
+                    ]
+                )
+                eval (body) <...>
+            ]
+        ]
+
+        (fail "Unknown function class")
+    ]
 ]

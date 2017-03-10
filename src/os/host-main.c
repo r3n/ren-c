@@ -1,119 +1,665 @@
-/***********************************************************************
-**
-**  REBOL [R3] Language Interpreter and Run-time Environment
-**
-**  Copyright 2012 REBOL Technologies
-**  REBOL is a trademark of REBOL Technologies
-**
-**  Additional code modifications and improvements Copyright 2012 Saphirion AG
-**
-**  Licensed under the Apache License, Version 2.0 (the "License");
-**  you may not use this file except in compliance with the License.
-**  You may obtain a copy of the License at
-**
-**  http://www.apache.org/licenses/LICENSE-2.0
-**
-**  Unless required by applicable law or agreed to in writing, software
-**  distributed under the License is distributed on an "AS IS" BASIS,
-**  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**  See the License for the specific language governing permissions and
-**  limitations under the License.
-**
-************************************************************************
-**
-**	Title: Host environment main entry point
-**	Note: OS independent
-**  Author: Carl Sassenrath
-**  Purpose:
-**		Provides the outer environment that calls the REBOL lib.
-**		This module is more or less just an example and includes
-**		a very simple console prompt.
-**
-************************************************************************
-**
-**  WARNING to PROGRAMMERS:
-**
-**		This open source code is strictly managed to maintain
-**		source consistency according to our standards, not yours.
-**
-**		1. Keep code clear and simple.
-**		2. Document odd code, your reasoning, or gotchas.
-**		3. Use our source style for code, indentation, comments, etc.
-**		4. It must work on Win32, Linux, OS X, BSD, big/little endian.
-**		5. Test your code really well before submitting it.
-**
-***********************************************************************/
+//
+//  File: %host-main.c
+//  Summary: "Host environment main entry point"
+//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  Homepage: https://github.com/metaeducation/ren-c/
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Copyright 2012 REBOL Technologies
+// Copyright 2012-2017 Rebol Open Source Contributors
+// REBOL is a trademark of REBOL Technologies
+//
+// See README.md and CREDITS.md for more information.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// %host-main.c is the original entry point for the open-sourced R3-Alpha.
+// Depending on whether it was POSIX or Windows, it would define either a
+// `main()` or `WinMain()`, and implemented a very rudimentary console.
+//
+// On POSIX systems it uses <termios.h> to implement line editing:
+//
+// http://pubs.opengroup.org/onlinepubs/7908799/xbd/termios.html
+//
+// On Windows it uses the Console API:
+//
+// https://msdn.microsoft.com/en-us/library/ms682087.aspx
+//
+// !!! Originally %host-main.c was a client of the %reb-host.h (RL_Api).  It
+// did not have access to things like the definition of a REBVAL or a REBSER.
+// The sparse and convoluted nature of the RL_Api presented an awkward
+// barrier, and the "sample console" stagnated as a result.
+//
+// In lieu of a suitable "abstracted" variant of the core services--be that
+// an evolution of RL_Api or otherwise--the console now links directly
+// against the Ren-C core.  This provides full access to the routines and
+// hooks necessary to evolve the console if one were interested.  (The GUI
+// inteface Ren Garden is the flagship console for Ren-C, so that is where
+// most investment will be made.)
+//
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
 #ifdef _WIN32
-#undef _WIN32_WINNT
-#define _WIN32_WINNT 0x0500
-#include <windows.h>
+    //
+    // On Windows it is required to include <windows.h>, and defining the
+    // _WIN32_WINNT constant to 0x0501 specifies the minimum targeted version
+    // is Windows XP.  This is the earliest platform API still supported by
+    // Visual Studio 2015:
+    //
+    //     https://msdn.microsoft.com/en-us/library/6sehtctf.aspx
+    //
+    // R3-Alpha used 0x0500, indicating a minimum target of Windows 2000.  No
+    // Windows-XP-specific dependencies were added in Ren-C, but the version
+    // was bumped to avoid compilation errors in the common case.
+    //
+    // !!! Note that %sys-core.h includes <windows.h> as well if building
+    // for windows.  The redundant inclusion should not create a problem.
+    // (So better to do the inclusion just to test that it doesn't.)
+    //
+    #undef _WIN32_WINNT
+    #define _WIN32_WINNT 0x0501
+    #include <windows.h>
+
+    // Put any dependencies that include <windows.h> here
+    //
+    /* #include "..." */
+    /* #include "..." */
+
+    // Undefine the Windows version of IS_ERROR to avoid compiler warning
+    // when Rebol redefines it.  (Rebol defines IS_XXX for all datatypes.)
+    //
+    #undef IS_ERROR
+    #undef max
+    #undef min
+#else
+    #include <signal.h> // needed for SIGINT, SIGTERM, SIGHUP
 #endif
 
-#include "reb-host.h"		// standard host include files
-#include "host-table.inc"
 
-#ifdef CUSTOM_STARTUP
-#include "host-init.h"
-#endif
+#include "sys-core.h"
+#include "sys-ext.h"
+#include "tmp-boot-extensions.h"
 
-/**********************************************************************/
+EXTERN_C void RL_Version(REBYTE vers[]);
+EXTERN_C void RL_Init(void *lib);
+EXTERN_C void RL_Shutdown(REBOOL clean);
+EXTERN_C void RL_Escape();
 
-REBARGS Main_Args;
+EXTERN_C REBOL_HOST_LIB Host_Lib_Init;
 
-#ifdef TO_WINDOWS
-HINSTANCE App_Instance = 0;
-#endif
+
+// The initialization done by RL_Init() is intended to be as basic as possible
+// in order to get the Rebol series/values/array functions ready to be run.
+// Once that's ready, the rest of the initialization can take advantage of
+// a working evaluator.  This includes PARSE to process the command line
+// parameters, or PRINT to output boot banners.
+//
+// The %make-host-init.r file takes the %host-start.r script and turns it
+// into a compressed binary C literal.  That literal can be LOADed and
+// executed to return the HOST-START function, which takes the command line
+// arguments as an array of STRING! and handles it from there.
+//
+#include "tmp-host-start.inc"
+
+
+const REBYTE halt_str[] = "[escape]";
+const REBYTE breakpoint_str[] =
+    "** Breakpoint Hit (see BACKTRACE, DEBUG, and RESUME)\n";
+const REBYTE interrupted_str[] =
+    "** Execution Interrupted (see BACKTRACE, DEBUG, and RESUME)\n";
 
 #ifndef REB_CORE
-extern void Init_Windows(void);
-extern void OS_Init_Graphics(void);
-extern void OS_Destroy_Graphics(void);
+EXTERN_C void Init_Windows(void);
+EXTERN_C void OS_Init_Graphics(void);
+EXTERN_C void OS_Destroy_Graphics(void);
 #endif
 
-extern void Init_Core_Ext(void);
 
-//#define TEST_EXTENSIONS
-#ifdef TEST_EXTENSIONS
-extern void Init_Ext_Test(void);	// see: host-ext-test.c
+#ifdef TO_WINDOWS
+    EXTERN_C HINSTANCE App_Instance;
+    HINSTANCE App_Instance = 0;
 #endif
+
 
 // Host bare-bones stdio functs:
 extern void Open_StdIO(void);
-extern void Put_Str(REBYTE *buf);
-extern REBYTE *Get_Str();
+extern void Close_StdIO(void);
+extern void Put_Str(const REBYTE *buf);
+
 
 /* coverity[+kill] */
 void Host_Crash(const char *reason) {
-	OS_Crash(cb_cast("REBOL Host Failure"), cb_cast(reason));
+    OS_CRASH(cb_cast("REBOL Host Failure"), cb_cast(reason));
 }
+
+
+// Current stack level displayed in the REPL, where bindings are assumed to
+// be made for evaluations.  So if the prompt reads `[3]>>`, and a string
+// of text is typed in to be loaded as code, that code will be bound to
+// the user context, then the lib context, then to the variables of whatever
+// function is located at stack level 3.
+//
+extern REBCNT HG_Stack_Level;
+REBCNT HG_Stack_Level = 1;
+
+REBVAL HG_Host_Repl;
+
+
+// The DEBUG command is a host-specific "native", which modifies state that
+// is specific to controlling variables and behaviors in the REPL.  Since
+// the core itself seeks to avoid having any UI and only provide evaluation
+// services, C code for DEBUG must either be within the host, or the DEBUG
+// native would need to implement an abstract protocol that could make
+// callbacks into the host.
+//
+// A standard or library might evolve so that every host does not reimplement
+// the debug logic.  However, much of the debugging behavior depends on the
+// nature of the host (textual vs. GUI), as well as being able to modify
+// state known to the host and not the core.  So for the moment, DEBUG is
+// implemented entirely in the host...while commands like BREAKPOINT have
+// their implementation in the core with a callback to the host to implement
+// the host-specific portion.
+//
+// !!! Can the REBNATIVE with source-in-comment declaration style be
+// something that non-core code can use, vs. this handmade variant?
+//
+const REBYTE N_debug_spec[] =
+    " {Dialect for interactive debugging, see documentation for details}"
+    " 'value [_ integer! frame! function! block!]"
+        " {Stack level to inspect or dialect block, or enter debug mode}"
+    "";
+REB_R N_debug(REBFRM *frame_) {
+    PARAM(1, value); // no automatic INCLUDE_PARAMS_OF_XXX for manual native
+
+    REBVAL *value = ARG(value);
+
+    if (IS_VOID(value)) {
+        //
+        // e.g. just `>> debug` and [enter] in the console.  Ideally this
+        // would shift the REPL into a mode where all commands issued were
+        // assumed to be in the debug dialect, similar to Ren Garden's
+        // modalities like `debug>>`.
+        //
+        Debug_Fmt("Sorry, there is no debug>> 'mode' yet in the console.");
+        goto modify_with_confidence;
+    }
+
+    if (IS_INTEGER(value) || IS_FRAME(value) || IS_FUNCTION(value)) {
+        REBFRM *frame;
+
+        // We pass TRUE here to account for an extra stack level... the one
+        // added by DEBUG itself, which presumably should not count.
+        //
+        if (!(frame = Frame_For_Stack_Level(&HG_Stack_Level, value, TRUE)))
+            fail (Error_Invalid_Arg(value));
+
+        Init_Block(D_OUT, Make_Where_For_Frame(frame));
+        return R_OUT;
+    }
+
+    assert(IS_BLOCK(value));
+
+    Debug_Fmt(
+        "Sorry, but the `debug [...]` dialect is not defined yet.\n"
+        "Change the stack level (integer!, frame!, function!)\n"
+        "Or try out these commands:\n"
+        "\n"
+        "    BREAKPOINT, RESUME, BACKTRACE\n"
+    );
+
+modify_with_confidence:
+    Debug_Fmt(
+        "(Note: Ren-C is 'modify-with-confidence'...so just because a debug\n"
+        "feature you want isn't implemented doesn't mean you can't add it!)\n"
+    );
+
+    return R_BLANK;
+}
+
+
+//
+//  Do_Code()
+//
+// This is a version of a routine that was offered by the RL_Api, which has
+// been expanded here in order to permit the necessary customizations for
+// interesting REPL behavior w.r.t. binding, error handling, and response
+// to throws.
+//
+// !!! Now that this code has been moved into the host, the convoluted
+// integer-return-scheme can be eliminated and the code integrated more
+// clearly into the surrounding calls.
+//
+int Do_Code(
+    int *exit_status,
+    REBVAL *out,
+    const REBVAL *code,
+    REBOOL at_breakpoint
+) {
+    assert(IS_BLOCK(code));
+
+    struct Reb_State state;
+    REBCTX *error;
+
+    // Breakpoint REPLs are nested, and we may wish to jump out of them to
+    // the topmost level via a HALT.  However, all other errors need to be
+    // confined, so that if one is doing evaluations during the pause of
+    // a breakpoint an error doesn't "accidentally resume" by virtue of
+    // jumping the stack out of the REPL.
+    //
+    // The topmost layer REPL, however, needs to catch halts in order to
+    // keep control and not crash out.
+    //
+    if (at_breakpoint)
+        PUSH_TRAP(&error, &state);
+    else
+        PUSH_UNHALTABLE_TRAP(&error, &state);
+
+// The first time through the following code 'error' will be NULL, but...
+// `fail` can longjmp here, so 'error' won't be NULL *if* that happens!
+
+    if (error) {
+        if (ERR_NUM(error) == RE_HALT) {
+            assert(!at_breakpoint);
+            return -1; // !!! Revisit hardcoded #
+        }
+
+        Init_Error(out, error);
+        return -cast(REBINT, ERR_NUM(error));
+    }
+
+    if (Do_At_Throws(out, VAL_ARRAY(code), VAL_INDEX(code), SPECIFIED)) {
+        if (at_breakpoint) {
+            if (
+                IS_FUNCTION(out)
+                && VAL_FUNC_DISPATCHER(out) == &N_resume
+            ) {
+                //
+                // This means we're done with the embedded REPL.  We want to
+                // resume and may be returning a piece of code that will be
+                // run by the finishing BREAKPOINT command in the target
+                // environment.
+                //
+                // We'll never return a halt, so we reuse -1 (in this very
+                // temporary scheme built on the very clunky historical REPL,
+                // which will not last much longer...fingers crossed.)
+                //
+                DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
+                CATCH_THROWN(out, out);
+                *exit_status = -1;
+                return -1;
+            }
+
+            if (
+                IS_FUNCTION(out)
+                && VAL_FUNC_DISPATCHER(out) == &N_quit
+            ) {
+                //
+                // It would be frustrating if the system did not respond to
+                // a QUIT and forced you to do `resume/with [quit]`.  So
+                // this is *not* caught, rather passed back up with the
+                // special -2 status code.
+                //
+                DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
+                CATCH_THROWN(out, out);
+                *exit_status = -2;
+                return -2;
+            }
+        }
+        else {
+            // We are at the top level REPL, where we catch QUIT
+            //
+            if (
+                IS_FUNCTION(out)
+                && VAL_FUNC_DISPATCHER(out) == &N_quit
+            ) {
+                DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
+                CATCH_THROWN(out, out);
+                *exit_status = Exit_Status_From_Value(out);
+                return -2; // Revisit hardcoded #
+            }
+        }
+
+        fail (Error_No_Catch_For_Throw(out));
+    }
+
+    DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
+
+    return 0;
+}
+
+
+void Host_Repl(
+    int *exit_status,
+    REBVAL *out,
+    REBOOL at_breakpoint
+) {
+    REBOOL last_failed = FALSE;
+    SET_VOID(out);
+
+    DECLARE_LOCAL (level);
+    DECLARE_LOCAL (frame);
+    SET_BLANK(level);
+    SET_BLANK(frame);
+
+    PUSH_GUARD_VALUE(frame);
+
+    while (TRUE) {
+        int do_result;
+
+        if (at_breakpoint) {
+            //
+            // If we're stopped at a breakpoint, then the REPL has a
+            // modality to it of "which stack level you are examining".
+            // The DEBUG command can change this, so at the moment it
+            // has to be refreshed each time an evaluation is performed.
+
+            SET_INTEGER(level, HG_Stack_Level);
+
+            REBFRM *f = Frame_For_Stack_Level(NULL, level, FALSE);
+            assert(f);
+
+            Init_Any_Context(
+                frame,
+                REB_FRAME,
+                Context_For_Frame_May_Reify_Managed(f)
+            );
+        }
+
+        DECLARE_LOCAL (code_or_error);
+        if (Apply_Only_Throws(
+            code_or_error, // where return value of HOST-REPL is saved
+            TRUE, // error if not all arguments before END_CELL are consumed
+            &HG_Host_Repl, // HOST-REPL function to run
+            out, // last-result (always void first run through loop)
+            last_failed ? TRUE_VALUE : FALSE_VALUE, // last-failed
+            level, // focus-level
+            frame, // focus-frame
+            END_CELL
+        )) {
+            // The REPL should not execute anything that should throw.
+            // Determine graceful way of handling if it does.
+            //
+            panic (code_or_error);
+        }
+
+        if (IS_ERROR(code_or_error)) {
+            do_result = -cast(int, ERR_NUM(VAL_CONTEXT(code_or_error)));
+            Move_Value(out, code_or_error);
+        }
+        else if (IS_BLOCK(code_or_error))
+            do_result = Do_Code(
+                exit_status, out, code_or_error, at_breakpoint
+            );
+        else
+            panic (code_or_error);
+
+        // NOTE: Although the operation has finished at this point, it may
+        // be that a Ctrl-C set up a pending FAIL, which will be triggered
+        // during output below.  See the PUSH_UNHALTABLE_TRAP in the caller.
+
+        if (do_result == -1) {
+            //
+            // If we're inside a breakpoint, this actually means "resume",
+            // because Do_Code doesn't do any error trapping if we pass
+            // in `at_breakpoint = TRUE`.  Hence any HALT longjmp would
+            // have bypassed this, so the -1 signal is reused (for now).
+            //
+            if (at_breakpoint)
+                goto cleanup_and_return;
+
+            // !!! The "Halt" status is communicated via -1, but
+            // is not an actual valid "error value".  It cannot be
+            // created by user code, and the fact that it is done
+            // via the error mechanism is an "implementation detail".
+            //
+            Put_Str(halt_str);
+            last_failed = FALSE;
+
+            // The output value will be an END marker on halt, to signal the
+            // unusability of the interrupted result.
+            //
+            SET_VOID(out);
+        }
+        else if (do_result == -2) {
+            //
+            // Command issued a purposeful QUIT or EXIT, exit_status
+            // contains status.  Assume nothing was pushed on stack
+            //
+            goto cleanup_and_return;
+        }
+        else if (do_result < -2) {
+            last_failed = TRUE;
+            assert(IS_ERROR(out));
+        }
+        else {
+            // Result will be printed by next loop
+            //
+            assert(do_result == 0);
+            last_failed = FALSE;
+        }
+    }
+
+cleanup_and_return:
+    DROP_GUARD_VALUE(frame);
+    return;
+}
+
+
+//
+//  Host_Breakpoint_Quitting_Hook()
+//
+// This hook is registered with the core as the function that gets called
+// when a breakpoint triggers.
+//
+// There are only two options for leaving the hook.  One is to return TRUE
+// and thus signal a QUIT, where `instruction` is the value to quit /WITH.
+// The other choice is to return FALSE, where `instruction` is a purposefully
+// constructed "resume instruction".
+//
+// (Note: See remarks in the implementation of `REBNATIVE(resume)` for the
+// format of resume instructions.  But generally speaking, the host does not
+// need to know the details, as this represents a protocol that is supposed
+// to only be between BREAKPOINT and RESUME.  So the host just needs to
+// bubble up the argument to a throw that had the RESUME native's name on it,
+// when that type of throw is caught.)
+//
+// The ways in which a breakpoint hook can be exited are constrained in
+// order to "sandbox" it somewhat.  Though a nested REPL may be invoked in
+// response to a breakpoint--as is done here--continuation should be done
+// purposefully vs. "accidentally resuming" just because a FAIL or a THROW
+// happened.  One does not want to hit a breakpoint, then mistype a variable
+// name and trigger an error that does a longjmp that effectively cancels
+// the interactive breakpoint session!
+//
+// Hence RESUME and QUIT should be the only ways to get out of the breakpoint.
+// Note that RESUME/DO provides a loophole, where it's possible to run code
+// that performs a THROW or FAIL which is not trapped by the sandbox.
+//
+REBOOL Host_Breakpoint_Quitting_Hook(
+    REBVAL *instruction_out,
+    REBOOL interrupted
+) {
+    // Notify the user that the breakpoint or interruption was hit.
+    //
+    if (interrupted)
+        Put_Str(interrupted_str);
+    else
+        Put_Str(breakpoint_str);
+
+    // We save the stack level from before, so that we can put it back when
+    // we resume.  Each new breakpoint nesting hit will default to debugging
+    // stack level 1...e.g. the level that called breakpoint.
+    //
+    REBCNT old_stack_level = HG_Stack_Level;
+
+    DECLARE_LOCAL (level);
+    SET_INTEGER(level, 1);
+
+    if (Frame_For_Stack_Level(NULL, level, FALSE) != NULL)
+        HG_Stack_Level = 1;
+    else
+        HG_Stack_Level = 0; // Happens if you just type "breakpoint"
+
+    // Spawn nested REPL.
+    //
+    int exit_status;
+    Host_Repl(&exit_status, instruction_out, TRUE);
+
+    // Restore stack level, which is presumably still valid (there shouldn't
+    // have been any way to "delete levels from the stack above" while we
+    // were nested).
+    //
+    // !!! It might be nice if the prompt had a way of conveying that you were
+    // in nested breaks, and give the numberings of them adjusted:
+    //
+    //     |14|6|1|>> ...
+    //
+    // Or maybe that's TMI?
+    //
+    HG_Stack_Level = old_stack_level;
+
+    // We get -1 for RESUME and -2 for QUIT, under the current convoluted
+    // scheme of return codes.
+    //
+    // !!! Eliminate return codes now that RL_Api dependence is gone and
+    // speak in terms of the REBVALs themselves.
+    //
+    assert(exit_status == -1 || exit_status == -2);
+    return LOGICAL(exit_status == -2);
+}
+
+
+// Register host-specific DEBUG native in user and lib contexts.  (See
+// notes on N_debug regarding why the C code implementing DEBUG is in
+// the host and not part of Rebol Core.)
+//
+void Init_Debug_Extension(void) {
+    const REBYTE debug_utf8[] = "debug";
+    REBSTR *debug_name = Intern_UTF8_Managed(debug_utf8, LEN_BYTES(debug_utf8));
+
+    REBCTX *user_context = VAL_CONTEXT(Get_System(SYS_CONTEXTS, CTX_USER));
+    if (
+        0 == Find_Canon_In_Context(Lib_Context, STR_CANON(debug_name), TRUE) &&
+        0 == Find_Canon_In_Context(user_context, STR_CANON(debug_name), TRUE)
+    ) {
+        REBARR *spec_array = Scan_UTF8_Managed(
+            N_debug_spec, LEN_BYTES(N_debug_spec)
+        );
+        DECLARE_LOCAL (spec);
+        Init_Block(spec, spec_array);
+        Bind_Values_Deep(ARR_HEAD(spec_array), Lib_Context);
+
+        REBFUN *debug_native = Make_Function(
+            Make_Paramlist_Managed_May_Fail(spec, MKF_KEYWORDS),
+            &N_debug,
+            NULL, // no underlying function, this is fundamental
+            NULL // not providing a specialization
+        );
+
+        Move_Value(
+            Append_Context(Lib_Context, 0, debug_name),
+            FUNC_VALUE(debug_native)
+        );
+        Move_Value(
+            Append_Context(user_context, 0, debug_name),
+            FUNC_VALUE(debug_native)
+        );
+    }
+    else {
+        // It's already there--e.g. someone added REBNATIVE(debug).  Assert
+        // about it in the debug build, otherwise don't add the host version.
+        //
+        assert(FALSE);
+    }
+}
+
+
+#ifdef TO_WINDOWS
+
+//
+// This is the callback passed to `SetConsoleCtrlHandler()`.
+//
+BOOL WINAPI Handle_Break(DWORD dwCtrlType)
+{
+    switch(dwCtrlType) {
+    case CTRL_C_EVENT:
+    case CTRL_BREAK_EVENT:
+        RL_Escape();
+        return TRUE; // TRUE = "we handled it"
+
+    case CTRL_CLOSE_EVENT:
+        //
+        // !!! Theoretically the close event could confirm that the user
+        // wants to exit, if there is possible unsaved state.  As a UI
+        // premise this is probably less good than persisting the state
+        // and bringing it back.
+        //
+    case CTRL_LOGOFF_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        //
+        // They pushed the close button, did a shutdown, etc.  Exit.
+        //
+        // !!! Review arbitrary "100" exit code here.
+        //
+        OS_EXIT(100);
+        return TRUE; // TRUE = "we handled it"
+
+    default:
+        return FALSE; // FALSE = "we didn't handle it"
+    }
+}
+
+#else
+
+//
+// Hook registered via `signal()`.
+//
+static void Handle_Signal(int sig)
+{
+    RL_Escape();
+}
+
+#endif
+
 
 
 /***********************************************************************
 **
 **  MAIN ENTRY POINT
 **
-**	Win32 args:
-**		inst:  current instance of the application (app handle)
-**		prior: always NULL (use a mutex for single inst of app)
-**		cmd:   command line string (or use GetCommandLine)
-**	    show:  how app window is to be shown (e.g. maximize, minimize, etc.)
+**  Win32 args:
+**      inst:  current instance of the application (app handle)
+**      prior: always NULL (use a mutex for single inst of app)
+**      cmd:   command line string (or use GetCommandLine)
+**      show:  how app window is to be shown (e.g. maximize, minimize, etc.)
 **
-**	Win32 return:
-**		If the function succeeds, terminating when it receives a WM_QUIT
-**		message, it should return the exit value contained in that
-**		message's wParam parameter. If the function terminates before
-**		entering the message loop, it should return zero.
+**  Win32 return:
+**      If the function succeeds, terminating when it receives a WM_QUIT
+**      message, it should return the exit value contained in that
+**      message's wParam parameter. If the function terminates before
+**      entering the message loop, it should return zero.
 **
 **  Posix args: as you would expect in C.
 **  Posix return: ditto.
 **
-***********************************************************************/
+*/
+/***********************************************************************/
 
 // Using a main entry point for a console program (as opposed to WinMain)
 // so that we can connect to the console.  See the StackOverflow question
@@ -125,219 +671,365 @@ void Host_Crash(const char *reason) {
 
 int main(int argc, char **argv_ansi)
 {
-	REBYTE vers[8];
-	REBYTE *line;
-	REBINT err_num;
-	REBYTE *embedded_script = NULL;
-	REBI64 embedded_size = 0;
+    // Must be done before an console I/O can occur. Does not use reb-lib,
+    // so this device should open even if there are other problems.
+    //
+    Open_StdIO();
 
-	REBCHR **argv;
+    Host_Lib = &Host_Lib_Init;
+    RL_Init(Host_Lib);
 
-	// As defined, Put_Str takes non-const data
-	REBYTE prompt_str[] = ">> ";
-	REBYTE result_str[] = "== ";
-
+    // While running the Rebol initialization code, we don't want any special
+    // Ctrl-C handling... leave it to the OS (which would likely terminate
+    // the process).  But once it's done, set up the interrupt handler.
+    //
+    // Note: Once this was done in Open_StdIO, but it's less opaque to do it
+    // here (since there are already platform-dependent #ifdefs to handle the
+    // command line arguments)
+    //
 #ifdef TO_WINDOWS
-	// Were we using WinMain we'd be getting our arguments in Unicode, but
-	// since we're using an ordinary main() we do not.  However, this call
-	// lets us slip out and pick up the arguments in Unicode form.
-	argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    SetConsoleCtrlHandler(Handle_Break, TRUE);
 #else
-	// Assume no wide character support, and just take the ANSI C args
-	argv = argv_ansi;
+    // SIGINT is the interrupt, usually tied to "Ctrl-C"
+    //
+    signal(SIGINT, Handle_Signal);
+
+    // SIGTERM is sent on "polite request to end", e.g. default unix `kill`
+    //
+    signal(SIGTERM, Handle_Signal);
+
+    // SIGHUP is sent on a hangup, e.g. user's terminal disconnected
+    //
+    signal(SIGHUP, Handle_Signal);
+
+    // SIGQUIT is used to terminate a program in a way that is designed to
+    // debug it, e.g. a core dump.  Receiving SIGQUIT is a case where
+    // program exit functions like deletion of temporary files may be
+    // skipped to provide more state to analyze in a debugging scenario.
+    //
+    // -- no handler
+
+    // SIGKILL is the impolite signal for shutdown; cannot be hooked/blocked
 #endif
 
-	Host_Lib = &Host_Lib_Init;
+    // With basic initialization done, we want to turn the platform-dependent
+    // argument strings into a block of Rebol strings as soon as possible.
+    // That way the command line argument processing can be taken care of by
+    // PARSE instead of C code!
+    //
+    REBARR *argv = Make_Array(argc);
 
-	embedded_script = OS_Read_Embedded(&embedded_size);
-	Parse_Args(argc, argv, &Main_Args);
+#ifdef TO_WINDOWS
+    //
+    // Were we using WinMain we'd be getting our arguments in Unicode, but
+    // since we're using an ordinary main() we do not.  However, this call
+    // lets us slip out and pick up the arguments in Unicode form.
+    //
+    wchar_t **argv_utf16 = cast(
+        wchar_t**, CommandLineToArgvW(GetCommandLineW(), &argc)
+    );
+    int i = 0;
+    for (; i < argc; ++i) {
+        if (argv_utf16[i] == NULL)
+            continue; // shell bug
 
-	vers[0] = 5; // len
-	RL_Version(&vers[0]);
+        static_assert_c(sizeof(REBUNI) == sizeof(wchar_t));
 
-	// Must be done before an console I/O can occur. Does not use reb-lib,
-	// so this device should open even if there are other problems.
-	Open_StdIO();  // also sets up interrupt handler
+        Init_String(
+            Alloc_Tail_Array(argv),
+            Make_UTF16_May_Fail(cast(REBUNI*, argv_utf16[i]))
+        );
+    }
+#else
+    // Assume no wide character support, and just take the ANSI C args, which
+    // should ideally be in UTF8
+    //
+    int i = 0;
+    for (; i < argc; ++i) {
+        if (argv_ansi[i] == NULL)
+            continue; // shell bug
 
-	// Initialize the REBOL library (reb-lib):
-	if (!CHECK_STRUCT_ALIGN) Host_Crash("Incompatible struct alignment");
-	if (!Host_Lib) Host_Crash("Missing host lib");
-	// !!! Second part will become vers[2] < RL_REV on release!!!
-	if (vers[1] != RL_VER || vers[2] != RL_REV) Host_Crash("Incompatible reb-lib DLL");
-	err_num = RL_Init(&Main_Args, Host_Lib);
-	if (err_num == 1) Host_Crash("Host-lib wrong size");
-	if (err_num == 2) Host_Crash("Host-lib wrong version/checksum");
+        Init_String(
+            Alloc_Tail_Array(argv), Make_UTF8_May_Fail(argv_ansi[i])
+        );
+    }
+#endif
 
-	//Initialize core extension commands
-	Init_Core_Ext();
-#ifdef EXT_LICENSING
-	Init_Licensing_Ext();
-#endif //EXT_LICENSING
+    // !!! Register EXPERIMENTAL breakpoint hook.  Note that %host-main.c is
+    // not really expected to stick around as the main REPL...
+    //
+    PG_Breakpoint_Quitting_Hook = &Host_Breakpoint_Quitting_Hook;
+
+    DECLARE_LOCAL (argv_value);
+    Init_Block(argv_value, argv);
+    PUSH_GUARD_VALUE(argv_value);
 
 #ifdef TEST_EXTENSIONS
-	Init_Ext_Test();
+    Init_Ext_Test();
 #endif
 
 #ifdef TO_WINDOWS
-	// no console, we must be the child process
-	if (GetStdHandle(STD_OUTPUT_HANDLE) == 0)
-	{
-		App_Instance = GetModuleHandle(NULL);
-	}
+    // no console, we must be the child process
+    if (GetStdHandle(STD_OUTPUT_HANDLE) == 0)
+    {
+        App_Instance = GetModuleHandle(NULL);
+    }
 #ifdef REB_CORE
-	else //use always the console for R3/core
-	{
-		// GetWindowsLongPtr support 32 & 64 bit windows
-		App_Instance = (HINSTANCE)GetWindowLongPtr(GetConsoleWindow(), GWLP_HINSTANCE);
-	}
+    else //use always the console for R3/core
+    {
+        // GetWindowsLongPtr support 32 & 64 bit windows
+        App_Instance = (HINSTANCE)GetWindowLongPtr(GetConsoleWindow(), GWLP_HINSTANCE);
+    }
 #else
-	//followinng R3/view code behaviors when compiled as:
-	//-"console app" mode: stdio redirection works but blinking console window during start
-	//-"GUI app" mode stdio redirection doesn't work properly, no blinking console window during start
-	else if (argc > 1) // we have command line args
-	{
-		// GetWindowsLongPtr support 32 & 64 bit windows
-		App_Instance = (HINSTANCE)GetWindowLongPtr(GetConsoleWindow(), GWLP_HINSTANCE);
-	}
-	else // no command line args but a console - launch child process so GUI is initialized and exit
-	{
-		DWORD dwCreationFlags = CREATE_DEFAULT_ERROR_MODE | DETACHED_PROCESS;
-		STARTUPINFO startinfo;
-		PROCESS_INFORMATION procinfo;
-		ZeroMemory(&startinfo, sizeof(startinfo));
-		startinfo.cb = sizeof(startinfo);
-		if (!CreateProcess(NULL, argv[0], NULL, NULL, FALSE, dwCreationFlags, NULL, NULL, &startinfo, &procinfo))
-			MessageBox(0, L"CreateProcess() failed :(", L"", 0);
-		exit(0);
-	}
+    //followinng R3/view code behaviors when compiled as:
+    //-"console app" mode: stdio redirection works but blinking console window during start
+    //-"GUI app" mode stdio redirection doesn't work properly, no blinking console window during start
+    else if (argc > 1) // we have command line args
+    {
+        // GetWindowsLongPtr support 32 & 64 bit windows
+        App_Instance = (HINSTANCE)GetWindowLongPtr(GetConsoleWindow(), GWLP_HINSTANCE);
+    }
+    else // no command line args but a console - launch child process so GUI is initialized and exit
+    {
+        DWORD dwCreationFlags = CREATE_DEFAULT_ERROR_MODE | DETACHED_PROCESS;
+        STARTUPINFO startinfo;
+        PROCESS_INFORMATION procinfo;
+        ZeroMemory(&startinfo, sizeof(startinfo));
+        startinfo.cb = sizeof(startinfo);
+        if (!CreateProcess(NULL, argv[0], NULL, NULL, FALSE, dwCreationFlags, NULL, NULL, &startinfo, &procinfo))
+            MessageBox(0, L"CreateProcess() failed :(", L"", 0);
+        exit(0);
+    }
 #endif //REB_CORE
 #endif //TO_WINDOWS
 
-	// Common code for console & GUI version
+    // Common code for console & GUI version
 #ifndef REB_CORE
-	Init_Windows();
-	OS_Init_Graphics();
+    Init_Windows();
+    OS_Init_Graphics();
 #endif // REB_CORE
 
-	// Call sys/start function. If a compressed script is provided, it will be
-	// decompressed, stored in system/options/boot-host, loaded, and evaluated.
-	// Returns: 0: ok, -1: error, 1: bad data.
-#ifdef CUSTOM_STARTUP
-	// For custom startup, you can provide compressed script code here:
-	err_num = RL_Start(
-		&Reb_Init_Code[0], REB_INIT_SIZE,
-		embedded_script, embedded_size, 0
-	);
-#else
-	err_num = RL_Start(0, 0, embedded_script, embedded_size, 0);
-#endif
+    Init_Debug_Extension();
 
-#if !defined(ENCAP)
-	// !!! What should an encapped executable do with a --do?  Here we just
-	// ignore it, as the assumption is that it is a packaged system that
-	// doesn't necessarily want to present itself as an arbitrary interpreter
+    struct Reb_State state;
+    REBCTX *error;
 
-	// Previously this command line option was handled by the Rebol Core
-	// itself, in Mezzanine initialization.  However, Ren/C is catering to
-	// needs of other kinds of clients.  So rather than having those clients
-	// figure out how to send Rebol a "--do" option in a "command line
-	// arguments buffer", it is turned the other way so that if something
-	// does have a command line it needs to call APIs to run them.  This
-	// "pulled out" piece of command line processing uses the RL_Api still,
-	// with RL_Do_String (more options will be available with Ren/C proper)
+    PUSH_UNHALTABLE_TRAP(&error, &state);
 
-	// !!! NOTE: Encapping needs to be thought of similarly; it is not a
-	// Ren/C feature, rather a feature that some client (e.g. a console
-	// client named "Rebol") would implement.
+// The first time through the following code 'error' will be NULL, but...
+// `fail` can longjmp here, so 'error' won't be NULL *if* that happens!
 
-	// !!! The command line processing tells us if we have just '--do' with
-	// nothing afterward by setting do_arg to NULL.  When all the command
-	// line processing is taken out of Ren/C's concern that kind of decision
-	// can be revisited.  In the meantime, we test for NULL.
+    int exit_status;
+    REBOOL finished;
 
-	if (err_num >= 0 && (Main_Args.options & RO_DO) && Main_Args.do_arg) {
-		RXIARG result;
-		REBYTE *do_arg_utf8;
-		REBCNT len_predicted;
-		REBCNT len_encoded;
+    Prep_Global_Cell(&HG_Host_Repl);
+    SET_BLANK(&HG_Host_Repl);
 
-		// On Windows, do_arg is a REBCHR*.  We need to get it into UTF8.
-		// !!! Better helpers needed than this; Ren/C can call host's OS_ALLOC
-		// so this should be more seamless.
-	#ifdef TO_WINDOWS
-		len_predicted = RL_Length_As_UTF8(
-			Main_Args.do_arg, wcslen(Main_Args.do_arg), TRUE, TRUE
-		);
-		do_arg_utf8 = OS_ALLOC_ARRAY(REBYTE, len_predicted + 1);
-		len_encoded = len_predicted;
-		RL_Encode_UTF8(
-			do_arg_utf8,
-			len_predicted + 1,
-			Main_Args.do_arg,
-			&len_encoded,
-			TRUE,
-			TRUE
-		);
+    if (error != NULL) {
+        //
+        // We want to avoid doing I/O directly from the C code of the host,
+        // and let that go through WRITE-STDOUT.  Hence any part of the
+        // startup that can error should be TRAP'd by the startup code itself
+        // and handled or PRINT'd in some way.
+        // 
+        // The exception is a halt with Ctrl-C, which can currently only be
+        // handled by C code that ran PUSH_UNHALTABLE_TRAP().
+        //
+        if (ERR_NUM(error) != RE_HALT)
+            panic (error);
 
-		// Sanity check; we shouldn't get a different answer.
-		assert(len_predicted == len_encoded);
+        exit_status = 128; // http://stackoverflow.com/questions/1101957/
+        finished = TRUE;
+    }
+    else {
+        REBSER *startup = Decompress(
+            &Reb_Init_Code[0],
+            REB_INIT_SIZE,
+            -1,
+            FALSE,
+            FALSE
+        );
+        if (startup == NULL)
+            panic ("Can't decompress %host-start.r linked into executable");
 
-		// Encoding doesn't NULL-terminate on its own.
-		do_arg_utf8[len_encoded] = '\0';
-	#else
-		do_arg_utf8 = b_cast(Main_Args.do_arg);
-	#endif
+        REBARR *array = Scan_UTF8_Managed(
+            BIN_HEAD(startup), BIN_LEN(startup)
+        );
 
-		RL_Do_String(do_arg_utf8, 0, &result);
+        // Bind the REPL and startup code into the lib context.
+        //
+        // !!! It's important not to load the REPL into user, because since it
+        // uses routines like PRINT to do it's I/O you (probably) don't want
+        // the REPL to get messed up if PRINT is redefined--for instance.  It
+        // should probably have its own context, which would entail a copy of
+        // every word in lib that it uses, but that mechanic hasn't been
+        // fully generalized--and might not be the right answer anyway.
+        //
+        Bind_Values_All_Deep(ARR_HEAD(array), Lib_Context);
 
-	#ifdef TO_WINDOWS
-		OS_FREE(do_arg_utf8);
-	#endif
+        // The new policy for source code in Ren-C is that it loads read only.
+        // This didn't go through the LOAD Rebol function (should it?  it
+        // never did before.)  For now, use simple binding but lock it.
+        //
+        Deep_Freeze_Array(array);
 
-		// We ignore the result; and only ask for it to help prevent an
-		// item from being put on the stack that we'd have to print out.
-		// (there is no RL_DS_DROP, while Ren/C would just use DS_DROP)
+        DECLARE_LOCAL (code);
+        Init_Block(code, array);
 
-		// The above may request a QUIT, and thus bubble out to the topmost
-		// Rebol handler.  Or it may have some kind of error.  We lack
-		// any way here to tell if there was an error.  While quitting
-		// is not necessarily ideal, it was the previous behavior when
-		// a --do was provided.  However it would be nice if we could
-		// have the option of examining the crash state.
+        DECLARE_LOCAL (host_start);
+        if (
+            Do_Code(&exit_status, host_start, code, FALSE)
+            != 0
+        ){
+            panic (startup); // just loads functions, shouldn't QUIT or error
+        }
 
-		// !!! Under RenC, this client would be able to catch the error
-		// itself and cleanly shut down the system (if it wished).
+        Free_Series(startup);
 
-		RL_Do_String(cb_cast("quit"), 0, 0);
-	}
+        REBSER *embedded = NULL;
+        REBI64 embedded_size = 0;
+        REBYTE *embedded_utf8 = OS_READ_EMBEDDED(&embedded_size);
+        if (embedded_utf8 != NULL) {
+            if (embedded_size <= 4)
+                panic ("No 4-byte long payload at start of embedded script");
 
-	// Console line input loop (just an example, can be improved):
-	if (
-		!(Main_Args.options & RO_CGI)
-		&& (
-			!Main_Args.script // no script was provided
-			|| err_num < 0         // script halted or had error
-			|| Main_Args.options & RO_HALT  // --halt option
-		)
-	){
-		err_num = 0;  // reset error code (but should be able to set it below too!)
-		while (TRUE) {
-			Put_Str(prompt_str);
-			if ((line = Get_Str())) {
-				RL_Do_String(line, 0, 0);
-				RL_Print_TOS(0, result_str);
-				OS_FREE(line);
-			}
-			else break; // EOS
-		}
-	}
-#endif //!ENCAP
-	OS_Quit_Devices(0);
+            i32 ptype = 0;
+            REBYTE *data = embedded_utf8 + sizeof(ptype);
+            embedded_size -= sizeof(ptype);
+
+            memcpy(&ptype, embedded_utf8, sizeof(ptype));
+
+            if (ptype == 1) { // COMPRESSed data
+                embedded = Decompress(data, embedded_size, -1, FALSE, FALSE);
+            }
+            else {
+                embedded = Make_Binary(embedded_size);
+                memcpy(BIN_HEAD(embedded), data, embedded_size);
+            }
+
+            OS_FREE(embedded_utf8);
+        }
+
+        DECLARE_LOCAL (embedded_value);
+        if (embedded == NULL)
+            SET_BLANK(embedded_value);
+        else
+            Init_Block(embedded_value, embedded);
+
+        DECLARE_LOCAL (ext_value);
+        SET_BLANK(ext_value);
+        LOAD_BOOT_EXTENSIONS(ext_value);
+
+        if (!IS_FUNCTION(host_start))
+            panic (host_start); // should not be able to error
+
+        DECLARE_LOCAL (result);
+        if (Apply_Only_Throws(
+            result, TRUE,
+            host_start, // startup function, implicit GC guard
+            argv_value, // argv parameter, implicit GC guard
+            embedded_value, // embedded-script parameter, implicit GC guard
+            ext_value,
+            END_CELL
+        )) {
+            if (
+                IS_FUNCTION(result)
+                && VAL_FUNC_DISPATCHER(result) == &N_quit
+            ) {
+                CATCH_THROWN(result, result);
+                exit_status = Exit_Status_From_Value(result);
+
+                DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
+
+                SHUTDOWN_BOOT_EXTENSIONS();
+                Shutdown_Core();
+                OS_EXIT(exit_status);
+                DEAD_END;
+            }
+
+            fail (Error_No_Catch_For_Throw(result));
+        }
+
+        DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
+
+        // HOST-START returns either an integer exit code or a blank if the
+        // behavior should be to fall back to the REPL.
+        //
+        if (IS_FUNCTION(result)) {
+            finished = FALSE;
+            Move_Value(&HG_Host_Repl, result);
+        }
+        else if (IS_INTEGER(result)) {
+            finished = TRUE;
+            exit_status = VAL_INT32(result);
+        }
+        else
+            panic (result); // no other legal return values for now
+    }
+
+    DROP_GUARD_VALUE(argv_value);
+
+    PUSH_GUARD_VALUE(&HG_Host_Repl); // might be blank
+
+    // Although the REPL routine does a PUSH_UNHALTABLE_TRAP in order to
+    // catch any errors or halts, it then has to report those errors when
+    // that trap is engaged.  So imagine it's in the process of trapping an
+    // error and prints out a very long one, and the user wants to interrupt
+    // the error report with a Ctrl-C...but there's not one in effect.
+    //
+    // This loop institutes a top-level trap whose only job is to catch the
+    // interrupts that occur during overlong error reports inside the REPL.
+    //
+    DECLARE_LOCAL (value);
+
+    while (NOT(finished)) {
+        SET_END(value);
+        PUSH_GUARD_VALUE(value); // !!! Out_Value expects value to be GC safe
+
+        struct Reb_State state;
+        REBCTX *error;
+
+        PUSH_UNHALTABLE_TRAP(&error, &state);
+
+    // The first time through the following code 'error' will be NULL, but...
+    // `fail` can longjmp here, so 'error' won't be NULL *if* that happens!
+
+        if (error) {
+            //
+            // If a HALT happens and manages to get here, just go set up the
+            // trap again and call into the REPL again.  (It wasn't an
+            // evaluation error because those have their own traps, it was a
+            // halt that happened during output.)
+            //
+            assert(ERR_NUM(error) == RE_HALT);
+        }
+        else {
+            Host_Repl(&exit_status, value, FALSE);
+
+            finished = TRUE;
+
+            DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
+        }
+
+        DROP_GUARD_VALUE(value);
+    }
+
+    DROP_GUARD_VALUE(&HG_Host_Repl);
+
+    SHUTDOWN_BOOT_EXTENSIONS();
+
+    OS_QUIT_DEVICES(0);
+
 #ifndef REB_CORE
-	OS_Destroy_Graphics();
+    OS_Destroy_Graphics();
 #endif
 
-	// A QUIT does not exit this way, so the only valid return code is zero.
-	return 0;
-}
+    Close_StdIO();
 
+    // No need to do a "clean" shutdown, as we are about to exit the process
+    // (Note: The debug build runs through the clean shutdown anyway!)
+    //
+    RL_Shutdown(FALSE);
+
+    return exit_status;
+}

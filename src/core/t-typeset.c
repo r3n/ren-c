@@ -1,266 +1,341 @@
-/***********************************************************************
-**
-**  REBOL [R3] Language Interpreter and Run-time Environment
-**
-**  Copyright 2012 REBOL Technologies
-**  REBOL is a trademark of REBOL Technologies
-**
-**  Licensed under the Apache License, Version 2.0 (the "License");
-**  you may not use this file except in compliance with the License.
-**  You may obtain a copy of the License at
-**
-**  http://www.apache.org/licenses/LICENSE-2.0
-**
-**  Unless required by applicable law or agreed to in writing, software
-**  distributed under the License is distributed on an "AS IS" BASIS,
-**  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**  See the License for the specific language governing permissions and
-**  limitations under the License.
-**
-************************************************************************
-**
-**  Module:  t-typeset.c
-**  Summary: typeset datatype
-**  Section: datatypes
-**  Author:  Carl Sassenrath
-**  Notes:
-**
-***********************************************************************/
+//
+//  File: %t-typeset.c
+//  Summary: "typeset datatype"
+//  Section: datatypes
+//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  Homepage: https://github.com/metaeducation/ren-c/
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Copyright 2012 REBOL Technologies
+// Copyright 2012-2017 Rebol Open Source Contributors
+// REBOL is a trademark of REBOL Technologies
+//
+// See README.md and CREDITS.md for more information.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
 
 #include "sys-core.h"
 
 
-/***********************************************************************
-**
-*/	const REBU64 Typesets[] =
-/*
-**		Order of symbols is important- used below for Make_Typeset().
-**
-************************************************************************/
-{
-	1, 0, // First (0th) typeset is not valid
-	SYM_ANY_TYPEX,     ((REBU64)1<<REB_MAX)-2, // do not include END!
-	SYM_ANY_WORDX,     TS_WORD,
-	SYM_ANY_PATHX,     TS_PATH,
-	SYM_ANY_FUNCTIONX, TS_FUNCTION,
-	SYM_NUMBERX,       TS_NUMBER,
-	SYM_SCALARX,       TS_SCALAR,
-	SYM_SERIESX,       TS_SERIES,
-	SYM_ANY_STRINGX,   TS_STRING,
-	SYM_ANY_OBJECTX,   TS_OBJECT,
-	SYM_ANY_ARRAYX,    TS_ARRAY,
-	0, 0
+//
+// symbol-to-typeset-bits mapping table
+//
+// NOTE: Order of symbols is important, because this is used to build a
+// list of typeset word symbols ordered relative to their symbol #,
+// which lays out the legal unbound WORD! values you can use during
+// a MAKE TYPESET! (bound words will be looked up as variables to see
+// if they contain a DATATYPE! or a typeset, but general reduction is
+// not performed on the block passed in.)
+//
+// !!! Is it necessary for MAKE TYPESET! to allow unbound words at all,
+// or should the typesets be required to be in bound variables?  Should
+// clients be asked to pass in only datatypes and typesets, hence doing
+// their own reduce before trying to make a typeset out of a block?
+//
+const struct {
+    REBSYM sym;
+    REBU64 bits;
+} Typesets[] = {
+    {SYM_ANY_VALUE_X, TS_VALUE},
+    {SYM_ANY_WORD_X, TS_WORD},
+    {SYM_ANY_PATH_X, TS_PATH},
+    {SYM_ANY_NUMBER_X, TS_NUMBER},
+    {SYM_ANY_SCALAR_X, TS_SCALAR},
+    {SYM_ANY_SERIES_X, TS_SERIES},
+    {SYM_ANY_STRING_X, TS_STRING},
+    {SYM_ANY_CONTEXT_X, TS_CONTEXT},
+    {SYM_ANY_ARRAY_X, TS_ARRAY},
+
+    {SYM_0, 0}
 };
 
 
-/***********************************************************************
-**
-*/	REBINT CT_Typeset(REBVAL *a, REBVAL *b, REBINT mode)
-/*
-***********************************************************************/
+//
+//  CT_Typeset: C
+//
+REBINT CT_Typeset(const RELVAL *a, const RELVAL *b, REBINT mode)
 {
-	if (mode < 0) return -1;
-	return EQUAL_TYPESET(a, b);
+    if (mode < 0) return -1;
+    return EQUAL_TYPESET(a, b);
 }
 
 
-/***********************************************************************
-**
-*/	void Init_Typesets(void)
-/*
-**		Create typeset variables that are defined above.
-**		For example: NUMBER is both integer and decimal.
-**		Add the new variables to the system context.
-**
-***********************************************************************/
+//
+//  Init_Typesets: C
+//
+// Create typeset variables that are defined above.
+// For example: NUMBER is both integer and decimal.
+// Add the new variables to the system context.
+//
+void Init_Typesets(void)
 {
-	REBVAL *value;
-	REBINT n;
+    REBDSP dsp_orig = DSP;
 
-	Set_Root_Series(ROOT_TYPESETS, Make_Array(40), "typeset presets");
+    REBINT n;
+    for (n = 0; Typesets[n].sym != 0; n++) {
+        //
+        // Note: the symbol in the typeset is not the symbol of a word holding
+        // the typesets, rather an extra data field used when the typeset is
+        // in a context key slot to identify that field's name
+        //
+        DS_PUSH_TRASH;
+        Init_Typeset(DS_TOP, Typesets[n].bits, NULL);
 
-	for (n = 0; Typesets[n]; n += 2) {
-		value = Alloc_Tail_Array(VAL_SERIES(ROOT_TYPESETS));
-		VAL_SET(value, REB_TYPESET);
-		VAL_TYPESET(value) = Typesets[n+1];
-		if (Typesets[n] > 1)
-			*Append_Frame(Lib_Context, 0, (REBCNT)(Typesets[n])) = *value;
-	}
+        Move_Value(
+            Append_Context(Lib_Context, NULL, Canon(Typesets[n].sym)),
+            DS_TOP
+        );
+    }
+
+    Init_Block(ROOT_TYPESETS, Pop_Stack_Values(dsp_orig));
 }
 
 
-/***********************************************************************
-**
-*/	REBFLG Make_Typeset(REBVAL *block, REBVAL *value, REBFLG load)
-/*
-**		block - block of datatypes (datatype words ok too)
-**		value - value to hold result (can be word-spec type too)
-**
-***********************************************************************/
+//
+//  Init_Typeset: C
+//
+// Name should be set when a typeset is being used as a function parameter
+// specifier, or as a key in an object.
+//
+void Init_Typeset(RELVAL *value, REBU64 bits, REBSTR *opt_name)
 {
-	const REBVAL *val;
-	REBCNT sym;
-	REBSER *types = VAL_SERIES(ROOT_TYPESETS);
-
-	VAL_TYPESET(value) = 0;
-
-	for (; NOT_END(block); block++) {
-		val = NULL;
-		if (IS_WORD(block)) {
-			//Print("word: %s", Get_Word_Name(block));
-			sym = VAL_WORD_SYM(block);
-			if (VAL_WORD_FRAME(block)) { // Get word value
-				val = GET_VAR(block);
-			} else if (sym < REB_MAX) { // Accept datatype word
-				TYPE_SET(value, VAL_WORD_SYM(block)-1);
-				continue;
-			} // Special typeset symbols:
-			else if (sym >= SYM_ANY_TYPEX && sym < SYM_DATATYPES)
-				val = BLK_SKIP(types, sym - SYM_ANY_TYPEX + 1);
-		}
-		if (!val) val = block;
-		if (IS_DATATYPE(val)) {
-			TYPE_SET(value, VAL_TYPE_KIND(val));
-		} else if (IS_TYPESET(val)) {
-			VAL_TYPESET(value) |= VAL_TYPESET(val);
-		} else {
-			if (load) return FALSE;
-			Trap_Arg_DEAD_END(block);
-		}
-	}
-
-	return TRUE;
+    // No lookback is the default.
+    //
+    VAL_RESET_HEADER_EXTRA(value, REB_TYPESET, TYPESET_FLAG_NO_LOOKBACK);
+    INIT_TYPESET_NAME(value, opt_name);
+    VAL_TYPESET_BITS(value) = bits;
 }
 
 
-/***********************************************************************
-**
-*/	REBFLG MT_Typeset(REBVAL *out, REBVAL *data, REBCNT type)
-/*
-***********************************************************************/
-{
-	if (!IS_BLOCK(data)) return FALSE;
+//
+//  Update_Typeset_Bits_Core: C
+//
+// This sets the bits in a bitset according to a block of datatypes.  There
+// is special handling by which BAR! will set the "variadic" bit on the
+// typeset, which is heeded by functions only.
+//
+// !!! R3-Alpha supported fixed word symbols for datatypes and typesets.
+// Confusingly, this means that if you have said `word!: integer!` and use
+// WORD!, you will get the integer type... but if WORD! is unbound then it
+// will act as WORD!.  Also, is essentially having "keywords" and should be
+// reviewed to see if anything actually used it.
+//
+REBOOL Update_Typeset_Bits_Core(
+    RELVAL *typeset,
+    const RELVAL *head,
+    REBSPC *specifier
+) {
+    assert(IS_TYPESET(typeset));
+    VAL_TYPESET_BITS(typeset) = 0;
 
-	if (!Make_Typeset(VAL_BLK_HEAD(data), out, TRUE)) return FALSE;
-	VAL_SET(out, REB_TYPESET);
+    const RELVAL *item = head;
+    if (NOT_END(item) && IS_BLOCK(item)) {
+        // Double blocks are a variadic signal.
+        if (NOT_END(item + 1))
+            fail (Error(RE_MISC));
 
-	return TRUE;
+        item = VAL_ARRAY_AT(item);
+        SET_VAL_FLAG(typeset, TYPESET_FLAG_VARIADIC);
+    }
+
+    for (; NOT_END(item); item++) {
+        const RELVAL *var = NULL;
+
+        if (IS_WORD(item))
+            var = Get_Opt_Var_May_Fail(item, specifier);
+
+        if (var == NULL)
+            var = item;
+
+        // Though MAKE FUNCTION! at its lowest level attempts to avoid any
+        // keywords, there are native-optimized function generators that do
+        // use them.  Since this code is shared by both, it may or may not
+        // set typeset flags as a parameter.  Default to always for now.
+        //
+        const REBOOL keywords = TRUE;
+
+        if (
+            keywords && IS_TAG(item) && (
+                0 == Compare_String_Vals(item, ROOT_ELLIPSIS_TAG, TRUE)
+            )
+        ) {
+            // Notational convenience for variadic.
+            // func [x [<...> integer!]] => func [x [[integer!]]]
+            //
+            SET_VAL_FLAG(typeset, TYPESET_FLAG_VARIADIC);
+        }
+        else if (
+            IS_BAR(item) || (keywords && IS_TAG(item) && (
+                0 == Compare_String_Vals(item, ROOT_END_TAG, TRUE)
+            ))
+        ) {
+            // A BAR! in a typeset spec for functions indicates a tolerance
+            // of endability.  Notational convenience:
+            //
+            // func [x [<end> integer!]] => func [x [| integer!]]
+            //
+            SET_VAL_FLAG(typeset, TYPESET_FLAG_ENDABLE);
+        }
+        else if (
+            IS_BLANK(item) || (keywords && IS_TAG(item) && (
+                0 == Compare_String_Vals(item, ROOT_OPT_TAG, TRUE)
+            ))
+        ) {
+            // A BLANK! in a typeset spec for functions indicates a willingness
+            // to take an optional.  (This was once done with the "UNSET!"
+            // datatype, but now that there isn't a user-exposed unset data
+            // type this is not done.)  Still, since REB_MAX_VOID is available
+            // internally it is used in the type filtering here.
+            //
+            // func [x [<opt> integer!]] => func [x [_ integer!]]
+            //
+            // !!! As with BAR! for variadics, review if this makes sense to
+            // allow with `make typeset!` instead of just function specs.
+            // Note however that this is required for the legacy compatibility
+            // of ANY-TYPE!, which included UNSET! because it was a datatype
+            // in R3-Alpha and Rebol2.
+            //
+            TYPE_SET(typeset, REB_MAX_VOID);
+        }
+        else if (IS_DATATYPE(var)) {
+            TYPE_SET(typeset, VAL_TYPE_KIND(var));
+        }
+        else if (IS_TYPESET(var)) {
+            VAL_TYPESET_BITS(typeset) |= VAL_TYPESET_BITS(var);
+        }
+        else
+            fail (Error_Invalid_Arg_Core(item, specifier));
+    }
+
+    return TRUE;
 }
 
 
-/***********************************************************************
-**
-*/	REBINT Find_Typeset(REBVAL *block)
-/*
-***********************************************************************/
+//
+//  MAKE_Typeset: C
+//
+void MAKE_Typeset(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
-	REBVAL value;
-	REBVAL *val;
-	REBINT n;
+    assert(kind == REB_TYPESET);
 
-	VAL_SET(&value, REB_TYPESET);
-	Make_Typeset(block, &value, 0);
+    if (IS_TYPESET(arg)) {
+        Move_Value(out, arg);
+        return;
+    }
 
-	val = VAL_BLK_SKIP(ROOT_TYPESETS, 1);
+    if (!IS_BLOCK(arg)) goto bad_make;
 
-	for (n = 1; NOT_END(val); val++, n++) {
-		if (EQUAL_TYPESET(&value, val)){
-			//Print("FTS: %d", n);
-			return n;
-		}
-	}
+    Init_Typeset(out, 0, NULL);
+    Update_Typeset_Bits_Core(out, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
+    return;
 
-//	Print("Size Typesets: %d", VAL_TAIL(ROOT_TYPESETS));
-	Append_Value(VAL_SERIES(ROOT_TYPESETS), &value);
-	return n;
+bad_make:
+    fail (Error_Bad_Make(REB_TYPESET, arg));
 }
 
 
-/***********************************************************************
-**
-*/	REBSER *Typeset_To_Block(REBVAL *tset)
-/*
-**		Converts typeset value to a block of datatypes.
-**		No order is specified.
-**
-***********************************************************************/
+//
+//  TO_Typeset: C
+//
+void TO_Typeset(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
-	REBSER *block;
-	REBVAL *value;
-	REBINT n;
-	REBINT size = 0;
-
-	for (n = 0; n < REB_MAX; n++) {
-		if (TYPE_CHECK(tset, n)) size++;
-	}
-
-	block = Make_Array(size);
-
-	// Convert bits to types:
-	for (n = 0; n < REB_MAX; n++) {
-		if (TYPE_CHECK(tset, n)) {
-			value = Alloc_Tail_Array(block);
-			Set_Datatype(value, n);
-		}
-	}
-	return block;
+    MAKE_Typeset(out, kind, arg);
 }
 
 
-/***********************************************************************
-**
-*/	REBTYPE(Typeset)
-/*
-***********************************************************************/
+//
+//  Typeset_To_Array: C
+//
+// Converts typeset value to a block of datatypes.
+// No order is specified.
+//
+REBARR *Typeset_To_Array(const REBVAL *tset)
 {
-	REBVAL *val = D_ARG(1);
-	REBVAL *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
+    REBARR *block;
+    REBVAL *value;
+    REBINT n;
+    REBINT size = 0;
 
-	switch (action) {
+    for (n = 0; n < REB_MAX; n++) {
+        if (TYPE_CHECK(tset, cast(enum Reb_Kind, n))) size++;
+    }
 
-	case A_FIND:
-		if (IS_DATATYPE(arg)) {
-			DECIDE(TYPE_CHECK(val, VAL_TYPE_KIND(arg)));
-		}
-		Trap_Arg_DEAD_END(arg);
+    block = Make_Array(size);
 
-	case A_MAKE:
-	case A_TO:
-		if (IS_BLOCK(arg)) {
-			VAL_SET(D_OUT, REB_TYPESET);
-			Make_Typeset(VAL_BLK_DATA(arg), D_OUT, 0);
-			return R_OUT;
-		}
-	//	if (IS_NONE(arg)) {
-	//		VAL_SET(arg, REB_TYPESET);
-	//		VAL_TYPESET(arg) = 0L;
-	//		return R_ARG2;
-	//	}
-		if (IS_TYPESET(arg)) return R_ARG2;
-		Trap_Make_DEAD_END(REB_TYPESET, arg);
+    // Convert bits to types:
+    for (n = 0; n < REB_MAX; n++) {
+        if (TYPE_CHECK(tset, cast(enum Reb_Kind, n))) {
+            value = Alloc_Tail_Array(block);
+            if (n == 0) {
+                //
+                // !!! A NONE! value is currently supported in typesets to
+                // indicate that they take optional values.  This may wind up
+                // as a feature of MAKE FUNCTION! only.
+                //
+                SET_BLANK(value);
+            }
+            else
+                Val_Init_Datatype(value, cast(enum Reb_Kind, n));
+        }
+    }
+    return block;
+}
 
-	case A_AND:
-	case A_OR:
-	case A_XOR:
-		if (IS_DATATYPE(arg)) VAL_TYPESET(arg) = TYPESET(VAL_TYPE_KIND(arg));
-		else if (!IS_TYPESET(arg)) Trap_Arg_DEAD_END(arg);
 
-		if (action == A_OR) VAL_TYPESET(val) |= VAL_TYPESET(arg);
-		else if (action == A_AND) VAL_TYPESET(val) &= VAL_TYPESET(arg);
-		else VAL_TYPESET(val) ^= VAL_TYPESET(arg);
-		return R_ARG1;
+//
+//  REBTYPE: C
+//
+REBTYPE(Typeset)
+{
+    REBVAL *val = D_ARG(1);
+    REBVAL *arg = D_ARGC > 1 ? D_ARG(2) : NULL;
 
-	case A_COMPLEMENT:
-		VAL_TYPESET(val) = ~VAL_TYPESET(val);
-		return R_ARG1;
+    switch (action) {
 
-	default:
-		Trap_Action_DEAD_END(REB_TYPESET, action);
-	}
+    case SYM_FIND:
+        if (IS_DATATYPE(arg)) {
+            return (TYPE_CHECK(val, VAL_TYPE_KIND(arg))) ? R_TRUE : R_FALSE;
+        }
+        fail (Error_Invalid_Arg(arg));
 
-is_true:
-	return R_TRUE;
+    case SYM_AND_T:
+    case SYM_OR_T:
+    case SYM_XOR_T:
+        if (IS_DATATYPE(arg)) {
+            VAL_TYPESET_BITS(arg) = FLAGIT_KIND(VAL_TYPE(arg));
+        }
+        else if (!IS_TYPESET(arg))
+            fail (Error_Invalid_Arg(arg));
 
-is_false:
-	return R_FALSE;
+        if (action == SYM_OR_T)
+            VAL_TYPESET_BITS(val) |= VAL_TYPESET_BITS(arg);
+        else if (action == SYM_AND_T)
+            VAL_TYPESET_BITS(val) &= VAL_TYPESET_BITS(arg);
+        else
+            VAL_TYPESET_BITS(val) ^= VAL_TYPESET_BITS(arg);
+        Move_Value(D_OUT, D_ARG(1));
+        return R_OUT;
+
+    case SYM_COMPLEMENT:
+        VAL_TYPESET_BITS(val) = ~VAL_TYPESET_BITS(val);
+        Move_Value(D_OUT, D_ARG(1));
+        return R_OUT;
+
+    default:
+        fail (Error_Illegal_Action(REB_TYPESET, action));
+    }
 }

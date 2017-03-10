@@ -44,13 +44,15 @@ make/objs/
 # directories (such as make-win32 or make-osx-x64) so they don't erase
 # each other's state
 make-*
+!tests/**/make-*
 
 src/boot/boot-code.r
 src/boot/host-init.r
+src/boot/tmp-*
 
 src/core/b-boot.c
+src/core/tmp-*
 
-src/include/ext-types.h
 src/include/host-ext-*
 src/include/host-init.h
 src/include/host-lib.h
@@ -62,8 +64,7 @@ src/include/reb-lib.h
 src/include/reb-types.h
 src/include/tmp-*
 
-src/tools/reb-lib-doc.txt
-src/reb-lib-doc.txt
+src/os/tmp-*
 
 #################
 ## Eclipse

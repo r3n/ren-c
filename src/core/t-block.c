@@ -1,884 +1,1067 @@
-/***********************************************************************
-**
-**  REBOL [R3] Language Interpreter and Run-time Environment
-**
-**  Copyright 2012 REBOL Technologies
-**  REBOL is a trademark of REBOL Technologies
-**
-**  Licensed under the Apache License, Version 2.0 (the "License");
-**  you may not use this file except in compliance with the License.
-**  You may obtain a copy of the License at
-**
-**  http://www.apache.org/licenses/LICENSE-2.0
-**
-**  Unless required by applicable law or agreed to in writing, software
-**  distributed under the License is distributed on an "AS IS" BASIS,
-**  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**  See the License for the specific language governing permissions and
-**  limitations under the License.
-**
-************************************************************************
-**
-**  Module:  t-block.c
-**  Summary: block related datatypes
-**  Section: datatypes
-**  Author:  Carl Sassenrath
-**  Notes:
-**
-***********************************************************************/
+//
+//  File: %t-block.c
+//  Summary: "block related datatypes"
+//  Section: datatypes
+//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  Homepage: https://github.com/metaeducation/ren-c/
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Copyright 2012 REBOL Technologies
+// Copyright 2012-2017 Rebol Open Source Contributors
+// REBOL is a trademark of REBOL Technologies
+//
+// See README.md and CREDITS.md for more information.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
 
 #include "sys-core.h"
 
 
-// !!! Should there be a qsort header so we don't redefine it here?
-typedef int cmp_t(const void *, const void *);
-extern void reb_qsort(void *a, size_t n, size_t es, cmp_t *cmp);
-
-
-/***********************************************************************
-**
-*/	REBINT CT_Array(REBVAL *a, REBVAL *b, REBINT mode)
-/*
-**	"Compare Type" dispatcher for the following types:
-**
-**		CT_Block(REBVAL *a, REBVAL *b, REBINT mode)
-**		CT_Paren(REBVAL *a, REBVAL *b, REBINT mode)
-**		CT_Path(REBVAL *a, REBVAL *b, REBINT mode)
-**		CT_Set_Path(REBVAL *a, REBVAL *b, REBINT mode)
-**		CT_Get_Path(REBVAL *a, REBVAL *b, REBINT mode)
-**		CT_Lit_Path(REBVAL *a, REBVAL *b, REBINT mode)
-**
-***********************************************************************/
+//
+//  CT_Array: C
+//
+// "Compare Type" dispatcher for the following types: (list here to help
+// text searches)
+//
+//     CT_Block()
+//     CT_Group()
+//     CT_Path()
+//     CT_Set_Path()
+//     CT_Get_Path()
+//     CT_Lit_Path()
+//
+REBINT CT_Array(const RELVAL *a, const RELVAL *b, REBINT mode)
 {
-	REBINT num;
+    REBINT num;
 
-	if (mode == 3)
-		return VAL_SERIES(a) == VAL_SERIES(b) && VAL_INDEX(a) == VAL_INDEX(b);
-
-	num = Cmp_Block(a, b, mode > 1);
-	if (mode >= 0) return (num == 0);
-	if (mode == -1) return (num >= 0);
-	return (num > 0);
-}
-
-static void No_Nones(REBVAL *arg) {
-	arg = VAL_BLK_DATA(arg);
-	for (; NOT_END(arg); arg++) {
-		if (IS_NONE(arg)) Trap_Arg(arg);
-	}
-}
-
-/***********************************************************************
-**
-*/	REBFLG MT_Array(REBVAL *out, REBVAL *data, REBCNT type)
-/*
-**	"Make Type" dispatcher for the following subtypes:
-**
-**		MT_Block(REBVAL *out, REBVAL *data, REBCNT type)
-**		MT_Paren(REBVAL *out, REBVAL *data, REBCNT type)
-**		MT_Path(REBVAL *out, REBVAL *data, REBCNT type)
-**		MT_Set_Path(REBVAL *out, REBVAL *data, REBCNT type)
-**		MT_Get_Path(REBVAL *out, REBVAL *data, REBCNT type)
-**		MT_Lit_Path(REBVAL *out, REBVAL *data, REBCNT type)
-**
-***********************************************************************/
-{
-	REBCNT i;
-
-	if (!ANY_BLOCK(data)) return FALSE;
-	if (type >= REB_PATH && type <= REB_LIT_PATH)
-		if (!ANY_WORD(VAL_BLK_HEAD(data))) return FALSE;
-
-	*out = *data++;
-	VAL_SET(out, type);
-	i = IS_INTEGER(data) ? Int32(data) - 1 : 0;
-	if (i > VAL_TAIL(out)) i = VAL_TAIL(out); // clip it
-	VAL_INDEX(out) = i;
-	return TRUE;
+    num = Cmp_Array(a, b, LOGICAL(mode == 1));
+    if (mode >= 0) return (num == 0);
+    if (mode == -1) return (num >= 0);
+    return (num > 0);
 }
 
 
-/***********************************************************************
-**
-*/	REBCNT Find_Block(REBSER *series, REBCNT index, REBCNT end, const REBVAL *target, REBCNT len, REBCNT flags, REBINT skip)
-/*
-**		Flags are set according to: ALL_FIND_REFS
-**
-**	Main Parameters:
-**		start - index to start search
-**		end   - ending position
-**		len   - length of target
-**		skip  - skip factor
-**		dir   - direction
-**
-**	Comparison Parameters:
-**		case  - case sensitivity
-**		wild  - wild cards/keys
-**
-**	Final Parmameters:
-**		tail  - tail position
-**		match - sequence
-**		SELECT - (value that follows)
-**
-***********************************************************************/
-{
-	REBVAL *value;
-	REBVAL *val;
-	REBCNT cnt;
-	REBCNT start = index;
+//
+//  MAKE_Array: C
+//
+// "Make Type" dispatcher for the following subtypes:
+//
+//     MAKE_Block
+//     MAKE_Group
+//     MAKE_Path
+//     MAKE_Set_Path
+//     MAKE_Get_Path
+//     MAKE_Lit_Path
+//
+void MAKE_Array(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
+    //
+    // `make block! 10` => creates array with certain initial capacity
+    //
+    if (IS_INTEGER(arg) || IS_DECIMAL(arg)) {
+        Init_Any_Array(out, kind, Make_Array(Int32s(arg, 0)));
+        return;
+    }
 
-	if (flags & (AM_FIND_REVERSE | AM_FIND_LAST)) {
-		skip = -1;
-		start = 0;
-		if (flags & AM_FIND_LAST) index = end - len;
-		else index--;
-	}
+    // !!! See #2263 -- Ren-C has unified MAKE and construction syntax.  A
+    // block parameter to MAKE should be arity 2...the existing array for
+    // the data source, and an offset from that array value's index:
+    //
+    //     >> p1: #[path! [[a b c] 2]]
+    //     == b/c
+    //
+    //     >> head p1
+    //     == a/b/c
+    //
+    //     >> block: [a b c]
+    //     >> p2: make path! compose [(block) 2]
+    //     == b/c
+    //
+    //     >> append block 'd
+    //     == [a b c d]
+    //
+    //     >> p2
+    //     == b/c/d
+    //
+    // !!! This could be eased to not require the index, but without it then
+    // it can be somewhat confusing as to why [[a b c]] is needed instead of
+    // just [a b c] as the construction spec.
+    //
+    if (ANY_ARRAY(arg)) {
+        if (
+            VAL_ARRAY_LEN_AT(arg) != 2
+            || !ANY_ARRAY(VAL_ARRAY_AT(arg))
+            || !IS_INTEGER(VAL_ARRAY_AT(arg) + 1)
+        ) {
+            goto bad_make;
+        }
 
-	// Optimized find word in block:
-	if (ANY_WORD(target)) {
-		for (; index >= start && index < end; index += skip) {
-			value = BLK_SKIP(series, index);
-			if (ANY_WORD(value)) {
-				cnt = (VAL_WORD_SYM(value) == VAL_WORD_SYM(target));
-				if (flags & AM_FIND_CASE) {
-					// Must be same type and spelling:
-					if (cnt && VAL_TYPE(value) == VAL_TYPE(target)) return index;
-				}
-				else {
-					// Can be different type or alias:
-					if (cnt || VAL_WORD_CANON(value) == VAL_WORD_CANON(target)) return index;
-				}
-			}
-			if (flags & AM_FIND_MATCH) break;
-		}
-		return NOT_FOUND;
-	}
-	// Match a block against a block:
-	else if (ANY_BLOCK(target) && !(flags & AM_FIND_ONLY)) {
-		for (; index >= start && index < end; index += skip) {
-			cnt = 0;
-			value = BLK_SKIP(series, index);
-			for (val = VAL_BLK_DATA(target); NOT_END(val); val++, value++) {
-				if (0 != Cmp_Value(value, val, (REBOOL)(flags & AM_FIND_CASE))) break;
-				if (++cnt >= len) {
-					return index;
-				}
-			}
-			if (flags & AM_FIND_MATCH) break;
-		}
-		return NOT_FOUND;
-	}
-	// Find a datatype in block:
-	else if (IS_DATATYPE(target) || IS_TYPESET(target)) {
-		for (; index >= start && index < end; index += skip) {
-			value = BLK_SKIP(series, index);
-			// Used if's so we can trace it...
-			if (IS_DATATYPE(target)) {
-				if (VAL_TYPE(value) == VAL_TYPE_KIND(target)) return index;
-				if (IS_DATATYPE(value) && VAL_TYPE_KIND(value) == VAL_TYPE_KIND(target)) return index;
-			}
-			if (IS_TYPESET(target)) {
-				if (TYPE_CHECK(target, VAL_TYPE(value))) return index;
-				if (IS_DATATYPE(value) && TYPE_CHECK(target, VAL_TYPE_KIND(value))) return index;
-				if (IS_TYPESET(value) && EQUAL_TYPESET(value, target)) return index;
-			}
-			if (flags & AM_FIND_MATCH) break;
-		}
-		return NOT_FOUND;
-	}
-	// All other cases:
-	else {
-		for (; index >= start && index < end; index += skip) {
-			value = BLK_SKIP(series, index);
-			if (0 == Cmp_Value(value, target, (REBOOL)(flags & AM_FIND_CASE))) return index;
-			if (flags & AM_FIND_MATCH) break;
-		}
-		return NOT_FOUND;
-	}
+        RELVAL *any_array = VAL_ARRAY_AT(arg);
+        REBINT index = VAL_INDEX(any_array) + Int32(VAL_ARRAY_AT(arg) + 1) - 1;
+
+        if (index < 0 || index > cast(REBINT, VAL_LEN_HEAD(any_array)))
+            goto bad_make;
+
+        REBSPC *derived = Derive_Specifier(VAL_SPECIFIER(arg), any_array);
+        Init_Any_Series_At_Core(
+            out,
+            kind,
+            AS_SERIES(VAL_ARRAY(any_array)),
+            index,
+            derived
+        );
+
+        // !!! Previously this code would clear line break options on path
+        // elements, using `CLEAR_VAL_FLAG(..., VALUE_FLAG_LINE)`.  But if
+        // arrays are allowed to alias each others contents, the aliasing
+        // via MAKE shouldn't modify the store.  Line marker filtering out of
+        // paths should be part of the MOLDing logic -or- a path with embedded
+        // line markers should use construction syntax to preserve them.
+
+        return;
+    }
+
+    // !!! In R3-Alpha, MAKE and TO handled all cases except INTEGER!
+    // and TYPESET! in the same way.  Ren-C switches MAKE of ANY-ARRAY!
+    // to be special (in order to compatible with construction syntax),
+    // continues the special treatment of INTEGER! by MAKE to mean
+    // a size, and disallows MAKE TYPESET!.  This is a practical matter
+    // of addressing changes in #2263 and keeping legacy working, as
+    // opposed to endorsing any rationale in R3-Alpha's choices.
+    //
+    if (IS_TYPESET(arg))
+        goto bad_make;
+
+    TO_Array(out, kind, arg);
+    return;
+
+bad_make:
+    fail (Error_Bad_Make(kind, arg));
 }
 
 
-/***********************************************************************
-**
-*/	void Make_Block_Type(REBFLG make, REBVAL *value, REBVAL *arg)
-/*
-**		Value can be:
-**			1. a datatype (e.g. BLOCK!)
-**			2. a value (e.g. [...])
-**
-**		Arg can be:
-**			1. integer (length of block)
-**			2. block (copy it)
-**			3. value (convert to a block)
-**
-***********************************************************************/
-{
-	enum Reb_Kind type;
-	REBCNT len;
-	REBSER *ser;
-
-	// make block! ...
-	if (IS_DATATYPE(value))
-		type = VAL_TYPE_KIND(value);
-	else  // make [...] ....
-		type = VAL_TYPE(value);
-
-	// make block! [1 2 3]
-	if (ANY_BLOCK(arg)) {
-		len = VAL_BLK_LEN(arg);
-		if (len > 0 && type >= REB_PATH && type <= REB_LIT_PATH)
-			No_Nones(arg);
-		ser = Copy_Values_Len_Shallow(VAL_BLK_DATA(arg), len);
-		goto done;
-	}
-
-	if (IS_STRING(arg)) {
-		REBCNT index, len = 0;
-		VAL_SERIES(arg) = Prep_Bin_Str(arg, &index, &len); // (keeps safe)
-		ser = Scan_Source(VAL_BIN(arg), VAL_LEN(arg));
-		goto done;
-	}
-
-	if (IS_BINARY(arg)) {
-		ser = Scan_Source(VAL_BIN_DATA(arg), VAL_LEN(arg));
-		goto done;
-	}
-
-	if (IS_MAP(arg)) {
-		ser = Map_To_Block(VAL_SERIES(arg), 0);
-		goto done;
-	}
-
-	if (ANY_OBJECT(arg)) {
-		ser = Make_Object_Block(VAL_OBJ_FRAME(arg), 3);
-		goto done;
-	}
-
-	if (IS_VECTOR(arg)) {
-		ser = Make_Vector_Block(arg);
-		goto done;
-	}
-
-//	if (make && IS_NONE(arg)) {
-//		ser = Make_Array(0);
-//		goto done;
-//	}
-
-	// to block! typset
-	if (!make && IS_TYPESET(arg) && type == REB_BLOCK) {
-		Val_Init_Block(value, Typeset_To_Block(arg));
-		return;
-	}
-
-	if (make) {
-		// make block! 10
-		if (IS_INTEGER(arg) || IS_DECIMAL(arg)) {
-			len = Int32s(arg, 0);
-			Val_Init_Series(value, type, Make_Array(len));
-			return;
-		}
-		Trap_Arg(arg);
-	}
-
-	ser = Copy_Values_Len_Shallow(arg, 1);
-
-done:
-	Val_Init_Series(value, type, ser);
-	return;
-}
-
-// WARNING! Not re-entrant. !!!  Must find a way to push it on stack?
-// Fields initialized to zero due to global scope
-static struct {
-	REBFLG cased;
-	REBFLG reverse;
-	REBCNT offset;
-	REBVAL *compare;
-} sort_flags;
-
-/***********************************************************************
-**
-*/	static int Compare_Val(const void *v1, const void *v2)
-/*
-***********************************************************************/
-{
-	// !!!! BE SURE that 64 bit large difference comparisons work
-
-	if (sort_flags.reverse)
-		return Cmp_Value(
-			cast(const REBVAL*, v2) + sort_flags.offset,
-			cast(const REBVAL*, v1) + sort_flags.offset,
-			sort_flags.cased
-		);
-	else
-		return Cmp_Value(
-			cast(const REBVAL*, v1) + sort_flags.offset,
-			cast(const REBVAL*, v2) + sort_flags.offset,
-			sort_flags.cased
-		);
-
-/*
-	REBI64 n = VAL_INT64((REBVAL*)v1) - VAL_INT64((REBVAL*)v2);
-	if (n > 0) return 1;
-	if (n < 0) return -1;
-	return 0;
-*/
+//
+//  TO_Array: C
+//
+void TO_Array(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
+    if (IS_TYPESET(arg)) {
+        //
+        // This makes a block of types out of a typeset.  Previously it was
+        // restricted to only BLOCK!, now it lets you turn a typeset into
+        // a GROUP! or a PATH!, etc.
+        //
+        Init_Any_Array(out, kind, Typeset_To_Array(arg));
+    }
+    else if (ANY_ARRAY(arg)) {
+        //
+        // `to group! [1 2 3]` etc. -- copy the array data at the index
+        // position and change the type.  (Note: MAKE does not copy the
+        // data, but aliases it under a new kind.)
+        //
+        Init_Any_Array(
+            out,
+            kind,
+            Copy_Values_Len_Shallow(
+                VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg), VAL_ARRAY_LEN_AT(arg)
+            )
+        );
+    }
+    else if (IS_STRING(arg)) {
+        //
+        // `to block! "some string"` historically scans the source, so you
+        // get an unbound code array.  Because the string may contain REBUNI
+        // characters, it may have to be converted to UTF8 before being
+        // used with the scanner.
+        //
+        REBCNT index;
+        REBSER *utf8 = Temp_Bin_Str_Managed(arg, &index, NULL);
+        PUSH_GUARD_SERIES(utf8);
+        Init_Any_Array(
+            out,
+            kind,
+            Scan_UTF8_Managed(BIN_HEAD(utf8), BIN_LEN(utf8))
+        );
+        DROP_GUARD_SERIES(utf8);
+    }
+    else if (IS_BINARY(arg)) {
+        //
+        // `to block! #{00BDAE....}` assumes the binary data is UTF8, and
+        // goes directly to the scanner to make an unbound code array.
+        //
+        Init_Any_Array(
+            out, kind, Scan_UTF8_Managed(VAL_BIN_AT(arg), VAL_LEN_AT(arg))
+        );
+    }
+    else if (IS_MAP(arg)) {
+        Init_Any_Array(out, kind, Map_To_Array(VAL_MAP(arg), 0));
+    }
+    else if (ANY_CONTEXT(arg)) {
+        Init_Any_Array(out, kind, Context_To_Array(VAL_CONTEXT(arg), 3));
+    }
+    else if (IS_VECTOR(arg)) {
+        Init_Any_Array(out, kind, Vector_To_Array(arg));
+    }
+    else {
+        // !!! The general case of not having any special conversion behavior
+        // in R3-Alpha is just to fall through to making a 1-element block
+        // containing the value.  This may seem somewhat random, and an
+        // error may be preferable.
+        //
+        Init_Any_Array(out, kind, Copy_Values_Len_Shallow(arg, SPECIFIED, 1));
+    }
 }
 
 
-/***********************************************************************
-**
-*/	static int Compare_Call(const void *v1, const void *v2)
-/*
-***********************************************************************/
-{
-	REBVAL *args = NULL;
-	REBVAL out;
+//
+//  Find_In_Array: C
+//
+// Flags are set according to: ALL_FIND_REFS
+//
+// Main Parameters:
+// start - index to start search
+// end   - ending position
+// len   - length of target
+// skip  - skip factor
+// dir   - direction
+//
+// Comparison Parameters:
+// case  - case sensitivity
+// wild  - wild cards/keys
+//
+// Final Parmameters:
+// tail  - tail position
+// match - sequence
+// SELECT - (value that follows)
+//
+REBCNT Find_In_Array(
+    REBARR *array,
+    REBCNT index,
+    REBCNT end,
+    const RELVAL *target,
+    REBCNT len,
+    REBFLGS flags,
+    REBINT skip
+) {
+    RELVAL *value;
+    RELVAL *val;
+    REBCNT cnt;
+    REBCNT start = index;
 
-	REBINT result = -1;
+    if (flags & (AM_FIND_REVERSE | AM_FIND_LAST)) {
+        skip = -1;
+        start = 0;
+        if (flags & AM_FIND_LAST) index = end - len;
+        else index--;
+    }
 
-	const void *tmp = NULL;
+    // Optimized find word in block:
+    if (ANY_WORD(target)) {
+        for (; index >= start && index < end; index += skip) {
+            value = ARR_AT(array, index);
+            if (ANY_WORD(value)) {
+                cnt = (VAL_WORD_SPELLING(value) == VAL_WORD_SPELLING(target));
+                if (flags & AM_FIND_CASE) {
+                    // Must be same type and spelling:
+                    if (cnt && VAL_TYPE(value) == VAL_TYPE(target)) return index;
+                }
+                else {
+                    // Can be different type or alias:
+                    if (cnt || VAL_WORD_CANON(value) == VAL_WORD_CANON(target)) return index;
+                }
+            }
+            if (flags & AM_FIND_MATCH) break;
+        }
+        return NOT_FOUND;
+    }
+    // Match a block against a block:
+    else if (ANY_ARRAY(target) && !(flags & AM_FIND_ONLY)) {
+        for (; index >= start && index < end; index += skip) {
+            cnt = 0;
+            value = ARR_AT(array, index);
+            for (val = VAL_ARRAY_AT(target); NOT_END(val); val++, value++) {
+                if (0 != Cmp_Value(value, val, LOGICAL(flags & AM_FIND_CASE)))
+                    break;
+                if (++cnt >= len) {
+                    return index;
+                }
+            }
+            if (flags & AM_FIND_MATCH) break;
+        }
+        return NOT_FOUND;
+    }
+    // Find a datatype in block:
+    else if (IS_DATATYPE(target) || IS_TYPESET(target)) {
+        for (; index >= start && index < end; index += skip) {
+            value = ARR_AT(array, index);
+            // Used if's so we can trace it...
+            if (IS_DATATYPE(target)) {
+                if (VAL_TYPE(value) == VAL_TYPE_KIND(target)) return index;
+                if (IS_DATATYPE(value) && VAL_TYPE_KIND(value) == VAL_TYPE_KIND(target)) return index;
+            }
+            if (IS_TYPESET(target)) {
+                if (TYPE_CHECK(target, VAL_TYPE(value))) return index;
+                if (IS_DATATYPE(value) && TYPE_CHECK(target, VAL_TYPE_KIND(value))) return index;
+                if (IS_TYPESET(value) && EQUAL_TYPESET(value, target)) return index;
+            }
+            if (flags & AM_FIND_MATCH) break;
+        }
+        return NOT_FOUND;
+    }
+    // All other cases:
+    else {
+        for (; index >= start && index < end; index += skip) {
+            value = ARR_AT(array, index);
+            if (
+                0 == Cmp_Value(
+                    value, target, LOGICAL(flags & AM_FIND_CASE)
+                )
+            ) {
+                return index;
+            }
 
-	if (!sort_flags.reverse) { /*swap v1 and v2 */
-		tmp = v1;
-		v1 = v2;
-		v2 = tmp;
-	}
-
-	args = BLK_SKIP(VAL_FUNC_WORDS(sort_flags.compare), 1);
-	if (NOT_END(args) && !TYPE_CHECK(args, VAL_TYPE(cast(const REBVAL*, v1)))) {
-		Trap3_DEAD_END(RE_EXPECT_ARG,
-			Of_Type(sort_flags.compare), args, Of_Type(cast(const REBVAL*, v1))
-		);
-	}
-	++ args;
-	if (NOT_END(args) && !TYPE_CHECK(args, VAL_TYPE(cast(const REBVAL*, v2)))) {
-		Trap3_DEAD_END(RE_EXPECT_ARG,
-			Of_Type(sort_flags.compare), args, Of_Type(cast(const REBVAL*, v2))
-		);
-	}
-
-	Apply_Func(&out, sort_flags.compare, v1, v2, 0);
-
-	if (IS_LOGIC(&out)) {
-		if (VAL_LOGIC(&out)) result = 1;
-	}
-	else if (IS_INTEGER(&out)) {
-		if (VAL_INT64(&out) > 0) result = 1;
-		if (VAL_INT64(&out) == 0) result = 0;
-	}
-	else if (IS_DECIMAL(&out)) {
-		if (VAL_DECIMAL(&out) > 0) result = 1;
-		if (VAL_DECIMAL(&out) == 0) result = 0;
-	}
-	else if (IS_CONDITIONAL_TRUE(&out)) result = 1;
-
-	return result;
+            if (flags & AM_FIND_MATCH) break;
+        }
+        return NOT_FOUND;
+    }
 }
 
 
-/***********************************************************************
-**
-*/	static void Sort_Block(REBVAL *block, REBFLG ccase, REBVAL *skipv, REBVAL *compv, REBVAL *part, REBFLG all, REBFLG rev)
-/*
-**		series [series!]
-**		/case {Case sensitive sort}
-**		/skip {Treat the series as records of fixed size}
-**		size [integer!] {Size of each record}
-**		/compare  {Comparator offset, block or function}
-**		comparator [integer! block! function!]
-**		/part {Sort only part of a series}
-**		limit [number! series!] {Length of series to sort}
-**		/all {Compare all fields}
-**		/reverse {Reverse sort order}
-**
-***********************************************************************/
+struct sort_flags {
+    REBOOL cased;
+    REBOOL reverse;
+    REBCNT offset;
+    REBVAL *comparator;
+    REBOOL all; // !!! not used?
+};
+
+
+//
+//  Compare_Val: C
+//
+static int Compare_Val(void *arg, const void *v1, const void *v2)
 {
-	REBCNT len;
-	REBCNT skip = 1;
-	REBCNT size = sizeof(REBVAL);
-//	int (*sfunc)(const void *v1, const void *v2);
+    struct sort_flags *flags = cast(struct sort_flags*, arg);
 
-	sort_flags.cased = ccase;
-	sort_flags.reverse = rev;
-	sort_flags.compare = 0;
-	sort_flags.offset = 0;
+    // !!!! BE SURE that 64 bit large difference comparisons work
 
-	if (IS_INTEGER(compv)) sort_flags.offset = Int32(compv)-1;
-	if (ANY_FUNC(compv)) sort_flags.compare = compv;
-
-	// Determine length of sort:
-	len = Partial1(block, part);
-	if (len <= 1) return;
-
-	// Skip factor:
-	if (!IS_NONE(skipv)) {
-		skip = Get_Num_Arg(skipv);
-		if (skip <= 0 || len % skip != 0 || skip > len)
-			Trap_Range(skipv);
-	}
-
-	// Use fast quicksort library function:
-	if (skip > 1) len /= skip, size *= skip;
-
-	if (sort_flags.compare)
-		reb_qsort(VAL_BLK_DATA(block), len, size, Compare_Call);
-	else
-		reb_qsort(VAL_BLK_DATA(block), len, size, Compare_Val);
-
+    if (flags->reverse)
+        return Cmp_Value(
+            cast(const RELVAL*, v2) + flags->offset,
+            cast(const RELVAL*, v1) + flags->offset,
+            flags->cased
+        );
+    else
+        return Cmp_Value(
+            cast(const RELVAL*, v1) + flags->offset,
+            cast(const RELVAL*, v2) + flags->offset,
+            flags->cased
+        );
 }
 
 
-/***********************************************************************
-**
-*/	static void Trim_Block(REBSER *ser, REBCNT index, REBCNT flags)
-/*
-**		See Trim_String().
-**
-***********************************************************************/
+//
+//  Compare_Val_Custom: C
+//
+static int Compare_Val_Custom(void *arg, const void *v1, const void *v2)
 {
-	REBVAL *blk = BLK_HEAD(ser);
-	REBCNT out = index;
-	REBCNT end = ser->tail;
+    struct sort_flags *flags = cast(struct sort_flags*, arg);
 
-	if (flags & AM_TRIM_TAIL) {
-		for (; end >= (index+1); end--) {
-			if (VAL_TYPE(blk+end-1) > REB_NONE) break;
-		}
-		Remove_Series(ser, end, ser->tail - end);
-		if (!(flags & AM_TRIM_HEAD) || index >= end) return;
-	}
+    DECLARE_LOCAL (result);
+    if (Apply_Only_Throws(
+        result,
+        TRUE,
+        flags->comparator,
+        flags->reverse ? v1 : v2,
+        flags->reverse ? v2 : v1,
+        END_CELL
+    )) {
+        fail (Error_No_Catch_For_Throw(result));
+    }
 
-	if (flags & AM_TRIM_HEAD) {
-		for (; index < end; index++) {
-			if (VAL_TYPE(blk+index) > REB_NONE) break;
-		}
-		Remove_Series(ser, out, index - out);
-	}
+    REBINT tristate = -1;
 
-	if (flags == 0) {
-		for (; index < end; index++) {
-			if (VAL_TYPE(blk+index) > REB_NONE) {
-				*BLK_SKIP(ser, out) = blk[index];
-				out++;
-			}
-		}
-		Remove_Series(ser, out, end - out);
-	}
+    if (IS_LOGIC(result)) {
+        if (VAL_LOGIC(result))
+            tristate = 1;
+    }
+    else if (IS_INTEGER(result)) {
+        if (VAL_INT64(result) > 0)
+            tristate = 1;
+        else if (VAL_INT64(result) == 0)
+            tristate = 0;
+    }
+    else if (IS_DECIMAL(result)) {
+        if (VAL_DECIMAL(result) > 0)
+            tristate = 1;
+        else if (VAL_DECIMAL(result) == 0)
+            tristate = 0;
+    }
+    else if (IS_CONDITIONAL_TRUE(result))
+        tristate = 1;
+
+    return tristate;
 }
 
 
-/***********************************************************************
-**
-*/	void Shuffle_Block(REBVAL *value, REBFLG secure)
-/*
-***********************************************************************/
-{
-	REBCNT n;
-	REBCNT k;
-	REBCNT idx = VAL_INDEX(value);
-	REBVAL *data = VAL_BLK_HEAD(value);
-	REBVAL swap;
+//
+//  Sort_Block: C
+//
+// series [any-series!]
+// /case {Case sensitive sort}
+// /skip {Treat the series as records of fixed size}
+// size [integer!] {Size of each record}
+// /compare  {Comparator offset, block or function}
+// comparator [integer! block! function!]
+// /part {Sort only part of a series}
+// limit [any-number! any-series!] {Length of series to sort}
+// /all {Compare all fields}
+// /reverse {Reverse sort order}
+//
+static void Sort_Block(
+    REBVAL *block,
+    REBOOL ccase,
+    REBVAL *skipv,
+    REBVAL *compv,
+    REBVAL *part,
+    REBOOL all,
+    REBOOL rev
+) {
+    struct sort_flags flags;
+    flags.cased = ccase;
+    flags.reverse = rev;
+    flags.all = all; // !!! not used?
 
-	for (n = VAL_LEN(value); n > 1;) {
-		k = idx + (REBCNT)Random_Int(secure) % n;
-		n--;
-		swap = data[k];
-		data[k] = data[n + idx];
-		data[n + idx] = swap;
-	}
+    if (IS_FUNCTION(compv)) {
+        flags.comparator = compv;
+        flags.offset = 0;
+    }
+    else if (IS_INTEGER(compv)) {
+        flags.comparator = NULL;
+        flags.offset = Int32(compv) - 1;
+    }
+    else {
+        assert(IS_VOID(compv));
+        flags.comparator = NULL;
+        flags.offset = 0;
+    }
+
+    // Determine length of sort:
+    REBCNT len;
+    Partial1(block, part, &len);
+    if (len <= 1)
+        return;
+
+    // Skip factor:
+    REBCNT skip;
+    if (!IS_VOID(skipv)) {
+        skip = Get_Num_From_Arg(skipv);
+        if (skip <= 0 || len % skip != 0 || skip > len)
+            fail (Error_Out_Of_Range(skipv));
+    }
+    else
+        skip = 1;
+
+    reb_qsort_r(
+        VAL_ARRAY_AT(block),
+        len / skip,
+        sizeof(REBVAL) * skip,
+        &flags,
+        flags.comparator != NULL ? &Compare_Val_Custom : &Compare_Val
+    );
 }
 
 
-/***********************************************************************
-**
-*/	REBINT PD_Array(REBPVS *pvs)
-/*
-**	Path dispatch for the following types:
-**
-**		PD_Block(REBPVS *pvs)
-**		PD_Paren(REBPVS *pvs)
-**		PD_Path(REBPVS *pvs)
-**		PD_Get_Path(REBPVS *pvs)
-**		PD_Set_Path(REBPVS *pvs)
-**		PD_Lit_Path(REBPVS *pvs)
-**
-***********************************************************************/
+//
+//  Shuffle_Block: C
+//
+void Shuffle_Block(REBVAL *value, REBOOL secure)
 {
-	REBINT n = 0;
+    REBCNT n;
+    REBCNT k;
+    REBCNT idx = VAL_INDEX(value);
+    RELVAL *data = VAL_ARRAY_HEAD(value);
 
-	/* Issues!!!
-		a/1.3
-		a/not-found: 10 error or append?
-		a/not-followed: 10 error or append?
-	*/
+    // Rare case where RELVAL bit copying is okay...between spots in the
+    // same array.
+    //
+    RELVAL swap;
 
-	if (IS_INTEGER(pvs->select)) {
-		n = Int32(pvs->select) + VAL_INDEX(pvs->value) - 1;
-	}
-	else if (IS_WORD(pvs->select)) {
-		n = Find_Word(VAL_SERIES(pvs->value), VAL_INDEX(pvs->value), VAL_WORD_CANON(pvs->select));
-		if (cast(REBCNT, n) != NOT_FOUND) n++;
-	}
-	else {
-		// other values:
-		n = Find_Block_Simple(VAL_SERIES(pvs->value), VAL_INDEX(pvs->value), pvs->select) + 1;
-	}
-
-	if (n < 0 || (REBCNT)n >= VAL_TAIL(pvs->value)) {
-		if (pvs->setval) return PE_BAD_SELECT;
-		return PE_NONE;
-	}
-
-	if (pvs->setval) TRAP_PROTECT(VAL_SERIES(pvs->value));
-	pvs->value = VAL_BLK_SKIP(pvs->value, n);
-	// if valset - check PROTECT on block
-	//if (NOT_END(pvs->path+1)) Next_Path(pvs); return PE_OK;
-	return PE_SET;
+    for (n = VAL_LEN_AT(value); n > 1;) {
+        k = idx + (REBCNT)Random_Int(secure) % n;
+        n--;
+        swap = data[k];
+        data[k] = data[n + idx];
+        data[n + idx] = swap;
+    }
 }
 
 
-/***********************************************************************
-**
-*/	REBVAL *Pick_Block(REBVAL *block, REBVAL *selector)
-/*
-***********************************************************************/
+//
+//  PD_Array: C
+//
+// Path dispatch for the following types:
+//
+//     PD_Block
+//     PD_Group
+//     PD_Path
+//     PD_Get_Path
+//     PD_Set_Path
+//     PD_Lit_Path
+//
+REBINT PD_Array(REBPVS *pvs)
 {
-	REBINT n = 0;
+    REBINT n = 0;
 
-	n = Get_Num_Arg(selector);
-	n += VAL_INDEX(block) - 1;
-	if (n < 0 || (REBCNT)n >= VAL_TAIL(block)) return 0;
-	return VAL_BLK_SKIP(block, n);
-}
+    /* Issues!!!
+        a/1.3
+        a/not-found: 10 error or append?
+        a/not-followed: 10 error or append?
+    */
 
+    if (IS_INTEGER(pvs->selector)) {
+        n = Int32(pvs->selector) + VAL_INDEX(pvs->value) - 1;
+    }
+    else if (IS_WORD(pvs->selector)) {
+        n = Find_Word_In_Array(
+            VAL_ARRAY(pvs->value),
+            VAL_INDEX(pvs->value),
+            VAL_WORD_CANON(pvs->selector)
+        );
+        if (cast(REBCNT, n) != NOT_FOUND) n++;
+    }
+    else {
+        // other values:
+        n = 1 + Find_In_Array_Simple(
+            VAL_ARRAY(pvs->value),
+            VAL_INDEX(pvs->value),
+            pvs->selector
+        );
+    }
 
-/***********************************************************************
-**
-*/	REBTYPE(Array)
-/*
-**	Implementation of type dispatch of the following:
-**
-**		REBTYPE(Block)
-**		REBTYPE(Paren)
-**		REBTYPE(Path)
-**		REBTYPE(Get_Path)
-**		REBTYPE(Set_Path)
-**		REBTYPE(Lit_Path)
-**
-***********************************************************************/
-{
-	REBVAL	*value = D_ARG(1);
-	REBVAL  *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
-	REBSER  *ser;
-	REBINT	index;
-	REBINT	tail;
-	REBINT	len;
-	REBVAL  val;
-	REBCNT	args;
-	REBCNT  ret;
+    if (n < 0 || cast(REBCNT, n) >= VAL_LEN_HEAD(pvs->value)) {
+        if (pvs->opt_setval)
+            fail (Error_Bad_Path_Select(pvs));
 
-	// Support for port: OPEN [scheme: ...], READ [ ], etc.
-	if (action >= PORT_ACTIONS && IS_BLOCK(value))
-		return T_Port(call_, action);
+        return PE_NONE;
+    }
 
-	// Most common series actions:  !!! speed this up!
-	len = Do_Series_Action(call_, action, value, arg);
-	if (len >= 0) return len; // return code
+    if (pvs->opt_setval)
+        FAIL_IF_READ_ONLY_SERIES(VAL_SERIES(pvs->value));
 
-	// Special case (to avoid fetch of index and tail below):
-	if (action == A_MAKE || action == A_TO) {
-		Make_Block_Type(action == A_MAKE, value, arg); // returned in value
+    pvs->value_specifier = Derive_Specifier(pvs->value_specifier, pvs->value);
+    pvs->value = VAL_ARRAY_AT_HEAD(pvs->value, n);
 
-		if (ANY_PATH(value)) {
-			// Get rid of any line break options on the path's elements
-			REBVAL *clear = BLK_HEAD(VAL_SERIES(value));
-			for (; NOT_END(clear); clear++) {
-				VAL_CLR_OPT(clear, OPT_VALUE_LINE);
-			}
-		}
-		*D_OUT = *value;
-		return R_OUT;
-	}
-
-	index = (REBINT)VAL_INDEX(value);
-	tail  = (REBINT)VAL_TAIL(value);
-	ser   = VAL_SERIES(value);
-
-	// Check must be in this order (to avoid checking a non-series value);
-	if (action >= A_TAKE && action <= A_SORT && IS_PROTECT_SERIES(ser))
-		Trap_DEAD_END(RE_PROTECTED);
-
-	switch (action) {
-
-	//-- Picking:
-
-#ifdef REMOVE_THIS
-
-//CHANGE SELECT TO USE PD_BLOCK?
-
-	case A_PATH:
-		if (IS_INTEGER(arg)) {
-			action = A_PICK;
-			goto repick;
-		}
-		// block/select case:
-		ret = Find_Block_Simple(ser, index, arg);
-		goto select_val;
-
-	case A_PATH_SET:
-		action = A_POKE;
-		// no SELECT case allowed !!!!
+#if !defined(NDEBUG)
+    if (pvs->value_specifier == SPECIFIED && IS_RELATIVE(pvs->value)) {
+        printf("Relative value found in PD_Array with no specifier\n");
+        panic (pvs->value);
+    }
 #endif
 
-	case A_POKE:
-	case A_PICK:
-repick:
-		value = Pick_Block(value, arg);
-		if (action == A_PICK) {
-			if (!value) goto is_none;
-			*D_OUT = *value;
-		} else {
-			if (!value) Trap_Range_DEAD_END(arg);
-			arg = D_ARG(3);
-			*value = *arg;
-			*D_OUT = *arg;
-		}
-		return R_OUT;
+    return PE_SET_IF_END;
+}
 
-/*
-		len = Get_Num_Arg(arg); // Position
-		index += len;
-		if (len > 0) index--;
-		if (len == 0 || index < 0 || index >= tail) {
-			if (action == A_PICK) goto is_none;
-			Trap_Range_DEAD_END(arg);
-		}
-		if (action == A_PICK) {
-pick_it:
-			*D_OUT = BLK_HEAD(ser)[index];
-			return R_OUT;
-		}
-		arg = D_ARG(3);
-		*D_OUT = *arg;
-		BLK_HEAD(ser)[index] = *arg;
-		return R_OUT;
-*/
 
-	case A_TAKE:
-		// take/part:
-		if (D_REF(2)) {
-			len = Partial1(value, D_ARG(3));
-			if (len == 0) {
-zero_blk:
-				Val_Init_Block(D_OUT, Make_Array(0));
-				return R_OUT;
-			}
-		} else
-			len = 1;
+//
+//  Pick_Block: C
+//
+// Fills out with void if no pick.
+//
+RELVAL *Pick_Block(REBVAL *out, const REBVAL *block, const REBVAL *selector)
+{
+    REBINT n = 0;
 
-		index = VAL_INDEX(value); // /part can change index
-		// take/last:
-		if (D_REF(5)) index = tail - len;
-		if (index < 0 || index >= tail) {
-			if (!D_REF(2)) goto is_none;
-			goto zero_blk;
-		}
+    n = Get_Num_From_Arg(selector);
+    n += VAL_INDEX(block) - 1;
+    if (n < 0 || cast(REBCNT, n) >= VAL_LEN_HEAD(block)) {
+        SET_VOID(out);
+        return NULL;
+    }
+    else {
+        RELVAL *slot = VAL_ARRAY_AT_HEAD(block, n);
+        Derelativize(out, slot, VAL_SPECIFIER(block));
+        return slot;
+    }
+}
 
-		// if no /part, just return value, else return block:
-		if (!D_REF(2)) *D_OUT = BLK_HEAD(ser)[index];
-		else Val_Init_Block(D_OUT, Copy_Array_At_Max_Shallow(ser, index, len));
-		Remove_Series(ser, index, len);
-		return R_OUT;
 
-	//-- Search:
+//
+//  REBTYPE: C
+//
+// Implementation of type dispatch of the following:
+//
+//     REBTYPE(Block)
+//     REBTYPE(Group)
+//     REBTYPE(Path)
+//     REBTYPE(Get_Path)
+//     REBTYPE(Set_Path)
+//     REBTYPE(Lit_Path)
+//
+REBTYPE(Array)
+{
+    REBVAL *value = D_ARG(1);
+    REBVAL *arg = D_ARGC > 1 ? D_ARG(2) : NULL;
 
-	case A_FIND:
-	case A_SELECT:
-		args = Find_Refines(call_, ALL_FIND_REFS);
-//		if (ANY_BLOCK(arg) || args) {
-			len = ANY_BLOCK(arg) ? VAL_BLK_LEN(arg) : 1;
-			if (args & AM_FIND_PART) tail = Partial1(value, D_ARG(ARG_FIND_LIMIT));
-			ret = 1;
-			if (args & AM_FIND_SKIP) ret = Int32s(D_ARG(ARG_FIND_SIZE), 1);
-			ret = Find_Block(ser, index, tail, arg, len, args, ret);
-//		}
-/*		else {
-			len = 1;
-			ret = Find_Block_Simple(ser, index, arg);
-		}
-*/
-		if (ret >= (REBCNT)tail) goto is_none;
-		if (args & AM_FIND_ONLY) len = 1;
-		if (action == A_FIND) {
-			if (args & (AM_FIND_TAIL | AM_FIND_MATCH)) ret += len;
-			VAL_INDEX(value) = ret;
-		}
-		else {
-			ret += len;
-			if (ret >= (REBCNT)tail) goto is_none;
-			value = BLK_SKIP(ser, ret);
-		}
-		break;
+    // Common operations for any series type (length, head, etc.)
+    {
+        REB_R r = Series_Common_Action_Maybe_Unhandled(frame_, action);
+        if (r != R_UNHANDLED)
+            return r;
+    }
 
-	//-- Modification:
-	case A_APPEND:
-	case A_INSERT:
-	case A_CHANGE:
-		// Length of target (may modify index): (arg can be anything)
-		len = Partial1((action == A_CHANGE) ? value : arg, D_ARG(AN_LIMIT));
-		index = VAL_INDEX(value);
-		args = 0;
-		if (D_REF(AN_ONLY)) SET_FLAG(args, AN_ONLY);
-		if (D_REF(AN_PART)) SET_FLAG(args, AN_PART);
-		index = Modify_Array(action, ser, index, arg, args, len, D_REF(AN_DUP) ? Int32(D_ARG(AN_COUNT)) : 1);
-		VAL_INDEX(value) = index;
-		break;
+    // NOTE: Partial1() used below can mutate VAL_INDEX(value), be aware :-/
+    //
+    REBARR *array = VAL_ARRAY(value);
+    REBCNT index = VAL_INDEX(value);
+    REBSPC *specifier = VAL_SPECIFIER(value);
 
-	case A_CLEAR:
-		if (index < tail) {
-			if (index == 0) Reset_Series(ser);
-			else {
-				SET_END(BLK_SKIP(ser, index));
-				VAL_TAIL(value) = (REBCNT)index;
-			}
-		}
-		break;
+    switch (action) {
+    case SYM_POKE:
+    case SYM_PICK: {
+        RELVAL *slot;
+    pick_using_arg:
+        slot = Pick_Block(D_OUT, value, arg);
+        if (action == SYM_PICK) {
+            if (IS_VOID(D_OUT)) {
+                assert(!slot);
+                return R_VOID;
+            }
+        } else {
+            FAIL_IF_READ_ONLY_ARRAY(array);
+            if (IS_VOID(D_OUT)) {
+                assert(!slot);
+                fail (Error_Out_Of_Range(arg));
+            }
+            arg = D_ARG(3);
+            Move_Value(slot, arg);
+            Move_Value(D_OUT, arg);
+        }
+        return R_OUT;
+    }
 
-	//-- Creation:
+    case SYM_TAKE: {
+        INCLUDE_PARAMS_OF_TAKE;
 
-	case A_COPY: // /PART len /DEEP /TYPES kinds
-	{
-		REBU64 types = 0;
-		if (D_REF(ARG_COPY_DEEP)) {
-			types |= D_REF(ARG_COPY_TYPES) ? 0 : TS_STD_SERIES;
-		}
-		if D_REF(ARG_COPY_TYPES) {
-			arg = D_ARG(ARG_COPY_KINDS);
-			if (IS_DATATYPE(arg)) types |= TYPESET(VAL_TYPE_KIND(arg));
-			else types |= VAL_TYPESET(arg);
-		}
-		len = Partial1(value, D_ARG(ARG_COPY_LIMIT));
-		VAL_SERIES(value) = Copy_Array_Core_Managed(
-			ser,
-			VAL_INDEX(value),
-			VAL_INDEX(value) + len,
-			D_REF(ARG_COPY_DEEP),
-			types
-		);
-		VAL_INDEX(value) = 0;
-	}
-		break;
+        UNUSED(PAR(series));
+        if (REF(deep))
+            fail (Error(RE_BAD_REFINES));
 
-	//-- Special actions:
+        REBCNT len;
 
-	case A_TRIM:
-		args = Find_Refines(call_, ALL_TRIM_REFS);
-		if (args & ~(AM_TRIM_HEAD|AM_TRIM_TAIL)) Trap_DEAD_END(RE_BAD_REFINES);
-		Trim_Block(ser, index, args);
-		break;
+        FAIL_IF_READ_ONLY_ARRAY(array);
 
-	case A_SWAP:
-		if (SERIES_WIDE(ser) != SERIES_WIDE(VAL_SERIES(arg)))
-			Trap_Arg_DEAD_END(arg);
-		if (IS_PROTECT_SERIES(VAL_SERIES(arg))) Trap_DEAD_END(RE_PROTECTED);
-		if (index < tail && VAL_INDEX(arg) < VAL_TAIL(arg)) {
-			val = *VAL_BLK_DATA(value);
-			*VAL_BLK_DATA(value) = *VAL_BLK_DATA(arg);
-			*VAL_BLK_DATA(arg) = val;
-		}
-		value = 0;
-		break;
+        if (REF(part)) {
+            Partial1(value, ARG(limit), &len);
+            if (len == 0)
+                goto return_empty_block;
 
-	case A_REVERSE:
-		len = Partial1(value, D_ARG(3));
-		if (len == 0) break;
-		value = VAL_BLK_DATA(value);
-		arg = value + len - 1;
-		for (len /= 2; len > 0; len--) {
-			val = *value;
-			*value++ = *arg;
-			*arg-- = val;
-		}
-		value = 0;
-		break;
+            assert(VAL_LEN_HEAD(value) >= len);
+        }
+        else
+            len = 1;
 
-	case A_SORT:
-		Sort_Block(
-			value,
-			D_REF(2),	// case sensitive
-			D_ARG(4),	// skip size
-			D_ARG(6),	// comparator
-			D_ARG(8),	// part-length
-			D_REF(9),	// all fields
-			D_REF(10)	// reverse
-		);
-		break;
+        index = VAL_INDEX(value); // /part can change index
 
-	case A_RANDOM:
-		if (!IS_BLOCK(value)) Trap_Action_DEAD_END(VAL_TYPE(value), action);
-		if (D_REF(2)) Trap_DEAD_END(RE_BAD_REFINES); // seed
-		if (D_REF(4)) { // /only
-			if (index >= tail) goto is_none;
-			len = (REBCNT)Random_Int(D_REF(3)) % (tail - index);  // /secure
-			arg = D_ARG(2); // pass to pick
-			SET_INTEGER(arg, len+1);
-			action = A_PICK;
-			goto repick;
-		}
-		Shuffle_Block(value, D_REF(3));
-		break;
+        if (REF(last))
+            index = VAL_LEN_HEAD(value) - len;
 
-	default:
-		Trap_Action_DEAD_END(VAL_TYPE(value), action);
-	}
+        if (index >= VAL_LEN_HEAD(value)) {
+            if (NOT(REF(part)))
+                return R_VOID;
 
-	if (!value)
-		return R_ARG1;
+            goto return_empty_block;
+        }
 
-	*D_OUT = *value;
-	return R_OUT;
+        if (REF(part))
+            Init_Block(
+                D_OUT, Copy_Array_At_Max_Shallow(array, index, specifier, len)
+            );
+        else
+            Derelativize(D_OUT, &ARR_HEAD(array)[index], specifier);
 
-is_none:
-	return R_NONE;
+        Remove_Series(AS_SERIES(array), index, len);
+        return R_OUT;
+    }
+
+    //-- Search:
+
+    case SYM_FIND:
+    case SYM_SELECT: {
+        INCLUDE_PARAMS_OF_FIND;
+
+        UNUSED(PAR(series));
+        UNUSED(PAR(value)); // aliased as arg
+
+        REBINT len = ANY_ARRAY(arg) ? VAL_ARRAY_LEN_AT(arg) : 1;
+
+        REBCNT limit;
+        if (REF(part))
+            Partial1(value, ARG(limit), &limit);
+        else
+            limit = VAL_LEN_HEAD(value);
+
+        REBFLGS flags = (
+            (REF(only) ? AM_FIND_ONLY : 0)
+            | (REF(match) ? AM_FIND_MATCH : 0)
+            | (REF(reverse) ? AM_FIND_REVERSE : 0)
+            | (REF(case) ? AM_FIND_CASE : 0)
+            | (REF(last) ? AM_FIND_LAST : 0)
+        );
+
+        REBCNT skip = REF(skip) ? Int32s(ARG(size), 1) : 1;
+
+        REBCNT ret = Find_In_Array(
+            array, index, limit, arg, len, flags, skip
+        );
+
+        if (ret >= limit) {
+            if (action == SYM_FIND)
+                return R_BLANK;
+            return R_VOID;
+        }
+
+        if (REF(only))
+            len = 1;
+
+        if (action == SYM_FIND) {
+            if (REF(tail) || REF(match))
+                ret += len;
+            VAL_INDEX(value) = ret;
+            Move_Value(D_OUT, value);
+        }
+        else {
+            ret += len;
+            if (ret >= limit) {
+                if (action == SYM_FIND)
+                    return R_BLANK;
+                return R_VOID;
+            }
+            Derelativize(D_OUT, ARR_AT(array, ret), specifier);
+        }
+        return R_OUT;
+    }
+
+    //-- Modification:
+    case SYM_APPEND:
+    case SYM_INSERT:
+    case SYM_CHANGE: {
+        INCLUDE_PARAMS_OF_INSERT;
+
+        UNUSED(PAR(series));
+        UNUSED(PAR(value));
+
+        // Length of target (may modify index): (arg can be anything)
+        //
+        REBCNT len;
+        Partial1(
+            (action == SYM_CHANGE)
+                ? value
+                : arg,
+            ARG(limit),
+            &len
+        );
+
+        FAIL_IF_READ_ONLY_ARRAY(array);
+        index = VAL_INDEX(value);
+
+        REBFLGS flags = 0;
+        if (REF(only))
+            flags |= AM_ONLY;
+        if (REF(part))
+            flags |= AM_PART;
+
+        index = Modify_Array(
+            action,
+            array,
+            index,
+            arg,
+            flags,
+            len,
+            REF(dup) ? Int32(ARG(count)) : 1
+        );
+        VAL_INDEX(value) = index;
+        Move_Value(D_OUT, value);
+        return R_OUT;
+    }
+
+    case SYM_CLEAR: {
+        FAIL_IF_READ_ONLY_ARRAY(array);
+        if (index < VAL_LEN_HEAD(value)) {
+            if (index == 0) Reset_Array(array);
+            else {
+                SET_END(ARR_AT(array, index));
+                SET_SERIES_LEN(VAL_SERIES(value), cast(REBCNT, index));
+            }
+        }
+        Move_Value(D_OUT, value);
+        return R_OUT;
+    }
+
+    //-- Creation:
+
+    case SYM_COPY: {
+        INCLUDE_PARAMS_OF_COPY;
+
+        UNUSED(PAR(value));
+
+        REBU64 types = 0;
+        REBCNT tail = 0;
+        index = VAL_INDEX(value);
+
+        UNUSED(REF(part));
+        Partial1(value, ARG(limit), &tail);
+        tail += index;
+
+        if (REF(deep))
+            types |= REF(types) ? 0 : TS_STD_SERIES;
+
+        if (REF(types)) {
+            if (IS_DATATYPE(ARG(kinds)))
+                types |= FLAGIT_KIND(VAL_TYPE(ARG(kinds)));
+            else
+                types |= VAL_TYPESET_BITS(ARG(kinds));
+        }
+
+        REBARR *copy = Copy_Array_Core_Managed(
+            array,
+            VAL_INDEX(value), // at
+            specifier,
+            tail, // tail
+            0, // extra
+            REF(deep), // deep
+            types // types
+        );
+        Init_Any_Array(D_OUT, VAL_TYPE(value), copy);
+        return R_OUT;
+    }
+
+    //-- Special actions:
+
+    case SYM_TRIM: {
+        INCLUDE_PARAMS_OF_TRIM;
+
+        UNUSED(PAR(series));
+
+        FAIL_IF_READ_ONLY_ARRAY(array);
+
+        if (REF(auto) || REF(all) || REF(lines))
+            fail (Error(RE_BAD_REFINES));
+
+        if (REF(with)) {
+            assert(!IS_VOID(ARG(str)));
+            fail (Error(RE_BAD_REFINES));
+        }
+
+        RELVAL *head = ARR_HEAD(array);
+        REBCNT out = index;
+        REBINT end = ARR_LEN(array);
+
+        if (REF(tail)) {
+            for (; end >= cast(REBINT, index + 1); end--) {
+                if (VAL_TYPE(head + end - 1) != REB_BLANK)
+                    break;
+            }
+            Remove_Series(AS_SERIES(array), end, ARR_LEN(array) - end);
+
+            // if (!(flags & AM_TRIM_HEAD) || index >= end) return;
+        }
+
+        if (REF(head)) {
+            for (; cast(REBINT, index) < end; index++) {
+                if (VAL_TYPE(head + index) != REB_BLANK) break;
+            }
+            Remove_Series(AS_SERIES(array), out, index - out);
+        }
+
+        if (NOT(REF(head) || REF(tail))) {
+            for (; cast(REBINT, index) < end; index++) {
+                if (VAL_TYPE(head + index) != REB_BLANK) {
+                    //
+                    // Rare case of legal RELVAL bit copying... from one slot
+                    // in an array to another in that same array.
+                    //
+                    *ARR_AT(array, out) = head[index];
+                    out++;
+                }
+            }
+            Remove_Series(AS_SERIES(array), out, end - out);
+        }
+
+        Move_Value(D_OUT, value);
+        return R_OUT;
+    }
+
+    case SYM_SWAP: {
+        if (!ANY_ARRAY(arg))
+            fail (Error_Invalid_Arg(arg));
+
+        FAIL_IF_READ_ONLY_ARRAY(array);
+        FAIL_IF_READ_ONLY_ARRAY(VAL_ARRAY(arg));
+
+        if (
+            index < VAL_LEN_HEAD(value)
+            && VAL_INDEX(arg) < VAL_LEN_HEAD(arg)
+        ) {
+            // RELVAL bits can be copied within the same array
+            //
+            RELVAL temp = *VAL_ARRAY_AT(value);
+            *VAL_ARRAY_AT(value) = *VAL_ARRAY_AT(arg);
+            *VAL_ARRAY_AT(arg) = temp;
+        }
+        Move_Value(D_OUT, D_ARG(1));
+        return R_OUT;
+    }
+
+    case SYM_REVERSE: {
+        REBCNT len;
+        Partial1(value, D_ARG(3), &len);
+
+        FAIL_IF_READ_ONLY_ARRAY(array);
+
+        if (len != 0) {
+            //
+            // RELVAL bits may be copied from slots within the same array
+            //
+            RELVAL *front = VAL_ARRAY_AT(value);
+            RELVAL *back = front + len - 1;
+            for (len /= 2; len > 0; len--) {
+                RELVAL temp = *front;
+                *front++ = *back;
+                *back-- = temp;
+            }
+        }
+        Move_Value(D_OUT, D_ARG(1));
+        return R_OUT;
+    }
+
+    case SYM_SORT: {
+        INCLUDE_PARAMS_OF_SORT;
+
+        UNUSED(PAR(series));
+        UNUSED(REF(part)); // checks limit as void
+        UNUSED(REF(skip)); // checks size as void
+        UNUSED(REF(compare)); // checks comparator as void
+
+        FAIL_IF_READ_ONLY_ARRAY(array);
+
+        Sort_Block(
+            value,
+            REF(case),
+            ARG(size), // skip size (may be void if no /SKIP)
+            ARG(comparator), // (may be void if no /COMPARE)
+            ARG(limit), // (may be void if no /PART)
+            REF(all),
+            REF(reverse)
+        );
+        Move_Value(D_OUT, value);
+        return R_OUT;
+    }
+
+    case SYM_RANDOM: {
+        INCLUDE_PARAMS_OF_RANDOM;
+
+        UNUSED(PAR(value));
+
+        if (REF(seed))
+            fail (Error(RE_BAD_REFINES));
+
+        if (REF(only)) { // pick an element out of the array
+            if (index >= VAL_LEN_HEAD(value))
+                return R_BLANK;
+
+            SET_INTEGER(
+                ARG(seed),
+                1 + (Random_Int(REF(secure)) % (VAL_LEN_HEAD(value) - index))
+            );
+            arg = ARG(seed); // argument to pick
+            action = SYM_PICK;
+            goto pick_using_arg;
+        }
+
+        Shuffle_Block(value, REF(secure));
+        Move_Value(D_OUT, value);
+        return R_OUT;
+    }
+
+    default:
+        break; // fallthrough to error
+    }
+
+    // If it wasn't one of the block actions, fall through and let the port
+    // system try.  OPEN [scheme: ...], READ [ ], etc.
+    //
+    // !!! This used to be done by sensing explicitly what a "port action"
+    // was, but that involved checking if the action was in a numeric range.
+    // The symbol-based action dispatch is more open-ended.  Trying this
+    // to see how it works.
+
+    return T_Port(frame_, action);
+
+return_empty_block:
+    Init_Block(D_OUT, Make_Array(0));
+    return R_OUT;
 }
 
 
 #if !defined(NDEBUG)
-/***********************************************************************
-**
-*/	void Assert_Array_Core(const REBSER *series, REBOOL typed_words)
-/*
-***********************************************************************/
+
+//
+//  Assert_Array_Core: C
+//
+void Assert_Array_Core(REBARR *a)
 {
-	REBCNT len;
-	REBVAL *value;
+    // Basic integrity checks (series is not marked free, etc.)  Note that
+    // we don't use ASSERT_SERIES the macro here, because that checks to
+    // see if the series is an array...and if so, would call this routine
+    //
+    Assert_Series_Core(AS_SERIES(a));
 
-	if (SERIES_FREED(series))
-		Panic_Series(series);
+    if (NOT(GET_SER_FLAG(a, SERIES_FLAG_ARRAY)))
+        panic (a);
 
-	if (!Is_Array_Series(series))
-		Panic_Series(series);
+    RELVAL *item = ARR_HEAD(a);
+    REBCNT i;
+    for (i = 0; i < ARR_LEN(a); ++i, ++item) {
+        if (IS_END(item)) {
+            printf("Premature array end at index %d\n", i);
+            panic (a);
+        }
+    }
 
-	for (len = 0; len < series->tail; len++) {
-		value = BLK_SKIP(series, len);
+    if (NOT_END(item))
+        panic (item);
 
-		if (VAL_TYPE(value) == REB_END) {
-			// Premature end
-			Panic_Series(series);
-		}
+    if (GET_SER_INFO(a, SERIES_INFO_HAS_DYNAMIC)) {
+        REBCNT rest = SER_REST(AS_SERIES(a));
 
-		if (
-			typed_words
-			&& (!ANY_WORD(value) || !VAL_GET_EXT(value, EXT_WORD_TYPED))
-		) {
-			Panic_Series(series);
-		}
-	}
+        assert(rest > 0 && rest > i);
+        for (; i < rest - 1; ++i, ++item) {
+            if (NOT(item->header.bits & NODE_FLAG_CELL)) {
+                printf("Unwritable cell found in array rest capacity\n");
+                panic (a);
+            }
+        }
+        assert(item == ARR_AT(a, rest - 1));
 
-	if (!IS_END(BLK_SKIP(series, SERIES_TAIL(series)))) {
-		// Not legal to not have an END! at all
-		Panic_Series(series);
-	}
+        RELVAL *ultimate = ARR_AT(a, rest - 1);
+        if (NOT_END(ultimate) || (ultimate->header.bits & NODE_FLAG_CELL)) {
+            printf("Implicit termination/unwritable END missing from array\n");
+            panic (a);
+        }
+    }
+
 }
 #endif

@@ -1,192 +1,255 @@
-/***********************************************************************
-**
-**  REBOL [R3] Language Interpreter and Run-time Environment
-**
-**  Copyright 2012 REBOL Technologies
-**  REBOL is a trademark of REBOL Technologies
-**
-**  Licensed under the Apache License, Version 2.0 (the "License");
-**  you may not use this file except in compliance with the License.
-**  You may obtain a copy of the License at
-**
-**  http://www.apache.org/licenses/LICENSE-2.0
-**
-**  Unless required by applicable law or agreed to in writing, software
-**  distributed under the License is distributed on an "AS IS" BASIS,
-**  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**  See the License for the specific language governing permissions and
-**  limitations under the License.
-**
-************************************************************************
-**
-**  Module:  p-clipboard.c
-**  Summary: clipboard port interface
-**  Section: ports
-**  Author:  Carl Sassenrath
-**  Notes:
-**
-***********************************************************************/
+//
+//  File: %p-clipboard.c
+//  Summary: "clipboard port interface"
+//  Section: ports
+//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  Homepage: https://github.com/metaeducation/ren-c/
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Copyright 2012 REBOL Technologies
+// Copyright 2012-2017 Rebol Open Source Contributors
+// REBOL is a trademark of REBOL Technologies
+//
+// See README.md and CREDITS.md for more information.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
 
 #include "sys-core.h"
 
 
-/***********************************************************************
-**
-*/	static REB_R Clipboard_Actor(struct Reb_Call *call_, REBSER *port, REBCNT action)
-/*
-***********************************************************************/
+//
+//  Clipboard_Actor: C
+//
+static REB_R Clipboard_Actor(REBFRM *frame_, REBCTX *port, REBSYM action)
 {
-	REBREQ *req;
-	REBINT result;
-	REBVAL *arg;
-	REBCNT refs;	// refinement argument flags
-	REBINT len;
-	REBSER *ser;
+    REBINT result;
+    REBVAL *arg;
+    REBINT len;
+    REBSER *ser;
 
-	Validate_Port(port, action);
+    arg = D_ARGC > 1 ? D_ARG(2) : NULL;
 
-	arg = D_ARG(2);
+    REBREQ *req = Ensure_Port_State(port, RDI_CLIPBOARD);
 
-	req = cast(REBREQ*, Use_Port_State(port, RDI_CLIPBOARD, sizeof(REBREQ)));
+    switch (action) {
+    case SYM_UPDATE:
+        // Update the port object after a READ or WRITE operation.
+        // This is normally called by the WAKE-UP function.
+        arg = CTX_VAR(port, STD_PORT_DATA);
+        if (req->command == RDC_READ) {
+            // this could be executed twice:
+            // once for an event READ, once for the CLOSE following the READ
+            if (!req->common.data) return R_BLANK;
+            len = req->actual;
+            if (GET_FLAG(req->flags, RRF_WIDE)) {
+                // convert to UTF8, so that it can be converted back to string!
+                Init_Binary(arg, Make_UTF8_Binary(
+                    req->common.data,
+                    len / sizeof(REBUNI),
+                    0,
+                    OPT_ENC_UNISRC
+                ));
+            }
+            else {
+                REBSER *ser = Make_Binary(len);
+                memcpy(BIN_HEAD(ser), req->common.data, len);
+                SET_SERIES_LEN(ser, len);
+                Init_Binary(arg, ser);
+            }
+            OS_FREE(req->common.data); // release the copy buffer
+            req->common.data = 0;
+        }
+        else if (req->command == RDC_WRITE) {
+            SET_BLANK(arg);  // Write is done.
+        }
+        return R_BLANK;
 
-	switch (action) {
-	case A_UPDATE:
-		// Update the port object after a READ or WRITE operation.
-		// This is normally called by the WAKE-UP function.
-		arg = OFV(port, STD_PORT_DATA);
-		if (req->command == RDC_READ) {
-			// this could be executed twice:
-			// once for an event READ, once for the CLOSE following the READ
-			if (!req->common.data) return R_NONE;
-			len = req->actual;
-			if (GET_FLAG(req->flags, RRF_WIDE)) {
-				len /= sizeof(REBUNI); //correct length
-				// Copy the string (convert to latin-8 if it fits):
-				Val_Init_Binary(arg, Copy_Wide_Str(req->common.data, len));
-			} else {
-				REBSER *ser = Make_Binary(len);
-				memcpy(BIN_HEAD(ser), req->common.data, len);
-				SERIES_TAIL(ser) = len;
-				Val_Init_Binary(arg, ser);
-			}
-			OS_FREE(req->common.data); // release the copy buffer
-			req->common.data = 0;
-		}
-		else if (req->command == RDC_WRITE) {
-			SET_NONE(arg);  // Write is done.
-		}
-		return R_NONE;
+    case SYM_READ: {
+        INCLUDE_PARAMS_OF_READ;
 
-	case A_READ:
-		// This device is opened on the READ:
-		if (!IS_OPEN(req)) {
-			if (OS_DO_DEVICE(req, RDC_OPEN))
-				Trap_Port_DEAD_END(RE_CANNOT_OPEN, port, req->error);
-		}
-		// Issue the read request:
-		CLR_FLAG(req->flags, RRF_WIDE); // allow byte or wide chars
-		result = OS_DO_DEVICE(req, RDC_READ);
-		if (result < 0) Trap_Port_DEAD_END(RE_READ_ERROR, port, req->error);
-		if (result > 0) return R_NONE; /* pending */
+        UNUSED(PAR(source)); // already accounted for
+        if (REF(part)) {
+            assert(!IS_VOID(ARG(limit)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        if (REF(seek)) {
+            assert(!IS_VOID(ARG(index)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        UNUSED(PAR(string)); // handled in dispatcher
+        UNUSED(PAR(lines)); // handled in dispatcher
 
-		// Copy and set the string result:
-		arg = OFV(port, STD_PORT_DATA);
+        // This device is opened on the READ:
+        if (!IS_OPEN(req)) {
+            if (OS_DO_DEVICE(req, RDC_OPEN))
+                fail (Error_On_Port(RE_CANNOT_OPEN, port, req->error));
+        }
+        // Issue the read request:
+        CLR_FLAG(req->flags, RRF_WIDE); // allow byte or wide chars
+        result = OS_DO_DEVICE(req, RDC_READ);
+        if (result < 0) fail (Error_On_Port(RE_READ_ERROR, port, req->error));
+        if (result > 0) return R_BLANK; /* pending */
 
-		len = req->actual;
-		if (GET_FLAG(req->flags, RRF_WIDE)) {
-			len /= sizeof(REBUNI); //correct length
-			// Copy the string (convert to latin-8 if it fits):
-			Val_Init_Binary(arg, Copy_Wide_Str(req->common.data, len));
-		} else {
-			REBSER *ser = Make_Binary(len);
-			memcpy(BIN_HEAD(ser), req->common.data, len);
-			SERIES_TAIL(ser) = len;
-			Val_Init_Binary(arg, ser);
-		}
+        // Copy and set the string result:
+        arg = CTX_VAR(port, STD_PORT_DATA);
 
-		*D_OUT = *arg;
-		return R_OUT;
+        len = req->actual;
+        if (GET_FLAG(req->flags, RRF_WIDE)) {
+            // convert to UTF8, so that it can be converted back to string!
+            Init_Binary(arg, Make_UTF8_Binary(
+                req->common.data,
+                len / sizeof(REBUNI),
+                0,
+                OPT_ENC_UNISRC
+            ));
+        }
+        else {
+            REBSER *ser = Make_Binary(len);
+            memcpy(BIN_HEAD(ser), req->common.data, len);
+            SET_SERIES_LEN(ser, len);
+            Init_Binary(arg, ser);
+        }
 
-	case A_WRITE:
-		if (!IS_STRING(arg) && !IS_BINARY(arg)) Trap1_DEAD_END(RE_INVALID_PORT_ARG, arg);
-		// This device is opened on the WRITE:
-		if (!IS_OPEN(req)) {
-			if (OS_DO_DEVICE(req, RDC_OPEN)) Trap_Port_DEAD_END(RE_CANNOT_OPEN, port, req->error);
-		}
+        Move_Value(D_OUT, arg);
+        return R_OUT; }
 
-		refs = Find_Refines(call_, ALL_WRITE_REFS);
+    case SYM_WRITE: {
+        INCLUDE_PARAMS_OF_WRITE;
 
-		// Handle /part refinement:
-		len = VAL_LEN(arg);
-		if (refs & AM_WRITE_PART && VAL_INT32(D_ARG(ARG_WRITE_LIMIT)) < len)
-			len = VAL_INT32(D_ARG(ARG_WRITE_LIMIT));
+        UNUSED(PAR(destination));
+        UNUSED(PAR(data)); // used as arg
 
-		// If bytes, see if we can fit it:
-		if (SERIES_WIDE(VAL_SERIES(arg)) == 1) {
+        if (REF(seek)) {
+            assert(!IS_VOID(ARG(index)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        if (REF(append))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(allow)) {
+            assert(!IS_VOID(ARG(access)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        if (REF(lines))
+            fail (Error(RE_BAD_REFINES));
+
+        if (!IS_STRING(arg) && !IS_BINARY(arg))
+            fail (Error(RE_INVALID_PORT_ARG, arg));
+
+        // This device is opened on the WRITE:
+        if (!IS_OPEN(req)) {
+            if (OS_DO_DEVICE(req, RDC_OPEN))
+                fail (Error_On_Port(RE_CANNOT_OPEN, port, req->error));
+        }
+
+        // Handle /part refinement:
+        len = VAL_LEN_AT(arg);
+        if (REF(part) && VAL_INT32(ARG(limit)) < len)
+            len = VAL_INT32(ARG(limit));
+
+        // If bytes, see if we can fit it:
+        if (SER_WIDE(VAL_SERIES(arg)) == 1) {
 #ifdef ARG_STRINGS_ALLOWED
-			if (Is_Not_ASCII(VAL_BIN_DATA(arg), len)) {
-				Val_Init_String(
-					arg, Copy_Bytes_To_Unicode(VAL_BIN_DATA(arg), len)
-				);
-			} else
-				req->common.data = VAL_BIN_DATA(arg);
+            if (!All_Bytes_ASCII(VAL_BIN_AT(arg), len)) {
+                REBSER *copy = Copy_Bytes_To_Unicode(VAL_BIN_AT(arg), len);
+                Init_String(arg, copy);
+            } else
+                req->common.data = VAL_BIN_AT(arg);
 #endif
 
-			// Temp conversion:!!!
-			ser = Make_Unicode(len);
-			len = Decode_UTF8(UNI_HEAD(ser), VAL_BIN_DATA(arg), len, FALSE);
-			SERIES_TAIL(ser) = len = abs(len);
-			UNI_TERM(ser);
-			Val_Init_String(arg, ser);
-			req->common.data = cast(REBYTE*, UNI_HEAD(ser));
-			SET_FLAG(req->flags, RRF_WIDE);
-		}
-		else
-		// If unicode (may be from above conversion), handle it:
-		if (SERIES_WIDE(VAL_SERIES(arg)) == sizeof(REBUNI)) {
-			req->common.data = cast(REBYTE *, VAL_UNI_DATA(arg));
-			SET_FLAG(req->flags, RRF_WIDE);
-		}
+            // Temp conversion:!!!
+            ser = Make_Unicode(len);
+            len = Decode_UTF8_Negative_If_Latin1(
+                UNI_HEAD(ser), VAL_BIN_AT(arg), len, FALSE
+            );
+            len = abs(len);
+            TERM_UNI_LEN(ser, len);
+            Init_String(arg, ser);
+            req->common.data = cast(REBYTE*, UNI_HEAD(ser));
+            SET_FLAG(req->flags, RRF_WIDE);
+        }
+        else
+        // If unicode (may be from above conversion), handle it:
+        if (SER_WIDE(VAL_SERIES(arg)) == sizeof(REBUNI)) {
+            req->common.data = cast(REBYTE *, VAL_UNI_AT(arg));
+            SET_FLAG(req->flags, RRF_WIDE);
+        }
 
-		// Temp!!!
-		req->length = len * sizeof(REBUNI);
+        // Temp!!!
+        req->length = len * sizeof(REBUNI);
 
-		// Setup the write:
-		*OFV(port, STD_PORT_DATA) = *arg;	// keep it GC safe
-		req->actual = 0;
+        // Setup the write:
+        Move_Value(CTX_VAR(port, STD_PORT_DATA), arg); // keep it GC safe
+        req->actual = 0;
 
-		result = OS_DO_DEVICE(req, RDC_WRITE);
-		SET_NONE(OFV(port, STD_PORT_DATA)); // GC can collect it
+        result = OS_DO_DEVICE(req, RDC_WRITE);
+        SET_BLANK(CTX_VAR(port, STD_PORT_DATA)); // GC can collect it
 
-		if (result < 0) Trap_Port_DEAD_END(RE_WRITE_ERROR, port, req->error);
-		//if (result == DR_DONE) SET_NONE(OFV(port, STD_PORT_DATA));
-		break;
+        if (result < 0) fail (Error_On_Port(RE_WRITE_ERROR, port, req->error));
+        //if (result == DR_DONE) SET_BLANK(CTX_VAR(port, STD_PORT_DATA));
+        break; }
 
-	case A_OPEN:
-		if (OS_DO_DEVICE(req, RDC_OPEN)) Trap_Port_DEAD_END(RE_CANNOT_OPEN, port, req->error);
-		break;
+    case SYM_OPEN: {
+        INCLUDE_PARAMS_OF_OPEN;
 
-	case A_CLOSE:
-		OS_DO_DEVICE(req, RDC_CLOSE);
-		break;
+        UNUSED(PAR(spec));
+        if (REF(new))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(read))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(write))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(seek))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(allow)) {
+            assert(!IS_VOID(ARG(access)));
+            fail (Error(RE_BAD_REFINES));
+        }
 
-	case A_OPENQ:
-		if (IS_OPEN(req)) return R_TRUE;
-		return R_FALSE;
+        if (OS_DO_DEVICE(req, RDC_OPEN))
+            fail (Error_On_Port(RE_CANNOT_OPEN, port, req->error));
+        break; }
 
-	default:
-		Trap_Action_DEAD_END(REB_PORT, action);
-	}
+    case SYM_CLOSE:
+        OS_DO_DEVICE(req, RDC_CLOSE);
+        break;
 
-	return R_ARG1; // port
+    case SYM_OPEN_Q:
+        if (IS_OPEN(req)) return R_TRUE;
+        return R_FALSE;
+
+    default:
+        fail (Error_Illegal_Action(REB_PORT, action));
+    }
+
+    Move_Value(D_OUT, D_ARG(1)); // port
+    return R_OUT;
 }
 
 
-/***********************************************************************
-**
-*/	void Init_Clipboard_Scheme(void)
-/*
-***********************************************************************/
+//
+//  get-clipboard-actor-handle: native [
+//
+//  {Retrieve handle to the native actor for clipboard}
+//
+//      return: [handle!]
+//  ]
+//
+REBNATIVE(get_clipboard_actor_handle)
 {
-	Register_Scheme(SYM_CLIPBOARD, 0, Clipboard_Actor);
+    Make_Port_Actor_Handle(D_OUT, &Clipboard_Actor);
+    return R_OUT;
 }

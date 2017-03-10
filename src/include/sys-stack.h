@@ -1,319 +1,526 @@
-/***********************************************************************
-**
-**  REBOL [R3] Language Interpreter and Run-time Environment
-**
-**  Copyright 2012 REBOL Technologies
-**  REBOL is a trademark of REBOL Technologies
-**
-**  Licensed under the Apache License, Version 2.0 (the "License");
-**  you may not use this file except in compliance with the License.
-**  You may obtain a copy of the License at
-**
-**  http://www.apache.org/licenses/LICENSE-2.0
-**
-**  Unless required by applicable law or agreed to in writing, software
-**  distributed under the License is distributed on an "AS IS" BASIS,
-**  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**  See the License for the specific language governing permissions and
-**  limitations under the License.
-**
-************************************************************************
-**
-**  Summary: REBOL Stack Definitions
-**  Module:  sys-stack.h
-**  Notes:
-**
-**	This contains the implementations of two important stacks in
-**	the evaluator: the Data Stack and the Call Stack
-**
-**	DATA STACK (CS_*):
-**
-**	The data stack is mostly for REDUCE and COMPOSE, which use it
-**	as a common buffer for values that are being gathered to be
-**	inserted into another series.  It's better to go through this
-**	buffer step because it means the precise size of the new
-**	insertions are known ahead of time.  If a series is created,
-**	it will not waste space or time on expansion, and if a series
-**	is to be inserted into as a target, the proper size gap for
-**	the insertion can be opened up exactly once (without any
-**	need for repeatedly shuffling on individual insertions).
-**
-**	Beyond that purpose, the data stack can also be used as a
-**	place to store a value to protect it from the garbage
-**	collector.  The stack must be balanced in the case of success
-**	when a native or action runs, but if a Trap() is called then
-**	the stack will be automatically balanced.
-**
-**	The data stack specifically needs contiguous memory for its
-**	applications.  That is more important than having stability
-**	of pointers to any data on the stack.  Hence if any push or
-**	pops can happen, there is no guarantee that the pointers will
-**	remain consistent...as the memory buffer may need to be
-**	reallocated (and hence relocated).  The index positions will
-**	remain consistent, however: and using DSP and DS_AT it is
-**	possible to work with stack items by index.
-**
-**	CALL STACK (CS_*):
-**
-**	The requirements for the call stack are different from the data
-**	stack, due to a need for pointer stability.  Being an ordinary
-**	series, the data stack will relocate its memory on expansion.
-**	This creates problems for natives and actions where pointers to
-**	parameters are saved to variables from D_ARG(N) macros.  These
-**	would need a refresh after every potential expanding operation.
-**
-**	Having a separate data structure offers other opportunities,
-**	such as hybridizing with CLOSURE! argument objects such that
-**	they would not need to be copied from the data stack.  It also
-**	allows freeing the information tracked by calls from the rule
-**	of being strictly a sequence of REBVALs.
-**
-***********************************************************************/
+//
+//  File: %sys-stack.h
+//  Summary: {Definitions for "Data Stack", "Chunk Stack" and the C stack}
+//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  Homepage: https://github.com/metaeducation/ren-c/
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Copyright 2012 REBOL Technologies
+// Copyright 2012-2017 Rebol Open Source Contributors
+// REBOL is a trademark of REBOL Technologies
+//
+// See README.md and CREDITS.md for more information
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// The data stack and chunk stack are two different data structures for
+// temporarily storing REBVALs.  With the data stack, values are pushed one
+// at a time...while with the chunk stack, an array of value cells of a given
+// length is returned.
+//
+// A key difference between the two stacks is pointer stability.  Though the
+// data stack can accept any number of pushes and then pop the last N pushes
+// into a series, each push could potentially change the memory address of
+// every other value in the stack.  That's because the data stack is really
+// a REBARR series under the hood.  But the chunk stack is a custom structure,
+// and guarantees that the address of the values in a chunk will stay stable
+// until that chunk is popped.
+//
+// Another difference is that values on the data stack are implicitly GC safe,
+// while clients of the chunk stack needing GC safety must do so manually.
+//
+// Because of their differences, they are applied to different problems:
+//
+// A notable usage of the data stack is by REDUCE and COMPOSE.  They use it
+// as a buffer for values that are being gathered to be inserted into the
+// final array.  It's better to use the data stack as a buffer because it
+// means the size of the accumulated result is known before either creating
+// a new series or inserting /INTO a target.  This prevents wasting space on
+// expansions or resizes and shuffling due to a guessed size.
+//
+// The chunk stack has an important use as the storage for arguments to
+// functions being invoked.  The pointers to these arguments are passed by
+// natives through the stack to other routines, which may take arbitrarily
+// long to return...and may call code involving many data stack pushes and
+// pops.  Argument pointers must be stable, so using the data stack would
+// not work.  Also, to efficiently implement argument fulfillment without
+// pre-filling the cells, uninitialized memory is allowed in the chunk stack
+// across potentical garbage collections.  This means implicit GC protection
+// can't be performed, with a subset of valid cells marked by the frame. 
+//
 
 
-/***********************************************************************
-**
-**	At the moment, the data stack is *mostly* implemented as a typical
-**	series.  Pushing unfilled slots on the stack (via PUSH_TRASH_UNSAFE)
-**	partially inlines Alloc_Tail_List, so it only pays for the function
-**	call in cases where expansion is necessary.
-**
-**	When Rebol was first open-sourced, there were other deviations from
-**	being a normal series.  It was not terminated with a REB_END, so
-**	you would be required to call a special DS_TERMINATE() routine to
-**	put the terminator in place before using the data stack with a
-**	routine that expected termination.  It also had to be expanded
-**	manually, so a DS_PUSH was not guaranteed to trigger a potential
-**	growth of the stack--if expansion hadn't been anticipated with a
-**	large enough space for that push, it would corrupt memory.
-**
-**	Overall, optimizing the stack structure should be easier now that
-**	it has a more dedicated purpose.  So those tricks are not being
-**	used for the moment.  Future profiling can try those and other
-**	approaches when a stable and complete system has been achieved.
-**
-***********************************************************************/
+//=////////////////////////////////////////////////////////////////////////=//
+//
+//  DATA STACK
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// The data stack (DS_) is for pushing one individual REBVAL at a time.  The
+// values can then be popped in a Last-In-First-Out way.  It is also possible
+// to mark a stack position, do any number of pushes, and then ask for the
+// range of values pushed since the mark to be placed into a REBARR array.
+// As long as a value is on the data stack, any series it refers to will be
+// protected from being garbage-collected.
+//
+// The data stack has many applications, and can be used by any piece of the
+// system.  But there is a rule that when that piece is finished, it must
+// "balance" the stack back to where it was when it was called!  There is
+// a check in the main evaluator loop that the stack has been balanced to
+// wherever it started by the time a function call ends.  However, it is not
+// necessary to balance the stack in the case of calling a `fail`--because
+// it will be automatically restored to where it was at the PUSH_TRAP().
+//
+// To speed pushes and pops to the stack while also making sure that each
+// push is tested to see if an expansion is needed, a trick is used.  This
+// trick is to grow the stack in blocks, and always maintain that the block
+// has an END marker at its point of capacity--and ensure that there are no
+// end markers between the DSP and that capacity.  This way, if a push runs
+// up against an END it knows to do an expansion.
+//
 
-// (D)ata (S)tack "(P)ointer" is an integer index into Rebol's data stack
+// DSP stands for "(D)ata (S)tack "(P)osition", and is the index of the top
+// of the data stack (last valid item in the underlying array)
+//
 #define DSP \
-	cast(REBINT, SERIES_TAIL(DS_Series) - 1)
+    DS_Index
 
-// Access value at given stack location
+// DS_AT accesses value at given stack location
+//
 #define DS_AT(d) \
-	BLK_SKIP(DS_Series, (d))
+    (DS_Movable_Base + (d))
 
-// Most recently pushed item
+// DS_TOP is the most recently pushed item
+//
+inline static REBVAL *DS_TOP_Core() {
+    assert(NOT(IS_END_MACRO(DS_AT(DSP))));
+    return DS_AT(DSP);
+}
+
 #define DS_TOP \
-	BLK_LAST(DS_Series)
+    DS_TOP_Core()
 
 #if !defined(NDEBUG)
-	#define IN_DATA_STACK(p) \
-		(SERIES_TAIL(DS_Series) != 0 && (p) >= DS_AT(0) && (p) <= DS_TOP)
+    #define IN_DATA_STACK_DEBUG(v) \
+        IS_VALUE_IN_ARRAY_DEBUG(DS_Array, (v))
 #endif
 
-// PUSHING: Note the DS_PUSH macros inherit the property of SET_XXX that
-// they use their parameters multiple times.  Don't use with the result of
-// a function call because that function could be called multiple times.
+//
+// PUSHING
 //
 // If you push "unsafe" trash to the stack, it has the benefit of costing
 // nothing extra in a release build for setting the value (as it is just
 // left uninitialized).  But you must make sure that a GC can't run before
 // you have put a valid value into the slot you pushed.
+//
+// If the stack runs out of capacity then it will be expanded by the basis
+// defined below.  The number is arbitrary and should be tuned.  Note the
+// number of bytes will be sizeof(REBVAL) * STACK_EXPAND_BASIS
+//
+
+#define STACK_EXPAND_BASIS 128
 
 #define DS_PUSH_TRASH \
-	( \
-		SERIES_FITS(DS_Series, 1) \
-			? cast(void, ++DS_Series->tail) \
-			: ( \
-				SERIES_REST(DS_Series) >= STACK_LIMIT \
-					? Trap_Stack_Overflow() \
-					: cast(void, cast(REBUPT, Alloc_Tail_Array(DS_Series))) \
-			), \
-		SET_TRASH(DS_TOP) \
-	)
+    (++DSP, IS_END(DS_TOP) \
+        ? Expand_Data_Stack_May_Fail(STACK_EXPAND_BASIS) \
+        : SET_TRASH_IF_DEBUG(DS_TOP))
 
-#define DS_PUSH_TRASH_SAFE \
-	(DS_PUSH_TRASH, SET_TRASH_SAFE(DS_TOP), NOOP)
+inline static void DS_PUSH(const REBVAL *v) {
+    ASSERT_VALUE_MANAGED(v); // would fail on END marker
+    DS_PUSH_TRASH;
+    Move_Value(DS_TOP, v);
+}
 
-#define DS_PUSH(v) \
-	(ASSERT_VALUE_MANAGED(v), DS_PUSH_TRASH, *DS_TOP = *(v), NOOP)
 
-#define DS_PUSH_UNSET \
-	(DS_PUSH_TRASH, SET_UNSET(DS_TOP), NOOP)
-
-#define DS_PUSH_NONE \
-	(DS_PUSH_TRASH, SET_NONE(DS_TOP), NOOP)
-
-#define DS_PUSH_TRUE \
-	(DS_PUSH_TRASH, SET_TRUE(DS_TOP), NOOP)
-
-#define DS_PUSH_INTEGER(n) \
-	(DS_PUSH_TRASH, SET_INTEGER(DS_TOP, (n)), NOOP)
-
-#define DS_PUSH_DECIMAL(n) \
-	(DS_PUSH_TRASH, SET_DECIMAL(DS_TOP, (n)), NOOP)
-
-// POPPING AND "DROPPING"
-
-#define DS_DROP \
-	(--DS_Series->tail, BLK_TERM(DS_Series), NOOP)
-
-#define DS_POP_INTO(v) \
-	do { \
-		assert(!IS_TRASH(DS_TOP) || VAL_TRASH_SAFE(DS_TOP)); \
-		*(v) = *DS_TOP; \
-		DS_DROP; \
-	} while (0)
+//
+// POPPING
+//
+// Since it's known that END markers were never pushed, a pop can just leave
+// whatever bits had been previously pushed, dropping only the index.  The
+// only END marker will be the one indicating the tail of the stack.  
+//
 
 #ifdef NDEBUG
-	#define DS_DROP_TO(dsp) \
-		(DS_Series->tail = (dsp) + 1, BLK_TERM(DS_Series), NOOP)
+    #define DS_DROP \
+        (--DS_Index)
+
+    #define DS_DROP_TO(dsp) \
+        (DS_Index = dsp)
 #else
-	#define DS_DROP_TO(dsp) \
-		do { \
-			assert(DSP >= (dsp)); \
-			while (DSP != (dsp)) {DS_DROP;} \
-		} while (0)
+    inline static void DS_DROP_Core() {
+        // Note: DS_TOP checks to make sure it's not an END.
+        SET_UNREADABLE_BLANK(DS_TOP); // TRASH would mean ASSERT_ARRAY failing
+        --DS_Index;
+    }
+
+    #define DS_DROP \
+        DS_DROP_Core()
+
+    inline static void DS_DROP_TO_Core(REBDSP dsp) {
+        assert(DSP >= dsp);
+        while (DSP != dsp)
+            DS_DROP;
+    }
+
+    #define DS_DROP_TO(dsp) \
+        DS_DROP_TO_Core(dsp)
 #endif
 
 
-/***********************************************************************
-**
-**	The call stack uses a custom "chunked" allocator to avoid the
-**	overhead of calling Make_Mem on each push and Free_Mem on
-**	each pop.  It keeps one spare chunk allocated, and only frees
-**	a chunk when a full chunk prior to it has the last element
-**	popped out of it.  In memory the situation looks like this:
-**
-**		[chunk->next
-**			(->chunk_left call->prior ...data [arg1][arg2][arg3]...)
-**			(->chunk_left call->prior ...data [arg1]...)
-**			(->chunk_left call->prior ...data [arg1][arg2]...)
-**			...chunk remaining space...
-**		]
-**
-**	Each [chunk] contains (calls).  The calls are singly linked
-**	backwards to form the call frame stack, while the chunks are
-**	singly linked forward.  Since the chunk size is a known
-**	constant, it's possible to quickly deduce the chunk a call
-**	lives in from its pointer and the remaining size in the chunk.
-**
-***********************************************************************/
+//=////////////////////////////////////////////////////////////////////////=//
+//
+//  CHUNK STACK
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Unlike the data stack, values living in the chunk stack are not implicitly
+// protected from garbage collection.
+//
+// Also, unlike the data stack, the chunk stack allows the pushing and popping
+// of arbitrary-sized arrays of values which will not be relocated during
+// their lifetime.
+//
+// This is accomplished using a custom "chunked" allocator.  The two structs
+// involved are a list of "Chunkers", which internally have a list of
+// "Chunks" threaded between them.  The method keeps one spare chunker
+// allocated, and only frees a chunker when a full chunker prior has the last
+// element popped out of it.  In memory it looks like this:
+//
+//      [chunker->next
+//          (->offset size [value1][value2][value3]...)   // chunk 1
+//          (->offset size [value1]...)                   // chunk 2
+//          (->offset size [value1][value2]...)           // chunk 3
+//          ...remaining payload space in chunker...
+//      ]
+//
+// Since the chunker size is a known constant, it's possible to quickly deduce
+// the chunker a chunk lives in from its pointer and the remaining payload
+// amount in the chunker.
+//
+
+struct Reb_Chunker;
+
+struct Reb_Chunker {
+    struct Reb_Chunker *next;
+    // use REBUPT for `size` so 'payload' is 64-bit aligned on 32-bit platforms
+    REBUPT size;
+    REBYTE payload[1];
+};
+
+#define BASE_CHUNKER_SIZE (sizeof(struct Reb_Chunker*) + sizeof(REBUPT))
+#define CS_CHUNKER_PAYLOAD (4096 - BASE_CHUNKER_SIZE) // 12 bits for offset
+
 
 struct Reb_Chunk;
 
-#define CS_CHUNK_PAYLOAD (2048 - sizeof(struct Reb_Chunk*))
-
 struct Reb_Chunk {
-	struct Reb_Chunk *next;
-	REBYTE payload[CS_CHUNK_PAYLOAD];
+    //
+    // We start the chunk with a Reb_Header, which has as its `bits`
+    // field a REBUPT (unsigned integer size of a pointer).  We are relying
+    // on the fact that the high 2 bits of this value is always 0 in order
+    // for it to be an implicit END for the value array of the previous chunk.
+    //
+    // !!! Previously this was used to store arbitrary numbers that ended
+    // with the low 2 bits 0, e.g. the size.  New endianness-dependent
+    // features restrict this somewhat, so it's really just a free set of
+    // flags and byte-sized quantities...currently not used except in this
+    // termination role.  But available if needed...
+    //
+    struct Reb_Header header;
+
+    REBUPT size;
+
+    REBUPT offset;
+
+    // Pointer to the previous chunk.  As the second pointer in this chunk,
+    // with the chunk 64-bit aligned to start with, it means the values will
+    // be 64-bit aligned on 32-bit platforms.
+    //
+    struct Reb_Chunk *prev;
+
+    // The `values` is an array whose real size exceeds the struct.  (It is
+    // set to a size of one because it cannot be [0] if built with C++.)
+    // When the value pointer is given back to the user, the address of
+    // this array is how they speak about the chunk itself.
+    //
+    // See note above about how the next chunk's `size` header serves as
+    // an END marker for this array (which may or may not be necessary for
+    // the client's purposes, but function arg lists do make use of it)
+    //
+    // These are actually non-relative values, but REBVAL has a constructor
+    // and that interferes with the use of offsetof in the C++ build.  So
+    // RELVAL is chosen as a POD-type to use in the structure.
+    //
+    RELVAL values[1];
 };
 
-struct Reb_Call {
-	// How many bytes are left in the memory chunk this call frame lives in
-	// (its own size has already been subtracted from the amount)
-	REBINT chunk_left;
+inline static REBCNT CHUNK_SIZE(struct Reb_Chunk *chunk) {
+    return chunk->size;
+}
 
-	struct Reb_Call *prior;
+// The offset of this chunk in the memory chunker this chunk lives in
+// (its own size has already been subtracted from the amount).
+//
+inline static REBCNT CHUNK_OFFSET(struct Reb_Chunk *chunk) {
+    return chunk->offset;
+}
 
-	// In an ideal world, it would not be possible for code to get its hands
-	// on words that had been bound into a specific call frame while it
-	// was still being formed...because no executing code would have access
-	// to words that were linked into it.  Unfortunately with stack-relative
-	// addressing, they can get that access:
-	//
-	//		leaker: func [/eval e /gimme g] [
-	//			either gimme [return [g]] [reduce e]
-	//		]
-	//
-	//		leaker/eval reduce leaker/gimme 10
-	//
-	// Since a leaked word from another instance of a function can give
-	// access to a call frame during its formation, we need a way to tell
-	// when a call frame is finished forming and a candidate for lookup
-	// via Get_Var.  'args_ready' defaults to TRUE in Make_Call and then
-	// is set to FALSE in Dispatch_Call when the function runs.
-	//
-	// !!! For optimization this boolean could be squeaked in lots of
-	// other places, but a regular struct field for clarity right now.
+// If we do a sizeof(struct Reb_Chunk) then it includes a value in it that we
+// generally don't want for our math, due to C++ "no zero element array" rule
+//
+#define BASE_CHUNK_SIZE (sizeof(struct Reb_Chunk) - sizeof(REBVAL))
 
-	REBOOL args_ready;	// Function's arguments have finished evaluating
+#define CHUNK_FROM_VALUES(v) \
+    cast(struct Reb_Chunk *, cast(REBYTE*, (v)) \
+        - offsetof(struct Reb_Chunk, values))
 
-	REBCNT num_vars;	// !!! Redundant with VAL_FUNC_NUM_WORDS()?
+#define CHUNK_LEN_FROM_VALUES(v) \
+    ((CHUNK_SIZE(CHUNK_FROM_VALUES(v)) - offsetof(struct Reb_Chunk, values)) \
+        / sizeof(REBVAL))
 
-	REBVAL *out;		// where to write the function's output
-
-	REBVAL func;			// copy (important!!) of function for call
-
-	REBVAL where;			// block and index of execution
-	REBVAL label;			// func word backtrace
-
-	// these are "variables"...SELF, RETURN, args, locals
-	REBVAL vars[1];		// (array exceeds struct, but cannot be [0] in C++)
-};
-
-#define DSF_NUM_VARS(c)	((c)->num_vars)
-
-// Size must compensate -1 for the already-accounted-for length one array
-#define DSF_SIZE(c) \
-	( \
-		sizeof(struct Reb_Call) \
-		+ sizeof(REBVAL) * (DSF_NUM_VARS(c) > 0 ? DSF_NUM_VARS(c) - 1 : 0) \
-	)
-
-#define DSF_CHUNK(c) \
-	cast(struct Reb_Chunk*, \
-		cast(REBYTE*, (c)) \
-		+ DSF_SIZE(c) \
-		+ (c)->chunk_left \
-		- sizeof(struct Reb_Chunk) \
-	)
+inline static struct Reb_Chunker *CHUNKER_FROM_CHUNK(struct Reb_Chunk *c) {
+    return cast(
+        struct Reb_Chunker*,
+        cast(REBYTE*, c)
+            - CHUNK_OFFSET(c)
+            - offsetof(struct Reb_Chunker, payload)
+    );
+}
 
 
-// !!! DSF is to be renamed (C)all (S)tack (P)ointer, but being left as DSF
-// in the initial commit to try and cut back on the disruption seen in
-// one commit, as there are already a lot of changes.
+// This doesn't necessarily call Alloc_Mem, because chunks are allocated
+// sequentially inside of "chunker" blocks, in their ordering on the stack.
+// Allocation is only required if we need to step into a new chunk (and even
+// then only if we aren't stepping into a chunk that we are reusing from
+// a prior expansion).
+//
+// The "Ended" indicates that there is no need to manually put an end in the
+// `num_values` slot.  Chunks are implicitly terminated by their layout,
+// because the low bit of subsequent chunks is set to 0, for data that does
+// double-duty as a END marker.
+//
+inline static REBVAL* Push_Value_Chunk_Of_Length(REBCNT num_values) {
+    const REBCNT size = BASE_CHUNK_SIZE + num_values * sizeof(REBVAL);
+    assert(size % 4 == 0); // low 2 bits must be zero for terminator trick
 
-#define DSF (CS_Running + 0) // avoid assignment to DSF via + 0
+    // an extra Reb_Header is placed at the very end of the array to
+    // denote a block terminator without a full REBVAL
+    //
+    const REBCNT size_with_terminator = size + sizeof(struct Reb_Header);
 
-#define SET_DSF(c) \
-	( \
-		CS_Running = (c), \
-		(c) ? cast(void, (c)->args_ready = TRUE) : NOOP \
-	)
+    struct Reb_Chunker *chunker = CHUNKER_FROM_CHUNK(TG_Top_Chunk);
 
-#define DSF_OUT(c)		((c)->out)
-#define PRIOR_DSF(c)	((c)->prior)
-#define DSF_WHERE(c)	c_cast(const REBVAL*, &(c)->where)
-#define DSF_LABEL(c)	c_cast(const REBVAL*, &(c)->label)
-#define DSF_FUNC(c)		c_cast(const REBVAL*, &(c)->func)
-#define DSF_RETURN(c)	coming@soon
+    // Establish invariant where 'chunk' points to a location big enough to
+    // hold the data (with data's size accounted for in chunk_size).  Note
+    // that TG_Top_Chunk is never NULL, due to the initialization leaving
+    // one empty chunk at the beginning and manually destroying it on
+    // shutdown (this simplifies Push)
+    //
+    const REBCNT payload_left =
+        chunker->size
+            - CHUNK_OFFSET(TG_Top_Chunk)
+            - CHUNK_SIZE(TG_Top_Chunk);
 
-// VARS includes (*will* include) RETURN dispatching value, locals...
-#ifdef NDEBUG
-	#define DSF_VAR(c,n)	(&(c)->vars[(n) - 1])
+    assert(chunker->size >= CS_CHUNKER_PAYLOAD);
+
+    struct Reb_Chunk *chunk;
+    if (payload_left >= size_with_terminator) {
+        //
+        // Topmost chunker has space for the chunk *and* a header to signal
+        // that chunk's END marker.  So advance past the topmost chunk (whose
+        // size will depend upon num_values)
+        //
+        chunk = cast(struct Reb_Chunk*,
+            cast(REBYTE*, TG_Top_Chunk) + CHUNK_SIZE(TG_Top_Chunk)
+        );
+
+        Init_Endlike_Header(&chunk->header, 0);
+        chunk->size = size;
+
+        // top's offset accounted for previous chunk, account for ours
+        //
+        chunk->offset = CHUNK_OFFSET(TG_Top_Chunk) + CHUNK_SIZE(TG_Top_Chunk);
+    }
+    else { // Topmost chunker has insufficient space
+        REBOOL need_alloc = TRUE;
+        if (chunker->next) {
+            //
+            // Previously allocated chunker exists, check if it is big enough
+            //
+            assert(!chunker->next->next);
+            if (chunker->next->size >= size_with_terminator)
+                need_alloc = FALSE;
+            else
+                Free_Mem(chunker->next, chunker->next->size + BASE_CHUNKER_SIZE);
+        }
+        if (need_alloc) {
+            //
+            // No previously allocated chunker...we have to allocate it
+            //
+            const REBCNT payload_size = BASE_CHUNKER_SIZE
+                + (size_with_terminator < CS_CHUNKER_PAYLOAD ?
+                    CS_CHUNKER_PAYLOAD : (size_with_terminator << 1));
+            chunker->next = cast(struct Reb_Chunker*, Alloc_Mem(payload_size));
+            chunker->next->next = NULL;
+            chunker->next->size = payload_size - BASE_CHUNKER_SIZE;
+        }
+
+        assert(chunker->next->size >= size_with_terminator);
+
+        chunk = cast(struct Reb_Chunk*, &chunker->next->payload);
+
+        Init_Endlike_Header(&chunk->header, 0);
+        chunk->size = size;
+        chunk->offset = 0;
+    }
+
+
+    // Set header in next element to 0, so it can serve as a terminator
+    // for the data range of this until it gets instantiated (if ever)
+    //
+    Init_Endlike_Header(
+        &cast(struct Reb_Chunk*, cast(REBYTE*, chunk) + size)->header,
+        0
+    );
+    assert(IS_END(&chunk->values[num_values]));
+
+    chunk->prev = TG_Top_Chunk;
+
+    TG_Top_Chunk = chunk;
+
+
+    // Set all chunk cells writable.
+    //
+    // !!! Should be using VALUE_FLAG_STACK
+    {
+    REBCNT index;
+    for (index = 0; index < num_values; index++)
+        INIT_CELL(&chunk->values[index]);
+    }
+
+    assert(CHUNK_FROM_VALUES(&chunk->values[0]) == chunk);
+    return KNOWN(&chunk->values[0]);
+}
+
+
+// Free an array of previously pushed REBVALs.  This only occasionally
+// requires an actual call to Free_Mem(), as the chunks are allocated
+// sequentially inside containing allocations.
+//
+inline static void Drop_Chunk_Of_Values(REBVAL *opt_head)
+{
+    struct Reb_Chunk* chunk = TG_Top_Chunk;
+
+    // Passing in `opt_head` is optional, but a good check to make sure you are
+    // actually dropping the chunk you think you are.  (On an error condition
+    // when dropping chunks to try and restore the top chunk to a previous
+    // state, this information isn't available.)
+    //
+    assert(!opt_head || CHUNK_FROM_VALUES(opt_head) == chunk);
+
+    // Drop to the prior top chunk
+    TG_Top_Chunk = chunk->prev;
+
+    if (CHUNK_OFFSET(chunk) == 0) {
+        // This chunk sits at the head of a chunker.
+
+        struct Reb_Chunker *chunker = CHUNKER_FROM_CHUNK(chunk);
+
+        assert(TG_Top_Chunk);
+
+        // When we've completely emptied a chunker, we check to see if the
+        // chunker after it is still live.  If so, we free it.  But we
+        // want to keep *this* just-emptied chunker alive for overflows if we
+        // rapidly get another push, to avoid Make_Mem()/Free_Mem() costs.
+
+        if (chunker->next) {
+            Free_Mem(chunker->next, chunker->next->size + BASE_CHUNKER_SIZE);
+            chunker->next = NULL;
+        }
+    }
+
+    // In debug builds we poison the memory for the chunk... but not the `prev`
+    // pointer because we expect that to stick around!
+    //
+#if !defined(NDEBUG)
+    memset(
+        cast(REBYTE*, chunk) + sizeof(struct Reb_Chunk*),
+        0xBD,
+        CHUNK_SIZE(chunk) - sizeof(struct Reb_Chunk*)
+    );
+    assert(IS_END(cast(REBVAL*, chunk)));
+#endif
+}
+
+
+//=////////////////////////////////////////////////////////////////////////=//
+//
+//  C STACK
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Rebol doesn't want to crash in the event of a stack overflow, but would
+// like to gracefully trap it and return the user to the console.  While it
+// is possible for Rebol to set a limit to how deeply it allows function
+// calls in the interpreter to recurse, there's no *portable* way to
+// catch a stack overflow in the C code of the interpreter itself.
+//
+// Hence, by default Rebol will use a non-standard heuristic.  It looks
+// at the compiled addresses of local (stack-allocated) variables in a
+// function, and decides from their relative pointers if memory is growing
+// "up" or "down".  It then extrapolates that C function call frames will
+// be laid out consecutively, and the memory difference between a stack
+// variable in the topmost stacks can be checked against some limit.
+//
+// This has nothing to do with guarantees in the C standard, and compilers
+// can really put variables at any address they feel like:
+//
+// http://stackoverflow.com/a/1677482/211160
+//
+// Additionally, it puts the burden on every recursive or deeply nested
+// routine to sprinkle calls to the C_STACK_OVERFLOWING macro somewhere
+// in it.  The ideal answer is to make Rebol itself corral an interpreted
+// script such that it can't cause the C code to stack overflow.  Lacking
+// that ideal this technique could break, so build configurations should
+// be able to turn it off if needed.
+//
+// In the meantime, C_STACK_OVERFLOWING is a macro which takes the
+// address of some variable local to the currently executed function.
+// Note that because the limit is noticed before the C stack has *actually*
+// overflowed, you still have a bit of stack room to do the cleanup and
+// raise an error trap.  (You need to take care of any unmanaged series
+// allocations, etc).  So cleaning up that state should be doable without
+// making deep function calls.
+//
+// !!! Future approaches should look into use of Windows stack exceptions
+// or libsigsegv:
+//
+// http://stackoverflow.com/questions/5013806/
+//
+
+#ifdef OS_STACK_GROWS_UP
+    #define C_STACK_OVERFLOWING(address_of_local_var) \
+        (cast(REBUPT, address_of_local_var) >= Stack_Limit)
 #else
-	#define DSF_VAR(c,n)	DSF_VAR_Debug((c), (n)) // checks arg index bound
+    #define C_STACK_OVERFLOWING(address_of_local_var) \
+        (cast(REBUPT, address_of_local_var) <= Stack_Limit)
 #endif
 
-// ARGS is the parameters and refinements
-#define DSF_ARG(c,n)	DSF_VAR((c), (n) - 1 + FIRST_PARAM_INDEX)
-#define DSF_NUM_ARGS(c)	(DSF_NUM_VARS(c) - (FIRST_PARAM_INDEX - 1))
+#define STACK_BOUNDS (4*1024*1000) // note: need a better way to set it !!
+// Also: made somewhat smaller than linker setting to allow trapping it
 
-// !!! The function spec numbers words according to their position.  With
-// definitional return, 0 is SELF, 1 is the RETURN, 2 is the first argument.
-// (without, 1 is the first argument).  This layout is in flux as the
-// workings of locals are rethought...their most sensible location would
-// probably be between the RETURN and the arguments.
-
-// Reference from ds that points to current return value:
-#define D_OUT			DSF_OUT(call_)
-#define D_ARG(n)		DSF_ARG(call_, (n))
-#define D_REF(n)		(!IS_NONE(D_ARG(n)))
-
-// Functions should generally not to detect the arity they were invoked with,
-// (and it doesn't make sense as most implementations get the full list of
-// arguments and refinements).  However, several dispatches may go through
-// actions and other locations.  IS_BINARY_ACTION() and other functions could
-// be used to do this more gracefully, but actions need review anyway
-#define DS_ARGC			DSF_NUM_ARGS(call_)
+#define Trap_Stack_Overflow() \
+    fail (VAL_CONTEXT(TASK_STACK_ERROR));

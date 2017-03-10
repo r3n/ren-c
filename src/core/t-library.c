@@ -1,95 +1,108 @@
-/***********************************************************************
-**
-**  REBOL [R3] Language Interpreter and Run-time Environment
-**
-**  Copyright 2014 Atronix Engineering, Inc.
-**  REBOL is a trademark of REBOL Technologies
-**
-**  Licensed under the Apache License, Version 2.0 (the "License");
-**  you may not use this file except in compliance with the License.
-**  You may obtain a copy of the License at
-**
-**  http://www.apache.org/licenses/LICENSE-2.0
-**
-**  Unless required by applicable law or agreed to in writing, software
-**  distributed under the License is distributed on an "AS IS" BASIS,
-**  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**  See the License for the specific language governing permissions and
-**  limitations under the License.
-**
-************************************************************************
-**
-**  Module:  t-library.c
-**  Summary: External Library Support
-**  Section: datatypes
-**  Author:  Shixin Zeng
-**  Notes:
-**
-***********************************************************************/
+//
+//  File: %t-library.c
+//  Summary: "External Library Support"
+//  Section: datatypes
+//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  Homepage: https://github.com/metaeducation/ren-c/
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Copyright 2014 Atronix Engineering, Inc.
+// Copyright 2014-2017 Rebol Open Source Contributors
+// REBOL is a trademark of REBOL Technologies
+//
+// See README.md and CREDITS.md for more information.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
 
 #include "sys-core.h"
 
-/***********************************************************************
-**
-*/	REBINT CT_Library(REBVAL *a, REBVAL *b, REBINT mode)
-/*
-***********************************************************************/
+
+//
+//  CT_Library: C
+//
+REBINT CT_Library(const RELVAL *a, const RELVAL *b, REBINT mode)
 {
-	//RL_Print("%s, %d\n", __func__, __LINE__);
-	if (mode >= 0) {
-		return VAL_LIB_HANDLE(a) == VAL_LIB_HANDLE(b);
-	}
-	return -1;
+    if (mode >= 0) {
+        return VAL_LIBRARY(a) == VAL_LIBRARY(b);
+    }
+    return -1;
 }
 
-/***********************************************************************
-**
-*/	REBTYPE(Library)
-/*
-***********************************************************************/
+
+//
+//  MAKE_Library: C
+//
+void MAKE_Library(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
-	REBVAL *val = D_ARG(1);
-	REBVAL *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
+    assert(kind == REB_LIBRARY);
 
-	// unary actions
-	switch(action) {
-		case A_MAKE:
-			//RL_Print("%s, %d, Make library action\n", __func__, __LINE__);
-		case A_TO:
-			if (!IS_DATATYPE(val)) {
-				Trap_Types_DEAD_END(RE_EXPECT_VAL, REB_LIBRARY, VAL_TYPE(val));
-			}
-			if (!IS_FILE(arg)) {
-				Trap_Types_DEAD_END(RE_EXPECT_VAL, REB_FILE, VAL_TYPE(arg));
-			} else {
-				REBCNT len = VAL_LEN(arg);
-				void *lib = NULL;
-				REBCNT error = 0;
-				REBSER *path = Value_To_OS_Path(arg, FALSE);
-				lib = OS_OPEN_LIBRARY(cast(REBCHR*, SERIES_DATA(path)), &error);
-				Free_Series(path);
-				if (!lib) {
-					Trap_Make_DEAD_END(REB_LIBRARY, arg);
-				}
+    if (!IS_FILE(arg))
+        fail (Error_Unexpected_Type(REB_FILE, VAL_TYPE(arg)));
 
-				VAL_LIB_SPEC(D_OUT) = Make_Array(1);
-				MANAGE_SERIES(VAL_LIB_SPEC(D_OUT));
+    REBCNT error = 0;
 
-				Append_Value(VAL_LIB_SPEC(D_OUT), arg);
-				VAL_LIB_HANDLE(D_OUT) = (REBLHL*)Make_Node(LIB_POOL);
-				VAL_LIB_FD(D_OUT) = lib;
-				USE_LIB(VAL_LIB_HANDLE(D_OUT));
-				OPEN_LIB(VAL_LIB_HANDLE(D_OUT));
-				SET_TYPE(D_OUT, REB_LIBRARY);
-			}
-			break;
-		case A_CLOSE:
-			OS_CLOSE_LIBRARY(VAL_LIB_FD(val));
-			CLOSE_LIB(VAL_LIB_HANDLE(val));
-			SET_UNSET(D_OUT);
-			break;
-		default:
-			Trap_Action_DEAD_END(REB_LIBRARY, action);
-	}
-	return R_OUT;
+    REBSER *path = Value_To_OS_Path(arg, FALSE);
+    void *fd = OS_OPEN_LIBRARY(SER_HEAD(REBCHR, path), &error);
+    Free_Series(path);
+
+    if (!fd)
+        fail (Error_Bad_Make(REB_LIBRARY, arg));
+
+    REBARR *singular = Alloc_Singular_Array();
+    VAL_RESET_HEADER(ARR_HEAD(singular), REB_LIBRARY);
+    ARR_HEAD(singular)->payload.library.singular = singular;
+
+    AS_SERIES(singular)->misc.fd = fd;
+    AS_SERIES(singular)->link.meta = NULL; // build from spec, e.g. arg?
+
+    MANAGE_ARRAY(singular);
+    Move_Value(out, KNOWN(ARR_HEAD(singular)));
+}
+
+
+//
+//  TO_Library: C
+//
+void TO_Library(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
+{
+    MAKE_Library(out, kind, arg);
+}
+
+
+//
+//  REBTYPE: C
+//
+REBTYPE(Library)
+{
+    switch(action) {
+    case SYM_CLOSE: {
+        INCLUDE_PARAMS_OF_CLOSE;
+
+        REBVAL *lib = ARG(port); // !!! generic arg name is "port"?
+
+        if (VAL_LIBRARY_FD(lib) == NULL) {
+            // allow to CLOSE an already closed library
+        }
+        else {
+            OS_CLOSE_LIBRARY(VAL_LIBRARY_FD(lib));
+            AS_SERIES(VAL_LIBRARY(lib))->misc.fd = NULL;
+        }
+        return R_VOID; }
+}
+
+    fail (Error_Illegal_Action(REB_LIBRARY, action));
 }

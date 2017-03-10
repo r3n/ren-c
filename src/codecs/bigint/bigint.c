@@ -63,7 +63,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <string.h>
-#include <stdio.h>
+//#include <stdio.h> // !!! No <stdio.h> in Ren-C release builds
 #include <time.h>
 //#include "os_port.h"
 #include "bigint_config.h"
@@ -510,6 +510,8 @@ bigint *bi_divide(BI_CTX *ctx, bigint *u, bigint *v, int is_mod)
  */
 static bigint *bi_int_divide(BI_CTX *ctx, bigint *biR, comp denom)
 {
+    (void)ctx; // !!! Not used?
+
     int i = biR->size - 1;
     long_comp r = 0;
 

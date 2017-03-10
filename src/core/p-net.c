@@ -1,31 +1,32 @@
-/***********************************************************************
-**
-**  REBOL [R3] Language Interpreter and Run-time Environment
-**
-**  Copyright 2012 REBOL Technologies
-**  REBOL is a trademark of REBOL Technologies
-**
-**  Licensed under the Apache License, Version 2.0 (the "License");
-**  you may not use this file except in compliance with the License.
-**  You may obtain a copy of the License at
-**
-**  http://www.apache.org/licenses/LICENSE-2.0
-**
-**  Unless required by applicable law or agreed to in writing, software
-**  distributed under the License is distributed on an "AS IS" BASIS,
-**  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**  See the License for the specific language governing permissions and
-**  limitations under the License.
-**
-************************************************************************
-**
-**  Module:  p-net.c
-**  Summary: network port interface
-**  Section: ports
-**  Author:  Carl Sassenrath
-**  Notes:
-**
-***********************************************************************/
+//
+//  File: %p-net.c
+//  Summary: "network port interface"
+//  Section: ports
+//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  Homepage: https://github.com/metaeducation/ren-c/
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Copyright 2012 REBOL Technologies
+// Copyright 2012-2017 Rebol Open Source Contributors
+// REBOL is a trademark of REBOL Technologies
+//
+// See README.md and CREDITS.md for more information.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
 
 #include "sys-core.h"
 
@@ -35,314 +36,508 @@
 #define NET_BUF_SIZE 32*1024
 
 enum Transport_Types {
-	TRANSPORT_TCP,
-	TRANSPORT_UDP
+    TRANSPORT_TCP,
+    TRANSPORT_UDP
 };
 
-/***********************************************************************
-**
-*/	static void Ret_Query_Net(REBSER *port, REBREQ *sock, REBVAL *ret)
-/*
-***********************************************************************/
+//
+//  Ret_Query_Net: C
+//
+static void Ret_Query_Net(REBCTX *port, struct devreq_net *sock, REBVAL *out)
 {
-	REBVAL *info = In_Object(port, STD_PORT_SCHEME, STD_SCHEME_INFO, 0);
-	REBSER *obj;
+    REBVAL *std_info = In_Object(port, STD_PORT_SCHEME, STD_SCHEME_INFO, 0);
+    REBCTX *info;
 
-	if (!info || !IS_OBJECT(info)) Trap_Port(RE_INVALID_SPEC, port, -10);
+    if (!std_info || !IS_OBJECT(std_info))
+        fail (Error_On_Port(RE_INVALID_SPEC, port, -10));
 
-	obj = Copy_Array_Shallow(VAL_OBJ_FRAME(info));
-	MANAGE_SERIES(obj);
+    info = Copy_Context_Shallow(VAL_CONTEXT(std_info));
 
-	Val_Init_Object(ret, obj);
-	Set_Tuple(
-		OFV(obj, STD_NET_INFO_LOCAL_IP),
-		cast(REBYTE*, &sock->special.net.local_ip),
-		4
-	);
-	Set_Tuple(
-		OFV(obj, STD_NET_INFO_REMOTE_IP),
-		cast(REBYTE*, &sock->special.net.remote_ip),
-		4
-	);
-	SET_INTEGER(OFV(obj, STD_NET_INFO_LOCAL_PORT), sock->special.net.local_port);
-	SET_INTEGER(OFV(obj, STD_NET_INFO_REMOTE_PORT), sock->special.net.remote_port);
+    Set_Tuple(
+        CTX_VAR(info, STD_NET_INFO_LOCAL_IP),
+        cast(REBYTE*, &sock->local_ip),
+        4
+    );
+    SET_INTEGER(
+        CTX_VAR(info, STD_NET_INFO_LOCAL_PORT),
+        sock->local_port
+    );
+
+    Set_Tuple(
+        CTX_VAR(info, STD_NET_INFO_REMOTE_IP),
+        cast(REBYTE*, &sock->remote_ip),
+        4
+    );
+    SET_INTEGER(
+        CTX_VAR(info, STD_NET_INFO_REMOTE_PORT),
+        sock->remote_port
+    );
+
+    Init_Object(out, info);
 }
 
 
-/***********************************************************************
-**
-*/	static void Accept_New_Port(REBVAL *out, REBSER *port, REBREQ *sock)
-/*
-**		Clone a listening port as a new accept port.
-**
-***********************************************************************/
+//
+//  Accept_New_Port: C
+//
+// Clone a listening port as a new accept port.
+//
+static void Accept_New_Port(REBVAL *out, REBCTX *port, struct devreq_net *sock)
 {
-	REBREQ *nsock;
+    struct devreq_net *nsock;
+    REBREQ *req = AS_REBREQ(sock);
 
-	// Get temp sock struct created by the device:
-	nsock = sock->common.sock;
-	if (!nsock) return;  // false alarm
-	sock->common.sock = nsock->next;
-	nsock->common.data = 0;
-	nsock->next = 0;
+    // Get temp sock struct created by the device:
+    nsock = cast(struct devreq_net*, req->common.sock);
+    if (!nsock) return;  // false alarm
+    req->common.sock = AS_REBREQ(nsock)->next;
+    REBREQ *nreq = AS_REBREQ(nsock);
+    nreq->common.data = 0;
+    nreq->next = 0;
 
-	// Create a new port using ACCEPT request passed by sock->common.sock:
-	port = Copy_Array_Shallow(port);
-	SET_PORT(out, port);	// Also for GC protect
-	SET_NONE(OFV(port, STD_PORT_DATA)); // just to be sure.
-	SET_NONE(OFV(port, STD_PORT_STATE)); // just to be sure.
+    // Create a new port using ACCEPT request passed by sock->common.sock:
+    port = Copy_Context_Shallow(port);
+    Init_Port(out, port); // Also for GC protect
 
-	// Copy over the new sock data:
-	sock = cast(REBREQ*, Use_Port_State(port, RDI_NET, sizeof(*sock)));
-	*sock = *nsock;
-	sock->clen = sizeof(*sock);
-	sock->port = port;
-	OS_FREE(nsock); // allocated by dev_net.c (MT issues?)
+    SET_BLANK(CTX_VAR(port, STD_PORT_DATA)); // just to be sure.
+    SET_BLANK(CTX_VAR(port, STD_PORT_STATE)); // just to be sure.
+
+    // Copy over the new sock data:
+    sock = cast(struct devreq_net*, Ensure_Port_State(port, RDI_NET));
+    *sock = *nsock;
+    AS_REBREQ(sock)->port = port;
+    OS_FREE(nsock); // allocated by dev_net.c (MT issues?)
 }
 
-/***********************************************************************
-**
-*/	static REB_R Transport_Actor(struct Reb_Call *call_, REBSER *port, REBCNT action, enum Transport_Types proto)
-/*
-***********************************************************************/
-{
-	REBREQ *sock;	// IO request
-	REBVAL *spec;	// port spec
-	REBVAL *arg;	// action argument value
-	REBVAL *val;	// e.g. port number value
-	REBINT result;	// IO result
-	REBCNT refs;	// refinement argument flags
-	REBCNT len;		// generic length
-	REBSER *ser;	// simplifier
+//
+//  Transport_Actor: C
+//
+static REB_R Transport_Actor(
+    REBFRM *frame_,
+    REBCTX *port,
+    REBSYM action,
+    enum Transport_Types proto
+) {
+    // Initialize the IO request
+    //
+    REBREQ *sock = Ensure_Port_State(port, RDI_NET);
+    if (proto == TRANSPORT_UDP)
+        SET_FLAG(sock->modes, RST_UDP);
 
-	Validate_Port(port, action);
+    REBVAL *spec = CTX_VAR(port, STD_PORT_SPEC);
+    if (!IS_OBJECT(spec))
+        fail (Error(RE_INVALID_PORT));
 
-	*D_OUT = *D_ARG(1);
-	arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
-	refs = 0;
+    // sock->timeout = 4000; // where does this go? !!!
 
-	sock = cast(REBREQ*, Use_Port_State(port, RDI_NET, sizeof(*sock)));
-	if (proto == TRANSPORT_UDP) {
-		SET_FLAG(sock->modes, RST_UDP);
-	}
-	//Debug_Fmt("Sock: %x", sock);
-	spec = OFV(port, STD_PORT_SPEC);
-	if (!IS_OBJECT(spec)) Trap_DEAD_END(RE_INVALID_PORT);
+    // !!! Comment said "HOW TO PREVENT OVERWRITE DURING BUSY OPERATION!!!
+    // Should it just ignore it or cause an error?"
 
-	// sock->timeout = 4000; // where does this go? !!!
+    // Actions for an unopened socket:
 
-	// HOW TO PREVENT OVERWRITE DURING BUSY OPERATION!!!
-	// Should it just ignore it or cause an error?
+    if (!IS_OPEN(sock)) {
 
-	// Actions for an unopened socket:
-	if (!IS_OPEN(sock)) {
+        switch (action) { // Ordered by frequency
 
-		switch (action) {	// Ordered by frequency
+        case SYM_OPEN: {
+            REBVAL *arg = Obj_Value(spec, STD_PORT_SPEC_NET_HOST);
+            REBVAL *val = Obj_Value(spec, STD_PORT_SPEC_NET_PORT_ID);
 
-		case A_OPEN:
+            if (OS_DO_DEVICE(sock, RDC_OPEN))
+                fail (Error_On_Port(RE_CANNOT_OPEN, port, -12));
+            SET_OPEN(sock);
 
-			arg = Obj_Value(spec, STD_PORT_SPEC_NET_HOST);
-			val = Obj_Value(spec, STD_PORT_SPEC_NET_PORT_ID);
+            // Lookup host name (an extra TCP device step):
+            if (IS_STRING(arg)) {
+                sock->common.data = VAL_BIN(arg);
+                DEVREQ_NET(sock)->remote_port =
+                    IS_INTEGER(val) ? VAL_INT32(val) : 80;
 
-			if (OS_DO_DEVICE(sock, RDC_OPEN)) Trap_Port_DEAD_END(RE_CANNOT_OPEN, port, -12);
-			SET_OPEN(sock);
+                // Note: sets remote_ip field
+                //
+                REBINT result = OS_DO_DEVICE(sock, RDC_LOOKUP);
+                if (result < 0)
+                    fail (Error_On_Port(RE_NO_CONNECT, port, sock->error));
 
-			// Lookup host name (an extra TCP device step):
-			if (IS_STRING(arg)) {
-				sock->common.data = VAL_BIN(arg);
-				sock->special.net.remote_port = IS_INTEGER(val) ? VAL_INT32(val) : 80;
-				result = OS_DO_DEVICE(sock, RDC_LOOKUP);  // sets remote_ip field
-				if (result < 0) Trap_Port_DEAD_END(RE_NO_CONNECT, port, sock->error);
-				return R_OUT;
-			}
+                Move_Value(D_OUT, CTX_VALUE(port));
+                return R_OUT;
+            }
+            else if (IS_TUPLE(arg)) { // Host IP specified:
+                DEVREQ_NET(sock)->remote_port =
+                    IS_INTEGER(val) ? VAL_INT32(val) : 80;
+                memcpy(&(DEVREQ_NET(sock)->remote_ip), VAL_TUPLE(arg), 4);
+                break;
+            }
+            else if (IS_BLANK(arg)) { // No host, must be a LISTEN socket:
+                SET_FLAG(sock->modes, RST_LISTEN);
+                sock->common.sock = 0; // where ACCEPT requests are queued
+                DEVREQ_NET(sock)->local_port =
+                    IS_INTEGER(val) ? VAL_INT32(val) : 8000;
+                break;
+            }
+            else
+                fail (Error_On_Port(RE_INVALID_SPEC, port, -10));
+            break; }
 
-			// Host IP specified:
-			else if (IS_TUPLE(arg)) {
-				sock->special.net.remote_port = IS_INTEGER(val) ? VAL_INT32(val) : 80;
-				memcpy(&sock->special.net.remote_ip, VAL_TUPLE(arg), 4);
-				break;
-			}
+        case SYM_CLOSE:
+            Move_Value(D_OUT, CTX_VALUE(port));
+            return R_OUT;
 
-			// No host, must be a LISTEN socket:
-			else if (IS_NONE(arg)) {
-				SET_FLAG(sock->modes, RST_LISTEN);
-				sock->common.data = 0; // where ACCEPT requests are queued
-				sock->special.net.local_port = IS_INTEGER(val) ? VAL_INT32(val) : 8000;
-				break;
-			}
-			else Trap_Port_DEAD_END(RE_INVALID_SPEC, port, -10);
+        case SYM_OPEN_Q:
+            return R_FALSE;
 
-		case A_CLOSE:
-			return R_OUT;
+        case SYM_UPDATE:  // allowed after a close
+            break;
 
-		case A_OPENQ:
-			return R_FALSE;
+        default:
+            fail (Error_On_Port(RE_NOT_OPEN, port, -12));
+        }
+    }
 
-		case A_UPDATE:	// allowed after a close
-			break;
+    // Actions for an open socket:
 
-		default:
-			Trap_Port_DEAD_END(RE_NOT_OPEN, port, -12);
-		}
-	}
+    switch (action) { // Ordered by frequency
 
-	// Actions for an open socket:
-	switch (action) {	// Ordered by frequency
+    case SYM_UPDATE: {
+        //
+        // Update the port object after a READ or WRITE operation.
+        // This is normally called by the WAKE-UP function.
+        //
+        REBVAL *port_data = CTX_VAR(port, STD_PORT_DATA);
+        if (sock->command == RDC_READ) {
+            if (ANY_BINSTR(port_data)) {
+                SET_SERIES_LEN(
+                    VAL_SERIES(port_data),
+                    VAL_LEN_HEAD(port_data) + sock->actual
+                );
+            }
+        }
+        else if (sock->command == RDC_WRITE) {
+            SET_BLANK(port_data); // Write is done.
+        }
+        return R_BLANK; }
 
-	case A_UPDATE:
-		// Update the port object after a READ or WRITE operation.
-		// This is normally called by the WAKE-UP function.
-		arg = OFV(port, STD_PORT_DATA);
-		if (sock->command == RDC_READ) {
-			if (ANY_BINSTR(arg)) VAL_TAIL(arg) += sock->actual;
-		}
-		else if (sock->command == RDC_WRITE) {
-			SET_NONE(arg);  // Write is done.
-		}
-		return R_NONE;
+    case SYM_READ: {
+        INCLUDE_PARAMS_OF_READ;
 
-	case A_READ:
-		// Read data into a buffer, expanding the buffer if needed.
-		// If no length is given, program must stop it at some point.
-		refs = Find_Refines(call_, ALL_READ_REFS);
-		if (!GET_FLAG(sock->modes, RST_UDP)
-			&& !GET_FLAG(sock->state, RSM_CONNECT))
-			Trap_Port_DEAD_END(RE_NOT_CONNECTED, port, -15);
+        UNUSED(PAR(source));
 
-		// Setup the read buffer (allocate a buffer if needed):
-		arg = OFV(port, STD_PORT_DATA);
-		if (!IS_STRING(arg) && !IS_BINARY(arg)) {
-			Val_Init_Binary(arg, Make_Binary(NET_BUF_SIZE));
-		}
-		ser = VAL_SERIES(arg);
-		sock->length = SERIES_AVAIL(ser); // space available
-		if (sock->length < NET_BUF_SIZE/2) Extend_Series(ser, NET_BUF_SIZE);
-		sock->length = SERIES_AVAIL(ser);
-		sock->common.data = STR_TAIL(ser); // write at tail
-		//if (SERIES_TAIL(ser) == 0)
-		sock->actual = 0;  // Actual for THIS read, not for total.
+        if (REF(part)) {
+            assert(!IS_VOID(ARG(limit)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        if (REF(seek)) {
+            assert(!IS_VOID(ARG(index)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        UNUSED(PAR(string)); // handled in dispatcher
+        UNUSED(PAR(lines)); // handled in dispatcher
 
-		//Print("(max read length %d)", sock->length);
-		result = OS_DO_DEVICE(sock, RDC_READ); // recv can happen immediately
-		if (result < 0) Trap_Port_DEAD_END(RE_READ_ERROR, port, sock->error);
-		break;
+        // Read data into a buffer, expanding the buffer if needed.
+        // If no length is given, program must stop it at some point.
+        if (
+            !GET_FLAG(sock->modes, RST_UDP)
+            && !GET_FLAG(sock->state, RSM_CONNECT)
+        ) {
+            fail (Error_On_Port(RE_NOT_CONNECTED, port, -15));
+        }
 
-	case A_WRITE:
-		// Write the entire argument string to the network.
-		// The lower level write code continues until done.
+        // Setup the read buffer (allocate a buffer if needed):
+        //
+        REBVAL *port_data = CTX_VAR(port, STD_PORT_DATA);
+        REBSER *buffer;
+        if (!IS_STRING(port_data) && !IS_BINARY(port_data)) {
+            buffer = Make_Binary(NET_BUF_SIZE);
+            Init_Binary(port_data, buffer);
+        }
+        else {
+            buffer = VAL_SERIES(port_data);
+            assert(BYTE_SIZE(buffer));
 
-		refs = Find_Refines(call_, ALL_WRITE_REFS);
-		if (!GET_FLAG(sock->modes, RST_UDP)
-			&& !GET_FLAG(sock->state, RSM_CONNECT))
-			Trap_Port_DEAD_END(RE_NOT_CONNECTED, port, -15);
+            if (SER_AVAIL(buffer) < NET_BUF_SIZE/2)
+                Extend_Series(buffer, NET_BUF_SIZE);
+        }
 
-		// Determine length. Clip /PART to size of string if needed.
-		spec = D_ARG(2);
-		len = VAL_LEN(spec);
-		if (refs & AM_WRITE_PART) {
-			REBCNT n = Int32s(D_ARG(ARG_WRITE_LIMIT), 0);
-			if (n <= len) len = n;
-		}
+        sock->length = SER_AVAIL(buffer);
+        sock->common.data = BIN_TAIL(buffer); // write at tail
+        sock->actual = 0; // actual for THIS read (not for total)
 
-		// Setup the write:
-		*OFV(port, STD_PORT_DATA) = *spec;	// keep it GC safe
-		sock->length = len;
-		sock->common.data = VAL_BIN_DATA(spec);
-		sock->actual = 0;
+        // Note: recv can happen immediately
+        //
+        REBINT result = OS_DO_DEVICE(sock, RDC_READ);
+        if (result < 0)
+            fail (Error_On_Port(RE_READ_ERROR, port, sock->error));
 
-		//Print("(write length %d)", len);
-		result = OS_DO_DEVICE(sock, RDC_WRITE); // send can happen immediately
-		if (result < 0) Trap_Port_DEAD_END(RE_WRITE_ERROR, port, sock->error);
-		if (result == DR_DONE) SET_NONE(OFV(port, STD_PORT_DATA));
-		break;
+        Move_Value(D_OUT, CTX_VALUE(port));
+        return R_OUT; }
 
-	case A_PICK:
-		// FIRST server-port returns new port connection.
-		len = Get_Num_Arg(arg); // Position
-		if (len == 1 && GET_FLAG(sock->modes, RST_LISTEN) && sock->common.data)
-			Accept_New_Port(D_OUT, port, sock); // sets D_OUT
-		else
-			Trap_Range_DEAD_END(arg);
-		break;
+    case SYM_WRITE: {
+        INCLUDE_PARAMS_OF_WRITE;
 
-	case A_QUERY:
-		// Get specific information - the scheme's info object.
-		// Special notation allows just getting part of the info.
-		Ret_Query_Net(port, sock, D_OUT);
-		break;
+        UNUSED(PAR(destination));
 
-	case A_OPENQ:
-		// Connect for clients, bind for servers:
-		if (sock->state & ((1<<RSM_CONNECT) | (1<<RSM_BIND))) return R_TRUE;
-		return R_FALSE;
+        if (REF(seek)) {
+            assert(!IS_VOID(ARG(index)));
+            fail (Error(RE_MISC));
+        }
+        if (REF(append))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(allow)) {
+            assert(!IS_VOID(ARG(access)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        if (REF(lines))
+            fail (Error(RE_BAD_REFINES));
 
-	case A_CLOSE:
-		if (IS_OPEN(sock)) {
-			OS_DO_DEVICE(sock, RDC_CLOSE);
-			SET_CLOSED(sock);
-		}
-		break;
+        // Write the entire argument string to the network.
+        // The lower level write code continues until done.
 
-	case A_LENGTH:
-		arg = OFV(port, STD_PORT_DATA);
-		len = ANY_SERIES(arg) ? VAL_TAIL(arg) : 0;
-		SET_INTEGER(D_OUT, len);
-		break;
+        if (
+            !GET_FLAG(sock->modes, RST_UDP)
+            && !GET_FLAG(sock->state, RSM_CONNECT)
+        ){
+            fail (Error_On_Port(RE_NOT_CONNECTED, port, -15));
+        }
 
-	case A_OPEN:
-		result = OS_DO_DEVICE(sock, RDC_CONNECT);
-		if (result < 0) Trap_Port_DEAD_END(RE_NO_CONNECT, port, sock->error);
-		break;
-		//Trap_Port_DEAD_END(RE_ALREADY_OPEN, port);
+        // Determine length. Clip /PART to size of string if needed.
+        REBVAL *data = ARG(data);
 
-	case A_DELETE: // Temporary to TEST error handler!
-		{
-			REBVAL *event = Append_Event();		// sets signal
-			VAL_SET(event, REB_EVENT);		// (has more space, if we need it)
-			VAL_EVENT_TYPE(event) = EVT_ERROR;
-			VAL_EVENT_DATA(event) = 101;
-			VAL_EVENT_REQ(event) = sock;
-		}
-		break;
+        REBCNT len = VAL_LEN_AT(data);
+        if (REF(part)) {
+            REBCNT n = Int32s(ARG(limit), 0);
+            if (n <= len)
+                len = n;
+        }
 
-	default:
-		Trap_Action_DEAD_END(REB_PORT, action);
-	}
+        // Setup the write:
 
-	return R_OUT;
+        Move_Value(CTX_VAR(port, STD_PORT_DATA), data); // keep it GC safe
+        sock->length = len;
+        sock->common.data = VAL_BIN_AT(data);
+        sock->actual = 0;
+
+        // Note: send can happen immediately
+        //
+        REBINT result = OS_DO_DEVICE(sock, RDC_WRITE);
+        if (result < 0)
+            fail (Error_On_Port(RE_WRITE_ERROR, port, sock->error));
+
+        if (result == DR_DONE)
+            SET_BLANK(CTX_VAR(port, STD_PORT_DATA));
+
+        Move_Value(D_OUT, CTX_VALUE(port));
+        return R_OUT; }
+
+    case SYM_PICK: {
+        INCLUDE_PARAMS_OF_PICK;
+        UNUSED(PAR(aggregate));
+
+        // FIRST server-port returns new port connection.
+        //
+        REBCNT len = Get_Num_From_Arg(ARG(index));
+        if (len == 1 && GET_FLAG(sock->modes, RST_LISTEN) && sock->common.data)
+            Accept_New_Port(SINK(D_OUT), port, DEVREQ_NET(sock));
+        else
+            fail (Error_Out_Of_Range(ARG(index)));
+        return R_OUT; }
+
+    case SYM_QUERY: {
+        //
+        // Get specific information - the scheme's info object.
+        // Special notation allows just getting part of the info.
+        //
+        Ret_Query_Net(port, DEVREQ_NET(sock), D_OUT);
+        return R_OUT; }
+
+    case SYM_OPEN_Q:
+        //
+        // Connect for clients, bind for servers:
+        //
+        return R_FROM_BOOL (
+            LOGICAL(sock->state & ((1 << RSM_CONNECT) | (1 << RSM_BIND)))
+        );
+
+    case SYM_CLOSE: {
+        if (IS_OPEN(sock)) {
+            OS_DO_DEVICE(sock, RDC_CLOSE);
+            SET_CLOSED(sock);
+        }
+        Move_Value(D_OUT, CTX_VALUE(port));
+        return R_OUT; }
+
+    case SYM_LENGTH: {
+        REBVAL *port_data = CTX_VAR(port, STD_PORT_DATA);
+        SET_INTEGER(
+            D_OUT,
+            ANY_SERIES(port_data) ? VAL_LEN_HEAD(port_data) : 0
+        );
+        return R_OUT; }
+
+    case SYM_OPEN: {
+        REBINT result = OS_DO_DEVICE(sock, RDC_CONNECT);
+        if (result < 0)
+            fail (Error_On_Port(RE_NO_CONNECT, port, sock->error));
+        Move_Value(D_OUT, CTX_VALUE(port));
+        return R_OUT; }
+
+    case SYM_DELETE: {
+        //
+        // !!! Comment said "Temporary to TEST error handler!"
+        //
+        REBVAL *event = Append_Event(); // sets signal
+        VAL_RESET_HEADER(event, REB_EVENT); // has more space, if needed
+        VAL_EVENT_TYPE(event) = EVT_ERROR;
+        VAL_EVENT_DATA(event) = 101;
+        VAL_EVENT_REQ(event) = sock;
+        Move_Value(D_OUT, CTX_VALUE(port));
+        return R_OUT; }
+    }
+
+    fail (Error_Illegal_Action(REB_PORT, action));
 }
 
-/***********************************************************************
-**
-*/	static REB_R TCP_Actor(struct Reb_Call *call_, REBSER *port, REBCNT action)
-/*
-***********************************************************************/
+
+//
+//  TCP_Actor: C
+//
+static REB_R TCP_Actor(REBFRM *frame_, REBCTX *port, REBSYM action)
 {
-	return Transport_Actor(call_, port, action, TRANSPORT_TCP);
+    return Transport_Actor(frame_, port, action, TRANSPORT_TCP);
 }
 
-/***********************************************************************
-**
-*/	static REB_R UDP_Actor(struct Reb_Call *call_, REBSER *port, REBCNT action)
-/*
-***********************************************************************/
+
+//
+//  UDP_Actor: C
+//
+static REB_R UDP_Actor(REBFRM *frame_, REBCTX *port, REBSYM action)
 {
-	return Transport_Actor(call_, port, action, TRANSPORT_UDP);
+    return Transport_Actor(frame_, port, action, TRANSPORT_UDP);
 }
 
-/***********************************************************************
-**
-*/	void Init_TCP_Scheme(void)
-/*
-***********************************************************************/
+
+//
+//  get-tcp-actor-handle: native [
+//
+//  {Retrieve handle to the native actor for TCP}
+//
+//      return: [handle!]
+//  ]
+//
+REBNATIVE(get_tcp_actor_handle)
 {
-	Register_Scheme(SYM_TCP, 0, TCP_Actor);
+    Make_Port_Actor_Handle(D_OUT, &TCP_Actor);
+    return R_OUT;
 }
-/***********************************************************************
-**
-*/	void Init_UDP_Scheme(void)
-/*
-***********************************************************************/
+
+
+//
+//  get-udp-actor-handle: native [
+//
+//  {Retrieve handle to the native actor for UDP}
+//
+//      return: [handle!]
+//  ]
+//
+REBNATIVE(get_udp_actor_handle)
 {
-	Register_Scheme(SYM_UDP, 0, UDP_Actor);
+    Make_Port_Actor_Handle(D_OUT, &UDP_Actor);
+    return R_OUT;
+}
+
+
+//
+//  set-udp-multicast: native [
+//
+//  {Join (or leave) an IPv4 multicast group}
+//
+//      return: [<opt>]
+//      port [port!]
+//          {An open UDP port}
+//      group [tuple!]
+//          {Multicast group to join (224.0.0.0 to 239.255.255.255)}
+//      member [tuple!]
+//          {Member to add to multicast group (use 0.0.0.0 for INADDR_ANY)}
+//      /drop
+//          {Leave the group (default is to add)}
+//  ]
+//
+REBNATIVE(set_udp_multicast)
+//
+// !!! SET-MODES was never standardized or implemented for R3-Alpha, so there
+// was no RDC_MODIFY written.  While it is tempting to just go ahead and
+// start writing `setsockopt` calls right here in this file, that would mean
+// adding platform-sensitive network includes into the core.
+//
+// Ultimately, the desire is that ports would be modules--consisting of some
+// Rebol code, and some C code (possibly with platform-conditional libs).
+// This is the direction for the extension model, where the artificial limit
+// of having "native port actors" that can't just do the OS calls they want
+// will disappear.
+//
+// Until that happens, we want to pass this through to the Reb_Device layer
+// somehow.  It's not easy to see how to modify this "REBREQ" which is
+// actually *the port's state* to pass it the necessary information for this
+// request.  Hence the cheat is just to pass it the frame, and then let
+// Reb_Device implementations go ahead and use the extension API to pick
+// that frame apart.
+{
+    INCLUDE_PARAMS_OF_SET_UDP_MULTICAST;
+
+    REBCTX *port = VAL_CONTEXT(ARG(port));
+    REBREQ *sock = Ensure_Port_State(port, RDI_NET);
+
+    sock->common.data = cast(REBYTE*, frame_);
+
+    // sock->command is going to just be RDC_MODIFY, so all there is to go
+    // by is the data and flags.  Since RFC3171 specifies IPv4 multicast
+    // address space...how about that?
+    //
+    sock->flags = 3171;
+
+    UNUSED(ARG(group));
+    UNUSED(ARG(member));
+    UNUSED(REF(drop));
+
+    REBINT result = OS_DO_DEVICE(sock, RDC_MODIFY);
+    if (result < 0)
+        fail (Error(RE_MISC)); // should device layer just fail()?
+
+    return R_VOID;
+}
+
+
+//
+//  set-udp-ttl: native [
+//
+//  {Set the TTL of a UDP port}
+//
+//      return: [<opt>]
+//      port [port!]
+//          {An open UDP port}
+//      ttl [integer!]
+//          {0 = local machine only, 1 = subnet (default), or up to 255}
+//  ]
+//
+REBNATIVE(set_udp_ttl)
+{
+    INCLUDE_PARAMS_OF_SET_UDP_TTL;
+
+    REBCTX *port = VAL_CONTEXT(ARG(port));
+    REBREQ *sock = Ensure_Port_State(port, RDI_NET);
+
+    sock->common.data = cast(REBYTE*, frame_);
+
+    // sock->command is going to just be RDC_MODIFY, so all there is to go
+    // by is the data and flags.  Since RFC2365 specifies IPv4 multicast
+    // administrative boundaries...how about that?
+    //
+    sock->flags = 2365;
+
+    UNUSED(ARG(ttl));
+
+    REBINT result = OS_DO_DEVICE(sock, RDC_MODIFY);
+    if (result < 0)
+        fail (Error(RE_MISC)); // should device layer just fail()?
+
+    return R_VOID;
 }

@@ -1,46 +1,48 @@
 REBOL [
-	System: "REBOL [R3] Language Interpreter and Run-time Environment"
-	Title: "Make primary boot files"
-	Rights: {
-		Copyright 2012 REBOL Technologies
-		REBOL is a trademark of REBOL Technologies
-	}
-	License: {
-		Licensed under the Apache License, Version 2.0
-		See: http://www.apache.org/licenses/LICENSE-2.0
-	}
-	Author: "Carl Sassenrath"
-	Version: 2.100.0
-	Needs: 2.100.100
-	Purpose: {
-		A lot of the REBOL system is built by REBOL, and this program
-		does most of the serious work. It generates most of the C include
-		files required to compile REBOL.
-	}
+    System: "REBOL [R3] Language Interpreter and Run-time Environment"
+    Title: "Make primary boot files"
+    File: %make-boot.r ;-- used by EMIT-HEADER to indicate emitting script
+    Rights: {
+        Copyright 2012 REBOL Technologies
+        Copyright 2012-2017 Rebol Open Source Contributors
+        REBOL is a trademark of REBOL Technologies
+    }
+    License: {
+        Licensed under the Apache License, Version 2.0
+        See: http://www.apache.org/licenses/LICENSE-2.0
+    }
+    Version: 2.100.0
+    Needs: 2.100.100
+    Purpose: {
+        A lot of the REBOL system is built by REBOL, and this program
+        does most of the serious work. It generates most of the C include
+        files required to compile REBOL.
+    }
 ]
 
 print "--- Make Boot : System Embedded Script ---"
 
 do %common.r
+do %common-emitter.r
 
 do %form-header.r
 
 do %systems.r
-config: config-system/guess system/options/args
+args: parse-args system/options/args
+config: config-system to-value args/OS_ID
 
-write-if: func [file data] [
-	if data <> attempt [read file][
-		print ["UPDATE:" file]
-		write file data
-	]
-]
 
 ;-- SETUP --------------------------------------------------------------
 
 change-dir %../boot/
 ;dir: %../core/temp/  ; temporary definition
-inc: %../include/
-src: %../core/
+output-dir: fix-win32-path to file! any [args/OUTDIR %../]
+mkdir/deep output-dir/include
+mkdir/deep output-dir/boot
+mkdir/deep output-dir/core
+inc: output-dir/include
+src: output-dir/core
+boot: output-dir/boot
 
 version: load %version.r
 version/4: config/id/2
@@ -55,35 +57,47 @@ Licensed under the Apache License, Version 2.0
 }
 
 sections: [
-	boot-types
-	boot-words
-	boot-root
-	boot-task
-	boot-strings
-	boot-booters
-	boot-actions
-	boot-natives
-	boot-ops
-	boot-typespecs
-	boot-errors
-	boot-sysobj
-	boot-base
-	boot-sys
-	boot-mezz
-	boot-protocols
-;	boot-script
+    boot-types
+    boot-words
+    boot-root
+    boot-task
+    boot-actions
+    boot-natives
+    boot-typespecs
+    boot-errors
+    boot-sysobj
+    boot-base
+    boot-sys
+    boot-mezz
+;   boot-script
 ]
 
-include-protocols: false      ; include protocols in build
+; Args passed: platform, product
+;
+; !!! Heed /script/args so you could say e.g. `do/args %make-boot.r [0.3.01]`
+; Note however that current leaning is that scripts called by the invoked
+; process will not have access to the "outer" args, hence there will be only
+; one "args" to be looked at in the long run.  This is an attempt to still
+; be able to bootstrap under the conditions of the A111 rebol.com R3-Alpha
+; as well as function either from the command line or the REPL.
+;
+unless args: any [
+    if string? :system/script/args [
+        either block? load system/script/args [
+            load system/script/args
+        ][
+            reduce [load system/script/args]
+        ]
+    ]
+    :system/script/args
 
-;-- Error handler:
-error: func [msg arg] [print ["*** Make-boot error:" msg arg] halt]
+    ; This is the only piece that should be necessary if not dealing w/legacy
+    system/options/args
+] [
+    fail "No platform specified."
+]
 
-;-- Args passed: platform, product
-if none? args: system/options/args [error "No platform specified." ""]
-
-if args/1 = ">" [args: ["Win32" "VIEW-PRO"]] ; for debugging only
-product: to-word any [args/2  "core"]
+product: to-word any [args/PRODUCT  "core"]
 
 platform-data: context [type: 'windows]
 build: context [features: [help-strings]]
@@ -93,82 +107,6 @@ build: context [features: [help-strings]]
 ;platform-data: platforms/:platform
 ;build: platform-data/builds/:product
 
-;-- UTILITIES ----------------------------------------------------------
-
-up-word: func [w] [
-	w: uppercase form w
-	foreach [f t] [
-		#"-" #"_"
-	][replace/all w f t]
-	w
-]
-
-;-- Emit Function
-out: make string! 100000
-emit: func [data] [repend out data]
-
-to-c-name: func [word] [
-	word: form word
-	foreach [f t] [
-		"..." "ellipsis"
-		#"-" #"_"
-		#"." #"_"
-		#"?" #"q"
-		#"!" #"x"
-		#"~" ""
-		#"*" "_p"
-		#"+" "_add"
-		#"|" "or_bar"
-	][replace/all word f t]
-	word
-]
-
-emit-enum: func [word] [emit [tab to-c-name word "," newline]]
-
-emit-line: func [prefix word cmt /var /define /code /decl /up1 /local str][
-
-	str: to-c-name word
-
-	if word = 0 [prefix: ""]
-
-	if not any [code decl] [
-		either var [uppercase/part str 1] [uppercase str]
-	]
-
-	if up1 [uppercase/part str 1]
-
-	str: any [
-		if define [rejoin [prefix str]]
-		if code   [rejoin ["    " prefix str cmt]]
-		if decl   [rejoin [prefix str cmt]]
-		rejoin ["    " prefix str ","]
-	]
-	if any [code decl] [cmt: none]
-	if cmt [
-		len: 32 - length str
-		loop to-integer len / 4 [append str tab]
-		any [
-			if define [repend str cmt]
-			if cmt [repend str ["// " cmt]]
-		]
-	]
-	append str newline
-	append out str
-]
-
-emit-head: func [title [string!] file [file!]] [
-	clear out
-	emit form-header/gen title file %make-boot.r
-]
-
-emit-end: func [/easy] [
-	if not easy [remove find/last out #","]
-	append out {^};^/}
-]
-
-remove-tests: func [d] [
-	while [d: find d #test][remove/part d 2]
-]
 
 ;----------------------------------------------------------------------------
 ;
@@ -179,45 +117,72 @@ remove-tests: func [d] [
 boot-types: load %types.r
 
 
-emit-head "Evaluation Maps" %evaltypes.h
+emit-header "Evaluation Maps" %evaltypes.h
 
 
 emit {
+
 /***********************************************************************
 **
-*/	const REBACT Value_Dispatch[REB_MAX] =
+*/  const REBACT Value_Dispatch[REB_MAX] =
 /*
-**		The ACTION dispatch function for each datatype.
+**      The ACTION dispatch function for each datatype.
 **
 ***********************************************************************/
-^{
 }
+emit-line "{"
 
-foreach-record-NO-RETURN type boot-types [
-	emit-line/var "T_" type/class type/name
+for-each-record type boot-types [
+    if group? type/class [type/class: first type/class]
+
+    case [
+        type/class = 0 [ ; REB_0 should not ever be dispatched, bad news
+            emit-item "NULL"
+        ]
+        type/class = '+ [ ; Extension types just fail until registered
+            emit-item "T_Fail"
+        ]
+        true [ ; All other types should have handlers
+            emit-item ["T_" propercase-of type/class]
+        ]
+    ]
+    emit-annotation type/name
 ]
 emit-end
+
+
 
 emit {
+
+extern const REBPEF Path_Dispatch[REB_MAX];
+
 /***********************************************************************
 **
-*/	const REBPEF Path_Dispatch[REB_MAX] =
+*/  const REBPEF Path_Dispatch[REB_MAX] =
 /*
-**		The path evaluator function for each datatype.
+**      The path evaluator function for each datatype.
 **
 ***********************************************************************/
-^{
 }
+emit-line "{"
 
-foreach-record-NO-RETURN type boot-types [
-	emit-line/var "PD_" switch/default type/path [
-		* [type/class]
-		- [0]
-	][type/path] type/name
+for-each-record type boot-types [
+    if group? type/class [type/class: first type/class]
+
+    either type/path = '- [
+        emit-item "PD_Fail"
+    ][
+        emit-item [
+            "PD_" propercase-of (
+                either type/path = '* [type/class] [type/path]
+            )
+        ]
+    ]
+    emit-annotation type/name
 ]
 emit-end
 
-write inc/tmp-evaltypes.h out
+write-emitted inc/tmp-evaltypes.inc
 
 
 ;----------------------------------------------------------------------------
@@ -226,50 +191,71 @@ write inc/tmp-evaltypes.h out
 ;
 ;----------------------------------------------------------------------------
 
-emit-head "Datatype Makers" %maketypes.h
+emit-header "Datatype Makers" %maketypes.h
 emit newline
 
-types-used: []
+types-used: copy []
 
-foreach-record-NO-RETURN type boot-types [
-	if all [
-		type/make = '*
-		word? type/class
-		not find types-used type/class
-	][
-		; using -Wredundant-decls it seems these prototypes are already
-		; taken care of by make-headers.r, no need to re-emit
-		comment [
-			emit-line/up1/decl
-				"extern REBFLG MT_" type/class "(REBVAL *, REBVAL *, REBCNT);"
-		]
-		append types-used type/class
-	]
+for-each-record type boot-types [
+    if group? type/class [type/class: first type/class]
+
+    if all [
+        type/make = '*
+        word? type/class
+        not find types-used type/class
+    ][
+        append types-used type/class
+    ]
 ]
 
 emit {
 
 /***********************************************************************
 **
-*/	const MAKE_FUNC Make_Dispatch[REB_MAX] =
+*/  const MAKE_FUNC Make_Dispatch[REB_MAX] =
 /*
-**		Specifies the make method used for each datatype.
+**      Specifies the make method used for each datatype.
 **
 ***********************************************************************/
-^{
 }
+emit-line "{"
+for-each-record type boot-types [
+    if group? type/class [type/class: first type/class]
 
-foreach-record-NO-RETURN type boot-types [
-	either type/make = '* [
-		emit-line/var "MT_" type/class type/name
-	][
-		emit-line "" "0" type/name
-	]
+    either type/make = '* [
+        emit-item ["MAKE_" propercase-of type/class]
+    ][
+        emit-item "MAKE_Fail"
+    ]
+    emit-annotation type/name
 ]
-
 emit-end
 
-write inc/tmp-maketypes.h out
+
+emit {
+/***********************************************************************
+**
+*/  const TO_FUNC To_Dispatch[REB_MAX] =
+/*
+**      Specifies the TO method used for each datatype.
+**
+***********************************************************************/
+}
+emit-line "{"
+for-each-record type boot-types [
+    if group? type/class [type/class: first type/class]
+
+    either type/make = '* [
+        emit-item ["TO_" propercase-of type/class]
+    ][
+        emit-item "TO_Fail"
+    ]
+    emit-annotation type/name
+]
+emit-end
+
+write-emitted inc/tmp-maketypes.inc
+
 
 ;----------------------------------------------------------------------------
 ;
@@ -277,103 +263,52 @@ write inc/tmp-maketypes.h out
 ;
 ;----------------------------------------------------------------------------
 
-emit-head "Datatype Comparison Functions" %comptypes.h
+emit-header "Datatype Comparison Functions" %comptypes.h
 emit newline
 
-types-used: []
+types-used: copy []
 
-foreach-record-NO-RETURN type boot-types [
-	if all [
-		word? type/class
-		not find types-used type/class
-	][
-		; using -Wredundant-decls it seems these prototypes are already
-		; taken care of by make-headers.r, no need to re-emit
-		comment [
-			emit-line/up1/decl
-				"extern REBINT CT_" type/class "(REBVAL *, REBVAL *, REBINT);"
-		]
-		append types-used type/class
-	]
+for-each-record type boot-types [
+    if group? type/class [type/class: first type/class]
+
+    if all [
+        word? type/class
+        not find types-used type/class
+    ][
+        append types-used type/class
+    ]
 ]
 
 emit {
 /***********************************************************************
 **
-*/	const REBCTF Compare_Types[REB_MAX] =
+*/  const REBCTF Compare_Types[REB_MAX] =
 /*
-**		Type comparision functions.
+**      Type comparision functions.
 **
 ***********************************************************************/
-^{
 }
+emit-line "{"
+for-each-record type boot-types [
+    if group? type/class [type/class: first type/class]
 
-foreach-record-NO-RETURN type boot-types [
-	emit-line/var "CT_" type/class type/name
+    case [
+        type/class = 0 [
+            emit-item "NULL"
+        ]
+        type/class = '+ [
+            emit-item "CT_Fail"
+        ]
+        true [
+            emit-item ["CT_" propercase-of type/class]
+        ]
+    ]
+    emit-annotation type/name
 ]
 emit-end
 
-write inc/tmp-comptypes.h out
+write-emitted inc/tmp-comptypes.inc
 
-
-;----------------------------------------------------------------------------
-;
-; Moldtypes.h - Dispatchers for Mold and Form
-;
-;----------------------------------------------------------------------------
-
-;emit-head "Mold Dispatchers"
-;
-;emit {
-;/***********************************************************************
-;**
-;*/	const MOLD_FUNC Mold_Dispatch[REB_MAX] =
-;/*
-;**		The MOLD dispatch function for each datatype.
-;**
-;***********************************************************************/
-;^{
-;}
-;
-;foreach-record-NO-RETURN type boot-types [
-;	f: "Mold_"
-;	switch/default type/mold [
-;		* [t: type/class]
-;		+ [t: type/name]
-;		- [t: 0]
-;	][t: uppercase/part form type/mold 1]
-;	emit [tab "case " uppercase join "REB_" type/name ":" tab "\\" t]
-;	emit newline
-;	;emit-line/var f t type/name
-;]
-;emit-end
-;
-;emit {
-;/***********************************************************************
-;**
-;*/	const MOLD_FUNC Form_Dispatch[REB_MAX] =
-;/*
-;**		The FORM dispatch function for each datatype.
-;**
-;***********************************************************************/
-;^{
-;}
-;foreach-record-NO-RETURN type boot-types [
-;	f: "Mold_"
-;	switch/default type/form [
-;		*  [t: type/class]
-;		f* [t: type/class f: "Form_"]
-;		+  [t: type/name]
-;		f+ [t: type/name f: "Form_"]
-;		-  [t: 0]
-;	][t: uppercase/part form type/mold 1]
-;	emit [tab "case " uppercase join "REB_" type/name ":" tab "\\" t]
-;	emit newline
-;	;emit-line/var f t type/name
-;]
-;emit-end
-;
-;write inc/tmp-moldtypes.h out
 
 ;----------------------------------------------------------------------------
 ;
@@ -381,211 +316,158 @@ write inc/tmp-comptypes.h out
 ;
 ;----------------------------------------------------------------------------
 
-emit-head "Datatype Definitions" %reb-types.h
+emit-header "Datatype Definitions" %reb-types.h
 
-emit [
-{
+emit {
 /***********************************************************************
 **
-*/	enum Reb_Kind
+*/  enum Reb_Kind
 /*
-**		Internal datatype numbers. These change. Do not export.
+**      Internal datatype numbers. These change. Do not export.
 **
 ***********************************************************************/
-^{
 }
-]
+emit-line "{"
 
-datatypes: []
+datatypes: copy []
 n: 0
-foreach-record-NO-RETURN type boot-types [
-	append datatypes type/name
-	emit-line "REB_" type/name n
-	n: n + 1
+
+for-each-record type boot-types [
+    append datatypes type/name
+
+    either type/name = 0 [
+        emit-item/assign "REB_0" 0
+    ][
+        emit-item/assign/upper ["REB_" type/name] n
+    ]
+    emit-annotation n
+
+    n: n + 1
 ]
-emit {    REB_MAX
-^};
+
+emit-item/assign "REB_MAX" n
+emit-annotation n
+emit-end
+
+emit {
+/***********************************************************************
+**
+**  REBOL Type Check Macros
+**
+***********************************************************************/
+}
+
+new-types: copy []
+n: 0
+for-each-record type boot-types [
+    ;
+    ; Type #0 is reserved for special purposes
+    ;
+    if n != 0 [
+        ;
+        ; Emit the IS_INTEGER() / etc. test for the datatype.  Use LOGICAL()
+        ; so that `REBOOL b = IS_INTEGER(value);` passes the tests in the
+        ; build guaranteeing all REBOOL are 1 or 0, despite the fact that
+        ; there are other values that C considers "truthy".
+        ;
+        emit-line [
+            {#define IS_} (uppercase to-c-name type/name) "(v)" space
+            "LOGICAL(VAL_TYPE(v)==REB_" (uppercase to-c-name type/name) ")"
+        ]
+
+        append new-types to-word adjoin form type/name "!"
+    ]
+
+    n: n + 1
+]
+
+; These macros are not automatically generated, though perhaps some of them
+; should be.  They are here because all the type concerns tie together...
+; if they are renumbered then tests using > or < might start failing.
+;
+; !!! Consider ways of making this more robust.
+;
+emit {
+#define IS_ANY_VALUE(v) \
+    LOGICAL(VAL_TYPE(v) != REB_MAX_VOID)
+
+#define ANY_SCALAR(v) \
+    LOGICAL(VAL_TYPE(v) >= REB_LOGIC && VAL_TYPE(v) <= REB_DATE)
+
+#define ANY_SERIES(v) \
+    LOGICAL(VAL_TYPE(v) >= REB_PATH && VAL_TYPE(v) <= REB_VECTOR)
+
+#define ANY_STRING(v) \
+    LOGICAL(VAL_TYPE(v) >= REB_STRING && VAL_TYPE(v) <= REB_TAG)
+
+#define ANY_BINSTR(v) \
+    LOGICAL(VAL_TYPE(v) >= REB_BINARY && VAL_TYPE(v) <= REB_TAG)
+
+inline static REBOOL ANY_ARRAY_KIND(enum Reb_Kind k) {
+    return LOGICAL(k >= REB_PATH && k <= REB_BLOCK);
+}
+
+#define ANY_ARRAY(v) \
+    ANY_ARRAY_KIND(VAL_TYPE(v))
+
+inline static REBOOL ANY_WORD_KIND(enum Reb_Kind k) {
+    return LOGICAL(k >= REB_WORD && k <= REB_ISSUE);
+}
+
+#define ANY_WORD(v) \
+    ANY_WORD_KIND(VAL_TYPE(v))
+
+#define ANY_PATH(v) \
+    LOGICAL(VAL_TYPE(v) >= REB_PATH && VAL_TYPE(v) <= REB_LIT_PATH)
+
+#define ANY_EVAL_BLOCK(v) \
+    LOGICAL(VAL_TYPE(v) == REB_BLOCK || VAL_TYPE(v) == REB_GROUP)
+
+inline static REBOOL ANY_CONTEXT_KIND(enum Reb_Kind k) {
+    return LOGICAL(k >= REB_OBJECT && k <= REB_PORT);
+}
+
+#define ANY_CONTEXT(v) \
+    ANY_CONTEXT_KIND(VAL_TYPE(v))
+
 }
 
 emit {
 /***********************************************************************
 **
-**	REBOL Type Check Macros
+**  REBOL Typeset Defines
 **
 ***********************************************************************/
+
+// User-facing typesets, such as ANY-VALUE!, do not include void (absence of
+// a value) nor the internal "REB_0" type
+//
+#define TS_VALUE ((FLAGIT_KIND(REB_MAX_VOID) - 1) - FLAGIT_KIND(REB_0))
 }
 
-new-types: []
-foreach-record-NO-RETURN type boot-types [
-	append new-types to-word join type/name "!"
-	str: uppercase form type/name
-	replace/all str #"-" #"_"
-	def: join {#define IS_} [str "(v)"]
-	len: 31 - length def
-	loop to-integer len / 4 [append def tab]
-	emit [def "(VAL_TYPE(v)==REB_" str ")" newline]
-]
+typeset-sets: copy []
 
-emit {
-/***********************************************************************
-**
-**	REBOL Typeset Defines
-**
-***********************************************************************/
-}
-
-typeset-sets: []
-
-foreach-record-NO-RETURN type boot-types [
-	foreach ts compose [(type/typesets)] [
-		spot: any [
-			select typeset-sets ts
-			first back insert tail typeset-sets reduce [ts copy []]
-		]
-		append spot type/name
-	]
+for-each-record type boot-types [
+    for-each ts compose [(type/typesets)] [
+        spot: any [
+            select typeset-sets ts
+            first back insert tail typeset-sets reduce [ts copy []]
+        ]
+        append spot type/name
+    ]
 ]
 remove/part typeset-sets 2 ; the - markers
 
-foreach [ts types] typeset-sets [
-	emit ["#define TS_" up-word ts " ("]
-	foreach t types [
-		emit ["((REBU64)1<<REB_" up-word t ")|"]
-	]
-	append remove back tail out ")^/"
+for-each [ts types] typeset-sets [
+    emit ["#define" space uppercase to-c-name ["TS_" ts] space "("]
+    for-each t types [
+        emit ["FLAGIT_KIND(" uppercase to-c-name ["REB_" t] ")|"]
+    ]
+    unemit #"|" ;-- remove the last | added
+    emit [")" newline]
 ]
 
-write-if inc/reb-types.h out
-
-;----------------------------------------------------------------------------
-;
-; Extension Related Tables
-;
-;----------------------------------------------------------------------------
-
-ext-types: load %types-ext.r
-rxt-record: [type offset size]
-
-; Generate type table with necessary gaps
-rxt-types: []
-n: 0
-foreach :rxt-record ext-types [
-	if integer? offset [
-		insert/dup tail rxt-types 0 offset - n
-		n: offset
-	]
-	append rxt-types type
-	n: n + 1
-]
-
-
-emit-head "Extension Types (Isolators)" %ext-types.h
-
-emit [
-{
-enum REBOL_Ext_Types
-^{
-}
-]
-n: 0
-foreach :rxt-record ext-types [
-	either integer? offset [
-		emit-line "RXT_" rejoin [type " = " offset] n
-	][
-		emit-line "RXT_" type n
-	]
-	n: n + 1
-]
-emit {    RXT_MAX
-^};
-}
-
-write inc/ext-types.h out ; part of Host-Kit distro
-
-emit-head "Extension Type Equates" %tmp-exttypes.h
-emit {
-
-#ifdef __cplusplus
-extern "C" ^{
-#endif
-
-extern const REBRXT Reb_To_RXT[REB_MAX];
-
-/***********************************************************************
-**
-*/	const REBRXT Reb_To_RXT[REB_MAX] =
-/*
-***********************************************************************/
-^{
-}
-
-foreach-record-NO-RETURN type boot-types [
-	either find ext-types type/name [
-		emit-line "RXT_" type/name type/name
-	][
-		emit-line "" 0 type/name
-	]
-]
-emit-end
-
-emit {
-/***********************************************************************
-**
-*/	const REBYTE RXT_To_Reb[RXT_MAX] =
-/*
-***********************************************************************/
-^{
-}
-
-n: 0
-foreach type rxt-types [
-	either word? type [emit-line "REB_" type n][
-		emit-line "" 0 n
-	]
-	n: n + 1
-]
-emit-end
-
-emit {
-/***********************************************************************
-**
-*/	const REBCNT RXT_Eval_Class[RXT_MAX] =
-/*
-***********************************************************************/
-^{
-}
-
-n: 0
-foreach type rxt-types [
-	either all [
-		word? type
-		rec: find ext-types type
-	][
-		emit-line "RXX_" rec/3 rec/1
-	][
-		emit-line "" 0 n
-	]
-	n: n + 1
-]
-emit-end
-
-emit {
-#define RXT_ALLOWED_TYPES (}
-foreach type next rxt-types [
-	if word? type [
-		emit replace join "((u64)" uppercase rejoin ["1<<REB_" type ") \^/"] #"-" #"_"
-		emit "|"
-	]
-]
-remove back tail out
-emit ")^/"
-
-emit {
-#ifdef __cplusplus
-^}
-#endif
-}
-write inc/tmp-exttypes.h out
+write-emitted inc/reb-types.h
 
 
 ;----------------------------------------------------------------------------
@@ -594,110 +476,90 @@ write inc/tmp-exttypes.h out
 ;
 ;----------------------------------------------------------------------------
 
-emit-head "Boot Definitions" %bootdefs.h
+emit-header "Boot Definitions" %bootdefs.h
 
-emit [
-{
-#define REBOL_VER } version/1 {
-#define REBOL_REV } version/2 {
-#define REBOL_UPD } version/3 {
-#define REBOL_SYS } version/4 {
-#define REBOL_VAR } version/5 {
-}
-]
-
-;-- Generate Lower-Level String Table ----------------------------------------
-
-emit {
-/***********************************************************************
-**
-**	REBOL Boot Strings
-**
-**		These are special strings required during boot and other
-**		operations. Putting them here hides them from exe hackers.
-**		These are all string offsets within a single string.
-**
-***********************************************************************/
-}
-
-boot-strings: load %strings.r
-
-code: ""
-n: 0
-foreach str boot-strings [
-	either set-word? :str [
-		emit-line/define "#define RS_" to word! str n ;R3
-	][
-		n: n + 1
-		append code str
-		append code null
-	]
-]
-
-emit ["#define RS_MAX" tab n lf]
-emit ["#define RS_SIZE" tab length out lf]
-boot-strings: to-binary code
+emit-line [{#define REBOL_VER} space (version/1)]
+emit-line [{#define REBOL_REV} space (version/2)]
+emit-line [{#define REBOL_UPD} space (version/3)]
+emit-line [{#define REBOL_SYS} space (version/4)]
+emit-line [{#define REBOL_VAR} space (version/5)]
 
 ;-- Generate Canonical Words (must follow datatypes above!) ------------------
 
 emit {
 /***********************************************************************
 **
-*/	enum REBOL_Symbols
+*/  enum REBOL_Symbols
 /*
-**		REBOL static canonical words (symbols) used with the code.
+**      REBOL static canonical words (symbols) used with the code.
 **
 ***********************************************************************/
-^{
-	SYM_NOT_USED = 0,
 }
+emit-line "{"
+emit-item/assign "SYM_0" 0
 
-n: 1
-foreach-record-NO-RETURN type boot-types [
-	emit-line "SYM_" join type/name "_type" n
-	n: n + 1
+n: 0
+boot-words: copy []
+add-word: func [
+    ; LEAVE is not available in R3-Alpha compatibility PROC
+    ; RETURN () is not legal in R3-Alpha compatibility FUNC (no RETURN: [...])
+    ; Make it a FUNC and just RETURN blank to appease both
+
+    word
+    /skip-if-duplicate
+    /type
+][
+    ;
+    ; Horribly inefficient linear search, but MAP! in R3-Alpha is unreliable
+    ; and implemented differently, and we want this code to work in it too.
+    ;
+    if find boot-words word [
+        if skip-if-duplicate [return blank]
+        fail ["Duplicate word specified" word]
+    ]
+
+    ; Although TO-C-NAME is used on the SYM_XXX string as a whole, in order
+    ; to get names like SYM_ELLIPSIS the escaping has to be done on the
+    ; individual word first in this case, as opposed to something more generic
+    ; which would also turn SYM_.a. into "SYM__DOTA_DOT" (or similar) 
+    ;
+    emit-item/upper ["SYM_" (to-c-name word)]
+    emit-annotation spaced [n "-" word]
+    n: n + 1
+
+    ; The types make a SYM_XXX entry, but they're kept in a separate block
+    ; in the boot object (see `boot-types` in `sections`)
+    ;
+    ; !!! Update--temporarily to make word numbering easier, they are
+    ; duplicated.  Consider a better way longer term.
+    ;
+    append boot-words word ;-- was `unless type [...]`
+    return blank
 ]
 
-boot-words: load %words.r
+for-each-record type boot-types [
+    if n = 0 [n: n + 1 | continue]
 
-replace boot-words '*port-modes* load %modes.r
-
-foreach word boot-words [
-	emit-line "SYM_" word reform [n "-" word]
-	n: n + 1
+    add-word/type to-word unspaced [to-string type/name "!"]
 ]
+
+wordlist: load %words.r
+replace wordlist '*port-modes* load %modes.r
+
+for-each word wordlist [add-word word]
+
+boot-actions: load boot/tmp-actions.r
+for-each item boot-actions [
+    if set-word? :item [
+        add-word/skip-if-duplicate to-word item ;-- maybe in %words.r already
+    ]
+]
+
 emit-end
 
-;-- Generate Action Constants ------------------------------------------------
+print [n "words + actions"]
 
-emit {
-/***********************************************************************
-**
-*/	enum REBOL_Actions
-/*
-**		REBOL datatype action numbers.
-**
-***********************************************************************/
-^{
-}
-
-boot-actions: load %actions.r
-n: 1
-emit-line "A_" "type = 0" "Handled by interpreter"
-foreach word boot-actions [
-	if set-word? :word [
-		emit-line "A_" to word! :word n ;R3
-		n: n + 1
-	]
-]
-emit [tab "A_MAX_ACTION" lf "};"]
-emit {
-
-#define IS_BINARY_ACT(a) ((a) <= A_XOR)
-}
-print [n "actions"]
-
-write inc/tmp-bootdefs.h out
+write-emitted inc/tmp-bootdefs.h
 
 ;----------------------------------------------------------------------------
 ;
@@ -705,7 +567,7 @@ write inc/tmp-bootdefs.h out
 ;
 ;----------------------------------------------------------------------------
 
-emit-head "System Object" %sysobj.h
+emit-header "System Object" %sysobj.h
 emit newline
 
 at-value: func ['field] [next find boot-sysobj to-set-word field]
@@ -722,33 +584,49 @@ change at-value product to lit-word! product
 plats: load %platforms.r
 
 change/only at-value platform reduce [
-	any [select plats version/4 "Unknown"]
-	any [select third any [find/skip plats version/4 3 []] version/5 ""]
+    any [select plats version/4 "Unknown"]
+    any [select third any [find/skip plats version/4 3 []] version/5 ""]
 ]
 
-ob: context boot-sysobj
+ob: has boot-sysobj
 
-make-obj-defs: func [obj prefix depth /local f] [
-	uppercase prefix
-	emit ["enum " prefix "object {" newline]
-	emit-line prefix "SELF = 0" none
-	foreach field words-of obj [ ;R3
-		emit-line prefix field none
-	]
-	emit [tab uppercase join prefix "MAX^/"]
-	emit "};^/^/"
+make-obj-defs: procedure [obj prefix depth /selfless] [
+    prefix: uppercase-of prefix
+    emit-line ["enum " prefix "object {"]
 
-	if depth > 1 [
-		foreach field words-of obj [ ;R3
-			f: join prefix [field #"_"]
-			replace/all f "-" "_"
-			all [
-				field <> 'standard
-				object? get in obj field
-				make-obj-defs obj/:field f depth - 1
-			]
-		]
-	]
+    either selfless [
+        ;
+        ; Make sure *next* value starts at 1.  Keys/vars in contexts start
+        ; at 1, and if there's no "userspace" self in the 1 slot, the first
+        ; key has to be...so we make `SYS_CTX_0 = 0` (for instance)
+        ;
+        emit-item/assign [prefix "0"] 0
+    ][
+        ; The internal generator currently puts SELF at the start of new
+        ; objects in key slot 1, by default.  Eventually MAKE OBJECT! will
+        ; have nothing to do with adding SELF, and it will be entirely a
+        ; by-product of generators.
+        ;
+        emit-item/assign [prefix "SELF"] 1
+    ]
+
+    for-each field words-of obj [
+        emit-item/upper [prefix field]
+    ]
+    emit-item [prefix "MAX"]
+    emit-end
+
+    if depth > 1 [
+        for-each field words-of obj [
+            if all [
+                field != 'standard
+                object? get in obj field
+            ][
+                extended-prefix: uppercase to-c-name [prefix field "_"]
+                make-obj-defs obj/:field extended-prefix (depth - 1)
+            ]
+        ]
+    ]
 ]
 
 make-obj-defs ob "SYS_" 1
@@ -763,28 +641,7 @@ make-obj-defs ob/options "OPTIONS_" 4
 make-obj-defs ob/locale "LOCALE_" 4
 make-obj-defs ob/view "VIEW_" 4
 
-write inc/tmp-sysobj.h out
-
-;----------------------------------------------------------------------------
-
-emit-head "Dialects" %reb-dialect.h
-emit {
-enum REBOL_dialect_error {
-	REB_DIALECT_END = 0,	// End of dialect block
-	REB_DIALECT_MISSING,	// Requested dialect is missing or not valid
-	REB_DIALECT_NO_CMD,		// Command needed before the arguments
-	REB_DIALECT_BAD_SPEC,	// Dialect spec is not valid
-	REB_DIALECT_BAD_ARG,	// The argument type does not match the dialect
-	REB_DIALECT_EXTRA_ARG	// There are more args than the command needs
-};
-
-}
-make-obj-defs ob/dialects "DIALECTS_" 4
-
-emit {#define DIALECT_LIT_CMD 0x1000
-}
-
-write inc/reb-dialect.h out
+write-emitted inc/tmp-sysobj.h
 
 
 ;----------------------------------------------------------------------------
@@ -793,25 +650,25 @@ write inc/reb-dialect.h out
 ;
 ;----------------------------------------------------------------------------
 
-emit-head "Event Types" %reb-evtypes.h
+emit-header "Event Types" %reb-evtypes.h
 emit newline
 
-emit ["enum event_types {" newline]
-foreach field ob/view/event-types [
-	emit-line "EVT_" field none
+emit-line ["enum event_types {"]
+for-each field ob/view/event-types [
+    emit-item/upper ["EVT_" field]
 ]
-emit [tab "EVT_MAX^/"]
-emit "};^/^/"
+emit-item "EVT_MAX"
+emit-end
 
-emit ["enum event_keys {" newline]
-emit-line "EVK_" "NONE" none
-foreach field ob/view/event-keys [
-	emit-line "EVK_" field none
+emit-line ["enum event_keys {"]
+emit-item "EVK_NONE"
+for-each field ob/view/event-keys [
+    emit-item/upper ["EVK_" field]
 ]
-emit [tab "EVK_MAX^/"]
-emit "};^/^/"
+emit-item "EVK_MAX"
+emit-end
 
-write inc/reb-evtypes.h out
+write-emitted inc/reb-evtypes.h
 
 
 ;----------------------------------------------------------------------------
@@ -822,85 +679,113 @@ write inc/reb-evtypes.h out
 
 ;-- Error Structure ----------------------------------------------------------
 
-emit-head "Error Structure and Constants" %errnums.h
+emit-header "Error Structure and Constants" %errnums.h
 
 emit {
-#ifdef VAL_TYPE
 /***********************************************************************
 **
-*/	typedef struct REBOL_Error_Obj
+*/  typedef struct REBOL_Error_Vars
 /*
 ***********************************************************************/
-^{
 }
+emit-line "{"
+
 ; Generate ERROR object and append it to bootdefs.h:
-emit-line/code "REBVAL " 'self ";" ;R3
-foreach word words-of ob/standard/error [ ;R3
-	if word = 'near [word: 'nearest] ; prevents C problem
-	emit-line/code "REBVAL " word ";"
+emit-line/indent "REBVAL self;"
+for-each word words-of ob/standard/error [
+    either word = 'near [
+        emit-line/indent ["REBVAL nearest;"]
+        emit-annotation "near/far are non-standard C keywords"
+    ][
+        emit-line/indent ["REBVAL" space (to-c-name word) ";"]
+    ]
+    
 ]
-emit {^} ERROR_OBJ;
-#endif
-}
+emit-line "} ERROR_VARS;"
 
 emit {
 /***********************************************************************
 **
-*/	enum REBOL_Errors
+*/  enum REBOL_Errors
 /*
 ***********************************************************************/
-^{
 }
+emit-line "{"
 
 boot-errors: load %errors.r
-err-list: make block! 200
-errs: false
 
-foreach [cat msgs] boot-errors [
-	code: second msgs
-	new1: true
-	foreach [word val] skip msgs 4 [
-		err: uppercase form to word! word ;R3
-		replace/all err "-" "_"
-		if find err-list err [print ["DUPLICATE Error Constant:" err] errs: true]
-		append err-list err
-		either new1 [
-			emit-line "RE_" reform [err "=" code] reform [code mold val]
-			new1: false
-		][
-			emit-line "RE_" err reform [code mold val]
-		]
-		code: code + 1
-	]
-	emit-line "RE_" join to word! cat "_max" none ;R3
-	emit newline
+id-list: make block! 200
+
+for-each [category info] boot-errors [
+    unless all [
+        (quote code:) == info/1
+        integer? info/2
+        (quote type:) == info/3
+        string? info/4
+    ][
+        fail ["%errors.r" category "not [code: INTEGER! type: STRING! ...]"]
+    ]
+
+    code: info/2
+
+    new-section: true
+    for-each [key val] skip info 4 [
+        unless set-word? key [
+            fail ["Non SET-WORD! key in %errors.r:" key]
+        ]
+
+        id: to-word key
+        if find id-list id [
+            fail ["DUPLICATE id in %errors.r:" id]
+        ]
+
+        append id-list id
+
+        either new-section [
+            emit-item/assign/upper ["RE_" id] code
+            new-section: false
+        ][
+            emit-item/upper ["RE_" id]
+        ]
+        emit-annotation spaced [code mold val]
+
+        code: code + 1
+    ]
+    emit-item ["RE_" (uppercase-of to word! category) "_MAX"]
+    emit newline
 ]
-if errs [wait 3 quit]
+
 emit-end
 
-emit {
-#define RE_NOTE RE_NO_LOAD
-#define RE_USER RE_MESSAGE
-}
+emit-line {#define RE_USER MAX_I32}
+emit-annotation {Hardcoded, update in %make-boot.r}
 
-write inc/tmp-errnums.h out
+emit-line {#define RE_CATEGORY_SIZE 1000}
+emit-annotation {Hardcoded, update in %make-boot.r}
+
+emit-line {#define RE_INTERNAL_FIRST RE_MISC}
+emit-annotation {GENERATED! update in %make-boot.r}
+
+emit-line {#define RE_MAX RE_COMMAND_MAX}
+emit-annotation {GENERATED! update in %make-boot.r}
+
+write-emitted inc/tmp-errnums.h
 
 ;-------------------------------------------------------------------------
 
-emit-head "Port Modes" %port-modes.h
+emit-header "Port Modes" %port-modes.h
 
 data: load %modes.r
 
-emit {
-enum port_modes ^{
-}
+emit newline
+emit-line "enum port_modes {"
 
-foreach word data [
-	emit-enum word
+for-each word data [
+    emit-item/upper word
 ]
 emit-end
 
-write inc/tmp-portmodes.h out
+write-emitted inc/tmp-portmodes.h
 
 ;----------------------------------------------------------------------------
 ;
@@ -911,153 +796,138 @@ write inc/tmp-portmodes.h out
 ;-- Add other MEZZ functions:
 mezz-files: load %../mezz/boot-files.r ; base lib, sys, mezz
 
-;append boot-mezz+ none ?? why was this needed?
+for-each section [boot-base boot-sys boot-mezz] [
+    set section make block! 200
+    for-each file first mezz-files [
+        append get section load join-of %../mezz/ file
+    ]
 
-foreach section [boot-base boot-sys boot-mezz] [
-	set section make block! 200
-	foreach file first mezz-files [
-		append get section load join %../mezz/ file
-	]
-	remove-tests get section
+    ;-- Expectation is that section does not return result; GROUP! makes unset
+    append get section [()]
 
-	;-- Expectation is that section does not return result; PAREN! makes unset
-	append get section [()]
-
-	mezz-files: next mezz-files
+    mezz-files: next mezz-files
 ]
 
-boot-protocols: make block! 20
-foreach file first mezz-files [
-	m: load/all join %../mezz/ file ; not REBOL word
-	append/only append/only boot-protocols m/2 skip m 2
+emit-header "Sys Context" %sysctx.h
+
+; We don't actually want to create the object in the R3-MAKE Rebol, because
+; the constructs are intended to run in the Rebol being built.  But the list
+; of top-level SET-WORD!s is needed.  R3-Alpha used a non-evaluating CONSTRUCT
+; to do this, but Ren-C's non-evaluating construct expects direct alternation
+; of SET-WORD! and unevaluated value (even another SET-WORD!).  So we just
+; gather the top-level set-words manually.
+
+sctx: has collect [
+    for-each item boot-sys [
+        if set-word? :item [
+            keep item
+            keep "stub proxy for %sys-base.r item"
+        ]
+    ]
 ]
 
-emit-head "Sys Context" %sysctx.h
-sctx: construct boot-sys
-make-obj-defs sctx "SYS_CTX_" 1
-write inc/tmp-sysctx.h out
+; !!! The SYS_CTX has no SELF...it is not produced by the ordinary gathering
+; constructor, but uses Alloc_Context() directly.  Rather than try and force
+; it to have a SELF, having some objects that don't helps pave the way
+; to the userspace choice of self-vs-no-self (as with func's <no-return>)
+;
+make-obj-defs/selfless sctx "SYS_CTX_" 1
+
+write-emitted inc/tmp-sysctx.h
 
 
 ;----------------------------------------------------------------------------
 ;
-; b-boot.c - Boot data file
+; TMP-BOOT-BLOCK.R and TMP-BOOT-BLOCK.C
+;
+; Create the aggregated Rebol file of all the Rebol-formatted data that is
+; used in bootstrap.  This includes everything from a list of WORD!s that
+; are built-in as symbols, to the sys and mezzanine functions.
+;
+; %tmp-boot-block.c is just a C file containing a literal constant of the
+; compressed representation of %tmp-boot-block.r
 ;
 ;----------------------------------------------------------------------------
 
-;-- Build b-boot.c output file -------------------------------------------------
-
-
-emit-head "Natives and Bootstrap" %b-boot.c
-emit {
-#include "sys-core.h"
-
-}
+emit-header "Natives and Bootstrap" %tmp-boot-block.c
+emit newline
+emit-line {#include "sys-core.h"}
+emit newline
 
 externs: make string! 2000
-boot-booters: load %booters.r
-boot-natives: load %natives.r
+boot-natives: load boot/tmp-natives.r
+num-natives: 0
 
-nats: append copy boot-booters boot-natives
-
-n: boot-sys
-;while [n: find n 'native] [
-;	if set-word? first back n [
-;		print index-of n
-;		append nats copy/part back n 3
-;	]
-;	n: next next n
-;]
-
-nat-count: 0
-
-foreach val nats [
-	if set-word? val [
-		emit-line/decl "REBNATIVE(" to word! val ");" ;R3
-		nat-count: nat-count + 1
-	]
+for-each val boot-natives [
+    if set-word? val [
+        num-natives: num-natives + 1
+    ]
 ]
 
-print [nat-count "natives"]
+print [num-natives "natives"]
 
-emit [newline {const REBFUN Native_Funcs[} nat-count {] = ^{
-}]
-foreach val nats [
-	if set-word? val [
-		emit-line/code "N_" to word! val "," ;R3
-	]
-	;nat-count: nat-count + 1
+emit newline
+
+emit-line {REBVAL Natives[NUM_NATIVES];}
+
+emit-line "const REBNAT Native_C_Funcs[NUM_NATIVES] = {"
+
+for-each val boot-natives [
+    if set-word? val [
+        emit-item ["N_" to word! val]
+    ]
 ]
 emit-end
 emit newline
 
-;-- Embedded REBOL Tests:
-;where: find boot/script 'tests
-;if where [
-;	remove where
-;	foreach file sort load %../tests/ [
-;		test: load join %../tests/ file
-;		if test/1 <> 'skip-test [
-;			where: insert where test
-;		]
-;	]
-;]
 
 ;-- Build typespecs block (in same order as datatypes table):
+
 boot-typespecs: make block! 100
 specs: load %typespec.r
-foreach type datatypes [
-	append/only boot-typespecs select specs type
+for-each type datatypes [
+    if type = 0 [continue]
+    verify [spec: select specs type]
+    append/only boot-typespecs spec
 ]
 
 ;-- Create main code section (compressed):
+
 boot-types: new-types
 boot-root: load %root.r
 boot-task: load %task.r
-boot-ops: load %ops.r
-;boot-script: load %script.r
 
-write %boot-code.r mold reduce sections
+write boot/tmp-boot-block.r mold reduce sections
 data: mold/flat reduce sections
 insert data reduce ["; Copyright (C) REBOL Technologies " now newline]
 insert tail data make char! 0 ; scanner requires zero termination
 
 comp-data: compress data: to-binary data
 
-emit [
-{
+emit {
 // Native_Specs contains data which is the DEFLATE-algorithm-compressed
 // representation of the textual function specs for Rebol's native
 // routines.  Though DEFLATE includes the compressed size in the payload,
 // NAT_UNCOMPRESSED_SIZE is also defined to be used as a sanity check
 // on the decompression process.
 }
-newline
-]
+emit newline
 
-emit ["const REBYTE Native_Specs[NAT_COMPRESSED_SIZE] = {" newline]
+emit-line ["const REBYTE Native_Specs[NAT_COMPRESSED_SIZE] = {"]
 
 ;-- Convert UTF-8 binary to C-encoded string:
 emit binary-to-c comp-data
-emit-end/easy
+emit-line "};" ;-- EMIT-END would erase the last comma, but there's no extra
 
-write src/b-boot.c out
+write-emitted src/tmp-boot-block.c
 
 ;-- Output stats:
 print [
-	"Compressed" length data "to" length comp-data "bytes:"
-	to-integer ((length comp-data) / (length data) * 100)
-	"percent of original"
+    "Compressed" length data "to" length comp-data "bytes:"
+    to-integer ((length comp-data) / (length data) * 100)
+    "percent of original"
 ]
 
-;-- Create platform string:
-;platform: to-string platform
-;lowercase platform
-;if platform-data/type = 'windows [ ; Why?? Not sure.
-;	product: to-string product
-;	lowercase product
-;	replace/all product "-" ""
-;]
-;;dir: to-file rejoin [%../to- platform "/" product "/temp/"]
 
 ;----------------------------------------------------------------------------
 ;
@@ -1065,76 +935,105 @@ print [
 ;
 ;----------------------------------------------------------------------------
 
-emit-head "Bootstrap Structure and Root Module" %boot.h
+emit-header "Bootstrap Structure and Root Module" %boot.h
 
-emit [
-{
-#define MAX_NATS      } nat-count {
-#define NAT_UNCOMPRESSED_SIZE } length data {
-#define NAT_COMPRESSED_SIZE } length comp-data {
-#define CHECK_TITLE   } checksum to binary! title {
+emit newline
 
-extern const REBYTE Native_Specs[];
-extern const REBFUN Native_Funcs[];
+emit-line ["#define NUM_NATIVES" space num-natives]
+emit-line ["#define NAT_UNCOMPRESSED_SIZE" space (length data)]
+emit-line ["#define NAT_COMPRESSED_SIZE" space (length comp-data)]
+emit-line ["#define CHECK_TITLE" space (checksum to binary! title)]
 
-typedef struct REBOL_Boot_Block ^{
+emit {
+// Compressed data of the native specifications.  This is uncompressed during
+// boot and executed.
+//
+extern const REBYTE Native_Specs[NAT_COMPRESSED_SIZE];
+
+// Raw C function pointers for natives.
+//
+extern const REBNAT Native_C_Funcs[NUM_NATIVES];
+
+// A canon FUNCTION! REBVAL of the native, accessible by the native's index #.
+//
+extern REBVAL Natives[NUM_NATIVES];
 }
+
+emit newline
+emit-line "enum Native_Indices {"
+
+nat-index: 0
+for-each val boot-natives [
+    if set-word? val [
+        emit-item/assign ["N_" (to word! val) "_ID"] nat-index
+        nat-index: nat-index + 1
+    ]
 ]
 
-foreach word sections [
-	word: form word
-	remove/part word 5 ; boot_
-	emit-line/code "REBVAL " word ";"
+emit-end
+
+emit newline
+emit-line "typedef struct REBOL_Boot_Block {"
+
+for-each word sections [
+    word: form word
+    remove/part word 5 ; boot_
+    emit-line/indent ["REBVAL" space (to-c-name word) ";"]
 ]
 emit "} BOOT_BLK;"
 
 ;-------------------
 
-emit [
-{
+emit [newline newline]
 
-//**** ROOT Context (Root Module):
+emit-line {//**** ROOT Context (Root Module):}
+emit newline
 
-typedef struct REBOL_Root_Context ^{
-}
+emit-line "typedef struct REBOL_Root_Vars {"
+emit-line/indent "REBVAL rootvar;"
+emit-annotation {[0] reserved for the context itself}
+
+for-each word boot-root [
+    emit-line/indent ["REBVAL" space (to-c-name word) ";"]
 ]
+emit-line ["} ROOT_VARS;"]
+emit newline
 
-foreach word boot-root [
-	emit-line/code "REBVAL " word ";"
+n: 1
+for-each word boot-root [
+    emit-line [
+        "#define" space (uppercase to-c-name ["ROOT_" word]) space
+        "(&Root_Vars->" (lowercase to-c-name word) ")"
+    ]
+    n: n + 1
 ]
-emit ["} ROOT_CTX;" lf lf]
-
-n: 0
-foreach word boot-root [
-	emit-line/define "#define ROOT_" word join "(&Root_Context->" [lowercase replace/all form word #"-" #"_" ")"]
-	n: n + 1
-]
-emit ["#define ROOT_MAX " n lf]
+emit-line ["#define ROOT_MAX" space n]
 
 ;-------------------
 
-emit [
-{
+emit [newline newline]
 
-//**** Task Context
+emit-line {//**** TASK Context:}
+emit newline
 
-typedef struct REBOL_Task_Context ^{
-}
+emit-line "typedef struct REBOL_Task_Context {"
+emit-line/indent "REBVAL rootvar;"
+emit-annotation {[0] reserved for the context itself}
+
+for-each word boot-task [
+    emit-line/indent ["REBVAL" space (to-c-name word) ";"]
 ]
+emit-line ["} TASK_VARS;"]
+emit newline
 
-foreach word boot-task [
-	emit-line/code "REBVAL " word ";"
+n: 1
+for-each word boot-task [
+    emit-line [
+        "#define" space (uppercase to-c-name ["TASK_" word]) space
+        "(&Task_Vars->" (lowercase to-c-name word) ")"
+    ]
+    n: n + 1
 ]
-emit ["} TASK_CTX;" lf lf]
+emit-line ["#define TASK_MAX" space n]
 
-n: 0
-foreach word boot-task [
-	emit-line/define "#define TASK_" word join "(&Task_Context->" [lowercase replace/all form word #"-" #"_" ")"]
-	n: n + 1
-]
-emit ["#define TASK_MAX " n lf]
-
-write inc/tmp-boot.h out
-;print ask "-DONE-"
-;wait .3
-print "   "
+write-emitted inc/tmp-boot.h

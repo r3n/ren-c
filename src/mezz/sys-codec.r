@@ -1,68 +1,130 @@
 REBOL [
-	System: "REBOL [R3] Language Interpreter and Run-time Environment"
-	Title: "REBOL 3 Boot Sys: Encoder and Decoder"
-	Rights: {
-		Copyright 2012 REBOL Technologies
-		REBOL is a trademark of REBOL Technologies
-	}
-	License: {
-		Licensed under the Apache License, Version 2.0
-		See: http://www.apache.org/licenses/LICENSE-2.0
-	}
-	Context: sys
-	Note: {
-		The boot binding of this module is SYS then LIB deep.
-		Any non-local words not found in those contexts WILL BE
-		UNBOUND and will error out at runtime!
-	}
+    System: "REBOL [R3] Language Interpreter and Run-time Environment"
+    Title: "REBOL 3 Boot Sys: Encoder and Decoder"
+    Rights: {
+        Copyright 2012 REBOL Technologies
+        REBOL is a trademark of REBOL Technologies
+    }
+    License: {
+        Licensed under the Apache License, Version 2.0
+        See: http://www.apache.org/licenses/LICENSE-2.0
+    }
+    Context: sys
+    Note: {
+        The boot binding of this module is SYS then LIB deep.
+        Any non-local words not found in those contexts WILL BE
+        UNBOUND and will error out at runtime!
+    }
 ]
+
+
+; This function is called by the C function Register_Codec(), but can
+; also be called by user code.
+;
+; !!! There should also be an unregister-codec*
+;
+register-codec*: func [
+    name [word!]
+        {Descriptive name of the codec.}
+    suffixes [file! block!]
+        {File extension or block of file extensions the codec processes}
+    identify? [function! blank!]
+    decode [function! blank!]
+    encode [function! blank!]
+    <local> codec
+][
+    unless block? suffixes [suffixes: reduce [suffixes]]
+
+    codec: construct [] compose/only [
+        name: quote (name)
+
+        ; !!! There was a "type:" field here before, which was always set to
+        ; IMAGE!.  Should the argument types of the encode function be cached
+        ; here, or be another parameter, or...?
+
+        suffixes: (suffixes)
+        identify?: quote (:identify?)
+        decode: quote (:decode)
+        encode: quote (:encode)
+    ]
+
+    append system/codecs reduce [(to set-word! name) codec]
+
+    ; Media-types block format: [.abc .def type ...]
+    ; !!! Should be a map, with blocks of codecs on collisions
+    ;
+    append append system/options/file-types suffixes (bind name system/codecs)
+    
+    return codec
+]
+
+
+; Special import case for extensions:
+append system/options/file-types switch/default fourth system/version [
+    3 [[%.rx %.dll extension]]  ; Windows
+    2 [[%.rx %.dylib %.so extension]]  ; OS X
+    4 7 [[%.rx %.so extension]]  ; Other Posix
+] [[%.rx extension]]
+
 
 decode: function [
- 	{Decodes a series of bytes into the related datatype (e.g. image!).}
-	type [word!] {Media type (jpeg, png, etc.)}
-	data [binary!] {The data to decode}
+    {Decodes a series of bytes into the related datatype (e.g. image!).}
+    
+    type [word!]
+        {Media type (jpeg, png, etc.)}
+    data [binary!]
+        {The data to decode}
 ][
-	unless all [
-		cod: select system/codecs type
-		data: do-codec cod/entry 'decode data
-	][
-		cause-error 'access 'no-codec type
-	]
-	data
+    unless all [
+        cod: select system/codecs type
+        f: :cod/decode
+        (data: f data)
+    ][
+        cause-error 'access 'no-codec type
+    ]
+    data
 ]
+
 
 encode: function [
-	{Encodes a datatype (e.g. image!) into a series of bytes.}
-	type [word!] {Media type (jpeg, png, etc.)}
-	data [image! binary! string!] {The data to encode}
-	/options opts [block!] {Special encoding options}
+    {Encodes a datatype (e.g. image!) into a series of bytes.}
+
+    return: [binary!]
+    type [word!]
+        {Media type (jpeg, png, etc.)}
+    data
+        {The data to encode}
+    /options
+        {Special encoding options}
+    opts [block!]
 ][
-	unless all [
-		cod: select system/codecs type
-		;encode patch replacing internal PNG encoder crash for now
-		data: switch/default cod/name [
-			png [
-				lib/to-png data
-			]
-		][
-			do-codec cod/entry 'encode data
-		]
-	][
-		cause-error 'access 'no-codec type
-	]
-	data
+    unless all [
+        cod: select system/codecs type
+        f: :cod/encode
+        (data: f data)
+    ][
+        cause-error 'access 'no-codec type
+    ]
+    data
 ]
 
-encoding?: function [
-	"Returns the media codec name for given binary data. (identify)"
-	data [binary!]
+
+encoding-of: function [
+    "Returns the media codec name for given binary data. (identify)"
+
+    return [word!]
+    data [binary!]
 ][
-	foreach [name codec] system/codecs [
-		if do-codec codec/entry 'identify data [
-			return name
-		]
-	]
-	none
+    for-each [name codec] system/codecs [
+        if all [
+            f: :codec/identify?
+            (f data)
+        ][
+            return name
+        ]
+    ]
+    blank
 ]
 
-export [decode encode encoding?]
+
+export [decode encode encoding-of]

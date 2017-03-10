@@ -1,1092 +1,1605 @@
-/***********************************************************************
-**
-**  REBOL [R3] Language Interpreter and Run-time Environment
-**
-**  Copyright 2014 Atronix Engineering, Inc.
-**  REBOL is a trademark of REBOL Technologies
-**
-**  Licensed under the Apache License, Version 2.0 (the "License");
-**  you may not use this file except in compliance with the License.
-**  You may obtain a copy of the License at
-**
-**  http://www.apache.org/licenses/LICENSE-2.0
-**
-**  Unless required by applicable law or agreed to in writing, software
-**  distributed under the License is distributed on an "AS IS" BASIS,
-**  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**  See the License for the specific language governing permissions and
-**  limitations under the License.
-**
-************************************************************************
-**
-**  Module:  t-strut.c
-**  Summary: C struct object datatype
-**  Section: datatypes
-**  Author:  Shixin Zeng
-**  Notes:
-**
-***********************************************************************/
+//
+//  File: %t-struct.c
+//  Summary: "C struct object datatype"
+//  Section: datatypes
+//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  Homepage: https://github.com/metaeducation/ren-c/
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Copyright 2014 Atronix Engineering, Inc.
+// Copyright 2014-2017 Rebol Open Source Contributors
+// REBOL is a trademark of REBOL Technologies
+//
+// See README.md and CREDITS.md for more information.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
 
 #include "sys-core.h"
 
-#define STATIC_assert(e) do {(void)sizeof(char[1 - 2*!(e)]);} while(0)
 
-#define IS_INTEGER_TYPE(t) ((t) < STRUCT_TYPE_INTEGER)
-#define IS_DECIMAL_TYPE(t) ((t) > STRUCT_TYPE_INTEGER && (t) < STRUCT_TYPE_DECIMAL)
-#define IS_NUMERIC_TYPE(t) (IS_INTEGER_TYPE(t) || IS_DECIMAL_TYPE(t))
-
-static const REBINT type_to_sym [STRUCT_TYPE_MAX] = {
-	SYM_UINT8,
-	SYM_INT8,
-	SYM_UINT16,
-	SYM_INT16,
-	SYM_UINT32,
-	SYM_INT32,
-	SYM_UINT64,
-	SYM_INT64,
-	-1, //SYM_INTEGER,
-
-	SYM_FLOAT,
-	SYM_DOUBLE,
-	-1, //SYM_DECIMAL,
-
-	SYM_POINTER,
-	-1, //SYM_STRUCT
-	SYM_REBVAL
-	//STRUCT_TYPE_MAX
-};
-
-static REBOOL get_scalar(const REBSTU *stu,
-				  const struct Struct_Field *field,
-				  REBCNT n, /* element index, starting from 0 */
-				  REBVAL *val)
-{
-	REBYTE *data = SERIES_SKIP(STRUCT_DATA_BIN(stu),
-							 STRUCT_OFFSET(stu) + field->offset + n * field->size);
-	switch (field->type) {
-		case STRUCT_TYPE_UINT8:
-			SET_INTEGER(val, *(u8*)data);
-			break;
-		case STRUCT_TYPE_INT8:
-			SET_INTEGER(val, *(i8*)data);
-			break;
-		case STRUCT_TYPE_UINT16:
-			SET_INTEGER(val, *(u16*)data);
-			break;
-		case STRUCT_TYPE_INT16:
-			SET_INTEGER(val, *(i8*)data);
-			break;
-		case STRUCT_TYPE_UINT32:
-			SET_INTEGER(val, *(u32*)data);
-			break;
-		case STRUCT_TYPE_INT32:
-			SET_INTEGER(val, *(i32*)data);
-			break;
-		case STRUCT_TYPE_UINT64:
-			SET_INTEGER(val, *(u64*)data);
-			break;
-		case STRUCT_TYPE_INT64:
-			SET_INTEGER(val, *(i64*)data);
-			break;
-		case STRUCT_TYPE_FLOAT:
-			SET_DECIMAL(val, *(float*)data);
-			break;
-		case STRUCT_TYPE_DOUBLE:
-			SET_DECIMAL(val, *(double*)data);
-			break;
-		case STRUCT_TYPE_POINTER:
-			SET_INTEGER(val, cast(REBUPT, *cast(void**, data)));
-			break;
-		case STRUCT_TYPE_STRUCT:
-			{
-				SET_TYPE(val, REB_STRUCT);
-				VAL_STRUCT_FIELDS(val) = field->fields;
-				VAL_STRUCT_SPEC(val) = field->spec;
-				VAL_STRUCT_DATA(val) = Make_Series(
-					1, sizeof(struct Struct_Data), MKS_NONE
-				);
-				VAL_STRUCT_DATA_BIN(val) = STRUCT_DATA_BIN(stu);
-				VAL_STRUCT_OFFSET(val) = data - SERIES_DATA(VAL_STRUCT_DATA_BIN(val));
-				VAL_STRUCT_LEN(val) = field->size;
-			}
-			break;
-		case STRUCT_TYPE_REBVAL:
-			memcpy(val, data, sizeof(REBVAL));
-			break;
-		default:
-			/* should never be here */
-			return FALSE;
-	}
-	return TRUE;
-}
-
-/***********************************************************************
-**
-*/	static REBFLG Get_Struct_Var(REBSTU *stu, REBVAL *word, REBVAL *val)
-/*
-***********************************************************************/
-{
-	struct Struct_Field *field = NULL;
-	REBCNT i = 0;
-	field = (struct Struct_Field *)SERIES_DATA(stu->fields);
-	for (i = 0; i < SERIES_TAIL(stu->fields); i ++, field ++) {
-		if (VAL_WORD_CANON(word) == VAL_SYM_CANON(BLK_SKIP(PG_Word_Table.series, field->sym))) {
-			if (field->array) {
-				REBSER *ser = Make_Array(field->dimension);
-				REBCNT n = 0;
-				for (n = 0; n < field->dimension; n ++) {
-					REBVAL elem;
-					get_scalar(stu, field, n, &elem);
-					Append_Value(ser, &elem);
-				}
-				Val_Init_Block(val, ser);
-			} else {
-				get_scalar(stu, field, 0, val);
-			}
-			return TRUE;
-		}
-	}
-	return FALSE;
+// The managed HANDLE! for a ffi_type will have a reference in structs that
+// use it.  Basic non-struct FFI_TYPE_XXX use the stock ffi_type_xxx pointers
+// that do not have to be freed, so they use simple HANDLE! which do not
+// register this cleanup hook.
+//
+static void cleanup_ffi_type(const REBVAL *v) {
+    assert(IS_HANDLE(v));
+    ffi_type *fftype = cast(ffi_type*, v->payload.handle.pointer);
+    if (fftype->type == FFI_TYPE_STRUCT)
+        OS_FREE(fftype->elements);
+    OS_FREE(fftype);
 }
 
 
-#ifdef NEED_SET_STRUCT_VARS
-/***********************************************************************
-**
-*/	static void Set_Struct_Vars(REBSTU *strut, REBVAL *blk)
-/*
-***********************************************************************/
+static void fail_if_non_accessible(const REBVAL *val)
 {
-}
-#endif
-
-
-/***********************************************************************
-**
-*/	REBSER *Struct_To_Block(const REBSTU *stu)
-/*
-**		Used by MOLD to create a block.
-**
-***********************************************************************/
-{
-	REBSER *ser = Make_Array(10);
-	struct Struct_Field *field = (struct Struct_Field*) SERIES_DATA(stu->fields);
-	REBCNT i;
-
-	// We are building a recursive structure.  So if we did not hand each
-	// sub-series over to the GC then a single Free_Series() would not know
-	// how to free them all.  There would have to be a specialized walk to
-	// free the resulting structure.  Hence, don't invoke the GC until the
-	// root series being returned is done being used or is safe from GC!
-	MANAGE_SERIES(ser);
-
-	for(i = 0; i < SERIES_TAIL(stu->fields); i ++, field ++) {
-		REBVAL *val = NULL;
-		REBVAL *type_blk = NULL;
-
-		/* required field name */
-		val = Alloc_Tail_Array(ser);
-		Val_Init_Word_Unbound(val, REB_SET_WORD, field->sym);
-
-		/* required type */
-		type_blk = Alloc_Tail_Array(ser);
-		Val_Init_Block(type_blk, Make_Array(1));
-
-		val = Alloc_Tail_Array(VAL_SERIES(type_blk));
-		if (field->type == STRUCT_TYPE_STRUCT) {
-			REBVAL *nested = NULL;
-			DS_PUSH_NONE;
-			nested = DS_TOP;
-
-			Val_Init_Word_Unbound(val, REB_WORD, SYM_STRUCT_TYPE);
-			get_scalar(stu, field, 0, nested);
-			val = Alloc_Tail_Array(VAL_SERIES(type_blk));
-			Val_Init_Block(val, Struct_To_Block(&VAL_STRUCT(nested)));
-
-			DS_DROP;
-		} else
-			Val_Init_Word_Unbound(val, REB_WORD, type_to_sym[field->type]);
-
-		/* optional dimension */
-		if (field->dimension > 1) {
-			REBSER *dim = Make_Array(1);
-			REBVAL *dv = NULL;
-			val = Alloc_Tail_Array(VAL_SERIES(type_blk));
-			Val_Init_Block(val, dim);
-
-			dv = Alloc_Tail_Array(dim);
-			SET_INTEGER(dv, field->dimension);
-		}
-
-		/* optional initialization */
-		if (field->dimension > 1) {
-			REBSER *dim = Make_Array(1);
-			REBCNT n = 0;
-			val = Alloc_Tail_Array(ser);
-			Val_Init_Block(val, dim);
-			for (n = 0; n < field->dimension; n ++) {
-				REBVAL *dv = Alloc_Tail_Array(dim);
-				get_scalar(stu, field, n, dv);
-			}
-		} else {
-			val = Alloc_Tail_Array(ser);
-			get_scalar(stu, field, 0, val);
-		}
-	}
-	return ser;
+    if (VAL_STRUCT_INACCESSIBLE(val)) {
+        DECLARE_LOCAL (i);
+        SET_INTEGER(i, cast(REBUPT, VAL_STRUCT_DATA_HEAD(val)));
+        fail (Error(RE_BAD_MEMORY, i, val));
+    }
 }
 
-static REBOOL same_fields(REBSER *tgt, REBSER *src)
-{
-	struct Struct_Field *tgt_fields = (struct Struct_Field *) SERIES_DATA(tgt);
-	struct Struct_Field *src_fields = (struct Struct_Field *) SERIES_DATA(src);
-	REBCNT n;
+static void get_scalar(
+    REBVAL *out,
+    REBSTU *stu,
+    REBFLD *field,
+    REBCNT n // element index, starting from 0
+){
+    assert(n == 0 || FLD_IS_ARRAY(field));
 
-	if (SERIES_TAIL(tgt) != SERIES_TAIL(src)) {
-		return FALSE;
-	}
+    REBCNT offset =
+        STU_OFFSET(stu) + FLD_OFFSET(field) + (n * FLD_WIDE(field));
 
-	for(n = 0; n < SERIES_TAIL(src); n ++) {
-		if (tgt_fields[n].type != src_fields[n].type) {
-			return FALSE;
-		}
-		if (VAL_SYM_CANON(BLK_SKIP(PG_Word_Table.series, tgt_fields[n].sym))
-			!= VAL_SYM_CANON(BLK_SKIP(PG_Word_Table.series, src_fields[n].sym))
-			|| tgt_fields[n].offset != src_fields[n].offset
-			|| tgt_fields[n].dimension != src_fields[n].dimension
-			|| tgt_fields[n].size != src_fields[n].size) {
-			return FALSE;
-		}
-		if (tgt_fields[n].type == STRUCT_TYPE_STRUCT
-			&& ! same_fields(tgt_fields[n].fields, src_fields[n].fields)) {
-			return FALSE;
-		}
-	}
+    if (FLD_IS_STRUCT(field)) {
+        //
+        // In order for the schema to participate in GC it must be a series.
+        // Currently this series is created with a single value of the root
+        // schema in the case of a struct expansion.  This wouldn't be
+        // necessary if each field that was a structure offered a REBSER
+        // already... !!! ?? !!! ... it will be necessary if the schemas
+        // are to uniquely carry an ffi_type freed when they are GC'd
+        //
+        REBSTU *sub_stu = Alloc_Singular_Array();
+        AS_SERIES(sub_stu)->link.schema = field;
+        REBVAL *single = SINK(ARR_HEAD(sub_stu));
 
-	return TRUE;
+        // In this case the structure lives at an offset inside another.
+        //
+        // Note: The original code allowed this for STU_INACCESSIBLE(stu).
+        //
+        VAL_RESET_HEADER(single, REB_STRUCT);
+        MANAGE_ARRAY(sub_stu);
+        single->payload.structure.stu = sub_stu;
+
+        // The parent data may be a singular array for a HANDLE! or a BINARY!
+        // series, depending on whether the data is owned by Rebol or not.
+        // That series pointer is being referenced again here.
+        //
+        single->payload.structure.data =
+            ARR_HEAD(stu)->payload.structure.data;
+        single->extra.struct_offset = offset;
+
+        // With all fields initialized, assign canon value as result
+        //
+        Move_Value(out, single);
+        assert(VAL_STRUCT_SIZE(out) == FLD_WIDE(field));
+        return;
+    }
+
+    if (STU_INACCESSIBLE(stu)) {
+        //
+        // !!! This just gets void with no error...that seems like a bad idea,
+        // if the data is truly inaccessible.
+        //
+        SET_VOID(out);
+        return;
+    }
+
+    REBYTE *p = offset + STU_DATA_HEAD(stu);
+
+    switch (FLD_TYPE_SYM(field)) {
+    case SYM_UINT8:
+        SET_INTEGER(out, *cast(u8*, p));
+        break;
+
+    case SYM_INT8:
+        SET_INTEGER(out, *cast(i8*, p));
+        break;
+
+    case SYM_UINT16:
+        SET_INTEGER(out, *cast(u16*, p));
+        break;
+
+    case SYM_INT16:
+        SET_INTEGER(out, *cast(i8*, p));
+        break;
+
+    case SYM_UINT32:
+        SET_INTEGER(out, *cast(u32*, p));
+        break;
+
+    case SYM_INT32:
+        SET_INTEGER(out, *cast(i32*, p));
+        break;
+
+    case SYM_UINT64:
+        SET_INTEGER(out, *cast(u64*, p));
+        break;
+
+    case SYM_INT64:
+        SET_INTEGER(out, *cast(i64*, p));
+        break;
+
+    case SYM_FLOAT:
+        SET_DECIMAL(out, *cast(float*, p));
+        break;
+
+    case SYM_DOUBLE:
+        SET_DECIMAL(out, *cast(double*, p));
+        break;
+
+    case SYM_POINTER:
+        SET_INTEGER(out, cast(REBUPT, *cast(void**, p)));
+        break;
+
+    case SYM_REBVAL:
+        Move_Value(out, cast(const REBVAL*, p));
+        break;
+
+    default:
+        assert(FALSE);
+        fail (Error(RE_MISC));
+    }
 }
 
-static REBOOL assign_scalar(REBSTU *stu,
-							struct Struct_Field *field,
-							REBCNT n, /* element index, starting from 0 */
-							REBVAL *val)
+
+//
+//  Get_Struct_Var: C
+//
+static REBOOL Get_Struct_Var(REBVAL *out, REBSTU *stu, const REBVAL *word)
 {
-	u64 i = 0;
-	double d = 0;
-	void *data = SERIES_SKIP(STRUCT_DATA_BIN(stu),
-							 STRUCT_OFFSET(stu) + field->offset + n * field->size);
+    REBARR *fieldlist = STU_FIELDLIST(stu);
 
-	if (field->type == STRUCT_TYPE_REBVAL) {
-		memcpy(data, val, sizeof(REBVAL));
-		return TRUE;
-	}
+    RELVAL *item = ARR_HEAD(fieldlist);
+    for (; NOT_END(item); ++item) {
+        REBFLD *field = VAL_ARRAY(item);
+        if (STR_CANON(FLD_NAME(field)) != VAL_WORD_CANON(word))
+            continue;
 
-	switch (VAL_TYPE(val)) {
-		case REB_DECIMAL:
-			if (!IS_NUMERIC_TYPE(field->type)) {
-				Trap_Type_DEAD_END(val);
-			}
-			d = VAL_DECIMAL(val);
-			i = (u64) d;
-			break;
-		case REB_INTEGER:
-			if (!IS_NUMERIC_TYPE(field->type)
-				&& field->type != STRUCT_TYPE_POINTER) {
-				Trap_Type_DEAD_END(val);
-			}
-			i = (u64) VAL_INT64(val);
-			d = (double)i;
-			break;
-		case REB_STRUCT:
-			if (STRUCT_TYPE_STRUCT != field->type) {
-				Trap_Type_DEAD_END(val);
-			}
-			break;
-		default:
-			Trap_Type_DEAD_END(val);
-	}
+        if (FLD_IS_ARRAY(field)) {
+            //
+            // Structs contain packed data for the field type in an array.
+            // This data cannot expand or contract, and is not in a
+            // Rebol-compatible format.  A Rebol Array is made by
+            // extracting the information.
+            //
+            // !!! Perhaps a fixed-size VECTOR! could have its data
+            // pointer into these arrays?
+            //
+            REBCNT dimension = FLD_DIMENSION(field);
+            REBARR *array = Make_Array(dimension);
+            REBCNT n;
+            for (n = 0; n < dimension; ++n) {
+                REBVAL *dest = SINK(ARR_AT(array, n));
+                get_scalar(dest, stu, field, n);
+            }
+            TERM_ARRAY_LEN(array, dimension);
+            Init_Block(out, array);
+        }
+        else
+            get_scalar(out, stu, field, 0);
 
-	switch (field->type) {
-		case STRUCT_TYPE_INT8:
-			*(i8*)data = (i8)i;
-			break;
-		case STRUCT_TYPE_UINT8:
-			*(u8*)data = (u8)i;
-			break;
-		case STRUCT_TYPE_INT16:
-			*(i16*)data = (i16)i;
-			break;
-		case STRUCT_TYPE_UINT16:
-			*(u16*)data = (u16)i;
-			break;
-		case STRUCT_TYPE_INT32:
-			*(i32*)data = (i32)i;
-			break;
-		case STRUCT_TYPE_UINT32:
-			*(u32*)data = (u32)i;
-			break;
-		case STRUCT_TYPE_INT64:
-			*(i64*)data = (i64)i;
-			break;
-		case STRUCT_TYPE_UINT64:
-			*(u64*)data = (u64)i;
-			break;
-		case STRUCT_TYPE_POINTER:
-			*cast(void**, data) = cast(void*, cast(REBUPT, i));
-			break;
-		case STRUCT_TYPE_FLOAT:
-			*(float*)data = (float)d;
-			break;
-		case STRUCT_TYPE_DOUBLE:
-			*(double*)data = (double)d;
-			break;
-		case STRUCT_TYPE_STRUCT:
-			if (field->size != VAL_STRUCT_LEN(val)) {
-				Trap_Arg_DEAD_END(val);
-			}
-			if (same_fields(field->fields, VAL_STRUCT_FIELDS(val))) {
-				memcpy(data, SERIES_SKIP(VAL_STRUCT_DATA_BIN(val), VAL_STRUCT_OFFSET(val)), field->size);
-			} else {
-				Trap_Arg_DEAD_END(val);
-			}
-			break;
-		default:
-			/* should never be here */
-			return FALSE;
-	}
-	return TRUE;
+        return TRUE;
+    }
+
+    return FALSE; // word not found in struct's field symbols
 }
 
-/***********************************************************************
-**
-*/	static REBFLG Set_Struct_Var(REBSTU *stu, REBVAL *word, REBVAL *elem, REBVAL *val)
-/*
-***********************************************************************/
+
+//
+//  Struct_To_Array: C
+//
+// Used by MOLD to create a block.
+//
+// Cannot fail(), because fail() could call MOLD on a struct!, which will end
+// up infinitive recursive calls.
+//
+REBARR *Struct_To_Array(REBSTU *stu)
 {
-	struct Struct_Field *field = NULL;
-	REBCNT i = 0;
-	field = (struct Struct_Field *)SERIES_DATA(stu->fields);
-	for (i = 0; i < SERIES_TAIL(stu->fields); i ++, field ++) {
-		if (VAL_WORD_CANON(word) == VAL_SYM_CANON(BLK_SKIP(PG_Word_Table.series, field->sym))) {
-			if (field->array) {
-				if (elem == NULL) { //set the whole array
-					REBCNT n = 0;
-					if ((!IS_BLOCK(val) || field->dimension != VAL_LEN(val))) {
-						return FALSE;
-					}
+    REBARR *fieldlist = STU_FIELDLIST(stu);
+    RELVAL *item = ARR_HEAD(fieldlist);
 
-					for(n = 0; n < field->dimension; n ++) {
-						if (!assign_scalar(stu, field, n, VAL_BLK_SKIP(val, n))) {
-							return FALSE;
-						}
-					}
+    REBDSP dsp_orig = DSP;
 
-				} else {// set only one element
-					if (!IS_INTEGER(elem)
-						|| VAL_INT32(elem) <= 0
-						|| VAL_INT32(elem) > cast(REBINT, field->dimension)) {
-						return FALSE;
-					}
-					return assign_scalar(stu, field, VAL_INT32(elem) - 1, val);
-				}
-				return TRUE;
-			} else {
-				return assign_scalar(stu, field, 0, val);
-			}
-			return TRUE;
-		}
-	}
-	return FALSE;
+    // fail_if_non_accessible(STU_TO_VAL(stu));
+
+    for(; NOT_END(item); ++item) {
+        REBFLD *field = VAL_ARRAY(item);
+
+        DS_PUSH_TRASH;
+        Init_Set_Word(DS_TOP, FLD_NAME(field)); // required name
+
+        REBARR *typespec = Make_Array(2); // required type
+
+        if (FLD_IS_STRUCT(field)) {
+            Init_Word(Alloc_Tail_Array(typespec), Canon(SYM_STRUCT_X));
+
+            DECLARE_LOCAL (nested);
+            get_scalar(nested, stu, field, 0);
+
+            PUSH_GUARD_VALUE(nested); // is this guard still necessary?
+            Init_Block(
+                Alloc_Tail_Array(typespec),
+                Struct_To_Array(VAL_STRUCT(nested))
+            );
+            DROP_GUARD_VALUE(nested);
+        }
+        else {
+            // Elemental type (from a fixed list of known C types)
+            //
+            Init_Word(Alloc_Tail_Array(typespec), Canon(FLD_TYPE_SYM(field)));
+        }
+
+        // "optional dimension and initialization."
+        //
+        // !!! Comment said the initialization was optional, but it seems
+        // that the initialization always happens (?)
+        //
+        if (FLD_IS_ARRAY(field)) {
+            //
+            // Dimension becomes INTEGER! in a BLOCK! (to look like a C array)
+            //
+            REBCNT dimension = FLD_DIMENSION(field);
+            REBARR *one_int = Alloc_Singular_Array();
+            SET_INTEGER(ARR_HEAD(one_int), dimension);
+            Init_Block(Alloc_Tail_Array(typespec), one_int);
+
+            // Initialization seems to be just another block after that (?)
+            //
+            REBARR *init = Make_Array(dimension);
+            REBCNT n;
+            for (n = 0; n < dimension; n ++) {
+                REBVAL *dest = SINK(ARR_AT(init, n));
+                get_scalar(dest, stu, field, n);
+            }
+            TERM_ARRAY_LEN(init, dimension);
+            Init_Block(Alloc_Tail_Array(typespec), init);
+        }
+        else {
+            REBVAL *dest = Alloc_Tail_Array(typespec);
+            get_scalar(dest, stu, field, 0);
+        }
+
+        DS_PUSH_TRASH;
+        Init_Block(DS_TOP, typespec); // required type
+    }
+
+    return Pop_Stack_Values(dsp_orig);
 }
+
+
+static REBOOL same_fields(REBARR *tgt_fieldlist, REBARR *src_fieldlist)
+{
+    if (ARR_LEN(tgt_fieldlist) != ARR_LEN(src_fieldlist))
+        return FALSE;
+
+    RELVAL *tgt_item = ARR_HEAD(tgt_fieldlist);
+    RELVAL *src_item = ARR_HEAD(src_fieldlist);
+
+    for (; NOT_END(src_item); ++src_item, ++tgt_item) {
+        REBFLD *src_field = VAL_ARRAY(src_item);
+        REBFLD *tgt_field = VAL_ARRAY(tgt_item);
+
+        if (
+            FLD_IS_STRUCT(tgt_field) &&
+            !same_fields(FLD_FIELDLIST(tgt_field), FLD_FIELDLIST(src_field))
+        ){
+            return FALSE;
+        }
+
+        if (FLD_TYPE_SYM(tgt_field) != FLD_TYPE_SYM(src_field))
+            return FALSE;
+
+        if (FLD_IS_ARRAY(tgt_field)) {
+            if (!FLD_IS_ARRAY(src_field))
+                return FALSE;
+
+            if (FLD_DIMENSION(tgt_field) != FLD_DIMENSION(src_field))
+                return FALSE;
+        }
+
+        if (FLD_OFFSET(tgt_field) != FLD_OFFSET(src_field))
+            return FALSE;
+
+        assert(FLD_WIDE(tgt_field) == FLD_WIDE(src_field));
+    }
+
+    assert(IS_END(tgt_item));
+
+    return TRUE;
+}
+
+
+static REBOOL assign_scalar_core(
+    REBYTE *data_head,
+    REBCNT offset,
+    REBFLD *field,
+    REBCNT n,
+    const REBVAL *val
+){
+    assert(n == 0 || FLD_IS_ARRAY(field));
+
+    void *data = data_head +
+        offset + FLD_OFFSET(field) + (n * FLD_WIDE(field));
+
+    if (FLD_IS_STRUCT(field)) {
+        if (!IS_STRUCT(val))
+            fail (Error_Invalid_Type(VAL_TYPE(val)));
+
+        if (FLD_WIDE(field) != VAL_STRUCT_SIZE(val))
+            fail (Error_Invalid_Arg(val));
+
+        if (!same_fields(FLD_FIELDLIST(field), VAL_STRUCT_FIELDLIST(val)))
+            fail (Error_Invalid_Arg(val));
+
+        memcpy(data, VAL_STRUCT_DATA_AT(val), FLD_WIDE(field));
+
+        return TRUE;
+    }
+
+    // All other types take numbers
+
+    i64 i;
+    double d;
+
+    switch (VAL_TYPE(val)) {
+    case REB_DECIMAL:
+        d = VAL_DECIMAL(val);
+        i = cast(i64, d);
+        break;
+
+    case REB_INTEGER:
+        i = VAL_INT64(val);
+        d = cast(double, i);
+        break;
+
+    default:
+        fail (Error_Invalid_Type(VAL_TYPE(val)));
+    }
+
+    switch (FLD_TYPE_SYM(field)) {
+    case SYM_INT8:
+        if (i > 0x7f || i < -128)
+            fail (Error(RE_OVERFLOW));
+        *cast(i8*, data) = cast(i8, i);
+        break;
+
+    case SYM_UINT8:
+        if (i > 0xff || i < 0)
+            fail (Error(RE_OVERFLOW));
+        *cast(u8*, data) = cast(u8, i);
+        break;
+
+    case SYM_INT16:
+        if (i > 0x7fff || i < -0x8000)
+            fail (Error(RE_OVERFLOW));
+        *cast(i16*, data) = cast(i16, i);
+        break;
+
+    case SYM_UINT16:
+        if (i > 0xffff || i < 0)
+            fail (Error(RE_OVERFLOW));
+        *cast(u16*, data) = cast(u16, i);
+        break;
+
+    case SYM_INT32:
+        if (i > MAX_I32 || i < MIN_I32)
+            fail (Error(RE_OVERFLOW));
+        *cast(i32*, data) = cast(i32, i);
+        break;
+
+    case SYM_UINT32:
+        if (i > MAX_U32 || i < 0)
+            fail (Error(RE_OVERFLOW));
+        *cast(u32*, data) = cast(u32, i);
+        break;
+
+    case SYM_INT64:
+        *cast(i64*, data) = i;
+        break;
+
+    case SYM_UINT64:
+        if (i < 0)
+            fail (Error(RE_OVERFLOW));
+        *cast(u64*, data) = cast(u64, i);
+        break;
+
+    case SYM_FLOAT:
+        *cast(float*, data) = cast(float, d);
+        break;
+
+    case SYM_DOUBLE:
+        *cast(double*, data) = d;
+        break;
+
+    case SYM_POINTER:
+        if (sizeof(void*) == 4 && i > MAX_U32)
+            fail (Error(RE_OVERFLOW));
+        *cast(void**, data) = cast(void*, cast(REBUPT, i));
+        break;
+
+    case SYM_REBVAL:
+        //
+        // !!! This is a dangerous thing to be doing in generic structs, but
+        // for the main purpose of REBVAL (tunneling) it should be okay so
+        // long as the REBVAL* that is passed in is actually a pointer into
+        // a frame's args.
+        //
+        *cast(const REBVAL**, data) = val;
+        break;
+
+    default:
+        assert(FALSE);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+
+inline static REBOOL assign_scalar(
+    REBSTU *stu,
+    REBFLD *field,
+    REBCNT n,
+    const REBVAL *val
+) {
+    return assign_scalar_core(
+        STU_DATA_HEAD(stu), STU_OFFSET(stu), field, n, val
+    );
+}
+
+
+//
+//  Set_Struct_Var: C
+//
+static REBOOL Set_Struct_Var(
+    REBSTU *stu,
+    const REBVAL *word,
+    const REBVAL *elem,
+    const REBVAL *val
+) {
+    REBARR *fieldlist = STU_FIELDLIST(stu);
+    RELVAL *item = ARR_HEAD(fieldlist);
+
+    for (; NOT_END(item); ++item) {
+        REBFLD *field = VAL_ARRAY(item);
+
+        if (VAL_WORD_CANON(word) != STR_CANON(FLD_NAME(field)))
+            continue;
+
+        if (FLD_IS_ARRAY(field)) {
+            if (elem == NULL) { // set the whole array
+                if (!IS_BLOCK(val))
+                    return FALSE;
+
+                REBCNT dimension = FLD_DIMENSION(field);
+                if (dimension != VAL_LEN_AT(val))
+                    return FALSE;
+
+                REBCNT n = 0;
+                for(n = 0; n < dimension; ++n) {
+                    if (!assign_scalar(
+                        stu, field, n, KNOWN(VAL_ARRAY_AT_HEAD(val, n))
+                    )) {
+                        return FALSE;
+                    }
+                }
+            }
+            else { // set only one element
+                if (!IS_INTEGER(elem) || VAL_INT32(elem) != 1)
+                    return FALSE;
+
+                return assign_scalar(stu, field, 0, val);
+            }
+            return TRUE;
+        }
+
+        return assign_scalar(stu, field, 0, val);
+    }
+
+    return FALSE;
+}
+
 
 /* parse struct attribute */
 static void parse_attr (REBVAL *blk, REBINT *raw_size, REBUPT *raw_addr)
 {
-	REBVAL *attr = VAL_BLK_DATA(blk);
+    REBVAL *attr = KNOWN(VAL_ARRAY_AT(blk));
 
-	*raw_size = -1;
-	*raw_addr = 0;
+    *raw_size = -1;
+    *raw_addr = 0;
 
-	while (NOT_END(attr)) {
-		if (IS_SET_WORD(attr)) {
-			switch (VAL_WORD_CANON(attr)) {
-				case SYM_RAW_SIZE:
-					++ attr;
-					if (IS_INTEGER(attr)) {
-						if (*raw_size > 0) { /* duplicate raw-size */
-							Trap_Arg(attr);
-						}
-						*raw_size = VAL_INT64(attr);
-						if (*raw_size <= 0) {
-							Trap_Arg(attr);
-						}
-					} else {
-						Trap_Arg(attr);
-					}
-					break;
-				case SYM_RAW_MEMORY:
-					++ attr;
-					if (IS_INTEGER(attr)) {
-						if (*raw_addr != 0) { /* duplicate raw-memory */
-							Trap_Arg(attr);
-						}
-						*raw_addr = VAL_UNT64(attr);
-						if (*raw_addr == 0) {
-							Trap_Arg(attr);
-						}
-					} else {
-						Trap_Arg(attr);
-					}
-					break;
-					/*
-					   case SYM_ALIGNMENT:
-					   ++ attr;
-					   if (IS_INTEGER(attr)) {
-					   alignment = VAL_INT64(attr);
-					   } else {
-					   Trap_Arg_DEAD_END(attr);
-					   }
-					   break;
-					   */
-				default:
-					Trap_Arg(attr);
-			}
-		} else {
-			Trap_Arg(attr);
-		}
-		++ attr;
-	}
-}
+    while (NOT_END(attr)) {
+        if (!IS_SET_WORD(attr))
+            fail (Error_Invalid_Arg(attr));
 
-/* set storage memory to external addr: raw_addr */
-static void set_ext_storage (REBVAL *out, REBINT raw_size, REBUPT raw_addr)
-{
-	REBSER *data_ser = VAL_STRUCT_DATA_BIN(out);
-	REBSER *ser = NULL;
+        switch (VAL_WORD_SYM(attr)) {
+        case SYM_RAW_SIZE:
+            ++ attr;
+            if (NOT_END(attr) && IS_INTEGER(attr)) {
+                if (*raw_size > 0) /* duplicate raw-size */
+                    fail (Error_Invalid_Arg(attr));
 
-	if (raw_size >= 0 && raw_size != cast(REBINT, VAL_STRUCT_LEN(out))) {
-		Trap(RE_INVALID_DATA);
-	}
+                *raw_size = VAL_INT64(attr);
+                if (*raw_size <= 0)
+                    fail (Error_Invalid_Arg(attr));
+            }
+            else
+                fail (Error_Invalid_Arg(attr));
+            break;
 
-	ser = Make_Series(
-		SERIES_LEN(data_ser), // counts terminator, though a "LEN" shouldn't!
-		SERIES_WIDE(data_ser),
-		Is_Array_Series(data_ser) ? (MKS_ARRAY | MKS_EXTERNAL) : MKS_EXTERNAL
-	);
+        case SYM_RAW_MEMORY:
+            ++ attr;
+            if (NOT_END(attr) && IS_INTEGER(attr)) {
+                if (*raw_addr != 0) /* duplicate raw-memory */
+                    fail (Error_Invalid_Arg(attr));
 
-	ser->data = (REBYTE*)raw_addr;
+                *raw_addr = cast(REBU64, VAL_INT64(attr));
+                if (*raw_addr == 0)
+                    fail (Error_Invalid_Arg(attr));
+            }
+            else
+                fail (Error_Invalid_Arg(attr));
+            break;
 
-	VAL_STRUCT_DATA_BIN(out) = ser;
-}
+        case SYM_EXTERN:
+            ++ attr;
 
-static REBOOL parse_field_type(struct Struct_Field *field, REBVAL *spec, REBVAL *inner, REBVAL **init)
-{
-	REBVAL *val = VAL_BLK_DATA(spec);
+            if (*raw_addr != 0) // raw-memory is exclusive with extern
+                fail (Error_Invalid_Arg(attr));
 
-	if (IS_WORD(val)){
-		switch (VAL_WORD_CANON(val)) {
-			case SYM_UINT8:
-				field->type = STRUCT_TYPE_UINT8;
-				field->size = 1;
-				break;
-			case SYM_INT8:
-				field->type = STRUCT_TYPE_INT8;
-				field->size = 1;
-				break;
-			case SYM_UINT16:
-				field->type = STRUCT_TYPE_UINT16;
-				field->size = 2;
-				break;
-			case SYM_INT16:
-				field->type = STRUCT_TYPE_INT16;
-				field->size = 2;
-				break;
-			case SYM_UINT32:
-				field->type = STRUCT_TYPE_UINT32;
-				field->size = 4;
-				break;
-			case SYM_INT32:
-				field->type = STRUCT_TYPE_INT32;
-				field->size = 4;
-				break;
-			case SYM_UINT64:
-				field->type = STRUCT_TYPE_UINT64;
-				field->size = 8;
-				break;
-			case SYM_INT64:
-				field->type = STRUCT_TYPE_INT64;
-				field->size = 8;
-				break;
-			case SYM_FLOAT:
-				field->type = STRUCT_TYPE_FLOAT;
-				field->size = 4;
-				break;
-			case SYM_DOUBLE:
-				field->type = STRUCT_TYPE_DOUBLE;
-				field->size = 8;
-				break;
-			case SYM_POINTER:
-				field->type = STRUCT_TYPE_POINTER;
-				field->size = sizeof(void*);
-				break;
-			case SYM_STRUCT_TYPE:
-				++ val;
-				if (IS_BLOCK(val)) {
-					REBFLG res;
+            if (IS_END(attr) || !IS_BLOCK(attr)
+                || VAL_LEN_AT(attr) != 2) {
+                fail (Error_Invalid_Arg(attr));
+            }
+            else {
+                REBVAL *lib = KNOWN(VAL_ARRAY_AT_HEAD(attr, 0));
+                if (!IS_LIBRARY(lib))
+                    fail (Error_Invalid_Arg(attr));
+                if (IS_LIB_CLOSED(VAL_LIBRARY(lib)))
+                    fail (Error(RE_BAD_LIBRARY));
 
-					res = MT_Struct(inner, val, REB_STRUCT);
+                REBVAL *sym = KNOWN(VAL_ARRAY_AT_HEAD(attr, 1));
+                if (!ANY_BINSTR(sym))
+                    fail (Error_Invalid_Arg(sym));
 
-					if (!res) {
-						//RL_Print("Failed to make nested struct!\n");
-						return FALSE;
-					}
+                CFUNC *addr = OS_FIND_FUNCTION(
+                    VAL_LIBRARY_FD(lib),
+                    s_cast(VAL_RAW_DATA_AT(sym))
+                );
+                if (!addr)
+                    fail (Error(RE_SYMBOL_NOT_FOUND, sym));
 
-					field->size = SERIES_TAIL(VAL_STRUCT_DATA_BIN(inner));
-					field->type = STRUCT_TYPE_STRUCT;
-					field->fields = VAL_STRUCT_FIELDS(inner);
-					field->spec = VAL_STRUCT_SPEC(inner);
-					*init = inner; /* a shortcut for struct intialization */
-				} else {
-					Trap_Types_DEAD_END(RE_EXPECT_VAL, REB_BLOCK, VAL_TYPE(val));
-				}
-				break;
-			case SYM_REBVAL:
-				field->type = STRUCT_TYPE_REBVAL;
-				field->size = sizeof(REBVAL);
-				break;
-			default:
-				Trap_Type_DEAD_END(val);
-		}
-	} else if (IS_STRUCT(val)) { //[b: [struct-a] val-a]
-		field->size = SERIES_TAIL(VAL_STRUCT_DATA_BIN(val));
-		field->type = STRUCT_TYPE_STRUCT;
-		field->fields = VAL_STRUCT_FIELDS(val);
-		field->spec = VAL_STRUCT_SPEC(val);
-		*init = val;
-	} else {
-		Trap_Type_DEAD_END(val);
-	}
-	++ val;
+                *raw_addr = cast(REBUPT, addr);
+            }
+            break;
 
-	if (IS_BLOCK(val)) {// make struct! [a: [int32 [2]] [0 0]]
-		REBVAL ret;
+        // !!! This alignment code was commented out for some reason.
+        /*
+        case SYM_ALIGNMENT:
+            ++ attr;
+            if (!IS_INTEGER(attr))
+                fail (Error_Invalid_Arg(attr));
+                
+            alignment = VAL_INT64(attr);
+            break;
+        */
 
-		if (Do_Block_Throws(&ret, VAL_SERIES(val), 0)) {
-			// !!! Does not check for thrown cases...what should this
-			// do in case of THROW, BREAK, QUIT?
-			Trap_Thrown(&ret);
-			DEAD_END;
-		}
+        default:
+            fail (Error_Invalid_Arg(attr));
+        }
 
-		if (!IS_INTEGER(&ret)) {
-			Trap_Types_DEAD_END(RE_EXPECT_VAL, REB_INTEGER, VAL_TYPE(val));
-		}
-		field->dimension = cast(REBCNT, VAL_INT64(&ret));
-		field->array = TRUE;
-		++ val;
-	} else {
-		field->dimension = 1; /* scalar */
-		field->array = FALSE;
-	}
-
-	if (NOT_END(val)) {
-		Trap_Type_DEAD_END(val);
-	}
-
-	return TRUE;
-}
-
-/***********************************************************************
-**
-*/	REBFLG MT_Struct(REBVAL *out, REBVAL *data, REBCNT type)
-/*
- * Format:
- * make struct! [
- *     field1 [type1]
- *     field2: [type2] field2-init-value
- * 	   field3: [struct [field1 [type1]]]
- * 	   field4: [type1[3]]
- * 	   ...
- * ]
-***********************************************************************/
-{
-	//RL_Print("%s\n", __func__);
-	REBINT max_fields = 16;
-
-	VAL_STRUCT_FIELDS(out) = Make_Series(
-		max_fields, sizeof(struct Struct_Field), MKS_NONE
-	);
-	MANAGE_SERIES(VAL_STRUCT_FIELDS(out));
-
-	if (IS_BLOCK(data)) {
-		//Reduce_Block_No_Set(VAL_SERIES(data), 0, NULL);
-		//data = DS_POP;
-		REBVAL *blk = VAL_BLK_DATA(data);
-		REBINT field_idx = 0; /* for field index */
-		u64 offset = 0; /* offset in data */
-		REBCNT eval_idx = 0; /* for spec block evaluation */
-		REBVAL *init = NULL; /* for result to save in data */
-		REBOOL expect_init = FALSE;
-		REBINT raw_size = -1;
-		REBUPT raw_addr = 0;
-		REBCNT alignment = 0;
-
-		VAL_STRUCT_SPEC(out) = Copy_Array_Shallow(VAL_SERIES(data));
-		VAL_STRUCT_DATA(out) = Make_Series(
-			1, sizeof(struct Struct_Data), MKS_NONE
-		);
-		EXPAND_SERIES_TAIL(VAL_STRUCT_DATA(out), 1);
-
-		VAL_STRUCT_DATA_BIN(out) = Make_Series(max_fields << 2, 1, MKS_NONE);
-		VAL_STRUCT_OFFSET(out) = 0;
-
-		// We tell the GC to manage this series, but it will not cause a
-		// synchronous garbage collect.  Still, when's the right time?
-		ENSURE_SERIES_MANAGED(VAL_STRUCT_SPEC(out));
-		MANAGE_SERIES(VAL_STRUCT_DATA(out));
-		MANAGE_SERIES(VAL_STRUCT_DATA_BIN(out));
-
-		/* set type early such that GC will handle it correctly, i.e, not collect series in the struct */
-		SET_TYPE(out, REB_STRUCT);
-
-		if (IS_BLOCK(blk)) {
-			parse_attr(blk, &raw_size, &raw_addr);
-			++ blk;
-		}
-
-		while (NOT_END(blk)) {
-			REBVAL *inner;
-			struct Struct_Field *field = NULL;
-			u64 step = 0;
-
-			EXPAND_SERIES_TAIL(VAL_STRUCT_FIELDS(out), 1);
-
-			DS_PUSH_NONE;
-			inner = DS_TOP; /* save in stack so that it won't be GC'ed when MT_Struct is recursively called */
-
-			field = (struct Struct_Field *)SERIES_SKIP(VAL_STRUCT_FIELDS(out), field_idx);
-			field->offset = (REBCNT)offset;
-			if (IS_SET_WORD(blk)) {
-				field->sym = VAL_WORD_SYM(blk);
-				expect_init = TRUE;
-				if (raw_addr) {
-					/* initialization is not allowed for raw memory struct */
-					Trap_Arg_DEAD_END(blk);
-				}
-			} else if (IS_WORD(blk)) {
-				field->sym = VAL_WORD_SYM(blk);
-				expect_init = FALSE;
-			} else {
-				Trap_Type_DEAD_END(blk);
-			}
-			++ blk;
-
-			if (!IS_BLOCK(blk)) {
-				Trap_Arg_DEAD_END(blk);
-			}
-
-			if (!parse_field_type(field, blk, inner, &init)) { return FALSE; }
-			++ blk;
-
-			STATIC_assert(sizeof(field->size) <= 4);
-			STATIC_assert(sizeof(field->dimension) <= 4);
-
-			step = (u64)field->size * (u64)field->dimension;
-			if (step > VAL_STRUCT_LIMIT) {
-				Trap1_DEAD_END(RE_SIZE_LIMIT, out);
-			}
-
-			EXPAND_SERIES_TAIL(VAL_STRUCT_DATA_BIN(out), step);
-
-			if (expect_init) {
-				REBVAL safe; // result of reduce or do (GC saved during eval)
-				init = &safe;
-
-				if (IS_BLOCK(blk)) {
-					Reduce_Block(init, VAL_SERIES(blk), 0, FALSE);
-					++ blk;
-				} else {
-					eval_idx = Do_Next_May_Throw(
-						init, VAL_SERIES(data), blk - VAL_BLK_DATA(data)
-					);
-					if (eval_idx == THROWN_FLAG) {
-						Trap_Thrown(init);
-						DEAD_END;
-					}
-
-					blk = VAL_BLK_SKIP(data, eval_idx);
-				}
-
-				if (field->array) {
-					if (IS_INTEGER(init)) { /* interpreted as a C pointer */
-						void *ptr = cast(void *, cast(REBUPT, VAL_INT64(init)));
-
-						/* assuming it's an valid pointer and holding enough space */
-						memcpy(SERIES_SKIP(VAL_STRUCT_DATA_BIN(out), (REBCNT)offset), ptr, field->size * field->dimension);
-					} else if (IS_BLOCK(init)) {
-						REBCNT n = 0;
-
-						if (VAL_LEN(init) != field->dimension) {
-							Trap_Arg_DEAD_END(init);
-						}
-						/* assign */
-						for (n = 0; n < field->dimension; n ++) {
-							if (!assign_scalar(&VAL_STRUCT(out), field, n, VAL_BLK_SKIP(init, n))) {
-								//RL_Print("Failed to assign element value\n");
-								goto failed;
-							}
-						}
-					} else {
-						Trap_Types_DEAD_END(RE_EXPECT_VAL, REB_BLOCK, VAL_TYPE(blk));
-					}
-				} else {
-					/* scalar */
-					if (!assign_scalar(&VAL_STRUCT(out), field, 0, init)) {
-						//RL_Print("Failed to assign scalar value\n");
-						goto failed;
-					}
-				}
-			} else if (raw_addr == 0) {
-				if (field->type == STRUCT_TYPE_STRUCT) {
-					REBCNT n = 0;
-					for (n = 0; n < field->dimension; n ++) {
-						memcpy(SERIES_SKIP(VAL_STRUCT_DATA_BIN(out), ((REBCNT)offset) + n * field->size), SERIES_DATA(VAL_STRUCT_DATA_BIN(init)), field->size);
-					}
-				} else if (field->type == STRUCT_TYPE_REBVAL) {
-					REBVAL unset;
-					REBCNT n = 0;
-					SET_UNSET(&unset);
-					for (n = 0; n < field->dimension; n ++) {
-						if (!assign_scalar(&VAL_STRUCT(out), field, n, &unset)) {
-							//RL_Print("Failed to assign element value\n");
-							goto failed;
-						}
-					}
-				} else {
-					memset(SERIES_SKIP(VAL_STRUCT_DATA_BIN(out), (REBCNT)offset), 0, field->size * field->dimension);
-				}
-			}
-
-			offset +=  step;
-			/*
-			if (alignment != 0) {
-				offset = ((offset + alignment - 1) / alignment) * alignment;
-			}
-			*/
-			if (offset > VAL_STRUCT_LIMIT) {
-				Trap1_DEAD_END(RE_SIZE_LIMIT, out);
-			}
-
-			field->done = TRUE;
-
-			++ field_idx;
-
-			DS_DROP; /* pop up the inner struct*/
-		}
-
-		VAL_STRUCT_LEN(out) = (REBCNT)offset;
-
-		if (raw_addr) {
-			set_ext_storage(out, raw_size, raw_addr);
-			// The above creates VAL_STRUCT_DATA_BIN and it's not managed
-			MANAGE_SERIES(VAL_STRUCT_DATA_BIN(out));
-		}
-		else {
-			// Might be already managed?  (It's better if we're certain...)
-			ENSURE_SERIES_MANAGED(VAL_STRUCT_DATA_BIN(out));
-		}
-
-		// For every series we create, we must either free it or hand it over
-		// to the GC to manage.
-
-		ENSURE_SERIES_MANAGED(VAL_STRUCT_FIELDS(out)); // managed already?
-		ENSURE_SERIES_MANAGED(VAL_STRUCT_SPEC(out)); // managed already?
-		ENSURE_SERIES_MANAGED(VAL_STRUCT_DATA(out)); // managed already?
-
-		return TRUE;
-	}
-
-failed:
-	Free_Series(VAL_STRUCT_FIELDS(out));
-	Free_Series(VAL_STRUCT_SPEC(out));
-	Free_Series(VAL_STRUCT_DATA_BIN(out));
-	Free_Series(VAL_STRUCT_DATA(out));
-
-	return FALSE;
+        ++ attr;
+    }
 }
 
 
-/***********************************************************************
-**
-*/	REBINT PD_Struct(REBPVS *pvs)
-/*
-***********************************************************************/
-{
-	struct Struct_Field *field = NULL;
-	REBCNT i = 0;
-	REBSTU *stu = &VAL_STRUCT(pvs->value);
-	if (!IS_WORD(pvs->select)) {
-		return PE_BAD_SELECT;
-	}
-	if (! pvs->setval || NOT_END(pvs->path + 1)) {
-		if (!Get_Struct_Var(stu, pvs->select, pvs->store)) {
-			return PE_BAD_SELECT;
-		}
-
-		/* Setting element to an array in the struct:
-		 * struct/field/1: 0
-		 * */
-		if (pvs->setval
-			&& IS_BLOCK(pvs->store)
-			&& IS_END(pvs->path + 2)) {
-			REBVAL *sel = pvs->select;
-			pvs->value = pvs->store;
-			Next_Path(pvs); // sets value in pvs->value
-			if (!Set_Struct_Var(stu, sel, pvs->select, pvs->value)) {
-				return PE_BAD_SET;
-			}
-			return PE_OK;
-		}
-		return PE_USE;
-	} else {// setval && END
-		if (!Set_Struct_Var(stu, pvs->select, NULL, pvs->setval)) {
-			return PE_BAD_SET;
-		}
-		return PE_OK;
-	}
-	return PE_BAD_SELECT;
+// The managed handle logic always assumes a cleanup function, so it doesn't
+// have to test for NULL.
+//
+static void cleanup_noop(const REBVAL *v) {
+    assert(IS_HANDLE(v));
 }
 
 
-/***********************************************************************
-**
-*/	REBINT Cmp_Struct(const REBVAL *s, const REBVAL *t)
-/*
-***********************************************************************/
-{
-	REBINT n = VAL_STRUCT_FIELDS(s) - VAL_STRUCT_FIELDS(t);
-	if (n != 0) {
-		return n;
-	}
-	n = VAL_STRUCT_DATA(s) - VAL_STRUCT_DATA(t);
-	return n;
+//
+// set storage memory to external addr: raw_addr
+//
+// "External Storage" is the idea that a STRUCT! which is modeling a C
+// struct doesn't use a BINARY! series as the backing store, rather a pointer
+// that is external to the system.  When Atronix added the FFI initially,
+// this was done by creating a separate type of REBSER that could use an
+// external pointer.  This uses a managed HANDLE! for the same purpose, as
+// a less invasive way of doing the same thing.
+//
+static REBSER *make_ext_storage(
+    REBCNT len,
+    REBINT raw_size,
+    REBUPT raw_addr
+) {
+    if (raw_size >= 0 && raw_size != cast(REBINT, len)) {
+        DECLARE_LOCAL (i);
+        SET_INTEGER(i, raw_size);
+        fail (Error(RE_INVALID_DATA, i));
+    }
+
+    DECLARE_LOCAL (handle);
+    Init_Handle_Managed(handle, cast(REBYTE*, raw_addr), len, &cleanup_noop);
+
+    return AS_SERIES(handle->extra.singular);
 }
 
 
-/***********************************************************************
-**
-*/	REBINT CT_Struct(REBVAL *a, REBVAL *b, REBINT mode)
-/*
-***********************************************************************/
+//
+//  Total_Struct_Dimensionality: C
+//
+// This recursively counts the total number of data elements inside of a
+// struct.  This includes for instance every array element inside a
+// nested struct's field, along with its fields.
+//
+// !!! Is this really how char[1000] would be handled in the FFI?  By
+// creating 1000 ffi_types?  :-/
+//
+static REBCNT Total_Struct_Dimensionality(REBARR *fields)
 {
-	//printf("comparing struct a (%p) with b (%p), mode: %d\n", a, b, mode);
-	switch (mode) {
-		case 3: /* same? */
-		case 2: /* strict equality */
-			return 0 == Cmp_Struct(a, b);
-		case 1: /* equvilance */
-		case 0: /* coersed equality*/
-			if (Cmp_Struct(a, b) == 0) {
-				return 1;
-			}
-			return IS_STRUCT(a) && IS_STRUCT(b)
-				 && same_fields(VAL_STRUCT_FIELDS(a), VAL_STRUCT_FIELDS(b))
-				 && VAL_STRUCT_LEN(a) == VAL_STRUCT_LEN(b)
-				 && !memcmp(SERIES_DATA(VAL_STRUCT_DATA_BIN(a)), SERIES_DATA(VAL_STRUCT_DATA_BIN(b)), VAL_STRUCT_LEN(a));
-		default:
-			return -1;
-	}
-	return -1;
+    REBCNT n_fields = 0;
+
+    RELVAL *item = ARR_HEAD(fields);
+    for (; NOT_END(item); ++item) {
+        REBFLD *field = VAL_ARRAY(item);
+
+        if (FLD_IS_STRUCT(field))
+            n_fields += Total_Struct_Dimensionality(FLD_FIELDLIST(field));
+        else
+            n_fields += FLD_IS_ARRAY(field) ? FLD_DIMENSION(field) : 1;
+    }
+    return n_fields;
 }
 
-/***********************************************************************
-**
-*/	void Copy_Struct(const REBSTU *src, REBSTU *dst)
-/*
-***********************************************************************/
-{
-	/* Read only fields */
-	dst->spec = src->spec;
-	dst->fields = src->fields;
 
-	/* writable field */
-	dst->data = Copy_Sequence(src->data);
-	STRUCT_DATA_BIN(dst) = Copy_Sequence(STRUCT_DATA_BIN(src));
+//
+//  Prepare_Field_For_FFI: C
+//
+// The main reason structs exist is so that they can be used with the FFI,
+// and the FFI requires you to set up a "ffi_type" C struct describing
+// each datatype. This is a helper function that sets up proper ffi_type.
+// There are stock types for the primitives, but each structure needs its
+// own.
+//
+static void Prepare_Field_For_FFI(REBFLD *schema)
+{
+    assert(IS_UNREADABLE_IF_DEBUG(FLD_AT(schema, IDX_FIELD_FFTYPE)));
+
+    ffi_type *fftype;
+
+    if (!FLD_IS_STRUCT(schema)) {
+        fftype = Get_FFType_For_Sym(FLD_TYPE_SYM(schema));
+        assert(fftype != NULL);
+
+        // The FFType pointers returned by Get_FFType_For_Sym should not be
+        // freed, so a "simple" handle is used that just holds the pointer.
+        //
+        Init_Handle_Simple(FLD_AT(schema, IDX_FIELD_FFTYPE), fftype, 0);
+        return;
+    }
+
+    // For struct fields--on the other hand--it's necessary to do a custom
+    // allocation for a new type registered with the FFI.
+    //
+    fftype = OS_ALLOC(ffi_type);
+    fftype->type = FFI_TYPE_STRUCT;
+
+    // "This is set by libffi; you should initialize it to zero."
+    // http://www.atmark-techno.com/~yashi/libffi.html#Structures
+    //
+    fftype->size = 0;
+    fftype->alignment = 0;
+
+    REBARR *fieldlist = FLD_FIELDLIST(schema);
+
+    REBCNT dimensionality = Total_Struct_Dimensionality(fieldlist);
+    fftype->elements = OS_ALLOC_N(ffi_type*, dimensionality + 1); // NULL term
+
+    RELVAL *item = ARR_HEAD(fieldlist);
+
+    REBCNT j = 0;
+    for (; NOT_END(item); ++item) {
+        REBFLD *field = VAL_ARRAY(item);
+        REBCNT dimension = FLD_IS_ARRAY(field) ? FLD_DIMENSION(field) : 1;
+
+        REBCNT n = 0;
+        for (n = 0; n < dimension; ++n)
+            fftype->elements[j++] = FLD_FFTYPE(field);
+    }
+
+    fftype->elements[j] = NULL;
+
+    Init_Handle_Managed(
+        FLD_AT(schema, IDX_FIELD_FFTYPE),
+        fftype,
+        dimensionality + 1,
+        &cleanup_ffi_type
+    );
 }
 
-/***********************************************************************
-**
-*/	void Copy_Struct_Val(const REBVAL *src, REBVAL *dst)
-/*
-***********************************************************************/
-{
-	SET_TYPE(dst, REB_STRUCT);
-	Copy_Struct(&VAL_STRUCT(src), &VAL_STRUCT(dst));
+
+//
+// This takes a spec like `[int32 [2]]` and sets the output field's properties
+// by recognizing a finite set of FFI type keywords defined in %words.r.
+//
+// This also allows for embedded structure types.  If the type is not being
+// included by reference, but rather with a sub-definition inline, then it
+// will actually be creating a new `inner` STRUCT! value.  Since this value
+// is managed and not referred to elsewhere, there can't be evaluations.
+//
+static void Parse_Field_Type_May_Fail(
+    REBFLD *field,
+    REBVAL *spec,
+    REBVAL *inner // will be set only if STRUCT!
+){
+    SET_TRASH_IF_DEBUG(inner);
+
+    RELVAL *val = VAL_ARRAY_AT(spec);
+
+    if (IS_END(val))
+        fail (Error(RE_MISC)); // !!! better error
+
+    if (IS_WORD(val)) {
+        REBSYM sym = VAL_WORD_SYM(val);
+
+        // Initialize the type symbol with the unbound word by default (will
+        // be overwritten in the struct cases).
+        //
+        Init_Word(FLD_AT(field, IDX_FIELD_TYPE), Canon(sym));
+
+        switch (sym) {
+        case SYM_UINT8:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), 1);
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_INT8:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), 1);
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_UINT16:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), 2);
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_INT16:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), 2);
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_UINT32:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), 4);
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_INT32:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), 4);
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_UINT64:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), 8);
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_INT64:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), 8);
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_FLOAT:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), 4);
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_DOUBLE:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), 8);
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_POINTER:
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), sizeof(void*));
+            Prepare_Field_For_FFI(field);
+            break;
+
+        case SYM_STRUCT_X: {
+            ++ val;
+            if (!IS_BLOCK(val))
+                fail (Error_Unexpected_Type(REB_BLOCK, VAL_TYPE(val)));
+
+            DECLARE_LOCAL (specified);
+            Derelativize(specified, val, VAL_SPECIFIER(spec));
+            MAKE_Struct(inner, REB_STRUCT, specified); // may fail()
+
+            SET_INTEGER(
+                FLD_AT(field, IDX_FIELD_WIDE),
+                VAL_STRUCT_DATA_LEN(inner)
+            );
+            Init_Block(
+                FLD_AT(field, IDX_FIELD_TYPE),
+                VAL_STRUCT_FIELDLIST(inner)
+            );
+
+            // Borrow the same ffi_type* that was built for the inner struct
+            // (What about just storing the STRUCT! value itself in the type
+            // field, instead of the array of fields?)
+            //
+            Move_Value(
+                FLD_AT(field, IDX_FIELD_FFTYPE),
+                FLD_AT(VAL_STRUCT_SCHEMA(inner), IDX_FIELD_FFTYPE)
+            );
+            break; }
+
+        case SYM_REBVAL: {
+            //
+            // While most data types have some kind of proxying of when you
+            // pass a Rebol value in (such as turning an INTEGER! into bits
+            // for a C `int`) if the argument is marked as being a REBVAL
+            // then the VAL_TYPE is ignored, and it acts like a pointer to
+            // the actual argument in the frame...whatever that may be.
+            //
+            // !!! The initial FFI implementation from Atronix would actually
+            // store sizeof(REBVAL) in the struct, not sizeof(REBVAL*).  The
+            // struct's binary data was then hooked into the garbage collector
+            // to make sure that cell was marked.  Because the intended use
+            // of the feature is "tunneling" a value from a routine's frame
+            // to a callback's frame, the lifetime of the REBVAL* should last
+            // for the entirety of the routine it was passed to.
+            //
+            SET_INTEGER(FLD_AT(field, IDX_FIELD_WIDE), sizeof(REBVAL*));
+            Prepare_Field_For_FFI(field);
+            break; }
+
+        default:
+            fail (Error_Invalid_Type(VAL_TYPE(val)));
+        }
+    }
+    else if (IS_STRUCT(val)) {
+        //
+        // [b: [struct-a] val-a]
+        //
+        SET_INTEGER(
+            FLD_AT(field, IDX_FIELD_WIDE),
+            VAL_STRUCT_DATA_LEN(val)
+        );
+        Init_Block(
+            FLD_AT(field, IDX_FIELD_TYPE),
+            VAL_STRUCT_FIELDLIST(val)
+        );
+
+        // Borrow the same ffi_type* that the struct uses, see above note
+        // regarding alternative ideas.
+        //
+        Move_Value(
+            FLD_AT(field, IDX_FIELD_FFTYPE),
+            FLD_AT(VAL_STRUCT_SCHEMA(val), IDX_FIELD_FFTYPE)
+        );
+        Derelativize(inner, val, VAL_SPECIFIER(spec));
+    }
+    else
+        fail (Error_Invalid_Type(VAL_TYPE(val)));
+
+    ++ val;
+
+    // Find out the array dimension (if there is one)
+    //
+    if (IS_END(val)) {
+        SET_BLANK(FLD_AT(field, IDX_FIELD_DIMENSION)); // scalar
+    }
+    else if (IS_BLOCK(val)) {
+        //
+        // make struct! [a: [int32 [2]] [0 0]]
+        //
+        DECLARE_LOCAL (ret);
+        if (Do_At_Throws(
+            ret,
+            VAL_ARRAY(val),
+            VAL_INDEX(val),
+            VAL_SPECIFIER(spec)
+        )) {
+            // !!! Does not check for thrown cases...what should this
+            // do in case of THROW, BREAK, QUIT?
+            fail (Error_No_Catch_For_Throw(ret));
+        }
+
+        if (!IS_INTEGER(ret))
+            fail (Error_Unexpected_Type(REB_INTEGER, VAL_TYPE(val)));
+
+        SET_INTEGER(FLD_AT(field, IDX_FIELD_DIMENSION), VAL_INT64(ret));
+        ++ val;
+    }
+    else
+        fail (Error_Invalid_Type(VAL_TYPE(val)));
 }
 
-/* a: make struct! [uint 8 i: 1]
- * b: make a [i: 10]
- */
-static void init_fields(REBVAL *ret, REBVAL *spec)
+
+//
+//  Init_Struct_Fields: C
+//
+// a: make struct! [uint 8 i: 1]
+// b: make a [i: 10]
+//
+void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
 {
-	REBVAL *blk = NULL;
+    REBVAL *blk = NULL;
 
-	for (blk = VAL_BLK_DATA(spec); NOT_END(blk); blk += 2) {
-		struct Struct_Field *fld = NULL;
-		REBSER *fields = VAL_STRUCT_FIELDS(ret);
-		unsigned int i = 0;
-		REBVAL *word = blk;
-		REBVAL *fld_val = blk + 1;
+    for (blk = KNOWN(VAL_ARRAY_AT(spec)); NOT_END(blk); blk += 2) {
+        REBVAL *word = blk;
+        REBVAL *fld_val = blk + 1;
 
-		if (IS_BLOCK(word)) { /* options: raw-memory, etc */
-			REBINT raw_size = -1;
-			REBUPT raw_addr = 0;
+        if (IS_BLOCK(word)) { // options: raw-memory, etc
+            REBINT raw_size = -1;
+            REBUPT raw_addr = 0;
 
-			if (VAL_TAIL(spec) != 1) { /* make sure no other field initialization */
-				Trap_Arg(spec);
-			}
+            // make sure no other field initialization
+            if (VAL_LEN_HEAD(spec) != 1)
+                fail (Error_Invalid_Arg(spec));
 
-			parse_attr(word, &raw_size, &raw_addr);
-			set_ext_storage(ret, raw_size, raw_addr);
+            parse_attr(word, &raw_size, &raw_addr);
+            ret->payload.structure.data
+                 = make_ext_storage(VAL_STRUCT_SIZE(ret), raw_size, raw_addr);
 
-			break;
-		} else if (! IS_SET_WORD(word)) {
-			Trap_Arg(word);
-		}
+            break;
+        }
+        else if (! IS_SET_WORD(word))
+            fail (Error_Invalid_Arg(word));
 
-		if (IS_END(fld_val)) {
-			Trap1(RE_NEED_VALUE, fld_val);
-		}
+        if (IS_END(fld_val))
+            fail (Error(RE_NEED_VALUE, fld_val));
 
-		for (i = 0; i < SERIES_TAIL(fields); i ++) {
-			fld = (struct Struct_Field*)SERIES_SKIP(fields, i);
-			if (fld->sym == VAL_WORD_CANON(word)) {
-				if (fld->dimension > 1) {
-					REBCNT n = 0;
-					if (IS_BLOCK(fld_val)) {
-						if (VAL_LEN(fld_val) != fld->dimension) {
-							Trap_Arg(fld_val);
-						}
-						for(n = 0; n < fld->dimension; n ++) {
-							if (!assign_scalar(&VAL_STRUCT(ret), fld, n, VAL_BLK_SKIP(fld_val, n))) {
-								Trap_Arg(fld_val);
-							}
-						}
-					} else if (IS_INTEGER(fld_val)) {
-						void *ptr = cast(void *,
-							cast(REBUPT, VAL_INT64(fld_val))
-						);
+        REBARR *fieldlist = VAL_STRUCT_FIELDLIST(ret);
+        RELVAL *item = ARR_HEAD(fieldlist);
 
-						/* assuming it's an valid pointer and holding enough space */
-						memcpy(SERIES_SKIP(VAL_STRUCT_DATA_BIN(ret), fld->offset), ptr, fld->size * fld->dimension);
-					} else {
-						Trap_Arg(fld_val);
-					}
-				} else {
-					if (!assign_scalar(&VAL_STRUCT(ret), fld, 0, fld_val)) {
-						Trap_Arg(fld_val);
-					}
-				}
-				break;
-			}
-		}
+        for (; NOT_END(item); ++item) {
+            REBFLD *field = VAL_ARRAY(item);
 
-		if (i == SERIES_TAIL(fields)) {
-			Trap_Arg(word); /* field not found in the parent struct */
-		}
-	}
+            if (STR_CANON(FLD_NAME(field)) != VAL_WORD_CANON(word))
+                continue;
+
+            if (FLD_IS_ARRAY(field)) {
+                if (IS_BLOCK(fld_val)) {
+                    REBCNT dimension = FLD_DIMENSION(field);
+
+                    if (VAL_LEN_AT(fld_val) != dimension)
+                        fail (Error_Invalid_Arg(fld_val));
+
+                    REBCNT n = 0;
+                    for (n = 0; n < dimension; ++n) {
+                        if (NOT(assign_scalar(
+                            VAL_STRUCT(ret),
+                            field,
+                            n,
+                            KNOWN(VAL_ARRAY_AT_HEAD(fld_val, n))
+                        ))) {
+                            fail (Error_Invalid_Arg(fld_val));
+                        }
+                    }
+                }
+                else if (IS_INTEGER(fld_val)) { // interpret as a data pointer
+                    void *ptr = cast(void *,
+                        cast(REBUPT, VAL_INT64(fld_val))
+                    );
+
+                    // assuming valid pointer to enough space
+                    memcpy(
+                        VAL_STRUCT_DATA_HEAD(ret) + FLD_OFFSET(field),
+                        ptr,
+                        FLD_LEN_BYTES_TOTAL(field)
+                    );
+                }
+                else
+                    fail (Error_Invalid_Arg(fld_val));
+            }
+            else {
+                if (NOT(assign_scalar(VAL_STRUCT(ret), field, 0, fld_val)))
+                    fail (Error_Invalid_Arg(fld_val));
+            }
+            return;
+        }
+
+        fail (Error_Invalid_Arg(word)); // field not in the parent struct
+    }
 }
 
-/***********************************************************************
-**
-*/	REBTYPE(Struct)
-/*
-***********************************************************************/
+
+//
+//  MAKE_Struct: C
+//
+// Format:
+//     make struct! [
+//         field1 [type1]
+//         field2: [type2] field2-init-value
+//         field3: [struct [field1 [type1]]]
+//         field4: [type1[3]]
+//         ...
+//     ]
+//
+void MAKE_Struct(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
+    assert(kind == REB_STRUCT);
+
+    if (!IS_BLOCK(arg))
+        fail (Error_Invalid_Arg(arg));
+
+    REBINT max_fields = 16;
+
+//
+// SET UP SCHEMA
+//
+    // Every struct has a "schema"--this is a description (potentially
+    // hierarchical) of its fields, including any nested structs.  The
+    // schema should be shared between common instances of the same struct.
+    //
+    REBFLD *schema = Make_Array(IDX_FIELD_MAX);
+    SET_BLANK(FLD_AT(schema, IDX_FIELD_NAME)); // no symbol for struct itself
+    // we'll be filling in the IDX_FIELD_TYPE slot with an array of fields
+    SET_BLANK(FLD_AT(schema, IDX_FIELD_DIMENSION)); // not an array
+
+    SET_UNREADABLE_BLANK(FLD_AT(schema, IDX_FIELD_FFTYPE));
+
+    SET_BLANK(FLD_AT(schema, IDX_FIELD_OFFSET)); // the offset is not used
+    // we'll be filling in the IDX_FIELD_WIDE at the end.
+
+
+//
+// PROCESS FIELDS
+//
+
+    u64 offset = 0; // offset in data
+
+    REBINT raw_size = -1;
+    REBUPT raw_addr = 0;
+
+    DECLARE_LOCAL (specified);
+
+    RELVAL *item = VAL_ARRAY_AT(arg);
+    if (NOT_END(item) && IS_BLOCK(item)) {
+        //
+        // !!! This would suggest raw-size, raw-addr, or extern can be leading
+        // in the struct definition, perhaps as:
+        //
+        //     make struct! [[raw-size] ...]
+        //
+        Derelativize(specified, item, VAL_SPECIFIER(arg));
+        parse_attr(specified, &raw_size, &raw_addr);
+        ++item;
+    }
+
+    // !!! This makes binary data for each struct level? ???
+    //
+    REBSER *data_bin;
+    if (raw_addr == 0)
+        data_bin = Make_Binary(max_fields << 2);
+
+    REBINT field_idx = 0; // for field index
+    REBIXO eval_idx = 0; // for spec block evaluation
+
+    REBDSP dsp_orig = DSP; // use data stack to accumulate fields (BLOCK!s)
+
+    DECLARE_LOCAL (spec);
+    DECLARE_LOCAL (init); // for result to save in data
+
+    while (NOT_END(item)) {
+
+        // Add another field...
+
+        REBFLD *field = Make_Array(IDX_FIELD_MAX);
+
+        SET_UNREADABLE_BLANK(FLD_AT(field, IDX_FIELD_FFTYPE));
+        SET_INTEGER(FLD_AT(field, IDX_FIELD_OFFSET), offset);
+
+        // Must be a word or a set-word, with set-words initializing
+
+        REBOOL expect_init;
+        if (IS_SET_WORD(item)) {
+            expect_init = TRUE;
+            if (raw_addr) {
+                // initialization is not allowed for raw memory struct
+                fail (Error_Invalid_Arg_Core(item, VAL_SPECIFIER(arg)));
+            }
+        }
+        else if (IS_WORD(item))
+            expect_init = FALSE;
+        else
+            fail (Error_Invalid_Type(VAL_TYPE(item)));
+
+        Init_Word(FLD_AT(field, IDX_FIELD_NAME), VAL_WORD_SPELLING(item));
+
+        ++item;
+        if (IS_END(item) || !IS_BLOCK(item))
+            fail (Error_Invalid_Arg_Core(item, VAL_SPECIFIER(arg)));
+
+        Derelativize(spec, item, VAL_SPECIFIER(arg));
+
+        // Fills in the width, dimension, type, and ffi_type (if needed)
+        //
+        Parse_Field_Type_May_Fail(field, spec, init);
+
+        REBCNT dimension = FLD_IS_ARRAY(field) ? FLD_DIMENSION(field) : 1;
+        ++item;
+
+        // !!! Why does the fail take out as an argument?  (Copied from below)
+
+        if (FLD_WIDE(field) > MAX_U32)
+            fail (Error(RE_SIZE_LIMIT, out));
+        if (dimension > MAX_U32)
+            fail (Error(RE_SIZE_LIMIT, out));
+
+        u64 step = cast(u64, FLD_WIDE(field)) * cast(u64, dimension);
+
+        if (step > VAL_STRUCT_LIMIT)
+            fail (Error(RE_SIZE_LIMIT, out));
+
+        if (raw_addr == 0)
+            EXPAND_SERIES_TAIL(data_bin, step);
+
+        if (expect_init) {
+            if (IS_END(item))
+               fail (Error_Invalid_Arg(arg));
+
+            if (IS_BLOCK(item)) {
+                Derelativize(specified, item, VAL_SPECIFIER(arg));
+
+                if (Reduce_Any_Array_Throws(
+                    init, specified, REDUCE_FLAG_DROP_BARS
+                )){
+                    fail (Error_No_Catch_For_Throw(init));
+                }
+
+                ++item;
+            }
+            else {
+                eval_idx = DO_NEXT_MAY_THROW(
+                    init,
+                    VAL_ARRAY(arg),
+                    item - VAL_ARRAY_AT(arg),
+                    VAL_SPECIFIER(arg)
+                );
+                if (eval_idx == THROWN_FLAG)
+                    fail (Error_No_Catch_For_Throw(init));
+
+                if (eval_idx == END_FLAG)
+                    item = VAL_ARRAY_TAIL(arg);
+                else
+                    item = VAL_ARRAY_AT_HEAD(item, cast(REBCNT, eval_idx));
+            }
+
+            if (FLD_IS_ARRAY(field)) {
+                if (IS_INTEGER(init)) { // interpreted as a C pointer
+                    void *ptr = cast(void *, cast(REBUPT, VAL_INT64(init)));
+
+                    // assume valid pointer to enough space
+                    memcpy(
+                        SER_AT(REBYTE, data_bin, cast(REBCNT, offset)),
+                        ptr,
+                        FLD_LEN_BYTES_TOTAL(field)
+                    );
+                }
+                else if (IS_BLOCK(init)) {
+                    REBCNT n = 0;
+
+                    if (VAL_LEN_AT(init) != FLD_DIMENSION(field))
+                        fail (Error_Invalid_Arg(init));
+
+                    // assign
+                    for (n = 0; n < FLD_DIMENSION(field); n ++) {
+                        if (!assign_scalar_core(
+                            BIN_HEAD(data_bin),
+                            offset,
+                            field,
+                            n,
+                            KNOWN(VAL_ARRAY_AT_HEAD(init, n))
+                        )) {
+                            //printf("Failed to assign element value\n");
+                            fail (Error(RE_MISC));
+                        }
+                    }
+                }
+                else
+                    fail (Error_Unexpected_Type(REB_BLOCK, VAL_TYPE(item)));
+            }
+            else {
+                // scalar
+                if (!assign_scalar_core(
+                    BIN_HEAD(data_bin), offset, field, 0, init
+                )) {
+                    //printf("Failed to assign scalar value\n");
+                    fail (Error(RE_MISC));
+                }
+            }
+        }
+        else if (raw_addr == 0) {
+            if (FLD_IS_STRUCT(field)) {
+                REBCNT n = 0;
+                for (n = 0; n < FLD_DIMENSION(field); n ++) {
+                    memcpy(
+                        SER_AT(
+                            REBYTE,
+                            data_bin,
+                            cast(REBCNT, offset) + (n * FLD_WIDE(field))
+                        ),
+                        VAL_STRUCT_DATA_HEAD(init),
+                        FLD_WIDE(field)
+                    );
+                }
+            }
+            else {
+                memset(
+                    SER_AT(REBYTE, data_bin, cast(REBCNT, offset)),
+                    0,
+                    FLD_LEN_BYTES_TOTAL(field)
+                );
+            }
+        }
+
+        offset += step;
+
+        //if (alignment != 0) {
+        //  offset = ((offset + alignment - 1) / alignment) * alignment;
+
+        if (offset > VAL_STRUCT_LIMIT)
+            fail (Error(RE_SIZE_LIMIT, out));
+
+        ++ field_idx;
+
+        TERM_ARRAY_LEN(field, 6);
+        ASSERT_ARRAY(field);
+
+        DS_PUSH_TRASH;
+        Init_Block(DS_TOP, field); // really should be an OBJECT!
+    }
+
+    REBARR *fieldlist = Pop_Stack_Values(dsp_orig);
+    ASSERT_ARRAY(fieldlist);
+
+    Init_Block(FLD_AT(schema, IDX_FIELD_TYPE), fieldlist);
+    Prepare_Field_For_FFI(schema);
+
+    SET_INTEGER(FLD_AT(schema, IDX_FIELD_WIDE), offset); // total size known
+
+    TERM_ARRAY_LEN(schema, IDX_FIELD_MAX);
+    ASSERT_ARRAY(schema);
+
+//
+// FINALIZE VALUE
+//
+
+    REBSTU *stu = Alloc_Singular_Array();
+
+    // Set it to blank so the Kill_Series can be called upon in case of error
+    // thrown before it is fully constructed.
+    //
+    SET_BLANK(ARR_HEAD(stu));
+
+    MANAGE_ARRAY(schema);
+    AS_SERIES(stu)->link.schema = schema;
+
+    VAL_RESET_HEADER(out, REB_STRUCT);
+    out->payload.structure.stu = stu;
+    if (raw_addr) {
+        out->payload.structure.data
+            = make_ext_storage(
+                FLD_LEN_BYTES_TOTAL(schema), raw_size, raw_addr
+            );
+    }
+    else {
+        MANAGE_SERIES(data_bin);
+        out->payload.structure.data = data_bin;
+    }
+    out->extra.struct_offset = 0;
+
+    *ARR_HEAD(stu) = *out;
+    MANAGE_ARRAY(stu);
+}
+
+
+//
+//  TO_Struct: C
+//
+void TO_Struct(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
-	REBVAL *val;
-	REBVAL *arg;
-	REBVAL *ret;
+    MAKE_Struct(out, kind, arg);
+}
 
-	arg = D_ARG(2);
-	val = D_ARG(1);
 
-	ret = D_OUT;
+//
+//  PD_Struct: C
+//
+REBINT PD_Struct(REBPVS *pvs)
+{
+    REBSTU *stu = VAL_STRUCT(pvs->value);
+    if (!IS_WORD(pvs->selector))
+        fail (Error_Bad_Path_Select(pvs));
 
-	SET_UNSET(ret);
-	// unary actions
-	switch(action) {
-		case A_MAKE:
-			//RL_Print("%s, %d, Make struct action\n", __func__, __LINE__);
-		case A_TO:
-			//RL_Print("%s, %d, To struct action\n", __func__, __LINE__);
+    fail_if_non_accessible(KNOWN(pvs->value));
 
-			// Clone an existing STRUCT:
-			if (IS_STRUCT(val)) {
-				Copy_Struct_Val(val, ret);
+    if (!pvs->opt_setval || NOT_END(pvs->item + 1)) {
+        if (NOT(Get_Struct_Var(pvs->store, stu, pvs->selector)))
+            fail (Error_Bad_Path_Select(pvs));
 
-				/* only accept value initialization */
-				init_fields(ret, arg);
-			} else if (!IS_DATATYPE(val)) {
-				goto is_arg_error;
-			} else {
-				// Initialize STRUCT from block:
-				// make struct! [float a: 0]
-				// make struct! [double a: 0]
-				if (IS_BLOCK(arg)) {
-					if (!MT_Struct(ret, arg, REB_STRUCT)) {
-						goto is_arg_error;
-					}
-				} else {
-					Trap_Make_DEAD_END(REB_STRUCT, arg);
-				}
-			}
-			SET_TYPE(ret, REB_STRUCT);
-			break;
+        // !!! Comment here said "Setting element to an array in the struct"
+        // and gave the example `struct/field/1: 0`.  What is thus happening
+        // here is that the ordinary SET-PATH! dispatch which goes one step
+        // at a time can't work to update something whose storage is not
+        // a REBVAL*.  So (struct/field) produces a temporary BLOCK! out of
+        // the C array data, and if the set just sets an element in that
+        // block then it will be forgotten and have no effect.
+        //
+        // So the workaround is to bypass ordinary dispatch and call it to
+        // look ahead manually by one step.  Whatever change is made to
+        // the block is then turned around and re-set in the underlying
+        // memory that produced it.
+        //
+        // A better general mechanism for this kind of problem is needed,
+        // although it only affects "extension types" which use natively
+        // packed structures to store their state instead of REBVAL.  (See
+        // a similar technique used by PD_Gob)
+        //
+        if (
+            pvs->opt_setval
+            && IS_BLOCK(pvs->store)
+            && IS_END(pvs->item + 2)
+        ) {
+            // !!! This is dodgy; it has to copy (as selector is a pointer to
+            // a memory cell it may not own), has to guard (as the next path
+            // evaluation may not protect the result...)
+            //
+            DECLARE_LOCAL (sel_orig);
+            Move_Value(sel_orig, pvs->selector);
+            PUSH_GUARD_VALUE(sel_orig);
 
-		case A_CHANGE:
-			{
-				if (!IS_BINARY(arg)) {
-					Trap_Types_DEAD_END(RE_EXPECT_VAL, REB_BINARY, VAL_TYPE(arg));
-				}
+            pvs->value = pvs->store;
+            pvs->value_specifier = SPECIFIED;
 
-				if (VAL_LEN(arg) != SERIES_TAIL(VAL_STRUCT_DATA_BIN(val))) {
-					Trap_Arg_DEAD_END(arg);
-				}
-				memcpy(SERIES_DATA(VAL_STRUCT_DATA_BIN(val)),
-					   SERIES_DATA(VAL_SERIES(arg)),
-					   SERIES_TAIL(VAL_STRUCT_DATA_BIN(val)));
-			}
-			break;
-		case A_REFLECT:
-			{
-				REBINT n = VAL_WORD_CANON(arg); // zero on error
-				switch (n) {
-					case SYM_VALUES:
-						Val_Init_Binary(ret, Copy_Sequence_At_Len(VAL_STRUCT_DATA_BIN(val), VAL_STRUCT_OFFSET(val), VAL_STRUCT_LEN(val)));
-						break;
-					case SYM_SPEC:
-						Val_Init_Block(
-							ret, Copy_Array_Deep_Managed(VAL_STRUCT_SPEC(val))
-						);
-						Unbind_Values_Deep(VAL_BLK_HEAD(val));
-						break;
-					case SYM_ADDR:
-						SET_INTEGER(ret, (REBUPT)SERIES_SKIP(VAL_STRUCT_DATA_BIN(val), VAL_STRUCT_OFFSET(val)));
-						break;
-					default:
-						Trap_Reflect_DEAD_END(REB_STRUCT, arg);
-				}
-			}
-			break;
+            if (Next_Path_Throws(pvs)) { // updates pvs->store, pvs->selector
+                DROP_GUARD_VALUE(sel_orig);
+                fail (Error_No_Catch_For_Throw(pvs->store)); // !!! Review
+            }
 
-		case A_LENGTH:
-			SET_INTEGER(ret, SERIES_TAIL(VAL_STRUCT_DATA_BIN(val)));
-			break;
-		default:
-			Trap_Action_DEAD_END(REB_STRUCT, action);
-	}
-	return R_OUT;
+            DECLARE_LOCAL (specific);
+            Derelativize(specific, pvs->value, pvs->value_specifier);
 
-is_arg_error:
-	Trap_Types_DEAD_END(RE_EXPECT_VAL, REB_STRUCT, VAL_TYPE(arg));
+            if (!Set_Struct_Var(stu, sel_orig, pvs->selector, specific))
+                fail (Error_Bad_Path_Set(pvs));
+
+            DROP_GUARD_VALUE(sel_orig);
+
+            return PE_OK;
+        }
+
+        return PE_USE_STORE;
+    }
+    else {
+        // setting (because opt_setval is non-NULL, and at end of path)
+
+        if (!Set_Struct_Var(stu, pvs->selector, NULL, pvs->opt_setval))
+            fail (Error_Bad_Path_Set(pvs));
+
+        return PE_OK;
+    }
+
+    fail (Error_Bad_Path_Select(pvs));
+}
+
+
+//
+//  Cmp_Struct: C
+//
+REBINT Cmp_Struct(const RELVAL *s, const RELVAL *t)
+{
+    REBINT n = VAL_STRUCT_FIELDLIST(s) - VAL_STRUCT_FIELDLIST(t);
+    fail_if_non_accessible(const_KNOWN(s));
+    fail_if_non_accessible(const_KNOWN(t));
+    if (n != 0) {
+        return n;
+    }
+    n = VAL_STRUCT(s) - VAL_STRUCT(t);
+    return n;
+}
+
+
+//
+//  CT_Struct: C
+//
+REBINT CT_Struct(const RELVAL *a, const RELVAL *b, REBINT mode)
+{
+    switch (mode) {
+    case 1: // strict equality
+        return 0 == Cmp_Struct(a, b);
+
+    case 0: // coerced equality
+        if (Cmp_Struct(a, b) == 0)
+            return 1;
+
+        return (
+            IS_STRUCT(a) && IS_STRUCT(b)
+            && same_fields(VAL_STRUCT_FIELDLIST(a), VAL_STRUCT_FIELDLIST(b))
+            && VAL_STRUCT_SIZE(a) == VAL_STRUCT_SIZE(b)
+            && !memcmp(
+                VAL_STRUCT_DATA_HEAD(a),
+                VAL_STRUCT_DATA_HEAD(b),
+                VAL_STRUCT_SIZE(a)
+            )
+        );
+
+    default:
+        return -1;
+    }
+    return -1;
+}
+
+
+//
+//  Copy_Struct_Managed: C
+//
+REBSTU *Copy_Struct_Managed(REBSTU *src)
+{
+    fail_if_non_accessible(STU_VALUE(src));
+
+    assert(ARR_LEN(src) == 1);
+    assert(IS_STRUCT(ARR_AT(src, 0)));
+
+    // This doesn't copy the data out of the array, or the schema...just the
+    // value.  In fact, the schema is in the misc field and has to just be
+    // linked manually.
+    //
+    REBSTU *copy = Copy_Array_Shallow(src, SPECIFIED);
+    AS_SERIES(copy)->link.schema = AS_SERIES(src)->link.schema;
+
+    // Update the binary data with a copy of its sequence.
+    //
+    // !!! Note that this leaves the offset intact, and will wind up making a
+    // copy as big as struct the instance is embedded into if nonzero offset.
+
+    REBSER *bin_copy = Make_Binary(STU_DATA_LEN(src));
+    memcpy(BIN_HEAD(bin_copy), STU_DATA_HEAD(src), STU_DATA_LEN(src));
+    TERM_BIN_LEN(bin_copy, STU_DATA_LEN(src));
+    STU_VALUE(copy)->payload.structure.data = bin_copy;
+    assert(STU_DATA_HEAD(copy) == BIN_HEAD(bin_copy));
+
+    MANAGE_SERIES(bin_copy);
+    MANAGE_ARRAY(copy);
+    return copy;
+}
+
+
+//
+//  REBTYPE: C
+//
+REBTYPE(Struct)
+{
+    REBVAL *val;
+    REBVAL *arg;
+
+    val = D_ARG(1);
+
+    SET_VOID(D_OUT);
+    // unary actions
+    switch(action) {
+
+    case SYM_CHANGE: {
+        arg = D_ARG(2);
+        if (!IS_BINARY(arg))
+            fail (Error_Unexpected_Type(REB_BINARY, VAL_TYPE(arg)));
+
+        if (VAL_LEN_AT(arg) != VAL_STRUCT_DATA_LEN(val))
+            fail (Error_Invalid_Arg(arg));
+
+        memcpy(
+            VAL_STRUCT_DATA_HEAD(val),
+            BIN_HEAD(VAL_SERIES(arg)),
+            VAL_STRUCT_DATA_LEN(val)
+        );
+        Move_Value(D_OUT, val);
+        break; }
+
+    case SYM_REFLECT: {
+        arg = D_ARG(2);
+        switch (VAL_WORD_SYM(arg)) {
+        case SYM_VALUES: {
+            fail_if_non_accessible(val);
+            REBSER *bin = Make_Binary(VAL_STRUCT_SIZE(val));
+            memcpy(
+                BIN_HEAD(bin),
+                VAL_STRUCT_DATA_AT(val),
+                VAL_STRUCT_SIZE(val)
+            );
+            TERM_BIN_LEN(bin, VAL_STRUCT_SIZE(val));
+            Init_Binary(D_OUT, bin);
+            break; }
+
+        case SYM_SPEC:
+            Init_Block(D_OUT, Struct_To_Array(VAL_STRUCT(val)));
+            break;
+
+        case SYM_ADDR:
+            SET_INTEGER(D_OUT, cast(REBUPT, VAL_STRUCT_DATA_AT(val)));
+            break;
+
+        default:
+            fail (Error_Cannot_Reflect(REB_STRUCT, arg));
+        }
+        break; }
+
+    case SYM_LENGTH:
+        SET_INTEGER(D_OUT, VAL_STRUCT_DATA_LEN(val));
+        break;
+
+    default:
+        fail (Error_Illegal_Action(REB_STRUCT, action));
+    }
+    return R_OUT;
+}
+
+
+//
+//  destroy-struct-storage: native [
+//
+//  {Destroy the external memory associated the struct}
+//
+//      struct [struct!]
+//      /free
+//          {Specify the function to free the memory}
+//      free-func [function!]
+//  ]
+//
+REBNATIVE(destroy_struct_storage)
+{
+    INCLUDE_PARAMS_OF_DESTROY_STRUCT_STORAGE;
+
+    REBSER *data = ARG(struct)->payload.structure.data;
+    if (NOT(Is_Array_Series(data)))
+        fail (Error(RE_NO_EXTERNAL_STORAGE));
+
+    RELVAL *handle = ARR_HEAD(AS_ARRAY(data));
+
+    DECLARE_LOCAL (pointer);
+    SET_INTEGER(pointer, cast(REBUPT, VAL_HANDLE_POINTER(handle)));
+
+    if (VAL_HANDLE_LEN(handle) == 0)
+        fail (Error(RE_ALREADY_DESTROYED, pointer));
+
+    // TBD: assert handle length was correct for memory block size
+
+    SET_HANDLE_LEN(handle, 0);
+
+    if (REF(free)) {
+        if (NOT(IS_FUNCTION_RIN(ARG(free_func))))
+            fail (Error(RE_FREE_NEEDS_ROUTINE));
+
+        if (Do_Va_Throws(D_OUT, ARG(free_func), pointer, END_CELL))
+            return R_OUT_IS_THROWN;
+    }
+
+    return R_VOID;
 }

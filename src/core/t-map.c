@@ -1,576 +1,777 @@
-/***********************************************************************
-**
-**  REBOL [R3] Language Interpreter and Run-time Environment
-**
-**  Copyright 2012 REBOL Technologies
-**  REBOL is a trademark of REBOL Technologies
-**
-**  Licensed under the Apache License, Version 2.0 (the "License");
-**  you may not use this file except in compliance with the License.
-**  You may obtain a copy of the License at
-**
-**  http://www.apache.org/licenses/LICENSE-2.0
-**
-**  Unless required by applicable law or agreed to in writing, software
-**  distributed under the License is distributed on an "AS IS" BASIS,
-**  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-**  See the License for the specific language governing permissions and
-**  limitations under the License.
-**
-************************************************************************
-**
-**  Module:  t-map.c
-**  Summary: map datatype
-**  Section: datatypes
-**  Author:  Carl Sassenrath
-**  Notes:
-**
-***********************************************************************/
-/*
-	A map is a SERIES that can also include a hash table for faster lookup.
-
-	The hashing method used here is the same as that used for the
-	REBOL symbol table, with the exception that this method must
-	also store the value of the symbol (not just its word).
-
-	The structure of the series header for a map is the	same as other
-	series, except that the opt series field is	a pointer to a REBCNT
-	series, the hash table.
-
-	The hash table is an array of REBCNT integers that are index values
-	into the map series. NOTE: They are one-based to avoid 0 which is an
-	empty slot.
-
-	Each value in the map consists of a word followed by its value.
-
-	These functions are also used hashing SET operations (e.g. UNION).
-
-	The series/tail / 2 is the number of values stored.
-
-	The hash-series/tail is a prime number that is use for computing
-	slots in the hash table.
-*/
+//
+//  File: %t-map.c
+//  Summary: "map datatype"
+//  Section: datatypes
+//  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
+//  Homepage: https://github.com/metaeducation/ren-c/
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// Copyright 2012 REBOL Technologies
+// Copyright 2012-2017 Rebol Open Source Contributors
+// REBOL is a trademark of REBOL Technologies
+//
+// See README.md and CREDITS.md for more information.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+//=////////////////////////////////////////////////////////////////////////=//
+//
+// See %sys-map.h for an explanation of the map structure.
+//
 
 #include "sys-core.h"
 
-#define MIN_DICT 8 // size to switch to hashing
-
-
-/***********************************************************************
-**
-*/	REBINT CT_Map(REBVAL *a, REBVAL *b, REBINT mode)
-/*
-***********************************************************************/
+//
+//  CT_Map: C
+//
+REBINT CT_Map(const RELVAL *a, const RELVAL *b, REBINT mode)
 {
-	if (mode < 0) return -1;
-	if (mode == 3) return VAL_SERIES(a) == VAL_SERIES(b);
-	return 0 == Cmp_Block(a, b, 0);
+    if (mode < 0) return -1;
+    return 0 == Cmp_Array(a, b, FALSE);
 }
 
 
-/***********************************************************************
-**
-*/	static REBSER *Make_Map(REBINT size)
-/*
-**		Makes a MAP block (that holds both keys and values).
-**		Size is the number of key-value pairs.
-**		If size >= MIN_DICT, then a hash series is also created.
-**
-***********************************************************************/
+//
+//  Make_Map: C
+//
+// Makes a MAP block (that holds both keys and values).
+// Capacity is measured in key-value pairings.
+// A hash series is also created.
+//
+static REBMAP *Make_Map(REBCNT capacity)
 {
-	REBSER *blk = Make_Array(size * 2);
-	REBSER *ser = 0;
+    REBARR *pairlist = Make_Array(capacity * 2);
+    SET_SER_FLAG(pairlist, ARRAY_FLAG_PAIRLIST);
 
-	if (size >= MIN_DICT) ser = Make_Hash_Sequence(size);
+    AS_SERIES(pairlist)->link.hashlist = Make_Hash_Sequence(capacity);
 
-	blk->extra.series = ser;
-
-	return blk;
+    return AS_MAP(pairlist);
 }
 
 
-/***********************************************************************
-**
-*/	REBINT Find_Key(REBSER *series, REBSER *hser, REBVAL *key, REBINT wide, REBCNT cased, REBYTE mode)
-/*
-**		Returns hash index (either the match or the new one).
-**		A return of zero is valid (as a hash index);
-**
-**		Wide: width of record (normally 2, a key and a value).
-**
-**		Modes:
-**			0 - search, return hash if found or not
-**			1 - search, return hash, else return -1 if not
-**			2 - search, return hash, else append value and return -1
-**
-***********************************************************************/
-{
-	REBCNT *hashes;
-	REBCNT skip;
-	REBCNT hash;
-	REBCNT len;
-	REBCNT n;
-	REBVAL *val;
+//
+//  Find_Key_Hashed: C
+//
+// Returns hash index (either the match or the new one).
+// A return of zero is valid (as a hash index);
+//
+// Wide: width of record (normally 2, a key and a value).
+//
+// Modes:
+//     0 - search, return hash if found or not
+//     1 - search, return hash, else return -1 if not
+//     2 - search, return hash, else append value and return -1
+//
+REBINT Find_Key_Hashed(
+    REBARR *array,
+    REBSER *hashlist,
+    const RELVAL *key, // !!! assumes key is followed by value(s) via ++
+    REBSPC *specifier,
+    REBCNT wide,
+    REBOOL cased,
+    REBYTE mode
+) {
+    REBCNT len = SER_LEN(hashlist);
+    assert(len > 0);
 
-	// Compute hash for value:
-	len = hser->tail;
-	hash = Hash_Value(key, len);
-	if (!hash) Trap_Type_DEAD_END(key);
+    REBCNT hash = Hash_Value(key);
 
-	// Determine skip and first index:
-	skip  = (len == 0) ? 0 : (hash & 0x0000FFFF) % len;
-	if (skip == 0) skip = 1;
-	hash = (len == 0) ? 0 : (hash & 0x00FFFF00) % len;
+    // The REBCNT[] hash array size is chosen to try and make a large enough
+    // table relative to the data that collisions will be hopefully not
+    // frequent.  But they may still collide.  The method R3-Alpha chose to
+    // deal with collisions was to have a "skip" amount that will go try
+    // another hash bucket until the searched for key is found or a 0
+    // entry in the hashlist is found.
+    //
+    // Note: if len and skip are co-primes is guaranteed that repeatedly
+    // adding skip (and subtracting len when needed) all positions are
+    // visited.  1 <= skip < len, and len is prime, so this is guaranteed.
 
-	// Scan hash table for match:
-	hashes = (REBCNT*)hser->data;
-	if (ANY_WORD(key)) {
-		while ((n = hashes[hash])) {
-			val = BLK_SKIP(series, (n-1) * wide);
-			if (
-				ANY_WORD(val) &&
-				(VAL_WORD_SYM(key) == VAL_BIND_SYM(val) ||
-				(!cased && VAL_WORD_CANON(key) == VAL_BIND_CANON(val)))
-			) return hash;
-			hash += skip;
-			if (hash >= len) hash -= len;
-		}
-	}
-	else if (ANY_BINSTR(key)) {
-		while ((n = hashes[hash])) {
-			val = BLK_SKIP(series, (n-1) * wide);
-			if (
-				VAL_TYPE(val) == VAL_TYPE(key)
-				&& 0 == Compare_String_Vals(key, val, (REBOOL)(!IS_BINARY(key) && !cased))
-			) return hash;
-			hash += skip;
-			if (hash >= len) hash -= len;
-		}
-	} else {
-		while ((n = hashes[hash])) {
-			val = BLK_SKIP(series, (n-1) * wide);
-			if (VAL_TYPE(val) == VAL_TYPE(key) && 0 == Cmp_Value(key, val, !cased)) return hash;
-			hash += skip;
-			if (hash >= len) hash -= len;
-		}
-	}
+    REBCNT skip = hash % (len - 1) + 1;
 
-	// Append new value the target series:
-	if (mode > 1) {
-		hashes[hash] = SERIES_TAIL(series)+1;
-		//Debug_Num("hash:", hashes[hash]);
-		Append_Series(series, (REBYTE*)key, wide);
-		//Dump_Series(series, "hash");
-	}
+    hash = hash % len;
 
-	return (mode > 0) ? NOT_FOUND : hash;
+    // a 'zombie' is a key with void value, that may be overwritten.  Set to
+    // len to indicate zombie not yet encountered.
+    //
+    REBCNT zombie = len;
+
+    REBCNT uncased = len; // uncased match not yet encountered
+
+    // Scan hash table for match:
+
+    REBCNT *hashes = SER_HEAD(REBCNT, hashlist);
+    REBCNT n;
+    RELVAL *val;
+
+    if (ANY_WORD(key)) {
+        while ((n = hashes[hash])) {
+            val = ARR_AT(array, (n - 1) * wide);
+            if (ANY_WORD(val) && VAL_WORD_SPELLING(key) == VAL_WORD_SPELLING(val))
+                return hash;
+
+            if (!cased && VAL_WORD_CANON(key) == VAL_WORD_CANON(val) && uncased == len) {
+                uncased = hash;
+            }
+            else if (wide > 1 && IS_VOID(++val) && zombie == len) {
+                zombie = hash;
+            }
+            hash += skip;
+            if (hash >= len) hash -= len;
+        }
+    }
+    else if (ANY_BINSTR(key)) {
+        while ((n = hashes[hash])) {
+            val = ARR_AT(array, (n - 1) * wide);
+            if (VAL_TYPE(val) == VAL_TYPE(key)) {
+                if (0 == Compare_String_Vals(val, key, FALSE)) return hash;
+                if (
+                    !cased && uncased == len
+                    && 0 == Compare_String_Vals(
+                        val, key, LOGICAL(!IS_BINARY(key))
+                    )
+                ) {
+                    uncased = hash;
+                }
+            }
+            if (wide > 1 && IS_VOID(++val) && zombie == len)  {
+                zombie = hash;
+            }
+            hash += skip;
+            if (hash >= len) hash -= len;
+        }
+    } else {
+        while ((n = hashes[hash])) {
+            val = ARR_AT(array, (n - 1) * wide);
+            if (VAL_TYPE(val) == VAL_TYPE(key)) {
+                if (0 == Cmp_Value(key, val, TRUE)) {
+                    return hash;
+                }
+                if (
+                    !cased && uncased == len
+                    && REB_CHAR == VAL_TYPE(val)
+                    && 0 == Cmp_Value(key, val, FALSE)
+                ) {
+                    uncased = hash;
+                }
+            }
+            if (wide > 1 && IS_VOID(++val) && zombie == len) zombie = hash;
+            hash += skip;
+            if (hash >= len) hash -= len;
+        }
+    }
+
+    //assert(n == 0);
+    if (!cased && uncased < len) hash = uncased; // uncased< match
+    else if (zombie < len) { // zombie encountered!
+        assert(mode == 0);
+        hash = zombie;
+        n = hashes[hash];
+        // new key overwrite zombie
+        *ARR_AT(array, (n - 1) * wide) = *key;
+    }
+    // Append new value the target series:
+    if (mode > 1) {
+        REBCNT index;
+        const RELVAL *src = key;
+        hashes[hash] = (ARR_LEN(array) / wide) + 1;
+
+        // This used to use Append_Values_Len, but that is a REBVAL* interface
+        // !!! Should there be an Append_Values_Core which takes RELVAL*?
+        //
+        for (index = 0; index < wide; ++src, ++index)
+            Append_Value_Core(array, src, specifier);
+    }
+
+    return (mode > 0) ? NOT_FOUND : hash;
 }
 
 
-/***********************************************************************
-**
-*/	static void Rehash_Hash(REBSER *series)
-/*
-**		Recompute the entire hash table. Table must be large enough.
-**
-***********************************************************************/
+//
+//  Rehash_Map: C
+//
+// Recompute the entire hash table for a map. Table must be large enough.
+//
+static void Rehash_Map(REBMAP *map)
 {
-	REBVAL *val;
-	REBCNT n;
-	REBCNT key;
-	REBCNT *hashes;
+    REBSER *hashlist = MAP_HASHLIST(map);
 
-	if (!series->extra.series) return;
+    if (!hashlist) return;
 
-	hashes = cast(REBCNT*, series->extra.series->data);
+    REBCNT *hashes = SER_HEAD(REBCNT, hashlist);
+    REBARR *pairlist = MAP_PAIRLIST(map);
 
-	val = BLK_HEAD(series);
-	for (n = 0; n < series->tail; n += 2, val += 2) {
-		key = Find_Key(series, series->extra.series, val, 2, 0, 0);
-		hashes[key] = n/2+1;
-	}
+    REBVAL *key = KNOWN(ARR_HEAD(pairlist));
+    REBCNT n;
+
+    for (n = 0; n < ARR_LEN(pairlist); n += 2, key += 2) {
+        const REBOOL cased = TRUE; // cased=TRUE is always fine
+
+        if (IS_VOID(key + 1)) {
+            //
+            // It's a "zombie", move last key to overwrite it
+            //
+            Move_Value(
+                key, KNOWN(ARR_AT(pairlist, ARR_LEN(pairlist) - 2))
+            );
+            Move_Value(
+                &key[1], KNOWN(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))
+            );
+            SET_ARRAY_LEN_NOTERM(pairlist, ARR_LEN(pairlist) - 2);
+        }
+
+        REBCNT hash = Find_Key_Hashed(
+            pairlist, hashlist, key, SPECIFIED, 2, cased, 0
+        );
+        hashes[hash] = n / 2 + 1;
+
+        // discard zombies at end of pairlist
+        //
+        while (IS_VOID(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))) {
+            SET_ARRAY_LEN_NOTERM(pairlist, ARR_LEN(pairlist) - 2);
+        }
+    }
 }
 
 
-/***********************************************************************
-**
-*/	static REBCNT Find_Entry(REBSER *series, REBVAL *key, REBVAL *val)
-/*
-**		Try to find the entry in the map. If not found
-**		and val is SET, create the entry and store the key and
-**		val.
-**
-**		RETURNS: the index to the VALUE or zero if there is none.
-**
-***********************************************************************/
+//
+//  Expand_Hash: C
+//
+// Expand hash series. Clear it but set its tail.
+//
+void Expand_Hash(REBSER *ser)
 {
-	REBSER *hser = series->extra.series; // can be null
-	REBCNT *hashes;
-	REBCNT hash;
-	REBVAL *v;
-	REBCNT n;
+    REBINT pnum = Get_Hash_Prime(SER_LEN(ser) + 1);
+    if (pnum == 0) {
+        DECLARE_LOCAL (temp);
+        SET_INTEGER(temp, SER_LEN(ser) + 1);
+        fail (Error(RE_SIZE_LIMIT, temp));
+    }
 
-	if (IS_NONE(key)) return 0;
+    assert(!Is_Array_Series(ser));
+    Remake_Series(ser, pnum + 1, SER_WIDE(ser), MKS_POWER_OF_2);
 
-	// We may not be large enough yet for the hash table to
-	// be worthwhile, so just do a linear search:
-	if (!hser) {
-		if (series->tail < MIN_DICT*2) {
-			v = BLK_HEAD(series);
-			if (ANY_WORD(key)) {
-				for (n = 0; n < series->tail; n += 2, v += 2) {
-					if (ANY_WORD(v) && SAME_SYM(key, v)) {
-						if (val) *++v = *val;
-						return n/2+1;
-					}
-				}
-			}
-			else if (ANY_BINSTR(key)) {
-				for (n = 0; n < series->tail; n += 2, v += 2) {
-					if (VAL_TYPE(key) == VAL_TYPE(v) && 0 == Compare_String_Vals(key, v, (REBOOL)!IS_BINARY(v))) {
-						if (val)
-							*++v = *val;
-
-						return n/2+1;
-					}
-				}
-			}
-			else if (IS_INTEGER(key)) {
-				for (n = 0; n < series->tail; n += 2, v += 2) {
-					if (IS_INTEGER(v) && VAL_INT64(key) == VAL_INT64(v)) {
-						if (val) *++v = *val;
-						return n/2+1;
-					}
-				}
-			}
-			else if (IS_CHAR(key)) {
-				for (n = 0; n < series->tail; n += 2, v += 2) {
-					if (IS_CHAR(v) && VAL_CHAR(key) == VAL_CHAR(v)) {
-						if (val) *++v = *val;
-						return n/2+1;
-					}
-				}
-			}
-			else Trap_Type_DEAD_END(key);
-
-			if (!val) return 0;
-			Append_Value(series, key);
-			Append_Value(series, val); // does not copy value, e.g. if string
-			return series->tail/2;
-		}
-
-		// Add hash table:
-		//Print("hash added %d", series->tail);
-		series->extra.series = hser = Make_Hash_Sequence(series->tail);
-		MANAGE_SERIES(hser);
-		Rehash_Hash(series);
-	}
-
-	// Get hash table, expand it if needed:
-	if (series->tail > hser->tail/2) {
-		Expand_Hash(hser); // modifies size value
-		Rehash_Hash(series);
-	}
-
-	hash = Find_Key(series, hser, key, 2, 0, 0);
-	hashes = (REBCNT*)hser->data;
-	n = hashes[hash];
-
-	// Just a GET of value:
-	if (!val) return n;
-
-	// Must set the value:
-	if (n) {  // re-set it:
-		*BLK_SKIP(series, ((n-1)*2)+1) = *val; // set it
-		return n;
-	}
-
-	// Create new entry:
-	Append_Value(series, key);
-	Append_Value(series, val);  // does not copy value, e.g. if string
-
-	return (hashes[hash] = series->tail/2);
+    Clear_Series(ser);
+    SET_SERIES_LEN(ser, pnum);
 }
 
 
-/***********************************************************************
-**
-*/	REBINT Length_Map(REBSER *series)
-/*
-***********************************************************************/
-{
-	REBCNT n, c = 0;
-	REBVAL *v = BLK_HEAD(series);
+//
+//  Find_Map_Entry: C
+//
+// Try to find the entry in the map. If not found and val isn't void, create
+// the entry and store the key and val.
+//
+// RETURNS: the index to the VALUE or zero if there is none.
+//
+static REBCNT Find_Map_Entry(
+    REBMAP *map,
+    const RELVAL *key,
+    REBSPC *key_specifier,
+    const RELVAL *val,
+    REBSPC *val_specifier,
+    REBOOL cased // case-sensitive if true
+) {
+    assert(!IS_VOID(key));
 
-	for (n = 0; n < series->tail; n += 2, v += 2) {
-		if (!IS_NONE(v+1)) c++; // must have non-none value
-	}
+    REBSER *hashlist = MAP_HASHLIST(map); // can be null
+    REBARR *pairlist = MAP_PAIRLIST(map);
 
-	return c;
+    assert(hashlist);
+
+    // Get hash table, expand it if needed:
+    if (ARR_LEN(pairlist) > SER_LEN(hashlist) / 2) {
+        Expand_Hash(hashlist); // modifies size value
+        Rehash_Map(map);
+    }
+
+    REBCNT hash = Find_Key_Hashed(
+        pairlist, hashlist, key, key_specifier, 2, cased, 0
+    );
+
+    REBCNT *hashes = SER_HEAD(REBCNT, hashlist);
+    REBCNT n = hashes[hash];
+
+    // n==0 or pairlist[(n-1)*]=~key
+
+    // Just a GET of value:
+    if (!val) return n;
+
+    // If not just a GET, it may try to set the value in the map.  Which means
+    // the key may need to be stored.  Since copies of keys are never made,
+    // a SET must always be done with an immutable key...because if it were
+    // changed, there'd be no notification to rehash the map.
+    //
+    if (!Is_Value_Immutable(key))
+        fail (Error(RE_MAP_KEY_UNLOCKED, key));
+
+    // Must set the value:
+    if (n) {  // re-set it:
+        Derelativize(
+            ARR_AT(pairlist, ((n - 1) * 2) + 1),
+            val,
+            val_specifier
+        );
+        return n;
+    }
+
+    if (IS_VOID(val)) return 0; // trying to remove non-existing key
+
+    // Create new entry.  Note that it does not copy underlying series (e.g.
+    // the data of a string), which is why the immutability test is necessary
+    //
+    Append_Value_Core(pairlist, key, key_specifier);
+    Append_Value_Core(pairlist, val, val_specifier);
+
+    return (hashes[hash] = (ARR_LEN(pairlist) / 2));
 }
 
 
-/***********************************************************************
-**
-*/	REBINT PD_Map(REBPVS *pvs)
-/*
-***********************************************************************/
+//
+//  PD_Map: C
+//
+REBINT PD_Map(REBPVS *pvs)
 {
-	REBVAL *data = pvs->value;
-	REBVAL *val = 0;
-	REBINT n = 0;
+    REBOOL setting = LOGICAL(pvs->opt_setval && IS_END(pvs->item + 1));
 
-	if (IS_END(pvs->path+1)) val = pvs->setval;
-	if (IS_NONE(pvs->select)) return PE_NONE;
+    assert(IS_MAP(pvs->value));
 
-	if (!ANY_WORD(pvs->select) && !ANY_BINSTR(pvs->select) &&
-		!IS_INTEGER(pvs->select) && !IS_CHAR(pvs->select))
-		return PE_BAD_SELECT;
+    if (setting)
+        FAIL_IF_READ_ONLY_SERIES(VAL_SERIES(pvs->value));
 
-	n = Find_Entry(VAL_SERIES(data), pvs->select, val);
+    REBINT n = Find_Map_Entry(
+        VAL_MAP(pvs->value),
+        pvs->selector,
+        SPECIFIED,
+        setting ? pvs->opt_setval : NULL,
+        SPECIFIED,
+        setting // `cased` flag for case-sensitivity--use when setting only
+    );
 
-	if (!n) return PE_NONE;
+    if (n == 0) {
+        SET_VOID(pvs->store);
+        return PE_USE_STORE;
+    }
 
-	TRAP_PROTECT(VAL_SERIES(data));
-	pvs->value = VAL_BLK_SKIP(data, ((n-1)*2)+1);
-	return PE_OK;
+    REBVAL *val = KNOWN(
+        ARR_AT(MAP_PAIRLIST(VAL_MAP(pvs->value)), ((n - 1) * 2) + 1)
+    );
+    if (IS_VOID(val)) {
+        SET_VOID(pvs->store);
+        return PE_USE_STORE;
+    }
+
+    pvs->value = val;
+    pvs->value_specifier = SPECIFIED;
+
+    return PE_OK;
 }
 
 
-/***********************************************************************
-**
-*/	static void Append_Map(REBSER *ser, REBVAL *arg, REBCNT len)
-/*
-***********************************************************************/
-{
-	REBVAL *val;
-	REBCNT n;
+//
+//  Append_Map: C
+//
+static void Append_Map(
+    REBMAP *map,
+    REBARR *array,
+    REBCNT index,
+    REBSPC *specifier,
+    REBCNT len
+) {
+    RELVAL *item = ARR_AT(array, index);
+    REBCNT n = 0;
 
-	val = VAL_BLK_DATA(arg);
-	for (n = 0; n < len && NOT_END(val) && NOT_END(val+1); val += 2, n += 2) {
-		Find_Entry(ser, val, val+1);
-	}
+    while (n < len && NOT_END(item)) {
+        if (IS_END(item + 1)) {
+            //
+            // Keys with no value not allowed, e.g. `make map! [1 "foo" 2]`
+            //
+            fail (Error(RE_PAST_END));
+        }
+
+        Find_Map_Entry(
+            map,
+            item,
+            specifier,
+            item + 1,
+            specifier,
+            TRUE
+        );
+
+        item += 2;
+        n += 2;
+    }
 }
 
 
-/***********************************************************************
-**
-*/	REBFLG MT_Map(REBVAL *out, REBVAL *data, REBCNT type)
-/*
-***********************************************************************/
+//
+//  MAKE_Map: C
+//
+void MAKE_Map(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
-	REBCNT n;
-	REBSER *series;
-
-	if (!IS_BLOCK(data) && !IS_MAP(data)) return FALSE;
-
-	n = VAL_BLK_LEN(data);
-	if (n & 1) return FALSE;
-
-	series = Make_Map(n/2);
-
-	Append_Map(series, data, UNKNOWN);
-
-	Rehash_Hash(series);
-
-	Val_Init_Map(out, series);
-
-	return TRUE;
+    if (ANY_NUMBER(arg)) {
+        REBMAP *map = Make_Map(Int32s(arg, 0));
+        Init_Map(out, map);
+    }
+    else {
+        // !!! R3-Alpha TO of MAP! was like MAKE but wouldn't accept just
+        // being given a size.
+        //
+        TO_Map(out, kind, arg);
+    }
 }
 
 
-/***********************************************************************
-**
-*/	REBSER *Map_To_Block(REBSER *mapser, REBINT what)
-/*
-**		mapser = series of the map
-**		what: -1 - words, +1 - values, 0 -both
-**
-***********************************************************************/
+//
+//  TO_Map: C
+//
+void TO_Map(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
-	REBVAL *val;
-	REBCNT cnt = 0;
-	REBSER *blk;
-	REBVAL *out;
+    assert(kind == REB_MAP);
 
-	// Count number of set entries:
-	for (val = BLK_HEAD(mapser); NOT_END(val) && NOT_END(val+1); val += 2) {
-		if (!IS_NONE(val+1)) cnt++; // must have non-none value
-	}
+    REBARR* array;
+    REBCNT len;
+    REBCNT index;
+    REBSPC *specifier;
 
-	// Copy entries to new block:
-	blk = Make_Array(cnt * ((what == 0) ? 2 : 1));
-	out = BLK_HEAD(blk);
-	for (val = BLK_HEAD(mapser); NOT_END(val) && NOT_END(val+1); val += 2) {
-		if (!IS_NONE(val+1)) {
-			if (what <= 0) *out++ = val[0];
-			if (what >= 0) *out++ = val[1];
-		}
-	}
+    if (IS_BLOCK(arg) || IS_GROUP(arg)) {
+        //
+        // make map! [word val word val]
+        //
+        array = VAL_ARRAY(arg);
+        index = VAL_INDEX(arg);
+        len = VAL_ARRAY_LEN_AT(arg);
+        specifier = VAL_SPECIFIER(arg);
+    }
+    else if (IS_MAP(arg)) {
+        array = MAP_PAIRLIST(VAL_MAP(arg));
+        index = 0;// maps don't have an index/"position"
+        len = ARR_LEN(array);
+        specifier = SPECIFIED; // there should be no relative values in a MAP!
+    }
+    else
+        fail (Error_Invalid_Arg(arg));
 
-	SET_END(out);
-	blk->tail = out - BLK_HEAD(blk);
-	return blk;
+    REBMAP *map = Make_Map(len / 2); // [key value key value...] + END
+    Append_Map(map, array, index, specifier, len);
+    Rehash_Map(map);
+    Init_Map(out, map);
 }
 
 
-/***********************************************************************
-**
-*/	void Block_As_Map(REBSER *blk)
-/*
-**		Convert existing block to a map.
-**
-***********************************************************************/
+//
+//  Map_To_Array: C
+//
+// what: -1 - words, +1 - values, 0 -both
+//
+REBARR *Map_To_Array(REBMAP *map, REBINT what)
 {
-	REBSER *ser = 0;
-	REBCNT size = SERIES_TAIL(blk);
+    REBCNT count = Length_Map(map);
 
-	if (size >= MIN_DICT) ser = Make_Hash_Sequence(size);
-	blk->extra.series = ser;
-	Rehash_Hash(blk);
+    // Copy entries to new block:
+    //
+    REBARR *array = Make_Array(count * ((what == 0) ? 2 : 1));
+    REBVAL *dest = SINK(ARR_HEAD(array));
+    REBVAL *val = KNOWN(ARR_HEAD(MAP_PAIRLIST(map)));
+    for (; NOT_END(val); val += 2) {
+        assert(NOT_END(val + 1));
+        if (!IS_VOID(val + 1)) {
+            if (what <= 0) {
+                Move_Value(dest, &val[0]);
+                ++dest;
+            }
+            if (what >= 0) {
+                Move_Value(dest, &val[1]);
+                ++dest;
+            }
+        }
+    }
+
+    TERM_ARRAY_LEN(array, cast(RELVAL*, dest) - ARR_HEAD(array));
+    assert(IS_END(dest));
+    return array;
 }
 
 
-/***********************************************************************
-**
-*/	REBSER *Map_To_Object(REBSER *mapser)
-/*
-***********************************************************************/
+//
+//  Mutate_Array_Into_Map: C
+//
+// Convert existing array to a map.  The array is tested to make sure it is
+// not managed, hence it has not been put into any REBVALs that might use
+// a non-map-aware access to it.  (That would risk making changes to the
+// array that did not keep the hashes in sync.)
+//
+REBMAP *Mutate_Array_Into_Map(REBARR *a)
 {
-	REBVAL *val;
-	REBCNT cnt = 0;
-	REBSER *frame;
-	REBVAL *word;
-	REBVAL *mval;
+    REBCNT size = ARR_LEN(a);
 
-	// Count number of set entries:
-	for (mval = BLK_HEAD(mapser); NOT_END(mval) && NOT_END(mval+1); mval += 2) {
-		if (ANY_WORD(mval) && !IS_NONE(mval+1)) cnt++;
-	}
+    // See note above--can't have this array be accessible via some ANY-BLOCK!
+    //
+    assert(NOT(IS_ARRAY_MANAGED(a)));
 
-	// See Make_Frame() - cannot use it directly because no Collect_Words
-	frame = Make_Frame(cnt, TRUE);
+    SET_SER_FLAG(a, ARRAY_FLAG_PAIRLIST);
 
-	word = FRM_WORD(frame, 1);
-	val  = FRM_VALUE(frame, 1);
-	for (mval = BLK_HEAD(mapser); NOT_END(mval) && NOT_END(mval+1); mval += 2) {
-		if (ANY_WORD(mval) && !IS_NONE(mval+1)) {
-			Val_Init_Word_Typed(
-				word,
-				REB_SET_WORD,
-				VAL_WORD_SYM(mval),
-				// all types except END or UNSET
-				~((TYPESET(REB_END) | TYPESET(REB_UNSET)))
-			);
-			word++;
-			*val++ = mval[1];
-		}
-	}
+    REBMAP *map = AS_MAP(a);
+    MAP_HASHLIST(map) = Make_Hash_Sequence(size);
 
-	SET_END(word);
-	SET_END(val);
-	FRM_WORD_SERIES(frame)->tail = frame->tail = cnt + 1;
-
-	return frame;
+    Rehash_Map(map);
+    return map;
 }
 
 
-/***********************************************************************
-**
-*/	REBTYPE(Map)
-/*
-***********************************************************************/
+//
+//  Alloc_Context_From_Map: C
+//
+REBCTX *Alloc_Context_From_Map(REBMAP *map)
 {
-	REBVAL *val = D_ARG(1);
-	REBVAL *arg = DS_ARGC > 1 ? D_ARG(2) : NULL;
-	REBINT n;
-	REBSER *series;
+    // Doesn't use Length_Map because it only wants to consider words.
+    //
+    // !!! Should this fail() if any of the keys aren't words?  It seems
+    // a bit haphazard to have `make object! make map! [x 10 <y> 20]` and
+    // just throw out the <y> 20 case...
 
-	if (action != A_MAKE && action != A_TO)
-		series = VAL_SERIES(val);
+    REBVAL *mval = KNOWN(ARR_HEAD(MAP_PAIRLIST(map)));
+    REBCNT count = 0;
 
-	// Check must be in this order (to avoid checking a non-series value);
-	if (action >= A_TAKE && action <= A_SORT) {
-		if(IS_PROTECT_SERIES(series))
-			Trap_DEAD_END(RE_PROTECTED);
-	}
+    for (; NOT_END(mval); mval += 2) {
+        assert(NOT_END(mval + 1));
+        if (ANY_WORD(mval) && !IS_VOID(mval + 1))
+            ++count;
+    }
 
-	switch (action) {
+    // See Alloc_Context() - cannot use it directly because no Collect_Words
 
-	case A_PICK:		// same as SELECT for MAP! datatype
-	case A_SELECT:
-		n = Find_Entry(series, arg, 0);
-		if (!n) return R_NONE;
-		*D_OUT = *VAL_BLK_SKIP(val, ((n-1)*2)+1);
-		break;
+    REBCTX *context = Alloc_Context(count);
+    REBVAL *key = CTX_KEYS_HEAD(context);
+    REBVAL *var = CTX_VARS_HEAD(context);
 
-	case A_INSERT:
-	case A_APPEND:
-		if (!IS_BLOCK(arg)) Trap_Arg_DEAD_END(val);
-		*D_OUT = *val;
-		if (D_REF(AN_DUP)) {
-			n = Int32(D_ARG(AN_COUNT));
-			if (n <= 0) break;
-		}
-		Append_Map(series, arg, Partial1(arg, D_ARG(AN_LIMIT)));
-		break;
+    mval = KNOWN(ARR_HEAD(MAP_PAIRLIST(map)));
 
-	case A_POKE:  // CHECK all pokes!!! to be sure they check args now !!!
-		n = Find_Entry(series, arg, D_ARG(3));
-		*D_OUT = *D_ARG(3);
-		break;
+    for (; NOT_END(mval); mval += 2) {
+        assert(NOT_END(mval + 1));
+        if (ANY_WORD(mval) && !IS_VOID(mval + 1)) {
+            // !!! Used to leave SET_WORD typed values here... but why?
+            // (Objects did not make use of the set-word vs. other distinctions
+            // that function specs did.)
+            Init_Typeset(
+                key,
+                // all types except void
+                ~FLAGIT_KIND(REB_MAX_VOID),
+                VAL_WORD_SPELLING(mval)
+            );
+            ++key;
+            Move_Value(var, &mval[1]);
+            ++var;
+        }
+    }
 
-	case A_LENGTH:
-		n = Length_Map(series);
-		SET_INTEGER(D_OUT, n);
-		break;
+    TERM_ARRAY_LEN(CTX_VARLIST(context), count + 1);
+    TERM_ARRAY_LEN(CTX_KEYLIST(context), count + 1);
+    assert(IS_END(key));
+    assert(IS_END(var));
 
-	case A_MAKE:
-	case A_TO:
-		// make map! [word val word val]
-		if (IS_BLOCK(arg) || IS_PAREN(arg) || IS_MAP(arg)) {
-			if (MT_Map(D_OUT, arg, 0)) return R_OUT;
-			Trap_Arg_DEAD_END(arg);
-//		} else if (IS_NONE(arg)) {
-//			n = 3; // just a start
-		// make map! 10000
-		} else if (IS_NUMBER(arg)) {
-			if (action == A_TO) Trap_Arg_DEAD_END(arg);
-			n = Int32s(arg, 0);
-		} else
-			Trap_Make_DEAD_END(REB_MAP, Of_Type(arg));
-		// positive only
-		series = Make_Map(n);
-		Val_Init_Map(D_OUT, series);
-		break;
+    VAL_RESET_HEADER(CTX_VALUE(context), REB_OBJECT);
+    CTX_VALUE(context)->extra.binding = NULL;
 
-	case A_COPY:
-		if (MT_Map(D_OUT, val, 0)) return R_OUT;
-		Trap_Arg_DEAD_END(val);
+    return context;
+}
 
-	case A_CLEAR:
-		Clear_Series(series);
-		if (series->extra.series) Clear_Series(series->extra.series);
-		Val_Init_Map(D_OUT, series);
-		break;
 
-	case A_REFLECT:
-		action = What_Reflector(arg); // zero on error
-		// Adjust for compatibility with PICK:
-		if (action == OF_VALUES) n = 1;
-		else if (action == OF_WORDS) n = -1;
-		else if (action == OF_BODY) n = 0;
-		else Trap_Reflect_DEAD_END(REB_MAP, arg);
-		series = Map_To_Block(series, n);
-		Val_Init_Block(D_OUT, series);
-		break;
+//
+//  REBTYPE: C
+//
+REBTYPE(Map)
+{
+    REBVAL *val = D_ARG(1);
+    REBVAL *arg = D_ARGC > 1 ? D_ARG(2) : NULL;
 
-	case A_TAILQ:
-		return (Length_Map(series) == 0) ? R_TRUE : R_FALSE;
+    REBMAP *map = VAL_MAP(val);
+    REBCNT tail;
 
-	default:
-		Trap_Action_DEAD_END(REB_MAP, action);
-	}
+    switch (action) {
 
-	return R_OUT;
+    case SYM_PICK:
+        Pick_Block(D_OUT, val, arg);
+        if (IS_VOID(D_OUT)) return R_BLANK;
+        return R_OUT;
+
+    case SYM_FIND:
+    case SYM_SELECT: {
+        INCLUDE_PARAMS_OF_FIND;
+
+        UNUSED(PAR(series));
+        UNUSED(PAR(value)); // handled as `arg`
+
+        if (REF(part)) {
+            assert(!IS_VOID(ARG(limit)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        if (REF(only))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(skip)) {
+            assert(!IS_VOID(ARG(size)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        if (REF(last))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(reverse))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(tail))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(match))
+            fail (Error(RE_BAD_REFINES));
+
+        REBINT n = Find_Map_Entry(
+            map,
+            arg,
+            SPECIFIED,
+            NULL,
+            SPECIFIED,
+            REF(case)
+        );
+
+        if (n == 0)
+            return action == SYM_FIND ? R_FALSE : R_VOID;
+
+        Move_Value(
+            D_OUT,
+            KNOWN(ARR_AT(MAP_PAIRLIST(map), ((n - 1) * 2) + 1))
+        );
+
+        if (action == SYM_FIND)
+            return IS_VOID(D_OUT) ? R_FALSE : R_TRUE;
+
+        return R_OUT; }
+
+    case SYM_INSERT:
+    case SYM_APPEND: {
+        INCLUDE_PARAMS_OF_INSERT;
+
+        FAIL_IF_READ_ONLY_ARRAY(MAP_PAIRLIST(map));
+
+        UNUSED(PAR(series));
+        UNUSED(PAR(value)); // handled as arg
+
+        if (REF(only))
+            fail (Error(RE_BAD_REFINES));
+
+        if (!IS_BLOCK(arg))
+            fail (Error_Invalid_Arg(val));
+        Move_Value(D_OUT, val);
+        if (REF(dup)) {
+            if (Int32(ARG(count)) <= 0) break;
+        }
+
+        UNUSED(REF(part));
+        Partial1(arg, ARG(limit), &tail);
+        Append_Map(
+            map,
+            VAL_ARRAY(arg),
+            VAL_INDEX(arg),
+            VAL_SPECIFIER(arg),
+            tail
+        );
+        return R_OUT; }
+
+    case SYM_REMOVE: {
+        INCLUDE_PARAMS_OF_REMOVE;
+
+        FAIL_IF_READ_ONLY_ARRAY(MAP_PAIRLIST(map));
+
+        UNUSED(PAR(series));
+
+        if (REF(part)) {
+            assert(!IS_VOID(ARG(limit)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        if (NOT(REF(map)))
+            fail (Error_Illegal_Action(REB_MAP, action));
+
+        Move_Value(D_OUT, val);
+        Find_Map_Entry(
+            map, ARG(key), SPECIFIED, VOID_CELL, SPECIFIED, TRUE
+        );
+        return R_OUT; }
+
+    case SYM_POKE: { // CHECK all pokes!!! to be sure they check args now !!!
+        FAIL_IF_READ_ONLY_ARRAY(MAP_PAIRLIST(map));
+
+        REBINT n = Find_Map_Entry(
+            map, arg, SPECIFIED, D_ARG(3), SPECIFIED, TRUE
+        );
+        Move_Value(D_OUT, D_ARG(3));
+        return R_OUT; }
+
+    case SYM_LENGTH:
+        SET_INTEGER(D_OUT, Length_Map(map));
+        return R_OUT;
+
+    case SYM_COPY: {
+        INCLUDE_PARAMS_OF_COPY;
+
+        UNUSED(PAR(value));
+        if (REF(part)) {
+            assert(!IS_VOID(ARG(limit)));
+            fail (Error(RE_BAD_REFINES));
+        }
+        if (REF(deep))
+            fail (Error(RE_BAD_REFINES));
+        if (REF(types)) {
+            assert(!IS_VOID(ARG(kinds)));
+            fail (Error(RE_BAD_REFINES));
+        }
+
+        // !!! the copying map case should probably not be a MAKE case, but
+        // implemented here as copy.
+        //
+        MAKE_Map(D_OUT, REB_MAP, val); // may fail()
+        return R_OUT; }
+
+    case SYM_CLEAR:
+        FAIL_IF_READ_ONLY_ARRAY(MAP_PAIRLIST(map));
+
+        Reset_Array(MAP_PAIRLIST(map));
+
+        // !!! Review: should the space for the hashlist be reclaimed?  This
+        // clears all the indices but doesn't scale back the size.
+        //
+        Clear_Series(MAP_HASHLIST(map));
+
+        Init_Map(D_OUT, map);
+        return R_OUT;
+
+    case SYM_REFLECT: {
+        REBSYM sym = VAL_WORD_SYM(arg);
+
+        REBINT n;
+        if (sym == SYM_VALUES)
+            n = 1;
+        else if (sym == SYM_WORDS)
+            n = -1;
+        else if (sym == SYM_BODY)
+            n = 0;
+        else
+            fail (Error_Cannot_Reflect(REB_MAP, arg));
+
+        REBARR *array = Map_To_Array(map, n);
+        Init_Block(D_OUT, array);
+        return R_OUT;
+    }
+
+    case SYM_TAIL_Q:
+        return (Length_Map(map) == 0) ? R_TRUE : R_FALSE;
+    }
+
+    fail (Error_Illegal_Action(REB_MAP, action));
 }
