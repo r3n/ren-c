@@ -22,8 +22,9 @@ compiler:
 
 env:
     global:
-        # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
-        #   via the "travis encrypt" command using the project repo's public key
+        #
+        # travis encrypt COVERITY_SCAN_TOKEN via project's public key
+        #
         - secure: "FS7Yj7N5eUuh6i1R/YXBnmFmTG7MFtn1pZTY2MXYf+Vx6dvKghJ0uy/KwMi22pEUkoPSE2IxRJjPpHmLP00ZdtqS5llMQvZeb0+rLlKw8L+BqmWMYk24XvTZRFYMuq98uylABoTpELGi2ZsrSa7/sxPSRhfP12M+5pSiDtktW6vxMKcq1t7Y1sZyoz16kFQMnwDdxHlrVXqpIz3Mgy+3uPkDBV/cPxHAaJPG5Z3bGWoxRDONdMVh2ei3gXDFOJZDexzBxKucYWadletfzcSDlJFbJz1vvK9OWvPQDEeFNDJRqEmCTwhlRBN0MFzla/dvxJbw+rrJbRk7A4VBkQFAlMP3J8fLHFMajuF3FreHCFdIDktwnwDAFLZsjy+o5Af99ob/lyxcsPRqi3Ej7GQEngfLCQ5OGNZ2M+Ekih/4F6a78UK0e5DF9SVtmAM1HMN5KJN+VxD0VVb8aTilLb1sf6y4kkYiOlYvCUIS62Vceb1KjyVicTG93V5VeI8EUT3t7sLGebwgyYgm1ghG0yRzgjXiFDNEXQYlsLNos/JhUoXEPCJLkSDzQCnqGsU2YPz9hBMBiAtPmSmSSC8TxcW4z+ESA8Ph++w78oi+84OdUZ8scA9+YaItgD/LMYauvpkBy5tbm+xWM841nZXs4JmRFDor8Mw0t5OEOPvO/0qKe4Y="
 
     matrix:
