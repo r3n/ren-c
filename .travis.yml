@@ -23,9 +23,9 @@ compiler:
 env:
     global:
         #
-        # travis encrypt COVERITY_SCAN_TOKEN via project's public key
+        # COVERITY_SCAN_TOKEN
         #
-        - secure: "FS7Yj7N5eUuh6i1R/YXBnmFmTG7MFtn1pZTY2MXYf+Vx6dvKghJ0uy/KwMi22pEUkoPSE2IxRJjPpHmLP00ZdtqS5llMQvZeb0+rLlKw8L+BqmWMYk24XvTZRFYMuq98uylABoTpELGi2ZsrSa7/sxPSRhfP12M+5pSiDtktW6vxMKcq1t7Y1sZyoz16kFQMnwDdxHlrVXqpIz3Mgy+3uPkDBV/cPxHAaJPG5Z3bGWoxRDONdMVh2ei3gXDFOJZDexzBxKucYWadletfzcSDlJFbJz1vvK9OWvPQDEeFNDJRqEmCTwhlRBN0MFzla/dvxJbw+rrJbRk7A4VBkQFAlMP3J8fLHFMajuF3FreHCFdIDktwnwDAFLZsjy+o5Af99ob/lyxcsPRqi3Ej7GQEngfLCQ5OGNZ2M+Ekih/4F6a78UK0e5DF9SVtmAM1HMN5KJN+VxD0VVb8aTilLb1sf6y4kkYiOlYvCUIS62Vceb1KjyVicTG93V5VeI8EUT3t7sLGebwgyYgm1ghG0yRzgjXiFDNEXQYlsLNos/JhUoXEPCJLkSDzQCnqGsU2YPz9hBMBiAtPmSmSSC8TxcW4z+ESA8Ph++w78oi+84OdUZ8scA9+YaItgD/LMYauvpkBy5tbm+xWM841nZXs4JmRFDor8Mw0t5OEOPvO/0qKe4Y="
+        -secure: "oDfldczkNQ9sXnI4JmL5XMHDyKWBwOj6ZdTuZkcEzJ9gfJl2wuqWWAeOTt6ErWc9q3hdhbb3UudvPCmaU2dK37WUsHZRtx30ddEhp8kJwz1DdLGjlnV+2PVJ4qLrausxDpVMHuB4vBdgVj9r16lZ0c/ezGs2QJae/mb2OAO8WLTUBcA8qhyGBFK8ywho5eX7LltLV/kkHqgKSY6bYAzCc/8zFj3cttP5dqMmig1Kb9dlruM2e8yMyoF8c0fLyVd//KUyynI43gaUtTGaM+YNqixqjNauVTa9LOSOAjzxedPDrWe81A3tsXVxGGXzr7zDeKvSZrtlQgjosLofXxT4NcQSHewYhM3zG/t2L9e480af+9FA9WD9EYk0Y0utwGJk7ld//8Fk6wcrCPVUUzwerI7Y0ftOFq1hUeFrpFrriCPOf5zrxF9NvqWL2XtU9ppW7m2LwRet7guOfUx2ULBosMkDYNv7k4vTAAs3iF1e4vXFygzPN1v2apKyEr5/dLndNJZFUxNoCYhtFjGBR7wfZ5lnc6fSsdy0lNVmIas/q+UuDCv3C8hyPWarexClt5ohLTtztzgbhsFEtKWViJcYma/LasmZhLfseNtBq6Z7aGj2Qfk0zABU/fB37+K1zDTI9upgUD3dt/YNi9kQ7LCwMtFy7Oc6uT2oxebapHYjRJE="
 
     matrix:
         # Linux x86, release
