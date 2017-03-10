@@ -90,7 +90,7 @@ addons:
             name: "metaeducation/ren-c"
             description: "Library for embedding a Rebol interpreter into C codebases"
         notification_email: zeng.shixin@gmail.com
-        build_command_prepend: "export CC=\\\"${TOOLS}${CC}${REL+ -DNDEBUG}\\\""
+        build_command_prepend: "export CC=\\\"${TOOLS}${CC}${REL+ -DNDEBUG} -Werror ${LIBC_FLAG}\\\""
         build_command: "bash make/coverity-scan-build.sh"
         branch_pattern: coverity_scan
 
