@@ -4,11 +4,8 @@
 # (http://docs.travis-ci.com/).
 #
 
-# Force new container-based infrastructure.
-#
-# http://docs.travis-ci.com/user/migrating-from-legacy/
-#
-sudo: false
+# coverity command requires "sudo"
+sudo: required
 
 
 notifications:
