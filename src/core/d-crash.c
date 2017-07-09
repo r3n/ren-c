@@ -91,18 +91,19 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
     }
 #endif
 
-    strncat(title, "PANIC()", PANIC_TITLE_BUF_SIZE - 0);
+    STRNCAT_S(title, PANIC_BUF_SIZE, STR_AND_LEN("PANIC()"));
 
-    strncat(buf, Str_Panic_Directions, PANIC_BUF_SIZE - 0);
+    STRNCAT_S(buf, PANIC_BUF_SIZE, STR_AND_LEN(Str_Panic_Directions));
 
-    strncat(buf, "\n", PANIC_BUF_SIZE - strlen(buf));
+    STRNCAT_S(buf, PANIC_BUF_SIZE - strlen(buf), STR_AND_LEN("\n"));
 
     switch (Detect_Rebol_Pointer(p)) {
     case DETECTED_AS_UTF8: // string might be empty...handle specially?
-        strncat(
+        STRNCAT_S(
             buf,
+            PANIC_BUF_SIZE - strlen(buf),
             cast(const char*, p),
-            PANIC_BUF_SIZE - strlen(buf)
+            strlen(p)
         );
         break;
 
@@ -129,7 +130,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
         Panic_Series_Debug(cast(REBSER*, s));
     #else
         UNUSED(s);
-        strncat(buf, "valid series", PANIC_BUF_SIZE - strlen(buf));
+        STRNCAT_S(buf, "valid series", PANIC_BUF_SIZE - strlen(buf));
     #endif
         break; }
 
@@ -137,7 +138,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
     #if !defined(NDEBUG)
         Panic_Series_Debug(m_cast(REBSER*, cast(const REBSER*, p)));
     #endif
-        strncat(buf, "freed series", PANIC_BUF_SIZE - strlen(buf));
+        STRNCAT_S(buf, PANIC_BUF_SIZE - strlen(buf), STR_AND_LEN("freed series"));
         break;
 
     case DETECTED_AS_VALUE:
@@ -145,7 +146,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
     #if !defined(NDEBUG)
         Panic_Value_Debug(cast(const REBVAL*, p));
     #else
-        strncat(buf, "value", PANIC_BUF_SIZE - strlen(buf));
+        STRNCAT_S(buf, PANIC_BUF_SIZE - strlen(buf), STR_AND_LEN("value"));
     #endif
         break;
 
@@ -153,7 +154,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
     #if !defined(NDEBUG)
         Panic_Value_Debug(cast(const RELVAL*, p));
     #endif
-        strncat(buf, "trash cell", PANIC_BUF_SIZE - strlen(buf));
+        STRNCAT_S(buf, PANIC_BUF_SIZE - strlen(buf), STR_AND_LEN("trash cell"));
         break;
     }
 

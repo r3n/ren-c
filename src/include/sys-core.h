@@ -76,7 +76,12 @@
 // External system includes:
 #include <stdlib.h>
 #include <stdarg.h>     // For var-arg Print functions
+
+// want boundsd-checked functions (i.e. *_s version, like strncpy_s)
+#define __STDC_WANT_LIB_EXT1_    1
+#define __STDC_WANT_SECURE_LIB__ 1 // For MSVC
 #include <string.h>
+
 #include <setjmp.h>
 #include <math.h>
 #include <stddef.h>     // for offsetof()

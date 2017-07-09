@@ -1170,7 +1170,7 @@ REBINT m_to_string (REBYTE *s, REBINT n, const REBCNT a[]) {
         *--k = '0' + r;
     }
 
-    strcpy(s_cast(s), s_cast(k));
+    STRCPY_S(s_cast(s), n, s_cast(k));
     return vmax - k;
 }
 

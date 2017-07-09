@@ -182,18 +182,18 @@ REBYTE *Form_Int_Pad(REBYTE *buf, REBI64 val, REBINT max, REBINT len, REBYTE pad
 
     n = Form_Int_Len(tmp, val, max + 1);
     if (n == 0) {
-        strcpy(s_cast(buf), "??");
+        STRCPY_S(s_cast(buf), max, "??");
         return buf;  // too long
     }
 
     if (len >= 0) {
-        strcpy(s_cast(buf), s_cast(tmp));
+        STRCPY_S(s_cast(buf), max, s_cast(tmp));
         buf += n;
         for (; n < len; n++) *buf++ = pad;
     }
     else { // len < 0
         for (; n < -len; len++) *buf++ = pad;
-        strcpy(s_cast(buf), s_cast(tmp));
+        STRCPY_S(s_cast(buf), max, s_cast(tmp));
         buf += n;
     }
 

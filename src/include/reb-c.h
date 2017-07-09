@@ -69,6 +69,8 @@
 #endif
 
 
+
+
 //
 // TYPE TRAITS
 //
@@ -1130,6 +1132,46 @@ inline static const REBYTE *Skip_To_Byte(
     #define MIN(a,b) (((a) < (b)) ? (a) : (b))
     #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #endif
+
+
+#define STR_AND_LEN(s) (s), strlen(s)
+
+// Secure version of string functions
+// Note that MSC doesn't define __STDC_LIB_EXT1__, but __STDC_SECURE_LIB__
+// instead
+#if defined (__STDC_SECURE_LIB__) || defined(__STDC_LIB_EXT1__)
+#define STRNCAT_S strncat_s
+#define STRNCPY_S(dst, dst_sz, src, count) strncpy_s(dst, dst_sz, src, count)
+#define STRCPY_S(dst, dst_sz, src) strcpy_s(dst, dst_sz, src)
+#define WCSNCAT_S wcsncat_s
+#define WCSNCPY_S wcsncpy_s
+#else
+inline void STRNCAT_S(wchar_t *dst, size_t dst_sz, wchar_t *src, size_t n)
+{
+    strncat(dst, src, MIN(n, dst_sz));
+}
+
+inline void STRNCPY_S(wchar_t *dst, size_t dst_sz, wchar_t *src, size_t n)
+{
+    strncpy(dst, src, MIN(n, dst_sz));
+}
+
+inline void STRCPY_S(wchar_t *dst, size_t dst_sz, wchar_t *src)
+{
+    strncpy(dst, src, ((dst_sz) - 1));
+}
+
+inline void WCSNCAT_S(wchar_t *dst, size_t dst_sz, wchar_t *src, size_t n)
+{
+    wcsncat(dst, src, MIN(n, dst_sz));
+}
+
+inline void WCSTRCPY_S(wchar_t *dst, size_t dst_sz, wchar_t *src, size_t n)
+{
+    wcstrncpy(dst, src, MIN(n, dst_sz)));
+}
+#endif
+
 
 
 // Byte string functions:

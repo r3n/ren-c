@@ -30,7 +30,7 @@
 // Based on original code in t-integer.c
 //
 
-#include "reb-c.h"
+#include "sys-core.h"
 #include "sys-int-funcs.h"
 
 REBOOL reb_i32_add_overflow(i32 x, i32 y, i32 *sum)

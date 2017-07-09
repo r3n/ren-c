@@ -49,7 +49,12 @@
 
 #if !defined(NDEBUG)
 
-#ifdef _MSC_VER
+#if defined (__STDC_SECURE_LIB__) // _MSC_VER
+#define snprintf(buf, buf_sz, fmt, ...) \
+    _snprintf_s(buf, buf_sz, buf_sz - 1, fmt, __VA_ARGS__)
+#elif defined(__STDC_LIB_EXT1__)
+#define snprintf snprintf_s
+#elif defined(_MSC_VER)
 #define snprintf _snprintf
 #endif
 

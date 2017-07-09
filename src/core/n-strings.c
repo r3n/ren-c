@@ -965,7 +965,8 @@ const char *cs_cast_(const REBYTE *s)
 //
 REBYTE *COPY_BYTES_(REBYTE *dest, const REBYTE *src, size_t count)
 {
-    return b_cast(strncpy(s_cast(dest), cs_cast(src), count));
+    STRCPY_S(s_cast(dest), count, cs_cast(src));
+    return s_cast(dest);
 }
 
 
@@ -1002,9 +1003,10 @@ int COMPARE_BYTES_(const REBYTE *lhs, const REBYTE *rhs)
 //
 REBYTE *APPEND_BYTES_LIMIT_(REBYTE *dest, const REBYTE *src, size_t max)
 {
-    return b_cast(strncat(
-        s_cast(dest), cs_cast(src), MAX(max - LEN_BYTES(dest) - 1, 0)
-    ));
+    STRNCAT_S(
+        s_cast(dest), MAX(max - LEN_BYTES(dest) - 1, 0), cs_cast(src), LEN_BYTES(src)
+    );
+    return b_cast(dest);
 }
 
 
@@ -1016,9 +1018,13 @@ REBYTE *APPEND_BYTES_LIMIT_(REBYTE *dest, const REBYTE *src, size_t max)
 REBCHR *OS_STRNCPY_(REBCHR *dest, const REBCHR *src, size_t count)
 {
 #ifdef OS_WIDE_CHAR
-    return cast(REBCHR*,
-        wcsncpy(cast(wchar_t*, dest), cast(const wchar_t*, src), count)
+    WCSNCPY_S(
+        cast(wchar_t*, dest),
+        count,
+        cast(const wchar_t*, src),
+        wcslen(cast(const wchar_t*, src))
     );
+    return cast(REBCHR*, dest);
 #else
     #ifdef TO_OPENBSD
         return cast(REBCHR*,
@@ -1041,9 +1047,14 @@ REBCHR *OS_STRNCPY_(REBCHR *dest, const REBCHR *src, size_t count)
 REBCHR *OS_STRNCAT_(REBCHR *dest, const REBCHR *src, size_t max)
 {
 #ifdef OS_WIDE_CHAR
-    return cast(REBCHR*,
-        wcsncat(cast(wchar_t*, dest), cast(const wchar_t*, src), max)
+    WCSNCAT_S(
+        cast(wchar_t*, dest),
+        max,
+        cast(const wchar_t*, src),
+        wcslen(cast(const wchar_t*, src))
     );
+
+    return cast(REBCHR*, dest);
 #else
     #ifdef TO_OPENBSD
         return cast(REBCHR*,
