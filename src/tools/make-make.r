@@ -316,7 +316,6 @@ add-new-obj-folders: procedure [
     ]
 ]
 
-
 parse user-config/toolset [
     any [
         'gcc opt set cc-exec [file! | blank!] (
@@ -382,7 +381,7 @@ if all [set? 'linker-exec linker-exec][
 
 system-config: config-system user-config/os-id
 dump system-config
-rebmake/set-target-platform system-config/os-base
+rebmake/set-target-platform system-config/os-base system-config/os-name
 
 add-app-def: adapt specialize :append [series: app-config/definitions] [
     value: flatten/deep reduce bind value system-definitions

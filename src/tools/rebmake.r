@@ -220,6 +220,7 @@ windows: make platform-class [
 
 set-target-platform: func [
     platform
+    os-name
 ][
     switch/default platform [
         posix [
@@ -298,21 +299,21 @@ application-class: make project-class [
     linker: _
     searches: _
     ldflags: _
-
-    link: func [][
-        linker/link output depends ldflags
-    ]
+    optimization: false
+    debug: false
 
     command: func [
         <local>
         ld
     ][
         ld: any [linker default-linker]
-        ld/command
+        ld/command/O/g
             output
             depends
             searches
             ldflags
+            optimization
+            debug
     ]
 
 ]
@@ -642,6 +643,9 @@ linker-class: make object! [
         depends [block! blank!]
         searches [block! blank!]
         ldflags [block! any-string! blank!]
+        /dynamic
+        /O optimization
+        /g debug
     ][
     ]
 
@@ -659,6 +663,8 @@ ld: make linker-class [
         searches [block! blank!]
         ldflags [block! any-string! blank!]
         /dynamic
+        /O optimization
+        /g debug
         <local>
         dep
         suffix
@@ -771,6 +777,8 @@ llvm-link: make linker-class [
         searches [block! blank!]
         ldflags [block! any-string! blank!]
         /dynamic
+        /O optimization
+        /g debug
         <local>
         dep
         suffix
@@ -864,6 +872,8 @@ link: make linker-class [
         searches [block! blank!]
         ldflags [block! any-string! blank!]
         /dynamic
+        /O optimization
+        /g debug
         <local>
         dep
         suffix
