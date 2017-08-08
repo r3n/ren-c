@@ -8,4 +8,5 @@ extensions: [
     - gif _
     - jpg _
     - png _
+    - ODBC _
 ]

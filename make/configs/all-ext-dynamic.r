@@ -7,5 +7,6 @@ extensions: [
     * bmp _
     * gif _
     * jpg _
-    ;* png _
+    * png _
+    * ODBC _
 ]
