@@ -180,6 +180,11 @@ osx: make posix [
     dll-suffix: ".dyn"
 ]
 
+emscripten: make posix [
+    exe-suffix: ".html"
+    obj-suffix: ".bc"
+]
+
 windows: make platform-class [
     name: 'Windows
     exe-suffix: ".exe"
@@ -224,7 +229,7 @@ set-target-platform: func [
 ][
     switch/default platform [
         posix [
-            target-platform: posix
+            target-platform: either os-name = 'emscripten [emscripten][posix]
         ]
         linux [
             target-platform: linux
@@ -552,6 +557,10 @@ clang: make gcc [
     name: 'clang
 ]
 
+emcc: make gcc [
+    name: 'emcc
+]
+
 ; Microsoft CL compiler
 cl: make compiler-class [
     name: 'cl
@@ -856,6 +865,75 @@ llvm-link: make linker-class [
         ][
             dump dep
             fail "unrecognized dependency"
+        ]
+    ]
+]
+
+emcc-link: make ld [
+    name: 'emcc-link
+    exec-file: %emcc
+    command: func [
+        output [file!]
+        depends [block! blank!]
+        searches [block! blank!]
+        ldflags [block! any-string! blank!]
+        /dynamic
+        /O opt-level
+        /G debug
+        <local>
+        dep
+        suffix
+    ][
+        suffix: either dynamic [
+            target-platform/dll-suffix
+        ][
+            target-platform/exe-suffix
+        ]
+        spaced [
+            case [
+                file? exec-file [to-local-file exec-file]
+                exec-file [exec-file]
+                true [{gcc}]
+            ]
+            if dynamic ["-shared"]
+            "-o" to-local-file either ends-with? output suffix [
+                output
+            ][
+                unspaced [output suffix]
+            ]
+
+            unless any [blank? searches empty? searches] [
+                unspaced ["-L" delimit map-to-local-file searches " -L"]
+            ]
+
+            if O [
+                case [
+                    opt-level = true ["-O2"]
+                    opt-level = false ["-O0"]
+                    integer? opt-level [unspaced ["-O" opt-level]]
+                    true [fail ["unrecognized optimization level:" opt-level]]
+                ]
+            ]
+            if g [
+                ;print mold debug
+                case [
+                    blank? debug []
+                    debug = true ["-g -g3"]
+                    debug = false []
+                    integer? debug [unspaced ["-g" debug]]
+                    true [fail ["unrecognized debug option:" debug]]
+                ]
+            ]
+
+            if block? ldflags [
+                spaced map-each flg ldflags [
+                    filter-flag flg id
+                ]
+            ]
+
+            if block? depends [
+                spaced map-each dep depends [accept dep]
+            ]
         ]
     ]
 ]

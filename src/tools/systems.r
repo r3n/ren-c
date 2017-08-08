@@ -124,6 +124,10 @@ systems: [
 
     0.14.02     syllable-svr    linux   [LEN LLC F64]               [M32 HID]
                 [M DL]             [HID DYN]
+
+    ;-------------------------------------------------------------------------
+    0.99.01     emscripten      posix   [LEN LLC]                   []
+                [M DL]             []
 ]
 
 system-definitions: make object! [
