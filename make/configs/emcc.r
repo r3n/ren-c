@@ -11,4 +11,5 @@ extensions: [
 ]
 with-ffi: no
 
-ldflags: ["--emrun"]
+cflags: ["-s ASSERTIONS=1"]
+ldflags: ["--emrun -s ASSERTIONS=1"]
