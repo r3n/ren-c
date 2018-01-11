@@ -1529,9 +1529,9 @@ for-each ext builtin-extensions [
         append any [all [mod-obj mod-obj/depends] ext-objs] gen-obj/dir/I/D/F
             ext/source
             "../src/extensions/"
-            ext/includes
-            ext/definitions
-            ext/cflags
+            opt ext/includes
+            opt ext/definitions
+            opt ext/cflags
     ]
 ]
 
@@ -1712,9 +1712,9 @@ for-each ext dynamic-extensions [
         append mod-objs gen-obj/dir/I/D/F
             ext/source
             "../src/extensions/"
-            ext/includes
+            opt ext/includes
             append copy ["EXT_DLL"] opt ext/definitions
-            ext/cflags
+            opt ext/cflags
     ]
     append dynamic-libs ext-proj: make rebmake/dynamic-library-class [
         name: join-of either system-config/os-base = 'windows ["r3-"]["libr3-"]
