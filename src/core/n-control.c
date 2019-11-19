@@ -572,10 +572,6 @@ REBNATIVE(match)
 
     assert(Is_Action_Frame(parent));
 
-    // REBFRM whose built FRAME! context we will steal
-
-    DECLARE_FRAME (f, parent->feed, EVAL_MASK_DEFAULT);  // capture DSP *now*
-
     REBVAL *test = ARG(test);
 
     switch (KIND3Q_BYTE(test)) {
@@ -584,18 +580,25 @@ REBNATIVE(match)
         if (NOT_CELL_FLAG(test, UNEVALUATED)) // soft quote eval'd
             goto either_match; // allow `MATCH ('NULL?) ...`
 
+        // REBFRM whose built FRAME! context we will steal
+        //
+        DECLARE_FRAME (f, parent->feed, EVAL_MASK_DEFAULT);  // capture DSP
+        Push_Frame(D_OUT, f);
+
         if (Get_If_Word_Or_Path_Throws(
             D_OUT,
             test,
             SPECIFIED,
             true  // push_refinements, DECLARE_FRAME() captured original DSP
         )){
+            Drop_Frame(f);
             return R_THROWN;
         }
 
         Move_Value(test, D_OUT);
 
         if (not IS_ACTION(test)) {
+            Drop_Frame(f);
             if (
                 IS_WORD(test) or IS_GET_WORD(test) or IS_SET_WORD(test)
                 or ANY_PATH(test)  // ^-- we allow ISSUE!
@@ -613,8 +616,10 @@ REBNATIVE(match)
         // return value if the filter function returns a truthy result.
 
         REBVAL *first_arg;
-        if (Make_Invocation_Frame_Throws(D_OUT, f, &first_arg, test))
+        if (Make_Invocation_Frame_Throws(f, &first_arg, test)) {
+            Drop_Frame(f);
             return R_THROWN;
+        }
 
         if (not first_arg)
             fail ("MATCH with a function pattern must take at least 1 arg");

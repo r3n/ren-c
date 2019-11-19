@@ -464,15 +464,14 @@ REBNATIVE(do)
         Begin_Prefix_Action(f, VAL_FRAME_LABEL(source));
 
         bool threw = Eval_Throws(f);
+        assert(threw or IS_END(f->feed->value));  // we started at END_FLAG
 
         Drop_Frame(f);
 
         if (threw)
             return R_THROWN; // prohibits recovery from exits
 
-        assert(IS_END(f->feed->value)); // started at END_FLAG, can only throw
-
-        return f->out; }
+        return D_OUT; }
 
       default:
         break;
@@ -860,12 +859,12 @@ REBNATIVE(applique)
     Begin_Prefix_Action(f, VAL_ACTION_LABEL(applicand));
 
     bool action_threw = Eval_Throws(f);
+    assert(action_threw or IS_END(f->feed->value));  // we started at END_FLAG
 
     Drop_Frame(f);
 
     if (action_threw)
         return R_THROWN;
 
-    assert(IS_END(f->feed->value)); // we started at END_FLAG, can only throw
     return D_OUT;
 }

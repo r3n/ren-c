@@ -312,20 +312,35 @@ inline static void Conserve_Varlist(REBARR *varlist)
 // This privileged level of access can be used by natives that feel they can
 // optimize performance by working with the evaluator directly.
 
-
-inline static void Drop_Or_Abort_Frame_Core(REBFRM *f)
-{
+inline static void Free_Frame_Internal(REBFRM *f) {
     if (f->varlist and NOT_SERIES_FLAG(f->varlist, MANAGED))
         Conserve_Varlist(f->varlist);
     TRASH_POINTER_IF_DEBUG(f->varlist);
 
     assert(IS_POINTER_TRASH_DEBUG(f->alloc_value_list));
+
+    FREE(REBFRM, f);
 }
 
 
 inline static void Push_Frame(REBVAL *out, REBFRM *f)
 {
     assert(f->feed->value != nullptr);
+    assert(SECOND_BYTE(f->flags) == 0); // END signal
+    assert(not (f->flags.bits & NODE_FLAG_CELL));
+
+    // All calls through to Eval_Core() are assumed to happen at the same C
+    // stack level for a pushed frame (though this is not currently enforced).
+    // Hence it's sufficient to check for C stack overflow only once, e.g.
+    // not on each Eval_Step_Throws() for `reduce [a | b | ... | z]`.
+    //
+    // !!! This method is being replaced by "stackless", as there is no
+    // reliable platform independent method for detecting stack overflows.
+    //
+    if (C_STACK_OVERFLOWING(&f)) {
+        Free_Frame_Internal(f);  // not in stack, feed + frame wouldn't free
+        Fail_Stack_Overflow();
+    }
 
     // Frames are pushed to reuse for several sequential operations like
     // ANY, ALL, CASE, REDUCE.  It is allowed to change the output cell for
@@ -333,17 +348,6 @@ inline static void Push_Frame(REBVAL *out, REBFRM *f)
     // slot at all times; use null until first eval call if needed
     //
     f->out = out;
-
-    // All calls through to Eval_Core() are assumed to happen at the same C
-    // stack level for a pushed frame (though this is not currently enforced).
-    // Hence it's sufficient to check for C stack overflow only once, e.g.
-    // not on each Eval_Step_Throws() for `reduce [a | b | ... | z]`.
-    //
-    if (C_STACK_OVERFLOWING(&f))
-        Fail_Stack_Overflow();
-
-    assert(SECOND_BYTE(f->flags) == 0); // END signal
-    assert(not (f->flags.bits & NODE_FLAG_CELL));
 
     // Though we can protect the value written into the target pointer 'out'
     // from GC during the course of evaluation, we can't protect the
@@ -451,7 +455,10 @@ inline static void Push_Frame(REBVAL *out, REBFRM *f)
     f->state.dsp = f->dsp_orig;
   #endif
 
-    f->varlist = nullptr;
+    assert(f->varlist == nullptr);  // Prep_Frame_Core() set to nullptr
+
+    assert(IS_POINTER_TRASH_DEBUG(f->alloc_value_list));
+    f->alloc_value_list = NOD(f);  // doubly link list, terminates in `f`
 }
 
 
@@ -520,11 +527,10 @@ inline static void Abort_Frame(REBFRM *f) {
     }
 
   pop:
-
     assert(TG_Top_Frame == f);
     TG_Top_Frame = f->prior;
 
-    Drop_Or_Abort_Frame_Core(f);
+    Free_Frame_Internal(f);
 }
 
 
@@ -557,7 +563,7 @@ inline static void Drop_Frame_Core(REBFRM *f) {
 
     TG_Top_Frame = f->prior;
 
-    Drop_Or_Abort_Frame_Core(f);
+    Free_Frame_Internal(f);
 }
 
 inline static void Drop_Frame_Unbalanced(REBFRM *f) {
@@ -587,6 +593,9 @@ inline static void Prep_Frame_Core(
 ){
     assert(NOT_FEED_FLAG(feed, BARRIER_HIT));  // couldn't do anything
 
+   if (f == nullptr)  // e.g. a failed allocation
+       fail (Error_No_Memory(sizeof(REBFRM)));
+
     f->feed = feed;
     Prep_Cell(&f->spare);
     Init_Unreadable_Void(&f->spare);
@@ -598,20 +607,21 @@ inline static void Prep_Frame_Core(
     f->was_eval_called = false;
   #endif
 
-    f->alloc_value_list = NOD(f);  // doubly link list, terminates in `f`
+    f->varlist = nullptr;
+
+    TRASH_POINTER_IF_DEBUG(f->alloc_value_list);
 }
 
 #define DECLARE_FRAME(name,feed,flags) \
-    REBFRM name##struct; \
-    Prep_Frame_Core(&name##struct, feed, flags); \
-    REBFRM * const name = &name##struct
+    REBFRM * name = TRY_ALLOC(REBFRM); \
+    Prep_Frame_Core(name, feed, flags);
 
 #define DECLARE_FRAME_AT(name,any_array,flags) \
     DECLARE_FEED_AT (name##feed, any_array); \
     DECLARE_FRAME (name, name##feed, flags)
 
 #define DECLARE_END_FRAME(name,flags) \
-    DECLARE_FRAME(name, &TG_Frame_Feed_End, flags)
+    DECLARE_FRAME (name, &TG_Frame_Feed_End, flags)
 
 
 inline static void Begin_Action_Core(
