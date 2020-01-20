@@ -63,7 +63,7 @@ toolset: [
     strip _
 ]
 
-;one of 'no', 'assert', 'symbols' or 'sanitize'
+;one of 'no', ''asserts', ''symbols' or ''sanitize'
 debug: no
 
 ; one of 'no', 1, 2 or 4
