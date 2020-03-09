@@ -592,7 +592,7 @@ cl: make compiler-class [
                         keep "/Od /Zi"
                     ]
                     debug = false []
-                    
+
                     fail ["unrecognized debug option:" g]
                 ]
             ]
@@ -668,7 +668,7 @@ ld: make linker-class [
             if dynamic [keep "-shared"]
 
             keep "-o"
-            
+
             output: file-to-local output
             either ends-with? output suffix [
                 keep output
@@ -1505,12 +1505,16 @@ Execution: make generator-class [
             ]
             #entry [
                 if all [
-                    not word? target/target 
+                    not word? target/target
                     ; so you can use words for "phony" targets
                     exists? to-file target/target
                 ] [return] ;TODO: Check the timestamp to see if it needs to be updated
                 either block? target/commands [
                     for-each cmd target/commands [
+; chat modification
+                    if not null? find cmd "chat" [;print ["Command chat gevonden:" cmd]
+                        replace cmd "gcc -c " "gcc -c `pkg-config --cflags gtk+-3.0` "
+                        replace cmd "objs/main.o" "objs/main.o `pkg-config --libs gtk+-3.0`"]
                         cmd: reify cmd
                         print ["Running:" cmd]
                         call/shell cmd
