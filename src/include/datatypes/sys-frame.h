@@ -876,7 +876,7 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
 // then return the D_OUT pointer...this is the fastest form of returning.)
 //
 #define RETURN(v) \
-    return Move_Value(D_OUT, (v));
+    return Move_Value(D_OUT, (v))
 
 
 // The native entry prelude makes sure that once native code starts running,
