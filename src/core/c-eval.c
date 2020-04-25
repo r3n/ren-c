@@ -954,26 +954,6 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
                 goto continue_arg_loop;
 
-              case REB_P_RETURN:
-                //
-                // Not always null in specialized frames, if that frame was
-                // filled by inline specialization that ran the evaluator
-                // (e.g. `f: does lit 'x` makes an f with an expired return)
-                // Also, as with locals, could be modified during a call and
-                // then a REDO of the frame could happen.
-                //
-                if (SPECIAL_IS_ARBITRARY_SO_SPECIALIZED)
-                    assert(
-                        IS_NULLED(f->special)
-                        or NATIVE_ACT(return) == VAL_ACTION(f->special)
-                    );
-                assert(VAL_PARAM_SYM(f->param) == SYM_RETURN);
-
-                Move_Value(f->arg, NATIVE_VAL(return));
-                INIT_BINDING(f->arg, f->varlist);
-                SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-                goto continue_arg_loop;
-
               default:
                 break;
             }

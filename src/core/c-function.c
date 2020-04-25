@@ -8,7 +8,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Ren-C Open Source Contributors
+// Copyright 2012-2020 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -557,7 +557,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             //
             Init_Param(
                 DS_PUSH(),
-                REB_P_RETURN,
+                REB_P_LOCAL,
                 Canon(SYM_RETURN),
                 TS_OPT_VALUE
             );
@@ -568,16 +568,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         }
         else {
             REBVAL *param = DS_AT(definitional_return_dsp);
-
-            // Note: AUGMENT may be copying an already REB_P_RETURN'd argument
-            // from a pre-existing parameter list.  Else REB_P_LOCAL.
-            //
-            assert(
-                VAL_PARAM_CLASS(param) == REB_P_LOCAL
-                or VAL_PARAM_CLASS(param) == REB_P_RETURN
-            );
-            mutable_KIND_BYTE(param) = REB_P_RETURN;
-
+            assert(VAL_PARAM_CLASS(param) == REB_P_LOCAL);
             assert(MIRROR_BYTE(param) == REB_TYPESET);
         }
 

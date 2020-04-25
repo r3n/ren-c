@@ -443,7 +443,6 @@ bool Specialize_Action_Throws(
         }
 
         switch (VAL_PARAM_CLASS(param)) {
-          case REB_P_RETURN:
           case REB_P_LOCAL:
             assert(IS_NULLED(arg));  // no bindings, you can't set these
             goto unspecialized_arg;
@@ -653,7 +652,7 @@ void For_Each_Unspecialized_Param(
             continue;  // specialized out, not in interface
 
         Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
-        if (pclass == REB_P_RETURN or pclass == REB_P_LOCAL)
+        if (pclass == REB_P_LOCAL)
             continue;  // locals not in interface
 
         if (not hook(param, PHF_MASK_NONE, opaque)) {  // unsorted pass
@@ -682,7 +681,7 @@ void For_Each_Unspecialized_Param(
             continue;
 
         Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
-        if (pclass == REB_P_LOCAL or pclass == REB_P_RETURN)
+        if (pclass == REB_P_LOCAL)
             continue;
 
         // If the modal parameter has had its refinement specialized out, it
@@ -904,7 +903,6 @@ bool Make_Invocation_Frame_Throws(
             break;
 
           case REB_P_LOCAL:
-          case REB_P_RETURN:
             break;
 
           default:

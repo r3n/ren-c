@@ -263,7 +263,6 @@ e-types/emit {
         REB_TS_NOOP_IF_BLANK = PSEUDOTYPE_FIVE,
 
         PSEUDOTYPE_SIX,
-        REB_P_RETURN = PSEUDOTYPE_SIX,
         REB_TS_QUOTED_WORD = PSEUDOTYPE_SIX,  /* !!! temp compatibility */
 
         PSEUDOTYPE_SEVEN,
