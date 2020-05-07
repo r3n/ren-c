@@ -1524,6 +1524,10 @@ Execution: make generator-class [
                 ] [return] ;TODO: Check the timestamp to see if it needs to be updated
                 either block? target/commands [
                     for-each cmd target/commands [
+                    ; gtk-view modification
+                    if not null? find cmd "gtk-view" [;print ["Command gtk-view gevonden:" cmd]
+                        replace cmd "gcc -c " "gcc -c `pkg-config --cflags gtk+-3.0` "
+                        replace cmd "objs/main.o" "objs/main.o `pkg-config --libs gtk+-3.0`"]
                         cmd: reify cmd
                         print ["Running:" cmd]
                         call/shell cmd
