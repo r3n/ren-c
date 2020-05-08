@@ -334,19 +334,36 @@ void Shutdown_Pools(void)
     GC_Kill_Series(GC_Manuals);
 
   #if !defined(NDEBUG)
+    int num_leaks = 0;
+    REBSER *leaked = nullptr;
     REBSEG *debug_seg = Mem_Pools[SER_POOL].segs;
     for(; debug_seg != NULL; debug_seg = debug_seg->next) {
-        REBSER *series = cast(REBSER*, debug_seg + 1);
+        REBSER *s = cast(REBSER*, debug_seg + 1);
         REBLEN n;
-        for (n = Mem_Pools[SER_POOL].units; n > 0; n--, series++) {
-            if (IS_FREE_NODE(series))
+        for (n = Mem_Pools[SER_POOL].units; n > 0; --n, ++s) {
+            if (IS_FREE_NODE(s))
                 continue;
 
-            printf("At least one leaked series at shutdown...\n");
-            if (GET_SERIES_FLAG(series, MANAGED))
-                printf("And it's MANAGED, which *really* shouldn't happen\n");
-            panic (series);
+            ++num_leaks;
+
+            if (GET_SERIES_FLAG(s, MANAGED)) {
+                printf("MANAGED series leak, this REALLY shouldn't happen\n");
+                leaked = s;  // report a managed one if found
+            }
+            else if (not leaked) {
+                leaked = s;  // first one found
+            }
+            else if (
+                NOT_SERIES_FLAG(leaked, MANAGED)
+                and leaked->tick < s->tick
+            ){
+                leaked = s;  // update if earlier tick reference
+            }
         }
+    }
+    if (leaked) {
+        printf("%d leaked series at shutdown...panic()ing one\n", num_leaks);
+        panic (leaked);
     }
   #endif
 
