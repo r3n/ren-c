@@ -32,3 +32,9 @@
 (["abc" "de" "fghi" "jk"] == split "abc|de/fghi:jk" charset "|/:")
 (["abc" "de" "fghi" "jk"] == split "abc^M^Jde^Mfghi^Jjk" [CR LF | #"^M" | newline])
 (["abc" "de" "fghi" "jk"] == split "abc     de fghi  jk" [some #" "])
+; tag delimiter in block
+([[a] [b c] []] == split [a <t> b c <t>] <t>)
+; bar delimiter in block
+([[a] [b c] []] ==  split [a | b c |] '|)
+; word delimiter in block 
+([[a] [b c] []] == split [a x b c x] 'x)

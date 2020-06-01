@@ -594,7 +594,7 @@ split: function [
     series "The series to split"
         [any-series!]
     dlm "Split size, delimiter(s) (if all integer block), or block rule(s)"
-        [block! integer! char! bitset! text! tag!]
+        [block! integer! char! bitset! text! tag! word!]
     /into "If dlm is integer, split in n pieces (vs. pieces of length n)"
 ][
     parse (try match block! dlm) [some integer! end] then [
@@ -607,10 +607,11 @@ split: function [
         ]
     ]
 
-    if tag? dlm [dlm: form dlm]  ; reserve other strings for future meanings
+    if all [any-string? series tag? dlm] [dlm: form dlm]
+    ; reserve other strings for future meanings
 
-    result: collect [
-        parse series if integer? dlm [
+    result: collect [parse series case [
+        integer? dlm [
             size: dlm  ; alias for readability in integer case
             if size < 1 [fail "Bad SPLIT size given:" size]
 
@@ -626,11 +627,11 @@ split: function [
             ] else [
                 [any [copy series 1 size skip (keep/only series)] end]
             ]
-        ] else [
+        ]
+        block? dlm [
             ; A block that is not all integers, e.g. not `[1 1 1]`, acts as a
             ; PARSE rule (see %split.test.reb)
             ;
-            ensure [bitset! text! char! block!] dlm
 
             [
                 any [mk1: while [mk2: [dlm | end] break | skip] (
@@ -639,7 +640,18 @@ split: function [
                 end
             ]
         ]
-    ]
+        default [
+            ensure [bitset! text! char! word! tag!] dlm
+            [
+                some [
+                    copy mk1: [to dlm | to end]
+                    (keep/only mk1)
+                    opt thru dlm
+                ]
+                end
+            ]
+        ]   
+    ]]
 
     ; Special processing, to handle cases where the spec'd more items in
     ; /into than the series contains (so we want to append empty items),
@@ -665,7 +677,7 @@ split: function [
         (switch type of dlm [
             bitset! [did find dlm try last series]
             char! [dlm = last series]
-            text! [
+            text! tag! word! [
                 (did find series dlm) and [empty? find-last/tail series dlm]
             ]
             block! [false]

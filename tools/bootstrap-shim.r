@@ -334,3 +334,31 @@ eval: func [] [
         https://forum.rebol.info/t/eval-evaluate-and-reeval-reevaluate/1173
     ]
 ]
+
+split: function [
+    {Split series in pieces: fixed/variable size, fixed number, or delimited}
+
+    return: [block!]
+    series "The series to split"
+        [any-series!]
+    dlm "Split size, delimiter(s) (if all integer block), or block rule(s)"
+        [block! integer! char! bitset! text! tag! word! bar!]
+    /into "If dlm is integer, split in n pieces (vs. pieces of length n)"
+][
+    if all [any-string? series tag? dlm] [dlm: form dlm]
+    if any [word? dlm bar? dlm tag? dlm] [
+        return collect [parse series [
+            [
+                some [
+                    copy t: [to dlm | to end]
+                    (keep/only t)
+                    opt thru dlm
+                ]
+                end
+            ]
+        ]]
+    ]
+
+    apply :lib/split [series: series dlm: dlm into: into]
+]
+
