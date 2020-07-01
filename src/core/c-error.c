@@ -44,10 +44,10 @@ void Snap_State_Core(struct Reb_State *s)
     //
     assert(ARR_LEN(BUF_COLLECT) == 0);
 
-    s->guarded_len = SER_LEN(GC_Guarded);
+    s->guarded_len = SER_USED(GC_Guarded);
     s->frame = FS_TOP;
 
-    s->manuals_len = SER_LEN(GC_Manuals);
+    s->manuals_len = SER_USED(GC_Manuals);
     s->mold_buf_len = STR_LEN(STR(MOLD_BUF));
     s->mold_buf_size = STR_SIZE(STR(MOLD_BUF));
     s->mold_loop_tail = ARR_LEN(TG_Mold_Stack);
@@ -84,15 +84,15 @@ void Assert_State_Balanced_Debug(
 
     assert(ARR_LEN(BUF_COLLECT) == 0);
 
-    if (s->guarded_len != SER_LEN(GC_Guarded)) {
+    if (s->guarded_len != SER_USED(GC_Guarded)) {
         printf(
             "PUSH_GC_GUARD()x%d without DROP_GC_GUARD()\n",
-            cast(int, SER_LEN(GC_Guarded) - s->guarded_len)
+            cast(int, SER_USED(GC_Guarded) - s->guarded_len)
         );
         REBNOD *guarded = *SER_AT(
             REBNOD*,
             GC_Guarded,
-            SER_LEN(GC_Guarded) - 1
+            SER_USED(GC_Guarded) - 1
         );
         panic_at (guarded, file, line);
     }
@@ -104,7 +104,7 @@ void Assert_State_Balanced_Debug(
     // this in general for things that may not need "series" overhead,
     // e.g. a contiguous pointer stack.
     //
-    if (s->manuals_len > SER_LEN(GC_Manuals)) {
+    if (s->manuals_len > SER_USED(GC_Manuals)) {
         //
         // Note: Should this ever actually happen, panic() on the series won't
         // do any real good in helping debug it.  You'll probably need
@@ -113,15 +113,15 @@ void Assert_State_Balanced_Debug(
         //
         panic_at ("manual series freed outside checkpoint", file, line);
     }
-    else if (s->manuals_len < SER_LEN(GC_Manuals)) {
+    else if (s->manuals_len < SER_USED(GC_Manuals)) {
         printf(
             "Make_Series()x%d w/o Free_Unmanaged_Series or Manage_Series\n",
-            cast(int, SER_LEN(GC_Manuals) - s->manuals_len)
+            cast(int, SER_USED(GC_Manuals) - s->manuals_len)
         );
         REBSER *manual = *(SER_AT(
             REBSER*,
             GC_Manuals,
-            SER_LEN(GC_Manuals) - 1
+            SER_USED(GC_Manuals) - 1
         ));
         panic_at (manual, file, line);
     }
@@ -176,11 +176,11 @@ void Trapped_Helper(struct Reb_State *s)
     // any arglist series in call frames that have been wiped off the stack.
     // (Closure series will be managed.)
     //
-    assert(SER_LEN(GC_Manuals) >= s->manuals_len);
-    while (SER_LEN(GC_Manuals) != s->manuals_len) {
+    assert(SER_USED(GC_Manuals) >= s->manuals_len);
+    while (SER_USED(GC_Manuals) != s->manuals_len) {
         // Freeing the series will update the tail...
         Free_Unmanaged_Series(
-            *SER_AT(REBSER*, GC_Manuals, SER_LEN(GC_Manuals) - 1)
+            *SER_AT(REBSER*, GC_Manuals, SER_USED(GC_Manuals) - 1)
         );
     }
 

@@ -674,28 +674,33 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
             les.data_idx = VAL_INDEX(les.data);
             if (ANY_ARRAY(les.data))
                 les.specifier = VAL_SPECIFIER(les.data);
+            les.data_len = VAL_LEN_HEAD(les.data);  // has HOLD, won't change
         }
         else if (ANY_CONTEXT(les.data)) {
             les.data_ser = SER(CTX_VARLIST(VAL_CONTEXT(les.data)));
             les.data_idx = 1;
+            les.data_len = SER_USED(les.data_ser);  // has HOLD, won't change
         }
         else if (ANY_PATH(les.data)) {
             les.data_ser = SER(VAL_PATH(les.data));
             les.data_idx = 0;
             les.specifier = VAL_PATH_SPECIFIER(les.data);
+            les.data_len = SER_USED(les.data_ser);  // has HOLD, won't change
         }
         else if (IS_MAP(les.data)) {
             les.data_ser = SER(MAP_PAIRLIST(VAL_MAP(les.data)));
             les.data_idx = 0;
+            les.data_len = SER_USED(les.data_ser);  // has HOLD, won't change
         }
         else
             panic ("Illegal type passed to Loop_Each()");
+
+        // HOLD so length can't change
 
         took_hold = NOT_SERIES_INFO(les.data_ser, HOLD);
         if (took_hold)
             SET_SERIES_INFO(les.data_ser, HOLD);
 
-        les.data_len = SER_LEN(les.data_ser);  // HOLD so length can't change
         if (les.data_idx >= les.data_len) {
             assert(IS_BLANK(D_OUT));  // result if loop body never runs
             r = nullptr;
@@ -1235,7 +1240,7 @@ static REB_R Remove_Each_Core(struct Remove_Each_State *res)
 
     REBLEN index = res->start;  // up here to avoid longjmp clobber warnings
 
-    REBLEN len = SER_LEN(res->series);  // temp read-only, this won't change
+    REBLEN len = SER_USED(res->series);  // temp read-only, this won't change
     while (index < len) {
         assert(res->start == index);
 
@@ -1386,7 +1391,7 @@ REBNATIVE(remove_each)
     //
     res.series = VAL_SERIES_ENSURE_MUTABLE(res.data);
 
-    if (VAL_INDEX(res.data) >= SER_LEN(res.series)) {
+    if (VAL_INDEX(res.data) >= SER_USED(res.series)) {
         //
         // If index is past the series end, then there's nothing removable.
         //
