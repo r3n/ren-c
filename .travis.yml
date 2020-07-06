@@ -205,7 +205,6 @@ matrix:
         - CONFIG=generic-c++.r
         - OS_ID=0.2.40
         - DEBUG=asserts
-        - CFLAGS="{-DDEBUG_UTF8_EVERYWHERE}"  # keep this debug mode working
         - STANDARD=c++11
         - RIGOROUS=no
         - STATIC=no  # static linking switch not honored
