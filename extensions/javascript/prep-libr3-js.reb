@@ -208,17 +208,29 @@ e-cwrap/emit {
      * calling it `r.Run()`, if one wanted).  Additionally, module support
      * in browsers is rolling out, although not fully mainstream yet.
      */
-    var reb  /* local definition only if not using modules */
 
     /* Could use ENVIRONMENT_IS_NODE here, but really the test should be for
      * if the system supports modules (someone with an understanding of the
-     * state of browser modules should look at this).  Note `Module.exports`
-     * seems not to be defined, even in the node version.
+     * state of browser modules should look at this).
      */
     if (typeof module !== 'undefined')
         reb = module.exports  /* add to what you get with require('rebol') */
-    else
-        reb = {}  /* build a new dictionary to use reb.Xxx() if in browser */
+    else {
+        /* !!! In browser, `reb` is a global (window.reb) set by load-r3.js
+         * But it would be better if we "modularized" and let the caller
+         * name the module, with `reb` just being a default.  However,
+         * letting them name it creates a lot of issues within EM_ASM
+         * calls from the C code.  Also, the worker wants to use the same
+         * name.  Punt for now.  Note `self` must be used instead of `window`
+         * as `window` exists only on the main thread (`self` is a synonym).
+         */
+         if (typeof window !== 'undefined')
+            reb = window.reb  /* main, load-r3.js made it (has reb.m) */
+        else {
+            reb = self.reb = {}  /* worker, make our own API container */
+            reb.m = self  /* module exports are at global scope on worker? */
+        }
+     }
 }
 
 to-js-type: func [
@@ -397,7 +409,7 @@ map-each-api [
             continue
         ]
 
-        enter: copy {_RL_rebEnterApi_internal();}
+        enter: {reb.m._RL_rebEnterApi_internal();}
         if false [
             ; It can be useful for debugging to see the API entry points;
             ; using console.error() adds a stack trace to it.
@@ -478,7 +490,11 @@ map-each-api [
                  */
                 HEAP32[(va>>2) + (argc + 1)] = va + 4
 
-                a = _RL_$<Name>(this.quotes, HEAP32[va>>2], va + 4 * (argc + 1))
+                a = reb.m._RL_$<Name>(
+                    this.quotes,
+                    HEAP32[va>>2],
+                    va + 4 * (argc + 1)
+                )
 
                 stackRestore(stack)
 
@@ -491,7 +507,7 @@ map-each-api [
         } api
     ] else [
         e-cwrap/emit cscape/with {
-            reb.$<No-Reb-Name> = cwrap_tolerant(  /* vs. Module.cwrap() */
+            reb.$<No-Reb-Name> = cwrap_tolerant(  /* vs. R3Module.cwrap() */
                 'RL_$<Name>',
                 $<Js-Returns>, [
                     $(Js-Param-Types),
@@ -548,8 +564,8 @@ e-cwrap/emit {
         else
             throw Error("Unknown array type in reb.Binary " + typeof array)
 
-        let binary = _RL_rebUninitializedBinary_internal(view.length)
-        let head = _RL_rebBinaryHead_internal(binary)
+        let binary = reb.m._RL_rebUninitializedBinary_internal(view.length)
+        let head = reb.m._RL_rebBinaryHead_internal(binary)
         writeArrayToMemory(view, head)  /* uses Int8Array.set() on HEAP8 */
 
         return binary
@@ -561,10 +577,10 @@ e-cwrap/emit {
      * https://stackoverflow.com/a/53605865
      */
     reb.Bytes = function(binary) {
-        let ptr = _RL_rebBinaryAt_internal(binary)
-        let size = _RL_rebBinarySizeAt_internal(binary)
+        let ptr = reb.m._RL_rebBinaryAt_internal(binary)
+        let size = reb.m._RL_rebBinarySizeAt_internal(binary)
 
-        var view = new Uint8Array(Module.HEAPU8.buffer, ptr, size)
+        var view = new Uint8Array(reb.m.HEAPU8.buffer, ptr, size)
 
         /* Copy method: https://stackoverflow.com/a/22114687/211160
          */
@@ -581,9 +597,9 @@ e-cwrap/emit {
      * the ACTION! (turned into an integer)
      */
 
-    let RL_JS_NATIVES = {}  /* !!! would a Map be more performant? */
-    let RL_JS_CANCELABLES = new Set()  /* American spelling has one 'L' */
-    const RL_JS_ERROR_HALTED = Error("Halted by Escape, reb.Halt(), or HALT")
+    reb.JS_NATIVES = {}  /* !!! would a Map be more performant? */
+    reb.JS_CANCELABLES = new Set()  /* American spelling has one 'L' */
+    reb.JS_ERROR_HALTED = Error("Halted by Escape, reb.Halt(), or HALT")
 
     /* If we just used raw ES6 Promises there would be no way for a signal to
      * cancel them.  Whether it was a setTimeout(), a fetch(), or otherwise...
@@ -628,7 +644,7 @@ e-cwrap/emit {
                 }
                 else {
                     resolve(val)
-                    RL_JS_CANCELABLES.delete(cancelable)
+                    reb.JS_CANCELABLES.delete(cancelable)
                 }
             })
             promise.catch((error) => {
@@ -637,7 +653,7 @@ e-cwrap/emit {
                 }
                 else {
                     reject(error)
-                    RL_JS_CANCELABLES.delete(cancelable)
+                    reb.JS_CANCELABLES.delete(cancelable)
                 }
             })
 
@@ -654,20 +670,20 @@ e-cwrap/emit {
                 }
 
                 wasCanceled = true
-                reject(RL_JS_ERROR_HALTED)
+                reject(reb.JS_ERROR_HALTED)
 
                 /* !!! Supposedly it is safe to iterate and delete at the
-                 * same time.  If not, RL_JS_CANCELABLES would need to be
+                 * same time.  If not, reb.JS_CANCELABLES would need to be
                  * copied by the iteration to allow this deletion:
                  *
                  * https://stackoverflow.com/q/28306756/
                  */
-                RL_JS_CANCELABLES.delete(cancelable)
+                reb.JS_CANCELABLES.delete(cancelable)
             }
         })
         cancelable.cancel = cancel
 
-        RL_JS_CANCELABLES.add(cancelable)  /* reb.Halt() calls if in set */
+        reb.JS_CANCELABLES.add(cancelable)  /* reb.Halt() calls if in set */
         return cancelable
     }
 
@@ -684,26 +700,26 @@ e-cwrap/emit {
          * as the return result for a JS-AWAITER, but the user can explicitly
          * request augmentation for promises that they manually `await`.
          */
-        RL_JS_CANCELABLES.forEach(promise => {
+        reb.JS_CANCELABLES.forEach(promise => {
             promise.cancel()
         })
     }
 
 
     reb.RegisterId_internal = function(id, fn) {
-        if (id in RL_JS_NATIVES)
+        if (id in reb.JS_NATIVES)
             throw Error("Already registered " + id + " in JS_NATIVES table")
-        RL_JS_NATIVES[id] = fn
+        reb.JS_NATIVES[id] = fn
     }
 
     reb.UnregisterId_internal = function(id) {
-        if (!(id in RL_JS_NATIVES))
+        if (!(id in reb.JS_NATIVES))
             throw Error("Can't delete " + id + " in JS_NATIVES table")
-        delete RL_JS_NATIVES[id]
+        delete reb.JS_NATIVES[id]
     }
 
     reb.RunNative_internal = function(id, frame_id) {
-        if (!(id in RL_JS_NATIVES))
+        if (!(id in reb.JS_NATIVES))
             throw Error("Can't dispatch " + id + " in JS_NATIVES table")
 
         let resolver = function(res) {
@@ -738,8 +754,8 @@ e-cwrap/emit {
                 )
             }
 
-            RL_JS_NATIVES[frame_id] = res  /* stow result */
-            _RL_rebSignalResolveNative_internal(frame_id)
+            reb.JS_NATIVES[frame_id] = res  /* stow result */
+            reb.m._RL_rebSignalResolveNative_internal(frame_id)
         }
 
         let rejecter = function(rej) {
@@ -759,11 +775,11 @@ e-cwrap/emit {
             if (typeof rej == "number")
                 console.log("Suspicious numeric throw() in JS-AWAITER");
 
-            RL_JS_NATIVES[frame_id] = rej  /* stow result */
-            _RL_rebSignalRejectNative_internal(frame_id)
+            reb.JS_NATIVES[frame_id] = rej  /* stow result */
+            reb.m._RL_rebSignalRejectNative_internal(frame_id)
         }
 
-        let native = RL_JS_NATIVES[id]
+        let native = reb.JS_NATIVES[id]
         if (native.is_awaiter) {
             /*
              * There is no built in capability of ES6 promises to cancel, but
@@ -795,7 +811,7 @@ e-cwrap/emit {
     }
 
     reb.GetNativeResult_internal = function(frame_id) {
-        var result = RL_JS_NATIVES[frame_id]  /* resolution or rejection */
+        var result = reb.JS_NATIVES[frame_id]  /* resolution or rejection */
         reb.UnregisterId_internal(frame_id);
 
         if (typeof result == "function")  /* needed to empower emterpreter */
@@ -809,36 +825,36 @@ e-cwrap/emit {
     }
 
     reb.GetNativeError_internal = function(frame_id) {
-        var result = RL_JS_NATIVES[frame_id]  /* resolution or rejection */
+        var result = reb.JS_NATIVES[frame_id]  /* resolution or rejection */
         reb.UnregisterId_internal(frame_id)
-        if (result == RL_JS_ERROR_HALTED)
+        if (result == reb.JS_ERROR_HALTED)
             return 0  /* in halt state, can't run more code, will throw! */
 
         return reb.Value("make error!", reb.T(String(result)))
     }
 
     reb.ResolvePromise_internal = function(promise_id, rebval) {
-        if (!(promise_id in RL_JS_NATIVES))
+        if (!(promise_id in reb.JS_NATIVES))
             throw Error(
                 "Can't find promise_id " + promise_id + " in JS_NATIVES"
             )
-        RL_JS_NATIVES[promise_id][0](rebval)  /* [0] is resolve() */
+        reb.JS_NATIVES[promise_id][0](rebval)  /* [0] is resolve() */
         reb.UnregisterId_internal(promise_id);
     }
 
     reb.RejectPromise_internal = function(promise_id, throw_id) {
-        if (!(throw_id in RL_JS_NATIVES))  /* frame_id of throwing awaiter */
+        if (!(throw_id in reb.JS_NATIVES))  /* frame_id of throwing awaiter */
             throw Error(
                 "Can't find throw_id " + throw_id + " in JS_NATIVES"
             )
-        let error = RL_JS_NATIVES[throw_id]  /* typically JS Error() Object */
+        let error = reb.JS_NATIVES[throw_id]  /* typically a JS Error() obj */
         reb.UnregisterId_internal(throw_id)
 
-        if (!(promise_id in RL_JS_NATIVES))
+        if (!(promise_id in reb.JS_NATIVES))
             throw Error(
                 "Can't find promise_id " + promise_id + " in JS_NATIVES"
             )
-        RL_JS_NATIVES[promise_id][1](error)  /* [1] is reject() */
+        reb.JS_NATIVES[promise_id][1](error)  /* [1] is reject() */
         reb.UnregisterId_internal(promise_id)
     }
 
@@ -865,7 +881,7 @@ e-cwrap/emit {
 if false [  ; Only used if DEBUG_JAVASCRIPT_SILENT_TRACE (how to know here?)
     e-cwrap/emit {
         reb.GetSilentTrace_internal = function() {
-            return UTF8ToString(_RL_rebGetSilentTrace_internal())
+            return UTF8ToString(reb.m._RL_rebGetSilentTrace_internal())
         }
     }
 ]
@@ -1000,7 +1016,7 @@ e-node-preload: (make-emitter
 )
 
 e-node-preload/emit {
-    var Module = {};
+    var R3Module = {};
     console.log("Yes we're getting a chance to preload...")
     console.log(__dirname + '/libr3.bytecode')
     var fs = require('fs');
@@ -1008,10 +1024,10 @@ e-node-preload/emit {
     /* We don't want the direct result, but want the ArrayBuffer
      * Hence the .buffer (?)
      */
-    Module.emterpreterFile =
+    R3Module.emterpreterFile =
         fs.readFileSync(__dirname + '/libr3.bytecode').buffer
 
-    console.log(Module.emterpreterFile)
+    console.log(R3Module.emterpreterFile)
 }
 
 e-node-preload/write-emitted

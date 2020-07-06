@@ -414,7 +414,7 @@ EXTERN_C intptr_t RL_rebPromise(REBFLGS flags, void *p, va_list *vaptr)
 
   #ifdef USE_ASYNCIFY
     EM_ASM(
-        { setTimeout(function() { _RL_rebIdle_internal(); }, 0); }
+        { setTimeout(function() { reb.m._RL_rebIdle_internal(); }, 0); }
     );  // note `_RL` (leading underscore means no cwrap)
   #else
     pthread_mutex_lock(&PG_Promise_Mutex);
@@ -880,7 +880,7 @@ REB_R JavaScript_Dispatcher(REBFRM *f)
         MAIN_THREAD_EM_ASM(  // blocking call
             {
                 reb.RunNative_internal($0, $1);  // `;` is necessary here
-                _RL_rebTakeAwaitLock_internal();
+                reb.m._RL_rebTakeAwaitLock_internal();
             },
             native_id,  // => $0
             frame_id  // => $1
@@ -1185,12 +1185,16 @@ REBNATIVE(js_eval_p)
             MAIN_THREAD_EM_ASM(
                 { eval(UTF8ToString($0)) },
                 utf8
-            );
-        else
+            );  // !!! ...should be an else clause here...
+        // !!! However, there's an emscripten bug, so use two `if`s instead
+        // https://github.com/emscripten-core/emscripten/issues/11539
+        //
+        if (not REF(local))
             MAIN_THREAD_EM_ASM(
                 { (1,eval)(UTF8ToString($0)) },
                 utf8
             );
+
         return Init_Void(D_OUT);
     }
 

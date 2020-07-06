@@ -175,6 +175,17 @@ ldflags: compose [
         {--pre-js prep/include/node-preload.js}
     ])
 
+    ; The default build will create an emscripten module named "Module", which
+    ; holds various emscripten state (including the memory heap) and service
+    ; routines.  If everyone built their projects like this, you would not be
+    ; able to load more than one at a time due to the name collision.  So
+    ; we use the "Modularize" option to get a callback with a parameter that
+    ; is the module object when it is ready.  This also simplifies the loading
+    ; process of registering notifications for being loaded and ready.
+    ; https://emscripten.org/docs/getting_started/FAQ.html#can-i-use-multiple-emscripten-compiled-programs-on-one-web-page
+    ;
+    {-s MODULARIZE=1 -s 'EXPORT_NAME="r3_module_promiser"'}
+
     (if debug-javascript-extension [
         {-s ASSERTIONS=1}
     ] else [
