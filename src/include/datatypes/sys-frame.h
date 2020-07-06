@@ -619,8 +619,12 @@ inline static void Push_Action(
         );
     }
 
-    if (not Did_Series_Data_Alloc(s, num_args + 1 + 1)) // +rootvar, +end
-        fail ("Out of memory in Push_Action()");
+    if (not Did_Series_Data_Alloc(s, num_args + 1 + 1)) {  // +rootvar, +end
+        s->info.bits |= SERIES_INFO_INACCESSIBLE;
+        GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
+        f->varlist = nullptr;
+        fail (Error_No_Memory(sizeof(REBVAL) * (num_args + 1 + 1)));
+    }
 
     f->rootvar = cast(REBVAL*, s->content.dynamic.data);
     f->rootvar->header.bits =
@@ -710,7 +714,7 @@ inline static void Drop_Action(REBFRM *f) {
         if (GET_SERIES_FLAG(f->varlist, MANAGED))
             f->varlist = nullptr; // references exist, let a new one alloc
         else {
-            // This node could be reused vs. calling Make_Node() on the next
+            // This node could be reused vs. calling Alloc_Node() on the next
             // action invocation...but easier for the moment to let it go.
             //
             Free_Node(SER_POOL, NOD(f->varlist));

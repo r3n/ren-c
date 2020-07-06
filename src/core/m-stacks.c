@@ -93,7 +93,9 @@ void Startup_Frame_Stack(void)
     TG_Frame_Feed_End.specifier = SPECIFIED;
     TRASH_POINTER_IF_DEBUG(TG_Frame_Feed_End.pending);
 
-    REBFRM *f = ALLOC(REBFRM);  // can't use DECLARE_FRAME(), must be dynamic
+    REBFRM *f = TRY_ALLOC(REBFRM);  // can't DECLARE_FRAME(), must be dynamic
+    if (f == nullptr)
+        fail (Error_No_Memory(sizeof(REBFRM)));
     Prep_Frame_Core(f, &TG_Frame_Feed_End, EVAL_MASK_DEFAULT);
 
     Push_Frame(nullptr, f);
