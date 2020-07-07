@@ -120,14 +120,14 @@ inline static bool TYPE_CHECK_BITS(const REBCEL *v, REBU64 bits) {
 
 inline static bool TYPE_CHECK_EXACT_BITS(const REBCEL *v, REBU64 bits) {
     uint_fast32_t low = bits & cast(uint32_t, 0xFFFFFFFF);
-    if (low == VAL_TYPESET_LOW_BITS(v))
-        return true;
+    if (low != VAL_TYPESET_LOW_BITS(v))
+        return false;
 
     uint_fast32_t high = bits >> 32;
-    if (high == VAL_TYPESET_HIGH_BITS(v))
-        return true;
+    if (high != VAL_TYPESET_HIGH_BITS(v))
+        return false;
 
-    return false;
+    return true;
 }
 
 inline static void TYPE_SET(REBCEL *v, REBYTE n) {
