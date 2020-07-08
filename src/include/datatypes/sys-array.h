@@ -508,7 +508,7 @@ inline static const RELVAL *VAL_ARRAY_AT(REBCEL(const*) v) {
     m_cast(RELVAL*, VAL_ARRAY_AT(KNOWN_MUTABLE(v)))
 
 // !!! R3-Alpha introduced concepts of immutable series with PROTECT, but
-// did not consider the protected status to apply to binding.  Revolt added
+// did not consider the protected status to apply to binding.  Ren-C added
 // more notions of immutability (const, holds, locking/freezing) and enforces
 // it at compile-time...which caught many bugs.  But being able to bind
 // "immutable" data was mechanically required by R3-Alpha for efficiency...so
