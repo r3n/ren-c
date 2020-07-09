@@ -298,150 +298,148 @@ static uintptr_t arg_to_ffi(
 
         memcpy(dest, VAL_STRUCT_DATA_AT(arg), STU_SIZE(VAL_STRUCT(arg)));
 
+        TERM_BIN_LEN(store, offset + STU_SIZE(VAL_STRUCT(arg)));
         return offset;
     }
 
     assert(IS_WORD(schema));
 
+    union {
+        uint8_t u8;
+        int8_t i8;
+        uint16_t u16;
+        int16_t i16;
+        uint32_t u32;
+        int32_t i32;
+        int64_t i64;
+
+        float f;
+        double d;
+
+        intptr_t ipt;
+    } buffer;
+
+    char *data;
+    REBSIZ size;
+
     switch (VAL_WORD_SYM(schema)) {
       case SYM_UINT8: {
-        uint8_t u;
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(u));
         if (not arg)
-            break;
-
-        if (not IS_INTEGER(arg))
+            buffer.u8 = 0;  // return value, make space (but initialize)
+        else if (IS_INTEGER(arg))
+            buffer.u8 = cast(uint8_t, VAL_INT64(arg));
+        else
             fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
 
-        u = cast(uint8_t, VAL_INT64(arg));
-        memcpy(dest, &u, sizeof(u));
+        data = cast(char*, &buffer.u8);
+        size = sizeof(buffer.u8);
         break; }
 
       case SYM_INT8: {
-        int8_t i;
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(i));
         if (not arg)
-            break;
-
-        if (not IS_INTEGER(arg))
+            buffer.i8 = 0;  // return value, make space (but initialize)
+        else if (IS_INTEGER(arg))
+            buffer.i8 = cast(int8_t, VAL_INT64(arg));
+        else
             fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
 
-        i = cast(int8_t, VAL_INT64(arg));
-        memcpy(dest, &i, sizeof(i));
+        data = cast(char*, &buffer.i8);
+        size = sizeof(buffer.i8);
         break; }
 
       case SYM_UINT16: {
-        uint16_t u;
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(u));
         if (not arg)
-            break;
-
-        if (not IS_INTEGER(arg))
+            buffer.u16 = 0;  // return value, make space (but initialize)
+        else if (IS_INTEGER(arg))
+            buffer.u16 = cast(uint16_t, VAL_INT64(arg));
+        else
             fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
 
-        u = cast(uint16_t, VAL_INT64(arg));
-        memcpy(dest, &u, sizeof(u));
+        data = cast(char*, &buffer.u16);
+        size = sizeof(buffer.u16);
         break; }
 
-      case SYM_INT16:{
-        int16_t i;
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(i));
+      case SYM_INT16: {
         if (not arg)
-            break;
-
-        if (not IS_INTEGER(arg))
+            buffer.i16 = 0;  // return value, make space (but initialize)
+        else if (IS_INTEGER(arg))
+            buffer.i16 = cast(int16_t, VAL_INT64(arg));
+        else
             fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
 
-        i = cast(int16_t, VAL_INT64(arg));
-        memcpy(dest, &i, sizeof(i));
+        data = cast(char*, &buffer.i16);
+        size = sizeof(buffer.i16);
         break; }
 
       case SYM_UINT32: {
-        uint32_t u;
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(u));
         if (not arg)
-            break;
-
-        if (not IS_INTEGER(arg))
+            buffer.u32 = 0;  // return value, make space (but initialize)
+        else if (IS_INTEGER(arg))
+            buffer.u32 = cast(int32_t, VAL_INT64(arg));
+        else
             fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
 
-        u = cast(uint32_t, VAL_INT64(arg));
-        memcpy(dest, &u, sizeof(u));
+        data = cast(char*, &buffer.u32);
+        size = sizeof(buffer.u32);
         break; }
 
       case SYM_INT32: {
-        int32_t i;
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(i));
         if (not arg)
-            break;
-
-        if (not IS_INTEGER(arg))
+            buffer.i32 = 0;  // return value, make space (but initialize)
+        else if (IS_INTEGER(arg))
+            buffer.i32 = cast(int32_t, VAL_INT64(arg));
+        else
             fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
 
-        i = cast(int32_t, VAL_INT64(arg));
-        memcpy(dest, &i, sizeof(i));
+        data = cast(char*, &buffer.i32);
+        size = sizeof(buffer.i32);
         break; }
 
       case SYM_UINT64:
       case SYM_INT64: {
-        int64_t i;
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(i));
         if (not arg)
-            break;
-
-        if (not IS_INTEGER(arg))
+            buffer.i64 = 0;  // return value, make space (but initialize)
+        else if (IS_INTEGER(arg))
+            buffer.i64 = VAL_INT64(arg);
+        else
             fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
 
-        i = VAL_INT64(arg);
-        memcpy(dest, &i, sizeof(int64_t));
+        data = cast(char*, &buffer.i64);
+        size = sizeof(buffer.i64);
         break; }
 
       case SYM_POINTER: {
         //
         // Note: Function pointers and data pointers may not be same size.
         //
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(void*));
-        if (not arg)
+        if (not arg) {
+            buffer.ipt = 0xDECAFBAD;  // return value, make space (but init)
+        }
+        else switch (VAL_TYPE(arg)) {
+          case REB_NULLED:
+            buffer.ipt = 0;
             break;
 
-        switch (VAL_TYPE(arg)) {
-          case REB_NULLED: {
-            intptr_t ipt = 0;
-            memcpy(dest, &ipt, sizeof(void*));
-            break; }
-
-          case REB_INTEGER: {
-            intptr_t ipt = VAL_INT64(arg);
-            memcpy(dest, &ipt, sizeof(void*));
-            break; }
+          case REB_INTEGER:
+            buffer.ipt = VAL_INT64(arg);
+            break;
 
         // !!! This is a questionable idea, giving out pointers directly into
         // Rebol series data.  The data may be relocated in memory if any
         // modifications happen during a callback (or in the future, just for
         // GC compaction even if not changed)...so the memory is not "stable".
         //
-          case REB_TEXT: {  // !!!
-            const REBYTE *utf8 = VAL_UTF8_AT(nullptr, arg);
-            memcpy(dest, &utf8, sizeof(REBYTE*));  // copies a *pointer*!
-            break; }
+          case REB_TEXT:  // !!! copies a *pointer*!
+            buffer.ipt = cast(intptr_t, VAL_UTF8_AT(nullptr, arg));
+            break;
 
-          case REB_BINARY: {  // !!!
-            const REBYTE *bytes = VAL_BYTES_AT(nullptr, arg);
-            memcpy(dest, &bytes, sizeof(REBYTE*));  // copies a *pointer*!
-            break; }
+          case REB_BINARY:  // !!! copies a *pointer*!
+            buffer.ipt = cast(intptr_t, VAL_BYTES_AT(nullptr, arg));
+            break;
 
-          case REB_CUSTOM: {  // !!!
-            REBYTE *raw_ptr = VAL_VECTOR_HEAD(arg);
-            memcpy(dest, &raw_ptr, sizeof(raw_ptr));  // copies a *pointer*!
-            break; }
+          case REB_CUSTOM:  // !!! copies a *pointer* (and assumes vector!)
+            buffer.ipt = cast(intptr_t, VAL_VECTOR_HEAD(arg));
+            break;
 
           case REB_ACTION: {
             if (not IS_ACTION_RIN(arg))
@@ -450,51 +448,51 @@ static uintptr_t arg_to_ffi(
             REBRIN *rin = VAL_ACT_DETAILS(arg);
             CFUNC* cfunc = RIN_CFUNC(rin);
             size_t sizeof_cfunc = sizeof(cfunc);  // avoid conditional const
-            if (sizeof_cfunc != sizeof(void*))  // not necessarily true
-                fail ("Void pointer size not equal to function pointer size");
-            memcpy(dest, &cfunc, sizeof(void*));
+            if (sizeof_cfunc != sizeof(intptr_t))  // not necessarily true
+                fail ("intptr_t size not equal to function pointer size");
+            memcpy(&buffer.ipt, &cfunc, sizeof(intptr_t));
             break; }
 
           default:
             fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
         }
+
+        data = cast(char*, &buffer.ipt);
+        size = sizeof(buffer.ipt);
         break; }  // end case FFI_TYPE_POINTER
 
       case SYM_REBVAL: {
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(REBVAL*));
         if (not arg)
-            break;
+            buffer.ipt = 0xDECAFBAD;  // return value, make space (but init)
+        else
+            buffer.ipt = cast(intptr_t, arg);
 
-        memcpy(dest, &arg, sizeof(REBVAL*));  // copies a *pointer*!
+        data = cast(char*, &buffer.ipt);
+        size = sizeof(buffer.ipt);
         break; }
 
       case SYM_FLOAT: {
-        float f;
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(f));
         if (not arg)
-            break;
-
-        if (not IS_DECIMAL(arg))
+            buffer.f = 0;  // return value, make space (but initialize)
+        else if (IS_DECIMAL(arg))
+            buffer.f = cast(float, VAL_DECIMAL(arg));
+        else
             fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
 
-        f = cast(float, VAL_DECIMAL(arg));
-        memcpy(dest, &f, sizeof(f));
+        data = cast(char*, &buffer.f);
+        size = sizeof(buffer.f);
         break; }
 
       case SYM_DOUBLE: {
-        double d;
-        if (not dest)
-            dest = Expand_And_Align(&offset, store, sizeof(d));
         if (not arg)
-            break;
-
-        if (not IS_DECIMAL(arg))
+            buffer.d = 0;
+        else if (IS_DECIMAL(arg))
+            buffer.d = VAL_DECIMAL(arg);
+        else
             fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
 
-        d = VAL_DECIMAL(arg);
-        memcpy(dest, &d, sizeof(double));
+        data = cast(char*, &buffer.d);
+        size = sizeof(buffer.d);
         break;}
 
       case SYM_STRUCT_X:
@@ -511,6 +509,16 @@ static uintptr_t arg_to_ffi(
       default:
         fail (arg);
     }
+
+    if (store) {
+        assert(dest == nullptr);
+        dest = Expand_And_Align(&offset, store, size);
+    }
+
+    memcpy(dest, data, size);
+
+    if (store)
+        TERM_BIN_LEN(store, offset + size);
 
     return offset;
 }
@@ -916,7 +924,7 @@ struct Reb_Callback_Invocation {
     REBRIN *rin;
 };
 
-static void callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
+static REBVAL *callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
 {
     // Build an array of code to run which represents the call.  The first
     // item in that array will be the callback function value, and then
@@ -951,6 +959,8 @@ static void callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
             param  // parameter used for symbol in error only
         );
     }
+
+    return nullptr;  // return result not used
 }
 
 

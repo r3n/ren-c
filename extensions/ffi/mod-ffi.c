@@ -22,6 +22,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 
+#define REBOL_IMPLICIT_END  // don't require rebEND in API calls (C99 or C++)
 #include "sys-core.h"
 
 #include "tmp-mod-ffi.h"
@@ -34,74 +35,65 @@ REBTYP *EG_Struct_Type = nullptr;  // (E)xtension (G)lobal
 // and MAKE-CALLBACK natives take as an option via refinement
 //
 static ffi_abi Abi_From_Word(const REBVAL *word) {
-    switch (VAL_WORD_SYM(word)) {
-      case SYM_DEFAULT:
-        return FFI_DEFAULT_ABI;
+    //
+    // !!! In order to use #ifdefs inside the call, we cannot use the variadic
+    // macro that injects rebEND, but need to use a plain C call and add our
+    // own rebEND.  This should be an official technique with an official
+    // name (like _nomacro?), though perhaps it should only be offered in one
+    // variation (e.g. one that returns a value that you must unbox separately
+    // with a macro?)  Review the question, and use the underlying _inline
+    // for now.
+    //
+    ffi_abi abi = (ffi_abi)rebUnboxInteger_inline("switch", rebQ(word), "[",
 
-    #ifdef X86_WIN64
-      case SYM_WIN64:
-        return FFI_WIN64;
+        "'default [", rebI(FFI_DEFAULT_ABI), "]",
 
-    #elif defined(X86_WIN32) || defined(TO_LINUX_X86) || defined(TO_LINUX_X64)
-      case SYM_SYSV:
-        return FFI_SYSV;
+      #ifdef X86_WIN64
 
-      // !!! While these are defined on newer versions of LINUX X86 and X64
-      // FFI, older versions (e.g. 3.0.13) only have STDCALL/THISCALL/FASTCALL
-      // on Windows.  We could detect the FFI version, but since basically
-      // no one uses anything but the default punt on it for now.
-      //
-      #ifdef X86_WIN32
-        case SYM_STDCALL:
-          return FFI_STDCALL;
+        "'win64 [", rebI(FFI_WIN64), "]",
 
-        case SYM_THISCALL:
-          return FFI_THISCALL;
+      #elif defined(X86_WIN32) \
+            || defined(TO_LINUX_X86) || defined(TO_LINUX_X64)
 
-        case SYM_FASTCALL:
-          return FFI_FASTCALL;
-      #endif
+        "'sysv [", rebI(FFI_SYSV), "]",
 
-      #ifdef X86_WIN32
-        case SYM_MS_CDECL:
-          return FFI_MS_CDECL;
-      #else
-        case SYM_UNIX64:
-          return FFI_UNIX64;
-      #endif //X86_WIN32
+        // !!! While these are defined on newer versions of LINUX X86/X64 FFI
+        // older versions (e.g. 3.0.13) only have STDCALL/THISCALL/FASTCALL
+        // on Windows.  We could detect the FFI version, but since basically
+        // no one uses anything but the default punt on it for now.
+        //
+        #ifdef X86_WIN32
+            "'stdcall [", rebI(FFI_STDCALL), "]",
+            "'thiscall [", rebI(FFI_THISCALL), "]",
+            "'fastcall [", rebI(FFI_FASTCALL), "]",
+        #endif
 
-    #elif defined (TO_LINUX_ARM)
-      case SYM_VFP:
-        return FFI_VFP;
+        #ifdef X86_WIN32
+            "'ms-cdecl [", rebI(FFI_MS_CDECL), "]",
+        #else
+            "'unix64 [", rebI(FFI_UNIX64), "]",
+        #endif
 
-      case SYM_SYSV:
-        return FFI_SYSV;
+      #elif defined (TO_LINUX_ARM)
 
-    #elif defined (TO_LINUX_MIPS)
-      case SYM_O32:
-        return FFI_O32;
+        "'vfp [", rebI(FFI_VFP), "]",
+        "'sysv [", rebI(FFI_SYSV), "]",
 
-      case SYM_N32:
-        return FFI_N32;
+      #elif defined (TO_LINUX_MIPS)
 
-      case SYM_N64:
-        return FFI_N64;
+        "'o32 [", rebI(FFI_O32), "]",
+        "'n32 [", rebI(FFI_N32), "]",
+        "'n64 [", rebI(FFI_N64), "]",
+        "'o32-soft-float [", rebI(FFI_O32_SOFT_FLOAT), "]",
+        "'n32-soft-float [", rebI(FFI_N32_SOFT_FLOAT), "]",
+        "'n64-soft-float [", rebI(FFI_N64_SOFT_FLOAT), "]",
 
-      case SYM_O32_SOFT_FLOAT:
-        return FFI_O32_SOFT_FLOAT;
+      #endif  // X86_WIN64
 
-      case SYM_N32_SOFT_FLOAT:
-        return FFI_N32_SOFT_FLOAT;
+        "fail [{Unknown ABI for platform:}", rebQ(word), "]",
+    "]", rebEND);  // <-- rebEND required because we're not using a macro!
 
-      case SYM_N64_SOFT_FLOAT:
-        return FFI_N64_SOFT_FLOAT;
-    #endif //X86_WIN64
-
-      default:
-        break;
-    }
-
-    fail (word);
+    return abi;
 }
 
 
