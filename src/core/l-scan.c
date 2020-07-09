@@ -2535,6 +2535,8 @@ bool Scan_To_Stack_Relaxed_Failed(SCAN_LEVEL *level) {
 //
 static REBARR *Scan_Child_Array(SCAN_LEVEL *parent, REBYTE mode_char)
 {
+    assert(mode_char == ')' or mode_char == ']');
+
     SCAN_STATE *ss = parent->ss;
     ++ss->depth;
 
@@ -2549,16 +2551,7 @@ static REBARR *Scan_Child_Array(SCAN_LEVEL *parent, REBYTE mode_char)
     child.newline_pending = false;
     child.opts = parent->opts &= ~(SCAN_FLAG_NULLEDS_LEGAL | SCAN_FLAG_NEXT);
 
-    // The way that path scanning works is that after one item has been
-    // scanned it is *retroactively* decided to begin picking up more items
-    // in the path.  Hence, we take over one pushed item from the caller.
-    //
-    REBDSP dsp_orig;
-    if (mode_char == '/') {
-        assert(DSP > 0);
-        dsp_orig = DSP - 1;
-    } else
-        dsp_orig = DSP;
+    REBDSP dsp_orig = DSP;
 
     child.mode_char = mode_char;
     Scan_To_Stack(&child);
