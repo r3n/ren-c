@@ -83,7 +83,7 @@ array: function [
     if block? size [
         if tail? rest: next size [rest: _]
         if not integer? size: first size [
-            fail @size ["Expected INTEGER! size in BLOCK!, not" type of :size]
+            fail 'size ["Expected INTEGER! size in BLOCK!, not" type of :size]
         ]
     ]
     block: make block! size

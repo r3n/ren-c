@@ -87,10 +87,10 @@ join: function [
     result: switch type of :value [
         block! [append head reduce :value]
         group! [
-            fail @value "Can't JOIN a GROUP! onto a series (use AS BLOCK!)."
+            fail 'value "Can't JOIN a GROUP! onto a series (use AS BLOCK!)."
         ]
         action! [
-            fail @value "Can't JOIN an ACTION! onto a series (use APPEND)."
+            fail 'value "Can't JOIN an ACTION! onto a series (use APPEND)."
         ]
         default [
             append/only head :value
