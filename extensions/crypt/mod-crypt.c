@@ -8,6 +8,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
+// Copyright 2012 Saphirion AG
 // Copyright 2012-2020 Rebol Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
@@ -21,12 +22,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// R3-Alpha originally had a few hand-picked routines for hashing picked from
-// OpenSSL.  Saphirion added support for the AES streaming cipher and Diffie
-// Hellman keys in order to do Transport Layer Security (TLS, e.g. the "S" in
-// for "Secure" in HTTPS).  But cryptography represents something of a moving
-// target; and in the interest of being relatively lightweight a pragmatic
-// set of "current" crypto is included by default.
+// See README.md for notes about this extension.
 //
 
 #include "mbedtls/rsa.h"

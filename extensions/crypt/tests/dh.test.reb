@@ -68,4 +68,4 @@
 ; Coming up with meaningful further tests is a work in progress, but learning
 ; at the most basic level of one byte provided many insights...
 ;
-; (ECHDE is a higher priority at this time)
+; (ECDHE is a higher priority at this time)
