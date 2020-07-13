@@ -290,15 +290,39 @@ e1/write-emitted
 
 
 script-name: copy c-src
-replace script-name ".c" "-init.reb"
-replace script-name "mod" "ext"
+parse script-name [
+    some [thru "/"]
+    change "mod-" "ext-"
+    to "."
+    change "." "-init."
+    change ["c" end | "cpp" end] "reb"
+] else [
+    fail [
+        "Extension main file should have naming pattern %mod-xxx.c(pp),"
+        "and Rebol initialization should be %ext-xxx-init.reb"
+    ]  ; auto-generating version of initial (and poor) manual naming scheme
+]
+
 
 ; === [{Make Extension Init Code from} script-name] ===
 
-inc-name: copy file-name
-replace inc-name ".c" "-init.c"
+inc-name: second split-path c-src
+is-cpp: false
+parse inc-name [
+    change "mod-" "tmp-mod-"
+    to "."
+    change "." "-init."
+    change ["c" end | "cpp" end] "c"  ; !!! Keep as .cpp if it is?
+] else [
+    fail [
+        "Extension main file should have naming pattern %mod-xxx.c(pp),"
+        "so extension init code generates as %tmp-mod-xxx-init.c"
+    ]  ; auto-generating version of initial (and poor) manual naming scheme
+]
 
-dest: join output-dir join %tmp- inc-name
+dest: join output-dir inc-name
+
+if is-cpp [print [mold dest] wait 2]
 
 e: make-emitter "Ext custom init code" dest
 
