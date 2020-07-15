@@ -621,7 +621,6 @@ REBNATIVE(evaluate)
         Set_Opt_Polymorphic_May_Fail(
             ARG(var), SPECIFIED,
             D_SPARE, SPECIFIED,
-            true,  // any (e.g. VOID! is legal)
             false  // not hard (e.g. GROUP!s don't run, and not literal)
         );
 

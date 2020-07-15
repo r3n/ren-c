@@ -61,7 +61,7 @@ emulate: enfixed lib/func [
     :set-word [set-word!]
     code [block!]
 ] lib/in lib [
-    set/any set-word do in lib code  ; SET/ANY, needs to emulate VOID!
+    set set-word do in lib code
     elide export set-word
 ]
 
@@ -337,7 +337,7 @@ apply: emulate [
                 using-args: did set (in frame second params/1) :arg
             ] else [
                 if using-args [
-                    set* (in frame params/1) :arg
+                    set (in frame params/1) :arg
                 ]
             ]
 

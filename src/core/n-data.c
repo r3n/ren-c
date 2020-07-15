@@ -604,14 +604,8 @@ void Set_Opt_Polymorphic_May_Fail(
     REBSPC *target_specifier,
     const RELVAL *setval,
     REBSPC *setval_specifier,
-    bool any,
     bool hard
 ){
-    if (IS_VOID(setval)) {
-        if (not any)
-            fail (Error_Need_Non_Void_Core(target_orig, target_specifier));
-    }
-
     const REBCEL *target = VAL_UNESCAPED(target_orig);
     enum Reb_Kind kind = CELL_KIND(target);
 
@@ -669,7 +663,6 @@ void Set_Opt_Polymorphic_May_Fail(
 //          {Word or path, or block of words and paths}
 //      value [<opt> any-value!]
 //          "Value or block of values (NULL means unset)"
-//      /any "Allow ANY-VALUE! assignments (e.g. do not error on VOID!)"
 //      /hard "Do not evaluate GROUP!s in PATH! (assume pre-COMPOSE'd)"
 //      /single "If target and value are blocks, set each to the same value"
 //      /some "blank values (or values past end of block) are not set."
@@ -702,7 +695,6 @@ REBNATIVE(set)
             SPECIFIED,
             IS_BLANK(value) and REF(some) ? NULLED_CELL : value,
             SPECIFIED,
-            did REF(any),
             did REF(hard)
         );
 
@@ -738,7 +730,6 @@ REBNATIVE(set)
             (IS_BLOCK(value) and not REF(single))
                 ? VAL_SPECIFIER(value)
                 : SPECIFIED,
-            did REF(any),
             did REF(hard)
         );
     }

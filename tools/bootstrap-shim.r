@@ -55,6 +55,11 @@ trap [
     QUIT
 ]
 
+; SET was changed to accept VOID!, use SET VAR NON VOID! (...EXPRESSION...)
+; if that is what was intended.
+;
+set: specialize 'lib/set [opt: true]
+
 ; Enfixedness was conceived as not a property of an action itself, but of a
 ; particular relationship between a word and an action.  While this had some
 ; benefits, it became less and less relevant in a world of "opportunistic
@@ -128,7 +133,7 @@ modernize-action: function [
 
                 append proxiers compose [
                     (as set-word! last-refine-word) try (as get-word! proxy)
-                    set* (as lit-word! proxy) void
+                    set (as lit-word! proxy) void
                 ]
                 spec: my next
                 continue

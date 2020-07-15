@@ -281,11 +281,13 @@ func: func* [
     ;
     if const? body [new-body: const new-body]
 
-    func* new-spec either defaulters [
+    let thing
+    func* new-spec thing: either defaulters [
         append/only defaulters as group! any [new-body body]
     ][
         any [new-body body]
     ]
+    (elide if thing/1 = 'new-body [print mold new-spec print mold thing])
 ]
 
 
@@ -441,13 +443,6 @@ redescribe [
     {Create an ACTION, implicity gathering SET-WORD!s as <local> by default}
 ] :function
 
-
-undefine: redescribe [
-    {Sets the value of a word to VOID! (in its current context.)}
-](
-    specialize 'set [any: true | value: void]
-)
-
 unset: redescribe [
     {Clear the value of a word to null (in its current context.)}
 ](
@@ -470,7 +465,7 @@ so: enfixed func [
         ]
     ]
     if tail? feed [return]
-    set* 'feed take feed
+    set 'feed take feed
     if (block? :feed) and [semiquoted? 'feed] [
         fail "Don't use literal block as SO right hand side, use ([...])"
     ]
@@ -557,11 +552,6 @@ skip*: redescribe [
     specialize 'skip [only: true]
 )
 
-set*: redescribe [
-    {Variant of SET that allows VOID! values}
-](
-    :set/any
-)
 
 ensure: redescribe [
     {Pass through value if it matches test, otherwise trigger a FAIL}
@@ -664,15 +654,15 @@ iterate-skip: redescribe [
         comment [
             let result
             trap [result: do f] then e => [
-                set* word saved
+                set word saved
                 fail e
             ]
-            set* word saved
+            set word saved
             :result
         ]
 
         do f
-        elide set* word saved
+        elide set word saved
     ][
         series: <overwritten>
     ]

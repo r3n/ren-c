@@ -2254,7 +2254,6 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                     IS_BLOCK(f->out)
                         ? VAL_SPECIFIER(f->out)
                         : SPECIFIED,
-                    false,  // not /ANY, e.g. voids are not legal
                     false  // doesn't use "hard" semantics on groups in paths
                 );
             }
@@ -2394,11 +2393,11 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             "] ] func [f] [",
                 "for-each output", outputs, "[",
                     "if f/(output) [",  // void in case func doesn't (null?)
-                        "set/any f/(output) void",
+                        "set f/(output) void",
                     "]",
                 "]",
                 "either first", f->out, "[",
-                    "set/any first", f->out, "do f",
+                    "set first", f->out, "do f",
                 "] [do f]",
             "]",
         rebEND);

@@ -149,7 +149,7 @@
     same? :a-value a-value
 )
 (
-    undefine 'a-value
+    a-value: void
     e: trap [a-value]
     e/id = 'need-non-void
 )

@@ -25,10 +25,10 @@
                 it does not allow BLANK!.  This makes a BLOCK!-style apply
                 using positions non-viable.  We OPT all nones here.
             }
-            using-args: did set/any (in frame second params/1) opt :arg
+            using-args: did set (in frame second params/1) opt :arg
         ] else [
             if using-args [
-                set/any (in frame params/1) :arg
+                set (in frame params/1) :arg
             ]
         ]
 
