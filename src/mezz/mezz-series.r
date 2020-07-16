@@ -650,7 +650,7 @@ split: function [
                 ]
                 end
             ]
-        ]   
+        ]
     ]]
 
     ; Special processing, to handle cases where the spec'd more items in

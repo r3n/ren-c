@@ -36,5 +36,5 @@
 ([[a] [b c] []] == split [a <t> b c <t>] <t>)
 ; bar delimiter in block
 ([[a] [b c] []] ==  split [a | b c |] '|)
-; word delimiter in block 
+; word delimiter in block
 ([[a] [b c] []] == split [a x b c x] 'x)

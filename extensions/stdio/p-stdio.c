@@ -368,7 +368,7 @@ REB_R Console_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         // issue arose in the Go language as well:
         //
         // https://github.com/golang/go/issues/13697
-		  
+
         const REBLEN readbuf_size = 30 * 1024;  // may back off to smaller size
 
         REBVAL *data = CTX_VAR(ctx, STD_PORT_DATA);
