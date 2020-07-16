@@ -506,9 +506,9 @@ REBNATIVE(collect_words)
 }
 
 
-inline static void Get_Opt_Polymorphic_May_Fail(
+inline static void Get_Var_May_Fail(
     REBVAL *out,
-    const RELVAL *source_orig,
+    const RELVAL *source_orig,  // ANY-WORD! or ANY-PATH!
     REBSPC *specifier,
     bool any,  // should a VOID! value be gotten normally vs. error
     bool hard  // should GROUP!s in paths not be evaluated
@@ -517,7 +517,7 @@ inline static void Get_Opt_Polymorphic_May_Fail(
     enum Reb_Kind kind = CELL_KIND(source);
 
     if (ANY_WORD_KIND(kind)) {
-        Move_Opt_Var_May_Fail(out, source, specifier);
+        Move_Value(out, Lookup_Word_May_Fail(source, specifier));
     }
     else if (ANY_PATH_KIND(kind)) {
         //
@@ -564,7 +564,7 @@ REBNATIVE(get)
     REBVAL *source = ARG(source);
 
     if (not IS_BLOCK(source)) {
-        Get_Opt_Polymorphic_May_Fail(
+        Get_Var_May_Fail(
             D_OUT,
             source,
             SPECIFIED,
@@ -579,7 +579,7 @@ REBNATIVE(get)
     RELVAL *item = VAL_ARRAY_AT(source);
 
     for (; NOT_END(item); ++item, ++dest) {
-        Get_Opt_Polymorphic_May_Fail(
+        Get_Var_May_Fail(
             dest,
             item,
             VAL_SPECIFIER(source),
@@ -595,11 +595,40 @@ REBNATIVE(get)
 
 
 //
-//  Set_Opt_Polymorphic_May_Fail: C
+//  get*: native [
+//
+//  {Gets the value of a word or path, allows VOID!}
+//
+//      return: [<opt> any-value!]
+//      source "Word or path to get"
+//          [<blank> <dequote> any-word! any-path!]
+//  ]
+//
+REBNATIVE(get_p)
+//
+// This is added as a compromise, as `:var` won't efficiently get ANY-VALUE!.
+// At least `get* 'var` doesn't make you pay for path processing, and it's
+// not a specialization so it doesn't incur that overhead.
+{
+    INCLUDE_PARAMS_OF_GET_P;
+
+    Get_Var_May_Fail(
+        D_OUT,
+        ARG(source),
+        SPECIFIED,
+        true,  // allow VOID!, e.g. GET/ANY
+        false  // evaluate GROUP!s, e.g. not GET/HARD
+    );
+    return D_OUT;
+}
+
+
+//
+//  Set_Var_May_Fail: C
 //
 // Note this is used by both SET and the SET-BLOCK! data type in %c-eval.c
 //
-void Set_Opt_Polymorphic_May_Fail(
+void Set_Var_May_Fail(
     const RELVAL *target_orig,
     REBSPC *target_specifier,
     const RELVAL *setval,
@@ -610,7 +639,7 @@ void Set_Opt_Polymorphic_May_Fail(
     enum Reb_Kind kind = CELL_KIND(target);
 
     if (ANY_WORD_KIND(kind)) {
-        REBVAL *var = Sink_Var_May_Fail(target, target_specifier);
+        REBVAL *var = Sink_Word_May_Fail(target, target_specifier);
         Derelativize(var, setval, setval_specifier);
     }
     else if (ANY_PATH_KIND(kind)) {
@@ -690,7 +719,7 @@ REBNATIVE(set)
     REBVAL *value = ARG(value);
 
     if (not IS_BLOCK(target)) {
-        Set_Opt_Polymorphic_May_Fail(
+        Set_Var_May_Fail(
             target,
             SPECIFIED,
             IS_BLANK(value) and REF(some) ? NULLED_CELL : value,
@@ -723,7 +752,7 @@ REBNATIVE(set)
                 continue; // /SOME means treat blanks as no-ops
         }
 
-        Set_Opt_Polymorphic_May_Fail(
+        Set_Var_May_Fail(
             item,
             VAL_SPECIFIER(target),
             IS_END(v) ? BLANK_VALUE : v, // R3-Alpha/Red blank after END
@@ -887,7 +916,7 @@ REBNATIVE(semiquoted_q)
     // !!! TBD: Enforce this is a function parameter (specific binding branch
     // makes the test different, and easier)
 
-    const REBVAL *var = Get_Opt_Var_May_Fail(ARG(parameter), SPECIFIED);
+    const REBVAL *var = Lookup_Word_May_Fail(ARG(parameter), SPECIFIED);
 
     return Init_Logic(D_OUT, GET_CELL_FLAG(var, UNEVALUATED));
 }
@@ -1351,7 +1380,7 @@ REBNATIVE(aliases_q)
 inline static bool Is_Set(const REBVAL *location)
 {
     if (ANY_WORD(location))
-        return not IS_NULLED(Get_Opt_Var_May_Fail(location, SPECIFIED));
+        return not IS_NULLED(Lookup_Word_May_Fail(location, SPECIFIED));
 
     DECLARE_LOCAL (temp); // result may be generated
     Get_Path_Core(temp, location, SPECIFIED);
@@ -1362,7 +1391,7 @@ inline static bool Is_Set(const REBVAL *location)
 inline static bool Is_Defined(const REBVAL *location)
 {
     if (ANY_WORD(location))
-        return not IS_VOID(Get_Opt_Var_May_Fail(location, SPECIFIED));
+        return not IS_VOID(Lookup_Word_May_Fail(location, SPECIFIED));
 
     DECLARE_LOCAL (temp); // result may be generated
     Get_Path_Core(temp, location, SPECIFIED);

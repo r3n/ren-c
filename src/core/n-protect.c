@@ -264,7 +264,7 @@ static void Protect_Word_Value(REBVAL *word, REBFLGS flags)
             //
             REBVAL *var = m_cast(
                 REBVAL*,
-                Get_Opt_Var_May_Fail(word, SPECIFIED)
+                Lookup_Word_May_Fail(word, SPECIFIED)
             );
             Protect_Value(var, flags);
             Uncolor(var);
@@ -339,7 +339,7 @@ static REB_R Protect_Unprotect_Core(REBFRM *frame_, REBFLGS flags)
                     //
                     var = m_cast(
                         REBVAL*,
-                        Get_Opt_Var_May_Fail(item, VAL_SPECIFIER(value))
+                        Lookup_Word_May_Fail(item, VAL_SPECIFIER(value))
                     );
                 }
                 else if (IS_PATH(value)) {

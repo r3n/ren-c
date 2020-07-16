@@ -71,7 +71,8 @@ description-of: function [
     return: [<opt> text!]
     v [<blank> any-value!]
 ][
-    opt switch type of :v [
+    opt switch type of get/any 'v [
+        void! [blank]
         any-array! [spaced ["array of length:" length of v]]
         image! [spaced ["size:" v/size]]
         datatype! [
@@ -109,6 +110,11 @@ help: function [
     /doc
         "Open web browser to related documentation."
 ][
+    if undefined? 'topic [
+        print "#[void] is a literal VOID! value"
+        return
+    ]
+
     if null? :topic [
         ;
         ; Was just `>> help` or `do [help]` or similar.
@@ -180,7 +186,7 @@ help: function [
     make-libuser: does [
         libuser: copy system/contexts/lib
         for-each [key val] system/contexts/user [
-            if set? 'val [
+            if not void? get/any 'val [
                append libuser reduce [key :val]
             ]
         ]
@@ -223,10 +229,10 @@ help: function [
 
             switch type of value: get/any topic [
                 null [
-                    print ["No information on" topic "(is null)"]
+                    print [topic "is null"]
                 ]
                 void! [
-                    print [topic "is unset (e.g. a VOID! value)"]
+                    print [topic "is not defined (e.g. has a VOID! value)"]
                 ]
             ] then [
                 return

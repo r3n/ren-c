@@ -1875,7 +1875,7 @@ bool Get_If_Word_Or_Path_Throws(
     if (IS_WORD(v) or IS_GET_WORD(v) or IS_SYM_WORD(v)) {
         if (opt_name_out)
             *opt_name_out = VAL_WORD_SPELLING(v);
-        Move_Opt_Var_May_Fail(out, v, specifier);
+        Get_Word_May_Fail(out, v, specifier);
     }
     else if (IS_PATH(v) or IS_GET_PATH(v) or IS_SYM_PATH(v)) {
         REBSPC *derived = Derive_Specifier(specifier, v);

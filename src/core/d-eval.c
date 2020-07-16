@@ -127,7 +127,7 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
     //
     if (*next_gotten) {
         assert(IS_WORD(*next));
-        assert(Try_Get_Opt_Var(*next, *specifier) == *next_gotten);
+        assert(Try_Lookup_Word(*next, *specifier) == *next_gotten);
     }
 
     assert(f == FS_TOP);

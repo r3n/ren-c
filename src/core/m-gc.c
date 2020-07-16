@@ -738,7 +738,7 @@ static void Mark_Frame_Stack_Deep(void)
         if (f->feed->gotten)
             assert(
                 f->feed->gotten
-                == Try_Get_Opt_Var(f->feed->value, f->feed->specifier)
+                == Try_Lookup_Word(f->feed->value, f->feed->specifier)
             );
 
         if (

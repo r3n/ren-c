@@ -322,7 +322,7 @@ bool Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
     if (not IS_WORD(feed->value))
         return false;
 
-    feed->gotten = Try_Get_Opt_Var(feed->value, feed->specifier);
+    feed->gotten = Try_Lookup_Word(feed->value, feed->specifier);
 
     if (not feed->gotten or not IS_ACTION(feed->gotten))
         return false;
@@ -586,7 +586,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         goto give_up_backward_quote_priority;
 
     assert(not *next_gotten);  // Fetch_Next_In_Frame() cleared it
-    *next_gotten = Try_Get_Opt_Var(*next, *specifier);
+    *next_gotten = Try_Lookup_Word(*next, *specifier);
 
     if (not *next_gotten or not IS_ACTION(*next_gotten))
         goto give_up_backward_quote_priority;  // note only ACTION! is ENFIXED
@@ -1864,9 +1864,9 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
       case REB_WORD:
         if (not gotten)
-            gotten = Get_Opt_Var_May_Fail(v, *specifier);
+            gotten = Lookup_Word_May_Fail(v, *specifier);
 
-        if (IS_ACTION(gotten)) {  // before IS_NULLED() is common case
+        if (IS_ACTION(gotten)) {  // before IS_VOID() is common case
             REBACT *act = VAL_ACTION(gotten);
 
             if (GET_ACTION_FLAG(act, ENFIXED)) {
@@ -1892,10 +1892,10 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             goto process_action;
         }
 
-        if (IS_VOID(gotten))  // need `:x` if it's void ("unset")
+        if (IS_VOID(gotten))  // need GET/ANY if it's void ("undefined")
             fail (Error_Need_Non_Void_Core(v, *specifier));
 
-        Move_Value(f->out, gotten); // no copy CELL_FLAG_UNEVALUATED
+        Move_Value(f->out, gotten);  // no copy CELL_FLAG_UNEVALUATED
         break;
 
 
@@ -1903,7 +1903,8 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 //
 // Right hand side is evaluated into `out`, and then copied to the variable.
 //
-// Nulled cells are allowed: https://forum.rebol.info/t/895/4
+// All values are allowed in these assignments, including NULL and VOID!
+// https://forum.rebol.info/t/1206
 
       case REB_SET_WORD: {
         if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))  // see notes
@@ -1911,18 +1912,27 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
       set_word_with_out:
 
-        Move_Value(Sink_Var_May_Fail(v, *specifier), f->out);
+        Move_Value(Sink_Word_May_Fail(v, *specifier), f->out);
         break; }
 
 
 //==//// GET-WORD! ///////////////////////////////////////////////////////==//
 //
-// A GET-WORD! does no dispatch on functions, and will return NULL if the
-// variable is not set.  The GET native operation requires the /ANY refinement
-// to retrieve a VOID! value, but a GET-WORD! acts with an implicit /ANY.
+// A GET-WORD! does no dispatch on functions.  It will fetch other values as
+// normal, but will error on VOID! and direct you to GET/ANY.  This matches
+// Rebol2 behavior, choosing to break with R3-Alpha and Red which will give
+// back "voided" values ("UNSET!")...to make typos less likely to bite those
+// who wanted to use ACTION!s inertly:
+// https://forum.rebol.info/t/should-get-word-of-a-void-raise-an-error/1301
 
       case REB_GET_WORD:
-        Move_Opt_Var_May_Fail(f->out, v, *specifier);
+        if (not gotten)
+            gotten = Lookup_Word_May_Fail(v, *specifier);
+
+        if (IS_VOID(gotten))
+            fail (Error_Need_Non_Void_Core(v, *specifier));
+
+        Move_Value(f->out, gotten);
         break;
 
 
@@ -2102,12 +2112,14 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 //
 //    :foo/(print "side effect" 1)  ; this is allowed
 //
-// Consistent with GET-WORD!, a GET-PATH! acts as GET/ANY and permits VOID!
-// and NULL return results.
+// Consistent with GET-WORD!, a GET-PATH! acts as GET and won't return VOID!.
 
       case REB_GET_PATH:
         if (Get_Path_Throws_Core(f->out, v, *specifier))
             goto return_thrown;
+
+        if (IS_VOID(f->out))  // need GET/ANY if it's void ("undefined")
+            fail (Error_Need_Non_Void_Core(v, *specifier));
 
         // !!! This didn't appear to be true for `-- "hi" "hi"`, processing
         // GET-PATH! of a variadic.  Review if it should be true.
@@ -2247,7 +2259,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                 ++dest,
                 IS_END(src) or not IS_BLOCK(f->out) ? NOOP : (++src, NOOP)
             ){
-                Set_Opt_Polymorphic_May_Fail(
+                Set_Var_May_Fail(
                     dest,
                     *specifier,
                     IS_END(src) ? BLANK_VALUE : src,  // R3-Alpha blanks > END
@@ -2642,9 +2654,9 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
     // we can see if it looks up to any kind of ACTION! at all.
 
     if (not *next_gotten)
-        *next_gotten = Try_Get_Opt_Var(*next, *specifier);
+        *next_gotten = Try_Lookup_Word(*next, *specifier);
     else
-        assert(*next_gotten == Try_Get_Opt_Var(*next, *specifier));
+        assert(*next_gotten == Try_Lookup_Word(*next, *specifier));
 
 //=//// NEW EXPRESSION IF UNBOUND, NON-FUNCTION, OR NON-ENFIX /////////////=//
 

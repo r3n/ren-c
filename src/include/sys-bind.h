@@ -67,6 +67,8 @@
 //     coming.  It can be an ordinary singular array which was created with
 //     MAKE VARARGS! and has its index updated for all shared instances.
 //
+// Due to the performance-critical nature of these routines, they are inline
+// so that locations using them may avoid overhead in invocation.
 
 
 #ifdef NDEBUG
@@ -432,29 +434,24 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
 // because one instance is.  This is not one of the flags included in the
 // CELL_MASK_COPIED, so it shouldn't be able to leak out of the varlist.
 //
-// The Get_Opt_Var_May_Fail() function takes the conservative default that
+// The Lookup_Word_May_Fail() function takes the conservative default that
 // only const access is needed.  A const pointer to a REBVAL is given back
 // which may be inspected, but the contents not modified.  While a bound
 // variable that is not currently set will return a REB_NULLED value,
-// Get_Opt_Var_May_Fail() on an *unbound* word will raise an error.
+// Lookup_Word_May_Fail() on an *unbound* word will raise an error.
 //
-// Get_Mutable_Var_May_Fail() offers a parallel facility for getting a
+// Lookup_Mutable_Word_May_Fail() offers a parallel facility for getting a
 // non-const REBVAL back.  It will fail if the variable is either unbound
 // -or- marked with OPT_TYPESET_LOCKED to protect against modification.
 //
 
 
-// Get the word--variable--value. (Generally, use the macros like
-// GET_VAR or GET_MUTABLE_VAR instead of this).  This routine is
-// called quite a lot and so attention to performance is important.
+// Find the context a word is bound into.  This accounts for relative binding.
+// So if the word is bound to the arguments or locals of a function, the
+// `specifier` should be the REBFRM* (or FRAME! REBCTX*) for the instance
+// that is applicable.
 //
-// Coded assuming most common case is to give an error on unbounds, and
-// that only read access is requested (so no checking on protection)
-//
-// Due to the performance-critical nature of this routine, it is declared
-// as inline so that locations using it can avoid overhead in invocation.
-//
-inline static REBCTX *Get_Var_Context(
+inline static REBCTX *Get_Word_Context(
     const REBCEL *any_word,
     REBSPC *specifier
 ){
@@ -541,50 +538,57 @@ inline static REBCTX *Get_Var_Context(
     return c;
 }
 
-static inline const REBVAL *Get_Opt_Var_May_Fail(
+static inline const REBVAL *Lookup_Word_May_Fail(
     const REBCEL *any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
         fail (Error_Not_Bound_Raw(KNOWN(any_word)));
 
-    REBCTX *c = Get_Var_Context(any_word, specifier);
+    REBCTX *c = Get_Word_Context(any_word, specifier);
     if (GET_SERIES_INFO(c, INACCESSIBLE))
         fail (Error_No_Relative_Core(any_word));
 
     return CTX_VAR(c, VAL_WORD_INDEX(any_word));
 }
 
-static inline const REBVAL *Try_Get_Opt_Var(
+static inline const REBVAL *Try_Lookup_Word(
     const REBCEL *any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
         return nullptr;
 
-    REBCTX *c = Get_Var_Context(any_word, specifier);
+    REBCTX *c = Get_Word_Context(any_word, specifier);
     if (GET_SERIES_INFO(c, INACCESSIBLE))
         return nullptr;
 
     return CTX_VAR(c, VAL_WORD_INDEX(any_word));
 }
 
-inline static void Move_Opt_Var_May_Fail(
-    REBVAL *out,
+static inline const REBVAL *Get_Word_May_Fail(
+    RELVAL *out,
     const REBCEL *any_word,
     REBSPC *specifier
 ){
-    Move_Value(out, Get_Opt_Var_May_Fail(any_word, specifier));
+    const REBVAL *var = Lookup_Word_May_Fail(any_word, specifier);
+    if (IS_VOID(var))
+        fail (Error_Need_Non_Void_Core(
+            cast(const REBVAL*, any_word),
+            specifier
+        ));
+
+    return Move_Value(out, var);
 }
 
-static inline REBVAL *Get_Mutable_Var_May_Fail(
+static inline REBVAL *Lookup_Mutable_Word_May_Fail(
     const REBCEL *any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
         fail (Error_Not_Bound_Raw(KNOWN(any_word)));
 
-    REBCTX *ctx = Get_Var_Context(any_word, specifier);
+    REBCTX *ctx = Get_Word_Context(any_word, specifier);
 
     // A context can be permanently frozen (`lock obj`) or temporarily
     // protected, e.g. `protect obj | unprotect obj`.  A native will
@@ -609,11 +613,11 @@ static inline REBVAL *Get_Mutable_Var_May_Fail(
     return var;
 }
 
-inline static REBVAL *Sink_Var_May_Fail(
+inline static REBVAL *Sink_Word_May_Fail(
     const REBCEL *any_word,
     REBSPC *specifier
 ){
-    REBVAL *var = Get_Mutable_Var_May_Fail(any_word, specifier);
+    REBVAL *var = Lookup_Mutable_Word_May_Fail(any_word, specifier);
     TRASH_CELL_IF_DEBUG(var);
     return var;
 }
@@ -815,4 +819,3 @@ inline static REBSPC *Derive_Specifier(REBSPC *parent, const REBCEL *item) {
 
 #define Unbind_Values_Deep(values) \
     Unbind_Values_Core((values), nullptr, true)
-

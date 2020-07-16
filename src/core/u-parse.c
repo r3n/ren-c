@@ -381,10 +381,7 @@ static const RELVAL *Get_Parse_Value(
         if (VAL_CMD(rule))  // includes IS_BAR()...also a "command"
             return rule;
 
-        Move_Opt_Var_May_Fail(cell, rule, specifier);
-        if (IS_NULLED(cell))
-            fail (Error_No_Value_Core(rule, specifier));
-
+        Get_Word_May_Fail(cell, rule, specifier);
         return cell;
     }
 
@@ -799,7 +796,7 @@ static REBIXO To_Thru_Block_Rule(
                         fail (Error_Parse_Rule());
                 }
                 else {
-                    Move_Opt_Var_May_Fail(cell, rule, P_RULE_SPECIFIER);
+                    Get_Word_May_Fail(cell, rule, P_RULE_SPECIFIER);
                     rule = cell;
                 }
             }
@@ -1218,7 +1215,7 @@ static void Handle_Mark_Rule(
     REBYTE k = KIND_BYTE(rule);  // REB_0_END ok
     if (k == REB_WORD or k == REB_SET_WORD) {
         Move_Value(
-            Sink_Var_May_Fail(rule, specifier),
+            Sink_Word_May_Fail(rule, specifier),
             P_INPUT_VALUE
         );
     }
@@ -1243,7 +1240,7 @@ static REB_R Handle_Seek_Rule_Dont_Update_Begin(
 ){
     REBYTE k = KIND_BYTE(rule);  // REB_0_END ok
     if (k == REB_WORD or k == REB_GET_WORD) {
-        rule = Get_Opt_Var_May_Fail(rule, specifier);
+        rule = Lookup_Word_May_Fail(rule, specifier);
         k = KIND_BYTE(rule);
     }
     else if (k == REB_PATH) {
@@ -1616,7 +1613,7 @@ REBNATIVE(subparse)
                     SET_END(P_OUT);  // restore invariant
 
                     Init_Block(
-                        Sink_Var_May_Fail(
+                        Sink_Word_May_Fail(
                             set_or_copy_word,
                             P_RULE_SPECIFIER
                         ),
@@ -1933,7 +1930,7 @@ REBNATIVE(subparse)
                 assert(IS_WORD(rule));  // word - some other variable
 
                 if (rule != save) {
-                    Move_Opt_Var_May_Fail(save, rule, P_RULE_SPECIFIER);
+                    Get_Word_May_Fail(save, rule, P_RULE_SPECIFIER);
                     rule = save;
                 }
                 if (IS_NULLED(rule))
@@ -2408,7 +2405,7 @@ REBNATIVE(subparse)
                 count = (begin > P_POS) ? 0 : P_POS - begin;
 
                 if (flags & PF_COPY) {
-                    REBVAL *sink = Sink_Var_May_Fail(
+                    REBVAL *sink = Sink_Word_May_Fail(
                         set_or_copy_word,
                         P_RULE_SPECIFIER
                     );
@@ -2486,7 +2483,7 @@ REBNATIVE(subparse)
 
                     if (IS_SER_ARRAY(P_INPUT)) {
                         Derelativize(
-                            Sink_Var_May_Fail(
+                            Sink_Word_May_Fail(
                                 set_or_copy_word, P_RULE_SPECIFIER
                             ),
                             ARR_AT(ARR(P_INPUT), begin),
@@ -2494,7 +2491,7 @@ REBNATIVE(subparse)
                         );
                     }
                     else {
-                        REBVAL *var = Sink_Var_May_Fail(
+                        REBVAL *var = Sink_Word_May_Fail(
                             set_or_copy_word, P_RULE_SPECIFIER
                         );
 

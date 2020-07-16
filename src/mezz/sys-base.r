@@ -91,11 +91,11 @@ do*: func [
         if original-path [change-dir original-path]
 
         if quit_FINALIZER and [only] [
-            quit :value  ; "rethrow" the QUIT if DO/ONLY
+            quit get/any 'value  ; "rethrow" the QUIT if DO/ONLY
         ]
 
         set 'force-remote-import old-force-remote-import
-        return :value  ; returns from DO*, because of <with> return
+        return get/any 'value  ; returns from DO*, because of <with> return
     ]
 
     ; If a file is being mentioned as a DO location and the "current path"
@@ -196,7 +196,7 @@ do*: func [
         ]
     ]
 
-    return finalizer :result
+    return finalizer get/any 'result
 ]
 
 export: func [

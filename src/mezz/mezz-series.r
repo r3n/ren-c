@@ -74,34 +74,44 @@ remold: redescribe [
 array: function [
     {Makes and initializes a block of a given size}
 
+    return: "Generated block or null if blank input"
+        [<opt> block!]
     size "Size or block of sizes for each dimension"
-        [integer! block!]
+        [<blank> integer! block!]
     /initial "Initial value (will be called each time if a function)"
         [any-value!]
 ][
     initial: :initial else '_  ; default to BLANK!
     if block? size [
-        if tail? rest: next size [rest: _]
-        if not integer? size: first size [
-            fail 'size ["Expected INTEGER! size in BLOCK!, not" type of :size]
+        rest: next size else [
+            ;
+            ; Might be reasonable to say `array/initial [] <x>` is `<x>` ?
+            ;
+            fail "Empty ARRAY dimensions (file issue if you want a meaning)"
         ]
+        if not integer? size: size/1 [
+            fail 'size ["Expect INTEGER! size in BLOCK!, not" type of size]
+        ]
+        if tail? rest [rest: null]  ; want `array [2]` => `[_ _]`, no recurse
     ]
+    else [rest: null]
+
     block: make block! size
     case [
-        block? :rest [
-            loop size [block: insert/only block array/initial rest :initial]
+        block? rest [
+            loop size [append/only block array/initial rest :initial]
         ]
         any-series? :initial [
-            loop size [block: insert/only block copy/deep initial]
+            loop size [append/only block copy/deep initial]
         ]
         action? :initial [
-            loop size [block: insert/only block initial]  ; Called every time
+            loop size [append/only block initial]  ; Called every time
         ]
         default [
-            insert/dup/only block :initial size
+            append/only/dup block :initial size
         ]
     ]
-    head of block
+    return block
 ]
 
 

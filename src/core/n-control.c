@@ -1274,7 +1274,7 @@ REBNATIVE(default)
     }
 
     if (IS_SET_WORD(target))
-        Move_Opt_Var_May_Fail(D_OUT, target, SPECIFIED);
+        Move_Value(D_OUT, Lookup_Word_May_Fail(target, SPECIFIED));
     else {
         assert(IS_SET_PATH(target));
 
@@ -1338,7 +1338,7 @@ REBNATIVE(default)
         return R_THROWN;
 
     if (IS_SET_WORD(target))
-        Move_Value(Sink_Var_May_Fail(target, SPECIFIED), D_OUT);
+        Move_Value(Sink_Word_May_Fail(target, SPECIFIED), D_OUT);
     else {
         assert(IS_SET_PATH(target));
         DECLARE_LOCAL (dummy);

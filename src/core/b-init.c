@@ -244,7 +244,7 @@ REBNATIVE(generic)
     Init_Word(ARR_AT(details, IDX_NATIVE_BODY), VAL_WORD_CANON(ARG(verb)));
     Init_Object(ARR_AT(details, IDX_NATIVE_CONTEXT), Lib_Context);
 
-    REBVAL *verb_var = Sink_Var_May_Fail(ARG(verb), SPECIFIED);
+    REBVAL *verb_var = Sink_Word_May_Fail(ARG(verb), SPECIFIED);
     Init_Action_Unbound(verb_var, generic);  // set the word to the action
 
     return Init_Void(D_OUT);  // see ENFIX for why evaluate to void

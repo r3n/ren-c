@@ -2703,7 +2703,7 @@ REBNATIVE(transcode)
 
     const REBVAL *line_number;
     if (ANY_WORD(ARG(line)))
-        line_number = Get_Opt_Var_May_Fail(ARG(line), SPECIFIED);
+        line_number = Lookup_Word_May_Fail(ARG(line), SPECIFIED);
     else
         line_number = ARG(line);
 
@@ -2738,7 +2738,7 @@ REBNATIVE(transcode)
     if (REF(relax)) {
         bool failed = Scan_To_Stack_Relaxed_Failed(&level);
 
-        REBVAL *var = Get_Mutable_Var_May_Fail(ARG(relax), SPECIFIED);
+        REBVAL *var = Lookup_Mutable_Word_May_Fail(ARG(relax), SPECIFIED);
         if (failed) {
             Move_Value(var, DS_TOP);
             DS_DROP();
@@ -2772,13 +2772,13 @@ REBNATIVE(transcode)
     }
 
     if (ANY_WORD(ARG(line)))  // they wanted the line number updated
-        Init_Integer(Sink_Var_May_Fail(ARG(line), SPECIFIED), ss.line);
+        Init_Integer(Sink_Word_May_Fail(ARG(line), SPECIFIED), ss.line);
 
     // Return the input BINARY! or TEXT! advanced by how much the transcode
     // operation consumed.
     //
     if (REF(next)) {
-        REBVAL *var = Sink_Var_May_Fail(ARG(next), SPECIFIED);
+        REBVAL *var = Sink_Word_May_Fail(ARG(next), SPECIFIED);
         Move_Value(var, source);
 
         if (IS_BINARY(var))

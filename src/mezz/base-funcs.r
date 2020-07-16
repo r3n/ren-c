@@ -57,7 +57,7 @@ maybe: enfixed func* [
     ; https://github.com/rebol/rebol-issues/issues/2275
     ;
     if null? :optional [return get/hard/any compose target]
-    set/hard/any compose target :optional
+    set/hard compose target :optional
 ]
 
 

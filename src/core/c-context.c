@@ -931,7 +931,7 @@ REBCTX *Construct_Context_Managed(
         if (IS_SET_WORD(value + 1))
             fail (Error_Invalid_Type(VAL_TYPE(value + 1))); // TBD: support
 
-        REBVAL *var = Sink_Var_May_Fail(value, specifier);
+        REBVAL *var = Sink_Word_May_Fail(value, specifier);
         Derelativize(var, value + 1, specifier);
     }
 

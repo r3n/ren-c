@@ -178,7 +178,7 @@ REBNATIVE(dump)
     PROBE(v);
     printf("=> ");
     if (IS_WORD(v)) {
-        const REBVAL *var = Try_Get_Opt_Var(v, SPECIFIED);
+        const REBVAL *var = Try_Lookup_Word(v, SPECIFIED);
         if (not var) {
             PROBE("\\unbound\\");
         }

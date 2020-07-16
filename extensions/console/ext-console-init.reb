@@ -116,16 +116,13 @@ console!: make object! [
     ]
 
     print-result: method [return: <void> v [<opt> any-value!]] [
-        last-result: :v
+        if void? last-result: get/any 'v [
+            return  ; e.g. result of PRINT or HELP, best to output nothing.
+        ]
+
         case [
             null? :v [
                 print "; null"  ; no representation, use comment
-            ]
-
-            void? :v [
-                ; Actions that by contract return no information return void.
-                ; Since it's what comes back from things like HELP it's best
-                ; that the console not print anything in response.
             ]
 
             free? :v [
@@ -482,7 +479,7 @@ ext-console-impl: function [
         result/id = 'no-catch
         :result/arg2 = :QUIT  ; throw's /NAME
     ] then [
-        return switch type of :result/arg1 [
+        return switch type of get* 'result/arg1 [
             void! [0]  ; plain QUIT, no /WITH, call that success
 
             logic! [either :result/arg1 [0] [1]]  ; logic true is success

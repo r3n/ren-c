@@ -69,7 +69,7 @@ inline static bool Vararg_Op_If_No_Advance_Handled(
         // and the rules apply.  Note the raw check is faster, no need to
         // separately test for IS_END()
 
-        const REBVAL *child_gotten = Try_Get_Opt_Var(opt_look, specifier);
+        const REBVAL *child_gotten = Try_Lookup_Word(opt_look, specifier);
 
         if (child_gotten and VAL_TYPE(child_gotten) == REB_ACTION) {
             if (GET_ACTION_FLAG(VAL_ACTION(child_gotten), ENFIXED)) {

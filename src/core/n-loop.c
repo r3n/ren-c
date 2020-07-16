@@ -369,7 +369,7 @@ REBVAL *Real_Var_From_Pseudo(REBVAL *pseudo_var) {
     // variables is locked at fixed size.)
     //
     assert(IS_QUOTED_WORD(pseudo_var));
-    return Get_Mutable_Var_May_Fail(pseudo_var, SPECIFIED);
+    return Lookup_Mutable_Word_May_Fail(pseudo_var, SPECIFIED);
 }
 
 

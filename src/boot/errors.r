@@ -83,7 +83,7 @@ Syntax: [
 
 Script: [
     no-value:           [:arg1 {has no value}]
-    need-non-void:      [:arg1 {is VOID!}]
+    need-non-void:      [:arg1 {is VOID! (Note: use GET/ANY to GET voids)}]
     need-non-null:      [:arg1 {needs a value, can't be null}]
     need-non-end:       [{end was reached while trying to set} :arg1]
     not-bound:          [:arg1 {word is not bound to a context}]
