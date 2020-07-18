@@ -1662,46 +1662,37 @@ REBNATIVE(subparse)
 
                     if (IS_GET_BLOCK(rule)) {
                         //
-                        // Experimental use of GET-BLOCK! to mean ordinary
+                        // !!! Experimental use of GET-BLOCK! to mean ordinary
                         // evaluation of material that is not matched as
-                        // a PARSE rule.  It does a REDUCE instead of a plain
-                        // DO in order to more parallel the evaluator behavior
-                        // of a GET-BLOCK!, which is probably the best idea.
+                        // a PARSE rule.
                         //
-                        REBDSP dsp_orig = DSP;
                         assert(IS_END(P_OUT));  // should be true until finish
-                        if (Reduce_To_Stack_Throws(
+                        if (Do_Any_Array_At_Throws(
                             P_OUT,
                             rule,
                             P_RULE_SPECIFIER
                         )){
                             return R_THROWN;
                         }
-                        SET_END(P_OUT);  // since we didn't throw, put it back
 
-                        if (DSP == dsp_orig) {
+                        if (IS_END(P_OUT) or IS_NULLED(P_OUT)) {
                             // Nothing to add
                         }
                         else if (only) {
-                            Init_Block(
+                            Move_Value(
                                 Alloc_Tail_Array(P_COLLECTION),
-                                Pop_Stack_Values(dsp_orig)
+                                P_OUT
                             );
                         }
-                        else {
-                            REBVAL *stacked = DS_AT(dsp_orig);
-                            do {
-                                ++stacked;
-                                Move_Value(
-                                    Alloc_Tail_Array(P_COLLECTION),
-                                    stacked
-                                );
-                            } while (stacked != DS_TOP);
-                        }
-                        DS_DROP_TO(dsp_orig);
+                        else
+                            rebElide(
+                                "append", P_COLLECTION_VALUE, rebQ1(P_OUT),
+                            rebEND);
+
+                        SET_END(P_OUT);  // since we didn't throw, put it back
 
                         // Don't touch P_POS, we didn't consume anything from
-                        // the input series.
+                        // the input series but just fabricated DO material.
 
                         FETCH_NEXT_RULE(f);
                     }

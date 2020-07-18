@@ -2278,19 +2278,10 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
 //==//// GET-BLOCK! //////////////////////////////////////////////////////==//
 //
-// !!! This code path should be unified with GET/ANY of BLOCK!.  Temporarily
-// does a REDUCE, but that was an experiment to see if perhaps GET of a
-// BLOCK! should actually be what REDUCE was.  That thought experiment is
-// probably over--it shouldn't, functions should not run (at least ones that
-// are not zero arity)
+// !!! Currently just inert, awaiting future usage.
 
       case REB_GET_BLOCK:
-        *next_gotten = nullptr; // arbitrary code changes fetched variables
-
-        if (Reduce_To_Stack_Throws(f->out, v, *specifier))
-            goto return_thrown;
-
-        Init_Block(f->out, Pop_Stack_Values(f->dsp_orig));
+        Derelativize(f->out, v, *specifier);
         break;
 
 

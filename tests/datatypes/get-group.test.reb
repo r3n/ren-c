@@ -19,7 +19,7 @@
     m: 1020
     o: make object! [f: 304]
     block: [m o/f]
-    :(block) = [1020 304]
+    :(block) = [m o/f]
 )
 
 ; GET-GROUP! on arity-0 ACTION!s is also legal

@@ -83,25 +83,25 @@
     [3] = parse [1 2 3] [
         collect x [
             keep integer!
-            keep :['a <b> #c]
+            keep :[second [A [<pick> <me>] B]]
             keep integer!
         ]
     ]
-    x = [1 a <b> #c 2]
+    x = [1 <pick> <me> 2]
 ])
 (did all [
     [3] = parse [1 2 3] [
         collect x [
             keep integer!
-            keep only :['a <b> #c]
+            keep only :[second [A [<pick> <me>] B]]
             keep integer!
         ]
     ]
-    x = [1 [a <b> #c] 2]
+    x = [1 [<pick> <me>] 2]
 ])
 (did all [
     parse [1 2 3] [collect x [keep only :[[a b c]]]]
-    x = [[[a b c]]]
+    x = [[a b c]]
 ])
 
 [
