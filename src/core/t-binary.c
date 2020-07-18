@@ -79,7 +79,7 @@ REBLEN find_binary(
     REBSER *bin,
     REBLEN index,
     REBLEN end,
-    const RELVAL *pattern,
+    const REBCEL *pattern,
     REBLEN flags,
     REBINT skip
 ) {
@@ -91,7 +91,7 @@ REBLEN find_binary(
     else
         start = index;
 
-    if (ANY_STRING(pattern)) {
+    if (ANY_STRING_KIND(CELL_KIND(pattern))) {
         if (skip != 1)
             fail ("String search in BINARY! only supports /SKIP 1 for now.");
 
@@ -99,8 +99,8 @@ REBLEN find_binary(
 
         REBYTE *bp2;
         REBLEN len2;
-        if (not IS_TEXT(pattern)) { // !!! for TAG!, but what about FILE! etc?
-            formed = Copy_Form_Value(pattern, 0);
+        if (CELL_KIND(pattern) != REB_TEXT) { // !!! <tag>...but FILE! etc?
+            formed = Copy_Form_Cell(pattern, 0);
             len2 = STR_LEN(formed);
             bp2 = STR_HEAD(formed);
             *size = STR_SIZE(formed);
@@ -128,7 +128,7 @@ REBLEN find_binary(
 
         return result;
     }
-    else if (IS_BINARY(pattern)) {
+    else if (CELL_KIND(pattern) == REB_BINARY) {
         if (skip != 1)
             fail ("Search for BINARY! in BINARY! only supports /SKIP 1 ATM");
 
@@ -141,7 +141,7 @@ REBLEN find_binary(
             flags & AM_FIND_MATCH
         );
     }
-    else if (IS_CHAR(pattern)) {
+    else if (CELL_KIND(pattern) == REB_CHAR) {
         //
         // Technically speaking the upper and lowercase sizes of a character
         // may not be the same.  It's okay here since we only do cased.
@@ -159,7 +159,7 @@ REBLEN find_binary(
             flags & (AM_FIND_CASE | AM_FIND_MATCH)
         );
     }
-    else if (IS_INTEGER(pattern)) {  // specific byte value, never apply case
+    else if (CELL_KIND(pattern) == REB_INTEGER) {  // specific byte (exact)
         if (VAL_INT64(pattern) < 0 or VAL_INT64(pattern) > 255)
             fail (Error_Out_Of_Range(KNOWN(pattern)));
 
@@ -175,7 +175,7 @@ REBLEN find_binary(
             flags & AM_FIND_MATCH
         );
     }
-    else if (IS_BITSET(pattern)) {
+    else if (CELL_KIND(pattern) == REB_BITSET) {
         *size = 1;
 
         return Find_Bin_Bitset(

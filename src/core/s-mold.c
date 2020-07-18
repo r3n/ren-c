@@ -391,11 +391,11 @@ void MF_Unhooked(REB_MOLD *mo, const REBCEL *v, bool form)
 
 
 //
-//  Mold_Or_Form_Value: C
+//  Mold_Or_Form_Cell: C
 //
-// Mold or form any value to string series tail.
+// Variation which molds a cell, e.g. no quoting is considered.
 //
-void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
+void Mold_Or_Form_Cell(REB_MOLD *mo, const REBCEL *cell, bool form)
 {
     REBSTR *s = mo->series;
     ASSERT_SERIES_TERM(SER(s));
@@ -412,45 +412,36 @@ void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
         // wastefully, so short circuit here in the release build.  (Have
         // the debug build keep going to exercise mold on the data.)
         //
-    #ifdef NDEBUG
+      #ifdef NDEBUG
         if (STR_LEN(s) >= mo->limit)
             return;
-    #endif
+      #endif
     }
 
-    // Mold hooks take a REBCEL* and not a RELVAL*, so they expect any literal
-    // output to have already been done.
+    MOLD_HOOK *hook = Mold_Or_Form_Hook_For_Type_Of(cell);
+    hook(mo, cell, form);
+
+    ASSERT_SERIES_TERM(SER(s));
+}
+
+
+//
+//  Mold_Or_Form_Value: C
+//
+// Mold or form any value to string series tail.
+//
+void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
+{
+    // Mold hooks take a REBCEL* and not a RELVAL*, so they expect any quotes
+    // applied to have already been done.
 
     REBLEN depth = VAL_NUM_QUOTES(v);
-    const REBCEL *cell = VAL_UNESCAPED(v);
-    enum Reb_Kind kind = CELL_KIND(cell);
 
     REBLEN i;
     for (i = 0; i < depth; ++i)
         Append_Ascii(mo->series, "'");
 
-    if (kind != REB_NULLED) {
-        MOLD_HOOK *hook = Mold_Or_Form_Hook_For_Type_Of(cell);
-        hook(mo, cell, form);
-    }
-    else if (depth == 0) {
-        //
-        // NULLs should only be molded out in debug scenarios, but this still
-        // happens a lot, e.g. PROBE() of context arrays when they have unset
-        // variables.  This happens so often in debug builds, in fact, that a
-        // debug_break() here would be very annoying (the method used for
-        // REB_0 items)
-        //
-      #ifdef NDEBUG
-        panic (v);
-      #else
-        printf("!!! Request to MOLD or FORM a NULL !!!\n");
-        Append_Ascii(s, "!!!null!!!");
-        return;
-      #endif
-    }
-
-    ASSERT_SERIES_TERM(SER(s));
+    Mold_Or_Form_Cell(mo, VAL_UNESCAPED(v), form);
 }
 
 
@@ -466,6 +457,22 @@ REBSTR *Copy_Mold_Or_Form_Value(const RELVAL *v, REBFLGS opts, bool form)
 
     Push_Mold(mo);
     Mold_Or_Form_Value(mo, v, form);
+    return Pop_Molded_String(mo);
+}
+
+
+//
+//  Copy_Mold_Or_Form_Value: C
+//
+// Form a value based on the mold opts provided.
+//
+REBSTR *Copy_Mold_Or_Form_Cell(const REBCEL *cell, REBFLGS opts, bool form)
+{
+    DECLARE_MOLD (mo);
+    mo->opts = opts;
+
+    Push_Mold(mo);
+    Mold_Or_Form_Cell(mo, cell, form);
     return Pop_Molded_String(mo);
 }
 

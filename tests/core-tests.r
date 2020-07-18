@@ -15,8 +15,6 @@
 ;
 ; *****************************************************************************
 
-%parse-tests.r
-
 %api/librebol.test.reb
 
 %datatypes/action.test.reb
@@ -204,6 +202,9 @@
 %misc/help.test.reb
 
 %network/http.test.reb
+
+%parse/parse.test.reb
+%parse/parse-collect.test.reb
 
 %redbol/redbol-apply.test.reb
 

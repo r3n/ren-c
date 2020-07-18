@@ -332,36 +332,70 @@ inline static const REBYTE *VAL_BYTES_LIMIT_AT(
 // ANY-WORD! or an ANY-STRING! to get UTF-8 data.  This is a convenience
 // routine for handling that.
 //
-inline static const REBYTE *VAL_UTF8_AT(REBSIZ *size_out, const RELVAL *v)
-{
-    const REBYTE *utf8;
-    REBSIZ utf8_size;
-    if (ANY_STRING(v)) {
-        utf8_size = VAL_SIZE_LIMIT_AT(NULL, v, UNKNOWN);
-        utf8 = VAL_STRING_AT(v);
-    }
-    else {
-        assert(ANY_WORD(v));
-
-        REBSTR *spelling = VAL_WORD_SPELLING(v);
-        utf8_size = STR_SIZE(spelling);
-        utf8 = STR_HEAD(spelling);
-    }
-
-    // A STRING! can contain embedded '\0', so it's not very safe for callers
-    // to not ask for a size and just go by the null terminator.  Check it in
-    // the debug build, though perhaps consider a fail() in the release build.
-    //
+inline static const REBYTE *VAL_UTF8_LIMIT_AT(
+    REBLEN *length_out,
+    REBSIZ *size_out,
+    const REBCEL *v,
+    REBLEN limit
+){
   #if !defined(NDEBUG)
-    REBLEN n;
-    for (n = 0; n < utf8_size; ++n)
-        assert(utf8[n] != '\0');
+    REBSIZ dummy_size;
+    if (not size_out)
+        size_out = &dummy_size;  // force size calculation for debug check
   #endif
 
-    if (size_out != NULL)
-        *size_out = utf8_size;
+    REBCHR(const*) utf8;
+    if (ANY_STRING_KIND(CELL_KIND(v))) {
+        utf8 = VAL_STRING_AT(v);
+
+        if (size_out or length_out) {
+            REBSIZ utf8_size = VAL_SIZE_LIMIT_AT(length_out, v, limit);
+
+            // Protect against embedded '\0' in debug build, which are illegal
+            // in ANY-STRING!, and mess up clients who go by NUL terminators.
+            //
+          #if !defined(NDEBUG)
+            REBLEN n;
+            for (n = 0; n < utf8_size; ++n)
+                assert(utf8[n] != '\0');
+          #endif
+
+            if (size_out)
+                *size_out = utf8_size;
+            // length_out handled by VAL_SIZE_LIMIT_AT, even if nullptr
+        }
+    }
+    else {
+        assert(ANY_WORD_KIND(CELL_KIND(v)));
+
+        REBSTR *spelling = VAL_WORD_SPELLING(v);
+        utf8 = STR_HEAD(spelling);
+
+        if (size_out or length_out) {
+            if (limit == UNKNOWN and not length_out)
+                *size_out = STR_SIZE(spelling);
+            else {
+                // WORD!s don't cache their codepoint length, must calculate
+                //
+                REBCHR(const*) cp = utf8;
+                REBLEN index = 0;
+                for (index = 0; index < limit; ++index, cp = NEXT_STR(cp)) {
+                    if (CHR_CODE(cp) == '\0')
+                        break;
+                }
+                if (size_out)
+                    *size_out = cp - utf8;
+                if (length_out)
+                    *length_out = index;
+            }
+        }
+    }
+
     return utf8; 
 }
+
+#define VAL_UTF8_AT(size_out,v) \
+    VAL_UTF8_LIMIT_AT(nullptr, (size_out), (v), UNKNOWN)
 
 
 // To make interfaces easier for some functions that take REBSTR* strings,

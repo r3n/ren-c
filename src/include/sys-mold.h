@@ -54,6 +54,9 @@ struct rebol_mold {
 #define Copy_Form_Value(v,opts) \
     Copy_Mold_Or_Form_Value((v), (opts), true)
 
+#define Copy_Form_Cell(v,opts) \
+    Copy_Mold_Or_Form_Cell((v), (opts), true)
+
 
 // Modes allowed by FORM
 enum {

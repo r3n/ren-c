@@ -725,7 +725,7 @@ REBLEN Next_Line(REBYTE **bin)
 REBLEN Find_In_Any_Sequence(
     REBLEN *len,  // length of match (e.g. if pattern is a TAG!, includes <>)
     const RELVAL *any_series,
-    const RELVAL *pattern,
+    const REBCEL *pattern,
     REBFLGS flags
 ){
     REBLEN index = VAL_INDEX(any_series);
