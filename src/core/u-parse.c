@@ -772,8 +772,12 @@ static REBIXO To_Thru_Block_Rule(
 ) {
     DECLARE_LOCAL (cell); // holds evaluated rules (use frame cell instead?)
 
+    // Note: This enumeration goes through <= SER_LEN(P_INPUT), because the
+    // block rule might be something like `to [{a} | end]`.  e.g. being
+    // positioned on the end cell or null terminator of a string may match.
+    //
     REBLEN pos = P_POS;
-    for (; pos < SER_LEN(P_INPUT); ++pos) {
+    for (; pos <= SER_LEN(P_INPUT); ++pos) {  // see note
         const RELVAL *blk = VAL_ARRAY_HEAD(rule_block);
         for (; NOT_END(blk); blk++) {
             if (IS_BAR(blk))
@@ -887,7 +891,11 @@ static REBIXO To_Thru_Block_Rule(
 
                 REBUNI ch_unadjusted = GET_CHAR_AT(STR(P_INPUT), pos);
                 REBUNI ch;
-                if (!P_HAS_CASE)
+                if (ch_unadjusted == '\0') { // cannot be passed to UP_CASE()
+                    assert(pos == SER_LEN(P_INPUT));  // match END above or ""
+                    ch = '\0';  // !!! allows match with TO CHAR! 0 (good?)
+                }
+                else if (!P_HAS_CASE)
                     ch = UP_CASE(ch_unadjusted);
                 else
                     ch = ch_unadjusted;

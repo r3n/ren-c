@@ -304,6 +304,9 @@ REBLEN Modify_String_Or_Binary(
     REBYTE src_byte;  // only used by BINARY! (mold buffer is UTF-8 legal)
 
     if (IS_CHAR(src)) {  // characters store their encoding in their payload
+        if (VAL_CHAR(src) == '\0' and IS_SER_STRING(dst_ser))
+            fail (Error_Illegal_Zero_Byte_Raw());
+
         src_ptr = VAL_CHAR_ENCODED(src);
         src_size_raw = VAL_CHAR_ENCODED_SIZE(src);
 
@@ -368,7 +371,11 @@ REBLEN Modify_String_Or_Binary(
                 const REBYTE *bp = src_ptr;
                 for (; bytes_left > 0; --bytes_left, ++bp) {
                     REBUNI c = *bp;
-                    if (c >= 0x80) {
+                    if (c < 0x80) {  // ASCII, just check for 0 bytes
+                        if (c == '\0')
+                            fail (Error_Illegal_Zero_Byte_Raw());
+                    }
+                    else {
                         bp = Back_Scan_UTF8_Char(&c, bp, &bytes_left);
                         if (not bp)  // !!! Should Back_Scan() fail?
                             fail (Error_Bad_Utf8_Raw());

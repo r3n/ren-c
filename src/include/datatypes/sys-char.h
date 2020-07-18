@@ -383,6 +383,12 @@ inline static const REBYTE *Back_Scan_UTF8_Char(
     // UTF-16 surrogate values are illegal in UTF-32, and anything
     // over Plane 17 (> 0x10FFFF) is illegal.
     //
+    // !!! It may be that someday, when UTF-16 is no longer in the picture,
+    // that these codepoints are reclaimed.  Also someone might want to be
+    // using UTF-8 encoding as a space optimization for another numeric
+    // encoding where small numbers are considered more likely than large.
+    // These may be filtered at some other level (codec?).
+    //
     if (*out > UNI_MAX_LEGAL_UTF32)
         return nullptr;
     if (*out >= UNI_SUR_HIGH_START && *out <= UNI_SUR_LOW_END)
@@ -391,10 +397,9 @@ inline static const REBYTE *Back_Scan_UTF8_Char(
     if (size)
         *size -= trail;
 
-    // !!! Original implementation used 0 as a return value to indicate a
-    // decoding failure.  However, 0 is a legal UTF8 codepoint, and also
-    // Rebol strings are able to store NUL characters (they track a length
-    // and are not zero-terminated.)  Should this be legal?
+    // Note that Ren-C disallows internal zero bytes in ANY-STRING!, so that
+    // a single pointer can be given to C for the data and no length...and
+    // not have this be misleading or cause bugs.
     //
     // !!! Note also that there is a trend to decode illegal codepoints as
     // a substitution character.  If Rebol is willing to do this, at what

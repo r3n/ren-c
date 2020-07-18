@@ -2,6 +2,14 @@
 
 (did parse "abc" ["abc" end])
 
+; Edge case of matching END with TO or THRU
+;
+("" = parse "" [to ["a" | end]])
+("" = parse "" [thru ["a" | end]])
+([] = parse [] [to ["a" | end]])
+([] = parse [] [thru ["a" | end]])
+
+
 ; Are null rules raising the right error?
 
 (
