@@ -820,7 +820,11 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
                     rebI(key_event->wRepeatCount)
             );
 
-            ++t->in;  // we took all the repeats into account in one step
+            // we aren't generating an event, so do NOT increment t->in
+            // (it will be done when the loop falls through)
+            //
+            // !!! Would it be better to just `goto start_over;` here?
+
             t->surrogate = '\0';  // may or may not have been set
             t->repeat_surrogate = 0;
         }
