@@ -599,13 +599,70 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     );
 
     // We have to inject a simple dispatcher to flip the phase to one that has
-    // the more limited frame.
+    // the more limited frame.  But we have to make an expanded exemplar if
+    // there is one.  (We can't expand the existing exemplar, because more
+    // than one AUGMENT might happen to the same function).  :-/
+
+    REBCTX *old_exemplar = ACT_EXEMPLAR(VAL_ACTION(augmentee));
+    REBCTX *exemplar;
+    if (not old_exemplar)
+        exemplar = nullptr;
+    else {
+        REBLEN old_len = ARR_LEN(ACT_PARAMLIST(VAL_ACTION(augmentee)));
+        REBLEN delta = ARR_LEN(paramlist) - old_len;
+        assert(delta > 0);
+        
+        REBARR *old_varlist = CTX_VARLIST(old_exemplar);
+        assert(ARR_LEN(old_varlist) == old_len);
+
+        REBARR *varlist = Copy_Array_At_Extra_Shallow(
+            old_varlist,
+            0,  // index
+            SPECIFIED,
+            delta,  // extra cells
+            SER(old_varlist)->header.bits
+        );
+        SER(varlist)->info.bits = SER(old_varlist)->info.bits;
+        INIT_VAL_CONTEXT_VARLIST(ARR_HEAD(varlist), varlist);
+        
+        // We fill in the added parameters in the specialization as null for
+        // starters.  They are unspecialized.
+        //
+        blockscope {
+            RELVAL *temp = ARR_AT(varlist, old_len);
+            REBLEN i;
+            for (i = 0; i < delta; ++i) {
+                Init_Nulled(temp);
+                temp = temp + 1;
+            }
+            TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));
+        }
+
+        // !!! Inefficient, we need to keep the ARG_MARKED_CHECKED bit, but
+        // copying won't keep it by default!  Review folding this into the
+        // copy machinery as part of the stackless copy implementation.  Done
+        // poorly here alongside the copy that should be parameterized.
+        //
+        blockscope {
+            RELVAL *src = ARR_HEAD(old_varlist) + 1;
+            RELVAL *dest = ARR_HEAD(varlist) + 1;
+            REBLEN i;
+            for (i = 1; i < old_len; ++i, ++src, ++dest) {
+                if (GET_CELL_FLAG(src, ARG_MARKED_CHECKED))
+                    SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
+            }
+        }
+
+        MISC_META_NODE(varlist) = nullptr;  // GC sees, must initialize
+        exemplar = CTX(varlist);
+        INIT_CTX_KEYLIST_SHARED(exemplar, paramlist);
+    }
 
     REBACT* augmentated = Make_Action(
         paramlist,
         &Augmenter_Dispatcher,
         ACT_UNDERLYING(VAL_ACTION(augmentee)),
-        ACT_EXEMPLAR(VAL_ACTION(augmentee)),
+        exemplar,
         1  // size of the ACT_DETAILS array
     );
 
