@@ -95,18 +95,11 @@ REB_R MAKE_Word(
 
         return out;
     }
-    else if (IS_CHAR(arg)) {
-        REBUNI c = VAL_CHAR(arg);
-        REBSIZ encoded_size = Encoded_Size_For_Codepoint(c);
+    else if (IS_CHAR(arg)) {  // CHAR! caches the UTF-8 encoding in the cell
+        const REBYTE *encoded = VAL_CHAR_ENCODED(arg);
+        REBSIZ encoded_size = VAL_CHAR_ENCODED_SIZE(arg);
 
-        // !!! A compiler warning on gcc 4.6.3 seems to think Encode_UTF8_Char
-        // writes outside the buf if you don't add the `+ 1`.  It's wrong :-(
-        // but for now we'll appease it.
-        //
-        REBYTE buf[UNI_ENCODED_MAX + 1];
-        Encode_UTF8_Char(buf, c, encoded_size);
-
-        if (nullptr == Scan_Any_Word(out, kind, buf, encoded_size))
+        if (nullptr == Scan_Any_Word(out, kind, encoded, encoded_size))
             fail (Error_Bad_Char_Raw(arg));
         return out;
     }
