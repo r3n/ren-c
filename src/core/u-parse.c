@@ -621,10 +621,10 @@ static REB_R Parse_One_Rule(
         const REBCEL *rule_cell = VAL_UNESCAPED(rule);
         enum Reb_Kind rule_cell_kind = CELL_KIND(rule_cell);
         if (
-            ANY_WORD_KIND(rule_cell_kind) and VAL_NUM_QUOTES(rule) == 1
-            or ANY_STRING_KIND(rule_cell_kind) and VAL_NUM_QUOTES(rule) <= 1
-            or rule_cell_kind == REB_BINARY and VAL_NUM_QUOTES(rule) == 0
-            or rule_cell_kind == REB_INTEGER and VAL_NUM_QUOTES(rule) == 1
+            (ANY_WORD_KIND(rule_cell_kind) and VAL_NUM_QUOTES(rule) == 1)
+            or (ANY_STRING_KIND(rule_cell_kind) and VAL_NUM_QUOTES(rule) <= 1)
+            or (rule_cell_kind == REB_BINARY and VAL_NUM_QUOTES(rule) == 0)
+            or (rule_cell_kind == REB_INTEGER and VAL_NUM_QUOTES(rule) == 1)
         ){
             REBLEN len;
             REBLEN index = Find_In_Any_Sequence(
