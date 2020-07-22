@@ -205,7 +205,26 @@ reb.m = {
             return URL.createObjectURL(workerJsBlob)
 
         return libRebolComponentURL(suffix)
-    }
+    },
+
+    // Emscripten does a capture of a module's "ENV" state when the module
+    // is initialized, as the initial answers to `getenv()`.  This state is
+    // snapshotted just once--and the right time to set it up is in preRun().
+    // Doing it sooner will be overwritten, and later won't be captured.
+    //
+    preRun: [function (mod) {
+        config.log("libRebol preRun() executing")
+
+        // Some debug options must be set before a Rebol evaluator is ready.
+        // Historically this is done with environment variables.  Right now
+        // they're only debug options, and designing some parameterization of
+        // reb.Startup() would be hard to maintain and overkill.
+        //
+        if (config.tracing_on) {
+            mod.ENV['R3_TRACE_JAVASCRIPT'] = '1'
+            mod.ENV['R3_PROBE_FAILURES'] = '1'  // !!! Separate config flag?
+        }
+    }]
 }
 
 
@@ -581,17 +600,6 @@ return assign_git_commit_promiser(os_id)  // sets git_commit
     reb.m = module  // overwrite the defaults with the instantiated module
 
     config.info('Executing Rebol boot code...')
-
-    // Some debug options must be set before a Rebol evaluator is ready.
-    // Historically this is done with environment variables, because right now
-    // they're only debug options and designing some parameterization of
-    // reb.Startup() would be hard to maintain and overkill.  Fortunately
-    // Emscripten can simulate getenv() with ENV.
-    //
-    if (config.tracing_on) {
-        ENV['R3_TRACE_JAVASCRIPT'] = '1'
-        ENV['R3_PROBE_FAILURES'] = '1'  // !!! Separate config flag needed?
-    }
 
     reb.Startup()  // Sets up memory pools, symbols, base, sys, mezzanine...
 

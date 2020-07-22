@@ -1231,6 +1231,20 @@ REBNATIVE(init_javascript_extension)
 {
     JAVASCRIPT_INCLUDE_PARAMS_OF_INIT_JAVASCRIPT_EXTENSION;
 
+  #ifdef DEBUG_JAVASCRIPT_EXTENSION
+    //
+    // See remarks in %load-r3.js about why environment variables are used to
+    // control such settings (at least for now) in the early boot process.
+    // Once boot is complete, JS-TRACE can be called (if built with JS debug).
+    // Emscripten provides ENV to mimic environment variables.
+    //
+    const char *env_js_trace = getenv("R3_TRACE_JAVASCRIPT");
+    if (env_js_trace and atoi(env_js_trace) != 0) {
+        PG_JS_Trace = true;
+        printf("ENV['R3_TRACE_JAVASCRIPT'] is nonzero...PG_JS_Trace is on\n");
+    }
+  #endif
+
     TRACE("INIT-JAVASCRIPT-EXTENSION called");
 
   #if defined(USE_PTHREADS)
@@ -1256,20 +1270,6 @@ REBNATIVE(init_javascript_extension)
 
     ENDIFY_POINTER_IF_DEBUG(PG_Native_Result);
     PG_Native_State = NATIVE_STATE_NONE;
-
-  #ifdef DEBUG_JAVASCRIPT_EXTENSION
-    //
-    // See remarks in %load-r3.js about why environment variables are used to
-    // control such settings (at least for now) in the early boot process.
-    // Once boot is complete, JS-TRACE can be called (if built with JS debug).
-    // Emscripten provides ENV to mimic environment variables.
-    //
-    const char *env_js_trace = getenv("R3_TRACE_JAVASCRIPT");
-    if (env_js_trace and atoi(env_js_trace) != 0) {
-        PG_JS_Trace = true;
-        printf("ENV['R3_TRACE_JAVASCRIPT'] is nonzero...PG_JS_Trace is on\n");
-    }
-  #endif
 
     return Init_Void(D_OUT);
 }

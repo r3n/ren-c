@@ -260,7 +260,13 @@ ldflags: compose [
     ;
     ; https://github.com/emscripten-core/emscripten/issues/9412
     ;
-    {-s "EXTRA_EXPORTED_RUNTIME_METHODS=['allocateUTF8']"}
+    ; ENV is an object which represents the initial environment for getenv()
+    ; calls.  This is used to set up configuration options for the C code that
+    ; come into effect before rebStartup() is finished.  The snapshot happens
+    ; after the module's preRun() method, and to assign ENV with MODULARIZE=1
+    ; one must export it (or ENV is a function stub that raises an error).
+    ;
+    {-s "EXTRA_EXPORTED_RUNTIME_METHODS=['ENV']"}
     ; {-s "EXTRA_EXPORTED_RUNTIME_METHODS=['ccall', 'cwrap', 'allocateUTF8']"}
 
     ; WASM does not have source maps, so disabling it can aid in debugging
