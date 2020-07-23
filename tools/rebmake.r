@@ -1524,6 +1524,11 @@ Execution: make generator-class [
                 ] [return] ;TODO: Check the timestamp to see if it needs to be updated
                 either block? target/commands [
                     for-each cmd target/commands [
+                        ; mysql modification
+                        if not null? find cmd "mysql" [;print ["Command mysql gevonden:" cmd]
+                            replace cmd "gcc -c " "gcc -c `mysql_config --cflags` "
+                            replace cmd "objs/main.o" "objs/main.o `mysql_config --libs` "
+                        ]
                         cmd: reify cmd
                         print ["Running:" cmd]
                         call/shell cmd
