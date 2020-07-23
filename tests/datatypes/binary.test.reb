@@ -42,3 +42,18 @@
 )
 
 ('bad-path-pick = pick trap [pick #{00} 'x] 'id)
+
+
+[#1791
+    (#{E188B4} = head insert #{} "^(1234)")
+    (#{E188B400} = head insert #{00} "^(1234)")
+    (#{E188B40000} = head insert #{0000} "^(1234)")
+
+    (#{E188B4} = append #{} "^(1234)")
+    (#{00E188B4} = append #{00} "^(1234)")
+    (#{0000E188B4} = append #{0000} "^(1234)")
+
+    (#{E188B4} = head change #{} "^(1234)")
+    (#{E188B4} = head change #{00} "^(1234)")
+    (#{E188B4} = head change #{0000} "^(1234)")
+]

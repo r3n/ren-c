@@ -38,3 +38,9 @@
 ([[a] [b c] []] ==  split [a | b c |] '|)
 ; word delimiter in block
 ([[a] [b c] []] == split [a x b c x] 'x)
+
+
+[#690 (
+    ["This" " is a" " test" " to see "]
+        = split "This! is a. test? to see " charset "!?."
+)]

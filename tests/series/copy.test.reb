@@ -33,3 +33,9 @@
     error? trap [copy :f]
     true
 )]
+
+
+[#138 (
+    b: make binary! 100
+    #{} = copy/part b 50
+)]

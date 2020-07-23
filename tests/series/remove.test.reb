@@ -29,22 +29,22 @@
     null? find a-bitset #"a"
 )
 
-(
-    1 = take copy #{010203}
-)(
-    3 = take/last copy #{010203}
-)(
-    #{0102} = take/part copy #{010203} 2
-)(
-    #{0203} = take/part copy next #{010203} 100  ; should clip
-)
+[
+    (1 = take #{010203})
+    (#{01} = take/part #{010203} 1)  ; always a series
+    (3 = take/last #{010203})
+    (#{0102} = take/part #{010203} 2)
+    (#{0203} = take/part next #{010203} 100)  ; should clip
 
-(
-    #"a" = take copy "abc"
-)(
-    #"c" = take/last copy "abc"
-)(
-    "ab" = take/part copy "abc" 2
-)(
-    "bc" = take/part copy next "abc" 100  ; should clip
-)
+    (#"a" = take "abc")
+    ("a" = take/part "abc" 1)  ; always a series
+    (#"c" = take/last "abc")
+    ("ab" = take/part "abc" 2)
+    ("bc" = take/part next "abc" 100)  ; should clip
+
+    ('a = take [a b c])
+    ([a] = take/part [a b c] 1)  ; always a series
+    ('c = take/last [a b c])
+    ([a b] = take/part [a b c] 2)
+    ([b c] = take/part next [a b c] 100)  ; should clip
+]
