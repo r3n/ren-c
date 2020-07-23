@@ -227,3 +227,28 @@
         true
     ]
 )
+
+
+[#1043
+    (error? trap [make char! #{}])
+    (error? trap [make char! ""])
+]
+
+
+[#1031
+    ; 1 UTF-8 byte
+    (#"b" = to char! #{62})
+    (#{62} = to binary! #"b")
+
+    ; 2 UTF-8 bytes
+    (#"à" = to char! #{C3A0})
+    (#{C3A0} = to binary! #"à")
+
+    ; 3 UTF-8 bytes
+    (#"漢" = to char! #{E6BCA2})
+    (#{E6BCA2} = to binary! #"漢")
+
+    ; 4 UTF-8 bytes
+    (#"😺" = to char! #{F09F98BA})
+    (#{F09F98BA} = to binary! #"😺")
+]

@@ -508,6 +508,9 @@ REBLEN Find_Char_In_Str(
     // !!! In UTF-8, finding a char in a string is really just like finding a
     // string in a string.  Optimize as this all folds together.
 
+    if (uni == 0)
+        return NOT_FOUND;  // there can be no `\0` codepoints in ANY-STRING!
+
     REBSTR *temp = Make_Codepoint_String(uni);
 
     REBLEN i = Find_Str_In_Str(
@@ -550,6 +553,16 @@ REBLEN Find_Char_In_Bin(
         fail ("Find_Char_In_Bin() only searches the whole binary for now");
 
     UNUSED(lowest);
+
+    if (uni == 0) {  // can't Make a REBSTR with 0 byte in it
+        return Find_Bin_In_Bin(
+            bin,
+            index_orig,
+            cb_cast(""),  // NUL terminator only
+            1,  // 1 byte
+            flags
+        );
+    }
 
     REBSTR *temp = Make_Codepoint_String(uni);
 

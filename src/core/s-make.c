@@ -127,8 +127,14 @@ REBSTR *Append_Codepoint(REBSTR *dst, REBUNI c)
 //
 // Create a string that holds a single codepoint.
 //
+// !!! This could be more optimal if a CHAR! is passed in, because it caches
+// the UTF-8 encoding in the cell.  Review callsites if that is actionable.
+//
 REBSTR *Make_Codepoint_String(REBUNI c)
 {
+    if (c == '\0')
+        fail (Error_Illegal_Zero_Byte_Raw());
+
     REBSIZ size = Encoded_Size_For_Codepoint(c);
     REBSTR *s = Make_String(size);
     Encode_UTF8_Char(STR_HEAD(s), c, size);

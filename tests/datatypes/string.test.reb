@@ -165,3 +165,8 @@
     insert b first a
     a == b
 )]
+
+
+[#207
+    ('illegal-zero-byte = (trap [to text! to char! 0])/id)
+]

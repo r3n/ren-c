@@ -849,8 +849,18 @@ static REBIXO To_Thru_Block_Rule(
             else if (P_TYPE == REB_BINARY) {
                 REBYTE ch1 = *BIN_AT(P_INPUT, pos);
 
-                // Handle special string types:
-                if (IS_CHAR(rule)) {
+                if (pos == SER_LEN(P_INPUT)) {
+                    //
+                    // If we weren't matching END, then the only other thing
+                    // we'll match at the BINARY! end is an empty BINARY!.
+                    // Not a NUL codepoint, because the internal BINARY!
+                    // terminator is implementation detail.
+                    //
+                    assert(ch1 == '\0');  // internal BINARY! terminator
+                    if (IS_BINARY(rule) and VAL_LEN_AT(rule) == 0)
+                        return pos;
+                }
+                else if (IS_CHAR(rule)) {
                     if (VAL_CHAR(rule) > 0xff)
                         fail (Error_Parse_Rule());
 
@@ -902,6 +912,9 @@ static REBIXO To_Thru_Block_Rule(
 
                 if (IS_CHAR(rule)) {
                     REBUNI ch2 = VAL_CHAR(rule);
+                    if (ch2 == 0)
+                        return END_FLAG;  // cannot find 0 char in ANY-STRING!
+
                     if (!P_HAS_CASE)
                         ch2 = UP_CASE(ch2);
                     if (ch == ch2) {
