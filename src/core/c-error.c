@@ -202,7 +202,7 @@ void Trapped_Helper(struct Reb_State *s)
 
     Eval_Sigmask = s->saved_sigmask;
 
-    Saved_State = s->last_state;
+    TG_Jump_List = s->last_jump;
 }
 
 
@@ -317,7 +317,7 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     // There should be a PUSH_TRAP of some kind in effect if a `fail` can
     // ever be run.
     //
-    if (Saved_State == NULL)
+    if (TG_Jump_List == nullptr)
         panic (error);
 
     // If the error doesn't have a where/near set, set it from stack
@@ -340,7 +340,7 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     // the way R3-Alpha handles stack overflows, and alternative plans.)
     //
     REBFRM *f = FS_TOP;
-    while (f != Saved_State->frame) {
+    while (f != TG_Jump_List->frame) {
         if (Is_Action_Frame(f)) {
             assert(f->varlist); // action must be running
             Drop_Action(f);
@@ -353,7 +353,7 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
 
     TG_Top_Frame = f; // TG_Top_Frame is writable FS_TOP
 
-    Saved_State->error = error;
+    TG_Jump_List->error = error;
 
     // If a throw was being processed up the stack when the error was raised,
     // then it had the thrown argument set.  Trash it in debug builds.  (The
@@ -363,7 +363,7 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     SET_END(&TG_Thrown_Arg);
   #endif
 
-    LONG_JUMP(Saved_State->cpu_state, 1);
+    LONG_JUMP(TG_Jump_List->cpu_state, 1);
 }
 
 

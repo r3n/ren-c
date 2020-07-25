@@ -235,7 +235,7 @@ TVAR REBARR *DS_Array;
 TVAR REBDSP DS_Index;
 TVAR REBVAL *DS_Movable_Top;
 
-TVAR struct Reb_State *Saved_State; // Saved state for Catch (CPU state, etc.)
+TVAR struct Reb_State *TG_Jump_List; // Saved state for TRAP (CPU state, etc.)
 
 #if !defined(NDEBUG)
     TVAR bool TG_Pushing_Mold; // Push_Mold should not directly recurse

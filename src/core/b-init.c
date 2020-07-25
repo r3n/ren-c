@@ -895,7 +895,7 @@ static void Init_Contexts_Object(void)
 void Startup_Task(void)
 {
     Trace_Level = 0;
-    Saved_State = 0;
+    TG_Jump_List = nullptr;
 
     Eval_Cycles = 0;
     Eval_Dose = EVAL_DOSE;
@@ -1166,7 +1166,7 @@ void Startup_Core(void)
     PG_Mem_Limit = 0;
     Reb_Opts = TRY_ALLOC(REB_OPTS);
     CLEAR(Reb_Opts, sizeof(REB_OPTS));
-    Saved_State = NULL;
+    TG_Jump_List = nullptr;
 
     Check_Basics();
 
@@ -1402,7 +1402,7 @@ void Shutdown_Core(void)
     Check_Memory_Debug(); // old R3-Alpha check, call here to keep it working
   #endif
 
-    assert(Saved_State == NULL);
+    assert(TG_Jump_List == nullptr);
 
     // !!! Currently the molding logic uses a test of the Boot_Phase to know
     // if it's safe to check the system object for how many digits to mold.

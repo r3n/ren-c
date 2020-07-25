@@ -36,7 +36,7 @@ struct Reb_State {
     jmp_buf cpu_state;
   #endif
 
-    struct Reb_State *last_state;
+    struct Reb_State *last_jump;
 
     REBDSP dsp;
     struct Reb_Chunk *top_chunk;

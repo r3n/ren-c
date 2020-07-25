@@ -313,7 +313,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     // Waiting opens the doors to pressing Ctrl-C, which may get this code
     // to throw an error.  There needs to be a state to catch it.
     //
-    assert(Saved_State != nullptr);
+    assert(TG_Jump_List != nullptr);
 
     REBVAL *system_port = Get_System(SYS_PORTS, PORTS_SYSTEM);
     if (not IS_PORT(system_port))

@@ -1489,12 +1489,26 @@ REBVAL *RL_rebRescue(
     REBDNG *dangerous, // !!! pure C function only if not using throw/catch!
     void *opaque
 ){
+    return RL_rebRescueWith(dangerous, nullptr, opaque);
+}
+
+
+//
+//  rebRescueWith: RL_API
+//
+// Variant of rebRescue() with a handler hook (parallels TRAP/WITH, except
+// for C code as the protected code and the handler).  More similar to
+// Ruby's rescue2 operation.
+//
+REBVAL *RL_rebRescueWith(
+    REBDNG *dangerous,  // !!! pure C function only if not using throw/catch!
+    REBRSC *rescuer,  // errors in the rescuer function will *not* be caught
+    void *opaque
+){
     ENTER_API;
 
-    struct Reb_State state;
-    REBCTX *error_ctx;
-
-    PUSH_TRAP(&error_ctx, &state);
+    struct Reb_State jump;
+    PUSH_TRAP_SO_FAIL_CAN_JUMP_BACK_HERE(&jump);
 
     // We want API allocations via rebValue() or rebMalloc() that occur in the
     // body of the C function for the rebRescue() to be automatically cleaned
@@ -1510,9 +1524,16 @@ REBVAL *RL_rebRescue(
     // The first time through the following code 'error' will be null, but...
     // `fail` can longjmp here, so 'error' won't be null *if* that happens!
     //
-    if (error_ctx) {
+    if (jump.error) {
         Abort_Frame(dummy);
-        return Init_Error(Alloc_Value(), error_ctx);
+
+        REBVAL *error = Init_Error(Alloc_Value(), jump.error);
+        if (not rescuer)
+            return error;  // plain rebRescue() behavior
+
+        REBVAL *result = (*rescuer)(error, opaque);  // *not* guarded by trap!
+        rebRelease(error);
+        return result;  // no special handling, may be null
     }
 
     REBVAL *result = (*dangerous)(opaque);
@@ -1520,7 +1541,7 @@ REBVAL *RL_rebRescue(
     if (not result) {
         // null is considered a legal result
     }
-    else if (KIND_BYTE(result) == REB_ERROR) {
+    else if (rescuer == nullptr and KIND_BYTE(result) == REB_ERROR) {
         //
         // Analogous to how TRAP works, if you don't have a handler for the
         // error case then you can't return an ERROR!, since all errors
@@ -1553,6 +1574,8 @@ REBVAL *RL_rebRescue(
         }
     }
 
+    DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&jump);
+
     // !!! To abstract how the system deals with exception handling, the
     // rebRescue() routine started being used in lieu of PUSH_TRAP/DROP_TRAP
     // internally to the system.  Some of these system routines accumulate
@@ -1560,49 +1583,7 @@ REBVAL *RL_rebRescue(
     //
     Drop_Frame_Unbalanced(dummy);
 
-    DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
-
     return result;
-}
-
-
-//
-//  rebRescueWith: RL_API
-//
-// Variant of rebRescue() with a handler hook (parallels TRAP/WITH, except
-// for C code as the protected code and the handler).  More similar to
-// Ruby's rescue2 operation.
-//
-REBVAL *RL_rebRescueWith(
-    REBDNG *dangerous,  // !!! pure C function only if not using throw/catch!
-    REBRSC *rescuer,  // errors in the rescuer function will *not* be caught
-    void *opaque
-){
-    ENTER_API;
-
-    struct Reb_State state;
-    REBCTX *error_ctx;
-
-    PUSH_TRAP(&error_ctx, &state);
-
-    // The first time through the following code 'error' will be null, but...
-    // `fail` can longjmp here, so 'error' won't be null *if* that happens!
-    //
-    if (error_ctx) {
-        REBVAL *error = Init_Error(Alloc_Value(), error_ctx);
-
-        REBVAL *result = (*rescuer)(error, opaque);  // *not* guarded by trap!
-
-        rebRelease(error);
-        return result;  // no special handling, may be null
-    }
-
-    REBVAL *result = (*dangerous)(opaque);  // guarded by trap
-    assert(not IS_NULLED(result));  // nulled cells not exposed by API
-
-    DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
-
-    return result;  // no special handling, may be NULL
 }
 
 
