@@ -2345,20 +2345,6 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         Init_Block(outputs, Pop_Stack_Values(dsp_outputs));
         PUSH_GC_GUARD(outputs);
 
-        // !!! You generally don't want to use the API inside the evaluator
-        // (this is only a temporary measure).  But if you do, you can't use
-        // it inside of a function that has not fulfilled its arguments.
-        // So imagine `10 = [a b]: some-func`... the `=` is building a frame
-        // with two arguments, and it has the 10 fulfilled but the other
-        // cell is invalid bits.  So when the API handle tries to attach its
-        // ownership it forces reification of a frame that's partial.  We
-        // have to give the API handle a fulfilled frame to stick to, so
-        // we wrap in a function that we make look like it ran and got all
-        // its arguments.
-        //
-        DECLARE_END_FRAME(dummy, EVAL_MASK_DEFAULT);
-        Push_Dummy_Frame(dummy);
-
         // Now create a function to splice in to the execution stream that
         // specializes what we are calling so the output parameters have
         // been preloaded with the words or paths from the left block.
@@ -2391,8 +2377,6 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
         Move_Value(spare, specialized);
         rebRelease(specialized);
-
-        Drop_Dummy_Frame_Unbalanced(dummy);
 
         // Toss away the pending WORD!/PATH!/ACTION! that was in the execution
         // stream previously.
