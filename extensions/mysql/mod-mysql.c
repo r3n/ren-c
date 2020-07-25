@@ -22,19 +22,13 @@
 
 #include <mysql.h>
 
+#define REBOL_IMPLICIT_END
 // Include the rebol core for the rebnative c-function
 #include "sys-core.h"
 
 #include "tmp-mod-mysql.h"
 
 // Helper functions
-
-void finish_with_error(MYSQL *con)
-{
-  fprintf(stderr, "%s\n", mysql_error(con));
-  mysql_close(con);
-  //exit(1);
-}
 
 // End Helper Functions
 
@@ -60,15 +54,15 @@ REBNATIVE(mysql_connect)
         fprintf(stderr, "%s\n", mysql_error(con));
         //exit(1);
     }
-    void *host = ARG(host);
-    void *user = ARG(user);
-    void *pwrd = ARG(pwrd);
-    void *dbnm = ARG(dbnm);
+    REBSTR host = rebSpell(ARG(host));
+    REBSTR user = rebSpell(ARG(user));
+    REBSTR pwrd = rebSpell(ARG(pwrd));
+    REBSTR dbnm = rebSpell(ARG(dbnm));
     
     if (mysql_real_connect(connection, host, user, pwrd, 
           dbnm, 0, NULL, 0) == NULL)
     {
-      finish_with_error(connection);
+      print("Error connecting");
     } 
 
     return rebHandle(connection);
