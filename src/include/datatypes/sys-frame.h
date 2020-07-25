@@ -742,8 +742,6 @@ inline static void Push_Action(
 
 
 inline static void Drop_Action(REBFRM *f) {
-    assert(NOT_SERIES_FLAG(f->varlist, VARLIST_FRAME_FAILED));
-
     assert(
         not f->opt_label
         or GET_SERIES_FLAG(f->opt_label, IS_STRING)

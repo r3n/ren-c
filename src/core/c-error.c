@@ -343,9 +343,7 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     while (f != Saved_State->frame) {
         if (Is_Action_Frame(f)) {
             assert(f->varlist); // action must be running
-            REBARR *stub = f->varlist; // will be stubbed, info bits reset
             Drop_Action(f);
-            SET_SERIES_FLAG(stub, VARLIST_FRAME_FAILED); // API leaks o.k.
         }
 
         REBFRM *prior = f->prior;
