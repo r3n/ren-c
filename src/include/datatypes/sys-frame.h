@@ -51,6 +51,31 @@ inline static bool IS_QUOTABLY_SOFT(const RELVAL *v) {
 //=////////////////////////////////////////////////////////////////////////=//
 
 
+// When Push_Action() happens, it sets f->original, but it's guaranteed to be
+// null if an action is not running.  This is tested via a macro because the
+// debug build doesn't do any inlining, and it's called often.
+//
+#define Is_Action_Frame(f) \
+    ((f)->original != nullptr)
+
+
+// While a function frame is fulfilling its arguments, the `f->param` will
+// be pointing to a typeset.  The invariant that is maintained is that
+// `f->param` will *not* be a typeset when the function is actually in the
+// process of running.  (So no need to set/clear/test another "mode".)
+//
+// Some cases in debug code call this all the way up the call stack, and when
+// the debug build doesn't inline functions it's best to use as a macro.
+
+#define Is_Action_Frame_Fulfilling_Unchecked(f) \
+    NOT_END((f)->param)
+
+inline static bool Is_Action_Frame_Fulfilling(REBFRM *f) {
+    assert(Is_Action_Frame(f));
+    return Is_Action_Frame_Fulfilling_Unchecked(f);
+}
+
+
 inline static bool FRM_IS_VARIADIC(REBFRM *f) {
     return f->feed->vaptr != nullptr or f->feed->packed != nullptr;
 }
@@ -170,6 +195,15 @@ inline static const REBSTR *FRM_LABEL(REBFRM *f) {
     }
 #endif
 
+
+inline static REBCTX *Context_For_Frame_May_Manage(REBFRM *f) {
+    assert(not Is_Action_Frame_Fulfilling(f));
+    SET_SERIES_FLAG(f->varlist, MANAGED);
+    return CTX(f->varlist);
+}
+
+
+//=//// FRAME LABELING ////////////////////////////////////////////////////=//
 
 inline static void Get_Frame_Label_Or_Blank(RELVAL *out, REBFRM *f) {
     assert(Is_Action_Frame(f));
@@ -378,6 +412,18 @@ inline static void Abort_Frame(REBFRM *f) {
         GC_Kill_Series(SER(f->varlist));  // not alloc'd with manuals tracking
     TRASH_POINTER_IF_DEBUG(f->varlist);
 
+    //
+    // If a frame is aborted, then we allow its API handles to leak.
+    //
+    REBNOD *n = f->alloc_value_list;
+    while (n != NOD(f)) {
+        REBARR *a = ARR(n);
+        n = LINK(n).custom.node;
+        TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
+        GC_Kill_Series(SER(a));
+    }
+    TRASH_POINTER_IF_DEBUG(f->alloc_value_list);
+
     // Abort_Frame() handles any work that wouldn't be done done naturally by
     // feeding a frame to its natural end.
     // 
@@ -451,6 +497,16 @@ inline static void Drop_Frame_Core(REBFRM *f) {
     TRASH_POINTER_IF_DEBUG(f->varlist);
 
     assert(TG_Top_Frame == f);
+
+    REBNOD *n = f->alloc_value_list;
+    while (n != NOD(f)) {
+        REBARR *a = ARR(n);
+      #if defined(DEBUG_STDIO_OK)
+        printf("API handle was allocated but not freed, panic'ing leak\n");
+      #endif
+        panic (a);
+    }
+
     TG_Top_Frame = f->prior;
 }
 
@@ -491,6 +547,8 @@ inline static void Prep_Frame_Core(
   #ifdef DEBUG_ENSURE_FRAME_EVALUATES
     f->was_eval_called = false;
   #endif
+
+    f->alloc_value_list = NOD(f);  // doubly link list, terminates in `f`
 }
 
 #define DECLARE_FRAME(name,feed,flags) \

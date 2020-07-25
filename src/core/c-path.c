@@ -610,10 +610,15 @@ REBNATIVE(pick)
         assert(r == R_UNHANDLED);
         fail (Error_Bad_Path_Pick_Raw(PVS_PICKER(pvs)));
     }
-    if (GET_CELL_FLAG(r, ROOT))
-        return r;
-
-    switch (KIND_BYTE(r)) {
+    else if (GET_CELL_FLAG(r, ROOT)) {  // API value
+        //
+        // It was parented to the PVS frame, we have to read it out.
+        //
+        Move_Value(D_OUT, r);
+        rebRelease(r);
+        r = D_OUT;
+    }
+    else switch (CELL_KIND_UNCHECKED(r)) {
       case REB_R_INVISIBLE:
         assert(false); // only SETs should do this
         break;
