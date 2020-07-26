@@ -125,7 +125,7 @@ make-port*: function [
                 opt [
                     ":" copy s2 digits (
                         append out compose [
-                            port-id: (to-integer s2)
+                            port-id: (to integer! s2)
                         ]
                     )
                 ] (
