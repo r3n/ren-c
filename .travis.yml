@@ -138,7 +138,7 @@ matrix:
       # https://github.com/hostilefork/replpad-js
       #
       os: linux
-      dist: bionic  # Trying instead of xenial to check Firefox Marionette
+      dist: bionic  # Marionette has JSON problem on Xenial's Python 3.5
       language: c
       env:
         - NUMBER=1
@@ -157,6 +157,9 @@ matrix:
         apt:
           packages:
             - net-tools  # for netstat/etc. diagnosing network issues
+            - python3  # used for "headless" web testing
+            - python3-pip  # installs marionette driver
+            - python3-setuptools  # also needed (for whatever reason)
 
     - name: "[2] WebAssembly no pthreads, release"
       #
@@ -171,7 +174,7 @@ matrix:
       # This build varation is created as a fallback.
       #
       os: linux
-      dist: xenial  # Travis recommended distribution as of Mar-2020
+      dist: bionic  # Marionette has JSON problem on Xenial's Python 3.5
       language: c
       env:
         - NUMBER=2
@@ -190,6 +193,9 @@ matrix:
         apt:
           packages:
             - net-tools  # for netstat/etc. diagnosing network issues
+            - python3  # used for "headless" web testing
+            - python3-pip  # installs marionette driver
+            - python3-setuptools  # also needed (for whatever reason)
 
     - name: "[3] OSX x64, debug, clang++"
       #
@@ -1256,7 +1262,7 @@ script:
       # 80/20 rule it's going to deliver on catching most of the breakages.
       #
       if [[ $OS_ID = 0.16.1 || $OS_ID = 0.16.2 ]]; then
-        $PIP install marionette-driver --user  # Python Install Package
+        pip3 install marionette-driver --user  # Python Install Package
 
         # Create a Firefox profile in the current directory that we can tweak
         # (as finding the default one's auto-generated name is a pain)
@@ -1334,7 +1340,7 @@ script:
         # `last-deploy.short-hash`...so we must pass the current commit in
         # explicitly to be asked for in the URL.
         #
-        python test-repl-ff.py --shorthash "${GIT_COMMIT_SHORT}"
+        python3 test-repl-ff.py --shorthash "${GIT_COMMIT_SHORT}"
         export DONT_GREENLIGHT_BUILD=$?  # captures last command exit code
       fi
 
