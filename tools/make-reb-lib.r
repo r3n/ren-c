@@ -547,9 +547,11 @@ e-lib/emit {
      *
      * Note: There is no need to rebR() the handle due to the failure; the
      * handles will auto-GC.
+     *
+     * !!! Should this use LIB/FAIL instead of FAIL?
      */
     #define rebFail_OS(errnum) \
-        rebJumps("fail", rebError_OS(errnum), rebEND);  // !!! or...LIB/FAIL ?
+        rebJumps("fail", rebR(rebError_OS(errnum)), rebEND);
 
     /*
      * Function entry points for reb-lib.  Formulating this way allows the
