@@ -51,35 +51,37 @@ REBNATIVE(mysql_connect)
     MYSQL *connection = mysql_init(NULL);
     if (connection == NULL) 
     {
-        fprintf(stderr, "%s\n", mysql_error(con));
+        return rebVoid();
+        // fprintf(stderr, "%s\n", mysql_error(con));
         //exit(1);
     }
-    REBSTR host = rebSpell(ARG(host));
-    REBSTR user = rebSpell(ARG(user));
-    REBSTR pwrd = rebSpell(ARG(pwrd));
-    REBSTR dbnm = rebSpell(ARG(dbnm));
+    const char * host = s_cast(VAL_STRING_AT(ARG(host)));
+    const char * user = s_cast(VAL_STRING_AT(ARG(user)));
+    const char * pwrd = s_cast(VAL_STRING_AT(ARG(pwrd)));
+    const char * dbnm = s_cast(VAL_STRING_AT(ARG(dbnm)));
     
     if (mysql_real_connect(connection, host, user, pwrd, 
           dbnm, 0, NULL, 0) == NULL)
     {
-      print("Error connecting");
+        return rebVoid();
     } 
 
-    return rebHandle(connection);
+    return rebHandle(connection, 0, nullptr);
 }
 
 //
 //  export mysql-close: native [
 //      "Closes a previously opened connection"
 //      return: [logic!]
-//      connection [object!]
+//      connection [handle!]
 //  ]
 //
 REBNATIVE(mysql_close)
 {
     MYSQL_INCLUDE_PARAMS_OF_MYSQL_CLOSE;
 
-    REBVAL *connection = ARG(connection);
+//zmq_msg_t *msg = VAL_HANDLE_POINTER(zmq_msg_t, ARG(msg));
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
 
     mysql_close(connection); 
 
@@ -90,13 +92,16 @@ REBNATIVE(mysql_close)
 //  export mysql-get-host-info: native [
 //      "Returns a string describing the type of connection in use, including the server host name."
 //      return: [text!]
+//      connection [object!]
 //  ]
 //
 REBNATIVE(mysql_get_host_info)
 {
     MYSQL_INCLUDE_PARAMS_OF_MYSQL_GET_HOST_INFO;
 
-    const char *result = mysql_get_host_info();
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    const char *result = mysql_get_host_info(connection);
 
     return rebText(result);
 }
@@ -105,13 +110,16 @@ REBNATIVE(mysql_get_host_info)
 //  export mysql-errno: native [
 //      "For the connection specified by mysql, mysql_errno() returns the error code for the most recently invoked API function that can succeed or fail."
 //      return: [integer!]
+//      connection [handle!]
 //  ]
 //
 REBNATIVE(mysql_errno)
 {
     MYSQL_INCLUDE_PARAMS_OF_MYSQL_ERRNO;
 
-    unsigned int *result = mysql_errno();
+    MYSQL *connection = VAL_HANDLE_POINTER(MYSQL, ARG(connection));
+
+    unsigned int result = mysql_errno(connection);
 
     return rebInteger(result);
 }
@@ -120,13 +128,16 @@ REBNATIVE(mysql_errno)
 //  export mysql-error: native [
 //      "For the connection specified by mysql, mysql_error() returns a null-terminated string containing the error message for the most recently invoked API function that failed. "
 //      return: [text!]
+//      con [handle!]
 //  ]
 //
 REBNATIVE(mysql_error)
 {
     MYSQL_INCLUDE_PARAMS_OF_MYSQL_ERROR;
 
-    const char *result = mysql_error();
+    MYSQL *connection = VAL_HANDLE_POINTER(MYSQL, ARG(con));
+
+    const char *result = mysql_error(connection);
 
     return rebText(result);
 }
