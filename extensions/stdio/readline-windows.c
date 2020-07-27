@@ -435,7 +435,20 @@ static bool Read_Input_Records_Interrupted(STD_TERM *t)
   #endif
 
     CHECK_INPUT_RECORDS(t);
-    return rebWasHalting();
+    if (rebWasHalting()) {
+        //
+        // !!! This doesn't provide the desired behavior of being able to
+        // cancel pending input when interpreter code is running...it only
+        // cancels pending input during line editing.  More thinking about
+        // the layering needs to be done in order to make the cancellation
+        // hook interoperate with the smart terminal features of being able
+        // to PeekConsoleInput and flush it out--which may or may not be
+        // available in all configurations.
+        //
+        Term_Abandon_Pending_Events(t);
+        return true;
+    }
+    return false;
 }
 
 
@@ -913,10 +926,36 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
 //
 void Term_Abandon_Pending_Events(STD_TERM *t)
 {
-    t->in = t->in_tail = t->buf;
+    // overwrite the buffer of everything pending with any more pending data
+
+    DWORD num_events;
+    while (true) {
+        //
+        // Ask if there's at least one event still pending
+        //
+        if (not PeekConsoleInput(Stdin_Handle, t->buf, 1, &num_events))
+            rebFail_OS (GetLastError());
+
+        if (num_events == 0)
+            break;  // if no events at all, don't do a blocking read
+
+        // Now read the events that we're just going to ignore
+        //
+        if (not ReadConsoleInput(
+            Stdin_Handle,  // input buffer handle
+            t->buf,  // buffer to read into
+            READ_BUF_LEN - 1,  // size of read buffer
+            &num_events
+        )){
+            rebFail_OS (GetLastError());
+        }
+        assert(num_events != 0);  // Should be blocking (see PeekConsoleInput)
+    }
+
+    t->in = t->in_tail = t->buf;  // Clear out whatever events we got
 
   #if !defined(NDEBUG)
-    t->buf[0].EventType = MENU_EVENT;
+    t->buf[0].EventType = MENU_EVENT;  // v-- poison the empty buffer
     t->buf[0].Event.MenuEvent.dwCommandId = MENU_ID_TRASH_DEBUG;
   #endif
 }
