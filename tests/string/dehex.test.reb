@@ -45,3 +45,7 @@
         no-encode == dehex no-encode
     ]
 )
+
+[#1986
+    ("/form?v=ř" = dehex as text! #{2F666F726D3F763D254335253939})
+]
