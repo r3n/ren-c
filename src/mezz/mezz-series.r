@@ -283,16 +283,22 @@ reword: function [
     ; that will look something like:
     ;
     ; [
-    ;     "keyword1" (keyword-match: lit keyword1)
-    ;     | "keyword2" (keyword-match: lit keyword2)
+    ;     "keyword1" suffix (keyword-match: 'keyword1)
+    ;     | "keyword2" suffix (keyword-match: 'keyword2)
     ;     | fail
     ; ]
     ;
-    ; Note that the enclosing rule has to account for `prefix` and `suffix`,
-    ; this just matches the keywords, setting `keyword-match` if one did.
+    ; Note that the enclosing rule has to account for `prefix`, but `suffix`
+    ; has to be part of this rule.  If it weren't, imagine if prefix is "$<"
+    ; and suffix is ">" and you try to match "$<10>":
+    ;
+    ;    prefix [
+    ;         "1" (keyword-match: '1)  ; ...this will take priority and match
+    ;         | "10" (keyword-match: '10)
+    ;    ] suffix  ; ...but then it's at "0>" and not ">", so it fails
     ;
     keyword-match: _  ; variable that gets set by rule
-    any-keyword-rule: collect [
+    any-keyword-suffix-rule: collect [
         for-each [keyword value] values [
             if not match keyword-types keyword [
                 fail ["Invalid keyword type:" keyword]
@@ -305,7 +311,9 @@ reword: function [
                     keyword
                 ]
 
-                compose lit (keyword-match: lit (keyword))
+                suffix
+
+                compose '(keyword-match: '(keyword))
             ]
 
             keep/line '|
@@ -321,7 +329,7 @@ reword: function [
             prefix  ; consume prefix (if no-op, may not be at start of match)
             [
                 [
-                    any-keyword-rule suffix (
+                    any-keyword-suffix-rule (
                         append/part out a offset? a b  ; output before prefix
 
                         v: select/(case_REWORD) values keyword-match
