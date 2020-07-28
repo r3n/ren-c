@@ -668,26 +668,25 @@ void Throttle_Mold(REB_MOLD *mo) {
     if (NOT_MOLD_FLAG(mo, MOLD_FLAG_LIMIT))
         return;
 
-    if (STR_LEN(mo->series) > mo->limit) {
-        //
+    if (STR_LEN(mo->series) - mo->index > mo->limit) {
+        REBINT overage = (STR_LEN(mo->series) - mo->index) - mo->limit;
+
         // Mold buffer is UTF-8...length limit is (currently) in characters,
         // not bytes.  Have to back up the right number of bytes, but also
         // adjust the character length appropriately.
 
-        REBINT overage = STR_LEN(mo->series) - mo->limit;
-        assert(mo->limit >= 3);
-        overage += 3;  // subtract out characters for ellipsis
-
         REBCHR(*) tail = STR_TAIL(mo->series);
         REBUNI dummy;
-        REBCHR(*) cp = SKIP_CHR(&dummy, tail, -overage);
+        REBCHR(*) cp = SKIP_CHR(&dummy, tail, -(overage));
 
         SET_STR_LEN_SIZE(
             mo->series,
             STR_LEN(mo->series) - overage,
             STR_SIZE(mo->series) - (tail - cp)
         );
-        Append_Ascii(mo->series, "..."); // adds a null at the tail
+
+        assert(not (mo->opts & MOLD_FLAG_WAS_TRUNCATED));
+        mo->opts |= MOLD_FLAG_WAS_TRUNCATED;
     }
 }
 

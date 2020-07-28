@@ -37,7 +37,12 @@ dump: function [
         case [
             null? :val ["\null\"]
             object? :val [unspaced ["make object! [" (summarize-obj val) "]"]]
-            default [mold/limit :val system/options/dump-size]
+            default [
+                trunc: void
+                append (
+                    mold/limit/truncated :val system/options/dump-size 'trunc
+                ) if trunc ["..."]
+            ]
         ]
     ]
 
@@ -45,7 +50,11 @@ dump: function [
         switch type of item [
             refinement!  ; treat as label, /a no shift and shorter than "a"
             text! [  ; good for longer labeling when you need spaces/etc.
-                print [mold/limit item system/options/dump-size]
+                print unspaced [
+                    elide trunc: void
+                    mold/limit/truncated item system/options/dump-size 'trunc
+                    if trunc ["..."]
+                ]
             ]
 
             word! [

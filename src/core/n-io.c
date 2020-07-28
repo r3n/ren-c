@@ -54,6 +54,8 @@ REBNATIVE(form)
 //      /flat "No indentation"
 //      /limit "Limit to a certain length"
 //          [integer!]
+//      /truncated "Returns LOGIC! of whether the mold was truncated"
+//          [<output>]
 //  ]
 //
 REBNATIVE(mold)
@@ -77,7 +79,16 @@ REBNATIVE(mold)
 
     Mold_Value(mo, ARG(value));
 
-    return Init_Text(D_OUT, Pop_Molded_String(mo));
+    REBSTR *popped = Pop_Molded_String(mo);  // sets MOLD_FLAG_TRUNCATED
+
+    if (REF(truncated))
+        rebElide(
+            NAT_VALUE(set),
+            rebQ1(REF(truncated)),
+            rebL(mo->opts & MOLD_FLAG_WAS_TRUNCATED),
+        rebEND);
+
+    return Init_Text(D_OUT, popped);
 }
 
 

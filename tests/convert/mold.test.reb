@@ -155,3 +155,22 @@
         not new-line? next next x
     ]
 )]
+
+
+[#2405
+    ({"ab} = mold/limit "abcdefg" 3)
+    (
+        [str trunc]: mold/limit "abcdefg" 3
+        did all [
+            str = {"ab}
+            trunc = true
+        ]
+    )
+    (
+        [str trunc]: mold/limit "abcdefg" 300
+        did all [
+            str = {"abcdefg"}
+            trunc = false
+        ]
+    )
+]
