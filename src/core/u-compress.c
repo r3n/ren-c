@@ -45,12 +45,12 @@
 // Decode bytes in Big Endian format (least significant byte first) into a
 // uint32.  GZIP format uses this to store the decompressed-size-mod-2^32.
 //
-static uint32_t Bytes_To_U32_BE(const REBYTE * const in)
+static uint32_t Bytes_To_U32_BE(const REBYTE *bp)
 {
-    return cast(uint32_t, in[0])
-        | cast(uint32_t, in[1] << 8)
-        | cast(uint32_t, in[2] << 16)
-        | cast(uint32_t, in[3] << 24);
+    return cast(uint32_t, bp[0])
+        | cast(uint32_t, bp[1] << 8)
+        | cast(uint32_t, bp[2] << 16)
+        | cast(uint32_t, bp[3] << 24);
 }
 
 
@@ -70,8 +70,8 @@ static uint32_t Bytes_To_U32_BE(const REBYTE * const in)
 // that and want to see if you could use a lighter build without it...)
 //
 static const int window_bits_zlib = MAX_WBITS;
-static const int window_bits_gzip = MAX_WBITS | 16; // "+ 16"
-static const int window_bits_detect_zlib_gzip = MAX_WBITS | 32; // "+ 32"
+static const int window_bits_gzip = MAX_WBITS | 16;  // "+ 16"
+static const int window_bits_detect_zlib_gzip = MAX_WBITS | 32;  // "+ 32"
 static const int window_bits_zlib_raw = -(MAX_WBITS);
 // "raw gzip" would be nonsense, e.g. `-(MAX_WBITS | 16)`
 
@@ -132,12 +132,12 @@ unsigned char *Compress_Alloc_Core(
     size_t *size_out,
     const void* input,
     size_t size_in,
-    REBSTR *envelope // NONE, ZLIB, or GZIP... null defaults GZIP
+    REBSTR *envelope  // NONE, ZLIB, or GZIP... null defaults GZIP
 ){
     z_stream strm;
-    strm.zalloc = &zalloc; // fail() cleans up automatically, see notes
+    strm.zalloc = &zalloc;  // fail() cleans up automatically, see notes
     strm.zfree = &zfree;
-    strm.opaque = nullptr; // passed to zalloc and zfree, not needed currently
+    strm.opaque = nullptr;  // passed to zalloc/zfree, not needed currently
 
     int window_bits = window_bits_gzip;
     if (not envelope) {
@@ -160,7 +160,7 @@ unsigned char *Compress_Alloc_Core(
         break;
 
       default:
-        assert(false); // release build keeps default
+        assert(false);  // release build keeps default
     }
 
     // compression level can be a value from 1 to 9, or Z_DEFAULT_COMPRESSION
@@ -206,7 +206,7 @@ unsigned char *Compress_Alloc_Core(
         uint32_t gzip_len = Bytes_To_U32_BE(
             output + strm.total_out - sizeof(uint32_t)
         );
-        assert(size_in == gzip_len); // !!! 64-bit REBLEN would need modulo
+        assert(size_in == gzip_len);  // !!! 64-bit REBLEN would need modulo
     }
   #endif
 
@@ -216,8 +216,8 @@ unsigned char *Compress_Alloc_Core(
     if (buf_size - strm.total_out > 1024)
         output = cast(REBYTE*, rebRealloc(output, strm.total_out));
 
-    deflateEnd(&strm);
-    return output; // done last (so strm variables can be read up to end)
+    deflateEnd(&strm);  // done last (so strm variables can be read up to end)
+    return output;
 }
 
 
@@ -232,12 +232,12 @@ unsigned char *Decompress_Alloc_Core(
     const void *input,
     size_t size_in,
     int max,
-    REBSTR *envelope // NONE, ZLIB, GZIP, or DETECT... null defaults GZIP
+    REBSTR *envelope  // NONE, ZLIB, GZIP, or DETECT... null defaults GZIP
 ){
     z_stream strm;
-    strm.zalloc = &zalloc; // fail() cleans up automatically, see notes
+    strm.zalloc = &zalloc;  // fail() cleans up automatically, see notes
     strm.zfree = &zfree;
-    strm.opaque = nullptr; // passed to zalloc and zfree, not needed currently
+    strm.opaque = nullptr;  // passed to zalloc/zfree, not needed currently
     strm.total_out = 0;
 
     strm.avail_in = size_in;
@@ -268,7 +268,7 @@ unsigned char *Decompress_Alloc_Core(
         break;
 
       default:
-        assert(false); // fall through with default in release build
+        assert(false);  // fall through with default in release build
     }
 
     int ret_init = inflateInit2(&strm, window_bits);
@@ -278,10 +278,10 @@ unsigned char *Decompress_Alloc_Core(
     REBLEN buf_size;
     if (
         envelope
-        and STR_SYMBOL(envelope) == SYM_GZIP // not DETECT...trust stored size
-        and size_in < 4161808 // (2^32 / 1032 + 18) ->1032 max deflate ratio
+        and STR_SYMBOL(envelope) == SYM_GZIP  // not DETECT, trust stored size
+        and size_in < 4161808  // (2^32 / 1032 + 18) ->1032 max deflate ratio
     ){
-        const REBSIZ gzip_min_overhead = 18; // at *least* 18 bytes
+        const REBSIZ gzip_min_overhead = 18;  // at *least* 18 bytes
         if (size_in < gzip_min_overhead)
             fail ("GZIP compressed size less than minimum for gzip format");
 
@@ -336,7 +336,7 @@ unsigned char *Decompress_Alloc_Core(
         int ret_inflate = inflate(&strm, Z_NO_FLUSH);
 
         if (ret_inflate == Z_STREAM_END)
-            break; // Finished. (and buffer was big enough)
+            break;  // Finished. (and buffer was big enough)
 
         if (ret_inflate != Z_OK)
             fail (Error_Compression(&strm, ret_inflate));
@@ -380,7 +380,7 @@ unsigned char *Decompress_Alloc_Core(
     if (size_out)
         *size_out = strm.total_out;
 
-    inflateEnd(&strm); // done last (so strm variables can be read up to end)
+    inflateEnd(&strm);  // done last (so strm variables can be read up to end)
     return output;
 }
 
@@ -456,4 +456,132 @@ REBNATIVE(checksum_core)
     TERM_BIN_LEN(bin, 4);
 
     return Init_Binary(D_OUT, bin);
+}
+
+
+//
+//  deflate: native [
+//
+//  "Compress data using DEFLATE: https://en.wikipedia.org/wiki/DEFLATE"
+//
+//      return: [binary!]
+//      data "If text, it will be UTF-8 encoded"
+//          [binary! text!]
+//      /part "Length of data (elements)"
+//          [any-value!]
+//      /envelope "ZLIB (adler32, no size) or GZIP (crc32, uncompressed size)"
+//          [word!]
+//  ]
+//
+REBNATIVE(deflate)
+{
+    INCLUDE_PARAMS_OF_DEFLATE;
+
+    REBLEN limit = Part_Len_May_Modify_Index(ARG(data), ARG(part));
+
+    REBSIZ size;
+    const REBYTE *bp = VAL_BYTES_LIMIT_AT(&size, ARG(data), limit);
+
+    REBSTR *envelope;
+    if (not REF(envelope))
+        envelope = Canon(SYM_NONE);  // Note: nullptr is gzip (for bootstrap)
+    else {
+        envelope = VAL_WORD_SPELLING(ARG(envelope));
+        switch (STR_SYMBOL(envelope)) {
+          case SYM_ZLIB:
+          case SYM_GZIP:
+            break;
+
+          default:
+            fail (PAR(envelope));
+        }
+    }
+
+    size_t compressed_size;
+    void *compressed = Compress_Alloc_Core(
+        &compressed_size,
+        bp,
+        size,
+        envelope
+    );
+
+    return rebRepossess(compressed, compressed_size);
+}
+
+
+//
+//  inflate: native [
+//
+//  "Decompresses DEFLATEd data: https://en.wikipedia.org/wiki/DEFLATE"
+//
+//      return: [binary!]
+//      data [binary! handle!]
+//      /part "Length of compressed data (must match end marker)"
+//          [any-value!]
+//      /max "Error out if result is larger than this"
+//          [integer!]
+//      /envelope "ZLIB, GZIP, or DETECT (http://stackoverflow.com/a/9213826)"
+//          [word!]
+//  ]
+//
+REBNATIVE(inflate)
+//
+// GZIP is a slight variant envelope which uses a CRC32 checksum.  For data
+// whose original size was < 2^32 bytes, the gzip envelope stored that size...
+// so memory efficiency is achieved even if max = -1.
+//
+// Note: That size guarantee exists for data compressed with rebGzipAlloc() or
+// adhering to the gzip standard.  However, archives created with the GNU
+// gzip tool make streams with possible trailing zeros or concatenations:
+//
+// http://stackoverflow.com/a/9213826
+{
+    INCLUDE_PARAMS_OF_INFLATE;
+
+    REBINT max;
+    if (REF(max)) {
+        max = Int32s(ARG(max), 1);
+        if (max < 0)
+            fail (PAR(max));
+    }
+    else
+        max = -1;
+
+    REBYTE *data;
+    REBSIZ size;
+    if (IS_BINARY(ARG(data))) {
+        data = VAL_BIN_AT(ARG(data));
+        size = Part_Len_May_Modify_Index(ARG(data), ARG(part));
+    }
+    else {
+        data = VAL_HANDLE_POINTER(REBYTE, ARG(data));
+        size = VAL_HANDLE_LEN(ARG(data));
+    }
+
+    REBSTR *envelope;
+    if (not REF(envelope))
+        envelope = Canon(SYM_NONE);  // Note: nullptr is gzip (for bootstrap)
+    else {
+        switch (VAL_WORD_SYM(ARG(envelope))) {
+          case SYM_ZLIB:
+          case SYM_GZIP:
+          case SYM_DETECT:
+            envelope = VAL_WORD_SPELLING(ARG(envelope));
+            break;
+
+          default:
+            fail (PAR(envelope));
+        }
+    }
+
+    size_t decompressed_size;
+    void *decompressed = Decompress_Alloc_Core(
+        &decompressed_size,
+        data,
+        size,
+        max,
+        envelope
+    );
+
+    return rebRepossess(decompressed, decompressed_size);
 }
