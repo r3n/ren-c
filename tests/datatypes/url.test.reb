@@ -32,3 +32,31 @@
         (as text! first b) = "http://example.com/abc{def}"
     ]
 )
+
+[#2380 (
+    url: decode-url http://example.com/get?q=ščř#kovtička
+    did all [
+        url/scheme == lit 'http  ; Note: DECODE-URL returns BLOCK! with 'http 
+        url/host == "example.com"
+        url/path == "/get?q=ščř"
+        url/tag == "kovtička"
+    ]
+)(
+    url: decode-url http://švéd:břéťa@example.com:8080/get?q=ščř#kovtička
+    did all [
+        url/scheme == lit 'http
+        url/user == "švéd"
+        url/pass == "břéťa"
+        url/host == "example.com"
+        url/port-id == 8080
+        url/path == "/get?q=ščř"
+        url/tag == "kovtička"
+    ]
+)(
+    url: decode-url http://host?query
+    did all [
+        url/scheme == lit 'http
+        url/host == "host"
+        url/path == "?query"
+    ]
+)]
