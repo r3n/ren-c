@@ -790,7 +790,7 @@ void Mold_Uni_Char(REB_MOLD *mo, REBUNI c, bool parened)
             EXPAND_SERIES_TAIL(SER(buf), 7);  // worst case: ^(1234)
             TERM_STR_LEN_SIZE(buf, len_old, size_old);
 
-            Append_Ascii(buf, "^\"");
+            Append_Ascii(buf, "^(");
 
             REBYTE *bp = BIN_TAIL(SER(buf));
             REBYTE *ep = Form_Uni_Hex(bp, c); // !!! Make a mold...

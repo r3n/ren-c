@@ -170,3 +170,11 @@
 [#207
     ('illegal-zero-byte = (trap [to text! to char! 0])/id)
 ]
+
+[#2280 (  ; Byte-Order-Mark ("BOM") deprecated in UTF-8, don't hide it
+    t: to text! #{EFBBBFC3A4C3B6C3BC}
+    did all [
+        t = "^(FEFF)äöü"
+        4 = length of t
+    ]
+)]
