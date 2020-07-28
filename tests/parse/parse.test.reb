@@ -215,6 +215,10 @@
 [#1457
     (not parse "ba" compose [to (charset "a") "ba" end])
 ]
+[#2141 (
+    xset: charset "x"
+    did parse "x" [thru [xset] end]
+)]
 
 ; self-modifying rule, not legal in Ren-C if it's during the parse
 

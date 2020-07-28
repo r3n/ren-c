@@ -900,12 +900,17 @@ static REBIXO To_Thru_Block_Rule(
                 assert(ANY_STRING_KIND(P_TYPE));
 
                 REBUNI ch_unadjusted = GET_CHAR_AT(STR(P_INPUT), pos);
-                REBUNI ch;
                 if (ch_unadjusted == '\0') { // cannot be passed to UP_CASE()
-                    assert(pos == SER_LEN(P_INPUT));  // match END above or ""
-                    ch = '\0';  // !!! allows match with TO CHAR! 0 (good?)
+                    assert(pos == SER_LEN(P_INPUT));
+
+                    if (IS_TEXT(rule) and VAL_LEN_AT(rule) == 0)
+                        return pos;  // empty string can match at end
+
+                    goto next_alternate_rule;  // other match is END (above)
                 }
-                else if (!P_HAS_CASE)
+
+                REBUNI ch;
+                if (!P_HAS_CASE)
                     ch = UP_CASE(ch_unadjusted);
                 else
                     ch = ch_unadjusted;
@@ -913,7 +918,7 @@ static REBIXO To_Thru_Block_Rule(
                 if (IS_CHAR(rule)) {
                     REBUNI ch2 = VAL_CHAR(rule);
                     if (ch2 == 0)
-                        return END_FLAG;  // cannot find 0 char in ANY-STRING!
+                        goto next_alternate_rule;  // no 0 char in ANY-STRING!
 
                     if (!P_HAS_CASE)
                         ch2 = UP_CASE(ch2);
@@ -924,7 +929,7 @@ static REBIXO To_Thru_Block_Rule(
                     }
                 }
                 else if (IS_BITSET(rule)) {
-                    if (Check_Bit(VAL_SERIES(rule), ch, not P_HAS_CASE)) {
+                    if (Check_Bit(VAL_BITSET(rule), ch, not P_HAS_CASE)) {
                         if (is_thru)
                             return pos + 1;
                         return pos;
