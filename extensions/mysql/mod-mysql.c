@@ -172,43 +172,6 @@ REBNATIVE(mysql_get_client_info)
 }
 
 //
-//  export mysql-get-client-version: native [
-//    
-//      {Returns an integer that represents the MySQL client library version.}
-//
-//      return: [integer!]
-//  ]
-//
-REBNATIVE(mysql_get_client_version)
-{
-    MYSQL_INCLUDE_PARAMS_OF_MYSQL_GET_CLIENT_VERSION;
-
-    int *result = mysql_get_client_version();
-
-    return rebInteger(result);
-}
-
-//
-//  export mysql-get-host-info: native [
-//    
-//      "Returns a string describing the type of connection in use, including the server host name."
-//
-//      return: [text!]
-//      connection [handle!]
-//  ]
-//
-REBNATIVE(mysql_get_host_info)
-{
-    MYSQL_INCLUDE_PARAMS_OF_MYSQL_GET_HOST_INFO;
-
-    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
-
-    const char *result = mysql_get_host_info(connection);
-
-    return rebText(result);
-}
-
-//
 //  export mysql-get-server-info: native [
 //    
 //      {Returns a string that represents the MySQL server version (for example, "5.7.32").}
@@ -229,21 +192,21 @@ REBNATIVE(mysql_get_server_info)
 }
 
 //
-//  export mysql-get-server-version: native [
+//  export mysql-get-host-info: native [
 //    
-//      {Returns an integer that represents the MySQL server version.}
+//      {Returns a string describing the type of connection in use, including the server host name.} 
 //
-//      return: [integer!]
+//      return: [text!]
 //      connection [handle!]
 //  ]
 //
 REBNATIVE(mysql_get_host_info)
 {
-    MYSQL_INCLUDE_PARAMS_OF_MYSQL_GET_SERVER_VERSION;
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_GET_HOST_INFO;
 
     MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
 
-    unsigned int *result = mysql_get_host_info(connection);
+    const char *result = mysql_get_host_info(connection);
 
-    return rebInteger(result);
+    return rebText(result);
 }
