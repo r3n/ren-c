@@ -256,7 +256,9 @@ DEVICE_CMD Write_IO(REBREQ *io)
         // answer for C89 builds on arbitrarily limited platforms, vs.
         // catering to it here.
         //
-        assert(Redir_Inp or Redir_Out);
+      #if defined(REBOL_SMART_CONSOLE)
+        assert(Redir_Inp or Redir_Out);  // should have used smarts otherwise
+      #endif
 
         if (req->modes & RFM_TEXT) {
             //
@@ -326,20 +328,44 @@ DEVICE_CMD Read_IO(REBREQ *io)
         return DR_DONE;
     }
 
-    // While Windows historically uses UCS-2/UTF-16 in its console I/O, the
-    // plain ReadFile() style calls are byte-oriented, so you get whatever
-    // code page is in use.
+    // !!! While Windows historically uses UCS-2/UTF-16 in its console I/O,
+    // the plain ReadFile() style calls are byte-oriented, so you get whatever
+    // code page is in use.  This is good for UTF-8 files, but would need
+    // some kind of conversion to get better than ASCII on systems without
+    // the REBOL_SMART_CONSOLE setting.
 
+    DWORD bytes_to_read = req->length;
+
+  try_smaller_read: ;  // semicolon since next line is declaration
     DWORD total;
     BOOL ok = ReadFile(
         Stdin_Handle,
         BIN_HEAD(bin),
-        req->length,
+        bytes_to_read,
         &total,
         0
     );
-    if (not ok)
+    if (not ok) {
+        DWORD error_code = GetLastError();
+        if (error_code == ERROR_NOT_ENOUGH_MEMORY) {
+            //
+            // When you call ReadFile() instead of ReadConsole() on a standard
+            // input handle that's attached to a console, some versions of
+            // Windows (notably Windows 7) can return this error when the
+            // length of the read request is too large.  How large is unknown.
+            //
+            // https://github.com/golang/go/issues/13697
+            //
+            // To address this, we back the size off and try again a few
+            // times before actually raising an error.
+            //
+            if (bytes_to_read > 10 * 1024) {
+                bytes_to_read -= 1024;
+                goto try_smaller_read;
+            }
+        }
         rebFail_OS (GetLastError());
+    }
 
     TERM_BIN_LEN(bin, total);
     return DR_DONE;

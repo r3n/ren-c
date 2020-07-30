@@ -29,3 +29,9 @@
     https://github.com/metaeducation/ren-c/issues/1005
     ("ò" = reword "ò$a" reduce ['a ""])
 ]
+
+[#2333 (
+    subs: ["1" "foo" "10" "bar"]
+    text: "$<10>"
+    "bar" = reword/escape text subs ["$<" ">"]
+)]

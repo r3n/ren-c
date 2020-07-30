@@ -56,7 +56,7 @@
     :a-value == a-value
 )
 (
-    a-value: #"^@"
+    a-value: NUL
     :a-value == a-value
 )
 (
@@ -149,7 +149,7 @@
     same? :a-value a-value
 )
 (
-    undefine 'a-value
+    a-value: void
     e: trap [a-value]
     e/id = 'need-non-void
 )

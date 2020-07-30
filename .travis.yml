@@ -138,7 +138,7 @@ matrix:
       # https://github.com/hostilefork/replpad-js
       #
       os: linux
-      dist: bionic  # Trying instead of xenial to check Firefox Marionette
+      dist: bionic  # Marionette has JSON problem on Xenial's Python 3.5
       language: c
       env:
         - NUMBER=1
@@ -157,6 +157,9 @@ matrix:
         apt:
           packages:
             - net-tools  # for netstat/etc. diagnosing network issues
+            - python3  # used for "headless" web testing
+            - python3-pip  # installs marionette driver
+            - python3-setuptools  # also needed (for whatever reason)
 
     - name: "[2] WebAssembly no pthreads, release"
       #
@@ -171,7 +174,7 @@ matrix:
       # This build varation is created as a fallback.
       #
       os: linux
-      dist: xenial  # Travis recommended distribution as of Mar-2020
+      dist: bionic  # Marionette has JSON problem on Xenial's Python 3.5
       language: c
       env:
         - NUMBER=2
@@ -190,6 +193,9 @@ matrix:
         apt:
           packages:
             - net-tools  # for netstat/etc. diagnosing network issues
+            - python3  # used for "headless" web testing
+            - python3-pip  # installs marionette driver
+            - python3-setuptools  # also needed (for whatever reason)
 
     - name: "[3] OSX x64, debug, clang++"
       #
@@ -410,7 +416,7 @@ matrix:
         - OS_ID=0.3.1
         - DEBUG=none
         - CROSS_PREFIX=i686-w64-mingw32-  # trailing hyphen is intentional
-        - STANDARD=c
+        - STANDARD=gnu89  # no smart terminal features in C89 build, test that
         - RIGOROUS=yes
         - STATIC=yes
         - TCC=i386-win32-tcc
@@ -418,7 +424,7 @@ matrix:
         - ARCH_CFLAGS=-m32
         - WITH_FFI=no  # was "dynamic"
         - ODBC_REQUIRES_LTDL=no
-        - EXTENSIONS="ODBC + Clipboard + TCC +"
+        - EXTENSIONS="Clipboard + TCC +"  # note ODBC requires C99
       addons:
         apt:
           packages:
@@ -441,7 +447,7 @@ matrix:
         - OS_ID=0.3.40
         - DEBUG=asserts
         - CROSS_PREFIX=x86_64-w64-mingw32-  # trailing hyphen is intentional
-        - STANDARD=c
+        - STANDARD=c99  # should have smart terminal featuers in C99 build
         - RIGOROUS=yes
         - STATIC=yes
         - TCC=x86_64-win32-tcc
@@ -549,818 +555,437 @@ matrix:
 # default tools that will be installed.  But you can add custom steps:
 #
 # https://docs.travis-ci.com/user/customizing-the-build#Customizing-the-Installation-Step
-#
-# In our case, we'd like to fetch a Rebol binary to use as the "r3-make".
-# Its job is to process C and Rebol sources to automatically generate some
-# header files and embedded Rebol code bundles used in bootstrap, as well as
-# to generate makefiles.
-#
-# !!! Originally, the Rebol that was fetched was the last r3-alpha that was
-# published on rebol.com, to ensure that it could still be used for bootstrap.
-# Conversion of the build in mid-2017 to using %rebmake.r meant that only a
-# semi-recent Ren-C could be used to run the build prep steps.  There will not
-# be an attempt to go back to building with R3-Alpha, though a more purposeful
-# stable build should be picked at some point to replace the ad-hoc choice
-# which wound up in the make dir.  The shim which is required to upgrade that
-# older Ren-C is now rather "thick", and slows the build down significantly.
-#
+
 install:
-  - export PREBUILT="$(pwd)/prebuilt"  # see README.md in %prebuilt/ directory
 
-  # If we do two builds, we use the bootstrap executable for the first and the
-  # resulting Rebol from that build to do the second.  To keep from making
-  # mistakes and accidentally using the wrong r3-make, the executables are
-  # named `r3-one` and `r3-two`.  (If we only do one build, then r3-one will
-  # just get renamed to r3-two.)
-  - |
-    if [[ $TRAVIS_OS_NAME = linux ]]; then
-      wget -O "${PREBUILT}/r3-one" https://s3.amazonaws.com/r3bootstraps/r3-linux-x64-8994d23
-    elif [[ $TRAVIS_OS_NAME = osx ]]; then
-      #
-      # Brew was being installed even on minimal release builds, making it
-      # unnoticed that there was a .dylib dependency from the bootstrap
-      # release executable on ZeroMQ and ODBC.  This old debug build was
-      # captured at the same version number as the bootstrap executables.
-      # Use it for now until the next capture for the old OS X.
-      #
-      wget -O "${PREBUILT}/r3-one" https://s3.amazonaws.com/r3bootstraps/r3-osx-x64-8994d23-debug
-    else
-      echo "!!! Unknown Travis Platform !!!"
-      exit 1
-    fi
+# The install step is performed in build.sh
 
-  - chmod +x "${PREBUILT}/r3-one"  # make bootstrap Rebol tool executable
+script:
+  - . build.sh
 
-  - PATH="${PREBUILT}":$PATH  # so we can just say `r3-one` or `r3-two`
+  - TOP_DIR=$(pwd)
+  - cd build
 
-  # Install "Homebrew" package manager.  The Travis OS X images have brew
-  # preinstalled, but get old and out of sync with the package database.
-  # This means brew has to update.  It's supposed to do this automatically,
-  # but circa 2017 it broke in some images due to the lack of a sufficiently
-  # up-to-date Ruby:
+## TEST ##
+
+  # Run once but don't pipe output, in case it prints out useful crash msg
+  # that we want to see in the Travis log (especially helpful for failures
+  # only happening in the Travis builds that aren't reproducing locally)
+  # Save the exit code ($?) so we can return it to Travis as last step
   #
-  # https://github.com/travis-ci/travis-ci/issues/8552
+  # !!! This is a very minimal sanity check to ensure the built R3 does
+  # *something*, and it can't be used on cross-compilations (e.g. a Windows
+  # executable won't run on Linux).  Running the full test suite would be a
+  # bit much, and developers are expected to have already done that.  But
+  # doing an HTTPS read exercises a fair amount of code.
+  #
   - |
-    if [[ $TRAVIS_OS_NAME = osx && $BREW = yes ]]; then
-      #
-      # But even if brew can update automatically, it generates an unsightly
-      # amount of output if it does so during a `brew install`.  So redirect
-      # the hundreds of lines to /dev/null to shorten the Travis log.
-      #
-      # https://github.com/Homebrew/legacy-homebrew/issues/35662
-      #
-      brew update > /dev/null
+    if [[ $OS_ID = 0.4.40 || $OS_ID = 0.4.4 || $OS_ID = 0.2.40 ]]; then
+        $RUNNER ./r3 --do "print {Testing...} quit either find to-text read https://example.com {<h1>Example Domain</h1>} [0] [1]"
+        R3_EXIT_STATUS=$?
+    else
+        R3_EXIT_STATUS=0
+    fi
+    echo "$R3_EXIT_STATUS"
 
-      brew install unixodbc  # for ODBC extension
-      brew install zmq  # for ZeroMQ extension
+  # Run basic testing on FFI if it is included and this container can run it
+  - |
+    if [[ -z $WITH_FFI || $WITH_FFI != no ]]; then
+      if [[ $OS_ID = 0.4.40 || $OS_ID = 0.4.4 ]]; then
+        $RUNNER ./r3 ../tests/misc/qsort_r.r
+        R3_EXIT_STATUS=$?
+      else
+        R3_EXIT_STATUS=0
+      fi
+    else
+        R3_EXIT_STATUS=0
+    fi
+    echo "$R3_EXIT_STATUS"
+
+  # If the build is TCC-based and the host can run the produced executable,
+  # do a simple test that does a TCC fibonnaci calculation.
+
+  # The TCC extension currently looks at the environment variable
+  # LIBREBOL_INCLUDE_DIR to find "rebol.h".  Ultimately, this should be
+  # shipped with the TCC extension.  (It may be desirable to embed it,
+  # but it also may be desirable to have a copy that a file can find
+  # via `#include "rebol.h"`)
+  #
+  # (export is so that the child process can see the environment variable)
+  #
+  - |
+    echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR}"
+    export LIBREBOL_INCLUDE_DIR="${TOP_DIR}/build/prep/include"
+    if [[ (! -z $TCC) && ($TCC != no) ]]; then
+      if [[ $OS_ID = 0.4.40 ]]; then
+        $RUNNER ./r3 ../extensions/tcc/tests/fib.r
+        R3_EXIT_STATUS=$?
+      elif [[ $OS_ID = 0.4.4 ]]; then
+        #
+        # Most 32-bit builds are intending to run on 32-bit systems, hence
+        # the running TCC should link to libs in `/usr/lib`.  But this
+        # container is 64-bit (Travis does not support 32-bit containers,
+        # nor do they seem to intend to).  The tcc extension heeds this
+        # environment variable and uses hardcoded output of `gcc -v m32`
+        # for library directories to override `/usr/lib` with.
+        #
+        export REBOL_TCC_EXTENSION_32BIT_ON_64BIT=1
+        $RUNNER ./r3 ../extensions/tcc/tests/fib.r
+        R3_EXIT_STATUS=$?
+      fi
+    else
+        R3_EXIT_STATUS=0
+    fi
+    echo $R3_EXIT_STATUS
+    if [[ $R3_EXIT_STATUS != 0 ]]; then
+      exit $R3_EXIT_STATUS
     fi
 
-  - |
-    if [[ $OS_ID = 0.16.1 || $OS_ID = 0.16.2 ]]; then
-      git clone --depth 1 https://github.com/emscripten-core/emsdk
-      cd emsdk
-      ./emsdk update-tags  # no `emsdk update` on git clone, use git pull
+## DEPLOY STEP ##
 
-      # We use the latest incoming branch of emscripten (`tot-upstream`), not
-      # the latest upstream release (`latest-upstream`) or the latest stable
-      # release (`latest`).  While this is a more volatile choice, it helps
-      # find out about potential problems faster...and make use of patches
-      # that are applied to address our issues as soon as they are available.
-      #
-      ./emsdk install tot-upstream
-      ./emsdk activate tot-upstream
-
-      source emsdk_env.sh  # `source` => "inherit the environment variables"
-      cd ..
-    fi
-
-    # Check for Python install utility ("PIP").  This is required to get the
-    # Amazon Web Services command-line tool.  We only use the most basic
-    # installation feature, so any version of pip should suffice.
+  # Check for Python install utility ("PIP").  This is required to get the
+  # Amazon Web Services command-line tool.  We only use the most basic
+  # installation feature, so any version of pip should suffice.
   - |
     if ( pip3 --version ); then
-      PIP=pip3
+            PIP=pip3
     elif ( pip2 --version ); then
-      PIP=pip2
+            PIP=pip2
     elif ( pip --version ); then
-      PIP=pip
+            PIP=pip
     else
-      echo "!!! NO VERSION OF PYTHON INSTALLER (PIP) FOUND !!!"
-      exit 1
+            echo "!!! NO VERSION OF PYTHON INSTALLER (PIP) FOUND !!!"
+            exit 1
     fi
     echo "PIP=$PIP"
 
-    # Install the AWS command-line tool for uploading to s3 (which we use
-    # instead of Travis's `deploy`)
+  # Install the AWS command-line tool for uploading to s3 (which we use
+  # instead of Travis's `deploy`)
   - |
     if ( $PIP install awscli --upgrade --user ); then
-        echo "AWS installed"
+                    echo "AWS installed"
     else
-        echo "!!! AWS not installed !!!"
-        exit 1
+                    echo "!!! AWS not installed !!!"
+                    exit 1
     fi
     if ( aws --version ); then
-      AWS=aws  # it was in the path
+            AWS=aws  # it was in the path
     else
-      AWS="$(find /Users/travis/Library/Python/ -name aws)"  # look for it
-      if ( ! $AWS --version ); then
-        echo "!!! AMAZON WEB SERVICE UPLOAD TOOL (AWS) NOT FOUND !!!"
-        exit 1
-      fi
+            AWS="$(find /Users/travis/Library/Python/ -name aws)"  # look for it
+            if ( ! $AWS --version ); then
+                    echo "!!! AMAZON WEB SERVICE UPLOAD TOOL (AWS) NOT FOUND !!!"
+                    exit 1
+            fi
     fi
     echo "AWS=$AWS"
 
-script:
-      # whatever home directory Travis put us in, build there
-    - |
-      TOP_DIR="$(pwd)"  # https://stackoverflow.com/a/10795195/
+  # !!! This used to delete things because otherwise they would be uploaded
+  # to s3 along with the whole build directory.  It doesn't really matter
+  # now, because we are specific about what we upload using the aws tool.
+  # It still might be desirable to delete things...
+  #
+  - rm -rf objs
+  - rm -f makefile*
+  - rm -f Toolchain*
+  - rm -f r3-make*  # `-f` for success even when r3-make* doesn't exist
 
-    - |
-      "${CROSS_PREFIX}gcc" --version  # Output version of gcc for the log
+  # !!! When we *needed* to delete things, we would `- rm -rf tcc` and
+  # `-rm -rf prep` here.  But we don't right now, because we wait until the
+  # end (below) to zip together `rebol.h` and the TCC runtime files that the
+  # caller will need.  This is a temporary solution, and is evolving.
 
-    # Ask for as many parallel builds as the virtual host supports
-    - |
-      if [[ $TRAVIS_OS_NAME = linux ]]; then
-        export MAKE_JOBS="$(nproc)"
-      fi
-      if [[ $TRAVIS_OS_NAME = osx ]]; then
-        export MAKE_JOBS="$(sysctl -n hw.ncpu)"
-      fi
+  # check what is left in the build directory...
+  - ls
 
-    # Native Development Kit (NDK) is for C/C++ cross-compilation to Android.
-    # https://developer.android.com/ndk
-    # @giuliolunati is the maintainer and active user of the Android build.
-    - |
-      if [[ $OS_ID = 0.13.2 ]]; then
-          if [[ $(uname -m) = x86_64 ]]; then
-              wget https://github.com/giuliolunati/android-travis/releases/download/v1.0.0/android-ndk-r13.tgz
-              export ANDROID_NDK="${TOP_DIR}/android-ndk-r13"
-          else
-              exit 1
-          fi
-          tar zxf android-ndk-r13.tgz
-          echo "$(pwd)"
-          ls -dl "$(pwd)/android-ndk-r13"
-          export CROSS_PREFIX="${ANDROID_NDK}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-"
-          export SYSROOT="${ANDROID_NDK}/platforms/android-19/arch-arm"
-      fi
+  # Name the executable based on the abbreviated commit, whether it is a
+  # debug or release build, and if it was built using C++ or not.  Note that
+  # the C++ debug builds have additional runtime checks in the debug
+  # build...though there should not be any impact on the release build.
+  # (Though there may be additional DLL dependencies regardless.)
+  #
+  # !!! All Ren-C stakeholders should be using debug builds at this time.  
+  #
+  # Note: -z tests if a variable is undefined
+  #
+  - NEW_NAME="r3"; NEW_NAME_WITH_COMMIT="r3-${GIT_COMMIT_SHORT}"
+  - |
+    if [[ $DEBUG != none ]]; then
+        NEW_NAME+='-debug'
+        NEW_NAME_WITH_COMMIT+='-debug'
+    fi
+  - |
+    if [[ $STANDARD = c++ || $STANDARD = c++0x || $STANDARD = c++11 || $STANDARD = c++14 || $STANDARD = c++17 ]]; then
+        NEW_NAME+='-cpp'
+        NEW_NAME_WITH_COMMIT+='-cpp'
+    fi
+  - echo NEW_NAME="$NEW_NAME"
+  - echo NEW_NAME_WITH_COMMIT="$NEW_NAME_WITH_COMMIT"
 
-    # @ShixinZeng added pre-built FFI libraries that are compatible with the
-    # MinGW cross-compiler and committed them to the git repository, because
-    # that was apparently easier/faster than trying to build it here
-    #
-    # !!! Review making this use the package manager's libffi if possible
-    - |
-      if [[ $OS_ID = 0.3.40 || $OS_ID = 0.3.1 ]]; then  # Win32/Win64
-          if [[ $OS_ID = 0.3.40 ]]; then
-              export PKG_CONFIG_PATH="${TOP_DIR}/extensions/ffi/ffi-prebuilt/lib64/pkgconfig"
-          else
-              export PKG_CONFIG_PATH="${TOP_DIR}/extensions/ffi/ffi-prebuilt/lib32/pkgconfig"
-          fi
+  # Move the executable into a directory based on its OS_ID platform.
+  # This is because the deploy step is run for each OS and would
+  # otherwise overwrite executables in the same location.
+  #
+  # Note: [[-e]] tests for "existence"
+  #
+  - mkdir "$OS_ID"
+  - |
+    # Windows builds end in .exe
+    if [[ -e r3.exe ]]; then
+        cp r3.exe "${OS_ID}/${NEW_NAME_WITH_COMMIT}.exe"
+        mv r3.exe "${OS_ID}/${NEW_NAME}.exe"
+    fi
 
-          # Check cflags and libs
-          # ("--define-prefix would be better, but it is not recognized")
-          #
-          pkg-config --define-variable="prefix=\"${TOP_DIR}/extensions/ffi/ffi-prebuilt\"" --cflags libffi
-          pkg-config --define-variable="prefix=\"${TOP_DIR}/extensions/ffi/ffi-prebuilt\"" --libs libffi
-      fi
+    # Most other platforms have no suffix
+    if [[ -e r3 ]]; then
+        cp r3 "${OS_ID}/${NEW_NAME_WITH_COMMIT}"
+        mv r3 "${OS_ID}/${NEW_NAME}"
+    fi
 
-    # Linux needs to build FFI if it is cross-compiling to 32-bit.  It's not
-    # clear why it wouldn't use the `sudo apt get` FFI packages of the distro
-    # on 64-bit (other than to use a consistent version committed in the repo)
-    - |
-      if [[ -z $WITH_FFI || $WITH_FFI != no ]]; then
-          mkdir ffi-build
-          cd external/libffi
-          ./autogen.sh
-          cd "${TOP_DIR}/ffi-build"
-          if [[ -z $HOST ]]; then
-              "${TOP_DIR}/external/libffi/configure" --prefix="$(pwd)/fakeroot" CFLAGS="$ARCH_CFLAGS"
-          else #cross-compiling
-              "${TOP_DIR}/external/libffi/configure" --prefix="$(pwd)/fakeroot" --host="$HOST"
-          fi
-          make -j "$MAKE_JOBS"
-          make install
-          export PKG_CONFIG_PATH="$(pwd)/fakeroot/lib/pkgconfig"
-          # check cflags and libs
-          pkg-config --cflags libffi
-          pkg-config --libs libffi
+    # All emscripten builds produce .js and .wasm
+    if [[ -e libr3.js ]]; then
+         cp libr3.js "${OS_ID}/lib${NEW_NAME_WITH_COMMIT}.js"
+         mv libr3.js "${OS_ID}/lib${NEW_NAME}.js"
+    fi
+    if [[ -e libr3.wasm ]]; then
+         cp libr3.wasm "${OS_ID}/lib${NEW_NAME_WITH_COMMIT}.wasm"
+         mv libr3.wasm "${OS_ID}/lib${NEW_NAME}.wasm"
+    fi
 
-          ls "$(pkg-config --variable=toolexeclibdir libffi)"
+    # Only pthreads builds produce .js.mem and .worker.js
+    if [[ -e libr3.js.mem ]]; then
+         cp libr3.js.mem "${OS_ID}/lib${NEW_NAME_WITH_COMMIT}.js.mem"
+         mv libr3.js.mem "${OS_ID}/lib${NEW_NAME}.js.mem"
+    fi
+    if [[ -e libr3.worker.js ]]; then
+         cp libr3.worker.js "${OS_ID}/lib${NEW_NAME_WITH_COMMIT}.worker.js"
+         mv libr3.worker.js "${OS_ID}/lib${NEW_NAME}.worker.js"
+    fi
 
-          #remove dynamic libraries to force it to link with static libraries
-          rm -f "$(pkg-config --variable=toolexeclibdir libffi)/*.so*"
-          rm -f "$(pkg-config --variable=toolexeclibdir libffi)/*.dylib*"
-          rm -f "$(pkg-config --variable=toolexeclibdir libffi)/*.dll*"
-          
-          ls "$(pkg-config --variable=toolexeclibdir libffi)"
+  # Ultimately we'd like extensions to have an easy standard way to encap
+  # resources that they use, and the TCC extension could pack up %rebol.h
+  # and %libtcc1.a, as well as other support files it needs right into the
+  # executable in a zip format.  But for now, we just make a zip file and
+  # those who want to use TCC compilation have to unpack that zip manually.
+  #
+  # Note: The script prints out a list of the files it stores.  If you unzip
+  # it you should be able to use the containing directory as both the
+  # CONFIG_TCCDIR and the LIBREBOL_INCLUDE_DIR path.
+  #
+  # !!! It should be able to be done with r3-make, but uses features of file
+  # paths and zip compression that are only available in newer builds.
+  # Temporarily grab a special build for this purpose.
+  #
+  - |
+    if [[ ! -z $TCC ]]; then
+      #
+      # Temporary solution on top of temporary solution (should be on s3,
+      # but can't upload there at the moment)
+      #
+      wget http://hostilefork.com/media/shared/prebuilt/r3-encap
+      chmod +x ./r3-encap
+      ./r3-encap "${TOP_DIR}/extensions/tcc/encap-tcc-resources.reb" OS_ID="${OS_ID}"
+      mv tcc-encap.zip "${OS_ID}/${NEW_NAME_WITH_COMMIT}-tcc-encap.zip"
+    fi
 
-          echo "FFI builds are erroring for now, above command fails"
-          echo "Revisit when time permits - not currently being used"
-      fi
+  # Web Browsers are picky about the MIME type of WebAssembly files.  If
+  # it's not `application/wasm` then it complains.  The `deploy` upload
+  # mechanic in Travis has no way to specify this property, so we use the
+  # command-line `aws` tool to do the upload of the .wasm file.
+  #
+  # We also want to control the *order* in which files are uploaded, which
+  # Travis's deploy does not support.  For how the keys are kept secure
+  # despite publishing this upload script, see:
+  #
+  # http://stackoverflow.com/a/42547424/211160
+  #
+  # NOTE: This is only one Travis "step" because the `upload` function is
+  # not shared across steps.  That's not necessarily a great reason to
+  # do it this way; we'd prefer more of this to be done with Rebol scripts.
+  #
+  - |
+    if [[ ${R3_EXIT_STATUS} != 0 ]]; then
+      exit 0  # don't try to upload any files if the tests didn't work
+    fi
 
-    - mkdir "${TOP_DIR}/build"
-    - cd "${TOP_DIR}/build"
+    if [[ ${TRAVIS_REPO_SLUG} != "metaeducation/ren-c" ]]; then
+      exit 0  # secret AWS credentials to upload are only for metaeducation
+    fi
 
-    # For building the TCC extension, it requires both the TCC library (API
-    # you can link in to pass a string of code and compile it), as well as
-    # runtime support for that code once compiled.  See TCC extension README.
-    #
-    # While Fabrice Bellard is not involved in TCC development any longer,
-    # others are maintaining it.  Modifications have been proposed which would
-    # make the "Standalone Building" feature for Rebol better:
-    #
-    # http://lists.nongnu.org/archive/html/tinycc-devel/2018-12/msg00011.html
-    #
-    # But given priorities, there are not enough Rebol dev resources to
-    # develop and maintain a separate fork of TCC for that.
-    #
-    - |
-      if [[ ! -z $TCC ]]; then
-          if [[ 0 = 1 ]]; then
-              #
-              # !!! What's a better representation for literal false in bash?
-              #
-              # !!! was if [[ $OS_ID == 0.4.40 ]], but the old trusty doesn't
-              # have working variadics in its stock libtcc)
-              #
-              # ---
-              #
-              # Just use the tcc and libtcc installed by the package manager
-              # (in the matrix settings above).  That's because the platform
-              # the TCC inside Rebol will be compiling for after installation
-              # on the user's machine is identical to the Travis container
-              # doing the compilation.
-              #
-              # This directory may vary, find with `dpkg -L tcc`
-              #
-              # (export is so that if we run r3 to test tcc, it can see it)
-              #
-              export CONFIG_TCCDIR=/usr/lib/tcc  # no slash!
-          else
-              # If cross-compiling, we can't merely `sudo apt-get` the libtcc
-              # and resources we need...have to build it from scratch.
+    if [[ ${TRAVIS_BRANCH} != "master" || ${TRAVIS_PULL_REQUEST} != "false" ]]; then
+      exit 0  # only direct pushes of master branch considered for upload
+    fi
 
-              # By using `--depth=1` this gets the publicly updated *latest
-              # commit only* (don't bother cloning the entire history)
-              #
-              git clone --depth=1 git://repo.or.cz/tinycc.git tcc
-
-              # TCC has an %include/ directory at the top level of the build
-              # (for the unix-style files) and tends to generate libtcc1.a in
-              # the top-level directory also.  But if you're using Win32, you
-              # want to set CONFIG_TCCDIR to the %win32/ subdir, which
-              # contains a different %include/ as well as a %lib/ dir.
-              #
-              # (export is so that if we run r3 to test tcc, it can see it)
-              cd tcc
-              export CONFIG_TCCDIR="$(pwd)"
-
-              # If you want a "tcc.exe" cross compiler, you could use
-              # `./configure --enable-cross` and then `make`.  However, a TCC
-              # executable is no longer needed to build the TCC extension.
-
-              echo "Generating libtcc.a (provides the libtcc compilation API)"
-
-              # libtcc.a requires --config-mingw32, or it doesn't think it's a
-              # native compiler and disables functions in tccrun.c (including
-              # the important `tcc_relocate()`
-              #
-              # !!! If the 64-bit tries to use `--config-mingw64`, then it
-              # also doesn't define `TCC_IS_NATIVE` on windows, because it
-              # seems `TCC_TARGET_PE` (Program Executable, e.g. Windows) is
-              # only set by `--config-mingw32`.  Review.
-
-              if [[ $OS_ID = 0.4.40 ]]; then
-                  ./configure --cpu=x86_64 --enable-static --extra-cflags="$ARCH_CFLAGS" --extra-ldflags="$ARCH_CFLAGS"
-              elif [[ $OS_ID = 0.4.4 ]]; then
-                  ./configure --cpu=x86 --enable-static --extra-cflags="$ARCH_CFLAGS" --extra-ldflags="$ARCH_CFLAGS"
-              elif [[ $OS_ID = 0.3.1 ]]; then  #x86-win32
-                  ./configure --config-mingw32 --cpu=x86 --enable-static --extra-cflags="$ARCH_CFLAGS" --cross-prefix="$CROSS_PREFIX" --extra-ldflags="$ARCH_CFLAGS"
-              elif [[ $OS_ID = 0.13.2 ]]; then  #arm-android5
-                  ./configure --cpu=arm --enable-static --extra-cflags="$ARCH_CFLAGS --sysroot=\"$SYSROOT\"" --cross-prefix="$CROSS_PREFIX" --extra-ldflags="$ARCH_CFLAGS --sysroot=\"$SYSROOT\""
-              else  #x86_64-win32, see note that --config-mingw32 vs. --config-mingw64 is intentional
-                  ./configure --config-mingw32 --cpu=x86_64 --enable-static --extra-cflags="$ARCH_CFLAGS" --cross-prefix="$CROSS_PREFIX" --extra-ldflags="$ARCH_CFLAGS"
-              fi
-              make libtcc.a && cp libtcc.a libtcc.a.bak
-
-              make clean
-
-              # For the generation of %libtcc1.a, `--config-mingw32` must be
-              # turned off, or it will try to compile with tcc.exe
-
-              echo "Generating libtcc1.a (runtime lib for TCC-built programs)"
-
-              if [[ $OS_ID = 0.4.40 ]]; then
-                  ./configure --cpu=x86_64 --extra-cflags="$ARCH_CFLAGS" --extra-ldflags="$ARCH_CFLAGS"
-              elif [[ $OS_ID = 0.4.4 ]]; then
-                  ./configure --cpu=x86 --extra-cflags="$ARCH_CFLAGS" --extra-ldflags="$ARCH_CFLAGS"
-              elif [[ $OS_ID = 0.3.1 ]]; then  # x86-win32
-                  ./configure --cpu=x86 --extra-cflags="$ARCH_CFLAGS" --cross-prefix="$CROSS_PREFIX" --extra-ldflags="$ARCH_CFLAGS"
-              elif [[ $OS_ID = 0.13.2 ]]; then  # arm-android5
-                  ./configure --cpu=arm --extra-cflags="$ARCH_CFLAGS --sysroot=\"$SYSROOT\"" --cross-prefix="$CROSS_PREFIX"  --extra-ldflags="$ARCH_CFLAGS --sysroot=\"$SYSROOT\""
-              else  # x86_64-win32
-                  ./configure --cpu=x86_64 --extra-cflags="$ARCH_CFLAGS" --cross-prefix="$CROSS_PREFIX" --extra-ldflags="$ARCH_CFLAGS"
-              fi
-
-              echo "make libtcc1.a"
-              # Note: Could fail to build tcc due to lack of '-ldl' on Windows
-              make libtcc1.a XCC="${CROSS_PREFIX}gcc" XAR="${CROSS_PREFIX}ar" || echo "ignoring error in building libtcc1.a"
-              cp bin/* .  # restore cross-compilers, libtcc1.a depends on tcc
-              touch tcc  # update the timestamp so it won't be rebuilt
-              echo "ls"
-              ls  # take a look at files under current directory
-              echo "make libtcc1.a"
-              make libtcc1.a XCC="${CROSS_PREFIX}gcc" XAR="${CROSS_PREFIX}ar"
-              "${CROSS_PREFIX}ar" d libtcc1.a armeabi.o  # avoid link conflict with libtcc.a
-
-              #restore libtcc.a
-              # make libtcc1.a could have generated a new libtcc.a
-              cp libtcc.a.bak libtcc.a
-
-              echo "Objdumping!"
-              objdump -a libtcc.a
-          fi
-          make
-          cd "${TOP_DIR}/build"
-      fi
-
-    # Grab the abbreviated and full git commit ID into environment variables.
-    # The full commit is passed to make to build into the binary, and the
-    # abbreviated commit is used to name the executable.
-    #
-    # http://stackoverflow.com/a/42549385/211160
-    #
-    - GIT_COMMIT="$(git show --format="%H" --no-patch)"
-    - echo "$GIT_COMMIT"
-    - GIT_COMMIT_SHORT="$(git show --format="%h" --no-patch)"
-    - echo "$GIT_COMMIT_SHORT"
-
-    # As an extra step to test bootstrap ability, if the build can be run on
-    # the Travis we are using...make the debug build go even further by doing
-    # another full build, but using the just built r3 as its own r3-make.
-    # This will work on 64-bit OS X or Linux, and 32-bit if 32-bit support has
-    # been installed
-    #
-    - |
-      if [[ $DEBUG != none && ($OS_ID = 0.4.40 || $OS_ID = 0.4.4 || $OS_ID = 0.2.40) ]]; then
-          #
-          # If building twice, don't specify GIT_COMMIT for the first build.
-          # This means there's a test of the build process when one is not
-          # specified, in case something is broken about that.  (This is how
-          # most people will build locally, so good to test it.)
-          #
-          # Also request address sanitizer to be used for the first build.  It
-          # is very heavyweight and makes the executable *huge* and slow, so
-          # we do not apply it to any of the binaries which are uploaded to s3
-          # -- not even debug ones.
-          #
-          r3-one ../make.r CONFIG="../configs/${CONFIG}" TARGET=makefile STANDARD="$STANDARD" OS_ID="$OS_ID" RIGOROUS="$RIGOROUS" DEBUG=sanitize OPTIMIZE=2 STATIC=no ODBC_REQUIRES_LTDL="$ODBC_REQUIRES_LTDL" EXTENSIONS="$EXTENSIONS" $EXTRA
-          make clean prep folders
-          make -j "$MAKE_JOBS"
-
-          # We have to set R3_MAKE explicitly to circumvent the automatic
-          # r3-make filename inference, as we always use Linux "r3-two"
-          # (not "r3-two.exe") even when doing windows builds, since this is
-          # a cross-compilation.
-          #
-          mv r3 "${PREBUILT}/r3-two"
-          rm "${PREBUILT}/r3-one"
-          export R3_MAKE="${PREBUILT}/r3-two"
-
-          # Now that we've moved the `r3` out of the way, try cleaning up the
-          # other build products...and make sure it doesn't accidentally pick
-          # up the old makefile.
-          #
-          make clean
-          rm makefile
-
-          # This instructs `r3-two` to use a mode in which allocations are not
-          # pooled, but each uses an individual `malloc()`.  That means we
-          # get the benefit of the checked/hooked allocator for address
-          # sanitizer, which the pools don't have a parallel to at the moment.
-          #
-          export R3_ALWAYS_MALLOC=1
-
-          # We'll do a simple HTTPS read test on the second build.  But on
-          # this first build, we also do it because it has the address
-          # sanitizer, which may catch more problems.
-          #
-          r3-two --do "print {Testing...} quit either find to-text read https://example.com {<h1>Example Domain</h1>} [0] [1]";
-          R3_EXIT_STATUS=$?
-          echo $R3_EXIT_STATUS
+    function upload {
+      # Note that `;;` is specific to bash's `case`, unrelated to `;`
+      case $1 in
+        *.wasm) OPT_TYPE="--content-type application/wasm" ;;
+        *) OPT_TYPE="" ;;
+      esac
+      rm -f _
+      $AWS s3 cp $1 s3://${AWS_S3_BUCKET_NAME}/travis-builds/$1 $OPT_TYPE
+      $AWS s3 cp s3://${AWS_S3_BUCKET_NAME}/travis-builds/$1 _
+      if ( cmp $1 _ ); then
+        echo === UPLOADED $1 ===
       else
-        mv "${PREBUILT}/r3-one" "${PREBUILT}/r3-two"
-      fi
-
-    - |
-      if [[ -z $TCC ]]; then
-        export WITH_TCC=no
-      else
-        export WITH_TCC="%${PWD}/tcc/${TCC}"
-      fi
-
-    # On the second build of building twice, or just building once, include
-    # the GIT_COMMIT
-    #
-    - r3-two ../make.r CONFIG="../configs/${CONFIG}" TARGET=makefile STANDARD="$STANDARD" OS_ID="$OS_ID" DEBUG="$DEBUG" GIT_COMMIT="{$GIT_COMMIT}" RIGOROUS="$RIGOROUS" STATIC="$STATIC" WITH_FFI="$WITH_FFI" WITH_TCC="$WITH_TCC" ODBC_REQUIRES_LTDL="$ODBC_REQUIRES_LTDL" EXTENSIONS="$EXTENSIONS" $EXTRA
-
-    # Do the main build of the files we will be uploading
-    #
-    - make clean prep folders
-    - make -j "$MAKE_JOBS"
-
-    # Dump out a list of the library dependencies of the executable
-    - |
-      if [[ $OS_ID = 0.4.40 || $OS_ID = 0.4.4 ]]; then
-          ldd ./r3
-      elif [[ $OS_ID = 0.2.40 ]]; then
-          otool -L ./r3
-      fi
-
-    # Run once but don't pipe output, in case it prints out useful crash msg
-    # that we want to see in the Travis log (especially helpful for failures
-    # only happening in the Travis builds that aren't reproducing locally)
-    # Save the exit code ($?) so we can return it to Travis as last step
-    #
-    # !!! This is a very minimal sanity check to ensure the built R3 does
-    # *something*, and it can't be used on cross-compilations (e.g. a Windows
-    # executable won't run on Linux).  Running the full test suite would be a
-    # bit much, and developers are expected to have already done that.  But
-    # doing an HTTPS read exercises a fair amount of code.
-    #
-    - |
-      if [[ $OS_ID = 0.4.40 || $OS_ID = 0.4.4 || $OS_ID = 0.2.40 ]]; then
-          $RUNNER ./r3 --do "print {Testing...} quit either find to-text read https://example.com {<h1>Example Domain</h1>} [0] [1]"
-          R3_EXIT_STATUS=$?
-      else
-          R3_EXIT_STATUS=0
-      fi
-    - echo "$R3_EXIT_STATUS"
-
-    # Run basic testing on FFI if it is included and this container can run it
-    - |
-      if [[ -z $WITH_FFI || $WITH_FFI != no ]]; then
-        if [[ $OS_ID = 0.4.40 || $OS_ID = 0.4.4 ]]; then
-          $RUNNER ./r3 ../tests/misc/qsort_r.r
-          R3_EXIT_STATUS=$?
-        else
-          R3_EXIT_STATUS=0
-        fi
-      else
-          R3_EXIT_STATUS=0
-      fi
-    - echo "$R3_EXIT_STATUS"
-
-    # If the build is TCC-based and the host can run the produced executable,
-    # do a simple test that does a TCC fibonnaci calculation.
-    - |
-      # The TCC extension currently looks at the environment variable
-      # LIBREBOL_INCLUDE_DIR to find "rebol.h".  Ultimately, this should be
-      # shipped with the TCC extension.  (It may be desirable to embed it,
-      # but it also may be desirable to have a copy that a file can find
-      # via `#include "rebol.h"`)
-      #
-      # (export is so that the child process can see the environment variable)
-      #
-      echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR}"
-      export LIBREBOL_INCLUDE_DIR="${TOP_DIR}/build/prep/include"
-      if [[ (! -z $TCC) && ($TCC != no) ]]; then
-        if [[ $OS_ID = 0.4.40 ]]; then
-          $RUNNER ./r3 ../tests/misc/fib.r
-          R3_EXIT_STATUS=$?
-        elif [[ $OS_ID = 0.4.4 ]]; then
-          #
-          # Most 32-bit builds are intending to run on 32-bit systems, hence
-          # the running TCC should link to libs in `/usr/lib`.  But this
-          # container is 64-bit (Travis does not support 32-bit containers,
-          # nor do they seem to intend to).  The tcc extension heeds this
-          # environment variable and uses hardcoded output of `gcc -v m32`
-          # for library directories to override `/usr/lib` with.
-          #
-          export REBOL_TCC_EXTENSION_32BIT_ON_64BIT=1
-          $RUNNER ./r3 ../tests/misc/fib.r
-          R3_EXIT_STATUS=$?
-        fi
-      else
-          R3_EXIT_STATUS=0
-      fi
-      echo $R3_EXIT_STATUS
-
-    - |
-      if [[ $R3_EXIT_STATUS != 0 ]]; then
-        exit $R3_EXIT_STATUS
-      fi
-
-# DEPLOY STEP:
-
-    # !!! This used to delete things because otherwise they would be uploaded
-    # to s3 along with the whole build directory.  It doesn't really matter
-    # now, because we are specific about what we upload using the aws tool.
-    # It still might be desirable to delete things...
-    #
-    - rm -rf objs
-    - rm -f makefile*
-    - rm -f Toolchain*
-    - rm -f r3-make*  # `-f` for success even when r3-make* doesn't exist
-
-    # !!! When we *needed* to delete things, we would `- rm -rf tcc` and
-    # `-rm -rf prep` here.  But we don't right now, because we wait until the
-    # end (below) to zip together `rebol.h` and the TCC runtime files that the
-    # caller will need.  This is a temporary solution, and is evolving.
-
-    # check what is left in the build directory...
-    - ls
-
-    # Name the executable based on the abbreviated commit, whether it is a
-    # debug or release build, and if it was built using C++ or not.  Note that
-    # the C++ debug builds have additional runtime checks in the debug
-    # build...though there should not be any impact on the release build.
-    # (Though there may be additional DLL dependencies regardless.)
-    #
-    # !!! All Ren-C stakeholders should be using debug builds at this time.  
-    #
-    # Note: -z tests if a variable is undefined
-    #
-    - NEW_NAME="r3"; NEW_NAME_WITH_COMMIT="r3-${GIT_COMMIT_SHORT}"
-    - |
-      if [[ $DEBUG != none ]]; then
-          NEW_NAME+='-debug'
-          NEW_NAME_WITH_COMMIT+='-debug'
-      fi
-    - |
-      if [[ $STANDARD = c++ || $STANDARD = c++0x || $STANDARD = c++11 || $STANDARD = c++14 || $STANDARD = c++17 ]]; then
-          NEW_NAME+='-cpp'
-          NEW_NAME_WITH_COMMIT+='-cpp'
-      fi
-    - echo NEW_NAME="$NEW_NAME"
-    - echo NEW_NAME_WITH_COMMIT="$NEW_NAME_WITH_COMMIT"
-
-    # Move the executable into a directory based on its OS_ID platform.
-    # This is because the deploy step is run for each OS and would
-    # otherwise overwrite executables in the same location.
-    #
-    # Note: [[-e]] tests for "existence"
-    #
-    - mkdir "$OS_ID"
-    - |
-      # Windows builds end in .exe
-      if [[ -e r3.exe ]]; then
-          cp r3.exe "${OS_ID}/${NEW_NAME_WITH_COMMIT}.exe"
-          mv r3.exe "${OS_ID}/${NEW_NAME}.exe"
-      fi
-
-      # Most other platforms have no suffix
-      if [[ -e r3 ]]; then
-          cp r3 "${OS_ID}/${NEW_NAME_WITH_COMMIT}"
-          mv r3 "${OS_ID}/${NEW_NAME}"
-      fi
-
-      # All emscripten builds produce .js and .wasm
-      if [[ -e libr3.js ]]; then
-           cp libr3.js "${OS_ID}/lib${NEW_NAME_WITH_COMMIT}.js"
-           mv libr3.js "${OS_ID}/lib${NEW_NAME}.js"
-      fi
-      if [[ -e libr3.wasm ]]; then
-           cp libr3.wasm "${OS_ID}/lib${NEW_NAME_WITH_COMMIT}.wasm"
-           mv libr3.wasm "${OS_ID}/lib${NEW_NAME}.wasm"
-      fi
-
-      # Only pthreads builds produce .js.mem and .worker.js
-      if [[ -e libr3.js.mem ]]; then
-           cp libr3.js.mem "${OS_ID}/lib${NEW_NAME_WITH_COMMIT}.js.mem"
-           mv libr3.js.mem "${OS_ID}/lib${NEW_NAME}.js.mem"
-      fi
-      if [[ -e libr3.worker.js ]]; then
-           cp libr3.worker.js "${OS_ID}/lib${NEW_NAME_WITH_COMMIT}.worker.js"
-           mv libr3.worker.js "${OS_ID}/lib${NEW_NAME}.worker.js"
-      fi
-
-    # Ultimately we'd like extensions to have an easy standard way to encap
-    # resources that they use, and the TCC extension could pack up %rebol.h
-    # and %libtcc1.a, as well as other support files it needs right into the
-    # executable in a zip format.  But for now, we just make a zip file and
-    # those who want to use TCC compilation have to unpack that zip manually.
-    #
-    # Note: The script prints out a list of the files it stores.  If you unzip
-    # it you should be able to use the containing directory as both the
-    # CONFIG_TCCDIR and the LIBREBOL_INCLUDE_DIR path.
-    #
-    # !!! It should be able to be done with r3-make, but uses features of file
-    # paths and zip compression that are only available in newer builds.
-    # Temporarily grab a special build for this purpose.
-    #
-    - |
-      if [[ ! -z $TCC ]]; then
-        #
-        # Temporary solution on top of temporary solution (should be on s3,
-        # but can't upload there at the moment)
-        #
-        wget http://hostilefork.com/media/shared/prebuilt/r3-encap
-        chmod +x ./r3-encap
-        ./r3-encap "${TOP_DIR}/extensions/tcc/encap-tcc-resources.reb" OS_ID="${OS_ID}"
-        mv tcc-encap.zip "${OS_ID}/${NEW_NAME_WITH_COMMIT}-tcc-encap.zip"
-      fi
-
-    # Web Browsers are picky about the MIME type of WebAssembly files.  If
-    # it's not `application/wasm` then it complains.  The `deploy` upload
-    # mechanic in Travis has no way to specify this property, so we use the
-    # command-line `aws` tool to do the upload of the .wasm file.
-    #
-    # We also want to control the *order* in which files are uploaded, which
-    # Travis's deploy does not support.  For how the keys are kept secure
-    # despite publishing this upload script, see:
-    #
-    # http://stackoverflow.com/a/42547424/211160
-    #
-    # NOTE: This is only one Travis "step" because the `upload` function is
-    # not shared across steps.  That's not necessarily a great reason to
-    # do it this way; we'd prefer more of this to be done with Rebol scripts.
-    #
-    - |
-      if [[ ${R3_EXIT_STATUS} != 0 ]]; then
-        exit 0  # don't try to upload any files if the tests didn't work
-      fi
-
-      if [[ ${TRAVIS_REPO_SLUG} != "metaeducation/ren-c" ]]; then
-        exit 0  # secret AWS credentials to upload are only for metaeducation
-      fi
-
-      if [[ ${TRAVIS_BRANCH} != "master" || ${TRAVIS_PULL_REQUEST} != "false" ]]; then
-        exit 0  # only direct pushes of master branch considered for upload
-      fi
-
-      function upload {
-        # Note that `;;` is specific to bash's `case`, unrelated to `;`
-        case $1 in
-          *.wasm) OPT_TYPE="--content-type application/wasm" ;;
-          *) OPT_TYPE="" ;;
-        esac
-        rm -f _
-        $AWS s3 cp $1 s3://${AWS_S3_BUCKET_NAME}/travis-builds/$1 $OPT_TYPE
-        $AWS s3 cp s3://${AWS_S3_BUCKET_NAME}/travis-builds/$1 _
-        if ( cmp $1 _ ); then
-          echo === UPLOADED $1 ===
-        else
-          echo === UPLOAD $1 FAILED ===
-          exit 1
-        fi
-      }
-
-      for i in $OS_ID/*; do upload $i; done
-
-      # Start out by defaulting that we will greenlight the build and bump
-      # the commit check...but if the browser REPL deployment doesn't pass
-      # a test, we will change our answer and keep serving users the previous
-      # commit via the old %last-deploy.short-hash
-      #
-      export DONT_GREENLIGHT_BUILD=0
-
-      # Esmcripten build: copy load-r3.js to travis-builds/
-      # (not in subdir of 0.16.x because loader needs to pick between them)
-      #
-      # Note: This is a weak link in the test-before-deploy strategy.  Because
-      # there's not a way to override the singular loader, a change must be
-      # deployed before we can test any build (even a non-"greenlit" one).
-      #
-      if [[ $OS_ID = 0.16.1 || $OS_ID = 0.16.2 ]]; then
-        cp ../extensions/javascript/load-r3.js .
-        upload load-r3.js
-      fi
-
-      # Generally we want to run testing before deployment.  For native builds
-      # it is expected that the committer runs them (it would be nice to have
-      # the build farm check as well, but that hasn't been too much of a
-      # problem).  But web builds breaking is.  So we want to check the
-      # deployment before "green-lighting" the %last-deploy.short-hash
-      #
-      # We do this currently in the web builds with a "headless" Firefox (e.g.
-      # no GUI Window), automated through the Python's `marionette_driver`:
-      #
-      # https://firefox-source-docs.mozilla.org/python/marionette_driver.html
-      #
-      # The Marionette httpd server for control exists only in Firefox (with
-      # a default port 2828) and is only enabled if you use `-marionette`.
-      #
-      # https://vakila.github.io/blog/marionette-act-i-automation/
-      #
-      # Comparable-but-incompatible APIs to control running browsers exist for
-      # Chrome and others.  The W3C's "WebDriver" initiative standardizes a
-      # "ODBC for browser control" which translates a common API into calls
-      # with plugins for each particular browser.  The layer is bulky and is
-      # typically used with "Selenium" which is even bulkier.  To be lighter
-      # we just use Python with raw Marionette (it is likely not difficult to
-      # just use Rebol to send the http requests, also.)
-      #
-      # Long term we might have to do more than this simple test, but in the
-      # 80/20 rule it's going to deliver on catching most of the breakages.
-      #
-      if [[ $OS_ID = 0.16.1 || $OS_ID = 0.16.2 ]]; then
-        $PIP install marionette-driver --user  # Python Install Package
-
-        # Create a Firefox profile in the current directory that we can tweak
-        # (as finding the default one's auto-generated name is a pain)
-        #
-        firefox -headless -CreateProfile "ff-profile $(pwd)/ff-profile"
-
-        ######################################################################
-        #
-        # !!! We'd like 0.16.1 to pass the pthread builds test by configuring
-        # Firefox to use pthreads.  We can do the configuration--but right now
-        # pthreads are not working in Firefox due to issues with headers:
-        #
-        # https://bugzilla.mozilla.org/show_bug.cgi?id=1586217
-        # https://github.com/emscripten-core/emscripten/issues/10014
-        #
-        # Until that is sorted out, we're just going to have to hope that the
-        # Asyncify build test is good enough to mark passing both builds.
-        # So what we're really testing is if Firefox is downgrading the
-        # build to Asyncify.  :-(  Chrome with pthreads will just need to be
-        # hoped to work.
-        #
-        ######################################################################
-        #
-        export FF_SHARED_MEMORY=false
-
-        # The way to set `about:config` flags in preferences is via %user.js
-        #
-        # https://askubuntu.com/a/313662/137769
-        # http://kb.mozillazine.org/User.js_file
-        #
-        # Rebol's more optimal "Pthreads" web build requires shared memory
-        # and WebAssembly threads, which Firefox does not enable by default
-        # at time of writing (Mar-2020).  Hence the less-optimial "Asyncify"
-        # build provides a fallback, and %load-r3.js detects which to use.
-        #
-        # Even if this default changes, explicitly setting the flag to `true`
-        # for the Pthreads deployment test and `false` for the Asyncify test
-        # gives the right coverage for the corresponding build.
-        #
-        # !!! See above comments about why we only test the 0.16.2 build
-        # (non-pthreads) due to 0.16.1 not working in Firefox at the moment.
-        #
-        # The Marionette port for control defaults to 2828, and can be
-        # overridden on the command line by `--marionette-port <port>`.  But
-        # to show another place to set it, here's the profile setting.
-        #
-        # Unfortunately Travis and HereDoc aren't very compatible, so we use
-        # plain ECHO instead to make our user.js file:
-        #
-        # https://en.wikipedia.org/wiki/Here_document#Unix_shells
-        # https://travis-ci.community/t/2756
-        {
-            echo "user_pref(\"javascript.options.shared_memory\", ${FF_SHARED_MEMORY});"
-            echo "user_pref(\"marionette.port\", 2828);"  # should be default
-        } > $(pwd)/ff-profile/user.js
-
-        # We keep the Python test script for the browser build in the GitHub
-        # replpad-js repository.  Fetch it.
-        #
-        wget https://raw.githubusercontent.com/hostilefork/replpad-js/master/tests/test-repl-ff.py
-
-        # Start Firefox headless with the marionette automation enabled
-        # (the `&` starts it in the background)
-        #
-        firefox -headless --profile ff-profile -marionette  &
-        sleep 5  # Give Firefox time to spin up (should be in cache now)
-
-        echo "Running netstat -lntu: Marionette should be listening on 2828"
-        netstat -lntu
-        ps aux | grep firefox
-
-        # Run the script.  The result will be 0 if the test was sucessful.
-        # Note that we ask the REPL to be instantiated with the libr3.js we
-        # just uploaded that has not been "greenlit" by uploading the
-        # `last-deploy.short-hash`...so we must pass the current commit in
-        # explicitly to be asked for in the URL.
-        #
-        python test-repl-ff.py --shorthash "${GIT_COMMIT_SHORT}"
-        export DONT_GREENLIGHT_BUILD=$?  # captures last command exit code
-      fi
-
-      # Each ${OS_ID} directory contains several builds for recent commits.
-      # Since they are served statically from S3, we don't have a query to
-      # serve the most recent one that successfully built (based on a date
-      # or other property).  So we write a file with a fixed name in that
-      # directory to identify the last build...it can be obtained via a
-      # CORS fetch() request.
-      #
-      # However, the upload might take a while...or fail part way through.
-      # Hence, we make this the last file uploaded--so that when the browser
-      # tries to fetch files for that ID, they'll all be there.
-      #
-      if (( $DONT_GREENLIGHT_BUILD != 0 )); then
-        echo "=== DON'T GREENLIGHT BUILD! ==="
+        echo === UPLOAD $1 FAILED ===
         exit 1
-      else
-        #
-        # -n option to echo means "no newline at end" (it's not a "text file"
-        # so there is no standard enforcing that it have one...and it's
-        # easier in the client to not have it)
-        #
-        echo -n "${GIT_COMMIT_SHORT}" > ${OS_ID}/last-deploy.short-hash
-        upload ${OS_ID}/last-deploy.short-hash
       fi
+    }
+
+    for i in $OS_ID/*; do upload $i; done
+
+    # Start out by defaulting that we will greenlight the build and bump
+    # the commit check...but if the browser REPL deployment doesn't pass
+    # a test, we will change our answer and keep serving users the previous
+    # commit via the old %last-deploy.short-hash
+    #
+    export DONT_GREENLIGHT_BUILD=0
+
+    # Esmcripten build: copy load-r3.js to travis-builds/
+    # (not in subdir of 0.16.x because loader needs to pick between them)
+    #
+    # Note: This is a weak link in the test-before-deploy strategy.  Because
+    # there's not a way to override the singular loader, a change must be
+    # deployed before we can test any build (even a non-"greenlit" one).
+    #
+    if [[ $OS_ID = 0.16.1 || $OS_ID = 0.16.2 ]]; then
+      cp ../extensions/javascript/load-r3.js .
+      upload load-r3.js
+    fi
+
+    # Generally we want to run testing before deployment.  For native builds
+    # it is expected that the committer runs them (it would be nice to have
+    # the build farm check as well, but that hasn't been too much of a
+    # problem).  But web builds breaking is.  So we want to check the
+    # deployment before "green-lighting" the %last-deploy.short-hash
+    #
+    # We do this currently in the web builds with a "headless" Firefox (e.g.
+    # no GUI Window), automated through the Python's `marionette_driver`:
+    #
+    # https://firefox-source-docs.mozilla.org/python/marionette_driver.html
+    #
+    # The Marionette httpd server for control exists only in Firefox (with
+    # a default port 2828) and is only enabled if you use `-marionette`.
+    #
+    # https://vakila.github.io/blog/marionette-act-i-automation/
+    #
+    # Comparable-but-incompatible APIs to control running browsers exist for
+    # Chrome and others.  The W3C's "WebDriver" initiative standardizes a
+    # "ODBC for browser control" which translates a common API into calls
+    # with plugins for each particular browser.  The layer is bulky and is
+    # typically used with "Selenium" which is even bulkier.  To be lighter
+    # we just use Python with raw Marionette (it is likely not difficult to
+    # just use Rebol to send the http requests, also.)
+    #
+    # Long term we might have to do more than this simple test, but in the
+    # 80/20 rule it's going to deliver on catching most of the breakages.
+    #
+    if [[ $OS_ID = 0.16.1 || $OS_ID = 0.16.2 ]]; then
+      pip3 install marionette-driver --user  # Python Install Package
+
+      # Create a Firefox profile in the current directory that we can tweak
+      # (as finding the default one's auto-generated name is a pain)
+      #
+      firefox -headless -CreateProfile "ff-profile $(pwd)/ff-profile"
+
+      ######################################################################
+      #
+      # !!! We'd like 0.16.1 to pass the pthread builds test by configuring
+      # Firefox to use pthreads.  We can do the configuration--but right now
+      # pthreads are not working in Firefox due to issues with headers:
+      #
+      # https://bugzilla.mozilla.org/show_bug.cgi?id=1586217
+      # https://github.com/emscripten-core/emscripten/issues/10014
+      #
+      # Until that is sorted out, we're just going to have to hope that the
+      # Asyncify build test is good enough to mark passing both builds.
+      # So what we're really testing is if Firefox is downgrading the
+      # build to Asyncify.  :-(  Chrome with pthreads will just need to be
+      # hoped to work.
+      #
+      ######################################################################
+      #
+      export FF_SHARED_MEMORY=false
+
+      # The way to set `about:config` flags in preferences is via %user.js
+      #
+      # https://askubuntu.com/a/313662/137769
+      # http://kb.mozillazine.org/User.js_file
+      #
+      # Rebol's more optimal "Pthreads" web build requires shared memory
+      # and WebAssembly threads, which Firefox does not enable by default
+      # at time of writing (Mar-2020).  Hence the less-optimial "Asyncify"
+      # build provides a fallback, and %load-r3.js detects which to use.
+      #
+      # Even if this default changes, explicitly setting the flag to `true`
+      # for the Pthreads deployment test and `false` for the Asyncify test
+      # gives the right coverage for the corresponding build.
+      #
+      # !!! See above comments about why we only test the 0.16.2 build
+      # (non-pthreads) due to 0.16.1 not working in Firefox at the moment.
+      #
+      # The Marionette port for control defaults to 2828, and can be
+      # overridden on the command line by `--marionette-port <port>`.  But
+      # to show another place to set it, here's the profile setting.
+      #
+      # Unfortunately Travis and HereDoc aren't very compatible, so we use
+      # plain ECHO instead to make our user.js file:
+      #
+      # https://en.wikipedia.org/wiki/Here_document#Unix_shells
+      # https://travis-ci.community/t/2756
+      {
+          echo "user_pref(\"javascript.options.shared_memory\", ${FF_SHARED_MEMORY});"
+          echo "user_pref(\"marionette.port\", 2828);"  # should be default
+      } > $(pwd)/ff-profile/user.js
+
+      # We keep the Python test script for the browser build in the GitHub
+      # replpad-js repository.  Fetch it.
+      #
+      wget https://raw.githubusercontent.com/hostilefork/replpad-js/master/tests/test-repl-ff.py
+
+      # Start Firefox headless with the marionette automation enabled
+      # (the `&` starts it in the background)
+      #
+      firefox -headless --profile ff-profile -marionette  &
+      sleep 5  # Give Firefox time to spin up (should be in cache now)
+
+      echo "Running netstat -lntu: Marionette should be listening on 2828"
+      netstat -lntu
+      ps aux | grep firefox
+
+      # Run the script.  The result will be 0 if the test was sucessful.
+      # Note that we ask the REPL to be instantiated with the libr3.js we
+      # just uploaded that has not been "greenlit" by uploading the
+      # `last-deploy.short-hash`...so we must pass the current commit in
+      # explicitly to be asked for in the URL.
+      #
+      python3 test-repl-ff.py --shorthash "${GIT_COMMIT_SHORT}"
+      export DONT_GREENLIGHT_BUILD=$?  # captures last command exit code
+    fi
+
+    # Each ${OS_ID} directory contains several builds for recent commits.
+    # Since they are served statically from S3, we don't have a query to
+    # serve the most recent one that successfully built (based on a date
+    # or other property).  So we write a file with a fixed name in that
+    # directory to identify the last build...it can be obtained via a
+    # CORS fetch() request.
+    #
+    # However, the upload might take a while...or fail part way through.
+    # Hence, we make this the last file uploaded--so that when the browser
+    # tries to fetch files for that ID, they'll all be there.
+    #
+    if (( $DONT_GREENLIGHT_BUILD != 0 )); then
+      echo "=== DON'T GREENLIGHT BUILD! ==="
+      exit 1
+    else
+      #
+      # -n option to echo means "no newline at end" (it's not a "text file"
+      # so there is no standard enforcing that it have one...and it's
+      # easier in the client to not have it)
+      #
+      echo -n "${GIT_COMMIT_SHORT}" > ${OS_ID}/last-deploy.short-hash
+      upload ${OS_ID}/last-deploy.short-hash
+    fi
 
 
 after_script:

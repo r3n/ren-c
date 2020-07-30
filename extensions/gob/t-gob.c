@@ -209,7 +209,7 @@ static void Insert_Gobs(
             // For the moment, assume this GOB-or-WORD! containing block
             // only contains non-relative values.
             //
-            val = Get_Opt_Var_May_Fail(val, SPECIFIED);
+            val = Lookup_Word_May_Fail(val, SPECIFIED);
         }
         if (IS_GOB(val)) {
             count++;
@@ -260,7 +260,7 @@ static void Insert_Gobs(
             //
             // Again, assume no relative values
             //
-            val = Get_Opt_Var_May_Fail(val, SPECIFIED);
+            val = Lookup_Word_May_Fail(val, SPECIFIED);
         }
         if (IS_GOB(val)) {
             if (GOB_PARENT(VAL_GOB(val)) != NULL)

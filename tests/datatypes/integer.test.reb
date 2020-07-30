@@ -35,7 +35,7 @@
 (0 == to integer! "0")
 (error? trap [to integer! false])
 (error? trap [to integer! true])
-(0 == to integer! #"^@")
+(0 == to integer! NUL)
 (1 == to integer! #"^a")
 (0 == to integer! #0)
 (1 == to integer! #1)

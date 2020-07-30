@@ -159,10 +159,10 @@ odbc-execute: func [
                 sym-group! [
                         reduce as group! item
                 ]
-            ] then (value => [
+            ] then value => [
                 append parameters :value
                 "?"
-            ]) else [
+            ] else [
                 ; REDUCE may have evaluated items and made WORD!/etc.
                 ; But SPACED reduces implicitly.  So map to a quoted
                 ; version to avoid double-evaluations.

@@ -52,6 +52,8 @@ void Snap_State_Core(struct Reb_State *s)
     s->mold_buf_size = STR_SIZE(STR(MOLD_BUF));
     s->mold_loop_tail = ARR_LEN(TG_Mold_Stack);
 
+    s->saved_sigmask = Eval_Sigmask;
+
     // !!! Is this initialization necessary?
     s->error = NULL;
 }
@@ -128,6 +130,8 @@ void Assert_State_Balanced_Debug(
     assert(s->mold_buf_size == STR_SIZE(STR(MOLD_BUF)));
     assert(s->mold_loop_tail == ARR_LEN(TG_Mold_Stack));
 
+    assert(s->saved_sigmask == Eval_Sigmask);  // !!! is this always true?
+
     assert(s->error == NULL); // !!! necessary?
 }
 
@@ -195,6 +199,8 @@ void Trapped_Helper(struct Reb_State *s)
   #endif
 
     SET_SERIES_LEN(TG_Mold_Stack, s->mold_loop_tail);
+
+    Eval_Sigmask = s->saved_sigmask;
 
     Saved_State = s->last_state;
 }
@@ -499,10 +505,12 @@ void Set_Location_Of_Error(
         REBLIN line = MISC(f->feed->array).line;
 
         REBSYM file_sym = STR_SYMBOL(file);
-        if (file_sym != SYM___ANONYMOUS__)
-            Init_Word(&vars->file, file);
-        if (line != 0)
-            Init_Integer(&vars->line, line);
+        if (IS_NULLED_OR_BLANK(&vars->file)) {
+            if (file_sym != SYM___ANONYMOUS__)
+                Init_Word(&vars->file, file);
+            if (line != 0)
+                Init_Integer(&vars->line, line);
+        }
     }
 }
 

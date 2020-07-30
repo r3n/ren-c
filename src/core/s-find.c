@@ -378,72 +378,107 @@ REBLEN Find_Str_In_Bin(
 REBLEN Find_Str_In_Str(
     REBSTR *str1,
     REBLEN index_unsigned,
-    REBLEN end_unsigned,
+    REBLEN limit_unsigned,
     REBINT skip,
     REBSTR *str2,
     REBINT index2,
     REBLEN len,
     REBFLGS flags
 ){
-    // Signed quantities used to allow stepping outside of bounds and still
-    // being able to compare, but incoming parameters should not be negative.
-    //
-    REBINT index = index_unsigned;
-    REBINT end = end_unsigned;
-
-    REBINT start;
-    if (skip < 0)
-        start = 0;
-    else
-        start = index;
+    assert(index_unsigned <= STR_LEN(str1));
+    assert(index2 <= cast(REBINT, STR_LEN(str2)));
 
     assert((flags & ~(AM_FIND_CASE | AM_FIND_MATCH)) == 0);
+    bool uncase = not (flags & AM_FIND_CASE);  // case insenstive
 
-    bool uncase = not (flags & AM_FIND_CASE); // case insenstive
+    // Signed quantities allow stepping outside of bounds (e.g. large /SKIP)
+    // and still comparing...but incoming parameters should not be negative.
+    //
+    REBINT index = index_unsigned;
+    REBINT end = limit_unsigned - len;
 
-    REBUNI c2_canon; // calculate first char lowercase once, vs. each step
-    REBCHR(const*) next2 = STR_AT(str2, index2);
-    next2 = NEXT_CHR(&c2_canon, next2);
+    // `str2` is always stepped through forwards in FIND, even with a negative
+    // value for skip.  If the position is at the tail, it cannot be found.
+    //
+    if (index2 == cast(REBINT, STR_LEN(str2)))
+        return NOT_FOUND;  // getting c2 would be '\0' (LO_CASE illegal)
+
+    REBUNI c2_canon;  // calculate first char lowercase once, vs. each step
+    REBCHR(const*) next2 = NEXT_CHR(&c2_canon, STR_AT(str2, index2));
     if (uncase)
         c2_canon = LO_CASE(c2_canon);
 
+    // cp1 is the position in str1 that is our current tested head of a match
+    //
     REBCHR(const*) cp1 = STR_AT(str1, index);
-    REBUNI c1;
-    if (skip > 0)
-        cp1 = NEXT_CHR(&c1, cp1);
-    else
-        NEXT_CHR(&c1, cp1);
 
-    while (skip < 0 ? index >= start : index < end) {
+    REBUNI c1;  // c1 is the currently tested character for str1
+    if (skip < 0) {
+        //
+        // Note: `find/skip tail "abcdef" "def" -3` is "def", so first search
+        // position should be at the `d`.  We can reduce the amount of work
+        // we do in the later loop checking against STR_LEN(str1) `len` by
+        // up-front finding the earliest point we can look modulo `skip`,
+        // e.g. `find/skip tail "abcdef" "cdef" -2` should start at `c`.
+        //
+        do {
+            index += skip;
+            if (index < 0)
+                return NOT_FOUND;
+            cp1 = SKIP_CHR(&c1, cp1, skip);
+        } while (index + len > STR_LEN(str1));
+    }
+    else {
+        if (index + len > STR_LEN(str1))
+            return NOT_FOUND;
+
+        c1 = CHR_CODE(cp1);
+    }
+
+    while (true) {
         if (c1 == c2_canon or (uncase and LO_CASE(c1) == c2_canon)) {
-            REBCHR(const*) tp1 = cp1;
-            if (skip > 0)
-                tp1 = cp1;
-            else
-                tp1 = NEXT_STR(cp1);  // compensate from overstep
-
-            REBCHR(const*) tp2 = next2;
+            //
+            // The optimized first character match for str2 in str1 passed.
+            // Now check subsequent positions, where both may need LO_CASE().
+            //
+            REBCHR(const*) tp1 = NEXT_STR(cp1);
+            REBCHR(const*) tp2 = next2;  // next2 is second position in str2
             REBLEN n;
-            for (n = 1; n < len; n++) {
+            for (n = 1; n < len; n++) {  // n = 0 (first char) already matched
                 tp1 = NEXT_CHR(&c1, tp1);
 
                 REBUNI c2;
                 tp2 = NEXT_CHR(&c2, tp2);
                 if (c1 == c2 or (uncase and LO_CASE(c1) == LO_CASE(c2)))
-                    continue;
+                    continue;  // the `for`
 
-                break;
+                break;  // the `for`
             }
             if (n == len)
                 return index;
         }
-        if (flags & AM_FIND_MATCH)
-            break;
 
-        cp1 = SKIP_CHR(&c1, cp1, skip);
+        // The /MATCH flag historically indicates only considering the first
+        // position, so exit loop on first mismatch.  (!!! Better name "/AT"?)
+        //
+        if (flags & AM_FIND_MATCH)
+            goto not_found;
+
         index += skip;
+
+        if (skip < 0) {
+            if (index < 0)  // !!! What about /PART with negative skips?
+                goto not_found;
+            assert(cp1 >= STR_AT(str1, - skip));
+        } else {
+            if (index > end)
+                goto not_found;
+            assert(cp1 <= STR_AT(str1, STR_LEN(str1) - skip));
+        }
+        cp1 = SKIP_CHR(&c1, cp1, skip);
     }
 
+  not_found:
     return NOT_FOUND;
 }
 
@@ -472,6 +507,9 @@ REBLEN Find_Char_In_Str(
 
     // !!! In UTF-8, finding a char in a string is really just like finding a
     // string in a string.  Optimize as this all folds together.
+
+    if (uni == 0)
+        return NOT_FOUND;  // there can be no `\0` codepoints in ANY-STRING!
 
     REBSTR *temp = Make_Codepoint_String(uni);
 
@@ -515,6 +553,16 @@ REBLEN Find_Char_In_Bin(
         fail ("Find_Char_In_Bin() only searches the whole binary for now");
 
     UNUSED(lowest);
+
+    if (uni == 0) {  // can't Make a REBSTR with 0 byte in it
+        return Find_Bin_In_Bin(
+            bin,
+            index_orig,
+            cb_cast(""),  // NUL terminator only
+            1,  // 1 byte
+            flags
+        );
+    }
 
     REBSTR *temp = Make_Codepoint_String(uni);
 
@@ -610,7 +658,7 @@ REBLEN Find_Str_Bitset(
     REBCHR(const*) cp1 = STR_AT(str, index);
     REBUNI c1;
     if (skip > 0)
-        cp1 = NEXT_CHR(&c1, cp1);
+        c1 = CHR_CODE(cp1);  // skip 1 will pass over cp1, so leave as is
     else
         cp1 = BACK_CHR(&c1, cp1);
 
@@ -690,7 +738,7 @@ REBLEN Next_Line(REBYTE **bin)
 REBLEN Find_In_Any_Sequence(
     REBLEN *len,  // length of match (e.g. if pattern is a TAG!, includes <>)
     const RELVAL *any_series,
-    const RELVAL *pattern,
+    const REBCEL *pattern,
     REBFLGS flags
 ){
     REBLEN index = VAL_INDEX(any_series);

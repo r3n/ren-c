@@ -8,5 +8,5 @@
 ("1^/^/2" = delimit #"^/" ["1^/" "2"])
 
 ; Empty text is distinct from BLANK/null
-("A" = delimit ":" [_ "A" null])
+(" A" = delimit ":" [_ "A" null])
 (":A:" = delimit ":" ["" "A" ""])

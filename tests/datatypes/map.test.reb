@@ -120,3 +120,11 @@
     ((trap [append b2 'z])/id = 'series-auto-locked)
     ((trap [append b4 'q])/id = 'series-auto-locked)
 ]
+
+
+; !!! This should be extended to test instances of each datatype
+[#774 (
+    m: make map! []
+    m/(#"A"): 1020
+    1020 = m/(#"A")
+)]

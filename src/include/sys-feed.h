@@ -250,9 +250,11 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
 
         feed->specifier = SPECIFIED;
 
+        SCAN_LEVEL level;
         SCAN_STATE ss;
         const REBLIN start_line = 1;
-        Init_Va_Scan_State_Core(
+        Init_Va_Scan_Level_Core(
+            &level,
             &ss,
             Intern("sys-do.h"),
             start_line,
@@ -260,7 +262,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             feed
         );
 
-        REBVAL *error = rebRescue(cast(REBDNG*, &Scan_To_Stack), &ss);
+        REBVAL *error = rebRescue(cast(REBDNG*, &Scan_To_Stack), &level);
         Shutdown_Interning_Binder(&binder, feed->context);
 
         if (error) {

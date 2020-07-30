@@ -129,7 +129,7 @@ fix-gen_uuid.c: function [
                 copy unused: [
                     {static unsigned char variant_bits[]}
                   ]
-                  (target: unspaced [{// } to text! unused])
+                  (target: unspaced [{//} _ to text! unused])
                 ] target
 
             | skip

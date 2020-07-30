@@ -29,6 +29,7 @@ struct Params_Of_State {
     REBARR *arr;
     REBLEN num_visible;
     RELVAL *dest;
+    bool just_words;
 };
 
 // Reconstitute parameter back into a full value, e.g. REB_P_REFINEMENT
@@ -55,32 +56,38 @@ static bool Params_Of_Hook(
 
     Init_Any_Word(s->dest, REB_WORD, VAL_PARAM_SPELLING(param));
 
-    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
-        Refinify(KNOWN(s->dest));
-
-    switch (VAL_PARAM_CLASS(param)) {
-      case REB_P_NORMAL:
-        break;
-
-      case REB_P_HARD_QUOTE:
-        Getify(KNOWN(s->dest));
-        break;
-
-      case REB_P_MODAL:
-        if (flags & PHF_DEMODALIZED) {
-            // associated refinement specialized out
+    if (not s->just_words) {
+        if (
+            not (flags & PHF_UNREFINED)
+            and TYPE_CHECK(param, REB_TS_REFINEMENT)
+        ){
+            Refinify(KNOWN(s->dest));
         }
-        else
-            Symify(KNOWN(s->dest));
-        break;
 
-      case REB_P_SOFT_QUOTE:
-        Quotify(KNOWN(s->dest), 1);
-        break;
+        switch (VAL_PARAM_CLASS(param)) {
+          case REB_P_NORMAL:
+            break;
 
-      default:
-        assert(false);
-        DEAD_END;
+          case REB_P_HARD_QUOTE:
+            Getify(KNOWN(s->dest));
+            break;
+
+          case REB_P_MODAL:
+            if (flags & PHF_DEMODALIZED) {
+                // associated refinement specialized out
+            }
+            else
+                Symify(KNOWN(s->dest));
+            break;
+
+          case REB_P_SOFT_QUOTE:
+            Quotify(KNOWN(s->dest), 1);
+            break;
+
+          default:
+            assert(false);
+            DEAD_END;
+        }
     }
 
     ++s->dest;
@@ -92,11 +99,12 @@ static bool Params_Of_Hook(
 //
 // Returns array of function words, unbound.
 //
-REBARR *Make_Action_Parameters_Arr(REBACT *act)
+REBARR *Make_Action_Parameters_Arr(REBACT *act, bool just_words)
 {
     struct Params_Of_State s;
     s.arr = nullptr;
     s.num_visible = 0;
+    s.just_words = just_words;
 
     For_Each_Unspecialized_Param(act, &Params_Of_Hook, &s);
 
@@ -150,6 +158,7 @@ REBARR *Make_Action_Typesets_Arr(REBACT *act)
     struct Params_Of_State s;
     s.arr = nullptr;
     s.num_visible = 0;
+    s.just_words = false;  // (ignored)
 
     For_Each_Unspecialized_Param(act, &Typesets_Of_Hook, &s);
 
@@ -1864,8 +1873,9 @@ bool Get_If_Word_Or_Path_Throws(
     bool push_refinements
 ) {
     if (IS_WORD(v) or IS_GET_WORD(v) or IS_SYM_WORD(v)) {
-        *opt_name_out = VAL_WORD_SPELLING(v);
-        Move_Opt_Var_May_Fail(out, v, specifier);
+        if (opt_name_out)
+            *opt_name_out = VAL_WORD_SPELLING(v);
+        Get_Word_May_Fail(out, v, specifier);
     }
     else if (IS_PATH(v) or IS_GET_PATH(v) or IS_SYM_PATH(v)) {
         REBSPC *derived = Derive_Specifier(specifier, v);

@@ -75,11 +75,11 @@ PVAR REB_OPTS *Reb_Opts;
     PVAR bool PG_Probe_Failures; // helpful especially for boot errors & panics
 #endif
 
-#if defined(INCLUDE_CALLGRIND_NATIVE)
+#ifdef INCLUDE_CALLGRIND_NATIVE
     PVAR bool PG_Callgrind_On;
 #endif
 
-#ifndef NDEBUG
+#ifdef DEBUG_ENABLE_ALWAYS_MALLOC
     PVAR bool PG_Always_Malloc;   // For memory-related troubleshooting
 #endif
 
@@ -119,6 +119,7 @@ PVAR REBVAL *Root_Skip_Tag; // marks a hard quote as "skippable" if wrong type
 PVAR REBVAL *Root_Dequote_Tag; // remove quotes before typecheck
 PVAR REBVAL *Root_Requote_Tag; // add quotes that were dequoted back to return
 PVAR REBVAL *Root_Const_Tag; // pass a CONST version of the input argument
+PVAR REBVAL *Root_Output_Tag;  // argument goes to set-block! output
 PVAR REBVAL *Root_Modal_Tag;  // !!! needed for bootstrap, vs @arg modal
 
 PVAR REBVAL *Root_Empty_Text; // read-only ""
@@ -193,7 +194,6 @@ TVAR REBSER **Prior_Expand; // Track prior series expansions (acceleration)
 TVAR REBSER *TG_Mold_Stack; // Used to prevent infinite loop in cyclical molds
 
 TVAR REBARR *TG_Buf_Collect; // for collecting object keys or words
-TVAR REBSER *TG_Buf_Utf8; // UTF8 reused buffer
 TVAR REBSER *TG_Byte_Buf; // temporary byte buffer used mainly by raw print
 TVAR REBSTR *TG_Mold_Buf; // temporary UTF8 buffer - used mainly by mold
 

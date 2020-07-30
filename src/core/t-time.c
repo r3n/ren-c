@@ -130,8 +130,9 @@ const REBYTE *Scan_Time(RELVAL *out, const REBYTE *cp, REBLEN len)
 
     REBYTE merid;
     if (
-        (UP_CASE(*cp) == 'A' || UP_CASE(*cp) == 'P')
-        && (UP_CASE(cp[1]) == 'M')
+        *cp != '\0'
+        && (UP_CASE(*cp) == 'A' || UP_CASE(*cp) == 'P')
+        && (cp[1] != '\0' and UP_CASE(cp[1]) == 'M')
     ){
         merid = cast(REBYTE, UP_CASE(*cp));
         cp += 2;

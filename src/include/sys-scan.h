@@ -267,15 +267,31 @@ enum rebol_esc_codes {
 };
 
 
-/*
-**  Scanner State Structure
-*/
+//=//// SCANNER STATE STRUCTURES //////////////////////////////////////////=//
+//
+// R3-Alpha had a single state structure called SCAN_STATE, which was passed
+// between recursions of the scanner.  Ren-C breaks this into two parts: the
+// scanner's current position in the state (current line number, current token
+// beginning and end byte pointers)...and properties unique to each level
+// (what kind of array is being scanned, where the line was when that array
+// started, etc.)
+//
+// This was introduced to try and improve some error messages that were not
+// able to accurately track unique properties across recursion levels.  e.g.
+// if a nested block is going to give an error about an unmatched bracket,
+// it wants that error to point to the line number of the start of what it
+// was trying to match.  But it cannot overwrite the line number of a
+// shared scan state without potentially garbling the reported start line
+// of the outer recursion.  Separate variables are needed--and it's clearer
+// to break them out into structures than to try and use local variables
+//
 
-typedef struct rebol_scan_state {
+typedef struct rebol_scan_state {  // shared across all levels of a scan
     //
-    // The mode_char can be '\0', ']', ')', or '/'
+    // Beginning and end positions of currently processed token.
     //
-    REBYTE mode_char;
+    const REBYTE *begin;
+    const REBYTE *end;
 
     // If feed is NULL, then it is assumed that the `begin` is the source of
     // the UTF-8 data to scan.  Otherwise, it is a variadic feed of UTF-8
@@ -283,23 +299,45 @@ typedef struct rebol_scan_state {
     //
     struct Reb_Feed *feed;
 
-    const REBYTE *begin;
-    const REBYTE *end;
+    REBSTR *file;  // file currently being scanned (or anonymous)
 
-    // The "limit" feature was not implemented, scanning stopped on a null
-    // terminator.  It may be interesting in the future, but it doesn't mix
-    // well with scanning variadics which merge REBVAL and UTF-8 strings
-    // together...
+    REBLIN line;  // line number where current scan position is
+    const REBYTE *line_head;  // pointer to head of current line (for errors)
+
+    // The "limit" feature was not implemented, scanning just stopped at '\0'.
+    // It may be interesting in the future, but it doesn't mix well with
+    // scanning variadics which merge REBVAL and UTF-8 strings together...
     //
     /* const REBYTE *limit; */
-    
-    REBLEN line;
-    const REBYTE *line_head; // head of current line (used for errors)
+
+    // !!! R3-Alpha had a /RELAX mode for TRANSCODE, which offered the ability
+    // to get a partial scan with an error on a token.  An error propagating
+    // out via fail() would not allow a user to get such partial results
+    // (unless they were parameters to the error).  The feature was not really
+    // specified well...but without some more recoverable notion of state in a
+    // nested parse, only errors at the topmost level can be meaningful.  So
+    // Ren-C has this flag which is set by the scanner on failure.  A better
+    // notion would likely integrate with PARSE.  In any case, we track the
+    // depth so that a failure can potentially be recovered from at 0.
+    //
+    REBLEN depth;
+} SCAN_STATE;
+
+typedef struct rebol_scan_level {  // each array scan corresponds to a level
+    SCAN_STATE *ss;  // shared state of where the scanner head currently is
+
+    // '\0' => top level scan
+    // ']' => this level is scanning a block
+    // '/' => this level is scanning a path
+    // ')' => this level is scanning a group
+    //
+    // (Chosen as the terminal character to use in error messages for the
+    // character we are seeking to find a match for).
+    //
+    REBYTE mode_char;
 
     REBLEN start_line;
     const REBYTE *start_line_head;
-
-    REBSTR *file;
 
     // CELL_FLAG_LINE appearing on a value means that there is a line break
     // *before* that value.  Hence when a newline is seen, it means the *next*
@@ -308,16 +346,14 @@ typedef struct rebol_scan_state {
     bool newline_pending;
 
     REBFLGS opts;
-} SCAN_STATE;
+} SCAN_LEVEL;
 
 #define ANY_CR_LF_END(c) ((c) == '\0' or (c) == CR or (c) == LF)
 
 enum {
     SCAN_FLAG_NEXT = 1 << 0, // load/next feature
-    SCAN_FLAG_ONLY = 1 << 1, // only single value (no blocks)
-    SCAN_FLAG_RELAX = 1 << 2, // no error throw
-    SCAN_FLAG_NULLEDS_LEGAL = 1 << 3, // NULL splice in top level of rebValue()
-    SCAN_FLAG_LOCK_SCANNED = 1 << 4  // lock series as they are loaded
+    SCAN_FLAG_NULLEDS_LEGAL = 1 << 2, // NULL splice in top level of rebValue()
+    SCAN_FLAG_LOCK_SCANNED = 1 << 3  // lock series as they are loaded
 };
 
 

@@ -125,30 +125,31 @@
         return m_cast(REBYTE*, bp);
     }
 
+    inline static REBUNI CHR_CODE(const REBYTE *bp) {
+        REBUNI codepoint;
+        NEXT_CHR(&codepoint, bp);
+        return codepoint;
+    }
+
     inline static REBYTE* SKIP_CHR(
         REBUNI *codepoint_out,
         const REBYTE *bp,
         REBINT delta
     ){
-        REBINT n = delta;
-        while (n != 0) {
-            if (delta > 0) {
-                bp = NEXT_CHR(codepoint_out, bp);
-                --n;
-            }
-            else {
-                bp = BACK_CHR(codepoint_out, bp);
-                ++n;
+        if (delta > 0) {
+            while (delta != 0) {
+                bp = NEXT_STR(bp);
+                --delta;
             }
         }
+        else {
+            while (delta != 0) {
+                bp = BACK_STR(bp);
+                ++delta;
+            }
+        }
+        *codepoint_out = CHR_CODE(bp);
         return m_cast(REBYTE*, bp);
-    }
-
-
-    inline static REBUNI CHR_CODE(const REBYTE *bp) {
-        REBUNI codepoint;
-        NEXT_CHR(&codepoint, bp);
-        return codepoint;
     }
 
     inline static REBYTE* WRITE_CHR(REBYTE* bp, REBUNI c) {
@@ -188,6 +189,7 @@
         const REBYTE *bp;  // will actually be mutable if constructed mutable
 
         RebchrPtr () {}
+        RebchrPtr (nullptr_t n) : bp (n) {}
         explicit RebchrPtr (const REBYTE *bp) : bp (bp) {}
         explicit RebchrPtr (const char *cstr)
             : bp (cast(const REBYTE*, cstr)) {}
@@ -206,7 +208,7 @@
             --t;
             while (Is_Continuation_Byte_If_Utf8(*t))
                 --t;
-            next(out);
+            Back_Scan_UTF8_Char_Unchecked(out, t);
             return RebchrPtr {t};
         }
 
@@ -226,27 +228,28 @@
             return RebchrPtr {t};
         }
 
-        RebchrPtr skip(REBUNI *out, REBINT delta) {
-            assert(delta != 0);
-            REBINT n = delta;
-            const REBYTE *t = bp;  // shouldn't be used
-            while (n != 0) {
-                if (delta > 0) {
-                    t = next(out).bp;
-                    --n;
-                }
-                else {
-                    t = back(out).bp;
-                    ++n;
-                }
-            }
-            return RebchrPtr {t};
-        }
-
         REBUNI code() {
             REBUNI c;
             next(&c);
             return c;
+        }
+
+        RebchrPtr skip(REBUNI *out, REBINT delta) {
+            RebchrPtr t = *this;
+            if (delta > 0) {
+                while (delta != 0) {
+                    t = t.next_only();
+                    --delta;
+                }
+            }
+            else {
+                while (delta != 0) {
+                    t = t.back_only();
+                    ++delta;
+                }
+            }
+            *out = t.code();
+            return RebchrPtr {t.bp};
         }
 
         REBSIZ operator-(const REBYTE *rhs)
@@ -267,13 +270,28 @@
         bool operator!=(const REBYTE *other)
           { return bp != other; }
 
-        operator const void*() { return bp; }  // implicit cast
-        operator const REBYTE*() { return bp; }  // implicit cast
+        bool operator>(const RebchrPtr<const REBYTE*> &other)
+          { return bp > other.bp; }
+
+        bool operator<(const REBYTE *other)
+          { return bp < other; }
+
+        bool operator<=(const RebchrPtr<const REBYTE*> &other)
+          { return bp <= other.bp; }
+
+        bool operator>=(const REBYTE *other)
+          { return bp >= other; }
+
+        operator bool() { return bp != nullptr; }  // implicit
+        operator const void*() { return bp; }  // implicit
+        operator const REBYTE*() { return bp; }  // implicit
+        operator const char*() { return cast(const char*, bp); }  // implicit
     };
 
     template<>
     struct RebchrPtr<REBYTE*> : public RebchrPtr<const REBYTE*> {
         RebchrPtr () : RebchrPtr<const REBYTE*>() {}
+        RebchrPtr (nullptr_t n) : RebchrPtr<const REBYTE*>(n) {}
         explicit RebchrPtr (REBYTE *bp)
             : RebchrPtr<const REBYTE*> (bp) {}
         explicit RebchrPtr (char *cstr)
@@ -303,16 +321,17 @@
             return RebchrPtr {m_cast(REBYTE*, bp) + size};
         }
 
-        operator void*() { return m_cast(REBYTE*, bp); }  // implicit cast
-        operator REBYTE*() { return m_cast(REBYTE*, bp); }  // implicit cast
+        operator void*() { return m_cast(REBYTE*, bp); }  // implicit
+        operator REBYTE*() { return m_cast(REBYTE*, bp); }  // implicit
+        explicit operator char*() { return m_cast(char*, bp); }
     };
 
     #define NEXT_CHR(out, cp)               (cp).next(out)
     #define BACK_CHR(out, cp)               (cp).back(out)
     #define NEXT_STR(cp)                    (cp).next_only()
     #define BACK_STR(cp)                    (cp).back_only()
-    #define SKIP_CHR(out,cp,delta)          (cp).skip((out), (delta))
     #define CHR_CODE(cp)                    (cp).code()
+    #define SKIP_CHR(out,cp,delta)          (cp).skip((out), (delta))
     #define WRITE_CHR(cp, c)                (cp).write(c)
 #endif
 
@@ -388,7 +407,7 @@ inline static REBLEN STR_LEN(REBSTR *s) {
 
     if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
       #if defined(DEBUG_UTF8_EVERYWHERE)
-        if (MISC(s).length > SER_USED(s)) // includes 0xDECAFBAD
+        if (MISC(s).length > SER_USED(SER(s))) // includes 0xDECAFBAD
             panic(s);
       #endif
         return MISC(s).length;
@@ -415,7 +434,7 @@ inline static REBLEN STR_INDEX_AT(REBSTR *s, REBSIZ offset) {
 
     if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
       #if defined(DEBUG_UTF8_EVERYWHERE)
-        if (MISC(s).length > SER_USED(s)) // includes 0xDECAFBAD
+        if (MISC(s).length > SER_USED(SER(s))) // includes 0xDECAFBAD
             panic(s);
       #endif
 
@@ -810,6 +829,15 @@ inline static REBUNI GET_CHAR_AT(REBSTR *s, REBLEN n) {
 // having more than one way of doing a CHANGE to a character.  Review.
 //
 inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
+    //
+    // We are maintaining the same length, but DEBUG_UTF8_EVERYWHERE will
+    // corrupt the length every time the SER_USED() changes.  Workaround that
+    // by saving the length and restoring at the end.
+    //
+  #ifdef DEBUG_UTF8_EVERYWHERE
+    REBLEN len = STR_LEN(s);
+  #endif
+
     assert(not IS_STR_SYMBOL(s));
     assert(n < STR_LEN(s));
 
@@ -827,24 +855,28 @@ inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
 
         int delta = size - old_size;
         if (delta < 0) {  // shuffle forward, memmove() vs memcpy(), overlaps!
-            memmove(cp + size, old_next_cp, STR_TAIL(s) - old_next_cp);
+            memmove(
+                cast(REBYTE*, cp) + size,
+                old_next_cp,
+                STR_TAIL(s) - old_next_cp
+            );
 
-            // We are maintaining the same length, but for debuggability the
-            // string code doesn't let you change the SER_USED() without
-            // assigning the length.  (See #ifdef DEBUG_UTF8_EVERYWHERE)
-            //
-            REBLEN len = STR_LEN(s);
             SET_SERIES_USED(SER(s), SER_USED(SER(s)) + delta);
-            MISC(SER(s)).length = len;
         }
         else {
             EXPAND_SERIES_TAIL(SER(s), delta);  // this adds to SERIES_USED
-            cp = STR_HEAD(s) + cp_offset;  // refresh `cp` (may reallocate!)
+            cp = cast(REBCHR(*),  // refresh `cp` (may've reallocated!)
+                cast(REBYTE*, STR_HEAD(s)) + cp_offset
+            );
             REBYTE *later = cast(REBYTE*, cp) + delta;
-            memmove(later, cp, STR_TAIL(s) - later);  // may not be terminated
+            memmove(
+                later,
+                cp,
+                cast(REBYTE*, STR_TAIL(s)) - later
+            );  // Note: may not be terminated
         }
 
-        *STR_TAIL(s) = '\0';  // add terminator
+        *cast(REBYTE*, STR_TAIL(s)) = '\0';  // add terminator
 
         // `cp` still is the start of the character for the index we were
         // dealing with.  Only update bookmark if it's an offset *after*
@@ -854,6 +886,10 @@ inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
         if (book and BMK_OFFSET(book) > cp_offset)
             BMK_OFFSET(book) += delta;
     }
+
+  #ifdef DEBUG_UTF8_EVERYWHERE  // see note on `len` at start of function
+    MISC(SER(s)).length = len;
+  #endif
 
     Encode_UTF8_Char(cp, c, size);
     ASSERT_SERIES_TERM(SER(s));
@@ -951,7 +987,7 @@ inline static REBCTX *Error_Illegal_Cr(const REBYTE *at, const REBYTE *start)
     }
     REBVAL *str = rebSizedText(
         cast(const char*, back),
-        at - back + 1  // include the CR (should show escaped, e.g. ^M)
+        at - cast(const REBYTE*, back) + 1  // include CR (escaped, e.g. ^M)
     );
     REBCTX *error = Error_Illegal_Cr_Raw(str);
     rebRelease(str);

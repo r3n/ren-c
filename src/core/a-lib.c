@@ -377,7 +377,7 @@ void RL_rebShutdown(bool clean)
     //
     OS_Quit_Devices(0);
 
-  #if defined(NDEBUG)
+  #if defined(NDEBUG) && !defined(INCLUDE_CALLGRIND_NATIVE)
     if (not clean)
         return;  // Only do the work above this line in an unclean shutdown
   #else
@@ -385,6 +385,12 @@ void RL_rebShutdown(bool clean)
     // need it--to see if it triggers any alerts.
     //
     UNUSED(clean);
+
+    // Shutdown, Startup, and then shutdown again to make sure we can do so
+    // in case a system wanted to uninitialize then reinitialize.
+    //
+    Shutdown_Core();
+    Startup_Core();
   #endif
 
     // Everything Shutdown_Core() does pertains to getting a no-leak state
@@ -747,8 +753,9 @@ REBVAL *RL_rebArg(unsigned char quotes, const void *p, va_list *vaptr)
 //
 //=////////////////////////////////////////////////////////////////////////=//
 
-static void Run_Va_May_Fail(
+static void Run_Va_May_Fail_Core(
     REBVAL *out,
+    bool interruptible,  // whether a HALT can cause a longjmp/throw
     unsigned char quotes,  // how many quote levels to add to spliced values
     const void *p,  // first pointer (may be END, nullptr means NULLED)
     va_list *vaptr  // va_end() handled by feed for all cases (throws, fails)
@@ -757,12 +764,24 @@ static void Run_Va_May_Fail(
 
     REBFLGS flags = EVAL_MASK_DEFAULT | FLAG_QUOTING_BYTE(quotes);
 
+    // !!! Some kind of policy is needed to decide how to disable halting in
+    // the API.  It uses the longjmp() mechanism as a "no catch for throw",
+    // meaning that an error could be introduced at any moment in the code.
+    // Recovery from a HALT is almost like recovering from a stack overflow
+    // exception, in terms of how bad the program state could wind up (though
+    // the intereter will be okay, it's like any line in your program could
+    // have half-run.  Review a holistic answer.
+    //
     REBFLGS saved_sigmask = Eval_Sigmask;
-    Eval_Sigmask &= ~SIG_HALT;  // We don't want halt or Ctrl-C during APIs
+    if (interruptible)
+        Eval_Sigmask |= SIG_HALT;  // enable
+    else
+        Eval_Sigmask &= ~SIG_HALT;  // disable
 
     DECLARE_VA_FEED (feed, p, vaptr, flags);
     bool threw = Do_Feed_To_End_Maybe_Stale_Throws(out, feed);
 
+    // (see also Reb_State->saved_sigmask RE: if a longjmp happens)
     Eval_Sigmask = saved_sigmask;
 
     if (threw) {
@@ -777,6 +796,9 @@ static void Run_Va_May_Fail(
 
     CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
 }
+
+#define Run_Va_May_Fail(out,quotes,p,vaptr) \
+    Run_Va_May_Fail_Core((out), false, (quotes), (p), (vaptr))
 
 
 //
@@ -816,6 +838,24 @@ REBVAL *RL_rebQuote(unsigned char quotes, const void *p, va_list *vaptr)
     return Quotify(result, 1);  // nulled cells legal for API if quoted
 }
 
+
+//
+//  rebQuoteInterruptible: RL_API
+//
+// !!! The core interruptible routine used at the moment is rebQuote, inside
+// of console code.  More will be needed, but this is made to quarantine the
+// unfinished design points to one routine for now.
+//
+REBVAL *RL_rebQuoteInterruptible(
+    unsigned char quotes,
+    const void *p,
+    va_list *vaptr
+){
+    REBVAL *result = Alloc_Value();
+    Run_Va_May_Fail_Core(result, true, quotes, p, vaptr);  // calls va_end()
+
+    return Quotify(result, 1);  // nulled cells legal for API if quoted
+}
 
 //
 //  rebElide: RL_API
@@ -1321,16 +1361,7 @@ REBVAL *RL_rebRescue(
     // now pretend to be applying a dummy native.
     //
     DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT);  // not FULLY_SPECIALIZED
-    Push_Frame(nullptr, f);
-
-    REBSTR *opt_label = NULL;
-
-    Push_Action(f, PG_Dummy_Action, UNBOUND);
-    Begin_Prefix_Action(f, opt_label);
-    assert(IS_END(f->arg));
-    f->param = END_NODE;  // signal all arguments gathered
-    f->arg = m_cast(REBVAL*, END_NODE);
-    f->special = END_NODE;
+    Push_Dummy_Frame(f);
 
   #ifdef DEBUG_ENSURE_FRAME_EVALUATES
     f->was_eval_called = true;  // "fake" frame, okay to lie
@@ -1350,14 +1381,7 @@ REBVAL *RL_rebRescue(
 
     REBVAL *result = (*dangerous)(opaque);
 
-    Drop_Action(f);
-
-    // !!! To abstract how the system deals with exception handling, the
-    // rebRescue() routine started being used in lieu of PUSH_TRAP/DROP_TRAP
-    // internally to the system.  Some of these system routines accumulate
-    // stack state, so Drop_Frame_Unbalanced() must be used.
-    //
-    Drop_Frame_Unbalanced(f);
+    Drop_Dummy_Frame_Unbalanced(f);
 
     DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
 
@@ -1432,21 +1456,37 @@ REBVAL *RL_rebRescueWith(
 //
 //  rebHalt: RL_API
 //
-// Signal that code evaluation needs to be interrupted.
+// This function sets a signal that is checked during evaluation of code
+// when it is run interruptibly.  Most API evaluations are not interruptible,
+// because that would create unsafe situations.
 //
-// Returns:
-//     nothing
-// Notes:
-//     This function sets a signal that is checked during evaluation
-//     and will cause the interpreter to begin processing an escape
-//     trap. Note that control must be passed back to REBOL for the
-//     signal to be recognized and handled.
+// !!! Halting, exceptions, and stack overflows are all areas where the
+// computing world in general doesn't have great answers.  Ren-C is nothing
+// special in this regard, and more thought needs to be put into it!
 //
 void RL_rebHalt(void)
 {
     SET_SIGNAL(SIG_HALT);
 }
 
+
+//
+//  rebWasHalting: RL_API
+//
+// Returns whether or not the halting signal is set, but clears it if set.
+// Hence the question it answers is "was it halting" (previous to this call),
+// because it never will be after it.
+//
+// Hence whoever checks this flag has erased the knowledge of a Ctrl-C signal,
+// and bears the burden for propagating the signal up to something that does
+// a HALT later--or it will be lost.
+//
+bool RL_rebWasHalting(void)
+{
+    bool halting = GET_SIGNAL(SIG_HALT);
+    CLR_SIGNAL(SIG_HALT);
+    return halting;
+}
 
 
 //=//// API "INSTRUCTIONS" ////////////////////////////////////////////////=//
@@ -1834,8 +1874,10 @@ REBVAL *RL_rebError_OS(int errnum)  // see also convenience macro rebFail_OS()
 
         char buffer[MAX_POSIX_ERROR_LEN];
         char *maybe_str = strerror_r(errnum, buffer, MAX_POSIX_ERROR_LEN);
-        if (maybe_str != buffer)
-            strncpy(buffer, maybe_str, MAX_POSIX_ERROR_LEN);
+        if (maybe_str != buffer) {
+            strncpy(buffer, maybe_str, MAX_POSIX_ERROR_LEN - 1);
+            buffer[MAX_POSIX_ERROR_LEN - 1] = '\0';  // in case truncated
+        }
         error = Error_User(buffer);
     #else
         // Quoting glibc's strerror_r manpage: "The XSI-compliant strerror_r()

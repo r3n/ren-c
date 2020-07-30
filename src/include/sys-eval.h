@@ -162,7 +162,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
     Literal_Next_In_Feed(out, feed);
 
     if (KIND_BYTE_UNCHECKED(feed->value) == REB_WORD) {
-        feed->gotten = Try_Get_Opt_Var(feed->value, feed->specifier);
+        feed->gotten = Try_Lookup_Word(feed->value, feed->specifier);
         if (
             not feed->gotten
             or not IS_ACTION(feed->gotten)

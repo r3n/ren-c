@@ -25,7 +25,7 @@
 ]
 (trap [fail make error! ""] then [true])
 (trap [1 / 0] then :error?)
-(trap [1 / 0] then (func [e] [error? e]))
+(trap [1 / 0] then e => [error? e])
 (trap [] then (func [e] [<handler-not-run>]) else [true])
 [#1514
     (error? trap [trap [1 / 0] then :add])

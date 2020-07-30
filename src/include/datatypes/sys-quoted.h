@@ -213,7 +213,7 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
 
 
 inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v) {
-    if (KIND_BYTE(v) != REB_QUOTED)
+    if (KIND_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable blanks
         return v;  // Note: kind byte may be > 64
 
     // The reason this routine returns `const` is because you can't modify

@@ -381,10 +381,7 @@ static const RELVAL *Get_Parse_Value(
         if (VAL_CMD(rule))  // includes IS_BAR()...also a "command"
             return rule;
 
-        Move_Opt_Var_May_Fail(cell, rule, specifier);
-        if (IS_NULLED(cell))
-            fail (Error_No_Value_Core(rule, specifier));
-
+        Get_Word_May_Fail(cell, rule, specifier);
         return cell;
     }
 
@@ -607,7 +604,40 @@ static REB_R Parse_One_Rule(
     else {
         assert(ANY_STRING_KIND(P_TYPE) or P_TYPE == REB_BINARY);
 
-        switch (VAL_TYPE(rule)) {
+        // We try to allow some conveniences when parsing strings based on
+        // how items render, e.g.:
+        //
+        //     >> did parse "ab<c>10" ['ab <c> '10]
+        //     == #[true]
+        //
+        // It can be less visually noisy than:
+        //
+        //     >> did parse "ab<c>10" ["ab" {<c>} "10"]
+        //     == #[true]
+        //
+        // !!! The concept is based somewhat on what was legal in FIND for
+        // Rebol2, and leverages quoting.  It's being experimented with.
+        //
+        const REBCEL *rule_cell = VAL_UNESCAPED(rule);
+        enum Reb_Kind rule_cell_kind = CELL_KIND(rule_cell);
+        if (
+            (ANY_WORD_KIND(rule_cell_kind) and VAL_NUM_QUOTES(rule) == 1)
+            or (ANY_STRING_KIND(rule_cell_kind) and VAL_NUM_QUOTES(rule) <= 1)
+            or (rule_cell_kind == REB_BINARY and VAL_NUM_QUOTES(rule) == 0)
+            or (rule_cell_kind == REB_INTEGER and VAL_NUM_QUOTES(rule) == 1)
+        ){
+            REBLEN len;
+            REBLEN index = Find_In_Any_Sequence(
+                &len,
+                P_INPUT_VALUE,
+                rule_cell,
+                P_FIND_FLAGS | AM_FIND_MATCH
+            );
+            if (index == NOT_FOUND)
+                return R_UNHANDLED;
+            return Init_Integer(P_OUT, index + len);
+        }
+        else switch (VAL_TYPE(rule)) {
           case REB_CHAR:
             if (P_TYPE == REB_BINARY) {
                 //
@@ -648,22 +678,6 @@ static REB_R Parse_One_Rule(
             }
             return Init_Integer(P_OUT, P_POS + 1);
 
-          case REB_TAG:
-          case REB_FILE:
-          case REB_EMAIL:
-          case REB_TEXT:
-          case REB_BINARY: {
-            REBLEN len;
-            REBLEN index = Find_In_Any_Sequence(
-                &len,
-                P_INPUT_VALUE,
-                rule,
-                P_FIND_FLAGS | AM_FIND_MATCH
-            );
-            if (index == NOT_FOUND)
-                return R_UNHANDLED;
-            return Init_Integer(P_OUT, index + len); }
-
           case REB_BITSET: {
             //
             // Check current char/byte against character set, advance matches
@@ -688,22 +702,21 @@ static REB_R Parse_One_Rule(
             REBSIZ size;
             const REBYTE *bp = VAL_BYTES_AT(&size, P_INPUT_VALUE);
 
+            SCAN_LEVEL level;
             SCAN_STATE ss;
-            Init_Scan_State(&ss, filename, start_line, bp, size);
-            ss.opts |= SCAN_FLAG_NEXT;  // _ONLY?
-            ss.opts |= SCAN_FLAG_RELAX;  // error is parse failure
+            Init_Scan_Level(&level, &ss, filename, start_line, bp, size);
+            level.opts |= SCAN_FLAG_NEXT;  // _ONLY?
 
             REBDSP dsp_orig = DSP;
-            Scan_To_Stack_Relaxed(&ss);
+            if (Scan_To_Stack_Relaxed_Failed(&level)) {
+                DS_DROP();
+                return R_UNHANDLED;
+            }
+
             if (DSP == dsp_orig)
                 return R_UNHANDLED;  // nothing was scanned
 
             assert(DSP == dsp_orig + 1);  // only adds one value to stack
-
-            if (IS_ERROR(DS_TOP)) {
-                DS_DROP();
-                return R_UNHANDLED;
-            }
 
             enum Reb_Kind kind = VAL_TYPE(DS_TOP);
             if (IS_DATATYPE(rule)) {
@@ -759,8 +772,12 @@ static REBIXO To_Thru_Block_Rule(
 ) {
     DECLARE_LOCAL (cell); // holds evaluated rules (use frame cell instead?)
 
+    // Note: This enumeration goes through <= SER_LEN(P_INPUT), because the
+    // block rule might be something like `to [{a} | end]`.  e.g. being
+    // positioned on the end cell or null terminator of a string may match.
+    //
     REBLEN pos = P_POS;
-    for (; pos <= SER_LEN(P_INPUT); ++pos) {
+    for (; pos <= SER_LEN(P_INPUT); ++pos) {  // see note
         const RELVAL *blk = VAL_ARRAY_HEAD(rule_block);
         for (; NOT_END(blk); blk++) {
             if (IS_BAR(blk))
@@ -800,7 +817,7 @@ static REBIXO To_Thru_Block_Rule(
                         fail (Error_Parse_Rule());
                 }
                 else {
-                    Move_Opt_Var_May_Fail(cell, rule, P_RULE_SPECIFIER);
+                    Get_Word_May_Fail(cell, rule, P_RULE_SPECIFIER);
                     rule = cell;
                 }
             }
@@ -832,8 +849,18 @@ static REBIXO To_Thru_Block_Rule(
             else if (P_TYPE == REB_BINARY) {
                 REBYTE ch1 = *BIN_AT(P_INPUT, pos);
 
-                // Handle special string types:
-                if (IS_CHAR(rule)) {
+                if (pos == SER_LEN(P_INPUT)) {
+                    //
+                    // If we weren't matching END, then the only other thing
+                    // we'll match at the BINARY! end is an empty BINARY!.
+                    // Not a NUL codepoint, because the internal BINARY!
+                    // terminator is implementation detail.
+                    //
+                    assert(ch1 == '\0');  // internal BINARY! terminator
+                    if (IS_BINARY(rule) and VAL_LEN_AT(rule) == 0)
+                        return pos;
+                }
+                else if (IS_CHAR(rule)) {
                     if (VAL_CHAR(rule) > 0xff)
                         fail (Error_Parse_Rule());
 
@@ -873,6 +900,15 @@ static REBIXO To_Thru_Block_Rule(
                 assert(ANY_STRING_KIND(P_TYPE));
 
                 REBUNI ch_unadjusted = GET_CHAR_AT(STR(P_INPUT), pos);
+                if (ch_unadjusted == '\0') { // cannot be passed to UP_CASE()
+                    assert(pos == SER_LEN(P_INPUT));
+
+                    if (IS_TEXT(rule) and VAL_LEN_AT(rule) == 0)
+                        return pos;  // empty string can match at end
+
+                    goto next_alternate_rule;  // other match is END (above)
+                }
+
                 REBUNI ch;
                 if (!P_HAS_CASE)
                     ch = UP_CASE(ch_unadjusted);
@@ -881,6 +917,9 @@ static REBIXO To_Thru_Block_Rule(
 
                 if (IS_CHAR(rule)) {
                     REBUNI ch2 = VAL_CHAR(rule);
+                    if (ch2 == 0)
+                        goto next_alternate_rule;  // no 0 char in ANY-STRING!
+
                     if (!P_HAS_CASE)
                         ch2 = UP_CASE(ch2);
                     if (ch == ch2) {
@@ -890,7 +929,7 @@ static REBIXO To_Thru_Block_Rule(
                     }
                 }
                 else if (IS_BITSET(rule)) {
-                    if (Check_Bit(VAL_SERIES(rule), ch, not P_HAS_CASE)) {
+                    if (Check_Bit(VAL_BITSET(rule), ch, not P_HAS_CASE)) {
                         if (is_thru)
                             return pos + 1;
                         return pos;
@@ -1219,7 +1258,7 @@ static void Handle_Mark_Rule(
     REBYTE k = KIND_BYTE(rule);  // REB_0_END ok
     if (k == REB_WORD or k == REB_SET_WORD) {
         Move_Value(
-            Sink_Var_May_Fail(rule, specifier),
+            Sink_Word_May_Fail(rule, specifier),
             P_INPUT_VALUE
         );
     }
@@ -1244,7 +1283,7 @@ static REB_R Handle_Seek_Rule_Dont_Update_Begin(
 ){
     REBYTE k = KIND_BYTE(rule);  // REB_0_END ok
     if (k == REB_WORD or k == REB_GET_WORD) {
-        rule = Get_Opt_Var_May_Fail(rule, specifier);
+        rule = Lookup_Word_May_Fail(rule, specifier);
         k = KIND_BYTE(rule);
     }
     else if (k == REB_PATH) {
@@ -1617,7 +1656,7 @@ REBNATIVE(subparse)
                     SET_END(P_OUT);  // restore invariant
 
                     Init_Block(
-                        Sink_Var_May_Fail(
+                        Sink_Word_May_Fail(
                             set_or_copy_word,
                             P_RULE_SPECIFIER
                         ),
@@ -1649,46 +1688,37 @@ REBNATIVE(subparse)
 
                     if (IS_GET_BLOCK(rule)) {
                         //
-                        // Experimental use of GET-BLOCK! to mean ordinary
+                        // !!! Experimental use of GET-BLOCK! to mean ordinary
                         // evaluation of material that is not matched as
-                        // a PARSE rule.  It does a REDUCE instead of a plain
-                        // DO in order to more parallel the evaluator behavior
-                        // of a GET-BLOCK!, which is probably the best idea.
+                        // a PARSE rule.
                         //
-                        REBDSP dsp_orig = DSP;
                         assert(IS_END(P_OUT));  // should be true until finish
-                        if (Reduce_To_Stack_Throws(
+                        if (Do_Any_Array_At_Throws(
                             P_OUT,
                             rule,
                             P_RULE_SPECIFIER
                         )){
                             return R_THROWN;
                         }
-                        SET_END(P_OUT);  // since we didn't throw, put it back
 
-                        if (DSP == dsp_orig) {
+                        if (IS_END(P_OUT) or IS_NULLED(P_OUT)) {
                             // Nothing to add
                         }
                         else if (only) {
-                            Init_Block(
+                            Move_Value(
                                 Alloc_Tail_Array(P_COLLECTION),
-                                Pop_Stack_Values(dsp_orig)
+                                P_OUT
                             );
                         }
-                        else {
-                            REBVAL *stacked = DS_AT(dsp_orig);
-                            do {
-                                ++stacked;
-                                Move_Value(
-                                    Alloc_Tail_Array(P_COLLECTION),
-                                    stacked
-                                );
-                            } while (stacked != DS_TOP);
-                        }
-                        DS_DROP_TO(dsp_orig);
+                        else
+                            rebElide(
+                                "append", P_COLLECTION_VALUE, rebQ1(P_OUT),
+                            rebEND);
+
+                        SET_END(P_OUT);  // since we didn't throw, put it back
 
                         // Don't touch P_POS, we didn't consume anything from
-                        // the input series.
+                        // the input series but just fabricated DO material.
 
                         FETCH_NEXT_RULE(f);
                     }
@@ -1934,7 +1964,7 @@ REBNATIVE(subparse)
                 assert(IS_WORD(rule));  // word - some other variable
 
                 if (rule != save) {
-                    Move_Opt_Var_May_Fail(save, rule, P_RULE_SPECIFIER);
+                    Get_Word_May_Fail(save, rule, P_RULE_SPECIFIER);
                     rule = save;
                 }
                 if (IS_NULLED(rule))
@@ -2409,7 +2439,7 @@ REBNATIVE(subparse)
                 count = (begin > P_POS) ? 0 : P_POS - begin;
 
                 if (flags & PF_COPY) {
-                    REBVAL *sink = Sink_Var_May_Fail(
+                    REBVAL *sink = Sink_Word_May_Fail(
                         set_or_copy_word,
                         P_RULE_SPECIFIER
                     );
@@ -2487,7 +2517,7 @@ REBNATIVE(subparse)
 
                     if (IS_SER_ARRAY(P_INPUT)) {
                         Derelativize(
-                            Sink_Var_May_Fail(
+                            Sink_Word_May_Fail(
                                 set_or_copy_word, P_RULE_SPECIFIER
                             ),
                             ARR_AT(ARR(P_INPUT), begin),
@@ -2495,7 +2525,7 @@ REBNATIVE(subparse)
                         );
                     }
                     else {
-                        REBVAL *var = Sink_Var_May_Fail(
+                        REBVAL *var = Sink_Word_May_Fail(
                             set_or_copy_word, P_RULE_SPECIFIER
                         );
 

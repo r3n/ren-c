@@ -40,10 +40,7 @@
 ]
 
 [#84
-    (equal? mold make bitset! "^(00)" "make bitset! #{80}")
-]
-[#84
-    (equal? mold/all make bitset! "^(00)" "#[bitset! #{80}]")
+    (equal? mold/all (make bitset! #{80}) "#[bitset! #{80}]")
 ]
 
 
@@ -158,3 +155,22 @@
         not new-line? next next x
     ]
 )]
+
+
+[#2405
+    ({"ab} = mold/limit "abcdefg" 3)
+    (
+        [str trunc]: mold/limit "abcdefg" 3
+        did all [
+            str = {"ab}
+            trunc = true
+        ]
+    )
+    (
+        [str trunc]: mold/limit "abcdefg" 300
+        did all [
+            str = {"abcdefg"}
+            trunc = false
+        ]
+    )
+]

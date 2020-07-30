@@ -255,7 +255,7 @@ make-changes-file: function [
         if find [{* } {- }] copy/part text 2 [remove/part text 2]
 
         unspaced [
-            {``` } text { ```} space
+            {```} _ text _ {```} _
 
             ; github username or git author name
             " *" github-user-name co/author "* | "

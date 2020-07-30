@@ -76,10 +76,10 @@ make object! compose [
             not :result [
                 "test returned #[false]"
             ]
-        ] then (message => [
+        ] then message => [
             test-failures: me + 1
             log reduce [space {"failed, } message {"} newline]
-        ]) else [
+        ] else [
             successes: me + 1
             log reduce [space {"succeeded"} newline]
         ]
@@ -132,7 +132,7 @@ make object! compose [
         allowed-flags: flags
 
         ; calculate test checksum
-        test-checksum: checksum 'sha1 read-binary file
+        test-checksum: checksum/method (read-binary file) 'sha1
 
         log-file: log-file-prefix
 
@@ -167,9 +167,8 @@ make object! compose [
                         any whitespace
                         [
                             position: "%" (
-                                next-position:
-                                    transcode/next 'value
-                                    position
+                                next_position: _  ; !!! for SET-WORD! gather
+                                [value next-position]: transcode position
                             )
                             :next-position
                                 |

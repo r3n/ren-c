@@ -26,6 +26,22 @@
 
 
 //
+//  MF_Null: C
+//
+// Prior to generalized quoting, NULL did not have a rendering function and
+// it was considered an error to try and mold them.  When quoting arrived,
+// escaped NULL was renderable as its ticks, followed by nothing.  This is
+// the "nothing" part, saving on a special-case for that.
+//
+void MF_Null(REB_MOLD *mo, const REBCEL *v, bool form)
+{
+    UNUSED(mo);
+    UNUSED(form);
+    UNUSED(v);
+}
+
+
+//
 //  MF_Blank: C
 //
 void MF_Blank(REB_MOLD *mo, const REBCEL *v, bool form)

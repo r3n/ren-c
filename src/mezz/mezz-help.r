@@ -71,7 +71,8 @@ description-of: function [
     return: [<opt> text!]
     v [<blank> any-value!]
 ][
-    opt switch type of :v [
+    opt switch type of get/any 'v [
+        void! [blank]
         any-array! [spaced ["array of length:" length of v]]
         image! [spaced ["size:" v/size]]
         datatype! [
@@ -109,6 +110,11 @@ help: function [
     /doc
         "Open web browser to related documentation."
 ][
+    if undefined? 'topic [
+        print "#[void] is a literal VOID! value"
+        return
+    ]
+
     if null? :topic [
         ;
         ; Was just `>> help` or `do [help]` or similar.
@@ -180,7 +186,7 @@ help: function [
     make-libuser: does [
         libuser: copy system/contexts/lib
         for-each [key val] system/contexts/user [
-            if set? 'val [
+            if not void? get/any 'val [
                append libuser reduce [key :val]
             ]
         ]
@@ -223,10 +229,10 @@ help: function [
 
             switch type of value: get/any topic [
                 null [
-                    print ["No information on" topic "(is null)"]
+                    print [topic "is null"]
                 ]
                 void! [
-                    print [topic "is unset (e.g. a VOID! value)"]
+                    print [topic "is not defined (e.g. has a VOID! value)"]
                 ]
             ] then [
                 return
@@ -329,8 +335,6 @@ help: function [
     ; help for complex function derivations is a research project in its
     ; own right.  So it tends to break--test it as much as possible.
 
-    space4: unspaced [space space space space]  ; use instead of tab
-
     print "USAGE:"
 
     args: _  ; plain arguments
@@ -346,13 +350,9 @@ help: function [
     ; !!! Should refinement args be shown for enfixed case??
     ;
     if enfixed and [not empty? args] [
-        print unspaced [
-            space4 spaced [args/1 (uppercase mold topic) next args]
-        ]
+        print [_ _ _ _ args/1 (uppercase mold topic) next args]
     ] else [
-        print unspaced [
-            space4 spaced [(uppercase mold topic) args refinements]
-        ]
+        print [_ _ _ _ (uppercase mold topic) args refinements]
     ]
 
     meta: try meta-of :value
@@ -360,32 +360,23 @@ help: function [
     print newline
 
     print "DESCRIPTION:"
-    print unspaced [space4 (:meta/description or '{(undocumented)})]
-    print unspaced [
-        space4 spaced [(uppercase mold topic) {is an ACTION!}]
-    ]
+    print [_ _ _ _ (:meta/description or '{(undocumented)})]
+    print [_ _ _ _ (uppercase mold topic) {is an ACTION!}]
 
     print-args: function [list /indent-words] [
         for-each param list [
-            type: try ensure [<opt> block!] (
+            type: ensure [<opt> block!] (
                 select try :meta/parameter-types to-word param
             )
-            note: try ensure [<opt> text!] (
+            note: ensure [<opt> text!] (
                 select try :meta/parameter-notes to-word param
             )
 
-            ; parameter name and type line
-            if type [
-                print unspaced [space4 param space "[" type "]"]
-            ] else [
-                print unspaced [space4 param]
-            ]
-
+            print [_ _ _ _ param (if type [unspaced ["[" type "]"]])]
             if note [
-                print unspaced [space4 space4 note]
+                print [_ _ _ _ _ _ _ _ note]
             ]
         ]
-        null
     ]
 
     print newline
@@ -394,7 +385,7 @@ help: function [
         either :meta/return-type [mold :meta/return-type] ["(undocumented)"]
     ]
     if :meta/return-note [
-        print unspaced [space4 meta/return-note]
+        print [_ _ _ _ meta/return-note]
     ]
 
     if not empty? args [
@@ -456,7 +447,7 @@ source: function [
     ; from combining the the META-OF information.
 
     write-stdout unspaced [
-        mold name ":" space "make action! [" space mold spec-of :f
+        mold name ":" _ "make action! [" _ mold spec-of :f
     ]
 
     ; While all interfaces as far as invocation is concerned has been unified

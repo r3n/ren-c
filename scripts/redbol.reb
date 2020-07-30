@@ -61,7 +61,7 @@ emulate: enfixed lib/func [
     :set-word [set-word!]
     code [block!]
 ] lib/in lib [
-    set/any set-word do in lib code  ; SET/ANY, needs to emulate VOID!
+    set set-word do in lib code
     elide export set-word
 ]
 
@@ -117,46 +117,81 @@ rewrite-spec-and-body: helper [
         ;
         if block? first spec [take spec]  ; skip Rebol2's [throw]
 
+        ; Rebol2 and R3-Alpha hid refinements that appeared after /LOCAL
+        ; https://forum.rebol.info/t/analogue-to-rebol2s-hidden-parameters/1273
+        ; Don't hide them, but make them work by pushing them before <local>.
+        ;
+        local-tag-pos: null
+
+        swap-if-after-local: does [
+            if local-tag-pos [
+                assert [local-tag-pos/1 = <local>]
+                local-tag-pos: insert/only local-tag-pos take spec
+                assert [local-tag-pos/1 = <local>]
+            ]
+        ]
+
         spool-descriptions-and-locals: does [
-            while [match [text! set-word!] first spec] [
+            while [match [text! set-word!] first spec] [  ; end-tolerant (null)
+                if not set-word? spec/1 [
+                    swap-if-after-local  ; description for hidden refinement..?
+                ]
                 spec: my next
             ]
         ]
 
         while [not tail? spec] [
-            refinement: try match path! spec/1
+            refinement: to word! try match path! spec/1
 
             ; Refinements with multiple arguments are no longer allowed, and
             ; there weren't many of those so it's not a big deal.  But there
             ; are *many* instances of the non-refinement usage of /LOCAL.
             ; These translate in Ren-C to the <local> tag.
             ;
-            if refinement = lit /local [
+            if refinement = 'local [
                 change spec <local>
-                refinement: _
+                local-tag-pos: spec  ; see note about hidden refinements above
+                spec: my next
+                continue
             ]
 
+            if not refinement [
+                spec: my next  ; ordinary args (or local WORD! after /LOCAL)
+                continue
+            ]
+
+            ; if we get here it's a refinement that is *not* /LOCAL.  This
+            ; means if local-tag-pos isn't null, we need to be moving
+            ; everything we do back to before the <local> (spool does this too)
+            ;
+            swap-if-after-local
             spec: my next
-            if not refinement [continue]
 
-            if tail? spec [break]
             spool-descriptions-and-locals
+
+            if not argument: match [word! lit-word! get-word!] first spec [
+                insert body compose/deep [
+                    (refinement): either (refinement) [true] [blank]
+                ]
+                continue
+            ]
+
             if tail? spec [break]
 
-            if not argument: match [word! lit-word! get-word!] spec/1 [
-                continue  ; refinement didn't take args, so leave it alone
-            ]
             take spec  ; don't want argument between refinement + type block
 
-            if not tail? spec [spool-descriptions-and-locals]
+            spool-descriptions-and-locals
 
             ; may be at tail, if so need the [any-value!] injection
 
-            if types: match block! first spec [  ; explicit arg types
+            if types: match block! spec/1 [  ; explicit arg types
+                swap-if-after-local
                 spec: my next
             ]
             else [
                 insert/only spec [any-value!]  ; old refinement-arg default
+                swap-if-after-local
+                spec: my next
             ]
 
             append spec as set-word! argument  ; SET-WORD! in specs are locals
@@ -171,8 +206,8 @@ rewrite-spec-and-body: helper [
             ; since NONE! is closer to Ren-C's NULL for unused refinements.)
 
             insert body compose/deep [
-                (argument): :(try refinement)
-                if value? :(refinement) [(refinement): true]
+                (argument): :(refinement)
+                (refinement): either value? :(refinement) [true] [blank]
             ]
 
             if tail? spec [break]
@@ -184,13 +219,13 @@ rewrite-spec-and-body: helper [
                     {Refinement} refinement {can't take more than one}
                     {argument in the Redbol emulation, so} extra {must be}
                     {done some other way.  (We should be *able* to do}
-                    {it via variadics, but woul be much more involved.)}
+                    {it via variadics, but would be much more involved.)}
                 ]
             ]
         ]
 
         spec: head spec  ; At tail, so seek head for any debugging!
-
+    
         ; We don't go to an effort to provide a non-definitional return.  But
         ; add support for an EXIT that's a synonym for returning void.
         ;
@@ -221,6 +256,10 @@ redbol-func: func: emulate [
         spec [block!]
         body [block!]
     ][
+        if find spec <local> [
+            return func-nonconst spec body  ; assume "new style" function 
+        ]
+
         spec: copy spec
         body: copy body
         rewrite-spec-and-body spec body
@@ -237,6 +276,10 @@ redbol-function: function: emulate [
         /with [object! block! map!]  ; from R3-Alpha, not adopted by Red
         /extern [block!]  ; from R3-Alpha, adopted by Red
     ][
+        if find spec <local> [
+            return function-nonconst spec body  ; assume "new style" function 
+        ]
+
         if block? with [with: make object! with]
 
         spec: copy spec
@@ -294,7 +337,7 @@ apply: emulate [
                 using-args: did set (in frame second params/1) :arg
             ] else [
                 if using-args [
-                    set* (in frame params/1) :arg
+                    set (in frame params/1) :arg
                 ]
             ]
 
@@ -325,7 +368,7 @@ to-rebol-file: emulate [:local-to-file]
 why?: emulate [does [lib/why]]  ; not exported yet, :why not bound
 
 null: emulate [
-    #"^@" ; NUL in Ren-C https://en.wikipedia.org/wiki/Null_character
+    make char! 0  ; NUL in Ren-C https://en.wikipedia.org/wiki/Null_character
 ]
 
 ; Ren-C's VOID! is nearly identical to UNSET!, but the concept is that
@@ -335,6 +378,7 @@ null: emulate [
 ; https://forum.rebol.info/t/947
 ;
 unset!: emulate [:void!]
+unset?: emulate [:void?]
 
 ; NONE is reserved for `if none [x = 1 | y = 2] [...]`
 ;
@@ -540,13 +584,13 @@ try: emulate [
     ][
         trap [
             result: do block
-        ] then (err => [
+        ] then err => [
             case [
                 blank? :except [err]
                 block? :except [do except]
                 action? :except [try except err]  ; NULL result runs ELSE (!)
             ]
-        ]) else [
+        ] else [
             result
         ]
     ]
@@ -874,7 +918,7 @@ break: emulate [
 
 ++: emulate [
     func [] [
-        fail @return [
+        fail 'return [
             {++ and -- are not in the Redbol layer by default, as they were}
             {not terribly popular to begin with...but also because `--` is}
             {a very useful and easy-to-type dumping construct in Ren-C, that}
@@ -1314,7 +1358,7 @@ read: emulate [
 hijack 'lib/transcode enclose copy :lib/transcode function [f [frame!]] [
     trap [
         result: lib/do copy f  ; COPY so we can DO it again if needed
-    ] then (e => [
+    ] then e => [
         if e/id != 'bad-utf8 [
             fail e
         ]
@@ -1335,7 +1379,7 @@ hijack 'lib/transcode enclose copy :lib/transcode function [f [frame!]] [
         ]
 
         result: lib/do f  ; this time if it fails, we won't TRAP it
-    ])
+    ]
     result
 ]
 

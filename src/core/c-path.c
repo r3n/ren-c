@@ -113,7 +113,7 @@ bool Next_Path_Throws(REBPVS *pvs)
         fail (Error_No_Value_Core(*v, *specifier));
 
     if (IS_GET_WORD(*v)) {  // e.g. object/:field
-        Move_Opt_Var_May_Fail(PVS_PICKER(pvs), *v, *specifier);
+        Get_Word_May_Fail(PVS_PICKER(pvs), *v, *specifier);
     }
     else if (
         IS_GROUP(*v)  // object/(expr) case:
@@ -355,7 +355,7 @@ bool Eval_Path_Throws_Core(
         // Remember the actual location of this variable, not just its value,
         // in case we need to do R_IMMEDIATE writeback (e.g. month/day: 1)
         //
-        pvs->u.ref.cell = Get_Mutable_Var_May_Fail(*v, specifier);
+        pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(*v, specifier);
 
         Move_Value(pvs->out, KNOWN(pvs->u.ref.cell));
 
@@ -504,7 +504,7 @@ bool Eval_Path_Throws_Core(
 void Get_Simple_Value_Into(REBVAL *out, const RELVAL *val, REBSPC *specifier)
 {
     if (IS_WORD(val) or IS_GET_WORD(val))
-        Move_Opt_Var_May_Fail(out, val, specifier);
+        Get_Word_May_Fail(out, val, specifier);
     else if (IS_PATH(val) or IS_GET_PATH(val))
         Get_Path_Core(out, val, specifier);
     else
@@ -533,7 +533,7 @@ REBCTX *Resolve_Path(const REBVAL *path, REBLEN *index_out)
     if (IS_END(picker) or not ANY_WORD(picker))
         return NULL; // !!! only handles heads of paths that are ANY-WORD!
 
-    const RELVAL *var = Get_Opt_Var_May_Fail(picker, VAL_SPECIFIER(path));
+    const RELVAL *var = Lookup_Word_May_Fail(picker, VAL_SPECIFIER(path));
 
     ++picker;
     if (IS_END(picker))

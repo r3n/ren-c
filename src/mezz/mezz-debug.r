@@ -26,7 +26,7 @@ verify: function [
             ;
             while ['| = first conditions] [conditions: my next]
 
-            fail @conditions make error! [
+            fail 'conditions make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [

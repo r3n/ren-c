@@ -2,7 +2,15 @@
 (char? #"a")
 (not char? 1)
 (char! = type of #"a")
-(#"^@" = #"^(00)")
+
+; !!! Workaround for test scanner's use of TRANSCODE that violates the ability
+; to actually work with 0 byte representations in strings (even for a test
+; that is character based).
+;
+(do load #{23225E4022203D2023225E2830302922})  ; ^ @ = ^ (00)
+(do load #{23225E286E756C6C2922203D2023225E2830302922})  ; ^ (null) = ^ (00)
+((load #{23225E2830302922}) = make char! 0)  ; ^ (00)
+
 (#"^A" = #"^(01)")
 (#"^B" = #"^(02)")
 (#"^C" = #"^(03)")
@@ -131,7 +139,8 @@
 (#"~" = #"^(7E)")
 (#"^~" = #"^(7F)")
 ; alternatives
-(#"^(null)" = #"^(00)")
+
+
 (#"^(line)" = #"^(0A)")
 (#"^/" = #"^(0A)")
 (#"^(tab)" = #"^(09)")
@@ -140,30 +149,40 @@
 (#"^(esc)" = #"^(1B)")
 (#"^(back)" = #"^(08)")
 (#"^(del)" = #"^(7f)")
-(#"^(00)" = make char! 0)
-(#"^(00)" = to char! 0)
 ({#"a"} = mold #"a")
 
-(char? #"^(00)")  ; minimmum codepoint
+(
+    c: make char! 0
+    did all [
+        char? c
+        0 = to integer! c
+    ]
+)(
+    c: to char! 0
+    did all [
+        char? c
+        0 = to integer! c
+    ]
+)
 
 (char? #"^(ff)")  ; no longer the maximum
 
-(0 = subtract #"^(00)" #"^(00)")
-(-1 = subtract #"^(00)" #"^(01)")
-(-255 = subtract #"^(00)" #"^(ff)")
-(1 = subtract #"^(01)" #"^(00)")
+(0 = subtract NUL NUL)
+(-1 = subtract NUL #"^(01)")
+(-255 = subtract NUL #"^(ff)")
+(1 = subtract #"^(01)" NUL)
 (0 = subtract #"^(01)" #"^(01)")
 (-254 = subtract #"^(01)" #"^(ff)")
-(255 = subtract #"^(ff)" #"^(00)")
+(255 = subtract #"^(ff)" NUL)
 (254 = subtract #"^(ff)" #"^(01)")
 (0 = subtract #"^(ff)" #"^(ff)")
 
 (
-    e: trap [#"^(00)" - 1]
+    e: trap [NUL - 1]
     e/id = 'type-limit
 )
 (
-    e: trap [#"^(00)" + -1]
+    e: trap [NUL + -1]
     e/id = 'type-limit
 )
 
@@ -208,3 +227,28 @@
         true
     ]
 )
+
+
+[#1043
+    (error? trap [make char! #{}])
+    (error? trap [make char! ""])
+]
+
+
+[#1031
+    ; 1 UTF-8 byte
+    (#"b" = to char! #{62})
+    (#{62} = to binary! #"b")
+
+    ; 2 UTF-8 bytes
+    (#"à" = to char! #{C3A0})
+    (#{C3A0} = to binary! #"à")
+
+    ; 3 UTF-8 bytes
+    (#"漢" = to char! #{E6BCA2})
+    (#{E6BCA2} = to binary! #"漢")
+
+    ; 4 UTF-8 bytes
+    (#"😺" = to char! #{F09F98BA})
+    (#{F09F98BA} = to binary! #"😺")
+]

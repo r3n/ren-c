@@ -15,8 +15,6 @@
 ;
 ; *****************************************************************************
 
-%parse-tests.r
-
 %api/librebol.test.reb
 
 %datatypes/action.test.reb
@@ -161,6 +159,7 @@
 %functions/invisible.test.reb
 %functions/let.test.reb
 %functions/modal.test.reb
+%functions/multi.test.reb
 %functions/oneshot.test.reb
 %functions/redescribe.test.reb
 %functions/redo.test.reb
@@ -203,6 +202,9 @@
 %misc/help.test.reb
 
 %network/http.test.reb
+
+%parse/parse.test.reb
+%parse/parse-collect.test.reb
 
 %redbol/redbol-apply.test.reb
 
@@ -255,6 +257,7 @@
 %string/encode.test.reb
 %string/decompress.test.reb
 %string/dehex.test.reb
+%string/transcode.test.reb
 %string/utf8.test.reb
 
 %system/system.test.reb

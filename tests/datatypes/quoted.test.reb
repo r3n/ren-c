@@ -221,19 +221,19 @@
         |
         #[void]
     ][
-        lit-item: quote :item
+        lit-item: quote get/any 'item
 
         comment "Just testing for crashes; discards mold result"
         mold :lit-item
 
-        (e1: try trap [equal1: :item = :item]) and [
+        (e1: try trap [equal1: equal? get/any 'item get/any 'item]) and [
             e1/where: e1/near: _
         ]
         (e2: try trap [equal2: :lit-item = :lit-item]) and [
             e2/where: e2/near: _
         ]
         if :e1 != :e2 [
-            print mold type of :item
+            print mold type of get/any 'item
             print mold e1
             print mold e2
             fail "no error parity"
@@ -254,7 +254,7 @@
 (
     did all [
         void? x: '#[void]
-        void? :x
+        void? get/any 'x
     ]
 )
 

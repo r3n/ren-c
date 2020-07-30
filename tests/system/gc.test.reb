@@ -27,7 +27,7 @@
 ; Nested unspaced
 (
     nested-unspaced: func [n] [
-        either n <= 1 [n] [unspaced [n space nested-unspaced n - 1]]
+        either n <= 1 [n] [unspaced [n _ nested-unspaced n - 1]]
     ]
     "9 8 7 6 5 4 3 2 1" = nested-unspaced 9
 )
@@ -54,8 +54,7 @@
 )
 ; transcode...
 (
-    transcode 'block to binary! "a [b c]"
-    (unspaced ["<" mold block ">"])
+    (unspaced ["<" mold transcode to binary! "a [b c]" ">"])
         = "<[a [b c]]>"
 )
 ; ...

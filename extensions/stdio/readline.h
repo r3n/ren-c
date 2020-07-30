@@ -47,9 +47,12 @@
 // with C89 then another aspect of that constraint is that you aren't going
 // to get features like command history or tab completion.
 //
-#if defined (__STDC_VERSION__) && __STDC_VERSION__ < 199901L
-    // ...
-#elif !defined(CPLUSPLUS_11)
+#if !defined(__STDC_VERSION__) && !defined(__cplusplus)
+    // ...compiler doesn't follow the foundational standard of spec versioning
+    // e.g. too old to be at or after C99 or C++11 (--std=gnu89 acts like this)
+#elif defined (__STDC_VERSION__) && __STDC_VERSION__ < 199901L
+    // ...claims to be a C compiler, but too old to guarantee variadic macros
+#elif defined(__cplusplus) && !defined(CPLUSPLUS_11)
     // ...C++11 standardized variadic macros in sync with C99's version...
 #elif !defined(TO_WINDOWS) and defined(NO_TTY_ATTRIBUTES)
     // ...couldn't do terminal code even if we bothered with C89 support...

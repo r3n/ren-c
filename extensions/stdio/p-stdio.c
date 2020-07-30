@@ -337,12 +337,11 @@ REB_R Console_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             return rebValue("copy #{}", rebEND);
 
       #if defined(REBOL_SMART_CONSOLE)
-        if (Term_IO) {
+        if (Term_IO) {  // e.g. no redirection (Term_IO is null if so)
             REBVAL *result = Read_Line(Term_IO);
             if (rebDid("void?", rebQ1(result), rebEND)) {  // HALT received
                 rebRelease(result);
-                rebHalt();  // can't do `rebElide("halt")` (it's a throw)
-                return rebValue("const as binary! {halt}", rebEND);  // unseen
+                return rebVoid();
             }
             if (rebDid("blank?", result, rebEND)) {  // ESCAPE received
                 rebRelease(result);
@@ -355,12 +354,22 @@ REB_R Console_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         }
       #endif
 
-        // !!! A fixed size buffer is used to gather console input.  This is
-        // re-used between READ requests.
+        // This build either doesn't have smart console features, or it does
+        // and the input or output have been redirected to a file.
+        //
+        // !!! A fixed size buffer is used to gather standard input.  This is
+        // re-used between READ requests.  A better strategy should be used:
         //
         // https://github.com/rebol/rebol-issues/issues/2364
         //
-        const REBLEN readbuf_size = 32 * 1024;
+        // !!! It appears using ReadFile() on a stdin handle which is attached
+        // to a console can give ERROR_NOT_ENOUGH_MEMORY on some versions of
+        // windows when too large a request is made (e.g. Windows 7).  The
+        // issue arose in the Go language as well:
+        //
+        // https://github.com/golang/go/issues/13697
+
+        const REBLEN readbuf_size = 30 * 1024;  // may back off to smaller size
 
         REBVAL *data = CTX_VAR(ctx, STD_PORT_DATA);
         if (not IS_BINARY(data))

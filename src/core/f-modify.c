@@ -304,6 +304,9 @@ REBLEN Modify_String_Or_Binary(
     REBYTE src_byte;  // only used by BINARY! (mold buffer is UTF-8 legal)
 
     if (IS_CHAR(src)) {  // characters store their encoding in their payload
+        if (VAL_CHAR(src) == '\0' and IS_SER_STRING(dst_ser))
+            fail (Error_Illegal_Zero_Byte_Raw());
+
         src_ptr = VAL_CHAR_ENCODED(src);
         src_size_raw = VAL_CHAR_ENCODED_SIZE(src);
 
@@ -368,7 +371,11 @@ REBLEN Modify_String_Or_Binary(
                 const REBYTE *bp = src_ptr;
                 for (; bytes_left > 0; --bytes_left, ++bp) {
                     REBUNI c = *bp;
-                    if (c >= 0x80) {
+                    if (c < 0x80) {  // ASCII, just check for 0 bytes
+                        if (c == '\0')
+                            fail (Error_Illegal_Zero_Byte_Raw());
+                    }
+                    else {
                         bp = Back_Scan_UTF8_Char(&c, bp, &bytes_left);
                         if (not bp)  // !!! Should Back_Scan() fail?
                             fail (Error_Bad_Utf8_Raw());
@@ -473,7 +480,7 @@ REBLEN Modify_String_Or_Binary(
     // !!! Bad first implementation; improve.
     //
     if (IS_SER_STRING(dst_ser)) {
-        REBCHR(const *) t = src_ptr + src_size_raw;
+        REBCHR(const*) t = cast(REBCHR(const*), src_ptr + src_size_raw);
         while (src_len_raw > limit) {
             t = BACK_STR(t);
             --src_len_raw;
@@ -513,8 +520,10 @@ REBLEN Modify_String_Or_Binary(
         SET_SERIES_USED(dst_ser, dst_used + src_size_total);
 
         if (IS_SER_STRING(dst_ser)) {
-            if (bookmark and BMK_INDEX(bookmark) > dst_idx)  // only INSERT
+            if (bookmark and BMK_INDEX(bookmark) > dst_idx) {  // only INSERT
+                BMK_INDEX(bookmark) += src_len_total;
                 BMK_OFFSET(bookmark) += src_size_total;
+            }
             MISC(dst_ser).length = dst_len_old + src_len_total;
         }
     }
@@ -628,17 +637,18 @@ REBLEN Modify_String_Or_Binary(
     // unified with the mold buffer?)
 
     if (bookmark) {
-        if (BMK_INDEX(bookmark) > STR_LEN(STR(dst_ser))) {  // past active
+        REBSTR *dst_str = STR(dst_ser);
+        if (BMK_INDEX(bookmark) > STR_LEN(dst_str)) {  // past active
             assert(sym == SYM_CHANGE);  // only change removes material
-            Free_Bookmarks_Maybe_Null(STR(dst_ser));
+            Free_Bookmarks_Maybe_Null(dst_str);
         }
         else {
           #if defined(DEBUG_BOOKMARKS_ON_MODIFY)
-            Check_Bookmarks_Debug(dst_ser);
+            Check_Bookmarks_Debug(dst_str);
           #endif
 
-            if (STR_LEN(STR(dst_ser)) < sizeof(REBVAL))  // not kept if small
-                Free_Bookmarks_Maybe_Null(STR(dst_ser));
+            if (STR_LEN(dst_str) < sizeof(REBVAL))  // not kept if small
+                Free_Bookmarks_Maybe_Null(dst_str);
         }
     }
 

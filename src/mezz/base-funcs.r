@@ -46,7 +46,7 @@ maybe: enfixed func* [
         ; While DEFAULT requires a BLOCK!, MAYBE does not.  Catch mistakes
         ; such as `x: maybe [...]`
         ;
-        fail @optional [
+        fail 'optional [
             "Literal" type of :optional "used w/MAYBE, use () if intentional"
         ]
     ]
@@ -57,7 +57,7 @@ maybe: enfixed func* [
     ; https://github.com/rebol/rebol-issues/issues/2275
     ;
     if null? :optional [return get/hard/any compose target]
-    set/hard/any compose target :optional
+    set/hard compose target :optional
 ]
 
 
@@ -281,11 +281,13 @@ func: func* [
     ;
     if const? body [new-body: const new-body]
 
-    func* new-spec either defaulters [
+    let thing
+    func* new-spec thing: either defaulters [
         append/only defaulters as group! any [new-body body]
     ][
         any [new-body body]
     ]
+    (elide if thing/1 = 'new-body [print mold new-spec print mold thing])
 ]
 
 
@@ -441,13 +443,6 @@ redescribe [
     {Create an ACTION, implicity gathering SET-WORD!s as <local> by default}
 ] :function
 
-
-undefine: redescribe [
-    {Sets the value of a word to VOID! (in its current context.)}
-](
-    specialize 'set [any: true | value: void]
-)
-
 unset: redescribe [
     {Clear the value of a word to null (in its current context.)}
 ](
@@ -463,14 +458,14 @@ so: enfixed func [
     feed [<opt> <end> any-value! <...>]
 ][
     if not condition [
-        fail @condition make error! [
+        fail 'condition make error! [
             type: 'Script
             id: 'assertion-failure
             arg1: compose [((:condition)) so]
         ]
     ]
     if tail? feed [return]
-    set* 'feed take feed
+    set 'feed take feed
     if (block? :feed) and [semiquoted? 'feed] [
         fail "Don't use literal block as SO right hand side, use ([...])"
     ]
@@ -487,7 +482,7 @@ matched: enfixed redescribe [
         let value: :f/value  ; returned value
 
         if not do f [
-            fail @f make error! [
+            fail 'f make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [(:value) matches (:test)]
@@ -507,7 +502,7 @@ was: enfixed redescribe [
 ](
     func [left [<opt> any-value!] right [<opt> any-value!]] [
         if :left != :right [
-            fail @return make error! [
+            fail 'return make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [(:left) is (:right)]
@@ -557,11 +552,6 @@ skip*: redescribe [
     specialize 'skip [only: true]
 )
 
-set*: redescribe [
-    {Variant of SET that allows VOID! values}
-](
-    :set/any
-)
 
 ensure: redescribe [
     {Pass through value if it matches test, otherwise trigger a FAIL}
@@ -592,7 +582,7 @@ really: func [
     ; as `x: really [...]`
     ;
     if semiquoted? 'value [
-        fail @value [
+        fail 'value [
             "Literal" type of :value "used w/REALLY, use () if intentional"
         ]
     ]
@@ -620,7 +610,7 @@ find-last: redescribe [
 ](
     adapt 'find-reverse [
         if not any-series? series [
-            fail @series "Can only use FIND-LAST on ANY-SERIES!"
+            fail 'series "Can only use FIND-LAST on ANY-SERIES!"
         ]
 
         series: tail of series  ; can't use plain TAIL due to /TAIL refinement
@@ -663,16 +653,16 @@ iterate-skip: redescribe [
         ; !!! https://github.com/rebol/rebol-issues/issues/2331
         comment [
             let result
-            trap [result: do f] then (lambda e [
-                set* word saved
+            trap [result: do f] then e => [
+                set word saved
                 fail e
-            ])
-            set* word saved
+            ]
+            set word saved
             :result
         ]
 
         do f
-        elide set* word saved
+        elide set word saved
     ][
         series: <overwritten>
     ]
@@ -742,7 +732,7 @@ once-bar: func [
             |
         '|| = look: take lookahead  ; hack...recognize selfs
     ] else [
-        fail @right [
+        fail 'right [
             "|| expected single expression, found residual of" :look
         ]
     ]
@@ -971,7 +961,7 @@ fail: func [
     {Interrupts execution by reporting an error (a TRAP can intercept it).}
 
     :blame "Point to variable or parameter to blame"
-        [<skip> sym-word! sym-path!]
+        [<skip> lit-word! lit-path!]
     reason "ERROR! value, message text, or failure spec"
         [<end> error! text! block!]
     /where "Frame or parameter at which to indicate the error originated"

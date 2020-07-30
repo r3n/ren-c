@@ -37,6 +37,9 @@
 // taken advantage of if they are available.
 //
 
+#ifndef REB_C_H_1020_0304  // "include guard" allows multiple #includes
+#define REB_C_H_1020_0304  // numbers in case REB_C_H defined elsewhere
+
 
 //=//// EXPECTS <stdint.h> OR "pstdint.h" SHIM INCLUDED ///////////////////=//
 //
@@ -471,8 +474,11 @@
 
 #elif defined(CPLUSPLUS_11) //...or above
     //
-    // nullptr included: http://en.cppreference.com/w/cpp/language/nullptr
+    // http://en.cppreference.com/w/cpp/language/nullptr
+    // is defined as `using nullptr_t = decltype(nullptr);` in <cstddef>
     //
+    #include <cstddef>
+    using std::nullptr_t;
 #else
     // C++98 shim from "Effective C++": https://stackoverflow.com/a/44517878
     //
@@ -1048,3 +1054,6 @@
         ));
     }
 #endif
+
+
+#endif  // !defined(REB_C_H_1020_0304)

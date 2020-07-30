@@ -218,7 +218,7 @@ static REBVAL *Run_Sandboxed_Group(REBVAL *group) {
     //
     // So don't add superfluous libRebol calls here, except to debug.
     //
-    return rebQuote(group, rebEND);  // ownership gets proxied
+    return rebQuoteInterruptible(group, rebEND);  // ownership gets proxied
 }
 
 

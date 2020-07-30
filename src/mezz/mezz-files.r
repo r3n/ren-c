@@ -101,7 +101,15 @@ read-line: function [
         system/ports/input: open [scheme: 'console]
     ]
 
-    data: read system/ports/input
+    if void? data: read system/ports/input [
+        ;
+        ; !!! Currently VOID is returned from a port when you read it if
+        ; there was a Ctrl-C that happened.  The code does not have permission
+        ; to spontanously interrupt any API processing, but we can react
+        ; by issuing a THROW manually.
+        ;
+        HALT
+    ]
 
     all [
         1 = length of data
@@ -228,7 +236,7 @@ confirm: function [
         block? with
         length of with > 2
 
-        fail @with [
+        fail 'with [
             "maximum 2 arguments allowed for with [true false]"
             "got:" mold with
         ]

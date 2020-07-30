@@ -297,13 +297,19 @@ int OS_Quit_Devices(int flags)
 
     REBDEV *dev = PG_Device_List;
     for (; dev != nullptr; dev = dev->next) {
-        if (not (dev->flags & RDF_INIT))
-            continue;
+        if (dev->flags & RDF_INIT) {
+            if (dev->commands[RDC_QUIT] != nullptr)
+                dev->commands[RDC_QUIT](cast(REBREQ*, dev));
+            dev->flags &= ~RDF_INIT;
+        }
 
-        if (dev->commands[RDC_QUIT] == nullptr)
-            continue;
-
-        dev->commands[RDC_QUIT](cast(REBREQ*, dev));
+        // !!! There was nothing to clear out pending events in R3-Alpha
+        // if the device itself didn't free them.  "OS Events" for instance.
+        // In order to be able to shut down and start up again safely if
+        // we want to, they have to be freed.
+        //
+        while (dev->pending)
+            Detach_Request(&dev->pending, dev->pending);
     }
 
     return 0;

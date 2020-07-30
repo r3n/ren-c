@@ -706,6 +706,46 @@ REBNATIVE(matches)
 
 
 //
+//  non: native [
+//
+//  {Make sure a value does NOT match a type constraint (see also: ENSURE)}
+//
+//      return: "Input value if it passes the type test"
+//          [<opt> any-value!]
+//      test "The test to apply (limited to DATATYPE! and NULL at this time)"
+//          [<opt> datatype!]
+//      value "Value to test (will either be returned as result or error)"
+//          [<opt> any-value!]
+// ]
+//
+REBNATIVE(non)
+//
+// !!! This is a partial implementation of NON implemented for R3C, just good
+// enough for `non void!` and `non null` cases to give validation options to
+// those wanting a less permissive SET (now that it has no /ANY refinement).
+{
+    INCLUDE_PARAMS_OF_NON;
+
+    REBVAL *test = ARG(test);
+    REBVAL *value = ARG(value);
+
+    if (IS_NULLED(test)) {  // not a datatype, needs special case
+        if (IS_NULLED(value))
+            fail ("NON expected value to not be NULL, but it was");
+    }
+    else if (VAL_TYPE_KIND(test) == REB_VOID) {  // specialize common case
+        if (IS_VOID(value))
+            fail ("NON expected value to not be VOID!, but it was");
+    }
+    else if (not TYPE_CHECK(value, VAL_TYPE_KIND(test))) {
+        fail ("NON expected value to not match a type, but it did match");
+    }
+
+    RETURN (value);
+}
+
+
+//
 //  all: native [
 //
 //  {Short-circuiting variant of AND, using a block of expressions as input}
@@ -1234,7 +1274,7 @@ REBNATIVE(default)
     }
 
     if (IS_SET_WORD(target))
-        Move_Opt_Var_May_Fail(D_OUT, target, SPECIFIED);
+        Move_Value(D_OUT, Lookup_Word_May_Fail(target, SPECIFIED));
     else {
         assert(IS_SET_PATH(target));
 
@@ -1298,7 +1338,7 @@ REBNATIVE(default)
         return R_THROWN;
 
     if (IS_SET_WORD(target))
-        Move_Value(Sink_Var_May_Fail(target, SPECIFIED), D_OUT);
+        Move_Value(Sink_Word_May_Fail(target, SPECIFIED), D_OUT);
     else {
         assert(IS_SET_PATH(target));
         DECLARE_LOCAL (dummy);

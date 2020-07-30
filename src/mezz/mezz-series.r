@@ -74,34 +74,44 @@ remold: redescribe [
 array: function [
     {Makes and initializes a block of a given size}
 
+    return: "Generated block or null if blank input"
+        [<opt> block!]
     size "Size or block of sizes for each dimension"
-        [integer! block!]
+        [<blank> integer! block!]
     /initial "Initial value (will be called each time if a function)"
         [any-value!]
 ][
     initial: :initial else '_  ; default to BLANK!
     if block? size [
-        if tail? rest: next size [rest: _]
-        if not integer? size: first size [
-            fail @size ["Expected INTEGER! size in BLOCK!, not" type of :size]
+        rest: next size else [
+            ;
+            ; Might be reasonable to say `array/initial [] <x>` is `<x>` ?
+            ;
+            fail "Empty ARRAY dimensions (file issue if you want a meaning)"
         ]
+        if not integer? size: size/1 [
+            fail 'size ["Expect INTEGER! size in BLOCK!, not" type of size]
+        ]
+        if tail? rest [rest: null]  ; want `array [2]` => `[_ _]`, no recurse
     ]
+    else [rest: null]
+
     block: make block! size
     case [
-        block? :rest [
-            loop size [block: insert/only block array/initial rest :initial]
+        block? rest [
+            loop size [append/only block array/initial rest :initial]
         ]
         any-series? :initial [
-            loop size [block: insert/only block copy/deep initial]
+            loop size [append/only block copy/deep initial]
         ]
         action? :initial [
-            loop size [block: insert/only block initial]  ; Called every time
+            loop size [append/only block initial]  ; Called every time
         ]
         default [
-            insert/dup/only block :initial size
+            append/only/dup block :initial size
         ]
     ]
-    head of block
+    return block
 ]
 
 
@@ -273,16 +283,22 @@ reword: function [
     ; that will look something like:
     ;
     ; [
-    ;     "keyword1" (keyword-match: lit keyword1)
-    ;     | "keyword2" (keyword-match: lit keyword2)
+    ;     "keyword1" suffix (keyword-match: 'keyword1)
+    ;     | "keyword2" suffix (keyword-match: 'keyword2)
     ;     | fail
     ; ]
     ;
-    ; Note that the enclosing rule has to account for `prefix` and `suffix`,
-    ; this just matches the keywords, setting `keyword-match` if one did.
+    ; Note that the enclosing rule has to account for `prefix`, but `suffix`
+    ; has to be part of this rule.  If it weren't, imagine if prefix is "$<"
+    ; and suffix is ">" and you try to match "$<10>":
+    ;
+    ;    prefix [
+    ;         "1" (keyword-match: '1)  ; ...this will take priority and match
+    ;         | "10" (keyword-match: '10)
+    ;    ] suffix  ; ...but then it's at "0>" and not ">", so it fails
     ;
     keyword-match: _  ; variable that gets set by rule
-    any-keyword-rule: collect [
+    any-keyword-suffix-rule: collect [
         for-each [keyword value] values [
             if not match keyword-types keyword [
                 fail ["Invalid keyword type:" keyword]
@@ -295,7 +311,9 @@ reword: function [
                     keyword
                 ]
 
-                compose lit (keyword-match: lit (keyword))
+                suffix
+
+                compose '(keyword-match: '(keyword))
             ]
 
             keep/line '|
@@ -311,7 +329,7 @@ reword: function [
             prefix  ; consume prefix (if no-op, may not be at start of match)
             [
                 [
-                    any-keyword-rule suffix (
+                    any-keyword-suffix-rule (
                         append/part out a offset? a b  ; output before prefix
 
                         v: select/(case_REWORD) values keyword-match
@@ -594,7 +612,7 @@ split: function [
     series "The series to split"
         [any-series!]
     dlm "Split size, delimiter(s) (if all integer block), or block rule(s)"
-        [block! integer! char! bitset! text! tag!]
+        [block! integer! char! bitset! text! tag! word!]
     /into "If dlm is integer, split in n pieces (vs. pieces of length n)"
 ][
     parse (try match block! dlm) [some integer! end] then [
@@ -607,10 +625,11 @@ split: function [
         ]
     ]
 
-    if tag? dlm [dlm: form dlm]  ; reserve other strings for future meanings
+    if all [any-string? series tag? dlm] [dlm: form dlm]
+    ; reserve other strings for future meanings
 
-    result: collect [
-        parse series if integer? dlm [
+    result: collect [parse series case [
+        integer? dlm [
             size: dlm  ; alias for readability in integer case
             if size < 1 [fail "Bad SPLIT size given:" size]
 
@@ -626,11 +645,11 @@ split: function [
             ] else [
                 [any [copy series 1 size skip (keep/only series)] end]
             ]
-        ] else [
+        ]
+        block? dlm [
             ; A block that is not all integers, e.g. not `[1 1 1]`, acts as a
             ; PARSE rule (see %split.test.reb)
             ;
-            ensure [bitset! text! char! block!] dlm
 
             [
                 any [mk1: while [mk2: [dlm | end] break | skip] (
@@ -639,7 +658,18 @@ split: function [
                 end
             ]
         ]
-    ]
+        default [
+            ensure [bitset! text! char! word! tag!] dlm
+            [
+                some [
+                    copy mk1: [to dlm | to end]
+                    (keep/only mk1)
+                    opt thru dlm
+                ]
+                end
+            ]
+        ]
+    ]]
 
     ; Special processing, to handle cases where the spec'd more items in
     ; /into than the series contains (so we want to append empty items),
@@ -665,7 +695,7 @@ split: function [
         (switch type of dlm [
             bitset! [did find dlm try last series]
             char! [dlm = last series]
-            text! [
+            text! tag! word! [
                 (did find series dlm) and [empty? find-last/tail series dlm]
             ]
             block! [false]

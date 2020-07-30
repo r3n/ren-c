@@ -2,6 +2,43 @@
 
 (did parse "abc" ["abc" end])
 
+; Edge case of matching END with TO or THRU
+;
+("" = parse "" [to ["a" | end]])
+("" = parse "" [thru ["a" | end]])
+([] = parse [] [to ["a" | end]])
+([] = parse [] [thru ["a" | end]])
+
+
+[#206 (
+    any-char: complement charset ""
+    repeat n 512 [
+        if n = 1 [continue]
+        if "" != parse (append copy "" to char! n - 1) [set c any-char end] [
+            fail "Parse didn't work"
+        ]
+        if c != to char! n - 1 [fail "Char didn't match"]
+    ]
+    true
+)]
+
+
+; Don't leak internal detail that BINARY! or ANY-STRING! are 0-terminated
+[
+    (NUL = to char! 0)
+
+    (null = parse "" [to NUL])
+    (null = parse "" [thru NUL])
+    (null = parse "" [to [NUL]])
+    (null = parse "" [thru [NUL]])
+
+    (null = parse #{} [to NUL])
+    (null = parse #{} [thru NUL])
+    (null = parse #{} [to [NUL]])
+    (null = parse #{} [thru [NUL]])
+]
+
+
 ; Are null rules raising the right error?
 
 (
@@ -178,6 +215,10 @@
 [#1457
     (not parse "ba" compose [to (charset "a") "ba" end])
 ]
+[#2141 (
+    xset: charset "x"
+    did parse "x" [thru [xset] end]
+)]
 
 ; self-modifying rule, not legal in Ren-C if it's during the parse
 
@@ -290,113 +331,6 @@
 ])
 
 
-; COLLECT and KEEP keywords
-;
-; Non-keyword COLLECT has issues with binding, but also does not have the
-; necessary hook to be able to "backtrack" and remove kept material when a
-; match rule containing keeps ultimately fails.  These keywords were initially
-; introduced in Red, without backtracking...and affecting the return result.
-; In Ren-C, backtracking is implemented, and also it is used to set variables
-; (like a SET or COPY) instead of affecting the return result.
-
-(did all [
-    parse [1 2 3] [collect x [keep [some integer!]]]
-    x = [1 2 3]
-])
-(did all [
-    parse [1 2 3] [collect x [some [keep integer!]]]
-    x = [1 2 3]
-])
-(did all [
-    parse [1 2 3] [collect x [keep only [some integer!]]]
-    x = [[1 2 3]]
-])
-(did all [
-    parse [1 2 3] [collect x [some [keep only integer!]]]
-    x = [[1] [2] [3]]
-])
-
-; Collecting non-array series fragments
-
-(did all [
-    "bbb" = parse "aaabbb" [collect x [keep [some "a"]]]
-    x = ["aaa"]
-])
-(did all [
-    "" = parse "aaabbbccc" [
-        collect x [keep [some "a"] some "b" keep [some "c"]]
-    ]
-    x = ["aaa" "ccc"]
-])
-
-; Backtracking (more tests needed!)
-
-(did all [
-    [] = parse [1 2 3] [
-        collect x [
-            keep integer! keep integer! keep text!
-            |
-            keep integer! keep [some integer!]
-        ]
-    ]
-    x = [1 2 3]
-])
-
-; No change to variable on failed match (consistent with Rebol2/R3-Alpha/Red
-; behaviors w.r.t SET and COPY)
-
-(did all [
-    x: <before>
-    null = parse [1 2] [collect x [keep integer! keep text!]]
-    x = <before>
-])
-
-; Nested collect
-
-(did all [
-    did parse [1 2 3 4] [
-        collect a [
-            keep integer!
-            collect b [keep [2 integer!]]
-            keep integer!
-        ]
-        end
-    ]
-
-    a = [1 4]
-    b = [2 3]
-])
-
-; GET-BLOCK! can be used to keep material that did not originate from the
-; input series or a match rule.  It does a REDUCE to more closely parallel
-; the behavior of a GET-BLOCK! in the ordinary evaluator.
-;
-(did all [
-    [3] = parse [1 2 3] [
-        collect x [
-            keep integer!
-            keep :['a <b> #c]
-            keep integer!
-        ]
-    ]
-    x = [1 a <b> #c 2]
-])
-(did all [
-    [3] = parse [1 2 3] [
-        collect x [
-            keep integer!
-            keep only :['a <b> #c]
-            keep integer!
-        ]
-    ]
-    x = [1 [a <b> #c] 2]
-])
-(did all [
-    parse [1 2 3] [collect x [keep only :[[a b c]]]]
-    x = [[[a b c]]]
-])
-
-
 ; As alternatives to using SET-WORD! to set the parse position and GET-WORD!
 ; to get the parse position, Ren-C has MARK and SEEK.  One ability this
 ; gives is to mark a variable without having it be a SET-WORD! and thus
@@ -418,32 +352,6 @@
     parse "123456789" [seek pos copy nums to end]
     nums = "56789"
 )
-
-
-[
-    {KEEP without blocks}
-    https://github.com/metaeducation/ren-c/issues/935
-
-    (did all [
-        did parse "aaabbb" [collect x [keep some "a" keep some "b"] end]
-        x = ["aaa" "bbb"]
-    ])
-
-    (did all [
-        parse "aaabbb" [collect x [keep to "b"] to end]
-        x = ["aaa"]
-    ])
-
-    (did all [
-        parse "aaabbb" [
-            collect outer [
-                some [collect inner keep some "a" | keep some "b"]
-            ]
-        ]
-        outer = ["bbb"]
-        inner = ["aaa"]
-    ])
-]
 
 
 ; Multi-byte characters and strings present a lot of challenges.  There should
@@ -556,3 +464,32 @@
 )(
     <outlier> = countify ["a" "b" "c"] "aaabccbbcd"
 )]
+
+[
+    https://github.com/rebol/rebol-issues/issues/2393
+    (not parse "aa" [some [#"a"] reject])
+    (not parse "aabb" [some [#"a"] reject some [#"b"]])
+    (not parse "aabb" [some [#"a" reject] to end])
+]
+
+; !!! R3-Alpha introduced a controversial "must make progress" rule, where
+; something like an empty string does not make progress on a string parse
+; so even if it doesn't fail, it fails the whole parse.  Red has all of
+; these tests pass.  Ren-C is questioning the progress rule, believing the
+; benefit of infinite-loop-avoidance is not worth the sacrifice of logic.
+[
+    (not parse "ab" [to [""] "ab" end])
+    (did parse "ab" [to ["a"] "ab" end])
+    (did parse "ab" [to ["ab"] "ab" end])
+    (not parse "ab" [thru [""] "ab" end])
+    (did parse "ab" [thru ["a"] "b" end])
+    (not parse "ab" [thru ["ab"] "" end])
+]
+
+; Ren-C made it possible to use quoted WORD!s in place of CHAR! or TEXT! to
+; match in strings.  This gives a cleaner look, as you drop off 3 vertical
+; tick marks from everything like ["ab"] to become just ['ab]
+;
+("c" = parse "abbbbbc" ['a some ['b]])
+("" = parse "abbbbc" ['ab some ['bc | 'b]])
+("def" = parse "abc10def" ['abc '10])

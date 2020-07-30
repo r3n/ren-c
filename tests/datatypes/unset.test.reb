@@ -15,14 +15,13 @@
 ]
 
 (null? trap [a: null a])
-(not error? trap [set* 'a null])
+(not error? trap [set 'a null])
 
 (error? trap [a: void a])
-(not error? trap [set* 'a void])
+(not error? trap [set 'a void])
 
 (
-    a-value: 10
-    undefine 'a-value
+    a-value: void
     e: trap [a-value]
     e/id = 'need-non-void
 )

@@ -19,7 +19,7 @@
 ]
 (even? -1.7976931348623157e308)
 ; char
-(even? #"^@")
+(even? NUL)
 (not even? #"^a")
 (even? #"^b")
 (not even? #"^(ff)")

@@ -135,11 +135,8 @@ bool Add_Typeset_Bits_Core(
         const REBCEL *unescaped = VAL_UNESCAPED(maybe_word);
 
         const RELVAL *item;
-        if (CELL_KIND(unescaped) == REB_WORD) {
-            item = Get_Opt_Var_May_Fail(unescaped, specifier);
-            if (not item)
-                fail (Error_No_Value_Core(maybe_word, specifier));
-        }
+        if (CELL_KIND(unescaped) == REB_WORD)
+            item = Lookup_Word_May_Fail(unescaped, specifier);
         else
             item = maybe_word; // wasn't variable
 
@@ -159,6 +156,19 @@ bool Add_Typeset_Bits_Core(
                 // instead of just function specs.
                 //
                 TYPE_SET(typeset, REB_NULLED);
+            }
+            else if (0 == Compare_String_Vals(item, Root_Output_Tag, true)) {
+                //
+                // !!! Typeset bits are currently scarce, so output is being
+                // indicated solely by being a refinement and having this
+                // set of potential argument types.  It represents little
+                // risk at time of writing to disrupting existing code during
+                // the multiple return values prototyping stage, because it
+                // only has an effect when you use a SET-BLOCK! to the left.
+                //
+                TYPE_SET(typeset, REB_NULLED);
+                TYPE_SET(typeset, REB_WORD);
+                TYPE_SET(typeset, REB_PATH);
             }
             else if (0 == Compare_String_Vals(item, Root_Skip_Tag, true)) {
                 if (VAL_PARAM_CLASS(typeset) != REB_P_HARD_QUOTE)
@@ -235,7 +245,7 @@ bool Add_Typeset_Bits_Core(
             if (VAL_WORD_SYM(item) == SYM_REFINEMENT_X)
                 TYPE_SET(typeset, REB_TS_REFINED_PATH);
         }
-        else
+        else if (IS_NULLED(item))
             fail (Error_Bad_Value_Core(maybe_word, specifier));
 
         // !!! Review erroring policy--should probably not just be ignoring

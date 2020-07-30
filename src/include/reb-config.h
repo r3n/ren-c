@@ -346,8 +346,16 @@ Special internal defines used by RT, not Host-Kit developers:
     #if defined(ENDIAN_LITTLE) && defined(TO_LINUX_X64)
         #define DEBUG_USE_BITFIELD_HEADER_PUNS
     #endif
-#endif
 
+    #define DEBUG_ENABLE_ALWAYS_MALLOC
+#else
+    // We may want to test the valgrind build even if it's release so that
+    // it checks the R3_ALWAYS_MALLOC environment variable
+    //
+    #if defined(INCLUDE_CALLGRIND_NATIVE)
+        #define DEBUG_ENABLE_ALWAYS_MALLOC
+    #endif
+#endif
 
 // System V ABI for X86 says alignment can be 4 bytes for double.  However,
 // you can change this in the compiler settings.  We should either sync with
@@ -359,7 +367,7 @@ Special internal defines used by RT, not Host-Kit developers:
 // !!! We are overpaying for the ALIGN_SIZE if it's not needed for double,
 // so perhaps it is that which should be configurable in the build settings...
 //
-#if defined(ENDIAN_LITTLE) && defined(TO_LINUX_X86)
+#if defined(TO_WINDOWS_X86) || defined(TO_LINUX_X86)
     #define DEBUG_DONT_CHECK_ALIGN
 #endif
 

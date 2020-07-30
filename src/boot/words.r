@@ -304,26 +304,6 @@ raw-size
 extern
 rebval
 
-;routine
-;void -- already specified
-library
-name
-abi
-stdcall
-fastcall
-sysv
-thiscall
-unix64
-ms-cdecl
-win64
-default
-vfp ;arm
-o32; mips abi
-n32; mips abi
-n64; mips abi
-o32-soft-float; mips abi
-n32-soft-float; mips abi
-n64-soft-float; mips abi
 ...
 varargs
 

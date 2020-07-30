@@ -196,7 +196,7 @@ REBNATIVE(shove)
 
     if (REF(set)) {
         if (IS_SET_WORD(left)) {
-            Move_Value(D_OUT, Get_Opt_Var_May_Fail(left, SPECIFIED));
+            Move_Value(D_OUT, Lookup_Word_May_Fail(left, SPECIFIED));
         }
         else if (IS_SET_PATH(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
@@ -241,7 +241,7 @@ REBNATIVE(shove)
 
     if (REF(set)) {
         if (IS_SET_WORD(left)) {
-            Move_Value(Sink_Var_May_Fail(left, SPECIFIED), D_OUT);
+            Move_Value(Sink_Word_May_Fail(left, SPECIFIED), D_OUT);
         }
         else if (IS_SET_PATH(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
@@ -377,7 +377,7 @@ REBNATIVE(do)
         //
         // See code called in system/intrinsic/do*
         //
-        REBVAL *sys_do_helper = CTX_VAR(Sys_Context, SYS_CTX_DO_P);
+        REBVAL *sys_do_helper = Get_Sys_Function(DO_P);
         assert(IS_ACTION(sys_do_helper));
 
         UNUSED(REF(args)); // detected via `value? :arg`
@@ -618,10 +618,9 @@ REBNATIVE(evaluate)
     }
 
     if (not IS_NULLED(var))
-        Set_Opt_Polymorphic_May_Fail(
+        Set_Var_May_Fail(
             ARG(var), SPECIFIED,
             D_SPARE, SPECIFIED,
-            true,  // any (e.g. VOID! is legal)
             false  // not hard (e.g. GROUP!s don't run, and not literal)
         );
 

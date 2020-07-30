@@ -1,4 +1,9 @@
 ; functions/series/find.r
+;
+; !!! R3-Alpha had a severe lack of tests for FIND.  However, the same routine
+; is used in PARSE, so parse tests exercise the same code path (though not the
+; reverse case currently...)
+
 [#473 (
     null? find blank 1
 )]
@@ -32,3 +37,53 @@
         "1.1" == find/part str "1." 2
     ]
 )]
+
+[
+    (null = find "" "")
+    (null = find "a" "")
+    (null = find tail "a" "")
+    (null = find "" "a")
+
+    ("ab" = find "ab" "a")
+    ("b" = find "ab" "b")
+    (null = find "ab" "c")
+
+    (null = find-reverse "" "")
+    (null = find-reverse "a" "")
+    (null = find-reverse tail "a" "")
+    (null = find-reverse "" "a")
+
+    ("ab" = find-reverse tail "ab" "a")
+    ("b" = find-reverse tail "ab" "b")
+    (null = find-reverse tail "ab" "c")
+]
+
+[
+    ("def" = find/skip tail "abcdef" "def" -3)
+    (null = find/skip tail "abcdef" "def" -2)
+    ("def" = find/skip tail "abcdef" "def" -1)
+
+    ("abcdef" = find/skip tail "abcdef" "abc" -3)
+    ("abcdef" = find/skip tail "abcdef" "abc" -2)
+    (null = find/skip back tail "abcdef" "abc" -2)
+    ("abcdef" = find/skip tail "abcdef" "abc" -1)
+]
+
+("cd" = find skip "abcd" 2 "cd")
+("abcd" = find-reverse skip "abcd" 2 "abcd")
+
+[
+    (did ab: to binary! "ab")
+
+    (ab = find ab "a")
+    ((to binary! "b") = find ab "b")
+    (null = find ab "c")
+
+    ; !!! String search in binary only supports /skip of 1 for now (e.g no -1)
+    ;(ab = find-reverse tail ab "a")
+    ;((to binary! "b") = find-reverse tail ab "b")
+    ;(null = find-reverse tail ab "c")
+]
+
+(null = find "api-transient" "to")
+("transient" = find "api-transient" "trans")

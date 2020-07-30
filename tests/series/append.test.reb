@@ -43,3 +43,16 @@
 )(
     "abcdefgh" = append/part "abc" ["defg" "hijk"] 5
 )]
+
+('illegal-zero-byte = (trap [append "abc" make char! 0])/id)
+('illegal-zero-byte = (trap [append "abc" #{410041}])/id)
+
+
+[#146 (
+    b: append [] 0
+    repeat n 10 [
+        append b n
+        remove b
+    ]
+    b = [10]
+)]

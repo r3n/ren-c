@@ -23,7 +23,7 @@
 (not zero? 0x2147483647)
 (not zero? 0x-2147483648)
 ; char
-(zero? #"^@")
+(zero? NUL)
 (not zero? #"^a")
 (not zero? #"^(ff)")
 ; money

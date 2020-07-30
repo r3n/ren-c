@@ -60,8 +60,8 @@ emit-native-proto: function [
             ]
         ] unspaced [
             newline newline
-            {; !!! DO NOT EDIT HERE! This is generated from }
-            mold the-file { line } line newline
+            {; !!! DO NOT EDIT HERE! This is generated from} _
+                mold the-file _ {line} _ line newline
             mold/only proto-parser/data
         ]
 

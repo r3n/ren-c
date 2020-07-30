@@ -431,7 +431,7 @@ hookname: enfixed func [
     if t/(column) = 0 [return "nullptr"]
 
     unspaced [prefix propercase-of switch ensure word! t/(column) [
-        '+ [t/name]         ; type has its own unique hook
+        '+ [as text! t/name]  ; type has its own unique hook
         '* [t/class]        ; type uses common hook for class
         '? ['unhooked]      ; datatype provided by extension
         '- ['fail]          ; service unavailable for type
@@ -714,52 +714,50 @@ e-errfuncs/write-emitted
 
 mezz-files: load %../mezz/boot-files.r  ; base, sys, mezz
 
-for-each section [:boot-base boot-sys :boot-mezz] [
-    if word? section [
-        set section s: make block! 200
-        for-each file first mezz-files [
-            append s load join %../mezz/ file
-        ]
-        append s _  ; !!! would <section-done> be better?
+sys-toplevel: copy []
+
+for-each section [boot-base boot-sys boot-mezz] [
+    set section s: make text! 20000
+    append/line s "["
+    for-each file first mezz-files [  ; doesn't use LOAD to strip
+        gather: try if section = 'boot-sys ['sys-toplevel]
+        text: stripload/gather join %../mezz/ file opt gather
+        append/line s text
     ]
-    else [
-        set section s: make text! 20000
-        append/line s "["
-        for-each file first mezz-files [
-            text: stripload join %../mezz/ file  ; doesn't use LOAD to strip
-            append/line s text
-        ]
-        append/line s "_"  ; !!! would <section-done> be better?
-        append/line s "]"
-    ]
+    append/line s "_"  ; !!! would <section-done> be better?
+    append/line s "]"
 
     mezz-files: next mezz-files
 ]
 
 e-sysctx: make-emitter "Sys Context" inc/tmp-sysctx.h
 
-; We don't actually want to create the object in the R3-MAKE Rebol, because
-; the constructs are intended to run in the Rebol being built.  But the list
-; of top-level SET-WORD!s is needed.  R3-Alpha used a non-evaluating CONSTRUCT
-; to do this, but Ren-C's non-evaluating construct expects direct alternation
-; of SET-WORD! and unevaluated value (even another SET-WORD!).  So we just
-; gather the top-level set-words manually.
+; We heuristically gather top level declarations in the system context, vs.
+; trying to use LOAD and look at actual object keys.  Because this process
+; is potentially error prone, the debug build checks any loads by context
+; index number against the actual context key name of the loaded object.
 
 sctx: make object! collect [
-    for-each item boot-sys [
-        if set-word? :item [
-            keep item
-            keep "stub proxy for %sys-base.r item"
-        ]
+    for-each item sys-toplevel [
+        keep as set-word! item
+        keep "stub proxy for %sys-base.r item"
     ]
 ]
-
-; !!! The SYS_CTX has no SELF...it is not produced by the ordinary gathering
-; constructor, but uses Alloc_Context() directly.  Rather than try and force
-; it to have a SELF, having some objects that don't helps pave the way
-; to the userspace choice of self-vs-no-self (as with func's `<with> return`)
-;
 make-obj-defs/selfless e-sysctx sctx "SYS_CTX" 1
+
+num: 1
+e-sysctx/emit newline
+e-sysctx/emit {
+    #if !defined(NDEBUG)
+}
+for-each item sys-toplevel [
+    e-sysctx/emit 'item {
+        #define SYS_CTXKEY_${AS TEXT! ITEM} "$<item>"
+    }
+]
+e-sysctx/emit {
+    #endif  /* !defined(NDEBUG) */
+}
 
 e-sysctx/write-emitted
 
@@ -784,7 +782,7 @@ sections: [
     boot-errors
     boot-sysobj
     :boot-base
-    boot-sys
+    :boot-sys
     :boot-mezz
 ]
 

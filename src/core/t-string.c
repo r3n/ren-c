@@ -158,7 +158,7 @@ REBLEN find_string(
     REBSTR *str,
     REBLEN index,
     REBLEN end,
-    const RELVAL *pattern,
+    const REBCEL *pattern,
     REBLEN flags,
     REBINT skip
 ){
@@ -173,11 +173,15 @@ REBLEN find_string(
     //
     assert(end >= index);
 
-    if (ANY_STRING(pattern)) {
-        bool str_is_all_ascii = false;
+    if (
+        ANY_STRING_KIND(CELL_KIND(pattern))
+        or ANY_WORD_KIND(CELL_KIND(pattern))
+        or REB_INTEGER == CELL_KIND(pattern)  // `find "ab10cd" 10` -> "10cd"
+    ){
+        bool str_is_all_ascii = false;  // !!! future string flag feature
         bool pattern_is_all_ascii = false;
         if (str_is_all_ascii and not pattern_is_all_ascii)
-            return NOT_FOUND; // can't possibly find non-ascii in ascii
+            return NOT_FOUND;  // can't possibly find non-ascii in ascii
 
         // !!! A TAG! does not have its delimiters in it.  The logic of the
         // find would have to be rewritten to accomodate this, and it's a
@@ -185,19 +189,21 @@ REBLEN find_string(
         // for now just form the tag into a temporary alternate series.
 
         REBSTR *formed = nullptr;
-        REBYTE *bp2;
+        const REBYTE *bp2;
         REBSIZ size2;
-        if (not IS_TEXT(pattern)) { // !!! for TAG!, but what about FILE! etc?
-            formed = Copy_Form_Value(pattern, 0);
+        if (
+            CELL_KIND(pattern) != REB_TEXT
+            and CELL_KIND(pattern) != REB_WORD
+         ){
+            // !!! `<tag>`, `set-word:` but FILE!, etc?
+            //
+            formed = Copy_Form_Cell(pattern, 0);
             *len = STR_LEN(formed);
             bp2 = STR_HEAD(formed);
             size2 = STR_SIZE(formed);
         }
-        else {
-            *len = VAL_LEN_AT(pattern);
-            bp2 = VAL_STRING_AT(pattern);
-            size2 = VAL_SIZE_LIMIT_AT(NULL, pattern, *len);
-        }
+        else
+            bp2 = VAL_UTF8_LIMIT_AT(len, &size2, pattern, UNKNOWN);
 
         REBLEN result;
 
@@ -232,24 +238,41 @@ REBLEN find_string(
                     flags & AM_FIND_MATCH
                 );
         }
-        else
+        else {
+            REBSTR *pattern_str;
+            REBLEN pattern_index;
+            if (formed) {
+                pattern_str = formed;
+                pattern_index = 0;
+            }
+            else if (ANY_STRING_KIND(CELL_KIND(pattern))) {
+                pattern_str = VAL_STRING(pattern);
+                pattern_index = VAL_INDEX(pattern);
+            }
+            else {
+                assert(ANY_WORD_KIND(CELL_KIND(pattern)));
+                pattern_str = VAL_WORD_SPELLING(pattern);
+                pattern_index = 0;
+            }
+
             result = Find_Str_In_Str(
                 str,  // not all_ascii, has multibyte utf-8 sequences
                 index,
                 end,
                 skip,
-                formed ? formed : VAL_STRING(pattern),
-                formed ? 0 : VAL_INDEX(pattern),
+                pattern_str,
+                pattern_index,
                 *len,
                 flags & (AM_FIND_MATCH | AM_FIND_CASE)
             );
+        }
 
         if (formed)
             Free_Unmanaged_Series(SER(formed));
 
         return result;
     }
-    else if (IS_CHAR(pattern)) {
+    else if (CELL_KIND(pattern) == REB_CHAR) {
         *len = 1;
 
         return Find_Char_In_Str(
@@ -261,7 +284,7 @@ REBLEN find_string(
             flags & (AM_FIND_MATCH | AM_FIND_CASE)
         );
     }
-    else if (IS_BITSET(pattern)) {
+    else if (CELL_KIND(pattern) == REB_BITSET) {
         *len = 1;
 
         return Find_Str_Bitset(
@@ -273,7 +296,7 @@ REBLEN find_string(
             flags & (AM_FIND_MATCH | AM_FIND_CASE)
         );
     }
-    else if (IS_BINARY(pattern)) {
+    else if (CELL_KIND(pattern) == REB_BINARY) {
         //
         // Finding an arbitrary binary (which may not be UTF-8) in a string
         // is probably most sensibly done by thinking of the string itself
@@ -285,7 +308,8 @@ REBLEN find_string(
             return index;  // empty binaries / strings are matches
 
         const REBYTE *pbytes = VAL_BIN_AT(pattern);
-        REBSIZ offset = cast(REBYTE*, STR_AT(str, index)) - STR_HEAD(str);
+        REBSIZ offset =
+            cast(REBYTE*, STR_AT(str, index)) - cast(REBYTE*, STR_HEAD(str));
         REBLEN result = Find_Bin_In_Bin(
             SER(str),
             offset,
@@ -766,7 +790,7 @@ void Mold_Uni_Char(REB_MOLD *mo, REBUNI c, bool parened)
             EXPAND_SERIES_TAIL(SER(buf), 7);  // worst case: ^(1234)
             TERM_STR_LEN_SIZE(buf, len_old, size_old);
 
-            Append_Ascii(buf, "^\"");
+            Append_Ascii(buf, "^(");
 
             REBYTE *bp = BIN_TAIL(SER(buf));
             REBYTE *ep = Form_Uni_Hex(bp, c); // !!! Make a mold...

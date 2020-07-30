@@ -7,7 +7,7 @@
         ;
         {} #{e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855}
         #{} #{e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855}
-     
+
         ; Simple non-empty cases
         ;
         "Rebol" #{C8537DEDCA2810F48C80008DBCBDA9AC2FA60382C7F073118DDDEDEEEE65FF47}

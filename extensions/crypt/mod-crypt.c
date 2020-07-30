@@ -8,6 +8,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
+// Copyright 2012 Saphirion AG
 // Copyright 2012-2020 Rebol Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
@@ -21,12 +22,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// R3-Alpha originally had a few hand-picked routines for hashing picked from
-// OpenSSL.  Saphirion added support for the AES streaming cipher and Diffie
-// Hellman keys in order to do Transport Layer Security (TLS, e.g. the "S" in
-// for "Secure" in HTTPS).  But cryptography represents something of a moving
-// target; and in the interest of being relatively lightweight a pragmatic
-// set of "current" crypto is included by default.
+// See README.md for notes about this extension.
 //
 
 #include "mbedtls/rsa.h"
@@ -1033,7 +1029,37 @@ REBNATIVE(aes_stream)
 }
 
 
-#define ECC_BYTES 32  // number of bytes for SECP256R1 coordinates
+// For reasons that don't seem particularly good for a generic cryptography
+// library that is not entirely TLS-focused, the 25519 curve isn't in the
+// main list of curves:
+//
+// https://github.com/ARMmbed/mbedtls/issues/464
+//
+struct mbedtls_ecp_curve_info curve25519_info =
+    { MBEDTLS_ECP_DP_CURVE25519, 29, 256, "curve25519"};
+
+
+static const struct mbedtls_ecp_curve_info *Ecp_Curve_Info_From_Word(
+    const REBVAL *word
+){
+    const struct mbedtls_ecp_curve_info *info;
+
+    if (rebDidQ("'curve25519 =", word, rebEND))
+        info = &curve25519_info;
+    else {
+        char *name = rebSpellQ("lowercase to text!", word, rebEND);
+        info = mbedtls_ecp_curve_info_from_name(name);
+        rebFree(name);
+    }
+
+    if (not info)
+        rebJumpsQ (
+            "fail [{Unknown ECC curve specified:}", word, "]",
+        rebEND);
+
+    return info;
+}
+
 
 //
 //  export ecc-generate-keypair: native [
@@ -1041,9 +1067,14 @@ REBNATIVE(aes_stream)
 //
 //      return: "object with PUBLIC/X, PUBLIC/Y, and PRIVATE key members"
 //          [object!]
+//      group "Elliptic curve group [CURVE25519 SECP256R1 ...]"
+//          [word!]
 //  ]
 //
 REBNATIVE(ecc_generate_keypair)
+//
+// !!! Note: using curve25519 seems to always give a y coordinate of zero
+// in the public key.  Is this correct (it seems to yield the right secret)?
 {
     CRYPT_INCLUDE_PARAMS_OF_ECC_GENERATE_KEYPAIR;
 
@@ -1056,8 +1087,12 @@ REBNATIVE(ecc_generate_keypair)
     REBVAL *error = nullptr;
     REBVAL *result = nullptr;
 
+    const struct mbedtls_ecp_curve_info *info
+        = Ecp_Curve_Info_From_Word(ARG(group));
+    size_t num_bytes = info->bit_size / 8;
+
     IF_NOT_0(cleanup, error,
-        mbedtls_ecdh_setup(&ctx, MBEDTLS_ECP_DP_SECP256R1)
+        mbedtls_ecdh_setup(&ctx, info->grp_id)
     );
 
     IF_NOT_0(cleanup, error, mbedtls_ecdh_gen_public(
@@ -1071,21 +1106,21 @@ REBNATIVE(ecc_generate_keypair)
     // Allocate into memory that can be retaken directly as BINARY! in Rebol
     //
   blockscope {
-    uint8_t *p_publicX = rebAllocN(uint8_t, ECC_BYTES);
-    uint8_t *p_publicY = rebAllocN(uint8_t, ECC_BYTES);
-    uint8_t *p_privateKey = rebAllocN(uint8_t, ECC_BYTES);
+    uint8_t *p_publicX = rebAllocN(uint8_t, num_bytes);
+    uint8_t *p_publicY = rebAllocN(uint8_t, num_bytes);
+    uint8_t *p_privateKey = rebAllocN(uint8_t, num_bytes);
 
-    mbedtls_mpi_write_binary(&ctx.ctx.mbed_ecdh.Q.X, p_publicX, ECC_BYTES);
-    mbedtls_mpi_write_binary(&ctx.ctx.mbed_ecdh.Q.Y, p_publicY, ECC_BYTES);
-    mbedtls_mpi_write_binary(&ctx.ctx.mbed_ecdh.d, p_privateKey, ECC_BYTES);
+    mbedtls_mpi_write_binary(&ctx.ctx.mbed_ecdh.Q.X, p_publicX, num_bytes);
+    mbedtls_mpi_write_binary(&ctx.ctx.mbed_ecdh.Q.Y, p_publicY, num_bytes);
+    mbedtls_mpi_write_binary(&ctx.ctx.mbed_ecdh.d, p_privateKey, num_bytes);
 
     result = rebValue(
         "make object! [",
             "public-key: make object! [",
-                "x:", rebR(rebRepossess(p_publicX, ECC_BYTES)),
-                "y:", rebR(rebRepossess(p_publicY, ECC_BYTES)),
+                "x:", rebR(rebRepossess(p_publicX, num_bytes)),
+                "y:", rebR(rebRepossess(p_publicY, num_bytes)),
             "]",
-            "private-key:", rebR(rebRepossess(p_privateKey, ECC_BYTES)),
+            "private-key:", rebR(rebRepossess(p_privateKey, num_bytes)),
         "]",
     rebEND);
   }
@@ -1103,6 +1138,8 @@ REBNATIVE(ecc_generate_keypair)
 //  export ecdh-shared-secret: native [
 //      return: "secret"
 //          [binary!]
+//      group "Elliptic curve group [CURVE25519 SECP256R1 ...]"
+//          [word!]
 //      private "32-byte private key"
 //          [binary!]
 //      public "64-byte public key of peer (or OBJECT! with 32-byte X and Y)"
@@ -1113,15 +1150,19 @@ REBNATIVE(ecdh_shared_secret)
 {
     CRYPT_INCLUDE_PARAMS_OF_ECDH_SHARED_SECRET;
 
-    assert(ECC_BYTES == 32);
+    const struct mbedtls_ecp_curve_info *info
+        = Ecp_Curve_Info_From_Word(ARG(group));
+    size_t num_bytes = info->bit_size / 8;
 
-    unsigned char public_key[ECC_BYTES * 2];
-    rebBytesInto(public_key, ECC_BYTES * 2, "use [bin] [",
+    unsigned char *public_key = rebAllocN(REBYTE, num_bytes * 2);
+
+    rebBytesInto(public_key, num_bytes * 2, "use [bin] [",
         "bin: either binary?", ARG(public), "[", ARG(public), "] [",
             "append copy pick", ARG(public), "'x", "pick", ARG(public), "'y"
         "]",
-        "if 64 != length of bin [",
-            "fail {Public BINARY! must be 64 bytes total for secp256r1}"
+        "if", rebI(num_bytes * 2), "!= length of bin [",
+            "fail [{Public BINARY! must be}", rebI(num_bytes * 2),
+                "{bytes total for}", rebQ1(ARG(group)), "]",
         "]",
         "bin",
     "]", rebEND);
@@ -1136,24 +1177,25 @@ REBNATIVE(ecdh_shared_secret)
     REBVAL *error = nullptr;
 
     IF_NOT_0(cleanup, error,
-        mbedtls_ecdh_setup(&ctx, MBEDTLS_ECP_DP_SECP256R1)
+        mbedtls_ecdh_setup(&ctx, info->grp_id)
     );
 
     IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
         &ctx.ctx.mbed_ecdh.Qp.X,
         public_key,
-        ECC_BYTES
+        num_bytes
     ));
     IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
         &ctx.ctx.mbed_ecdh.Qp.Y,
-        public_key + ECC_BYTES,
-        ECC_BYTES
+        public_key + num_bytes,
+        num_bytes
     ));
     IF_NOT_0(cleanup, error, mbedtls_mpi_lset( &ctx.ctx.mbed_ecdh.Qp.Z, 1 ));
 
     rebElide(
-        "if 32 != length of", ARG(private), "[",
-            "fail {Size of PRIVATE key must be 32 bytes for secp256r1}"
+        "if", rebI(num_bytes), "!= length of", ARG(private), "[",
+            "fail [{Size of PRIVATE key must be}",
+                rebI(num_bytes), "{for}", rebQ1(ARG(group)), "]"
         "]",
         ARG(private),
     rebEND);
@@ -1162,26 +1204,27 @@ REBNATIVE(ecdh_shared_secret)
         mbedtls_mpi_read_binary(
             &ctx.ctx.mbed_ecdh.d,
             VAL_BIN_AT(ARG(private)),
-            ECC_BYTES
+            num_bytes
         )
     );
 
   blockscope {
-    uint8_t *secret = rebAllocN(uint8_t, ECC_BYTES);
+    uint8_t *secret = rebAllocN(uint8_t, num_bytes);
     size_t olen;
     IF_NOT_0(cleanup, error, mbedtls_ecdh_calc_secret(
         &ctx,
         &olen,
         secret,
-        ECC_BYTES,
+        num_bytes,
         &get_random,
         nullptr
     ));
-    assert(olen == ECC_BYTES);
-    result = rebRepossess(secret, ECC_BYTES);
+    assert(olen == num_bytes);
+    result = rebRepossess(secret, num_bytes);
   }
 
   cleanup:
+    rebFree(public_key);
     mbedtls_ecdh_free(&ctx);
 
     if (error)

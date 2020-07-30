@@ -127,7 +127,7 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
     //
     if (*next_gotten) {
         assert(IS_WORD(*next));
-        assert(Try_Get_Opt_Var(*next, *specifier) == *next_gotten);
+        assert(Try_Lookup_Word(*next, *specifier) == *next_gotten);
     }
 
     assert(f == FS_TOP);
@@ -265,7 +265,7 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
 
   #ifdef DEBUG_UTF8_EVERYWHERE
     if (ANY_STRING(f->out)) {
-        REBLEN len = STR_LEN(VAL_SERIES(f->out));
+        REBLEN len = STR_LEN(VAL_STRING(f->out));
         UNUSED(len); // just one invariant for now, SER_LEN checks it
     }
   #endif

@@ -55,6 +55,11 @@ trap [
     QUIT
 ]
 
+; SET was changed to accept VOID!, use SET VAR NON VOID! (...EXPRESSION...)
+; if that is what was intended.
+;
+set: specialize 'lib/set [opt: true]
+
 ; Enfixedness was conceived as not a property of an action itself, but of a
 ; particular relationship between a word and an action.  While this had some
 ; benefits, it became less and less relevant in a world of "opportunistic
@@ -128,7 +133,7 @@ modernize-action: function [
 
                 append proxiers compose [
                     (as set-word! last-refine-word) try (as get-word! proxy)
-                    set* (as lit-word! proxy) void
+                    set (as lit-word! proxy) void
                 ]
                 spec: my next
                 continue
@@ -298,26 +303,33 @@ lib/read: read: enclose 'lib-read function [f [frame!]] [
     bin
 ]
 
-transcode: function [  ; !!! TBD: migrate this shim to redbol.reb
-    return: [text! binary!]
-    var [any-word!]
+transcode: function [
+    return: [<opt> any-value!]
     source [text! binary!]
-    /next
-    /only
-    /relax
+    /next [word!]
+    ; /relax not supported in shim... it could be
 ][
-    set [var pos:] lib/transcode/(next)/(only)/(relax)
+    values: lib/transcode/(either next ['next] [blank])
         either text? source [to binary! source] [source]
+    pos: take/last values
+    assert [binary? pos]
 
-    ; In order to return a text position in pre-UTF-8 everywhere, we fake it
-    ; by seeing how much binary was consumed and assume skipping that many
-    ; bytes will sync us.  (From @rgchris's LOAD-NEXT)
-    ;
-    if text? source [
-        pos: skip source subtract (length of source) (length of to text! pos)
+    if next [
+        assert [1 >= length of values]
+
+        ; In order to return a text position in pre-UTF-8 everywhere, fake it
+        ; by seeing how much binary was consumed and assume skipping that many
+        ; bytes will sync us.  (From @rgchris's LOAD-NEXT).
+        ;
+        if text? source [
+            rest: to text! pos
+            pos: skip source subtract (length of source) (length of rest)
+        ]
+        set next pos
+        return pick values 1  ; may be null
     ]
 
-    return pos
+    return values
 ]
 
 reeval: :eval
@@ -327,3 +339,31 @@ eval: func [] [
         https://forum.rebol.info/t/eval-evaluate-and-reeval-reevaluate/1173
     ]
 ]
+
+split: function [
+    {Split series in pieces: fixed/variable size, fixed number, or delimited}
+
+    return: [block!]
+    series "The series to split"
+        [any-series!]
+    dlm "Split size, delimiter(s) (if all integer block), or block rule(s)"
+        [block! integer! char! bitset! text! tag! word! bar!]
+    /into "If dlm is integer, split in n pieces (vs. pieces of length n)"
+][
+    if all [any-string? series tag? dlm] [dlm: form dlm]
+    if any [word? dlm bar? dlm tag? dlm] [
+        return collect [parse series [
+            [
+                some [
+                    copy t: [to dlm | to end]
+                    (keep/only t)
+                    opt thru dlm
+                ]
+                end
+            ]
+        ]]
+    ]
+
+    apply :lib/split [series: series dlm: dlm into: into]
+]
+

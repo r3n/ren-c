@@ -172,6 +172,14 @@ gen-obj: func [
     ;
     append flags <msc:/wd4255>
 
+    ; Warnings when __declspec(uuid(x)) is used on types, or __declspec is
+    ; used before linkage specifications, etc. etc.  These are violated
+    ; e.g. by older versions of %shlobj.h and %ocidl.h.  You can get them if
+    ; you use something like a Windows XP-era SDK with a more modern Visual
+    ; Studio compiler (e.g. 2019, which deprecated support for targeting XP).
+    ;
+    append flags [<msc:/wd4917> <msc:/wd4768> <msc:/wd4091>]
+
     ; The May 2018 update of Visual Studio 2017 added a warning for when you
     ; use an #ifdef on something that is #define'd, but 0.  Then the internal
     ; %yvals.h in MSVC tests #ifdef __has_builtin, which has to be defined
@@ -636,8 +644,8 @@ gen-obj: func [
                 join %main/ (last ensure path! s)
             ] [s]
         cflags: either empty? flags [_] [flags]
-        definitions: D
-        includes: I
+        definitions: try D
+        includes: try I
         ((if prefer-O2 [[optimization: #prefer-O2-optimization]]))
     ]
 ]

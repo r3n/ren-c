@@ -72,7 +72,7 @@ loud-print: redescribe [
 console!: make object! [
     name: _
     repl: true  ; used to identify this as a console! object
-    is-loaded:  false  ; if true then this is a loaded (external) skin
+    is-loaded: false  ; if true then this is a loaded (external) skin
     was-updated: false  ; if true then console! object found in loaded skin
     last-result: void  ; last evaluated result (sent by HOST-CONSOLE)
 
@@ -116,16 +116,13 @@ console!: make object! [
     ]
 
     print-result: method [return: <void> v [<opt> any-value!]] [
-        last-result: :v
+        if void? last-result: get/any 'v [
+            return  ; e.g. result of PRINT or HELP, best to output nothing.
+        ]
+
         case [
             null? :v [
                 print "; null"  ; no representation, use comment
-            ]
-
-            void? :v [
-                ; Actions that by contract return no information return void.
-                ; Since it's what comes back from things like HELP it's best
-                ; that the console not print anything in response.
             ]
 
             free? :v [
@@ -280,10 +277,10 @@ start-console: function [
             proto-skin/name: default ["loaded"]
             append o/loaded skin-file
 
-        ] then (lambda e [
+        ] then e => [
             skin-error: e  ; show error later if `--verbose`
             proto-skin/name: "error"
-        ])
+        ]
     ]
 
     proto-skin/name: default ["default"]
@@ -482,7 +479,7 @@ ext-console-impl: function [
         result/id = 'no-catch
         :result/arg2 = :QUIT  ; throw's /NAME
     ] then [
-        return switch type of :result/arg1 [
+        return switch type of get* 'result/arg1 [
             void! [0]  ; plain QUIT, no /WITH, call that success
 
             logic! [either :result/arg1 [0] [1]]  ; logic true is success
@@ -651,7 +648,7 @@ ext-console-impl: function [
         code: load/all delimit newline result
         assert [block? code]
 
-    ] then (lambda error [
+    ] then error => [
         ;
         ; If loading the string gave back an error, check to see if it
         ; was the kind of error that comes from having partial input
@@ -668,7 +665,7 @@ ext-console-impl: function [
                 "}" ["{"]
                 ")" ["("]
                 "]" ["["]
-            ] also (lambda unclosed [
+            ] also unclosed => [
                 ;
                 ; Backslash is used in the second column to help make a
                 ; pattern that isn't legal in Rebol code, which is also
@@ -676,14 +673,14 @@ ext-console-impl: function [
                 ; transcripts, potentially to replay them without running
                 ; program output or evaluation results.
                 ;
-                write-stdout unspaced [unclosed #"\" space space]
+                write-stdout unspaced [unclosed "\" _ _]
                 emit [reduce [  ; reduce will runs in sandbox
                     ((<*> result))  ; splice previous inert literal lines
                     system/console/input-hook  ; hook to run in sandbox
                 ]]
 
                 return block!
-            ])
+            ]
         ]
 
         ; Could be an unclosed double quote (unclosed tag?) which more input
@@ -691,7 +688,7 @@ ext-console-impl: function [
         ;
         emit [system/console/print-error (<*> error)]
         return <prompt>
-    ])
+    ]
 
     === HANDLE CODE THAT HAS BEEN SUCCESSFULLY LOADED ===
 

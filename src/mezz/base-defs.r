@@ -181,7 +181,7 @@ pointfree*: func* [
     ]
 
     if :block/1 [
-        fail @block ["Unused argument data at end of POINTFREE block"]
+        fail 'block ["Unused argument data at end of POINTFREE block"]
     ]
 
     ; We now create an action out of the frame.  NULL parameters are taken as
@@ -303,7 +303,7 @@ pointfree: enclose (specialize* 'pointfree* [action: :void]) func* [f] [
         ]
     ] else [
         if :args [
-            fail @args ["=> without block on right hand side can't take args"]
+            fail 'args ["=> without block on right hand side can't take args"]
         ]
         pointfree make block! body  ; !!! Allow varargs direct for efficiency?
     ]
@@ -326,7 +326,7 @@ back: specialize 'skip [
 
 bound?: chain [specialize 'reflect [property: 'binding] | :value?]
 
-unspaced: specialize 'delimit [delimiter: _]
+unspaced: adapt specialize 'delimit [delimiter: "null-me"] [delimiter: null]
 unspaced-text: chain [:unspaced | specialize 'else [branch: [copy ""]]]
 
 spaced: specialize 'delimit [delimiter: space]
@@ -335,7 +335,7 @@ spaced-text: chain [:spaced | specialize 'else [branch: [copy ""]]]
 newlined: chain [
     adapt specialize 'delimit [delimiter: newline] [
         if text? :line [
-            fail @line "NEWLINED on TEXT! semantics being debated"
+            fail 'line "NEWLINED on TEXT! semantics being debated"
         ]
     ]
         |

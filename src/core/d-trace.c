@@ -152,7 +152,7 @@ REBVAL *Trace_Eval_Dangerous(REBFRM *f)
         //
         // Note: \\ -> \ in C, because backslashes are escaped
         //
-        const REBVAL *var = Try_Get_Opt_Var(v, SPECIFIED);
+        const REBVAL *var = Try_Lookup_Word(v, SPECIFIED);
         if (not var) {
             rebElide("write-stdout { : \\\\end\\\\}", rebEND);
         }

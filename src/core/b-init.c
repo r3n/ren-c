@@ -244,7 +244,7 @@ REBNATIVE(generic)
     Init_Word(ARR_AT(details, IDX_NATIVE_BODY), VAL_WORD_CANON(ARG(verb)));
     Init_Object(ARR_AT(details, IDX_NATIVE_CONTEXT), Lib_Context);
 
-    REBVAL *verb_var = Sink_Var_May_Fail(ARG(verb), SPECIFIED);
+    REBVAL *verb_var = Sink_Word_May_Fail(ARG(verb), SPECIFIED);
     Init_Action_Unbound(verb_var, generic);  // set the word to the action
 
     return Init_Void(D_OUT);  // see ENFIX for why evaluate to void
@@ -333,6 +333,7 @@ static void Init_Action_Spec_Tags(void)
     Root_Dequote_Tag = Make_Locked_Tag("dequote");
     Root_Requote_Tag = Make_Locked_Tag("requote");
     Root_Const_Tag = Make_Locked_Tag("const");
+    Root_Output_Tag = Make_Locked_Tag("output");
 
     // !!! Needed for bootstrap, as `@arg` won't LOAD in old r3
     //
@@ -352,6 +353,7 @@ static void Shutdown_Action_Spec_Tags(void)
     rebRelease(Root_Dequote_Tag);
     rebRelease(Root_Requote_Tag);
     rebRelease(Root_Const_Tag);
+    rebRelease(Root_Output_Tag);
 
     rebRelease(Root_Modal_Tag);  // !!! only needed for bootstrap with old r3
 }
@@ -1089,6 +1091,22 @@ static void Startup_Sys(REBARR *boot_sys) {
 }
 
 
+#if !defined(NDEBUG)
+//
+//  Get_Sys_Function_Debug: C
+//
+// See remarks on Get_Sys_Function.  (Double-check the heuristic for getting
+// SYS context ID numbers in the context without using LOAD.)
+//
+REBVAL *Get_Sys_Function_Debug(REBLEN index, const char *name)
+{
+    const char *key = STR_UTF8(VAL_KEY_SPELLING(CTX_KEY(Sys_Context, index)));
+    assert(strcmp(key, name) == 0);
+    return CTX_VAR(Sys_Context, index);
+}
+#endif
+
+
 // By this point in the boot, it's possible to trap failures and exit in
 // a graceful fashion.  This is the routine protected by rebRescue() so that
 // initialization can handle exceptions.
@@ -1099,7 +1117,7 @@ static REBVAL *Startup_Mezzanine(BOOT_BLK *boot)
 
     Startup_Sys(VAL_ARRAY(&boot->sys));
 
-    REBVAL *finish_init = CTX_VAR(Sys_Context, SYS_CTX_FINISH_INIT_CORE);
+    REBVAL *finish_init = Get_Sys_Function(FINISH_INIT_CORE);
     assert(IS_ACTION(finish_init));
 
     // The FINISH-INIT-CORE function should likely do very little.  But right
@@ -1187,7 +1205,7 @@ void Startup_Core(void)
     fail (Error_No_Value_Raw(BLANK_VALUE)); // same as panic (crash)
   #endif
 
-  #ifndef NDEBUG
+  #ifdef DEBUG_ENABLE_ALWAYS_MALLOC
     PG_Always_Malloc = false;
   #endif
 

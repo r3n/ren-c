@@ -447,7 +447,7 @@ ctx-zip: context [
                     ]
 
                     either uncompressed-data [
-                        info unspaced ["^- -> ok [" method "]^/"]
+                        info unspaced [_ _ _ _ "-> ok [" method "]^/"]
                     ][
                         num-errors: me + 1
                     ]

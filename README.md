@@ -1,7 +1,7 @@
 ![Ren-C Logo][100]
 
 # Ren-C
-[![Build Status][101]](https://travis-ci.org/metaeducation/ren-c)
+[![Build Status][101]](https://travis-ci.com/github/metaeducation/ren-c)
 
 
 **Ren-C** is a branch of the [Apache 2.0 open-sourced][1] [Rebol 3][2] [codebase](https://github.com/rebol/rebol).
@@ -139,4 +139,4 @@ should be more possible--and maybe even a little "fun" (?))*
 [16]: https://github.com/metaeducation/ren-c/blob/master/make/tools/systems.r
 
 [100]: https://raw.githubusercontent.com/metaeducation/ren-c/master/docs/ren-c-logo.png
-[101]: https://travis-ci.org/metaeducation/ren-c.svg?branch=master
+[101]: https://travis-ci.com/metaeducation/ren-c.svg?branch=master

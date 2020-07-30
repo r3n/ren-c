@@ -25,6 +25,15 @@
 // Avoids use of complex OS libraries and GNU readline() but hardcodes some
 // parts only for the common standard.
 //
+// NOTE: Windows Console does not handle Unicode characters well by default.
+// You can change the code page, e.g. at a command prompt say:
+//
+//     REG ADD HKCU\Console /v CodePage /t REG_DWORD /d 0xfde9
+//
+// This will help get at least a `box` character to show instead of nothing.
+// But you will need to choose a font in the Console's "Properties" menu that
+// covers the characters you wish to display:
+// https://superuser.com/a/927575
 
 #include <assert.h>
 #include <stdint.h>
@@ -49,30 +58,38 @@
 
 //=//// CONFIGURATION /////////////////////////////////////////////////////=//
 
-enum {
-    BEL = 7,
-    BS = 8,
-    LF = 10,
-    CR = 13,
-    ESC = 27,
-    DEL = 127
-};
+#if defined(DEBUG_OVERLAY_SYS_CORE)
+    #undef IS_ERROR
+    #undef min
+    #undef max
+    #undef RL_API  // hack :-/
+    #include "sys-core.h"  // extra internal API to pick apart cells in debug
+#else
+    enum {
+        BEL = 7,
+        BS = 8,
+        LF = 10,
+        CR = 13,
+        ESC = 27,
+        DEL = 127
+    };
+
+    // Codepoints 0xD800 to 0xDFFF are reserved for "UTF-16 surrogates".
+    // It is technically possible for UTF-8 or UCS-4 to encode these directly,
+    // they aren't supposed to...and Ren-C prohibits loading them.  (It should
+    // also prevent saving them, but does not currently.)
+    //
+    // Windows Terminal API sends DWORD "unicode" characters, which means high
+    // codepoints are done as two events.  We have to piece that together.
+    //
+    #define UNI_SUR_HIGH_START  (WCHAR)0xD800
+    #define UNI_SUR_HIGH_END    (WCHAR)0xDBFF
+    #define UNI_SUR_LOW_START   (WCHAR)0xDC00
+    #define UNI_SUR_LOW_END     (WCHAR)0xDFFF
+#endif
 
 
 #define READ_BUF_LEN 64   // input events read at a time from console
-
-// Codepoints 0xD800 to 0xDFFF are reserved for "UTF-16 surrogates".  Though
-// it is technically possible for UTF-8 or UCS-4 to encode these directly,
-// they aren't supposed to...and Ren-C prohibits loading them.  (It should
-// also prevent saving them, but does not currently.)
-//
-// Windows Terminal API sends DWORD "unicode" characters, which means high
-// codepoints are done as two events.  We have to piece that together.
-//
-#define UNI_SUR_HIGH_START  (WCHAR)0xD800
-#define UNI_SUR_HIGH_END    (WCHAR)0xDBFF
-#define UNI_SUR_LOW_START   (WCHAR)0xDC00
-#define UNI_SUR_LOW_END     (WCHAR)0xDFFF
 
 
 struct Reb_Terminal_Struct {
@@ -343,10 +360,14 @@ void Quit_Terminal(STD_TERM *t)
 #endif
 
 
-#if defined(NDEBUG)
-    #define ENSURE_COHERENT_POSITION_DEBUG(t) \
-        NOOP
-#else
+// If you can printf(), then there are ways to adjust the console position
+// that never go through the smart terminal.  This will intrinsically not
+// have the right cursor index, so this invariant won't hold.
+//
+// Enable this code when trying to debug a particular console issue, but it
+// is a disruptive assert otherwise.
+//
+#if defined(DEBUG_ENSURE_CONSOLE_POSITION)
     void ENSURE_COHERENT_POSITION_DEBUG(STD_TERM *t) {
         CONSOLE_SCREEN_BUFFER_INFO info;
         if (not GetConsoleScreenBufferInfo(Stdout_Handle, &info))
@@ -365,6 +386,9 @@ void Quit_Terminal(STD_TERM *t)
         }
         assert(!"Console position is not coherent with terminal state");
     }
+#else
+    #define ENSURE_COHERENT_POSITION_DEBUG(t) \
+        NOOP
 #endif
 
 
@@ -411,7 +435,20 @@ static bool Read_Input_Records_Interrupted(STD_TERM *t)
   #endif
 
     CHECK_INPUT_RECORDS(t);
-    return false;  // not interrupted (note we could return `len` if needed)
+    if (rebWasHalting()) {
+        //
+        // !!! This doesn't provide the desired behavior of being able to
+        // cancel pending input when interpreter code is running...it only
+        // cancels pending input during line editing.  More thinking about
+        // the layering needs to be done in order to make the cancellation
+        // hook interoperate with the smart terminal features of being able
+        // to PeekConsoleInput and flush it out--which may or may not be
+        // available in all configurations.
+        //
+        Term_Abandon_Pending_Events(t);
+        return true;
+    }
+    return false;
 }
 
 
@@ -622,6 +659,12 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
         assert(t->in != t->in_tail);
     }
 
+    KEY_EVENT_RECORD *key_event = &t->in->Event.KeyEvent;  // shorthand
+  #if !defined(NDEBUG)
+    if (t->in->EventType != KEY_EVENT)
+        TRASH_POINTER_IF_DEBUG(key_event);
+  #endif
+
     if (t->in->EventType == WINDOW_BUFFER_SIZE_EVENT) {
         t->columns = t->in->Event.WindowBufferSizeEvent.dwSize.X;
         t->rows = t->in->Event.WindowBufferSizeEvent.dwSize.Y;
@@ -646,23 +689,88 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
         // work, it's not supported".)
     }
     else if (
-        t->in->EventType == KEY_EVENT and not t->in->Event.KeyEvent.bKeyDown
+        t->in->EventType == KEY_EVENT and not key_event->bKeyDown
     ){
-        // We ignore key up events for now, but an unbuffered mode might
-        // want to give them back.
+        // Note: an unbuffered mode might want to give give access to the
+        // scan codes, and specific down-and-up key events.  However, an
+        // unbuffered mode is probably better done with a normal Windows
+        // messaging loop or DirectX layer...as ReadConsoleInput() seems to
+        // be notoriously buggy.
+
+        // During a Paste operation (either through Ctrl-V or a menu operation
+        // where text is translated into events by the request we made for
+        // ENABLED_PROCESSED_INPUT), there are problems of sending key ups
+        // on higher unicode characters but no key downs:
+        // https://github.com/judah/haskeline/issues/54
+        //
+        // The issue is erratic; only some characters are affected.  That bug
+        // mentions pasting `Λ, lowercase λ`, which does not seem to trigger
+        // the problem on the Windows 10 used at time of writing.  However
+        // the issue manifests when trying to paste `A♣`... the `♣` does not
+        // show up as a key down, only a key up.
+        //
+        // (See notes in header how you may have to change the code page to
+        // get this to work at all in the first place.  Be sure to try it in
+        // a plain Command Prompt session and see that working in the first
+        // place--because if it won't work there, it likely won't work here.)
+        //
+        // This workaround originates from libuv:
+        // https://github.com/libuv/libuv/blob/02dcde08386441d5a89dbcb602a1ad367a506cc0/src/win/tty.c#L730
+        //
+        if (
+            key_event->uChar.UnicodeChar != 0
+            and (
+                (key_event->dwControlKeyState & LEFT_ALT_PRESSED)
+                or (key_event->wVirtualKeyCode == VK_MENU)
+            )
+        ){
+            goto handle_key_down_event;
+        }
     }
     else if (
         t->in->EventType == KEY_EVENT
-        and t->in->Event.KeyEvent.uChar.UnicodeChar >= 32  // 32 is space
-        and t->in->Event.KeyEvent.uChar.UnicodeChar != 127  // 127 is DEL
+        and (key_event->dwControlKeyState & LEFT_ALT_PRESSED)
+        and not (key_event->dwControlKeyState & ENHANCED_KEY)
+        and (
+            key_event->wVirtualKeyCode == VK_INSERT
+            or key_event->wVirtualKeyCode == VK_END
+            or key_event->wVirtualKeyCode == VK_DOWN
+            or key_event->wVirtualKeyCode == VK_NEXT
+            or key_event->wVirtualKeyCode == VK_LEFT
+            or key_event->wVirtualKeyCode == VK_CLEAR
+            or key_event->wVirtualKeyCode == VK_RIGHT
+            or key_event->wVirtualKeyCode == VK_HOME
+            or key_event->wVirtualKeyCode == VK_UP
+            or key_event->wVirtualKeyCode == VK_PRIOR
+            or key_event->wVirtualKeyCode == VK_NUMPAD0
+            or key_event->wVirtualKeyCode == VK_NUMPAD1
+            or key_event->wVirtualKeyCode == VK_NUMPAD2
+            or key_event->wVirtualKeyCode == VK_NUMPAD3
+            or key_event->wVirtualKeyCode == VK_NUMPAD4
+            or key_event->wVirtualKeyCode == VK_NUMPAD5
+            or key_event->wVirtualKeyCode == VK_NUMPAD6
+            or key_event->wVirtualKeyCode == VK_NUMPAD7
+            or key_event->wVirtualKeyCode == VK_NUMPAD8
+            or key_event->wVirtualKeyCode == VK_NUMPAD9
+        )
     ){
+        // "Ignore keypresses to numpad number keys if the left alt is held
+        // because the user is composing a character, or windows simulating
+        // this." <- this clause taken from libuv as well
+    }
+    else if (
+        t->in->EventType == KEY_EVENT
+        and key_event->uChar.UnicodeChar >= 32  // 32 is space
+        and key_event->uChar.UnicodeChar != 127  // 127 is DEL
+    ){
+      handle_key_down_event:
 
     //=//// ASCII printable character or UTF-8 ////////////////////////////=//
         //
         // https://en.wikipedia.org/wiki/ASCII
         // https://en.wikipedia.org/wiki/UTF-8
 
-        assert(t->in->Event.KeyEvent.wRepeatCount > 0);
+        assert(key_event->wRepeatCount > 0);
 
         // High codepoints such as Emoji are encoded on Windows as "surrogate
         // pairs"...so multiple `KeyEvent`s.  Thus they can be split across
@@ -677,12 +785,12 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
         // in tablet mode, and that does send the events.  More future-forward
         // apps like "Windows Terminal" are supposed to work.
         //
-        WCHAR wchar = t->in->Event.KeyEvent.uChar.UnicodeChar;
+        WCHAR wchar = key_event->uChar.UnicodeChar;
         if (wchar >= UNI_SUR_HIGH_START and wchar <= UNI_SUR_HIGH_END) {
             assert(t->surrogate == '\0');
             assert(t->repeat_surrogate == 0);
             t->surrogate = wchar;
-            t->repeat_surrogate = t->in->Event.KeyEvent.wRepeatCount;
+            t->repeat_surrogate = key_event->wRepeatCount;
             ++t->in;
             goto start_over;
         }
@@ -690,14 +798,14 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
         uint32_t codepoint;
         if (wchar >= UNI_SUR_LOW_START and wchar <= UNI_SUR_LOW_END) {
             assert(t->surrogate != 0);
-            assert(t->repeat_surrogate == t->in->Event.KeyEvent.wRepeatCount);
+            assert(t->repeat_surrogate == key_event->wRepeatCount);
             codepoint = t->surrogate;
             codepoint -= UNI_SUR_HIGH_START;
             codepoint *= 0x400;
             codepoint += wchar;
             codepoint -= UNI_SUR_LOW_START;
             codepoint += 0x10000;
-            printf("Codepoint: %u\n", codepoint);
+            //printf("Codepoint: %u\n", codepoint);
         }
         else
             codepoint = wchar;
@@ -709,8 +817,8 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
             // is pressed multiple times.  If this is the case, we do not
             // advance the input record pointer...but decrement the count.
             //
-            assert(t->in->Event.KeyEvent.wRepeatCount > 0);
-            if (--t->in->Event.KeyEvent.wRepeatCount == 0) {
+            assert(key_event->wRepeatCount > 0);
+            if (--key_event->wRepeatCount == 0) {
                 ++t->in;  // "consume" the event if all the repeats are done
                 t->surrogate = '\0';  // may or may not have been set
                 t->repeat_surrogate = 0;
@@ -722,17 +830,21 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
 
             rebElide(
                 "append/dup", e_buffered, rebR(rebChar(codepoint)),
-                    rebI(t->in->Event.KeyEvent.wRepeatCount)
+                    rebI(key_event->wRepeatCount)
             );
 
-            ++t->in;  // we took all the repeats into account in one step
+            // we aren't generating an event, so do NOT increment t->in
+            // (it will be done when the loop falls through)
+            //
+            // !!! Would it be better to just `goto start_over;` here?
+
             t->surrogate = '\0';  // may or may not have been set
             t->repeat_surrogate = 0;
         }
     }
     else if (
         t->in->EventType == KEY_EVENT
-        and t->in->Event.KeyEvent.bKeyDown
+        and key_event->bKeyDown
     ){
         static struct {
            WORD code;
@@ -753,8 +865,8 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
             { 0, nullptr }
         };
 
-        const WCHAR wchar = t->in->Event.KeyEvent.uChar.UnicodeChar;
-        const WORD vkey = t->in->Event.KeyEvent.wVirtualKeyCode;
+        const WCHAR wchar = key_event->uChar.UnicodeChar;
+        const WORD vkey = key_event->wVirtualKeyCode;
 
         if (wchar == '\n' or vkey == VK_RETURN) {
             e = rebChar('\n');
@@ -779,9 +891,9 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
             );
         }
 
-        assert(t->in->Event.KeyEvent.wRepeatCount > 0);
+        assert(key_event->wRepeatCount > 0);
         if (e) {
-            if (--t->in->Event.KeyEvent.wRepeatCount == 0)
+            if (--key_event->wRepeatCount == 0)
                 ++t->in;  // consume event if no more repeats
         }
     }
@@ -814,10 +926,36 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
 //
 void Term_Abandon_Pending_Events(STD_TERM *t)
 {
-    t->in = t->in_tail = t->buf;
+    // overwrite the buffer of everything pending with any more pending data
+
+    DWORD num_events;
+    while (true) {
+        //
+        // Ask if there's at least one event still pending
+        //
+        if (not PeekConsoleInput(Stdin_Handle, t->buf, 1, &num_events))
+            rebFail_OS (GetLastError());
+
+        if (num_events == 0)
+            break;  // if no events at all, don't do a blocking read
+
+        // Now read the events that we're just going to ignore
+        //
+        if (not ReadConsoleInput(
+            Stdin_Handle,  // input buffer handle
+            t->buf,  // buffer to read into
+            READ_BUF_LEN - 1,  // size of read buffer
+            &num_events
+        )){
+            rebFail_OS (GetLastError());
+        }
+        assert(num_events != 0);  // Should be blocking (see PeekConsoleInput)
+    }
+
+    t->in = t->in_tail = t->buf;  // Clear out whatever events we got
 
   #if !defined(NDEBUG)
-    t->buf[0].EventType = MENU_EVENT;
+    t->buf[0].EventType = MENU_EVENT;  // v-- poison the empty buffer
     t->buf[0].Event.MenuEvent.dwCommandId = MENU_ID_TRASH_DEBUG;
   #endif
 }

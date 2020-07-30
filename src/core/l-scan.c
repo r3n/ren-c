@@ -474,6 +474,9 @@ static const REBYTE *Scan_Quote_Push_Mold(
 
         ++src;
 
+        if (c == '\0')  // e.g. ^(00) or ^@
+            fail (Error_Illegal_Zero_Byte_Raw());  // legal CHAR!, not string
+
         Append_Codepoint(mo->series, c);
     }
 
@@ -560,6 +563,9 @@ const REBYTE *Scan_Item_Push_Mold(
 
         ++bp;
 
+        if (c == '\0')  // e.g. ^(00) or ^@
+            fail (Error_Illegal_Zero_Byte_Raw());  // legal CHAR!, not string
+
         Append_Codepoint(mo->series, c);
     }
 
@@ -612,6 +618,7 @@ static const REBYTE *Skip_Tag(const REBYTE *cp)
 //
 static void Update_Error_Near_For_Line(
     REBCTX *error,
+    SCAN_STATE *ss,
     REBLEN line,
     const REBYTE *line_head
 ){
@@ -644,6 +651,9 @@ static void Update_Error_Near_For_Line(
 
     ERROR_VARS *vars = ERR_VARS(error);
     Init_Text(&vars->nearest, Pop_Molded_String(mo));
+
+    Init_Word(&vars->file, ss->file);
+    Init_Integer(&vars->line, ss->line);
 }
 
 
@@ -682,7 +692,7 @@ static REBCTX *Error_Syntax(SCAN_STATE *ss, enum Reb_Token token) {
     );
 
     REBCTX *error = Error_Scan_Invalid_Raw(token_name, token_text);
-    Update_Error_Near_For_Line(error, ss->line, ss->line_head);
+    Update_Error_Near_For_Line(error, ss, ss->line, ss->line_head);
     return error;
 }
 
@@ -697,7 +707,7 @@ static REBCTX *Error_Syntax(SCAN_STATE *ss, enum Reb_Token token) {
 // better form of this error would walk the scan state stack and be able to
 // report all the unclosed terms.
 //
-static REBCTX *Error_Missing(SCAN_STATE *ss, char wanted) {
+static REBCTX *Error_Missing(SCAN_LEVEL *level, char wanted) {
     DECLARE_LOCAL (expected);
     Init_Text(expected, Make_Codepoint_String(wanted));
 
@@ -710,9 +720,19 @@ static REBCTX *Error_Missing(SCAN_STATE *ss, char wanted) {
     // at the block the string is in, which isn't as useful.
     //
     if (wanted == ')' or wanted == ']')
-        Update_Error_Near_For_Line(error, ss->start_line, ss->start_line_head);
+        Update_Error_Near_For_Line(
+            error,
+            level->ss,
+            level->start_line,
+            level->start_line_head
+        );
     else
-        Update_Error_Near_For_Line(error, ss->line, ss->line_head);
+        Update_Error_Near_For_Line(
+            error,
+            level->ss,
+            level->ss->line,
+            level->ss->line_head
+        );
     return error;
 }
 
@@ -727,7 +747,7 @@ static REBCTX *Error_Extra(SCAN_STATE *ss, char seen) {
     Init_Text(unexpected, Make_Codepoint_String(seen));
 
     REBCTX *error = Error_Scan_Extra_Raw(unexpected);
-    Update_Error_Near_For_Line(error, ss->line, ss->line_head);
+    Update_Error_Near_For_Line(error, ss, ss->line, ss->line_head);
     return error;
 }
 
@@ -741,9 +761,14 @@ static REBCTX *Error_Extra(SCAN_STATE *ss, char seen) {
 // applications if it would point out the locations of both points.  R3-Alpha
 // only pointed out the location of the start token.
 //
-static REBCTX *Error_Mismatch(SCAN_STATE *ss, char wanted, char seen) {
+static REBCTX *Error_Mismatch(SCAN_LEVEL *level, char wanted, char seen) {
     REBCTX *error = Error_Scan_Mismatch_Raw(rebChar(wanted), rebChar(seen));
-    Update_Error_Near_For_Line(error, ss->start_line, ss->start_line_head);
+    Update_Error_Near_For_Line(
+        error,
+        level->ss,
+        level->start_line,
+        level->start_line_head
+    );
     return error;
 }
 
@@ -919,8 +944,9 @@ static REBLEN Prescan_Token(SCAN_STATE *ss)
 //
 static enum Reb_Token Locate_Token_May_Push_Mold(
     REB_MOLD *mo,
-    SCAN_STATE *ss
+    SCAN_LEVEL *level
 ){
+    SCAN_STATE *ss = level->ss;
     TRASH_POINTER_IF_DEBUG(ss->end);  // this routine should set ss->end
 
   acquisition_loop:
@@ -958,8 +984,8 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
 
             Derelativize(DS_PUSH(), ss->feed->value, ss->feed->specifier);
 
-            if (ss->newline_pending) {
-                ss->newline_pending = false;
+            if (level->newline_pending) {
+                level->newline_pending = false;
                 SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
             }
         }
@@ -978,8 +1004,8 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             //
             if (not ss->line_head) {
                 assert(ss->feed->vaptr != nullptr);
-                assert(not ss->start_line_head);
-                ss->line_head = ss->start_line_head = ss->begin;
+                assert(not level->start_line_head);
+                level->start_line_head = ss->line_head = ss->begin;
             }
          }
     }
@@ -1024,7 +1050,10 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             }
             else
                 assert(strmode == STRMODE_NO_CR);
-            fail (Error_Illegal_Cr(cp, ss->begin)); }
+
+            REBCTX *error = Error_Illegal_Cr(cp, ss->begin);
+            Update_Error_Near_For_Line(error, ss, ss->line, ss->line_head);
+            fail (error); }
 
           case LEX_DELIMIT_LINEFEED:
           delimit_line_feed:
@@ -1062,9 +1091,9 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
                 ++cp;
             ss->end = cp;
             if (ss->begin[0] == '"')
-                fail (Error_Missing(ss, '"'));
+                fail (Error_Missing(level, '"'));
             if (ss->begin[0] == '{')
-                fail (Error_Missing(ss, '}'));
+                fail (Error_Missing(level, '}'));
             panic ("Invalid string start delimiter");
 
           case LEX_DELIMIT_RIGHT_BRACE:
@@ -1329,7 +1358,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
                 // have bad characters in it, but that would be detected by
                 // the caller, so we mention the missing `}` first.)
                 //
-                fail (Error_Missing(ss, '}'));
+                fail (Error_Missing(level, '}'));
             }
             if (cp - 1 == ss->begin)
                 return TOKEN_ISSUE;
@@ -1510,23 +1539,26 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
 
 
 //
-//  Init_Va_Scan_State_Core: C
+//  Init_Va_Scan_Level_Core: C
 //
 // Initialize a scanner state structure, using variadic C arguments.
 //
-void Init_Va_Scan_State_Core(
+void Init_Va_Scan_Level_Core(
+    SCAN_LEVEL *level,
     SCAN_STATE *ss,
     REBSTR *file,
     REBLIN line,
     const REBYTE *opt_begin,  // preload the scanner outside the va_list
     struct Reb_Feed *feed
 ){
-    ss->mode_char = '\0';
-
+    level->ss = ss;
     ss->feed = feed;
 
     ss->begin = opt_begin;  // if null, Locate_Token's first fetch from vaptr
     TRASH_POINTER_IF_DEBUG(ss->end);
+
+    ss->file = file;
+    ss->depth = 0;
 
     // !!! Splicing REBVALs into a scan as it goes creates complexities for
     // error messages based on line numbers.  Fortunately the splice of a
@@ -1535,46 +1567,43 @@ void Init_Va_Scan_State_Core(
     // any errors occur...it just might not give the whole picture when used
     // to offer an error message of what's happening with the spliced values.
     //
-    ss->start_line_head = ss->line_head = nullptr;
-
-    ss->start_line = ss->line = line;
-    ss->file = file;
-
-    ss->newline_pending = false;
-
-    ss->opts = 0;
+    level->start_line_head = ss->line_head = nullptr;
+    level->start_line = ss->line = line;
+    level->mode_char = '\0';
+    level->newline_pending = false;
+    level->opts = 0;
 }
 
 
 //
-//  Init_Scan_State: C
+//  Init_Scan_Level: C
 //
-void Init_Scan_State(
+void Init_Scan_Level(
+    SCAN_LEVEL *out,
     SCAN_STATE *ss,
     REBSTR *file,
     REBLIN line,
     const REBYTE *utf8,
     REBLEN limit  // !!! limit feature not implemented in R3-Alpha
 ){
+    out->ss = ss;
+
     assert(utf8[limit] == '\0');  // if limit used, make sure it was the end
     UNUSED(limit);
-
-    ss->mode_char = '\0';
 
     ss->feed = nullptr;  // signal Locate_Token this isn't a variadic scan
     ss->begin = utf8;
     TRASH_POINTER_IF_DEBUG(ss->end);
 
-    ss->start_line_head = ss->line_head = utf8;
-
-    ss->start_line = ss->line = line;
-
-    ss->newline_pending = false;
-
     ss->file = file;
-    ss->opts = 0;
-
     ss->feed = nullptr;
+    ss->depth = 0;
+
+    out->mode_char = '\0';
+    out->start_line_head = ss->line_head = utf8;
+    out->start_line = ss->line = line;
+    out->newline_pending = false;
+    out->opts = 0;
 }
 
 
@@ -1657,8 +1686,7 @@ static REBINT Scan_Head(SCAN_STATE *ss)
 #define CELL_FLAG_BLANK_MARKED_GET NODE_FLAG_MARKED
 
 
-static REBARR *Scan_Full_Array(SCAN_STATE *ss, REBYTE mode_char);
-static REBARR *Scan_Child_Array(SCAN_STATE *ss, REBYTE mode_char);
+static REBARR *Scan_Child_Array(SCAN_LEVEL *level, REBYTE mode_char);
 
 //
 //  Scan_To_Stack: C
@@ -1683,15 +1711,17 @@ static REBARR *Scan_Child_Array(SCAN_STATE *ss, REBYTE mode_char);
 // (It only has a return value because it may be called by rebRescue(), and
 // that's the convention it uses.)
 //
-REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
+REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
     DECLARE_MOLD (mo);
 
     if (C_STACK_OVERFLOWING(&mo))
         Fail_Stack_Overflow();
 
-    const bool just_once = did (ss->opts & SCAN_FLAG_NEXT);
+    SCAN_STATE *ss = level->ss;
+
+    const bool just_once = did (level->opts & SCAN_FLAG_NEXT);
     if (just_once)
-        ss->opts &= ~SCAN_FLAG_NEXT;  // e.g. recursion loads an entire BLOCK!
+        level->opts &= ~SCAN_FLAG_NEXT;  // recursion loads an entire BLOCK!
 
     REBLEN lit_depth = 0;
 
@@ -1701,7 +1731,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
 
     while (true) {
         Drop_Mold_If_Pushed(mo);
-        token = Locate_Token_May_Push_Mold(mo, ss);
+        token = Locate_Token_May_Push_Mold(mo, level);
         if (token == TOKEN_END)
             break;
 
@@ -1715,7 +1745,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
 
         switch (token) {
           case TOKEN_NEWLINE:
-            ss->newline_pending = true;
+            level->newline_pending = true;
             ss->line_head = ep;
             continue;
 
@@ -1742,7 +1772,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
 
                     break;  // mode will be changed to '/'
                 }
-                if (len == 1 or ss->mode_char != '/')
+                if (len == 1 or level->mode_char != '/')
                     goto syntax_error;
                 --len;
                 --ss->end;
@@ -1753,7 +1783,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
           case TOKEN_SET:
           token_set:
             len--;
-            if (ss->mode_char == '/' and token == TOKEN_SET) {
+            if (level->mode_char == '/' and token == TOKEN_SET) {
                 token = TOKEN_WORD;  // will be a PATH_SET
                 ss->end--;  // put ':' back on end but not beginning
             }
@@ -1797,7 +1827,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
           case TOKEN_GET_GROUP_BEGIN:
           case TOKEN_GET_BLOCK_BEGIN:
             if (ep[-1] == ':') {
-                if (len == 1 or ss->mode_char != '/')
+                if (len == 1 or level->mode_char != '/')
                     goto syntax_error;
                 --len;
                 --ss->end;
@@ -1809,13 +1839,13 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
           case TOKEN_GROUP_BEGIN:
           case TOKEN_BLOCK_BEGIN: {
             REBARR *a = Scan_Child_Array(
-                ss, (token >= TOKEN_GET_BLOCK_BEGIN) ? ']' : ')'
+                level, (token >= TOKEN_GET_BLOCK_BEGIN) ? ']' : ')'
             );
 
             enum Reb_Kind kind = KIND_OF_ARRAY_FROM_TOKEN(token);
             if (
                 *ss->end == ':'  // `...(foo):` or `...[bar]:`
-                and ss->mode_char != '/'  // leave `:` so SET-PATH! gets made
+                and level->mode_char != '/'  // leave `:` to make SET-PATH!
             ){
                 if (
                     token == TOKEN_GET_BLOCK_BEGIN
@@ -1839,7 +1869,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
                 // Basically you don't expect to see a TOKEN_PATH while doing
                 // a path scan unless you wind up at the end.
                 //
-                if (ss->mode_char == '/') {
+                if (level->mode_char == '/') {
                     Init_Blank(DS_PUSH());
                     Init_Blank(DS_PUSH());
                     goto loop;
@@ -1862,49 +1892,49 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
                 break;
             }
 
-            if (ss->mode_char != '/')  // saw slash(es) while not scanning path
+            if (level->mode_char != '/')  // saw slash(es), not scanning path
                 goto scan_path_head_is_DS_TOP;
 
             goto loop;  // otherwise, we were scanning a path already
 
           case TOKEN_BLOCK_END: {
-            if (ss->mode_char == ']')
+            if (level->mode_char == ']')
                 goto array_done;
 
-            if (ss->mode_char == '/') {  // implicit end, such as `[lit /]`
+            if (level->mode_char == '/') {  // implicit end, such as `[lit /]`
                 Init_Blank(DS_PUSH());
                 --ss->begin;
                 --ss->end;
                 goto array_done;
             }
 
-            if (ss->mode_char != '\0')  // expected e.g. `)` before the `]`
-                fail (Error_Mismatch(ss, ss->mode_char, ']'));
+            if (level->mode_char != '\0')  // expected e.g. `)` before the `]`
+                fail (Error_Mismatch(level, level->mode_char, ']'));
 
             // just a stray unexpected ']'
             //
             fail (Error_Extra(ss, ']')); }
 
           case TOKEN_GROUP_END: {
-            if (ss->mode_char == ')')
+            if (level->mode_char == ')')
                 goto array_done;
 
-            if (ss->mode_char == '/') {  // implicit end, such as `(lit /)`
+            if (level->mode_char == '/') {  // implicit end, such as `(lit /)`
                 Init_Blank(DS_PUSH());
                 --ss->begin;
                 --ss->end;
                 goto array_done;
             }
 
-            if (ss->mode_char != '\0')  // expected e.g. ']' before the ')'
-                fail (Error_Mismatch(ss, ss->mode_char, ')'));
+            if (level->mode_char != '\0')  // expected e.g. ']' before the ')'
+                fail (Error_Mismatch(level, level->mode_char, ')'));
 
             // just a stray unexpected ')'
             //
             fail (Error_Extra(ss, ')')); }
 
           case TOKEN_INTEGER:  // INTEGER! or start of DATE!
-            if (*ep != '/' or ss->mode_char == '/') {
+            if (*ep != '/' or level->mode_char == '/') {
                 if (ep != Scan_Integer(DS_PUSH(), bp, len))
                     goto syntax_error;
             }
@@ -1950,7 +1980,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
           case TOKEN_TIME:
             if (
                 bp[len - 1] == ':'
-                and ss->mode_char == '/'  // could be path/10: set
+                and level->mode_char == '/'  // could be path/10: set
             ){
                 if (ep - 1 != Scan_Integer(DS_PUSH(), bp, len - 1))
                     goto syntax_error;
@@ -1962,7 +1992,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
             break;
 
           case TOKEN_DATE:
-            while (*ep == '/' and ss->mode_char != '/') {  // Is it date/time?
+            while (*ep == '/' and level->mode_char != '/') {  // Is date/time?
                 ep++;
                 while (IS_LEX_NOT_DELIMIT(*ep)) ep++;
                 len = cast(REBLEN, ep - bp);
@@ -2035,7 +2065,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
             break;
 
           case TOKEN_CONSTRUCT: {
-            REBARR *array = Scan_Full_Array(ss, ']');
+            REBARR *array = Scan_Child_Array(level, ']');
 
             // !!! Should the scanner be doing binding at all, and if so why
             // just Lib_Context?  Not binding would break functions entirely,
@@ -2206,7 +2236,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
             }
         }
 
-        if (ss->mode_char == '/') {
+        if (level->mode_char == '/') {
             if (*ep != '/')  // e.g. `a/b`, just finished scanning b
                 goto array_done;
 
@@ -2252,18 +2282,15 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
                 // Note we still might come up empty (e.g. `foo/)`)
             }
             else {
-                REBYTE saved_mode_char = ss->mode_char;
-                bool saved_newline_pending = ss->newline_pending;
-                ss->newline_pending = false;
+                SCAN_LEVEL child;
+                child.ss = ss;
+                child.start_line = level->start_line;
+                child.start_line_head = level->start_line_head;
+                child.opts = level->opts;
+                child.mode_char = '/';
+                child.newline_pending = false;
 
-                ss->mode_char = '/';
-                if (ss->opts & SCAN_FLAG_RELAX)
-                    Scan_To_Stack_Relaxed(ss);
-                else
-                    Scan_To_Stack(ss);
-
-                ss->mode_char = saved_mode_char;
-                ss->newline_pending = saved_newline_pending;
+                Scan_To_Stack(&child);
             }
 
             // Any trailing colons should have been left on, because the child
@@ -2309,7 +2336,7 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
             }
             else {
                 REBFLGS flags = NODE_FLAG_MANAGED;
-                if (ss->newline_pending)
+                if (level->newline_pending)
                     flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
 
                 bool blank_marked_get =
@@ -2395,22 +2422,22 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
         // process paths or other arrays...because the newline belongs on the
         // whole array...not the first element of it).
         //
-        if (ss->newline_pending) {
-            ss->newline_pending = false;
+        if (level->newline_pending) {
+            level->newline_pending = false;
             SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
         }
 
         // Added for TRANSCODE/NEXT (LOAD/NEXT is deprecated, see #1703)
         //
-        if ((ss->opts & SCAN_FLAG_ONLY) or just_once)
+        if (just_once)
             goto array_done;
     }
 
     // At some point, a token for an end of block or group needed to jump to
     // the array_done.  If it didn't, we never got a proper closing.
     //
-    if (ss->mode_char == ']' or ss->mode_char == ')')
-        fail (Error_Missing(ss, ss->mode_char));
+    if (level->mode_char == ']' or level->mode_char == ')')
+        fail (Error_Missing(level, level->mode_char));
 
   array_done:
 
@@ -2431,14 +2458,31 @@ REBVAL *Scan_To_Stack(SCAN_STATE *ss) {
 
 
 //
-//  Scan_To_Stack_Relaxed: C
+//  Scan_To_Stack_Relaxed_Failed: C
 //
-void Scan_To_Stack_Relaxed(SCAN_STATE *ss) {
-    SCAN_STATE ss_before = *ss;
+// If the scan failed, the error will be on the top of the stack.  (This is
+// done to avoid passing in a potentially volatile memory location, e.g.
+// the result of getting a variable location.)
+//
+bool Scan_To_Stack_Relaxed_Failed(SCAN_LEVEL *level) {
+    SCAN_STATE *ss = level->ss;
+    SCAN_LEVEL before = *level;
+    SCAN_STATE ss_before = *level->ss;
 
-    REBVAL *error = rebRescue(cast(REBDNG*, &Scan_To_Stack), ss);
+    REBVAL *error = rebRescue(cast(REBDNG*, &Scan_To_Stack), level);
     if (not error)
-        return;  // scan went fine, hopefully the common case...
+        return false;  // scan went fine, hopefully the common case...
+
+    // !!! See notes on ->depth regarding TRANSCODE/RELAX and the problems
+    // with trying to do recoverable transcoding.  It was a half-baked feature
+    // in R3-Alpha that we try to keep in some form, but we only attempt to
+    // actually recover the parse if we're not in a nested block.  Otherwise
+    // we fail since you cannot recover without more scanner state exposure.
+    //
+    if (ss->depth != 0)
+        fail (VAL_CONTEXT(error));
+
+    before.ss = &ss_before;
 
     // Because rebRescue() restores the data stack, the in-progress scan
     // contents were lost.  But the `ss` state tells us where the token was
@@ -2468,21 +2512,16 @@ void Scan_To_Stack_Relaxed(SCAN_STATE *ss) {
         ss_before.begin = BIN_HEAD(bin);
         TRASH_POINTER_IF_DEBUG(ss_before.end);
 
-        Scan_To_Stack(&ss_before);  // !!! Shouldn't error...check that?
+        Scan_To_Stack(&before);  // !!! Shouldn't error...check that?
 
         Free_Unmanaged_Series(bin);
     }
 
     ss->begin = ss->end;  // skip malformed token
 
-    // !!! R3-Alpha's /RELAX mode (called TRANSCODE/ERROR) just added the
-    // error to the end of the processed input.  This isn't distinguishable
-    // from loading a construction syntax error, so consider what the
-    // interface should be (perhaps raise an error parameterized by the
-    // partial scanned data plus the error raised?)
-    //
     Move_Value(DS_PUSH(), error);
     rebRelease(error);
+    return true;
 }
 
 
@@ -2494,9 +2533,15 @@ void Scan_To_Stack_Relaxed(SCAN_STATE *ss) {
 // reflection, allowing for better introspection and error messages.  (This
 // is similar to the benefits of Reb_Frame.)
 //
-static REBARR *Scan_Child_Array(SCAN_STATE *ss, REBYTE mode_char)
+static REBARR *Scan_Child_Array(SCAN_LEVEL *parent, REBYTE mode_char)
 {
-    SCAN_STATE child = *ss;
+    assert(mode_char == ')' or mode_char == ']');
+
+    SCAN_STATE *ss = parent->ss;
+    ++ss->depth;
+
+    SCAN_LEVEL child;
+    child.ss = ss;
 
     // Capture current line and head of line into the starting points, because
     // some errors wish to report the start of the array's location.
@@ -2504,24 +2549,12 @@ static REBARR *Scan_Child_Array(SCAN_STATE *ss, REBYTE mode_char)
     child.start_line = ss->line;
     child.start_line_head = ss->line_head;
     child.newline_pending = false;
-    child.opts &= ~(SCAN_FLAG_NULLEDS_LEGAL | SCAN_FLAG_NEXT);
+    child.opts = parent->opts &= ~(SCAN_FLAG_NULLEDS_LEGAL | SCAN_FLAG_NEXT);
 
-    // The way that path scanning works is that after one item has been
-    // scanned it is *retroactively* decided to begin picking up more items
-    // in the path.  Hence, we take over one pushed item from the caller.
-    //
-    REBDSP dsp_orig;
-    if (mode_char == '/') {
-        assert(DSP > 0);
-        dsp_orig = DSP - 1;
-    } else
-        dsp_orig = DSP;
+    REBDSP dsp_orig = DSP;
 
     child.mode_char = mode_char;
-    if (child.opts & SCAN_FLAG_RELAX)
-        Scan_To_Stack_Relaxed(&child);
-    else
-        Scan_To_Stack(&child);
+    Scan_To_Stack(&child);
 
     REBARR *a = Pop_Stack_Values_Core(
         dsp_orig,
@@ -2536,37 +2569,8 @@ static REBARR *Scan_Child_Array(SCAN_STATE *ss, REBYTE mode_char)
     SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
     SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
-    // The only variables that should actually be written back into the
-    // parent ss are those reflecting an update in the "feed" of data.
-    //
-    // Don't update the start line for the parent, because that's still
-    // the line where that array scan started.
-
-    ss->begin = child.begin;
-    ss->end = child.end;
-    assert(ss->feed == child.feed);  // shouldn't have changed
-    ss->line = child.line;
-    ss->line_head = child.line_head;
-
+    --ss->depth;
     return a;
-}
-
-
-//
-//  Scan_Full_Array: C
-//
-// Variation of scan_block to avoid problem with aggregate values.
-//
-static REBARR *Scan_Full_Array(SCAN_STATE *ss, REBYTE mode_char)
-{
-    bool saved_only = did (ss->opts & SCAN_FLAG_ONLY);
-    ss->opts &= ~SCAN_FLAG_ONLY;
-
-    REBARR *array = Scan_Child_Array(ss, mode_char);
-
-    if (saved_only)
-        ss->opts |= SCAN_FLAG_ONLY;
-    return array;
 }
 
 
@@ -2578,16 +2582,17 @@ static REBARR *Scan_Full_Array(SCAN_STATE *ss, REBYTE mode_char)
 REBARR *Scan_UTF8_Managed(REBSTR *filename, const REBYTE *utf8, REBSIZ size)
 {
     SCAN_STATE ss;
+    SCAN_LEVEL level;
     const REBLIN start_line = 1;
-    Init_Scan_State(&ss, filename, start_line, utf8, size);
+    Init_Scan_Level(&level, &ss, filename, start_line, utf8, size);
 
     REBDSP dsp_orig = DSP;
-    Scan_To_Stack(&ss);
+    Scan_To_Stack(&level);
 
     REBARR *a = Pop_Stack_Values_Core(
         dsp_orig,
         NODE_FLAG_MANAGED
-            | (ss.newline_pending ? ARRAY_FLAG_NEWLINE_AT_TAIL : 0)
+            | (level.newline_pending ? ARRAY_FLAG_NEWLINE_AT_TAIL : 0)
     );
 
     MISC(a).line = ss.line;
@@ -2606,10 +2611,11 @@ REBARR *Scan_UTF8_Managed(REBSTR *filename, const REBYTE *utf8, REBSIZ size)
 //
 REBINT Scan_Header(const REBYTE *utf8, REBLEN len)
 {
+    SCAN_LEVEL level;
     SCAN_STATE ss;
     REBSTR * const filename = Canon(SYM___ANONYMOUS__);
     const REBLIN start_line = 1;
-    Init_Scan_State(&ss, filename, start_line, utf8, len);
+    Init_Scan_Level(&level, &ss, filename, start_line, utf8, len);
 
     REBINT result = Scan_Head(&ss);
     if (result == 0)
@@ -2655,15 +2661,14 @@ void Shutdown_Scanner(void)
 //
 //  {Translates UTF-8 source (from a text or binary) to values}
 //
-//      return: "New position after transcoding"
+//      return: "Transcoded value (or block of values)"
+//          [<opt> any-value!]
+//      source "If BINARY!, must be Unicode UTF-8 encoded"
 //          [text! binary!]
-//      var "Variable to set"
-//          [any-word!]
-//      source "Must be Unicode UTF-8 encoded"
-//          [text! binary!]
-//      /next "Translate next complete value (blocks as single value)"
-//      /only "Translate only a single value (blocks dissected)"
-//      /relax "Do not cause errors - return error object as value in place"
+//      /next "Translate next complete value and give back next position"
+//          [<output>]  ; <opt> text! binary!
+//      /relax "Return an error and skip token if possible (top level only)"
+//          [<output>]  ; <opt> error!
 //      /file "File to be associated with BLOCK!s and GROUP!s in source"
 //          [file! url!]
 //      /line "Line number for start of scan, word variable will be updated"
@@ -2672,11 +2677,19 @@ void Shutdown_Scanner(void)
 //
 REBNATIVE(transcode)
 //
-// R3-Alpha's TRANSCODE would return a length 2 BLOCK!.  Ren-C aims to unify
-// the PARSE interface and TRANSCODE, so it breaks the variable out into a
-// separate location to SET.  This is a step toward the goal:
+// R3-Alpha's TRANSCODE would return a length 2 BLOCK!.  Ren-C uses multiple
+// return values, and operates in a reduced case where if you ask for only
+// one return value then it assumes you want the entire thing transcoded...
+// but if you ask for 2 it assumes you want partial and 3 assumes you would
+// like errors reported as a value instead of needing a TRAP.
 //
 // https://github.com/rebol/rebol-issues/issues/1916
+//
+// !!! See notes on SCAN_STATE->depth for explanations of why the /RELAX
+// option works only at the top level.  The /ONLY option was removed entirely,
+// as it was fairly useless...taking items out of blocks but then would wind
+// up failing when it hit the closing brace on successive calls.  A more
+// coherent notion of continuable scanner state is required.
 {
     INCLUDE_PARAMS_OF_TRANSCODE;
 
@@ -2690,7 +2703,7 @@ REBNATIVE(transcode)
 
     const REBVAL *line_number;
     if (ANY_WORD(ARG(line)))
-        line_number = Get_Opt_Var_May_Fail(ARG(line), SPECIFIED);
+        line_number = Lookup_Word_May_Fail(ARG(line), SPECIFIED);
     else
         line_number = ARG(line);
 
@@ -2709,13 +2722,12 @@ REBNATIVE(transcode)
     REBSIZ size;
     const REBYTE *bp = VAL_BYTES_AT(&size, source);
 
+    SCAN_LEVEL level;
     SCAN_STATE ss;
-    Init_Scan_State(&ss, filename, start_line, bp, size);
+    Init_Scan_Level(&level, &ss, filename, start_line, bp, size);
 
     if (REF(next))
-        ss.opts |= SCAN_FLAG_NEXT;
-    if (REF(only))
-        ss.opts |= SCAN_FLAG_ONLY;
+        level.opts |= SCAN_FLAG_NEXT;
 
     // If the source data bytes are "1" then the scanner will push INTEGER! 1
     // if the source data is "[1]" then the scanner will push BLOCK! [1]
@@ -2724,18 +2736,24 @@ REBNATIVE(transcode)
     //
     REBDSP dsp_orig = DSP;
     if (REF(relax)) {
-        ss.opts |= SCAN_FLAG_RELAX;
-        Scan_To_Stack_Relaxed(&ss);
+        bool failed = Scan_To_Stack_Relaxed_Failed(&level);
+
+        REBVAL *var = Lookup_Mutable_Word_May_Fail(ARG(relax), SPECIFIED);
+        if (failed) {
+            Move_Value(var, DS_TOP);
+            DS_DROP();
+        }
+        else
+            Init_Nulled(var);
     }
     else
-        Scan_To_Stack(&ss);
+        Scan_To_Stack(&level);
 
-    REBVAL *var = Sink_Var_May_Fail(ARG(var), SPECIFIED);
-    if (REF(next) or REF(only)) {
+    if (REF(next)) {
         if (DSP == dsp_orig)
-            Init_Nulled(var);
+            Init_Nulled(D_OUT);
         else {
-            Move_Value(var, DS_TOP);
+            Move_Value(D_OUT, DS_TOP);
             DS_DROP();
         }
         assert(DSP == dsp_orig);
@@ -2744,27 +2762,29 @@ REBNATIVE(transcode)
         REBARR *a = Pop_Stack_Values_Core(
             dsp_orig,
             NODE_FLAG_MANAGED
-                | (ss.newline_pending ? ARRAY_FLAG_NEWLINE_AT_TAIL : 0)
+                | (level.newline_pending ? ARRAY_FLAG_NEWLINE_AT_TAIL : 0)
         );
         MISC(a).line = ss.line;
         LINK_FILE_NODE(a) = NOD(ss.file);
         SER(a)->header.bits |= ARRAY_MASK_HAS_FILE_LINE;
 
-        Init_Block(Sink_Var_May_Fail(ARG(var), SPECIFIED), a);
+        Init_Block(D_OUT, a);
     }
 
     if (ANY_WORD(ARG(line)))  // they wanted the line number updated
-        Init_Integer(Sink_Var_May_Fail(ARG(line), SPECIFIED), ss.line);
+        Init_Integer(Sink_Word_May_Fail(ARG(line), SPECIFIED), ss.line);
 
     // Return the input BINARY! or TEXT! advanced by how much the transcode
     // operation consumed.
     //
-    Move_Value(D_OUT, source);
-    if (not IS_NULLED(var) and (REF(next) or REF(only))) {
-        if (IS_BINARY(source))
-            VAL_INDEX(D_OUT) = ss.end - VAL_BIN_HEAD(source);
+    if (REF(next)) {
+        REBVAL *var = Sink_Word_May_Fail(ARG(next), SPECIFIED);
+        Move_Value(var, source);
+
+        if (IS_BINARY(var))
+            VAL_INDEX(var) = ss.end - VAL_BIN_HEAD(var);
         else {
-            assert(IS_TEXT(source));
+            assert(IS_TEXT(var));
 
             // !!! The scanner does not currently keep track of how many
             // codepoints it went past, it only advances bytes.  But the TEXT!
@@ -2777,13 +2797,11 @@ REBNATIVE(transcode)
             // maybe that would make it slower when this isn't needed?)
             //
             if (ss.begin != 0)
-                VAL_INDEX(D_OUT) += Num_Codepoints_For_Bytes(bp, ss.begin);
+                VAL_INDEX(var) += Num_Codepoints_For_Bytes(bp, ss.begin);
             else
-                VAL_INDEX(D_OUT) += BIN_TAIL(VAL_SERIES(source)) - bp;
+                VAL_INDEX(var) += BIN_TAIL(VAL_SERIES(var)) - bp;
         }
     }
-    else
-        VAL_INDEX(D_OUT) = VAL_LEN_HEAD(source);  // Note: ss.end is trash
 
     return D_OUT;
 }
@@ -2802,14 +2820,15 @@ const REBYTE *Scan_Any_Word(
     const REBYTE *utf8,
     REBLEN len
 ) {
+    SCAN_LEVEL level;
     SCAN_STATE ss;
     REBSTR * const filename = Canon(SYM___ANONYMOUS__);
     const REBLIN start_line = 1;
-    Init_Scan_State(&ss, filename, start_line, utf8, len);
+    Init_Scan_Level(&level, &ss, filename, start_line, utf8, len);
 
     DECLARE_MOLD (mo);
 
-    enum Reb_Token token = Locate_Token_May_Push_Mold(mo, &ss);
+    enum Reb_Token token = Locate_Token_May_Push_Mold(mo, &level);
     if (token != TOKEN_WORD)
         return nullptr;
 

@@ -194,12 +194,12 @@ make-http-request: func [
         space "HTTP/1.0" CR LF
     ]
     for-each [word string] headers [
-        append result unspaced [mold word space string CR LF]
+        append result unspaced [mold word _ string CR LF]
     ]
     if content [
         content: as binary! content
         append result unspaced [
-            "Content-Length:" space (length of content) CR LF
+            "Content-Length:" _ length of content CR LF
         ]
     ]
     append result unspaced [CR LF]
@@ -317,8 +317,8 @@ check-response: function [port] [
                 body: to text! conn/data
                 dump body
             ] then [
-                print unspaced [
-                    "S: " length of conn/data " binary bytes in buffer ..."
+                print spaced [
+                    "S:" length of conn/data "binary bytes in buffer ..."
                 ]
             ]
         ]

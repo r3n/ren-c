@@ -52,10 +52,18 @@ bool All_Bytes_ASCII(REBYTE *bp, REBLEN len)
 //     2. it does not contain other values ("123 456")
 //     3. it's not empty or only whitespace
 //
+// !!! This seems to be an addition to R3-Alpha for things like TO WORD! of
+// a TEXT! to use with arbitrary whitespace (Rebol2 would just include the
+// whitespace in the WORD!).  In cases such like that, it is redundant with
+// work done by TRANSCODE...though it is lighter weight.  It also permits
+// clipping out syntax that may not be accepted by the scanner (e.g. if
+// TO DATE! permitted textual syntax that was not independently LOAD-able).
+// It should be reviewed.
+//
 const REBYTE *Analyze_String_For_Scan(
     REBSIZ *opt_size_out,
     const REBVAL *any_string,
-    REBLEN max_len // maximum length in *codepoints*
+    REBLEN max_len  // maximum length in *codepoints*
 ){
     REBCHR(const*) up = VAL_STRING_AT(any_string);
     REBLEN index = VAL_INDEX(any_string);
@@ -63,45 +71,44 @@ const REBYTE *Analyze_String_For_Scan(
     if (len == 0)
         fail (Error_Past_End_Raw());
 
-    REBUNI c;
+    REBUNI c;  // we know there is at least one character
+    up = NEXT_CHR(&c, up);
 
     // Skip leading whitespace
     //
     for (; index < len; ++index, --len) {
-        up = NEXT_CHR(&c, up);
         if (not IS_SPACE(c))
             break;
+        up = NEXT_CHR(&c, up);
     }
 
     // Skip up to max_len non-space characters.
     //
+    // !!! The R3-Alpha code would fail with Error_Invalid_Chars_Raw() if
+    // there were UTF-8 characters in most calls.  Only ANY-WORD! from
+    // ANY-STRING! allowed it.  Though it's not clear why it wouldn't be
+    // better to delegate to the scanning routine itself to give a more
+    // pointed error... allow c >= 0x80 for now.
+    //
     REBLEN num_chars = 0;
-    for (; len > 0;) {
+    do {
         ++num_chars;
-        --len;
-
-        // The R3-Alpha code would fail with Error_Invalid_Chars_Raw() if
-        // there were UTF-8 characters in most calls.  Only ANY-WORD! from
-        // ANY-STRING! allowed it.  Though it's not clear why it wouldn't be
-        // better to delegate to the scanning routine itself to give a
-        // more pointed error... allow c >= 0x80 for now.
-
         if (num_chars > max_len)
             fail (Error_Too_Long_Raw());
 
-        up = NEXT_CHR(&c, up);
-        if (IS_SPACE(c)) {
-            --len;
+        --len;
+        if (len == 0)
             break;
-        }
-    }
+
+        up = NEXT_CHR(&c, up);
+    } while (not IS_SPACE(c));
 
     // Rest better be just spaces
     //
     for (; len > 0; --len) {
-        up = NEXT_CHR(&c, up);
-        if (!IS_SPACE(c))
+        if (not IS_SPACE(c))
             fail (Error_Invalid_Chars_Raw());
+        up = NEXT_CHR(&c, up);
     }
 
     if (num_chars == 0)

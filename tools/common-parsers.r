@@ -76,11 +76,15 @@ load-until-blank: function [
     text [text!]
     /next {Return values and next position.}
 ] [
-
     wsp: compose [some (charset { ^-})]
 
+    res: _  ; !!! collect as SET-WORD!s for locals, evolving...
     rebol-value: parsing-at x [
-        res: try attempt [transcode/next (lit dummy:) x]
+        ;
+        ; !!! SET-BLOCK! not bootstrap
+        ;
+        attempt [transcode/next x 'res] else [res: blank]
+        res
     ]
 
     terminator: [opt wsp newline opt wsp newline]

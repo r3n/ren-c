@@ -92,8 +92,8 @@ bool Do_Signals_Throws(REBVAL *out)
     //
     // !!! This seems overdesigned considering SIG_EVENT_PORT isn't used.
     //
-    REBLEN filtered_sigs = Eval_Signals & Eval_Sigmask;
-    REBLEN saved_mask = Eval_Sigmask;
+    REBFLGS filtered_sigs = Eval_Signals & Eval_Sigmask;
+    REBFLGS saved_sigmask = Eval_Sigmask;
     Eval_Sigmask = 0;
 
     // "Be careful of signal loops! EG: do not PRINT from here."
@@ -118,7 +118,7 @@ bool Do_Signals_Throws(REBVAL *out)
             panic ("Ctrl-C or other HALT signal with no trap to process it");
 
         CLR_SIGNAL(SIG_HALT);
-        Eval_Sigmask = saved_mask;
+        Eval_Sigmask = saved_sigmask;
 
         Init_Thrown_With_Label(out, NULLED_CELL, NAT_VALUE(halt));
         return true; // thrown
@@ -136,7 +136,7 @@ bool Do_Signals_Throws(REBVAL *out)
         // if the garbage collector and such are going to run during this
         // execution, the signal mask has to be turned back on.  Review.
         //
-        Eval_Sigmask = saved_mask;
+        Eval_Sigmask = saved_sigmask;
 
         // !!! If implemented, this would allow triggering a breakpoint
         // with a keypress.  This needs to be thought out a bit more,
@@ -145,6 +145,6 @@ bool Do_Signals_Throws(REBVAL *out)
         fail ("BREAKPOINT from SIG_INTERRUPT not currently implemented");
     }
 
-    Eval_Sigmask = saved_mask;
+    Eval_Sigmask = saved_sigmask;
     return thrown;
 }

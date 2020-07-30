@@ -311,22 +311,28 @@ inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
 // LIT ran, it would get deferred until after the RETURN.  This is not
 // consistent with the pattern people expect.
 //
-void Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
+// Returns TRUE if it set the flag.
+//
+bool Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
     assert(NOT_FEED_FLAG(feed, DEFERRING_ENFIX));
     assert(not feed->gotten);
 
     CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
 
     if (not IS_WORD(feed->value))
-        return;
+        return false;
 
-    feed->gotten = Try_Get_Opt_Var(feed->value, feed->specifier);
+    feed->gotten = Try_Lookup_Word(feed->value, feed->specifier);
 
     if (not feed->gotten or not IS_ACTION(feed->gotten))
-        return;
+        return false;
+
+    if (NOT_ACTION_FLAG(VAL_ACTION(feed->gotten), ENFIXED))
+        return false;
 
     if (GET_ACTION_FLAG(VAL_ACTION(feed->gotten), DEFERS_LOOKBACK))
         SET_FEED_FLAG(feed, DEFERRING_ENFIX);
+    return true;
 }
 
 
@@ -580,7 +586,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         goto give_up_backward_quote_priority;
 
     assert(not *next_gotten);  // Fetch_Next_In_Frame() cleared it
-    *next_gotten = Try_Get_Opt_Var(*next, *specifier);
+    *next_gotten = Try_Lookup_Word(*next, *specifier);
 
     if (not *next_gotten or not IS_ACTION(*next_gotten))
         goto give_up_backward_quote_priority;  // note only ACTION! is ENFIXED
@@ -1398,24 +1404,76 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
     //=//// SOFT QUOTED ARG-OR-REFINEMENT-ARG  ////////////////////////////=//
 
+        // Quotes from the right already "win" over quotes from the left, in
+        // a case like `help left-quoter` where they point at teach other.
+        // But there's also an issue where something sits between quoting
+        // constructs like the `[x]` in between the `else` and `=>`:
+        //
+        //     if condition [...] else [x] => [...]
+        //
+        // Here the neutral [x] is meant to be a left argument to the lambda,
+        // producing the effect of:
+        //
+        //     if condition [...] else ([x] => [...])
+        //
+        // To get this effect, we need a different kind of deferment that
+        // hops over a unit of material.  Soft quoting is unique in that it
+        // means we can do that hop over exactly one unit without breaking
+        // the evaluator mechanics of feeding one element at a time with
+        // "no takebacks".
+        //
+        // First, we cache the quoted argument into the frame slot.  This is
+        // the common case of what is desired.  But if we advance the feed and
+        // notice a quoting enfix construct afterward looking left, we call
+        // into a nested evaluator before finishing the operation.
+
               case REB_P_SOFT_QUOTE:
-                if (not IS_QUOTABLY_SOFT(*next)) {
-                    Literal_Next_In_Frame(f->arg, f); // CELL_FLAG_UNEVALUATED
-                }
-                else {
-                    if (Eval_Value_Throws(f->arg, *next, *specifier)) {
+                Literal_Next_In_Frame(f->arg, f);  // CELL_FLAG_UNEVALUATED
+
+                // See remarks on Lookahead_To_Sync_Enfix_Defer_Flag().  We
+                // have to account for enfix deferrals in cases like:
+                //
+                //     return if false '[foo] else '[bar]
+                if (
+                    Lookahead_To_Sync_Enfix_Defer_Flag(f->feed) and
+                    GET_ACTION_FLAG(VAL_ACTION(f->feed->gotten), QUOTES_FIRST)
+                ){
+                    // We need to defer and let the right hand quote that is
+                    // quoting leftward win.  We use the EVAL_FLAG_POST_SWITCH
+                    // flag to jump into a subframe where subframe->out is
+                    // the f->arg, and it knows to get the arg from there.
+
+                    REBFLGS flags = EVAL_MASK_DEFAULT
+                        | EVAL_FLAG_FULFILLING_ARG
+                        | EVAL_FLAG_POST_SWITCH
+                        | EVAL_FLAG_INERT_OPTIMIZATION;
+
+                    if (IS_VOID(*next))  // Eval_Step() has callers test this
+                        fail (Error_Void_Evaluation_Raw());  // must be quoted
+
+                    DECLARE_FRAME (subframe, f->feed, flags);
+
+                    Push_Frame(f->arg, subframe);
+                    bool threw = Eval_Throws(subframe);
+                    Drop_Frame(subframe);
+
+                    if (threw) {
                         Move_Value(f->out, f->arg);
                         goto abort_action;
                     }
-                    Fetch_Next_Forget_Lookback(f);
                 }
-
-                // Have to account for enfix deferrals in cases like:
-                //
-                //     return if false '[foo] else '[bar]
-                //
-                Lookahead_To_Sync_Enfix_Defer_Flag(f->feed);
-
+                else if (IS_QUOTABLY_SOFT(f->arg)) {
+                    //
+                    // We did not defer the quoted argument.  If the argument
+                    // is something like a GROUP!, GET-WORD!, or GET-PATH!...
+                    // it has to be evaluated.
+                    //
+                    Move_Value(spare, f->arg);
+                    if (Eval_Value_Throws(f->arg, spare, *specifier)) {
+                        Move_Value(f->out, f->arg);
+                        goto abort_action;
+                    }
+                }
                 break;
 
               default:
@@ -1806,9 +1864,9 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
       case REB_WORD:
         if (not gotten)
-            gotten = Get_Opt_Var_May_Fail(v, *specifier);
+            gotten = Lookup_Word_May_Fail(v, *specifier);
 
-        if (IS_ACTION(gotten)) {  // before IS_NULLED() is common case
+        if (IS_ACTION(gotten)) {  // before IS_VOID() is common case
             REBACT *act = VAL_ACTION(gotten);
 
             if (GET_ACTION_FLAG(act, ENFIXED)) {
@@ -1834,10 +1892,10 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             goto process_action;
         }
 
-        if (IS_VOID(gotten))  // need `:x` if it's void ("unset")
+        if (IS_VOID(gotten))  // need GET/ANY if it's void ("undefined")
             fail (Error_Need_Non_Void_Core(v, *specifier));
 
-        Move_Value(f->out, gotten); // no copy CELL_FLAG_UNEVALUATED
+        Move_Value(f->out, gotten);  // no copy CELL_FLAG_UNEVALUATED
         break;
 
 
@@ -1845,7 +1903,8 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 //
 // Right hand side is evaluated into `out`, and then copied to the variable.
 //
-// Nulled cells are allowed: https://forum.rebol.info/t/895/4
+// All values are allowed in these assignments, including NULL and VOID!
+// https://forum.rebol.info/t/1206
 
       case REB_SET_WORD: {
         if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))  // see notes
@@ -1853,18 +1912,27 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
       set_word_with_out:
 
-        Move_Value(Sink_Var_May_Fail(v, *specifier), f->out);
+        Move_Value(Sink_Word_May_Fail(v, *specifier), f->out);
         break; }
 
 
 //==//// GET-WORD! ///////////////////////////////////////////////////////==//
 //
-// A GET-WORD! does no dispatch on functions, and will return NULL if the
-// variable is not set.  The GET native operation requires the /ANY refinement
-// to retrieve a VOID! value, but a GET-WORD! acts with an implicit /ANY.
+// A GET-WORD! does no dispatch on functions.  It will fetch other values as
+// normal, but will error on VOID! and direct you to GET/ANY.  This matches
+// Rebol2 behavior, choosing to break with R3-Alpha and Red which will give
+// back "voided" values ("UNSET!")...to make typos less likely to bite those
+// who wanted to use ACTION!s inertly:
+// https://forum.rebol.info/t/should-get-word-of-a-void-raise-an-error/1301
 
       case REB_GET_WORD:
-        Move_Opt_Var_May_Fail(f->out, v, *specifier);
+        if (not gotten)
+            gotten = Lookup_Word_May_Fail(v, *specifier);
+
+        if (IS_VOID(gotten))
+            fail (Error_Need_Non_Void_Core(v, *specifier));
+
+        Move_Value(f->out, gotten);
         break;
 
 
@@ -2044,12 +2112,14 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 //
 //    :foo/(print "side effect" 1)  ; this is allowed
 //
-// Consistent with GET-WORD!, a GET-PATH! acts as GET/ANY and permits VOID!
-// and NULL return results.
+// Consistent with GET-WORD!, a GET-PATH! acts as GET and won't return VOID!.
 
       case REB_GET_PATH:
         if (Get_Path_Throws_Core(f->out, v, *specifier))
             goto return_thrown;
+
+        if (IS_VOID(f->out))  // need GET/ANY if it's void ("undefined")
+            fail (Error_Need_Non_Void_Core(v, *specifier));
 
         // !!! This didn't appear to be true for `-- "hi" "hi"`, processing
         // GET-PATH! of a variadic.  Review if it should be true.
@@ -2166,7 +2236,41 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                 = mutable_KIND_BYTE(spare)
                 = mutable_MIRROR_BYTE(spare)
                 = REB_SET_BLOCK;
-            goto set_block_with_out;
+
+            // !!! This code used to be jumped to as part of the implementation of
+            // SET-BLOCK!, as "set_block_with_out".  It is likely to be discarded
+            // in light of the new purpose of SET-BLOCK! as multiple returns,
+            // but was moved here for now.
+
+            if (IS_NULLED(f->out)) // `[x y]: null` is illegal
+                fail (Error_Need_Non_Null_Core(v, *specifier));
+
+            const RELVAL *dest = VAL_ARRAY_AT(v);
+
+            const RELVAL *src;
+            if (IS_BLOCK(f->out))
+                src = VAL_ARRAY_AT(f->out);
+            else
+                src = f->out;
+
+            for (
+                ;
+                NOT_END(dest);
+                ++dest,
+                IS_END(src) or not IS_BLOCK(f->out) ? NOOP : (++src, NOOP)
+            ){
+                Set_Var_May_Fail(
+                    dest,
+                    *specifier,
+                    IS_END(src) ? BLANK_VALUE : src,  // R3-Alpha blanks > END
+                    IS_BLOCK(f->out)
+                        ? VAL_SPECIFIER(f->out)
+                        : SPECIFIED,
+                    false  // doesn't use "hard" semantics on groups in paths
+                );
+            }
+
+            break;
         }
 
         fail (Error_Bad_Set_Group_Raw()); }
@@ -2174,61 +2278,153 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
 //==//// GET-BLOCK! //////////////////////////////////////////////////////==//
 //
-// !!! This code path should be unified with GET/ANY of BLOCK!.  Temporarily
-// does a REDUCE, but that was an experiment to see if perhaps GET of a
-// BLOCK! should actually be what REDUCE was.  That thought experiment is
-// probably over--it shouldn't, functions should not run (at least ones that
-// are not zero arity)
+// !!! Currently just inert, awaiting future usage.
 
       case REB_GET_BLOCK:
-        *next_gotten = nullptr; // arbitrary code changes fetched variables
-
-        if (Reduce_To_Stack_Throws(f->out, v, *specifier))
-            goto return_thrown;
-
-        Init_Block(f->out, Pop_Stack_Values(f->dsp_orig));
+        Derelativize(f->out, v, *specifier);
         break;
 
 
 //==//// SET-BLOCK! //////////////////////////////////////////////////////==//
 //
-// Synonym for SET on the produced thing.
+// The evaluator treats SET-BLOCK! specially as a means for implementing
+// multiple return values.  The trick is that it does so by pre-loading
+// arguments in the frame with variables to update, in a way that could have
+// historically been achieved with passing a WORD! or PATH! to a refinement.
+// So if there was a function that updates a variable you pass in by name:
+//
+//     result: updating-function/update arg1 arg2 'var
+//
+// The /UPDATE parameter is marked as being effectively a "return value", so
+// that equivalent behavior can be achieved with:
+//
+//     [result var]: updating-function arg1 arg2
+//
+// !!! This is an extremely slow-running prototype of the desired behavior.
+// It is a mock up intended to find any flaws in the concept before writing
+// a faster native version that would require rewiring the evaluator somewhat.
 
       case REB_SET_BLOCK: {
-        if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))
-            goto return_thrown;
+        assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));
 
-      set_block_with_out:
+        if (VAL_LEN_AT(v) == 0)
+            fail ("SET-BLOCK! must not be empty for now.");
 
-        if (IS_NULLED(f->out)) // `[x y]: null` is illegal
-            fail (Error_Need_Non_Null_Core(v, *specifier));
-
-        const RELVAL *dest = VAL_ARRAY_AT(v);
-
-        const RELVAL *src;
-        if (IS_BLOCK(f->out))
-            src = VAL_ARRAY_AT(f->out);
-        else
-            src = f->out;
-
-        for (
-            ;
-            NOT_END(dest);
-            ++dest, IS_END(src) or not IS_BLOCK(f->out) ? NOOP : (++src, NOOP)
-        ){
-            Set_Opt_Polymorphic_May_Fail(
-                dest,
-                *specifier,
-                IS_END(src) ? BLANK_VALUE : src,  // R3-Alpha blanks after END
-                IS_BLOCK(f->out)
-                    ? VAL_SPECIFIER(f->out)
-                    : SPECIFIED,
-                false,  // not /ANY, e.g. voids are not legal
-                false  // doesn't use "hard" semantics on groups in paths
-            );
+        RELVAL *check = VAL_ARRAY_AT(v);
+        for (; NOT_END(check); ++check) {
+            if (IS_BLANK(check) or IS_WORD(check) or IS_PATH(check))
+                continue;
+            fail ("SET-BLOCK! elements must be WORD/PATH/BLANK for now.");
         }
 
-        break; }
+        if (not (IS_WORD(*next) or IS_PATH(*next) or IS_ACTION(*next)))
+            fail ("SET_BLOCK! must be followed by WORD/PATH/ACTION for now.");
+
+        // Turn SET-BLOCK! into a BLOCK! in `f->out` for easier processing.
+        //
+        Derelativize(f->out, v, *specifier);
+        mutable_KIND_BYTE(f->out) = REB_BLOCK;
+        mutable_MIRROR_BYTE(f->out) = REB_BLOCK;
+
+        // Get the next argument as an ACTION!, specialized if necessary, into
+        // the `spare`.  We'll specialize it further to set any output
+        // arguments to words from the left hand side.
+        //
+        if (Get_If_Word_Or_Path_Throws(
+            spare,
+            nullptr,
+            *next,
+            *specifier,
+            false
+        )){
+            goto return_thrown;
+        }
+
+        if (not IS_ACTION(spare))
+            fail ("SET-BLOCK! is only allowed to have ACTION! on right ATM.");
+
+        // Find all the "output" parameters.  Right now that's any parameter
+        // which is marked as being legal to be word! or path! *specifically*.
+        //
+        const REBU64 ts_out = FLAGIT_KIND(REB_TS_REFINEMENT)
+            | FLAGIT_KIND(REB_NULLED)
+            | FLAGIT_KIND(REB_WORD)
+            | FLAGIT_KIND(REB_PATH);
+
+        REBDSP dsp_outputs = DSP;
+        REBVAL *temp = VAL_ACT_PARAMS_HEAD(spare);
+        for (; NOT_END(temp); ++temp) {
+            if (not TYPE_CHECK_EXACT_BITS(temp, ts_out))
+                continue;
+            Init_Word(DS_PUSH(), VAL_TYPESET_STRING(temp));
+        }
+
+        DECLARE_LOCAL(outputs);
+        Init_Block(outputs, Pop_Stack_Values(dsp_outputs));
+        PUSH_GC_GUARD(outputs);
+
+        // !!! You generally don't want to use the API inside the evaluator
+        // (this is only a temporary measure).  But if you do, you can't use
+        // it inside of a function that has not fulfilled its arguments.
+        // So imagine `10 = [a b]: some-func`... the `=` is building a frame
+        // with two arguments, and it has the 10 fulfilled but the other
+        // cell is invalid bits.  So when the API handle tries to attach its
+        // ownership it forces reification of a frame that's partial.  We
+        // have to give the API handle a fulfilled frame to stick to, so
+        // we wrap in a function that we make look like it ran and got all
+        // its arguments.
+        //
+        DECLARE_END_FRAME(dummy, EVAL_MASK_DEFAULT);
+        Push_Dummy_Frame(dummy);
+
+        // Now create a function to splice in to the execution stream that
+        // specializes what we are calling so the output parameters have
+        // been preloaded with the words or paths from the left block.
+        //
+        REBVAL *specialized = rebValue(
+            "enclose specialize", rebQ1(spare), "collect [ use [block] [",
+                "block: next", f->out,
+                "for-each output", outputs, "["
+                    "if tail? block [break]",  // no more outputs wanted
+                    "if block/1 [",  // interested in this result
+                        "keep setify output",
+                        "keep quote compose block/1",  // pre-compose, safety
+                    "]",
+                    "block: next block",
+                "]",
+                "if not tail? block [fail {Too many multi-returns}]",
+            "] ] func [f] [",
+                "for-each output", outputs, "[",
+                    "if f/(output) [",  // void in case func doesn't (null?)
+                        "set f/(output) void",
+                    "]",
+                "]",
+                "either first", f->out, "[",
+                    "set first", f->out, "do f",
+                "] [do f]",
+            "]",
+        rebEND);
+
+        DROP_GC_GUARD(outputs);
+
+        Move_Value(spare, specialized);
+        rebRelease(specialized);
+
+        Drop_Dummy_Frame_Unbalanced(dummy);
+
+        // Toss away the pending WORD!/PATH!/ACTION! that was in the execution
+        // stream previously.
+        //
+        Fetch_Next_Forget_Lookback(f);
+
+        // Interject the function with our multiple return arguments and
+        // return value assignment step.
+        //
+        gotten = spare;
+        v = spare;
+        kind.byte = KIND_BYTE(v);
+
+        goto reevaluate; }
 
 
 //==//////////////////////////////////////////////////////////////////////==//
@@ -2449,9 +2645,9 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
     // we can see if it looks up to any kind of ACTION! at all.
 
     if (not *next_gotten)
-        *next_gotten = Try_Get_Opt_Var(*next, *specifier);
+        *next_gotten = Try_Lookup_Word(*next, *specifier);
     else
-        assert(*next_gotten == Try_Get_Opt_Var(*next, *specifier));
+        assert(*next_gotten == Try_Lookup_Word(*next, *specifier));
 
 //=//// NEW EXPRESSION IF UNBOUND, NON-FUNCTION, OR NON-ENFIX /////////////=//
 

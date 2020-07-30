@@ -17,7 +17,7 @@
 (not odd? 1.7976931348623157e308)
 (not odd? -1.7976931348623157e308)
 ; char
-(not odd? #"^@")
+(not odd? NUL)
 (odd? #"^a")
 (not odd? #"^b")
 (odd? #"^(ff)")

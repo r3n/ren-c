@@ -81,15 +81,20 @@
 //
 // https://medium.com/@tkssharma/javascript-module-pattern-b4b5012ada9f
 //
-// Two global objects are exported.  One is `Module`, which is how Emscripten
-// expects to get its configuration parameters (as properties of that global
-// object), so the startup function must initialize it with all the necessary
-// properties and callbacks.
+// Only one object is exported, the `reb` object.  It is the container for
+// the API.  The reason all the APIs are in an object (e.g. `reb.Elide()`
+// instead of `rebElide()` as needed in C) is because Node.js doesn't allow
+// global functions.  So the only way to get an API would be through something
+// like `let reb = require('rebol')`.
 //
-// The other object is `reb` which is the container for the API.  The reason
-// all the APIs are in an object (e.g. `reb.Elide()` instead of `rebElide()`)
-// is because Node.js doesn't allow global functions, so the only way to get
-// an API would be through something like `let reb = require('rebol')`.
+// The `reb.m` member holds the Emscripten module object.  This contains the
+// WebAssembly heap and other service routines, and all of the "unwrapped"
+// raw API exports--which take integer parameters as heap addresses only.
+// (The reb.XXX routines are wrapped to speak in terms of types like strings
+// or arrays.)  By default Emscripten would make this a global variable
+// called `Module`, but using the `MODULARIZE=1` option it will give us a
+// factory function that passes the module as a parameter so we can place it
+// wherever we like.
 //
 // It may look like reb.Startup() takes two parameters.  But if you read all
 // the way to the bottom of the file, you'll see `console` is passed in with
@@ -102,10 +107,22 @@
 // off.  If you have that problem, comment out the function temporarily.
 //
 
-var reb = {}  // This aggregator is where we put all the Rebol APIs
+// We can make an aggregator here for all the Rebol APIs, which is global for
+// the browser... e.g. this is actually `window.reb`.  But that doesn't do
+// a Web Worker much good in threaded builds, since they have no `window`.
+// Even though they share the same heap, they make their own copies of all
+// the API wrappers in their own `reb` as `self.reb`.
+//
+var reb = {}
 
-var Module  // Emscripten expects this to be global and set up with options
 
+// !!! This `reb.Startup` function gets overwritten by the wrapped version of
+// the internal API's `reb.Startup`, which is then invoked during the load
+// process.  It works...but, for clarity the internal version might should be
+// changed to something like `Startup_internal`, and the C version can then
+// simply `#define rebStartup RL_Startup_internal` since it has no parallel
+// to this loading step.
+//
 reb.Startup = function(console_in, config_in) {  // only ONE arg, see above!
 
 
@@ -134,6 +151,81 @@ if (config_in)  // config is optional, you can just say `load_r3()`
     config = Object.assign({}, default_config, config_in)
 else
     config = default_config
+
+
+// The factory function for MODULARIZE=1 in Emscripten takes an object as a
+// parameter for the defaults.  Since we don't need the defaults once the
+// actual module is loaded, we reuse the same variable for the defaults as we
+// do the ultimately loaded module.  For documentation on options:
+//
+// https://emscripten.org/docs/api_reference/module.html#affecting-execution
+//
+reb.m = {
+    //
+    // For errors like:
+    //
+    //    "table import 1 has a larger maximum size 37c than the module's
+    //     declared maximum 890"
+    //
+    // The total memory must be bumped up.  These large sizes occur in debug
+    // builds with lots of assertions and symbol tables.  Note that the size
+    // may appear smaller than the maximum in the error message, as previous
+    // tables (e.g. table import 0 in the case above) can consume memory.
+    //
+    // !!! Messing with this setting never seemed to help.  See the emcc
+    // parameter ALLOW_MEMORY_GROWTH for another possibility.
+    //
+ /* TOTAL_MEMORY: 16 * 1024 * 1024, */
+
+    locateFile: function(s) {
+        //
+        // function for finding %libr3.wasm  (Note: memoryInitializerPrefixURL
+        // for bytecode was deprecated)
+        //
+        // https://stackoverflow.com/q/46332699
+        //
+        config.info("reb.m.locateFile() asking for .wasm address of " + s)
+
+        let stem = s.substr(0, s.indexOf('.'))
+        let suffix = s.substr(s.indexOf('.'))
+
+        // Although we rename the files to add the Git Commit Hash before
+        // uploading them to S3, it seems that for some reason the .js hard
+        // codes the name the file was built under in this request.  :-/
+        // So even if the request was for `libr3-xxxxx.js` it will be asked
+        // in this routine as "Where is `libr3.wasm`
+        //
+        // For the moment, sanity check to libr3.  But it should be `rebol`,
+        // or any name you choose to build with.
+        //
+        if (stem != "libr3")
+            throw Error("Unknown libRebol stem: " + stem)
+
+        if (suffix == ".worker.js")
+            return URL.createObjectURL(workerJsBlob)
+
+        return libRebolComponentURL(suffix)
+    },
+
+    // Emscripten does a capture of a module's "ENV" state when the module
+    // is initialized, as the initial answers to `getenv()`.  This state is
+    // snapshotted just once--and the right time to set it up is in preRun().
+    // Doing it sooner will be overwritten, and later won't be captured.
+    //
+    preRun: [function (mod) {
+        config.log("libRebol preRun() executing")
+
+        // Some debug options must be set before a Rebol evaluator is ready.
+        // Historically this is done with environment variables.  Right now
+        // they're only debug options, and designing some parameterization of
+        // reb.Startup() would be hard to maintain and overkill.
+        //
+        if (config.tracing_on) {
+            mod.ENV['R3_TRACE_JAVASCRIPT'] = '1'
+            mod.ENV['R3_PROBE_FAILURES'] = '1'  // !!! Separate config flag?
+        }
+    }]
+}
 
 
 //=//// PICK BUILD BASED ON BROWSER CAPABILITIES //////////////////////////=//
@@ -407,61 +499,6 @@ let prefetch_worker_js_promiser = () => new Promise(
 )
 
 
-Module = {  // Note that this is assigning a global
-    //
-    // For errors like:
-    //
-    //    "table import 1 has a larger maximum size 37c than the module's
-    //     declared maximum 890"
-    //
-    // The total memory must be bumped up.  These large sizes occur in debug
-    // builds with lots of assertions and symbol tables.  Note that the size
-    // may appear smaller than the maximum in the error message, as previous
-    // tables (e.g. table import 0 in the case above) can consume memory.
-    //
-    // !!! Messing with this setting never seemed to help.  See the emcc
-    // parameter ALLOW_MEMORY_GROWTH for another possibility.
-    //
- /* TOTAL_MEMORY: 16 * 1024 * 1024, */
-
-    locateFile: function(s) {
-        //
-        // function for finding %libr3.wasm  (Note: memoryInitializerPrefixURL
-        // for bytecode was deprecated)
-        //
-        // https://stackoverflow.com/q/46332699
-        //
-        config.info("Module.locateFile() asking for .wasm address of " + s)
-
-        let stem = s.substr(0, s.indexOf('.'))
-        let suffix = s.substr(s.indexOf('.'))
-
-        // Although we rename the files to add the Git Commit Hash before
-        // uploading them to S3, it seems that for some reason the .js hard
-        // codes the name the file was built under in this request.  :-/
-        // So even if the request was for `libr3-xxxxx.js` it will be asked
-        // in this routine as "Where is `libr3.wasm`
-        //
-        // For the moment, sanity check to libr3.  But it should be `rebol`,
-        // or any name you choose to build with.
-        //
-        if (stem != "libr3")
-            throw Error("Unknown libRebol stem: " + stem)
-
-        if (suffix == ".worker.js")
-            return URL.createObjectURL(workerJsBlob)
-
-        return libRebolComponentURL(suffix)
-    },
-
-    // This is a callback that happens sometime after you load the emscripten
-    // library (%libr3.js in this case).  It's turned into a promise instead
-    // of a callback.  Sanity check it's not used prior by making it a string.
-    //
-    onRuntimeInitialized: "<mutated from a callback into a Promise>"
-}
-
-
 //=// CONVERTING CALLBACKS TO PROMISES /////////////////////////////////////=//
 //
 // https://stackoverflow.com/a/22519785
@@ -489,16 +526,6 @@ if (document.readyState == "loading") {
     // event 'DOMContentLoaded' is gone
     dom_content_loaded_promise = Promise.resolve()
 }
-
-let runtime_init_promise = new Promise(function(resolve, reject) {
-    //
-    // The load of %libr3.js will at some point will trigger a call to
-    // onRuntimeInitialized().  We set it up so that when it does, it will
-    // resolve this promise (used to trigger a .then() step).
-    //
-    Module.onRuntimeInitialized = resolve
-})
-
 
 let load_rebol_scripts = function(defer) {
     let scripts = document.querySelectorAll("script[type='text/rebol']")
@@ -552,36 +579,27 @@ let load_rebol_scripts = function(defer) {
 //=//// MAIN PROMISE CHAIN ////////////////////////////////////////////////=//
 
 return assign_git_commit_promiser(os_id)  // sets git_commit
-  .then(function () {
+  .then(() => {
     config.log("prefetching worker...")
     return prefetch_worker_js_promiser()  // no-op in the non-pthread build
   })
-  .then(function() {
+  .then(() => {
 
-    load_js_promiser(libRebolComponentURL(".js"))  // needs git_commit
+    return load_js_promiser(libRebolComponentURL(".js"))  // needs git_commit
 
-  }).then(function() {
+  }).then(() => {  // we now know r3_module_promiser is available
 
     config.info('Loading/Running ' + libRebolComponentURL(".js") + '...')
     if (use_asyncify)
-        config.warn("The Asyncify build is biggers/slower, be patient...")
+        config.warn("The Asyncify build is bigger/slower, be patient...")
 
-    return runtime_init_promise
+    return r3_module_promiser(reb.m)  // at first, `reb.m` is defaults...
 
-  }).then(function() {  // emscripten's onRuntimeInitialized() has no args
+  }).then(module => {  // "Modularized" emscripten passes us the module
+
+    reb.m = module  // overwrite the defaults with the instantiated module
 
     config.info('Executing Rebol boot code...')
-
-    // Some debug options must be set before a Rebol evaluator is ready.
-    // Historically this is done with environment variables, because right now
-    // they're only debug options and designing some parameterization of
-    // reb.Startup() would be hard to maintain and overkill.  Fortunately
-    // Emscripten can simulate getenv() with ENV.
-    //
-    if (config.tracing_on) {
-        ENV['R3_TRACE_JAVASCRIPT'] = '1'
-        ENV['R3_PROBE_FAILURES'] = '1'  // !!! Separate config flag needed?
-    }
 
     reb.Startup()  // Sets up memory pools, symbols, base, sys, mezzanine...
 
@@ -622,12 +640,13 @@ return assign_git_commit_promiser(os_id)  // sets git_commit
         "for-each collation builtin-extensions",
             "[load-extension collation]"
     )
-  }).then(()=>load_rebol_scripts(false))
+  }).then(() => load_rebol_scripts(false))
   .then(dom_content_loaded_promise)
-  .then(()=>load_rebol_scripts(true))
-  .then(()=>{
-      let code = me.innerText.trim()
-      if (code) eval(code)
+  .then(() => load_rebol_scripts(true))
+  .then(() => {
+     let code = me.innerText.trim()
+     if (code)
+        eval(code)
   })
 
 //=//// END ANONYMOUS CLOSURE USED AS MODULE //////////////////////////////=//

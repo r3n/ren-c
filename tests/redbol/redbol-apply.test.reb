@@ -12,7 +12,7 @@
 
     while [block: sync-invisibles block] [
         block: if only [
-            arg: block/1
+            arg: get* 'block/1
             try next block
         ] else [
             try evaluate @(lit arg:) block
@@ -25,10 +25,10 @@
                 it does not allow BLANK!.  This makes a BLOCK!-style apply
                 using positions non-viable.  We OPT all nones here.
             }
-            using-args: did set/any (in frame second params/1) opt :arg
+            using-args: did set (in frame second params/1) opt get* 'arg
         ] else [
             if using-args [
-                set/any (in frame params/1) :arg
+                set (in frame params/1) get* 'arg
             ]
         ]
 

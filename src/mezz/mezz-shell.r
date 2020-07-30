@@ -31,7 +31,13 @@ cd: func [
     switch type of :path [
         null []
         file! [change-dir path]
-        text! [change-dir local-to-file path]
+        text! [
+            ; !!! LOCAL-TO-FILE lives in the filesystem extension, and does
+            ; not get bound due to an ordering problem.  Hence it needs the
+            ; lib/ prefix.  Review.
+            ;
+            change-dir lib/local-to-file path
+        ]
         word! path! [change-dir to-file path]
     ]
 

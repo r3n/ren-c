@@ -49,7 +49,7 @@
     a-value: first [:a-value]
     :a-value == do reduce [:a-value]
 )
-(#"^@" == do [#"^@"])
+(NUL == do [NUL])
 (
     a-value: make image! 0x0
     same? a-value do reduce [a-value]
@@ -131,7 +131,7 @@
     a-value: first [:a]
     :a == reeval :a-value
 )
-(#"^@" == reeval #"^@")
+(NUL == reeval NUL)
 (
     a-value: make image! 0x0
     same? a-value reeval a-value

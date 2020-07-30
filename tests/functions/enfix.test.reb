@@ -330,3 +330,22 @@
         ]
     )
 ]
+
+; Parameters in-between soft quoted functions (one trying to quote right and
+; one trying to quote left) will be processed by the right hand function
+; first.
+[
+    (
+        rightq: func ['x] [compose [<rightq> was (x)]]
+        leftq: enfixed func ['y] [compose [<leftq> was (y)]]
+
+        [<rightq> was [<leftq> was foo]] = rightq foo leftq
+    )(
+        rightq: func ['x] [compose [<rightq> was (x)]]
+        leftq: enfixed func [:y] [compose [<leftq> was (y)]]
+
+        [<rightq> was [<leftq> was foo]] = rightq foo leftq
+    )
+
+    ((1 then x => [x * 10]) = 10)
+]

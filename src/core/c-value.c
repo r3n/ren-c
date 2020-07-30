@@ -55,27 +55,27 @@ ATTRIBUTE_NO_RETURN void Panic_Value_Debug(const RELVAL *v) {
       case REB_VOID:
       case REB_BLANK:
       #if defined(DEBUG_TRACK_CELLS)
-        printf("REBVAL init ");
+        printf("REBVAL init");
 
         #if defined(DEBUG_TRACK_EXTEND_CELLS)
             #if defined(DEBUG_COUNT_TICKS)
-                printf("@ tick #%d", cast(unsigned int, v->tick));
+                printf(" @ tick #%d", cast(unsigned int, v->tick));
                 if (v->touch != 0)
-                    printf("@ touch #%d", cast(unsigned int, v->touch));
+                    printf(" @ touch #%d", cast(unsigned int, v->touch));
             #endif
 
-            printf("@ %s:%d\n", v->track.file, v->track.line);
+            printf(" @ %s:%d\n", v->track.file, v->track.line);
         #else
             #if defined(DEBUG_COUNT_TICKS)
-                printf("@ tick #%d", cast(unsigned int, v->extra.tick));
+                printf(" @ tick #%d", cast(unsigned int, v->extra.tick));
             #endif
 
             printf(
-                "@ %s:%d\n", PAYLOAD(Track, v).file, PAYLOAD(Track, v).line
+                " @ %s:%d\n", PAYLOAD(Track, v).file, PAYLOAD(Track, v).line
             );
         #endif
       #else
-        printf("No track info (see DEBUG_TRACK_CELLS/DEBUG_COUNT_TICKS)\n");
+        printf("- no track info (see DEBUG_TRACK_CELLS/DEBUG_COUNT_TICKS)\n");
       #endif
         fflush(stdout);
         break;
@@ -130,7 +130,7 @@ inline static void Probe_Molded_Value(const REBVAL *v)
     Push_Mold(mo);
     Mold_Value(mo, v);
 
-    printf("%s\n", STR_AT(mo->series, mo->index));
+    printf("%s\n", cast(const char*, STR_AT(mo->series, mo->index)));
     fflush(stdout);
 
     Drop_Mold(mo);
@@ -220,6 +220,15 @@ void* Probe_Core_Debug(
 
       case DETECTED_AS_CELL: {
         const REBVAL *v = cast(const REBVAL*, p);
+
+      #if !defined(NDEBUG)  // IS_PARAM() etc. would crash on unreadable blank
+        if (IS_UNREADABLE_DEBUG(v)) {
+            Probe_Print_Helper(p, expr, "Value", file, line);
+            Append_Ascii(mo->series, "\\\\Unreadable BLANK!\\\\");
+            break;
+        }
+      #endif
+
         if (IS_PARAM(v)) {
             Probe_Print_Helper(p, expr, "Param Cell", file, line);
 
@@ -249,7 +258,7 @@ void* Probe_Core_Debug(
     }
 
     if (mo->offset != STR_LEN(mo->series))
-        printf("%s\n", STR_AT(mo->series, mo->index));
+        printf("%s\n", cast(const char*, STR_AT(mo->series, mo->index)));
     fflush(stdout);
 
     Drop_Mold(mo);

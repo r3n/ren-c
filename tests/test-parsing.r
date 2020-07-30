@@ -35,10 +35,9 @@ make object! [
         any [
             position:
 
-            ["{" | {"}] (
-                ; handle string using TRANSCODE
+            ["{" | {"}] (  ; handle string using TRANSCODE
                 success-rule: trap [
-                    position: transcode/next 'dummy position
+                    [_ position]: transcode position
                 ] then [
                     [end skip]
                 ] else [
@@ -93,14 +92,14 @@ make object! [
                 change-dir first split-path test-file
             ]
             test-sources: get in load-testfile test-file 'contents
-        ] then (err => [
+        ] then err => [
             ; probe err
             append collected-tests reduce [
                 test-file 'dialect {^/"failed, cannot read the file"^/}
             ]
             change-dir current-dir
             return
-        ]) else [
+        ] else [
             change-dir current-dir
             append collected-tests test-file
         ]
@@ -123,7 +122,9 @@ make object! [
 
         single-value: parsing-at x [
             trap [
-                next-position: transcode/next (lit value:) x
+                value: _  ; !!! for collecting with SET-WORD!, evolving
+                next-position: _  ; !!! ...same
+                [value next-position]: transcode x
             ] else [
                 type: in types 'val
                 next-position

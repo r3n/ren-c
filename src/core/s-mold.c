@@ -391,11 +391,11 @@ void MF_Unhooked(REB_MOLD *mo, const REBCEL *v, bool form)
 
 
 //
-//  Mold_Or_Form_Value: C
+//  Mold_Or_Form_Cell: C
 //
-// Mold or form any value to string series tail.
+// Variation which molds a cell, e.g. no quoting is considered.
 //
-void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
+void Mold_Or_Form_Cell(REB_MOLD *mo, const REBCEL *cell, bool form)
 {
     REBSTR *s = mo->series;
     ASSERT_SERIES_TERM(SER(s));
@@ -412,45 +412,36 @@ void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
         // wastefully, so short circuit here in the release build.  (Have
         // the debug build keep going to exercise mold on the data.)
         //
-    #ifdef NDEBUG
+      #ifdef NDEBUG
         if (STR_LEN(s) >= mo->limit)
             return;
-    #endif
+      #endif
     }
 
-    // Mold hooks take a REBCEL* and not a RELVAL*, so they expect any literal
-    // output to have already been done.
+    MOLD_HOOK *hook = Mold_Or_Form_Hook_For_Type_Of(cell);
+    hook(mo, cell, form);
+
+    ASSERT_SERIES_TERM(SER(s));
+}
+
+
+//
+//  Mold_Or_Form_Value: C
+//
+// Mold or form any value to string series tail.
+//
+void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
+{
+    // Mold hooks take a REBCEL* and not a RELVAL*, so they expect any quotes
+    // applied to have already been done.
 
     REBLEN depth = VAL_NUM_QUOTES(v);
-    const REBCEL *cell = VAL_UNESCAPED(v);
-    enum Reb_Kind kind = CELL_KIND(cell);
 
     REBLEN i;
     for (i = 0; i < depth; ++i)
         Append_Ascii(mo->series, "'");
 
-    if (kind != REB_NULLED) {
-        MOLD_HOOK *hook = Mold_Or_Form_Hook_For_Type_Of(cell);
-        hook(mo, cell, form);
-    }
-    else if (depth == 0) {
-        //
-        // NULLs should only be molded out in debug scenarios, but this still
-        // happens a lot, e.g. PROBE() of context arrays when they have unset
-        // variables.  This happens so often in debug builds, in fact, that a
-        // debug_break() here would be very annoying (the method used for
-        // REB_0 items)
-        //
-      #ifdef NDEBUG
-        panic (v);
-      #else
-        printf("!!! Request to MOLD or FORM a NULL !!!\n");
-        Append_Ascii(s, "!!!null!!!");
-        return;
-      #endif
-    }
-
-    ASSERT_SERIES_TERM(SER(s));
+    Mold_Or_Form_Cell(mo, VAL_UNESCAPED(v), form);
 }
 
 
@@ -466,6 +457,22 @@ REBSTR *Copy_Mold_Or_Form_Value(const RELVAL *v, REBFLGS opts, bool form)
 
     Push_Mold(mo);
     Mold_Or_Form_Value(mo, v, form);
+    return Pop_Molded_String(mo);
+}
+
+
+//
+//  Copy_Mold_Or_Form_Value: C
+//
+// Form a value based on the mold opts provided.
+//
+REBSTR *Copy_Mold_Or_Form_Cell(const REBCEL *cell, REBFLGS opts, bool form)
+{
+    DECLARE_MOLD (mo);
+    mo->opts = opts;
+
+    Push_Mold(mo);
+    Mold_Or_Form_Cell(mo, cell, form);
     return Pop_Molded_String(mo);
 }
 
@@ -496,6 +503,15 @@ bool Form_Reduce_Throws(
         or IS_CHAR(delimiter) or IS_TEXT(delimiter)
     );
 
+    // Initially Ren-C advocated treating blank the same as null, to be the
+    // "less noisy" null since it was legal to fetch with plain WORD!.  Now
+    // that plain words fetch nulls without error, it's more interesting for
+    // dialects to leverage blanks for unique meaning.  Space is particularly
+    // nice when used in DELIMIT scenarios.
+    //
+    if (IS_BLANK(delimiter))
+        delimiter = SPACE_VALUE;
+
     DECLARE_MOLD (mo);
     Push_Mold(mo);
 
@@ -519,7 +535,7 @@ bool Form_Reduce_Throws(
             break;
         }
 
-        if (IS_NULLED_OR_BLANK(out))
+        if (IS_NULLED(out))
             continue;  // opt-out and maybe keep option open to return NULL
 
         nothing = false;
@@ -528,7 +544,11 @@ bool Form_Reduce_Throws(
             Append_Codepoint(mo->series, VAL_CHAR(out));
             pending = false;
         }
-        else if (IS_NULLED_OR_BLANK(delimiter))
+        else if (IS_BLANK(out)) {
+            Append_Codepoint(mo->series, ' ');
+            pending = false;
+        }
+        else if (IS_NULLED(delimiter))
             Form_Value(mo, out);
         else {
             if (pending)
@@ -648,26 +668,25 @@ void Throttle_Mold(REB_MOLD *mo) {
     if (NOT_MOLD_FLAG(mo, MOLD_FLAG_LIMIT))
         return;
 
-    if (STR_LEN(mo->series) > mo->limit) {
-        //
+    if (STR_LEN(mo->series) - mo->index > mo->limit) {
+        REBINT overage = (STR_LEN(mo->series) - mo->index) - mo->limit;
+
         // Mold buffer is UTF-8...length limit is (currently) in characters,
         // not bytes.  Have to back up the right number of bytes, but also
         // adjust the character length appropriately.
 
-        REBINT overage = STR_LEN(mo->series) - mo->limit;
-        assert(mo->limit >= 3);
-        overage += 3;  // subtract out characters for ellipsis
-
         REBCHR(*) tail = STR_TAIL(mo->series);
         REBUNI dummy;
-        REBCHR(*) cp = SKIP_CHR(&dummy, tail, -overage);
+        REBCHR(*) cp = SKIP_CHR(&dummy, tail, -(overage));
 
         SET_STR_LEN_SIZE(
             mo->series,
             STR_LEN(mo->series) - overage,
             STR_SIZE(mo->series) - (tail - cp)
         );
-        Append_Ascii(mo->series, "..."); // adds a null at the tail
+
+        assert(not (mo->opts & MOLD_FLAG_WAS_TRUNCATED));
+        mo->opts |= MOLD_FLAG_WAS_TRUNCATED;
     }
 }
 

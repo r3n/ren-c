@@ -122,7 +122,7 @@ bytes-to-version: reverse copy version-to-bytes
 ; length of `verify_data` is part of the cipher spec, with 12 as default for
 ; the specs in the RFC.  The table should probably encode these choices.
 ;
-; If ECHDE is mentioned in the cipher suite, then that doesn't imply a
+; If ECDHE is mentioned in the cipher suite, then that doesn't imply a
 ; specific elliptic curve--but rather a *category* of curves.  Hence another
 ; layer of negotiation is slipstreamed into TLS 1.2 via a "protocol extension"
 ; to narrow it further, where the client offers which curves it has.  We only
@@ -142,12 +142,12 @@ cipher-suites: compose [
 
     #{C0 14} [
         TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA
-        <echde-rsa> @aes [size 32 block 16 iv 16] #sha1 [size 20]
+        <ecdhe-rsa> @aes [size 32 block 16 iv 16] #sha1 [size 20]
     ]
 
     #{C0 13} [
         TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
-        <echde-rsa> @aes [size 16 block 16 iv 16] #sha1 [size 20]
+        <ecdhe-rsa> @aes [size 16 block 16 iv 16] #sha1 [size 20]
     ]
 
     ; The Discourse server on forum.rebol.info offers these choices too:
@@ -571,13 +571,13 @@ client-hello: function [
         change list_length to-2bin (length of list_item_1)
     ]
 
-    ; When your cipher suites mention ECHDE, that doesn't imply any particular
+    ; When your cipher suites mention ECDHE, that doesn't imply any particular
     ; curve.  So the "extensions" in the hello message should say which curves
     ; you support (if you don't, then the server can just pick whatever it
     ; chooses).  At time of writing, we are experimenting with secp256r1
     ; and not building in any others.
     ;
-    if true [  ; should depend on if any "_ECHDE_" ciphers are in the table
+    if true [  ; should depend on if any "_ECDHE_" ciphers are in the table
         emit ctx [
             #{00 0A}                    ; extension type (supported_groups=10)
           extension_length:
@@ -603,7 +603,7 @@ client-hello: function [
     ; We've modified the "easy-ecc" library providing secp256r1 to accept
     ; uncompressed format keys (it initially only took X coordinate and sign).
     ;
-    if true [  ; should depend on if any "_ECHDE_" ciphers are in the table
+    if true [  ; should depend on if any "_ECDHE_" ciphers are in the table
         emit ctx [
             #{00 0b}                    ; extension type (ec_points_format=11)
           extension_length:
@@ -671,10 +671,12 @@ client-key-exchange: function [
             key-len: to-2bin length of key-data  ; Two bytes for this case
         ]
 
-        <echde-rsa> [
-            ctx/ecdh-keypair: ecc-generate-keypair  ; specifically secp256r1
+        <ecdhe-rsa> [
+            ctx/ecdh-keypair: ecc-generate-keypair 'secp256r1
+
             ctx/pre-master-secret: (
-                ecdh-shared-secret ctx/ecdh-keypair/private-key ctx/ecdh-pub
+                ecdh-shared-secret 'secp256r1
+                    ctx/ecdh-keypair/private-key ctx/ecdh-pub
             )
 
             ; we use the 65-byte uncompressed format to send our key back
@@ -1221,7 +1223,7 @@ parse-messages: function [
                             ]
                             <dhe-dss>
                             <dhe-rsa>
-                            <echde-rsa> [
+                            <ecdhe-rsa> [
                                 ; for DH cipher suites the certificate is used
                                 ; just for signing the key exchange data
                             ]
@@ -1269,7 +1271,7 @@ parse-messages: function [
                                 msg-obj
                             ]
 
-                            <echde-rsa> [
+                            <ecdhe-rsa> [
                                 msg-obj: context [
                                     type: msg-type
                                     length: len
@@ -1277,7 +1279,7 @@ parse-messages: function [
                                     curve-info: grab 'bin 3
                                     if curve-info <> #{03 00 17} [
                                         fail [
-                                            "ECHDE only works for secp256r1"
+                                            "ECDHE only works for secp256r1"
                                         ]
                                     ]
 

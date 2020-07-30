@@ -147,7 +147,7 @@ save: function [
         ]
 
         header [
-            insert data unspaced [{REBOL} space (mold header) newline]
+            insert data unspaced [{REBOL} _ (mold header) newline]
         ]
     ]
 

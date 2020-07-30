@@ -654,7 +654,7 @@ pe-format: context [
     ] DOS-header
 
     PE-header-rule: [
-        "PE^@^@" | fail-at: (err: 'missing-PE-signature) fail
+        "PE" #{0000} | fail-at: (err: 'missing-PE-signature) fail
     ]
 
     COFF-header: _
@@ -999,10 +999,10 @@ pe-format: context [
     ][
         trap [
             parse-exe exe-data
-        ] then (lambda err [
+        ] then err => [
             ;print ["Failed to parse exe:" err]
             return null
-        ])
+        ]
 
         ;check if there's section name conflicts
 

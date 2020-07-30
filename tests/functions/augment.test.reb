@@ -48,3 +48,28 @@
     (1020 = switch-d/default 'b ['b [1000 + 20]] [300 + 4])
     (304 = switch-d/default 'j ['b [1000 + 20]] [300 + 4])
 ]
+
+; Augmenting a specialized function
+(
+    two-a-plus-three-b: func [a [integer!] /b [integer!]] [
+        (2 * a) + either b [3 * b] [0]
+    ]
+    two-a-plus-six: specialize 'two-a-plus-three-b [b: 2]
+
+    two-a-plus-six-plus-four-c: enclose augment 'two-a-plus-six [
+        /c [integer!]
+    ] func [f [frame!]] [
+        let old-c: f/c
+        let x: do f
+        if old-c [
+            x + (4 * old-c)
+        ] else [
+            x
+        ]
+    ]
+
+    did all [
+        10 = two-a-plus-six-plus-four-c 2
+        50 = two-a-plus-six-plus-four-c/c 2 10
+    ]
+)

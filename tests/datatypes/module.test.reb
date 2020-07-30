@@ -48,8 +48,11 @@
 ([1 2 3] = load/type "1 2 3" null)
 ([1 2 3] = load "rebol [] 1 2 3")
 (
-    d: load/header "rebol [] 1 2 3"
-    all [object? first d [1 2 3] = next d]
+    d: load/header "rebol [] 1 2 3" 'header
+    all [
+        object? header
+        [1 2 3] = d
+    ]
 )
 
 ; This was a test from the %sys-load.r which trips up the loading mechanic

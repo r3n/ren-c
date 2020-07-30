@@ -39,7 +39,7 @@
     a-value: first [:a]
     :a-value == any [:a-value]
 )
-(#"^@" == any [#"^@"])
+(NUL == any [NUL])
 (
     a-value: make image! 0x0
     same? a-value any [a-value]
@@ -138,7 +138,7 @@
     a-value: first [:a]
     :a-value == any [false :a-value]
 )
-(#"^@" == any [false #"^@"])
+(NUL == any [false NUL])
 (
     a-value: make image! 0x0
     same? a-value any [false a-value]
@@ -235,7 +235,7 @@
     a-value: first [:a]
     :a-value == any [:a-value false]
 )
-(#"^@" == any [#"^@" false])
+(NUL == any [NUL false])
 (
     a-value: make image! 0x0
     same? a-value any [a-value false]

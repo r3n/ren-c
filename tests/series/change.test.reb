@@ -98,6 +98,12 @@
     ]
 )
 
+[#490 (
+    data: "C# Rules"
+    change/part data "REBOL" 2
+    data = "REBOL Rules"
+)]
+
 ; !!! FORMAT isn't really tested, but it's built on CHANGE.
 
 (

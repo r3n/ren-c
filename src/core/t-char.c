@@ -73,7 +73,12 @@ REBINT CT_Char(const REBCEL *a, const REBCEL *b, REBINT mode)
     REBINT num;
 
     if (mode >= 0) {
-        if (mode == 0)
+        //
+        // !!! NUL (#"^@", '\0') is not legal strings.  However, it is a
+        // claimed "valid codepoint", which can be appended to BINARY!.  But
+        // LO_CASE() does not accept it (which catches illegal stringlike use)
+        //
+        if (mode == 0 and VAL_CHAR(a) != 0 and VAL_CHAR(b) != 0)
             num = LO_CASE(VAL_CHAR(a)) - LO_CASE(VAL_CHAR(b));
         else
             num = VAL_CHAR(a) - VAL_CHAR(b);

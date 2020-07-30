@@ -20,9 +20,9 @@ error-response: func [code uri <local> values] [
 start-response: func [port res <local> code text type body] [
     set [code type body] res
     write port unspaced [
-        "HTTP/1.0" space code space code-map/:code CR LF
-        "Content-type:" space type CR LF
-        "Content-length:" space (length of body) CR LF
+        "HTTP/1.0" _ code _ code-map/:code CR LF
+        "Content-type:" _ type CR LF
+        "Content-length:" _ (length of body) CR LF
         CR LF
     ]
     ; Manual chunking is only necessary because of several bugs in R3's

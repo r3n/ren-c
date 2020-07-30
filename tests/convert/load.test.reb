@@ -17,10 +17,7 @@
 ; LOAD/NEXT removed, see #1703
 ;
 (error? trap [load/next "1"])
-(did all [
-    #{} = transcode/next 'value to binary! "1"
-    value = 1
-])
+
 
 [#1122 (
     any [
@@ -31,8 +28,11 @@
 ; R2 bug
 (
      x: 1
-     error? trap [x: load/header ""]
-     not error? x
+     x: load/header "" 'header
+     did all [
+        x = []
+        null? header
+     ]
 )
 
 [#1421 (

@@ -53,7 +53,8 @@ for-each file [
     %../../scripts/prot-tls.r  ; TLS (a.k.a. the "S" in HTTPS)
     %../../scripts/prot-http.r  ; HTTP Client (HTTPS if used with TLS)
 ][
-    set [header: contents:] stripload/header join %../mezz/ file
+    header: _  ; was a SET-WORD!...for locals gathering?
+    contents: stripload/header (join %../mezz/ file) 'header
 
     ; We go ahead and LOAD the header in this case, so we can write only the
     ; module fields we care about ("Description" is not needed, for instance.)
@@ -89,7 +90,8 @@ for-each file [
 ][
     print ["loading:" file]
 
-    set [header: contents:] stripload/header file
+    header: _  ; !!! Was a SET-WORD!...for locals gathering?
+    contents: stripload/header file 'header
 
     is-module: false  ; currently none of these three files are modules
     if is-module [

@@ -37,7 +37,12 @@ dump: function [
         case [
             null? :val ["\null\"]
             object? :val [unspaced ["make object! [" (summarize-obj val) "]"]]
-            default [mold/limit :val system/options/dump-size]
+            default [
+                trunc: void
+                append (
+                    mold/limit/truncated :val system/options/dump-size 'trunc
+                ) if trunc ["..."]
+            ]
         ]
     ]
 
@@ -45,7 +50,11 @@ dump: function [
         switch type of item [
             refinement!  ; treat as label, /a no shift and shorter than "a"
             text! [  ; good for longer labeling when you need spaces/etc.
-                print [mold/limit item system/options/dump-size]
+                print unspaced [
+                    elide trunc: void
+                    mold/limit/truncated item system/options/dump-size 'trunc
+                    if trunc ["..."]
+                ]
             ]
 
             word! [
@@ -64,7 +73,7 @@ dump: function [
                 enablements/(prefix): item
             ]
 
-            fail @value [
+            fail 'value [
                 "Item not TEXT!, INTEGER!, WORD!, PATH!, GROUP!:" :item
             ]
         ]
@@ -211,7 +220,7 @@ summarize-obj: function [
         for-each [word val] obj [
             if not set? 'val [continue]  ; don't consider unset fields
 
-            type: type of :val
+            type: type of get/any 'val
 
             str: if match [object!] type [
                 spaced [word | words of :val]
@@ -233,10 +242,10 @@ summarize-obj: function [
                     if not find str pattern [continue]
                 ]
 
-                fail @pattern
+                fail 'pattern
             ]
 
-            if desc: description-of try :val [
+            if desc: description-of try get/any 'val [
                 if 48 < length of desc [
                     desc: append copy/part desc 45 "..."
                 ]

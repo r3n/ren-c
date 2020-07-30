@@ -259,7 +259,7 @@ int main(int argc, char *argv_ansi[])
     //
     REBVAL *main_startup = rebValue(
         "use [code] [",
-            "transcode 'code", rebR(startup_bin),
+            "code: transcode", rebR(startup_bin),
             "bind/only/set code lib",  // only ADD top level set-word!s to lib
             "bind code lib",  // but BIND to anything else that exists in lib
             "do code",

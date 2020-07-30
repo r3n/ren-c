@@ -175,6 +175,17 @@ ldflags: compose [
         {--pre-js prep/include/node-preload.js}
     ])
 
+    ; The default build will create an emscripten module named "Module", which
+    ; holds various emscripten state (including the memory heap) and service
+    ; routines.  If everyone built their projects like this, you would not be
+    ; able to load more than one at a time due to the name collision.  So
+    ; we use the "Modularize" option to get a callback with a parameter that
+    ; is the module object when it is ready.  This also simplifies the loading
+    ; process of registering notifications for being loaded and ready.
+    ; https://emscripten.org/docs/getting_started/FAQ.html#can-i-use-multiple-emscripten-compiled-programs-on-one-web-page
+    ;
+    {-s MODULARIZE=1 -s 'EXPORT_NAME="r3_module_promiser"'}
+
     (if debug-javascript-extension [
         {-s ASSERTIONS=1}
     ] else [
@@ -249,7 +260,13 @@ ldflags: compose [
     ;
     ; https://github.com/emscripten-core/emscripten/issues/9412
     ;
-    {-s "EXTRA_EXPORTED_RUNTIME_METHODS=['allocateUTF8']"}
+    ; ENV is an object which represents the initial environment for getenv()
+    ; calls.  This is used to set up configuration options for the C code that
+    ; come into effect before rebStartup() is finished.  The snapshot happens
+    ; after the module's preRun() method, and to assign ENV with MODULARIZE=1
+    ; one must export it (or ENV is a function stub that raises an error).
+    ;
+    {-s "EXTRA_EXPORTED_RUNTIME_METHODS=['ENV']"}
     ; {-s "EXTRA_EXPORTED_RUNTIME_METHODS=['ccall', 'cwrap', 'allocateUTF8']"}
 
     ; WASM does not have source maps, so disabling it can aid in debugging

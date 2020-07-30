@@ -28,7 +28,7 @@ struct rebol_mold {
     REBLEN index;       // codepoint index where mold starts within series
     REBSIZ offset;      // byte offset where mold starts within series
     REBFLGS opts;       // special option flags
-    REBLEN limit;       // how many characters before cutting off with "..."
+    REBLEN limit;       // how many characters before cutting off
     REBLEN reserve;     // how much capacity to reserve at the outset
     REBINT indent;      // indentation amount
     REBYTE period;      // for decimal point
@@ -54,6 +54,9 @@ struct rebol_mold {
 #define Copy_Form_Value(v,opts) \
     Copy_Mold_Or_Form_Value((v), (opts), true)
 
+#define Copy_Form_Cell(v,opts) \
+    Copy_Mold_Or_Form_Cell((v), (opts), true)
+
 
 // Modes allowed by FORM
 enum {
@@ -75,7 +78,8 @@ enum REB_Mold_Opts {
     MOLD_FLAG_ONLY = 1 << 5, // Mold/only - no outer block []
     MOLD_FLAG_LINES  = 1 << 6, // add a linefeed between each value
     MOLD_FLAG_LIMIT = 1 << 7, // Limit length to mold->limit, then "..."
-    MOLD_FLAG_RESERVE = 1 << 8  // At outset, reserve capacity for buffer
+    MOLD_FLAG_RESERVE = 1 << 8,  // At outset, reserve capacity for buffer
+    MOLD_FLAG_WAS_TRUNCATED = 1 << 9  // Set true upon truncation
 };
 
 #define MOLD_MASK_NONE 0

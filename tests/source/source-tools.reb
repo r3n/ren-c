@@ -104,10 +104,6 @@ rebsource: context [
 
         %extensions/png/lodepng.h
         %extensions/png/lodepng.c
-
-        %extensions/crypt/sha1/u-sha1.c
-
-        %extensions/crypt/md5/u-md5.c
     ]
 
 

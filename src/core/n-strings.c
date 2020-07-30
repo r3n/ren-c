@@ -64,134 +64,6 @@ REBNATIVE(delimit)
 
 
 //
-//  deflate: native [
-//
-//  "Compress data using DEFLATE: https://en.wikipedia.org/wiki/DEFLATE"
-//
-//      return: [binary!]
-//      data "If text, it will be UTF-8 encoded"
-//          [binary! text!]
-//      /part "Length of data (elements)"
-//          [any-value!]
-//      /envelope "ZLIB (adler32, no size) or GZIP (crc32, uncompressed size)"
-//          [word!]
-//  ]
-//
-REBNATIVE(deflate)
-{
-    INCLUDE_PARAMS_OF_DEFLATE;
-
-    REBLEN limit = Part_Len_May_Modify_Index(ARG(data), ARG(part));
-
-    REBSIZ size;
-    const REBYTE *bp = VAL_BYTES_LIMIT_AT(&size, ARG(data), limit);
-
-    REBSTR *envelope;
-    if (not REF(envelope))
-        envelope = Canon(SYM_NONE);  // Note: nullptr is gzip (for bootstrap)
-    else {
-        envelope = VAL_WORD_SPELLING(ARG(envelope));
-        switch (STR_SYMBOL(envelope)) {
-          case SYM_ZLIB:
-          case SYM_GZIP:
-            break;
-
-          default:
-            fail (PAR(envelope));
-        }
-    }
-
-    size_t compressed_size;
-    void *compressed = Compress_Alloc_Core(
-        &compressed_size,
-        bp,
-        size,
-        envelope
-    );
-
-    return rebRepossess(compressed, compressed_size);
-}
-
-
-//
-//  inflate: native [
-//
-//  "Decompresses DEFLATEd data: https://en.wikipedia.org/wiki/DEFLATE"
-//
-//      return: [binary!]
-//      data [binary! handle!]
-//      /part "Length of compressed data (must match end marker)"
-//          [any-value!]
-//      /max "Error out if result is larger than this"
-//          [integer!]
-//      /envelope "ZLIB, GZIP, or DETECT (http://stackoverflow.com/a/9213826)"
-//          [word!]
-//  ]
-//
-REBNATIVE(inflate)
-//
-// GZIP is a slight variant envelope which uses a CRC32 checksum.  For data
-// whose original size was < 2^32 bytes, the gzip envelope stored that size...
-// so memory efficiency is achieved even if max = -1.
-//
-// Note: That size guarantee exists for data compressed with rebGzipAlloc() or
-// adhering to the gzip standard.  However, archives created with the GNU
-// gzip tool make streams with possible trailing zeros or concatenations:
-//
-// http://stackoverflow.com/a/9213826
-{
-    INCLUDE_PARAMS_OF_INFLATE;
-
-    REBINT max;
-    if (REF(max)) {
-        max = Int32s(ARG(max), 1);
-        if (max < 0)
-            fail (PAR(max));
-    }
-    else
-        max = -1;
-
-    REBYTE *data;
-    REBSIZ size;
-    if (IS_BINARY(ARG(data))) {
-        data = VAL_BIN_AT(ARG(data));
-        size = Part_Len_May_Modify_Index(ARG(data), ARG(part));
-    }
-    else {
-        data = VAL_HANDLE_POINTER(REBYTE, ARG(data));
-        size = VAL_HANDLE_LEN(ARG(data));
-    }
-
-    REBSTR *envelope;
-    if (not REF(envelope))
-        envelope = Canon(SYM_NONE);  // Note: nullptr is gzip (for bootstrap)
-    else {
-        switch (VAL_WORD_SYM(ARG(envelope))) {
-          case SYM_ZLIB:
-          case SYM_GZIP:
-          case SYM_DETECT:
-            envelope = VAL_WORD_SPELLING(ARG(envelope));
-            break;
-
-          default:
-            fail (PAR(envelope));
-        }
-    }
-
-    size_t decompressed_size;
-    void *decompressed = Decompress_Alloc_Core(
-        &decompressed_size,
-        data,
-        size,
-        max,
-        envelope
-    );
-
-    return rebRepossess(decompressed, decompressed_size);
-}
-
-
-//
 //  debase: native [
 //
 //  {Decodes binary-coded string (BASE-64 default) to binary value.}
@@ -524,6 +396,14 @@ REBNATIVE(dehex)
                 if (next == NULL)
                     fail ("Bad UTF-8 sequence in %XX of dehex");
             }
+
+            // !!! Should you be able to give a BINARY! to be dehexed and then
+            // get a BINARY! back that permits internal zero chars?  This
+            // would not be guaranteeing UTF-8 compatibility.  Seems dodgy.
+            //
+            if (decoded == '\0')
+                fail (Error_Illegal_Zero_Byte_Raw());
+
             Append_Codepoint(mo->series, decoded);
             --scan_size; // one less (see why it's called "Back_Scan")
 

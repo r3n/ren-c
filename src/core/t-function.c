@@ -163,7 +163,8 @@ void MF_Action(REB_MOLD *mo, const REBCEL *v, bool form)
     // functions temporarily uses the word list as a substitute (which
     // drops types)
     //
-    REBARR *parameters = Make_Action_Parameters_Arr(VAL_ACTION(v));
+    const bool just_words = false;
+    REBARR *parameters = Make_Action_Parameters_Arr(VAL_ACTION(v), just_words);
     Mold_Array_At(mo, parameters, 0, "[]");
     Free_Unmanaged_Array(parameters);
 
@@ -244,20 +245,20 @@ REBTYPE(Action)
         UNUSED(ARG(value));
 
         REBVAL *property = ARG(property);
-        switch (VAL_WORD_SYM(property)) {
+        REBSYM sym = VAL_WORD_SYM(property);
+        switch (sym) {
           case SYM_BINDING: {
             if (Did_Get_Binding_Of(D_OUT, value))
                 return D_OUT;
             return nullptr; }
 
           case SYM_WORDS:
-            fail ("Use PARAMETERS OF for parameter ordering, not WORDS OF");
-
-          case SYM_PARAMETERS:
+          case SYM_PARAMETERS: {
+            bool just_words = (sym == SYM_WORDS);
             return Init_Block(
                 D_OUT,
-                Make_Action_Parameters_Arr(VAL_ACTION(value))
-            );
+                Make_Action_Parameters_Arr(VAL_ACTION(value), just_words)
+            ); }
 
           case SYM_TYPESETS:
             return Init_Block(

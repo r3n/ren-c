@@ -91,9 +91,9 @@ make-port*: function [
     digits:      [1 5 digit]
     alpha-num:   make bitset! [#"a" - #"z" #"A" - #"Z" #"0" - #"9"]
     scheme-char: insert copy alpha-num "+-."
-    path-char:   insert copy alpha-num "!/=+-_.;:&$@%*',~?| []()^"" ; !!! note: space allowed
-    user-char:   insert copy alpha-num "=+-_.;&$@%*,'#|"
-    pass-char:   complement make bitset! "^/ ^-@"
+    path-char:   complement make bitset! "#"
+    user-char:   complement make bitset! ":@"
+    host-char:   complement make bitset! ":/?"
     s1: s2: _ ; in R3, input datatype is preserved - these are now URL strings
     out: []
     emit: func ['w v] [
@@ -108,7 +108,7 @@ make-port*: function [
             ; scheme name: [//]
             copy s1 some scheme-char ":" opt "//" ( ; "//" is optional ("URN")
                 append out compose [
-                    scheme: (quote as word! s1)
+                    scheme: '(as word! s1)
                 ]
             )
 
@@ -121,11 +121,11 @@ make-port*: function [
 
             ; optional host [:port]
             opt [
-                copy s1 any user-char
+                copy s1 any host-char
                 opt [
                     ":" copy s2 digits (
                         append out compose [
-                            port-id: (to-integer s2)
+                            port-id: (to integer! s2)
                         ]
                     )
                 ] (
@@ -162,7 +162,7 @@ make-port*: function [
         opt [copy s1 some path-char (emit path s1)]
 
         ; optional bookmark
-        opt ["#" copy s1 some path-char (emit tag s1)]
+        opt ["#" copy s1 to end (emit tag s1)]
 
         end
     ]

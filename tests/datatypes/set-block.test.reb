@@ -1,14 +1,8 @@
 ; SET-BLOCK! tests
+;
+; !!! For the most part, the functions %multi.test.reb covers SET-BLOCK!, as
+; they are used for multiple return values.  This file should cover more
+; scanner and mechanical tests of the type itself vs. that feature.
 
 (set-block! = type of first [[a b c]:])
 (set-path! = type of first [a/[b c d]:])
-
-(
-    a: _ b: _
-    [a b]: [10 20]
-    (a = 10) and [b = 20]
-)(
-    a: _ b: _
-    [a b]: <thing>
-    (a = <thing>) and [b = <thing>]
-)

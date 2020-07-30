@@ -720,7 +720,7 @@ inline static REBSER *Alloc_Series_Node(REBFLGS flags) {
 
 
 inline static REBLEN FIND_POOL(size_t size) {
-  #if !defined(NDEBUG)
+  #ifdef DEBUG_ENABLE_ALWAYS_MALLOC
     if (PG_Always_Malloc)
         return SYSTEM_POOL;
   #endif
