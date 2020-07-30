@@ -28,7 +28,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include <sys/signal.h>
+#include <signal.h>  // !!! Was #include <sys/signal.h>, caused warning
 
 #include "sys-core.h"
 

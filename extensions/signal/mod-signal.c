@@ -26,7 +26,7 @@
 
 #include "tmp-mod-signal.h"
 
-#include <sys/signal.h>
+#include <signal.h>  // !!! Was #include <sys/signal.h>, caused warning
 
 #include "signal-req.h"
 
