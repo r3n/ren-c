@@ -693,8 +693,8 @@ pe-format: context [
              | fail-at: (err: 'missing-image-signature) fail
         ]
         u16-le (signature-value: u16)
-        copy major-linker-version byte
-        copy minor-linker-version byte
+        copy major-linker-version skip  ; 1 byte
+        copy minor-linker-version skip  ; 1 byte
         u32-le (size-of-code: u32)
         u32-le (size-of-initialized-data: u32)
         u32-le (size-of-uninialized-data: u32)
@@ -754,12 +754,12 @@ pe-format: context [
 
     section: _
     section-rule: gen-rule [
-        copy name [8 byte]
+        copy name [8 skip]  ; 8 bytes
         u32-le (virtual-size: u32)
         u32-le (virtual-offset: u32)
         u32-le (physical-size: u32)
         u32-le (physical-offset: u32)
-        copy reserved [12 byte]
+        copy reserved [12 skip]  ; 12 bytes
         u32-le (flags: u32)
         (append sections copy section)
     ] section
