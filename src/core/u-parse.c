@@ -682,13 +682,18 @@ static REB_R Parse_One_Rule(
             //
             // Check current char/byte against character set, advance matches
             //
+            bool uncased;
             REBUNI uni;
-            if (P_TYPE == REB_BINARY)
+            if (P_TYPE == REB_BINARY) {
                 uni = *BIN_AT(P_INPUT, P_POS);
-            else
+                uncased = false;
+            }
+            else {
                 uni = GET_CHAR_AT(STR(P_INPUT), P_POS);
+                uncased = not P_HAS_CASE;
+            }
 
-            if (Check_Bit(VAL_BITSET(rule), uni, not P_HAS_CASE))
+            if (Check_Bit(VAL_BITSET(rule), uni, uncased))
                 return Init_Integer(P_OUT, P_POS + 1);
 
             return R_UNHANDLED; }

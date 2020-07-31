@@ -493,3 +493,8 @@
 ("c" = parse "abbbbbc" ['a some ['b]])
 ("" = parse "abbbbc" ['ab some ['bc | 'b]])
 ("def" = parse "abc10def" ['abc '10])
+
+(
+    byteset: make bitset! [0 16 32]
+    did parse #{001020} [some byteset end]
+)
