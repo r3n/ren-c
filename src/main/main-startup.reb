@@ -735,22 +735,6 @@ main-startup: function [
     for-each [spec body] host-prot [module spec body]
     host-prot: 'done
 
-    ; "Setup SECURE configuration (a NO-OP for min boot)"
-    ; !!! SECURE was not finished in R3-Alpha
-
-comment [
-    lib/secure case [
-        o/secure [
-            o/secure
-        ]
-        file? o/script [
-            compose [file throw (file) [allow read] (first script-path) allow]
-        ]
-    ] else [
-        compose [file throw (file) [allow read] %. allow] ; default
-    ]
-]
-
     ;
     ; start-up scripts, o/loaded tracks which ones are loaded (with full path)
     ;

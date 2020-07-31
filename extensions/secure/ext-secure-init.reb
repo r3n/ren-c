@@ -17,6 +17,24 @@ REBOL [
     }
 ]
 
+
+; !!! This code was taken from R3-Alpha's startup for SECURE.  The comment
+; said "Setup SECURE configuration (a NO-OP for min boot)".
+;
+comment [
+    lib/secure case [
+        o/secure [
+            o/secure
+        ]
+        file? o/script [
+            compose [file throw (file) [allow read] (first script-path) allow]
+        ]
+    ] else [
+        compose [file throw (file) [allow read] %. allow] ; default
+    ]
+]
+
+
 secure: function [
     "Set security policies (use SECURE help for more information)."
     return: [<opt> any-value!]
