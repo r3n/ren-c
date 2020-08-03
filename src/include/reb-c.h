@@ -709,17 +709,12 @@
     #define TRASH_POINTER_IF_DEBUG(p) \
         NOOP
 
-    #define TRASH_CFUNC_IF_DEBUG(p) \
+    #define TRASH_CFUNC_IF_DEBUG(T,p) \
         NOOP
 #else
     #if defined(__cplusplus) // needed even if not C++11
         template<class T>
         inline static void TRASH_POINTER_IF_DEBUG(T* &p) {
-            p = reinterpret_cast<T*>(static_cast<uintptr_t>(0xDECAFBAD));
-        }
-
-        template<class T>
-        inline static void TRASH_CFUNC_IF_DEBUG(T* &p) {
             p = reinterpret_cast<T*>(static_cast<uintptr_t>(0xDECAFBAD));
         }
 
@@ -735,13 +730,6 @@
 
         template<class T>
         inline static bool IS_POINTER_TRASH_DEBUG(T* p) {
-            return (
-                p == reinterpret_cast<T*>(static_cast<uintptr_t>(0xDECAFBAD))
-            );
-        }
-
-        template<class T>
-        inline static bool IS_CFUNC_TRASH_DEBUG(T* p) {
             return (
                 p == reinterpret_cast<T*>(static_cast<uintptr_t>(0xDECAFBAD))
             );
@@ -778,9 +766,6 @@
         #define TRASH_POINTER_IF_DEBUG(p) \
             ((p) = cast(void*, cast(uintptr_t, 0xDECAFBAD)))
 
-        #define TRASH_CFUNC_IF_DEBUG(p) \
-            ((p) = cast(CFUNC*, cast(uintptr_t, 0xDECAFBAD)))
-
         #define SAFETRASH_POINTER_IF_DEBUG(p) \
             ((p) = cast(void*, cast(uintptr_t, 0x5AFE5AFE)))
 
@@ -790,15 +775,20 @@
         #define IS_POINTER_TRASH_DEBUG(p) \
             ((p) == cast(void*, cast(uintptr_t, 0xDECAFBAD)))
 
-        #define IS_CFUNC_TRASH_DEBUG(p) \
-            ((p) == cast(CFUNC*, cast(uintptr_t, 0xDECAFBAD)))
-
         #define IS_POINTER_SAFETRASH_DEBUG(p) \
             ((p) == cast(void*, cast(uintptr_t, 0x5AFE5AFE)))
 
         #define IS_POINTER_FREETRASH_DEBUG(p) \
             ((p) == cast(void*, cast(uintptr_t, 0xF4EEF4EE)))
     #endif
+
+    // C functions must be cast to the right type, even in C (no void*)
+
+    #define TRASH_CFUNC_IF_DEBUG(T,p) \
+        ((p) = cast(T, cast(uintptr_t, 0xDECAFBAD)))
+
+    #define IS_CFUNC_TRASH_DEBUG(T,p) \
+        ((p) == cast(T, cast(uintptr_t, 0xDECAFBAD)))
 #endif
 
 

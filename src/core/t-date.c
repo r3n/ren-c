@@ -393,7 +393,10 @@ void Adjust_Date_Zone(RELVAL *d, bool to_utc)
 void Subtract_Date(REBVAL *d1, REBVAL *d2, REBVAL *result)
 {
     REBINT diff = Diff_Date(VAL_DATE(d1), VAL_DATE(d2));
-    if (cast(REBLEN, abs(diff)) > (((1U << 31) - 1) / SECS_IN_DAY))
+
+    // Note: abs() takes `int`, but there is a labs(), and C99 has llabs()
+    //
+    if (cast(REBLEN, abs(cast(int, diff))) > (((1U << 31) - 1) / SECS_IN_DAY))
         fail (Error_Overflow_Raw());
 
     REBI64 t1;
