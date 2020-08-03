@@ -24,13 +24,13 @@ depends: compose [
         ]
     ])
 
-    (if "1" = get-env "USE_FCNTL_NOT_FCNTL64" [
+    (if "1" = get-env "USE_BACKDATED_GLIBC" [
         [%filesystem/fcntl-patch.c]
     ])
 ]
 
 ldflags: compose [
-    (if "1" = get-env "USE_FCNTL_NOT_FCNTL64" [
-        {-Wl,--wrap=fcntl64}
+    (if "1" = get-env "USE_BACKDATED_GLIBC" [
+        {-Wl,--wrap=fcntl64 -Wl,--wrap=log -Wl,--wrap=pow}
     ])
 ]

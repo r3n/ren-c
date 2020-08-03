@@ -21,7 +21,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // This file is signaled for the filesystem extension to include by the
-// environment variable USE_FCNTL_NOT_FCNTL64.  (Environment variables are not
+// environment variable USE_BACKDATED_GLIBC.  (Environment variables are not
 // ideal, but the all-Rebol build system is not very mature yet.)
 //
 // What it does is use special GCC features to "backdate" an executable built
@@ -30,10 +30,20 @@
 // <fcntl.h>, `fcntl` was remapped via a #define to call a function that is
 // actually named fcntl64()...unavailable on Linuxes before October 2018.
 //
+// Subsequently `pow` and `log` for math were changed in such a way that they
+// were linking against 2.29 with some kind of more "optimized" version.  This
+// doesn't really have anything to do with the filesystem extension, but
+// localizing the hack to this file is more useful at the moment than putting
+// it somewhere else.  (Revisit at a later date if needed, though the real
+// answer is probably just to switch to `musl`.)  Full list of operations is:
+//
+//     "...exp, exp2, log, log2, pow, sinf, cosf, sincosf and tanf"
+//
 // It's hardly ideal to do this.  But for some of the reasoning, please see:
 // https://forum.rebol.info/t/1231
 //
 
+#define _GNU_SOURCE  // so we get F_OFD_XXX and not just F_XXX
 #include <fcntl.h>
 #include "sys-core.h"
 
@@ -43,6 +53,20 @@
 // https://stackoverflow.com/q/4032373/
 //
 asm (".symver fcntl64, fcntl@GLIBC_2.2.5");
+
+
+// We add to the patch to also backdate pow() and log(), which were updated
+// in math from 2.29....
+//
+asm (".symver pow, pow@GLIBC_2.2.5");
+asm (".symver log, log@GLIBC_2.2.5");
+
+EXTERN_C double __wrap_pow(double base, double exponent)
+  { return pow(base, exponent); }
+
+EXTERN_C double __wrap_log(double x)
+  { return log(x); }
+
 
 // When the linker switch `--wrap=fcntl64` is used, then all the calls to
 // fcntl() that were mapped to fcntl64() will be routed through this function,
