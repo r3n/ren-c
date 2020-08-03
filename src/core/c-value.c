@@ -244,7 +244,10 @@ void* Probe_Core_Debug(
         }
         else {
             Probe_Print_Helper(p, expr, "Value", file, line);
-            Mold_Value(mo, v);
+            if (IS_NULLED(v))
+                Append_Ascii(mo->series, "; null");
+            else
+                Mold_Value(mo, v);
         }
         break; }
 
@@ -268,5 +271,12 @@ void* Probe_Core_Debug(
 
     return m_cast(void*, p); // must be cast back to const if source was const
 }
+
+
+// Version with fewer parameters, useful to call from the C debugger (which
+// cannot call macros like PROBE())
+//
+void Probe(const void *p)
+  { Probe_Core_Debug(p, "C debug", "N/A", 0); }
 
 #endif // defined(DEBUG_HAS_PROBE)

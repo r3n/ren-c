@@ -635,20 +635,20 @@
     template <typename P>
     class Never_Null {  // named so error message hints what's wrong
         typedef typename std::remove_pointer<P>::type T;
-        P pointer;
+        P p;
 
       public:
-        Never_Null () : pointer () {}
-        Never_Null (P& pointer) : pointer (pointer) {
-            assert(pointer != nullptr);
+        Never_Null () : p () {}
+        Never_Null (P & p) : p (p) {
+            assert(p != nullptr);
         }
-        T& operator*() { return *pointer; }
-        P operator->() { return pointer; }
-        operator P() { return pointer; }
+        T& operator*() { return *p; }
+        P operator->() { return p; }
+        operator P() { return p; }
         P operator= (const P rhs) {  // if it returned reference, loses check
             assert(rhs != nullptr);
-            this->pointer = rhs;
-            return pointer;
+            this->p = rhs;
+            return p;
         }
     };
 
