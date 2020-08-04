@@ -944,6 +944,40 @@ void Swap_Series_Content(REBSER* a, REBSER* b)
 
 
 //
+//  swap-contents: native [
+//      {Low-level operation for swapping the underlying data for two series.}
+//
+//      return: [void!]
+//      series1 [any-series!]
+//      series2 [any-series!]
+//  ]
+//
+REBNATIVE(swap_contents)
+{
+    INCLUDE_PARAMS_OF_SWAP_CONTENTS;
+
+    FAIL_IF_READ_ONLY(ARG(series1));
+    FAIL_IF_READ_ONLY(ARG(series2));
+
+    if (ANY_ARRAY(ARG(series1)) != ANY_ARRAY(ARG(series2)))
+        fail ("Can only SWAP-CONTENTS of arrays with other arrays");
+
+    // !!! This is a conservative check, as some binaries could be swapped
+    // with ANY-STRING!.  However, that would require checking that the
+    // binary is valid UTF-8...mechanics that are available in AS TEXT! etc.
+    // Let the user do their own aliasing for now, since the checks are
+    // annoying to write.
+    //
+    if (IS_BINARY(ARG(series1)) != IS_BINARY(ARG(series2)))
+        fail ("Can only SWAP-CONTENTS of binaries with other binaries");
+
+    Swap_Series_Content(VAL_SERIES(ARG(series1)), VAL_SERIES(ARG(series2)));
+
+    return Init_Void(D_OUT);
+}
+
+
+//
 //  Remake_Series: C
 //
 // Reallocate a series as a given maximum size.  Content in the retained
