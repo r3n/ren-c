@@ -212,8 +212,9 @@ REBNATIVE(quote)
 //
 //  {Remove quoting levels from the evaluated argument}
 //
-//      return: [<opt> any-value!]
-//      optional [<opt> any-value!]
+//      return: "Value with quotes removed (NULL is passed through as NULL)"
+//          [<opt> any-value!]
+//      value [<opt> any-value!]
 //      /depth "Number of quoting levels to remove (default 1)"
 //          [integer!]
 //  ]
@@ -222,13 +223,18 @@ REBNATIVE(unquote)
 {
     INCLUDE_PARAMS_OF_UNQUOTE;
 
+    REBVAL *v = ARG(value);
+
+    if (IS_NULLED(v))
+        return nullptr;  // It's more convenient to allow NULL than not
+        
     REBINT depth = REF(depth) ? VAL_INT32(ARG(depth)) : 1;
     if (depth < 0)
         fail (PAR(depth));
-    if (cast(REBLEN, depth) > VAL_NUM_QUOTES(ARG(optional)))
-        fail (PAR(depth));
+    if (cast(REBLEN, depth) > VAL_NUM_QUOTES(v))
+        fail ("Value not quoted enough for unquote depth requested");
 
-    return Unquotify(Move_Value(D_OUT, ARG(optional)), depth);
+    return Unquotify(Move_Value(D_OUT, v), depth);
 }
 
 
