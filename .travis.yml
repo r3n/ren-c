@@ -662,6 +662,8 @@ script:
   # Install the AWS command-line tool for uploading to s3 (which we use
   # instead of Travis's `deploy`)
   - |
+    $PIP install wheel  # else you get "invalid command 'bdist_wheel'"
+
     if ( $PIP install awscli --upgrade --user ); then
                     echo "AWS installed"
     else
@@ -881,6 +883,7 @@ script:
     # 80/20 rule it's going to deliver on catching most of the breakages.
     #
     if [[ $OS_ID = 0.16.1 || $OS_ID = 0.16.2 ]]; then
+      pip3 install wheel  # https://stackoverflow.com/a/44862371
       pip3 install marionette-driver --user  # Python Install Package
 
       # Create a Firefox profile in the current directory that we can tweak
