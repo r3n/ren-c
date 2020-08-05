@@ -56,12 +56,6 @@ Internal: [
     invalid-error:      [{error object or fields were not valid:} :arg1]
     hash-overflow:      {Hash ran out of space}
 
-    bad-utf8:           {invalid UTF-8 byte sequence found during decoding}
-    codepoint-too-high: [{codepoint} :arg1 {too large (or data is not UTF-8)}]
-    illegal-zero-byte:  {#{00} bytes illegal in ANY-STRING!, use BINARY!}
-    illegal-cr:         [{Illegal CR: See DELINE, and TO-TEXT/RELAX:} :arg1]
-    mixed-cr-lf-found:  {DELINE requires files to be CR LF or LF consistently}
-
     debug-only:         {Feature available only in DEBUG builds}
 
     invalid-exit:       {Frame does not exist on the stack to EXIT from}
@@ -93,6 +87,13 @@ Script: [
     void-evaluation:    "VOID! cells cannot be evaluated"
 
     assertion-failure:  [{assertion failure:} :arg1]
+
+    bad-utf8:           {invalid UTF-8 byte sequence found during decoding}
+    codepoint-too-high: [{codepoint} :arg1 {too large (or data is not UTF-8)}]
+    illegal-zero-byte:  {#{00} bytes illegal in ANY-STRING!, use BINARY!}
+    illegal-cr:         [{Illegal CR: See DELINE, and TO-TEXT/RELAX:} :arg1]
+    mixed-cr-lf-found:  {DELINE requires files to be CR LF or LF consistently}
+    bad-utf8-bin-edit:  {String aliased as BINARY! can't become invalid UTF-8}
 
     phase-bad-arg-type:
         [:arg1 {internal phase disallows} :arg2 {for its} :arg3 {argument}]

@@ -48,3 +48,24 @@
     ([a b] = take/part [a b c] 2)
     ([b c] = take/part next [a b c] 100)  ; should clip
 ]
+
+; UTF-8 Removals in binary alias should not allow bad strings
+[
+    (
+        str: "Tæke Pært"
+        bin: as binary! str
+        true
+    )
+
+    ('bad-utf8-bin-edit = pick trap [take/part bin 2] 'id)
+    (str = {Tæke Pært})
+
+    ((as binary! "Tæ") = take/part bin 3)
+    (str = "ke Pært")
+
+    ('bad-utf8-bin-edit = pick trap [take/part bin 5] 'id)
+    (str = "ke Pært")
+
+    ((as binary! "ke Pæ") = take/part bin 6)
+    (str = "rt")
+]

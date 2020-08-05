@@ -31,15 +31,14 @@
 // Returns new dst_idx
 //
 REBLEN Modify_Array(
-    REBSTR *verb,  // INSERT, APPEND, CHANGE
     REBARR *dst_arr,  // target
     REBLEN dst_idx,  // position
+    enum Reb_Symbol sym,  // INSERT, APPEND, CHANGE
     const REBVAL *src_val,  // source
     REBLEN flags,  // AM_SPLICE, AM_PART, AM_LINE
     REBLEN part,  // dst to remove (CHANGE) or limit to grow (APPEND/INSERT)
     REBINT dups  // dup count of how many times to insert the src content
 ){
-    REBSYM sym = STR_SYMBOL(verb);
     assert(sym == SYM_INSERT or sym == SYM_CHANGE or sym == SYM_APPEND);
 
     REBLEN tail = ARR_LEN(dst_arr);
@@ -227,13 +226,12 @@ REBLEN Modify_Array(
 //
 REBLEN Modify_String_Or_Binary(
     REBVAL *dst,  // ANY-STRING! or BINARY! value to modify
-    REBSTR *verb,  // SYM_APPEND at tail, or SYM_INSERT/SYM_CHANGE at index
+    enum Reb_Symbol sym,  // SYM_APPEND @ tail, SYM_INSERT/SYM_CHANGE @ index
     const REBVAL *src,  // ANY-VALUE! argument with content to inject
     REBFLGS flags,  // AM_PART, AM_LINE
     REBLEN part,  // dst to remove (CHANGE) or limit to grow (APPEND/INSERT)
     REBINT dups  // dup count of how many times to insert the src content
 ){
-    REBSYM sym = STR_SYMBOL(verb);
     assert(sym == SYM_INSERT or sym == SYM_CHANGE or sym == SYM_APPEND);
 
     FAIL_IF_READ_ONLY(dst);  // rules out symbol strings (e.g. from ANY-WORD!)
@@ -248,7 +246,7 @@ REBLEN Modify_String_Or_Binary(
         if (IS_SER_STRING(dst_ser)) {
             REBYTE at = *BIN_AT(dst_ser, dst_idx);
             if (Is_Continuation_Byte_If_Utf8(at))
-                fail ("Index at codepoint to modify string-aliased-BINARY!");
+                fail (Error_Bad_Utf8_Bin_Edit_Raw());
             dst_len_old = STR_LEN(STR(dst_ser));
         }
         dst_off = dst_idx;
@@ -284,12 +282,15 @@ REBLEN Modify_String_Or_Binary(
     if (limit == 0 or dups <= 0)
         return sym == SYM_APPEND ? 0 : dst_idx;
 
+    // Now that we know there's actual work to do, we need `dst_idx` to speak
+    // in terms of codepoints (if applicable)
+    
     if (sym == SYM_APPEND or dst_off > dst_used) {
         dst_off = SER_USED(dst_ser);
-        if (IS_BINARY(dst))
-            dst_idx = dst_used;
-        else
-            dst_idx = dst_len_old;
+        dst_idx = dst_len_old;
+    }
+    else if (IS_BINARY(dst) and IS_SER_STRING(dst_ser)) {
+        dst_idx = STR_INDEX_AT(STR(dst_ser), dst_off);
     }
 
     // If the src is not an ANY-STRING!, then we need to create string data
@@ -323,7 +324,8 @@ REBLEN Modify_String_Or_Binary(
 
         src_byte = VAL_UINT8(src);  // fails if out of range
         if (IS_SER_STRING(dst_ser) and src_byte >= 0x80)
-            fail ("Can't mutate aliased string as binary to incomplete UTF-8");
+            fail (Error_Bad_Utf8_Bin_Edit_Raw());
+
         src_ptr = &src_byte;
         src_len_raw = src_size_raw = 1;
     }
@@ -343,7 +345,7 @@ REBLEN Modify_String_Or_Binary(
             if (IS_SER_STRING(bin)) {  // guaranteed valid UTF-8
                 REBSTR *str = STR(bin);
                 if (Is_Continuation_Byte_If_Utf8(*src_ptr))
-                    fail ("Index codepoint to insert string-aliased-BINARY!");
+                    fail (Error_Bad_Utf8_Bin_Edit_Raw());
 
                 // !!! We could be more optimal here since we know it's valid
                 // UTF-8 than walking characters up to the limit, like:
@@ -378,7 +380,7 @@ REBLEN Modify_String_Or_Binary(
                     else {
                         bp = Back_Scan_UTF8_Char(&c, bp, &bytes_left);
                         if (not bp)  // !!! Should Back_Scan() fail?
-                            fail (Error_Bad_Utf8_Raw());
+                            fail (Error_Bad_Utf8_Bin_Edit_Raw());
                     }
                     ++src_len_raw;
 
@@ -537,8 +539,14 @@ REBLEN Modify_String_Or_Binary(
 
         REBLEN dst_len_at;
         REBSIZ dst_size_at;
-        if (IS_SER_STRING(dst_ser))
-            dst_size_at = VAL_SIZE_LIMIT_AT(&dst_len_at, dst, UNKNOWN);
+        if (IS_SER_STRING(dst_ser)) {
+            if (IS_BINARY(dst)) {
+                dst_size_at = VAL_LEN_AT(dst);  // byte count
+                dst_len_at = STR_INDEX_AT(STR(dst_ser), dst_size_at);
+            }
+            else
+                dst_size_at = VAL_SIZE_LIMIT_AT(&dst_len_at, dst, UNKNOWN);
+        }
         else {
             dst_len_at = VAL_LEN_AT(dst);
             dst_size_at = dst_len_at;
@@ -559,16 +567,47 @@ REBLEN Modify_String_Or_Binary(
         // have to be moved safely out of the way before being overwritten.
 
         REBSIZ part_size;
-        if (part > dst_len_at) {
-            part = dst_len_at;
-            part_size = dst_size_at;
+        if (IS_SER_STRING(dst_ser)) {
+            if (IS_BINARY(dst)) {
+                //
+                // The calculations on the new length depend on `part` being
+                // in terms of codepoint count.  Transform it from byte count,
+                // and also be sure it's a legitimate codepoint boundary and
+                // not splitting a codepoint's bytes.
+                //
+                if (part > dst_size_at) {  // can use STR_LEN() from above
+                    part = dst_len_at;
+                    part_size = dst_size_at;
+                }
+                else {  // count how many codepoints are in the `part`
+                    part_size = part;
+                    REBCHR(*) cp = BIN_AT(dst_ser, dst_off);
+                    REBCHR(*) pp = BIN_AT(dst_ser, dst_off + part_size);
+                    if (Is_Continuation_Byte_If_Utf8(*pp))
+                        fail (Error_Bad_Utf8_Bin_Edit_Raw());
+                    
+                    part = 0;
+                    for (; cp != pp; cp = NEXT_STR(cp))
+                        ++part;
+                }
+            }
+            else {
+                if (part > dst_len_at) {  // can use STR_LEN() from above
+                    part = dst_len_at;
+                    part_size = dst_size_at;
+                }
+                else {
+                    REBLEN check;
+                    part_size = VAL_SIZE_LIMIT_AT(&check, dst, part);
+                    assert(check == part);
+                    UNUSED(check);
+                }
+            }
         }
-        else {
-            if (IS_SER_STRING(dst_ser)) {
-                REBLEN check;
-                part_size = VAL_SIZE_LIMIT_AT(&check, dst, part);
-                assert(check == part);
-                UNUSED(check);
+        else {  // Just a non-aliased binary; keep the part in bytes
+            if (part > dst_size_at) {
+                part = dst_size_at;
+                part_size = dst_size_at;
             }
             else
                 part_size = part;
@@ -653,5 +692,12 @@ REBLEN Modify_String_Or_Binary(
     }
 
     ASSERT_SERIES_TERM(dst_ser);
-    return (sym == SYM_APPEND) ? 0 : dst_idx + src_len_total;
+
+    if (sym == SYM_APPEND)
+        return 0;
+
+    if (IS_BINARY(dst))
+        return dst_off + src_size_total;
+
+    return dst_idx + src_len_total;
 }

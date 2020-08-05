@@ -2568,7 +2568,7 @@ REBNATIVE(subparse)
                 if (flags & PF_REMOVE) {
                     FAIL_IF_READ_ONLY(P_INPUT_VALUE);
                     if (count)
-                        Remove_Series_Len(P_INPUT, begin, count);
+                        Remove_Any_Series_Len(P_INPUT_VALUE, begin, count);
                     P_POS = begin;
                 }
 
@@ -2634,11 +2634,11 @@ REBNATIVE(subparse)
                             mod_flags |= AM_SPLICE;
                         }
                         P_POS = Modify_Array(
-                            (flags & PF_CHANGE)
-                                ? Canon(SYM_CHANGE)
-                                : Canon(SYM_INSERT),
                             ARR(P_INPUT),
                             begin,
+                            (flags & PF_CHANGE)
+                                ? SYM_CHANGE
+                                : SYM_INSERT,
                             specified,
                             mod_flags,
                             count,
@@ -2659,8 +2659,8 @@ REBNATIVE(subparse)
                         P_POS = Modify_String_Or_Binary(  // checks read-only
                             P_INPUT_VALUE,
                             (flags & PF_CHANGE)
-                                ? Canon(SYM_CHANGE)
-                                : Canon(SYM_INSERT),
+                                ? SYM_CHANGE
+                                : SYM_INSERT,
                             specified,
                             mod_flags,
                             count,

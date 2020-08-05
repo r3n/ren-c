@@ -619,7 +619,7 @@ REBTYPE(Binary)
 
         VAL_INDEX(v) = Modify_String_Or_Binary(
             v,
-            VAL_WORD_CANON(verb),
+            cast(enum Reb_Symbol, sym),
             ARG(value),
             flags,
             len,
@@ -713,7 +713,6 @@ REBTYPE(Binary)
             return Init_Any_Series(D_OUT, VAL_TYPE(v), Make_Binary(0));
         }
 
-        REBSER *ser = VAL_SERIES(v);
         index = VAL_INDEX(v);
 
         // if no /PART, just return value, else return string
@@ -727,7 +726,7 @@ REBTYPE(Binary)
                 Copy_Sequence_At_Len(VAL_SERIES(v), VAL_INDEX(v), len)
             );
         }
-        Remove_Series_Units(ser, VAL_INDEX(v), len);
+        Remove_Any_Series_Len(v, VAL_INDEX(v), len);  // bad UTF-8 alias fails
         return D_OUT; }
 
       case SYM_CLEAR: {

@@ -128,11 +128,9 @@ static void reverse_string(REBVAL *v, REBLEN len)
         // Effectively do a CHANGE/PART to overwrite the reversed portion of
         // the string (from the input value's index to the tail).
 
-        DECLARE_LOCAL (verb);
-        Init_Word(verb, Canon(SYM_CHANGE));
         Modify_String_Or_Binary(
             v,
-            VAL_WORD_SPELLING(verb),
+            SYM_CHANGE,
             temp,
             AM_PART,  // heed len for deletion
             len,
@@ -1134,7 +1132,7 @@ REBTYPE(String)
 
         VAL_INDEX(v) = Modify_String_Or_Binary(  // does read-only check
             v,
-            VAL_WORD_SPELLING(verb),
+            cast(enum Reb_Symbol, sym),
             ARG(value),
             flags,
             len,
@@ -1234,7 +1232,6 @@ REBTYPE(String)
             return Init_Any_String(D_OUT, VAL_TYPE(v), Make_String(0));
         }
 
-        REBSTR *s = VAL_STRING(v);
         index = VAL_INDEX(v);
 
         // if no /PART, just return value, else return string
@@ -1244,7 +1241,7 @@ REBTYPE(String)
         else
             Init_Char_Unchecked(D_OUT, CHR_CODE(VAL_STRING_AT(v)));
 
-        Remove_Series_Len(SER(s), VAL_INDEX(v), len);
+        Remove_Any_Series_Len(v, VAL_INDEX(v), len);
         return D_OUT; }
 
       case SYM_CLEAR: {

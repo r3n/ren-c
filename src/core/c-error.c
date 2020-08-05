@@ -1445,20 +1445,34 @@ void Shutdown_Stackoverflow(void)
 }
 
 
-// Limited molder (used, e.g., for errors)
+// !!! This is a limited molder used for errors.  There is a more general
+// facility for limiting molds, but this limits the addition of a particular
+// item (not the mold overall).  ItLimited molder used, e.g., for errors)
+// The kludgey implementation was factored out of Remove_Series_Len().
+// Review this in light of a general facility.
 //
-static void Mold_Value_Limit(REB_MOLD *mo, RELVAL *v, REBLEN len)
+static void Mold_Value_Limit(REB_MOLD *mo, RELVAL *v, REBLEN limit)
 {
-    REBLEN start = STR_LEN(mo->series);
+    REBSTR *str = mo->series;
+    REBLEN start = STR_LEN(str);
     Mold_Value(mo, v);
 
-    if (STR_LEN(mo->series) - start > len) {
-        Remove_Series_Len(
-            SER(mo->series),
-            start + len,
-            STR_LEN(mo->series) - start - len
-        );
-        Append_Ascii(mo->series, "...");
+    if (STR_LEN(str) - start > limit) {
+        REBLEN len = STR_LEN(str) - start - limit;
+        REBLEN index = start + len;
+        REBCHR(*) cp = STR_AT(str, index);
+        REBCHR(*) ep = STR_AT(str, index + len);
+
+        REBLEN len_old = STR_LEN(str);
+        REBSIZ size_old = STR_SIZE(str);
+
+        assert(len <= len_old);
+
+        Remove_Series_Units(SER(str), cp - STR_HEAD(str), ep - cp);
+        Free_Bookmarks_Maybe_Null(str);
+        SET_STR_LEN_SIZE(str, len_old - len, size_old - (ep - cp));
+
+        Append_Ascii(str, "...");
     }
 }
 

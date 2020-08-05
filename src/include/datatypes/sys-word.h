@@ -127,6 +127,11 @@
         operator unsigned int() const
           { return cast(unsigned int, n); }
 
+        explicit operator enum Reb_Symbol() {
+            assert(n != SYM_0);
+            return cast(enum Reb_Symbol, n);
+        }
+
         bool operator>=(enum Reb_Symbol other) const {
             assert(other != SYM_0);
             return n >= other;

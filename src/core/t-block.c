@@ -974,9 +974,9 @@ REBTYPE(Array)
 
         Move_Value(D_OUT, array);
         VAL_INDEX(D_OUT) = Modify_Array(
-            VAL_WORD_SPELLING(verb),
             arr,
             index,
+            cast(enum Reb_Symbol, sym),
             ARG(value),
             flags,
             len,
