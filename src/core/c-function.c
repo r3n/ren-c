@@ -1662,7 +1662,7 @@ REB_R Elider_Dispatcher(REBFRM *f)
         const REBVAL *label = VAL_THROWN_LABEL(discarded);
         if (IS_ACTION(label)) {
             if (
-                VAL_ACTION(label) == NAT_ACTION(unwind)
+                VAL_ACTION(label) == NATIVE_ACT(unwind)
                 and VAL_BINDING(label) == NOD(f->varlist)
             ){
                 CATCH_THROWN(discarded, discarded);

@@ -264,7 +264,7 @@ bool Wait_Ports_Throws(
         if (GET_SIGNAL(SIG_HALT)) {
             CLR_SIGNAL(SIG_HALT);
 
-            Init_Thrown_With_Label(out, NULLED_CELL, NAT_VALUE(halt));
+            Init_Thrown_With_Label(out, NULLED_CELL, NATIVE_VAL(halt));
             return true; // thrown
         }
 

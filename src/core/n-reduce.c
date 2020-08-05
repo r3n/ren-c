@@ -243,7 +243,7 @@ REB_R Compose_To_Stack_Core(
             if (
                 predicate
                 and not doubled_group
-                and VAL_ACTION(predicate) != NAT_ACTION(identity)
+                and VAL_ACTION(predicate) != NATIVE_ACT(identity)
             ){
                 insert = rebValue(predicate, rebQ(out, rebEND), rebEND);
             } else

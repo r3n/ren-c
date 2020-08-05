@@ -982,11 +982,11 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                 if (SPECIAL_IS_ARBITRARY_SO_SPECIALIZED)
                     assert(
                         IS_NULLED(f->special)
-                        or NAT_ACTION(return) == VAL_ACTION(f->special)
+                        or NATIVE_ACT(return) == VAL_ACTION(f->special)
                     );
                 assert(VAL_PARAM_SYM(f->param) == SYM_RETURN);
 
-                Move_Value(f->arg, NAT_VALUE(return));
+                Move_Value(f->arg, NATIVE_VAL(return));
                 INIT_BINDING(f->arg, f->varlist);
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
                 goto continue_arg_loop;
@@ -1647,7 +1647,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             const REBVAL *label = VAL_THROWN_LABEL(f->out);
             if (IS_ACTION(label)) {
                 if (
-                    VAL_ACTION(label) == NAT_ACTION(unwind)
+                    VAL_ACTION(label) == NATIVE_ACT(unwind)
                     and VAL_BINDING(label) == NOD(f->varlist)
                 ){
                     // Eval_Core catches unwinds to the current frame, so throws
@@ -1664,7 +1664,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                     goto dispatch_completed;
                 }
                 else if (
-                    VAL_ACTION(label) == NAT_ACTION(redo)
+                    VAL_ACTION(label) == NATIVE_ACT(redo)
                     and VAL_BINDING(label) == NOD(f->varlist)
                 ){
                     // This was issued by REDO, and should be a FRAME! with
@@ -2625,7 +2625,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         // compatibly with history.
 
         REBNOD *binding = nullptr;
-        Push_Action(f, NAT_ACTION(path_0), binding);
+        Push_Action(f, NATIVE_ACT(path_0), binding);
 
         REBSTR *opt_label = nullptr;
         Begin_Enfix_Action(f, opt_label);
