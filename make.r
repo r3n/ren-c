@@ -547,6 +547,10 @@ gen-obj: func [
                 ;
                 <msc:/wd26812>
                 <msc:/wd26495>
+
+                ; Implicit conversion from `int` to `REBD32`, possible loss.
+                ;
+                <msc:/wd5219>
             ]
         ]
         _ #[false] 'no 'off 'false [
