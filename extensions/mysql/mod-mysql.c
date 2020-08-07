@@ -39,7 +39,7 @@
 //
 //      {Attempts to establish a connection to a MySQL server running on host}
 //
-//      return: [object!]
+//      return: [handle!]
 //      host [text!]
 //      user [text!]
 //      pwrd [text!]
@@ -53,7 +53,8 @@ REBNATIVE(mysql_connect)
     MYSQL *connection = mysql_init(NULL);
     if (connection == NULL) 
     {
-        return rebVoid();
+        rebJumps("FAIL {No connection returned from mysql_init}");
+        //return rebVoid();
         // fprintf(stderr, "%s\n", mysql_error(con));
         //exit(1);
     }
@@ -65,7 +66,9 @@ REBNATIVE(mysql_connect)
     if (mysql_real_connect(connection, host, user, pwrd, 
           dbnm, 0, NULL, 0) == NULL)
     {
-        return rebVoid();
+        rebJumps("FAIL {Not able to connect to database mysql_real_connect}");
+
+        // return rebVoid();
     } 
 
     return rebHandle(connection, 0, nullptr);
