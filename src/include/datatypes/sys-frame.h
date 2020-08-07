@@ -315,7 +315,7 @@ inline static void Push_Frame_No_Varlist(REBVAL *out, REBFRM *f)
     //
     if (IS_END(f->feed->value)) {  // don't take hold on empty feeds
         assert(IS_POINTER_TRASH_DEBUG(f->feed->pending));
-        assert(NOT_FEED_FLAG(f->feed, TOOK_HOLD));
+        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
     }
     else if (FRM_IS_VALIST(f)) {
         //
@@ -324,14 +324,14 @@ inline static void Push_Frame_No_Varlist(REBVAL *out, REBFRM *f)
         // which is created will have a hold put on it to be released when
         // the frame is finished.
         //
-        assert(NOT_FEED_FLAG(f->feed, TOOK_HOLD));
+        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
     }
     else {
         if (GET_SERIES_INFO(f->feed->array, HOLD))
             NOOP; // already temp-locked
         else {
             SET_SERIES_INFO(f->feed->array, HOLD);
-            SET_FEED_FLAG(f->feed, TOOK_HOLD);
+            SET_EVAL_FLAG(f, TOOK_HOLD);
         }
     }
 
@@ -373,7 +373,7 @@ inline static void Abort_Frame(REBFRM *f) {
         goto pop;
 
     if (FRM_IS_VALIST(f)) {
-        assert(NOT_FEED_FLAG(f->feed, TOOK_HOLD));
+        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
 
         // Aborting valist frames is done by just feeding all the values
         // through until the end.  This is assumed to do any work, such
@@ -398,14 +398,14 @@ inline static void Abort_Frame(REBFRM *f) {
             Fetch_Next_Forget_Lookback(f);
     }
     else {
-        if (GET_FEED_FLAG(f->feed, TOOK_HOLD)) {
+        if (GET_EVAL_FLAG(f, TOOK_HOLD)) {
             //
             // The frame was either never variadic, or it was but got spooled
             // into an array by Reify_Va_To_Array_In_Frame()
             //
             assert(GET_SERIES_INFO(f->feed->array, HOLD));
             CLEAR_SERIES_INFO(f->feed->array, HOLD);
-            CLEAR_FEED_FLAG(f->feed, TOOK_HOLD); // !!! needed?
+            CLEAR_EVAL_FLAG(f, TOOK_HOLD); // !!! needed?
         }
     }
 
@@ -424,6 +424,12 @@ inline static void Drop_Frame_Core(REBFRM *f) {
   #if defined(DEBUG_EXPIRED_LOOKBACK)
     free(f->stress);
   #endif
+
+    if (GET_EVAL_FLAG(f, TOOK_HOLD)) {
+        assert(GET_SERIES_INFO(f->feed->array, HOLD));
+        CLEAR_SERIES_INFO(f->feed->array, HOLD);
+        CLEAR_EVAL_FLAG(f, TOOK_HOLD);  // needed?
+    }
 
     if (f->varlist) {
         assert(NOT_SERIES_FLAG(f->varlist, MANAGED));

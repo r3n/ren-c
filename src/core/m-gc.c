@@ -422,9 +422,9 @@ void Reify_Va_To_Array_In_Frame(
     else {
         f->feed->pending = f->feed->value + 1;
 
-        assert(NOT_FEED_FLAG(f->feed, TOOK_HOLD));
+        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
         SET_SERIES_INFO(f->feed->array, HOLD);
-        SET_FEED_FLAG(f->feed, TOOK_HOLD);
+        SET_EVAL_FLAG(f, TOOK_HOLD);
     }
 }
 

@@ -443,13 +443,13 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         | EVAL_FLAG_NEXT_ARG_FROM_OUT
         | EVAL_FLAG_FULFILL_ONLY  // can be requested or <blank> can trigger
         | EVAL_FLAG_RUNNING_ENFIX  // can be requested with REEVALUATE_CELL
+        | EVAL_FLAG_TOOK_HOLD  // can be set by va_list reification
     );  // should be unchanged on exit
   #endif
 
     assert(DSP >= f->dsp_orig);  // REDUCE accrues, APPLY adds refinements
     assert(not IS_TRASH_DEBUG(f->out));  // all invisible will preserve output
     assert(f->out != spare);  // overwritten by temporary calculations
-    assert(GET_EVAL_FLAG(f, DEFAULT_DEBUG));  // must use EVAL_MASK_DEFAULT
     assert(NOT_FEED_FLAG(f->feed, BARRIER_HIT));
 
     // Caching KIND_BYTE(*at) in a local can make a slight performance
@@ -2821,7 +2821,9 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
   #if !defined(NDEBUG)
     Eval_Core_Exit_Checks_Debug(f);  // called unless a fail() longjmps
     assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));
-    assert(f->flags.bits == initial_flags);  // any change should be restored
+    assert(
+        (f->flags.bits & ~EVAL_FLAG_TOOK_HOLD) == initial_flags
+    );  // any change should be restored, but va_list reification may hold
   #endif
 
     return false;  // false => not thrown

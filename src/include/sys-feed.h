@@ -38,14 +38,9 @@
 
 #define FEED_MASK_DEFAULT 0
 
-
-// SERIES_INFO_HOLD is used to make a temporary read-only lock of an array
-// while it is running.  Since the same array can wind up on multiple levels
-// of the stack (e.g. recursive functions), the source must be connected with
-// a bit saying whether it was the level that protected it, so it can know to
-// release the hold when it's done.
+// Available.
 //
-#define FEED_FLAG_TOOK_HOLD \
+#define FEED_FLAG_0 \
     FLAG_LEFT_BIT(0)
 
 
@@ -478,15 +473,6 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
 
         ++feed->index; // for consistency in index termination state
 
-        if (GET_FEED_FLAG(feed, TOOK_HOLD)) {
-            assert(GET_SERIES_INFO(feed->array, HOLD));
-            CLEAR_SERIES_INFO(feed->array, HOLD);
-
-            // !!! Future features may allow you to move on to another array.
-            // If so, the "hold" bit would need to be reset like this.
-            //
-            CLEAR_FEED_FLAG(feed, TOOK_HOLD);
-        }
     }
     else {
         // A variadic can source arbitrary pointers, which can be detected
