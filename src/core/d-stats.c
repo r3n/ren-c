@@ -338,8 +338,17 @@ REBNATIVE(callgrind)
 // Note: In order to start callgrind without collecting data by default (so
 // that you can instrument just part of the code) use:
 //
-//     valgrind --tool=callgrind --dump-instr=yes --collect-atstart=no ./r3
+//     valgrind --tool=callgrind --instr-atstart=no --collect-atstart=no ./r3
 //
+// For easy copy/paste into the shell, here's a useful command line:
+/*
+     valgrind --tool=callgrind \
+          --collect-jumps=yes \
+          --dump-instr=yes \
+          --instr-atstart=no \
+          --collect-atstart=no \
+          ./r3
+*/
 // The tool kcachegrind is very useful for reading the results.
 {
     INCLUDE_PARAMS_OF_CALLGRIND;
