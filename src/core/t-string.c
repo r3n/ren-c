@@ -696,26 +696,27 @@ REB_R PD_String(
     if (n < 0 or cast(REBLEN, n) >= STR_LEN(s))
         fail (Error_Out_Of_Range(picker));
 
-    REBINT c;
+
     if (IS_CHAR(opt_setval)) {
-        c = VAL_CHAR(opt_setval);
-        if (c > cast(REBI64, MAX_UNI))
-            return R_UNHANDLED;
+        Move_Value(pvs->out, opt_setval);
     }
     else if (IS_INTEGER(opt_setval)) {
-        c = Int32(opt_setval);
-        if (c > cast(REBI64, MAX_UNI) or c < 0)
-            return R_UNHANDLED;
+        Init_Char_May_Fail(pvs->out, Int32(opt_setval));
     }
-    else if (ANY_BINSTR(opt_setval)) {
-        REBLEN i = VAL_INDEX(opt_setval);
-        if (i >= VAL_LEN_HEAD(opt_setval))
-            fail (opt_setval);
-
-        c = GET_CHAR_AT(VAL_STRING(opt_setval), i);
-    }
-    else
+    else {
+        // !!! This used to allow setting to a string to set to the first
+        // character of that string, but that seems random.  Splicing
+        // strings might be useful, but inconsistent with BLOCK!s which
+        // preserve the value.  NULL might be interesting for removing
+        // things, but changing the length could be confusing.  BINARY!
+        // converted to a CHAR! could also be arguably useful.  Review.
+        //
         return R_UNHANDLED;
+    }
+
+    REBUNI c = VAL_CHAR(pvs->out);
+    if (c == 0)
+        fail (Error_Illegal_Zero_Byte_Raw());
 
     SET_CHAR_AT(s, n, c);
     return R_INVISIBLE;
