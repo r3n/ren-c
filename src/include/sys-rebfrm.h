@@ -389,9 +389,6 @@ STATIC_ASSERT(31 < 32); // otherwise EVAL_FLAG_XXX too high
 
 #define TRASHED_INDEX ((REBLEN)(-3))
 
-#define IS_KIND_INERT(k) \
-    ((k) >= REB_BLOCK)
-
 
 struct Reb_Feed {
     //
