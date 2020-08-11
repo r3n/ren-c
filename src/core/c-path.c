@@ -329,7 +329,7 @@ bool Eval_Path_Throws_Core(
     DECLARE_FRAME (pvs, feed, flags | EVAL_FLAG_PATH_MODE);
 
     SHORTHAND (v, pvs->feed->value, NEVERNULL(const RELVAL*));
-    ASSERT_NOT_END(*v);  // tested 0-length path previously
+    assert(NOT_END(*v));  // tested 0-length path previously
 
     SET_END(out);
     Push_Frame(out, pvs);

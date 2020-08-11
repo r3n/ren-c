@@ -114,7 +114,7 @@ static inline void CATCH_THROWN(
     RELVAL *arg_out,
     REBVAL *thrown // Note: may be same pointer as arg_out
 ){
-    ASSERT_NOT_END(&TG_Thrown_Arg);
+    assert(NOT_END(&TG_Thrown_Arg));
 
     UNUSED(thrown);
     Move_Value(arg_out, &TG_Thrown_Arg);

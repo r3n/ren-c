@@ -167,7 +167,7 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
 
     //=//// v-- BELOW CHECKS ONLY APPLY IN EXITS CASE WITH MORE CODE //////=//
 
-    ASSERT_NOT_END(*next);
+    assert(NOT_END(*next));
     assert(*next != f->out);
 
     //=//// ^-- ADD CHECKS EARLIER THAN HERE IF THEY SHOULD ALWAYS RUN ////=//

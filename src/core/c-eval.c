@@ -1113,7 +1113,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                     // to TAKE be seen as an error?  Failing to take first
                     // gives out-of-order evaluation.
                     //
-                    ASSERT_NOT_END(f->out);
+                    assert(NOT_END(f->out));
                     REBARR *array1;
                     if (IS_END(f->out))
                         array1 = EMPTY_ARRAY;

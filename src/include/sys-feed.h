@@ -530,7 +530,8 @@ inline static const RELVAL *Fetch_Next_In_Feed(  // adds not-end checking
     struct Reb_Feed *feed,
     bool preserve
 ){
-    ASSERT_NOT_END(feed->value);
+    assert(KIND_BYTE_UNCHECKED(feed->value) != REB_0_END);
+        // ^-- faster than NOT_END()
     return Fetch_Next_In_Feed_Core(feed, preserve);
 }
 
@@ -610,7 +611,8 @@ inline static void Prep_Array_Feed(
         feed->value = opt_first;
         feed->index = index;
         feed->pending = ARR_AT(array, index);
-        ASSERT_NOT_END(feed->value);
+        assert(KIND_BYTE_UNCHECKED(feed->value) != REB_0_END);
+            // ^-- faster than NOT_END()
     }
     else {
         feed->value = ARR_AT(array, index);

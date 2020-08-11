@@ -671,18 +671,6 @@ inline static RELVAL *Prep_Stack_Cell_Core(
 #define NOT_END(v) \
     (not IS_END(v))
 
-// We can probably get away with a lighter check in any situation that is
-// doing an `assert(NOT_END(v))` and not catch bad/corrupt cells.  Because
-// the assert is only saying what it's not...presumably there will be a
-// check to do something with it that validates it when it's actually used.
-//
-#if defined(NDEBUG)
-    #define ASSERT_NOT_END(v)
-#else
-    #define ASSERT_NOT_END(v) \
-        assert(KIND_BYTE_UNCHECKED(v) != REB_0_END)
-#endif
-
 
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -870,7 +858,7 @@ inline static void INIT_BINDING(RELVAL *v, void *p) {
 inline static void Move_Value_Header(RELVAL *out, const RELVAL *v)
 {
     assert(out != v);  // usually a sign of a mistake; not worth supporting
-    ASSERT_NOT_END(v);  // SET_END() is the only way to write an end
+    assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
 
     // Note: Pseudotypes are legal to move, but none of them are bindable
 
@@ -948,7 +936,7 @@ inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
 inline static void Blit_Cell(RELVAL *out, const RELVAL *v)
 {
     assert(out != v);  // usually a sign of a mistake; not worth supporting
-    ASSERT_NOT_END(v);
+    assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
 
     ASSERT_CELL_WRITABLE_EVIL_MACRO(out, __FILE__, __LINE__);
 

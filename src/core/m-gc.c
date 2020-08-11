@@ -100,15 +100,15 @@ static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v);
 
 inline static void Queue_Mark_Opt_Value_Deep(const RELVAL *v)
 {
-    ASSERT_NOT_END(v); // can be NULLED, just not END
-    Queue_Mark_Opt_End_Cell_Deep(v);
+    assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
+    Queue_Mark_Opt_End_Cell_Deep(v);  // nulled cell & unreadable void are ok
 }
 
 inline static void Queue_Mark_Value_Deep(const RELVAL *v)
 {
-    ASSERT_NOT_END(v);
-    assert(KIND_BYTE_UNCHECKED(v) != REB_NULLED);  // Unreadable void ok
-    Queue_Mark_Opt_End_Cell_Deep(v);
+    assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
+    assert(KIND_BYTE_UNCHECKED(v) != REB_NULLED);  // faster than IS_NULLED()
+    Queue_Mark_Opt_End_Cell_Deep(v);  // unreadable void is ok
 }
 
 
