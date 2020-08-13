@@ -284,7 +284,7 @@ REBLEN Modify_String_Or_Binary(
 
     // Now that we know there's actual work to do, we need `dst_idx` to speak
     // in terms of codepoints (if applicable)
-    
+
     if (sym == SYM_APPEND or dst_off > dst_used) {
         dst_off = SER_USED(dst_ser);
         dst_idx = dst_len_old;
@@ -585,7 +585,7 @@ REBLEN Modify_String_Or_Binary(
                     REBCHR(*) pp = BIN_AT(dst_ser, dst_off + part_size);
                     if (Is_Continuation_Byte_If_Utf8(*pp))
                         fail (Error_Bad_Utf8_Bin_Edit_Raw());
-                    
+
                     part = 0;
                     for (; cp != pp; cp = NEXT_STR(cp))
                         ++part;

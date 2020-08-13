@@ -1445,32 +1445,30 @@ void Shutdown_Stackoverflow(void)
 }
 
 
-// !!! This is a limited molder used for errors.  There is a more general
-// facility for limiting molds, but this limits the addition of a particular
-// item (not the mold overall).  ItLimited molder used, e.g., for errors)
-// The kludgey implementation was factored out of Remove_Series_Len().
-// Review this in light of a general facility.
+// !!! Though molding has a general facility for a "limit" of the overall
+// mold length, this only limits the length a particular value can contribute
+// to the mold.  It was only used in error molding and was kept working
+// without a general review of such a facility.  Review.
 //
 static void Mold_Value_Limit(REB_MOLD *mo, RELVAL *v, REBLEN limit)
 {
     REBSTR *str = mo->series;
-    REBLEN start = STR_LEN(str);
-    Mold_Value(mo, v);
 
-    if (STR_LEN(str) - start > limit) {
-        REBLEN len = STR_LEN(str) - start - limit;
-        REBLEN index = start + len;
-        REBCHR(*) cp = STR_AT(str, index);
-        REBCHR(*) ep = STR_AT(str, index + len);
+    REBLEN start_len = STR_LEN(str);
+    REBSIZ start_size = STR_SIZE(str);
 
-        REBLEN len_old = STR_LEN(str);
-        REBSIZ size_old = STR_SIZE(str);
+    Mold_Value(mo, v);  // Note: can't cache pointer into `str` across this
 
-        assert(len <= len_old);
+    REBLEN end_len = STR_LEN(str);
 
-        Remove_Series_Units(SER(str), cp - STR_HEAD(str), ep - cp);
+    if (end_len - start_len > limit) {
+        REBCHR(*) at = STR_HEAD(str) + start_size;
+        REBLEN n = 0;
+        for (; n < limit; ++n)
+            at = NEXT_STR(at);
+
+        SET_STR_LEN_SIZE(str, start_len + limit, at - STR_HEAD(str));
         Free_Bookmarks_Maybe_Null(str);
-        SET_STR_LEN_SIZE(str, len_old - len, size_old - (ep - cp));
 
         Append_Ascii(str, "...");
     }
