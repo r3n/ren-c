@@ -1738,8 +1738,7 @@ void *RL_rebZdeflateAlloc(
     const void *input,
     size_t in_len
 ){
-    REBSTR *envelope = Canon(SYM_ZLIB);
-    return Compress_Alloc_Core(out_len, input, in_len, envelope);
+    return Compress_Alloc_Core(out_len, input, in_len, SYM_ZLIB);
 }
 
 
@@ -1759,8 +1758,7 @@ void *RL_rebZinflateAlloc(
     size_t len_in,
     int max
 ){
-    REBSTR *envelope = Canon(SYM_ZLIB);
-    return Decompress_Alloc_Core(len_out, input, len_in, max, envelope);
+    return Decompress_Alloc_Core(len_out, input, len_in, max, SYM_ZLIB);
 }
 
 

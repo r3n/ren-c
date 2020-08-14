@@ -128,11 +128,11 @@ static REBCTX *Error_Compression(const z_stream *strm, int ret)
 // Common code for compressing raw deflate, zlib envelope, gzip envelope.
 // Exported as rebDeflateAlloc() and rebGunzipAlloc() for clarity.
 //
-unsigned char *Compress_Alloc_Core(
-    size_t *size_out,
+REBYTE *Compress_Alloc_Core(
+    REBSIZ *size_out,
     const void* input,
-    size_t size_in,
-    REBSTR *envelope  // NONE, ZLIB, or GZIP... null defaults GZIP
+    REBSIZ size_in,
+    enum Reb_Symbol envelope  // SYM_NONE, SYM_ZLIB, or SYM_GZIP
 ){
     z_stream strm;
     strm.zalloc = &zalloc;  // fail() cleans up automatically, see notes
@@ -140,13 +140,7 @@ unsigned char *Compress_Alloc_Core(
     strm.opaque = nullptr;  // passed to zalloc/zfree, not needed currently
 
     int window_bits = window_bits_gzip;
-    if (not envelope) {
-        //
-        // See notes in Decompress_Alloc_Core() about why gzip is chosen to
-        // be invocable via nullptr for bootstrap; not really applicable to
-        // the compression side, but might as well be consistent.
-    }
-    else switch (STR_SYMBOL(envelope)) {
+    switch (envelope) {
       case SYM_NONE:
         window_bits = window_bits_zlib_raw;
         break;
@@ -202,7 +196,7 @@ unsigned char *Compress_Alloc_Core(
     // GZIP contains a 32-bit length of the uncompressed data (modulo 2^32),
     // at the tail of the compressed data.  Sanity check that it's right.
     //
-    if (envelope and STR_SYMBOL(envelope) == SYM_GZIP) {
+    if (envelope and envelope == SYM_GZIP) {
         uint32_t gzip_len = Bytes_To_U32_BE(
             output + strm.total_out - sizeof(uint32_t)
         );
@@ -227,12 +221,12 @@ unsigned char *Compress_Alloc_Core(
 // Common code for decompressing: raw deflate, zlib envelope, gzip envelope.
 // Exported as rebInflateAlloc() and rebGunzipAlloc() for clarity.
 //
-unsigned char *Decompress_Alloc_Core(
-    size_t *size_out,
+REBYTE *Decompress_Alloc_Core(
+    REBSIZ *size_out,
     const void *input,
-    size_t size_in,
+    REBSIZ size_in,
     int max,
-    REBSTR *envelope  // NONE, ZLIB, GZIP, or DETECT... null defaults GZIP
+    enum Reb_Symbol envelope  // SYM_NONE, SYM_ZLIB, SYM_GZIP, or SYM_DETECT
 ){
     z_stream strm;
     strm.zalloc = &zalloc;  // fail() cleans up automatically, see notes
@@ -244,13 +238,7 @@ unsigned char *Decompress_Alloc_Core(
     strm.next_in = cast(const z_Bytef*, input);
 
     int window_bits = window_bits_gzip;
-    if (not envelope) {
-        //
-        // The reason GZIP is chosen as the default is because the symbols
-        // in %words.r are loaded as part of the boot process from code that
-        // is compressed with GZIP, so it's a Catch-22 otherwise.
-    }
-    else switch (STR_SYMBOL(envelope)) {
+    switch (envelope) {
       case SYM_NONE:
         window_bits = window_bits_zlib_raw;
         break;
@@ -277,8 +265,7 @@ unsigned char *Decompress_Alloc_Core(
 
     REBLEN buf_size;
     if (
-        envelope
-        and STR_SYMBOL(envelope) == SYM_GZIP  // not DETECT, trust stored size
+        envelope == SYM_GZIP  // not DETECT, trust stored size
         and size_in < 4161808  // (2^32 / 1032 + 18) ->1032 max deflate ratio
     ){
         const REBSIZ gzip_min_overhead = 18;  // at *least* 18 bytes
@@ -482,12 +469,12 @@ REBNATIVE(deflate)
     REBSIZ size;
     const REBYTE *bp = VAL_BYTES_LIMIT_AT(&size, ARG(data), limit);
 
-    REBSTR *envelope;
+    enum Reb_Symbol envelope;
     if (not REF(envelope))
-        envelope = Canon(SYM_NONE);  // Note: nullptr is gzip (for bootstrap)
+        envelope = SYM_NONE;
     else {
-        envelope = VAL_WORD_SPELLING(ARG(envelope));
-        switch (STR_SYMBOL(envelope)) {
+        envelope = cast(enum Reb_Symbol, VAL_WORD_SYM(ARG(envelope)));
+        switch (envelope) {
           case SYM_ZLIB:
           case SYM_GZIP:
             break;
@@ -558,15 +545,15 @@ REBNATIVE(inflate)
         size = VAL_HANDLE_LEN(ARG(data));
     }
 
-    REBSTR *envelope;
+    enum Reb_Symbol envelope;
     if (not REF(envelope))
-        envelope = Canon(SYM_NONE);  // Note: nullptr is gzip (for bootstrap)
+        envelope = SYM_NONE;
     else {
-        switch (VAL_WORD_SYM(ARG(envelope))) {
+        envelope = cast(enum Reb_Symbol, VAL_WORD_SYM(ARG(envelope)));
+        switch (envelope) {
           case SYM_ZLIB:
           case SYM_GZIP:
           case SYM_DETECT:
-            envelope = VAL_WORD_SPELLING(ARG(envelope));
             break;
 
           default:

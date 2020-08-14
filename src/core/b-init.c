@@ -1275,14 +1275,13 @@ void Startup_Core(void)
 
     size_t utf8_size;
     const int max = -1;  // trust size in gzip data
-    REBSTR *envelope = nullptr;  // GZIP is the default
-    REBYTE *utf8 = cast(REBYTE*, Decompress_Alloc_Core(
+    REBYTE *utf8 = Decompress_Alloc_Core(
         &utf8_size,
         Native_Specs,
         Nat_Compressed_Size,
         max,
-        envelope
-    ));
+        SYM_GZIP
+    );
 
     REBARR *boot_array = Scan_UTF8_Managed(
         Intern("tmp-boot.r"),

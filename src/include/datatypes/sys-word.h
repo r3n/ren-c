@@ -115,8 +115,11 @@
         bool operator==(OPT_REBSYM &&other) const = delete;
         bool operator!=(OPT_REBSYM &&other) const = delete;
 
-        operator unsigned int() const
+        operator unsigned int() const  // so it works in switch() statements
           { return cast(unsigned int, n); }
+
+        explicit operator enum Reb_Symbol()  // must be an *explicit* cast
+          { return n; }
     };
 
     struct REBSYM {  // acts like a REBOL_Symbol with no OPT_REBSYM compares
@@ -124,12 +127,13 @@
         REBSYM () {}
         REBSYM (int n) : n (cast(enum Reb_Symbol, n)) {}
         REBSYM (OPT_REBSYM opt_sym) : n (opt_sym.n) {}
-        operator unsigned int() const
+
+        operator unsigned int() const  // so it works in switch() statements
           { return cast(unsigned int, n); }
 
-        explicit operator enum Reb_Symbol() {
+        explicit operator enum Reb_Symbol() {  // must be an *explicit* cast
             assert(n != SYM_0);
-            return cast(enum Reb_Symbol, n);
+            return n;
         }
 
         bool operator>=(enum Reb_Symbol other) const {
