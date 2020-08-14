@@ -198,7 +198,9 @@ REBNATIVE(checksum)
     CRYPT_INCLUDE_PARAMS_OF_CHECKSUM;
 
     REBLEN len = Part_Len_May_Modify_Index(ARG(data), ARG(part));
-    REBYTE *data = VAL_RAW_DATA_AT(ARG(data));  // after Part_Len, may change
+
+    REBSIZ size;
+    const REBYTE *data = VAL_BYTES_LIMIT_AT(&size, ARG(data), len);
 
     // Turn the method into a string and look it up in the table that mbedTLS
     // builds in when you `#include "md.h"`.  How many entries are in this
@@ -212,63 +214,24 @@ REBNATIVE(checksum)
     rebEND);
     if (method_name == nullptr)
         fail ("Must specify SETTINGS for CHECKSUM");
+
     const mbedtls_md_info_t *info = mbedtls_md_info_from_string(method_name);
-    rebFree(method_name);
-
-    if (info != nullptr) {
-        int hmac = REF(key) ? 1 : 0;  // !!! int, but seems to be a boolean?
-
-        unsigned char md_size = mbedtls_md_get_size(info);
-        REBYTE *output = rebAllocN(REBYTE, md_size);
-
-        REBVAL *error = nullptr;
-        REBVAL *result = nullptr;
-
-        struct mbedtls_md_context_t ctx;
-        mbedtls_md_init(&ctx);
-        IF_NOT_0(cleanup, error, mbedtls_md_setup(&ctx, info, hmac));
-
-        if (hmac) {
-            REBSIZ key_size;
-            const REBYTE *key_bytes = VAL_BYTES_AT(&key_size, ARG(key));
-
-            IF_NOT_0(cleanup, error,
-                mbedtls_md_hmac_starts(&ctx, key_bytes, key_size)
-            );
-            IF_NOT_0(cleanup, error, mbedtls_md_hmac_update(&ctx, data, len));
-            IF_NOT_0(cleanup, error, mbedtls_md_hmac_finish(&ctx, output));
-        }
-        else {
-            IF_NOT_0(cleanup, error, mbedtls_md_starts(&ctx));
-            IF_NOT_0(cleanup, error, mbedtls_md_update(&ctx, data, len));
-            IF_NOT_0(cleanup, error, mbedtls_md_finish(&ctx, output));
-        }
-
-        result = rebRepossess(output, md_size);
-
-      cleanup:
-        mbedtls_md_free(&ctx);
-        if (error)
-            rebJumps ("fail", error, rebEND);
-
-        return result;
+    if (info) {
+        rebFree(method_name);
+        goto found_tls_info;
     }
 
-    if (REF(key))
+    if (REF(key))  // old methods do not support HMAC keying
         rebJumps ("fail {/METHOD does not support HMAC keying}", rebEND);
 
-    // Look up some internally available methods based on the WORD!
+    // Look up some internally available methods.
     //
-    // !!! Note: There used to be entries in %words.r for the methods.  It
-    // is proposed that extensions be able to plug into an agreed upon
-    // (but not shipped in the executable) allocation of words to numbers
-    // in order to do faster lookups from C.  For now we use libRebol.
-    //
-    if (rebDidQ("'CRC24 =", ARG(method), rebEND)) {
-        Init_Integer(D_OUT, Compute_CRC24(data, len));
-        return D_OUT;
+    if (0 == strcmp(method_name, "CRC24")) {
+        rebFree(method_name);
+        Init_Integer(D_SPARE, Compute_CRC24(data, size));
+        return rebValue("enbin [le + 3]", D_SPARE, rebEND);
     }
-    if (rebDidQ("'CRC32 =", ARG(method), rebEND)) {
+    if (0 == strcmp(method_name, "CRC32")) {
         //
         // CRC32 is a hash needed for gzip which is a sunk cost, and it
         // was exposed in R3-Alpha.  It is typically an unsigned 32-bit
@@ -277,32 +240,74 @@ REBNATIVE(checksum)
         // generate a value that could be used by Rebol2, as it only had
         // 32-bit signed INTEGER!.
         //
-        REBINT crc32 = cast(int32_t, crc32_z(0L, data, len));
-        return Init_Integer(D_OUT, crc32);
+        rebFree(method_name);
+        Init_Integer(D_SPARE, crc32_z(0L, data, size));
+        return rebValue("enbin [le + 4]", D_SPARE, rebEND);
     }
-    else if (rebDidQ("'ADLER32 =", ARG(method), rebEND)) {
+    else if (0 == strcmp(method_name, "ADLER32")) {
         //
         // ADLER32 is a hash available in zlib which is a sunk cost, so
         // it was exposed by Saphirion.  That happened after 64-bit
         // integers were available, and did not convert the unsigned
         // result of the adler calculation to a signed integer.
         //
-        uLong adler = z_adler32(0L, data, len);
-        return Init_Integer(D_OUT, adler);
+        rebFree(method_name);
+        Init_Integer(D_SPARE, z_adler32(1L, data, size));  // Note the 1L (!)
+        return rebValue("enbin [le + 4]", D_SPARE, rebEND);
     }
-    else if (rebDidQ("'TCP =", ARG(method), rebEND)) {
+    else if (0 == strcmp(method_name, "TCP")) {
         //
         // !!! This was an "Internet TCP 16-bit checksum" that was initially
         // a refinement (presumably because adding table entries was a pain).
         // It does not seem to be used?
         //
-        REBINT ipc = Compute_IPC(data, len);
-        return Init_Integer(D_OUT, ipc);
+        rebFree(method_name);
+        Init_Integer(D_SPARE, Compute_IPC(data, size));
+        return rebValue("enbin [le + 2]", D_SPARE, rebEND);
     }
 
     rebJumps (
         "fail [{Unknown CHECKSUM method:}", rebQ1(ARG(method)), "]",
-     rebEND);
+    rebEND);
+
+  found_tls_info: {
+    int hmac = REF(key) ? 1 : 0;  // !!! int, but seems to be a boolean?
+
+    unsigned char md_size = mbedtls_md_get_size(info);
+    REBYTE *output = rebAllocN(REBYTE, md_size);
+
+    REBVAL *error = nullptr;
+    REBVAL *result = nullptr;
+
+    struct mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    IF_NOT_0(cleanup, error, mbedtls_md_setup(&ctx, info, hmac));
+
+    if (hmac) {
+        REBSIZ key_size;
+        const REBYTE *key_bytes = VAL_BYTES_AT(&key_size, ARG(key));
+
+        IF_NOT_0(cleanup, error,
+            mbedtls_md_hmac_starts(&ctx, key_bytes, key_size)
+        );
+        IF_NOT_0(cleanup, error, mbedtls_md_hmac_update(&ctx, data, size));
+        IF_NOT_0(cleanup, error, mbedtls_md_hmac_finish(&ctx, output));
+    }
+    else {
+        IF_NOT_0(cleanup, error, mbedtls_md_starts(&ctx));
+        IF_NOT_0(cleanup, error, mbedtls_md_update(&ctx, data, size));
+        IF_NOT_0(cleanup, error, mbedtls_md_finish(&ctx, output));
+    }
+
+    result = rebRepossess(output, md_size);
+
+  cleanup:
+    mbedtls_md_free(&ctx);
+    if (error)
+        rebJumps ("fail", error, rebEND);
+
+    return result;
+  }
 }
 
 

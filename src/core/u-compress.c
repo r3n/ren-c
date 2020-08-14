@@ -379,11 +379,11 @@ REBYTE *Decompress_Alloc_Core(
 //
 //      return: "Little-endian format of 4-byte CRC-32"
 //          [binary!]
-//      data "Data to encode (using UTF-8 if TEXT!)"
-//          [binary! text!]
 //      method "Either ADLER32 or CRC32"
 //          [word!]
-//      /part "Length of data (only supported for BINARY! at the moment)"
+//      data "Data to encode (using UTF-8 if TEXT!)"
+//          [binary! text!]
+//      /part "Length of data"
 //          [any-value!]
 //  ]
 //
@@ -402,43 +402,44 @@ REBNATIVE(checksum_core)
 {
     INCLUDE_PARAMS_OF_CHECKSUM_CORE;
 
-    const REBYTE *data;
+    REBLEN len = Part_Len_May_Modify_Index(ARG(data), ARG(part));
+
     REBSIZ size;
+    const REBYTE *data = VAL_BYTES_LIMIT_AT(&size, ARG(data), len);
 
-    if (IS_TEXT(ARG(data))) {
-        if (REF(part))  // !!! requires different considerations, review
-            fail ("/PART not implemented for CHECKSUM-32 and UTF-8 yet");
-        data = VAL_BYTES_AT(&size, ARG(data));
-    }
-    else {
-        size = Part_Len_May_Modify_Index(ARG(data), ARG(part));
-        data = VAL_BIN_AT(ARG(data));  // after Part_Len, may modify
-    }
+    uLong crc;  // Note: zlib.h defines "crc32" as "z_crc32"
+    switch (VAL_WORD_SYM(ARG(method))) {
+      case SYM_CRC32:
+        crc = crc32_z(0L, data, size);
+        break;
 
-    uLong crc32;
-    if (VAL_WORD_SYM(ARG(method)) == SYM_CRC32)
-        crc32 = crc32_z(0L, data, size);
-    else if (VAL_WORD_SYM(ARG(method)) == SYM_ADLER32)
-        crc32 = z_adler32(0L, data, size);
-    else
+      case SYM_ADLER32:
+        //
+        // The zlib documentation shows passing 0L, but this is not right.
+        // "At the beginning [of Adler-32], A is initialized to 1, B to 0"
+        // A is the low 16-bits, B is the high.  Hence start with 1L.
+        //
+        crc = z_adler32(1L, data, size);
+        break;
+
+      default:
         fail ("METHOD for CHECKSUM-CORE must be CRC32 or ADLER32");
+    }
 
     REBBIN *bin = Make_Binary(4);
     REBYTE *bp = BIN_HEAD(bin);
 
-    // Existing clients seem to want a little-endian BINARY! most of the time.
     // Returning as a BINARY! avoids signedness issues (R3-Alpha CRC-32 was a
     // signed integer, which was weird):
     //
     // https://github.com/rebol/rebol-issues/issues/2375
     //
-    // !!! This is an experiment, to try it--as it isn't a very public
-    // function--used only by unzip.reb and Mezzanine save at time of writing.
+    // When formulated as a binary, most callers seem to want little endian.
     //
     int i;
     for (i = 0; i < 4; ++i, ++bp) {
-        *bp = crc32 % 256;
-        crc32 >>= 8;
+        *bp = crc % 256;
+        crc >>= 8;
     }
     TERM_BIN_LEN(bin, 4);
 
