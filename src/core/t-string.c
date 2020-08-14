@@ -49,16 +49,39 @@ enum {
 //
 //  CT_String: C
 //
-REBINT CT_String(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_String(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     assert(ANY_STRING_KIND(CELL_KIND(a)));
     assert(ANY_STRING_KIND(CELL_KIND(b)));
 
-    REBINT num = Compare_String_Vals(a, b, mode != 1);
+    REBLEN l1  = VAL_LEN_AT(a);
+    REBLEN l2  = VAL_LEN_AT(b);
+    REBLEN len = MIN(l1, l2);
 
-    if (mode >= 0) return (num == 0) ? 1 : 0;
-    if (mode == -1) return (num >= 0) ? 1 : 0;
-    return (num > 0) ? 1 : 0;
+    REBCHR(const*) cp1 = VAL_STRING_AT(a);
+    REBCHR(const*) cp2 = VAL_STRING_AT(b);
+
+    for (; len > 0; len--) {
+        REBUNI c1;
+        REBUNI c2;
+
+        cp1 = NEXT_CHR(&c1, cp1);
+        cp2 = NEXT_CHR(&c2, cp2);
+
+        REBINT d;
+        if (strict)
+            d = c1 - c2;
+        else
+            d = LO_CASE(c1) - LO_CASE(c2);
+
+        if (d != 0)
+            return d > 0 ? 1 : -1;
+    }
+
+    if (l1 == l2)
+        return 0;
+
+    return l1 > l2 ? 1 : -1;
 }
 
 

@@ -28,17 +28,15 @@
 //
 //  CT_Pair: C
 //
-REBINT CT_Pair(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Pair(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0)
-        return Cmp_Pair(a, b) == 0; // works for INTEGER=0 too (spans x y)
+    UNUSED(strict);  // !!! Should this be heeded for the decimal?
 
-    if (0 == VAL_INT64(b)) { // for negative? and positive?
-        if (mode == -1)
-            return (VAL_PAIR_X_DEC(a) >= 0 || VAL_PAIR_Y_DEC(a) >= 0); // not LT
-        return (VAL_PAIR_X_DEC(a) > 0 && VAL_PAIR_Y_DEC(a) > 0); // NOT LTE
-    }
-    return -1;
+    REBDEC diff;
+
+    if ((diff = VAL_PAIR_Y_DEC(a) - VAL_PAIR_Y_DEC(b)) == 0)
+        diff = VAL_PAIR_X_DEC(a) - VAL_PAIR_X_DEC(b);
+    return (diff > 0.0) ? 1 : ((diff < 0.0) ? -1 : 0);
 }
 
 
@@ -115,21 +113,6 @@ REB_R MAKE_Pair(
 REB_R TO_Pair(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
     return MAKE_Pair(out, kind, nullptr, arg);
-}
-
-
-//
-//  Cmp_Pair: C
-//
-// Given two pairs, compare them.
-//
-REBINT Cmp_Pair(REBCEL(const*) t1, REBCEL(const*) t2)
-{
-    REBDEC diff;
-
-    if ((diff = VAL_PAIR_Y_DEC(t1) - VAL_PAIR_Y_DEC(t2)) == 0)
-        diff = VAL_PAIR_X_DEC(t1) - VAL_PAIR_X_DEC(t2);
-    return (diff > 0.0) ? 1 : ((diff < 0.0) ? -1 : 0);
 }
 
 

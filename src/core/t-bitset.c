@@ -34,19 +34,17 @@
 // not attempt to answer any existential questions--as comparisons in R3-Alpha
 // need significant review.
 //
-REBINT CT_Bitset(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Bitset(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0) {  // !!! keep defer to binary comparisons from R3-Alphae
-        DECLARE_LOCAL (atemp);
-        DECLARE_LOCAL (btemp);
-        Init_Binary(atemp, VAL_BITSET(a));
-        Init_Binary(btemp, VAL_BITSET(b));
-        return (
-            BITS_NOT(VAL_BITSET(a)) == BITS_NOT(VAL_BITSET(b))
-            && Compare_Binary_Vals(atemp, btemp) == 0
-        );
-    }
-    return -1;
+    DECLARE_LOCAL (atemp);
+    DECLARE_LOCAL (btemp);
+    Init_Binary(atemp, VAL_BITSET(a));
+    Init_Binary(btemp, VAL_BITSET(b));
+
+    if (BITS_NOT(VAL_BITSET(a)) != BITS_NOT(VAL_BITSET(b)))
+        return 1;
+        
+    return CT_Binary(atemp, btemp, strict);
 }
 
 

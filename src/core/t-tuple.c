@@ -27,13 +27,25 @@
 //
 //  CT_Tuple: C
 //
-REBINT CT_Tuple(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Tuple(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBINT num = Cmp_Tuple(a, b);
-    if (mode > 1) return (num == 0 && VAL_TUPLE_LEN(a) == VAL_TUPLE_LEN(b));
-    if (mode >= 0)  return (num == 0);
-    if (mode == -1) return (num >= 0);
-    return (num > 0);
+    UNUSED(strict);
+
+    REBLEN len = MAX(VAL_TUPLE_LEN(a), VAL_TUPLE_LEN(b));
+    assert(len < MAX_TUPLE);
+
+    const REBYTE *vp1 = VAL_TUPLE(a);
+    const REBYTE *vp2 = VAL_TUPLE(b);
+
+    // Note: unused bytes in tuples are 0, so that 1.0.0 can = 1.0.0.0
+
+    REBINT n;
+    for (; len > 0; len--, ++vp1, ++vp2) {
+        n = cast(REBINT, *vp1) - *vp2;
+        if (n != 0)
+            return n > 0 ? 1 : -1;
+    }
+    return 0;
 }
 
 
@@ -149,31 +161,6 @@ REB_R MAKE_Tuple(
 REB_R TO_Tuple(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
     return MAKE_Tuple(out, kind, nullptr, arg);
-}
-
-
-//
-//  Cmp_Tuple: C
-//
-// Given two tuples, compare them.
-//
-REBINT Cmp_Tuple(REBCEL(const*) t1, REBCEL(const*) t2)
-{
-    REBLEN len = MAX(VAL_TUPLE_LEN(t1), VAL_TUPLE_LEN(t2));
-    assert(len < MAX_TUPLE);
-
-    const REBYTE *vp1 = VAL_TUPLE(t1);
-    const REBYTE *vp2 = VAL_TUPLE(t2);
-
-    // Note: unused bytes in tuples are 0, so that 1.0.0 can = 1.0.0.0
-
-    REBINT n;
-    for (; len > 0; len--, ++vp1, ++vp2) {
-        n = cast(REBINT, *vp1) - *vp2;
-        if (n != 0)
-            return n;
-    }
-    return 0;
 }
 
 

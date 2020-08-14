@@ -1450,34 +1450,27 @@ REBINT Cmp_Struct(REBCEL(const*) s, REBCEL(const*) t)
 //
 //  CT_Struct: C
 //
-REBINT CT_Struct(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Struct(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    switch (mode) {
-    case 1: // strict equality
-        return 0 == Cmp_Struct(a, b);
+    if (strict)
+        return Cmp_Struct(a, b);
 
-    case 0: // coerced equality
-        if (Cmp_Struct(a, b) == 0)
-            return 1;
+    if (Cmp_Struct(a, b) == 0)
+        return 0;
 
-        return (
-            CELL_KIND(a) == REB_CUSTOM
-            and CELL_KIND(b) == REB_CUSTOM
-            and CELL_CUSTOM_TYPE(a) == EG_Struct_Type
-            and CELL_CUSTOM_TYPE(b) == EG_Struct_Type
-            and same_fields(VAL_STRUCT_FIELDLIST(a), VAL_STRUCT_FIELDLIST(b))
-            and VAL_STRUCT_SIZE(a) == VAL_STRUCT_SIZE(b)
-            and not memcmp(
-                VAL_STRUCT_DATA_HEAD(a),
-                VAL_STRUCT_DATA_HEAD(b),
-                VAL_STRUCT_SIZE(a)
-            )
-        );
-
-    default:
-        ; // let fall through to -1 case
-    }
-    return -1;
+    return (
+        CELL_KIND(a) == REB_CUSTOM
+        and CELL_KIND(b) == REB_CUSTOM
+        and CELL_CUSTOM_TYPE(a) == EG_Struct_Type
+        and CELL_CUSTOM_TYPE(b) == EG_Struct_Type
+        and same_fields(VAL_STRUCT_FIELDLIST(a), VAL_STRUCT_FIELDLIST(b))
+        and VAL_STRUCT_SIZE(a) == VAL_STRUCT_SIZE(b)
+        and not memcmp(
+            VAL_STRUCT_DATA_HEAD(a),
+            VAL_STRUCT_DATA_HEAD(b),
+            VAL_STRUCT_SIZE(a)
+        )
+    ) ? 0 : 1;  // !!! > or < result needed, but comparison is under review
 }
 
 

@@ -51,11 +51,10 @@ const struct {
 //
 //  CT_Gob: C
 //
-REBINT CT_Gob(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Gob(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0)
-        return VAL_GOB(a) == VAL_GOB(b) && VAL_GOB_INDEX(a) == VAL_GOB_INDEX(b);
-    return -1;
+    UNUSED(strict);
+    return VAL_GOB(a) == VAL_GOB(b) && VAL_GOB_INDEX(a) == VAL_GOB_INDEX(b);
 }
 
 //

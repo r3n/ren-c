@@ -25,70 +25,6 @@
 #include "sys-core.h"
 
 
-
-static bool Equal_Context(REBCEL(const*) v1, REBCEL(const*) v2)
-{
-    if (CELL_KIND(v1) != CELL_KIND(v2)) // e.g. ERROR! won't equal OBJECT!
-        return false;
-
-    REBCTX *c1 = VAL_CONTEXT(v1);
-    REBCTX *c2 = VAL_CONTEXT(v2);
-    if (c1 == c2)
-        return true; // short-circuit, always equal if same context pointer
-
-    // Note: can't short circuit on unequal frame lengths alone, as hidden
-    // fields of objects (notably `self`) do not figure into the `equal?`
-    // of their public portions.
-
-    const REBVAL *key1 = CTX_KEYS_HEAD(c1);
-    const REBVAL *key2 = CTX_KEYS_HEAD(c2);
-    const REBVAL *var1 = CTX_VARS_HEAD(c1);
-    const REBVAL *var2 = CTX_VARS_HEAD(c2);
-
-    // Compare each entry, in order.  Skip any hidden fields, field names are
-    // compared case-insensitively.
-    //
-    // !!! The order dependence suggests that `make object! [a: 1 b: 2]` will
-    // not be equal to `make object! [b: 1 a: 2]`.  See #2341
-    //
-    for (; NOT_END(key1) && NOT_END(key2); key1++, key2++, var1++, var2++) {
-      no_advance:
-        if (Is_Param_Hidden(key1)) {
-            key1++; var1++;
-            if (IS_END(key1)) break;
-            goto no_advance;
-        }
-        if (Is_Param_Hidden(key2)) {
-            key2++; var2++;
-            if (IS_END(key2)) break;
-            goto no_advance;
-        }
-
-        if (VAL_KEY_CANON(key1) != VAL_KEY_CANON(key2)) // case-insensitive
-            return false;
-
-        const bool is_case = false;
-        if (Cmp_Value(var1, var2, is_case) != 0) // case-insensitive
-            return false;
-    }
-
-    // Either key1 or key2 is at the end here, but the other might contain
-    // all hidden values.  Which is okay.  But if a value isn't hidden,
-    // they don't line up.
-    //
-    for (; NOT_END(key1); key1++, var1++) {
-        if (not Is_Param_Hidden(key1))
-            return false;
-    }
-    for (; NOT_END(key2); key2++, var2++) {
-        if (not Is_Param_Hidden(key2))
-            return false;
-    }
-
-    return true;
-}
-
-
 static void Append_To_Context(REBCTX *context, REBVAL *arg)
 {
     // Can be a word:
@@ -201,10 +137,75 @@ collect_end:
 //
 //  CT_Context: C
 //
-REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode < 0) return -1;
-    return Equal_Context(a, b) ? 1 : 0;
+    assert(ANY_CONTEXT_KIND(CELL_KIND(a)));
+    assert(ANY_CONTEXT_KIND(CELL_KIND(b)));
+
+    if (CELL_KIND(a) != CELL_KIND(b))  // e.g. ERROR! won't equal OBJECT!
+        return CELL_KIND(a) > CELL_KIND(b) ? 1 : 0;
+
+    REBCTX *c1 = VAL_CONTEXT(a);
+    REBCTX *c2 = VAL_CONTEXT(b);
+    if (c1 == c2)
+        return 0;  // short-circuit, always equal if same context pointer
+
+    // Note: can't short circuit on unequal frame lengths alone, as hidden
+    // fields of objects (notably `self`) do not figure into the `equal?`
+    // of their public portions.
+
+    const REBVAL *key1 = CTX_KEYS_HEAD(c1);
+    const REBVAL *key2 = CTX_KEYS_HEAD(c2);
+    const REBVAL *var1 = CTX_VARS_HEAD(c1);
+    const REBVAL *var2 = CTX_VARS_HEAD(c2);
+
+    // Compare each entry, in order.  Skip any hidden fields, field names are
+    // compared case-insensitively.
+    //
+    // !!! The order dependence suggests that `make object! [a: 1 b: 2]` will
+    // not be equal to `make object! [b: 1 a: 2]`.  See #2341
+    //
+    for (; NOT_END(key1) && NOT_END(key2); key1++, key2++, var1++, var2++) {
+      no_advance:
+        if (Is_Param_Hidden(key1)) {
+            ++key1;
+            ++var1;
+            if (IS_END(key1))
+                break;
+            goto no_advance;
+        }
+        if (Is_Param_Hidden(key2)) {
+            ++key2;
+            ++var2;
+            if (IS_END(key2))
+                break;
+            goto no_advance;
+        }
+
+        REBSTR *canon1 = VAL_KEY_CANON(key1);
+        REBSTR *canon2 = VAL_KEY_CANON(key2);
+        if (canon1 != canon2)  // case-insensitive, even in `strict` compare
+            return canon1 > canon2 ? 1 : -1;
+
+        REBINT diff = Cmp_Value(var1, var2, strict);
+        if (diff != 0)
+            return diff;
+    }
+
+    // Either key1 or key2 is at the end here, but the other might contain
+    // all hidden values.  Which is okay.  But if a value isn't hidden,
+    // they don't line up.
+    //
+    for (; NOT_END(key1); key1++, var1++) {
+        if (not Is_Param_Hidden(key1))
+            return 1;
+    }
+    for (; NOT_END(key2); key2++, var2++) {
+        if (not Is_Param_Hidden(key2))
+            return -1;
+    }
+
+    return 0;
 }
 
 

@@ -26,29 +26,6 @@
 
 
 //
-//  Compare_Binary_Vals: C
-//
-// Compares bytes, not chars. Return the difference.
-//
-REBINT Compare_Binary_Vals(REBCEL(const*) v1, REBCEL(const*) v2)
-{
-    REBLEN l1 = VAL_LEN_AT(v1);
-    REBLEN l2 = VAL_LEN_AT(v2);
-    REBLEN len = MIN(l1, l2);
-
-    REBINT n = memcmp(
-        SER_DATA_AT(SER_WIDE(VAL_SERIES(v1)), VAL_SERIES(v1), VAL_INDEX(v1)),
-        SER_DATA_AT(SER_WIDE(VAL_SERIES(v2)), VAL_SERIES(v2), VAL_INDEX(v2)),
-        len
-    );
-
-    if (n != 0) return n;
-
-    return l1 - l2;
-}
-
-
-//
 //  Compare_Bytes: C
 //
 // Compare two byte-wide strings. Return lexical difference.
@@ -99,74 +76,6 @@ const REBYTE *Match_Bytes(const REBYTE *src, const REBYTE *pat)
         return 0; // if not at end of pat, then error
 
     return src;
-}
-
-
-//
-//  Compare_Uni_Str: C
-//
-// Compare two ranges of string data.  Return lexical difference.
-//
-// Uncase: compare is case-insensitive.
-//
-REBINT Compare_Uni_Str(
-    const REBYTE* bp1,
-    const REBYTE* bp2,
-    REBLEN len,
-    bool uncase
-){
-    REBCHR(const*) u1 = cast(REBCHR(const*), bp1);
-    REBCHR(const*) u2 = cast(REBCHR(const*), bp2);
-
-    for (; len > 0; len--) {
-        REBUNI c1;
-        REBUNI c2;
-
-        u1 = NEXT_CHR(&c1, u1);
-        u2 = NEXT_CHR(&c2, u2);
-
-        REBINT d;
-        if (uncase)
-            d = LO_CASE(c1) - LO_CASE(c2);
-        else
-            d = c1 - c2;
-
-        if (d != 0)
-            return d;
-    }
-
-    return 0;
-}
-
-
-//
-//  Compare_String_Vals: C
-//
-// Compare two string values. Either can be byte or unicode wide.
-//
-// Uncase: compare is case-insensitive.
-//
-// Used for: general string comparions (various places)
-//
-REBINT Compare_String_Vals(REBCEL(const*) v1, REBCEL(const*) v2, bool uncase)
-{
-    assert(CELL_KIND(v1) != REB_BINARY and CELL_KIND(v2) != REB_BINARY);
-
-    REBLEN l1  = VAL_LEN_AT(v1);
-    REBLEN l2  = VAL_LEN_AT(v2);
-    REBLEN len = MIN(l1, l2);
-
-    REBINT n = Compare_Uni_Str(
-        VAL_STRING_AT(v1),  // as a REBYTE* (can't put REBCHR(*) in %sys-core.h)
-        VAL_STRING_AT(v2),
-        len,
-        uncase
-    );
-
-    if (n != 0)
-        return n;
-
-    return l1 - l2;
 }
 
 

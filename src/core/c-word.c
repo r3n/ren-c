@@ -443,36 +443,6 @@ void GC_Kill_Interning(REBSTR *intern)
 
 
 //
-//  Compare_Word: C
-//
-// Compare the names of two words and return the difference.
-// Note that words are kept UTF8 encoded.
-// Positive result if s > t and negative if s < t.
-//
-REBINT Compare_Word(REBCEL(const*) s, REBCEL(const*) t, bool strict)
-{
-    const REBYTE *sp = STR_HEAD(VAL_WORD_SPELLING(s));
-    const REBYTE *tp = STR_HEAD(VAL_WORD_SPELLING(t));
-
-    // !!! "Strict" is generally interpreted as "case-sensitive comparison".
-    // Using strcmp() means the two pointers must be to '\0'-terminated byte
-    // arrays, and they are checked byte-for-byte.  This does not account
-    // for unicode normalization.  Review.
-    //
-    // https://en.wikipedia.org/wiki/Unicode_equivalence#Normalization
-    //
-    if (strict)
-        return strcmp(cs_cast(sp), cs_cast(tp));
-
-    if (VAL_WORD_CANON(s) == VAL_WORD_CANON(t))
-        return 0; // equivalent canon forms are considered equal
-
-    // They must differ by case....
-    return Compare_UTF8(sp, tp, strsize(tp)) + 2;
-}
-
-
-//
 //  Startup_Interning: C
 //
 // Get the engine ready to do Intern_UTF8_Managed(), which is required to

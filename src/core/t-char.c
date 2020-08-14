@@ -68,26 +68,22 @@ const uint_fast8_t firstByteMark[7] = {
 //
 //  CT_Char: C
 //
-REBINT CT_Char(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Char(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     REBINT num;
 
-    if (mode >= 0) {
-        //
-        // !!! NUL (#"^@", '\0') is not legal strings.  However, it is a
-        // claimed "valid codepoint", which can be appended to BINARY!.  But
-        // LO_CASE() does not accept it (which catches illegal stringlike use)
-        //
-        if (mode == 0 and VAL_CHAR(a) != 0 and VAL_CHAR(b) != 0)
-            num = LO_CASE(VAL_CHAR(a)) - LO_CASE(VAL_CHAR(b));
-        else
-            num = VAL_CHAR(a) - VAL_CHAR(b);
-        return (num == 0);
-    }
+    // !!! NUL (#"^@", '\0') is not legal strings.  However, it is a
+    // claimed "valid codepoint", which can be appended to BINARY!.  But
+    // LO_CASE() does not accept it (which catches illegal stringlike use)
+    //
+    if (not strict and VAL_CHAR(a) != 0 and VAL_CHAR(b) != 0)
+        num = LO_CASE(VAL_CHAR(a)) - LO_CASE(VAL_CHAR(b));
+    else
+        num = VAL_CHAR(a) - VAL_CHAR(b);
 
-    num = VAL_CHAR(a) - VAL_CHAR(b);
-    if (mode == -1) return (num >= 0);
-    return (num > 0);
+    if (num == 0)
+        return 0;
+    return (num > 0) ? 1 : -1;
 }
 
 

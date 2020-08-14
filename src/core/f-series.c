@@ -217,70 +217,18 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
 
 //
-//  Cmp_Array: C
-//
-// Compare two arrays and return the difference of the first
-// non-matching value.
-//
-REBINT Cmp_Array(REBCEL(const*) sval, REBCEL(const*) tval, bool is_case)
-{
-    if (C_STACK_OVERFLOWING(&is_case))
-        Fail_Stack_Overflow();
-
-    if (
-        VAL_SERIES(sval) == VAL_SERIES(tval)
-        and VAL_INDEX(sval) == VAL_INDEX(tval)
-    ){
-         return 0;
-    }
-
-    const RELVAL *s = VAL_ARRAY_AT(sval);
-    const RELVAL *t = VAL_ARRAY_AT(tval);
-
-    if (IS_END(s) or IS_END(t))
-        goto diff_of_ends;
-
-    while (
-        VAL_TYPE(s) == VAL_TYPE(t)
-        or (ANY_NUMBER(s) and ANY_NUMBER(t))
-    ){
-        REBINT diff;
-        if ((diff = Cmp_Value(s, t, is_case)) != 0)
-            return diff;
-
-        s++;
-        t++;
-
-        if (IS_END(s) or IS_END(t))
-            goto diff_of_ends;
-    }
-
-    return VAL_TYPE(s) - VAL_TYPE(t);
-
-diff_of_ends:
-    // Treat end as if it were a REB_xxx type of 0, so all other types would
-    // compare larger than it.
-    //
-    if (IS_END(s)) {
-        if (IS_END(t))
-            return 0;
-        return -1;
-    }
-    return 1;
-}
-
-
-//
 //  Cmp_Value: C
 //
 // Compare two values and return the difference.
 //
 // is_case should be true for case sensitive compare
 //
-REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
+REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool strict)
 {
-    if (is_case and (VAL_NUM_QUOTES(sval) != VAL_NUM_QUOTES(tval)))
-        return VAL_NUM_QUOTES(sval) - VAL_NUM_QUOTES(tval);
+    REBLEN squotes = VAL_NUM_QUOTES(sval);
+    REBLEN tquotes = VAL_NUM_QUOTES(tval);
+    if (strict and (squotes != tquotes))
+        return squotes > tquotes ? 1 : -1;
 
     REBCEL(const*) s = VAL_UNESCAPED(sval);
     REBCEL(const*) t = VAL_UNESCAPED(tval);
@@ -291,7 +239,7 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
         s_kind != t_kind
         and not (ANY_NUMBER_KIND(s_kind) and ANY_NUMBER_KIND(t_kind))
     ){
-        return s_kind - t_kind;
+        return s_kind > t_kind ? 1 : -1;
     }
 
     // !!! The strange and ad-hoc way this routine was written has some
@@ -310,25 +258,13 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
             d2 = VAL_DECIMAL(t);
             goto chkDecimal;
         }
-        return THE_SIGN(VAL_INT64(s) - VAL_INT64(t));
+        return CT_Integer(s, t, strict);
 
       case REB_LOGIC:
-        return VAL_LOGIC(s) - VAL_LOGIC(t);
+        return CT_Logic(s, t, strict);
 
-      case REB_CHAR: { // REBUNI is unsigned, use compares vs. cast+THE_SIGN
-        if (is_case) {
-            if (VAL_CHAR(s) > VAL_CHAR(t))
-                return 1;
-            if (VAL_CHAR(s) < VAL_CHAR(t))
-                return -1;
-            return 0;
-        }
-
-        if (UP_CASE(VAL_CHAR(s)) > UP_CASE(VAL_CHAR(t)))
-            return 1;
-        if (UP_CASE(VAL_CHAR(s)) < UP_CASE(VAL_CHAR(t)))
-            return -1;
-        return 0; }
+      case REB_CHAR:
+        return CT_Char(s, t, strict);
 
       case REB_PERCENT:
       case REB_DECIMAL:
@@ -353,16 +289,16 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
         return 1;
 
       case REB_PAIR:
-        return Cmp_Pair(s, t);
+        return CT_Pair(s, t, strict);
 
       case REB_TUPLE:
-        return Cmp_Tuple(s, t);
+        return CT_Tuple(s, t, strict);
 
       case REB_TIME:
-        return Cmp_Time(s, t);
+        return CT_Time(s, t, strict);
 
       case REB_DATE:
-        return Cmp_Date(s, t);
+        return CT_Date(s, t, strict);
 
       case REB_BLOCK:
       case REB_SET_BLOCK:
@@ -376,10 +312,10 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
       case REB_SET_PATH:
       case REB_GET_PATH:
       case REB_SYM_PATH:
-        return Cmp_Array(s, t, is_case);
+        return CT_Array(s, t, strict);
 
       case REB_MAP:
-        return Cmp_Array(s, t, is_case);  // !!! Fails if wrong hash size (!)
+        return CT_Map(s, t, strict);  // !!! Not implemented
 
       case REB_TEXT:
       case REB_FILE:
@@ -387,35 +323,31 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
       case REB_URL:
       case REB_TAG:
       case REB_ISSUE:
-        return Compare_String_Vals(s, t, not is_case);
+        return CT_String(s, t, strict);
 
-      case REB_BITSET: {  // !!! Temporarily init as binaries at index 0
-        DECLARE_LOCAL (stemp);
-        DECLARE_LOCAL (ttemp);
-        Init_Binary(stemp, VAL_BITSET(s));
-        Init_Binary(ttemp, VAL_BITSET(t));
-        return Compare_Binary_Vals(stemp, ttemp); }
+      case REB_BITSET:
+        return CT_Bitset(s, t, strict);
 
       case REB_BINARY:
-        return Compare_Binary_Vals(s, t);
+        return CT_Binary(s, t, strict);
 
       case REB_DATATYPE:
-        return VAL_TYPE_KIND(s) - VAL_TYPE_KIND(t);
+        return CT_Datatype(s, t, strict);
 
       case REB_WORD:
       case REB_SET_WORD:
       case REB_GET_WORD:
       case REB_SYM_WORD:
-        return Compare_Word(s,t,is_case);
+        return CT_Word(s, t, strict);
 
       case REB_ERROR:
       case REB_OBJECT:
       case REB_MODULE:
       case REB_PORT:
-        return VAL_CONTEXT(s) - VAL_CONTEXT(t);
+        return CT_Context(s, t, strict);
 
       case REB_ACTION:
-        return VAL_ACT_PARAMLIST(s) - VAL_ACT_PARAMLIST(t);
+        return CT_Action(s, t, strict);
 
       case REB_CUSTOM:
         //
@@ -433,12 +365,13 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
       case REB_BLANK:
       case REB_NULLED: // !!! should nulls be allowed at this level?
       case REB_VOID:
-        break;
+        return CT_Unit(s, t, strict);
 
       default:
-        panic (nullptr); // all cases should be handled above
+        break;
     }
-    return 0;
+
+    panic (nullptr);  // all cases should be handled above
 }
 
 

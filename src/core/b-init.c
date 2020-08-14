@@ -808,10 +808,10 @@ static void Init_System_Object(
     // made is actually identical to the definition in %sysobj.r.
     //
     assert(
-        1 == CT_Context(
+        0 == CT_Context(
             Get_System(SYS_STANDARD, STD_ACTION_META),
             Root_Action_Meta,
-            1 // "strict equality"
+            true  // "strict equality"
         )
     );
 

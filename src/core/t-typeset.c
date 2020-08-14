@@ -61,10 +61,12 @@ const struct {
 //
 //  CT_Typeset: C
 //
-REBINT CT_Typeset(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Typeset(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode < 0) return -1;
-    return EQUAL_TYPESET(a, b);
+    UNUSED(strict);
+    if (EQUAL_TYPESET(a, b))
+        return 0;
+    return a > b ? 1 : -1;  // !!! Bad arbitrary comparison, review
 }
 
 
@@ -136,23 +138,25 @@ bool Add_Typeset_Bits_Core(
             item = maybe_word; // wasn't variable
 
         if (IS_TAG(item)) {
-            if (0 == Compare_String_Vals(item, Root_Ellipsis_Tag, true)) {
+            bool strict = false;
+
+            if (0 == CT_String(item, Root_Ellipsis_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_VARIADIC);
             }
-            else if (0 == Compare_String_Vals(item, Root_End_Tag, true)) {
+            else if (0 == CT_String(item, Root_End_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_ENDABLE);
             }
-            else if (0 == Compare_String_Vals(item, Root_Blank_Tag, true)) {
+            else if (0 == CT_String(item, Root_Blank_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_NOOP_IF_BLANK);
             }
-            else if (0 == Compare_String_Vals(item, Root_Opt_Tag, true)) {
+            else if (0 == CT_String(item, Root_Opt_Tag, strict)) {
                 //
                 // !!! Review if this makes sense to allow with MAKE TYPESET!
                 // instead of just function specs.
                 //
                 TYPE_SET(typeset, REB_NULLED);
             }
-            else if (0 == Compare_String_Vals(item, Root_Output_Tag, true)) {
+            else if (0 == CT_String(item, Root_Output_Tag, strict)) {
                 //
                 // !!! Typeset bits are currently scarce, so output is being
                 // indicated solely by being a refinement and having this
@@ -168,7 +172,7 @@ bool Add_Typeset_Bits_Core(
                 TYPE_SET(typeset, REB_PATH);
                 break;
             }
-            else if (0 == Compare_String_Vals(item, Root_Skip_Tag, true)) {
+            else if (0 == CT_String(item, Root_Skip_Tag, strict)) {
                 if (VAL_PARAM_CLASS(typeset) != REB_P_HARD_QUOTE)
                     fail ("Only hard-quoted parameters are <skip>-able");
 
@@ -176,16 +180,16 @@ bool Add_Typeset_Bits_Core(
                 TYPE_SET(typeset, REB_TS_ENDABLE); // skip => null
                 TYPE_SET(typeset, REB_NULLED);  // null if specialized
             }
-            else if (0 == Compare_String_Vals(item, Root_Dequote_Tag, true)) {
+            else if (0 == CT_String(item, Root_Dequote_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_DEQUOTE_REQUOTE);
             }
-            else if (0 == Compare_String_Vals(item, Root_Requote_Tag, true)) {
+            else if (0 == CT_String(item, Root_Requote_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_DEQUOTE_REQUOTE);
             }
-            else if (0 == Compare_String_Vals(item, Root_Const_Tag, true)) {
+            else if (0 == CT_String(item, Root_Const_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_CONST);
             }
-            else if (0 == Compare_String_Vals(item, Root_Modal_Tag, true)) {
+            else if (0 == CT_String(item, Root_Modal_Tag, strict)) {
                 //
                 // !!! <modal> is not the general way to make modal args (the
                 // `@arg` notation is used), but the native specs are loaded

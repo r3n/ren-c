@@ -28,37 +28,43 @@
 //
 //  CT_Word: C
 //
-// !!! The R3-Alpha code did a non-ordering comparison; it only tells whether
-// the words are equal or not (1 or 0).  This creates bad invariants for
-// sorting etc.  Review.
+// Compare the names of two words and return the difference.
+// Note that words are kept UTF8 encoded.
 //
-REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBINT e;
-    REBINT diff;
-    if (mode >= 0) {
-        if (mode == 1) {
-            //
-            // Symbols must be exact match, case-sensitively
-            //
-            if (VAL_WORD_SPELLING(a) != VAL_WORD_SPELLING(b))
-                return 0;
-        }
-        else {
-            // Different cases acceptable, only check for a canon match
-            //
-            if (VAL_WORD_CANON(a) != VAL_WORD_CANON(b))
-                return 0;
-        }
+    const REBYTE *sp = STR_HEAD(VAL_WORD_SPELLING(a));
+    const REBYTE *tp = STR_HEAD(VAL_WORD_SPELLING(b));
 
-        return 1;
+    if (strict) {
+        if (VAL_WORD_SPELLING(a) == VAL_WORD_SPELLING(b))
+            return 0;
+
+        // !!! "Strict" is interpreted as "case-sensitive comparison".  Using
+        // strcmp() means the two pointers must be to '\0'-terminated byte
+        // arrays, and they are checked byte-for-byte.  This does not account
+        // for unicode normalization.  Review.
+        //
+        // https://en.wikipedia.org/wiki/Unicode_equivalence#Normalization
+        //
+        REBINT diff = strcmp(cs_cast(sp), cs_cast(tp));  // byte match check
+        if (diff == 0)
+            return 0;
+        return diff > 0 ? 1 : -1;  // not strictly in [-1 0 1]
     }
     else {
-        diff = Compare_Word(a, b, false);
-        if (mode == -1) e = diff >= 0;
-        else e = diff > 0;
+        // Different cases acceptable, only check for a canon match
+        //
+        if (VAL_WORD_CANON(a) == VAL_WORD_CANON(b))
+            return 0;
+
+        // !!! "They must differ by case...."  This needs to account for
+        // unicode "case folding", as well as "normalization".
+        //
+        REBINT diff = Compare_UTF8(sp, tp, strsize(tp)) + 2;
+        assert(diff == 0 or diff == -1 or diff == 1);
+        return diff;
     }
-    return e;
 }
 
 

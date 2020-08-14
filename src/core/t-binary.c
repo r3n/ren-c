@@ -37,16 +37,23 @@
 //
 //  CT_Binary: C
 //
-REBINT CT_Binary(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Binary(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    assert(CELL_KIND(a) == REB_BINARY);
-    assert(CELL_KIND(b) == REB_BINARY);
+    UNUSED(strict);  // no lax form of comparison
 
-    REBINT num = Compare_Binary_Vals(a, b);
+    REBLEN l1 = VAL_LEN_AT(a);
+    REBLEN l2 = VAL_LEN_AT(b);
+    REBLEN len = MIN(l1, l2);
 
-    if (mode >= 0) return (num == 0) ? 1 : 0;
-    if (mode == -1) return (num >= 0) ? 1 : 0;
-    return (num > 0) ? 1 : 0;
+    REBINT n = memcmp(VAL_BIN_AT(a), VAL_BIN_AT(b), len);
+
+    if (n != 0)  // not guaranteed to be strictly in [-1 0 1]
+        return n > 0 ? 1 : -1;
+
+    if (l1 == l2)
+        return 0;
+
+    return l1 > l2 ? 1 : -1;
 }
 
 

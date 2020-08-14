@@ -284,14 +284,15 @@ inline static bool Single_Test_Throws(
         );
         return false;
 
-     case REB_TAG: // just support <opt> for now
+     case REB_TAG: {  // just support <opt> for now
+        bool strict = false;
         Init_Logic(
             out,
             CELL_KIND(arg_cell) == REB_NULLED
-            and 0 == Compare_String_Vals(test_cell, Root_Opt_Tag, true)
+            and 0 == CT_String(test_cell, Root_Opt_Tag, strict)
             and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg)
         );
-        return false;
+        return false; }
 
       case REB_INTEGER: // interpret as length
         Init_Logic(
@@ -1140,7 +1141,8 @@ REBNATIVE(switch)
             // !!! A branch composed into the switch cases block may want to
             // see the un-mutated condition value.
             //
-            if (not Compare_Modify_Values(left, D_OUT, 0))  // 0 => lax
+            const bool strict = false;
+            if (0 != Compare_Modify_Values(left, D_OUT, strict))
                 continue;
         }
         else {
@@ -1447,9 +1449,9 @@ REBNATIVE(catch)
                 Move_Value(temp2, label);
 
                 // Return the THROW/NAME's arg if the names match
-                // !!! 0 means equal?, but strict-equal? might be better
                 //
-                if (Compare_Modify_Values(temp1, temp2, 0))
+                bool strict = false;  // e.g. EQUAL?, better if STRICT-EQUAL?
+                if (0 == Compare_Modify_Values(temp1, temp2, strict))
                     goto was_caught;
             }
         }
@@ -1458,9 +1460,9 @@ REBNATIVE(catch)
             Move_Value(temp2, label);
 
             // Return the THROW/NAME's arg if the names match
-            // !!! 0 means equal?, but strict-equal? might be better
             //
-            if (Compare_Modify_Values(temp1, temp2, 0))
+            bool strict = false;  // e.g. EQUAL?, better if STRICT-EQUAL?
+            if (0 == Compare_Modify_Values(temp1, temp2, strict))
                 goto was_caught;
         }
     }

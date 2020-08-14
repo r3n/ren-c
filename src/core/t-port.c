@@ -28,10 +28,12 @@
 //
 //  CT_Port: C
 //
-REBINT CT_Port(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Port(REBCEL(const*) a, REBCEL(const*) b, REBINT strict)
 {
-    if (mode < 0) return -1;
-    return VAL_CONTEXT(a) == VAL_CONTEXT(b);
+    UNUSED(strict);
+    if (VAL_CONTEXT(a) == VAL_CONTEXT(b))
+        return 0;
+    return VAL_CONTEXT(a) > VAL_CONTEXT(b) ? 1 : -1;  // !!! Review
 }
 
 

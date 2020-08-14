@@ -32,11 +32,11 @@
 // !!! Was never implemented in R3-Alpha; called into raw array comparison,
 // which is clearly incorrect.  Needs to be written.
 //
-REBINT CT_Map(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Map(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     UNUSED(a);
     UNUSED(b);
-    UNUSED(mode);
+    UNUSED(strict);
     fail ("https://github.com/rebol/rebol-issues/issues/2340");
 }
 
@@ -84,7 +84,7 @@ REBINT Find_Key_Hashed(
     const RELVAL *key, // !!! assumes key is followed by value(s) via ++
     REBSPC *specifier,
     REBLEN wide,
-    bool cased,
+    bool strict,
     REBYTE mode
 ){
     // Hashlists store a indexes into the actual data array, of where the
@@ -121,12 +121,12 @@ REBINT Find_Key_Hashed(
     while ((n = indexes[slot]) != 0) {
         RELVAL *k = ARR_AT(array, (n - 1) * wide); // stored key
         if (0 == Cmp_Value(k, key, true)) { // exact match
-            if (cased)
+            if (strict)
                 return slot; // don't need to check synonyms, stop looking
             goto found_synonym; // confirm exact match is the only match
         }
 
-        if (not cased) {
+        if (not strict) {
             if (0 == Cmp_Value(k, key, false)) { // non-strict match
 
               found_synonym:;
@@ -146,7 +146,7 @@ REBINT Find_Key_Hashed(
     }
 
     if (synonym_slot != -1) {
-        assert(not cased);
+        assert(not strict);
         return synonym_slot; // there weren't other spellings of the same key
     }
 
@@ -256,7 +256,7 @@ REBLEN Find_Map_Entry(
     REBSPC *key_specifier,
     const RELVAL *val,
     REBSPC *val_specifier,
-    bool cased // case-sensitive if true
+    bool strict
 ) {
     assert(not IS_NULLED(key));
 
@@ -274,7 +274,7 @@ REBLEN Find_Map_Entry(
     const REBLEN wide = 2;
     const REBYTE mode = 0; // just search for key, don't add it
     REBLEN slot = Find_Key_Hashed(
-        pairlist, hashlist, key, key_specifier, wide, cased, mode
+        pairlist, hashlist, key, key_specifier, wide, strict, mode
     );
 
     REBLEN *indexes = SER_HEAD(REBLEN, hashlist);
@@ -396,13 +396,14 @@ static void Append_Map(
             fail (Error_Past_End_Raw());
         }
 
+        bool strict = true;
         Find_Map_Entry(
             map,
             item,
             specifier,
             item + 1,
             specifier,
-            true
+            strict
         );
 
         item += 2;

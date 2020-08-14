@@ -281,19 +281,18 @@ bool Eq_Decimal2(REBDEC a, REBDEC b)
 //
 //  CT_Decimal: C
 //
-REBINT CT_Decimal(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Decimal(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0) {
-        if (mode == 0)
-            return almost_equal(VAL_DECIMAL(a), VAL_DECIMAL(b), 10) ? 1 : 0;
-
-        return almost_equal(VAL_DECIMAL(a), VAL_DECIMAL(b), 0) ? 1 : 0;
+    if (strict) {
+        if (almost_equal(VAL_DECIMAL(a), VAL_DECIMAL(b), 0))
+            return 0;
+    }
+    else {
+        if (almost_equal(VAL_DECIMAL(a), VAL_DECIMAL(b), 10))
+            return 0;
     }
 
-    if (mode == -1)
-        return (VAL_DECIMAL(a) >= VAL_DECIMAL(b)) ? 1 : 0;
-
-    return (VAL_DECIMAL(a) > VAL_DECIMAL(b)) ? 1 : 0;
+    return (VAL_DECIMAL(a) > VAL_DECIMAL(b)) ? 1 : -1;
 }
 
 

@@ -38,14 +38,41 @@
 //     CT_Get_Path()
 //     CT_Lit_Path()
 //
-REBINT CT_Array(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Array(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBINT num = Cmp_Array(a, b, mode == 1);
-    if (mode >= 0)
-        return (num == 0);
-    if (mode == -1)
-        return (num >= 0);
-    return (num > 0);
+    if (C_STACK_OVERFLOWING(&strict))
+        Fail_Stack_Overflow();
+
+    if (
+        VAL_SERIES(a) == VAL_SERIES(b)
+        and VAL_INDEX(a) == VAL_INDEX(b)
+    ){
+        return 0;
+    }
+
+    const RELVAL *aval = VAL_ARRAY_AT(a);
+    const RELVAL *bval = VAL_ARRAY_AT(b);
+
+    for (; ; ++aval, ++bval) {
+        if (IS_END(aval)) {
+            if (IS_END(bval))
+                return 0;
+            return -1;
+        }
+        else if (IS_END(bval))
+            return 1;
+
+        if (
+            VAL_TYPE(aval) != VAL_TYPE(bval)
+            and not (ANY_NUMBER(aval) and ANY_NUMBER(bval))
+        ){
+            return VAL_TYPE(aval) > VAL_TYPE(bval) ? 1 : -1;
+        }
+ 
+        REBINT diff = Cmp_Value(aval, bval, strict);
+        if (diff != 0)
+            return diff;
+    }
 }
 
 

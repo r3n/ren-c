@@ -311,8 +311,10 @@ REBINT Compare_Vector(REBCEL(const*) v1, REBCEL(const*) v2)
     for (n = 0; n < len; n++) {
         Get_Vector_At(temp1, v1, n + VAL_VECTOR_INDEX(v1));
         Get_Vector_At(temp2, v2, n + VAL_VECTOR_INDEX(v2));
-        if (not Compare_Modify_Values(temp1, temp2, 1)) // strict equality
-            return 1; // arbitrary (compare didn't discern > or <)
+        const bool strict = true;
+        REBINT diff = Compare_Modify_Values(temp1, temp2, strict);
+        if (diff != 0)
+            return diff;
     }
 
     return l1 - l2;
@@ -516,14 +518,10 @@ REB_R MAKE_Vector(
 //
 //  CT_Vector: C
 //
-REBINT CT_Vector(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Vector(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBINT n = Compare_Vector(a, b);  // needs to be expanded for equality
-    if (mode >= 0) {
-        return n == 0;
-    }
-    if (mode == -1) return n >= 0;
-    return n > 0;
+    UNUSED(strict);
+    return Compare_Vector(a, b);
 }
 
 

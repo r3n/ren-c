@@ -236,16 +236,17 @@ void Push_Paramlist_Triads_May_Fail(
 
     //=//// TOP-LEVEL SPEC TAGS LIKE <local>, <with> etc. /////////////////=//
 
+        bool strict = false;
         if (IS_TAG(item) and (*flags & MKF_KEYWORDS)) {
-            if (0 == Compare_String_Vals(item, Root_With_Tag, true)) {
+            if (0 == CT_String(item, Root_With_Tag, strict)) {
                 mode = SPEC_MODE_WITH;
                 continue;
             }
-            else if (0 == Compare_String_Vals(item, Root_Local_Tag, true)) {
+            else if (0 == CT_String(item, Root_Local_Tag, strict)) {
                 mode = SPEC_MODE_LOCAL;
                 continue;
             }
-            else if (0 == Compare_String_Vals(item, Root_Void_Tag, true)) {
+            else if (0 == CT_String(item, Root_Void_Tag, strict)) {
                 *flags |= MKF_IS_VOIDER;  // use Voider_Dispatcher()
 
                 // Fake as if they said [void!] !!! make more efficient

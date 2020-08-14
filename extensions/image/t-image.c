@@ -175,16 +175,15 @@ void Fill_Rect(
 //
 //  CT_Image: C
 //
-REBINT CT_Image(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Image(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode < 0)
-        return -1;
+    UNUSED(strict);
 
-    if (VAL_IMAGE_WIDTH(a) != VAL_IMAGE_WIDTH(a))
-        return 0;
+    if (VAL_IMAGE_WIDTH(a) != VAL_IMAGE_WIDTH(b))
+        return VAL_IMAGE_WIDTH(a) > VAL_IMAGE_WIDTH(b) ? 1 : -1;
 
-    if (VAL_IMAGE_HEIGHT(b) != VAL_IMAGE_HEIGHT(b))
-        return 0;
+    if (VAL_IMAGE_HEIGHT(a) != VAL_IMAGE_HEIGHT(b))
+        return VAL_IMAGE_HEIGHT(a) > VAL_IMAGE_HEIGHT(b) ? 1 : -1;
 
     // !!! There is an image "position" stored in the binary.  This is a
     // dodgy concept of a linear index into the image being an X/Y
@@ -195,14 +194,12 @@ REBINT CT_Image(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
     // https://github.com/rebol/rebol-issues/issues/801
     //
     if (VAL_IMAGE_POS(a) != VAL_IMAGE_POS(b))
-        return 0;
+        return VAL_IMAGE_POS(a) > VAL_IMAGE_POS(b) ? 1 : -1;
 
     assert(VAL_IMAGE_LEN_AT(a) == VAL_IMAGE_LEN_AT(b));
 
     int cmp = memcmp(VAL_IMAGE_AT(a), VAL_IMAGE_AT(b), VAL_IMAGE_LEN_AT(a));
-    if (cmp == 0)
-        return 1;
-    return 0;
+    return cmp;
 }
 
 

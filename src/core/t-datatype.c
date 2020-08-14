@@ -28,18 +28,22 @@
 //
 //  CT_Datatype: C
 //
-REBINT CT_Datatype(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Datatype(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode < 0)
-        return -1;  // !!! R3-Alpha-ism (compare never made much sense)
+    UNUSED(strict);
 
     if (VAL_TYPE_KIND_OR_CUSTOM(a) != VAL_TYPE_KIND_OR_CUSTOM(b))
-        return 0;
+        return VAL_TYPE_KIND_OR_CUSTOM(a) > VAL_TYPE_KIND_OR_CUSTOM(b)
+            ? 1
+            : -1;
 
-    if (VAL_TYPE_KIND_OR_CUSTOM(a) == REB_CUSTOM)
-        return VAL_TYPE_HOOKS_NODE(a) == VAL_TYPE_HOOKS_NODE(b);
+    if (VAL_TYPE_KIND_OR_CUSTOM(a) == REB_CUSTOM) {
+        if (VAL_TYPE_HOOKS_NODE(a) == VAL_TYPE_HOOKS_NODE(b))
+            return 0;
+        return 1;  // !!! all cases of "just return greater" are bad
+    }
 
-    return 1;
+    return 0;
 }
 
 

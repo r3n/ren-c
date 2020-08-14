@@ -272,7 +272,7 @@ typedef REBVAL *REB_R;
 // no overrides for individual types (only if they are the only type in
 // their class).
 //
-typedef REBINT (COMPARE_HOOK)(REBCEL(const*) a, REBCEL(const*) b, REBINT s);
+typedef REBINT (COMPARE_HOOK)(REBCEL(const*) a, REBCEL(const*) b, bool strict);
 
 
 // PER-TYPE MAKE HOOKS: for `make datatype def`

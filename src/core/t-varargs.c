@@ -534,9 +534,9 @@ REBTYPE(Varargs)
 // Simple comparison function stub (required for every type--rules TBD for
 // levels of "exactness" in equality checking, or sort-stable comparison.)
 //
-REBINT CT_Varargs(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Varargs(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    UNUSED(mode);
+    UNUSED(strict);
 
     // !!! For the moment, say varargs are the same if they have the same
     // source feed from which the data comes.  (This check will pass even
@@ -544,8 +544,8 @@ REBINT CT_Varargs(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
     // long as its identity is needed).
     //
     if (VAL_BINDING(a) == VAL_BINDING(b))
-        return 1;
-    return 0;
+        return 0;
+    return VAL_BINDING(a) > VAL_BINDING(b) ? 1 : -1;
 }
 
 

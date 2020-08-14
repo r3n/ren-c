@@ -58,21 +58,18 @@ const REBYTE *Scan_Money(
 //
 //  CT_Money: C
 //
-REBINT CT_Money(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Money(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
+    UNUSED(strict);
+
     bool e = deci_is_equal(VAL_MONEY_AMOUNT(a), VAL_MONEY_AMOUNT(b));
+    if (e)
+        return 0;
 
-    if (mode < 0) {
-        bool g = deci_is_lesser_or_equal(
-            VAL_MONEY_AMOUNT(b), VAL_MONEY_AMOUNT(a)
-        );
-        if (mode == -1)
-            e = (e or g);
-        else
-            e = (g and not e);
-    }
-
-    return e ? 1 : 0;
+    bool g = deci_is_lesser_or_equal(
+        VAL_MONEY_AMOUNT(b), VAL_MONEY_AMOUNT(a)
+    );
+    return g ? 1 : -1;
 }
 
 

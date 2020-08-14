@@ -110,7 +110,7 @@ inline static REBVAL *Init_Vector(
 // !!! These hooks allow the REB_VECTOR cell type to dispatch to code in the
 // VECTOR! extension if it is loaded.
 //
-extern REBINT CT_Vector(REBCEL(const*) a, REBCEL(const*) b, REBINT mode);
+extern REBINT CT_Vector(REBCEL(const*) a, REBCEL(const*) b, bool strict);
 extern REB_R MAKE_Vector(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
 extern REB_R TO_Vector(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
 extern void MF_Vector(REB_MOLD *mo, REBCEL(const*) v, bool form);

@@ -1009,19 +1009,12 @@ REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
 //     CT_Get_Path()
 //     CT_Lit_Path()
 //
-REBINT CT_Path(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Path(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBINT num;
     if (MIRROR_BYTE(a) == REB_WORD and MIRROR_BYTE(b) == REB_WORD)
-        num = Compare_Word(a, b, mode == 1);
+        return CT_Word(a, b, strict);
     else if (MIRROR_BYTE(a) != REB_WORD and MIRROR_BYTE(b) != REB_WORD)
-        num = Cmp_Array(a, b, mode == 1);
+        return CT_Array(a, b,strict);
     else
-        num = -1;  // !!! what is the right answer here?
-
-    if (mode >= 0)
-        return (num == 0);
-    if (mode == -1)
-        return (num >= 0);
-    return (num > 0);
+        return -1;  // !!! what is the right answer here?
 }

@@ -31,11 +31,13 @@
 //
 //  CT_Integer: C
 //
-REBINT CT_Integer(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Integer(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0)  return (VAL_INT64(a) == VAL_INT64(b));
-    if (mode == -1) return (VAL_INT64(a) >= VAL_INT64(b));
-    return (VAL_INT64(a) > VAL_INT64(b));
+    UNUSED(strict);  // no lax form of comparison
+
+    if (VAL_INT64(a) == VAL_INT64(b))
+        return 0;
+    return (VAL_INT64(a) > VAL_INT64(b)) ? 1 : -1;
 }
 
 

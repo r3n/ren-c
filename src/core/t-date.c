@@ -32,15 +32,15 @@
 //
 //  CT_Date: C
 //
-REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     REBYMD dat_a = VAL_DATE(a);
     REBYMD dat_b = VAL_DATE(b);
 
-    if (mode == 1) {
+    if (strict) {
         if (Does_Date_Have_Zone(a)) {
             if (not Does_Date_Have_Zone(b))
-                return 0; // can't be equal
+                return 1;  // can't be equal
 
             if (
                 dat_a.year != dat_b.year
@@ -48,12 +48,12 @@ REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
                 or dat_a.day != dat_b.year
                 or dat_a.zone != dat_b.zone
             ){
-                return 0; // both have zones, all bits must be equal
+                return 1;  // both have zones, all bits must be equal
             }
         }
         else {
             if (Does_Date_Have_Zone(b))
-                return 0; // a doesn't have, b does, can't be equal
+                return 1;  // a doesn't have, b does, can't be equal
 
             if (
                 dat_a.year != dat_b.year
@@ -61,30 +61,41 @@ REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
                 or dat_a.day != dat_b.day
                 // old code here ignored .zone
             ){
-                return 0; // canonized to 0 zone not equal
+                return 1;  // canonized to 0 zone not equal
             }
         }
 
         if (Does_Date_Have_Time(a)) {
             if (not Does_Date_Have_Time(b))
-                return 0; // can't be equal;
+                return 1;  // can't be equal;
 
             if (VAL_NANO(a) != VAL_NANO(b))
-                return 0; // both have times, all bits must be equal
+                return 1;  // both have times, all bits must be equal
         }
         else {
             if (Does_Date_Have_Time(b))
-                return 0; // a doesn't have, b, does, can't be equal
+                return 1; // a doesn't have, b, does, can't be equal
 
             // neither have times so equal
         }
-        return 1;
+        return 0;
     }
 
-    REBINT num = Cmp_Date(a, b);
-    if (mode >= 0)  return (num == 0);
-    if (mode == -1) return (num >= 0);
-    return (num > 0);
+    REBINT diff = Diff_Date(VAL_DATE(a), VAL_DATE(b));
+    if (diff != 0)
+        return diff;
+
+    if (not Does_Date_Have_Time(a)) {
+        if (not Does_Date_Have_Time(b))
+            return 0;  // equal if no diff and neither has a time
+
+        return -1;  // b is bigger if no time on a
+    }
+
+    if (not Does_Date_Have_Time(b))
+        return 1;  // a is bigger if no time on b
+
+    return CT_Time(a, b, strict);
 }
 
 
@@ -415,29 +426,6 @@ void Subtract_Date(REBVAL *d1, REBVAL *d2, REBVAL *result)
         result,
         (t1 - t2) + (cast(REBI64, diff) * TIME_IN_DAY)
     );
-}
-
-
-//
-//  Cmp_Date: C
-//
-REBINT Cmp_Date(REBCEL(const*) d1, REBCEL(const*) d2)
-{
-    REBINT diff = Diff_Date(VAL_DATE(d1), VAL_DATE(d2));
-    if (diff != 0)
-        return diff;
-
-    if (not Does_Date_Have_Time(d1)) {
-        if (not Does_Date_Have_Time(d2))
-            return 0; // equal if no diff and neither has a time
-
-        return -1; // d2 is bigger if no time on d1
-    }
-
-    if (not Does_Date_Have_Time(d2))
-        return 1; // d1 is bigger if no time on d2
-
-    return Cmp_Time(d1, d2);
 }
 
 

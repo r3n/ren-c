@@ -139,7 +139,7 @@ inline static REBVAL *Init_Image_Black_Opaque(RELVAL *out, REBLEN w, REBLEN h)
 // !!! These hooks allow the REB_IMAGE cell type to dispatch to code in the
 // IMAGE! extension if it is loaded.
 //
-extern REBINT CT_Image(REBCEL(const*) a, REBCEL(const*) b, REBINT mode);
+extern REBINT CT_Image(REBCEL(const*) a, REBCEL(const*) b, bool strict);
 extern REB_R MAKE_Image(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
 extern REB_R TO_Image(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
 extern void MF_Image(REB_MOLD *mo, REBCEL(const*) v, bool form);

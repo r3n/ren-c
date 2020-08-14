@@ -39,12 +39,12 @@
 //
 // !!! Currently, in order to have a GENERIC dispatcher (e.g. REBTYPE())
 // then one also must implement a comparison function.  However, compare
-// functions specifically take REBCEL, so you can't pass REB_LITERAL to them.
+// functions specifically take REBCEL, so you can't pass REB_QUOTED to them.
 // The handling for QUOTED! is in the comparison dispatch itself.
 //
-REBINT CT_Quoted(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Quoted(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    UNUSED(a); UNUSED(b); UNUSED(mode);
+    UNUSED(a); UNUSED(b); UNUSED(strict);
     assert(!"CT_Quoted should never be called");
     return 0;
 }

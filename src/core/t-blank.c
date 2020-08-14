@@ -128,11 +128,13 @@ REB_R TO_Unit(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
 // Must have a comparison function, otherwise SORT would not work on arrays
 // with blanks or voids in them.
 //
-REBINT CT_Unit(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Unit(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0)
-        return (CELL_KIND(a) == CELL_KIND(b));
-    return -1;
+    UNUSED(strict);  // no lax form of comparison
+
+    if (CELL_KIND(a) == CELL_KIND(b))
+        return 0;
+    return (CELL_KIND(a) > CELL_KIND(b)) ? 1 : -1;
 }
 
 
@@ -205,13 +207,13 @@ void MF_Handle(REB_MOLD *mo, REBCEL(const*) v, bool form)
 //
 //  CT_Handle: C
 //
-REBINT CT_Handle(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
+REBINT CT_Handle(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     // Would it be meaningful to allow user code to compare HANDLE!?
     //
     UNUSED(a);
     UNUSED(b);
-    UNUSED(mode);
+    UNUSED(strict);
     fail ("Currently comparing HANDLE! types is not allowed.");
 }
 
