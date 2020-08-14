@@ -611,7 +611,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         REBLEN old_len = ARR_LEN(ACT_PARAMLIST(VAL_ACTION(augmentee)));
         REBLEN delta = ARR_LEN(paramlist) - old_len;
         assert(delta > 0);
-        
+
         REBARR *old_varlist = CTX_VARLIST(old_exemplar);
         assert(ARR_LEN(old_varlist) == old_len);
 
@@ -624,7 +624,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         );
         SER(varlist)->info.bits = SER(old_varlist)->info.bits;
         INIT_VAL_CONTEXT_VARLIST(ARR_HEAD(varlist), varlist);
-        
+
         // We fill in the added parameters in the specialization as null for
         // starters.  They are unspecialized.
         //

@@ -382,6 +382,7 @@ static void Init_Action_Meta_Shim(void) {
         Init_Blank(Append_Context(meta, nullptr, Canon(field_syms[i - 1])));
 
     Init_Object(CTX_VAR(meta, 1), meta); // it's "selfish"
+    TYPE_SET(CTX_KEY(meta, 1), REB_TS_HIDDEN);  // hide self
 
     Root_Action_Meta = Init_Object(Alloc_Value(), meta);
 
@@ -860,7 +861,7 @@ static void Init_System_Object(
     // made is actually identical to the definition in %sysobj.r.
     //
     assert(
-        0 == CT_Context(
+        1 == CT_Context(
             Get_System(SYS_STANDARD, STD_ACTION_META),
             Root_Action_Meta,
             1 // "strict equality"
