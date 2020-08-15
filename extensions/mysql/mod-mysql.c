@@ -39,7 +39,7 @@
 //
 //      {Attempts to establish a connection to a MySQL server running on host}
 //
-//      return: [handle!]
+//      return: [handle! void!]
 //      host [text!]
 //      user [text!]
 //      pwrd [text!]
@@ -53,10 +53,8 @@ REBNATIVE(mysql_connect)
     MYSQL *connection = mysql_init(NULL);
     if (connection == NULL) 
     {
-        rebJumps("FAIL {No connection returned from mysql_init}");
-        //return rebVoid();
-        // fprintf(stderr, "%s\n", mysql_error(con));
-        //exit(1);
+        rebJumps("FAIL {Not able to initialize connection using mysql_init}");
+        return rebVoid();
     }
     const char * host = cast(char*, VAL_STRING_AT(ARG(host)));
     const char * user = cast(char*, VAL_STRING_AT(ARG(user)));
@@ -66,9 +64,8 @@ REBNATIVE(mysql_connect)
     if (mysql_real_connect(connection, host, user, pwrd, 
           dbnm, 0, NULL, 0) == NULL)
     {
-        rebJumps("FAIL {Not able to connect to database mysql_real_connect}");
-
-        // return rebVoid();
+        rebJumps("FAIL {Not able to connect using mysql_real_connect}");
+        return rebVoid();
     } 
 
     return rebHandle(connection, 0, nullptr);
@@ -87,7 +84,6 @@ REBNATIVE(mysql_close)
 {
     MYSQL_INCLUDE_PARAMS_OF_MYSQL_CLOSE;
 
-//zmq_msg_t *msg = VAL_HANDLE_POINTER(zmq_msg_t, ARG(msg));
     MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
 
     mysql_close(connection); 
@@ -212,4 +208,140 @@ REBNATIVE(mysql_get_host_info)
     const char *result = mysql_get_host_info(connection);
 
     return rebText(result);
+}
+
+//
+//  export mysql-affected-rows: native [
+//    
+//      {Returns the number of rows changed, deleted, or inserted by the last statement.} 
+//
+//      return: [integer!]
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_affected_rows)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_AFFECTED_ROWS;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    unsigned int result = mysql_affected_rows(connection);
+
+    return rebInteger(result);
+}
+
+//
+//  export mysql-field-count: native [
+//    
+//      {Returns the number of columns for the most recent query on the connection.} 
+//
+//      return: [integer!]
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_field_count)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_FIELD_COUNT;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    unsigned int result = mysql_field_count(connection);
+
+    return rebInteger(result);
+}
+
+//
+//  export mysql-store-result: native [
+//    
+//      {Reads the entire result of a query to the client, allocates a structure, and places the result into this structure. } 
+//
+//      return: [handle!]
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_store_result)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_STORE_RESULT;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    MYSQL_RES *resultset = mysql_store_result(connection);
+
+    return rebHandle(resultset, 0, nullptr);
+}
+
+//
+//  export mysql-num-rows: native [
+//    
+//      {Returns the number of rows in the result set.} 
+//
+//      return: [integer!]
+//      resultset [handle!]
+//  ]
+//
+REBNATIVE(mysql_num_rows)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_NUM_ROWS;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+
+    unsigned int result = mysql_num_rows(resultset);
+
+    return rebInteger(result);
+}
+
+//
+//  export mysql-fetch-row: native [
+//    
+//      {Retrieves the next row of a result set} 
+//
+//      return: [block!]
+//      resultset [handle!]
+//  ]
+//
+REBNATIVE(mysql_fetch_row)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_FETCH_ROW;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+
+    int num_fields = mysql_num_fields(resultset);
+    MYSQL_ROW row;
+    REBVAL *block = rebValue("[]");
+    if ((row = mysql_fetch_row(resultset)))
+    {
+        for (int i=0; i < num_fields; i++)
+        {
+            if (not row[i])
+            {
+                rebElide("append", block, rebBlank());
+            }
+            else
+            {
+                rebElide("append", block, rebText(row[i]));
+            }
+        }
+    }
+
+    return block;
+}
+
+//
+//  export mysql-free-result: native [
+//    
+//      {Frees the memory allocated for a result set.} 
+//
+//      return: [void!]
+//      resultset [handle!]
+//  ]
+//
+REBNATIVE(mysql_free_result)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_FREE_RESULT;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+
+    mysql_free_result(resultset);
+
+    return rebVoid();
 }
