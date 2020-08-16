@@ -318,7 +318,7 @@ REBNATIVE(mysql_fetch_row)
             }
             else
             {
-                rebElide("append", block, rebText(row[i]));
+                rebElide("append", block, rebT(row[i]));
             }
         }
     }
