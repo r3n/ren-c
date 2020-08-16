@@ -306,8 +306,11 @@ REBNATIVE(mysql_fetch_row)
     MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
 
     int num_fields = mysql_num_fields(resultset);
+
     MYSQL_ROW row;
+    MYSQL_FIELD *field;
     REBVAL *block = rebValue("[]");
+
     if ((row = mysql_fetch_row(resultset)))
     {
         for (int i=0; i < num_fields; i++)
@@ -318,7 +321,19 @@ REBNATIVE(mysql_fetch_row)
             }
             else
             {
-                rebElide("append", block, rebT(row[i]));
+                field = mysql_fetch_field_direct( resultset, i);
+
+                switch ( field->type ) {
+                    case MYSQL_TYPE_STRING:
+                    case MYSQL_TYPE_VAR_STRING:
+                    case MYSQL_TYPE_BLOB:
+                        rebElide("append", block, rebT(row[i]));
+                        break;
+
+                    default:
+                        rebElide("append", block, row[i]);
+                        break;
+                }
             }
         }
     }
