@@ -430,7 +430,7 @@ inline static REBSTR* Intern(const void *p)
     switch (Detect_Rebol_Pointer(p)) {
       case DETECTED_AS_UTF8: {
         const char *utf8 = cast(const char*, p);
-        return Intern_UTF8_Managed(cb_cast(utf8), strlen(utf8)); }
+        return Intern_UTF8_Managed(cb_cast(utf8), strsize(utf8)); }
 
       case DETECTED_AS_SERIES: {
         REBSER *s = m_cast(REBSER*, cast(const REBSER*, p));

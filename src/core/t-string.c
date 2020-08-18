@@ -1436,7 +1436,7 @@ void Startup_String(void)
 
     const REBYTE *dc = cb_cast(";%\"()[]{}<>");
 
-    for (c = LEN_BYTES(dc); c > 0; c--)
+    for (c = strsize(dc); c > 0; c--)
         URL_Escapes[*dc++] = ESC_URL | ESC_FILE;
 }
 

@@ -56,7 +56,7 @@ REBSTR *Make_String_Core(REBSIZ encoded_capacity, REBFLGS flags)
 REBSER *Copy_Bytes(const REBYTE *src, REBINT len)
 {
     if (len < 0)
-        len = LEN_BYTES(src);
+        len = strsize(src);
 
     REBSER *dst = Make_Binary(len);
     memcpy(BIN_HEAD(dst), src, len);
@@ -185,7 +185,7 @@ REBSTR *Append_Ascii_Len(REBSTR *dst, const char *ascii, REBLEN len)
 //
 REBSTR *Append_Ascii(REBSTR *dst, const char *src)
 {
-    return Append_Ascii_Len(dst, src, strlen(src));
+    return Append_Ascii_Len(dst, src, strsize(src));
 }
 
 

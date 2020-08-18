@@ -454,14 +454,21 @@ REBINT Compare_Word(const REBCEL *s, const REBCEL *t, bool strict)
     const REBYTE *sp = STR_HEAD(VAL_WORD_SPELLING(s));
     const REBYTE *tp = STR_HEAD(VAL_WORD_SPELLING(t));
 
+    // !!! "Strict" is generally interpreted as "case-sensitive comparison".
+    // Using strcmp() means the two pointers must be to '\0'-terminated byte
+    // arrays, and they are checked byte-for-byte.  This does not account
+    // for unicode normalization.  Review.
+    //
+    // https://en.wikipedia.org/wiki/Unicode_equivalence#Normalization
+    //
     if (strict)
-        return COMPARE_BYTES(sp, tp); // must match byte-for-byte
+        return strcmp(cs_cast(sp), cs_cast(tp));
 
     if (VAL_WORD_CANON(s) == VAL_WORD_CANON(t))
         return 0; // equivalent canon forms are considered equal
 
     // They must differ by case....
-    return Compare_UTF8(sp, tp, LEN_BYTES(tp)) + 2;
+    return Compare_UTF8(sp, tp, strsize(tp)) + 2;
 }
 
 

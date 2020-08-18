@@ -295,7 +295,10 @@ static void Add_Lib_Keys_For_Unscannable_Set_Words(void)
 
     REBLEN i;
     for (i = 0; names[i] != NULL; ++i) {
-        REBSTR *str = Intern_UTF8_Managed(cb_cast(names[i]), strlen(names[i]));
+        REBSTR *str = Intern_UTF8_Managed(
+            cb_cast(names[i]),
+            strsize(names[i])
+        );
         REBVAL *val = Append_Context(Lib_Context, NULL, str);
         assert(IS_VOID(val));
         UNUSED(val);
