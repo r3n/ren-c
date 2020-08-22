@@ -74,5 +74,12 @@ depends: [
         ; but the PR to fix it has not been merged to LodePNG master.
         ;
         <gnu:-Wno-cast-qual>
+
+        ; Comparison of unsigned enum value is >= 0.  A pending PR that has
+        ; not been merged mentions this...update lodepng if that happens:
+        ;
+        ; https://github.com/lvandeve/lodepng/pull/135
+        ;
+        <gnu:-Wno-type-limits>
     ]
 ]
