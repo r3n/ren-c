@@ -420,7 +420,7 @@ REBNATIVE(destroy_struct_storage)
         if (not IS_ACTION_RIN(ARG(free)))
             fail (Error_Free_Needs_Routine_Raw());
 
-        rebElideQ(rebU1(ARG(free)), pointer, rebEND);
+        rebElideQ(rebU(ARG(free)), pointer, rebEND);
     }
 
     return nullptr;

@@ -191,7 +191,7 @@ inline static bool Do_Branch_Core_Throws(
         return RunQ_Throws(
             out,
             false, // !fully, e.g. arity-0 functions can ignore condition
-            rebU1(branch),
+            rebU(branch),
             condition, // may be an END marker, if not Do_Branch_With() case
             rebEND // ...but if condition wasn't an END marker, we need one
         );

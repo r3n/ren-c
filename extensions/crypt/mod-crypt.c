@@ -267,7 +267,7 @@ REBNATIVE(checksum)
     }
 
     rebJumps (
-        "fail [{Unknown CHECKSUM method:}", rebQ1(ARG(method)), "]",
+        "fail [{Unknown CHECKSUM method:}", rebQ(ARG(method)), "]",
     rebEND);
 
   found_tls_info: {
@@ -1167,7 +1167,7 @@ REBNATIVE(ecdh_shared_secret)
         "]",
         "if", rebI(num_bytes * 2), "!= length of bin [",
             "fail [{Public BINARY! must be}", rebI(num_bytes * 2),
-                "{bytes total for}", rebQ1(ARG(group)), "]",
+                "{bytes total for}", rebQ(ARG(group)), "]",
         "]",
         "bin",
     "]", rebEND);
@@ -1200,7 +1200,7 @@ REBNATIVE(ecdh_shared_secret)
     rebElide(
         "if", rebI(num_bytes), "!= length of", ARG(private), "[",
             "fail [{Size of PRIVATE key must be}",
-                rebI(num_bytes), "{for}", rebQ1(ARG(group)), "]"
+                rebI(num_bytes), "{for}", rebQ(ARG(group)), "]"
         "]",
         ARG(private),
     rebEND);

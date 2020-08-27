@@ -479,7 +479,7 @@ static int Compare_Val_Custom(void *arg, const void *v1, const void *v2)
     if (RunQ_Throws(
         result,
         fully,
-        rebU1(flags->comparator),
+        rebU(flags->comparator),
         flags->reverse ? v1 : v2,
         flags->reverse ? v2 : v1,
         rebEND

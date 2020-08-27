@@ -57,7 +57,7 @@ REB_R MAKE_Port(
     assert(IS_ACTION(make_port_helper));
 
     assert(not IS_NULLED(arg)); // would need to DEVOID it otherwise
-    if (RunQ_Throws(out, fully, rebU1(make_port_helper), arg, rebEND))
+    if (RunQ_Throws(out, fully, rebU(make_port_helper), arg, rebEND))
         fail (Error_No_Catch_For_Throw(out));
 
     // !!! Shouldn't this be testing for !IS_PORT( ) ?

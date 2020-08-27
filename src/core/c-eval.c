@@ -2382,7 +2382,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         // been preloaded with the words or paths from the left block.
         //
         REBVAL *specialized = rebValue(
-            "enclose specialize", rebQ1(spare), "collect [ use [block] [",
+            "enclose specialize", rebQ(spare), "collect [ use [block] [",
                 "block: next", f->out,
                 "for-each output", outputs, "["
                     "if tail? block [break]",  // no more outputs wanted

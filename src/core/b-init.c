@@ -1131,7 +1131,7 @@ static REBVAL *Startup_Mezzanine(BOOT_BLK *boot)
     if (RunQ_Throws(
         result,
         true, // fully = true (error if all arguments aren't consumed)
-        rebU1(finish_init), // %sys-start.r function to call
+        rebU(finish_init), // %sys-start.r function to call
         KNOWN(&boot->mezz), // boot-mezz argument
         rebEND
     )){

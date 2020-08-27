@@ -87,7 +87,7 @@ REBVAL *Read_Line(STD_TERM *t)
                 "fail {nullptr interruption of terminal not done yet}",
             rebEND);
         }
-        else if (rebDid("void?", rebQ1(e), rebEND)) {
+        else if (rebDid("void?", rebQ(e), rebEND)) {
             line = rebVoid();
         }
         else if (rebDidQ(e, "= newline", rebEND)) {
@@ -121,7 +121,7 @@ REBVAL *Read_Line(STD_TERM *t)
         }
         else if (rebDidQ("word?", e, rebEND)) {  // recognized "virtual key"
             uint32_t ch = rebUnboxChar(
-                "to char! switch", rebQ1(e), "[",
+                "to char! switch", rebQ(e), "[",
                     "'escape ['E]",
 
                     "'up ['U]",
@@ -339,7 +339,7 @@ REB_R Console_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
       #if defined(REBOL_SMART_CONSOLE)
         if (Term_IO) {  // e.g. no redirection (Term_IO is null if so)
             REBVAL *result = Read_Line(Term_IO);
-            if (rebDid("void?", rebQ1(result), rebEND)) {  // HALT received
+            if (rebDid("void?", rebQ(result), rebEND)) {  // HALT received
                 rebRelease(result);
                 return rebVoid();
             }

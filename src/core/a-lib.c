@@ -1591,7 +1591,7 @@ static const void *rebSpliceQuoteAdjuster_internal(
 //
 //  rebQUOTING: RL_API
 //
-// This is #defined as rebQ, with C89 shortcut rebQ1 => rebQ(v, rebEND)
+// This is #defined as rebQ, but C89 shortcut is rebQ => rebQ(v, rebEND)
 //
 const void *RL_rebQUOTING(
     unsigned char quotes,
@@ -1604,7 +1604,7 @@ const void *RL_rebQUOTING(
 //
 //  rebUNQUOTING: RL_API
 //
-// This is #defined as rebU, with C89 shortcut rebU1 => rebU(v, rebEND)
+// This is #defined as rebU, but C89 shortcut is rebU => rebU(v, rebEND)
 //
 const void *RL_rebUNQUOTING(
     unsigned char quotes,

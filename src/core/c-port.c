@@ -140,7 +140,7 @@ REBINT Awake_System(REBARR *ports, bool only)
     if (RunQ_Throws(
         result,
         true, // fully
-        rebU1(only ? awake_only : awake),
+        rebU(only ? awake_only : awake),
         port,
         tmp,
         rebEND

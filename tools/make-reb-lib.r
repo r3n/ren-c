@@ -519,14 +519,6 @@ e-lib/emit {
      */
 
     #define rebR rebRELEASING
-    #define rebQ rebQUOTING
-    #define rebU rebUNQUOTING
-
-    #define rebQ1(v)  /* C89 requires the rebEND, nice to omit it */ \
-        rebQ((v), rebEND)  /* has optimization in rebQ() for this case */
-
-    #define rebU1(v) /* C89 requires the rebEND, nice to omit it */ \
-        rebU((v), rebEND)  /* has optimization in rebU() for this case */
 
     #define rebT(utf8) \
         rebR(rebText(utf8))  /* might rebTEXT() delayed-load? */
@@ -536,6 +528,23 @@ e-lib/emit {
 
     #define rebL(flag) \
         rebR(rebLogic(flag))
+
+    #ifdef REBOL_EXPLICIT_END
+        /*
+         * Most invocations of rebQ() are single-arity.  Avoid common pain
+         * in the C89 builds by making the shorthand work (if truly needed
+         * to quote multiple items, rebQUOTING/rebUNQUOTING are available).
+         */
+        #define rebQ(v) \
+            rebQUOTING((v), rebEND)  /* 1-arg + end optimized in rebQ() */
+
+        #define rebU(v) \
+            rebUNQUOTING((v), rebEND)  /* 1-arg + end optimized in rebU() */
+    #else
+        #define rebQ rebQUOTING
+        #define rebU rebUNQUOTING
+    #endif
+
 
     /*
      * !!! This is a convenience wrapper over the function that makes a

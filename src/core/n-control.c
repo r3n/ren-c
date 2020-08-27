@@ -254,7 +254,7 @@ inline static bool Single_Test_Throws(
         bool threw = RunQ_Throws(
             temp,
             true,  // `fully` (ensure argument consumed)
-            rebU1(KNOWN(test)),
+            rebU(KNOWN(test)),
             NULLIFY_NULLED(arg_specified),  // nulled cells to nullptr for API
             rebEND
         );
@@ -937,7 +937,7 @@ REBNATIVE(case)
             if (RunQ_Throws(
                 temp,
                 true,  // fully = true (e.g. argument must be taken)
-                rebU1(predicate),
+                rebU(predicate),
                 D_OUT,  // argument
                 rebEND
             )){
@@ -1152,7 +1152,7 @@ REBNATIVE(switch)
             if (RunQ_Throws(
                 temp,
                 true,  // fully = true (e.g. both arguments must be taken)
-                rebU1(predicate),
+                rebU(predicate),
                 left,  // first arg (left hand side if infix)
                 D_OUT,  // second arg (right hand side if infix)
                 rebEND
@@ -1180,7 +1180,7 @@ REBNATIVE(switch)
                 if (RunQ_Throws(
                     temp,
                     false,  // fully = false, e.g. arity-0 functions are ok
-                    rebU1(KNOWN(*v)),  // actions don't need specifiers
+                    rebU(KNOWN(*v)),  // actions don't need specifiers
                     D_OUT,
                     rebEND
                 )){

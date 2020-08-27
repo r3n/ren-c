@@ -1717,7 +1717,7 @@ REBNATIVE(subparse)
                         }
                         else
                             rebElide(
-                                "append", P_COLLECTION_VALUE, rebQ1(P_OUT),
+                                "append", P_COLLECTION_VALUE, rebQ(P_OUT),
                             rebEND);
 
                         SET_END(P_OUT);  // since we didn't throw, put it back

@@ -385,7 +385,7 @@ REBNATIVE(do)
         if (RunQ_Throws(
             D_OUT,
             true,  // fully = true, error if not all arguments consumed
-            rebU1(sys_do_helper),
+            rebU(sys_do_helper),
             source,
             REF(args),
             REF(only) ? TRUE_VALUE : FALSE_VALUE,
