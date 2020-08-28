@@ -430,45 +430,6 @@ void Reify_Va_To_Array_In_Frame(
 
 
 //
-//  Reify_Any_C_Valist_Frames: C
-//
-// Some of the call stack frames may have been invoked with a C function call
-// that took a comma-separated list of REBVAL (the way printf works, a
-// variadic "va_list").
-//
-// http://en.cppreference.com/w/c/variadic
-//
-// Although it's a list of REBVAL*, these call frames have no REBARR series
-// behind.  Yet they still need to be enumerated to protect the values coming
-// up in the later EVALUATEs.  But enumerating a C va_list can't be undone.
-// The REBVAL* is lost if it isn't saved, and these frames may be in
-// mid-evaluation.
-//
-// Hence, the garbage collector has to "reify" the remaining portion of the
-// va_list into a REBARR before starting the GC.  Then the rest of the
-// evaluation happens on that array.
-//
-static void Reify_Any_C_Valist_Frames(void)
-{
-    // IMPORTANT: This must be done *before* any of the mark/sweep logic
-    // begins, because it creates new arrays.  In the future it may be
-    // possible to introduce new series in mid-garbage collection (which would
-    // be necessary for an incremental garbage collector), but for now the
-    // feature is not supported.
-    //
-    ASSERT_NO_GC_MARKS_PENDING();
-
-    REBFRM *f = FS_TOP;
-    for (; f != FS_BOTTOM; f = f->prior) {
-        if (NOT_END(f->feed->value) and FRM_IS_VALIST(f)) {
-            const bool truncated = true;
-            Reify_Va_To_Array_In_Frame(f, truncated);
-        }
-    }
-}
-
-
-//
 //  Mark_Root_Series: C
 //
 // Root Series are any manual series that were allocated but have not been
@@ -592,7 +553,6 @@ static void Mark_Root_Series(void)
 
         Propagate_All_GC_Marks(); // !!! is propagating on each segment good?
     }
-
 }
 
 
@@ -712,16 +672,11 @@ static void Mark_Frame_Stack_Deep(void)
 
     while (true) { // mark all frames (even FS_BOTTOM)
         //
-        // Should have taken care of reifying all the VALIST on the stack
-        // earlier in the recycle process (don't want to create new arrays
-        // once the recycling has started...)
-        //
-        assert(not f->feed->vaptr or IS_POINTER_TRASH_DEBUG(f->feed->vaptr));
-
         // Note: f->feed->pending should either live in f->feed->array, or
         // it may be trash (e.g. if it's an apply).  GC can ignore it.
         //
-        Queue_Mark_Node_Deep(f->feed->array);
+        if (f->feed->array)
+            Queue_Mark_Node_Deep(f->feed->array);
 
         // END is possible, because the frame could be sitting at the end of
         // a block when a function runs, e.g. `do [zero-arity]`.  That frame
@@ -1101,7 +1056,6 @@ REBLEN Recycle_Core(bool shutdown, REBSER *sweeplist)
   #endif
 
     ASSERT_NO_GC_MARKS_PENDING();
-    Reify_Any_C_Valist_Frames();
 
   #if !defined(NDEBUG)
     PG_Reb_Stats->Recycle_Counter++;
