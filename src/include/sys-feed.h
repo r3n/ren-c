@@ -450,10 +450,7 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         // is being executed hence won't be relocated or modified.  This
         // means the release build doesn't need to call ARR_AT().
         //
-        assert(
-            feed->array // incrementing plain array of REBVAL[]
-            or feed->pending == ARR_AT(feed->array, feed->index)
-        );
+        assert(feed->pending == ARR_AT(feed->array, feed->index));
 
         lookback = feed->value;  // should have been stable
         feed->value = feed->pending;
@@ -472,7 +469,6 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         TRASH_POINTER_IF_DEBUG(feed->pending);
 
         ++feed->index; // for consistency in index termination state
-
     }
     else {
         // A variadic can source arbitrary pointers, which can be detected
@@ -486,8 +482,8 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
 
     assert(
         IS_END(feed->value)
-        or feed->value == &feed->fetched
         or NOT_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY)
+        or feed->value == &feed->fetched
     );
 
   #ifdef DEBUG_EXPIRED_LOOKBACK
