@@ -1814,8 +1814,13 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     //
     SET_SERIES_FLAG(f->varlist, MANAGED);
 
+    // !!! A bug here was fixed in the stackless build more elegantly.  Just
+    // make a copy for old mainline.
+    //
+    REBVAL *rootcopy = Move_Value(FRM_SPARE(f), rootvar);
+
     const bool fully = true;
-    if (RunQ_Throws(f->out, fully, rebU(outer), rootvar, rebEND))
+    if (RunQ_Throws(f->out, fully, rebU(outer), rootcopy, rebEND))
         return R_THROWN;
 
     return f->out;

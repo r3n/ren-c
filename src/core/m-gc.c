@@ -354,11 +354,6 @@ static void Propagate_All_GC_Marks(void)
 // them, so stack frames can be inspected more meaningfully--both for upcoming
 // evaluations and those already past.
 //
-// A non-debug reason to reify a va_list into an array is if the garbage
-// collector needs to see the upcoming values to protect them from GC.  In
-// this case it only needs to protect those values that have not yet been
-// consumed.
-//
 // Because items may well have already been consumed from the va_list() that
 // can't be gotten back, we put in a marker to help hint at the truncation
 // (unless told that it's not truncated, e.g. a debug mode that calls it
