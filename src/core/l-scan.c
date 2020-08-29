@@ -2190,6 +2190,19 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         // are into the user context (which we will expand).
         //
         if (ss->feed and ss->feed->binder and ANY_WORD(DS_TOP)) {
+            //
+            // We don't initialize the binder until the first WORD! seen.
+            //
+            if (not ss->feed->context) {
+                ss->feed->context = Get_Context_From_Stack();
+                ss->feed->lib =
+                    (ss->feed->context != Lib_Context)
+                        ? Lib_Context
+                        : nullptr;
+
+                Init_Interning_Binder(ss->feed->binder, ss->feed->context);
+            }
+
             REBSTR *canon = VAL_WORD_CANON(DS_TOP);
             REBINT n = Get_Binder_Index_Else_0(ss->feed->binder, canon);
             if (n > 0) {
