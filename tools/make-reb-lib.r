@@ -185,12 +185,6 @@ c89-variadic-inlines: make block! length of api-objects
 c++-variadic-inlines: make block! length of api-objects
 
 for-each api api-objects [do in api [
-    if find [
-        "rebEnterApi_internal" ; called as RL_rebEnterApi_internal
-    ] name [
-        continue
-    ]
-
     if find spec #noreturn [
         assert [returns = "void"]
         opt-dead-end: "DEAD_END;"
@@ -215,14 +209,9 @@ for-each api api-objects [do in api [
 
         wrapper-params: default ["void"]
 
-        enter: try if name != "rebStartup" [
-            "LIBREBOL_PREFIX(rebEnterApi_internal)();"
-        ]
-
         cscape/with {
             $<OPT-NORETURN>
             inline static $<Returns> $<Name>$<Q>$<inline>($<Wrapper-Params>) {
-                $<Enter>
                 $<Opt-Va-Start>
                 $<opt-return> LIBREBOL_PREFIX($<Name>)($<Proxied-Args>);
                 $<OPT-DEAD-END>
@@ -245,15 +234,10 @@ for-each api api-objects [do in api [
 
         wrapper-params: default ["void"]
 
-        enter: try if name != "rebStartup" [
-            "LIBREBOL_PREFIX(rebEnterApi_internal)();"
-        ]
-
         cscape/with {
             template <typename... Ts>
             $<OPT-NORETURN>
             inline static $<Returns> $<Name>$<Q>($<Wrapper-Params>) {
-                $<Enter>
                 LIBREBOL_PACK_CPP_ARGS;
                 $<opt-return> LIBREBOL_PREFIX($<Name>)($<Proxied-Args>);
                 $<OPT-DEAD-END>

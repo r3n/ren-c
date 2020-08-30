@@ -409,7 +409,6 @@ map-each-api [
             continue
         ]
 
-        enter: {reb.m._RL_rebEnterApi_internal();}
         if false [
             ; It can be useful for debugging to see the API entry points;
             ; using console.error() adds a stack trace to it.
@@ -460,7 +459,6 @@ map-each-api [
 
         e-cwrap/emit cscape/with {
             reb.$<No-Reb-Name>_qlevel = function() {
-                $<Enter>
                 let argc = arguments.length
                 let stack = stackSave()
                 let packed = stackAlloc(4 * (argc + 1))
