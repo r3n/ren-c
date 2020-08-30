@@ -1037,25 +1037,15 @@ void *RL_rebUnboxHandle(
 }
 
 
+// Helper function for `rebSpellInto()` and `rebSpell()`
 //
-//  rebSpellInto: RL_API
-//
-// Extract UTF-8 data from an ANY-STRING! or ANY-WORD!.
-//
-// API does not return the number of UTF-8 characters for a value, because
-// the answer to that is always cached for any value position as LENGTH OF.
-// The more immediate quantity of concern to return is the number of bytes.
-//
-size_t RL_rebSpellInto(
-    unsigned char quotes,  // `#define FooQ(...) Foo(1, __VA_LIST__, rebEND)`
+static size_t Spell_Into(
     char *buf,
     size_t buf_size,  // number of bytes
-    const void *p, va_list *vaptr
+    const REBVAL *v
 ){
-    DECLARE_LOCAL (v);
-    Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
-
-    assert(ANY_STRING(v) or ANY_WORD(v));
+    if (not (ANY_STRING(v) or ANY_WORD(v)))
+        fail ("rebSpell() APIs only accept ANY-STRING! or ANY-WORD!");
 
     REBSIZ utf8_size;
     const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
@@ -1069,6 +1059,28 @@ size_t RL_rebSpellInto(
     memcpy(buf, utf8, limit);
     buf[limit] = '\0';
     return utf8_size;
+}
+
+
+//
+//  rebSpellInto: RL_API
+//
+// Extract UTF-8 data from an ANY-STRING! or ANY-WORD!.
+//
+// API does not return the number of UTF-8 characters for a value, because
+// the answer to that is always cached for any value position as LENGTH OF.
+// The more immediate quantity of concern to return is the number of bytes.
+//
+size_t RL_rebSpellInto(
+    unsigned char quotes,
+    char *buf,
+    size_t buf_size,  // number of bytes
+    const void *p, va_list *vaptr
+){
+    DECLARE_LOCAL (v);
+    Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
+
+    return Spell_Into(buf, buf_size, v);
 }
 
 
@@ -1089,35 +1101,25 @@ char *RL_rebSpell(
     if (IS_NULLED(v))
         return nullptr;  // NULL is passed through, for opting out
 
-    size_t size = rebSpellIntoQ(nullptr, 0, v, rebEND);
-    char *result = cast(char*, rebMalloc(size));  // no +1 for term needed...
+    size_t size = Spell_Into(nullptr, 0, v);
+    char *result = rebAllocN(char, size);  // no +1 for term needed...
     assert(result[size] == '\0');  // ...see rebRepossess() for why this is
-    rebSpellIntoQ(result, size, v, rebEND);
+    
+    size_t check = Spell_Into(result, size, v);
+    assert(check == size);
+    UNUSED(check);
+
     return result;
 }
 
 
+// Helper function for `rebSpellIntoWide()` and `rebSpellWide()`
 //
-//  rebSpellIntoWide: RL_API
-//
-// Extract UCS-2 data from an ANY-STRING! or ANY-WORD!.  Note this is *not*
-// UTF-16, so codepoints that require more than two bytes to represent will
-// cause errors.
-//
-// !!! Although the rebSpellInto API deals in bytes, this deals in count of
-// characters.  (The use of REBLEN instead of REBSIZ indicates this.)  It may
-// be more useful for the wide string APIs to do this so leaving it that way
-// for now.
-//
-unsigned int RL_rebSpellIntoWide(
-    unsigned char quotes,  // `#define FooQ(...) Foo(1, __VA_LIST__, rebEND)`
+static unsigned int Spell_Into_Wide(
     REBWCHAR *buf,
     unsigned int buf_chars,  // chars buf can hold (not including terminator)
-    const void *p, va_list *vaptr
+    const REBVAL *v
 ){
-    DECLARE_LOCAL (v);
-    Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
-
     REBCHR(const*) cp;
     REBLEN len;
     if (ANY_STRING(v)) {
@@ -1138,7 +1140,7 @@ unsigned int RL_rebSpellIntoWide(
         Free_Unmanaged_Series(SER(s));
     }
     else
-        fail ("rebSpellIntoWide() only accepts ANY-STRING! and ANY-WORD!");
+        fail ("rebSpell() APIs only accept ANY-STRING! or ANY-WORD!");
 
     if (not buf) {  // querying for size
         assert(buf_chars == 0);
@@ -1164,6 +1166,31 @@ unsigned int RL_rebSpellIntoWide(
 
 
 //
+//  rebSpellIntoWide: RL_API
+//
+// Extract UCS-2 data from an ANY-STRING! or ANY-WORD!.  Note this is *not*
+// UTF-16, so codepoints that require more than two bytes to represent will
+// cause errors.
+//
+// !!! Although the rebSpellInto API deals in bytes, this deals in count of
+// characters.  (The use of REBLEN instead of REBSIZ indicates this.)  It may
+// be more useful for the wide string APIs to do this so leaving it that way
+// for now.
+//
+unsigned int RL_rebSpellIntoWide(
+    unsigned char quotes,
+    REBWCHAR *buf,
+    unsigned int buf_chars,  // chars buf can hold (not including terminator)
+    const void *p, va_list *vaptr
+){
+    DECLARE_LOCAL (v);
+    Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
+
+    return Spell_Into_Wide(buf, buf_chars, v);
+}
+
+
+//
 //  rebSpellWide: RL_API
 //
 // Gives the spelling as WCHARs.  If length in codepoints is needed, use
@@ -1177,21 +1204,78 @@ unsigned int RL_rebSpellIntoWide(
 // and extraction of that with rebBytes(), then dividing the size by 2).
 //
 REBWCHAR *RL_rebSpellWide(
-    unsigned char quotes,  // `#define FooQ(...) Foo(1, __VA_LIST__, rebEND)`
+    unsigned char quotes,
     const void *p, va_list *vaptr
 ){
-    DECLARE_LOCAL (string);
-    Run_Va_May_Fail(string, quotes, p, vaptr);  // calls va_end()
+    DECLARE_LOCAL (v);
+    Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
 
-    if (IS_NULLED(string))
+    if (IS_NULLED(v))
         return nullptr;  // null passed through, for opting out
 
-    REBLEN len = rebSpellIntoWideQ(nullptr, 0, string, rebEND);
+    REBLEN len = Spell_Into_Wide(nullptr, 0, v);
     REBWCHAR *result = cast(
         REBWCHAR*, rebMalloc(sizeof(REBWCHAR) * (len + 1))
     );
-    rebSpellIntoWideQ(result, len, string, rebEND);
+
+    REBLEN check = Spell_Into_Wide(result, len, v);
+    assert(check == len);
+    UNUSED(check);
+
     return result;
+}
+
+
+// Helper function for `rebBytesInto()` and `rebBytes()`
+//
+// CHAR!, ANY-STRING!, and ANY-WORD! are allowed without an AS BINARY!.
+//
+// !!! How many types should be allowed to convert automatically?
+//
+static size_t Bytes_Into(
+    unsigned char *buf,
+    size_t buf_size,
+    const REBVAL *v
+){
+    if (IS_BINARY(v)) {
+        REBSIZ size = VAL_LEN_AT(v);
+        if (buf == nullptr) {
+            assert(buf_size == 0);
+            return size;
+        }
+
+        REBSIZ limit = MIN(buf_size, size);
+        memcpy(buf, VAL_BIN_AT(v), limit);
+        return size;
+    }
+
+    if (IS_CHAR(v)) {  // Note: CHAR! caches its UTF-8 encoding in the cell
+        REBSIZ size = VAL_CHAR_ENCODED_SIZE(v);
+        if (buf == nullptr) {
+            assert(buf_size == 0);
+            return size;
+        }
+
+        REBSIZ limit = MIN(buf_size, size);
+        memcpy(buf, VAL_CHAR_ENCODED(v), limit);
+        return size;
+    }
+
+    if (ANY_WORD(v) or ANY_STRING(v)) {
+        REBSIZ size = Spell_Into(nullptr, 0, v);
+        if (buf == nullptr) {
+            assert(buf_size == 0);
+            return size;
+        }
+
+        REBSIZ check = Spell_Into(s_cast(buf), buf_size, v);
+        assert(check == size);
+        UNUSED(check);
+
+        return size;
+    }
+
+    fail ("rebBytes() only works with ANY-STRING!/ANY-WORD!/BINARY!/CHAR!");
 }
 
 
@@ -1205,24 +1289,15 @@ REBWCHAR *RL_rebSpellWide(
 // zero termination of Rebol series, including binaries.  Review.
 //
 size_t RL_rebBytesInto(
-    unsigned char quotes,  // `#define FooQ(...) Foo(1, __VA_LIST__, rebEND)`
+    unsigned char quotes,
     unsigned char *buf,
     size_t buf_size,
     const void *p, va_list *vaptr
 ){
-    DECLARE_LOCAL (binary);
-    Run_Va_May_Fail(binary, quotes, p, vaptr);  // calls va_end()
+    DECLARE_LOCAL (v);
+    Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
 
-    REBSIZ size = VAL_LEN_AT(binary);
-
-    if (not buf) {
-        assert(buf_size == 0);
-        return size;  // exact size ('\0' only on rebRepossess()-able memory)
-    }
-
-    REBSIZ limit = MIN(buf_size, size);
-    memcpy(s_cast(buf), cs_cast(VAL_BIN_AT(binary)), limit);
-    return size;
+    return Bytes_Into(buf, buf_size, v);
 }
 
 
@@ -1233,69 +1308,27 @@ size_t RL_rebBytesInto(
 // encoding of an ANY-STRING! or ANY-WORD! and that size in bytes.  (Hence,
 // for strings it is like rebSpell() except telling you how many bytes.)
 //
-// !!! This may wind up being a generic TO BINARY! converter, so you might
-// be able to get the byte conversion for any type.
-//
 unsigned char *RL_rebBytes(
-    unsigned char quotes,  // `#define FooQ(...) Foo(1, __VA_LIST__, rebEND)`
+    unsigned char quotes,
     size_t *size_out,  // !!! Enforce non-null, to ensure type safety?
     const void *p, va_list *vaptr
 ){
-    DECLARE_LOCAL (series);
-    Run_Va_May_Fail(series, quotes, p, vaptr);  // calls va_end()
+    DECLARE_LOCAL (v);
+    Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
 
-    if (IS_NULLED(series)) {
+    if (IS_NULLED(v)) {
         *size_out = 0;
-        return nullptr;  // NULL is passed through, for opting out
+        return nullptr;  // nullptr is passed through, for opting out
     }
 
-    if (IS_CHAR(series)) {
-        //
-        // Needing the UTF-8 encoding of a character common (e.g. writing the
-        // terminal code).  We could make people run AS BINARY! on CHAR!, but
-        // it's more efficient to offer it as one of the fundamental things
-        // rebBytes() can handle (the character cell holds the encoded form).
-        //
-        *size_out = series->payload.Character.size_then_encoded[0];
-        char *result = rebAllocN(char, *size_out);  // no +1 needed...
-        assert(result[*size_out] == '\0');  // ...see rebRepossess() for why
-        memcpy(
-            result,
-            &series->payload.Character.size_then_encoded[1],
-            *size_out
-        );
-        return cast(unsigned char*, result);
-    }
+    REBSIZ size = Bytes_Into(nullptr, 0, v);
 
-    if (ANY_WORD(series) or ANY_STRING(series)) {
-        *size_out = rebSpellIntoQ(nullptr, 0, series, rebEND);
-        char *result = rebAllocN(char, *size_out);  // no +1 needed...
-        assert(result[*size_out] == '\0');  // ...see rebRepossess() for why
-        size_t check = rebSpellIntoQ(
-            result,
-            *size_out,
-            series,
-        rebEND);
-        assert(check == *size_out);
-        UNUSED(check);
-        return cast(unsigned char*, result);
-    }
+    unsigned char *result = rebAllocN(unsigned char, size);  // no +1 needed...
+    assert(result[size] == '\0');  // ...see rebRepossess() for why
+    Bytes_Into(result, size, v);
 
-    if (IS_BINARY(series)) {
-        *size_out = rebBytesIntoQ(nullptr, 0, series, rebEND);
-        unsigned char *result = rebAllocN(REBYTE, *size_out);
-        assert(result[*size_out] == '\0');  // ...see rebRepossess() for why
-        size_t check = rebBytesIntoQ(
-            result,
-            *size_out,
-            series,
-        rebEND);
-        assert(check == *size_out);
-        UNUSED(check);
-        return result;
-    }
-
-    fail ("rebBytes() only works with ANY-STRING!/ANY-WORD!/BINARY!/CHAR!");
+    *size_out = size;
+    return cast(unsigned char*, result);
 }
 
 
