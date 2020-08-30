@@ -461,39 +461,38 @@ map-each-api [
         e-cwrap/emit cscape/with {
             reb.$<No-Reb-Name>_qlevel = function() {
                 $<Enter>
-                var argc = arguments.length
-                var stack = stackSave()
-                var va = stackAlloc(4 * (argc + 1 + 1))
-                var a, i, l, p
-                for (i=0; i < argc; i++) {
-                    a = arguments[i]
-                    switch (typeof a) {
-                      case 'string':
-                        l = lengthBytesUTF8(a) + 4
-                        l = l & ~3
-                        p = stackAlloc(l)
-                        stringToUTF8(a, p, l)
+                let argc = arguments.length
+                let stack = stackSave()
+                let packed = stackAlloc(4 * (argc + 1))
+                for (let i = 0; i < argc; ++i) {
+                    let arg = arguments[i]
+                    let p  /* heap address for (maybe) adjusted argument */
+
+                    switch (typeof arg) {
+                      case 'string': {  /* JS strings act as source code */
+                        let len = lengthBytesUTF8(arg) + 4
+                        len = len & ~3  /* corrected to align in 32-bits? */
+                        p = stackAlloc(len)
+                        stringToUTF8(arg, p, len)
+                        break }
+
+                      case 'number':  /* heap address, e.g. REBVAL pointer */
+                        p = arg
                         break
-                      case 'number':
-                        p = a
-                        break
+
                       default:
                         throw Error("Invalid type!")
                     }
-                    HEAP32[(va>>2) + i] = p
+
+                    HEAP32[(packed>>2) + i] = p
                 }
 
-                HEAP32[(va>>2) + argc] = reb.END
-
-                /* `va + 4` is where first vararg is, must pass as *address*.
-                 * Just put that address on the heap after the reb.END.
-                 */
-                HEAP32[(va>>2) + (argc + 1)] = va + 4
+                HEAP32[(packed>>2) + argc] = reb.END
 
                 a = reb.m._RL_$<Name>(
                     this.quotes,
-                    HEAP32[va>>2],
-                    va + 4 * (argc + 1)
+                    packed,
+                    0  /* null vaptr means `p` is array of `const void*` */
                 )
 
                 stackRestore(stack)
