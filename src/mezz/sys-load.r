@@ -545,6 +545,7 @@ load-module: func [
 
     let mod: null
     let hdr: null
+    let tmp: null
 
     ; NOTES:
     ;
