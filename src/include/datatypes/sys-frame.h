@@ -51,12 +51,12 @@ inline static bool IS_QUOTABLY_SOFT(const RELVAL *v) {
 //=////////////////////////////////////////////////////////////////////////=//
 
 
-inline static bool FRM_IS_VALIST(REBFRM *f) {
-    return f->feed->vaptr != nullptr;
+inline static bool FRM_IS_VARIADIC(REBFRM *f) {
+    return f->feed->vaptr != nullptr or f->feed->packed != nullptr;
 }
 
 inline static REBARR *FRM_ARRAY(REBFRM *f) {
-    assert(IS_END(f->feed->value) or not FRM_IS_VALIST(f));
+    assert(IS_END(f->feed->value) or not FRM_IS_VARIADIC(f));
     return f->feed->array;
 }
 
@@ -70,12 +70,12 @@ inline static REBLEN FRM_INDEX(REBFRM *f) {
     if (IS_END(f->feed->value))
         return ARR_LEN(f->feed->array);
 
-    assert(not FRM_IS_VALIST(f));
+    assert(not FRM_IS_VARIADIC(f));
     return f->feed->index - 1;
 }
 
 inline static REBLEN FRM_EXPR_INDEX(REBFRM *f) {
-    assert(not FRM_IS_VALIST(f));
+    assert(not FRM_IS_VARIADIC(f));
     return f->expr_index - 1;
 }
 
@@ -317,7 +317,7 @@ inline static void Push_Frame_No_Varlist(REBVAL *out, REBFRM *f)
         assert(IS_POINTER_TRASH_DEBUG(f->feed->pending));
         assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
     }
-    else if (FRM_IS_VALIST(f)) {
+    else if (FRM_IS_VARIADIC(f)) {
         //
         // There's nothing to put a hold on while it's a va_list-based frame.
         // But a GC might occur and "Reify" it, in which case the array
@@ -372,7 +372,7 @@ inline static void Abort_Frame(REBFRM *f) {
     if (IS_END(f->feed->value))
         goto pop;
 
-    if (FRM_IS_VALIST(f)) {
+    if (FRM_IS_VARIADIC(f)) {
         assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
 
         // Aborting valist frames is done by just feeding all the values

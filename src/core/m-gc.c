@@ -365,7 +365,7 @@ void Reify_Va_To_Array_In_Frame(
 ) {
     REBDSP dsp_orig = DSP;
 
-    assert(FRM_IS_VALIST(f));
+    assert(FRM_IS_VARIADIC(f));
 
     if (truncated) {
         DS_PUSH();
@@ -395,7 +395,9 @@ void Reify_Va_To_Array_In_Frame(
         f->feed->index = 0;
     }
 
-    assert(not f->feed->vaptr);  // feeding forward should have called va_end
+    // feeding forward should have called va_end
+    //
+    assert(not f->feed->vaptr and not f->feed->packed);
 
     if (DSP == dsp_orig)
         f->feed->array = EMPTY_ARRAY;  // don't bother making new empty array

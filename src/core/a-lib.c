@@ -684,8 +684,17 @@ const void *RL_rebArgR(unsigned char quotes, const void *p, va_list *vaptr)
     // JavaScript string proxying.
     //
     UNUSED(quotes);
-    const char *name = cast(const char*, p);
-    const void *p2 = va_arg(*vaptr, const void*);
+    const char *name;
+    const void *p2;
+    if (vaptr) {
+        name = cast(const char*, p);
+        p2 = va_arg(*vaptr, const void*);
+    }
+    else {
+        const void* const *packed = cast(const void* const*, p);
+        name = cast(const char*, *packed++);
+        p2 = *packed++;
+    }
     if (Detect_Rebol_Pointer(p2) != DETECTED_AS_END)
         fail ("rebArg() isn't actually variadic, it's arity-1");
 
@@ -1532,7 +1541,7 @@ bool RL_rebWasHalting(void)
 //
 // !!! Formative discussion: https://forum.rebol.info/t/1050
 //
-static const void *rebSpliceQuoteAdjuster_internal(
+static const REBINS *rebSpliceQuoteAdjuster_internal(
     int delta,  // -1 to remove quote from splices, +1 to add quote to splices
     const void *p,
     va_list *vaptr
@@ -1546,9 +1555,19 @@ static const void *rebSpliceQuoteAdjuster_internal(
     // just calling rebQ(value) to get a quote on a single value.  Sense
     // that situation and make it faster.
     //
+    const void* const *packed;
+    if (vaptr)
+        packed = nullptr;
+    else {
+        packed = cast(const void* const*, p);
+        p = *packed++;
+    }
     if (not p or Detect_Rebol_Pointer(p) == DETECTED_AS_CELL) {
         const REBVAL *first = REIFY_NULL(VAL(p));  // save pointer
-        p = va_arg(*vaptr, const void*);  // advance next pointer (fast!)
+        if (vaptr)
+            p = va_arg(*vaptr, const void*);  // advance next pointer (fast!)
+        else
+            p = *packed++;
         if (p and Detect_Rebol_Pointer(p) == DETECTED_AS_END) {
             a = Alloc_Singular(NODE_FLAG_MANAGED);
             CLEAR_SERIES_FLAG(a, MANAGED);  // see notes above on why we lied
@@ -1585,7 +1604,7 @@ static const void *rebSpliceQuoteAdjuster_internal(
 
     SET_ARRAY_FLAG(a, INSTRUCTION_ADJUST_QUOTING);
     MISC(a).quoting_delta = delta;
-    return a;
+    return NOD(a);
 }
 
 //
@@ -1593,7 +1612,7 @@ static const void *rebSpliceQuoteAdjuster_internal(
 //
 // This is #defined as rebQ, but C89 shortcut is rebQ => rebQ(v, rebEND)
 //
-const void *RL_rebQUOTING(
+const REBINS *RL_rebQUOTING(
     unsigned char quotes,
     const void *p, va_list *vaptr
 ){
@@ -1606,7 +1625,7 @@ const void *RL_rebQUOTING(
 //
 // This is #defined as rebU, but C89 shortcut is rebU => rebU(v, rebEND)
 //
-const void *RL_rebUNQUOTING(
+const REBINS *RL_rebUNQUOTING(
     unsigned char quotes,
     const void *p, va_list *vaptr
 ){
@@ -1623,7 +1642,7 @@ const void *RL_rebUNQUOTING(
 // they are seen (or even if they are not seen, if there is a failure on that
 // call it will still process the va_list in order to release these handles)
 //
-const void *RL_rebRELEASING(REBVAL *v)
+const REBINS *RL_rebRELEASING(REBVAL *v)
 {
     if (not Is_Api_Value(v))
         fail ("Cannot apply rebR() to non-API value");
@@ -1633,7 +1652,7 @@ const void *RL_rebRELEASING(REBVAL *v)
         fail ("Cannot apply rebR() more than once to the same API value");
 
     SET_ARRAY_FLAG(a, SINGULAR_API_RELEASE);
-    return a;  // returned as const void* to discourage use outside variadics
+    return NOD(a);
 }
 
 

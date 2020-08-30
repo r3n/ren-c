@@ -79,7 +79,7 @@ void Dump_Frame_Location(const RELVAL *v, REBFRM *f)
 
         printf("Dump_Frame_Location() rest\n");
 
-        if (FRM_IS_VALIST(f)) {
+        if (FRM_IS_VARIADIC(f)) {
             //
             // NOTE: This reifies the va_list in the frame, which should not
             // affect procssing.  But it is a side-effect and may need to be
@@ -223,7 +223,7 @@ void Eval_Core_Expression_Checks_Debug(REBFRM *f)
     // Mutate va_list sources into arrays at fairly random moments in the
     // debug build.  It should be able to handle it at any time.
     //
-    if (FRM_IS_VALIST(f) and SPORADICALLY(50)) {
+    if (FRM_IS_VARIADIC(f) and SPORADICALLY(50)) {
         const bool truncated = true;
         Reify_Va_To_Array_In_Frame(f, truncated);
     }
@@ -304,7 +304,7 @@ void Eval_Core_Exit_Checks_Debug(REBFRM *f) {
 
     SHORTHAND (next, f->feed->value, NEVERNULL(const RELVAL*));
 
-    if (NOT_END(*next) and not FRM_IS_VALIST(f)) {
+    if (NOT_END(*next) and not FRM_IS_VARIADIC(f)) {
         if (f->feed->index > ARR_LEN(f->feed->array)) {
             assert(
                 (f->feed->pending and IS_END(f->feed->pending))

@@ -435,6 +435,12 @@ struct Reb_Feed {
     //
     va_list *vaptr;
 
+    // The feed could also be coming from a packed array of pointers...this
+    // is used by the C++ interface, which creates a `std::array` on the
+    // C stack of the processed variadic arguments it enumerated.
+    //
+    const void* const *packed;
+
     // This contains an IS_END() marker if the next fetch should be an attempt
     // to consult the va_list (if any).  That end marker may be resident in
     // an array, or if it's a plain va_list source it may be the global END.

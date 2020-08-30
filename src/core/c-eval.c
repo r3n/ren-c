@@ -1587,7 +1587,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         assert(IS_END(f->param));
         assert(
             IS_END(*next)
-            or FRM_IS_VALIST(f)
+            or FRM_IS_VARIADIC(f)
             or IS_VALUE_IN_ARRAY_DEBUG(f->feed->array, *next)
         );
 

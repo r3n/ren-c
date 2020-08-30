@@ -279,14 +279,20 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             // feed is actually over so as to put null... so get another
             // value out of the va_list and keep going.
             //
-            p = va_arg(*feed->vaptr, const void*);
+            if (feed->vaptr)
+                p = va_arg(*feed->vaptr, const void*);
+            else
+                p = *feed->packed++;
             goto detect_again;
         }
 
         // !!! for now, assume scan went to the end; ultimately it would need
         // to pass the feed in as a parameter for partial scans
         //
-        feed->vaptr = nullptr;
+        if (feed->vaptr)
+            feed->vaptr = nullptr;
+        else
+            feed->packed = nullptr;
 
         REBARR *reified = Pop_Stack_Values(dsp_orig);
 
@@ -389,8 +395,14 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         // The va_end() is taken care of here, or if there is a throw/fail it
         // is taken care of by Abort_Frame_Core()
         //
-        va_end(*feed->vaptr);
-        feed->vaptr = nullptr;
+        if (feed->vaptr) {
+            va_end(*feed->vaptr);
+            feed->vaptr = nullptr;
+        }
+        else {
+            assert(feed->packed);
+            feed->packed = nullptr;
+        }
 
         // !!! Error reporting expects there to be an array.  The whole story
         // of errors when there's a va_list is not told very well, and what
@@ -463,8 +475,26 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         ++feed->pending; // might be becoming an END marker, here
         ++feed->index;
     }
-    else if (not feed->vaptr) {
+    else if (feed->vaptr) {
         //
+        // A variadic can source arbitrary pointers, which can be detected
+        // and handled in different ways.  Notably, a UTF-8 string can be
+        // differentiated and loaded.
+        //
+        const void *p = va_arg(*feed->vaptr, const void*);
+       // feed->index = TRASHED_INDEX; // avoids warning in release build
+        lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
+    }
+    else if (feed->packed) {
+        //
+        // C++ variadics use an ordinary packed array of pointers, because
+        // they do more ambitious things with the arguments and there is no
+        // (standard) way to construct a C va_list programmatically.
+        //
+        const void *p = *feed->packed++;
+        lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
+    }
+    else {
         // The frame was either never variadic, or it was but got spooled into
         // an array by Reify_Va_To_Array_In_Frame().  The first END we hit
         // is the full stop end.
@@ -474,15 +504,6 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         TRASH_POINTER_IF_DEBUG(feed->pending);
 
         ++feed->index; // for consistency in index termination state
-    }
-    else {
-        // A variadic can source arbitrary pointers, which can be detected
-        // and handled in different ways.  Notably, a UTF-8 string can be
-        // differentiated and loaded.
-        //
-        const void *p = va_arg(*feed->vaptr, const void*);
-        feed->index = TRASHED_INDEX; // avoids warning in release build
-        lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
     }
 
     assert(
@@ -581,6 +602,7 @@ inline static void Prep_Array_Feed(
     Init_Unreadable_Blank(&feed->lookback);
 
     feed->vaptr = nullptr;
+    feed->packed = nullptr;
     feed->array = array;
     feed->specifier = specifier;
     feed->flags.bits = flags;
@@ -624,7 +646,15 @@ inline static void Prep_Va_Feed(
     feed->index = TRASHED_INDEX;  // avoid warning in release build
     feed->array = nullptr;
     feed->flags.bits = flags;
-    feed->vaptr = vaptr;
+    if (vaptr == nullptr) {  // `p` should be treated as a packed void* array
+        feed->vaptr = nullptr;
+        feed->packed = cast(const void* const*, p);
+        p = *feed->packed++;
+    }
+    else {
+        feed->vaptr = vaptr;
+        feed->packed = nullptr;
+    }
     feed->pending = END_NODE;  // signal next fetch comes from va_list
     feed->specifier = SPECIFIED;  // relative values not allowed
     Detect_Feed_Pointer_Maybe_Fetch(feed, p, false);

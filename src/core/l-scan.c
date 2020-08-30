@@ -963,7 +963,12 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
         if (not ss->feed)  // not a variadic va_list-based scan...
             return TOKEN_END;  // ...so end of utf-8 input was *the* end
 
-        const void *p = va_arg(*ss->feed->vaptr, const void*);
+        const void *p;
+        if (ss->feed->vaptr)
+            p = va_arg(*ss->feed->vaptr, const void*);
+        else
+            p = *ss->feed->packed++;
+
         if (not p or Detect_Rebol_Pointer(p) != DETECTED_AS_UTF8) {
             //
             // If it's not a UTF-8 string we don't know how to handle it.
@@ -1003,7 +1008,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             // context for the error-causing input.
             //
             if (not ss->line_head) {
-                assert(ss->feed->vaptr != nullptr);
+                assert(ss->feed->vaptr or ss->feed->packed);
                 assert(not level->start_line_head);
                 level->start_line_head = ss->line_head = ss->begin;
             }
