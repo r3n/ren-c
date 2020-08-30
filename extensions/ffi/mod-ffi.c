@@ -40,15 +40,12 @@ static ffi_abi Abi_From_Word(const REBVAL *word) {
 
     assert(IS_WORD(word));
 
-    // !!! In order to use #ifdefs inside the call, we cannot use the variadic
+    // In order to use #ifdefs inside the call, we cannot use the variadic
     // macro that injects rebEND, but need to use a plain C call and add our
-    // own rebEND.  This should be an official technique with an official
-    // name (like _nomacro?), though perhaps it should only be offered in one
-    // variation (e.g. one that returns a value that you must unbox separately
-    // with a macro?)  Review the question, and use the underlying _inline
-    // for now.
+    // own rebEND.
     //
-    ffi_abi abi = (ffi_abi)rebUnboxInteger_inline("switch", rebQ(word), "[",
+    ffi_abi abi = (ffi_abi)LIBREBOL_NOMACRO(rebUnboxInteger)(
+      "switch", rebQ(word), "[",
 
         "'default [", rebI(FFI_DEFAULT_ABI), "]",
 
@@ -95,7 +92,9 @@ static ffi_abi Abi_From_Word(const REBVAL *word) {
       #endif  // X86_WIN64
 
         "fail [{Unknown ABI for platform:}", rebQ(word), "]",
-    "]", rebEND);  // <-- rebEND required because we're not using a macro!
+      "]", 
+      rebEND  // <-- rebEND required, call is not a macro (LIBREBOL_NOMACRO)
+    );
 
     return abi;
 }

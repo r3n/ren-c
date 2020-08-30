@@ -766,6 +766,13 @@ e-lib/emit {
 
         #endif  /* REBOL_EXPLICIT_END */
 
+
+        /*
+         * The NOMACRO version of the API is one in which you can use macros
+         * inside the call.  If you're using C this means you'll have to
+         * explicitly put a rebEND on, whether using C99 or not.
+         */
+        #define LIBREBOL_NOMACRO(api) api##_inline
     #else
         /*
          * If using C++, variadic calls can be type-checked to make sure only
@@ -879,6 +886,12 @@ e-lib/emit {
 
         $[C++-Variadic-Inlines]
 
+        /*
+         * The NOMACRO version of the API is one in which you can use macros
+         * inside the call.  If you're using C99 this means you'll have to
+         * explicitly put a rebEND on.  No special action w/C++ wrappers.
+         */
+        #define LIBREBOL_NOMACRO(api) api
     #endif  /* C++ versions */
 
     /*
