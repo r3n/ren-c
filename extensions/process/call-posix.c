@@ -875,7 +875,7 @@ REB_R Call_Core(REBFRM *frame_) {
         );
     }
     else if (non_errno_ret < 0)
-        rebJumps("fail {Unknown error happened in CALL}");
+        rebJumps("fail {Unknown error happened in CALL}", rebEND);
 
 
     // Call may not succeed if r != 0, but we still have to run cleanup

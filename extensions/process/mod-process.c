@@ -837,9 +837,12 @@ REBNATIVE(send_signal)
 {
     PROCESS_INCLUDE_PARAMS_OF_SEND_SIGNAL;
 
+    pid_t pid = rebUnboxInteger(ARG(pid), rebEND);
+    int signal = rebUnboxInteger(ARG(signal), rebEND);
+
     // !!! Is called `send-signal` but only seems to call kill (?)
     //
-    kill_process(rebUnboxInteger(ARG(pid)), rebUnboxInteger(ARG(signal)));
+    kill_process(pid, signal);
 
     return Init_Void(D_OUT);
 }

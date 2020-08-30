@@ -130,7 +130,7 @@ int get_random(void *p_rng, unsigned char *output, size_t output_len)
         return 0;  // success
   #endif
 
-  rebJumps ("fail {Random number generation did not succeed}");
+  rebJumps ("fail {Random number generation did not succeed}", rebEND);
 }
 
 
@@ -478,19 +478,20 @@ REBNATIVE(rsa)
 
         if (p)
             IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-                &ctx.P, VAL_BIN_AT(p), rebUnbox("length of", p)));
+                &ctx.P, VAL_BIN_AT(p), rebUnbox("length of", p, rebEND)));
         if (q)
             IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-                &ctx.Q, VAL_BIN_AT(q), rebUnbox("length of", q)));
+                &ctx.Q, VAL_BIN_AT(q), rebUnbox("length of", q, rebEND)));
         if (dp)
             IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-                &ctx.DP, VAL_BIN_AT(dp), rebUnbox("length of", dp)));
+                &ctx.DP, VAL_BIN_AT(dp), rebUnbox("length of", dp, rebEND)));
         if (dq)
             IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-                &ctx.DQ, VAL_BIN_AT(dq), rebUnbox("length of", dq)));
+                &ctx.DQ, VAL_BIN_AT(dq), rebUnbox("length of", dq, rebEND)));
         if (qinv)
             IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-                &ctx.QP, VAL_BIN_AT(qinv), rebUnbox("length of", qinv)));
+                &ctx.QP, VAL_BIN_AT(qinv),
+                rebUnbox("length of", qinv, rebEND)));
 
         IF_NOT_0(cleanup, error, mbedtls_rsa_gen_key(
             &ctx,

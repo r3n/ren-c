@@ -831,7 +831,7 @@ REB_R PD_Gob(
 
     if (IS_INTEGER(picker))
         return rebValueQ(
-            rebU(NATIVE_VAL(pick)), ARR_AT(gob, IDX_GOB_PANE), picker,
+            rebU(NATIVE_VAL(pick)), KNOWN(ARR_AT(gob, IDX_GOB_PANE)), picker,
         rebEND);
 
     return R_UNHANDLED;
@@ -1048,7 +1048,7 @@ REBTYPE(Gob)
 
     case SYM_REVERSE:
         return rebValueQ(
-            "reverse", ARR_AT(gob, IDX_GOB_PANE),
+            "reverse", KNOWN(ARR_AT(gob, IDX_GOB_PANE)),
         rebEND);
 
     default:

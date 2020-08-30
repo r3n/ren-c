@@ -67,7 +67,8 @@ REBNATIVE(test_librebol)
 
     Init_Integer(DS_PUSH(), 2);
     intptr_t getter = rebUnboxInteger("api-transient {Hello}", rebEND);
-    Init_Logic(DS_PUSH(), rebDidQ("{Hello} =", cast(void*, getter), rebEND));
+    REBNOD *getter_node = cast(REBNOD*, cast(void*, getter));
+    Init_Logic(DS_PUSH(), rebDidQ("{Hello} =", getter_node, rebEND));
 
     return Init_Block(D_OUT, Pop_Stack_Values(dsp_orig));
   #endif
