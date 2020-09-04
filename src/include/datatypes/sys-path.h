@@ -172,6 +172,31 @@ inline static void Set_Path_Core(  // !!! Appears to be unused.  Unnecessary?
 }
 
 
+// If a value cell holding a PATH! is to a shorthand form (e.g. WORD! cell)
+// then turn that into an array.  (We don't want to destructively reify
+// paths, e.g. there should be no actual PG_2_Blanks_Array paths existing.)
+//
+inline static REBARR *VAL_PATH(RELVAL *path)
+{
+    assert(ANY_PATH_KIND(CELL_TYPE(path)));
+    if (MIRROR_BYTE(path) == REB_WORD) {
+        assert(VAL_WORD_SYM(VAL_UNESCAPED(path)) == SYM__SLASH_1_);
+        return PG_2_Blanks_Array;
+    }
+    return VAL_ARRAY(path);
+}
+
+inline static REBSPC *VAL_PATH_SPECIFIER(RELVAL *path)
+{
+    assert(ANY_PATH_KIND(CELL_TYPE(path)));
+    if (MIRROR_BYTE(path) == REB_WORD) {
+        assert(VAL_WORD_SYM(VAL_UNESCAPED(path)) == SYM__SLASH_1_);
+        return SPECIFIED;
+    }
+    return VAL_SPECIFIER(path);
+}
+
+
 // Ren-C has no REFINEMENT! datatype, so `/foo` is a PATH!, which generalizes
 // to where `/foo/bar` is a PATH! as well, etc.
 //
@@ -188,6 +213,12 @@ inline static REBVAL *Refinify(REBVAL *v) {
     // you can't put paths in paths in the first place.
     //
     assert(CELL_KIND(VAL_UNESCAPED(v)) != REB_PATH);
+
+    if (IS_BLANK(v)) {  // !!! Special handling needed, review callsites
+        Init_Word(v, PG_Slash_1_Canon);
+        mutable_KIND_BYTE(v) = REB_PATH;
+        return v;
+    }
 
     REBARR *a = Make_Array(2);
     Init_Blank(Alloc_Tail_Array(a));

@@ -516,6 +516,22 @@ void Startup_Interning(void)
 
 
 //
+//  Startup_Slash_1_Symbol: C
+//
+// The trick which allows the `/` to be a 2-element PATH! and yet act like a
+// WORD! when used in evaluative contexts requires that word's spelling to be
+// available during scanning.  But scanning is what loads the %words.r symbol
+// list!  Break the Catch-22 by manually interning the symbol used.
+//
+void Startup_Slash_1_Symbol(void)
+{
+    const char *slash1 = "-slash-1-";
+    assert(PG_Slash_1_Canon == nullptr);
+    PG_Slash_1_Canon = Intern_UTF8_Managed(cb_cast(slash1), strsize(slash1));
+}
+
+
+//
 //  Startup_Symbols: C
 //
 // By this point in the boot, the canon words have already been interned for
@@ -532,6 +548,7 @@ void Startup_Interning(void)
 //
 void Startup_Symbols(REBARR *words)
 {
+    assert(PG_Symbol_Canons == nullptr);
     PG_Symbol_Canons = Make_Series_Core(
         1 + ARR_LEN(words), // 1 + => extra trash at head for SYM_0
         sizeof(REBSTR*),
@@ -554,6 +571,9 @@ void Startup_Symbols(REBARR *words)
 
         sym = cast(REBSYM, cast(REBLEN, sym) + 1);
         *SER_AT(REBSTR*, PG_Symbol_Canons, cast(REBLEN, sym)) = canon;
+
+        if (sym == SYM__SLASH_1_)
+            assert(canon == PG_Slash_1_Canon);  // make sure it lined up!
 
         // More code was loaded than just the word list, and it might have
         // included alternate-case forms of the %words.r words.  Walk any
@@ -599,6 +619,9 @@ void Startup_Symbols(REBARR *words)
 void Shutdown_Symbols(void)
 {
     Free_Unmanaged_Series(PG_Symbol_Canons);
+    PG_Symbol_Canons = nullptr;
+
+    PG_Slash_1_Canon = nullptr;
 }
 
 

@@ -283,9 +283,16 @@ inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v);
 #define CELL_KIND_UNCHECKED(cell) \
     cast(enum Reb_Kind, MIRROR_BYTE(cell))
 
+#define CELL_TYPE_UNCHECKED(cell) \
+    cast(enum Reb_Kind, KIND_BYTE_UNCHECKED(cell) % REB_64)
+
+
 #if defined(NDEBUG)
     #define CELL_KIND CELL_KIND_UNCHECKED
+    #define CELL_TYPE CELL_TYPE_UNCHECKED
 #else
+    #define CELL_TYPE CELL_TYPE_UNCHECKED  // develop this more rigorously
+
     #if !defined(CPLUSPLUS_11)
         #define CELL_KIND(cell) \
             cast(enum Reb_Kind, MIRROR_BYTE(cast(const RELVAL*, cell)))

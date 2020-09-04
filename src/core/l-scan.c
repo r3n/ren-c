@@ -1880,13 +1880,16 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     goto loop;
                 }
 
-                // Handle the simple `/` case
+                // Handle the `/` case
+                //
+                // There is an unusual finesse at work here where the cell
+                // format used is that of WORD! `-slash-1-`, so that it has a
+                // binding and a spelling.  Yet when arrays are requested, it
+                // gives that array as the global `PG_Path_2_Blanks_Array`,
+                // for what you get as `make path! [_ _]`.
 
-                REBARR *a = Make_Array(2);
-                Init_Blank(ARR_AT(a, 0));
-                Init_Blank(ARR_AT(a, 1));
-                TERM_ARRAY_LEN(a, 2);
-                Init_Path(DS_PUSH(), a);
+                Init_Word(DS_PUSH(), PG_Slash_1_Canon);  // mirror is REB_WORD
+                mutable_KIND_BYTE(DS_TOP) = REB_PATH;  // but kind is REB_PATH
                 break;
             }
 

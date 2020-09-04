@@ -1852,6 +1852,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // enfix in cases like `(+ 1 2)`, or after PARAMLIST_IS_INVISIBLE e.g.
 // `10 comment "hi" + 20`.
 
+      process_word:
       case REB_WORD:
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, *specifier);
@@ -1896,6 +1897,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // All values are allowed in these assignments, including NULL and VOID!
 // https://forum.rebol.info/t/1206
 
+      process_set_word:
       case REB_SET_WORD: {
         if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))  // see notes
             goto return_thrown;
@@ -1915,6 +1917,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // who wanted to use ACTION!s inertly:
 // https://forum.rebol.info/t/should-get-word-of-a-void-raise-an-error/1301
 
+      process_get_word:
       case REB_GET_WORD:
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, *specifier);
@@ -1980,6 +1983,11 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // If the get of the path is null, then it will be an error.
 
       case REB_PATH: {
+        if (MIRROR_BYTE(v) == REB_WORD) {
+            assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+            goto process_word;
+        }
+
         assert(VAL_INDEX_UNCHECKED(v) == 0);  // this is the rule for now
 
         if (ANY_INERT(ARR_HEAD(VAL_ARRAY(v)))) {
@@ -2068,6 +2076,11 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // Note that nulled cells are allowed: https://forum.rebol.info/t/895/4
 
       case REB_SET_PATH: {
+        if (MIRROR_BYTE(v) == REB_WORD) {
+            assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+            goto process_set_word;
+        }
+
         if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))
             goto return_thrown;
 
@@ -2105,6 +2118,11 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // Consistent with GET-WORD!, a GET-PATH! acts as GET and won't return VOID!.
 
       case REB_GET_PATH:
+        if (MIRROR_BYTE(v) == REB_WORD) {
+            assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+            goto process_get_word;
+        }
+
         if (Get_Path_Throws_Core(f->out, v, *specifier))
             goto return_thrown;
 
@@ -2599,32 +2617,21 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
     if (kind.byte == REB_PATH) {
         if (
             GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)
-            or VAL_LEN_AT(*next) != 2
-            or not IS_BLANK(ARR_AT(VAL_ARRAY(*next), 0))
-            or not IS_BLANK(ARR_AT(VAL_ARRAY(*next), 1))
+            or MIRROR_BYTE(*next) != REB_WORD
         ){
             CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
             goto finished;
         }
 
-        // We had something like `5 + 5 / 2 + 3`.  This is a special form of
-        // path dispatch tentatively called "path splitting" (as opposed to
-        // `a/b` which is "path picking").  For the moment, this is not
-        // handled as a parameterization to the PD_Xxx() functions, nor is it
-        // a separate dispatch like PS_Xxx()...but it just performs division
-        // compatibly with history.
-
-        REBNOD *binding = nullptr;
-        Push_Action(f, NATIVE_ACT(path_0), binding);
-
-        REBSTR *opt_label = nullptr;
-        Begin_Enfix_Action(f, opt_label);
-
-        Fetch_Next_Forget_Lookback(f);  // advances f->value
-        goto process_action;
+        // Although the `/` case appears to be a PATH!, it is actually a
+        // WORD! under the hood and can have a binding.  The "spelling" of
+        // this word is an alias, because `/` is purposefully not legal in
+        // words.)  Operations based on VAL_TYPE() or CELL_TYPE() will see it
+        // as PATH!, but CELL_KIND() will interpret the cell bits as a word.
+        //
+        assert(VAL_WORD_SYM(VAL_UNESCAPED(*next)) == SYM__SLASH_1_);
     }
-
-    if (kind.byte != REB_WORD) {
+    else if (kind.byte != REB_WORD) {
         CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
         goto finished;
     }

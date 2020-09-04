@@ -687,6 +687,20 @@ static void Startup_Empty_Array(void)
 {
     PG_Empty_Array = Make_Array_Core(0, NODE_FLAG_MANAGED);
     SET_SERIES_INFO(PG_Empty_Array, FROZEN);
+
+    // "Empty" PATH!s that look like `/` are actually a WORD! cell format
+    // under the hood.  This allows them to have bindings and do double-duty
+    // for actions like division or other custom purposes.  But when they
+    // are accessed as an array, they give two blanks `[_ _]`.
+    //
+  blockscope {
+    REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
+    Init_Blank(ARR_AT(a, 0));
+    Init_Blank(ARR_AT(a, 1));
+    TERM_ARRAY_LEN(a, 2);
+    SET_SERIES_INFO(a, FROZEN);
+    PG_2_Blanks_Array = a;
+  }
 }
 
 
@@ -755,6 +769,11 @@ static void Init_Root_Vars(void)
     Root_Empty_Block = Init_Block(Alloc_Value(), PG_Empty_Array);
     Ensure_Value_Frozen(Root_Empty_Block, locker);
 
+    // Note: has to be a BLOCK!, 2-element blank paths use SYM__SLASH_1_
+    //
+    Root_2_Blanks_Block = Init_Block(Alloc_Value(), PG_2_Blanks_Array);
+    Ensure_Value_Frozen(Root_2_Blanks_Block, locker);
+
     // Note: rebText() can't run yet, review.
     //
     REBSTR *nulled_uni = Make_String(1);
@@ -801,6 +820,8 @@ static void Shutdown_Root_Vars(void)
     Root_Empty_Text = nullptr;
     rebRelease(Root_Empty_Block);
     Root_Empty_Block = nullptr;
+    rebRelease(Root_2_Blanks_Block);
+    Root_2_Blanks_Block = nullptr;
     rebRelease(Root_Empty_Binary);
     Root_Empty_Binary = nullptr;
 }
@@ -1285,6 +1306,8 @@ void Startup_Core(void)
         max,
         SYM_GZIP
     );
+
+    Startup_Slash_1_Symbol();  // see notes--needed before scanning
 
     REBARR *boot_array = Scan_UTF8_Managed(
         Intern("tmp-boot.r"),

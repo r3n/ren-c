@@ -153,12 +153,13 @@ inline static RELVAL *Quotify_Core(
 // do '''X -> ''X, ''X -> 'X or 'X -> X.  Use Unquotify() for the more
 // generic routine, but this is needed by the evaluator most commonly.
 //
+// Note: Strangely pretentious name is on purpose, to discourage general use.
+//
 inline static RELVAL *Unquotify_In_Situ(RELVAL *v, REBLEN unquotes)
 {
-    assert(KIND_BYTE(v) >= REB_64); // not an in-situ quoted value otherwise
+    assert(KIND_BYTE(v) >= REB_64);  // not an in-situ quoted value otherwise
     assert(cast(REBLEN, KIND_BYTE(v) / REB_64) >= unquotes);
     mutable_KIND_BYTE(v) -= REB_64 * unquotes;
-    assert(KIND_BYTE(v) % 64 == MIRROR_BYTE(v));
     return v;
 }
 

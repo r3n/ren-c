@@ -219,10 +219,8 @@ inline static bool Did_Init_Inert_Optimize_Complete(
     if (KIND_BYTE_UNCHECKED(feed->value) != REB_PATH)
         return true;  // paths do enfix processing if '/'
 
-    if (
-        KIND_BYTE(ARR_AT(VAL_ARRAY(feed->value), 0)) == REB_BLANK
-        and KIND_BYTE(ARR_AT(VAL_ARRAY(feed->value), 1)) == REB_BLANK
-    ){
+    if (MIRROR_BYTE(feed->value) == REB_WORD) {
+        assert(VAL_WORD_SYM(feed->value) == SYM__SLASH_1_);
         *flags |= EVAL_FLAG_POST_SWITCH | EVAL_FLAG_INERT_OPTIMIZATION;
         return false;  // Let evaluator handle `/`
     }

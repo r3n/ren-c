@@ -154,14 +154,23 @@ void Unbind_Values_Core(RELVAL *head, REBCTX *context, bool deep)
 {
     RELVAL *v = head;
     for (; NOT_END(v); ++v) {
+        //
+        // !!! We inefficiently dequote all values just to make sure we don't
+        // damage shared bindings; review more efficient means of doing this.
+        //
+        REBLEN num_quotes = Dequotify(v);
+        enum Reb_Kind kind = CELL_KIND(cast(REBCEL*, v));
+
         if (
-            ANY_WORD(v)
+            ANY_WORD_KIND(kind)
             and (not context or VAL_BINDING(v) == NOD(context))
         ){
             Unbind_Any_Word(v);
         }
-        else if (ANY_ARRAY_OR_PATH(v) and deep)
+        else if (ANY_ARRAY_OR_PATH_KIND(kind) and deep)
             Unbind_Values_Core(VAL_ARRAY_AT(v), context, true);
+
+        Quotify(v, num_quotes);
     }
 }
 
@@ -265,7 +274,7 @@ static void Clonify_And_Bind_Relative(
     REBLEN num_quotes = VAL_NUM_QUOTES(v);
     Dequotify(v);
 
-    enum Reb_Kind kind = cast(enum Reb_Kind, KIND_BYTE_UNCHECKED(v));
+    enum Reb_Kind kind = CELL_KIND(cast(REBCEL*, v));
     assert(kind < REB_MAX_PLUS_MAX);  // we dequoted it (pseudotypes ok)
 
     if (deep_types & FLAGIT_KIND(kind) & TS_SERIES_OBJ) {
@@ -274,7 +283,7 @@ static void Clonify_And_Bind_Relative(
         //
         REBSER *series;
         const RELVAL *sub_src;
-        if (ANY_CONTEXT(v)) {
+        if (ANY_CONTEXT_KIND(kind)) {
             INIT_VAL_CONTEXT_VARLIST(
                 v,
                 CTX_VARLIST(Copy_Context_Shallow_Managed(VAL_CONTEXT(v)))
