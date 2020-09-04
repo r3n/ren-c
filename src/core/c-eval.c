@@ -368,16 +368,6 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     if (IS_END(*next)) // `do [x:]`, `do [o/x:]`, etc. are illegal
         fail (Error_Need_Non_End_Core(v, *specifier));
 
-    // !!! While assigning `x: #[void]` is not legal, we make a special
-    // exemption for quoted voids, e.g. '#[void]`.  This means a molded
-    // object with void fields can be safely MAKE'd back.
-    //
-    if (KIND_BYTE(*next) == REB_VOID + REB_64) {
-        Init_Void(f->out);
-        Fetch_Next_Forget_Lookback(f);  // advances f->value
-        return false;
-    }
-
     // Using a SET-XXX! means you always have at least two elements; it's like
     // an arity-1 function.  `1 + x: whatever ...`.  This overrides the no
     // lookahead behavior flag right up front.
