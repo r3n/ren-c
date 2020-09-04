@@ -296,7 +296,7 @@ void Push_Paramlist_Triads_May_Fail(
             else {
                 assert(IS_TEXT(DS_TOP));  // !!! are blocks after notes good?
 
-                if (IS_BLANK_RAW(DS_TOP - 2)) {
+                if (IS_VOID_RAW(DS_TOP - 2)) {
                     //
                     // No parameters pushed, e.g. func [[integer!] {<-- bad}]
                     //
@@ -910,7 +910,7 @@ REBARR *Make_Paramlist_Managed_May_Fail(
     // the function description--it will be extracted from the slot before
     // it is turned into a rootkey for param_notes.
     //
-    Init_Unreadable_Blank(DS_PUSH()); // paramlist[0] becomes ACT_ARCHETYPE()
+    Init_Unreadable_Void(DS_PUSH()); // paramlist[0] becomes ACT_ARCHETYPE()
     Move_Value(DS_PUSH(), EMPTY_BLOCK); // param_types[0] (object canon)
     Move_Value(DS_PUSH(), EMPTY_TEXT); // param_notes[0] (desc, then canon)
 

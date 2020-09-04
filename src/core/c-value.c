@@ -221,10 +221,10 @@ void* Probe_Core_Debug(
       case DETECTED_AS_CELL: {
         const REBVAL *v = cast(const REBVAL*, p);
 
-      #if !defined(NDEBUG)  // IS_PARAM() etc. would crash on unreadable blank
+      #if !defined(NDEBUG)  // IS_PARAM() etc. would crash on unreadable void
         if (IS_UNREADABLE_DEBUG(v)) {
             Probe_Print_Helper(p, expr, "Value", file, line);
-            Append_Ascii(mo->series, "\\\\Unreadable BLANK!\\\\");
+            Append_Ascii(mo->series, "\\\\Unreadable VOID!\\\\");
             break;
         }
       #endif

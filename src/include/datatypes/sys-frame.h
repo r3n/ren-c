@@ -471,7 +471,7 @@ inline static void Prep_Frame_Core(
 
     f->feed = feed;
     Prep_Stack_Cell(&f->spare);
-    Init_Unreadable_Blank(&f->spare);
+    Init_Unreadable_Void(&f->spare);
     f->dsp_orig = DS_Index;
     f->flags = Endlike_Header(flags);
     TRASH_POINTER_IF_DEBUG(f->out);

@@ -113,7 +113,7 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
     const RELVAL *src = head;
     RELVAL *dest = ARR_HEAD(a);
     for (; count < len; ++count, ++src, ++dest) {
-        if (KIND_BYTE_UNCHECKED(src) == REB_NULLED)  // allow unreadable blank
+        if (KIND_BYTE_UNCHECKED(src) == REB_NULLED)  // allow unreadable void
             assert(flags & ARRAY_FLAG_NULLEDS_LEGAL);
 
         Derelativize(dest, src, specifier);

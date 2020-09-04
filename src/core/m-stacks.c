@@ -33,13 +33,13 @@
 void Startup_Data_Stack(REBLEN capacity)
 {
     // Start the data stack out with just one element in it, and make it an
-    // unreadable blank in the debug build.  This helps avoid accidental
+    // unreadable void in the debug build.  This helps avoid accidental
     // reads and is easy to notice when it is overwritten.  It also means
     // that indices into the data stack can be unsigned (no need for -1 to
     // mean empty, because 0 can)
     //
     DS_Array = Make_Array_Core(1, ARRAY_FLAG_NULLEDS_LEGAL);
-    Init_Unreadable_Blank(ARR_HEAD(DS_Array));
+    Init_Unreadable_Void(ARR_HEAD(DS_Array));
     SET_CELL_FLAG(ARR_HEAD(DS_Array), PROTECTED);
 
     // The END marker will signal DS_PUSH() that it has run out of space,
@@ -122,7 +122,7 @@ void Startup_Frame_Stack(void)
         nullptr, // no specialization exemplar (or inherited exemplar)
         1 // details array capacity (unused, but 0 is not legal)
     );
-    Init_Unreadable_Blank(ARR_HEAD(ACT_DETAILS(PG_Dummy_Action)));
+    Init_Unreadable_Void(ARR_HEAD(ACT_DETAILS(PG_Dummy_Action)));
 
     Push_Action(f, PG_Dummy_Action, UNBOUND);
 
@@ -287,7 +287,7 @@ REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
     REBLEN len_new = len_old + amount;
     REBLEN n;
     for (n = len_old; n < len_new; ++n) {
-        Init_Unreadable_Blank(cell);
+        Init_Unreadable_Void(cell);
         cell->header.bits |= (CELL_FLAG_STACK_LIFETIME | CELL_FLAG_TRANSIENT);
         ++cell;
     }

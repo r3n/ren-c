@@ -583,7 +583,7 @@ inline static void Literal_Next_In_Feed(REBVAL *out, struct Reb_Feed *feed) {
 // Just to simplify matters, the frame cell is set to a bit pattern the GC
 // will accept.  It would need stack preparation anyway, and this simplifies
 // the invariant so if a recycle happens before Eval_Core() gets to its
-// body, it's always set to something.  Using an unreadable blank means we
+// body, it's always set to something.  Using an unreadable void means we
 // signal to users of the frame that they can't be assured of any particular
 // value between evaluations; it's not cleared.
 //
@@ -597,9 +597,9 @@ inline static void Prep_Array_Feed(
     REBFLGS flags
 ){
     Prep_Stack_Cell(&feed->fetched);
-    Init_Unreadable_Blank(&feed->fetched);
+    Init_Unreadable_Void(&feed->fetched);
     Prep_Stack_Cell(&feed->lookback);
-    Init_Unreadable_Blank(&feed->lookback);
+    Init_Unreadable_Void(&feed->lookback);
 
     feed->vaptr = nullptr;
     feed->packed = nullptr;
@@ -639,9 +639,9 @@ inline static void Prep_Va_Feed(
     REBFLGS flags
 ){
     Prep_Stack_Cell(&feed->fetched);
-    Init_Unreadable_Blank(&feed->fetched);
+    Init_Unreadable_Void(&feed->fetched);
     Prep_Stack_Cell(&feed->lookback);
-    Init_Unreadable_Blank(&feed->lookback);
+    Init_Unreadable_Void(&feed->lookback);
 
     feed->index = TRASHED_INDEX;  // avoid warning in release build
     feed->array = nullptr;

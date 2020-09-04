@@ -361,7 +361,7 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
         EXTRA(Binding, paired).node = binding;
         paired->payload = old->payload;
 
-        Init_Unreadable_Blank(PAIRING_KEY(paired));
+        Init_Unreadable_Void(PAIRING_KEY(paired));
 
       #if !defined(NDEBUG)
         paired->header.bits &= ~CELL_FLAG_PROTECTED;  // need to manage it

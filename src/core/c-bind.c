@@ -717,7 +717,7 @@ void Virtual_Bind_Deep_To_New_Context(
             // synthesized variable until the loop code has initialized it
             // with something.  However, in case any other code gets run,
             // it can't be left trash...so we'd need it to be at least an
-            // unreadable blank.  But since this code is also shared with USE,
+            // unreadable void.  But since this code is also shared with USE,
             // it doesn't do any initialization...so go ahead and put void.
             //
             Init_Void(var);

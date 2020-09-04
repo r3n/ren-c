@@ -107,7 +107,7 @@ inline static void Queue_Mark_Opt_Value_Deep(const RELVAL *v)
 inline static void Queue_Mark_Value_Deep(const RELVAL *v)
 {
     ASSERT_NOT_END(v);
-    assert(KIND_BYTE_UNCHECKED(v) != REB_NULLED);  // Unreadable blank ok
+    assert(KIND_BYTE_UNCHECKED(v) != REB_NULLED);  // Unreadable void ok
     Queue_Mark_Opt_End_Cell_Deep(v);
 }
 

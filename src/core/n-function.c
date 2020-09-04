@@ -560,7 +560,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
 
     // Start with pushing a cell for the special [0] slot
     //
-    Init_Unreadable_Blank(DS_PUSH());  // paramlist[0] becomes ACT_ARCHETYPE()
+    Init_Unreadable_Void(DS_PUSH());  // paramlist[0] becomes ACT_ARCHETYPE()
     Move_Value(DS_PUSH(), EMPTY_BLOCK);  // param_types[0] (object canon)
     Move_Value(DS_PUSH(), EMPTY_TEXT);  // param_notes[0] (desc, then canon)
 

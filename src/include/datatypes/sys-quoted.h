@@ -111,7 +111,7 @@ inline static RELVAL *Quotify_Core(
         paired->extra = v->extra;
         paired->payload = v->payload;
  
-        Init_Unreadable_Blank(PAIRING_KEY(paired));  // Key not used ATM
+        Init_Unreadable_Void(PAIRING_KEY(paired));  // Key not used ATM
 
         Manage_Pairing(paired);
 
@@ -213,7 +213,7 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
 
 
 inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v) {
-    if (KIND_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable blanks
+    if (KIND_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable voids
         return v;  // Note: kind byte may be > 64
 
     // The reason this routine returns `const` is because you can't modify

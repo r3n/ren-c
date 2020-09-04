@@ -274,7 +274,7 @@ inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
     if (GET_ACTION_FLAG(f->original, IS_INVISIBLE))
         return;
 
-  #ifdef DEBUG_UNREADABLE_BLANKS
+  #ifdef DEBUG_UNREADABLE_VOIDS
     //
     // The f->out slot should be initialized well enough for GC safety.
     // But in the debug build, if we're not running an invisible function
@@ -283,14 +283,14 @@ inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
     //
     // END has an advantage because recycle/torture will catch cases of
     // evaluating into movable memory.  But if END is always set, natives
-    // might *assume* it.  Fuzz it with unreadable blanks.
+    // might *assume* it.  Fuzz it with unreadable voids.
     //
     // !!! Should natives be able to count on f->out being END?  This was
     // at one time the case, but this code was in one instance.
     //
     if (NOT_ACTION_FLAG(FRM_PHASE(f), IS_INVISIBLE)) {
         if (SPORADICALLY(2))
-            Init_Unreadable_Blank(f->out);
+            Init_Unreadable_Void(f->out);
         else
             SET_END(f->out);
         SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
@@ -798,7 +798,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
           skip_this_arg_for_now:  // the GC marks args up through f->arg...
 
-            Init_Unreadable_Blank(f->arg);  // ...so cell must have valid bits
+            Init_Unreadable_Void(f->arg);  // ...so cell must have valid bits
             continue;
 
     //=//// ACTUAL LOOP BODY //////////////////////////////////////////////=//

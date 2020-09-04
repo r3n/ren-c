@@ -204,17 +204,17 @@
                 | NODE_FLAG_FREE
             )) == (NODE_FLAG_CELL | NODE_FLAG_NODE)
         ){
-            // Unreadable blank is signified in the Extra by a negative tick
+            // Unreadable void is signified in the Extra by a negative tick
             //
-            if (KIND_BYTE_UNCHECKED(v) == REB_BLANK) {
+            if (KIND_BYTE_UNCHECKED(v) == REB_VOID) {
                 if (v->extra.tick < 0) {
-                    printf("KIND_BYTE() called on unreadable BLANK!\n");
+                    printf("KIND_BYTE() called on unreadable VOID!\n");
                   #ifdef DEBUG_COUNT_TICKS
                     printf("Made on tick: %d\n", cast(int, -v->extra.tick));
                   #endif
                     panic_at (v, file, line);
                 }
-                return REB_BLANK;
+                return REB_VOID;
             }
 
             return KIND_BYTE_UNCHECKED(v);  // majority return here

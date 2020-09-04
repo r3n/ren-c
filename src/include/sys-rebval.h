@@ -393,9 +393,9 @@ union Reb_Value_Extra { //=/////////////////// ACTUAL EXTRA DEFINITION ////=//
     //
     // A tick field is included in all debug builds, not just those which
     // DEBUG_TRACK_CELLS...because negative signs are used to give a distinct
-    // state to unreadable blanks.  See %sys-track.h and %sys-blank.h
+    // state to unreadable voids.  See %sys-track.h and %sys-void.h
     //
-    intptr_t tick;  // Note: will be negative for unreadable blanks
+    intptr_t tick;  // Note: will be negative for unreadable voids
   #endif
 
     // The release build doesn't put anything in the ->extra field by default,

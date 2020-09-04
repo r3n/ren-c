@@ -119,7 +119,7 @@ static void Append_To_Context(REBCTX *context, REBVAL *arg)
     // Leave the [0] slot blank while collecting (ROOTKEY/ROOTPARAM), but
     // valid (but "unreadable") bits so that the copy will still work.
     //
-    Init_Unreadable_Blank(ARR_HEAD(BUF_COLLECT));
+    Init_Unreadable_Void(ARR_HEAD(BUF_COLLECT));
     SET_ARRAY_LEN_NOTERM(BUF_COLLECT, 1);
 
     // Setup binding table with obj words.  Binding table is empty so don't

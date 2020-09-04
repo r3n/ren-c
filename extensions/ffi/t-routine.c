@@ -1039,7 +1039,7 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
     // ACT_ARCHETYPE (see comments on `struct Reb_Action`)
     //
     REBDSP dsp_orig = DSP;
-    Init_Unreadable_Blank(DS_PUSH());  // GC-safe form of "trash"
+    Init_Unreadable_Void(DS_PUSH());  // GC-safe form of "trash"
 
     // arguments can be complex, defined as structures.  A "schema" is a
     // REBVAL that holds either an INTEGER! for simple types, or a HANDLE!

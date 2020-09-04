@@ -191,7 +191,7 @@ REBNATIVE(shove)
     // into may want it evaluative.  (Enfix handling itself does soft quoting)
     //
   #if !defined(NDEBUG)
-    Init_Unreadable_Blank(D_OUT); // make sure we reassign it
+    Init_Unreadable_Void(D_OUT); // make sure we reassign it
   #endif
 
     if (REF(set)) {
@@ -334,7 +334,7 @@ REBNATIVE(do)
                 // varargs does.  This will cause an assert if reused, and
                 // having BLANK! mean "thrown" may evolve into a convention.
                 //
-                Init_Unreadable_Blank(position);
+                Init_Unreadable_Void(position);
                 return R_THROWN;
             }
 
@@ -576,7 +576,7 @@ REBNATIVE(evaluate)
                 // varargs does.  This will cause an assert if reused, and
                 // having BLANK! mean "thrown" may evolve into a convention.
                 //
-                Init_Unreadable_Blank(position);
+                Init_Unreadable_Void(position);
                 Move_Value(D_OUT, D_SPARE);
                 return R_THROWN;
             }
