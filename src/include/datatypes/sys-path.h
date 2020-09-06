@@ -176,7 +176,7 @@ inline static void Set_Path_Core(  // !!! Appears to be unused.  Unnecessary?
 // then turn that into an array.  (We don't want to destructively reify
 // paths, e.g. there should be no actual PG_2_Blanks_Array paths existing.)
 //
-inline static REBARR *VAL_PATH(RELVAL *path)
+inline static REBARR *VAL_PATH(const RELVAL *path)
 {
     assert(ANY_PATH_KIND(CELL_TYPE(path)));
     if (MIRROR_BYTE(path) == REB_WORD) {
@@ -186,7 +186,7 @@ inline static REBARR *VAL_PATH(RELVAL *path)
     return VAL_ARRAY(path);
 }
 
-inline static REBSPC *VAL_PATH_SPECIFIER(RELVAL *path)
+inline static REBSPC *VAL_PATH_SPECIFIER(const RELVAL *path)
 {
     assert(ANY_PATH_KIND(CELL_TYPE(path)));
     if (MIRROR_BYTE(path) == REB_WORD) {

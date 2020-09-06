@@ -129,7 +129,7 @@ inline static bool Single_Test_Throws(
     const REBCEL *test_cell = VAL_UNESCAPED(test);
     const REBCEL *arg_cell = VAL_UNESCAPED(arg);
 
-    enum Reb_Kind test_kind = CELL_KIND(test_cell);
+    enum Reb_Kind test_kind = CELL_TYPE(test_cell);
 
     // If test is a WORD! or PATH! then GET it.  To help keep things clear,
     // require GET-WORD! or GET-PATH! for actions to convey they are not being
@@ -271,7 +271,7 @@ inline static bool Single_Test_Throws(
       case REB_DATATYPE:
         Init_Logic(
             out,
-            VAL_TYPE_KIND(test_cell) == CELL_KIND(arg_cell)
+            VAL_TYPE_KIND(test_cell) == CELL_TYPE(arg_cell)
                 and VAL_NUM_QUOTES(arg) == sum_quotes
         );
         return false;
@@ -279,7 +279,7 @@ inline static bool Single_Test_Throws(
       case REB_TYPESET:
         Init_Logic(
             out,
-            TYPE_CHECK(test_cell, CELL_KIND(arg_cell))
+            TYPE_CHECK(test_cell, CELL_TYPE(arg_cell))
                 and VAL_NUM_QUOTES(arg) == sum_quotes
         );
         return false;

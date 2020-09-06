@@ -2329,18 +2329,27 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 // done by cutting out the allowance of escaping levels as
                 // meaning for the kind byte.  Not a priority.
                 //
-                REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
-                MISC(a).line = ss->line;
-                LINK_FILE_NODE(a) = NOD(ss->file);
-                SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
-                SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
+                bool is_get_path = GET_CELL_FLAG(DS_TOP, BLANK_MARKED_GET);
+                if (IS_BLANK(DS_TOP)) {  // `/` or `:/`
+                    Init_Word(DS_TOP, PG_Slash_1_Canon);
+                    mutable_KIND_BYTE(DS_TOP) = is_get_path
+                        ? REB_GET_PATH
+                        : REB_PATH;
+                }
+                else {
+                    REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
+                    MISC(a).line = ss->line;
+                    LINK_FILE_NODE(a) = NOD(ss->file);
+                    SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
+                    SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
-                Append_Value(a, DS_TOP);  // may be BLANK!
-                Init_Blank(Alloc_Tail_Array(a));
-                if (GET_CELL_FLAG(DS_TOP, BLANK_MARKED_GET))
-                    Init_Any_Path(DS_TOP, REB_GET_PATH, a);
-                else
-                    Init_Path(DS_TOP, a);
+                    Append_Value(a, DS_TOP);  // may be BLANK!
+                    Init_Blank(Alloc_Tail_Array(a));
+                    if (GET_CELL_FLAG(DS_TOP, BLANK_MARKED_GET))
+                        Init_Any_Path(DS_TOP, REB_GET_PATH, a);
+                    else
+                        Init_Path(DS_TOP, a);
+                }
             }
             else if (
                 DSP - dsp_path_head == 1  // one more item added

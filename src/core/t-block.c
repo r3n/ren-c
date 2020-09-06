@@ -289,7 +289,14 @@ REB_R MAKE_Array(
 //  TO_Array: C
 //
 REB_R TO_Array(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
-    if (ANY_ARRAY_OR_PATH(arg)) {
+    if (ANY_PATH(arg)) {
+        return Init_Any_Array(
+            out,
+            kind,
+            Copy_Array_Shallow(VAL_PATH(arg), VAL_PATH_SPECIFIER(arg))
+        );
+    }
+    else if (ANY_ARRAY(arg)) {
         return Init_Any_Array(
             out,
             kind,

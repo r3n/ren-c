@@ -845,70 +845,65 @@ void MF_Path(REB_MOLD *mo, const REBCEL *v, bool form)
 {
     UNUSED(form);
 
-    if (MIRROR_BYTE(v) == REB_WORD) {
-        assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
-        Append_Ascii(mo->series, "/");
-        return;
-    }
-
-    REBARR *a = VAL_ARRAY(v);
-
-    // Recursion check:
-    if (Find_Pointer_In_Series(TG_Mold_Stack, a) != NOT_FOUND) {
-        Append_Ascii(mo->series, ".../...");
-        return;
-    }
-    Push_Pointer_To_Series(TG_Mold_Stack, a);
-
-    // Routine may be called on value that reports REB_QUOTED, even if it
-    // has no additional payload and is aliasing the cell itself.  Checking
-    // the type could be avoided if each type had its own dispatcher, but
-    // this routine seems to need to be generic.
-    //
-    enum Reb_Kind kind = CELL_KIND(v);
+    enum Reb_Kind kind = CELL_TYPE(v);  // Note: CELL_KIND() might be WORD!
 
     if (kind == REB_GET_PATH)
         Append_Codepoint(mo->series, ':');
     else if (kind == REB_SYM_PATH)
         Append_Codepoint(mo->series, '@');
 
-    assert(VAL_INDEX(v) == 0); // the new rule, not an ANY-ARRAY!, always head
-    assert(ARR_LEN(a) >= 2); // another new rule, even / is `make path! [_ _]`
+    if (MIRROR_BYTE(v) == REB_WORD) {  // optimized for `/`, allows binding
+        assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+        Append_Ascii(mo->series, "/");
+    }
+    else {
+        REBARR *a = VAL_ARRAY(v);
 
-    RELVAL *item = ARR_HEAD(a);
-    while (NOT_END(item)) {
-        assert(not ANY_PATH(item)); // another new rule
+        // Recursion check:
+        if (Find_Pointer_In_Series(TG_Mold_Stack, a) != NOT_FOUND) {
+            Append_Ascii(mo->series, ".../...");
+            return;
+        }
+        Push_Pointer_To_Series(TG_Mold_Stack, a);
 
-        if (not IS_BLANK(item)) { // no blank molding; indicated by slashes
-            //
-            // !!! Molding of items in paths which have slashes in them, such
-            // as URL! or FILE! (or some historical date formats) need some
-            // kind of escaping, otherwise they have to be outlawed too.
-            // FILE! has the option of `a/%"dir/file.txt"/b` to put the file
-            // in quotes, but URL does not.
-            //
-            Mold_Value(mo, item);
+        assert(VAL_INDEX(v) == 0);  // new rule, not ANY-ARRAY!, always head
+        assert(ARR_LEN(a) >= 2); // another rule, even / is `make path! [_ _]`
 
-            // Note: We ignore VALUE_FLAG_NEWLINE_BEFORE here for ANY-PATH,
-            // but any embedded BLOCK! or GROUP! which do have newlines in
-            // them can make newlines, e.g.:
-            //
-            //     a/[
-            //        b c d
-            //     ]/e
+        RELVAL *item = ARR_HEAD(a);
+        while (NOT_END(item)) {
+            assert(not ANY_PATH(item)); // another new rule
+
+            if (not IS_BLANK(item)) { // no blank molding; slashes convey it
+                //
+                // !!! Molding of items in paths which have slashes in them,
+                // like URL! or FILE! (or some historical date formats) need
+                // some kind of escaping, otherwise they have to be outlawed
+                // too.  FILE! has the option of `a/%"dir/file.txt"/b` to put
+                // the file in quotes, but URL does not.
+                //
+                Mold_Value(mo, item);
+
+                // Note: Ignore VALUE_FLAG_NEWLINE_BEFORE here for ANY-PATH,
+                // but any embedded BLOCK! or GROUP! which do have newlines in
+                // them can make newlines, e.g.:
+                //
+                //     a/[
+                //        b c d
+                //     ]/e
+            }
+
+            ++item;
+            if (IS_END(item))
+                break;
+
+            Append_Codepoint(mo->series, '/');
         }
 
-        ++item;
-        if (IS_END(item))
-            break;
-
-        Append_Codepoint(mo->series, '/');
+        Drop_Pointer_From_Series(TG_Mold_Stack, a);
     }
 
     if (kind == REB_SET_PATH)
         Append_Codepoint(mo->series, ':');
-
-    Drop_Pointer_From_Series(TG_Mold_Stack, a);
 }
 
 
@@ -992,10 +987,14 @@ REB_R MAKE_Path(
 
 static void Push_Path_Recurses(RELVAL *path, REBSPC *specifier)
 {
-    RELVAL *item = VAL_ARRAY_AT(path);
+    RELVAL *item = ARR_HEAD(VAL_PATH(path));
     for (; NOT_END(item); ++item) {
-        if (IS_PATH(item))
-            Push_Path_Recurses(item, Derive_Specifier(specifier, item));
+        if (IS_PATH(item)) {
+            if (IS_SPECIFIC(item))
+                Push_Path_Recurses(item, VAL_SPECIFIER(item));
+            else
+                Push_Path_Recurses(item, specifier);
+        }
         else
             Derelativize(DS_PUSH(), item, specifier);
     }
@@ -1062,7 +1061,14 @@ REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
 //
 REBINT CT_Path(const REBCEL *a, const REBCEL *b, REBINT mode)
 {
-    REBINT num = Cmp_Array(a, b, mode == 1);
+    REBINT num;
+    if (MIRROR_BYTE(a) == REB_WORD and MIRROR_BYTE(b) == REB_WORD)
+        num = Compare_Word(a, b, mode == 1);
+    else if (MIRROR_BYTE(a) != REB_WORD and MIRROR_BYTE(b) != REB_WORD)
+        num = Cmp_Array(a, b, mode == 1);
+    else
+        num = -1;  // !!! what is the right answer here?
+
     if (mode >= 0)
         return (num == 0);
     if (mode == -1)
