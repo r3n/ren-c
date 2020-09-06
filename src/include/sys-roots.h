@@ -174,7 +174,7 @@ inline static REBARR *Alloc_Instruction(enum Reb_Api_Opcode opcode) {
     );
     MISC(s).opcode = opcode;
     SER_CELL(s)->header.bits =
-        CELL_MASK_NON_STACK_END | NODE_FLAG_ROOT;
+        CELL_MASK_PREP_END | NODE_FLAG_ROOT;
     TRACK_CELL_IF_DEBUG(SER_CELL(s), "<<instruction>>", 0);
     return ARR(s);
 }

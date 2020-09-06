@@ -543,10 +543,10 @@ REBNOD *Try_Find_Containing_Node_Debug(const void *p)
 //
 REBVAL *Alloc_Pairing(void) {
     REBVAL *paired = cast(REBVAL*, Make_Node(PAR_POOL));  // 2x REBVAL size
-    Prep_Non_Stack_Cell(paired);
+    Prep_Cell(paired);
 
     REBVAL *key = PAIRING_KEY(paired);
-    Prep_Non_Stack_Cell(key);
+    Prep_Cell(key);
 
     return paired;
 }
@@ -719,7 +719,7 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
             // but when it is this will be useful.
             //
             for (index = 0; index < delta; index++)
-                Prep_Non_Stack_Cell(ARR_AT(ARR(s), index));
+                Prep_Cell(ARR_AT(ARR(s), index));
         }
       #endif
         ASSERT_SERIES_TERM_IF_NEEDED(s);
@@ -767,7 +767,7 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
             //
             while (delta != 0) {
                 --delta;
-                Prep_Non_Stack_Cell(ARR_AT(ARR(s), index + delta));
+                Prep_Cell(ARR_AT(ARR(s), index + delta));
             }
         }
       #endif

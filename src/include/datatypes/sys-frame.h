@@ -470,7 +470,7 @@ inline static void Prep_Frame_Core(
     assert(NOT_FEED_FLAG(feed, BARRIER_HIT));  // couldn't do anything
 
     f->feed = feed;
-    Prep_Stack_Cell(&f->spare);
+    Prep_Cell(&f->spare);
     Init_Unreadable_Void(&f->spare);
     f->dsp_orig = DS_Index;
     f->flags = Endlike_Header(flags);
@@ -582,7 +582,6 @@ inline static void Push_Action(
     if (not f->varlist) { // usually means first action call in the REBFRM
         s = Alloc_Series_Node(
             SERIES_MASK_VARLIST
-                | SERIES_FLAG_STACK_LIFETIME
                 | SERIES_FLAG_FIXED_SIZE // FRAME!s don't expand ATM
         );
         s->info = Endlike_Header(
@@ -612,7 +611,6 @@ inline static void Push_Action(
     f->rootvar->header.bits =
         NODE_FLAG_NODE
             | NODE_FLAG_CELL
-            | NODE_FLAG_STACK
             | CELL_FLAG_PROTECTED  // payload/binding tweaked, but not by user
             | CELL_MASK_CONTEXT
             | FLAG_KIND_BYTE(REB_FRAME)
@@ -627,9 +625,7 @@ inline static void Push_Action(
 
     s->content.dynamic.used = num_args + 1;
     RELVAL *tail = ARR_TAIL(f->varlist);
-    tail->header.bits = NODE_FLAG_STACK
-        | FLAG_KIND_BYTE(REB_0)
-        | FLAG_MIRROR_BYTE(REB_0);
+    tail->header.bits = FLAG_KIND_BYTE(REB_0);  // no NODE_FLAG_CELL
     TRACK_CELL_IF_DEBUG(tail, __FILE__, __LINE__);
 
     // Current invariant for all arrays (including fixed size), last cell in

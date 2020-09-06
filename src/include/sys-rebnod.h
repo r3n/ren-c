@@ -422,18 +422,17 @@ union Reb_Header {
 #define NODE_BYTEMASK_0x10_MARKED 0x10
 
 
-//=//// NODE_FLAG_TRANSIENT (fifth-leftmost bit) //////////////////////////=//
+//=//// NODE_FLAG_4 (fifth-leftmost bit) //////////////////////////////////=//
 //
-// The "TRANSIENT" flag is currently used only by node cells, and only in
-// the data stack.  The concept is that data stack cells are so volatile that
-// they cannot be passed as REBVAL* addresses to anything that might write
-// between frames.  This means that moving any value with an unmanaged binding
-// into it need not worry about managing...because the data stack cell has
-// no longer lifetime than any cell with which it can interact.
+// !!! This bit is reclaimed from a scrapped idea of distinguishing cells on
+// the data stack in particular, as not requiring persistent reification of
+// frames.  Besides adding complexity, the idea is incompatible with a
+// stackless model...which rearranges the data stack as will when suspending
+// or resuming stacks.
 //
-#define NODE_FLAG_TRANSIENT \
+#define NODE_FLAG_4 \
     FLAG_LEFT_BIT(4)
-#define NODE_BYTEMASK_0x08_TRANSIENT 0x08
+#define NODE_BYTEMASK_0x08_FOUR 0x08
 
 
 //=//// NODE_FLAG_ROOT (sixth-leftmost bit) ///////////////////////////////=//
@@ -450,32 +449,17 @@ union Reb_Header {
 #define NODE_BYTEMASK_0x04_ROOT 0x04
 
 
-//=//// NODE_FLAG_STACK (seventh-leftmost bit) ////////////////////////////=//
+//=//// NODE_FLAG_6 (seventh-leftmost bit) ////////////////////////////////=//
 //
-// When writing to a value cell, it is sometimes necessary to know how long
-// that cell will "be alive".  This is important if there is some stack-based
-// transient structure in the source cell, which would need to be converted
-// into something longer-lived if the destination cell will outlive it.
+// !!! This bit was recovered from a scrapped concept of marking cells based
+// on their projected lifetimes, to limit the amount of REBFRM* reification
+// as REBARR* varlists that needed to be monitored by GC.  It was a complex
+// idea for an optimization to start with, but a "stackless" model undermines
+// the notion of such lifetimes.
 //
-// Hence cells must be formatted to say if they are CELL_FLAG_STACK_LIFETIME
-// or not, before any writing can be done to them.  If they are not then they
-// are presumed to be indefinite lifetime (e.g. cells resident inside of an
-// array managed by the garbage collector).
-//
-// But for cells marked CELL_FLAG_STACK_LIFETIME, that means it is expected
-// that scanning *backwards* in memory will find a specially marked REB_FRAME
-// cell, which will lead to the frame to whose lifetime the cell is bound.
-//
-// !!! This feature is a work in progress.
-//
-// For series, varlists of FRAME! are also marked with this to indicates that
-// a context's varlist data lives on the stack.  That means that when the
-// action terminates, the data will no longer be accessible (so
-// SERIES_INFO_INACCESSIBLE will be true).
-//
-#define NODE_FLAG_STACK \
+#define NODE_FLAG_6 \
     FLAG_LEFT_BIT(6)
-#define NODE_BYTEMASK_0x02_STACK 0x02
+#define NODE_BYTEMASK_0x02_SIX 0x02
 
 
 //=//// NODE_FLAG_CELL (eighth-leftmost bit) //////////////////////////////=//

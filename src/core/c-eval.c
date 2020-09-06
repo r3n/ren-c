@@ -799,33 +799,16 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             // array which backs the frame may not have any initialization of
             // its bits.  The goal is to make it so that the GC uses the
             // f->param position to know how far the frame fulfillment is
-            // gotten, and only mark those values.  Hoewver, there is also
-            // a desire to differentiate cell formatting between "stack"
-            // and "heap" to do certain optimizations.  After a recent change,
-            // it's becoming more integrated by using pooled memory for the
-            // args...however issues of stamping the bits remain.  This just
-            // blindly formats them with NODE_FLAG_STACK to make the arg
-            // initialization work, but it's in progress to do this more
-            // subtly so that the frame can be left formatted as non-stack.
+            // gotten, and only mark those values.  This just blindly formats
+            // them with NODE_FLAG_STACK to make the arg initialization work.
             //
             if (
                 NOT_EVAL_FLAG(f, DOING_PICKUPS)
                 and not SPECIAL_IS_ARG_SO_TYPECHECKING
             ){
-                Prep_Stack_Cell(f->arg); // improve...
-            }
-            else {
-                // If the incoming series came from a heap frame, just put
-                // a bit on it saying its a stack node for now--this will
-                // stop some asserts.  The optimization is not enabled yet
-                // which avoids reification on stack nodes of lower stack
-                // levels--so it's not going to cause problems -yet-
-                //
-                f->arg->header.bits |= CELL_FLAG_STACK_LIFETIME;
+                Prep_Cell(f->arg);  // improve...
             }
 
-            assert(f->arg->header.bits & NODE_FLAG_CELL);
-            assert(f->arg->header.bits & CELL_FLAG_STACK_LIFETIME);
 
     //=//// A /REFINEMENT ARG /////////////////////////////////////////////=//
 
@@ -1587,23 +1570,6 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         }
 
         Expire_Out_Cell_Unless_Invisible(f);
-
-        // While you can't evaluate into an array cell (because it may move)
-        // an evaluation is allowed to be performed into stable cells on the
-        // stack -or- API handles.
-        //
-        // !!! Could get complicated if a manual lifetime is used and freed
-        // during an evaluation.  Not currently possible since there's nothing
-        // like a rebValue() which targets a cell passed in by the user.  But if
-        // such a thing ever existed it would have that problem...and would
-        // need to take a "hold" on the cell to prevent a rebFree() while the
-        // evaluation was in progress.
-        //
-        assert(f->out->header.bits & (
-            CELL_FLAG_STACK_LIFETIME
-            | NODE_FLAG_TRANSIENT
-            | NODE_FLAG_ROOT
-        ));
 
         *next_gotten = nullptr; // arbitrary code changes fetched variables
 

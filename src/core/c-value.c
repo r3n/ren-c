@@ -172,7 +172,6 @@ void* Probe_Core_Debug(
         // types in terms of sizing, just to know what they are.
 
         if (SER_WIDE(s) == sizeof(REBYTE)) {
-            DECLARE_LOCAL (value);
             if (GET_SERIES_FLAG(s, IS_STRING)) {
                 REBSTR *str = STR(s);
                 if (IS_STR_SYMBOL(str))

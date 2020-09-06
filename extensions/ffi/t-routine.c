@@ -1127,7 +1127,6 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
                 DECLARE_LOCAL (block);
                 Derelativize(block, item, VAL_SPECIFIER(ffi_spec));
 
-                DECLARE_LOCAL (param);
                 Schema_From_Block_May_Fail(
                     ret_schema,
                     nullptr,  // dummy (return/output has no arg to typecheck)

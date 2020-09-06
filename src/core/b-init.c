@@ -729,40 +729,23 @@ static void Init_Root_Vars(void)
     // the root set.  Should that change, they could be explicitly added
     // to the GC's root set.
 
-    Prep_Non_Stack_Cell(&PG_Nulled_Cell);
-    Init_Nulled(&PG_Nulled_Cell);
+    Init_Nulled(Prep_Cell(&PG_Nulled_Cell));
+    Init_Blank(Prep_Cell(&PG_Blank_Value));
+    Init_False(Prep_Cell(&PG_False_Value));
+    Init_True(Prep_Cell(&PG_True_Value));
+    Init_Void(Prep_Cell(&PG_Void_Value));
 
-    Prep_Non_Stack_Cell(&PG_Blank_Value);
-    Init_Blank(&PG_Blank_Value);
+    RESET_CELL(Prep_Cell(&PG_R_Thrown), REB_R_THROWN, CELL_MASK_NONE);
+    RESET_CELL(Prep_Cell(&PG_R_Invisible), REB_R_INVISIBLE, CELL_MASK_NONE);
+    RESET_CELL(Prep_Cell(&PG_R_Immediate), REB_R_IMMEDIATE, CELL_MASK_NONE);
 
-    Prep_Non_Stack_Cell(&PG_False_Value);
-    Init_False(&PG_False_Value);
-
-    Prep_Non_Stack_Cell(&PG_True_Value);
-    Init_True(&PG_True_Value);
-
-    Prep_Non_Stack_Cell(&PG_Void_Value);
-    Init_Void(&PG_Void_Value);
-
-    Prep_Non_Stack_Cell(&PG_R_Thrown);
-    RESET_CELL(&PG_R_Thrown, REB_R_THROWN, CELL_MASK_NONE);
-
-    Prep_Non_Stack_Cell(&PG_R_Invisible);
-    RESET_CELL(&PG_R_Invisible, REB_R_INVISIBLE, CELL_MASK_NONE);
-
-    Prep_Non_Stack_Cell(&PG_R_Immediate);
-    RESET_CELL(&PG_R_Immediate, REB_R_IMMEDIATE, CELL_MASK_NONE);
-
-    Prep_Non_Stack_Cell(&PG_R_Redo_Unchecked);
-    RESET_CELL(&PG_R_Redo_Unchecked, REB_R_REDO, CELL_MASK_NONE);
+    RESET_CELL(Prep_Cell(&PG_R_Redo_Unchecked), REB_R_REDO, CELL_MASK_NONE);
     EXTRA(Any, &PG_R_Redo_Unchecked).flag = false;  // "unchecked"
 
-    Prep_Non_Stack_Cell(&PG_R_Redo_Checked);
-    RESET_CELL(&PG_R_Redo_Checked, REB_R_REDO, CELL_MASK_NONE);
+    RESET_CELL(Prep_Cell(&PG_R_Redo_Checked), REB_R_REDO, CELL_MASK_NONE);
     EXTRA(Any, &PG_R_Redo_Checked).flag = true;  // "checked"
 
-    Prep_Non_Stack_Cell(&PG_R_Reference);
-    RESET_CELL(&PG_R_Reference, REB_R_REFERENCE, CELL_MASK_NONE);
+    RESET_CELL(Prep_Cell(&PG_R_Reference), REB_R_REFERENCE, CELL_MASK_NONE);
 
     REBSER *locker = nullptr;
 
@@ -1006,11 +989,11 @@ void Startup_Task(void)
     // The thrown arg is not intended to ever be around long enough to be
     // seen by the GC.
     //
-    Prep_Non_Stack_Cell(&TG_Thrown_Arg);
+    Prep_Cell(&TG_Thrown_Arg);
   #if !defined(NDEBUG)
     SET_END(&TG_Thrown_Arg);
 
-    Prep_Non_Stack_Cell(&TG_Thrown_Label_Debug);
+    Prep_Cell(&TG_Thrown_Label_Debug);
     SET_END(&TG_Thrown_Label_Debug); // see notes, only used "SPORADICALLY()"
   #endif
 

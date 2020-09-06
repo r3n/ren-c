@@ -392,9 +392,7 @@ inline static REBTYP *CELL_CUSTOM_TYPE(const REBCEL *v) {
 // details in %sys-quoted.h for how this byte is used).
 //
 // The value is expected to already be "pre-formatted" with the NODE_FLAG_CELL
-// bit, so that is left as-is.  Also, CELL_FLAG_STACK_LIFETIME must have
-// been set if the value is stack-based (e.g. on the C stack or in a frame),
-// so that is left as-is also.  See CELL_MASK_PERSIST.
+// bit, so that is left as-is.  See also CELL_MASK_PERSIST.
 //
 
 inline static REBVAL *RESET_VAL_HEADER_at(
@@ -489,15 +487,16 @@ inline static REBVAL *RESET_CUSTOM_CELL(
         }
 #endif
 
-#define CELL_MASK_NON_STACK \
+
+#define CELL_MASK_PREP \
     (NODE_FLAG_NODE | NODE_FLAG_CELL)
 
-#define CELL_MASK_NON_STACK_END \
-    (CELL_MASK_NON_STACK \
+#define CELL_MASK_PREP_END \
+    (CELL_MASK_PREP \
         | FLAG_KIND_BYTE(REB_0) \
-        | FLAG_MIRROR_BYTE(REB_0))  // a more explicit CELL_MASK_NON_STACK
+        | FLAG_MIRROR_BYTE(REB_0))  // a more explicit CELL_MASK_PREP
 
-inline static void Prep_Non_Stack_Cell_Core(
+inline static RELVAL *Prep_Cell_Core(
     RELVAL *c
 
   #if defined(DEBUG_TRACK_CELLS)
@@ -509,51 +508,17 @@ inline static void Prep_Non_Stack_Cell_Core(
     ALIGN_CHECK_CELL_EVIL_MACRO(c, file, line);
   #endif
 
-    c->header.bits = CELL_MASK_NON_STACK;
-    TRACK_CELL_IF_DEBUG(cast(RELVAL*, c), file, line);
-}
-
-#if defined(DEBUG_TRACK_CELLS)
-    #define Prep_Non_Stack_Cell(c) \
-        Prep_Non_Stack_Cell_Core((c), __FILE__, __LINE__)
-#else
-    #define Prep_Non_Stack_Cell(c) \
-        Prep_Non_Stack_Cell_Core(c)
-#endif
-
-#define CELL_MASK_STACK \
-    (NODE_FLAG_NODE | NODE_FLAG_CELL | CELL_FLAG_STACK_LIFETIME)
-
-inline static RELVAL *Prep_Stack_Cell_Core(
-    RELVAL *c
-
-  #if defined(DEBUG_TRACK_CELLS)
-  , const char *file
-  , int line
-  #endif
-){
-  #ifdef DEBUG_MEMORY_ALIGN
-    ALIGN_CHECK_CELL_EVIL_MACRO(c, file, line);
-  #endif
-  #ifdef DEBUG_TRASH_MEMORY
-    c->header.bits = CELL_MASK_STACK \
-        | FLAG_KIND_BYTE(REB_T_TRASH) \
-        | FLAG_MIRROR_BYTE(REB_T_TRASH);
-  #else
-    c->header.bits = CELL_MASK_STACK \
-        | FLAG_KIND_BYTE(REB_0) \
-        | FLAG_MIRROR_BYTE(REB_0);
-  #endif
+    c->header.bits = CELL_MASK_PREP;
     TRACK_CELL_IF_DEBUG(cast(RELVAL*, c), file, line);
     return c;
 }
 
 #if defined(DEBUG_TRACK_CELLS)
-    #define Prep_Stack_Cell(c) \
-        Prep_Stack_Cell_Core((c), __FILE__, __LINE__)
+    #define Prep_Cell(c) \
+        Prep_Cell_Core((c), __FILE__, __LINE__)
 #else
-    #define Prep_Stack_Cell(c) \
-        Prep_Stack_Cell_Core(c)
+    #define Prep_Cell(c) \
+        Prep_Cell_Core(c)
 #endif
 
 
@@ -837,28 +802,15 @@ inline static void INIT_BINDING(RELVAL *v, void *p) {
 
     if (binding->header.bits & NODE_FLAG_MANAGED) {
         assert(
-            binding->header.bits & ARRAY_FLAG_IS_PARAMLIST // relative
-            or binding->header.bits & ARRAY_FLAG_IS_VARLIST // specific
+            binding->header.bits & ARRAY_FLAG_IS_PARAMLIST  // relative
+            or binding->header.bits & ARRAY_FLAG_IS_VARLIST  // specific
             or (
                 IS_VARARGS(v) and not IS_SER_DYNAMIC(binding)
             ) // varargs from MAKE VARARGS! [...], else is a varlist
         );
     }
-    else {
-        // Can only store unmanaged pointers in stack cells (and only if the
-        // lifetime of the stack entry is guaranteed to outlive the binding)
-        //
-        assert(CTX(p));
-        if (v->header.bits & NODE_FLAG_TRANSIENT) {
-            // let anything go... for now.
-            // SERIES_FLAG_STACK_LIFETIME might not be set yet due to construction
-            // constraints, see Make_Context_For_Action_Push_Partials()
-        }
-        else {
-            assert(v->header.bits & CELL_FLAG_STACK_LIFETIME);
-            assert(binding->header.bits & SERIES_FLAG_STACK_LIFETIME);
-        }
-    }
+    else
+        assert(binding->header.bits & ARRAY_FLAG_IS_VARLIST);
   #endif
 }
 
@@ -882,14 +834,10 @@ inline static void Move_Value_Header(RELVAL *out, const RELVAL *v)
 }
 
 
-// !!! Because you cannot assign REBVALs to one another (e.g. `*dest = *src`)
-// a function is used.  The reason that a function is used is because this
-// gives more flexibility in decisions based on the destination cell regarding
-// whether it is necessary to reify information in the source cell.
-//
-// That advanced purpose has not yet been implemented, because it requires
-// being able to "sniff" a cell for its lifetime.  For now it only preserves
-// the CELL_FLAG_STACK_LIFETIME bit, without actually doing anything with it.
+// Because you cannot assign REBVALs to one another (e.g. `*dest = *src`)
+// a function is used.  This provides an opportunity to check things like
+// moving data into protected locations, and to mask out bits that should
+// not be propagated.
 //
 // Interface designed to line up with Derelativize()
 //
@@ -920,8 +868,6 @@ inline static REBVAL *Move_Value(RELVAL *out, const REBVAL *v)
 //
 inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
 {
-    assert(not (out->header.bits & CELL_FLAG_STACK_LIFETIME));
-
     // This special kind of copy can only be done into another object's
     // variable slot. (Since the source may be a FRAME!, v *might* be stack
     // but it should never be relative.  If it's stack, we have to go through
@@ -984,10 +930,9 @@ inline static REBVAL *Constify(REBVAL *v) {
 //
 // Rather than allow a REBVAL to be declared plainly as a local variable in
 // a C function, this macro provides a generic "constructor-like" hook.
-// See CELL_FLAG_STACK_LIFETIME for the experimental motivation.  But even if
-// this were merely a synonym for a plain REBVAL declaration in the release
-// build, it provides a useful generic hook into the point of declaration
-// of a stack value.
+// This faciliates the differentiation of cell lifetimes (API vs. stack),
+// as well as cell protection states.  It can also be useful for debugging
+// scenarios, for knowing where cells are initialized.
 //
 // Note: because this will run instructions, a routine should avoid doing a
 // DECLARE_LOCAL inside of a loop.  It should be at the outermost scope of
@@ -996,7 +941,6 @@ inline static REBVAL *Constify(REBVAL *v) {
 // Note: It sets NODE_FLAG_FREE, so this is a "trash" cell by default.
 //
 #define DECLARE_LOCAL(name) \
-    REBVAL name##_pair[2]; \
-    Prep_Stack_Cell(cast(REBVAL*, &name##_pair)); /* tbd: FS_TOP FRAME! */ \
-    REBVAL * const name = cast(REBVAL*, &name##_pair) + 1; \
-    Prep_Stack_Cell(name)
+    REBVAL name##_cell; \
+    Prep_Cell(&name##_cell); \
+    REBVAL * const name = &name##_cell;

@@ -146,8 +146,6 @@ inline static REBLEN SER_USED(REBSER *s) {
 }
 
 inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
-    assert(NOT_SERIES_FLAG(s, STACK_LIFETIME));
-
     if (LEN_BYTE_OR_255(s) == 255)
         s->content.dynamic.used = used;
     else {

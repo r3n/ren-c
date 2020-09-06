@@ -597,10 +597,8 @@ inline static void Prep_Array_Feed(
     REBSPC *specifier,
     REBFLGS flags
 ){
-    Prep_Stack_Cell(&feed->fetched);
-    Init_Unreadable_Void(&feed->fetched);
-    Prep_Stack_Cell(&feed->lookback);
-    Init_Unreadable_Void(&feed->lookback);
+    Init_Unreadable_Void(Prep_Cell(&feed->fetched));
+    Init_Unreadable_Void(Prep_Cell(&feed->lookback));
 
     feed->vaptr = nullptr;
     feed->packed = nullptr;
@@ -640,10 +638,8 @@ inline static void Prep_Va_Feed(
     va_list *vaptr,
     REBFLGS flags
 ){
-    Prep_Stack_Cell(&feed->fetched);
-    Init_Unreadable_Void(&feed->fetched);
-    Prep_Stack_Cell(&feed->lookback);
-    Init_Unreadable_Void(&feed->lookback);
+    Init_Unreadable_Void(Prep_Cell(&feed->fetched));
+    Init_Unreadable_Void(Prep_Cell(&feed->lookback));
 
     feed->index = TRASHED_INDEX;  // avoid warning in release build
     feed->array = nullptr;

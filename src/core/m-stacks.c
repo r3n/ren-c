@@ -286,11 +286,8 @@ REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
 
     REBLEN len_new = len_old + amount;
     REBLEN n;
-    for (n = len_old; n < len_new; ++n) {
+    for (n = len_old; n < len_new; ++n, ++cell)
         Init_Unreadable_Void(cell);
-        cell->header.bits |= (CELL_FLAG_STACK_LIFETIME | CELL_FLAG_TRANSIENT);
-        ++cell;
-    }
 
     // Update the end marker to serve as the indicator for when the next
     // stack push would need to expand.

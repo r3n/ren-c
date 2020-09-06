@@ -541,7 +541,7 @@ void Rebind_Values_Deep(
                 // BIND to an object must be performed, or METHOD should be
                 // used to do it implicitly.
             }
-            else if (GET_SERIES_FLAG(binding, STACK_LIFETIME)) {
+            else if (REB_FRAME == CTX_TYPE(CTX(binding))) {
                 //
                 // Leave bindings to frame alone, e.g. RETURN's definitional
                 // reference...may be an unnecessary optimization as they

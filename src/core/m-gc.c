@@ -500,9 +500,6 @@ static void Mark_Root_Series(void)
             }
 
             if (s->header.bits & NODE_FLAG_CELL) { // a pairing
-                if (s->header.bits & NODE_FLAG_STACK)
-                    assert(!"stack pairings not believed to exist");
-
                 if (s->header.bits & NODE_FLAG_MANAGED)
                     continue; // PAIR! or other value will mark it
 
@@ -513,8 +510,12 @@ static void Mark_Root_Series(void)
             }
 
             if (IS_SER_ARRAY(s)) {
-                if (s->header.bits & (NODE_FLAG_MANAGED | NODE_FLAG_STACK))
-                    continue; // BLOCK!, Mark_Frame_Stack_Deep() etc. mark it
+                if (s->header.bits & NODE_FLAG_MANAGED)
+                    continue; // BLOCK! should mark it
+
+                if (GET_ARRAY_FLAG(s, IS_VARLIST))
+                    if (CTX_TYPE(CTX(s)) == REB_FRAME)
+                        continue;  // Mark_Frame_Stack_Deep() etc. mark it
 
                 // This means someone did something like Make_Array() and then
                 // ran an evaluation before referencing it somewhere from the
@@ -770,12 +771,6 @@ static void Mark_Frame_Stack_Deep(void)
 
         REBVAL *arg;
         for (arg = FRM_ARGS_HEAD(f); NOT_END(param); ++param, ++arg) {
-            //
-            // At time of writing, all frame storage is in stack cells...not
-            // varlists.
-            //
-            assert(arg->header.bits & CELL_FLAG_STACK_LIFETIME);
-
             if (param == f->param) {
                 //
                 // When param and f->param match, that means that arg is the

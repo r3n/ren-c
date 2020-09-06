@@ -782,8 +782,7 @@ REBNATIVE(applique)
     REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
         applicand,
         f->dsp_orig, // lowest_ordered_dsp of refinements to weave in
-        &binder,
-        CELL_MASK_STACK
+        &binder
     );
     Manage_Array(CTX_VARLIST(exemplar)); // binding code into it
 
@@ -849,7 +848,6 @@ REBNATIVE(applique)
 
     Push_Frame_No_Varlist(D_OUT, f);
     f->varlist = CTX_VARLIST(stolen);
-    SET_SERIES_FLAG(f->varlist, STACK_LIFETIME);
     f->rootvar = CTX_ARCHETYPE(stolen);
     f->arg = f->rootvar + 1;
     // f->param assigned above

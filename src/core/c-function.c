@@ -1118,7 +1118,7 @@ REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
     // don't pass it in to the allocation...it needs to be set, but will be
     // overridden by SERIES_INFO_INACCESSIBLE.
     //
-    REBARR *varlist = Alloc_Singular(NODE_FLAG_STACK | NODE_FLAG_MANAGED);
+    REBARR *varlist = Alloc_Singular(NODE_FLAG_MANAGED);
     SER(varlist)->header.bits |= SERIES_MASK_VARLIST;
     SET_SERIES_INFO(varlist, INACCESSIBLE);
     MISC_META_NODE(varlist) = nullptr;
@@ -1775,8 +1775,6 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     REBVAL *outer = KNOWN(ARR_AT(details, 1));  // takes 1 arg (a FRAME!)
     assert(IS_ACTION(outer));
 
-    assert(GET_SERIES_FLAG(f->varlist, STACK_LIFETIME));
-
     // We want to call OUTER with a FRAME! value that will dispatch to INNER
     // when (and if) it runs DO on it.  That frame is the one built for this
     // call to the encloser.  If it isn't managed, there's no worries about
@@ -1784,7 +1782,6 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     //
     REBCTX *c = Steal_Context_Vars(CTX(f->varlist), NOD(FRM_PHASE(f)));
     INIT_LINK_KEYSOURCE(c, NOD(VAL_ACTION(inner)));
-    CLEAR_SERIES_FLAG(c, STACK_LIFETIME);
 
     assert(GET_SERIES_INFO(f->varlist, INACCESSIBLE));  // look dead
 
