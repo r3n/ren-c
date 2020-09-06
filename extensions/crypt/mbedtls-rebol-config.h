@@ -1,5 +1,5 @@
 // !!! This file started from a snapshot of the default mbedTLS `config.h`
-// circa Apr-2020.  It was edited to add or remove switches for Rebol.
+// circa Sep-2020.  It was edited to add or remove switches for Rebol.
 //
 // To remove a flag that is enabled by default, change:
 //
@@ -40,7 +40,7 @@
  *  memory footprint.
  */
 /*
- *  Copyright (C) 2006-2018, ARM Limited, All Rights Reserved
+ *  Copyright The Mbed TLS Contributors
  *  SPDX-License-Identifier: Apache-2.0
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -54,8 +54,6 @@
  *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
- *  This file is part of mbed TLS (https://tls.mbed.org)
  */
 
 #ifndef MBEDTLS_CONFIG_H
@@ -794,6 +792,7 @@
  *
  * Comment macros to disable the curve and functions for it
  */
+/* Short Weierstrass curves (supporting ECP, ECDH, ECDSA) */
 #define MBEDTLS_ECP_DP_SECP192R1_ENABLED
 #define MBEDTLS_ECP_DP_SECP224R1_ENABLED
 #define MBEDTLS_ECP_DP_SECP256R1_ENABLED
@@ -805,6 +804,7 @@
 #define MBEDTLS_ECP_DP_BP256R1_ENABLED
 #define MBEDTLS_ECP_DP_BP384R1_ENABLED
 #define MBEDTLS_ECP_DP_BP512R1_ENABLED
+/* Montgomery curves (supporting ECP) */
 #define MBEDTLS_ECP_DP_CURVE25519_ENABLED
 #define MBEDTLS_ECP_DP_CURVE448_ENABLED
 
@@ -818,6 +818,28 @@
  * Comment this macro to disable NIST curves optimisation.
  */
 #define MBEDTLS_ECP_NIST_OPTIM
+
+/**
+ * \def MBEDTLS_ECP_NO_INTERNAL_RNG
+ *
+ * When this option is disabled, mbedtls_ecp_mul() will make use of an
+ * internal RNG when called with a NULL \c f_rng argument, in order to protect
+ * against some side-channel attacks.
+ *
+ * This protection introduces a dependency of the ECP module on one of the
+ * DRBG modules. For very constrained implementations that don't require this
+ * protection (for example, because you're only doing signature verification,
+ * so not manipulating any secret, or because local/physical side-channel
+ * attacks are outside your threat model), it might be desirable to get rid of
+ * that dependency.
+ *
+ * \warning Enabling this option makes some uses of ECP vulnerable to some
+ * side-channel attacks. Only enable it if you know that's not a problem for
+ * your use case.
+ *
+ * Uncomment this macro to disable some counter-measures in ECP.
+ */
+//#define MBEDTLS_ECP_NO_INTERNAL_RNG
 
 /**
  * \def MBEDTLS_ECP_RESTARTABLE
@@ -1123,7 +1145,7 @@
  *
  * Enable the ECDH-RSA based ciphersuite modes in SSL / TLS.
  *
- * Requires: MBEDTLS_ECDH_C, MBEDTLS_X509_CRT_PARSE_C
+ * Requires: MBEDTLS_ECDH_C, MBEDTLS_RSA_C, MBEDTLS_X509_CRT_PARSE_C
  *
  * This enables the following ciphersuites (if other requisites are
  * enabled as well):
@@ -1554,12 +1576,12 @@
  *
  * Comment this macro to disable support for Encrypt-then-MAC
  */
-#define MBEDTLS_SSL_ENCRYPT_THEN_MAC
+// REBDISABLE #define MBEDTLS_SSL_ENCRYPT_THEN_MAC
 
 /** \def MBEDTLS_SSL_EXTENDED_MASTER_SECRET
  *
- * Enable support for Extended Master Secret, aka Session Hash
- * (draft-ietf-tls-session-hash-02).
+ * Enable support for RFC 7627: Session Hash and Extended Master Secret
+ * Extension.
  *
  * This was introduced as "the proper fix" to the Triple Handshake familiy of
  * attacks, but it is recommended to always use it (even if you disable
@@ -1572,12 +1594,13 @@
  *
  * Comment this macro to disable support for Extended Master Secret.
  */
-#define MBEDTLS_SSL_EXTENDED_MASTER_SECRET
+// REBDISABLE #define MBEDTLS_SSL_EXTENDED_MASTER_SECRET
 
 /**
  * \def MBEDTLS_SSL_FALLBACK_SCSV
  *
- * Enable support for FALLBACK_SCSV (draft-ietf-tls-downgrade-scsv-00).
+ * Enable support for RFC 7507: Fallback Signaling Cipher Suite Value (SCSV)
+ * for Preventing Protocol Downgrade Attacks.
  *
  * For servers, it is recommended to always enable this, unless you support
  * only one version of TLS, or know for sure that none of your clients
@@ -1636,7 +1659,7 @@
  *
  * Comment this macro to disable 1/n-1 record splitting.
  */
-#define MBEDTLS_SSL_CBC_RECORD_SPLITTING
+// REBDISABLE #define MBEDTLS_SSL_CBC_RECORD_SPLITTING
 
 /**
  * \def MBEDTLS_SSL_RENEGOTIATION
@@ -1717,7 +1740,7 @@
  *
  * Comment this macro to disable support for TLS 1.0
  */
-#define MBEDTLS_SSL_PROTO_TLS1
+// REBDISABLE #define MBEDTLS_SSL_PROTO_TLS1
 
 /**
  * \def MBEDTLS_SSL_PROTO_TLS1_1
@@ -1729,7 +1752,7 @@
  *
  * Comment this macro to disable support for TLS 1.1 / DTLS 1.0
  */
-#define MBEDTLS_SSL_PROTO_TLS1_1
+// REBDISABLE #define MBEDTLS_SSL_PROTO_TLS1_1
 
 /**
  * \def MBEDTLS_SSL_PROTO_TLS1_2
@@ -1741,7 +1764,26 @@
  *
  * Comment this macro to disable support for TLS 1.2 / DTLS 1.2
  */
-#define MBEDTLS_SSL_PROTO_TLS1_2
+// REBDISABLE #define MBEDTLS_SSL_PROTO_TLS1_2
+
+/**
+ * \def MBEDTLS_SSL_PROTO_TLS1_3_EXPERIMENTAL
+ *
+ * This macro is used to selectively enable experimental parts
+ * of the code that contribute to the ongoing development of
+ * the prototype TLS 1.3 and DTLS 1.3 implementation, and provide
+ * no other purpose.
+ *
+ * \warning TLS 1.3 and DTLS 1.3 aren't yet supported in Mbed TLS,
+ *          and no feature exposed through this macro is part of the
+ *          public API. In particular, features under the control
+ *          of this macro are experimental and don't come with any
+ *          stability guarantees.
+ *
+ * Uncomment this macro to enable experimental and partial
+ * functionality specific to TLS 1.3.
+ */
+//#define MBEDTLS_SSL_PROTO_TLS1_3_EXPERIMENTAL
 
 /**
  * \def MBEDTLS_SSL_PROTO_DTLS
@@ -1756,7 +1798,7 @@
  *
  * Comment this macro to disable support for DTLS
  */
-#define MBEDTLS_SSL_PROTO_DTLS
+// REBDISABLE #define MBEDTLS_SSL_PROTO_DTLS
 
 /**
  * \def MBEDTLS_SSL_ALPN
@@ -1780,7 +1822,7 @@
  *
  * Comment this to disable anti-replay in DTLS.
  */
-#define MBEDTLS_SSL_DTLS_ANTI_REPLAY
+// REBDISABLE #define MBEDTLS_SSL_DTLS_ANTI_REPLAY
 
 /**
  * \def MBEDTLS_SSL_DTLS_HELLO_VERIFY
@@ -1798,7 +1840,7 @@
  *
  * Comment this to disable support for HelloVerifyRequest.
  */
-#define MBEDTLS_SSL_DTLS_HELLO_VERIFY
+// REBDISABLE #define MBEDTLS_SSL_DTLS_HELLO_VERIFY
 
 /**
  * \def MBEDTLS_SSL_DTLS_CLIENT_PORT_REUSE
@@ -1814,7 +1856,7 @@
  *
  * Comment this to disable support for clients reusing the source port.
  */
-#define MBEDTLS_SSL_DTLS_CLIENT_PORT_REUSE
+// REBDISABLE #define MBEDTLS_SSL_DTLS_CLIENT_PORT_REUSE
 
 /**
  * \def MBEDTLS_SSL_DTLS_BADMAC_LIMIT
@@ -1825,7 +1867,7 @@
  *
  * Requires: MBEDTLS_SSL_PROTO_DTLS
  */
-#define MBEDTLS_SSL_DTLS_BADMAC_LIMIT
+// REBDISABLE #define MBEDTLS_SSL_DTLS_BADMAC_LIMIT
 
 /**
  * \def MBEDTLS_SSL_SESSION_TICKETS
@@ -1901,6 +1943,62 @@
  * Enable modifying the maximum I/O buffer size.
  */
 //#define MBEDTLS_SSL_VARIABLE_BUFFER_LENGTH
+
+/**
+ * \def MBEDTLS_TEST_CONSTANT_FLOW_MEMSAN
+ *
+ * Enable testing of the constant-flow nature of some sensitive functions with
+ * clang's MemorySanitizer. This causes some existing tests to also test
+ * this non-functional property of the code under test.
+ *
+ * This setting requires compiling with clang -fsanitize=memory. The test
+ * suites can then be run normally.
+ *
+ * \warning This macro is only used for extended testing; it is not considered
+ * part of the library's API, so it may change or disappear at any time.
+ *
+ * Uncomment to enable testing of the constant-flow nature of selected code.
+ */
+//#define MBEDTLS_TEST_CONSTANT_FLOW_MEMSAN
+
+/**
+ * \def MBEDTLS_TEST_CONSTANT_FLOW_VALGRIND
+ *
+ * Enable testing of the constant-flow nature of some sensitive functions with
+ * valgrind's memcheck tool. This causes some existing tests to also test
+ * this non-functional property of the code under test.
+ *
+ * This setting requires valgrind headers for building, and is only useful for
+ * testing if the tests suites are run with valgrind's memcheck. This can be
+ * done for an individual test suite with 'valgrind ./test_suite_xxx', or when
+ * using CMake, this can be done for all test suites with 'make memcheck'.
+ *
+ * \warning This macro is only used for extended testing; it is not considered
+ * part of the library's API, so it may change or disappear at any time.
+ *
+ * Uncomment to enable testing of the constant-flow nature of selected code.
+ */
+//#define MBEDTLS_TEST_CONSTANT_FLOW_VALGRIND
+
+/**
+ * \def MBEDTLS_TEST_HOOKS
+ *
+ * Enable features for invasive testing such as introspection functions and
+ * hooks for fault injection. This enables additional unit tests.
+ *
+ * Merely enabling this feature should not change the behavior of the product.
+ * It only adds new code, and new branching points where the default behavior
+ * is the same as when this feature is disabled.
+ * However, this feature increases the attack surface: there is an added
+ * risk of vulnerabilities, and more gadgets that can make exploits easier.
+ * Therefore this feature must never be enabled in production.
+ *
+ * See `docs/architecture/testing/mbed-crypto-invasive-testing.md` for more
+ * information.
+ *
+ * Uncomment to enable invasive tests.
+ */
+//#define MBEDTLS_TEST_HOOKS
 
 /**
  * \def MBEDTLS_THREADING_ALT
@@ -2389,7 +2487,7 @@
  *
  * This module is used for testing (ssl_client/server).
  */
-#define MBEDTLS_CERTS_C
+// REBDISABLE #define MBEDTLS_CERTS_C
 
 /**
  * \def MBEDTLS_CHACHA20_C
@@ -2549,7 +2647,9 @@
  * This module is used by the following key exchanges:
  *      ECDHE-ECDSA
  *
- * Requires: MBEDTLS_ECP_C, MBEDTLS_ASN1_WRITE_C, MBEDTLS_ASN1_PARSE_C
+ * Requires: MBEDTLS_ECP_C, MBEDTLS_ASN1_WRITE_C, MBEDTLS_ASN1_PARSE_C,
+ *           and at least one MBEDTLS_ECP_DP_XXX_ENABLED for a
+ *           short Weierstrass curve.
  */
 // REBDISABLE #define MBEDTLS_ECDSA_C
 
@@ -3174,7 +3274,7 @@
  *
  * This module is required for SSL/TLS client support.
  */
-#define MBEDTLS_SSL_CLI_C
+// REBDISABLE #define MBEDTLS_SSL_CLI_C
 
 /**
  * \def MBEDTLS_SSL_SRV_C
@@ -3188,7 +3288,7 @@
  *
  * This module is required for SSL/TLS server support.
  */
-#define MBEDTLS_SSL_SRV_C
+// REBDISABLE #define MBEDTLS_SSL_SRV_C
 
 /**
  * \def MBEDTLS_SSL_TLS_C
@@ -3204,7 +3304,7 @@
  *
  * This module is required for SSL/TLS.
  */
-#define MBEDTLS_SSL_TLS_C
+// REBDISABLE #define MBEDTLS_SSL_TLS_C
 
 /**
  * \def MBEDTLS_THREADING_C
@@ -3573,6 +3673,22 @@
  *
  */
 //#define MBEDTLS_SSL_CID_PADDING_GRANULARITY 16
+
+/** \def MBEDTLS_SSL_TLS1_3_PADDING_GRANULARITY
+ *
+ * This option controls the use of record plaintext padding
+ * in TLS 1.3.
+ *
+ * The padding will always be chosen so that the length of the
+ * padded plaintext is a multiple of the value of this option.
+ *
+ * Note: A value of \c 1 means that no padding will be used
+ *       for outgoing records.
+ *
+ * Note: On systems lacking division instructions,
+ *       a power of two should be preferred.
+ */
+//#define MBEDTLS_SSL_TLS1_3_PADDING_GRANULARITY 1
 
 /** \def MBEDTLS_SSL_OUT_CONTENT_LEN
  *
