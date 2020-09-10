@@ -78,3 +78,23 @@
 ("$0.10000000000000000000000000" = mold $1 / $10)
 ("$0.33333333333333333333333333" = mold $1 / $3)
 ("$0.66666666666666666666666667" = mold $2 / $3)
+
+
+; Configurability of the `/` is special, because it is a PATH! and not a WORD!
+; The synonym -SLASH-1- is used to refer to it in "word-space", and it can
+; be bound using this.  Note that because it is a PATH!, `/` won't get
+; collected by routines like COLLECT-WORDS or similar...so this applies to
+; specific intents for overloading, vs. thinking of `/` as being truly
+; "word-equivalent"
+;
+[#2516 (
+    code: [1 / 2]
+    obj: make object! [
+        -slash-1-: enfix func [a b] [
+            return reduce '(b a)
+        ]
+    ]
+    0.5 = do code
+    bind code obj
+    '(2 1) = do code
+)]

@@ -111,7 +111,7 @@ inline static RELVAL *Quotify_Core(
         paired->extra = v->extra;
         paired->payload = v->payload;
  
-        Init_Unreadable_Blank(PAIRING_KEY(paired));  // Key not used ATM
+        Init_Unreadable_Void(PAIRING_KEY(paired));  // Key not used ATM
 
         Manage_Pairing(paired);
 
@@ -153,12 +153,13 @@ inline static RELVAL *Quotify_Core(
 // do '''X -> ''X, ''X -> 'X or 'X -> X.  Use Unquotify() for the more
 // generic routine, but this is needed by the evaluator most commonly.
 //
+// Note: Strangely pretentious name is on purpose, to discourage general use.
+//
 inline static RELVAL *Unquotify_In_Situ(RELVAL *v, REBLEN unquotes)
 {
-    assert(KIND_BYTE(v) >= REB_64); // not an in-situ quoted value otherwise
+    assert(KIND_BYTE(v) >= REB_64);  // not an in-situ quoted value otherwise
     assert(cast(REBLEN, KIND_BYTE(v) / REB_64) >= unquotes);
     mutable_KIND_BYTE(v) -= REB_64 * unquotes;
-    assert(KIND_BYTE(v) % 64 == MIRROR_BYTE(v));
     return v;
 }
 
@@ -213,7 +214,7 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
 
 
 inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v) {
-    if (KIND_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable blanks
+    if (KIND_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable voids
         return v;  // Note: kind byte may be > 64
 
     // The reason this routine returns `const` is because you can't modify

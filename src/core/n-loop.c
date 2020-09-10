@@ -89,7 +89,7 @@ REBNATIVE(break)
 {
     INCLUDE_PARAMS_OF_BREAK;
 
-    return Init_Thrown_With_Label(D_OUT, NULLED_CELL, NAT_VALUE(break));
+    return Init_Thrown_With_Label(D_OUT, NULLED_CELL, NATIVE_VAL(break));
 }
 
 
@@ -113,7 +113,7 @@ REBNATIVE(continue)
     return Init_Thrown_With_Label(
         D_OUT,
         ARG(value), // null if missing, e.g. `do [continue]`
-        NAT_VALUE(continue)
+        NATIVE_VAL(continue)
     );
 }
 
@@ -380,6 +380,7 @@ struct Loop_Each_State {
     REBCTX *pseudo_vars_ctx;  // vars made by Virtual_Bind_To_New_Context()
     REBVAL *data;  // the data argument passed in
     REBSER *data_ser;  // series data being enumerated (if applicable)
+    REBSPC *specifier;  // specifier (if applicable)
     REBLEN data_idx;  // index into the data for filling current variable
     REBLEN data_len;  // length of the data
 };
@@ -433,7 +434,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                     Derelativize(
                         var,
                         ARR_AT(ARR(les->data_ser), les->data_idx),
-                        VAL_SPECIFIER(les->data)
+                        les->specifier
                     );
                 if (++les->data_idx == les->data_len)
                     more_data = false;
@@ -671,15 +672,17 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         if (ANY_SERIES(les.data)) {
             les.data_ser = VAL_SERIES(les.data);
             les.data_idx = VAL_INDEX(les.data);
+            if (ANY_ARRAY(les.data))
+                les.specifier = VAL_SPECIFIER(les.data);
         }
         else if (ANY_CONTEXT(les.data)) {
             les.data_ser = SER(CTX_VARLIST(VAL_CONTEXT(les.data)));
             les.data_idx = 1;
         }
         else if (ANY_PATH(les.data)) {
-            les.data_ser = VAL_SERIES(les.data);
-            assert(VAL_INDEX(les.data) == 0);
+            les.data_ser = SER(VAL_PATH(les.data));
             les.data_idx = 0;
+            les.specifier = VAL_PATH_SPECIFIER(les.data);
         }
         else if (IS_MAP(les.data)) {
             les.data_ser = SER(MAP_PAIRLIST(VAL_MAP(les.data)));
@@ -974,7 +977,7 @@ REBNATIVE(stop)
         IS_ENDISH_NULLED(ARG(value))
             ? VOID_VALUE  // `if true [stop]`
             : ARG(value),  // `if true [stop 5]`, etc.
-        NAT_VALUE(stop)
+        NATIVE_VAL(stop)
     );
 }
 

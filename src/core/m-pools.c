@@ -543,10 +543,10 @@ REBNOD *Try_Find_Containing_Node_Debug(const void *p)
 //
 REBVAL *Alloc_Pairing(void) {
     REBVAL *paired = cast(REBVAL*, Make_Node(PAR_POOL));  // 2x REBVAL size
-    Prep_Non_Stack_Cell(paired);
+    Prep_Cell(paired);
 
     REBVAL *key = PAIRING_KEY(paired);
-    Prep_Non_Stack_Cell(key);
+    Prep_Cell(key);
 
     return paired;
 }
@@ -719,7 +719,7 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
             // but when it is this will be useful.
             //
             for (index = 0; index < delta; index++)
-                Prep_Non_Stack_Cell(ARR_AT(ARR(s), index));
+                Prep_Cell(ARR_AT(ARR(s), index));
         }
       #endif
         ASSERT_SERIES_TERM_IF_NEEDED(s);
@@ -767,7 +767,7 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
             //
             while (delta != 0) {
                 --delta;
-                Prep_Non_Stack_Cell(ARR_AT(ARR(s), index + delta));
+                Prep_Cell(ARR_AT(ARR(s), index + delta));
             }
         }
       #endif
@@ -940,6 +940,40 @@ void Swap_Series_Content(REBSER* a, REBSER* b)
     union Reb_Series_Link a_link = LINK(a);
     LINK(a) = LINK(b);
     LINK(b) = a_link;
+}
+
+
+//
+//  swap-contents: native [
+//      {Low-level operation for swapping the underlying data for two series.}
+//
+//      return: [void!]
+//      series1 [any-series!]
+//      series2 [any-series!]
+//  ]
+//
+REBNATIVE(swap_contents)
+{
+    INCLUDE_PARAMS_OF_SWAP_CONTENTS;
+
+    FAIL_IF_READ_ONLY(ARG(series1));
+    FAIL_IF_READ_ONLY(ARG(series2));
+
+    if (ANY_ARRAY(ARG(series1)) != ANY_ARRAY(ARG(series2)))
+        fail ("Can only SWAP-CONTENTS of arrays with other arrays");
+
+    // !!! This is a conservative check, as some binaries could be swapped
+    // with ANY-STRING!.  However, that would require checking that the
+    // binary is valid UTF-8...mechanics that are available in AS TEXT! etc.
+    // Let the user do their own aliasing for now, since the checks are
+    // annoying to write.
+    //
+    if (IS_BINARY(ARG(series1)) != IS_BINARY(ARG(series2)))
+        fail ("Can only SWAP-CONTENTS of binaries with other binaries");
+
+    Swap_Series_Content(VAL_SERIES(ARG(series1)), VAL_SERIES(ARG(series2)));
+
+    return Init_Void(D_OUT);
 }
 
 

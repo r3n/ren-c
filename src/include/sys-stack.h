@@ -132,7 +132,7 @@ inline static REBVAL *DS_AT(REBDSP d) {
         (DS_Movable_Top -= (DS_Index - (dsp)), DS_Index = (dsp))
 #else
     inline static void DS_DROP(void) {
-        Init_Unreadable_Blank(DS_TOP); // mostly trashy but safe for NOT_END()
+        Init_Unreadable_Void(DS_TOP); // mostly trashy but safe for NOT_END()
         --DS_Index;
         --DS_Movable_Top;
     }

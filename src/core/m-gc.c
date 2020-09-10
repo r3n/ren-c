@@ -100,15 +100,15 @@ static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v);
 
 inline static void Queue_Mark_Opt_Value_Deep(const RELVAL *v)
 {
-    ASSERT_NOT_END(v); // can be NULLED, just not END
-    Queue_Mark_Opt_End_Cell_Deep(v);
+    assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
+    Queue_Mark_Opt_End_Cell_Deep(v);  // nulled cell & unreadable void are ok
 }
 
 inline static void Queue_Mark_Value_Deep(const RELVAL *v)
 {
-    ASSERT_NOT_END(v);
-    assert(KIND_BYTE_UNCHECKED(v) != REB_NULLED);  // Unreadable blank ok
-    Queue_Mark_Opt_End_Cell_Deep(v);
+    assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
+    assert(KIND_BYTE_UNCHECKED(v) != REB_NULLED);  // faster than IS_NULLED()
+    Queue_Mark_Opt_End_Cell_Deep(v);  // unreadable void is ok
 }
 
 
@@ -165,11 +165,11 @@ static void Queue_Mark_Pairing_Deep(REBVAL *paired)
 //
 static void Queue_Mark_Node_Deep(void *p)
 {
-    REBYTE *bp = cast(REBYTE*, p);
-    if (*bp & NODE_BYTEMASK_0x10_MARKED)
+    REBYTE first = *cast(REBYTE*, p);
+    if (first & NODE_BYTEMASK_0x10_MARKED)
         return;  // may not be finished marking yet, but has been queued
 
-    if (*bp & NODE_BYTEMASK_0x01_CELL) {  // e.g. a pairing
+    if (first & NODE_BYTEMASK_0x01_CELL) {  // e.g. a pairing
         REBVAL *v = VAL(p);
         if (GET_CELL_FLAG(v, MANAGED))
             Queue_Mark_Pairing_Deep(v);
@@ -354,11 +354,6 @@ static void Propagate_All_GC_Marks(void)
 // them, so stack frames can be inspected more meaningfully--both for upcoming
 // evaluations and those already past.
 //
-// A non-debug reason to reify a va_list into an array is if the garbage
-// collector needs to see the upcoming values to protect them from GC.  In
-// this case it only needs to protect those values that have not yet been
-// consumed.
-//
 // Because items may well have already been consumed from the va_list() that
 // can't be gotten back, we put in a marker to help hint at the truncation
 // (unless told that it's not truncated, e.g. a debug mode that calls it
@@ -370,7 +365,7 @@ void Reify_Va_To_Array_In_Frame(
 ) {
     REBDSP dsp_orig = DSP;
 
-    assert(FRM_IS_VALIST(f));
+    assert(FRM_IS_VARIADIC(f));
 
     if (truncated) {
         DS_PUSH();
@@ -400,7 +395,9 @@ void Reify_Va_To_Array_In_Frame(
         f->feed->index = 0;
     }
 
-    assert(not f->feed->vaptr);  // feeding forward should have called va_end
+    // feeding forward should have called va_end
+    //
+    assert(not f->feed->vaptr and not f->feed->packed);
 
     if (DSP == dsp_orig)
         f->feed->array = EMPTY_ARRAY;  // don't bother making new empty array
@@ -422,48 +419,9 @@ void Reify_Va_To_Array_In_Frame(
     else {
         f->feed->pending = f->feed->value + 1;
 
-        assert(NOT_FEED_FLAG(f->feed, TOOK_HOLD));
+        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
         SET_SERIES_INFO(f->feed->array, HOLD);
-        SET_FEED_FLAG(f->feed, TOOK_HOLD);
-    }
-}
-
-
-//
-//  Reify_Any_C_Valist_Frames: C
-//
-// Some of the call stack frames may have been invoked with a C function call
-// that took a comma-separated list of REBVAL (the way printf works, a
-// variadic "va_list").
-//
-// http://en.cppreference.com/w/c/variadic
-//
-// Although it's a list of REBVAL*, these call frames have no REBARR series
-// behind.  Yet they still need to be enumerated to protect the values coming
-// up in the later EVALUATEs.  But enumerating a C va_list can't be undone.
-// The REBVAL* is lost if it isn't saved, and these frames may be in
-// mid-evaluation.
-//
-// Hence, the garbage collector has to "reify" the remaining portion of the
-// va_list into a REBARR before starting the GC.  Then the rest of the
-// evaluation happens on that array.
-//
-static void Reify_Any_C_Valist_Frames(void)
-{
-    // IMPORTANT: This must be done *before* any of the mark/sweep logic
-    // begins, because it creates new arrays.  In the future it may be
-    // possible to introduce new series in mid-garbage collection (which would
-    // be necessary for an incremental garbage collector), but for now the
-    // feature is not supported.
-    //
-    ASSERT_NO_GC_MARKS_PENDING();
-
-    REBFRM *f = FS_TOP;
-    for (; f != FS_BOTTOM; f = f->prior) {
-        if (NOT_END(f->feed->value) and FRM_IS_VALIST(f)) {
-            const bool truncated = true;
-            Reify_Va_To_Array_In_Frame(f, truncated);
-        }
+        SET_EVAL_FLAG(f, TOOK_HOLD);
     }
 }
 
@@ -542,9 +500,6 @@ static void Mark_Root_Series(void)
             }
 
             if (s->header.bits & NODE_FLAG_CELL) { // a pairing
-                if (s->header.bits & NODE_FLAG_STACK)
-                    assert(!"stack pairings not believed to exist");
-
                 if (s->header.bits & NODE_FLAG_MANAGED)
                     continue; // PAIR! or other value will mark it
 
@@ -555,8 +510,12 @@ static void Mark_Root_Series(void)
             }
 
             if (IS_SER_ARRAY(s)) {
-                if (s->header.bits & (NODE_FLAG_MANAGED | NODE_FLAG_STACK))
-                    continue; // BLOCK!, Mark_Frame_Stack_Deep() etc. mark it
+                if (s->header.bits & NODE_FLAG_MANAGED)
+                    continue; // BLOCK! should mark it
+
+                if (GET_ARRAY_FLAG(s, IS_VARLIST))
+                    if (CTX_TYPE(CTX(s)) == REB_FRAME)
+                        continue;  // Mark_Frame_Stack_Deep() etc. mark it
 
                 // This means someone did something like Make_Array() and then
                 // ran an evaluation before referencing it somewhere from the
@@ -592,7 +551,6 @@ static void Mark_Root_Series(void)
 
         Propagate_All_GC_Marks(); // !!! is propagating on each segment good?
     }
-
 }
 
 
@@ -655,7 +613,7 @@ static void Mark_Natives(void)
 {
     REBLEN n;
     for (n = 0; n < Num_Natives; ++n)
-        Queue_Mark_Value_Deep(&Natives[n]);
+        Queue_Mark_Node_Deep(Natives[n]);
 
     Propagate_All_GC_Marks();
 }
@@ -674,7 +632,7 @@ static void Mark_Guarded_Nodes(void)
     REBLEN n = SER_USED(GC_Guarded);
     for (; n > 0; --n, ++np) {
         REBNOD *node = *np;
-        if (node->header.bits & NODE_FLAG_CELL) {
+        if (Is_Node_Cell(node)) {
             //
             // !!! What if someone tried to GC_GUARD a managed paired REBSER?
             //
@@ -712,16 +670,11 @@ static void Mark_Frame_Stack_Deep(void)
 
     while (true) { // mark all frames (even FS_BOTTOM)
         //
-        // Should have taken care of reifying all the VALIST on the stack
-        // earlier in the recycle process (don't want to create new arrays
-        // once the recycling has started...)
-        //
-        assert(not f->feed->vaptr or IS_POINTER_TRASH_DEBUG(f->feed->vaptr));
-
         // Note: f->feed->pending should either live in f->feed->array, or
         // it may be trash (e.g. if it's an apply).  GC can ignore it.
         //
-        Queue_Mark_Node_Deep(f->feed->array);
+        if (f->feed->array)
+            Queue_Mark_Node_Deep(f->feed->array);
 
         // END is possible, because the frame could be sitting at the end of
         // a block when a function runs, e.g. `do [zero-arity]`.  That frame
@@ -818,12 +771,6 @@ static void Mark_Frame_Stack_Deep(void)
 
         REBVAL *arg;
         for (arg = FRM_ARGS_HEAD(f); NOT_END(param); ++param, ++arg) {
-            //
-            // At time of writing, all frame storage is in stack cells...not
-            // varlists.
-            //
-            assert(arg->header.bits & CELL_FLAG_STACK_LIFETIME);
-
             if (param == f->param) {
                 //
                 // When param and f->param match, that means that arg is the
@@ -1101,7 +1048,6 @@ REBLEN Recycle_Core(bool shutdown, REBSER *sweeplist)
   #endif
 
     ASSERT_NO_GC_MARKS_PENDING();
-    Reify_Any_C_Valist_Frames();
 
   #if !defined(NDEBUG)
     PG_Reb_Stats->Recycle_Counter++;

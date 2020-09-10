@@ -128,11 +128,11 @@ static REBCTX *Error_Compression(const z_stream *strm, int ret)
 // Common code for compressing raw deflate, zlib envelope, gzip envelope.
 // Exported as rebDeflateAlloc() and rebGunzipAlloc() for clarity.
 //
-unsigned char *Compress_Alloc_Core(
-    size_t *size_out,
+REBYTE *Compress_Alloc_Core(
+    REBSIZ *size_out,
     const void* input,
-    size_t size_in,
-    REBSTR *envelope  // NONE, ZLIB, or GZIP... null defaults GZIP
+    REBSIZ size_in,
+    enum Reb_Symbol envelope  // SYM_NONE, SYM_ZLIB, or SYM_GZIP
 ){
     z_stream strm;
     strm.zalloc = &zalloc;  // fail() cleans up automatically, see notes
@@ -140,13 +140,7 @@ unsigned char *Compress_Alloc_Core(
     strm.opaque = nullptr;  // passed to zalloc/zfree, not needed currently
 
     int window_bits = window_bits_gzip;
-    if (not envelope) {
-        //
-        // See notes in Decompress_Alloc_Core() about why gzip is chosen to
-        // be invocable via nullptr for bootstrap; not really applicable to
-        // the compression side, but might as well be consistent.
-    }
-    else switch (STR_SYMBOL(envelope)) {
+    switch (envelope) {
       case SYM_NONE:
         window_bits = window_bits_zlib_raw;
         break;
@@ -202,7 +196,7 @@ unsigned char *Compress_Alloc_Core(
     // GZIP contains a 32-bit length of the uncompressed data (modulo 2^32),
     // at the tail of the compressed data.  Sanity check that it's right.
     //
-    if (envelope and STR_SYMBOL(envelope) == SYM_GZIP) {
+    if (envelope and envelope == SYM_GZIP) {
         uint32_t gzip_len = Bytes_To_U32_BE(
             output + strm.total_out - sizeof(uint32_t)
         );
@@ -227,12 +221,12 @@ unsigned char *Compress_Alloc_Core(
 // Common code for decompressing: raw deflate, zlib envelope, gzip envelope.
 // Exported as rebInflateAlloc() and rebGunzipAlloc() for clarity.
 //
-unsigned char *Decompress_Alloc_Core(
-    size_t *size_out,
+REBYTE *Decompress_Alloc_Core(
+    REBSIZ *size_out,
     const void *input,
-    size_t size_in,
+    REBSIZ size_in,
     int max,
-    REBSTR *envelope  // NONE, ZLIB, GZIP, or DETECT... null defaults GZIP
+    enum Reb_Symbol envelope  // SYM_NONE, SYM_ZLIB, SYM_GZIP, or SYM_DETECT
 ){
     z_stream strm;
     strm.zalloc = &zalloc;  // fail() cleans up automatically, see notes
@@ -244,13 +238,7 @@ unsigned char *Decompress_Alloc_Core(
     strm.next_in = cast(const z_Bytef*, input);
 
     int window_bits = window_bits_gzip;
-    if (not envelope) {
-        //
-        // The reason GZIP is chosen as the default is because the symbols
-        // in %words.r are loaded as part of the boot process from code that
-        // is compressed with GZIP, so it's a Catch-22 otherwise.
-    }
-    else switch (STR_SYMBOL(envelope)) {
+    switch (envelope) {
       case SYM_NONE:
         window_bits = window_bits_zlib_raw;
         break;
@@ -277,8 +265,7 @@ unsigned char *Decompress_Alloc_Core(
 
     REBLEN buf_size;
     if (
-        envelope
-        and STR_SYMBOL(envelope) == SYM_GZIP  // not DETECT, trust stored size
+        envelope == SYM_GZIP  // not DETECT, trust stored size
         and size_in < 4161808  // (2^32 / 1032 + 18) ->1032 max deflate ratio
     ){
         const REBSIZ gzip_min_overhead = 18;  // at *least* 18 bytes
@@ -392,11 +379,11 @@ unsigned char *Decompress_Alloc_Core(
 //
 //      return: "Little-endian format of 4-byte CRC-32"
 //          [binary!]
-//      data "Data to encode (using UTF-8 if TEXT!)"
-//          [binary! text!]
 //      method "Either ADLER32 or CRC32"
 //          [word!]
-//      /part "Length of data (only supported for BINARY! at the moment)"
+//      data "Data to encode (using UTF-8 if TEXT!)"
+//          [binary! text!]
+//      /part "Length of data"
 //          [any-value!]
 //  ]
 //
@@ -415,43 +402,44 @@ REBNATIVE(checksum_core)
 {
     INCLUDE_PARAMS_OF_CHECKSUM_CORE;
 
-    const REBYTE *data;
+    REBLEN len = Part_Len_May_Modify_Index(ARG(data), ARG(part));
+
     REBSIZ size;
+    const REBYTE *data = VAL_BYTES_LIMIT_AT(&size, ARG(data), len);
 
-    if (IS_TEXT(ARG(data))) {
-        if (REF(part))  // !!! requires different considerations, review
-            fail ("/PART not implemented for CHECKSUM-32 and UTF-8 yet");
-        data = VAL_BYTES_AT(&size, ARG(data));
-    }
-    else {
-        size = Part_Len_May_Modify_Index(ARG(data), ARG(part));
-        data = VAL_BIN_AT(ARG(data));  // after Part_Len, may modify
-    }
+    uLong crc;  // Note: zlib.h defines "crc32" as "z_crc32"
+    switch (VAL_WORD_SYM(ARG(method))) {
+      case SYM_CRC32:
+        crc = crc32_z(0L, data, size);
+        break;
 
-    uLong crc32;
-    if (VAL_WORD_SYM(ARG(method)) == SYM_CRC32)
-        crc32 = crc32_z(0L, data, size);
-    else if (VAL_WORD_SYM(ARG(method)) == SYM_ADLER32)
-        crc32 = z_adler32(0L, data, size);
-    else
+      case SYM_ADLER32:
+        //
+        // The zlib documentation shows passing 0L, but this is not right.
+        // "At the beginning [of Adler-32], A is initialized to 1, B to 0"
+        // A is the low 16-bits, B is the high.  Hence start with 1L.
+        //
+        crc = z_adler32(1L, data, size);
+        break;
+
+      default:
         fail ("METHOD for CHECKSUM-CORE must be CRC32 or ADLER32");
+    }
 
     REBBIN *bin = Make_Binary(4);
     REBYTE *bp = BIN_HEAD(bin);
 
-    // Existing clients seem to want a little-endian BINARY! most of the time.
     // Returning as a BINARY! avoids signedness issues (R3-Alpha CRC-32 was a
     // signed integer, which was weird):
     //
     // https://github.com/rebol/rebol-issues/issues/2375
     //
-    // !!! This is an experiment, to try it--as it isn't a very public
-    // function--used only by unzip.reb and Mezzanine save at time of writing.
+    // When formulated as a binary, most callers seem to want little endian.
     //
     int i;
     for (i = 0; i < 4; ++i, ++bp) {
-        *bp = crc32 % 256;
-        crc32 >>= 8;
+        *bp = crc % 256;
+        crc >>= 8;
     }
     TERM_BIN_LEN(bin, 4);
 
@@ -482,12 +470,12 @@ REBNATIVE(deflate)
     REBSIZ size;
     const REBYTE *bp = VAL_BYTES_LIMIT_AT(&size, ARG(data), limit);
 
-    REBSTR *envelope;
+    enum Reb_Symbol envelope;
     if (not REF(envelope))
-        envelope = Canon(SYM_NONE);  // Note: nullptr is gzip (for bootstrap)
+        envelope = SYM_NONE;
     else {
-        envelope = VAL_WORD_SPELLING(ARG(envelope));
-        switch (STR_SYMBOL(envelope)) {
+        envelope = cast(enum Reb_Symbol, VAL_WORD_SYM(ARG(envelope)));
+        switch (envelope) {
           case SYM_ZLIB:
           case SYM_GZIP:
             break;
@@ -558,15 +546,15 @@ REBNATIVE(inflate)
         size = VAL_HANDLE_LEN(ARG(data));
     }
 
-    REBSTR *envelope;
+    enum Reb_Symbol envelope;
     if (not REF(envelope))
-        envelope = Canon(SYM_NONE);  // Note: nullptr is gzip (for bootstrap)
+        envelope = SYM_NONE;
     else {
-        switch (VAL_WORD_SYM(ARG(envelope))) {
+        envelope = cast(enum Reb_Symbol, VAL_WORD_SYM(ARG(envelope)));
+        switch (envelope) {
           case SYM_ZLIB:
           case SYM_GZIP:
           case SYM_DETECT:
-            envelope = VAL_WORD_SPELLING(ARG(envelope));
             break;
 
           default:

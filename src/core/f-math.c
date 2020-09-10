@@ -130,7 +130,7 @@ REBINT Form_Int_Len(REBYTE *buf, REBI64 val, REBINT maxl)
 
 #define MIN_I64_STR "-9223372036854775808"
     if (val == INT64_MIN) {
-        len = strlen(MIN_I64_STR);
+        len = strsize(MIN_I64_STR);
         if (maxl < len + 1) return 0;
         memcpy(buf, MIN_I64_STR, len + 1);
         return len;
@@ -222,7 +222,7 @@ REBYTE *Form_Int(REBYTE *buf, REBINT val)
 REBYTE *Form_Integer(REBYTE *buf, REBI64 val)
 {
     INT_TO_STR(val, buf);
-    return buf+LEN_BYTES(buf);
+    return buf + strsize(buf);
 }
 
 
@@ -232,7 +232,7 @@ REBYTE *Form_Integer(REBYTE *buf, REBI64 val)
 REBINT Emit_Integer(REBYTE *buf, REBI64 val)
 {
     INT_TO_STR(val, buf);
-    return LEN_BYTES(buf);
+    return strsize(buf);
 }
 
 

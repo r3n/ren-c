@@ -963,7 +963,12 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
         if (not ss->feed)  // not a variadic va_list-based scan...
             return TOKEN_END;  // ...so end of utf-8 input was *the* end
 
-        const void *p = va_arg(*ss->feed->vaptr, const void*);
+        const void *p;
+        if (ss->feed->vaptr)
+            p = va_arg(*ss->feed->vaptr, const void*);
+        else
+            p = *ss->feed->packed++;
+
         if (not p or Detect_Rebol_Pointer(p) != DETECTED_AS_UTF8) {
             //
             // If it's not a UTF-8 string we don't know how to handle it.
@@ -1003,7 +1008,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             // context for the error-causing input.
             //
             if (not ss->line_head) {
-                assert(ss->feed->vaptr != nullptr);
+                assert(ss->feed->vaptr or ss->feed->packed);
                 assert(not level->start_line_head);
                 level->start_line_head = ss->line_head = ss->begin;
             }
@@ -1875,13 +1880,16 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     goto loop;
                 }
 
-                // Handle the simple `/` case
+                // Handle the `/` case
+                //
+                // There is an unusual finesse at work here where the cell
+                // format used is that of WORD! `-slash-1-`, so that it has a
+                // binding and a spelling.  Yet when arrays are requested, it
+                // gives that array as the global `PG_Path_2_Blanks_Array`,
+                // for what you get as `make path! [_ _]`.
 
-                REBARR *a = Make_Array(2);
-                Init_Blank(ARR_AT(a, 0));
-                Init_Blank(ARR_AT(a, 1));
-                TERM_ARRAY_LEN(a, 2);
-                Init_Path(DS_PUSH(), a);
+                Init_Word(DS_PUSH(), PG_Slash_1_Canon);  // mirror is REB_WORD
+                mutable_KIND_BYTE(DS_TOP) = REB_PATH;  // but kind is REB_PATH
                 break;
             }
 
@@ -2116,7 +2124,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 // data stack could go bad on any DS_PUSH() or DS_DROP().
                 //
                 DECLARE_LOCAL (cell);
-                Init_Unreadable_Blank(cell);
+                Init_Unreadable_Void(cell);
                 PUSH_GC_GUARD(cell);
 
                 PUSH_GC_GUARD(array);
@@ -2190,6 +2198,19 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         // are into the user context (which we will expand).
         //
         if (ss->feed and ss->feed->binder and ANY_WORD(DS_TOP)) {
+            //
+            // We don't initialize the binder until the first WORD! seen.
+            //
+            if (not ss->feed->context) {
+                ss->feed->context = Get_Context_From_Stack();
+                ss->feed->lib =
+                    (ss->feed->context != Lib_Context)
+                        ? Lib_Context
+                        : nullptr;
+
+                Init_Interning_Binder(ss->feed->binder, ss->feed->context);
+            }
+
             REBSTR *canon = VAL_WORD_CANON(DS_TOP);
             REBINT n = Get_Binder_Index_Else_0(ss->feed->binder, canon);
             if (n > 0) {
@@ -2308,18 +2329,27 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 // done by cutting out the allowance of escaping levels as
                 // meaning for the kind byte.  Not a priority.
                 //
-                REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
-                MISC(a).line = ss->line;
-                LINK_FILE_NODE(a) = NOD(ss->file);
-                SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
-                SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
+                bool is_get_path = GET_CELL_FLAG(DS_TOP, BLANK_MARKED_GET);
+                if (IS_BLANK(DS_TOP)) {  // `/` or `:/`
+                    Init_Word(DS_TOP, PG_Slash_1_Canon);
+                    mutable_KIND_BYTE(DS_TOP) = is_get_path
+                        ? REB_GET_PATH
+                        : REB_PATH;
+                }
+                else {
+                    REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
+                    MISC(a).line = ss->line;
+                    LINK_FILE_NODE(a) = NOD(ss->file);
+                    SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
+                    SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
-                Append_Value(a, DS_TOP);  // may be BLANK!
-                Init_Blank(Alloc_Tail_Array(a));
-                if (GET_CELL_FLAG(DS_TOP, BLANK_MARKED_GET))
-                    Init_Any_Path(DS_TOP, REB_GET_PATH, a);
-                else
-                    Init_Path(DS_TOP, a);
+                    Append_Value(a, DS_TOP);  // may be BLANK!
+                    Init_Blank(Alloc_Tail_Array(a));
+                    if (GET_CELL_FLAG(DS_TOP, BLANK_MARKED_GET))
+                        Init_Any_Path(DS_TOP, REB_GET_PATH, a);
+                    else
+                        Init_Path(DS_TOP, a);
+                }
             }
             else if (
                 DSP - dsp_path_head == 1  // one more item added

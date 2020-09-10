@@ -36,6 +36,16 @@
 // so that routines like HELP won't have additional output than what they
 // print out.
 //
+// In the debug build, it is possible to make an "unreadable" void!.  This
+// will behave neutrally as far as the garbage collector is concerned, so
+// it can be used as a placeholder for a value that will be filled in at
+// some later time--spanning an evaluation.  But if the special IS_UNREADABLE
+// checks are not used, it will not respond to IS_VOID() and will also
+// refuse VAL_TYPE() checks.  This is useful anytime a placeholder is needed
+// in a slot temporarily where the code knows it's supposed to come back and
+// fill in the correct thing later...where the asserts serve as a reminder
+// if that fill in never happens.
+//
 
 #define VOID_VALUE \
     c_cast(const REBVAL*, &PG_Void_Value)
@@ -60,3 +70,45 @@ inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
         Init_Void(cell);
     return cell;
 }
+
+
+#if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, same as plain VOID!
+    #define Init_Unreadable_Void(v) \
+        Init_Void(v)
+
+    #define IS_VOID_RAW(v) \
+        IS_BLANK(v)
+
+    #define ASSERT_UNREADABLE_IF_DEBUG(v) \
+        assert(IS_VOID(v))  // would have to be a void even if not unreadable
+
+    #define ASSERT_READABLE_IF_DEBUG(v) \
+        NOOP
+#else
+    inline static REBVAL *Init_Unreadable_Void_Debug(
+        RELVAL *out, const char *file, int line
+    ){
+        RESET_CELL_Debug(out, REB_VOID, CELL_MASK_NONE, file, line);
+        assert(out->extra.tick > 0);
+        out->extra.tick = -out->extra.tick;
+        return KNOWN(out);
+    }
+
+    #define Init_Unreadable_Void(out) \
+        Init_Unreadable_Void_Debug((out), __FILE__, __LINE__)
+
+    #define IS_VOID_RAW(v) \
+        (KIND_BYTE_UNCHECKED(v) == REB_VOID)
+
+    inline static bool IS_UNREADABLE_DEBUG(const RELVAL *v) {
+        if (KIND_BYTE_UNCHECKED(v) != REB_VOID)
+            return false;
+        return v->extra.tick < 0;
+    }
+
+    #define ASSERT_UNREADABLE_IF_DEBUG(v) \
+        assert(IS_UNREADABLE_DEBUG(v))
+
+    #define ASSERT_READABLE_IF_DEBUG(v) \
+        assert(not IS_UNREADABLE_DEBUG(v))
+#endif

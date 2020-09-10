@@ -104,13 +104,13 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
 
     strncat(buf, Str_Panic_Directions, PANIC_BUF_SIZE - 0);
 
-    strncat(buf, "\n", PANIC_BUF_SIZE - strlen(buf));
+    strncat(buf, "\n", PANIC_BUF_SIZE - strsize(buf));
 
     if (not p) {
         strncat(
             buf,
             "Panic was passed C nullptr",
-            PANIC_BUF_SIZE - strlen(buf)
+            PANIC_BUF_SIZE - strsize(buf)
         );
     }
     else switch (Detect_Rebol_Pointer(p)) {
@@ -118,7 +118,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
         strncat(
             buf,
             cast(const char*, p),
-            PANIC_BUF_SIZE - strlen(buf)
+            PANIC_BUF_SIZE - strsize(buf)
         );
         break;
 
@@ -145,13 +145,13 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
         Panic_Series_Debug(cast(REBSER*, s));
       #else
         UNUSED(s);
-        strncat(buf, "valid series", PANIC_BUF_SIZE - strlen(buf));
+        strncat(buf, "valid series", PANIC_BUF_SIZE - strsize(buf));
       #endif
         break; }
 
       case DETECTED_AS_FREED_SERIES:
       #if defined(NDEBUG)
-        strncat(buf, "freed series", PANIC_BUF_SIZE - strlen(buf));
+        strncat(buf, "freed series", PANIC_BUF_SIZE - strsize(buf));
       #else
         Panic_Series_Debug(m_cast(REBSER*, cast(const REBSER*, p)));
       #endif
@@ -162,7 +162,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
         const REBVAL *v = cast(const REBVAL*, p);
       #if defined(NDEBUG)
         UNUSED(v);
-        strncat(buf, "value", PANIC_BUF_SIZE - strlen(buf));
+        strncat(buf, "value", PANIC_BUF_SIZE - strsize(buf));
       #else
         if (KIND_BYTE_UNCHECKED(v) == REB_ERROR) {
             printf("...panicking on an ERROR! value...");
@@ -174,7 +174,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
 
       case DETECTED_AS_FREED_CELL:
       #if defined(NDEBUG)
-        strncat(buf, "freed cell", PANIC_BUF_SIZE - strlen(buf));
+        strncat(buf, "freed cell", PANIC_BUF_SIZE - strsize(buf));
       #else
         Panic_Value_Debug(cast(const RELVAL*, p));
       #endif

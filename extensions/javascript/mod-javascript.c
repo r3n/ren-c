@@ -947,7 +947,7 @@ REB_R JavaScript_Dispatcher(REBFRM *f)
             return Init_Thrown_With_Label(
                 f->out,
                 NULLED_CELL,
-                NAT_VALUE(halt)
+                NATIVE_VAL(halt)
             );
         }
 

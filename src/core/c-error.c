@@ -1445,20 +1445,32 @@ void Shutdown_Stackoverflow(void)
 }
 
 
-// Limited molder (used, e.g., for errors)
+// !!! Though molding has a general facility for a "limit" of the overall
+// mold length, this only limits the length a particular value can contribute
+// to the mold.  It was only used in error molding and was kept working
+// without a general review of such a facility.  Review.
 //
-static void Mold_Value_Limit(REB_MOLD *mo, RELVAL *v, REBLEN len)
+static void Mold_Value_Limit(REB_MOLD *mo, RELVAL *v, REBLEN limit)
 {
-    REBLEN start = STR_LEN(mo->series);
-    Mold_Value(mo, v);
+    REBSTR *str = mo->series;
 
-    if (STR_LEN(mo->series) - start > len) {
-        Remove_Series_Len(
-            SER(mo->series),
-            start + len,
-            STR_LEN(mo->series) - start - len
-        );
-        Append_Ascii(mo->series, "...");
+    REBLEN start_len = STR_LEN(str);
+    REBSIZ start_size = STR_SIZE(str);
+
+    Mold_Value(mo, v);  // Note: can't cache pointer into `str` across this
+
+    REBLEN end_len = STR_LEN(str);
+
+    if (end_len - start_len > limit) {
+        REBCHR(*) at = STR_HEAD(str) + start_size;
+        REBLEN n = 0;
+        for (; n < limit; ++n)
+            at = NEXT_STR(at);
+
+        SET_STR_LEN_SIZE(str, start_len + limit, at - STR_HEAD(str));
+        Free_Bookmarks_Maybe_Null(str);
+
+        Append_Ascii(str, "...");
     }
 }
 

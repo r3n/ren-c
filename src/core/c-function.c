@@ -296,7 +296,7 @@ void Push_Paramlist_Triads_May_Fail(
             else {
                 assert(IS_TEXT(DS_TOP));  // !!! are blocks after notes good?
 
-                if (IS_BLANK_RAW(DS_TOP - 2)) {
+                if (IS_VOID_RAW(DS_TOP - 2)) {
                     //
                     // No parameters pushed, e.g. func [[integer!] {<-- bad}]
                     //
@@ -910,7 +910,7 @@ REBARR *Make_Paramlist_Managed_May_Fail(
     // the function description--it will be extracted from the slot before
     // it is turned into a rootkey for param_notes.
     //
-    Init_Unreadable_Blank(DS_PUSH()); // paramlist[0] becomes ACT_ARCHETYPE()
+    Init_Unreadable_Void(DS_PUSH()); // paramlist[0] becomes ACT_ARCHETYPE()
     Move_Value(DS_PUSH(), EMPTY_BLOCK); // param_types[0] (object canon)
     Move_Value(DS_PUSH(), EMPTY_TEXT); // param_notes[0] (desc, then canon)
 
@@ -1118,7 +1118,7 @@ REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
     // don't pass it in to the allocation...it needs to be set, but will be
     // overridden by SERIES_INFO_INACCESSIBLE.
     //
-    REBARR *varlist = Alloc_Singular(NODE_FLAG_STACK | NODE_FLAG_MANAGED);
+    REBARR *varlist = Alloc_Singular(NODE_FLAG_MANAGED);
     SER(varlist)->header.bits |= SERIES_MASK_VARLIST;
     SET_SERIES_INFO(varlist, INACCESSIBLE);
     MISC_META_NODE(varlist) = nullptr;
@@ -1662,7 +1662,7 @@ REB_R Elider_Dispatcher(REBFRM *f)
         const REBVAL *label = VAL_THROWN_LABEL(discarded);
         if (IS_ACTION(label)) {
             if (
-                VAL_ACTION(label) == NAT_ACTION(unwind)
+                VAL_ACTION(label) == NATIVE_ACT(unwind)
                 and VAL_BINDING(label) == NOD(f->varlist)
             ){
                 CATCH_THROWN(discarded, discarded);
@@ -1775,8 +1775,6 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     REBVAL *outer = KNOWN(ARR_AT(details, 1));  // takes 1 arg (a FRAME!)
     assert(IS_ACTION(outer));
 
-    assert(GET_SERIES_FLAG(f->varlist, STACK_LIFETIME));
-
     // We want to call OUTER with a FRAME! value that will dispatch to INNER
     // when (and if) it runs DO on it.  That frame is the one built for this
     // call to the encloser.  If it isn't managed, there's no worries about
@@ -1784,7 +1782,6 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     //
     REBCTX *c = Steal_Context_Vars(CTX(f->varlist), NOD(FRM_PHASE(f)));
     INIT_LINK_KEYSOURCE(c, NOD(VAL_ACTION(inner)));
-    CLEAR_SERIES_FLAG(c, STACK_LIFETIME);
 
     assert(GET_SERIES_INFO(f->varlist, INACCESSIBLE));  // look dead
 
@@ -1814,8 +1811,13 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     //
     SET_SERIES_FLAG(f->varlist, MANAGED);
 
+    // !!! A bug here was fixed in the stackless build more elegantly.  Just
+    // make a copy for old mainline.
+    //
+    REBVAL *rootcopy = Move_Value(FRM_SPARE(f), rootvar);
+
     const bool fully = true;
-    if (RunQ_Throws(f->out, fully, rebU1(outer), rootvar, rebEND))
+    if (RunQ_Throws(f->out, fully, rebU(outer), rootcopy, rebEND))
         return R_THROWN;
 
     return f->out;

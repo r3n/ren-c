@@ -133,3 +133,14 @@
     (unset 'blk protect/deep 'blk true)
 ]
 (unprotect 'blk true)
+
+
+; TESTS FOR TEMPORARY EVALUATION HOLDS
+; These should elaborated on, and possibly be in their own file.  Simple tests
+; for now.
+
+('series-held = pick trap [do code: [clear code]] 'id)
+(
+    obj: make object! [x: 10]
+    'series-held = pick trap [do code: [obj/x: (clear code recycle 20)]] 'id
+)

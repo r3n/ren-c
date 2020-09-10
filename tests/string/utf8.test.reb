@@ -108,7 +108,7 @@
         t = "ƈօʊʀֆօռǟɢɢօռɨ"
     )(
         e: trap [insert b #{E08080}]
-        e/id = 'bad-utf8
+        e/id = 'bad-utf8-bin-edit
     )(
         b: as binary! const "test"
         e: trap [append b 1]
@@ -126,7 +126,7 @@
         did all [
             t = "dɐᴚdɐZdıZ"
             e: trap [append b #{E08080}]
-            e/id = 'bad-utf8
+            e/id = 'bad-utf8-bin-edit
         ]
     )
     (

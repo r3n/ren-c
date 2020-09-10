@@ -496,31 +496,24 @@ REB_R PD_Binary(
     if (n < 0 or cast(REBLEN, n) >= SER_LEN(ser))
         fail (Error_Out_Of_Range(picker));
 
-    REBINT c;
     if (IS_CHAR(opt_setval)) {
-        c = VAL_CHAR(opt_setval);
-        if (c > cast(REBI64, MAX_UNI))
-            return R_UNHANDLED;
+        Init_Integer(pvs->out, VAL_CHAR(opt_setval));
     }
     else if (IS_INTEGER(opt_setval)) {
-        c = Int32(opt_setval);
-        if (c > cast(REBI64, MAX_UNI) or c < 0)
-            return R_UNHANDLED;
+        Move_Value(pvs->out, opt_setval);
     }
-    else if (ANY_BINSTR(opt_setval)) {
-        REBLEN i = VAL_INDEX(opt_setval);
-        if (i >= VAL_LEN_HEAD(opt_setval))
-            fail (opt_setval);
-
-        c = GET_CHAR_AT(VAL_STRING(opt_setval), i);
-    }
-    else
+    else {
+        // !!! See notes in the REBTYPE(String) about alternate cases
+        // for the POKE'd value.
+        //
         return R_UNHANDLED;
+    }
 
-    if (c > 0xff)
+    REBINT i = Int32(pvs->out);
+    if (i > 0xff)
         fail (Error_Out_Of_Range(opt_setval));
 
-    BIN_HEAD(ser)[n] = cast(REBYTE, c);
+    BIN_HEAD(ser)[n] = cast(REBYTE, i);
     return R_INVISIBLE;
 }
 
@@ -619,7 +612,7 @@ REBTYPE(Binary)
 
         VAL_INDEX(v) = Modify_String_Or_Binary(
             v,
-            VAL_WORD_CANON(verb),
+            cast(enum Reb_Symbol, sym),
             ARG(value),
             flags,
             len,
@@ -713,7 +706,6 @@ REBTYPE(Binary)
             return Init_Any_Series(D_OUT, VAL_TYPE(v), Make_Binary(0));
         }
 
-        REBSER *ser = VAL_SERIES(v);
         index = VAL_INDEX(v);
 
         // if no /PART, just return value, else return string
@@ -727,7 +719,7 @@ REBTYPE(Binary)
                 Copy_Sequence_At_Len(VAL_SERIES(v), VAL_INDEX(v), len)
             );
         }
-        Remove_Series_Units(ser, VAL_INDEX(v), len);
+        Remove_Any_Series_Len(v, VAL_INDEX(v), len);  // bad UTF-8 alias fails
         return D_OUT; }
 
       case SYM_CLEAR: {

@@ -76,4 +76,9 @@ depends: [
 
         <msc:/wd4127>  ; conditional expression is constant
      ]  ; also needed for ECDHE
+
+     ; !!! This is required unless you enable MBEDTLS_ECP_NO_INTERNAL_RNG,
+     ; which menacingly refers to opportunities for side channel attacks.
+     ;
+     [%crypt/mbedtls/library/hmac_drbg.c  #no-c++]
 ]

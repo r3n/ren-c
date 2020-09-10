@@ -51,12 +51,12 @@ inline static bool IS_QUOTABLY_SOFT(const RELVAL *v) {
 //=////////////////////////////////////////////////////////////////////////=//
 
 
-inline static bool FRM_IS_VALIST(REBFRM *f) {
-    return f->feed->vaptr != nullptr;
+inline static bool FRM_IS_VARIADIC(REBFRM *f) {
+    return f->feed->vaptr != nullptr or f->feed->packed != nullptr;
 }
 
 inline static REBARR *FRM_ARRAY(REBFRM *f) {
-    assert(IS_END(f->feed->value) or not FRM_IS_VALIST(f));
+    assert(IS_END(f->feed->value) or not FRM_IS_VARIADIC(f));
     return f->feed->array;
 }
 
@@ -70,12 +70,12 @@ inline static REBLEN FRM_INDEX(REBFRM *f) {
     if (IS_END(f->feed->value))
         return ARR_LEN(f->feed->array);
 
-    assert(not FRM_IS_VALIST(f));
+    assert(not FRM_IS_VARIADIC(f));
     return f->feed->index - 1;
 }
 
 inline static REBLEN FRM_EXPR_INDEX(REBFRM *f) {
-    assert(not FRM_IS_VALIST(f));
+    assert(not FRM_IS_VARIADIC(f));
     return f->expr_index - 1;
 }
 
@@ -315,23 +315,23 @@ inline static void Push_Frame_No_Varlist(REBVAL *out, REBFRM *f)
     //
     if (IS_END(f->feed->value)) {  // don't take hold on empty feeds
         assert(IS_POINTER_TRASH_DEBUG(f->feed->pending));
-        assert(NOT_FEED_FLAG(f->feed, TOOK_HOLD));
+        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
     }
-    else if (FRM_IS_VALIST(f)) {
+    else if (FRM_IS_VARIADIC(f)) {
         //
         // There's nothing to put a hold on while it's a va_list-based frame.
         // But a GC might occur and "Reify" it, in which case the array
         // which is created will have a hold put on it to be released when
         // the frame is finished.
         //
-        assert(NOT_FEED_FLAG(f->feed, TOOK_HOLD));
+        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
     }
     else {
         if (GET_SERIES_INFO(f->feed->array, HOLD))
             NOOP; // already temp-locked
         else {
             SET_SERIES_INFO(f->feed->array, HOLD);
-            SET_FEED_FLAG(f->feed, TOOK_HOLD);
+            SET_EVAL_FLAG(f, TOOK_HOLD);
         }
     }
 
@@ -372,8 +372,8 @@ inline static void Abort_Frame(REBFRM *f) {
     if (IS_END(f->feed->value))
         goto pop;
 
-    if (FRM_IS_VALIST(f)) {
-        assert(NOT_FEED_FLAG(f->feed, TOOK_HOLD));
+    if (FRM_IS_VARIADIC(f)) {
+        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
 
         // Aborting valist frames is done by just feeding all the values
         // through until the end.  This is assumed to do any work, such
@@ -398,14 +398,14 @@ inline static void Abort_Frame(REBFRM *f) {
             Fetch_Next_Forget_Lookback(f);
     }
     else {
-        if (GET_FEED_FLAG(f->feed, TOOK_HOLD)) {
+        if (GET_EVAL_FLAG(f, TOOK_HOLD)) {
             //
             // The frame was either never variadic, or it was but got spooled
             // into an array by Reify_Va_To_Array_In_Frame()
             //
             assert(GET_SERIES_INFO(f->feed->array, HOLD));
             CLEAR_SERIES_INFO(f->feed->array, HOLD);
-            CLEAR_FEED_FLAG(f->feed, TOOK_HOLD); // !!! needed?
+            CLEAR_EVAL_FLAG(f, TOOK_HOLD); // !!! needed?
         }
     }
 
@@ -424,6 +424,12 @@ inline static void Drop_Frame_Core(REBFRM *f) {
   #if defined(DEBUG_EXPIRED_LOOKBACK)
     free(f->stress);
   #endif
+
+    if (GET_EVAL_FLAG(f, TOOK_HOLD)) {
+        assert(GET_SERIES_INFO(f->feed->array, HOLD));
+        CLEAR_SERIES_INFO(f->feed->array, HOLD);
+        CLEAR_EVAL_FLAG(f, TOOK_HOLD);  // needed?
+    }
 
     if (f->varlist) {
         assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
@@ -464,8 +470,8 @@ inline static void Prep_Frame_Core(
     assert(NOT_FEED_FLAG(feed, BARRIER_HIT));  // couldn't do anything
 
     f->feed = feed;
-    Prep_Stack_Cell(&f->spare);
-    Init_Unreadable_Blank(&f->spare);
+    Prep_Cell(&f->spare);
+    Init_Unreadable_Void(&f->spare);
     f->dsp_orig = DS_Index;
     f->flags = Endlike_Header(flags);
     TRASH_POINTER_IF_DEBUG(f->out);
@@ -576,7 +582,6 @@ inline static void Push_Action(
     if (not f->varlist) { // usually means first action call in the REBFRM
         s = Alloc_Series_Node(
             SERIES_MASK_VARLIST
-                | SERIES_FLAG_STACK_LIFETIME
                 | SERIES_FLAG_FIXED_SIZE // FRAME!s don't expand ATM
         );
         s->info = Endlike_Header(
@@ -606,7 +611,6 @@ inline static void Push_Action(
     f->rootvar->header.bits =
         NODE_FLAG_NODE
             | NODE_FLAG_CELL
-            | NODE_FLAG_STACK
             | CELL_FLAG_PROTECTED  // payload/binding tweaked, but not by user
             | CELL_MASK_CONTEXT
             | FLAG_KIND_BYTE(REB_FRAME)
@@ -621,9 +625,7 @@ inline static void Push_Action(
 
     s->content.dynamic.used = num_args + 1;
     RELVAL *tail = ARR_TAIL(f->varlist);
-    tail->header.bits = NODE_FLAG_STACK
-        | FLAG_KIND_BYTE(REB_0)
-        | FLAG_MIRROR_BYTE(REB_0);
+    tail->header.bits = FLAG_KIND_BYTE(REB_0);  // no NODE_FLAG_CELL
     TRACK_CELL_IF_DEBUG(tail, __FILE__, __LINE__);
 
     // Current invariant for all arrays (including fixed size), last cell in
@@ -876,7 +878,7 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
 // then return the D_OUT pointer...this is the fastest form of returning.)
 //
 #define RETURN(v) \
-    return Move_Value(D_OUT, (v));
+    return Move_Value(D_OUT, (v))
 
 
 // The native entry prelude makes sure that once native code starts running,

@@ -100,7 +100,7 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
         capacity + 1, // size + room for ROOTKEY
         SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
     );
-    Init_Unreadable_Blank(Alloc_Tail_Array(keylist));
+    Init_Unreadable_Void(Alloc_Tail_Array(keylist));
 
     // Default the ancestor link to be to this keylist itself.
     //
@@ -567,7 +567,7 @@ REBARR *Collect_Keylist_Managed(
     // Leave the [0] slot blank while collecting (ROOTKEY/ROOTPARAM), but
     // valid (but "unreadable") bits so that the copy will still work.
     //
-    Init_Unreadable_Blank(ARR_HEAD(BUF_COLLECT));
+    Init_Unreadable_Void(ARR_HEAD(BUF_COLLECT));
     SET_ARRAY_LEN_NOTERM(BUF_COLLECT, 1);
 
     if (flags & COLLECT_ENSURE_SELF) {
@@ -626,7 +626,7 @@ REBARR *Collect_Keylist_Managed(
         keylist = Grab_Collected_Array_Managed(cl, SERIES_MASK_KEYLIST);
 
     // !!! Usages of the rootkey for non-FRAME! contexts is open for future,
-    // but it's set to an unreadable blank at the moment just to make sure it
+    // but it's set to an unreadable void at the moment just to make sure it
     // doesn't get used on accident.
     //
     ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(keylist));
@@ -1023,7 +1023,7 @@ REBCTX *Merge_Contexts_Selfish_Managed(REBCTX *parent1, REBCTX *parent2)
     // Leave the [0] slot blank while collecting (ROOTKEY/ROOTPARAM), but
     // valid (but "unreadable") bits so that the copy will still work.
     //
-    Init_Unreadable_Blank(ARR_HEAD(BUF_COLLECT));
+    Init_Unreadable_Void(ARR_HEAD(BUF_COLLECT));
     SET_ARRAY_LEN_NOTERM(BUF_COLLECT, 1);
 
     // Setup binding table and BUF_COLLECT with parent1 words.  Don't bother
@@ -1052,7 +1052,7 @@ REBCTX *Merge_Contexts_Selfish_Managed(REBCTX *parent1, REBCTX *parent2)
         SPECIFIED,
         NODE_FLAG_MANAGED
     );
-    Init_Unreadable_Blank(ARR_HEAD(keylist)); // Currently no rootkey usage
+    Init_Unreadable_Void(ARR_HEAD(keylist)); // Currently no rootkey usage
 
     if (parent1 == NULL)
         LINK_ANCESTOR_NODE(keylist) = NOD(keylist);
@@ -1427,7 +1427,7 @@ void Assert_Context_Core(REBCTX *c)
     }
 
     REBVAL *rootkey = CTX_ROOTKEY(c);
-    if (IS_BLANK_RAW(rootkey)) {
+    if (IS_VOID_RAW(rootkey)) {
         //
         // Note that in the future the rootkey for ordinary OBJECT! or ERROR!
         // PORT! etc. may be more interesting than BLANK.  But it uses that

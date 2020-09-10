@@ -430,7 +430,9 @@ inline static REBLEN STR_INDEX_AT(REBSTR *s, REBSIZ offset) {
     if (Is_Definitely_Ascii(s))
         return offset;
 
-    assert(*BIN_AT(SER(s), offset) < 0x80);  // must be codepoint boundary
+    // The position `offset` describes must be a codepoint boundary.
+    //
+    assert(not Is_Continuation_Byte_If_Utf8(*BIN_AT(SER(s), offset)));
 
     if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
       #if defined(DEBUG_UTF8_EVERYWHERE)

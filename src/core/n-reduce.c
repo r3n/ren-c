@@ -243,9 +243,9 @@ REB_R Compose_To_Stack_Core(
             if (
                 predicate
                 and not doubled_group
-                and VAL_ACTION(predicate) != NAT_ACTION(identity)
+                and VAL_ACTION(predicate) != NATIVE_ACT(identity)
             ){
-                insert = rebValue(predicate, rebQ(out, rebEND), rebEND);
+                insert = rebValue(predicate, rebQ(out), rebEND);
             } else
                 insert = IS_NULLED(out) ? nullptr : out;
 
@@ -320,8 +320,8 @@ REB_R Compose_To_Stack_Core(
             if (insert != out)
                 rebRelease(insert);
 
-          #ifdef DEBUG_UNREADABLE_BLANKS
-            Init_Unreadable_Blank(out);  // shouldn't leak temp eval to caller
+          #ifdef DEBUG_UNREADABLE_VOIDS
+            Init_Unreadable_Void(out);  // shouldn't leak temp eval to caller
           #endif
 
             changed = true;

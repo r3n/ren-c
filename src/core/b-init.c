@@ -295,7 +295,10 @@ static void Add_Lib_Keys_For_Unscannable_Set_Words(void)
 
     REBLEN i;
     for (i = 0; names[i] != NULL; ++i) {
-        REBSTR *str = Intern_UTF8_Managed(cb_cast(names[i]), strlen(names[i]));
+        REBSTR *str = Intern_UTF8_Managed(
+            cb_cast(names[i]),
+            strsize(names[i])
+        );
         REBVAL *val = Append_Context(Lib_Context, NULL, str);
         assert(IS_VOID(val));
         UNUSED(val);
@@ -382,6 +385,7 @@ static void Init_Action_Meta_Shim(void) {
         Init_Blank(Append_Context(meta, nullptr, Canon(field_syms[i - 1])));
 
     Init_Object(CTX_VAR(meta, 1), meta); // it's "selfish"
+    TYPE_SET(CTX_KEY(meta, 1), REB_TS_HIDDEN);  // hide self
 
     Root_Action_Meta = Init_Object(Alloc_Value(), meta);
 
@@ -581,11 +585,9 @@ static REBARR *Startup_Natives(const REBVAL *boot_natives)
 
         // While the lib context natives can be overwritten, the system
         // currently depends on having a permanent list of the natives that
-        // does not change, see uses via NAT_VALUE() and NAT_ACT().
+        // does not change, see uses via NATIVE_VAL() and NAT_ACT().
         //
-        Prep_Non_Stack_Cell(&Natives[n]);
-        Move_Value(&Natives[n], native); // Note: Loses enfixedness (!)
-        SET_CELL_FLAG(&Natives[n], PROTECTED);
+        Natives[n] = VAL_ACTION(native);  // Note: Loses enfixedness (!)
 
         REBVAL *catalog_item = Move_Value(Alloc_Tail_Array(catalog), name);
         mutable_KIND_BYTE(catalog_item) = REB_WORD;
@@ -685,6 +687,20 @@ static void Startup_Empty_Array(void)
 {
     PG_Empty_Array = Make_Array_Core(0, NODE_FLAG_MANAGED);
     SET_SERIES_INFO(PG_Empty_Array, FROZEN);
+
+    // "Empty" PATH!s that look like `/` are actually a WORD! cell format
+    // under the hood.  This allows them to have bindings and do double-duty
+    // for actions like division or other custom purposes.  But when they
+    // are accessed as an array, they give two blanks `[_ _]`.
+    //
+  blockscope {
+    REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
+    Init_Blank(ARR_AT(a, 0));
+    Init_Blank(ARR_AT(a, 1));
+    TERM_ARRAY_LEN(a, 2);
+    SET_SERIES_INFO(a, FROZEN);
+    PG_2_Blanks_Array = a;
+  }
 }
 
 
@@ -713,45 +729,33 @@ static void Init_Root_Vars(void)
     // the root set.  Should that change, they could be explicitly added
     // to the GC's root set.
 
-    Prep_Non_Stack_Cell(&PG_Nulled_Cell);
-    Init_Nulled(&PG_Nulled_Cell);
+    Init_Nulled(Prep_Cell(&PG_Nulled_Cell));
+    Init_Blank(Prep_Cell(&PG_Blank_Value));
+    Init_False(Prep_Cell(&PG_False_Value));
+    Init_True(Prep_Cell(&PG_True_Value));
+    Init_Void(Prep_Cell(&PG_Void_Value));
 
-    Prep_Non_Stack_Cell(&PG_Blank_Value);
-    Init_Blank(&PG_Blank_Value);
+    RESET_CELL(Prep_Cell(&PG_R_Thrown), REB_R_THROWN, CELL_MASK_NONE);
+    RESET_CELL(Prep_Cell(&PG_R_Invisible), REB_R_INVISIBLE, CELL_MASK_NONE);
+    RESET_CELL(Prep_Cell(&PG_R_Immediate), REB_R_IMMEDIATE, CELL_MASK_NONE);
 
-    Prep_Non_Stack_Cell(&PG_False_Value);
-    Init_False(&PG_False_Value);
-
-    Prep_Non_Stack_Cell(&PG_True_Value);
-    Init_True(&PG_True_Value);
-
-    Prep_Non_Stack_Cell(&PG_Void_Value);
-    Init_Void(&PG_Void_Value);
-
-    Prep_Non_Stack_Cell(&PG_R_Thrown);
-    RESET_CELL(&PG_R_Thrown, REB_R_THROWN, CELL_MASK_NONE);
-
-    Prep_Non_Stack_Cell(&PG_R_Invisible);
-    RESET_CELL(&PG_R_Invisible, REB_R_INVISIBLE, CELL_MASK_NONE);
-
-    Prep_Non_Stack_Cell(&PG_R_Immediate);
-    RESET_CELL(&PG_R_Immediate, REB_R_IMMEDIATE, CELL_MASK_NONE);
-
-    Prep_Non_Stack_Cell(&PG_R_Redo_Unchecked);
-    RESET_CELL(&PG_R_Redo_Unchecked, REB_R_REDO, CELL_MASK_NONE);
+    RESET_CELL(Prep_Cell(&PG_R_Redo_Unchecked), REB_R_REDO, CELL_MASK_NONE);
     EXTRA(Any, &PG_R_Redo_Unchecked).flag = false;  // "unchecked"
 
-    Prep_Non_Stack_Cell(&PG_R_Redo_Checked);
-    RESET_CELL(&PG_R_Redo_Checked, REB_R_REDO, CELL_MASK_NONE);
+    RESET_CELL(Prep_Cell(&PG_R_Redo_Checked), REB_R_REDO, CELL_MASK_NONE);
     EXTRA(Any, &PG_R_Redo_Checked).flag = true;  // "checked"
 
-    Prep_Non_Stack_Cell(&PG_R_Reference);
-    RESET_CELL(&PG_R_Reference, REB_R_REFERENCE, CELL_MASK_NONE);
+    RESET_CELL(Prep_Cell(&PG_R_Reference), REB_R_REFERENCE, CELL_MASK_NONE);
 
     REBSER *locker = nullptr;
 
     Root_Empty_Block = Init_Block(Alloc_Value(), PG_Empty_Array);
     Ensure_Value_Frozen(Root_Empty_Block, locker);
+
+    // Note: has to be a BLOCK!, 2-element blank paths use SYM__SLASH_1_
+    //
+    Root_2_Blanks_Block = Init_Block(Alloc_Value(), PG_2_Blanks_Array);
+    Ensure_Value_Frozen(Root_2_Blanks_Block, locker);
 
     // Note: rebText() can't run yet, review.
     //
@@ -799,6 +803,8 @@ static void Shutdown_Root_Vars(void)
     Root_Empty_Text = nullptr;
     rebRelease(Root_Empty_Block);
     Root_Empty_Block = nullptr;
+    rebRelease(Root_2_Blanks_Block);
+    Root_2_Blanks_Block = nullptr;
     rebRelease(Root_Empty_Binary);
     Root_Empty_Binary = nullptr;
 }
@@ -862,7 +868,7 @@ static void Init_System_Object(
     // made is actually identical to the definition in %sysobj.r.
     //
     assert(
-        0 == CT_Context(
+        1 == CT_Context(
             Get_System(SYS_STANDARD, STD_ACTION_META),
             Root_Action_Meta,
             1 // "strict equality"
@@ -983,11 +989,11 @@ void Startup_Task(void)
     // The thrown arg is not intended to ever be around long enough to be
     // seen by the GC.
     //
-    Prep_Non_Stack_Cell(&TG_Thrown_Arg);
+    Prep_Cell(&TG_Thrown_Arg);
   #if !defined(NDEBUG)
     SET_END(&TG_Thrown_Arg);
 
-    Prep_Non_Stack_Cell(&TG_Thrown_Label_Debug);
+    Prep_Cell(&TG_Thrown_Label_Debug);
     SET_END(&TG_Thrown_Label_Debug); // see notes, only used "SPORADICALLY()"
   #endif
 
@@ -1129,7 +1135,7 @@ static REBVAL *Startup_Mezzanine(BOOT_BLK *boot)
     if (RunQ_Throws(
         result,
         true, // fully = true (error if all arguments aren't consumed)
-        rebU1(finish_init), // %sys-start.r function to call
+        rebU(finish_init), // %sys-start.r function to call
         KNOWN(&boot->mezz), // boot-mezz argument
         rebEND
     )){
@@ -1276,14 +1282,15 @@ void Startup_Core(void)
 
     size_t utf8_size;
     const int max = -1;  // trust size in gzip data
-    REBSTR *envelope = nullptr;  // GZIP is the default
-    REBYTE *utf8 = cast(REBYTE*, Decompress_Alloc_Core(
+    REBYTE *utf8 = Decompress_Alloc_Core(
         &utf8_size,
         Native_Specs,
         Nat_Compressed_Size,
         max,
-        envelope
-    ));
+        SYM_GZIP
+    );
+
+    Startup_Slash_1_Symbol();  // see notes--needed before scanning
 
     REBARR *boot_array = Scan_UTF8_Managed(
         Intern("tmp-boot.r"),

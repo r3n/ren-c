@@ -299,12 +299,9 @@ REBNATIVE(decode_utf16le)
 
     // Drop byte-order marker, if present
     //
-    if (
-        VAL_LEN_AT(D_OUT) > 0
-        && GET_CHAR_AT(VAL_STRING(D_OUT), VAL_INDEX(D_OUT)) == 0xFEFF
-    ){
-        Remove_Series_Len(VAL_SERIES(D_OUT), VAL_INDEX(D_OUT), 1);
-    }
+    rebElide(
+        "if #\"^(FEFF)\" = first", D_OUT, "[take", D_OUT, "]",
+    rebEND);
 
     return D_OUT;
 }
@@ -386,12 +383,9 @@ REBNATIVE(decode_utf16be)
 
     // Drop byte-order marker, if present
     //
-    if (
-        VAL_LEN_AT(D_OUT) > 0
-        && GET_CHAR_AT(VAL_STRING(D_OUT), VAL_INDEX(D_OUT)) == 0xFEFF
-    ){
-        Remove_Series_Len(VAL_SERIES(D_OUT), VAL_INDEX(D_OUT), 1);
-    }
+    rebElide(
+        "if #\"^(FEFF)\" = first", D_OUT, "[take", D_OUT, "]",
+    rebEND);
 
     return D_OUT;
 }

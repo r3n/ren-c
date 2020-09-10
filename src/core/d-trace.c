@@ -130,7 +130,7 @@ REBVAL *Trace_Eval_Dangerous(REBFRM *f)
 
     rebElide("loop 4 *", rebI(depth), "[write-stdout space]", rebEND);
 
-    if (FRM_IS_VALIST(f)) {
+    if (FRM_IS_VARIADIC(f)) {
         //
         // If you are doing a sequence of REBVAL* held in a C va_list,
         // it doesn't have an "index".  It could manufacture one if

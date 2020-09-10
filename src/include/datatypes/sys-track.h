@@ -67,16 +67,16 @@
             c->extra.tick = c->tick = TG_Tick;
             c->touch = 0;
         #else
-            c->extra.tick = 1; // unreadable blank needs for debug payload
+            c->extra.tick = 1;  // unreadable void needs for debug payload
         #endif
-      #else // in space that is overwritten for cells that fill in payloads 
+      #else  // in space that is overwritten for cells that fill in payloads 
         PAYLOAD(Track, c).file = file;
         PAYLOAD(Track, c).line = line;
           
         #ifdef DEBUG_COUNT_TICKS
             c->extra.tick = TG_Tick;
         #else
-            c->extra.tick = 1; // unreadable blank needs for debug payload
+            c->extra.tick = 1;  // unreadable void needs for debug payload
         #endif
       #endif
     }
@@ -87,7 +87,7 @@
 #elif !defined(NDEBUG)
 
     #define TRACK_CELL_IF_DEBUG(c,file,line) \
-        ((c)->extra.tick = 1) // unreadable blank needs for debug payload
+        ((c)->extra.tick = 1)  // unreadable void needs for debug payload
 
 #else
 

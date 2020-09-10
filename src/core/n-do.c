@@ -117,8 +117,8 @@ REBNATIVE(shove)
 
     REBVAL *left = ARG(left);
 
-    if (IS_END(*v)) // ...shouldn't happen for WORD!/PATH! unless APPLY
-        RETURN (ARG(left)) // ...because evaluator wants `help <-` to work
+    if (IS_END(*v))  // ...shouldn't happen for WORD!/PATH! unless APPLY
+        RETURN (ARG(left));  // ...because evaluator wants `help <-` to work
 
     // It's best for SHOVE to do type checking here, as opposed to setting
     // some kind of EVAL_FLAG_SHOVING and passing that into the evaluator, then
@@ -191,7 +191,7 @@ REBNATIVE(shove)
     // into may want it evaluative.  (Enfix handling itself does soft quoting)
     //
   #if !defined(NDEBUG)
-    Init_Unreadable_Blank(D_OUT); // make sure we reassign it
+    Init_Unreadable_Void(D_OUT); // make sure we reassign it
   #endif
 
     if (REF(set)) {
@@ -334,7 +334,7 @@ REBNATIVE(do)
                 // varargs does.  This will cause an assert if reused, and
                 // having BLANK! mean "thrown" may evolve into a convention.
                 //
-                Init_Unreadable_Blank(position);
+                Init_Unreadable_Void(position);
                 return R_THROWN;
             }
 
@@ -385,7 +385,7 @@ REBNATIVE(do)
         if (RunQ_Throws(
             D_OUT,
             true,  // fully = true, error if not all arguments consumed
-            rebU1(sys_do_helper),
+            rebU(sys_do_helper),
             source,
             REF(args),
             REF(only) ? TRUE_VALUE : FALSE_VALUE,
@@ -576,7 +576,7 @@ REBNATIVE(evaluate)
                 // varargs does.  This will cause an assert if reused, and
                 // having BLANK! mean "thrown" may evolve into a convention.
                 //
-                Init_Unreadable_Blank(position);
+                Init_Unreadable_Void(position);
                 Move_Value(D_OUT, D_SPARE);
                 return R_THROWN;
             }
@@ -715,7 +715,7 @@ REBNATIVE(redo)
     // of the frame.  Use REDO as the throw label that Eval_Core() will
     // identify for that behavior.
     //
-    Move_Value(D_OUT, NAT_VALUE(redo));
+    Move_Value(D_OUT, NATIVE_VAL(redo));
     INIT_BINDING(D_OUT, c);
 
     // The FRAME! contains its ->phase and ->binding, which should be enough
@@ -782,8 +782,7 @@ REBNATIVE(applique)
     REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
         applicand,
         f->dsp_orig, // lowest_ordered_dsp of refinements to weave in
-        &binder,
-        CELL_MASK_STACK
+        &binder
     );
     Manage_Array(CTX_VARLIST(exemplar)); // binding code into it
 
@@ -849,7 +848,6 @@ REBNATIVE(applique)
 
     Push_Frame_No_Varlist(D_OUT, f);
     f->varlist = CTX_VARLIST(stolen);
-    SET_SERIES_FLAG(f->varlist, STACK_LIFETIME);
     f->rootvar = CTX_ARCHETYPE(stolen);
     f->arg = f->rootvar + 1;
     // f->param assigned above

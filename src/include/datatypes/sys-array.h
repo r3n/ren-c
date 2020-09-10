@@ -168,14 +168,14 @@ inline static void Prep_Array(
         //
         REBLEN n;
         for (n = 0; n < SER(a)->content.dynamic.rest - 1; ++n, ++prep)
-            Prep_Non_Stack_Cell(prep);
+            Prep_Cell(prep);
     }
     else {
         assert(capacity_plus_one != 0);
 
         REBLEN n;
         for (n = 1; n < capacity_plus_one; ++n, ++prep)
-            Prep_Non_Stack_Cell(prep); // have to prep cells in useful capacity
+            Prep_Cell(prep);  // have to prep cells in useful capacity
 
         // If an array isn't expandable, let the release build not worry
         // about the bits in the excess capacity.  But set them to trash in
@@ -242,7 +242,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
       #endif
     }
     else {
-        SER_CELL(s)->header.bits = CELL_MASK_NON_STACK_END;
+        SER_CELL(s)->header.bits = CELL_MASK_PREP_END;
         TRACK_CELL_IF_DEBUG(SER_CELL(s), "<<make>>", 0);
 
         s->info = Endlike_Header(

@@ -31,11 +31,11 @@
 // The scanning code in R3-Alpha used NULL to return failure during the scan
 // of a value, possibly leaving the value itself in an incomplete or invalid
 // state.  Rather than write stray incomplete values into these spots, Ren-C
-// puts "unreadable blank"
+// puts "unreadable void"
 //
 
 #define return_NULL \
-    do { Init_Unreadable_Blank(out); return NULL; } while (1)
+    do { Init_Unreadable_Void(out); return NULL; } while (1)
 
 
 //
@@ -262,7 +262,7 @@ REB_R Reflect_Core(REBFRM *frame_)
 
     REBVAL *v = ARG(value);
     const REBCEL *cell = VAL_UNESCAPED(v);
-    enum Reb_Kind kind = CELL_KIND(cell);
+    enum Reb_Kind kind = CELL_TYPE(cell);
 
     switch (VAL_WORD_SYM(ARG(property))) {
       case SYM_0:
@@ -1363,7 +1363,7 @@ REBNATIVE(scan_net_header)
                 // Does it already use a block?
                 if (IS_BLOCK(item + 1)) {
                     // Block of values already exists:
-                    val = Init_Unreadable_Blank(
+                    val = Init_Unreadable_Void(
                         Alloc_Tail_Array(VAL_ARRAY(item + 1))
                     );
                 }
@@ -1375,7 +1375,7 @@ REBNATIVE(scan_net_header)
                         item + 1, // prior value
                         SPECIFIED // no relative values added
                     );
-                    val = Init_Unreadable_Blank(Alloc_Tail_Array(a));
+                    val = Init_Unreadable_Void(Alloc_Tail_Array(a));
                     Init_Block(item + 1, a);
                 }
                 break;
@@ -1384,7 +1384,7 @@ REBNATIVE(scan_net_header)
 
         if (IS_END(item)) { // didn't break, add space for new word/value
             Init_Set_Word(Alloc_Tail_Array(result), name);
-            val = Init_Unreadable_Blank(Alloc_Tail_Array(result));
+            val = Init_Unreadable_Void(Alloc_Tail_Array(result));
         }
 
         while (IS_LEX_SPACE(*cp)) cp++;

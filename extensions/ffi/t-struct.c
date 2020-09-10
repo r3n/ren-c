@@ -1087,12 +1087,12 @@ REB_R MAKE_Struct(
     // MAKE process runs evaluations, so the fields must be GC valid.
     //
     REBFLD *schema = Make_Array(IDX_FIELD_MAX);
-    Init_Unreadable_Blank(FLD_AT(schema, IDX_FIELD_TYPE));  // will fill in
+    Init_Unreadable_Void(FLD_AT(schema, IDX_FIELD_TYPE));  // will fill in
     Init_Blank(FLD_AT(schema, IDX_FIELD_DIMENSION));  // not making an array
-    Init_Unreadable_Blank(FLD_AT(schema, IDX_FIELD_FFTYPE));  // will fill in
+    Init_Unreadable_Void(FLD_AT(schema, IDX_FIELD_FFTYPE));  // will fill in
     Init_Blank(FLD_AT(schema, IDX_FIELD_NAME));  // no symbol for structs
     Init_Blank(FLD_AT(schema, IDX_FIELD_OFFSET));  // the offset is not used
-    Init_Unreadable_Blank(FLD_AT(schema, IDX_FIELD_WIDE));  // will fill in
+    Init_Unreadable_Void(FLD_AT(schema, IDX_FIELD_WIDE));  // will fill in
     TERM_ARRAY_LEN(schema, IDX_FIELD_MAX);
 
 //
@@ -1138,12 +1138,12 @@ REB_R MAKE_Struct(
         // get GC'd) we do run evaluations, so it must be GC-valid.
 
         REBFLD *field = Make_Array(IDX_FIELD_MAX);
-        Init_Unreadable_Blank(FLD_AT(field, IDX_FIELD_TYPE));
-        Init_Unreadable_Blank(FLD_AT(field, IDX_FIELD_DIMENSION));
-        Init_Unreadable_Blank(FLD_AT(field, IDX_FIELD_FFTYPE));
-        Init_Unreadable_Blank(FLD_AT(field, IDX_FIELD_NAME));
+        Init_Unreadable_Void(FLD_AT(field, IDX_FIELD_TYPE));
+        Init_Unreadable_Void(FLD_AT(field, IDX_FIELD_DIMENSION));
+        Init_Unreadable_Void(FLD_AT(field, IDX_FIELD_FFTYPE));
+        Init_Unreadable_Void(FLD_AT(field, IDX_FIELD_NAME));
         Init_Integer(FLD_AT(field, IDX_FIELD_OFFSET), offset);
-        Init_Unreadable_Blank(FLD_AT(field, IDX_FIELD_WIDE));
+        Init_Unreadable_Void(FLD_AT(field, IDX_FIELD_WIDE));
         TERM_ARRAY_LEN(field, IDX_FIELD_MAX);
 
         // Must be a word or a set-word, with set-words initializing

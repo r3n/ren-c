@@ -193,7 +193,7 @@ REBINT Compare_String_Vals(const REBCEL *v1, const REBCEL *v2, bool uncase)
 REBINT Compare_UTF8(const REBYTE *s1, const REBYTE *s2, REBSIZ l2)
 {
     REBUNI c1, c2;
-    REBSIZ l1 = LEN_BYTES(s1);
+    REBSIZ l1 = strsize(s1);
     REBINT result = 0;
 
     for (; l1 > 0 && l2 > 0; s1++, s2++, l1--, l2--) {

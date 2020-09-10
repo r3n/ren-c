@@ -501,24 +501,25 @@ REBSER *Hash_Block(const REBVAL *block, REBLEN skip, bool cased)
 // Compute an IP checksum given some data and a length.
 // Used only on BINARY values.
 //
-REBINT Compute_IPC(REBYTE *data, REBLEN length)
+REBINT Compute_IPC(const REBYTE *data, REBSIZ size)
 {
-    REBLEN  lSum = 0;   // stores the summation
-    REBYTE  *up = data;
+    REBLEN sum = 0;  // stores the summation
+    const REBYTE *bp = data;
 
-    while (length > 1) {
-        lSum += (up[0] << 8) | up[1];
-        up += 2;
-        length -= 2;
+    while (size > 1) {
+        sum += (bp[0] << 8) | bp[1];
+        bp += 2;
+        size -= 2;
     }
 
-    // Handle the odd byte if necessary
-    if (length) lSum += *up;
+    if (size != 0)
+        sum += *bp;  // Handle the odd byte if necessary
 
     // Add back the carry outs from the 16 bits to the low 16 bits
-    lSum = (lSum >> 16) + (lSum & 0xffff);  // Add high-16 to low-16
-    lSum += (lSum >> 16);                   // Add carry
-    return (REBINT)( (~lSum) & 0xffff);     // 1's complement, then truncate
+
+    sum = (sum >> 16) + (sum & 0xffff);  // Add high-16 to low-16
+    sum += (sum >> 16);  // Add carry
+    return cast(REBINT, (~sum) & 0xffff);  // 1's complement, then truncate
 }
 
 

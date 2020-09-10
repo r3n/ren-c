@@ -128,11 +128,9 @@ static void reverse_string(REBVAL *v, REBLEN len)
         // Effectively do a CHANGE/PART to overwrite the reversed portion of
         // the string (from the input value's index to the tail).
 
-        DECLARE_LOCAL (verb);
-        Init_Word(verb, Canon(SYM_CHANGE));
         Modify_String_Or_Binary(
             v,
-            VAL_WORD_SPELLING(verb),
+            SYM_CHANGE,
             temp,
             AM_PART,  // heed len for deletion
             len,
@@ -698,26 +696,27 @@ REB_R PD_String(
     if (n < 0 or cast(REBLEN, n) >= STR_LEN(s))
         fail (Error_Out_Of_Range(picker));
 
-    REBINT c;
+
     if (IS_CHAR(opt_setval)) {
-        c = VAL_CHAR(opt_setval);
-        if (c > cast(REBI64, MAX_UNI))
-            return R_UNHANDLED;
+        Move_Value(pvs->out, opt_setval);
     }
     else if (IS_INTEGER(opt_setval)) {
-        c = Int32(opt_setval);
-        if (c > cast(REBI64, MAX_UNI) or c < 0)
-            return R_UNHANDLED;
+        Init_Char_May_Fail(pvs->out, Int32(opt_setval));
     }
-    else if (ANY_BINSTR(opt_setval)) {
-        REBLEN i = VAL_INDEX(opt_setval);
-        if (i >= VAL_LEN_HEAD(opt_setval))
-            fail (opt_setval);
-
-        c = GET_CHAR_AT(VAL_STRING(opt_setval), i);
-    }
-    else
+    else {
+        // !!! This used to allow setting to a string to set to the first
+        // character of that string, but that seems random.  Splicing
+        // strings might be useful, but inconsistent with BLOCK!s which
+        // preserve the value.  NULL might be interesting for removing
+        // things, but changing the length could be confusing.  BINARY!
+        // converted to a CHAR! could also be arguably useful.  Review.
+        //
         return R_UNHANDLED;
+    }
+
+    REBUNI c = VAL_CHAR(pvs->out);
+    if (c == 0)
+        fail (Error_Illegal_Zero_Byte_Raw());
 
     SET_CHAR_AT(s, n, c);
     return R_INVISIBLE;
@@ -1134,7 +1133,7 @@ REBTYPE(String)
 
         VAL_INDEX(v) = Modify_String_Or_Binary(  // does read-only check
             v,
-            VAL_WORD_SPELLING(verb),
+            cast(enum Reb_Symbol, sym),
             ARG(value),
             flags,
             len,
@@ -1234,7 +1233,6 @@ REBTYPE(String)
             return Init_Any_String(D_OUT, VAL_TYPE(v), Make_String(0));
         }
 
-        REBSTR *s = VAL_STRING(v);
         index = VAL_INDEX(v);
 
         // if no /PART, just return value, else return string
@@ -1244,7 +1242,7 @@ REBTYPE(String)
         else
             Init_Char_Unchecked(D_OUT, CHR_CODE(VAL_STRING_AT(v)));
 
-        Remove_Series_Len(SER(s), VAL_INDEX(v), len);
+        Remove_Any_Series_Len(v, VAL_INDEX(v), len);
         return D_OUT; }
 
       case SYM_CLEAR: {
@@ -1438,7 +1436,7 @@ void Startup_String(void)
 
     const REBYTE *dc = cb_cast(";%\"()[]{}<>");
 
-    for (c = LEN_BYTES(dc); c > 0; c--)
+    for (c = strsize(dc); c > 0; c--)
         URL_Escapes[*dc++] = ESC_URL | ESC_FILE;
 }
 

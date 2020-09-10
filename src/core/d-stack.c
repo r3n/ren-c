@@ -94,7 +94,7 @@ REBVAL *Init_Near_For_Frame(RELVAL *out, REBFRM *f)
 {
     REBLEN dsp_start = DSP;
 
-    if (NOT_END(f->feed->value) and FRM_IS_VALIST(f)) {
+    if (NOT_END(f->feed->value) and FRM_IS_VARIADIC(f)) {
         //
         // Traversing a C va_arg, so reify into a (truncated) array.
         //

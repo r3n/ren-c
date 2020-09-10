@@ -129,7 +129,7 @@ inline static bool Single_Test_Throws(
     const REBCEL *test_cell = VAL_UNESCAPED(test);
     const REBCEL *arg_cell = VAL_UNESCAPED(arg);
 
-    enum Reb_Kind test_kind = CELL_KIND(test_cell);
+    enum Reb_Kind test_kind = CELL_TYPE(test_cell);
 
     // If test is a WORD! or PATH! then GET it.  To help keep things clear,
     // require GET-WORD! or GET-PATH! for actions to convey they are not being
@@ -254,7 +254,7 @@ inline static bool Single_Test_Throws(
         bool threw = RunQ_Throws(
             temp,
             true,  // `fully` (ensure argument consumed)
-            rebU1(KNOWN(test)),
+            rebU(KNOWN(test)),
             NULLIFY_NULLED(arg_specified),  // nulled cells to nullptr for API
             rebEND
         );
@@ -271,7 +271,7 @@ inline static bool Single_Test_Throws(
       case REB_DATATYPE:
         Init_Logic(
             out,
-            VAL_TYPE_KIND(test_cell) == CELL_KIND(arg_cell)
+            VAL_TYPE_KIND(test_cell) == CELL_TYPE(arg_cell)
                 and VAL_NUM_QUOTES(arg) == sum_quotes
         );
         return false;
@@ -279,7 +279,7 @@ inline static bool Single_Test_Throws(
       case REB_TYPESET:
         Init_Logic(
             out,
-            TYPE_CHECK(test_cell, CELL_KIND(arg_cell))
+            TYPE_CHECK(test_cell, CELL_TYPE(arg_cell))
                 and VAL_NUM_QUOTES(arg) == sum_quotes
         );
         return false;
@@ -937,7 +937,7 @@ REBNATIVE(case)
             if (RunQ_Throws(
                 temp,
                 true,  // fully = true (e.g. argument must be taken)
-                rebU1(predicate),
+                rebU(predicate),
                 D_OUT,  // argument
                 rebEND
             )){
@@ -1152,7 +1152,7 @@ REBNATIVE(switch)
             if (RunQ_Throws(
                 temp,
                 true,  // fully = true (e.g. both arguments must be taken)
-                rebU1(predicate),
+                rebU(predicate),
                 left,  // first arg (left hand side if infix)
                 D_OUT,  // second arg (right hand side if infix)
                 rebEND
@@ -1180,7 +1180,7 @@ REBNATIVE(switch)
                 if (RunQ_Throws(
                     temp,
                     false,  // fully = false, e.g. arity-0 functions are ok
-                    rebU1(KNOWN(*v)),  // actions don't need specifiers
+                    rebU(KNOWN(*v)),  // actions don't need specifiers
                     D_OUT,
                     rebEND
                 )){

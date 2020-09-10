@@ -38,14 +38,9 @@
 
 #define FEED_MASK_DEFAULT 0
 
-
-// SERIES_INFO_HOLD is used to make a temporary read-only lock of an array
-// while it is running.  Since the same array can wind up on multiple levels
-// of the stack (e.g. recursive functions), the source must be connected with
-// a bit saying whether it was the level that protected it, so it can know to
-// release the hold when it's done.
+// Available.
 //
-#define FEED_FLAG_TOOK_HOLD \
+#define FEED_FLAG_0 \
     FLAG_LEFT_BIT(0)
 
 
@@ -236,17 +231,21 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
       case DETECTED_AS_UTF8: {
         REBDSP dsp_orig = DSP;
 
-        // !!! Current hack is to just allow one binder to be passed in for
-        // use binding any newly loaded portions (spliced ones are left with
-        // their bindings, though there may be special "binding instructions"
-        // or otherwise, that get added).
+        // Allocate space for a binder, but don't initialize it until needed
+        // (e.g. a WORD! is seen in a text portion).  This way things like
+        // `rebElide(foo_func, "1")` or `block = rebValue("[", item, "]")`
+        // won't trigger it.
         //
-        feed->context = Get_Context_From_Stack();
-        feed->lib = (feed->context != Lib_Context) ? Lib_Context : nullptr;
-
+        // Note that the binder is only used on loaded text.  The scanner
+        // leaves all spliced values with whatever bindings they have (even
+        // if that is none).
+        //
+        // !!! Some kind of "binding instruction" might allow other uses?
+        //
         struct Reb_Binder binder;
-        Init_Interning_Binder(&binder, feed->context);
         feed->binder = &binder;
+        feed->context = nullptr;  // made non-nullptr when binder initialized
+        feed->lib = nullptr;
 
         feed->specifier = SPECIFIED;
 
@@ -263,7 +262,8 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         );
 
         REBVAL *error = rebRescue(cast(REBDNG*, &Scan_To_Stack), &level);
-        Shutdown_Interning_Binder(&binder, feed->context);
+        if (feed->context)
+            Shutdown_Interning_Binder(&binder, feed->context);
 
         if (error) {
             REBCTX *error_ctx = VAL_CONTEXT(error);
@@ -279,14 +279,20 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             // feed is actually over so as to put null... so get another
             // value out of the va_list and keep going.
             //
-            p = va_arg(*feed->vaptr, const void*);
+            if (feed->vaptr)
+                p = va_arg(*feed->vaptr, const void*);
+            else
+                p = *feed->packed++;
             goto detect_again;
         }
 
         // !!! for now, assume scan went to the end; ultimately it would need
         // to pass the feed in as a parameter for partial scans
         //
-        feed->vaptr = nullptr;
+        if (feed->vaptr)
+            feed->vaptr = nullptr;
+        else
+            feed->packed = nullptr;
 
         REBARR *reified = Pop_Stack_Values(dsp_orig);
 
@@ -389,8 +395,14 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         // The va_end() is taken care of here, or if there is a throw/fail it
         // is taken care of by Abort_Frame_Core()
         //
-        va_end(*feed->vaptr);
-        feed->vaptr = nullptr;
+        if (feed->vaptr) {
+            va_end(*feed->vaptr);
+            feed->vaptr = nullptr;
+        }
+        else {
+            assert(feed->packed);
+            feed->packed = nullptr;
+        }
 
         // !!! Error reporting expects there to be an array.  The whole story
         // of errors when there's a va_list is not told very well, and what
@@ -455,10 +467,7 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         // is being executed hence won't be relocated or modified.  This
         // means the release build doesn't need to call ARR_AT().
         //
-        assert(
-            feed->array // incrementing plain array of REBVAL[]
-            or feed->pending == ARR_AT(feed->array, feed->index)
-        );
+        assert(feed->pending == ARR_AT(feed->array, feed->index));
 
         lookback = feed->value;  // should have been stable
         feed->value = feed->pending;
@@ -466,8 +475,26 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         ++feed->pending; // might be becoming an END marker, here
         ++feed->index;
     }
-    else if (not feed->vaptr) {
+    else if (feed->vaptr) {
         //
+        // A variadic can source arbitrary pointers, which can be detected
+        // and handled in different ways.  Notably, a UTF-8 string can be
+        // differentiated and loaded.
+        //
+        const void *p = va_arg(*feed->vaptr, const void*);
+       // feed->index = TRASHED_INDEX; // avoids warning in release build
+        lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
+    }
+    else if (feed->packed) {
+        //
+        // C++ variadics use an ordinary packed array of pointers, because
+        // they do more ambitious things with the arguments and there is no
+        // (standard) way to construct a C va_list programmatically.
+        //
+        const void *p = *feed->packed++;
+        lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
+    }
+    else {
         // The frame was either never variadic, or it was but got spooled into
         // an array by Reify_Va_To_Array_In_Frame().  The first END we hit
         // is the full stop end.
@@ -477,31 +504,12 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         TRASH_POINTER_IF_DEBUG(feed->pending);
 
         ++feed->index; // for consistency in index termination state
-
-        if (GET_FEED_FLAG(feed, TOOK_HOLD)) {
-            assert(GET_SERIES_INFO(feed->array, HOLD));
-            CLEAR_SERIES_INFO(feed->array, HOLD);
-
-            // !!! Future features may allow you to move on to another array.
-            // If so, the "hold" bit would need to be reset like this.
-            //
-            CLEAR_FEED_FLAG(feed, TOOK_HOLD);
-        }
-    }
-    else {
-        // A variadic can source arbitrary pointers, which can be detected
-        // and handled in different ways.  Notably, a UTF-8 string can be
-        // differentiated and loaded.
-        //
-        const void *p = va_arg(*feed->vaptr, const void*);
-        feed->index = TRASHED_INDEX; // avoids warning in release build
-        lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
     }
 
     assert(
         IS_END(feed->value)
-        or feed->value == &feed->fetched
         or NOT_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY)
+        or feed->value == &feed->fetched
     );
 
   #ifdef DEBUG_EXPIRED_LOOKBACK
@@ -522,7 +530,8 @@ inline static const RELVAL *Fetch_Next_In_Feed(  // adds not-end checking
     struct Reb_Feed *feed,
     bool preserve
 ){
-    ASSERT_NOT_END(feed->value);
+    assert(KIND_BYTE_UNCHECKED(feed->value) != REB_0_END);
+        // ^-- faster than NOT_END()
     return Fetch_Next_In_Feed_Core(feed, preserve);
 }
 
@@ -575,7 +584,7 @@ inline static void Literal_Next_In_Feed(REBVAL *out, struct Reb_Feed *feed) {
 // Just to simplify matters, the frame cell is set to a bit pattern the GC
 // will accept.  It would need stack preparation anyway, and this simplifies
 // the invariant so if a recycle happens before Eval_Core() gets to its
-// body, it's always set to something.  Using an unreadable blank means we
+// body, it's always set to something.  Using an unreadable void means we
 // signal to users of the frame that they can't be assured of any particular
 // value between evaluations; it's not cleared.
 //
@@ -588,12 +597,11 @@ inline static void Prep_Array_Feed(
     REBSPC *specifier,
     REBFLGS flags
 ){
-    Prep_Stack_Cell(&feed->fetched);
-    Init_Unreadable_Blank(&feed->fetched);
-    Prep_Stack_Cell(&feed->lookback);
-    Init_Unreadable_Blank(&feed->lookback);
+    Init_Unreadable_Void(Prep_Cell(&feed->fetched));
+    Init_Unreadable_Void(Prep_Cell(&feed->lookback));
 
     feed->vaptr = nullptr;
+    feed->packed = nullptr;
     feed->array = array;
     feed->specifier = specifier;
     feed->flags.bits = flags;
@@ -601,7 +609,8 @@ inline static void Prep_Array_Feed(
         feed->value = opt_first;
         feed->index = index;
         feed->pending = ARR_AT(array, index);
-        ASSERT_NOT_END(feed->value);
+        assert(KIND_BYTE_UNCHECKED(feed->value) != REB_0_END);
+            // ^-- faster than NOT_END()
     }
     else {
         feed->value = ARR_AT(array, index);
@@ -629,15 +638,21 @@ inline static void Prep_Va_Feed(
     va_list *vaptr,
     REBFLGS flags
 ){
-    Prep_Stack_Cell(&feed->fetched);
-    Init_Unreadable_Blank(&feed->fetched);
-    Prep_Stack_Cell(&feed->lookback);
-    Init_Unreadable_Blank(&feed->lookback);
+    Init_Unreadable_Void(Prep_Cell(&feed->fetched));
+    Init_Unreadable_Void(Prep_Cell(&feed->lookback));
 
     feed->index = TRASHED_INDEX;  // avoid warning in release build
     feed->array = nullptr;
     feed->flags.bits = flags;
-    feed->vaptr = vaptr;
+    if (vaptr == nullptr) {  // `p` should be treated as a packed void* array
+        feed->vaptr = nullptr;
+        feed->packed = cast(const void* const*, p);
+        p = *feed->packed++;
+    }
+    else {
+        feed->vaptr = vaptr;
+        feed->packed = nullptr;
+    }
     feed->pending = END_NODE;  // signal next fetch comes from va_list
     feed->specifier = SPECIFIED;  // relative values not allowed
     Detect_Feed_Pointer_Maybe_Fetch(feed, p, false);

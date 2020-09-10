@@ -50,6 +50,11 @@ REBVAL *Init_Any_Path_At_Core(
     if (ARR_LEN(a) < 2)
         panic (a);
 
+    assert(a != PG_2_Blanks_Array);  // should always be SYM__SLASH_1_ cell
+    assert(not (  // v-- also should never be initialized like this
+        ARR_LEN(a) == 2 and IS_BLANK(ARR_AT(a, 0)) and IS_BLANK(ARR_AT(a, 1))
+    ));
+
     return KNOWN(out);
 }
 
@@ -314,22 +319,13 @@ bool Eval_Path_Throws_Core(
     while (KIND_BYTE(ARR_AT(array, index)) == REB_BLANK)
         ++index; // pre-feed any blanks
 
-    // Treat a 0-length PATH! as if it gives back an ACTION! which does "what
-    // a zero length path would do", e.g. an analogue to division (though in
-    // the future, types might define this some other way.)
-    //
-    if (IS_END(ARR_AT(array, index))) {
-        if (label_out)
-            *label_out = nullptr;
-        Move_Value(out, NAT_VALUE(path_0));
-        return false;
-    }
+    assert(NOT_END(ARR_AT(array, index)));
 
     DECLARE_ARRAY_FEED (feed, array, index, specifier);
     DECLARE_FRAME (pvs, feed, flags | EVAL_FLAG_PATH_MODE);
 
     SHORTHAND (v, pvs->feed->value, NEVERNULL(const RELVAL*));
-    ASSERT_NOT_END(*v);  // tested 0-length path previously
+    assert(NOT_END(*v));  // tested 0-length path previously
 
     SET_END(out);
     Push_Frame(out, pvs);
@@ -715,17 +711,34 @@ REBNATIVE(poke)
 
 
 //
-//  path-0: enfix native [
+//  -slash-1-: enfix native [
 //
-//  {Temporary native in lieu of PD_Xxx() dispatch so `/` performs division}
+//  {Default implementation for `/` in the evaluator}
 //
 //      left [<opt> any-value!]
 //      right [<opt> any-value!]
 //  ]
 //
-REBNATIVE(path_0)
+REBNATIVE(_slash_1_)
+//
+// It's very desirable to have `/`, `/foo`, `/foo/`, `/foo/(bar)` etc. be
+// instances of the same datatype of PATH!.  In this scheme, `/` would act
+// like a "root path" and be achieved with `to path! [_ _]`.
+//
+// But with limited ASCII symbols, there is strong demand for `/` to be able
+// to act like division in evaluative contexts, or to be overrideable for
+// other things in a way not too dissimilar from `+`.
+//
+// The compromise used is to make `/` be a cell whose VAL_TYPE() is REB_PATH,
+// but whose CELL_KIND() is REB_WORD with the special spelling `-1-SLASH-`.
+// Binding mechanics and evaluator behavior are based on this unusual name.
+// But when inspected by the user, it appears to be a PATH! with 2 blanks.
+//
+// This duality is imperfect, as any routine with semantics like COLLECT-WORDS
+// would have to specifically account for it, or just see an empty path.
+// But it is intended to give some ability to configure the behavior easily.
 {
-    INCLUDE_PARAMS_OF_PATH_0;
+    INCLUDE_PARAMS_OF__SLASH_1_;
 
     REBVAL *left = ARG(left);
     REBVAL *right = ARG(right);
@@ -763,6 +776,8 @@ REB_R PD_Path(
     if (opt_setval)
         fail ("PATH!s are immutable (convert to GROUP! or BLOCK! to mutate)");
 
+    Init_Block(pvs->out, VAL_PATH(pvs->out));
+
     return PD_Array(pvs, picker, opt_setval);
 }
 
@@ -776,6 +791,8 @@ REB_R PD_Path(
 //
 REBTYPE(Path)
 {
+    REBVAL *path = D_ARG(1);
+
     switch (VAL_WORD_SYM(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
@@ -783,6 +800,10 @@ REBTYPE(Path)
 
         switch (VAL_WORD_SYM(ARG(property))) {
           case SYM_LENGTH:
+            if (MIRROR_BYTE(path) == REB_WORD) {
+                assert(VAL_WORD_SYM(path) == SYM__SLASH_1_);
+                return Init_Integer(frame_->out, 2);
+            }
             return Series_Common_Action_Maybe_Unhandled(frame_, verb);
 
           // !!! Any other interesting reflectors?
@@ -798,6 +819,11 @@ REBTYPE(Path)
         // copy of a path may copy groups that are mutable.
         //
       case SYM_COPY:
+        if (MIRROR_BYTE(path) == REB_WORD) {
+            assert(VAL_WORD_SYM(path) == SYM__SLASH_1_);
+            return Move_Value(frame_->out, path);
+        }
+
         goto retrigger;
 
       default:
@@ -819,64 +845,65 @@ void MF_Path(REB_MOLD *mo, const REBCEL *v, bool form)
 {
     UNUSED(form);
 
-    REBARR *a = VAL_ARRAY(v);
-
-    // Recursion check:
-    if (Find_Pointer_In_Series(TG_Mold_Stack, a) != NOT_FOUND) {
-        Append_Ascii(mo->series, ".../...");
-        return;
-    }
-    Push_Pointer_To_Series(TG_Mold_Stack, a);
-
-    // Routine may be called on value that reports REB_QUOTED, even if it
-    // has no additional payload and is aliasing the cell itself.  Checking
-    // the type could be avoided if each type had its own dispatcher, but
-    // this routine seems to need to be generic.
-    //
-    enum Reb_Kind kind = CELL_KIND(v);
+    enum Reb_Kind kind = CELL_TYPE(v);  // Note: CELL_KIND() might be WORD!
 
     if (kind == REB_GET_PATH)
         Append_Codepoint(mo->series, ':');
     else if (kind == REB_SYM_PATH)
         Append_Codepoint(mo->series, '@');
 
-    assert(VAL_INDEX(v) == 0); // the new rule, not an ANY-ARRAY!, always head
-    assert(ARR_LEN(a) >= 2); // another new rule, even / is `make path! [_ _]`
+    if (MIRROR_BYTE(v) == REB_WORD) {  // optimized for `/`, allows binding
+        assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+        Append_Ascii(mo->series, "/");
+    }
+    else {
+        REBARR *a = VAL_ARRAY(v);
 
-    RELVAL *item = ARR_HEAD(a);
-    while (NOT_END(item)) {
-        assert(not ANY_PATH(item)); // another new rule
+        // Recursion check:
+        if (Find_Pointer_In_Series(TG_Mold_Stack, a) != NOT_FOUND) {
+            Append_Ascii(mo->series, ".../...");
+            return;
+        }
+        Push_Pointer_To_Series(TG_Mold_Stack, a);
 
-        if (not IS_BLANK(item)) { // no blank molding; indicated by slashes
-            //
-            // !!! Molding of items in paths which have slashes in them, such
-            // as URL! or FILE! (or some historical date formats) need some
-            // kind of escaping, otherwise they have to be outlawed too.
-            // FILE! has the option of `a/%"dir/file.txt"/b` to put the file
-            // in quotes, but URL does not.
-            //
-            Mold_Value(mo, item);
+        assert(VAL_INDEX(v) == 0);  // new rule, not ANY-ARRAY!, always head
+        assert(ARR_LEN(a) >= 2); // another rule, even / is `make path! [_ _]`
 
-            // Note: We ignore VALUE_FLAG_NEWLINE_BEFORE here for ANY-PATH,
-            // but any embedded BLOCK! or GROUP! which do have newlines in
-            // them can make newlines, e.g.:
-            //
-            //     a/[
-            //        b c d
-            //     ]/e
+        RELVAL *item = ARR_HEAD(a);
+        while (NOT_END(item)) {
+            assert(not ANY_PATH(item)); // another new rule
+
+            if (not IS_BLANK(item)) { // no blank molding; slashes convey it
+                //
+                // !!! Molding of items in paths which have slashes in them,
+                // like URL! or FILE! (or some historical date formats) need
+                // some kind of escaping, otherwise they have to be outlawed
+                // too.  FILE! has the option of `a/%"dir/file.txt"/b` to put
+                // the file in quotes, but URL does not.
+                //
+                Mold_Value(mo, item);
+
+                // Note: Ignore VALUE_FLAG_NEWLINE_BEFORE here for ANY-PATH,
+                // but any embedded BLOCK! or GROUP! which do have newlines in
+                // them can make newlines, e.g.:
+                //
+                //     a/[
+                //        b c d
+                //     ]/e
+            }
+
+            ++item;
+            if (IS_END(item))
+                break;
+
+            Append_Codepoint(mo->series, '/');
         }
 
-        ++item;
-        if (IS_END(item))
-            break;
-
-        Append_Codepoint(mo->series, '/');
+        Drop_Pointer_From_Series(TG_Mold_Stack, a);
     }
 
     if (kind == REB_SET_PATH)
         Append_Codepoint(mo->series, ':');
-
-    Drop_Pointer_From_Series(TG_Mold_Stack, a);
 }
 
 
@@ -943,16 +970,31 @@ REB_R MAKE_Path(
     if (ARR_LEN(arr) < 2) // !!! Should pass produced array as BLOCK! to error
         fail ("MAKE PATH! must produce path of at least length 2");
 
+    // Need special case code if the array needs to be a disguised WORD!
+    // (See -SLASH-1- for details)
+    //
+    if (ARR_LEN(arr) == 2)
+        if (IS_BLANK(ARR_AT(arr, 0)) and IS_BLANK(ARR_AT(arr, 1))) {
+            Free_Unmanaged_Array(arr);
+            Init_Word(out, PG_Slash_1_Canon);
+            mutable_KIND_BYTE(out) = REB_PATH;
+            return out;
+        }
+
     return Init_Any_Path(out, kind, arr);
 }
 
 
 static void Push_Path_Recurses(RELVAL *path, REBSPC *specifier)
 {
-    RELVAL *item = VAL_ARRAY_AT(path);
+    RELVAL *item = ARR_HEAD(VAL_PATH(path));
     for (; NOT_END(item); ++item) {
-        if (IS_PATH(item))
-            Push_Path_Recurses(item, Derive_Specifier(specifier, item));
+        if (IS_PATH(item)) {
+            if (IS_SPECIFIC(item))
+                Push_Path_Recurses(item, VAL_SPECIFIER(item));
+            else
+                Push_Path_Recurses(item, specifier);
+        }
         else
             Derelativize(DS_PUSH(), item, specifier);
     }
@@ -995,6 +1037,14 @@ REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
     if (DSP - dsp_orig < 2)
         fail ("TO PATH! must produce a path of at least length 2");
 
+    if (DSP - dsp_orig == 2)
+        if (IS_BLANK(DS_TOP) and IS_BLANK(DS_TOP - 1)) {
+            DS_DROP_TO(dsp_orig);
+            Init_Word(out, PG_Slash_1_Canon);
+            mutable_KIND_BYTE(out) = REB_PATH;
+            return out;
+        }
+
     return Init_Any_Path(out, kind, Pop_Stack_Values(dsp_orig));
 }
 
@@ -1011,7 +1061,14 @@ REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
 //
 REBINT CT_Path(const REBCEL *a, const REBCEL *b, REBINT mode)
 {
-    REBINT num = Cmp_Array(a, b, mode == 1);
+    REBINT num;
+    if (MIRROR_BYTE(a) == REB_WORD and MIRROR_BYTE(b) == REB_WORD)
+        num = Compare_Word(a, b, mode == 1);
+    else if (MIRROR_BYTE(a) != REB_WORD and MIRROR_BYTE(b) != REB_WORD)
+        num = Cmp_Array(a, b, mode == 1);
+    else
+        num = -1;  // !!! what is the right answer here?
+
     if (mode >= 0)
         return (num == 0);
     if (mode == -1)

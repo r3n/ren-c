@@ -60,18 +60,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         and (binding = VAL_BINDING(v))
         and NOT_SERIES_INFO(binding, INACCESSIBLE)
     ){
-        if (
-            not (binding->header.bits & NODE_FLAG_MANAGED)
-            and NOT_CELL_FLAG(v, STACK_LIFETIME)
-            and NOT_CELL_FLAG(v, TRANSIENT)
-        ){
-            // If a stack cell holds an unmanaged stack-based pointer, we
-            // assume the lifetime is taken care of and the GC does not need
-            // to be involved.  Only stack cells are allowed to do this.
-            //
-            panic (v);
-        }
-        if (not (binding->header.bits & NODE_FLAG_CELL)) {
+        if (not Is_Node_Cell(binding)) {
             assert(IS_SER_ARRAY(binding));
             if (
                 GET_ARRAY_FLAG(binding, IS_VARLIST)
@@ -85,7 +74,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
                 }
                 REBNOD *keysource = LINK_KEYSOURCE(binding);
                 if (
-                    not (keysource->header.bits & NODE_FLAG_CELL)
+                    not Is_Node_Cell(keysource)
                     and GET_ARRAY_FLAG(keysource, IS_PARAMLIST)
                 ){
                     if (
@@ -507,7 +496,7 @@ void Assert_Array_Marked_Correctly(REBARR *a) {
         // to Queue_Mark_Context_Deep.
 
         REBNOD *keysource = LINK_KEYSOURCE(a);
-        if (keysource->header.bits & NODE_FLAG_CELL) {
+        if (Is_Node_Cell(keysource)) {
             //
             // Must be a FRAME! and it must be on the stack running.  If
             // it has stopped running, then the keylist must be set to

@@ -287,29 +287,34 @@ void Remove_Series_Units(REBSER *s, REBSIZ offset, REBINT quantity)
 
 
 //
-//  Remove_Series_Len: C
+//  Remove_Any_Series_Len: C
 //
 // Remove a series of values (bytes, longs, reb-vals) from the
 // series at the given index.
 //
-void Remove_Series_Len(REBSER *s, REBLEN index, REBINT len)
+void Remove_Any_Series_Len(REBVAL *v, REBLEN index, REBINT len)
 {
-    if (IS_SER_STRING(s) and not IS_STR_SYMBOL(s)) {
-        REBSTR *str = STR(s);
-        REBCHR(*) cp = STR_AT(str, index);
-        REBCHR(*) ep = STR_AT(str, index + len);
-
-        REBINT len_old = STR_LEN(str);
-        REBSIZ size_old = STR_SIZE(str);
-
-        assert(len <= len_old);
-
-        Remove_Series_Units(s, cp - STR_HEAD(str), ep - cp);
-        Free_Bookmarks_Maybe_Null(str);
-        SET_STR_LEN_SIZE(str, len_old - len, size_old - (ep - cp));
+    if (ANY_BINSTR(v)) {  // ANY-STRING! or BINARY! series
+        //
+        // The complicated logic in Modify_String_Or_Binary() handles many
+        // aspects of the removal; e.g. updating "bookmarks" that help find
+        // indexes in UTF-8 strings, as well as checking to make sure that
+        // modifications of binaries that are aliases of strings do not make
+        // invalid UTF-8.  Factor better...but don't repeat that work here.
+        //
+        DECLARE_LOCAL (temp);
+        Init_Any_Series_At(temp, VAL_TYPE(v), VAL_SERIES(v), index);
+        Modify_String_Or_Binary(
+            temp,
+            SYM_CHANGE,
+            NULLED_CELL,
+            AM_PART,
+            len,
+            1  // dups
+        );
     }
-    else
-        Remove_Series_Units(s, index, len);
+    else  // ANY-ARRAY! is more straightforward
+        Remove_Series_Units(VAL_SERIES(v), index, len);
 }
 
 

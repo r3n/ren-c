@@ -120,7 +120,7 @@ ctx-zip: context [
             "Offset where the compressed entry will be stored in the file"
     ][
         ; info on data before compression
-        crc: checksum-core data 'crc32
+        crc: checksum-core 'crc32 data
 
         uncompressed-size: to-ilong length of data
 
@@ -433,7 +433,7 @@ ctx-zip: context [
                             throw blank
                         ]
 
-                        check: checksum-core data 'crc32
+                        check: checksum-core 'crc32 data
                         if crc != check [
                             info "^- -> failed [bad crc32]^/"
                             print [

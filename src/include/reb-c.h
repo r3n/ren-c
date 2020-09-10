@@ -962,18 +962,41 @@
 
 //=//// BYTE STRINGS VS UNENCODED CHARACTER STRINGS ///////////////////////=//
 //
-// Use these when you semantically are talking about unsigned characters as
-// bytes.  For instance: if you want to count unencoded chars in 'char *' us
-// strlen(), and the reader will know that is a count of letters.  If you have
-// something like UTF-8 with more than one byte per character, use LEN_BYTES.
-// The casting macros are derived from "Casts for the Masses (in C)":
+// With UTF-8 Everywhere, the term "length" of a string refers to its number
+// of codepoints, while "size" returns to the number of bytes (in the size_t
+// sense of the word).  This makes the byte-based C function `strlen()`
+// something of a misnomer.
+//
+// To address this issue, we define `strsize()`.  Besides having a name that
+// helps emphasize it returns a byte count, it is also made polymorphic to
+// accept unsigned character pointers as well as signed ones.  To do this in
+// C it has to use a cast that foregoes type checking.  But the C++ build
+// checks via templates that only `const char*` and `const unsigned char*`
+// are passed.  (Note that strict aliasing rules permit casting between
+// pointers to char types.)
+//
+// We also include some convenience functions for switching between char*
+// and unsigned char*, from:
 //
 // http://blog.hostilefork.com/c-casts-for-the-masses/
-//
-// For APPEND_BYTES_LIMIT, m is the max-size allocated for d (dest)
-//
-#include <string.h> // for strlen() etc, but also defines `size_t`
-#define strsize strlen
+
+#include <string.h>  // for strlen() etc, but also defines `size_t`
+
+#ifdef CPLUSPLUS11
+    template<
+        typename T,
+        typename std::enable_if<
+            std::is_same<T, char>::value
+            || std::is_same<T, unsigned char>::value
+        >
+    >
+    size_t strsize(const T *bp)
+        { return strlen((const char*)bp); }
+#else
+    #define strsize(bp) \
+        strlen((const char*)bp)
+#endif
+
 #if defined(NDEBUG)
     /* These [S]tring and [B]inary casts are for "flips" between a 'char *'
      * and 'unsigned char *' (or 'const char *' and 'const unsigned char *').
@@ -983,24 +1006,6 @@
     #define cs_cast(b)      ((const char *)(b))
     #define b_cast(s)       ((unsigned char *)(s))
     #define cb_cast(s)      ((const unsigned char *)(s))
-
-    #define LEN_BYTES(s) \
-        strlen((const char*)(s))
-
-    #define COPY_BYTES(d,s,n) \
-        strncpy((char*)(d), (const char*)(s), (n))
-
-    #define COMPARE_BYTES(l,r) \
-        strcmp((const char*)(l), (const char*)(r))
-
-    inline static unsigned char *APPEND_BYTES_LIMIT(
-        unsigned char *dest, const unsigned char *src, size_t max
-    ){
-        size_t len = LEN_BYTES(dest);
-        return b_cast(strncat(
-            s_cast(dest), cs_cast(src), MAX(max - len - 1, 0)
-        ));
-    }
 #else
     /* We want to ensure the input type is what we thought we were flipping,
      * particularly not the already-flipped type.  Instead of type_traits, 4
@@ -1017,32 +1022,6 @@
 
     inline static const char *cs_cast(const unsigned char *s)
         { return (const char*)s; }
-
-    // Debug build uses inline functions to ensure you pass in unsigned char *
-    //
-    inline static unsigned char *COPY_BYTES(
-        unsigned char *dest, const unsigned char *src, size_t count
-    ){
-        return b_cast(strncpy(s_cast(dest), cs_cast(src), count));
-    }
-
-    inline static size_t LEN_BYTES(const unsigned char *str)
-        { return strlen(cs_cast(str)); }
-
-    inline static int COMPARE_BYTES(
-        const unsigned char *lhs, const unsigned char *rhs
-    ){
-        return strcmp(cs_cast(lhs), cs_cast(rhs));
-    }
-
-    inline static unsigned char *APPEND_BYTES_LIMIT(
-        unsigned char *dest, const unsigned char *src, size_t max
-    ){
-        size_t len = LEN_BYTES(dest);
-        return b_cast(strncat(
-            s_cast(dest), cs_cast(src), MAX(max - len - 1, 0)
-        ));
-    }
 #endif
 
 

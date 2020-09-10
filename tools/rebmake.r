@@ -678,7 +678,13 @@ ld: make linker-class [
         collect-text [
             keep ("gcc" unless file-to-local/pass exec-file)
 
-            if dynamic [keep "-shared"]
+            ; !!! This breaks emcc at the moment; no other DLLs are being
+            ; made, so leave it off.
+            ; https://github.com/emscripten-core/emscripten/issues/11814
+            ;
+            comment [
+                if dynamic [keep "-shared"]
+            ]
 
             keep "-o"
             

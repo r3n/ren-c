@@ -83,7 +83,6 @@
 
         REBCTX *c = CTX(p);
         assert(CTX_TYPE(c) == REB_FRAME);
-        assert(GET_SERIES_FLAG(c, STACK_LIFETIME));
 
         // Note: May be managed or unamanged.
 
@@ -106,7 +105,6 @@
         //
         REBCTX *c = CTX(EXTRA(Binding, v).node);
         assert(CTX_TYPE(c) == REB_FRAME); // may be inaccessible
-        assert(GET_SERIES_FLAG(c, STACK_LIFETIME));
         return cast(REBSPC*, c);
     }
 #endif
@@ -348,20 +346,32 @@ inline static REBNOD *SPC_BINDING(REBSPC *specifier)
 // If the cell we're writing into is a stack cell, there's a chance that
 // management/reification of the binding can be avoided.
 //
+// Payload and header should be valid prior to making this call.
+//
 inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
-    EXTRA(Binding, out).node = binding; // payload and header should be valid
+    EXTRA(Binding, out).node = binding;
 
+    // If a QUOTED! cell is 4 quotes or more, then the VAL_UNESCAPED() payload
+    // contains a binding that must match that of the REB_QUOTED.  But this
+    // may be shared with other REB_QUOTED instances, that can't have their
+    // bindings corrupted.  A new payload must be made in that case.
+    //
     if (KIND_BYTE(out) == REB_QUOTED) {  // always claims to be bindable
         RELVAL *old = VAL_QUOTED_PAYLOAD_CELL(out);
-        if (not Is_Bindable(old) or EXTRA(Binding, old).node == binding)
-            return; // it's okay to reuse the payload
+        if (not Is_Bindable(old))
+            return;  // unescaped value isn't *actually* a bindable type
+
+        if (EXTRA(Binding, old).node == binding) {
+            assert(not binding or GET_SERIES_FLAG(binding, MANAGED));
+            return;  // can reuse the allocation
+        }
 
         REBVAL *paired = Alloc_Pairing();
         paired->header = old->header;
         EXTRA(Binding, paired).node = binding;
         paired->payload = old->payload;
 
-        Init_Unreadable_Blank(PAIRING_KEY(paired));
+        Init_Unreadable_Void(PAIRING_KEY(paired));
 
       #if !defined(NDEBUG)
         paired->header.bits &= ~CELL_FLAG_PROTECTED;  // need to manage it
@@ -370,48 +380,21 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
         Manage_Pairing(paired);
 
       #if !defined(NDEBUG)
-        SET_CELL_FLAG(paired, PROTECTED); // maybe shared; can't change
+        SET_CELL_FLAG(paired, PROTECTED);  // may become shared; can't change
       #endif
 
         PAYLOAD(Any, out).first.node = NOD(paired);  // update to new binding
         assert(GET_CELL_FLAG(out, FIRST_IS_NODE));  // should have been set
     }
 
-    if (
-        not binding // unbound
-        or GET_SERIES_FLAG(binding, MANAGED) // managed already
-        or GET_CELL_FLAG(out, TRANSIENT) // can't pass up/down stack
-    ){
-        return;
-    }
+    if (not binding or GET_SERIES_FLAG(binding, MANAGED))
+        return;  // unbound or managed already (frame OR object context)
 
-    assert(GET_SERIES_FLAG(binding, STACK_LIFETIME));
- 
-    REBFRM *f = FRM(LINK_KEYSOURCE(binding));
-    assert(IS_END(f->param)); // cannot manage frame varlist in mid fulfill!
-    UNUSED(f); // !!! not actually used yet, coming soon
-
-    if (out->header.bits & NODE_FLAG_STACK) {
-        //
-        // If the cell we're writing to is a stack cell, there's a chance
-        // that management/reification of the binding can be avoided.
-        //
-        REBLEN bind_depth = 1; // !!! need to find v's binding stack level
-        REBLEN out_depth;
-        if (not (out->header.bits & CELL_FLAG_STACK_LIFETIME))
-            out_depth = 0;
-        else
-            out_depth = 1; // !!! need to find out's stack level
-
-        bool smarts_enabled = false; 
-        if (smarts_enabled and out_depth >= bind_depth)
-            return; // binding will outlive `out`, don't manage
-
-        // no luck...`out` might outlive the binding, must manage
-    }
+    REBFRM *f = FRM(LINK_KEYSOURCE(binding));  // unmanaged can only be frame
+    assert(IS_END(f->param));  // cannot manage frame varlist in mid fulfill!
+    UNUSED(f);
 
     binding->header.bits |= NODE_FLAG_MANAGED; // burdens the GC, now...
-    EXTRA(Binding, out).node = binding;
 }
 
 

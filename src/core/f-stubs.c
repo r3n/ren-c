@@ -383,7 +383,7 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
         assert(VAL_PHASE(archetype) != nullptr);
     }
     else {
-      #ifdef DEBUG_UNREADABLE_BLANKS
+      #ifdef DEBUG_UNREADABLE_VOIDS
         assert(IS_UNREADABLE_DEBUG(CTX_ROOTKEY(c)));
       #endif
         assert(VAL_PHASE(archetype) == nullptr);

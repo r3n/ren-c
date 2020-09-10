@@ -48,12 +48,7 @@
 
 // Default for Eval_Core_May_Throw() is just a single EVALUATE step.
 //
-#if defined(NDEBUG)
-    #define EVAL_MASK_DEFAULT 0
-#else
-    #define EVAL_MASK_DEFAULT \
-        (EVAL_FLAG_DEFAULT_DEBUG)
-#endif
+#define EVAL_MASK_DEFAULT 0
 
 
 // See Endlike_Header() for why these are chosen the way they are.  This
@@ -360,20 +355,20 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(30)
 
 
-#if !defined(NDEBUG)
-
-    //=//// EVAL_FLAG_DEFAULT_DEBUG ///////////////////////////////////////=//
-    //
-    // It may be advantageous to have some bits set to true by default instead
-    // of false, so all evaluations should describe their settings relative
-    // to EVAL_MASK_DEFAULT, and purposefully mask out any truthy flags that
-    // apply by default they don't want.  The default mask includes this flag
-    // just so the evaluator can make sure EVAL_MASK_DEFAULT was used.
-    //
-    #define EVAL_FLAG_DEFAULT_DEBUG \
-        FLAG_LEFT_BIT(31)
-
-#endif
+//=//// EVAL_FLAG_TOOK_HOLD ///////////////////////////////////////////////=//
+//
+// If a frame takes SERIES_INFO_HOLD on an array it is enumerating, it has to
+// remember that it did so it can release it when it is done processing.
+// Note that this has to be a flag on the frame, not the feed--as a feed can
+// be shared among many frames.
+//
+// !!! This is undermined by work in stackless, where a single bit is not
+// sufficient since the stacks do not cleanly unwind:
+//
+// https://forum.rebol.info/t/1317
+//
+#define EVAL_FLAG_TOOK_HOLD \
+    FLAG_LEFT_BIT(31)
 
 
 STATIC_ASSERT(31 < 32); // otherwise EVAL_FLAG_XXX too high
@@ -393,9 +388,6 @@ STATIC_ASSERT(31 < 32); // otherwise EVAL_FLAG_XXX too high
 
 
 #define TRASHED_INDEX ((REBLEN)(-3))
-
-#define IS_KIND_INERT(k) \
-    ((k) >= REB_BLOCK)
 
 
 struct Reb_Feed {
@@ -442,6 +434,12 @@ struct Reb_Feed {
     // NULL it is assumed that the values are sourced from a simple array.
     //
     va_list *vaptr;
+
+    // The feed could also be coming from a packed array of pointers...this
+    // is used by the C++ interface, which creates a `std::array` on the
+    // C stack of the processed variadic arguments it enumerated.
+    //
+    const void* const *packed;
 
     // This contains an IS_END() marker if the next fetch should be an attempt
     // to consult the va_list (if any).  That end marker may be resident in

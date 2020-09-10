@@ -274,7 +274,7 @@ inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
     if (GET_ACTION_FLAG(f->original, IS_INVISIBLE))
         return;
 
-  #ifdef DEBUG_UNREADABLE_BLANKS
+  #ifdef DEBUG_UNREADABLE_VOIDS
     //
     // The f->out slot should be initialized well enough for GC safety.
     // But in the debug build, if we're not running an invisible function
@@ -283,14 +283,14 @@ inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
     //
     // END has an advantage because recycle/torture will catch cases of
     // evaluating into movable memory.  But if END is always set, natives
-    // might *assume* it.  Fuzz it with unreadable blanks.
+    // might *assume* it.  Fuzz it with unreadable voids.
     //
     // !!! Should natives be able to count on f->out being END?  This was
     // at one time the case, but this code was in one instance.
     //
     if (NOT_ACTION_FLAG(FRM_PHASE(f), IS_INVISIBLE)) {
         if (SPORADICALLY(2))
-            Init_Unreadable_Blank(f->out);
+            Init_Unreadable_Void(f->out);
         else
             SET_END(f->out);
         SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
@@ -368,16 +368,6 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     if (IS_END(*next)) // `do [x:]`, `do [o/x:]`, etc. are illegal
         fail (Error_Need_Non_End_Core(v, *specifier));
 
-    // !!! While assigning `x: #[void]` is not legal, we make a special
-    // exemption for quoted voids, e.g. '#[void]`.  This means a molded
-    // object with void fields can be safely MAKE'd back.
-    //
-    if (KIND_BYTE(*next) == REB_VOID + REB_64) {
-        Init_Void(f->out);
-        Fetch_Next_Forget_Lookback(f);  // advances f->value
-        return false;
-    }
-
     // Using a SET-XXX! means you always have at least two elements; it's like
     // an arity-1 function.  `1 + x: whatever ...`.  This overrides the no
     // lookahead behavior flag right up front.
@@ -443,13 +433,13 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         | EVAL_FLAG_NEXT_ARG_FROM_OUT
         | EVAL_FLAG_FULFILL_ONLY  // can be requested or <blank> can trigger
         | EVAL_FLAG_RUNNING_ENFIX  // can be requested with REEVALUATE_CELL
+        | EVAL_FLAG_TOOK_HOLD  // can be set by va_list reification
     );  // should be unchanged on exit
   #endif
 
     assert(DSP >= f->dsp_orig);  // REDUCE accrues, APPLY adds refinements
     assert(not IS_TRASH_DEBUG(f->out));  // all invisible will preserve output
     assert(f->out != spare);  // overwritten by temporary calculations
-    assert(GET_EVAL_FLAG(f, DEFAULT_DEBUG));  // must use EVAL_MASK_DEFAULT
     assert(NOT_FEED_FLAG(f->feed, BARRIER_HIT));
 
     // Caching KIND_BYTE(*at) in a local can make a slight performance
@@ -798,7 +788,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
           skip_this_arg_for_now:  // the GC marks args up through f->arg...
 
-            Init_Unreadable_Blank(f->arg);  // ...so cell must have valid bits
+            Init_Unreadable_Void(f->arg);  // ...so cell must have valid bits
             continue;
 
     //=//// ACTUAL LOOP BODY //////////////////////////////////////////////=//
@@ -809,33 +799,16 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             // array which backs the frame may not have any initialization of
             // its bits.  The goal is to make it so that the GC uses the
             // f->param position to know how far the frame fulfillment is
-            // gotten, and only mark those values.  Hoewver, there is also
-            // a desire to differentiate cell formatting between "stack"
-            // and "heap" to do certain optimizations.  After a recent change,
-            // it's becoming more integrated by using pooled memory for the
-            // args...however issues of stamping the bits remain.  This just
-            // blindly formats them with NODE_FLAG_STACK to make the arg
-            // initialization work, but it's in progress to do this more
-            // subtly so that the frame can be left formatted as non-stack.
+            // gotten, and only mark those values.  This just blindly formats
+            // them with NODE_FLAG_STACK to make the arg initialization work.
             //
             if (
                 NOT_EVAL_FLAG(f, DOING_PICKUPS)
                 and not SPECIAL_IS_ARG_SO_TYPECHECKING
             ){
-                Prep_Stack_Cell(f->arg); // improve...
-            }
-            else {
-                // If the incoming series came from a heap frame, just put
-                // a bit on it saying its a stack node for now--this will
-                // stop some asserts.  The optimization is not enabled yet
-                // which avoids reification on stack nodes of lower stack
-                // levels--so it's not going to cause problems -yet-
-                //
-                f->arg->header.bits |= CELL_FLAG_STACK_LIFETIME;
+                Prep_Cell(f->arg);  // improve...
             }
 
-            assert(f->arg->header.bits & NODE_FLAG_CELL);
-            assert(f->arg->header.bits & CELL_FLAG_STACK_LIFETIME);
 
     //=//// A /REFINEMENT ARG /////////////////////////////////////////////=//
 
@@ -965,7 +938,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                 // of clearing the locals, they may not be null...
                 //
                 if (SPECIAL_IS_ARBITRARY_SO_SPECIALIZED)
-                    assert(IS_NULLED(f->special));
+                    assert(IS_NULLED(f->special) or IS_VOID(f->special));
 
                 Init_Void(f->arg);
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
@@ -982,11 +955,11 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                 if (SPECIAL_IS_ARBITRARY_SO_SPECIALIZED)
                     assert(
                         IS_NULLED(f->special)
-                        or NAT_ACTION(return) == VAL_ACTION(f->special)
+                        or NATIVE_ACT(return) == VAL_ACTION(f->special)
                     );
                 assert(VAL_PARAM_SYM(f->param) == SYM_RETURN);
 
-                Move_Value(f->arg, NAT_VALUE(return));
+                Move_Value(f->arg, NATIVE_VAL(return));
                 INIT_BINDING(f->arg, f->varlist);
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
                 goto continue_arg_loop;
@@ -1113,7 +1086,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                     // to TAKE be seen as an error?  Failing to take first
                     // gives out-of-order evaluation.
                     //
-                    ASSERT_NOT_END(f->out);
+                    assert(NOT_END(f->out));
                     REBARR *array1;
                     if (IS_END(f->out))
                         array1 = EMPTY_ARRAY;
@@ -1587,7 +1560,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         assert(IS_END(f->param));
         assert(
             IS_END(*next)
-            or FRM_IS_VALIST(f)
+            or FRM_IS_VARIADIC(f)
             or IS_VALUE_IN_ARRAY_DEBUG(f->feed->array, *next)
         );
 
@@ -1597,23 +1570,6 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         }
 
         Expire_Out_Cell_Unless_Invisible(f);
-
-        // While you can't evaluate into an array cell (because it may move)
-        // an evaluation is allowed to be performed into stable cells on the
-        // stack -or- API handles.
-        //
-        // !!! Could get complicated if a manual lifetime is used and freed
-        // during an evaluation.  Not currently possible since there's nothing
-        // like a rebValue() which targets a cell passed in by the user.  But if
-        // such a thing ever existed it would have that problem...and would
-        // need to take a "hold" on the cell to prevent a rebFree() while the
-        // evaluation was in progress.
-        //
-        assert(f->out->header.bits & (
-            CELL_FLAG_STACK_LIFETIME
-            | NODE_FLAG_TRANSIENT
-            | NODE_FLAG_ROOT
-        ));
 
         *next_gotten = nullptr; // arbitrary code changes fetched variables
 
@@ -1647,7 +1603,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             const REBVAL *label = VAL_THROWN_LABEL(f->out);
             if (IS_ACTION(label)) {
                 if (
-                    VAL_ACTION(label) == NAT_ACTION(unwind)
+                    VAL_ACTION(label) == NATIVE_ACT(unwind)
                     and VAL_BINDING(label) == NOD(f->varlist)
                 ){
                     // Eval_Core catches unwinds to the current frame, so throws
@@ -1664,7 +1620,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                     goto dispatch_completed;
                 }
                 else if (
-                    VAL_ACTION(label) == NAT_ACTION(redo)
+                    VAL_ACTION(label) == NATIVE_ACT(redo)
                     and VAL_BINDING(label) == NOD(f->varlist)
                 ){
                     // This was issued by REDO, and should be a FRAME! with
@@ -1862,6 +1818,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // enfix in cases like `(+ 1 2)`, or after PARAMLIST_IS_INVISIBLE e.g.
 // `10 comment "hi" + 20`.
 
+      process_word:
       case REB_WORD:
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, *specifier);
@@ -1906,6 +1863,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // All values are allowed in these assignments, including NULL and VOID!
 // https://forum.rebol.info/t/1206
 
+      process_set_word:
       case REB_SET_WORD: {
         if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))  // see notes
             goto return_thrown;
@@ -1925,6 +1883,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // who wanted to use ACTION!s inertly:
 // https://forum.rebol.info/t/should-get-word-of-a-void-raise-an-error/1301
 
+      process_get_word:
       case REB_GET_WORD:
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, *specifier);
@@ -1990,6 +1949,11 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // If the get of the path is null, then it will be an error.
 
       case REB_PATH: {
+        if (MIRROR_BYTE(v) == REB_WORD) {
+            assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+            goto process_word;
+        }
+
         assert(VAL_INDEX_UNCHECKED(v) == 0);  // this is the rule for now
 
         if (ANY_INERT(ARR_HEAD(VAL_ARRAY(v)))) {
@@ -2078,6 +2042,11 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // Note that nulled cells are allowed: https://forum.rebol.info/t/895/4
 
       case REB_SET_PATH: {
+        if (MIRROR_BYTE(v) == REB_WORD) {
+            assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+            goto process_set_word;
+        }
+
         if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))
             goto return_thrown;
 
@@ -2115,6 +2084,11 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // Consistent with GET-WORD!, a GET-PATH! acts as GET and won't return VOID!.
 
       case REB_GET_PATH:
+        if (MIRROR_BYTE(v) == REB_WORD) {
+            assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+            goto process_get_word;
+        }
+
         if (Get_Path_Throws_Core(f->out, v, *specifier))
             goto return_thrown;
 
@@ -2382,7 +2356,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         // been preloaded with the words or paths from the left block.
         //
         REBVAL *specialized = rebValue(
-            "enclose specialize", rebQ1(spare), "collect [ use [block] [",
+            "enclose specialize", rebQ(spare), "collect [ use [block] [",
                 "block: next", f->out,
                 "for-each output", outputs, "["
                     "if tail? block [break]",  // no more outputs wanted
@@ -2609,32 +2583,21 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
     if (kind.byte == REB_PATH) {
         if (
             GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)
-            or VAL_LEN_AT(*next) != 2
-            or not IS_BLANK(ARR_AT(VAL_ARRAY(*next), 0))
-            or not IS_BLANK(ARR_AT(VAL_ARRAY(*next), 1))
+            or MIRROR_BYTE(*next) != REB_WORD
         ){
             CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
             goto finished;
         }
 
-        // We had something like `5 + 5 / 2 + 3`.  This is a special form of
-        // path dispatch tentatively called "path splitting" (as opposed to
-        // `a/b` which is "path picking").  For the moment, this is not
-        // handled as a parameterization to the PD_Xxx() functions, nor is it
-        // a separate dispatch like PS_Xxx()...but it just performs division
-        // compatibly with history.
-
-        REBNOD *binding = nullptr;
-        Push_Action(f, NAT_ACTION(path_0), binding);
-
-        REBSTR *opt_label = nullptr;
-        Begin_Enfix_Action(f, opt_label);
-
-        Fetch_Next_Forget_Lookback(f);  // advances f->value
-        goto process_action;
+        // Although the `/` case appears to be a PATH!, it is actually a
+        // WORD! under the hood and can have a binding.  The "spelling" of
+        // this word is an alias, because `/` is purposefully not legal in
+        // words.)  Operations based on VAL_TYPE() or CELL_TYPE() will see it
+        // as PATH!, but CELL_KIND() will interpret the cell bits as a word.
+        //
+        assert(VAL_WORD_SYM(VAL_UNESCAPED(*next)) == SYM__SLASH_1_);
     }
-
-    if (kind.byte != REB_WORD) {
+    else if (kind.byte != REB_WORD) {
         CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
         goto finished;
     }
@@ -2821,7 +2784,9 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
   #if !defined(NDEBUG)
     Eval_Core_Exit_Checks_Debug(f);  // called unless a fail() longjmps
     assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));
-    assert(f->flags.bits == initial_flags);  // any change should be restored
+    assert(
+        (f->flags.bits & ~EVAL_FLAG_TOOK_HOLD) == initial_flags
+    );  // any change should be restored, but va_list reification may hold
   #endif
 
     return false;  // false => not thrown

@@ -67,7 +67,7 @@ REB_R MAKE_Library(
         fail (arg);
 
     REBLIB *lib = Alloc_Singular(NODE_FLAG_MANAGED);
-    Init_Unreadable_Blank(ARR_SINGLE(lib));  // !!! save name? other data?
+    Init_Unreadable_Void(ARR_SINGLE(lib));  // !!! save name? other data?
 
     LINK(lib).fd = fd;  // seen as shared by all instances
     MISC_META_NODE(lib) = nullptr;  // !!! build from spec, e.g. arg?

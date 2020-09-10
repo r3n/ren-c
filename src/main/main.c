@@ -266,8 +266,8 @@ int main(int argc, char *argv_ansi[])
         "]",
     rebEND);
 
-    if (rebNot("action?", rebQ1(main_startup), rebEND))
-        rebJumps("PANIC-VALUE", rebQ1(main_startup), rebEND);  // terminates
+    if (rebNot("action?", rebQ(main_startup), rebEND))
+        rebJumps("PANIC-VALUE", rebQ(main_startup), rebEND);  // terminates
 
     // This runs the MAIN-STARTUP, which returns *requests* to execute
     // arbitrary code by way of its return results.  The ENTRAP is thus here

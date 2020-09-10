@@ -113,7 +113,7 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
     const RELVAL *src = head;
     RELVAL *dest = ARR_HEAD(a);
     for (; count < len; ++count, ++src, ++dest) {
-        if (KIND_BYTE_UNCHECKED(src) == REB_NULLED)  // allow unreadable blank
+        if (KIND_BYTE_UNCHECKED(src) == REB_NULLED)  // allow unreadable void
             assert(flags & ARRAY_FLAG_NULLEDS_LEGAL);
 
         Derelativize(dest, src, specifier);
@@ -157,7 +157,7 @@ void Clonify(
     REBLEN num_quotes = VAL_NUM_QUOTES(v);
     Dequotify(v);
 
-    enum Reb_Kind kind = cast(enum Reb_Kind, KIND_BYTE_UNCHECKED(v));
+    enum Reb_Kind kind = CELL_KIND(cast(REBCEL*, v));
     assert(kind < REB_MAX_PLUS_MAX); // we dequoted it (pseudotypes ok)
 
     if (deep_types & FLAGIT_KIND(kind) & TS_SERIES_OBJ) {
@@ -165,7 +165,7 @@ void Clonify(
         // Objects and series get shallow copied at minimum
         //
         REBSER *series;
-        if (ANY_CONTEXT(v)) {
+        if (ANY_CONTEXT_KIND(kind)) {
             INIT_VAL_CONTEXT_VARLIST(
                 v,
                 CTX_VARLIST(Copy_Context_Shallow_Managed(VAL_CONTEXT(v)))
@@ -385,8 +385,10 @@ void Uncolor(RELVAL *v)
 {
     REBARR *array;
 
-    if (ANY_ARRAY_OR_PATH(v))
+    if (ANY_ARRAY(v))
         array = VAL_ARRAY(v);
+    else if (ANY_PATH(v))
+        array = VAL_PATH(v);
     else if (IS_MAP(v))
         array = MAP_PAIRLIST(VAL_MAP(v));
     else if (ANY_CONTEXT(v))

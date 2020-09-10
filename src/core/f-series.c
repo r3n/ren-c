@@ -173,7 +173,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
         index = cast(REBINT, VAL_INDEX(value));
         if (index < tail and len != 0)
-            Remove_Series_Len(VAL_SERIES(value), VAL_INDEX(value), len);
+            Remove_Any_Series_Len(value, VAL_INDEX(value), len);
 
         RETURN (value); }
 

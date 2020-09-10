@@ -433,3 +433,8 @@ exclude
 ;read  ; covered above
 ;write  ; covered above
 exec
+
+; This word is the actual underlying cell for `/` paths, which allows for
+; binding and execution of operations like division, in spite of being PATH!.
+;
+-slash-1-

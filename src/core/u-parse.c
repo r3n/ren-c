@@ -208,7 +208,7 @@ static bool Subparse_Throws(
     DECLARE_FRAME (f, rules_feed, EVAL_MASK_DEFAULT);
 
     Push_Frame(out, f);  // checks for C stack overflow
-    Push_Action(f, NAT_ACTION(subparse), UNBOUND);
+    Push_Action(f, NATIVE_ACT(subparse), UNBOUND);
 
     Begin_Prefix_Action(f, Canon(SYM_SUBPARSE));
 
@@ -216,32 +216,32 @@ static bool Subparse_Throws(
     f->arg = m_cast(REBVAL*, END_NODE);
     f->special = END_NODE;
 
-    Derelativize(Prep_Stack_Cell(P_INPUT_VALUE), input, input_specifier);
+    Derelativize(Prep_Cell(P_INPUT_VALUE), input, input_specifier);
 
     // We always want "case-sensitivity" on binary bytes, vs. treating as
     // case-insensitive bytes for ASCII characters.
     //
-    Init_Integer(Prep_Stack_Cell(P_FIND_FLAGS_VALUE), flags);
+    Init_Integer(Prep_Cell(P_FIND_FLAGS_VALUE), flags);
 
     // If there's an array for collecting into, there has to be some way of
     // passing it between frames.
     //
     REBLEN collect_tail;
     if (opt_collection) {
-        Init_Block(Prep_Stack_Cell(P_COLLECTION_VALUE), opt_collection);
+        Init_Block(Prep_Cell(P_COLLECTION_VALUE), opt_collection);
         collect_tail = ARR_LEN(opt_collection);  // roll back here on failure
     }
     else {
-        Init_Blank(Prep_Stack_Cell(P_COLLECTION_VALUE));
+        Init_Blank(Prep_Cell(P_COLLECTION_VALUE));
         collect_tail = 0;
     }
 
     // Need to track NUM-QUOTES somewhere that it can be read from the frame
     //
-    Init_Nulled(Prep_Stack_Cell(P_NUM_QUOTES_VALUE));
+    Init_Nulled(Prep_Cell(P_NUM_QUOTES_VALUE));
 
-    assert(ACT_NUM_PARAMS(NAT_ACTION(subparse)) == 5); // checks RETURN:
-    Init_Nulled(Prep_Stack_Cell(f->rootvar + 5));
+    assert(ACT_NUM_PARAMS(NATIVE_ACT(subparse)) == 5); // checks RETURN:
+    Init_Nulled(Prep_Cell(f->rootvar + 5));
 
     // !!! By calling the subparse native here directly from its C function
     // vs. going through the evaluator, we don't get the opportunity to do
@@ -270,14 +270,14 @@ static bool Subparse_Throws(
         //
         const REBVAL *label = VAL_THROWN_LABEL(out);
         if (IS_ACTION(label)) {
-            if (VAL_ACTION(label) == NAT_ACTION(parse_reject)) {
+            if (VAL_ACTION(label) == NATIVE_ACT(parse_reject)) {
                 CATCH_THROWN(out, out);
                 assert(IS_NULLED(out));
                 *interrupted_out = true;
                 return false;
             }
 
-            if (VAL_ACTION(label) == NAT_ACTION(parse_accept)) {
+            if (VAL_ACTION(label) == NATIVE_ACT(parse_accept)) {
                 CATCH_THROWN(out, out);
                 assert(IS_INTEGER(out));
                 *interrupted_out = true;
@@ -1717,7 +1717,7 @@ REBNATIVE(subparse)
                         }
                         else
                             rebElide(
-                                "append", P_COLLECTION_VALUE, rebQ1(P_OUT),
+                                "append", P_COLLECTION_VALUE, rebQ(P_OUT),
                             rebEND);
 
                         SET_END(P_OUT);  // since we didn't throw, put it back
@@ -1889,7 +1889,7 @@ REBNATIVE(subparse)
                     return Init_Thrown_With_Label(
                         P_OUT,
                         thrown_arg,
-                        NAT_VALUE(parse_accept)
+                        NATIVE_VAL(parse_accept)
                     ); }
 
                   case SYM_REJECT: {
@@ -1899,7 +1899,7 @@ REBNATIVE(subparse)
                     return Init_Thrown_With_Label(
                         P_OUT,
                         NULLED_CELL,
-                        NAT_VALUE(parse_reject)
+                        NATIVE_VAL(parse_reject)
                     ); }
 
                   case SYM_FAIL:  // deprecated... use LOGIC! false instead
@@ -2568,7 +2568,7 @@ REBNATIVE(subparse)
                 if (flags & PF_REMOVE) {
                     FAIL_IF_READ_ONLY(P_INPUT_VALUE);
                     if (count)
-                        Remove_Series_Len(P_INPUT, begin, count);
+                        Remove_Any_Series_Len(P_INPUT_VALUE, begin, count);
                     P_POS = begin;
                 }
 
@@ -2634,11 +2634,11 @@ REBNATIVE(subparse)
                             mod_flags |= AM_SPLICE;
                         }
                         P_POS = Modify_Array(
-                            (flags & PF_CHANGE)
-                                ? Canon(SYM_CHANGE)
-                                : Canon(SYM_INSERT),
                             ARR(P_INPUT),
                             begin,
+                            (flags & PF_CHANGE)
+                                ? SYM_CHANGE
+                                : SYM_INSERT,
                             specified,
                             mod_flags,
                             count,
@@ -2659,8 +2659,8 @@ REBNATIVE(subparse)
                         P_POS = Modify_String_Or_Binary(  // checks read-only
                             P_INPUT_VALUE,
                             (flags & PF_CHANGE)
-                                ? Canon(SYM_CHANGE)
-                                : Canon(SYM_INSERT),
+                                ? SYM_CHANGE
+                                : SYM_INSERT,
                             specified,
                             mod_flags,
                             count,

@@ -95,8 +95,6 @@
 
 #define CELL_FLAG_MANAGED NODE_FLAG_MANAGED
 #define CELL_FLAG_ROOT NODE_FLAG_ROOT
-#define CELL_FLAG_TRANSIENT NODE_FLAG_TRANSIENT
-#define CELL_FLAG_STACK_LIFETIME NODE_FLAG_STACK
 
 #define CELL_FLAG_ARG_MARKED_CHECKED NODE_FLAG_MARKED
 #define CELL_FLAG_OUT_MARKED_STALE NODE_FLAG_MARKED
@@ -288,8 +286,7 @@ inline static union Reb_Header Endlike_Header(uintptr_t bits) {
 //
 
 #define CELL_MASK_PERSIST \
-    (NODE_FLAG_NODE | NODE_FLAG_CELL | NODE_FLAG_MANAGED | NODE_FLAG_ROOT \
-        | CELL_FLAG_TRANSIENT | CELL_FLAG_STACK_LIFETIME)
+    (NODE_FLAG_NODE | NODE_FLAG_CELL | NODE_FLAG_MANAGED | NODE_FLAG_ROOT)
 
 #define CELL_MASK_COPY \
     ~(CELL_MASK_PERSIST | NODE_FLAG_MARKED | CELL_FLAG_PROTECTED \
@@ -393,9 +390,9 @@ union Reb_Value_Extra { //=/////////////////// ACTUAL EXTRA DEFINITION ////=//
     //
     // A tick field is included in all debug builds, not just those which
     // DEBUG_TRACK_CELLS...because negative signs are used to give a distinct
-    // state to unreadable blanks.  See %sys-track.h and %sys-blank.h
+    // state to unreadable voids.  See %sys-track.h and %sys-void.h
     //
-    intptr_t tick;  // Note: will be negative for unreadable blanks
+    intptr_t tick;  // Note: will be negative for unreadable voids
   #endif
 
     // The release build doesn't put anything in the ->extra field by default,

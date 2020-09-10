@@ -418,10 +418,10 @@ comment: emulate [
 
 value?: emulate [
     func [
-        {See SET? in Ren-C: https://trello.com/c/BlktEl2M}
+        {See DEFINED? in Ren-C: https://trello.com/c/BlktEl2M}
         value
     ][
-        either any-word? :value [set? value] [true]  ; bizarre.  :-/
+        either any-word? :value [defined? value] [true]  ; bizarre.  :-/
     ]
 ]
 
@@ -432,7 +432,7 @@ type?: emulate [
     ][
         case [
             not word [type of :value]
-            unset? 'value ['unset!]  ; https://trello.com/c/rmsTJueg
+            undefined? 'value ['unset!]  ; https://trello.com/c/rmsTJueg
             blank? :value ['none!]  ; https://trello.com/c/vJTaG3w5
             group? :value ['paren!]  ; https://trello.com/c/ANlT44nH
             (match ['word!] :value) ['lit-word!]
@@ -466,11 +466,16 @@ set: emulate [
         set_ANY: any
         any: :lib/any
 
+        all [
+            not set_ANY
+            undefined? 'value
+            fail "Can't SET a value to UNSET! unless SET/ANY is used"
+        ]
+
         applique 'set [
             target: either any-context? target [words of target] [target]
             value: :value
             some: some
-            opt: set_ANY
         ]
     ]
 ]
@@ -494,7 +499,6 @@ get: emulate [
         ][
             get/(any_GET) source
         ]
-        return :result
     ]
 ]
 
@@ -602,7 +606,7 @@ default: emulate [
         'word [word! set-word! lit-word!]
         value
     ][
-        if (unset? word) or [blank? get word] [
+        if (undefined? word) or [blank? get word] [
             set word :value
         ] else [
             :value
@@ -1025,22 +1029,21 @@ xor: emulate [enfixed :difference]
 ; Ren-C NULL means no branch ran, Rebol2 this is communicated by #[none]
 ; Ren-C #[void] when branch ran w/null result, Rebol2 would call that #[unset]
 ;
-devoider: helper [
+denuller: helper [
     func [action [action!]] [
         chain [
             :action
                 |
             func [x [<opt> any-value!]] [
-                if null? :x [return blank]  ; "none"
-                :x
+                either-match any-value! get/any 'x [blank]
             ]
         ]
     ]
 ]
 
-if: emulate [devoider :if]
-unless: emulate [devoider adapt 'if [condition: not :condition]]
-case: emulate [devoider :case]
+if: emulate [denuller :if]
+unless: emulate [denuller adapt 'if [condition: not :condition]]
+case: emulate [denuller :case]
 
 switch: emulate [  ; Ren-C evaluates cases: https://trello.com/c/9ChhSWC4/
     enclose (augment 'switch [
@@ -1062,7 +1065,7 @@ for-each-nonconst: emulate [
     ] adapt :for-each []  ; see RESKINNED for why this is an ADAPT for now
 ]
 
-while: emulate [devoider :while]
+while: emulate [denuller :while]
 foreach: emulate [
     function [
         {No SET-WORD! capture, see https://trello.com/c/AXkiWE5Z}
@@ -1105,19 +1108,19 @@ foreach: emulate [
     ]
 ]
 
-loop: emulate [devoider :loop]
-repeat: emulate [devoider :repeat]
-forall: emulate [devoider :iterate]
-forskip: emulate [devoider :iterate-skip]
+loop: emulate [denuller :loop]
+repeat: emulate [denuller :repeat]
+forall: emulate [denuller :iterate]
+forskip: emulate [denuller :iterate-skip]
 
-any: emulate [devoider :any]
-all: emulate [devoider :all]
+any: emulate [denuller :any]
+all: emulate [denuller :all]
 
-find: emulate [devoider :find]
-select: emulate [devoider :select]
-pick: emulate [devoider :pick]
+find: emulate [denuller :find]
+select: emulate [denuller :select]
+pick: emulate [denuller :pick]
 
-first: emulate [devoider :first]
+first: emulate [denuller :first]
 first+: emulate [
     enclose 'first func [f] [
         use [loc] [
@@ -1127,20 +1130,20 @@ first+: emulate [
         ]
     ]
 ]
-second: emulate [devoider :second]
-third: emulate [devoider :third]
-fourth: emulate [devoider :fourth]
-fifth: emulate [devoider :fifth]
-sixth: emulate [devoider :sixth]
-seventh: emulate [devoider :seventh]
-eighth: emulate [devoider :eighth]
-ninth: emulate [devoider :ninth]
-tenth: emulate [devoider :tenth]
+second: emulate [denuller :second]
+third: emulate [denuller :third]
+fourth: emulate [denuller :fourth]
+fifth: emulate [denuller :fifth]
+sixth: emulate [denuller :sixth]
+seventh: emulate [denuller :seventh]
+eighth: emulate [denuller :eighth]
+ninth: emulate [denuller :ninth]
+tenth: emulate [denuller :tenth]
 
-query: emulate [devoider :query]
-wait: emulate [devoider :wait]
-bind?: emulate [devoider specialize 'of [property: 'binding]]
-bound?: emulate [devoider specialize 'of [property: 'binding]]
+query: emulate [denuller :query]
+wait: emulate [denuller :wait]
+bind?: emulate [denuller specialize 'of [property: 'binding]]
+bound?: emulate [denuller specialize 'of [property: 'binding]]
 
 
 ; https://forum.rebol.info/t/justifiable-asymmetry-to-on-block/751

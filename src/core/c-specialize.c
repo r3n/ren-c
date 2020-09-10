@@ -93,8 +93,7 @@
 REBCTX *Make_Context_For_Action_Push_Partials(
     const REBVAL *action,  // need ->binding, so can't just be a REBACT*
     REBDSP lowest_ordered_dsp,  // caller can add refinement specializations
-    struct Reb_Binder *opt_binder,
-    REBFLGS prep  // cell formatting mask bits, result managed if non-stack
+    struct Reb_Binder *opt_binder
 ){
     REBDSP highest_ordered_dsp = DSP;
 
@@ -125,7 +124,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         assert(special == ACT_PARAMS_HEAD(act));
 
     for (; NOT_END(param); ++param, ++arg, ++special, ++index) {
-        arg->header.bits = prep;
+        Prep_Cell(arg);
 
         if (Is_Param_Hidden(param)) {  // specialized out
             assert(GET_CELL_FLAG(special, ARG_MARKED_CHECKED));
@@ -146,7 +145,6 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
           continue_unspecialized:
 
-            assert(arg->header.bits == prep);
             Init_Nulled(arg);
             if (opt_binder) {
                 if (not Is_Param_Unbindable(param))
@@ -208,12 +206,6 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     TERM_ARRAY_LEN(varlist, num_slots);
     MISC_META_NODE(varlist) = nullptr;  // GC sees this, we must initialize
 
-    // !!! Can't pass SERIES_FLAG_STACK_LIFETIME into Make_Array_Core(),
-    // because TERM_ARRAY_LEN won't let it set stack array lengths.
-    //
-    if (prep & CELL_FLAG_STACK_LIFETIME)
-        SET_SERIES_FLAG(varlist, STACK_LIFETIME);
-
     INIT_CTX_KEYLIST_SHARED(CTX(varlist), ACT_PARAMLIST(act));
     return CTX(varlist);
 }
@@ -236,8 +228,7 @@ REBCTX *Make_Context_For_Action(
     REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
         action,
         lowest_ordered_dsp,
-        opt_binder,
-        CELL_MASK_NON_STACK
+        opt_binder
     );
 
     Manage_Array(CTX_VARLIST(exemplar));  // !!! was needed before, review
@@ -282,8 +273,7 @@ bool Specialize_Action_Throws(
     REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
         specializee,
         lowest_ordered_dsp,
-        opt_def ? &binder : nullptr,
-        CELL_MASK_NON_STACK
+        opt_def ? &binder : nullptr
     );
     Manage_Array(CTX_VARLIST(exemplar)); // destined to be managed, guarded
 
@@ -1219,13 +1209,13 @@ REBNATIVE(does)
         // !!! The error reports that DOES doesn't accept the type for its
         // specializee argument, vs. that DO doesn't accept it.
         //
-        REBVAL *typeset = ACT_PARAM(NAT_ACTION(do), 1);
+        REBVAL *typeset = ACT_PARAM(NATIVE_ACT(do), 1);
         REBVAL *param = PAR(specializee);
         if (not TYPE_CHECK(typeset, VAL_TYPE(specializee)))
             fail (Error_Arg_Type(frame_, param, VAL_TYPE(specializee)));
 
         exemplar = Make_Context_For_Action(
-            NAT_VALUE(do),
+            NATIVE_VAL(do),
             DSP, // lower dsp would be if we wanted to add refinements
             nullptr // don't set up a binder; just poke specializee in frame
         );
@@ -1236,7 +1226,7 @@ REBNATIVE(does)
         assert(VAL_KEY_SYM(CTX_KEY(exemplar, 1)) == SYM_RETURN);
         Move_Value(CTX_VAR(exemplar, 2), specializee);
         SET_CELL_FLAG(CTX_VAR(exemplar, 2), ARG_MARKED_CHECKED);
-        Move_Value(specializee, NAT_VALUE(do));
+        Move_Value(specializee, NATIVE_VAL(do));
     }
 
     REBACT *doer = Make_Action_From_Exemplar(exemplar);

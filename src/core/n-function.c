@@ -71,7 +71,7 @@ REB_R Init_Thrown_Unwind_Value(
     const REBVAL *value,
     REBFRM *frame // required if level is INTEGER! or ACTION!
 ) {
-    Move_Value(out, NAT_VALUE(unwind));
+    Move_Value(out, NATIVE_VAL(unwind));
 
     if (IS_FRAME(level)) {
         INIT_BINDING(out, VAL_CONTEXT(level));
@@ -235,7 +235,7 @@ REBNATIVE(return)
 
     assert(f_binding->header.bits & ARRAY_FLAG_IS_VARLIST);
 
-    Move_Value(D_OUT, NAT_VALUE(unwind)); // see also Make_Thrown_Unwind_Value
+    Move_Value(D_OUT, NATIVE_VAL(unwind)); // see also Make_Thrown_Unwind_Value
     INIT_BINDING_MAY_MANAGE(D_OUT, f_binding);
 
     return Init_Thrown_With_Label(D_OUT, v, D_OUT);
@@ -560,7 +560,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
 
     // Start with pushing a cell for the special [0] slot
     //
-    Init_Unreadable_Blank(DS_PUSH());  // paramlist[0] becomes ACT_ARCHETYPE()
+    Init_Unreadable_Void(DS_PUSH());  // paramlist[0] becomes ACT_ARCHETYPE()
     Move_Value(DS_PUSH(), EMPTY_BLOCK);  // param_types[0] (object canon)
     Move_Value(DS_PUSH(), EMPTY_TEXT);  // param_notes[0] (desc, then canon)
 
@@ -611,7 +611,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         REBLEN old_len = ARR_LEN(ACT_PARAMLIST(VAL_ACTION(augmentee)));
         REBLEN delta = ARR_LEN(paramlist) - old_len;
         assert(delta > 0);
-        
+
         REBARR *old_varlist = CTX_VARLIST(old_exemplar);
         assert(ARR_LEN(old_varlist) == old_len);
 
@@ -624,7 +624,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         );
         SER(varlist)->info.bits = SER(old_varlist)->info.bits;
         INIT_VAL_CONTEXT_VARLIST(ARR_HEAD(varlist), varlist);
-        
+
         // We fill in the added parameters in the specialization as null for
         // starters.  They are unspecialized.
         //
@@ -900,7 +900,7 @@ REB_R Skinner_Dispatcher(REBFRM *f)
     //
     Init_Action_Maybe_Bound(
         DS_PUSH(),
-        NAT_ACTION(skinner_return_helper),
+        NATIVE_ACT(skinner_return_helper),
         NOD(FRM_PHASE(f))
     );
 

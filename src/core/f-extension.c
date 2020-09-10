@@ -182,8 +182,8 @@ REBNATIVE(load_extension)
         &specs_size,
         VAL_HANDLE_POINTER(REBYTE, specs_compressed),
         VAL_HANDLE_LEN(specs_compressed),
-        -1, // max
-        Canon(SYM_GZIP)
+        -1,  // max
+        SYM_GZIP
     );
 
     REBARR *specs = Scan_UTF8_Managed(
