@@ -1875,11 +1875,15 @@ bool Get_If_Word_Or_Path_Throws(
     bool push_refinements
 ) {
     if (IS_WORD(v) or IS_GET_WORD(v) or IS_SYM_WORD(v)) {
+      get_as_word:
         if (opt_name_out)
             *opt_name_out = VAL_WORD_SPELLING(v);
         Get_Word_May_Fail(out, v, specifier);
     }
     else if (IS_PATH(v) or IS_GET_PATH(v) or IS_SYM_PATH(v)) {
+        if (MIRROR_BYTE(v) == REB_WORD)  // e.g. `/`
+            goto get_as_word;
+
         REBSPC *derived = Derive_Specifier(specifier, v);
         if (Eval_Path_Throws_Core(
             out,
