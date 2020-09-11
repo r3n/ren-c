@@ -1367,6 +1367,8 @@ REBNATIVE(default)
 //          [<opt> any-value!]
 //      block "Block to evaluate"
 //          [block!]
+//      /result "Evaluation result if not thrown"
+//          [<output>]
 //      /name "Catches a named throw (single name if not block)"
 //          [block! word! action! object!]
 //      /quit "Special catch for QUIT native"
@@ -1386,8 +1388,14 @@ REBNATIVE(catch)
     if (REF(any) and REF(name))
         fail (Error_Bad_Refines_Raw());
 
-    if (not Do_Any_Array_At_Throws(D_OUT, ARG(block), SPECIFIED))
-        return nullptr; // no throw means just return null
+    if (not Do_Any_Array_At_Throws(D_OUT, ARG(block), SPECIFIED)) {
+        if (REF(result))
+            rebElide(
+                NATIVE_VAL(set), rebQ(REF(result)), rebQ(D_OUT),
+            rebEND);
+
+        return nullptr;  // no throw means just return null
+    }
 
     const REBVAL *label = VAL_THROWN_LABEL(D_OUT);
 

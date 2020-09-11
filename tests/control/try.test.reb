@@ -42,3 +42,20 @@
 ([3] = entrap [1 + 2])
 ([[b c]] = entrap [skip [a b c] 1])
 ('no-arg = (entrap [lit])/id)
+
+
+; Multiple return values
+(
+    [e v]: trap [10 + 20]
+    did all [
+        null? e
+        v = 30
+    ]
+)
+(
+    [e v]: trap [fail "Hello"]
+    did all [
+        error? e
+        undefined? 'v
+    ]
+)
