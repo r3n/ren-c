@@ -2566,14 +2566,14 @@ REBNATIVE(subparse)
                 }
 
                 if (flags & PF_REMOVE) {
-                    FAIL_IF_READ_ONLY(P_INPUT_VALUE);
+                    ENSURE_MUTABLE(P_INPUT_VALUE);
                     if (count)
                         Remove_Any_Series_Len(P_INPUT_VALUE, begin, count);
                     P_POS = begin;
                 }
 
                 if (flags & (PF_INSERT | PF_CHANGE)) {
-                    FAIL_IF_READ_ONLY(P_INPUT_VALUE);
+                    ENSURE_MUTABLE(P_INPUT_VALUE);
                     count = (flags & PF_INSERT) ? 0 : count;
                     bool only = false;
 

@@ -329,7 +329,7 @@ REB_R PD_Map(
         return R_UNHANDLED;
 
     if (opt_setval)
-        FAIL_IF_READ_ONLY(pvs->out);
+        ENSURE_MUTABLE(pvs->out);
 
     // Fetching and setting with path-based access is case-preserving for any
     // initial insertions.  However, the case-insensitivity means that all
@@ -726,7 +726,7 @@ REBTYPE(Map)
         if (IS_NULLED_OR_BLANK(value))
             RETURN (v);  // don't fail on read only if it would be a no-op
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         if (REF(only) or REF(line) or REF(dup))
             fail (Error_Bad_Refines_Raw());
@@ -770,7 +770,7 @@ REBTYPE(Map)
         return Init_Map(D_OUT, Copy_Map(map, types)); }
 
     case SYM_CLEAR:
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         Reset_Array(MAP_PAIRLIST(map));
 

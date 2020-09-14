@@ -572,7 +572,7 @@ void Poke_Vector_Fail_If_Read_Only(
     // !!! How does this tie into CONST-ness?  How should aggregate types
     // handle their overall constness vs. that of their components?
     //
-    FAIL_IF_READ_ONLY(VAL_VECTOR_BINARY(value));
+    ENSURE_MUTABLE(VAL_VECTOR_BINARY(value));
 
     REBINT n;
     if (IS_INTEGER(picker) or IS_DECIMAL(picker)) // #2312
@@ -661,7 +661,7 @@ REBTYPE(Vector)
         INCLUDE_PARAMS_OF_RANDOM;
         UNUSED(PAR(value));
 
-        FAIL_IF_READ_ONLY(VAL_VECTOR_BINARY(v));
+        ENSURE_MUTABLE(VAL_VECTOR_BINARY(v));
 
         if (REF(seed) or REF(only))
             fail (Error_Bad_Refines_Raw());

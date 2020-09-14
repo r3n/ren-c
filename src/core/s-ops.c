@@ -291,7 +291,7 @@ void Change_Case(
     }
 
     assert(ANY_STRING(val));
-    FAIL_IF_READ_ONLY(val);
+    ENSURE_MUTABLE(val);
 
     // This is a mutating operation, and we want to return the same series at
     // the same index.  However, R3-Alpha code would use Partial() and may

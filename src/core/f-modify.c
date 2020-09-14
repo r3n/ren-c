@@ -234,7 +234,7 @@ REBLEN Modify_String_Or_Binary(
 ){
     assert(sym == SYM_INSERT or sym == SYM_CHANGE or sym == SYM_APPEND);
 
-    FAIL_IF_READ_ONLY(dst);  // rules out symbol strings (e.g. from ANY-WORD!)
+    ENSURE_MUTABLE(dst);  // rules out symbol strings (e.g. from ANY-WORD!)
 
     REBSER *dst_ser = VAL_SERIES(dst);
     REBLEN dst_idx = VAL_INDEX(dst);

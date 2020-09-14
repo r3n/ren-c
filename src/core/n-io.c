@@ -154,7 +154,7 @@ REBNATIVE(new_line)
     bool mark = VAL_LOGIC(ARG(mark));
 
     REBVAL *pos = ARG(position);
-    FAIL_IF_READ_ONLY(pos);
+    ENSURE_MUTABLE(pos);
 
     RELVAL *item = VAL_ARRAY_AT(pos);
 

@@ -960,7 +960,7 @@ REBNATIVE(free)
     REBSER *s = VAL_SERIES(v);
     if (GET_SERIES_INFO(s, INACCESSIBLE))
         fail ("Cannot FREE already freed series");
-    FAIL_IF_READ_ONLY(v);
+    ENSURE_MUTABLE(v);
 
     Decay_Series(s);
     return Init_Void(D_OUT); // !!! Should it return the freed, not-useful value?

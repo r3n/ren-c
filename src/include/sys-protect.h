@@ -43,34 +43,6 @@ enum {
     PROT_FREEZE = 1 << 4
 };
 
-
-inline static REBVAL *Derelativize(  // !!! forward-declaration (reoragnize?)
-    RELVAL *out,
-    const RELVAL *v,
-    REBSPC *specifier
-);
-
-inline static void FAIL_IF_READ_ONLY_CORE(
-    const RELVAL *v,
-    REBSPC *specifier
-){
-    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
-
-    FAIL_IF_READ_ONLY_SER(s);
-
-    if (GET_CELL_FLAG(v, CONST)) {
-        DECLARE_LOCAL (specific);
-        Derelativize(specific, v, specifier);
-        fail (Error_Const_Value_Raw(specific));
-    }
-}
-
-#define FAIL_IF_READ_ONLY(v) \
-    FAIL_IF_READ_ONLY_CORE((v), SPECIFIED)
-
-
-
 inline static bool Is_Array_Deeply_Frozen(REBARR *a) {
     return GET_SERIES_INFO(a, FROZEN);
 

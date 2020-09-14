@@ -696,7 +696,7 @@ REB_R PD_Array(
     }
 
     if (opt_setval)
-        FAIL_IF_READ_ONLY(pvs->out);
+        ENSURE_MUTABLE(pvs->out);
 
     pvs->u.ref.cell = VAL_ARRAY_AT_HEAD(pvs->out, n);
     pvs->u.ref.specifier = VAL_SPECIFIER(pvs->out);
@@ -849,7 +849,7 @@ REBTYPE(Array)
         if (REF(deep))
             fail (Error_Bad_Refines_Raw());
 
-        FAIL_IF_READ_ONLY(array);
+        ENSURE_MUTABLE(array);
 
         REBLEN len;
         if (REF(part)) {
@@ -963,7 +963,7 @@ REBTYPE(Array)
                 VAL_INDEX(array) = 0;
             RETURN (array); // don't fail on read only if it would be a no-op
         }
-        FAIL_IF_READ_ONLY(array);
+        ENSURE_MUTABLE(array);
 
         REBLEN index = VAL_INDEX(array);
 
@@ -992,7 +992,7 @@ REBTYPE(Array)
         return D_OUT; }
 
       case SYM_CLEAR: {
-        FAIL_IF_READ_ONLY(array);
+        ENSURE_MUTABLE(array);
         REBLEN index = VAL_INDEX(array);
         if (index < VAL_LEN_HEAD(array)) {
             if (index == 0) Reset_Array(arr);
@@ -1055,8 +1055,8 @@ REBTYPE(Array)
         if (not ANY_ARRAY(arg))
             fail (arg);
 
-        FAIL_IF_READ_ONLY(array);
-        FAIL_IF_READ_ONLY(arg);
+        ENSURE_MUTABLE(array);
+        ENSURE_MUTABLE(arg);
 
         REBLEN index = VAL_INDEX(array);
 
@@ -1080,7 +1080,7 @@ REBTYPE(Array)
         INCLUDE_PARAMS_OF_REVERSE;
         UNUSED(ARG(series));  // covered by `v`
 
-        FAIL_IF_READ_ONLY(array);
+        ENSURE_MUTABLE(array);
 
         REBLEN len = Part_Len_May_Modify_Index(array, ARG(part));
         if (len == 0)
@@ -1133,7 +1133,7 @@ REBTYPE(Array)
         INCLUDE_PARAMS_OF_SORT;
         UNUSED(PAR(series));  // covered by `v`
 
-        FAIL_IF_READ_ONLY(array);
+        ENSURE_MUTABLE(array);
 
         Sort_Block(
             array,
@@ -1174,7 +1174,7 @@ REBTYPE(Array)
             return Inherit_Const(D_OUT, array);
         }
 
-        FAIL_IF_READ_ONLY(array);
+        ENSURE_MUTABLE(array);
         Shuffle_Block(array, did REF(secure));
         RETURN (array); }
 

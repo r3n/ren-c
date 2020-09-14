@@ -956,8 +956,8 @@ REBNATIVE(swap_contents)
 {
     INCLUDE_PARAMS_OF_SWAP_CONTENTS;
 
-    FAIL_IF_READ_ONLY(ARG(series1));
-    FAIL_IF_READ_ONLY(ARG(series2));
+    ENSURE_MUTABLE(ARG(series1));
+    ENSURE_MUTABLE(ARG(series2));
 
     if (ANY_ARRAY(ARG(series1)) != ANY_ARRAY(ARG(series2)))
         fail ("Can only SWAP-CONTENTS of arrays with other arrays");

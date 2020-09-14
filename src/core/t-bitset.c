@@ -622,7 +622,7 @@ REBTYPE(Bitset)
         if (IS_NULLED_OR_BLANK(arg))
             RETURN (v);  // don't fail on read only if it would be a no-op
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         bool diff;
         if (BITS_NOT(VAL_BITSET(v)))
@@ -658,7 +658,7 @@ REBTYPE(Bitset)
         return Init_Bitset(D_OUT, copy); }
 
       case SYM_CLEAR:
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
         Clear_Series(VAL_BITSET(v));
         RETURN (v);
 

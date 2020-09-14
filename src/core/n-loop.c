@@ -1370,7 +1370,7 @@ REBNATIVE(remove_each)
 
     struct Remove_Each_State res;
     res.data = ARG(data);
-    FAIL_IF_READ_ONLY(res.data);
+    ENSURE_MUTABLE(res.data);
 
     // !!! Currently there is no support for VECTOR!, or IMAGE! (what would
     // that even *mean*?) yet these are in the ANY-SERIES! typeset.

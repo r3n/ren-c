@@ -573,6 +573,51 @@ inline static void FAIL_IF_READ_ONLY_SER(REBSER *s) {
     fail (Error_Series_Protected_Raw());
 }
 
+// While ideally error messages would give back data that is bound exactly to
+// the context that was applicable, threading the specifier into many cases
+// can overcomplicate code.  We'd break too many invariants to just say a
+// relativized value is "unbound", so make an expired frame if necessary.
+//
+inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
+    if (not Is_Bindable(v) or IS_SPECIFIC(v))
+        Move_Value(out, KNOWN(v));
+    else {  // must be bound to a function
+        REBACT *binding = ACT(VAL_BINDING(v));
+        REBCTX *expired = Make_Expired_Frame_Ctx_Managed(binding);
+
+        Move_Value_Header(out, v);
+        out->payload = v->payload;
+        EXTRA(Binding, out).node = NOD(expired);
+    }
+    return KNOWN(out);
+}
+
+#if defined(NDEBUG)
+    #define KNOWN_MUTABLE(v) v
+#else
+    inline static const RELVAL* KNOWN_MUTABLE(const RELVAL* v) {
+        assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
+        REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
+        assert(not Is_Series_Read_Only(s));
+        assert(NOT_CELL_FLAG(v, CONST));
+        return v;
+    }
+#endif
+
+inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
+    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
+    REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
+
+    FAIL_IF_READ_ONLY_SER(s);
+
+    if (NOT_CELL_FLAG(v, CONST))
+        return v;
+
+    DECLARE_LOCAL (specific);
+    Unrelativize(specific, v);
+    fail (Error_Const_Value_Raw(specific));
+}
+
 
 //=////////////////////////////////////////////////////////////////////////=//
 //

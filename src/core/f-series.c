@@ -163,7 +163,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
         INCLUDE_PARAMS_OF_REMOVE;
         UNUSED(PAR(series));  // accounted for by `value`
 
-        FAIL_IF_READ_ONLY(value);
+        ENSURE_MUTABLE(value);
 
         REBINT len;
         if (REF(part))
