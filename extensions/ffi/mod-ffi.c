@@ -187,7 +187,7 @@ REBNATIVE(make_routine)
     //
     const REBYTE *utf8 = VAL_UTF8_AT(nullptr, ARG(name));
 
-    CFUNC *cfunc = Find_Function(LIB_FD(lib), cast(char*, utf8));
+    CFUNC *cfunc = Find_Function(LIB_FD(lib), cast(const char*, utf8));
     if (cfunc == nullptr)
         fail ("FFI: Couldn't find function in library");
 

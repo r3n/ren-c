@@ -885,35 +885,46 @@ struct Reb_Series {
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define SER(p) \
-        cast(REBSER*, (p))
+        ((REBSER*)(p))  // don't use `cast` so casting away const is allowed
 
 #else
 
-    template <class T>
-    inline REBSER *SER(T *p) {
-        constexpr bool derived = std::is_same<T, REBSER>::value
-            or std::is_same<T, REBSTR>::value
-            or std::is_same<T, REBARR>::value
-            or std::is_same<T, REBCTX>::value
-            or std::is_same<T, REBACT>::value;
+    template <
+        typename T,
+        typename T0 = typename std::remove_const<T>::type,
+        typename S = typename std::conditional<
+            std::is_const<T>::value,  // boolean
+            const REBSER,  // true branch
+            REBSER  // false branch
+        >::type
+    >
+    inline S *SER(T *p) {
+        constexpr bool derived = std::is_same<T0, REBSER>::value
+            or std::is_same<T0, REBSTR>::value
+            or std::is_same<T0, REBARR>::value
+            or std::is_same<T0, REBCTX>::value
+            or std::is_same<T0, REBACT>::value
+            or std::is_same<T0, REBMAP>::value;
 
-        constexpr bool base = std::is_same<T, void>::value
-            or std::is_same<T, REBNOD>::value;
+        constexpr bool base = std::is_same<T0, void>::value
+            or std::is_same<T0, REBNOD>::value;
 
         static_assert(
             derived or base, 
-            "SER() works on void/REBNOD/REBSER/REBSTR/REBARR/REBCTX/REBACT"
+            "SER() works on "
+                "void/REBNOD/REBSER/REBSTR/REBARR/REBCTX/REBACT/REBMAP"
         );
 
-        if (base and (reinterpret_cast<REBNOD*>(p)->header.bits & (
+        bool b = base;  // needed to avoid compiler constexpr warning
+        if (b and p and ((reinterpret_cast<const REBNOD*>(p)->header.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
         )) != (
             NODE_FLAG_NODE
-        )){
+        ))){
             panic (p);
         }
 
-        return reinterpret_cast<REBSER*>(p);
+        return reinterpret_cast<S*>(p);
     }
 
 #endif

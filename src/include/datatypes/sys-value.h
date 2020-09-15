@@ -784,10 +784,10 @@ inline static REBVAL *KNOWN(const_if_c REBCEL *v) {
 //
 
 #define SPECIFIED \
-    cast(REBSPC*, 0) // cast() doesn't like nullptr, fix
+    ((REBSPC*)nullptr)  // cast() doesn't like nullptr, fix
 
 #define UNBOUND \
-   cast(REBNOD*, 0) // cast() doesn't like nullptr, fix
+   ((REBNOD*)nullptr)  // cast() doesn't like nullptr, fix
 
 inline static REBNOD *VAL_BINDING(const REBCEL *v) {
     assert(Is_Bindable(v));

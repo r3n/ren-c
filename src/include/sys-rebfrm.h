@@ -779,7 +779,8 @@ typedef bool (REBEVL)(REBFRM * const);
 
         static_assert(base, "FRM() works on void/REBNOD/REBFRM");
 
-        if (base and (reinterpret_cast<REBNOD*>(p)->header.bits & (
+        bool b = base;  // needed to avoid compiler constexpr warning
+        if (b and p and (reinterpret_cast<REBNOD*>(p)->header.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
         )) != (
             NODE_FLAG_NODE | NODE_FLAG_CELL

@@ -35,7 +35,7 @@
 #if !defined(NDEBUG)
 
 #define Is_Marked(n) \
-    (SER(n)->header.bits & NODE_FLAG_MARKED)
+    (NOD(n)->header.bits & NODE_FLAG_MARKED)
 
 
 //

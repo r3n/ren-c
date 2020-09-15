@@ -71,7 +71,8 @@ struct Reb_Action {
             "ACT() works on void/REBNOD/REBSER/REBARR/REBACT/nullptr"
         );
 
-        if (base and p and (cast(REBSER*, p)->header.bits & (
+        bool b = base;  // needed to avoid compiler constexpr warning
+        if (b and p and (reinterpret_cast<const REBSER*>(p)->header.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
                 | SERIES_MASK_PARAMLIST
                 | ARRAY_FLAG_IS_VARLIST

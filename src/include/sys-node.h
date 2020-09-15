@@ -35,20 +35,35 @@
 
 #else
 
-    template <typename P>
-    inline static REBNOD *NOD(P p) {
-        constexpr bool derived =
-            std::is_same<P, nullptr_t>::value  // here to avoid check below
-            or std::is_same<P, REBVAL*>::value
-            or std::is_same<P, REBSER*>::value
-            or std::is_same<P, REBSTR*>::value
-            or std::is_same<P, REBARR*>::value
-            or std::is_same<P, REBCTX*>::value
-            or std::is_same<P, REBACT*>::value
-            or std::is_same<P, REBMAP*>::value
-            or std::is_same<P, REBFRM*>::value;
+    inline static REBNOD *NOD(nullptr_t p) {
+        UNUSED(p);
+        return nullptr;
+    }
 
-        constexpr bool base = std::is_same<P, void*>::value;
+    template <
+        typename T,
+        typename T0 = typename std::remove_const<T>::type,
+        typename N = typename std::conditional<
+            std::is_const<T>::value,  // boolean
+            const REBNOD,  // true branch
+            REBNOD  // false branch
+        >::type
+    >
+    inline static N *NOD(T *p) {
+        constexpr bool derived =
+            std::is_same<T0, REBNOD>::value
+            or std::is_same<T0, REBVAL>::value
+            or std::is_same<T0, REBSER>::value
+            or std::is_same<T0, REBSTR>::value
+            or std::is_same<T0, REBARR>::value
+            or std::is_same<T0, REBCTX>::value
+            or std::is_same<T0, REBACT>::value
+            or std::is_same<T0, REBMAP>::value
+            or std::is_same<T0, REBFRM>::value;
+
+        constexpr bool base =
+            std::is_same<T0, void>::value
+            or std::is_same<T0, REBYTE>::value;
 
         static_assert(
             derived or base,
@@ -56,7 +71,8 @@
                "/REBMAP/REBFRM or nullptr"
         );
 
-        if (base and p and (((REBNOD*)p)->header.bits & (
+        bool b = base;  // needed to avoid compiler constexpr warning
+        if (b and p and (reinterpret_cast<const REBNOD*>(p)->header.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE
         )) != (
             NODE_FLAG_NODE
@@ -64,11 +80,7 @@
             panic (p);
         }
 
-        // !!! This uses a regular C cast because the `cast()` macro has not
-        // been written in such a way as to tolerate nullptr, and C++ will
-        // not reinterpret_cast<> a nullptr.  Review more elegant answers.
-        //
-        return (REBNOD*)p;
+        return reinterpret_cast<N*>(p);
     }
 #endif
 

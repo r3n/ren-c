@@ -342,8 +342,21 @@ struct Reb_String {
     struct Reb_Series series;  // http://stackoverflow.com/a/9747062
 };
 
-#define STR(p) \
-    cast(REBSTR*, (p))  // !!! Enhance with more checks, like SER() does.
+#if !defined(DEBUG_CHECK_CASTS)
+
+    #define STR(p) \
+        ((REBSTR*)(p))  // don't use `cast` so casting away const is allowed
+
+#else  // !!! Enhance with more checks, like SER() does.
+
+    inline static REBSTR *STR(void *p)
+      { return cast(REBSTR*, SER(p)); }
+
+    inline static const REBSTR *STR(const void *p)
+      { return cast(const REBSTR*, SER(p)); }
+
+#endif
+
 
 inline static bool IS_SER_STRING(REBSER *s) {
     if (NOT_SERIES_FLAG((s), IS_STRING))

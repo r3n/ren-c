@@ -339,7 +339,7 @@ REBNATIVE(open_connection)
     rc = SQLSetEnvAttr(
         henv,
         SQL_ATTR_ODBC_VERSION,
-        cast(SQLPOINTER, SQL_OV_ODBC3),
+        cast(SQLPOINTER, cast(uintptr_t, SQL_OV_ODBC3)),
         0  // StringLength (ignored for this attribute)
     );
     if (not SQL_SUCCEEDED(rc)) {
@@ -358,7 +358,12 @@ REBNATIVE(open_connection)
         rebJumps ("fail", error);
     }
 
-    rc = SQLSetConnectAttr(hdbc, SQL_LOGIN_TIMEOUT, cast(SQLPOINTER, 5), 0);
+    rc = SQLSetConnectAttr(
+        hdbc,
+        SQL_LOGIN_TIMEOUT,
+        cast(SQLPOINTER, cast(uintptr_t, 5)),
+        0
+    );
     if (not SQL_SUCCEEDED(rc)) {
         REBVAL *error = Error_ODBC_Dbc(hdbc);
         SQLFreeHandle(SQL_HANDLE_DBC, hdbc);

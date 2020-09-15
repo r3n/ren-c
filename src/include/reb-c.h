@@ -399,13 +399,13 @@
 // stepping through the debugger, and also they consume a measurable amount
 // of runtime.  Hence we sacrifice cast checking in the debug builds...and the
 // release C++ builds on Travis are relied upon to do the proper optimizations
-// as well as report any static analysis errors.
+// as well as report any static analysis errors.  See DEBUG_CHECK_CASTS.
 //
 // !!! C++14 gcc release builds seem to trigger bad behavior on cast() to
 // a CFUNC*, and non-C++14 builds are allowing cast of `const void*` to
 // non-const `char` with plain `cast()`.  Investigate as time allows.
 
-#if !defined(CPLUSPLUS_11) || !defined(NDEBUG)
+#if !defined(__cplusplus) or !defined(DEBUG_CHECK_CASTS)
     /* These macros are easier-to-spot variants of the parentheses cast.
      * The 'm_cast' is when getting [M]utablity on a const is okay (RARELY!)
      * Plain 'cast' can do everything else (except remove volatile)
@@ -420,7 +420,7 @@
      * access.  Stray writes to that can cause even time-traveling bugs, with
      * effects *before* that write is made...due to "undefined behavior".
      */
-#elif defined(__cplusplus) /* for gcc -Wundef */ && (__cplusplus < 201103L)
+#elif !defined(CPLUSPLUS_11)
     /* Well-intentioned macros aside, C has no way to enforce that you can't
      * cast away a const without m_cast. C++98 builds can do that, at least:
      */
