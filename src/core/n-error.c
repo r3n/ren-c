@@ -36,6 +36,7 @@
 //
 static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
     INCLUDE_PARAMS_OF_TRAP;
+    UNUSED(ARG(result));
 
     if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(code)))
         return VOID_VALUE;
