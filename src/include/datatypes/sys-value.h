@@ -313,6 +313,15 @@ inline static REBTYP *CELL_CUSTOM_TYPE(const REBCEL *v) {
     return SER(EXTRA(Any, v).node);
 }
 
+// Sometimes you have a REBCEL* and need to pass a REBVAL* to something.  It
+// doesn't seem there's too much bad that can happen if you do; you'll get
+// back something that might be quoted up to 3 levels...if it's an escaped
+// cell then it won't be quoted at all.  Main thing to know is that you don't
+// necessarily get the original value you had back.
+//
+inline static const RELVAL* CELL_TO_VAL(const REBCEL* cell)
+  { return cast(const RELVAL*, cell); }
+
 
 //=//// VALUE TYPE (always REB_XXX <= REB_MAX) ////////////////////////////=//
 //
@@ -738,6 +747,8 @@ inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
         assert(IS_END(v) or IS_SPECIFIC(v)); // END for KNOWN(ARR_HEAD()), etc.
         return cast(REBVAL*, v);
     }
+
+    inline static REBVAL *KNOWN(const REBVAL *v) = delete;
 #endif
 
 

@@ -1838,7 +1838,7 @@ REB_R Chainer_Dispatcher(REBFRM *f)
     // Go in reverse order, so the function to apply last is at the bottom of
     // the stack.
     //
-    REBVAL *chained = KNOWN(ARR_LAST(pipeline));
+    const RELVAL *chained = ARR_LAST(pipeline);
     for (; chained != ARR_HEAD(pipeline); --chained) {
         assert(IS_ACTION(chained));
         Move_Value(DS_PUSH(), KNOWN(chained));

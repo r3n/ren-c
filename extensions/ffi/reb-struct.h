@@ -481,7 +481,7 @@ inline static REBACT *RIN_CALLBACK_ACTION(REBRIN *r) {
 }
 
 inline static REBVAL *RIN_RET_SCHEMA(REBRIN *r)
-    { return KNOWN(RIN_AT(r, IDX_ROUTINE_RET_SCHEMA)); }
+    { return RIN_AT(r, IDX_ROUTINE_RET_SCHEMA); }
 
 inline static REBLEN RIN_NUM_FIXED_ARGS(REBRIN *r)
     { return VAL_LEN_HEAD(RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS)); }

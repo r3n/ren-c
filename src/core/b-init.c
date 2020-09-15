@@ -480,7 +480,7 @@ REBVAL *Make_Native(
     // table built in the bootstrap scripts, `Native_C_Funcs`.
 
     REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
-        KNOWN(spec),
+        spec,
         MKF_KEYWORDS | MKF_RETURN  // return type checked only in debug build
     );
 
