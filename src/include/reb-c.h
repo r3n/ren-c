@@ -817,6 +817,8 @@
     #define UNUSED(x) \
         ((void)(x))
 #else
+    #include <cstring>  // for memset
+
     // Can't trash the variable if it's not an lvalue.  So for the basic
     // SFINAE overload, just cast void.  Do this also for cases that are
     // lvalues, but we don't really know how to "trash" them.
