@@ -169,7 +169,7 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
 //
 // Anything that calls this must call Uncolor() when done.
 //
-void Protect_Value(RELVAL *v, REBFLGS flags)
+void Protect_Value(const RELVAL *v, REBFLGS flags)
 {
     if (ANY_SERIES(v))
         Protect_Series(VAL_SERIES(v), VAL_INDEX(v), flags);
@@ -185,7 +185,7 @@ void Protect_Value(RELVAL *v, REBFLGS flags)
 //
 // Anything that calls this must call Uncolor() when done.
 //
-void Protect_Series(REBSER *s, REBLEN index, REBFLGS flags)
+void Protect_Series(const REBSER *s, REBLEN index, REBFLGS flags)
 {
     if (Is_Series_Black(s))
         return; // avoid loop
@@ -209,7 +209,7 @@ void Protect_Series(REBSER *s, REBLEN index, REBFLGS flags)
 
     Flip_Series_To_Black(s); // recursion protection
 
-    RELVAL *val = ARR_AT(ARR(s), index);
+    const RELVAL *val = ARR_AT(ARR(s), index);
     for (; NOT_END(val); val++)
         Protect_Value(val, flags);
 }
@@ -317,7 +317,7 @@ static REB_R Protect_Unprotect_Core(REBFRM *frame_, REBFLGS flags)
 
     if (IS_BLOCK(value)) {
         if (REF(words)) {
-            RELVAL *val;
+            const RELVAL *val;
             for (val = VAL_ARRAY_AT(value); NOT_END(val); val++) {
                 DECLARE_LOCAL (word); // need binding, can't pass RELVAL
                 Derelativize(word, val, VAL_SPECIFIER(value));
@@ -327,7 +327,7 @@ static REB_R Protect_Unprotect_Core(REBFRM *frame_, REBFLGS flags)
         }
         if (REF(values)) {
             REBVAL *var;
-            RELVAL *item;
+            const RELVAL *item;
 
             DECLARE_LOCAL (safe);
 
@@ -505,6 +505,10 @@ REBNATIVE(locked_q)
 // moment, etc.  Just put a flag at the top level for now, since that is
 // "better than nothing", and revisit later in the design.
 //
+// !!! Note this is currently allowed to freeze CONST values.  Review, as
+// the person who gave const access may have intended to prevent changes
+// that would prevent *them* from later mutating it.
+//
 void Force_Value_Frozen_Core(
     const RELVAL *v,
     bool deep,
@@ -518,9 +522,9 @@ void Force_Value_Frozen_Core(
 
     if (ANY_ARRAY_KIND(kind)) {
         if (deep)
-            Freeze_Array_Deep(VAL_ARRAY(cell));
+            Freeze_Array_Deep(m_cast(REBARR*, VAL_ARRAY(cell)));
         else
-            Freeze_Array_Shallow(VAL_ARRAY(cell));
+            Freeze_Array_Shallow(m_cast(REBARR*, VAL_ARRAY(cell)));
         if (opt_locker)
             SET_SERIES_INFO(VAL_ARRAY(cell), AUTO_LOCKED);
     }

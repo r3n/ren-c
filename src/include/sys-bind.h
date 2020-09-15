@@ -337,7 +337,7 @@ struct Reb_Collector {
 inline static REBNOD *SPC_BINDING(REBSPC *specifier)
 {
     assert(specifier != UNBOUND);
-    REBVAL *rootvar = CTX_ARCHETYPE(CTX(specifier)); // works even if Decay()d
+    const REBVAL *rootvar = CTX_ARCHETYPE(CTX(specifier));  // ok if Decay()'d
     assert(IS_FRAME(rootvar));
     return EXTRA(Binding, rootvar).node;
 }
@@ -506,7 +506,7 @@ inline static REBCTX *Get_Word_Context(
         // up with the body it intended to reuse.
         //
         assert(
-            ACT_UNDERLYING(NOD(binding))
+            ACT_UNDERLYING(binding)
             == ACT_UNDERLYING(VAL_ACTION(CTX_ROOTKEY(c)))
         );
     }
@@ -775,7 +775,7 @@ inline static REBSPC *Derive_Specifier(REBSPC *parent, REBCEL(const*) item) {
 //
 // Instead write:
 //
-//     Bind_Values_Deep(VAL_ARRAY_HEAD(block), context);
+//     Bind_Values_Deep(ARR_HEAD(VAL_ARRAY(block)), context);
 //
 // That will pass the address of the first value element of the block's
 // contents.  You could use a later value element, but note that the interface

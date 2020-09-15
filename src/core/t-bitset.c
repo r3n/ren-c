@@ -73,7 +73,7 @@ void MF_Bitset(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     Pre_Mold(mo, v); // #[bitset! or make bitset!
 
-    REBBIN *s = VAL_BITSET(v);
+    const REBBIN *s = VAL_BITSET(v);
 
     if (BITS_NOT(s))
         Append_Ascii(mo->series, "[not bits ");
@@ -206,7 +206,7 @@ REBINT Find_Max_Bit(const RELVAL *val)
 // Check bit indicated. Returns true if set.
 // If uncased is true, try to match either upper or lower case.
 //
-bool Check_Bit(REBSER *bset, REBLEN c, bool uncased)
+bool Check_Bit(const REBSER *bset, REBLEN c, bool uncased)
 {
     REBLEN i, n = c;
     REBLEN tail = SER_LEN(bset);
@@ -288,7 +288,7 @@ bool Set_Bits(REBSER *bset, const REBVAL *val, bool set)
     if (IS_BINARY(val)) {
         REBLEN i = VAL_INDEX(val);
 
-        REBYTE *bp = VAL_BIN_HEAD(val);
+        const REBYTE *bp = BIN_HEAD(VAL_BINARY(val));
         for (; i != VAL_LEN_HEAD(val); i++)
             Set_Bit(bset, bp[i], set);
 
@@ -310,7 +310,7 @@ bool Set_Bits(REBSER *bset, const REBVAL *val, bool set)
     if (!ANY_ARRAY(val))
         fail (Error_Invalid_Type(VAL_TYPE(val)));
 
-    RELVAL *item = VAL_ARRAY_AT(val);
+    const RELVAL *item = VAL_ARRAY_AT(val);
 
     if (
         NOT_END(item)
@@ -415,7 +415,7 @@ bool Set_Bits(REBSER *bset, const REBVAL *val, bool set)
 // Check bits indicated by strings and chars and ranges.
 // If uncased is true, try to match either upper or lower case.
 //
-bool Check_Bits(REBSER *bset, const REBVAL *val, bool uncased)
+bool Check_Bits(const REBSER *bset, const REBVAL *val, bool uncased)
 {
     if (IS_CHAR(val))
         return Check_Bit(bset, VAL_CHAR(val), uncased);
@@ -425,7 +425,7 @@ bool Check_Bits(REBSER *bset, const REBVAL *val, bool uncased)
 
     if (IS_BINARY(val)) {
         REBLEN i = VAL_INDEX(val);
-        REBYTE *bp = VAL_BIN_HEAD(val);
+        const REBYTE *bp = BIN_HEAD(VAL_BINARY(val));
         for (; i != VAL_LEN_HEAD(val); ++i)
             if (Check_Bit(bset, bp[i], uncased))
                 return true;
@@ -450,7 +450,7 @@ bool Check_Bits(REBSER *bset, const REBVAL *val, bool uncased)
 
     // Loop through block of bit specs
 
-    RELVAL *item;
+    const RELVAL *item;
     for (item = VAL_ARRAY_AT(val); NOT_END(item); item++) {
 
         switch (VAL_TYPE(item)) {
@@ -525,14 +525,14 @@ REB_R PD_Bitset(
     const REBVAL *picker,
     const REBVAL *opt_setval
 ){
-    REBSER *ser = VAL_SERIES(pvs->out);
-
     if (opt_setval == NULL) {
+        const REBSER *ser = VAL_SERIES(pvs->out);
         if (Check_Bits(ser, picker, false))
             return Init_True(pvs->out);
         return nullptr; // !!! Red false on out of range, R3-Alpha NONE! (?)
     }
 
+    REBSER *ser = VAL_SERIES_ENSURE_MUTABLE(pvs->out);
     if (Set_Bits(
         ser,
         picker,
@@ -622,7 +622,7 @@ REBTYPE(Bitset)
         if (IS_NULLED_OR_BLANK(arg))
             RETURN (v);  // don't fail on read only if it would be a no-op
 
-        ENSURE_MUTABLE(v);
+        REBBIN *bin = VAL_BITSET_ENSURE_MUTABLE(v);
 
         bool diff;
         if (BITS_NOT(VAL_BITSET(v)))
@@ -630,7 +630,7 @@ REBTYPE(Bitset)
         else
             diff = true;
 
-        if (not Set_Bits(VAL_BITSET(v), arg, diff))
+        if (not Set_Bits(bin, arg, diff))
             fail (arg);
         RETURN (v); }
 
@@ -638,10 +638,12 @@ REBTYPE(Bitset)
         INCLUDE_PARAMS_OF_REMOVE;
         UNUSED(PAR(series));  // covered by `v`
 
+        REBBIN *bin = VAL_BITSET_ENSURE_MUTABLE(v);
+
         if (not REF(part))
             fail (Error_Missing_Arg_Raw());
 
-        if (not Set_Bits(VAL_BITSET(v), ARG(part), false))
+        if (not Set_Bits(bin, ARG(part), false))
             fail (PAR(part));
 
         RETURN (v); }
@@ -657,10 +659,11 @@ REBTYPE(Bitset)
         INIT_BITS_NOT(copy, BITS_NOT(VAL_BITSET(v)));
         return Init_Bitset(D_OUT, copy); }
 
-      case SYM_CLEAR:
-        ENSURE_MUTABLE(v);
-        Clear_Series(VAL_BITSET(v));
-        RETURN (v);
+      case SYM_CLEAR: {
+        REBBIN *bin = VAL_BITSET_ENSURE_MUTABLE(v);
+        INIT_BITS_NOT(bin, false);
+        Clear_Series(bin);
+        RETURN (v); }
 
       case SYM_INTERSECT:
       case SYM_UNION:

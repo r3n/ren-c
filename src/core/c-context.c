@@ -304,7 +304,7 @@ REBCTX *Copy_Context_Shallow_Extra_Managed(REBCTX *src, REBLEN extra) {
         INIT_CTX_KEYLIST_UNIQUE(dest, keylist);
     }
 
-    INIT_VAL_CONTEXT_VARLIST(CTX_ARCHETYPE(dest), CTX_VARLIST(dest));
+    INIT_VAL_CONTEXT_VARLIST(CTX_ROOTVAR(dest), CTX_VARLIST(dest));
 
     // !!! Should the new object keep the meta information, or should users
     // have to copy that manually?  If it's copied would it be a shallow or
@@ -653,7 +653,7 @@ REBARR *Collect_Unique_Words_Managed(
     // any non-words in a block the user passed in.
     //
     if (not IS_NULLED(ignore)) {
-        RELVAL *check = VAL_ARRAY_AT(ignore);
+        const RELVAL *check = VAL_ARRAY_AT(ignore);
         for (; NOT_END(check); ++check) {
             if (not ANY_WORD_KIND(CELL_KIND(VAL_UNESCAPED(check))))
                 fail (Error_Bad_Value_Core(check, VAL_SPECIFIER(ignore)));
@@ -674,7 +674,7 @@ REBARR *Collect_Unique_Words_Managed(
     // an error...so they will just be skipped when encountered.
     //
     if (IS_BLOCK(ignore)) {
-        RELVAL *item = VAL_ARRAY_AT(ignore);
+        const RELVAL *item = VAL_ARRAY_AT(ignore);
         for (; NOT_END(item); ++item) {
             REBCEL(const*) unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
             REBSTR *canon = VAL_WORD_CANON(unescaped);
@@ -712,7 +712,7 @@ REBARR *Collect_Unique_Words_Managed(
     REBARR *array = Grab_Collected_Array_Managed(cl, SERIES_FLAGS_NONE);
 
     if (IS_BLOCK(ignore)) {
-        RELVAL *item = VAL_ARRAY_AT(ignore);
+        const RELVAL *item = VAL_ARRAY_AT(ignore);
         for (; NOT_END(item); ++item) {
             REBCEL(const*) unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
             REBSTR *canon = VAL_WORD_CANON(unescaped);
@@ -754,7 +754,7 @@ void Rebind_Context_Deep(
     REBCTX *dest,
     struct Reb_Binder *opt_binder
 ) {
-    Rebind_Values_Deep(source, dest, CTX_VARS_HEAD(dest), opt_binder);
+    Rebind_Values_Deep(CTX_VARS_HEAD(dest), source, dest, opt_binder);
 }
 
 
@@ -1179,7 +1179,7 @@ void Resolve_Context(
     }
     else if (IS_BLOCK(only_words)) {
         // Limit exports to only these words:
-        RELVAL *word = VAL_ARRAY_AT(only_words);
+        const RELVAL *word = VAL_ARRAY_AT(only_words);
         for (; NOT_END(word); word++) {
             if (IS_WORD(word) or IS_SET_WORD(word)) {
                 Add_Binder_Index(&binder, VAL_WORD_CANON(word), -1);
@@ -1274,7 +1274,7 @@ void Resolve_Context(
                 Remove_Binder_Index_Else_0(&binder, VAL_KEY_CANON(key));
         }
         else if (IS_BLOCK(only_words)) {
-            RELVAL *word = VAL_ARRAY_AT(only_words);
+            const RELVAL *word = VAL_ARRAY_AT(only_words);
             for (; NOT_END(word); word++) {
                 if (IS_WORD(word) or IS_SET_WORD(word))
                     Remove_Binder_Index_Else_0(&binder, VAL_WORD_CANON(word));
@@ -1401,7 +1401,7 @@ void Assert_Context_Core(REBCTX *c)
     if (keylist == NULL)
         panic (c);
 
-    REBVAL *rootvar = CTX_ARCHETYPE(c);
+    REBVAL *rootvar = CTX_ROOTVAR(c);
     if (not ANY_CONTEXT(rootvar))
         panic (rootvar);
 

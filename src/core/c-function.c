@@ -330,7 +330,7 @@ void Push_Paramlist_Triads_May_Fail(
             VAL_TYPESET_HIGH_BITS(param) = 0;
             Add_Typeset_Bits_Core(
                 param,
-                VAL_ARRAY_HEAD(item),
+                ARR_HEAD(VAL_ARRAY(item)),
                 derived
             );
             if (was_refinement)
@@ -1205,16 +1205,14 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
             UNUSED(real_body_index);
         }
 
-        REBARR *real_body = VAL_ARRAY(body);
-
-        REBARR *maybe_fake_body;
-        if (example == NULL) {
-            maybe_fake_body = real_body;
+        const REBARR *maybe_fake_body;
+        if (example == nullptr) {
+            maybe_fake_body = VAL_ARRAY(body);
         }
         else {
             // See %sysobj.r for STANDARD/FUNC-BODY and STANDARD/PROC-BODY
             //
-            maybe_fake_body = Copy_Array_Shallow_Flags(
+            REBARR *fake = Copy_Array_Shallow_Flags(
                 VAL_ARRAY(example),
                 VAL_SPECIFIER(example),
                 NODE_FLAG_MANAGED
@@ -1224,7 +1222,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
             // To give it the appearance of executing code in place, we use
             // a GROUP!.
 
-            RELVAL *slot = ARR_AT(maybe_fake_body, real_body_index); // #BODY
+            RELVAL *slot = ARR_AT(fake, real_body_index); // #BODY
             assert(IS_ISSUE(slot));
 
             // Note: clears VAL_FLAG_LINE
@@ -1233,6 +1231,8 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
             INIT_VAL_NODE(slot, VAL_ARRAY(body));
             VAL_INDEX(slot) = 0;
             INIT_BINDING(slot, a);  // relative binding
+
+            maybe_fake_body = fake;
         }
 
         // Cannot give user a relative value back, so make the relative
@@ -1794,7 +1794,7 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     // When the DO of the FRAME! executes, we don't want it to run the
     // encloser again (infinite loop).
     //
-    REBVAL *rootvar = CTX_ARCHETYPE(c);
+    REBVAL *rootvar = CTX_ROOTVAR(c);
     INIT_VAL_CONTEXT_PHASE(rootvar, VAL_ACTION(inner));
     INIT_BINDING_MAY_MANAGE(rootvar, VAL_BINDING(inner));
 
@@ -1832,7 +1832,7 @@ REB_R Encloser_Dispatcher(REBFRM *f)
 REB_R Chainer_Dispatcher(REBFRM *f)
 {
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-    REBARR *pipeline = VAL_ARRAY(ARR_HEAD(details));
+    const REBARR *pipeline = VAL_ARRAY(ARR_HEAD(details));
 
     // The post-processing pipeline has to be "pushed" so it is not forgotten.
     // Go in reverse order, so the function to apply last is at the bottom of

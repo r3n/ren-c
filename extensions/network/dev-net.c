@@ -441,12 +441,14 @@ DEVICE_CMD Transfer_Socket(REBREQ *sock)
 
     int result;
 
-    REBVAL *port = CTX_ARCHETYPE(CTX(ReqPortCtx(sock)));
+    const REBVAL *port = CTX_ARCHETYPE(CTX(ReqPortCtx(sock)));
 
     assert(req->actual < req->length);  // else we should've returned DR_DONE
 
     if (mode == RSM_SEND) {
         size_t len = req->length - req->actual;  // how much to try to write
+
+        REBBIN *bin = VAL_BINARY_KNOWN_MUTABLE(req->common.binary);
 
         // If host is no longer connected:
         Set_Addr(
@@ -456,7 +458,7 @@ DEVICE_CMD Transfer_Socket(REBREQ *sock)
         );
         result = sendto(
             req->requestee.socket,
-            s_cast(VAL_BIN_AT_HEAD(req->common.binary, req->actual)), len,
+            s_cast(BIN_AT(bin, req->actual)), len,
             MSG_NOSIGNAL, // Flags
             cast(struct sockaddr*, &remote_addr), addr_len
         );
@@ -489,7 +491,7 @@ DEVICE_CMD Transfer_Socket(REBREQ *sock)
         // The buffer should be big enough to hold the request size (or some
         // implementation-defined NET_BUF_SIZE if req->length is MAX_UINT32).
         //
-        REBBIN *bin = VAL_BINARY(req->common.binary);
+        REBBIN *bin = VAL_BINARY_KNOWN_MUTABLE(req->common.binary);
         size_t len;
         if (req->length == UINT32_MAX)
             len = SER_AVAIL(bin);

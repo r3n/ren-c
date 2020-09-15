@@ -201,7 +201,7 @@ void New_Indented_Line(REB_MOLD *mo)
 //
 //  Find_Pointer_In_Series: C
 //
-REBLEN Find_Pointer_In_Series(REBSER *s, void *p)
+REBLEN Find_Pointer_In_Series(REBSER *s, const void *p)
 {
     REBLEN index = 0;
     for (; index < SER_LEN(s); ++index) {
@@ -214,18 +214,18 @@ REBLEN Find_Pointer_In_Series(REBSER *s, void *p)
 //
 //  Push_Pointer_To_Series: C
 //
-void Push_Pointer_To_Series(REBSER *s, void *p)
+void Push_Pointer_To_Series(REBSER *s, const void *p)
 {
     if (SER_FULL(s))
         Extend_Series(s, 8);
-    *SER_AT(void*, s, SER_LEN(s)) = p;
+    *SER_AT(const void*, s, SER_LEN(s)) = p;
     SET_SERIES_LEN(s, SER_LEN(s) + 1);
 }
 
 //
 //  Drop_Pointer_From_Series: C
 //
-void Drop_Pointer_From_Series(REBSER *s, void *p)
+void Drop_Pointer_From_Series(REBSER *s, const void *p)
 {
     assert(p == *SER_AT(void*, s, SER_LEN(s) - 1));
     UNUSED(p);
@@ -243,7 +243,7 @@ void Drop_Pointer_From_Series(REBSER *s, void *p)
 //
 void Mold_Array_At(
     REB_MOLD *mo,
-    REBARR *a,
+    const REBARR *a,
     REBLEN index,
     const char *sep
 ){
@@ -266,7 +266,7 @@ void Mold_Array_At(
 
     bool first_item = true;
 
-    RELVAL *item = ARR_AT(a, index);
+    const RELVAL *item = ARR_AT(a, index);
     while (NOT_END(item)) {
         if (GET_CELL_FLAG(item, NEWLINE_BEFORE)) {
            if (not indented and (sep[1] != '\0')) {
@@ -312,7 +312,7 @@ void Mold_Array_At(
 //
 void Form_Array_At(
     REB_MOLD *mo,
-    REBARR *array,
+    const REBARR *array,
     REBLEN index,
     REBCTX *opt_context
 ){
@@ -323,7 +323,7 @@ void Form_Array_At(
 
     REBINT n;
     for (n = 0; n < len;) {
-        RELVAL *item = ARR_AT(array, index + n);
+        const RELVAL *item = ARR_AT(array, index + n);
         REBVAL *wval = nullptr;
         if (opt_context and (IS_WORD(item) or IS_GET_WORD(item))) {
             wval = Select_Canon_In_Context(opt_context, VAL_WORD_CANON(item));
@@ -493,7 +493,7 @@ REBSTR *Copy_Mold_Or_Form_Cell(REBCEL(const*) cell, REBFLGS opts, bool form)
 //
 bool Form_Reduce_Throws(
     REBVAL *out,
-    REBARR *array,
+    const REBARR *array,
     REBLEN index,
     REBSPC *specifier,
     const REBVAL *delimiter
@@ -806,7 +806,7 @@ void Drop_Mold_Core(
 //
 void Startup_Mold(REBLEN size)
 {
-    TG_Mold_Stack = Make_Series(10, sizeof(void*));
+    TG_Mold_Stack = Make_Series(10, sizeof(const void*));
 
     // Most string code tries to optimize "bookmarks" that help map indices
     // to encoded codepoint positions in such a way that when the string

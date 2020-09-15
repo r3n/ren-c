@@ -41,7 +41,7 @@ static void update(REBREQ *signal, REBINT len, REBVAL *arg)
     const REBYTE source_pid[] = "source-pid";
     const REBYTE source_uid[] = "source-uid";
 
-    Extend_Series(VAL_SERIES(arg), len);
+    Extend_Series(VAL_SERIES_KNOWN_MUTABLE(arg), len);
 
     for (i = 0; i < len; i ++) {
         REBCTX *obj = Alloc_Context(REB_OBJECT, 8);
@@ -63,7 +63,7 @@ static void update(REBREQ *signal, REBINT len, REBVAL *arg)
         );
         Init_Integer(val, sig[i].si_uid);
 
-        Init_Object(Alloc_Tail_Array(VAL_ARRAY(arg)), obj);
+        Init_Object(Alloc_Tail_Array(VAL_ARRAY_KNOWN_MUTABLE(arg)), obj);
     }
 
     req->actual = 0; /* avoid duplicate updates */
@@ -178,7 +178,7 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
             sigemptyset(&ReqPosixSignal(signal)->mask);
 
-            RELVAL *item;
+            const RELVAL *item;
             for (item = VAL_ARRAY_AT_HEAD(val, 0); NOT_END(item); ++item) {
                 DECLARE_LOCAL (sig);
                 Derelativize(sig, item, VAL_SPECIFIER(val));

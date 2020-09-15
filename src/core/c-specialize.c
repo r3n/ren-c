@@ -293,7 +293,7 @@ bool Specialize_Action_Throws(
 
         Bind_Values_Inner_Loop(
             &binder,
-            VAL_ARRAY_AT(opt_def),
+            VAL_ARRAY_AT_MUTABLE_HACK(opt_def),
             exemplar,
             FLAGIT_KIND(REB_SET_WORD),  // types to bind (just set-word!)
             0,  // types to "add midstream" to binding as we go (nothing)

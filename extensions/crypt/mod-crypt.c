@@ -401,7 +401,7 @@ REBNATIVE(rc4_stream)
         ctx,
         VAL_LEN_AT(data),
         VAL_BIN_AT(data),  // input "message"
-        VAL_BIN_AT(data)  // output (same, since it modifies)
+        VAL_BIN_AT_ENSURE_MUTABLE(data)  // output (same, since it modifies)
     ));
 
   cleanup:
@@ -512,7 +512,7 @@ REBNATIVE(rsa)
     // !!! See notes above about direct binary access via libRebol
     //
   blockscope {
-    REBYTE *dataBuffer = VAL_BIN_AT(ARG(data));
+    const REBYTE *dataBuffer = VAL_BIN_AT(ARG(data));
     REBINT data_len = rebUnbox("length of", ARG(data), rebEND);
 
     // Buffer suitable for recapturing as a BINARY! for either the encrypted
@@ -577,11 +577,11 @@ REBNATIVE(dh_generate_keypair)
     CRYPT_INCLUDE_PARAMS_OF_DH_GENERATE_KEYPAIR;
 
     REBVAL *g = ARG(base);
-    REBYTE *g_data = VAL_BIN_AT(g);
+    const REBYTE *g_data = VAL_BIN_AT(g);
     REBLEN g_size = rebUnbox("length of", g, rebEND);
 
     REBVAL *p = ARG(modulus);
-    REBYTE *p_data = VAL_BIN_AT(p);
+    const REBYTE *p_data = VAL_BIN_AT(p);
     REBLEN p_size = rebUnbox("length of", p, rebEND);
 
     struct mbedtls_dhm_context ctx;
@@ -769,15 +769,15 @@ REBNATIVE(dh_compute_secret)
     // otherwise gave Error(RE_EXT_CRYPT_INVALID_KEY_FIELD)
     //
     REBVAL *p = rebValue("ensure binary! pick", obj, "'modulus", rebEND);
-    REBYTE *p_data = VAL_BIN_AT(p);
+    const REBYTE *p_data = VAL_BIN_AT(p);
     REBLEN p_size = rebUnbox("length of", p, rebEND);
 
     REBVAL *x = rebValue("ensure binary! pick", obj, "'private-key", rebEND);
-    REBYTE *x_data = VAL_BIN_AT(x);
+    const REBYTE *x_data = VAL_BIN_AT(x);
     REBLEN x_size = rebUnbox("length of", x, rebEND);
 
     REBVAL *gy = ARG(peer_key);
-    REBYTE *gy_data = VAL_BIN_AT(gy);
+    const REBYTE *gy_data = VAL_BIN_AT(gy);
     REBLEN gy_size = rebUnbox("length of", x, rebEND);
 
     REBVAL *result = nullptr;
@@ -883,7 +883,7 @@ REBNATIVE(aes_key)
 {
     CRYPT_INCLUDE_PARAMS_OF_AES_KEY;
 
-    REBYTE *p_key = VAL_BIN_AT(ARG(key));
+    const REBYTE *p_key = VAL_BIN_AT(ARG(key));
     REBINT keybits = VAL_LEN_AT(ARG(key)) << 3;
     if (keybits != 128 and keybits != 192 and keybits != 256) {
         DECLARE_LOCAL (i);
@@ -978,7 +978,7 @@ REBNATIVE(aes_stream)
     struct mbedtls_cipher_context_t *ctx
         = VAL_HANDLE_POINTER(struct mbedtls_cipher_context_t, ARG(ctx));
 
-    REBYTE *input = VAL_BIN_AT(ARG(data));
+    const REBYTE *input = VAL_BIN_AT(ARG(data));
     REBINT ilen = VAL_LEN_AT(ARG(data));
 
     if (ilen == 0)

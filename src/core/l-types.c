@@ -1323,13 +1323,13 @@ REBNATIVE(scan_net_header)
 
     REBVAL *header = ARG(header);
     REBLEN index = VAL_INDEX(header);
-    REBSER *utf8 = VAL_SERIES(header);
+    const REBSER *utf8 = VAL_SERIES(header);
 
-    REBYTE *cp = BIN_HEAD(utf8) + index;
+    const REBYTE *cp = BIN_HEAD(utf8) + index;
 
     while (IS_LEX_ANY_SPACE(*cp)) cp++; // skip white space
 
-    REBYTE *start;
+    const REBYTE *start;
     REBINT len;
 
     while (true) {
@@ -1364,7 +1364,7 @@ REBNATIVE(scan_net_header)
                 if (IS_BLOCK(item + 1)) {
                     // Block of values already exists:
                     val = Init_Unreadable_Void(
-                        Alloc_Tail_Array(VAL_ARRAY(item + 1))
+                        Alloc_Tail_Array(VAL_ARRAY_ENSURE_MUTABLE(item + 1))
                     );
                 }
                 else {

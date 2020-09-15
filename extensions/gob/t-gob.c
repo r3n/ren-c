@@ -489,8 +489,8 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const REBVAL *word, const REBVAL *val)
             for (i = 0; Gob_Flag_Words[i].sym != 0; ++i)
                 CLR_GOB_FLAG(gob, Gob_Flag_Words[i].flags);
 
-            RELVAL* item;
-            for (item = VAL_ARRAY_HEAD(val); NOT_END(item); item++)
+            const RELVAL* item;
+            for (item = ARR_HEAD(VAL_ARRAY(val)); NOT_END(item); item++)
                 if (IS_WORD(item)) Set_Gob_Flag(gob, VAL_WORD_CANON(item));
         }
         break;
@@ -965,7 +965,7 @@ REBTYPE(Gob)
         INCLUDE_PARAMS_OF_INSERT;
         UNUSED(PAR(series));  // covered by `v`
 
-        REBVAL *value = ARG(value);
+        RELVAL *value = ARG(value);
 
         if (IS_NULLED_OR_BLANK(value))
             RETURN (v);  // don't fail on read only if it would be a no-op
@@ -982,7 +982,7 @@ REBTYPE(Gob)
         }
         else if (IS_BLOCK(value)) {
             len = VAL_ARRAY_LEN_AT(value);
-            value = SPECIFIC(VAL_ARRAY_AT(value)); // !!! REVIEW
+            value = VAL_ARRAY_KNOWN_MUTABLE_AT(value);  // !!! REVIEW
         }
         else
             fail (PAR(value));

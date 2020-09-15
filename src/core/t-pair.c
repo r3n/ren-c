@@ -80,7 +80,7 @@ REB_R MAKE_Pair(
         y = arg;
     }
     else if (IS_BLOCK(arg)) {
-        RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *item = VAL_ARRAY_AT(arg);
 
         if (ANY_NUMBER(item))
             x = item;

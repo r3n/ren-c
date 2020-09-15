@@ -231,7 +231,7 @@ inline static REBARR *GOB_PANE(REBGOB *g) {
 
     assert(IS_BLOCK(v));  // only other legal thing that can be in pane cell
     assert(VAL_INDEX(v) == 0);  // pane array shouldn't have an index
-    return VAL_ARRAY(v);
+    return VAL_ARRAY_KNOWN_MUTABLE(v);
 }
 
 #define GOB_PARENT(g) \

@@ -268,7 +268,7 @@ inline static void Unbind_Any_Word(RELVAL *v) {
 inline static REBVAL *Init_Any_Word(
     RELVAL *out,
     enum Reb_Kind kind,
-    REBSTR *spelling
+    const REBSTR *spelling
 ){
     RESET_CELL(out, kind, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, spelling);

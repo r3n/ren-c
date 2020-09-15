@@ -85,7 +85,7 @@ void Bind_Values_Inner_Loop(
         ){
             Bind_Values_Inner_Loop(
                 binder,
-                VAL_ARRAY_AT(cell),
+                VAL_ARRAY_AT_MUTABLE_HACK(CELL_TO_VAL(cell)),
                 context,
                 bind_types,
                 add_midstream_types,
@@ -168,7 +168,7 @@ void Unbind_Values_Core(RELVAL *head, REBCTX *context, bool deep)
             Unbind_Any_Word(v);
         }
         else if (ANY_ARRAY_OR_PATH_KIND(kind) and deep)
-            Unbind_Values_Core(VAL_ARRAY_AT(v), context, true);
+            Unbind_Values_Core(VAL_ARRAY_AT_MUTABLE_HACK(v), context, true);
 
         Quotify(v, num_quotes);
     }
@@ -413,7 +413,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
         Add_Binder_Index(&binder, VAL_KEY_CANON(param), param_num);
   }
 
-    REBARR *original = VAL_ARRAY(body);
+    const REBARR *original = VAL_ARRAY(body);
     REBLEN index = VAL_INDEX(body);
     REBSPC *specifier = VAL_SPECIFIER(body);
     REBLEN tail = VAL_LEN_AT(body);
@@ -433,7 +433,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
     REBARR *copy = Make_Array_For_Copy(len, flags, original);
 
-    RELVAL *src = ARR_AT(original, index);
+    const RELVAL *src = ARR_AT(original, index);
     RELVAL *dest = ARR_HEAD(copy);
     REBLEN count = 0;
     for (; count < len; ++count, ++dest, ++src) {
@@ -507,15 +507,20 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 // Rebind is always deep.
 //
 void Rebind_Values_Deep(
+    RELVAL *head,
     REBCTX *src,
     REBCTX *dst,
-    RELVAL *head,
     struct Reb_Binder *opt_binder
 ) {
     RELVAL *v = head;
     for (; NOT_END(v); ++v) {
         if (ANY_ARRAY_OR_PATH(v)) {
-            Rebind_Values_Deep(src, dst, VAL_ARRAY_AT(v), opt_binder);
+            Rebind_Values_Deep(
+                VAL_ARRAY_AT_ENSURE_MUTABLE(v),
+                src,
+                dst,
+                opt_binder
+            );
         }
         else if (ANY_WORD(v) and VAL_BINDING(v) == NOD(src)) {
             INIT_BINDING(v, dst);
@@ -840,7 +845,12 @@ void Virtual_Bind_Deep_To_New_Context(
         // duplicates.
         //
         Bind_Values_Inner_Loop(
-            &binder, VAL_ARRAY_AT(body_in_out), c, TS_WORD, 0, BIND_DEEP
+            &binder,
+            VAL_ARRAY_AT_MUTABLE_HACK(body_in_out),
+            c,
+            TS_WORD,
+            0,
+            BIND_DEEP
         );
     }
 

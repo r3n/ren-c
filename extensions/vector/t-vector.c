@@ -236,7 +236,7 @@ void Set_Vector_Row(REBCEL(const*) vec, const REBVAL *blk) // !!! can not be BLO
     REBLEN len = VAL_LEN_AT(blk);
 
     if (IS_BLOCK(blk)) {
-        RELVAL *val = VAL_ARRAY_AT(blk);
+        const RELVAL *val = VAL_ARRAY_AT(blk);
 
         REBLEN n = 0;
         for (; NOT_END(val); val++) {
@@ -246,7 +246,7 @@ void Set_Vector_Row(REBCEL(const*) vec, const REBVAL *blk) // !!! can not be BLO
         }
     }
     else { // !!! This would just interpet the data as int64_t pointers (???)
-        REBYTE *data = VAL_BIN_AT(blk);
+        REBYTE *data = VAL_BIN_AT_ENSURE_MUTABLE(blk);
 
         DECLARE_LOCAL (temp);
 

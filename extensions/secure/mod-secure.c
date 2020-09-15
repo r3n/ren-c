@@ -56,7 +56,7 @@ enum Reb_Security_Byte_Offsets {
 //
 // !!! This C code would likely be better as Rebol in %ext-secure-init.reb
 //
-bool Match_Sub_Path(REBSTR *s1, REBSTR *s2)
+bool Match_Sub_Path(const REBSTR *s1, const REBSTR *s2)
 {
     REBLEN len1 = STR_LEN(s1);
     if (len1 > STR_LEN(s2))
@@ -144,7 +144,7 @@ const REBYTE *Security_Policy(
 
     // !!! Comment said "no relatives in STATE_POLICIES"
     //
-    const RELVAL *item = VAL_ARRAY_HEAD(policy);
+    const RELVAL *item = ARR_HEAD(VAL_ARRAY(policy));
 
     for (; NOT_END(item); item += 2) {
         if (IS_END(item + 1) or not IS_TUPLE(item + 1))  // must map to tuple

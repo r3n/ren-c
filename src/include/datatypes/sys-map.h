@@ -51,10 +51,15 @@ struct Reb_Map {
 #define LINK_HASHLIST(s)            SER(LINK(s).custom.node)
 
 
-inline static REBARR *MAP_PAIRLIST(REBMAP *m) {
+inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
     assert(GET_ARRAY_FLAG(&(m)->pairlist, IS_PAIRLIST));
-    return (&(m)->pairlist);
+    return (&m_cast(REBMAP*, m)->pairlist);
 }
+
+#ifdef __cplusplus
+    inline static const REBARR *MAP_PAIRLIST(const REBMAP *m)
+      { return MAP_PAIRLIST(m_cast(REBMAP*, m)); }
+#endif
 
 #define MAP_HASHLIST(m) \
     LINK_HASHLIST(MAP_PAIRLIST(m))
@@ -69,7 +74,7 @@ inline static REBMAP *MAP(void *p) {
 }
 
 
-inline static REBMAP *VAL_MAP(REBCEL(const*) v) {
+inline static const REBMAP *VAL_MAP(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_MAP);
 
     REBARR *a = ARR(PAYLOAD(Any, v).first.node);
@@ -79,9 +84,15 @@ inline static REBMAP *VAL_MAP(REBCEL(const*) v) {
     return MAP(a);
 }
 
-inline static REBLEN Length_Map(REBMAP *map)
+#define VAL_MAP_ENSURE_MUTABLE(v) \
+    m_cast(REBMAP*, VAL_MAP(ENSURE_MUTABLE(v)))
+
+#define VAL_MAP_KNOWN_MUTABLE(v) \
+    m_cast(REBMAP*, VAL_MAP(KNOWN_MUTABLE(v)))
+
+inline static REBLEN Length_Map(const REBMAP *map)
 {
-    REBVAL *v = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    const REBVAL *v = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
 
     REBLEN count = 0;
     for (; NOT_END(v); v += 2) {

@@ -172,8 +172,8 @@ static bool Set_Event_Var(REBVAL *event, const REBVAL *word, const REBVAL *val)
         mutable_VAL_EVENT_FLAGS(event)
             &= ~(EVF_DOUBLE | EVF_CONTROL | EVF_SHIFT);
 
-        RELVAL *item;
-        for (item = VAL_ARRAY_HEAD(val); NOT_END(item); ++item) {
+        const RELVAL *item;
+        for (item = ARR_HEAD(VAL_ARRAY(val)); NOT_END(item); ++item) {
             if (not IS_WORD(item))
                 continue;
 
@@ -207,24 +207,24 @@ static bool Set_Event_Var(REBVAL *event, const REBVAL *word, const REBVAL *val)
 //
 //  Set_Event_Vars: C
 //
-void Set_Event_Vars(REBVAL *evt, RELVAL *blk, REBSPC *specifier)
+void Set_Event_Vars(REBVAL *evt, const RELVAL *head, REBSPC *specifier)
 {
     DECLARE_LOCAL (var);
     DECLARE_LOCAL (val);
 
-    while (NOT_END(blk)) {
-        Derelativize(var, blk, specifier);
-        ++blk;
+    while (NOT_END(head)) {
+        Derelativize(var, head, specifier);
+        ++head;
 
         if (not IS_SET_WORD(var))
             fail (var);
 
-        if (IS_END(blk))
+        if (IS_END(head))
             Init_Blank(val);
         else
-            Get_Simple_Value_Into(val, blk, specifier);
+            Get_Simple_Value_Into(val, head, specifier);
 
-        ++blk;
+        ++head;
 
         if (!Set_Event_Var(evt, var, val))
             fail (Error_Bad_Field_Set_Raw(var, Type_Of(val)));

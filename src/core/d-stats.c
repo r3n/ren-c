@@ -150,7 +150,7 @@ enum {
 //
 REB_R Measured_Dispatch_Hook(REBFRM * const f)
 {
-    REBMAP *m = VAL_MAP(Root_Stats_Map);
+    REBMAP *m = VAL_MAP_KNOWN_MUTABLE(Root_Stats_Map);
 
     REBACT *phase = FRM_PHASE(f);
     bool is_first_phase = (phase == f->original);
@@ -220,7 +220,7 @@ REB_R Measured_Dispatch_Hook(REBFRM * const f)
         else {
             REBVAL *stats = SPECIFIC(ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1));
 
-            REBARR *a = IS_BLOCK(stats) ? VAL_ARRAY(stats) : NULL;
+            REBARR *a = IS_BLOCK(stats) ? VAL_ARRAY_KNOWN_MUTABLE(stats) : NULL;
 
             if (
                 a != NULL

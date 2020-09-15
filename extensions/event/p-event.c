@@ -80,11 +80,12 @@ REBVAL *Append_Event(void)
         if (VAL_LEN_HEAD(state) > EVENTS_LIMIT)
             panic (state);
 
-        Extend_Series(VAL_SERIES(state), EVENTS_CHUNK);
+        Extend_Series(VAL_SERIES_KNOWN_MUTABLE(state), EVENTS_CHUNK);
     }
-    TERM_ARRAY_LEN(VAL_ARRAY(state), VAL_LEN_HEAD(state) + 1);
 
-    return Init_Blank(ARR_LAST(VAL_ARRAY(state)));
+    REBARR *state_array = VAL_ARRAY_KNOWN_MUTABLE(state);
+    TERM_ARRAY_LEN(state_array, VAL_LEN_HEAD(state) + 1);
+    return Init_Blank(ARR_LAST(state_array));
 }
 
 
@@ -94,21 +95,19 @@ REBVAL *Append_Event(void)
 // Find the last event in the queue by the model
 // Check its type, if it matches, then return the event or NULL
 //
-REBVAL *Find_Last_Event(REBINT model, uint32_t type)
+// !!! Not currently used.
+//
+const REBVAL *Find_Last_Event(REBINT model, uint32_t type)
 {
-    REBVAL *port;
-    RELVAL *value;
-    REBVAL *state;
-
-    port = Get_System(SYS_PORTS, PORTS_SYSTEM);
+    REBVAL *port = Get_System(SYS_PORTS, PORTS_SYSTEM);
     if (!IS_PORT(port)) return NULL; // verify it is a port object
 
     // Get queue block:
-    state = VAL_CONTEXT_VAR(port, STD_PORT_STATE);
+    REBVAL *state = VAL_CONTEXT_VAR(port, STD_PORT_STATE);
     if (!IS_BLOCK(state)) return NULL;
 
-    value = VAL_ARRAY_TAIL(state) - 1;
-    for (; value >= VAL_ARRAY_HEAD(state); --value) {
+    const RELVAL *value = VAL_ARRAY_TAIL(state) - 1;
+    for (; value >= ARR_HEAD(VAL_ARRAY(state)); --value) {
         if (VAL_EVENT_MODEL(value) == model) {
             if (cast(uint32_t, VAL_EVENT_TYPE(value)) == type) {
                 return SPECIFIC(value);
@@ -200,7 +199,7 @@ REB_R Event_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         return r; }
 
     case SYM_CLEAR:
-        TERM_ARRAY_LEN(VAL_ARRAY(state), 0);
+        TERM_ARRAY_LEN(VAL_ARRAY_KNOWN_MUTABLE(state), 0);
         CLR_SIGNAL(SIG_EVENT_PORT);
         RETURN (port);
 

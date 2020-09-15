@@ -956,9 +956,6 @@ REBNATIVE(swap_contents)
 {
     INCLUDE_PARAMS_OF_SWAP_CONTENTS;
 
-    ENSURE_MUTABLE(ARG(series1));
-    ENSURE_MUTABLE(ARG(series2));
-
     if (ANY_ARRAY(ARG(series1)) != ANY_ARRAY(ARG(series2)))
         fail ("Can only SWAP-CONTENTS of arrays with other arrays");
 
@@ -971,7 +968,9 @@ REBNATIVE(swap_contents)
     if (IS_BINARY(ARG(series1)) != IS_BINARY(ARG(series2)))
         fail ("Can only SWAP-CONTENTS of binaries with other binaries");
 
-    Swap_Series_Content(VAL_SERIES(ARG(series1)), VAL_SERIES(ARG(series2)));
+    REBSER *s1 = VAL_SERIES_ENSURE_MUTABLE(ARG(series1));
+    REBSER *s2 = VAL_SERIES_ENSURE_MUTABLE(ARG(series2));
+    Swap_Series_Content(s1, s2);
 
     return Init_Void(D_OUT);
 }

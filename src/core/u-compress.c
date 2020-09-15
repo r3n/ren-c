@@ -535,7 +535,7 @@ REBNATIVE(inflate)
     else
         max = -1;
 
-    REBYTE *data;
+    const REBYTE *data;
     REBSIZ size;
     if (IS_BINARY(ARG(data))) {
         data = VAL_BIN_AT(ARG(data));

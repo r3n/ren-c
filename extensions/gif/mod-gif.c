@@ -199,14 +199,14 @@ void Decode_LZW(REBYTE *data, REBYTE **cpp, REBYTE *colortab, int32_t w, int32_t
 }
 
 
-static bool Has_Valid_GIF_Header(REBYTE *data, uint32_t len) {
+static bool Has_Valid_GIF_Header(const REBYTE *data, uint32_t len) {
     if (len < 5)
         return false;
 
-    if (strncmp(cast(char*, data), "GIF87", 5) == 0)
+    if (strncmp(cs_cast(data), "GIF87", 5) == 0)
         return true;
 
-    if (strncmp(cast(char*, data), "GIF89", 5) == 0)
+    if (strncmp(cs_cast(data), "GIF89", 5) == 0)
         return true;
 
     return false;
@@ -226,7 +226,7 @@ REBNATIVE(identify_gif_q)
 {
     GIF_INCLUDE_PARAMS_OF_IDENTIFY_GIF_Q;
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
+    const REBYTE *data = VAL_BIN_AT(ARG(data));
     uint32_t len = VAL_LEN_AT(ARG(data));
 
     // Assume signature matching is good enough (will get a fail() on
@@ -250,7 +250,7 @@ REBNATIVE(decode_gif)
 {
     GIF_INCLUDE_PARAMS_OF_DECODE_GIF;
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
+    const REBYTE *data = VAL_BIN_AT(ARG(data));
     uint32_t len = VAL_LEN_AT(ARG(data));
 
     if (not Has_Valid_GIF_Header(data, len))
@@ -263,8 +263,10 @@ REBNATIVE(decode_gif)
     uint32_t  colors;
     bool  interlaced;
 
-    REBYTE *cp = data;
-    REBYTE *end = data + len;
+    // !!! Decode_LZW is not const-correct, trust it won't modify
+    //
+    REBYTE *cp = m_cast(REBYTE*, data);
+    REBYTE *end = m_cast(REBYTE*, data) + len;
 
     global_colors = 0;
     global_colormap = (unsigned char *) NULL;

@@ -455,12 +455,12 @@ REBNATIVE(deline)
         return D_OUT;
     }
 
-    REBSTR *s = VAL_STRING(input);
+    REBSTR *s = VAL_STRING_ENSURE_MUTABLE(input);
     REBLEN len_head = STR_LEN(s);
 
     REBLEN len_at = VAL_LEN_AT(input);
 
-    REBCHR(*) dest = VAL_STRING_AT(input);
+    REBCHR(*) dest = VAL_STRING_AT_KNOWN_MUTABLE(input);
     REBCHR(const*) src = dest;
 
     // DELINE tolerates either LF or CR LF, in order to avoid disincentivizing
@@ -522,7 +522,7 @@ REBNATIVE(enline)
 
     REBVAL *val = ARG(string);
 
-    REBSTR *s = VAL_STRING(val);
+    REBSTR *s = VAL_STRING_ENSURE_MUTABLE(val);
     REBLEN idx = VAL_INDEX(val);
 
     REBLEN len;
@@ -866,7 +866,7 @@ REBNATIVE(find_script)
     const REBYTE *header_bp = bp + offset;
 
     REBLEN index = VAL_INDEX(arg);
-    REBCHR(*) cp = VAL_STRING_AT(arg);
+    REBCHR(const*) cp = VAL_STRING_AT(arg);
     for (; cp != header_bp; cp = NEXT_STR(cp))
         ++index;
 
@@ -901,17 +901,17 @@ REBNATIVE(invalid_utf8_q)
     INCLUDE_PARAMS_OF_INVALID_UTF8_Q;
 
     REBVAL *arg = ARG(data);
-    REBYTE *utf8 = VAL_BIN_AT(arg);
+    const REBYTE *utf8 = VAL_BIN_AT(arg);
     REBSIZ size = VAL_LEN_AT(arg);
 
-    REBYTE *end = utf8 + size;
+    const REBYTE *end = utf8 + size;
 
     REBLEN trail;
     for (; utf8 != end; utf8 += trail) {
         trail = trailingBytesForUTF8[*utf8] + 1;
         if (utf8 + trail > end or not isLegalUTF8(utf8, trail)) {
             Move_Value(D_OUT, arg);
-            VAL_INDEX(D_OUT) = utf8 - VAL_BIN_HEAD(arg);
+            VAL_INDEX(D_OUT) = utf8 - BIN_HEAD(VAL_BINARY(arg));
             return D_OUT;
         }
     }

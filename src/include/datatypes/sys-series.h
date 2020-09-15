@@ -140,7 +140,7 @@
 // "content", there's room for a length in the node.
 //
 
-inline static REBLEN SER_USED(REBSER *s) {
+inline static REBLEN SER_USED(const REBSER *s) {
     REBYTE len_byte = LEN_BYTE_OR_255(s);
     return len_byte == 255 ? s->content.dynamic.used : len_byte;
 }
@@ -176,7 +176,7 @@ inline static void SET_SERIES_LEN(REBSER *s, REBLEN len) {
 // for instance a generic debugging routine might just want a byte pointer
 // but have no element type pointer to pass in.
 //
-inline static REBYTE *SER_DATA(REBSER *s) {
+inline static REBYTE *SER_DATA(const_if_c REBSER *s) {
     // if updating, also update manual inlining in SER_AT_RAW
 
     // The VAL_CONTEXT(), VAL_SERIES(), VAL_ARRAY() extractors do the failing
@@ -189,7 +189,7 @@ inline static REBYTE *SER_DATA(REBSER *s) {
         : cast(REBYTE*, &s->content);
 }
 
-inline static REBYTE *SER_DATA_AT(REBYTE w, REBSER *s, REBLEN i) {
+inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
   #if !defined(NDEBUG)
     if (w != SER_WIDE(s)) {  // will be "unusual" value if free
         if (IS_FREE_NODE(s))
@@ -212,6 +212,18 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, REBSER *s, REBLEN i) {
         );
 }
 
+#ifdef __cplusplus
+    inline static const REBYTE *SER_DATA(const REBSER *s)  // "SER_DATA_HEAD"
+      { return SER_DATA(m_cast(REBSER*, s)); }
+
+    inline static const REBYTE *SER_DATA_AT(
+        REBYTE w,
+        const REBSER *s,
+        REBLEN i
+    ){
+        return SER_DATA_AT(w, m_cast(REBSER*, s), i);
+    }
+#endif
 
 //
 // In general, requesting a pointer into the series data requires passing in
@@ -225,25 +237,36 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, REBSER *s, REBLEN i) {
 // this is used very frequently.
 
 #define SER_AT(t,s,i) \
-    ((t*)SER_DATA_AT(sizeof(t), (s), (i)))
+    cast(t*, SER_DATA_AT(sizeof(t), (s), (i)))
 
 #define SER_HEAD(t,s) \
     SER_AT(t, (s), 0)
 
-inline static REBYTE *SER_DATA_TAIL(size_t wide, REBSER *s) {
-    return SER_DATA_AT(wide, s, SER_USED(s));
-}
+inline static REBYTE *SER_DATA_TAIL(size_t w, const_if_c REBSER *s)
+  { return SER_DATA_AT(w, s, SER_USED(s)); }
+
+#ifdef __cplusplus
+    inline static const REBYTE *SER_DATA_TAIL(size_t w, const REBSER *s)
+      { return SER_DATA_AT(w, s, SER_USED(s)); }
+#endif
 
 #define SER_TAIL(t,s) \
-    ((t*)SER_DATA_TAIL(sizeof(t), (s)))
+    cast(t*, SER_DATA_TAIL(sizeof(t), (s)))
 
-inline static REBYTE *SER_DATA_LAST(size_t wide, REBSER *s) {
+inline static REBYTE *SER_DATA_LAST(size_t wide, const_if_c REBSER *s) {
     assert(SER_USED(s) != 0);
     return SER_DATA_AT(wide, s, SER_USED(s) - 1);
 }
 
+#ifdef __cplusplus
+    inline static const REBYTE *SER_DATA_LAST(size_t wide, const REBSER *s) {
+        assert(SER_USED(s) != 0);
+        return SER_DATA_AT(wide, s, SER_USED(s) - 1);
+    }
+#endif
+
 #define SER_LAST(t,s) \
-    ((t*)SER_DATA_LAST(sizeof(t), (s)))
+    cast(t*, SER_DATA_LAST(sizeof(t), (s)))
 
 
 #define SER_FULL(s) \
@@ -339,40 +362,21 @@ inline static void TERM_SEQUENCE_LEN(REBSER *s, REBLEN len) {
 #define NOTE_SERIES_MAYBE_TERM(s) NOOP
 
 
-//=////////////////////////////////////////////////////////////////////////=//
-//
-//  SERIES MANAGED MEMORY
-//
-//=////////////////////////////////////////////////////////////////////////=//
+//=//// SERIES MANAGED MEMORY /////////////////////////////////////////////=//
 //
 // If NODE_FLAG_MANAGED is not explicitly passed to Make_Series_Core, a
-// series will be manually memory-managed by default.  Thus, you don't need
+// series will be manually memory-managed by default.  Hence you don't need
 // to worry about the series being freed out from under you while building it.
-// But to keep from leaking it, must be freed with Free_Unmanaged_Series() or
-// delegated to the GC to manage with Manage_Series().
+// Manual series are tracked, and automatically freed in the case of a fail().
 //
-// (In debug builds, there is a test at the end of every Rebol function
-// dispatch that checks to make sure one of those two things happened for any
-// series allocated during the call.)
-//
-// Manual series will be automatically freed in the case of a fail().  But
-// there are several cases in the system where series are not GC managed, but
-// also not in the manuals tracking list.  These are particularly tricky and
-// done for efficiency...so they must have their cleanup in the case of fail()
-// through other means.
+// All manual series *must* either be freed with Free_Unmanaged_Series() or
+// delegated to the GC with Manage_Series() before the frame ends.  Once a
+// series is managed, only the GC is allowed to free it.
 //
 // Manage_Series() is shallow--it only sets a bit on that *one* series, not
-// any series referenced by values inside of it.  This means that you cannot
-// build a hierarchical structure that isn't visible to the GC and then do a
-// single Manage_Series() call on the root to hand it over to the garbage
-// collector.  While it would be technically possible to deeply walk the
-// structure, the efficiency gained from pre-building the structure with the
-// managed bit set is significant...so that's how deep copies and the
-// scanner/load do it.
-//
-// (In debug builds, if any unmanaged series are found inside of values
-// reachable by the GC, it will raise an alert.)
-//
+// any series referenced by values inside of it.  Hence many routines that
+// build hierarchical structures (like the scanner) only return managed
+// results, since they can manage it as they build them.
 
 inline static void Untrack_Manual_Series(REBSER *s)
 {
@@ -390,7 +394,7 @@ inline static void Untrack_Manual_Series(REBSER *s)
         // (instead of keeping the series we want to free).
         //
         REBSER **current_ptr = last_ptr - 1;
-        while (*current_ptr != s) {
+        for (; *current_ptr != s; --current_ptr) {
           #if !defined(NDEBUG)
             if (
                 current_ptr
@@ -400,7 +404,6 @@ inline static void Untrack_Manual_Series(REBSER *s)
                 panic(s);
             }
           #endif
-            --current_ptr;
         }
         *current_ptr = *last_ptr;
     }
@@ -410,39 +413,44 @@ inline static void Untrack_Manual_Series(REBSER *s)
     --GC_Manuals->content.dynamic.used;
 }
 
-// Rather than free a series, this function can be used--which will transition
-// a manually managed series to be one managed by the GC.  There is no way to
-// transition back--once a series has become managed, only the GC can free it.
-//
-inline static REBSER *Manage_Series(REBSER *s)
+inline static REBSER *Manage_Series(REBSER *s)  // give manual series to GC
 {
   #if !defined(NDEBUG)
-    if (GET_SERIES_FLAG(s, MANAGED)) {
-        printf("Attempt to manage already managed series\n");
-        panic (s);
-    }
+    if (GET_SERIES_FLAG(s, MANAGED))
+        panic (s);  // shouldn't manage an already managed series
   #endif
 
     s->header.bits |= NODE_FLAG_MANAGED;
-
     Untrack_Manual_Series(s);
     return s;
 }
 
-inline static REBSER *Force_Series_Managed(void *p) {
-    REBSER *s = SER(p);
+#ifdef NDEBUG
+    #define ASSERT_SERIES_MANAGED(s)
+#else
+    inline static void ASSERT_SERIES_MANAGED(const void *s) {
+        if (NOT_SERIES_FLAG(s, MANAGED))
+            panic (s);
+    }
+#endif
+
+inline static REBSER *Force_Series_Managed(const_if_c void *p) {
+    REBSER *s = m_cast(REBSER*, SER(p));
     if (NOT_SERIES_FLAG(s, MANAGED))
         Manage_Series(s);
     return s;
 }
 
-#ifdef NDEBUG
-    #define ASSERT_SERIES_MANAGED(s) \
-        NOOP
+#if !defined(__cplusplus)
+    #define Force_Series_Managed_Core Force_Series_Managed
 #else
-    inline static void ASSERT_SERIES_MANAGED(void *s) {
-        if (NOT_SERIES_FLAG(s, MANAGED))
-            panic (s);
+    inline static REBSER *Force_Series_Managed_Core(void *p)
+      { return Force_Series_Managed(p); }  // mutable series may be unmanaged
+
+    inline static REBSER *Force_Series_Managed_Core(const void *p) {
+        const REBSER *s = SER(p);
+        ASSERT_SERIES_MANAGED(s);  // const series should already be managed
+        return m_cast(REBSER*, s);
     }
 #endif
 
@@ -473,15 +481,15 @@ inline static REBSER *Force_Series_Managed(void *p) {
 // are and asserts it's 0 by the time each evaluation ends, to ensure balance.
 //
 
-static inline bool Is_Series_Black(REBSER *s) {
+static inline bool Is_Series_Black(const REBSER *s) {
     return GET_SERIES_INFO(s, BLACK);
 }
 
-static inline bool Is_Series_White(REBSER *s) {
+static inline bool Is_Series_White(const REBSER *s) {
     return NOT_SERIES_INFO(s, BLACK);
 }
 
-static inline void Flip_Series_To_Black(REBSER *s) {
+static inline void Flip_Series_To_Black(const REBSER *s) {
     assert(NOT_SERIES_INFO(s, BLACK));
     SET_SERIES_INFO(s, BLACK);
 #if !defined(NDEBUG)
@@ -489,7 +497,7 @@ static inline void Flip_Series_To_Black(REBSER *s) {
 #endif
 }
 
-static inline void Flip_Series_To_White(REBSER *s) {
+static inline void Flip_Series_To_White(const REBSER *s) {
     assert(GET_SERIES_INFO(s, BLACK));
     CLEAR_SERIES_INFO(s, BLACK);
 #if !defined(NDEBUG)
@@ -502,13 +510,13 @@ static inline void Flip_Series_To_White(REBSER *s) {
 // Freezing and Locking
 //
 
-inline static void Freeze_Sequence(REBSER *s) { // there is no unfreeze!
+inline static void Freeze_Sequence(const REBSER *s) {  // there is no unfreeze
     assert(not IS_SER_ARRAY(s)); // use Deep_Freeze_Array
     SET_SERIES_INFO(s, FROZEN_SHALLOW);
     SET_SERIES_INFO(s, FROZEN_DEEP);  // so generic deep frozen checks faster
 }
 
-inline static bool Is_Series_Frozen(REBSER *s) {
+inline static bool Is_Series_Frozen(const REBSER *s) {
     assert(not IS_SER_ARRAY(s));  // use Is_Array_Deeply_Frozen
     if (NOT_SERIES_INFO(s, FROZEN_SHALLOW))
         return false;
@@ -516,7 +524,7 @@ inline static bool Is_Series_Frozen(REBSER *s) {
     return true;
 }
 
-inline static bool Is_Series_Read_Only(REBSER *s) { // may be temporary...
+inline static bool Is_Series_Read_Only(const REBSER *s) {  // may be temporary
     return 0 != (s->info.bits &
         (SERIES_INFO_HOLD | SERIES_INFO_PROTECTED
         | SERIES_INFO_FROZEN_SHALLOW | SERIES_INFO_FROZEN_DEEP)
@@ -625,7 +633,7 @@ inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
 #define PUSH_GC_GUARD(p) \
     Push_Guard_Node(NOD(p))
 
-inline static void DROP_GC_GUARD(void *p) {
+inline static void DROP_GC_GUARD(const void *p) {
   #if defined(NDEBUG)
     UNUSED(p);
   #else
@@ -648,16 +656,23 @@ inline static void DROP_GC_GUARD(void *p) {
 // Uses "evil macro" variations because it is called so frequently, that in
 // the debug build (which doesn't inline functions) there's a notable cost.
 //
-inline static REBSER *VAL_SERIES(REBCEL(const*) v) {
+inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
   #if !defined(NDEBUG)
     enum Reb_Kind k = CELL_KIND(v);
     assert(ANY_SERIES_KIND_EVIL_MACRO or ANY_PATH_KIND_EVIL_MACRO);
   #endif
-    REBSER *s = SER(PAYLOAD(Any, v).first.node);
+    const REBSER *s = SER(PAYLOAD(Any, v).first.node);
     if (GET_SERIES_INFO(s, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return s;
 }
+
+#define VAL_SERIES_ENSURE_MUTABLE(v) \
+    m_cast(REBSER*, VAL_SERIES(ENSURE_MUTABLE(v)))
+
+#define VAL_SERIES_KNOWN_MUTABLE(v) \
+    m_cast(REBSER*, VAL_SERIES(KNOWN_MUTABLE(v)))
+
 
 #define VAL_INDEX_UNCHECKED(v) \
     PAYLOAD(Any, (v)).second.u32
@@ -685,12 +700,13 @@ inline static REBSER *VAL_SERIES(REBCEL(const*) v) {
 #endif
 
 
-inline static REBYTE *VAL_DATA_AT(REBCEL(const*) v) {
+inline static const REBYTE *VAL_DATA_AT(REBCEL(const*) v) {
     return SER_DATA_AT(SER_WIDE(VAL_SERIES(v)), VAL_SERIES(v), VAL_INDEX(v));
 }
 
 #define Init_Any_Series_At(v,t,s,i) \
-    Init_Any_Series_At_Core((v), (t), (s), (i), UNBOUND)
+    Init_Any_Series_At_Core((v), (t), \
+        Force_Series_Managed_Core(s), (i), UNBOUND)
 
 #define Init_Any_Series(v,t,s) \
     Init_Any_Series_At((v), (t), (s), 0)

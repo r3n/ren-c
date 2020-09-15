@@ -521,8 +521,8 @@ struct Reb_Node {
         (did (FIRST_BYTE(cast(struct Reb_Node*, (p))->header) \
             & NODE_BYTEMASK_0x40_FREE))  // byte access defeats strict alias
 #else
-    inline static bool IS_FREE_NODE(void *p) {
-        REBYTE first = FIRST_BYTE(cast(struct Reb_Node*, p)->header);
+    inline static bool IS_FREE_NODE(const void *p) {
+        REBYTE first = FIRST_BYTE(cast(const struct Reb_Node*, p)->header);
 
         if (not (first & NODE_BYTEMASK_0x40_FREE))
             return false;  // byte access defeats strict alias

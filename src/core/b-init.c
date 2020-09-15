@@ -369,7 +369,7 @@ REBVAL *Make_Native(
     RELVAL **item, // the item will be advanced as necessary
     REBSPC *specifier,
     REBNAT dispatcher,
-    REBVAL *module
+    const REBVAL *module
 ){
     assert(specifier == SPECIFIED); // currently a requirement
 
@@ -412,7 +412,7 @@ REBVAL *Make_Native(
     }
     ++*item;
 
-    REBVAL *spec = SPECIFIC(*item);
+    const REBVAL *spec = SPECIFIC(*item);
     ++*item;
     if (not IS_BLOCK(spec))
         panic (spec);
@@ -496,7 +496,7 @@ static REBARR *Startup_Natives(const REBVAL *boot_natives)
     Init_Action_Meta_Shim();
 
     assert(VAL_INDEX(boot_natives) == 0); // should be at head, sanity check
-    RELVAL *item = VAL_ARRAY_AT(boot_natives);
+    RELVAL *item = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_natives);
     REBSPC *specifier = VAL_SPECIFIER(boot_natives);
 
     // Although the natives are not being "executed", there are typesets
@@ -559,7 +559,7 @@ static REBARR *Startup_Natives(const REBVAL *boot_natives)
 static REBARR *Startup_Generics(const REBVAL *boot_generics)
 {
     assert(VAL_INDEX(boot_generics) == 0); // should be at head, sanity check
-    RELVAL *head = VAL_ARRAY_AT(boot_generics);
+    RELVAL *head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_generics);
     REBSPC *specifier = VAL_SPECIFIER(boot_generics);
 
     // Add SET-WORD!s that are top-level in the generics block to the lib
@@ -765,7 +765,7 @@ static void Init_System_Object(
     REBCTX *errors_catalog
 ) {
     assert(VAL_INDEX(boot_sysobj_spec) == 0);
-    RELVAL *spec_head = VAL_ARRAY_AT(boot_sysobj_spec);
+    RELVAL *spec_head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_sysobj_spec);
 
     // Create the system object from the sysobj block (defined in %sysobj.r)
     //
@@ -837,8 +837,8 @@ static void Init_System_Object(
     assert(IS_OBJECT(std_error));
     mutable_KIND_BYTE(std_error) = REB_ERROR;
     mutable_MIRROR_BYTE(std_error) = REB_ERROR;
-    mutable_KIND_BYTE(CTX_ARCHETYPE(VAL_CONTEXT(std_error))) = REB_ERROR;
-    mutable_MIRROR_BYTE(CTX_ARCHETYPE(VAL_CONTEXT(std_error))) = REB_ERROR;
+    mutable_KIND_BYTE(CTX_ROOTVAR(VAL_CONTEXT(std_error))) = REB_ERROR;
+    mutable_MIRROR_BYTE(CTX_ROOTVAR(VAL_CONTEXT(std_error))) = REB_ERROR;
     assert(CTX_KEY_SYM(VAL_CONTEXT(std_error), 1) == SYM_SELF);
     mutable_KIND_BYTE(VAL_CONTEXT_VAR(std_error, 1)) = REB_ERROR;
     mutable_MIRROR_BYTE(VAL_CONTEXT_VAR(std_error, 1)) = REB_ERROR;
@@ -1059,9 +1059,9 @@ REBVAL *Get_Sys_Function_Debug(REBLEN index, const char *name)
 //
 static REBVAL *Startup_Mezzanine(BOOT_BLK *boot)
 {
-    Startup_Base(VAL_ARRAY(&boot->base));
+    Startup_Base(VAL_ARRAY_KNOWN_MUTABLE(&boot->base));
 
-    Startup_Sys(VAL_ARRAY(&boot->sys));
+    Startup_Sys(VAL_ARRAY_KNOWN_MUTABLE(&boot->sys));
 
     REBVAL *finish_init = Get_Sys_Function(FINISH_INIT_CORE);
     assert(IS_ACTION(finish_init));
@@ -1241,9 +1241,10 @@ void Startup_Core(void)
 
     rebFree(utf8); // don't need decompressed text after it's scanned
 
-    BOOT_BLK *boot = cast(BOOT_BLK*, VAL_ARRAY_HEAD(ARR_HEAD(boot_array)));
+    BOOT_BLK *boot =
+        cast(BOOT_BLK*, ARR_HEAD(VAL_ARRAY_KNOWN_MUTABLE(ARR_HEAD(boot_array))));
 
-    Startup_Symbols(VAL_ARRAY(&boot->words));
+    Startup_Symbols(VAL_ARRAY_KNOWN_MUTABLE(&boot->words));
 
     // STR_SYMBOL(), VAL_WORD_SYM() and Canon(SYM_XXX) now available
 
@@ -1267,7 +1268,8 @@ void Startup_Core(void)
     PUSH_GC_GUARD(Sys_Context);
 
     REBARR *datatypes_catalog = Startup_Datatypes(
-        VAL_ARRAY(&boot->types), VAL_ARRAY(&boot->typespecs)
+        VAL_ARRAY_KNOWN_MUTABLE(&boot->types),
+        VAL_ARRAY_KNOWN_MUTABLE(&boot->typespecs)
     );
     Manage_Array(datatypes_catalog);
     PUSH_GC_GUARD(datatypes_catalog);

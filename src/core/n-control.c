@@ -185,7 +185,7 @@ inline static bool Single_Test_Throws(
 
     switch (test_kind) {
       case REB_PATH: { // AND the tests together
-        RELVAL *item = VAL_ARRAY_AT(test_cell);
+        const RELVAL *item = VAL_ARRAY_AT(test_cell);
         REBSPC *specifier = Derive_Specifier(test_specifier, test);
 
         for (; NOT_END(item); ++item) {
@@ -213,7 +213,7 @@ inline static bool Single_Test_Throws(
         return false; } // return the LOGIC! truth, false=no throw
 
       case REB_BLOCK: { // OR the tests together
-        RELVAL *item = VAL_ARRAY_AT(test_cell);
+        const RELVAL *item = VAL_ARRAY_AT(test_cell);
         REBSPC *specifier = Derive_Specifier(test_specifier, test);
         for (; NOT_END(item); ++item) {
             if (Single_Test_Throws(
@@ -600,7 +600,7 @@ REBNATIVE(match)
         DECLARE_LOCAL (temp);
         f->out = SET_END(temp);
 
-        f->rootvar = CTX_ARCHETYPE(CTX(f->varlist));
+        f->rootvar = CTX_ROOTVAR(CTX(f->varlist));
         f->param = ACT_PARAMS_HEAD(VAL_ACTION(test));
         f->arg = f->rootvar + 1;
         f->special = f->arg;
@@ -1300,7 +1300,7 @@ REBNATIVE(default)
         // a faster native we just do a more optimal version of that.
         //
         bool has_groups = false;
-        RELVAL *item = VAL_ARRAY_AT(target);
+        const RELVAL *item = VAL_ARRAY_AT(target);
         for (; NOT_END(item); ++item) {
             if (IS_GROUP(item))
                 has_groups = true;
@@ -1442,7 +1442,7 @@ REBNATIVE(catch)
             //
             // Test all the words in the block for a match to catch
 
-            RELVAL *candidate = VAL_ARRAY_AT(ARG(name));
+            const RELVAL *candidate = VAL_ARRAY_AT(ARG(name));
             for (; NOT_END(candidate); candidate++) {
                 //
                 // !!! Should we test a typeset for illegal name types?

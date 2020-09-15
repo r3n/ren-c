@@ -309,7 +309,7 @@ bool Next_Path_Throws(REBPVS *pvs)
 bool Eval_Path_Throws_Core(
     REBVAL *out, // if opt_setval, this is only used to return a thrown value
     REBSTR **label_out,
-    REBARR *array,
+    const REBARR *array,
     REBLEN index,
     REBSPC *specifier,
     const REBVAL *opt_setval, // Note: may be the same as out!
@@ -524,8 +524,8 @@ void Get_Simple_Value_Into(REBVAL *out, const RELVAL *val, REBSPC *specifier)
 //
 REBCTX *Resolve_Path(const REBVAL *path, REBLEN *index_out)
 {
-    REBARR *array = VAL_ARRAY(path);
-    RELVAL *picker = ARR_HEAD(array);
+    const REBARR *array = VAL_ARRAY(path);
+    const RELVAL *picker = ARR_HEAD(array);
 
     if (IS_END(picker) or not ANY_WORD(picker))
         return NULL; // !!! only handles heads of paths that are ANY-WORD!
@@ -806,7 +806,7 @@ void MF_Path(REB_MOLD *mo, REBCEL(const*) v, bool form)
         Append_Ascii(mo->series, "/");
     }
     else {
-        REBARR *a = VAL_ARRAY(v);
+        const REBARR *a = VAL_ARRAY(v);
 
         // Recursion check:
         if (Find_Pointer_In_Series(TG_Mold_Stack, a) != NOT_FOUND) {
@@ -818,7 +818,7 @@ void MF_Path(REB_MOLD *mo, REBCEL(const*) v, bool form)
         assert(VAL_INDEX(v) == 0);  // new rule, not ANY-ARRAY!, always head
         assert(ARR_LEN(a) >= 2); // another rule, even / is `make path! [_ _]`
 
-        RELVAL *item = ARR_HEAD(a);
+        const RELVAL *item = ARR_HEAD(a);
         while (NOT_END(item)) {
             assert(not ANY_PATH(item)); // another new rule
 
@@ -899,7 +899,7 @@ REB_R MAKE_Path(
         }
         else { // Splice any generated paths, so there are no paths-in-paths.
 
-            RELVAL *item = VAL_ARRAY_AT(out);
+            const RELVAL *item = VAL_ARRAY_AT(out);
             if (IS_BLANK(item) and DSP != dsp_orig) {
                 if (IS_BLANK(DS_TOP)) // make path! ['a/b/ `/c`]
                     fail ("Cannot merge slashes in MAKE PATH!");
@@ -934,9 +934,9 @@ REB_R MAKE_Path(
 }
 
 
-static void Push_Path_Recurses(RELVAL *path, REBSPC *specifier)
+static void Push_Path_Recurses(const RELVAL *path, REBSPC *specifier)
 {
-    RELVAL *item = ARR_HEAD(VAL_PATH(path));
+    const RELVAL *item = ARR_HEAD(VAL_PATH(path));
     for (; NOT_END(item); ++item) {
         if (IS_PATH(item)) {
             if (IS_SPECIFIC(item))
@@ -975,7 +975,7 @@ REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
     }
 
     REBDSP dsp_orig = DSP;
-    RELVAL *item = VAL_ARRAY_AT(arg);
+    const RELVAL *item = VAL_ARRAY_AT(arg);
     for (; NOT_END(item); ++item) {
         if (IS_PATH(item))
             Push_Path_Recurses(item, VAL_SPECIFIER(arg));

@@ -235,7 +235,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
         RESET_CELL(value, REB_DATATYPE, CELL_FLAG_FIRST_IS_NODE);
         VAL_TYPE_KIND_ENUM(value) = kind;
         VAL_TYPE_SPEC_NODE(value) = NOD(
-            VAL_ARRAY(ARR_AT(boot_typespecs, n - 2))
+            VAL_ARRAY_KNOWN_MUTABLE(ARR_AT(boot_typespecs, n - 2))
         );
 
         // !!! The system depends on these definitions, as they are used by

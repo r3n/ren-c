@@ -140,7 +140,7 @@ REBNATIVE(request_file_p)
         DECLARE_MOLD (mo);
         Push_Mold(mo);
 
-        RELVAL *item;
+        const RELVAL *item;
         for (item = VAL_ARRAY_AT(ARG(filter)); NOT_END(item); ++item) {
             Form_Value(mo, item);
             Append_Codepoint(mo->series, '\0');

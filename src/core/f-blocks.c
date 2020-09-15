@@ -33,7 +33,7 @@
 // by giving an `extra` count of how many value cells one needs.
 //
 REBARR *Copy_Array_At_Extra_Shallow(
-    REBARR *original,
+    const REBARR *original,
     REBLEN index,
     REBSPC *specifier,
     REBLEN extra,
@@ -48,7 +48,7 @@ REBARR *Copy_Array_At_Extra_Shallow(
 
     REBARR *copy = Make_Array_For_Copy(len + extra, flags, original);
 
-    RELVAL *src = ARR_AT(original, index);
+    const RELVAL *src = ARR_AT(original, index);
     RELVAL *dest = ARR_HEAD(copy);
     REBLEN count = 0;
     for (; count < len; ++count, ++dest, ++src)
@@ -67,7 +67,7 @@ REBARR *Copy_Array_At_Extra_Shallow(
 // length (clipping if it exceeds the array length)
 //
 REBARR *Copy_Array_At_Max_Shallow(
-    REBARR *original,
+    const REBARR *original,
     REBLEN index,
     REBSPC *specifier,
     REBLEN max
@@ -231,7 +231,7 @@ void Clonify(
 // cannot be freed with Free_Unmanaged_Series().
 //
 REBARR *Copy_Array_Core_Managed(
-    REBARR *original,
+    const REBARR *original,
     REBLEN index,
     REBSPC *specifier,
     REBLEN tail,
@@ -257,7 +257,7 @@ REBARR *Copy_Array_Core_Managed(
         original
     );
 
-    RELVAL *src = ARR_AT(original, index);
+    const RELVAL *src = ARR_AT(original, index);
     RELVAL *dest = ARR_HEAD(copy);
     REBLEN count = 0;
     for (; count < len; ++count, ++dest, ++src) {
@@ -292,14 +292,14 @@ REBARR *Copy_Array_Core_Managed(
 // paramlist to another.
 //
 REBARR *Copy_Rerelativized_Array_Deep_Managed(
-    REBARR *original,
+    const REBARR *original,
     REBACT *before, // references to `before` will be changed to `after`
     REBACT *after
 ){
     const REBFLGS flags = NODE_FLAG_MANAGED;
 
     REBARR *copy = Make_Array_For_Copy(ARR_LEN(original), flags, original);
-    RELVAL *src = ARR_HEAD(original);
+    const RELVAL *src = ARR_HEAD(original);
     RELVAL *dest = ARR_HEAD(copy);
 
     for (; NOT_END(src); ++src, ++dest) {
@@ -362,14 +362,14 @@ RELVAL *Alloc_Tail_Array(REBARR *a)
 //
 //  Uncolor_Array: C
 //
-void Uncolor_Array(REBARR *a)
+void Uncolor_Array(const REBARR *a)
 {
     if (Is_Series_White(SER(a)))
         return; // avoid loop
 
     Flip_Series_To_White(SER(a));
 
-    RELVAL *val;
+    const RELVAL *val;
     for (val = ARR_HEAD(a); NOT_END(val); ++val)
         if (ANY_ARRAY_OR_PATH(val) or IS_MAP(val) or ANY_CONTEXT(val))
             Uncolor(val);
@@ -381,9 +381,9 @@ void Uncolor_Array(REBARR *a)
 //
 // Clear the recusion markers for series and object trees.
 //
-void Uncolor(RELVAL *v)
+void Uncolor(const RELVAL *v)
 {
-    REBARR *array;
+    const REBARR *array;
 
     if (ANY_ARRAY(v))
         array = VAL_ARRAY(v);
@@ -403,5 +403,5 @@ void Uncolor(RELVAL *v)
         return;
     }
 
-    Uncolor_Array(array);
+    Uncolor_Array(array);  // ignore constness
 }

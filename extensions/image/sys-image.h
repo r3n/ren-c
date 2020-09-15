@@ -48,7 +48,7 @@ inline static REBVAL *VAL_IMAGE_BIN(REBCEL(const*) v) {
 
 inline static REBYTE *VAL_IMAGE_HEAD(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
-    return SER_DATA(VAL_BINARY(VAL_IMAGE_BIN(v)));
+    return SER_DATA(VAL_BINARY_ENSURE_MUTABLE(VAL_IMAGE_BIN(v)));
 }
 
 inline static REBYTE *VAL_IMAGE_AT_HEAD(REBCEL(const*) v, REBLEN pos) {
@@ -90,7 +90,7 @@ inline static bool IS_IMAGE(const RELVAL *v) {
 
 inline static REBVAL *Init_Image(
     RELVAL *out,
-    REBSER *bin,
+    const REBSER *bin,
     REBLEN width,
     REBLEN height
 ){

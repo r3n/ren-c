@@ -118,7 +118,7 @@ REBVAL *Init_Near_For_Frame(RELVAL *out, REBFRM *f)
         start = 0;
 
     REBLEN count = 0;
-    RELVAL *item = ARR_AT(FRM_ARRAY(f), start);
+    const RELVAL *item = ARR_AT(FRM_ARRAY(f), start);
     for (; NOT_END(item) and count < 6; ++item, ++count) {
         assert(not IS_NULLED(item));  // can't be in arrays, API won't splice
         Derelativize(DS_PUSH(), item, f->feed->specifier);

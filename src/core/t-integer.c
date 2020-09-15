@@ -141,7 +141,7 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
         // This is a stopgap while ENBIN and DEBIN are hammered out which
         // preserves the old behavior in the TO INTEGER! case.
         //
-        REBYTE *bp = VAL_BIN_AT(value);
+        const REBYTE *bp = VAL_BIN_AT(value);
         REBLEN n = VAL_LEN_AT(value);
         if (n == 0) {
             Init_Integer(out, 0);
@@ -165,7 +165,7 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
         // more sense as these would be hexes likely typed in by users,
         // who rarely do 2s-complement math in their head.
 
-        REBSTR *spelling = VAL_STRING(value);
+        const REBSTR *spelling = VAL_STRING(value);
         const REBYTE *bp = STR_HEAD(spelling);
         size_t size = STR_SIZE(spelling);
 

@@ -69,39 +69,22 @@ REBINT CT_String(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 ***********************************************************************/
 
 
-static void swap_chars(REBVAL *val1, REBVAL *val2)
-{
-    REBSTR *s1 = VAL_STRING(val1);
-    REBSTR *s2 = VAL_STRING(val2);
-
-    REBUNI c1 = GET_CHAR_AT(s1, VAL_INDEX(val1));
-    REBUNI c2 = GET_CHAR_AT(s2, VAL_INDEX(val2));
-
-    SET_CHAR_AT(s1, VAL_INDEX(val1), c2);
-    SET_CHAR_AT(s2, VAL_INDEX(val2), c1);
-}
-
-static void reverse_binary(REBVAL *v, REBLEN len)
-{
-    REBYTE *bp = VAL_BIN_AT(v);
-
-    REBLEN n = 0;
-    REBLEN m = len - 1;
-    for (; n < len / 2; n++, m--) {
-        REBYTE b = bp[n];
-        bp[n] = bp[m];
-        bp[m] = b;
-    }
-}
-
-
-static void reverse_string(REBVAL *v, REBLEN len)
+static void reverse_string(REBSTR *str, REBLEN index, REBLEN len)
 {
     if (len == 0)
         return; // if non-zero, at least one character in the string
 
-    if (Is_String_Definitely_ASCII(v))
-        reverse_binary(v, len);
+    if (Is_String_Definitely_ASCII(str)) {
+        REBYTE *bp = STR_AT(str, index);
+
+        REBLEN n = 0;
+        REBLEN m = len - 1;
+        for (; n < len / 2; n++, m--) {
+            REBYTE b = bp[n];
+            bp[n] = bp[m];
+            bp[m] = b;
+        }
+    }
     else {
         // !!! This is an inefficient method for reversing strings with
         // variable size codepoints.  Better way could work in place:
@@ -111,10 +94,9 @@ static void reverse_string(REBVAL *v, REBLEN len)
         DECLARE_MOLD (mo);
         Push_Mold(mo);
 
-        REBLEN val_len_head = VAL_LEN_HEAD(v);
+        REBLEN val_len_head = STR_LEN(str);
 
-        REBSTR *s = VAL_STRING(v);
-        REBCHR(const*) up = STR_TAIL(s);  // last exists due to len != 0
+        REBCHR(const*) up = STR_TAIL(str);  // last exists due to len != 0
         REBLEN n;
         for (n = 0; n < len; ++n) {
             REBUNI c;
@@ -128,8 +110,10 @@ static void reverse_string(REBVAL *v, REBLEN len)
         // Effectively do a CHANGE/PART to overwrite the reversed portion of
         // the string (from the input value's index to the tail).
 
+        DECLARE_LOCAL (string);  // !!! Temp value, string type is irrelevant
+        Init_Any_String_At(string, REB_TEXT, str, index);
         Modify_String_Or_Binary(
-            v,
+            string,
             SYM_CHANGE,
             temp,
             AM_PART,  // heed len for deletion
@@ -140,7 +124,7 @@ static void reverse_string(REBVAL *v, REBLEN len)
         // Regardless of whether the whole string was reversed or just some
         // part from the index to the tail, the length shouldn't change.
         //
-        assert(VAL_LEN_HEAD(v) == val_len_head);
+        assert(VAL_LEN_HEAD(string) == val_len_head);
         UNUSED(val_len_head);
     }
 }
@@ -153,7 +137,7 @@ static void reverse_string(REBVAL *v, REBLEN len)
 //
 REBLEN find_string(
     REBLEN *len,
-    REBSTR *str,
+    const REBSTR *str,
     REBLEN index,
     REBLEN end,
     REBCEL(const*) pattern,
@@ -237,7 +221,7 @@ REBLEN find_string(
                 );
         }
         else {
-            REBSTR *pattern_str;
+            const REBSTR *pattern_str;
             REBLEN pattern_index;
             if (formed) {
                 pattern_str = formed;
@@ -306,8 +290,7 @@ REBLEN find_string(
             return index;  // empty binaries / strings are matches
 
         const REBYTE *pbytes = VAL_BIN_AT(pattern);
-        REBSIZ offset =
-            cast(REBYTE*, STR_AT(str, index)) - cast(REBYTE*, STR_HEAD(str));
+        REBSIZ offset = STR_AT(str, index) - STR_HEAD(str);
         REBLEN result = Find_Bin_In_Bin(
             SER(str),
             offset,
@@ -415,11 +398,11 @@ REB_R MAKE_String(
         if (VAL_ARRAY_LEN_AT(def) != 2)
             goto bad_make;
 
-        RELVAL *first = VAL_ARRAY_AT(def);
+        const RELVAL *first = VAL_ARRAY_AT(def);
         if (not ANY_STRING(first))
             goto bad_make;
 
-        RELVAL *index = VAL_ARRAY_AT(def) + 1;
+        const RELVAL *index = VAL_ARRAY_AT(def) + 1;
         if (!IS_INTEGER(index))
             goto bad_make;
 
@@ -519,58 +502,6 @@ static int Compare_Chr(void *thunk, const void *v1, const void *v2)
 
 
 //
-//  Sort_String: C
-//
-static void Sort_String(
-    REBVAL *string,
-    bool ccase,
-    REBVAL *skipv,
-    REBVAL *compv,
-    REBVAL *part,
-    bool rev
-){
-    // !!! System appears to boot without a sort of a string.  A different
-    // method will be needed for UTF-8... qsort() cannot work with variable
-    // sized codepoints.  However, it could work if all the codepoints were
-    // known to be ASCII range in the memory of interest, maybe common case.
-
-    if (not IS_NULLED(compv))
-        fail (Error_Bad_Refine_Raw(compv)); // !!! didn't seem to be supported (?)
-
-    REBLEN skip = 1;
-    REBLEN size = 1;
-    REBLEN thunk = 0;
-
-    REBLEN len = Part_Len_May_Modify_Index(string, part);  // length of sort
-    if (len <= 1)
-        return;
-
-    if (not IS_NULLED(skipv)) {
-        skip = Get_Num_From_Arg(skipv);
-        if (skip <= 0 or len % skip != 0 or skip > len)
-            fail (skipv);
-    }
-
-    // Use fast quicksort library function:
-    if (skip > 1) {
-        len /= skip;
-        size *= skip;
-    }
-
-    if (ccase) thunk |= CC_FLAG_CASE;
-    if (rev) thunk |= CC_FLAG_REVERSE;
-
-    reb_qsort_r(
-        VAL_STRING_AT(string),
-        len,
-        size * SER_WIDE(VAL_SERIES(string)),
-        &thunk,
-        Compare_Chr
-    );
-}
-
-
-//
 //  PD_String: C
 //
 REB_R PD_String(
@@ -578,8 +509,6 @@ REB_R PD_String(
     const REBVAL *picker,
     const REBVAL *opt_setval
 ){
-    REBSTR *s = VAL_STRING(pvs->out);
-
     // Note: There was some more careful management of overflow here in the
     // PICK and POKE actions, before unification.  But otherwise the code
     // was less thorough.  Consider integrating this bit, though it seems
@@ -597,6 +526,7 @@ REB_R PD_String(
     */
 
     if (opt_setval == NULL) { // PICK-ing
+        const REBSTR *s = VAL_STRING(pvs->out);
         if (IS_INTEGER(picker) or IS_DECIMAL(picker)) { // #2312
             REBINT n = Int32(picker);
             if (n == 0)
@@ -682,7 +612,7 @@ REB_R PD_String(
 
     // Otherwise, POKE-ing
 
-    ENSURE_MUTABLE(pvs->out);
+    REBSTR *s = VAL_STRING_ENSURE_MUTABLE(pvs->out);
 
     if (not IS_INTEGER(picker))
         return R_UNHANDLED;
@@ -818,7 +748,7 @@ void Mold_Uni_Char(REB_MOLD *mo, REBUNI c, bool parened)
 //
 //  Mold_Text_Series_At: C
 //
-void Mold_Text_Series_At(REB_MOLD *mo, REBSTR *s, REBLEN index) {
+void Mold_Text_Series_At(REB_MOLD *mo, const REBSTR *s, REBLEN index) {
     REBSTR *buf = mo->series;
 
     if (index >= STR_LEN(s)) {
@@ -1076,8 +1006,7 @@ REBTYPE(String)
 
         UNUSED(PAR(series)); // already accounted for
 
-        REBSTR *s = VAL_STRING(v);
-        ENSURE_MUTABLE(v);
+        REBSTR *s = VAL_STRING_ENSURE_MUTABLE(v);
 
         REBINT limit;
         if (REF(part))
@@ -1246,8 +1175,7 @@ REBTYPE(String)
         return D_OUT; }
 
       case SYM_CLEAR: {
-        ENSURE_MUTABLE(v);
-        REBSTR *s = VAL_STRING(v);
+        REBSTR *s = VAL_STRING_ENSURE_MUTABLE(v);
 
         if (index >= tail)
             RETURN (v);  // clearing after available data has no effect
@@ -1318,52 +1246,91 @@ REBTYPE(String)
     //-- Special actions:
 
       case SYM_SWAP: {
-        ENSURE_MUTABLE(v);
-
         REBVAL *arg = D_ARG(2);
 
         if (VAL_TYPE(v) != VAL_TYPE(arg))
             fail (Error_Not_Same_Type_Raw());
 
-        ENSURE_MUTABLE(arg);
+        REBSTR *v_str = VAL_STRING_ENSURE_MUTABLE(v);
+        REBSTR *arg_str = VAL_STRING_ENSURE_MUTABLE(arg);
 
-        if (index < tail and VAL_INDEX(arg) < VAL_LEN_HEAD(arg))
-            swap_chars(v, arg);
+        if (index < tail and VAL_INDEX(arg) < VAL_LEN_HEAD(arg)) {
+            REBUNI v_c = GET_CHAR_AT(v_str, VAL_INDEX(v));
+            REBUNI arg_c = GET_CHAR_AT(arg_str, VAL_INDEX(arg));
+
+            SET_CHAR_AT(v_str, VAL_INDEX(v), arg_c);
+            SET_CHAR_AT(arg_str, VAL_INDEX(arg), v_c);
+        }
         RETURN (v); }
 
       case SYM_REVERSE: {
         INCLUDE_PARAMS_OF_REVERSE;
         UNUSED(ARG(series));
 
-        ENSURE_MUTABLE(v);
+        REBSTR *str = VAL_STRING_ENSURE_MUTABLE(v);
 
+        Move_Value(D_OUT, v);  // save before index adjustment
         REBINT len = Part_Len_May_Modify_Index(v, ARG(part));
         if (len > 0)
-            reverse_string(v, len);
-        RETURN (v); }
+            reverse_string(str, VAL_INDEX(v), len);
+        return D_OUT; }
 
       case SYM_SORT: {
         INCLUDE_PARAMS_OF_SORT;
 
-        ENSURE_MUTABLE(v);
+        REBYTE *data_at = VAL_STRING_AT_ENSURE_MUTABLE(v);
 
         UNUSED(PAR(series));
 
         if (REF(all))
             fail (Error_Bad_Refine_Raw(ARG(all)));
 
-        if (not Is_String_Definitely_ASCII(v))
+        if (not Is_String_Definitely_ASCII(VAL_STRING(v)))
             fail ("UTF-8 Everywhere: String sorting temporarily unavailable");
 
-        Sort_String(
-            v,
-            did REF(case),
-            ARG(skip),  // blank! if not /SKIP
-            ARG(compare),  // blank! if not /COMPARE
-            ARG(part),  // blank! if not /PART
-            did REF(reverse)
+        // !!! A different method will be needed for UTF-8... qsort() can't
+        // work with variable sized codepoints.  However, it could work if all
+        // the codepoints were known to be ASCII range in the memory of
+        // interest, maybe common case.
+
+        if (REF(compare))
+            fail (Error_Bad_Refine_Raw(PAR(compare))); // !!! not in R3-Alpha
+
+        Move_Value(D_OUT, v);  // before index modification
+        REBLEN len = Part_Len_May_Modify_Index(v, ARG(part));
+        if (len <= 1)
+            return D_OUT;
+
+        REBLEN skip;
+        if (not REF(skip))
+            skip = 1;
+        else {
+            skip = Get_Num_From_Arg(ARG(skip));
+            if (skip <= 0 or len % skip != 0 or skip > len)
+                fail (PAR(skip));
+        }
+
+        // Use fast quicksort library function:
+        REBLEN size = 1;
+        if (skip > 1) {
+            len /= skip;
+            size *= skip;
+        }
+
+        REBLEN thunk = 0;
+        if (REF(case))
+            thunk |= CC_FLAG_CASE;
+        if (REF(reverse))
+            thunk |= CC_FLAG_REVERSE;
+
+        reb_qsort_r(
+            data_at,
+            len,
+            size * sizeof(REBYTE),  // only ASCII for now
+            &thunk,
+            Compare_Chr
         );
-        RETURN (v); }
+        return D_OUT; }
 
       case SYM_RANDOM: {
         INCLUDE_PARAMS_OF_RANDOM;
@@ -1379,8 +1346,6 @@ REBTYPE(String)
             return Init_Void(D_OUT);
         }
 
-        ENSURE_MUTABLE(v);
-
         if (REF(only)) {
             if (index >= tail)
                 return nullptr;
@@ -1393,12 +1358,21 @@ REBTYPE(String)
             );
         }
 
-        if (not Is_String_Definitely_ASCII(v))
+        REBSTR *str = VAL_STRING_ENSURE_MUTABLE(v);
+
+        if (not Is_String_Definitely_ASCII(str))
             fail ("UTF-8 Everywhere: String shuffle temporarily unavailable");
 
-        ENSURE_MUTABLE(v);
+        bool secure = did REF(secure);
 
-        Shuffle_String(v, did REF(secure));
+        REBLEN n;
+        for (n = STR_LEN(str) - index; n > 1;) {
+            REBLEN k = index + cast(REBLEN, Random_Int(secure)) % n;
+            n--;
+            REBUNI swap = GET_CHAR_AT(str, k);
+            SET_CHAR_AT(str, k, GET_CHAR_AT(str, n + index));
+            SET_CHAR_AT(str, n + index, swap);
+        }
         RETURN (v); }
 
       default:

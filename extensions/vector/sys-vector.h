@@ -64,7 +64,8 @@ inline static REBYTE VAL_VECTOR_WIDE(REBCEL(const*) v) {  // "wide" REBSER term
 
 inline static REBYTE *VAL_VECTOR_HEAD(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Vector_Type);
-    return VAL_BIN_HEAD(VAL(PAYLOAD(Any, v).first.node));
+    REBVAL *binary = VAL(PAYLOAD(Any, v).first.node);
+    return BIN_HEAD(VAL_BINARY_ENSURE_MUTABLE(binary));
 }
 
 inline static REBLEN VAL_VECTOR_LEN_AT(REBCEL(const*) v) {

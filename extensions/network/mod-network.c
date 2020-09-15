@@ -339,7 +339,7 @@ static REB_R Transport_Actor(
             //         ]
             //     ]
             //
-            buffer = VAL_BINARY(port_data);
+            buffer = VAL_BINARY_KNOWN_MUTABLE(port_data);
 
             // !!! Port code doesn't skip the index, but what if user does?
             //

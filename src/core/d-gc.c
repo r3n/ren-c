@@ -146,7 +146,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
       case REB_MAP: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBMAP* map = VAL_MAP(v);
+        const REBMAP* map = VAL_MAP(v);
         assert(Is_Marked(map));
         assert(IS_SER_ARRAY(map));
         break; }
@@ -210,7 +210,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             break;
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBSER *s = VAL_SERIES(v);
+        const REBSER *s = VAL_SERIES(v);
 
         assert(SER_WIDE(s) == sizeof(REBYTE));
         assert(Is_Marked(s));
@@ -273,7 +273,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         if (GET_SERIES_INFO(context, INACCESSIBLE))
             break;
 
-        REBVAL *archetype = CTX_ARCHETYPE(context);
+        const REBVAL *archetype = CTX_ARCHETYPE(context);
         assert(CTX_TYPE(context) == kind);
         assert(VAL_CONTEXT(archetype) == context);
 
@@ -302,7 +302,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             break;
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBARR *a = VAL_ARRAY(v);
+        const REBARR *a = VAL_ARRAY(v);
         assert(Is_Marked(a));
         break; }
 
@@ -441,7 +441,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 // LINK() or MISC(), or which fields had been assigned to correctly use for
 // reading back what to mark.  This has been standardized.
 //
-void Assert_Array_Marked_Correctly(REBARR *a) {
+void Assert_Array_Marked_Correctly(const REBARR *a) {
     assert(Is_Marked(a));
 
     #ifdef HEAVY_CHECKS
@@ -461,7 +461,7 @@ void Assert_Array_Marked_Correctly(REBARR *a) {
     #endif
 
     if (GET_ARRAY_FLAG(a, IS_PARAMLIST)) {
-        RELVAL *archetype = ARR_HEAD(a);
+        const RELVAL *archetype = ARR_HEAD(a);
         assert(IS_ACTION(archetype));
         assert(not EXTRA(Binding, archetype).node);
 
@@ -481,7 +481,7 @@ void Assert_Array_Marked_Correctly(REBARR *a) {
             assert(specialty == a);
     }
     else if (GET_ARRAY_FLAG(a, IS_VARLIST)) {
-        REBVAL *archetype = CTX_ARCHETYPE(CTX(a));
+        const REBVAL *archetype = CTX_ARCHETYPE(CTX(a));
 
         // Currently only FRAME! archetypes use binding
         //

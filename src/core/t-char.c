@@ -114,7 +114,7 @@ REB_R MAKE_Char(
         return Init_Char_May_Fail(out, n); }
 
       case REB_BINARY: {
-        const REBYTE *bp = VAL_BIN_HEAD(arg);
+        const REBYTE *bp = VAL_BIN_AT(arg);
         REBSIZ len = VAL_LEN_AT(arg);
         if (len == 0)
             goto bad_make;
@@ -166,7 +166,7 @@ REB_R TO_Char(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 
     REBCHR(const *) cp = nullptr;
     if (ANY_STRING(arg))
-        cp = VAL_STRING_HEAD(arg);
+        cp = STR_HEAD(VAL_STRING(arg));
     else if (ANY_WORD(arg))
         cp = STR_HEAD(VAL_WORD_SPELLING(arg));
 

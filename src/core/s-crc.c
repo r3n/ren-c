@@ -439,26 +439,29 @@ REBVAL *Init_Map(RELVAL *out, REBMAP *map)
 //
 REBSER *Hash_Block(const REBVAL *block, REBLEN skip, bool cased)
 {
-    REBLEN n;
-    REBSER *hashlist;
-    REBLEN *hashes;
-    REBARR *array = VAL_ARRAY(block);
-    RELVAL *value;
-
     // Create the hash array (integer indexes):
-    hashlist = Make_Hash_Sequence(VAL_LEN_AT(block));
-    hashes = SER_HEAD(REBLEN, hashlist);
+    REBSER *hashlist = Make_Hash_Sequence(VAL_LEN_AT(block));
 
-    value = VAL_ARRAY_AT(block);
+    const RELVAL *value = VAL_ARRAY_AT(block);
     if (IS_END(value))
         return hashlist;
 
-    n = VAL_INDEX(block);
+    REBLEN *hashes = SER_HEAD(REBLEN, hashlist);
+
+    const REBARR *array = VAL_ARRAY(block);
+    REBLEN n = VAL_INDEX(block);
+
     while (true) {
         REBLEN skip_index = skip;
 
         REBLEN hash = Find_Key_Hashed(
-            array, hashlist, value, VAL_SPECIFIER(block), 1, cased, 0
+            m_cast(REBARR*, array),  // mode == 0, no modification, cast ok
+            hashlist,
+            value,
+            VAL_SPECIFIER(block),
+            1,
+            cased,
+            0  // mode
         );
         hashes[hash] = (n / skip) + 1;
 

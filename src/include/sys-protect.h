@@ -43,10 +43,10 @@ enum {
     PROT_FREEZE = 1 << 4
 };
 
-inline static bool Is_Array_Frozen_Shallow(REBARR *a)
+inline static bool Is_Array_Frozen_Shallow(const REBARR *a)
   { return GET_SERIES_INFO(a, FROZEN_SHALLOW); }
 
-inline static bool Is_Array_Frozen_Deep(REBARR *a) {
+inline static bool Is_Array_Frozen_Deep(const REBARR *a) {
     if (NOT_SERIES_INFO(a, FROZEN_DEEP))
         return false;
 

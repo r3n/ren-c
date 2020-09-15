@@ -291,7 +291,7 @@ REBNATIVE(decode_utf16le)
 {
     UTF_INCLUDE_PARAMS_OF_DECODE_UTF16LE;
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
+    const REBYTE *data = VAL_BIN_AT(ARG(data));
     REBLEN len = VAL_LEN_AT(ARG(data));
 
     const bool little_endian = true;
@@ -375,7 +375,7 @@ REBNATIVE(decode_utf16be)
 {
     UTF_INCLUDE_PARAMS_OF_DECODE_UTF16BE;
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
+    const REBYTE *data = VAL_BIN_AT(ARG(data));
     REBLEN len = VAL_LEN_AT(ARG(data));
 
     const bool little_endian = false;

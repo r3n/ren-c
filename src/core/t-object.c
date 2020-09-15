@@ -106,7 +106,7 @@ static void Append_To_Context(REBCTX *context, REBVAL *arg)
 
     // Process word/value argument block:
 
-    RELVAL *item = VAL_ARRAY_AT(arg);
+    const RELVAL *item = VAL_ARRAY_AT(arg);
 
     // Can't actually fail() during a collect, so make sure any errors are
     // set and then jump to a Collect_End()
@@ -129,7 +129,7 @@ static void Append_To_Context(REBCTX *context, REBVAL *arg)
 
     // Examine word/value argument block
 
-    RELVAL *word;
+    const RELVAL *word;
     for (word = item; NOT_END(word); word += 2) {
         if (!IS_WORD(word) && !IS_SET_WORD(word)) {
             error = Error_Bad_Value_Core(word, VAL_SPECIFIER(arg));
@@ -324,7 +324,7 @@ REB_R MAKE_Context(
         // !!! This binds the actual body data, not a copy of it.  See
         // Virtual_Bind_Deep_To_New_Context() for future directions.
         //
-        Bind_Values_Deep(VAL_ARRAY_AT(arg), ctx);
+        Bind_Values_Deep(VAL_ARRAY_AT_MUTABLE_HACK(arg), ctx);
 
         DECLARE_LOCAL (dummy);
         if (Do_Any_Array_At_Throws(dummy, arg, SPECIFIED)) {
@@ -896,7 +896,7 @@ REBNATIVE(construct)
             D_OUT,
             Construct_Context_Managed(
                 REB_OBJECT,
-                VAL_ARRAY_AT(spec),
+                VAL_ARRAY_AT_MUTABLE_HACK(spec),  // warning: modifies binding!
                 VAL_SPECIFIER(spec),
                 parent
             )
@@ -917,7 +917,7 @@ REBNATIVE(construct)
     // !!! This binds the actual body data, not a copy of it.  See
     // Virtual_Bind_Deep_To_New_Context() for future directions.
     //
-    Bind_Values_Deep(VAL_ARRAY_AT(spec), context);
+    Bind_Values_Deep(VAL_ARRAY_AT_ENSURE_MUTABLE(spec), context);
 
     DECLARE_LOCAL (dummy);
     if (Do_Any_Array_At_Throws(dummy, spec, SPECIFIED)) {

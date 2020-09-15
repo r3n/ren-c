@@ -92,7 +92,7 @@ REBLEN Modify_Array(
         }
 
         if (not tail_newline) {
-            RELVAL *tail_cell = VAL_ARRAY_AT(unescaped) + ilen;
+            const RELVAL *tail_cell = VAL_ARRAY_AT(unescaped) + ilen;
             if (IS_END(tail_cell)) {
                 tail_newline = GET_ARRAY_FLAG(
                     VAL_ARRAY(src_val),
@@ -234,9 +234,9 @@ REBLEN Modify_String_Or_Binary(
 ){
     assert(sym == SYM_INSERT or sym == SYM_CHANGE or sym == SYM_APPEND);
 
-    ENSURE_MUTABLE(dst);  // rules out symbol strings (e.g. from ANY-WORD!)
+    ENSURE_MUTABLE(dst);  // note this also rules out ANY-WORD!s
 
-    REBSER *dst_ser = VAL_SERIES(dst);
+    REBSER *dst_ser = VAL_SERIES_ENSURE_MUTABLE(dst);
     REBLEN dst_idx = VAL_INDEX(dst);
     REBSIZ dst_used = SER_USED(dst_ser);
 
@@ -330,7 +330,7 @@ REBLEN Modify_String_Or_Binary(
         src_len_raw = src_size_raw = 1;
     }
     else if (IS_BINARY(src)) {
-        REBSER *bin = VAL_BINARY(src);
+        const REBBIN *bin = VAL_BINARY(src);
         REBLEN offset = VAL_INDEX(src);
 
         src_ptr = BIN_AT(bin, offset);
@@ -343,7 +343,7 @@ REBLEN Modify_String_Or_Binary(
         }
         else {
             if (IS_SER_STRING(bin)) {  // guaranteed valid UTF-8
-                REBSTR *str = STR(bin);
+                const REBSTR *str = STR(bin);
                 if (Is_Continuation_Byte_If_Utf8(*src_ptr))
                     fail (Error_Bad_Utf8_Bin_Edit_Raw());
 
@@ -429,7 +429,7 @@ REBLEN Modify_String_Or_Binary(
             // between.  There is some rationale to this, though implications
             // for operations like TO TEXT! of a BLOCK! are unclear...
             //
-            RELVAL *item;
+            const RELVAL *item;
             for (item = VAL_ARRAY_AT(src); NOT_END(item); ++item)
                 Form_Value(mo, item);
             goto use_mold_buffer;

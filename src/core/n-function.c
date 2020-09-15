@@ -311,13 +311,13 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
     REBVAL *out = D_OUT;  // plan ahead for factoring into Chain_Action(out..
 
     REBVAL *pipeline = ARG(pipeline);
-    REBVAL *first = SPECIFIC(VAL_ARRAY_AT(pipeline));
+    const REBVAL *first = SPECIFIC(VAL_ARRAY_AT(pipeline));
 
     // !!! Current validation is that all are functions.  Should there be other
     // checks?  (That inputs match outputs in the chain?)  Should it be
     // a dialect and allow things other than functions?
     //
-    REBVAL *check = first;
+    const REBVAL *check = first;
     while (NOT_END(check)) {
         if (not IS_ACTION(check))
             fail (check);
@@ -339,7 +339,7 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
         ACT_EXEMPLAR(VAL_ACTION(first)),  // same exemplar as first action
         1  // details array capacity
     );
-    Freeze_Array_Deep(VAL_ARRAY(pipeline));
+    Force_Value_Frozen_Deep(pipeline);
     Move_Value(ARR_HEAD(ACT_DETAILS(chain)), pipeline);
 
     return Init_Action_Unbound(out, chain);
@@ -979,7 +979,7 @@ REBNATIVE(reskinned)
     bool need_skin_phase = false; // only needed if types were broadened
 
     RELVAL *param = ARR_AT(paramlist, 1); // first param (0 is ACT_ARCHETYPE)
-    RELVAL *item = VAL_ARRAY_AT(ARG(skin));
+    const RELVAL *item = VAL_ARRAY_AT(ARG(skin));
     Reb_Param_Class pclass;
     while (NOT_END(item)) {
         bool change;

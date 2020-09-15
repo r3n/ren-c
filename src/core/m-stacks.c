@@ -329,10 +329,8 @@ void Pop_Stack_Values_Into(REBVAL *into, REBDSP dsp_start) {
     REBLEN len = DSP - dsp_start;
     REBVAL *values = SPECIFIC(ARR_AT(DS_Array, dsp_start + 1));
 
-    ENSURE_MUTABLE(into);
-
     VAL_INDEX(into) = Insert_Series(
-        SER(VAL_ARRAY(into)),
+        VAL_SERIES_ENSURE_MUTABLE(into),
         VAL_INDEX(into),
         cast(REBYTE*, values), // stack only holds fully specified REBVALs
         len // multiplied by width (sizeof(REBVAL)) in Insert_Series

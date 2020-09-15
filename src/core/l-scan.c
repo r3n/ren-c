@@ -2818,7 +2818,7 @@ REBNATIVE(transcode)
         Move_Value(var, source);
 
         if (IS_BINARY(var))
-            VAL_INDEX(var) = ss.end - VAL_BIN_HEAD(var);
+            VAL_INDEX(var) = ss.end - BIN_HEAD(VAL_BINARY(var));
         else {
             assert(IS_TEXT(var));
 

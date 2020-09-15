@@ -257,7 +257,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     REBVAL *ports = nullptr;
     REBINT n = 0;
 
-    RELVAL *val;
+    const RELVAL *val;
     if (not IS_BLOCK(ARG(value)))
         val = ARG(value);
     else {
@@ -429,7 +429,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
   post_wait_loop:
 
     if (not did_port_action) {  // timeout
-        RESET_ARRAY(VAL_ARRAY(waked));  // just reset the waked list
+        RESET_ARRAY(VAL_ARRAY_KNOWN_MUTABLE(waked));  // just reset the waked list
         return nullptr;
     }
 
@@ -446,12 +446,12 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     Move_Value(D_OUT, sieved);
     rebRelease(sieved);
 
-    RESET_ARRAY(VAL_ARRAY(waked));  // clear waked list
+    RESET_ARRAY(VAL_ARRAY_KNOWN_MUTABLE(waked));  // clear waked list
 
     if (REF(all))
         return D_OUT;  // caller wants all the ports that waked us
 
-    RELVAL *first = VAL_ARRAY_AT(D_OUT);
+    const RELVAL *first = VAL_ARRAY_AT(D_OUT);
     if (not IS_PORT(first)) {
         assert(!"First element of intersection not port, does this happen?");
         return nullptr;

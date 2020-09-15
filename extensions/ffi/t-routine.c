@@ -83,7 +83,7 @@ static void Schema_From_Block_May_Fail(
     if (VAL_LEN_AT(blk) == 0)
         fail (blk);
 
-    RELVAL *item = VAL_ARRAY_AT(blk);
+    const RELVAL *item = VAL_ARRAY_AT(blk);
 
     DECLARE_LOCAL (def);
     DECLARE_LOCAL (temp);
@@ -256,7 +256,7 @@ static uintptr_t arg_to_ffi(
         offset = 10200304;  // shouldn't be used, but avoid warning
 
     if (IS_BLOCK(schema)) {
-        REBFLD *top = VAL_ARRAY(schema);
+        REBFLD *top = VAL_ARRAY_KNOWN_MUTABLE(schema);
 
         assert(FLD_IS_STRUCT(top));
         assert(not FLD_IS_ARRAY(top));  // !!! wasn't supported--should be?
@@ -532,7 +532,7 @@ static void ffi_to_rebol(
     void *ffi_rvalue
 ){
     if (IS_BLOCK(schema)) {
-        REBFLD *top = VAL_ARRAY(schema);
+        REBFLD *top = VAL_ARRAY_KNOWN_MUTABLE(schema);
 
         assert(FLD_IS_STRUCT(top));
         assert(not FLD_IS_ARRAY(top));  // !!! wasn't supported, should be?
@@ -852,8 +852,8 @@ REB_R Routine_Dispatcher(REBFRM *f)
     REBLEN i;
     for (i = 0; i < num_args; ++i) {
         uintptr_t off = cast(uintptr_t, *SER_AT(void*, arg_offsets, i));
-        assert(off == 0 or off < SER_LEN(store));
-        *SER_AT(void*, arg_offsets, i) = SER_DATA(store) + off;
+        assert(off == 0 or off < BIN_LEN(store));
+        *SER_AT(void*, arg_offsets, i) = BIN_DATA(store, off);
     }
   }
 
@@ -1065,7 +1065,7 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
     REBLEN num_fixed = 0;  // number of fixed (non-variadic) arguments
     bool is_variadic = false;  // default to not being variadic
 
-    RELVAL *item = VAL_ARRAY_AT(ffi_spec);
+    const RELVAL *item = VAL_ARRAY_AT(ffi_spec);
     for (; NOT_END(item); ++item) {
         if (IS_TEXT(item))
             continue;  // !!! TBD: extract ACT_META info from spec notes

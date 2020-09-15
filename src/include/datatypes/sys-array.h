@@ -53,22 +53,42 @@
 // marker in its tail slot, which is one past the last position that is
 // valid for writing a full REBVAL.
 
-inline static RELVAL *ARR_AT(REBARR *a, REBLEN n)
-    { return SER_AT(RELVAL, cast(REBSER*, a), n); }
+inline static RELVAL *ARR_AT(const_if_c REBARR *a, REBLEN n)
+  { return SER_AT(RELVAL, SER(a), n); }
 
-inline static RELVAL *ARR_HEAD(REBARR *a)
-    { return SER_HEAD(RELVAL, cast(REBSER*, a)); }
+inline static RELVAL *ARR_HEAD(const_if_c REBARR *a)
+  { return SER_HEAD(RELVAL, SER(a)); }
 
-inline static RELVAL *ARR_TAIL(REBARR *a)
-    { return SER_TAIL(RELVAL, cast(REBSER*, a)); }
+inline static RELVAL *ARR_TAIL(const_if_c REBARR *a)
+  { return SER_TAIL(RELVAL, SER(a)); }
 
-inline static RELVAL *ARR_LAST(REBARR *a)
-    { return SER_LAST(RELVAL, cast(REBSER*, a)); }
+inline static RELVAL *ARR_LAST(const_if_c REBARR *a)
+  { return SER_LAST(RELVAL, SER(a)); }
 
-inline static RELVAL *ARR_SINGLE(REBARR *a) {
-    assert(not IS_SER_DYNAMIC(a)); // singular test avoided in release build
+inline static RELVAL *ARR_SINGLE(const_if_c REBARR *a) {
+    assert(not IS_SER_DYNAMIC(a));
     return cast(RELVAL*, &SER(a)->content.fixed);
 }
+
+#ifdef __cplusplus
+    inline static const RELVAL *ARR_AT(const REBARR *a, REBLEN n)
+        { return SER_AT(const RELVAL, SER(a), n); }
+
+    inline static const RELVAL *ARR_HEAD(const REBARR *a)
+        { return SER_HEAD(const RELVAL, SER(a)); }
+
+    inline static const RELVAL *ARR_TAIL(const REBARR *a)
+        { return SER_TAIL(const RELVAL, SER(a)); }
+
+    inline static const RELVAL *ARR_LAST(const REBARR *a)
+        { return SER_LAST(const RELVAL, SER(a)); }
+
+    inline static const RELVAL *ARR_SINGLE(const REBARR *a) {
+        assert(not IS_SER_DYNAMIC(a));
+        return cast(const RELVAL*, &SER(a)->content.fixed);
+    }
+#endif
+
 
 // It's possible to calculate the array from just a cell if you know it's a
 // cell inside a singular array.
@@ -305,7 +325,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
 inline static REBARR *Make_Array_For_Copy(
     REBLEN capacity,
     REBFLGS flags,
-    REBARR *original
+    const REBARR *original
 ){
     if (original and GET_ARRAY_FLAG(original, NEWLINE_AT_TAIL)) {
         //
@@ -405,7 +425,7 @@ enum {
 // See TS_NOT_COPIED for the default types excluded from being deep copied
 //
 inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
-    REBARR *original, // ^-- not a macro because original mentioned twice
+    const REBARR *original, // ^-- not macro because original mentioned twice
     REBLEN index,
     REBSPC *specifier,
     REBLEN extra,
@@ -452,36 +472,57 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
 // These operations do not need to take the value's index position into
 // account; they strictly operate on the array series
 //
-inline static REBARR *VAL_ARRAY(REBCEL(const*) v) {
+inline static const REBARR *VAL_ARRAY(REBCEL(const*) v) {
     if (ANY_PATH_KIND(CELL_KIND(v)))
         assert(VAL_INDEX_UNCHECKED(v) == 0);
     else
         assert(ANY_ARRAY_KIND(CELL_KIND(v)));
 
-    REBARR *a = ARR(PAYLOAD(Any, v).first.node);
+    const REBARR *a = ARR(PAYLOAD(Any, v).first.node);
     if (GET_SERIES_INFO(a, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return ARR(a);
 }
 
-#define VAL_ARRAY_HEAD(v) \
-    ARR_HEAD(VAL_ARRAY(v))
+#define VAL_ARRAY_ENSURE_MUTABLE(v) \
+    m_cast(REBARR*, VAL_ARRAY(ENSURE_MUTABLE(v)))
+
+#define VAL_ARRAY_KNOWN_MUTABLE(v) \
+    m_cast(REBARR*, VAL_ARRAY(KNOWN_MUTABLE(v)))
 
 
 // These array operations take the index position into account.  The use
 // of the word AT with a missing index is a hint that the index is coming
 // from the VAL_INDEX() of the value itself.
 //
-inline static RELVAL *VAL_ARRAY_AT(REBCEL(const*) v) {
+inline static const RELVAL *VAL_ARRAY_AT(REBCEL(const*) v) {
     if (VAL_INDEX(v) > ARR_LEN(VAL_ARRAY(v)))
         fail (Error_Past_End_Raw());  // don't clip and give deceptive pointer
     return ARR_AT(VAL_ARRAY(v), VAL_INDEX(v));
 }
 
+#define VAL_ARRAY_AT_ENSURE_MUTABLE(v) \
+    m_cast(RELVAL*, VAL_ARRAY_AT(ENSURE_MUTABLE(v)))
+
+#define VAL_ARRAY_KNOWN_MUTABLE_AT(v) \
+    m_cast(RELVAL*, VAL_ARRAY_AT(KNOWN_MUTABLE(v)))
+
+// !!! R3-Alpha introduced concepts of immutable series with PROTECT, but
+// did not consider the protected status to apply to binding.  Revolt added
+// more notions of immutability (const, holds, locking/freezing) and enforces
+// it at compile-time...which caught many bugs.  But being able to bind
+// "immutable" data was mechanically required by R3-Alpha for efficiency...so
+// new answers will be needed.  See Virtual_Bind_Deep_To_New_Context() for
+// some of the thinking on this topic.  Until it's solved, binding-related
+// calls to this function get mutable access on non-mutable series.  :-/
+//
+#define VAL_ARRAY_AT_MUTABLE_HACK(v) \
+    m_cast(RELVAL*, VAL_ARRAY_AT(v))
+
 #define VAL_ARRAY_LEN_AT(v) \
     VAL_LEN_AT(v)
 
-inline static RELVAL *VAL_ARRAY_TAIL(const RELVAL *v)
+inline static const RELVAL *VAL_ARRAY_TAIL(const RELVAL *v)
   { return ARR_TAIL(VAL_ARRAY(v)); }
 
 
@@ -496,8 +537,8 @@ inline static RELVAL *VAL_ARRAY_TAIL(const RELVAL *v)
 // head because it's taking an index.  So  it looks weird enough to suggest
 // looking here for what the story is.
 //
-inline static RELVAL *VAL_ARRAY_AT_HEAD(const RELVAL *v, REBLEN n) {
-    REBARR *a = VAL_ARRAY(v);  // debug build checks it's ANY-ARRAY!
+inline static const RELVAL *VAL_ARRAY_AT_HEAD(const RELVAL *v, REBLEN n) {
+    const REBARR *a = VAL_ARRAY(v);  // debug build checks it's ANY-ARRAY!
     if (n > ARR_LEN(a))
         fail (Error_Past_End_Raw());
     return ARR_AT(a, (n));
@@ -547,7 +588,7 @@ inline static RELVAL *Init_Relative_Block_At(
 //
 inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {
     assert(ANY_GROUP_KIND(CELL_KIND(group)));
-    RELVAL *inner = VAL_ARRAY_AT(group);
+    const RELVAL *inner = VAL_ARRAY_AT(group);
     if (KIND_BYTE(inner) != REB_GROUP or NOT_END(inner + 1))
         return false; // plain (...) GROUP!
     return true; // a ((...)) GROUP!, inject as rule
@@ -570,7 +611,7 @@ inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {
     #define ASSERT_ARRAY_MANAGED(array) \
         ASSERT_SERIES_MANAGED(SER(array))
 
-    static inline void ASSERT_SERIES(REBSER *s) {
+    static inline void ASSERT_SERIES(const REBSER *s) {
         if (IS_SER_ARRAY(s))
             Assert_Array_Core(ARR(s));
         else

@@ -202,7 +202,7 @@ inline static REBSYM FLD_TYPE_SYM(REBFLD *f) {
 
 inline static REBARR *FLD_FIELDLIST(REBFLD *f) {
     assert(FLD_IS_STRUCT(f));
-    return VAL_ARRAY(FLD_AT(f, IDX_FIELD_TYPE));
+    return VAL_ARRAY_KNOWN_MUTABLE(FLD_AT(f, IDX_FIELD_TYPE));
 }
 
 inline static bool FLD_IS_ARRAY(REBFLD *f) {
@@ -234,7 +234,7 @@ inline static REBLEN FLD_LEN_BYTES_TOTAL(REBFLD *f) {
 
 inline static ffi_type* SCHEMA_FFTYPE(const RELVAL *schema) {
     if (IS_BLOCK(schema)) {
-        REBFLD *field = VAL_ARRAY(schema);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(schema);
         return FLD_FFTYPE(field);
     }
     return Get_FFType_For_Sym(VAL_WORD_SYM(schema));
@@ -291,7 +291,7 @@ inline static REBLEN STU_SIZE(REBSTU *stu)
 inline static REBYTE *STU_DATA_HEAD(REBSTU *stu) {
     REBVAL *data = STU_DATA(stu);
     if (IS_BINARY(data))
-        return VAL_BIN_HEAD(data);
+        return BIN_HEAD(VAL_BINARY_KNOWN_MUTABLE(data));
 
     assert(VAL_HANDLE_LEN(data) != 0);  // is HANDLE!
     return VAL_HANDLE_POINTER(REBYTE, data);
@@ -487,7 +487,8 @@ inline static REBLEN RIN_NUM_FIXED_ARGS(REBRIN *r)
     { return VAL_LEN_HEAD(RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS)); }
 
 inline static REBVAL *RIN_ARG_SCHEMA(REBRIN *r, REBLEN n) { // 0-based index
-    return SPECIFIC(VAL_ARRAY_AT_HEAD(RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS), n));
+    REBVAL *arg_schemas = RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS);
+    return SPECIFIC(ARR_AT(VAL_ARRAY_KNOWN_MUTABLE(arg_schemas), n));
 }
 
 inline static ffi_cif *RIN_CIF(REBRIN *r)

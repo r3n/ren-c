@@ -858,7 +858,7 @@ struct Reb_Series {
 // co-opted for other purposes.
 //
 #define LINK(s) \
-    SER(s)->link_private
+    m_cast(REBSER*, SER(s))->link_private
 
 
 // A pending feature is that the series `->misc` field be used to track if
@@ -866,14 +866,14 @@ struct Reb_Series {
 // build could do a check in that case.
 //
 #if defined(CPLUSPLUS_11)
-    inline static union Reb_Series_Misc& Get_Series_Misc(REBSER *s) {
+    inline static union Reb_Series_Misc& Get_Series_Misc(const REBSER *s) {
         //
         // It would be nice here if we could do some kind of check like
         // `assert(not IS_POINTER_FREETRASH_DEBUG(s->misc_private.trash))`
         // but that would invoke undefined behavior (disengaged union access
         // once another field is assigned).  Valgrind and UBSAN complain.
         //
-        return s->misc_private;
+        return m_cast(REBSER*, s)->misc_private;
     }
 
     #define MISC(s) \
@@ -937,13 +937,13 @@ struct Reb_Series {
 //
 
 #define SET_SERIES_FLAG(s,name) \
-    (SER(s)->header.bits |= SERIES_FLAG_##name)
+    (m_cast(REBSER*, SER(s))->header.bits |= SERIES_FLAG_##name)
 
 #define GET_SERIES_FLAG(s,name) \
     ((SER(s)->header.bits & SERIES_FLAG_##name) != 0)
 
 #define CLEAR_SERIES_FLAG(s,name) \
-    (SER(s)->header.bits &= ~SERIES_FLAG_##name)
+    (m_cast(REBSER*, SER(s))->header.bits &= ~SERIES_FLAG_##name)
 
 #define NOT_SERIES_FLAG(s,name) \
     ((SER(s)->header.bits & SERIES_FLAG_##name) == 0)
@@ -954,13 +954,13 @@ struct Reb_Series {
 //
 
 #define SET_SERIES_INFO(s,name) \
-    (SER(s)->info.bits |= SERIES_INFO_##name)
+    (m_cast(REBSER*, SER(s))->info.bits |= SERIES_INFO_##name)
 
 #define GET_SERIES_INFO(s,name) \
     ((SER(s)->info.bits & SERIES_INFO_##name) != 0)
 
 #define CLEAR_SERIES_INFO(s,name) \
-    (SER(s)->info.bits &= ~SERIES_INFO_##name)
+    (m_cast(REBSER*, SER(s))->info.bits &= ~SERIES_INFO_##name)
 
 #define NOT_SERIES_INFO(s,name) \
     ((SER(s)->info.bits & SERIES_INFO_##name) == 0)
@@ -984,7 +984,7 @@ struct Reb_Series {
 
 #define MAX_SERIES_WIDE 0x100
 
-inline static REBYTE SER_WIDE(REBSER *s) {
+inline static REBYTE SER_WIDE(const REBSER *s) {
     //
     // Arrays use 0 width as a strategic choice, so that the second byte of
     // the ->info flags is 0.  See Endlike_Header() for why.
@@ -1002,12 +1002,12 @@ inline static REBYTE SER_WIDE(REBSER *s) {
 // Bias is empty space in front of head:
 //
 
-inline static REBLEN SER_BIAS(REBSER *s) {
+inline static REBLEN SER_BIAS(const REBSER *s) {
     assert(IS_SER_DYNAMIC(s));
     return cast(REBLEN, ((s)->content.dynamic.bias >> 16) & 0xffff);
 }
 
-inline static REBLEN SER_REST(REBSER *s) {
+inline static REBLEN SER_REST(const REBSER *s) {
     if (LEN_BYTE_OR_255(s) == 255)
         return s->content.dynamic.rest;
 
@@ -1036,11 +1036,11 @@ inline static void SER_SUB_BIAS(REBSER *s, REBLEN b) {
     s->content.dynamic.bias -= b << 16;
 }
 
-inline static size_t SER_TOTAL(REBSER *s) {
+inline static size_t SER_TOTAL(const REBSER *s) {
     return (SER_REST(s) + SER_BIAS(s)) * SER_WIDE(s);
 }
 
-inline static size_t SER_TOTAL_IF_DYNAMIC(REBSER *s) {
+inline static size_t SER_TOTAL_IF_DYNAMIC(const REBSER *s) {
     if (not IS_SER_DYNAMIC(s))
         return 0;
     return SER_TOTAL(s);

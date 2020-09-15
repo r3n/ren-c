@@ -165,7 +165,7 @@ static void Queue_Mark_Pairing_Deep(REBVAL *paired)
 //
 static void Queue_Mark_Node_Deep(void *p)
 {
-    REBYTE first = *cast(REBYTE*, p);
+    REBYTE first = *cast(const REBYTE*, p);
     if (first & NODE_BYTEMASK_0x10_MARKED)
         return;  // may not be finished marking yet, but has been queued
 
@@ -402,8 +402,8 @@ void Reify_Va_To_Array_In_Frame(
     if (DSP == dsp_orig)
         f->feed->array = EMPTY_ARRAY;  // don't bother making new empty array
     else {
-        f->feed->array = Pop_Stack_Values(dsp_orig);
-        Manage_Array(f->feed->array);  // held alive while frame running
+        REBARR *a = Pop_Stack_Values_Core(dsp_orig, SERIES_FLAG_MANAGED);
+        f->feed->array = a;  // held alive while frame running
     }
 
     if (truncated)
@@ -674,7 +674,7 @@ static void Mark_Frame_Stack_Deep(void)
         // it may be trash (e.g. if it's an apply).  GC can ignore it.
         //
         if (f->feed->array)
-            Queue_Mark_Node_Deep(f->feed->array);
+            Queue_Mark_Node_Deep(m_cast(REBARR*, f->feed->array));
 
         // END is possible, because the frame could be sitting at the end of
         // a block when a function runs, e.g. `do [zero-arity]`.  That frame
@@ -1247,7 +1247,7 @@ void Startup_GC(void)
     // The marking queue used in lieu of recursion to ensure that deeply
     // nested structures don't cause the C stack to overflow.
     //
-    GC_Mark_Stack = Make_Series(100, sizeof(REBARR*));
+    GC_Mark_Stack = Make_Series(100, sizeof(const REBNOD*));
     TERM_SEQUENCE(GC_Mark_Stack);
 }
 

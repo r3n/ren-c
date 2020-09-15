@@ -245,8 +245,8 @@ void Expand_Hash(REBSER *ser)
 //
 //  Find_Map_Entry: C
 //
-// Try to find the entry in the map. If not found and val isn't void, create
-// the entry and store the key and val.
+// Try to find the entry in the map. If not found and val isn't nullptr,
+// create the entry and store the key and val.
 //
 // RETURNS: the index to the VALUE or zero if there is none.
 //
@@ -327,9 +327,6 @@ REB_R PD_Map(
     if (IS_NULLED(picker))  // best to error on a null picker
         return R_UNHANDLED;
 
-    if (opt_setval)
-        ENSURE_MUTABLE(pvs->out);
-
     // Fetching and setting with path-based access is case-preserving for any
     // initial insertions.  However, the case-insensitivity means that all
     // writes after that to the same key will not be overriding the key,
@@ -339,27 +336,38 @@ REB_R PD_Map(
     //
     const bool cased = false;
 
-    REBINT n = Find_Map_Entry(
-        VAL_MAP(pvs->out),
-        picker,
-        SPECIFIED,
-        opt_setval,
-        SPECIFIED,
-        cased
-    );
+    if (opt_setval) {
+        REBMAP *m = VAL_MAP_ENSURE_MUTABLE(pvs->out);
 
-    if (opt_setval != NULL) {
+        REBINT n = Find_Map_Entry(
+            m,  // modified (if not located in map)
+            picker,
+            SPECIFIED,
+            opt_setval,  // value to set
+            SPECIFIED,
+            cased
+        );
+
         assert(n != 0);
         return R_INVISIBLE;
     }
 
+    const REBMAP *m = VAL_MAP(pvs->out);
+
+    REBINT n = Find_Map_Entry(
+        m_cast(REBMAP*, m),  // not modified
+        picker,
+        SPECIFIED,
+        nullptr,  // no value, so map not changed
+        SPECIFIED,
+        cased
+    );
+
     if (n == 0)
         return nullptr;
 
-    REBVAL *val = SPECIFIC(
-        ARR_AT(MAP_PAIRLIST(VAL_MAP(pvs->out)), ((n - 1) * 2) + 1)
-    );
-    if (IS_NULLED(val)) // zombie entry, means unused
+    const REBVAL *val = SPECIFIC(ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1));
+    if (IS_NULLED(val))  // zombie entry, means unused
         return nullptr;
 
     return Move_Value(pvs->out, val); // RETURN (...) uses `frame_`, not `pvs`
@@ -371,12 +379,12 @@ REB_R PD_Map(
 //
 static void Append_Map(
     REBMAP *map,
-    REBARR *array,
+    const REBARR *array,
     REBLEN index,
     REBSPC *specifier,
     REBLEN len
 ) {
-    RELVAL *item = ARR_AT(array, index);
+    const RELVAL *item = ARR_AT(array, index);
     REBLEN n = 0;
 
     while (n < len && NOT_END(item)) {
@@ -426,7 +434,7 @@ REB_R MAKE_Map(
 }
 
 
-inline static REBMAP *Copy_Map(REBMAP *map, REBU64 types) {
+inline static REBMAP *Copy_Map(const REBMAP *map, REBU64 types) {
     REBARR *copy = Copy_Array_Shallow_Flags(
         MAP_PAIRLIST(map),
         SPECIFIED,
@@ -479,7 +487,7 @@ REB_R TO_Map(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
         //
         // make map! [word val word val]
         //
-        REBARR* array = VAL_ARRAY(arg);
+        const REBARR* array = VAL_ARRAY(arg);
         REBLEN len = VAL_ARRAY_LEN_AT(arg);
         REBLEN index = VAL_INDEX(arg);
         REBSPC *specifier = VAL_SPECIFIER(arg);
@@ -510,13 +518,13 @@ REB_R TO_Map(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 // what: -1 - words, +1 - values, 0 -both
 //
-REBARR *Map_To_Array(REBMAP *map, REBINT what)
+REBARR *Map_To_Array(const REBMAP *map, REBINT what)
 {
     REBLEN count = Length_Map(map);
     REBARR *a = Make_Array(count * ((what == 0) ? 2 : 1));
 
-    REBVAL *dest = SPECIFIC(ARR_HEAD(a));
-    REBVAL *val = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    RELVAL *dest = ARR_HEAD(a);
+    const REBVAL *val = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     for (; NOT_END(val); val += 2) {
         if (not IS_NULLED(val + 1)) {  // can't be END
             if (what <= 0) {
@@ -530,7 +538,7 @@ REBARR *Map_To_Array(REBMAP *map, REBINT what)
         }
     }
 
-    TERM_ARRAY_LEN(a, cast(RELVAL*, dest) - ARR_HEAD(a));
+    TERM_ARRAY_LEN(a, dest - ARR_HEAD(a));
     assert(IS_END(dest));
     return a;
 }
@@ -539,7 +547,7 @@ REBARR *Map_To_Array(REBMAP *map, REBINT what)
 //
 //  Alloc_Context_From_Map: C
 //
-REBCTX *Alloc_Context_From_Map(REBMAP *map)
+REBCTX *Alloc_Context_From_Map(const REBMAP *map)
 {
     // Doesn't use Length_Map because it only wants to consider words.
     //
@@ -547,7 +555,7 @@ REBCTX *Alloc_Context_From_Map(REBMAP *map)
     // a bit haphazard to have `make object! make map! [x 10 <y> 20]` and
     // just throw out the <y> 20 case...
 
-    REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     REBLEN count = 0;
 
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
@@ -586,7 +594,7 @@ REBCTX *Alloc_Context_From_Map(REBMAP *map)
 //
 void MF_Map(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
-    REBMAP *m = VAL_MAP(v);
+    const REBMAP *m = VAL_MAP(v);
 
     // Prevent endless mold loop:
     if (Find_Pointer_In_Series(TG_Mold_Stack, m) != NOT_FOUND) {
@@ -606,7 +614,7 @@ void MF_Map(REB_MOLD *mo, REBCEL(const*) v, bool form)
     //
     mo->indent++;
 
-    RELVAL *key = ARR_HEAD(MAP_PAIRLIST(m));
+    const RELVAL *key = ARR_HEAD(MAP_PAIRLIST(m));
     for (; NOT_END(key); key += 2) {  // note value slot must not be END
         if (IS_NULLED(key + 1))
             continue; // if value for this key is void, key has been removed
@@ -637,38 +645,39 @@ void MF_Map(REB_MOLD *mo, REBCEL(const*) v, bool form)
 //
 REBTYPE(Map)
 {
-    REBVAL *v = D_ARG(1);
-    REBMAP *map = VAL_MAP(v);
+    REBVAL *map = D_ARG(1);
 
     switch (VAL_WORD_SYM(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // covered by `v`
 
+        const REBMAP *m = VAL_MAP(map);
+
         REBVAL *property = ARG(property);
         switch (VAL_WORD_SYM(property)) {
           case SYM_LENGTH:
-            return Init_Integer(D_OUT, Length_Map(map));
+            return Init_Integer(D_OUT, Length_Map(m));
 
           case SYM_VALUES:
-            return Init_Block(D_OUT, Map_To_Array(map, 1));
+            return Init_Block(D_OUT, Map_To_Array(m, 1));
 
           case SYM_WORDS:
-            return Init_Block(D_OUT, Map_To_Array(map, -1));
+            return Init_Block(D_OUT, Map_To_Array(m, -1));
 
           case SYM_BODY:
-            return Init_Block(D_OUT, Map_To_Array(map, 0));
+            return Init_Block(D_OUT, Map_To_Array(m, 0));
 
           case SYM_TAIL_Q:
-            return Init_Logic(D_OUT, Length_Map(map) == 0);
+            return Init_Logic(D_OUT, Length_Map(m) == 0);
 
           default:
             break;
         }
         fail (Error_Cannot_Reflect(REB_MAP, property)); }
 
-    case SYM_FIND:
-    case SYM_SELECT: {
+      case SYM_FIND:
+      case SYM_SELECT: {
         INCLUDE_PARAMS_OF_FIND;
         UNUSED(PAR(series));  // covered by `v`
 
@@ -678,11 +687,13 @@ REBTYPE(Map)
         if (REF(part) or REF(only) or REF(skip) or REF(tail) or REF(match))
             fail (Error_Bad_Refines_Raw());
 
+        const REBMAP *m = VAL_MAP(map);
+
         REBINT n = Find_Map_Entry(
-            map,
+            m_cast(REBMAP*, VAL_MAP(map)),  // should not modify, see below
             ARG(pattern),
             SPECIFIED,
-            NULL,
+            nullptr,  // nullptr indicates it will only search, not modify
             SPECIFIED,
             did REF(case)
         );
@@ -692,7 +703,7 @@ REBTYPE(Map)
 
         Move_Value(
             D_OUT,
-            SPECIFIC(ARR_AT(MAP_PAIRLIST(map), ((n - 1) * 2) + 1))
+            SPECIFIC(ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1))
         );
 
         if (VAL_WORD_SYM(verb) == SYM_FIND)
@@ -700,15 +711,15 @@ REBTYPE(Map)
 
         return D_OUT; }
 
-    case SYM_PUT: {
+      case SYM_PUT: {
         INCLUDE_PARAMS_OF_PUT;
         UNUSED(ARG(series)); // extracted to `map`
 
         REBINT n = Find_Map_Entry(
-            map,
+            VAL_MAP_ENSURE_MUTABLE(map),
             ARG(key),
             SPECIFIED,
-            ARG(value),
+            ARG(value),  // non-null indicates it will modify, vs. just search
             SPECIFIED,
             did REF(case)
         );
@@ -716,16 +727,16 @@ REBTYPE(Map)
 
         RETURN (ARG(value)); }
 
-    case SYM_INSERT:
-    case SYM_APPEND: {
+      case SYM_INSERT:
+      case SYM_APPEND: {
         INCLUDE_PARAMS_OF_INSERT;
         UNUSED(PAR(series));
 
         REBVAL *value = ARG(value);
         if (IS_NULLED_OR_BLANK(value))
-            RETURN (v);  // don't fail on read only if it would be a no-op
+            RETURN (map);  // don't fail on read only if it would be a no-op
 
-        ENSURE_MUTABLE(v);
+        REBMAP *m = VAL_MAP_ENSURE_MUTABLE(map);
 
         if (REF(only) or REF(line) or REF(dup))
             fail (Error_Bad_Refines_Raw());
@@ -736,16 +747,16 @@ REBTYPE(Map)
         REBLEN len = Part_Len_May_Modify_Index(value, ARG(part));
 
         Append_Map(
-            map,
+            m,
             VAL_ARRAY(value),
             VAL_INDEX(value),
             VAL_SPECIFIER(value),
             len
         );
 
-        return Init_Map(D_OUT, map); }
+        return Init_Map(D_OUT, m); }
 
-    case SYM_COPY: {
+      case SYM_COPY: {
         INCLUDE_PARAMS_OF_COPY;
         UNUSED(PAR(value));
 
@@ -766,21 +777,21 @@ REBTYPE(Map)
             }
         }
 
-        return Init_Map(D_OUT, Copy_Map(map, types)); }
+        return Init_Map(D_OUT, Copy_Map(VAL_MAP(map), types)); }
 
-    case SYM_CLEAR:
-        ENSURE_MUTABLE(v);
+      case SYM_CLEAR: {
+        REBMAP *m = VAL_MAP_ENSURE_MUTABLE(map);
 
-        Reset_Array(MAP_PAIRLIST(map));
+        Reset_Array(MAP_PAIRLIST(m));
 
         // !!! Review: should the space for the hashlist be reclaimed?  This
         // clears all the indices but doesn't scale back the size.
         //
-        Clear_Series(MAP_HASHLIST(map));
+        Clear_Series(MAP_HASHLIST(m));
 
-        return Init_Map(D_OUT, map);
+        return Init_Map(D_OUT, m); }
 
-    default:
+      default:
         break;
     }
 

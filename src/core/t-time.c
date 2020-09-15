@@ -270,7 +270,7 @@ REB_R MAKE_Time(
         if (VAL_ARRAY_LEN_AT(arg) > 3)
             goto no_time;
 
-        RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *item = VAL_ARRAY_AT(arg);
         if (not IS_INTEGER(item))
             goto no_time;
 

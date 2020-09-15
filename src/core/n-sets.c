@@ -100,7 +100,9 @@ REBSER *Make_Set_Operation_Series(
         // and extending Find_Key to FIND on the value itself w/o the hash.
 
         do {
-            REBARR *array1 = VAL_ARRAY(val1); // val1 and val2 swapped 2nd pass!
+            // Note: val1 and val2 swapped 2nd pass!
+            //
+            const REBARR *array1 = VAL_ARRAY(val1);
 
             // Check what is in series1 but not in series2
             //
@@ -111,16 +113,16 @@ REBSER *Make_Set_Operation_Series(
             //
             i = VAL_INDEX(val1);
             for (; i < ARR_LEN(array1); i += skip) {
-                RELVAL *item = ARR_AT(array1, i);
+                const RELVAL *item = ARR_AT(array1, i);
                 if (flags & SOP_FLAG_CHECK) {
                     h = Find_Key_Hashed(
-                        VAL_ARRAY(val2),
+                        m_cast(REBARR*, VAL_ARRAY(val2)),  // mode 1 unchanged
                         hser,
                         item,
                         VAL_SPECIFIER(val1),
                         skip,
                         cased,
-                        1
+                        1  // won't modify the input array
                     );
                     h = (h >= 0);
                     if (flags & SOP_FLAG_INVERT) h = !h;
@@ -183,7 +185,9 @@ REBSER *Make_Set_Operation_Series(
         Push_Mold(mo);
 
         do {
-            REBSTR *str = VAL_STRING(val1); // val1 and val2 swapped 2nd pass!
+            // Note: val1 and val2 swapped 2nd pass!
+            //
+            const REBSTR *str = VAL_STRING(val1);
 
             REBUNI uc;
 
@@ -255,7 +259,9 @@ REBSER *Make_Set_Operation_Series(
         Push_Mold(mo);
 
         do {
-            REBBIN *bin = VAL_SERIES(val1); // val1 and val2 swapped 2nd pass!
+            // Note: val1 and val2 swapped 2nd pass!
+            //
+            const REBBIN *bin = VAL_BINARY(val1);
             REBYTE b;
 
             // Iterate over first series

@@ -81,7 +81,7 @@ REB_R MAKE_Tuple(
         REBLEN len = 0;
         REBINT n;
 
-        RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *item = VAL_ARRAY_AT(arg);
 
         for (; NOT_END(item); ++item, ++vp, ++len) {
             if (len >= MAX_TUPLE)
@@ -109,7 +109,7 @@ REB_R MAKE_Tuple(
     REBLEN alen;
 
     if (IS_ISSUE(arg)) {
-        REBSTR *spelling = VAL_STRING(arg);
+        const REBSTR *spelling = VAL_STRING(arg);
         const REBYTE *ap = STR_HEAD(spelling);
         size_t size = STR_SIZE(spelling); // UTF-8 len
         if (size & 1)
@@ -126,7 +126,7 @@ REB_R MAKE_Tuple(
         }
     }
     else if (IS_BINARY(arg)) {
-        REBYTE *ap = VAL_BIN_AT(arg);
+        const REBYTE *ap = VAL_BIN_AT(arg);
         REBLEN len = VAL_LEN_AT(arg);
         if (len > MAX_TUPLE) len = MAX_TUPLE;
         VAL_TUPLE_LEN(out) = len;

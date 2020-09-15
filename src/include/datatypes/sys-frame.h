@@ -55,7 +55,7 @@ inline static bool FRM_IS_VARIADIC(REBFRM *f) {
     return f->feed->vaptr != nullptr or f->feed->packed != nullptr;
 }
 
-inline static REBARR *FRM_ARRAY(REBFRM *f) {
+inline static const REBARR *FRM_ARRAY(REBFRM *f) {
     assert(IS_END(f->feed->value) or not FRM_IS_VARIADIC(f));
     return f->feed->array;
 }

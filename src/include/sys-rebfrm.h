@@ -452,7 +452,7 @@ struct Reb_Feed {
     // messages to reach backwards and present more context of where the
     // error is located.
     //
-    REBARR *array;
+    const REBARR *array;
 
     // This holds the index of the *next* item in the array to fetch as
     // f->value for processing.  It's invalid if the frame is for a C va_list.

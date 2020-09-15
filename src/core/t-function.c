@@ -302,7 +302,7 @@ REBTYPE(Action)
             if (ARR_LEN(details) < 1 or not ANY_ARRAY(ARR_HEAD(details)))
                 return nullptr;
 
-            REBARR *a = VAL_ARRAY(ARR_HEAD(details));
+            const REBARR *a = VAL_ARRAY(ARR_HEAD(details));
             if (NOT_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED))
                 return nullptr;
 

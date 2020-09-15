@@ -137,7 +137,7 @@ bool Match_For_Compose(const RELVAL *group, const REBVAL *label) {
     if (VAL_LEN_AT(group) == 0) // you have a pattern, so leave `()` as-is
         return false;
 
-    RELVAL *first = VAL_ARRAY_AT(group);
+    const RELVAL *first = VAL_ARRAY_AT(group);
     if (VAL_TYPE(first) != VAL_TYPE(label))
         return false;
 
@@ -210,7 +210,7 @@ REB_R Compose_To_Stack_Core(
             // find compositions inside it if /DEEP and it's an array
         }
         else if (not only and Is_Any_Doubled_Group(*v)) {
-            RELVAL *inner = VAL_ARRAY_AT(*v);
+            const RELVAL *inner = VAL_ARRAY_AT(*v);
             if (Match_For_Compose(inner, label)) {
                 doubled_group = true;
                 match = inner;
@@ -269,7 +269,7 @@ REB_R Compose_To_Stack_Core(
                 if (quotes != 0 or kind != REB_GROUP)
                     fail ("Currently can only splice plain unquoted GROUP!s");
 
-                RELVAL *push = VAL_ARRAY_AT(insert);
+                const RELVAL *push = VAL_ARRAY_AT(insert);
                 if (NOT_END(push)) {
                     //
                     // Only proxy newline flag from the template on *first*
@@ -503,7 +503,7 @@ static void Flatten_Core(
         if (IS_BLOCK(item) and level != FLATTEN_NOT) {
             REBSPC *derived = Derive_Specifier(specifier, item);
             Flatten_Core(
-                VAL_ARRAY_AT(item),
+                VAL_ARRAY_AT_ENSURE_MUTABLE(item),
                 derived,
                 level == FLATTEN_ONCE ? FLATTEN_NOT : FLATTEN_DEEP
             );
@@ -533,7 +533,7 @@ REBNATIVE(flatten)
     REBDSP dsp_orig = DSP;
 
     Flatten_Core(
-        VAL_ARRAY_AT(ARG(block)),
+        VAL_ARRAY_AT_ENSURE_MUTABLE(ARG(block)),
         VAL_SPECIFIER(ARG(block)),
         REF(deep) ? FLATTEN_DEEP : FLATTEN_ONCE
     );

@@ -211,12 +211,12 @@ static void Write_File_Port(REBREQ *file, REBVAL *data, REBLEN len, bool lines)
         REBSIZ offset = VAL_OFFSET_FOR_INDEX(data, VAL_INDEX(data));
         REBSIZ size = VAL_SIZE_LIMIT_AT(NULL, data, len);
 
-        req->common.data = BIN_AT(VAL_SERIES(data), offset);
+        req->common.data = BIN_AT(VAL_SERIES_KNOWN_MUTABLE(data), offset);
         req->length = size;
         req->modes |= RFM_TEXT; // do LF => CR LF, e.g. on Windows
     }
     else {
-        req->common.data = VAL_BIN_AT(data);
+        req->common.data = VAL_BIN_AT_KNOWN_MUTABLE(data);
         req->length = len;
         req->modes &= ~RFM_TEXT; // don't do LF => CR LF, e.g. on Windows
     }

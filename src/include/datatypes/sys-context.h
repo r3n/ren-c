@@ -116,7 +116,7 @@
 #define VAL_PHASE_UNCHECKED(v) \
     ACT(VAL_PHASE_NODE(v))
 
-inline static REBACT *VAL_PHASE(REBVAL *frame) {
+inline static REBACT *VAL_PHASE(const REBVAL *frame) {
     assert(IS_FRAME(frame));
     REBACT *phase = VAL_PHASE_UNCHECKED(frame);
     assert(phase != nullptr);
@@ -127,17 +127,21 @@ inline static REBACT *VAL_PHASE(REBVAL *frame) {
 // allocated context, and in that case it will have to come out of the
 // REBSER node data itself.
 //
-inline static REBVAL *CTX_ARCHETYPE(REBCTX *c) {
-    REBSER *varlist = SER(CTX_VARLIST(c));
+inline static const REBVAL *CTX_ARCHETYPE(const REBCTX *c) {
+    const REBSER *varlist = SER(CTX_VARLIST(c));
     if (not IS_SER_DYNAMIC(varlist))
-        return cast(REBVAL*, &varlist->content.fixed);
+        return cast(const REBVAL*, &varlist->content.fixed);
 
     // If a context has its data freed, it must be converted into non-dynamic
     // form if it wasn't already (e.g. if it wasn't a FRAME!)
     //
     assert(NOT_SERIES_INFO(varlist, INACCESSIBLE));
-    return cast(REBVAL*, varlist->content.dynamic.data);
+    return cast(const REBVAL*, varlist->content.dynamic.data);
 }
+
+inline static REBVAL *CTX_ROOTVAR(REBCTX *c)  // mutable archetype access
+  { return m_cast(REBVAL*, CTX_ARCHETYPE(c)); }
+
 
 // CTX_KEYLIST is called often, and it's worth it to make it as fast as
 // possible--even in an unoptimized build.

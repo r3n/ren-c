@@ -56,7 +56,9 @@ REBNATIVE(identify_jpeg_q)
         return Init_False(D_OUT);
     }
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
+    // !!! jpeg_info is not const-correct; we trust it not to modify data
+    //
+    REBYTE *data = m_cast(REBYTE*, VAL_BIN_AT(ARG(data)));
     REBLEN len = VAL_LEN_AT(ARG(data));
 
     int w, h;
@@ -82,7 +84,9 @@ REBNATIVE(decode_jpeg)
     if (setjmp(jpeg_state))
         fail (Error_Bad_Media_Raw()); // generic
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
+    // !!! jpeg code is not const-correct, we trust it not to modify data
+    //
+    REBYTE *data = m_cast(REBYTE*, VAL_BIN_AT(ARG(data)));
     REBLEN len = VAL_LEN_AT(ARG(data));
 
     int w, h;

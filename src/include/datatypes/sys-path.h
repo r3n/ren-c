@@ -176,14 +176,14 @@ inline static void Set_Path_Core(  // !!! Appears to be unused.  Unnecessary?
 // then turn that into an array.  (We don't want to destructively reify
 // paths, e.g. there should be no actual PG_2_Blanks_Array paths existing.)
 //
-inline static REBARR *VAL_PATH(const RELVAL *path)
+inline static const REBARR *VAL_PATH(const RELVAL *path)
 {
     assert(ANY_PATH_KIND(CELL_TYPE(path)));
     if (MIRROR_BYTE(path) == REB_WORD) {
         assert(VAL_WORD_SYM(VAL_UNESCAPED(path)) == SYM__SLASH_1_);
         return PG_2_Blanks_Array;
     }
-    REBARR *a = VAL_ARRAY(path);
+    const REBARR *a = VAL_ARRAY(path);
     assert(ARR_LEN(a) >= 2);
     assert(Is_Array_Frozen_Shallow(a));
     return a;

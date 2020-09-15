@@ -671,9 +671,13 @@ inline static RELVAL *Prep_Cell_Core(
 //
 
 
-inline static void INIT_VAL_NODE(RELVAL *v, void *p) {
+// Note: If incoming p is mutable, we currently assume that's allowed by the
+// flag bits of the node.  This could have a runtime check in debug build
+// with a C++ variation that only takes mutable pointers.
+//
+inline static void INIT_VAL_NODE(RELVAL *v, const void *p) {
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    PAYLOAD(Any, v).first.node = NOD(p);
+    PAYLOAD(Any, v).first.node = NOD(m_cast(void*, p));
 }
 
 #define VAL_NODE(v) \
@@ -802,11 +806,11 @@ inline static REBNOD *VAL_BINDING(REBCEL(const*) v) {
     return EXTRA(Binding, v).node;
 }
 
-inline static void INIT_BINDING(RELVAL *v, void *p) {
+inline static void INIT_BINDING(RELVAL *v, const void *p) {
     assert(Is_Bindable(v)); // works on partially formed values
 
-    REBNOD *binding = cast(REBNOD*, p);
-    EXTRA(Binding, v).node = binding;
+    const REBNOD *binding = cast(const REBNOD*, p);
+    EXTRA(Binding, v).node = m_cast(REBNOD*, binding);
 
   #if !defined(NDEBUG)
     if (not binding)

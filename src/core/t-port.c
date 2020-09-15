@@ -86,7 +86,7 @@ REB_R TO_Port(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
     //
     REBCTX *context = Copy_Context_Shallow_Managed(VAL_CONTEXT(arg));
     RESET_VAL_HEADER(
-        CTX_ARCHETYPE(context),
+        CTX_ROOTVAR(context),
         REB_PORT,
         CELL_MASK_CONTEXT
     );

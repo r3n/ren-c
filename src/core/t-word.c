@@ -132,14 +132,14 @@ REB_R TO_Word(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
     // a generalization of "refinement paths"
     //
     if (IS_PATH(arg)) {
-        REBARR *a = VAL_ARRAY(arg);
+        const REBARR *a = VAL_ARRAY(arg);
         REBLEN index = 0;
         while (KIND_BYTE(ARR_AT(a, index)) == REB_BLANK)
             ++index;
         if (IS_END(ARR_AT(a, index)))
             fail ("Can't MAKE ANY-WORD! from PATH! that's all BLANK!s");
 
-        RELVAL *non_blank = ARR_AT(a, index);
+        const RELVAL *non_blank = ARR_AT(a, index);
         ++index;
         while (KIND_BYTE(ARR_AT(a, index)) == REB_BLANK)
             ++index;

@@ -379,7 +379,7 @@ struct Loop_Each_State {
     LOOP_MODE mode;  // FOR-EACH, MAP-EACH, EVERY
     REBCTX *pseudo_vars_ctx;  // vars made by Virtual_Bind_To_New_Context()
     REBVAL *data;  // the data argument passed in
-    REBSER *data_ser;  // series data being enumerated (if applicable)
+    const REBSER *data_ser;  // series data being enumerated (if applicable)
     REBSPC *specifier;  // specifier (if applicable)
     REBLEN data_idx;  // index into the data for filling current variable
     REBLEN data_len;  // length of the data
@@ -488,8 +488,8 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
               case REB_MAP: {
                 assert(les->data_idx % 2 == 0);  // should be on key slot
 
-                REBVAL *key;
-                REBVAL *val;
+                const REBVAL *key;
+                const REBVAL *val;
                 while (true) {  // pass over the unused map slots
                     key = SPECIFIC(ARR_AT(ARR(les->data_ser), les->data_idx));
                     ++les->data_idx;
@@ -597,7 +597,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 les->mode == LOOP_MAP_EACH_SPLICED
                 and IS_BLOCK(les->out)
             ){
-                RELVAL *v = VAL_ARRAY_AT(les->out);
+                const RELVAL *v = VAL_ARRAY_AT(les->out);
                 for (; NOT_END(v); ++v)
                     Derelativize(DS_PUSH(), v, VAL_SPECIFIER(les->out));
             }
@@ -715,8 +715,8 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
     if (took_hold)  // release read-only lock
         CLEAR_SERIES_INFO(les.data_ser, HOLD);
 
-    if (IS_DATATYPE(les.data))
-        Free_Unmanaged_Array(ARR(les.data_ser));  // temp array of instances
+    if (IS_DATATYPE(les.data))  // must free temp array of instances
+        Free_Unmanaged_Array(m_cast(REBARR*, ARR(les.data_ser)));
 
     //=//// NOW FINISH UP /////////////////////////////////////////////////=//
 
@@ -1110,7 +1110,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
     REBLEN count = 0;
     if (ANY_ARRAY(res->data)) {
         if (res->broke) {  // cleanup markers, don't do removals
-            RELVAL *temp = VAL_ARRAY_AT(res->data);
+            RELVAL *temp = VAL_ARRAY_KNOWN_MUTABLE_AT(res->data);
             for (; NOT_END(temp); ++temp) {
                 if (GET_CELL_FLAG(temp, MARKED_REMOVE))
                     CLEAR_CELL_FLAG(temp, MARKED_REMOVE);
@@ -1120,7 +1120,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
 
         REBLEN len = VAL_LEN_HEAD(res->data);
 
-        RELVAL *dest = VAL_ARRAY_AT(res->data);
+        RELVAL *dest = VAL_ARRAY_KNOWN_MUTABLE_AT(res->data);
         RELVAL *src = dest;
 
         // avoid blitting cells onto themselves by making the first thing we
@@ -1141,7 +1141,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
                 ++count;
             }
             if (IS_END(src)) {
-                TERM_ARRAY_LEN(VAL_ARRAY(res->data), len);
+                TERM_ARRAY_LEN(VAL_ARRAY_KNOWN_MUTABLE(res->data), len);
                 return count;
             }
             Blit_Cell(dest, src);  // same array--rare place we can do this
@@ -1181,7 +1181,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
         // identity of the incoming series is kept but now with different
         // underlying data.
         //
-        Swap_Series_Content(popped, VAL_SERIES(res->data));
+        Swap_Series_Content(popped, res->series);
 
         Free_Unmanaged_Series(popped);  // now frees incoming series's data
     }
@@ -1213,7 +1213,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
         // identity of the incoming series is kept but now with different
         // underlying data.
         //
-        Swap_Series_Content(SER(popped), VAL_SERIES(res->data));
+        Swap_Series_Content(SER(popped), res->series);
 
         Free_Unmanaged_Series(SER(popped));  // frees incoming series's data
     }
@@ -1305,8 +1305,8 @@ static REB_R Remove_Each_Core(struct Remove_Each_State *res)
 
             do {
                 assert(res->start <= len);
-                SET_CELL_FLAG(
-                    VAL_ARRAY_AT_HEAD(res->data, res->start),
+                SET_CELL_FLAG(  // v-- okay to mark despite read only
+                    m_cast(RELVAL*, ARR_AT(VAL_ARRAY(res->data), res->start)),
                     MARKED_REMOVE
                 );
                 ++res->start;
@@ -1370,7 +1370,6 @@ REBNATIVE(remove_each)
 
     struct Remove_Each_State res;
     res.data = ARG(data);
-    ENSURE_MUTABLE(res.data);
 
     // !!! Currently there is no support for VECTOR!, or IMAGE! (what would
     // that even *mean*?) yet these are in the ANY-SERIES! typeset.
@@ -1385,7 +1384,7 @@ REBNATIVE(remove_each)
     // not be running a REMOVE-EACH on it.  This check for permissions applies
     // even if the REMOVE-EACH turns out to be a no-op.
     //
-    res.series = VAL_SERIES(res.data);
+    res.series = VAL_SERIES_ENSURE_MUTABLE(res.data);
 
     if (VAL_INDEX(res.data) >= SER_LEN(res.series)) {
         //

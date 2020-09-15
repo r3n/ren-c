@@ -206,7 +206,7 @@ REBNATIVE(bind)
         Init_Any_Array(D_OUT, VAL_TYPE(v), copy);
     }
     else {
-        at = VAL_ARRAY_AT(v); // only affects binding from current index
+        at = VAL_ARRAY_AT_MUTABLE_HACK(v);  // only affects bindings after index
         Move_Value(D_OUT, v);
     }
 
@@ -287,7 +287,7 @@ REBNATIVE(in)
 
     // Special form: IN object block
     if (IS_BLOCK(word) or IS_GROUP(word)) {
-        Bind_Values_Deep(VAL_ARRAY_HEAD(word), context);
+        Bind_Values_Deep(VAL_ARRAY_AT_MUTABLE_HACK(word), context);
         Quotify(word, num_quotes);
         RETURN (word);
     }
@@ -466,8 +466,14 @@ REBNATIVE(unbind)
 
     if (ANY_WORD(word))
         Unbind_Any_Word(word);
-    else
-        Unbind_Values_Core(VAL_ARRAY_AT(word), NULL, did REF(deep));
+    else {
+        REBCTX *opt_context = nullptr;
+        Unbind_Values_Core(
+            VAL_ARRAY_AT_ENSURE_MUTABLE(word),
+            opt_context,
+            did REF(deep)
+        );
+    }
 
     RETURN (word);
 }
@@ -498,7 +504,7 @@ REBNATIVE(collect_words)
     if (REF(deep))
         flags |= COLLECT_DEEP;
 
-    RELVAL *head = VAL_ARRAY_AT(ARG(block));
+    const RELVAL *head = VAL_ARRAY_AT(ARG(block));
     return Init_Block(
         D_OUT,
         Collect_Unique_Words_Managed(head, flags, ARG(ignore))
@@ -575,18 +581,22 @@ REBNATIVE(get)
     }
 
     REBARR *results = Make_Array(VAL_LEN_AT(source));
-    REBVAL *dest = SPECIFIC(ARR_HEAD(results));
-    RELVAL *item = VAL_ARRAY_AT(source);
+    RELVAL *dest = ARR_HEAD(results);
+    const RELVAL *item = VAL_ARRAY_AT(source);
 
     for (; NOT_END(item); ++item, ++dest) {
+        DECLARE_LOCAL (temp);
         Get_Var_May_Fail(
-            dest,
+            temp,  // don't want to write directly into movable memory
             item,
             VAL_SPECIFIER(source),
             did REF(any),
             did REF(hard)
         );
-        Voidify_If_Nulled(dest);  // blocks can't contain nulls
+        if (IS_NULLED(temp))
+            Init_Void(dest);  // blocks can't contain nulls
+        else
+            Move_Value(dest, temp);
     }
 
     TERM_ARRAY_LEN(results, VAL_LEN_AT(source));
@@ -957,10 +967,9 @@ REBNATIVE(free)
     if (ANY_CONTEXT(v) or IS_HANDLE(v))
         fail ("FREE only implemented for ANY-SERIES! at the moment");
 
-    REBSER *s = VAL_SERIES(v);
+    REBSER *s = VAL_SERIES_ENSURE_MUTABLE(v);
     if (GET_SERIES_INFO(s, INACCESSIBLE))
         fail ("Cannot FREE already freed series");
-    ENSURE_MUTABLE(v);
 
     Decay_Series(s);
     return Init_Void(D_OUT); // !!! Should it return the freed, not-useful value?
@@ -1022,7 +1031,7 @@ bool Try_As_String(
         Inherit_Const(Quotify(out, quotes), v);
     }
     else if (IS_BINARY(v)) {  // If valid UTF-8, BINARY! aliases as ANY-STRING!
-        REBBIN *bin = VAL_SERIES(v);
+        const REBBIN *bin = VAL_BINARY(v);
         REBSIZ offset = VAL_INDEX(v);
 
         // The position in the binary must correspond to an actual
@@ -1033,11 +1042,11 @@ bool Try_As_String(
         // Checking before keeps from constraining input on errors, but
         // may be misleading by suggesting a valid "codepoint" was seen.
         //
-        REBYTE *at_ptr = BIN_AT(bin, offset);
+        const REBYTE *at_ptr = BIN_AT(bin, offset);
         if (Is_Continuation_Byte_If_Utf8(*at_ptr))
             fail ("Index at codepoint to convert binary to ANY-STRING!");
 
-        REBSTR *str;
+        const REBSTR *str;
         REBLEN index;
         if (
             NOT_SERIES_FLAG(bin, IS_STRING)
@@ -1084,7 +1093,11 @@ bool Try_As_String(
             SET_SERIES_FLAG(bin, UTF8_NONWORD);
             str = STR(bin);
 
-            SET_STR_LEN_SIZE(str, num_codepoints, BIN_LEN(bin));
+            SET_STR_LEN_SIZE(
+                m_cast(REBSTR*, str),  // legal for tweaking cached data
+                num_codepoints,
+                BIN_LEN(bin)
+            );
             LINK(bin).bookmarks = nullptr;
 
             // !!! TBD: cache index/offset
@@ -1099,9 +1112,9 @@ bool Try_As_String(
             str = STR(bin);
             index = 0;
 
-            REBCHR(*) cp = STR_HEAD(str);
+            REBCHR(const*) cp = STR_HEAD(str);
             REBLEN len = STR_LEN(str);
-            while (index < len and cast(REBYTE*, cp) != at_ptr) {
+            while (index < len and cp != at_ptr) {
                 ++index;
                 cp = NEXT_STR(cp);
             }
@@ -1157,15 +1170,7 @@ REBNATIVE(as)
       case REB_BLOCK:
       case REB_GROUP:
         if (ANY_PATH(v)) {
-            //
-            // This forces the freezing of the path's array; otherwise the
-            // BLOCK! or GROUP! would be able to mutate the immutable path.
-            // There is currently no such thing as a shallow non-removable
-            // bit, though we could use SERIES_INFO_HOLD for that.  For now,
-            // freeze deeply and anyone who doesn't like the effect can use
-            // TO PATH! and accept the copying.
-            //
-            Freeze_Array_Deep(VAL_ARRAY(v));
+            assert(Is_Array_Frozen_Shallow(VAL_ARRAY(v)));
             break;
         }
 
@@ -1215,7 +1220,7 @@ REBNATIVE(as)
       case REB_SET_WORD:
       case REB_SYM_WORD: {
         if (ANY_STRING(v)) {  // aliasing data as an ANY-WORD! freezes data
-            REBSTR *s = VAL_STRING(v);
+            const REBSTR *s = VAL_STRING(v);
             if (not IS_STR_SYMBOL(s)) {
                 //
                 // If the string isn't already a symbol, it could contain
@@ -1249,12 +1254,12 @@ REBNATIVE(as)
             // We have to permanently freeze the underlying series from any
             // mutation to use it in a WORD! (and also, may add STRING flag);
             //
-            REBBIN *bin = VAL_BINARY(v);
+            const REBBIN *bin = VAL_BINARY(v);
             if (not Is_Series_Frozen(bin))
                 if (GET_CELL_FLAG(v, CONST))  // can't freeze or add IS_STRING
                     fail (Error_Alias_Constrains_Raw());
 
-            REBSTR *str;
+            const REBSTR *str;
             if (IS_SER_STRING(bin) and IS_STR_SYMBOL(STR(bin)))
                 str = STR(bin);
             else {

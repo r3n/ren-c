@@ -35,7 +35,7 @@
 // The size is that of a binary structure used by
 // the port for storing internal information.
 //
-REBREQ *Force_Get_Port_State(REBVAL *port, void *device)
+REBREQ *Force_Get_Port_State(const REBVAL *port, void *device)
 {
     REBDEV *dev = cast(REBDEV*, device);
     REBCTX *ctx = VAL_CONTEXT(port);
@@ -46,7 +46,7 @@ REBREQ *Force_Get_Port_State(REBVAL *port, void *device)
     if (IS_BINARY(state)) {
         assert(VAL_INDEX(state) == 0);  // should always be at head
         assert(VAL_LEN_HEAD(state) == dev->req_size);  // should be right size
-        req = VAL_BINARY(state);
+        req = VAL_BINARY_KNOWN_MUTABLE(state);
     }
     else {
         assert(IS_BLANK(state));
@@ -72,7 +72,7 @@ bool Pending_Port(const RELVAL *port)
         REBVAL *state = CTX_VAR(VAL_CONTEXT(port), STD_PORT_STATE);
 
         if (IS_BINARY(state)) {
-            REBREQ *req = VAL_BINARY(state);
+            REBREQ *req = VAL_BINARY_KNOWN_MUTABLE(state);
             if (not (Req(req)->flags & RRF_PENDING))
                 return false;
         }

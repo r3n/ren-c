@@ -2315,7 +2315,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         if (VAL_LEN_AT(v) == 0)
             fail ("SET-BLOCK! must not be empty for now.");
 
-        RELVAL *check = VAL_ARRAY_AT(v);
+        const RELVAL *check = VAL_ARRAY_AT(v);
         for (; NOT_END(check); ++check) {
             if (IS_BLANK(check) or IS_WORD(check) or IS_PATH(check))
                 continue;

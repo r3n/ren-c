@@ -130,7 +130,7 @@ void Append_Values_Len(REBARR *a, const REBVAL *head, REBLEN len)
 // middle of a UTF-8 codepoint, hence a string series aliased as a binary
 // could only have its copy used in a BINARY!.
 //
-REBSER *Copy_Sequence_Core(REBSER *s, REBFLGS flags)
+REBSER *Copy_Sequence_Core(const REBSER *s, REBFLGS flags)
 {
     assert(not IS_SER_ARRAY(s));
 
@@ -174,7 +174,7 @@ REBSER *Copy_Sequence_Core(REBSER *s, REBFLGS flags)
 // length information, or Init_Any_String() will complain.
 //
 REBSER *Copy_Sequence_At_Len_Extra(
-    REBSER *s,
+    const REBSER *s,
     REBLEN index,
     REBLEN len,
     REBLEN extra
@@ -314,7 +314,7 @@ void Remove_Any_Series_Len(REBVAL *v, REBLEN index, REBINT len)
         );
     }
     else  // ANY-ARRAY! is more straightforward
-        Remove_Series_Units(VAL_SERIES(v), index, len);
+        Remove_Series_Units(VAL_SERIES_ENSURE_MUTABLE(v), index, len);
 }
 
 
@@ -403,13 +403,13 @@ REBYTE *Reset_Buffer(REBSER *buf, REBLEN len)
 //
 //  Assert_Series_Term_Core: C
 //
-void Assert_Series_Term_Core(REBSER *s)
+void Assert_Series_Term_Core(const REBSER *s)
 {
     if (IS_SER_ARRAY(s)) {
         //
         // END values aren't canonized to zero bytes, check IS_END explicitly
         //
-        RELVAL *tail = ARR_TAIL(ARR(s));
+        const RELVAL *tail = ARR_TAIL(ARR(s));
         if (NOT_END(tail))
             panic (tail);
     }
@@ -431,7 +431,7 @@ void Assert_Series_Term_Core(REBSER *s)
 //
 //  Assert_Series_Core: C
 //
-void Assert_Series_Core(REBSER *s)
+void Assert_Series_Core(const REBSER *s)
 {
     if (IS_FREE_NODE(s))
         panic (s);

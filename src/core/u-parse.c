@@ -100,7 +100,10 @@
 
 #define P_COLLECTION_VALUE  (f->rootvar + 3)
 #define P_COLLECTION \
-    (IS_BLANK(P_COLLECTION_VALUE) ? nullptr : VAL_ARRAY(P_COLLECTION_VALUE))
+    (IS_BLANK(P_COLLECTION_VALUE) \
+        ? nullptr \
+        : VAL_ARRAY_KNOWN_MUTABLE(P_COLLECTION_VALUE) \
+    )
 
 #define P_NUM_QUOTES_VALUE  (f->rootvar + 4)
 #define P_NUM_QUOTES        VAL_INT32(P_NUM_QUOTES_VALUE)
@@ -197,7 +200,7 @@ inline static REBSYM VAL_CMD(const RELVAL *v) {
 static bool Subparse_Throws(
     bool *interrupted_out,
     REBVAL *out,
-    RELVAL *input,
+    const RELVAL *input,
     REBSPC *input_specifier,
     struct Reb_Feed *rules_feed,
     REBARR *opt_collection,
@@ -783,7 +786,7 @@ static REBIXO To_Thru_Block_Rule(
     //
     REBLEN pos = P_POS;
     for (; pos <= SER_LEN(P_INPUT); ++pos) {  // see note
-        const RELVAL *blk = VAL_ARRAY_HEAD(rule_block);
+        const RELVAL *blk = ARR_HEAD(VAL_ARRAY(rule_block));
         for (; NOT_END(blk); blk++) {
             if (IS_BAR(blk))
                 fail (Error_Parse_Rule()); // !!! Shouldn't `TO [|]` succeed?

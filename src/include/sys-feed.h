@@ -592,7 +592,7 @@ inline static void Literal_Next_In_Feed(REBVAL *out, struct Reb_Feed *feed) {
 inline static void Prep_Array_Feed(
     struct Reb_Feed *feed,
     const RELVAL *opt_first,
-    REBARR *array,
+    const REBARR *array,
     REBLEN index,
     REBSPC *specifier,
     REBFLGS flags

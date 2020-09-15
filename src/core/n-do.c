@@ -461,7 +461,7 @@ REBNATIVE(do)
 
         Push_Frame_No_Varlist(D_OUT, f);
         f->varlist = CTX_VARLIST(stolen);
-        f->rootvar = CTX_ARCHETYPE(stolen);
+        f->rootvar = CTX_ROOTVAR(stolen);
         f->arg = f->rootvar + 1;
         // f->param set above
         f->special = f->arg;
@@ -808,10 +808,10 @@ REBNATIVE(applique)
     //
     Bind_Values_Inner_Loop(
         &binder,
-        VAL_ARRAY_HEAD(ARG(def)), // !!! bindings are mutated!  :-(
+        VAL_ARRAY_AT_MUTABLE_HACK(ARG(def)),  // mutates bindings
         exemplar,
-        FLAGIT_KIND(REB_SET_WORD), // types to bind (just set-word!),
-        0, // types to "add midstream" to binding as we go (nothing)
+        FLAGIT_KIND(REB_SET_WORD),  // types to bind (just set-word!),
+        0,  // types to "add midstream" to binding as we go (nothing)
         BIND_DEEP
     );
 
@@ -861,7 +861,7 @@ REBNATIVE(applique)
 
     Push_Frame_No_Varlist(D_OUT, f);
     f->varlist = CTX_VARLIST(stolen);
-    f->rootvar = CTX_ARCHETYPE(stolen);
+    f->rootvar = CTX_ROOTVAR(stolen);
     f->arg = f->rootvar + 1;
     // f->param assigned above
     f->special = f->arg; // signal only type-check the existing data

@@ -161,7 +161,7 @@ static bool Get_Struct_Var(REBVAL *out, REBSTU *stu, const REBVAL *word)
 
     RELVAL *item = ARR_HEAD(fieldlist);
     for (; NOT_END(item); ++item) {
-        REBFLD *field = VAL_ARRAY(item);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
         if (STR_CANON(FLD_NAME(field)) != VAL_WORD_CANON(word))
             continue;
 
@@ -211,7 +211,7 @@ REBARR *Struct_To_Array(REBSTU *stu)
     // fail_if_non_accessible(STU_TO_VAL(stu));
 
     for(; NOT_END(item); ++item) {
-        REBFLD *field = VAL_ARRAY(item);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         Init_Set_Word(DS_PUSH(), FLD_NAME(field)); // required name
 
@@ -292,8 +292,8 @@ static bool same_fields(REBARR *tgt_fieldlist, REBARR *src_fieldlist)
     RELVAL *src_item = ARR_HEAD(src_fieldlist);
 
     for (; NOT_END(src_item); ++src_item, ++tgt_item) {
-        REBFLD *src_field = VAL_ARRAY(src_item);
-        REBFLD *tgt_field = VAL_ARRAY(tgt_item);
+        REBFLD *src_field = VAL_ARRAY_KNOWN_MUTABLE(src_item);
+        REBFLD *tgt_field = VAL_ARRAY_KNOWN_MUTABLE(tgt_item);
 
         if (FLD_IS_STRUCT(tgt_field))
             if (not same_fields(
@@ -494,7 +494,7 @@ static bool Set_Struct_Var(
     RELVAL *item = ARR_HEAD(fieldlist);
 
     for (; NOT_END(item); ++item) {
-        REBFLD *field = VAL_ARRAY(item);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         if (VAL_WORD_CANON(word) != STR_CANON(FLD_NAME(field)))
             continue;
@@ -534,9 +534,12 @@ static bool Set_Struct_Var(
 
 
 /* parse struct attribute */
-static void parse_attr (REBVAL *blk, REBINT *raw_size, uintptr_t *raw_addr)
-{
-    REBVAL *attr = SPECIFIC(VAL_ARRAY_AT(blk));
+static void parse_attr(
+    const REBVAL *blk,
+    REBINT *raw_size,
+    uintptr_t *raw_addr
+){
+    const REBVAL *attr = SPECIFIC(VAL_ARRAY_AT(blk));
 
     *raw_size = -1;
     *raw_addr = 0;
@@ -577,14 +580,14 @@ static void parse_attr (REBVAL *blk, REBINT *raw_size, uintptr_t *raw_addr)
             if (IS_END(attr) or not IS_BLOCK(attr) or VAL_LEN_AT(attr) != 2)
                 fail (attr);
 
-            REBVAL *lib = SPECIFIC(VAL_ARRAY_AT_HEAD(attr, 0));
+            const RELVAL *lib = VAL_ARRAY_AT_HEAD(attr, 0);
             if (not IS_LIBRARY(lib))
                 fail (attr);
             if (IS_LIB_CLOSED(VAL_LIBRARY(lib)))
                 fail (Error_Bad_Library_Raw());
 
-            REBVAL *sym = SPECIFIC(VAL_ARRAY_AT_HEAD(attr, 1));
-            if (not IS_BINARY(sym) and not ANY_STRING(sym))
+            RELVAL *sym = VAL_ARRAY_AT_HEAD(attr, 1);
+            if (not ANY_STRING(sym))
                 fail (sym);
 
             CFUNC *addr = Find_Function(
@@ -673,7 +676,7 @@ static REBLEN Total_Struct_Dimensionality(REBARR *fields)
 
     RELVAL *item = ARR_HEAD(fields);
     for (; NOT_END(item); ++item) {
-        REBFLD *field = VAL_ARRAY(item);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         if (FLD_IS_STRUCT(field))
             n_fields += Total_Struct_Dimensionality(FLD_FIELDLIST(field));
@@ -737,7 +740,7 @@ static void Prepare_Field_For_FFI(REBFLD *schema)
 
     REBLEN j = 0;
     for (; NOT_END(item); ++item) {
-        REBFLD *field = VAL_ARRAY(item);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
         REBLEN dimension = FLD_IS_ARRAY(field) ? FLD_DIMENSION(field) : 1;
 
         REBLEN n = 0;
@@ -772,7 +775,7 @@ static void Parse_Field_Type_May_Fail(
 ){
     TRASH_CELL_IF_DEBUG(inner);
 
-    RELVAL *val = VAL_ARRAY_AT(spec);
+    const RELVAL *val = VAL_ARRAY_AT(spec);
 
     if (IS_END(val))
         fail ("Empty field type in FFI");
@@ -953,10 +956,10 @@ static void Parse_Field_Type_May_Fail(
 //
 void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
 {
-    REBVAL *spec_item = SPECIFIC(VAL_ARRAY_AT(spec));
+    const RELVAL *spec_item = VAL_ARRAY_AT(spec);
 
     while (NOT_END(spec_item)) {
-        REBVAL *word;
+        const REBVAL *word;
         if (IS_BLOCK(spec_item)) { // options: raw-memory, etc
             REBINT raw_size = -1;
             uintptr_t raw_addr = 0;
@@ -980,7 +983,7 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
                 fail (word);
         }
 
-        REBVAL *fld_val = spec_item + 1;
+        const REBVAL *fld_val = spec_item + 1;
         if (IS_END(fld_val))
             fail (Error_Need_Non_End_Raw(fld_val));
 
@@ -988,7 +991,7 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
         RELVAL *item = ARR_HEAD(fieldlist);
 
         for (; NOT_END(item); ++item) {
-            REBFLD *field = VAL_ARRAY(item);
+            REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
             if (STR_CANON(FLD_NAME(field)) != VAL_WORD_CANON(word))
                 continue;

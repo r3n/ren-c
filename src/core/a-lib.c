@@ -604,7 +604,7 @@ unsigned char *RL_rebBinaryHead_internal(const REBVAL *binary)
 {
     ENTER_API;
 
-    return VAL_BIN_HEAD(binary);
+    return BIN_HEAD(VAL_BINARY_KNOWN_MUTABLE(binary));
 }
 
 
@@ -615,7 +615,7 @@ unsigned char *RL_rebBinaryAt_internal(const REBVAL *binary)
 {
     ENTER_API;
 
-    return VAL_BIN_AT(binary);
+    return VAL_BIN_AT_KNOWN_MUTABLE(binary);
 }
 
 

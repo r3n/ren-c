@@ -129,8 +129,8 @@ const REBYTE *Analyze_String_For_Scan(
 //
 REBSER *Xandor_Binary(const REBVAL *verb, REBVAL *value, REBVAL *arg)
 {
-    REBYTE *p0 = VAL_BIN_AT(value);
-    REBYTE *p1 = VAL_BIN_AT(arg);
+    const REBYTE *p0 = VAL_BIN_AT(value);
+    const REBYTE *p1 = VAL_BIN_AT(arg);
 
     REBLEN t0 = VAL_LEN_AT(value);
     REBLEN t1 = VAL_LEN_AT(arg);
@@ -230,28 +230,6 @@ REBSER *Complement_Binary(REBVAL *value)
 
 
 //
-//  Shuffle_String: C
-//
-// Randomize a string. Return a new string series.
-// Handles both BYTE and UNICODE strings.
-//
-void Shuffle_String(REBVAL *value, bool secure)
-{
-    REBSTR *s = VAL_STRING(value);
-    REBLEN idx = VAL_INDEX(value);
-
-    REBLEN n;
-    for (n = VAL_LEN_AT(value); n > 1;) {
-        REBLEN k = idx + cast(REBLEN, Random_Int(secure)) % n;
-        n--;
-        REBUNI swap = GET_CHAR_AT(s, k);
-        SET_CHAR_AT(s, k, GET_CHAR_AT(s, n + idx));
-        SET_CHAR_AT(s, n + idx, swap);
-    }
-}
-
-
-//
 //  Trim_Tail: C
 //
 // Used to trim off hanging spaces during FORM and MOLD.
@@ -291,7 +269,6 @@ void Change_Case(
     }
 
     assert(ANY_STRING(val));
-    ENSURE_MUTABLE(val);
 
     // This is a mutating operation, and we want to return the same series at
     // the same index.  However, R3-Alpha code would use Partial() and may
@@ -310,7 +287,7 @@ void Change_Case(
     // be possible, only contractions (is that true?)  Review when UTF-8
     // Everywhere is more mature to the point this is worth worrying about.
     //
-    REBCHR(*) up = VAL_STRING_AT(val);
+    REBCHR(*) up = VAL_STRING_AT_ENSURE_MUTABLE(val);
     REBCHR(*) dp;
     if (upper) {
         REBLEN n;

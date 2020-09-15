@@ -577,7 +577,7 @@ REB_R MAKE_Error(
         Init_Error(out, error);
 
         Rebind_Context_Deep(root_error, error, NULL); // NULL=>no more binds
-        Bind_Values_Deep(VAL_ARRAY_AT(arg), error);
+        Bind_Values_Deep(VAL_ARRAY_AT_MUTABLE_HACK(arg), error);
 
         DECLARE_LOCAL (evaluated);
         if (Do_Any_Array_At_Throws(evaluated, arg, SPECIFIED)) {
@@ -765,7 +765,7 @@ REBCTX *Make_Error_Managed_Core(
 
     REBLEN expected_args = 0;
     if (IS_BLOCK(message)) { // GET-WORD!s in template should match va_list
-        RELVAL *temp = VAL_ARRAY_HEAD(message);
+        const RELVAL *temp = ARR_HEAD(VAL_ARRAY(message));
         for (; NOT_END(temp); ++temp) {
             if (IS_GET_WORD(temp))
                 ++expected_args;
@@ -807,7 +807,7 @@ REBCTX *Make_Error_Managed_Core(
         REBVAL *value = CTX_VAR(error, root_len) + 1;
 
     #ifdef NDEBUG
-        const RELVAL *temp = VAL_ARRAY_HEAD(message);
+        const RELVAL *temp = ARR_HEAD(VAL_ARRAY(message));
     #else
         // Will get here even for a parameterless string due to throwing in
         // the extra "arguments" of the __FILE__ and __LINE__
@@ -815,7 +815,7 @@ REBCTX *Make_Error_Managed_Core(
         const RELVAL *temp =
             IS_TEXT(message)
                 ? cast(const RELVAL*, END_NODE) // gcc/g++ 2.95 needs (bug)
-                : VAL_ARRAY_HEAD(message);
+                : ARR_HEAD(VAL_ARRAY(message));
     #endif
 
         for (; NOT_END(temp); ++temp) {
@@ -869,8 +869,8 @@ REBCTX *Make_Error_Managed_Core(
         assert(IS_END(value)); // ...same
     }
 
-    mutable_KIND_BYTE(CTX_ARCHETYPE(error)) = REB_ERROR;
-    mutable_MIRROR_BYTE(CTX_ARCHETYPE(error)) = REB_ERROR;
+    mutable_KIND_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
+    mutable_MIRROR_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
 
     // C struct mirroring fixed portion of error fields
     //
@@ -1400,7 +1400,7 @@ REBCTX *Startup_Errors(const REBVAL *boot_errors)
     assert(VAL_INDEX(boot_errors) == 0);
     REBCTX *catalog = Construct_Context_Managed(
         REB_OBJECT,
-        VAL_ARRAY_AT(boot_errors),
+        VAL_ARRAY_KNOWN_MUTABLE_AT(boot_errors),  // modifies bindings
         VAL_SPECIFIER(boot_errors),
         NULL
     );
@@ -1412,7 +1412,7 @@ REBCTX *Startup_Errors(const REBVAL *boot_errors)
     for (val = CTX_VAR(catalog, SELFISH(1)); NOT_END(val); val++) {
         REBCTX *error = Construct_Context_Managed(
             REB_OBJECT,
-            VAL_ARRAY_HEAD(val),
+            ARR_HEAD(VAL_ARRAY_KNOWN_MUTABLE(val)),  // modifies bindings
             SPECIFIED, // source array not in a function body
             NULL
         );

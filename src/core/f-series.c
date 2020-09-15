@@ -84,7 +84,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
             return Init_Logic(D_OUT, index > tail);
 
           case SYM_FILE: {
-            REBSER *s = VAL_SERIES(value);
+            const REBSER *s = VAL_SERIES(value);
             if (not IS_SER_ARRAY(s))
                 return nullptr;
             if (NOT_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED))
@@ -92,7 +92,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
             return Init_File(D_OUT, LINK_FILE(s)); }
 
           case SYM_LINE: {
-            REBSER *s = VAL_SERIES(value);
+            const REBSER *s = VAL_SERIES(value);
             if (not IS_SER_ARRAY(s))
                 return nullptr;
             if (NOT_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED))
@@ -163,7 +163,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
         INCLUDE_PARAMS_OF_REMOVE;
         UNUSED(PAR(series));  // accounted for by `value`
 
-        ENSURE_MUTABLE(value);
+        ENSURE_MUTABLE(value);  // !!! Review making this extract
 
         REBINT len;
         if (REF(part))
@@ -234,8 +234,8 @@ REBINT Cmp_Array(REBCEL(const*) sval, REBCEL(const*) tval, bool is_case)
          return 0;
     }
 
-    RELVAL *s = VAL_ARRAY_AT(sval);
-    RELVAL *t = VAL_ARRAY_AT(tval);
+    const RELVAL *s = VAL_ARRAY_AT(sval);
+    const RELVAL *t = VAL_ARRAY_AT(tval);
 
     if (IS_END(s) or IS_END(t))
         goto diff_of_ends;
@@ -448,9 +448,12 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
 // Simple search for a value in an array. Return the index of
 // the value or the TAIL index if not found.
 //
-REBLEN Find_In_Array_Simple(REBARR *array, REBLEN index, const RELVAL *target)
-{
-    RELVAL *value = ARR_HEAD(array);
+REBLEN Find_In_Array_Simple(
+    const REBARR *array,
+    REBLEN index,
+    const RELVAL *target
+){
+    const RELVAL *value = ARR_HEAD(array);
 
     for (; index < ARR_LEN(array); index++) {
         if (0 == Cmp_Value(value + index, target, false))

@@ -31,14 +31,12 @@
 //
 //  Tuples_To_RGBA: C
 //
-void Tuples_To_RGBA(REBYTE *rgba, REBLEN size, REBVAL *blk, REBLEN len)
+void Tuples_To_RGBA(REBYTE *rgba, REBLEN size, const REBVAL *head, REBLEN len)
 {
-    REBYTE *bin;
-
     if (len > size) len = size; // avoid over-run
 
-    for (; len > 0; len--, rgba += 4, blk++) {
-        bin = VAL_TUPLE(blk);
+    for (; len > 0; len--, rgba += 4, ++head) {
+        const REBYTE *bin = VAL_TUPLE(head);
         rgba[0] = bin[0];
         rgba[1] = bin[1];
         rgba[2] = bin[2];
@@ -71,7 +69,7 @@ void Set_Pixel_Tuple(REBYTE *dp, const RELVAL *tuple)
 // true and `index_out` will contain the index position from the head of
 // the array of the non-tuple.  Otherwise returns false.
 //
-bool Array_Has_Non_Tuple(REBLEN *index_out, RELVAL *blk)
+bool Array_Has_Non_Tuple(REBLEN *index_out, const RELVAL *blk)
 {
     assert(ANY_ARRAY(blk));
 
@@ -264,7 +262,7 @@ REB_R MAKE_Image(
         Init_Image_Black_Opaque(out, w, h);
     }
     else if (IS_BLOCK(arg)) {  // make image! [size rgba index]
-        RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *item = VAL_ARRAY_AT(arg);
         if (not IS_PAIR(item))
             goto bad_make;
 
@@ -497,7 +495,7 @@ void Bin_To_RGBA(
 //
 //  Alpha_To_Bin: C
 //
-void Alpha_To_Bin(REBYTE *bin, REBYTE *rgba, REBINT len)
+void Alpha_To_Bin(REBYTE *bin, const REBYTE *rgba, REBINT len)
 {
     for (; len > 0; len--, rgba += 4)
         *bin++ = rgba[3];
@@ -507,7 +505,7 @@ void Alpha_To_Bin(REBYTE *bin, REBYTE *rgba, REBINT len)
 //
 //  Bin_To_Alpha: C
 //
-void Bin_To_Alpha(REBYTE *rgba, REBLEN size, REBYTE *bin, REBINT len)
+void Bin_To_Alpha(REBYTE *rgba, REBLEN size, const REBYTE *bin, REBINT len)
 {
     if (len > (REBINT)size) len = size; // avoid over-run
 
@@ -590,6 +588,8 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
 
     REBVAL *value = ARG(series);  // !!! confusing name
     REBVAL *arg = ARG(value);
+
+    REBSER *bin = VAL_BINARY_ENSURE_MUTABLE(VAL_IMAGE_BIN(value));
 
     REBLEN index = VAL_IMAGE_POS(value);
     REBLEN tail = VAL_IMAGE_LEN_HEAD(value);
@@ -720,10 +720,10 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
     // Expand image data if necessary:
     if (sym == SYM_INSERT) {
         if (index > tail) index = tail;
-        Expand_Series(VAL_BINARY(VAL_IMAGE_BIN(value)), index, dup * part);
+        Expand_Series(bin, index, dup * part);
 
         //length in 'pixels'
-        RESET_IMAGE(VAL_BIN_HEAD(value) + (index * 4), dup * part);
+        RESET_IMAGE(BIN_HEAD(bin) + (index * 4), dup * part);
         Reset_Height(value);
         tail = VAL_LEN_HEAD(value);
         only = false;
@@ -950,9 +950,8 @@ REBTYPE(Image)
     REBINT  diff, len, w, h;
     REBVAL  *val;
 
-    REBSER *series = VAL_BINARY(VAL_IMAGE_BIN(value));
     REBINT index = VAL_IMAGE_POS(value);
-    REBINT tail = cast(REBINT, SER_LEN(series));
+    REBINT tail = cast(REBINT, BIN_LEN(VAL_BINARY(VAL_IMAGE_BIN(value))));
 
     // Clip index if past tail:
     //
@@ -1003,7 +1002,7 @@ REBTYPE(Image)
             // of images being at an "index" is sketchy.  Assume that someone
             // asking for the bytes doesn't care about the index.
             //
-            REBBIN *bin = VAL_BINARY(VAL_IMAGE_BIN(value));
+            const REBBIN *bin = VAL_BINARY(VAL_IMAGE_BIN(value));
             return Init_Binary(D_OUT, bin); }  // at 0 index
 
         default:
@@ -1049,10 +1048,9 @@ REBTYPE(Image)
         RETURN (value); }
 
     case SYM_CLEAR:
-        ENSURE_MUTABLE(value);
         if (index < tail) {
             SET_SERIES_LEN(
-                VAL_BINARY(VAL_IMAGE_BIN(value)),
+                VAL_BINARY_ENSURE_MUTABLE(VAL_IMAGE_BIN(value)),
                 cast(REBLEN, index)
             );
             Reset_Height(value);
@@ -1064,7 +1062,7 @@ REBTYPE(Image)
         INCLUDE_PARAMS_OF_REMOVE;
         UNUSED(PAR(series));
 
-        ENSURE_MUTABLE(value);
+        REBSER *series = VAL_BINARY_ENSURE_MUTABLE(VAL_IMAGE_BIN(value));
 
         if (REF(part)) {
             val = ARG(part);

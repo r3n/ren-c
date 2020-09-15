@@ -198,7 +198,7 @@ REB_R MAKE_Decimal(
 
     default:
         if (ANY_ARRAY(arg) && VAL_ARRAY_LEN_AT(arg) == 2) {
-            RELVAL *item = VAL_ARRAY_AT(arg);
+            const RELVAL *item = VAL_ARRAY_AT(arg);
             if (IS_INTEGER(item))
                 d = cast(REBDEC, VAL_INT64(item));
             else if (IS_DECIMAL(item) || IS_PERCENT(item))

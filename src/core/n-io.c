@@ -154,9 +154,7 @@ REBNATIVE(new_line)
     bool mark = VAL_LOGIC(ARG(mark));
 
     REBVAL *pos = ARG(position);
-    ENSURE_MUTABLE(pos);
-
-    RELVAL *item = VAL_ARRAY_AT(pos);
+    RELVAL *item = VAL_ARRAY_AT_ENSURE_MUTABLE(pos);
 
     REBINT skip;
     if (REF(all))
@@ -209,7 +207,7 @@ REBNATIVE(new_line_q)
 
     REBVAL *pos = ARG(position);
 
-    REBARR *arr;
+    const REBARR *arr;
     const RELVAL *item;
 
     if (IS_VARARGS(pos)) {
