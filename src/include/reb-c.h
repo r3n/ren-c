@@ -340,6 +340,54 @@
 #endif
 
 
+//=//// C-ONLY CONSTNESS //////////////////////////////////////////////////=//
+//
+// C lacks overloading, which means that having one version of code for const
+// input and another for non-const input requires two entirely different names
+// for the function variations.  That can wind up seeming noisier than is
+// worth it for a compile-time check.  This makes it easier to declare the C++
+// variation for the const case:
+//
+//    // C build mutable result even if const input (mutable case in C++)
+//    Member* Get_Member(const_if_c Object* o) {...}
+//
+//    #ifdef __cplusplus
+//        // C++ build adds protection to the const input case
+//        const Member* Get_Member(const Object *o) {...}
+//    #endif
+//
+
+#ifdef __cplusplus
+    #define const_if_c
+#else
+    #define const_if_c const
+#endif
+
+
+//=//// C-ONLY CONSTNESS //////////////////////////////////////////////////=//
+//
+// C lacks overloading, which means that having one version of code for const
+// input and another for non-const input requires two entirely different names
+// for the function variations.  That can wind up seeming noisier than is
+// worth it for a compile-time check.  This makes it easier to declare the C++
+// variation for the const case:
+//
+//    // C build mutable result even if const input (mutable case in C++)
+//    Member* Get_Member(const_if_c Object* o) {...}
+//
+//    #ifdef __cplusplus
+//        // C++ build adds protection to the const input case
+//        const Member* Get_Member(const Object *o) {...}
+//    #endif
+//
+
+#ifdef __cplusplus
+    #define const_if_c
+#else
+    #define const_if_c const
+#endif
+
+
 //=//// CASTING MACROS ////////////////////////////////////////////////////=//
 //
 // The following code and explanation is from "Casts for the Masses (in C)":

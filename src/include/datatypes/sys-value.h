@@ -732,20 +732,15 @@ inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
 //
 // Use for: "invalid conversion from 'Reb_Value*' to 'Reb_Specific_Value*'"
 
-#if !defined(__cplusplus) // poorer protection in C, loses constness
-    inline static REBVAL *KNOWN(const REBCEL *v) {
-        assert(IS_END(v) or IS_SPECIFIC(v));
-        return m_cast(REBVAL*, c_cast(REBCEL*, v));
-    }
-#else
-    inline static const REBVAL *KNOWN(const REBCEL *v) {
-        assert(IS_END(v) or IS_SPECIFIC(v)); // END for KNOWN(ARR_HEAD()), etc.
-        return cast(const REBVAL*, v);
-    }
+inline static REBVAL *KNOWN(const_if_c REBCEL *v) {
+    assert(IS_END(v) or IS_SPECIFIC(v));
+    return m_cast(REBVAL*, cast(const REBVAL*, v));
+}
 
-    inline static REBVAL *KNOWN(REBCEL *v) {
-        assert(IS_END(v) or IS_SPECIFIC(v)); // END for KNOWN(ARR_HEAD()), etc.
-        return cast(REBVAL*, v);
+#if defined(__cplusplus)
+    inline static const REBVAL *KNOWN(const REBCEL *v) {
+        assert(IS_END(v) or IS_SPECIFIC(v));  // END for KNOWN(ARR_HEAD())
+        return cast(const REBVAL*, v);
     }
 
     inline static REBVAL *KNOWN(const REBVAL *v) = delete;
