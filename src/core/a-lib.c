@@ -2020,64 +2020,89 @@ REBVAL *RL_rebError_OS(int errnum)  // see also convenience macro rebFail_OS()
         error = Error(SYM_0, SYM_0, message, END_NODE);
         rebRelease(message);
     }
+  #elif defined(USE_STRERROR_NOT_STRERROR_R)
+    char *shared = strerror(errnum);  // not thread safe, deprecated
+    error = Error_User(shared);
   #else
     // strerror() is not thread-safe, but strerror_r is. Unfortunately, at
     // least in glibc, there are two different protocols for strerror_r(),
     // depending on whether you are using the POSIX-compliant implementation
     // or the GNU implementation.
     //
-    // The convoluted test below is the inversion of the actual test glibc
-    // suggests to discern the version of strerror_r() provided. As other,
-    // non-glibc implementations (such as OS X's libSystem) also provide the
-    // POSIX-compliant version, we invert the test: explicitly use the
-    // older GNU implementation when we are sure about it, and use the
-    // more modern POSIX-compliant version otherwise. Finally, we only
-    // attempt this feature detection when using glibc (__GNU_LIBRARY__),
-    // as this particular combination of the (more widely standardised)
-    // _POSIX_C_SOURCE and _XOPEN_SOURCE defines might mean something
-    // completely different on non-glibc implementations.
+    // It was once possible to tell the difference between which protocol
+    // you were using based on this test:
     //
-    // (Note that undefined pre-processor names arithmetically compare as 0,
-    // which is used in the original glibc test; we are more explicit.)
+    //   The XSI-compliant version of strerror_r() is provided if:
+    //   (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && ! _GNU_SOURCE
+    //   Otherwise, the GNU-specific version is provided.
+    //
+    // Sadly, in GCC 9.3.0 using C99, _GNU_SOURCE is defined but the POSIX
+    // definition (int returning) is in effect.  Other libraries like musl
+    // seem to get this #define tapdance wrong as well.
+    //
+    // There are many attempted workarounds on the Internet (trying to use the
+    // lower-level `sys_errlist` directly--which may not include all errors,
+    // or using function overloading that only works on C++).  This takes a
+    // different tactic in pure C by capturing either result cast to intptr_t.
 
-    #ifdef USE_STRERROR_NOT_STRERROR_R
-        char *shared = strerror(errnum);
-        error = Error_User(shared);
-    #elif defined(__GNU_LIBRARY__) \
-            && (defined(_GNU_SOURCE) \
-                || ((!defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE < 200112L) \
-                    && (!defined(_XOPEN_SOURCE) || _XOPEN_SOURCE < 600)))
+    char buf[MAX_POSIX_ERROR_LEN];
+    buf[0] = cast(char, 255);  // never valid in UTF-8 sequences
+    int old_errno = errno;
+    intptr_t r = cast(intptr_t, strerror_r(errnum, buf, MAX_POSIX_ERROR_LEN));
+    int new_errno = errno;
 
-        // May return an immutable string instead of filling the buffer
-
-        char buffer[MAX_POSIX_ERROR_LEN];
-        char *maybe_str = strerror_r(errnum, buffer, MAX_POSIX_ERROR_LEN);
-        if (maybe_str != buffer) {
-            strncpy(buffer, maybe_str, MAX_POSIX_ERROR_LEN - 1);
-            buffer[MAX_POSIX_ERROR_LEN - 1] = '\0';  // in case truncated
-        }
-        error = Error_User(buffer);
-    #else
+    if (r == -1 or new_errno != old_errno) {
+        //
+        // errno was changed, so probably the return value is just -1 or
+        // something else that doesn't provide info, and errno is the error.
+        //
+        assert(false);
+        error = Error_User("Error during strerror_r call");  // w/new_errno?
+    }
+    else if (r == 0) {
+        //
         // Quoting glibc's strerror_r manpage: "The XSI-compliant strerror_r()
         // function returns 0 on success. On error, a (positive) error number
         // is returned (since glibc 2.13), or -1 is returned and errno is set
-        // to indicate the error (glibc versions before 2.13)."
-
-        char buffer[MAX_POSIX_ERROR_LEN];
-        int result = strerror_r(errnum, buffer, MAX_POSIX_ERROR_LEN);
-
-        // Alert us to any problems in a debug build.
-        assert(result == 0);
-
-        if (result == 0)
-            error = Error_User(buffer);
-        else if (result == EINVAL)
-            error = Error_User("EINVAL: bad errno passed to strerror_r()");
-        else if (result == ERANGE)
-            error = Error_User("ERANGE: insufficient buffer size for error");
+        // to indicate the error (glibc versions before 2.13)."  GNU version
+        // always succeds and should never return 0 (a null char*).
+        //
+        // Documentation isn't clear on whether the buffer is terminated if
+        // the message is too long, or ERANGE always returned.  Terminate.
+        //
+        buf[MAX_POSIX_ERROR_LEN - 1] = '\0';
+        error = Error_User(buf);
+    }
+    else if (r == EINVAL)  // documented result from POSIX strerror_r
+        error = Error_User("EINVAL: bad errno passed to strerror_r()");
+    else if (r == ERANGE)  // documented result from POSIX strerror_r
+        error = Error_User("ERANGE: insufficient buffer size for error");
+    else if (r == cast(intptr_t, buf)) {
+        //
+        // The POSIX version gives us our error back as a pointer if it
+        // filled the buffer successfully.  Sanity check that's what happened.
+        //
+        if (buf[0] == cast(char, 255)) {
+            assert(false);
+            error = Error_User("Buffer not correctly updated by strerror_r");
+        }
         else
-            error = Error_User("Unknown problem with strerror_r() message");
-    #endif
+            error = Error_User(buf);
+    }
+    else if (r < 256) {  // extremely unlikely to be a string buffer pointer
+        assert(false);
+        error = Error_User("Unknown POSIX strerror_r error result code");
+    }
+    else {
+        // The GNU version never fails, but may return an immutable string
+        // instead of filling the buffer. Unknown errors get an
+        // "unknown error" message.  The result is always null terminated.
+        //
+        // (This is the risky part, if `r` is not a valid pointer but some
+        // weird large int return result from POSIX strerror_r.)
+        //
+        error = Error_User(cast(const char*, r));
+    }
   #endif
 
     return Init_Error(Alloc_Value(), error);
