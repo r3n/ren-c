@@ -23,7 +23,6 @@
 // Provides a very simple interface to the signals on Linux
 //
 
-#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include <errno.h>

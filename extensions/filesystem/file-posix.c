@@ -46,7 +46,13 @@
     #define _GNU_SOURCE
 #endif
 
+// Typically, including stdio.h is not allowed by %sys-core.h
+// But this file needs it for remove(), rmdir(), rename()
+// (unlink() in unistd.h works for remove() and rmdir(), but not rename())
+//
+#define REBOL_ALLOW_STDIO_FOR_REMOVE_AND_RENAME
 #include <stdio.h>
+
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>

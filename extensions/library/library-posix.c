@@ -31,7 +31,6 @@
 #endif
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <poll.h>
 #include <fcntl.h>  // Includes `O_XXX` constant definitions
 #include <unistd.h>

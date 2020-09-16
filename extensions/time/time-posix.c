@@ -40,7 +40,6 @@
 #endif
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <poll.h>
 #include <fcntl.h>              /* Obtain O_* constant definitions */
 #include <unistd.h>
