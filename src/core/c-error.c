@@ -1342,7 +1342,7 @@ REBCTX *Error_Bad_Make(enum Reb_Kind type, const REBVAL *spec)
 REBCTX *Error_Bad_Make_Parent(enum Reb_Kind type, const REBVAL *parent)
 {
     assert(parent != nullptr);
-    fail (Error_Bad_Make_Parent_Raw(Datatype_From_Kind(type), parent));
+    return Error_Bad_Make_Parent_Raw(Datatype_From_Kind(type), parent);
 }
 
 
