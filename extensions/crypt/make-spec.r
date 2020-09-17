@@ -14,7 +14,6 @@ definitions: [
 depends: [
     [%crypt/mbedtls/library/rsa.c  #no-c++]
     [%crypt/mbedtls/library/rsa_internal.c  #no-c++]
-    [%crypt/mbedtls/library/oid.c  #no-c++]  ; !!! Is this really needed?
 
     ; If you're using a platform that mbedTLS has been designed for,
     ; you can take the standard settings of what "malloc" and "free"

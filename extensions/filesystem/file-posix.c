@@ -50,7 +50,7 @@
 // But this file needs it for remove(), rmdir(), rename()
 // (unlink() in unistd.h works for remove() and rmdir(), but not rename())
 //
-#define REBOL_ALLOW_STDIO_FOR_REMOVE_AND_RENAME
+#define REBOL_ALLOW_STDIO_IN_RELEASE_BUILD
 #include <stdio.h>
 
 #include <string.h>

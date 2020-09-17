@@ -40,7 +40,6 @@
 #include <windows.h>
 #undef IS_ERROR // windows defines this, different meaning from %sys-core.h
 
-#include <stdio.h>
 #include <assert.h>
 
 #include "sys-core.h" // for CTX_ARCHETYPE(), temporary

@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 
 #define WIN32_LEAN_AND_MEAN  // trim down the Win32 headers

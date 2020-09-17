@@ -207,7 +207,7 @@
  *
  * Enable this layer to allow use of alternative memory allocators.
  */
-//#define MBEDTLS_PLATFORM_MEMORY
+#define MBEDTLS_PLATFORM_MEMORY  // REBENABLE
 
 /**
  * \def MBEDTLS_PLATFORM_NO_STD_FUNCTIONS
@@ -226,7 +226,7 @@
  * Uncomment to prevent default assignment of standard functions in the
  * platform layer.
  */
-//#define MBEDTLS_PLATFORM_NO_STD_FUNCTIONS
+#define MBEDTLS_PLATFORM_NO_STD_FUNCTIONS  // REBENABLE
 
 /**
  * \def MBEDTLS_PLATFORM_EXIT_ALT
@@ -252,13 +252,11 @@
  * platform function
  */
 //#define MBEDTLS_PLATFORM_EXIT_ALT
-//#define MBEDTLS_PLATFORM_TIME_ALT
-#if defined(NDEBUG)  // REBENABLE
-    #define MBEDTLS_PLATFORM_FPRINTF_ALT
-    #define MBEDTLS_PLATFORM_PRINTF_ALT
-    #define MBEDTLS_PLATFORM_SNPRINTF_ALT
-    #define MBEDTLS_PLATFORM_VSNPRINTF_ALT
-#endif
+#define MBEDTLS_PLATFORM_TIME_ALT  // REBENABLE
+//#define MBEDTLS_PLATFORM_FPRINTF_ALT
+//#define MBEDTLS_PLATFORM_PRINTF_ALT
+//#define MBEDTLS_PLATFORM_SNPRINTF_ALT
+//#define MBEDTLS_PLATFORM_VSNPRINTF_ALT
 //#define MBEDTLS_PLATFORM_NV_SEED_ALT
 //#define MBEDTLS_PLATFORM_SETUP_TEARDOWN_ALT
 
@@ -1354,7 +1352,8 @@
  *
  * This enables support for PKCS#1 v1.5 operations.
  */
-#define MBEDTLS_PKCS1_V15
+//#define MBEDTLS_PKCS1_V15  // REBDISABLE - rsa.c requires oid.h, but with
+                             // this it also depends on oid.c and snprintf
 
 /**
  * \def MBEDTLS_PKCS1_V21
@@ -3520,11 +3519,11 @@
 //#define MBEDTLS_MEMORY_ALIGN_MULTIPLE      4 /**< Align on multiples of this value */
 
 /* Platform options */
-//#define MBEDTLS_PLATFORM_STD_MEM_HDR   <stdlib.h> /**< Header to include if MBEDTLS_PLATFORM_NO_STD_FUNCTIONS is defined. Don't define if no header is needed. */
+#define MBEDTLS_PLATFORM_STD_MEM_HDR   <stdlib.h> /**< Header to include if MBEDTLS_PLATFORM_NO_STD_FUNCTIONS is defined. Don't define if no header is needed. */  // REBENABLE
 //#define MBEDTLS_PLATFORM_STD_CALLOC        calloc /**< Default allocator to use, can be undefined */
 //#define MBEDTLS_PLATFORM_STD_FREE            free /**< Default free to use, can be undefined */
 //#define MBEDTLS_PLATFORM_STD_EXIT            exit /**< Default exit to use, can be undefined */
-//#define MBEDTLS_PLATFORM_STD_TIME            time /**< Default time to use, can be undefined. MBEDTLS_HAVE_TIME must be enabled */
+#define MBEDTLS_PLATFORM_STD_TIME            time /**< Default time to use, can be undefined. MBEDTLS_HAVE_TIME must be enabled */  // REBENABLE
 //#define MBEDTLS_PLATFORM_STD_FPRINTF      fprintf /**< Default fprintf to use, can be undefined */
 //#define MBEDTLS_PLATFORM_STD_PRINTF        printf /**< Default printf to use, can be undefined */
 /* Note: your snprintf must correctly zero-terminate the buffer! */
@@ -3537,9 +3536,9 @@
 
 /* To Use Function Macros MBEDTLS_PLATFORM_C must be enabled */
 /* MBEDTLS_PLATFORM_XXX_MACRO and MBEDTLS_PLATFORM_XXX_ALT cannot both be defined */
-//#define MBEDTLS_PLATFORM_CALLOC_MACRO        calloc /**< Default allocator macro to use, can be undefined */
-//#define MBEDTLS_PLATFORM_FREE_MACRO            free /**< Default free macro to use, can be undefined */
-//#define MBEDTLS_PLATFORM_EXIT_MACRO            exit /**< Default exit macro to use, can be undefined */
+#define MBEDTLS_PLATFORM_CALLOC_MACRO        calloc /**< Default allocator macro to use, can be undefined */  // REBENABLE
+#define MBEDTLS_PLATFORM_FREE_MACRO            free /**< Default free macro to use, can be undefined */  // REBENABLE
+#define MBEDTLS_PLATFORM_EXIT_MACRO            exit /**< Default exit macro to use, can be undefined */  // REBENABLE
 //#define MBEDTLS_PLATFORM_TIME_MACRO            time /**< Default time macro to use, can be undefined. MBEDTLS_HAVE_TIME must be enabled */
 //#define MBEDTLS_PLATFORM_TIME_TYPE_MACRO       time_t /**< Default time macro to use, can be undefined. MBEDTLS_HAVE_TIME must be enabled */
 //#define MBEDTLS_PLATFORM_FPRINTF_MACRO      fprintf /**< Default fprintf macro to use, can be undefined */
