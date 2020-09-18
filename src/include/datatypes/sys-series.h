@@ -855,7 +855,7 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN capacity) {
     // The allocation may have returned more than we requested, so we note
     // that in 'rest' so that the series can expand in and use the space.
     //
-    assert(size % wide == 0);
+    /*assert(size % wide == 0);*/  // allow irregular sizes
     s->content.dynamic.rest = size / wide;
 
     // We set the tail of all series to zero initially, but currently do
@@ -868,7 +868,7 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN capacity) {
     if ((GC_Ballast -= size) <= 0)
         SET_SIGNAL(SIG_RECYCLE);
 
-    assert(SER_TOTAL(s) == size);
+    assert(SER_TOTAL(s) <= size);  // irregular sizes won't use all the space
     return true;
 }
 

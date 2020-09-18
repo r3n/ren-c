@@ -1362,7 +1362,7 @@ REBLEN Check_Memory_Debug(void)
             if (pool_num >= SER_POOL)
                 continue; // size doesn't match a known pool
 
-            if (Mem_Pools[pool_num].wide != SER_TOTAL(s))
+            if (Mem_Pools[pool_num].wide < SER_TOTAL(s))
                 panic (s);
         }
     }
