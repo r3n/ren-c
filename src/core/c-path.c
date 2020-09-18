@@ -38,7 +38,7 @@ REBVAL *Init_Any_Path_At_Core(
     REBNOD *binding
 ){
     assert(ANY_PATH_KIND(kind));
-    Ensure_Series_Managed(SER(a));
+    Force_Series_Managed(SER(a));
     ASSERT_SERIES_TERM(SER(a));
     assert(index == 0);  // !!! current rule
 

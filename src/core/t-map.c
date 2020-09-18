@@ -291,7 +291,7 @@ REBLEN Find_Map_Entry(
     // changed, there'd be no notification to rehash the map.
     //
     REBSER *locker = SER(MAP_PAIRLIST(map));
-    Ensure_Value_Frozen(key, locker);
+    Force_Value_Frozen(key, locker);
 
     // Must set the value:
     if (n) {  // re-set it:

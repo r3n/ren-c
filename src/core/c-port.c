@@ -29,13 +29,13 @@
 
 
 //
-//  Ensure_Port_State: C
+//  Force_Get_Port_State: C
 //
 // Use private state area in a port. Create if necessary.
 // The size is that of a binary structure used by
 // the port for storing internal information.
 //
-REBREQ *Ensure_Port_State(REBVAL *port, void *device)
+REBREQ *Force_Get_Port_State(REBVAL *port, void *device)
 {
     REBDEV *dev = cast(REBDEV*, device);
     REBCTX *ctx = VAL_CONTEXT(port);

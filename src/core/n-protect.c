@@ -149,10 +149,8 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
         // Since PROTECT/HIDE is something of an esoteric feature, keep it
         // that way for now, even though it means the keylist has to be
         // made unique.
-        //
-        Ensure_Keylist_Unique_Invalidated(context);
 
-        REBVAL *key = CTX_KEY(context, index);
+        REBVAL *key = CTX_KEY(Force_Keylist_Unique(context), index);
 
         if (flags & PROT_SET) {
             TYPE_SET(key, REB_TS_HIDDEN);
@@ -496,7 +494,7 @@ REBNATIVE(locked_q)
 
 
 //
-//  Ensure_Value_Frozen: C
+//  Force_Value_Frozen: C
 //
 // !!! The concept behind `opt_locker` is that it might be able to give the
 // user more information about why data would be automatically locked, e.g.
@@ -505,7 +503,7 @@ REBNATIVE(locked_q)
 // moment, etc.  Just put a flag at the top level for now, since that is
 // "better than nothing", and revisit later in the design.
 //
-void Ensure_Value_Frozen(const RELVAL *v, REBSER *opt_locker) {
+void Force_Value_Frozen(const RELVAL *v, REBSER *opt_locker) {
     if (Is_Value_Frozen(v))
         return;
 
@@ -602,7 +600,7 @@ REBNATIVE(lock)
     }
 
     REBSER *locker = NULL;
-    Ensure_Value_Frozen(D_OUT, locker);
+    Force_Value_Frozen(D_OUT, locker);
 
     return D_OUT;
 }

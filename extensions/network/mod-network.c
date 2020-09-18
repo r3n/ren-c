@@ -86,7 +86,7 @@ static REB_R Transport_Actor(
 ){
     // Initialize the IO request
     //
-    REBREQ *sock = Ensure_Port_State(port, &Dev_Net);
+    REBREQ *sock = Force_Get_Port_State(port, &Dev_Net);
     struct rebol_devreq *req = Req(sock);
 
     if (proto == TRANSPORT_UDP)
@@ -600,7 +600,7 @@ REBNATIVE(set_udp_multicast)
 {
     NETWORK_INCLUDE_PARAMS_OF_SET_UDP_MULTICAST;
 
-    REBREQ *sock = Ensure_Port_State(ARG(port), &Dev_Net);
+    REBREQ *sock = Force_Get_Port_State(ARG(port), &Dev_Net);
 
     struct rebol_devreq *req = Req(sock);
     if (not (req->modes & RST_UDP)) // !!! other checks?
@@ -643,7 +643,7 @@ REBNATIVE(set_udp_ttl)
 {
     NETWORK_INCLUDE_PARAMS_OF_SET_UDP_TTL;
 
-    REBREQ *sock = Ensure_Port_State(ARG(port), &Dev_Net);
+    REBREQ *sock = Force_Get_Port_State(ARG(port), &Dev_Net);
     struct rebol_devreq *req = Req(sock);
 
     if (not (req->modes & RST_UDP)) // !!! other checks?

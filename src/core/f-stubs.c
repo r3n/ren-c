@@ -273,7 +273,7 @@ REBVAL *Init_Any_Series_At_Core(
     REBNOD *binding
 ){
     assert(ANY_SERIES_KIND(type));
-    Ensure_Series_Managed(s);
+    Force_Series_Managed(s);
 
     // Note: a R3-Alpha Make_Binary() comment said:
     //
@@ -335,7 +335,7 @@ REBVAL *Init_Any_String_At(
         panic(s);
   #endif
 
-    Ensure_Series_Managed(s);
+    Force_Series_Managed(s);
 
     RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, s);

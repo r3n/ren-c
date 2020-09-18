@@ -241,9 +241,9 @@ inline static void **AddrOfReqPortCtx(REBREQ *req) {
 // Review the implications, but just going with making it legal to manage
 // something multiple times for now.
 //
-inline static void Ensure_Req_Managed(REBREQ *req) {
+inline static void Force_Req_Managed(REBREQ *req) {
     ASSERT_REBREQ(req);
-    Ensure_Series_Managed(req);
+    Force_Series_Managed(req);
 }
 
 

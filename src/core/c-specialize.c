@@ -1179,7 +1179,7 @@ REBNATIVE(does)
         //
         RELVAL *body = ARR_HEAD(ACT_DETAILS(doer));
         REBSER *locker = NULL;
-        Ensure_Value_Frozen(specializee, locker);
+        Force_Value_Frozen(specializee, locker);
         Move_Value(body, specializee);
 
         return Init_Action_Unbound(D_OUT, doer);

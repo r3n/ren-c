@@ -734,7 +734,7 @@ DEVICE_CMD Accept_Socket(REBREQ *sock)
     Init_Blank(CTX_VAR(connection, STD_PORT_DATA)); // just to be sure.
     Init_Blank(CTX_VAR(connection, STD_PORT_STATE)); // just to be sure.
 
-    REBREQ *sock_new = Ensure_Port_State(CTX_ARCHETYPE(connection), &Dev_Net);
+    REBREQ *sock_new = Force_Get_Port_State(CTX_ARCHETYPE(connection), &Dev_Net);
 
     struct rebol_devreq *req_new = Req(sock_new);
 

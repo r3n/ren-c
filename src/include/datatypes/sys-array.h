@@ -134,7 +134,7 @@ inline static void TERM_SERIES(REBSER *s) {
 // wasn't really being used anyway, so it wasn't worth it to workaround.
 //
 #define Manage_Array(a)             Manage_Series(SER(a))  // SEE NOTE
-#define Ensure_Array_Managed(a)     Ensure_Series_Managed(SER(a))  // SEE NOTE
+#define Force_Array_Managed(a)     Force_Series_Managed(SER(a))  // SEE NOTE
 
 
 //

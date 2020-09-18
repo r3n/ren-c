@@ -1807,7 +1807,7 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     // won't free it if there are outstanding references.
     //
     // Note that since varlists aren't added to the manual series list, the
-    // bit must be tweaked vs. using Ensure_Array_Managed.
+    // bit must be tweaked vs. using Force_Array_Managed.
     //
     SET_SERIES_FLAG(f->varlist, MANAGED);
 

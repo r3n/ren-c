@@ -458,7 +458,7 @@ inline static REBSER *Manage_Series(REBSER *s)
     return s;
 }
 
-inline static REBSER *Ensure_Series_Managed(void *p) {
+inline static REBSER *Force_Series_Managed(void *p) {
     REBSER *s = SER(p);
     if (NOT_SERIES_FLAG(s, MANAGED))
         Manage_Series(s);

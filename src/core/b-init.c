@@ -45,13 +45,13 @@
 
 
 //
-//  Ensure_Basics: C
+//  Check_Basics: C
 //
 // Initially these checks were in the debug build only.  However, they are so
 // foundational that it's probably worth getting a coherent crash in any build
 // where these tests don't work.
 //
-static void Ensure_Basics(void)
+static void Check_Basics(void)
 {
     //=//// CHECK REBVAL SIZE ////////////////////////////////////////////=//
 
@@ -312,7 +312,7 @@ static REBVAL *Make_Locked_Tag(const char *utf8) { // helper
     mutable_MIRROR_BYTE(t) = REB_TAG;
 
     REBSER *locker = nullptr;
-    Ensure_Value_Frozen(t, locker);
+    Force_Value_Frozen(t, locker);
     return t;
 }
 
@@ -390,7 +390,7 @@ static void Init_Action_Meta_Shim(void) {
     Root_Action_Meta = Init_Object(Alloc_Value(), meta);
 
     REBSER *locker = nullptr;
-    Ensure_Value_Frozen(Root_Action_Meta, locker);
+    Force_Value_Frozen(Root_Action_Meta, locker);
 
 }
 
@@ -750,12 +750,12 @@ static void Init_Root_Vars(void)
     REBSER *locker = nullptr;
 
     Root_Empty_Block = Init_Block(Alloc_Value(), PG_Empty_Array);
-    Ensure_Value_Frozen(Root_Empty_Block, locker);
+    Force_Value_Frozen(Root_Empty_Block, locker);
 
     // Note: has to be a BLOCK!, 2-element blank paths use SYM__SLASH_1_
     //
     Root_2_Blanks_Block = Init_Block(Alloc_Value(), PG_2_Blanks_Array);
-    Ensure_Value_Frozen(Root_2_Blanks_Block, locker);
+    Force_Value_Frozen(Root_2_Blanks_Block, locker);
 
     // Note: rebText() can't run yet, review.
     //
@@ -769,10 +769,10 @@ static void Init_Root_Vars(void)
   #endif
 
     Root_Empty_Text = Init_Text(Alloc_Value(), nulled_uni);
-    Ensure_Value_Frozen(Root_Empty_Text, locker);
+    Force_Value_Frozen(Root_Empty_Text, locker);
 
     Root_Empty_Binary = Init_Binary(Alloc_Value(), Make_Binary(0));
-    Ensure_Value_Frozen(Root_Empty_Binary, locker);
+    Force_Value_Frozen(Root_Empty_Binary, locker);
 
     Root_Space_Char = rebChar(' ');
     Root_Newline_Char = rebChar('\n');
@@ -1228,7 +1228,7 @@ void Startup_Core(void)
     CLEAR(Reb_Opts, sizeof(REB_OPTS));
     Saved_State = NULL;
 
-    Ensure_Basics();
+    Check_Basics();
 
 //=//// INITIALIZE MEMORY AND ALLOCATORS //////////////////////////////////=//
 
