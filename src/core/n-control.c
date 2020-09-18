@@ -737,7 +737,7 @@ REBNATIVE(non)
         if (IS_VOID(value))
             fail ("NON expected value to not be VOID!, but it was");
     }
-    else if (not TYPE_CHECK(value, VAL_TYPE_KIND(test))) {
+    else if (TYPE_CHECK(value, VAL_TYPE_KIND(test))) {
         fail ("NON expected value to not match a type, but it did match");
     }
 
