@@ -29,7 +29,79 @@
 #include "tmp-mod-mysql.h"
 
 // Helper functions
-
+const char * field_type_to_text(int field_type){
+    const char *result; 
+    switch ( field_type ) {
+        case MYSQL_TYPE_TINY:
+            result = "TINYINT";
+            break;
+        case MYSQL_TYPE_SHORT:
+            result = "SMALLINT";
+            break;
+        case MYSQL_TYPE_LONG:
+            result = "INTEGER";
+            break;
+        case MYSQL_TYPE_INT24:
+            result = "MEDIUMINT";
+            break;
+        case MYSQL_TYPE_LONGLONG:
+            result = "BIGINT";
+            break;
+        case MYSQL_TYPE_DECIMAL:
+        case MYSQL_TYPE_NEWDECIMAL:
+            result = "DECIMAL";
+            break;
+        case MYSQL_TYPE_FLOAT:
+            result = "FLOAT";
+            break;
+        case MYSQL_TYPE_DOUBLE:
+            result = "DOUBLE";
+            break;
+        case MYSQL_TYPE_BIT:
+            result = "BIT";
+            break;
+        case MYSQL_TYPE_TIMESTAMP:
+            result = "TIMESTAMP";
+            break;
+        case MYSQL_TYPE_DATE:
+            result = "DATE";
+            break;
+        case MYSQL_TYPE_TIME:
+            result = "TIME";
+            break;
+        case MYSQL_TYPE_DATETIME:
+            result = "DATETIME";
+            break;
+        case MYSQL_TYPE_YEAR:
+            result = "YEAR";
+            break;
+        case MYSQL_TYPE_STRING:
+            result = "CHAR";
+            break;
+        case MYSQL_TYPE_VAR_STRING:
+            result = "VARCHAR";
+            break;
+        case MYSQL_TYPE_BLOB:
+            result = "BLOB";
+            break;
+        case MYSQL_TYPE_SET:
+            result = "SET";
+            break;
+        case MYSQL_TYPE_ENUM:
+            result = "ENUM";
+            break;
+        case MYSQL_TYPE_GEOMETRY:
+            result = "SPATIAL";
+            break;
+        case MYSQL_TYPE_NULL:
+            result = "NULL";
+            break;
+        default: 
+            result = "UNKNOWN";
+            break;
+    }
+    return result;
+}
 // End Helper Functions
 
 // "warning: implicit declaration of function"
@@ -191,6 +263,26 @@ REBNATIVE(mysql_get_server_info)
 }
 
 //
+//  export mysql-get-server-version: native [
+//    
+//      {Returns the MySQL server version as a number.}
+//
+//      return: [integer!]
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_get_server_version)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_GET_SERVER_VERSION;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    unsigned int result = mysql_get_server_version(connection);
+
+    return rebInteger(result);
+}
+
+//
 //  export mysql-get-host-info: native [
 //    
 //      {Returns a string describing the type of connection in use, including the server host name.} 
@@ -208,6 +300,26 @@ REBNATIVE(mysql_get_host_info)
     const char *result = mysql_get_host_info(connection);
 
     return rebText(result);
+}
+
+//
+//  export mysql-get-proto-info: native [
+//    
+//      {Returns the protocol version of the connection as a number.}
+//
+//      return: [integer!]
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_get_proto_info)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_GET_PROTO_INFO;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    unsigned int result = mysql_get_proto_info(connection);
+
+    return rebInteger(result);
 }
 
 //
@@ -251,6 +363,26 @@ REBNATIVE(mysql_field_count)
 }
 
 //
+//  export mysql-num-fields: native [
+//    
+//      {Returns the number of columns for a resultset.} 
+//
+//      return: [integer!]
+//      resultset [handle!]
+//  ]
+//
+REBNATIVE(mysql_num_fields)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_NUM_FIELDS;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+
+    unsigned int result = mysql_num_fields(resultset);
+
+    return rebInteger(result);
+}
+
+//
 //  export mysql-store-result: native [
 //    
 //      {Reads the entire result of a query to the client, allocates a structure, and places the result into this structure. } 
@@ -266,6 +398,26 @@ REBNATIVE(mysql_store_result)
     MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
 
     MYSQL_RES *resultset = mysql_store_result(connection);
+
+    return rebHandle(resultset, 0, nullptr);
+}
+
+//
+//  export mysql-use-result: native [
+//    
+//      {Initiates a result set retrieval of a query to the client, allocates a structure, does not place the result into this structure like mysql-store-result does. } 
+//
+//      return: [handle!]
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_use_result)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_USE_RESULT;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    MYSQL_RES *resultset = mysql_use_result(connection);
 
     return rebHandle(resultset, 0, nullptr);
 }
@@ -310,6 +462,7 @@ REBNATIVE(mysql_fetch_row)
     MYSQL_ROW row;
     MYSQL_FIELD *field;
     REBVAL *block = rebValue("[]");
+    REBVAL *blank = rebBlank();
 
     if ((row = mysql_fetch_row(resultset)))
     {
@@ -317,12 +470,12 @@ REBNATIVE(mysql_fetch_row)
         {
             if (not row[i])
             {
-                rebElide("append", block, rebBlank());
+                rebElide("append", block, blank);
             }
             else
             {
                 field = mysql_fetch_field_direct( resultset, i);
-
+ 
                 switch ( field->type ) {
                     case MYSQL_TYPE_STRING:
                     case MYSQL_TYPE_VAR_STRING:
@@ -330,6 +483,14 @@ REBNATIVE(mysql_fetch_row)
                         rebElide("append", block, rebT(row[i]));
                         break;
 
+                    case MYSQL_TYPE_DATE:
+                        rebElide("append", block, "make date! replace", rebT(row[i]), "{0000-00-00} {0000-01-01}");
+                        break;
+
+                    case MYSQL_TYPE_DATETIME:
+                        rebElide("append", block, "make date! replace replace", rebT(row[i]), "{ } {/} {0000-00-00} {0000-01-01}");
+                        break;
+                  
                     default:
                         rebElide("append", block, row[i]);
                         break;
@@ -338,7 +499,116 @@ REBNATIVE(mysql_fetch_row)
         }
     }
 
+    rebRelease(blank);
+
     return block;
+}
+
+//
+//  export mysql-fetch-field: native [
+//    
+//      {Retrieves the next field properties of a row in a result set.
+//       Returns a block! with the values of:
+//         name
+//         org_name
+//         table
+//         org_table
+//         type
+//         length
+//         max_length
+//         flags
+//         decimals
+//         charsetnr
+//      } 
+//
+//      return: [block!]
+//      resultset [handle!]
+//  ]
+//
+REBNATIVE(mysql_fetch_field)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_FETCH_FIELD;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+
+    MYSQL_FIELD *field;
+    REBVAL *block = rebValue("[]");
+    const char *field_type;
+
+    field = mysql_fetch_field(resultset);
+    
+    // Append all properties to the block
+    rebElide("append", block, rebT(field->name));
+    rebElide("append", block, rebT(field->org_name));
+    rebElide("append", block, rebT(field->table));
+    rebElide("append", block, rebT(field->org_table));
+    field_type = field_type_to_text(field->type);
+    rebElide("append", block, rebT(field_type));
+    rebElide("append", block, rebI(field->length));
+    rebElide("append", block, rebI(field->max_length));
+    rebElide("append", block, rebI(field->flags));
+    rebElide("append", block, rebI(field->decimals));
+    rebElide("append", block, rebI(field->charsetnr));
+
+    return block;
+}
+
+//
+//  export mysql-fetch-fields: native [
+//    
+//      {Retrieves a block containing field properties of all field from a row in a result set.
+//       Returns a block! of block!s with the values of:
+//         name
+//         org_name
+//         table
+//         org_table
+//         type
+//         length
+//         max_length
+//         flags
+//         decimals
+//         charsetnr
+//       This function saves recursive calling of mysql-fetch-field.
+//      } 
+//
+//      return: [block!]
+//      resultset [handle!]
+//  ]
+//
+REBNATIVE(mysql_fetch_fields)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_FETCH_FIELDS;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+
+    MYSQL_FIELD *field;
+    REBVAL *block = rebValue("[]");
+    REBVAL *collectblock = rebValue("[]");
+    const char *field_type;
+
+    while((field = mysql_fetch_field(resultset)))
+    {
+        // Append all properties to the block
+        rebElide("append", block, rebT(field->name));
+        rebElide("append", block, rebT(field->org_name));
+        rebElide("append", block, rebT(field->table));
+        rebElide("append", block, rebT(field->org_table));
+        field_type = field_type_to_text(field->type);
+        rebElide("append", block, rebT(field_type));
+        rebElide("append", block, rebI(field->length));
+        rebElide("append", block, rebI(field->max_length));
+        rebElide("append", block, rebI(field->flags));
+        rebElide("append", block, rebI(field->decimals));
+        rebElide("append", block, rebI(field->charsetnr));
+
+        // Append the block to the container and clear the block
+        rebElide("append/only", collectblock, "copy", block);
+        rebElide("clear", block);
+    }
+
+    rebRelease(block);
+
+    return collectblock;
 }
 
 //
