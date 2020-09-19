@@ -226,6 +226,84 @@ REBNATIVE(mysql_error)
 }
 
 //
+//  export mysql-character-set-name: native [
+//    
+//      {Returns a string describing the type of connection in use, including the server host name.} 
+//
+//      return: [text!]
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_character_set_name)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_CHARACTER_SET_NAME;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    const char *result = mysql_character_set_name(connection);
+
+    return rebText(result);
+}
+
+//
+//  export mysql-get-character-set-info: native [
+//    
+//      {Provides information about the default client character set. The default character set may be changed with the mysql-set-character-set.} 
+//
+//      return: [text!]
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_get_character_set_info)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_GET_CHARACTER_SET_INFO;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+    MY_CHARSET_INFO cs;
+
+    mysql_get_character_set_info(connection, &cs);
+
+    REBVAL *text = rebValue("{}");
+   
+    // Append all info to the text
+    rebElide(  "append", text
+             , "spaced [{character set information:\ncharacter set+collation number:}", rebI(cs.number)
+             , "{\ncharacter set name:}", rebT(cs.name)
+             , "{\ncollation name:}", rebT(cs.csname)
+             , "{\ncomment:}", rebT(cs.comment)
+             , "{\ndirectory:}", rebT(cs.dir)
+             , "{\nmulti byte character min. length:}", rebI(cs.mbminlen)
+             , "{\nmulti byte character max. length:}", rebI(cs.mbmaxlen)
+             , "]" );
+
+    return text;
+}
+
+//
+//  export mysql-set-character-set: native [
+//    
+//      { This function is used to set the default character set for the current connection. 
+//        The string csname specifies a valid character set name. The connection collation becomes the default collation of the character set. 
+//      } 
+//
+//      return: [integer!] {Zero for success. Nonzero if an error occurred.}
+//      connection [handle!]
+//      csname [text!]
+//  ]
+//
+REBNATIVE(mysql_set_character_set)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_SET_CHARACTER_SET;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+    const char * csname = cast(char*, VAL_STRING_AT(ARG(csname)));
+
+    int result = mysql_set_character_set(connection, csname);
+
+    return rebInteger(result);
+}
+
+//
 //  export mysql-get-client-info: native [
 //    
 //      {Returns a string that represents the MySQL client library version (for example, "5.7.32")}
@@ -554,6 +632,57 @@ REBNATIVE(mysql_fetch_field)
 }
 
 //
+//  export mysql-fetch-field-direct: native [
+//    
+//      {Retrieves the field properties of the requested field from a row in a result set.
+//       Returns a block! with the values of:
+//         name
+//         org_name
+//         table
+//         org_table
+//         type
+//         length
+//         max_length
+//         flags
+//         decimals
+//         charsetnr
+//      } 
+//
+//      return: [block!]
+//      resultset [handle!]
+//      fieldnumber [integer!]
+//  ]
+//
+REBNATIVE(mysql_fetch_field_direct)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_FETCH_FIELD_DIRECT;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+    unsigned int fieldnumber = rebUnboxInteger(ARG(fieldnumber));
+
+    MYSQL_FIELD *field;
+    REBVAL *block = rebValue("[]");
+    const char *field_type;
+
+    field = mysql_fetch_field_direct(resultset, fieldnumber);
+    
+    // Append all properties to the block
+    rebElide("append", block, rebT(field->name));
+    rebElide("append", block, rebT(field->org_name));
+    rebElide("append", block, rebT(field->table));
+    rebElide("append", block, rebT(field->org_table));
+    field_type = field_type_to_text(field->type);
+    rebElide("append", block, rebT(field_type));
+    rebElide("append", block, rebI(field->length));
+    rebElide("append", block, rebI(field->max_length));
+    rebElide("append", block, rebI(field->flags));
+    rebElide("append", block, rebI(field->decimals));
+    rebElide("append", block, rebI(field->charsetnr));
+
+    return block;
+}
+
+//
 //  export mysql-fetch-fields: native [
 //    
 //      {Retrieves a block containing field properties of all field from a row in a result set.
@@ -581,25 +710,29 @@ REBNATIVE(mysql_fetch_fields)
 
     MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
 
-    MYSQL_FIELD *field;
+    unsigned int num_fields;
+    unsigned int i;
+    MYSQL_FIELD *fields;
     REBVAL *block = rebValue("[]");
     REBVAL *collectblock = rebValue("[]");
     const char *field_type;
 
-    while((field = mysql_fetch_field(resultset)))
-    {
+    num_fields = mysql_num_fields(resultset);
+    fields = mysql_fetch_fields(resultset);
+
+    for(i = 0; i < num_fields; i++){
         // Append all properties to the block
-        rebElide("append", block, rebT(field->name));
-        rebElide("append", block, rebT(field->org_name));
-        rebElide("append", block, rebT(field->table));
-        rebElide("append", block, rebT(field->org_table));
-        field_type = field_type_to_text(field->type);
+        rebElide("append", block, rebT(fields[i].name));
+        rebElide("append", block, rebT(fields[i].org_name));
+        rebElide("append", block, rebT(fields[i].table));
+        rebElide("append", block, rebT(fields[i].org_table));
+        field_type = field_type_to_text(fields[i].type);
         rebElide("append", block, rebT(field_type));
-        rebElide("append", block, rebI(field->length));
-        rebElide("append", block, rebI(field->max_length));
-        rebElide("append", block, rebI(field->flags));
-        rebElide("append", block, rebI(field->decimals));
-        rebElide("append", block, rebI(field->charsetnr));
+        rebElide("append", block, rebI(fields[i].length));
+        rebElide("append", block, rebI(fields[i].max_length));
+        rebElide("append", block, rebI(fields[i].flags));
+        rebElide("append", block, rebI(fields[i].decimals));
+        rebElide("append", block, rebI(fields[i].charsetnr));
 
         // Append the block to the container and clear the block
         rebElide("append/only", collectblock, "copy", block);
@@ -609,6 +742,220 @@ REBNATIVE(mysql_fetch_fields)
     rebRelease(block);
 
     return collectblock;
+}
+
+//
+//  export mysql-fetch-lengths: native [
+//    
+//      {Retrieves a block containing field lengths of current row in a result set.} 
+//
+//      return: [block!]
+//      resultset [handle!]
+//  ]
+//
+REBNATIVE(mysql_fetch_lengths)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_FETCH_LENGTHS;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+
+    unsigned int num_fields;
+    unsigned long *lengths;
+    unsigned int i;
+    REBVAL *block = rebValue("[]");
+
+    num_fields = mysql_num_fields(resultset);
+    lengths = mysql_fetch_lengths(resultset);
+
+    for(i = 0; i < num_fields; i++){
+        rebElide("append", block, rebI(lengths[i]));
+    }
+
+    return block;
+}
+
+//
+//  export mysql-insert-id: native [
+//    
+//      {Returns the value generated for an AUTO_INCREMENT column by the previous INSERT or UPDATE statement.} 
+//
+//      return: [integer!]
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_insert_id)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_INSERT_ID;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    unsigned int result = mysql_insert_id(connection);
+
+    return rebInteger(result);
+}
+
+//
+//  export mysql-data-seek: native [
+//    
+//      {  Seeks to an arbitrary row in a query result set. The offset value is a row number. 
+// Specify a value in the range from 0 to mysql-num-rows - 1.
+// This function requires that the result set structure contains the entire result of the query, 
+// so mysql-data-seek may be used only in conjunction with mysql-store-result, not with mysql-use-result. 
+//      } 
+//
+//      return: [void!]
+//      resultset [handle!]
+//      offset [integer!]
+//  ]
+//
+REBNATIVE(mysql_data_seek)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_DATA_SEEK;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+    unsigned int offset = rebUnboxInteger(ARG(offset));
+
+    mysql_data_seek(resultset, offset);
+
+    return rebVoid();
+}
+
+//
+//  export mysql-field-seek: native [
+//    
+//      { Sets the field cursor to the given offset. The next call to mysql-fetch-field retrieves the field definition of the column associated with that offset.
+// To seek to the beginning of a row, pass an offset value of zero.
+//      } 
+//
+//      return: [integer!] {The previous value of the field cursor.}
+//      resultset [handle!]
+//      offset [integer!]
+//  ]
+//
+REBNATIVE(mysql_field_seek)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_FIELD_SEEK;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+    unsigned int offset = rebUnboxInteger(ARG(offset));
+
+    unsigned int result = mysql_field_seek(resultset, offset);
+
+    return rebInteger(result);
+}
+
+//
+//  export mysql-field-tell: native [
+//    
+//      {Returns the position of the field cursor used for the last mysql-fetch-field.} 
+//
+//      return: [integer!]
+//      resultset [handle!]
+//  ]
+//
+REBNATIVE(mysql_field_tell)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_FIELD_TELL;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+
+    unsigned int result = mysql_field_tell(resultset);
+
+    return rebInteger(result);
+}
+
+//
+//  export mysql-row-seek: native [
+//    
+//      {  Sets the row cursor to an arbitrary row in a query result set. 
+// The offset value is a row offset, typically a value returned from mysql-row-tell or from mysql-row-seek. 
+// This value is not a row number; to seek to a row within a result set by number, use mysql-data-seek instead.
+// This function requires that the result set structure contains the entire result of the query, 
+// so mysql-row-seek may be used only in conjunction with mysql-store-result, not with mysql-use-result.
+//      } 
+//
+//      return: [handle!] {The previous value of the row cursor. This value may be passed to a subsequent call to mysql-row-seek.}
+//      resultset [handle!]
+//      offset [handle!]
+//  ]
+//
+REBNATIVE(mysql_row_seek)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_ROW_SEEK;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+    MYSQL_ROW_OFFSET offset = VAL_HANDLE_VOID_POINTER(ARG(offset));
+
+    MYSQL_ROW_OFFSET result = mysql_row_seek(resultset, offset);
+
+    return rebHandle(result, 0, nullptr);
+}
+
+//
+//  export mysql-row-tell: native [
+//    
+//      { Returns the current position of the row cursor for the last mysql-fetch-row. This value can be used as an argument to mysql-row-seek.
+// Use mysql-row-tell only after mysql-store-result, not after mysql-use-result. } 
+//
+//      return: [handle!]
+//      resultset [handle!]
+//  ]
+//
+REBNATIVE(mysql_row_tell)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_ROW_TELL;
+
+    MYSQL_RES *resultset = VAL_HANDLE_POINTER( MYSQL_RES, ARG(resultset));
+
+    MYSQL_ROW_OFFSET result = mysql_row_tell(resultset);
+
+    return rebHandle(result, 0, nullptr);
+}
+
+//
+//  export mysql-sqlstate: native [
+//    
+//      {Returns a null-terminated string containing the SQLSTATE error code for the most recently executed SQL statement.
+// The error code consists of five characters. '00000' means “no error.” The values are specified by ANSI SQL and ODBC. 
+//}
+//
+//      return: [text!] {A null-terminated character string containing the SQLSTATE error code.}
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_sqlstate)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_SQLSTATE;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    const char *result = mysql_sqlstate(connection);
+
+    return rebText(result);
+}
+//
+//  export mysql-stat: native [
+//    
+//      {Returns a character string containing information similar to that provided by the mysqladmin status command. This includes uptime in seconds and the number of running
+// threads, questions, reloads, and open tables. }
+//
+//      return: [text! void!] {A character string describing the server status. NULL if an error occurred.}
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_stat)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_STAT;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    const char *result = mysql_stat(connection);
+
+    if (result == NULL){ 
+        return rebVoid(); 
+    }
+
+    return rebText(result);
 }
 
 //

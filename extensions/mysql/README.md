@@ -21,22 +21,38 @@ When compiling the extension the flag \`mysql_config --cflags --libs` will have 
 Basic functions
 
     mysql-affected-rows
+    mysql-character-set-name
     mysql-close
     mysql-connect (uses mysql_init and mysql_real_connect)
+    mysql-data-seek
     mysql-errno
     mysql-error
     mysql-fetch-field
+    mysql-fetch-field-direct
     mysql-fetch-fields
+    mysql-fetch-lengths
     mysql-fetch-row (uses also mysql_fetch_field_direct)
     mysql-field-count
+    mysql-field-seek
+    mysql-field-tell
     mysql-free-result
+    mysql-get-character-set-info
     mysql-get-client-info
     mysql-get-host-info
+    mysql-get-proto-info
     mysql-get-server-info
+    mysql-get-server-version
+    mysql-insert-id
     mysql-num-fields
     mysql-num-rows
     mysql-query
+    mysql-row-seek
+    mysql-row-tell
+    mysql-set-character-set
+    mysql-sqlstate
+    mysql-stat
     mysql-store-result
+    mysql-use-result
 
 Thread functions
 
