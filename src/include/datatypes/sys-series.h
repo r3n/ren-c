@@ -193,9 +193,9 @@ inline static REBYTE *SER_AT_RAW(REBYTE w, REBSER *s, REBLEN i) {
   #if !defined(NDEBUG)
     if (w != SER_WIDE(s)) {  // will be "unusual" value if free
         if (IS_FREE_NODE(s))
-            printf("SER_SEEK_RAW asked on freed series\n");
+            printf("SER_AT_RAW asked on freed series\n");
         else
-            printf("SER_SEEK_RAW asked %d on width=%d\n", w, SER_WIDE(s));
+            printf("SER_AT_RAW asked %d on width=%d\n", w, SER_WIDE(s));
         panic (s);
     }
   #endif
@@ -207,31 +207,6 @@ inline static REBYTE *SER_AT_RAW(REBYTE w, REBSER *s, REBLEN i) {
 
     return ((w) * (i)) + ( // v-- inlining of SER_DATA_RAW
         IS_SER_DYNAMIC(s)
-            ? cast(REBYTE*, s->content.dynamic.data)
-            : cast(REBYTE*, &s->content)
-        );
-}
-
-
-inline static REBYTE *SER_SEEK_RAW(REBYTE w, REBSER *s, REBSIZ n) {
-  #if !defined(NDEBUG)
-    if (w != SER_WIDE(s)) {
-        REBYTE wide = SER_WIDE(s);
-        if (wide == 0)
-            printf("SER_SEEK_RAW asked on freed series\n");
-        else
-            printf("SER_SEEK_RAW asked %d on width=%d\n", w, SER_WIDE(s));
-        panic (s);
-    }
-
-    // The VAL_CONTEXT(), VAL_SERIES(), VAL_ARRAY() extractors do the failing
-    // upon extraction--that's meant to catch it before it gets this far.
-    //
-    assert(NOT_SERIES_INFO(s, INACCESSIBLE));
-  #endif
-
-    return ((w) * (n)) + ( // v-- inlining of SER_DATA_RAW
-        (LEN_BYTE_OR_255(s) == 255)
             ? cast(REBYTE*, s->content.dynamic.data)
             : cast(REBYTE*, &s->content)
         );
@@ -251,9 +226,6 @@ inline static REBYTE *SER_SEEK_RAW(REBYTE w, REBSER *s, REBSIZ n) {
 
 #define SER_AT(t,s,i) \
     ((t*)SER_AT_RAW(sizeof(t), (s), (i)))
-
-#define SER_SEEK(t,s,i) \
-    ((t*)SER_SEEK_RAW(sizeof(t), (s), (i)))
 
 #define SER_HEAD(t,s) \
     SER_AT(t, (s), 0)
@@ -330,8 +302,7 @@ inline static void EXPAND_SERIES_TAIL(REBSER *s, REBLEN delta) {
 
 inline static void TERM_SEQUENCE(REBSER *s) {
     assert(not IS_SER_ARRAY(s));
-
-    memset(SER_SEEK_RAW(SER_WIDE(s), s, SER_USED(s)), 0, SER_WIDE(s));
+    memset(SER_AT_RAW(SER_WIDE(s), s, SER_USED(s)), 0, SER_WIDE(s));
 }
 
 inline static void TERM_SEQUENCE_LEN(REBSER *s, REBLEN len) {

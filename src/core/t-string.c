@@ -657,7 +657,7 @@ REB_R PD_String(
             Append_Codepoint(mo->series, '/');
         else {
             if (
-                *SER_SEEK(REBYTE, SER(mo->series), STR_SIZE(mo->series) - 1)
+                *SER_AT(REBYTE, SER(mo->series), STR_SIZE(mo->series) - 1)
                 != '/'
             ){
                 Append_Codepoint(mo->series, '/');
