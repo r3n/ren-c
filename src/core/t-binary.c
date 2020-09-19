@@ -437,7 +437,7 @@ static void Sort_Binary(
         thunk |= CC_FLAG_REVERSE;
 
     reb_qsort_r(
-        VAL_RAW_DATA_AT(binary),
+        VAL_BIN_AT(binary),
         len,
         size,
         &thunk,

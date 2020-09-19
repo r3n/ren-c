@@ -59,7 +59,7 @@ REBLEN Insert_Series(
     Expand_Series(s, index, len); // tail += len
 
     memcpy(
-        SER_DATA_RAW(s) + (SER_WIDE(s) * index),
+        SER_DATA(s) + (SER_WIDE(s) * index),
         data,
         SER_WIDE(s) * len
     );
@@ -85,7 +85,7 @@ void Append_Series(REBSER *s, const void *data, REBLEN len)
     assert(not IS_SER_ARRAY(s));
 
     EXPAND_SERIES_TAIL(s, len);
-    memcpy(SER_DATA_RAW(s) + (wide * used_old), data, wide * len);
+    memcpy(SER_DATA(s) + (wide * used_old), data, wide * len);
 
     TERM_SERIES(s);
 }
@@ -154,7 +154,7 @@ REBSER *Copy_Sequence_Core(REBSER *s, REBFLGS flags)
         TERM_SEQUENCE_LEN(copy, SER_USED(s));
     }
 
-    memcpy(SER_DATA_RAW(copy), SER_DATA_RAW(s), used * SER_WIDE(s));
+    memcpy(SER_DATA(copy), SER_DATA(s), used * SER_WIDE(s));
     return copy;
 }
 
@@ -183,8 +183,8 @@ REBSER *Copy_Sequence_At_Len_Extra(
 
     REBSER *copy = Make_Series(len + 1 + extra, SER_WIDE(s));
     memcpy(
-        SER_DATA_RAW(copy),
-        SER_DATA_RAW(s) + index * SER_WIDE(s),
+        SER_DATA(copy),
+        SER_DATA(s) + index * SER_WIDE(s),
         (len + 1) * SER_WIDE(s)
     );
     TERM_SEQUENCE_LEN(copy, len);
@@ -280,7 +280,7 @@ void Remove_Series_Units(REBSER *s, REBSIZ offset, REBINT quantity)
     SET_SERIES_USED(s, used_old - cast(REBLEN, quantity));
     quantity *= SER_WIDE(s);
 
-    REBYTE *data = SER_DATA_RAW(s) + start;
+    REBYTE *data = SER_DATA(s) + start;
     memmove(data, data + quantity, total - (start + quantity));
     TERM_SERIES(s);
 }
@@ -394,7 +394,7 @@ REBYTE *Reset_Buffer(REBSER *buf, REBLEN len)
     Unbias_Series(buf, true);
     Expand_Series(buf, 0, len); // sets new tail
 
-    return SER_DATA_RAW(buf);
+    return SER_DATA(buf);
 }
 
 
@@ -421,7 +421,7 @@ void Assert_Series_Term_Core(REBSER *s)
         REBYTE wide = SER_WIDE(s);
         REBLEN n;
         for (n = 0; n < wide; n++) {
-            if (0 != SER_DATA_RAW(s)[(used * wide) + n])
+            if (0 != SER_DATA(s)[(used * wide) + n])
                 panic (s);
         }
     }

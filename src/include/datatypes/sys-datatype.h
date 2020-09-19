@@ -143,14 +143,14 @@ inline static CFUNC** VAL_TYPE_HOOKS(const RELVAL *type) {
     enum Reb_Kind k = VAL_TYPE_KIND_OR_CUSTOM(type);
     if (k != REB_CUSTOM)
         return Builtin_Type_Hooks[k];
-    return cast(CFUNC**, SER_DATA_RAW(VAL_TYPE_CUSTOM(type)));
+    return cast(CFUNC**, SER_DATA(VAL_TYPE_CUSTOM(type)));
 }
 
 inline static CFUNC** HOOKS_FOR_TYPE_OF(const REBCEL *v) {
     enum Reb_Kind k = CELL_TYPE(v);
     if (k != REB_CUSTOM)
         return Builtin_Type_Hooks[k];
-    return cast(CFUNC**, SER_DATA_RAW(CELL_CUSTOM_TYPE(v)));
+    return cast(CFUNC**, SER_DATA(CELL_CUSTOM_TYPE(v)));
 }
 
 #define Generic_Hook_For_Type_Of(v) \

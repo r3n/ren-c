@@ -176,7 +176,7 @@ inline static void SET_SERIES_LEN(REBSER *s, REBLEN len) {
 // for instance a generic debugging routine might just want a byte pointer
 // but have no element type pointer to pass in.
 //
-inline static REBYTE *SER_DATA_RAW(REBSER *s) {
+inline static REBYTE *SER_DATA(REBSER *s) {
     // if updating, also update manual inlining in SER_AT_RAW
 
     // The VAL_CONTEXT(), VAL_SERIES(), VAL_ARRAY() extractors do the failing
@@ -189,13 +189,13 @@ inline static REBYTE *SER_DATA_RAW(REBSER *s) {
         : cast(REBYTE*, &s->content);
 }
 
-inline static REBYTE *SER_AT_RAW(REBYTE w, REBSER *s, REBLEN i) {
+inline static REBYTE *SER_DATA_AT(REBYTE w, REBSER *s, REBLEN i) {
   #if !defined(NDEBUG)
     if (w != SER_WIDE(s)) {  // will be "unusual" value if free
         if (IS_FREE_NODE(s))
-            printf("SER_AT_RAW asked on freed series\n");
+            printf("SER_DATA_AT asked on freed series\n");
         else
-            printf("SER_AT_RAW asked %d on width=%d\n", w, SER_WIDE(s));
+            printf("SER_DATA_AT asked %d on width=%d\n", w, SER_WIDE(s));
         panic (s);
     }
   #endif
@@ -205,7 +205,7 @@ inline static REBYTE *SER_AT_RAW(REBYTE w, REBSER *s, REBLEN i) {
     //
     assert(not (s->info.bits & SERIES_INFO_INACCESSIBLE));
 
-    return ((w) * (i)) + ( // v-- inlining of SER_DATA_RAW
+    return ((w) * (i)) + ( // v-- inlining of SER_DATA
         IS_SER_DYNAMIC(s)
             ? cast(REBYTE*, s->content.dynamic.data)
             : cast(REBYTE*, &s->content)
@@ -225,25 +225,25 @@ inline static REBYTE *SER_AT_RAW(REBYTE w, REBSER *s, REBLEN i) {
 // this is used very frequently.
 
 #define SER_AT(t,s,i) \
-    ((t*)SER_AT_RAW(sizeof(t), (s), (i)))
+    ((t*)SER_DATA_AT(sizeof(t), (s), (i)))
 
 #define SER_HEAD(t,s) \
     SER_AT(t, (s), 0)
 
-inline static REBYTE *SER_TAIL_RAW(size_t w, REBSER *s) {
-    return SER_AT_RAW(w, s, SER_USED(s));
+inline static REBYTE *SER_DATA_TAIL(size_t wide, REBSER *s) {
+    return SER_DATA_AT(wide, s, SER_USED(s));
 }
 
 #define SER_TAIL(t,s) \
-    ((t*)SER_TAIL_RAW(sizeof(t), (s)))
+    ((t*)SER_DATA_TAIL(sizeof(t), (s)))
 
-inline static REBYTE *SER_LAST_RAW(size_t w, REBSER *s) {
+inline static REBYTE *SER_DATA_LAST(size_t wide, REBSER *s) {
     assert(SER_USED(s) != 0);
-    return SER_AT_RAW(w, s, SER_USED(s) - 1);
+    return SER_DATA_AT(wide, s, SER_USED(s) - 1);
 }
 
 #define SER_LAST(t,s) \
-    ((t*)SER_LAST_RAW(sizeof(t), (s)))
+    ((t*)SER_DATA_LAST(sizeof(t), (s)))
 
 
 #define SER_FULL(s) \
@@ -288,7 +288,7 @@ inline static void EXPAND_SERIES_TAIL(REBSER *s, REBLEN delta) {
         }
     }
     else if (SER_WIDE(s) == 1)  // presume BINARY! or ANY-STRING! (?)
-        *SER_TAIL_RAW(1, s) = 0xFE;  // invalid UTF-8 byte, e.g. poisonous
+        *SER_DATA_TAIL(1, s) = 0xFE;  // invalid UTF-8 byte, e.g. poisonous
     else {
         // Assume other series (like GC_Mark_Stack) don't necessarily
         // terminate.
@@ -302,7 +302,7 @@ inline static void EXPAND_SERIES_TAIL(REBSER *s, REBLEN delta) {
 
 inline static void TERM_SEQUENCE(REBSER *s) {
     assert(not IS_SER_ARRAY(s));
-    memset(SER_AT_RAW(SER_WIDE(s), s, SER_USED(s)), 0, SER_WIDE(s));
+    memset(SER_DATA_AT(SER_WIDE(s), s, SER_USED(s)), 0, SER_WIDE(s));
 }
 
 inline static void TERM_SEQUENCE_LEN(REBSER *s, REBLEN len) {
@@ -682,8 +682,8 @@ inline static REBSER *VAL_SERIES(const REBCEL *v) {
 #endif
 
 
-inline static REBYTE *VAL_RAW_DATA_AT(const REBCEL *v) {
-    return SER_AT_RAW(SER_WIDE(VAL_SERIES(v)), VAL_SERIES(v), VAL_INDEX(v));
+inline static REBYTE *VAL_DATA_AT(const REBCEL *v) {
+    return SER_DATA_AT(SER_WIDE(VAL_SERIES(v)), VAL_SERIES(v), VAL_INDEX(v));
 }
 
 #define Init_Any_Series_At(v,t,s,i) \

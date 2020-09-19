@@ -561,7 +561,7 @@ static void Sort_String(
     if (rev) thunk |= CC_FLAG_REVERSE;
 
     reb_qsort_r(
-        VAL_RAW_DATA_AT(string),
+        VAL_STRING_AT(string),
         len,
         size * SER_WIDE(VAL_SERIES(string)),
         &thunk,

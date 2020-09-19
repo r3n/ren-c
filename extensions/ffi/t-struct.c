@@ -589,7 +589,7 @@ static void parse_attr (REBVAL *blk, REBINT *raw_size, uintptr_t *raw_addr)
 
             CFUNC *addr = Find_Function(
                 VAL_LIBRARY_FD(lib),
-                s_cast(VAL_RAW_DATA_AT(sym)) // UTF-8 data of STRING!/BINARY!
+                cs_cast(VAL_UTF8_AT(nullptr, sym))
             );
             if (addr == nullptr)
                 fail (Error_Symbol_Not_Found_Raw(sym));

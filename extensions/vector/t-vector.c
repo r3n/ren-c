@@ -450,7 +450,7 @@ bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
 
     REBLEN num_bytes = len * (bitsize / 8);
     REBSER *bin = Make_Binary(num_bytes);
-    CLEAR(SER_DATA_RAW(bin), num_bytes);  // !!! 0 bytes -> 0 int/float?
+    CLEAR(BIN_HEAD(bin), num_bytes);  // !!! 0 bytes -> 0 int/float?
     SET_SERIES_LEN(bin, num_bytes);
     TERM_SERIES(bin);
 
@@ -497,7 +497,7 @@ REB_R MAKE_Vector(
         REBYTE bitsize = 32;
         REBLEN num_bytes = (len * bitsize) / 8;
         REBSER *bin = Make_Binary(num_bytes);
-        CLEAR(SER_DATA_RAW(bin), num_bytes);
+        CLEAR(BIN_HEAD(bin), num_bytes);
         SET_SERIES_LEN(bin, num_bytes);
         TERM_SERIES(bin);
 

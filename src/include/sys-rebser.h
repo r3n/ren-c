@@ -174,7 +174,7 @@
 //
 // The optimization which uses small series will fit the data into the series
 // node if it is small enough.  But doing this requires a test on SER_LEN()
-// and SER_DATA_RAW() to see if the small optimization is in effect.  Some
+// and SER_DATA() to see if the small optimization is in effect.  Some
 // code is more interested in the performance gained by being able to assume
 // where to look for the data pointer and the length (e.g. paramlists and
 // context varlists/keylists).  Passing this flag into series creation

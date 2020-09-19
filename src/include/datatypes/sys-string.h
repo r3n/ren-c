@@ -544,7 +544,7 @@ inline static void Free_Bookmarks_Maybe_Null(REBSTR *s) {
         for (i = 0; i != index; ++i)
             cp = NEXT_STR(cp);
 
-        REBSIZ actual = cast(REBYTE*, cp) - SER_DATA_RAW(SER(s));
+        REBSIZ actual = cast(REBYTE*, cp) - SER_DATA(SER(s));
         assert(actual == offset);
     }
 #endif
@@ -655,7 +655,7 @@ inline static REBCHR(*) STR_AT(REBSTR *s, REBLEN at) {
     }
 
     index = booked;
-    cp = cast(REBCHR(*), SER_DATA_RAW(SER(s)) + BMK_OFFSET(bookmark)); }
+    cp = cast(REBCHR(*), SER_DATA(SER(s)) + BMK_OFFSET(bookmark)); }
 
     if (index > at) {
       #ifdef DEBUG_TRACE_BOOKMARKS

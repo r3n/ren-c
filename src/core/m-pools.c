@@ -741,8 +741,8 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
         // termination that is not a full-sized cell).
 
         memmove(
-            SER_DATA_RAW(s) + start + extra,
-            SER_DATA_RAW(s) + start,
+            SER_DATA(s) + start + extra,
+            SER_DATA(s) + start,
             size - start
         );
 
