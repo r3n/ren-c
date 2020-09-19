@@ -350,7 +350,7 @@ bool Set_Bits(REBSER *bset, const REBVAL *val, bool set)
             break; }
 
         case REB_INTEGER: {
-            REBLEN n = Int32s(KNOWN(item), 0);
+            REBLEN n = Int32s(SPECIFIC(item), 0);
             if (n > MAX_BITSET)
                 return false;
             if (
@@ -361,7 +361,7 @@ bool Set_Bits(REBSER *bset, const REBVAL *val, bool set)
                 REBUNI c = n;
                 item += 2;
                 if (IS_INTEGER(item)) {
-                    n = Int32s(KNOWN(item), 0);
+                    n = Int32s(SPECIFIC(item), 0);
                     if (n < c)
                         fail (Error_Past_End_Raw());
                     for (; c <= n; c++)
@@ -381,7 +381,7 @@ bool Set_Bits(REBSER *bset, const REBVAL *val, bool set)
         case REB_URL:
         case REB_TAG:
 //      case REB_ISSUE:
-            Set_Bits(bset, KNOWN(item), set);
+            Set_Bits(bset, SPECIFIC(item), set);
             break;
 
         case REB_WORD: {
@@ -476,14 +476,14 @@ bool Check_Bits(REBSER *bset, const REBVAL *val, bool uncased)
             break; }
 
         case REB_INTEGER: {
-            REBLEN n = Int32s(KNOWN(item), 0);
+            REBLEN n = Int32s(SPECIFIC(item), 0);
             if (n > 0xffff)
                 return false;
             if (IS_WORD(item + 1) && VAL_WORD_SYM(item + 1) == SYM_HYPHEN) {
                 REBUNI c = n;
                 item += 2;
                 if (IS_INTEGER(item)) {
-                    n = Int32s(KNOWN(item), 0);
+                    n = Int32s(SPECIFIC(item), 0);
                     if (n < c)
                         fail (Error_Past_End_Raw());
                     for (; c <= n; c++)
@@ -505,7 +505,7 @@ bool Check_Bits(REBSER *bset, const REBVAL *val, bool uncased)
         case REB_URL:
         case REB_TAG:
 //      case REB_ISSUE:
-            if (Check_Bits(bset, KNOWN(item), uncased))
+            if (Check_Bits(bset, SPECIFIC(item), uncased))
                 return true;
             break;
 

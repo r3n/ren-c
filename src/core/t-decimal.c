@@ -128,7 +128,7 @@ REBVAL *Init_Decimal_Bits(RELVAL *out, const REBYTE *bp)
     #error "Unsupported CPU endian"
   #endif
 
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

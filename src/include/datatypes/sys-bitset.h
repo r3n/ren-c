@@ -56,7 +56,7 @@ inline static REBVAL *Init_Bitset(RELVAL *out, REBBIN *bits) {
     RESET_CELL(out, REB_BITSET, CELL_FLAG_FIRST_IS_NODE);
     ASSERT_SERIES_MANAGED(bits);
     INIT_VAL_NODE(out, bits);
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

@@ -81,7 +81,7 @@ inline static REBMAP *VAL_MAP(const REBCEL *v) {
 
 inline static REBLEN Length_Map(REBMAP *map)
 {
-    REBVAL *v = KNOWN(ARR_HEAD(MAP_PAIRLIST(map)));
+    REBVAL *v = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
 
     REBLEN count = 0;
     for (; NOT_END(v); v += 2) {

@@ -66,7 +66,7 @@ REBREQ *Force_Get_Port_State(REBVAL *port, void *device)
 // Return true if port value is pending a signal.
 // Not valid for all ports - requires request struct!!!
 //
-bool Pending_Port(REBVAL *port)
+bool Pending_Port(const RELVAL *port)
 {
     if (IS_PORT(port)) {
         REBVAL *state = CTX_VAR(VAL_CONTEXT(port), STD_PORT_STATE);

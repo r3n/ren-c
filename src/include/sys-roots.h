@@ -124,7 +124,7 @@ inline static REBVAL *Alloc_Value(void)
     // Giving the cell itself NODE_FLAG_ROOT lets a REBVAL* be discerned as
     // either an API handle or not.  The flag is not copied by Move_Value().
     //
-    REBVAL *v = KNOWN(ARR_SINGLE(a));
+    REBVAL *v = SPECIFIC(ARR_SINGLE(a));
 
     // We are introducing this series to the GC and can't leave it trash.
     // If a pattern like `Do_Evaluation_Into(Alloc_Value(), ...)` is used,

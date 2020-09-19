@@ -537,7 +537,7 @@ REB_R Specializer_Dispatcher(REBFRM *f)
 {
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
 
-    REBVAL *exemplar = KNOWN(ARR_HEAD(details));
+    REBVAL *exemplar = SPECIFIC(ARR_HEAD(details));
     assert(IS_FRAME(exemplar));
 
     INIT_FRM_PHASE(f, VAL_PHASE(exemplar));
@@ -819,7 +819,7 @@ REB_R Block_Dispatcher(REBFRM *f)
 
     if (IS_SPECIFIC(block)) {
         if (FRM_BINDING(f) == UNBOUND) {
-            if (Do_Any_Array_At_Throws(f->out, KNOWN(block), SPECIFIED))
+            if (Do_Any_Array_At_Throws(f->out, SPECIFIC(block), SPECIFIED))
                 return R_THROWN;
             return f->out;
         }
@@ -842,7 +842,7 @@ REB_R Block_Dispatcher(REBFRM *f)
         // through a copy on behalf of o2/b.
 
         REBARR *body_array = Copy_And_Bind_Relative_Deep_Managed(
-            KNOWN(block),
+            SPECIFIC(block),
             ACT_PARAMLIST(FRM_PHASE(f)),
             TS_WORD,
             false  // do not gather LETs

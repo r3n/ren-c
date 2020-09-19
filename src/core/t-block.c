@@ -232,7 +232,7 @@ REB_R MAKE_Array(
             REBCTX *context = CTX(EXTRA(Binding, arg).node);
             REBFRM *param_frame = CTX_FRAME_MAY_FAIL(context);
 
-            REBVAL *param = KNOWN(
+            REBVAL *param = SPECIFIC(
                 ARR_HEAD(ACT_PARAMLIST(FRM_PHASE(param_frame)))
             );
             if (VAL_VARARGS_SIGNED_PARAM_INDEX(arg) < 0)

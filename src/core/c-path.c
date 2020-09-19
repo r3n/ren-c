@@ -55,7 +55,7 @@ REBVAL *Init_Any_Path_At_Core(
         ARR_LEN(a) == 2 and IS_BLANK(ARR_AT(a, 0)) and IS_BLANK(ARR_AT(a, 1))
     ));
 
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 
@@ -353,7 +353,7 @@ bool Eval_Path_Throws_Core(
         //
         pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(*v, specifier);
 
-        Move_Value(pvs->out, KNOWN(pvs->u.ref.cell));
+        Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
 
         if (IS_ACTION(pvs->out))
             pvs->opt_label = VAL_WORD_SPELLING(*v);

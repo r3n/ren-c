@@ -54,7 +54,7 @@ inline static bool IS_TRUTHY(const RELVAL *v) {
 inline static REBVAL *Init_Logic(RELVAL *out, bool flag) {
     RESET_CELL(out, REB_LOGIC, CELL_MASK_NONE);
     PAYLOAD(Logic, out).flag = flag;
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 #define Init_True(out) \

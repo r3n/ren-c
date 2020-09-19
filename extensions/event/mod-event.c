@@ -264,7 +264,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
         ports = ARG(value);
         val = VAL_ARRAY_AT(ports);
         for (; NOT_END(val); val++) {  // find timeout
-            if (Pending_Port(KNOWN(val)))
+            if (Pending_Port(val))
                 ++n;
 
             if (IS_INTEGER(val) or IS_DECIMAL(val) or IS_TIME(val))
@@ -286,11 +286,11 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
             break;
 
           case REB_PORT: {
-            if (not Pending_Port(KNOWN(val)))
+            if (not Pending_Port(val))
                 return nullptr;
 
             REBARR *single = Make_Array(1);
-            Append_Value(single, KNOWN(val));
+            Append_Value(single, SPECIFIC(val));
             Init_Block(ARG(value), single);
             ports = ARG(value);
 
@@ -457,7 +457,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
         return nullptr;
     }
 
-    RETURN (KNOWN(first));
+    RETURN (SPECIFIC(first));
 }
 
 

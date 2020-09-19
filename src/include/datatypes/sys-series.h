@@ -551,7 +551,7 @@ inline static void FAIL_IF_READ_ONLY_SER(REBSER *s) {
 //
 inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
     if (not Is_Bindable(v) or IS_SPECIFIC(v))
-        Move_Value(out, KNOWN(v));
+        Move_Value(out, SPECIFIC(v));
     else {  // must be bound to a function
         REBACT *binding = ACT(VAL_BINDING(v));
         REBCTX *expired = Make_Expired_Frame_Ctx_Managed(binding);
@@ -560,7 +560,7 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
         out->payload = v->payload;
         EXTRA(Binding, out).node = NOD(expired);
     }
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 #if defined(NDEBUG)
@@ -585,7 +585,7 @@ inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
         return v;
 
     DECLARE_LOCAL (specific);
-    Unrelativize(specific, v);
+    Unrelativize(specific, v);  // relative values lose binding in error object
     fail (Error_Const_Value_Raw(specific));
 }
 

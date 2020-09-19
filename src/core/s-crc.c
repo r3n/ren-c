@@ -425,7 +425,7 @@ REBVAL *Init_Map(RELVAL *out, REBMAP *map)
     INIT_VAL_NODE(out, MAP_PAIRLIST(map));
     // second payload pointer not used
 
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

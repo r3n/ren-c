@@ -276,7 +276,7 @@ inline static REBVAL *Init_Any_Word(
   #if !defined(NDEBUG)
     INIT_WORD_INDEX_UNCHECKED(out, -1);  // index not heeded if no binding
   #endif
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 #define Init_Word(out,str)          Init_Any_Word((out), REB_WORD, (str))
@@ -295,7 +295,7 @@ inline static REBVAL *Init_Any_Word_Bound(
     INIT_VAL_NODE(out, spelling);
     INIT_BINDING(out, context);
     INIT_WORD_INDEX(out, index);
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

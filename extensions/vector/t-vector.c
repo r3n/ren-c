@@ -220,7 +220,7 @@ static void Set_Vector_At(const REBCEL *vec, REBLEN n, const RELVAL *set) {
 
     rebJumps(
         "FAIL [",
-            KNOWN(set), "{out of range for}",
+            SPECIFIC(set), "{out of range for}",
                 "unspaced [", rebI(bitsize), "{-bit}]",
                 rebT(sign ? "signed" : "unsigned"),
                 "{VECTOR! type}"
@@ -428,7 +428,7 @@ bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
             return false;
         if (init_len > len)  // !!! Expands without error, is this good?
             len = init_len;
-        iblk = KNOWN(item);
+        iblk = SPECIFIC(item);
         ++item;
     }
     else

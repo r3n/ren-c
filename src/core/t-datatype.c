@@ -180,7 +180,7 @@ REBVAL *Datatype_From_Url(const REBVAL *url) {
     rebEND);
 
     if (i != -1)
-        return KNOWN(ARR_AT(PG_Extension_Types, i));
+        return SPECIFIC(ARR_AT(PG_Extension_Types, i));
     return nullptr;
 }
 
@@ -219,7 +219,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
 
         enum Reb_Kind kind = cast(enum Reb_Kind, n);
 
-        REBVAL *value = Append_Context(Lib_Context, KNOWN(word), NULL);
+        REBVAL *value = Append_Context(Lib_Context, SPECIFIC(word), NULL);
         if (kind == REB_CUSTOM) {
             //
             // There shouldn't be any literal CUSTOM! datatype instances.
@@ -250,7 +250,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
         assert(value == CTX_VAR(Lib_Context, n));
         SET_CELL_FLAG(value, PROTECTED);
 
-        Append_Value(catalog, KNOWN(word));
+        Append_Value(catalog, SPECIFIC(word));
     }
 
     // !!! Near-term hack to create LIT-WORD! and LIT-PATH!, to try and keep

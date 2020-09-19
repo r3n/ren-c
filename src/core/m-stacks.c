@@ -52,7 +52,7 @@ void Startup_Data_Stack(REBLEN capacity)
     // initial stack size.  It requires you to be on an END to run.
     //
     DS_Index = 1;
-    DS_Movable_Top = KNOWN(ARR_AT(DS_Array, DS_Index));  // can't push RELVALs
+    DS_Movable_Top = SPECIFIC(ARR_AT(DS_Array, DS_Index));  // can't push RELVALs
     Expand_Data_Stack_May_Fail(capacity);
 
     DS_DROP();  // drop the hypothetical thing that triggered the expand
@@ -228,7 +228,7 @@ REBCTX *Get_Context_From_Stack(void)
         return Lib_Context;
 
     REBARR *details = ACT_DETAILS(phase);
-    REBVAL *context = KNOWN(ARR_AT(details, 1));
+    REBVAL *context = SPECIFIC(ARR_AT(details, 1));
     return VAL_CONTEXT(context);
 }
 
@@ -255,8 +255,8 @@ REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
     //
     assert(len_old == DS_Index);
     assert(IS_END(DS_Movable_Top));
-    assert(DS_Movable_Top == KNOWN(ARR_TAIL(DS_Array)));
-    assert(DS_Movable_Top - KNOWN(ARR_HEAD(DS_Array)) == cast(int, len_old));
+    assert(DS_Movable_Top == SPECIFIC(ARR_TAIL(DS_Array)));
+    assert(DS_Movable_Top - SPECIFIC(ARR_HEAD(DS_Array)) == cast(int, len_old));
 
     // If adding in the requested amount would overflow the stack limit, then
     // give a data stack overflow error.
@@ -327,7 +327,7 @@ REBARR *Pop_Stack_Values_Core(REBDSP dsp_start, REBFLGS flags)
 //
 void Pop_Stack_Values_Into(REBVAL *into, REBDSP dsp_start) {
     REBLEN len = DSP - dsp_start;
-    REBVAL *values = KNOWN(ARR_AT(DS_Array, dsp_start + 1));
+    REBVAL *values = SPECIFIC(ARR_AT(DS_Array, dsp_start + 1));
 
     ENSURE_MUTABLE(into);
 

@@ -726,24 +726,32 @@ inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
     return ACT(EXTRA(Binding, v).node);
 }
 
-
-// When you have a RELVAL* (e.g. from a REBARR) that you "know" to be specific,
-// the KNOWN macro can be used for that.  Checks to make sure in debug build.
+// When you have a RELVAL* (e.g. from a REBARR) that you KNOW to be specific,
+// you might be bothered by an error like:
 //
-// Use for: "invalid conversion from 'Reb_Value*' to 'Reb_Specific_Value*'"
+//     "invalid conversion from 'Reb_Value*' to 'Reb_Specific_Value*'"
+//
+// You can use SPECIFIC to cast it if you are *sure* that it has been
+// derelativized -or- is a value type that doesn't have a specifier (e.g. an
+// integer).  If the value is actually relative, this will assert at runtime!
 
-inline static REBVAL *KNOWN(const_if_c REBCEL *v) {
+inline static REBVAL *SPECIFIC(const_if_c REBCEL *v) {
+    //
+    // Note: END is tolerated to help in specified array enumerations, e.g.
+    //
+    //     REBVAL *head = SPECIFIC(ARR_HEAD(specified_array));  // may be end
+    //
     assert(IS_END(v) or IS_SPECIFIC(v));
     return m_cast(REBVAL*, cast(const REBVAL*, v));
 }
 
 #if defined(__cplusplus)
-    inline static const REBVAL *KNOWN(const REBCEL *v) {
-        assert(IS_END(v) or IS_SPECIFIC(v));  // END for KNOWN(ARR_HEAD())
+    inline static const REBVAL *SPECIFIC(const REBCEL *v) {
+        assert(IS_END(v) or IS_SPECIFIC(v));  // ^-- see note about END
         return cast(const REBVAL*, v);
     }
 
-    inline static REBVAL *KNOWN(const REBVAL *v) = delete;
+    inline static REBVAL *SPECIFIC(const REBVAL *v) = delete;
 #endif
 
 
@@ -863,7 +871,7 @@ inline static REBVAL *Move_Value(RELVAL *out, const REBVAL *v)
     else
         out->extra = v->extra; // extra isn't a binding (INTEGER! MONEY!...)
 
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 
@@ -883,7 +891,7 @@ inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
     out->header.bits |= (
         v->header.bits & (CELL_FLAG_ARG_MARKED_CHECKED)
     );
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

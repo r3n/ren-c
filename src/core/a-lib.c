@@ -1731,7 +1731,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         DECLARE_VA_FEED (feed, p, vaptr, feed_flags);
 
         while (NOT_END(feed->value)) {
-            Move_Value(DS_PUSH(), KNOWN(feed->value));
+            Move_Value(DS_PUSH(), SPECIFIC(feed->value));
             Fetch_Next_In_Feed(feed, false);
         }
 

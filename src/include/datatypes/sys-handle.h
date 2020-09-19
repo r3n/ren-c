@@ -153,7 +153,7 @@ inline static REBVAL *Init_Handle_Cdata(
     VAL_HANDLE_SINGULAR_NODE(out) = nullptr;
     VAL_HANDLE_CDATA_P(out) = cdata;
     VAL_HANDLE_LENGTH_U(out) = length;  // non-zero signals cdata
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 inline static REBVAL *Init_Handle_Cfunc(
@@ -164,7 +164,7 @@ inline static REBVAL *Init_Handle_Cfunc(
     VAL_HANDLE_SINGULAR_NODE(out) = nullptr;
     VAL_HANDLE_CFUNC_P(out) = cfunc;
     VAL_HANDLE_LENGTH_U(out) = 0;  // signals cfunc
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 inline static void Init_Handle_Cdata_Managed_Common(
@@ -204,7 +204,7 @@ inline static REBVAL *Init_Handle_Cdata_Managed(
 
     REBARR *a = VAL_HANDLE_SINGULAR(out);
     VAL_HANDLE_CDATA_P(ARR_SINGLE(a)) = cdata;
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 inline static REBVAL *Init_Handle_Cdata_Managed_Cfunc(
@@ -218,5 +218,5 @@ inline static REBVAL *Init_Handle_Cdata_Managed_Cfunc(
     
     REBARR *a = VAL_HANDLE_SINGULAR(out);
     VAL_HANDLE_CFUNC_P(ARR_SINGLE(a)) = cfunc;
-    return KNOWN(out);
+    return SPECIFIC(out);
 }

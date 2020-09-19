@@ -279,7 +279,7 @@ REBTYPE(Action)
             // that symbol out before giving it back.
             //
             REBVAL *param = VAL_ACT_PARAMS_HEAD(value);
-            REBVAL *typeset = KNOWN(ARR_HEAD(copy));
+            REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
             for (; NOT_END(param); ++param, ++typeset) {
                 assert(IS_PARAM(param));
                 RESET_CELL(typeset, REB_TYPESET, CELL_MASK_NONE);

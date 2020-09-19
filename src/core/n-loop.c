@@ -491,9 +491,9 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 REBVAL *key;
                 REBVAL *val;
                 while (true) {  // pass over the unused map slots
-                    key = KNOWN(ARR_AT(ARR(les->data_ser), les->data_idx));
+                    key = SPECIFIC(ARR_AT(ARR(les->data_ser), les->data_idx));
                     ++les->data_idx;
-                    val = KNOWN(ARR_AT(ARR(les->data_ser), les->data_idx));
+                    val = SPECIFIC(ARR_AT(ARR(les->data_ser), les->data_idx));
                     ++les->data_idx;
                     if (les->data_idx == les->data_len)
                         more_data = false;

@@ -274,7 +274,7 @@ inline static REBFLD *STU_SCHEMA(REBSTU *stu) {
 }
 
 #define STU_DATA(stu) \
-    KNOWN(ARR_SINGLE(stu))  // BINARY! or HANDLE!
+    SPECIFIC(ARR_SINGLE(stu))  // BINARY! or HANDLE!
 
 #define STU_OFFSET(stu) \
     MISC(stu).custom.u32
@@ -366,7 +366,7 @@ inline static REBVAL *Init_Struct(RELVAL *out, REBSTU *stu) {
     RESET_CUSTOM_CELL(out, EG_Struct_Type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, stu);
     VAL_STRUCT_OFFSET(out) = 0;
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 
@@ -487,7 +487,7 @@ inline static REBLEN RIN_NUM_FIXED_ARGS(REBRIN *r)
     { return VAL_LEN_HEAD(RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS)); }
 
 inline static REBVAL *RIN_ARG_SCHEMA(REBRIN *r, REBLEN n) { // 0-based index
-    return KNOWN(VAL_ARRAY_AT_HEAD(RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS), n));
+    return SPECIFIC(VAL_ARRAY_AT_HEAD(RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS), n));
 }
 
 inline static ffi_cif *RIN_CIF(REBRIN *r)

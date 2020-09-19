@@ -37,7 +37,7 @@ extern REBTYP* EG_Image_Type;
 
 inline static REBVAL *VAL_IMAGE_BIN(const REBCEL *v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
-    return KNOWN(ARR_SINGLE(ARR(PAYLOAD(Any, v).first.node)));
+    return SPECIFIC(ARR_SINGLE(ARR(PAYLOAD(Any, v).first.node)));
 }
 
 #define VAL_IMAGE_WIDTH(v) \
@@ -106,7 +106,7 @@ inline static REBVAL *Init_Image(
 
     assert(VAL_IMAGE_POS(out) == 0);  // !!! sketchy concept, is in BINARY!
 
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 inline static void RESET_IMAGE(REBYTE *p, REBLEN num_pixels) {

@@ -2132,7 +2132,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     cell,
                     kind,
                     nullptr,
-                    KNOWN(ARR_AT(array, 1))
+                    SPECIFIC(ARR_AT(array, 1))
                 );
                 if (r == R_THROWN) {  // !!! good argument for not using MAKE
                     assert(false);

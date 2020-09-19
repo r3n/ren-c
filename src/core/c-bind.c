@@ -326,7 +326,7 @@ static void Clonify_And_Bind_Relative(
         // copied series and "clonify" the values in it.
         //
         if (deep_types & FLAGIT_KIND(kind) & TS_ARRAYS_OBJ) {
-            REBVAL *sub = KNOWN(ARR_HEAD(ARR(series)));
+            REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
             for (; NOT_END(sub); ++sub, ++sub_src)
                 Clonify_And_Bind_Relative(
                     sub,

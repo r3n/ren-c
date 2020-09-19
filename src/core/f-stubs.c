@@ -92,7 +92,7 @@ REBINT Int32(const RELVAL *val)
     return VAL_INT32(val);
 
 out_of_range:
-    fail (Error_Out_Of_Range(KNOWN(val)));
+    fail (Error_Out_Of_Range(SPECIFIC(val)));
 }
 
 
@@ -134,7 +134,7 @@ REBINT Int32s(const RELVAL *val, REBINT sign)
     }
 
 out_of_range:
-    fail (Error_Out_Of_Range(KNOWN(val)));
+    fail (Error_Out_Of_Range(SPECIFIC(val)));
 }
 
 
@@ -300,7 +300,7 @@ REBVAL *Init_Any_Series_At_Core(
             panic(s);
   #endif
 
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 
@@ -340,7 +340,7 @@ REBVAL *Init_Any_String_At(
     RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, s);
     VAL_INDEX(out) = index;
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

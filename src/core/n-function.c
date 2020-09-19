@@ -311,7 +311,7 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
     REBVAL *out = D_OUT;  // plan ahead for factoring into Chain_Action(out..
 
     REBVAL *pipeline = ARG(pipeline);
-    REBVAL *first = KNOWN(VAL_ARRAY_AT(pipeline));
+    REBVAL *first = SPECIFIC(VAL_ARRAY_AT(pipeline));
 
     // !!! Current validation is that all are functions.  Should there be other
     // checks?  (That inputs match outputs in the chain?)  Should it be
@@ -876,7 +876,7 @@ REBNATIVE(skinner_return_helper)
 REB_R Skinner_Dispatcher(REBFRM *f)
 {
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-    REBVAL *skinned = KNOWN(ARR_HEAD(details));
+    REBVAL *skinned = SPECIFIC(ARR_HEAD(details));
 
     REBVAL *param = ACT_PARAMS_HEAD(FRM_PHASE(f));
     REBVAL *arg = FRM_ARGS_HEAD(f);

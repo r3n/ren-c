@@ -449,7 +449,7 @@ static inline REBVAL *Init_Action_Unbound(
     Force_Array_Managed(ACT_PARAMLIST(a));
     Move_Value(out, ACT_ARCHETYPE(a));
     assert(VAL_BINDING(out) == UNBOUND);
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 static inline REBVAL *Init_Action_Maybe_Bound(
@@ -464,7 +464,7 @@ static inline REBVAL *Init_Action_Maybe_Bound(
     Move_Value(out, ACT_ARCHETYPE(a));
     assert(VAL_BINDING(out) == UNBOUND);
     INIT_BINDING(out, binding);
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

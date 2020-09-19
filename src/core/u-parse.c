@@ -2281,7 +2281,7 @@ REBNATIVE(subparse)
                     }
 
                     if (Is_Api_Value(into))
-                        rebRelease(KNOWN(into));  // !!! rethink to use P_CELL
+                        rebRelease(SPECIFIC(into));  // !!! rethink to use P_CELL
 
                     SET_END(P_OUT);  // restore invariant
                     break;

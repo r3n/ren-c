@@ -187,7 +187,7 @@ static void Rehash_Map(REBMAP *map)
     REBLEN *hashes = SER_HEAD(REBLEN, hashlist);
     REBARR *pairlist = MAP_PAIRLIST(map);
 
-    REBVAL *key = KNOWN(ARR_HEAD(pairlist));
+    REBVAL *key = SPECIFIC(ARR_HEAD(pairlist));
     REBLEN n;
 
     for (n = 0; n < ARR_LEN(pairlist); n += 2, key += 2) {
@@ -198,10 +198,10 @@ static void Rehash_Map(REBMAP *map)
             // It's a "zombie", move last key to overwrite it
             //
             Move_Value(
-                key, KNOWN(ARR_AT(pairlist, ARR_LEN(pairlist) - 2))
+                key, SPECIFIC(ARR_AT(pairlist, ARR_LEN(pairlist) - 2))
             );
             Move_Value(
-                &key[1], KNOWN(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))
+                &key[1], SPECIFIC(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))
             );
             SET_ARRAY_LEN_NOTERM(pairlist, ARR_LEN(pairlist) - 2);
         }
@@ -357,7 +357,7 @@ REB_R PD_Map(
     if (n == 0)
         return nullptr;
 
-    REBVAL *val = KNOWN(
+    REBVAL *val = SPECIFIC(
         ARR_AT(MAP_PAIRLIST(VAL_MAP(pvs->out)), ((n - 1) * 2) + 1)
     );
     if (IS_NULLED(val)) // zombie entry, means unused
@@ -452,7 +452,7 @@ inline static REBMAP *Copy_Map(REBMAP *map, REBU64 types) {
     //
     assert(ARR_LEN(copy) % 2 == 0); // should be [key value key value]...
 
-    REBVAL *key = KNOWN(ARR_HEAD(copy)); // all keys/values are specified
+    REBVAL *key = SPECIFIC(ARR_HEAD(copy)); // all keys/values are specified
     for (; NOT_END(key); key += 2) {
         assert(Is_Value_Frozen(key)); // immutable key
 
@@ -516,8 +516,8 @@ REBARR *Map_To_Array(REBMAP *map, REBINT what)
     REBLEN count = Length_Map(map);
     REBARR *a = Make_Array(count * ((what == 0) ? 2 : 1));
 
-    REBVAL *dest = KNOWN(ARR_HEAD(a));
-    REBVAL *val = KNOWN(ARR_HEAD(MAP_PAIRLIST(map)));
+    REBVAL *dest = SPECIFIC(ARR_HEAD(a));
+    REBVAL *val = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     for (; NOT_END(val); val += 2) {
         if (not IS_NULLED(val + 1)) {  // can't be END
             if (what <= 0) {
@@ -548,7 +548,7 @@ REBCTX *Alloc_Context_From_Map(REBMAP *map)
     // a bit haphazard to have `make object! make map! [x 10 <y> 20]` and
     // just throw out the <y> 20 case...
 
-    REBVAL *mval = KNOWN(ARR_HEAD(MAP_PAIRLIST(map)));
+    REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     REBLEN count = 0;
 
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
@@ -562,7 +562,7 @@ REBCTX *Alloc_Context_From_Map(REBMAP *map)
     REBVAL *key = CTX_KEYS_HEAD(context);
     REBVAL *var = CTX_VARS_HEAD(context);
 
-    mval = KNOWN(ARR_HEAD(MAP_PAIRLIST(map)));
+    mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
 
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1)) {
@@ -693,7 +693,7 @@ REBTYPE(Map)
 
         Move_Value(
             D_OUT,
-            KNOWN(ARR_AT(MAP_PAIRLIST(map), ((n - 1) * 2) + 1))
+            SPECIFIC(ARR_AT(MAP_PAIRLIST(map), ((n - 1) * 2) + 1))
         );
 
         if (VAL_WORD_SYM(verb) == SYM_FIND)

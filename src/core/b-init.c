@@ -436,7 +436,7 @@ REBVAL *Make_Native(
     if (not IS_SET_WORD(*item))
         panic (*item);
 
-    REBVAL *name = KNOWN(*item);
+    REBVAL *name = SPECIFIC(*item);
     ++*item;
 
     bool enfix;
@@ -470,7 +470,7 @@ REBVAL *Make_Native(
     }
     ++*item;
 
-    REBVAL *spec = KNOWN(*item);
+    REBVAL *spec = SPECIFIC(*item);
     ++*item;
     if (not IS_BLOCK(spec))
         panic (spec);
@@ -573,7 +573,7 @@ static REBARR *Startup_Natives(const REBVAL *boot_natives)
         if (n >= Num_Natives)
             panic (item);
 
-        REBVAL *name = KNOWN(item);
+        REBVAL *name = SPECIFIC(item);
         assert(IS_SET_WORD(name));
 
         REBVAL *native = Make_Native(
@@ -1136,7 +1136,7 @@ static REBVAL *Startup_Mezzanine(BOOT_BLK *boot)
         result,
         true, // fully = true (error if all arguments aren't consumed)
         rebU(finish_init), // %sys-start.r function to call
-        KNOWN(&boot->mezz), // boot-mezz argument
+        SPECIFIC(&boot->mezz), // boot-mezz argument
         rebEND
     )){
         fail (Error_No_Catch_For_Throw(result));
@@ -1352,23 +1352,23 @@ void Startup_Core(void)
     // boot->natives is from the automatically gathered list of natives found
     // by scanning comments in the C sources for `native: ...` declarations.
     //
-    REBARR *natives_catalog = Startup_Natives(KNOWN(&boot->natives));
+    REBARR *natives_catalog = Startup_Natives(SPECIFIC(&boot->natives));
     Manage_Array(natives_catalog);
     PUSH_GC_GUARD(natives_catalog);
 
     // boot->generics is the list in %generics.r
     //
-    REBARR *generics_catalog = Startup_Generics(KNOWN(&boot->generics));
+    REBARR *generics_catalog = Startup_Generics(SPECIFIC(&boot->generics));
     Manage_Array(generics_catalog);
     PUSH_GC_GUARD(generics_catalog);
 
     // boot->errors is the error definition list from %errors.r
     //
-    REBCTX *errors_catalog = Startup_Errors(KNOWN(&boot->errors));
+    REBCTX *errors_catalog = Startup_Errors(SPECIFIC(&boot->errors));
     PUSH_GC_GUARD(errors_catalog);
 
     Init_System_Object(
-        KNOWN(&boot->sysobj),
+        SPECIFIC(&boot->sysobj),
         datatypes_catalog,
         natives_catalog,
         generics_catalog,

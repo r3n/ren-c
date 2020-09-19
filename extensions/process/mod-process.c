@@ -431,7 +431,7 @@ REBNATIVE(set_env)
         if (unsetenv(key_utf8) == -1)
             fail ("unsetenv() couldn't unset environment variable");
       #else
-        // WARNING: KNOWN PORTABILITY ISSUE
+        // WARNING: SPECIFIC PORTABILITY ISSUE
         //
         // Simply saying putenv("FOO") will delete FOO from the environment,
         // but it's not consistent...does nothing on NetBSD for instance.  But
@@ -454,7 +454,7 @@ REBNATIVE(set_env)
 
         rebFree(val_utf8);
       #else
-        // WARNING: KNOWN MEMORY LEAK!
+        // WARNING: SPECIFIC MEMORY LEAK!
         //
         // putenv takes its argument as a single "key=val" string.  It is
         // *fatally flawed*, and obsoleted by setenv and unsetenv in System V:

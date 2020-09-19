@@ -206,7 +206,7 @@ typedef struct gob_window {  // Maps gob to window
 #define GOB_ALPHA(g) \
     EXTRA(Bytes, ARR_AT((g), IDX_GOB_SIZE_AND_ALPHA)).common[0]
 
-#define GOB_CONTENT(g)              KNOWN(ARR_AT((g), IDX_GOB_CONTENT))
+#define GOB_CONTENT(g)              SPECIFIC(ARR_AT((g), IDX_GOB_CONTENT))
 #define mutable_GOB_CONTENT(g)      ARR_AT((g), IDX_GOB_CONTENT)
 
 #define GOB_TYPE(g) \
@@ -214,7 +214,7 @@ typedef struct gob_window {  // Maps gob to window
 
 #define SET_GOB_TYPE(g,t)       (GOB_TYPE(g) = (t))
 
-#define GOB_DATA(g)             KNOWN(ARR_AT((g), IDX_GOB_DATA))
+#define GOB_DATA(g)             SPECIFIC(ARR_AT((g), IDX_GOB_DATA))
 #define mutable_GOB_DATA(g)     ARR_AT((g), IDX_GOB_DATA)
 #define GOB_DTYPE(g)            VAL_TYPE(GOB_DATA(g))
 
@@ -251,7 +251,7 @@ inline static void SET_GOB_OWNER(REBGOB *g, REBGOB *owner) {
 #define GOB_STRING(g)       SER_HEAD(GOB_CONTENT(g))
 #define GOB_LEN(g)          ARR_LEN(GOB_PANE(g))
 #define SET_GOB_LEN(g,l)    TERM_ARRAY_LEN(GOB_PANE(g), (l))
-#define GOB_HEAD(g)         KNOWN(ARR_HEAD(GOB_PANE(g)))
+#define GOB_HEAD(g)         SPECIFIC(ARR_HEAD(GOB_PANE(g)))
 
 #define GOB_BITMAP(g)   GOB_STRING(g)
 #define GOB_AT(g,n)   (GOB_HEAD(g)+n)
@@ -301,7 +301,7 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
     RESET_CUSTOM_CELL(out, EG_Gob_Type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, g);
     VAL_GOB_INDEX(out) = 0;
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

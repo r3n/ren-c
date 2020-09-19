@@ -200,7 +200,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             // into f->lookback, where it will be safe until the next fetch.
             //
             assert(feed->value == &feed->fetched);
-            lookback = Move_Value(&feed->lookback, KNOWN(&feed->fetched));
+            lookback = Move_Value(&feed->lookback, SPECIFIC(&feed->fetched));
         }
         else {
             // pointer they had should be stable, GC-safe
@@ -335,7 +335,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             if (ARR_LEN(inst1) > 1)
                 panic ("rebU() of more than one value splice not written");
 
-            REBVAL *single = KNOWN(ARR_SINGLE(inst1));
+            REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
             Move_Value(&feed->fetched, single);
             Quotify(
                 &feed->fetched,
@@ -354,7 +354,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             // vs. putting it in fetched/MARKED_TEMPORARY...but that makes
             // this more convoluted.  Review.
 
-            REBVAL *single = KNOWN(ARR_SINGLE(inst1));
+            REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
             Move_Value(&feed->fetched, single);
             Quotify(&feed->fetched, QUOTING_BYTE(feed));
             SET_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);

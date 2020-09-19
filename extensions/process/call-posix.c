@@ -235,7 +235,7 @@ REB_R Call_Core(REBFRM *frame_) {
             RELVAL *param = VAL_ARRAY_AT_HEAD(block, i);
             if (not IS_TEXT(param))  // usermode layer ensures FILE! converted
                 fail (PAR(command));
-            argv[i] = rebSpell(KNOWN(param), rebEND);
+            argv[i] = rebSpell(SPECIFIC(param), rebEND);
         }
         argv[argc] = nullptr;
     }

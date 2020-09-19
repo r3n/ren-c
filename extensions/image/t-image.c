@@ -302,7 +302,7 @@ REB_R MAKE_Image(
             // MAKE IMAGE! format allowed you to specify it.
 
             if (NOT_END(item) and IS_INTEGER(item)) {
-                VAL_IMAGE_POS(out) = (Int32s(KNOWN(item), 1) - 1);
+                VAL_IMAGE_POS(out) = (Int32s(SPECIFIC(item), 1) - 1);
                 ++item;
             }
         }
@@ -335,7 +335,7 @@ REB_R MAKE_Image(
 
             REBYTE *ip = VAL_IMAGE_HEAD(out);  // image pointer
             Tuples_To_RGBA(
-                ip, w * h, KNOWN(VAL_ARRAY_AT(item)), VAL_LEN_AT(item)
+                ip, w * h, SPECIFIC(VAL_ARRAY_AT(item)), VAL_LEN_AT(item)
             );
         }
         else
@@ -768,7 +768,7 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
         if (index + part > tail) part = tail - index;  // clip it
         ip += index * 4;
         for (; dup > 0; dup--, ip += part * 4)
-            Tuples_To_RGBA(ip, part, KNOWN(VAL_ARRAY_AT(arg)), part);
+            Tuples_To_RGBA(ip, part, SPECIFIC(VAL_ARRAY_AT(arg)), part);
     }
     else
         fail (Error_Invalid_Type(VAL_TYPE(arg)));
@@ -927,7 +927,7 @@ void MF_Image(REB_MOLD *mo, const REBCEL *v, bool form)
     Pre_Mold(mo, v);
     if (GET_MOLD_FLAG(mo, MOLD_FLAG_ALL)) {
         DECLARE_LOCAL (head);
-        Move_Value(head, KNOWN(v));
+        Move_Value(head, SPECIFIC(v));
         VAL_IMAGE_POS(head) = 0; // mold all of it
         Mold_Image_Data(mo, head);
         Post_Mold(mo, v);

@@ -526,7 +526,7 @@ static inline const REBVAL *Lookup_Word_May_Fail(
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
-        fail (Error_Not_Bound_Raw(KNOWN(any_word)));
+        fail (Error_Not_Bound_Raw(SPECIFIC(any_word)));
 
     REBCTX *c = Get_Word_Context(any_word, specifier);
     if (GET_SERIES_INFO(c, INACCESSIBLE))
@@ -569,7 +569,7 @@ static inline REBVAL *Lookup_Mutable_Word_May_Fail(
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
-        fail (Error_Not_Bound_Raw(KNOWN(any_word)));
+        fail (Error_Not_Bound_Raw(SPECIFIC(any_word)));
 
     REBCTX *ctx = Get_Word_Context(any_word, specifier);
 
@@ -641,7 +641,7 @@ inline static REBVAL *Derelativize(
 
     if (not Is_Bindable(v)) {
         out->extra = v->extra; // extra.binding union field isn't even active
-        return KNOWN(out);
+        return SPECIFIC(out);
     }
 
     REBNOD *binding = EXTRA(Binding, v).node;
@@ -714,7 +714,7 @@ inline static REBVAL *Derelativize(
     // in case the caller had a relative value slot and wants to use its
     // known non-relative form... this is inline, so no cost if not used.
     //
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 
@@ -751,7 +751,7 @@ inline static REBVAL *Derelativize(
 
 inline static REBSPC *Derive_Specifier(REBSPC *parent, const REBCEL *item) {
     if (IS_SPECIFIC(item))
-        return VAL_SPECIFIER(KNOWN(item));
+        return VAL_SPECIFIER(SPECIFIC(item));
     return parent;
 }
 

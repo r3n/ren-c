@@ -161,7 +161,7 @@ REBLEN find_binary(
     }
     else if (CELL_KIND(pattern) == REB_INTEGER) {  // specific byte (exact)
         if (VAL_INT64(pattern) < 0 or VAL_INT64(pattern) > 255)
-            fail (Error_Out_Of_Range(KNOWN(pattern)));
+            fail (Error_Out_Of_Range(SPECIFIC(pattern)));
 
         *size = 1;
 

@@ -71,7 +71,7 @@ inline static REBVAL *Init_Builtin_Datatype(RELVAL *out, enum Reb_Kind kind) {
     assert(VAL_TYPE_KIND(out) == kind);
     assert(GET_CELL_FLAG(out, FIRST_IS_NODE));
     assert(NOT_CELL_FLAG(out, SECOND_IS_NODE));  // only custom types have
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 
@@ -87,7 +87,7 @@ inline static REBVAL *Init_Custom_Datatype(RELVAL *out, REBTYP *type) {
     VAL_TYPE_KIND_ENUM(out) = REB_CUSTOM;
     VAL_TYPE_SPEC_NODE(out) = NOD(EMPTY_ARRAY);
     VAL_TYPE_HOOKS_NODE(out) = NOD(type);
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

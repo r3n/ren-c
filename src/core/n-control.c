@@ -254,7 +254,7 @@ inline static bool Single_Test_Throws(
         bool threw = RunQ_Throws(
             temp,
             true,  // `fully` (ensure argument consumed)
-            rebU(KNOWN(test)),
+            rebU(SPECIFIC(test)),
             NULLIFY_NULLED(arg_specified),  // nulled cells to nullptr for API
             rebEND
         );
@@ -994,7 +994,7 @@ REBNATIVE(case)
         }
         else if (IS_ACTION(*v)) {
             DECLARE_LOCAL (temp);
-            if (Do_Branch_With_Throws(temp, nullptr, KNOWN(*v), D_OUT)) {
+            if (Do_Branch_With_Throws(temp, nullptr, SPECIFIC(*v), D_OUT)) {
                 Move_Value(D_OUT, temp);
                 goto threw;
             }
@@ -1180,7 +1180,7 @@ REBNATIVE(switch)
                 if (RunQ_Throws(
                     temp,
                     false,  // fully = false, e.g. arity-0 functions are ok
-                    rebU(KNOWN(*v)),  // actions don't need specifiers
+                    rebU(SPECIFIC(*v)),  // actions don't need specifiers
                     D_OUT,
                     rebEND
                 )){

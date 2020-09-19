@@ -81,7 +81,7 @@ inline static bool Is_Block_Style_Varargs(
     // array with one BLOCK!, that is the actual array and index to advance.
     //
     REBARR *array1 = ARR(EXTRA(Binding, vararg).node);
-    *shared_out = KNOWN(ARR_HEAD(array1));
+    *shared_out = SPECIFIC(ARR_HEAD(array1));
     assert(
         IS_END(*shared_out)
         or (IS_BLOCK(*shared_out) and ARR_LEN(array1) == 1)
@@ -149,11 +149,11 @@ inline static const REBVAL *Param_For_Varargs_Maybe_Null(const REBCEL *v) {
     if (phase) {
         REBARR *paramlist = ACT_PARAMLIST(phase);
         if (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0) // e.g. enfix
-            return KNOWN(ARR_AT(
+            return SPECIFIC(ARR_AT(
                 paramlist,
                 - VAL_VARARGS_SIGNED_PARAM_INDEX(v)
             ));
-        return KNOWN(ARR_AT(
+        return SPECIFIC(ARR_AT(
             paramlist,
             VAL_VARARGS_SIGNED_PARAM_INDEX(v)
         ));

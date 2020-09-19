@@ -1136,12 +1136,12 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
                 break; }
 
               default:
-                fail (KNOWN(item));
+                fail (SPECIFIC(item));
             }
             break;
 
           default:
-            fail (KNOWN(item));
+            fail (SPECIFIC(item));
         }
     }
 

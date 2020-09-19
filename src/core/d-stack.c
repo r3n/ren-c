@@ -166,7 +166,7 @@ REBVAL *Init_Near_For_Frame(RELVAL *out, REBFRM *f)
     else
         Init_Block(out, near);
 
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

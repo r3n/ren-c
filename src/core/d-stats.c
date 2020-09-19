@@ -218,7 +218,7 @@ REB_R Measured_Dispatch_Hook(REBFRM * const f)
             assert(n != 0); // should have inserted
         }
         else {
-            REBVAL *stats = KNOWN(ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1));
+            REBVAL *stats = SPECIFIC(ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1));
 
             REBARR *a = IS_BLOCK(stats) ? VAL_ARRAY(stats) : NULL;
 
