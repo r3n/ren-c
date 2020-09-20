@@ -301,7 +301,7 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
 //
 // This indicates that the user had a tempoary desire to protect a series
 // size or values from modification.  It is the usermode analogue of
-// SERIES_INFO_FROZEN, but can be reversed.
+// SERIES_INFO_FROZEN_DEEP, but can be reversed.
 //
 // Note: There is a feature in PROTECT (CELL_FLAG_PROTECTED) which protects
 // a certain variable in a context from being changed.  It is similar, but
@@ -321,13 +321,13 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
 // gathered, and apply all the removals at once before releasing the hold.
 //
 // It will be released when the execution is finished, which distinguishes it
-// from SERIES_INFO_FROZEN, which will never be reset, as long as it lives...
+// from SERIES_INFO_FROZEN_DEEP, which will never be reset, as long as it lives...
 //
 #define SERIES_INFO_HOLD \
     FLAG_LEFT_BIT(5)
 
 
-//=//// SERIES_INFO_FROZEN ////////////////////////////////////////////////=//
+//=//// SERIES_INFO_FROZEN_DEEP ////////////////////////////////////////////////=//
 //
 // Indicates that the length or values cannot be modified...ever.  It has been
 // locked and will never be released from that state for its lifetime, and if
@@ -341,7 +341,7 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
 // of abstraction, but if one manages to get a raw non-const pointer into a
 // value in the series data...then by that point it cannot be enforced.
 //
-#define SERIES_INFO_FROZEN \
+#define SERIES_INFO_FROZEN_DEEP \
     FLAG_LEFT_BIT(6)
 
 
@@ -467,9 +467,11 @@ STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(28)
 
 
-//=//// SERIES_INFO_29 ////////////////////////////////////////////////////=//
+//=//// SERIES_INFO_FROZEN_SHALLOW ////////////////////////////////////////=//
 //
-#define SERIES_INFO_29 \
+// A series can be locked permanently, but only at its own top level.
+//
+#define SERIES_INFO_FROZEN_SHALLOW \
     FLAG_LEFT_BIT(29)
 
 

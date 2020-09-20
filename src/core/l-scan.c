@@ -2345,6 +2345,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
                     Append_Value(a, DS_TOP);  // may be BLANK!
                     Init_Blank(Alloc_Tail_Array(a));
+                    Freeze_Array_Shallow(a);
                     if (GET_CELL_FLAG(DS_TOP, BLANK_MARKED_GET))
                         Init_Any_Path(DS_TOP, REB_GET_PATH, a);
                     else
@@ -2430,7 +2431,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                         CELL_FLAG_FIRST_IS_NODE
                     );
 
-                INIT_VAL_NODE(DS_TOP, a);
+                INIT_VAL_NODE(DS_TOP, Freeze_Array_Shallow(a));
                 VAL_INDEX(DS_TOP) = 0;
                 INIT_BINDING(DS_TOP, UNBOUND);
             }

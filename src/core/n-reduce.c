@@ -362,12 +362,14 @@ REB_R Compose_To_Stack_Core(
                 pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
 
             REBARR *popped = Pop_Stack_Values_Core(dsp_deep, pop_flags);
-            if (ANY_PATH_KIND(kind))
+            if (ANY_PATH_KIND(kind)) {
+                Freeze_Array_Shallow(popped);
                 Init_Any_Path(
                     DS_PUSH(),
                     kind,
                     popped  // can't push and pop in same step, need variable
                 );
+            }
             else
                 Init_Any_Array(
                     DS_PUSH(),
@@ -471,7 +473,11 @@ REBNATIVE(compose)
 
     REBARR *popped = Pop_Stack_Values_Core(dsp_orig, flags);
     if (ANY_PATH(ARG(value)))
-        return Init_Any_Path(D_OUT, VAL_TYPE(ARG(value)), popped);
+        return Init_Any_Path(
+            D_OUT,
+            VAL_TYPE(ARG(value)),
+            Freeze_Array_Shallow(popped)
+        );
 
     return Init_Any_Array(D_OUT, VAL_TYPE(ARG(value)), popped);
 }

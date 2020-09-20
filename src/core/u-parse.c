@@ -1179,7 +1179,7 @@ static REBIXO Do_Eval_Rule(REBFRM *f)
         //
         holder = Alloc_Singular(SERIES_FLAGS_NONE);
         Move_Value(ARR_SINGLE(holder), P_CELL);
-        Deep_Freeze_Array(holder); // don't allow modification of temporary
+        Freeze_Array_Deep(holder);  // don't allow modification of temporary
     }
 
     // We want to reuse the same frame we're in, because if you say

@@ -339,7 +339,7 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
         ACT_EXEMPLAR(VAL_ACTION(first)),  // same exemplar as first action
         1  // details array capacity
     );
-    Deep_Freeze_Array(VAL_ARRAY(pipeline));
+    Freeze_Array_Deep(VAL_ARRAY(pipeline));
     Move_Value(ARR_HEAD(ACT_DETAILS(chain)), pipeline);
 
     return Init_Action_Unbound(out, chain);

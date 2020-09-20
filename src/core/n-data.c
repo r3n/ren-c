@@ -1165,7 +1165,7 @@ REBNATIVE(as)
             // freeze deeply and anyone who doesn't like the effect can use
             // TO PATH! and accept the copying.
             //
-            Deep_Freeze_Array(VAL_ARRAY(v));
+            Freeze_Array_Deep(VAL_ARRAY(v));
             break;
         }
 

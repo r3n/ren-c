@@ -93,9 +93,7 @@ void Startup_Typesets(void)
     // using the Root_Typesets?
     //
     Root_Typesets = Init_Block(Alloc_Value(), Pop_Stack_Values(dsp_orig));
-
-    REBSER *locker = nullptr;
-    Force_Value_Frozen(Root_Typesets, locker);
+    Force_Value_Frozen_Deep(Root_Typesets);
 }
 
 

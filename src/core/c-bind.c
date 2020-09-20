@@ -311,6 +311,9 @@ static void Clonify_And_Bind_Relative(
                 INIT_BINDING(v, UNBOUND);
 
                 sub_src = VAL_ARRAY_AT(v);  // look for LETs
+
+                if (ANY_PATH_KIND(kind))  // must freeze the copy shallow
+                    Freeze_Array_Shallow(ARR(series));
             }
             else {
                 series = Copy_Sequence_Core(

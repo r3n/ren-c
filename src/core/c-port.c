@@ -170,7 +170,7 @@ bool Redo_Action_Throws(REBVAL *out, REBFRM *f, REBACT *run)
         Move_Value(first, ACT_ARCHETYPE(run));
     }
     else
-        Init_Path(first, Pop_Stack_Values(dsp_orig));
+        Init_Path(first, Freeze_Array_Shallow(Pop_Stack_Values(dsp_orig)));
 
     bool threw = Do_At_Mutable_Maybe_Stale_Throws(
         out,  // invisibles allow for out to not be Init_Void()'d

@@ -504,17 +504,22 @@ static inline void Flip_Series_To_White(REBSER *s) {
 
 inline static void Freeze_Sequence(REBSER *s) { // there is no unfreeze!
     assert(not IS_SER_ARRAY(s)); // use Deep_Freeze_Array
-    SET_SERIES_INFO(s, FROZEN);
+    SET_SERIES_INFO(s, FROZEN_SHALLOW);
+    SET_SERIES_INFO(s, FROZEN_DEEP);  // so generic deep frozen checks faster
 }
 
 inline static bool Is_Series_Frozen(REBSER *s) {
-    assert(not IS_SER_ARRAY(s)); // use Is_Array_Deeply_Frozen
-    return GET_SERIES_INFO(s, FROZEN);
+    assert(not IS_SER_ARRAY(s));  // use Is_Array_Deeply_Frozen
+    if (NOT_SERIES_INFO(s, FROZEN_SHALLOW))
+        return false;
+    assert(GET_SERIES_INFO(s, FROZEN_DEEP));  // true on frozen non-arrays
+    return true;
 }
 
 inline static bool Is_Series_Read_Only(REBSER *s) { // may be temporary...
     return 0 != (s->info.bits &
-        (SERIES_INFO_FROZEN | SERIES_INFO_HOLD | SERIES_INFO_PROTECTED)
+        (SERIES_INFO_HOLD | SERIES_INFO_PROTECTED
+        | SERIES_INFO_FROZEN_SHALLOW | SERIES_INFO_FROZEN_DEEP)
     );
 }
 
@@ -537,8 +542,10 @@ inline static void FAIL_IF_READ_ONLY_SER(REBSER *s) {
     if (GET_SERIES_INFO(s, HOLD))
         fail (Error_Series_Held_Raw());
 
-    if (GET_SERIES_INFO(s, FROZEN))
+    if (GET_SERIES_INFO(s, FROZEN_SHALLOW))
         fail (Error_Series_Frozen_Raw());
+
+    assert(NOT_SERIES_INFO(s, FROZEN_DEEP));  // implies FROZEN_SHALLOW
 
     assert(GET_SERIES_INFO(s, PROTECTED));
     fail (Error_Series_Protected_Raw());

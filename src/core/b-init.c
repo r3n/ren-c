@@ -311,8 +311,7 @@ static REBVAL *Make_Locked_Tag(const char *utf8) { // helper
     mutable_KIND_BYTE(t) = REB_TAG;
     mutable_MIRROR_BYTE(t) = REB_TAG;
 
-    REBSER *locker = nullptr;
-    Force_Value_Frozen(t, locker);
+    Force_Value_Frozen_Deep(t);
     return t;
 }
 
@@ -388,9 +387,7 @@ static void Init_Action_Meta_Shim(void) {
     TYPE_SET(CTX_KEY(meta, 1), REB_TS_HIDDEN);  // hide self
 
     Root_Action_Meta = Init_Object(Alloc_Value(), meta);
-
-    REBSER *locker = nullptr;
-    Force_Value_Frozen(Root_Action_Meta, locker);
+    Force_Value_Frozen_Deep(Root_Action_Meta);
 
 }
 
@@ -686,7 +683,7 @@ static void Startup_End_Node(void)
 static void Startup_Empty_Array(void)
 {
     PG_Empty_Array = Make_Array_Core(0, NODE_FLAG_MANAGED);
-    SET_SERIES_INFO(PG_Empty_Array, FROZEN);
+    Freeze_Array_Deep(PG_Empty_Array);
 
     // "Empty" PATH!s that look like `/` are actually a WORD! cell format
     // under the hood.  This allows them to have bindings and do double-duty
@@ -698,7 +695,7 @@ static void Startup_Empty_Array(void)
     Init_Blank(ARR_AT(a, 0));
     Init_Blank(ARR_AT(a, 1));
     TERM_ARRAY_LEN(a, 2);
-    SET_SERIES_INFO(a, FROZEN);
+    Freeze_Array_Deep(a);
     PG_2_Blanks_Array = a;
   }
 }
@@ -747,15 +744,13 @@ static void Init_Root_Vars(void)
 
     RESET_CELL(Prep_Cell(&PG_R_Reference), REB_R_REFERENCE, CELL_MASK_NONE);
 
-    REBSER *locker = nullptr;
-
     Root_Empty_Block = Init_Block(Alloc_Value(), PG_Empty_Array);
-    Force_Value_Frozen(Root_Empty_Block, locker);
+    Force_Value_Frozen_Deep(Root_Empty_Block);
 
     // Note: has to be a BLOCK!, 2-element blank paths use SYM__SLASH_1_
     //
     Root_2_Blanks_Block = Init_Block(Alloc_Value(), PG_2_Blanks_Array);
-    Force_Value_Frozen(Root_2_Blanks_Block, locker);
+    Force_Value_Frozen_Deep(Root_2_Blanks_Block);
 
     // Note: rebText() can't run yet, review.
     //
@@ -769,10 +764,10 @@ static void Init_Root_Vars(void)
   #endif
 
     Root_Empty_Text = Init_Text(Alloc_Value(), nulled_uni);
-    Force_Value_Frozen(Root_Empty_Text, locker);
+    Force_Value_Frozen_Deep(Root_Empty_Text);
 
     Root_Empty_Binary = Init_Binary(Alloc_Value(), Make_Binary(0));
-    Force_Value_Frozen(Root_Empty_Binary, locker);
+    Force_Value_Frozen_Deep(Root_Empty_Binary);
 
     Root_Space_Char = rebChar(' ');
     Root_Newline_Char = rebChar('\n');

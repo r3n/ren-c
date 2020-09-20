@@ -41,6 +41,7 @@ REBVAL *Init_Any_Path_At_Core(
     Force_Series_Managed(SER(a));
     ASSERT_SERIES_TERM(SER(a));
     assert(index == 0);  // !!! current rule
+    assert(Is_Array_Frozen_Shallow(a));  // must be immutable (may be aliased)
 
     RESET_CELL(out, kind, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, a);
@@ -981,7 +982,7 @@ REB_R MAKE_Path(
             return out;
         }
 
-    return Init_Any_Path(out, kind, arr);
+    return Init_Any_Path(out, kind, Freeze_Array_Shallow(arr));
 }
 
 
@@ -1022,7 +1023,7 @@ REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         Init_Blank(ARR_AT(a, 0));
         Move_Value(ARR_AT(a, 1), arg);
         TERM_ARRAY_LEN(a, 2);
-        return Init_Any_Path(out, kind, a);
+        return Init_Any_Path(out, kind, Freeze_Array_Shallow(a));
     }
 
     REBDSP dsp_orig = DSP;
@@ -1045,7 +1046,8 @@ REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
             return out;
         }
 
-    return Init_Any_Path(out, kind, Pop_Stack_Values(dsp_orig));
+    REBARR *a = Pop_Stack_Values(dsp_orig);
+    return Init_Any_Path(out, kind, Freeze_Array_Shallow(a));
 }
 
 

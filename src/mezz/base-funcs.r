@@ -703,7 +703,7 @@ count-down: redescribe [
 lock-of: redescribe [
     "If value is already locked, return it...otherwise CLONE it and LOCK it."
 ](
-    specialize 'lock [clone: true]
+    chain [:copy/deep | :freeze]
 )
 
 eval-all: func [

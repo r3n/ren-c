@@ -1178,8 +1178,7 @@ REBNATIVE(does)
         // things invariant we have to lock it.
         //
         RELVAL *body = ARR_HEAD(ACT_DETAILS(doer));
-        REBSER *locker = NULL;
-        Force_Value_Frozen(specializee, locker);
+        Force_Value_Frozen_Deep(specializee);
         Move_Value(body, specializee);
 
         return Init_Action_Unbound(D_OUT, doer);

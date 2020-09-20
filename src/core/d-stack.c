@@ -162,7 +162,7 @@ REBVAL *Init_Near_For_Frame(RELVAL *out, REBFRM *f)
     // so assume that will help a little bit with making the error clear.
     //
     if (GET_EVAL_FLAG(f, PATH_MODE))
-        Init_Path(out, near);
+        Init_Path(out, Freeze_Array_Shallow(near));
     else
         Init_Block(out, near);
 

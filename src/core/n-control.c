@@ -1310,6 +1310,7 @@ REBNATIVE(default)
                 }
             }
             TERM_ARRAY_LEN(composed, VAL_LEN_AT(target));
+            Freeze_Array_Shallow(composed);
             Init_Any_Path(target, REB_SET_PATH, composed);
         }
 

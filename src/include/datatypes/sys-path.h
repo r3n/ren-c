@@ -183,7 +183,9 @@ inline static REBARR *VAL_PATH(const RELVAL *path)
         assert(VAL_WORD_SYM(VAL_UNESCAPED(path)) == SYM__SLASH_1_);
         return PG_2_Blanks_Array;
     }
-    return VAL_ARRAY(path);
+    REBARR *a = VAL_ARRAY(path);
+    assert(Is_Array_Frozen_Shallow(a));
+    return a;
 }
 
 inline static REBSPC *VAL_PATH_SPECIFIER(const RELVAL *path)
@@ -223,7 +225,7 @@ inline static REBVAL *Refinify(REBVAL *v) {
     REBARR *a = Make_Array(2);
     Init_Blank(Alloc_Tail_Array(a));
     Move_Value(Alloc_Tail_Array(a), v);
-    return Init_Path(v, a);
+    return Init_Path(v, Freeze_Array_Shallow(a));
 }
 
 inline static bool IS_REFINEMENT(const RELVAL *v) {

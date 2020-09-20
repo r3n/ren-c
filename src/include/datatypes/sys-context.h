@@ -396,9 +396,8 @@ inline static void Deep_Freeze_Context(REBCTX *c) {
     Uncolor_Array(CTX_VARLIST(c));
 }
 
-inline static bool Is_Context_Deeply_Frozen(REBCTX *c) {
-    return GET_SERIES_INFO(c, FROZEN);
-}
+#define Is_Context_Frozen_Deep(c) \
+    Is_Array_Frozen_Deep(CTX_VARLIST(c))
 
 
 //=////////////////////////////////////////////////////////////////////////=//

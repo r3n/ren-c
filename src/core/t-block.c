@@ -1223,7 +1223,7 @@ REBNATIVE(blockify)
         Move_Value(ARR_HEAD(a), v);
         TERM_ARRAY_LEN(a, 1);
     }
-    return Init_Block(D_OUT, a);
+    return Init_Block(D_OUT, Freeze_Array_Shallow(a));
 }
 
 

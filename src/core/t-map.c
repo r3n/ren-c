@@ -290,8 +290,7 @@ REBLEN Find_Map_Entry(
     // a SET must always be done with an immutable key...because if it were
     // changed, there'd be no notification to rehash the map.
     //
-    REBSER *locker = SER(MAP_PAIRLIST(map));
-    Force_Value_Frozen(key, locker);
+    Force_Value_Frozen_Deep_Blame(key, MAP_PAIRLIST(map));
 
     // Must set the value:
     if (n) {  // re-set it:
@@ -454,7 +453,7 @@ inline static REBMAP *Copy_Map(REBMAP *map, REBU64 types) {
 
     REBVAL *key = SPECIFIC(ARR_HEAD(copy)); // all keys/values are specified
     for (; NOT_END(key); key += 2) {
-        assert(Is_Value_Frozen(key)); // immutable key
+        assert(Is_Value_Frozen_Deep(key));  // immutable key
 
         REBVAL *v = key + 1;
         if (IS_NULLED(v))
