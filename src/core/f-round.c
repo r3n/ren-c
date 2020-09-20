@@ -36,13 +36,16 @@
 // Identical to ROUND mezzanine function.
 // Note: scale arg only valid if RF_TO is set
 //
-REBDEC Round_Dec(REBDEC dec, REBLEN flags, REBDEC scale)
+REBDEC Round_Dec(REBDEC dec, REBFRM *frame_, REBDEC scale)
 {
+    INCLUDE_PARAMS_OF_ROUND;
+    UNUSED(ARG(value));  // was extracted for `dec`
+
     REBDEC r;
     union {REBDEC d; REBI64 i;} m;
     REBI64 j;
 
-    if (flags & RF_TO) {
+    if (REF(to)) {
         if (scale == 0.0)
             fail (Error_Zero_Divide_Raw());
         scale = fabs(scale);
@@ -70,9 +73,9 @@ REBDEC Round_Dec(REBDEC dec, REBLEN flags, REBDEC scale)
         scale = 1.0 / scale;
         dec = dec * scale;
     }
-    if (flags & (RF_DOWN | RF_FLOOR | RF_CEILING)) {
-        if (flags & RF_FLOOR) dec = floor(dec);
-        else if (flags & RF_DOWN) dec = Dec_Trunc(dec);
+    if (REF(down) or REF(floor) or REF(ceiling)) {
+        if (REF(floor)) dec = floor(dec);
+        else if (REF(down)) dec = Dec_Trunc(dec);
         else dec = ceil(dec);
     } else {
         /*  integer-compare fabs(dec) and floor(fabs(dec)) + 0.5,
@@ -83,12 +86,12 @@ REBDEC Round_Dec(REBDEC dec, REBLEN flags, REBDEC scale)
         m.d = floor(m.d) + 0.5;
         if (j - m.i < -10) dec = Dec_Trunc(dec);
         else if (j - m.i > 10) dec = Dec_Away(dec);
-        else if (flags & RF_EVEN) {
+        else if (REF(even)) {
             if (fmod(fabs(dec), 2.0) < 1.0) dec = Dec_Trunc(dec);
             else dec = Dec_Away(dec);
         }
-        else if (flags & RF_HALF_DOWN) dec = Dec_Trunc(dec);
-        else if (flags & RF_HALF_CEILING) dec = ceil(dec);
+        else if (REF(half_down)) dec = Dec_Trunc(dec);
+        else if (REF(half_ceiling)) dec = ceil(dec);
         else dec = Dec_Away(dec);
     }
 
@@ -142,12 +145,15 @@ REBDEC Round_Dec(REBDEC dec, REBLEN flags, REBDEC scale)
 // Identical to ROUND mezzanine function.
 // Note: scale arg only valid if RF_TO is set
 //
-REBI64 Round_Int(REBI64 num, REBLEN flags, REBI64 scale)
+REBI64 Round_Int(REBI64 num, REBFRM *frame_, REBI64 scale)
 {
+    INCLUDE_PARAMS_OF_ROUND;
+    UNUSED(ARG(value));  // was extracted as `num`
+
     /* using safe unsigned arithmetic */
     REBU64 sc, n, r, m, s;
 
-    if (flags & RF_TO) {
+    if (REF(to)) {
         if (scale == 0) fail (Error_Zero_Divide_Raw());
         sc = Int_Abs(scale);
     }
@@ -158,9 +164,9 @@ REBI64 Round_Int(REBI64 num, REBLEN flags, REBI64 scale)
     s = sc - r;
     if (r == 0) return num;
 
-    if (flags & (RF_DOWN | RF_FLOOR | RF_CEILING)) {
-        if (flags & RF_DOWN) {Int_Trunc; return num;}
-        if (flags & RF_FLOOR) {Int_Floor; return num;}
+    if (REF(down) or REF(floor) or REF(ceiling)) {
+        if (REF(down)) {Int_Trunc; return num;}
+        if (REF(floor)) {Int_Floor; return num;}
         Int_Ceil;
         return num;
     }
@@ -170,12 +176,12 @@ REBI64 Round_Int(REBI64 num, REBLEN flags, REBI64 scale)
     else if (r > s) {Int_Away; return num;}
 
     /* half */
-    if (flags & RF_EVEN) {
+    if (REF(even)) {
         if ((n / sc) & 1) {Int_Away; return num;}
         else {Int_Trunc; return num;}
     }
-    if (flags & RF_HALF_DOWN) {Int_Trunc; return num;}
-    if (flags & RF_HALF_CEILING) {Int_Ceil; return num;}
+    if (REF(half_down)) {Int_Trunc; return num;}
+    if (REF(half_ceiling)) {Int_Ceil; return num;}
 
     Int_Away; return num; /* this is round_half_away */
 }
@@ -184,24 +190,27 @@ REBI64 Round_Int(REBI64 num, REBLEN flags, REBI64 scale)
 //  Round_Deci: C
 //
 // Identical to ROUND mezzanine function.
-// Note: scale arg only valid if RF_TO is set
+// Note: scale arg only valid if REF(to) is set
 //
-deci Round_Deci(deci num, REBLEN flags, deci scale)
+deci Round_Deci(deci num, REBFRM *frame_, deci scale)
 {
+    INCLUDE_PARAMS_OF_ROUND;
+    UNUSED(ARG(value));  // was extracted as `num`
+
     deci deci_one = {1u, 0u, 0u, 0u, 0};
 
-    if (flags & RF_TO) {
+    if (REF(to)) {
         if (deci_is_zero(scale)) fail (Error_Zero_Divide_Raw());
         scale = deci_abs(scale);
     }
     else scale = deci_one;
 
-    if (flags & RF_EVEN) return deci_half_even(num, scale);
-    if (flags & RF_DOWN) return deci_truncate(num, scale);
-    if (flags & RF_HALF_DOWN) return deci_half_truncate(num, scale);
-    if (flags & RF_FLOOR) return deci_floor(num, scale);
-    if (flags & RF_CEILING) return deci_ceil(num, scale);
-    if (flags & RF_HALF_CEILING) return deci_half_ceil(num, scale);
+    if (REF(even)) return deci_half_even(num, scale);
+    if (REF(down)) return deci_truncate(num, scale);
+    if (REF(half_down)) return deci_half_truncate(num, scale);
+    if (REF(floor)) return deci_floor(num, scale);
+    if (REF(ceiling)) return deci_ceil(num, scale);
+    if (REF(half_ceiling)) return deci_half_ceil(num, scale);
 
     return deci_half_away(num, scale);
 }

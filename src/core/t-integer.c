@@ -402,21 +402,12 @@ REBTYPE(Integer)
 
     case SYM_ROUND: {
         INCLUDE_PARAMS_OF_ROUND;
-
-        UNUSED(PAR(value));
-
-        REBFLGS flags = (
-            (REF(to) ? RF_TO : 0)
-            | (REF(even) ? RF_EVEN : 0)
-            | (REF(down) ? RF_DOWN : 0)
-            | (REF(half_down) ? RF_HALF_DOWN : 0)
-            | (REF(floor) ? RF_FLOOR : 0)
-            | (REF(ceiling) ? RF_CEILING : 0)
-            | (REF(half_ceiling) ? RF_HALF_CEILING : 0)
-        );
+        USED(ARG(value));  // extracted as d1, others are passed via frame_
+        USED(ARG(even)); USED(ARG(down)); USED(ARG(half_down));
+        USED(ARG(floor)); USED(ARG(ceiling)); USED(ARG(half_ceiling));
 
         if (not REF(to))
-            return Init_Integer(D_OUT, Round_Int(num, flags, 0L));
+            return Init_Integer(D_OUT, Round_Int(num, frame_, 0L));
 
         REBVAL *to = ARG(to);
 
@@ -424,13 +415,13 @@ REBTYPE(Integer)
             return Init_Money(
                 D_OUT,
                 Round_Deci(
-                    int_to_deci(num), flags, VAL_MONEY_AMOUNT(to)
+                    int_to_deci(num), frame_, VAL_MONEY_AMOUNT(to)
                 )
             );
 
         if (IS_DECIMAL(to) || IS_PERCENT(to)) {
             REBDEC dec = Round_Dec(
-                cast(REBDEC, num), flags, VAL_DECIMAL(to)
+                cast(REBDEC, num), frame_, VAL_DECIMAL(to)
             );
             RESET_CELL(D_OUT, VAL_TYPE(to), CELL_MASK_NONE);
             VAL_DECIMAL(D_OUT) = dec;
@@ -440,7 +431,7 @@ REBTYPE(Integer)
         if (IS_TIME(ARG(to)))
             fail (PAR(to));
 
-        return Init_Integer(D_OUT, Round_Int(num, flags, VAL_INT64(to))); }
+        return Init_Integer(D_OUT, Round_Int(num, frame_, VAL_INT64(to))); }
 
     case SYM_RANDOM: {
         INCLUDE_PARAMS_OF_RANDOM;

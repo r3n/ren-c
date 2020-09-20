@@ -75,16 +75,5 @@ inline static REBYTE VAL_UINT8(const REBCEL *v) {
 }
 
 
-// Rounding flags (passed as refinements to ROUND function):
-enum {
-    RF_TO = 1 << 0,
-    RF_EVEN = 1 << 1,
-    RF_DOWN = 1 << 2,
-    RF_HALF_DOWN = 1 << 3,
-    RF_FLOOR = 1 << 4,
-    RF_CEILING = 1 << 5,
-    RF_HALF_CEILING = 1 << 6
-};
-
 #define ROUND_TO_INT(d) \
     cast(int32_t, floor((MAX(INT32_MIN, MIN(INT32_MAX, d))) + 0.5))

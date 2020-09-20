@@ -488,39 +488,32 @@ REBTYPE(Decimal)
 
     case SYM_ROUND: {
         INCLUDE_PARAMS_OF_ROUND;
-
-        UNUSED(PAR(value));
-
-        REBFLGS flags = (
-            (REF(to) ? RF_TO : 0)
-            | (REF(even) ? RF_EVEN : 0)
-            | (REF(down) ? RF_DOWN : 0)
-            | (REF(half_down) ? RF_HALF_DOWN : 0)
-            | (REF(floor) ? RF_FLOOR : 0)
-            | (REF(ceiling) ? RF_CEILING : 0)
-            | (REF(half_ceiling) ? RF_HALF_CEILING : 0)
-        );
+        USED(ARG(value));  // extracted as d1, others are passed via frame_
+        USED(ARG(even)); USED(ARG(down)); USED(ARG(half_down));
+        USED(ARG(floor)); USED(ARG(ceiling)); USED(ARG(half_ceiling));
 
         if (REF(to)) {
             if (IS_MONEY(ARG(to)))
                 return Init_Money(D_OUT, Round_Deci(
-                    decimal_to_deci(d1), flags, VAL_MONEY_AMOUNT(ARG(to))
+                    decimal_to_deci(d1), frame_, VAL_MONEY_AMOUNT(ARG(to))
                 ));
 
             if (IS_TIME(ARG(to)))
                 fail (PAR(to));
 
-            d1 = Round_Dec(d1, flags, Dec64(ARG(to)));
+            d1 = Round_Dec(d1, frame_, Dec64(ARG(to)));
             if (IS_INTEGER(ARG(to)))
                 return Init_Integer(D_OUT, cast(REBI64, d1));
 
             if (IS_PERCENT(ARG(to)))
                 type = REB_PERCENT;
         }
-        else
+        else {
+            Init_True(ARG(to));  // default a rounding amount
             d1 = Round_Dec(
-                d1, flags | RF_TO, type == REB_PERCENT ? 0.01L : 1.0L
+                d1, frame_, type == REB_PERCENT ? 0.01L : 1.0L
             );
+        }
         goto setDec; }
 
     case SYM_RANDOM: {
