@@ -184,6 +184,7 @@ inline static REBARR *VAL_PATH(const RELVAL *path)
         return PG_2_Blanks_Array;
     }
     REBARR *a = VAL_ARRAY(path);
+    assert(ARR_LEN(a) >= 2);
     assert(Is_Array_Frozen_Shallow(a));
     return a;
 }

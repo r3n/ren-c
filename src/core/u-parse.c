@@ -2627,12 +2627,8 @@ REBNATIVE(subparse)
                         Derelativize(specified, rule, P_RULE_SPECIFIER);
 
                         REBLEN mod_flags = (flags & PF_INSERT) ? 0 : AM_PART;
-                        if (
-                            not only and
-                            Splices_Into_Type_Without_Only(P_TYPE, specified)
-                        ){
+                        if (not only and Splices_Without_Only(specified))
                             mod_flags |= AM_SPLICE;
-                        }
                         P_POS = Modify_Array(
                             ARR(P_INPUT),
                             begin,

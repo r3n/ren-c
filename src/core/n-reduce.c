@@ -255,9 +255,10 @@ REB_R Compose_To_Stack_Core(
                 // compose [(elide "so do 'empty' composes")] => []
             }
             else if (
-                insert and IS_BLOCK(insert) and (predicate or doubled_group)
+                insert
+                and Splices_Without_Only(insert)
+                and (predicate or doubled_group)
             ){
-                //
                 // We splice blocks if they were produced by a predicate
                 // application, or if (( )) was used.
 

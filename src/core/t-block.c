@@ -968,12 +968,8 @@ REBTYPE(Array)
         REBLEN index = VAL_INDEX(array);
 
         REBFLGS flags = 0;
-        if (
-            not REF(only)
-            and Splices_Into_Type_Without_Only(VAL_TYPE(array), ARG(value))
-        ){
+        if (not REF(only) and Splices_Without_Only(ARG(value)))
             flags |= AM_SPLICE;
-        }
         if (REF(part))
             flags |= AM_PART;
         if (REF(line))
@@ -1256,7 +1252,7 @@ REBNATIVE(groupify)
         Move_Value(ARR_HEAD(a), v);
         TERM_ARRAY_LEN(a, 1);
     }
-    return Init_Group(D_OUT, a);
+    return Init_Group(D_OUT, Freeze_Array_Shallow(a));
 }
 
 
@@ -1287,7 +1283,7 @@ REBNATIVE(enblock)
         Move_Value(ARR_HEAD(a), v);
         TERM_ARRAY_LEN(a, 1);
     }
-    return Init_Block(D_OUT, a);
+    return Init_Block(D_OUT, Freeze_Array_Shallow(a));
 }
 
 
@@ -1318,7 +1314,7 @@ REBNATIVE(engroup)
         Move_Value(ARR_HEAD(a), v);
         TERM_ARRAY_LEN(a, 1);
     }
-    return Init_Group(D_OUT, a);
+    return Init_Group(D_OUT, Freeze_Array_Shallow(a));
 }
 
 
