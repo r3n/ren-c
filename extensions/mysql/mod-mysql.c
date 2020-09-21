@@ -208,7 +208,7 @@ REBNATIVE(mysql_errno)
 //
 //  export mysql-error: native [
 //
-//      "For the connection specified mysql_error() returns a null-terminated string containing the error message for the most recently invoked API function that failed. "
+//      "For the connection specified mysql_error() returns a null-terminated string containing the error message for the most recently invoked API function that failed."
 //
 //      return: [text!]
 //      connection [handle!]
@@ -248,9 +248,17 @@ REBNATIVE(mysql_character_set_name)
 //
 //  export mysql-get-character-set-info: native [
 //    
-//      {Provides information about the default client character set. The default character set may be changed with the mysql-set-character-set.} 
+//      {Provides a block with information about the default client character set. The default character set may be changed with the mysql-set-character-set.} 
 //
-//      return: [text!]
+//      return: [block!] {character set information:
+//  - character set+collation number
+//  - characterset name
+//  - collation name
+//  - comment
+//  - directory (can be null, in which case blank! returned)
+//  - multi byte character min. length
+//  - multi byte character max. length
+//  }
 //      connection [handle!]
 //  ]
 //
@@ -262,21 +270,27 @@ REBNATIVE(mysql_get_character_set_info)
     MY_CHARSET_INFO cs;
 
     mysql_get_character_set_info(connection, &cs);
-
-    REBVAL *text = rebValue("{}");
    
-    // Append all info to the text
-    rebElide(  "append", text
-             , "spaced [{character set information:\ncharacter set+collation number:}", rebI(cs.number)
-             , "{\ncharacter set name:}", rebT(cs.name)
-             , "{\ncollation name:}", rebT(cs.csname)
-             , "{\ncomment:}", rebT(cs.comment)
-             , "{\ndirectory:}", rebT(cs.dir)
-             , "{\nmulti byte character min. length:}", rebI(cs.mbminlen)
-             , "{\nmulti byte character max. length:}", rebI(cs.mbmaxlen)
-             , "]" );
+    // Append all info to the output
+    REBVAL *block = rebValue("[]");
+    REBVAL *blank = rebBlank();
 
-    return text;
+    rebElide("append", block, rebI(cs.number));
+    rebElide("append", block, rebT(cs.name));
+    rebElide("append", block, rebT(cs.csname));
+    rebElide("append", block, rebT(cs.comment));
+    if (cs.dir == NULL){
+        rebElide("append", block, blank);
+    }
+    else {
+        rebElide("append", block, rebT(cs.dir));
+    }
+    rebElide("append", block, rebI(cs.mbminlen));
+    rebElide("append", block, rebI(cs.mbmaxlen));
+
+    rebRelease(blank);
+
+    return block;
 }
 
 //
@@ -798,9 +812,9 @@ REBNATIVE(mysql_insert_id)
 //  export mysql-data-seek: native [
 //    
 //      {  Seeks to an arbitrary row in a query result set. The offset value is a row number. 
-// Specify a value in the range from 0 to mysql-num-rows - 1.
-// This function requires that the result set structure contains the entire result of the query, 
-// so mysql-data-seek may be used only in conjunction with mysql-store-result, not with mysql-use-result. 
+//         Specify a value in the range from 0 to mysql-num-rows - 1.
+//         This function requires that the result set structure contains the entire result of the query, 
+//         so mysql-data-seek may be used only in conjunction with mysql-store-result, not with mysql-use-result. 
 //      } 
 //
 //      return: [void!]
@@ -824,7 +838,7 @@ REBNATIVE(mysql_data_seek)
 //  export mysql-field-seek: native [
 //    
 //      { Sets the field cursor to the given offset. The next call to mysql-fetch-field retrieves the field definition of the column associated with that offset.
-// To seek to the beginning of a row, pass an offset value of zero.
+//        To seek to the beginning of a row, pass an offset value of zero.
 //      } 
 //
 //      return: [integer!] {The previous value of the field cursor.}
@@ -868,10 +882,10 @@ REBNATIVE(mysql_field_tell)
 //  export mysql-row-seek: native [
 //    
 //      {  Sets the row cursor to an arbitrary row in a query result set. 
-// The offset value is a row offset, typically a value returned from mysql-row-tell or from mysql-row-seek. 
-// This value is not a row number; to seek to a row within a result set by number, use mysql-data-seek instead.
-// This function requires that the result set structure contains the entire result of the query, 
-// so mysql-row-seek may be used only in conjunction with mysql-store-result, not with mysql-use-result.
+//         The offset value is a row offset, typically a value returned from mysql-row-tell or from mysql-row-seek. 
+//         This value is not a row number; to seek to a row within a result set by number, use mysql-data-seek instead.
+//         This function requires that the result set structure contains the entire result of the query, 
+//         so mysql-row-seek may be used only in conjunction with mysql-store-result, not with mysql-use-result.
 //      } 
 //
 //      return: [handle!] {The previous value of the row cursor. This value may be passed to a subsequent call to mysql-row-seek.}
@@ -895,7 +909,7 @@ REBNATIVE(mysql_row_seek)
 //  export mysql-row-tell: native [
 //    
 //      { Returns the current position of the row cursor for the last mysql-fetch-row. This value can be used as an argument to mysql-row-seek.
-// Use mysql-row-tell only after mysql-store-result, not after mysql-use-result. } 
+//        Use mysql-row-tell only after mysql-store-result, not after mysql-use-result. } 
 //
 //      return: [handle!]
 //      resultset [handle!]
@@ -916,8 +930,7 @@ REBNATIVE(mysql_row_tell)
 //  export mysql-sqlstate: native [
 //    
 //      {Returns a null-terminated string containing the SQLSTATE error code for the most recently executed SQL statement.
-// The error code consists of five characters. '00000' means “no error.” The values are specified by ANSI SQL and ODBC. 
-//}
+//       The error code consists of five characters. '00000' means “no error.” The values are specified by ANSI SQL and ODBC.}
 //
 //      return: [text!] {A null-terminated character string containing the SQLSTATE error code.}
 //      connection [handle!]
@@ -937,7 +950,7 @@ REBNATIVE(mysql_sqlstate)
 //  export mysql-stat: native [
 //    
 //      {Returns a character string containing information similar to that provided by the mysqladmin status command. This includes uptime in seconds and the number of running
-// threads, questions, reloads, and open tables. }
+//       threads, questions, reloads, and open tables. }
 //
 //      return: [text! void!] {A character string describing the server status. NULL if an error occurred.}
 //      connection [handle!]
