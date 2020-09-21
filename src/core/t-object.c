@@ -411,20 +411,38 @@ REB_R PD_Context(
     if (not IS_WORD(picker))
         return R_UNHANDLED;
 
-    const bool always = false;
-    REBLEN n = Find_Canon_In_Context(c, VAL_WORD_CANON(picker), always);
+    // See if the binding of the word is already to the context (so there's
+    // no need to go hunting).  'x
+    //
+    REBLEN n;
+    if (VAL_BINDING(picker) == NOD(c))
+        n = VAL_WORD_INDEX(picker);
+    else {
+        const bool always = false;
+        n = Find_Canon_In_Context(c, VAL_WORD_CANON(picker), always);
 
-    if (n == 0)
-        return R_UNHANDLED;
+        if (n == 0)
+            return R_UNHANDLED;
 
+        // !!! As an experiment, try caching the binding index in the word.
+        // This "corrupts" it, but if we say paths effectively own their
+        // top-level words that could be all right.  Note this won't help if
+        // the word is an evaluative product, as the bits live in the cell
+        // and it will be discarded.
+        //
+        INIT_BINDING(m_cast(REBVAL*, picker), NOD(c));
+        INIT_WORD_INDEX(m_cast(REBVAL*, picker), n);
+    }
+
+    REBVAL *var = CTX_VAR(c, n);
     if (opt_setval) {
         ENSURE_MUTABLE(pvs->out);
 
-        if (GET_CELL_FLAG(CTX_VAR(c, n), PROTECTED))
+        if (GET_CELL_FLAG(var, PROTECTED))
             fail (Error_Protected_Word_Raw(picker));
     }
 
-    pvs->u.ref.cell = CTX_VAR(c, n);
+    pvs->u.ref.cell = var;
     pvs->u.ref.specifier = SPECIFIED;
     return R_REFERENCE;
 }
