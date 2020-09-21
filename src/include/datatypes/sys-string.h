@@ -493,39 +493,47 @@ inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
 }
 
 
-
 //=//// CACHED ACCESSORS AND BOOKMARKS ////////////////////////////////////=//
 //
-// A "bookmark" in this terminology is simply a small REBSER-sized node which
-// holds a mapping from an index to an offset in a string.  It is pointed to
-// by the string's LINK() field in the series node.
+// A "bookmark" in this terminology is simply a REBSER which contains a list
+// of indexes and offsets.  This helps to accelerate finding positions in
+// UTF-8 strings based on index, vs. having to necessarily search from the
+// beginning.
+//
+// !!! At the moment, only one bookmark is in effect at a time.  Even though
+// it's just two numbers, there's only one pointer's worth of space in the
+// series node otherwise.  Bookmarks aren't generated for strings that are
+// very short, or that are never enumerated.
+
+struct Reb_Bookmark {
+    REBLEN index;
+    REBSIZ offset;
+};
 
 #define BMK_INDEX(b) \
-    PAYLOAD(Bookmark, ARR_SINGLE(b)).index
+    SER_HEAD(struct Reb_Bookmark, (b))->index
 
 #define BMK_OFFSET(b) \
-    PAYLOAD(Bookmark, ARR_SINGLE(b)).offset
+    SER_HEAD(struct Reb_Bookmark, (b))->offset
 
 inline static REBBMK* Alloc_Bookmark(void) {
-    REBARR *bookmark = Alloc_Singular(SERIES_FLAG_MANAGED);
-    CLEAR_SERIES_FLAG(bookmark, MANAGED);  // so it's manual but untracked
-    LINK(bookmark).bookmarks = nullptr;
-    RESET_CELL(ARR_SINGLE(bookmark), REB_X_BOOKMARK, CELL_MASK_NONE);
-
-    // For the moment, REB_X_BOOKMARK is a high numbered type, which keeps
-    // it out of the type list *but* means it claims bindability.  Setting
-    // its mirror byte to claim it is REB_LOGIC preserves some debuggability
-    // (its main type is still bookmark) but makes Is_Bindable() false
-    //
-    mutable_MIRROR_BYTE(ARR_SINGLE(bookmark)) = REB_LOGIC;
-    return bookmark;
+    REBSER *s = Make_Series_Core(
+        1,
+        sizeof(struct Reb_Bookmark),
+        SERIES_FLAG_MANAGED  // LINK_NODE_NEEDS_MARK not neded if is bookmark
+    );
+    LINK(s).bookmarks = nullptr;  // !!! efficiency by linking bookmarks?
+    SET_SERIES_LEN(s, 1);
+    CLEAR_SERIES_FLAG(s, MANAGED);  // manual but untracked (avoid leak error)
+    return s;
 }
 
-inline static void Free_Bookmarks_Maybe_Null(REBSTR *s) {
-    assert(not IS_STR_SYMBOL(s));  // call on string
-    if (LINK(s).bookmarks)
-        GC_Kill_Series(SER(LINK(s).bookmarks));  // recursive free whole list
-    LINK(s).bookmarks = nullptr;
+inline static void Free_Bookmarks_Maybe_Null(REBSTR *str) {
+    assert(not IS_STR_SYMBOL(str));  // call on string
+    if (LINK(str).bookmarks) {
+        GC_Kill_Series(SER(LINK(str).bookmarks));
+        LINK(str).bookmarks = nullptr;
+    }
 }
 
 #if !defined(NDEBUG)
@@ -533,8 +541,6 @@ inline static void Free_Bookmarks_Maybe_Null(REBSTR *s) {
         REBBMK *bookmark = LINK(s).bookmarks;
         if (not bookmark)
             return;
-
-        assert(not LINK(SER(bookmark)).bookmarks);
 
         REBLEN index = BMK_INDEX(bookmark);
         REBSIZ offset = BMK_OFFSET(bookmark);

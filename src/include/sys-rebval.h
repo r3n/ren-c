@@ -446,11 +446,6 @@ struct Reb_Any_Payload  // generic, for adding payloads after-the-fact
     union Reb_Any second;
 };
 
-struct Reb_Bookmark_Payload {   // see %sys-string.h (used w/REB_X_BOOKMARK)
-    REBLEN index;
-    REBSIZ offset;
-};
-
 union Reb_Bytes_Payload  // IMPORTANT: Do not cast, use `Pointers` instead
 {
     REBYTE common[sizeof(uint32_t) * 2];  // same on 32-bit/64-bit platforms
@@ -506,8 +501,6 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     struct Reb_Integer_Payload Integer;
     struct Reb_Decimal_Payload Decimal;
     struct Reb_Time_Payload Time;
-
-    struct Reb_Bookmark_Payload Bookmark;  // internal (see REB_X_BOOKMARK)
 
     union Reb_Bytes_Payload Bytes;
 

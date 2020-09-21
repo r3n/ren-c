@@ -221,7 +221,7 @@ typedef struct Reb_Action REBACT;
 struct Reb_Map;
 typedef struct Reb_Map REBMAP;
 
-typedef REBARR REBBMK;  // "bookmark" (list of UTF-8 index=>offset singulars)
+typedef REBSER REBBMK;  // "bookmark" (list of UTF-8 index=>offsets)
 
 typedef REBSER REBTYP;  // Rebol Type (list of hook function pointers)
 
