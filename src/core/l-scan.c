@@ -665,6 +665,12 @@ static void Update_Error_Near_For_Line(
 // the NEAR field of the error with the "current" line number and line text,
 // e.g. where the end point of the token is seen.
 //
+// !!! Note: the scanning process had a `goto scan_error` as a single point
+// at the end of the routine, but that made it harder to break on where the
+// actual error was occurring.  Goto may be more beneficial and cut down on
+// code size in some way, but having lots of calls help esp. when scanning
+// during boot and getting error line numbers printf'd in the Wasm build.
+//
 static REBCTX *Error_Syntax(SCAN_STATE *ss, enum Reb_Token token) {
     //
     // The scanner code has `bp` and `ep` locals which mirror ss->begin and
@@ -1790,7 +1796,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     break;  // mode will be changed to '/'
                 }
                 if (len == 1 or level->mode_char != '/')
-                    goto syntax_error;
+                    fail (Error_Syntax(ss, token));
                 --len;
                 --ss->end;
             }
@@ -1810,7 +1816,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
           token_word:
             if (len == 0) {
                 --bp;
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             }
 
             Init_Any_Word(
@@ -1822,7 +1828,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
           case TOKEN_ISSUE:
             if (ep != Scan_Issue(DS_PUSH(), bp + 1, len - 1))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             break;
 
           case TOKEN_APOSTROPHE: {
@@ -1845,7 +1851,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
           case TOKEN_GET_BLOCK_BEGIN:
             if (ep[-1] == ':') {
                 if (len == 1 or level->mode_char != '/')
-                    goto syntax_error;
+                    fail (Error_Syntax(ss, token));
                 --len;
                 --ss->end;
             }
@@ -1868,7 +1874,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     token == TOKEN_GET_BLOCK_BEGIN
                     or token == TOKEN_GET_GROUP_BEGIN
                 ){
-                    goto syntax_error;  // `:(foo):` or `:[bar]:`
+                    fail (Error_Syntax(ss, token));  // `:(foo):` or `:[bar]:`
                 }
                 Init_Any_Array(DS_PUSH(), SETIFY_ANY_PLAIN_KIND(kind), a);
                 ++ss->begin;
@@ -1956,7 +1962,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
           case TOKEN_INTEGER:  // INTEGER! or start of DATE!
             if (*ep != '/' or level->mode_char == '/') {
                 if (ep != Scan_Integer(DS_PUSH(), bp, len))
-                    goto syntax_error;
+                    fail (Error_Syntax(ss, token));
             }
             else {  // saw a `/` not in block
                 token = TOKEN_DATE;
@@ -1964,7 +1970,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     ++ep;
                 len = cast(REBLEN, ep - bp);
                 if (ep != Scan_Date(DS_PUSH(), bp, len))
-                    goto syntax_error;
+                    fail (Error_Syntax(ss, token));
 
                 // !!! used to just set ss->begin to ep...which tripped up an
                 // assert that ss->end is greater than ss->begin at the start
@@ -1977,10 +1983,10 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
           case TOKEN_DECIMAL:
           case TOKEN_PERCENT:
             if (*ep == '/')
-                goto syntax_error;  // Do not allow 1.2/abc
+                fail (Error_Syntax(ss, token));  // Do not allow 1.2/abc
 
             if (ep != Scan_Decimal(DS_PUSH(), bp, len, false))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
 
             if (bp[len - 1] == '%') {
                 RESET_VAL_HEADER(DS_TOP, REB_PERCENT, CELL_MASK_NONE);
@@ -1991,10 +1997,10 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
           case TOKEN_MONEY:
             if (*ep == '/') {  // Do not allow $1/$2
                 ++ep;
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             }
             if (ep != Scan_Money(DS_PUSH(), bp, len))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             break;
 
           case TOKEN_TIME:
@@ -2003,12 +2009,12 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 and level->mode_char == '/'  // could be path/10: set
             ){
                 if (ep - 1 != Scan_Integer(DS_PUSH(), bp, len - 1))
-                    goto syntax_error;
+                    fail (Error_Syntax(ss, token));
                 ss->end--;  // put ':' back on end but not beginning
                 break;
             }
             if (ep != Scan_Time(DS_PUSH(), bp, len))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             break;
 
           case TOKEN_DATE:
@@ -2023,14 +2029,14 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 ss->begin = ep;  // End point extended to cover time
             }
             if (ep != Scan_Date(DS_PUSH(), bp, len))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             break;
 
           case TOKEN_CHAR: {
             REBUNI uni;
             bp += 2;  // skip #", and subtract 1 from ep for "
             if (ep - 1 != Scan_UTF8_Char_Escapable(&uni, bp))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             Init_Char_May_Fail(DS_PUSH(), uni);
             break; }
 
@@ -2040,32 +2046,32 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
           case TOKEN_BINARY:
             if (ep != Scan_Binary(DS_PUSH(), bp, len))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             break;
 
           case TOKEN_PAIR:
             if (ep != Scan_Pair(DS_PUSH(), bp, len))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             break;
 
           case TOKEN_TUPLE:
             if (ep != Scan_Tuple(DS_PUSH(), bp, len))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             break;
 
           case TOKEN_FILE:
             if (ep != Scan_File(DS_PUSH(), bp, len))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             break;
 
           case TOKEN_EMAIL:
             if (ep != Scan_Email(DS_PUSH(), bp, len))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             break;
 
           case TOKEN_URL:
             if (ep != Scan_URL(DS_PUSH(), bp, len))
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             break;
 
           case TOKEN_TAG:
@@ -2080,7 +2086,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 REB_TAG,
                 STRMODE_NO_CR
             )){
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             }
             break;
 
@@ -2291,7 +2297,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
             if (*ep != '(' and *ep != '[' and IS_LEX_DELIMIT(*ep)) {
                 token = TOKEN_PATH;  // so error says "bad path"
-                goto syntax_error;
+                fail (Error_Syntax(ss, token));
             }
             ss->begin = ep;  // skip next /
         }
@@ -2403,7 +2409,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
                 if (ANY_GET_KIND(kind_head) or blank_marked_get) {
                     if (ss->begin and *ss->end == ':')
-                      goto syntax_error;  // for instance `:a/b/c:`
+                      fail (Error_Syntax(ss, token));  // like `:a/b/c:`
 
                     RESET_VAL_HEADER(
                         DS_TOP,
@@ -2417,7 +2423,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 }
                 else if (ANY_SYM_KIND(kind_head)) {  // !!! TBD: blank hack
                     if (ss->begin and *ss->end == ':')
-                      goto syntax_error;  // for instance `@a/b/c:`
+                      fail (Error_Syntax(ss, token));  // like `@a/b/c:`
 
                     RESET_VAL_HEADER(
                         DS_TOP,
@@ -2492,10 +2498,6 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
     // Note: ss->newline_pending may be true; used for ARRAY_NEWLINE_AT_TAIL
 
     return nullptr;  // to be used w/rebRescue(), has to return a REBVAL*
-
-  syntax_error:
-
-    fail (Error_Syntax(ss, token));
 }
 
 
