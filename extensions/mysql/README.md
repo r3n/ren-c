@@ -43,8 +43,11 @@ Basic functions
     mysql-get-server-info
     mysql-get-server-version
     mysql-insert-id
+    mysql-more-results
+    mysql-next-result
     mysql-num-fields
     mysql-num-rows
+    mysql-ping
     mysql-query
     mysql-row-seek
     mysql-row-tell
@@ -53,6 +56,7 @@ Basic functions
     mysql-stat
     mysql-store-result
     mysql-use-result
+    mysql-warning-count
 
 Thread functions
 

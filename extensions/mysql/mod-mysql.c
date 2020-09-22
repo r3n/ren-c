@@ -164,6 +164,26 @@ REBNATIVE(mysql_close)
 }
 
 //
+//  export mysql-ping: native [
+//    
+//      "Checks whether the connection to the server is working."
+//
+//      return: [integer!] "Zero if the connection to the server is active. Nonzero if an error occurred."
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_ping)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_PING;
+
+    MYSQL *connection = VAL_HANDLE_POINTER(MYSQL, ARG(connection));
+
+    unsigned int result = mysql_ping(connection);
+
+    return rebInteger(result);
+}
+
+//
 //  export mysql-query: native [
 //    
 //      "Executes the SQL statement"
@@ -188,7 +208,7 @@ REBNATIVE(mysql_query)
 //
 //  export mysql-errno: native [
 //    
-//      "For the connection specified mysql_errno() returns the error code for the most recently invoked API function that can succeed or fail."
+//      "For the connection specified mysql-errno returns the error code for the most recently invoked API function that can succeed or fail."
 //
 //      return: [integer!]
 //      connection [handle!]
@@ -208,7 +228,7 @@ REBNATIVE(mysql_errno)
 //
 //  export mysql-error: native [
 //
-//      "For the connection specified mysql_error() returns a null-terminated string containing the error message for the most recently invoked API function that failed."
+//      "For the connection specified mysql-error returns a null-terminated string containing the error message for the most recently invoked API function that failed."
 //
 //      return: [text!]
 //      connection [handle!]
@@ -223,6 +243,26 @@ REBNATIVE(mysql_error)
     const char *result = mysql_error(connection);
 
     return rebText(result);
+}
+
+//
+//  export mysql-warning-count: native [
+//    
+//      "For the connection specified mysql-warning-count returns the error code for the most recently invoked API function that can succeed or fail."
+//
+//      return: [integer!] "Number of errors, warnings, and notes generated during execution of the previous SQL statement."
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_warning_count)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_WARNING_COUNT;
+
+    MYSQL *connection = VAL_HANDLE_POINTER(MYSQL, ARG(connection));
+
+    unsigned int result = mysql_warning_count(connection);
+
+    return rebInteger(result);
 }
 
 //
@@ -946,6 +986,7 @@ REBNATIVE(mysql_sqlstate)
 
     return rebText(result);
 }
+
 //
 //  export mysql-stat: native [
 //    
@@ -969,6 +1010,49 @@ REBNATIVE(mysql_stat)
     }
 
     return rebText(result);
+}
+
+//
+//  export mysql-more-results: native [
+//    
+//      {Used when you execute multiple statements specified as a single statement string.}
+//
+//      return: [logic!] "TRUE (1) if more results exist. FALSE (0) if no more results exist."
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_more_results)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_MORE_RESULTS;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    bool result = mysql_more_results(connection);
+    REBVAL *logic = rebValue("TO LOGIC!", result);
+
+    return rebValue(logic);
+}
+
+//
+//  export mysql-next-result: native [
+//    
+//      {Reads the next statement result and returns a status to indicate whether more results exist.}
+//
+//      return: [integer!] {0  Successful and there are more results
+//  -1  Successful and there are no more results
+//  >0  An error occurred}
+//      connection [handle!]
+//  ]
+//
+REBNATIVE(mysql_next_result)
+{
+    MYSQL_INCLUDE_PARAMS_OF_MYSQL_NEXT_RESULT;
+
+    MYSQL *connection = VAL_HANDLE_POINTER( MYSQL, ARG(connection));
+
+    int result = mysql_next_result(connection);
+
+    return rebInteger(result);
 }
 
 //
