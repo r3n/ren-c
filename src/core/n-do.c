@@ -84,7 +84,8 @@ REBNATIVE(reeval)
 //          "Requests parameter convention based on enfixee's first argument"
 //      :right [<...> <end> any-value!]
 //          "(uses magic -- SHOVE can't be written easily in usermode yet)"
-//      /enfix "Follow completion rules for enfix, e.g. `1 + 2 <- * 3` is 9"
+//      /prefix "Force either prefix or enfix behavior (vs. acting as is)"
+//          [logic!]
 //      /set "If left hand side is a SET-WORD! or SET-PATH!, shove and assign"
 //  ]
 //
@@ -98,7 +99,7 @@ REBNATIVE(shove)
 // The SHOVE operation is used to push values from the left to act as the
 // first argument of an operation, e.g.:
 //
-//      >> 10 <- lib/(print "Hi!" first [multiply]) 20
+//      >> 10 >- lib/(print "Hi!" first [multiply]) 20
 //      Hi!
 //      200
 //
@@ -110,7 +111,7 @@ REBNATIVE(shove)
 
     REBFRM *f;
     if (not Is_Frame_Style_Varargs_May_Fail(&f, ARG(right)))
-        fail ("SHOVE (<-) not implemented for MAKE VARARGS! [...] yet");
+        fail ("SHOVE (>-) not implemented for MAKE VARARGS! [...] yet");
 
     SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
     SHORTHAND (specifier, f->feed->specifier, REBSPC*);
@@ -127,7 +128,7 @@ REBNATIVE(shove)
     // !!! Pure invisibility should work; see SYNC-INVISIBLES for ideas,
     // something like this should be in the tests and be able to work:
     //
-    //    >> 10 <- comment "ignore me" lib/+ 20
+    //    >> 10 >- comment "ignore me" lib/+ 20
     //    == 30
     //
     // !!! To get the feature working as a first cut, this doesn't try get too
@@ -166,16 +167,20 @@ REBNATIVE(shove)
     if (not IS_ACTION(shovee) and not ANY_SET_KIND(VAL_TYPE(shovee)))
         fail ("SHOVE's immediate right must be ACTION! or SET-XXX! type");
 
-    // Even if the function isn't enfix, say it is.  This permits things
-    // like `5 + 5 -> subtract 7` to give 3.
+    // Basic operator `>-` will use the enfix status of the shovee.
+    // `->-` will force enfix evaluator behavior even if shovee is prefix.
+    // `>--` will force prefix evaluator behavior even if shovee is enfix.
     //
-    if (REF(enfix) and IS_ACTION(shovee)) {
-        //
-        // This is currently explicitly passed to the Reevaluate() function
-        // below.  It's so that `add 1 2 -> 3` is 7
-    }
+    bool enfix;
+    if (REF(prefix))
+        enfix = not VAL_LOGIC(ARG(prefix));
+    else if (IS_ACTION(shovee))
+        enfix = GET_ACTION_FLAG(shovee, ENFIXED);
     else
-        Fetch_Next_Forget_Lookback(f);  // so that `10 -> = 5 + 5` is true
+        enfix = false;
+
+    if (not enfix)
+        Fetch_Next_Forget_Lookback(f);
 
     // Trying to EVAL a SET-WORD! or SET-PATH! with no args would be an error.
     // So interpret it specially...GET the value and SET it back.  Note this
@@ -231,7 +236,7 @@ REBNATIVE(shove)
         frame_,
         shovee,
         flags,
-        did REF(enfix)
+        enfix
     )){
         rebRelease(composed_set_path);  // ok if nullptr
         return R_THROWN;

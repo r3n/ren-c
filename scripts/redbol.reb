@@ -482,7 +482,7 @@ set: emulate [
 
 get: emulate [
     func [
-        {Now no OBJECT! support, unset vars always null, use <- to check}
+        {Now no OBJECT! support, unset vars always null}
         return: [<opt> any-value!]
         source {Legacy handles Rebol2 types, not *any* type like R3-Alpha}
             [blank! any-word! any-path! any-context! block!]

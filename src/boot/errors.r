@@ -105,7 +105,7 @@ Script: [
     cannot-use:         [{cannot use} :arg1 {on} :arg2 {value}]
 
     ambiguous-infix:    {Ambiguous infix expression--use GROUP! to clarify}
-    literal-left-path:  {Use -> to pass literal left PATH! parameters right}
+    literal-left-path:  {Use >- to pass literal left PATH! parameters right}
 
     bad-get-group:      {GET-GROUP! gets WORD!/PATH!/BLOCK!, arity-0 ACTION!}
     bad-set-group:      {SET-GROUP! sets WORD!/PATH!/BLOCK!, arity-1 ACTION!}

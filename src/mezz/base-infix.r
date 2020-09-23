@@ -68,23 +68,33 @@ xor+: enfixed :difference
 =>: enfixed :lambda  ; quick function generator
 
 
-; <- is the SHOVE operator.  It grabs whatever is on the left and uses it as
-; the first argument to whatever operation is on its right hand side.  It
-; adopts the parameter convention of the right.  If the right's first argument
-; is evaluative and the left is a SET-WORD! or SET-PATH!, it will grab the
-; value of that and then run the assignment after the function is done.
+; >- is the SHOVE operator.  It uses the item immediately to its left for
+; the first argument to whatever operation is on its right hand side.
+; Parameter conventions of that first argument apply when processing the
+; value, e.g. quoted arguments will act quoted.
 ;
-; While both <- and -> are enfix operations, the -> variation does not follow
-; the rules of enfix completion:
+; By default, the evaluation rules proceed according to the enfix mode of
+; the operation being shoved into:
 ;
-;     >> 10 <- lib/= 5 + 5
-;     ** Script Error: + does not allow logic! for its value1 argument
+;    >> 10 >- lib/= 5 + 5  ; as if you wrote `10 = 5 + 5`
+;    ** Script Error: + does not allow logic! for its value1 argument
 ;
-;     >> 10 -> lib/= 5 + 5
-;     == #[true]
+;    >> 10 >- equal? 5 + 5  ; as if you wrote `equal? 10 5 + 5`
+;    == #[true]
 ;
-<-: enfixed :shove/enfix
-->: enfixed :shove
+; You can force processing to be enfix using `->-` (an infix-looking "icon"):
+;
+;    >> 1 ->- lib/add 2 * 3  ; as if you wrote `1 + 2 * 3`
+;    == 9
+;
+; Or force prefix processing using `>--` (multi-arg prefix "icon"):
+;
+;    >> 10 >-- lib/+ 2 * 3  ; as if you wrote `add 1 2 * 3`
+;    == 7
+;
+>-: enfixed :shove
+>--: enfixed specialize '>- [prefix: true]
+->-: enfixed specialize '>- [prefix: false]
 
 
 ; The -- and ++ operators were deemed too "C-like", so ME was created to allow
@@ -94,13 +104,15 @@ xor+: enfixed :difference
 me: enfixed redescribe [
     {Update variable using it as the left hand argument to an enfix operator}
 ](
-    :shove/set/enfix  ; /ENFIX so `x: 1 | x: me + 1 * 10` is 20, not 11
+    ; /ENFIX so `x: 1 | x: me + 1 * 10` is 20, not 11
+    ;
+    specialize 'shove [set: true | prefix: false]
 )
 
 my: enfixed redescribe [
     {Update variable using it as the first argument to a prefix operator}
 ](
-    :shove/set
+    specialize 'shove [set: true | prefix: true]
 )
 
 

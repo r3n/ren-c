@@ -162,12 +162,12 @@
 
     ([/A _ /B word] = (word foob |))
     ([/A _ /B _] = (<not a word> foob |))
-    ([/A 20 /B word] = (word <- foob/a 20))
+    ([/A 20 /B word] = (word ->- foob/a 20))
 
     (comment [
         {Currently SHOVE and <skip> don't work together, maybe shouldn't}
         https://github.com/metaeducation/ren-c/issues/909
-        [/A 20 /B _] = (<not a word> <- foob/a 20)
+        [/A 20 /B _] = (<not a word> ->- foob/a 20)
     ] true)
 ]
 

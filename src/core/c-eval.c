@@ -626,7 +626,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
     Derelativize(f->out, v, *specifier); // for NEXT_ARG_FROM_OUT
     SET_CELL_FLAG(f->out, UNEVALUATED); // so lookback knows it was quoted
 
-    // We skip over the word that invoked the action (e.g. <-, OF, =>).
+    // We skip over the word that invoked the action (e.g. ->-, OF, =>).
     // v will then hold a pointer to that word (possibly now resident in the
     // frame spare).  (f->out holds what was the left)
     //
@@ -1134,9 +1134,9 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                   case REB_P_HARD_QUOTE:
                     if (not GET_CELL_FLAG(f->out, UNEVALUATED)) {
                         //
-                        // This can happen e.g. with `x: 10 | x -> lit`.  We
+                        // This can happen e.g. with `x: 10 | x >- lit`.  We
                         // raise an error in this case, while still allowing
-                        // `10 -> lit` to work, so people don't have to go
+                        // `10 >- lit` to work, so people don't have to go
                         // out of their way rethinking operators if it could
                         // just work out for inert types.
                         //
@@ -1222,8 +1222,8 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                     // Note: This permits f->out to not carry the UNEVALUATED
                     // flag--enfixed operations which have evaluations on
                     // their left are treated as if they were in a GROUP!.
-                    // This is important to `1 + 2 <- lib/* 3` being 9, while
-                    // also allowing `1 + x: <- lib/default [...]` to work.
+                    // This is important to `1 + 2 ->- lib/* 3` being 9, while
+                    // also allowing `1 + x: ->- lib/default [...]` to work.
 
                     if (IS_QUOTABLY_SOFT(f->out)) {
                         if (Eval_Value_Throws(f->arg, f->out, SPECIFIED)) {
@@ -2523,7 +2523,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
     // We're sitting at what "looks like the end" of an evaluation step.
     // But we still have to consider enfix.  e.g.
     //
-    //    evaluate @val [1 + 2 * 3]
+    //    [pos val]: evaluate [1 + 2 * 3]
     //
     // We want that to give a position of [] and `val = 9`.  The evaluator
     // cannot just dispatch on REB_INTEGER in the switch() above, give you 1,
@@ -2538,7 +2538,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
     // Slightly more nuanced is why PARAMLIST_IS_INVISIBLE functions have to
     // be considered in the lookahead also.  Consider this case:
     //
-    //    evaluate @val [1 + 2 * comment ["hi"] 3 4 / 5]
+    //    [pos val]: evaluate [1 + 2 * comment ["hi"] 3 4 / 5]
     //
     // We want `val = 9`, with `pos = [4 / 5]`.  To do this, we
     // can't consider an evaluation finished until all the "invisibles" have
@@ -2556,7 +2556,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
     // If something was run with the expectation it should take the next arg
     // from the output cell, and an evaluation cycle ran that wasn't an
     // ACTION! (or that was an arity-0 action), that's not what was meant.
-    // But it can happen, e.g. `x: 10 | x <-`, where <- doesn't get an
+    // But it can happen, e.g. `x: 10 | x ->-`, where ->- doesn't get an
     // opportunity to quote left because it has no argument...and instead
     // retriggers and lets x run.
 
@@ -2571,7 +2571,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
     // For long-pondered technical reasons, only WORD! is able to dispatch
     // enfix.  If it's necessary to dispatch an enfix function via path, then
-    // a word is used to do it, like `->` in `x: -> lib/method [...] [...]`.
+    // a word is used to do it, like `>-` in `x: >- lib/method [...] [...]`.
 
     kind.byte = KIND_BYTE(*next);
 
