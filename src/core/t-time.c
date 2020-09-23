@@ -659,32 +659,25 @@ REBTYPE(Time)
 
           case SYM_ROUND: {
             INCLUDE_PARAMS_OF_ROUND;
-            UNUSED(PAR(value));  // covered by `v`
-
-            REBFLGS flags = (
-                (REF(to) ? RF_TO : 0)
-                | (REF(even) ? RF_EVEN : 0)
-                | (REF(down) ? RF_DOWN : 0)
-                | (REF(half_down) ? RF_HALF_DOWN : 0)
-                | (REF(floor) ? RF_FLOOR : 0)
-                | (REF(ceiling) ? RF_CEILING : 0)
-                | (REF(half_ceiling) ? RF_HALF_CEILING : 0)
-            );
+            USED(ARG(value));  // aliased as v, others are passed via frame_
+            USED(ARG(even)); USED(ARG(down)); USED(ARG(half_down));
+            USED(ARG(floor)); USED(ARG(ceiling)); USED(ARG(half_ceiling));
 
             if (not REF(to)) {
-                secs = Round_Int(secs, flags | RF_TO, SEC_SEC);
+                Init_True(ARG(to));  // by default make it /TO seconds
+                secs = Round_Int(secs, frame_, SEC_SEC);
                 return Init_Time_Nanoseconds(D_OUT, secs);
             }
 
             REBVAL *to = ARG(to);
             if (IS_TIME(to)) {
-                secs = Round_Int(secs, flags, VAL_NANO(to));
+                secs = Round_Int(secs, frame_, VAL_NANO(to));
                 return Init_Time_Nanoseconds(D_OUT, secs);
             }
             else if (IS_DECIMAL(to)) {
                 VAL_DECIMAL(to) = Round_Dec(
                     cast(REBDEC, secs),
-                    flags,
+                    frame_,
                     Dec64(to) * SEC_SEC
                 );
                 VAL_DECIMAL(to) /= SEC_SEC;
@@ -692,7 +685,8 @@ REBTYPE(Time)
                 RETURN (to);
             }
             else if (IS_INTEGER(to)) {
-                VAL_INT64(to) = Round_Int(secs, 1, Int32(to) * SEC_SEC) / SEC_SEC;
+                VAL_INT64(to)
+                    = Round_Int(secs, frame_, Int32(to) * SEC_SEC) / SEC_SEC;
                 RESET_VAL_HEADER(to, REB_INTEGER, CELL_MASK_NONE);
                 RETURN (to);
             }

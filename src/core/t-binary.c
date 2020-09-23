@@ -161,7 +161,7 @@ REBLEN find_binary(
     }
     else if (CELL_KIND(pattern) == REB_INTEGER) {  // specific byte (exact)
         if (VAL_INT64(pattern) < 0 or VAL_INT64(pattern) > 255)
-            fail (Error_Out_Of_Range(KNOWN(pattern)));
+            fail (Error_Out_Of_Range(SPECIFIC(pattern)));
 
         *size = 1;
 
@@ -437,7 +437,7 @@ static void Sort_Binary(
         thunk |= CC_FLAG_REVERSE;
 
     reb_qsort_r(
-        VAL_RAW_DATA_AT(binary),
+        VAL_BIN_AT(binary),
         len,
         size,
         &thunk,
@@ -487,7 +487,7 @@ REB_R PD_Binary(
 
     // Otherwise, POKE-ing
 
-    FAIL_IF_READ_ONLY(pvs->out);
+    ENSURE_MUTABLE(pvs->out);
 
     if (not IS_INTEGER(picker))
         return R_UNHANDLED;
@@ -592,7 +592,7 @@ REBTYPE(Binary)
         INCLUDE_PARAMS_OF_INSERT;  // compatible frame with APPEND, CHANGE
         UNUSED(PAR(series));  // covered by `v`
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         if (REF(only)) {
             // !!! Doesn't pay attention...all binary appends are /ONLY
@@ -673,7 +673,7 @@ REBTYPE(Binary)
       case SYM_TAKE: {
         INCLUDE_PARAMS_OF_TAKE;
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         UNUSED(PAR(series));
 
@@ -724,7 +724,7 @@ REBTYPE(Binary)
 
       case SYM_CLEAR: {
         REBSER *ser = VAL_SERIES(v);
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         if (index >= tail)
             RETURN (v); // clearing after available data has no effect
@@ -807,7 +807,7 @@ REBTYPE(Binary)
 
       case SYM_SUBTRACT:
       case SYM_ADD: {
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
         REBVAL *arg = D_ARG(2);
 
         REBINT amount;
@@ -864,14 +864,14 @@ REBTYPE(Binary)
     //-- Special actions:
 
       case SYM_SWAP: {
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         REBVAL *arg = D_ARG(2);
 
         if (VAL_TYPE(v) != VAL_TYPE(arg))
             fail (Error_Not_Same_Type_Raw());
 
-        FAIL_IF_READ_ONLY(arg);
+        ENSURE_MUTABLE(arg);
 
         if (index < tail and VAL_INDEX(arg) < VAL_LEN_HEAD(arg)) {
             REBYTE temp = *VAL_BIN_AT(v);
@@ -884,7 +884,7 @@ REBTYPE(Binary)
         INCLUDE_PARAMS_OF_REVERSE;
         UNUSED(ARG(series));
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         REBINT len = Part_Len_May_Modify_Index(v, ARG(part));
         if (len > 0)
@@ -894,7 +894,7 @@ REBTYPE(Binary)
       case SYM_SORT: {
         INCLUDE_PARAMS_OF_SORT;
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         UNUSED(PAR(series));
 
@@ -924,7 +924,7 @@ REBTYPE(Binary)
             return Init_Void(D_OUT);
         }
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         if (REF(only)) {
             if (index >= tail)

@@ -38,9 +38,10 @@ REBVAL *Init_Any_Path_At_Core(
     REBNOD *binding
 ){
     assert(ANY_PATH_KIND(kind));
-    Ensure_Series_Managed(SER(a));
+    Force_Series_Managed(SER(a));
     ASSERT_SERIES_TERM(SER(a));
     assert(index == 0);  // !!! current rule
+    assert(Is_Array_Frozen_Shallow(a));  // must be immutable (may be aliased)
 
     RESET_CELL(out, kind, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, a);
@@ -55,7 +56,7 @@ REBVAL *Init_Any_Path_At_Core(
         ARR_LEN(a) == 2 and IS_BLANK(ARR_AT(a, 0)) and IS_BLANK(ARR_AT(a, 1))
     ));
 
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 
@@ -353,7 +354,7 @@ bool Eval_Path_Throws_Core(
         //
         pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(*v, specifier);
 
-        Move_Value(pvs->out, KNOWN(pvs->u.ref.cell));
+        Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
 
         if (IS_ACTION(pvs->out))
             pvs->opt_label = VAL_WORD_SPELLING(*v);
@@ -711,58 +712,6 @@ REBNATIVE(poke)
 
 
 //
-//  -slash-1-: enfix native [
-//
-//  {Default implementation for `/` in the evaluator}
-//
-//      left [<opt> any-value!]
-//      right [<opt> any-value!]
-//  ]
-//
-REBNATIVE(_slash_1_)
-//
-// It's very desirable to have `/`, `/foo`, `/foo/`, `/foo/(bar)` etc. be
-// instances of the same datatype of PATH!.  In this scheme, `/` would act
-// like a "root path" and be achieved with `to path! [_ _]`.
-//
-// But with limited ASCII symbols, there is strong demand for `/` to be able
-// to act like division in evaluative contexts, or to be overrideable for
-// other things in a way not too dissimilar from `+`.
-//
-// The compromise used is to make `/` be a cell whose VAL_TYPE() is REB_PATH,
-// but whose CELL_KIND() is REB_WORD with the special spelling `-1-SLASH-`.
-// Binding mechanics and evaluator behavior are based on this unusual name.
-// But when inspected by the user, it appears to be a PATH! with 2 blanks.
-//
-// This duality is imperfect, as any routine with semantics like COLLECT-WORDS
-// would have to specifically account for it, or just see an empty path.
-// But it is intended to give some ability to configure the behavior easily.
-{
-    INCLUDE_PARAMS_OF__SLASH_1_;
-
-    REBVAL *left = ARG(left);
-    REBVAL *right = ARG(right);
-
-    // !!! Somewhat whimsically, this goes ahead and guesses at a possible
-    // behavior for "dividing" strings using SPLIT.  This is a placeholder
-    // for the idea that the left hand type gets to dispatch a choice of
-    // what it means, as with ordinary path dispatch.
-    //
-    // Uses the /INTO refinement so that `"abcdef" / 2` divides the string
-    // into two pieces, as opposed to pieces of length 2.
-    //
-    if (ANY_STRING(left) or ANY_ARRAY(left))
-        return rebValueQ("split/into", left, right, rebEND);
-
-    // Note: DIVIDE is historically a "type action", so technically it is the
-    // left hand side type which gets to pick the behavior--consistent with
-    // the plan for how 0-length paths would work.
-    //
-    return rebValueQ("divide", left, right, rebEND);
-}
-
-
-//
 //  PD_Path: C
 //
 // A PATH! is not an array, but if it is implemented as one it may choose to
@@ -981,7 +930,7 @@ REB_R MAKE_Path(
             return out;
         }
 
-    return Init_Any_Path(out, kind, arr);
+    return Init_Any_Path(out, kind, Freeze_Array_Shallow(arr));
 }
 
 
@@ -1022,7 +971,7 @@ REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         Init_Blank(ARR_AT(a, 0));
         Move_Value(ARR_AT(a, 1), arg);
         TERM_ARRAY_LEN(a, 2);
-        return Init_Any_Path(out, kind, a);
+        return Init_Any_Path(out, kind, Freeze_Array_Shallow(a));
     }
 
     REBDSP dsp_orig = DSP;
@@ -1045,7 +994,8 @@ REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
             return out;
         }
 
-    return Init_Any_Path(out, kind, Pop_Stack_Values(dsp_orig));
+    REBARR *a = Pop_Stack_Values(dsp_orig);
+    return Init_Any_Path(out, kind, Freeze_Array_Shallow(a));
 }
 
 

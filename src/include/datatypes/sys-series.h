@@ -176,7 +176,7 @@ inline static void SET_SERIES_LEN(REBSER *s, REBLEN len) {
 // for instance a generic debugging routine might just want a byte pointer
 // but have no element type pointer to pass in.
 //
-inline static REBYTE *SER_DATA_RAW(REBSER *s) {
+inline static REBYTE *SER_DATA(REBSER *s) {
     // if updating, also update manual inlining in SER_AT_RAW
 
     // The VAL_CONTEXT(), VAL_SERIES(), VAL_ARRAY() extractors do the failing
@@ -189,13 +189,13 @@ inline static REBYTE *SER_DATA_RAW(REBSER *s) {
         : cast(REBYTE*, &s->content);
 }
 
-inline static REBYTE *SER_AT_RAW(REBYTE w, REBSER *s, REBLEN i) {
+inline static REBYTE *SER_DATA_AT(REBYTE w, REBSER *s, REBLEN i) {
   #if !defined(NDEBUG)
     if (w != SER_WIDE(s)) {  // will be "unusual" value if free
         if (IS_FREE_NODE(s))
-            printf("SER_SEEK_RAW asked on freed series\n");
+            printf("SER_DATA_AT asked on freed series\n");
         else
-            printf("SER_SEEK_RAW asked %d on width=%d\n", w, SER_WIDE(s));
+            printf("SER_DATA_AT asked %d on width=%d\n", w, SER_WIDE(s));
         panic (s);
     }
   #endif
@@ -205,33 +205,8 @@ inline static REBYTE *SER_AT_RAW(REBYTE w, REBSER *s, REBLEN i) {
     //
     assert(not (s->info.bits & SERIES_INFO_INACCESSIBLE));
 
-    return ((w) * (i)) + ( // v-- inlining of SER_DATA_RAW
+    return ((w) * (i)) + ( // v-- inlining of SER_DATA
         IS_SER_DYNAMIC(s)
-            ? cast(REBYTE*, s->content.dynamic.data)
-            : cast(REBYTE*, &s->content)
-        );
-}
-
-
-inline static REBYTE *SER_SEEK_RAW(REBYTE w, REBSER *s, REBSIZ n) {
-  #if !defined(NDEBUG)
-    if (w != SER_WIDE(s)) {
-        REBYTE wide = SER_WIDE(s);
-        if (wide == 0)
-            printf("SER_SEEK_RAW asked on freed series\n");
-        else
-            printf("SER_SEEK_RAW asked %d on width=%d\n", w, SER_WIDE(s));
-        panic (s);
-    }
-
-    // The VAL_CONTEXT(), VAL_SERIES(), VAL_ARRAY() extractors do the failing
-    // upon extraction--that's meant to catch it before it gets this far.
-    //
-    assert(NOT_SERIES_INFO(s, INACCESSIBLE));
-  #endif
-
-    return ((w) * (n)) + ( // v-- inlining of SER_DATA_RAW
-        (LEN_BYTE_OR_255(s) == 255)
             ? cast(REBYTE*, s->content.dynamic.data)
             : cast(REBYTE*, &s->content)
         );
@@ -250,28 +225,25 @@ inline static REBYTE *SER_SEEK_RAW(REBYTE w, REBSER *s, REBSIZ n) {
 // this is used very frequently.
 
 #define SER_AT(t,s,i) \
-    ((t*)SER_AT_RAW(sizeof(t), (s), (i)))
-
-#define SER_SEEK(t,s,i) \
-    ((t*)SER_SEEK_RAW(sizeof(t), (s), (i)))
+    ((t*)SER_DATA_AT(sizeof(t), (s), (i)))
 
 #define SER_HEAD(t,s) \
     SER_AT(t, (s), 0)
 
-inline static REBYTE *SER_TAIL_RAW(size_t w, REBSER *s) {
-    return SER_AT_RAW(w, s, SER_USED(s));
+inline static REBYTE *SER_DATA_TAIL(size_t wide, REBSER *s) {
+    return SER_DATA_AT(wide, s, SER_USED(s));
 }
 
 #define SER_TAIL(t,s) \
-    ((t*)SER_TAIL_RAW(sizeof(t), (s)))
+    ((t*)SER_DATA_TAIL(sizeof(t), (s)))
 
-inline static REBYTE *SER_LAST_RAW(size_t w, REBSER *s) {
+inline static REBYTE *SER_DATA_LAST(size_t wide, REBSER *s) {
     assert(SER_USED(s) != 0);
-    return SER_AT_RAW(w, s, SER_USED(s) - 1);
+    return SER_DATA_AT(wide, s, SER_USED(s) - 1);
 }
 
 #define SER_LAST(t,s) \
-    ((t*)SER_LAST_RAW(sizeof(t), (s)))
+    ((t*)SER_DATA_LAST(sizeof(t), (s)))
 
 
 #define SER_FULL(s) \
@@ -316,7 +288,7 @@ inline static void EXPAND_SERIES_TAIL(REBSER *s, REBLEN delta) {
         }
     }
     else if (SER_WIDE(s) == 1)  // presume BINARY! or ANY-STRING! (?)
-        *SER_TAIL_RAW(1, s) = 0xFE;  // invalid UTF-8 byte, e.g. poisonous
+        *SER_DATA_TAIL(1, s) = 0xFE;  // invalid UTF-8 byte, e.g. poisonous
     else {
         // Assume other series (like GC_Mark_Stack) don't necessarily
         // terminate.
@@ -330,8 +302,7 @@ inline static void EXPAND_SERIES_TAIL(REBSER *s, REBLEN delta) {
 
 inline static void TERM_SEQUENCE(REBSER *s) {
     assert(not IS_SER_ARRAY(s));
-
-    memset(SER_SEEK_RAW(SER_WIDE(s), s, SER_USED(s)), 0, SER_WIDE(s));
+    memset(SER_DATA_AT(SER_WIDE(s), s, SER_USED(s)), 0, SER_WIDE(s));
 }
 
 inline static void TERM_SEQUENCE_LEN(REBSER *s, REBLEN len) {
@@ -458,7 +429,7 @@ inline static REBSER *Manage_Series(REBSER *s)
     return s;
 }
 
-inline static REBSER *Ensure_Series_Managed(void *p) {
+inline static REBSER *Force_Series_Managed(void *p) {
     REBSER *s = SER(p);
     if (NOT_SERIES_FLAG(s, MANAGED))
         Manage_Series(s);
@@ -533,17 +504,22 @@ static inline void Flip_Series_To_White(REBSER *s) {
 
 inline static void Freeze_Sequence(REBSER *s) { // there is no unfreeze!
     assert(not IS_SER_ARRAY(s)); // use Deep_Freeze_Array
-    SET_SERIES_INFO(s, FROZEN);
+    SET_SERIES_INFO(s, FROZEN_SHALLOW);
+    SET_SERIES_INFO(s, FROZEN_DEEP);  // so generic deep frozen checks faster
 }
 
 inline static bool Is_Series_Frozen(REBSER *s) {
-    assert(not IS_SER_ARRAY(s)); // use Is_Array_Deeply_Frozen
-    return GET_SERIES_INFO(s, FROZEN);
+    assert(not IS_SER_ARRAY(s));  // use Is_Array_Deeply_Frozen
+    if (NOT_SERIES_INFO(s, FROZEN_SHALLOW))
+        return false;
+    assert(GET_SERIES_INFO(s, FROZEN_DEEP));  // true on frozen non-arrays
+    return true;
 }
 
 inline static bool Is_Series_Read_Only(REBSER *s) { // may be temporary...
     return 0 != (s->info.bits &
-        (SERIES_INFO_FROZEN | SERIES_INFO_HOLD | SERIES_INFO_PROTECTED)
+        (SERIES_INFO_HOLD | SERIES_INFO_PROTECTED
+        | SERIES_INFO_FROZEN_SHALLOW | SERIES_INFO_FROZEN_DEEP)
     );
 }
 
@@ -566,11 +542,58 @@ inline static void FAIL_IF_READ_ONLY_SER(REBSER *s) {
     if (GET_SERIES_INFO(s, HOLD))
         fail (Error_Series_Held_Raw());
 
-    if (GET_SERIES_INFO(s, FROZEN))
+    if (GET_SERIES_INFO(s, FROZEN_SHALLOW))
         fail (Error_Series_Frozen_Raw());
+
+    assert(NOT_SERIES_INFO(s, FROZEN_DEEP));  // implies FROZEN_SHALLOW
 
     assert(GET_SERIES_INFO(s, PROTECTED));
     fail (Error_Series_Protected_Raw());
+}
+
+// While ideally error messages would give back data that is bound exactly to
+// the context that was applicable, threading the specifier into many cases
+// can overcomplicate code.  We'd break too many invariants to just say a
+// relativized value is "unbound", so make an expired frame if necessary.
+//
+inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
+    if (not Is_Bindable(v) or IS_SPECIFIC(v))
+        Move_Value(out, SPECIFIC(v));
+    else {  // must be bound to a function
+        REBACT *binding = ACT(VAL_BINDING(v));
+        REBCTX *expired = Make_Expired_Frame_Ctx_Managed(binding);
+
+        Move_Value_Header(out, v);
+        out->payload = v->payload;
+        EXTRA(Binding, out).node = NOD(expired);
+    }
+    return SPECIFIC(out);
+}
+
+#if defined(NDEBUG)
+    #define KNOWN_MUTABLE(v) v
+#else
+    inline static const RELVAL* KNOWN_MUTABLE(const RELVAL* v) {
+        assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
+        REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
+        assert(not Is_Series_Read_Only(s));
+        assert(NOT_CELL_FLAG(v, CONST));
+        return v;
+    }
+#endif
+
+inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
+    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
+    REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
+
+    FAIL_IF_READ_ONLY_SER(s);
+
+    if (NOT_CELL_FLAG(v, CONST))
+        return v;
+
+    DECLARE_LOCAL (specific);
+    Unrelativize(specific, v);  // relative values lose binding in error object
+    fail (Error_Const_Value_Raw(specific));
 }
 
 
@@ -666,8 +689,8 @@ inline static REBSER *VAL_SERIES(const REBCEL *v) {
 #endif
 
 
-inline static REBYTE *VAL_RAW_DATA_AT(const REBCEL *v) {
-    return SER_AT_RAW(SER_WIDE(VAL_SERIES(v)), VAL_SERIES(v), VAL_INDEX(v));
+inline static REBYTE *VAL_DATA_AT(const REBCEL *v) {
+    return SER_DATA_AT(SER_WIDE(VAL_SERIES(v)), VAL_SERIES(v), VAL_INDEX(v));
 }
 
 #define Init_Any_Series_At(v,t,s,i) \

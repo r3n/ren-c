@@ -43,48 +43,41 @@ enum {
     PROT_FREEZE = 1 << 4
 };
 
+inline static bool Is_Array_Frozen_Shallow(REBARR *a)
+  { return GET_SERIES_INFO(a, FROZEN_SHALLOW); }
 
-inline static REBVAL *Derelativize(  // !!! forward-declaration (reoragnize?)
-    RELVAL *out,
-    const RELVAL *v,
-    REBSPC *specifier
-);
+inline static bool Is_Array_Frozen_Deep(REBARR *a) {
+    if (NOT_SERIES_INFO(a, FROZEN_DEEP))
+        return false;
 
-inline static void FAIL_IF_READ_ONLY_CORE(
-    const RELVAL *v,
-    REBSPC *specifier
-){
-    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
-
-    FAIL_IF_READ_ONLY_SER(s);
-
-    if (GET_CELL_FLAG(v, CONST)) {
-        DECLARE_LOCAL (specific);
-        Derelativize(specific, v, specifier);
-        fail (Error_Const_Value_Raw(specific));
-    }
+    assert(GET_SERIES_INFO(a, FROZEN_SHALLOW));  // implied by FROZEN_DEEP
+    return true;
 }
 
-#define FAIL_IF_READ_ONLY(v) \
-    FAIL_IF_READ_ONLY_CORE((v), SPECIFIED)
-
-
-
-inline static bool Is_Array_Deeply_Frozen(REBARR *a) {
-    return GET_SERIES_INFO(a, FROZEN);
-
-    // should be frozen all the way down (can only freeze arrays deeply)
-}
-
-inline static void Deep_Freeze_Array(REBARR *a) {
+inline static REBARR *Freeze_Array_Deep(REBARR *a) {
     Protect_Series(
         SER(a),
         0, // start protection at index 0
         PROT_DEEP | PROT_SET | PROT_FREEZE
     );
     Uncolor_Array(a);
+    return a;
+}
+
+inline static REBARR *Freeze_Array_Shallow(REBARR *a) {
+    SET_SERIES_INFO(a, FROZEN_SHALLOW);
+    return a;
 }
 
 #define Is_Array_Shallow_Read_Only(a) \
-    Is_Series_Read_Only(a)
+    Is_Series_Read_Only(SER(a))
+
+#define Force_Value_Frozen_Deep(v) \
+    Force_Value_Frozen_Core((v), true, SER(EMPTY_ARRAY))  // auto-locked
+
+#define Force_Value_Frozen_Deep_Blame(v,blame) \
+    Force_Value_Frozen_Core((v), true, SER(blame))
+
+#define Force_Value_Frozen_Shallow(v) \
+    Force_Value_Frozen_Core((v), false, SER(EMPTY_ARRAY))  // auto-locked
+

@@ -296,7 +296,7 @@ REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
     // The UTF-8 series can be aliased with AS to become an ANY-STRING! or a
     // BINARY!.  If it is, then it should not be modified.
     //
-    SET_SERIES_INFO(s, FROZEN);
+    Freeze_Sequence(s);
 
     if (not canon) {  // no canon found, so this interning must become canon
         SET_SERIES_INFO(s, STRING_CANON);
@@ -517,6 +517,23 @@ void Startup_Interning(void)
 
 //
 //  Startup_Slash_1_Symbol: C
+//
+// It's very desirable to have `/`, `/foo`, `/foo/`, `/foo/(bar)` etc. be
+// instances of the same datatype of PATH!.  In this scheme, `/` would act
+// like a "root path" and be achieved with `to path! [_ _]`.
+//
+// But with limited ASCII symbols, there is strong demand for `/` to be able
+// to act like division in evaluative contexts, or to be overrideable for
+// other things in a way not too dissimilar from `+`.
+//
+// The compromise used is to make `/` be a cell whose VAL_TYPE() is REB_PATH,
+// but whose CELL_KIND() is REB_WORD with the special spelling `-1-SLASH-`.
+// Binding mechanics and evaluator behavior are based on this unusual name.
+// But when inspected by the user, it appears to be a PATH! with 2 blanks.
+//
+// This duality is imperfect, as any routine with semantics like COLLECT-WORDS
+// would have to specifically account for it, or just see an empty path.
+// But it is intended to give some ability to configure the behavior easily.
 //
 // The trick which allows the `/` to be a 2-element PATH! and yet act like a
 // WORD! when used in evaluative contexts requires that word's spelling to be

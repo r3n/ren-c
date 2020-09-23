@@ -58,33 +58,22 @@ inline static REBVAL *Init_Integer(RELVAL *out, REBI64 i64) {
 
 inline static int32_t VAL_INT32(const REBCEL *v) {
     if (VAL_INT64(v) > INT32_MAX or VAL_INT64(v) < INT32_MIN)
-        fail (Error_Out_Of_Range(KNOWN(v)));
+        fail (Error_Out_Of_Range(SPECIFIC(v)));
     return cast(int32_t, VAL_INT64(v));
 }
 
 inline static uint32_t VAL_UINT32(const REBCEL *v) {
     if (VAL_INT64(v) < 0 or VAL_INT64(v) > UINT32_MAX)
-        fail (Error_Out_Of_Range(KNOWN(v)));
+        fail (Error_Out_Of_Range(SPECIFIC(v)));
     return cast(uint32_t, VAL_INT64(v));
 }
 
 inline static REBYTE VAL_UINT8(const REBCEL *v) {
     if (VAL_INT64(v) > 255 or VAL_INT64(v) < 0)
-        fail (Error_Out_Of_Range(KNOWN(v)));
+        fail (Error_Out_Of_Range(SPECIFIC(v)));
     return cast(REBYTE, VAL_INT32(v));
 }
 
-
-// Rounding flags (passed as refinements to ROUND function):
-enum {
-    RF_TO = 1 << 0,
-    RF_EVEN = 1 << 1,
-    RF_DOWN = 1 << 2,
-    RF_HALF_DOWN = 1 << 3,
-    RF_FLOOR = 1 << 4,
-    RF_CEILING = 1 << 5,
-    RF_HALF_CEILING = 1 << 6
-};
 
 #define ROUND_TO_INT(d) \
     cast(int32_t, floor((MAX(INT32_MIN, MIN(INT32_MAX, d))) + 0.5))

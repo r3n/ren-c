@@ -234,7 +234,7 @@ REBLEN Modify_String_Or_Binary(
 ){
     assert(sym == SYM_INSERT or sym == SYM_CHANGE or sym == SYM_APPEND);
 
-    FAIL_IF_READ_ONLY(dst);  // rules out symbol strings (e.g. from ANY-WORD!)
+    ENSURE_MUTABLE(dst);  // rules out symbol strings (e.g. from ANY-WORD!)
 
     REBSER *dst_ser = VAL_SERIES(dst);
     REBLEN dst_idx = VAL_INDEX(dst);
@@ -656,7 +656,7 @@ REBLEN Modify_String_Or_Binary(
     // Since the series may be expanded, its pointer could change...so this
     // can't be done up front at the top of this routine.
     //
-    REBYTE *dst_ptr = SER_SEEK(REBYTE, dst_ser, dst_off);
+    REBYTE *dst_ptr = SER_AT(REBYTE, dst_ser, dst_off);
 
     REBLEN d;
     for (d = 0; d < cast(REBLEN, dups); ++d) {  // dups checked above as > 0

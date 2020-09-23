@@ -80,7 +80,7 @@
 // may be used as the start of a copy which is ultimately of length 0.
 //
 inline static REBVAL *DS_AT(REBDSP d) {
-    REBVAL *at = KNOWN(ARR_HEAD(DS_Array) + d);
+    REBVAL *at = SPECIFIC(ARR_HEAD(DS_Array) + d);
     assert(
         ((at->header.bits & NODE_FLAG_CELL) and d <= (DSP + 1))
         or (not (SECOND_BYTE(at->header) != REB_0 and d == (DSP + 1)))

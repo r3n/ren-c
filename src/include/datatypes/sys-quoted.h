@@ -142,7 +142,7 @@ inline static RELVAL *Quotify_Core(
     #define Quotify Quotify_Core
 #else
     inline static REBVAL *Quotify(REBVAL *v, REBLEN depth)
-        { return KNOWN(Quotify_Core(v, depth)); }
+        { return SPECIFIC(Quotify_Core(v, depth)); }
 
     inline static RELVAL *Quotify(RELVAL *v, REBLEN depth)
         { return Quotify_Core(v, depth); }
@@ -206,7 +206,7 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
     #define Unquotify Unquotify_Core
 #else
     inline static REBVAL *Unquotify(REBVAL *v, REBLEN depth)
-        { return KNOWN(Unquotify_Core(v, depth)); }
+        { return SPECIFIC(Unquotify_Core(v, depth)); }
 
     inline static RELVAL *Unquotify(RELVAL *v, REBLEN depth)
         { return Unquotify_Core(v, depth); }

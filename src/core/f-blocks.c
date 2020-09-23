@@ -204,7 +204,7 @@ void Clonify(
         // copied series and "clonify" the values in it.
         //
         if (deep_types & FLAGIT_KIND(kind) & TS_ARRAYS_OBJ) {
-            REBVAL *sub = KNOWN(ARR_HEAD(ARR(series)));
+            REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
             for (; NOT_END(sub); ++sub)
                 Clonify(sub, flags, deep_types);
         }
@@ -304,7 +304,7 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
 
     for (; NOT_END(src); ++src, ++dest) {
         if (not IS_RELATIVE(src)) {
-            Move_Value(dest, KNOWN(src));
+            Move_Value(dest, SPECIFIC(src));
             continue;
         }
 

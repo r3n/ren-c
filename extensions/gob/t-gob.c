@@ -265,7 +265,7 @@ static void Insert_Gobs(
         if (IS_GOB(val)) {
             if (GOB_PARENT(VAL_GOB(val)) != NULL)
                 fail ("GOB! not expected to have parent");
-            Move_Value(item, KNOWN(val));
+            Move_Value(item, SPECIFIC(val));
             ++item;
 
             SET_GOB_PARENT(VAL_GOB(val), gob);
@@ -831,7 +831,7 @@ REB_R PD_Gob(
 
     if (IS_INTEGER(picker))
         return rebValueQ(
-            rebU(NATIVE_VAL(pick)), KNOWN(ARR_AT(gob, IDX_GOB_PANE)), picker,
+            rebU(NATIVE_VAL(pick)), SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)), picker,
         rebEND);
 
     return R_UNHANDLED;
@@ -982,7 +982,7 @@ REBTYPE(Gob)
         }
         else if (IS_BLOCK(value)) {
             len = VAL_ARRAY_LEN_AT(value);
-            value = KNOWN(VAL_ARRAY_AT(value)); // !!! REVIEW
+            value = SPECIFIC(VAL_ARRAY_AT(value)); // !!! REVIEW
         }
         else
             fail (PAR(value));
@@ -1020,7 +1020,7 @@ REBTYPE(Gob)
         // !!! Could make the indexed pane into a local if we had a spare
         // local, but its' good to exercise the API as much as possible).
         //
-        REBVAL *pane = KNOWN(ARR_AT(gob, IDX_GOB_PANE));
+        REBVAL *pane = SPECIFIC(ARR_AT(gob, IDX_GOB_PANE));
         return rebValue(
             "applique :take [",
                 "series: at", pane, rebI(index + 1),
@@ -1048,7 +1048,7 @@ REBTYPE(Gob)
 
     case SYM_REVERSE:
         return rebValueQ(
-            "reverse", KNOWN(ARR_AT(gob, IDX_GOB_PANE)),
+            "reverse", SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)),
         rebEND);
 
     default:

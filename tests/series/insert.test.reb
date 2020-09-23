@@ -26,13 +26,13 @@
     a: first [(0)]
     b: make group! 0
     insert b first a
-    a == b
+    b == '(0)
 )
 (
     a: first [(0)]
     b: make group! 0
     insert b a
-    a == b
+    b == '((0))
 )
 ; text
 (

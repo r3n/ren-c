@@ -1179,7 +1179,7 @@ static REBIXO Do_Eval_Rule(REBFRM *f)
         //
         holder = Alloc_Singular(SERIES_FLAGS_NONE);
         Move_Value(ARR_SINGLE(holder), P_CELL);
-        Deep_Freeze_Array(holder); // don't allow modification of temporary
+        Freeze_Array_Deep(holder);  // don't allow modification of temporary
     }
 
     // We want to reuse the same frame we're in, because if you say
@@ -2281,7 +2281,7 @@ REBNATIVE(subparse)
                     }
 
                     if (Is_Api_Value(into))
-                        rebRelease(KNOWN(into));  // !!! rethink to use P_CELL
+                        rebRelease(SPECIFIC(into));  // !!! rethink to use P_CELL
 
                     SET_END(P_OUT);  // restore invariant
                     break;
@@ -2566,14 +2566,14 @@ REBNATIVE(subparse)
                 }
 
                 if (flags & PF_REMOVE) {
-                    FAIL_IF_READ_ONLY(P_INPUT_VALUE);
+                    ENSURE_MUTABLE(P_INPUT_VALUE);
                     if (count)
                         Remove_Any_Series_Len(P_INPUT_VALUE, begin, count);
                     P_POS = begin;
                 }
 
                 if (flags & (PF_INSERT | PF_CHANGE)) {
-                    FAIL_IF_READ_ONLY(P_INPUT_VALUE);
+                    ENSURE_MUTABLE(P_INPUT_VALUE);
                     count = (flags & PF_INSERT) ? 0 : count;
                     bool only = false;
 
@@ -2627,12 +2627,8 @@ REBNATIVE(subparse)
                         Derelativize(specified, rule, P_RULE_SPECIFIER);
 
                         REBLEN mod_flags = (flags & PF_INSERT) ? 0 : AM_PART;
-                        if (
-                            not only and
-                            Splices_Into_Type_Without_Only(P_TYPE, specified)
-                        ){
+                        if (not only and Splices_Without_Only(specified))
                             mod_flags |= AM_SPLICE;
-                        }
                         P_POS = Modify_Array(
                             ARR(P_INPUT),
                             begin,

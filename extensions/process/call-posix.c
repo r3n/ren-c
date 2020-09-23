@@ -133,9 +133,9 @@ REB_R Call_Core(REBFRM *frame_) {
     // they are not read-only, before we try appending to them.
     //
     if (IS_TEXT(ARG(output)) or IS_BINARY(ARG(output)))
-        FAIL_IF_READ_ONLY(ARG(output));
+        ENSURE_MUTABLE(ARG(output));
     if (IS_TEXT(ARG(error)) or IS_BINARY(ARG(error)))
-        FAIL_IF_READ_ONLY(ARG(error));
+        ENSURE_MUTABLE(ARG(error));
 
     char *inbuf;
     size_t inbuf_size;
@@ -235,7 +235,7 @@ REB_R Call_Core(REBFRM *frame_) {
             RELVAL *param = VAL_ARRAY_AT_HEAD(block, i);
             if (not IS_TEXT(param))  // usermode layer ensures FILE! converted
                 fail (PAR(command));
-            argv[i] = rebSpell(KNOWN(param), rebEND);
+            argv[i] = rebSpell(SPECIFIC(param), rebEND);
         }
         argv[argc] = nullptr;
     }

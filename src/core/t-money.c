@@ -247,18 +247,9 @@ REBTYPE(Money)
 
       case SYM_ROUND: {
         INCLUDE_PARAMS_OF_ROUND;
-
-        UNUSED(PAR(value));
-
-        REBFLGS flags = (
-            (REF(to) ? RF_TO : 0)
-            | (REF(even) ? RF_EVEN : 0)
-            | (REF(down) ? RF_DOWN : 0)
-            | (REF(half_down) ? RF_HALF_DOWN : 0)
-            | (REF(floor) ? RF_FLOOR : 0)
-            | (REF(ceiling) ? RF_CEILING : 0)
-            | (REF(half_ceiling) ? RF_HALF_CEILING : 0)
-        );
+        USED(ARG(value));  // aliased as v, others are passed via frame_
+        USED(ARG(even)); USED(ARG(down)); USED(ARG(half_down));
+        USED(ARG(floor)); USED(ARG(ceiling)); USED(ARG(half_ceiling));
 
         REBVAL *to = ARG(to);
 
@@ -278,7 +269,7 @@ REBTYPE(Money)
 
         Init_Money(
             D_OUT,
-            Round_Deci(VAL_MONEY_AMOUNT(v), flags, VAL_MONEY_AMOUNT(temp))
+            Round_Deci(VAL_MONEY_AMOUNT(v), frame_, VAL_MONEY_AMOUNT(temp))
         );
 
         if (REF(to)) {

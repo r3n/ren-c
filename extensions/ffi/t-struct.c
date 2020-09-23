@@ -511,7 +511,7 @@ static bool Set_Struct_Var(
                 REBLEN n = 0;
                 for(n = 0; n < dimension; ++n) {
                     if (not assign_scalar(
-                        stu, field, n, KNOWN(VAL_ARRAY_AT_HEAD(val, n))
+                        stu, field, n, SPECIFIC(VAL_ARRAY_AT_HEAD(val, n))
                     )) {
                         return false;
                     }
@@ -536,7 +536,7 @@ static bool Set_Struct_Var(
 /* parse struct attribute */
 static void parse_attr (REBVAL *blk, REBINT *raw_size, uintptr_t *raw_addr)
 {
-    REBVAL *attr = KNOWN(VAL_ARRAY_AT(blk));
+    REBVAL *attr = SPECIFIC(VAL_ARRAY_AT(blk));
 
     *raw_size = -1;
     *raw_addr = 0;
@@ -577,19 +577,19 @@ static void parse_attr (REBVAL *blk, REBINT *raw_size, uintptr_t *raw_addr)
             if (IS_END(attr) or not IS_BLOCK(attr) or VAL_LEN_AT(attr) != 2)
                 fail (attr);
 
-            REBVAL *lib = KNOWN(VAL_ARRAY_AT_HEAD(attr, 0));
+            REBVAL *lib = SPECIFIC(VAL_ARRAY_AT_HEAD(attr, 0));
             if (not IS_LIBRARY(lib))
                 fail (attr);
             if (IS_LIB_CLOSED(VAL_LIBRARY(lib)))
                 fail (Error_Bad_Library_Raw());
 
-            REBVAL *sym = KNOWN(VAL_ARRAY_AT_HEAD(attr, 1));
+            REBVAL *sym = SPECIFIC(VAL_ARRAY_AT_HEAD(attr, 1));
             if (not IS_BINARY(sym) and not ANY_STRING(sym))
                 fail (sym);
 
             CFUNC *addr = Find_Function(
                 VAL_LIBRARY_FD(lib),
-                s_cast(VAL_RAW_DATA_AT(sym)) // UTF-8 data of STRING!/BINARY!
+                cs_cast(VAL_UTF8_AT(nullptr, sym))
             );
             if (addr == nullptr)
                 fail (Error_Symbol_Not_Found_Raw(sym));
@@ -953,7 +953,7 @@ static void Parse_Field_Type_May_Fail(
 //
 void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
 {
-    REBVAL *spec_item = KNOWN(VAL_ARRAY_AT(spec));
+    REBVAL *spec_item = SPECIFIC(VAL_ARRAY_AT(spec));
 
     while (NOT_END(spec_item)) {
         REBVAL *word;
@@ -1006,7 +1006,7 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
                             VAL_STRUCT(ret),
                             field,
                             n,
-                            KNOWN(VAL_ARRAY_AT_HEAD(fld_val, n))
+                            SPECIFIC(VAL_ARRAY_AT_HEAD(fld_val, n))
                         )){
                             fail (fld_val);
                         }
@@ -1234,7 +1234,7 @@ REB_R MAKE_Struct(
                             offset,
                             field,
                             n,
-                            KNOWN(VAL_ARRAY_AT_HEAD(init, n))
+                            SPECIFIC(VAL_ARRAY_AT_HEAD(init, n))
                         )){
                             fail ("FFI: Failed to assign element value");
                         }

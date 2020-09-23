@@ -71,7 +71,7 @@ inline static REBVAL *Init_Builtin_Datatype(RELVAL *out, enum Reb_Kind kind) {
     assert(VAL_TYPE_KIND(out) == kind);
     assert(GET_CELL_FLAG(out, FIRST_IS_NODE));
     assert(NOT_CELL_FLAG(out, SECOND_IS_NODE));  // only custom types have
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 
@@ -87,7 +87,7 @@ inline static REBVAL *Init_Custom_Datatype(RELVAL *out, REBTYP *type) {
     VAL_TYPE_KIND_ENUM(out) = REB_CUSTOM;
     VAL_TYPE_SPEC_NODE(out) = NOD(EMPTY_ARRAY);
     VAL_TYPE_HOOKS_NODE(out) = NOD(type);
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 
@@ -143,14 +143,14 @@ inline static CFUNC** VAL_TYPE_HOOKS(const RELVAL *type) {
     enum Reb_Kind k = VAL_TYPE_KIND_OR_CUSTOM(type);
     if (k != REB_CUSTOM)
         return Builtin_Type_Hooks[k];
-    return cast(CFUNC**, SER_DATA_RAW(VAL_TYPE_CUSTOM(type)));
+    return cast(CFUNC**, SER_DATA(VAL_TYPE_CUSTOM(type)));
 }
 
 inline static CFUNC** HOOKS_FOR_TYPE_OF(const REBCEL *v) {
     enum Reb_Kind k = CELL_TYPE(v);
     if (k != REB_CUSTOM)
         return Builtin_Type_Hooks[k];
-    return cast(CFUNC**, SER_DATA_RAW(CELL_CUSTOM_TYPE(v)));
+    return cast(CFUNC**, SER_DATA(CELL_CUSTOM_TYPE(v)));
 }
 
 #define Generic_Hook_For_Type_Of(v) \

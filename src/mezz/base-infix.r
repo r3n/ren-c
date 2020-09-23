@@ -25,76 +25,44 @@ REBOL [
     }
 ]
 
-; R3-Alpha has several forms illegal for SET-WORD! (e.g. `<:`)  Ren-C allows
-; more of these things, but if they were top-level SET-WORD! in this file then
-; R3-Alpha wouldn't be able to read it when used as bootstrap r3-make.  It
-; also can't LOAD several WORD! forms that Ren-C can (e.g. `->`)
+
+; ARITHMETIC OPERATORS
 ;
-; So %b-init.c manually adds the keys via Add_Lib_Keys_R3Alpha_Cant_Make().
-; R3-ALPHA-LIT annotates to warn not to try and assign SET-WORD! forms, and
-; to bind interned strings.
+; Note that `/` is actually path containing two elements, both of which are
+; BLANK! so they do not render.  A special mechanism through a word binding
+; hidden in the cell allows it to dispatch.  See Startup_Slash_1_Symbol()
+
++: enfixed :add
+-: enfixed :subtract
+*: enfixed :multiply
+-slash-1-: enfixed :divide  ; TBD: make `/: enfixed :divide` act equivalently
+
+
+; SET OPERATORS
+
+and+: enfixed :intersect
+or+: enfixed :union
+xor+: enfixed :difference
+
+
+; COMPARISON OPERATORS
 ;
-r3-alpha-lit: func [:spelling [word! text!]] [
-    either word? spelling [
-        spelling
-    ][
-        bind (to word! spelling) (binding of 'r3-alpha-lit)
-    ]
-]
+; !!! See discussion about the future of comparison operators:
+; https://forum.rebol.info/t/349
 
+=: enfixed :equal?
+<>: enfixed :not-equal?
+<: enfixed :lesser?
+>: enfixed :greater?
 
-; Make top-level words
-;
-+: -: *: and+: or+: xor+: _
+>=: enfixed :greater-or-equal?
+=<: <=: enfixed :equal-or-lesser?  ; https://forum.rebol.info/t/349/11
+!=: enfixed :not-equal?  ; http://www.rebol.net/r3blogs/0017.html
+==: enfixed :strict-equal?  ; !!! https://forum.rebol.info/t/349
+!==: enfixed :strict-not-equal?  ; !!! bad pairing, most would think !=
 
-for-each [math-op function-name] [
-    +       add
-    -       subtract
-    *       multiply
+=?: enfixed :same?
 
-    ; / is a 0-arity PATH! in Ren-C.  While "pathing" with a number on the
-    ; left acts as division, it has slight differences.
-
-    and+    intersect
-    or+     union
-    xor+    difference
-][
-    set math-op enfixed (get function-name)
-]
-
-
-
-; Make top-level words for things not added by %b-init.c
-;
-=: !=: ==: !==: =?: _
-
-; <= looks a lot like a left arrow.  In the interest of "new thought", core
-; defines the operation in terms of =<
-;
-lesser-or-equal?: :equal-or-lesser?
-
-for-each [comparison-op function-name] compose [
-    =       equal?
-    <>      not-equal?
-    <       lesser?
-    (r3-alpha-lit "=<") equal-or-lesser?
-    >       greater?
-    >=      greater-or-equal?
-
-    <=      lesser-or-equal?  ; !!! https://forum.rebol.info/t/349/11
-
-    !=      not-equal?  ; !!! http://www.rebol.net/r3blogs/0017.html
-
-    ==      strict-equal?  ; !!! https://forum.rebol.info/t/349
-    !==     strict-not-equal?  ; !!! bad pairing, most would think !=
-
-    =?      same?
-][
-    ; !!! See discussion about the future of comparison operators:
-    ; https://forum.rebol.info/t/349
-    ;
-    set comparison-op enfixed (get function-name)
-]
 
 
 =>: enfixed :lambda  ; quick function generator
@@ -115,8 +83,8 @@ for-each [comparison-op function-name] compose [
 ;     >> 10 -> lib/= 5 + 5
 ;     == #[true]
 ;
-set (r3-alpha-lit "<-") enfixed :shove/enfix
-set (r3-alpha-lit "->") enfixed :shove
+<-: enfixed :shove/enfix
+->: enfixed :shove
 
 
 ; The -- and ++ operators were deemed too "C-like", so ME was created to allow
@@ -141,6 +109,6 @@ my: enfixed redescribe [
 ; to allow longer runs of evaluation.  "Invisible functions" (those which
 ; `return: []`) permit a more flexible version of the mechanic.
 
-set (r3-alpha-lit "<|") tweak copy :eval-all 'postpone on
-set (r3-alpha-lit "|>") tweak enfixed :shove 'postpone on
+<|: tweak copy :eval-all 'postpone on
+|>: tweak enfixed :shove 'postpone on
 ||: :once-bar

@@ -193,24 +193,33 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define ARR(p) \
-        cast(REBARR*, (p))
+        ((REBARR*)(p))  // don't use `cast` so casting away const is allowed
 
 #else
 
-    template <class T>
-    inline REBARR *ARR(T *p) {
-        constexpr bool derived = std::is_same<T, REBARR>::value;
+    template <
+        typename T,
+        typename T0 = typename std::remove_const<T>::type,
+        typename A = typename std::conditional<
+            std::is_const<T>::value,  // boolean
+            const REBARR,  // true branch
+            REBARR  // false branch
+        >::type
+    >
+    inline A *ARR(T *p) {
+        constexpr bool derived = std::is_same<T0, REBARR>::value;
 
-        constexpr bool base = std::is_same<T, void>::value
-            or std::is_same<T, REBNOD>::value
-            or std::is_same<T, REBSER>::value;
+        constexpr bool base = std::is_same<T0, void>::value
+            or std::is_same<T0, REBNOD>::value
+            or std::is_same<T0, REBSER>::value;
 
         static_assert(
             derived or base,
             "ARR works on void/REBNOD/REBSER/REBARR"
         );
 
-        if (base and (reinterpret_cast<REBSER*>(p)->header.bits & (
+        bool b = base;  // needed to avoid compiler constexpr warning
+        if (b and p and (reinterpret_cast<const REBSER*>(p)->header.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
         )) != (
             NODE_FLAG_NODE
@@ -218,9 +227,10 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
             panic (p);
         }
 
-        assert(WIDE_BYTE_OR_0(reinterpret_cast<REBSER*>(p)) == 0);
+        if (p)
+            assert(WIDE_BYTE_OR_0(reinterpret_cast<const REBSER*>(p)) == 0);
 
-        return reinterpret_cast<REBARR*>(p);
+        return reinterpret_cast<A*>(p);
     }
 
 #endif

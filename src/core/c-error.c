@@ -1342,7 +1342,7 @@ REBCTX *Error_Bad_Make(enum Reb_Kind type, const REBVAL *spec)
 REBCTX *Error_Bad_Make_Parent(enum Reb_Kind type, const REBVAL *parent)
 {
     assert(parent != nullptr);
-    fail (Error_Bad_Make_Parent_Raw(Datatype_From_Kind(type), parent));
+    return Error_Bad_Make_Parent_Raw(Datatype_From_Kind(type), parent);
 }
 
 
@@ -1510,7 +1510,7 @@ void MF_Error(REB_MOLD *mo, const REBCEL *v, bool form)
         Append_Ascii(mo->series, RM_BAD_ERROR_FORMAT);
 
     // Form: ** Where: function
-    REBVAL *where = KNOWN(&vars->where);
+    REBVAL *where = SPECIFIC(&vars->where);
     if (
         not IS_BLANK(where)
         and not (IS_BLOCK(where) and VAL_LEN_AT(where) == 0)
@@ -1521,7 +1521,7 @@ void MF_Error(REB_MOLD *mo, const REBCEL *v, bool form)
     }
 
     // Form: ** Near: location
-    REBVAL *nearest = KNOWN(&vars->nearest);
+    REBVAL *nearest = SPECIFIC(&vars->nearest);
     if (not IS_BLANK(nearest)) {
         Append_Codepoint(mo->series, '\n');
         Append_Ascii(mo->series, RM_ERROR_NEAR);
@@ -1549,7 +1549,7 @@ void MF_Error(REB_MOLD *mo, const REBCEL *v, bool form)
     // only be used in ANY-WORD! values at the moment, so the filename is
     // not a FILE!.
     //
-    REBVAL *file = KNOWN(&vars->file);
+    REBVAL *file = SPECIFIC(&vars->file);
     if (not IS_BLANK(file)) {
         Append_Codepoint(mo->series, '\n');
         Append_Ascii(mo->series, RM_ERROR_FILE);
@@ -1560,7 +1560,7 @@ void MF_Error(REB_MOLD *mo, const REBCEL *v, bool form)
     }
 
     // Form: ** Line: line-number
-    REBVAL *line = KNOWN(&vars->line);
+    REBVAL *line = SPECIFIC(&vars->line);
     if (not IS_BLANK(line)) {
         Append_Codepoint(mo->series, '\n');
         Append_Ascii(mo->series, RM_ERROR_LINE);

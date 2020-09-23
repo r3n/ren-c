@@ -37,7 +37,6 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 
-#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -98,7 +97,7 @@ void Attach_Request(REBREQ **node, REBREQ *req)
 
     // Link the new request to end:
     *node = req;
-    Ensure_Req_Managed(req);
+    Force_Req_Managed(req);
     NextReq(req) = nullptr;
     Req(req)->flags |= RRF_PENDING;
 }

@@ -161,7 +161,7 @@ REBNATIVE(shove)
         Move_Value(shovee, D_OUT);  // Note: can't eval directly into arg slot
     }
     else
-        Move_Value(shovee, KNOWN(*v));
+        Move_Value(shovee, SPECIFIC(*v));
 
     if (not IS_ACTION(shovee) and not ANY_SET_KIND(VAL_TYPE(shovee)))
         fail ("SHOVE's immediate right must be ACTION! or SET-XXX! type");

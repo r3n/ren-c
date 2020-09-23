@@ -390,7 +390,21 @@ REBTYPE(Tuple)
                     if (dec == 0.0)
                         fail (Error_Zero_Divide_Raw());
 
-                    v = cast(REBINT, Round_Dec(v / dec, 0, 1.0));
+                    // !!! After moving all the ROUND service routines to
+                    // talk directly to ROUND frames, cases like this that
+                    // don't have round frames need one.  Can't run:
+                    //
+                    //    v = cast(REBINT, Round_Dec(v / dec, 0, 1.0));
+                    //
+                    // The easiest way to do it is to call ROUND.  Methods for
+                    // this are being improved all the time, so the slowness
+                    // of scanning and binding is not too important.  (The
+                    // TUPLE! code is all going to be replaced... so just
+                    // consider this an API test.)
+                    //
+                    v = rebUnboxInteger(
+                        "to integer! round divide", rebI(v), arg,
+                    rebEND);
                 }
                 else {
                     if (a == 0)

@@ -29,13 +29,13 @@
 
 
 //
-//  Ensure_Port_State: C
+//  Force_Get_Port_State: C
 //
 // Use private state area in a port. Create if necessary.
 // The size is that of a binary structure used by
 // the port for storing internal information.
 //
-REBREQ *Ensure_Port_State(REBVAL *port, void *device)
+REBREQ *Force_Get_Port_State(REBVAL *port, void *device)
 {
     REBDEV *dev = cast(REBDEV*, device);
     REBCTX *ctx = VAL_CONTEXT(port);
@@ -66,7 +66,7 @@ REBREQ *Ensure_Port_State(REBVAL *port, void *device)
 // Return true if port value is pending a signal.
 // Not valid for all ports - requires request struct!!!
 //
-bool Pending_Port(REBVAL *port)
+bool Pending_Port(const RELVAL *port)
 {
     if (IS_PORT(port)) {
         REBVAL *state = CTX_VAR(VAL_CONTEXT(port), STD_PORT_STATE);
@@ -170,7 +170,7 @@ bool Redo_Action_Throws(REBVAL *out, REBFRM *f, REBACT *run)
         Move_Value(first, ACT_ARCHETYPE(run));
     }
     else
-        Init_Path(first, Pop_Stack_Values(dsp_orig));
+        Init_Path(first, Freeze_Array_Shallow(Pop_Stack_Values(dsp_orig)));
 
     bool threw = Do_At_Mutable_Maybe_Stale_Throws(
         out,  // invisibles allow for out to not be Init_Void()'d

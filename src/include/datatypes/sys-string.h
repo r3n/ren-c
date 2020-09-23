@@ -51,7 +51,7 @@
 
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// REBCHR(*) + REBCHR(const*): "ITERATOR" TYPE FOR KNOWN GOOD UTF-8 DATA
+// REBCHR(*) + REBCHR(const*): "ITERATOR" TYPE FOR SPECIFIC GOOD UTF-8 DATA
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -342,8 +342,21 @@ struct Reb_String {
     struct Reb_Series series;  // http://stackoverflow.com/a/9747062
 };
 
-#define STR(p) \
-    cast(REBSTR*, (p))  // !!! Enhance with more checks, like SER() does.
+#if !defined(DEBUG_CHECK_CASTS)
+
+    #define STR(p) \
+        ((REBSTR*)(p))  // don't use `cast` so casting away const is allowed
+
+#else  // !!! Enhance with more checks, like SER() does.
+
+    inline static REBSTR *STR(void *p)
+      { return cast(REBSTR*, SER(p)); }
+
+    inline static const REBSTR *STR(const void *p)
+      { return cast(const REBSTR*, SER(p)); }
+
+#endif
+
 
 inline static bool IS_SER_STRING(REBSER *s) {
     if (NOT_SERIES_FLAG((s), IS_STRING))
@@ -531,7 +544,7 @@ inline static void Free_Bookmarks_Maybe_Null(REBSTR *s) {
         for (i = 0; i != index; ++i)
             cp = NEXT_STR(cp);
 
-        REBSIZ actual = cast(REBYTE*, cp) - SER_DATA_RAW(SER(s));
+        REBSIZ actual = cast(REBYTE*, cp) - SER_DATA(SER(s));
         assert(actual == offset);
     }
 #endif
@@ -642,7 +655,7 @@ inline static REBCHR(*) STR_AT(REBSTR *s, REBLEN at) {
     }
 
     index = booked;
-    cp = cast(REBCHR(*), SER_DATA_RAW(SER(s)) + BMK_OFFSET(bookmark)); }
+    cp = cast(REBCHR(*), SER_DATA(SER(s)) + BMK_OFFSET(bookmark)); }
 
     if (index > at) {
       #ifdef DEBUG_TRACE_BOOKMARKS

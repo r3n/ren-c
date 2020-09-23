@@ -741,8 +741,8 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
         // termination that is not a full-sized cell).
 
         memmove(
-            SER_DATA_RAW(s) + start + extra,
-            SER_DATA_RAW(s) + start,
+            SER_DATA(s) + start + extra,
+            SER_DATA(s) + start,
             size - start
         );
 
@@ -956,8 +956,8 @@ REBNATIVE(swap_contents)
 {
     INCLUDE_PARAMS_OF_SWAP_CONTENTS;
 
-    FAIL_IF_READ_ONLY(ARG(series1));
-    FAIL_IF_READ_ONLY(ARG(series2));
+    ENSURE_MUTABLE(ARG(series1));
+    ENSURE_MUTABLE(ARG(series2));
 
     if (ANY_ARRAY(ARG(series1)) != ANY_ARRAY(ARG(series2)))
         fail ("Can only SWAP-CONTENTS of arrays with other arrays");
@@ -1160,7 +1160,7 @@ void Decay_Series(REBSER *s)
                     // !!! Would a no-op cleaner be more efficient for those?
                     //
                     if (MISC(s).cleaner)
-                        (MISC(s).cleaner)(KNOWN(v));
+                        (MISC(s).cleaner)(SPECIFIC(v));
                 }
             }
         }
@@ -1186,6 +1186,12 @@ void GC_Kill_Series(REBSER *s)
     }
   #endif
 
+    // By default the series is touched so its tick reflects the tick that
+    // freed it.  If you need to know the tick where it was allocated, then
+    // comment this out so it remains that way.
+    //
+    TOUCH_SERIES_IF_DEBUG(s);
+
     if (NOT_SERIES_INFO(s, INACCESSIBLE))
         Decay_Series(s);
 
@@ -1206,10 +1212,6 @@ void GC_Kill_Series(REBSER *s)
 
   #if !defined(NDEBUG)
     PG_Reb_Stats->Series_Freed++;
-
-    #if defined(DEBUG_COUNT_TICKS)
-        s->tick = TG_Tick; // update to be tick on which series was freed
-    #endif
   #endif
 }
 

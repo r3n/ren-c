@@ -187,7 +187,7 @@ static void Rehash_Map(REBMAP *map)
     REBLEN *hashes = SER_HEAD(REBLEN, hashlist);
     REBARR *pairlist = MAP_PAIRLIST(map);
 
-    REBVAL *key = KNOWN(ARR_HEAD(pairlist));
+    REBVAL *key = SPECIFIC(ARR_HEAD(pairlist));
     REBLEN n;
 
     for (n = 0; n < ARR_LEN(pairlist); n += 2, key += 2) {
@@ -198,10 +198,10 @@ static void Rehash_Map(REBMAP *map)
             // It's a "zombie", move last key to overwrite it
             //
             Move_Value(
-                key, KNOWN(ARR_AT(pairlist, ARR_LEN(pairlist) - 2))
+                key, SPECIFIC(ARR_AT(pairlist, ARR_LEN(pairlist) - 2))
             );
             Move_Value(
-                &key[1], KNOWN(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))
+                &key[1], SPECIFIC(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))
             );
             SET_ARRAY_LEN_NOTERM(pairlist, ARR_LEN(pairlist) - 2);
         }
@@ -290,8 +290,7 @@ REBLEN Find_Map_Entry(
     // a SET must always be done with an immutable key...because if it were
     // changed, there'd be no notification to rehash the map.
     //
-    REBSER *locker = SER(MAP_PAIRLIST(map));
-    Ensure_Value_Frozen(key, locker);
+    Force_Value_Frozen_Deep_Blame(key, MAP_PAIRLIST(map));
 
     // Must set the value:
     if (n) {  // re-set it:
@@ -329,7 +328,7 @@ REB_R PD_Map(
         return R_UNHANDLED;
 
     if (opt_setval)
-        FAIL_IF_READ_ONLY(pvs->out);
+        ENSURE_MUTABLE(pvs->out);
 
     // Fetching and setting with path-based access is case-preserving for any
     // initial insertions.  However, the case-insensitivity means that all
@@ -357,7 +356,7 @@ REB_R PD_Map(
     if (n == 0)
         return nullptr;
 
-    REBVAL *val = KNOWN(
+    REBVAL *val = SPECIFIC(
         ARR_AT(MAP_PAIRLIST(VAL_MAP(pvs->out)), ((n - 1) * 2) + 1)
     );
     if (IS_NULLED(val)) // zombie entry, means unused
@@ -452,9 +451,9 @@ inline static REBMAP *Copy_Map(REBMAP *map, REBU64 types) {
     //
     assert(ARR_LEN(copy) % 2 == 0); // should be [key value key value]...
 
-    REBVAL *key = KNOWN(ARR_HEAD(copy)); // all keys/values are specified
+    REBVAL *key = SPECIFIC(ARR_HEAD(copy)); // all keys/values are specified
     for (; NOT_END(key); key += 2) {
-        assert(Is_Value_Frozen(key)); // immutable key
+        assert(Is_Value_Frozen_Deep(key));  // immutable key
 
         REBVAL *v = key + 1;
         if (IS_NULLED(v))
@@ -516,8 +515,8 @@ REBARR *Map_To_Array(REBMAP *map, REBINT what)
     REBLEN count = Length_Map(map);
     REBARR *a = Make_Array(count * ((what == 0) ? 2 : 1));
 
-    REBVAL *dest = KNOWN(ARR_HEAD(a));
-    REBVAL *val = KNOWN(ARR_HEAD(MAP_PAIRLIST(map)));
+    REBVAL *dest = SPECIFIC(ARR_HEAD(a));
+    REBVAL *val = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     for (; NOT_END(val); val += 2) {
         if (not IS_NULLED(val + 1)) {  // can't be END
             if (what <= 0) {
@@ -548,7 +547,7 @@ REBCTX *Alloc_Context_From_Map(REBMAP *map)
     // a bit haphazard to have `make object! make map! [x 10 <y> 20]` and
     // just throw out the <y> 20 case...
 
-    REBVAL *mval = KNOWN(ARR_HEAD(MAP_PAIRLIST(map)));
+    REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     REBLEN count = 0;
 
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
@@ -562,7 +561,7 @@ REBCTX *Alloc_Context_From_Map(REBMAP *map)
     REBVAL *key = CTX_KEYS_HEAD(context);
     REBVAL *var = CTX_VARS_HEAD(context);
 
-    mval = KNOWN(ARR_HEAD(MAP_PAIRLIST(map)));
+    mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
 
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1)) {
@@ -693,7 +692,7 @@ REBTYPE(Map)
 
         Move_Value(
             D_OUT,
-            KNOWN(ARR_AT(MAP_PAIRLIST(map), ((n - 1) * 2) + 1))
+            SPECIFIC(ARR_AT(MAP_PAIRLIST(map), ((n - 1) * 2) + 1))
         );
 
         if (VAL_WORD_SYM(verb) == SYM_FIND)
@@ -726,7 +725,7 @@ REBTYPE(Map)
         if (IS_NULLED_OR_BLANK(value))
             RETURN (v);  // don't fail on read only if it would be a no-op
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         if (REF(only) or REF(line) or REF(dup))
             fail (Error_Bad_Refines_Raw());
@@ -770,7 +769,7 @@ REBTYPE(Map)
         return Init_Map(D_OUT, Copy_Map(map, types)); }
 
     case SYM_CLEAR:
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         Reset_Array(MAP_PAIRLIST(map));
 

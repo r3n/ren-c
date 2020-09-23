@@ -56,7 +56,7 @@ static ffi_abi Abi_From_Word(const REBVAL *word) {
       #elif defined(X86_WIN32) \
             || defined(TO_LINUX_X86) || defined(TO_LINUX_X64)
 
-        "'sysv [", rebI(FFI_SYSV), "]",
+        /* "'sysv [", rebI(FFI_SYSV), "]", */  // !!! Should this be defined?
 
         // !!! While these are defined on newer versions of LINUX X86/X64 FFI
         // older versions (e.g. 3.0.13) only have STDCALL/THISCALL/FASTCALL
@@ -187,7 +187,7 @@ REBNATIVE(make_routine)
     //
     const REBYTE *utf8 = VAL_UTF8_AT(nullptr, ARG(name));
 
-    CFUNC *cfunc = Find_Function(LIB_FD(lib), cast(char*, utf8));
+    CFUNC *cfunc = Find_Function(LIB_FD(lib), cast(const char*, utf8));
     if (cfunc == nullptr)
         fail ("FFI: Couldn't find function in library");
 

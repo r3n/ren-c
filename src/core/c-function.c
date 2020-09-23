@@ -61,7 +61,7 @@ static bool Params_Of_Hook(
             not (flags & PHF_UNREFINED)
             and TYPE_CHECK(param, REB_TS_REFINEMENT)
         ){
-            Refinify(KNOWN(s->dest));
+            Refinify(SPECIFIC(s->dest));
         }
 
         switch (VAL_PARAM_CLASS(param)) {
@@ -69,7 +69,7 @@ static bool Params_Of_Hook(
             break;
 
           case REB_P_HARD_QUOTE:
-            Getify(KNOWN(s->dest));
+            Getify(SPECIFIC(s->dest));
             break;
 
           case REB_P_MODAL:
@@ -77,11 +77,11 @@ static bool Params_Of_Hook(
                 // associated refinement specialized out
             }
             else
-                Symify(KNOWN(s->dest));
+                Symify(SPECIFIC(s->dest));
             break;
 
           case REB_P_SOFT_QUOTE:
-            Quotify(KNOWN(s->dest), 1);
+            Quotify(SPECIFIC(s->dest), 1);
             break;
 
           default:
@@ -1250,14 +1250,14 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // The FRAME! stored in the body for the specialization has a phase
         // which is actually the function to be run.
         //
-        REBVAL *frame = KNOWN(ARR_HEAD(details));
+        REBVAL *frame = SPECIFIC(ARR_HEAD(details));
         assert(IS_FRAME(frame));
         Move_Value(out, frame);
         return;
     }
 
     if (ACT_DISPATCHER(a) == &Generic_Dispatcher) {
-        REBVAL *verb = KNOWN(ARR_HEAD(details));
+        REBVAL *verb = SPECIFIC(ARR_HEAD(details));
         assert(IS_WORD(verb));
         Move_Value(out, verb);
         return;
@@ -1471,7 +1471,7 @@ REB_R Generic_Dispatcher(REBFRM *f)
 {
     REBACT *phase = FRM_PHASE(f);
     REBARR *details = ACT_DETAILS(phase);
-    REBVAL *verb = KNOWN(ARR_HEAD(details));
+    REBVAL *verb = SPECIFIC(ARR_HEAD(details));
     assert(IS_WORD(verb));
 
     // !!! It's technically possible to throw in locals or refinements at
@@ -1740,7 +1740,7 @@ REB_R Adapter_Dispatcher(REBFRM *f)
     assert(ARR_LEN(details) == 2);
 
     RELVAL* prelude = ARR_AT(details, 0);
-    REBVAL* adaptee = KNOWN(ARR_AT(details, 1));
+    REBVAL* adaptee = SPECIFIC(ARR_AT(details, 1));
 
     // The first thing to do is run the prelude code, which may throw.  If it
     // does throw--including a RETURN--that means the adapted function will
@@ -1770,9 +1770,9 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == 2);
 
-    REBVAL *inner = KNOWN(ARR_AT(details, 0));  // same args as f
+    REBVAL *inner = SPECIFIC(ARR_AT(details, 0));  // same args as f
     assert(IS_ACTION(inner));
-    REBVAL *outer = KNOWN(ARR_AT(details, 1));  // takes 1 arg (a FRAME!)
+    REBVAL *outer = SPECIFIC(ARR_AT(details, 1));  // takes 1 arg (a FRAME!)
     assert(IS_ACTION(outer));
 
     // We want to call OUTER with a FRAME! value that will dispatch to INNER
@@ -1807,7 +1807,7 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     // won't free it if there are outstanding references.
     //
     // Note that since varlists aren't added to the manual series list, the
-    // bit must be tweaked vs. using Ensure_Array_Managed.
+    // bit must be tweaked vs. using Force_Array_Managed.
     //
     SET_SERIES_FLAG(f->varlist, MANAGED);
 
@@ -1838,10 +1838,10 @@ REB_R Chainer_Dispatcher(REBFRM *f)
     // Go in reverse order, so the function to apply last is at the bottom of
     // the stack.
     //
-    REBVAL *chained = KNOWN(ARR_LAST(pipeline));
+    const RELVAL *chained = ARR_LAST(pipeline);
     for (; chained != ARR_HEAD(pipeline); --chained) {
         assert(IS_ACTION(chained));
-        Move_Value(DS_PUSH(), KNOWN(chained));
+        Move_Value(DS_PUSH(), SPECIFIC(chained));
     }
 
     // Extract the first function, itself which might be a chain.
@@ -1875,11 +1875,15 @@ bool Get_If_Word_Or_Path_Throws(
     bool push_refinements
 ) {
     if (IS_WORD(v) or IS_GET_WORD(v) or IS_SYM_WORD(v)) {
+      get_as_word:
         if (opt_name_out)
             *opt_name_out = VAL_WORD_SPELLING(v);
         Get_Word_May_Fail(out, v, specifier);
     }
     else if (IS_PATH(v) or IS_GET_PATH(v) or IS_SYM_PATH(v)) {
+        if (MIRROR_BYTE(v) == REB_WORD)  // e.g. `/`
+            goto get_as_word;
+
         REBSPC *derived = Derive_Specifier(specifier, v);
         if (Eval_Path_Throws_Core(
             out,

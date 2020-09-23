@@ -561,7 +561,7 @@ static void Sort_String(
     if (rev) thunk |= CC_FLAG_REVERSE;
 
     reb_qsort_r(
-        VAL_RAW_DATA_AT(string),
+        VAL_STRING_AT(string),
         len,
         size * SER_WIDE(VAL_SERIES(string)),
         &thunk,
@@ -657,7 +657,7 @@ REB_R PD_String(
             Append_Codepoint(mo->series, '/');
         else {
             if (
-                *SER_SEEK(REBYTE, SER(mo->series), STR_SIZE(mo->series) - 1)
+                *SER_AT(REBYTE, SER(mo->series), STR_SIZE(mo->series) - 1)
                 != '/'
             ){
                 Append_Codepoint(mo->series, '/');
@@ -682,7 +682,7 @@ REB_R PD_String(
 
     // Otherwise, POKE-ing
 
-    FAIL_IF_READ_ONLY(pvs->out);
+    ENSURE_MUTABLE(pvs->out);
 
     if (not IS_INTEGER(picker))
         return R_UNHANDLED;
@@ -1077,7 +1077,7 @@ REBTYPE(String)
         UNUSED(PAR(series)); // already accounted for
 
         REBSTR *s = VAL_STRING(v);
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         REBINT limit;
         if (REF(part))
@@ -1201,7 +1201,7 @@ REBTYPE(String)
       case SYM_TAKE: {
         INCLUDE_PARAMS_OF_TAKE;
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         UNUSED(PAR(series));
 
@@ -1246,7 +1246,7 @@ REBTYPE(String)
         return D_OUT; }
 
       case SYM_CLEAR: {
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
         REBSTR *s = VAL_STRING(v);
 
         if (index >= tail)
@@ -1318,14 +1318,14 @@ REBTYPE(String)
     //-- Special actions:
 
       case SYM_SWAP: {
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         REBVAL *arg = D_ARG(2);
 
         if (VAL_TYPE(v) != VAL_TYPE(arg))
             fail (Error_Not_Same_Type_Raw());
 
-        FAIL_IF_READ_ONLY(arg);
+        ENSURE_MUTABLE(arg);
 
         if (index < tail and VAL_INDEX(arg) < VAL_LEN_HEAD(arg))
             swap_chars(v, arg);
@@ -1335,7 +1335,7 @@ REBTYPE(String)
         INCLUDE_PARAMS_OF_REVERSE;
         UNUSED(ARG(series));
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         REBINT len = Part_Len_May_Modify_Index(v, ARG(part));
         if (len > 0)
@@ -1345,7 +1345,7 @@ REBTYPE(String)
       case SYM_SORT: {
         INCLUDE_PARAMS_OF_SORT;
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         UNUSED(PAR(series));
 
@@ -1379,7 +1379,7 @@ REBTYPE(String)
             return Init_Void(D_OUT);
         }
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         if (REF(only)) {
             if (index >= tail)
@@ -1396,7 +1396,7 @@ REBTYPE(String)
         if (not Is_String_Definitely_ASCII(v))
             fail ("UTF-8 Everywhere: String shuffle temporarily unavailable");
 
-        FAIL_IF_READ_ONLY(v);
+        ENSURE_MUTABLE(v);
 
         Shuffle_String(v, did REF(secure));
         RETURN (v); }

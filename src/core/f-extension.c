@@ -170,9 +170,9 @@ REBNATIVE(load_extension)
     // in the original extension model was very twisty and was a barrier
     // to enhancement.  So trying a monolithic rewrite for starters.
 
-    REBVAL *script_compressed = KNOWN(ARR_AT(details, IDX_COLLATOR_SCRIPT));
-    REBVAL *specs_compressed = KNOWN(ARR_AT(details, IDX_COLLATOR_SPECS));
-    REBVAL *dispatchers_handle = KNOWN(ARR_AT(details, IDX_COLLATOR_DISPATCHERS));
+    REBVAL *script_compressed = SPECIFIC(ARR_AT(details, IDX_COLLATOR_SCRIPT));
+    REBVAL *specs_compressed = SPECIFIC(ARR_AT(details, IDX_COLLATOR_SPECS));
+    REBVAL *dispatchers_handle = SPECIFIC(ARR_AT(details, IDX_COLLATOR_DISPATCHERS));
 
     REBLEN num_natives = VAL_HANDLE_LEN(dispatchers_handle);
     REBNAT *dispatchers = VAL_HANDLE_POINTER(REBNAT, dispatchers_handle);

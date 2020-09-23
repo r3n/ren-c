@@ -61,7 +61,7 @@ static REB_R DNS_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     // for that cost if your script doesn't do any network operations.
     // Hence the port state of being open or closed relates to that.
     //
-    REBREQ *req = Ensure_Port_State(port, &Dev_Net);
+    REBREQ *req = Force_Get_Port_State(port, &Dev_Net);
     struct rebol_devreq *sock = Req(req);
 
     sock->timeout = 4000;  // where does this go? !!!

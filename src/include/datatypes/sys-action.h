@@ -446,10 +446,10 @@ static inline REBVAL *Init_Action_Unbound(
   #if !defined(NDEBUG)
     Extra_Init_Action_Checks_Debug(a);
   #endif
-    Ensure_Array_Managed(ACT_PARAMLIST(a));
+    Force_Array_Managed(ACT_PARAMLIST(a));
     Move_Value(out, ACT_ARCHETYPE(a));
     assert(VAL_BINDING(out) == UNBOUND);
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 static inline REBVAL *Init_Action_Maybe_Bound(
@@ -460,11 +460,11 @@ static inline REBVAL *Init_Action_Maybe_Bound(
   #if !defined(NDEBUG)
     Extra_Init_Action_Checks_Debug(a);
   #endif
-    Ensure_Array_Managed(ACT_PARAMLIST(a));
+    Force_Array_Managed(ACT_PARAMLIST(a));
     Move_Value(out, ACT_ARCHETYPE(a));
     assert(VAL_BINDING(out) == UNBOUND);
     INIT_BINDING(out, binding);
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

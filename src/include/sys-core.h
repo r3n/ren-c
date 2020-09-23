@@ -117,6 +117,13 @@
 // in the release build, and give a hopefully informative error.
 //
 #if defined(NDEBUG) && !defined(DEBUG_STDIO_OK)
+    //
+    // `stdin` is required to be macro https://en.cppreference.com/w/c/io
+    //
+    #if defined(stdin) and !defined(REBOL_ALLOW_STDIO_IN_RELEASE_BUILD)
+        #error "<stdio.h> included prior to %sys-core.h in release build"
+    #endif
+
     #define printf dont_include_stdio_h
     #define fprintf dont_include_stdio_h
 #else

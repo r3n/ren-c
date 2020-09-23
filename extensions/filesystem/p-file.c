@@ -292,7 +292,7 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     else if (!IS_FILE(path))
         fail (Error_Invalid_Spec_Raw(path));
 
-    REBREQ *file = Ensure_Port_State(port, &Dev_File);
+    REBREQ *file = Force_Get_Port_State(port, &Dev_File);
     struct rebol_devreq *req = Req(file);
 
     // !!! R3-Alpha never implemented quite a number of operations on files,

@@ -171,6 +171,8 @@ enum LEX_CLASS_ENUM {
 #define LEX_WORD        (LEX_CLASS_WORD<<LEX_SHIFT)
 #define LEX_NUMBER      (LEX_CLASS_NUMBER<<LEX_SHIFT)
 
+typedef uint16_t LEXFLAGS;  // 16 flags per lex class
+
 #define LEX_FLAG(n)             (1 << (n))
 #define SET_LEX_FLAG(f,l)       (f = f | LEX_FLAG(l))
 #define HAS_LEX_FLAGS(f,l)      (f & (l))

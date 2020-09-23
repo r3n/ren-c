@@ -154,7 +154,7 @@ REBNATIVE(new_line)
     bool mark = VAL_LOGIC(ARG(mark));
 
     REBVAL *pos = ARG(position);
-    FAIL_IF_READ_ONLY(pos);
+    ENSURE_MUTABLE(pos);
 
     RELVAL *item = VAL_ARRAY_AT(pos);
 
@@ -279,7 +279,7 @@ REBLEN Milliseconds_From_Value(const RELVAL *v) {
     }
 
     if (msec < 0)
-        fail (Error_Out_Of_Range(KNOWN(v)));
+        fail (Error_Out_Of_Range(SPECIFIC(v)));
 
     return cast(REBLEN, msec);
 }

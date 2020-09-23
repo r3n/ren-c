@@ -37,8 +37,8 @@ REBINT Compare_Binary_Vals(const REBCEL *v1, const REBCEL *v2)
     REBLEN len = MIN(l1, l2);
 
     REBINT n = memcmp(
-        SER_AT_RAW(SER_WIDE(VAL_SERIES(v1)), VAL_SERIES(v1), VAL_INDEX(v1)),
-        SER_AT_RAW(SER_WIDE(VAL_SERIES(v2)), VAL_SERIES(v2), VAL_INDEX(v2)),
+        SER_DATA_AT(SER_WIDE(VAL_SERIES(v1)), VAL_SERIES(v1), VAL_INDEX(v1)),
+        SER_DATA_AT(SER_WIDE(VAL_SERIES(v2)), VAL_SERIES(v2), VAL_INDEX(v2)),
         len
     );
 

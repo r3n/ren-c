@@ -209,7 +209,7 @@ static void Process_Block_Helper(
 
     RELVAL *text;
     for (text = VAL_ARRAY_AT(block); NOT_END(text); ++text)
-        Process_Text_Helper_Core(some_tcc_api, state, KNOWN(text), label);
+        Process_Text_Helper_Core(some_tcc_api, state, SPECIFIC(text), label);
 
     rebRelease(block);
 }
@@ -493,7 +493,7 @@ REBNATIVE(compile_p)
             if (not IS_TEXT(item))
                 fail ("If COMPILE*/FILES, compilables must be TEXT! paths");
 
-            char *filename_utf8 = rebSpell(KNOWN(item), rebEND);
+            char *filename_utf8 = rebSpell(SPECIFIC(item), rebEND);
             tcc_add_file(state, filename_utf8);
             rebFree(filename_utf8);
         }
@@ -524,7 +524,7 @@ REBNATIVE(compile_p)
                 // back and fill in its dispatcher and TCC_State after the
                 // compilation...
                 //
-                Move_Value(DS_PUSH(), KNOWN(item));
+                Move_Value(DS_PUSH(), SPECIFIC(item));
 
                 REBARR *details = VAL_ACT_DETAILS(item);
                 RELVAL *source = ARR_AT(details, IDX_NATIVE_BODY);
@@ -652,7 +652,7 @@ REBNATIVE(compile_p)
         assert(IS_ACTION(native) and Is_User_Native(VAL_ACTION(native)));
 
         REBARR *details = VAL_ACT_DETAILS(native);
-        REBVAL *linkname = KNOWN(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME));
+        REBVAL *linkname = SPECIFIC(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME));
 
         char *name_utf8 = rebSpell("ensure text!", linkname, rebEND);
         void *sym = tcc_get_symbol(state, name_utf8);

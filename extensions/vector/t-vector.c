@@ -220,7 +220,7 @@ static void Set_Vector_At(const REBCEL *vec, REBLEN n, const RELVAL *set) {
 
     rebJumps(
         "FAIL [",
-            KNOWN(set), "{out of range for}",
+            SPECIFIC(set), "{out of range for}",
                 "unspaced [", rebI(bitsize), "{-bit}]",
                 rebT(sign ? "signed" : "unsigned"),
                 "{VECTOR! type}"
@@ -428,7 +428,7 @@ bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
             return false;
         if (init_len > len)  // !!! Expands without error, is this good?
             len = init_len;
-        iblk = KNOWN(item);
+        iblk = SPECIFIC(item);
         ++item;
     }
     else
@@ -450,7 +450,7 @@ bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
 
     REBLEN num_bytes = len * (bitsize / 8);
     REBSER *bin = Make_Binary(num_bytes);
-    CLEAR(SER_DATA_RAW(bin), num_bytes);  // !!! 0 bytes -> 0 int/float?
+    CLEAR(BIN_HEAD(bin), num_bytes);  // !!! 0 bytes -> 0 int/float?
     SET_SERIES_LEN(bin, num_bytes);
     TERM_SERIES(bin);
 
@@ -497,7 +497,7 @@ REB_R MAKE_Vector(
         REBYTE bitsize = 32;
         REBLEN num_bytes = (len * bitsize) / 8;
         REBSER *bin = Make_Binary(num_bytes);
-        CLEAR(SER_DATA_RAW(bin), num_bytes);
+        CLEAR(BIN_HEAD(bin), num_bytes);
         SET_SERIES_LEN(bin, num_bytes);
         TERM_SERIES(bin);
 
@@ -572,7 +572,7 @@ void Poke_Vector_Fail_If_Read_Only(
     // !!! How does this tie into CONST-ness?  How should aggregate types
     // handle their overall constness vs. that of their components?
     //
-    FAIL_IF_READ_ONLY(VAL_VECTOR_BINARY(value));
+    ENSURE_MUTABLE(VAL_VECTOR_BINARY(value));
 
     REBINT n;
     if (IS_INTEGER(picker) or IS_DECIMAL(picker)) // #2312
@@ -661,7 +661,7 @@ REBTYPE(Vector)
         INCLUDE_PARAMS_OF_RANDOM;
         UNUSED(PAR(value));
 
-        FAIL_IF_READ_ONLY(VAL_VECTOR_BINARY(v));
+        ENSURE_MUTABLE(VAL_VECTOR_BINARY(v));
 
         if (REF(seed) or REF(only))
             fail (Error_Bad_Refines_Raw());

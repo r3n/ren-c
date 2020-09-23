@@ -365,10 +365,14 @@ static inline REBVAL *Init_Any_Context(
 #define Copy_Context_Shallow_Managed(src) \
     Copy_Context_Shallow_Extra_Managed((src), 0)
 
-// Returns true if the keylist had to be changed to make it unique.
+// Make sure a context's keylist is not shared.  Note any CTX_KEY() values
+// may go stale from this context after this call.
 //
-#define Ensure_Keylist_Unique_Invalidated(context) \
-    Expand_Context_Keylist_Core((context), 0)
+inline static REBCTX *Force_Keylist_Unique(REBCTX *context) {
+    bool was_changed = Expand_Context_Keylist_Core(context, 0);
+    UNUSED(was_changed);  // keys wouldn't go stale if this was false
+    return context;
+}
 
 // Useful if you want to start a context out as NODE_FLAG_MANAGED so it does
 // not have to go in the unmanaged roots list and be removed later.  (Be
@@ -392,9 +396,8 @@ inline static void Deep_Freeze_Context(REBCTX *c) {
     Uncolor_Array(CTX_VARLIST(c));
 }
 
-inline static bool Is_Context_Deeply_Frozen(REBCTX *c) {
-    return GET_SERIES_INFO(c, FROZEN);
-}
+#define Is_Context_Frozen_Deep(c) \
+    Is_Array_Frozen_Deep(CTX_VARLIST(c))
 
 
 //=////////////////////////////////////////////////////////////////////////=//

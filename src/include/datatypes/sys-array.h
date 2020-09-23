@@ -134,7 +134,7 @@ inline static void TERM_SERIES(REBSER *s) {
 // wasn't really being used anyway, so it wasn't worth it to workaround.
 //
 #define Manage_Array(a)             Manage_Series(SER(a))  // SEE NOTE
-#define Ensure_Array_Managed(a)     Ensure_Series_Managed(SER(a))  // SEE NOTE
+#define Force_Array_Managed(a)     Force_Series_Managed(SER(a))  // SEE NOTE
 
 
 //
@@ -533,39 +533,14 @@ inline static RELVAL *Init_Relative_Block_At(
     Init_Relative_Block_At((out), (action), (array), 0)
 
 
-// PATH! types will splice into each other, but not into a BLOCK! or GROUP!.
-// BLOCK! or GROUP! will splice into any other array:
+// The rule for splicing is now fixed as "only plain BLOCK! splices":
+// https://forum.rebol.info/t/1332
 //
-//     [a b c d/e/f] -- append copy [a b c] 'd/e/f
-//      a/b/c/d/e/f  -- append copy 'a/b/c [d e f]
-//     (a b c d/e/f) -- append copy '(a b c) 'd/e/f
-//      a/b/c/d/e/f  -- append copy 'a/b/c '(d e f)
-//      a/b/c/d/e/f  -- append copy 'a/b/c 'd/e/f
+// Despite the simple contract, using a call to this routine helps document
+// placs where the decision to splice or not is being made.
 //
-// This rule influences the behavior of TO conversions as well:
-// https://forum.rebol.info/t/justifiable-asymmetry-to-on-block/751
-//
-inline static bool Splices_Into_Type_Without_Only(
-    enum Reb_Kind array_kind,
-    const REBVAL *arg
-){
-    // !!! It's desirable for the system to make VOID! insertion "ornery".
-    // Requiring the use of /ONLY to put it into arrays may not be perfect,
-    // but it's at least something.  Having the check and error in this
-    // routine for the moment helps catch it on at least some functions that
-    // are similar to APPEND/INSERT/CHANGE in their concerns, and *have*
-    // an /ONLY option.
-    //
-    if (IS_VOID(arg))
-        fail ("VOID! cannot be put into arrays without using /ONLY");
-
-    assert(ANY_ARRAY_KIND(array_kind));
-
-    enum Reb_Kind arg_kind = CELL_KIND(VAL_UNESCAPED(arg));
-    return arg_kind == REB_GROUP
-        or arg_kind == REB_BLOCK
-        or (ANY_PATH_KIND(arg_kind) and ANY_PATH_KIND(array_kind));
-}
+#define Splices_Without_Only(v) \
+    IS_BLOCK(v)
 
 
 // Checks if ANY-GROUP! is like ((...)) or (...), used by COMPOSE & PARSE

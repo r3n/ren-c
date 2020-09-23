@@ -202,7 +202,7 @@ inline static void *Expand_And_Align_Core(
 
     *offset_out = SER_LEN(store) + padding;
     EXPAND_SERIES_TAIL(store, padding + size);
-    return SER_DATA_RAW(store) + *offset_out;
+    return SER_DATA(store) + *offset_out;
 }
 
 inline static void *Expand_And_Align(
@@ -847,13 +847,13 @@ REB_R Routine_Dispatcher(REBFRM *f)
     if (IS_BLANK(RIN_RET_SCHEMA(rin)))
         ret_offset = nullptr;
     else
-        ret_offset = SER_DATA_RAW(store) + cast(uintptr_t, ret_offset);
+        ret_offset = SER_DATA(store) + cast(uintptr_t, ret_offset);
 
     REBLEN i;
     for (i = 0; i < num_args; ++i) {
         uintptr_t off = cast(uintptr_t, *SER_AT(void*, arg_offsets, i));
         assert(off == 0 or off < SER_LEN(store));
-        *SER_AT(void*, arg_offsets, i) = SER_DATA_RAW(store) + off;
+        *SER_AT(void*, arg_offsets, i) = SER_DATA(store) + off;
     }
   }
 
@@ -1136,12 +1136,12 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
                 break; }
 
               default:
-                fail (KNOWN(item));
+                fail (SPECIFIC(item));
             }
             break;
 
           default:
-            fail (KNOWN(item));
+            fail (SPECIFIC(item));
         }
     }
 

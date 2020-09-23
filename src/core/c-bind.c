@@ -311,6 +311,9 @@ static void Clonify_And_Bind_Relative(
                 INIT_BINDING(v, UNBOUND);
 
                 sub_src = VAL_ARRAY_AT(v);  // look for LETs
+
+                if (ANY_PATH_KIND(kind))  // must freeze the copy shallow
+                    Freeze_Array_Shallow(ARR(series));
             }
             else {
                 series = Copy_Sequence_Core(
@@ -326,7 +329,7 @@ static void Clonify_And_Bind_Relative(
         // copied series and "clonify" the values in it.
         //
         if (deep_types & FLAGIT_KIND(kind) & TS_ARRAYS_OBJ) {
-            REBVAL *sub = KNOWN(ARR_HEAD(ARR(series)));
+            REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
             for (; NOT_END(sub); ++sub, ++sub_src)
                 Clonify_And_Bind_Relative(
                     sub,

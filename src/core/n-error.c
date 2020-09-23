@@ -36,6 +36,7 @@
 //
 static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
     INCLUDE_PARAMS_OF_TRAP;
+    UNUSED(ARG(result));
 
     if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(code)))
         return VOID_VALUE;
@@ -53,6 +54,8 @@ static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
 //          [<opt> error!]
 //      code "Code to execute and monitor"
 //          [block! action!]
+//      /result "The optional output result of the evaluation"
+//          [<output>]
 //  ]
 //
 REBNATIVE(trap)
@@ -61,8 +64,11 @@ REBNATIVE(trap)
 
     REBVAL *error = rebRescue(cast(REBDNG*, &Trap_Dangerous), frame_);
     UNUSED(ARG(code)); // gets used by the above call, via the frame_ pointer
-    if (not error)
+    if (not error) {
+        if (REF(result))
+            rebElide(NATIVE_VAL(set), rebQ(REF(result)), rebQ(D_OUT), rebEND);
         return nullptr; // code didn't fail() or throw
+    }
 
     if (IS_VOID(error)) // signal used to indicate a throw
         return R_THROWN;

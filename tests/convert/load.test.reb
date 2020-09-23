@@ -41,6 +41,6 @@
         error? trap [load "[a>]"]
         error? trap [load "[a+<]"]
         error? trap [load "[1<]"]
-        error? trap [load "[+<]"]
+        error? trap [load "[+a<]"]
     ]
 )]

@@ -83,3 +83,19 @@
 [#851
     (null? attempt [catch/quit [] fail make error! ""])
 ]
+
+; Multiple return values
+(
+    [c v]: catch [throw 304]
+    did all [
+        c = 304
+        undefined? 'v
+    ]
+)
+(
+    [c v]: catch [10 + 20]
+    did all [
+        null? c
+        v = 30
+    ]
+)

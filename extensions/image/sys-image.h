@@ -37,7 +37,7 @@ extern REBTYP* EG_Image_Type;
 
 inline static REBVAL *VAL_IMAGE_BIN(const REBCEL *v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
-    return KNOWN(ARR_SINGLE(ARR(PAYLOAD(Any, v).first.node)));
+    return SPECIFIC(ARR_SINGLE(ARR(PAYLOAD(Any, v).first.node)));
 }
 
 #define VAL_IMAGE_WIDTH(v) \
@@ -48,7 +48,7 @@ inline static REBVAL *VAL_IMAGE_BIN(const REBCEL *v) {
 
 inline static REBYTE *VAL_IMAGE_HEAD(const REBCEL *v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
-    return SER_DATA_RAW(VAL_BINARY(VAL_IMAGE_BIN(v)));
+    return SER_DATA(VAL_BINARY(VAL_IMAGE_BIN(v)));
 }
 
 inline static REBYTE *VAL_IMAGE_AT_HEAD(const REBCEL *v, REBLEN pos) {
@@ -106,7 +106,7 @@ inline static REBVAL *Init_Image(
 
     assert(VAL_IMAGE_POS(out) == 0);  // !!! sketchy concept, is in BINARY!
 
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 inline static void RESET_IMAGE(REBYTE *p, REBLEN num_pixels) {
@@ -130,7 +130,7 @@ inline static REBVAL *Init_Image_Black_Opaque(RELVAL *out, REBLEN w, REBLEN h)
     TERM_SERIES(bin);
     Manage_Series(bin);
 
-    RESET_IMAGE(SER_DATA_RAW(bin), (w * h));  // length in 'pixels'
+    RESET_IMAGE(SER_DATA(bin), (w * h));  // length in 'pixels'
 
     return Init_Image(out, bin, w, h);
 }

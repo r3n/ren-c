@@ -313,6 +313,15 @@ inline static REBTYP *CELL_CUSTOM_TYPE(const REBCEL *v) {
     return SER(EXTRA(Any, v).node);
 }
 
+// Sometimes you have a REBCEL* and need to pass a REBVAL* to something.  It
+// doesn't seem there's too much bad that can happen if you do; you'll get
+// back something that might be quoted up to 3 levels...if it's an escaped
+// cell then it won't be quoted at all.  Main thing to know is that you don't
+// necessarily get the original value you had back.
+//
+inline static const RELVAL* CELL_TO_VAL(const REBCEL* cell)
+  { return cast(const RELVAL*, cell); }
+
 
 //=//// VALUE TYPE (always REB_XXX <= REB_MAX) ////////////////////////////=//
 //
@@ -717,27 +726,32 @@ inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
     return ACT(EXTRA(Binding, v).node);
 }
 
-
-// When you have a RELVAL* (e.g. from a REBARR) that you "know" to be specific,
-// the KNOWN macro can be used for that.  Checks to make sure in debug build.
+// When you have a RELVAL* (e.g. from a REBARR) that you KNOW to be specific,
+// you might be bothered by an error like:
 //
-// Use for: "invalid conversion from 'Reb_Value*' to 'Reb_Specific_Value*'"
+//     "invalid conversion from 'Reb_Value*' to 'Reb_Specific_Value*'"
+//
+// You can use SPECIFIC to cast it if you are *sure* that it has been
+// derelativized -or- is a value type that doesn't have a specifier (e.g. an
+// integer).  If the value is actually relative, this will assert at runtime!
 
-#if !defined(__cplusplus) // poorer protection in C, loses constness
-    inline static REBVAL *KNOWN(const REBCEL *v) {
-        assert(IS_END(v) or IS_SPECIFIC(v));
-        return m_cast(REBVAL*, c_cast(REBCEL*, v));
-    }
-#else
-    inline static const REBVAL *KNOWN(const REBCEL *v) {
-        assert(IS_END(v) or IS_SPECIFIC(v)); // END for KNOWN(ARR_HEAD()), etc.
+inline static REBVAL *SPECIFIC(const_if_c REBCEL *v) {
+    //
+    // Note: END is tolerated to help in specified array enumerations, e.g.
+    //
+    //     REBVAL *head = SPECIFIC(ARR_HEAD(specified_array));  // may be end
+    //
+    assert(IS_END(v) or IS_SPECIFIC(v));
+    return m_cast(REBVAL*, cast(const REBVAL*, v));
+}
+
+#if defined(__cplusplus)
+    inline static const REBVAL *SPECIFIC(const REBCEL *v) {
+        assert(IS_END(v) or IS_SPECIFIC(v));  // ^-- see note about END
         return cast(const REBVAL*, v);
     }
 
-    inline static REBVAL *KNOWN(REBCEL *v) {
-        assert(IS_END(v) or IS_SPECIFIC(v)); // END for KNOWN(ARR_HEAD()), etc.
-        return cast(REBVAL*, v);
-    }
+    inline static REBVAL *SPECIFIC(const REBVAL *v) = delete;
 #endif
 
 
@@ -778,10 +792,10 @@ inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
 //
 
 #define SPECIFIED \
-    cast(REBSPC*, 0) // cast() doesn't like nullptr, fix
+    ((REBSPC*)nullptr)  // cast() doesn't like nullptr, fix
 
 #define UNBOUND \
-   cast(REBNOD*, 0) // cast() doesn't like nullptr, fix
+   ((REBNOD*)nullptr)  // cast() doesn't like nullptr, fix
 
 inline static REBNOD *VAL_BINDING(const REBCEL *v) {
     assert(Is_Bindable(v));
@@ -857,7 +871,7 @@ inline static REBVAL *Move_Value(RELVAL *out, const REBVAL *v)
     else
         out->extra = v->extra; // extra isn't a binding (INTEGER! MONEY!...)
 
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 
@@ -877,7 +891,7 @@ inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
     out->header.bits |= (
         v->header.bits & (CELL_FLAG_ARG_MARKED_CHECKED)
     );
-    return KNOWN(out);
+    return SPECIFIC(out);
 }
 
 

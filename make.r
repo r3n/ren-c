@@ -187,6 +187,12 @@ gen-obj: func [
     ;
     append flags <msc:/wd4574>
 
+    ; There's a warning on reinterpret_cast between related classes, trying to
+    ; suggest you use static_cast instead.  This complicates the `cast` macro
+    ; tricks, which just use reinterpret_cast.
+    ;
+    append flags <msc:/wd4946>
+
     if block? s [
         for-each flag next s [
             switch flag [

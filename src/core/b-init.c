@@ -45,13 +45,13 @@
 
 
 //
-//  Ensure_Basics: C
+//  Check_Basics: C
 //
 // Initially these checks were in the debug build only.  However, they are so
 // foundational that it's probably worth getting a coherent crash in any build
 // where these tests don't work.
 //
-static void Ensure_Basics(void)
+static void Check_Basics(void)
 {
     //=//// CHECK REBVAL SIZE ////////////////////////////////////////////=//
 
@@ -251,68 +251,12 @@ REBNATIVE(generic)
 }
 
 
-//
-//  Add_Lib_Keys_For_Unscannable_Set_Words: C
-//
-// In order for the bootstrap to assign values to library words, they have to
-// exist in the bootstrap context.  The way they get into the context is by
-// a scan for top-level SET-WORD!s in the %sys-xxx.r and %mezz-xxx.r files.
-//
-// ...BUT, R3-Alpha didn't resolve how to make get the SET-WORD! versions of
-// things like `<:`.  There is contention with scan patterns for tags that
-// were never reconciled.  So long as they can't be scanned as SET-WORD!,
-// they have to be put into the lib context manually.
-//
-// !!! Now that %base-xxx.r and %mezz-xxx.r aren't actually LOAD-ed by the
-// bootstrapping executable (they are just READ and have their text munged
-// by PARSE), this really isn't a bootstrap limitiation.  As soon as the
-// scanner is fixed to make SET-WORD!s for things, the entry in this table
-// isn't needed...no need to update the bootstrap executable.
-//
-static void Add_Lib_Keys_For_Unscannable_Set_Words(void)
-{
-    const char *names[] = {
-        "<",
-        ">",
-
-        "<=",  // less than or equal !!! https://forum.rebol.info/t/349/11
-        // `=>:` actually works as a SET-WORD!, used for lambda functions
-
-        ">=",  // greater than or equal to
-        "=<",  // equal to or less than
-
-        "<>",  // not equal (the chosen meaning, as opposed to "empty tag")
-
-        // https://forum.rebol.info/t/1039
-        "->",  // enfix path op, "SHOVE": https://trello.com/c/Kg9A45b5
-        "<-",  // "SHOVE" variation
-
-        "|>",  // Evaluate to next single expression, but do ones afterward
-        "<|",  // Evaluate to previous expression, but do rest (like ALSO)
-
-        nullptr
-    };
-
-    REBLEN i;
-    for (i = 0; names[i] != NULL; ++i) {
-        REBSTR *str = Intern_UTF8_Managed(
-            cb_cast(names[i]),
-            strsize(names[i])
-        );
-        REBVAL *val = Append_Context(Lib_Context, NULL, str);
-        assert(IS_VOID(val));
-        UNUSED(val);
-    }
-}
-
-
 static REBVAL *Make_Locked_Tag(const char *utf8) { // helper
     REBVAL *t = rebText(utf8);
     mutable_KIND_BYTE(t) = REB_TAG;
     mutable_MIRROR_BYTE(t) = REB_TAG;
 
-    REBSER *locker = nullptr;
-    Ensure_Value_Frozen(t, locker);
+    Force_Value_Frozen_Deep(t);
     return t;
 }
 
@@ -388,9 +332,7 @@ static void Init_Action_Meta_Shim(void) {
     TYPE_SET(CTX_KEY(meta, 1), REB_TS_HIDDEN);  // hide self
 
     Root_Action_Meta = Init_Object(Alloc_Value(), meta);
-
-    REBSER *locker = nullptr;
-    Ensure_Value_Frozen(Root_Action_Meta, locker);
+    Force_Value_Frozen_Deep(Root_Action_Meta);
 
 }
 
@@ -436,7 +378,7 @@ REBVAL *Make_Native(
     if (not IS_SET_WORD(*item))
         panic (*item);
 
-    REBVAL *name = KNOWN(*item);
+    REBVAL *name = SPECIFIC(*item);
     ++*item;
 
     bool enfix;
@@ -470,7 +412,7 @@ REBVAL *Make_Native(
     }
     ++*item;
 
-    REBVAL *spec = KNOWN(*item);
+    REBVAL *spec = SPECIFIC(*item);
     ++*item;
     if (not IS_BLOCK(spec))
         panic (spec);
@@ -480,7 +422,7 @@ REBVAL *Make_Native(
     // table built in the bootstrap scripts, `Native_C_Funcs`.
 
     REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
-        KNOWN(spec),
+        spec,
         MKF_KEYWORDS | MKF_RETURN  // return type checked only in debug build
     );
 
@@ -573,7 +515,7 @@ static REBARR *Startup_Natives(const REBVAL *boot_natives)
         if (n >= Num_Natives)
             panic (item);
 
-        REBVAL *name = KNOWN(item);
+        REBVAL *name = SPECIFIC(item);
         assert(IS_SET_WORD(name));
 
         REBVAL *native = Make_Native(
@@ -686,7 +628,7 @@ static void Startup_End_Node(void)
 static void Startup_Empty_Array(void)
 {
     PG_Empty_Array = Make_Array_Core(0, NODE_FLAG_MANAGED);
-    SET_SERIES_INFO(PG_Empty_Array, FROZEN);
+    Freeze_Array_Deep(PG_Empty_Array);
 
     // "Empty" PATH!s that look like `/` are actually a WORD! cell format
     // under the hood.  This allows them to have bindings and do double-duty
@@ -698,7 +640,7 @@ static void Startup_Empty_Array(void)
     Init_Blank(ARR_AT(a, 0));
     Init_Blank(ARR_AT(a, 1));
     TERM_ARRAY_LEN(a, 2);
-    SET_SERIES_INFO(a, FROZEN);
+    Freeze_Array_Deep(a);
     PG_2_Blanks_Array = a;
   }
 }
@@ -747,15 +689,13 @@ static void Init_Root_Vars(void)
 
     RESET_CELL(Prep_Cell(&PG_R_Reference), REB_R_REFERENCE, CELL_MASK_NONE);
 
-    REBSER *locker = nullptr;
-
     Root_Empty_Block = Init_Block(Alloc_Value(), PG_Empty_Array);
-    Ensure_Value_Frozen(Root_Empty_Block, locker);
+    Force_Value_Frozen_Deep(Root_Empty_Block);
 
     // Note: has to be a BLOCK!, 2-element blank paths use SYM__SLASH_1_
     //
     Root_2_Blanks_Block = Init_Block(Alloc_Value(), PG_2_Blanks_Array);
-    Ensure_Value_Frozen(Root_2_Blanks_Block, locker);
+    Force_Value_Frozen_Deep(Root_2_Blanks_Block);
 
     // Note: rebText() can't run yet, review.
     //
@@ -769,10 +709,10 @@ static void Init_Root_Vars(void)
   #endif
 
     Root_Empty_Text = Init_Text(Alloc_Value(), nulled_uni);
-    Ensure_Value_Frozen(Root_Empty_Text, locker);
+    Force_Value_Frozen_Deep(Root_Empty_Text);
 
     Root_Empty_Binary = Init_Binary(Alloc_Value(), Make_Binary(0));
-    Ensure_Value_Frozen(Root_Empty_Binary, locker);
+    Force_Value_Frozen_Deep(Root_Empty_Binary);
 
     Root_Space_Char = rebChar(' ');
     Root_Newline_Char = rebChar('\n');
@@ -1136,7 +1076,7 @@ static REBVAL *Startup_Mezzanine(BOOT_BLK *boot)
         result,
         true, // fully = true (error if all arguments aren't consumed)
         rebU(finish_init), // %sys-start.r function to call
-        KNOWN(&boot->mezz), // boot-mezz argument
+        SPECIFIC(&boot->mezz), // boot-mezz argument
         rebEND
     )){
         fail (Error_No_Catch_For_Throw(result));
@@ -1228,7 +1168,7 @@ void Startup_Core(void)
     CLEAR(Reb_Opts, sizeof(REB_OPTS));
     Saved_State = NULL;
 
-    Ensure_Basics();
+    Check_Basics();
 
 //=//// INITIALIZE MEMORY AND ALLOCATORS //////////////////////////////////=//
 
@@ -1338,7 +1278,6 @@ void Startup_Core(void)
     Startup_Typesets();
 
     Startup_True_And_False();
-    Add_Lib_Keys_For_Unscannable_Set_Words();
 
 //=//// RUN CODE BEFORE ERROR HANDLING INITIALIZED ////////////////////////=//
 
@@ -1352,23 +1291,23 @@ void Startup_Core(void)
     // boot->natives is from the automatically gathered list of natives found
     // by scanning comments in the C sources for `native: ...` declarations.
     //
-    REBARR *natives_catalog = Startup_Natives(KNOWN(&boot->natives));
+    REBARR *natives_catalog = Startup_Natives(SPECIFIC(&boot->natives));
     Manage_Array(natives_catalog);
     PUSH_GC_GUARD(natives_catalog);
 
     // boot->generics is the list in %generics.r
     //
-    REBARR *generics_catalog = Startup_Generics(KNOWN(&boot->generics));
+    REBARR *generics_catalog = Startup_Generics(SPECIFIC(&boot->generics));
     Manage_Array(generics_catalog);
     PUSH_GC_GUARD(generics_catalog);
 
     // boot->errors is the error definition list from %errors.r
     //
-    REBCTX *errors_catalog = Startup_Errors(KNOWN(&boot->errors));
+    REBCTX *errors_catalog = Startup_Errors(SPECIFIC(&boot->errors));
     PUSH_GC_GUARD(errors_catalog);
 
     Init_System_Object(
-        KNOWN(&boot->sysobj),
+        SPECIFIC(&boot->sysobj),
         datatypes_catalog,
         natives_catalog,
         generics_catalog,

@@ -43,7 +43,7 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     if (path == NULL)
         fail (Error_Invalid_Spec_Raw(spec));
 
-    REBREQ *serial = Ensure_Port_State(port, &Dev_Serial);
+    REBREQ *serial = Force_Get_Port_State(port, &Dev_Serial);
     struct rebol_devreq *req = Req(serial);
 
     // Actions for an unopened serial port:

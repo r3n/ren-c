@@ -54,21 +54,30 @@ struct Reb_Context {
 
 #else
 
-    template<typename T>
-    inline static REBCTX *CTX(T *p) {
-        constexpr bool derived = std::is_same<T, REBCTX>::value;
+    template <
+        typename T,
+        typename T0 = typename std::remove_const<T>::type,
+        typename C = typename std::conditional<
+            std::is_const<T>::value,  // boolean
+            const REBCTX,  // true branch
+            REBCTX  // false branch
+        >::type
+    >
+    inline static C *CTX(T *p) {
+        constexpr bool derived = std::is_same<T0, REBCTX>::value;
 
-        constexpr bool base = std::is_same<T, void>::value
-            or std::is_same<T, REBNOD>::value
-            or std::is_same<T, REBSER>::value
-            or std::is_same<T, REBARR>::value;
+        constexpr bool base = std::is_same<T0, void>::value
+            or std::is_same<T0, REBNOD>::value
+            or std::is_same<T0, REBSER>::value
+            or std::is_same<T0, REBARR>::value;
 
         static_assert(
             derived or base,
             "CTX() works on REBNOD/REBSER/REBARR/REBCTX"
         );
 
-        if (base and (reinterpret_cast<REBNOD*>(p)->header.bits & (
+        bool b = base;  // needed to avoid compiler constexpr warning
+        if (b and p and (reinterpret_cast<const REBNOD*>(p)->header.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
                 | ARRAY_FLAG_IS_VARLIST
                 | ARRAY_FLAG_IS_PARAMLIST
@@ -80,7 +89,7 @@ struct Reb_Context {
             panic (p);
         }
 
-        return reinterpret_cast<REBCTX*>(p);
+        return reinterpret_cast<C*>(p);
     }
 
 #endif

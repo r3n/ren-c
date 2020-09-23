@@ -149,10 +149,8 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
         // Since PROTECT/HIDE is something of an esoteric feature, keep it
         // that way for now, even though it means the keylist has to be
         // made unique.
-        //
-        Ensure_Keylist_Unique_Invalidated(context);
 
-        REBVAL *key = CTX_KEY(context, index);
+        REBVAL *key = CTX_KEY(Force_Keylist_Unique(context), index);
 
         if (flags & PROT_SET) {
             TYPE_SET(key, REB_TS_HIDDEN);
@@ -194,8 +192,9 @@ void Protect_Series(REBSER *s, REBLEN index, REBFLGS flags)
 
     if (flags & PROT_SET) {
         if (flags & PROT_FREEZE) {
-            assert(flags & PROT_DEEP);
-            SET_SERIES_INFO(s, FROZEN);
+            if (flags & PROT_DEEP)
+                SET_SERIES_INFO(s, FROZEN_DEEP);
+            SET_SERIES_INFO(s, FROZEN_SHALLOW);
         }
         else
             SET_SERIES_INFO(s, PROTECTED);
@@ -228,8 +227,9 @@ void Protect_Context(REBCTX *c, REBFLGS flags)
 
     if (flags & PROT_SET) {
         if (flags & PROT_FREEZE) {
-            assert(flags & PROT_DEEP);
-            SET_SERIES_INFO(c, FROZEN);
+            if (flags & PROT_DEEP)
+                SET_SERIES_INFO(c, FROZEN_DEEP);
+            SET_SERIES_INFO(c, FROZEN_SHALLOW);
         }
         else
             SET_SERIES_INFO(c, PROTECTED);
@@ -444,14 +444,14 @@ REBNATIVE(unprotect)
 
 
 //
-//  Is_Value_Frozen: C
+//  Is_Value_Frozen_Deep: C
 //
 // "Frozen" is a stronger term here than "Immutable".  Mutable refers to the
 // mutable/const distinction, where a value being immutable doesn't mean its
 // series will never change in the future.  The frozen requirement is needed
 // in order to do things like use blocks as map keys, etc.
 //
-bool Is_Value_Frozen(const RELVAL *v) {
+bool Is_Value_Frozen_Deep(const RELVAL *v) {
     const REBCEL *cell = VAL_UNESCAPED(v);
     UNUSED(v); // debug build trashes, to avoid accidental usage below
 
@@ -466,10 +466,10 @@ bool Is_Value_Frozen(const RELVAL *v) {
     }
 
     if (ANY_ARRAY_OR_PATH_KIND(kind))
-        return Is_Array_Deeply_Frozen(VAL_ARRAY(cell));
+        return Is_Array_Frozen_Deep(VAL_ARRAY(cell));
 
     if (ANY_CONTEXT_KIND(kind))
-        return Is_Context_Deeply_Frozen(VAL_CONTEXT(cell));
+        return Is_Context_Frozen_Deep(VAL_CONTEXT(cell));
 
     if (ANY_SERIES_KIND(kind))
         return Is_Series_Frozen(VAL_SERIES(cell));
@@ -491,12 +491,12 @@ REBNATIVE(locked_q)
 {
     INCLUDE_PARAMS_OF_LOCKED_Q;
 
-    return Init_Logic(D_OUT, Is_Value_Frozen(ARG(value)));
+    return Init_Logic(D_OUT, Is_Value_Frozen_Deep(ARG(value)));
 }
 
 
 //
-//  Ensure_Value_Frozen: C
+//  Force_Value_Frozen: C
 //
 // !!! The concept behind `opt_locker` is that it might be able to give the
 // user more information about why data would be automatically locked, e.g.
@@ -505,25 +505,36 @@ REBNATIVE(locked_q)
 // moment, etc.  Just put a flag at the top level for now, since that is
 // "better than nothing", and revisit later in the design.
 //
-void Ensure_Value_Frozen(const RELVAL *v, REBSER *opt_locker) {
-    if (Is_Value_Frozen(v))
+void Force_Value_Frozen_Core(
+    const RELVAL *v,
+    bool deep,
+    REBSER *opt_locker
+){
+    if (Is_Value_Frozen_Deep(v))
         return;
 
     const REBCEL *cell = VAL_UNESCAPED(v);
     enum Reb_Kind kind = CELL_KIND(cell);
 
-    if (ANY_ARRAY_OR_PATH_KIND(kind)) {
-        Deep_Freeze_Array(VAL_ARRAY(cell));
+    if (ANY_ARRAY_KIND(kind)) {
+        if (deep)
+            Freeze_Array_Deep(VAL_ARRAY(cell));
+        else
+            Freeze_Array_Shallow(VAL_ARRAY(cell));
         if (opt_locker)
             SET_SERIES_INFO(VAL_ARRAY(cell), AUTO_LOCKED);
     }
     else if (ANY_CONTEXT_KIND(kind)) {
-        Deep_Freeze_Context(VAL_CONTEXT(cell));
+        if (deep)
+            Deep_Freeze_Context(VAL_CONTEXT(cell));
+        else
+            fail ("What does a shallow freeze of a context mean?");
         if (opt_locker)
             SET_SERIES_INFO(VAL_CONTEXT(cell), AUTO_LOCKED);
     }
     else if (ANY_SERIES_KIND(kind)) {
         Freeze_Sequence(VAL_SERIES(cell));
+        UNUSED(deep);
         if (opt_locker)
             SET_SERIES_INFO(VAL_SERIES(cell), AUTO_LOCKED);
     } else
@@ -532,77 +543,29 @@ void Ensure_Value_Frozen(const RELVAL *v, REBSER *opt_locker) {
 
 
 //
-//  lock: native [
+//  freeze: native [
 //
 //  {Permanently lock values (if applicable) so they can be immutably shared.}
 //
-//      value [any-value!]
-//          {Value to lock (will be locked deeply if an ANY-ARRAY!)}
-//      /clone
-//          {Will lock a clone of the original (if not already immutable)}
+//      value "Value to make permanently immutable"
+//          [any-value!]
+//      /deep "Freeze deeply"
+//  ;   /blame "What to report as source of lock in error"
+//  ;       [any-series!]  ; not exposed for the moment
 //  ]
 //
-REBNATIVE(lock)
-//
-// !!! COPY in Rebol truncates before the index.  You can't `y: copy next x`
-// and then `first back y` to get at a copy of the the original `first x`.
-//
-// This locking operation is opportunistic in terms of whether it actually
-// copies the data or not.  But if it did just a normal COPY, it'd truncate,
-// while if it just passes the value through it does not truncate.  So
-// `lock/copy x` wouldn't be semantically equivalent to `lock copy x` :-/
-//
-// So the strategy here is to go with a different option, CLONE.  CLONE was
-// already being considered as an operation due to complaints about backward
-// compatibility if COPY were changed to /DEEP by default.
-//
-// The "freezing" bit can only be used on deep copies, so it would not make
-// sense to use with a shallow one.  However, a truncating COPY/DEEP could
-// be made to have a version operating on read only data that reused a
-// subset of the data.  This would use a "slice"; letting one series refer
-// into another, with a different starting point.  That would complicate the
-// garbage collector because multiple REBSER would be referring into the same
-// data.  So that's a possibility.
+REBNATIVE(freeze)
 {
-    INCLUDE_PARAMS_OF_LOCK;
+    INCLUDE_PARAMS_OF_FREEZE;
 
-    REBVAL *v = ARG(value);
+    // REF(blame) is not exposed as a feature because there's nowhere to store
+    // locking information in the series.  So the only thing that happens if
+    // you pass in something other than null is SERIES_FLAG_AUTO_LOCKED is set
+    // to deliver a message that the system locked something implicitly.  We
+    // don't want to say that here, so hold off on the feature.
+    //
+    REBSER *locker = nullptr;
+    Force_Value_Frozen_Core(ARG(value), did REF(deep), locker);
 
-    if (!REF(clone))
-        Move_Value(D_OUT, v);
-    else {
-        if (ANY_ARRAY_OR_PATH(v)) {
-            Init_Any_Array_At(
-                D_OUT,
-                VAL_TYPE(v),
-                Copy_Array_Deep_Managed(
-                    VAL_ARRAY(v),
-                    VAL_SPECIFIER(v)
-                ),
-                VAL_INDEX(v)
-            );
-        }
-        else if (ANY_CONTEXT(v)) {
-            Init_Any_Context(
-                D_OUT,
-                VAL_TYPE(v),
-                Copy_Context_Core_Managed(VAL_CONTEXT(v), TS_STD_SERIES)
-            );
-        }
-        else if (ANY_SERIES(v)) {
-            Init_Any_Series_At(
-                D_OUT,
-                VAL_TYPE(v),
-                Copy_Sequence_Core(VAL_SERIES(v), NODE_FLAG_MANAGED),
-                VAL_INDEX(v)
-            );
-        }
-        else
-            fail (Error_Invalid_Type(VAL_TYPE(v))); // not yet implemented
-    }
-
-    REBSER *locker = NULL;
-    Ensure_Value_Frozen(D_OUT, locker);
-
-    return D_OUT;
+    RETURN (ARG(value));
 }

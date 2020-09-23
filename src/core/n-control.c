@@ -254,7 +254,7 @@ inline static bool Single_Test_Throws(
         bool threw = RunQ_Throws(
             temp,
             true,  // `fully` (ensure argument consumed)
-            rebU(KNOWN(test)),
+            rebU(SPECIFIC(test)),
             NULLIFY_NULLED(arg_specified),  // nulled cells to nullptr for API
             rebEND
         );
@@ -737,7 +737,7 @@ REBNATIVE(non)
         if (IS_VOID(value))
             fail ("NON expected value to not be VOID!, but it was");
     }
-    else if (not TYPE_CHECK(value, VAL_TYPE_KIND(test))) {
+    else if (TYPE_CHECK(value, VAL_TYPE_KIND(test))) {
         fail ("NON expected value to not match a type, but it did match");
     }
 
@@ -994,7 +994,7 @@ REBNATIVE(case)
         }
         else if (IS_ACTION(*v)) {
             DECLARE_LOCAL (temp);
-            if (Do_Branch_With_Throws(temp, nullptr, KNOWN(*v), D_OUT)) {
+            if (Do_Branch_With_Throws(temp, nullptr, SPECIFIC(*v), D_OUT)) {
                 Move_Value(D_OUT, temp);
                 goto threw;
             }
@@ -1180,7 +1180,7 @@ REBNATIVE(switch)
                 if (RunQ_Throws(
                     temp,
                     false,  // fully = false, e.g. arity-0 functions are ok
-                    rebU(KNOWN(*v)),  // actions don't need specifiers
+                    rebU(SPECIFIC(*v)),  // actions don't need specifiers
                     D_OUT,
                     rebEND
                 )){
@@ -1310,6 +1310,7 @@ REBNATIVE(default)
                 }
             }
             TERM_ARRAY_LEN(composed, VAL_LEN_AT(target));
+            Freeze_Array_Shallow(composed);
             Init_Any_Path(target, REB_SET_PATH, composed);
         }
 
@@ -1367,6 +1368,8 @@ REBNATIVE(default)
 //          [<opt> any-value!]
 //      block "Block to evaluate"
 //          [block!]
+//      /result "Evaluation result if not thrown"
+//          [<output>]
 //      /name "Catches a named throw (single name if not block)"
 //          [block! word! action! object!]
 //      /quit "Special catch for QUIT native"
@@ -1386,8 +1389,14 @@ REBNATIVE(catch)
     if (REF(any) and REF(name))
         fail (Error_Bad_Refines_Raw());
 
-    if (not Do_Any_Array_At_Throws(D_OUT, ARG(block), SPECIFIED))
-        return nullptr; // no throw means just return null
+    if (not Do_Any_Array_At_Throws(D_OUT, ARG(block), SPECIFIED)) {
+        if (REF(result))
+            rebElide(
+                NATIVE_VAL(set), rebQ(REF(result)), rebQ(D_OUT),
+            rebEND);
+
+        return nullptr;  // no throw means just return null
+    }
 
     const REBVAL *label = VAL_THROWN_LABEL(D_OUT);
 

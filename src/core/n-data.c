@@ -575,7 +575,7 @@ REBNATIVE(get)
     }
 
     REBARR *results = Make_Array(VAL_LEN_AT(source));
-    REBVAL *dest = KNOWN(ARR_HEAD(results));
+    REBVAL *dest = SPECIFIC(ARR_HEAD(results));
     RELVAL *item = VAL_ARRAY_AT(source);
 
     for (; NOT_END(item); ++item, ++dest) {
@@ -960,7 +960,7 @@ REBNATIVE(free)
     REBSER *s = VAL_SERIES(v);
     if (GET_SERIES_INFO(s, INACCESSIBLE))
         fail ("Cannot FREE already freed series");
-    FAIL_IF_READ_ONLY(v);
+    ENSURE_MUTABLE(v);
 
     Decay_Series(s);
     return Init_Void(D_OUT); // !!! Should it return the freed, not-useful value?
@@ -1165,7 +1165,7 @@ REBNATIVE(as)
             // freeze deeply and anyone who doesn't like the effect can use
             // TO PATH! and accept the copying.
             //
-            Deep_Freeze_Array(VAL_ARRAY(v));
+            Freeze_Array_Deep(VAL_ARRAY(v));
             break;
         }
 
