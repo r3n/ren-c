@@ -799,12 +799,12 @@ static REBCTX *Error_Mismatch(SCAN_LEVEL *level, char wanted, char seen) {
 // GET_LEX_CLASS(ss->begin[0]).  Fingerprinting just helps accelerate further
 // categorization.
 //
-static REBLEN Prescan_Token(SCAN_STATE *ss)
+static LEXFLAGS Prescan_Token(SCAN_STATE *ss)
 {
     assert(IS_POINTER_TRASH_DEBUG(ss->end));  // prescan only uses ->begin
 
     const REBYTE *cp = ss->begin;
-    REBLEN flags = 0;
+    LEXFLAGS flags = 0;  // flags for all LEX_SPECIALs seen after ss->begin[0]
 
     while (IS_LEX_SPACE(*cp))  // skip whitespace (if any)
         ++cp;
@@ -1025,7 +1025,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
          }
     }
 
-    REBLEN flags = Prescan_Token(ss);  // sets ->begin, ->end
+    LEXFLAGS flags = Prescan_Token(ss);  // sets ->begin, ->end
 
     const REBYTE *cp = ss->begin;
 

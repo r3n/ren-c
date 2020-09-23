@@ -251,61 +251,6 @@ REBNATIVE(generic)
 }
 
 
-//
-//  Add_Lib_Keys_For_Unscannable_Set_Words: C
-//
-// In order for the bootstrap to assign values to library words, they have to
-// exist in the bootstrap context.  The way they get into the context is by
-// a scan for top-level SET-WORD!s in the %sys-xxx.r and %mezz-xxx.r files.
-//
-// ...BUT, R3-Alpha didn't resolve how to make get the SET-WORD! versions of
-// things like `<:`.  There is contention with scan patterns for tags that
-// were never reconciled.  So long as they can't be scanned as SET-WORD!,
-// they have to be put into the lib context manually.
-//
-// !!! Now that %base-xxx.r and %mezz-xxx.r aren't actually LOAD-ed by the
-// bootstrapping executable (they are just READ and have their text munged
-// by PARSE), this really isn't a bootstrap limitiation.  As soon as the
-// scanner is fixed to make SET-WORD!s for things, the entry in this table
-// isn't needed...no need to update the bootstrap executable.
-//
-static void Add_Lib_Keys_For_Unscannable_Set_Words(void)
-{
-    const char *names[] = {
-        "<",
-        ">",
-
-        "<=",  // less than or equal !!! https://forum.rebol.info/t/349/11
-        // `=>:` actually works as a SET-WORD!, used for lambda functions
-
-        ">=",  // greater than or equal to
-        "=<",  // equal to or less than
-
-        "<>",  // not equal (the chosen meaning, as opposed to "empty tag")
-
-        // https://forum.rebol.info/t/1039
-        "->",  // enfix path op, "SHOVE": https://trello.com/c/Kg9A45b5
-        "<-",  // "SHOVE" variation
-
-        "|>",  // Evaluate to next single expression, but do ones afterward
-        "<|",  // Evaluate to previous expression, but do rest (like ALSO)
-
-        nullptr
-    };
-
-    REBLEN i;
-    for (i = 0; names[i] != NULL; ++i) {
-        REBSTR *str = Intern_UTF8_Managed(
-            cb_cast(names[i]),
-            strsize(names[i])
-        );
-        REBVAL *val = Append_Context(Lib_Context, NULL, str);
-        assert(IS_VOID(val));
-        UNUSED(val);
-    }
-}
-
-
 static REBVAL *Make_Locked_Tag(const char *utf8) { // helper
     REBVAL *t = rebText(utf8);
     mutable_KIND_BYTE(t) = REB_TAG;
@@ -1333,7 +1278,6 @@ void Startup_Core(void)
     Startup_Typesets();
 
     Startup_True_And_False();
-    Add_Lib_Keys_For_Unscannable_Set_Words();
 
 //=//// RUN CODE BEFORE ERROR HANDLING INITIALIZED ////////////////////////=//
 

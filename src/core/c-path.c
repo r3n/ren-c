@@ -712,58 +712,6 @@ REBNATIVE(poke)
 
 
 //
-//  -slash-1-: enfix native [
-//
-//  {Default implementation for `/` in the evaluator}
-//
-//      left [<opt> any-value!]
-//      right [<opt> any-value!]
-//  ]
-//
-REBNATIVE(_slash_1_)
-//
-// It's very desirable to have `/`, `/foo`, `/foo/`, `/foo/(bar)` etc. be
-// instances of the same datatype of PATH!.  In this scheme, `/` would act
-// like a "root path" and be achieved with `to path! [_ _]`.
-//
-// But with limited ASCII symbols, there is strong demand for `/` to be able
-// to act like division in evaluative contexts, or to be overrideable for
-// other things in a way not too dissimilar from `+`.
-//
-// The compromise used is to make `/` be a cell whose VAL_TYPE() is REB_PATH,
-// but whose CELL_KIND() is REB_WORD with the special spelling `-1-SLASH-`.
-// Binding mechanics and evaluator behavior are based on this unusual name.
-// But when inspected by the user, it appears to be a PATH! with 2 blanks.
-//
-// This duality is imperfect, as any routine with semantics like COLLECT-WORDS
-// would have to specifically account for it, or just see an empty path.
-// But it is intended to give some ability to configure the behavior easily.
-{
-    INCLUDE_PARAMS_OF__SLASH_1_;
-
-    REBVAL *left = ARG(left);
-    REBVAL *right = ARG(right);
-
-    // !!! Somewhat whimsically, this goes ahead and guesses at a possible
-    // behavior for "dividing" strings using SPLIT.  This is a placeholder
-    // for the idea that the left hand type gets to dispatch a choice of
-    // what it means, as with ordinary path dispatch.
-    //
-    // Uses the /INTO refinement so that `"abcdef" / 2` divides the string
-    // into two pieces, as opposed to pieces of length 2.
-    //
-    if (ANY_STRING(left) or ANY_ARRAY(left))
-        return rebValueQ("split/into", left, right, rebEND);
-
-    // Note: DIVIDE is historically a "type action", so technically it is the
-    // left hand side type which gets to pick the behavior--consistent with
-    // the plan for how 0-length paths would work.
-    //
-    return rebValueQ("divide", left, right, rebEND);
-}
-
-
-//
 //  PD_Path: C
 //
 // A PATH! is not an array, but if it is implemented as one it may choose to
