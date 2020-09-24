@@ -287,7 +287,7 @@ pointfree: enclose (specialize* 'pointfree* [action: :void]) func* [f] [
 ]
 
 
-=>: enfixed lambda: func* [
+->: enfixed lambda: func* [
     {Convenience variadic wrapper for MAKE ACTION! or POINTFREE}
 
     return: [action!]

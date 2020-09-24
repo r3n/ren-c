@@ -1380,14 +1380,14 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         // Quotes from the right already "win" over quotes from the left, in
         // a case like `help left-quoter` where they point at teach other.
         // But there's also an issue where something sits between quoting
-        // constructs like the `[x]` in between the `else` and `=>`:
+        // constructs like the `[x]` in between the `else` and `->`:
         //
-        //     if condition [...] else [x] => [...]
+        //     if condition [...] else [x] -> [...]
         //
         // Here the neutral [x] is meant to be a left argument to the lambda,
         // producing the effect of:
         //
-        //     if condition [...] else ([x] => [...])
+        //     if condition [...] else ([x] -> [...])
         //
         // To get this effect, we need a different kind of deferment that
         // hops over a unit of material.  Soft quoting is unique in that it

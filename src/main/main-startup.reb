@@ -751,7 +751,7 @@ main-startup: function [
             do o/bin/rebol.reb
             append o/loaded o/bin/rebol.reb
             loud-print ["Finished evaluating script:" o/bin/rebol.reb]
-        ] then e => [
+        ] then e -> [
             die/error "Error found in rebol.reb script" e
         ]
     ]
@@ -769,7 +769,7 @@ main-startup: function [
             do o/resources/user.reb
             append o/loaded o/resources/user.reb
             loud-print ["Finished evaluating script:" o/resources/user.reb]
-        ] then e => [
+        ] then e -> [
             die/error "Error found in user.reb script" e
         ]
     ]

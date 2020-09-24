@@ -64,8 +64,7 @@ xor+: enfixed :difference
 =?: enfixed :same?
 
 
-
-=>: enfixed :lambda  ; quick function generator
+; Note: -> is defined enfix at lambda
 
 
 ; >- is the SHOVE operator.  It uses the item immediately to its left for

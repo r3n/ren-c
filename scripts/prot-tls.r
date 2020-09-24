@@ -222,11 +222,11 @@ emit: function [
 ; !!! These shorthands cover what's needed and are chosen to clearly separate
 ; the number of bytes from the number being encoded (both integers).
 ;
-to-1bin: (=> enbin [be + 1])
-to-2bin: (=> enbin [be + 2])
-to-3bin: (=> enbin [be + 3])
-to-4bin: (=> enbin [be + 4])
-to-8bin: (=> enbin [be + 8])
+to-1bin: (-> enbin [be + 1])
+to-2bin: (-> enbin [be + 2])
+to-3bin: (-> enbin [be + 3])
+to-4bin: (-> enbin [be + 4])
+to-8bin: (-> enbin [be + 8])
 
 make-tls-error: func [
     message [text! block!]

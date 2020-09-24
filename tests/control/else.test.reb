@@ -48,18 +48,18 @@
 
 ; Hard quotes need to account for enfix deferral
 (
-    foo: func [y] [return lit 1 then (x => [x + y])]
-    bar: func [y] [return 1 then (x => [x + y])]
+    foo: func [y] [return lit 1 then (x -> [x + y])]
+    bar: func [y] [return 1 then (x -> [x + y])]
     did all [
         11 = foo 10
         1 = bar 10
     ]
 )
 
-; The above should work whether you use a GROUP! or not (=> quote left wins)
+; The above should work whether you use a GROUP! or not (-> quote left wins)
 (
-    foo: func [y] [return lit 1 then x => [x + y]]
-    bar: func [y] [return 1 then x => [x + y]]
+    foo: func [y] [return lit 1 then x -> [x + y]]
+    bar: func [y] [return 1 then x -> [x + y]]
     did all [
         11 = foo 10
         1 = bar 10

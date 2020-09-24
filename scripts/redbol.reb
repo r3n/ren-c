@@ -588,7 +588,7 @@ try: emulate [
     ][
         trap [
             result: do block
-        ] then err => [
+        ] then err -> [
             case [
                 blank? :except [err]
                 block? :except [do except]
@@ -1361,7 +1361,7 @@ read: emulate [
 hijack 'lib/transcode enclose copy :lib/transcode function [f [frame!]] [
     trap [
         result: lib/do copy f  ; COPY so we can DO it again if needed
-    ] then e => [
+    ] then e -> [
         if e/id != 'bad-utf8 [
             fail e
         ]

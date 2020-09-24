@@ -92,7 +92,7 @@ make object! [
                 change-dir first split-path test-file
             ]
             test-sources: get in load-testfile test-file 'contents
-        ] then err => [
+        ] then err -> [
             ; probe err
             append collected-tests reduce [
                 test-file 'dialect {^/"failed, cannot read the file"^/}

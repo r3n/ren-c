@@ -999,7 +999,7 @@ pe-format: context [
     ][
         trap [
             parse-exe exe-data
-        ] then err => [
+        ] then err -> [
             ;print ["Failed to parse exe:" err]
             return null
         ]

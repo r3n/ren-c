@@ -53,7 +53,7 @@
             b = [<xx>]
             trap [
                 append b 'z  ; block doesn't truly "exist", can't append
-            ] then e => [
+            ] then e -> [
                 e/id = 'series-frozen
             ]
         ]

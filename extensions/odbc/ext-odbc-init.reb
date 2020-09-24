@@ -159,7 +159,7 @@ odbc-execute: func [
                 sym-group! [
                         reduce as group! item
                 ]
-            ] then value => [
+            ] then value -> [
                 append parameters :value
                 "?"
             ] else [

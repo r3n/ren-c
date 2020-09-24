@@ -93,6 +93,9 @@ uneval: func [] [
     fail 'return "QUOTE has replaced UNEVAL"
 ]
 
+=>: func [] [
+    fail 'return "=> for lambda has been replaced by ->"
+]
 
 ; To be more visually pleasing, properties like LENGTH can be extracted using
 ; a reflector as simply `length of series`, with no hyphenation.  This is
