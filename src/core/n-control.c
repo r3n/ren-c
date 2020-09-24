@@ -898,7 +898,7 @@ REBNATIVE(case)
     }
 
     DECLARE_FRAME_AT (f, ARG(cases), EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
+    SHORTHAND (v, f->feed->value, const RELVAL*);
     SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
     REBVAL *last_branch_result = ARG(cases);  // can reuse--frame holds cases
@@ -1074,7 +1074,7 @@ REBNATIVE(switch)
     }
 
     DECLARE_FRAME_AT (f, ARG(cases), EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
+    SHORTHAND (v, f->feed->value, const RELVAL*);
     SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
     Push_Frame(nullptr, f);

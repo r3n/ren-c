@@ -673,7 +673,10 @@
 
 //=//// PREVENT NULL ASSIGNMENTS /////////////////////////////////////////=//
 //
-// This came in handly for a debugging scenario, and isn't bad documentation.
+// This came in handly for a debugging scenario.  But because it uses deep
+// voodoo to accomplish its work (like overloading -> and &), it interferes
+// with more important applications of that voodoo.  So it shouldn't be used
+// on types that depend on that (like REBVAL pointers).
 //
 
 #if !defined(CPLUSPLUS_11) || defined(NDEBUG)

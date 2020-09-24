@@ -212,7 +212,7 @@ bool Traced_Eval_Hook_Throws(REBFRM * const f)
     if (depth < 0 || depth >= Trace_Level)
         return Eval_Internal_Maybe_Stale_Throws(f);  // (REPL uses to hide)
 
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
+    SHORTHAND (v, f->feed->value, const RELVAL*);
 
     if (depth > 10)
         depth = 10; // don't indent so far it goes off the screen

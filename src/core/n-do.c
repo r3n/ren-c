@@ -113,7 +113,7 @@ REBNATIVE(shove)
     if (not Is_Frame_Style_Varargs_May_Fail(&f, ARG(right)))
         fail ("SHOVE (>-) not implemented for MAKE VARARGS! [...] yet");
 
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
+    SHORTHAND (v, f->feed->value, const RELVAL*);
     SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
     REBVAL *left = ARG(left);

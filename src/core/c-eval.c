@@ -356,7 +356,7 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     REBFRM *f,
     const RELVAL *v
 ){
-    SHORTHAND (next, f->feed->value, NEVERNULL(const RELVAL*));
+    SHORTHAND (next, f->feed->value, const RELVAL*);
     SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
     if (GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT))  { // e.g. `10 -> x:`
@@ -417,7 +417,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
     // (This is ensured by the C++ build, that you don't say `if (next)...`)
     //
     REBVAL * const spare = FRM_SPARE(f);  // pointer is const (not the cell)
-    SHORTHAND (next, f->feed->value, NEVERNULL(const RELVAL*));
+    SHORTHAND (next, f->feed->value, const RELVAL*);
     SHORTHAND (next_gotten, f->feed->gotten, const REBVAL*);
     SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 

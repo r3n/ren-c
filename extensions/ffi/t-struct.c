@@ -1069,7 +1069,7 @@ REB_R MAKE_Struct(
         fail (arg);
 
     DECLARE_FRAME_AT (f, arg, EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
+    SHORTHAND (v, f->feed->value, const RELVAL*);
     SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
     Push_Frame(nullptr, f);

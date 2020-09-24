@@ -112,7 +112,7 @@ REB_R PD_Unhooked(
 //
 bool Next_Path_Throws(REBPVS *pvs)
 {
-    SHORTHAND (v, pvs->feed->value, NEVERNULL(const RELVAL *));
+    SHORTHAND (v, pvs->feed->value, const RELVAL*);
     SHORTHAND (specifier, pvs->feed->specifier, REBSPC *);
 
     if (IS_NULLED(pvs->out))
@@ -325,7 +325,7 @@ bool Eval_Path_Throws_Core(
     DECLARE_ARRAY_FEED (feed, array, index, specifier);
     DECLARE_FRAME (pvs, feed, flags | EVAL_FLAG_PATH_MODE);
 
-    SHORTHAND (v, pvs->feed->value, NEVERNULL(const RELVAL*));
+    SHORTHAND (v, pvs->feed->value, const RELVAL*);
     assert(NOT_END(*v));  // tested 0-length path previously
 
     SET_END(out);

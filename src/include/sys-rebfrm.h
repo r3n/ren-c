@@ -486,7 +486,7 @@ struct Reb_Feed {
     // !!! Review impacts on debugging; e.g. a debug mode should hold onto
     // the initial value in order to display full error messages.
     //
-    NEVERNULL(const RELVAL *) value;
+    const RELVAL *value;  // is never nullptr (ends w/END cells or rebEND)
 
     // There is a lookahead step to see if the next item in an array is a
     // WORD!.  If so it is checked to see if that word is a "lookback word"

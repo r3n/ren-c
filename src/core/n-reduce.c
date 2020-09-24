@@ -42,7 +42,7 @@ bool Reduce_To_Stack_Throws(
     );
 
     DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
+    SHORTHAND (v, f->feed->value, const RELVAL*);
 
     Push_Frame(nullptr, f);
 
@@ -178,7 +178,7 @@ REB_R Compose_To_Stack_Core(
     DECLARE_FEED_AT_CORE (feed, any_array, specifier);
 
     DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
+    SHORTHAND (v, f->feed->value, const RELVAL*);
 
     Push_Frame(nullptr, f);
 
