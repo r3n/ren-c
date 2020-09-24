@@ -36,12 +36,12 @@
 #define VAL_TYPE_KIND_ENUM(v) \
     EXTRA(Datatype, (v)).kind
 
-inline static enum Reb_Kind VAL_TYPE_KIND_OR_CUSTOM(const REBCEL *v) {
+inline static enum Reb_Kind VAL_TYPE_KIND_OR_CUSTOM(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_DATATYPE);
     return VAL_TYPE_KIND_ENUM(v);
 }
 
-inline static enum Reb_Kind VAL_TYPE_KIND(const REBCEL *v) {
+inline static enum Reb_Kind VAL_TYPE_KIND(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_DATATYPE);
     enum Reb_Kind k = VAL_TYPE_KIND_ENUM(v);
     assert(k != REB_CUSTOM);
@@ -146,7 +146,7 @@ inline static CFUNC** VAL_TYPE_HOOKS(const RELVAL *type) {
     return cast(CFUNC**, SER_DATA(VAL_TYPE_CUSTOM(type)));
 }
 
-inline static CFUNC** HOOKS_FOR_TYPE_OF(const REBCEL *v) {
+inline static CFUNC** HOOKS_FOR_TYPE_OF(REBCEL(const*) v) {
     enum Reb_Kind k = CELL_TYPE(v);
     if (k != REB_CUSTOM)
         return Builtin_Type_Hooks[k];

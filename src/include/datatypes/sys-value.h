@@ -143,8 +143,8 @@
             } \
         } while (0)
 
-    inline static const REBCEL *READABLE(
-        const REBCEL *c,
+    inline static REBCEL(const*) READABLE(
+        REBCEL(const*) c,
         const char *file,
         int line
     ){
@@ -152,8 +152,8 @@
         return c;
     }
 
-    inline static REBCEL *WRITABLE(
-        REBCEL *c,
+    inline static RELVAL *WRITABLE(
+        RELVAL *c,
         const char *file,
         int line
     ){
@@ -248,7 +248,7 @@
     // were interested in its unquoted kind.
     //
     inline static REBYTE KIND_BYTE_Debug(
-        const REBCEL *v,
+        REBCEL(const*) v,
         const char *file,
         int line
     ) = delete;
@@ -278,7 +278,7 @@
 // are interested in the kind of *cell* (for purposes of knowing its bit
 // layout expectations) that is stored in the MIRROR_BYTE().
 
-inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v);
+inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v);
 
 #define CELL_KIND_UNCHECKED(cell) \
     cast(enum Reb_Kind, MIRROR_BYTE(cell))
@@ -297,7 +297,7 @@ inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v);
         #define CELL_KIND(cell) \
             cast(enum Reb_Kind, MIRROR_BYTE(cast(const RELVAL*, cell)))
     #else
-        inline static enum Reb_Kind CELL_KIND(const REBCEL *cell) {
+        inline static enum Reb_Kind CELL_KIND(REBCEL(const*) cell) {
             return cast(enum Reb_Kind, MIRROR_BYTE(cast(const RELVAL*, cell)));
         }
 
@@ -308,7 +308,7 @@ inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v);
     #endif
 #endif
 
-inline static REBTYP *CELL_CUSTOM_TYPE(const REBCEL *v) {
+inline static REBTYP *CELL_CUSTOM_TYPE(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_CUSTOM);
     return SER(EXTRA(Any, v).node);
 }
@@ -319,7 +319,7 @@ inline static REBTYP *CELL_CUSTOM_TYPE(const REBCEL *v) {
 // cell then it won't be quoted at all.  Main thing to know is that you don't
 // necessarily get the original value you had back.
 //
-inline static const RELVAL* CELL_TO_VAL(const REBCEL* cell)
+inline static const RELVAL* CELL_TO_VAL(REBCEL(const*) cell)
   { return cast(const RELVAL*, cell); }
 
 
@@ -686,7 +686,7 @@ inline static void INIT_VAL_NODE(RELVAL *v, void *p) {
 // An ANY-ARRAY! in the deep copy of a function body must be relative also to
 // the same function if it contains any instances of such relative words.
 //
-inline static bool IS_RELATIVE(const REBCEL *v) {
+inline static bool IS_RELATIVE(REBCEL(const*) v) {
     if (not Is_Bindable(v) or not EXTRA(Binding, v).node)
         return false; // INTEGER! and other types are inherently "specific"
 
@@ -735,7 +735,7 @@ inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
 // derelativized -or- is a value type that doesn't have a specifier (e.g. an
 // integer).  If the value is actually relative, this will assert at runtime!
 
-inline static REBVAL *SPECIFIC(const_if_c REBCEL *v) {
+inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
     //
     // Note: END is tolerated to help in specified array enumerations, e.g.
     //
@@ -746,7 +746,7 @@ inline static REBVAL *SPECIFIC(const_if_c REBCEL *v) {
 }
 
 #if defined(__cplusplus)
-    inline static const REBVAL *SPECIFIC(const REBCEL *v) {
+    inline static const REBVAL *SPECIFIC(const RELVAL *v) {
         assert(IS_END(v) or IS_SPECIFIC(v));  // ^-- see note about END
         return cast(const REBVAL*, v);
     }
@@ -797,7 +797,7 @@ inline static REBVAL *SPECIFIC(const_if_c REBCEL *v) {
 #define UNBOUND \
    ((REBNOD*)nullptr)  // cast() doesn't like nullptr, fix
 
-inline static REBNOD *VAL_BINDING(const REBCEL *v) {
+inline static REBNOD *VAL_BINDING(REBCEL(const*) v) {
     assert(Is_Bindable(v));
     return EXTRA(Binding, v).node;
 }

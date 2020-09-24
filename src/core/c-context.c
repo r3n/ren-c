@@ -487,7 +487,7 @@ void Collect_Context_Keys(
 static void Collect_Inner_Loop(struct Reb_Collector *cl, const RELVAL *head)
 {
     for (; NOT_END(head); ++head) {
-        const REBCEL *cell = VAL_UNESCAPED(head); // cell of X from '''X
+        REBCEL(const*) cell = VAL_UNESCAPED(head); // cell of X from '''X
         enum Reb_Kind kind = CELL_KIND(cell);
 
         if (ANY_WORD_KIND(kind)) {
@@ -676,7 +676,7 @@ REBARR *Collect_Unique_Words_Managed(
     if (IS_BLOCK(ignore)) {
         RELVAL *item = VAL_ARRAY_AT(ignore);
         for (; NOT_END(item); ++item) {
-            const REBCEL *unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
+            REBCEL(const*) unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
             REBSTR *canon = VAL_WORD_CANON(unescaped);
 
             // A block may have duplicate words in it (this situation could
@@ -714,7 +714,7 @@ REBARR *Collect_Unique_Words_Managed(
     if (IS_BLOCK(ignore)) {
         RELVAL *item = VAL_ARRAY_AT(ignore);
         for (; NOT_END(item); ++item) {
-            const REBCEL *unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
+            REBCEL(const*) unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
             REBSTR *canon = VAL_WORD_CANON(unescaped);
 
           #if !defined(NDEBUG)

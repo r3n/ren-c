@@ -648,7 +648,7 @@ inline static void DROP_GC_GUARD(void *p) {
 // Uses "evil macro" variations because it is called so frequently, that in
 // the debug build (which doesn't inline functions) there's a notable cost.
 //
-inline static REBSER *VAL_SERIES(const REBCEL *v) {
+inline static REBSER *VAL_SERIES(REBCEL(const*) v) {
   #if !defined(NDEBUG)
     enum Reb_Kind k = CELL_KIND(v);
     assert(ANY_SERIES_KIND_EVIL_MACRO or ANY_PATH_KIND_EVIL_MACRO);
@@ -672,24 +672,20 @@ inline static REBSER *VAL_SERIES(const REBCEL *v) {
     // becomes prohibitive when the functions aren't inlined and checks wind
     // up getting done 
     //
-    inline static REBLEN & VAL_INDEX(REBCEL *v) { // C++ reference type
+    inline static REBLEN VAL_INDEX(REBCEL(const*) v) { // C++ reference type
         enum Reb_Kind k = CELL_KIND(v);
         assert(ANY_SERIES_KIND_EVIL_MACRO or ANY_PATH_KIND_EVIL_MACRO);
         return VAL_INDEX_UNCHECKED(v);
     }
-    inline static REBLEN VAL_INDEX(const REBCEL *v) {
-        enum Reb_Kind k = CELL_KIND(v);
-        if (ANY_PATH_KIND_EVIL_MACRO) {
-            assert(VAL_INDEX_UNCHECKED(v) == 0);
-            return 0;
-        }
-        assert(ANY_SERIES_KIND_EVIL_MACRO);
+    inline static REBLEN & VAL_INDEX(RELVAL *v) {
+        enum Reb_Kind k = VAL_TYPE(v);
+        assert(ANY_SERIES_KIND_EVIL_MACRO or ANY_PATH_KIND_EVIL_MACRO);
         return VAL_INDEX_UNCHECKED(v);
     }
 #endif
 
 
-inline static REBYTE *VAL_DATA_AT(const REBCEL *v) {
+inline static REBYTE *VAL_DATA_AT(REBCEL(const*) v) {
     return SER_DATA_AT(SER_WIDE(VAL_SERIES(v)), VAL_SERIES(v), VAL_INDEX(v));
 }
 

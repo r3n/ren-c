@@ -51,7 +51,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(Is_Marked(PAYLOAD(Any, v).first.node));
         return;
     }
-    enum Reb_Kind kind = CELL_KIND_UNCHECKED(cast(const REBCEL*, v));
+    enum Reb_Kind kind = CELL_KIND_UNCHECKED(cast(REBCEL(const*), v));
     assert(kind == MIRROR_BYTE(v));
 
     REBNOD *binding;

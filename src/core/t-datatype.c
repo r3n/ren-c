@@ -28,7 +28,7 @@
 //
 //  CT_Datatype: C
 //
-REBINT CT_Datatype(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Datatype(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     if (mode < 0)
         return -1;  // !!! R3-Alpha-ism (compare never made much sense)
@@ -84,7 +84,7 @@ REB_R TO_Datatype(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
 //
 //  MF_Datatype: C
 //
-void MF_Datatype(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Datatype(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     if (not form)
         Pre_Mold_All(mo, v);  // e.g. `#[datatype!`

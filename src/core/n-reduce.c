@@ -187,7 +187,7 @@ REB_R Compose_To_Stack_Core(
   #endif
 
     for (; NOT_END(*v); Fetch_Next_Forget_Lookback(f)) {
-        const REBCEL *cell = VAL_UNESCAPED(*v);
+        REBCEL(const*) cell = VAL_UNESCAPED(*v);
         enum Reb_Kind kind = CELL_KIND(cell); // notice `''(...)`
 
         if (not ANY_ARRAY_OR_PATH_KIND(kind)) { // won't substitute/recurse

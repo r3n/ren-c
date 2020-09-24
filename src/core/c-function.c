@@ -349,7 +349,7 @@ void Push_Paramlist_Triads_May_Fail(
             quoted = true;
         }
 
-        const REBCEL* cell = VAL_UNESCAPED(item);
+        REBCEL(const*) cell = VAL_UNESCAPED(item);
 
         REBSTR* spelling;
         Reb_Param_Class pclass = REB_P_DETECT;

@@ -150,10 +150,10 @@ inline static void SET_VAL_EVENT_Y(REBVAL *v, uint16_t y) {
 // !!! These hooks allow the REB_GOB cell type to dispatch to code in the
 // EVENT! extension if it is loaded.
 //
-extern REBINT CT_Event(const REBCEL *a, const REBCEL *b, REBINT mode);
+extern REBINT CT_Event(REBCEL(const*) a, REBCEL(const*) b, REBINT mode);
 extern REB_R MAKE_Event(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
 extern REB_R TO_Event(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
-extern void MF_Event(REB_MOLD *mo, const REBCEL *v, bool form);
+extern void MF_Event(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Event);
 extern REB_R PD_Event(REBPVS *pvs, const REBVAL *picker, const REBVAL *opt_setval);
 

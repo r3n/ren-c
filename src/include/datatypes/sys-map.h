@@ -69,7 +69,7 @@ inline static REBMAP *MAP(void *p) {
 }
 
 
-inline static REBMAP *VAL_MAP(const REBCEL *v) {
+inline static REBMAP *VAL_MAP(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_MAP);
 
     REBARR *a = ARR(PAYLOAD(Any, v).first.node);

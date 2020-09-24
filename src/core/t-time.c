@@ -179,7 +179,7 @@ const REBYTE *Scan_Time(RELVAL *out, const REBYTE *cp, REBLEN len)
 //
 //  MF_Time: C
 //
-void MF_Time(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Time(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);  // no difference between MOLD and FORM at this time
 
@@ -216,7 +216,7 @@ void MF_Time(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 //  CT_Time: C
 //
-REBINT CT_Time(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Time(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     REBINT num = Cmp_Time(a, b);
     if (mode >= 0)  return (num == 0);
@@ -354,7 +354,7 @@ REB_R TO_Time(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 // Given two TIME!s (or DATE!s with a time componet), compare them.
 //
-REBINT Cmp_Time(const REBCEL *v1, const REBCEL *v2)
+REBINT Cmp_Time(REBCEL(const*) v1, REBCEL(const*) v2)
 {
     REBI64 t1 = VAL_NANO(v1);
     REBI64 t2 = VAL_NANO(v2);

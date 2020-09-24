@@ -49,7 +49,7 @@ enum {
 //
 //  CT_String: C
 //
-REBINT CT_String(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_String(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     assert(ANY_STRING_KIND(CELL_KIND(a)));
     assert(ANY_STRING_KIND(CELL_KIND(b)));
@@ -156,7 +156,7 @@ REBLEN find_string(
     REBSTR *str,
     REBLEN index,
     REBLEN end,
-    const REBCEL *pattern,
+    REBCEL(const*) pattern,
     REBLEN flags,
     REBINT skip
 ){
@@ -951,13 +951,13 @@ void Mold_Text_Series_At(REB_MOLD *mo, REBSTR *s, REBLEN index) {
 // wishes to preserve round-trip copy-and-paste from URL bars in browsers
 // to source and back.  Encoding concerns are handled elsewhere.
 //
-static void Mold_Url(REB_MOLD *mo, const REBCEL *v)
+static void Mold_Url(REB_MOLD *mo, REBCEL(const*) v)
 {
     Append_String(mo->series, v, VAL_LEN_AT(v));
 }
 
 
-static void Mold_File(REB_MOLD *mo, const REBCEL *v)
+static void Mold_File(REB_MOLD *mo, REBCEL(const*) v)
 {
     REBLEN len = VAL_LEN_AT(v);
 
@@ -978,7 +978,7 @@ static void Mold_File(REB_MOLD *mo, const REBCEL *v)
 }
 
 
-static void Mold_Tag(REB_MOLD *mo, const REBCEL *v)
+static void Mold_Tag(REB_MOLD *mo, REBCEL(const*) v)
 {
     Append_Codepoint(mo->series, '<');
     Append_String(mo->series, v, VAL_LEN_AT(v));
@@ -989,7 +989,7 @@ static void Mold_Tag(REB_MOLD *mo, const REBCEL *v)
 //
 //  MF_String: C
 //
-void MF_String(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_String(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     REBSTR *buf = mo->series;
 

@@ -44,7 +44,7 @@ void Bind_Values_Inner_Loop(
     REBFLGS flags
 ){
     for (; NOT_END(head); ++head) {
-        const REBCEL *cell = VAL_UNESCAPED(head); // may equal v, e.g. `\x`
+        REBCEL(const*) cell = VAL_UNESCAPED(head); // may equal v, e.g. `\x`
         enum Reb_Kind kind = CELL_KIND(cell);
 
         REBU64 type_bit = FLAGIT_KIND(kind);
@@ -159,7 +159,7 @@ void Unbind_Values_Core(RELVAL *head, REBCTX *context, bool deep)
         // damage shared bindings; review more efficient means of doing this.
         //
         REBLEN num_quotes = Dequotify(v);
-        enum Reb_Kind kind = CELL_KIND(cast(REBCEL*, v));
+        enum Reb_Kind kind = CELL_KIND(cast(REBCEL(const*), v));
 
         if (
             ANY_WORD_KIND(kind)
@@ -274,7 +274,7 @@ static void Clonify_And_Bind_Relative(
     REBLEN num_quotes = VAL_NUM_QUOTES(v);
     Dequotify(v);
 
-    enum Reb_Kind kind = CELL_KIND(cast(REBCEL*, v));
+    enum Reb_Kind kind = CELL_KIND(cast(REBCEL(const*), v));
     assert(kind < REB_MAX_PLUS_MAX);  // we dequoted it (pseudotypes ok)
 
     if (deep_types & FLAGIT_KIND(kind) & TS_SERIES_OBJ) {

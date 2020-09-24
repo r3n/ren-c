@@ -121,7 +121,7 @@ enum {
 #define MAX_HEX_LEN     16
 
 
-inline static void Pre_Mold(REB_MOLD *mo, const REBCEL *v)
+inline static void Pre_Mold(REB_MOLD *mo, REBCEL(const*) v)
   { Pre_Mold_Core((mo), (v), GET_MOLD_FLAG(mo, MOLD_FLAG_ALL)); }
 
 #define Pre_Mold_All(mo,v) \

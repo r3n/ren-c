@@ -73,10 +73,10 @@ inline static RELVAL *ARR_SINGLE(REBARR *a) {
 // It's possible to calculate the array from just a cell if you know it's a
 // cell inside a singular array.
 //
-inline static REBARR *Singular_From_Cell(const REBCEL *v) {
-    REBARR *singular = ARR( // some checking in debug builds is done by ARR()
+inline static REBARR *Singular_From_Cell(const RELVAL *v) {
+    REBARR *singular = ARR(  // some checking in debug builds is done by ARR()
         cast(void*,
-            cast(REBYTE*, m_cast(REBCEL*, v))
+            cast(REBYTE*, m_cast(RELVAL*, v))
             - offsetof(struct Reb_Series, content)
         )
     );
@@ -452,7 +452,7 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
 // These operations do not need to take the value's index position into
 // account; they strictly operate on the array series
 //
-inline static REBARR *VAL_ARRAY(const REBCEL *v) {
+inline static REBARR *VAL_ARRAY(REBCEL(const*) v) {
     if (ANY_PATH_KIND(CELL_KIND(v)))
         assert(VAL_INDEX_UNCHECKED(v) == 0);
     else
@@ -472,7 +472,7 @@ inline static REBARR *VAL_ARRAY(const REBCEL *v) {
 // of the word AT with a missing index is a hint that the index is coming
 // from the VAL_INDEX() of the value itself.
 //
-inline static RELVAL *VAL_ARRAY_AT(const REBCEL *v) {
+inline static RELVAL *VAL_ARRAY_AT(REBCEL(const*) v) {
     if (VAL_INDEX(v) > ARR_LEN(VAL_ARRAY(v)))
         fail (Error_Past_End_Raw());  // don't clip and give deceptive pointer
     return ARR_AT(VAL_ARRAY(v), VAL_INDEX(v));
@@ -545,7 +545,7 @@ inline static RELVAL *Init_Relative_Block_At(
 
 // Checks if ANY-GROUP! is like ((...)) or (...), used by COMPOSE & PARSE
 //
-inline static bool Is_Any_Doubled_Group(const REBCEL *group) {
+inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {
     assert(ANY_GROUP_KIND(CELL_KIND(group)));
     RELVAL *inner = VAL_ARRAY_AT(group);
     if (KIND_BYTE(inner) != REB_GROUP or NOT_END(inner + 1))

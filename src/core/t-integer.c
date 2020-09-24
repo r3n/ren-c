@@ -31,7 +31,7 @@
 //
 //  CT_Integer: C
 //
-REBINT CT_Integer(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Integer(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     if (mode >= 0)  return (VAL_INT64(a) == VAL_INT64(b));
     if (mode == -1) return (VAL_INT64(a) >= VAL_INT64(b));
@@ -240,7 +240,7 @@ check_sign:
 //
 //  MF_Integer: C
 //
-void MF_Integer(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Integer(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 

@@ -65,12 +65,12 @@
     EXTRA(Any, (v)).cfunc
 
 
-inline static bool Is_Handle_Cfunc(const REBCEL *v) {
+inline static bool Is_Handle_Cfunc(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_HANDLE);
     return VAL_HANDLE_LENGTH_U(v) == 0;
 }
 
-inline static uintptr_t VAL_HANDLE_LEN(const REBCEL *v) {
+inline static uintptr_t VAL_HANDLE_LEN(REBCEL(const*) v) {
     assert(not Is_Handle_Cfunc(v));
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a)
@@ -79,7 +79,7 @@ inline static uintptr_t VAL_HANDLE_LEN(const REBCEL *v) {
         return VAL_HANDLE_LENGTH_U(v);
 }
 
-inline static void *VAL_HANDLE_VOID_POINTER(const REBCEL *v) {
+inline static void *VAL_HANDLE_VOID_POINTER(REBCEL(const*) v) {
     assert(not Is_Handle_Cfunc(v));
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a)
@@ -91,7 +91,7 @@ inline static void *VAL_HANDLE_VOID_POINTER(const REBCEL *v) {
 #define VAL_HANDLE_POINTER(t, v) \
     cast(t *, VAL_HANDLE_VOID_POINTER(v))
 
-inline static CFUNC *VAL_HANDLE_CFUNC(const REBCEL *v) {
+inline static CFUNC *VAL_HANDLE_CFUNC(REBCEL(const*) v) {
     assert(Is_Handle_Cfunc(v));
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a)
@@ -100,7 +100,7 @@ inline static CFUNC *VAL_HANDLE_CFUNC(const REBCEL *v) {
         return VAL_HANDLE_CFUNC_P(v);
 }
 
-inline static CLEANUP_CFUNC *VAL_HANDLE_CLEANER(const REBCEL *v) {
+inline static CLEANUP_CFUNC *VAL_HANDLE_CLEANER(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_HANDLE);
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (not a)
@@ -108,8 +108,8 @@ inline static CLEANUP_CFUNC *VAL_HANDLE_CLEANER(const REBCEL *v) {
     return MISC(a).cleaner;
 }
 
-inline static void SET_HANDLE_LEN(REBCEL *v, uintptr_t length) {
-    assert(CELL_KIND(v) == REB_HANDLE);
+inline static void SET_HANDLE_LEN(RELVAL *v, uintptr_t length) {
+    assert(VAL_TYPE(v) == REB_HANDLE);
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a)
         VAL_HANDLE_LENGTH_U(ARR_SINGLE(a)) = length;
@@ -117,8 +117,8 @@ inline static void SET_HANDLE_LEN(REBCEL *v, uintptr_t length) {
         VAL_HANDLE_LENGTH_U(v) = length;
 }
 
-inline static void SET_HANDLE_CDATA(REBCEL *v, void *cdata) {
-    assert(CELL_KIND(v) == REB_HANDLE);
+inline static void SET_HANDLE_CDATA(RELVAL *v, void *cdata) {
+    assert(VAL_TYPE(v) == REB_HANDLE);
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a) {
         assert(VAL_HANDLE_LENGTH_U(ARR_SINGLE(a)) != 0);
@@ -130,7 +130,7 @@ inline static void SET_HANDLE_CDATA(REBCEL *v, void *cdata) {
     }
 }
 
-inline static void SET_HANDLE_CFUNC(REBCEL *v, CFUNC *cfunc) {
+inline static void SET_HANDLE_CFUNC(RELVAL *v, CFUNC *cfunc) {
     assert(Is_Handle_Cfunc(v));
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a) {

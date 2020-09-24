@@ -203,7 +203,7 @@ inline static bool SAME_STR(REBSTR *s1, REBSTR *s2) {
 }
 
 
-inline static bool IS_WORD_UNBOUND(const REBCEL *v) {
+inline static bool IS_WORD_UNBOUND(REBCEL(const*) v) {
     assert(ANY_WORD_KIND(CELL_KIND(v)));
     return not EXTRA(Binding, v).node;
 }
@@ -211,12 +211,12 @@ inline static bool IS_WORD_UNBOUND(const REBCEL *v) {
 #define IS_WORD_BOUND(v) \
     (not IS_WORD_UNBOUND(v))
 
-inline static REBSTR *VAL_WORD_SPELLING(const REBCEL *v) {
+inline static REBSTR *VAL_WORD_SPELLING(REBCEL(const*) v) {
     assert(ANY_WORD_KIND(CELL_KIND(v)));
     return STR(PAYLOAD(Any, v).first.node);
 }
 
-inline static REBSTR *VAL_WORD_CANON(const REBCEL *v) {
+inline static REBSTR *VAL_WORD_CANON(REBCEL(const*) v) {
     assert(ANY_WORD_KIND(CELL_KIND(v)));
     return STR_CANON(STR(PAYLOAD(Any, v).first.node));
 }
@@ -229,14 +229,14 @@ inline static REBSTR *VAL_WORD_CANON(const REBCEL *v) {
 // But they won't if there are any words outstanding that hold that spelling,
 // so this is a safe technique as long as these words are GC-mark-visible.
 //
-inline static REBSTR *VAL_STORED_CANON(const REBCEL *v) {
+inline static REBSTR *VAL_STORED_CANON(REBCEL(const*) v) {
     assert(ANY_WORD_KIND(CELL_KIND(v)));
     REBSTR *str = STR(PAYLOAD(Any, v).first.node);
     assert(GET_SERIES_INFO(str, STRING_CANON));
     return str;
 }
 
-inline static OPT_REBSYM VAL_WORD_SYM(const REBCEL *v) {
+inline static OPT_REBSYM VAL_WORD_SYM(REBCEL(const*) v) {
     assert(ANY_WORD_KIND(CELL_KIND(v)));
     return STR_SYMBOL(STR(PAYLOAD(Any, v).first.node));
 }
@@ -251,7 +251,7 @@ inline static void INIT_WORD_INDEX(RELVAL *v, REBLEN i) {
     INIT_WORD_INDEX_UNCHECKED(v, i);
 }
 
-inline static REBLEN VAL_WORD_INDEX(const REBCEL *v) {
+inline static REBLEN VAL_WORD_INDEX(REBCEL(const*) v) {
     assert(IS_WORD_BOUND(v));
     REBINT i = PAYLOAD(Any, v).second.i32;
     assert(i > 0);
@@ -320,7 +320,7 @@ inline static const REBYTE *VAL_BYTES_LIMIT_AT(
         return VAL_BIN_AT(v);
     }
 
-    if (ANY_STRING(v)) {    
+    if (ANY_STRING(v)) {
         *size_out = VAL_SIZE_LIMIT_AT(NULL, v, limit);
         return VAL_STRING_AT(v);
     }
@@ -344,7 +344,7 @@ inline static const REBYTE *VAL_BYTES_LIMIT_AT(
 inline static const REBYTE *VAL_UTF8_LIMIT_AT(
     REBLEN *length_out,
     REBSIZ *size_out,
-    const REBCEL *v,
+    REBCEL(const*) v,
     REBLEN limit
 ){
   #if !defined(NDEBUG)

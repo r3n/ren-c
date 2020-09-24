@@ -32,7 +32,7 @@
 //
 //  CT_Date: C
 //
-REBINT CT_Date(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     REBYMD dat_a = VAL_DATE(a);
     REBYMD dat_b = VAL_DATE(b);
@@ -91,13 +91,13 @@ REBINT CT_Date(const REBCEL *a, const REBCEL *b, REBINT mode)
 //
 //  MF_Date: C
 //
-void MF_Date(REB_MOLD *mo, const REBCEL *v_orig, bool form)
+void MF_Date(REB_MOLD *mo, REBCEL(const*) v_orig, bool form)
 {
     // We can't/shouldn't modify the incoming date value we are molding, so we
     // make a copy that we can tweak during the emit process
 
     DECLARE_LOCAL (v);
-    Move_Value(v, SPECIFIC(v_orig));
+    Move_Value(v, SPECIFIC(CELL_TO_VAL(v_orig)));
 
     if (
         VAL_MONTH(v) == 0
@@ -421,7 +421,7 @@ void Subtract_Date(REBVAL *d1, REBVAL *d2, REBVAL *result)
 //
 //  Cmp_Date: C
 //
-REBINT Cmp_Date(const REBCEL *d1, const REBCEL *d2)
+REBINT Cmp_Date(REBCEL(const*) d1, REBCEL(const*) d2)
 {
     REBINT diff = Diff_Date(VAL_DATE(d1), VAL_DATE(d2));
     if (diff != 0)

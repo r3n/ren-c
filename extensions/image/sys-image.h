@@ -35,7 +35,7 @@
 
 extern REBTYP* EG_Image_Type;
 
-inline static REBVAL *VAL_IMAGE_BIN(const REBCEL *v) {
+inline static REBVAL *VAL_IMAGE_BIN(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
     return SPECIFIC(ARR_SINGLE(ARR(PAYLOAD(Any, v).first.node)));
 }
@@ -46,12 +46,12 @@ inline static REBVAL *VAL_IMAGE_BIN(const REBCEL *v) {
 #define VAL_IMAGE_HEIGHT(v) \
     MISC(ARR(PAYLOAD(Any, v).first.node)).custom.i
 
-inline static REBYTE *VAL_IMAGE_HEAD(const REBCEL *v) {
+inline static REBYTE *VAL_IMAGE_HEAD(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
     return SER_DATA(VAL_BINARY(VAL_IMAGE_BIN(v)));
 }
 
-inline static REBYTE *VAL_IMAGE_AT_HEAD(const REBCEL *v, REBLEN pos) {
+inline static REBYTE *VAL_IMAGE_AT_HEAD(REBCEL(const*) v, REBLEN pos) {
     return VAL_IMAGE_HEAD(v) + (pos * 4);
 }
 
@@ -65,15 +65,15 @@ inline static REBYTE *VAL_IMAGE_AT_HEAD(const REBCEL *v, REBLEN pos) {
 #define VAL_IMAGE_POS(v) \
     VAL_INDEX(VAL_IMAGE_BIN(v))
 
-inline static REBYTE *VAL_IMAGE_AT(const REBCEL *v) {
+inline static REBYTE *VAL_IMAGE_AT(REBCEL(const*) v) {
     return VAL_IMAGE_AT_HEAD(v, VAL_IMAGE_POS(v));
 }
 
-inline static REBLEN VAL_IMAGE_LEN_HEAD(const REBCEL *v) {
+inline static REBLEN VAL_IMAGE_LEN_HEAD(REBCEL(const*) v) {
     return VAL_IMAGE_HEIGHT(v) * VAL_IMAGE_WIDTH(v);
 }
 
-inline static REBLEN VAL_IMAGE_LEN_AT(const REBCEL *v) {
+inline static REBLEN VAL_IMAGE_LEN_AT(REBCEL(const*) v) {
     if (VAL_IMAGE_POS(v) >= VAL_IMAGE_LEN_HEAD(v))
         return 0;  // avoid negative position
     return VAL_IMAGE_LEN_HEAD(v) - VAL_IMAGE_POS(v);
@@ -139,9 +139,9 @@ inline static REBVAL *Init_Image_Black_Opaque(RELVAL *out, REBLEN w, REBLEN h)
 // !!! These hooks allow the REB_IMAGE cell type to dispatch to code in the
 // IMAGE! extension if it is loaded.
 //
-extern REBINT CT_Image(const REBCEL *a, const REBCEL *b, REBINT mode);
+extern REBINT CT_Image(REBCEL(const*) a, REBCEL(const*) b, REBINT mode);
 extern REB_R MAKE_Image(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
 extern REB_R TO_Image(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
-extern void MF_Image(REB_MOLD *mo, const REBCEL *v, bool form);
+extern void MF_Image(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Image);
 extern REB_R PD_Image(REBPVS *pvs, const REBVAL *picker, const REBVAL *opt_setval);

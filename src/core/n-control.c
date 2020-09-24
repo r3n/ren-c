@@ -126,8 +126,8 @@ inline static bool Single_Test_Throws(
     //
     sum_quotes += VAL_NUM_QUOTES(test);
 
-    const REBCEL *test_cell = VAL_UNESCAPED(test);
-    const REBCEL *arg_cell = VAL_UNESCAPED(arg);
+    REBCEL(const*) test_cell = VAL_UNESCAPED(test);
+    REBCEL(const*) arg_cell = VAL_UNESCAPED(arg);
 
     enum Reb_Kind test_kind = CELL_TYPE(test_cell);
 

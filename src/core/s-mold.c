@@ -104,7 +104,7 @@ REBYTE *Prep_Mold_Overestimated(REB_MOLD *mo, REBLEN num_bytes)
 //
 // Emit the initial datatype function, depending on /ALL option
 //
-void Pre_Mold_Core(REB_MOLD *mo, const REBCEL *v, bool all)
+void Pre_Mold_Core(REB_MOLD *mo, REBCEL(const*) v, bool all)
 {
     if (all)
         Append_Ascii(mo->series, "#[");
@@ -142,7 +142,7 @@ void End_Mold_Core(REB_MOLD *mo, bool all)
 // For series that has an index, add the index for mold/all.
 // Add closing block.
 //
-void Post_Mold(REB_MOLD *mo, const REBCEL *v)
+void Post_Mold(REB_MOLD *mo, REBCEL(const*) v)
 {
     if (VAL_INDEX(v)) {
         Append_Codepoint(mo->series, ' ');
@@ -352,7 +352,7 @@ void Form_Array_At(
 //
 //  MF_Fail: C
 //
-void MF_Fail(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Fail(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -378,7 +378,7 @@ void MF_Fail(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 //  MF_Unhooked: C
 //
-void MF_Unhooked(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Unhooked(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(mo);
     UNUSED(form);
@@ -395,7 +395,7 @@ void MF_Unhooked(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 // Variation which molds a cell, e.g. no quoting is considered.
 //
-void Mold_Or_Form_Cell(REB_MOLD *mo, const REBCEL *cell, bool form)
+void Mold_Or_Form_Cell(REB_MOLD *mo, REBCEL(const*) cell, bool form)
 {
     REBSTR *s = mo->series;
     ASSERT_SERIES_TERM(SER(s));
@@ -466,7 +466,7 @@ REBSTR *Copy_Mold_Or_Form_Value(const RELVAL *v, REBFLGS opts, bool form)
 //
 // Form a value based on the mold opts provided.
 //
-REBSTR *Copy_Mold_Or_Form_Cell(const REBCEL *cell, REBFLGS opts, bool form)
+REBSTR *Copy_Mold_Or_Form_Cell(REBCEL(const*) cell, REBFLGS opts, bool form)
 {
     DECLARE_MOLD (mo);
     mo->opts = opts;

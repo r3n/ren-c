@@ -26,7 +26,7 @@
 
 
 
-static bool Equal_Context(const REBCEL *v1, const REBCEL *v2)
+static bool Equal_Context(REBCEL(const*) v1, REBCEL(const*) v2)
 {
     if (CELL_KIND(v1) != CELL_KIND(v2)) // e.g. ERROR! won't equal OBJECT!
         return false;
@@ -201,7 +201,7 @@ collect_end:
 //
 //  CT_Context: C
 //
-REBINT CT_Context(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     if (mode < 0) return -1;
     return Equal_Context(a, b) ? 1 : 0;
@@ -573,7 +573,7 @@ REBCTX *Copy_Context_Core_Managed(REBCTX *original, REBU64 types)
 //
 //  MF_Context: C
 //
-void MF_Context(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     REBSTR *s = mo->series;
 

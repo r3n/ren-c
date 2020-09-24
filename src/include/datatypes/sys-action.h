@@ -303,7 +303,7 @@
 #define VAL_ACT_DETAILS_NODE(v) \
     PAYLOAD(Any, (v)).second.node  // lvalue, but a node
 
-inline static REBARR *VAL_ACT_DETAILS(const REBCEL *v) {
+inline static REBARR *VAL_ACT_DETAILS(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION);
     return ARR(VAL_ACT_DETAILS_NODE(v));
 }
@@ -392,7 +392,7 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 #define ACT_PARAMS_HEAD(a) \
     (cast(REBVAL*, SER(ACT_PARAMLIST(a))->content.dynamic.data) + 1)
 
-inline static REBACT *VAL_ACTION(const REBCEL *v) {
+inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION); // so it works on literals
     REBSER *s = SER(VAL_ACT_PARAMLIST_NODE(v));
     if (GET_SERIES_INFO(s, INACCESSIBLE))
@@ -413,12 +413,12 @@ inline static REBACT *VAL_ACTION(const REBCEL *v) {
     ACT_PARAM(VAL_ACTION(v), n)
 
 
-inline static REBNAT VAL_ACT_DISPATCHER(const REBCEL *v) {
+inline static REBNAT VAL_ACT_DISPATCHER(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION);
     return MISC(VAL_ACT_DETAILS_NODE(v)).dispatcher;
 }
 
-inline static REBCTX *VAL_ACT_META(const REBCEL *v) {
+inline static REBCTX *VAL_ACT_META(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION);
     return MISC_META(VAL_ACT_PARAMLIST_NODE(v));
 }

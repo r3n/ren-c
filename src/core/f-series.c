@@ -222,7 +222,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 // Compare two arrays and return the difference of the first
 // non-matching value.
 //
-REBINT Cmp_Array(const REBCEL *sval, const REBCEL *tval, bool is_case)
+REBINT Cmp_Array(REBCEL(const*) sval, REBCEL(const*) tval, bool is_case)
 {
     if (C_STACK_OVERFLOWING(&is_case))
         Fail_Stack_Overflow();
@@ -282,8 +282,8 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
     if (is_case and (VAL_NUM_QUOTES(sval) != VAL_NUM_QUOTES(tval)))
         return VAL_NUM_QUOTES(sval) - VAL_NUM_QUOTES(tval);
 
-    const REBCEL *s = VAL_UNESCAPED(sval);
-    const REBCEL *t = VAL_UNESCAPED(tval);
+    REBCEL(const*) s = VAL_UNESCAPED(sval);
+    REBCEL(const*) t = VAL_UNESCAPED(tval);
     enum Reb_Kind s_kind = CELL_KIND(s);
     enum Reb_Kind t_kind = CELL_KIND(t);
 

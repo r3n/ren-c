@@ -24,7 +24,7 @@
 
 #include "sys-core.h"
 
-static bool Same_Action(const REBCEL *a, const REBCEL *b)
+static bool Same_Action(REBCEL(const*) a, REBCEL(const*) b)
 {
     assert(CELL_KIND(a) == REB_ACTION and CELL_KIND(b) == REB_ACTION);
 
@@ -46,7 +46,7 @@ static bool Same_Action(const REBCEL *a, const REBCEL *b)
 //
 //  CT_Action: C
 //
-REBINT CT_Action(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Action(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     if (mode >= 0)
         return Same_Action(a, b) ? 1 : 0;
@@ -150,7 +150,7 @@ REB_R TO_Action(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 //  MF_Action: C
 //
-void MF_Action(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Action(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 

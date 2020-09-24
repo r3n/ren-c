@@ -729,21 +729,21 @@ inline static REBCHR(*) STR_AT(REBSTR *s, REBLEN at) {
 #define VAL_STRING_TAIL(v) \
     STR_TAIL(VAL_SERIES(v))
 
-inline static REBSTR *VAL_STRING(const REBCEL *v) {
+inline static REBSTR *VAL_STRING(REBCEL(const*) v) {
     assert(ANY_STRING_KIND(CELL_KIND(v)) or ANY_WORD_KIND(CELL_KIND(v)));
     return STR(VAL_NODE(v));  // VAL_SERIES() would assert
 }
 
-inline static REBLEN VAL_LEN_HEAD(const REBCEL *v) {
+inline static REBLEN VAL_LEN_HEAD(REBCEL(const*) v) {
     if (REB_BINARY == CELL_KIND(v))
         return SER_USED(VAL_SERIES(v));  // binaries can alias strings...
     return SER_LEN(VAL_SERIES(v));  // senses strings, not optimal.  :-/
 }
 
-inline static bool VAL_PAST_END(const REBCEL *v)
+inline static bool VAL_PAST_END(REBCEL(const*) v)
    { return VAL_INDEX(v) > VAL_LEN_HEAD(v); }
 
-inline static REBLEN VAL_LEN_AT(const REBCEL *v) {
+inline static REBLEN VAL_LEN_AT(REBCEL(const*) v) {
     //
     // !!! At present, it is considered "less of a lie" to tell people the
     // length of a series is 0 if its index is actually past the end, than
@@ -758,7 +758,7 @@ inline static REBLEN VAL_LEN_AT(const REBCEL *v) {
     return VAL_LEN_HEAD(v) - VAL_INDEX(v);  // take current index into account
 }
 
-inline static REBCHR(*) VAL_STRING_AT(const REBCEL *v) {
+inline static REBCHR(*) VAL_STRING_AT(REBCEL(const*) v) {
     REBSTR *s = VAL_STRING(v);  // debug build checks that it's ANY-STRING!
     if (VAL_INDEX(v) == 0)
         return STR_HEAD(s);  // common case, try and be fast
@@ -769,7 +769,7 @@ inline static REBCHR(*) VAL_STRING_AT(const REBCEL *v) {
 
 inline static REBSIZ VAL_SIZE_LIMIT_AT(
     REBLEN *length, // length in chars to end (including limit)
-    const REBCEL *v,
+    REBCEL(const*) v,
     REBLEN limit  // UNKNOWN (e.g. a very large number) for no limit
 ){
     assert(ANY_STRING_KIND(CELL_KIND(v)));
@@ -801,7 +801,7 @@ inline static REBSIZ VAL_OFFSET(const RELVAL *v) {
     return VAL_STRING_AT(v) - VAL_STRING_HEAD(v);
 }
 
-inline static REBSIZ VAL_OFFSET_FOR_INDEX(const REBCEL *v, REBLEN index) {
+inline static REBSIZ VAL_OFFSET_FOR_INDEX(REBCEL(const*) v, REBLEN index) {
     assert(ANY_STRING_KIND(CELL_KIND(v)));
 
     REBCHR(const*) at;

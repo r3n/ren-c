@@ -213,7 +213,7 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
 #endif
 
 
-inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v) {
+inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v) {
     if (KIND_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable voids
         return v;  // Note: kind byte may be > 64
 

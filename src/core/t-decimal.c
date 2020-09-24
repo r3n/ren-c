@@ -281,7 +281,7 @@ bool Eq_Decimal2(REBDEC a, REBDEC b)
 //
 //  CT_Decimal: C
 //
-REBINT CT_Decimal(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Decimal(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     if (mode >= 0) {
         if (mode == 0)
@@ -302,7 +302,7 @@ REBINT CT_Decimal(const REBCEL *a, const REBCEL *b, REBINT mode)
 //
 // Code mostly duplicated in MF_Percent.
 //
-void MF_Decimal(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Decimal(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -323,7 +323,7 @@ void MF_Decimal(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 // Code mostly duplicated in MF_Decimal.
 //
-void MF_Percent(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Percent(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 

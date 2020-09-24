@@ -94,24 +94,24 @@
     #define VAL_CHAR(v) \
         EXTRA(Character, (v)).codepoint
 #else
-    inline static REBUNI const & VAL_CHAR(const REBCEL *v) {
+    inline static REBUNI VAL_CHAR(REBCEL(const*) v) {
         assert(CELL_KIND(v) == REB_CHAR);
-        return EXTRA(Character, (v)).codepoint;
+        return EXTRA(Character, v).codepoint;
     }
 
-    inline static REBUNI & VAL_CHAR(REBCEL *v) {
-        assert(CELL_KIND(v) == REB_CHAR);
-        return EXTRA(Character, (v)).codepoint;
+    inline static REBUNI & VAL_CHAR(RELVAL *v) {
+        assert(VAL_TYPE(v) == REB_CHAR);
+        return EXTRA(Character, v).codepoint;
     }
 #endif
 
-inline static REBYTE VAL_CHAR_ENCODED_SIZE(const REBCEL *v) {
+inline static REBYTE VAL_CHAR_ENCODED_SIZE(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_CHAR);
     assert(PAYLOAD(Character, (v)).size_then_encoded[0] <= UNI_ENCODED_MAX);
     return PAYLOAD(Character, (v)).size_then_encoded[0];
 }
 
-inline static const REBYTE *VAL_CHAR_ENCODED(const REBCEL *v) {
+inline static const REBYTE *VAL_CHAR_ENCODED(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_CHAR);
     return &(PAYLOAD(Character, (v)).size_then_encoded[1]);  // [0] is size
 }

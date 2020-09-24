@@ -30,7 +30,7 @@
 //
 // Compares bytes, not chars. Return the difference.
 //
-REBINT Compare_Binary_Vals(const REBCEL *v1, const REBCEL *v2)
+REBINT Compare_Binary_Vals(REBCEL(const*) v1, REBCEL(const*) v2)
 {
     REBLEN l1 = VAL_LEN_AT(v1);
     REBLEN l2 = VAL_LEN_AT(v2);
@@ -148,7 +148,7 @@ REBINT Compare_Uni_Str(
 //
 // Used for: general string comparions (various places)
 //
-REBINT Compare_String_Vals(const REBCEL *v1, const REBCEL *v2, bool uncase)
+REBINT Compare_String_Vals(REBCEL(const*) v1, REBCEL(const*) v2, bool uncase)
 {
     assert(CELL_KIND(v1) != REB_BINARY and CELL_KIND(v2) != REB_BINARY);
 
@@ -738,7 +738,7 @@ REBLEN Next_Line(REBYTE **bin)
 REBLEN Find_In_Any_Sequence(
     REBLEN *len,  // length of match (e.g. if pattern is a TAG!, includes <>)
     const RELVAL *any_series,
-    const REBCEL *pattern,
+    REBCEL(const*) pattern,
     REBFLGS flags
 ){
     REBLEN index = VAL_INDEX(any_series);

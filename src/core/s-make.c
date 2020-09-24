@@ -216,7 +216,7 @@ void Append_Spelling(REBSTR *dst, REBSTR *spelling)
 //
 // Append a partial string to a UTF-8 binary series.
 //
-void Append_String(REBSTR *dst, const REBCEL *src, REBLEN limit)
+void Append_String(REBSTR *dst, REBCEL(const*) src, REBLEN limit)
 {
     assert(not IS_STR_SYMBOL(dst));
     assert(ANY_STRING_KIND(CELL_KIND(src)));

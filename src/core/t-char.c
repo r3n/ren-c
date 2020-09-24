@@ -68,7 +68,7 @@ const uint_fast8_t firstByteMark[7] = {
 //
 //  CT_Char: C
 //
-REBINT CT_Char(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Char(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     REBINT num;
 
@@ -207,7 +207,7 @@ static REBINT Math_Arg_For_Char(REBVAL *arg, const REBVAL *verb)
 //
 //  MF_Char: C
 //
-void MF_Char(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Char(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     REBUNI c = VAL_CHAR(v);
 

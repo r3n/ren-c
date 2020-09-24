@@ -138,13 +138,58 @@ typedef struct Reb_Node REBNOD;
 // the "type that it is" and use CELL_KIND() and not VAL_TYPE(), this alias
 // for RELVAL prevents VAL_TYPE() operations.
 //
+// Because a REBCEL can be linked to by a QUOTED!, it's important not to
+// modify the potentially-shared escaped data.  So all REBCEL* should be
+// const.  That's enforced in the C++ debug build, and a wrapping class is
+// used for the pointer to make sure one doesn't assume it lives in an array
+// and try to do pointer math on it...since it may be a singular allocation.
+//
 #if !defined(CPLUSPLUS_11)
-    #define REBCEL \
-        struct Reb_Value // same as RELVAL, no checking in C build
+
+    #define REBCEL(const_star) \
+        const struct Reb_Value *  // same as RELVAL, no checking in C build
+
+#elif defined(NDEBUG)
+    //
+    // The %sys-internals.h API is used by core extensions, and we may want
+    // to build the executable with C++ but an extension with C.  If there
+    // are "trick" pointer types that are classes with methods passed in
+    // the API, that would inhibit such an implementation.
+    //
+    // Making it easy to configure such a mixture isn't a priority at this
+    // time.  But just make sure some C++ builds are possible without
+    // using the active pointer class.  Choose debug builds for now.
+    //
+    struct Reb_Cell;  // won't implicitly downcast to RELVAL
+    #define REBCEL(const_star) \
+        const struct Reb_Cell *  // not a class instance in %sys-internals.h
 #else
-    struct Reb_Cell; // won't implicitly downcast to RELVAL
-    #define REBCEL \
-        struct Reb_Cell // *might* have KIND_BYTE() > REB_64
+    struct Reb_Cell;  // won't implicitly downcast to RELVAL
+    template<typename T>
+    struct RebcellPtr {
+        T p;
+        static_assert(
+            std::is_same<const Reb_Cell*, T>::value,
+            "Instantiations of REBCEL only work as REBCEL(const*)"
+        );
+
+        RebcellPtr () { }
+        RebcellPtr (const Reb_Cell *p) : p (p) {}
+
+        const Reb_Cell **operator&() { return &p; }
+        const Reb_Cell *operator->() { return p; }
+        const Reb_Cell &operator*() { return *p; }
+
+        operator const Reb_Cell* () { return p; }
+
+        explicit operator const Reb_Value* ()
+          { return reinterpret_cast<const Reb_Value*>(p); }
+
+        explicit operator const Reb_Relative_Value* ()
+          { return reinterpret_cast<const Reb_Relative_Value*>(p); }
+    };
+    #define REBCEL(const_star) \
+        struct RebcellPtr<Reb_Cell const_star>
 #endif
 
 
@@ -227,7 +272,7 @@ typedef REBVAL *REB_R;
 // no overrides for individual types (only if they are the only type in
 // their class).
 //
-typedef REBINT (COMPARE_HOOK)(const REBCEL *a, const REBCEL *b, REBINT s);
+typedef REBINT (COMPARE_HOOK)(REBCEL(const*) a, REBCEL(const*) b, REBINT s);
 
 
 // PER-TYPE MAKE HOOKS: for `make datatype def`
@@ -301,7 +346,7 @@ typedef struct rebol_mold REB_MOLD;
 // has a different handler than strings.  So not all molds are driven by
 // their class entirely.
 //
-typedef void (MOLD_HOOK)(REB_MOLD *mo, const REBCEL *v, bool form);
+typedef void (MOLD_HOOK)(REB_MOLD *mo, REBCEL(const*) v, bool form);
 
 
 //=//// PARAMETER ENUMERATION /////////////////////////////////////////////=//

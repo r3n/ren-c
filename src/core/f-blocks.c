@@ -157,7 +157,7 @@ void Clonify(
     REBLEN num_quotes = VAL_NUM_QUOTES(v);
     Dequotify(v);
 
-    enum Reb_Kind kind = CELL_KIND(cast(REBCEL*, v));
+    enum Reb_Kind kind = CELL_KIND(cast(REBCEL(const*), v));
     assert(kind < REB_MAX_PLUS_MAX); // we dequoted it (pseudotypes ok)
 
     if (deep_types & FLAGIT_KIND(kind) & TS_SERIES_OBJ) {

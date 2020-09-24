@@ -32,7 +32,7 @@
 #define TRUE_VALUE \
     c_cast(const REBVAL*, &PG_True_Value)
 
-inline static bool VAL_LOGIC(const REBCEL *v) {
+inline static bool VAL_LOGIC(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_LOGIC);
     return PAYLOAD(Logic, v).flag;
 }

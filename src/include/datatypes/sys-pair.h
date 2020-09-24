@@ -40,7 +40,7 @@ inline static REBVAL *PAIRING_KEY(REBVAL *paired) {
 #define VAL_PAIR_NODE(v) \
     PAYLOAD(Any, (v)).first.node 
 
-inline static REBVAL *VAL_PAIRING(const REBCEL *v) {
+inline static REBVAL *VAL_PAIRING(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_PAIR);
     return VAL(VAL_NODE(v));
 }
@@ -51,25 +51,25 @@ inline static REBVAL *VAL_PAIRING(const REBCEL *v) {
 #define VAL_PAIR_Y(v) \
     VAL(VAL_PAIRING(v))
 
-inline static REBDEC VAL_PAIR_X_DEC(const REBCEL *v) {
+inline static REBDEC VAL_PAIR_X_DEC(REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_X(v)))
         return cast(REBDEC, VAL_INT64(VAL_PAIR_X(v)));
     return VAL_DECIMAL(VAL_PAIR_X(v));
 }
 
-inline static REBDEC VAL_PAIR_Y_DEC(const REBCEL *v) {
+inline static REBDEC VAL_PAIR_Y_DEC(REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_Y(v)))
         return cast(REBDEC, VAL_INT64(VAL_PAIR_Y(v)));
     return VAL_DECIMAL(VAL_PAIR_Y(v));
 }
 
-inline static REBI64 VAL_PAIR_X_INT(const REBCEL *v) {
+inline static REBI64 VAL_PAIR_X_INT(REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_X(v)))
         return VAL_INT64(VAL_PAIR_X(v));
     return ROUND_TO_INT(VAL_DECIMAL(VAL_PAIR_X(v)));
 }
 
-inline static REBDEC VAL_PAIR_Y_INT(const REBCEL *v) {
+inline static REBDEC VAL_PAIR_Y_INT(REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_Y(v)))
         return VAL_INT64(VAL_PAIR_Y(v));
     return ROUND_TO_INT(VAL_DECIMAL(VAL_PAIR_Y(v)));

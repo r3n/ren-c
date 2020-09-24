@@ -56,7 +56,7 @@ inline static enum Reb_Kind KIND_FROM_SYM(REBSYM s) {
 #define SYM_FROM_KIND(k) \
     cast(REBSYM, cast(enum Reb_Kind, (k)))
 
-inline static REBSYM VAL_TYPE_SYM(const REBCEL *v) {
+inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
     //
     // !!! The extension type list is limited to a finite set as a first step
     // of generalizing the approach.  Bridge compatibility for things like
@@ -98,7 +98,7 @@ inline static REBSYM VAL_TYPE_SYM(const REBCEL *v) {
 #define VAL_TYPESET_HIGH_BITS(v) \
     EXTRA(Typeset, (v)).high_bits
 
-inline static bool TYPE_CHECK(const REBCEL *v, REBYTE n) {
+inline static bool TYPE_CHECK(REBCEL(const*) v, REBYTE n) {
     if (n < 32)
         return did (VAL_TYPESET_LOW_BITS(v) & FLAGIT_KIND(n));
 
@@ -106,7 +106,7 @@ inline static bool TYPE_CHECK(const REBCEL *v, REBYTE n) {
     return did (VAL_TYPESET_HIGH_BITS(v) & FLAGIT_KIND(n - 32));
 }
 
-inline static bool TYPE_CHECK_BITS(const REBCEL *v, REBU64 bits) {
+inline static bool TYPE_CHECK_BITS(REBCEL(const*) v, REBU64 bits) {
     uint_fast32_t low = bits & cast(uint32_t, 0xFFFFFFFF);
     if (low & VAL_TYPESET_LOW_BITS(v))
         return true;
@@ -118,7 +118,7 @@ inline static bool TYPE_CHECK_BITS(const REBCEL *v, REBU64 bits) {
     return false;
 }
 
-inline static bool TYPE_CHECK_EXACT_BITS(const REBCEL *v, REBU64 bits) {
+inline static bool TYPE_CHECK_EXACT_BITS(REBCEL(const*) v, REBU64 bits) {
     uint_fast32_t low = bits & cast(uint32_t, 0xFFFFFFFF);
     if (low != VAL_TYPESET_LOW_BITS(v))
         return false;
@@ -130,7 +130,7 @@ inline static bool TYPE_CHECK_EXACT_BITS(const REBCEL *v, REBU64 bits) {
     return true;
 }
 
-inline static void TYPE_SET(REBCEL *v, REBYTE n) {
+inline static void TYPE_SET(RELVAL *v, REBYTE n) {
     if (n < 32) {
         VAL_TYPESET_LOW_BITS(v) |= FLAGIT_KIND(n);
         return;
@@ -139,7 +139,7 @@ inline static void TYPE_SET(REBCEL *v, REBYTE n) {
     VAL_TYPESET_HIGH_BITS(v) |= FLAGIT_KIND(n - 32);
 }
 
-inline static void TYPE_CLEAR(REBCEL *v, REBYTE n) {
+inline static void TYPE_CLEAR(RELVAL *v, REBYTE n) {
     if (n < 32) {
         VAL_TYPESET_HIGH_BITS(v) &= ~FLAGIT_KIND(n);
         return;
@@ -148,7 +148,7 @@ inline static void TYPE_CLEAR(REBCEL *v, REBYTE n) {
     VAL_TYPESET_HIGH_BITS(v) &= ~FLAGIT_KIND(n - 32);
 }
 
-inline static bool EQUAL_TYPESET(const REBCEL *v1, const REBCEL *v2) {
+inline static bool EQUAL_TYPESET(REBCEL(const*) v1, REBCEL(const*) v2) {
     if (VAL_TYPESET_LOW_BITS(v1) != VAL_TYPESET_LOW_BITS(v2))
         return false;
     if (VAL_TYPESET_HIGH_BITS(v1) != VAL_TYPESET_HIGH_BITS(v2))

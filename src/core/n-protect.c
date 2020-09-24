@@ -452,7 +452,7 @@ REBNATIVE(unprotect)
 // in order to do things like use blocks as map keys, etc.
 //
 bool Is_Value_Frozen_Deep(const RELVAL *v) {
-    const REBCEL *cell = VAL_UNESCAPED(v);
+    REBCEL(const*) cell = VAL_UNESCAPED(v);
     UNUSED(v); // debug build trashes, to avoid accidental usage below
 
     enum Reb_Kind kind = CELL_KIND(cell);
@@ -513,7 +513,7 @@ void Force_Value_Frozen_Core(
     if (Is_Value_Frozen_Deep(v))
         return;
 
-    const REBCEL *cell = VAL_UNESCAPED(v);
+    REBCEL(const*) cell = VAL_UNESCAPED(v);
     enum Reb_Kind kind = CELL_KIND(cell);
 
     if (ANY_ARRAY_KIND(kind)) {

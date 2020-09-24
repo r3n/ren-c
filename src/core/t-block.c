@@ -38,7 +38,7 @@
 //     CT_Get_Path()
 //     CT_Lit_Path()
 //
-REBINT CT_Array(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Array(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     REBINT num = Cmp_Array(a, b, mode == 1);
     if (mode >= 0)
@@ -727,7 +727,7 @@ RELVAL *Pick_Block(REBVAL *out, const REBVAL *block, const REBVAL *picker)
 //
 //  MF_Array: C
 //
-void MF_Array(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Array(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     // Routine may be called on value that reports REB_QUOTED, even if it
     // has no additional payload and is aliasing the cell itself.  Checking

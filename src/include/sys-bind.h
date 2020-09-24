@@ -89,7 +89,7 @@
         return cast(REBSPC*, c);
     }
 
-    inline static REBSPC *VAL_SPECIFIER(const REBCEL *v) {
+    inline static REBSPC *VAL_SPECIFIER(REBCEL(const*) v) {
         if (ANY_PATH_KIND(CELL_KIND(v)))
             assert(VAL_INDEX_UNCHECKED(v) == 0);
         else
@@ -435,7 +435,7 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
 // that is applicable.
 //
 inline static REBCTX *Get_Word_Context(
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     assert(ANY_WORD_KIND(CELL_KIND(any_word)));
@@ -522,11 +522,11 @@ inline static REBCTX *Get_Word_Context(
 }
 
 static inline const REBVAL *Lookup_Word_May_Fail(
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
-        fail (Error_Not_Bound_Raw(SPECIFIC(any_word)));
+        fail (Error_Not_Bound_Raw(SPECIFIC(CELL_TO_VAL(any_word))));
 
     REBCTX *c = Get_Word_Context(any_word, specifier);
     if (GET_SERIES_INFO(c, INACCESSIBLE))
@@ -536,7 +536,7 @@ static inline const REBVAL *Lookup_Word_May_Fail(
 }
 
 static inline const REBVAL *Try_Lookup_Word(
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
@@ -551,7 +551,7 @@ static inline const REBVAL *Try_Lookup_Word(
 
 static inline const REBVAL *Get_Word_May_Fail(
     RELVAL *out,
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     const REBVAL *var = Lookup_Word_May_Fail(any_word, specifier);
@@ -565,11 +565,11 @@ static inline const REBVAL *Get_Word_May_Fail(
 }
 
 static inline REBVAL *Lookup_Mutable_Word_May_Fail(
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
-        fail (Error_Not_Bound_Raw(SPECIFIC(any_word)));
+        fail (Error_Not_Bound_Raw(SPECIFIC(CELL_TO_VAL(any_word))));
 
     REBCTX *ctx = Get_Word_Context(any_word, specifier);
 
@@ -597,7 +597,7 @@ static inline REBVAL *Lookup_Mutable_Word_May_Fail(
 }
 
 inline static REBVAL *Sink_Word_May_Fail(
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     REBVAL *var = Lookup_Mutable_Word_May_Fail(any_word, specifier);
@@ -749,9 +749,9 @@ inline static REBVAL *Derelativize(
 // would need such derivation.
 //
 
-inline static REBSPC *Derive_Specifier(REBSPC *parent, const REBCEL *item) {
+inline static REBSPC *Derive_Specifier(REBSPC *parent, REBCEL(const*) item) {
     if (IS_SPECIFIC(item))
-        return VAL_SPECIFIER(SPECIFIC(item));
+        return VAL_SPECIFIER(SPECIFIC(CELL_TO_VAL(item)));
     return parent;
 }
 

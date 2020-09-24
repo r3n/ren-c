@@ -182,7 +182,7 @@ REBINT Hash_UTF8(const REBYTE *utf8, REBSIZ size)
 //
 uint32_t Hash_Value(const RELVAL *v)
 {
-    const REBCEL *cell = VAL_UNESCAPED(v); // hash contained quoted content
+    REBCEL(const*) cell = VAL_UNESCAPED(v); // hash contained quoted content
     enum Reb_Kind kind = CELL_KIND(cell);
 
     uint32_t hash;

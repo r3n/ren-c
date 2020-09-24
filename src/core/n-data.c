@@ -513,7 +513,7 @@ inline static void Get_Var_May_Fail(
     bool any,  // should a VOID! value be gotten normally vs. error
     bool hard  // should GROUP!s in paths not be evaluated
 ){
-    const REBCEL *source = VAL_UNESCAPED(source_orig);
+    REBCEL(const*) source = VAL_UNESCAPED(source_orig);
     enum Reb_Kind kind = CELL_KIND(source);
 
     if (ANY_WORD_KIND(kind)) {
@@ -635,7 +635,7 @@ void Set_Var_May_Fail(
     REBSPC *setval_specifier,
     bool hard
 ){
-    const REBCEL *target = VAL_UNESCAPED(target_orig);
+    REBCEL(const*) target = VAL_UNESCAPED(target_orig);
     enum Reb_Kind kind = CELL_KIND(target);
 
     if (ANY_WORD_KIND(kind)) {

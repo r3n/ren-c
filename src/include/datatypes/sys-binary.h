@@ -90,7 +90,7 @@ inline static REBSER *Make_Binary_Core(REBLEN capacity, REBFLGS flags)
 #define VAL_BIN_HEAD(v) \
     BIN_HEAD(VAL_SERIES(v))
 
-inline static REBYTE *VAL_BIN_AT(const REBCEL *v) {
+inline static REBYTE *VAL_BIN_AT(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_BINARY or CELL_KIND(v) == REB_BITSET);
     if (VAL_INDEX(v) > BIN_LEN(VAL_SERIES(v)))
         fail (Error_Past_End_Raw());  // don't give deceptive return pointer
@@ -106,7 +106,7 @@ inline static REBYTE *VAL_BIN_AT(const REBCEL *v) {
 #define Init_Binary_At(out,bin,offset) \
     Init_Any_Series_At((out), REB_BINARY, (bin), (offset))
 
-inline static REBBIN *VAL_BINARY(const REBCEL* v) {
+inline static REBBIN *VAL_BINARY(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_BINARY);
     return VAL_SERIES(v);
 }

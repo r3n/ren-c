@@ -417,7 +417,7 @@ REBNATIVE(shift)
 
 //  CT_Fail: C
 //
-REBINT CT_Fail(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Fail(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     UNUSED(a);
     UNUSED(b);
@@ -429,7 +429,7 @@ REBINT CT_Fail(const REBCEL *a, const REBCEL *b, REBINT mode)
 
 //  CT_Unhooked: C
 //
-REBINT CT_Unhooked(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Unhooked(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     UNUSED(a);
     UNUSED(b);
@@ -477,7 +477,7 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, REBINT strictness)
 
     enum Reb_Kind ta;
     if (KIND_BYTE(a) == REB_QUOTED) { // 4 or more quote levels
-        const REBCEL *acell = VAL_UNESCAPED(a);
+        REBCEL(const*) acell = VAL_UNESCAPED(a);
         Move_Value_Header(a, cast(const RELVAL*, acell));
         a->extra = acell->extra;
         a->payload = acell->payload;
@@ -492,7 +492,7 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, REBINT strictness)
 
     enum Reb_Kind tb;
     if (KIND_BYTE(b) == REB_QUOTED) { // 4 or more quote levels
-        const REBCEL *bcell = VAL_UNESCAPED(b);
+        REBCEL(const*) bcell = VAL_UNESCAPED(b);
         Move_Value_Header(b, cast(const RELVAL*, bcell));
         b->extra = bcell->extra;
         b->payload = bcell->payload;

@@ -279,18 +279,18 @@ inline static bool IS_GOB(const RELVAL *v)  // Note: QUOTED! does not count
     #define VAL_GOB_INDEX(v) \
         PAYLOAD(Any, v).second.u
 #else
-    inline static REBGOB* VAL_GOB(const REBCEL *v) {
+    inline static REBGOB* VAL_GOB(REBCEL(const*) v) {
         assert(CELL_CUSTOM_TYPE(v) == EG_Gob_Type);
         return cast(REBGOB*, VAL_NODE(v));
     }
 
-    inline static uintptr_t const &VAL_GOB_INDEX(const REBCEL *v) {
+    inline static uintptr_t VAL_GOB_INDEX(REBCEL(const*) v) {
         assert(CELL_CUSTOM_TYPE(v) == EG_Gob_Type);
         return PAYLOAD(Any, v).second.u;
     }
 
-    inline static uintptr_t &VAL_GOB_INDEX(REBCEL *v) {
-        assert(CELL_CUSTOM_TYPE(v) == EG_Gob_Type);
+    inline static uintptr_t & VAL_GOB_INDEX(RELVAL *v) {
+        assert(CELL_CUSTOM_TYPE(VAL_UNESCAPED(v)) == EG_Gob_Type);
         return PAYLOAD(Any, v).second.u;
     }
 #endif
@@ -308,9 +308,9 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
 // !!! These hooks allow the GOB! cell type to dispatch to code in the
 // GOB! extension if it is loaded.
 //
-extern REBINT CT_Gob(const REBCEL *a, const REBCEL *b, REBINT mode);
+extern REBINT CT_Gob(REBCEL(const*) a, REBCEL(const*) b, REBINT mode);
 extern REB_R MAKE_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
 extern REB_R TO_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
-extern void MF_Gob(REB_MOLD *mo, const REBCEL *v, bool form);
+extern void MF_Gob(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Gob);
 extern REB_R PD_Gob(REBPVS *pvs, const REBVAL *picker, const REBVAL *opt_setval);

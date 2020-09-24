@@ -61,7 +61,7 @@ const struct {
 //
 //  CT_Typeset: C
 //
-REBINT CT_Typeset(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Typeset(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     if (mode < 0) return -1;
     return EQUAL_TYPESET(a, b);
@@ -130,7 +130,7 @@ bool Add_Typeset_Bits_Core(
     const RELVAL *maybe_word = head;
     for (; NOT_END(maybe_word); ++maybe_word) {
         REBLEN num_quotes = VAL_NUM_QUOTES(maybe_word);
-        const REBCEL *unescaped = VAL_UNESCAPED(maybe_word);
+        REBCEL(const*) unescaped = VAL_UNESCAPED(maybe_word);
 
         const RELVAL *item;
         if (CELL_KIND(unescaped) == REB_WORD)
@@ -204,7 +204,7 @@ bool Add_Typeset_Bits_Core(
                 TYPE_SET(typeset, VAL_TYPE_KIND_OR_CUSTOM(item));
             }
             else {
-                const REBCEL *cell = VAL_UNESCAPED(item);
+                REBCEL(const*) cell = VAL_UNESCAPED(item);
                 if (num_quotes > 1)
                    fail ("General type quoting not supported, use QUOTED!");
 
@@ -224,7 +224,7 @@ bool Add_Typeset_Bits_Core(
             VAL_TYPESET_HIGH_BITS(typeset) |= VAL_TYPESET_HIGH_BITS(item);
         }
         else if (IS_QUOTED(item)) {
-            const REBCEL *cell = VAL_UNESCAPED(item);
+            REBCEL(const*) cell = VAL_UNESCAPED(item);
             if (CELL_KIND(cell) != REB_DATATYPE)
                 fail ("General typeset quoting not supported, use QUOTED!");
 
@@ -322,7 +322,7 @@ REBARR *Typeset_To_Array(const REBVAL *tset)
 //
 //  MF_Typeset: C
 //
-void MF_Typeset(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Typeset(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     REBINT n;
 

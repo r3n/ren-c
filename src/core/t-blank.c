@@ -33,7 +33,7 @@
 // escaped NULL was renderable as its ticks, followed by nothing.  This is
 // the "nothing" part, saving on a special-case for that.
 //
-void MF_Null(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Null(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(mo);
     UNUSED(form);
@@ -44,7 +44,7 @@ void MF_Null(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 //  MF_Blank: C
 //
-void MF_Blank(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Blank(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form); // no distinction between MOLD and FORM
     UNUSED(v);
@@ -57,7 +57,7 @@ void MF_Blank(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 // !!! No literal notation for VOID! values has been decided.
 //
-void MF_Void(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Void(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form); // no distinction between MOLD and FORM
     UNUSED(v);
@@ -128,7 +128,7 @@ REB_R TO_Unit(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
 // Must have a comparison function, otherwise SORT would not work on arrays
 // with blanks or voids in them.
 //
-REBINT CT_Unit(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Unit(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     if (mode >= 0)
         return (CELL_KIND(a) == CELL_KIND(b));
@@ -193,7 +193,7 @@ REBTYPE(Unit)
 //
 //  MF_Handle: C
 //
-void MF_Handle(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Handle(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);  // !!! Handles have "no printable form", what to do here?
     UNUSED(v);
@@ -205,7 +205,7 @@ void MF_Handle(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 //  CT_Handle: C
 //
-REBINT CT_Handle(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Handle(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     // Would it be meaningful to allow user code to compare HANDLE!?
     //

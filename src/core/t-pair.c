@@ -28,7 +28,7 @@
 //
 //  CT_Pair: C
 //
-REBINT CT_Pair(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Pair(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     if (mode >= 0)
         return Cmp_Pair(a, b) == 0; // works for INTEGER=0 too (spans x y)
@@ -123,7 +123,7 @@ REB_R TO_Pair(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 // Given two pairs, compare them.
 //
-REBINT Cmp_Pair(const REBCEL *t1, const REBCEL *t2)
+REBINT Cmp_Pair(REBCEL(const*) t1, REBCEL(const*) t2)
 {
     REBDEC diff;
 
@@ -222,7 +222,7 @@ REB_R PD_Pair(
 //
 //  MF_Pair: C
 //
-void MF_Pair(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Pair(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     Mold_Or_Form_Value(mo, VAL_PAIR_X(v), form);
 

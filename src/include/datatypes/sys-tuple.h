@@ -44,24 +44,24 @@
 #else
     // C++ build can inject a check that it's a tuple, and still give l-value
 
-    inline static const REBYTE *VAL_TUPLE(const REBCEL *v) {
+    inline static const REBYTE *VAL_TUPLE(REBCEL(const*) v) {
         assert(CELL_KIND(v) == REB_TUPLE);
         return PAYLOAD(Bytes, v).common;
     }
 
-    inline static REBYTE *VAL_TUPLE(REBCEL *v) {
-        assert(CELL_KIND(v) == REB_TUPLE);
+    inline static REBYTE *VAL_TUPLE(RELVAL *v) {
+        assert(VAL_TYPE(v) == REB_TUPLE);
         return PAYLOAD(Bytes, v).common;
     }
 
-    inline static REBYTE VAL_TUPLE_LEN(const REBCEL *v) {
+    inline static REBYTE VAL_TUPLE_LEN(REBCEL(const*) v) {
         assert(CELL_KIND(v) == REB_TUPLE);
         assert(EXTRA(Any, v).u <= MAX_TUPLE);
         return EXTRA(Any, v).u;
     }
 
-    inline static uintptr_t &VAL_TUPLE_LEN(REBCEL *v) {
-        assert(CELL_KIND(v) == REB_TUPLE);
+    inline static uintptr_t & VAL_TUPLE_LEN(RELVAL *v) {
+        assert(VAL_TYPE(v) == REB_TUPLE);
         return EXTRA(Any, v).u;
     }
 #endif

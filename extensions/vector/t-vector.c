@@ -35,7 +35,7 @@
 // Ren-C vectors are built on type of BINARY!.  This means that the memory
 // must be read via memcpy() in order to avoid strict aliasing violations.
 //
-REBVAL *Get_Vector_At(RELVAL *out, const REBCEL *vec, REBLEN n)
+REBVAL *Get_Vector_At(RELVAL *out, REBCEL(const*) vec, REBLEN n)
 {
     REBYTE *data = VAL_VECTOR_HEAD(vec);
 
@@ -112,7 +112,7 @@ REBVAL *Get_Vector_At(RELVAL *out, const REBCEL *vec, REBLEN n)
 }
 
 
-static void Set_Vector_At(const REBCEL *vec, REBLEN n, const RELVAL *set) {
+static void Set_Vector_At(REBCEL(const*) vec, REBLEN n, const RELVAL *set) {
     assert(IS_INTEGER(set) or IS_DECIMAL(set));  // caller should error
 
     REBYTE *data = VAL_VECTOR_HEAD(vec);
@@ -230,7 +230,7 @@ static void Set_Vector_At(const REBCEL *vec, REBLEN n, const RELVAL *set) {
 }
 
 
-void Set_Vector_Row(const REBCEL *vec, const REBVAL *blk) // !!! can not be BLOCK!?
+void Set_Vector_Row(REBCEL(const*) vec, const REBVAL *blk) // !!! can not be BLOCK!?
 {
     REBLEN idx = VAL_INDEX(blk);
     REBLEN len = VAL_LEN_AT(blk);
@@ -291,7 +291,7 @@ REBARR *Vector_To_Array(const REBVAL *vect)
 // <, however the REBINT returned here is supposed to.  Review if this code
 // ever becomes relevant.
 //
-REBINT Compare_Vector(const REBCEL *v1, const REBCEL *v2)
+REBINT Compare_Vector(REBCEL(const*) v1, REBCEL(const*) v2)
 {
     bool non_integer1 = not VAL_VECTOR_INTEGRAL(v1);
     bool non_integer2 = not VAL_VECTOR_INTEGRAL(v2);
@@ -516,7 +516,7 @@ REB_R MAKE_Vector(
 //
 //  CT_Vector: C
 //
-REBINT CT_Vector(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Vector(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     REBINT n = Compare_Vector(a, b);  // needs to be expanded for equality
     if (mode >= 0) {
@@ -680,7 +680,7 @@ REBTYPE(Vector)
 //
 //  MF_Vector: C
 //
-void MF_Vector(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Vector(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     REBLEN len;
     REBLEN n;

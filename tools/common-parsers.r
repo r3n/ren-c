@@ -249,11 +249,12 @@ proto-parser: context [
 
         ; http://blog.hostilefork.com/kinda-smart-pointers-in-c/
         ;
-        ;     TYPEMACRO(*) Some_Function(TYPEMACRO(const *) value, ...)
+        ;     TYPEMACRO(*) Some_Function(TYPEMACRO(const*) value, ...)
         ;     { ...
         ;
         typemacro-parentheses: [
-            "(*)" | "(const *)"
+            "(*)" | "(const*)"
+            | "(const *)" (fail "use (const*) not (const *)")
         ]
 
         function-proto: [

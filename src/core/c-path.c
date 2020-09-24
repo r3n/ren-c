@@ -790,7 +790,7 @@ REBTYPE(Path)
 //
 //  MF_Path: C
 //
-void MF_Path(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Path(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -1009,7 +1009,7 @@ REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
 //     CT_Get_Path()
 //     CT_Lit_Path()
 //
-REBINT CT_Path(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Path(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     REBINT num;
     if (MIRROR_BYTE(a) == REB_WORD and MIRROR_BYTE(b) == REB_WORD)

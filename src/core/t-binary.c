@@ -37,7 +37,7 @@
 //
 //  CT_Binary: C
 //
-REBINT CT_Binary(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Binary(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     assert(CELL_KIND(a) == REB_BINARY);
     assert(CELL_KIND(b) == REB_BINARY);
@@ -79,7 +79,7 @@ REBLEN find_binary(
     REBSER *bin,
     REBLEN index,
     REBLEN end,
-    const REBCEL *pattern,
+    REBCEL(const*) pattern,
     REBLEN flags,
     REBINT skip
 ) {
@@ -161,7 +161,7 @@ REBLEN find_binary(
     }
     else if (CELL_KIND(pattern) == REB_INTEGER) {  // specific byte (exact)
         if (VAL_INT64(pattern) < 0 or VAL_INT64(pattern) > 255)
-            fail (Error_Out_Of_Range(SPECIFIC(pattern)));
+            fail (Error_Out_Of_Range(SPECIFIC(CELL_TO_VAL(pattern))));
 
         *size = 1;
 
@@ -521,7 +521,7 @@ REB_R PD_Binary(
 //
 //  MF_Binary: C
 //
-void MF_Binary(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Binary(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 

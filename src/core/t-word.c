@@ -32,7 +32,7 @@
 // the words are equal or not (1 or 0).  This creates bad invariants for
 // sorting etc.  Review.
 //
-REBINT CT_Word(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     REBINT e;
     REBINT diff;
@@ -156,7 +156,7 @@ REB_R TO_Word(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 }
 
 
-inline static void Mold_Word(REB_MOLD *mo, const REBCEL *v)
+inline static void Mold_Word(REB_MOLD *mo, REBCEL(const*) v)
 {
     REBSTR *spelling = VAL_WORD_SPELLING(v);
     Append_Utf8(mo->series, STR_UTF8(spelling), STR_SIZE(spelling));
@@ -166,7 +166,7 @@ inline static void Mold_Word(REB_MOLD *mo, const REBCEL *v)
 //
 //  MF_Word: C
 //
-void MF_Word(REB_MOLD *mo, const REBCEL *v, bool form) {
+void MF_Word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
     Mold_Word(mo, v);
 }
@@ -175,7 +175,7 @@ void MF_Word(REB_MOLD *mo, const REBCEL *v, bool form) {
 //
 //  MF_Set_word: C
 //
-void MF_Set_word(REB_MOLD *mo, const REBCEL *v, bool form) {
+void MF_Set_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
     Mold_Word(mo, v);
     Append_Codepoint(mo->series, ':');
@@ -185,7 +185,7 @@ void MF_Set_word(REB_MOLD *mo, const REBCEL *v, bool form) {
 //
 //  MF_Get_word: C
 //
-void MF_Get_word(REB_MOLD *mo, const REBCEL *v, bool form) {
+void MF_Get_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
     Append_Codepoint(mo->series, ':');
     Mold_Word(mo, v);
@@ -195,7 +195,7 @@ void MF_Get_word(REB_MOLD *mo, const REBCEL *v, bool form) {
 //
 //  MF_Sym_word: C
 //
-void MF_Sym_word(REB_MOLD *mo, const REBCEL *v, bool form) {
+void MF_Sym_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
     Append_Codepoint(mo->series, '@');
     Mold_Word(mo, v);

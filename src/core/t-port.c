@@ -28,7 +28,7 @@
 //
 //  CT_Port: C
 //
-REBINT CT_Port(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Port(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     if (mode < 0) return -1;
     return VAL_CONTEXT(a) == VAL_CONTEXT(b);

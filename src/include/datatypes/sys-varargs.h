@@ -67,7 +67,7 @@
 
 inline static bool Is_Block_Style_Varargs(
     REBVAL **shared_out,
-    const REBCEL *vararg
+    REBCEL(const*) vararg
 ){
     assert(CELL_KIND(vararg) == REB_VARARGS);
 
@@ -93,7 +93,7 @@ inline static bool Is_Block_Style_Varargs(
 
 inline static bool Is_Frame_Style_Varargs_Maybe_Null(
     REBFRM **f_out,
-    const REBCEL *vararg
+    REBCEL(const*) vararg
 ){
     assert(CELL_KIND(vararg) == REB_VARARGS);
 
@@ -142,7 +142,7 @@ inline static bool Is_Frame_Style_Varargs_May_Fail(
     (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0)
 
 
-inline static const REBVAL *Param_For_Varargs_Maybe_Null(const REBCEL *v) {
+inline static const REBVAL *Param_For_Varargs_Maybe_Null(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_VARARGS);
 
     REBACT *phase = VAL_VARARGS_PHASE(v);

@@ -269,7 +269,7 @@ REBARR *Struct_To_Array(REBSTU *stu)
 }
 
 
-void MF_Struct(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Struct(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -1425,7 +1425,7 @@ REB_R PD_Struct(
 //
 //  Cmp_Struct: C
 //
-REBINT Cmp_Struct(const REBCEL *s, const REBCEL *t)
+REBINT Cmp_Struct(REBCEL(const*) s, REBCEL(const*) t)
 {
     REBINT n = VAL_STRUCT_FIELDLIST(s) - VAL_STRUCT_FIELDLIST(t);
     fail_if_non_accessible(VAL_STRUCT(s));
@@ -1441,7 +1441,7 @@ REBINT Cmp_Struct(const REBCEL *s, const REBCEL *t)
 //
 //  CT_Struct: C
 //
-REBINT CT_Struct(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Struct(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     switch (mode) {
     case 1: // strict equality

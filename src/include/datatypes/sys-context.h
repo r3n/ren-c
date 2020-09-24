@@ -264,7 +264,7 @@ inline static void FAIL_IF_INACCESSIBLE_CTX(REBCTX *c) {
     }
 }
 
-inline static REBCTX *VAL_CONTEXT(const REBCEL *v) {
+inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
     assert(ANY_CONTEXT_KIND(CELL_KIND(v)));
     assert(
         (VAL_PHASE_UNCHECKED(v) != nullptr) == (CELL_KIND(v) == REB_FRAME)

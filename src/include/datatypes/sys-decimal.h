@@ -37,12 +37,12 @@
 #else
     // allows an assert, but also lvalue: `VAL_DECIMAL(v) = xxx`
     //
-    inline static REBDEC & VAL_DECIMAL(REBCEL *v) { // C++ reference type
+    inline static REBDEC VAL_DECIMAL(REBCEL(const*) v) { // C++ reference type
         assert(CELL_KIND(v) == REB_DECIMAL or CELL_KIND(v) == REB_PERCENT);
         return PAYLOAD(Decimal, v).dec;
     }
-    inline static REBDEC VAL_DECIMAL(const REBCEL *v) {
-        assert(CELL_KIND(v) == REB_DECIMAL or CELL_KIND(v) == REB_PERCENT);
+    inline static REBDEC & VAL_DECIMAL(RELVAL *v) {
+        assert(VAL_TYPE(v) == REB_DECIMAL or VAL_TYPE(v) == REB_PERCENT);
         return PAYLOAD(Decimal, v).dec;
     }
 #endif

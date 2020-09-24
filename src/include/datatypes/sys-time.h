@@ -38,13 +38,13 @@
 #else
     // C++ has reference types--use them and add extra assert it's a date
 
-    inline static REBYMD& VAL_DATE(REBCEL *v) {
+    inline static REBYMD VAL_DATE(REBCEL(const*) v) {
         assert(CELL_KIND(v) == REB_DATE);
         return EXTRA(Date, v).ymdz; // mutable reference
     }
 
-    inline static const REBYMD& VAL_DATE(const REBCEL *v) {
-        assert(CELL_KIND(v) == REB_DATE);
+    inline static REBYMD & VAL_DATE(RELVAL *v) {
+        assert(VAL_TYPE(v) == REB_DATE);
         return EXTRA(Date, v).ymdz; // const reference
     }
 #endif
@@ -79,7 +79,7 @@
 //
 #define NO_DATE_ZONE -64
 
-inline static bool Does_Date_Have_Time(const REBCEL *v)
+inline static bool Does_Date_Have_Time(REBCEL(const*) v)
 {
     assert(CELL_KIND(v) == REB_DATE);
     if (PAYLOAD(Time, v).nanoseconds == NO_DATE_TIME) {
@@ -89,7 +89,7 @@ inline static bool Does_Date_Have_Time(const REBCEL *v)
     return true;
 }
 
-inline static bool Does_Date_Have_Zone(const REBCEL *v)
+inline static bool Does_Date_Have_Zone(REBCEL(const*) v)
 {
     assert(CELL_KIND(v) == REB_DATE);
     if (VAL_DATE(v).zone == NO_DATE_ZONE)  // out of band of 7-bit field
@@ -98,7 +98,7 @@ inline static bool Does_Date_Have_Zone(const REBCEL *v)
     return true;
 }
 
-inline static int VAL_ZONE(const REBCEL *v) {
+inline static int VAL_ZONE(REBCEL(const*) v) {
     assert(Does_Date_Have_Zone(v));
     return VAL_DATE(v).zone;
 }
@@ -110,7 +110,7 @@ inline static int VAL_ZONE(const REBCEL *v) {
 //
 //=////////////////////////////////////////////////////////////////////////=//
 
-inline static REBI64 VAL_NANO(const REBCEL *v) {
+inline static REBI64 VAL_NANO(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_TIME or Does_Date_Have_Time(v));
     return PAYLOAD(Time, v).nanoseconds;
 }

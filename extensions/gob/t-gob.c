@@ -51,7 +51,7 @@ const struct {
 //
 //  CT_Gob: C
 //
-REBINT CT_Gob(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Gob(REBCEL(const*) a, REBCEL(const*) b, REBINT mode)
 {
     if (mode >= 0)
         return VAL_GOB(a) == VAL_GOB(b) && VAL_GOB_INDEX(a) == VAL_GOB_INDEX(b);
@@ -100,7 +100,7 @@ REBGOB *Make_Gob(void)
 //
 //  Cmp_Gob: C
 //
-REBINT Cmp_Gob(const REBCEL *g1, const REBCEL *g2)
+REBINT Cmp_Gob(REBCEL(const*) g1, REBCEL(const*) g2)
 {
     REBINT n;
 
@@ -841,7 +841,7 @@ REB_R PD_Gob(
 //
 //  MF_Gob: C
 //
-void MF_Gob(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Gob(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 

@@ -1053,7 +1053,7 @@ REBCTX *Error_No_Memory(REBLEN bytes)
 //
 //  Error_No_Relative_Core: C
 //
-REBCTX *Error_No_Relative_Core(const REBCEL *any_word)
+REBCTX *Error_No_Relative_Core(REBCEL(const*) any_word)
 {
     DECLARE_LOCAL (unbound);
     Init_Any_Word(
@@ -1478,7 +1478,7 @@ static void Mold_Value_Limit(REB_MOLD *mo, RELVAL *v, REBLEN limit)
 //
 //  MF_Error: C
 //
-void MF_Error(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Error(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     // Protect against recursion. !!!!
     //
