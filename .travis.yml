@@ -203,8 +203,11 @@ matrix:
       # files that end in .c as c++ ("-x c++") is deprecated for some overly
       # prescriptive and annoying reason.
       #
+      # Note: Homebrew (and Apple) no longer support OS X 10.12, so this is
+      # the minimum we bother to try.
+      #
       os: osx
-      osx_image: xcode8.3  # try an older XCode (on OS X 10.12)
+      osx_image: xcode9.4  # try an older XCode (on OS X 10.13)
       language: cpp
       env:
         - NUMBER=3
@@ -236,7 +239,7 @@ matrix:
       # them in at least one build.
       #
       os: osx
-      osx_image: xcode9.1  # try a newer XCode (on OS X 10.12)
+      osx_image: xcode12u  # try a newer XCode (on OS X 10.15.5)
       language: cpp
       env:
         - NUMBER=4
