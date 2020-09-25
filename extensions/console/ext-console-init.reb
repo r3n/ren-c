@@ -7,7 +7,7 @@ REBOL [
     Options: []  ; !!! If ISOLATE, wouldn't see LIB/PRINT changes, etc.
 
     Rights: {
-        Copyright 2016-2018 Rebol Open Source Contributors
+        Copyright 2016-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {

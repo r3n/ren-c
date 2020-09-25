@@ -4,7 +4,7 @@ REBOL [
     File: %encap-tcc-resources.reb  ; used by MAKE-EMITTER
 
     Rights: {
-        Copyright 2019 Rebol Open Source Contributors
+        Copyright 2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {

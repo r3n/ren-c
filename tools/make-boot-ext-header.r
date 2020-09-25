@@ -4,7 +4,7 @@ REBOL [
     File: %make-boot-ext-header.r  ; EMIT-HEADER uses to note emitting script
     Rights: {
         Copyright 2017 Atronix Engineering
-        Copyright 2017-2018 Rebol Open Source Contributors
+        Copyright 2017-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {

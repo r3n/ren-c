@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2011 Andreas Bolka <a AT bolka DOT at>
-// Copyright 2018-2019 Rebol Open Source Contributors
+// Copyright 2018-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 // (Links with the ØMQ library, the use of which is granted under the terms of
 // the GNU Lesser General Public License (LGPL), Version 3.)

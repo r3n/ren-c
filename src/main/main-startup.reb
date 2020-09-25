@@ -4,7 +4,7 @@ REBOL [
     File: %main-startup.r
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -82,7 +82,7 @@ boot-banner: [
     "REBOL 3.0 (Ren-C branch)"
     -
     = Copyright: "2012 REBOL Technologies"
-    = Copyright: "2012-2017 Rebol Open Source Contributors"
+    = Copyright: "2012-2017 Ren-C Open Source Contributors"
     = "" "Apache 2.0 License, see LICENSE."
     = Website:  "http://github.com/metaeducation/ren-c"
     -

@@ -2,7 +2,7 @@ REBOL [
     System: "REBOL [R3] Language Interpreter and Run-time Environment"
     Title: "Common Code for Emitting Text Files"
     Rights: {
-        Copyright 2016-2018 Rebol Open Source Contributors
+        Copyright 2016-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -293,7 +293,7 @@ make-emitter: function [
             **
             **  REBOL [R3] Language Interpreter and Run-time Environment
             **  Copyright 2012 REBOL Technologies
-            **  Copyright 2012-2018 Rebol Open Source Contributors
+            **  Copyright 2012-2018 Ren-C Open Source Contributors
             **  REBOL is a trademark of REBOL Technologies
             **  Licensed under the Apache License, Version 2.0
             **
@@ -327,7 +327,7 @@ make-emitter: function [
                 File: (stem)
                 Rights: {
                     Copyright 2012 REBOL Technologies
-                    Copyright 2012-2018 Rebol Open Source Contributors
+                    Copyright 2012-2018 Ren-C Open Source Contributors
                     REBOL is a trademark of REBOL Technologies
                 }
                 License: {

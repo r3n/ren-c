@@ -3,7 +3,7 @@ REBOL [
     Title: "Rebol2 and Red Compatibility Shim"
     Homepage: https://trello.com/b/l385BE7a/porting-guide
     Rights: {
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {

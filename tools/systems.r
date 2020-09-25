@@ -3,7 +3,7 @@ REBOL [
     Title: "System build targets"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2017 Rebol Open Source Contributors
+        Copyright 2012-2017 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {

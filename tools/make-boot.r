@@ -4,7 +4,7 @@ REBOL [
     File: %make-boot.r  ; used by EMIT-HEADER to indicate emitting script
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -58,7 +58,7 @@ mkdir/deep probe core
 Title: {
     REBOL
     Copyright 2012 REBOL Technologies
-    Copyright 2012-2019 Rebol Open Source Contributors
+    Copyright 2012-2019 Ren-C Open Source Contributors
     REBOL is a trademark of REBOL Technologies
     Licensed under the Apache License, Version 2.0
 }

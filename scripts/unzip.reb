@@ -3,7 +3,7 @@ REBOL [
     Title: "Zip and Unzip Services"
     Rights: {
         Copyright 2009 Vincent Ecuyer
-        Copyright 2009-2019 Rebol Open Source Contributors
+        Copyright 2009-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
 
         See README.md and CREDITS.md for more information.

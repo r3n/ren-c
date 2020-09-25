@@ -7,7 +7,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2018-2019 Rebol Open Source Contributors
+// Copyright 2018-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.

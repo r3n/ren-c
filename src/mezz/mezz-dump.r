@@ -3,7 +3,7 @@ REBOL [
     Title: "REBOL 3 Mezzanine: Dump"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2018 Rebol Open Source Contributors
+        Copyright 2012-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {

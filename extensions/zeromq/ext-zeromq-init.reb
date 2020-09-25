@@ -11,7 +11,7 @@ REBOL [
 
     Rights: [
         "Copyright (C) 2011 Andreas Bolka <a AT bolka DOT at>"
-        "Copyright (C) 2018 Rebol Open Source Developers"
+        "Copyright (C) 2018 Ren-C Open Source Contributors"
     ]
 
     License: {

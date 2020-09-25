@@ -12,7 +12,7 @@ REBOL [
 
     Rights: {
         Copyright 2017 Atronix Engineering
-        Copyright 2017-2018 Rebol Open Source Developers
+        Copyright 2017-2018 Ren-C Open Source Contributors
     }
     License: {
         Licensed under the Apache License, Version 2.0

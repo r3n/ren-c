@@ -3,7 +3,7 @@ REBOL [
     Title: "Generate native specifications"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2020 Rebol Open Source Developers
+        Copyright 2012-2020 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {

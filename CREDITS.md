@@ -1,6 +1,6 @@
 > This file's intent is to centralize credit to organizations, individuals,
 > and to code + libraries + tools used.  For all new source contributions
-> please give copyright attribution to "Rebol Open Source Contributors".
+> please give copyright attribution to "Ren-C Open Source Contributors".
 > Include any new credits in pull requests as a modification to this file.
 >
 > **NOTE** The project has also benefited from significant supporting work

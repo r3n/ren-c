@@ -4,7 +4,7 @@ REBOL [
     File: %natives-emitters.r
     Rights: {
         Copyright 2017 Atronix Engineering
-        Copyright 2017 Rebol Open Source Contributors
+        Copyright 2017 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {

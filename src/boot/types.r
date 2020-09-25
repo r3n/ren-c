@@ -3,7 +3,7 @@ REBOL [
     Title: "Rebol datatypes and their related attributes"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Developers
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {

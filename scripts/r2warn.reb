@@ -3,7 +3,7 @@ REBOL [
     Title: "Warnings for Rebol2 users who are using Ren-C"
     Homepage: https://trello.com/b/l385BE7a/porting-guide
     Rights: {
-        Copyright 2012-2018 Rebol Open Source Contributors
+        Copyright 2012-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
