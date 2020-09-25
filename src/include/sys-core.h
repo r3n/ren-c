@@ -120,7 +120,15 @@
     //
     // `stdin` is required to be macro https://en.cppreference.com/w/c/io
     //
-    #if defined(stdin) and !defined(REBOL_ALLOW_STDIO_IN_RELEASE_BUILD)
+    #ifdef TO_OSX_X64
+        //
+        // !!! At least as of XCode 12.0, including basic system headers will
+        // force the inclusion of <stdio.h>.  If someone with an OS X system
+        // wants to dig into why that is, they may...but tolerate it for now.
+        // Checking if `printf` and such makes it into the link would require
+        // dumping the library symbols, in general anyway...
+        //
+    #elif defined(stdin) and !defined(REBOL_ALLOW_STDIO_IN_RELEASE_BUILD)
         #error "<stdio.h> included prior to %sys-core.h in release build"
     #endif
 
