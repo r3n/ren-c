@@ -71,8 +71,6 @@ args: parse-args system/script/args  ; either from command line or DO/ARGS
 do %tools/systems.r
 system-config: config-system args/OS_ID
 
-do %scripts/unzip.reb
-
 all [
     config-tccdir: try local-to-file try get-env "CONFIG_TCCDIR"
     (exists? config-tccdir) or [
