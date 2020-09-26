@@ -71,7 +71,7 @@ make object! compose [
                 "test returned void"
             ]
             not logic? :result [
-                spaced ["was" (an type of :result) ", not logic!"]
+                spaced ["was" (an type of get/any 'result) ", not logic!"]
             ]
             not :result [
                 "test returned #[false]"
