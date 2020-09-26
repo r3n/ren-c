@@ -993,7 +993,12 @@ void MF_String(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
       case REB_ISSUE:
         Append_Codepoint(mo->series, '#');
-        Append_String(mo->series, v, VAL_LEN_AT(v));
+
+        if (VAL_LEN_AT(v) == 0) {
+            // Just be `#` (Note `#""` would LOAD as invalid character ATM)
+        }
+        else
+            Append_String(mo->series, v, VAL_LEN_AT(v));
         break;
 
       default:

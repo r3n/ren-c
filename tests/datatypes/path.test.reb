@@ -185,7 +185,7 @@
 
 ; ISSUE! has internal slashes (like FILE!), and does not load as a path
 [
-    ("iss/ue/path" = as text! ensure issue! "#iss/ue/path")
+    ("iss/ue/path" = as text! ensure issue! load "#iss/ue/path")
 ]
 
 ; https://gitter.im/red/red?at=5b23be5d1ee2d149ecc4c3fd

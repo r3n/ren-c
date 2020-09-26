@@ -1218,6 +1218,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             HAS_LEX_FLAG(flags, LEX_SPECIAL_AT)  // @ anywhere but at the head
             and *cp != '<'  // want <foo="@"> to be a TAG!, not an EMAIL!
             and *cp != '\''  // want '@foo to be a SYM-WORD!
+            and *cp != '#'  // want #@ to be an ISSUE! (charlike)
         ){
             if (*cp == '@')  // consider `@a@b`, `@@`, etc. ambiguous
                 fail (Error_Syntax(ss, TOKEN_EMAIL));
@@ -1234,21 +1235,37 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             panic ("@ dead end");
 
           case LEX_SPECIAL_PERCENT:  // %filename
+            token = TOKEN_FILE;
+
+          issue_or_file_token:  // issue jumps here, should set `token`
+            assert(token == TOKEN_FILE or token == TOKEN_ISSUE);
+
             cp = ss->end;
+            if (*cp == ';') {
+                //
+                // !!! Help catch errors when writing `#;` which is an easy
+                // mistake to make thinking it's like `#:` and a way to make
+                // a single character.
+                //
+                ss->end = cp;
+                fail (Error_Syntax(ss, token));
+            }
             if (*cp == '"') {
                 cp = Scan_Quote_Push_Mold(mo, cp, ss);
                 if (not cp)
-                    fail (Error_Syntax(ss, TOKEN_FILE));
+                    fail (Error_Syntax(ss, token));
                 ss->end = cp;
-                return TOKEN_FILE;
+                return token;
             }
             while (*cp == '/' or *cp == '.') {  // deal path/tuple delimiters
                 cp++;
+
                 while (IS_LEX_NOT_DELIMIT(*cp))
                     ++cp;
             }
+
             ss->end = cp;
-            return TOKEN_FILE;
+            return token;
 
           case LEX_SPECIAL_COLON:  // :word :12 (time)
             assert(false);  // !!! Time form not supported ATM (use 0:12)
@@ -1386,8 +1403,11 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
                 //
                 fail (Error_Missing(level, '}'));
             }
-            if (cp - 1 == ss->begin)
-                return TOKEN_ISSUE;
+            if (cp - 1 == ss->begin) {
+                --cp;
+                token = TOKEN_ISSUE;
+                goto issue_or_file_token;  // same policies on including `/`
+            }
 
             fail (Error_Syntax(ss, TOKEN_INTEGER));
 
@@ -3030,10 +3050,18 @@ const REBYTE *Scan_Any_Word(
 // Scan an issue word, allowing special characters.
 // Returning null should trigger an error in the caller.
 //
+// Passed in buffer and size does not count the leading `#` so that the code
+// can be used to create issues from buffers without it (e.g. TO-HEX).
+//
+// !!! Since this follows the same rules as FILE!, the code should merge,
+// though FILE! will make mutable strings and not have in-cell optimization.
+//
 const REBYTE *Scan_Issue(RELVAL *out, const REBYTE *cp, REBLEN len)
 {
-    if (len == 0)
-        return nullptr;
+    if (len == 0) {  // Lone `#` means empty issue!, TBD: alias 0 codepoint
+        Init_Issue(out, VAL_STRING(EMPTY_TEXT));
+        return cp;
+    }
 
     while (IS_LEX_SPACE(*cp))  // skip whitespace
         ++cp;
@@ -3042,42 +3070,39 @@ const REBYTE *Scan_Issue(RELVAL *out, const REBYTE *cp, REBLEN len)
 
     REBLEN l = len;
     while (l > 0) {
+        //
+        // Allows nearly every visible character that isn't a delimiter
+        // as a char surrogate, e.g. #\ or #@ are legal, as are #<< and #>>
+        //
         switch (GET_LEX_CLASS(*bp)) {
           case LEX_CLASS_DELIMIT:
-            if (GET_LEX_VALUE(*bp) != LEX_DELIMIT_PERIOD)
-                return nullptr;
+            switch (GET_LEX_VALUE(*bp)) {
+              case LEX_DELIMIT_SLASH:  // internal slashes are legal
+              case LEX_DELIMIT_PERIOD:  // internal dots also legal
+                break;
 
-            goto lex_word_or_number;
+              case LEX_DELIMIT_SEMICOLON:
+                assert(false);  // scanner shouldn't get here (error case)
+                break;
 
-          case LEX_CLASS_SPECIAL: {  // Flag all but first special char
-            REBLEN c = GET_LEX_VALUE(*bp);
-            if (
-                LEX_SPECIAL_APOSTROPHE != c
-                and LEX_SPECIAL_COMMA != c
-                and LEX_SPECIAL_PLUS != c
-                and LEX_SPECIAL_MINUS != c
-                and LEX_SPECIAL_BAR != c
-                and LEX_SPECIAL_BLANK != c
-                and LEX_SPECIAL_COLON != c
-
-                // !!! R3-Alpha didn't allow #<< or #>>, but this was used
-                // in things like pdf-maker.r - and Red allows it.  Ren-C
-                // aims to make ISSUE!s back into strings, so allow it here.
-                //
-                and LEX_SPECIAL_GREATER != c
-                and LEX_SPECIAL_LESSER != c
-            ){
-                return nullptr;
+              default:
+                // ultimately #{...} and #"..." should be "ISSUECHAR!"
+                return nullptr;  // other purposes, `#(` `#[`, etc.
             }
-            goto lex_word_or_number; }
+            break;
 
-          lex_word_or_number:
           case LEX_CLASS_WORD:
+            if (*bp == '^')
+                return nullptr;  // TBD: #^(NN) for light-looking escapes
+            break;
+
+          case LEX_CLASS_SPECIAL:  // includes `<` and '>'
           case LEX_CLASS_NUMBER:
-            ++bp;
-            --l;
             break;
         }
+
+        ++bp;
+        --l;
     }
 
     Init_Issue(out, Make_Sized_String_UTF8(cs_cast(cp), len));
