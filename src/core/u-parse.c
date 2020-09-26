@@ -2769,8 +2769,17 @@ REBNATIVE(parse)
     REBLEN progress = VAL_UINT32(D_OUT);
     assert(progress <= VAL_LEN_HEAD(ARG(input)));
     Move_Value(D_OUT, ARG(input));
+
+    // !!! Current policy is to try to return the same number of quotes as
+    // the input.  VAL_INDEX() allows reading indices out of REBCEL which
+    // are guaranteed unescaped (hence you won't be falsely reading out of
+    // the data of a REB_QUOTED container).  But REBCEL is read only, so
+    // the writes must be done to a RELVAL.  We must dequote and requote to
+    // make sure we don't write to a REB_QUOTED or shared contained cell.
+    //
+    REBLEN num_quotes = Dequotify(D_OUT);
     VAL_INDEX(D_OUT) = progress;
-    return D_OUT;
+    return Quotify(D_OUT, num_quotes);
 }
 
 
