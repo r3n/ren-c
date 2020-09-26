@@ -1838,12 +1838,12 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             assert(ss->end > bp);
             lit_depth = ss->end - bp;
 
-            if (not ANY_CR_LF_END(*ss->begin))  // more to come...(maybe)
-                goto loop;  // so wrap next value
+            if (*ss->begin != '\0' and not IS_LEX_ANY_SPACE(*ss->begin))
+                goto loop;  // isn't a lone quoting, apply lit_depth to next
 
             Quotify(Init_Nulled(DS_PUSH()), lit_depth);
             lit_depth = 0;
-            goto loop; }  // wrap next value
+            goto loop; }
 
           case TOKEN_SYM_GROUP_BEGIN:
           case TOKEN_SYM_BLOCK_BEGIN:
