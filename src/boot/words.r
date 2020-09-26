@@ -217,6 +217,7 @@ lit-word!  ; !!! simulated datatype constraint (a QUOTED! like 'x)
 lit-path!  ; !!! simulated datatype costraint (a QUOTED! like 'x/y)
 refinement!  ; !!! simulated datatype constraint (a PATH! like `/word`)
 predicate!  ; !!! simulated datatype constraint (a TUPLE! like `.word`)
+blackhole!  ; !!! simulated datatype constraint (the ISSUE! `#`)
 match
 do
 into

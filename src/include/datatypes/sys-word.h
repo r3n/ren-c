@@ -408,6 +408,40 @@ inline static const REBYTE *VAL_UTF8_LIMIT_AT(
     VAL_UTF8_LIMIT_AT(nullptr, (size_out), (v), UNKNOWN)
 
 
+// An empty ISSUE! is a "black hole".  It looks like `#`.
+//
+// Use it when you want to opt-IN to a calculation, but opt-OUT of the result.
+// This is in contrast with BLANK!, which typically opts out of both, and the
+// truthy nature of ISSUE! helps write clean and mostly safe code for it:
+//
+//     do-something [foo /bar [blank! word! path! space!] <local> result] [
+//          do-some-processing-on foo
+//          if bar [  ; unlike BLANK!, blackhole is truthy so branch runs
+//             result: more-processing-on foo
+//             set bar result  ; blackhole SET is no-op (BLANK! would error)
+//          ]
+//     ]
+//
+// The alias "BLACKHOLE!" is a type constraint which is today just a synonym
+// for ISSUE!, but will hopefully have teeth in the future.
+//
+inline static bool Is_Blackhole(const RELVAL *v) {
+    if (not IS_ISSUE(v))
+        return false;
+
+    if (VAL_LEN_AT(v) == 0)
+        return true;
+
+    // Anything that accepts "blackholes" should not have broader meaning for
+    // ISSUE!s taken.  Ultimately this will be corrected for by having
+    // BLACKHOLE! be a type constraint with teeth, that doesn't pass through
+    // all ISSUE!s.  But for now, simplify callsites by handling the error
+    // raising for them when they do the blackhole test.
+    //
+    fail ("Only plain # can be used with 'blackhole' SPACE! interpretation");
+}
+
+
 // To make interfaces easier for some functions that take REBSTR* strings,
 // it can be useful to allow passing UTF-8 text, a REBVAL* with an ANY-WORD!
 // or ANY-STRING!, or just plain UTF-8 text.

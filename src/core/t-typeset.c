@@ -188,6 +188,7 @@ bool Add_Typeset_Bits_Core(
                 CLEAR_ALL_TYPESET_BITS(typeset);
                 TYPE_SET(typeset, REB_TS_REFINEMENT);
                 TYPE_SET(typeset, REB_NULLED);
+                TYPE_SET(typeset, REB_ISSUE);  // see Is_Blackhole()
                 TYPE_SET(typeset, REB_WORD);
                 TYPE_SET(typeset, REB_PATH);
                 break;
@@ -232,6 +233,10 @@ bool Add_Typeset_Bits_Core(
         }
         else if (IS_SYM_WORD(item)) {  // see Startup_Fake_Type_Constraint()
             switch (VAL_WORD_SYM(item)) {
+              case SYM_BLACKHOLE_X:
+                TYPE_SET(typeset, REB_ISSUE);
+                break;
+
               case SYM_LIT_WORD_X:
               case SYM_LIT_PATH_X:
                 TYPE_SET(typeset, REB_QUOTED);

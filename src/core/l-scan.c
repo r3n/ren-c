@@ -2944,13 +2944,16 @@ REBNATIVE(transcode)
     if (REF(relax)) {
         bool failed = Scan_To_Stack_Relaxed_Failed(&level);
 
-        REBVAL *var = Lookup_Mutable_Word_May_Fail(ARG(relax), SPECIFIED);
-        if (failed) {
-            Move_Value(var, DS_TOP);
-            DS_DROP();
+        if (not Is_Blackhole(REF(relax))) {
+            REBVAL *var = Lookup_Mutable_Word_May_Fail(ARG(relax), SPECIFIED);
+            if (failed)
+                Move_Value(var, DS_TOP);
+            else
+                Init_Nulled(var);
         }
-        else
-            Init_Nulled(var);
+
+        if (failed)
+            DS_DROP();
     }
     else
         Scan_To_Stack(&level);
@@ -2983,7 +2986,7 @@ REBNATIVE(transcode)
     // Return the input BINARY! or TEXT! advanced by how much the transcode
     // operation consumed.
     //
-    if (REF(next)) {
+    if (REF(next) and not Is_Blackhole(ARG(next))) {
         REBVAL *var = Sink_Word_May_Fail(ARG(next), SPECIFIED);
         Move_Value(var, source);
 

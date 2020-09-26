@@ -438,14 +438,13 @@ REB_R Compose_To_Stack_Core(
 //
 //  {Evaluates only contents of GROUP!-delimited expressions in an array}
 //
-//      return: "May return NULL if PATH! compose dissolves"
-//          [<opt> any-array! any-path! any-word! action! integer! text! tag!]
-//      :predicate "Function to run on composed slots (default: ENBLOCK)"
-//          [<skip> predicate! action!]
+//      return: [blackhole! any-array! any-path! any-word! action!]
+//      :predicate [<skip> action!]  ; !!! PATH! may be meant as value (!)
+//          "Function to run on composed slots (default: ENBLOCK)"
 //      :label "Distinguish compose groups, e.g. [(plain) (<*> composed)]"
 //          [<skip> tag! file!]
-//      value "Array to use as the template (no-op if WORD! or ACTION!)"
-//          [any-array! any-path! any-word! action!]
+//      value "The template to fill in (no-op if WORD!, ACTION! or SPACE!)"
+//          [blackhole! any-array! any-path! any-word! action!]
 //      /deep "Compose deeply into nested arrays"
 //      /only "Do not exempt ((...)) from predicate application"
 //  ]
@@ -460,6 +459,9 @@ REBNATIVE(compose)
     REBVAL *predicate = ARG(predicate);
     if (Cache_Predicate_Throws(D_OUT, predicate))
         return R_THROWN;
+
+    if (Is_Blackhole(ARG(value)))
+        RETURN (ARG(value));  // sink locations composed to avoid double eval
 
     if (ANY_WORD(ARG(value)) or IS_ACTION(ARG(value)))
         RETURN (ARG(value));  // makes it easier to `set/hard compose target`

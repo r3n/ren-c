@@ -2242,7 +2242,9 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         for (; NOT_END(check); ++check) {
             if (IS_BLANK(check) or IS_WORD(check) or IS_PATH(check))
                 continue;
-            fail ("SET-BLOCK! elements must be WORD/PATH/BLANK for now.");
+            if (Is_Blackhole(check))
+                continue;
+            fail ("SET-BLOCK! elements must be WORD/PATH/BLANK/ISSUE for now");
         }
 
         if (not (IS_WORD(*next) or IS_PATH(*next) or IS_ACTION(*next)))
@@ -2275,6 +2277,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         //
         const REBU64 ts_out = FLAGIT_KIND(REB_TS_REFINEMENT)
             | FLAGIT_KIND(REB_NULLED)
+            | FLAGIT_KIND(REB_ISSUE)  // for Is_Blackhole() use with SET
             | FLAGIT_KIND(REB_WORD)
             | FLAGIT_KIND(REB_PATH);
 

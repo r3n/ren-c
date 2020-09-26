@@ -121,3 +121,12 @@
         value = [[😺 😺] (😺)]  ; no position out always gets block
     ]
 )
+
+; Test for "blackhole" functionality
+[
+    (10 = set # 10)  ; thrown away
+    ([abc def] = [# _]: transcode "abc def")  ; means /NEXT is NULL
+    ('abc = [# #]: transcode "abc def")  ; /NEXT is # so truthy, SET ignores
+    (null = [# # #]: transcode "3o4")
+    ('scan-invalid = pick trap [[# # _]: transcode "3o4"] 'id)
+]

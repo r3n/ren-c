@@ -2129,6 +2129,7 @@ REBNATIVE(subparse)
 
                 // !!! Simulate constrained types since they do not exist yet.
                 //
+                case SYM_BLACKHOLE_X:  // actually an ISSUE!
                 case SYM_LIT_WORD_X:  // actually a QUOTED!
                 case SYM_LIT_PATH_X:  // actually a QUOTED!
                 case SYM_REFINEMENT_X:  // actually a PATH!

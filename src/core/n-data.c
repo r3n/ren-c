@@ -643,6 +643,9 @@ void Set_Var_May_Fail(
     REBSPC *setval_specifier,
     bool hard
 ){
+    if (Is_Blackhole(target_orig))  // name for a space-bearing ISSUE! ('#')
+        return;
+
     REBCEL(const*) target = VAL_UNESCAPED(target_orig);
     enum Reb_Kind kind = CELL_TYPE(target);
 
@@ -694,7 +697,7 @@ void Set_Var_May_Fail(
 //
 //      return: [<opt> any-value!]
 //          {Will be the values set to, or void if any set values are void}
-//      target [any-word! any-sequence! block! quoted!]
+//      target [blackhole! any-word! any-path! block! quoted!]
 //          {Word or path, or block of words and paths}
 //      value [<opt> any-value!]
 //          "Value or block of values (NULL means unset)"
