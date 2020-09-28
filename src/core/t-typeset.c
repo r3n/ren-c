@@ -164,9 +164,12 @@ bool Add_Typeset_Bits_Core(
                 // the multiple return values prototyping stage, because it
                 // only has an effect when you use a SET-BLOCK! to the left.
                 //
+                CLEAR_ALL_TYPESET_BITS(typeset);
+                TYPE_SET(typeset, REB_TS_REFINEMENT);
                 TYPE_SET(typeset, REB_NULLED);
                 TYPE_SET(typeset, REB_WORD);
                 TYPE_SET(typeset, REB_PATH);
+                break;
             }
             else if (0 == Compare_String_Vals(item, Root_Skip_Tag, true)) {
                 if (VAL_PARAM_CLASS(typeset) != REB_P_HARD_QUOTE)

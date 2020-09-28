@@ -54,8 +54,8 @@ REBNATIVE(form)
 //      /flat "No indentation"
 //      /limit "Limit to a certain length"
 //          [integer!]
-//      /truncated "Returns LOGIC! of whether the mold was truncated"
-//          [<output>]
+//      /truncated "Whether the mold was truncated"
+//          [<output> logic!]
 //  ]
 //
 REBNATIVE(mold)

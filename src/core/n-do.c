@@ -506,7 +506,7 @@ REBNATIVE(do)
 //          varargs!  ; simulates as if frame! or block! is being executed
 //      ]
 //      /result "Value from the step (VOID! + quoted return pos if invisible)"
-//          [<output>]
+//          [<output> <opt> any-value!]
 //  ]
 //
 REBNATIVE(evaluate)

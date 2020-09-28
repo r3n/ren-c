@@ -156,6 +156,11 @@ inline static bool EQUAL_TYPESET(REBCEL(const*) v1, REBCEL(const*) v2) {
     return true;
 }
 
+inline static void CLEAR_ALL_TYPESET_BITS(RELVAL *v) {
+    VAL_TYPESET_HIGH_BITS(v) = 0;
+    VAL_TYPESET_LOW_BITS(v) = 0;
+}
+
 
 //=//// PARAMETER CLASS ///////////////////////////////////////////////////=//
 //

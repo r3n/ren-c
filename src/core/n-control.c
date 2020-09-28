@@ -1385,7 +1385,7 @@ REBNATIVE(default)
 //      block "Block to evaluate"
 //          [block!]
 //      /result "Evaluation result if not thrown"
-//          [<output>]
+//          [<output> <opt> any-value!]
 //      /name "Catches a named throw (single name if not block)"
 //          [block! word! action! object!]
 //      /quit "Special catch for QUIT native"

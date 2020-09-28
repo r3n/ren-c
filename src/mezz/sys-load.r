@@ -98,9 +98,9 @@ load-header: function [
         [file! url!]
     /only "Only process header, don't decompress body"
     /required "Script header is required"
-    /body [<output>]  ; [binary! block!]
-    /line [<output>]  ; integer!
-    /final [<output>]  ; binary!
+    /body [<output> binary! block!]
+    /line [<output> integer!]
+    /final [<output> binary!]
 
     <static>
     non-ws (make bitset! [not 1 - 32])
@@ -268,7 +268,7 @@ load: function [
     source "Source or block of sources"
         [file! url! text! binary! block!]
     /header "Request the Rebol header object be returned as well"
-        [<output>]
+        [<output> object!]
     /all "Load all values (cannot be used with /HEADER)"
     /type "E.g. rebol, text, markup, jpeg... (by default, auto-detected)"
         [word!]

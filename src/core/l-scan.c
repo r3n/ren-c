@@ -2711,9 +2711,9 @@ void Shutdown_Scanner(void)
 //      source "If BINARY!, must be Unicode UTF-8 encoded"
 //          [text! binary!]
 //      /next "Translate next complete value and give back next position"
-//          [<output>]  ; <opt> text! binary!
+//          [<output> <opt> text! binary!]
 //      /relax "Return an error and skip token if possible (top level only)"
-//          [<output>]  ; <opt> error!
+//          [<output> <opt> error!]
 //      /file "File to be associated with BLOCK!s and GROUP!s in source"
 //          [file! url!]
 //      /line "Line number for start of scan, word variable will be updated"

@@ -55,7 +55,7 @@ static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
 //      code "Code to execute and monitor"
 //          [block! action!]
 //      /result "The optional output result of the evaluation"
-//          [<output>]
+//          [<output> <opt> any-value!]
 //  ]
 //
 REBNATIVE(trap)
