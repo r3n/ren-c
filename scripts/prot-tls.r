@@ -195,22 +195,39 @@ debug: (comment [:print] blank)
 emit: function [
     {Emits binary data, optionally marking positions with SET-WORD!}
 
+    return: [void!]
     ctx [object!]
     code [block! binary!]
     <local> result
 ][
-    if block? code [
-        while [code: sync-invisibles code] [
-            if set-word? code/1 [
-                set code/1 tail ctx/msg  ; save position
-                code: my next
-            ] else [
-                code: evaluate @result code else [break]
+    if binary? code [
+        append ctx/msg code
+        return
+    ]
+
+    while [code] [
+        if set-word? code/1 [
+            set code/1 tail ctx/msg  ; save position
+            code: my next
+        ]
+        else [
+            ; Keep evaluating so long as returned code pos is quoted, as
+            ; it indicates invisible eval (`emit ctx [comment "X" ...]`)
+            ;
+            ; Note: this would be nicer with predicates, since UNTIL's
+            ; ultimate return result after looping could be falsey:
+            ;
+            ;    if until .not.quoted? [[code result]: evaluate code] [
+            ;         append ctx/msg ensure binary! result
+            ;    ]
+            ;
+            until [
+                not quoted? [code result]: evaluate code
+            ]
+            if code [
                 append ctx/msg ensure binary! result
             ]
         ]
-    ] else [
-        append ctx/msg code
     ]
 ]
 

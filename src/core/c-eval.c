@@ -384,8 +384,18 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
             return true;
     }
     else {  // !!! Reusing the frame, would inert optimization be worth it?
-        if ((*PG_Eval_Maybe_Stale_Throws)(f))  // reuse `f`
-            return true;
+        do {
+            if ((*PG_Eval_Maybe_Stale_Throws)(f))  // reuse `f`
+                return true;
+
+            // Keep evaluating as long as evaluations vanish, e.g.
+            // `x: comment "hi" 2` shouldn't fail.
+            //
+            // !!! Note this behavior is already handled by FULFILLING_ARG
+            // but but we are reusing a frame that may-or-may-not be
+            // fulfilling.  There may be a better way of centralizing this.
+            //
+        } while (IS_END(f->out) and NOT_END(*next));
     }
 
     if (IS_END(f->out))  // e.g. `do [x: ()]` or `(x: comment "hi")`.
@@ -1710,18 +1720,39 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
             // !!! Ideally we would check that f->out hadn't changed, but
             // that would require saving the old value somewhere...
-            //
-            // !!! Why is this test a NOT?
 
-            if (NOT_CELL_FLAG(f->out, OUT_MARKED_STALE) or IS_END(*next))
+            // If a "good" output is in `f->out`, the invisible should have
+            // had no effect on it.  So jump to the position after output
+            // would be checked by a normal function.
+            //
+            if (NOT_CELL_FLAG(f->out, OUT_MARKED_STALE) or IS_END(*next)) {
+                //
+                // Note: could be an END that is not "stale", example:
+                //
+                //     is-barrier?: func [x [<end> integer!]] [null? x]
+                //     is-barrier? (<| 10)
+                //
+                goto skip_output_check;
+            }
+
+            // If the evaluation is being called by something like EVALUATE,
+            // they may want to see the next value literally.  Refer to this
+            // explanation:
+            //
+            // https://forum.rebol.info/t/1173/4
+            //
+            // But argument evaluation isn't customizable at that level, and
+            // wants all the invisibles processed.  So only do one-at-a-time
+            // invisibles if we're not fulfilling arguments.
+            //
+            if (NOT_EVAL_FLAG(f, FULFILLING_ARG))
                 goto skip_output_check;
 
-            // If an invisible is at the start of a frame and nothing is
-            // after it, it has to retrigger until it finds something (or
-            // until it hits the end of the frame).  It should not do a
-            // START_NEW_EXPRESSION()...the expression index doesn't update.
+            // Note that we do not do START_NEW_EXPRESSION() here when an
+            // invisible is being processed as part of an argument.  They
+            // all get lumped into one step.
             //
-            //     do [comment "a" 1] => 1
+            // !!! Review debugging implications.
 
             gotten = *next_gotten;
             v = Lookback_While_Fetching_Next(f);

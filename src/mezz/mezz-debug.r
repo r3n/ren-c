@@ -19,7 +19,12 @@ verify: function [
         {Conditions to check}
     <local> result
 ][
-    while [pos: evaluate @result conditions] [
+    while [pos: evaluate/result conditions 'result] [
+        if quoted? pos [  ; invisible that vaporized
+            conditions: pos
+            continue
+        ]
+
         if (void? :result) or [not :result] [
             ;
             ; including bars in the failure report looks messy, skip them

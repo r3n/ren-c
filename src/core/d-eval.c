@@ -255,7 +255,6 @@ void Do_Process_Action_Checks_Debug(REBFRM *f) {
 //  Do_After_Action_Checks_Debug: C
 //
 void Do_After_Action_Checks_Debug(REBFRM *f) {
-    assert(NOT_END(f->out));
     assert(not Is_Evaluator_Throwing_Debug());
 
     if (GET_SERIES_INFO(f->varlist, INACCESSIBLE)) // e.g. ENCLOSE

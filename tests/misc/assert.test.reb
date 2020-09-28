@@ -59,3 +59,12 @@
     e: trap [10 + 10 matched text!]
     e/id = 'assertion-failure
 )
+
+; Invisibles
+(
+    assert []
+    assert [comment "hi" 1]
+    assert [1 elide 2 + 3]
+    assert [comment "hi" (true)]
+    assert [(true) elide 2 + 3]
+)

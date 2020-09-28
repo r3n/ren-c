@@ -14,7 +14,9 @@
 
 (
     val: <overwritten>
-    pos: evaluate @val [1 + comment "a" comment "b" 2 * 3 fail "too far"]
+    pos: evaluate/result [
+        1 + comment "a" comment "b" 2 * 3 fail "too far"
+    ] 'val
     did all [
         val = 9
         pos = [fail "too far"]
@@ -22,7 +24,9 @@
 )
 (
     val: <overwritten>
-    pos: evaluate @val [1 comment "a" + comment "b" 2 * 3 fail "too far"]
+    pos: evaluate/result [
+        1 comment "a" + comment "b" 2 * 3 fail "too far"
+    ] 'val
     did all [
         val = 9
         pos = [fail "too far"]
@@ -30,7 +34,9 @@
 )
 (
     val: <overwritten>
-    pos: evaluate @val [1 comment "a" comment "b" + 2 * 3 fail "too far"]
+    pos: evaluate/result [
+        1 comment "a" comment "b" + 2 * 3 fail "too far"
+    ] 'val
     did all [
         val = 9
         pos = [fail "too far"]
@@ -53,17 +59,19 @@
 )
 
 (
-    error? trap [
+    e: trap [
         evaluate evaluate [1 elide "a" + elide "b" 2 * 3 fail "too far"]
     ]
+    e/id = 'expect-arg
 )
 (
-    error? trap [
-        evaluate evaluate [1 elide "a" elide "b" + 2 * 3 fail "too far"]
-    ]
+    pos: evaluate evaluate [1 elide "a" elide "b" + 2 * 3 fail "too far"]
+    pos = quote [elide "b" + 2 * 3 fail "too far"]
 )
 (
-    pos: evaluate @val [1 + 2 * 3 elide "a" elide "b" fail "too far"]
+    pos: evaluate [
+        1 + 2 * 3 elide "a" elide "b" fail "too far"
+    ] 'val
     did all [
         val = 9
         pos = [elide "a" elide "b" fail "too far"]

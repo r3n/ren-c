@@ -496,65 +496,73 @@ REBNATIVE(do)
 //
 //  {Perform a single evaluator step, returning the next source position}
 //
-//      return: [<opt> block! group! varargs!]
-//      :var "Is set with result of evaluation (left as-is if end/invisible)"
-//          [<skip> sym-word! sym-path! sym-group!]
+//      return: "Next position (quoted if result requested and invisible)"
+//          [<opt> quoted! block! group! varargs!]
 //      source [
 //          <blank>  ; useful for `evaluate try ...` scenarios when no match
+//          <dequote>  ; tolerate quoted input (quotes discarded)
 //          block!  ; source code in block form
 //          group!  ; same as block (or should it have some other nuance?)
 //          varargs!  ; simulates as if frame! or block! is being executed
 //      ]
-//      /set "DEPRECATED: use `evaluate @var` or `evaluate @(lit var:)` etc."
-//          [any-word!]
+//      /result "Value from the step (VOID! + quoted return pos if invisible)"
+//          [<output>]
 //  ]
 //
 REBNATIVE(evaluate)
 {
     INCLUDE_PARAMS_OF_EVALUATE;
 
-    if (REF(set))
-        fail ("EVALUATE/SET deprecated: https://forum.rebol.info/t/1173");
-
     REBVAL *source = ARG(source);  // may be only GC reference, don't lose it!
   #if !defined(NDEBUG)
     SET_CELL_FLAG(ARG(source), PROTECTED);
   #endif
 
-    REBVAL *var = ARG(var);
-
-    if (IS_SYM_GROUP(var)) {
-        if (Do_Any_Array_At_Throws(D_OUT, var, SPECIFIED))
-            return R_THROWN;
-
-        if (IS_BLANK(D_OUT))
-            Init_Nulled(var);  // for consistency with <skip>'d var
-        if (ANY_WORD(D_OUT) or ANY_PATH(D_OUT))
-            Move_Value(var, D_OUT);
-        else
-            fail ("@(...) for EVALUATE must be BLANK!/ANY-WORD!/ANY-PATH!");
-    }
+    REBVAL *var = ARG(result);
 
     switch (VAL_TYPE(source)) {
       case REB_BLOCK:
       case REB_GROUP: {
         REBLEN index;
-        if (Eval_Step_In_Any_Array_At_Throws(
-            D_SPARE,
-            &index,
-            source,
-            SPECIFIED,
-            EVAL_MASK_DEFAULT
-        )){
-            Move_Value(D_OUT, D_SPARE);
-            return R_THROWN;
+        if (VAL_LEN_AT(source) == 0) {  // `evaluate []` should return null
+            Init_Nulled(D_OUT);
+            Init_Void(D_SPARE);
         }
+        else {
+            if (Eval_Step_In_Any_Array_At_Throws(
+                D_SPARE,
+                &index,
+                source,
+                SPECIFIED,
+                EVAL_MASK_DEFAULT
+            )){
+                Move_Value(D_OUT, D_SPARE);
+                return R_THROWN;
+            }
 
-        if (IS_END(D_SPARE))  // we were at array end or was just COMMENT/etc.
-            return nullptr;  // leave the result variable with old value
+            Move_Value(D_OUT, source);
+            VAL_INDEX(D_OUT) = index;
 
-        Move_Value(D_OUT, source);
-        VAL_INDEX(D_OUT) = index;
+            if (IS_END(D_SPARE)) {
+                //
+                // This means the result was invisible:
+                //
+                //   evaluate [comment "hi" 1 + 2]  ; should return '[1 + 2]
+                //
+                // Adding a quote level on the return result helps cue the
+                // caller that the void we choose to return is actually
+                // invisible, if they want to do correct invisible handling.
+                //
+                // https://forum.rebol.info/t/1173/
+                //
+                Init_Void(D_SPARE);
+                Quotify(D_OUT, 1);  // void-is-invisible signal on array
+            }
+            else {
+                Move_Value(D_OUT, source);
+                VAL_INDEX(D_OUT) = index;
+            }
+        }
         break; }  // update variable
 
       case REB_VARARGS: {
@@ -622,9 +630,9 @@ REBNATIVE(evaluate)
         panic (source);
     }
 
-    if (not IS_NULLED(var))
+    if (IS_TRUTHY(var))
         Set_Var_May_Fail(
-            ARG(var), SPECIFIED,
+            var, SPECIFIED,
             D_SPARE, SPECIFIED,
             false  // not hard (e.g. GROUP!s don't run, and not literal)
         );

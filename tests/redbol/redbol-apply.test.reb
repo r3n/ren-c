@@ -1,21 +1,26 @@
 ; functions/control/apply.r
 
-(did redbol-apply: function [
+(did redbol-apply: func [
     return: [<opt> any-value!]
     action [action!]
     block [block!]
     /only
+    <local> arg frame params using-args
 ][
     frame: make frame! :action
     params: parameters of :action
     using-args: true
 
-    while [block: sync-invisibles block] [
+    while [not tail? block] [
         block: if only [
             arg: get* 'block/1
             try next block
         ] else [
-            try evaluate @(lit arg:) block
+            ; Skip comments and other invisibles.
+            ; (note: could be result IF when `until .not.quoted? [...]`
+            ;
+            until [not quoted? [block arg]: evaluate block]
+            try block
         ]
 
         if refinement? params/1 [

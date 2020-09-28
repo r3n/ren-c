@@ -158,7 +158,8 @@ pointfree*: func* [
             strict-equal? blank! type of :block/1 [block: skip block 1]
 
             match word! p/1 [
-                if not block: try evaluate @var block [
+                until [not quoted? block: try evaluate/result block 'var]
+                if not block [
                     break  ; ran out of args, assume remaining unspecialized
                 ]
                 frame/(p/1): :var

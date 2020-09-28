@@ -55,9 +55,10 @@ bool Reduce_To_Stack_Throws(
             return true;
         }
 
-        if (IS_END(out)) {  // e.g. `reduce []` or `reduce [comment "hi"]`
-            assert(IS_END(*v));
-            break;
+        if (IS_END(out)) {
+            if (IS_END(*v))
+                break;  // `reduce []`
+            continue;  // `reduce [comment "hi"]`
         }
 
         // We can't put nulls into array cells, so we put BLANK!.  This is

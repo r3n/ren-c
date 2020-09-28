@@ -181,22 +181,23 @@ join-of: func [] [
 ]
 
 
-; REJOIN in R3-Alpha meant "reduce and join"; the idea of JOIN in Ren-C
-; already implies reduction of the appended data.  JOIN-ALL is a friendlier
+; REJOIN in R3-Alpha meant "reduce and join".  JOIN-ALL is a friendlier
 ; name, suggesting the join result is the type of the first reduced element.
 ;
 ; But JOIN-ALL doesn't act exactly the same as REJOIN--in fact, most cases
 ; of REJOIN should be replaced not with JOIN-ALL, but with UNSPACED.  Note
-; that although UNSPACED always returns a STRING!, the AS operator allows
+; that although UNSPACED always returns a TEXT!, the AS operator allows
 ; aliasing to other string types (`as tag! unspaced [...]` will not create a
 ; copy of the series data the way TO TAG! would).
 ;
-rejoin: function [
-    "Reduces and joins a block of values."
+rejoin: func [
+    {Reduces and joins a block of values}
+
     return: [any-series!]
         "Will be the type of the first non-null series produced by evaluation"
     block [block!]
         "Values to reduce and join together"
+    <local> values pos evaluated result
 ][
     ; An empty block should result in an empty block.
     ;
@@ -206,7 +207,7 @@ rejoin: function [
     ;
     values: copy []
     pos: block
-    while [pos: evaluate @(lit evaluated:) pos][
+    while [pos: evaluate/result pos 'evaluated][
         append/only values :evaluated
     ]
 

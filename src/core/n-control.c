@@ -770,6 +770,11 @@ REBNATIVE(all)
             Abort_Frame(f);
             return R_THROWN;
         }
+        if (GET_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
+            if (IS_END(f->feed->value))  // `all []`
+                break;
+            continue;  // `all [comment "hi" 1]`, first step is stale
+        }
 
         if (IS_FALSEY(D_OUT)) {  // any false/blank/null will trigger failure
             Abort_Frame(f);
@@ -808,6 +813,11 @@ REBNATIVE(any)
         if (Eval_Step_Maybe_Stale_Throws(D_OUT, f)) {
             Abort_Frame(f);
             return R_THROWN;
+        }
+        if (GET_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
+            if (IS_END(f->feed->value))  // `any []`
+                break;
+            continue;  // `any [comment "hi" 1]`, first step is stale
         }
 
         if (IS_TRUTHY(D_OUT)) { // successful ANY returns the value
@@ -849,6 +859,12 @@ REBNATIVE(none)
             Abort_Frame(f);
             return R_THROWN;
         }
+        if (GET_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
+            if (IS_END(f->feed->value))  // `none []`
+                break;
+            continue;  // `none [comment "hi" 1]`, first step is stale
+        }
+
 
         if (IS_TRUTHY(D_OUT)) {  // any true results mean failure
             Abort_Frame(f);

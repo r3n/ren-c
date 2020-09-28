@@ -236,21 +236,21 @@
     success
 )
 (
-    b: evaluate @value [1 2]
+    [b value]: evaluate [1 2]
     did all [
         1 = value
         [2] = b
     ]
 )
 (
-    value: <untouched>
+    value: <overwritten>
     did all [
-        null? evaluate @value []
-        value = <untouched>
+        null? [_ value]: evaluate []
+        undefined? 'value
     ]
 )
 (
-    evaluate @value [trap [1 / 0]]
+    [_ value]: evaluate [trap [1 / 0]]
     error? value
 )
 (

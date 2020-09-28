@@ -325,12 +325,12 @@ apply: emulate [
         params: parameters of :action
         using-args: true
 
-        while [block: sync-invisibles block] [
+        while [block] [
             block: if only [
                 arg: block/1
                 try next block
             ] else [
-                try evaluate @(lit arg:) block
+                try evaluate/result block (lit arg:)
             ]
 
             if refinement? params/1 [
@@ -530,7 +530,7 @@ do: emulate [
 
         if var [  ; DO/NEXT
             if args [fail "Can't use DO/NEXT with ARGS"]
-            source: evaluate @(lit result:) :source
+            source: evaluate/result :source (lit result:)
             set var source  ; DO/NEXT put the *position* in the var
             return :result  ; DO/NEXT returned the *evaluative result*
         ]
