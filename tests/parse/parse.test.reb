@@ -39,26 +39,47 @@
 ]
 
 
-; Are null rules raising the right error?
-
+; Plain voids cause an error, quoted voids match literal voids
 (
-    foo: null
+    foo: void
     e: trap [parse "a" [foo]]
-    e/id = 'no-value
+    e/id = 'need-non-void
+)(
+    foo: quote void
+    did parse compose [(void)] [foo end]
 )
 
-; Blank and empty block case handling
+; Empty block case handling
 
 (did parse [] [end])
 (did parse [] [[[]] end])
-(did parse [] [_ _ _ end])
 (not parse [x] [end])
-(not parse [x] [_ _ _ end])
 (not parse [x] [[[]] end])
-(did parse [] [[[_ _ _] end]])
-(did parse [x] ['x _ end])
-(did parse [x] [_ 'x end])
 (did parse [x] [[] 'x [] end])
+
+; Literal blank vs. fetched blank/null handling.
+; Literal blank means "skip" at source level, but if retrieved from a variable
+; it means the same as null.
+; https://forum.rebol.info/t/1348
+[
+    (did parse [x] ['x null end])
+    (did parse [x] [blank 'x end])
+
+    (did parse [] [blank blank blank end])
+    (not parse [] [_ _ _ end])
+    (did parse [x <y> "z"] [_ _ _ end])
+
+    (not parse [x <y> "z"] ['_ '_ '_ end])
+    (did parse [_ _ _] ['_ '_ '_ end])
+    (
+        q-blank: quote _
+        did parse [_ _ _] [q-blank q-blank q-blank end]
+    )
+
+    (not parse [] [[[_ _ _] end]])
+    (did parse [] [[[blank blank blank] end]])
+    (did parse [] [[[null null null] end]])
+]
 
 ; SET-WORD! (store current input position)
 

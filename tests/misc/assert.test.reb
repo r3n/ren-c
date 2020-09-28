@@ -61,10 +61,10 @@
 )
 
 ; Invisibles
-(
-    assert []
-    assert [comment "hi" 1]
-    assert [1 elide 2 + 3]
-    assert [comment "hi" (true)]
-    assert [(true) elide 2 + 3]
-)
+[
+    (assert [] true)
+    (assert [comment "hi" 1] true)
+    (assert [1 elide 2 + 3] true)
+    (assert [comment "hi" (true)] true)
+    (assert [(true) elide 2 + 3] true)
+]

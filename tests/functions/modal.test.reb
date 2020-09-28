@@ -8,29 +8,29 @@
         reduce [x y]
     ])
 
-    ([3 _] = foo 3)
+    ([3 #[void]] = foo 3)
     ([3 /y] = foo @(1 + 2))
-    ([@(1 + 2) _] = foo '@(1 + 2))
+    ([@(1 + 2) #[void]] = foo '@(1 + 2))
 
     (did item: 300)
 
-    ([304 _] = foo item + 4)
+    ([304 #[void]] = foo item + 4)
     ([304 /y] = foo @(item + 4))
-    ([@(item + 4) _] = foo '@(item + 4))
+    ([@(item + 4) #[void]] = foo '@(item + 4))
 
-    ([300 _] = foo item)
+    ([300 #[void]] = foo item)
     ([300 /y] = foo @item)
-    ([@item _] = foo '@item)
+    ([@item #[void]] = foo '@item)
 
-    ([[a b] _] = foo [a b])
+    ([[a b] #[void]] = foo [a b])
     ([[a b] /y] = foo @[a b])
-    ([@[a b] _] = foo '@[a b])
+    ([@[a b] #[void]] = foo '@[a b])
 
     (did obj: make object! [field: 1020])
 
-    ([1020 _] = foo obj/field)
+    ([1020 #[void]] = foo obj/field)
     ([1020 /y] = foo @obj/field)
-    ([@obj/field _] = foo '@obj/field)
+    ([@obj/field #[void]] = foo '@obj/field)
 ]
 
 [
@@ -40,23 +40,23 @@
         reduce [x y]
     ])
 
-    (3 bar = [3 _])
+    (3 bar = [3 #[void]])
     (@(1 + 2) bar = [3 /y])
 
     (did item: 300)
 
-    ((item + 4) bar = [304 _])
+    ((item + 4) bar = [304 #[void]])
     (@(item + 4) bar = [304 /y])
 
-    (item bar = [300 _])
+    (item bar = [300 #[void]])
     (@item bar = [300 /y])
 
-    ([a b] bar = [[a b] _])
+    ([a b] bar = [[a b] #[void]])
     (@[a b] bar = [[a b] /y])
 
     (did obj: make object! [field: 1020])
 
-    (obj/field bar = [1020 _])
+    (obj/field bar = [1020 #[void]])
     (@obj/field bar = [1020 /y])
 ]
 
@@ -69,7 +69,7 @@
 
     ([a @x /y] = parameters of :foo)
 
-    ([10 20 _] = foo 10 20)
+    ([10 20 #[void]] = foo 10 20)
     ([10 20 /y] = foo 10 @(20))
 
     (did fooy: :foo/y)

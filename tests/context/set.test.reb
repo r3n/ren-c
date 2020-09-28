@@ -2,14 +2,14 @@
 [#1763
     (
         a: <before>
-        [_] = set [a] reduce [null]
+        [#[void]] = set/any [a] reduce [null]
         blank? :a
     )
 ]
 (
     a: <a-before>
     b: <b-before>
-    [2 _] = set [a b] reduce [2 null]
+    [2 #[void]] = set/any [a b] reduce [2 null]
     a = 2
     blank? :b
 )

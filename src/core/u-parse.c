@@ -1027,7 +1027,7 @@ static REBIXO To_Thru_Non_Block_Rule(
     REBYTE kind = KIND_BYTE(rule);
     assert(kind != REB_BLOCK);
 
-    if (kind == REB_BLANK)
+    if (IS_NULLED_OR_BLANK_KIND(kind))
         return P_POS; // make it a no-op
 
     if (kind == REB_LOGIC) // no-op if true, match failure if false
@@ -1502,10 +1502,13 @@ REBNATIVE(subparse)
             return Init_Integer(P_OUT, P_POS); // indicate match @ current pos
         }
 
+        if (IS_BLANK(rule)) {  // pre-evaluative source blanks act like SKIP
+            rule = Init_Word(save, Canon(SYM_SKIP));
+        }
+        else if (IS_GROUP(rule) or IS_GET_GROUP(rule)) {
+
     //=//// (GROUP!) AND :(GET-GROUP!) PROCESSING /////////////////////////=//
 
-        if (IS_GROUP(rule) or IS_GET_GROUP(rule)) {
-            //
             // Code below may jump here to re-process groups, consider:
             //
             //    rule: lit (print "Hi")
@@ -1565,12 +1568,23 @@ REBNATIVE(subparse)
         //
         const RELVAL *subrule = nullptr;
 
-        if (ANY_PLAIN_GET_SET_WORD(rule)) { // word!, set-word!, or get-word!
-
+        if (ANY_PLAIN_GET_SET_WORD(rule)) {
+            //
+            // "Source-level" blanks act as SKIP.  Quoted blanks match BLANK!
+            // elements literally.  Blanks fetched from variables act as NULL.
+            // Quoted blanks fetched from variables match literal BLANK!.
+            // https://forum.rebol.info/t/1348
+            //
+            // This handles making a literal blank act like the word! SKIP
+            //
             REBSYM cmd = VAL_CMD(rule);
             if (cmd != SYM_0) {
-                if (not IS_WORD(rule)) // Command but not WORD! (COPY:, :THRU)
+                if (not IS_WORD(rule) and not IS_BLANK(rule)) {
+                    //
+                    // Command but not WORD! (COPY:, :THRU)
+                    //
                     fail (Error_Parse_Command(f));
+                }
 
                 if (cmd > SYM_BREAK)  // R3-Alpha claimed "optimization"
                     goto skip_pre_rule;  // but jump tables are fast, review
@@ -1972,8 +1986,6 @@ REBNATIVE(subparse)
                     Get_Word_May_Fail(save, rule, P_RULE_SPECIFIER);
                     rule = save;
                 }
-                if (IS_NULLED(rule))
-                    fail (Error_No_Value_Core(P_RULE, P_RULE_SPECIFIER));
             }
         }
         else if (ANY_PATH(rule)) {
@@ -2006,18 +2018,19 @@ REBNATIVE(subparse)
             continue;
         }
 
-        assert(not IS_NULLED(rule));
+        assert(not IS_VOID(rule));
 
         if (IS_BAR(rule))
             fail ("BAR! must be source level (else PARSE can't skip it)");
 
         switch (VAL_TYPE(rule)) {
+          case REB_NULLED:
+          case REB_BLANK: // if we see a blank here, it was variable-fetched
+            FETCH_NEXT_RULE(f);  // handle fetched blanks same as null
+            continue;
+
           case REB_GROUP:
             goto process_group; // GROUP! can make WORD! that fetches GROUP!
-
-          case REB_BLANK: // no-op
-            FETCH_NEXT_RULE(f);
-            continue;
 
           case REB_LOGIC: // true is a no-op, false causes match failure
             if (VAL_LOGIC(rule)) {
@@ -2086,7 +2099,7 @@ REBNATIVE(subparse)
 
             REBIXO i; // temp index point
 
-            if (IS_WORD(rule)) {
+            if (IS_WORD(rule)) {  // could be literal BLANK!, now SYM_SKIP
                 REBSYM cmd = VAL_CMD(rule);
 
                 switch (cmd) {

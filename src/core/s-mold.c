@@ -499,18 +499,8 @@ bool Form_Reduce_Throws(
     const REBVAL *delimiter
 ){
     assert(
-        IS_NULLED(delimiter) or IS_BLANK(delimiter)
-        or IS_CHAR(delimiter) or IS_TEXT(delimiter)
+        IS_NULLED(delimiter) or IS_CHAR(delimiter) or IS_TEXT(delimiter)
     );
-
-    // Initially Ren-C advocated treating blank the same as null, to be the
-    // "less noisy" null since it was legal to fetch with plain WORD!.  Now
-    // that plain words fetch nulls without error, it's more interesting for
-    // dialects to leverage blanks for unique meaning.  Space is particularly
-    // nice when used in DELIMIT scenarios.
-    //
-    if (IS_BLANK(delimiter))
-        delimiter = SPACE_VALUE;
 
     DECLARE_MOLD (mo);
     Push_Mold(mo);
@@ -524,18 +514,33 @@ bool Form_Reduce_Throws(
     bool nothing = true;  // any elements seen so far have been null or blank
 
     do {
+        // See philosophy on handling blanks differently from nulls, but only
+        // at dialect "source level".
+        // https://forum.rebol.info/t/1348
+        //
+        if (KIND_BYTE_UNCHECKED(f->feed->value) == REB_BLANK) {
+            Literal_Next_In_Frame(out, f);
+            Append_Codepoint(mo->series, ' ');
+            pending = false;
+            nothing = false;
+            continue;
+        }
+
         if (Eval_Step_Throws(out, f)) {
             Drop_Mold(mo);
             Abort_Frame(f);
             return true;
         }
 
-        if (IS_END(out)) {  // e.g. forming `[]`, `[()]`, `[comment "hi"]`
-            assert(nothing);
-            break;
+        if (IS_END(out)) {
+            if (IS_END(f->feed->value)) {  // spaced []
+                assert(nothing);
+                break;
+            }
+            continue;  // spaced [comment "a" ...]
         }
 
-        if (IS_NULLED(out))
+        if (IS_NULLED(out) or IS_BLANK(out))  // see note above on BLANK!
             continue;  // opt-out and maybe keep option open to return NULL
 
         nothing = false;
@@ -544,8 +549,8 @@ bool Form_Reduce_Throws(
             Append_Codepoint(mo->series, VAL_CHAR(out));
             pending = false;
         }
-        else if (IS_BLANK(out)) {
-            Append_Codepoint(mo->series, ' ');
+        else if (IS_ISSUE(out)) {  // ISSUE! pending unification w/CHAR!
+            Form_Value(mo, out);
             pending = false;
         }
         else if (IS_NULLED(delimiter))

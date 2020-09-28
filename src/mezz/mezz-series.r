@@ -231,8 +231,8 @@ reword: function [
 
     out: make (type of source) length of source
 
-    prefix: _
-    suffix: _
+    prefix: null
+    suffix: null
     case [
         null? escape [prefix: "$"]  ; refinement not used, so use default
 
@@ -240,7 +240,7 @@ reword: function [
             escape = ""
             escape = []
         ][
-            prefix: _  ; pure search and replace, no prefix/suffix
+            prefix: null  ; pure search and replace, no prefix/suffix
         ]
 
         block? escape [
@@ -297,23 +297,23 @@ reword: function [
     ;         | "10" (keyword-match: '10)
     ;    ] suffix  ; ...but then it's at "0>" and not ">", so it fails
     ;
-    keyword-match: _  ; variable that gets set by rule
+    keyword-match: null  ; variable that gets set by rule
     any-keyword-suffix-rule: collect [
         for-each [keyword value] values [
             if not match keyword-types keyword [
                 fail ["Invalid keyword type:" keyword]
             ]
 
-            keep reduce [
-                if match [integer! word!] keyword [
+            keep compose/deep <*> [
+                (<*> if match [integer! word!] keyword [
                     to-text keyword  ; `parse "a1" ['a '1]` illegal for now
                 ] else [
                     keyword
-                ]
+                ])
 
-                suffix
+                (<*> suffix)
 
-                compose '(keyword-match: '(keyword))
+                (keyword-match: '(<*> keyword))
             ]
 
             keep/line '|

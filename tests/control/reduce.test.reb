@@ -6,7 +6,7 @@
     success
 )
 ([] = reduce [])
-(blank? first reduce [null])
+(void? first reduce [null])
 ("1 + 1" = reduce "1 + 1")
 (error? first reduce [trap [1 / 0]])
 [#1760 ; unwind functions should stop evaluation
@@ -24,7 +24,7 @@
     error? trap blk
 )
 
-([3 _ 300] = reduce [1 + 2 if false [10 + 20] 100 + 200])
+([3 #[void] 300] = reduce [1 + 2 if false [10 + 20] 100 + 200])
 
 ; Quick flatten test, here for now
 (

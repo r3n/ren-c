@@ -61,13 +61,14 @@ bool Reduce_To_Stack_Throws(
             continue;  // `reduce [comment "hi"]`
         }
 
-        // We can't put nulls into array cells, so we put BLANK!.  This is
-        // compatible with historical behavior of `reduce [if 1 = 2 [<x>]]`
-        // which produced `[#[none]]`, and is generally more useful than
-        // putting VOID!, as more operations skip blanks vs. erroring.
+        // We can't put nulls into array cells, so we put VOID!.  This is
+        // conservative to try and notice mistakes based on expectations of
+        // the number of slots (COMPOSE is an alternative for such uses).
+        // This should be overrideable by a predicate to process the value
+        // before it is put in the result array.
         //
         if (IS_NULLED(out))
-            Init_Blank(DS_PUSH());
+            Init_Void(DS_PUSH());
         else
             Move_Value(DS_PUSH(), out);
 
