@@ -579,13 +579,13 @@ const REBYTE *Scan_Item_Push_Mold(
 //
 //  Skip_Tag: C
 //
-// Skip the entire contents of a tag, including quoted strings.
+// Skip the entire contents of a tag, including quoted strings and newlines.
 // The argument points to the opening '<'.  nullptr is returned on errors.
 //
 static const REBYTE *Skip_Tag(const REBYTE *cp)
 {
-    if (*cp == '<')
-        ++cp;
+    assert(*cp == '<');
+    ++cp;
 
     while (*cp != '\0' and *cp != '>') {
         if (*cp == '"') {
@@ -1038,15 +1038,12 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
     enum Reb_Token token;  // only set if falling through to `scan_word`
 
     // Up-front, do a check for "arrow words".  This test bails out if any
-    // non-arrow word characters are seen.
+    // non-arrow word characters are seen.  Arrow WORD!s are contiguous
+    // sequences of *only* "<", ">", "-", "=", "+", and "|".  This covers
+    // things like `-->` and `<=`, but also applies to things that *look*
+    // like they would be tags... like `<>` or `<+>`, which are WORD!s.
     //
-    if (*cp == '<' and *ss->end == '>') {  // "tag-shaped" <...> so not a word
-        if (cp + 1 == ss->end)  // `<>`
-            return TOKEN_WORD;  // !!! TBD: TOKEN_TAG with executable "magic"
-
-        // Fall through to old validation in switch() for tag validation
-    }
-    else if (
+    if (
         0 == (flags & ~(  // check flags for any obvious non-arrow characters
             LEX_FLAGS_ARROW_EXCEPT_EQUAL
             // don't count LEX_SPECIAL_AT; only valid at head, so not in flags
@@ -1284,14 +1281,20 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             token = TOKEN_WORD;
             goto scanword;
 
-          case LEX_SPECIAL_GREATER:
-            goto special_lesser;
+          case LEX_SPECIAL_GREATER:  // arrow words like `>` handled above
+            fail (Error_Syntax(ss, TOKEN_TAG));
 
           case LEX_SPECIAL_LESSER:
-          special_lesser:;
             cp = Skip_Tag(cp);
-            if (not cp)
+            if (
+                not cp  // couldn't find ending `>`
+                or not (
+                    IS_LEX_DELIMIT(*cp)
+                    or IS_LEX_ANY_SPACE(*cp)  // `<abc>def` not legal
+                )
+            ){
                 fail (Error_Syntax(ss, TOKEN_TAG));
+            }
             ss->end = cp;
             return TOKEN_TAG;
 
@@ -1538,23 +1541,11 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
     if (HAS_LEX_FLAGS(flags, LEX_WORD_FLAGS))
         fail (Error_Syntax(ss, TOKEN_WORD));  // has non-word chars (eg % \ )
 
-    if (HAS_LEX_FLAG(flags, LEX_SPECIAL_LESSER)) {
-        // Allow word<tag> and word</tag> but not word< word<= word<> etc.
-
-        cp = Skip_To_Byte(cp, ss->end, '<');
-        if (
-            cp[1] == '<' or cp[1] == '>' or cp[1] == '='
-            or IS_LEX_SPACE(cp[1])
-            or (cp[1] != '/' and IS_LEX_DELIMIT(cp[1]))
-        ){
-            fail (Error_Syntax(ss, token));
-        }
-        ss->end = cp;
-    }
-    else if (HAS_LEX_FLAG(flags, LEX_SPECIAL_GREATER)) {
-        if (*cp == '=' and cp[1] == '>' and IS_LEX_DELIMIT(cp[2]))
-            return TOKEN_WORD;  // enable `=>`
-        fail (Error_Syntax(ss, token));
+    if (
+        HAS_LEX_FLAG(flags, LEX_SPECIAL_LESSER)
+        or HAS_LEX_FLAG(flags, LEX_SPECIAL_GREATER)
+    ){
+        fail (Error_Syntax(ss, token));  // "arrow words" handled at beginning
     }
 
     return token;
