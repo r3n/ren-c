@@ -202,20 +202,20 @@ ctx-zip: context [
     ]
 
     zip: function [
-        {Builds a zip archive from a file or block of files.}
-        return: [integer!]
-            {Number of entries in archive.}
-        where [file! url! binary! text!]
-            "Where to build it"
-        source [file! url! block!]
-            "Files to include in archive"
-        /deep
-            "Includes files in subdirectories"
-        /verbose
-            "Lists files while compressing"
-        /only
-            "Include the root source directory"
+        {Build zip archive from a file or dialected data specification block}
+
+        return: "Number of entries in archive"
+            [integer!]
+        where "Where to build the archive (allows series in-memory)"
+            [file! url! binary! text!]
+        source "Files to archive (only STORE and DEFLATE supported)"
+            [file! url! block!]
+        /deep "Includes files in subdirectories"
+        /verbose "Lists files while compressing"
+        /only "Include the root source directory"
     ][
+        info: if not verbose [:elide] else [:print]
+
         if match [file! url!] where [
             where: open/write where
         ]
@@ -236,7 +236,7 @@ ctx-zip: context [
         iterate source [
             name: source/1
             root+name: if find "\/" name/1 [
-                if verbose [print ["Warning: absolute path" name]]
+                info ["Warning: absolute path" name]
                 name
             ] else [root/:name]
 
@@ -278,7 +278,7 @@ ctx-zip: context [
             if not binary? data [data: to binary! data]
 
             name: to-path-file name
-            if verbose [print [name]]
+            info [name]
 
             set [file-entry: dir-entry:] zip-entry name date data offset
 
@@ -305,22 +305,20 @@ ctx-zip: context [
     ]
 
     unzip: function [
-        {Decompresses a zip archive with to a directory or a block.}
-        where [file! url! any-array!]
-            "Where to decompress it"
-        source [file! url! binary!]
-            "Archive to decompress (only STORE and DEFLATE methods supported)"
-        /verbose
-            "Lists files while decompressing (default)"
-        /quiet
-            "Don't lists files while decompressing"
+        {Decompresses a zip archive to a directory or a block}
+
+        return: [void! block!]
+            "If `where` was a block, then position after archive insertion"
+        where "Where to decompress it"
+            [file! block!]
+        source "Archive to decompress (only STORE and DEFLATE supported)"
+            [file! url! binary!]
+        /verbose "Lists files while decompressing (default)"
+        /quiet "Don't lists files while decompressing"
     ][
         num-errors: 0
-        info: either all [quiet | not verbose] [
-            func [value] []
-        ][
-            func [value][prin join "" value]
-        ]
+        info: all [quiet | not verbose] then [:elide] else [:print]
+
         if not block? where [
             where: my dirize
             if not exists? where [make-dir/deep where]
@@ -360,7 +358,10 @@ ctx-zip: context [
                 (flag: (name = tmp))
                 flag
                 ; check successfull
-                (info name: to-file name)
+                (
+                    name: to-file name
+                    info [name]
+                )
                 :central-header
                 (num-entries: me + 1)
                 2 skip ; version made by
@@ -417,25 +418,25 @@ ctx-zip: context [
                         ]
 
                         if method <> 'deflate [
-                            info ["^- -> failed [method " method "]^/"]
+                            info ["-> failed" #"[" "method" method #"]"]
                             throw blank
                         ]
                         data: copy/part data compressed-size
                         trap [
                             data: inflate/max data uncompressed-size
                         ] then [
-                            info "^- -> failed [deflate]^/"
+                            info "-> failed [deflate]"
                             throw blank
                         ]
 
                         if uncompressed-size != length of data [
-                            info "^- -> failed [wrong output size]^/"
+                            info "-> failed [wrong output size]"
                             throw blank
                         ]
 
                         check: checksum-core 'crc32 data
                         if crc != check [
-                            info "^- -> failed [bad crc32]^/"
+                            info "-> failed [bad crc32]"
                             print [
                                 "expected crc:" crc LF
                                 "actual crc:" check
@@ -447,7 +448,7 @@ ctx-zip: context [
                     ]
 
                     either uncompressed-data [
-                        info unspaced [_ _ _ _ "-> ok [" method "]^/"]
+                        info ["-> ok" _ #"[" method #"]"]
                     ][
                         num-errors: me + 1
                     ]
@@ -486,6 +487,9 @@ ctx-zip: context [
             ]
             :central-header
         ]]
+
+        if block? where [return where]
+        return
     ]
 ]
 

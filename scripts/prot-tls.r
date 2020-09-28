@@ -461,7 +461,7 @@ client-hello: function [
     set [ctx/min-version: ctx/max-version:] case [
         decimal? version [reduce [version version]]
         block? version [
-            parse version [decimal! decimal! end] else [
+            parse version [decimal! decimal!] else [
                 fail "BLOCK! /VERSION must be two DECIMAL! (min ver, max ver)"
             ]
             version

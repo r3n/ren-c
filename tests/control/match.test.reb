@@ -7,8 +7,8 @@
 ; https://github.com/metaeducation/ren-c/pull/730
 ;
 
-("aaa" = match parse "aaa" [some "a" end])
-(null = match parse "aaa" [some "b" end])
+("aaa" = match parse "aaa" [some "a"])
+(null = match parse "aaa" [some "b"])
 
 (10 = match integer! 10)
 (null = match integer! "ten")

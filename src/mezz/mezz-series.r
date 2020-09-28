@@ -408,7 +408,7 @@ extract: function [
     ]
     index: default [1]
     if block? index [
-        parse index [some [any-number! | logic!] end] else [
+        parse index [some [any-number! | logic!]] else [
             cause-error 'Script 'invalid-arg reduce [index]
         ]
         out: make (type of series) len * length of index
@@ -615,7 +615,7 @@ split: function [
         [block! integer! char! bitset! text! tag! word!]
     /into "If dlm is integer, split in n pieces (vs. pieces of length n)"
 ][
-    parse (try match block! dlm) [some integer! end] then [
+    parse (try match block! dlm) [some integer!] then [
         return map-each len dlm [
             if len <= 0 [
                 series: skip series negate len
@@ -643,7 +643,7 @@ split: function [
                     copy series to end (keep/only series)
                 ]
             ] else [
-                [any [copy series 1 size skip (keep/only series)] end]
+                [any [copy series 1 size skip (keep/only series)]]
             ]
         ]
         block? dlm [

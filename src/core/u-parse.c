@@ -2736,6 +2736,8 @@ REBNATIVE(subparse)
 //      rules "Rules to parse by"
 //          [<blank> block!]
 //      /case "Uses case-sensitive comparison"
+//      /progress "Allow partial matches; set to how far a match progressed"
+//          [<output> <opt> any-series! quoted!]
 //  ]
 //
 REBNATIVE(parse)
@@ -2748,7 +2750,9 @@ REBNATIVE(parse)
 {
     INCLUDE_PARAMS_OF_PARSE;
 
-    if (not ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(ARG(input)))))
+    REBVAL *input = ARG(input);
+
+    if (not ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(input))))
         fail ("PARSE input must be an ANY-SERIES! (use AS BLOCK! for PATH!)");
 
     DECLARE_ARRAY_FEED (rules_feed,
@@ -2761,7 +2765,7 @@ REBNATIVE(parse)
     if (Subparse_Throws(
         &interrupted,
         SET_END(D_OUT),
-        ARG(input), SPECIFIED,
+        input, SPECIFIED,
         rules_feed,
         nullptr,  // start out with no COLLECT in effect, so no P_COLLECTION
         REF(case) ? AM_FIND_CASE : 0
@@ -2776,23 +2780,51 @@ REBNATIVE(parse)
         return R_THROWN;
     }
 
-    if (IS_NULLED(D_OUT))
-        return nullptr;
+    REBVAL *progress = ARG(progress);
 
-    REBLEN progress = VAL_UINT32(D_OUT);
-    assert(progress <= VAL_LEN_HEAD(ARG(input)));
-    Move_Value(D_OUT, ARG(input));
+    if (IS_NULLED(D_OUT)) {
+        if (IS_TRUTHY(progress)) {
+            //
+            // While returning NULL in this case might be nice for letting the
+            // caller test only the progress to know about the success of a
+            // partial match, setting it to VOID! helps pave the way for a
+            // future in which a failed partial match could tell you how far
+            // it got in the input before failing.
+            //
+            rebElideQ("set", progress, VOID_VALUE, rebEND);
+        }
+        return nullptr;
+    }
+
+    REBLEN index = VAL_UINT32(D_OUT);  // index reached by subparse
+    assert(index <= VAL_LEN_HEAD(input));
+
+    if (not IS_TRUTHY(progress)) {
+        //
+        // Not asking for how far a parse got implies that the parse must
+        // reach the complete end of input in order to have succeeded.
+        //
+        if (index == VAL_LEN_HEAD(input))
+            RETURN (input);
+
+        return nullptr;
+    }
 
     // !!! Current policy is to try to return the same number of quotes as
     // the input.  VAL_INDEX() allows reading indices out of REBCEL which
     // are guaranteed unescaped (hence you won't be falsely reading out of
     // the data of a REB_QUOTED container).  But REBCEL is read only, so
-    // the writes must be done to a RELVAL.  We must dequote and requote to
+    // the writes must be done to a RELVAL.  We must dequote/requote to
     // make sure we don't write to a REB_QUOTED or shared contained cell.
     //
-    REBLEN num_quotes = Dequotify(D_OUT);
-    VAL_INDEX(D_OUT) = progress;
-    return Quotify(D_OUT, num_quotes);
+    Move_Value(D_SPARE, ARG(input));
+    REBLEN num_quotes = Dequotify(D_SPARE);  // take quotes out
+    VAL_INDEX(D_SPARE) = index;  // update cell guaranteed not REB_QUOTED
+    Quotify(D_SPARE, num_quotes);  // put quotes back
+
+    rebElideQ("set", progress, D_SPARE, rebEND);
+
+    RETURN (ARG(input));  // main return value is input at original position
 }
 
 

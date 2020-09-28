@@ -27,26 +27,29 @@
 ; Collecting non-array series fragments
 
 (did all [
-    "bbb" = parse "aaabbb" [collect x [keep [some "a"]]]
+    [_ pos]: parse "aaabbb" [collect x [keep [some "a"]]]
+    "bbb" = pos
     x = ["aaa"]
 ])
 (did all [
-    "" = parse "aaabbbccc" [
+    [_ pos]: parse "aaabbbccc" [
         collect x [keep [some "a"] some "b" keep [some "c"]]
     ]
+    "" = pos
     x = ["aaa" "ccc"]
 ])
 
 ; Backtracking (more tests needed!)
 
 (did all [
-    [] = parse [1 2 3] [
+    [_ pos]: parse [1 2 3] [
         collect x [
             keep integer! keep integer! keep text!
             |
             keep integer! keep [some integer!]
         ]
     ]
+    [] = pos
     x = [1 2 3]
 ])
 
@@ -80,27 +83,29 @@
 ; the behavior of a GET-BLOCK! in the ordinary evaluator.
 ;
 (did all [
-    [3] = parse [1 2 3] [
+    [_ pos]: parse [1 2 3] [
         collect x [
             keep integer!
             keep :[second [A [<pick> <me>] B]]
             keep integer!
         ]
     ]
+    [3] = pos
     x = [1 <pick> <me> 2]
 ])
 (did all [
-    [3] = parse [1 2 3] [
+    [_ pos]: parse [1 2 3] [
         collect x [
             keep integer!
             keep only :[second [A [<pick> <me>] B]]
             keep integer!
         ]
     ]
+    [3] = pos
     x = [1 [<pick> <me>] 2]
 ])
 (did all [
-    parse [1 2 3] [collect x [keep only :[[a b c]]]]
+    parse [1 2 3] [collect x [keep only :[[a b c]]] to end]
     x = [[a b c]]
 ])
 
@@ -109,7 +114,7 @@
     https://github.com/metaeducation/ren-c/issues/935
 
     (did all [
-        did parse "aaabbb" [collect x [keep some "a" keep some "b"] end]
+        did parse "aaabbb" [collect x [keep some "a" keep some "b"]]
         x = ["aaa" "bbb"]
     ])
 

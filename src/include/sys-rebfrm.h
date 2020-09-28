@@ -228,7 +228,7 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
 // cases are designed to operate in isolation, and are incompatible with the
 // idea of enfix operations that stay pending in the evaluation queue, e.g.
 //
-//     match parse "aab" [some "a" end] else [print "what should this do?"]
+//     match parse "aab" [some "a"] else [print "what should this do?"]
 //
 // MATCH is variadic, and in one step asks to make a frame from the right
 // hand side.  But it's 99% likely intent of this was to attach the ELSE to

@@ -204,7 +204,7 @@ make object! [
             position: (type: value: _)
         ]
 
-        rule: [any token end]
+        rule: [any token]
 
         parse test-sources rule else [
             append collected-tests reduce [
