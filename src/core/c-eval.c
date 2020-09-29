@@ -212,7 +212,7 @@ inline static void Finalize_Arg(REBFRM *f) {
         return;
     }
 
-    if (not Typecheck_Including_Quoteds(f->param, f->arg)) {
+    if (not Typecheck_Including_Constraints(f->param, f->arg)) {
         fail (Error_Arg_Type(f, f->param, VAL_TYPE(f->arg)));
     }
 
@@ -998,7 +998,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                 // NULL is not technically in the valid argument types for
                 // refinement arguments, but is legal in fulfilled frames.
                 //
-                assert(Typecheck_Including_Quoteds(f->param, f->arg));
+                assert(Typecheck_Including_Constraints(f->param, f->arg));
 
                 goto continue_arg_loop;
             }
@@ -1334,7 +1334,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                 if (not Is_Param_Skippable(f->param))
                     Literal_Next_In_Frame(f->arg, f); // CELL_FLAG_UNEVALUATED
                 else {
-                    if (not Typecheck_Including_Quoteds(f->param, *next)) {
+                    if (not Typecheck_Including_Constraints(f->param, *next)) {
                         assert(Is_Param_Endable(f->param));
                         Init_Endish_Nulled(f->arg); // not EVAL_FLAG_BARRIER_HIT
                         SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);

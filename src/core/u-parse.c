@@ -575,23 +575,14 @@ static REB_R Parse_One_Rule(
                 return Init_Integer(P_OUT, pos + 1); // type was in typeset
             return R_UNHANDLED;
 
-          case REB_WORD:
-            if (VAL_WORD_SYM(rule) == SYM_LIT_WORD_X) { // hack for lit-word!
-                if (IS_QUOTED_WORD(item))
-                    return Init_Integer(P_OUT, pos + 1);
-                return R_UNHANDLED;
+          case REB_WORD: {  // !!! Small set of simulated type constraints
+            if (Matches_Fake_Type_Constraint(
+                item,
+                cast(enum Reb_Symbol, VAL_WORD_SYM(rule))
+            )){
+                return Init_Integer(P_OUT, pos + 1);
             }
-            if (VAL_WORD_SYM(rule) == SYM_LIT_PATH_X) { // hack for lit-path!
-                if (IS_QUOTED_PATH(item))
-                    return Init_Integer(P_OUT, pos + 1);
-                return R_UNHANDLED;
-            }
-            if (VAL_WORD_SYM(rule) == SYM_REFINEMENT_X) { // another hack...
-                if (IS_REFINEMENT(item))
-                    return Init_Integer(P_OUT, pos + 1);
-                return R_UNHANDLED;
-            }
-            fail (Error_Parse_Rule());
+            return R_UNHANDLED; }
 
           default:
             break;
@@ -2133,16 +2124,11 @@ REBNATIVE(subparse)
                     break;
                 }
 
-                // !!! This is a hack to try and get some semblance of
-                // compatibility in a world where 'X and 'X/Y/Z don't have
-                // unique datatype "kinds", but are both QUOTED! (versions of
-                // WORD! and PATH! respectively).  By making a LIT-WORD! and
-                // LIT-PATH! parse rule keyword, situations can be worked
-                // around, but MATCH should be used in the general case.
+                // !!! Simulate constrained types since they do not exist yet.
                 //
-                case SYM_LIT_WORD_X: // lit-word!
-                case SYM_LIT_PATH_X: // lit-path!
-                case SYM_REFINEMENT_X: {  // refinement!
+                case SYM_LIT_WORD_X:  // actually a QUOTED!
+                case SYM_LIT_PATH_X:  // actually a QUOTED!
+                case SYM_REFINEMENT_X: {  // actually a PATH!
                     REB_R r = Parse_One_Rule(f, P_POS, rule);
                     assert(r != R_IMMEDIATE);
                     if (r == R_THROWN)

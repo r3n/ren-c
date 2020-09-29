@@ -210,9 +210,9 @@ thru
 quote
 literal  ; should both LIT and LITERAL be supported, or just LIT?
 lit
-lit-word!  ; !!! compatibility hack; not a DATATYPE!, so parse keyword
-lit-path!  ; !!! compatibility hack; not a DATATYPE!, so parse keyword
-refinement!  ; !!! compatibility hack; not a DATATYPE!, so parse keyword
+lit-word!  ; !!! simulated datatype constraint (a QUOTED! like 'x)
+lit-path!  ; !!! simulated datatype costraint (a QUOTED! like 'x/y)
+refinement!  ; !!! simulated datatype constraint (a PATH! like `/word`)
 match
 do
 into

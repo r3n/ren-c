@@ -266,7 +266,6 @@ e-types/emit {
         REB_TS_QUOTED_WORD = PSEUDOTYPE_SIX,  /* !!! temp compatibility */
 
         PSEUDOTYPE_SEVEN,
-        REB_TS_QUOTED_PATH = PSEUDOTYPE_SEVEN,  /* !!! temp compatibility */
         REB_G_XYF = PSEUDOTYPE_SEVEN,  /* used by GOB, compact 2xfloat */
 
         PSEUDOTYPE_EIGHT,
@@ -278,7 +277,6 @@ e-types/emit {
         REB_X_BOOKMARK = PSEUDOTYPE_NINE,
 
         PSEUDOTYPE_TEN,
-        REB_TS_REFINED_PATH = PSEUDOTYPE_TEN,  /* !!! temp (?) compatibility */
 
         PSEUDOTYPE_ELEVEN,
         REB_TS_CONST = PSEUDOTYPE_ELEVEN,

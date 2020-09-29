@@ -129,12 +129,9 @@ bool Add_Typeset_Bits_Core(
 
     const RELVAL *maybe_word = head;
     for (; NOT_END(maybe_word); ++maybe_word) {
-        REBLEN num_quotes = VAL_NUM_QUOTES(maybe_word);
-        REBCEL(const*) unescaped = VAL_UNESCAPED(maybe_word);
-
         const RELVAL *item;
-        if (CELL_KIND(unescaped) == REB_WORD)
-            item = Lookup_Word_May_Fail(unescaped, specifier);
+        if (IS_WORD(maybe_word))
+            item = Lookup_Word_May_Fail(maybe_word, specifier);
         else
             item = maybe_word; // wasn't variable
 
@@ -198,55 +195,33 @@ bool Add_Typeset_Bits_Core(
             }
         }
         else if (IS_DATATYPE(item)) {
-            if (num_quotes == 0) {
-                //
-                // !!! For the moment, all REB_CUSTOM types are glommed
-                // together into the same typeset test.  Doing better will
-                // involve a redesign of typesets from R3-Alpha's 64 bits.
-                //
-                TYPE_SET(typeset, VAL_TYPE_KIND_OR_CUSTOM(item));
-            }
-            else {
-                REBCEL(const*) cell = VAL_UNESCAPED(item);
-                if (num_quotes > 1)
-                   fail ("General type quoting not supported, use QUOTED!");
-
-                if (VAL_TYPE_KIND(cell) == REB_WORD)
-                    TYPE_SET(typeset, REB_TS_QUOTED_WORD);
-                else if (VAL_TYPE_KIND(cell) == REB_PATH)
-                    TYPE_SET(typeset, REB_TS_QUOTED_PATH);
-                else
-                    fail ("WORD!/PATH! quote typechecking only, use QUOTED!");
-            }
+            //
+            // !!! For the moment, all REB_CUSTOM types are glommed
+            // together into the same typeset test.  Doing better will
+            // involve a redesign of typesets from R3-Alpha's 64 bits.
+            //
+            TYPE_SET(typeset, VAL_TYPE_KIND_OR_CUSTOM(item));
         }
         else if (IS_TYPESET(item)) {
-            if (num_quotes != 0)
-                fail ("General typeset quoting not supported, use QUOTED!");
-
             VAL_TYPESET_LOW_BITS(typeset) |= VAL_TYPESET_LOW_BITS(item);
             VAL_TYPESET_HIGH_BITS(typeset) |= VAL_TYPESET_HIGH_BITS(item);
         }
-        else if (IS_QUOTED(item)) {
-            REBCEL(const*) cell = VAL_UNESCAPED(item);
-            if (CELL_KIND(cell) != REB_DATATYPE)
-                fail ("General typeset quoting not supported, use QUOTED!");
+        else if (IS_SYM_WORD(item)) {  // see Startup_Fake_Type_Constraint()
+            switch (VAL_WORD_SYM(item)) {
+              case SYM_LIT_WORD_X:
+              case SYM_LIT_PATH_X:
+                TYPE_SET(typeset, REB_QUOTED);
+                break;
 
-            if (VAL_TYPE_KIND(cell) == REB_WORD)
-                TYPE_SET(typeset, REB_TS_QUOTED_WORD);
-            else if (VAL_TYPE_KIND(cell) == REB_PATH)
-                TYPE_SET(typeset, REB_TS_QUOTED_PATH);
-            else
-                fail ("WORD!/PATH! quote typechecking only, use QUOTED!");
+              case SYM_REFINEMENT_X:
+                TYPE_SET(typeset, REB_PATH);
+                break;
+
+              default:
+                fail ("Unknown fake type constraint!");
+            }
         }
-        else if (IS_SYM_WORD(item)) {  // !!! Hacks !!!
-            //
-            // Allow type-checking to filter on paths which start with BLANK!,
-            // especially useful to combine with <skip>, e.g. `switch /equal?`
-            //
-            if (VAL_WORD_SYM(item) == SYM_REFINEMENT_X)
-                TYPE_SET(typeset, REB_TS_REFINED_PATH);
-        }
-        else if (IS_NULLED(item))
+        else
             fail (Error_Bad_Value_Core(maybe_word, specifier));
 
         // !!! Review erroring policy--should probably not just be ignoring

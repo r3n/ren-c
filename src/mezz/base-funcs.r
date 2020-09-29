@@ -143,7 +143,7 @@ func: func* [
     |
         :(either var '[
             set var: [
-                match [any-word! 'word!]
+                match [any-word! lit-word!]
                 | ahead any-path! into [blank! word!]
             ](
                 append new-spec var

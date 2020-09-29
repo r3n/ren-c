@@ -913,6 +913,6 @@ inline static void FAIL_IF_BAD_RETURN_TYPE(REBFRM *f) {
     // Typeset bits for locals in frames are usually ignored, but the RETURN:
     // local uses them for the return types of a function.
     //
-    if (not Typecheck_Including_Quoteds(typeset, f->out))
+    if (not Typecheck_Including_Constraints(typeset, f->out))
         fail (Error_Bad_Return_Type(f, VAL_TYPE(f->out)));
 }

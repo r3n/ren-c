@@ -865,7 +865,7 @@ REBNATIVE(for)
 //      return: "Last body result, or null if BREAK"
 //          [<opt> any-value!]
 //      'word "Variable set to each position in the series at skip distance"
-//          [word! 'word! blank!]
+//          [word! lit-word! blank!]
 //      series "The series to iterate over"
 //          [<blank> any-series!]
 //      skip "Number of positions to skip each time"
@@ -1038,7 +1038,7 @@ REBNATIVE(cycle)
 //      return: "Last body result, or null if BREAK"
 //          [<opt> any-value!]
 //      'vars "Word or block of words to set each time, no new var if quoted"
-//          [blank! word! 'word! block!]
+//          [blank! word! lit-word! block!]
 //      data "The series to traverse"
 //          [<blank> any-series! any-context! map! any-path!
 //           action!]  ; experimental

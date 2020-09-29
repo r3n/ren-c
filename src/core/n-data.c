@@ -1142,9 +1142,9 @@ bool Try_As_String(
 //
 //  {Aliases underlying data of one value to act as another of same class}
 //
-//      return: [<opt> any-path! any-series! any-word! quoted!]
-//      type [datatype! quoted!]
-//      value [<blank> any-path! any-series! any-word! quoted!]
+//      return: [<opt> any-path! any-series! any-word!]
+//      type [datatype!]
+//      value [<dequote> <blank> any-path! any-series! any-word!]
 //  ]
 //
 REBNATIVE(as)
@@ -1152,19 +1152,11 @@ REBNATIVE(as)
     INCLUDE_PARAMS_OF_AS;
 
     REBVAL *v = ARG(value);
-    Dequotify(v); // number of incoming quotes not relevant
-    if (not ANY_SERIES(v) and not ANY_WORD(v) and not ANY_PATH(v))
-        fail (PAR(value));
 
     REBVAL *t = ARG(type);
-    REBLEN quotes = VAL_NUM_QUOTES(t); // number of quotes on type *do* matter
-    Dequotify(t);
-    if (not IS_DATATYPE(t))
-        fail (PAR(type));
-
     enum Reb_Kind new_kind = VAL_TYPE_KIND(t);
     if (new_kind == VAL_TYPE(v))
-        RETURN (Quotify(v, quotes)); // just may change quotes
+        RETURN (v);
 
     switch (new_kind) {
       case REB_BLOCK:
@@ -1208,7 +1200,7 @@ REBNATIVE(as)
             D_OUT,
             new_kind,
             v,
-            quotes,
+            0,  // no quotes
             STRMODE_ALL_CODEPOINTS  // See AS-TEXT/STRICT for stricter
         )){
             goto bad_cast;
@@ -1244,7 +1236,7 @@ REBNATIVE(as)
                 s = Intern_UTF8_Managed(utf8, utf8_size);
             }
             Init_Any_Word(D_OUT, new_kind, s);
-            return Inherit_Const(Quotify(D_OUT, quotes), v);
+            return Inherit_Const(D_OUT, v);
         }
 
         if (IS_BINARY(v)) {
@@ -1281,10 +1273,7 @@ REBNATIVE(as)
                 Freeze_Sequence(bin);
             }
 
-            return Inherit_Const(
-                Quotify(Init_Any_Word(D_OUT, new_kind, str), quotes),
-                v
-            );
+            return Inherit_Const(Init_Any_Word(D_OUT, new_kind, str), v);
         }
 
         if (not ANY_WORD(v))
@@ -1298,7 +1287,7 @@ REBNATIVE(as)
                 SER(VAL_STRING(v)),
                 ANY_WORD(v) ? 0 : VAL_OFFSET(v)
             );
-            return Inherit_Const(Quotify(D_OUT, quotes), v);
+            return Inherit_Const(D_OUT, v);
         }
 
         fail (v); }
@@ -1316,7 +1305,7 @@ REBNATIVE(as)
     mutable_KIND_BYTE(D_OUT)
         = mutable_MIRROR_BYTE(D_OUT)
         = new_kind;
-    return Trust_Const(Quotify(D_OUT, quotes));
+    return Trust_Const(D_OUT);
 }
 
 

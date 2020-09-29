@@ -281,7 +281,7 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
         REBVAL *typeset = ACT_PARAMS_HEAD(phase);
         assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
         if (
-            not Typecheck_Including_Quoteds(typeset, f->out)
+            not Typecheck_Including_Constraints(typeset, f->out)
             and not (
                 GET_ACTION_FLAG(phase, IS_INVISIBLE)
                 and IS_NULLED(f->out) // this happens with `do [return]`

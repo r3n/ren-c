@@ -97,7 +97,7 @@ REBNATIVE(skinner_return_helper)
     // Typeset bits for locals in frames are usually ignored, but the RETURN:
     // local uses them for the return types of a function.
     //
-    if (not Typecheck_Including_Quoteds(param, v))
+    if (not Typecheck_Including_Constraints(param, v))
         fail (Error_Bad_Return_Type(f, VAL_TYPE(v)));
 
     RETURN (v);

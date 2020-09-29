@@ -174,7 +174,7 @@ REB_R TO_Unhooked(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 //      return: "VALUE converted to TYPE, null if type or value are blank"
 //          [<opt> any-value!]
-//      'type [<blank> quoted! word! path! datatype!]
+//      type [<blank> datatype! sym-word!]
 //      value [<blank> <dequote> any-value!]
 //  ]
 //
@@ -185,39 +185,23 @@ REBNATIVE(to)
     REBVAL *v = ARG(value);
     REBVAL *type = ARG(type);
 
-    REBLEN new_quotes = VAL_NUM_QUOTES(type);
-    Dequotify(type);
+    if (IS_SYM_WORD(type))
+        Move_Value(type, Datatype_From_Kind(REB_ISSUE));
 
-    REBSTR *opt_name;
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        &opt_name,
-        type,
-        SPECIFIED,
-        true // push refinements, we'll just drop on error as we don't run
-    )){
-        return R_THROWN;
-    }
-    new_quotes += VAL_NUM_QUOTES(D_OUT);
-    Dequotify(D_OUT);
-
-    if (not IS_DATATYPE(D_OUT))
-        fail (PAR(type));
-
-    enum Reb_Kind new_kind = VAL_TYPE_KIND(D_OUT);
+    enum Reb_Kind new_kind = VAL_TYPE_KIND(type);
     enum Reb_Kind old_kind = VAL_TYPE(v);
 
     if (
         new_kind == old_kind
         and (
             new_kind != REB_CUSTOM
-            or CELL_CUSTOM_TYPE(D_OUT) == CELL_CUSTOM_TYPE(v)
+            or CELL_CUSTOM_TYPE(type) == CELL_CUSTOM_TYPE(v)
         )
     ){
         return rebValueQ("copy", v, rebEND);
     }
 
-    TO_HOOK* hook = To_Hook_For_Type(D_OUT);
+    TO_HOOK* hook = To_Hook_For_Type(type);
 
     REB_R r = hook(D_OUT, new_kind, v); // may fail();
     if (r == R_THROWN) {
@@ -228,7 +212,7 @@ REBNATIVE(to)
         assert(!"TO conversion did not return intended type");
         fail (Error_Invalid_Type(VAL_TYPE(r)));
     }
-    return Quotify(r, new_quotes); // must be either D_OUT or an API handle
+    return r; // must be either D_OUT or an API handle
 }
 
 
