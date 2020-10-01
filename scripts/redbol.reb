@@ -361,9 +361,13 @@ apply: emulate [
 
 ?: emulate [:help]
 
-to-local-file: emulate [:file-to-local]
+to-local-file: emulate [
+    get/any 'file-to-local  ; not available in web build
+]
 
-to-rebol-file: emulate [:local-to-file]
+to-rebol-file: emulate [
+    get/any 'local-to-file  ; not available in web build
+]
 
 why?: emulate [does [lib/why]]  ; not exported yet, :why not bound
 
@@ -1387,8 +1391,8 @@ hijack 'lib/transcode enclose copy :lib/transcode function [f [frame!]] [
 ]
 
 
-call: emulate [
-    :call*  ; brings back the /WAIT switch (Ren-C waits by default)
+call: emulate [  ; brings back the /WAIT switch (Ren-C waits by default)
+    get/any 'call*  ; use GET/ANY because not available in web build
 ]
 
 
