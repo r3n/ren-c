@@ -207,7 +207,7 @@ static void Process_Block_Helper(
         "ensure block! select", config, "as word!", rebT(label),
     rebEND);
 
-    RELVAL *text;
+    const RELVAL *text;
     for (text = VAL_ARRAY_AT(block); NOT_END(text); ++text)
         Process_Text_Helper_Core(some_tcc_api, state, SPECIFIC(text), label);
 
@@ -488,7 +488,7 @@ REBNATIVE(compile_p)
     REBDSP dsp_orig = DSP;  // natives are pushed to the stack
 
     if (REF(files)) {
-        RELVAL *item;
+        const RELVAL *item;
         for (item = VAL_ARRAY_AT(compilables); NOT_END(item); ++item) {
             if (not IS_TEXT(item))
                 fail ("If COMPILE*/FILES, compilables must be TEXT! paths");
@@ -515,7 +515,7 @@ REBNATIVE(compile_p)
         DECLARE_MOLD (mo);  // Note: mold buffer is UTF-8
         Push_Mold(mo);
 
-        RELVAL *item;
+        const RELVAL *item;
         for (item = VAL_ARRAY_AT(compilables); NOT_END(item); ++item) {
             if (IS_ACTION(item)) {
                 assert(Is_User_Native(VAL_ACTION(item)));

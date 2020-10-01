@@ -535,7 +535,7 @@ static bool Set_Struct_Var(
 
 /* parse struct attribute */
 static void parse_attr(
-    const REBVAL *blk,
+    const RELVAL *blk,
     REBINT *raw_size,
     uintptr_t *raw_addr
 ){
@@ -586,7 +586,7 @@ static void parse_attr(
             if (IS_LIB_CLOSED(VAL_LIBRARY(lib)))
                 fail (Error_Bad_Library_Raw());
 
-            RELVAL *sym = VAL_ARRAY_AT_HEAD(attr, 1);
+            const RELVAL *sym = VAL_ARRAY_AT_HEAD(attr, 1);
             if (not ANY_STRING(sym))
                 fail (sym);
 
@@ -959,7 +959,7 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
     const RELVAL *spec_item = VAL_ARRAY_AT(spec);
 
     while (NOT_END(spec_item)) {
-        const REBVAL *word;
+        const RELVAL *word;
         if (IS_BLOCK(spec_item)) { // options: raw-memory, etc
             REBINT raw_size = -1;
             uintptr_t raw_addr = 0;
