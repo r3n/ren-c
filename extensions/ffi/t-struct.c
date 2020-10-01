@@ -588,14 +588,14 @@ static void parse_attr(
 
             const RELVAL *sym = VAL_ARRAY_AT_HEAD(attr, 1);
             if (not ANY_STRING(sym))
-                fail (sym);
+                fail (rebUnrelativize(sym));
 
             CFUNC *addr = Find_Function(
                 VAL_LIBRARY_FD(lib),
                 cs_cast(VAL_UTF8_AT(nullptr, sym))
             );
             if (addr == nullptr)
-                fail (Error_Symbol_Not_Found_Raw(sym));
+                fail (Error_Symbol_Not_Found_Raw(rebUnrelativize(sym)));
 
             *raw_addr = cast(uintptr_t, addr);
             break; }
@@ -980,12 +980,12 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
         else {
             word = spec_item;
             if (not IS_SET_WORD(word))
-                fail (word);
+                fail (rebUnrelativize(word));
         }
 
-        const REBVAL *fld_val = spec_item + 1;
+        const RELVAL *fld_val = spec_item + 1;
         if (IS_END(fld_val))
-            fail (Error_Need_Non_End_Raw(fld_val));
+            fail (Error_Need_Non_End_Raw(rebUnrelativize(fld_val)));
 
         REBARR *fieldlist = VAL_STRUCT_FIELDLIST(ret);
         RELVAL *item = ARR_HEAD(fieldlist);
@@ -1001,7 +1001,7 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
                     REBLEN dimension = FLD_DIMENSION(field);
 
                     if (VAL_LEN_AT(fld_val) != dimension)
-                        fail (fld_val);
+                        fail (rebUnrelativize(fld_val));
 
                     REBLEN n = 0;
                     for (n = 0; n < dimension; ++n) {
@@ -1011,7 +1011,7 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
                             n,
                             SPECIFIC(VAL_ARRAY_AT_HEAD(fld_val, n))
                         )){
-                            fail (fld_val);
+                            fail (rebUnrelativize(fld_val));
                         }
                     }
                 }
@@ -1028,11 +1028,17 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
                     );
                 }
                 else
-                    fail (fld_val);
+                    fail (rebUnrelativize(fld_val));
             }
             else {
-                if (not assign_scalar(VAL_STRUCT(ret), field, 0, fld_val))
-                    fail (fld_val);
+                if (not assign_scalar(
+                    VAL_STRUCT(ret),
+                    field,
+                    0,
+                    SPECIFIC(fld_val)
+                )){
+                    fail (rebUnrelativize(fld_val));
+                }
             }
             goto next_spec_pair;
         }

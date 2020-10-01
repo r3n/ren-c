@@ -578,6 +578,14 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
     return SPECIFIC(out);
 }
 
+// This is a super lazy version of unrelativization, which can be used to
+// hand a relative value to something like fail(), since fail will clean up
+// the stray alloc.
+//
+#define rebUnrelativize(v) \
+    Unrelativize(Alloc_Value(), (v))
+
+
 #if defined(NDEBUG)
     #define KNOWN_MUTABLE(v) v
 #else
