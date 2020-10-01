@@ -56,8 +56,6 @@ min: :minimum
 max: :maximum
 abs: :absolute
 
-rebol.com: http://www.rebol.com
-
 blank: _   ; e.g. sometimes `return blank` reads better than `return _`
 null: '  ; a single apostrophe with nothing after it is a quoted null
 
