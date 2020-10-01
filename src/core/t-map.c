@@ -349,6 +349,7 @@ REB_R PD_Map(
         );
 
         assert(n != 0);
+        UNUSED(n);
         return R_INVISIBLE;
     }
 
