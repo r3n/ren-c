@@ -430,8 +430,8 @@ REB_R PD_Context(
         // the word is an evaluative product, as the bits live in the cell
         // and it will be discarded.
         //
-        INIT_BINDING(m_cast(REBVAL*, picker), NOD(c));
-        INIT_WORD_INDEX(m_cast(REBVAL*, picker), n);
+        INIT_BINDING(m_cast(RELVAL*, picker), NOD(c));
+        INIT_WORD_INDEX(m_cast(RELVAL*, picker), n);
     }
 
     REBVAL *var = CTX_VAR(c, n);

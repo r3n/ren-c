@@ -556,8 +556,8 @@ static REB_R Parse_One_Rule(
     }
 
     if (IS_SER_ARRAY(P_INPUT)) {
-        REBARR *arr = ARR(P_INPUT);
-        RELVAL *item = ARR_AT(arr, pos);
+        const REBARR *arr = ARR(P_INPUT);
+        const RELVAL *item = ARR_AT(arr, pos);
 
         switch (VAL_TYPE(rule)) {
           case REB_QUOTED:
@@ -2113,7 +2113,7 @@ REBNATIVE(subparse)
                     if (not subrule) // capture only on iteration #1
                         FETCH_NEXT_RULE_KEEP_LAST(&subrule, f);
 
-                    RELVAL *cmp = ARR_AT(ARR(P_INPUT), P_POS);
+                    const RELVAL *cmp = ARR_AT(ARR(P_INPUT), P_POS);
 
                     if (IS_END(cmp))
                         i = END_FLAG;
@@ -2158,7 +2158,7 @@ REBNATIVE(subparse)
                     if (not subrule) // capture only on iteration #1
                         FETCH_NEXT_RULE_KEEP_LAST(&subrule, f);
 
-                    RELVAL *cmp = ARR_AT(ARR(P_INPUT), P_POS);
+                    const RELVAL *cmp = ARR_AT(ARR(P_INPUT), P_POS);
 
                     if (IS_END(cmp))
                         i = END_FLAG;
@@ -2200,7 +2200,7 @@ REBNATIVE(subparse)
                     if (not IS_SER_ARRAY(P_INPUT))
                         fail (Error_Parse_Rule());
 
-                    RELVAL *into = ARR_AT(ARR(P_INPUT), P_POS);
+                    const RELVAL *into = ARR_AT(ARR(P_INPUT), P_POS);
                     if (IS_END(into)) {
                         i = END_FLAG;  // `parse [] [into [...]]`, rejects
                         break;
@@ -2547,7 +2547,6 @@ REBNATIVE(subparse)
                 }
 
                 if (flags & (PF_INSERT | PF_CHANGE)) {
-                    ENSURE_MUTABLE(P_INPUT_VALUE);
                     count = (flags & PF_INSERT) ? 0 : count;
                     bool only = false;
 
@@ -2603,8 +2602,15 @@ REBNATIVE(subparse)
                         REBLEN mod_flags = (flags & PF_INSERT) ? 0 : AM_PART;
                         if (not only and Splices_Without_Only(specified))
                             mod_flags |= AM_SPLICE;
+
+                        // Note: We could check for mutability at the start
+                        // of the operation -but- by checking right at the
+                        // last minute that allows protects or unprotects
+                        // to happen in rule processing if GROUP!s execute.
+                        //
+                        REBARR *a = VAL_ARRAY_ENSURE_MUTABLE(P_INPUT_VALUE);
                         P_POS = Modify_Array(
-                            ARR(P_INPUT),
+                            a,
                             begin,
                             (flags & PF_CHANGE)
                                 ? SYM_CHANGE
@@ -2616,7 +2622,7 @@ REBNATIVE(subparse)
                         );
 
                         if (IS_QUOTED(rule))
-                            Unquotify(ARR_AT(ARR(P_INPUT), P_POS - 1), 1);
+                            Unquotify(ARR_AT(a, P_POS - 1), 1);
                     }
                     else {
                         DECLARE_LOCAL (specified);

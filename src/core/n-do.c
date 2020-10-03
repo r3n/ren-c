@@ -175,7 +175,7 @@ REBNATIVE(shove)
     if (REF(prefix))
         enfix = not VAL_LOGIC(ARG(prefix));
     else if (IS_ACTION(shovee))
-        enfix = GET_ACTION_FLAG(shovee, ENFIXED);
+        enfix = GET_ACTION_FLAG(VAL_ACTION(shovee), ENFIXED);
     else
         enfix = false;
 
