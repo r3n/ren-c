@@ -566,7 +566,26 @@ ensure: redescribe [
             ;
             fail [
                 "ENSURE failed with argument of type"
-                    type of :arg else ["NULL"]
+                    type of get* 'arg else ["NULL"]
+            ]
+        ]
+    ]
+)
+
+non: redescribe [
+    {Pass through value if it *doesn't* match test, otherwise trigger a FAIL}
+](
+    specialize 'either-match/not [
+        branch: func [arg [<opt> any-value!]] [
+            ;
+            ; !!! Can't use FAIL/WHERE until there is a good way to SPECIALIZE
+            ; a conditional with a branch referring to invocation parameters:
+            ;
+            ; https://github.com/metaeducation/ren-c/issues/587
+            ;
+            fail [
+                "NON failed with argument of type"
+                    type of get* 'arg else ["NULL"]
             ]
         ]
     ]

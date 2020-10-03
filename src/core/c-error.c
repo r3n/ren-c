@@ -1211,6 +1211,11 @@ REBCTX *Error_No_Catch_For_Throw(REBVAL *thrown)
 //
 REBCTX *Error_Invalid_Type(enum Reb_Kind kind)
 {
+    if (kind == REB_NULLED) {
+        DECLARE_LOCAL (null_word);
+        Init_Word(null_word, Canon(SYM_NULL));
+        fail (Error_Invalid_Type_Raw(null_word));
+    }
     return Error_Invalid_Type_Raw(Datatype_From_Kind(kind));
 }
 

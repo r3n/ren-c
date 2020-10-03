@@ -163,9 +163,6 @@ inline static bool Single_Test_Throws(
         assert(lowest_ordered_dsp == DSP); // would have made specialization
         UNUSED(lowest_ordered_dsp);
 
-        if (IS_NULLED(out))
-            fail (Error_No_Value_Raw(dequoted_test));
-
         if (IS_ACTION(out)) {
             if (IS_GET_WORD(dequoted_test) or IS_GET_PATH(dequoted_test)) {
                 // ok
@@ -184,6 +181,22 @@ inline static bool Single_Test_Throws(
     }
 
     switch (test_kind) {
+      case REB_NULLED:  // more useful for NON NULL XXX than MATCH NULL XXX
+        Init_Logic(
+            out,
+            CELL_TYPE(arg_cell) == REB_NULLED
+                and VAL_NUM_QUOTES(arg) == sum_quotes
+        );
+        return false;
+
+      case REB_VOID:
+        //
+        // Was considered because NON VOID XXX is shorter than NON VOID! XXX.
+        // However, that encourages a habit of passing void values where they
+        // probably are better caught as errors.
+        //
+        break;
+
       case REB_PATH: { // AND the tests together
         const RELVAL *item = VAL_ARRAY_AT(test_cell);
         REBSPC *specifier = Derive_Specifier(test_specifier, test);
@@ -472,6 +485,7 @@ REBNATIVE(also)  // see `tweak :also #defer on` in %base-defs.r
 //       value [<opt> any-value!]
 //      'branch "Branch to run on non-matches, passed VALUE if ACTION!"
 //          [block! action! quoted!]
+//      /not "Invert the result of the the test (used by NON)"
 //  ]
 //
 REBNATIVE(either_match)
@@ -481,8 +495,12 @@ REBNATIVE(either_match)
     if (Match_Core_Throws(D_OUT, ARG(test), SPECIFIED, ARG(value), SPECIFIED))
         return R_THROWN;
 
-    if (VAL_LOGIC(D_OUT))
+    if (
+        (not REF(_not_) and VAL_LOGIC(D_OUT))
+        or (REF(_not_) and not VAL_LOGIC(D_OUT)
+    )){
         RETURN (ARG(value));
+    }
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(value)))
         return R_THROWN;
@@ -696,46 +714,6 @@ REBNATIVE(matches)
 
     assert(IS_LOGIC(D_OUT));
     return D_OUT;
-}
-
-
-//
-//  non: native [
-//
-//  {Make sure a value does NOT match a type constraint (see also: ENSURE)}
-//
-//      return: "Input value if it passes the type test"
-//          [<opt> any-value!]
-//      test "The test to apply (limited to DATATYPE! and NULL at this time)"
-//          [<opt> datatype!]
-//      value "Value to test (will either be returned as result or error)"
-//          [<opt> any-value!]
-// ]
-//
-REBNATIVE(non)
-//
-// !!! This is a partial implementation of NON implemented for R3C, just good
-// enough for `non void!` and `non null` cases to give validation options to
-// those wanting a less permissive SET (now that it has no /ANY refinement).
-{
-    INCLUDE_PARAMS_OF_NON;
-
-    REBVAL *test = ARG(test);
-    REBVAL *value = ARG(value);
-
-    if (IS_NULLED(test)) {  // not a datatype, needs special case
-        if (IS_NULLED(value))
-            fail ("NON expected value to not be NULL, but it was");
-    }
-    else if (VAL_TYPE_KIND(test) == REB_VOID) {  // specialize common case
-        if (IS_VOID(value))
-            fail ("NON expected value to not be VOID!, but it was");
-    }
-    else if (TYPE_CHECK(value, VAL_TYPE_KIND(test))) {
-        fail ("NON expected value to not match a type, but it did match");
-    }
-
-    RETURN (value);
 }
 
 
