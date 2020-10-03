@@ -1786,13 +1786,13 @@ REBNATIVE(subparse)
                     }
                     continue; }
 
-                  case SYM_NOT:
+                  case SYM__NOT_:  // see TO-C-NAME
                     flags |= PF_NOT;
                     flags ^= PF_NOT2;
                     FETCH_NEXT_RULE(f);
                     continue;
 
-                  case SYM_AND:
+                  case SYM__AND_:  // see TO-C-NAME
                   case SYM_AHEAD:
                     flags |= PF_AHEAD;
                     FETCH_NEXT_RULE(f);

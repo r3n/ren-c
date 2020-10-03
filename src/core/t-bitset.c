@@ -313,7 +313,7 @@ bool Set_Bits(REBSER *bset, const REBVAL *val, bool set)
     if (
         NOT_END(item)
         && IS_WORD(item)
-        && VAL_WORD_SYM(item) == SYM_NOT
+        && VAL_WORD_SYM(item) == SYM__NOT_  // see TO-C-NAME
     ){
         INIT_BITS_NOT(bset, true);
         item++;

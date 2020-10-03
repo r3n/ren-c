@@ -78,6 +78,28 @@ to-c-name: function [
         "~" [copy "tilde"]
         "|" [copy "bar"]
 
+        ; These are in the set of what are known as "alterative tokens".  They
+        ; aren't exactly keywords (and in C they're just done with #define).
+        ; Hence they are involved with the preproessor which means that
+        ; "clever" macros like ARG(not) or REF(and) will be invoked as
+        ; ARG(!) or REF(&&).  So instead use ARG(_not_) and REF(_and_), etc.
+        ;
+        ; (Complete list here for completeness, despite many being unused.)
+        ;
+        "and" [copy "_and_"]
+        "and_eq" [copy "_and_eq_"]
+        "bitand" [copy "_bitand_"]
+        "bitor" [copy "_bitor_"]
+        "compl" [copy "_compl_"]
+        "not" [copy "_not_"]
+        "not_eq" [copy "_not_eq_"]
+        "or" [copy "_or_"]
+        "or_eq" [copy "_or_eq_"]
+        "xor" [copy "_xor_"]
+        "xor_eq" [copy "_xor_eq_"]
+
+        "did" [copy "_did_"]  ; Ren-C addition, replaces not-not `!!`
+
         default [
             ;
             ; If these symbols occur composite in a longer word, they use a

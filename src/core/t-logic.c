@@ -116,9 +116,9 @@ REBNATIVE(did_q)
 //      not not :optional
 //  ]
 //
-REBNATIVE(did)
+REBNATIVE(_did_)  // see TO-C-NAME
 {
-    INCLUDE_PARAMS_OF_DID;
+    INCLUDE_PARAMS_OF__DID_;
 
     return Init_Logic(D_OUT, IS_TRUTHY(ARG(optional)));
 }
@@ -152,9 +152,9 @@ REBNATIVE(not_q)
 //      optional [<opt> any-value!]
 //  ]
 //
-REBNATIVE(not)
+REBNATIVE(_not_)  // see TO-C-NAME
 {
-    INCLUDE_PARAMS_OF_NOT;
+    INCLUDE_PARAMS_OF__NOT_;
 
     return Init_Logic(D_OUT, IS_FALSEY(ARG(optional)));
 }
@@ -215,9 +215,9 @@ REBNATIVE(xor_q)
 //          [block! action! quoted! sym-word! sym-path! sym-group! blank!]
 //  ]
 //
-REBNATIVE(and)
+REBNATIVE(_and_)  // see TO-C-NAME
 {
-    INCLUDE_PARAMS_OF_AND;
+    INCLUDE_PARAMS_OF__AND_;
 
     REBVAL *left = ARG(left);
     REBVAL *right = ARG(right);
@@ -247,9 +247,9 @@ REBNATIVE(and)
 //      'right "Evaluated as a branch only if LEFT is logically false"
 //          [block! group! quoted! sym-word! sym-path! sym-group! blank!]
 //  ]
-REBNATIVE(or)
+REBNATIVE(_or_)  // see TO-C-NAME
 {
-    INCLUDE_PARAMS_OF_OR;
+    INCLUDE_PARAMS_OF__OR_;
 
     REBVAL *left = ARG(left);
     REBVAL *right = ARG(right);
@@ -281,9 +281,9 @@ REBNATIVE(or)
 //          [block! group! quoted! sym-word! sym-path! sym-group! blank!]
 //  ]
 //
-REBNATIVE(xor)
+REBNATIVE(_xor_)  // see TO-C-NAME
 {
-    INCLUDE_PARAMS_OF_XOR;
+    INCLUDE_PARAMS_OF__XOR_;
 
     REBVAL *left = ARG(left);
 
