@@ -530,5 +530,5 @@ extern void MF_Struct(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REB_R Routine_Dispatcher(REBFRM *f);
 
 inline static bool IS_ACTION_RIN(const RELVAL *v)
-    { return VAL_ACT_DISPATCHER(v) == &Routine_Dispatcher; }
+    { return ACT_DISPATCHER(VAL_ACTION(v)) == &Routine_Dispatcher; }
 

@@ -51,14 +51,14 @@ bool Catching_Break_Or_Continue(REBVAL *val, bool *broke)
     if (not IS_ACTION(label))
         return false;
 
-    if (VAL_ACT_DISPATCHER(label) == &N_break) {
+    if (ACT_DISPATCHER(VAL_ACTION(label)) == &N_break) {
         *broke = true;
         CATCH_THROWN(val, val);
         assert(IS_NULLED(val)); // BREAK must always return NULL
         return true;
     }
 
-    if (VAL_ACT_DISPATCHER(label) == &N_continue) {
+    if (ACT_DISPATCHER(VAL_ACTION(label)) == &N_continue) {
         //
         // !!! Currently continue with no argument acts the same as asking
         // for CONTINUE NULL (the form with an argument).  This makes sense
@@ -1009,7 +1009,7 @@ REBNATIVE(cycle)
                 const REBVAL *label = VAL_THROWN_LABEL(D_OUT);
                 if (
                     IS_ACTION(label)
-                    and VAL_ACT_DISPATCHER(label) == &N_stop
+                    and ACT_DISPATCHER(VAL_ACTION(label)) == &N_stop
                 ){
                     // See notes on STOP for why CYCLE is unique among loop
                     // constructs, with a BREAK variant that returns a value.

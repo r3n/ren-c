@@ -465,7 +465,7 @@ REBNATIVE(meta_of)  // see notes on MISC_META()
 
     REBCTX *meta;
     if (IS_ACTION(v))
-        meta = VAL_ACT_META(v);
+        meta = MISC_META(VAL_ACT_PARAMLIST_NODE(v));
     else {
         assert(ANY_CONTEXT(v));
         meta = MISC_META(VAL_CONTEXT(v));

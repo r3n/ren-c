@@ -164,7 +164,7 @@ e-funcs/emit {
      * system-wide header in order to allow recognizing a given native by
      * identity in the C code, e.g.:
      *
-     *     if (VAL_ACT_DISPATCHER(native) == &N_parse) { ... }
+     *     if (ACT_DISPATCHER(VAL_ACTION(native)) == &N_parse) { ... }
      */
 }
 e-funcs/emit newline

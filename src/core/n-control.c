@@ -1391,14 +1391,14 @@ REBNATIVE(catch)
 
     if (REF(any) and not (
         IS_ACTION(label)
-        and VAL_ACT_DISPATCHER(label) == &N_quit
+        and ACT_DISPATCHER(VAL_ACTION(label)) == &N_quit
     )){
         goto was_caught;
     }
 
     if (REF(quit) and (
         IS_ACTION(label)
-        and VAL_ACT_DISPATCHER(label) == &N_quit
+        and ACT_DISPATCHER(VAL_ACTION(label)) == &N_quit
     )){
         goto was_caught;
     }

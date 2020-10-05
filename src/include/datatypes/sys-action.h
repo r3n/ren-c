@@ -403,26 +403,6 @@ inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
 #define VAL_ACT_PARAMLIST(v) \
     ACT_PARAMLIST(VAL_ACTION(v))
 
-#define VAL_ACT_NUM_PARAMS(v) \
-    ACT_NUM_PARAMS(VAL_ACTION(v))
-
-#define VAL_ACT_PARAMS_HEAD(v) \
-    ACT_PARAMS_HEAD(VAL_ACTION(v))
-
-#define VAL_ACT_PARAM(v,n) \
-    ACT_PARAM(VAL_ACTION(v), n)
-
-
-inline static REBNAT VAL_ACT_DISPATCHER(REBCEL(const*) v) {
-    assert(CELL_KIND(v) == REB_ACTION);
-    return MISC(VAL_ACT_DETAILS_NODE(v)).dispatcher;
-}
-
-inline static REBCTX *VAL_ACT_META(REBCEL(const*) v) {
-    assert(CELL_KIND(v) == REB_ACTION);
-    return MISC_META(VAL_ACT_PARAMLIST_NODE(v));
-}
-
 
 // Native values are stored in an array at boot time.  These are convenience
 // routines for accessing them, which should compile to be as efficient as

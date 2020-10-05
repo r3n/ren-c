@@ -190,6 +190,7 @@ void MF_Action(REB_MOLD *mo, REBCEL(const*) v, bool form)
 REBTYPE(Action)
 {
     REBVAL *value = D_ARG(1);
+    REBACT *act = VAL_ACTION(value);
 
     switch (VAL_WORD_SYM(verb)) {
       case SYM_COPY: {
@@ -203,8 +204,6 @@ REBTYPE(Action)
         if (REF(deep)) {
             // !!! always "deep", allow it?
         }
-
-        REBACT *act = VAL_ACTION(value);
 
         // Copying functions creates another handle which executes the same
         // code, yet has a distinct identity.  This means it would not be
@@ -275,14 +274,14 @@ REBTYPE(Action)
             return D_OUT;
 
           case SYM_TYPES: {
-            REBARR *copy = Make_Array(VAL_ACT_NUM_PARAMS(value));
+            REBARR *copy = Make_Array(ACT_NUM_PARAMS(act));
 
             // The typesets have a symbol in them for the parameters, and
             // ordinary typesets aren't supposed to have it--that's a
             // special feature for object keys and paramlists!  So clear
             // that symbol out before giving it back.
             //
-            REBVAL *param = VAL_ACT_PARAMS_HEAD(value);
+            REBVAL *param = ACT_PARAMS_HEAD(act);
             REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
             for (; NOT_END(param); ++param, ++typeset) {
                 assert(IS_PARAM(param));
@@ -290,7 +289,7 @@ REBTYPE(Action)
                 VAL_TYPESET_LOW_BITS(typeset) = VAL_TYPESET_LOW_BITS(param);
                 VAL_TYPESET_HIGH_BITS(typeset) = VAL_TYPESET_HIGH_BITS(param);
             }
-            TERM_ARRAY_LEN(copy, VAL_ACT_NUM_PARAMS(value));
+            TERM_ARRAY_LEN(copy, ACT_NUM_PARAMS(act));
             assert(IS_END(typeset));
 
             return Init_Block(D_OUT, copy); }
@@ -302,7 +301,7 @@ REBTYPE(Action)
             // is a series with the file and line bits set, then that's what
             // it returns for FILE OF and LINE OF.
 
-            REBARR *details = VAL_ACT_DETAILS(value);
+            REBARR *details = ACT_DETAILS(act);
             if (ARR_LEN(details) < 1 or not ANY_ARRAY(ARR_HEAD(details)))
                 return nullptr;
 
@@ -320,7 +319,7 @@ REBTYPE(Action)
             return D_OUT; }
 
           default:
-            fail (Error_Cannot_Reflect(VAL_TYPE(value), property));
+            fail (Error_Cannot_Reflect(REB_ACTION, property));
         }
         break; }
 

@@ -2337,7 +2337,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             | FLAGIT_KIND(REB_PATH);
 
         REBDSP dsp_outputs = DSP;
-        REBVAL *temp = VAL_ACT_PARAMS_HEAD(spare);
+        REBVAL *temp = ACT_PARAMS_HEAD(VAL_ACTION(spare));
         for (; NOT_END(temp); ++temp) {
             if (not TYPE_CHECK_EXACT_BITS(temp, ts_out))
                 continue;
