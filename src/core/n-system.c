@@ -253,7 +253,7 @@ REBNATIVE(check)
     }
     else if (IS_ACTION(value)) {
         ASSERT_ARRAY(VAL_ACT_PARAMLIST(value));
-        ASSERT_ARRAY(VAL_ACT_DETAILS(value));
+        ASSERT_ARRAY(ACT_DETAILS(VAL_ACTION(value)));
     }
 
     return Init_True(D_OUT);

@@ -282,12 +282,10 @@ REBCTX *Make_Context_For_Action(
 bool Specialize_Action_Throws(
     REBVAL *out,
     REBVAL *specializee,
-    REBSTR *opt_specializee_name,
     REBVAL *opt_def,  // !!! REVIEW: binding modified directly (not copied)
     REBDSP lowest_ordered_dsp
 ){
     assert(out != specializee);
-    UNUSED(opt_specializee_name);  // was used when this did META as well
 
     struct Reb_Binder binder;
     if (opt_def)
@@ -548,6 +546,11 @@ bool Specialize_Action_Throws(
     INIT_VAL_CONTEXT_PHASE(body, unspecialized);
 
     Init_Action_Unbound(out, specialized);
+
+    const REBSTR *opt_label = VAL_ACTION_OPT_LABEL(specializee);
+    if (opt_label)
+        INIT_ACTION_LABEL(out, opt_label);
+
     return false;  // code block did not throw
 }
 
@@ -576,10 +579,8 @@ REBNATIVE(specialize_p)  // see extended definition SPECIALIZE in %base-defs.r
     // shouldn't think that intends any ordering of /dup/part or /part/dup)
     //
     REBDSP lowest_ordered_dsp = DSP; // capture before any refinements pushed
-    REBSTR *opt_name;
     if (Get_If_Word_Or_Path_Throws(
         D_OUT,
-        &opt_name,
         specializee,
         SPECIFIED,
         true  // push_refines = true (don't generate temp specialization)
@@ -597,7 +598,6 @@ REBNATIVE(specialize_p)  // see extended definition SPECIALIZE in %base-defs.r
     if (Specialize_Action_Throws(
         D_OUT,
         specializee,
-        opt_name,
         ARG(def),
         lowest_ordered_dsp
     )){
@@ -953,17 +953,14 @@ bool Make_Frame_From_Varargs_Throws(
 
     DECLARE_FRAME (f, parent->feed, EVAL_MASK_DEFAULT);
 
-    REBSTR *opt_label;
     if (Get_If_Word_Or_Path_Throws(
         out,
-        &opt_label,
         specializee,
         SPECIFIED,
         true  // push_refinements = true (DECLARE_FRAME captured original DSP)
     )){
         return true;
     }
-    UNUSED(opt_label); // not used here
 
     if (not IS_ACTION(out))
         fail (specializee);

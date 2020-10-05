@@ -139,11 +139,9 @@ REBNATIVE(shove)
 
     REBVAL *shovee = ARG(right); // reuse arg cell for the shoved-into
 
-    REBSTR *opt_label = nullptr;
     if (IS_WORD(*v) or IS_PATH(*v)) {
         if (Get_If_Word_Or_Path_Throws(
             D_OUT, // can't eval directly into arg slot
-            &opt_label,
             *v,
             *specifier,
             false // !!! see above; false = don't push refinements
@@ -769,10 +767,8 @@ REBNATIVE(applique)
     // be taken into account, e.g. APPLY 'APPEND/ONLY/DUP pushes /ONLY, /DUP
     //
     REBDSP lowest_ordered_dsp = DSP;
-    REBSTR *opt_label;
     if (Get_If_Word_Or_Path_Throws(
         D_OUT,
-        &opt_label,
         applicand,
         SPECIFIED,
         true // push_refinements, don't specialize ACTION! on 'APPEND/ONLY/DUP
@@ -868,7 +864,7 @@ REBNATIVE(applique)
     INIT_FRM_PHASE(f, VAL_ACTION(applicand));
     FRM_BINDING(f) = VAL_BINDING(applicand);
 
-    Begin_Prefix_Action(f, opt_label);
+    Begin_Prefix_Action(f, VAL_ACTION_OPT_LABEL(applicand));
 
     bool action_threw = Eval_Throws(f);
 

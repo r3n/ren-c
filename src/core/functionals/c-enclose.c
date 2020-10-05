@@ -157,11 +157,9 @@ REBNATIVE(enclose_p)  // see extended definition ENCLOSE in %base-defs.r
     INCLUDE_PARAMS_OF_ENCLOSE_P;
 
     REBVAL *inner = ARG(inner);
-    REBSTR *opt_inner_name;
     const bool push_refinements = false;
     if (Get_If_Word_Or_Path_Throws(
         D_OUT,
-        &opt_inner_name,
         inner,
         SPECIFIED,
         push_refinements
@@ -174,10 +172,8 @@ REBNATIVE(enclose_p)  // see extended definition ENCLOSE in %base-defs.r
     Move_Value(inner, D_OUT); // Frees D_OUT, and GC safe (in ARG slot)
 
     REBVAL *outer = ARG(outer);
-    REBSTR *opt_outer_name;
     if (Get_If_Word_Or_Path_Throws(
         D_OUT,
-        &opt_outer_name,
         outer,
         SPECIFIED,
         push_refinements

@@ -218,11 +218,9 @@ REBNATIVE(hijack)
 {
     INCLUDE_PARAMS_OF_HIJACK;
 
-    REBSTR *opt_victim_name;
     const bool push_refinements = false;
     if (Get_If_Word_Or_Path_Throws(
         D_OUT,
-        &opt_victim_name,
         ARG(victim),
         SPECIFIED,
         push_refinements
@@ -235,10 +233,8 @@ REBNATIVE(hijack)
     Move_Value(ARG(victim), D_OUT);  // Frees up D_OUT
     REBACT *victim = VAL_ACTION(ARG(victim));  // GC safe (in ARG slot)
 
-    REBSTR *opt_hijacker_name;
     if (Get_If_Word_Or_Path_Throws(
         D_OUT,
-        &opt_hijacker_name,
         ARG(hijacker),
         SPECIFIED,
         push_refinements

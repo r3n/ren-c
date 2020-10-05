@@ -424,10 +424,8 @@ REBNATIVE(compose)
 
     REBVAL *predicate = ARG(predicate);
     if (not IS_NULLED(predicate)) {
-        REBSTR *opt_label;
         if (Get_If_Word_Or_Path_Throws(
             D_OUT,
-            &opt_label,
             predicate,
             SPECIFIED,
             false  // push_refinements = false, specialize for multiple uses

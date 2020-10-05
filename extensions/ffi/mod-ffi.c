@@ -334,7 +334,7 @@ REBNATIVE(addr_of) {
         // The CFUNC is fabricated by the FFI if it's a callback, or
         // just the wrapped DLL function if it's an ordinary routine
         //
-        REBRIN *rin = VAL_ACT_DETAILS(v);
+        REBRIN *rin = ACT_DETAILS(VAL_ACTION(v));
         return Init_Integer(
             D_OUT, cast(intptr_t, RIN_CFUNC(rin))
         );

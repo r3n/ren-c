@@ -271,8 +271,10 @@ bool Next_Path_Throws(REBPVS *pvs)
     // capture the last refinement's name, so check label for non-NULL.
     //
     if (IS_ACTION(pvs->out) and IS_WORD(PVS_PICKER(pvs))) {
-        if (not pvs->opt_label)
+        if (not pvs->opt_label) {  // !!! only used for this "bit" signal ATM
             pvs->opt_label = VAL_WORD_SPELLING(PVS_PICKER(pvs));
+            INIT_ACTION_LABEL(pvs->out, pvs->opt_label);
+        }
     }
 
     if (IS_END(*v))
@@ -308,7 +310,6 @@ bool Next_Path_Throws(REBPVS *pvs)
 //
 bool Eval_Path_Throws_Core(
     REBVAL *out, // if opt_setval, this is only used to return a thrown value
-    REBSTR **label_out,
     const REBARR *array,
     REBLEN index,
     REBSPC *specifier,
@@ -356,8 +357,10 @@ bool Eval_Path_Throws_Core(
 
         Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
 
-        if (IS_ACTION(pvs->out))
+        if (IS_ACTION(pvs->out)) {
             pvs->opt_label = VAL_WORD_SPELLING(*v);
+            INIT_ACTION_LABEL(pvs->out, pvs->opt_label);
+        }
     }
     else if (
         IS_GROUP(*v)
@@ -463,8 +466,7 @@ bool Eval_Path_Throws_Core(
             if (Specialize_Action_Throws(
                 PVS_PICKER(pvs),
                 pvs->out,
-                pvs->opt_label,
-                NULL, // opt_def
+                nullptr, // opt_def
                 dsp_orig // first_refine_dsp
             )){
                 panic ("REFINE-only specializations should not THROW");
@@ -475,9 +477,6 @@ bool Eval_Path_Throws_Core(
     }
 
   return_not_thrown:;
-    if (label_out)
-        *label_out = pvs->opt_label;
-
     Abort_Frame(pvs);
     assert(not Is_Evaluator_Throwing_Debug());
     return false; // not thrown

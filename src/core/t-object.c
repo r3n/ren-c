@@ -257,10 +257,8 @@ REB_R MAKE_Frame(
 
     REBDSP lowest_ordered_dsp = DSP; // Data stack gathers any refinements
 
-    REBSTR *opt_label;
     if (Get_If_Word_Or_Path_Throws( // Allows `MAKE FRAME! 'APPEND/DUP`, etc.
         out,
-        &opt_label,
         arg,
         SPECIFIED,
         true // push_refinements (e.g. don't auto-specialize ACTION! if PATH!)

@@ -110,11 +110,9 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
 
     REBVAL *adaptee = ARG(adaptee);
 
-    REBSTR *opt_adaptee_name;
     const bool push_refinements = false;
     if (Get_If_Word_Or_Path_Throws(
         D_OUT,
-        &opt_adaptee_name,
         adaptee,
         SPECIFIED,
         push_refinements

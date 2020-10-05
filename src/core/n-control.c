@@ -148,11 +148,9 @@ inline static bool Single_Test_Throws(
         DECLARE_LOCAL (dequoted_test); // wouldn't need if Get took any escape
         Dequotify(Derelativize(dequoted_test, test, test_specifier));
 
-        REBSTR *opt_label = NULL;
         REBDSP lowest_ordered_dsp = DSP;
         if (Get_If_Word_Or_Path_Throws( // !!! take any escape level?
             out,
-            &opt_label,
             dequoted_test,
             SPECIFIED,
             push_refinements // !!! Look into pushing e.g. `match :foo?/bar x`
@@ -570,10 +568,8 @@ REBNATIVE(match)
         if (NOT_CELL_FLAG(test, UNEVALUATED)) // soft quote eval'd
             goto either_match; // allow `MATCH ('NULL?) ...`
 
-        REBSTR *opt_label = NULL;
         if (Get_If_Word_Or_Path_Throws(
             D_OUT,
-            &opt_label,
             test,
             SPECIFIED,
             true  // push_refinements, DECLARE_FRAME() captured original DSP
@@ -621,7 +617,7 @@ REBNATIVE(match)
             | EVAL_FLAG_FULLY_SPECIALIZED
             | EVAL_FLAG_PROCESS_ACTION;
 
-        Begin_Prefix_Action(f, opt_label);
+        Begin_Prefix_Action(f, VAL_ACTION_OPT_LABEL(test));
 
         bool threw = Eval_Throws(f);
 
@@ -869,10 +865,8 @@ REBNATIVE(case)
 
     REBVAL *predicate = ARG(predicate);
     if (not IS_NULLED(predicate)) {
-        REBSTR *opt_label;
         if (Get_If_Word_Or_Path_Throws(
             D_OUT,
-            &opt_label,
             predicate,
             SPECIFIED,
             false  // push_refinements = false, specialize for multiple uses
@@ -1045,10 +1039,8 @@ REBNATIVE(switch)
 
     REBVAL *predicate = ARG(predicate);
     if (not IS_NULLED(predicate)) {
-        REBSTR *opt_label;
         if (Get_If_Word_Or_Path_Throws(
             D_OUT,
-            &opt_label,
             predicate,
             SPECIFIED,
             false  // push_refinements = false, specialize for multiple uses
@@ -1305,7 +1297,6 @@ REBNATIVE(default)
 
         if (Eval_Path_Throws_Core(
             D_OUT,
-            NULL, // not requesting symbol means refinements not allowed
             VAL_ARRAY(target),
             VAL_INDEX(target),
             VAL_SPECIFIER(target),
@@ -1334,7 +1325,6 @@ REBNATIVE(default)
         DECLARE_LOCAL (dummy);
         if (Eval_Path_Throws_Core(
             dummy,
-            NULL, // not requesting symbol means refinements not allowed
             VAL_ARRAY(target),
             VAL_INDEX(target),
             VAL_SPECIFIER(target),

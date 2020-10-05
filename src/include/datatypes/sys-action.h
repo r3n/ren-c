@@ -300,13 +300,9 @@
 #define VAL_ACT_PARAMLIST_NODE(v) \
     PAYLOAD(Any, (v)).first.node  // lvalue, but a node
 
-#define VAL_ACT_DETAILS_NODE(v) \
+#define VAL_ARCHETYPE_DETAILS_NODE(v) \
     PAYLOAD(Any, (v)).second.node  // lvalue, but a node
 
-inline static REBARR *VAL_ACT_DETAILS(REBCEL(const*) v) {
-    assert(CELL_KIND(v) == REB_ACTION);
-    return ARR(VAL_ACT_DETAILS_NODE(v));
-}
 
 inline static REBARR *ACT_PARAMLIST(REBACT *a) {
     assert(GET_ARRAY_FLAG(&a->paramlist, IS_PARAMLIST));
@@ -334,7 +330,7 @@ inline static void Sync_Paramlist_Archetype(REBARR *paramlist)
     ARR(ACT_DETAILS_NODE(a))  // array, but is unassignable
 
 #define ACT_DISPATCHER(a) \
-    (MISC(VAL_ACT_DETAILS(ACT_ARCHETYPE(a))).dispatcher)
+    (MISC(VAL_ARCHETYPE_DETAILS_NODE(ACT_ARCHETYPE(a))).dispatcher)
 
 // These are indices into the details array agreed upon by actions which have
 // the PARAMLIST_FLAG_IS_NATIVE set.
@@ -371,8 +367,7 @@ inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {
 // This makes Push_Action() slightly faster in assigning f->special.
 //
 inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
-    REBARR *details = VAL_ACT_DETAILS(ACT_ARCHETYPE(a));
-    REBARR *specialty = LINK_SPECIALTY(details);
+    REBARR *specialty = LINK_SPECIALTY(ACT_DETAILS(a));
     if (GET_ARRAY_FLAG(specialty, IS_VARLIST))
         return CTX(specialty);
 
@@ -380,7 +375,7 @@ inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
 }
 
 inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
-    REBARR *details = VAL_ACT_DETAILS(ACT_ARCHETYPE(a));
+    REBARR *details = ACT_DETAILS(a);
     REBSER *s = SER(LINK_SPECIALTY_NODE(details));
     return cast(REBVAL*, s->content.dynamic.data) + 1; // skip archetype/root
 }
@@ -402,6 +397,33 @@ inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
 
 #define VAL_ACT_PARAMLIST(v) \
     ACT_PARAMLIST(VAL_ACTION(v))
+
+// When an ACTION! is stored in a cell (e.g. not an "archetype"), it can
+// contain a label of the ANY-WORD! it was taken from.  If it is an array
+// node, it is presumed an archetype and has no label.
+//
+// !!! Theoretically, longer forms like `.not.equal?` for PREDICATE! could
+// use an array node here.  But since CHAINs store ACTION!s that can cache
+// the words, you get the currently executing label instead...which may
+// actually make more sense.
+//
+inline static const REBSTR *VAL_ACTION_OPT_LABEL(const RELVAL *v) {
+    assert(IS_ACTION(v));
+    REBSER *s = SER(PAYLOAD(Any, v).second.node);
+    if (IS_SER_ARRAY(s))
+        return nullptr;  // archetype (e.g. may live in paramlist[0] itself)
+    return STR(s);
+}
+
+inline static void INIT_ACTION_LABEL(RELVAL *v, const REBSTR *label)
+{
+    // !!! How to be certain this isn't an archetype node?  The GC should
+    // catch any violations when a paramlist[0] isn't an array...
+    //
+    ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);
+    assert(label != nullptr);
+    PAYLOAD(Any, v).second.node = NOD(label);
+}
 
 
 // Native values are stored in an array at boot time.  These are convenience

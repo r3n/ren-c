@@ -494,8 +494,11 @@ inline static void Prep_Frame_Core(
     DECLARE_FRAME(name, &TG_Frame_Feed_End, flags)
 
 
-inline static void Begin_Action_Core(REBFRM *f, REBSTR *opt_label, bool enfix)
-{
+inline static void Begin_Action_Core(
+    REBFRM *f,
+    const REBSTR *opt_label,
+    bool enfix
+){
     assert(NOT_EVAL_FLAG(f, RUNNING_ENFIX));
     assert(NOT_FEED_FLAG(f->feed, DEFERRING_ENFIX));
 

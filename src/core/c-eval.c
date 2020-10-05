@@ -737,10 +737,8 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 // at the `process_action` label.
 
       case REB_ACTION: {
-        REBSTR *opt_label = nullptr;  // not run from WORD!/PATH!, "nameless"
-
         Push_Action(f, VAL_ACTION(v), VAL_BINDING(v));
-        Begin_Prefix_Action(f, opt_label);
+        Begin_Prefix_Action(f, VAL_ACTION_OPT_LABEL(v));  // may cache label
 
         // We'd like `10 -> = 5 + 5` to work, and to do so it reevaluates in
         // a new frame, but has to run the `=` as "getting its next arg from
@@ -1779,10 +1777,8 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             // the action args, as the paramlist is likely be completely
             // incompatible with this next chain step.
             //
-            REBSTR *opt_label = f->opt_label;
             Drop_Action(f);
             Push_Action(f, VAL_ACTION(DS_TOP), VAL_BINDING(DS_TOP));
-            DS_DROP();
 
             // We use the same mechanism as enfix operations do...give the
             // next chain step its first argument coming from f->out
@@ -1792,9 +1788,11 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             // This might be interesting or it might be bugs waiting to
             // happen, trying it out of curiosity for now.
             //
-            Begin_Prefix_Action(f, opt_label);
+            Begin_Prefix_Action(f, VAL_ACTION_OPT_LABEL(DS_TOP));
             assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));
             SET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);
+
+            DS_DROP();
 
             goto process_action;
         }
@@ -1903,6 +1901,9 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             fail (Error_Need_Non_Void_Core(v, *specifier));
 
         Move_Value(f->out, gotten);
+
+        if (IS_ACTION(gotten))  // cache the word's label in the cell
+            INIT_ACTION_LABEL(f->out, VAL_WORD_SPELLING(v));
         break;
 
 
@@ -1978,10 +1979,8 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
         REBVAL *where = GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT) ? spare : f->out;
 
-        REBSTR *opt_label;
         if (Eval_Path_Throws_Core(
             where,
-            &opt_label,  // requesting says we run functions (not GET-PATH!)
             VAL_ARRAY(v),
             VAL_INDEX(v),
             Derive_Specifier(*specifier, v),
@@ -2012,7 +2011,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                 fail ("Use `<-` with invisibles fetched from PATH!");
 
             Push_Action(f, VAL_ACTION(where), VAL_BINDING(where));
-            Begin_Prefix_Action(f, opt_label);
+            Begin_Prefix_Action(f, VAL_ACTION_OPT_LABEL(where));
 
             if (where == f->out)
                 Expire_Out_Cell_Unless_Invisible(f);
@@ -2065,7 +2064,6 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
         if (Eval_Path_Throws_Core(
             spare,  // output if thrown, used as scratch space otherwise
-            nullptr,  // not requesting symbol means refinements not allowed
             VAL_ARRAY(v),
             VAL_INDEX(v),
             Derive_Specifier(*specifier, v),
@@ -2317,7 +2315,6 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         //
         if (Get_If_Word_Or_Path_Throws(
             spare,
-            nullptr,
             *next,
             *specifier,
             false

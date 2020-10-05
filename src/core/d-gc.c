@@ -370,15 +370,14 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         REBACT *a = VAL_ACTION(v);
         REBARR *paramlist = ACT_PARAMLIST(a);
         assert(Is_Marked(paramlist));
-        REBARR *details = ACT_DETAILS(a);
-        assert(Is_Marked(details));
+
+        assert(Is_Marked(PAYLOAD(Any, v).second.node));
 
         // Make sure the [0] slot of the paramlist holds an archetype that is
         // consistent with the paramlist itself.
         //
         REBVAL *archetype = ACT_ARCHETYPE(a);
         assert(paramlist == VAL_ACT_PARAMLIST(archetype));
-        assert(details == VAL_ACT_DETAILS(archetype));
         break; }
 
       case REB_QUOTED:
@@ -468,7 +467,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         // because of the potential for overflowing the C stack with calls
         // to Queue_Mark_Function_Deep.
 
-        REBARR *details = VAL_ACT_DETAILS(archetype);
+        REBARR *details = ACT_DETAILS(VAL_ACTION(archetype));
         assert(Is_Marked(details));
 
         REBARR *specialty = LINK_SPECIALTY(details);

@@ -995,7 +995,7 @@ REBACT *Make_Action(
     );
     TERM_ARRAY_LEN(details, details_capacity);
 
-    VAL_ACT_DETAILS_NODE(rootparam) = NOD(details);
+    VAL_ARCHETYPE_DETAILS_NODE(rootparam) = NOD(details);
 
     MISC(details).dispatcher = dispatcher; // level of indirection, hijackable
 
@@ -1353,16 +1353,15 @@ REB_R Dummy_Dispatcher(REBFRM *f)
 //
 bool Get_If_Word_Or_Path_Throws(
     REBVAL *out,
-    REBSTR **opt_name_out,
     const RELVAL *v,
     REBSPC *specifier,
     bool push_refinements
 ) {
     if (IS_WORD(v) or IS_GET_WORD(v) or IS_SYM_WORD(v)) {
       get_as_word:
-        if (opt_name_out)
-            *opt_name_out = VAL_WORD_SPELLING(v);
         Get_Word_May_Fail(out, v, specifier);
+        if (IS_ACTION(out))
+            INIT_ACTION_LABEL(out, VAL_WORD_SPELLING(v));
     }
     else if (IS_PATH(v) or IS_GET_PATH(v) or IS_SYM_PATH(v)) {
         if (MIRROR_BYTE(v) == REB_WORD)  // e.g. `/`
@@ -1371,7 +1370,6 @@ bool Get_If_Word_Or_Path_Throws(
         REBSPC *derived = Derive_Specifier(specifier, v);
         if (Eval_Path_Throws_Core(
             out,
-            opt_name_out,  // requesting says we run functions (not GET-PATH!)
             VAL_ARRAY(v),
             VAL_INDEX(v),
             derived,
@@ -1383,10 +1381,8 @@ bool Get_If_Word_Or_Path_Throws(
             return true;
         }
     }
-    else {
-        *opt_name_out = NULL;
+    else
         Derelativize(out, v, specifier);
-    }
 
     return false;
 }

@@ -533,7 +533,6 @@ inline static void Get_Var_May_Fail(
         //
         if (Eval_Path_Throws_Core(
             out,
-            NULL, // not requesting symbol means refinements not allowed
             VAL_ARRAY(source),
             VAL_INDEX(source),
             Derive_Specifier(specifier, source),
@@ -674,7 +673,6 @@ void Set_Var_May_Fail(
         DECLARE_LOCAL (dummy);
         if (Eval_Path_Throws_Core(
             dummy,
-            NULL, // not requesting symbol means refinements not allowed
             VAL_ARRAY(target),
             VAL_INDEX(target),
             Derive_Specifier(target_specifier, target),

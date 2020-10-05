@@ -93,7 +93,6 @@ inline static bool Get_Path_Throws_Core(
 ){
     return Eval_Path_Throws_Core(
         out,
-        NULL, // not requesting symbol means refinements not allowed
         VAL_ARRAY(any_path),
         VAL_INDEX(any_path),
         Derive_Specifier(specifier, any_path),
@@ -112,7 +111,6 @@ inline static void Get_Path_Core(
 
     if (Eval_Path_Throws_Core(
         out,
-        NULL, // not requesting symbol means refinements not allowed
         VAL_ARRAY(any_path),
         VAL_INDEX(any_path),
         Derive_Specifier(specifier, any_path),
@@ -134,7 +132,6 @@ inline static bool Set_Path_Throws_Core(
 
     return Eval_Path_Throws_Core(
         out,
-        NULL, // not requesting symbol means refinements not allowed
         VAL_ARRAY(any_path),
         VAL_INDEX(any_path),
         Derive_Specifier(specifier, any_path),
@@ -160,7 +157,6 @@ inline static void Set_Path_Core(  // !!! Appears to be unused.  Unnecessary?
 
     if (Eval_Path_Throws_Core(
         out,
-        NULL, // not requesting symbol means refinements not allowed
         VAL_ARRAY(any_path),
         VAL_INDEX(any_path),
         Derive_Specifier(specifier, any_path),

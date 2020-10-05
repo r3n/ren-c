@@ -725,8 +725,8 @@ static void Mark_Frame_Stack_Deep(void)
 
         Queue_Mark_Node_Deep(f->original);  // never nullptr
 
-        if (f->opt_label)
-            Queue_Mark_Node_Deep(f->opt_label);  // nullptr if anonymous
+        if (f->opt_label)  // nullptr if anonymous
+            Queue_Mark_Node_Deep(m_cast(REBSTR*, f->opt_label));
 
         // special can be used to GC protect an arbitrary value while a
         // function is running, currently.  nullptr is permitted as well

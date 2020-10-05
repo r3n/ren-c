@@ -445,7 +445,7 @@ static uintptr_t arg_to_ffi(
             if (not IS_ACTION_RIN(arg))
                 fail (Error_Only_Callback_Ptr_Raw());  // but routines, too
 
-            REBRIN *rin = VAL_ACT_DETAILS(arg);
+            REBRIN *rin = ACT_DETAILS(VAL_ACTION(arg));
             CFUNC* cfunc = RIN_CFUNC(rin);
             size_t sizeof_cfunc = sizeof(cfunc);  // avoid conditional const
             if (sizeof_cfunc != sizeof(intptr_t))  // not necessarily true

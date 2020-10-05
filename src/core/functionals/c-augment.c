@@ -98,11 +98,9 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
 
     REBVAL *augmentee = ARG(augmentee);
 
-    REBSTR *opt_augmentee_name;
     const bool push_refinements = false;
     if (Get_If_Word_Or_Path_Throws(
         D_OUT,
-        &opt_augmentee_name,
         augmentee,
         SPECIFIED,
         push_refinements

@@ -202,11 +202,9 @@ inline static bool Do_Branch_Core_Throws(
 
       case REB_SYM_WORD:
       case REB_SYM_PATH: {
-        REBSTR *name;
         const bool push_refinements = false;
         if (Get_If_Word_Or_Path_Throws(
             out,
-            &name,
             branch,
             SPECIFIED,
             push_refinements

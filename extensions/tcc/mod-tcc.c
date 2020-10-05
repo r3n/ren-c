@@ -526,7 +526,7 @@ REBNATIVE(compile_p)
                 //
                 Move_Value(DS_PUSH(), SPECIFIC(item));
 
-                REBARR *details = VAL_ACT_DETAILS(item);
+                REBARR *details = ACT_DETAILS(VAL_ACTION(item));
                 RELVAL *source = ARR_AT(details, IDX_NATIVE_BODY);
                 RELVAL *linkname = ARR_AT(details, IDX_TCC_NATIVE_LINKNAME);
 
@@ -651,7 +651,7 @@ REBNATIVE(compile_p)
         REBVAL *native = DS_TOP;
         assert(IS_ACTION(native) and Is_User_Native(VAL_ACTION(native)));
 
-        REBARR *details = VAL_ACT_DETAILS(native);
+        REBARR *details = ACT_DETAILS(VAL_ACTION(native));
         REBVAL *linkname = SPECIFIC(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME));
 
         char *name_utf8 = rebSpell("ensure text!", linkname, rebEND);
