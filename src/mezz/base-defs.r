@@ -239,23 +239,23 @@ inherit-meta: func* [
             ]
         ]
     ]
-    return :derived
+    return get 'derived  ; no :derived name cache
 ]
 
 enclose: enclose* 'enclose* func* [f] [  ; uses low-level ENCLOSE* to make
     let inner: f/inner: compose :f/inner
-    inherit-meta do f :inner
+    inherit-meta do f get 'inner  ; no :inner name cache
 ]
 inherit-meta :enclose 'enclose*  ; needed since we used ENCLOSE*
 
 specialize: enclose 'specialize* func* [f] [  ; now we have high-level ENCLOSE
     let specializee: f/specializee: compose :f/specializee
-    inherit-meta do f :specializee
+    inherit-meta do f get 'specializee  ; no :specializee name cache
 ]
 
 adapt: enclose 'adapt* func* [f] [
     let adaptee: f/adaptee: compose :f/adaptee
-    inherit-meta do f :adaptee
+    inherit-meta do f get 'adaptee  ; no :adaptee name cache
 ]
 
 chain: enclose 'chain* func* [f] [
@@ -266,7 +266,7 @@ chain: enclose 'chain* func* [f] [
 augment: enclose 'augment* func* [f] [
     let augmentee: f/augmentee: compose :f/augmentee
     let spec: :f/spec
-    inherit-meta/augment do f :augmentee spec
+    inherit-meta/augment do f get 'augmentee spec  ; no :augmentee name cache
 ]
 
 ; The lower-level pointfree function separates out the action it takes, but
@@ -284,7 +284,7 @@ pointfree: enclose (specialize* 'pointfree* [action: :void]) func* [f] [
     ; rest of block is invocation by example
     f/block: skip f/block 1  ; Note: NEXT not defined yet
 
-    inherit-meta do f :action
+    inherit-meta do f get 'action  ; no :action name cache
 ]
 
 

@@ -245,7 +245,7 @@ REBNATIVE(generic)
     Init_Object(ARR_AT(details, IDX_NATIVE_CONTEXT), Lib_Context);
 
     REBVAL *verb_var = Sink_Word_May_Fail(ARG(verb), SPECIFIED);
-    Init_Action_Unbound(verb_var, generic);  // set the word to the action
+    Init_Action(verb_var, generic, VAL_WORD_SPELLING(ARG(verb)), UNBOUND);
 
     return Init_Void(D_OUT);  // see ENFIX for why evaluate to void
 }
@@ -462,7 +462,7 @@ REBVAL *Make_Native(
     // Append the native to the module under the name given.
     //
     REBVAL *var = Append_Context(VAL_CONTEXT(module), name, 0);
-    Init_Action_Unbound(var, act);
+    Init_Action(var, act, VAL_WORD_SPELLING(name), UNBOUND);
 
     return var;
 }

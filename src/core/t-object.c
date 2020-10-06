@@ -764,9 +764,10 @@ REBTYPE(Context)
             // GC'd if all the frames pointing to them were expired but still
             // referenced somewhere.
             //
-            return Init_Action_Maybe_Bound(
+            return Init_Action(
                 D_OUT,
                 VAL_PHASE(v),  // archetypal, so no binding
+                ANONYMOUS,
                 EXTRA(Binding, v).node  // e.g. where RETURN returns to
             );
         }

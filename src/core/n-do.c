@@ -857,7 +857,7 @@ REBNATIVE(applique)
     INIT_FRM_PHASE(f, VAL_ACTION(applicand));
     FRM_BINDING(f) = VAL_BINDING(applicand);
 
-    Begin_Prefix_Action(f, VAL_ACTION_OPT_LABEL(applicand));
+    Begin_Prefix_Action(f, VAL_ACTION_LABEL(applicand));
 
     bool action_threw = Eval_Throws(f);
 

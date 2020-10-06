@@ -231,5 +231,6 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         augmentee
     );
 
-    return Init_Action_Unbound(D_OUT, augmentated);
+    Init_Action(D_OUT, augmentated, VAL_ACTION_LABEL(augmentee), UNBOUND);
+    return D_OUT;
 }

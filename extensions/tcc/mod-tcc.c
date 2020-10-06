@@ -370,7 +370,7 @@ REBNATIVE(make_native)
     Init_Blank(ARR_AT(details, IDX_TCC_NATIVE_STATE)); // no TCC_State, yet...
 
     SET_ACTION_FLAG(native, IS_NATIVE);
-    return Init_Action_Unbound(D_OUT, native);
+    return Init_Action(D_OUT, native, ANONYMOUS, UNBOUND);
 }
 
 

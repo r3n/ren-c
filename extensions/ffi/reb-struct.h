@@ -475,9 +475,9 @@ inline static REBLIB *RIN_LIB(REBRIN *r) {
     return VAL_LIBRARY(RIN_AT(r, IDX_ROUTINE_ORIGIN));
 }
 
-inline static REBACT *RIN_CALLBACK_ACTION(REBRIN *r) {
+inline static REBVAL *RIN_CALLBACK_ACTION(REBRIN *r) {
     assert(RIN_IS_CALLBACK(r));
-    return VAL_ACTION(RIN_AT(r, IDX_ROUTINE_ORIGIN));
+    return SPECIFIC(RIN_AT(r, IDX_ROUTINE_ORIGIN));
 }
 
 inline static REBVAL *RIN_RET_SCHEMA(REBRIN *r)

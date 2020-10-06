@@ -93,9 +93,10 @@ REB_R MAKE_Action(
         REBCTX *exemplar = VAL_CONTEXT(frame_copy);
         rebRelease(frame_copy);
 
-        return Init_Action_Maybe_Bound(
+        return Init_Action(
             out,
             Make_Action_From_Exemplar(exemplar),
+            ANONYMOUS,
             VAL_BINDING(arg)  // is this right?
         );
     }
@@ -128,7 +129,7 @@ REB_R MAKE_Action(
         1  // details capacity, just the slot filled by the relativized body
     );
 
-    return Init_Action_Unbound(out, act);
+    return Init_Action(out, act, ANONYMOUS, UNBOUND);
 }
 
 
@@ -240,7 +241,8 @@ REBTYPE(Action)
             Blit_Cell(dest, src);
         TERM_ARRAY_LEN(ACT_DETAILS(proxy), details_len);
 
-        return Init_Action_Maybe_Bound(D_OUT, proxy, VAL_BINDING(value)); }
+        Init_Action(D_OUT, proxy, VAL_ACTION_LABEL(value), VAL_BINDING(value));
+        return D_OUT; }
 
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;

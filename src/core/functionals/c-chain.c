@@ -129,5 +129,5 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
     Force_Value_Frozen_Deep(pipeline);
     Move_Value(ARR_AT(ACT_DETAILS(chain), IDX_CHAINER_PIPELINE), pipeline);
 
-    return Init_Action_Unbound(out, chain);
+    return Init_Action(out, chain, VAL_ACTION_LABEL(first), UNBOUND);
 }

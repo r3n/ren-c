@@ -200,7 +200,7 @@ REBNATIVE(make_routine)
     Init_Blank(RIN_AT(r, IDX_ROUTINE_CLOSURE));
     Move_Value(RIN_AT(r, IDX_ROUTINE_ORIGIN), ARG(lib));
 
-    return Init_Action_Unbound(D_OUT, routine);
+    return Init_Action(D_OUT, routine, ANONYMOUS, UNBOUND);
 }
 
 
@@ -241,7 +241,7 @@ REBNATIVE(make_routine_raw)
     Init_Blank(RIN_AT(r, IDX_ROUTINE_CLOSURE));
     Init_Blank(RIN_AT(r, IDX_ROUTINE_ORIGIN)); // no LIBRARY! in this case.
 
-    return Init_Action_Unbound(D_OUT, routine);
+    return Init_Action(D_OUT, routine, ANONYMOUS, UNBOUND);
 }
 
 
@@ -307,7 +307,7 @@ REBNATIVE(wrap_callback)
     );
     Move_Value(RIN_AT(r, IDX_ROUTINE_ORIGIN), ARG(action));
 
-    return Init_Action_Unbound(D_OUT, callback);
+    return Init_Action(D_OUT, callback, ANONYMOUS, UNBOUND);
 }
 
 

@@ -134,5 +134,5 @@ REBNATIVE(n_shot)
     );
     Init_Integer(ARR_AT(ACT_DETAILS(n_shot), IDX_ONESHOT_COUNTER), n);
 
-    return Init_Action_Unbound(D_OUT, n_shot);
+    return Init_Action(D_OUT, n_shot, ANONYMOUS, UNBOUND);
 }

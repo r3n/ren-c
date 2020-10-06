@@ -168,5 +168,5 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
     );
     Move_Value(ARR_AT(details, IDX_ADAPTER_ADAPTEE), adaptee);
 
-    return Init_Action_Unbound(D_OUT, adaptation);
+    return Init_Action(D_OUT, adaptation, VAL_ACTION_LABEL(adaptee), UNBOUND);
 }

@@ -141,5 +141,5 @@ REBNATIVE(typechecker)
     );
     Move_Value(ARR_AT(ACT_DETAILS(typechecker), IDX_TYPECHECKER_TYPE), type);
 
-    return Init_Action_Unbound(D_OUT, typechecker);
+    return Init_Action(D_OUT, typechecker, ANONYMOUS, UNBOUND);
 }

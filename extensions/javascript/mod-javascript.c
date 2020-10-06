@@ -1145,7 +1145,7 @@ REBNATIVE(js_native)
     TERM_ARRAY_LEN(details, IDX_JS_NATIVE_MAX);
     SET_ACTION_FLAG(native, IS_NATIVE);
 
-    return Init_Action_Unbound(D_OUT, native);
+    return Init_Action(D_OUT, native, ANONYMOUS, UNBOUND);
 }
 
 

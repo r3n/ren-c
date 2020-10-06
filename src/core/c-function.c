@@ -995,7 +995,7 @@ REBACT *Make_Action(
     );
     TERM_ARRAY_LEN(details, details_capacity);
 
-    VAL_ARCHETYPE_DETAILS_NODE(rootparam) = NOD(details);
+    VAL_ACTION_DETAILS_OR_LABEL_NODE(rootparam) = NOD(details);
 
     MISC(details).dispatcher = dispatcher; // level of indirection, hijackable
 

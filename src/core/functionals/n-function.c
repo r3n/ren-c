@@ -435,7 +435,7 @@ REBNATIVE(func_p)
         1  // details capacity... just the one array slot (will be filled)
     );
 
-    return Init_Action_Unbound(D_OUT, func);
+    return Init_Action(D_OUT, func, ANONYMOUS, UNBOUND);
 }
 
 

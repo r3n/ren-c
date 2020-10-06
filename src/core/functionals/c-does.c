@@ -195,10 +195,11 @@ REBNATIVE(does)
         Force_Value_Frozen_Deep(specializee);
         Move_Value(body, specializee);
 
-        return Init_Action_Unbound(D_OUT, doer);
+        return Init_Action(D_OUT, doer, ANONYMOUS, UNBOUND);
     }
 
     REBCTX *exemplar;
+    const REBSTR *label;
     if (
         GET_CELL_FLAG(specializee, UNEVALUATED)
         and (IS_WORD(specializee) or IS_PATH(specializee))
@@ -211,6 +212,7 @@ REBNATIVE(does)
             return R_THROWN;
         }
         exemplar = VAL_CONTEXT(D_OUT);
+        label = VAL_WORD_SPELLING(specializee);
     }
     else {
         // On all other types, we just make it act like a specialized call to
@@ -240,8 +242,9 @@ REBNATIVE(does)
         Move_Value(CTX_VAR(exemplar, 2), specializee);
         SET_CELL_FLAG(CTX_VAR(exemplar, 2), ARG_MARKED_CHECKED);
         Move_Value(specializee, NATIVE_VAL(do));
+        label = ANONYMOUS;
     }
 
     REBACT *doer = Make_Action_From_Exemplar(exemplar);
-    return Init_Action_Unbound(D_OUT, doer);
+    return Init_Action(D_OUT, doer, label, UNBOUND);
 }

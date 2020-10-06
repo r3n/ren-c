@@ -300,7 +300,7 @@
 #define VAL_ACT_PARAMLIST_NODE(v) \
     PAYLOAD(Any, (v)).first.node  // lvalue, but a node
 
-#define VAL_ARCHETYPE_DETAILS_NODE(v) \
+#define VAL_ACTION_DETAILS_OR_LABEL_NODE(v) \
     PAYLOAD(Any, (v)).second.node  // lvalue, but a node
 
 
@@ -323,14 +323,11 @@ inline static void Sync_Paramlist_Archetype(REBARR *paramlist)
   { VAL_ACT_PARAMLIST_NODE(ARR_HEAD(paramlist)) = NOD(paramlist); }
 
 
-#define ACT_DETAILS_NODE(a) \
-    PAYLOAD(Any, ACT_ARCHETYPE(a)).second.node  // assignable, but is a node
-
 #define ACT_DETAILS(a) \
-    ARR(ACT_DETAILS_NODE(a))  // array, but is unassignable
+    ARR(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE(a)))
 
 #define ACT_DISPATCHER(a) \
-    (MISC(VAL_ARCHETYPE_DETAILS_NODE(ACT_ARCHETYPE(a))).dispatcher)
+    (MISC(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE(a))).dispatcher)
 
 // These are indices into the details array agreed upon by actions which have
 // the PARAMLIST_FLAG_IS_NATIVE set.
@@ -407,11 +404,11 @@ inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
 // the words, you get the currently executing label instead...which may
 // actually make more sense.
 //
-inline static const REBSTR *VAL_ACTION_OPT_LABEL(const RELVAL *v) {
+inline static const REBSTR *VAL_ACTION_LABEL(const RELVAL *v) {
     assert(IS_ACTION(v));
-    REBSER *s = SER(PAYLOAD(Any, v).second.node);
+    REBSER *s = SER(VAL_ACTION_DETAILS_OR_LABEL_NODE(v));
     if (IS_SER_ARRAY(s))
-        return nullptr;  // archetype (e.g. may live in paramlist[0] itself)
+        return ANONYMOUS;  // archetype (e.g. may live in paramlist[0] itself)
     return STR(s);
 }
 
@@ -421,8 +418,8 @@ inline static void INIT_ACTION_LABEL(RELVAL *v, const REBSTR *label)
     // catch any violations when a paramlist[0] isn't an array...
     //
     ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);
-    assert(label != nullptr);
-    PAYLOAD(Any, v).second.node = NOD(label);
+    assert(label != nullptr);  // avoid needing to worry about null case
+    VAL_ACTION_DETAILS_OR_LABEL_NODE(v) = NOD(label);
 }
 
 
@@ -439,31 +436,25 @@ inline static void INIT_ACTION_LABEL(RELVAL *v, const REBSTR *label)
 
 // A fully constructed action can reconstitute the ACTION! REBVAL
 // that is its canon form from a single pointer...the REBVAL sitting in
-// the 0 slot of the action's paramlist.
+// the 0 slot of the action's paramlist.  That action has no binding and
+// no label.
 //
-static inline REBVAL *Init_Action_Unbound(
-    RELVAL *out,
-    REBACT *a
-){
-  #if !defined(NDEBUG)
-    Extra_Init_Action_Checks_Debug(a);
-  #endif
-    Force_Array_Managed(ACT_PARAMLIST(a));
-    Move_Value(out, ACT_ARCHETYPE(a));
-    assert(VAL_BINDING(out) == UNBOUND);
-    return SPECIFIC(out);
-}
-
-static inline REBVAL *Init_Action_Maybe_Bound(
+static inline REBVAL *Init_Action(
     RELVAL *out,
     REBACT *a,
-    REBNOD *binding // allowed to be UNBOUND
+    const REBSTR *label,  // allowed to be ANONYMOUS
+    REBNOD *binding  // allowed to be UNBOUND
 ){
   #if !defined(NDEBUG)
     Extra_Init_Action_Checks_Debug(a);
   #endif
     Force_Array_Managed(ACT_PARAMLIST(a));
     Move_Value(out, ACT_ARCHETYPE(a));
+    if (label)
+        INIT_ACTION_LABEL(out, label);
+    else {
+        // leave as the array from the archetype (array means not a label)
+    }
     assert(VAL_BINDING(out) == UNBOUND);
     INIT_BINDING(out, binding);
     return SPECIFIC(out);

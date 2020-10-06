@@ -932,7 +932,7 @@ static REBVAL *callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
     //
     REBARR *code = Make_Array(1 + inv->cif->nargs);
     RELVAL *elem = ARR_HEAD(code);
-    Init_Action_Unbound(elem, RIN_CALLBACK_ACTION(inv->rin));
+    Move_Value(elem, RIN_CALLBACK_ACTION(inv->rin));
     ++elem;
 
     REBLEN i;

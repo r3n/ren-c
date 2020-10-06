@@ -545,12 +545,7 @@ bool Specialize_Action_Throws(
     INIT_BINDING(body, VAL_BINDING(specializee));
     INIT_VAL_CONTEXT_PHASE(body, unspecialized);
 
-    Init_Action_Unbound(out, specialized);
-
-    const REBSTR *opt_label = VAL_ACTION_OPT_LABEL(specializee);
-    if (opt_label)
-        INIT_ACTION_LABEL(out, opt_label);
-
+    Init_Action(out, specialized, VAL_ACTION_LABEL(specializee), UNBOUND);
     return false;  // code block did not throw
 }
 

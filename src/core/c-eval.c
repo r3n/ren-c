@@ -738,7 +738,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
 
       case REB_ACTION: {
         Push_Action(f, VAL_ACTION(v), VAL_BINDING(v));
-        Begin_Prefix_Action(f, VAL_ACTION_OPT_LABEL(v));  // may cache label
+        Begin_Prefix_Action(f, VAL_ACTION_LABEL(v));  // may cache label
 
         // We'd like `10 -> = 5 + 5` to work, and to do so it reevaluates in
         // a new frame, but has to run the `=` as "getting its next arg from
@@ -1788,7 +1788,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
             // This might be interesting or it might be bugs waiting to
             // happen, trying it out of curiosity for now.
             //
-            Begin_Prefix_Action(f, VAL_ACTION_OPT_LABEL(DS_TOP));
+            Begin_Prefix_Action(f, VAL_ACTION_LABEL(DS_TOP));
             assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));
             SET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);
 
@@ -2011,7 +2011,7 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
                 fail ("Use `<-` with invisibles fetched from PATH!");
 
             Push_Action(f, VAL_ACTION(where), VAL_BINDING(where));
-            Begin_Prefix_Action(f, VAL_ACTION_OPT_LABEL(where));
+            Begin_Prefix_Action(f, VAL_ACTION_LABEL(where));
 
             if (where == f->out)
                 Expire_Out_Cell_Unless_Invisible(f);

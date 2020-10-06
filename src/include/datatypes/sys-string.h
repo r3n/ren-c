@@ -48,6 +48,13 @@
 //   See the distinction between SER_USED() and STR_LEN().
 //
 
+// Some places permit an optional label (such as the names of function
+// invocations, which may not have an associated name).  To make the callsite
+// intent clearer for passing in a null REBSTR*, use ANONYMOUS instead.
+//
+#define ANONYMOUS \
+    ((REBSTR*)nullptr)
+
 
 //=////////////////////////////////////////////////////////////////////////=//
 //

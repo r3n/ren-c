@@ -142,9 +142,10 @@ REB_R Skinner_Dispatcher(REBFRM *f)
     // just hope that it stays on the stack and doesn't do much besides
     // get dropped by that processing, which can account for it.
     //
-    Init_Action_Maybe_Bound(
+    Init_Action(
         DS_PUSH(),
         NATIVE_ACT(skinner_return_helper),
+        f->opt_label,
         NOD(FRM_PHASE(f))
     );
 
@@ -431,9 +432,10 @@ REBNATIVE(reskinned)
             Blit_Cell(dest, src);
     }
 
-    return Init_Action_Maybe_Bound(
+    return Init_Action(
         D_OUT,
         defers,  // REBACT* archetype doesn't contain a binding
+        VAL_ACTION_LABEL(ARG(action)),
         VAL_BINDING(ARG(action))  // inherit binding (user can rebind)
     );
 }
