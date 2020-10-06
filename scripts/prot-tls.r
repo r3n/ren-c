@@ -214,17 +214,7 @@ emit: function [
             ; Keep evaluating so long as returned code pos is quoted, as
             ; it indicates invisible eval (`emit ctx [comment "X" ...]`)
             ;
-            ; Note: this would be nicer with predicates, since UNTIL's
-            ; ultimate return result after looping could be falsey:
-            ;
-            ;    if until .not.quoted? [[code result]: evaluate code] [
-            ;         append ctx/msg ensure binary! result
-            ;    ]
-            ;
-            until [
-                not quoted? [code result]: evaluate code
-            ]
-            if code [
+            if until .not.quoted? [[code result]: evaluate code] [
                 append ctx/msg ensure binary! result
             ]
         ]
