@@ -110,18 +110,8 @@
 #define CTX_VARLIST(c) \
     (&(c)->varlist)
 
-#define VAL_PHASE_NODE(v) \
+#define VAL_FRAME_PHASE_OR_LABEL_NODE(v) \
     PAYLOAD(Any, (v)).second.node
-
-#define VAL_PHASE_UNCHECKED(v) \
-    ACT(VAL_PHASE_NODE(v))
-
-inline static REBACT *VAL_PHASE(const REBVAL *frame) {
-    assert(IS_FRAME(frame));
-    REBACT *phase = VAL_PHASE_UNCHECKED(frame);
-    assert(phase != nullptr);
-    return phase;
-}
 
 // There may not be any dynamic or stack allocation available for a stack
 // allocated context, and in that case it will have to come out of the
@@ -158,7 +148,13 @@ inline static REBARR *CTX_KEYLIST(REBCTX *c) {
     // phase changes, a fixed value can't be put into the keylist...that is
     // just the keylist of the underlying function.
     //
-    return ACT_PARAMLIST(VAL_PHASE(CTX_ARCHETYPE(c)));
+    // Although the phase node can be used in non-archetypal FRAME! values to
+    // store a symbol of the starting phase of the function uses, that is
+    // not true of archetypal frames...which store the phase for efficiency.
+    // Again, due to the frequent calls of this routine it is assumed even
+    // in the debug build w/o an assert.
+    //
+    return ARR(VAL_FRAME_PHASE_OR_LABEL_NODE(CTX_ARCHETYPE(c)));
 }
 
 static inline void INIT_CTX_KEYLIST_SHARED(REBCTX *c, REBARR *keylist) {
@@ -271,7 +267,8 @@ inline static void FAIL_IF_INACCESSIBLE_CTX(REBCTX *c) {
 inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
     assert(ANY_CONTEXT_KIND(CELL_KIND(v)));
     assert(
-        (VAL_PHASE_UNCHECKED(v) != nullptr) == (CELL_KIND(v) == REB_FRAME)
+        (VAL_FRAME_PHASE_OR_LABEL_NODE(v) != nullptr)
+        == (CELL_KIND(v) == REB_FRAME)
     );
     REBCTX *c = CTX(PAYLOAD(Any, v).first.node);
     FAIL_IF_INACCESSIBLE_CTX(c);
@@ -295,10 +292,33 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
     (PAYLOAD(Any, (v)).first.node = NOD(varlist))
 
 #define INIT_VAL_CONTEXT_PHASE(v,phase) \
-    (PAYLOAD(Any, (v)).second.node = NOD(phase))
+    (VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(phase))
 
-#define VAL_PHASE(v) \
-    ACT(PAYLOAD(Any, (v)).second.node)
+// A frame's phase is usually a pointer to which component action is in
+// effect.  But if the node where a phase would usually be found is a REBSTR*
+// then that implies the actual phase is the archetypal one for the frame...
+// and the string is the WORD! label cache to use as a name when an action
+// is extracted from the frame.
+//
+inline static REBACT *VAL_PHASE(const RELVAL *v) {
+    REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
+    if (IS_SER_ARRAY(s))
+        return ACT(s);
+    assert(IS_SER_STRING(s));  // cached label
+    return ACT(CTX_KEYLIST(VAL_CONTEXT(v)));
+}
+
+inline static const REBSTR *VAL_FRAME_LABEL(const RELVAL *v) {
+    REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
+    if (IS_SER_ARRAY(s))
+        return ANONYMOUS;
+    return STR(s);
+}
+
+inline static void INIT_VAL_FRAME_LABEL(RELVAL *v, const REBSTR *label) {
+    VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, label));
+}
+
 
 // Convenience macros to speak in terms of object values instead of the context
 //
@@ -352,8 +372,12 @@ static inline REBVAL *Init_Any_Context(
 #define Init_Port(out,c) \
     Init_Any_Context((out), REB_PORT, (c))
 
-#define Init_Frame(out,c) \
-    Init_Any_Context((out), REB_FRAME, (c))
+inline static REBVAL *Init_Frame(RELVAL *out, REBCTX *c, const REBSTR *label) {
+    Init_Any_Context(out, REB_FRAME, c);
+    if (label)
+        INIT_VAL_FRAME_LABEL(out, label);
+    return SPECIFIC(out);
+}
 
 
 //=////////////////////////////////////////////////////////////////////////=//

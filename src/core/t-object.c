@@ -279,7 +279,7 @@ REB_R MAKE_Frame(
     // put /REFINEMENTs in refinement slots (instead of true/false/null)
     // to preserve the order of execution.
 
-    return Init_Frame(out, exemplar);
+    return Init_Frame(out, exemplar, VAL_ACTION_LABEL(out));
 }
 
 
@@ -767,7 +767,7 @@ REBTYPE(Context)
             return Init_Action(
                 D_OUT,
                 VAL_PHASE(v),  // archetypal, so no binding
-                ANONYMOUS,
+                VAL_FRAME_LABEL(v),
                 EXTRA(Binding, v).node  // e.g. where RETURN returns to
             );
         }

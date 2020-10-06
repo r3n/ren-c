@@ -960,6 +960,8 @@ bool Make_Frame_From_Varargs_Throws(
     if (not IS_ACTION(out))
         fail (specializee);
 
+    const REBSTR *label = VAL_ACTION_LABEL(out);
+
     DECLARE_LOCAL (action);
     Move_Value(action, out);
     PUSH_GC_GUARD(action);
@@ -1001,7 +1003,7 @@ bool Make_Frame_From_Varargs_Throws(
     //
     SET_SERIES_FLAG(exemplar, MANAGED); // can't use Manage_Series
 
-    Init_Frame(out, exemplar);
+    Init_Frame(out, exemplar, label);
     return false;
 }
 
@@ -1079,6 +1081,10 @@ REBACT *Make_Action_From_Exemplar(REBCTX *exemplar)
         &Specializer_Dispatcher,
         IDX_SPECIALIZER_MAX  // details capacity
     );
-    Init_Frame(ARR_AT(ACT_DETAILS(action), IDX_SPECIALIZER_FRAME), exemplar);
+    Init_Frame(
+        ARR_AT(ACT_DETAILS(action), IDX_SPECIALIZER_FRAME),
+        exemplar,
+        ANONYMOUS
+    );
     return action;
 }

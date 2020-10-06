@@ -214,7 +214,7 @@ REBNATIVE(resume)
     Init_Action(
         resume,
         FRM_PHASE(frame_),
-        ANONYMOUS,
+        FRM_LABEL(frame_),
         FRM_BINDING(frame_)
     );
 

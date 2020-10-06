@@ -123,14 +123,26 @@ inline static int FRM_LINE(REBFRM *f) {
 #define FRM_PRIOR(f) \
     ((f)->prior + 0) // prevent assignment via this macro
 
+// The "phase" slot of a FRAME! value is the second node pointer in PAYLOAD().
+// If a frame value is non-archetypal, this slot may be occupied by a REBSTR*
+// which represents the cached name of the action from which the frame
+// was created.  This FRAME! value is archetypal, however...which never holds
+// such a cache.  For performance (even in the debug build, where this is
+// called *a lot*) this is a macro and is unchecked.
+//
 #define FRM_PHASE(f) \
-    VAL_PHASE_UNCHECKED((f)->rootvar)  // shoud be valid--unchecked for speed
+    cast(REBACT*, VAL_FRAME_PHASE_OR_LABEL_NODE((f)->rootvar))
 
 #define INIT_FRM_PHASE(f,phase) \
     INIT_VAL_CONTEXT_PHASE((f)->rootvar, (phase))
 
 #define FRM_BINDING(f) \
     EXTRA(Binding, (f)->rootvar).node
+
+inline static const REBSTR *FRM_LABEL(REBFRM *f) {
+    assert(Is_Action_Frame(f));
+    return f->opt_label;
+}
 
 #define FRM_UNDERLYING(f) \
     ACT_UNDERLYING((f)->original)

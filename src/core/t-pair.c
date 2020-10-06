@@ -265,7 +265,11 @@ REBTYPE(Pair)
     // mechanical trick vs. the standard DO, because the frame thinks it is
     // already running...and the check for that would be subverted.
 
-    REBVAL *frame = Init_Frame(D_OUT, Context_For_Frame_May_Manage(frame_));
+    REBVAL *frame = Init_Frame(
+        D_OUT,
+        Context_For_Frame_May_Manage(frame_),
+        FRM_LABEL(frame_)
+    );
 
     Move_Value(D_ARG(1), x1);
     if (x2)

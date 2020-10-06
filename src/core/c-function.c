@@ -836,7 +836,8 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
         Init_Frame(
             CTX_VAR(meta, STD_ACTION_META_PARAMETER_NOTES),
-            CTX(notes_varlist)
+            CTX(notes_varlist),
+            ANONYMOUS  // !!! this frame is a pun, what should this be?
         );
     }
 

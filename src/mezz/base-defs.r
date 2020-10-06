@@ -144,7 +144,7 @@ pointfree*: func* [
         match [word! lit-word! get-word!] w  ; !!! what about skippable params?
     ]
 
-    frame: make frame! :action  ; all frame fields default to NULL
+    frame: make frame! get 'action  ; use GET to avoid :action name cache
 
     ; Step through the block we are given--first looking to see if there is
     ; a BLANK! in the slot where a parameter was accepted.  If it is blank,

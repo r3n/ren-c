@@ -96,7 +96,7 @@ REB_R MAKE_Action(
         return Init_Action(
             out,
             Make_Action_From_Exemplar(exemplar),
-            ANONYMOUS,
+            VAL_FRAME_LABEL(arg),
             VAL_BINDING(arg)  // is this right?
         );
     }

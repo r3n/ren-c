@@ -212,7 +212,7 @@ REBNATIVE(does)
             return R_THROWN;
         }
         exemplar = VAL_CONTEXT(D_OUT);
-        label = VAL_WORD_SPELLING(specializee);
+        label = VAL_FRAME_LABEL(D_OUT);
     }
     else {
         // On all other types, we just make it act like a specialized call to

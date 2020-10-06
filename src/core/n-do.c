@@ -460,8 +460,11 @@ REBNATIVE(do)
         assert(FRM_PHASE(f) == phase);
         FRM_BINDING(f) = VAL_BINDING(source); // !!! should archetype match?
 
-        REBSTR *opt_label = nullptr;
-        Begin_Prefix_Action(f, opt_label);
+        // Some FRAME! values sneakily hide a label where the VAL_PHASE()
+        // would be (if they can get away with it, e.g. the phase can be
+        // assumed to be the main phase from the keylist).
+        //
+        Begin_Prefix_Action(f, VAL_FRAME_LABEL(source));
 
         bool threw = Eval_Throws(f);
 

@@ -145,7 +145,7 @@ REB_R Skinner_Dispatcher(REBFRM *f)
     Init_Action(
         DS_PUSH(),
         NATIVE_ACT(skinner_return_helper),
-        f->opt_label,
+        FRM_LABEL(f),
         NOD(FRM_PHASE(f))
     );
 

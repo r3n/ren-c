@@ -364,7 +364,7 @@ bool Did_Get_Binding_Of(REBVAL *out, const REBVAL *v)
         if (not n)
             return false;
 
-        Init_Frame(out, CTX(n));
+        Init_Frame(out, CTX(n), ANONYMOUS);  // !!! Review ANONYMOUS
         break; }
 
     case REB_WORD:

@@ -365,7 +365,7 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
       #ifdef DEBUG_UNREADABLE_VOIDS
         assert(IS_UNREADABLE_DEBUG(CTX_ROOTKEY(c)));
       #endif
-        assert(VAL_PHASE(archetype) == nullptr);
+        assert(PAYLOAD(Any, archetype).second.node == nullptr);
     }
 
     // Keylists are uniformly managed, or certain routines would return
