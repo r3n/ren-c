@@ -411,18 +411,11 @@ REBNATIVE(do)
 
       case REB_ACTION: {
         //
-        // Ren-C will only run arity 0 functions from DO, otherwise EVAL
+        // Ren-C will only run arity 0 functions from DO, otherwise REEVAL
         // must be used.  Look for the first non-local parameter to tell.
         //
-        REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(source));
-        while (
-            NOT_END(param)
-            and (VAL_PARAM_CLASS(param) == REB_P_LOCAL)
-        ){
-            ++param;
-        }
-        if (NOT_END(param))
-            fail (Error_Use_Eval_For_Eval_Raw());
+        if (First_Unspecialized_Param(VAL_ACTION(source))) 
+            fail (Error_Do_Arity_Non_Zero_Raw());
 
         if (Eval_Value_Throws(D_OUT, source, SPECIFIED))
             return R_THROWN;
@@ -485,7 +478,7 @@ REBNATIVE(do)
         break;
     }
 
-    fail (Error_Use_Eval_For_Eval_Raw()); // https://trello.com/c/YMAb89dv
+    fail (Error_Do_Arity_Non_Zero_Raw());  // https://trello.com/c/YMAb89dv
 }
 
 
