@@ -120,10 +120,10 @@
     //
     // `stdin` is required to be macro https://en.cppreference.com/w/c/io
     //
-    #ifdef TO_OSX_X64
+    #if defined(__clang__)
         //
-        // !!! At least as of XCode 12.0, including basic system headers will
-        // force the inclusion of <stdio.h>.  If someone with an OS X system
+        // !!! At least as of XCode 12.0 and Clang 9.0.1, including basic
+        // system headers will force the inclusion of <stdio.h>.  If someone
         // wants to dig into why that is, they may...but tolerate it for now.
         // Checking if `printf` and such makes it into the link would require
         // dumping the library symbols, in general anyway...
