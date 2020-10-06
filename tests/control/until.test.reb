@@ -55,7 +55,7 @@
 )(
     x: [1 2 3 4 5 6]
     did all [
-        5 = until .(-> greater? _ 4) [take x]
+        5 = until .(<- greater? _ 4) [take x]
         x = [6]
     ]
 )

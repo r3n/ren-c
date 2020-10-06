@@ -289,25 +289,30 @@ pointfree: enclose (specialize* 'pointfree* [action: :void]) func* [f] [
 
 
 ->: enfixed lambda: func* [
-    {Convenience variadic wrapper for MAKE ACTION! or POINTFREE}
+    {Convenience wrapper for MAKE ACTION! (Note: does not provide RETURN)}
 
     return: [action!]
-    :args [<end> word! block!]
-        {Block of argument words, or a single word (if only one argument)}
-    :body [any-value! <variadic>]
-        {Block that serves as the body, or pointfree expression if no block}
+    'args "Block of argument words, or a single word (if one argument)"
+        [<end> word! block!]
+    body "Block that serves as the body"
+        [block!]
 ][
-    if strict-equal? block! type of pick body 1 [
-        make action! compose [  ; use MAKE ACTION! for no RETURN handling
-            (blockify :args)
-            (const take body)
-        ]
-    ] else [
-        if :args [
-            fail 'args ["=> without block on right hand side can't take args"]
-        ]
-        pointfree make block! body  ; !!! Allow varargs direct for efficiency?
+    make action! reduce [  ; use MAKE ACTION! for no RETURN handling
+        blockify dequote args  ; note NULL for <end> produces `[]`
+        body
     ]
+]
+
+<-: enfixed func* [
+    {Declare action by example instantiation, missing args left unspecialized}
+
+    return: [action!]
+    :left "Enforces nothing to the left of the pointfree expression"
+        [<end>]
+    :expression "POINTFREE expression, BLANK!s are unspecialized arg slots"
+        [any-value! <...>]
+][
+    pointfree make block! expression  ; !!! Allow Vararg param for efficiency?
 ]
 
 

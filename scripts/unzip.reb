@@ -57,13 +57,13 @@ ctx-zip: context [
     end-of-central-sig: #{504B0506}
     data-descriptor-sig: #{504B0708}
 
-    to-ilong: (-> enbin [LE + 4])  ; Little endian 4-byte positive integer
-    get-ilong: (-> debin [LE + 4])
+    to-ilong: (<- enbin [LE + 4])  ; Little endian 4-byte positive integer
+    get-ilong: (<- debin [LE + 4])
 
-    to-ishort: (-> enbin [LE + 2])  ; Little endian 2-byte positive integer
-    get-ishort: (-> debin [LE + 2])
+    to-ishort: (<- enbin [LE + 2])  ; Little endian 2-byte positive integer
+    get-ishort: (<- debin [LE + 2])
 
-    to-long: (-> enbin [BE + 4])  ; Big endian 4-byte positive integer
+    to-long: (<- enbin [BE + 4])  ; Big endian 4-byte positive integer
 
     to-msdos-time: func [
         "Converts to a msdos time."
