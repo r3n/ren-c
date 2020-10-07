@@ -450,7 +450,7 @@ REBNATIVE(do)
         assert(GET_SERIES_FLAG(c, MANAGED));
         assert(GET_SERIES_INFO(c, INACCESSIBLE));
 
-        Push_Frame_No_Varlist(D_OUT, f);
+        Push_Frame(D_OUT, f);
         f->varlist = CTX_VARLIST(stolen);
         f->rootvar = CTX_ROOTVAR(stolen);
         f->arg = f->rootvar + 1;
@@ -851,7 +851,7 @@ REBNATIVE(applique)
         DS_DROP_TO(lowest_ordered_dsp); // zero refinements on stack, now
     }
 
-    Push_Frame_No_Varlist(D_OUT, f);
+    Push_Frame(D_OUT, f);
     f->varlist = CTX_VARLIST(stolen);
     f->rootvar = CTX_ROOTVAR(stolen);
     f->arg = f->rootvar + 1;
