@@ -160,15 +160,14 @@ REB_R PD_Unhooked(
 //
 bool Next_Path_Throws(REBPVS *pvs)
 {
-    SHORTHAND (v, pvs->feed->value, const RELVAL*);
-    SHORTHAND (specifier, pvs->feed->specifier, REBSPC *);
+    REBFRM * const f = pvs;  // to use the f_xxx macros
 
     if (IS_NULLED(pvs->out))
-        fail (Error_No_Value_Core(*v, *specifier));
+        fail (Error_No_Value_Core(f_value, f_specifier));
 
     bool actions_illegal = false;
 
-    if (IS_BLANK(*v) and not IS_FILE(pvs->out)) {  // !!! File hack...
+    if (IS_BLANK(f_value) and not IS_FILE(pvs->out)) {  // !!! File hack...
         //
         // !!! Literal BLANK!s in sequences are for internal "doubling up"
         // of delimiters, like `a..b`, or they can be used for prefixes like
@@ -183,7 +182,7 @@ bool Next_Path_Throws(REBPVS *pvs)
         //
         Fetch_Next_Forget_Lookback(pvs);  // may be at end
 
-        if (NOT_END(*v))
+        if (NOT_END(f_value))
            fail ("Literal BLANK!s not executable internal to sequences ATM");
 
         if (not IS_ACTION(pvs->out))
@@ -192,7 +191,7 @@ bool Next_Path_Throws(REBPVS *pvs)
         PVS_PICKER(pvs) = NULLED_CELL;  // no-op
         goto redo;
     }
-    else if (ANY_TUPLE(*v) and not IS_FILE(pvs->out)) {  // ignore file hack
+    else if (ANY_TUPLE(f_value) and not IS_FILE(pvs->out)) {  // ignore file hack
         //
         // !!! Tuples in PATH!s will require some thinking...especially since
         // it's not necessarily going to be useful to reflect the hierarchy
@@ -202,38 +201,38 @@ bool Next_Path_Throws(REBPVS *pvs)
         //
         DECLARE_LOCAL (temp);
         if (
-            VAL_SEQUENCE_LEN(*v) != 2 or
-            not IS_BLANK(VAL_SEQUENCE_AT(temp, *v, 1))
+            VAL_SEQUENCE_LEN(f_value) != 2 or
+            not IS_BLANK(VAL_SEQUENCE_AT(temp, f_value, 1))
         ){
             fail ("TUPLE! support in PATH! processing limited to `a.` forms");
         }
         Derelativize(
-            FRM_SPARE(pvs),
-            VAL_SEQUENCE_AT(temp, *v, 0),
-            VAL_SEQUENCE_SPECIFIER(*v)
+            f_spare,
+            VAL_SEQUENCE_AT(temp, f_value, 0),
+            VAL_SEQUENCE_SPECIFIER(f_value)
         );
-        PVS_PICKER(pvs) = FRM_SPARE(pvs);
+        PVS_PICKER(pvs) = f_spare;
         actions_illegal = true;
     }
-    else if (IS_GET_WORD(*v)) {  // e.g. object/:field
-        PVS_PICKER(pvs) = Get_Word_May_Fail(FRM_SPARE(pvs), *v, *specifier);
+    else if (IS_GET_WORD(f_value)) {  // e.g. object/:field
+        PVS_PICKER(pvs) = Get_Word_May_Fail(f_spare, f_value, f_specifier);
     }
     else if (
-        IS_GROUP(*v)  // object/(expr) case:
+        IS_GROUP(f_value)  // object/(expr) case:
         and NOT_EVAL_FLAG(pvs, PATH_HARD_QUOTE)  // not precomposed
     ){
         if (GET_EVAL_FLAG(pvs, NO_PATH_GROUPS))
             fail ("GROUP! in PATH! used with GET or SET (use REDUCE/EVAL)");
 
-        REBSPC *derived = Derive_Specifier(*specifier, *v);
-        if (Do_Any_Array_At_Throws(FRM_SPARE(pvs), *v, derived)) {
-            Move_Value(pvs->out, FRM_SPARE(pvs));
+        REBSPC *derived = Derive_Specifier(f_specifier, f_value);
+        if (Do_Any_Array_At_Throws(f_spare, f_value, derived)) {
+            Move_Value(pvs->out, f_spare);
             return true; // thrown
         }
-        PVS_PICKER(pvs) = FRM_SPARE(pvs);
+        PVS_PICKER(pvs) = f_spare;
     }
     else { // object/word and object/value case:
-        PVS_PICKER(pvs) = *v;  // relative value--cannot look up
+        PVS_PICKER(pvs) = f_value;  // relative value--cannot look up
     }
 
     Fetch_Next_Forget_Lookback(pvs);  // may be at end
@@ -243,7 +242,7 @@ bool Next_Path_Throws(REBPVS *pvs)
     bool was_custom = (KIND_BYTE(pvs->out) == REB_CUSTOM);  // !!! for hack
     PATH_HOOK *hook = Path_Hook_For_Type_Of(pvs->out);
 
-    if (IS_END(*v) and PVS_IS_SET_PATH(pvs)) {
+    if (IS_END(f_value) and PVS_IS_SET_PATH(pvs)) {
 
         const REBVAL *r = hook(pvs, PVS_PICKER(pvs), PVS_OPT_SETVAL(pvs));
 
@@ -251,7 +250,7 @@ bool Next_Path_Throws(REBPVS *pvs)
           case REB_0_END: { // unhandled
             assert(r == R_UNHANDLED); // shouldn't be other ends
             DECLARE_LOCAL (specific);
-            Derelativize(specific, PVS_PICKER(pvs), *specifier);
+            Derelativize(specific, PVS_PICKER(pvs), f_specifier);
             fail (Error_Bad_Path_Poke_Raw(specific));
           }
 
@@ -320,7 +319,7 @@ bool Next_Path_Throws(REBPVS *pvs)
             if (IS_NULLED(PVS_PICKER(pvs)))
                 fail ("NULL used in path picking but was not handled");
             DECLARE_LOCAL (specific);
-            Derelativize(specific, PVS_PICKER(pvs), *specifier);
+            Derelativize(specific, PVS_PICKER(pvs), f_specifier);
             fail (Error_Bad_Path_Pick_Raw(specific));
         }
         else if (GET_CELL_FLAG(r, ROOT)) { // API, from Alloc_Value()
@@ -342,7 +341,7 @@ bool Next_Path_Throws(REBPVS *pvs)
             // while they still have memory of what the struct and variable
             // are (which would be lost in this protocol otherwise).
             //
-            assert(IS_END(*v));
+            assert(IS_END(f_value));
             break;
 
           case REB_R_REFERENCE: {
@@ -385,7 +384,7 @@ bool Next_Path_Throws(REBPVS *pvs)
         }
     }
 
-    if (IS_END(*v))
+    if (IS_END(f_value))
         return false; // did not throw
 
     return Next_Path_Throws(pvs);
@@ -512,9 +511,9 @@ bool Eval_Path_Throws_Core(
 
     DECLARE_ARRAY_FEED (feed, array, index, specifier);
     DECLARE_FRAME (pvs, feed, flags | EVAL_FLAG_PATH_MODE);
+    REBFRM * const f = pvs;  // to use the f_xxx macros
 
-    SHORTHAND (v, pvs->feed->value, const RELVAL*);
-    assert(NOT_END(*v));  // tested 0-length path previously
+    assert(NOT_END(f_value));  // tested 0-length path previously
 
     SET_END(out);
     Push_Frame(out, pvs);
@@ -535,7 +534,7 @@ bool Eval_Path_Throws_Core(
     // Seed the path evaluation process by looking up the first item (to
     // get a datatype to dispatch on for the later path items)
     //
-    if (IS_TUPLE(*v)) {
+    if (IS_TUPLE(f_value)) {
         //
         // !!! As commented upon multiple times in this work-in-progress,
         // the meaning of a TUPLE! in a PATH! needs work as it's a "new thing"
@@ -546,60 +545,60 @@ bool Eval_Path_Throws_Core(
         //
         DECLARE_LOCAL (temp);
         if (
-            VAL_SEQUENCE_LEN(*v) != 2
-            or not IS_BLANK(VAL_SEQUENCE_AT(temp, *v, 0))
+            VAL_SEQUENCE_LEN(f_value) != 2
+            or not IS_BLANK(VAL_SEQUENCE_AT(temp, f_value, 0))
         ){
             fail ("Head TUPLE! support in PATH! limited to `.a` at moment");
         }
-        const RELVAL *second = VAL_SEQUENCE_AT(temp, *v, 1);
+        const RELVAL *second = VAL_SEQUENCE_AT(temp, f_value, 1);
         if (not IS_WORD(second))
             fail ("Head TUPLE support in PATH! limited to `.a` at moment");
 
         pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(
             second,
-            VAL_SEQUENCE_SPECIFIER(*v)
+            VAL_SEQUENCE_SPECIFIER(f_value)
         );
         Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
         if (IS_ACTION(pvs->out))
             pvs->opt_label = VAL_WORD_SPELLING(second);
     }
-    else if (IS_WORD(*v)) {
+    else if (IS_WORD(f_value)) {
         //
         // Remember the actual location of this variable, not just its value,
         // in case we need to do R_IMMEDIATE writeback (e.g. month/day: 1)
         //
-        pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(*v, specifier);
+        pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(f_value, specifier);
 
         Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
 
         if (IS_ACTION(pvs->out)) {
-            pvs->opt_label = VAL_WORD_SPELLING(*v);
+            pvs->opt_label = VAL_WORD_SPELLING(f_value);
             INIT_ACTION_LABEL(pvs->out, pvs->opt_label);
         }
     }
     else if (
-        IS_GROUP(*v)
-         and NOT_EVAL_FLAG(pvs, PATH_HARD_QUOTE)  // not precomposed
+        IS_GROUP(f_value)
+        and NOT_EVAL_FLAG(pvs, PATH_HARD_QUOTE)  // not precomposed
     ){
         pvs->u.ref.cell = nullptr; // nowhere to R_IMMEDIATE write back to
 
         if (GET_EVAL_FLAG(pvs, NO_PATH_GROUPS))
             fail ("GROUP! in PATH! used with GET or SET (use REDUCE/EVAL)");
 
-        REBSPC *derived = Derive_Specifier(specifier, *v);
-        if (Do_Any_Array_At_Throws(pvs->out, *v, derived))
+        REBSPC *derived = Derive_Specifier(specifier, f_value);
+        if (Do_Any_Array_At_Throws(pvs->out, f_value, derived))
             goto return_thrown;
     }
     else {
         pvs->u.ref.cell = nullptr; // nowhere to R_IMMEDIATE write back to
 
-        Derelativize(pvs->out, *v, specifier);
+        Derelativize(pvs->out, f_value, specifier);
     }
 
     const RELVAL *lookback;
     lookback = Lookback_While_Fetching_Next(pvs);
 
-    if (IS_END(*v)) {
+    if (IS_END(f_value)) {
         //
         // We want `set /a` and `get /a` to work.  The GET case should work
         // with just what we loaded in pvs->out being returned (which may be
@@ -626,7 +625,7 @@ bool Eval_Path_Throws_Core(
         if (Next_Path_Throws(pvs))
             goto return_thrown;
 
-        assert(IS_END(*v));
+        assert(IS_END(f_value));
     }
 
     TRASH_POINTER_IF_DEBUG(lookback);  // goto crosses it, don't use below

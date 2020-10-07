@@ -113,12 +113,9 @@ REBNATIVE(shove)
     if (not Is_Frame_Style_Varargs_May_Fail(&f, ARG(right)))
         fail ("SHOVE (>-) not implemented for MAKE VARARGS! [...] yet");
 
-    SHORTHAND (v, f->feed->value, const RELVAL*);
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
-
     REBVAL *left = ARG(left);
 
-    if (IS_END(*v))  // ...shouldn't happen for WORD!/PATH! unless APPLY
+    if (IS_END(f_value))  // ...shouldn't happen for WORD!/PATH! unless APPLY
         RETURN (ARG(left));  // ...because evaluator wants `help <-` to work
 
     // It's best for SHOVE to do type checking here, as opposed to setting
@@ -139,11 +136,11 @@ REBNATIVE(shove)
 
     REBVAL *shovee = ARG(right); // reuse arg cell for the shoved-into
 
-    if (IS_WORD(*v) or IS_PATH(*v)) {
+    if (IS_WORD(f_value) or IS_PATH(f_value)) {
         if (Get_If_Word_Or_Path_Throws(
             D_OUT, // can't eval directly into arg slot
-            *v,
-            *specifier,
+            f_value,
+            f_specifier,
             false // !!! see above; false = don't push refinements
         )){
             return R_THROWN;
@@ -151,8 +148,8 @@ REBNATIVE(shove)
 
         Move_Value(shovee, D_OUT);
     }
-    else if (IS_GROUP(*v)) {
-        if (Do_Any_Array_At_Throws(D_OUT, *v, *specifier))
+    else if (IS_GROUP(f_value)) {
+        if (Do_Any_Array_At_Throws(D_OUT, f_value, f_specifier))
             return R_THROWN;
         if (IS_END(D_OUT))  // !!! need SHOVE frame for type error
             fail ("GROUP! passed to SHOVE did not evaluate to content");
@@ -160,7 +157,7 @@ REBNATIVE(shove)
         Move_Value(shovee, D_OUT);  // Note: can't eval directly into arg slot
     }
     else
-        Move_Value(shovee, SPECIFIC(*v));
+        Move_Value(shovee, SPECIFIC(f_value));
 
     if (not IS_ACTION(shovee) and not ANY_SET_KIND(VAL_TYPE(shovee)))
         fail ("SHOVE's immediate right must be ACTION! or SET-XXX! type");

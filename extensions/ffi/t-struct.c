@@ -1078,8 +1078,6 @@ REB_R MAKE_Struct(
         fail (arg);
 
     DECLARE_FRAME_AT (f, arg, EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, const RELVAL*);
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
     Push_Frame(nullptr, f);
 
@@ -1113,7 +1111,7 @@ REB_R MAKE_Struct(
     REBINT raw_size = -1;
     uintptr_t raw_addr = 0;
 
-    if (NOT_END(*v) and IS_BLOCK(*v)) {
+    if (NOT_END(f_value) and IS_BLOCK(f_value)) {
         //
         // !!! This would suggest raw-size, raw-addr, or extern can be leading
         // in the struct definition, perhaps as:
@@ -1121,7 +1119,7 @@ REB_R MAKE_Struct(
         //     make struct! [[raw-size] ...]
         //
         DECLARE_LOCAL (specific);
-        Derelativize(specific, *v, VAL_SPECIFIER(arg));
+        Derelativize(specific, f_value, VAL_SPECIFIER(arg));
         parse_attr(specific, &raw_size, &raw_addr);
         Fetch_Next_Forget_Lookback(f);
     }
@@ -1141,7 +1139,7 @@ REB_R MAKE_Struct(
     DECLARE_LOCAL (spec);
     DECLARE_LOCAL (init); // for result to save in data
 
-    while (NOT_END(*v)) {
+    while (NOT_END(f_value)) {
 
         // Add another field...although we don't manage the array (so it won't
         // get GC'd) we do run evaluations, so it must be GC-valid.
@@ -1158,25 +1156,25 @@ REB_R MAKE_Struct(
         // Must be a word or a set-word, with set-words initializing
 
         bool expect_init;
-        if (IS_SET_WORD(*v)) {
+        if (IS_SET_WORD(f_value)) {
             expect_init = true;
             if (raw_addr) {
                 // initialization is not allowed for raw memory struct
-                fail (Error_Bad_Value_Core(*v, *specifier));
+                fail (Error_Bad_Value_Core(f_value, f_specifier));
             }
         }
-        else if (IS_WORD(*v))
+        else if (IS_WORD(f_value))
             expect_init = false;
         else
-            fail (Error_Invalid_Type(VAL_TYPE(*v)));
+            fail (Error_Invalid_Type(VAL_TYPE(f_value)));
 
-        Init_Word(FLD_AT(field, IDX_FIELD_NAME), VAL_WORD_SPELLING(*v));
+        Init_Word(FLD_AT(field, IDX_FIELD_NAME), VAL_WORD_SPELLING(f_value));
 
         Fetch_Next_Forget_Lookback(f);
-        if (IS_END(*v) or not IS_BLOCK(*v))
-            fail (Error_Bad_Value_Core(*v, VAL_SPECIFIER(arg)));
+        if (IS_END(f_value) or not IS_BLOCK(f_value))
+            fail (Error_Bad_Value_Core(f_value, f_specifier));
 
-        Derelativize(spec, *v, VAL_SPECIFIER(arg));
+        Derelativize(spec, f_value, VAL_SPECIFIER(arg));
 
         // Fills in the width, dimension, type, and ffi_type (if needed)
         //
@@ -1202,12 +1200,12 @@ REB_R MAKE_Struct(
             EXPAND_SERIES_TAIL(data_bin, step);
 
         if (expect_init) {
-            if (IS_END(*v))
+            if (IS_END(f_value))
                fail (arg);
 
-            if (IS_BLOCK(*v)) {
+            if (IS_BLOCK(f_value)) {
                 REBDSP dsp_reduce = DSP;
-                if (Reduce_To_Stack_Throws(out, *v, VAL_SPECIFIER(arg)))
+                if (Reduce_To_Stack_Throws(out, f_value, f_specifier))
                     fail (Error_No_Catch_For_Throw(init));
 
                 Init_Block(init, Pop_Stack_Values(dsp_reduce));
@@ -1250,7 +1248,7 @@ REB_R MAKE_Struct(
                     }
                 }
                 else
-                    fail (Error_Unexpected_Type(REB_BLOCK, VAL_TYPE(*v)));
+                    fail (Error_Unexpected_Type(REB_BLOCK, VAL_TYPE(f_value)));
             }
             else {
                 // scalar

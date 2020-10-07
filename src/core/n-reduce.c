@@ -42,12 +42,13 @@ bool Reduce_To_Stack_Throws(
     );
 
     DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, const RELVAL*);
 
     Push_Frame(nullptr, f);
 
     do {
-        bool line = IS_END(*v) ? false : GET_CELL_FLAG(*v, NEWLINE_BEFORE);
+        bool line = IS_END(f_value)
+            ? false
+            : GET_CELL_FLAG(f_value, NEWLINE_BEFORE);
 
         if (Eval_Step_Throws(out, f)) {
             DS_DROP_TO(dsp_orig);
@@ -56,7 +57,7 @@ bool Reduce_To_Stack_Throws(
         }
 
         if (IS_END(out)) {
-            if (IS_END(*v))
+            if (IS_END(f_value))
                 break;  // `reduce []`
             continue;  // `reduce [comment "hi"]`
         }
@@ -74,7 +75,7 @@ bool Reduce_To_Stack_Throws(
 
         if (line)
             SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
-    } while (NOT_END(*v));
+    } while (NOT_END(f_value));
 
     Drop_Frame_Unbalanced(f); // Drop_Frame() asserts on accumulation
     return false;
@@ -199,7 +200,6 @@ REB_R Compose_To_Stack_Core(
         rebRelease(cast(REBVAL*, m_cast(RELVAL*, any_array)));
 
     DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, const RELVAL*);
 
     Push_Frame(nullptr, f);
 
@@ -207,16 +207,16 @@ REB_R Compose_To_Stack_Core(
     f->was_eval_called = true;  // lie since we're using frame for enumeration
   #endif
 
-    for (; NOT_END(*v); Fetch_Next_Forget_Lookback(f)) {
-        REBCEL(const*) cell = VAL_UNESCAPED(*v);
+    for (; NOT_END(f_value); Fetch_Next_Forget_Lookback(f)) {
+        REBCEL(const*) cell = VAL_UNESCAPED(f_value);
         enum Reb_Kind heart = CELL_HEART(cell); // notice `''(...)`
 
         if (not ANY_ARRAY_OR_PATH_KIND(heart)) { // won't substitute/recurse
-            Derelativize(DS_PUSH(), *v, specifier); // keep newline flag
+            Derelativize(DS_PUSH(), f_value, specifier); // keep newline flag
             continue;
         }
 
-        REBLEN quotes = VAL_NUM_QUOTES(*v);
+        REBLEN quotes = VAL_NUM_QUOTES(f_value);
 
         bool doubled_group = false;  // override predicate with ((...))
 
@@ -228,8 +228,8 @@ REB_R Compose_To_Stack_Core(
             // Don't compose at this level, but may need to walk deeply to
             // find compositions inside it if /DEEP and it's an array
         }
-        else if (not only and Is_Any_Doubled_Group(*v)) {
-            const RELVAL *inner = VAL_ARRAY_AT(*v);
+        else if (not only and Is_Any_Doubled_Group(f_value)) {
+            const RELVAL *inner = VAL_ARRAY_AT(f_value);
             if (Match_For_Compose(inner, label)) {
                 doubled_group = true;
                 match = inner;
@@ -237,8 +237,8 @@ REB_R Compose_To_Stack_Core(
             }
         }
         else {  // plain compose, if match
-            if (Match_For_Compose(*v, label)) {
-                match = *v;
+            if (Match_For_Compose(f_value, label)) {
+                match = f_value;
                 match_specifier = specifier;
             }
         }
@@ -299,7 +299,7 @@ REB_R Compose_To_Stack_Core(
                     // that block to fit on one line?
                     //
                     Derelativize(DS_PUSH(), push, VAL_SPECIFIER(insert));
-                    if (GET_CELL_FLAG(*v, NEWLINE_BEFORE))
+                    if (GET_CELL_FLAG(f_value, NEWLINE_BEFORE))
                         SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
                     else
                         CLEAR_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
@@ -333,7 +333,7 @@ REB_R Compose_To_Stack_Core(
 
                 // Use newline intent from the GROUP! in the compose pattern
                 //
-                if (GET_CELL_FLAG(*v, NEWLINE_BEFORE))
+                if (GET_CELL_FLAG(f_value, NEWLINE_BEFORE))
                     SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
                 else
                     CLEAR_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
@@ -375,7 +375,7 @@ REB_R Compose_To_Stack_Core(
                 // may be controlled by a switch if it turns out to be needed.
                 //
                 DS_DROP_TO(dsp_deep);
-                Derelativize(DS_PUSH(), *v, specifier);
+                Derelativize(DS_PUSH(), f_value, specifier);
                 continue;
             }
 
@@ -416,7 +416,7 @@ REB_R Compose_To_Stack_Core(
 
             Quotify(DS_TOP, quotes);  // match original quoting
 
-            if (GET_CELL_FLAG(*v, NEWLINE_BEFORE))
+            if (GET_CELL_FLAG(f_value, NEWLINE_BEFORE))
                 SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
 
             changed = true;
@@ -424,7 +424,7 @@ REB_R Compose_To_Stack_Core(
         else {
             // compose [[(1 + 2)] (3 + 4)] => [[(1 + 2)] 7]  ; non-deep
             //
-            Derelativize(DS_PUSH(), *v, specifier);  // keep newline flag
+            Derelativize(DS_PUSH(), f_value, specifier);  // keep newline flag
         }
     }
 

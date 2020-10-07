@@ -982,37 +982,6 @@
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
 
-//=//// SHORTHAND FOR DEEPLY NESTED FIELDS ////////////////////////////////=//
-//
-// If a field is deeply nested in a structure and referred to many times in
-// C, it is possible to create a local pointer to that field and then use
-// a dereference to that pointer (which works for both assigning and reads).
-// Since it's a `const` pointer, the compiler should optimize it out.
-//
-// But there's a risk that one might say `if (shorthand)` and test for the
-// nullness or non-nullness of the shorthand vs. of the thing pointed to.
-// This adds a check in the C++ build that you always say `if (*shorthand)`
-//
-
-#if !defined(CPLUSPLUS_11)
-    #define SHORTHAND(name,ref,type) \
-        type* const name = &ref
-#else
-    template <typename T>
-    class Must_Dereference {  // named so error message hints what's wrong
-        T &ref;
-
-      public:
-        Must_Dereference (T& ref) : ref (ref) {}
-        T & operator*() { return ref; }
-        operator bool () = delete;  // !!! Could this static_assert()?
-    };
-
-    #define SHORTHAND(name,ref,type) \
-        Must_Dereference<type> name = ref
-#endif
-
-
 //=//// BYTE STRINGS VS UNENCODED CHARACTER STRINGS ///////////////////////=//
 //
 // With UTF-8 Everywhere, the term "length" of a string refers to its number

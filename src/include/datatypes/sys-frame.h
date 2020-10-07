@@ -196,6 +196,18 @@ inline static const REBSTR *FRM_LABEL(REBFRM *f) {
 #endif
 
 
+// These shorthands help you when your frame is named "f".  While such macros
+// are a bit "evil", they are extremely helpful for code readability.  They
+// may be #undef'd if they are causing a problem somewhere.
+
+#define f_value f->feed->value
+#define f_specifier f->feed->specifier
+#define f_spare FRM_SPARE(f)
+#define f_gotten f->feed->gotten
+#define f_index FRM_INDEX(f)
+
+
+
 inline static REBCTX *Context_For_Frame_May_Manage(REBFRM *f) {
     assert(not Is_Action_Frame_Fulfilling(f));
     SET_SERIES_FLAG(f->varlist, MANAGED);

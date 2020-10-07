@@ -884,8 +884,6 @@ REBNATIVE(case)
         return R_THROWN;
 
     DECLARE_FRAME_AT (f, ARG(cases), EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, const RELVAL*);
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
     REBVAL *last_branch_result = ARG(cases);  // can reuse--frame holds cases
     Init_Nulled(last_branch_result);  // default return result
@@ -906,7 +904,7 @@ REBNATIVE(case)
         if (Eval_Step_Maybe_Stale_Throws(D_OUT, f))
             goto threw;
 
-        if (IS_END(*v)) {
+        if (IS_END(f_value)) {
             CLEAR_CELL_FLAG(D_OUT, OUT_MARKED_STALE);
             goto reached_end;
         }
@@ -933,16 +931,19 @@ REBNATIVE(case)
         }
 
         if (not matched) {
-            if (IS_BLOCK(*v) or IS_ACTION(*v) or IS_QUOTED(*v)) {
-                //
+            if (
+                IS_BLOCK(f_value)
+                or IS_ACTION(f_value)
+                or IS_QUOTED(f_value)
+            ){
                 // Accepted branches for IF/etc. that are skipped on no match
             }
-            else if (IS_GROUP(*v)) {
+            else if (IS_GROUP(f_value)) {
                 //
                 // IF evaluates branches that are GROUP! even if it does not
                 // run them.  This implies CASE should too.
                 //
-                if (Eval_Value_Throws(D_SPARE, *v, *specifier)) {
+                if (Eval_Value_Throws(D_SPARE, f_value, f_specifier)) {
                     Move_Value(D_OUT, D_SPARE);
                     goto threw;
                 }
@@ -954,7 +955,7 @@ REBNATIVE(case)
                 // >> if false <some-tag>
                 // ** Script Error: if does not allow tag! for its branch...
                 //
-                fail (Error_Bad_Value_Core(*v, *specifier));
+                fail (Error_Bad_Value_Core(f_value, f_specifier));
             }
 
             Fetch_Next_Forget_Lookback(f); // skip next, whatever it is
@@ -963,31 +964,36 @@ REBNATIVE(case)
 
         // Can't use Do_Branch(), *v is unevaluated RELVAL...simulate it
 
-        if (IS_GROUP(*v)) {
-            if (Do_Any_Array_At_Throws(D_SPARE, *v, *specifier)) {
+        if (IS_GROUP(f_value)) {
+            if (Do_Any_Array_At_Throws(D_SPARE, f_value, f_specifier)) {
                 Move_Value(D_OUT, D_SPARE);
                 goto threw;
             }
-            *v = D_SPARE;
+            f_value = D_SPARE;
         }
 
-        if (IS_QUOTED(*v)) {
-            Unquotify(Derelativize(D_OUT, *v, *specifier), 1);
+        if (IS_QUOTED(f_value)) {
+            Unquotify(Derelativize(D_OUT, f_value, f_specifier), 1);
         }
-        else if (IS_BLOCK(*v)) {
-            if (Do_Any_Array_At_Throws(D_OUT, *v, *specifier))
+        else if (IS_BLOCK(f_value)) {
+            if (Do_Any_Array_At_Throws(D_OUT, f_value, f_specifier))
                 goto threw;
         }
-        else if (IS_ACTION(*v)) {
+        else if (IS_ACTION(f_value)) {
             DECLARE_LOCAL (temp);
-            if (Do_Branch_With_Throws(temp, nullptr, SPECIFIC(*v), D_OUT)) {
+            if (Do_Branch_With_Throws(
+                temp,
+                nullptr,  // no temporary cell needed
+                SPECIFIC(f_value),
+                D_OUT
+            )){
                 Move_Value(D_OUT, temp);
                 goto threw;
             }
             Move_Value(D_OUT, temp);
         }
         else
-            fail (Error_Bad_Value_Core(*v, *specifier));
+            fail (Error_Bad_Value_Core(f_value, f_specifier));
 
         Voidify_If_Nulled(D_OUT); // null is reserved for no branch taken
 
@@ -1046,8 +1052,6 @@ REBNATIVE(switch)
         return R_THROWN;
 
     DECLARE_FRAME_AT (f, ARG(cases), EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, const RELVAL*);
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
     Push_Frame(nullptr, f);
     REBVAL *last_branch_result = ARG(cases); // frame holds cases, can reuse
@@ -1059,9 +1063,9 @@ REBNATIVE(switch)
 
     Init_Nulled(D_OUT);  // fallout result if no branches run
 
-    while (NOT_END(*v)) {
+    while (NOT_END(f_value)) {
 
-        if (IS_BLOCK(*v) or IS_ACTION(*v)) {
+        if (IS_BLOCK(f_value) or IS_ACTION(f_value)) {
             Fetch_Next_Forget_Lookback(f);
             Init_Nulled(D_OUT);  // reset fallout output to null
             continue;
@@ -1081,7 +1085,7 @@ REBNATIVE(switch)
             goto threw;
 
         if (IS_END(D_OUT)) {
-            if (NOT_END(*v))  // was just COMMENT/etc. so more to go
+            if (NOT_END(f_value))  // was just COMMENT/etc. so more to go
                 continue;
 
             Drop_Frame(f);  // nothing left, so drop frame and return
@@ -1141,21 +1145,21 @@ REBNATIVE(switch)
         // Skip ahead to try and find BLOCK!/ACTION! branch to take the match
         //
         while (true) {
-            if (IS_END(*v))
+            if (IS_END(f_value))
                 goto reached_end;
 
-            if (IS_BLOCK(*v)) {  // *v is RELVAL, can't Do_Branch
-                if (Do_Any_Array_At_Throws(D_OUT, *v, *specifier))
+            if (IS_BLOCK(f_value)) {  // f_value is RELVAL, can't Do_Branch
+                if (Do_Any_Array_At_Throws(D_OUT, f_value, f_specifier))
                     goto threw;
                 break;
             }
 
-            if (IS_ACTION(*v)) {  // must have been COMPOSE'd in cases
+            if (IS_ACTION(f_value)) {  // must have been COMPOSE'd in cases
                 DECLARE_LOCAL (temp);
                 if (RunQ_Throws(
                     temp,
                     false,  // fully = false, e.g. arity-0 functions are ok
-                    rebU(SPECIFIC(*v)),  // actions don't need specifiers
+                    rebU(SPECIFIC(f_value)),  // actions don't need specifiers
                     D_OUT,
                     rebEND
                 )){

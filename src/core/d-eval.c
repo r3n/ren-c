@@ -43,6 +43,12 @@
 
 #include "sys-core.h"
 
+#undef f_value
+#undef f_gotten
+
+#define f_next f->feed->value
+#define f_next_gotten f->feed->gotten
+
 #if defined(DEBUG_COUNT_TICKS) && defined(DEBUG_HAS_PROBE)
 
 //
@@ -50,20 +56,17 @@
 //
 void Dump_Frame_Location(const RELVAL *v, REBFRM *f)
 {
-    SHORTHAND (next, f->feed->value, const RELVAL*);
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
-
     DECLARE_LOCAL (dump);
 
     if (v) {
-        Derelativize(dump, v, *specifier);
+        Derelativize(dump, v, f_specifier);
         printf("Dump_Frame_Location() current\n");
         PROBE(dump);
     }
 
-    if (IS_END(*next)) {
+    if (IS_END(f_next)) {
         printf("...then Dump_Frame_Location() is at end of array\n");
-        if (not v and not *next) { // well, that wasn't informative
+        if (not v and not f_next) { // well, that wasn't informative
             if (not f->prior)
                 printf("...and no parent frame, so you're out of luck\n");
             else {
@@ -73,7 +76,7 @@ void Dump_Frame_Location(const RELVAL *v, REBFRM *f)
         }
     }
     else {
-        Derelativize(dump, *next, *specifier);
+        Derelativize(dump, f_next, f_specifier);
         printf("Dump_Frame_Location() next\n");
         PROBE(dump);
 
@@ -94,8 +97,8 @@ void Dump_Frame_Location(const RELVAL *v, REBFRM *f)
             dump,
             REB_BLOCK,
             SER(f->feed->array),
-            cast(REBLEN, f->feed->index),
-            *specifier
+            cast(REBLEN, f_index),
+            f_specifier
         );
         PROBE(dump);
     }
@@ -117,17 +120,12 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
     // on the data stack or mold stack/etc.  See Drop_Frame() for the actual
     // balance check.
 
-    SHORTHAND (next, f->feed->value, const RELVAL*);
-    SHORTHAND (next_gotten, f->feed->gotten, const REBVAL*);
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
-    SHORTHAND (index, f->feed->index, REBLEN);
-
     // See notes on f->feed->gotten about the coherence issues in the face
     // of arbitrary function execution.
     //
-    if (*next_gotten) {
-        assert(IS_WORD(*next));
-        assert(Try_Lookup_Word(*next, *specifier) == *next_gotten);
+    if (f_next_gotten) {
+        assert(IS_WORD(f_next));
+        assert(Try_Lookup_Word(f_next, f_specifier) == f_next_gotten);
     }
 
     assert(f == FS_TOP);
@@ -135,10 +133,10 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
 
     if (f->feed->array) {
         assert(not IS_POINTER_TRASH_DEBUG(f->feed->array));
-        assert(*index != TRASHED_INDEX);
+        assert(f->feed->index != TRASHED_INDEX);
     }
     else
-        assert(*index == TRASHED_INDEX);
+        assert(f->feed->index == TRASHED_INDEX);
 
     // If this fires, it means that Flip_Series_To_White was not called an
     // equal number of times after Flip_Series_To_Black, which means that
@@ -159,7 +157,7 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
 
     //=//// ^-- ABOVE CHECKS *ALWAYS* APPLY ///////////////////////////////=//
 
-    if (IS_END(*next))
+    if (IS_END(f_next))
         return;
 
     if (NOT_END(f->out) and Is_Evaluator_Throwing_Debug())
@@ -167,8 +165,8 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
 
     //=//// v-- BELOW CHECKS ONLY APPLY IN EXITS CASE WITH MORE CODE //////=//
 
-    assert(NOT_END(*next));
-    assert(*next != f->out);
+    assert(NOT_END(f_next));
+    assert(f_next != f->out);
 
     //=//// ^-- ADD CHECKS EARLIER THAN HERE IF THEY SHOULD ALWAYS RUN ////=//
 }
@@ -301,15 +299,13 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
 void Eval_Core_Exit_Checks_Debug(REBFRM *f) {
     Eval_Core_Shared_Checks_Debug(f);
 
-    SHORTHAND (next, f->feed->value, const RELVAL*);
-
-    if (NOT_END(*next) and not FRM_IS_VARIADIC(f)) {
-        if (f->feed->index > ARR_LEN(f->feed->array)) {
+    if (NOT_END(f_next) and not FRM_IS_VARIADIC(f)) {
+        if (f_index > ARR_LEN(f->feed->array)) {
             assert(
                 (f->feed->pending and IS_END(f->feed->pending))
                 or Is_Evaluator_Throwing_Debug()
             );
-            assert(f->feed->index == ARR_LEN(f->feed->array) + 1);
+            assert(f_index == ARR_LEN(f->feed->array) + 1);
         }
     }
 
