@@ -20,7 +20,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// This file contains Eval_Internal_Maybe_Stale_Throws(), which is the central
+// This file contains Eval_Maybe_Stale_Throws(), which is the central
 // evaluator implementation.  Most callers should use higher level wrappers,
 // because the long name conveys any direct caller must handle the following:
 //
@@ -31,16 +31,11 @@
 //   it must be cleared off before passing pointers to the cell to a routine
 //   which may interpret that flag differently.
 //
-// * _Internal_ => This is the fundamental C code for the evaluator, but it
-//   can be "hooked".  Those hooks provide services like debug stepping and
-//   tracing.  So most calls to this routine should be through a function
-//   pointer and not directly.
-//
 // * _Throws => The return result is a boolean which all callers *must* heed.
 //   There is no "thrown value" data type or cell flag, so the only indication
 //   that a throw happened comes from this flag.  See %sys-throw.h
 //
-// Eval_Throws() is a small stub which takes care of the first two concerns,
+// Eval_Throws() is a small stub which takes care of the first concern,
 // though some low-level clients actually want the stale flag.
 //
 //=//// NOTES /////////////////////////////////////////////////////////////=//
@@ -51,7 +46,7 @@
 // * See %sys-do.h for wrappers that make it easier to run multiple evaluator
 //   steps in a frame and return the final result, giving VOID! by default.
 //
-// * Eval_Internal_Maybe_Stale_Throws() is LONG.  That's largely on purpose.
+// * Eval_Maybe_Stale_Throws() is LONG.  That is largely a purposeful choice.
 //   Breaking it into functions would add overhead (in the debug build if not
 //   also release builds) and prevent interesting tricks and optimizations.
 //   It is separated into sections, and the invariants in each section are
@@ -78,24 +73,6 @@
     //      *** DON'T COMMIT THIS --^ KEEP IT AT ZERO! ***
 
 #endif  // ^-- SERIOUSLY: READ ABOUT C-DEBUG-BREAK AND PLACES TICKS ARE STORED
-
-
-//
-//  Dispatch_Internal: C
-//
-// Default function provided for the hook at the moment of action application,
-// with all arguments gathered.
-//
-// As this is the default, it does nothing besides call the phase dispatcher.
-// Debugging and instrumentation might want to do other things...e.g TRACE
-// wants to preface the call by dumping the frame, and postfix it by showing
-// the evaluative result.
-//
-// !!! Review if lower-level than C tricks could be used to patch code in
-// some builds to not pay the cost for calling through a pointer.
-//
-REB_R Dispatch_Internal(REBFRM * const f)
-  { return ACT_DISPATCHER(FRM_PHASE(f))(f); }
 
 
 //=//// ARGUMENT LOOP MODES ///////////////////////////////////////////////=//
@@ -385,7 +362,7 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     }
     else {  // !!! Reusing the frame, would inert optimization be worth it?
         do {
-            if ((*PG_Eval_Maybe_Stale_Throws)(f))  // reuse `f`
+            if (Eval_Maybe_Stale_Throws(f))  // reuse `f`
                 return true;
 
             // Keep evaluating as long as evaluations vanish, e.g.
@@ -407,7 +384,7 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
 
 
 //
-//  Eval_Internal_Maybe_Stale_Throws: C
+//  Eval_Maybe_Stale_Throws: C
 //
 // See notes at top of file for general remarks on this central function's
 // name, and that wrappers should nearly always be used to call it.
@@ -416,7 +393,7 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
 // at each evaluation step are contained in %d-eval.c, to keep this file
 // more manageable in length.
 //
-bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
+bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 {
   #ifdef DEBUG_ENSURE_FRAME_EVALUATES
     f->was_eval_called = true;  // see definition for why this flag exists
@@ -1573,7 +1550,9 @@ bool Eval_Internal_Maybe_Stale_Throws(REBFRM * const f)
         // which are used to process the return result after the switch.
         //
       blockscope {
-        const REBVAL *r = (*PG_Dispatch)(f);  // default just calls FRM_PHASE
+        REBNAT dispatcher = ACT_DISPATCHER(FRM_PHASE(f));
+
+        const REBVAL *r = (*dispatcher)(f);
 
         if (r == f->out) {
             assert(NOT_CELL_FLAG(f->out, OUT_MARKED_STALE));

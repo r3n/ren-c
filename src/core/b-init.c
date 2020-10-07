@@ -713,24 +713,10 @@ static void Init_Root_Vars(void)
 
     Root_Space_Char = rebChar(' ');
     Root_Newline_Char = rebChar('\n');
-
-    // !!! Putting the stats map in a root object is a temporary solution
-    // to allowing a native coded routine to have a static which is guarded
-    // by the GC.  While it might seem better to move the stats into a
-    // mostly usermode implementation that hooks apply, this could preclude
-    // doing performance analysis on boot--when it would be too early for
-    // most user code to be running.  It may be that the debug build has
-    // this form of mechanism that can diagnose boot, while release builds
-    // rely on a usermode stats module.
-    //
-    Root_Stats_Map = Init_Map(Alloc_Value(), Make_Map(10));
 }
 
 static void Shutdown_Root_Vars(void)
 {
-    rebRelease(Root_Stats_Map);
-    Root_Stats_Map = nullptr;
-
     rebRelease(Root_Space_Char);
     Root_Space_Char = nullptr;
     rebRelease(Root_Newline_Char);
@@ -1279,13 +1265,6 @@ void Startup_Core(void)
     Startup_True_And_False();
 
 //=//// RUN CODE BEFORE ERROR HANDLING INITIALIZED ////////////////////////=//
-
-    // Initialize eval handler and ACTION! dispatcher to the default internal
-    // routines.  These routines have no tracing, no debug handling, etc.  If
-    // those features are needed, augmented functions must be substituted.
-    //
-    PG_Eval_Maybe_Stale_Throws = &Eval_Internal_Maybe_Stale_Throws;
-    PG_Dispatch = &Dispatch_Internal;
 
     // boot->natives is from the automatically gathered list of natives found
     // by scanning comments in the C sources for `native: ...` declarations.

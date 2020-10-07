@@ -137,8 +137,6 @@ PVAR REBVAL *Root_Newline_Char; // '\n' as a CHAR!
 
 PVAR REBVAL *Root_Action_Meta;
 
-PVAR REBVAL *Root_Stats_Map;
-
 PVAR REBVAL *Root_Stackoverflow_Error;  // made in advance, avoids extra calls
 PVAR REBVAL *Root_No_Memory_Error;  // also must be made in advance
 
@@ -147,15 +145,6 @@ PVAR REBARR *PG_Extension_Types;  // array of datatypes created by extensions
 // This signal word should be thread-local, but it will not work
 // when implemented that way. Needs research!!!!
 PVAR REBFLGS Eval_Signals;   // Signal flags
-
-// It is possible to swap out the evaluator for one that does tracing, or
-// single step debugging, etc.
-//
-// !!! This is a work in progress, and demos have had shown varying levels
-// of success.  But it is believed to be the correct long term approach.
-//
-PVAR REBEVL *PG_Eval_Maybe_Stale_Throws;  // Evaluator (REBFRM* in, bool out)
-PVAR REBNAT PG_Dispatch;  // Dispatcher (REBFRM* in, returns REBVAL*)
 
 PVAR REBDEV *PG_Device_List;  // Linked list of R3-Alpha-style "devices"
 
