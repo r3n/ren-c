@@ -122,12 +122,15 @@ static REB_R DNS_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         }
         else if (IS_TEXT(host)) {
             REBVAL *tuple = rebValue(
-                "match tuple! [' ' ']: transcode", host,
-            rebEND);
+                "match tuple! first transcode", host,
+            rebEND);  // W3C says non-IP hosts can't end with number in tuple
             if (tuple) {
-                Move_Value(host, tuple);
+                if (rebDidQ("integer? last", tuple, rebEND)) {
+                    Move_Value(host, tuple);
+                    rebRelease(tuple);
+                    goto reverse_lookup;
+                }
                 rebRelease(tuple);
-                goto reverse_lookup;
             }
 
             char *name = rebSpell(host, rebEND);
