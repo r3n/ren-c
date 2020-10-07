@@ -135,6 +135,14 @@ REBVAL *Init_Decimal_Bits(RELVAL *out, const REBYTE *bp)
 //
 //  MAKE_Decimal: C
 //
+// !!! The current thinking on the distinction between MAKE and TO is that
+// TO should not do any evaluations (including not looking at what words are
+// bound to, only their spellings).  Also, TO should be more based on the
+// visual intuition vs. internal representational knowledge...this would
+// suggest things like `to integer! #"1"` being the number 1, and not a
+// codepoint.  Hence historical conversions have been split into the TO
+// or MAKE as a rough idea of how these rules might be followed.
+//
 REB_R MAKE_Decimal(
     REBVAL *out,
     enum Reb_Kind kind,
@@ -148,46 +156,19 @@ REB_R MAKE_Decimal(
     REBDEC d;
 
     switch (VAL_TYPE(arg)) {
-    case REB_DECIMAL:
-        d = VAL_DECIMAL(arg);
-        goto dont_divide_if_percent;
-
-    case REB_PERCENT:
-        d = VAL_DECIMAL(arg);
-        goto dont_divide_if_percent;
-
-    case REB_INTEGER:
-        d = cast(REBDEC, VAL_INT64(arg));
-        goto dont_divide_if_percent;
-
-    case REB_MONEY:
-        d = deci_to_decimal(VAL_MONEY_AMOUNT(arg));
-        goto dont_divide_if_percent;
-
-    case REB_LOGIC:
+      case REB_LOGIC:
         d = VAL_LOGIC(arg) ? 1.0 : 0.0;
         goto dont_divide_if_percent;
 
-    case REB_CHAR:
+      case REB_CHAR:
         d = cast(REBDEC, VAL_CHAR(arg));
         goto dont_divide_if_percent;
 
-    case REB_TIME:
+      case REB_TIME:
         d = VAL_NANO(arg) * NANO;
         break;
 
-    case REB_TEXT: {
-        REBSIZ size;
-        const REBYTE *bp
-            = Analyze_String_For_Scan(&size, arg, MAX_SCAN_DECIMAL);
-
-        if (NULL == Scan_Decimal(out, bp, size, kind != REB_PERCENT))
-            goto bad_make;
-
-        d = VAL_DECIMAL(out); // may need to divide if percent, fall through
-        break; }
-
-    case REB_BINARY:
+      case REB_BINARY:
         if (VAL_LEN_AT(arg) < 8)
             fail (arg);
 
@@ -196,8 +177,49 @@ REB_R MAKE_Decimal(
         d = VAL_DECIMAL(out);
         break;
 
-    default:
-        if (ANY_ARRAY(arg) && VAL_ARRAY_LEN_AT(arg) == 2) {
+        // !!! It's not obvious that TEXT shouldn't provide conversions; and
+        // possibly more kinds than TO does.  Allow it for now, even though
+        // TO does it as well.
+        //
+      case REB_TEXT:
+        return TO_Decimal(out, kind, arg);
+
+        // !!! MAKE DECIMAL! from a PATH! ... as opposed to TO DECIMAL ...
+        // will allow evaluation of arbitrary code.  This is an experiment on
+        // the kinds of distinctions which TO and MAKE may have; it may not
+        // be kept as a feature.  Especially since it is of limited use
+        // when GROUP!s are evaluative, so `make decimal! '(50%)/2` would
+        // require the quote to work if the path was in an evaluative slot.
+        //
+      case REB_PATH: {  // fractions as 1/2 are an intuitive use for PATH!
+        if (VAL_SEQUENCE_LEN(arg) != 2)
+            goto bad_make;
+
+        DECLARE_LOCAL (temp1);  // decompress path from cell into values
+        DECLARE_LOCAL (temp2);
+        const RELVAL *numerator = VAL_SEQUENCE_AT(temp1, arg, 0);
+        const RELVAL *denominator = VAL_SEQUENCE_AT(temp2, arg, 1);
+        PUSH_GC_GUARD(numerator);  // might be GROUP!, so (1.2)/4
+        PUSH_GC_GUARD(denominator);
+
+        REBVAL *quotient = rebValue("divide", numerator, denominator, rebEND);
+
+        DROP_GC_GUARD(denominator);
+        DROP_GC_GUARD(numerator);
+
+        if (IS_INTEGER(quotient))
+            d = cast(REBDEC, VAL_INT64(quotient));
+        else if (IS_DECIMAL(quotient) or IS_PERCENT(quotient))
+            d = VAL_DECIMAL(quotient);
+        else {
+            rebRelease(quotient);
+            goto bad_make;  // made *something*, but not DECIMAL! or PERCENT!
+        }
+        rebRelease(quotient);
+        break; }
+
+      case REB_BLOCK:
+        if (VAL_ARRAY_LEN_AT(arg) == 2) {
             const RELVAL *item = VAL_ARRAY_AT(arg);
             if (IS_INTEGER(item))
                 d = cast(REBDEC, VAL_INT64(item));
@@ -233,12 +255,15 @@ REB_R MAKE_Decimal(
         }
         else
             fail (Error_Bad_Make(kind, arg));
+
+      default:
+        goto bad_make;
     }
 
     if (kind == REB_PERCENT)
         d /= 100.0;
 
-dont_divide_if_percent:
+  dont_divide_if_percent:
     if (!FINITE(d))
         fail (Error_Overflow_Raw());
 
@@ -246,7 +271,7 @@ dont_divide_if_percent:
     VAL_DECIMAL(out) = d;
     return out;
 
-bad_make:
+  bad_make:
     fail (Error_Bad_Make(kind, arg));
 }
 
@@ -254,9 +279,94 @@ bad_make:
 //
 //  TO_Decimal: C
 //
+// !!! The TO conversions for DECIMAL! are trying to honor the "only obvious"
+// conversions, with MAKE used for less obvious (e.g. make decimal [1 5]
+// giving you 100000).
+//
 REB_R TO_Decimal(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
-    return MAKE_Decimal(out, kind, nullptr, arg);
+    assert(kind == REB_DECIMAL or kind == REB_PERCENT);
+
+    REBDEC d;
+
+    switch (VAL_TYPE(arg)) {
+      case REB_DECIMAL:
+        assert(VAL_TYPE(arg) != kind);  // would have called COPY if same
+        d = VAL_DECIMAL(arg);
+        goto dont_divide_if_percent;
+
+      case REB_PERCENT:
+        d = VAL_DECIMAL(arg);
+        goto dont_divide_if_percent;
+
+      case REB_INTEGER:
+        d = cast(REBDEC, VAL_INT64(arg));
+        goto dont_divide_if_percent;
+
+      case REB_MONEY:
+        d = deci_to_decimal(VAL_MONEY_AMOUNT(arg));
+        goto dont_divide_if_percent;
+
+      case REB_TEXT: {
+        REBSIZ size;
+        const REBYTE *bp
+            = Analyze_String_For_Scan(&size, arg, MAX_SCAN_DECIMAL);
+
+        if (NULL == Scan_Decimal(out, bp, size, kind != REB_PERCENT))
+            goto bad_to;
+
+        d = VAL_DECIMAL(out); // may need to divide if percent, fall through
+        break; }
+
+      case REB_PATH: {  // fractions as 1/2 are an intuitive use for PATH!
+        if (VAL_SEQUENCE_LEN(arg) != 2)
+            goto bad_to;
+
+        DECLARE_LOCAL (temp1);  // decompress path from cell into values
+        DECLARE_LOCAL (temp2);
+        const RELVAL *numerator = VAL_SEQUENCE_AT(temp1, arg, 0);
+        const RELVAL *denominator = VAL_SEQUENCE_AT(temp2, arg, 1);
+
+        if (not IS_INTEGER(numerator))
+            goto bad_to;
+        if (not IS_INTEGER(denominator))
+            goto bad_to;
+
+        if (VAL_INT64(denominator) == 0)
+            fail (Error_Zero_Divide_Raw());
+
+        d = cast(REBDEC, VAL_INT64(numerator))
+            / cast(REBDEC, VAL_INT64(denominator));
+        break; }
+
+      case REB_TUPLE:  // Resist the urge for `make decimal 1x2` to be 1.2
+        goto bad_to;  // it's bad (and 1x02 is the same as 1.2 anyway)
+
+        // !!! This should likely not be a TO conversion, but probably should
+        // not be a MAKE conversion either.  So it should be something like
+        // AS...or perhaps a special codec like ENBIN?  Leaving compatible
+        // for now so people don't have to change it twice.
+        //
+      case REB_BINARY:
+        return MAKE_Decimal(out, kind, nullptr, arg);
+
+      default:
+        goto bad_to;
+    }
+
+    if (kind == REB_PERCENT)
+        d /= 100.0;
+
+  dont_divide_if_percent:
+    if (not FINITE(d))
+        fail (Error_Overflow_Raw());
+
+    RESET_CELL(out, kind, CELL_MASK_NONE);
+    VAL_DECIMAL(out) = d;
+    return out;
+
+  bad_to:
+    fail (Error_Bad_Cast_Raw(arg, Datatype_From_Kind(kind)));
 }
 
 
