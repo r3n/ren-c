@@ -184,6 +184,8 @@ REBTYPE(Sequence)
     //
     REBYTE buf[MAX_TUPLE];
     REBLEN len = VAL_SEQUENCE_LEN(sequence);
+    if (len > MAX_TUPLE)
+        len = MAX_TUPLE;
     bool all_byte_sized_ints = Did_Get_Sequence_Bytes(buf, sequence, len);
     UNUSED(all_byte_sized_ints);
     REBYTE *vp = buf;

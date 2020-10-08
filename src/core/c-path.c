@@ -1155,8 +1155,8 @@ REBINT CT_Sequence(REBCEL(const*) a, REBCEL(const*) b, bool strict)
             return diff > 0 ? 1 : -1;
 
         int cmp = memcmp(
-            &PAYLOAD(Bytes, a).common,
-            &PAYLOAD(Bytes, b).common,
+            &PAYLOAD(Bytes, a).varies,
+            &PAYLOAD(Bytes, b).varies,
             a_len  // same as b_len at this point
         );
         if (cmp == 0)

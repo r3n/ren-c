@@ -216,7 +216,7 @@ inline static REBVAL *Init_Any_Sequence_Bytes(
     const REBYTE *data,
     REBLEN len
 ){
-    if (len > sizeof(EXTRA(Bytes, out).common)) {  // use plain array for now
+    if (len > sizeof(EXTRA(Bytes, out).varies)) {  // use plain array for now
         REBARR *a = Make_Array_Core(len, NODE_FLAG_MANAGED);
         for (; len > 0; --len, ++data)
             Init_Integer(Alloc_Tail_Array(a), *data);
@@ -226,7 +226,7 @@ inline static REBVAL *Init_Any_Sequence_Bytes(
     else {
         RESET_CELL(out, REB_CHAR, CELL_MASK_NONE);
         REBLEN n = len;
-        REBYTE *bp = PAYLOAD(Bytes, out).common;
+        REBYTE *bp = PAYLOAD(Bytes, out).varies;
         for (; n > 0; --n, ++data, ++bp)
             *bp = *data;
         EXTRA(Any, out).u = len;
@@ -249,7 +249,7 @@ inline static REBVAL *Try_Init_Any_Sequence_All_Integers(
     Init_Unreadable_Void(out);  // not used for "blaming" a non-integer
   #endif
 
-    if (len > sizeof(PAYLOAD(Bytes, out)).common)
+    if (len > sizeof(PAYLOAD(Bytes, out)).varies)
         return nullptr;  // no optimization yet if won't fit in payload bytes
 
     if (len < 2) {
@@ -259,7 +259,7 @@ inline static REBVAL *Try_Init_Any_Sequence_All_Integers(
 
     RESET_CELL(out, kind, CELL_MASK_NONE);
 
-    REBYTE *bp = PAYLOAD(Bytes, out).common;
+    REBYTE *bp = PAYLOAD(Bytes, out).varies;
 
     const RELVAL *item = head;
     REBLEN n;
@@ -497,7 +497,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
     switch (heart) {
       case REB_CHAR:
         assert(n < EXTRA(Any, sequence).u);
-        return Init_Integer(store, PAYLOAD(Bytes, sequence).common[n]);
+        return Init_Integer(store, PAYLOAD(Bytes, sequence).varies[n]);
 
       case REB_WORD: {
         assert(n < 2);

@@ -28,11 +28,11 @@
 
 (tuple? 255.255.255.255.255.255.255)
 (
-    tuple: load "255.255.255.255.255.255.255.255.255.255.255"
+    tuple: load "1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1"
     did all [
-        11 = length of tuple
-        (for i 1 11 1 [
-            assert [tuple/(i) = 255]
+        30 = length of tuple  ; too big to fit in cell on 32-bit -or- 64-bit
+        (for i 1 30 1 [
+            assert [tuple/(i) = 1]
         ] true)
     ]
 )
