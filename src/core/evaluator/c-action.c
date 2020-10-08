@@ -98,7 +98,7 @@
 // updated to the parameter they are now being used in.
 //
 inline static void Finalize_Arg(REBFRM *f) {
-    assert(not Is_Param_Variadic(f->param)); // Use Finalize_Variadic_Arg()
+    assert(not Is_Param_Variadic(f->param));  // Use Finalize_Variadic_Arg()
 
     REBYTE kind_byte = KIND3Q_BYTE(f->arg);
 
@@ -114,13 +114,13 @@ inline static void Finalize_Arg(REBFRM *f) {
         return;
     }
 
-  #if defined(DEBUG_STALE_ARGS) // see notes on flag definition
+  #if defined(DEBUG_STALE_ARGS)  // see notes on flag definition
     assert(NOT_CELL_FLAG(f->arg, ARG_MARKED_CHECKED));
   #endif
 
     if (
         kind_byte == REB_BLANK
-        and TYPE_CHECK(f->param, REB_TS_NOOP_IF_BLANK) // e.g. <blank> param
+        and TYPE_CHECK(f->param, REB_TS_NOOP_IF_BLANK)  // e.g. <blank> param
     ){
         SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
         SET_EVAL_FLAG(f, FULFILL_ONLY);
@@ -186,7 +186,7 @@ inline static void Finalize_Arg(REBFRM *f) {
 // VARARGS!)
 //
 inline static void Finalize_Variadic_Arg_Core(REBFRM *f, bool enfix) {
-    assert(Is_Param_Variadic(f->param)); // use Finalize_Arg()
+    assert(Is_Param_Variadic(f->param));  // use Finalize_Arg()
 
     // Varargs are odd, because the type checking doesn't actually check the
     // types inside the parameter--it always has to be a VARARGS!.
@@ -308,13 +308,13 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   arg_loop:
 
-    assert(DSP >= f->dsp_orig); // path processing may push REFINEMENT!s
+    assert(DSP >= f->dsp_orig);  // path processing may push REFINEMENT!s
 
     assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));
 
     for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
 
-  //=//// CONTINUES (AT TOP SO GOTOS DO NOT CROSS INITIALIZATIONS ///////=//
+  //=//// CONTINUES (AT TOP SO GOTOS DO NOT CROSS INITIALIZATIONS /////////=//
 
         goto loop_body;  // optimized out
 
@@ -331,17 +331,17 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         }
         continue;
 
-        skip_this_arg_for_now:  // the GC marks args up through f->arg...
+      skip_this_arg_for_now:  // the GC marks args up through f->arg...
 
         Prep_Cell(f->arg);
         Init_Unreadable_Void(f->arg);  // ...so cell must have valid bits
         continue;
 
-  //=//// ACTUAL LOOP BODY //////////////////////////////////////////////=//
+  //=//// ACTUAL LOOP BODY ////////////////////////////////////////////////=//
 
       loop_body:
 
-  //=//// A /REFINEMENT ARG /////////////////////////////////////////////=//
+  //=//// A /REFINEMENT ARG ///////////////////////////////////////////////=//
 
         // Refinements can be tricky because the "visitation order" of the
         // parameters while walking across the parameter array might not
@@ -399,7 +399,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             else
                 assert(IS_NULLED(f->special));
 
-  //=//// UNSPECIALIZED REFINEMENT SLOT /////////////////////////////////=//
+  //=//// UNSPECIALIZED REFINEMENT SLOT ///////////////////////////////////=//
 
     // We want to fulfill all normal parameters before any refinements
     // that take arguments.  Ren-C allows normal parameters *after* any
@@ -453,7 +453,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             goto continue_arg_loop;
         }
 
-  //=//// "PURE" LOCAL: ARG /////////////////////////////////////////////=//
+  //=//// "PURE" LOCAL: ARG ///////////////////////////////////////////////=//
 
         // This takes care of locals, including "magic" RETURN cells that
         // need to be pre-filled.  !!! Note nuances with compositions:
@@ -485,7 +485,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
         if (GET_CELL_FLAG(f->special, ARG_MARKED_CHECKED)) {
 
-  //=//// SPECIALIZED OR OTHERWISE TYPECHECKED ARG //////////////////////=//
+  //=//// SPECIALIZED OR OTHERWISE TYPECHECKED ARG ////////////////////////=//
 
             if (not SPECIAL_IS_ARG_SO_TYPECHECKING) {
                 assert(SPECIAL_IS_ARBITRARY_SO_SPECIALIZED);
@@ -501,7 +501,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 );
 
                 Prep_Cell(f->arg);
-                Move_Value(f->arg, f->special); // won't copy the bit
+                Move_Value(f->arg, f->special);  // won't copy the bit
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             }
 
@@ -541,14 +541,14 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 Finalize_Variadic_Arg(f);
             else
                 Finalize_Arg(f);
-            goto continue_arg_loop; // looping to verify args/refines
+            goto continue_arg_loop;  // looping to verify args/refines
         }
 
-  //=//// NOT JUST TYPECHECKING, SO PREPARE ARGUMENT CELL ///////////////=//
+  //=//// NOT JUST TYPECHECKING, SO PREPARE ARGUMENT CELL /////////////////=//
 
         Prep_Cell(f->arg);
 
-  //=//// HANDLE IF NEXT ARG IS IN OUT SLOT (e.g. ENFIX, CHAIN) /////////=//
+  //=//// HANDLE IF NEXT ARG IS IN OUT SLOT (e.g. ENFIX, CHAIN) ///////////=//
 
         if (GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT)) {
             CLEAR_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);
@@ -580,7 +580,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 //
                 if (Is_Param_Variadic(f->param)) {
                     RESET_CELL(f->arg, REB_VARARGS, CELL_MASK_VARARGS);
-                    INIT_BINDING(f->arg, EMPTY_ARRAY); // feed finished
+                    INIT_BINDING(f->arg, EMPTY_ARRAY);  // feed finished
 
                     Finalize_Enfix_Variadic_Arg(f);
                     goto continue_arg_loop;
@@ -615,7 +615,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     Move_Value(ARR_SINGLE(feed), f->out);
 
                     array1 = Alloc_Singular(NODE_FLAG_MANAGED);
-                    Init_Block(ARR_SINGLE(array1), feed); // index 0
+                    Init_Block(ARR_SINGLE(array1), feed);  // index 0
                 }
 
                 RESET_CELL(f->arg, REB_VARARGS, CELL_MASK_VARARGS);
@@ -756,7 +756,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             goto continue_arg_loop;
         }
 
-  //=//// NON-ENFIX VARIADIC ARG (doesn't consume anything *yet*) ///////=//
+  //=//// NON-ENFIX VARIADIC ARG (doesn't consume anything *yet*) /////////=//
 
         // Evaluation argument "hook" parameters (marked in MAKE ACTION!
         // by a `[[]]` in the spec, and in FUNC by `<variadic>`).  They point
@@ -765,13 +765,13 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         //
         if (Is_Param_Variadic(f->param)) {
             RESET_CELL(f->arg, REB_VARARGS, CELL_MASK_VARARGS);
-            INIT_BINDING(f->arg, f->varlist); // frame-based VARARGS!
+            INIT_BINDING(f->arg, f->varlist);  // frame-based VARARGS!
 
             Finalize_Variadic_Arg(f);
             goto continue_arg_loop;
         }
 
-  //=//// AFTER THIS, PARAMS CONSUME FROM CALLSITE IF NOT APPLY /////////=//
+  //=//// AFTER THIS, PARAMS CONSUME FROM CALLSITE IF NOT APPLY ///////////=//
 
         // If this is a non-enfix action, we're at least at *second* slot:
         //
@@ -818,7 +818,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (GET_FEED_FLAG(f->feed, DEFERRING_ENFIX))
             fail (Error_Ambiguous_Infix_Raw());
 
-  //=//// ERROR ON END MARKER, BAR! IF APPLICABLE ///////////////////////=//
+  //=//// ERROR ON END MARKER, BAR! IF APPLICABLE /////////////////////////=//
 
         if (IS_END(f_next) or GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
             if (not Is_Param_Endable(f->param))
@@ -831,7 +831,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
         switch (pclass) {
 
-  //=//// REGULAR ARG-OR-REFINEMENT-ARG (consumes 1 EVALUATE's worth) ////=//
+  //=//// REGULAR ARG-OR-REFINEMENT-ARG (consumes 1 EVALUATE's worth) /////=//
 
           case REB_P_NORMAL:
           normal_handling: {
@@ -847,15 +847,15 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             }
             break; }
 
-  //=//// HARD QUOTED ARG-OR-REFINEMENT-ARG /////////////////////////////=//
+  //=//// HARD QUOTED ARG-OR-REFINEMENT-ARG ///////////////////////////////=//
 
           case REB_P_HARD_QUOTE:
             if (not Is_Param_Skippable(f->param))
-                Literal_Next_In_Frame(f->arg, f); // CELL_FLAG_UNEVALUATED
+                Literal_Next_In_Frame(f->arg, f);  // CELL_FLAG_UNEVALUATED
             else {
                 if (not Typecheck_Including_Constraints(f->param, f_next)) {
                     assert(Is_Param_Endable(f->param));
-                    Init_Endish_Nulled(f->arg); // not EVAL_FLAG_BARRIER_HIT
+                    Init_Endish_Nulled(f->arg);  // not EVAL_FLAG_BARRIER_HIT
                     SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
                     goto continue_arg_loop;
                 }
@@ -875,7 +875,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
             break;
 
-  //=//// MODAL ARG  ////////////////////////////////////////////////////=//
+  //=//// MODAL ARG  //////////////////////////////////////////////////////=//
 
           case REB_P_MODAL: {
             if (not ANY_SYM_KIND(VAL_TYPE(f_next)))  // not an @xxx
@@ -884,7 +884,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             Literal_Next_In_Frame(f->out, f);  // f->value is read-only...
             goto handle_modal_in_out; }  // ...in out so we can Unsymify()
 
-  //=//// SOFT QUOTED ARG-OR-REFINEMENT-ARG  ////////////////////////////=//
+  //=//// SOFT QUOTED ARG-OR-REFINEMENT-ARG  //////////////////////////////=//
 
     // Quotes from the right already "win" over quotes from the left, in
     // a case like `help left-quoter` where they point at teach other.
@@ -979,7 +979,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         //
         assert(NOT_FEED_FLAG(f->feed, NO_LOOKAHEAD));
 
-  //=//// TYPE CHECKING FOR (MOST) ARGS AT END OF ARG LOOP //////////////=//
+  //=//// TYPE CHECKING FOR (MOST) ARGS AT END OF ARG LOOP ////////////////=//
 
         // Some arguments can be fulfilled and skip type checking or
         // take care of it themselves.  But normal args pass through
@@ -1015,7 +1015,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         goto continue_arg_loop;
     }
 
-    assert(IS_END(f->arg)); // arg can otherwise point to any arg cell
+    assert(IS_END(f->arg));  // arg can otherwise point to any arg cell
 
     // There may have been refinements that were skipped because the
     // order of definition did not match the order of usage.  They were
@@ -1032,10 +1032,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
         assert(IS_SYM_WORD(DS_TOP));
 
-        if (not IS_WORD_BOUND(DS_TOP)) { // the loop didn't index it
+        if (not IS_WORD_BOUND(DS_TOP)) {  // the loop didn't index it
             mutable_KIND3Q_BYTE(DS_TOP) = REB_WORD;
             mutable_HEART_BYTE(DS_TOP) = REB_WORD;
-            fail (Error_Bad_Refine_Raw(DS_TOP)); // so duplicate or junk
+            fail (Error_Bad_Refine_Raw(DS_TOP));  // so duplicate or junk
         }
 
         // FRM_ARGS_HEAD offsets are 0-based, while index is 1-based.
@@ -1051,11 +1051,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         assert(TYPE_CHECK(f->param, REB_TS_REFINEMENT));
         DS_DROP();
 
-        if (Is_Typeset_Invisible(f->param)) {  /* no callsite arg, just drop */
+        if (Is_Typeset_Invisible(f->param)) {  // no callsite arg, just drop
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
-            f->param = END_NODE; // don't need f->param in paramlist
+            f->param = END_NODE;  // don't need f->param in paramlist
             goto arg_loop_and_any_pickups_done;
         }
 
@@ -1069,11 +1069,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     CLEAR_EVAL_FLAG(f, DOING_PICKUPS);  // reevaluate may set flag again
     assert(IS_END(f->param));  // signals !Is_Action_Frame_Fulfilling()
 
-  //==////////////////////////////////////////////////////////////////==//
-  //
-  // ACTION! ARGUMENTS NOW GATHERED, DISPATCH PHASE
-  //
-  //==////////////////////////////////////////////////////////////////==//
+  //=//// ACTION! ARGUMENTS NOW GATHERED, DISPATCH PHASE //////////////////=//
 
     if (GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT)) {
         if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))
@@ -1107,7 +1103,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
     Expire_Out_Cell_Unless_Invisible(f);
 
-    f_next_gotten = nullptr; // arbitrary code changes fetched variables
+    f_next_gotten = nullptr;  // arbitrary code changes fetched variables
 
     // Note that the dispatcher may push ACTION! values to the data stack
     // which are used to process the return result after the switch.
@@ -1121,10 +1117,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         assert(NOT_CELL_FLAG(f->out, OUT_MARKED_STALE));
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // other cases Move_Value()
     }
-    else if (not r) { // API and internal code can both return `nullptr`
+    else if (not r) {  // API and internal code can both return `nullptr`
         Init_Nulled(f->out);
     }
-    else if (GET_CELL_FLAG(r, ROOT)) { // API, from Alloc_Value()
+    else if (GET_CELL_FLAG(r, ROOT)) {  // API, from Alloc_Value()
         Handle_Api_Dispatcher_Result(f, r);
     }
     else switch (KIND3Q_BYTE(r)) {  // it's a "pseudotype" instruction
@@ -1201,9 +1197,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     f->special = CTX_VARS_HEAD(exemplar);
                     f->arg = FRM_ARGS_HEAD(f);
                     for (; NOT_END(f->arg); ++f->arg, ++f->special) {
-                        if (IS_NULLED(f->special)) // no specialization
+                        if (IS_NULLED(f->special))  // no specialization
                             continue;
-                        Move_Value(f->arg, f->special); // reset it
+                        Move_Value(f->arg, f->special);  // reset it
                     }
                 }
 
@@ -1223,7 +1219,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // run the f->phase again.  The dispatcher may have changed the
         // value of what f->phase is, for instance.
 
-        if (not EXTRA(Any, r).flag) // R_REDO_UNCHECKED
+        if (not EXTRA(Any, r).flag)  // R_REDO_UNCHECKED
             goto redo_unchecked;
 
       redo_checked:  // R_REDO_CHECKED
@@ -1295,11 +1291,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   dispatch_completed:
 
-  //==////////////////////////////////////////////////////////////////==//
-  //
-  // ACTION! CALL COMPLETION
-  //
-  //==////////////////////////////////////////////////////////////////==//
+  //=//// ACTION! CALL COMPLETION /////////////////////////////////////////=//
 
     // Here we know the function finished and nothing threw past it or
     // FAIL / fail()'d.  It should still be in REB_ACTION evaluation
@@ -1377,7 +1369,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   abort_action:
 
     Drop_Action(f);
-    DS_DROP_TO(f->dsp_orig);  // any unprocessed refinements or chains on stack
+    DS_DROP_TO(f->dsp_orig);  // drop unprocessed refinements/chains on stack
 
     return true;  // true => thrown
 }

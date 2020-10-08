@@ -180,7 +180,7 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     REBFRM *f,
     const RELVAL *v
 ){
-    if (GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT))  { // e.g. `10 -> x:`
+    if (GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT))  {  // e.g. `10 -> x:`
         CLEAR_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // this helper counts as eval
         return false;
@@ -200,7 +200,7 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
 
     SET_END(f->out);  // `1 x: comment "hi"` shouldn't set x to 1!
 
-    if (CURRENT_CHANGES_IF_FETCH_NEXT) { // must use new frame
+    if (CURRENT_CHANGES_IF_FETCH_NEXT) {  // must use new frame
         if (Eval_Step_In_Subframe_Throws(f->out, f, flags))
             return true;
     }
@@ -282,7 +282,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         | EVAL_FLAG_REEVALUATE_CELL
     )){
         if (GET_EVAL_FLAG(f, POST_SWITCH)) {
-            CLEAR_EVAL_FLAG(f, POST_SWITCH); // !!! necessary?
+            CLEAR_EVAL_FLAG(f, POST_SWITCH);  // !!! necessary?
             goto post_switch;
         }
 
@@ -323,7 +323,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     assert(NOT_FEED_FLAG(f->feed, DEFERRING_ENFIX));
   #endif
 
-//=//// START NEW EXPRESSION //////////////////////////////////////////////=//
+  //=//// START NEW EXPRESSION ////////////////////////////////////////////=//
 
     assert(Eval_Count >= 0);
     if (--Eval_Count == 0) {
@@ -339,7 +339,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));
     SET_CELL_FLAG(f->out, OUT_MARKED_STALE);  // internal use flag only
 
-    UPDATE_EXPRESSION_START(f); // !!! See FRM_INDEX() for caveats
+    UPDATE_EXPRESSION_START(f);  // !!! See FRM_INDEX() for caveats
 
     // If asked to evaluate `[]` then we have now done all the work the
     // evaluator needs to do--including marking the output stale.
@@ -358,7 +358,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
     // ^-- doesn't advance expression index: `reeval x` starts with `reeval`
 
-//=//// LOOKAHEAD FOR ENFIXED FUNCTIONS THAT QUOTE THEIR LEFT ARG /////////=//
+  //=//// LOOKAHEAD FOR ENFIXED FUNCTIONS THAT QUOTE THEIR LEFT ARG ///////=//
 
     // Ren-C has an additional lookahead step *before* an evaluation in order
     // to take care of this scenario.  To do this, it pre-emptively feeds the
@@ -403,7 +403,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE
             or VAL_PARAM_CLASS(first) == REB_P_MODAL
         ){
-            goto give_up_backward_quote_priority; // yield as an exemption
+            goto give_up_backward_quote_priority;  // yield as an exemption
         }
     }
 
@@ -414,15 +414,15 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     if (GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), SKIPPABLE_FIRST)) {
         REBVAL *first = First_Unspecialized_Param(VAL_ACTION(f_next_gotten));
-        if (not TYPE_CHECK(first, kind_current)) // left's kind
+        if (not TYPE_CHECK(first, kind_current))  // left's kind
             goto give_up_backward_quote_priority;
     }
 
     // Lookback args are fetched from f->out, then copied into an arg
     // slot.  Put the backwards quoted value into f->out.
     //
-    Derelativize(f->out, v, f_specifier); // for NEXT_ARG_FROM_OUT
-    SET_CELL_FLAG(f->out, UNEVALUATED); // so lookback knows it was quoted
+    Derelativize(f->out, v, f_specifier);  // for NEXT_ARG_FROM_OUT
+    SET_CELL_FLAG(f->out, UNEVALUATED);  // so lookback knows it was quoted
 
     // We skip over the word that invoked the action (e.g. ->-, OF, =>).
     // v will then hold a pointer to that word (possibly now resident in the
@@ -456,10 +456,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         v = &f->feed->lookback;
         gotten = nullptr;
 
-        SET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH); // for better error message
-        SET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT); // literal right op is arg
+        SET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);  // for better error message
+        SET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);  // literal right op is arg
 
-        goto give_up_backward_quote_priority; // run PATH!/WORD! normal
+        goto give_up_backward_quote_priority;  // run PATH!/WORD! normal
     }
 
     // Wasn't the at-end exception, so run normal enfix with right winning.
@@ -474,7 +474,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
   give_up_backward_quote_priority:
 
-//=//// BEGIN MAIN SWITCH STATEMENT ///////////////////////////////////////=//
+  //=//// BEGIN MAIN SWITCH STATEMENT /////////////////////////////////////=//
 
     // This switch is done with a case for all REB_XXX values, in order to
     // facilitate use of a "jump table optimization":
@@ -491,41 +491,46 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto finished;
 
 
-//==//// NULL ////////////////////////////////////////////////////////////==//
-//
-// Since nulled cells can't be in BLOCK!s, the evaluator shouldn't usually see
-// them.  Plus Q APIs quotes spliced values, so `rebValueQ("null?", nullptr)`
-// gets a QUOTED! that evaluates to null--it's not a null being evaluated.
-//
-// But plain `rebValue("null?", nullptr)` would be an error.  Another way
-// the evaluator can see NULL is REEVAL, such as `reeval first []`.
+    //=//// NULL //////////////////////////////////////////////////////////=//
+    //
+    // Since nulled cells can't be in BLOCK!s, the evaluator shouldn't usually
+    // see them.  It is technically possible to see one using REEVAL, such as
+    // with `reeval first []`.  However, the more common way to encounter this
+    // situation would be in the API:
+    //
+    //     REBVAL *v = nullptr;
+    //     bool is_null = rebDid("null?", v);  // oops, should be rebQ(v)
+    //
+    // Note: It seems tempting to let NULL evaluate to NULL as a convenience
+    // for such cases.  But this breaks the system in subtle ways--like
+    // making it impossible to "reify" the instruction stream as a BLOCK!
+    // for the debugger.  Mechanically speaking, this is best left an error.
 
       case REB_NULL:
         fail (Error_Evaluate_Null_Raw());
 
 
-//==//// VOID! ///////////////////////////////////////////////////////////==//
-//
-// "A void! is a means of giving a hot potato back that is a warning about
-//  something, but you don't want to force an error 'in the moment'...in case
-//  the returned information wasn't going to be used anyway."
-//
-// https://forum.rebol.info/t/947
-//
-// If we get here, the evaluator is actually seeing it, and it's time to fail.
+    //=//// VOID! /////////////////////////////////////////////////////////=//
+    //
+    // "A void! is a means of giving a hot potato back that is a warning about
+    //  something, but you don't want to force an error 'in the moment'...in
+    //  case the returned information wasn't going to be used anyway."
+    //
+    // https://forum.rebol.info/t/947
+    //
+    // If we get here, the evaluator is seeing it, and it's time to fail.
 
       case REB_VOID:
         fail (Error_Void_Evaluation_Raw());
 
 
-//==//// ACTION! /////////////////////////////////////////////////////////==//
-//
-// If an action makes it to the SWITCH statement, that means it is either
-// literally an action value in the array (`do compose [1 (:+) 2]`) or is
-// being retriggered via EVAL.
-//
-// Most action evaluations are triggered from a WORD! or PATH!, which jumps in
-// at the `process_action` label.
+    //=//// ACTION! ///////////////////////////////////////////////////////=//
+    //
+    // If an action makes it to the SWITCH statement, that means it is either
+    // literally an action value in the array (`do compose [1 (:+) 2]`) or is
+    // being retriggered via REEVAL.
+    //
+    // Most action evaluations are triggered from a WORD! or PATH! case.
 
       case REB_ACTION: {
         DECLARE_ACTION_SUBFRAME (subframe, f);
@@ -556,6 +561,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
       process_action: {
         FS_TOP->dsp_orig = f->dsp_orig;  // !!! How did this work in stackless
+
+        // Gather args and execute function (the arg gathering makes nested
+        // eval calls that lookahead, but no lookahead after the action runs)
+        //
         bool threw = Process_Action_Maybe_Stale_Throws(FS_TOP);
 
         assert(NOT_EVAL_FLAG(FS_TOP, NEXT_ARG_FROM_OUT));  // must consume
@@ -591,17 +600,17 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break; }
 
 
-//==//// WORD! ///////////////////////////////////////////////////////////==//
-//
-// A plain word tries to fetch its value through its binding.  It will fail
-// and longjmp out of this stack if the word is unbound (or if the binding is
-// to a variable which is not set).  Should the word look up to an action,
-// then that action will be called by jumping to the ACTION! case.
-//
-// NOTE: The usual dispatch of enfix functions is *not* via a REB_WORD in this
-// switch, it's by some code at the `post_switch:` label.  So you only see
-// enfix in cases like `(+ 1 2)`, or after PARAMLIST_IS_INVISIBLE e.g.
-// `10 comment "hi" + 20`.
+    //=//// WORD! /////////////////////////////////////////////////////////=//
+    //
+    // A plain word tries to fetch its value through its binding.  It fails
+    // if the word is unbound (or if the binding is to a variable which is
+    // set, but VOID!).  Should the word look up to an action, then that
+    // action will be invoked.
+    //
+    // NOTE: The usual dispatch of enfix functions is *not* via a REB_WORD in
+    // this switch, it's by some code at the `lookahead:` label.  You only see
+    // enfix here when there was nothing to the left, so cases like `(+ 1 2)`
+    // or in "stale" left hand situations like `10 comment "hi" + 20`.
 
       process_word:
       case REB_WORD:
@@ -643,12 +652,11 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break;
 
 
-//==//// SET-WORD! ///////////////////////////////////////////////////////==//
-//
-// Right hand side is evaluated into `out`, and then copied to the variable.
-//
-// All values are allowed in these assignments, including NULL and VOID!
-// https://forum.rebol.info/t/1206
+    //=//// SET-WORD! /////////////////////////////////////////////////////=//
+    //
+    // Right side is evaluated into `out`, and then copied to the variable.
+    //
+    // Null and void assigns are allowed: https://forum.rebol.info/t/895/4
 
       process_set_word:
       case REB_SET_WORD: {
@@ -661,14 +669,17 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break; }
 
 
-//==//// GET-WORD! ///////////////////////////////////////////////////////==//
-//
-// A GET-WORD! does no dispatch on functions.  It will fetch other values as
-// normal, but will error on VOID! and direct you to GET/ANY.  This matches
-// Rebol2 behavior, choosing to break with R3-Alpha and Red which will give
-// back "voided" values ("UNSET!")...to make typos less likely to bite those
-// who wanted to use ACTION!s inertly:
-// https://forum.rebol.info/t/should-get-word-of-a-void-raise-an-error/1301
+    //=//// GET-WORD! /////////////////////////////////////////////////////=//
+    //
+    // A GET-WORD! does no dispatch on functions.  It will fetch other values
+    // as normal, but will error on VOID! and direct you to GET/ANY.
+    //
+    // This handling of voids matches Rebol2 behavior, choosing to break with
+    // R3-Alpha and Red which will give back "voided" values ("UNSET!").
+    // The choice was made to make typos less likely to bite those whose
+    // intent with GET-WORD! was merely to use ACTION!s inertly:
+    //
+    // https://forum.rebol.info/t/1301
 
       process_get_word:
       case REB_GET_WORD:
@@ -685,24 +696,62 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break;
 
 
-//==//// GROUP! ///////////////////////////////////////////////////////////=//
-//
-// If a GROUP! is seen then it generates another call into Eval_Core().  The
-// current frame is not reused, as the source array from which values are
-// being gathered changes.
-//
-// Empty groups vaporize, as do ones that only consist of invisibles.  If
-// this is not desired, one should use DO or lead with `(void ...)`
-//
-//     >> 1 + 2 (comment "vaporize")
-//     == 3
-//
-//     >> 1 + () 2
-//     == 3
+    //=//// GROUP! ////////////////////////////////////////////////////////=//
+    //
+    // A GROUP! whose contents wind up vaporizing wants to be invisible:
+    //
+    //     >> 1 + 2 ()
+    //     == 3
+    //
+    //     >> 1 + 2 (comment "hi")
+    //     == 3
+    //
+    // But there's a limit with group invisibility and enfix.  A single step
+    // of the evaluator only has one lookahead, because it doesn't know if it
+    // wants to evaluate the next thing or not:
+    //
+    //     >> evaluate [1 (2) + 3]
+    //     == [(2) + 3]  ; takes one step...so next step will add 2 and 3
+    //
+    //     >> evaluate [1 (comment "hi") + 3]
+    //     == [(comment "hi") + 3]  ; next step errors: + has no left argument
+    //
+    // It is supposed to be possible for DO to be implemented as a series of
+    // successive single EVALUATE steps, giving no input beyond the block.  So
+    // that means even though the `f->out` may technically still hold bits of
+    // the last evaluation such that `do [1 (comment "hi") + 3]` *could* draw
+    // from them to give a left hand argument, it should not do so...and it's
+    // why those bits are marked "stale".
+    //
+    // The right of the operator is different story.  Turning up no result,
+    // the group can just invoke a reevaluate without breaking any rules:
+    //
+    //     >> evaluate [1 + (2) 3]
+    //     == [3]
+    //
+    //     >> evaluate [1 + (comment "hi") 3]
+    //     == []
+    //
+    // This subtlety means running a GROUP! must be able to notice when no
+    // result was produced (an output of END) and then re-trigger a step in
+    // the parent frame, e.g. to pick up the 3 above.
 
       case REB_GROUP:
       eval_group: {
         f_next_gotten = nullptr;  // arbitrary code changes fetched variables
+
+        // The IS_VOID() case here is specifically for REEVAL with invisibles,
+        // because it's desirable for `void? reeval :comment "hi" 1` to be
+        // 1 and not #[false].  The problem is that REEVAL is not invisible,
+        // and hence it wants to make sure something is written to the output
+        // so that standard invisibility doesn't kick in...hence it preloads
+        // with a non-stale void.
+        //
+        assert(
+            IS_END(f->out)
+            or GET_CELL_FLAG(f->out, OUT_MARKED_STALE)
+            or IS_VOID(f->out)
+        );
 
         DECLARE_FEED_AT_CORE (subfeed, v, f_specifier);
 
@@ -730,13 +779,20 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break; }
 
 
-//==//// PATH! and TUPLE! ////////////////////////////////////////////////==//
-//
-// Paths starting with inert values do not evaluate.  `/foo/bar` has a blank
-// at its head, and it evaluates to itself.
-//
-// Other paths run through the GET-PATH! mechanism and then EVAL the result.
-// If the get of the path is null, then it will be an error.
+    //=//// PATH! and TUPLE! //////////////////////////////////////////////=//
+    //
+    // PATH! and GET-PATH! have similar mechanisms, with the difference being
+    // that if a PATH! looks up to an action it will execute it.
+    //
+    // Paths looking up to VOID! are handled consistently with WORD! and
+    // GET-WORD!, and will error...directing you use GET/ANY if fetching
+    // voids is what you actually intended.
+    //
+    // PATH!s starting with inert values do not evaluate.  `/foo/bar` has a
+    // blank at its head, and it evaluates to itself.
+    //
+    // !!! The dispatch of TUPLE! is a work in progress, with concepts about
+    // being less willing to execute functions under some notations.
 
       case REB_PATH:
       case REB_TUPLE: {
@@ -820,27 +876,25 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break; }
 
 
-//==//// SET-PATH! and SET-TUPLE! ////////////////////////////////////////==//
-//
-// See notes on SET-WORD!  SET-PATH!s are handled in a similar way, by
-// pushing them to the stack, continuing the evaluation via a lightweight
-// reuse of the current frame.
-//
-// !!! The evaluation ordering is dictated by the fact that there isn't a
-// separate "evaluate path to target location" and "set target' step.  This
-// is because some targets of assignments (e.g. gob/size/x:) do not correspond
-// to a cell that can be returned; the path operation "encodes as it goes"
-// and requires the value to set as a parameter to Eval_Path.  Yet it is
-// counterintuitive given the "left-to-right" nature of the language:
-//
-//     >> foo: make object! [[bar][bar: 10]]
-//
-//     >> foo/(print "left" 'bar): (print "right" 20)
-//     right
-//     left
-//     == 20
-//
-// Note that nulled cells are allowed: https://forum.rebol.info/t/895/4
+    //=//// SET-PATH! /////////////////////////////////////////////////////=//
+    //
+    // See notes on SET-WORD!  SET-PATH!s are handled in a similar way.
+    //
+    // !!! The evaluation ordering is dictated by the fact that there isn't a
+    // separate "evaluate path to target location" and "set target' step.
+    // This is because some targets of assignments (e.g. gob/size/x:) do not
+    // correspond to a cell that can be returned; the path operation "encodes
+    // as it goes" and requires the value to set as a parameter.  Yet it is
+    // counterintuitive given the "left-to-right" nature of the language:
+    //
+    //     >> foo: make object! [[bar][bar: 10]]
+    //
+    //     >> foo/(print "left" 'bar): (print "right" 20)
+    //     right
+    //     left
+    //     == 20
+    //
+    // VOID! and NULL assigns are allowed: https://forum.rebol.info/t/895/4
 
       case REB_SET_PATH:
       case REB_SET_TUPLE: {
@@ -868,20 +922,20 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break; }
 
 
-//==//// GET-PATH! and GET-TUPLE! ////////////////////////////////////////==//
-//
-// Note that the GET native on a PATH! won't allow GROUP! execution:
-//
-//    foo: [X]
-//    path: 'foo/(print "side effect!" 1)
-//    get path  ; not allowed, due to surprising side effects
-//
-// However a source-level GET-PATH! allows them, since they are at the
-// callsite and you are assumed to know what you are doing:
-//
-//    :foo/(print "side effect" 1)  ; this is allowed
-//
-// Consistent with GET-WORD!, a GET-PATH! acts as GET and won't return VOID!.
+    //=//// GET-PATH! and GET-TUPLE! //////////////////////////////////////=//
+    //
+    // Note that the GET native on a PATH! won't allow GROUP! execution:
+    //
+    //    foo: [X]
+    //    path: 'foo/(print "side effect!" 1)
+    //    get path  ; not allowed, due to surprising side effects
+    //
+    // However a source-level GET-PATH! allows them, since they are at the
+    // callsite and you are assumed to know what you are doing:
+    //
+    //    :foo/(print "side effect" 1)  ; this is allowed
+    //
+   // Consistent with GET-WORD!, a GET-PATH! won't allow VOID! access.
 
       case REB_GET_PATH:
       case REB_GET_TUPLE:
@@ -904,23 +958,23 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break;
 
 
-//==//// GET-GROUP! //////////////////////////////////////////////////////==//
-//
-// This was initially conceived such that `:(x)` was a shorthand for the
-// expression `get x`.  But that's already pretty short--and arguably a
-// cleaner way of saying the same thing.  So instead, it's given the same
-// meaning in the evaluator as plain GROUP!...which seems wasteful on the
-// surface, but it means dialects can be free to use it to make a distinction.
-// Branches use it to mean "do not voidify the result".
+    //=//// GET-GROUP! ////////////////////////////////////////////////////=//
+    //
+    // This was initially conceived such that `:(x)` was a shorthand for the
+    // expression `get x`.  But that's already pretty short--and arguably a
+    // cleaner way of saying the same thing.  So instead, it's given the same
+    // meaning in the evaluator as plain GROUP!...which seems wasteful on the
+    // surface, but it means dialects can be free to use it to make a
+    // distinction.  Branches use it to mean "do not voidify the result".
 
       case REB_GET_GROUP:
         goto eval_group;
 
 
-//==//// SET-GROUP! //////////////////////////////////////////////////////==//
-//
-// Synonym for SET on the produced thing, unless it's an action...in which
-// case an arity-1 function is allowed to be called and passed the right.
+    //=//// SET-GROUP! ////////////////////////////////////////////////////=//
+    //
+    // Synonym for SET on the produced thing, unless it's an action...in which
+    // case an arity-1 function is allowed to be called and passed the right.
 
       case REB_SET_GROUP: {
         //
@@ -977,33 +1031,33 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         fail (Error_Bad_Set_Group_Raw()); }
 
 
-//==//// GET-BLOCK! //////////////////////////////////////////////////////==//
-//
-// !!! Currently just inert, awaiting future usage.
+    //=//// GET-BLOCK! ////////////////////////////////////////////////////=//
+    //
+    // !!! Currently just inert, which may end up being its ultimate usage
 
       case REB_GET_BLOCK:
         Derelativize(f->out, v, f_specifier);
         break;
 
 
-//==//// SET-BLOCK! //////////////////////////////////////////////////////==//
-//
-// The evaluator treats SET-BLOCK! specially as a means for implementing
-// multiple return values.  The trick is that it does so by pre-loading
-// arguments in the frame with variables to update, in a way that could have
-// historically been achieved with passing a WORD! or PATH! to a refinement.
-// So if there was a function that updates a variable you pass in by name:
-//
-//     result: updating-function/update arg1 arg2 'var
-//
-// The /UPDATE parameter is marked as being effectively a "return value", so
-// that equivalent behavior can be achieved with:
-//
-//     [result var]: updating-function arg1 arg2
-//
-// !!! This is an extremely slow-running prototype of the desired behavior.
-// It is a mock up intended to find any flaws in the concept before writing
-// a faster native version that would require rewiring the evaluator somewhat.
+    //=//// SET-BLOCK! ////////////////////////////////////////////////////=//
+    //
+    // The evaluator treats SET-BLOCK! specially as a means for implementing
+    // multiple return values.  The trick is that it does so by pre-loading
+    // arguments in the frame with variables to update, in a way that could've
+    // historically been achieved with passing WORD! or PATH! to a refinement.
+    // So if there was a function that updates a variable you pass in by name:
+    //
+    //     result: updating-function/update arg1 arg2 'var
+    //
+    // The /UPDATE parameter is marked as being effectively a "return value",
+    // so that equivalent behavior can be achieved with:
+    //
+    //     [result var]: updating-function arg1 arg2
+    //
+    // !!! This is a very slow-running prototype of the desired behavior.  It
+    // is a mock up intended to find any flaws in the concept before writing
+    // faster native code that would require rewiring the evaluator somewhat.
 
       case REB_SET_BLOCK: {
         assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));
@@ -1113,11 +1167,11 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto evaluate; }
 
 
-//==//////////////////////////////////////////////////////////////////////==//
-//
-// Treat all the other Is_Bindable() types as inert
-//
-//==//////////////////////////////////////////////////////////////////////==//
+    //=////////////////////////////////////////////////////////////////////=//
+    //
+    // Treat all the other Is_Bindable() types as inert
+    //
+    //=////////////////////////////////////////////////////////////////////=//
 
       case REB_BLOCK:
         //
@@ -1149,11 +1203,11 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto inert;
 
 
-//==//////////////////////////////////////////////////////////////////////==//
-//
-// Treat all the other not Is_Bindable() types as inert
-//
-//==//////////////////////////////////////////////////////////////////////==//
+     //=///////////////////////////////////////////////////////////////////=//
+     //
+     // Treat all the other NOT Is_Bindable() types as inert
+     //
+     //=///////////////////////////////////////////////////////////////////=//
 
       case REB_BLANK:
         //
@@ -1180,14 +1234,14 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break;
 
 
-//=//// QUOTED! (at 4 or more levels of escaping) /////////////////////////=//
-//
-// This is the form of literal that's too escaped to just overlay in the cell
-// by using a higher kind byte.  See the `default:` case in this switch for
-// handling of the more compact forms, that are much more common.
-//
-// (Highly escaped literals should be rare, but for completeness you need to
-// be able to escape any value, including any escaped one...!)
+    //=//// QUOTED! (at 4 or more levels of escaping) /////////////////////=//
+    //
+    // This is the form of literal that's too escaped to just overlay in the
+    // cell by using a higher kind byte.  See the `default:` case in this
+    // switch for handling the more compact forms, that are much more common.
+    //
+    // (Highly escaped literals should be rare, but for completeness you need
+    // to be able to escape any value, including any escaped one...!)
 
       case REB_QUOTED:
         Derelativize(f->out, v, f_specifier);
@@ -1195,11 +1249,11 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break;
 
 
-//==//// QUOTED! (at 3 levels of escaping or less...or just garbage) //////=//
-//
-// All the values for types at >= REB_64 currently represent the special
-// compact form of literals, which overlay inside the cell they escape.
-// The real type comes from the type modulo 64.
+    //=//// QUOTED! (at 3 levels of escaping or less...or garbage) ////////=//
+    //
+    // All the values for types at >= REB_64 currently represent the special
+    // compact form of literals, which overlay inside the cell they escape.
+    // The real type comes from the type modulo 64.
 
       default:
         Derelativize(f->out, v, f_specifier);
@@ -1208,7 +1262,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     }
 
 
-//=//// END MAIN SWITCH STATEMENT /////////////////////////////////////////=//
+  //=//// END MAIN SWITCH STATEMENT ///////////////////////////////////////=//
 
     // The UNEVALUATED flag is one of the bits that doesn't get copied by
     // Move_Value() or Derelativize().  Hence it can be overkill to clear it
@@ -1280,7 +1334,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         assert(!"Unexpected lack of use of NEXT_ARG_FROM_OUT");
     }
 
-//=//// IF NOT A WORD!, IT DEFINITELY STARTS A NEW EXPRESSION /////////////=//
+  //=//// IF NOT A WORD!, IT DEFINITELY STARTS A NEW EXPRESSION ///////////=//
 
     // For long-pondered technical reasons, only WORD! is able to dispatch
     // enfix.  If it's necessary to dispatch an enfix function via path, then
@@ -1289,7 +1343,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     switch (KIND3Q_BYTE_UNCHECKED(f_next)) {
       case REB_0_END:
         CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
-        goto finished; // hitting end is common, avoid do_next's switch()
+        goto finished;  // hitting end is common, avoid do_next's switch()
 
       case REB_WORD:
         break;  // need to check for lookahead
@@ -1318,7 +1372,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto finished;
     }
 
-//=//// FETCH WORD! TO PERFORM SPECIAL HANDLING FOR ENFIX/INVISIBLES //////=//
+  //=//// FETCH WORD! TO PERFORM SPECIAL HANDLING FOR ENFIX/INVISIBLES ////=//
 
     // First things first, we fetch the WORD! (if not previously fetched) so
     // we can see if it looks up to any kind of ACTION! at all.
@@ -1328,7 +1382,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     else
         assert(f_next_gotten == Try_Lookup_Word(f_next, f_specifier));
 
-//=//// NEW EXPRESSION IF UNBOUND, NON-FUNCTION, OR NON-ENFIX /////////////=//
+  //=//// NEW EXPRESSION IF UNBOUND, NON-FUNCTION, OR NON-ENFIX ///////////=//
 
     // These cases represent finding the start of a new expression.
     //
@@ -1350,7 +1404,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto finished;
     }
 
-//=//// IT'S A WORD ENFIXEDLY TIED TO A FUNCTION (MAY BE "INVISIBLE") /////=//
+  //=//// IS WORD ENFIXEDLY TIED TO A FUNCTION (MAY BE "INVISIBLE") ///////=//
 
     if (GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), QUOTES_FIRST)) {
         //
