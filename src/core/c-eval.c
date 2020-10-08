@@ -1063,24 +1063,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
                     if (GET_CELL_FLAG(f->out, UNEVALUATED))
                         SET_CELL_FLAG(f->arg, UNEVALUATED);
 
-                    // When we see `1 + 2 * 3`, when we're at the 2, we don't
-                    // want to let the * run yet.  So set a flag which says we
-                    // won't do lookahead that will be cleared when function
-                    // takes an argument *or* when a new expression starts.
-                    //
-                    // This flag is only set for evaluative left enfix.  What
-                    // it does is puts the enfix into a *single step defer*.
-                    //
-                    if (GET_EVAL_FLAG(f, RUNNING_ENFIX)) {
-                        assert(NOT_FEED_FLAG(f->feed, NO_LOOKAHEAD));
-                        if (
-                            NOT_ACTION_FLAG(FRM_PHASE(f), POSTPONES_ENTIRELY)
-                            and
-                            NOT_ACTION_FLAG(FRM_PHASE(f), DEFERS_LOOKBACK)
-                        ){
-                            SET_FEED_FLAG(f->feed, NO_LOOKAHEAD);
-                        }
-                    }
                     Finalize_Arg(f);
                     break;
 
@@ -1182,6 +1164,24 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
                   default:
                     assert(false);
+                }
+
+                // When we see `1 + 2 * 3`, when we're at the 2, we don't
+                // want to let the * run yet.  So set a flag which says we
+                // won't do lookahead that will be cleared when function
+                // takes an argument *or* when a new expression starts.
+                //
+                // This effectively puts the enfix into a *single step defer*.
+                //
+                if (GET_EVAL_FLAG(f, RUNNING_ENFIX)) {
+                    assert(NOT_FEED_FLAG(f->feed, NO_LOOKAHEAD));
+                    if (
+                        NOT_ACTION_FLAG(FRM_PHASE(f), POSTPONES_ENTIRELY)
+                        and
+                        NOT_ACTION_FLAG(FRM_PHASE(f), DEFERS_LOOKBACK)
+                    ){
+                        SET_FEED_FLAG(f->feed, NO_LOOKAHEAD);
+                    }
                 }
 
                 Expire_Out_Cell_Unless_Invisible(f);
@@ -1349,6 +1349,14 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
                 // have to account for enfix deferrals in cases like:
                 //
                 //     return if false '[foo] else '[bar]
+                //
+                // Note that this quoting lookahead ("lookback?") is exempt
+                // from the usual "no lookahead" rule while gathering enfix
+                // arguments.  This supports `null then x -> [1] else [2]`,
+                // being 2.  See details at:
+                //
+                // https://forum.rebol.info/t/1361
+                //
                 if (
                     Lookahead_To_Sync_Enfix_Defer_Flag(f->feed) and
                     GET_ACTION_FLAG(VAL_ACTION(f->feed->gotten), QUOTES_FIRST)
