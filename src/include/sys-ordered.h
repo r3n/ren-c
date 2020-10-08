@@ -143,8 +143,8 @@ inline static bool IS_NULLED_OR_BLANK_KIND(REBYTE k)
 #define ANY_VALUE(v) \
     (KIND_BYTE(v) != REB_NULLED)
 
-inline static bool ANY_SCALAR_KIND(REBYTE k)
-    { return k >= REB_LOGIC and k <= REB_PAIR; }
+inline static bool ANY_SCALAR_KIND(REBYTE k)  // !!! Should use TS_SCALAR?
+    { return k == REB_TUPLE or (k >= REB_LOGIC and k <= REB_PAIR); }
 
 #define ANY_SCALAR(v) \
     ANY_SCALAR_KIND(KIND_BYTE(v))

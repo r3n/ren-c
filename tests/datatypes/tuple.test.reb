@@ -8,8 +8,11 @@
 ;
 (1.2.3 = to tuple! [1 2 3])
 ;(1x2 = to tuple! [1 2])  ; !!! TBD when unified with pairs
-;(1. = to tuple! [1 _])  ; !!! TBD
-(.1 = to tuple! [_ 1])
+
+(error? trap [load "1."])  ; !!! Reserved
+(error? trap [load ".1"])  ; !!! Reserved
+;(.1 = to tuple! [_ 1])  ; No representation due to reservation
+;(1. = to tuple! [1 _])  ; No representation due to reservation
 
 ; !!! Should dot be inert?  Is there value to having it as an inert predicate
 ; form for something like identity that does not execute on its own?  It is

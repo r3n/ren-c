@@ -912,9 +912,6 @@ inline static REBVAL *Init_Zeroed_Hack(RELVAL *out, enum Reb_Kind kind) {
     if (kind == REB_PAIR) {
         Init_Pair_Int(out, 0, 0);
     }
-    else if (ANY_SEQUENCE_KIND(kind)) {
-        Init_Any_Sequence_Bytes(out, kind, nullptr, 0);
-    }
     else {
         RESET_CELL(out, kind, CELL_MASK_NONE);
         CLEAR(&out->extra, sizeof(union Reb_Value_Extra));
@@ -978,10 +975,22 @@ REBNATIVE(zero_q)
 {
     INCLUDE_PARAMS_OF_ZERO_Q;
 
-    enum Reb_Kind type = VAL_TYPE(ARG(value));
+    REBVAL *v = ARG(value);
+    enum Reb_Kind type = VAL_TYPE(v);
 
     if (not ANY_SCALAR_KIND(type))
         return Init_False(D_OUT);
+
+    if (type == REB_TUPLE) {
+        REBLEN len = VAL_SEQUENCE_LEN(v);
+        REBLEN i;
+        for (i = 0; i < len; ++i) {
+            const RELVAL *item = VAL_SEQUENCE_AT(D_SPARE, v, i);
+            if (not IS_INTEGER(item) or VAL_INT64(item) != 0)
+                return Init_False(D_OUT);
+        }
+        return Init_True(D_OUT);
+    }
  
     DECLARE_LOCAL (zero);
     Init_Zeroed_Hack(zero, type);
