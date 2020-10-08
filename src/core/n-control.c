@@ -1313,7 +1313,8 @@ REBNATIVE(default)
             target,  // !!! May not be array-based
             VAL_SPECIFIER(target),
             NULL, // not requesting value to set means it's a get
-            EVAL_FLAG_PATH_HARD_QUOTE // pre-COMPOSE'd, so GROUP!s are literal
+            EVAL_MASK_DEFAULT
+                | EVAL_FLAG_PATH_HARD_QUOTE // pre-COMPOSE'd, GROUP!s literal
         )){
             panic (D_OUT); // shouldn't be possible... no executions!
         }
@@ -1340,7 +1341,8 @@ REBNATIVE(default)
             target,  // !!! may not be array-based
             VAL_SPECIFIER(target),
             D_OUT,
-            EVAL_FLAG_PATH_HARD_QUOTE  // precomposed, no double evaluating
+            EVAL_MASK_DEFAULT
+                | EVAL_FLAG_PATH_HARD_QUOTE  // precomposed, no double eval
         )){
             panic (dummy); // shouldn't be possible, no executions!
         }

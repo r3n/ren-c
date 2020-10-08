@@ -774,7 +774,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             v,  // !!! may not be array-based
             f_specifier,
             nullptr, // `setval`: null means don't treat as SET-PATH!
-            EVAL_FLAG_PUSH_PATH_REFINES
+            EVAL_MASK_DEFAULT | EVAL_FLAG_PUSH_PATH_REFINES
         )){
             if (where != f->out)
                 Move_Value(f->out, where);

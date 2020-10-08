@@ -87,7 +87,7 @@ inline static bool Get_Path_Throws_Core(
         any_path,  // !!! may not be array-based
         specifier,
         NULL, // not requesting value to set means it's a get
-        0 // Name contains Get_Path_Throws() so it shouldn't be neutral
+        EVAL_MASK_DEFAULT  // "Throws"() so it shouldn't be inert on groups
     );
 }
 
@@ -104,7 +104,7 @@ inline static void Get_Path_Core(
         any_path,  // !!! may not be array-based
         specifier,
         NULL, // not requesting value to set means it's a get
-        EVAL_FLAG_NO_PATH_GROUPS
+        EVAL_MASK_DEFAULT | EVAL_FLAG_NO_PATH_GROUPS
     )){
         panic (out); // shouldn't be possible... no executions!
     }
@@ -124,7 +124,7 @@ inline static bool Set_Path_Throws_Core(
         any_path,  // !!! may not be array-based
         specifier,
         setval,
-        0 // Name contains Set_Path_Throws() so it shouldn't be neutral
+        EVAL_MASK_DEFAULT  // "Throws"() so groups shouldn't be inert
     );
 }
 
@@ -141,7 +141,7 @@ inline static void Set_Path_Core(  // !!! Appears to be unused.  Unnecessary?
     //
     DECLARE_LOCAL (out);
 
-    REBFLGS flags = EVAL_FLAG_NO_PATH_GROUPS;
+    REBFLGS flags = EVAL_MASK_DEFAULT | EVAL_FLAG_NO_PATH_GROUPS;
 
     if (Eval_Path_Throws_Core(
         out,

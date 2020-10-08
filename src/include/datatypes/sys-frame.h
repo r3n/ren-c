@@ -319,15 +319,13 @@ inline static void Free_Frame_Internal(REBFRM *f) {
 
     assert(IS_POINTER_TRASH_DEBUG(f->alloc_value_list));
 
-    FREE(REBFRM, f);
+    Free_Node(FRM_POOL, f);
 }
 
 
 inline static void Push_Frame(REBVAL *out, REBFRM *f)
 {
     assert(f->feed->value != nullptr);
-    assert(SECOND_BYTE(f->flags) == 0); // END signal
-    assert(not (f->flags.bits & NODE_FLAG_CELL));
 
     // All calls through to Eval_Core() are assumed to happen at the same C
     // stack level for a pushed frame (though this is not currently enforced).
@@ -596,11 +594,16 @@ inline static void Prep_Frame_Core(
    if (f == nullptr)  // e.g. a failed allocation
        fail (Error_No_Memory(sizeof(REBFRM)));
 
+    assert(
+        (flags & EVAL_MASK_DEFAULT) ==
+            (EVAL_FLAG_0_IS_TRUE | EVAL_FLAG_7_IS_TRUE)
+    );
+    f->flags.bits = flags;
+
     f->feed = feed;
     Prep_Cell(&f->spare);
     Init_Unreadable_Void(&f->spare);
     f->dsp_orig = DS_Index;
-    f->flags = Endlike_Header(flags);
     TRASH_POINTER_IF_DEBUG(f->out);
 
   #ifdef DEBUG_ENSURE_FRAME_EVALUATES
@@ -613,7 +616,7 @@ inline static void Prep_Frame_Core(
 }
 
 #define DECLARE_FRAME(name,feed,flags) \
-    REBFRM * name = TRY_ALLOC(REBFRM); \
+    REBFRM * name = cast(REBFRM*, Alloc_Node(FRM_POOL)); \
     Prep_Frame_Core(name, feed, flags);
 
 #define DECLARE_FRAME_AT(name,any_array,flags) \

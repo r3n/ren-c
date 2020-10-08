@@ -172,8 +172,10 @@ inline static void *Alloc_Node(REBLEN pool_id) {
 // have NODE_FLAG_FREE...which will identify the node as not in use to anyone
 // who enumerates the nodes in the pool (such as the garbage collector).
 //
-inline static void Free_Node(REBLEN pool_id, REBNOD *node)
+inline static void Free_Node(REBLEN pool_id, void *p)
 {
+    REBNOD* node = cast(REBNOD*, p);
+
   #ifdef DEBUG_MONITOR_SERIES
     if (
         pool_id == SER_POOL

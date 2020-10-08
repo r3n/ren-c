@@ -226,6 +226,8 @@ const REBPOOLSPEC Mem_Pool_Spec[MAX_POOLS] =
     DEF_POOL(sizeof(REBVAL) * 2, 16), // Pairings, PAR_POOL
   #endif
 
+    DEF_POOL(sizeof(REBFRM), 128),  // Frames
+
     DEF_POOL(sizeof(REBI64), 1), // Just used for tracking main memory
 };
 

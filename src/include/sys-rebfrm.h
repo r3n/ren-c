@@ -46,11 +46,6 @@
 //
 
 
-// Default for Eval_Core_May_Throw() is just a single EVALUATE step.
-//
-#define EVAL_MASK_DEFAULT 0
-
-
 // See Endlike_Header() for why these are chosen the way they are.  This
 // means that the Reb_Frame->flags field can function as an implicit END for
 // Reb_Frame->cell, as well as be distinguished from a REBVAL*, a REBSER*, or
@@ -113,8 +108,13 @@ STATIC_ASSERT(EVAL_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(6)
 
 
-#define EVAL_FLAG_7_IS_FALSE FLAG_LEFT_BIT(7) // is NOT a cell
-STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
+// !!! Historically frames have identified as being "cells" even though they
+// are not, in order to use that flag as a distinction when in bindings
+// from the non-cell choices like contexts and paramlists.  This may not be
+// the best way to flag frames; alternatives are in consideration.
+//
+#define EVAL_FLAG_7_IS_TRUE FLAG_LEFT_BIT(7)
+STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
 
 
 //=//// BITS 8-15 ARE 0 FOR END SIGNAL ////////////////////////////////////=//
@@ -368,7 +368,18 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(31)
 
 
-STATIC_ASSERT(31 < 32); // otherwise EVAL_FLAG_XXX too high
+STATIC_ASSERT(31 < 32);  // otherwise EVAL_FLAG_XXX too high
+
+
+// All frames must include EVAL_MASK_DEFAULT in their flags.  This is not
+// done automatically for two reasons: one is to make the calls more clear
+// with `DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT)` vs just saying 0.  Also,
+// it would permit there to be negative-default flags if some efficiency
+// trick favored the flag being truthy for its "unused" state, where you'd
+// say `DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT & ~EVAL_FLAG_SOME_SETTING)`.
+//
+#define EVAL_MASK_DEFAULT \
+    (EVAL_FLAG_0_IS_TRUE | EVAL_FLAG_7_IS_TRUE)
 
 
 #define SET_EVAL_FLAG(f,name) \
@@ -545,6 +556,27 @@ struct Reb_Feed {
 //
 struct Reb_Frame {
     //
+    // These are EVAL_FLAG_XXX or'd together--see their documentation above.
+    // A Reb_Header is used so that it can implicitly terminate `cell`, if
+    // that comes in useful (e.g. there's an apparent END after cell)
+    //
+    // Note: In order to use the memory pools, this must be in first position,
+    // and it must not have the NODE_FLAG_FREE bit set when in use.
+    //
+    union Reb_Header flags;  // See Endlike_Header()
+
+    // This is the source from which new values will be fetched.  In addition
+    // to working with an array, it is also possible to feed the evaluator
+    // arbitrary REBVAL*s through a variable argument list on the C stack.
+    // This means no array needs to be dynamically allocated (though some
+    // conditions require the va_list to be converted to an array, see notes
+    // on Reify_Va_To_Array_In_Frame().)
+    //
+    // Since frames may share source information, this needs to be done with
+    // a dereference.
+    //
+    struct Reb_Feed *feed;
+
     // The frame's "spare" is used for different purposes.  PARSE uses it as a
     // scratch storage space.  Path evaluation uses it as where the calculated
     // "picker" goes (so if `foo/(1 + 2)`, the 3 would be stored there to be
@@ -558,12 +590,6 @@ struct Reb_Frame {
     // space for things other than evaluation.)
     //
     RELVAL spare;
-
-    // These are EVAL_FLAG_XXX or'd together--see their documentation above.
-    // A Reb_Header is used so that it can implicitly terminate `cell`, if
-    // that comes in useful (e.g. there's an apparent END after cell)
-    //
-    union Reb_Header flags; // See Endlike_Header()
 
     // The prior call frame.  This never needs to be checked against nullptr,
     // because the bottom of the stack is FS_BOTTOM which is allocated at
@@ -584,18 +610,6 @@ struct Reb_Frame {
     // a final result, due to being GC-safe during function evaluation.
     //
     REBVAL *out;
-
-    // This is the source from which new values will be fetched.  In addition
-    // to working with an array, it is also possible to feed the evaluator
-    // arbitrary REBVAL*s through a variable argument list on the C stack.
-    // This means no array needs to be dynamically allocated (though some
-    // conditions require the va_list to be converted to an array, see notes
-    // on Reify_Va_To_Array_In_Frame().)
-    //
-    // Since frames may share source information, this needs to be done with
-    // a dereference.
-    //
-    struct Reb_Feed *feed;
 
     // The error reporting machinery doesn't want where `index` is right now,
     // but where it was at the beginning of a single EVALUATE step.

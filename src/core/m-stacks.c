@@ -126,6 +126,7 @@ void Shutdown_Frame_Stack(void)
     assert(IS_POINTER_TRASH_DEBUG(TG_Bottom_Frame->prior));
     TG_Bottom_Frame->prior = nullptr;
 
+  blockscope {
     REBFRM *f = FS_TOP;
 
     // There's a Catch-22 on checking the balanced state for outstanding
@@ -136,9 +137,33 @@ void Shutdown_Frame_Stack(void)
     Drop_Frame_Core(f); // can't be Drop_Frame() or Drop_Frame_Unbalanced()
 
     assert(not FS_TOP);
+  }
 
     TG_Top_Frame = nullptr;
     TG_Bottom_Frame = nullptr;
+
+  #if !defined(NDEBUG)
+  blockscope {
+    REBSEG *seg = Mem_Pools[FRM_POOL].segs;
+    for (; seg != nullptr; seg = seg->next) {
+        REBLEN n = Mem_Pools[FRM_POOL].units;
+        REBYTE *bp = cast(REBYTE*, seg + 1);
+        for (; n > 0; --n, bp += sizeof(REBFRM)) {
+            REBFRM *f = cast(REBFRM*, bp);
+            if (IS_FREE_NODE(f))
+                continue;
+          #ifdef DEBUG_COUNT_TICKS
+            printf(
+                "** FRAME LEAKED at tick %lu\n",
+                cast(unsigned long, f->tick)
+            );
+          #else
+            assert(!"** FRAME LEAKED but DEBUG_COUNT_TICKS not enabled");
+          #endif
+        }
+    }
+  }
+  #endif
 }
 
 
