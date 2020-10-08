@@ -87,3 +87,22 @@
 
 (null = find "api-transient" "to")
 ("transient" = find "api-transient" "trans")
+
+
+; Strings can be searched for in binaries, #{00} bytes aren't legal in string
+; and should be skipped as match candidates (like illegal UTF-8, e.g. #{FF}).
+[
+    (#{616263} = to binary! "abc")
+
+    (#{61626300FF} = find #{FF0061626300FF} "ABC")
+    (null = find/case #{FF0061626300FF} "ABC")
+    (#{61626300FF} = find #{FF0061626300FF} "abc")
+    (#{61626300FF} = find/case #{FF0061626300FF} "abc")
+
+    (#{61626300FF} = find #{FF0061626300FF} #{616263})
+    (#{61626300FF} = find/case #{FF0061626300FF} #{616263})  ; /case ignored
+
+    (#{414243} = to binary! "ABC")
+    (null = find #{FF0061626300FF} #{414243})
+    (null = find/case #{FF0061626300FF} #{414243})  ; /case ignored
+]

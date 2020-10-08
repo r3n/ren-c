@@ -229,6 +229,10 @@ REBLEN Find_Str_In_Bin(
     while (bp1 < end1) {
         const REBYTE *next1;
         REBUNI c1;
+        if (*bp1 == '\0') {  // 0 bytes can't match strings (no zero bytes)
+            ++bp1;
+            continue;
+        }
         if (*bp1 < 0x80) {
             c1 = *bp1;
             next1 = bp1;
@@ -248,7 +252,9 @@ REBLEN Find_Str_In_Bin(
 
             REBLEN n;
             for (n = 1; n < len2; n++) {
-                if (*temp1 < 0x80)
+                if (*temp1 == '\0')  // 0 bytes can't match
+                    break;
+                else if (*temp1 < 0x80)
                     c1 = *temp1;
                 else {
                     temp1 = Back_Scan_UTF8_Char(&c1, temp1, NULL);

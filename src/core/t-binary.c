@@ -586,8 +586,6 @@ REBTYPE(Binary)
             | (REF(case) ? AM_FIND_CASE : 0)
         );
 
-        flags |= AM_FIND_CASE;
-
         if (REF(part))
             tail = Part_Tail_May_Modify_Index(v, ARG(part));
 
