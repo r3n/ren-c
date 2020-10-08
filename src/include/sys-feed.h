@@ -96,6 +96,19 @@
     FLAG_LEFT_BIT(4)
 
 
+// When processing something like enfix, the output cell of a frame is the
+// place to look for the "next" value.  This setting has to be managed
+// carefully in recursion, because the recursion must preserve the same
+// notion of what the "out" cell is for the frame.
+//
+// !!! It may be better to think of this as an EVAL_FLAG, but those per-frame
+// flags are running short.  Once this setting is on a feed, it has to be
+// consumed or there will be an error.
+//
+#define FEED_FLAG_NEXT_ARG_FROM_OUT \
+    FLAG_LEFT_BIT(5)
+
+
 //=//// BITS 8...15 ARE THE QUOTING LEVEL /////////////////////////////////=//
 
 // There was significant deliberation over what the following code should do:

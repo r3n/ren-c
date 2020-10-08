@@ -105,14 +105,11 @@
 // correspond to what they are...and may be better for cohering the "executor"
 // pattern by making it possible to use a constant executor per frame.
 //
-// !!! Note: The stackless branch included EVAL_FLAG_KEEP_STALE_BIT here, and
-// EVAL_FLAG_NEXT_ARG_FROM_OUT is actually a feed flag.
-
 #define DECLARE_ACTION_SUBFRAME(f,parent) \
     DECLARE_FRAME (f, (parent)->feed, \
         EVAL_MASK_DEFAULT | /*EVAL_FLAG_KEEP_STALE_BIT |*/ ((parent)->flags.bits \
             & (EVAL_FLAG_FULFILLING_ARG | EVAL_FLAG_RUNNING_ENFIX \
-                | EVAL_FLAG_DIDNT_LEFT_QUOTE_PATH | EVAL_FLAG_NEXT_ARG_FROM_OUT)))
+                | EVAL_FLAG_DIDNT_LEFT_QUOTE_PATH)))
 
 
 #ifdef DEBUG_EXPIRED_LOOKBACK
@@ -180,8 +177,8 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     REBFRM *f,
     const RELVAL *v
 ){
-    if (GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT))  {  // e.g. `10 -> x:`
-        CLEAR_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);
+    if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT))  {  // e.g. `10 -> x:`
+        CLEAR_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // this helper counts as eval
         return false;
     }
@@ -251,7 +248,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     REBFLGS initial_flags = f->flags.bits & ~(
         EVAL_FLAG_POST_SWITCH
         | EVAL_FLAG_REEVALUATE_CELL
-        | EVAL_FLAG_NEXT_ARG_FROM_OUT
         | EVAL_FLAG_FULFILL_ONLY  // can be requested or <blank> can trigger
         | EVAL_FLAG_RUNNING_ENFIX  // can be requested with REEVALUATE_CELL
         | EVAL_FLAG_TOOK_HOLD  // can be set by va_list reification
@@ -336,7 +332,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto return_thrown;
     }
 
-    assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));
+    assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
     SET_CELL_FLAG(f->out, OUT_MARKED_STALE);  // internal use flag only
 
     UPDATE_EXPRESSION_START(f);  // !!! See FRM_INDEX() for caveats
@@ -457,7 +453,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         gotten = nullptr;
 
         SET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);  // for better error message
-        SET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);  // literal right op is arg
+        SET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);  // literal right op is arg
 
         goto give_up_backward_quote_priority;  // run PATH!/WORD! normal
     }
@@ -542,7 +538,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // a new frame, but has to run the `=` as "getting its next arg from
         // the output slot, but not being run in an enfix mode".
         //
-        if (NOT_EVAL_FLAG(subframe, NEXT_ARG_FROM_OUT))
+        if (NOT_FEED_FLAG(subframe->feed, NEXT_ARG_FROM_OUT))
             Expire_Out_Cell_Unless_Invisible(subframe);
 
         goto process_action; }
@@ -567,8 +563,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         bool threw = Process_Action_Maybe_Stale_Throws(FS_TOP);
 
-        assert(NOT_EVAL_FLAG(FS_TOP, NEXT_ARG_FROM_OUT));  // must consume
-        CLEAR_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);  // !!! should be feed flag?
+        assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));  // must consume
 
         if (threw) {
             Abort_Frame(FS_TOP);
@@ -823,7 +818,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             }
         }
 
-        REBVAL *where = GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT) ? f_spare : f->out;
+        REBVAL *where = GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)
+            ? f_spare
+            : f->out;
 
         if (Eval_Path_Throws_Core(
             where,
@@ -995,6 +992,11 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         if (IS_ACTION(f_spare)) {
             //
+            // Indicate that next argument should be taken from f->out
+            //
+            assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
+            SET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
+
             // Apply the function, and we can reuse this frame to do it.
             //
             // !!! But really it should not be allowed to take more than one
@@ -1008,10 +1010,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             Push_Frame(f->out, subframe);
             Push_Action(subframe, VAL_ACTION(f_spare), VAL_BINDING(f_spare));
             Begin_Prefix_Action(subframe, nullptr);  // no label
-
-            // !!! Should this be a feed flag?
-            assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));
-            SET_EVAL_FLAG(subframe, NEXT_ARG_FROM_OUT);
 
             goto process_action;
         }
@@ -1060,7 +1058,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // faster native code that would require rewiring the evaluator somewhat.
 
       case REB_SET_BLOCK: {
-        assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));
+        assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
 
         if (VAL_LEN_AT(v) == 0)
             fail ("SET-BLOCK! must not be empty for now.");
@@ -1327,7 +1325,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // opportunity to quote left because it has no argument...and instead
     // retriggers and lets x run.
 
-    if (GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT)) {
+    if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
         if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))
             fail (Error_Literal_Left_Path_Raw());
 
@@ -1547,10 +1545,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     //     left-lit: enfix :lit
     //     o: make object! [f: does [1]]
-    //     o/f left-lit  ; want error suggesting -> here, need flag for that
+    //     o/f left-lit  ; want error suggesting >- here, need flag for that
     //
     CLEAR_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);
-    assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));  // must be consumed
+    assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));  // must be consumed
 
   #if !defined(NDEBUG)
     Eval_Core_Exit_Checks_Debug(f);  // called unless a fail() longjmps

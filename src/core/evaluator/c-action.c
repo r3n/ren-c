@@ -550,8 +550,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// HANDLE IF NEXT ARG IS IN OUT SLOT (e.g. ENFIX, CHAIN) ///////////=//
 
-        if (GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT)) {
-            CLEAR_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);
+        if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
+            CLEAR_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
 
             if (GET_CELL_FLAG(f->out, OUT_MARKED_STALE)) {
                 //
@@ -1071,7 +1071,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// ACTION! ARGUMENTS NOW GATHERED, DISPATCH PHASE //////////////////=//
 
-    if (GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT)) {
+    if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
         if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))
             fail (Error_Literal_Left_Path_Raw());
     }
@@ -1084,9 +1084,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // can be useful as a convenience way of saying "takes the left hand
     // argument but ignores it" (e.g. with skippable args).  Allow it.
     //
-    if (GET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT)) {
+    if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
         assert(GET_EVAL_FLAG(f, RUNNING_ENFIX));
-        CLEAR_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);
+        CLEAR_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
     }
 
     assert(IS_END(f->param));
@@ -1330,8 +1330,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // happen, trying it out of curiosity for now.
         //
         Begin_Prefix_Action(f, VAL_ACTION_LABEL(DS_TOP));
-        assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));
-        SET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);
+        assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
+        SET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
 
         DS_DROP();
 
@@ -1362,7 +1362,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     //     o/f left-lit  ; want error suggesting -> here, need flag for that
     //
     CLEAR_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);
-    assert(NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT));  // must be consumed
+    assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));  // must be consumed
 
     return false;  // false => not thrown
 
