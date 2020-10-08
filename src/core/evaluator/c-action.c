@@ -333,26 +333,13 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
         skip_this_arg_for_now:  // the GC marks args up through f->arg...
 
+        Prep_Cell(f->arg);
         Init_Unreadable_Void(f->arg);  // ...so cell must have valid bits
         continue;
 
   //=//// ACTUAL LOOP BODY //////////////////////////////////////////////=//
 
       loop_body:
-
-        // !!! If not an APPLY or a typecheck of existing values, the data
-        // array which backs the frame may not have any initialization of
-        // its bits.  The goal is to make it so that the GC uses the
-        // f->param position to know how far the frame fulfillment is
-        // gotten, and only mark those values.  This just blindly formats
-        // them with NODE_FLAG_STACK to make the arg initialization work.
-        //
-        if (
-            NOT_EVAL_FLAG(f, DOING_PICKUPS)
-            and not SPECIAL_IS_ARG_SO_TYPECHECKING
-        ){
-            Prep_Cell(f->arg);  // improve...
-        }
 
   //=//// A /REFINEMENT ARG /////////////////////////////////////////////=//
 
@@ -390,6 +377,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // A specialization....
 
             if (GET_CELL_FLAG(f->special, ARG_MARKED_CHECKED)) {
+                Prep_Cell(f->arg);
                 Move_Value(f->arg, f->special);
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
                 goto continue_arg_loop;  // !!! Double-check?
@@ -447,6 +435,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
           unused_refinement:  // Note: might get pushed by a later slot
 
+            Prep_Cell(f->arg);
             Init_Nulled(f->arg);
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             goto continue_arg_loop;
@@ -457,6 +446,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 /* type checking */
             }
             else {
+                Prep_Cell(f->arg);
                 Refinify(Init_Word(f->arg, VAL_PARAM_SPELLING(f->param)));
             }
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
@@ -484,6 +474,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (SPECIAL_IS_ARBITRARY_SO_SPECIALIZED)
                 assert(IS_NULLED(f->special) or IS_VOID(f->special));
 
+            Prep_Cell(f->arg);  // Note: may be typechecking
             Init_Void(f->arg);
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             goto continue_arg_loop;
@@ -509,6 +500,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     or IS_VARARGS(f->special)
                 );
 
+                Prep_Cell(f->arg);
                 Move_Value(f->arg, f->special); // won't copy the bit
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             }
@@ -551,6 +543,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 Finalize_Arg(f);
             goto continue_arg_loop; // looping to verify args/refines
         }
+
+  //=//// NOT JUST TYPECHECKING, SO PREPARE ARGUMENT CELL ///////////////=//
+
+        Prep_Cell(f->arg);
 
   //=//// HANDLE IF NEXT ARG IS IN OUT SLOT (e.g. ENFIX, CHAIN) /////////=//
 
