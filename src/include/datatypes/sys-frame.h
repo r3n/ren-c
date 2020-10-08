@@ -176,6 +176,18 @@ inline static const REBSTR *FRM_LABEL(REBFRM *f) {
     ((f)->dsp_orig + 0) // prevent assignment via this macro
 
 
+#if !defined(__cplusplus)
+    #define STATE_BYTE(f) \
+        mutable_SECOND_BYTE((f)->flags)
+#else
+    inline static REBYTE& STATE_BYTE(REBFRM *f)  // type checks f...
+      { return mutable_SECOND_BYTE(f->flags); }  // ...but mutable
+#endif
+
+#define FLAG_STATE_BYTE(state) \
+    FLAG_SECOND_BYTE(state)
+
+
 // ARGS is the parameters and refinements
 // 1-based indexing into the arglist (0 slot is for FRAME! value)
 

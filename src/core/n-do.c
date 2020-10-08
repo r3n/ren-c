@@ -50,7 +50,7 @@ REBNATIVE(reeval)
 {
     INCLUDE_PARAMS_OF_REEVAL;
 
-    // REEVAL only *acts* variadic, but uses EVAL_FLAG_REEVALUATE_CELL
+    // REEVAL only *acts* variadic, but uses ST_EVALUATOR_REEVALUATING
     //
     UNUSED(ARG(expressions));
 

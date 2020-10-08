@@ -929,13 +929,13 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 GET_ACTION_FLAG(VAL_ACTION(f->feed->gotten), QUOTES_FIRST)
             ){
                 // We need to defer and let the right hand quote that is
-                // quoting leftward win.  We use the EVAL_FLAG_POST_SWITCH
-                // flag to jump into a subframe where subframe->out is
-                // the f->arg, and it knows to get the arg from there.
+                // quoting leftward win.  We use ST_EVALUATOR_LOOKING_AHEAD
+                // to jump into a subframe where subframe->out is the f->arg,
+                // and it knows to get the arg from there.
 
                 REBFLGS flags = EVAL_MASK_DEFAULT
                     | EVAL_FLAG_FULFILLING_ARG
-                    | EVAL_FLAG_POST_SWITCH
+                    | FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
                     | EVAL_FLAG_INERT_OPTIMIZATION;
 
                 if (IS_VOID(f_next))  // Eval_Step() has callers test this

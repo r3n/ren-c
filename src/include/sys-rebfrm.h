@@ -73,27 +73,15 @@ STATIC_ASSERT(EVAL_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(3)
 
 
-//=//// EVAL_FLAG_REEVALUATE_CELL /////////////////////////////////////////=//
+//=//// EVAL_FLAG_4 ///////////////////////////////////////////////////////=//
 //
-// Function dispatchers have a special return value used by EVAL, which tells
-// it to use the frame's cell as the head of the next evaluation (before
-// what f->value would have ordinarily run.)
-//
-// This allows EVAL/ONLY to be implemented by entering a new subframe with
-// new flags, and may have other purposes as well.
-//
-#define EVAL_FLAG_REEVALUATE_CELL \
+#define EVAL_FLAG_4 \
     FLAG_LEFT_BIT(4)
 
 
-//=//// EVAL_FLAG_POST_SWITCH /////////////////////////////////////////////=//
+//=//// EVAL_FLAG_5 ///////////////////////////////////////////////////////=//
 //
-// This jump allows a deferred lookback to compensate for the lack of the
-// evaluator's ability to (easily) be psychic about when it is gathering the
-// last argument of a function.  It allows re-entery to argument gathering at
-// the point after the switch() statement, with a preloaded f->out.
-//
-#define EVAL_FLAG_POST_SWITCH \
+#define EVAL_FLAG_5 \
     FLAG_LEFT_BIT(5)
 
 
@@ -117,12 +105,20 @@ STATIC_ASSERT(EVAL_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
 STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
 
 
-//=//// BITS 8-15 ARE 0 FOR END SIGNAL ////////////////////////////////////=//
+//=//// FLAGS 8-15 ARE USED FOR THE STATE_BYTE() //////////////////////////=//
+//
+// One byte's worth is used to encode a "frame state" that can be used by
+// natives or dispatchers, e.g. to encode which step they are on.
+//
 
-// The flags are resident in the frame after the frame's cell.  In order to
-// let the cell act like a terminated array (if one needs that), the flags
-// have the byte for the IS_END() signal set to 0.  This sacrifices some
-// flags, and may or may not be worth it for the feature.
+#undef EVAL_FLAG_8
+#undef EVAL_FLAG_9
+#undef EVAL_FLAG_10
+#undef EVAL_FLAG_11
+#undef EVAL_FLAG_12
+#undef EVAL_FLAG_13
+#undef EVAL_FLAG_14
+#undef EVAL_FLAG_15
 
 
 //=//// EVAL_FLAG_RUNNING_ENFIX ///////////////////////////////////////////=//
@@ -135,7 +131,7 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
 // as normal.  There's no good place to hold the memory that one is doing an
 // enfix fulfillment besides a bit on the frame itself.
 //
-// It is also used to indicate to a EVAL_FLAG_REEVALUATE_CELL frame whether
+// It is also used to indicate to a ST_EVALUATOR_REEVALUATING frame whether
 // to run an ACTION! cell as enfix or not.  The reason this may be overridden
 // on what's in the action can be seen in the REBNATIVE(shove) code.
 //
@@ -210,9 +206,9 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
 
 //=//// EVAL_FLAG_INERT_OPTIMIZATION //////////////////////////////////////=//
 //
-// If EVAL_FLAG_POST_SWITCH is being used due to an inert optimization, this
-// flag is set, so that the quoting machinery can realize the lookback quote
-// is not actually too late.
+// If ST_EVALUATOR_LOOKING_AHEAD is being used due to an inert optimization,
+// this flag is set, so that the quoting machinery can realize the lookback
+// quote is not actually too late.
 //
 #define EVAL_FLAG_INERT_OPTIMIZATION \
     FLAG_LEFT_BIT(22)

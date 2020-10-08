@@ -96,6 +96,18 @@
 #endif
 
 
+// The evaluator publishes its internal states in this header file, so that
+// a frame can be made with e.g. `FLAG_STATE_BYTE(ST_EVALUATOR_REEVALUATING)`
+// to start in various points of the evaluation process.  When doing so, be
+// sure the expected frame variables for that state are initialized.
+//
+enum {
+    ST_EVALUATOR_INITIAL_ENTRY = 0,
+    ST_EVALUATOR_LOOKING_AHEAD,
+    ST_EVALUATOR_REEVALUATING
+};
+
+
 // Simple helper for Eval_Maybe_Stale_Throws() that clears OUT_MARKED_STALE
 // (an alias for NODE_FLAG_MARKED that is used for generic purposes and may be
 // misinterpreted if it leaked.)
@@ -114,14 +126,14 @@ inline static bool Eval_Throws(REBFRM *f) {
 // Even though ANY_INERT() is a quick test, you can't skip the cost of frame
 // processing--due to enfix.  But a feed only looks ahead one unit at a time,
 // so advancing the frame past an inert item to find an enfix function means
-// you have to enter the frame specially with EVAL_FLAG_POST_SWITCH.
+// you have to enter the frame specially with ST_EVALUATOR_LOOKING_AHEAD.
 //
 inline static bool Did_Init_Inert_Optimize_Complete(
     REBVAL *out,
     struct Reb_Feed *feed,
     REBFLGS *flags
 ){
-    assert(not (*flags & EVAL_FLAG_POST_SWITCH));  // we might set it
+    assert(SECOND_BYTE(*flags) == 0);  // we might set the STATE_BYTE
     assert(not IS_END(feed->value));  // would be wasting time to call
 
     if (not ANY_INERT(feed->value)) {
@@ -148,7 +160,9 @@ inline static bool Did_Init_Inert_Optimize_Complete(
             // Quoting defeats NO_LOOKAHEAD but only on soft quotes.
             //
             if (NOT_FEED_FLAG(feed, NO_LOOKAHEAD)) {
-                *flags |= EVAL_FLAG_POST_SWITCH | EVAL_FLAG_INERT_OPTIMIZATION;
+                *flags |=
+                    FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
+                    | EVAL_FLAG_INERT_OPTIMIZATION;
                 return false;
             }
 
@@ -158,7 +172,9 @@ inline static bool Did_Init_Inert_Optimize_Complete(
             if (VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE)
                 return true;  // don't look back, yield the lookahead
 
-            *flags |= EVAL_FLAG_POST_SWITCH | EVAL_FLAG_INERT_OPTIMIZATION;
+            *flags |=
+                FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
+                | EVAL_FLAG_INERT_OPTIMIZATION;
             return false;
         }
 
@@ -167,9 +183,9 @@ inline static bool Did_Init_Inert_Optimize_Complete(
             return true;   // we're done!
         }
 
-        // EVAL_FLAG_POST_SWITCH assumes that if the first arg were quoted and
-        // skippable, that the skip check has already been done.  So we have
-        // to do that check here.
+        // ST_EVALUATOR_LOOKING_AHEAD assumes that if the first arg were
+        // quoted and skippable, that the skip check has already been done.
+        // So we have to do that check here.
         //
         if (GET_ACTION_FLAG(action, SKIPPABLE_FIRST)) {
             REBVAL *first = First_Unspecialized_Param(action);
@@ -177,7 +193,9 @@ inline static bool Did_Init_Inert_Optimize_Complete(
                 return true;  // didn't actually want this parameter type
         }
 
-        *flags |= EVAL_FLAG_POST_SWITCH | EVAL_FLAG_INERT_OPTIMIZATION;
+        *flags |=
+            FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
+            | EVAL_FLAG_INERT_OPTIMIZATION;
         return false;  // do normal enfix handling
     }
 
@@ -191,7 +209,9 @@ inline static bool Did_Init_Inert_Optimize_Complete(
 
     if (HEART_BYTE(feed->value) == REB_WORD) {
         if (VAL_WORD_SPELLING(feed->value) == PG_Slash_1_Canon) {
-            *flags |= EVAL_FLAG_POST_SWITCH | EVAL_FLAG_INERT_OPTIMIZATION;
+            *flags |=
+                FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
+                | EVAL_FLAG_INERT_OPTIMIZATION;
             return false;  // Let evaluator handle `/`
         }
         return true;  // refinement!s are inert, we're done
@@ -259,10 +279,12 @@ inline static bool Reevaluate_In_Subframe_Maybe_Stale_Throws(
     REBFLGS flags,
     bool enfix
 ){
+    assert(SECOND_BYTE(flags) == 0);
+    flags |= FLAG_STATE_BYTE(ST_EVALUATOR_REEVALUATING);
     if (enfix)
         flags |= EVAL_FLAG_RUNNING_ENFIX;
 
-    DECLARE_FRAME (subframe, f->feed, flags | EVAL_FLAG_REEVALUATE_CELL);
+    DECLARE_FRAME (subframe, f->feed, flags);
     subframe->u.reval.value = reval;
 
     Push_Frame(out, subframe);

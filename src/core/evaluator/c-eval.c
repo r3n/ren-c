@@ -246,9 +246,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
   #if !defined(NDEBUG)
     REBFLGS initial_flags = f->flags.bits & ~(
-        EVAL_FLAG_POST_SWITCH
-        | EVAL_FLAG_REEVALUATE_CELL
-        | EVAL_FLAG_FULFILL_ONLY  // can be requested or <blank> can trigger
+        EVAL_FLAG_FULFILL_ONLY  // can be requested or <blank> can trigger
         | EVAL_FLAG_RUNNING_ENFIX  // can be requested with REEVALUATE_CELL
         | EVAL_FLAG_TOOK_HOLD  // can be set by va_list reification
     );  // should be unchanged on exit
@@ -269,21 +267,15 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // have to be a test for points to `goto` before running normal eval.
     // This cost is paid on every entry to Eval_Core().
     //
-    // Trying alternatives (such as a synthetic REB_XXX type to signal it,
-    // to fold along in a switch) seem to only make it slower.  Using flags
-    // and testing them together as a group seems the fastest option.
-    //
-    if (f->flags.bits & (
-        EVAL_FLAG_POST_SWITCH
-        | EVAL_FLAG_REEVALUATE_CELL
-    )){
-        if (GET_EVAL_FLAG(f, POST_SWITCH)) {
-            CLEAR_EVAL_FLAG(f, POST_SWITCH);  // !!! necessary?
-            goto post_switch;
-        }
+    switch (STATE_BYTE(f)) {
+      case ST_EVALUATOR_INITIAL_ENTRY:
+        break;
 
-        CLEAR_EVAL_FLAG(f, REEVALUATE_CELL);
+      case ST_EVALUATOR_LOOKING_AHEAD:
+        goto lookahead;
 
+      case ST_EVALUATOR_REEVALUATING: {
+        //
         // The re-evaluate functionality may not want to heed the enfix state
         // in the action itself.  See REBNATIVE(shove)'s /ENFIX for instance.
         // So we go by the state of EVAL_FLAG_RUNNING_ENFIX on entry.
@@ -308,7 +300,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         v = f->u.reval.value;
         gotten = nullptr;
-        goto evaluate;
+        goto evaluate; }
+
+      default:
+        assert(false);
     }
 
   #if !defined(NDEBUG)
@@ -1316,7 +1311,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     // So this post-switch step is where all of it happens, and it's tricky!
 
-  post_switch:
+  lookahead:
 
     // If something was run with the expectation it should take the next arg
     // from the output cell, and an evaluation cycle ran that wasn't an
@@ -1501,8 +1496,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         SET_FEED_FLAG(f->feed, DEFERRING_ENFIX);
 
-        // Leave the enfix operator pending in the frame, and it's up to the
-        // parent frame to decide whether to use EVAL_FLAG_POST_SWITCH to jump
+        // Leave enfix operator pending in the frame.  It's up to the parent
+        // frame to decide whether to ST_EVALUATOR_LOOKING_AHEAD to jump
         // back in and finish fulfilling this arg or not.  If it does resume
         // and we get to this check again, f->prior->deferred can't be null,
         // otherwise it would be an infinite loop.
