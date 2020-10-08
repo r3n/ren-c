@@ -635,12 +635,11 @@ REBNATIVE(match)
         f->special = f->arg;
 
         f->flags.bits = EVAL_MASK_DEFAULT
-            | EVAL_FLAG_FULLY_SPECIALIZED
-            | EVAL_FLAG_PROCESS_ACTION;
+            | EVAL_FLAG_FULLY_SPECIALIZED;
 
         Begin_Prefix_Action(f, VAL_ACTION_LABEL(test));
 
-        bool threw = Eval_Throws(f);
+        bool threw = Process_Action_Throws(f);
 
         Drop_Frame(f);
 

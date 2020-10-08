@@ -431,8 +431,7 @@ REBNATIVE(do)
         // the context's memory in the cases where a copy isn't needed.
 
         REBFLGS flags = EVAL_MASK_DEFAULT
-            | EVAL_FLAG_FULLY_SPECIALIZED
-            | EVAL_FLAG_PROCESS_ACTION;
+            | EVAL_FLAG_FULLY_SPECIALIZED;
 
         DECLARE_END_FRAME (f, flags);
 
@@ -463,7 +462,7 @@ REBNATIVE(do)
         //
         Begin_Prefix_Action(f, VAL_FRAME_LABEL(source));
 
-        bool threw = Eval_Throws(f);
+        bool threw = Process_Action_Throws(f);
         assert(threw or IS_END(f->feed->value));  // we started at END_FLAG
 
         Drop_Frame(f);
@@ -752,7 +751,7 @@ REBNATIVE(applique)
     // EVAL_FLAG_PROCESS_ACTION causes the evaluator to jump straight to the
     // point in the switch() where a function is invoked.
     //
-    DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT | EVAL_FLAG_PROCESS_ACTION);
+    DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT);
 
     // Argument can be a literal action (APPLY :APPEND) or a WORD!/PATH!.
     // If it is a path, we push the refinements to the stack so they can
@@ -858,7 +857,7 @@ REBNATIVE(applique)
 
     Begin_Prefix_Action(f, VAL_ACTION_LABEL(applicand));
 
-    bool action_threw = Eval_Throws(f);
+    bool action_threw = Process_Action_Throws(f);
     assert(action_threw or IS_END(f->feed->value));  // we started at END_FLAG
 
     Drop_Frame(f);

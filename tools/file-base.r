@@ -43,22 +43,30 @@ core: [
     c-do.c
     c-context.c
     c-error.c
-    [
-        c-eval.c
 
-        ; There are several good reasons to optimize the evaluator itself even
-        ; if one is doing a "size-biased" build.  It's not just about wanting
-        ; the critical code to be faster--but also, since it recurses, if
-        ; stack frames aren't flattened out then they add up...and may blow
-        ; internal limits (like in a web browser for JS/WASM calls)
-        ;
-        #prefer-O2-optimization
+    ; EVALUATOR
+    ;
+    ; Uses `#prefer-O2-optimization`.  There are several good reasons to
+    ; optimize the evaluator itself even if one is doing a "size-biased"
+    ; build.  It's not just about wanting the critical code to be faster--but
+    ; also, since it recurses, if stack frames aren't flattened out then they
+    ; add up...and may blow internal limits (like in a web browser for
+    ; JS/WASM calls)
+    ;
+    ; !!! Note: this will not apply when the stackless branch is merged, which
+    ; does not recurse the evaluator and hence avoids the problem entirely.
+    [
+        evaluator/c-eval.c  #prefer-O2-optimization
+
+    ][
+        evaluator/c-action.c  #prefer-O2-optimization
 
         ; !!! See notes on Finalize_Arg() call in %c-eval.c; investigations
         ; make the need to disable this seem like a possible optimizer bug.
         ;
         <gnu:-Wno-array-bounds>
     ]
+
     c-function.c
     c-path.c
     c-port.c

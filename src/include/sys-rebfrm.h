@@ -167,12 +167,9 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(17)
 
 
-//=//// EVAL_FLAG_PROCESS_ACTION //////////////////////////////////////////=//
+//=//// EVAL_FLAG_18 //////////////////////////////////////////////////////=//
 //
-// Used to indicate that the Eval_Core code is being jumped into directly to
-// process an ACTION!, in a varlist that has already been set up.
-//
-#define EVAL_FLAG_PROCESS_ACTION \
+#define EVAL_FLAG_18 \
     FLAG_LEFT_BIT(18)
 
 

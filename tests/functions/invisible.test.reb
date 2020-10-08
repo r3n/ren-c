@@ -66,7 +66,7 @@
 )
 (
     pos: evaluate evaluate [1 elide "a" elide "b" + 2 * 3 fail "too far"]
-    pos = quote [elide "b" + 2 * 3 fail "too far"]
+    pos = lit '[elide "b" + 2 * 3 fail "too far"]
 )
 (
     pos: evaluate [
