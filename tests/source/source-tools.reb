@@ -227,7 +227,10 @@ rebsource: context [
                         ; `REBNATIVE(some_name_q)` to be correctly lined up
                         ; as the "to-c-name" of the Rebol set-word
                         ;
-                        if proto-parser/proto-arg-1 <> to-c-name name [
+                        if (
+                            proto-parser/proto-arg-1
+                            <> to-c-name/scope name #prefixed
+                        )[
                             line: try text-line-of proto-parser/parse-position
                             emit <id-mismatch> [
                                 (mold proto-parser/data/1) (file) (line)

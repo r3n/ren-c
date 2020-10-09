@@ -117,7 +117,14 @@ cscape: function [
             sub: try do code
 
             sub: switch mode [  ; still want to make sure mode is good
-                #cname [try to-c-name sub]
+                #cname [
+                    ; !!! The #prefixed scope is unchecked for valid global or
+                    ; local identifiers.  This is okay for cases that actually
+                    ; are prefixed, like `cscape {SYM_${...}}`.  But if there
+                    ; is no prefix, then the check might be helpful.  Review.
+                    ;
+                    try to-c-name/scope sub #prefixed
+                ]
                 #unspaced [
                     case [
                         blank? sub [blank]

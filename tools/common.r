@@ -39,7 +39,7 @@ to-c-name: function [
     return: [<opt> text!]
     value "Will be converted to text (via UNSPACED if BLOCK!)"
         [<blank> text! block! word!]
-    /scope "#global or #local, see http://stackoverflow.com/questions/228783/"
+    /scope "[#global #local #prefixed] see http://stackoverflow.com/q/228783/"
         [issue!]
 ][
     all [
@@ -149,15 +149,20 @@ to-c-name: function [
     scope: default [#global]
 
     case [
-        string/1 != "_" [<ok>]
+        scope = #prefixed [<ok>]  ; assume legitimate prefix
 
-        scope = 'global [
-            fail "global C ids starting with _ are reserved"
+        string/1 != #"_" [<ok>]
+
+        scope = #global [
+            fail ["global C ids starting with _ are reserved:" string]
         ]
 
-        scope = 'local [
+        scope = #local [
             find charset [#"A" - #"Z"] string/2 then [
-                fail "local C ids starting with _ and uppercase are reserved"
+                fail [
+                    "local C ids starting with _ and uppercase are reserved:"
+                        string
+                ]
             ]
         ]
 
