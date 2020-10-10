@@ -455,26 +455,17 @@ bool Is_Value_Frozen_Deep(const RELVAL *v) {
     REBCEL(const*) cell = VAL_UNESCAPED(v);
     UNUSED(v); // debug build trashes, to avoid accidental usage below
 
-    enum Reb_Kind kind = CELL_KIND(cell);
-    if (
-        kind == REB_BLANK
-        or ANY_SCALAR_KIND(kind)
-        or ANY_WORD_KIND(kind)
-        or kind == REB_ACTION // paramlist is identity, hash
-    ){
-        return true;
-    }
+    if (NOT_CELL_FLAG(cell, FIRST_IS_NODE))
+        return true;  // payloads that live in cell are immutable
 
-    if (ANY_ARRAY_OR_PATH_KIND(kind))
-        return Is_Array_Frozen_Deep(VAL_ARRAY(cell));
+    REBNOD *node = VAL_NODE(cell);
+    if (node->header.bits & NODE_BYTEMASK_0x01_CELL)
+        return true;  // !!! Will all non-quoted Pairings be frozen?
 
-    if (ANY_CONTEXT_KIND(kind))
-        return Is_Context_Frozen_Deep(VAL_CONTEXT(cell));
-
-    if (ANY_SERIES_KIND(kind))
-        return Is_Series_Frozen(VAL_SERIES(cell));
-
-    return false;
+    // Frozen deep should be set even on non-arrays, e.g. all frozen shallow
+    // strings should also have SERIES_INFO_FROZEN_DEEP.
+    //
+    return GET_SERIES_INFO(SER(node), FROZEN_DEEP);
 }
 
 
