@@ -360,6 +360,33 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
 
 
 //
+//  Intern_Any_String_Managed: C
+//
+// The main use of interning ANY-STRING! is FILE! for ARRAY_FLAG_FILE_LINE.
+// It's important to make a copy, because you would not want the change of
+// `file` to affect the filename references in already loaded sources:
+//
+//     file: copy %test
+//     x: transcode/file data1 file
+//     append file "-2"  ; shouldn't change FILE OF X answer
+//     y: transcode/file data2 file
+//
+// So mutable series shouldn't be used directly.  Reusing the string interning
+// mechanics also cuts down on storage of redundant data (though it needs to
+// allow spaces).
+//
+// !!! With UTF-8 Everywhere, could locked strings be used here?  Should all
+// locked strings become interned, and forward pointers to the old series in
+// the background to the interned version?
+//
+const REBSTR *Intern_Any_String_Managed(const RELVAL *v) {
+    REBSIZ utf8_size;
+    const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
+    return Intern_UTF8_Managed(utf8, utf8_size);
+}
+
+
+//
 //  GC_Kill_Interning: C
 //
 // Unlink this spelling out of the circularly linked list of synonyms.

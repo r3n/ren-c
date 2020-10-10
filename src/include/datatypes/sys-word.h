@@ -442,68 +442,8 @@ inline static bool Is_Blackhole(const RELVAL *v) {
 }
 
 
-// To make interfaces easier for some functions that take REBSTR* strings,
-// it can be useful to allow passing UTF-8 text, a REBVAL* with an ANY-WORD!
-// or ANY-STRING!, or just plain UTF-8 text.
+// Helper calls strsize() so you can more easily use literals at callsite.
+// (Better to call Intern_UTF8_Managed() with the size if you know it.)
 //
-// !!! Should NULLED_CELL or other arguments make anonymous symbols?
-//
-#ifdef CPLUSPLUS_11
-template<typename T>
-inline static const REBSTR* Intern(const T *p)
-{
-    static_assert(
-        std::is_same<T, REBVAL>::value
-        or std::is_same<T, char>::value
-        or std::is_same<T, REBSTR>::value,
-        "STR works on: char*, REBVAL*, REBSTR*"
-    );
-#else
-inline static const REBSTR* Intern(const void *p)
-{
-#endif
-    switch (Detect_Rebol_Pointer(p)) {
-      case DETECTED_AS_UTF8: {
-        const char *utf8 = cast(const char*, p);
-        return Intern_UTF8_Managed(cb_cast(utf8), strsize(utf8)); }
-
-      case DETECTED_AS_SERIES: {
-        REBSER *s = m_cast(REBSER*, cast(const REBSER*, p));
-        assert(GET_SERIES_FLAG(s, IS_STRING));
-        return STR(s); }
-
-      case DETECTED_AS_CELL: {
-        const REBVAL *v = cast(const REBVAL*, p);
-        if (ANY_WORD(v))
-            return VAL_WORD_SPELLING(v);
-
-        assert(ANY_STRING(v));
-
-        // You would not want the change of `file` to affect the filename
-        // references in x's loaded source.
-        //
-        //     file: copy %test
-        //     x: transcode/file data1 file
-        //     append file "-2"
-        //     y: transcode/file data2 file
-        //
-        // So mutable series shouldn't be used directly.  Reuse the string
-        // interning mechanics to cut down on storage.
-        //
-        // !!! With UTF-8 Everywhere, could locked strings be used here?
-        // Should all locked strings become interned, and forward pointers
-        // to the old series in the background to the interned version?
-        //
-        // !!! We know the length in codepoints, should we pass it to the
-        // Intern_UTF8 function to store?  Does it usually have to scan to
-        // calculate this, or can it be done on demand?
-        //
-        REBSIZ utf8_size;
-        const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
-        return Intern_UTF8_Managed(utf8, utf8_size); }
-
-      default:
-        panic ("Bad pointer type passed to Intern()");
-    }
-}
-
+inline static const REBSTR *Intern_Unsized_Managed(const char *utf8)
+  { return Intern_UTF8_Managed(cb_cast(utf8), strsize(utf8)); }

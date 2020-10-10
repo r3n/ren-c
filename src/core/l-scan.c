@@ -2904,7 +2904,7 @@ REBNATIVE(transcode)
     // !!! Should the base name and extension be stored, or whole path?
     //
     const REBSTR *file = REF(file)
-        ? Intern(ARG(file))
+        ? Intern_Any_String_Managed(ARG(file))
         : Canon(SYM___ANONYMOUS__);
 
     const REBVAL *line_number;

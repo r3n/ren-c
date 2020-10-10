@@ -257,7 +257,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         Init_Va_Scan_Level_Core(
             &level,
             &ss,
-            Intern("sys-do.h"),
+            Intern_Unsized_Managed("sys-do.h"),
             start_line,
             cast(const REBYTE*, p),
             feed

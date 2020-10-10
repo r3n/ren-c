@@ -1216,7 +1216,7 @@ void Startup_Core(void)
     Startup_Sequence_1_Symbol();  // see notes--needed before scanning
 
     REBARR *boot_array = Scan_UTF8_Managed(
-        Intern("tmp-boot.r"),
+        Intern_Unsized_Managed("tmp-boot.r"),
         utf8,
         utf8_size
     );
