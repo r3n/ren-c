@@ -185,7 +185,7 @@ REBNATIVE(make_routine)
     //
     // !!! Should it error if any bytes aren't ASCII?
     //
-    const REBYTE *utf8 = VAL_UTF8_AT(nullptr, ARG(name));
+    REBCHR(const*) utf8 = VAL_UTF8_AT(ARG(name));
 
     CFUNC *cfunc = Find_Function(LIB_FD(lib), cast(const char*, utf8));
     if (cfunc == nullptr)

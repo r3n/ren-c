@@ -163,7 +163,7 @@ static REB_R Transport_Actor(
                 //
                 // !!! Should not modify!
                 //
-                req->common.data = m_cast(REBYTE*, VAL_UTF8_AT(NULL, arg));
+                req->common.data = m_cast(REBYTE*, VAL_UTF8_AT(arg));
 
                 ReqNet(sock)->remote_port =
                     IS_INTEGER(port_id) ? VAL_INT32(port_id) : 80;

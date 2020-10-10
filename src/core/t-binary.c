@@ -68,7 +68,7 @@ REBINT CT_Binary(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 //  find_binary: C
 //
 REBLEN find_binary(
-    REBLEN *size,  // match size (if TAG! pattern, not VAL_LEN_AT(pattern))
+    REBSIZ *size,  // match size (if TAG! pattern, not VAL_LEN_AT(pattern))
     const REBSER *bin,
     REBLEN index,
     REBLEN end,
@@ -90,7 +90,7 @@ REBLEN find_binary(
 
         REBSTR *formed = nullptr;
 
-        const REBYTE *bp2;
+        REBCHR(const*) bp2;
         REBLEN len2;
         if (CELL_KIND(pattern) != REB_TEXT) { // !!! <tag>...but FILE! etc?
             formed = Copy_Form_Cell(pattern, 0);
@@ -98,11 +98,8 @@ REBLEN find_binary(
             bp2 = STR_HEAD(formed);
             *size = STR_SIZE(formed);
         }
-        else {
-            len2 = VAL_LEN_AT(pattern);
-            bp2 = VAL_STRING_AT(pattern);
-            *size = VAL_SIZE_LIMIT_AT(NULL, pattern, len2);
-        }
+        else
+            bp2 = VAL_UTF8_LEN_SIZE_AT(&len2, size, pattern);
 
         if (*size > end - index)  // series not long enough for pattern
             return NOT_FOUND;
@@ -246,14 +243,14 @@ static REBSER *MAKE_TO_Binary_Common(const REBVAL *arg)
     case REB_FILE:
     case REB_EMAIL:
     case REB_URL:
-    case REB_TAG: {  // !!! What should REB_ISSUE do?
-        REBSIZ offset = VAL_OFFSET_FOR_INDEX(arg, VAL_INDEX(arg));
+    case REB_TAG:
+    case REB_ISSUE: {
+        REBSIZ utf8_size;
+        REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, arg);
 
-        REBSIZ size = VAL_SIZE_LIMIT_AT(NULL, arg, UNKNOWN);
-
-        REBSER *bin = Make_Binary(size);
-        memcpy(BIN_HEAD(bin), BIN_AT(VAL_SERIES(arg), offset), size);
-        TERM_BIN_LEN(bin, size);
+        REBSER *bin = Make_Binary(utf8_size);
+        memcpy(BIN_HEAD(bin), utf8, utf8_size);
+        TERM_BIN_LEN(bin, utf8_size);
         return bin; }
 
     case REB_BLOCK:
@@ -595,9 +592,9 @@ REBTYPE(Binary)
         else
             skip = 1;
 
-        REBLEN len;
+        REBSIZ size;
         REBLEN ret = find_binary(
-            &len, VAL_SERIES(v), index, tail, pattern, flags, skip
+            &size, VAL_SERIES(v), index, tail, pattern, flags, skip
         );
 
         if (ret >= cast(REBLEN, tail))
@@ -605,7 +602,7 @@ REBTYPE(Binary)
 
         if (sym == SYM_FIND) {
             if (REF(tail) or REF(match))
-                ret += len;
+                ret += size;
             return Init_Any_Series_At(D_OUT, REB_BINARY, VAL_SERIES(v), ret);
         }
 

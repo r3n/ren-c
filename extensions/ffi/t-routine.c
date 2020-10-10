@@ -430,7 +430,7 @@ static uintptr_t arg_to_ffi(
         // GC compaction even if not changed)...so the memory is not "stable".
         //
           case REB_TEXT:  // !!! copies a *pointer*!
-            buffer.ipt = cast(intptr_t, VAL_UTF8_AT(nullptr, arg));
+            buffer.ipt = cast(intptr_t, VAL_UTF8_AT(arg));
             break;
 
           case REB_BINARY:  // !!! copies a *pointer*!

@@ -102,8 +102,8 @@ REBSTR *To_REBOL_Path(const RELVAL *string, REBFLGS flags)
     bool last_was_slash = false; // was last character appended a slash?
 
 restart:;
-    REBCHR(const*) up = VAL_STRING_AT(string);
-    REBLEN len = VAL_LEN_AT(string);
+    REBLEN len;
+    REBCHR(const*) up = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, string);
 
     REBUNI c = '\0'; // for test after loop (in case loop does not run)
 
@@ -197,8 +197,8 @@ enum {
 void Mold_File_To_Local(REB_MOLD *mo, const RELVAL *file, REBFLGS flags) {
     assert(IS_FILE(file));
 
-    REBCHR(const*) up = VAL_STRING_AT(file);
-    REBLEN len = VAL_LEN_AT(file);
+    REBLEN len;
+    REBCHR(const*) up = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, file);
 
     REBLEN i = 0;
 

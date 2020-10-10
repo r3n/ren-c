@@ -118,7 +118,7 @@ const REBYTE *Analyze_String_For_Scan(
     Move_Value(reindexed, any_string);
     VAL_INDEX(reindexed) = index;
 
-    return VAL_UTF8_AT(opt_size_out, reindexed);
+    return VAL_UTF8_SIZE_AT(opt_size_out, reindexed);
 }
 
 

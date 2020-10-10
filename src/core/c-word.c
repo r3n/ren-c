@@ -381,7 +381,7 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
 //
 const REBSTR *Intern_Any_String_Managed(const RELVAL *v) {
     REBSIZ utf8_size;
-    const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
+    REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
     return Intern_UTF8_Managed(utf8, utf8_size);
 }
 

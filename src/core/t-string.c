@@ -54,12 +54,13 @@ REBINT CT_String(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     assert(ANY_STRING_KIND(CELL_KIND(a)));
     assert(ANY_STRING_KIND(CELL_KIND(b)));
 
-    REBLEN l1  = VAL_LEN_AT(a);
-    REBLEN l2  = VAL_LEN_AT(b);
-    REBLEN len = MIN(l1, l2);
+    REBLEN l1;
+    REBCHR(const*) cp1 = VAL_UTF8_LEN_SIZE_AT(&l1, nullptr, a);
 
-    REBCHR(const*) cp1 = VAL_STRING_AT(a);
-    REBCHR(const*) cp2 = VAL_STRING_AT(b);
+    REBLEN l2;
+    REBCHR(const*) cp2 = VAL_UTF8_LEN_SIZE_AT(&l2, nullptr, b);
+
+    REBLEN len = MIN(l1, l2);
 
     for (; len > 0; len--) {
         REBUNI c1;
@@ -194,7 +195,7 @@ REBLEN find_string(
         // for now just form the tag into a temporary alternate series.
 
         REBSTR *formed = nullptr;
-        const REBYTE *bp2;
+        REBCHR(const*) bp2;
         REBSIZ size2;
         if (
             CELL_KIND(pattern) != REB_TEXT
@@ -208,7 +209,7 @@ REBLEN find_string(
             size2 = STR_SIZE(formed);
         }
         else
-            bp2 = VAL_UTF8_LIMIT_AT(len, &size2, pattern, UNKNOWN);
+            bp2 = VAL_UTF8_LEN_SIZE_AT(len, &size2, pattern);
 
         REBLEN result;
 
@@ -915,11 +916,11 @@ static void Mold_Url(REB_MOLD *mo, REBCEL(const*) v)
 
 static void Mold_File(REB_MOLD *mo, REBCEL(const*) v)
 {
-    REBLEN len = VAL_LEN_AT(v);
 
     Append_Codepoint(mo->series, '%');
 
-    REBCHR(const*) cp = VAL_STRING_AT(v);
+    REBLEN len;
+    REBCHR(const*) cp = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, v);
 
     REBLEN n;
     for (n = 0; n < len; ++n) {
@@ -1372,7 +1373,7 @@ REBTYPE(String)
             assert(ANY_STRING(v));
 
             REBSIZ utf8_size;
-            const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
+            REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
             Set_Random(Compute_CRC24(utf8, utf8_size));
             return Init_Void(D_OUT);
         }

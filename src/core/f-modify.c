@@ -447,14 +447,18 @@ REBLEN Modify_String_Or_Binary(
         if (VAL_SERIES(dst) == VAL_SERIES(src))
             goto form;
 
-        src_ptr = VAL_STRING_AT(src);
-
         // !!! We pass in an UNKNOWN for the limit of how long the input is
         // because currently /PART speaks in terms of the destination series.
         // However, if that were changed to /LIMIT then we would want to
         // be cropping the /PART of the input via passing a parameter here.
         //
-        src_size_raw = VAL_SIZE_LIMIT_AT(&src_len_raw, src, UNKNOWN);
+        src_ptr = VAL_UTF8_LEN_SIZE_AT_LIMIT(
+            &src_len_raw,
+            &src_size_raw,
+            src,
+            UNKNOWN
+        );
+
         if (not IS_SER_STRING(dst_ser))
             src_len_raw = src_size_raw;
     }

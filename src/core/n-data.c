@@ -35,8 +35,8 @@ static bool Check_Char_Range(const REBVAL *val, REBLEN limit)
 
     assert(ANY_STRING(val));
 
-    REBLEN len = VAL_LEN_AT(val);
-    REBCHR(const*) up = VAL_STRING_AT(val);
+    REBLEN len;
+    REBCHR(const*) up = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, val);
 
     for (; len > 0; len--) {
         REBUNI c;
@@ -1289,7 +1289,7 @@ REBNATIVE(as)
                 Freeze_Series(VAL_SERIES(v));
 
                 REBSIZ utf8_size;
-                const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
+                REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
                 s = Intern_UTF8_Managed(utf8, utf8_size);
             }
             Init_Any_Word(D_OUT, new_kind, s);

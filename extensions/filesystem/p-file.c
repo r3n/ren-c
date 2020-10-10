@@ -190,8 +190,12 @@ static void Read_File_Port(
 // !!! `len` comes from /PART, it should be in characters if a string and
 // in bytes if a BINARY!.  It seems to disregard it if the data is BLOCK!
 //
-static void Write_File_Port(REBREQ *file, REBVAL *data, REBLEN len, bool lines)
-{
+static void Write_File_Port(
+    REBREQ *file,
+    REBVAL *data,
+    REBLEN limit,
+    bool lines
+){
     struct rebol_devreq *req = Req(file);
 
     if (IS_BLOCK(data)) {
@@ -204,20 +208,25 @@ static void Write_File_Port(REBREQ *file, REBVAL *data, REBLEN len, bool lines)
             SET_MOLD_FLAG(mo, MOLD_FLAG_LINES);
         Form_Value(mo, data);
         Init_Text(data, Pop_Molded_String(mo)); // fall to next section
-        len = VAL_LEN_HEAD(data);
+        limit = VAL_LEN_HEAD(data);
     }
 
     if (IS_TEXT(data)) {
-        REBSIZ offset = VAL_OFFSET_FOR_INDEX(data, VAL_INDEX(data));
-        REBSIZ size = VAL_SIZE_LIMIT_AT(NULL, data, len);
+        REBSIZ size;
+        REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT_LIMIT(
+            nullptr,
+            &size,
+            data,
+            limit
+        );
 
-        req->common.data = BIN_AT(VAL_SERIES_KNOWN_MUTABLE(data), offset);
+        req->common.data = m_cast(REBYTE*, utf8);  // writing only
         req->length = size;
         req->modes |= RFM_TEXT; // do LF => CR LF, e.g. on Windows
     }
     else {
-        req->common.data = VAL_BIN_AT_KNOWN_MUTABLE(data);
-        req->length = len;
+        req->common.data = m_cast(REBYTE*, VAL_BIN_AT(data));  // writing only
+        req->length = limit;
         req->modes &= ~RFM_TEXT; // don't do LF => CR LF, e.g. on Windows
     }
 

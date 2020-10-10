@@ -167,16 +167,15 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
         // more sense as these would be hexes likely typed in by users,
         // who rarely do 2s-complement math in their head.
 
-        const REBSTR *spelling = VAL_STRING(value);
-        const REBYTE *bp = STR_HEAD(spelling);
-        size_t size = STR_SIZE(spelling);
+        REBSIZ utf8_size;
+        REBCHR(const*) bp = VAL_UTF8_SIZE_AT(&utf8_size, value);
 
-        if (size > MAX_HEX_LEN) {
+        if (utf8_size > MAX_HEX_LEN) {
             // Lacks BINARY!'s accommodation of leading 00s or FFs
             fail (Error_Out_Of_Range_Raw(value));
         }
 
-        if (!Scan_Hex(out, bp, size, size))
+        if (!Scan_Hex(out, bp, utf8_size, utf8_size))
             fail (Error_Bad_Make(REB_INTEGER, value));
 
         // !!! Unlike binary, always assumes unsigned (should it?).  Yet still

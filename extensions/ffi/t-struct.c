@@ -592,7 +592,7 @@ static void parse_attr(
 
             CFUNC *addr = Find_Function(
                 VAL_LIBRARY_FD(lib),
-                cs_cast(VAL_UTF8_AT(nullptr, sym))
+                cs_cast(VAL_UTF8_AT(sym))
             );
             if (addr == nullptr)
                 fail (Error_Symbol_Not_Found_Raw(rebUnrelativize(sym)));

@@ -80,13 +80,14 @@ REB_R MAKE_Array(
         //
         // `make block! "a <b> #c"` => `[a <b> #c]`, scans as code (unbound)
         //
-        REBSIZ size = VAL_SIZE_LIMIT_AT(nullptr, arg, UNKNOWN);
+        REBSIZ size;
+        REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&size, arg);
 
         const REBSTR *file = Canon(SYM___ANONYMOUS__);
         Init_Any_Array(
             out,
             kind,
-            Scan_UTF8_Managed(file, VAL_STRING_AT(arg), size)
+            Scan_UTF8_Managed(file, utf8, size)
         );
         return out;
     }
@@ -178,7 +179,7 @@ REB_R MAKE_Array(
         // get an unbound code array.
         //
         REBSIZ utf8_size;
-        const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, arg);
+        REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, arg);
         const REBSTR *file = Canon(SYM___ANONYMOUS__);
         return Init_Any_Array(
             out,

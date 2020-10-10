@@ -100,14 +100,8 @@ REB_R MAKE_Bitset(
     if (opt_parent)
         fail (Error_Bad_Make_Parent(kind, opt_parent));
 
-    REBINT len = Find_Max_Bit(arg);
-
-    // Determine size of bitset. Returns -1 for errors.
-    //
-    // !!! R3-alpha construction syntax said 0xFFFFFF while the A_MAKE
-    // path used 0x0FFFFFFF.  Assume A_MAKE was more likely right.
-    //
-    if (len < 0 || len > 0x0FFFFFFF)
+    REBLEN len = Find_Max_Bit(arg);
+    if (len == NOT_FOUND)
         fail (arg);
 
     REBBIN *bin = Make_Bitset(len);
@@ -141,10 +135,9 @@ REB_R TO_Bitset(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 // Return integer number for the maximum bit number defined by
 // the value. Used to determine how much space to allocate.
 //
-REBINT Find_Max_Bit(const RELVAL *val)
+REBLEN Find_Max_Bit(const RELVAL *val)
 {
-    REBINT maxi = 0;
-    REBINT n;
+    REBLEN maxi = 0;
 
     switch (VAL_TYPE(val)) {
 
@@ -162,12 +155,12 @@ REBINT Find_Max_Bit(const RELVAL *val)
     case REB_URL:
 //  case REB_ISSUE:
     case REB_TAG: {
-        n = VAL_INDEX(val);
-        REBCHR(const*) up = VAL_STRING_AT(val);
-        for (; n < cast(REBINT, VAL_LEN_HEAD(val)); n++) {
+        REBLEN len;
+        REBCHR(const*) up = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, val);
+        for (; len > 0; --len) {
             REBUNI c;
             up = NEXT_CHR(&c, up);
-            if (cast(REBINT, c) > maxi)
+            if (c > maxi)
                 maxi = cast(REBINT, c);
         }
         maxi++;
@@ -175,13 +168,13 @@ REBINT Find_Max_Bit(const RELVAL *val)
 
     case REB_BINARY:
         maxi = VAL_LEN_AT(val) * 8 - 1;
-        if (maxi < 0) maxi = 0;
         break;
 
     case REB_BLOCK:
         for (val = VAL_ARRAY_AT(val); NOT_END(val); val++) {
-            n = Find_Max_Bit(val);
-            if (n > maxi) maxi = n;
+            REBLEN n = Find_Max_Bit(val);
+            if (n != NOT_FOUND and n > maxi)
+                maxi = n;
         }
         //maxi++;
         break;
@@ -191,7 +184,7 @@ REBINT Find_Max_Bit(const RELVAL *val)
         break;
 
     default:
-        return -1;
+        return NOT_FOUND;
     }
 
     return maxi;
@@ -294,9 +287,9 @@ bool Set_Bits(REBSER *bset, const RELVAL *val, bool set)
     }
 
     if (ANY_STRING(val)) {
-        REBLEN i = VAL_INDEX(val);
-        REBCHR(const*) up = VAL_STRING_AT(val);
-        for (; i < VAL_LEN_HEAD(val); ++i) {
+        REBLEN len;
+        REBCHR(const*) up = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, val);
+        for (; len > 0; --len) {
             REBUNI c;
             up = NEXT_CHR(&c, up);
             Set_Bit(bset, c, set);
@@ -431,9 +424,9 @@ bool Check_Bits(const REBSER *bset, const RELVAL *val, bool uncased)
     }
 
     if (ANY_STRING(val)) {
-        REBLEN i = VAL_INDEX(val);
-        REBCHR(const*) up = VAL_STRING_AT(val);
-        for (; i != VAL_LEN_HEAD(val); ++i) {
+        REBLEN len;
+        REBCHR(const*) up = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, val);
+        for (; len > 0; --len) {
             REBUNI c;
             up = NEXT_CHR(&c, up);
             if (Check_Bit(bset, c, uncased))

@@ -75,13 +75,18 @@ REBSER *Copy_Bytes(const REBYTE *src, REBINT len)
 //
 REBSTR *Copy_String_At_Limit(const RELVAL *src, REBINT limit)
 {
-    REBLEN length_limit;
-    REBSIZ size = VAL_SIZE_LIMIT_AT(&length_limit, src, limit);
-    assert(length_limit <= size);
+    REBSIZ limited_size;
+    REBLEN limited_length;
+    REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT_LIMIT(
+        &limited_length,
+        &limited_size,
+        src,
+        limit
+    );
 
-    REBSTR *dst = Make_String(size);
-    memcpy(STR_HEAD(dst), VAL_STRING_AT(src), size);
-    TERM_STR_LEN_SIZE(dst, length_limit, size);
+    REBSTR *dst = Make_String(limited_size);
+    memcpy(STR_HEAD(dst), utf8, limited_size);
+    TERM_STR_LEN_SIZE(dst, limited_length, limited_size);
 
     return dst;
 }
@@ -221,18 +226,17 @@ void Append_String(REBSTR *dst, REBCEL(const*) src, REBLEN limit)
     assert(not IS_STR_SYMBOL(dst));
     assert(ANY_STRING_KIND(CELL_KIND(src)));
 
-    REBSIZ offset = VAL_OFFSET_FOR_INDEX(src, VAL_INDEX(src));
+    REBLEN len;
+    REBSIZ size;
+    REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT_LIMIT(&len, &size, src, limit);
 
     REBLEN old_len = STR_LEN(dst);
     REBSIZ old_used = STR_SIZE(dst);
 
-    REBLEN len;
-    REBSIZ size = VAL_SIZE_LIMIT_AT(&len, src, limit);
-
     REBLEN tail = STR_SIZE(dst);
     Expand_Series(SER(dst), tail, size);  // series USED changes too
 
-    memcpy(BIN_AT(SER(dst), tail), BIN_AT(VAL_SERIES(src), offset), size);
+    memcpy(BIN_AT(SER(dst), tail), utf8, size);
     TERM_STR_LEN_SIZE(dst, old_len + len, old_used + size);
 }
 
@@ -398,17 +402,11 @@ void Join_Binary_In_Byte_Buf(const REBVAL *blk, REBINT limit)
         case REB_EMAIL:
         case REB_URL:
         case REB_TAG: {
-            REBLEN val_len;
-            REBSIZ utf8_size = VAL_SIZE_LIMIT_AT(&val_len, val, UNKNOWN);
-
-            REBSIZ offset = VAL_OFFSET_FOR_INDEX(val, VAL_INDEX(val));
+            REBSIZ utf8_size;
+            REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, val);
 
             EXPAND_SERIES_TAIL(buf, utf8_size);
-            memcpy(
-                BIN_AT(buf, tail),
-                BIN_AT(VAL_SERIES(val), offset),
-                utf8_size
-            );
+            memcpy(BIN_AT(buf, tail), utf8, utf8_size);
             SET_SERIES_LEN(buf, tail + utf8_size);
             break; }
 

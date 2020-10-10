@@ -176,8 +176,8 @@ REBNATIVE(enhex)
     DECLARE_MOLD (mo);
     Push_Mold (mo);
 
-    REBLEN len = VAL_LEN_AT(ARG(string));
-    REBCHR(const*) cp = VAL_STRING_AT(ARG(string));
+    REBLEN len;
+    REBCHR(const*) cp = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, ARG(string));
 
     REBUNI c;
     cp = NEXT_CHR(&c, cp);
@@ -324,8 +324,8 @@ REBNATIVE(dehex)
     REBYTE scan[5];
     REBSIZ scan_size = 0;
 
-    REBLEN len = VAL_LEN_AT(ARG(string));
-    REBCHR(const*) cp = VAL_STRING_AT(ARG(string));
+    REBLEN len;
+    REBCHR(const*) cp = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, ARG(string));
 
     REBUNI c;
     cp = NEXT_CHR(&c, cp);

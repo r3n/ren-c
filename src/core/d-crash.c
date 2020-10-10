@@ -213,7 +213,7 @@ REBNATIVE(panic)
     // report the contained message.  PANIC-VALUE for the latter intent.
     //
     if (IS_TEXT(v)) {
-        p = VAL_UTF8_AT(nullptr, v);
+        p = VAL_UTF8_AT(v);
     }
     else {
         assert(IS_ERROR(v));

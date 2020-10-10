@@ -1141,7 +1141,7 @@ static size_t Spell_Into(
         fail ("rebSpell() APIs only accept ANY-STRING! or ANY-WORD!");
 
     REBSIZ utf8_size;
-    const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
+    REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
 
     if (not buf) {
         assert(buf_size == 0);
@@ -1217,26 +1217,9 @@ static unsigned int Spell_Into_Wide(
     unsigned int buf_chars,  // chars buf can hold (not including terminator)
     const REBVAL *v
 ){
-    REBCHR(const*) cp;
     REBLEN len;
-    if (ANY_STRING(v)) {
-        cp = VAL_STRING_AT(v);
-        len = VAL_LEN_AT(v);
-    }
-    else if (ANY_WORD(v)) {
-        const REBSTR *spelling = VAL_WORD_SPELLING(v);
-        cp = STR_HEAD(spelling);
-
-        // !!! Inefficient way of asking "how long is this UTF-8 series", fix!
-        //
-        REBSTR *s = Make_Sized_String_UTF8(
-            STR_UTF8(spelling),
-            STR_SIZE(spelling)
-        );
-        len = STR_LEN(s);
-        Free_Unmanaged_Series(SER(s));
-    }
-    else
+    REBCHR(const*) cp = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, v);
+    if (not ANY_STRING(v) and not ANY_WORD(v))
         fail ("rebSpell() APIs only accept ANY-STRING! or ANY-WORD!");
 
     if (not buf) {  // querying for size

@@ -214,7 +214,7 @@ REBNATIVE(write_stdout)
         // number of codepoints as well as the UTF-8 size.
         //
         REBSIZ utf8_size;
-        const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
+        REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
 
         Prin_OS_String(utf8, utf8_size, OPT_ENC_0);
     }

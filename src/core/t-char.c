@@ -139,7 +139,7 @@ REB_R MAKE_Char(
         //
         if (VAL_INDEX(arg) >= VAL_LEN_HEAD(arg))
             goto bad_make;
-        return Init_Char_Unchecked(out, CHR_CODE(VAL_STRING_AT(arg)));
+        return Init_Char_Unchecked(out, CHR_CODE(VAL_UTF8_AT(arg)));
 
       default:
         break;

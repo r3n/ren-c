@@ -1172,7 +1172,7 @@ REBNATIVE(js_eval_p)
 {
     JAVASCRIPT_INCLUDE_PARAMS_OF_JS_EVAL_P;
 
-    const char *utf8 = s_cast(VAL_STRING_AT(ARG(source)));
+    const char *utf8 = s_cast(VAL_UTF8_AT(ARG(source)));
 
     // Methods for global evaluation:
     // http://perfectionkills.com/global-eval-what-are-the-options/

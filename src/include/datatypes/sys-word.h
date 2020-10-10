@@ -342,7 +342,7 @@ inline static const REBYTE *VAL_BYTES_LIMIT_AT(
 // ANY-WORD! or an ANY-STRING! to get UTF-8 data.  This is a convenience
 // routine for handling that.
 //
-inline static const REBYTE *VAL_UTF8_LIMIT_AT(
+inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
     REBLEN *length_out,
     REBSIZ *size_out,
     REBCEL(const*) v,
@@ -401,11 +401,21 @@ inline static const REBYTE *VAL_UTF8_LIMIT_AT(
         }
     }
 
+  #if !defined(NDEBUG)
+    if (length_out and size_out)
+        assert(*length_out <= *size_out);
+  #endif
     return utf8; 
 }
 
-#define VAL_UTF8_AT(size_out,v) \
-    VAL_UTF8_LIMIT_AT(nullptr, (size_out), (v), UNKNOWN)
+#define VAL_UTF8_LEN_SIZE_AT(len_out,size_out,v) \
+    VAL_UTF8_LEN_SIZE_AT_LIMIT((len_out), (size_out), (v), UNKNOWN)
+
+#define VAL_UTF8_SIZE_AT(size_out,v) \
+    VAL_UTF8_LEN_SIZE_AT_LIMIT(nullptr, (size_out), (v), UNKNOWN)
+
+#define VAL_UTF8_AT(v) \
+    VAL_UTF8_LEN_SIZE_AT_LIMIT(nullptr, nullptr, (v), UNKNOWN)
 
 
 // An empty ISSUE! is a "black hole".  It looks like `#`.

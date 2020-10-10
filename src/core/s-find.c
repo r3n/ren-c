@@ -661,10 +661,14 @@ REBLEN Find_In_Any_Series(
     REBLEN end = VAL_LEN_HEAD(any_series);
     REBINT skip = 1;
 
-    if (IS_BINARY(any_series))
-        return find_binary(  // Note: returned len is in bytes here
-            len, VAL_SERIES(any_series), index, end, pattern, flags, skip
+    if (IS_BINARY(any_series)) {
+        REBSIZ size;
+        REBLEN result = find_binary(
+            &size, VAL_SERIES(any_series), index, end, pattern, flags, skip
         );
+        *len = size;
+        return result;
+    }
 
     if (ANY_STRING(any_series))
         return find_string(  // Note: returned len is in codepoints here

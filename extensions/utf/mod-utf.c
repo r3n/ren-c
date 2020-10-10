@@ -320,15 +320,11 @@ REBNATIVE(encode_utf16le)
 {
     UTF_INCLUDE_PARAMS_OF_ENCODE_UTF16LE;
 
+    REBLEN len;
+    REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, ARG(text));
+
     const bool little_endian = true;
-    Init_Binary(
-        D_OUT,
-        Encode_Utf16(
-            VAL_STRING_AT(ARG(text)),
-            VAL_LEN_AT(ARG(text)),
-            little_endian
-        )
-    );
+    Init_Binary(D_OUT, Encode_Utf16(utf8, len, little_endian));
 
     // !!! Should probably by default add a byte order mark, but given this
     // is weird "userspace" encoding it should be an option to the codec.
@@ -404,15 +400,11 @@ REBNATIVE(encode_utf16be)
 {
     UTF_INCLUDE_PARAMS_OF_ENCODE_UTF16BE;
 
+    REBLEN len;
+    REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, ARG(text));
+
     const bool little_endian = false;
-    Init_Binary(
-        D_OUT,
-        Encode_Utf16(
-            VAL_STRING_AT(ARG(text)),
-            VAL_LEN_AT(ARG(text)),
-            little_endian
-        )
-    );
+    Init_Binary(D_OUT, Encode_Utf16(utf8, len, little_endian));
 
     // !!! Should probably by default add a byte order mark, but given this
     // is weird "userspace" encoding it should be an option to the codec.
