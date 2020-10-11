@@ -226,7 +226,7 @@ bool Matches_Fake_Type_Constraint(const RELVAL *v, enum Reb_Symbol sym) {
       case SYM_BLACKHOLE_X:
         return IS_ISSUE(v) and VAL_LEN_AT(v) == 0;
 
-      case SYM_LIT_WORD_X: 
+      case SYM_LIT_WORD_X:
         return IS_QUOTED_WORD(v);
 
       case SYM_LIT_PATH_X:

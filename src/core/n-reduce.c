@@ -492,7 +492,7 @@ REBNATIVE(compose)
 
     if (ANY_SEQUENCE(ARG(value))) {
         if (not Try_Pop_Sequence_Or_Element_Or_Nulled(
-            D_OUT, 
+            D_OUT,
             VAL_TYPE(ARG(value)),
             dsp_orig
         )){

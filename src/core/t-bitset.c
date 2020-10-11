@@ -43,7 +43,7 @@ REBINT CT_Bitset(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 
     if (BITS_NOT(VAL_BITSET(a)) != BITS_NOT(VAL_BITSET(b)))
         return 1;
-        
+
     return CT_Binary(atemp, btemp, strict);
 }
 

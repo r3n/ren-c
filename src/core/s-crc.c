@@ -277,7 +277,7 @@ uint32_t Hash_Value(const RELVAL *v)
       case REB_GET_PATH:
       case REB_SYM_PATH:
         panic (nullptr);  // heart of type should never be ANY_SEQUENCE().
- 
+
       case REB_GROUP:
       case REB_SET_GROUP:
       case REB_GET_GROUP:

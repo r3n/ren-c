@@ -1582,7 +1582,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
     // scanning +$10.20 or -$10.20 or $3.04, there is common code to look
     // past the delimiter hit.  The same applies to times.  (DECIMAL! has
     // its own code)
-    
+
     if (*ss->end != '.')
         return token;
 
@@ -1856,7 +1856,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         if (level->mode == '/' or level->mode == '.') {
             if (IS_LEX_ANY_SPACE(*ep) or *ep == ']' or *ep == ')') {
                 Init_Blank(DS_PUSH());  // `a.:` or `b/:` need a blank
-                ss->end = ss->begin = ep = bp;  // let parent see `:` 
+                ss->end = ss->begin = ep = bp;  // let parent see `:`
                 goto done;
             }
 
@@ -1885,7 +1885,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         }
 
         goto token_prefixable_sigil;
-        
+
       token_prefixable_sigil:
         if (prefix_pending != TOKEN_END)
             fail (Error_Syntax(ss, token));  // can't make a GET-GET-WORD!
@@ -2499,7 +2499,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             fail (Error_Syntax(ss, token));
 
         assert(ANY_SEQUENCE(temp));  // Should be >= 2 elements, no decaying
-        
+
         Move_Value(DS_PUSH(), temp);
 
         // !!! Temporarily raise attention to usage like `.5` or `5.` to guide

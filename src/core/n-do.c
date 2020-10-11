@@ -411,7 +411,7 @@ REBNATIVE(do)
         // Ren-C will only run arity 0 functions from DO, otherwise REEVAL
         // must be used.  Look for the first non-local parameter to tell.
         //
-        if (First_Unspecialized_Param(VAL_ACTION(source))) 
+        if (First_Unspecialized_Param(VAL_ACTION(source)))
             fail (Error_Do_Arity_Non_Zero_Raw());
 
         if (Eval_Value_Throws(D_OUT, source, SPECIFIED))

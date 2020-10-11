@@ -425,7 +425,7 @@ bool Eval_Path_Throws_Core(
     REBLEN index = 0;
 
     enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), sequence));
-    
+
     // The evaluator has the behavior that inert-headed paths will just
     // give themselves back.  But this code path is for GET, where getting
     // something like `/a` will actually look up the word.

@@ -227,7 +227,7 @@ REBNATIVE(unquote)
 
     if (IS_NULLED(v))
         return nullptr;  // It's more convenient to allow NULL than not
-        
+
     REBINT depth = REF(depth) ? VAL_INT32(ARG(depth)) : 1;
     if (depth < 0)
         fail (PAR(depth));

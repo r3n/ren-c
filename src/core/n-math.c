@@ -991,7 +991,7 @@ REBNATIVE(zero_q)
         }
         return Init_True(D_OUT);
     }
- 
+
     DECLARE_LOCAL (zero);
     Init_Zeroed_Hack(zero, type);
 

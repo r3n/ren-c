@@ -638,7 +638,7 @@ unsigned int RL_rebBinarySizeAt_internal(const REBVAL *binary)
 // !!! Should there be variants for Strict/Relaxed, e.g. a version that does
 // not accept CR and one that does?
 //
-REBVAL *RL_rebSizedText(const char *utf8, size_t size) 
+REBVAL *RL_rebSizedText(const char *utf8, size_t size)
 {
     ENTER_API;
 
@@ -1201,7 +1201,7 @@ char *RL_rebSpell(
     size_t size = Spell_Into(nullptr, 0, v);
     char *result = rebAllocN(char, size);  // no +1 for term needed...
     assert(result[size] == '\0');  // ...see rebRepossess() for why this is
-    
+
     size_t check = Spell_Into(result, size, v);
     assert(check == size);
     UNUSED(check);

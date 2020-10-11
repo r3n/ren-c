@@ -622,7 +622,7 @@ REBVAL *Getify(REBVAL *out) {
     }
     else if (ANY_TUPLE_KIND(kind)) {    // Don't change "heart"
         mutable_KIND_BYTE(out) = REB_GET_TUPLE;
-    }        
+    }
     else if (ANY_WORD_KIND(kind)) {
         mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GET_WORD;
     }
@@ -677,7 +677,7 @@ REBVAL *Symify(REBVAL *out) {
     }
     else if (ANY_TUPLE_KIND(kind)) {    // Don't change "heart"
         mutable_KIND_BYTE(out) = REB_SYM_TUPLE;
-    }        
+    }
     else if (ANY_BLOCK_KIND(kind)) {
         mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SYM_BLOCK;
     }
@@ -721,8 +721,7 @@ REBNATIVE(symify)
 //
 //  Plainify: C
 //
-// Turn a value into its "plain" equivalent.  This works for all values,
-// since 
+// Turn a value into its "plain" equivalent.  This works for all values.
 //
 REBVAL *Plainify(REBVAL *out) {
     REBLEN quotes = Dequotify(out);

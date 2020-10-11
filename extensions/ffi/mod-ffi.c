@@ -92,7 +92,7 @@ static ffi_abi Abi_From_Word(const REBVAL *word) {
       #endif  // X86_WIN64
 
         "fail [{Unknown ABI for platform:}", rebQ(word), "]",
-      "]", 
+      "]",
       rebEND  // <-- rebEND required, call is not a macro (LIBREBOL_NOMACRO)
     );
 

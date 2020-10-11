@@ -86,7 +86,7 @@
         value [any-value!]
         <local> mtype
         <static> mapping (reduce [
-            path! block! 
+            path! block!
             tuple! group!
             block! sym-block!
             group! sym-group!
@@ -113,7 +113,7 @@
             items: transcode text
         ] then error -> [
             if iter/1 <> '!! [
-                fail ["Unexpected failure on" mold text "->" error/id] 
+                fail ["Unexpected failure on" mold text "->" error/id]
             ]
             iter: my next
             if iter/1 <> to tag! error/id [
@@ -134,7 +134,7 @@
         ]
 
         assert [iter/1 = '->]
-        iter: my next 
+        iter: my next
 
         compares: copy []
 
@@ -142,7 +142,7 @@
             print [mold text "=>" mold items "vs." mold compares]
             fail ["Transformation mismatch for" text]
         ]
-    
+
         start: true
         for-each v items [
             append/only compares iter/1
@@ -155,7 +155,7 @@
             ]
 
             start: false
- 
+
             t: transform v  ; turns path/tuples to block/group structure
 
             if t <> iter/1 [

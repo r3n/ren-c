@@ -290,7 +290,7 @@ static void Clonify_And_Bind_Relative(
         //
         REBSER *series;
         const RELVAL *sub_src;
-        
+
         bool would_need_deep;
 
         if (ANY_CONTEXT_KIND(heart)) {
