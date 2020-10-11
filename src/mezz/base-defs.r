@@ -69,6 +69,44 @@ tweak :then 'defer on
 tweak :also 'defer on
 
 
+; ARITHMETIC OPERATORS
+;
+; Note that `/` is actually path containing two elements, both of which are
+; BLANK! so they do not render.  A special mechanism through a word binding
+; hidden in the cell allows it to dispatch.  See Startup_Sequence_1_Symbol()
+
++: enfixed :add
+-: enfixed :subtract
+*: enfixed :multiply
+-slash-1-: enfixed :divide  ; TBD: make `/: enfixed :divide` act equivalently
+
+
+; SET OPERATORS
+
+and+: enfixed :intersect
+or+: enfixed :union
+xor+: enfixed :difference
+
+
+; COMPARISON OPERATORS
+;
+; !!! See discussion about the future of comparison operators:
+; https://forum.rebol.info/t/349
+
+=: enfixed :equal?
+<>: enfixed :not-equal?
+<: enfixed :lesser?
+>: enfixed :greater?
+
+>=: enfixed :greater-or-equal?
+=<: <=: enfixed :equal-or-lesser?  ; https://forum.rebol.info/t/349/11
+!=: enfixed :not-equal?  ; http://www.rebol.net/r3blogs/0017.html
+==: enfixed :strict-equal?  ; !!! https://forum.rebol.info/t/349
+!==: enfixed :strict-not-equal?  ; !!! bad pairing, most would think !=
+
+=?: enfixed :same?
+
+
 ; Common "Invisibles"
 
 comment: enfixed func* [
@@ -155,7 +193,7 @@ pointfree*: func* [
     for-skip p params 1 [
         case [
             ; !!! Have to use STRICT-EQUAL?, else '_ says type equal to blank
-            strict-equal? blank! type of :block/1 [block: skip block 1]
+            blank! == type of :block/1 [block: skip block 1]
 
             match word! p/1 [
                 until [not quoted? block: try evaluate/result block 'var]
@@ -219,7 +257,7 @@ inherit-meta: func* [
     /augment "Additional spec information to scan"
         [block!]
 ][
-    if not equal? action! reflect :original 'type [original: get original]
+    if action! <> reflect :original 'type [original: get original]
     if let m1: meta-of :original [
         set-meta :derived let m2: copy :m1  ; shallow copy
         if in m1 'parameter-notes [  ; shallow copy, but make frame match
@@ -399,7 +437,7 @@ reeval func* [
     <local>
         set-word type-name tester meta
 ][
-    while [not equal? <end> set-word: take set-words] [
+    while [<end> != set-word: take set-words] [
         type-name: copy as text! set-word
         change back tail of type-name "!"  ; change ? at tail to !
         tester: typechecker (get bind (as word! type-name) set-word)
@@ -499,7 +537,7 @@ to-lit-path: func* [value [any-value!]] [
 refinement?: func* [value [<opt> any-value!]] [
     did all [
         path? :value
-        equal? length of value 2  ; Called by FUNCTION when = not defined yet
+        2 = length of value
         blank? :value/1
         word? :value/2
     ]
@@ -515,7 +553,7 @@ print: func* [
         [<blank> char! text! block!]
 ][
     if char? line [
-        if not equal? line newline [
+        if line <> newline [
             fail "PRINT only allows CHAR! of newline (see WRITE-STDOUT)"
         ]
         return write-stdout line

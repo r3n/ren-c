@@ -344,7 +344,7 @@ redescribe: func [
                 fail [{PARAMETER-NOTES in META-OF is not a FRAME!} notes]
             ]
 
-            if not equal? :value (action of notes) [
+            if :value <> (action of notes) [
                 fail [{PARAMETER-NOTES in META-OF frame mismatch} notes]
             ]
         ]
@@ -369,11 +369,14 @@ redescribe: func [
         opt [
             copy description any text! (
                 description: spaced description
-                either all [equal? description {} | not meta] [
+                all [
+                    description = {}
+                    not meta
+                ] then [
                     ; No action needed (no meta to delete old description in)
-                ][
+                ] else [
                     on-demand-meta
-                    meta/description: if equal? description {} [
+                    meta/description: if description = {} [
                         _
                     ] else [
                         description
@@ -397,13 +400,16 @@ redescribe: func [
             opt [[copy note some text!] (
                 note: spaced note
                 on-demand-meta
-                either equal? param (lit return:) [
+                if param = 'return: [
                     meta/return-note: all [
-                        not equal? note {}
+                        note <> {}
                         copy note
                     ]
-                ][
-                    if notes or [not equal? note {}] [
+                ] else [
+                    any [
+                        notes
+                        note <> {}
+                    ] then [
                         on-demand-notes
 
                         if not find notes as word! param [
@@ -411,11 +417,11 @@ redescribe: func [
                         ]
 
                         let actual: first find parameters of :value param
-                        if not strict-equal? param actual [
+                        if param !== actual [
                             fail [param {doesn't match word type of} actual]
                         ]
 
-                        notes/(as word! param): if not equal? note {} [note]
+                        notes/(as word! param): if note <> {} [note]
                     ]
                 ]
             )]
@@ -445,6 +451,55 @@ unset: redescribe [
 ](
     adapt specialize 'set [value: <overwrite>] [value: null]  ; !!! fix
 )
+
+
+; >- is the SHOVE operator.  It uses the item immediately to its left for
+; the first argument to whatever operation is on its right hand side.
+; Parameter conventions of that first argument apply when processing the
+; value, e.g. quoted arguments will act quoted.
+;
+; By default, the evaluation rules proceed according to the enfix mode of
+; the operation being shoved into:
+;
+;    >> 10 >- lib/= 5 + 5  ; as if you wrote `10 = 5 + 5`
+;    ** Script Error: + does not allow logic! for its value1 argument
+;
+;    >> 10 >- equal? 5 + 5  ; as if you wrote `equal? 10 5 + 5`
+;    == #[true]
+;
+; You can force processing to be enfix using `->-` (an infix-looking "icon"):
+;
+;    >> 1 ->- lib/add 2 * 3  ; as if you wrote `1 + 2 * 3`
+;    == 9
+;
+; Or force prefix processing using `>--` (multi-arg prefix "icon"):
+;
+;    >> 10 >-- lib/+ 2 * 3  ; as if you wrote `add 1 2 * 3`
+;    == 7
+;
+>-: enfixed :shove
+>--: enfixed specialize '>- [prefix: true]
+->-: enfixed specialize '>- [prefix: false]
+
+
+; The -- and ++ operators were deemed too "C-like", so ME was created to allow
+; `some-var: me + 1` or `some-var: me / 2` in a generic way.  They share code
+; with SHOVE, so it's folded into the implementation of that.
+
+me: enfixed redescribe [
+    {Update variable using it as the left hand argument to an enfix operator}
+](
+    ; /ENFIX so `x: 1 | x: me + 1 * 10` is 20, not 11
+    ;
+    specialize 'shove [set: true | prefix: false]
+)
+
+my: enfixed redescribe [
+    {Update variable using it as the first argument to a prefix operator}
+](
+    specialize 'shove [set: true | prefix: true]
+)
+
 
 so: enfixed func [
     {Postfix assertion which won't keep running if left expression is false}
@@ -753,6 +808,16 @@ once-bar: func [
         ]
     ]
 ]
+
+
+; These constructs used to be enfix to complete their left hand side.  Yet
+; that form of completion was only one expression's worth, when they wanted
+; to allow longer runs of evaluation.  "Invisible functions" (those which
+; `return: []`) permit a more flexible version of the mechanic.
+
+<|: tweak copy :eval-all 'postpone on
+|>: tweak enfixed :shove 'postpone on
+||: :once-bar
 
 
 meth: enfixed func [
