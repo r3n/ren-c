@@ -480,7 +480,7 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, bool strict)
         // "strict" here still allows coercion, e.g. `1 < 1.1` should work.
         //
         switch (ta) {
-          case REB_NULLED:
+          case REB_NULL:
             return -1;  // consider always less than anything else
 
           case REB_INTEGER:
@@ -552,8 +552,8 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, bool strict)
 
     enum Reb_Kind kind = VAL_TYPE(a);
 
-    if (kind == REB_NULLED) {
-        assert(VAL_TYPE(b) == REB_NULLED);
+    if (kind == REB_NULL) {
+        assert(VAL_TYPE(b) == REB_NULL);
         return 0;  // nulls always equal
     }
 

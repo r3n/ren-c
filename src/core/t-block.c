@@ -240,7 +240,7 @@ REB_R MAKE_Array(
             else
                 param += VAL_VARARGS_SIGNED_PARAM_INDEX(arg);
 
-            if (TYPE_CHECK(param, REB_NULLED))
+            if (TYPE_CHECK(param, REB_NULL))
                 fail (Error_Null_Vararg_Array_Raw());
         }
 

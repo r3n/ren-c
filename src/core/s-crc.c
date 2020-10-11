@@ -188,7 +188,7 @@ uint32_t Hash_Value(const RELVAL *v)
     uint32_t hash;
 
     switch (heart) {
-      case REB_NULLED:
+      case REB_NULL:
         panic ("Cannot hash NULL");  // nulls can't be values or keys in MAP!s
 
       case REB_VOID:

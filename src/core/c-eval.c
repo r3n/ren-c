@@ -200,7 +200,7 @@ inline static void Finalize_Arg(REBFRM *f) {
         // then a returned null should duck the requote.
         //
         f->requotes += VAL_NUM_QUOTES(f->arg);
-        if (CELL_KIND(VAL_UNESCAPED(f->arg)) == REB_NULLED)
+        if (CELL_KIND(VAL_UNESCAPED(f->arg)) == REB_NULL)
             SET_EVAL_FLAG(f, REQUOTE_NULL);
 
         Dequotify(f->arg);
@@ -674,7 +674,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 // But plain `rebValue("null?", nullptr)` would be an error.  Another way
 // the evaluator can see NULL is REEVAL, such as `reeval first []`.
 
-      case REB_NULLED:
+      case REB_NULL:
         fail (Error_Evaluate_Null_Raw());
 
 
@@ -1786,7 +1786,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         if (GET_ACTION_FLAG(f->original, RETURN_REQUOTES)) {
             if (
-                KIND_BYTE_UNCHECKED(f->out) != REB_NULLED
+                KIND_BYTE_UNCHECKED(f->out) != REB_NULL
                 or GET_EVAL_FLAG(f, REQUOTE_NULL)
             ){
                 Quotify(f->out, f->requotes);
@@ -2248,7 +2248,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // which is marked as being legal to be word! or path! *specifically*.
         //
         const REBU64 ts_out = FLAGIT_KIND(REB_TS_REFINEMENT)
-            | FLAGIT_KIND(REB_NULLED)
+            | FLAGIT_KIND(REB_NULL)
             | FLAGIT_KIND(REB_ISSUE)  // for Is_Blackhole() use with SET
             | FLAGIT_KIND(REB_WORD)
             | FLAGIT_KIND(REB_PATH);

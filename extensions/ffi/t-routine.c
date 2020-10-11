@@ -50,7 +50,7 @@ static struct {
     {
         SYM_POINTER,
         FLAGIT_KIND(REB_INTEGER)
-            | FLAGIT_KIND(REB_NULLED)   // Rebol's null as 0 seems sensible
+            | FLAGIT_KIND(REB_NULL)   // Rebol's null seems sensible for NULL
             | FLAGIT_KIND(REB_TEXT)
             | FLAGIT_KIND(REB_BINARY)
             | FLAGIT_KIND(REB_CUSTOM)  // !!! Was REB_VECTOR, must narrow (!)
@@ -416,7 +416,7 @@ static uintptr_t arg_to_ffi(
             buffer.ipt = 0xDECAFBAD;  // return value, make space (but init)
         }
         else switch (VAL_TYPE(arg)) {
-          case REB_NULLED:
+          case REB_NULL:
             buffer.ipt = 0;
             break;
 

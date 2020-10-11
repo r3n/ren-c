@@ -136,8 +136,14 @@ to-c-name: function [
         ]
     ]
 
+    scope: default [#global]
+
     repeat s string [
-        (head? s) and [find charset [#"0" - #"9"] s/1] and [
+        all [
+            scope <> #prefixed
+            head? s
+            find charset [#"0" - #"9"] s/1
+        ] then [
             fail ["identifier" string "starts with digit in to-c-name"]
         ]
 
@@ -145,8 +151,6 @@ to-c-name: function [
             fail ["Non-alphanumeric or hyphen in" string "in to-c-name"]
         ]
     ]
-
-    scope: default [#global]
 
     case [
         scope = #prefixed [<ok>]  ; assume legitimate prefix

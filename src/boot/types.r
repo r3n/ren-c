@@ -51,7 +51,7 @@ REBOL [
 ; of the name to indicate its zero-ness and C falsey-ness is intrinsic to the
 ; design--huge parts of the system would not work if it were not zero.
 
-#end        "!!! `END!` isn't a datatype, this isn't exposed to the user"
+#0-end      "!!! `END!` isn't a datatype, this isn't exposed to the user"
             0           0       0       0       []
 
 ; REB_NULLED takes value 1, but it being 1 is less intrinsic.  It is also not

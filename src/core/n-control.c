@@ -179,10 +179,10 @@ inline static bool Single_Test_Throws(
     }
 
     switch (test_kind) {
-      case REB_NULLED:  // more useful for NON NULL XXX than MATCH NULL XXX
+      case REB_NULL:  // more useful for NON NULL XXX than MATCH NULL XXX
         Init_Logic(
             out,
-            CELL_TYPE(arg_cell) == REB_NULLED
+            CELL_TYPE(arg_cell) == REB_NULL
                 and VAL_NUM_QUOTES(arg) == sum_quotes
         );
         return false;
@@ -315,7 +315,7 @@ inline static bool Single_Test_Throws(
         bool strict = false;
         Init_Logic(
             out,
-            CELL_KIND(arg_cell) == REB_NULLED
+            CELL_KIND(arg_cell) == REB_NULL
             and 0 == CT_String(test_cell, Root_Opt_Tag, strict)
             and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg)
         );

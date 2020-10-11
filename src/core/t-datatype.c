@@ -253,32 +253,25 @@ bool Matches_Fake_Type_Constraint(const RELVAL *v, enum Reb_Symbol sym) {
 //
 REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
 {
-    if (ARR_LEN(boot_types) != REB_MAX - 2)  // exclude REB_0_END, REB_NULLED
-        panic (boot_types);  // every other type should have a WORD!
+    if (ARR_LEN(boot_types) != REB_MAX - 1)  // exclude REB_0_END
+        panic (boot_types);  // other types/internals should have a WORD!
 
     RELVAL *word = ARR_HEAD(boot_types);
 
-    if (VAL_WORD_SYM(word) != SYM_VOID_X)
-        panic (word);  // First "real" type should be VOID!
+    if (VAL_WORD_SYM(word) != SYM_NULL)
+        panic (word);  // First internal byte type is NULL at 1
 
-    REBARR *catalog = Make_Array(REB_MAX - 2);
-
-    // Put a nulled cell in position [1], just to have something there (the
-    // 0 slot is reserved in contexts, so there's no worry about filling space
-    // to line up with REB_0_END).  Note this is different from NULL the
-    // native, which generates a null (since you'd have to type :NULLED to
-    // get a null value, which is awkward).
-    //
-    REBVAL *nulled = Append_Context(Lib_Context, nullptr, Canon(SYM_NULLED));
-    Init_Nulled(nulled);
+    REBARR *catalog = Make_Array(REB_MAX - 1);
 
     REBINT n;
-    for (n = 2; NOT_END(word); word++, n++) {
-        assert(n < REB_MAX);
-
+    for (n = 1; NOT_END(word); word++, n++) {
         enum Reb_Kind kind = cast(enum Reb_Kind, n);
+        REBVAL *value = Append_Context(Lib_Context, SPECIFIC(word), nullptr);
 
-        REBVAL *value = Append_Context(Lib_Context, SPECIFIC(word), NULL);
+        if (kind == REB_NULL) {
+            Init_Nulled(value);
+            continue;
+        }
         if (kind == REB_CUSTOM) {
             //
             // There shouldn't be any literal CUSTOM! datatype instances.
@@ -287,7 +280,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
             // "not bindable" range.  (Is_Bindable() would be a slower test
             // if it had to account for it.)
             //
-            Init_Nulled(value);
+            Init_Void(value);
             continue;
         }
 

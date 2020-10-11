@@ -568,7 +568,7 @@ REBVAL *Setify(REBVAL *out) {
     else if (ANY_GROUP_KIND(kind)) {
         mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SET_GROUP;
     }
-    else if (kind == REB_NULLED) {
+    else if (kind == REB_NULL) {
         fail ("Cannot SETIFY a NULL");
     }
     else {
@@ -626,7 +626,7 @@ REBVAL *Getify(REBVAL *out) {
     else if (ANY_WORD_KIND(kind)) {
         mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GET_WORD;
     }
-    else if (kind == REB_NULLED) {
+    else if (kind == REB_NULL) {
         fail ("Cannot GETIFY a NULL");
     }
     else {
@@ -684,7 +684,7 @@ REBVAL *Symify(REBVAL *out) {
     else if (ANY_GROUP_KIND(kind)) {
         mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SYM_GROUP;
     }
-    else if (kind == REB_NULLED) {
+    else if (kind == REB_NULL) {
         fail ("Cannot SYMIFY a NULL");
     }
     else {
@@ -743,7 +743,7 @@ REBVAL *Plainify(REBVAL *out) {
     else if (ANY_GROUP_KIND(kind)) {
         mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GROUP;
     }
-    else if (kind == REB_NULLED)
+    else if (kind == REB_NULL)
         fail ("Cannot PLAINIFY a NULL");
 
     return Quotify(out, quotes);

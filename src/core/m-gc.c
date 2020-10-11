@@ -107,7 +107,7 @@ inline static void Queue_Mark_Opt_Value_Deep(const RELVAL *v)
 inline static void Queue_Mark_Value_Deep(const RELVAL *v)
 {
     assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
-    assert(KIND_BYTE_UNCHECKED(v) != REB_NULLED);  // faster than IS_NULLED()
+    assert(KIND_BYTE_UNCHECKED(v) != REB_NULL);  // faster than IS_NULLED()
     Queue_Mark_Opt_End_Cell_Deep(v);  // unreadable void is ok
 }
 
@@ -325,7 +325,7 @@ static void Propagate_All_GC_Marks(void)
             // reified C va_lists as Eval_Core() sources can have them.
             //
             if (
-                KIND_BYTE_UNCHECKED(v) == REB_NULLED
+                KIND_BYTE_UNCHECKED(v) == REB_NULL
                 and NOT_ARRAY_FLAG(a, IS_VARLIST)
                 and NOT_ARRAY_FLAG(a, NULLEDS_LEGAL)
             ){

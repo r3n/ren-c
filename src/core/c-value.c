@@ -44,7 +44,7 @@ REBNOD *Dump_Value_Debug(const RELVAL *v)
     REBNOD *containing = Try_Find_Containing_Node_Debug(v);
 
     switch (KIND_BYTE_UNCHECKED(v)) {
-      case REB_NULLED:
+      case REB_NULL:
       case REB_VOID:
       case REB_BLANK:
       #if defined(DEBUG_TRACK_CELLS)

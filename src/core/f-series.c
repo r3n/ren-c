@@ -419,7 +419,7 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool strict)
         fail ("Temporary disablement of CUSTOM! comparisons");
 
       case REB_BLANK:
-      case REB_NULLED: // !!! should nulls be allowed at this level?
+      case REB_NULL: // !!! should nulls be allowed at this level?
       case REB_VOID:
         return CT_Unit(s, t, strict);
 

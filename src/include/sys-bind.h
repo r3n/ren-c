@@ -417,7 +417,7 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
 // The Lookup_Word_May_Fail() function takes the conservative default that
 // only const access is needed.  A const pointer to a REBVAL is given back
 // which may be inspected, but the contents not modified.  While a bound
-// variable that is not currently set will return a REB_NULLED value,
+// variable that is not currently set will return a REB_NULL value,
 // Lookup_Word_May_Fail() on an *unbound* word will raise an error.
 //
 // Lookup_Mutable_Word_May_Fail() offers a parallel facility for getting a

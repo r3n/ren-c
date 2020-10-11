@@ -132,7 +132,7 @@ inline static bool IS_NULLED_OR_VOID_OR_END_KIND(REBYTE k)
     IS_NULLED_OR_VOID_OR_END_KIND(KIND_BYTE_UNCHECKED(v))
 
 inline static bool IS_NULLED_OR_BLANK_KIND(REBYTE k)
-    { return k == REB_NULLED or k == REB_BLANK; }
+    { return k == REB_NULL or k == REB_BLANK; }
 
 #define IS_NULLED_OR_BLANK(v) \
     IS_NULLED_OR_BLANK_KIND(KIND_BYTE(v))
@@ -141,7 +141,7 @@ inline static bool IS_NULLED_OR_BLANK_KIND(REBYTE k)
 //=//// TYPE CATEGORIES ///////////////////////////////////////////////////=//
 
 #define ANY_VALUE(v) \
-    (KIND_BYTE(v) != REB_NULLED)
+    (KIND_BYTE(v) != REB_NULL)
 
 inline static bool ANY_SCALAR_KIND(REBYTE k)  // !!! Should use TS_SCALAR?
     { return k == REB_TUPLE or (k >= REB_LOGIC and k <= REB_PAIR); }

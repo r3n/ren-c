@@ -41,10 +41,10 @@
     c_cast(const REBVAL*, &PG_Nulled_Cell)
 
 #define IS_NULLED(v) \
-    (VAL_TYPE(v) == REB_NULLED)
+    (VAL_TYPE(v) == REB_NULL)
 
 #define Init_Nulled(out) \
-    RESET_CELL((out), REB_NULLED, CELL_MASK_NONE)
+    RESET_CELL((out), REB_NULL, CELL_MASK_NONE)
 
 // !!! A theory was that the "evaluated" flag would help a function that took
 // both <opt> and <end>, which are converted to nulls, distinguish what kind
@@ -52,7 +52,7 @@
 // here just to make a note of the concept, and tag it via the callsites.
 //
 #define Init_Endish_Nulled(out) \
-    RESET_CELL((out), REB_NULLED, CELL_FLAG_UNEVALUATED)
+    RESET_CELL((out), REB_NULL, CELL_FLAG_UNEVALUATED)
 
 inline static bool IS_ENDISH_NULLED(const RELVAL *v)
     { return IS_NULLED(v) and GET_CELL_FLAG(v, UNEVALUATED); }
@@ -62,7 +62,7 @@ inline static bool IS_ENDISH_NULLED(const RELVAL *v)
 // be a "nulled cell" must translate any such cells to nullptr.
 //
 inline static const REBVAL *NULLIFY_NULLED(const REBVAL *cell)
-  { return VAL_TYPE(cell) == REB_NULLED ? nullptr : cell; }
+  { return VAL_TYPE(cell) == REB_NULL ? nullptr : cell; }
 
 inline static const REBVAL *REIFY_NULL(const REBVAL *cell)
   { return cell == nullptr ? NULLED_CELL : cell; }

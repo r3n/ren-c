@@ -47,8 +47,6 @@ gob!  ; !!! for molding, temporary
 struct!  ; !!! for molding, temporary
 library!  ; !!! for molding, temporary
 
-null  ; useful for reporting errors even though it's not a "type"
-
 generic  ; used in boot, see %generics.r
 
 export  ; used in extensions

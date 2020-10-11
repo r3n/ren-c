@@ -172,8 +172,6 @@ add-sym: function [
     return null
 ]
 
-add-sym 'nulled  ; make SYM_NULLED the first symbol (lines up with REB_NULLED)
-
 
 === DATATYPE DEFINITIONS ===
 
@@ -185,16 +183,22 @@ n: 0
 
 rebs: collect [
     for-each-record t type-table [
-        if issue? t/name [
-            assert [t/class = 0]  ; REB_0_END and REB_NULLED
-        ] else [
-            ensure word! t/name
+        if is-real-type: word? t/name [
             ensure word! t/class
-
-            assert [sym-n == n]  ; SYM_XXX should equal REB_XXX value
-            add-sym to-word unspaced [ensure word! t/name "!"]
-            keep cscape/with {REB_${T/NAME} = $<n>} [n t]
+        ] else [
+            ensure issue! t/name
+            assert [t/class = 0]  ; e.g. REB_NULL
+            t/name: mold t/name  ; TO TEXT! of ISSUE! includes # in bootstrap
+            take t/name  ; ...so mold and remove the #
         ]
+
+        if n <> 0 [
+            assert [sym-n == n]  ; SYM_XXX should equal REB_XXX value
+            add-sym to-word unspaced [t/name (if is-real-type ["!"])]
+        ]
+
+        keep cscape/with {REB_${T/NAME} = $<n>} [n t]
+
         n: n + 1
     ]
 ]
@@ -221,17 +225,17 @@ e-types/emit {
      * can make based on knowing a value is only in the range of the enum.
      */
     enum Reb_Kind {
-        REB_0 = 0,  /* reserved for internal purposes */
-        REB_0_END = REB_0,  /* ...most commonly array termination cells... */
-        REB_TS_ENDABLE = REB_0,  /* bit set in typesets for endability */
-        REB_P_DETECT = REB_0,  /* detect paramclass from vararg */
 
-        REB_NULLED = 1,  /* special null signal, not technically a "type" */
-
-        /*** REAL TYPES ***/
+        /*** TYPES AND INTERNALS GENERATED FROM %TYPES.R ***/
 
         $[Rebs],
         REB_MAX, /* one past valid types */
+
+        /*** ALIASES FOR REB_0_END ***/
+
+        REB_0 = REB_0_END,  /* REB_0 when used for signals besides ENDness */
+        REB_TS_ENDABLE = REB_0,  /* bit set in typesets for endability */
+        REB_P_DETECT = REB_0,  /* detect paramclass from vararg */
 
         /*** PSEUDOTYPES ***/
 
@@ -318,14 +322,22 @@ e-types/emit {
 }
 e-types/emit newline
 
-boot-types: copy []
-n: 1
+boot-types: copy []  ; includes internal types like REB_NULL (but not END)
+n: 0
+
 for-each-record t type-table [
-    if issue? t/name [
-        continue  ; IS_END(), IS_NULLED(), special tests
+    if n != 0 [
+        append boot-types either issue? t/name [
+            to-word t/name
+        ][
+            to-word unspaced [form t/name "!"]
+        ]
     ]
 
-    if t/name != 'quoted [  ; see IS_QUOTED(), handled specially
+    all [
+        not issue? t/name  ; internal type
+        t/name != 'quoted  ; see IS_QUOTED(), handled specially
+    ] then [
         e-types/emit 't {
             #define IS_${T/NAME}(v) \
                 (KIND_BYTE(v) == REB_${T/NAME})  /* $<n> */
@@ -333,32 +345,41 @@ for-each-record t type-table [
         e-types/emit newline
     ]
 
-    append boot-types to-word unspaced [form t/name "!"]
     n: n + 1
+]
+
+nontypes: collect [
+    for-each-record t type-table [
+        if issue? t/name [
+            keep cscape/with {FLAGIT_KIND(REB_${TO WORD! T/NAME})} 't
+        ]
+    ]
+]
+
+value-flagnots: compose [
+    "(FLAGIT_KIND(REB_MAX) - 1)"  ; Subtract 1 to get mask for everything
+    ((nontypes))  ; take out all nontypes
 ]
 
 e-types/emit {
     /*
      * TYPESET DEFINITIONS (e.g. TS_ARRAY or TS_STRING)
-     *
-     * Note: User-facing typesets, such as ANY-VALUE!, do not include null
-     * (absence of a value), nor do they include the internal "REB_0" type.
      */
 
     /*
-     * Subtract 1 to get mask for everything
-     * Subtract 1 again to take out REB_0_END (signal for "endability")
-     * Subtract 2 to take out REB_1_NULLED
+     * Typeset for ANY-VALUE!
      */
     #define TS_VALUE \
-        (((FLAGIT_KIND(REB_MAX) - 1) - 1) - 2)
+        ($<Delimit "&~" Value-Flagnots>)
 
     /*
-     * Similar to TS_VALUE but accept NULL (as REB_MAX)
+     * Typeset for [<OPT> ANY-VALUE!] (similar to TS_VALUE but accept NULL)
      */
     #define TS_OPT_VALUE \
-        ((FLAGIT_KIND(REB_MAX) - 1) - 1)
+        (TS_VALUE | FLAGIT_KIND(REB_NULL))
+
 }
+
 typeset-sets: copy []
 
 for-each-record t type-table [

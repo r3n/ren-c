@@ -1993,7 +1993,7 @@ REBNATIVE(subparse)
             fail ("BAR! must be source level (else PARSE can't skip it)");
 
         switch (VAL_TYPE(rule)) {
-          case REB_NULLED:
+          case REB_NULL:
           case REB_BLANK: // if we see a blank here, it was variable-fetched
             FETCH_NEXT_RULE(f);  // handle fetched blanks same as null
             continue;

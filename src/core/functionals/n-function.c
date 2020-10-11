@@ -323,7 +323,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
         else if (GET_ACTION_FLAG(a, HAS_RETURN)) {
             REBVAL *typeset = ACT_PARAMS_HEAD(a);
             assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
-            if (not TYPE_CHECK(typeset, REB_NULLED))  // `do []` returns
+            if (not TYPE_CHECK(typeset, REB_NULL))  // `do []` returns
                 ACT_DISPATCHER(a) = &Returner_Dispatcher;  // error when run
         }
         else {

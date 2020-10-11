@@ -463,7 +463,7 @@ void Push_Paramlist_Triads_May_Fail(
         // SPECIALIZE and other scenarios.
         //
         // Note there are currently two ways to get NULL: <opt> and <end>.
-        // If the typeset bits contain REB_NULLED, that indicates <opt>.
+        // If the typeset bits contain REB_NULL, that indicates <opt>.
         // But Is_Param_Endable() indicates <end>.
 
         if (refinement) {

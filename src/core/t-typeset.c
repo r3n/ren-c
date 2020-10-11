@@ -174,7 +174,7 @@ bool Add_Typeset_Bits_Core(
                 // !!! Review if this makes sense to allow with MAKE TYPESET!
                 // instead of just function specs.
                 //
-                TYPE_SET(typeset, REB_NULLED);
+                TYPE_SET(typeset, REB_NULL);
             }
             else if (0 == CT_String(item, Root_Output_Tag, strict)) {
                 //
@@ -187,7 +187,7 @@ bool Add_Typeset_Bits_Core(
                 //
                 CLEAR_ALL_TYPESET_BITS(typeset);
                 TYPE_SET(typeset, REB_TS_REFINEMENT);
-                TYPE_SET(typeset, REB_NULLED);
+                TYPE_SET(typeset, REB_NULL);
                 TYPE_SET(typeset, REB_ISSUE);  // see Is_Blackhole()
                 TYPE_SET(typeset, REB_WORD);
                 TYPE_SET(typeset, REB_PATH);
@@ -199,7 +199,7 @@ bool Add_Typeset_Bits_Core(
 
                 TYPE_SET(typeset, REB_TS_SKIPPABLE);
                 TYPE_SET(typeset, REB_TS_ENDABLE); // skip => null
-                TYPE_SET(typeset, REB_NULLED);  // null if specialized
+                TYPE_SET(typeset, REB_NULL);  // null if specialized
             }
             else if (0 == CT_String(item, Root_Dequote_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_DEQUOTE_REQUOTE);
@@ -313,7 +313,7 @@ REBARR *Typeset_To_Array(const REBVAL *tset)
     REBINT n;
     for (n = 1; n < REB_MAX; ++n) {
         if (TYPE_CHECK(tset, cast(enum Reb_Kind, n))) {
-            if (n == REB_NULLED) {
+            if (n == REB_NULL) {
                 //
                 // !!! A BLANK! value is currently supported in typesets to
                 // indicate that they take optional values.  This may wind up
@@ -350,14 +350,14 @@ void MF_Typeset(REB_MOLD *mo, REBCEL(const*) v, bool form)
     if (TYPE_CHECK(v, REB_0_END))
         Append_Ascii(mo->series, "<end> ");
 
-    STATIC_ASSERT(REB_NULLED == 1);
-    if (TYPE_CHECK(v, REB_NULLED))
+    STATIC_ASSERT(REB_NULL == 1);
+    if (TYPE_CHECK(v, REB_NULL))
         Append_Ascii(mo->series, "<opt> ");
 
     // !!! What about REB_TS_SKIPPABLE and other parameter properties, that
     // don't really fit into "types", but you can get with TYPESETS OF action?
 
-    for (n = REB_NULLED + 1; n < REB_MAX; n++) {
+    for (n = REB_NULL + 1; n < REB_MAX; n++) {
         enum Reb_Kind kind = cast(enum Reb_Kind, n);
         if (TYPE_CHECK(v, kind)) {
             if (kind == REB_CUSTOM) {

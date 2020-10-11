@@ -56,8 +56,8 @@ min: :minimum
 max: :maximum
 abs: :absolute
 
+; Note: NULL symbol is in lib context slot 1, is initialized on boot
 blank: _   ; e.g. sometimes `return blank` reads better than `return _`
-null: '  ; a single apostrophe with nothing after it is a quoted null
 
 void: func* [
     "Function returning void result (alternative for `#[void]`)"
