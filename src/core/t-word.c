@@ -113,12 +113,13 @@ REB_R MAKE_Word(
         //
         // Run the same mechanics that AS WORD! would, since it's immutable.
         //
-      as_word:
+      as_word: {
         REBVAL *as = rebValue("as", Datatype_From_Kind(kind), arg, rebEND);
         Move_Value(out, as);
         rebRelease(as);
 
         return out;
+      }
     }
     else if (IS_DATATYPE(arg)) {
         return Init_Any_Word(out, kind, Canon(VAL_TYPE_SYM(arg)));
