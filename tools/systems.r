@@ -275,7 +275,7 @@ systems: [
     0.16.02 pthread/emscripten "emscripten"
         #SG? #LEN
 
-    0.16.03 node/emscripten "node.js"
+    0.16.03 node/emscripten "nodejs"
         #SG? #LEN
 
     AIX: 17
