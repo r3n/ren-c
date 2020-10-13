@@ -11,10 +11,10 @@
     [] = rejoin [[]]
 )
 (
-    "" = rejoin [null]
+    "" = rejoin ["" null]
 )
 (
-    "" = rejoin [null null]
+    [] = rejoin [null null]
 )
 (
     [[]] = rejoin [[][]]
@@ -45,3 +45,13 @@
     value: 1
     "1" = rejoin [value]
 )
+
+[
+    https://github.com/metaeducation/ren-c/issues/1084
+    (#ab = rejoin [#a #b])
+]
+
+[
+    https://github.com/metaeducation/ren-c/issues/1085
+    (#a30bc = join #a [10 + 20 "b" #c])
+]

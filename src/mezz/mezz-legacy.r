@@ -193,36 +193,35 @@ join-of: func [] [
 rejoin: func [
     {Reduces and joins a block of values}
 
-    return: [any-series!]
-        "Will be the type of the first non-null series produced by evaluation"
-    block [block!]
-        "Values to reduce and join together"
-    <local> values pos evaluated result
+    return: "Same type as first non-null item produced by evaluation"
+        [issue! any-series! any-sequence!]
+    block "Values to reduce and join together"
+        [block!]
+    <local> base
 ][
-    ; An empty block should result in an empty block.
-    ;
-    if empty? block [return copy []]
+    cycle [  ; Keep evaluating until a usable BASE is found
 
-    ; Act like REDUCE of expression, but where null does not cause an error.
-    ;
-    values: copy []
-    pos: block
-    while [pos: evaluate/result pos 'evaluated][
-        append/only values :evaluated
+        if not block: evaluate/result block 'base [
+            return copy []  ; we exhausted block without finding a base value
+        ]
+
+        any [
+            quoted? block  ; just ran an invisible like COMMENT or ELIDE
+            null? :base  ; consider to have dissolved
+            blank? :base  ; treat same as NULL
+        ] then [
+            continue  ; do another evaluation step
+        ]
+
+        ; !!! Historical Rebol would default to a TEXT! if the first thing
+        ; found wasn't JOIN-able.  This is questionable.
+        ;
+        if not match [issue! any-sequence! any-series!] :base [
+            base: to text! :base
+        ]
+
+        return join base block  ; JOIN with what's left of the block
     ]
-
-    ; An empty block of values should result in an empty string.
-    ;
-    if empty? values [return copy {}]
-
-    ; Take type of the first element for the result, or default to string.
-    ;
-    result: if any-series? first values [
-        copy first values
-    ] else [
-        form first values
-    ]
-    append result next values
 ]
 
 

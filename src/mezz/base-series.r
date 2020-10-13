@@ -69,37 +69,38 @@ join: function [
     {Concatenates values to the end of a copy of a value}
 
     return:
-        [<requote> any-series! any-path! tuple! port!
+        [<requote> any-series! issue! any-sequence! port!
             map! object! module! bitset!]
-    head
-        [<dequote> any-series! any-path! tuple! port!
+    base
+        [<dequote> any-series! issue! any-sequence! port!
             map! object! module! bitset!]
     value [<opt> any-value!]
 ][
-    type: type of head
-    head: copy if find reduce [path! set-path! get-path! tuple!] type [
-        to block! head
-    ] else [
-        type: _
-        head
+    type: type of base  ; to set output type back to original if transformed
+    case [
+        find any-sequence! type [base: to block! base]
+        issue! = type [base: to text! base]
+        default [
+            base: copy base
+            type: _  ; don't apply any conversion at end
+        ]
     ]
 
     result: switch type of :value [
-        block! [append head reduce :value]
+        block! [append base reduce .identity :value]
         group! [
-            fail 'value "Can't JOIN a GROUP! onto a series (use AS BLOCK!)."
+            fail 'base "Can't JOIN a GROUP! onto a series (use AS BLOCK!)."
         ]
         action! [
-            fail 'value "Can't JOIN an ACTION! onto a series (use APPEND)."
+            fail 'base "Can't JOIN an ACTION! onto a series (use APPEND)."
         ]
         default [
-            append/only head :value
+            append/only base :value
         ]
     ]
 
     if type [
-        assert [block? result]
-        result: to type result
+        result: as type result
     ]
 
     return result
