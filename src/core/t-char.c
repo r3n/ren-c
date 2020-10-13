@@ -296,16 +296,8 @@ REBTYPE(Issue)
 {
     REBVAL *issue = D_ARG(1);
 
-    if (not IS_CHAR(issue))
-        return T_String(frame_, verb);
-
-    // Don't use a REBUNI for chr, because it does signed math and then will
-    // detect overflow.
-    //
-    REBI64 chr = cast(REBI64, VAL_CHAR(issue));
-    REBI64 arg;
-
     REBSYM sym = VAL_WORD_SYM(verb);
+
     switch (sym) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
@@ -313,12 +305,18 @@ REBTYPE(Issue)
 
         switch (VAL_WORD_SYM(ARG(property))) {
           case SYM_CODEPOINT:
+            if (not IS_CHAR(issue))
+                break;  // must be a single codepoint to use this reflector
             return Init_Integer(D_OUT, VAL_CHAR(issue));
+
+          case SYM_SIZE: {
+            REBSIZ size;
+            VAL_UTF8_SIZE_AT(&size, issue);
+            return Init_Integer(D_OUT, size); }
 
           case SYM_LENGTH: {
             REBLEN len;
-            REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, issue);
-            UNUSED(utf8);
+            VAL_UTF8_LEN_SIZE_AT(&len, nullptr, issue);
             return Init_Integer(D_OUT, len); }
 
           default:
@@ -326,6 +324,23 @@ REBTYPE(Issue)
         }
         return R_UNHANDLED; }
 
+      case SYM_COPY:  // since copy result is also immutable, Move() suffices
+        return Move_Value(D_OUT, issue);
+    }
+
+    // !!! All the math operations below are inherited from the CHAR!
+    // implementation, and will not work if the ISSUE! length is > 1.
+    //
+    if (not IS_CHAR(issue))
+        return R_UNHANDLED;
+
+    // Don't use a REBUNI for chr, because it does signed math and then will
+    // detect overflow.
+    //
+    REBI64 chr = cast(REBI64, VAL_CHAR(issue));
+    REBI64 arg;
+
+    switch (sym) {
       case SYM_ADD: {
         arg = Math_Arg_For_Char(D_ARG(2), verb);
         chr += arg;

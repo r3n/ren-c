@@ -1011,10 +1011,17 @@ REBTYPE(String)
     REBFLGS sop_flags;  // SOP_XXX "Set Operation" flags
 
     switch (sym) {
-        //
-        // !!! INTERSECT, UNION, DIFFERENCE temporarily unavailable on STRING!
-        //
-      case SYM_REFLECT:
+      case SYM_REFLECT: {
+        INCLUDE_PARAMS_OF_REFLECT;
+        UNUSED(ARG(value));  // accounted for by `v`
+
+        if (VAL_WORD_SYM(ARG(property)) == SYM_SIZE) {
+            REBSIZ size;
+            VAL_UTF8_SIZE_AT(&size, v);
+            return Init_Integer(D_OUT, size);
+        }
+        return Series_Common_Action_Maybe_Unhandled(frame_, verb); }
+
       case SYM_SKIP:
       case SYM_AT:
         return Series_Common_Action_Maybe_Unhandled(frame_, verb);

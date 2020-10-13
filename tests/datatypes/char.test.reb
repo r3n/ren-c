@@ -1,7 +1,39 @@
 ; datatypes/char.r
-(char? #"a")
-(not char? 1)
 (issue! = type of #"a")
+
+(char? #"a")
+(char? #a)
+(not char? 1)
+(not char? #aa)
+
+; Only length 1 issues should register as CHAR?
+(
+    for-each [issue length size] [
+        #b 1 1
+        #à 1 2
+        #漢 1 3
+        #😺 1 4
+
+        #bà 2 3
+        #😺😺 2 8
+        #漢à😺 3 9
+
+        #12345678901234567890 20 20  ; longer than fits in cell
+    ][
+        assert [length = length of issue]
+        assert [size = size of issue]
+        assert [(char? issue) == (1 = length of issue)]
+        assert [issue = copy issue]
+    ]
+    true
+)
+
+; Math operations should only work on single characters
+[
+    (#a + 1 = #b)
+    ('cannot-use = (trap [#aa + 1])/id)
+]
+
 
 ; !!! Workaround for test scanner's use of TRANSCODE that violates the ability
 ; to actually work with 0 byte representations in strings (even for a test
