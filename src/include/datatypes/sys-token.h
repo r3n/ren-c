@@ -94,7 +94,7 @@ inline static REBVAL *Init_Issue_Utf8(
         Freeze_Series(SER(str));
         Init_Text(out, str);
     }
-    mutable_KIND_BYTE(out) = REB_ISSUE;
+    mutable_KIND3Q_BYTE(out) = REB_ISSUE;
     return SPECIFIC(out);
 }
 
@@ -124,7 +124,7 @@ inline static REBVAL *Init_Char_Unchecked(RELVAL *out, REBUNI c) {
         EXTRA(Bytes, out).exactly_4[IDX_EXTRA_LEN] = 1;  // just one codepoint
     }
 
-    mutable_KIND_BYTE(out) = REB_ISSUE;  // heart is TEXT, presents as issue
+    mutable_KIND3Q_BYTE(out) = REB_ISSUE;  // heart is TEXT, presents as issue
     assert(VAL_CHAR(out) == c);
     return cast(REBVAL*, out);
 }

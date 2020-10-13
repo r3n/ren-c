@@ -101,7 +101,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
     // PATH! from non-head positions.
 
     Init_Any_Series_At_Core(out, REB_BLOCK, SER(a), index, specifier);
-    mutable_KIND_BYTE(out) = kind;
+    mutable_KIND3Q_BYTE(out) = kind;
     assert(HEART_BYTE(out) == REB_BLOCK);
 
     return SPECIFIC(out);
@@ -239,14 +239,14 @@ bool Next_Path_Throws(REBPVS *pvs)
 
   redo:;
 
-    bool was_custom = (KIND_BYTE(pvs->out) == REB_CUSTOM);  // !!! for hack
+    bool was_custom = (KIND3Q_BYTE(pvs->out) == REB_CUSTOM);  // !!! for hack
     PATH_HOOK *hook = Path_Hook_For_Type_Of(pvs->out);
 
     if (IS_END(f_value) and PVS_IS_SET_PATH(pvs)) {
 
         const REBVAL *r = hook(pvs, PVS_PICKER(pvs), PVS_OPT_SETVAL(pvs));
 
-        switch (KIND_BYTE(r)) {
+        switch (KIND3Q_BYTE(r)) {
           case REB_0_END: { // unhandled
             assert(r == R_UNHANDLED); // shouldn't be other ends
             DECLARE_LOCAL (specific);
@@ -325,7 +325,7 @@ bool Next_Path_Throws(REBPVS *pvs)
         else if (GET_CELL_FLAG(r, ROOT)) { // API, from Alloc_Value()
             Handle_Api_Dispatcher_Result(pvs, r);
         }
-        else switch (KIND_BYTE(r)) {
+        else switch (KIND3Q_BYTE(r)) {
           case REB_R_THROWN:
             panic ("Path dispatch isn't allowed to throw, only GROUP!s");
 
@@ -504,7 +504,7 @@ bool Eval_Path_Throws_Core(
     const REBARR *array = VAL_ARRAY(sequence);
     REBSPC *specifier = Derive_Specifier(sequence_specifier, sequence);
 
-    while (KIND_BYTE(ARR_AT(array, index)) == REB_BLANK)
+    while (KIND3Q_BYTE(ARR_AT(array, index)) == REB_BLANK)
         ++index; // pre-feed any blanks
 
     assert(NOT_END(ARR_AT(array, index)));
@@ -915,7 +915,7 @@ REBNATIVE(poke)
     PATH_HOOK *hook = Path_Hook_For_Type_Of(location);
 
     const REBVAL *r = hook(pvs, PVS_PICKER(pvs), ARG(value));
-    switch (KIND_BYTE(r)) {
+    switch (KIND3Q_BYTE(r)) {
     case REB_0_END: {
         assert(r == R_UNHANDLED);
         fail (Error_Bad_Path_Poke_Raw(rebUnrelativize(PVS_PICKER(pvs))));
@@ -1070,7 +1070,7 @@ REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         // new bindings in lookups.  Review!
         //
         Move_Value(out, arg);
-        mutable_KIND_BYTE(out) = arg_kind;
+        mutable_KIND3Q_BYTE(out) = arg_kind;
         return out;
     }
 

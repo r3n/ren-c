@@ -137,7 +137,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
         if (GET_ARRAY_FLAG(s, IS_VARLIST)) {
             printf("Series VARLIST detected.\n");
             REBCTX *context = CTX(s);
-            if (KIND_BYTE_UNCHECKED(CTX_ARCHETYPE(context)) == REB_ERROR) {
+            if (KIND3Q_BYTE_UNCHECKED(CTX_ARCHETYPE(context)) == REB_ERROR) {
                 printf("...and that VARLIST is of an ERROR!...");
                 PROBE(context);
             }
@@ -164,7 +164,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
         UNUSED(v);
         strncat(buf, "value", PANIC_BUF_SIZE - strsize(buf));
       #else
-        if (KIND_BYTE_UNCHECKED(v) == REB_ERROR) {
+        if (KIND3Q_BYTE_UNCHECKED(v) == REB_ERROR) {
             printf("...panicking on an ERROR! value...");
             PROBE(v);
         }

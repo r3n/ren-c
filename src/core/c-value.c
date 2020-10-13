@@ -43,7 +43,7 @@ REBNOD *Dump_Value_Debug(const RELVAL *v)
 
     REBNOD *containing = Try_Find_Containing_Node_Debug(v);
 
-    switch (KIND_BYTE_UNCHECKED(v)) {
+    switch (KIND3Q_BYTE_UNCHECKED(v)) {
       case REB_NULL:
       case REB_VOID:
       case REB_BLANK:
@@ -77,7 +77,7 @@ REBNOD *Dump_Value_Debug(const RELVAL *v)
         break;
     }
 
-    printf("kind_byte=%d\n", cast(int, KIND_BYTE_UNCHECKED(v)));
+    printf("kind_byte=%d\n", cast(int, KIND3Q_BYTE_UNCHECKED(v)));
 
     enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(v));
     const char *type = STR_UTF8(Canon(SYM_FROM_KIND(kind)));

@@ -208,7 +208,7 @@ inline static void Prep_Array(
             ++n;
             ++prep;
             prep->header.bits =
-                FLAG_KIND_BYTE(REB_T_TRASH)
+                FLAG_KIND3Q_BYTE(REB_T_TRASH)
                 | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
             TRACK_CELL_IF_DEBUG(prep, __FILE__, __LINE__);
         }
@@ -589,7 +589,7 @@ inline static RELVAL *Init_Relative_Block_At(
 inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {
     assert(ANY_GROUP_KIND(CELL_HEART(group)));
     const RELVAL *inner = VAL_ARRAY_AT(group);
-    if (KIND_BYTE(inner) != REB_GROUP or NOT_END(inner + 1))
+    if (KIND3Q_BYTE(inner) != REB_GROUP or NOT_END(inner + 1))
         return false; // plain (...) GROUP!
     return true; // a ((...)) GROUP!, inject as rule
 }

@@ -34,7 +34,7 @@
 // But that's the API.  Internal to Rebol, cells are the currency used, and
 // if they are to represent an "optional" value, there must be a special
 // bit pattern used to mark them as not containing any value at all.  These
-// are called "nulled cells" and marked by means of their KIND_BYTE().
+// are called "nulled cells" and marked by means of their KIND3Q_BYTE().
 //
 
 #define NULLED_CELL \

@@ -1147,7 +1147,7 @@ bool Try_As_String(
     else if (ANY_STRING(v)) {
       any_string:
         Move_Value(out, v);
-        mutable_KIND_BYTE(out)
+        mutable_KIND3Q_BYTE(out)
             = mutable_HEART_BYTE(out)
             = new_kind;
         Trust_Const(Quotify(out, quotes));
@@ -1208,7 +1208,7 @@ REBNATIVE(as)
                 REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
                 Init_Blank(ARR_HEAD(a));
                 Blit_Cell(ARR_AT(a, 1), v);
-                mutable_KIND_BYTE(ARR_AT(a, 1)) = REB_WORD;
+                mutable_KIND3Q_BYTE(ARR_AT(a, 1)) = REB_WORD;
                 mutable_HEART_BYTE(ARR_AT(a, 1)) = REB_WORD;
                 TERM_ARRAY_LEN(a, 2);
                 Init_Block(v, a);
@@ -1217,7 +1217,7 @@ REBNATIVE(as)
               case REB_SYM_WORD: {
                 REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
                 Blit_Cell(ARR_HEAD(a), v);
-                mutable_KIND_BYTE(ARR_HEAD(a)) = REB_WORD;
+                mutable_KIND3Q_BYTE(ARR_HEAD(a)) = REB_WORD;
                 mutable_HEART_BYTE(ARR_HEAD(a)) = REB_WORD;
                 Init_Blank(ARR_AT(a, 1));
                 TERM_ARRAY_LEN(a, 2);
@@ -1225,7 +1225,7 @@ REBNATIVE(as)
                 break; }
 
               case REB_BLOCK:
-                mutable_KIND_BYTE(v) = REB_BLOCK;
+                mutable_KIND3Q_BYTE(v) = REB_BLOCK;
                 assert(Is_Array_Frozen_Shallow(VAL_ARRAY(v)));
                 assert(VAL_INDEX(v) == 0);
                 break;
@@ -1271,7 +1271,7 @@ REBNATIVE(as)
 
         if (ANY_PATH(v)) {
             Move_Value(D_OUT, v);
-            mutable_KIND_BYTE(D_OUT)
+            mutable_KIND3Q_BYTE(D_OUT)
                 = new_kind;
             return Trust_Const(D_OUT);
         }
@@ -1310,7 +1310,7 @@ REBNATIVE(as)
                     goto bad_cast;
                 }
             }
-            mutable_KIND_BYTE(D_OUT) = REB_ISSUE;
+            mutable_KIND3Q_BYTE(D_OUT) = REB_ISSUE;
             return D_OUT;
         }
 
@@ -1485,7 +1485,7 @@ REBNATIVE(as)
     // updating the quotes is enough.
     //
     Move_Value(D_OUT, v);
-    mutable_KIND_BYTE(D_OUT)
+    mutable_KIND3Q_BYTE(D_OUT)
         = mutable_HEART_BYTE(D_OUT)
         = new_kind;
     return Trust_Const(D_OUT);

@@ -2478,7 +2478,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         for (; cleanup <= DS_TOP; ++cleanup) {
             if (IS_GET_WORD(cleanup)) {
                 REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);
-                mutable_KIND_BYTE(cleanup)
+                mutable_KIND3Q_BYTE(cleanup)
                     = mutable_HEART_BYTE(cleanup)
                     = REB_GET_WORD;
 
@@ -2592,7 +2592,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         if (not IS_ANY_SIGIL_KIND(kind))
             fail (Error_Syntax(ss, token));
 
-        mutable_KIND_BYTE(DS_TOP) = SETIFY_ANY_PLAIN_KIND(kind);
+        mutable_KIND3Q_BYTE(DS_TOP) = SETIFY_ANY_PLAIN_KIND(kind);
         if (kind != REB_PATH and kind != REB_TUPLE)  // keep "heart" as is
             mutable_HEART_BYTE(DS_TOP) = SETIFY_ANY_PLAIN_KIND(kind);
 
@@ -2605,13 +2605,13 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
         switch (prefix_pending) {
           case TOKEN_COLON:
-            mutable_KIND_BYTE(DS_TOP) = GETIFY_ANY_PLAIN_KIND(kind);
+            mutable_KIND3Q_BYTE(DS_TOP) = GETIFY_ANY_PLAIN_KIND(kind);
             if (kind != REB_PATH and kind != REB_TUPLE)  // keep "heart" as is
                 mutable_HEART_BYTE(DS_TOP) = GETIFY_ANY_PLAIN_KIND(kind);
             break;
 
           case TOKEN_AT:
-            mutable_KIND_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);
+            mutable_KIND3Q_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);
             if (kind != REB_PATH and kind != REB_TUPLE)  // keep "heart" as is
                 mutable_HEART_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);
             break;

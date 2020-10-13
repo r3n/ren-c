@@ -370,13 +370,13 @@ REBTYPE(Sequence)
         assert(HEART_BYTE(sequence) == REB_BLOCK);
 
         enum Reb_Kind kind = VAL_TYPE(sequence);
-        mutable_KIND_BYTE(sequence) = REB_BLOCK;
+        mutable_KIND3Q_BYTE(sequence) = REB_BLOCK;
 
         REB_R r = T_Array(frame_, verb);
 
-        assert(KIND_BYTE(r) == REB_BLOCK);
+        assert(KIND3Q_BYTE(r) == REB_BLOCK);
         Freeze_Array_Shallow(VAL_ARRAY_KNOWN_MUTABLE(r));
-        mutable_KIND_BYTE(r) = kind;
+        mutable_KIND3Q_BYTE(r) = kind;
 
         return r; }
 

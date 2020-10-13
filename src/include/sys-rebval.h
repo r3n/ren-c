@@ -587,7 +587,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     //
     // A Reb_Relative_Value is a point of view on a cell where VAL_TYPE() can
     // be called and will always give back a value in range < REB_MAX.  All
-    // KIND_BYTE() > REB_64 are considered to be REB_QUOTED variants of the
+    // KIND3Q_BYTE() > REB_64 are considered to be REB_QUOTED variants of the
     // byte modulo 64.
     //
     struct Reb_Relative_Value : public Reb_Cell {};

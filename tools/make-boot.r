@@ -214,7 +214,7 @@ e-types/emit {
      * While REB_MAX indicates the maximum legal VAL_TYPE(), there is also a
      * list of PSEUDOTYPE_ONE, PSEUDOTYPE_TWO, etc. values which are used
      * for special internal states and flags.  Some of these are used in the
-     * KIND_BYTE() of value cells to mark their usage of alternate payloads
+     * KIND3Q_BYTE() of value cells to mark their usage of alternate payloads
      * during algorithmic transformations (e.g. specialization).  Others are
      * used to signal special behaviors when returned from native dispatchers.
      * Still others are used as special indicators in typeset bitsets.
@@ -308,12 +308,12 @@ e-types/emit {
      * SINGLE TYPE CHECK MACROS, e.g. IS_BLOCK() or IS_TAG()
      *
      * These routines are based on VAL_TYPE(), which is distinct and costs
-     * more than KIND_BYTE() in the debug build.  In some commonly called
+     * more than KIND3Q_BYTE() in the debug build.  In some commonly called
      * routines that don't differentiate literal types, it may be worth it
-     * to use KIND_BYTE() for optimization purposes.
+     * to use KIND3Q_BYTE() for optimization purposes.
      *
      * Note that due to a raw type encoding trick, IS_QUOTED() is unusual.
-     * `KIND_BYTE(v) == REB_QUOTED` isn't `VAL_TYPE(v) == REB_QUOTED`,
+     * `KIND3Q_BYTE(v) == REB_QUOTED` isn't `VAL_TYPE(v) == REB_QUOTED`,
      * they mean different things.  This is because raw types > REB_64 are
      * used to encode literals whose escaping level is low enough that it
      * can use the same cell bits as the escaped value.
@@ -339,7 +339,7 @@ for-each-record t type-table [
     ] then [
         e-types/emit 't {
             #define IS_${T/NAME}(v) \
-                (KIND_BYTE(v) == REB_${T/NAME})  /* $<n> */
+                (KIND3Q_BYTE(v) == REB_${T/NAME})  /* $<n> */
         }
         e-types/emit newline
     ]

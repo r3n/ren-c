@@ -45,7 +45,7 @@
 //
 void Assert_Cell_Marked_Correctly(const RELVAL *v)
 {
-    if (KIND_BYTE_UNCHECKED(v) == REB_QUOTED) {
+    if (KIND3Q_BYTE_UNCHECKED(v) == REB_QUOTED) {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         assert(HEART_BYTE(v) == REB_QUOTED);
         assert(Is_Marked(PAYLOAD(Any, v).first.node));
@@ -332,7 +332,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(ARR_LEN(a) >= 2);
         RELVAL *item = ARR_HEAD(a);
         for (; NOT_END(item); ++item)
-            assert(not ANY_PATH_KIND(KIND_BYTE_UNCHECKED(item)));
+            assert(not ANY_PATH_KIND(KIND3Q_BYTE_UNCHECKED(item)));
         assert(Is_Marked(a));
         break; }
 
@@ -391,7 +391,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         // REB_QUOTED should not be contained in a quoted; instead, the
         // depth of the existing literal should just have been incremented.
         //
-        panic ("REB_QUOTED with (KIND_BYTE() % REB_64) > 0");
+        panic ("REB_QUOTED with (KIND3Q_BYTE() % REB_64) > 0");
 
     //=//// BEGIN INTERNAL TYPES ////////////////////////////////////////=//
 

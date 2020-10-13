@@ -372,7 +372,7 @@ void Push_Paramlist_Triads_May_Fail(
 
             spelling = VAL_REFINEMENT_SPELLING(cell);
             if (STR_SYMBOL(spelling) == SYM_LOCAL)  // /LOCAL
-                if (ANY_WORD_KIND(KIND_BYTE(item + 1)))  // END is 0
+                if (ANY_WORD_KIND(KIND3Q_BYTE(item + 1)))  // END is 0
                     fail (Error_Legacy_Local_Raw(spec));  // -> <local>
 
             if (CELL_KIND(cell) == REB_GET_PATH) {
@@ -977,7 +977,7 @@ REBACT *Make_Action(
     ASSERT_ARRAY_MANAGED(paramlist);
 
     RELVAL *rootparam = ARR_HEAD(paramlist);
-    assert(KIND_BYTE(rootparam) == REB_ACTION); // !!! not fully formed...
+    assert(KIND3Q_BYTE(rootparam) == REB_ACTION); // !!! not fully formed...
     assert(VAL_ACT_PARAMLIST(rootparam) == paramlist);
     assert(EXTRA(Binding, rootparam).node == UNBOUND); // archetype
 

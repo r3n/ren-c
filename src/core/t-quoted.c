@@ -107,14 +107,14 @@ REB_R PD_Quoted(
     UNUSED(picker);
     UNUSED(opt_setval);
 
-    if (KIND_BYTE(pvs->out) == REB_QUOTED)
+    if (KIND3Q_BYTE(pvs->out) == REB_QUOTED)
         Move_Value(pvs->out, VAL_QUOTED_PAYLOAD_CELL(pvs->out));
     else {
-        assert(KIND_BYTE(pvs->out) >= REB_MAX);
-        mutable_KIND_BYTE(pvs->out) %= REB_64;
+        assert(KIND3Q_BYTE(pvs->out) >= REB_MAX);
+        mutable_KIND3Q_BYTE(pvs->out) %= REB_64;
         assert(
             mutable_HEART_BYTE(pvs->out)
-            == mutable_KIND_BYTE(pvs->out)
+            == mutable_KIND3Q_BYTE(pvs->out)
         );
     }
 

@@ -353,7 +353,7 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
     // may be shared with other REB_QUOTED instances, that can't have their
     // bindings corrupted.  A new payload must be made in that case.
     //
-    if (KIND_BYTE(out) == REB_QUOTED) {  // always claims to be bindable
+    if (KIND3Q_BYTE(out) == REB_QUOTED) {  // always claims to be bindable
         RELVAL *old = VAL_QUOTED_PAYLOAD_CELL(out);
         if (not Is_Bindable(old))
             return;  // unescaped value isn't *actually* a bindable type

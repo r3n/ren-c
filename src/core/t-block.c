@@ -1309,8 +1309,8 @@ void Assert_Array_Core(const REBARR *a)
             panic (a);
         }
         if (not GET_ARRAY_FLAG(a, IS_PARAMLIST)) {  // uses > REB_MAX for PTYPE
-            if (KIND_BYTE_UNCHECKED(item) % REB_64 >= REB_MAX) {
-                printf("Invalid KIND_BYTE at index %d\n", cast(int, i));
+            if (KIND3Q_BYTE_UNCHECKED(item) % REB_64 >= REB_MAX) {
+                printf("Invalid KIND3Q_BYTE at index %d\n", cast(int, i));
                 panic (a);
             }
         }

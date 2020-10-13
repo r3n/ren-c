@@ -98,10 +98,10 @@ inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
         Init_Unreadable_Void_Debug((out), __FILE__, __LINE__)
 
     #define IS_VOID_RAW(v) \
-        (KIND_BYTE_UNCHECKED(v) == REB_VOID)
+        (KIND3Q_BYTE_UNCHECKED(v) == REB_VOID)
 
     inline static bool IS_UNREADABLE_DEBUG(const RELVAL *v) {
-        if (KIND_BYTE_UNCHECKED(v) != REB_VOID)
+        if (KIND3Q_BYTE_UNCHECKED(v) != REB_VOID)
             return false;
         return v->extra.tick < 0;
     }

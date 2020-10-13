@@ -53,7 +53,7 @@ inline static bool IS_QUOTED_KIND(REBYTE k)
   { return k == REB_QUOTED or k >= REB_64; }
 
 #define IS_QUOTED(v) \
-    IS_QUOTED_KIND(KIND_BYTE(v))
+    IS_QUOTED_KIND(KIND3Q_BYTE(v))
 
 
 //=//// BINDABILITY ///////////////////////////////////////////////////////=//
@@ -91,10 +91,10 @@ inline static bool ANY_INERT_KIND(REBYTE k) {
 }
 
 #define ANY_INERT(v) \
-    ANY_INERT_KIND(KIND_BYTE(v))
+    ANY_INERT_KIND(KIND3Q_BYTE(v))
 
 #define ANY_EVALUATIVE(v) \
-    (not ANY_INERT_KIND(KIND_BYTE(v)))
+    (not ANY_INERT_KIND(KIND3Q_BYTE(v)))
 
 
 //=//// FAST END+VOID+NULL TESTING ////////////////////////////////////////=//
@@ -122,37 +122,37 @@ inline static bool IS_NULLED_OR_VOID_KIND(REBYTE k) {
 }
 
 #define IS_NULLED_OR_VOID(v) \
-    IS_NULLED_OR_VOID_KIND(KIND_BYTE(v))
+    IS_NULLED_OR_VOID_KIND(KIND3Q_BYTE(v))
 
 inline static bool IS_NULLED_OR_VOID_OR_END_KIND(REBYTE k)
     { return k <= REB_VOID; }
 
 #define IS_NULLED_OR_VOID_OR_END(v) \
-    IS_NULLED_OR_VOID_OR_END_KIND(KIND_BYTE_UNCHECKED(v))
+    IS_NULLED_OR_VOID_OR_END_KIND(KIND3Q_BYTE_UNCHECKED(v))
 
 inline static bool IS_NULLED_OR_BLANK_KIND(REBYTE k)
     { return k == REB_NULL or k == REB_BLANK; }
 
 #define IS_NULLED_OR_BLANK(v) \
-    IS_NULLED_OR_BLANK_KIND(KIND_BYTE(v))
+    IS_NULLED_OR_BLANK_KIND(KIND3Q_BYTE(v))
 
 
 //=//// TYPE CATEGORIES ///////////////////////////////////////////////////=//
 
 #define ANY_VALUE(v) \
-    (KIND_BYTE(v) != REB_NULL)
+    (KIND3Q_BYTE(v) != REB_NULL)
 
 inline static bool ANY_SCALAR_KIND(REBYTE k)  // !!! Should use TS_SCALAR?
     { return k == REB_TUPLE or (k >= REB_LOGIC and k <= REB_PAIR); }
 
 #define ANY_SCALAR(v) \
-    ANY_SCALAR_KIND(KIND_BYTE(v))
+    ANY_SCALAR_KIND(KIND3Q_BYTE(v))
 
 inline static bool ANY_STRING_KIND(REBYTE k)
     { return k >= REB_TEXT and k <= REB_TAG; }
 
 #define ANY_STRING(v) \
-    ANY_STRING_KIND(KIND_BYTE(v))
+    ANY_STRING_KIND(KIND3Q_BYTE(v))
 
 #define ANY_BINSTR_KIND_EVIL_MACRO \
     (k >= REB_BINARY and k <= REB_TAG)
@@ -162,7 +162,7 @@ inline static bool ANY_BINSTR_KIND(REBYTE k)
     { return ANY_BINSTR_KIND_EVIL_MACRO; }
 
 #define ANY_BINSTR(v) \
-    ANY_BINSTR_KIND(KIND_BYTE(v))
+    ANY_BINSTR_KIND(KIND3Q_BYTE(v))
 
 
 #define ANY_ARRAY_OR_PATH_KIND_EVIL_MACRO \
@@ -172,7 +172,7 @@ inline static bool ANY_ARRAY_OR_PATH_KIND(REBYTE k)
     { return ANY_ARRAY_OR_PATH_KIND_EVIL_MACRO; }
 
 #define ANY_ARRAY_OR_PATH(v) \
-    ANY_ARRAY_OR_PATH_KIND(KIND_BYTE(v))
+    ANY_ARRAY_OR_PATH_KIND(KIND3Q_BYTE(v))
 
 
 #define ANY_ARRAY_KIND_EVIL_MACRO \
@@ -182,7 +182,7 @@ inline static bool ANY_ARRAY_KIND(REBYTE k)
     { return ANY_ARRAY_KIND_EVIL_MACRO; }
 
 #define ANY_ARRAY(v) \
-    ANY_ARRAY_KIND(KIND_BYTE(v))
+    ANY_ARRAY_KIND(KIND3Q_BYTE(v))
 
 
 #define ANY_SEQUENCE_KIND_EVIL_MACRO \
@@ -192,7 +192,7 @@ inline static bool ANY_SEQUENCE_KIND(REBYTE k)
     { return ANY_SEQUENCE_KIND_EVIL_MACRO; }
 
 #define ANY_SEQUENCE(v) \
-    ANY_SEQUENCE_KIND(KIND_BYTE(v))
+    ANY_SEQUENCE_KIND(KIND3Q_BYTE(v))
 
 
 #define ANY_SERIES_KIND_EVIL_MACRO \
@@ -202,7 +202,7 @@ inline static bool ANY_SERIES_KIND(REBYTE k)
     { return ANY_SERIES_KIND_EVIL_MACRO; }
 
 #define ANY_SERIES(v) \
-    ANY_SERIES_KIND(KIND_BYTE(v))
+    ANY_SERIES_KIND(KIND3Q_BYTE(v))
 
 
 // !!! The ANY-WORD! classification is an odd one, because it's not just
@@ -217,13 +217,13 @@ inline static bool ANY_WORD_KIND(REBYTE k)
     { return ANY_WORD_KIND_EVIL_MACRO; }
 
 #define ANY_WORD(v) \
-    ANY_WORD_KIND(KIND_BYTE(v))
+    ANY_WORD_KIND(KIND3Q_BYTE(v))
 
 inline static bool ANY_PLAIN_GET_SET_WORD_KIND(REBYTE k)
     { return k == REB_WORD or k == REB_GET_WORD or k == REB_SET_WORD; }
 
 #define ANY_PLAIN_GET_SET_WORD(v) \
-    ANY_PLAIN_GET_SET_WORD_KIND(KIND_BYTE(v))
+    ANY_PLAIN_GET_SET_WORD_KIND(KIND3Q_BYTE(v))
 
 
 #define ANY_PATH_KIND_EVIL_MACRO \
@@ -233,7 +233,7 @@ inline static bool ANY_PATH_KIND(REBYTE k)
     { return ANY_PATH_KIND_EVIL_MACRO; }
 
 #define ANY_PATH(v) \
-    ANY_PATH_KIND(KIND_BYTE(v))
+    ANY_PATH_KIND(KIND3Q_BYTE(v))
 
 
 #define ANY_TUPLE_KIND_EVIL_MACRO \
@@ -243,7 +243,7 @@ inline static bool ANY_TUPLE_KIND(REBYTE k)
     { return ANY_TUPLE_KIND_EVIL_MACRO; }
 
 #define ANY_TUPLE(v) \
-    ANY_TUPLE_KIND(KIND_BYTE(v))
+    ANY_TUPLE_KIND(KIND3Q_BYTE(v))
 
 
 // Used by scanner; it figures out what kind of path something would be, then
@@ -260,7 +260,7 @@ inline static bool ANY_BLOCK_KIND(REBYTE k)
         or k == REB_SET_BLOCK or k == REB_SYM_BLOCK; }
 
 #define ANY_BLOCK(v) \
-    ANY_BLOCK_KIND(KIND_BYTE(v))
+    ANY_BLOCK_KIND(KIND3Q_BYTE(v))
 
 
 inline static bool ANY_GROUP_KIND(REBYTE k)
@@ -268,21 +268,21 @@ inline static bool ANY_GROUP_KIND(REBYTE k)
         or k == REB_SET_GROUP or k == REB_SYM_GROUP; }
 
 #define ANY_GROUP(v) \
-    ANY_GROUP_KIND(KIND_BYTE(v))
+    ANY_GROUP_KIND(KIND3Q_BYTE(v))
 
 
 inline static bool ANY_CONTEXT_KIND(REBYTE k)
     { return k >= REB_OBJECT and k <= REB_PORT; }
 
 #define ANY_CONTEXT(v) \
-    ANY_CONTEXT_KIND(KIND_BYTE(v))
+    ANY_CONTEXT_KIND(KIND3Q_BYTE(v))
 
 
 inline static bool ANY_NUMBER_KIND(REBYTE k)
     { return k == REB_INTEGER or k == REB_DECIMAL or k == REB_PERCENT; }
 
 #define ANY_NUMBER(v) \
-    ANY_NUMBER_KIND(KIND_BYTE(v))
+    ANY_NUMBER_KIND(KIND3Q_BYTE(v))
 
 
 //=//// XXX <=> SET-XXX! <=> GET-XXX! TRANSFORMATION //////////////////////=//
@@ -394,7 +394,7 @@ inline static enum Reb_Kind BLOCKIFY_KIND(REBYTE k) {
 //=//// "PARAM" CELLS /////////////////////////////////////////////////////=//
 //
 // !!! Due to the scarcity of bytes in cells, yet a desire to use them for
-// parameters, they are a kind of "container" class in the KIND_BYTE() while
+// parameters, they are a kind of "container" class in the KIND3Q_BYTE() while
 // the actual CELL_KIND (via HEART_BYTE()) is a REB_TYPESET.
 //
 // Making the typeset expression more sophisticated to clearly express a list
@@ -404,7 +404,7 @@ inline static bool IS_PARAM_KIND(REBYTE k)
     { return k >= REB_P_NORMAL and k <= REB_P_LOCAL; }
 
 #define IS_PARAM(v) \
-    IS_PARAM_KIND(KIND_BYTE(v))
+    IS_PARAM_KIND(KIND3Q_BYTE(v))
 
 
 // If a type can be used with the VAL_UTF8_XXX accessors
@@ -413,4 +413,4 @@ inline static bool ANY_UTF8_KIND(REBYTE k)
     { return ANY_STRING_KIND(k) or ANY_WORD_KIND(k) or k == REB_ISSUE; }
 
 #define ANY_UTF8(v) \
-    ANY_UTF8_KIND(KIND_BYTE(v))
+    ANY_UTF8_KIND(KIND3Q_BYTE(v))

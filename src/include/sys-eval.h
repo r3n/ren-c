@@ -131,7 +131,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
 
     Literal_Next_In_Feed(out, feed);
 
-    if (KIND_BYTE_UNCHECKED(feed->value) == REB_WORD) {
+    if (KIND3Q_BYTE_UNCHECKED(feed->value) == REB_WORD) {
         feed->gotten = Try_Lookup_Word(feed->value, feed->specifier);
         if (
             not feed->gotten
@@ -173,7 +173,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
         //
         if (GET_ACTION_FLAG(action, SKIPPABLE_FIRST)) {
             REBVAL *first = First_Unspecialized_Param(action);
-            if (not TYPE_CHECK(first, KIND_BYTE(out)))
+            if (not TYPE_CHECK(first, KIND3Q_BYTE(out)))
                 return true;  // didn't actually want this parameter type
         }
 
@@ -186,7 +186,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
         return true;   // we're done!
     }
 
-    if (KIND_BYTE_UNCHECKED(feed->value) != REB_PATH)
+    if (KIND3Q_BYTE_UNCHECKED(feed->value) != REB_PATH)
         return true;  // paths do enfix processing if '/'
 
     if (HEART_BYTE(feed->value) == REB_WORD) {

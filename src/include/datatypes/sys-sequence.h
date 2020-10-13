@@ -142,7 +142,7 @@ inline static REBVAL *Init_Any_Sequence_1(RELVAL *out, enum Reb_Kind kind) {
         assert(ANY_TUPLE_KIND(kind));
         Init_Word(out, PG_Dot_1_Canon);
     }
-    mutable_KIND_BYTE(out) = kind;
+    mutable_KIND3Q_BYTE(out) = kind;
     assert(HEART_BYTE(out) == REB_WORD);  // leave as-is
     return SPECIFIC(out);
 }
@@ -155,7 +155,7 @@ inline static REBVAL *Init_Any_Sequence_1(RELVAL *out, enum Reb_Kind kind) {
 //
 // In order to make this not cost more than a REFINEMENT! ANY-WORD! did in
 // R3-Alpha, the underlying representation of `/foo` in the cell is the same
-// as an ANY-WORD!.  The KIND_BYTE() returned by VAL_TYPE() will reflect
+// as an ANY-WORD!.  The KIND3Q_BYTE() returned by VAL_TYPE() will reflect
 // the any sequence, while HEART_BYTE() reveals its word-oriented storage.
 
 inline static REBVAL *Try_Leading_Blank_Pathify(
@@ -178,7 +178,7 @@ inline static REBVAL *Try_Leading_Blank_Pathify(
     if (VAL_TYPE(v) == REB_WORD) {
         assert(HEART_BYTE(v) == REB_WORD);
         mutable_HEART_BYTE(v) = REB_GET_WORD;  // "refinement-style" signal
-        mutable_KIND_BYTE(v) = kind;
+        mutable_KIND3Q_BYTE(v) = kind;
         return v;
     }
 
@@ -188,7 +188,7 @@ inline static REBVAL *Try_Leading_Blank_Pathify(
     Freeze_Array_Shallow(a);
 
     Init_Block(v, a);
-    mutable_KIND_BYTE(v) = kind;
+    mutable_KIND3Q_BYTE(v) = kind;
 
     return v;
 }
@@ -231,7 +231,7 @@ inline static REBVAL *Init_Any_Sequence_Bytes(
             *dest = *data;
     }
 
-    mutable_KIND_BYTE(out) = kind;  // "veneer" over "heart" type
+    mutable_KIND3Q_BYTE(out) = kind;  // "veneer" over "heart" type
     return cast(REBVAL*, out);
 }
 
@@ -273,7 +273,7 @@ inline static REBVAL *Try_Init_Any_Sequence_All_Integers(
 
     EXTRA(Bytes, out).exactly_4[IDX_EXTRA_USED] = len;
 
-    mutable_KIND_BYTE(out) = kind;
+    mutable_KIND3Q_BYTE(out) = kind;
     return SPECIFIC(out);
 }
 
@@ -304,7 +304,7 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
 
     if (IS_WORD(v1) and IS_BLANK(v2)) {  // `foo.` and `foo/` cases
         Derelativize(out, v1, specifier);
-        mutable_KIND_BYTE(out) = kind;
+        mutable_KIND3Q_BYTE(out) = kind;
         mutable_HEART_BYTE(out) = REB_SYM_WORD;  // signal trailing
         return SPECIFIC(out);
     }
@@ -334,7 +334,7 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
     Freeze_Array_Shallow(a);
 
     Init_Block(out, a);
-    mutable_KIND_BYTE(out) = kind;
+    mutable_KIND3Q_BYTE(out) = kind;
     return SPECIFIC(out);
 }
 
@@ -519,7 +519,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         //
         if (sequence != store)
             Blit_Cell(store, CELL_TO_VAL(sequence));
-        mutable_KIND_BYTE(store) = REB_WORD;  // not ANY-SEQUENCE!
+        mutable_KIND3Q_BYTE(store) = REB_WORD;  // not ANY-SEQUENCE!
         mutable_HEART_BYTE(store) = REB_WORD;  // not the fake REB_GET_WORD
         return store; }
 

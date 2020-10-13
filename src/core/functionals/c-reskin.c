@@ -229,7 +229,7 @@ REBNATIVE(reskinned)
     while (NOT_END(item)) {
         bool change;
         if (
-            KIND_BYTE(item) != REB_SYM_WORD
+            KIND3Q_BYTE(item) != REB_SYM_WORD
             or VAL_WORD_SYM(item) != SYM_CHANGE
         ){
             change = false;
@@ -286,10 +286,10 @@ REBNATIVE(reskinned)
         // right marking, require an instruction.  (Better names needed, these
         // were just already in %words.r)
 
-        if (pclass != KIND_BYTE(param)) {
+        if (pclass != KIND3Q_BYTE(param)) {
             assert(HEART_BYTE(param) == REB_TYPESET);
             if (change)
-                mutable_KIND_BYTE(param) = pclass;
+                mutable_KIND3Q_BYTE(param) = pclass;
             else if (pclass != REB_P_NORMAL)  // assume plain word = no change
                 fail ("If parameter convention is reskinned, use #change");
         }
@@ -301,14 +301,14 @@ REBNATIVE(reskinned)
         // some bits.
 
         REBSYM sym = SYM_0;
-        if (REB_SYM_WORD == KIND_BYTE(item)) {
+        if (REB_SYM_WORD == KIND3Q_BYTE(item)) {
             sym = VAL_WORD_SYM(item);
             if (sym != SYM_REMOVE and sym != SYM_ADD)
                 fail ("RESKIN only supports @add and @remove instructions");
             ++item;
         }
 
-        if (REB_BLOCK != KIND_BYTE(item)) {
+        if (REB_BLOCK != KIND3Q_BYTE(item)) {
             if (change)  // [@change 'arg] is okay w/no block
                 continue;
             fail ("Expected BLOCK! after instruction");

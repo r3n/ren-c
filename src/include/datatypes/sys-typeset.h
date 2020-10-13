@@ -249,7 +249,7 @@ typedef enum Reb_Kind Reb_Param_Class;
 
 inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
     assert(IS_PARAM(v));
-    return cast(Reb_Param_Class, KIND_BYTE_UNCHECKED(v));
+    return cast(Reb_Param_Class, KIND3Q_BYTE_UNCHECKED(v));
 }
 
 
@@ -338,17 +338,17 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
 // Name should be NULL unless typeset in object keylist or func paramlist
 
 inline static const REBSTR *VAL_KEY_SPELLING(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND_BYTE_UNCHECKED(v)));
+    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
     return VAL_TYPESET_STRING(v);
 }
 
 inline static const REBSTR *VAL_KEY_CANON(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND_BYTE_UNCHECKED(v)));
+    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
     return STR_CANON(VAL_KEY_SPELLING(v));
 }
 
 inline static OPT_REBSYM VAL_KEY_SYM(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND_BYTE_UNCHECKED(v)));
+    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
     return STR_SYMBOL(VAL_KEY_SPELLING(v)); // mirrors canon's symbol
 }
 
@@ -378,7 +378,7 @@ inline static REBVAL *Init_Param(
     REBU64 bits
 ){
     RESET_CELL(out, REB_TYPESET, CELL_FLAG_FIRST_IS_NODE);
-    mutable_KIND_BYTE(out) = pclass;
+    mutable_KIND3Q_BYTE(out) = pclass;
 
     VAL_TYPESET_STRING_NODE(out) = NOD(spelling);
     VAL_TYPESET_LOW_BITS(out) = bits & cast(uint32_t, 0xFFFFFFFF);

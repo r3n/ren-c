@@ -38,7 +38,7 @@ inline static bool VAL_LOGIC(REBCEL(const*) v) {
 }
 
 inline static bool IS_TRUTHY(const RELVAL *v) {
-    if (KIND_BYTE(v) > REB_LOGIC)
+    if (KIND3Q_BYTE(v) > REB_LOGIC)
         return true;  // includes QUOTED: `if lit '_ [-- "this is truthy"]`
     if (IS_VOID(v))
         fail (Error_Void_Conditional_Raw());
@@ -73,7 +73,7 @@ inline static REBVAL *Init_Logic(RELVAL *out, bool flag) {
 inline static bool IS_CONDITIONAL_TRUE(const REBVAL *v) {
     if (IS_FALSEY(v))
         return false;
-    if (KIND_BYTE(v) == REB_BLOCK)
+    if (KIND3Q_BYTE(v) == REB_BLOCK)
         if (GET_CELL_FLAG(v, UNEVALUATED))
             fail (Error_Block_Conditional_Raw(v));
     return true;

@@ -578,7 +578,7 @@ REBNATIVE(match)
 
     REBVAL *test = ARG(test);
 
-    switch (KIND_BYTE(test)) {
+    switch (KIND3Q_BYTE(test)) {
       case REB_WORD:
       case REB_PATH: {
         if (NOT_CELL_FLAG(test, UNEVALUATED)) // soft quote eval'd

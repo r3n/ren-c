@@ -216,7 +216,7 @@ bool Add_Typeset_Bits_Core(
                 // `@arg` notation is used), but the native specs are loaded
                 // by a boostrap r3 that can't read them.
                 //
-                mutable_KIND_BYTE(typeset) = REB_P_MODAL;
+                mutable_KIND3Q_BYTE(typeset) = REB_P_MODAL;
             }
         }
         else if (IS_DATATYPE(item)) {

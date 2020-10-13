@@ -467,8 +467,8 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, bool strict)
     Dequotify(a);
     Dequotify(b);
 
-    enum Reb_Kind ta = cast(enum Reb_Kind, KIND_BYTE_UNCHECKED(a));
-    enum Reb_Kind tb = cast(enum Reb_Kind, KIND_BYTE_UNCHECKED(b));
+    enum Reb_Kind ta = cast(enum Reb_Kind, KIND3Q_BYTE_UNCHECKED(a));
+    enum Reb_Kind tb = cast(enum Reb_Kind, KIND3Q_BYTE_UNCHECKED(b));
 
     assert(ta < REB_MAX);  // we dequoted it
     assert(tb < REB_MAX);  // we dequoted this as well

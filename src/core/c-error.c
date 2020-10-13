@@ -871,7 +871,7 @@ REBCTX *Make_Error_Managed_Core(
         assert(IS_END(value)); // ...same
     }
 
-    mutable_KIND_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
+    mutable_KIND3Q_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
     mutable_HEART_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
 
     // C struct mirroring fixed portion of error fields

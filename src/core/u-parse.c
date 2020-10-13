@@ -141,7 +141,7 @@ inline static bool IS_BAR(const RELVAL *v)
 
 #define FETCH_TO_BAR_OR_END(f) \
     while (NOT_END(P_RULE) and not ( \
-        KIND_BYTE_UNCHECKED(P_RULE) == REB_WORD \
+        KIND3Q_BYTE_UNCHECKED(P_RULE) == REB_WORD \
         and VAL_NODE(P_RULE) == NOD(PG_Bar_Canon) \
     )){ \
         FETCH_NEXT_RULE(f); \
@@ -496,7 +496,7 @@ static REB_R Parse_One_Rule(
             return R_UNHANDLED; // Other cases below can assert if item is END
     }
 
-    switch (KIND_BYTE(rule)) { // handle rules w/same behavior for all P_INPUT
+    switch (KIND3Q_BYTE(rule)) { // handle rules w/same behavior for all P_INPUT
 
       case REB_BLANK:  // blank rules "match" but don't affect parse position
         return Init_Integer(P_OUT, pos);
@@ -951,7 +951,7 @@ static REBIXO To_Thru_Non_Block_Rule(
     const RELVAL *rule,
     bool is_thru
 ){
-    REBYTE kind = KIND_BYTE(rule);
+    REBYTE kind = KIND3Q_BYTE(rule);
     assert(kind != REB_BLOCK);
 
     if (IS_NULLED_OR_BLANK_KIND(kind))
@@ -1188,7 +1188,7 @@ static void Handle_Mark_Rule(
 
     Quotify(P_INPUT_VALUE, P_NUM_QUOTES);
 
-    REBYTE k = KIND_BYTE(rule);  // REB_0_END ok
+    REBYTE k = KIND3Q_BYTE(rule);  // REB_0_END ok
     if (k == REB_WORD or k == REB_SET_WORD) {
         Move_Value(
             Sink_Word_May_Fail(rule, specifier),
@@ -1217,16 +1217,16 @@ static REB_R Handle_Seek_Rule_Dont_Update_Begin(
     const RELVAL *rule,
     REBSPC *specifier
 ){
-    REBYTE k = KIND_BYTE(rule);  // REB_0_END ok
+    REBYTE k = KIND3Q_BYTE(rule);  // REB_0_END ok
     if (k == REB_WORD or k == REB_GET_WORD) {
         rule = Lookup_Word_May_Fail(rule, specifier);
-        k = KIND_BYTE(rule);
+        k = KIND3Q_BYTE(rule);
     }
     else if (k == REB_PATH or k == REB_TUPLE) {
         if (Get_Path_Throws_Core(P_CELL, rule, specifier))
             fail (Error_No_Catch_For_Throw(P_CELL));
         rule = P_CELL;
-        k = KIND_BYTE(rule);
+        k = KIND3Q_BYTE(rule);
     }
 
     REBINT index;

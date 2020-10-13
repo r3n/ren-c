@@ -90,11 +90,11 @@
 #define f_next f->feed->value
 #define f_next_gotten f->feed->gotten
 
-// In debug builds, the KIND_BYTE() calls enforce cell validity...but slow
+// In debug builds, the KIND3Q_BYTE() calls enforce cell validity...but slow
 // things down a little.  So we only use the checked version in the main
 // switch statement.  This abbreviation is also shorter and more legible.
 //
-#define kind_current KIND_BYTE_UNCHECKED(v)
+#define kind_current KIND3Q_BYTE_UNCHECKED(v)
 
 
 //=//// ARGUMENT LOOP MODES ///////////////////////////////////////////////=//
@@ -139,7 +139,7 @@
 inline static void Finalize_Arg(REBFRM *f) {
     assert(not Is_Param_Variadic(f->param)); // Use Finalize_Variadic_Arg()
 
-    REBYTE kind_byte = KIND_BYTE(f->arg);
+    REBYTE kind_byte = KIND3Q_BYTE(f->arg);
 
     if (kind_byte == REB_0_END) {
         //
@@ -527,7 +527,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // See DEBUG_ENSURE_FRAME_EVALUATES for why an empty array does not
     // bypass calling into the evaluator.
     //
-    if (KIND_BYTE(f_next) == REB_0_END)
+    if (KIND3Q_BYTE(f_next) == REB_0_END)
         goto finished;
 
     gotten = f_next_gotten;
@@ -550,7 +550,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
     // v-- This is the TG_Break_At_Tick or C-DEBUG-BREAK landing spot --v
 
-    if (KIND_BYTE(f_next) != REB_WORD) // right's kind - END would be REB_0
+    if (KIND3Q_BYTE(f_next) != REB_WORD) // right's kind - END would be REB_0
         goto give_up_backward_quote_priority;
 
     assert(not f_next_gotten);  // Fetch_Next_In_Frame() cleared it
@@ -613,7 +613,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
     if (
         IS_END(f_next)  // v-- out is what used to be on left
-        and (KIND_BYTE(f->out) == REB_WORD or KIND_BYTE(f->out) == REB_PATH)
+        and (KIND3Q_BYTE(f->out) == REB_WORD or KIND3Q_BYTE(f->out) == REB_PATH)
     ){
         // We make a special exemption for left-stealing arguments, when
         // they have nothing to their right.  They lose their priority
@@ -659,7 +659,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // fast tests like ANY_INERT() and IS_NULLED_OR_VOID_OR_END() has shown
     // to reduce performance in practice.  The compiler does the right thing.
 
-    switch (KIND_BYTE(v)) {  // checked version (done once, else kind_current)
+    switch (KIND3Q_BYTE(v)) {  // checked version (done once, else kind_current)
 
       case REB_0_END:
         goto finished;
@@ -1466,7 +1466,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             assert(IS_SYM_WORD(DS_TOP));
 
             if (not IS_WORD_BOUND(DS_TOP)) { // the loop didn't index it
-                mutable_KIND_BYTE(DS_TOP) = REB_WORD;
+                mutable_KIND3Q_BYTE(DS_TOP) = REB_WORD;
                 mutable_HEART_BYTE(DS_TOP) = REB_WORD;
                 fail (Error_Bad_Refine_Raw(DS_TOP)); // so duplicate or junk
             }
@@ -1560,7 +1560,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         else if (GET_CELL_FLAG(r, ROOT)) { // API, from Alloc_Value()
             Handle_Api_Dispatcher_Result(f, r);
         }
-        else switch (KIND_BYTE(r)) { // it's a "pseudotype" instruction
+        else switch (KIND3Q_BYTE(r)) { // it's a "pseudotype" instruction
             //
             // !!! Thrown values used to be indicated with a bit on the value
             // itself, but now it's conveyed through a return value.  This
@@ -1786,7 +1786,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         if (GET_ACTION_FLAG(f->original, RETURN_REQUOTES)) {
             if (
-                KIND_BYTE_UNCHECKED(f->out) != REB_NULL
+                KIND3Q_BYTE_UNCHECKED(f->out) != REB_NULL
                 or GET_EVAL_FLAG(f, REQUOTE_NULL)
             ){
                 Quotify(f->out, f->requotes);
@@ -2225,7 +2225,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // Turn SET-BLOCK! into a BLOCK! in `f->out` for easier processing.
         //
         Derelativize(f->out, v, f_specifier);
-        mutable_KIND_BYTE(f->out) = REB_BLOCK;
+        mutable_KIND3Q_BYTE(f->out) = REB_BLOCK;
         mutable_HEART_BYTE(f->out) = REB_BLOCK;
 
         // Get the next argument as an ACTION!, specialized if necessary, into
@@ -2485,7 +2485,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // enfix.  If it's necessary to dispatch an enfix function via path, then
     // a word is used to do it, like `>-` in `x: >- lib/method [...] [...]`.
 
-    switch (KIND_BYTE_UNCHECKED(f_next)) {
+    switch (KIND3Q_BYTE_UNCHECKED(f_next)) {
       case REB_0_END:
         CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
         goto finished; // hitting end is common, avoid do_next's switch()

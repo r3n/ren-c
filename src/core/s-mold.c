@@ -518,7 +518,7 @@ bool Form_Reduce_Throws(
         // at dialect "source level".
         // https://forum.rebol.info/t/1348
         //
-        if (KIND_BYTE_UNCHECKED(f->feed->value) == REB_BLANK) {
+        if (KIND3Q_BYTE_UNCHECKED(f->feed->value) == REB_BLANK) {
             Literal_Next_In_Frame(out, f);
             Append_Codepoint(mo->series, ' ');
             pending = false;

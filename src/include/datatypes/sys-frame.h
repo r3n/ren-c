@@ -743,7 +743,7 @@ inline static void Push_Action(
             | NODE_FLAG_CELL
             | CELL_FLAG_PROTECTED  // payload/binding tweaked, but not by user
             | CELL_MASK_CONTEXT
-            | FLAG_KIND_BYTE(REB_FRAME)
+            | FLAG_KIND3Q_BYTE(REB_FRAME)
             | FLAG_HEART_BYTE(REB_FRAME);
     TRACK_CELL_IF_DEBUG(f->rootvar, __FILE__, __LINE__);
     INIT_VAL_CONTEXT_VARLIST(f->rootvar, f->varlist);
@@ -755,7 +755,7 @@ inline static void Push_Action(
 
     s->content.dynamic.used = num_args + 1;
     RELVAL *tail = ARR_TAIL(f->varlist);
-    tail->header.bits = FLAG_KIND_BYTE(REB_0);  // no NODE_FLAG_CELL
+    tail->header.bits = FLAG_KIND3Q_BYTE(REB_0);  // no NODE_FLAG_CELL
     TRACK_CELL_IF_DEBUG(tail, __FILE__, __LINE__);
 
     // Current invariant for all arrays (including fixed size), last cell in
@@ -768,7 +768,7 @@ inline static void Push_Action(
     RELVAL *prep = ultimate - 1;
     for (; prep > tail; --prep) {
         prep->header.bits =
-            FLAG_KIND_BYTE(REB_T_TRASH)
+            FLAG_KIND3Q_BYTE(REB_T_TRASH)
             | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
         TRACK_CELL_IF_DEBUG(prep, __FILE__, __LINE__);
     }

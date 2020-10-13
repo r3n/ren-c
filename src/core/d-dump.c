@@ -118,7 +118,7 @@ void Dump_Stack(REBFRM *f, REBLEN level)
         "STACK[%d](%s) - %d\n",
         cast(int, level),
         Frame_Label_Or_Anonymous_UTF8(f),
-        KIND_BYTE(f->feed->value)
+        KIND3Q_BYTE(f->feed->value)
     );
 
     if (not Is_Action_Frame(f)) {

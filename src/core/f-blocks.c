@@ -113,7 +113,7 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
     const RELVAL *src = head;
     RELVAL *dest = ARR_HEAD(a);
     for (; count < len; ++count, ++src, ++dest) {
-        if (KIND_BYTE_UNCHECKED(src) == REB_NULL)  // allow unreadable void
+        if (KIND3Q_BYTE_UNCHECKED(src) == REB_NULL)  // allow unreadable void
             assert(flags & ARRAY_FLAG_NULLEDS_LEGAL);
 
         Derelativize(dest, src, specifier);
@@ -157,7 +157,7 @@ void Clonify(
     REBLEN num_quotes = VAL_NUM_QUOTES(v);
     Dequotify(v);
 
-    enum Reb_Kind kind = cast(enum Reb_Kind, KIND_BYTE_UNCHECKED(v));
+    enum Reb_Kind kind = cast(enum Reb_Kind, KIND3Q_BYTE_UNCHECKED(v));
     assert(kind < REB_MAX_PLUS_MAX); // we dequoted it (pseudotypes ok)
 
     enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), v));
