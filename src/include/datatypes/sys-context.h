@@ -367,7 +367,7 @@ inline static REBVAL *Init_Frame(RELVAL *out, REBCTX *c, const REBSTR *label) {
     Init_Any_Context(out, REB_FRAME, c);
     if (label)
         INIT_VAL_FRAME_LABEL(out, label);
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

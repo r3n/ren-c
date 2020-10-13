@@ -110,7 +110,7 @@ const REBVAL *Find_Last_Event(REBINT model, uint32_t type)
     for (; value >= ARR_HEAD(VAL_ARRAY(state)); --value) {
         if (VAL_EVENT_MODEL(value) == model) {
             if (cast(uint32_t, VAL_EVENT_TYPE(value)) == type) {
-                return SPECIFIC(value);
+                return cast(const REBVAL*, value);
             } else {
                 return NULL;
             }

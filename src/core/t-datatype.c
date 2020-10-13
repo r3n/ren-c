@@ -184,7 +184,7 @@ REBVAL *Datatype_From_Url(const REBVAL *url) {
     rebEND);
 
     if (i != -1)
-        return SPECIFIC(ARR_AT(PG_Extension_Types, i));
+        return cast(REBVAL*, ARR_AT(PG_Extension_Types, i));
     return nullptr;
 }
 

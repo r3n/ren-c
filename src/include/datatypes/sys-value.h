@@ -739,6 +739,11 @@ inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
 // You can use SPECIFIC to cast it if you are *sure* that it has been
 // derelativized -or- is a value type that doesn't have a specifier (e.g. an
 // integer).  If the value is actually relative, this will assert at runtime!
+//
+// Because SPECIFIC has cost in the debug build, there may be situations where
+// one is sure that the value is specific, and `cast(REBVAL*, v`) is a better
+// choice for efficiency.  This applies to things like `Move_Value()`, which
+// is called often and already knew its input was a REBVAL* to start with.
 
 inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
     //
@@ -876,7 +881,7 @@ inline static REBVAL *Move_Value(RELVAL *out, const REBVAL *v)
     else
         out->extra = v->extra; // extra isn't a binding (INTEGER! MONEY!...)
 
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -896,7 +901,7 @@ inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
     out->header.bits |= (
         v->header.bits & (CELL_FLAG_ARG_MARKED_CHECKED)
     );
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

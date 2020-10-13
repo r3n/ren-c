@@ -294,7 +294,7 @@ REBVAL *Init_Any_Series_At_Core(
     else
         assert(binding == UNBOUND);
 
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -319,7 +319,7 @@ REBVAL *Init_Any_String_At_Core(  // also used with ANY-WORD!
     RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, s);
     VAL_INDEX(out) = index;
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

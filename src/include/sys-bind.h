@@ -638,7 +638,7 @@ inline static REBVAL *Derelativize(
 
     if (not Is_Bindable(v)) {
         out->extra = v->extra; // extra.binding union field isn't even active
-        return SPECIFIC(out);
+        return cast(REBVAL*, out);
     }
 
     REBNOD *binding = EXTRA(Binding, v).node;
@@ -711,7 +711,7 @@ inline static REBVAL *Derelativize(
     // in case the caller had a relative value slot and wants to use its
     // known non-relative form... this is inline, so no cost if not used.
     //
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

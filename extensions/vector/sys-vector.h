@@ -103,7 +103,7 @@ inline static REBVAL *Init_Vector(
 
     Manage_Pairing(paired);
     INIT_VAL_NODE(out, paired);
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

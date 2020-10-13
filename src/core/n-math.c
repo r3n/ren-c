@@ -916,7 +916,7 @@ inline static REBVAL *Init_Zeroed_Hack(RELVAL *out, enum Reb_Kind kind) {
         CLEAR(&out->extra, sizeof(union Reb_Value_Extra));
         CLEAR(&out->payload, sizeof(union Reb_Value_Payload));
     }
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

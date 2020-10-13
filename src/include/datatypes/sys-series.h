@@ -575,7 +575,7 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
         out->payload = v->payload;
         EXTRA(Binding, out).node = NOD(expired);
     }
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 // This is a super lazy version of unrelativization, which can be used to

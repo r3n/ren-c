@@ -144,7 +144,7 @@ inline static REBVAL *Init_Any_Sequence_1(RELVAL *out, enum Reb_Kind kind) {
     }
     mutable_KIND3Q_BYTE(out) = kind;
     assert(HEART_BYTE(out) == REB_WORD);  // leave as-is
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -274,7 +274,7 @@ inline static REBVAL *Try_Init_Any_Sequence_All_Integers(
     EXTRA(Bytes, out).exactly_4[IDX_EXTRA_USED] = len;
 
     mutable_KIND3Q_BYTE(out) = kind;
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -306,7 +306,7 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
         Derelativize(out, v1, specifier);
         mutable_KIND3Q_BYTE(out) = kind;
         mutable_HEART_BYTE(out) = REB_SYM_WORD;  // signal trailing
-        return SPECIFIC(out);
+        return cast(REBVAL*, out);
     }
 
     if (IS_INTEGER(v1) and IS_INTEGER(v2)) {
@@ -335,7 +335,7 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
 
     Init_Block(out, a);
     mutable_KIND3Q_BYTE(out) = kind;
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 #define Try_Init_Any_Sequence_Pairlike(out,kind,v1,v2) \
@@ -400,7 +400,7 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
                 Symify(SPECIFIC(out));
         }
         
-        return SPECIFIC(out);  // valid path element, but it's standing alon
+        return cast(REBVAL*, out);  // valid path element, standing alone
     }
 
     if (DSP - dsp_orig == 2) {  // two-element path optimization
@@ -415,7 +415,7 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
         }
 
         DS_DROP_TO(dsp_orig);
-        return SPECIFIC(out);
+        return cast(REBVAL*, out);
     }
 
     // Attempt optimization for all-INTEGER! tuple or path, e.g. IP addresses
@@ -429,7 +429,7 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
         DSP - dsp_orig
     )){
         DS_DROP_TO(dsp_orig);
-        return SPECIFIC(out);
+        return cast(REBVAL*, out);
     }
 
     REBARR *a = Pop_Stack_Values_Core(dsp_orig, NODE_FLAG_MANAGED);
@@ -437,7 +437,7 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
     if (not Try_Init_Any_Sequence_Arraylike(out, kind, a))
         return nullptr;
 
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

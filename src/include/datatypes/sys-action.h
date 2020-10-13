@@ -457,7 +457,7 @@ static inline REBVAL *Init_Action(
     }
     assert(VAL_BINDING(out) == UNBOUND);
     INIT_BINDING(out, binding);
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

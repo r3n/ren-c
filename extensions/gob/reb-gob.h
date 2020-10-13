@@ -301,7 +301,7 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
     RESET_CUSTOM_CELL(out, EG_Gob_Type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, g);
     VAL_GOB_INDEX(out) = 0;
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

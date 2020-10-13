@@ -149,11 +149,11 @@ inline static const REBVAL *Param_For_Varargs_Maybe_Null(REBCEL(const*) v) {
     if (phase) {
         REBARR *paramlist = ACT_PARAMLIST(phase);
         if (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0) // e.g. enfix
-            return SPECIFIC(ARR_AT(
+            return cast(REBVAL*, ARR_AT(
                 paramlist,
                 - VAL_VARARGS_SIGNED_PARAM_INDEX(v)
             ));
-        return SPECIFIC(ARR_AT(
+        return cast(REBVAL*, ARR_AT(
             paramlist,
             VAL_VARARGS_SIGNED_PARAM_INDEX(v)
         ));

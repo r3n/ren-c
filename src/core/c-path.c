@@ -67,7 +67,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
             ARR_AT(a, index + 1),
             specifier
         )){
-            return SPECIFIC(out);
+            return cast(REBVAL*, out);
         }
 
         return nullptr;
@@ -79,7 +79,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
         ARR_AT(a, index),
         len_at
     )){
-        return SPECIFIC(out);
+        return cast(REBVAL*, out);
     }
 
     const RELVAL *v = ARR_HEAD(a);
@@ -104,7 +104,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
     mutable_KIND3Q_BYTE(out) = kind;
     assert(HEART_BYTE(out) == REB_BLOCK);
 
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

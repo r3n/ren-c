@@ -195,7 +195,7 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
 
     mutable_VAL_GOB(out) = g;
     VAL_GOB_INDEX(out) = 0;
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

@@ -488,7 +488,7 @@ inline static REBLEN RIN_NUM_FIXED_ARGS(REBRIN *r)
 
 inline static REBVAL *RIN_ARG_SCHEMA(REBRIN *r, REBLEN n) { // 0-based index
     REBVAL *arg_schemas = RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS);
-    return SPECIFIC(ARR_AT(VAL_ARRAY_KNOWN_MUTABLE(arg_schemas), n));
+    return cast(REBVAL*, ARR_AT(VAL_ARRAY_KNOWN_MUTABLE(arg_schemas), n));
 }
 
 inline static ffi_cif *RIN_CIF(REBRIN *r)

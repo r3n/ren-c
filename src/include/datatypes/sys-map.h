@@ -92,7 +92,7 @@ inline static const REBMAP *VAL_MAP(REBCEL(const*) v) {
 
 inline static REBLEN Length_Map(const REBMAP *map)
 {
-    const REBVAL *v = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    const REBVAL *v = cast(const REBVAL*, ARR_HEAD(MAP_PAIRLIST(map)));
 
     REBLEN count = 0;
     for (; NOT_END(v); v += 2) {

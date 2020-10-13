@@ -95,7 +95,7 @@ inline static REBVAL *Init_Issue_Utf8(
         Init_Text(out, str);
     }
     mutable_KIND3Q_BYTE(out) = REB_ISSUE;
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 // If you know that a codepoint is good (e.g. it came from an ANY-STRING!)
