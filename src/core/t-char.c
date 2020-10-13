@@ -326,6 +326,9 @@ REBTYPE(Issue)
 
       case SYM_COPY:  // since copy result is also immutable, Move() suffices
         return Move_Value(D_OUT, issue);
+
+      default:
+        break;
     }
 
     // !!! All the math operations below are inherited from the CHAR!
