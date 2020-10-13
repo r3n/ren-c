@@ -420,7 +420,7 @@
      * access.  Stray writes to that can cause even time-traveling bugs, with
      * effects *before* that write is made...due to "undefined behavior".
      */
-#elif !defined(CPLUSPLUS_11)
+#elif !defined(CPLUSPLUS_11) || !defined(DEBUG_CHECK_CASTS)
     /* Well-intentioned macros aside, C has no way to enforce that you can't
      * cast away a const without m_cast. C++98 builds can do that, at least:
      */
