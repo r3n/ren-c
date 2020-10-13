@@ -168,7 +168,7 @@ REB_R TO_Issue(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 
         return Init_Issue_Utf8(out, utf8, size, len);
     }
-    
+
     fail (Error_Bad_Cast_Raw(arg, Datatype_From_Kind(kind)));
 }
 

@@ -293,7 +293,7 @@ uint32_t Hash_Value(const RELVAL *v)
             panic (nullptr);
         }
         break; }
- 
+
       hash_any_array:
         //
       case REB_GROUP:

@@ -334,7 +334,7 @@ REBLEN Modify_String_Or_Binary(
         and not IS_TAG(src)  // tags need `<` and `>` to render
     ){
         // !!! Branch is very similar to the one for ISSUE! above (merge?)
- 
+
         // If Source == Destination we must prevent possible conflicts in
         // the memory regions being moved.  Clone the series just to be safe.
         //

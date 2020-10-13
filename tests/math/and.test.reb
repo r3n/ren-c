@@ -133,8 +133,8 @@
 [
     (
         x: 1
-        y: truesum: does [print "y" x: x * 2 true]
-        n: falsesum: does [print "n" x: x * 3 false]
+        y: truesum: does [x: x * 2 true]
+        n: falsesum: does [x: x * 3 false]
         o: make object! [
             y: :truesum
             n: :falsesum
