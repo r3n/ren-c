@@ -614,7 +614,7 @@ static REB_R Parse_One_Rule(
         // Rebol2, and leverages quoting.  It's being experimented with.
         //
         REBCEL(const*) rule_cell = VAL_UNESCAPED(rule);
-        enum Reb_Kind rule_cell_kind = CELL_TYPE(rule_cell);
+        enum Reb_Kind rule_cell_kind = CELL_KIND(rule_cell);
         if (
             (ANY_WORD_KIND(rule_cell_kind) and VAL_NUM_QUOTES(rule) == 1)
             or (ANY_STRING_KIND(rule_cell_kind) and VAL_NUM_QUOTES(rule) <= 1)
@@ -2173,7 +2173,7 @@ REBNATIVE(subparse)
                         i = END_FLAG;  // `parse [] [into [...]]`, rejects
                         break;
                     }
-                    else if (ANY_PATH_KIND(CELL_TYPE(VAL_UNESCAPED(into)))) {
+                    else if (ANY_PATH_KIND(CELL_KIND(VAL_UNESCAPED(into)))) {
                         //
                         // Can't PARSE an ANY-PATH! because it has no position
                         // But would be inconvenient if INTO did not support.

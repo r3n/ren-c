@@ -84,7 +84,7 @@ REBLEN find_binary(
     else
         start = index;
 
-    enum Reb_Kind cell_kind = CELL_TYPE(pattern);
+    enum Reb_Kind cell_kind = CELL_KIND(pattern);
     if (ANY_UTF8_KIND(cell_kind)) {
         if (skip != 1)
             fail ("String search in BINARY! only supports /SKIP 1 for now.");

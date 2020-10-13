@@ -196,12 +196,12 @@ static REBINT Math_Arg_For_Char(REBVAL *arg, const REBVAL *verb)
 //
 void MF_Issue(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
-    enum Reb_Kind cell_kind = CELL_KIND(v);
+    enum Reb_Kind heart = CELL_HEART(v);
     REBLEN len;
-    if (cell_kind == REB_BYTES)
+    if (heart == REB_BYTES)
         len = EXTRA(Bytes, v).exactly_4[IDX_EXTRA_LEN];
     else {
-        assert(cell_kind == REB_TEXT);
+        assert(heart == REB_TEXT);
         len = VAL_LEN_AT(v);
     }
 
@@ -239,7 +239,7 @@ void MF_Issue(REB_MOLD *mo, REBCEL(const*) v, bool form)
         }
     }
 
-    if (no_quotes or cell_kind == REB_BYTES) {  // !!! hack
+    if (no_quotes or heart == REB_BYTES) {  // !!! hack
         if (len == 1 and not no_quotes) {  // use historical CHAR! path
             bool parened = GET_MOLD_FLAG(mo, MOLD_FLAG_ALL);
 

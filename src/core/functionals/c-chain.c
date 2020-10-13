@@ -169,7 +169,7 @@ bool Cache_Predicate_Throws(
     // See %sys-sequence.h for more information.  We want optimized handling
     // of the `.foo` form (with "heart" as a GET-WORD!, not a BLOCK!).
     //
-    switch (MIRROR_BYTE(predicate)) {
+    switch (HEART_BYTE(predicate)) {
       case REB_GET_WORD: {  // representation of a `.foo` single-WORD! form
         const REBSTR *label = VAL_WORD_SPELLING(predicate);
         Move_Value(predicate, Lookup_Word_May_Fail(predicate, SPECIFIED));

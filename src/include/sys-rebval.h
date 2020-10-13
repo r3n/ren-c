@@ -227,12 +227,15 @@
 // After 8 bits for node flags, 8 bits for the datatype, and 8 generic value
 // bits...there's only 8 more bits left on 32-bit platforms in the header.
 //
-// !!! This is slated for an interesting feature of fitting an immutable
-// single element array into a cell.  The proposal is called "mirror bytes".
+// This is used for the `HEART` byte.  The heart byte corresponds to the
+// actual bit layout of the cell; it's what the GC marks a cell as.  The
+// CELL_HEART() will often match the CELL_KIND(), but won't in cases where
+// the KIND is REB_PATH but the HEART is REB_BLOCK...indicating that the
+// path is using the underlying implementation of a block.
 
-#define FLAG_MIRROR_BYTE(b)         FLAG_FOURTH_BYTE(b)
-#define MIRROR_BYTE(v)              FOURTH_BYTE((v)->header)
-#define mutable_MIRROR_BYTE(v)      mutable_FOURTH_BYTE((v)->header)
+#define FLAG_HEART_BYTE(b)         FLAG_FOURTH_BYTE(b)
+#define HEART_BYTE(v)              FOURTH_BYTE((v)->header)
+#define mutable_HEART_BYTE(v)      mutable_FOURTH_BYTE((v)->header)
 
 
 // Endlike headers have the second byte clear (to pass the IS_END() test).

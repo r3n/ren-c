@@ -209,7 +209,7 @@ inline static void Prep_Array(
             ++prep;
             prep->header.bits =
                 FLAG_KIND_BYTE(REB_T_TRASH)
-                | FLAG_MIRROR_BYTE(REB_T_TRASH); // unreadable
+                | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
             TRACK_CELL_IF_DEBUG(prep, __FILE__, __LINE__);
         }
       #endif
@@ -476,7 +476,7 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
 // account; they strictly operate on the array series
 //
 inline static const REBARR *VAL_ARRAY(REBCEL(const*) v) {
-    assert(ANY_ARRAY_KIND(CELL_KIND(v)));
+    assert(ANY_ARRAY_KIND(CELL_HEART(v)));
 
     const REBARR *a = ARR(PAYLOAD(Any, v).first.node);
     if (GET_SERIES_INFO(a, INACCESSIBLE))
@@ -587,7 +587,7 @@ inline static RELVAL *Init_Relative_Block_At(
 // Checks if ANY-GROUP! is like ((...)) or (...), used by COMPOSE & PARSE
 //
 inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {
-    assert(ANY_GROUP_KIND(CELL_KIND(group)));
+    assert(ANY_GROUP_KIND(CELL_HEART(group)));
     const RELVAL *inner = VAL_ARRAY_AT(group);
     if (KIND_BYTE(inner) != REB_GROUP or NOT_END(inner + 1))
         return false; // plain (...) GROUP!

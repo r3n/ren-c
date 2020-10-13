@@ -113,7 +113,7 @@ REB_R PD_Quoted(
         assert(KIND_BYTE(pvs->out) >= REB_MAX);
         mutable_KIND_BYTE(pvs->out) %= REB_64;
         assert(
-            mutable_MIRROR_BYTE(pvs->out)
+            mutable_HEART_BYTE(pvs->out)
             == mutable_KIND_BYTE(pvs->out)
         );
     }

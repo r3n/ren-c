@@ -68,7 +68,7 @@
 //   numeric sequences like IP addresses or colors into single cells.
 //
 // * Which compressed implementation form that an ANY-PATH! or ANY-TUPLE! is
-//   using is indicated by the MIRROR_BYTE().  This says which actual cell
+//   using is indicated by the HEART_BYTE().  This says which actual cell
 //   format is in effect:
 //
 //   - REB_BYTES has raw bytes in the payload
@@ -143,7 +143,7 @@ inline static REBVAL *Init_Any_Sequence_1(RELVAL *out, enum Reb_Kind kind) {
         Init_Word(out, PG_Dot_1_Canon);
     }
     mutable_KIND_BYTE(out) = kind;
-    assert(MIRROR_BYTE(out) == REB_WORD);  // leave as-is
+    assert(HEART_BYTE(out) == REB_WORD);  // leave as-is
     return SPECIFIC(out);
 }
 
@@ -156,7 +156,7 @@ inline static REBVAL *Init_Any_Sequence_1(RELVAL *out, enum Reb_Kind kind) {
 // In order to make this not cost more than a REFINEMENT! ANY-WORD! did in
 // R3-Alpha, the underlying representation of `/foo` in the cell is the same
 // as an ANY-WORD!.  The KIND_BYTE() returned by VAL_TYPE() will reflect
-// the any sequence, while MIRROR_BYTE() reveals its word-oriented storage.
+// the any sequence, while HEART_BYTE() reveals its word-oriented storage.
 
 inline static REBVAL *Try_Leading_Blank_Pathify(
     REBVAL *v,
@@ -172,12 +172,12 @@ inline static REBVAL *Try_Leading_Blank_Pathify(
 
     // The current optimization only covers WORD!s, to get parity with
     // R3-Alpha on REFINEMENT! fitting in a cell (plus `a/`, `.a`, `a.`) 
-    // How creative one gets to using the MIRROR_BYTE() depends on how much
+    // How creative one gets to using the HEART_BYTE() depends on how much
     // complication you want to bear in code like binding.
     //
     if (VAL_TYPE(v) == REB_WORD) {
-        assert(MIRROR_BYTE(v) == REB_WORD);
-        mutable_MIRROR_BYTE(v) = REB_GET_WORD;  // "refinement-style" signal
+        assert(HEART_BYTE(v) == REB_WORD);
+        mutable_HEART_BYTE(v) = REB_GET_WORD;  // "refinement-style" signal
         mutable_KIND_BYTE(v) = kind;
         return v;
     }
@@ -305,7 +305,7 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
     if (IS_WORD(v1) and IS_BLANK(v2)) {  // `foo.` and `foo/` cases
         Derelativize(out, v1, specifier);
         mutable_KIND_BYTE(out) = kind;
-        mutable_MIRROR_BYTE(out) = REB_SYM_WORD;  // signal trailing
+        mutable_HEART_BYTE(out) = REB_SYM_WORD;  // signal trailing
         return SPECIFIC(out);
     }
 
@@ -446,9 +446,9 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
 // optimized fashion using Refinify()
 
 inline static REBLEN VAL_SEQUENCE_LEN(REBCEL(const*) sequence) {
-    assert(ANY_SEQUENCE_KIND(CELL_TYPE(sequence)));
+    assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));
 
-    switch (MIRROR_BYTE(sequence)) {
+    switch (HEART_BYTE(sequence)) {
       case REB_BYTES:  // packed sequence of bytes directly in cell
         assert(NOT_CELL_FLAG(sequence, FIRST_IS_NODE));  // TBD: series form
         return EXTRA(Bytes, sequence).exactly_4[IDX_EXTRA_USED];
@@ -490,7 +490,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         Init_Unreadable_Void(store);  // catch use in case we don't write it
   #endif
 
-    assert(ANY_SEQUENCE_KIND(CELL_TYPE(sequence)));  // TYPE, not HEART
+    assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));
 
     enum Reb_Kind heart = CELL_HEART(sequence);
     switch (heart) {
@@ -520,7 +520,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         if (sequence != store)
             Blit_Cell(store, CELL_TO_VAL(sequence));
         mutable_KIND_BYTE(store) = REB_WORD;  // not ANY-SEQUENCE!
-        mutable_MIRROR_BYTE(store) = REB_WORD;  // not the fake REB_GET_WORD
+        mutable_HEART_BYTE(store) = REB_WORD;  // not the fake REB_GET_WORD
         return store; }
 
       case REB_BLOCK: {
@@ -544,11 +544,11 @@ inline static REBYTE VAL_SEQUENCE_BYTE_AT(REBCEL(const*) path, REBLEN n)
     return VAL_UINT8(at);  // !!! All callers of this routine need vetting
 }
 
-inline static REBSPC *VAL_SEQUENCE_SPECIFIER(const RELVAL *sequence)
+inline static REBSPC *VAL_SEQUENCE_SPECIFIER(REBCEL(const*) sequence)
 {
-    assert(ANY_SEQUENCE_KIND(CELL_TYPE(sequence)));  // TYPE, not HEART
+    assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));
 
-    switch (MIRROR_BYTE(sequence)) {
+    switch (CELL_HEART(sequence)) {
       case REB_BYTES:
       case REB_WORD:
       case REB_GET_WORD:
@@ -622,10 +622,10 @@ inline static REBVAL *Refinify(REBVAL *v) {
 }
 
 inline static bool IS_REFINEMENT_CELL(REBCEL(const*) v)
-  { return CELL_TYPE(v) == REB_PATH and MIRROR_BYTE(v) == REB_GET_WORD; }
+  { return CELL_KIND(v) == REB_PATH and CELL_HEART(v) == REB_GET_WORD; }
 
 inline static bool IS_REFINEMENT(const RELVAL *v)
-  { return IS_PATH(v) and MIRROR_BYTE(v) == REB_GET_WORD; }
+  { return IS_PATH(v) and HEART_BYTE(v) == REB_GET_WORD; }
 
 inline static bool IS_PREDICATE(const RELVAL *v) {
     if (not IS_TUPLE(v))

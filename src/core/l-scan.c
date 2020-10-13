@@ -2479,7 +2479,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             if (IS_GET_WORD(cleanup)) {
                 REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);
                 mutable_KIND_BYTE(cleanup)
-                    = mutable_MIRROR_BYTE(cleanup)
+                    = mutable_HEART_BYTE(cleanup)
                     = REB_GET_WORD;
 
                 Move_Value(ARR_SINGLE(a), cleanup);
@@ -2594,7 +2594,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
         mutable_KIND_BYTE(DS_TOP) = SETIFY_ANY_PLAIN_KIND(kind);
         if (kind != REB_PATH and kind != REB_TUPLE)  // keep "heart" as is
-            mutable_MIRROR_BYTE(DS_TOP) = SETIFY_ANY_PLAIN_KIND(kind);
+            mutable_HEART_BYTE(DS_TOP) = SETIFY_ANY_PLAIN_KIND(kind);
 
         ss->begin = ++ss->end;  // !!! ?
     }
@@ -2607,13 +2607,13 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
           case TOKEN_COLON:
             mutable_KIND_BYTE(DS_TOP) = GETIFY_ANY_PLAIN_KIND(kind);
             if (kind != REB_PATH and kind != REB_TUPLE)  // keep "heart" as is
-                mutable_MIRROR_BYTE(DS_TOP) = GETIFY_ANY_PLAIN_KIND(kind);
+                mutable_HEART_BYTE(DS_TOP) = GETIFY_ANY_PLAIN_KIND(kind);
             break;
 
           case TOKEN_AT:
             mutable_KIND_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);
             if (kind != REB_PATH and kind != REB_TUPLE)  // keep "heart" as is
-                mutable_MIRROR_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);
+                mutable_HEART_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);
             break;
 
           default:

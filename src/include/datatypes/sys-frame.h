@@ -744,7 +744,7 @@ inline static void Push_Action(
             | CELL_FLAG_PROTECTED  // payload/binding tweaked, but not by user
             | CELL_MASK_CONTEXT
             | FLAG_KIND_BYTE(REB_FRAME)
-            | FLAG_MIRROR_BYTE(REB_FRAME);
+            | FLAG_HEART_BYTE(REB_FRAME);
     TRACK_CELL_IF_DEBUG(f->rootvar, __FILE__, __LINE__);
     INIT_VAL_CONTEXT_VARLIST(f->rootvar, f->varlist);
 
@@ -769,7 +769,7 @@ inline static void Push_Action(
     for (; prep > tail; --prep) {
         prep->header.bits =
             FLAG_KIND_BYTE(REB_T_TRASH)
-            | FLAG_MIRROR_BYTE(REB_T_TRASH); // unreadable
+            | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
         TRACK_CELL_IF_DEBUG(prep, __FILE__, __LINE__);
     }
   #endif

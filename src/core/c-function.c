@@ -356,7 +356,7 @@ void Push_Paramlist_Triads_May_Fail(
         Reb_Param_Class pclass = REB_P_DETECT;
 
         bool refinement = false;  // paths with blanks at head are refinements
-        if (ANY_PATH_KIND(CELL_TYPE(cell))) {
+        if (ANY_PATH_KIND(CELL_KIND(cell))) {
             if (not IS_REFINEMENT_CELL(cell))
                 fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
 
@@ -375,11 +375,11 @@ void Push_Paramlist_Triads_May_Fail(
                 if (ANY_WORD_KIND(KIND_BYTE(item + 1)))  // END is 0
                     fail (Error_Legacy_Local_Raw(spec));  // -> <local>
 
-            if (CELL_TYPE(cell) == REB_GET_PATH) {
+            if (CELL_KIND(cell) == REB_GET_PATH) {
                 if (not quoted)
                     pclass = REB_P_HARD_QUOTE;
             }
-            else if (CELL_TYPE(cell) == REB_PATH) {
+            else if (CELL_KIND(cell) == REB_PATH) {
                 if (quoted)
                     pclass = REB_P_SOFT_QUOTE;
                 else
@@ -565,7 +565,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         else {
             REBVAL *param = DS_AT(definitional_return_dsp);
             assert(VAL_PARAM_CLASS(param) == REB_P_LOCAL);
-            assert(MIRROR_BYTE(param) == REB_TYPESET);
+            assert(HEART_BYTE(param) == REB_TYPESET);
             UNUSED(param);
         }
 
@@ -1363,7 +1363,7 @@ bool Get_If_Word_Or_Path_Throws(
         IS_PATH(v) or IS_GET_PATH(v) or IS_SYM_PATH(v)
         or IS_TUPLE(v) or IS_GET_TUPLE(v) or IS_SYM_TUPLE(v)
     ){
-        if (ANY_WORD_KIND(MIRROR_BYTE(v)))  // e.g. `/`
+        if (ANY_WORD_KIND(HEART_BYTE(v)))  // e.g. `/`
             goto get_as_word;  // faster than calling Eval_Path_Throws_Core?
 
         if (Eval_Path_Throws_Core(

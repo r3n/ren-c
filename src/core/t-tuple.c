@@ -360,14 +360,14 @@ REBTYPE(Sequence)
         //
       case SYM_COPY: {
         if (
-            MIRROR_BYTE(sequence) == REB_WORD
-            or MIRROR_BYTE(sequence) == REB_ISSUE
+            HEART_BYTE(sequence) == REB_WORD
+            or HEART_BYTE(sequence) == REB_ISSUE
         ){
             assert(VAL_WORD_SYM(sequence) == SYM__SLASH_1_);
             return Move_Value(frame_->out, sequence);
         }
 
-        assert(MIRROR_BYTE(sequence) == REB_BLOCK);
+        assert(HEART_BYTE(sequence) == REB_BLOCK);
 
         enum Reb_Kind kind = VAL_TYPE(sequence);
         mutable_KIND_BYTE(sequence) = REB_BLOCK;
@@ -452,7 +452,7 @@ void MF_Sequence(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
-    enum Reb_Kind kind = CELL_TYPE(v);  // Note: CELL_KIND() might be WORD!
+    enum Reb_Kind kind = CELL_KIND(v);  // ANY_SEQUENCE but CELL_HEART varies!
     char interstitial = ANY_TUPLE_KIND(kind) ? '.' : '/';
 
     if (kind == REB_GET_PATH or kind == REB_GET_TUPLE)

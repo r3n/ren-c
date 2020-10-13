@@ -37,10 +37,10 @@
 //
 
 inline static bool IS_CHAR_CELL(REBCEL(const*) v) {
-    if (CELL_TYPE(v) != REB_ISSUE)
+    if (CELL_KIND(v) != REB_ISSUE)
         return false;
 
-    if (CELL_KIND(v) != REB_BYTES)
+    if (CELL_HEART(v) != REB_BYTES)
         return false;  // allocated form, too long to be a character
 
     return EXTRA(Bytes, v).exactly_4[IDX_EXTRA_LEN] <= 1;  // codepoint
@@ -49,7 +49,7 @@ inline static bool IS_CHAR_CELL(REBCEL(const*) v) {
 #define IS_CHAR IS_CHAR_CELL  // could be faster if used VAL_TYPE()
 
 inline static REBUNI VAL_CHAR(REBCEL(const*) v) {
-    assert(CELL_KIND(v) == REB_BYTES);
+    assert(CELL_HEART(v) == REB_BYTES);
 
     if (EXTRA(Bytes, v).exactly_4[IDX_EXTRA_LEN] == 0)
         return 0;  // no '\0` bytes internal to series w/REB_TEXT "heart"
@@ -70,7 +70,7 @@ inline static REBYTE VAL_CHAR_ENCODED_SIZE(REBCEL(const*) v)
   { return Encoded_Size_For_Codepoint(VAL_CHAR(v)); }
 
 inline static const REBYTE *VAL_CHAR_ENCODED(REBCEL(const*) v) {
-    assert(CELL_TYPE(v) == REB_ISSUE and CELL_KIND(v) == REB_BYTES);
+    assert(CELL_KIND(v) == REB_ISSUE and CELL_HEART(v) == REB_BYTES);
     assert(EXTRA(Bytes, v).exactly_4[IDX_EXTRA_LEN] <= 1);  // e.g. codepoint
     return PAYLOAD(Bytes, v).at_least_8;  // !!! '\0' terminated or not?
 }
@@ -260,8 +260,8 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
         size_out = &dummy_size;  // force size calculation for debug check
   #endif
 
-    if (CELL_KIND(v) == REB_BYTES) {
-        assert(CELL_TYPE(v) == REB_ISSUE);
+    if (CELL_HEART(v) == REB_BYTES) {
+        assert(CELL_KIND(v) == REB_ISSUE);
         REBLEN len;
         REBSIZ size;
         if (limit >= EXTRA(Bytes, v).exactly_4[IDX_EXTRA_LEN]) {
@@ -284,7 +284,7 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
     }
 
     REBCHR(const*) utf8;
-    if (ANY_STRING_KIND(CELL_KIND(v))) {
+    if (ANY_STRING_KIND(CELL_HEART(v))) {
         utf8 = VAL_STRING_AT(v);
 
         if (size_out or length_out) {
@@ -305,7 +305,7 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
         }
     }
     else {
-        assert(ANY_WORD_KIND(CELL_KIND(v)));
+        assert(ANY_WORD_KIND(CELL_HEART(v)));
 
         const REBSTR *spelling = VAL_WORD_SPELLING(v);
         utf8 = STR_HEAD(spelling);

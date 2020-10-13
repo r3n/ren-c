@@ -90,7 +90,7 @@
     }
 
     inline static REBSPC *VAL_SPECIFIER(REBCEL(const*) v) {
-        assert(ANY_ARRAY_KIND(CELL_KIND(v)));
+        assert(ANY_ARRAY_KIND(CELL_HEART(v)));
 
         if (not EXTRA(Binding, v).node)
             return SPECIFIED;
@@ -435,7 +435,7 @@ inline static REBCTX *Get_Word_Context(
     REBCEL(const*) any_word,
     REBSPC *specifier
 ){
-    assert(ANY_WORD_KIND(CELL_KIND(any_word)));
+    assert(ANY_WORD_KIND(CELL_HEART(any_word)));
 
     REBNOD *binding = VAL_BINDING(any_word);
     assert(binding); // caller should check so context won't be null
@@ -652,8 +652,8 @@ inline static REBVAL *Derelativize(
         // needs to be a frame to have a precise invocation to lookup in.
 
       #if !defined(NDEBUG)
-        enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(v));
-        assert(ANY_WORD_KIND(kind) or ANY_ARRAY_OR_PATH_KIND(kind));
+        enum Reb_Kind heart = CELL_HEART(VAL_UNESCAPED(v));
+        assert(ANY_WORD_KIND(heart) or ANY_ARRAY_OR_PATH_KIND(heart));
 
         if (not specifier) {
             printf("Relative item used with SPECIFIED\n");

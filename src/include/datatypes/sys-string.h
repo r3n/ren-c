@@ -739,8 +739,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
 #endif
 
 inline static const REBSTR *VAL_STRING(REBCEL(const*) v) {
-    assert(ANY_STRING_KIND(CELL_KIND(v)) or ANY_WORD_KIND(CELL_KIND(v)));
-    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));  // might be optimized form
+    assert(ANY_STRING_KIND(CELL_HEART(v)) or ANY_WORD_KIND(CELL_HEART(v)));
     return STR(VAL_NODE(v));  // VAL_SERIES() would assert
 }
 
@@ -789,12 +788,6 @@ inline static REBCHR(const*) VAL_STRING_AT(REBCEL(const*) v) {
 
 
 inline static REBCHR(const*) VAL_STRING_TAIL(REBCEL(const*) v) {
-    if (NOT_CELL_FLAG(v, FIRST_IS_NODE)) {
-        assert(ANY_STRING_KIND(CELL_KIND(v)));  // heart must be stringlike
-        return PAYLOAD(Bytes, v).at_least_8
-            + EXTRA(Bytes, v).exactly_4[IDX_EXTRA_USED];
-    }
-
     const REBSTR *s = VAL_STRING(v);  // debug build checks it's ANY-STRING!
     return STR_TAIL(s);
 }
@@ -813,7 +806,7 @@ inline static REBSIZ VAL_SIZE_LIMIT_AT(
     REBCEL(const*) v,
     REBLEN limit  // UNLIMITED (e.g. a very large number) for no limit
 ){
-    assert(ANY_STRING_KIND(CELL_KIND(v)));
+    assert(ANY_STRING_KIND(CELL_HEART(v)));
 
     REBCHR(const*) at = VAL_STRING_AT(v);  // !!! update cache if needed
     REBCHR(const*) tail;
@@ -843,7 +836,7 @@ inline static REBSIZ VAL_OFFSET(const RELVAL *v) {
 }
 
 inline static REBSIZ VAL_OFFSET_FOR_INDEX(REBCEL(const*) v, REBLEN index) {
-    assert(ANY_STRING_KIND(CELL_KIND(v)));
+    assert(ANY_STRING_KIND(CELL_HEART(v)));
 
     REBCHR(const*) at;
 

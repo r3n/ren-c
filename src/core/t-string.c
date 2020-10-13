@@ -51,8 +51,8 @@ enum {
 //
 REBINT CT_String(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    assert(ANY_STRING_KIND(CELL_TYPE(a)) or REB_ISSUE == CELL_TYPE(a));
-    assert(ANY_STRING_KIND(CELL_TYPE(b)) or REB_ISSUE == CELL_TYPE(b));
+    assert(ANY_STRING_KIND(CELL_KIND(a)) or REB_ISSUE == CELL_KIND(a));
+    assert(ANY_STRING_KIND(CELL_KIND(b)) or REB_ISSUE == CELL_KIND(b));
 
     REBLEN l1;
     REBCHR(const*) cp1 = VAL_UTF8_LEN_SIZE_AT(&l1, nullptr, a);
@@ -179,12 +179,12 @@ REBLEN find_string(
     //
     assert(end >= index);
 
-    enum Reb_Kind type = CELL_TYPE(pattern);
+    enum Reb_Kind kind = CELL_KIND(pattern);
     if (
-        ANY_STRING_KIND(type)
-        or ANY_WORD_KIND(type)
-        or REB_INTEGER == type  // `find "ab10cd" 10` -> "10cd"
-        or REB_ISSUE == type
+        ANY_STRING_KIND(kind)
+        or ANY_WORD_KIND(kind)
+        or REB_INTEGER == kind  // `find "ab10cd" 10` -> "10cd"
+        or REB_ISSUE == kind
     ){
         bool str_is_all_ascii = false;  // !!! future string flag feature
         bool pattern_is_all_ascii = false;
@@ -200,9 +200,9 @@ REBLEN find_string(
         REBCHR(const*) bp2;
         REBSIZ size2;
         if (
-            CELL_TYPE(pattern) != REB_ISSUE
-            and CELL_TYPE(pattern) != REB_TEXT
-            and CELL_TYPE(pattern) != REB_WORD
+            CELL_KIND(pattern) != REB_ISSUE
+            and CELL_KIND(pattern) != REB_TEXT
+            and CELL_KIND(pattern) != REB_WORD
          ){
             // !!! `<tag>`, `set-word:` but FILE!, etc?
             //
@@ -271,7 +271,7 @@ REBLEN find_string(
 
         return result;
     }
-    else if (type == REB_BITSET) {
+    else if (kind == REB_BITSET) {
         *len = 1;
 
         return Find_Str_Bitset(
@@ -283,7 +283,7 @@ REBLEN find_string(
             flags & (AM_FIND_MATCH | AM_FIND_CASE)
         );
     }
-    else if (type == REB_BINARY) {
+    else if (kind == REB_BINARY) {
         //
         // Finding an arbitrary binary (which may not be UTF-8) in a string
         // is probably most sensibly done by thinking of the string itself

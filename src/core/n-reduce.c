@@ -379,7 +379,7 @@ REB_R Compose_To_Stack_Core(
                 continue;
             }
 
-            enum Reb_Kind kind = CELL_TYPE(cell);
+            enum Reb_Kind kind = CELL_KIND(cell);
             if (ANY_SEQUENCE_KIND(kind)) {
                 DECLARE_LOCAL (temp);
                 if (not Try_Pop_Sequence_Or_Element_Or_Nulled(

@@ -287,7 +287,7 @@ REBNATIVE(reskinned)
         // were just already in %words.r)
 
         if (pclass != KIND_BYTE(param)) {
-            assert(MIRROR_BYTE(param) == REB_TYPESET);
+            assert(HEART_BYTE(param) == REB_TYPESET);
             if (change)
                 mutable_KIND_BYTE(param) = pclass;
             else if (pclass != REB_P_NORMAL)  // assume plain word = no change

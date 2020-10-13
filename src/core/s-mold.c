@@ -112,11 +112,11 @@ void Pre_Mold_Core(REB_MOLD *mo, REBCEL(const*) v, bool all)
         Append_Ascii(mo->series, "make ");
 
     // If asked for the type name of a PARAM in a paramlist, VAL_TYPE()
-    // will report an invalid value.  So use MIRROR_BYTE() so that TYPESET!
+    // will report an invalid value.  So use HEART_BYTE() so that TYPESET!
     // comes back as the answer.
     //
     const REBSTR *type_name = Canon(
-        SYM_FROM_KIND(cast(enum Reb_Kind, MIRROR_BYTE(v)))
+        SYM_FROM_KIND(cast(enum Reb_Kind, HEART_BYTE(v)))
     );
     Append_Spelling(mo->series, type_name);
 

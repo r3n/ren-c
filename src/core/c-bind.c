@@ -45,7 +45,7 @@ void Bind_Values_Inner_Loop(
 ){
     for (; NOT_END(head); ++head) {
         REBCEL(const*) cell = VAL_UNESCAPED(head); // may equal v, e.g. `\x`
-        enum Reb_Kind kind = CELL_TYPE(cell);
+        enum Reb_Kind kind = CELL_KIND(cell);
         UNUSED(kind);  // !!! TBD: be influenced by KIND vs HEART?
 
         enum Reb_Kind heart = CELL_HEART(cell);

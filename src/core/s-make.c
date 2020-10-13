@@ -224,7 +224,7 @@ void Append_Spelling(REBSTR *dst, const REBSTR *spelling)
 void Append_String(REBSTR *dst, REBCEL(const*) src, REBLEN limit)
 {
     assert(not IS_STR_SYMBOL(dst));
-    assert(ANY_UTF8_KIND(CELL_TYPE(src)));
+    assert(ANY_UTF8_KIND(CELL_KIND(src)));
 
     REBLEN len;
     REBSIZ size;

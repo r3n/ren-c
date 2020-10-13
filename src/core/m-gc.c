@@ -252,8 +252,8 @@ static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v)
     // kinds that don't need marking include REB_0_END.  REB_INTEGER will
     // need marking when it becomes arbitrary precision and has a node...
     //
-    enum Reb_Kind kind = CELL_KIND_UNCHECKED(v);
-    if (kind < REB_PAIR)
+    enum Reb_Kind heart = cast(enum Reb_Kind, HEART_BYTE(v));
+    if (heart < REB_PAIR)
         return;
 
   #if !defined(NDEBUG)  // see Queue_Mark_Node_Deep() for notes on recursion
@@ -261,7 +261,7 @@ static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v)
     in_mark = true;
   #endif
 
-    if (IS_BINDABLE_KIND(kind)) {
+    if (IS_BINDABLE_KIND(heart)) {
         REBNOD *binding = EXTRA(Binding, v).node;
         if (binding != UNBOUND and (binding->header.bits & NODE_FLAG_MANAGED))
             Queue_Mark_Node_Deep(ARR(binding));

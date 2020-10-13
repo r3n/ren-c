@@ -554,7 +554,7 @@ REBVAL *Setify(REBVAL *out) {
 
     enum Reb_Kind kind = VAL_TYPE(out);
     if (ANY_WORD_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SET_WORD;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_SET_WORD;
     }
     else if (ANY_PATH_KIND(kind)) {  // Don't change "heart"!
         mutable_KIND_BYTE(out) = REB_SET_PATH;
@@ -563,10 +563,10 @@ REBVAL *Setify(REBVAL *out) {
         mutable_KIND_BYTE(out) = REB_SET_TUPLE;
     }
     else if (ANY_BLOCK_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SET_BLOCK;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_SET_BLOCK;
     }
     else if (ANY_GROUP_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SET_GROUP;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_SET_GROUP;
     }
     else if (kind == REB_NULL) {
         fail ("Cannot SETIFY a NULL");
@@ -612,10 +612,10 @@ REBVAL *Getify(REBVAL *out) {
 
     enum Reb_Kind kind = VAL_TYPE(out);
     if (ANY_BLOCK_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GET_BLOCK;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_GET_BLOCK;
     }
     else if (ANY_GROUP_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GET_GROUP;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_GET_GROUP;
     }
     else if (ANY_PATH_KIND(kind)) {  // Don't change "heart"
         mutable_KIND_BYTE(out) = REB_GET_PATH;
@@ -624,7 +624,7 @@ REBVAL *Getify(REBVAL *out) {
         mutable_KIND_BYTE(out) = REB_GET_TUPLE;
     }
     else if (ANY_WORD_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GET_WORD;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_GET_WORD;
     }
     else if (kind == REB_NULL) {
         fail ("Cannot GETIFY a NULL");
@@ -670,7 +670,7 @@ REBVAL *Symify(REBVAL *out) {
 
     enum Reb_Kind kind = VAL_TYPE(out);
     if (ANY_WORD_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SYM_WORD;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_WORD;
     }
     else if (ANY_PATH_KIND(kind)) {  // Don't change "heart"!
         mutable_KIND_BYTE(out) = REB_SYM_PATH;
@@ -679,10 +679,10 @@ REBVAL *Symify(REBVAL *out) {
         mutable_KIND_BYTE(out) = REB_SYM_TUPLE;
     }
     else if (ANY_BLOCK_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SYM_BLOCK;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_BLOCK;
     }
     else if (ANY_GROUP_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SYM_GROUP;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_GROUP;
     }
     else if (kind == REB_NULL) {
         fail ("Cannot SYMIFY a NULL");
@@ -728,7 +728,7 @@ REBVAL *Plainify(REBVAL *out) {
 
     enum Reb_Kind kind = VAL_TYPE(out);
     if (ANY_WORD_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_WORD;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_WORD;
     }
     else if (ANY_PATH_KIND(kind)) {  // Don't change "heart"!
         mutable_KIND_BYTE(out) = REB_PATH;
@@ -737,10 +737,10 @@ REBVAL *Plainify(REBVAL *out) {
         mutable_KIND_BYTE(out) = REB_TUPLE;
     }
     else if (ANY_BLOCK_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_BLOCK;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_BLOCK;
     }
     else if (ANY_GROUP_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GROUP;
+        mutable_KIND_BYTE(out) = mutable_HEART_BYTE(out) = REB_GROUP;
     }
     else if (kind == REB_NULL)
         fail ("Cannot PLAINIFY a NULL");

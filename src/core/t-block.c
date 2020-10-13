@@ -30,9 +30,9 @@
 //
 // "Compare Type" dispatcher for arrays.
 //
-// Note this routine is delegated to when something like a PATH! is using an
-// array for its implementation, so ANY_ARRAY(CELL_TYPE()) may not be true...
-// just ANY_ARRAY(CELL_HEART()).
+// Note this routine is delegated to by CT_Path() when it's using an array for
+// its implementation, so ANY_ARRAY(CELL_KIND()) may not be true...just
+// ANY_ARRAY(CELL_HEART()).
 //
 REBINT CT_Array(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {

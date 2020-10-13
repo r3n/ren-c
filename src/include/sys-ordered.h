@@ -70,15 +70,14 @@ inline static bool IS_QUOTED_KIND(REBYTE k)
 // ->extra field of the contained cell...so it comes off as "specified" in
 // those cases.
 //
-// Also note that the MIRROR_BYTE() is what is being tested--e.g. the type
-// that the cell payload and extra actually are *for*.  This is what gives
-// the CELL_KIND() as opposed to the VAL_TYPE
+// Also note that the HEART_BYTE() is what is being tested--e.g. the type
+// that the cell payload and extra actually are *for*.
 
 #define IS_BINDABLE_KIND(k) \
     ((k) >= REB_OBJECT)
 
 #define Is_Bindable(v) \
-    IS_BINDABLE_KIND(CELL_KIND_UNCHECKED(v))  // checked elsewhere
+    IS_BINDABLE_KIND(HEART_BYTE(v))  // checked elsewhere
 
 
 //=//// INERTNESS ////////////////////////////////////////////////////////=//
@@ -396,7 +395,7 @@ inline static enum Reb_Kind BLOCKIFY_KIND(REBYTE k) {
 //
 // !!! Due to the scarcity of bytes in cells, yet a desire to use them for
 // parameters, they are a kind of "container" class in the KIND_BYTE() while
-// the actual CELL_KIND (via MIRROR_BYTE()) is a REB_TYPESET.
+// the actual CELL_KIND (via HEART_BYTE()) is a REB_TYPESET.
 //
 // Making the typeset expression more sophisticated to clearly express a list
 // of parameter flags is something planned for the near future.

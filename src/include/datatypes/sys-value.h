@@ -276,52 +276,32 @@
 // A cell may have a larger KIND_BYTE() than legal Reb_Kind to represent a
 // literal in-situ...the actual kind comes from that byte % 64.  But if you
 // are interested in the kind of *cell* (for purposes of knowing its bit
-// layout expectations) that is stored in the MIRROR_BYTE().
+// layout expectations) that is stored in the HEART_BYTE().
 
 inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v);
 
 #define CELL_KIND_UNCHECKED(cell) \
-    cast(enum Reb_Kind, MIRROR_BYTE(cell))
-
-#define CELL_TYPE_UNCHECKED(cell) \
     cast(enum Reb_Kind, KIND_BYTE_UNCHECKED(cell) % REB_64)
 
+#define CELL_HEART_UNCHECKED(cell) \
+    cast(enum Reb_Kind, HEART_BYTE(cell))
 
-#if defined(NDEBUG)
+
+#if defined(NDEBUG) or !defined(CPLUSPLUS_11)
     #define CELL_KIND CELL_KIND_UNCHECKED
-    #define CELL_TYPE CELL_TYPE_UNCHECKED
-    #define CELL_HEART CELL_KIND_UNCHECKED
+    #define CELL_HEART CELL_HEART_UNCHECKED
 #else
-    #define CELL_TYPE CELL_TYPE_UNCHECKED  // develop this more rigorously
+    inline static enum Reb_Kind CELL_KIND(REBCEL(const*) cell)
+        { return CELL_KIND_UNCHECKED(cell); }
 
-    #if !defined(CPLUSPLUS_11)
-        #define CELL_KIND(cell) \
-            cast(enum Reb_Kind, MIRROR_BYTE(cast(const RELVAL*, cell)))
+    inline static enum Reb_Kind CELL_HEART(REBCEL(const*) cell)
+      { return CELL_HEART_UNCHECKED(cell); }
 
-        #define CELL_HEART(cell) \
-            cast(enum Reb_Kind, MIRROR_BYTE(cast(const RELVAL*, cell)))
-    #else
-        inline static enum Reb_Kind CELL_KIND(REBCEL(const*) cell) {
-            return cast(enum Reb_Kind, MIRROR_BYTE(cast(const RELVAL*, cell)));
-        }
-
-        // Don't want to ask an ordinary value cell its kind modulo 64 is;
-        // it may be REB_QUOTED and we need to call VAL_UNESCAPED() first!
-        //
-        inline static enum Reb_Kind CELL_KIND(const RELVAL *v) = delete;
-
-        // !!! New name for mirror byte is "heart byte" (WIP)
-
-        inline static enum Reb_Kind CELL_HEART(REBCEL(const*) cell) {
-            return cast(enum Reb_Kind, MIRROR_BYTE(cast(const RELVAL*, cell)));
-        }
-
-        // Don't want to ask an ordinary value cell its kind modulo 64 is;
-        // it may be REB_QUOTED and we need to call VAL_UNESCAPED() first!
-        //
-        inline static enum Reb_Kind CELL_HEART(const RELVAL *v) = delete;
-
-    #endif
+    // We want to disable asking for low level implementation details on a
+    // cell that may be a REB_QUOTED; you have to call VAL_UNESCAPED() first.
+    //
+    inline static enum Reb_Kind CELL_KIND(const RELVAL *v) = delete;
+    inline static enum Reb_Kind CELL_HEART(const RELVAL *v) = delete;
 #endif
 
 inline static REBTYP *CELL_CUSTOM_TYPE(REBCEL(const*) v) {
@@ -433,7 +413,7 @@ inline static REBVAL *RESET_VAL_HEADER_at(
     ASSERT_CELL_WRITABLE_EVIL_MACRO(v, file, line);
 
     v->header.bits &= CELL_MASK_PERSIST;
-    v->header.bits |= FLAG_KIND_BYTE(k) | FLAG_MIRROR_BYTE(k) | extra;
+    v->header.bits |= FLAG_KIND_BYTE(k) | FLAG_HEART_BYTE(k) | extra;
     return cast(REBVAL*, v);
 }
 
@@ -519,7 +499,7 @@ inline static REBVAL *RESET_CUSTOM_CELL(
 #define CELL_MASK_PREP_END \
     (CELL_MASK_PREP \
         | FLAG_KIND_BYTE(REB_0) \
-        | FLAG_MIRROR_BYTE(REB_0))  // a more explicit CELL_MASK_PREP
+        | FLAG_HEART_BYTE(REB_0))  // a more explicit CELL_MASK_PREP
 
 inline static RELVAL *Prep_Cell_Core(
     RELVAL *c
@@ -570,7 +550,7 @@ inline static RELVAL *Prep_Cell_Core(
         v->header.bits &= CELL_MASK_PERSIST;
         v->header.bits |=
             FLAG_KIND_BYTE(REB_T_TRASH)
-                | FLAG_MIRROR_BYTE(REB_T_TRASH);
+                | FLAG_HEART_BYTE(REB_T_TRASH);
 
         TRACK_CELL_IF_DEBUG(v, file, line);
         return v;
@@ -620,7 +600,7 @@ inline static RELVAL *Prep_Cell_Core(
         ASSERT_CELL_WRITABLE_EVIL_MACRO(v, file, line);
 
         mutable_KIND_BYTE(v) = REB_0_END; // release build behavior
-        mutable_MIRROR_BYTE(v) = REB_0_END;
+        mutable_HEART_BYTE(v) = REB_0_END;
 
         TRACK_CELL_IF_DEBUG(v, file, line);
         return cast(REBVAL*, v);
@@ -631,7 +611,7 @@ inline static RELVAL *Prep_Cell_Core(
 #else
     inline static REBVAL *SET_END(RELVAL *v) {
         mutable_KIND_BYTE(v) = REB_0_END; // must be a prepared cell
-        mutable_MIRROR_BYTE(v) = REB_0_END;
+        mutable_HEART_BYTE(v) = REB_0_END;
         return cast(REBVAL*, v);
     }
 #endif

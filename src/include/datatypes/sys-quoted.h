@@ -82,7 +82,7 @@ inline static RELVAL *Quotify_Core(
         return v;
     }
 
-    // Note: Not CELL_KIND(), may differ from what MIRROR_BYTE() says
+    // Note: Not CELL_KIND(), may differ from what HEART_BYTE() says
     //
     enum Reb_Kind type = cast(enum Reb_Kind, KIND_BYTE(v) % REB_64);
     if (type >= REB_MAX)  // e.g. REB_P_XXX for params

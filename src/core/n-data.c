@@ -520,7 +520,7 @@ inline static void Get_Var_May_Fail(
     bool hard  // should GROUP!s in paths not be evaluated
 ){
     REBCEL(const*) source = VAL_UNESCAPED(source_orig);
-    enum Reb_Kind kind = CELL_TYPE(source);
+    enum Reb_Kind kind = CELL_KIND(source);
 
     if (ANY_WORD_KIND(kind)) {
         Move_Value(out, Lookup_Word_May_Fail(source, specifier));
@@ -647,7 +647,7 @@ void Set_Var_May_Fail(
         return;
 
     REBCEL(const*) target = VAL_UNESCAPED(target_orig);
-    enum Reb_Kind kind = CELL_TYPE(target);
+    enum Reb_Kind kind = CELL_KIND(target);
 
     if (ANY_WORD_KIND(kind)) {
         REBVAL *var = Sink_Word_May_Fail(target, target_specifier);
@@ -1123,7 +1123,7 @@ bool Try_As_String(
         Inherit_Const(Quotify(out, quotes), v);
     }
     else if (IS_ISSUE(v)) {
-        if (CELL_KIND(cast(REBCEL(const*), v)) != REB_BYTES) {
+        if (CELL_HEART(cast(REBCEL(const*), v)) != REB_BYTES) {
             assert(Is_Series_Frozen(SER(VAL_STRING(v))));
             goto any_string;  // ISSUE! series must be immutable
         }
@@ -1148,7 +1148,7 @@ bool Try_As_String(
       any_string:
         Move_Value(out, v);
         mutable_KIND_BYTE(out)
-            = mutable_MIRROR_BYTE(out)
+            = mutable_HEART_BYTE(out)
             = new_kind;
         Trust_Const(Quotify(out, quotes));
     }
@@ -1192,7 +1192,7 @@ REBNATIVE(as)
       case REB_BLOCK:
       case REB_GROUP:
         if (ANY_SEQUENCE(v)) {  // internals vary based on optimization
-            switch (MIRROR_BYTE(v)) {
+            switch (HEART_BYTE(v)) {
               case REB_ISSUE:
                 fail ("Array Conversions of byte-oriented sequences TBD");
 
@@ -1209,7 +1209,7 @@ REBNATIVE(as)
                 Init_Blank(ARR_HEAD(a));
                 Blit_Cell(ARR_AT(a, 1), v);
                 mutable_KIND_BYTE(ARR_AT(a, 1)) = REB_WORD;
-                mutable_MIRROR_BYTE(ARR_AT(a, 1)) = REB_WORD;
+                mutable_HEART_BYTE(ARR_AT(a, 1)) = REB_WORD;
                 TERM_ARRAY_LEN(a, 2);
                 Init_Block(v, a);
                 break; }
@@ -1218,7 +1218,7 @@ REBNATIVE(as)
                 REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
                 Blit_Cell(ARR_HEAD(a), v);
                 mutable_KIND_BYTE(ARR_HEAD(a)) = REB_WORD;
-                mutable_MIRROR_BYTE(ARR_HEAD(a)) = REB_WORD;
+                mutable_HEART_BYTE(ARR_HEAD(a)) = REB_WORD;
                 Init_Blank(ARR_AT(a, 1));
                 TERM_ARRAY_LEN(a, 2);
                 Init_Block(v, a);
@@ -1486,7 +1486,7 @@ REBNATIVE(as)
     //
     Move_Value(D_OUT, v);
     mutable_KIND_BYTE(D_OUT)
-        = mutable_MIRROR_BYTE(D_OUT)
+        = mutable_HEART_BYTE(D_OUT)
         = new_kind;
     return Trust_Const(D_OUT);
 }

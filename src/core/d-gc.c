@@ -47,7 +47,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 {
     if (KIND_BYTE_UNCHECKED(v) == REB_QUOTED) {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        assert(MIRROR_BYTE(v) == REB_QUOTED);
+        assert(HEART_BYTE(v) == REB_QUOTED);
         assert(Is_Marked(PAYLOAD(Any, v).first.node));
         return;
     }
@@ -402,7 +402,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_P_LOCAL: {
         REBSTR *s = VAL_TYPESET_STRING(v);
         assert(Is_Marked(s));
-        assert(MIRROR_BYTE(v) == REB_TYPESET);
+        assert(HEART_BYTE(v) == REB_TYPESET);
         break; }
 
       case REB_G_XYF:
@@ -432,7 +432,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         panic (v);
     }
 
-    enum Reb_Kind kind = CELL_TYPE(cast(REBCEL(const*), v));
+    enum Reb_Kind kind = CELL_KIND(cast(REBCEL(const*), v));
     switch (kind) {
       case REB_TUPLE:
       case REB_SET_TUPLE:

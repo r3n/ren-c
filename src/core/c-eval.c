@@ -1467,7 +1467,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
             if (not IS_WORD_BOUND(DS_TOP)) { // the loop didn't index it
                 mutable_KIND_BYTE(DS_TOP) = REB_WORD;
-                mutable_MIRROR_BYTE(DS_TOP) = REB_WORD;
+                mutable_HEART_BYTE(DS_TOP) = REB_WORD;
                 fail (Error_Bad_Refine_Raw(DS_TOP)); // so duplicate or junk
             }
 
@@ -1944,7 +1944,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
       case REB_PATH:
       case REB_TUPLE: {
-        if (MIRROR_BYTE(v) == REB_WORD)
+        if (HEART_BYTE(v) == REB_WORD)
             goto process_word;  // special `/` or `.` case with hidden word
 
         const RELVAL *head = VAL_SEQUENCE_AT(f_spare, v, 0);
@@ -2046,7 +2046,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
       case REB_SET_PATH:
       case REB_SET_TUPLE: {
-        if (MIRROR_BYTE(v) == REB_WORD) {
+        if (HEART_BYTE(v) == REB_WORD) {
             assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
             goto process_set_word;
         }
@@ -2087,7 +2087,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
       case REB_GET_PATH:
       case REB_GET_TUPLE:
-        if (MIRROR_BYTE(v) == REB_WORD) {
+        if (HEART_BYTE(v) == REB_WORD) {
             assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
             goto process_get_word;
         }
@@ -2226,7 +2226,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         Derelativize(f->out, v, f_specifier);
         mutable_KIND_BYTE(f->out) = REB_BLOCK;
-        mutable_MIRROR_BYTE(f->out) = REB_BLOCK;
+        mutable_HEART_BYTE(f->out) = REB_BLOCK;
 
         // Get the next argument as an ACTION!, specialized if necessary, into
         // the `spare`.  We'll specialize it further to set any output
@@ -2496,7 +2496,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
       case REB_PATH: {  // need to check for lookahead *if* just a `/`
         if (
             GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)
-            or MIRROR_BYTE(f_next) != REB_WORD
+            or HEART_BYTE(f_next) != REB_WORD
         ){
             CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
             goto finished;
@@ -2505,8 +2505,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // Although the `/` case appears to be a PATH!, it is actually a
         // WORD! under the hood and can have a binding.  The "spelling" of
         // this word is an alias, because `/` is purposefully not legal in
-        // words.)  Operations based on VAL_TYPE() or CELL_TYPE() will see it
-        // as PATH!, but CELL_KIND() will interpret the cell bits as a word.
+        // words.)  Operations based on VAL_TYPE() or CELL_KIND() will see it
+        // as PATH!, but CELL_HEART() will interpret the cell bits as a word.
         //
         if (VAL_WORD_SPELLING(f_next) != PG_Slash_1_Canon)
             goto finished;  // optimized refinement (see IS_REFINEMENT())

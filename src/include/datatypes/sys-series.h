@@ -666,7 +666,7 @@ inline static void DROP_GC_GUARD(const void *p) {
 //
 inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
   #if !defined(NDEBUG)
-    enum Reb_Kind k = CELL_KIND(v);
+    enum Reb_Kind k = CELL_HEART(v);
     assert(ANY_SERIES_KIND_EVIL_MACRO);
   #endif
     const REBSER *s = SER(PAYLOAD(Any, v).first.node);
@@ -696,13 +696,13 @@ inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
     // up getting done 
     //
     inline static REBLEN VAL_INDEX(REBCEL(const*) v) { // C++ reference type
-        enum Reb_Kind k = CELL_KIND(v);
+        enum Reb_Kind k = CELL_HEART(v);  // only const access if heart!
         assert(ANY_SERIES_KIND_EVIL_MACRO);
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         return VAL_INDEX_UNCHECKED(v);
     }
     inline static REBLEN & VAL_INDEX(RELVAL *v) {
-        enum Reb_Kind k = VAL_TYPE(v);
+        enum Reb_Kind k = VAL_TYPE(v);  // mutable allowed if nonquoted
         assert(k == REB_ISSUE or ANY_SERIES_KIND_EVIL_MACRO);
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         return VAL_INDEX_UNCHECKED(v);

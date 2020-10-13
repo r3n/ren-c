@@ -204,7 +204,7 @@ inline static bool SAME_STR(const REBSTR *s1, const REBSTR *s2) {
 
 
 inline static bool IS_WORD_UNBOUND(REBCEL(const*) v) {
-    assert(ANY_WORD_KIND(CELL_KIND(v)));
+    assert(ANY_WORD_KIND(CELL_HEART(v)));
     return not EXTRA(Binding, v).node;
 }
 
@@ -212,12 +212,12 @@ inline static bool IS_WORD_UNBOUND(REBCEL(const*) v) {
     (not IS_WORD_UNBOUND(v))
 
 inline static const REBSTR *VAL_WORD_SPELLING(REBCEL(const*) v) {
-    assert(ANY_WORD_KIND(CELL_KIND(v)));
+    assert(ANY_WORD_KIND(CELL_HEART(v)));
     return STR(PAYLOAD(Any, v).first.node);
 }
 
 inline static const REBSTR *VAL_WORD_CANON(REBCEL(const*) v) {
-    assert(ANY_WORD_KIND(CELL_KIND(v)));
+    assert(ANY_WORD_KIND(CELL_HEART(v)));
     return STR_CANON(STR(PAYLOAD(Any, v).first.node));
 }
 
@@ -230,7 +230,7 @@ inline static const REBSTR *VAL_WORD_CANON(REBCEL(const*) v) {
 // so this is a safe technique as long as these words are GC-mark-visible.
 //
 inline static REBSTR *VAL_STORED_CANON(REBCEL(const*) v) {
-    assert(ANY_WORD_KIND(CELL_KIND(v)));
+    assert(ANY_WORD_KIND(CELL_HEART(v)));
     REBSTR *str = STR(PAYLOAD(Any, v).first.node);
     assert(GET_SERIES_INFO(str, STRING_CANON));
     return str;
@@ -238,7 +238,7 @@ inline static REBSTR *VAL_STORED_CANON(REBCEL(const*) v) {
 
 inline static OPT_REBSYM VAL_WORD_SYM(REBCEL(const*) v) {
     assert(PG_Symbol_Canons);  // all syms are 0 prior to Init_Symbols()
-    assert(ANY_WORD_KIND(CELL_KIND(v)));
+    assert(ANY_WORD_KIND(CELL_HEART(v)));
     return STR_SYMBOL(STR(PAYLOAD(Any, v).first.node));
 }
 

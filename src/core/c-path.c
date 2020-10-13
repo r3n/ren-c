@@ -102,7 +102,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
 
     Init_Any_Series_At_Core(out, REB_BLOCK, SER(a), index, specifier);
     mutable_KIND_BYTE(out) = kind;
-    assert(MIRROR_BYTE(out) == REB_BLOCK);
+    assert(HEART_BYTE(out) == REB_BLOCK);
 
     return SPECIFIC(out);
 }
@@ -1143,11 +1143,11 @@ REBINT CT_Sequence(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // internal representations like [1 2] the array and #{0102} the bytes.
     // See the Try_Init_Sequence() pecking order for how this is guaranteed.
     //
-    int heart_diff = cast(int, MIRROR_BYTE(a)) - MIRROR_BYTE(b);
+    int heart_diff = cast(int, HEART_BYTE(a)) - HEART_BYTE(b);
     if (heart_diff != 0)
         return heart_diff > 0 ? 1 : -1;
 
-    switch (MIRROR_BYTE(a)) {  // now known to be same as MIRROR_BYTE(b)
+    switch (HEART_BYTE(a)) {  // now known to be same as HEART_BYTE(b)
       case REB_BYTES: {  // packed bytes
         REBLEN a_len = VAL_SEQUENCE_LEN(a);
         int diff = cast(int, a_len) - VAL_SEQUENCE_LEN(b);

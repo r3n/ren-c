@@ -189,7 +189,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
     if (KIND_BYTE_UNCHECKED(feed->value) != REB_PATH)
         return true;  // paths do enfix processing if '/'
 
-    if (MIRROR_BYTE(feed->value) == REB_WORD) {
+    if (HEART_BYTE(feed->value) == REB_WORD) {
         if (VAL_WORD_SPELLING(feed->value) == PG_Slash_1_Canon) {
             *flags |= EVAL_FLAG_POST_SWITCH | EVAL_FLAG_INERT_OPTIMIZATION;
             return false;  // Let evaluator handle `/`

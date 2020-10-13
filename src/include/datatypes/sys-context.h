@@ -256,7 +256,7 @@ inline static void FAIL_IF_INACCESSIBLE_CTX(REBCTX *c) {
 }
 
 inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
-    assert(ANY_CONTEXT_KIND(CELL_KIND(v)));
+    assert(ANY_CONTEXT_KIND(CELL_HEART(v)));
     assert(
         (VAL_FRAME_PHASE_OR_LABEL_NODE(v) != nullptr)
         == (CELL_KIND(v) == REB_FRAME)
@@ -534,7 +534,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
     single->header.bits =
         NODE_FLAG_NODE | NODE_FLAG_CELL
             | FLAG_KIND_BYTE(REB_FRAME)
-            | FLAG_MIRROR_BYTE(REB_FRAME)
+            | FLAG_HEART_BYTE(REB_FRAME)
             | CELL_MASK_CONTEXT;
     INIT_BINDING(single, VAL_BINDING(rootvar));
     INIT_VAL_CONTEXT_VARLIST(single, ARR(stub));

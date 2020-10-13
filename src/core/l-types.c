@@ -264,7 +264,7 @@ REB_R Reflect_Core(REBFRM *frame_)
 
     REBVAL *v = ARG(value);
     REBCEL(const*) cell = VAL_UNESCAPED(v);
-    enum Reb_Kind kind = CELL_TYPE(cell);
+    enum Reb_Kind kind = CELL_KIND(cell);
 
     switch (VAL_WORD_SYM(ARG(property))) {
       case SYM_0:

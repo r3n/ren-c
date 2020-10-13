@@ -99,7 +99,7 @@ inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
     EXTRA(Typeset, (v)).high_bits
 
 inline static bool TYPE_CHECK(REBCEL(const*) v, REBYTE n) {
-    assert(MIRROR_BYTE(v) == REB_TYPESET);
+    assert(HEART_BYTE(v) == REB_TYPESET);
 
     if (n < 32)
         return did (VAL_TYPESET_LOW_BITS(v) & FLAGIT_KIND(n));
@@ -109,7 +109,7 @@ inline static bool TYPE_CHECK(REBCEL(const*) v, REBYTE n) {
 }
 
 inline static bool TYPE_CHECK_BITS(REBCEL(const*) v, REBU64 bits) {
-    assert(MIRROR_BYTE(v) == REB_TYPESET);
+    assert(HEART_BYTE(v) == REB_TYPESET);
 
     uint_fast32_t low = bits & cast(uint32_t, 0xFFFFFFFF);
     if (low & VAL_TYPESET_LOW_BITS(v))
@@ -123,7 +123,7 @@ inline static bool TYPE_CHECK_BITS(REBCEL(const*) v, REBU64 bits) {
 }
 
 inline static bool TYPE_CHECK_EXACT_BITS(REBCEL(const*) v, REBU64 bits) {
-    assert(MIRROR_BYTE(v) == REB_TYPESET);
+    assert(HEART_BYTE(v) == REB_TYPESET);
 
     uint_fast32_t low = bits & cast(uint32_t, 0xFFFFFFFF);
     if (low != VAL_TYPESET_LOW_BITS(v))
@@ -137,7 +137,7 @@ inline static bool TYPE_CHECK_EXACT_BITS(REBCEL(const*) v, REBU64 bits) {
 }
 
 inline static void TYPE_SET(RELVAL *v, REBYTE n) {
-    assert(MIRROR_BYTE(v) == REB_TYPESET);
+    assert(HEART_BYTE(v) == REB_TYPESET);
 
     if (n < 32) {
         VAL_TYPESET_LOW_BITS(v) |= FLAGIT_KIND(n);
@@ -148,7 +148,7 @@ inline static void TYPE_SET(RELVAL *v, REBYTE n) {
 }
 
 inline static void TYPE_CLEAR(RELVAL *v, REBYTE n) {
-    assert(MIRROR_BYTE(v) == REB_TYPESET);
+    assert(HEART_BYTE(v) == REB_TYPESET);
 
     if (n < 32) {
         VAL_TYPESET_HIGH_BITS(v) &= ~FLAGIT_KIND(n);
@@ -159,8 +159,8 @@ inline static void TYPE_CLEAR(RELVAL *v, REBYTE n) {
 }
 
 inline static bool EQUAL_TYPESET(REBCEL(const*) v1, REBCEL(const*) v2) {
-    assert(MIRROR_BYTE(v1) == REB_TYPESET);
-    assert(MIRROR_BYTE(v2) == REB_TYPESET);
+    assert(HEART_BYTE(v1) == REB_TYPESET);
+    assert(HEART_BYTE(v2) == REB_TYPESET);
 
     if (VAL_TYPESET_LOW_BITS(v1) != VAL_TYPESET_LOW_BITS(v2))
         return false;
@@ -170,7 +170,7 @@ inline static bool EQUAL_TYPESET(REBCEL(const*) v1, REBCEL(const*) v2) {
 }
 
 inline static void CLEAR_ALL_TYPESET_BITS(RELVAL *v) {
-    assert(MIRROR_BYTE(v) == REB_TYPESET);
+    assert(HEART_BYTE(v) == REB_TYPESET);
 
     VAL_TYPESET_HIGH_BITS(v) = 0;
     VAL_TYPESET_LOW_BITS(v) = 0;
