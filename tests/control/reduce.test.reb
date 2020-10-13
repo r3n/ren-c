@@ -6,7 +6,6 @@
     success
 )
 ([] = reduce [])
-(void? first reduce [null])
 ("1 + 1" = reduce "1 + 1")
 (error? first reduce [trap [1 / 0]])
 [#1760 ; unwind functions should stop evaluation
@@ -23,8 +22,6 @@
     blk: [reduce blk]
     error? trap blk
 )
-
-([3 #[void] 300] = reduce [1 + 2 if false [10 + 20] 100 + 200])
 
 ; Quick flatten test, here for now
 (
@@ -44,3 +41,16 @@
     ([304 1020] = reduce [300 + 4 comment <AE> 1000 + 20])
     ([304 1020] = reduce [300 + 4 1000 + 20 comment <AE>])
 ]
+
+
+; === PREDICATES ===
+;
+; Predicates influence the handling of NULLs, which error by default.
+
+('need-non-null = (trap [reduce [null]])/id)
+
+([3 _ 300] = reduce .try [1 + 2 if false [10 + 20] 100 + 200])
+([3 #[void] 300] = reduce .voidify [1 + 2 if false [10 + 20] 100 + 200])
+([3 300] = reduce .identity [1 + 2 if false [10 + 20] 100 + 200])
+
+([#[true] #[false]] = reduce .even? [2 + 2 3 + 4])

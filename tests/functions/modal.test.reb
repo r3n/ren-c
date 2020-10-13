@@ -5,7 +5,7 @@
     "Basic operational test"
 
     (did foo: function [@x /y] [
-        reduce [x y]
+        reduce .voidify [x y]
     ])
 
     ([3 #[void]] = foo 3)

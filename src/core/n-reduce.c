@@ -23,64 +23,6 @@
 
 #include "sys-core.h"
 
-//
-//  Reduce_To_Stack_Throws: C
-//
-// Reduce array from the index position specified in the value.
-//
-bool Reduce_To_Stack_Throws(
-    REBVAL *out,
-    const RELVAL *any_array,
-    REBSPC *specifier
-){
-    REBDSP dsp_orig = DSP;
-
-    DECLARE_ARRAY_FEED (feed,
-        VAL_ARRAY(any_array),
-        VAL_INDEX(any_array),
-        specifier
-    );
-
-    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
-
-    Push_Frame(nullptr, f);
-
-    do {
-        bool line = IS_END(f_value)
-            ? false
-            : GET_CELL_FLAG(f_value, NEWLINE_BEFORE);
-
-        if (Eval_Step_Throws(out, f)) {
-            DS_DROP_TO(dsp_orig);
-            Abort_Frame(f);
-            return true;
-        }
-
-        if (IS_END(out)) {
-            if (IS_END(f_value))
-                break;  // `reduce []`
-            continue;  // `reduce [comment "hi"]`
-        }
-
-        // We can't put nulls into array cells, so we put VOID!.  This is
-        // conservative to try and notice mistakes based on expectations of
-        // the number of slots (COMPOSE is an alternative for such uses).
-        // This should be overrideable by a predicate to process the value
-        // before it is put in the result array.
-        //
-        if (IS_NULLED(out))
-            Init_Void(DS_PUSH());
-        else
-            Move_Value(DS_PUSH(), out);
-
-        if (line)
-            SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
-    } while (NOT_END(f_value));
-
-    Drop_Frame_Unbalanced(f); // Drop_Frame() asserts on accumulation
-    return false;
-}
-
 
 //
 //  reduce: native [
@@ -89,6 +31,8 @@ bool Reduce_To_Stack_Throws(
 //
 //      return: "New array or value"
 //          [<opt> any-value!]
+//      :predicate "Applied after evaluation, default is .NON.NULL"
+//          [<skip> predicate! action!]
 //      value "GROUP! and BLOCK! evaluate each item, single values evaluate"
 //          [any-value!]
 //  ]
@@ -99,33 +43,106 @@ REBNATIVE(reduce)
 
     REBVAL *v = ARG(value);
 
-    if (IS_BLOCK(v) or IS_GROUP(v)) {
-        REBDSP dsp_orig = DSP;
-
-        if (Reduce_To_Stack_Throws(D_OUT, v, VAL_SPECIFIER(v)))
-            return R_THROWN;
-
-        REBFLGS pop_flags = NODE_FLAG_MANAGED | ARRAY_MASK_HAS_FILE_LINE;
-        if (GET_ARRAY_FLAG(VAL_ARRAY(v), NEWLINE_AT_TAIL))
-            pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
-
-        return Init_Any_Array(
-            D_OUT,
-            VAL_TYPE(v),
-            Pop_Stack_Values_Core(dsp_orig, pop_flags)
-        );
-    }
+    REBVAL *predicate = ARG(predicate);
+    if (Cache_Predicate_Throws(D_OUT, predicate))
+        return R_THROWN;
 
     // Single element REDUCE does an EVAL, but doesn't allow arguments.
     // (R3-Alpha, would just return the input, e.g. `reduce :foo` => :foo)
     // If there are arguments required, Eval_Value_Throws() will error.
     //
     // !!! Should the error be more "reduce-specific" if args were required?
+    //
+    // !!! How should predicates interact with this case?
+    //
+    if (not IS_BLOCK(v) and not IS_GROUP(v)) {
+        if (Eval_Value_Throws(D_OUT, v, SPECIFIED))
+            return R_THROWN;
 
-    if (Eval_Value_Throws(D_OUT, v, SPECIFIED))
-        return R_THROWN;
+        return D_OUT;  // let caller worry about whether to error on nulls
+    }
 
-    return D_OUT; // let caller worry about whether to error on nulls
+    REBDSP dsp_orig = DSP;
+
+    DECLARE_FEED_AT (feed, v);
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+
+    Push_Frame(nullptr, f);
+
+    do {
+        bool line = IS_END(f_value)
+            ? false
+            : GET_CELL_FLAG(f_value, NEWLINE_BEFORE);
+
+        if (Eval_Step_Throws(D_OUT, f)) {
+            DS_DROP_TO(dsp_orig);
+            Abort_Frame(f);
+            return R_THROWN;
+        }
+
+        if (IS_END(D_OUT)) {
+            if (IS_END(f_value))
+                break;  // `reduce []`
+            continue;  // `reduce [comment "hi"]`
+        }
+
+        // Try and do some optimized dispatch for common combinations of
+        // functions with REDUCE (.identity, .try, .opt).  Bear in mind that
+        // the CFUNC* must be checked explicitly vs. the REBACT* identity,
+        // otherwise a HIJACK might be overlooked.
+
+        REBNAT dispatcher = IS_NULLED(predicate)
+            ? nullptr
+            : ACT_DISPATCHER(VAL_ACTION(predicate));
+
+        if (not dispatcher) {  // act as NON NULL, so error on NULLs
+            if (IS_NULLED(D_OUT))
+                fail (Error_Need_Non_Null_Raw(v));
+
+            Move_Value(DS_PUSH(), D_OUT);
+        }
+        else if (dispatcher == &N_identity) {  // NULLs dissolve
+            if (not IS_NULLED(D_OUT))
+                Move_Value(DS_PUSH(), D_OUT);
+        }
+        else if (dispatcher == &N_opt) {  // NULLs and BLANK!s dissolve
+            if (not IS_NULLED_OR_BLANK(D_OUT))
+                Move_Value(DS_PUSH(), D_OUT);
+        }
+        else if (dispatcher == &N_try) {  // turn NULL into BLANK!
+            if (IS_NULLED(D_OUT))
+                Init_Blank(DS_PUSH());
+            else
+                Move_Value(DS_PUSH(), D_OUT);
+        }
+        else if (dispatcher == &N_voidify) {  // turn NULL into VOID!
+            if (IS_NULLED(D_OUT))
+                Init_Void(DS_PUSH());
+            else
+                Move_Value(DS_PUSH(), D_OUT);
+        }
+        else {  // no optimization for general cases
+            REBVAL *processed = rebValue(ARG(predicate), rebQ(D_OUT), rebEND);
+            if (processed)
+                Move_Value(DS_PUSH(), processed);
+            rebRelease(processed);
+        }
+
+        if (line)
+            SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
+    } while (NOT_END(f_value));
+
+    Drop_Frame_Unbalanced(f);  // Drop_Frame() asserts on accumulation
+
+    REBFLGS pop_flags = NODE_FLAG_MANAGED | ARRAY_MASK_HAS_FILE_LINE;
+    if (GET_ARRAY_FLAG(VAL_ARRAY(v), NEWLINE_AT_TAIL))
+        pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
+
+    return Init_Any_Array(
+        D_OUT,
+        VAL_TYPE(v),
+        Pop_Stack_Values_Core(dsp_orig, pop_flags)
+    );
 }
 
 

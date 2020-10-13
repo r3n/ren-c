@@ -1204,11 +1204,15 @@ REB_R MAKE_Struct(
                fail (arg);
 
             if (IS_BLOCK(f_value)) {
-                REBDSP dsp_reduce = DSP;
-                if (Reduce_To_Stack_Throws(out, f_value, f_specifier))
-                    fail (Error_No_Catch_For_Throw(init));
+                DECLARE_LOCAL (specific);
+                Derelativize(specific, f_value, f_specifier);
 
-                Init_Block(init, Pop_Stack_Values(dsp_reduce));
+                PUSH_GC_GUARD(specific);
+                REBVAL *reduced = rebValue("reduce", specific, rebEND);
+                DROP_GC_GUARD(specific);
+
+                Move_Value(init, reduced);
+                rebRelease(reduced);
 
                 Fetch_Next_Forget_Lookback(f);
             }
