@@ -117,7 +117,7 @@ const REBYTE Lex_Map[256] =
     /* 38 8   */    LEX_NUMBER|8,
     /* 39 9   */    LEX_NUMBER|9,
     /* 3A :   */    LEX_SPECIAL|LEX_SPECIAL_COLON,
-    /* 3B ;   */    LEX_DELIMIT|LEX_DELIMIT_SEMICOLON,
+    /* 3B ;   */    LEX_SPECIAL|LEX_SPECIAL_SEMICOLON,
     /* 3C <   */    LEX_SPECIAL|LEX_SPECIAL_LESSER,
     /* 3D =   */    LEX_WORD,
     /* 3E >   */    LEX_SPECIAL|LEX_SPECIAL_GREATER,
@@ -1106,16 +1106,6 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
           case LEX_DELIMIT_SPACE:
             panic ("Prescan_Token did not skip whitespace");
 
-          case LEX_DELIMIT_SEMICOLON:  // ; begin comment
-            while (not ANY_CR_LF_END(*cp))
-                ++cp;
-            if (*cp == '\0')
-                return TOKEN_END;  // `load ";"` is [] with no newline on tail
-            if (*cp == LF)
-                goto delimit_line_feed;
-            assert(*cp == CR);
-            goto delimit_return;
-
           case LEX_DELIMIT_RETURN:
           delimit_return: {
             //
@@ -1214,6 +1204,17 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
         }
 
       case LEX_CLASS_SPECIAL:
+        if (GET_LEX_VALUE(*cp) == LEX_SPECIAL_SEMICOLON) {  // begin comment
+            while (not ANY_CR_LF_END(*cp))
+                ++cp;
+            if (*cp == '\0')
+                return TOKEN_END;  // `load ";"` is [] with no newline on tail
+            if (*cp == LF)
+                goto delimit_line_feed;
+            assert(*cp == CR);
+            goto delimit_return;
+        }
+
         if (
             HAS_LEX_FLAG(flags, LEX_SPECIAL_AT)  // @ anywhere but at the head
             and *cp != '<'  // want <foo="@"> to be a TAG!, not an EMAIL!
@@ -3091,10 +3092,6 @@ const REBYTE *Scan_Issue(RELVAL *out, const REBYTE *cp, REBSIZ size)
             switch (GET_LEX_VALUE(*bp)) {
               case LEX_DELIMIT_SLASH:  // internal slashes are legal
               case LEX_DELIMIT_PERIOD:  // internal dots also legal
-                break;
-
-              case LEX_DELIMIT_SEMICOLON:
-                assert(false);  // scanner shouldn't get here (error case)
                 break;
 
               default:

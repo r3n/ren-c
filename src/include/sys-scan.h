@@ -92,7 +92,6 @@ enum LEX_DELIMIT_ENUM {
     LEX_DELIMIT_RIGHT_PAREN,        /* 29 ) */
     LEX_DELIMIT_LEFT_BRACKET,       /* 5B [ */
     LEX_DELIMIT_RIGHT_BRACKET,      /* 5D ] */
-    LEX_DELIMIT_SEMICOLON,          /* 3B ; */
 
     // As a step toward "Plan -4", the above delimiters are considered to
     // always terminate, e.g. a URL `http://example.com/a)` will not pick up
@@ -113,6 +112,9 @@ enum LEX_DELIMIT_ENUM {
 
     LEX_DELIMIT_MAX
 };
+
+STATIC_ASSERT(LEX_DELIMIT_MAX <= 16);
+
 
 
 /*
@@ -179,7 +181,7 @@ enum LEX_SPECIAL_ENUM {             /* The order is important! */
     LEX_SPECIAL_COMMA,              /* 2C , - decimal number */
     LEX_SPECIAL_POUND,              /* 23 # - hex number */
     LEX_SPECIAL_DOLLAR,             /* 24 $ - money */
-    LEX_SPECIAL_14,                 /* unused */
+    LEX_SPECIAL_SEMICOLON,          /* 3B ; - comment */
 
     // LEX_SPECIAL_WORD is not a LEX_VALUE() of anything in LEX_CLASS_SPECIAL,
     // it is used to set a flag by Prescan_Token().
@@ -190,6 +192,9 @@ enum LEX_SPECIAL_ENUM {             /* The order is important! */
 
     LEX_SPECIAL_MAX
 };
+
+STATIC_ASSERT(LEX_SPECIAL_MAX <= 16);
+
 
 /*
 **  Special Encodings
@@ -213,7 +218,8 @@ enum LEX_SPECIAL_ENUM {             /* The order is important! */
                         LEX_FLAG(LEX_SPECIAL_COMMA) |           \
                         LEX_FLAG(LEX_SPECIAL_POUND) |           \
                         LEX_FLAG(LEX_SPECIAL_DOLLAR) |          \
-                        LEX_FLAG(LEX_SPECIAL_COLON))
+                        LEX_FLAG(LEX_SPECIAL_COLON) |           \
+                        LEX_FLAG(LEX_SPECIAL_SEMICOLON))
 
 enum rebol_esc_codes {
     // Must match Esc_Names[]!

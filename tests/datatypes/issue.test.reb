@@ -40,7 +40,7 @@
         #! #@ ## #$ #% {#^^} #& #* {#(} {#)} #_ #+  ; caret used for escaping
         "#{" "#}" #|  ; #{xx} will become "ISSUE!" when BINARY! is &{xx}
         {#[} {#]} #\
-        {#;} #'  ; scanner checks specially for `#;` to error
+        #; #'  ; as with URL!, semicolons are allowed in the token
         #: {#"}  ; quotes for ISSUE! with internal spaces (braces in future)
         #, #. #/
         #< #> #?
