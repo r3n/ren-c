@@ -76,22 +76,20 @@ inline static RELVAL *Quotify_Core(
     RELVAL *v,
     REBLEN depth
 ){
-    if (KIND3Q_BYTE(v) == REB_QUOTED) {  // reuse payload, bump count
-        assert(PAYLOAD(Any, v).second.u > 3);  // or should've used kind byte
+    if (KIND3Q_BYTE_UNCHECKED(v) == REB_QUOTED) {  // reuse payload
+        assert(PAYLOAD(Any, v).second.u > 3);  // or else whould be "in-situ"
         PAYLOAD(Any, v).second.u += depth;
         return v;
     }
 
-    // Note: Not CELL_KIND(), may differ from what HEART_BYTE() says
-    //
-    enum Reb_Kind type = cast(enum Reb_Kind, KIND3Q_BYTE(v) % REB_64);
-    if (type >= REB_MAX)  // e.g. REB_P_XXX for params
+    REBYTE kind = KIND3Q_BYTE_UNCHECKED(v) % REB_64;  // HEART_BYTE may differ
+    if (kind >= REB_MAX)  // e.g. REB_P_XXX for params
         assert(depth == 0);
 
-    depth += KIND3Q_BYTE(v) / REB_64;
+    depth += KIND3Q_BYTE_UNCHECKED(v) / REB_64;
 
     if (depth <= 3) { // can encode in a cell with no REB_QUOTED payload
-        mutable_KIND3Q_BYTE(v) = type + (REB_64 * depth);
+        mutable_KIND3Q_BYTE(v) = kind + (REB_64 * depth);
     }
     else {
         // An efficiency trick here could point to VOID_VALUE, BLANK_VALUE,
@@ -107,7 +105,7 @@ inline static RELVAL *Quotify_Core(
 
         REBVAL *paired = Alloc_Pairing();
         Move_Value_Header(paired, v);
-        mutable_KIND3Q_BYTE(paired) = type;  // escaping only in literal
+        mutable_KIND3Q_BYTE(paired) = kind;  // escaping only in literal
         paired->extra = v->extra;
         paired->payload = v->payload;
  

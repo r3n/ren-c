@@ -440,6 +440,11 @@ inline static REBVAL *RESET_VAL_HEADER_at(
     // even if you overwrite the Payload/Extra immediately afterward; it also
     // corrupts the data to help ensure all relevant fields are overwritten.)
     //
+    // Note: RESET_VAL_HEADER is manually inlined here for efficiency in the
+    // debug build, since it winds up being two lines of code and the debug
+    // build wouldn't inline it itself...so it makes a performance difference
+    // for this very frequently called routine.
+    //
     inline static REBVAL *RESET_CELL_Debug(
         RELVAL *out,
         enum Reb_Kind kind,
@@ -447,11 +452,11 @@ inline static REBVAL *RESET_VAL_HEADER_at(
         const char *file,
         int line
     ){
-      #ifdef DEBUG_CELL_WRITABILITY
-        RESET_VAL_HEADER_at(out, kind, extra, file, line);
-      #else
-        RESET_VAL_HEADER(out, kind, extra);
-      #endif
+        ASSERT_CELL_WRITABLE_EVIL_MACRO(out, file, line);
+
+        out->header.bits &= CELL_MASK_PERSIST;
+        out->header.bits |=
+            FLAG_KIND3Q_BYTE(kind) | FLAG_HEART_BYTE(kind) | extra;
 
         TRACK_CELL_IF_DEBUG(out, file, line);
         return cast(REBVAL*, out);

@@ -59,7 +59,7 @@
         const char *file,
         int line
     ){
-      #ifdef DEBUG_TRACK_EXTEND_CELLS // cell is made bigger to hold it
+      #ifdef DEBUG_TRACK_EXTEND_CELLS  // cell is made bigger to hold it
         c->track.file = file;
         c->track.line = line;
 
@@ -72,7 +72,7 @@
       #else  // in space that is overwritten for cells that fill in payloads 
         PAYLOAD(Track, c).file = file;
         PAYLOAD(Track, c).line = line;
-          
+
         #ifdef DEBUG_COUNT_TICKS
             c->extra.tick = TG_Tick;
         #else

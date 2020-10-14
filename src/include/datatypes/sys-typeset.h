@@ -248,7 +248,7 @@ typedef enum Reb_Kind Reb_Param_Class;
 
 
 inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
-    assert(IS_PARAM(v));
+    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
     return cast(Reb_Param_Class, KIND3Q_BYTE_UNCHECKED(v));
 }
 
