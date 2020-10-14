@@ -187,11 +187,15 @@ make-http-request: func [
         {Request contents (Content-Length is created automatically).}
         {Empty string not exactly like blank.}
     <local> result
-] [
+][
+    ; The HTTP 1.1 protocol requires a `Host:` header.  Simple logic used
+    ; here is to fall back to requesting 1.0 only if there is no Host.
+    ; (though apparently often speakers of the 1.0 protocol require it too)
+    ;
     result: unspaced [
-        uppercase form method space
-        either file? target [next mold target] [target]
-        space "HTTP/1.0" CR LF
+        uppercase form method _
+            either file? target [next mold target] [target]
+            _ either headers/host ["HTTP/1.1"] ["HTTP/1.0"] CR LF
     ]
     for-each [word string] headers [
         append result unspaced [mold word _ string CR LF]
