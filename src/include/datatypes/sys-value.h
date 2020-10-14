@@ -621,24 +621,28 @@ inline static RELVAL *Prep_Cell_Core(
     }
 #endif
 
-#ifdef NDEBUG
+// IS_END()/NOT_END() are called *a lot*, and adding costly checks to it will
+// slow down the debug build dramatically--taking up to 10% of the total time.
+// Hence DEBUG_CHECK_ENDS is disabled in the default debug build.
+//
+#if !defined(DEBUG_CHECK_ENDS)
     #define IS_END(p) \
-        (cast(const REBYTE*, p)[1] == REB_0_END)
+        (((const REBYTE*)(p))[1] == REB_0_END)  // Note: needs (p) parens!
 #else
     inline static bool IS_END_Debug(
-        const void *p, // may not have NODE_FLAG_CELL, may be short as 2 bytes
+        const void *p,  // may not have NODE_FLAG_CELL, maybe short as 2 bytes
         const char *file,
         int line
     ){
-        if (cast(const REBYTE*, p)[0] & 0x40) { // e.g. NODE_FLAG_FREE
+        if (((const REBYTE*)(p))[0] & NODE_BYTEMASK_0x40_FREE) {
             printf("NOT_END() called on garbage\n");
             panic_at(p, file, line);
         }
 
-        if (cast(const REBYTE*, p)[1] == REB_0_END)
+        if (((const REBYTE*)(p))[1] == REB_0_END)
             return true;
 
-        if (not (cast(const REBYTE*, p)[0] & 0x01)) { // e.g. NODE_FLAG_CELL
+        if (not (((const REBYTE*)(p))[0] & NODE_BYTEMASK_0x01_CELL)) {
             printf("IS_END() found non-END pointer that's not a cell\n");
             panic_at(p, file, line);
         }
