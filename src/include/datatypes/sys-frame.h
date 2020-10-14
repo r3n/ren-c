@@ -770,7 +770,7 @@ inline static void Push_Action(
             | CELL_MASK_CONTEXT
             | FLAG_KIND3Q_BYTE(REB_FRAME)
             | FLAG_HEART_BYTE(REB_FRAME);
-    TRACK_CELL_IF_DEBUG(f->rootvar, __FILE__, __LINE__);
+    TRACK_CELL_IF_DEBUG_EVIL_MACRO(f->rootvar, __FILE__, __LINE__);
     INIT_VAL_CONTEXT_VARLIST(f->rootvar, f->varlist);
 
   sufficient_allocation:
@@ -781,13 +781,13 @@ inline static void Push_Action(
     s->content.dynamic.used = num_args + 1;
     RELVAL *tail = ARR_TAIL(f->varlist);
     tail->header.bits = FLAG_KIND3Q_BYTE(REB_0);  // no NODE_FLAG_CELL
-    TRACK_CELL_IF_DEBUG(tail, __FILE__, __LINE__);
+    TRACK_CELL_IF_DEBUG_EVIL_MACRO(tail, __FILE__, __LINE__);
 
     // Current invariant for all arrays (including fixed size), last cell in
     // the allocation is an end.
     RELVAL *ultimate = ARR_AT(f->varlist, s->content.dynamic.rest - 1);
     ultimate->header = Endlike_Header(0); // unreadable
-    TRACK_CELL_IF_DEBUG(ultimate, __FILE__, __LINE__);
+    TRACK_CELL_IF_DEBUG_EVIL_MACRO(ultimate, __FILE__, __LINE__);
 
   #if !defined(NDEBUG)
     RELVAL *prep = ultimate - 1;
@@ -795,7 +795,7 @@ inline static void Push_Action(
         prep->header.bits =
             FLAG_KIND3Q_BYTE(REB_T_TRASH)
             | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
-        TRACK_CELL_IF_DEBUG(prep, __FILE__, __LINE__);
+        TRACK_CELL_IF_DEBUG_EVIL_MACRO(prep, __FILE__, __LINE__);
     }
   #endif
 

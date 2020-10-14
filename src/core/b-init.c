@@ -609,7 +609,7 @@ static REBARR *Startup_Generics(const REBVAL *boot_generics)
 static void Startup_End_Node(void)
 {
     PG_End_Node.header = Endlike_Header(0); // no NODE_FLAG_CELL, R/O
-    TRACK_CELL_IF_DEBUG(&PG_End_Node, __FILE__, __LINE__);
+    TRACK_CELL_IF_DEBUG_EVIL_MACRO(&PG_End_Node, __FILE__, __LINE__);
     assert(IS_END(END_NODE)); // sanity check that it took
 }
 

@@ -89,8 +89,7 @@ inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
         RELVAL *out, const char *file, int line
     ){
         RESET_CELL_Debug(out, REB_VOID, CELL_MASK_NONE, file, line);
-        assert(out->extra.tick > 0);
-        out->extra.tick = -out->extra.tick;
+        out->extra.tick = -1;  // even non-tick counting builds default to 1
         return cast(REBVAL*, out);
     }
 

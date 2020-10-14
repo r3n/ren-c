@@ -462,7 +462,7 @@ inline static REBVAL *RESET_VAL_HEADER_at(
         out->header.bits |=
             FLAG_KIND3Q_BYTE(kind) | FLAG_HEART_BYTE(kind) | extra;
 
-        TRACK_CELL_IF_DEBUG(out, file, line);
+        TRACK_CELL_IF_DEBUG_EVIL_MACRO(out, file, line);
         return cast(REBVAL*, out);
     }
 
@@ -528,7 +528,7 @@ inline static RELVAL *Prep_Cell_Core(
   #endif
 
     c->header.bits = CELL_MASK_PREP;
-    TRACK_CELL_IF_DEBUG(cast(RELVAL*, c), file, line);
+    TRACK_CELL_IF_DEBUG_EVIL_MACRO(cast(RELVAL*, c), file, line);
     return c;
 }
 
@@ -566,7 +566,7 @@ inline static RELVAL *Prep_Cell_Core(
             FLAG_KIND3Q_BYTE(REB_T_TRASH)
                 | FLAG_HEART_BYTE(REB_T_TRASH);
 
-        TRACK_CELL_IF_DEBUG(v, file, line);
+        TRACK_CELL_IF_DEBUG_EVIL_MACRO(v, file, line);
         return v;
     }
 
@@ -616,7 +616,7 @@ inline static RELVAL *Prep_Cell_Core(
         mutable_KIND3Q_BYTE(v) = REB_0_END; // release build behavior
         mutable_HEART_BYTE(v) = REB_0_END;
 
-        TRACK_CELL_IF_DEBUG(v, file, line);
+        TRACK_CELL_IF_DEBUG_EVIL_MACRO(v, file, line);
         return cast(REBVAL*, v);
     }
 
