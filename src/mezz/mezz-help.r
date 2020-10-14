@@ -186,7 +186,7 @@ help: function [
     make-libuser: does [
         libuser: copy system/contexts/lib
         for-each [key val] system/contexts/user [
-            if not void? get/any 'val [
+            if set? 'val [
                append libuser reduce [key :val]
             ]
         ]

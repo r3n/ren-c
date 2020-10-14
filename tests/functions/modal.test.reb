@@ -37,7 +37,7 @@
     "Basic infix operational test"
 
     (did bar: enfix function [@x /y] [
-        reduce [x y]
+        reduce .voidify [x y]
     ])
 
     (3 bar = [3 #[void]])
@@ -64,7 +64,7 @@
     "Demodalizing specialization test"
 
     (did foo: function [a @x /y] [
-        reduce [a x y]
+        reduce .voidify [a x y]
     ])
 
     ([a @x /y] = parameters of :foo)
