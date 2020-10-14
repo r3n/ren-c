@@ -149,7 +149,7 @@ typedef struct Reb_Node REBNOD;
     #define REBCEL(const_star) \
         const struct Reb_Value *  // same as RELVAL, no checking in C build
 
-#elif defined(NDEBUG)
+#elif !defined(DEBUG_CHECK_CASTS)
     //
     // The %sys-internals.h API is used by core extensions, and we may want
     // to build the executable with C++ but an extension with C.  If there
@@ -164,6 +164,10 @@ typedef struct Reb_Node REBNOD;
     #define REBCEL(const_star) \
         const struct Reb_Cell *  // not a class instance in %sys-internals.h
 #else
+    // This heavier wrapper form of Reb_Cell() can be costly...empirically
+    // up to 10% of the runtime, since it's called so often.  But it protects
+    // against pointer arithmetic on REBCEL().
+    //
     struct Reb_Cell;  // won't implicitly downcast to RELVAL
     template<typename T>
     struct RebcellPtr {
