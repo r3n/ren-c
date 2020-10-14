@@ -121,27 +121,31 @@
     // In the debug build, functions aren't inlined, and the overhead actually
     // adds up very quickly of getting the 3 parameters passed in.  Run the
     // risk of repeating macro arguments to speed up this critical test.
+    //
+    // Note this isn't in a `do {...} while (0)` either, also for speed.
 
     #define ASSERT_CELL_READABLE_EVIL_MACRO(c,file,line) \
-        do { \
-            if (not ((c)->header.bits & NODE_FLAG_CELL)) { \
+        if ( \
+            (FIRST_BYTE(c->header) & ( \
+                NODE_BYTEMASK_0x01_CELL | NODE_BYTEMASK_0x80_NODE \
+                    | NODE_BYTEMASK_0x40_FREE \
+            )) != 0x81 \
+        ){ \
+            if (not ((c)->header.bits & NODE_FLAG_CELL)) \
                 printf("Non-cell passed to cell read/write routine\n"); \
-                panic_at ((c), (file), (line)); \
-            } \
-            else if (not ((c)->header.bits & NODE_FLAG_NODE)) { \
+            else if (not ((c)->header.bits & NODE_FLAG_NODE)) \
                 printf("Non-node passed to cell read/write routine\n"); \
-                panic_at ((c), (file), (line)); \
-            } \
-        } while (0) // assume trash-oriented checks will catch "free" cells
+            else \
+                printf("Free node passed to cell read/write routine\n"); \
+            panic_at ((c), (file), (line)); \
+        }
 
     #define ASSERT_CELL_WRITABLE_EVIL_MACRO(c,file,line) \
-        do { \
-            ASSERT_CELL_READABLE_EVIL_MACRO(c, file, line); \
-            if ((c)->header.bits & (CELL_FLAG_PROTECTED | NODE_FLAG_FREE)) { \
-                printf("Protected/free cell passed to writing routine\n"); \
-                panic_at ((c), (file), (line)); \
-            } \
-        } while (0)
+        ASSERT_CELL_READABLE_EVIL_MACRO(c, file, line); \
+        if ((c)->header.bits & CELL_FLAG_PROTECTED) { \
+            printf("Protected cell passed to writing routine\n"); \
+            panic_at ((c), (file), (line)); \
+        }
 
     inline static REBCEL(const*) READABLE(
         REBCEL(const*) c,
