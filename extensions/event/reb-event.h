@@ -42,7 +42,7 @@
 
 
 #define VAL_EVENT_TYPE(v) \
-    cast(const REBSYM, FIRST_UINT16(EXTRA(Any, (v)).u))
+    cast(REBSYM, FIRST_UINT16(EXTRA(Any, (v)).u))
 
 inline static void SET_VAL_EVENT_TYPE(REBVAL *v, REBSYM sym) {
     SET_FIRST_UINT16(EXTRA(Any, (v)).u, sym);
