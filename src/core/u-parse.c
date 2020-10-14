@@ -835,11 +835,10 @@ static REBIXO To_Thru_Block_Rule(
                 }
                 else if (IS_BINARY(rule)) {
                     REBLEN len = VAL_LEN_AT(rule);
-                    if (0 == Compare_Bytes(
+                    if (0 == memcmp(
                         BIN_AT(P_INPUT, pos),
                         VAL_BIN_AT(rule),
-                        len,
-                        false
+                        len
                     )) {
                         if (is_thru)
                             return pos + 1;

@@ -369,7 +369,7 @@ static const REBYTE *Scan_UTF8_Char_Escapable(REBUNI *out, const REBYTE *bp)
 
         // Check for identifiers
         for (c = 0; c < ESC_MAX; c++) {
-            if ((cp = Match_Bytes(bp, cb_cast(Esc_Names[c])))) {
+            if ((cp = Try_Diff_Bytes_Uncased(bp, cb_cast(Esc_Names[c])))) {
                 if (cp != nullptr and *cp == ')') {
                     bp = cp + 1;
                     *out = Esc_Codes[c];
@@ -1734,7 +1734,7 @@ static REBINT Scan_Head(SCAN_STATE *ss)
 
           case 'R':
           case 'r':
-            if (Match_Bytes(cp, cb_cast(Str_REBOL))) {
+            if (nullptr != Try_Diff_Bytes_Uncased(cp, cb_cast(Str_REBOL))) {
                 rebol = cp;
                 cp += 5;
                 break;

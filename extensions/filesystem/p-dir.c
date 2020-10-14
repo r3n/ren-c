@@ -67,25 +67,33 @@ static REBARR *Read_Dir_May_Fail(REBREQ *dir)
 
     Free_Req(file);
 
+    DECLARE_LOCAL (star);
+    Init_Char_Unchecked(star, '*');
+
+    DECLARE_LOCAL (question);
+    Init_Char_Unchecked(question, '?');
+
     // !!! This is some kind of error tolerance, review what it is for.
     //
     bool enabled = false;
     if (enabled
         and (
-            NOT_FOUND != Find_Char_In_Str(
-                '*',
+            NOT_FOUND != Find_Str_In_Str(
                 VAL_STRING(ReqFile(dir)->path),
                 VAL_INDEX(ReqFile(dir)->path), // first index to examine
                 STR_LEN(VAL_STRING(ReqFile(dir)->path)) + 1, // highest return + 1
                 0, // skip
+                star,
+                1,  // length of single codepoint string
                 AM_FIND_CASE // not relevant
             )
-            or NOT_FOUND != Find_Char_In_Str(
-                '?',
+            or NOT_FOUND != Find_Str_In_Str(
                 VAL_STRING(ReqFile(dir)->path),
                 VAL_INDEX(ReqFile(dir)->path), // first index to examine
                 STR_LEN(VAL_STRING(ReqFile(dir)->path)) + 1, // highest return + 1
                 0, // skip
+                question,
+                1,  // length of single codepoint string
                 AM_FIND_CASE // not relevant
             )
         )

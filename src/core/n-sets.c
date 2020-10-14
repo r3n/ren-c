@@ -189,20 +189,21 @@ REBSER *Make_Set_Operation_Series(
             //
             const REBSTR *str = VAL_STRING(val1);
 
-            REBUNI uc;
-
             // Iterate over first series
             //
             i = VAL_INDEX(val1);
             for (; i < STR_LEN(str); i += skip) {
-                uc = GET_CHAR_AT(str, i);
+                DECLARE_LOCAL (ch);
+                Init_Char_Unchecked(ch, GET_CHAR_AT(str, i));
+
                 if (flags & SOP_FLAG_CHECK) {
-                    h = (NOT_FOUND != Find_Char_In_Str(
-                        uc,
+                    h = (NOT_FOUND != Find_Str_In_Str(
                         VAL_STRING(val2),
                         VAL_INDEX(val2),
                         VAL_LEN_HEAD(val2),
                         skip,
+                        ch,
+                        1,  // single codepoint length
                         cased ? AM_FIND_CASE : 0
                     ));
 
@@ -212,12 +213,13 @@ REBSER *Make_Set_Operation_Series(
                 if (!h) continue;
 
                 if (
-                    NOT_FOUND == Find_Char_In_Str(
-                        uc, // c2 (the character to find)
+                    NOT_FOUND == Find_Str_In_Str(
                         mo->series, // ser
                         mo->index, // index - !!! was mo->start
                         STR_LEN(mo->series), // tail
                         skip, // skip
+                        ch,
+                        1,  // single codepoint length
                         cased ? AM_FIND_CASE : 0 // flags
                     )
                 ){
@@ -264,19 +266,19 @@ REBSER *Make_Set_Operation_Series(
             const REBBIN *bin = VAL_BINARY(val1);
             REBYTE b;
 
+            assert(skip == 1);  // !!! only skip of 1 was supported
+
             // Iterate over first series
             //
             i = VAL_INDEX(val1);
             for (; i < BIN_LEN(bin); i += skip) {
                 b = *BIN_AT(bin, i);
                 if (flags & SOP_FLAG_CHECK) {
-                    h = (NOT_FOUND != Find_Char_In_Bin(
-                        b,
+                    h = (NOT_FOUND != Find_Bin_In_Bin(
                         VAL_SERIES(val2),
-                        0,
                         VAL_INDEX(val2),
-                        VAL_LEN_HEAD(val2),
-                        skip,
+                        &b,
+                        1,
                         cased ? AM_FIND_CASE : 0
                     ));
 
@@ -286,13 +288,11 @@ REBSER *Make_Set_Operation_Series(
                 if (!h) continue;
 
                 if (
-                    NOT_FOUND == Find_Char_In_Bin(
-                        b, // c2 (the character to find)
+                    NOT_FOUND == Find_Bin_In_Bin(
                         SER(mo->series), // ser
-                        mo->offset, // head - !!! was mo->start
                         mo->offset, // index - !!! was also mo->start
-                        STR_SIZE(mo->series), // tail
-                        skip, // skip
+                        &b,
+                        1,
                         cased ? AM_FIND_CASE : 0 // flags
                     )
                 ){

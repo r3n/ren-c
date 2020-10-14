@@ -187,7 +187,7 @@ help: function [
         libuser: copy system/contexts/lib
         for-each [key val] system/contexts/user [
             if set? 'val [
-               append libuser reduce [key :val]
+               append libuser reduce [key get/any 'val]
             ]
         ]
         libuser

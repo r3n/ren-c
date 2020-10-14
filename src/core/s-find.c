@@ -26,46 +26,38 @@
 
 
 //
-//  Compare_Bytes: C
+//  Compare_Ascii_Uncased: C
 //
-// Compare two byte-wide strings. Return lexical difference.
+// Variant of memcmp() that checks case-insensitively.  Just used to detect
+// months in the scanner.  Returns a positive value, negative value, or 0.
+// (Not clamped to [-1 0 1]!)
 //
-// Uncase: compare is case-insensitive.
+// !!! There have been suggestions that the system use the ISO date format,
+// in order to be purely numeric and not need to vary by locale.  Review.
 //
-REBINT Compare_Bytes(const REBYTE *b1, const REBYTE *b2, REBLEN len, bool uncase)
-{
-    REBINT d;
-
+REBINT Compare_Ascii_Uncased(
+    const REBYTE *b1,
+    const REBYTE *b2,
+    REBLEN len
+){
     for (; len > 0; len--, b1++, b2++) {
+        assert(*b1 < 0x80 and *b2 < 0x80);
 
-        if (uncase) {
-            //
-            // !!! This routine is being possibly preserved for when faster
-            // compare can be done on UTF-8 strings if the series caches if
-            // all bytes are ASCII.  It is not meant to do "case-insensitive"
-            // processing of binaries, however.
-            //
-            assert(*b1 < 0x80 and *b2 < 0x80);
-
-            d = LO_CASE(*b1) - LO_CASE(*b2);
-        }
-        else
-            d = *b1 - *b2;
-
-        if (d != 0) return d;
+        REBINT diff = LO_CASE(*b1) - LO_CASE(*b2);
+        if (diff != 0)
+            return diff;
     }
-
     return 0;
 }
 
 
 //
-//  Match_Bytes: C
+//  Try_Diff_Bytes_Uncased: C
 //
-// Compare two binary strings. Return where the first differed.
-// Case insensitive.
+// Compare two binary strings case insensitively, stopping at '\0' terminator.
+// Return where the first differed.
 //
-const REBYTE *Match_Bytes(const REBYTE *src, const REBYTE *pat)
+const REBYTE *Try_Diff_Bytes_Uncased(const REBYTE *src, const REBYTE *pat)
 {
     while (*src != '\0' and *pat != '\0') {
         if (LO_CASE(*src++) != LO_CASE(*pat++))
@@ -399,104 +391,6 @@ REBLEN Find_Str_In_Str(
 
 
 //
-//  Find_Char_In_Str: C
-//
-// Supports AM_FIND_CASE for case-sensitivity and AM_FIND_MATCH to check only
-// the character at the current position and then stop.
-//
-// Skip can be set positive or negative (for reverse), and will be bounded
-// by the `start` and `end`.
-//
-// Note that features like "/LAST" are handled at a higher level and
-// translated into SKIP=(-1) and starting at (highest - 1).
-//
-REBLEN Find_Char_In_Str(
-    REBUNI uni,         // character to look for
-    const REBSTR *s,  // UTF-8 string series
-    REBLEN index_orig,  // first index to examine (if out of range, NOT_FOUND)
-    REBLEN highest,     // *one past* highest return result (e.g. SER_LEN)
-    REBINT skip,        // step amount while searching, can be negative!
-    REBFLGS flags       // AM_FIND_CASE, AM_FIND_MATCH
-){
-    assert((flags & ~(AM_FIND_CASE | AM_FIND_MATCH)) == 0);
-
-    // !!! In UTF-8, finding a char in a string is really just like finding a
-    // string in a string.  Optimize as this all folds together.
-
-    if (uni == 0)
-        return NOT_FOUND;  // there can be no `\0` codepoints in ANY-STRING!
-
-    DECLARE_LOCAL (temp);
-    Init_Char_May_Fail(temp, uni);
-
-    REBLEN i = Find_Str_In_Str(
-        s,
-        index_orig,
-        highest,
-        skip,
-        temp,
-        1,  // `len`
-        flags
-    );
-    Free_Unmanaged_Series(SER(temp));
-
-    return i;
-}
-
-
-//
-//  Find_Char_In_Bin: C
-//
-REBLEN Find_Char_In_Bin(
-    REBUNI uni,         // character to look for
-    const REBBIN *bin,  // binary series
-    REBLEN lowest,      // lowest return index
-    REBLEN index_orig,  // first index to examine (if out of range, NOT_FOUND)
-    REBLEN highest,     // *one past* highest return result (e.g. SER_LEN)
-    REBINT skip,        // step amount while searching, can be negative!
-    REBFLGS flags       // AM_FIND_CASE, AM_FIND_MATCH
-){
-    assert((flags & ~(AM_FIND_CASE | AM_FIND_MATCH)) == 0);
-
-    // !!! In UTF-8, finding a char in a string is really just like finding a
-    // string in a string.  Optimize as this all folds together.
-
-    if (skip != 1)
-        fail ("Find_Char_In_Bin() does not support SKIP <> 1 at the moment");
-
-    if (highest != BIN_LEN(bin))
-        fail ("Find_Char_In_Bin() only searches the whole binary for now");
-
-    UNUSED(lowest);
-
-    if (uni == 0) {  // can't Make a REBSTR with 0 byte in it
-        return Find_Bin_In_Bin(
-            bin,
-            index_orig,
-            cb_cast(""),  // NUL terminator only
-            1,  // 1 byte
-            flags
-        );
-    }
-
-    REBSTR *temp = Make_Codepoint_String(uni);
-
-    REBLEN i = Find_Str_In_Bin(
-        bin,
-        index_orig,
-        STR_HEAD(temp),
-        1, // 1 character
-        STR_SIZE(temp),
-        flags
-    );
-
-    Free_Unmanaged_Series(SER(temp));
-
-    return i;
-}
-
-
-//
 //  Find_Bin_Bitset: C
 //
 // General purpose find a bitset char in a binary.
@@ -589,56 +483,6 @@ REBLEN Find_Str_Bitset(
     }
 
     return NOT_FOUND;
-}
-
-
-//
-//  Count_Lines: C
-//
-// Count lines in a UTF-8 file.
-//
-REBLEN Count_Lines(REBYTE *bp, REBLEN len)
-{
-    REBLEN count = 0;
-
-    for (; len > 0; bp++, len--) {
-        if (*bp == CR) {
-            count++;
-            if (len == 1) break;
-            if (bp[1] == LF) bp++, len--;
-        }
-        else if (*bp == LF) count++;
-    }
-
-    return count;
-}
-
-
-//
-//  Next_Line: C
-//
-// Find next line termination. Advance the bp; return bin length.
-//
-REBLEN Next_Line(REBYTE **bin)
-{
-    REBLEN count = 0;
-    REBYTE *bp = *bin;
-
-    for (; *bp; bp++) {
-        if (*bp == CR) {
-            bp++;
-            if (*bp == LF) bp++;
-            break;
-        }
-        else if (*bp == LF) {
-            bp++;
-            break;
-        }
-        else count++;
-    }
-
-    *bin = bp;
-    return count;
 }
 
 
