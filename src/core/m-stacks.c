@@ -148,8 +148,8 @@ void Shutdown_Frame_Stack(void)
     for (; seg != nullptr; seg = seg->next) {
         REBLEN n = Mem_Pools[FRM_POOL].units;
         REBYTE *bp = cast(REBYTE*, seg + 1);
-        for (; n > 0; --n, bp += sizeof(REBFRM)) {
-            REBFRM *f = cast(REBFRM*, bp);
+        for (; n > 0; --n, bp += Mem_Pools[FRM_POOL].wide) {
+            REBFRM *f = cast(REBFRM*, bp);  // ^-- pool size may be rounded up
             if (IS_FREE_NODE(f))
                 continue;
           #ifdef DEBUG_COUNT_TICKS
