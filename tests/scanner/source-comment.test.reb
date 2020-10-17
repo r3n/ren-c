@@ -48,4 +48,3 @@
 )(
     'scan-invalid = (trap [load "'a; illegal quoted word"])/id
 )
-        

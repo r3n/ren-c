@@ -298,6 +298,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto process_action;
         }
 
+        if (NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT))
+            SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
+
         v = f->u.reval.value;
         gotten = nullptr;
         goto evaluate; }
@@ -328,7 +331,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     }
 
     assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
-    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);  // internal use flag only
+    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);  // out won't act as enfix input
 
     UPDATE_EXPRESSION_START(f);  // !!! See FRM_INDEX() for caveats
 
