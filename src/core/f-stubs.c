@@ -260,69 +260,6 @@ REBINT Get_System_Int(REBLEN i1, REBLEN i2, REBINT default_int)
 }
 
 
-//
-//  Init_Any_Series_At_Core: C
-//
-// Common function.
-//
-REBVAL *Init_Any_Series_At_Core(
-    RELVAL *out,
-    enum Reb_Kind type,
-    const REBSER *s,  // ensured managed by calling macro
-    REBLEN index,
-    REBNOD *binding
-){
-    assert(ANY_SERIES_KIND(type));
-    assert(GET_SERIES_FLAG(s, MANAGED));
-
-    // Note: a R3-Alpha Make_Binary() comment said:
-    //
-    //     Make a binary string series. For byte, C, and UTF8 strings.
-    //     Add 1 extra for terminator.
-    //
-    // One advantage of making all binaries terminate in 0 is that it means
-    // that if they were valid UTF-8, they could be aliased as Rebol strings,
-    // which are zero terminated.  So it's the rule.
-    //
-    ASSERT_SERIES_TERM(s);
-
-    RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, s);
-    VAL_INDEX(out) = index;
-    if (ANY_ARRAY_KIND(type))
-        INIT_BINDING(out, binding);
-    else
-        assert(binding == UNBOUND);
-
-    return cast(REBVAL*, out);
-}
-
-
-//
-//  Init_Any_String_At_Core: C
-//
-REBVAL *Init_Any_String_At_Core(  // also used with ANY-WORD!
-    RELVAL *out,
-    enum Reb_Kind type,
-    REBSER *s,  // calling macro ensures STR and forces to be managed
-    REBLEN index
-){
-    assert(GET_SERIES_FLAG(s, MANAGED));
-    assert(SER_WIDE(s) == 1);
-    ASSERT_SERIES_TERM(s);
-
-    if (ANY_WORD_KIND(type))
-        assert(NOT_SERIES_FLAG(s, UTF8_NONWORD));
-    else
-        assert(ANY_STRING_KIND(type));
-
-    RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, s);
-    VAL_INDEX(out) = index;
-    return cast(REBVAL*, out);
-}
-
-
 #if !defined(NDEBUG)
 
 //

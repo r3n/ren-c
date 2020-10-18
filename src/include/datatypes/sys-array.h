@@ -545,17 +545,47 @@ inline static const RELVAL *VAL_ARRAY_AT_HEAD(const RELVAL *v, REBLEN n) {
     return ARR_AT(a, (n));
 }
 
+//=//// ANY-ARRAY! INITIALIZER HELPERS ////////////////////////////////////=//
+//
+// Declaring as inline with type signature ensures you use a REBARR* to
+// initialize, and the C++ build can also validate managed consistent w/const.
+
+inline static REBVAL *Init_Any_Array_At_Core(
+    RELVAL *out,
+    enum Reb_Kind kind,
+    const_if_c REBARR *array,
+    REBLEN index,
+    REBNOD *binding
+){
+    return Init_Any_Series_At_Core(
+        out,
+        kind,
+        Force_Series_Managed_Core(array),
+        index,
+        binding
+    );
+}
+
+#ifdef __cplusplus
+    inline static REBVAL *Init_Any_Array_At_Core(
+        RELVAL *out,
+        enum Reb_Kind kind,
+        const REBARR *array,  // all const arrays should be already managed
+        REBLEN index,
+        REBNOD *binding
+    ){
+        return Init_Any_Series_At_Core(out, kind, SER(array), index, binding);
+    }
+#endif
+
 #define Init_Any_Array_At(v,t,a,i) \
-    Init_Any_Series_At((v), (t), SER(a), (i))
+    Init_Any_Array_At_Core((v), (t), (a), (i), UNBOUND)
 
 #define Init_Any_Array(v,t,a) \
     Init_Any_Array_At((v), (t), (a), 0)
 
-#define Init_Block(v,s) \
-    Init_Any_Array((v), REB_BLOCK, (s))
-
-#define Init_Group(v,s) \
-    Init_Any_Array((v), REB_GROUP, (s))
+#define Init_Block(v,s)     Init_Any_Array((v), REB_BLOCK, (s))
+#define Init_Group(v,s)     Init_Any_Array((v), REB_GROUP, (s))
 
 
 inline static RELVAL *Init_Relative_Block_At(

@@ -826,16 +826,16 @@ inline static REBNOD *VAL_BINDING(REBCEL(const*) v) {
 }
 
 inline static void INIT_BINDING(RELVAL *v, const void *p) {
-    assert(Is_Bindable(v)); // works on partially formed values
-
     const REBNOD *binding = cast(const REBNOD*, p);
     EXTRA(Binding, v).node = m_cast(REBNOD*, binding);
 
   #if !defined(NDEBUG)
     if (not binding)
-        return; // e.g. UNBOUND
+        return;  // e.g. UNBOUND
 
-    assert(not (binding->header.bits & NODE_FLAG_CELL)); // not currently used
+    assert(Is_Bindable(v));  // works on partially formed values
+
+    assert(not (binding->header.bits & NODE_FLAG_CELL));  // not currently used
 
     if (binding->header.bits & NODE_FLAG_MANAGED) {
         assert(
@@ -843,7 +843,7 @@ inline static void INIT_BINDING(RELVAL *v, const void *p) {
             or binding->header.bits & ARRAY_FLAG_IS_VARLIST  // specific
             or (
                 IS_VARARGS(v) and not IS_SER_DYNAMIC(binding)
-            ) // varargs from MAKE VARARGS! [...], else is a varlist
+            )  // varargs from MAKE VARARGS! [...], else is a varlist
         );
     }
     else

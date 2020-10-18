@@ -958,9 +958,35 @@ inline static REBLEN Num_Codepoints_For_Bytes(
 
 
 //=//// ANY-STRING! CONVENIENCE MACROS ////////////////////////////////////=//
+//
+// Declaring as inline with type signature ensures you use a REBSTR* to
+// initialize, and the C++ build can also validate managed consistent w/const.
 
-#define Init_Any_String_At(v,t,s,i) \
-    Init_Any_String_At_Core((v), (t), Force_Series_Managed_Core(STR(s)), (i))
+inline static REBVAL *Init_Any_String_At(
+    RELVAL *out,
+    enum Reb_Kind kind,
+    const_if_c REBSTR *str,
+    REBLEN index
+){
+    return Init_Any_Series_At_Core(
+        out,
+        kind,
+        Force_Series_Managed_Core(str),
+        index,
+        UNBOUND
+    );
+}
+
+#ifdef __cplusplus
+    inline static REBVAL *Init_Any_String_At(
+        RELVAL *out,
+        enum Reb_Kind kind,
+        const REBSTR *str,
+        REBLEN index
+    ){
+        return Init_Any_Series_At_Core(out, kind, SER(str), index, UNBOUND);
+    }
+#endif
 
 #define Init_Any_String(v,t,s) \
     Init_Any_String_At((v), (t), (s), 0)

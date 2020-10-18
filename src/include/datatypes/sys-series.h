@@ -714,6 +714,45 @@ inline static const REBYTE *VAL_DATA_AT(REBCEL(const*) v) {
     return SER_DATA_AT(SER_WIDE(VAL_SERIES(v)), VAL_SERIES(v), VAL_INDEX(v));
 }
 
+
+inline static REBVAL *Init_Any_Series_At_Core(
+    RELVAL *out,
+    enum Reb_Kind type,
+    const REBSER *s,  // ensured managed by calling macro
+    REBLEN index,
+    REBNOD *binding
+){
+  #if !defined(NDEBUG)
+    assert(ANY_SERIES_KIND(type));
+    assert(GET_SERIES_FLAG(s, MANAGED));
+
+    // Note: a R3-Alpha Make_Binary() comment said:
+    //
+    //     Make a binary string series. For byte, C, and UTF8 strings.
+    //     Add 1 extra for terminator.
+    //
+    // One advantage of making all binaries terminate in 0 is that it means
+    // that if they were valid UTF-8, they could be aliased as Rebol strings,
+    // which are zero terminated.  So it's the rule.
+    //
+    ASSERT_SERIES_TERM(s);
+
+    if (ANY_ARRAY_KIND(type))
+        assert(IS_SER_ARRAY(s));
+    else if (ANY_STRING_KIND(type))
+        assert(GET_SERIES_FLAG(s, IS_STRING));
+    else {
+        // Note: Binaries are allowed to alias strings
+    }
+  #endif
+
+    RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
+    INIT_VAL_NODE(out, s);
+    VAL_INDEX(out) = index;
+    INIT_BINDING(out, binding);  // asserts if unbindable type tries to bind
+    return cast(REBVAL*, out);
+}
+
 #define Init_Any_Series_At(v,t,s,i) \
     Init_Any_Series_At_Core((v), (t), \
         Force_Series_Managed_Core(s), (i), UNBOUND)
