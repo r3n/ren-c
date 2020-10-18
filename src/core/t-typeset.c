@@ -414,36 +414,45 @@ REBTYPE(Typeset)
 
         return nullptr; }
 
+      case SYM_UNIQUE:
+        RETURN (v);  // typesets unique by definition
+
       case SYM_INTERSECT:
       case SYM_UNION:
-      case SYM_DIFFERENCE: {
+      case SYM_DIFFERENCE:
+      case SYM_EXCLUDE: {
         REBVAL *arg = D_ARG(2);
 
-        if (IS_DATATYPE(arg)) {
-            REBYTE n = cast(REBYTE, VAL_TYPE(arg));
-            if (n < 32)
-                VAL_TYPESET_LOW_BITS(arg) = FLAGIT_KIND(n);
-            else {
-                assert(n < REB_MAX_PLUS_MAX);
-                VAL_TYPESET_HIGH_BITS(arg) = FLAGIT_KIND(n - 32);
-            }
-        }
+        if (IS_DATATYPE(arg))
+            Init_Typeset(arg, FLAGIT_KIND(VAL_TYPE(arg)));
         else if (not IS_TYPESET(arg))
             fail (arg);
 
-        if (VAL_WORD_SYM(verb) == SYM_UNION) {
+        switch (VAL_WORD_SYM(verb)) {
+          case SYM_UNION:
             VAL_TYPESET_LOW_BITS(v) |= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) |= VAL_TYPESET_HIGH_BITS(arg);
-        }
-        else if (VAL_WORD_SYM(verb) == SYM_INTERSECT) {
+            break;
+        
+          case SYM_INTERSECT:
             VAL_TYPESET_LOW_BITS(v) &= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) &= VAL_TYPESET_HIGH_BITS(arg);
-        }
-        else {
-            assert(VAL_WORD_SYM(verb) == SYM_DIFFERENCE);
+            break;
+
+          case SYM_DIFFERENCE:
             VAL_TYPESET_LOW_BITS(v) ^= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) ^= VAL_TYPESET_HIGH_BITS(arg);
+            break;
+
+          case SYM_EXCLUDE:
+            VAL_TYPESET_LOW_BITS(v) &= ~VAL_TYPESET_LOW_BITS(arg);
+            VAL_TYPESET_HIGH_BITS(v) &= ~VAL_TYPESET_HIGH_BITS(arg);
+            break;
+
+          default:
+            assert(false);
         }
+
         RETURN (v); }
 
       case SYM_COMPLEMENT: {

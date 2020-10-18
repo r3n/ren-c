@@ -423,13 +423,6 @@ reflect
 kind
 quotes
 
-; There was a special case in R3-Alpha for REBNATIVE(exclude) which wasn't an
-; "ACTION!" (which meant no enum value) but it called a common routine that
-; expected an action number.  So it passed zero.  Now that "type actions"
-; use symbols as identity, this formalizes the hack by adding exclude.
-;
-exclude
-
 ; !!! The SECURE feature in R3-Alpha was unfinished.  While the policies for
 ; security were conveyed with words, those words were mapped into an enum
 ; to pack as bit flags.  However, those bit flags have been moved to being

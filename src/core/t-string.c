@@ -1008,8 +1008,6 @@ REBTYPE(String)
     REBLEN index = VAL_INDEX(v);
     REBLEN tail = VAL_LEN_HEAD(v);
 
-    REBFLGS sop_flags;  // SOP_XXX "Set Operation" flags
-
     switch (sym) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
@@ -1022,6 +1020,12 @@ REBTYPE(String)
         }
         return Series_Common_Action_Maybe_Unhandled(frame_, verb); }
 
+      case SYM_UNIQUE:
+      case SYM_INTERSECT:
+      case SYM_UNION:
+      case SYM_DIFFERENCE:
+      case SYM_EXCLUDE:
+        //
       case SYM_SKIP:
       case SYM_AT:
         return Series_Common_Action_Maybe_Unhandled(frame_, verb);
@@ -1235,37 +1239,6 @@ REBTYPE(String)
             D_OUT,
             VAL_TYPE(v),
             Copy_String_At_Limit(v, len)
-        ); }
-
-    //-- Bitwise:
-
-      case SYM_INTERSECT:
-        sop_flags = SOP_FLAG_CHECK;
-        goto set_operation;
-
-      case SYM_UNION:
-        sop_flags = SOP_FLAG_BOTH;
-        goto set_operation;
-
-      case SYM_DIFFERENCE:
-        sop_flags = SOP_FLAG_BOTH | SOP_FLAG_CHECK | SOP_FLAG_INVERT;
-        goto set_operation;
-
-      set_operation: {
-        INCLUDE_PARAMS_OF_DIFFERENCE;  // should all have same spec
-
-        UNUSED(ARG(value1)); // covered by value
-
-        return Init_Any_Series(
-            D_OUT,
-            VAL_TYPE(v),
-            Make_Set_Operation_Series(
-                v,
-                ARG(value2),
-                sop_flags,
-                did REF(case),
-                REF(skip) ? Int32s(ARG(skip), 1) : 1
-            )
         ); }
 
     //-- Special actions:

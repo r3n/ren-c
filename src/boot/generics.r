@@ -146,6 +146,18 @@ difference: generic [
         [integer!]
 ]
 
+exclude: generic [
+    {Returns the first data set less the second data set.}
+
+    data "original data"
+        [any-array! any-string! binary! bitset! typeset!]
+    exclusions "data to exclude from series"
+        [any-array! any-string! binary! bitset! typeset!]
+    /case "Uses case-sensitive comparison"
+    /skip "Treat the series as records of fixed size"
+        [integer!]
+]
+
 
 ; Unary
 
@@ -157,6 +169,16 @@ negate: generic [
 complement: generic [
     {Returns the one's complement value.}
     value [logic! integer! tuple! binary! bitset! typeset!]
+]
+
+unique: generic [
+    {Returns the data set with duplicates removed}
+
+    series [any-array! any-string! binary! bitset! typeset!]
+    dummy:  ; unused, makes frame-compatible with INTERSECT/UNIQUE/etc.
+    /case "Use case-sensitive comparison (except bitsets)"
+    /skip "Treat the series as records of fixed size"
+        [integer!]
 ]
 
 absolute: generic [

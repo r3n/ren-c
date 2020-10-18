@@ -49,7 +49,8 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
     REBFLGS sop_flags;  // "SOP_XXX" Set Operation Flags
 
-    switch (VAL_WORD_SYM(verb)) {
+    REBSYM sym = VAL_WORD_SYM(verb);
+    switch (sym) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(PAR(value));  // covered by `value`
@@ -177,6 +178,10 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
         RETURN (value); }
 
+      case SYM_UNIQUE:  // Note: only has 1 argument, so dummy second arg
+        sop_flags = SOP_NONE;
+        goto set_operation;
+
       case SYM_INTERSECT:
         sop_flags = SOP_FLAG_CHECK;
         goto set_operation;
@@ -189,19 +194,25 @@ REB_R Series_Common_Action_Maybe_Unhandled(
         sop_flags = SOP_FLAG_BOTH | SOP_FLAG_CHECK | SOP_FLAG_INVERT;
         goto set_operation;
 
-      set_operation: {
-        INCLUDE_PARAMS_OF_DIFFERENCE;  // should all have same spec
-        UNUSED(ARG(value1));  // covered by `value`
+      case SYM_EXCLUDE:
+        sop_flags = SOP_FLAG_CHECK | SOP_FLAG_INVERT;
+        goto set_operation;
 
-        if (IS_BINARY(value))
-            return R_UNHANDLED; // !!! unhandled; use bitwise math, for now
+      set_operation: {
+        //
+        // Note: All set operations share a compatible spec.  The way that
+        // UNIQUE is compatible is via a dummy argument in the second
+        // parameter slot, so that the /CASE and /SKIP arguments line up.
+        //
+        INCLUDE_PARAMS_OF_DIFFERENCE;  // should all have compatible specs
+        UNUSED(ARG(value1));  // covered by `value`
 
         return Init_Any_Series(
             D_OUT,
             VAL_TYPE(value),
             Make_Set_Operation_Series(
                 value,
-                ARG(value2),
+                (sym == SYM_UNIQUE) ? nullptr : ARG(value2),
                 sop_flags,
                 did REF(case),
                 REF(skip) ? Int32s(ARG(skip), 1) : 1

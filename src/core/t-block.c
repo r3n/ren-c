@@ -760,9 +760,11 @@ REBTYPE(Array)
 
     REBSYM sym = VAL_WORD_SYM(verb);
     switch (sym) {
+      case SYM_UNIQUE:
       case SYM_INTERSECT:
       case SYM_UNION:
       case SYM_DIFFERENCE:
+      case SYM_EXCLUDE:
         //
       case SYM_REFLECT:
       case SYM_SKIP:
