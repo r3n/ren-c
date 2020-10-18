@@ -564,7 +564,8 @@ REBTYPE(Bitset)
 {
     REBVAL *v = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    REBSYM sym = VAL_WORD_SYM(verb);
+    switch (sym) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value)); // covered by `v`
@@ -600,8 +601,7 @@ REBTYPE(Bitset)
             return nullptr;
         return Init_True(D_OUT); }
 
-      case SYM_COMPLEMENT:
-      case SYM_NEGATE: {
+      case SYM_COMPLEMENT: {
         REBBIN *copy = Copy_Series_Core(VAL_BITSET(v), NODE_FLAG_MANAGED);
         INIT_BITS_NOT(copy, not BITS_NOT(VAL_BITSET(v)));
         return Init_Bitset(D_OUT, copy); }
@@ -657,7 +657,8 @@ REBTYPE(Bitset)
 
       case SYM_INTERSECT:
       case SYM_UNION:
-      case SYM_DIFFERENCE: {
+      case SYM_DIFFERENCE:
+      case SYM_EXCLUDE: {
         REBVAL *arg = D_ARG(2);
         if (IS_BITSET(arg)) {
             if (BITS_NOT(VAL_BITSET(arg)))  // !!! see #2365
@@ -672,10 +673,43 @@ REBTYPE(Bitset)
 
         Init_Binary(v, VAL_BITSET(v));
 
-        REBBIN *bits = Xandor_Binary(verb, v, arg);
+        // !!! Until the replacement implementation with Roaring Bitmaps, the
+        // bitset is based on a BINARY!.  Reuse the code on the generated
+        // proxy values.
+        //
+        REBVAL *action;
+        switch (sym) {
+          case SYM_INTERSECT:
+            action = rebValue(":bitwise-and", rebEND);
+            break;
+
+          case SYM_UNION:
+            action = rebValue(":bitwise-or", rebEND);
+            break;
+
+          case SYM_DIFFERENCE:
+            action = rebValue(":bitwise-xor", rebEND);
+            break;
+
+          case SYM_EXCLUDE:
+            action = rebValue(":bitwise-and-not", rebEND);
+            break;
+
+          default:
+            action = rebVoid();
+            assert(false);
+        }
+
+        REBVAL *processed = rebValue(
+            rebR(action), rebQ(v), rebQ(arg),
+        rebEND);
+
+        REBBIN *bits = VAL_BINARY_KNOWN_MUTABLE(processed);
+        rebRelease(processed);
+
         INIT_BITS_NOT(bits, false);
         Trim_Tail_Zeros(bits);
-        return Init_Bitset(D_OUT, Manage_Series(bits)); }
+        return Init_Bitset(D_OUT, bits); }
 
       default:
         break;

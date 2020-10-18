@@ -386,23 +386,28 @@ REBTYPE(Issue)
         chr %= arg;
         break;
 
-      case SYM_INTERSECT:
+      case SYM_BITWISE_NOT:
+        chr = cast(REBUNI, ~chr);
+        break;
+
+      case SYM_BITWISE_AND:
         arg = Math_Arg_For_Char(D_ARG(2), verb);
         chr &= cast(REBUNI, arg);
         break;
 
-      case SYM_UNION:
+      case SYM_BITWISE_OR:
         arg = Math_Arg_For_Char(D_ARG(2), verb);
         chr |= cast(REBUNI, arg);
         break;
 
-      case SYM_DIFFERENCE:
+      case SYM_BITWISE_XOR:
         arg = Math_Arg_For_Char(D_ARG(2), verb);
         chr ^= cast(REBUNI, arg);
         break;
 
-      case SYM_COMPLEMENT:
-        chr = cast(REBUNI, ~chr);
+      case SYM_BITWISE_AND_NOT:
+        arg = Math_Arg_For_Char(D_ARG(2), verb);
+        chr &= cast(REBUNI, ~arg);
         break;
 
       case SYM_EVEN_Q:

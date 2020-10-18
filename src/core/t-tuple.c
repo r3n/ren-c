@@ -202,9 +202,10 @@ REBTYPE(Sequence)
         or sym == SYM_MULTIPLY
         or sym == SYM_DIVIDE
         or sym == SYM_REMAINDER
-        or sym == SYM_INTERSECT
-        or sym == SYM_UNION
-        or sym == SYM_DIFFERENCE
+        or sym == SYM_BITWISE_AND
+        or sym == SYM_BITWISE_OR
+        or sym == SYM_BITWISE_XOR
+        or sym == SYM_BITWISE_AND_NOT
     ){
         assert(vp);
 
@@ -290,16 +291,20 @@ REBTYPE(Sequence)
                 v %= a;
                 break;
 
-            case SYM_INTERSECT:
+            case SYM_BITWISE_AND:
                 v &= a;
                 break;
 
-            case SYM_UNION:
+            case SYM_BITWISE_OR:
                 v |= a;
                 break;
 
-            case SYM_DIFFERENCE:
+            case SYM_BITWISE_XOR:
                 v ^= a;
+                break;
+
+            case SYM_BITWISE_AND_NOT:
+                v &= ~a;
                 break;
 
             default:
@@ -316,7 +321,7 @@ REBTYPE(Sequence)
     }
 
     // !!!! merge with SWITCH below !!!
-    if (sym == SYM_COMPLEMENT) {
+    if (sym == SYM_BITWISE_NOT) {
         REBLEN temp = len;
         for (; temp > 0; --temp, vp++)
             *vp = cast(REBYTE, ~*vp);

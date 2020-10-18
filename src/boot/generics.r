@@ -90,8 +90,37 @@ power: generic [
 ]
 
 
+bitwise-and: generic [
+    {Bitwise AND of two values}
+    return: [logic! integer! char! tuple! binary!]
+    value1 [logic! integer! char! tuple! binary!]
+    value2 [logic! integer! char! tuple! binary!]
+]
+
+bitwise-or: generic [
+    {Bitwise OR of two values}
+    return: [logic! integer! char! tuple! binary!]
+    value1 [logic! integer! char! tuple! binary!]
+    value2 [logic! integer! char! tuple! binary!]
+]
+
+bitwise-xor: generic [
+    {Bitwise XOR of two values}
+    return: [logic! integer! char! tuple! binary!]
+    value1 [logic! integer! char! tuple! binary!]
+    value2 [logic! integer! char! tuple! binary!]
+]
+
+bitwise-and-not: generic [
+    {Bitwise AND NOT of two values}
+    return: [logic! integer! char! tuple! binary!]
+    value1 [logic! integer! char! tuple! binary!]
+    value2 [logic! integer! char! tuple! binary!]
+]
+
+
 intersect: generic [
-    {Returns the intersection (AND) of two values}
+    {Returns the intersection (AND) of two sets}
 
     value1 [
         logic! integer! char! tuple!  ; math
@@ -109,7 +138,7 @@ intersect: generic [
 ]
 
 union: generic [
-    {Returns the union (OR) of two values}
+    {Returns the union (OR) of two sets}
 
     value1 [
         logic! integer! char! tuple!  ; math
@@ -127,7 +156,7 @@ union: generic [
 ]
 
 difference: generic [
-    {Returns the special difference (XOR) of two values}
+    {Returns the special difference (XOR) of two sets}
 
     value1 [
         logic! integer! char! tuple!  ; math
@@ -166,9 +195,14 @@ negate: generic [
     number [any-number! pair! money! time! bitset!]
 ]
 
-complement: generic [
+bitwise-not: generic [
     {Returns the one's complement value.}
-    value [logic! integer! tuple! binary! bitset! typeset!]
+    value [logic! integer! tuple! binary!]
+]
+
+complement: generic [
+    {Returns the inversion of a set}
+    value [bitset! typeset!]
 ]
 
 unique: generic [

@@ -373,19 +373,23 @@ REBTYPE(Logic)
 
     switch (VAL_WORD_SYM(verb)) {
 
-    case SYM_INTERSECT:
+    case SYM_BITWISE_AND:
         b2 = Math_Arg_For_Logic(D_ARG(2));
         return Init_Logic(D_OUT, b1 and b2);
 
-    case SYM_UNION:
+    case SYM_BITWISE_OR:
         b2 = Math_Arg_For_Logic(D_ARG(2));
         return Init_Logic(D_OUT, b1 or b2);
 
-    case SYM_DIFFERENCE:
+    case SYM_BITWISE_XOR:
         b2 = Math_Arg_For_Logic(D_ARG(2));
         return Init_Logic(D_OUT, b1 != b2);
 
-    case SYM_COMPLEMENT:
+    case SYM_BITWISE_AND_NOT:
+        b2 = Math_Arg_For_Logic(D_ARG(2));
+        return Init_Logic(D_OUT, b1 and not b2);
+
+    case SYM_BITWISE_NOT:
         return Init_Logic(D_OUT, not b1);
 
     case SYM_RANDOM: {

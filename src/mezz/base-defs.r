@@ -83,9 +83,11 @@ tweak :also 'defer on
 
 ; SET OPERATORS
 
-and+: enfixed :intersect
-or+: enfixed :union
-xor+: enfixed :difference
+not+: :bitwise-not
+and+: enfixed :bitwise-and
+or+: enfixed :bitwise-or
+xor+: enfixed :bitwise-xor
+and-not+: enfixed :bitwise-and-not
 
 
 ; COMPARISON OPERATORS

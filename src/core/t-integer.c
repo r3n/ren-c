@@ -270,9 +270,10 @@ REBTYPE(Integer)
         or sym == SYM_MULTIPLY
         or sym == SYM_DIVIDE
         or sym == SYM_POWER
-        or sym == SYM_INTERSECT
-        or sym == SYM_UNION
-        or sym == SYM_DIFFERENCE
+        or sym == SYM_BITWISE_AND
+        or sym == SYM_BITWISE_OR
+        or sym == SYM_BITWISE_XOR
+        or sym == SYM_BITWISE_AND_NOT
         or sym == SYM_REMAINDER
     ){
         REBVAL *val2 = D_ARG(2);
@@ -369,21 +370,24 @@ REBTYPE(Integer)
             fail (Error_Zero_Divide_Raw());
         return Init_Integer(D_OUT, (arg != -1) ? (num % arg) : 0);
 
-    case SYM_INTERSECT:
+    case SYM_BITWISE_AND:
         return Init_Integer(D_OUT, num & arg);
 
-    case SYM_UNION:
+    case SYM_BITWISE_OR:
         return Init_Integer(D_OUT, num | arg);
 
-    case SYM_DIFFERENCE:
+    case SYM_BITWISE_XOR:
         return Init_Integer(D_OUT, num ^ arg);
+
+    case SYM_BITWISE_AND_NOT:
+        return Init_Integer(D_OUT, num & ~arg);
 
     case SYM_NEGATE:
         if (num == INT64_MIN)
             fail (Error_Overflow_Raw());
         return Init_Integer(D_OUT, -num);
 
-    case SYM_COMPLEMENT:
+    case SYM_BITWISE_NOT:
         return Init_Integer(D_OUT, ~num);
 
     case SYM_ABSOLUTE:

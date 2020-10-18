@@ -247,18 +247,10 @@ REBSER *Make_Set_Operation_Series(
     else {
         assert(IS_BINARY(val1) and IS_BINARY(val2));
 
-        DECLARE_MOLD (mo);
-
-        // All binaries use "case-sensitive" comparison (e.g. each byte
-        // is treated distinctly)
-        //
-        cased = true;
-
-        // ask mo->series to have at least `i` capacity beyond mo->start
-        //
-        SET_MOLD_FLAG(mo, MOLD_FLAG_RESERVE);
-        mo->reserve = i;
-        Push_Mold(mo);
+        REBSER *buf = BYTE_BUF;
+        REBLEN buf_start_len = BIN_LEN(buf);
+        EXPAND_SERIES_TAIL(buf, i);  // ask for at least `i` capacity
+        REBLEN buf_at = buf_start_len;
 
         do {
             // Note: val1 and val2 swapped 2nd pass!
@@ -289,19 +281,16 @@ REBSER *Make_Set_Operation_Series(
 
                 if (
                     NOT_FOUND == Find_Bin_In_Bin(
-                        SER(mo->series), // ser
-                        mo->offset, // index - !!! was also mo->start
+                        buf,
+                        buf_start_len,
                         &b,
                         1,
                         cased ? AM_FIND_CASE : 0 // flags
                     )
                 ){
-                    // This would append non-valid UTF-8 to the mold buffer.
-                    // There should probably be a byte buffer.
-                    //
-                    fail ("Binary set operations temporarily unsupported.");
-
-                    // Append_String(mo->series, ser, i, skip);
+                    EXPAND_SERIES_TAIL(buf, 1);
+                    *BIN_AT(buf, buf_at) = b;
+                    ++buf_at;
                 }
             }
 
@@ -318,7 +307,12 @@ REBSER *Make_Set_Operation_Series(
             }
         } while (i);
 
-        out_ser = Pop_Molded_Binary(mo);
+        REBLEN out_len = buf_at - buf_start_len;
+        out_ser = Make_Binary(out_len);
+        memcpy(BIN_HEAD(out_ser), BIN_AT(buf, buf_start_len), out_len);
+        TERM_BIN_LEN(out_ser, out_len);
+
+        TERM_BIN_LEN(buf, buf_start_len);
     }
 
     return out_ser;

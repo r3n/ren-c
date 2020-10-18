@@ -999,7 +999,7 @@ REBTYPE(Image)
 
         break; }
 
-    case SYM_COMPLEMENT:
+    case SYM_BITWISE_NOT:
         Make_Complemented_Image(D_OUT, value);
         return D_OUT;
 

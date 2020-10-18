@@ -496,8 +496,11 @@ REBTYPE(Binary)
 
     REBSYM sym = VAL_WORD_SYM(verb);
     switch (sym) {
-
-        // Note: INTERSECT, UNION, DIFFERENCE handled later in the switch
+      case SYM_UNIQUE:
+      case SYM_INTERSECT:
+      case SYM_UNION:
+      case SYM_DIFFERENCE:
+      case SYM_EXCLUDE:
         //
       case SYM_REFLECT:
       case SYM_SKIP:
@@ -674,29 +677,76 @@ REBTYPE(Binary)
 
     //-- Bitwise:
 
-      case SYM_INTERSECT:
-      case SYM_UNION:
-      case SYM_DIFFERENCE: {
+      case SYM_BITWISE_AND:
+      case SYM_BITWISE_OR:
+      case SYM_BITWISE_XOR:
+      case SYM_BITWISE_AND_NOT: {
         REBVAL *arg = D_ARG(2);
+        if (not IS_BINARY(arg))
+            fail (Error_Math_Args(VAL_TYPE(arg), verb));
 
-        if (VAL_INDEX(v) > VAL_LEN_HEAD(v))
-            VAL_INDEX(v) = VAL_LEN_HEAD(v);
+        const REBYTE *p0 = VAL_BIN_AT(v);
+        const REBYTE *p1 = VAL_BIN_AT(arg);
 
-        if (VAL_INDEX(arg) > VAL_LEN_HEAD(arg))
-            VAL_INDEX(arg) = VAL_LEN_HEAD(arg);
+        REBLEN t0 = VAL_LEN_AT(v);
+        REBLEN t1 = VAL_LEN_AT(arg);
 
-        return Init_Any_Series(
-            D_OUT,
-            REB_BINARY,
-            Xandor_Binary(verb, v, arg)
-        ); }
+        REBLEN smaller = MIN(t0, t1);  // smaller array size
+        REBLEN larger = MAX(t0, t1);
 
-      case SYM_COMPLEMENT: {
-        return Init_Any_Series(
-            D_OUT,
-            REB_BINARY,
-            Complement_Binary(v)
-        ); }
+        REBSER *series = Make_Binary(larger);
+        TERM_SEQUENCE_LEN(series, larger);
+
+        REBYTE *dest = BIN_HEAD(series);
+
+        switch (VAL_WORD_SYM(verb)) {
+          case SYM_BITWISE_AND: {
+            REBLEN i;
+            for (i = 0; i < smaller; i++)
+                *dest++ = *p0++ & *p1++;
+            CLEAR(dest, larger - smaller);
+            break; }
+
+          case SYM_BITWISE_OR: {
+            REBLEN i;
+            for (i = 0; i < smaller; i++)
+                *dest++ = *p0++ | *p1++;
+            memcpy(dest, ((t0 > t1) ? p0 : p1), larger - smaller);
+            break; }
+
+          case SYM_BITWISE_XOR: {
+            REBLEN i;
+            for (i = 0; i < smaller; i++)
+                *dest++ = *p0++ ^ *p1++;
+            memcpy(dest, ((t0 > t1) ? p0 : p1), larger - smaller);
+            break; }
+
+          case SYM_BITWISE_AND_NOT: {
+            REBLEN i;
+            for (i = 0; i < smaller; i++)
+                *dest++ = *p0++ & ~*p1++;
+            if (t0 > t1)
+                memcpy(dest, p0, t0 - t1);
+            break; }
+
+          default:
+            assert(false);  // not reachable
+        }
+
+        return Init_Any_Series(D_OUT, REB_BINARY, series); }
+
+      case SYM_BITWISE_NOT: {
+        const REBYTE *bp = VAL_BIN_AT(v);
+        REBLEN len = VAL_LEN_AT(v);
+
+        REBSER *bin = Make_Binary(len);
+        TERM_SEQUENCE_LEN(bin, len);
+
+        REBYTE *dp = BIN_HEAD(bin);
+        for (; len > 0; len--, ++bp, ++dp)
+            *dp = ~(*bp);
+
+        return Init_Any_Series(D_OUT, REB_BINARY, bin); }
 
     // Arithmetic operations are allowed on BINARY!, because it's too limiting
     // to not allow `#{4B} + 1` => `#{4C}`.  Allowing the operations requires
