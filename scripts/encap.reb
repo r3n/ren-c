@@ -229,7 +229,7 @@ elf-format: context [
     ]
 
     find-section: function [
-        return: [blank! integer!]
+        return: [<opt> integer!]
             {The index of the section header with encap (sh_xxx vars set)}
         name [text!]
         section-headers [binary!]
@@ -254,7 +254,7 @@ elf-format: context [
             ]
             end
         ]
-        return blank
+        return null
     ]
 
     update-offsets: function [
@@ -526,7 +526,7 @@ elf-format: context [
                 encap-section-name
                 section-headers-data
                 string-section-data
-        ) or [
+        ) else [
             return null
         ]
 
@@ -888,13 +888,16 @@ pe-format: context [
         ;print ["Section headers end at:" index of end-of-section-header]
         sort/compare sections func [a b][a/physical-offset < b/physical-offset]
 
-        first-section-by-phy-offset: sections/1 or [ catch [
-            for-each sec sections [
-                if not zero? sec/physical-offset [
-                    throw sec
+        first-section-by-phy-offset: any [
+            sections/1
+            catch [
+                for-each sec sections [
+                    if not zero? sec/physical-offset [
+                        throw sec
+                    ]
                 ]
             ]
-        ] ]
+        ]
 
         ;dump first-section-by-phy-offset
         gap: (
@@ -1187,14 +1190,15 @@ generic-format: context [
             print "Binary contains no pre-existing encap data block"
         ]
 
-        (while [0 != modulo (length of executable) 4096] [
+        while [0 != modulo (length of executable) 4096] [
             append executable #{00}
             true
-        ]) and [
-            print [{Executable padded to} length of executable {bytes long.}]
-            true
-        ] or [
-            print {No padding of executable length required.}
+        ] then padded -> [
+            if padded [
+                print [{Executable padded to} length of executable {bytes.}]
+            ] else [
+                print {No padding of executable length required.}
+            ]
         ]
 
         append executable embedding
@@ -1308,7 +1312,7 @@ encap: function [
 
     ; !!! Currently only test the extraction for single-file, easier.
     ;
-    if single-script and [embed != extracted: get-encap out-rebol-path] [
+    all [single-script | embed != extracted: get-encap out-rebol-path] then [
         print ["Test extraction size:" length of extracted]
         print ["Embedded bytes" mold embed]
         print ["Extracted bytes" mold extracted]

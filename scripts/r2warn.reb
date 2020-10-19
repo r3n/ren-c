@@ -138,7 +138,11 @@ unless: checked [
         :look [any-value! <variadic>]
     ][
         right: take right
-        if (unset? 'left) or [not group? right] or [block? first look] [
+        any [
+            unset? 'left
+            not group? right
+            block? first look
+        ] then [
             fail 'look [
                 "UNLESS has been repurposed in Ren-C as an infix operator"
                 "which defaults to the left hand side, unless the right"
@@ -152,7 +156,10 @@ unless: checked [
             ]
         ]
 
-        (do as block! right) or [:left]
+        any [
+            do as block! right
+            :left
+        ]
     ]
 ]
 

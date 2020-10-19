@@ -694,7 +694,7 @@ main-startup: function [
     ; As long as there was no `--script` or `--do` passed on the command line
     ; explicitly, the first item after the options is implicitly the script.
     ;
-    if is-script-implicit and [not tail? argv] [
+    all [is-script-implicit | not tail? argv] then [
         o/script: local-to-file take argv
         quit-when-done: default [true]
     ]
@@ -774,9 +774,9 @@ main-startup: function [
         ]
     ]
 
-    (switch type of boot-embedded [
+    switch type of boot-embedded [
         blank! [
-            false  ; signal the `AND []` that there's no embedded code
+            false  ; signal that there's no embedded code
         ]
         binary! [ ; single script
             [code header]: load/type boot-embedded 'unbound
@@ -801,24 +801,28 @@ main-startup: function [
         ]
 
         die "Bad embedded boot data (not a BLOCK! or a BINARY!)"
-    ]) and [
-        ;boot-print ["executing embedded script:" mold code]
-        system/script: make system/standard/script [
-            title: select first code 'title
-            header: first code
-            parent: _
-            path: what-dir
-            args: script-args
+    ] then execute -> [
+        if execute [
+            ;boot-print ["executing embedded script:" mold code]
+            system/script: make system/standard/script [
+                title: select first code 'title
+                header: first code
+                parent: _
+                path: what-dir
+                args: script-args
+            ]
+            if 'module = select first code 'type [
+                code: reduce [first code | next code]
+                if object? tmp: sys/do-needs/no-user first code [
+                    append code tmp
+                ]
+                import do compose [module (code)]
+            ] else [
+                sys/do-needs first code
+                do intern next code
+            ]
+            quit ;ignore user script and "--do" argument
         ]
-        if 'module = select first code 'type [
-            code: reduce [first code | next code]
-            if object? tmp: sys/do-needs/no-user first code [append code tmp]
-            import do compose [module (code)]
-        ] else [
-            sys/do-needs first code
-            do intern next code
-        ]
-        quit ;ignore user script and "--do" argument
     ]
 
     ; Evaluate any script argument, e.g. `r3 test.r` or `r3 --script test.r`

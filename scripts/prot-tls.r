@@ -399,7 +399,7 @@ update-state: function [
     old: ensure [blank! issue! tag!] ctx/mode
     debug [mold old unspaced ["=" direction "=>"] new]
 
-    if old and [not find (legal: select transitions old) new] [
+    all [old | not find (legal: select transitions old) new] then [
         fail ["Invalid write state transition, expected one of:" mold legal]
     ]
 
@@ -1058,7 +1058,7 @@ parse-messages: function [
     data: proto/messages
 
     if ctx/encrypted? [
-        if ctx/block-size and [ctx/version > 1.0] [
+        all [ctx/block-size | ctx/version > 1.0] then [
             ;
             ; Grab the server's initialization vector, which will be new for
             ; each message.
@@ -1688,7 +1688,7 @@ tls-read-data: function [
 
         data: skip data len
 
-        if (tail? data) and [issue? ctx/mode] [
+        all [tail? data | issue? ctx/mode] then [
             debug [
                 "READING FINISHED"
                 length of head of ctx/data-buffer
@@ -1975,7 +1975,7 @@ sys/make-scheme [
         reflect: func [port [port!] property [word!]] [
             switch property [
                 'open? [
-                    port/state and [open? port/state/connection]
+                    did all [port/state | open? port/state/connection]
                 ]
 
                 'length [

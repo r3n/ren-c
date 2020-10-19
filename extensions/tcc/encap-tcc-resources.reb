@@ -53,7 +53,7 @@ change-dir %../../  ; assume this is the TOP_DIR
 top-dir: what-dir
 comment [
     top-dir: try as file! try get-env "TOP_DIR"
-    exists? top-dir or [
+    if exists? top-dir [true] else [
         print ["TOP_DIR does not exist" top-dir]
         fail [
             "TOP_DIR should be set to where the git repository for Rebol was"
@@ -73,7 +73,7 @@ system-config: config-system args/OS_ID
 
 all [
     config-tccdir: try local-to-file try get-env "CONFIG_TCCDIR"
-    (exists? config-tccdir) or [
+    if exists? config-tccdir [true] else [
         print ["CONFIG_TCCDIR setting is invalid" config-tccdir]
         false
     ]
@@ -81,7 +81,7 @@ all [
     tcc-libtcc1-file: as file! try (
         get-env "TCC_LIBTCC1_FILE" else [config-tccdir/libtcc1.a]
     )
-    (exists? tcc-libtcc1-file) or [
+    if exists? tcc-libtcc1-file [true] else [
         print ["TCC_LIBTCC1_FILE setting is invalid" tcc-libtcc1-file]
         false
     ]

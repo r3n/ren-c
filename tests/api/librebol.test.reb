@@ -13,6 +13,9 @@
 ; If the tests were not built in, an informational string is returned.
 
 (
-   (result: test-librebol)
-   (text? result) or [did all match block! result]
+    result: test-librebol
+    did any [
+        text? result
+        all match block! result
+    ]
 )

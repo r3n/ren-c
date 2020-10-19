@@ -434,7 +434,10 @@ redescribe: func [
     ; If you kill all the notes then they will be cleaned up.  The meta
     ; object will be left behind, however.
     ;
-    if notes and [every [param note] notes [null? :note]] [
+    all [
+        notes
+        every [param note] notes [null? :note]
+    ] then [
         meta/parameter-notes: _
     ]
 
@@ -517,8 +520,8 @@ so: enfixed func [
         ]
     ]
     if tail? feed [return]
-    set 'feed take feed
-    if (block? :feed) and [semiquoted? 'feed] [
+    feed: take feed
+    all [block? :feed | semiquoted? 'feed] then [
         fail "Don't use literal block as SO right hand side, use ([...])"
     ]
     return :feed
@@ -1105,7 +1108,7 @@ fail: func [
         ; If no specific location specified, and error doesn't already have a
         ; location, make it appear to originate from the frame calling FAIL.
         ;
-        where: default [frame or [binding of 'return]]
+        where: default [any [frame | binding of 'return]]
 
         set-location-of-error error where  ; !!! why is this native?
     ]

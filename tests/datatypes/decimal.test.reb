@@ -136,7 +136,7 @@
 
 [#1753 (
     c: last mold/all 1e16
-    (#"0" <= c) and [#"9" >= c]
+    (#0 <= c) and (#9 >= c)
 )]
 
 ; alternative form

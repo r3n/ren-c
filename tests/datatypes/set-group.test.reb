@@ -15,14 +15,14 @@
     m: <before>
     word: 'm
     (word): 1020
-    (word = 'm) and [m = 1020]
+    (word = 'm) and (m = 1020)
 )
 
 (
     o: make object! [f: <before>]
     path: 'o/f
     (path): 304
-    (path = 'o/f) and [o/f = 304]
+    (path = 'o/f) and (o/f = 304)
 )
 
 ; Retriggering multi-returns is questionable

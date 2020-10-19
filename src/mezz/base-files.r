@@ -116,7 +116,7 @@ make-dir: func [
 
     if exists? path [return path]
 
-    if (not deep) or [url? path] [
+    any [not deep | url? path] then [
         create path
         return path
     ]

@@ -49,7 +49,7 @@ sys/make-scheme [
     ][
         waked: sport/data ; The wake list (pending awakes)
 
-        if only and [not block? ports] [
+        all [only | not block? ports] then [
             return blank ; short cut for a pause
         ]
 
@@ -66,7 +66,7 @@ sys/make-scheme [
             event: first event-list
             port: event/port
 
-            if (not only) or [find ports port] [
+            any [not only | find ports port] then [
                 remove event-list  ; avoid overflow from WAKE-UP calling WAIT
 
                 if wake-up port event [

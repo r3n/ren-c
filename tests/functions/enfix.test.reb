@@ -139,7 +139,7 @@
     o: make object! [x: 10]
     count: 0
     o/(count: count + 1 'x): me + 20
-    (o/x = 30) and [count = 1]  ; shouldn't double-evaluate path group
+    (o/x = 30) and (count = 1)  ; shouldn't double-evaluate path group
 )
 
 

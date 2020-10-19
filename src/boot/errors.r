@@ -161,6 +161,8 @@ Script: [
     needs-return-value: [:arg1 {can't return void! (see RETURN: <void>)}]
     bad-return-type:    [:arg1 {doesn't have RETURN: enabled for} :arg2]
 
+    unintended-literal: [{Likely unintended literal, use quote/group:} :arg1]
+
     no-refine:          [:arg1 {has no refinement called} :arg2]
     bad-refines:        {incompatible or invalid refinements}
     bad-refine:         [{incompatible or duplicate refinement:} :arg1]

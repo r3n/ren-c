@@ -75,7 +75,7 @@ inline static bool IS_CONDITIONAL_TRUE(const REBVAL *v) {
         return false;
     if (KIND3Q_BYTE(v) == REB_BLOCK)
         if (GET_CELL_FLAG(v, UNEVALUATED))
-            fail (Error_Block_Conditional_Raw(v));
+            fail (Error_Block_Conditional_Raw(v));  // !!! Unintended_Literal?
     return true;
 }
 

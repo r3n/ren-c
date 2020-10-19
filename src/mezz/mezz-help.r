@@ -254,7 +254,7 @@ help: function [
     ]
 
     ; Open the web page for it?
-    if doc and [match [action! datatype!] :value] [
+    all [doc | match [action! datatype!] :value] then [
         item: form :topic
         if action? get :topic [
             ;
@@ -349,7 +349,7 @@ help: function [
     ; Output exemplar calling string, e.g. LEFT + RIGHT or FOO A B C
     ; !!! Should refinement args be shown for enfixed case??
     ;
-    if enfixed and [not empty? args] [
+    all [enfixed | not empty? args] then [
         print [_ _ _ _ args/1 (uppercase mold topic) next args]
     ] else [
         print [_ _ _ _ (uppercase mold topic) args refinements]
@@ -563,7 +563,7 @@ require-commit: function [
     ; If there's a specific ID then assume that if the current build does not
     ; have that ID then there *could* be a problem.
     ;
-    if (id: select c 'id) and [id <> commit] [
+    all [id: select c 'id | id <> commit] then [
         print [
             "This script has only been tested again commit" id LF
 

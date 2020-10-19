@@ -90,7 +90,7 @@ do*: func [
         if original-script [system/script: original-script]
         if original-path [change-dir original-path]
 
-        if quit_FINALIZER and [only] [
+        if quit_FINALIZER and only [
             quit get/any 'value  ; "rethrow" the QUIT if DO/ONLY
         ]
 
@@ -124,8 +124,10 @@ do*: func [
     let is-module: 'module = select hdr 'type
 
     let result
-    if (text? source) and [not is-module] [
-        ;
+    all [
+        text? source
+        not is-module
+    ] then [
         ; Return result without "script overhead" (e.g. don't change the
         ; working directory to the base of the file path supplied)
         ;

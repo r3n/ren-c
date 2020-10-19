@@ -294,7 +294,7 @@ make-emitter: function [
         ]
     ]
 
-    if (is-c or [is-js]) [
+    any [is-c is-js] then [
         e/emit 'return {
             /**********************************************************************
             **

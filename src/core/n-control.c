@@ -1231,7 +1231,7 @@ REBNATIVE(switch)
 //      let gotten
 //      either all [
 //          value? gotten: get/hard target
-//          only or [not blank? :gotten]
+//          any [only | not blank? :gotten]
 //      ][
 //          :gotten  ; so that `x: y: default z` leads to `x = y`
 //      ][

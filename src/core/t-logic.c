@@ -87,30 +87,12 @@ REBNATIVE(nand_q)
 
 
 //
-//  did?: native [
-//
-//  "Clamps a value to LOGIC! (e.g. a synonym for NOT? NOT? or TO-LOGIC)"
-//
-//      return: [logic!]
-//          "Only LOGIC!'s FALSE and BLANK! for value return FALSE"
-//      value [any-value!]
-//  ]
-//
-REBNATIVE(did_q)
-{
-    INCLUDE_PARAMS_OF_DID_Q;
-
-    return Init_Logic(D_OUT, IS_TRUTHY(ARG(value)));
-}
-
-
-//
 //  did: native/body [
 //
-//  "Variant of TO-LOGIC which considers null values to also be false"
+//  "Synonym for TO-LOGIC"
 //
-//      return: [logic!]
-//          {true if value is NOT a LOGIC! false, BLANK!, or null}
+//      return: "true if value is NOT a LOGIC! false, BLANK!, or NULL"
+//          [logic!]
 //      optional [<opt> any-value!]
 //  ][
 //      not not :optional
@@ -125,30 +107,12 @@ REBNATIVE(_did_)  // see TO-C-NAME
 
 
 //
-//  not?: native [
+//  not: native [
 //
 //  "Returns the logic complement."
 //
-//      return: [logic!]
-//          "Only LOGIC!'s FALSE and BLANK! for value return TRUE"
-//      value [any-value!]
-//  ]
-//
-REBNATIVE(not_q)
-{
-    INCLUDE_PARAMS_OF_NOT_Q;
-
-    return Init_Logic(D_OUT, IS_FALSEY(ARG(value)));
-}
-
-
-//
-//  not: native [
-//
-//  "Returns the logic complement, considering voids to be false."
-//
-//      return: [logic!]
-//          "Only LOGIC!'s FALSE, BLANK!, and void for cell return TRUE"
+//      return: "Only LOGIC!'s FALSE, BLANK!, and NULL return TRUE"
+//          [logic!]
 //      optional [<opt> any-value!]
 //  ]
 //
@@ -161,58 +125,15 @@ REBNATIVE(_not_)  // see TO-C-NAME
 
 
 //
-//  or?: native [
-//
-//  {Returns true if either value is conditionally true (no "short-circuit")}
-//
-//      value1 [any-value!]
-//      value2 [any-value!]
-//  ]
-//
-REBNATIVE(or_q)
-{
-    INCLUDE_PARAMS_OF_OR_Q;
-
-    return Init_Logic(
-        D_OUT,
-        IS_TRUTHY(ARG(value1)) or IS_TRUTHY(ARG(value2))
-    );
-}
-
-
-//
-//  xor?: native [
-//
-//  {Returns true if only one of the two values is conditionally true.}
-//
-//      value1 [any-value!]
-//      value2 [any-value!]
-//  ]
-//
-REBNATIVE(xor_q)
-{
-    INCLUDE_PARAMS_OF_XOR_Q;
-
-    // Note: no boolean ^^ in C; check unequal
-    //
-    return Init_Logic(
-        D_OUT,
-        IS_TRUTHY(ARG(value1)) != IS_TRUTHY(ARG(value2))
-    );
-}
-
-
-//
 //  and: enfix native [
 //
-//  {Boolean AND, with short-circuit if right hand side is BLOCK!}
+//  {Boolean AND, defaults to non-short-circuit unless /SHORT is used}
 //
-//      return: "Conditionally true or false value (not coerced to LOGIC!)"
-//          [<opt> any-value!]
-//      left "Expression which will always be evaluated"
-//          [<opt> any-value!]
-//      'right "Evaluated as a branch only if LEFT is logically true"
-//          [block! action! quoted! sym-word! sym-path! sym-group! blank!]
+//      return: [logic!]
+//      left [<opt> any-value!]
+//      right "Value to be conditionally evaluated, or branch if /SHORT"
+//          [<opt> <modal> any-value!]  ; bootstrap can't load @word
+//      /short "Use short-circuit evaluation on right argument"
 //  ]
 //
 REBNATIVE(_and_)  // see TO-C-NAME
@@ -222,31 +143,38 @@ REBNATIVE(_and_)  // see TO-C-NAME
     REBVAL *left = ARG(left);
     REBVAL *right = ARG(right);
 
-    if (IS_BLOCK(left))
-        if (GET_CELL_FLAG(left, UNEVALUATED))
-            fail ("left side of AND should not be literal block or quote");
+    if (GET_CELL_FLAG(left, UNEVALUATED))
+        if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
+            fail (Error_Unintended_Literal_Raw(left));
+
+    if (GET_CELL_FLAG(right, UNEVALUATED))
+        if (IS_BLOCK(right) and not REF(short))
+            fail (Error_Unintended_Literal_Raw(right));
 
     if (IS_FALSEY(left))
-        RETURN (left);  // preserve falsey value
+        return Init_False(D_OUT);
+
+    if (not REF(short))
+        return Init_Logic(D_OUT, IS_TRUTHY(right));
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
         return R_THROWN;
 
-    return D_OUT;  // preserve the exact truthy or falsey value
+    return Init_Logic(D_OUT, IS_TRUTHY(D_OUT));
 }
 
 
 //  or: enfix native [
 //
-//  {Boolean OR, with short-circuit mode if right hand side is BLOCK!}
+//  {Boolean OR, defaults to non-short-circuit unless /SHORT is used}
 //
-//      return: "Conditionally true or false value (not coerced to LOGIC!)"
-//          [<opt> any-value!]
-//      left "Expression which will always be evaluated"
-//          [<opt> any-value!]
-//      'right "Evaluated as a branch only if LEFT is logically false"
-//          [block! group! quoted! sym-word! sym-path! sym-group! blank!]
+//      return: [logic!]
+//      left [<opt> any-value!]
+//      right "Value to be conditionally evaluated, or branch if /SHORT"
+//          [<opt> <modal> any-value!]  ; bootstrap can't load @word
+//      /short "Use short-circuit evaluation on right argument"
 //  ]
+//
 REBNATIVE(_or_)  // see TO-C-NAME
 {
     INCLUDE_PARAMS_OF__OR_;
@@ -254,17 +182,24 @@ REBNATIVE(_or_)  // see TO-C-NAME
     REBVAL *left = ARG(left);
     REBVAL *right = ARG(right);
 
-    if (IS_BLOCK(left) or IS_QUOTED(left))
-        if (GET_CELL_FLAG(left, UNEVALUATED))
-            fail ("left side of OR should not be literal block or quote");
+    if (GET_CELL_FLAG(left, UNEVALUATED))
+        if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
+            fail (Error_Unintended_Literal_Raw(left));
+
+    if (GET_CELL_FLAG(right, UNEVALUATED))
+        if (IS_BLOCK(right) and not REF(short))
+            fail (Error_Unintended_Literal_Raw(right));
 
     if (IS_TRUTHY(left))
-        RETURN (left);
+        return Init_True(D_OUT);
+
+    if (not REF(short))
+        return Init_Logic(D_OUT, IS_TRUTHY(right));
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
         return R_THROWN;
 
-    return D_OUT;  // preserve the exact truthy or falsey value
+    return Init_Logic(D_OUT, IS_TRUTHY(D_OUT));
 }
 
 
@@ -273,39 +208,37 @@ REBNATIVE(_or_)  // see TO-C-NAME
 //
 //  {Boolean XOR}
 //
-//      return: "Conditionally true value, or LOGIC! false for failure case"
-//          [<opt> any-value!]
-//      left "Expression which will always be evaluated"
-//          [<opt> any-value!]
-//      'right "Expression that's also always evaluated (can't short circuit)"
-//          [block! group! quoted! sym-word! sym-path! sym-group! blank!]
+//      return: [logic!]
+//      left [<opt> any-value!]
+//      right "Value to be conditionally evaluated, or branch if /SHORT"
+//          [<opt> <modal> any-value!]
+//      /short "Short circut (not possible, but errors to let you know that)"
 //  ]
 //
 REBNATIVE(_xor_)  // see TO-C-NAME
+//
+// The reason XOR has a /SHORT refinement even though you can't make a
+// short-circuiting XOR is so that `a xor @[...]` is interpreted as trying to
+// use a branch vs. having a plain true right-hand side.  This will catch
+// people trying to do a short-circuit XOR with an A-Ha of an error vs.
+// just having the unintended behavior of "not left".
 {
     INCLUDE_PARAMS_OF__XOR_;
 
     REBVAL *left = ARG(left);
+    REBVAL *right = ARG(right);
 
-    if (IS_BLOCK(left) and GET_CELL_FLAG(left, UNEVALUATED))
-        fail ("left hand side of XOR should not be literal block");
+    if (GET_CELL_FLAG(left, UNEVALUATED))
+        if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
+            fail (Error_Unintended_Literal_Raw(left));
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(right), left))
-        return R_THROWN;  // ^-- we *always* evaluate the right hand side
+    if (REF(short))
+        fail ("XOR cannot run in short circuit mode");
 
-    REBVAL *right = D_OUT;
+    if (IS_FALSEY(left))
+        return Init_Logic(D_OUT, IS_TRUTHY(right));
 
-    if (IS_FALSEY(left)) {
-        if (IS_FALSEY(right))
-            return Init_False(D_OUT);  // default to logic false if both false
-
-        return right;
-    }
-
-    if (IS_TRUTHY(right))
-        return Init_False(D_OUT);  // default to logic false if both true
-
-    RETURN (left);
+    return Init_Logic(D_OUT, IS_FALSEY(right));
 }
 
 

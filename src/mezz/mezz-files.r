@@ -20,7 +20,7 @@ clean-path: function [
     /dir "Add a trailing / if missing"
 ][
     file: case [
-        only or [not file? file] [
+        any [only | not file? file] [
             copy file
         ]
 
@@ -42,7 +42,7 @@ clean-path: function [
         append what-dir file
     ]
 
-    if dir and [not dir? file] [append file #"/"]
+    all [dir | not dir? file] then [append file #"/"]
 
     out: make type of file length of file ; same datatype
     count: 0 ; back dir counter
@@ -52,7 +52,7 @@ clean-path: function [
             "../" (count: me + 1)
             | "./"
             | "/" (
-                if (not file? file) or [#"/" <> last out] [
+                any [not file? file | #"/" <> last out] then [
                     append out #"/"
                 ]
             )
@@ -69,7 +69,7 @@ clean-path: function [
         end
     ]
 
-    if (#"/" = last out) and [#"/" <> last file] [
+    all [#/ = last out | #/ <> last file] then [
         remove back tail of out
     ]
 
@@ -294,8 +294,8 @@ list-dir: function [
 
     for-each file files [
         any [
-            f and [dir? file]
-            d and [not dir? file]
+            all [f | dir? file]
+            all [d | not dir? file]
         ] then [
             continue
         ]

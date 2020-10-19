@@ -4,9 +4,9 @@
     num: 0
     repeat i 10 [
         num: num + 1
-        success: success and [i = num]
+        success: success and (i = num)
     ]
-    success and [10 = num]
+    success and (10 = num)
 )
 ; cycle return value
 (false = repeat i 1 [false])

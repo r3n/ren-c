@@ -25,7 +25,7 @@ verify: function [
             continue
         ]
 
-        if (void? :result) or [not :result] [
+        any [void? :result | not :result] then [
             ;
             ; including bars in the failure report looks messy, skip them
             ;

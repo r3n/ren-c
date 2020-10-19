@@ -692,15 +692,18 @@ split: function [
         ; If the last thing in the series is a delimiter, there is an
         ; implied empty field after it, which we add here.
         ;
-        (switch type of dlm [
+        switch type of dlm [
             bitset! [did find dlm try last series]
             char! [dlm = last series]
             text! tag! word! [
-                (did find series dlm) and [empty? find-last/tail series dlm]
+                did all [
+                    find series dlm
+                    empty? find-last/tail series dlm
+                ]
             ]
             block! [false]
-        ]) and [
-            add-fill-val
+        ] then fill -> [
+            if fill [add-fill-val]
         ]
     ]
 

@@ -62,7 +62,7 @@
         elide (flag: true)
         true [fail "shouldn't get here"]
     ]
-    (not flag) and [result = 1020]
+    (not flag) and (result = 1020)
 )
 
 
@@ -92,7 +92,7 @@
         true [s1: true]
         true [s2: true]
     ]
-    s1 and @s2
+    s1 and s2
 )]
 
 ; nested calls

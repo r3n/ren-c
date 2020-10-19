@@ -409,8 +409,8 @@ clos: emulate [:func]
 closure!: emulate [:action!]
 closure?: emulate [:action?]
 
-true?: emulate [:did?]  ; better name https://trello.com/c/Cz0qs5d7
-false?: emulate [:not?]  ; better name https://trello.com/c/Cz0qs5d7
+true?: emulate [:did]  ; better name https://trello.com/c/Cz0qs5d7
+false?: emulate [:not]  ; better name https://trello.com/c/Cz0qs5d7
 
 comment: emulate [
     func [
@@ -610,7 +610,10 @@ default: emulate [
         'word [word! set-word! lit-word!]
         value
     ][
-        if (undefined? word) or [blank? get word] [
+        any [
+            undefined? word
+            blank? get word
+        ] then [
             set word :value
         ] else [
             :value
@@ -751,7 +754,7 @@ repend: emulate [
         ;
         applique 'append/part/dup [
             series: series
-            value: (block? :value) and [reduce :value] or [:value]
+            value: either block? :value [reduce :value] [:value]
             part: part
             only: only
             dup: dup

@@ -50,7 +50,7 @@ LF:        newline
 
 ; Function synonyms
 
-to-logic: :did?
+to-logic: :did
 to-value: :try
 min: :minimum
 max: :maximum

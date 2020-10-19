@@ -247,7 +247,7 @@ to-js-type: func [
         ; !!! These APIs can also return nulls.  rebSpell("second [{a}]") is
         ; now null, as a way of doing passthru on failures.
         ;
-        (s = "char *") or [s = "const char *"] ["'string'"]
+        (s = "char *") or (s = "const char *") ["'string'"]
 
         ; Other pointer types aren't strings.  `unsigned char *` is a byte
         ; array, and should perhaps use ArrayBuffer.  But for now, just assume
@@ -951,7 +951,7 @@ write/lines output-dir/asyncify-blacklist.json collect-lines [
 
 write output-dir/emterpreter.blacklist.json json-collect [
     map-each-api [
-        if is-variadic and [name != "rebPromise"] [
+        all [is-variadic | name != "rebPromise"] then [
             ;
             ; Currently, all variadic APIs are variadic because they evaluate.
             ; The exception is rebPromise, which takes its variadic list as

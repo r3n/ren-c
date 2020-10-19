@@ -449,7 +449,10 @@ ext-console-impl: function [
         ; care of that.
         ;
         assert [blank? :result]
-        if (unset? 'system/console) or [not system/console] [
+        any [
+            undefined? 'system/console
+            not system/console
+        ] then [
             emit [start-console/skin '(<*> skin)]
         ]
         return <prompt>

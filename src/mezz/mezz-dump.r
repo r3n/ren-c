@@ -106,7 +106,10 @@ contains-newline: function [return: [logic!] pos [block! group!]] [
     while [pos] [
         any [
             new-line? pos
-            (match [block! group!] :pos/1) and [contains-newline :pos/1]
+            all [
+                match [block! group!] :pos/1
+                contains-newline :pos/1
+            ]
         ] then [return true]
 
         pos: try next pos
@@ -120,7 +123,11 @@ dump-to-newline: adapt 'dump [
         ; Mutate VARARGS! into a BLOCK!, with passed-in value at the head
         ;
         value: reduce [:value]
-        while [not (new-line? extra) or [tail? extra] or ['| = extra/1]] [
+        while [any [
+            not new-line? extra
+            tail? extra
+            '| = extra/1
+        ]] [
             append/only value extra/1
             all [
                 match [block! group!] :extra/1
@@ -279,7 +286,10 @@ summarize-obj: function [
         [<opt> <end> any-value!]
     :args [any-value! <variadic>]
 ][
-    while [(not new-line? args) and [value: take args]] [
+    while [all [
+        not new-line? args
+        value: take args
+    ]] [
         all [
             any-array? :value
             contains-newline value

@@ -578,7 +578,7 @@ load-module: func [
 
             ; If no further processing is needed, shortcut return
 
-            if (not version) and [delay or [module? :mod]] [
+            all [not version | any [delay | module? :mod]] then [
                 return reduce [source (try match module! :mod)]
             ]
         ]
@@ -722,7 +722,7 @@ load-module: func [
         name: :hdr/name
     ]
 
-    if (not no-lib) and [not word? :name] [
+    if (not no-lib) and @[not word? :name] [
         ;
         ; Requires name for full import
         ; Unnamed module can't be imported to lib, so /NO-LIB here
@@ -795,12 +795,12 @@ load-module: func [
         mod: _   ; don't need/want the block reference now
     ]
 
-    if version and [ver > modver] [
+    all [version | ver > modver] then [
         cause-error 'syntax 'needs reduce [name ver]
     ]
 
     ; If no further processing is needed, shortcut return
-    if (not override?) and [mod or [delay]] [return reduce [name mod]]
+    if (not override?) and (mod or delay) [return reduce [name mod]]
 
     ; If /DELAY, save the intermediate form
     if delay [
@@ -844,7 +844,10 @@ load-module: func [
         ]
     ]
 
-    if (not no-lib) and [override?] [
+    all [
+        not no-lib
+        override?
+    ] then [
         if pos [
             pos/2: mod  ; replace delayed module
         ] else [
