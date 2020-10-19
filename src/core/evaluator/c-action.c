@@ -296,6 +296,61 @@ bool Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
 }
 
 
+// The code for modal parameter handling has to be used for both enfix and
+// normal parameters.  It's enough code to be worth factoring out vs. repeat.
+//
+static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
+    switch (VAL_TYPE(f->out)) {
+      case REB_SYM_WORD:
+      case REB_SYM_PATH:
+        Getify(f->out);  // don't run @append or @append/only
+        goto enable_modal;
+
+      case REB_SYM_GROUP:
+      case REB_SYM_BLOCK:
+        Plainify(f->out);  // run GROUP!, pass block as-is
+        goto enable_modal;
+
+      default:
+        goto skip_enable_modal;
+    }
+
+  enable_modal: {
+    //
+    // !!! We could (should?) pre-check the paramlists to
+    // make sure users don't try and make a modal argument
+    // not followed by a refinement.  That would cost
+    // extra, but avoid the test on every call.
+    //
+    const RELVAL *enable = f->param + 1;
+    if (
+        IS_END(enable)
+        or not TYPE_CHECK(enable, REB_TS_REFINEMENT)
+    ){
+        fail ("Refinement must follow modal parameter");
+    }
+    if (not Is_Typeset_Invisible(enable))
+        fail ("Modal refinement cannot take arguments");
+
+    // Signal refinement as being in use.
+    //
+    Init_Sym_Word(DS_PUSH(), VAL_PARAM_CANON(enable));
+  }
+
+  skip_enable_modal:
+    //
+    // Because the possibility of needing to see the uneval'd
+    // value existed, the parameter had to act quoted.  Eval.
+    //
+    if (Eval_Value_Throws(f->arg, f->out, SPECIFIED)) {
+        Move_Value(f->arg, f->out);
+        return true;
+    }
+
+    return false;
+}
+
+
 //
 //  Process_Action_Maybe_Stale_Throws: C
 //
@@ -656,54 +711,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 if (not GET_CELL_FLAG(f->out, UNEVALUATED))
                     goto enfix_normal_handling;
 
-                handle_modal_in_out:
-
-                switch (VAL_TYPE(f->out)) {
-                  case REB_SYM_WORD:
-                  case REB_SYM_PATH:
-                    Getify(f->out);  // don't run @append or @append/only
-                    goto enable_modal;
-
-                  case REB_SYM_GROUP:
-                  case REB_SYM_BLOCK:
-                    Plainify(f->out);  // run GROUP!, pass block as-is
-                    goto enable_modal;
-
-                  default:
-                    goto skip_enable_modal;
-                }
-
-              enable_modal: {
-                //
-                // !!! We could (should?) pre-check the paramlists to
-                // make sure users don't try and make a modal argument
-                // not followed by a refinement.  That would cost
-                // extra, but avoid the test on every call.
-                //
-                const RELVAL *enable = f->param + 1;
-                if (
-                    IS_END(enable)
-                    or not TYPE_CHECK(enable, REB_TS_REFINEMENT)
-                ){
-                    fail ("Refinement must follow modal parameter");
-                }
-                if (not Is_Typeset_Invisible(enable))
-                    fail ("Modal refinement cannot take arguments");
-
-                // Signal refinement as being in use.
-                //
-                Init_Sym_Word(DS_PUSH(), VAL_PARAM_CANON(enable));
-              }
-
-              skip_enable_modal:
-                //
-                // Because the possibility of needing to see the uneval'd
-                // value existed, the parameter had to act quoted.  Eval.
-                //
-                if (Eval_Value_Throws(f->arg, f->out, SPECIFIED)) {
-                    Move_Value(f->arg, f->out);
+                if (Handle_Modal_In_Out_Throws(f))
                     goto abort_action;
-                }
 
                 Finalize_Arg(f);
                 break; }
@@ -882,7 +891,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 goto normal_handling;  // acquire as a regular argument
 
             Literal_Next_In_Frame(f->out, f);  // f->value is read-only...
-            goto handle_modal_in_out; }  // ...in out so we can Unsymify()
+            if (Handle_Modal_In_Out_Throws(f))  // ...out so we can Unsymify()
+                goto abort_action;
+
+            Lookahead_To_Sync_Enfix_Defer_Flag(f->feed);
+            break; }
 
   //=//// SOFT QUOTED ARG-OR-REFINEMENT-ARG  //////////////////////////////=//
 
