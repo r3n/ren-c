@@ -419,7 +419,7 @@ REBNATIVE(else)  // see `tweak :else #defer on` in %base-defs.r
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), NULLED_CELL))
         return R_THROWN;
 
-    return D_OUT;  // don't voidify, allows chaining: `else [...] then [...]`
+    return Voidify_If_Nulled(D_OUT);
 }
 
 
@@ -446,7 +446,7 @@ REBNATIVE(then)  // see `tweak :then #defer on` in %base-defs.r
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(optional)))
         return R_THROWN;
 
-    return D_OUT;  // don't voidify, allows chaining: `then [...] then [...]`
+    return Voidify_If_Nulled(D_OUT);  // avoid mistakes w/`then [] else []`
 }
 
 
