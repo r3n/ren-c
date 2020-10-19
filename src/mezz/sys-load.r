@@ -254,12 +254,6 @@ load-header: function [
 ]
 
 
-; !!! This is an idiom that should be done with something like <unbound>
-;
-no-all: make object! [all: _]
-no-all/all: void
-protect 'no-all/all
-
 load: function [
     {Loads code or data from a file, URL, text string, or binary.}
 
@@ -269,12 +263,12 @@ load: function [
         [file! url! text! binary! block!]
     /header "Request the Rebol header object be returned as well"
         [<output> object!]
-    /all "Load all values (cannot be used with /HEADER)"
+    /all "Load all values (cannot be used with /HEADER)"  ; use all_LOAD
     /type "E.g. rebol, text, markup, jpeg... (by default, auto-detected)"
         [word!]
-    <in> no-all  ; !!! temporary fake of <unbind> option
 ][
-    self: binding of 'return  ; so you can say SELF/ALL
+    all_LOAD: :all
+    all: :lib/all
 
     ; Note that code or data can be embedded in other datatypes, including
     ; not just text, but any binary data, including images, etc. The type
@@ -289,19 +283,18 @@ load: function [
     ; Note that IMPORT has its own loader, and does not use LOAD directly.
     ; /TYPE with anything other than 'EXTENSION disables extension loading.
 
-    if header and [self/all] [
+    all [header | all_LOAD] then [
         fail "Cannot use /ALL and /HEADER refinements together"
     ]
 
     if block? source [
         ; A BLOCK! means multiple sources, calls LOAD recursively for each
 
-        a: self/all  ; !!! Some bad interaction requires this, review
         return map-each s source [
             applique 'load [
                 source: s
                 header: header
-                all: a
+                all: all_LOAD
                 type: :type
             ]
         ]
@@ -363,7 +356,7 @@ load: function [
 
     ; Try to load the header, handle error
 
-    if not self/all [
+    if not all_LOAD [
         hdr: line: _  ; for SET-WORD! gathering, evolving...
         either object? data [
             fail "Code has not been updated for LOAD-EXT-MODULE"
@@ -402,7 +395,7 @@ load: function [
     ; the process have some variability to it that makes it a poor default.
     ;
     none [
-        self/all
+        all_LOAD
         header  ; technically doesn't prevent returning single value (?)
         (length of data) <> 1
     ] then [
