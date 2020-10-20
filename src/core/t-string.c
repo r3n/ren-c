@@ -905,7 +905,7 @@ void Mold_Text_Series_At(REB_MOLD *mo, const REBSTR *s, REBLEN index) {
 //
 static void Mold_Url(REB_MOLD *mo, REBCEL(const*) v)
 {
-    Append_String(mo->series, v, VAL_LEN_AT(v));
+    Append_String(mo->series, v);
 }
 
 
@@ -933,7 +933,7 @@ static void Mold_File(REB_MOLD *mo, REBCEL(const*) v)
 static void Mold_Tag(REB_MOLD *mo, REBCEL(const*) v)
 {
     Append_Codepoint(mo->series, '<');
-    Append_String(mo->series, v, VAL_LEN_AT(v));
+    Append_String(mo->series, v);
     Append_Codepoint(mo->series, '>');
 }
 
@@ -961,7 +961,7 @@ void MF_String(REB_MOLD *mo, REBCEL(const*) v, bool form)
     // would form with no delimiters, e.g. `form #foo` is just foo
     //
     if (form and kind != REB_TAG) {
-        Append_String(buf, v, VAL_LEN_AT(v));
+        Append_String(buf, v);
         return;
     }
 

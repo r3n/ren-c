@@ -1561,7 +1561,7 @@ void MF_Error(REB_MOLD *mo, REBCEL(const*) v, bool form)
             // error, because otherwise it obscures the LOAD call where the
             // scanner was invoked.  Review.
             //
-            Append_String(mo->series, nearest, VAL_LEN_HEAD(nearest));
+            Append_String(mo->series, nearest);
         }
         else if (ANY_ARRAY(nearest) or ANY_PATH(nearest))
             Mold_Value_Limit(mo, nearest, 60);

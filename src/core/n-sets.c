@@ -225,7 +225,7 @@ REBSER *Make_Set_Operation_Series(
                 ){
                     DECLARE_LOCAL (temp);
                     Init_Any_String_At(temp, REB_TEXT, str, i);
-                    Append_String(mo->series, temp, skip);
+                    Append_String_Limit(mo->series, temp, skip);
                 }
             }
 

@@ -209,7 +209,7 @@ void MF_Issue(REB_MOLD *mo, REBCEL(const*) v, bool form)
         if (IS_CHAR(v) and VAL_CHAR(v) == 0)
             fail (Error_Illegal_Zero_Byte_Raw());  // don't form #, only mold
 
-        Append_String(mo->series, v, len);
+        Append_String_Limit(mo->series, v, len);
         return;
     }
 
@@ -248,7 +248,7 @@ void MF_Issue(REB_MOLD *mo, REBCEL(const*) v, bool form)
             Append_Codepoint(mo->series, '"');
         }
         else
-            Append_String(mo->series, v, len);
+            Append_String_Limit(mo->series, v, len);
     } else
         Mold_Text_Series_At(mo, VAL_STRING(v), 0);
 }

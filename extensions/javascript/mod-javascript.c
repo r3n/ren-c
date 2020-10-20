@@ -1061,7 +1061,7 @@ REBNATIVE(js_native)
     // reb.ArgR() must be used to access the arguments out of the frame.
     //
     Append_Ascii(mo->series, "function () {");
-    Append_String(mo->series, source, VAL_LEN_AT(source));
+    Append_String(mo->series, source);
     Append_Ascii(mo->series, "};\n");  // end `function() {`
 
     if (REF(awaiter))

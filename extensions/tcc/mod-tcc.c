@@ -542,10 +542,10 @@ REBNATIVE(compile_p)
                 // https://forum.rebol.info/t/817
                 //
                 Append_Ascii(mo->series, "const REBVAL *");
-                Append_String(mo->series, linkname, VAL_LEN_AT(linkname));
+                Append_String(mo->series, linkname);
                 Append_Ascii(mo->series, "(void *frame_)\n{");
 
-                Append_String(mo->series, source, VAL_LEN_AT(source));
+                Append_String(mo->series, source);
 
                 Append_Ascii(mo->series, "}\n\n");
             }
@@ -558,7 +558,7 @@ REBNATIVE(compile_p)
                 // macros or constants.  The string will appear at the point
                 // in the compile where it is given in the list.
                 //
-                Append_String(mo->series, item, VAL_LEN_AT(item));
+                Append_String(mo->series, item);
                 Append_Ascii(mo->series, "\n");
             }
             else {
