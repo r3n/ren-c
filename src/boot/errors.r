@@ -95,6 +95,8 @@ Script: [
     mixed-cr-lf-found:  {DELINE requires files to be CR LF or LF consistently}
     bad-utf8-bin-edit:  {String aliased as BINARY! can't become invalid UTF-8}
 
+    find-string-binary: {Can't search binary in string (must convert input)}
+
     phase-bad-arg-type:
         [:arg1 {internal phase disallows} :arg2 {for its} :arg3 {argument}]
     phase-no-arg:

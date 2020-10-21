@@ -395,7 +395,8 @@
     did parse #{F09F90B1} [cattext]
 )(
     catbin: #{F09F90B1}
-    did parse "🐱" [catbin]
+    e: trap [did parse "🐱" [catbin]]
+    'find-string-binary = e/id
 )(
     catchar: #"🐱"
     did parse "🐱" [catchar]

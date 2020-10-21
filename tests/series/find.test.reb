@@ -106,3 +106,13 @@
     (null = find #{FF0061626300FF} #{414243})
     (null = find/case #{FF0061626300FF} #{414243})  ; /case ignored
 ]
+
+[
+    (#{C386} = find/skip to binary! "Æ" "Æ" 1)
+    (#{C386} = find/skip tail to binary! "Æ" "Æ" -1)
+]
+
+[
+    (#{00} = find #{00} #{00})
+    (#{00} = find/case #{00} #{00})
+]

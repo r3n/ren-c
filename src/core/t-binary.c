@@ -64,108 +64,6 @@ REBINT CT_Binary(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 ***********************************************************************/
 
 
-//
-//  find_binary: C
-//
-REBLEN find_binary(
-    REBSIZ *size,  // match size (if TAG! pattern, not VAL_LEN_AT(pattern))
-    const REBSER *bin,
-    REBLEN index,
-    REBLEN end,
-    REBCEL(const*) pattern,
-    REBLEN flags,
-    REBINT skip
-) {
-    assert(end >= index);
-
-    REBLEN start;
-    if (skip < 0)
-        start = 0;
-    else
-        start = index;
-
-    enum Reb_Kind cell_kind = CELL_KIND(pattern);
-    if (ANY_UTF8_KIND(cell_kind)) {
-        if (skip != 1)
-            fail ("String search in BINARY! only supports /SKIP 1 for now.");
-
-        REBSTR *formed = nullptr;
-
-        REBCHR(const*) bp2;
-        REBLEN len2;
-        if (cell_kind == REB_TAG) {  // !!! <tag>...but FILE! etc?
-            formed = Copy_Form_Cell(pattern, 0);
-            len2 = STR_LEN(formed);
-            bp2 = STR_HEAD(formed);
-            *size = STR_SIZE(formed);
-        }
-        else
-            bp2 = VAL_UTF8_LEN_SIZE_AT(&len2, size, pattern);
-
-        if (*size > end - index)  // series not long enough for pattern
-            return NOT_FOUND;
-
-        REBLEN result = Find_Str_In_Bin(
-            bin,
-            start,
-            bp2,
-            len2,
-            *size,
-            flags & (AM_FIND_MATCH | AM_FIND_CASE)
-        );
-
-        if (formed)
-            Free_Unmanaged_Series(SER(formed));
-
-        return result;
-    }
-    else if (cell_kind == REB_BINARY) {
-        if (skip != 1)
-            fail ("Search for BINARY! in BINARY! only supports /SKIP 1 ATM");
-
-        *size = VAL_LEN_AT(pattern);
-        return Find_Bin_In_Bin(
-            bin,
-            start,
-            VAL_BIN_AT(pattern),
-            *size,
-            flags & AM_FIND_MATCH
-        );
-    }
-    else if (cell_kind == REB_INTEGER) {  // specific byte (exact)
-        if (VAL_INT64(pattern) < 0 or VAL_INT64(pattern) > 255)
-            fail (Error_Out_Of_Range(SPECIFIC(CELL_TO_VAL(pattern))));
-
-        *size = 1;
-
-        REBYTE byte = cast(REBYTE, VAL_INT64(pattern));
-
-        return Find_Bin_In_Bin(
-            bin,
-            start,
-            &byte,
-            *size,
-            flags & AM_FIND_MATCH
-        );
-    }
-    else if (cell_kind == REB_BITSET) {
-        *size = 1;
-
-        return Find_Bin_Bitset(
-            bin,
-            start,
-            index,
-            end,
-            skip,
-            VAL_BITSET(pattern),
-            flags & AM_FIND_MATCH  // no AM_FIND_CASE
-        );
-    }
-    else
-        fail ("Unsupported pattern type passed to find_binary()");
-}
-
-
 static REBSER *Make_Binary_BE64(const REBVAL *arg)
 {
     REBSER *ser = Make_Binary(8);
@@ -563,15 +461,15 @@ REBTYPE(Binary)
         if (REF(part))
             tail = Part_Tail_May_Modify_Index(v, ARG(part));
 
-        REBLEN skip;
+        REBINT skip;
         if (REF(skip))
-            skip = Part_Len_May_Modify_Index(v, ARG(part));
+            skip = VAL_INT32(ARG(skip));
         else
             skip = 1;
 
-        REBSIZ size;
-        REBLEN ret = find_binary(
-            &size, VAL_SERIES(v), index, tail, pattern, flags, skip
+        REBLEN size;
+        REBLEN ret = Find_Value_In_Binstr(  // returned length is byte index
+            &size, v, tail, pattern, flags, skip
         );
 
         if (ret >= cast(REBLEN, tail))

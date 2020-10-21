@@ -21,6 +21,28 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// The idea of "set operations" like UNIQUE, INTERSECT, UNION, DIFFERENCE, and
+// EXCLUDE were historically applicable not just to bitsets and typesets, but
+// also to ANY-SERIES!.  Additionally, series were treated as *ordered*
+// collections of their elements:
+//
+//     rebol2>> exclude "abcd" "bd"
+//     == "ac"
+//
+//     rebol2>> exclude "dcba" "bd"
+//     == "ca"
+//
+// Making things more complex was the introduction of a /SKIP parameter, which
+// had a somewhat dubious definition of treating the series as fixed-length
+// spans where the set operation was based on the first element of that span.
+//
+//     rebol2>> exclude/skip [a b c d] [c] 2
+//     == [a b]
+//
+// The operations are kept here mostly in their R3-Alpha form, though they
+// had to be adapted to deal with the difference between UTF-8 strings and
+// binaries.
+//
 
 #include "sys-core.h"
 
@@ -157,14 +179,13 @@ REBSER *Make_Set_Operation_Series(
                 break;
             first_pass = false;
 
-            // Iterate over second series?
-            //
-            if ((i = ((flags & SOP_FLAG_BOTH) != 0))) {
-                const REBVAL *temp = val1;
-                val1 = val2;
-                val2 = temp;
-            }
-        } while (i);
+            if ((flags & SOP_FLAG_BOTH) == 0)
+                break;  // don't need to iterate over second series
+
+            const REBVAL *temp = val1;
+            val1 = val2;
+            val2 = temp;
+        } while (true);
 
         if (hret)
             Free_Unmanaged_Series(hret);
@@ -189,22 +210,23 @@ REBSER *Make_Set_Operation_Series(
             //
             const REBSTR *str = VAL_STRING(val1);
 
+            DECLARE_LOCAL (iter);
+            Move_Value(iter, val1);
+
             // Iterate over first series
             //
-            i = VAL_INDEX(val1);
-            for (; i < STR_LEN(str); i += skip) {
-                DECLARE_LOCAL (ch);
-                Init_Char_Unchecked(ch, GET_CHAR_AT(str, i));
+            for (; VAL_INDEX(iter) < STR_LEN(str); VAL_INDEX(iter) += skip) {
+                REBLEN len_match;
 
                 if (flags & SOP_FLAG_CHECK) {
-                    h = (NOT_FOUND != Find_Str_In_Str(
-                        VAL_STRING(val2),
-                        VAL_INDEX(val2),
+                    h = (NOT_FOUND != Find_Binstr_In_Binstr(
+                        &len_match,
+                        val2,
                         VAL_LEN_HEAD(val2),
-                        skip,
-                        ch,
+                        iter,
                         1,  // single codepoint length
-                        cased ? AM_FIND_CASE : 0
+                        cased ? AM_FIND_CASE : 0,
+                        skip
                     ));
 
                     if (flags & SOP_FLAG_INVERT) h = !h;
@@ -212,20 +234,23 @@ REBSER *Make_Set_Operation_Series(
 
                 if (!h) continue;
 
+                DECLARE_LOCAL (mo_value);
+                RESET_CELL(mo_value, REB_TEXT, CELL_FLAG_FIRST_IS_NODE);
+                VAL_NODE(mo_value) = NOD(mo->series);
+                VAL_INDEX(mo_value) = mo->index;
+
                 if (
-                    NOT_FOUND == Find_Str_In_Str(
-                        mo->series, // ser
-                        mo->index, // index - !!! was mo->start
-                        STR_LEN(mo->series), // tail
-                        skip, // skip
-                        ch,
+                    NOT_FOUND == Find_Binstr_In_Binstr(
+                        &len_match,
+                        mo_value,
+                        STR_LEN(mo->series),  // tail
+                        iter,
                         1,  // single codepoint length
-                        cased ? AM_FIND_CASE : 0 // flags
+                        cased ? AM_FIND_CASE : 0,  // flags
+                        skip  // skip
                     )
                 ){
-                    DECLARE_LOCAL (temp);
-                    Init_Any_String_At(temp, REB_TEXT, str, i);
-                    Append_String_Limit(mo->series, temp, skip);
+                    Append_String_Limit(mo->series, iter, skip);
                 }
             }
 
@@ -233,14 +258,13 @@ REBSER *Make_Set_Operation_Series(
                 break;
             first_pass = false;
 
-            // Iterate over second series?
-            //
-            if ((i = ((flags & SOP_FLAG_BOTH) != 0))) {
-                const REBVAL *temp = val1;
-                val1 = val2;
-                val2 = temp;
-            }
-        } while (i);
+            if ((flags & SOP_FLAG_BOTH) == 0)
+                break;  // don't need to iterate over second series
+
+            const REBVAL *temp = val1;
+            val1 = val2;
+            val2 = temp;
+        } while (true);
 
         out_ser = SER(Pop_Molded_String(mo));
     }
@@ -256,22 +280,24 @@ REBSER *Make_Set_Operation_Series(
             // Note: val1 and val2 swapped 2nd pass!
             //
             const REBBIN *bin = VAL_BINARY(val1);
-            REBYTE b;
-
-            assert(skip == 1);  // !!! only skip of 1 was supported
 
             // Iterate over first series
             //
-            i = VAL_INDEX(val1);
-            for (; i < BIN_LEN(bin); i += skip) {
-                b = *BIN_AT(bin, i);
+            DECLARE_LOCAL (iter);
+            Move_Value(iter, val1);
+
+            for (; VAL_INDEX(iter) < BIN_LEN(bin); VAL_INDEX(iter) += skip) {
+                REBLEN len_match;
+
                 if (flags & SOP_FLAG_CHECK) {
-                    h = (NOT_FOUND != Find_Bin_In_Bin(
-                        VAL_SERIES(val2),
-                        VAL_INDEX(val2),
-                        &b,
-                        1,
-                        cased ? AM_FIND_CASE : 0
+                    h = (NOT_FOUND != Find_Binstr_In_Binstr(
+                        &len_match,
+                        val2,  // searched
+                        VAL_LEN_HEAD(val2),  // limit (highest index)
+                        iter,  // pattern
+                        1,  // "part", e.g. matches only 1 byte
+                        cased ? AM_FIND_CASE : 0,
+                        skip
                     ));
 
                     if (flags & SOP_FLAG_INVERT) h = !h;
@@ -279,18 +305,27 @@ REBSER *Make_Set_Operation_Series(
 
                 if (!h) continue;
 
+                DECLARE_LOCAL (buf_value);
+                RESET_CELL(buf_value, REB_BINARY, CELL_FLAG_FIRST_IS_NODE);
+                VAL_NODE(buf_value) = NOD(buf);
+                VAL_INDEX(buf_value) = buf_start_len;
+
                 if (
-                    NOT_FOUND == Find_Bin_In_Bin(
-                        buf,
-                        buf_start_len,
-                        &b,
-                        1,
-                        cased ? AM_FIND_CASE : 0 // flags
+                    NOT_FOUND == Find_Binstr_In_Binstr(
+                        &len_match,
+                        buf_value,  // searched
+                        VAL_LEN_HEAD(buf_value),  // limit (highest index)
+                        iter,  // pattern
+                        1,  // "part", e.g. matches only 1 byte
+                        cased ? AM_FIND_CASE : 0,  // flags
+                        skip
                     )
                 ){
-                    EXPAND_SERIES_TAIL(buf, 1);
-                    *BIN_AT(buf, buf_at) = b;
-                    ++buf_at;
+                    EXPAND_SERIES_TAIL(buf, skip);
+                    REBLEN len_at = VAL_LEN_AT(iter);
+                    REBLEN min = MIN(len_at, skip);
+                    memcpy(BIN_AT(buf, buf_at), VAL_BIN_AT(iter), min);
+                    buf_at += min;
                 }
             }
 
@@ -298,14 +333,13 @@ REBSER *Make_Set_Operation_Series(
                 break;
             first_pass = false;
 
-            // Iterate over second series?
-            //
-            if ((i = ((flags & SOP_FLAG_BOTH) != 0))) {
-                const REBVAL *temp = val1;
-                val1 = val2;
-                val2 = temp;
-            }
-        } while (i);
+            if ((flags & SOP_FLAG_BOTH) == 0)
+                break;  // don't need to iterate over the second series
+
+            const REBVAL *temp = val1;
+            val1 = val2;
+            val2 = temp;
+        } while (true);
 
         REBLEN out_len = buf_at - buf_start_len;
         out_ser = Make_Binary(out_len);

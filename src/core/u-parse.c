@@ -623,13 +623,14 @@ static REB_R Parse_One_Rule(
             or (rule_cell_kind == REB_INTEGER and VAL_NUM_QUOTES(rule) == 1)
         ){
             REBLEN len;
-            REBLEN index = Find_In_Any_Series(
+            REBLEN index = Find_Value_In_Binstr(
                 &len,
                 P_INPUT_VALUE,
-                P_POS,
+                VAL_LEN_HEAD(P_INPUT_VALUE),
                 rule_cell,
                 P_FIND_FLAGS | AM_FIND_MATCH
-                    | (IS_ISSUE(rule) ? AM_FIND_CASE : 0)
+                    | (IS_ISSUE(rule) ? AM_FIND_CASE : 0),
+                1  // skip
             );
             if (index == NOT_FOUND)
                 return R_UNHANDLED;
@@ -739,8 +740,9 @@ static REBIXO To_Thru_Block_Rule(
     // block rule might be something like `to [{a} | end]`.  e.g. being
     // positioned on the end cell or null terminator of a string may match.
     //
-    REBLEN pos = P_POS;
-    for (; pos <= P_INPUT_LEN; ++pos) {  // see note
+    DECLARE_LOCAL (iter);
+    Move_Value(iter, P_INPUT_VALUE);  // need to slide pos
+    for (; VAL_INDEX(iter) <= P_INPUT_LEN; ++VAL_INDEX(iter)) {  // see note
         const RELVAL *blk = ARR_HEAD(VAL_ARRAY(rule_block));
         for (; NOT_END(blk); blk++) {
             if (IS_BAR(blk))
@@ -764,7 +766,7 @@ static REBIXO To_Thru_Block_Rule(
 
                 if (cmd != SYM_0) {
                     if (cmd == SYM_END) {
-                        if (pos >= P_INPUT_LEN)
+                        if (VAL_INDEX(iter) >= P_INPUT_LEN)
                             return P_INPUT_LEN;
                         goto next_alternate_rule;
                     }
@@ -792,7 +794,7 @@ static REBIXO To_Thru_Block_Rule(
                 if (ANY_ARRAY(rule))
                     fail (Error_Parse_Rule());
 
-                REB_R r = Parse_One_Rule(f, pos, rule);
+                REB_R r = Parse_One_Rule(f, VAL_INDEX(iter), rule);
                 if (r == R_THROWN)
                     return THROWN_FLAG;
 
@@ -802,17 +804,17 @@ static REBIXO To_Thru_Block_Rule(
                 }
                 else {  // P_OUT is pos we matched past, so back up if only TO
                     assert(r == P_OUT);
-                    pos = VAL_INT32(P_OUT);
+                    VAL_INDEX(iter) = VAL_INT32(P_OUT);
                     SET_END(P_OUT);
                     if (is_thru)
-                        return pos;  // don't back up
-                    return pos - 1;  // back up
+                        return VAL_INDEX(iter);  // don't back up
+                    return VAL_INDEX(iter) - 1;  // back up
                 }
             }
             else if (P_TYPE == REB_BINARY) {
-                REBYTE ch1 = *BIN_AT(P_INPUT, pos);
+                REBYTE ch1 = *VAL_BIN_AT(iter);
 
-                if (pos == P_INPUT_LEN) {
+                if (VAL_INDEX(iter) == P_INPUT_LEN) {
                     //
                     // If we weren't matching END, then the only other thing
                     // we'll match at the BINARY! end is an empty BINARY!.
@@ -821,7 +823,7 @@ static REBIXO To_Thru_Block_Rule(
                     //
                     assert(ch1 == '\0');  // internal BINARY! terminator
                     if (IS_BINARY(rule) and VAL_LEN_AT(rule) == 0)
-                        return pos;
+                        return VAL_INDEX(iter);
                 }
                 else if (IS_CHAR(rule)) {
                     if (VAL_CHAR(rule) > 0xff)
@@ -829,20 +831,20 @@ static REBIXO To_Thru_Block_Rule(
 
                     if (ch1 == VAL_CHAR(rule)) {
                         if (is_thru)
-                            return pos + 1;
-                        return pos;
+                            return VAL_INDEX(iter) + 1;
+                        return VAL_INDEX(iter);
                     }
                 }
                 else if (IS_BINARY(rule)) {
                     REBLEN len = VAL_LEN_AT(rule);
                     if (0 == memcmp(
-                        BIN_AT(P_INPUT, pos),
+                        VAL_BIN_AT(iter),
                         VAL_BIN_AT(rule),
                         len
                     )) {
                         if (is_thru)
-                            return pos + 1;
-                        return pos;
+                            return VAL_INDEX(iter) + 1;
+                        return VAL_INDEX(iter);
                     }
                 }
                 else if (IS_INTEGER(rule)) {
@@ -851,8 +853,8 @@ static REBIXO To_Thru_Block_Rule(
 
                     if (ch1 == VAL_INT32(rule)) {
                         if (is_thru)
-                            return pos + 1;
-                        return pos;
+                            return VAL_INDEX(iter) + 1;
+                        return VAL_INDEX(iter);
                     }
                 }
                 else
@@ -861,12 +863,12 @@ static REBIXO To_Thru_Block_Rule(
             else {
                 assert(ANY_STRING_KIND(P_TYPE));
 
-                REBUNI ch_unadjusted = GET_CHAR_AT(STR(P_INPUT), pos);
+                REBUNI ch_unadjusted = GET_CHAR_AT(STR(P_INPUT), VAL_INDEX(iter));
                 if (ch_unadjusted == '\0') { // cannot be passed to UP_CASE()
-                    assert(pos == P_INPUT_LEN);
+                    assert(VAL_INDEX(iter) == P_INPUT_LEN);
 
                     if (IS_TEXT(rule) and VAL_LEN_AT(rule) == 0)
-                        return pos;  // empty string can match at end
+                        return VAL_INDEX(iter);  // empty string can match end
 
                     goto next_alternate_rule;  // other match is END (above)
                 }
@@ -886,25 +888,26 @@ static REBIXO To_Thru_Block_Rule(
                         ch2 = UP_CASE(ch2);
                     if (ch == ch2) {
                         if (is_thru)
-                            return pos + 1;
-                        return pos;
+                            return VAL_INDEX(iter) + 1;
+                        return VAL_INDEX(iter);
                     }
                 }
                 else if (IS_BITSET(rule)) {
                     if (Check_Bit(VAL_BITSET(rule), ch, not P_HAS_CASE)) {
                         if (is_thru)
-                            return pos + 1;
-                        return pos;
+                            return VAL_INDEX(iter) + 1;
+                        return VAL_INDEX(iter);
                     }
                 }
                 else if (ANY_STRING(rule)) {
                     REBLEN len = VAL_LEN_AT(rule);
-                    REBLEN i = Find_In_Any_Series(
+                    REBLEN i = Find_Value_In_Binstr(
                         &len,
-                        P_INPUT_VALUE,
-                        pos,
+                        iter,
+                        VAL_LEN_HEAD(iter),
                         rule,
-                        AM_FIND_MATCH | P_FIND_FLAGS
+                        AM_FIND_MATCH | P_FIND_FLAGS,
+                        1  // skip
                     );
 
                     if (i != NOT_FOUND) {
@@ -916,8 +919,8 @@ static REBIXO To_Thru_Block_Rule(
                 else if (IS_INTEGER(rule)) {
                     if (ch_unadjusted == cast(REBUNI, VAL_INT32(rule))) {
                         if (is_thru)
-                            return pos + 1;
-                        return pos;
+                            return VAL_INDEX(iter) + 1;
+                        return VAL_INDEX(iter);
                     }
                 }
                 else
@@ -1003,12 +1006,13 @@ static REBIXO To_Thru_Non_Block_Rule(
     //=//// PARSE INPUT IS A STRING OR BINARY, USE A FIND ROUTINE /////////=//
 
     REBLEN len;  // e.g. if a TAG!, match length includes < and >
-    REBLEN i = Find_In_Any_Series(
+    REBLEN i = Find_Value_In_Binstr(
         &len,
         P_INPUT_VALUE,
-        P_POS,
+        VAL_LEN_HEAD(P_INPUT_VALUE),
         rule,
-        P_FIND_FLAGS
+        P_FIND_FLAGS,
+        1  // skip
     );
 
     if (i == NOT_FOUND)
