@@ -523,9 +523,14 @@ REBLEN Modify_String_Or_Binary(
         src_len_total = src_len_raw * dups;
     }
 
+  //=//// BELOW THIS LINE, BE CAREFUL WITH BOOKMARK-USING ROUTINES //////=//
+
+    // We extract the destination's bookmarks for updating.  This may conflict
+    // with other updating functions.  Be careful not to use any of the
+    // functions like VAL_UTF8_SIZE_AT() etc. that leverage bookmarks after
+    // the extraction occurs.
+
     REBBMK *bookmark = nullptr;
-    if (IS_SER_STRING(dst_ser))
-        bookmark = LINK(dst_ser).bookmarks;
 
     // For strings, we should have generated a bookmark in the process of this
     // modification in most cases where the size is notable.  If we had not,
@@ -537,6 +542,8 @@ REBLEN Modify_String_Or_Binary(
         SET_SERIES_USED(dst_ser, dst_used + src_size_total);
 
         if (IS_SER_STRING(dst_ser)) {
+            bookmark = LINK(dst_ser).bookmarks;
+
             if (bookmark and BMK_INDEX(bookmark) > dst_idx) {  // only INSERT
                 BMK_INDEX(bookmark) += src_len_total;
                 BMK_OFFSET(bookmark) += src_size_total;
@@ -561,6 +568,10 @@ REBLEN Modify_String_Or_Binary(
             }
             else
                 dst_size_at = VAL_SIZE_LIMIT_AT(&dst_len_at, dst, UNLIMITED);
+
+            // Note: above functions may update the bookmarks --^
+            //
+            bookmark = LINK(dst_ser).bookmarks;
         }
         else {
             dst_len_at = VAL_LEN_AT(dst);
@@ -660,6 +671,8 @@ REBLEN Modify_String_Or_Binary(
         // good a cache as any to be relevant for the next operation.
         //
         if (IS_SER_STRING(dst_ser)) {
+            bookmark = LINK(dst_ser).bookmarks;
+
             if (bookmark and BMK_INDEX(bookmark) > dst_idx) {
                 BMK_INDEX(bookmark) = dst_idx;
                 BMK_OFFSET(bookmark) = dst_off;
