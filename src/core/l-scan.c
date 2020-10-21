@@ -2533,7 +2533,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         ){
             REBARR *a = ARR(VAL_NODE(DS_TOP));
             MISC(a).line = ss->line;
-            LINK_FILE_NODE(a) = NOD(ss->file);
+            LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss->file));
             SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
             SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
@@ -2773,7 +2773,7 @@ static REBARR *Scan_Child_Array(SCAN_LEVEL *parent, REBYTE mode)
     // Tag array with line where the beginning bracket/group/etc. was found
     //
     MISC(a).line = ss->line;
-    LINK_FILE_NODE(a) = NOD(ss->file);
+    LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss->file));
     SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
     SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
@@ -2804,7 +2804,7 @@ REBARR *Scan_UTF8_Managed(const REBSTR *file, const REBYTE *utf8, REBSIZ size)
     );
 
     MISC(a).line = ss.line;
-    LINK_FILE_NODE(a) = NOD(ss.file);
+    LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss.file));
     SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
     SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
@@ -2976,7 +2976,7 @@ REBNATIVE(transcode)
                 | (level.newline_pending ? ARRAY_FLAG_NEWLINE_AT_TAIL : 0)
         );
         MISC(a).line = ss.line;
-        LINK_FILE_NODE(a) = NOD(ss.file);
+        LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss.file));
         SER(a)->header.bits |= ARRAY_MASK_HAS_FILE_LINE;
 
         Init_Block(D_OUT, a);
@@ -3114,7 +3114,10 @@ const REBYTE *Scan_Issue(RELVAL *out, const REBYTE *cp, REBSIZ size)
         --n;
     }
 
-    Init_Issue_Utf8(out, cp, size, len);
+    // !!! Review UTF-8 Safety, needs to use mold buffer the way TEXT! does
+    // to scan the data.
+    //
+    Init_Issue_Utf8(out, cast(REBCHR(const*), cp), size, len);
 
     return bp;
 }

@@ -419,7 +419,7 @@ inline static void INIT_ACTION_LABEL(RELVAL *v, const REBSTR *label)
     //
     ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);
     assert(label != nullptr);  // avoid needing to worry about null case
-    VAL_ACTION_DETAILS_OR_LABEL_NODE(v) = NOD(label);
+    VAL_ACTION_DETAILS_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, label));
 }
 
 

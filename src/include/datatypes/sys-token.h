@@ -270,7 +270,9 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
         }
         else {
             len = 0;
-            REBCHR(const*) at = PAYLOAD(Bytes, v).at_least_8;
+            REBCHR(const*) at = cast(REBCHR(const*),
+                PAYLOAD(Bytes, v).at_least_8
+            );
             for (; limit != 0; --limit, ++len)
                 at = NEXT_STR(at);
             size = at - PAYLOAD(Bytes, v).at_least_8;
@@ -280,7 +282,7 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
             *length_out = len;
         if (size_out)
             *size_out = size;
-        return PAYLOAD(Bytes, v).at_least_8;
+        return cast(REBCHR(const*), PAYLOAD(Bytes, v).at_least_8);
     }
 
     REBCHR(const*) utf8;
@@ -296,7 +298,7 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
           #if !defined(NDEBUG)
             REBLEN n;
             for (n = 0; n < utf8_size; ++n)
-                assert(utf8[n] != '\0');
+                assert(cast(const REBYTE*, utf8)[n] != '\0');
           #endif
 
             if (size_out)

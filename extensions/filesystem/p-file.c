@@ -220,7 +220,9 @@ static void Write_File_Port(
             limit
         );
 
-        req->common.data = m_cast(REBYTE*, utf8);  // writing only
+        req->common.data = m_cast(REBYTE*,  // writing only
+            cast(const REBYTE*, utf8)
+        );
         req->length = size;
         req->modes |= RFM_TEXT; // do LF => CR LF, e.g. on Windows
     }

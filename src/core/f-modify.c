@@ -607,9 +607,11 @@ REBLEN Modify_String_Or_Binary(
                 }
                 else {  // count how many codepoints are in the `part`
                     part_size = part;
-                    REBCHR(*) cp = BIN_AT(dst_ser, dst_off);
-                    REBCHR(*) pp = BIN_AT(dst_ser, dst_off + part_size);
-                    if (Is_Continuation_Byte_If_Utf8(*pp))
+                    REBCHR(*) cp = cast(REBCHR(*), BIN_AT(dst_ser, dst_off));
+                    REBCHR(*) pp = cast(REBCHR(*),
+                        BIN_AT(dst_ser, dst_off + part_size)
+                    );
+                    if (Is_Continuation_Byte_If_Utf8(*cast(REBYTE*, pp)))
                         fail (Error_Bad_Utf8_Bin_Edit_Raw());
 
                     part = 0;
@@ -623,7 +625,7 @@ REBLEN Modify_String_Or_Binary(
                     part_size = dst_size_at;
                 }
                 else {
-                    REBLEN check;
+                    REBLEN check;  // v-- !!! This call uses bookmark, review
                     part_size = VAL_SIZE_LIMIT_AT(&check, dst, part);
                     assert(check == part);
                     UNUSED(check);

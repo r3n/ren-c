@@ -380,7 +380,7 @@ inline static REBVAL *Init_Param(
     RESET_CELL(out, REB_TYPESET, CELL_FLAG_FIRST_IS_NODE);
     mutable_KIND3Q_BYTE(out) = pclass;
 
-    VAL_TYPESET_STRING_NODE(out) = NOD(spelling);
+    VAL_TYPESET_STRING_NODE(out) = NOD(m_cast(REBSTR*, spelling));
     VAL_TYPESET_LOW_BITS(out) = bits & cast(uint32_t, 0xFFFFFFFF);
     VAL_TYPESET_HIGH_BITS(out) = bits >> 32;
     assert(IS_PARAM(out));

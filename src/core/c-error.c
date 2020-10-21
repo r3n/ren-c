@@ -1489,7 +1489,9 @@ static void Mold_Value_Limit(REB_MOLD *mo, RELVAL *v, REBLEN limit)
     REBLEN end_len = STR_LEN(str);
 
     if (end_len - start_len > limit) {
-        REBCHR(*) at = STR_HEAD(str) + start_size;
+        REBCHR(const*) at = cast(REBCHR(const*),
+            cast(const REBYTE*, STR_HEAD(str)) + start_size
+        );
         REBLEN n = 0;
         for (; n < limit; ++n)
             at = NEXT_STR(at);

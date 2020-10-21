@@ -53,6 +53,7 @@
         constexpr bool derived =
             std::is_same<T0, REBNOD>::value
             or std::is_same<T0, REBVAL>::value
+            or std::is_same<T0, RELVAL>::value
             or std::is_same<T0, REBSER>::value
             or std::is_same<T0, REBSTR>::value
             or std::is_same<T0, REBARR>::value

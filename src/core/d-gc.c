@@ -258,10 +258,9 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
                 assert(VAL_BINDING(v) == FRM_BINDING(f));
         }
 
-        REBACT *phase = ACT(PAYLOAD(Any, v).second.node);
-        if (phase) {
+        if (PAYLOAD(Any, v).second.node) {
             assert(heart == REB_FRAME); // may be heap-based frame
-            assert(Is_Marked(phase));
+            assert(Is_Marked(PAYLOAD(Any, v).second.node));  // phase or label
         }
         else
             assert(heart != REB_FRAME); // phase if-and-only-if frame
@@ -453,7 +452,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
       case REB_ISSUE: {
         if (heart == REB_TEXT) {
-            REBSER *s = SER(VAL_STRING(v));
+            const REBSER *s = SER(VAL_STRING(v));
             assert(Is_Series_Frozen(s));
 
             // We do not want ISSUE!s to use series if the payload fits in

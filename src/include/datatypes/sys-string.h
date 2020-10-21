@@ -82,9 +82,6 @@
 // The code that runs behind the scenes is typical UTF-8 forward and backward
 // scanning code, minus any need for error handling.
 //
-// !!! Error handling is still included due to running common routines, but
-// should be factored out for efficiency.
-//
 #if !defined(CPLUSPLUS_11) or !defined(DEBUG_UTF8_EVERYWHERE)
     //
     // Plain C build uses trivial expansion of REBCHR(*) and REBCHR(const*)
@@ -199,7 +196,7 @@
         RebchrPtr (nullptr_t n) : bp (n) {}
         explicit RebchrPtr (const REBYTE *bp) : bp (bp) {}
         explicit RebchrPtr (const char *cstr)
-            : bp (cast(const REBYTE*, cstr)) {}
+            : bp (reinterpret_cast<const REBYTE*>(cstr)) {}
 
         RebchrPtr next(REBUNI *out) {
             const REBYTE *t = bp;
@@ -292,7 +289,8 @@
         operator bool() { return bp != nullptr; }  // implicit
         operator const void*() { return bp; }  // implicit
         operator const REBYTE*() { return bp; }  // implicit
-        operator const char*() { return cast(const char*, bp); }  // implicit
+        operator const char*()
+          { return reinterpret_cast<const char*>(bp); }  // implicit
     };
 
     template<>
@@ -302,10 +300,10 @@
         explicit RebchrPtr (REBYTE *bp)
             : RebchrPtr<const REBYTE*> (bp) {}
         explicit RebchrPtr (char *cstr)
-            : RebchrPtr<const REBYTE*> (cast(REBYTE*, cstr)) {}
+            : RebchrPtr<const REBYTE*> (reinterpret_cast<REBYTE*>(cstr)) {}
 
         static REBCHR(*) nonconst(REBCHR(const*) cp)
-          { return RebchrPtr {m_cast(REBYTE*, cp.bp)}; }
+          { return RebchrPtr {const_cast<REBYTE*>(cp.bp)}; }
 
         RebchrPtr back(REBUNI *out)
           { return nonconst(REBCHR(const*)::back(out)); }
@@ -324,13 +322,14 @@
 
         RebchrPtr write(REBUNI c) {
             REBSIZ size = Encoded_Size_For_Codepoint(c);
-            Encode_UTF8_Char(m_cast(REBYTE*, bp), c, size);
-            return RebchrPtr {m_cast(REBYTE*, bp) + size};
+            Encode_UTF8_Char(const_cast<REBYTE*>(bp), c, size);
+            return RebchrPtr {const_cast<REBYTE*>(bp) + size};
         }
 
-        operator void*() { return m_cast(REBYTE*, bp); }  // implicit
-        operator REBYTE*() { return m_cast(REBYTE*, bp); }  // implicit
-        explicit operator char*() { return m_cast(char*, bp); }
+        operator void*() { return const_cast<REBYTE*>(bp); }  // implicit
+        operator REBYTE*() { return const_cast<REBYTE*>(bp); }  // implicit
+        explicit operator char*()
+            { return const_cast<char*>(reinterpret_cast<const char*>(bp)); }
     };
 
     #define NEXT_CHR(out, cp)               (cp).next(out)
@@ -340,6 +339,20 @@
     #define CHR_CODE(cp)                    (cp).code()
     #define SKIP_CHR(out,cp,delta)          (cp).skip((out), (delta))
     #define WRITE_CHR(cp, c)                (cp).write(c)
+
+  #if defined(DEBUG_CHECK_CASTS)
+    //
+    // const_cast<> and reinterpret_cast<> don't work with user-defined
+    // conversion operators.  But since this codebase uses m_cast, we can
+    // cheat when the class is being used with the helpers.
+    //
+    template <>
+    inline REBCHR(*) m_cast_helper(REBCHR(const*) v)
+      { return RebchrPtr<REBYTE*> {const_cast<REBYTE*>(v.bp)}; }
+  #else
+    #error "DEBUG_UTF8_EVERYWHERE currently requires DEBUG_CHECK_CASTS"
+  #endif
+
 #endif
 
 
@@ -414,10 +427,10 @@ inline static size_t STR_SIZE(const REBSTR *s)  // e.g. encoded UTF-8 size
 
 
 inline static REBCHR(*) STR_HEAD(const_if_c REBSTR *s)
-  { return SER_HEAD(REBYTE, SER(s)); }
+  { return cast(REBCHR(*), SER_HEAD(REBYTE, SER(s))); }
 
 inline static REBCHR(*) STR_TAIL(const_if_c REBSTR *s)
-  { return SER_TAIL(REBYTE, SER(s)); }
+  { return cast(REBCHR(*), SER_TAIL(REBYTE, SER(s))); }
 
 #ifdef __cplusplus
     inline static REBCHR(const*) STR_HEAD(const REBSTR *s)

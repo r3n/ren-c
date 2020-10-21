@@ -240,7 +240,7 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
     cast(t*, SER_DATA_AT(sizeof(t), (s), (i)))
 
 #define SER_HEAD(t,s) \
-    SER_AT(t, (s), 0)
+    SER_AT(t, (s), 0)  // using SER_DATA_AT() vs. just SER_DATA() checks width
 
 inline static REBYTE *SER_DATA_TAIL(size_t w, const_if_c REBSER *s)
   { return SER_DATA_AT(w, s, SER_USED(s)); }
