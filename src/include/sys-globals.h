@@ -96,6 +96,10 @@ PVAR REBVAL PG_False_Value;
 PVAR REBVAL PG_True_Value;
 PVAR REBVAL PG_Void_Value;
 
+#ifdef DEBUG_TRASH_MEMORY
+    PVAR REBVAL PG_Trash_Value_Debug;
+#endif
+
 PVAR REBVAL PG_R_Invisible;  // has "pseudotype" REB_R_INVISIBLE
 PVAR REBVAL PG_R_Immediate;  // has "pseudotype" REB_R_IMMEDIATE
 PVAR REBVAL PG_R_Redo_Unchecked;  // "pseudotype" REB_R_REDO + false extra

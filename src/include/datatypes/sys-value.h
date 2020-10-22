@@ -551,6 +551,10 @@ inline static RELVAL *Prep_Cell_Core(
 //
 
 #if defined(DEBUG_TRASH_MEMORY)
+
+    #define TRASH_VALUE \
+        cast(const REBVAL*, &PG_Trash_Value_Debug)
+
     inline static RELVAL *Set_Trash_Debug(
         RELVAL *v
 
