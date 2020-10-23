@@ -118,10 +118,6 @@
 
 #define P_POS               VAL_INDEX_UNBOUNDED(ARG(position))
 
-#define P_OUT               (frame_->out)
-
-#define P_CELL              FRM_SPARE(frame_)
-
 
 // !!! R3-Alpha's PARSE code long predated frames, and was retrofitted to use
 // them as an experiment in Ren-C.  If it followed the rules of frames, then
@@ -493,7 +489,7 @@ REB_R Process_Group_For_Parse(
 // that is held by the frame.
 //
 // The return result is either an int position, END_FLAG, or THROWN_FLAG
-// Only in the case of THROWN_FLAG will f->out (aka P_OUT) be affected.
+// Only in the case of THROWN_FLAG will f->out (aka D_OUT) be affected.
 // Otherwise, it should exit the routine as an END marker (as it started);
 //
 static REB_R Parse_One_Rule(
@@ -503,17 +499,17 @@ static REB_R Parse_One_Rule(
 ){
     USE_PARAMS_OF_SUBPARSE;
 
-    assert(IS_END(P_OUT));
+    assert(IS_END(D_OUT));
 
     if (IS_GROUP(rule) or IS_GET_GROUP(rule)) {
-        rule = Process_Group_For_Parse(frame_, P_CELL, rule);
+        rule = Process_Group_For_Parse(frame_, D_SPARE, rule);
         if (rule == R_THROWN) {
-            Move_Value(P_OUT, P_CELL);
+            Move_Value(D_OUT, D_SPARE);
             return R_THROWN;
         }
         if (rule == R_INVISIBLE) {  // !!! Should this be legal?
             assert(pos <= P_INPUT_LEN);  // !!! Process_Group ensures
-            return Init_Integer(P_OUT, pos);
+            return Init_Integer(D_OUT, pos);
         }
         // was a GET-GROUP! :(...), use result as rule
     }
@@ -537,11 +533,11 @@ static REB_R Parse_One_Rule(
     switch (KIND3Q_BYTE(rule)) {  // handle w/same behavior for all P_INPUT
 
       case REB_BLANK:  // blank rules "match" but don't affect parse position
-        return Init_Integer(P_OUT, pos);
+        return Init_Integer(D_OUT, pos);
 
       case REB_LOGIC:
         if (VAL_LOGIC(rule))
-            return Init_Integer(P_OUT, pos);  // true matches always
+            return Init_Integer(D_OUT, pos);  // true matches always
         return R_UNHANDLED;  // false matches never
 
       case REB_INTEGER:
@@ -552,7 +548,7 @@ static REB_R Parse_One_Rule(
         // Process subrule in its own frame.  It will not change P_POS
         // directly (it will have its own P_POSITION_VALUE).  Hence the return
         // value regarding whether a match occurred or not has to be based on
-        // the result that comes back in P_OUT.
+        // the result that comes back in D_OUT.
 
         REBLEN pos_before = P_POS;
         P_POS = pos;  // modify input position
@@ -574,7 +570,7 @@ static REB_R Parse_One_Rule(
             P_COLLECTION,
             (P_FLAGS & PF_FIND_MASK)
         )){
-            Move_Value(P_OUT, subresult);
+            Move_Value(D_OUT, subresult);
             return R_THROWN;
         }
 
@@ -587,7 +583,7 @@ static REB_R Parse_One_Rule(
 
         REBINT index = VAL_INT32(subresult);
         assert(index >= 0);
-        return Init_Integer(P_OUT, index); }
+        return Init_Integer(D_OUT, index); }
 
       default:;
         // Other cases handled distinctly between blocks/strings/binaries...
@@ -599,18 +595,18 @@ static REB_R Parse_One_Rule(
 
         switch (VAL_TYPE(rule)) {
           case REB_QUOTED:
-            Derelativize(P_CELL, rule, P_RULE_SPECIFIER);
-            rule = Unquotify(P_CELL, 1);
+            Derelativize(D_SPARE, rule, P_RULE_SPECIFIER);
+            rule = Unquotify(D_SPARE, 1);
             break;  // fall through to direct match
 
           case REB_DATATYPE:
             if (VAL_TYPE(item) == VAL_TYPE_KIND(rule))
-                return Init_Integer(P_OUT, pos + 1);  // specific type match
+                return Init_Integer(D_OUT, pos + 1);  // specific type match
             return R_UNHANDLED;
 
           case REB_TYPESET:
             if (TYPE_CHECK(rule, VAL_TYPE(item)))
-                return Init_Integer(P_OUT, pos + 1);  // type was in typeset
+                return Init_Integer(D_OUT, pos + 1);  // type was in typeset
             return R_UNHANDLED;
 
           case REB_WORD: {  // !!! Small set of simulated type constraints
@@ -618,7 +614,7 @@ static REB_R Parse_One_Rule(
                 item,
                 cast(enum Reb_Symbol, VAL_WORD_SYM(rule))
             )){
-                return Init_Integer(P_OUT, pos + 1);
+                return Init_Integer(D_OUT, pos + 1);
             }
             return R_UNHANDLED; }
 
@@ -630,7 +626,7 @@ static REB_R Parse_One_Rule(
         // default?!
         //
         if (Cmp_Value(item, rule, did (P_FLAGS & AM_FIND_CASE)) == 0)
-            return Init_Integer(P_OUT, pos + 1);
+            return Init_Integer(D_OUT, pos + 1);
 
         return R_UNHANDLED;
     }
@@ -672,7 +668,7 @@ static REB_R Parse_One_Rule(
             );
             if (index == NOT_FOUND)
                 return R_UNHANDLED;
-            return Init_Integer(P_OUT, index + len);
+            return Init_Integer(D_OUT, index + len);
         }
         else switch (VAL_TYPE(rule)) {
           case REB_BITSET: {
@@ -691,7 +687,7 @@ static REB_R Parse_One_Rule(
             }
 
             if (Check_Bit(VAL_BITSET(rule), uni, uncased))
-                return Init_Integer(P_OUT, P_POS + 1);
+                return Init_Integer(D_OUT, P_POS + 1);
 
             return R_UNHANDLED; }
 
@@ -737,13 +733,13 @@ static REB_R Parse_One_Rule(
             // !!! We need the caller to know both the updated position in
             // the text string -and- be able to get the value.  It's already
             // on the data stack, so use that as the method to pass it back,
-            // but put the position after the match in P_OUT.
+            // but put the position after the match in D_OUT.
 
             if (P_TYPE == REB_BINARY)
-                Init_Integer(P_OUT, P_POS + (ss.end - bp));
+                Init_Integer(D_OUT, P_POS + (ss.end - bp));
             else
                 Init_Integer(
-                    P_OUT,
+                    D_OUT,
                     P_POS + Num_Codepoints_For_Bytes(bp, ss.end)
                 );
 
@@ -798,7 +794,7 @@ static REBIXO To_Thru_Block_Rule(
             else {
                 rule = Process_Group_For_Parse(frame_, cell, blk);
                 if (rule == R_THROWN) {
-                    Move_Value(P_OUT, cell);
+                    Move_Value(D_OUT, cell);
                     return THROWN_FLAG;
                 }
                 if (rule == R_INVISIBLE)
@@ -844,12 +840,12 @@ static REBIXO To_Thru_Block_Rule(
 
                 if (r == R_UNHANDLED) {
                     // fall through, keep looking
-                    SET_END(P_OUT);
+                    SET_END(D_OUT);
                 }
-                else {  // P_OUT is pos we matched past, so back up if only TO
-                    assert(r == P_OUT);
-                    VAL_INDEX_RAW(iter) = VAL_INT32(P_OUT);
-                    SET_END(P_OUT);
+                else {  // D_OUT is pos we matched past, so back up if only TO
+                    assert(r == D_OUT);
+                    VAL_INDEX_RAW(iter) = VAL_INT32(D_OUT);
+                    SET_END(D_OUT);
                     if (is_thru)
                         return VAL_INDEX(iter);  // don't back up
                     return VAL_INDEX(iter) - 1;  // back up
@@ -1148,19 +1144,19 @@ static REBIXO Do_Eval_Rule(REBFRM *frame_)
         //
         holder = EMPTY_ARRAY;  // read-only
         index = 0xDECAFBAD;  // shouldn't be used, avoid compiler warning
-        SET_END(P_CELL);
+        SET_END(D_SPARE);
     }
     else {
         // Evaluate next expression from the *input* series (not the rules)
         //
         if (Eval_Step_In_Any_Array_At_Throws(
-            P_CELL,
+            D_SPARE,
             &index,
             ARG(position),
             P_INPUT_SPECIFIER,
             EVAL_MASK_DEFAULT
         )){
-            Move_Value(P_OUT, P_CELL);  // BREAK/RETURN/QUIT/THROW...
+            Move_Value(D_OUT, D_SPARE);  // BREAK/RETURN/QUIT/THROW...
             return THROWN_FLAG;
         }
 
@@ -1168,7 +1164,7 @@ static REBIXO Do_Eval_Rule(REBFRM *frame_)
         // parse input is matched as a series.  Can this be avoided?
         //
         holder = Alloc_Singular(SERIES_FLAGS_NONE);
-        Move_Value(ARR_SINGLE(holder), P_CELL);
+        Move_Value(ARR_SINGLE(holder), D_SPARE);
         Freeze_Array_Deep(holder);  // don't allow modification of temporary
     }
 
@@ -1212,12 +1208,12 @@ static REBIXO Do_Eval_Rule(REBFRM *frame_)
         return THROWN_FLAG;
 
     if (r == R_UNHANDLED) {
-        SET_END(P_OUT);  // preserve invariant
+        SET_END(D_OUT);  // preserve invariant
         return P_POS;  // as failure, hand back original, no advancement
     }
 
-    REBLEN n = VAL_INT32(P_OUT);
-    SET_END(P_OUT);  // preserve invariant
+    REBLEN n = VAL_INT32(D_OUT);
+    SET_END(D_OUT);  // preserve invariant
     if (n == ARR_LEN(holder)) {
         //
         // Eval result reaching end means success, so return index advanced
@@ -1227,7 +1223,7 @@ static REBIXO Do_Eval_Rule(REBFRM *frame_)
         // communicate reaching the end, these parse routines always return
         // an array index.
         //
-        return IS_END(P_CELL) ? P_INPUT_LEN : index;
+        return IS_END(D_SPARE) ? P_INPUT_LEN : index;
     }
 
     return P_POS;  // as failure, hand back original position--no advancement
@@ -1259,8 +1255,8 @@ static void Handle_Mark_Rule(
         k == REB_PATH or k == REB_SET_PATH
         or k == REB_TUPLE or k == REB_SET_TUPLE
     ){
-        if (Set_Path_Throws_Core(P_OUT, rule, specifier, ARG(position)))
-            fail (Error_No_Catch_For_Throw(P_OUT));
+        if (Set_Path_Throws_Core(D_OUT, rule, specifier, ARG(position)))
+            fail (Error_No_Catch_For_Throw(D_OUT));
     }
     else
         fail (Error_Parse_Variable(frame_));
@@ -1282,9 +1278,9 @@ static REB_R Handle_Seek_Rule_Dont_Update_Begin(
         k = KIND3Q_BYTE(rule);
     }
     else if (k == REB_PATH or k == REB_TUPLE) {
-        if (Get_Path_Throws_Core(P_CELL, rule, specifier))
-            fail (Error_No_Catch_For_Throw(P_CELL));
-        rule = P_CELL;
+        if (Get_Path_Throws_Core(D_SPARE, rule, specifier))
+            fail (Error_No_Catch_For_Throw(D_SPARE));
+        rule = D_SPARE;
         k = KIND3Q_BYTE(rule);
     }
 
@@ -1414,7 +1410,7 @@ REBNATIVE(subparse)
     REBLEN collection_tail = P_COLLECTION ? ARR_LEN(P_COLLECTION) : 0;
     UNUSED(ARG(collection));  // implicitly accessed as P_COLLECTION
 
-    assert(IS_END(P_OUT));  // invariant provided by evaluator
+    assert(IS_END(D_OUT));  // invariant provided by evaluator
 
   #if !defined(NDEBUG)
     //
@@ -1494,7 +1490,7 @@ REBNATIVE(subparse)
     // Note: First test, so `[| ...anything...]` is a "no-op" match
 
     if (IS_BAR(rule))  // reached BAR! without a match failure, good!
-        return Init_Integer(P_OUT, P_POS);  // indicate match @ current pos
+        return Init_Integer(D_OUT, P_POS);  // indicate match @ current pos
 
     //=//// (GROUP!) AND :(GET-GROUP!) PROCESSING /////////////////////////=//
 
@@ -1516,7 +1512,7 @@ REBNATIVE(subparse)
 
         rule = Process_Group_For_Parse(f, save, rule);
         if (rule == R_THROWN) {
-            Move_Value(P_OUT, save);
+            Move_Value(D_OUT, save);
             return R_THROWN;
         }
         if (rule == R_INVISIBLE) {  // was a (...), or null-bearing :(...)
@@ -1537,14 +1533,14 @@ REBNATIVE(subparse)
 
         assert(Eval_Count >= 0);
         if (--Eval_Count == 0) {
-            SET_END(P_CELL);
+            SET_END(D_SPARE);
 
-            if (Do_Signals_Throws(P_CELL)) {
-                Move_Value(P_OUT, P_CELL);
+            if (Do_Signals_Throws(D_SPARE)) {
+                Move_Value(D_OUT, D_SPARE);
                 return R_THROWN;
             }
 
-            assert(IS_END(P_CELL));
+            assert(IS_END(D_SPARE));
         }
     }
 
@@ -1644,10 +1640,10 @@ REBNATIVE(subparse)
                 PUSH_GC_GUARD(collection);
 
                 bool interrupted;
-                assert(IS_END(P_OUT));  // invariant until finished
+                assert(IS_END(D_OUT));  // invariant until finished
                 bool threw = Subparse_Throws(
                     &interrupted,
-                    P_OUT,
+                    D_OUT,
                     ARG(position),  // affected by P_POS assignment above
                     SPECIFIED,
                     f->feed,
@@ -1661,12 +1657,12 @@ REBNATIVE(subparse)
                 if (threw)
                     goto return_thrown;
 
-                if (IS_NULLED(P_OUT)) {  // match of rule failed
-                    SET_END(P_OUT);  // restore invariant
+                if (IS_NULLED(D_OUT)) {  // match of rule failed
+                    SET_END(D_OUT);  // restore invariant
                     goto next_alternate;  // backtrack collect, seek |
                 }
-                P_POS = VAL_INT32(P_OUT);
-                SET_END(P_OUT);  // restore invariant
+                P_POS = VAL_INT32(D_OUT);
+                SET_END(D_OUT);  // restore invariant
 
                 Init_Block(
                     Sink_Word_May_Fail(set_or_copy_word, P_RULE_SPECIFIER),
@@ -1702,30 +1698,30 @@ REBNATIVE(subparse)
                     // evaluation of material that is not matched as
                     // a PARSE rule.
                     //
-                    assert(IS_END(P_OUT));  // should be true until finish
+                    assert(IS_END(D_OUT));  // should be true until finish
                     if (Do_Any_Array_At_Throws(
-                        P_OUT,
+                        D_OUT,
                         rule,
                         P_RULE_SPECIFIER
                     )){
                         goto return_thrown;
                     }
 
-                    if (IS_END(P_OUT) or IS_NULLED(P_OUT)) {
+                    if (IS_END(D_OUT) or IS_NULLED(D_OUT)) {
                         // Nothing to add
                     }
                     else if (only) {
                         Move_Value(
                             Alloc_Tail_Array(P_COLLECTION),
-                            P_OUT
+                            D_OUT
                         );
                     }
                     else
                         rebElide(
-                            "append", ARG(collection), rebQ(P_OUT),
+                            "append", ARG(collection), rebQ(D_OUT),
                         rebEND);
 
-                    SET_END(P_OUT);  // since we didn't throw, put it back
+                    SET_END(D_OUT);  // since we didn't throw, put it back
 
                     // Don't touch P_POS, we didn't consume anything from
                     // the input series but just fabricated DO material.
@@ -1735,10 +1731,10 @@ REBNATIVE(subparse)
                 else {  // Ordinary rule (may be block, may not be)
 
                     bool interrupted;
-                    assert(IS_END(P_OUT));  // invariant until finished
+                    assert(IS_END(D_OUT));  // invariant until finished
                     bool threw = Subparse_Throws(
                         &interrupted,
-                        P_OUT,
+                        D_OUT,
                         ARG(position),
                         SPECIFIED,
                         f->feed,
@@ -1751,12 +1747,12 @@ REBNATIVE(subparse)
                     if (threw)
                         goto return_thrown;
 
-                    if (IS_NULLED(P_OUT)) {  // match of rule failed
-                        SET_END(P_OUT);  // restore invariant
+                    if (IS_NULLED(D_OUT)) {  // match of rule failed
+                        SET_END(D_OUT);  // restore invariant
                         goto next_alternate;  // backtrack collect, seek |
                     }
-                    REBLEN pos_after = VAL_INT32(P_OUT);
-                    SET_END(P_OUT);  // restore invariant
+                    REBLEN pos_after = VAL_INT32(D_OUT);
+                    SET_END(D_OUT);  // restore invariant
 
                     assert(pos_after >= pos_before);  // 0 or more matches
 
@@ -1868,7 +1864,7 @@ REBNATIVE(subparse)
                     P_RULE,
                     P_RULE_SPECIFIER
                 )) {
-                    Move_Value(P_OUT, condition);
+                    Move_Value(D_OUT, condition);
                     goto return_thrown;
                 }
 
@@ -1892,7 +1888,7 @@ REBNATIVE(subparse)
                 thrown_arg->extra.trash = thrown_arg;  // see notes
 
                 Init_Thrown_With_Label(
-                    P_OUT,
+                    D_OUT,
                     thrown_arg,
                     NATIVE_VAL(parse_accept)
                 );
@@ -1903,7 +1899,7 @@ REBNATIVE(subparse)
                 // Similarly, this is a break/continue style "throw"
                 //
                 return Init_Thrown_With_Label(
-                    P_OUT,
+                    D_OUT,
                     NULLED_CELL,
                     NATIVE_VAL(parse_reject)
                 ); }
@@ -1983,7 +1979,7 @@ REBNATIVE(subparse)
     else if (ANY_SEQUENCE(rule)) {
         if (IS_PATH(rule) or IS_TUPLE(rule)) {
             if (Get_Path_Throws_Core(save, rule, P_RULE_SPECIFIER)) {
-                Move_Value(P_OUT, save);
+                Move_Value(D_OUT, save);
                 goto return_thrown;
             }
             rule = save;
@@ -2170,10 +2166,10 @@ REBNATIVE(subparse)
                 if (r == R_UNHANDLED)
                     i = END_FLAG;
                 else {
-                    assert(r == P_OUT);
-                    i = VAL_INT32(P_OUT);
+                    assert(r == D_OUT);
+                    i = VAL_INT32(D_OUT);
                 }
-                SET_END(P_OUT);  // preserve invariant
+                SET_END(D_OUT);  // preserve invariant
                 break; }
 
             // Because there are no LIT-XXX! datatypes, a special rule
@@ -2202,7 +2198,7 @@ REBNATIVE(subparse)
                         subrule, P_RULE_SPECIFIER,
                         cmp, P_INPUT_SPECIFIER
                     )){
-                        Move_Value(P_OUT, temp);
+                        Move_Value(D_OUT, temp);
                         return R_THROWN;
                     }
 
@@ -2244,8 +2240,8 @@ REBNATIVE(subparse)
                     //
                     // !!! Review faster way of sharing the AS transform.
                     //
-                    Derelativize(P_CELL, into, P_INPUT_SPECIFIER);
-                    into = rebValueQ("as block!", P_CELL, rebEND);
+                    Derelativize(D_SPARE, into, P_INPUT_SPECIFIER);
+                    into = rebValueQ("as block!", D_SPARE, rebEND);
                 }
                 else if (
                     not ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(into)))
@@ -2263,7 +2259,7 @@ REBNATIVE(subparse)
                 bool interrupted;
                 if (Subparse_Throws(
                     &interrupted,
-                    SET_END(P_OUT),
+                    SET_END(D_OUT),
                     into,
                     P_INPUT_SPECIFIER,  // harmless if specified API value
                     subrules_feed,
@@ -2275,20 +2271,20 @@ REBNATIVE(subparse)
 
                 // !!! ignore interrupted? (e.g. ACCEPT or REJECT ran)
 
-                if (IS_NULLED(P_OUT)) {
+                if (IS_NULLED(D_OUT)) {
                     i = END_FLAG;
                 }
                 else {
-                    if (VAL_UINT32(P_OUT) != VAL_LEN_HEAD(into))
+                    if (VAL_UINT32(D_OUT) != VAL_LEN_HEAD(into))
                         i = END_FLAG;
                     else
                         i = P_POS + 1;
                 }
 
                 if (Is_Api_Value(into))
-                    rebRelease(SPECIFIC(into));  // !!! rethink to use P_CELL
+                    rebRelease(SPECIFIC(into));  // !!! rethink to use D_SPARE
 
-                SET_END(P_OUT);  // restore invariant
+                SET_END(D_OUT);  // restore invariant
                 break; }
 
               case SYM_DO: {
@@ -2325,24 +2321,24 @@ REBNATIVE(subparse)
             bool interrupted;
             if (Subparse_Throws(
                 &interrupted,
-                SET_END(P_CELL),
+                SET_END(D_SPARE),
                 ARG(position),
                 SPECIFIED,
                 subrules_feed,
                 P_COLLECTION,
                 (P_FLAGS & PF_FIND_MASK)  // no PF_ONE_RULE
             )) {
-                Move_Value(P_OUT, P_CELL);
+                Move_Value(D_OUT, D_SPARE);
                 return R_THROWN;
             }
 
             // Non-breaking out of loop instances of match or not.
 
-            if (IS_NULLED(P_CELL))
+            if (IS_NULLED(D_SPARE))
                 i = END_FLAG;
             else {
-                assert(IS_INTEGER(P_CELL));
-                i = VAL_INT32(P_CELL);
+                assert(IS_INTEGER(D_SPARE));
+                i = VAL_INT32(D_SPARE);
             }
 
             if (interrupted) {  // ACCEPT or REJECT ran
@@ -2364,15 +2360,15 @@ REBNATIVE(subparse)
             if (r == R_UNHANDLED)
                 i = END_FLAG;
             else {
-                assert(r == P_OUT or r == R_IMMEDIATE);
+                assert(r == D_OUT or r == R_IMMEDIATE);
                 if (r == R_IMMEDIATE) {
                     assert(DSP == f->dsp_orig + 1);
                     if (not (P_FLAGS & PF_SET))  // only SET handles
                         DS_DROP();
                 }
-                i = VAL_INT32(P_OUT);
+                i = VAL_INT32(D_OUT);
             }
-            SET_END(P_OUT);  // preserve invariant
+            SET_END(D_OUT);  // preserve invariant
         }
 
         assert(i != THROWN_FLAG);
@@ -2514,11 +2510,11 @@ REBNATIVE(subparse)
                 //
                 if (IS_SET_GROUP(set_or_copy_word)) {
                     if (Do_Any_Array_At_Throws(
-                        P_CELL,
+                        D_SPARE,
                         set_or_copy_word,
                         P_RULE_SPECIFIER
                     )){
-                        Move_Value(P_OUT, P_CELL);
+                        Move_Value(D_OUT, D_SPARE);
                         return R_THROWN;
                     }
 
@@ -2527,10 +2523,10 @@ REBNATIVE(subparse)
                     // variables or paths...but for starters it does
                     // that just to show where more work could be done.
 
-                    if (not (IS_WORD(P_CELL) or IS_SET_WORD(P_CELL)))
-                        fail (Error_Parse_Variable_Raw(P_CELL));
+                    if (not (IS_WORD(D_SPARE) or IS_SET_WORD(D_SPARE)))
+                        fail (Error_Parse_Variable_Raw(D_SPARE));
 
-                    set_or_copy_word = P_CELL;
+                    set_or_copy_word = D_SPARE;
                 }
 
                 if (IS_SER_ARRAY(P_INPUT)) {
@@ -2624,7 +2620,7 @@ REBNATIVE(subparse)
                         rule,
                         derived
                     )){
-                        Move_Value(P_OUT, evaluated);
+                        Move_Value(D_OUT, evaluated);
                         goto return_thrown;
                     }
 
@@ -2733,11 +2729,11 @@ REBNATIVE(subparse)
     if (not IS_NULLED(ARG(collection)))  // fail -> drop COLLECT additions
       TERM_ARRAY_LEN(P_COLLECTION, collection_tail);
 
-    return Init_Nulled(P_OUT);
+    return Init_Nulled(D_OUT);
 
   return_thrown:
     if (not IS_NULLED(ARG(collection)))  // throw -> drop COLLECT additions
-        if (VAL_THROWN_LABEL(P_OUT) != NATIVE_VAL(parse_accept))  // ...unless
+        if (VAL_THROWN_LABEL(D_OUT) != NATIVE_VAL(parse_accept))  // ...unless
             TERM_ARRAY_LEN(P_COLLECTION, collection_tail);
 
     return R_THROWN;
