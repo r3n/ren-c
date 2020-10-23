@@ -857,7 +857,7 @@ REBNATIVE(find_script)
     Move_Value(D_OUT, arg);
 
     if (IS_BINARY(arg)) {  // may not all be valid UTF-8
-        VAL_INDEX(D_OUT) += offset;
+        VAL_INDEX_RAW(D_OUT) += offset;
         return D_OUT;
     }
 
@@ -874,7 +874,7 @@ REBNATIVE(find_script)
     for (; cp != header_bp; cp = NEXT_STR(cp))
         ++index;
 
-    VAL_INDEX(D_OUT) = index;
+    VAL_INDEX_RAW(D_OUT) = index;
     return D_OUT;
 }
 
@@ -915,7 +915,7 @@ REBNATIVE(invalid_utf8_q)
         trail = trailingBytesForUTF8[*utf8] + 1;
         if (utf8 + trail > end or not isLegalUTF8(utf8, trail)) {
             Move_Value(D_OUT, arg);
-            VAL_INDEX(D_OUT) = utf8 - BIN_HEAD(VAL_BINARY(arg));
+            VAL_INDEX_RAW(D_OUT) = utf8 - BIN_HEAD(VAL_BINARY(arg));
             return D_OUT;
         }
     }

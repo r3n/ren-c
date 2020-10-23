@@ -215,7 +215,11 @@ REBSER *Make_Set_Operation_Series(
 
             // Iterate over first series
             //
-            for (; VAL_INDEX(iter) < STR_LEN(str); VAL_INDEX(iter) += skip) {
+            for (
+                ;
+                VAL_INDEX_RAW(iter) < cast(REBIDX, STR_LEN(str));
+                VAL_INDEX_RAW(iter) += skip
+            ){
                 REBLEN len_match;
 
                 if (flags & SOP_FLAG_CHECK) {
@@ -237,7 +241,7 @@ REBSER *Make_Set_Operation_Series(
                 DECLARE_LOCAL (mo_value);
                 RESET_CELL(mo_value, REB_TEXT, CELL_FLAG_FIRST_IS_NODE);
                 VAL_NODE(mo_value) = NOD(mo->series);
-                VAL_INDEX(mo_value) = mo->index;
+                VAL_INDEX_RAW(mo_value) = mo->index;
 
                 if (
                     NOT_FOUND == Find_Binstr_In_Binstr(
@@ -286,7 +290,11 @@ REBSER *Make_Set_Operation_Series(
             DECLARE_LOCAL (iter);
             Move_Value(iter, val1);
 
-            for (; VAL_INDEX(iter) < BIN_LEN(bin); VAL_INDEX(iter) += skip) {
+            for (
+                ;
+                VAL_INDEX_RAW(iter) < cast(REBIDX, BIN_LEN(bin));
+                VAL_INDEX_RAW(iter) += skip
+            ){
                 REBLEN len_match;
 
                 if (flags & SOP_FLAG_CHECK) {
@@ -308,7 +316,7 @@ REBSER *Make_Set_Operation_Series(
                 DECLARE_LOCAL (buf_value);
                 RESET_CELL(buf_value, REB_BINARY, CELL_FLAG_FIRST_IS_NODE);
                 VAL_NODE(buf_value) = NOD(buf);
-                VAL_INDEX(buf_value) = buf_start_len;
+                VAL_INDEX_RAW(buf_value) = buf_start_len;
 
                 if (
                     NOT_FOUND == Find_Binstr_In_Binstr(

@@ -67,6 +67,7 @@ typedef unsigned char REBYTE; // don't change to uint8_t, see note
 // representation for 32-bit integers...even if that might be larger.
 //
 typedef int_fast32_t REBINT; // series index, signed, at *least* 32 bits
+typedef intptr_t REBIDX; // series index, signed, at *least* 32 bits
 typedef uint_fast32_t REBLEN; // series length, unsigned, at *least* 32 bits
 typedef size_t REBSIZ; // 32 bit (size in bytes)
 typedef int64_t REBI64; // 64 bit integer

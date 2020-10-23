@@ -273,10 +273,12 @@ REB_R MAKE_Time(
         return Init_Time_Nanoseconds(out, DEC_TO_SECS(VAL_DECIMAL(arg)));
 
     case REB_BLOCK: { // [hh mm ss]
-        if (VAL_ARRAY_LEN_AT(arg) > 3)
+        REBLEN len;
+        const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
+
+        if (len > 3)
             goto no_time;
 
-        const RELVAL *item = VAL_ARRAY_AT(arg);
         if (not IS_INTEGER(item))
             goto no_time;
 

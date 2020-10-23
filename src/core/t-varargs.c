@@ -200,7 +200,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
                 // effectively "undo the prefetch" by taking it down by 1.
                 //
                 assert(f_temp->feed->index > 0);
-                VAL_INDEX(shared) = f_temp->feed->index - 1; // all sharings
+                VAL_INDEX_UNBOUNDED(shared) = f_temp->feed->index - 1;
             }
 
             Drop_Frame(f_temp);
@@ -209,7 +209,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         case REB_P_HARD_QUOTE:
             Derelativize(out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared));
             SET_CELL_FLAG(out, UNEVALUATED);
-            VAL_INDEX(shared) += 1;
+            VAL_INDEX_UNBOUNDED(shared) += 1;
             break;
 
         case REB_P_MODAL:
@@ -227,7 +227,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
                 Derelativize(out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared));
                 SET_CELL_FLAG(out, UNEVALUATED);
             }
-            VAL_INDEX(shared) += 1;
+            VAL_INDEX_UNBOUNDED(shared) += 1;
             break;
 
         default:

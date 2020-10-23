@@ -5,7 +5,7 @@
 )
 (
     blk: []
-    same? blk at blk 2147483647
+    not same? blk at blk 2147483647
 )
 (
     blk: []
@@ -13,11 +13,11 @@
 )
 (
     blk: []
-    same? blk at blk -1
+    not same? blk at blk -1
 )
 (
     blk: []
-    same? blk at blk -2147483648
+    not same? blk at blk -2147483648
 )
 (
     blk: tail of [1 2 3]
@@ -33,44 +33,46 @@
 )
 (
     blk: tail of [1 2]
-    same? blk at blk 2147483647
+    not same? blk at blk 2147483647
 )
 (
     blk: [1 2]
-    same? blk at blk -2147483647
+    not same? blk at blk -2147483647
 )
 (
     blk: [1 2]
-    same? blk at blk -2147483648
+    not same? blk at blk -2147483648
 )
+
 ; string
 (
     str: ""
     same? str at str 1
 )
 (
-    str: ""
-    same? str at str 2147483647
-)
-(
-    str: ""
-    same? str at str 0
-)
-(
-    str: ""
-    same? str at str -1
-)
-(
-    str: ""
-    same? str at str -2147483648
-)
-(
     str: tail of "123"
     same? str at str 1
 )
 (
+    str: ""
+    same? str at str 0  ; !!! currently AT STR 0 and AT STR 1 same, review
+)
+(
     str: tail of "123"
     same? str at str 0
+)
+
+(
+    str: ""
+    not same? str at str 2147483647
+)
+(
+    str: ""
+    not same? str at str -1
+)
+(
+    str: ""
+    not same? str at str -2147483648
 )
 (
     str: tail of "123"
@@ -78,13 +80,13 @@
 )
 (
     str: tail of "12"
-    same? str at str 2147483647
+    not same? str at str 2147483647
 )
 (
     str: "12"
-    same? str at str -2147483647
+    not same? str at str -2147483647
 )
 (
     str: "12"
-    same? str at str -2147483648
+    not same? str at str -2147483648
 )

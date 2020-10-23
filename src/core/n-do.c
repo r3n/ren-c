@@ -531,7 +531,7 @@ REBNATIVE(evaluate)
             }
 
             Move_Value(D_OUT, source);
-            VAL_INDEX(D_OUT) = index;
+            VAL_INDEX_UNBOUNDED(D_OUT) = index;
 
             if (IS_END(D_SPARE)) {
                 //
@@ -550,7 +550,7 @@ REBNATIVE(evaluate)
             }
             else {
                 Move_Value(D_OUT, source);
-                VAL_INDEX(D_OUT) = index;
+                VAL_INDEX_UNBOUNDED(D_OUT) = index;
             }
         }
         break; }  // update variable
@@ -589,7 +589,7 @@ REBNATIVE(evaluate)
                 return nullptr;
             }
 
-            VAL_INDEX(position) = index;
+            VAL_INDEX_UNBOUNDED(position) = index;
         }
         else {
             REBFRM *f;

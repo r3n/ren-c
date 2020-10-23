@@ -689,7 +689,7 @@ REBNATIVE(same_q)
         return Init_Logic(
             D_OUT,
             VAL_SERIES(v1) == VAL_SERIES(v2)
-                and VAL_INDEX(v1) == VAL_INDEX(v2)
+                and VAL_INDEX_RAW(v1) == VAL_INDEX_RAW(v2)  // permissive
         );
 
     if (ANY_CONTEXT(v1))  // same if varlists match

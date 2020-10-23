@@ -42,10 +42,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
     REBFRM *frame_,
     const REBVAL *verb
 ){
-    REBVAL *value = D_ARG(1);
-
-    REBINT index = cast(REBINT, VAL_INDEX(value));
-    REBINT tail = cast(REBINT, VAL_LEN_HEAD(value));
+    REBVAL *v = D_ARG(1);
 
     REBFLGS sop_flags;  // "SOP_XXX" Set Operation Flags
 
@@ -60,32 +57,41 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
         switch (property) {
           case SYM_INDEX:
-            return Init_Integer(D_OUT, cast(REBI64, index) + 1);
+            return Init_Integer(D_OUT, VAL_INDEX_RAW(v) + 1);
 
-          case SYM_LENGTH:
-            return Init_Integer(D_OUT, tail > index ? tail - index : 0);
+          case SYM_LENGTH: {
+            REBI64 len_head = VAL_LEN_HEAD(v);
+            if (VAL_INDEX_RAW(v) < 0 or VAL_INDEX_RAW(v) > len_head)
+                return Init_Void(D_OUT);  // !!! better than erroring?
+            return Init_Integer(D_OUT, len_head - VAL_INDEX_RAW(v)); }
 
           case SYM_HEAD:
-            Move_Value(D_OUT, value);
-            VAL_INDEX(D_OUT) = 0;
+            Move_Value(D_OUT, v);
+            VAL_INDEX_RAW(D_OUT) = 0;
             return Trust_Const(D_OUT);
 
           case SYM_TAIL:
-            Move_Value(D_OUT, value);
-            VAL_INDEX(D_OUT) = cast(REBLEN, tail);
+            Move_Value(D_OUT, v);
+            VAL_INDEX_RAW(D_OUT) = VAL_LEN_HEAD(v);
             return Trust_Const(D_OUT);
 
           case SYM_HEAD_Q:
-            return Init_Logic(D_OUT, index == 0);
+            return Init_Logic(D_OUT, VAL_INDEX_RAW(v) == 0);
 
           case SYM_TAIL_Q:
-            return Init_Logic(D_OUT, index >= tail);
+            return Init_Logic(
+                D_OUT,
+                VAL_INDEX_RAW(v) == cast(REBIDX, VAL_LEN_HEAD(v))
+            );
 
           case SYM_PAST_Q:
-            return Init_Logic(D_OUT, index > tail);
+            return Init_Logic(
+                D_OUT,
+                VAL_INDEX_RAW(v) > cast(REBIDX, VAL_LEN_HEAD(v))
+            );
 
           case SYM_FILE: {
-            const REBSER *s = VAL_SERIES(value);
+            const REBSER *s = VAL_SERIES(v);
             if (not IS_SER_ARRAY(s))
                 return nullptr;
             if (NOT_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED))
@@ -93,7 +99,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
             return Init_File(D_OUT, LINK_FILE(s)); }
 
           case SYM_LINE: {
-            const REBSER *s = VAL_SERIES(value);
+            const REBSER *s = VAL_SERIES(v);
             if (not IS_SER_ARRAY(s))
                 return nullptr;
             if (NOT_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED))
@@ -106,77 +112,88 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
         break; }
 
-      case SYM_SKIP:
-      case SYM_AT: {
-        INCLUDE_PARAMS_OF_SKIP; // must be compatible with AT
-        UNUSED(ARG(series)); // is already `value`
+      case SYM_SKIP: {
+        INCLUDE_PARAMS_OF_SKIP;
+        UNUSED(ARG(series));  // covered by `v`
 
-        REBVAL *offset = ARG(offset);
-
-        REBINT len = Get_Num_From_Arg(offset);
+        // `skip x logic` means `either logic [skip x] [x]` (this is reversed
+        // from R3-Alpha and Rebol2, which skipped when false)
+        //
         REBI64 i;
-        if (VAL_WORD_SYM(verb) == SYM_SKIP) {
-            //
-            // `skip x logic` means `either logic [skip x] [x]` (this is
-            // reversed from R3-Alpha and Rebol2, which skipped when false)
-            //
-            if (IS_LOGIC(offset)) {
-                if (VAL_LOGIC(offset))
-                    i = cast(REBI64, index) + 1;
-                else
-                    i = cast(REBI64, index);
-            }
-            else {
-                // `skip series 1` means second element, add the len as-is
-                //
-                i = cast(REBI64, index) + cast(REBI64, len);
-            }
+        if (IS_LOGIC(ARG(offset))) {
+            if (VAL_LOGIC(ARG(offset)))
+                i = cast(REBI64, VAL_INDEX_RAW(v)) + 1;
+            else
+                i = cast(REBI64, VAL_INDEX_RAW(v));
         }
         else {
-            assert(VAL_WORD_SYM(verb) == SYM_AT);
-
-            // `at series 1` means first element, adjust index
+            // `skip series 1` means second element, add offset as-is
             //
-            // !!! R3-Alpha did this differently for values > 0 vs not, is
-            // this what's intended?
-            //
-            if (len > 0)
-                i = cast(REBI64, index) + cast(REBI64, len) - 1;
-            else
-                i = cast(REBI64, index) + cast(REBI64, len);
+            REBINT offset = Get_Num_From_Arg(ARG(offset));
+            i = cast(REBI64, VAL_INDEX_RAW(v)) + cast(REBI64, offset);
         }
 
-        if (i > cast(REBI64, tail)) {
-            if (REF(only))
+        if (not REF(unbounded)) {
+            if (i < 0 or i > cast(REBI64, VAL_LEN_HEAD(v)))
                 return nullptr;
-            i = cast(REBI64, tail); // past tail clips to tail if not /ONLY
-        }
-        else if (i < 0) {
-            if (REF(only))
-                return nullptr;
-            i = 0; // past head clips to head if not /ONLY
         }
 
-        VAL_INDEX(value) = cast(REBLEN, i);
-        RETURN (Trust_Const(value)); }
+        VAL_INDEX_RAW(v) = i;
+        RETURN (Trust_Const(v)); }
+
+      case SYM_AT: {
+        INCLUDE_PARAMS_OF_AT;
+        UNUSED(ARG(series));  // covered by `v`
+
+        REBINT offset = Get_Num_From_Arg(ARG(index));
+        REBI64 i;
+
+        // `at series 1` is first element, e.g. [0] in C.  Adjust offset.
+        //
+        // Note: Rebol2 and Red treat AT 1 and AT 0 as being the same:
+        //
+        //     rebol2>> at next next "abcd" 1
+        //     == "cd"
+        //
+        //     rebol2>> at next next "abcd" 0
+        //     == "cd"
+        //
+        // That doesn't make a lot of sense...but since `series/0` will always
+        // return NULL and `series/-1` returns the previous element, it hints
+        // at special treatment for index 0 (which is C-index -1).
+        //
+        // !!! Currently left as an open question.
+
+        if (offset > 0)
+            i = cast(REBI64, VAL_INDEX_RAW(v)) + cast(REBI64, offset) - 1;
+        else
+            i = cast(REBI64, VAL_INDEX_RAW(v)) + cast(REBI64, offset);
+
+        if (REF(bounded)) {
+            if (i < 0 or i > cast(REBI64, VAL_LEN_HEAD(v)))
+                return nullptr;
+        }
+
+        VAL_INDEX_RAW(v) = i;
+        RETURN (Trust_Const(v)); }
 
       case SYM_REMOVE: {
         INCLUDE_PARAMS_OF_REMOVE;
         UNUSED(PAR(series));  // accounted for by `value`
 
-        ENSURE_MUTABLE(value);  // !!! Review making this extract
+        ENSURE_MUTABLE(v);  // !!! Review making this extract
 
         REBINT len;
         if (REF(part))
-            len = Part_Len_May_Modify_Index(value, ARG(part));
+            len = Part_Len_May_Modify_Index(v, ARG(part));
         else
             len = 1;
 
-        index = cast(REBINT, VAL_INDEX(value));
-        if (index < tail and len != 0)
-            Remove_Any_Series_Len(value, VAL_INDEX(value), len);
+        REBIDX index = VAL_INDEX_RAW(v);
+        if (index < cast(REBIDX, VAL_LEN_HEAD(v)) and len != 0)
+            Remove_Any_Series_Len(v, index, len);
 
-        RETURN (value); }
+        RETURN (v); }
 
       case SYM_UNIQUE:  // Note: only has 1 argument, so dummy second arg
         sop_flags = SOP_NONE;
@@ -209,9 +226,9 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
         return Init_Any_Series(
             D_OUT,
-            VAL_TYPE(value),
+            VAL_TYPE(v),
             Make_Set_Operation_Series(
-                value,
+                v,
                 (sym == SYM_UNIQUE) ? nullptr : ARG(value2),
                 sop_flags,
                 did REF(case),

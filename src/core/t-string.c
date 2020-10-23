@@ -226,14 +226,16 @@ REB_R MAKE_String(
         // while #[string ["abcd" 2]] would join the pieces together in order
         // to produce #{abcd2}.  That behavior is not available in Ren-C.
 
-        if (VAL_ARRAY_LEN_AT(def) != 2)
+        REBLEN len;
+        const RELVAL *first = VAL_ARRAY_LEN_AT(&len, def);
+
+        if (len != 2)
             goto bad_make;
 
-        const RELVAL *first = VAL_ARRAY_AT(def);
         if (not ANY_STRING(first))
             goto bad_make;
 
-        const RELVAL *index = VAL_ARRAY_AT(def) + 1;
+        const RELVAL *index = first + 1;
         if (!IS_INTEGER(index))
             goto bad_make;
 
@@ -908,7 +910,7 @@ REBTYPE(String)
         //
         if (IS_NULLED(ARG(value)) and len == 0) {  // only nulls bypass
             if (sym == SYM_APPEND) // append always returns head
-                VAL_INDEX(v) = 0;
+                VAL_INDEX_RAW(v) = 0;
             RETURN (v); // don't fail on read only if it would be a no-op
         }
 
@@ -918,7 +920,7 @@ REBTYPE(String)
         if (REF(line))
             flags |= AM_LINE;
 
-        VAL_INDEX(v) = Modify_String_Or_Binary(  // does read-only check
+        VAL_INDEX_RAW(v) = Modify_String_Or_Binary(  // does read-only check
             v,
             cast(enum Reb_Symbol, sym),
             ARG(value),
@@ -1007,11 +1009,11 @@ REBTYPE(String)
 
         if (REF(last)) {
             if (len > tail) {
-                VAL_INDEX(v) = 0;
+                VAL_INDEX_RAW(v) = 0;
                 len = tail;
             }
             else
-                VAL_INDEX(v) = cast(REBLEN, tail - len);
+                VAL_INDEX_RAW(v) = cast(REBLEN, tail - len);
         }
 
         if (VAL_INDEX(v) >= tail) {

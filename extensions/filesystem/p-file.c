@@ -608,7 +608,7 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         INCLUDE_PARAMS_OF_SKIP;
 
         UNUSED(PAR(series));
-        UNUSED(REF(only)); // !!! Should /ONLY behave differently?
+        UNUSED(REF(unbounded));  // !!! Should /UNBOUNDED behave differently?
 
         ReqFile(file)->index += Get_Num_From_Arg(ARG(offset));
         req->modes |= RFM_RESEEK;

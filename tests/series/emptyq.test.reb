@@ -3,7 +3,7 @@
 (
     blk: tail of [1]
     clear head of blk
-    empty? blk
+    not empty? blk  ; !!! currently answers as "not tail?" so not empty
 )
 (empty? blank)
 [#190

@@ -324,7 +324,7 @@ bool Set_Bits(REBSER *bset, const RELVAL *val, bool set)
                 if (IS_CHAR(item)) {
                     REBLEN n = VAL_CHAR(item);
                     if (n < c)
-                        fail (Error_Past_End_Raw());
+                        fail (Error_Index_Out_Of_Range_Raw());
                     do {
                         Set_Bit(bset, c, set);
                     } while (c++ < n); // post-increment: test before overflow
@@ -350,7 +350,7 @@ bool Set_Bits(REBSER *bset, const RELVAL *val, bool set)
                 if (IS_INTEGER(item)) {
                     n = Int32s(SPECIFIC(item), 0);
                     if (n < c)
-                        fail (Error_Past_End_Raw());
+                        fail (Error_Index_Out_Of_Range_Raw());
                     for (; c <= n; c++)
                         Set_Bit(bset, c, set);
                 }
@@ -452,7 +452,7 @@ bool Check_Bits(const REBSER *bset, const RELVAL *val, bool uncased)
                 if (IS_CHAR(item)) {
                     REBLEN n = VAL_CHAR(item);
                     if (n < c)
-                        fail (Error_Past_End_Raw());
+                        fail (Error_Index_Out_Of_Range_Raw());
                     for (; c <= n; c++)
                         if (Check_Bit(bset, c, uncased))
                             return true;
@@ -475,7 +475,7 @@ bool Check_Bits(const REBSER *bset, const RELVAL *val, bool uncased)
                 if (IS_INTEGER(item)) {
                     n = Int32s(SPECIFIC(item), 0);
                     if (n < c)
-                        fail (Error_Past_End_Raw());
+                        fail (Error_Index_Out_Of_Range_Raw());
                     for (; c <= n; c++)
                         if (Check_Bit(bset, c, uncased))
                             return true;

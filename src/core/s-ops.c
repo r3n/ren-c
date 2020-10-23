@@ -68,7 +68,7 @@ const REBYTE *Analyze_String_For_Scan(
     REBLEN len;
     REBCHR(const*) up = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, any_string);
     if (len == 0)
-        fail (Error_Past_End_Raw());
+        fail (Error_Index_Out_Of_Range_Raw());
 
     // Skip leading whitespace
     //
@@ -78,7 +78,7 @@ const REBYTE *Analyze_String_For_Scan(
         up = NEXT_STR(up);
 
     if (len == 0)
-        fail (Error_Past_End_Raw());
+        fail (Error_Index_Out_Of_Range_Raw());
 
     REBCHR(const*) at_index = up;
 

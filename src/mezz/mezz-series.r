@@ -575,7 +575,9 @@ format: function [
                 pad: rule
                 val: form first values
                 values: my next
-                clear at val 1 + abs rule
+                if (abs rule) < length of val [
+                    clear at val 1 + abs rule
+                ]
                 if negative? rule [
                     pad: rule + length of val
                     if negative? pad [out: skip out negate pad]

@@ -446,10 +446,11 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
         if (GOB_PANE(gob))
             Clear_Series(SER(GOB_PANE(gob)));
 
-        if (IS_BLOCK(val))
-            Insert_Gobs(
-                gob, VAL_ARRAY_AT(val), 0, VAL_ARRAY_LEN_AT(val), false
-            );
+        if (IS_BLOCK(val)) {
+            REBLEN len;
+            const RELVAL *head = VAL_ARRAY_LEN_AT(&len, val);
+            Insert_Gobs(gob, head, 0, len, false);
+        }
         else if (IS_GOB(val))
             Insert_Gobs(gob, val, 0, 1, false);
         else if (IS_BLANK(val))
@@ -945,7 +946,7 @@ REBTYPE(Gob)
             fail (Error_Bad_Refines_Raw());
 
         if (!GOB_PANE(gob) || index >= tail)
-            fail (Error_Past_End_Raw());
+            fail (Error_Index_Out_Of_Range_Raw());
         if (
             VAL_WORD_SYM(verb) == SYM_CHANGE
             && (REF(part) || REF(only) || REF(dup))
@@ -984,8 +985,7 @@ REBTYPE(Gob)
             len = 1;
         }
         else if (IS_BLOCK(value)) {
-            len = VAL_ARRAY_LEN_AT(value);
-            value = VAL_ARRAY_KNOWN_MUTABLE_AT(value);  // !!! REVIEW
+            value = VAL_ARRAY_KNOWN_MUTABLE_LEN_AT(&len, value);  // !!!
         }
         else
             fail (PAR(value));

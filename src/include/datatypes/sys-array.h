@@ -496,17 +496,35 @@ inline static const REBARR *VAL_ARRAY(REBCEL(const*) v) {
 // of the word AT with a missing index is a hint that the index is coming
 // from the VAL_INDEX() of the value itself.
 //
-inline static const RELVAL *VAL_ARRAY_AT(REBCEL(const*) v) {
-    if (VAL_INDEX(v) > ARR_LEN(VAL_ARRAY(v)))
-        fail (Error_Past_End_Raw());  // don't clip and give deceptive pointer
-    return ARR_AT(VAL_ARRAY(v), VAL_INDEX(v));
+// IMPORTANT: This routine will trigger a failure if the array index is out
+// of bounds of the data.  If a function can deal with such out of bounds
+// arrays meaningfully, it should work with VAL_INDEX_UNBOUNDED().
+//
+inline static const RELVAL *VAL_ARRAY_LEN_AT(
+    REBLEN *len_at_out,
+    REBCEL(const*) v
+){
+    const REBARR *arr = VAL_ARRAY(v);
+    REBIDX i = VAL_INDEX_RAW(v);  // VAL_ARRAY() already checks it's series
+    REBLEN len = ARR_LEN(arr);
+    if (i < 0 or i > cast(REBIDX, len))
+        fail (Error_Index_Out_Of_Range_Raw());
+    if (len_at_out)  // inlining should remove this if() for VAL_ARRAY_AT()
+        *len_at_out = len - i;
+    return ARR_AT(arr, i);
 }
+
+#define VAL_ARRAY_AT(v) \
+    VAL_ARRAY_LEN_AT(nullptr, (v))
 
 #define VAL_ARRAY_AT_ENSURE_MUTABLE(v) \
     m_cast(RELVAL*, VAL_ARRAY_AT(ENSURE_MUTABLE(v)))
 
 #define VAL_ARRAY_KNOWN_MUTABLE_AT(v) \
     m_cast(RELVAL*, VAL_ARRAY_AT(KNOWN_MUTABLE(v)))
+
+#define VAL_ARRAY_KNOWN_MUTABLE_LEN_AT(len_out,v) \
+    m_cast(RELVAL*, VAL_ARRAY_LEN_AT((len_out), KNOWN_MUTABLE(v)))
 
 // !!! R3-Alpha introduced concepts of immutable series with PROTECT, but
 // did not consider the protected status to apply to binding.  Ren-C added
@@ -519,9 +537,6 @@ inline static const RELVAL *VAL_ARRAY_AT(REBCEL(const*) v) {
 //
 #define VAL_ARRAY_AT_MUTABLE_HACK(v) \
     m_cast(RELVAL*, VAL_ARRAY_AT(v))
-
-#define VAL_ARRAY_LEN_AT(v) \
-    VAL_LEN_AT(v)
 
 inline static const RELVAL *VAL_ARRAY_TAIL(const RELVAL *v)
   { return ARR_TAIL(VAL_ARRAY(v)); }
@@ -541,7 +556,7 @@ inline static const RELVAL *VAL_ARRAY_TAIL(const RELVAL *v)
 inline static const RELVAL *VAL_ARRAY_AT_HEAD(const RELVAL *v, REBLEN n) {
     const REBARR *a = VAL_ARRAY(v);  // debug build checks it's ANY-ARRAY!
     if (n > ARR_LEN(a))
-        fail (Error_Past_End_Raw());
+        fail (Error_Index_Out_Of_Range_Raw());
     return ARR_AT(a, (n));
 }
 
@@ -596,7 +611,7 @@ inline static RELVAL *Init_Relative_Block_At(
 ){
     RELVAL *block = RESET_CELL(out, REB_BLOCK, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(block, array);
-    VAL_INDEX(block) = index;
+    VAL_INDEX_RAW(block) = index;
     INIT_BINDING(block, action);
     return block;
 }

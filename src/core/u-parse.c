@@ -92,7 +92,7 @@
 #define P_TYPE              VAL_TYPE(P_INPUT_VALUE)
 #define P_INPUT             VAL_SERIES(P_INPUT_VALUE)
 #define P_INPUT_SPECIFIER   VAL_SPECIFIER(P_INPUT_VALUE)
-#define P_POS               VAL_INDEX(P_INPUT_VALUE)
+#define P_INPUT_IDX         VAL_INDEX(P_INPUT_VALUE)
 #define P_INPUT_LEN         VAL_LEN_HEAD(P_INPUT_VALUE)
 
 #define P_FIND_FLAGS_VALUE  (f->rootvar + 2)
@@ -101,13 +101,16 @@
 
 #define P_COLLECTION_VALUE  (f->rootvar + 3)
 #define P_COLLECTION \
-    (IS_BLANK(P_COLLECTION_VALUE) \
+    (IS_NULLED(P_COLLECTION_VALUE) \
         ? nullptr \
         : VAL_ARRAY_KNOWN_MUTABLE(P_COLLECTION_VALUE) \
     )
 
 #define P_NUM_QUOTES_VALUE  (f->rootvar + 4)
 #define P_NUM_QUOTES        VAL_INT32(P_NUM_QUOTES_VALUE)
+
+#define P_POSITION_VALUE    (f->rootvar + 5)
+#define P_POS               VAL_INDEX_UNBOUNDED(P_POSITION_VALUE)
 
 #define P_OUT (f->out)
 
@@ -236,7 +239,7 @@ static bool Subparse_Throws(
         collect_tail = ARR_LEN(opt_collection);  // roll back here on failure
     }
     else {
-        Init_Blank(Prep_Cell(P_COLLECTION_VALUE));
+        Init_Nulled(Prep_Cell(P_COLLECTION_VALUE));
         collect_tail = 0;
     }
 
@@ -244,8 +247,10 @@ static bool Subparse_Throws(
     //
     Init_Nulled(Prep_Cell(P_NUM_QUOTES_VALUE));
 
-    assert(ACT_NUM_PARAMS(NATIVE_ACT(subparse)) == 5); // checks RETURN:
-    Init_Nulled(Prep_Cell(f->rootvar + 5));
+    Init_Nulled(Prep_Cell(P_POSITION_VALUE));
+
+    assert(ACT_NUM_PARAMS(NATIVE_ACT(subparse)) == 6); // checks RETURN:
+    Init_Nulled(Prep_Cell(f->rootvar + 6));
 
     // !!! By calling the subparse native here directly from its C function
     // vs. going through the evaluator, we don't get the opportunity to do
@@ -343,7 +348,7 @@ static void Print_Parse_Index(REBFRM *f) {
     // when seeking a position given in a variable or modifying?
     //
     if (IS_END(P_RULE)) {
-        if (P_POS >= P_INPUT_LEN)
+        if (P_POS >= cast(REBIDX, P_INPUT_LEN))
             rebElide("print {[]: ** END **}", rebEND);
         else
             rebElide("print [{[]:} mold", input, "]", rebEND);
@@ -352,7 +357,7 @@ static void Print_Parse_Index(REBFRM *f) {
         DECLARE_LOCAL (rule);
         Derelativize(rule, P_RULE, P_RULE_SPECIFIER);
 
-        if (P_POS >= P_INPUT_LEN)
+        if (P_POS >= cast(REBIDX, P_INPUT_LEN))
             rebElide("print [mold", rule, "{** END **}]", rebEND);
         else {
             rebElide("print ["
@@ -435,7 +440,7 @@ REB_R Process_Group_For_Parse(
     // PARSE's own REMOVE/etc.  This is a sketchy idea, but as long as it's
     // allowed, each time arbitrary user code runs, rules have to be adjusted
     //
-    if (P_POS > P_INPUT_LEN)
+    if (P_POS > cast(REBIDX, P_INPUT_LEN))
         P_POS = P_INPUT_LEN;
 
     if (not inject or IS_NULLED(cell))  // even GET-GROUP! discards nulls
@@ -482,10 +487,10 @@ static REB_R Parse_One_Rule(
 
     if (Trace_Level) {
         Trace_Value("match", rule);
-        Trace_Parse_Input(P_INPUT_VALUE);
+        Trace_Parse_Input(P_POSITION_VALUE);
     }
 
-    if (P_POS == P_INPUT_LEN) { // at end of input
+    if (P_POS == cast(REBIDX, P_INPUT_LEN)) {  // at end of input
         if (IS_BLANK(rule) or IS_LOGIC(rule) or IS_BLOCK(rule)) {
             //
             // Only these types can *potentially* handle an END input.
@@ -511,10 +516,10 @@ static REB_R Parse_One_Rule(
 
       case REB_BLOCK: {
         //
-        // Process a subrule.  The subrule will run in its own frame, so it
-        // will not change P_POS directly (it will have its own P_INPUT_VALUE)
-        // Hence the return value regarding whether a match occurred or not
-        // has to be based on the result that comes back in P_OUT.
+        // Process subrule in its own frame.  It will not change P_POS
+        // directly (it will have its own P_POSITION_VALUE).  Hence the return
+        // value regarding whether a match occurred or not has to be based on
+        // the result that comes back in P_OUT.
 
         REBLEN pos_before = P_POS;
         P_POS = pos; // modify input position
@@ -530,7 +535,7 @@ static REB_R Parse_One_Rule(
         if (Subparse_Throws(
             &interrupted,
             SET_END(subresult),
-            P_INPUT_VALUE, // affected by P_POS assignment above
+            P_POSITION_VALUE, // affected by P_POS assignment above
             SPECIFIED,
             subfeed,
             P_COLLECTION,
@@ -625,8 +630,8 @@ static REB_R Parse_One_Rule(
             REBLEN len;
             REBLEN index = Find_Value_In_Binstr(
                 &len,
-                P_INPUT_VALUE,
-                VAL_LEN_HEAD(P_INPUT_VALUE),
+                P_POSITION_VALUE,
+                VAL_LEN_HEAD(P_POSITION_VALUE),
                 rule_cell,
                 P_FIND_FLAGS | AM_FIND_MATCH
                     | (IS_ISSUE(rule) ? AM_FIND_CASE : 0),
@@ -664,7 +669,7 @@ static REB_R Parse_One_Rule(
             REBLIN start_line = 1;
 
             REBSIZ size;
-            const REBYTE *bp = VAL_BYTES_AT(&size, P_INPUT_VALUE);
+            const REBYTE *bp = VAL_BYTES_AT(&size, P_POSITION_VALUE);
 
             SCAN_LEVEL level;
             SCAN_STATE ss;
@@ -701,7 +706,7 @@ static REB_R Parse_One_Rule(
             // on the data stack, so use that as the method to pass it back,
             // but put the position after the match in P_OUT.
 
-            if (IS_BINARY(P_INPUT_VALUE))
+            if (IS_BINARY(P_POSITION_VALUE))
                 Init_Integer(P_OUT, P_POS + (ss.end - bp));
             else
                 Init_Integer(
@@ -741,8 +746,12 @@ static REBIXO To_Thru_Block_Rule(
     // positioned on the end cell or null terminator of a string may match.
     //
     DECLARE_LOCAL (iter);
-    Move_Value(iter, P_INPUT_VALUE);  // need to slide pos
-    for (; VAL_INDEX(iter) <= P_INPUT_LEN; ++VAL_INDEX(iter)) {  // see note
+    Move_Value(iter, P_POSITION_VALUE);  // need to slide pos
+    for (
+        ;
+        VAL_INDEX_RAW(iter) <= cast(REBIDX, P_INPUT_LEN);
+        ++VAL_INDEX_RAW(iter)
+    ){  // see note
         const RELVAL *blk = ARR_HEAD(VAL_ARRAY(rule_block));
         for (; NOT_END(blk); blk++) {
             if (IS_BAR(blk))
@@ -804,7 +813,7 @@ static REBIXO To_Thru_Block_Rule(
                 }
                 else {  // P_OUT is pos we matched past, so back up if only TO
                     assert(r == P_OUT);
-                    VAL_INDEX(iter) = VAL_INT32(P_OUT);
+                    VAL_INDEX_RAW(iter) = VAL_INT32(P_OUT);
                     SET_END(P_OUT);
                     if (is_thru)
                         return VAL_INDEX(iter);  // don't back up
@@ -960,7 +969,7 @@ static REBIXO To_Thru_Non_Block_Rule(
         return P_POS; // make it a no-op
 
     if (kind == REB_LOGIC) // no-op if true, match failure if false
-        return VAL_LOGIC(rule) ? P_POS : END_FLAG;
+        return VAL_LOGIC(rule) ? cast(REBLEN, P_POS) : END_FLAG;
 
     if (kind == REB_WORD and VAL_WORD_SYM(rule) == SYM_END) {
         //
@@ -1008,8 +1017,8 @@ static REBIXO To_Thru_Non_Block_Rule(
     REBLEN len;  // e.g. if a TAG!, match length includes < and >
     REBLEN i = Find_Value_In_Binstr(
         &len,
-        P_INPUT_VALUE,
-        VAL_LEN_HEAD(P_INPUT_VALUE),
+        P_POSITION_VALUE,
+        VAL_LEN_HEAD(P_POSITION_VALUE),
         rule,
         P_FIND_FLAGS,
         1  // skip
@@ -1080,7 +1089,7 @@ static REBIXO Do_Eval_Rule(REBFRM *f)
     REBARR *holder;
 
     REBLEN index;
-    if (P_POS >= P_INPUT_LEN) {
+    if (P_POS >= cast(REBIDX, P_INPUT_LEN)) {
         //
         // We could short circuit and notice if the rule was END or not, but
         // that leaves out other potential matches like `[(print "Hi") end]`
@@ -1097,7 +1106,7 @@ static REBIXO Do_Eval_Rule(REBFRM *f)
         if (Eval_Step_In_Any_Array_At_Throws(
             P_CELL,
             &index,
-            P_INPUT_VALUE,
+            P_POSITION_VALUE,
             P_INPUT_SPECIFIER,
             EVAL_MASK_DEFAULT
         )){
@@ -1123,9 +1132,9 @@ static REBIXO Do_Eval_Rule(REBFRM *f)
     // result.
     //
     DECLARE_LOCAL (saved_input);
-    Move_Value(saved_input, P_INPUT_VALUE); // series and P_POS position
+    Move_Value(saved_input, P_POSITION_VALUE);  // series and P_POS position
     PUSH_GC_GUARD(saved_input);
-    Init_Block(P_INPUT_VALUE, holder);
+    Init_Block(P_POSITION_VALUE, holder);
 
     // !!! There is not a generic form of SUBPARSE/NEXT, but there should be.
     // The particular factoring of the one-rule form of parsing makes us
@@ -1146,7 +1155,7 @@ static REBIXO Do_Eval_Rule(REBFRM *f)
     // Restore the input series to what it was before parsing the temporary
     // (this restores P_POS, since it's just an alias for the input's index)
     //
-    Move_Value(P_INPUT_VALUE, saved_input);
+    Move_Value(P_POSITION_VALUE, saved_input);
     DROP_GC_GUARD(saved_input);
 
     if (r == R_THROWN)
@@ -1189,13 +1198,13 @@ static void Handle_Mark_Rule(
     //
     //     parse lit '''{abc} ["a" mark x:]` => '''{bc}
 
-    Quotify(P_INPUT_VALUE, P_NUM_QUOTES);
+    Quotify(P_POSITION_VALUE, P_NUM_QUOTES);
 
     REBYTE k = KIND3Q_BYTE(rule);  // REB_0_END ok
     if (k == REB_WORD or k == REB_SET_WORD) {
         Move_Value(
             Sink_Word_May_Fail(rule, specifier),
-            P_INPUT_VALUE
+            P_POSITION_VALUE
         );
     }
     else if (
@@ -1203,7 +1212,7 @@ static void Handle_Mark_Rule(
         or k == REB_TUPLE or k == REB_SET_TUPLE
     ){
         if (Set_Path_Throws_Core(
-            P_OUT, rule, specifier, P_INPUT_VALUE
+            P_OUT, rule, specifier, P_POSITION_VALUE
         )){
             fail (Error_No_Catch_For_Throw(P_OUT));
         }
@@ -1211,7 +1220,7 @@ static void Handle_Mark_Rule(
     else
         fail (Error_Parse_Variable(f));
 
-    Dequotify(P_INPUT_VALUE);  // go back to 0 quote level
+    Dequotify(P_POSITION_VALUE);  // go back to 0 quote level
 }
 
 
@@ -1282,9 +1291,9 @@ static REB_R Handle_Seek_Rule_Dont_Update_Begin(
 //      return: [<opt> integer!]
 //      input [any-series! any-array! quoted!]
 //      find-flags [integer!]
-//      collection "Array into which any KEEP values are collected"
-//          [blank! any-series!]
-//      <local> num-quotes
+//      /collection "Array into which any KEEP values are collected"
+//          [any-series!]
+//      <local> position num-quotes
 //  ]
 //
 REBNATIVE(subparse)
@@ -1320,6 +1329,7 @@ REBNATIVE(subparse)
 
     UNUSED(ARG(input));  // used via P_INPUT
     UNUSED(ARG(find_flags));  // used via P_FIND_FLAGS
+    UNUSED(ARG(position));  // used via P_POS
     UNUSED(ARG(num_quotes));  // used via P_NUM_QUOTES_VALUE
 
     REBFRM *f = frame_; // nice alias of implicit native parameter
@@ -1338,9 +1348,14 @@ REBNATIVE(subparse)
     Dequotify(P_INPUT_VALUE);
 
     // Make sure index position is not past END
-    //
-    if (VAL_INDEX(P_INPUT_VALUE) > VAL_LEN_HEAD(P_INPUT_VALUE))
-        VAL_INDEX(P_INPUT_VALUE) = VAL_LEN_HEAD(P_INPUT_VALUE);
+    if (
+        VAL_INDEX_UNBOUNDED(P_INPUT_VALUE)
+        > cast(REBIDX, VAL_LEN_HEAD(P_INPUT_VALUE))
+    ){
+        VAL_INDEX_RAW(P_INPUT_VALUE) = VAL_LEN_HEAD(P_INPUT_VALUE);
+    }
+
+    Move_Value(P_POSITION_VALUE, P_INPUT_VALUE);
 
     // Every time we hit an alternate rule match (with |), we have to reset
     // any of the collected values.  Remember the tail when we started.
@@ -1363,7 +1378,7 @@ REBNATIVE(subparse)
     // annoying to find to inspect in the debugger.  This makes pointers into
     // the value payloads so they can be seen more easily.
     //
-    const REBLEN *pos_debug = &P_POS;
+    const REBIDX *pos_debug = &P_POS;
     (void)pos_debug; // UNUSED() forces corruption in C++11 debug builds
   #endif
 
@@ -1373,8 +1388,7 @@ REBNATIVE(subparse)
 
     DECLARE_LOCAL (save);
 
-    REBLEN start = P_POS; // recovery restart point
-    REBLEN begin = P_POS; // point at beginning of match
+    REBIDX begin = P_POS; // point at beginning of match
 
     // The loop iterates across each REBVAL's worth of "rule" in the rule
     // block.  Some of these rules just set `flags` and `continue`, so that
@@ -1588,7 +1602,7 @@ REBNATIVE(subparse)
                     bool threw = Subparse_Throws(
                         &interrupted,
                         P_OUT,
-                        P_INPUT_VALUE, // affected by P_POS assignment above
+                        P_POSITION_VALUE, // affected by P_POS assignment above
                         SPECIFIED,
                         f->feed,
                         collection,
@@ -1682,7 +1696,7 @@ REBNATIVE(subparse)
                         bool threw = Subparse_Throws(
                             &interrupted,
                             P_OUT,
-                            P_INPUT_VALUE,
+                            P_POSITION_VALUE,
                             SPECIFIED,
                             f->feed,
                             P_COLLECTION,
@@ -1707,13 +1721,13 @@ REBNATIVE(subparse)
                         if (pos_after == pos_before and not only) {
                             target = nullptr;
                         }
-                        else if (ANY_STRING(P_INPUT_VALUE)) {
+                        else if (ANY_STRING(P_POSITION_VALUE)) {
                             target = nullptr;
                             Init_Any_String(
                                 Alloc_Tail_Array(P_COLLECTION),
                                 P_TYPE,
                                 Copy_String_At_Limit(
-                                    P_INPUT_VALUE,
+                                    P_POSITION_VALUE,
                                     pos_after - pos_before
                                 )
                             );
@@ -1820,7 +1834,7 @@ REBNATIVE(subparse)
                     if (IS_TRUTHY(condition))
                         continue;
 
-                    P_POS = NOT_FOUND;
+                    Init_Nulled(P_POSITION_VALUE);  // not found
                     goto post_match_processing; }
 
                   case SYM_ACCEPT:
@@ -1851,7 +1865,7 @@ REBNATIVE(subparse)
                     ); }
 
                   case SYM_FAIL:  // deprecated... use LOGIC! false instead
-                    P_POS = NOT_FOUND;
+                    Init_Nulled(P_POSITION_VALUE);  // not found
                     FETCH_NEXT_RULE(f);
                     goto post_match_processing;
 
@@ -1972,7 +1986,7 @@ REBNATIVE(subparse)
                 continue;
             }
             FETCH_NEXT_RULE(f);
-            P_POS = NOT_FOUND;
+            Init_Nulled(P_POSITION_VALUE);  // not found
             goto post_match_processing;
 
           case REB_INTEGER: // Specify count or range count, 1 or 2 integers
@@ -2038,13 +2052,13 @@ REBNATIVE(subparse)
 
                 switch (cmd) {
                 case SYM_SKIP:
-                    i = (P_POS < P_INPUT_LEN)
-                        ? P_POS + 1
+                    i = (P_POS < cast(REBIDX, P_INPUT_LEN))
+                        ? cast(REBLEN, P_POS + 1)
                         : END_FLAG;
                     break;
 
                 case SYM_END:
-                    i = (P_POS < P_INPUT_LEN)
+                    i = (P_POS < cast(REBIDX, P_INPUT_LEN))
                         ? END_FLAG
                         : P_INPUT_LEN;
                     break;
@@ -2268,7 +2282,7 @@ REBNATIVE(subparse)
                 if (Subparse_Throws(
                     &interrupted,
                     SET_END(P_CELL),
-                    P_INPUT_VALUE,
+                    P_POSITION_VALUE,
                     SPECIFIED,
                     subrules_feed,
                     P_COLLECTION,
@@ -2290,9 +2304,9 @@ REBNATIVE(subparse)
                 if (interrupted) { // ACCEPT or REJECT ran
                     assert(i != THROWN_FLAG);
                     if (i == END_FLAG)
-                        P_POS = NOT_FOUND;
+                        Init_Nulled(P_POSITION_VALUE);
                     else
-                        P_POS = cast(REBLEN, i);
+                        P_POS = i;
                     break;
                 }
             }
@@ -2325,7 +2339,7 @@ REBNATIVE(subparse)
             //
             if (i == END_FLAG) {  // this match failed
                 if (count < mincount) {
-                    P_POS = NOT_FOUND;  // number of matches was not enough
+                    Init_Nulled(P_POSITION_VALUE);  // num matches not enough
                 }
                 else {
                     // just keep index as is.
@@ -2351,8 +2365,15 @@ REBNATIVE(subparse)
             }
         }
 
-        if (P_POS > P_INPUT_LEN)
-            P_POS = NOT_FOUND;
+        // !!! This out of bounds check is necessary because GROUP!s execute
+        // code that could change the size of the input.  The idea of locking
+        // the input and only allowing mutations through PARSE rules has come
+        // up...but at the very least, such checks should only be needed right
+        // after potential group executions (which includes subrules).
+        //
+        if (not IS_NULLED(P_POSITION_VALUE))
+            if (P_POS > cast(REBIDX, P_INPUT_LEN))
+                Init_Nulled(P_POSITION_VALUE);  // not found
 
     //==////////////////////////////////////////////////////////////////==//
     //
@@ -2370,13 +2391,15 @@ REBNATIVE(subparse)
 
         if (flags) {
             if (flags & PF_NOT) {
-                if ((flags & PF_NOT2) and P_POS != NOT_FOUND)
-                    P_POS = NOT_FOUND;
-                else
+                if ((flags & PF_NOT2) and not IS_NULLED(P_POSITION_VALUE))
+                    Init_Nulled(P_POSITION_VALUE);  // not found
+                else {
+                    Move_Value(P_POSITION_VALUE, P_INPUT_VALUE);
                     P_POS = begin;
+                }
             }
 
-            if (P_POS == NOT_FOUND) {
+            if (IS_NULLED(P_POSITION_VALUE)) {
                 if (flags & PF_THEN) {
                     FETCH_TO_BAR_OR_END(f);
                     if (NOT_END(P_RULE))
@@ -2393,7 +2416,7 @@ REBNATIVE(subparse)
                         set_or_copy_word,
                         P_RULE_SPECIFIER
                     );
-                    if (ANY_ARRAY(P_INPUT_VALUE)) {
+                    if (ANY_ARRAY(P_POSITION_VALUE)) {
                         //
                         // Act like R3-Alpha in preserving GROUP! vs. BLOCK!
                         // distinction (which Rebol2 did not).  But don't keep
@@ -2410,7 +2433,7 @@ REBNATIVE(subparse)
                             )
                         );
                     }
-                    else if (IS_BINARY(P_INPUT_VALUE)) {
+                    else if (IS_BINARY(P_POSITION_VALUE)) {
                         Init_Binary(  // R3-Alpha behavior (e.g. not AS TEXT!)
                             sink,
                             Copy_Series_At_Len(P_INPUT, begin, count)
@@ -2511,9 +2534,9 @@ REBNATIVE(subparse)
                 }
 
                 if (flags & PF_REMOVE) {
-                    ENSURE_MUTABLE(P_INPUT_VALUE);
+                    ENSURE_MUTABLE(P_POSITION_VALUE);
                     if (count)
-                        Remove_Any_Series_Len(P_INPUT_VALUE, begin, count);
+                        Remove_Any_Series_Len(P_POSITION_VALUE, begin, count);
                     P_POS = begin;
                 }
 
@@ -2579,7 +2602,7 @@ REBNATIVE(subparse)
                         // last minute that allows protects or unprotects
                         // to happen in rule processing if GROUP!s execute.
                         //
-                        REBARR *a = VAL_ARRAY_ENSURE_MUTABLE(P_INPUT_VALUE);
+                        REBARR *a = VAL_ARRAY_ENSURE_MUTABLE(P_POSITION_VALUE);
                         P_POS = Modify_Array(
                             a,
                             begin,
@@ -2604,7 +2627,7 @@ REBNATIVE(subparse)
                         REBLEN mod_flags = (flags & PF_INSERT) ? 0 : AM_PART;
 
                         P_POS = Modify_String_Or_Binary(  // checks read-only
-                            P_INPUT_VALUE,
+                            P_POSITION_VALUE,
                             (flags & PF_CHANGE)
                                 ? SYM_CHANGE
                                 : SYM_INSERT,
@@ -2624,7 +2647,7 @@ REBNATIVE(subparse)
             set_or_copy_word = NULL;
         }
 
-        if (P_POS == NOT_FOUND) {
+        if (IS_NULLED(P_POSITION_VALUE)) {
 
           next_alternate:;
 
@@ -2648,7 +2671,8 @@ REBNATIVE(subparse)
             // Jump to the alternate rule and reset input
             //
             FETCH_NEXT_RULE(f);
-            P_POS = begin = start;
+            Move_Value(P_POSITION_VALUE, P_INPUT_VALUE);  // P_POS may be null
+            begin = P_INPUT_IDX;
         }
 
         if (P_FIND_FLAGS & PF_ONE_RULE)  // don't loop
@@ -2757,7 +2781,7 @@ REBNATIVE(parse)
     //
     Move_Value(D_SPARE, ARG(input));
     REBLEN num_quotes = Dequotify(D_SPARE);  // take quotes out
-    VAL_INDEX(D_SPARE) = index;  // update cell guaranteed not REB_QUOTED
+    VAL_INDEX_UNBOUNDED(D_SPARE) = index;  // cell guaranteed not REB_QUOTED
     Quotify(D_SPARE, num_quotes);  // put quotes back
 
     rebElideQ("set", progress, D_SPARE, rebEND);

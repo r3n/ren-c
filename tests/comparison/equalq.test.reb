@@ -121,13 +121,16 @@
 (equal? equal? #[bitset! #{00}] #{00} equal? #{00} #[bitset! #{00}])
 (equal? [] [])
 (equal? a-value: [] a-value)
+
 ; Reflexivity for past-tail blocks
-; Error in R2.
+; Error in R2, but not R3-Alpha.  Error again in Ren-C.  (SAME? allowed)
 (
     a-value: tail of [1]
     clear head of a-value
-    equal? a-value a-value
+    e: trap [equal? a-value a-value]
+    e/id = 'index-out-of-range
 )
+
 ; Reflexivity for cyclic blocks
 (
     a-value: copy []

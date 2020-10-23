@@ -784,19 +784,22 @@ inline static REBLEN VAL_LEN_AT(REBCEL(const*) v) {
     // and low level length themselves, they'll find it doesn't add up.
     // This is a longstanding historical Rebol issue that needs review.
     //
-    if (VAL_INDEX(v) >= VAL_LEN_HEAD(v))
-        return 0;  // avoid negative index
+    REBIDX i = VAL_INDEX(v);
+    if (i > cast(REBIDX, VAL_LEN_HEAD(v)))
+        fail ("Index past end of series");
+    if (i < 0)
+        fail ("Index before beginning of series");
 
-    return VAL_LEN_HEAD(v) - VAL_INDEX(v);  // take current index into account
+    return VAL_LEN_HEAD(v) - i;  // take current index into account
 }
 
 inline static REBCHR(const*) VAL_STRING_AT(REBCEL(const*) v) {
-    const REBSTR *s = VAL_STRING(v);  // debug build checks it's ANY-STRING!
-    if (VAL_INDEX(v) == 0)
-        return STR_HEAD(s);  // common case, try and be fast
-    if (VAL_PAST_END(v))
-        fail (Error_Past_End_Raw());  // don't give deceptive return pointer
-    return STR_AT(s, VAL_INDEX(v));
+    const REBSTR *str = VAL_STRING(v);  // checks that it's ANY-STRING!
+    REBIDX i = VAL_INDEX_RAW(v);
+    REBLEN len = STR_LEN(str);
+    if (i < 0 or i > cast(REBIDX, len))
+        fail (Error_Index_Out_Of_Range_Raw());
+    return i == 0 ? STR_HEAD(str) : STR_AT(str, i);
 }
 
 

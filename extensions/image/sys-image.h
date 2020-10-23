@@ -63,7 +63,7 @@ inline static REBYTE *VAL_IMAGE_AT_HEAD(REBCEL(const*) v, REBLEN pos) {
 // a lot of sense.
 
 #define VAL_IMAGE_POS(v) \
-    VAL_INDEX(VAL_IMAGE_BIN(v))
+    VAL_INDEX_UNBOUNDED(VAL_IMAGE_BIN(v))
 
 inline static REBYTE *VAL_IMAGE_AT(REBCEL(const*) v) {
     return VAL_IMAGE_AT_HEAD(v, VAL_IMAGE_POS(v));
@@ -74,7 +74,7 @@ inline static REBLEN VAL_IMAGE_LEN_HEAD(REBCEL(const*) v) {
 }
 
 inline static REBLEN VAL_IMAGE_LEN_AT(REBCEL(const*) v) {
-    if (VAL_IMAGE_POS(v) >= VAL_IMAGE_LEN_HEAD(v))
+    if (VAL_IMAGE_POS(v) >= cast(REBIDX, VAL_IMAGE_LEN_HEAD(v)))
         return 0;  // avoid negative position
     return VAL_IMAGE_LEN_HEAD(v) - VAL_IMAGE_POS(v);
 }

@@ -366,6 +366,8 @@ REBLEN Part_Len_May_Modify_Index(
     if (IS_NULLED(part))  // indicates /PART refinement unused
         return VAL_LEN_AT(series);  // leave index alone, use plain length
 
+    REBLEN iseries = VAL_INDEX(series);  // checked for in-bounds
+
     REBI64 len;
     if (IS_INTEGER(part) or IS_DECIMAL(part))
         len = Int32(part);  // may be positive or negative
@@ -377,7 +379,7 @@ REBLEN Part_Len_May_Modify_Index(
             fail (Error_Invalid_Part_Raw(part));
         }
 
-        len = cast(REBINT, VAL_INDEX(part)) - cast(REBINT, VAL_INDEX(series));
+        len = cast(REBINT, VAL_INDEX(part)) - cast(REBINT, iseries);
     }
 
     // Restrict length to the size available
@@ -389,9 +391,9 @@ REBLEN Part_Len_May_Modify_Index(
     }
     else {
         len = -len;
-        if (len > cast(REBINT, VAL_INDEX(series)))
-            len = cast(REBINT, VAL_INDEX(series));
-        VAL_INDEX(series) -= cast(REBLEN, len);
+        if (len > cast(REBI64, iseries))
+            len = iseries;
+        VAL_INDEX_RAW(series) -= cast(REBLEN, len);
     }
 
     if (len > UINT32_MAX) {

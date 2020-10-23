@@ -258,22 +258,20 @@ even?: generic [
 
 skip: generic [
     {Returns the series forward or backward from the current position.}
-    return: [<opt> <dequote> any-series! port!]
-        {Input skipped by the given offset, clipped to head/tail if not /ONLY}
+    return: "Input skipped by offset, or null if out of bounds"
+        [<opt> <dequote> any-series! port!]
     series [<blank> <requote> any-series! port!]
     offset [any-number! logic! pair!]
-    /only
-        {Don't clip to the boundaries of the series (return blank if beyond)}
+    /unbounded "Return out of bounds series if before tail or after head"
 ]
 
 at: generic [
     {Returns the series at the specified index.}
-    return: [<opt> <requote> any-series! port!]
-        {Input at the given index, clipped to head/tail if not /ONLY}
+    return: "Input at the given index, not clipped to head/tail by default"
+        [<opt> <requote> any-series! port!]
     series [<blank> <dequote> any-series! port!]
     index [any-number! logic! pair!]
-    /only
-        {Don't clip to the boundaries of the series (return blank if beyond)}
+    /bounded "Return null if index is before tail or after head"
 ]
 
 ; Series Search

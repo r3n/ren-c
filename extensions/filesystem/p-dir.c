@@ -133,7 +133,10 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         switch (property) {
         case SYM_LENGTH: {
-            REBLEN len = IS_BLOCK(state) ? VAL_ARRAY_LEN_AT(state) : 0;
+            if (not IS_BLOCK(state))
+                return 0;
+            REBLEN len;
+            VAL_ARRAY_LEN_AT(&len, state);
             return Init_Integer(D_OUT, len); }
 
         case SYM_OPEN_Q:
@@ -168,13 +171,16 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         else {
             // !!! This copies the strings in the block, shallowly.  What is
             // the purpose of doing this?  Why copy at all?
+
+            REBLEN len;
+            VAL_ARRAY_LEN_AT(&len, state);
             Init_Block(
                 D_OUT,
                 Copy_Array_Core_Managed(
                     VAL_ARRAY(state),
                     0, // at
                     VAL_SPECIFIER(state),
-                    VAL_ARRAY_LEN_AT(state), // tail
+                    len, // tail
                     0, // extra
                     ARRAY_MASK_HAS_FILE_LINE, // flags
                     TS_STRING // types

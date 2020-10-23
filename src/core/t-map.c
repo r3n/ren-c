@@ -380,12 +380,11 @@ REB_R PD_Map(
 //
 static void Append_Map(
     REBMAP *map,
-    const REBARR *array,
-    REBLEN index,
+    const RELVAL *head,
     REBSPC *specifier,
     REBLEN len
 ) {
-    const RELVAL *item = ARR_AT(array, index);
+    const RELVAL *item = head;
     REBLEN n = 0;
 
     while (n < len && NOT_END(item)) {
@@ -393,7 +392,7 @@ static void Append_Map(
             //
             // Keys with no value not allowed, e.g. `make map! [1 "foo" 2]`
             //
-            fail (Error_Past_End_Raw());
+            fail (Error_Index_Out_Of_Range_Raw());
         }
 
         bool strict = true;
@@ -489,13 +488,12 @@ REB_R TO_Map(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
         //
         // make map! [word val word val]
         //
-        const REBARR* array = VAL_ARRAY(arg);
-        REBLEN len = VAL_ARRAY_LEN_AT(arg);
-        REBLEN index = VAL_INDEX(arg);
+        REBLEN len;
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
         REBSPC *specifier = VAL_SPECIFIER(arg);
 
         REBMAP *map = Make_Map(len / 2); // [key value key value...] + END
-        Append_Map(map, array, index, specifier, len);
+        Append_Map(map, at, specifier, len);
         Rehash_Map(map);
         return Init_Map(out, map);
     }
@@ -747,14 +745,9 @@ REBTYPE(Map)
             fail (PAR(value));
 
         REBLEN len = Part_Len_May_Modify_Index(value, ARG(part));
+        const RELVAL *at = VAL_ARRAY_AT(value);  // w/modified index
 
-        Append_Map(
-            m,
-            VAL_ARRAY(value),
-            VAL_INDEX(value),
-            VAL_SPECIFIER(value),
-            len
-        );
+        Append_Map(m, at, VAL_SPECIFIER(value), len);
 
         return Init_Map(D_OUT, m); }
 

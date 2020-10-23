@@ -218,43 +218,45 @@ REB_R MAKE_Decimal(
         rebRelease(quotient);
         break; }
 
-      case REB_BLOCK:
-        if (VAL_ARRAY_LEN_AT(arg) == 2) {
-            const RELVAL *item = VAL_ARRAY_AT(arg);
-            if (IS_INTEGER(item))
-                d = cast(REBDEC, VAL_INT64(item));
-            else if (IS_DECIMAL(item) || IS_PERCENT(item))
-                d = VAL_DECIMAL(item);
-            else
-                fail (Error_Bad_Value_Core(item, VAL_SPECIFIER(arg)));
+      case REB_BLOCK: {
+        REBLEN len;
+        const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
 
-            ++item;
-
-            REBDEC exp;
-            if (IS_INTEGER(item))
-                exp = cast(REBDEC, VAL_INT64(item));
-            else if (IS_DECIMAL(item) || IS_PERCENT(item))
-                exp = VAL_DECIMAL(item);
-            else
-                fail (Error_Bad_Value_Core(item, VAL_SPECIFIER(arg)));
-
-            while (exp >= 1) {
-                //
-                // !!! Comment here said "funky. There must be a better way"
-                //
-                --exp;
-                d *= 10.0;
-                if (!FINITE(d))
-                    fail (Error_Overflow_Raw());
-            }
-
-            while (exp <= -1) {
-                ++exp;
-                d /= 10.0;
-            }
-        }
-        else
+        if (len != 2)
             fail (Error_Bad_Make(kind, arg));
+
+        if (IS_INTEGER(item))
+            d = cast(REBDEC, VAL_INT64(item));
+        else if (IS_DECIMAL(item) || IS_PERCENT(item))
+            d = VAL_DECIMAL(item);
+        else
+            fail (Error_Bad_Value_Core(item, VAL_SPECIFIER(arg)));
+
+        ++item;
+
+        REBDEC exp;
+        if (IS_INTEGER(item))
+            exp = cast(REBDEC, VAL_INT64(item));
+        else if (IS_DECIMAL(item) || IS_PERCENT(item))
+            exp = VAL_DECIMAL(item);
+        else
+            fail (Error_Bad_Value_Core(item, VAL_SPECIFIER(arg)));
+
+        while (exp >= 1) {
+            //
+            // !!! Comment here said "funky. There must be a better way"
+            //
+            --exp;
+            d *= 10.0;
+            if (!FINITE(d))
+                fail (Error_Overflow_Raw());
+        }
+
+        while (exp <= -1) {
+            ++exp;
+            d /= 10.0;
+        }
+        break; }
 
       default:
         goto bad_make;

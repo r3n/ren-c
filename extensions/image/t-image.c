@@ -243,7 +243,7 @@ REB_R MAKE_Image(
         //
         Copy_Image_Value(out, arg, VAL_IMAGE_LEN_AT(arg));
     }
-    else if (IS_BLANK(arg) || (IS_BLOCK(arg) && VAL_ARRAY_LEN_AT(arg) == 0)) {
+    else if (IS_BLANK(arg)) {
         //
         // make image! [] (or none)
         //
@@ -1124,7 +1124,7 @@ REBTYPE(Image)
             h = VAL_PAIR_Y_INT(arg);
             w = MAX(w, 0);
             h = MAX(h, 0);
-            diff = MIN(VAL_LEN_HEAD(value), VAL_IMAGE_POS(value));
+            diff = MIN(cast(REBIDX, VAL_LEN_HEAD(value)), VAL_IMAGE_POS(value));
             diff = MAX(0, diff);
             index = VAL_IMAGE_WIDTH(value); // width
             if (index) {

@@ -2993,7 +2993,7 @@ REBNATIVE(transcode)
         Move_Value(var, source);
 
         if (IS_BINARY(var))
-            VAL_INDEX(var) = ss.end - BIN_HEAD(VAL_BINARY(var));
+            VAL_INDEX_UNBOUNDED(var) = ss.end - BIN_HEAD(VAL_BINARY(var));
         else {
             assert(IS_TEXT(var));
 
@@ -3008,9 +3008,9 @@ REBNATIVE(transcode)
             // maybe that would make it slower when this isn't needed?)
             //
             if (ss.begin != 0)
-                VAL_INDEX(var) += Num_Codepoints_For_Bytes(bp, ss.begin);
+                VAL_INDEX_RAW(var) += Num_Codepoints_For_Bytes(bp, ss.begin);
             else
-                VAL_INDEX(var) += BIN_TAIL(VAL_SERIES(var)) - bp;
+                VAL_INDEX_RAW(var) += BIN_TAIL(VAL_SERIES(var)) - bp;
         }
     }
 

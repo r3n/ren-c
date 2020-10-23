@@ -453,8 +453,14 @@ REB_R MAKE_Date(
         return out;
     }
 
-    if (ANY_ARRAY(arg) and VAL_ARRAY_LEN_AT(arg) >= 3) {
-        const RELVAL *item = VAL_ARRAY_AT(arg);
+    if (not ANY_ARRAY(arg))
+        goto bad_make;
+
+  blockscope {
+    REBLEN len;
+    const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
+
+    if (len >= 3) {
         if (not IS_INTEGER(item))
             goto bad_make;
 
@@ -537,6 +543,7 @@ REB_R MAKE_Date(
         Adjust_Date_Zone(out, to_utc);
         return out;
     }
+  }
 
   bad_make:
     fail (Error_Bad_Make(REB_DATE, arg));

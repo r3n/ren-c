@@ -143,7 +143,7 @@ static REB_R Loop_Series_Common(
     // it must be checked for changing to another series, or non-series.
     //
     Move_Value(var, start);
-    REBLEN *state = &VAL_INDEX(var);
+    REBIDX *state = &VAL_INDEX_UNBOUNDED(var);
 
     // Run only once if start is equal to end...edge case.
     //
@@ -910,12 +910,16 @@ REBNATIVE(for_skip)
 
     // Starting location when past end with negative skip:
     //
-    if (skip < 0 and VAL_INDEX(var) >= VAL_LEN_HEAD(var))
-        VAL_INDEX(var) = VAL_LEN_HEAD(var) + skip;
+    if (
+        skip < 0
+        and VAL_INDEX_UNBOUNDED(var) >= cast(REBIDX, VAL_LEN_HEAD(var))
+    ){
+        VAL_INDEX_UNBOUNDED(var) = VAL_LEN_HEAD(var) + skip;
+    }
 
     while (true) {
         REBINT len = VAL_LEN_HEAD(var);  // VAL_LEN_HEAD() always >= 0
-        REBINT index = VAL_INDEX(var);  // (may have been set to < 0 below)
+        REBINT index = VAL_INDEX_RAW(var);  // may have been set to < 0 below
 
         if (index < 0)
             break;
@@ -925,7 +929,7 @@ REBNATIVE(for_skip)
             index = len + skip;  // negative
             if (index < 0)
                 break;
-            VAL_INDEX(var) = index;
+            VAL_INDEX_UNBOUNDED(var) = index;
         }
 
         if (Do_Branch_Throws(D_OUT, nullptr, ARG(body))) {
@@ -950,7 +954,12 @@ REBNATIVE(for_skip)
         if (not ANY_SERIES(var))
             fail (var);
 
-        VAL_INDEX(var) += skip;
+        // Increment via skip, which may go before 0 or after the tail of
+        // the series.
+        //
+        // !!! Should also check for overflows of REBIDX range.
+        //
+        VAL_INDEX_UNBOUNDED(var) += skip;
     }
 
     return D_OUT;

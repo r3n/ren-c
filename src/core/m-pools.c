@@ -716,7 +716,7 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
 
     assert(index <= SER_USED(s));
     if (delta & 0x80000000)
-        fail (Error_Past_End_Raw()); // 2GB max
+        fail (Error_Index_Out_Of_Range_Raw()); // 2GB max
 
     if (delta == 0)
         return;

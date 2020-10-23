@@ -197,14 +197,16 @@ REB_R MAKE_Binary(
         // while #[binary [#{0001} 2]] would join the pieces together in order
         // to produce #{000102}.  That behavior is not available in Ren-C.
 
-        if (VAL_ARRAY_LEN_AT(def) != 2)
+        REBLEN len;
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, def);
+        if (len != 2)
             goto bad_make;
 
-        const RELVAL *first = VAL_ARRAY_AT(def);
+        const RELVAL *first = at;
         if (not IS_BINARY(first))
             goto bad_make;
 
-        const RELVAL *index = VAL_ARRAY_AT(def) + 1;
+        const RELVAL *index = at + 1;
         if (not IS_INTEGER(index))
             goto bad_make;
 
@@ -429,7 +431,7 @@ REBTYPE(Binary)
         if (REF(line))
             flags |= AM_LINE;
 
-        VAL_INDEX(v) = Modify_String_Or_Binary(
+        VAL_INDEX_RAW(v) = Modify_String_Or_Binary(
             v,
             cast(enum Reb_Symbol, sym),
             ARG(value),
@@ -509,11 +511,11 @@ REBTYPE(Binary)
 
         if (REF(last)) {
             if (tail - len < 0) {
-                VAL_INDEX(v) = 0;
+                VAL_INDEX_RAW(v) = 0;
                 len = tail;
             }
             else
-                VAL_INDEX(v) = cast(REBLEN, tail - len);
+                VAL_INDEX_RAW(v) = cast(REBLEN, tail - len);
         }
 
         if (cast(REBINT, VAL_INDEX(v)) >= tail) {

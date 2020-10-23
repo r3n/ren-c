@@ -361,14 +361,8 @@ pointfree: enclose (specialize* 'pointfree* [action: :void]) func* [f] [
 ; specializations they don't fit easily into the NEXT OF SERIES model--this
 ; is a problem which hasn't been addressed.
 ;
-next: specialize 'skip [
-    offset: 1
-    only: true  ; don't clip (return null if already at head of series)
-]
-back: specialize 'skip [
-    offset: -1
-    only: true  ; don't clip (return null if already at tail of series)
-]
+next: specialize 'skip [offset: 1]
+back: specialize 'skip [offset: -1]
 
 bound?: chain [specialize 'reflect [property: 'binding] | :value?]
 

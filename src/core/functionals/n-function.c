@@ -312,7 +312,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
     // which overrides it, so the value won't have PARAMLIST_HAS_RETURN.
 
     REBARR *copy;
-    if (VAL_ARRAY_LEN_AT(body) == 0) {  // optimize empty body case
+    if (IS_END(VAL_ARRAY_AT(body))) {  // optimize empty body case
 
         if (GET_ACTION_FLAG(a, IS_INVISIBLE)) {
             ACT_DISPATCHER(a) = &Commenter_Dispatcher;

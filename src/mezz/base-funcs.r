@@ -601,13 +601,6 @@ default*: enfixed redescribe [
 )
 
 
-skip*: redescribe [
-    {Variant of SKIP that returns NULL instead of clipping to series bounds}
-](
-    specialize 'skip [only: true]
-)
-
-
 ensure: redescribe [
     {Pass through value if it matches test, otherwise trigger a FAIL}
 ](

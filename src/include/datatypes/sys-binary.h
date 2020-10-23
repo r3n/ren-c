@@ -101,15 +101,37 @@ inline static REBSER *Make_Binary_Core(REBLEN capacity, REBFLGS flags)
 
 //=//// BINARY! VALUES ////////////////////////////////////////////////////=//
 
-#define VAL_BIN_HEAD(v) \
-    BIN_HEAD(VAL_SERIES(v))
-
-inline static const REBYTE *VAL_BIN_AT(REBCEL(const*) v) {
-    assert(CELL_KIND(v) == REB_BINARY or CELL_KIND(v) == REB_BITSET);
-    if (VAL_INDEX(v) > BIN_LEN(VAL_SERIES(v)))
-        fail (Error_Past_End_Raw());  // don't give deceptive return pointer
-    return BIN_AT(VAL_SERIES(v), VAL_INDEX(v));
+inline static const REBBIN *VAL_BINARY(REBCEL(const*) v) {
+    assert(CELL_KIND(v) == REB_BINARY);
+    return VAL_SERIES(v);
 }
+
+#define VAL_BINARY_ENSURE_MUTABLE(v) \
+    m_cast(REBBIN*, VAL_BINARY(ENSURE_MUTABLE(v)))
+
+#define VAL_BINARY_KNOWN_MUTABLE(v) \
+    m_cast(REBBIN*, VAL_BINARY(KNOWN_MUTABLE(v)))
+
+
+inline static const REBYTE *VAL_BINARY_SIZE_AT(
+    REBSIZ *size_out,
+    REBCEL(const*) v
+){
+    const REBBIN *bin = VAL_BINARY(v);
+    REBIDX i = VAL_INDEX_RAW(v);
+    REBSIZ size = BIN_LEN(bin);
+    if (i < 0 or i > cast(REBIDX, size))
+        fail (Error_Index_Out_Of_Range_Raw());
+    if (size_out)
+        *size_out = size;
+    return BIN_AT(bin, i);
+}
+
+#define VAL_BINARY_SIZE_AT_ENSURE_MUTABLE(size_out,v) \
+    m_cast(REBYTE*, VAL_BINARY_SIZE_AT((size_out), ENSURE_MUTABLE(v)))
+
+#define VAL_BIN_AT(v) \
+    VAL_BINARY_SIZE_AT(nullptr, (v))
 
 #define VAL_BIN_AT_ENSURE_MUTABLE(v) \
     m_cast(REBYTE*, VAL_BIN_AT(ENSURE_MUTABLE(v)))
@@ -122,16 +144,5 @@ inline static const REBYTE *VAL_BIN_AT(REBCEL(const*) v) {
 
 #define Init_Binary_At(out,bin,offset) \
     Init_Any_Series_At((out), REB_BINARY, (bin), (offset))
-
-inline static const REBBIN *VAL_BINARY(REBCEL(const*) v) {
-    assert(CELL_KIND(v) == REB_BINARY);
-    return VAL_SERIES(v);
-}
-
-#define VAL_BINARY_ENSURE_MUTABLE(v) \
-    m_cast(REBBIN*, VAL_BINARY(ENSURE_MUTABLE(v)))
-
-#define VAL_BINARY_KNOWN_MUTABLE(v) \
-    m_cast(REBBIN*, VAL_BINARY(KNOWN_MUTABLE(v)))
 
 #define BYTE_BUF TG_Byte_Buf

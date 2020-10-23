@@ -682,32 +682,52 @@ inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
     m_cast(REBSER*, VAL_SERIES(KNOWN_MUTABLE(v)))
 
 
-#define VAL_INDEX_UNCHECKED(v) \
-    PAYLOAD(Any, (v)).second.u32
+#define VAL_INDEX_RAW(v) \
+    PAYLOAD(Any, (v)).second.i
 
 #if defined(NDEBUG) || !defined(CPLUSPLUS_11)
-    #define VAL_INDEX(v) \
-        VAL_INDEX_UNCHECKED(v)
+    #define VAL_INDEX_UNBOUNDED(v) \
+        VAL_INDEX_RAW(v)
 #else
-    // allows an assert, but also lvalue: `VAL_INDEX(v) = xxx`
+    // allows an assert, but uses C++ reference for lvalue:
+    //
+    //     VAL_INDEX_UNBOUNDED(v) = xxx;  // ensures v is ANY_SERIES!
     //
     // uses "evil macro" variants because the cost of this basic operation
     // becomes prohibitive when the functions aren't inlined and checks wind
     // up getting done 
     //
-    inline static REBLEN VAL_INDEX(REBCEL(const*) v) { // C++ reference type
+    inline static REBIDX VAL_INDEX_UNBOUNDED(REBCEL(const*) v) {
         enum Reb_Kind k = CELL_HEART(v);  // only const access if heart!
         assert(ANY_SERIES_KIND_EVIL_MACRO);
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        return VAL_INDEX_UNCHECKED(v);
+        return VAL_INDEX_RAW(v);
     }
-    inline static REBLEN & VAL_INDEX(RELVAL *v) {
+    inline static REBIDX & VAL_INDEX_UNBOUNDED(RELVAL *v) {
         enum Reb_Kind k = VAL_TYPE(v);  // mutable allowed if nonquoted
         assert(k == REB_ISSUE or ANY_SERIES_KIND_EVIL_MACRO);
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        return VAL_INDEX_UNCHECKED(v);
+        return VAL_INDEX_RAW(v);  // returns a C++ reference
     }
 #endif
+
+
+inline static REBLEN VAL_LEN_HEAD(REBCEL(const*) v);  // forward decl
+
+// Unlike VAL_INDEX_UNBOUNDED() that may give a negative number or past the
+// end of series, VAL_INDEX() does bounds checking and always returns an
+// unsigned REBLEN.
+//
+inline static REBLEN VAL_INDEX(REBCEL(const*) v) { // C++ reference type
+    enum Reb_Kind k = CELL_HEART(v);  // only const access if heart!
+    assert(ANY_SERIES_KIND_EVIL_MACRO);
+    UNUSED(k);
+    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
+    REBIDX i = VAL_INDEX_RAW(v);
+    if (i < 0 or i > cast(REBIDX, VAL_LEN_HEAD(v)))
+        fail (Error_Index_Out_Of_Range_Raw());
+    return i;
+}
 
 
 inline static const REBYTE *VAL_DATA_AT(REBCEL(const*) v) {
@@ -748,7 +768,7 @@ inline static REBVAL *Init_Any_Series_At_Core(
 
     RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, s);
-    VAL_INDEX(out) = index;
+    VAL_INDEX_RAW(out) = index;
     INIT_BINDING(out, binding);  // asserts if unbindable type tries to bind
     return cast(REBVAL*, out);
 }

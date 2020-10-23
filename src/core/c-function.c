@@ -740,7 +740,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             // argument while having nothing to do with the exit value of
             // the function.)
             //
-            if (VAL_ARRAY_LEN_AT(definitional_return + 1) != 0) {
+            if (NOT_END(VAL_ARRAY_AT(definitional_return + 1))) {
                 Move_Value(
                     CTX_VAR(meta, STD_ACTION_META_RETURN_TYPE),
                     &definitional_return[1]
@@ -756,7 +756,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             if (definitional_return and src == definitional_return + 1)
                 continue;
 
-            if (VAL_ARRAY_LEN_AT(src) == 0)
+            if (IS_END(VAL_ARRAY_AT(src)))
                 Init_Nulled(dest);
             else
                 Move_Value(dest, src);
@@ -1218,7 +1218,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
             //
             RESET_VAL_HEADER(slot, REB_GROUP, CELL_FLAG_FIRST_IS_NODE);
             INIT_VAL_NODE(slot, VAL_ARRAY(body));
-            VAL_INDEX(slot) = 0;
+            VAL_INDEX_RAW(slot) = 0;
             INIT_BINDING(slot, a);  // relative binding
 
             maybe_fake_body = fake;
@@ -1229,7 +1229,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
 
         RESET_VAL_HEADER(out, REB_BLOCK, CELL_FLAG_FIRST_IS_NODE);
         INIT_VAL_NODE(out, maybe_fake_body);
-        VAL_INDEX(out) = 0;
+        VAL_INDEX_RAW(out) = 0;
         INIT_BINDING(out, Make_Expired_Frame_Ctx_Managed(a));
         return;
     }

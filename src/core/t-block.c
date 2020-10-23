@@ -122,16 +122,14 @@ REB_R MAKE_Array(
         // then it can be somewhat confusing as to why [[a b c]] is needed
         // instead of just [a b c] as the construction spec.
         //
-        if (
-            VAL_ARRAY_LEN_AT(arg) != 2
-            or not ANY_ARRAY(VAL_ARRAY_AT(arg))
-            or not IS_INTEGER(VAL_ARRAY_AT(arg) + 1)
-        ) {
-            goto bad_make;
-        }
+        REBLEN len;
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
 
-        const RELVAL *any_array = VAL_ARRAY_AT(arg);
-        REBINT index = VAL_INDEX(any_array) + Int32(VAL_ARRAY_AT(arg) + 1) - 1;
+        if (len != 2 or not ANY_ARRAY(at) or not IS_INTEGER(at + 1))
+            goto bad_make;
+
+        const RELVAL *any_array = at;
+        REBINT index = VAL_INDEX(any_array) + Int32(at + 1) - 1;
 
         if (index < 0 or index > cast(REBINT, VAL_LEN_HEAD(any_array)))
             goto bad_make;
@@ -165,12 +163,12 @@ REB_R MAKE_Array(
         // position and change the type.  (Note: MAKE does not copy the
         // data, but aliases it under a new kind.)
         //
+        REBLEN len;
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
         return Init_Any_Array(
             out,
             kind,
-            Copy_Values_Len_Shallow(
-                VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg), VAL_ARRAY_LEN_AT(arg)
-            )
+            Copy_Values_Len_Shallow(at, VAL_SPECIFIER(arg), len)
         );
     }
     else if (IS_TEXT(arg)) {
@@ -303,12 +301,12 @@ REB_R TO_Array(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         return Init_Any_Array(out, kind, Pop_Stack_Values(dsp_orig));
     }
     else if (ANY_ARRAY(arg)) {
+        REBLEN len;
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
         return Init_Any_Array(
             out,
             kind,
-            Copy_Values_Len_Shallow(
-                VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg), VAL_ARRAY_LEN_AT(arg)
-            )
+            Copy_Values_Len_Shallow(at, VAL_SPECIFIER(arg), len)
         );
     }
     else {
@@ -824,7 +822,11 @@ REBTYPE(Array)
 
         REBVAL *pattern = ARG(pattern);
 
-        REBINT len = ANY_ARRAY(pattern) ? VAL_ARRAY_LEN_AT(pattern) : 1;
+        REBLEN len;
+        if (ANY_ARRAY(pattern))
+            VAL_ARRAY_LEN_AT(&len, pattern);
+        else
+            len = 1;
 
         REBLEN limit = Part_Tail_May_Modify_Index(array, ARG(part));
 
@@ -861,7 +863,7 @@ REBTYPE(Array)
         if (VAL_WORD_SYM(verb) == SYM_FIND) {
             if (REF(tail) or REF(match))
                 ret += len;
-            VAL_INDEX(array) = ret;
+            VAL_INDEX_RAW(array) = ret;
             Move_Value(D_OUT, array);
         }
         else {
@@ -891,7 +893,7 @@ REBTYPE(Array)
         //
         if (IS_NULLED(ARG(value)) and len == 0) {  // only nulls bypass writes
             if (sym == SYM_APPEND) // append always returns head
-                VAL_INDEX(array) = 0;
+                VAL_INDEX_RAW(array) = 0;
             RETURN (array); // don't fail on read only if it would be a no-op
         }
 
@@ -907,7 +909,7 @@ REBTYPE(Array)
             flags |= AM_LINE;
 
         Move_Value(D_OUT, array);
-        VAL_INDEX(D_OUT) = Modify_Array(
+        VAL_INDEX_RAW(D_OUT) = Modify_Array(
             arr,
             index,
             cast(enum Reb_Symbol, sym),

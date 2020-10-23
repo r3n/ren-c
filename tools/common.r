@@ -187,9 +187,12 @@ binary-to-c: function [
 
     return: [text!]
     data [binary!]
+    <local> data-len
 ][
+    data-len: length of data
+
     out: make text! 6 * (length of data)
-    while [not tail? data] [
+    while [not empty? try data] [
         ; grab hexes in groups of 8 bytes
         hexed: enbase/base (copy/part data 8) 16
         data: skip data 8
@@ -198,7 +201,7 @@ binary-to-c: function [
         ]
 
         take/last out  ; drop the last space
-        if tail? data [
+        if empty? try data [
             take/last out  ; lose that last comma
         ]
         append out newline  ; newline after each group, and at end
@@ -210,7 +213,7 @@ binary-to-c: function [
         some [thru "," (comma-count: comma-count + 1)]
         to end
     ]
-    assert [(comma-count + 1) = (length of head of data)]
+    assert [(comma-count + 1) = data-len]
 
     out
 ]
