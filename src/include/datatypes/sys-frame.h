@@ -200,10 +200,7 @@ inline static const REBSTR *FRM_LABEL(REBFRM *f) {
 #else
     inline static REBVAL *FRM_ARG(REBFRM *f, REBLEN n) {
         assert(n != 0 and n <= FRM_NUM_ARGS(f));
-
-        REBVAL *var = f->rootvar + n; // 1-indexed
-        assert(not IS_RELATIVE(cast(RELVAL*, var)));
-        return var;
+        return f->rootvar + n;  // 1-indexed
     }
 #endif
 
