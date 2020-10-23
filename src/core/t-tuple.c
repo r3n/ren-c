@@ -151,10 +151,11 @@ REB_R MAKE_Sequence(
         Init_Tuple_Bytes(out, buf, size);
     }
     else if (IS_BINARY(arg)) {
-        REBLEN len = VAL_LEN_AT(arg);
-        if (len > MAX_TUPLE)
-            len = MAX_TUPLE;
-        Init_Tuple_Bytes(out, VAL_BIN_AT(arg), len);
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);
+        if (size > MAX_TUPLE)
+            size = MAX_TUPLE;
+        Init_Tuple_Bytes(out, at, size);
     }
     else
         fail (arg);

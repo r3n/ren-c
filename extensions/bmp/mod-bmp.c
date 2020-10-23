@@ -297,13 +297,13 @@ REBNATIVE(identify_bmp_q)
 {
     BMP_INCLUDE_PARAMS_OF_IDENTIFY_BMP_Q;
 
-    const REBYTE *data = VAL_BIN_AT(ARG(data));
-    uint32_t len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
 
     // Assume signature matching is good enough (will get a fail() on
     // decode if it's a false positive).
     //
-    return Init_Logic(D_OUT, Has_Valid_BITMAPFILEHEADER(data, len));
+    return Init_Logic(D_OUT, Has_Valid_BITMAPFILEHEADER(data, size));
 }
 
 
@@ -320,10 +320,10 @@ REBNATIVE(decode_bmp)
 {
     BMP_INCLUDE_PARAMS_OF_DECODE_BMP;
 
-    const REBYTE *data = VAL_BIN_AT(ARG(data));
-    uint32_t len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
 
-    if (not Has_Valid_BITMAPFILEHEADER(data, len))
+    if (not Has_Valid_BITMAPFILEHEADER(data, size))
         fail (Error_Bad_Media_Raw());
 
     int32_t              i, j, x, y, c;

@@ -905,8 +905,9 @@ REBNATIVE(invalid_utf8_q)
     INCLUDE_PARAMS_OF_INVALID_UTF8_Q;
 
     REBVAL *arg = ARG(data);
-    const REBYTE *utf8 = VAL_BIN_AT(arg);
-    REBSIZ size = VAL_LEN_AT(arg);
+
+    REBSIZ size;
+    const REBYTE *utf8 = VAL_BINARY_SIZE_AT(&size, arg);
 
     const REBYTE *end = utf8 + size;
 

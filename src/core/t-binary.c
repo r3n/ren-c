@@ -41,19 +41,23 @@ REBINT CT_Binary(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     UNUSED(strict);  // no lax form of comparison
 
-    REBLEN l1 = VAL_LEN_AT(a);
-    REBLEN l2 = VAL_LEN_AT(b);
-    REBLEN len = MIN(l1, l2);
+    REBSIZ size1;
+    const REBYTE *data1 = VAL_BINARY_SIZE_AT(&size1, a);
 
-    REBINT n = memcmp(VAL_BIN_AT(a), VAL_BIN_AT(b), len);
+    REBSIZ size2;
+    const REBYTE *data2 = VAL_BINARY_SIZE_AT(&size2, b);
+
+    REBLEN size = MIN(size1, size2);
+
+    REBINT n = memcmp(data1, data2, size);
 
     if (n != 0)  // not guaranteed to be strictly in [-1 0 1]
         return n > 0 ? 1 : -1;
 
-    if (l1 == l2)
+    if (size1 == size2)
         return 0;
 
-    return l1 > l2 ? 1 : -1;
+    return size1 > size2 ? 1 : -1;
 }
 
 
@@ -117,8 +121,10 @@ static REBSER *Make_Binary_BE64(const REBVAL *arg)
 static REBSER *MAKE_TO_Binary_Common(const REBVAL *arg)
 {
     switch (VAL_TYPE(arg)) {
-    case REB_BINARY:
-        return Copy_Bytes(VAL_BIN_AT(arg), VAL_LEN_AT(arg));
+    case REB_BINARY: {
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, arg);
+        return Copy_Bytes(data, size); }
 
     case REB_TEXT:
     case REB_FILE:
@@ -348,29 +354,30 @@ void MF_Binary(REB_MOLD *mo, REBCEL(const*) v, bool form)
     if (GET_MOLD_FLAG(mo, MOLD_FLAG_ALL) and VAL_INDEX(v) != 0)
         Pre_Mold(mo, v); // #[binary!
 
-    REBLEN len = VAL_LEN_AT(v);
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
 
     switch (Get_System_Int(SYS_OPTIONS, OPTIONS_BINARY_BASE, 16)) {
       default:
       case 16: {
         Append_Ascii(mo->series, "#{"); // default, so #{...} not #16{...}
 
-        const bool brk = (len > 32);
-        Form_Base16(mo, VAL_BIN_AT(v), len, brk);
+        const bool brk = (size > 32);
+        Form_Base16(mo, data, size, brk);
         break; }
 
       case 64: {
         Append_Ascii(mo->series, "64#{");
 
-        const bool brk = (len > 64);
-        Form_Base64(mo, VAL_BIN_AT(v), len, brk);
+        const bool brk = (size > 64);
+        Form_Base64(mo, data, size, brk);
         break; }
 
       case 2: {
         Append_Ascii(mo->series, "2#{");
 
-        const bool brk = (len > 8);
-        Form_Base2(mo, VAL_BIN_AT(v), len, brk);
+        const bool brk = (size > 8);
+        Form_Base2(mo, data, size, brk);
         break; }
     }
 
@@ -530,7 +537,7 @@ REBTYPE(Binary)
         // if no /PART, just return value, else return string
         //
         if (not REF(part)) {
-            Init_Integer(D_OUT, *VAL_BIN_AT(v));
+            Init_Integer(D_OUT, *VAL_BINARY_AT(v));
         }
         else {
             Init_Binary(
@@ -585,14 +592,14 @@ REBTYPE(Binary)
         if (not IS_BINARY(arg))
             fail (Error_Math_Args(VAL_TYPE(arg), verb));
 
-        const REBYTE *p0 = VAL_BIN_AT(v);
-        const REBYTE *p1 = VAL_BIN_AT(arg);
+        REBSIZ t0;
+        const REBYTE *p0 = VAL_BINARY_SIZE_AT(&t0, v);
 
-        REBLEN t0 = VAL_LEN_AT(v);
-        REBLEN t1 = VAL_LEN_AT(arg);
+        REBSIZ t1;
+        const REBYTE *p1 = VAL_BINARY_SIZE_AT(&t1, arg);
 
-        REBLEN smaller = MIN(t0, t1);  // smaller array size
-        REBLEN larger = MAX(t0, t1);
+        REBSIZ smaller = MIN(t0, t1);  // smaller array size
+        REBSIZ larger = MAX(t0, t1);
 
         REBSER *series = Make_Binary(larger);
         TERM_SEQUENCE_LEN(series, larger);
@@ -636,14 +643,14 @@ REBTYPE(Binary)
         return Init_Any_Series(D_OUT, REB_BINARY, series); }
 
       case SYM_BITWISE_NOT: {
-        const REBYTE *bp = VAL_BIN_AT(v);
-        REBLEN len = VAL_LEN_AT(v);
+        REBSIZ size;
+        const REBYTE *bp = VAL_BINARY_SIZE_AT(&size, v);
 
-        REBSER *bin = Make_Binary(len);
-        TERM_SEQUENCE_LEN(bin, len);
+        REBBIN *bin = Make_Binary(size);
+        TERM_SEQUENCE_LEN(bin, size);
 
         REBYTE *dp = BIN_HEAD(bin);
-        for (; len > 0; len--, ++bp, ++dp)
+        for (; size > 0; --size, ++bp, ++dp)
             *dp = ~(*bp);
 
         return Init_Any_Series(D_OUT, REB_BINARY, bin); }
@@ -734,8 +741,8 @@ REBTYPE(Binary)
         if (VAL_TYPE(v) != VAL_TYPE(arg))
             fail (Error_Not_Same_Type_Raw());
 
-        REBYTE *v_at = VAL_BIN_AT_ENSURE_MUTABLE(v);
-        REBYTE *arg_at = VAL_BIN_AT_ENSURE_MUTABLE(arg);
+        REBYTE *v_at = VAL_BINARY_AT_ENSURE_MUTABLE(v);
+        REBYTE *arg_at = VAL_BINARY_AT_ENSURE_MUTABLE(arg);
 
         if (index < tail and VAL_INDEX(arg) < VAL_LEN_HEAD(arg)) {
             REBYTE temp = *v_at;
@@ -748,9 +755,9 @@ REBTYPE(Binary)
         INCLUDE_PARAMS_OF_REVERSE;
         UNUSED(ARG(series));
 
-        REBYTE *bp = VAL_BIN_AT_ENSURE_MUTABLE(v);
-
         REBLEN len = Part_Len_May_Modify_Index(v, ARG(part));
+        REBYTE *bp = VAL_BINARY_AT_ENSURE_MUTABLE(v);  // index may've changed
+
         if (len > 0) {
             REBLEN n = 0;
             REBLEN m = len - 1;
@@ -765,8 +772,6 @@ REBTYPE(Binary)
       case SYM_SORT: {
         INCLUDE_PARAMS_OF_SORT;
         UNUSED(PAR(series));
-
-        REBYTE *data_at = VAL_BIN_AT_ENSURE_MUTABLE(v);
 
         if (REF(all))
             fail (Error_Bad_Refine_Raw(ARG(all)));
@@ -783,6 +788,8 @@ REBTYPE(Binary)
         Move_Value(D_OUT, v);  // copy to output before index adjustment
 
         REBLEN len = Part_Len_May_Modify_Index(v, ARG(part));
+        REBYTE *data_at = VAL_BINARY_AT_ENSURE_MUTABLE(v);  // ^ index changes
+
         if (len <= 1)
             return D_OUT;
 
@@ -819,7 +826,9 @@ REBTYPE(Binary)
         UNUSED(PAR(value));
 
         if (REF(seed)) { // binary contents are the seed
-            Set_Random(Compute_CRC24(VAL_BIN_AT(v), VAL_LEN_AT(v)));
+            REBSIZ size;
+            const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
+            Set_Random(Compute_CRC24(data, size));
             return Init_Void(D_OUT);
         }
 
@@ -978,6 +987,9 @@ REBNATIVE(debin)
 {
     INCLUDE_PARAMS_OF_DEBIN;
 
+    REBSIZ bin_size;
+    const REBYTE *bin_data = VAL_BINARY_SIZE_AT(&bin_size, ARG(binary));
+
     REBVAL* settings = rebValue("compose", ARG(settings), rebEND);
     if (VAL_LEN_AT(settings) != 2 and VAL_LEN_AT(settings) != 3)
         fail("DEBIN requires array of length 2 or 3 for settings for now");
@@ -997,12 +1009,12 @@ REBNATIVE(debin)
     REBLEN num_bytes;
     const RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
     if (IS_END(third))
-        num_bytes = VAL_LEN_AT(ARG(binary));
+        num_bytes = bin_size;
     else {
         if (not IS_INTEGER(third))
             fail ("Third element of DEBIN settings must be an integer}");
         num_bytes = VAL_INT32(third);
-        if (VAL_LEN_AT(ARG(binary)) != num_bytes)
+        if (bin_size != num_bytes)
             fail ("Input binary is longer than number of bytes to DEBIN");
     }
     if (num_bytes <= 0) {
@@ -1020,7 +1032,7 @@ REBNATIVE(debin)
     // to be correct for starters...
 
     REBINT delta = little ? -1 : 1;
-    const REBYTE* bp = VAL_BIN_AT(ARG(binary));
+    const REBYTE* bp = bin_data;
     if (little)
         bp += num_bytes - 1;  // go backwards
 

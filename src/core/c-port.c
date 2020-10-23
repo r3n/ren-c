@@ -162,10 +162,9 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             if (not IS_BINARY(D_OUT))
                 fail ("/STRING or /LINES used on a non-BINARY!/STRING! read");
 
-            REBSTR *decoded = Make_Sized_String_UTF8(
-                cs_cast(VAL_BIN_AT(D_OUT)),
-                VAL_LEN_AT(D_OUT)
-            );
+            REBSIZ size;
+            const REBYTE *data = VAL_BINARY_SIZE_AT(&size, D_OUT);
+            REBSTR *decoded = Make_Sized_String_UTF8(cs_cast(data), size);
             Init_Text(D_OUT, decoded);
         }
 

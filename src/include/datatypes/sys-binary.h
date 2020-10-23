@@ -114,7 +114,7 @@ inline static const REBBIN *VAL_BINARY(REBCEL(const*) v) {
 
 
 inline static const REBYTE *VAL_BINARY_SIZE_AT(
-    REBSIZ *size_out,
+    REBSIZ *size_at_out,
     REBCEL(const*) v
 ){
     const REBBIN *bin = VAL_BINARY(v);
@@ -122,22 +122,22 @@ inline static const REBYTE *VAL_BINARY_SIZE_AT(
     REBSIZ size = BIN_LEN(bin);
     if (i < 0 or i > cast(REBIDX, size))
         fail (Error_Index_Out_Of_Range_Raw());
-    if (size_out)
-        *size_out = size;
+    if (size_at_out)
+        *size_at_out = size - i;
     return BIN_AT(bin, i);
 }
 
 #define VAL_BINARY_SIZE_AT_ENSURE_MUTABLE(size_out,v) \
     m_cast(REBYTE*, VAL_BINARY_SIZE_AT((size_out), ENSURE_MUTABLE(v)))
 
-#define VAL_BIN_AT(v) \
+#define VAL_BINARY_AT(v) \
     VAL_BINARY_SIZE_AT(nullptr, (v))
 
-#define VAL_BIN_AT_ENSURE_MUTABLE(v) \
-    m_cast(REBYTE*, VAL_BIN_AT(ENSURE_MUTABLE(v)))
+#define VAL_BINARY_AT_ENSURE_MUTABLE(v) \
+    m_cast(REBYTE*, VAL_BINARY_AT(ENSURE_MUTABLE(v)))
 
-#define VAL_BIN_AT_KNOWN_MUTABLE(v) \
-    m_cast(REBYTE*, VAL_BIN_AT(KNOWN_MUTABLE(v)))
+#define VAL_BINARY_AT_KNOWN_MUTABLE(v) \
+    m_cast(REBYTE*, VAL_BINARY_AT(KNOWN_MUTABLE(v)))
 
 #define Init_Binary(out,bin) \
     Init_Any_Series((out), REB_BINARY, (bin))

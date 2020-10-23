@@ -164,11 +164,10 @@ REBLEN Find_Binstr_In_Binstr(
         );
     }
     else {
-        head2 = VAL_BIN_AT(binstr2);
-        len2 = VAL_LEN_AT(binstr2);
-        if (limit2 < len2)
-            len2 = limit2;
-        size2 = len2;
+        head2 = VAL_BINARY_SIZE_AT(&size2, binstr2);
+        if (limit2 < size2)
+            size2 = limit2;
+        len2 = size2;
     }
 
     // `str2` is always stepped through forwards in FIND, even with a negative
@@ -221,9 +220,8 @@ REBLEN Find_Binstr_In_Binstr(
         cp1 = VAL_UTF8_SIZE_AT(&size_at1, binstr1);
     }
     else {
-        cp1 = VAL_BIN_AT(binstr1);
+        cp1 = VAL_BINARY_SIZE_AT(&size_at1, binstr1);
         len_head1 = VAL_LEN_HEAD(binstr1);
-        size_at1 = VAL_LEN_AT(binstr1);
     }
 
     // The size of binary that can be used for checked UTF8 scans needs to
@@ -441,7 +439,7 @@ REBLEN Find_Bitset_In_Binstr(
 
     bool is_str = (CELL_KIND(binstr) != REB_BINARY);
 
-    const REBYTE *cp1 = is_str ? VAL_STRING_AT(binstr) : VAL_BIN_AT(binstr);
+    const REBYTE *cp1 = is_str ? VAL_STRING_AT(binstr) : VAL_BINARY_AT(binstr);
     REBUNI c1;
     if (skip > 0) {  // skip 1 will pass over cp1, so leave as is
         if (is_str)

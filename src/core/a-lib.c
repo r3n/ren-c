@@ -615,7 +615,7 @@ unsigned char *RL_rebBinaryAt_internal(const REBVAL *binary)
 {
     ENTER_API;
 
-    return VAL_BIN_AT_KNOWN_MUTABLE(binary);
+    return VAL_BINARY_AT_KNOWN_MUTABLE(binary);
 }
 
 
@@ -1323,14 +1323,15 @@ static size_t Bytes_Into(
     const REBVAL *v
 ){
     if (IS_BINARY(v)) {
-        REBSIZ size = VAL_LEN_AT(v);
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
         if (buf == nullptr) {
             assert(buf_size == 0);
             return size;
         }
 
         REBSIZ limit = MIN(buf_size, size);
-        memcpy(buf, VAL_BIN_AT(v), limit);
+        memcpy(buf, data, limit);
         return size;
     }
 

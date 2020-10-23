@@ -747,10 +747,13 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
         Copy_Rect_Data(value, x, y, part_x, part_y, arg, 0, 0);
     }
     else if (IS_BINARY(arg)) {
-        if (index + part > tail) part = tail - index;  // clip it
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, arg);
+        if (part > cast(REBINT, size))
+            part = size;  // clip it
         ip += index * 4;
         for (; dup > 0; dup--, ip += part * 4)
-            Bin_To_RGBA(ip, part, VAL_BIN_AT(arg), part, only);
+            Bin_To_RGBA(ip, part, data, part, only);
     }
     else if (IS_BLOCK(arg)) {
         if (index + part > tail) part = tail - index;  // clip it
@@ -1290,11 +1293,13 @@ void Poke_Image_Fail_If_Read_Only(
                 Fill_Line(src, pixel, len, true);
             }
             else if (IS_BINARY(poke)) {
+                REBSIZ size;
+                const REBYTE *data = VAL_BINARY_SIZE_AT(&size, poke);
                 Bin_To_RGB(
                     src,
                     len,
-                    VAL_BIN_AT(poke),
-                    VAL_LEN_AT(poke) / 3
+                    data,
+                    size / 3
                 );
             }
             else
@@ -1310,12 +1315,9 @@ void Poke_Image_Fail_If_Read_Only(
                 Fill_Alpha_Line(src, cast(REBYTE, n), len);
             }
             else if (IS_BINARY(poke)) {
-                Bin_To_Alpha(
-                    src,
-                    len,
-                    VAL_BIN_AT(poke),
-                    VAL_LEN_AT(poke)
-                );
+                REBSIZ size;
+                const REBYTE *data = VAL_BINARY_SIZE_AT(&size, poke);
+                Bin_To_Alpha(src, len, data, size);
             }
             else
                 fail (poke);

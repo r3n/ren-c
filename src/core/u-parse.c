@@ -821,7 +821,7 @@ static REBIXO To_Thru_Block_Rule(
                 }
             }
             else if (P_TYPE == REB_BINARY) {
-                REBYTE ch1 = *VAL_BIN_AT(iter);
+                REBYTE ch1 = *VAL_BINARY_AT(iter);
 
                 if (VAL_INDEX(iter) == P_INPUT_LEN) {
                     //
@@ -845,15 +845,25 @@ static REBIXO To_Thru_Block_Rule(
                     }
                 }
                 else if (IS_BINARY(rule)) {
-                    REBLEN len = VAL_LEN_AT(rule);
-                    if (0 == memcmp(
-                        VAL_BIN_AT(iter),
-                        VAL_BIN_AT(rule),
-                        len
-                    )) {
-                        if (is_thru)
-                            return VAL_INDEX(iter) + 1;
-                        return VAL_INDEX(iter);
+                    REBSIZ rule_size;
+                    const REBYTE *rule_data = VAL_BINARY_SIZE_AT(
+                        &rule_size,
+                        rule
+                    );
+
+                    REBSIZ iter_size;
+                    const REBYTE *iter_data = VAL_BINARY_SIZE_AT(
+                        &iter_size,
+                        iter
+                    );
+
+                    if (
+                        iter_size == rule_size
+                        and (0 == memcmp(iter_data, rule_data, iter_size))
+                    ){
+                        if (is_thru)  // ^-- VAL_XXX_AT checked VAL_INDEX()
+                            return VAL_INDEX_RAW(iter) + 1;
+                        return VAL_INDEX_RAW(iter);
                     }
                 }
                 else if (IS_INTEGER(rule)) {

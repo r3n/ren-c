@@ -111,7 +111,9 @@ REB_R MAKE_Bitset(
         return out; // allocated at a size, no contents.
 
     if (IS_BINARY(arg)) {
-        memcpy(BIN_HEAD(bin), VAL_BIN_AT(arg), len/8 + 1);
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);
+        memcpy(BIN_HEAD(bin), at, (size / 8) + 1);
         return out;
     }
 
@@ -377,13 +379,16 @@ bool Set_Bits(REBSER *bset, const RELVAL *val, bool set)
             item++;
             if (not IS_BINARY(item))
                 return false;
-            REBLEN n = VAL_LEN_AT(item);
+
+            REBSIZ n;
+            const REBYTE *at = VAL_BINARY_SIZE_AT(&n, item);
+
             REBUNI c = BIN_LEN(bset);
             if (n >= c) {
                 Expand_Series(bset, c, (n - c));
                 CLEAR(BIN_AT(bset, c), (n - c));
             }
-            memcpy(BIN_HEAD(bset), VAL_BIN_AT(item), n);
+            memcpy(BIN_HEAD(bset), at, n);
             break; }
 
         default:

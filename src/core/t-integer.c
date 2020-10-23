@@ -172,8 +172,8 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
         // This is a stopgap while ENBIN and DEBIN are hammered out which
         // preserves the old behavior in the TO INTEGER! case.
         //
-        const REBYTE *bp = VAL_BIN_AT(value);
-        REBLEN n = VAL_LEN_AT(value);
+        REBSIZ n;
+        const REBYTE *bp = VAL_BINARY_SIZE_AT(&n, value);
         if (n == 0) {
             Init_Integer(out, 0);
             return;

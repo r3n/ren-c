@@ -248,9 +248,11 @@ uint32_t Hash_Value(const RELVAL *v)
         }
         break;
 
-      case REB_BINARY:
-        hash = Hash_Bytes(VAL_BIN_AT(cell), VAL_LEN_AT(cell));
-        break;
+      case REB_BINARY: {
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, cell);
+        hash = Hash_Bytes(data, size);
+        break; }
 
       case REB_TEXT:
       case REB_FILE:

@@ -227,7 +227,7 @@ static void Write_File_Port(
         req->modes |= RFM_TEXT; // do LF => CR LF, e.g. on Windows
     }
     else {
-        req->common.data = m_cast(REBYTE*, VAL_BIN_AT(data));  // writing only
+        req->common.data = m_cast(REBYTE*, VAL_BINARY_AT(data));
         req->length = limit;
         req->modes &= ~RFM_TEXT; // don't do LF => CR LF, e.g. on Windows
     }

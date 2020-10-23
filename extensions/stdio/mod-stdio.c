@@ -194,7 +194,9 @@ REBNATIVE(write_stdout)
         // from UTF-8 to wide characters, or not having CR turned into CR LF
         // sequences).
         //
-        Prin_OS_String(VAL_BIN_AT(v), VAL_LEN_AT(v), OPT_ENC_RAW);
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
+        Prin_OS_String(data, size, OPT_ENC_RAW);
     }
     else {
         assert(IS_TEXT(v) or IS_ISSUE(v));

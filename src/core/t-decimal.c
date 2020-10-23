@@ -168,14 +168,16 @@ REB_R MAKE_Decimal(
         d = VAL_NANO(arg) * NANO;
         break;
 
-      case REB_BINARY:
-        if (VAL_LEN_AT(arg) < 8)
+      case REB_BINARY: {
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);
+        if (size < 8)
             fail (arg);
 
-        Init_Decimal_Bits(out, VAL_BIN_AT(arg)); // makes REB_DECIMAL
+        Init_Decimal_Bits(out, at); // makes REB_DECIMAL
         RESET_VAL_HEADER(out, kind, CELL_MASK_NONE); // resets if REB_PERCENT
         d = VAL_DECIMAL(out);
-        break;
+        break; }
 
         // !!! It's not obvious that TEXT shouldn't provide conversions; and
         // possibly more kinds than TO does.  Allow it for now, even though

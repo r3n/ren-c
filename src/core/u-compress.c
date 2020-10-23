@@ -538,12 +538,12 @@ REBNATIVE(inflate)
     const REBYTE *data;
     REBSIZ size;
     if (IS_BINARY(ARG(data))) {
-        data = VAL_BIN_AT(ARG(data));
         size = Part_Len_May_Modify_Index(ARG(data), ARG(part));
+        data = VAL_BINARY_AT(ARG(data));  // after (in case index modified)
     }
     else {
-        data = VAL_HANDLE_POINTER(REBYTE, ARG(data));
         size = VAL_HANDLE_LEN(ARG(data));
+        data = VAL_HANDLE_POINTER(REBYTE, ARG(data));
     }
 
     enum Reb_Symbol envelope;

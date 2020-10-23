@@ -109,24 +109,24 @@ REB_R MAKE_Issue(
         return Init_Char_May_Fail(out, n); }
 
       case REB_BINARY: {
-        const REBYTE *bp = VAL_BIN_AT(arg);
-        REBSIZ len = VAL_LEN_AT(arg);
-        if (len == 0)
+        REBSIZ size;
+        const REBYTE *bp = VAL_BINARY_SIZE_AT(&size, arg);
+        if (size == 0)
             goto bad_make;
 
         REBUNI c;
         if (*bp <= 0x80) {
-            if (len != 1)
+            if (size != 1)
                 return MAKE_String(out, kind, nullptr, arg);
 
             c = *bp;
         }
         else {
-            bp = Back_Scan_UTF8_Char(&c, bp, &len);
-            --len;  // must decrement *after* (or Back_Scan() will fail)
+            bp = Back_Scan_UTF8_Char(&c, bp, &size);
+            --size;  // must decrement *after* (or Back_Scan() will fail)
             if (bp == nullptr)
                 goto bad_make;  // must be valid UTF8
-            if (len != 0)
+            if (size != 0)
                 return MAKE_String(out, kind, nullptr, arg);
         }
         return Init_Char_May_Fail(out, c); }

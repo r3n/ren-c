@@ -224,7 +224,7 @@ inline static const REBYTE *VAL_BYTES_LIMIT_AT(
 
     if (IS_BINARY(v)) {
         *size_out = limit;
-        return VAL_BIN_AT(v);
+        return VAL_BINARY_AT(v);
     }
 
     if (ANY_STRING(v)) {

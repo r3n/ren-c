@@ -158,14 +158,17 @@ REBNATIVE(identify_png_q)
     int arg = 5;
     state.decoder.zlibsettings.custom_context = &arg;
 
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
+
     unsigned width;
     unsigned height;
     unsigned error = lodepng_inspect(
         &width,
         &height,
         &state,
-        VAL_BIN_AT(ARG(data)), // PNG data
-        VAL_LEN_AT(ARG(data)) // PNG data length
+        data,  // PNG data
+        size  // PNG data length
     );
 
     // state contains extra information about the PNG such as text chunks
@@ -218,6 +221,9 @@ REBNATIVE(decode_png)
     state.info_png.color.colortype = LCT_RGBA;
     state.info_png.color.bitdepth = 8;
 
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
+
     unsigned char* image_bytes;
     unsigned w;
     unsigned h;
@@ -226,8 +232,8 @@ REBNATIVE(decode_png)
         &w,
         &h,
         &state,
-        VAL_BIN_AT(ARG(data)), // PNG data
-        VAL_LEN_AT(ARG(data)) // PNG data length
+        data,  // PNG data
+        size  // PNG data length
     );
 
     // `state` can contain potentially interesting information, such as

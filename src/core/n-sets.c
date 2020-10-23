@@ -330,9 +330,10 @@ REBSER *Make_Set_Operation_Series(
                     )
                 ){
                     EXPAND_SERIES_TAIL(buf, skip);
-                    REBLEN len_at = VAL_LEN_AT(iter);
-                    REBLEN min = MIN(len_at, skip);
-                    memcpy(BIN_AT(buf, buf_at), VAL_BIN_AT(iter), min);
+                    REBSIZ size_at;
+                    const REBYTE *iter_at = VAL_BINARY_SIZE_AT(&size_at, iter);
+                    REBLEN min = MIN(size_at, skip);
+                    memcpy(BIN_AT(buf, buf_at), iter_at, min);
                     buf_at += min;
                 }
             }

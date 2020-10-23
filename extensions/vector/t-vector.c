@@ -233,10 +233,10 @@ static void Set_Vector_At(REBCEL(const*) vec, REBLEN n, const RELVAL *set) {
 void Set_Vector_Row(REBCEL(const*) vec, const REBVAL *blk) // !!! can not be BLOCK!?
 {
     REBLEN idx = VAL_INDEX(blk);
-    REBLEN len = VAL_LEN_AT(blk);
 
     if (IS_BLOCK(blk)) {
-        const RELVAL *val = VAL_ARRAY_AT(blk);
+        REBLEN len;
+        const RELVAL *val = VAL_ARRAY_LEN_AT(&len, blk);
 
         REBLEN n = 0;
         for (; NOT_END(val); val++) {
@@ -246,12 +246,13 @@ void Set_Vector_Row(REBCEL(const*) vec, const REBVAL *blk) // !!! can not be BLO
         }
     }
     else { // !!! This would just interpet the data as int64_t pointers (???)
-        REBYTE *data = VAL_BIN_AT_ENSURE_MUTABLE(blk);
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, blk);
 
         DECLARE_LOCAL (temp);
 
         REBLEN n = 0;
-        for (; len > 0; len--, idx++) {
+        for (; size > 0; --size, ++idx) {
             Init_Integer(temp, cast(REBI64, data[idx]));
             Set_Vector_At(vec, n++, temp);
         }

@@ -213,7 +213,7 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         Move_Value(CTX_VAR(ctx, STD_PORT_DATA), data); // keep it GC safe
         req->length = len;
-        req->common.data = VAL_BIN_AT_KNOWN_MUTABLE(data);
+        req->common.data = VAL_BINARY_AT_KNOWN_MUTABLE(data);
         req->actual = 0;
 
         // "send can happen immediately"

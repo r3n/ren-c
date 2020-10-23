@@ -190,8 +190,9 @@ REBNATIVE(decode_text)
     // is to UTF-8 for source code, a .TXT file is a different beast, so
     // having wider format support might be a good thing.
 
-    Init_Text(D_OUT, Make_String_UTF8(cs_cast(VAL_BIN_AT(ARG(data)))));
-    return D_OUT;
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
+    return rebSizedText(cs_cast(data), size);
 }
 
 
@@ -291,11 +292,11 @@ REBNATIVE(decode_utf16le)
 {
     UTF_INCLUDE_PARAMS_OF_DECODE_UTF16LE;
 
-    const REBYTE *data = VAL_BIN_AT(ARG(data));
-    REBLEN len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
 
     const bool little_endian = true;
-    Init_Text(D_OUT, Decode_UTF16(data, len, little_endian, false));
+    Init_Text(D_OUT, Decode_UTF16(data, size, little_endian, false));
 
     // Drop byte-order marker, if present
     //
@@ -371,11 +372,11 @@ REBNATIVE(decode_utf16be)
 {
     UTF_INCLUDE_PARAMS_OF_DECODE_UTF16BE;
 
-    const REBYTE *data = VAL_BIN_AT(ARG(data));
-    REBLEN len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
 
     const bool little_endian = false;
-    Init_Text(D_OUT, Decode_UTF16(data, len, little_endian, false));
+    Init_Text(D_OUT, Decode_UTF16(data, size, little_endian, false));
 
     // Drop byte-order marker, if present
     //

@@ -191,11 +191,11 @@ REB_R MAKE_Array(
         // goes directly to the scanner to make an unbound code array.
         //
         const REBSTR *file = Canon(SYM___ANONYMOUS__);
-        return Init_Any_Array(
-            out,
-            kind,
-            Scan_UTF8_Managed(file, VAL_BIN_AT(arg), VAL_LEN_AT(arg))
-        );
+
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);
+
+        return Init_Any_Array(out, kind, Scan_UTF8_Managed(file, at, size));
     }
     else if (IS_MAP(arg)) {
         return Init_Any_Array(out, kind, Map_To_Array(VAL_MAP(arg), 0));

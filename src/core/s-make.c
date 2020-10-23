@@ -392,9 +392,10 @@ void Join_Binary_In_Byte_Buf(const REBVAL *blk, REBINT limit)
             break;
 
         case REB_BINARY: {
-            REBLEN len = VAL_LEN_AT(val);
-            EXPAND_SERIES_TAIL(buf, len);
-            memcpy(BIN_AT(buf, tail), VAL_BIN_AT(val), len);
+            REBSIZ size;
+            const REBYTE *data = VAL_BINARY_SIZE_AT(&size, val);
+            EXPAND_SERIES_TAIL(buf, size);
+            memcpy(BIN_AT(buf, tail), data, size);
             break; }
 
         case REB_ISSUE:

@@ -58,11 +58,11 @@ REBNATIVE(identify_jpeg_q)
 
     // !!! jpeg_info is not const-correct; we trust it not to modify data
     //
-    REBYTE *data = m_cast(REBYTE*, VAL_BIN_AT(ARG(data)));
-    REBLEN len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    REBYTE *data = m_cast(REBYTE*, VAL_BINARY_SIZE_AT(&size, ARG(data)));
 
     int w, h;
-    jpeg_info(s_cast(data), len, &w, &h); // may longjmp above
+    jpeg_info(s_cast(data), size, &w, &h); // may longjmp above
     return Init_True(D_OUT);
 }
 
@@ -86,15 +86,15 @@ REBNATIVE(decode_jpeg)
 
     // !!! jpeg code is not const-correct, we trust it not to modify data
     //
-    REBYTE *data = m_cast(REBYTE*, VAL_BIN_AT(ARG(data)));
-    REBLEN len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    REBYTE *data = m_cast(REBYTE*, VAL_BINARY_SIZE_AT(&size, ARG(data)));
 
     int w, h;
-    jpeg_info(s_cast(data), len, &w, &h); // may longjmp above
+    jpeg_info(s_cast(data), size, &w, &h); // may longjmp above
 
     char *image_bytes = rebAllocN(char, (w * h) * 4);  // RGBA is 4 bytes
 
-    jpeg_load(s_cast(data), len, image_bytes);
+    jpeg_load(s_cast(data), size, image_bytes);
 
     REBVAL *binary = rebRepossess(image_bytes, (w * h) * 4);
 

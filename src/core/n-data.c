@@ -1431,7 +1431,9 @@ REBNATIVE(as)
                 // *before* freezing the old string, so that if there's an
                 // error converting we don't add any constraints to the input.
                 //
-                str = Intern_UTF8_Managed(VAL_BIN_AT(v), VAL_LEN_AT(v));
+                REBSIZ size;
+                const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
+                str = Intern_UTF8_Managed(data, size);
 
                 // Constrain the input in the way it would be if we were doing
                 // the more efficient reuse.

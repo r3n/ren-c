@@ -171,13 +171,11 @@ static REBSTR *MAKE_TO_String_Common(
     const REBVAL *arg,
     enum Reb_Strmode strmode
 ){
-    if (IS_BINARY(arg))
-        return Append_UTF8_May_Fail(
-            nullptr,
-            cs_cast(VAL_BIN_AT(arg)),
-            VAL_LEN_AT(arg),
-            strmode
-        );
+    if (IS_BINARY(arg)) {
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);
+        return Append_UTF8_May_Fail(nullptr, cs_cast(at), size, strmode);
+    }
 
     if (ANY_STRING(arg))
         return Copy_String_At(arg);

@@ -160,14 +160,15 @@ void Bin_To_Money_May_Fail(REBVAL *result, const REBVAL *val)
     if (not IS_BINARY(val))
         fail (val);
 
-    REBLEN len = VAL_LEN_AT(val);
-    if (len > 12)
-        len = 12;
+    REBSIZ size;
+    const REBYTE *at = VAL_BINARY_SIZE_AT(&size, val);
+    if (size > 12)
+        size = 12;
 
     REBYTE buf[MAX_HEX_LEN+4] = {0}; // binary to convert
-    memcpy(buf, VAL_BIN_AT(val), len);
-    memcpy(buf + 12 - len, buf, len); // shift to right side
-    memset(buf, 0, 12 - len);
+    memcpy(buf, at, size);
+    memcpy(buf + 12 - size, buf, size); // shift to right side
+    memset(buf, 0, 12 - size);
     Init_Money(result, binary_to_deci(buf));
 }
 
