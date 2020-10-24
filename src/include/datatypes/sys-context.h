@@ -495,7 +495,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
     REBSER *stub = SER(c);
 
     // Rather than memcpy() and touch up the header and info to remove
-    // SERIES_INFO_HOLD put on by Enter_Native(), or NODE_FLAG_MANAGED,
+    // SERIES_INFO_HOLD from PARAMLIST_FLAG_IS_NATIVE, or NODE_FLAG_MANAGED,
     // etc.--use constant assignments and only copy the remaining fields.
     //
     REBSER *copy = Alloc_Series_Node(

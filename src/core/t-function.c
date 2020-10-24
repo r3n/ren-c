@@ -212,7 +212,9 @@ REBTYPE(Action)
         REBARR *proxy_paramlist = Copy_Array_Deep_Flags_Managed(
             ACT_PARAMLIST(act),
             SPECIFIED,  // !!! Note: not actually "deep", just typesets
-            SERIES_MASK_PARAMLIST
+            SERIES_MASK_PARAMLIST | (
+                SER(act)->header.bits & PARAMLIST_FLAG_IS_NATIVE
+            )
         );
         Sync_Paramlist_Archetype(proxy_paramlist);
         MISC_META_NODE(proxy_paramlist) = NOD(ACT_META(act));

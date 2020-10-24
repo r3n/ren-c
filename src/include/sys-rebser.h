@@ -312,18 +312,9 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(4)
 
 
-//=//// SERIES_INFO_HOLD //////////////////////////////////////////////////=//
+//=//// SERIES_INFO_5 /////////////////////////////////////////////////////=//
 //
-// Set in the header whenever some stack-based operation wants a temporary
-// hold on a series, to give it a protected state.  This will happen with a
-// DO, or PARSE, or enumerations.  Even REMOVE-EACH will transition the series
-// it is operating on into a HOLD state while the removal signals are being
-// gathered, and apply all the removals at once before releasing the hold.
-//
-// It will be released when the execution is finished, which distinguishes it
-// from SERIES_INFO_FROZEN_DEEP, which will never be reset, as long as it lives...
-//
-#define SERIES_INFO_HOLD \
+#define SERIES_INFO_5 \
     FLAG_LEFT_BIT(5)
 
 
@@ -467,17 +458,30 @@ STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(28)
 
 
+//=//// SERIES_INFO_HOLD //////////////////////////////////////////////////=//
+//
+// Set in the header whenever some stack-based operation wants a temporary
+// hold on a series, to give it a protected state.  This will happen with a
+// DO, or PARSE, or enumerations.  Even REMOVE-EACH will transition the series
+// it is operating on into a HOLD state while the removal signals are being
+// gathered, and apply all the removals at once before releasing the hold.
+//
+// It will be released when the execution is finished, which distinguishes it
+// from SERIES_INFO_FROZEN_DEEP, which will never be cleared once set.
+//
+// Note: This is set to be the same bit as PARAMLIST_FLAG_NATIVE in order to
+// make it possible to use non-branching masking to set a frame to read-only
+// as far as usermode operations are concerned.
+//
+#define SERIES_INFO_HOLD \
+    FLAG_LEFT_BIT(29)
+
+
 //=//// SERIES_INFO_FROZEN_SHALLOW ////////////////////////////////////////=//
 //
 // A series can be locked permanently, but only at its own top level.
 //
 #define SERIES_INFO_FROZEN_SHALLOW \
-    FLAG_LEFT_BIT(29)
-
-
-//=//// SERIES_INFO_30 ////////////////////////////////////////////////////=//
-//
-#define SERIES_INFO_30 \
     FLAG_LEFT_BIT(30)
 
 

@@ -247,6 +247,12 @@ static bool Subparse_Throws(
     f->arg = m_cast(REBVAL*, END_NODE);
     f->special = END_NODE;
 
+    // This needs to be set before INCLUDE_PARAMS_OF_SUBPARSE; it is what
+    // ensures that usermode accesses to the frame won't be able to fiddle
+    // the frame values to bit patterns the native might crash on.
+    //
+    SET_SERIES_INFO(SER(f->varlist), HOLD);
+
     REBFRM *frame_ = f;
     INCLUDE_PARAMS_OF_SUBPARSE;
 

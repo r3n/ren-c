@@ -172,8 +172,14 @@
 // rebValue() etc. should consider for binding, in addition to lib.  A BLANK!
 // in the 1 slot means no additional consideration...bind to lib only.
 //
+// Note: This is tactially set to be the same as SERIES_INFO_HOLD to make it
+// possible to branchlessly mask in the bit to stop frames from being mutable
+// by user code once native code starts running.
+//
 #define PARAMLIST_FLAG_IS_NATIVE \
     ARRAY_FLAG_29
+
+STATIC_ASSERT(PARAMLIST_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
 
 //=//// PARAMLIST_FLAG_ENFIXED ////////////////////////////////////////////=//

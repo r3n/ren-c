@@ -1122,7 +1122,20 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // which are used to process the return result after the switch.
     //
   blockscope {
-    REBNAT dispatcher = ACT_DISPATCHER(FRM_PHASE(f));
+    REBACT *phase = FRM_PHASE(f);
+
+    // Native code trusts that type checking has ensured it won't get bits
+    // in its argument slots that the C won't recognize.  Usermode code that
+    // gets its hands on a native's FRAME! (e.g. for debug viewing) can't be
+    // allowed to change the frame values to other bit patterns out from
+    // under the C or it could result in a crash.  By making the IS_NATIVE
+    // flag the same as the HOLD info bit, we can make sure the frame gets
+    // marked protected if it's a native...without needing an if() branch.
+    //
+    STATIC_ASSERT(PARAMLIST_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
+    SER(f->varlist)->info.bits |= SER(phase)->header.bits & SERIES_INFO_HOLD;
+
+    REBNAT dispatcher = ACT_DISPATCHER(phase);
 
     const REBVAL *r = (*dispatcher)(f);
 

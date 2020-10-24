@@ -895,9 +895,9 @@ inline static void Drop_Action(REBFRM *f) {
         // big enough for ensuing calls.  
         //
         // But no series bits we didn't set should be set...and right now,
-        // only Enter_Native() sets HOLD.  Clear that.  Also, it's possible
-        // for a "telegraphed" no lookahead bit used by an invisible to be
-        // left on, so clear it too.
+        // only PARAMLIST_FLAG_IS_NATIVE sets HOLD.  Clear that.  Also, it's
+        // possible for a "telegraphed" no lookahead bit used by an invisible
+        // to be left on, so clear it too.
         //
         CLEAR_SERIES_INFO(f->varlist, HOLD);
         CLEAR_SERIES_INFO(f->varlist, TELEGRAPH_NO_LOOKAHEAD);
@@ -998,27 +998,6 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
 //
 #define RETURN(v) \
     return Move_Value(D_OUT, (v))
-
-
-// The native entry prelude makes sure that once native code starts running,
-// then the frame's stub is flagged to indicate access via a FRAME! should
-// not have write access to variables.  That could cause crashes, as raw C
-// code is not insulated against having bit patterns for types in cells that
-// aren't expected.
-//
-// !!! Debug injection of bad types into usermode code may cause havoc as
-// well, and should be considered a security/permissions issue.  It just won't
-// (or shouldn't) crash the evaluator itself.
-//
-// This is automatically injected by the INCLUDE_PARAMS_OF_XXX macros.  The
-// reason this is done with code inlined into the native itself instead of
-// based on an IS_NATIVE() test is to avoid the cost of the testing--which
-// is itself a bit dodgy to tell a priori if a dispatcher is native or not.
-// This way there is no test and only natives pay the cost of flag setting.
-//
-inline static void Enter_Native(REBFRM *f) {
-    SET_SERIES_INFO(f->varlist, HOLD); // may or may not be managed
-}
 
 
 // Shared code for type checking the return result.  It's used by the
