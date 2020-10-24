@@ -422,14 +422,14 @@ REBNATIVE(reskinned)
         );
     else {
         // We're reusing the original dispatcher, so also reuse the original
-        // function body.  Note Blit_Cell() ensures that the cell formatting
+        // function body.  Note Blit_Relative() ensures that the cell formatting
         // on the source and target are the same, and it preserves relative
         // value information (rarely what you meant, but it's meant here).
         //
         RELVAL *src = ARR_HEAD(ACT_DETAILS(original));
         RELVAL *dest = ARR_HEAD(ACT_DETAILS(defers));
         for (; NOT_END(src); ++src, ++dest)
-            Blit_Cell(dest, src);
+            Blit_Relative(dest, src);
     }
 
     return Init_Action(

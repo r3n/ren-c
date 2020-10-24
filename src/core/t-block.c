@@ -542,15 +542,15 @@ void Shuffle_Array(REBARR *arr, REBLEN idx, bool secure)
         n--;
 
         // Only do the following block when an actual swap occurs.
-        // Otherwise an assertion will fail when trying to Blit_Cell() a
+        // Otherwise an assertion will fail when trying to Blit_Relative() a
         // value to itself.
         //
         if (k != (n + idx)) {
             swap.header = data[k].header;
             swap.payload = data[k].payload;
             swap.extra = data[k].extra;
-            Blit_Cell(&data[k], &data[n + idx]);
-            Blit_Cell(&data[n + idx], &swap);
+            Blit_Relative(&data[k], &data[n + idx]);
+            Blit_Relative(&data[n + idx], &swap);
     }
     }
 }
@@ -1000,8 +1000,8 @@ REBTYPE(Array)
             temp.header = a->header;
             temp.payload = a->payload;
             temp.extra = a->extra;
-            Blit_Cell(a, b);
-            Blit_Cell(b, &temp);
+            Blit_Relative(a, b);
+            Blit_Relative(b, &temp);
         }
         RETURN (array); }
 
@@ -1041,7 +1041,7 @@ REBTYPE(Array)
             // When we move the back cell to the front position, it gets the
             // newline flag based on the flag state that was *after* it.
             //
-            Blit_Cell(front, back);
+            Blit_Relative(front, back);
             if (line_back)
                 SET_CELL_FLAG(front, NEWLINE_BEFORE);
             else
@@ -1051,7 +1051,7 @@ REBTYPE(Array)
             // that was on the back will be the after for the next blit.
             //
             line_back = GET_CELL_FLAG(back, NEWLINE_BEFORE);
-            Blit_Cell(back, &temp);
+            Blit_Relative(back, &temp);
             if (line_front)
                 SET_CELL_FLAG(back, NEWLINE_BEFORE);
             else

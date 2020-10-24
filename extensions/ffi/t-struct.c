@@ -1396,7 +1396,7 @@ REB_R PD_Struct(
             // evaluation may not protect the result...)
             //
             DECLARE_LOCAL (sel_orig);
-            Blit_Cell(cast(RELVAL*, sel_orig), picker);
+            Blit_Relative(cast(RELVAL*, sel_orig), picker);
             PUSH_GC_GUARD(sel_orig);
 
             if (Next_Path_Throws(pvs)) { // updates pvs->out, PVS_PICKER()

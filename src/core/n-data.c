@@ -1208,7 +1208,7 @@ REBNATIVE(as)
               case REB_GET_WORD: {
                 REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
                 Init_Blank(ARR_HEAD(a));
-                Blit_Cell(ARR_AT(a, 1), v);
+                Blit_Relative(ARR_AT(a, 1), v);
                 mutable_KIND3Q_BYTE(ARR_AT(a, 1)) = REB_WORD;
                 mutable_HEART_BYTE(ARR_AT(a, 1)) = REB_WORD;
                 TERM_ARRAY_LEN(a, 2);
@@ -1217,7 +1217,7 @@ REBNATIVE(as)
 
               case REB_SYM_WORD: {
                 REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
-                Blit_Cell(ARR_HEAD(a), v);
+                Blit_Relative(ARR_HEAD(a), v);
                 mutable_KIND3Q_BYTE(ARR_HEAD(a)) = REB_WORD;
                 mutable_HEART_BYTE(ARR_HEAD(a)) = REB_WORD;
                 Init_Blank(ARR_AT(a, 1));

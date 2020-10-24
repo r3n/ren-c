@@ -518,7 +518,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         // a WORD! also unless we fiddle the bits at a new location.
         //
         if (sequence != store)
-            Blit_Cell(store, CELL_TO_VAL(sequence));
+            Blit_Relative(store, CELL_TO_VAL(sequence));
         mutable_KIND3Q_BYTE(store) = REB_WORD;  // not ANY-SEQUENCE!
         mutable_HEART_BYTE(store) = REB_WORD;  // not the fake REB_GET_WORD
         return store; }

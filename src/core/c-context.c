@@ -432,7 +432,7 @@ void Collect_Context_Keys(
 
     assert(cl->index >= 1); // 0 in bind table means "not present"
 
-    // This is necessary so Blit_Cell() below isn't overwriting memory that
+    // This is necessary so Blit_Relative() below isn't overwriting memory that
     // BUF_COLLECT does not own.  (It may make the buffer capacity bigger than
     // necessary if duplicates are found, but the actual buffer length will be
     // set correctly by the end.)
@@ -450,7 +450,7 @@ void Collect_Context_Keys(
 
             ++cl->index;
 
-            Blit_Cell(collect, key); // fast copy, matching cell formats
+            Blit_Relative(collect, key); // fast copy, matching cell formats
             ++collect;
         }
 
@@ -466,7 +466,7 @@ void Collect_Context_Keys(
         // Optimized add of all keys to bind table and collect buffer.
         //
         for (; NOT_END(key); ++key, ++collect, ++cl->index) {
-            Blit_Cell(collect, key);
+            Blit_Relative(collect, key);
             Add_Binder_Index(&cl->binder, VAL_KEY_CANON(key), cl->index);
         }
         SET_ARRAY_LEN_NOTERM(

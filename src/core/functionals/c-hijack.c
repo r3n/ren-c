@@ -287,7 +287,7 @@ REBNATIVE(hijack)
         MISC(victim_details).dispatcher = MISC(hijacker_details).dispatcher;
 
         // All function info arrays should live in cells with the same
-        // underlying formatting.  Blit_Cell ensures that's the case.
+        // underlying formatting.  Blit_Relative ensures that's the case.
         //
         // !!! It may be worth it to optimize some dispatchers to depend on
         // ARR_SINGLE(info) being correct.  That would mean hijack reversals
@@ -303,7 +303,7 @@ REBNATIVE(hijack)
         RELVAL *src = ARR_HEAD(hijacker_details);
         RELVAL *dest = ARR_HEAD(victim_details);
         for (; NOT_END(src); ++src, ++dest)
-            Blit_Cell(dest, src);
+            Blit_Relative(dest, src);
         TERM_ARRAY_LEN(victim_details, details_len);
     }
     else {

@@ -240,7 +240,7 @@ REBTYPE(Action)
         RELVAL *src = ARR_HEAD(ACT_DETAILS(act));
         RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy));
         for (; NOT_END(src); ++src, ++dest)
-            Blit_Cell(dest, src);
+            Blit_Relative(dest, src);
         TERM_ARRAY_LEN(ACT_DETAILS(proxy), details_len);
 
         Init_Action(D_OUT, proxy, VAL_ACTION_LABEL(value), VAL_BINDING(value));

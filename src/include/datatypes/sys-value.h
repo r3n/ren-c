@@ -927,7 +927,7 @@ inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
 // for the rare cases where it's legal, e.g. shuffling a cell from one place
 // in an array to another cell in the same array.
 //
-inline static RELVAL *Blit_Cell(RELVAL *out, const RELVAL *v)
+inline static RELVAL *Blit_Relative(RELVAL *out, const RELVAL *v)
 {
     // It's imaginable that you might try to blit a cell from a source that
     // could be an API node.  But it should never be *actually* relative
@@ -949,8 +949,20 @@ inline static RELVAL *Blit_Cell(RELVAL *out, const RELVAL *v)
 }
 
 #ifdef __cplusplus  // avoid blitting into REBVAL*, and use without specifier
-    inline static RELVAL *Blit_Cell(REBVAL *out, const RELVAL *v) = delete;
+    inline static RELVAL *Blit_Relative(REBVAL *out, const RELVAL *v) = delete;
 #endif
+
+// !!! Should this replace Move_Var() ?
+//
+inline static REBVAL *Blit_Specific(REBVAL *out, const REBVAL *v)
+{
+    Move_Value_Header(out, v);
+    out->header.bits |= (v->header.bits & NODE_FLAG_MARKED);
+    out->payload = v->payload;
+    out->extra = v->extra;
+    return out;
+}
+
 
 // !!! Super primordial experimental `const` feature.  Concept is that various
 // operations have to be complicit (e.g. SELECT or FIND) in propagating the

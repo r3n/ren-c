@@ -542,7 +542,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 //
 // Goal is that the mechanics are managed with low-level C, so the C++ build
 // is just there to notice when you try to use a raw byte copy.  Use functions
-// instead.  (See: Move_Value(), Blit_Cell(), Derelativize())
+// instead.  (See: Move_Value(), Blit_Relative(), Derelativize())
 //
 // Note: It is annoying that this means any structure that embeds a value cell
 // cannot be assigned.  However, `struct Reb_Value` must be the type exported
