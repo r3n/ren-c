@@ -91,22 +91,6 @@ REB_R Void_Dispatcher(REBFRM *f)
 
 
 //
-//  Null_Dispatcher: C
-//
-// Analogue to Void_Dispatcher() for `func [return: [<opt>] ...] [null]`
-// situations.
-//
-REB_R Null_Dispatcher(REBFRM *f)
-{
-    REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-    assert(VAL_LEN_AT(ARR_HEAD(details)) == 0);
-    UNUSED(details);
-
-    return nullptr;
-}
-
-
-//
 //  Interpreted_Dispatch_Details_0_Throws: C
 //
 // Common behavior shared by dispatchers which execute on BLOCK!s of code.
@@ -301,7 +285,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
 
     REBACT *a = Make_Action(
         Make_Paramlist_Managed_May_Fail(spec, mkf_flags),
-        &Null_Dispatcher,  // will be overwritten if non-[] body
+        &Void_Dispatcher,  // will be overwritten if non-[] body
         nullptr,  // no underlying action (use paramlist)
         nullptr,  // no specialization exemplar (or inherited exemplar)
         details_capacity  // we fill in details[0], caller fills any extra
@@ -323,11 +307,11 @@ REBACT *Make_Interpreted_Action_May_Fail(
         else if (GET_ACTION_FLAG(a, HAS_RETURN)) {
             REBVAL *typeset = ACT_PARAMS_HEAD(a);
             assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
-            if (not TYPE_CHECK(typeset, REB_NULL))  // `do []` returns
+            if (not TYPE_CHECK(typeset, REB_VOID))  // `do []` returns
                 ACT_DISPATCHER(a) = &Returner_Dispatcher;  // error when run
         }
         else {
-            // Keep the Null_Dispatcher passed in above
+            // Keep the Void_Dispatcher passed in above
         }
 
         // Reusing EMPTY_ARRAY won't allow adding ARRAY_HAS_FILE_LINE bits

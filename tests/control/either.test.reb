@@ -78,13 +78,13 @@
 
     (
         takes-2-logics: func [x [logic!] y [logic!]] [x]
-        infix-voider: enfixed func [return: [<opt>] x y] []
+        infix-voider: enfixed func [return: <void> x y] []
         true
     )
 
     (takes-2-logics (void) = void false)
 
-    ('arg-required = (trap [takes-2-logics true infix-voider true false])/id)
+    ('expect-arg = (trap [takes-2-logics true infix-voider true false])/id)
 ]
 
 ; Soft Quoted Branching
