@@ -284,7 +284,6 @@ func: func* [
     ][
         any [new-body body]
     ]
-    (elide if thing/1 = 'new-body [print mold new-spec print mold thing])
 ]
 
 
