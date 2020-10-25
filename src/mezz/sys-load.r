@@ -795,8 +795,8 @@ load-module: func [
         mod: _   ; don't need/want the block reference now
     ]
 
-    all [version | ver > modver] then [
-        cause-error 'syntax 'needs reduce [name ver]
+    all [version | version > modver] then [
+        cause-error 'syntax 'needs reduce [name version]
     ]
 
     ; If no further processing is needed, shortcut return
