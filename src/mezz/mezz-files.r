@@ -314,7 +314,7 @@ list-dir: function [
         ]
     ]
 
-    if (text? l) and [not empty? l] [print l]
+    all [text? l | not empty? l] then [print l]
 
     change-dir save-dir
 ]
