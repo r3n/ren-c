@@ -122,38 +122,7 @@
 
 
 inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
-    REBACT *phase = FRM_PHASE(f);
-    if (GET_ACTION_FLAG(phase, IS_INVISIBLE)) {
-        if (NOT_ACTION_FLAG(f->original, IS_INVISIBLE))
-            fail ("All invisible action phases must be invisible");
-        return;
-    }
-
-    if (GET_ACTION_FLAG(f->original, IS_INVISIBLE))
-        return;
-
-  #ifdef DEBUG_UNREADABLE_VOIDS
-    //
-    // The f->out slot should be initialized well enough for GC safety.
-    // But in the debug build, if we're not running an invisible function
-    // set it to END here, to make sure the non-invisible function writes
-    // *something* to the output.
-    //
-    // END has an advantage because recycle/torture will catch cases of
-    // evaluating into movable memory.  But if END is always set, natives
-    // might *assume* it.  Fuzz it with unreadable voids.
-    //
-    // !!! Should natives be able to count on f->out being END?  This was
-    // at one time the case, but this code was in one instance.
-    //
-    if (NOT_ACTION_FLAG(FRM_PHASE(f), IS_INVISIBLE)) {
-        if (SPORADICALLY(2))
-            Init_Unreadable_Void(f->out);
-        else
-            SET_END(f->out);
-        SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
-    }
-  #endif
+    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
 }
 
 
@@ -255,7 +224,18 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     assert(DSP >= f->dsp_orig);  // REDUCE accrues, APPLY adds refinements
     assert(not IS_TRASH_DEBUG(f->out));  // all invisible will preserve output
     assert(f->out != f_spare);  // overwritten by temporary calculations
-    assert(NOT_FEED_FLAG(f->feed, BARRIER_HIT));
+
+    // A barrier shouldn't cause an error in evaluation if code would be
+    // willing to accept an <end>.  So we allow argument gathering to try to
+    // run, but it may error if that's not acceptable.
+    //
+    if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
+        if (GET_EVAL_FLAG(f, FULFILLING_ARG)) {
+            f->out->header.bits |= CELL_FLAG_OUT_MARKED_STALE;
+            return false;
+        }
+        CLEAR_FEED_FLAG(f->feed, BARRIER_HIT);  // not an argument, clear flag
+    }
 
     const RELVAL *v;  // shorthand for the value we are switch()-ing on
     TRASH_POINTER_IF_DEBUG(v);
@@ -372,6 +352,17 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
     if (not f_next_gotten or not IS_ACTION(f_next_gotten))
         goto give_up_backward_quote_priority;  // note only ACTION! is ENFIXED
+
+    if (GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), IS_BARRIER)) {
+        //
+        // In a situation like `foo |`, we want FOO to be able to run...it
+        // may take 0 args or it may be able to tolerate END.  But we should
+        // not be required to run the barrier in the same evaluative step
+        // as the left hand side.  (It can be enfix, or it can not be.)
+        //
+        SET_FEED_FLAG(f->feed, BARRIER_HIT);
+        goto give_up_backward_quote_priority;
+    }
 
     if (NOT_ACTION_FLAG(VAL_ACTION(f_next_gotten), ENFIXED))
         goto give_up_backward_quote_priority;
@@ -845,11 +836,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             if (GET_ACTION_FLAG(act, ENFIXED))
                 fail ("Use `<-` to shove left enfix operands into PATH!s");
 
-            // !!! Review if invisibles can be supported without ->
-            //
-            if (GET_ACTION_FLAG(act, IS_INVISIBLE))
-                fail ("Use `<-` with invisibles fetched from PATH!");
-
             DECLARE_ACTION_SUBFRAME (subframe, f);
             Push_Frame(f->out, subframe);
             Push_Action(subframe, VAL_ACTION(where), VAL_BINDING(where));
@@ -1298,8 +1284,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // waits for `1 + 2` to finish.  This is because the right hand argument
     // of math operations tend to be declared #tight.
     //
-    // Slightly more nuanced is why PARAMLIST_IS_INVISIBLE functions have to
-    // be considered in the lookahead also.  Consider this case:
+    // Note that invisible functions have to be considered in the lookahead
+    // also.  Consider this case:
     //
     //    [pos val]: evaluate [1 + 2 * comment ["hi"] 3 4 / 5]
     //
@@ -1434,8 +1420,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         and not (
             GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), DEFERS_LOOKBACK)
                                        // ^-- `1 + if false [2] else [3]` => 4
-            or GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), IS_INVISIBLE)
-                                       // ^-- `1 + 2 + comment "foo" 3` => 6
+/*            or GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), IS_INVISIBLE)
+                                       // ^-- `1 + 2 + comment "foo" 3` => 6 */
         )
     ){
         if (GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)) {

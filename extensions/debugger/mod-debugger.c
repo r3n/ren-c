@@ -109,7 +109,7 @@ bool Do_Breakpoint_Throws(
 //
 //  "Signal breakpoint to the host, but do not participate in evaluation"
 //
-//      return: []
+//      return: [<invisible>]
 //          {Returns nothing, not even void ("invisible", like COMMENT)}
 //  ]
 //
@@ -118,7 +118,7 @@ REBNATIVE(breakpoint_p)
 // !!! Need definition to test for N_DEBUGGER_breakpoint function
 {
     if (Do_Breakpoint_Throws(
-        D_OUT,
+        D_SPARE,
         false,  // not a Ctrl-C, it's an actual BREAKPOINT
         VOID_VALUE  // default result if RESUME does not override
     )){
@@ -130,10 +130,10 @@ REBNATIVE(breakpoint_p)
     // return *either* a value or no-value...if breakpoint were variadic, it
     // could splice in a value in place of what comes after it.
     //
-    if (not IS_VOID(D_OUT))
+    if (not IS_VOID(D_SPARE))
         fail ("BREAKPOINT is invisible, can't RESUME/WITH code (use PAUSE)");
 
-    return R_INVISIBLE;
+    RETURN_INVISIBLE;
 }
 
 

@@ -83,7 +83,7 @@ enum {
 //     foo: func [a /b c] [...]  =>  bar: func [/b d e] [...]
 //                    foo/b 1 2  =>  bar/b 1 2
 //
-bool Redo_Action_Throws(REBVAL *out, REBFRM *f, REBACT *run)
+bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
 {
     REBARR *code_arr = Make_Array(FRM_NUM_ARGS(f)); // max, e.g. no refines
     RELVAL *code = ARR_HEAD(code_arr);
@@ -128,7 +128,7 @@ bool Redo_Action_Throws(REBVAL *out, REBFRM *f, REBACT *run)
 
             Init_Word(DS_PUSH(), VAL_PARAM_SPELLING(f->param));
 
-            if (Is_Typeset_Invisible(f->param)) {
+            if (Is_Typeset_Empty(f->param)) {
                 assert(IS_REFINEMENT(f->arg));  // used but argless refinement
                 continue;
             }
@@ -168,7 +168,6 @@ bool Redo_Action_Throws(REBVAL *out, REBFRM *f, REBACT *run)
         0,  // index
         SPECIFIED  // reusing existing REBVAL arguments, no relative values
     );
-    CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
     return threw;
 }
 
@@ -195,13 +194,10 @@ REB_R Hijacker_Dispatcher(REBFRM *f)
     // We need to build a new frame compatible with the hijacker, and
     // transform the parameters we've gathered to be compatible with it.
     //
-    if (Redo_Action_Throws(f->out, f, VAL_ACTION(hijacker)))
+    if (Redo_Action_Throws_Maybe_Stale(f->out, f, VAL_ACTION(hijacker)))
         return R_THROWN;
 
-    if (GET_ACTION_FLAG(phase, IS_INVISIBLE))
-        return R_INVISIBLE;
-
-    return f->out;
+    return f->out;  // Note: may have OUT_MARKED_STALE, hence invisible
 }
 
 

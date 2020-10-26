@@ -224,38 +224,7 @@ inline static void Finalize_Variadic_Arg_Core(REBFRM *f, bool enfix) {
 
 
 inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
-    REBACT *phase = FRM_PHASE(f);
-    if (GET_ACTION_FLAG(phase, IS_INVISIBLE)) {
-        if (NOT_ACTION_FLAG(f->original, IS_INVISIBLE))
-            fail ("All invisible action phases must be invisible");
-        return;
-    }
-
-    if (GET_ACTION_FLAG(f->original, IS_INVISIBLE))
-        return;
-
-  #ifdef DEBUG_UNREADABLE_VOIDS
-    //
-    // The f->out slot should be initialized well enough for GC safety.
-    // But in the debug build, if we're not running an invisible function
-    // set it to END here, to make sure the non-invisible function writes
-    // *something* to the output.
-    //
-    // END has an advantage because recycle/torture will catch cases of
-    // evaluating into movable memory.  But if END is always set, natives
-    // might *assume* it.  Fuzz it with unreadable voids.
-    //
-    // !!! Should natives be able to count on f->out being END?  This was
-    // at one time the case, but this code was in one instance.
-    //
-    if (NOT_ACTION_FLAG(FRM_PHASE(f), IS_INVISIBLE)) {
-        if (SPORADICALLY(2))
-            Init_Unreadable_Void(f->out);
-        else
-            SET_END(f->out);
-        SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
-    }
-  #endif
+    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
 }
 
 
@@ -329,7 +298,7 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     ){
         fail ("Refinement must follow modal parameter");
     }
-    if (not Is_Typeset_Invisible(enable))
+    if (not Is_Typeset_Empty(enable))
         fail ("Modal refinement cannot take arguments");
 
     // Signal refinement as being in use.
@@ -480,7 +449,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 INIT_BINDING(ordered, f->varlist);
                 INIT_WORD_INDEX(ordered, offset + 1);
 
-                if (Is_Typeset_Invisible(f->param)) {
+                if (Is_Typeset_Empty(f->param)) {
                     //
                     // There's no argument, so we won't need to come back
                     // for this one.  But we did need to set its index
@@ -766,6 +735,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 }
             }
 
+            // We are expiring the output cell here because we have "used up"
+            // the output result.  We don't know at this moment if the
+            // function going to behave invisibly.  If it does, then we have
+            // to *un-expire* the enfix invisible flag (!)
+            //
             Expire_Out_Cell_Unless_Invisible(f);
 
             goto continue_arg_loop;
@@ -835,7 +809,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// ERROR ON END MARKER, BAR! IF APPLICABLE /////////////////////////=//
 
-        if (IS_END(f_next) or GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
+        if (IS_END(f_next)) {
+          endlike_handling:
             if (not Is_Param_Endable(f->param))
                 fail (Error_No_Arg(f, f->param));
 
@@ -850,6 +825,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
           case REB_P_NORMAL:
           normal_handling: {
+            if (GET_FEED_FLAG(f->feed, BARRIER_HIT))
+                goto endlike_handling;
+
             REBFLGS flags = EVAL_MASK_DEFAULT
                 | EVAL_FLAG_FULFILLING_ARG;
 
@@ -893,6 +871,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   //=//// MODAL ARG  //////////////////////////////////////////////////////=//
 
           case REB_P_MODAL: {
+            if (GET_FEED_FLAG(f->feed, BARRIER_HIT))
+                goto endlike_handling;
+
             if (not ANY_SYM_KIND(VAL_TYPE(f_next)))  // not an @xxx
                 goto normal_handling;  // acquire as a regular argument
 
@@ -1070,7 +1051,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         assert(TYPE_CHECK(f->param, REB_TS_REFINEMENT));
         DS_DROP();
 
-        if (Is_Typeset_Invisible(f->param)) {  // no callsite arg, just drop
+        if (Is_Typeset_Empty(f->param)) {  // no callsite arg, just drop
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
@@ -1099,14 +1080,18 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
     // This happens if you have something intending to act as enfix but
     // that does not consume arguments, e.g. `x: enfixed func [] []`.
-    // An enfixed function with no arguments might sound dumb, but that
-    // can be useful as a convenience way of saying "takes the left hand
-    // argument but ignores it" (e.g. with skippable args).  Allow it.
+    // An enfixed function with no arguments might sound dumb, but it allows
+    // a 0-arity function to run in the same evaluation step as the left
+    // hand side.  This is how expression work (see `|:`)
     //
+    assert(NOT_EVAL_FLAG(f, UNDO_MARKED_STALE));
     if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
         assert(GET_EVAL_FLAG(f, RUNNING_ENFIX));
         CLEAR_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
+        f->out->header.bits |= CELL_FLAG_OUT_MARKED_STALE;  // won't undo this
     }
+    else if (GET_EVAL_FLAG(f, RUNNING_ENFIX) and NOT_END(f->out))
+        SET_EVAL_FLAG(f, UNDO_MARKED_STALE);
 
     assert(IS_END(f->param));
     assert(
@@ -1146,14 +1131,18 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     const REBVAL *r = (*dispatcher)(f);
 
     if (r == f->out) {
-        assert(NOT_CELL_FLAG(f->out, OUT_MARKED_STALE));
-        CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // other cases Move_Value()
+        //
+        // common case; we'll want to clear the UNEVALUATED flag if it's
+        // not an invisible return result (other cases Move_Value())
+        //
     }
     else if (not r) {  // API and internal code can both return `nullptr`
         Init_Nulled(f->out);
+        goto dispatch_completed;  // skips invisible check
     }
     else if (GET_CELL_FLAG(r, ROOT)) {  // API, from Alloc_Value()
         Handle_Api_Dispatcher_Result(f, r);
+        goto dispatch_completed;  // skips invisible check
     }
     else switch (KIND3Q_BYTE(r)) {  // it's a "pseudotype" instruction
         //
@@ -1237,6 +1226,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
                 INIT_FRM_PHASE(f, VAL_PHASE(f->out));
                 FRM_BINDING(f) = VAL_BINDING(f->out);
+                CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
                 goto redo_checked;
             }
         }
@@ -1251,6 +1241,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // run the f->phase again.  The dispatcher may have changed the
         // value of what f->phase is, for instance.
 
+        CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
+
         if (not EXTRA(Any, r).flag)  // R_REDO_UNCHECKED
             goto redo_unchecked;
 
@@ -1264,18 +1256,31 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
         goto arg_loop;
 
-      case REB_R_INVISIBLE: {
-        assert(GET_ACTION_FLAG(FRM_PHASE(f), IS_INVISIBLE));
+      default:
+        assert(!"Invalid pseudotype returned from action dispatcher");
+    }
+  }
 
-        if (NOT_SERIES_INFO(f->varlist, TELEGRAPH_NO_LOOKAHEAD))
-            CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
-        else {
-            SET_FEED_FLAG(f->feed, NO_LOOKAHEAD);
-            CLEAR_SERIES_INFO(f->varlist, TELEGRAPH_NO_LOOKAHEAD);
+  //=//// CHECK FOR INVISIBILITY (STALE OUTPUT) ///////////////////////////=//
+
+    if (not (f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE))
+        CLEAR_CELL_FLAG(f->out, UNEVALUATED);
+    else {
+        REBACT *phase = FRM_PHASE(f);
+        if (GET_ACTION_FLAG(phase, HAS_RETURN)) {
+            REBVAL *typeset = ACT_PARAMS_HEAD(phase);
+            assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
+            assert(TYPE_CHECK(typeset, REB_TS_INVISIBLE));
         }
 
-        // !!! Ideally we would check that f->out hadn't changed, but
-        // that would require saving the old value somewhere...
+        // We didn't know before we ran the enfix function if it was going
+        // to be invisible, so the output was expired.  Un-expire it if we
+        // are supposed to do so.
+        //
+        STATIC_ASSERT(
+            EVAL_FLAG_UNDO_MARKED_STALE == CELL_FLAG_OUT_MARKED_STALE
+        );
+        f->out->header.bits ^= (f->flags.bits & EVAL_FLAG_UNDO_MARKED_STALE);
 
         // If a "good" output is in `f->out`, the invisible should have
         // had no effect on it.  So jump to the position after output
@@ -1314,12 +1319,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         //
         assert(NOT_EVAL_FLAG(f, FULFILL_ONLY));
         Drop_Action(f);
-        return false; }
-
-      default:
-        assert(!"Invalid pseudotype returned from action dispatcher");
+        return false;
     }
-  }
 
   dispatch_completed:
 
@@ -1336,6 +1337,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   #endif
 
   skip_output_check:
+
+    CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
 
     // If we have functions pending to run on the outputs (e.g. this was
     // the result of a CHAIN) we can run those chained functions in the

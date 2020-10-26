@@ -20,7 +20,7 @@ REBOL [
 assert: func* [
     {Ensure conditions are conditionally true if hooked by debugging}
 
-    return: []
+    return: <elide>
     conditions [block!]
         {Block of conditions to evaluate and test for logical truth}
 ][
@@ -140,6 +140,8 @@ func: func* [
     let other
     parse spec [any [
         <void> (append new-spec <void>)
+    |
+        <elide> (append new-spec <elide>)
     |
         :(either var '[
             set var: [any-word! | lit-word! | refinement!] (
@@ -775,7 +777,7 @@ lock-of: redescribe [
 eval-all: func [
     {Evaluate any number of expressions and discard them}
 
-    return: []
+    return: <elide>
     expressions [<opt> any-value! <variadic>]
         {Any number of expressions on the right.}
 ][
@@ -808,7 +810,7 @@ once-bar: func [
 ; These constructs used to be enfix to complete their left hand side.  Yet
 ; that form of completion was only one expression's worth, when they wanted
 ; to allow longer runs of evaluation.  "Invisible functions" (those which
-; `return: []`) permit a more flexible version of the mechanic.
+; `return: <elide>`) permit a more flexible version of the mechanic.
 
 <|: tweak copy :eval-all 'postpone on
 |>: tweak enfixed :shove 'postpone on
@@ -1025,11 +1027,8 @@ cause-error: func [
 
 
 ; !!! Should there be a special bit or dispatcher used on the FAIL to ensure
-; it does not continue running?  `return: []` is already taken for the
-; "invisible" meaning, but it could be an optimized dispatcher used in
-; wrapping, e.g.:
-;
-;     fail: noreturn func [...] [...]
+; it does not continue running?  `return: []` has been freed up as it no
+; longer means invisible...
 ;
 ; Though HIJACK would have to be aware of it and preserve the rule.
 ;

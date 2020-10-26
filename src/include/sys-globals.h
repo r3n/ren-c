@@ -127,6 +127,8 @@ PVAR REBVAL *Root_Dequote_Tag; // remove quotes before typecheck
 PVAR REBVAL *Root_Requote_Tag; // add quotes that were dequoted back to return
 PVAR REBVAL *Root_Const_Tag; // pass a CONST version of the input argument
 PVAR REBVAL *Root_Output_Tag;  // argument goes to set-block! output
+PVAR REBVAL *Root_Invisible_Tag;  // return value can be invisible
+PVAR REBVAL *Root_Elide_Tag;  // will make any return result act invisibly
 PVAR REBVAL *Root_Modal_Tag;  // !!! needed for bootstrap, vs @arg modal
 
 PVAR REBVAL *Root_Empty_Text; // read-only ""

@@ -15,8 +15,8 @@ REBOL [
 dump: function [
     {Show the name of a value or expressions with the value (See Also: --)}
 
-    return: "Doesn't return anything, not even void (so like a COMMENT)"
-        []
+    return: <elide>
+        "Doesn't return anything, not even void (so like a COMMENT)"
     :value [any-value!]
     :extra "Optional variadic data for SET-WORD!, e.g. `dump x: 1 + 2`"
         [any-value! <variadic>]
@@ -169,7 +169,7 @@ dumps: enfixed function [
         ; have a way to be called--in spirit they are like enfix functions,
         ; so SHOVE (>-) would be used, but it doesn't work yet...review.)
         ;
-        d: function [return: [] /on /off <static> d'] compose/deep [
+        d: function [return: <elide> /on /off <static> d'] compose/deep [
             d': default [
                 d'': specialize 'dump [prefix: (as text! name)]
                 d'' #on
@@ -281,7 +281,7 @@ summarize-obj: function [
 **: enfixed function [
     {Comment until end of line, or end of current BLOCK!/GROUP!}
 
-    return: []
+    return: <elide>
     left "Enfix required for 'fully invisible' enfix behavior (ignored)"
         [<opt> <end> any-value!]
     :args [any-value! <variadic>]

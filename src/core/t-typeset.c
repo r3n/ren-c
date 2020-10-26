@@ -177,6 +177,9 @@ bool Add_Typeset_Bits_Core(
                 //
                 TYPE_SET(typeset, REB_NULL);
             }
+            else if (0 == CT_String(item, Root_Invisible_Tag, strict)) {
+                TYPE_SET(typeset, REB_TS_INVISIBLE);  // !!! REB_BYTES hack
+            }
             else if (0 == CT_String(item, Root_Output_Tag, strict)) {
                 //
                 // !!! Typeset bits are currently scarce, so output is being

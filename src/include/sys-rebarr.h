@@ -179,6 +179,7 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 // there is a "INFO_MISC" bit needed due to array flag saturation.
 //
 #define ARRAY_INFO_MISC_VOIDER SERIES_INFO_MISC_BIT
+#define ARRAY_INFO_MISC_ELIDER SERIES_INFO_MISC2_BIT
 
 
 // Ordinary source arrays use their ->link field to point to an interned file

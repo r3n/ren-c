@@ -64,18 +64,41 @@ STATIC_ASSERT(EVAL_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(2)
 
 
-//=//// EVAL_FLAG_3 ///////////////////////////////////////////////////////=//
+//=//// EVAL_FLAG_UNDO_MARKED_STALE ///////////////////////////////////////=//
 //
-// !!! Unused.  This bit is the same as NODE_FLAG_MARKED, which may make it
-// interesting for lining up with OUT_MARKED_STALE or ARG_MARKED_CHECKED.
+// Note: This bit is the same as NODE_FLAG_MARKED, so it lines up directly
+// with CELL_FLAG_OUT_MARKED_STALE.
 //
-#define EVAL_FLAG_3 \
+#define EVAL_FLAG_UNDO_MARKED_STALE \
     FLAG_LEFT_BIT(3)
 
+STATIC_ASSERT(EVAL_FLAG_UNDO_MARKED_STALE == CELL_FLAG_OUT_MARKED_STALE);
 
-//=//// EVAL_FLAG_4 ///////////////////////////////////////////////////////=//
+
+//=//// EVAL_FLAG_CACHE_NO_LOOKAHEAD //////////////////////////////////////=//
 //
-#define EVAL_FLAG_4 \
+// Without intervention, running an invisible will consume the state of the
+// FEED_FLAG_NO_LOOKAHEAD.  That creates a problem for things like:
+//
+//     >> 1 + comment "a" comment "b" 2 * 3
+//     == 7  ; you'll get 7 and not 9 if FEED_FLAG_NO_LOOKAHEAD is erased
+//
+// Originally invisible functions were pre-announced as purely invisible, and
+// would un-set the flag while the invisible ran...then restore it to the
+// previous state.  But this has changed to were it's not known until after
+// a function has executed if it was invisible.
+//
+// The current logic is to cache the *feed* flag in this *frame* flag before
+// each function runs, and then restore it in the event the execution turns
+// out to be invisible.
+//
+// Note: This is the same flag value as FEED_FLAG_NO_LOOKAHEAD.
+//
+// !!! This could lead to "multiplying" the influences of the flag across
+// several invisible evaluations; this should be reviewed to see if it makes
+// any actual problems in practice.
+//
+#define EVAL_FLAG_CACHE_NO_LOOKAHEAD \
     FLAG_LEFT_BIT(4)
 
 
@@ -85,14 +108,15 @@ STATIC_ASSERT(EVAL_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(5)
 
 
-//=//// EVAL_FLAG_FULFILLING_ARG //////////////////////////////////////////=//
+//=//// EVAL_FLAG_FULLY_SPECIALIZED ///////////////////////////////////////=//
 //
-// Deferred lookback operations need to know when they are dealing with an
-// argument fulfillment for a function, e.g. `summation 1 2 3 |> 100` should
-// be `(summation 1 2 3) |> 100` and not `summation 1 2 (3 |> 100)`.  This
-// also means that `add 1 <| 2` will act as an error.
+// When a null is seen in f->special, the question is whether that is an
+// intentional "null specialization" or if it means the argument should be
+// gathered normally (if applicable), as it would in a typical invocation.
+// If the frame is considered fully specialized (as with DO F) then there
+// will be no further argument gathered at the callsite, nulls are as-is.
 //
-#define EVAL_FLAG_FULFILLING_ARG \
+#define EVAL_FLAG_FULLY_SPECIALIZED \
     FLAG_LEFT_BIT(6)
 
 
@@ -256,15 +280,14 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(24)
 
 
-//=//// EVAL_FLAG_FULLY_SPECIALIZED ///////////////////////////////////////=//
+//=//// EVAL_FLAG_FULFILLING_ARG //////////////////////////////////////////=//
 //
-// When a null is seen in f->special, the question is whether that is an
-// intentional "null specialization" or if it means the argument should be
-// gathered normally (if applicable), as it would in a typical invocation.
-// If the frame is considered fully specialized (as with DO F) then there
-// will be no further argument gathered at the callsite, nulls are as-is.
+// Deferred lookback operations need to know when they are dealing with an
+// argument fulfillment for a function, e.g. `summation 1 2 3 |> 100` should
+// be `(summation 1 2 3) |> 100` and not `summation 1 2 (3 |> 100)`.  This
+// also means that `add 1 <| 2` will act as an error.
 //
-#define EVAL_FLAG_FULLY_SPECIALIZED \
+#define EVAL_FLAG_FULFILLING_ARG \
     FLAG_LEFT_BIT(25)
 
 

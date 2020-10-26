@@ -29,15 +29,14 @@ c-break-debug: :c-debug-break  ; easy to mix up
 
 lit: :literal  ; because it's shorter
 
-|: enfixed func* [
+|: func* [
     "Expression barrier - invisible so it vanishes, but blocks evaluation"
-    return: []
-    discarded [<opt> <end> any-value!]
+    return: <elide>
 ][
     ; Note: actually *faster* than a native, due to Commenter_Dispatcher()
 ]
 
-tweak :| 'postpone on
+tweak :| 'barrier on
 
 
 ??:  ; shorthand form to use in debug sessions, not intended to be committed
@@ -114,10 +113,10 @@ and-not+: enfixed :bitwise-and-not
 comment: enfixed func* [
     {Ignores the argument value, but does no evaluation (see also ELIDE).}
 
-    return: []
+    return: <elide>
         {The evaluator will skip over the result (not seen, not even void)}
     returned [<opt> <end> any-value!]
-        {The returned value.}  ; by protocol of enfixed `return: []`
+        {The returned value.}  ; by protocol of enfixed `return: <invisible>`
     :discarded [block! any-string! binary! any-scalar!]
         "Literal value to be ignored."  ; `comment print "hi"` disallowed
 ][
@@ -126,7 +125,7 @@ comment: enfixed func* [
 elide: func* [
     {Argument is evaluative, but discarded (see also COMMENT).}
 
-    return: []
+    return: <elide>
         {The evaluator will skip over the result (not seen, not even void)}
     discarded [<opt> any-value!]
         {Evaluated value to be ignored.}
@@ -135,7 +134,7 @@ elide: func* [
 
 nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
     {Arity-0 COMMENT (use to replace an arity-0 function with side effects)}
-    return: [] {Evaluator will skip result}
+    return: <elide> {Evaluator will skip result}
 ][
     ; https://github.com/metaeducation/ren-c/issues/581#issuecomment-562875470
 ]
@@ -153,7 +152,7 @@ nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
 |||: func* [
     {Inertly consumes all subsequent data, evaluating to previous result.}
 
-    return: []
+    return: <elide>
     :omit [any-value! <variadic>]
 ][
     until [null? take omit]

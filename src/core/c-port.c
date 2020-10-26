@@ -125,8 +125,10 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     if (n == 0 or not IS_ACTION(action = VAL_CONTEXT_VAR(actor, n)))
         fail (Error_No_Port_Action_Raw(verb));
 
-    if (Redo_Action_Throws(frame_->out, frame_, VAL_ACTION(action)))
+    if (Redo_Action_Throws_Maybe_Stale(frame_->out, frame_, VAL_ACTION(action)))
         return R_THROWN;
+
+    CLEAR_CELL_FLAG(frame_->out, OUT_MARKED_STALE);
 
     r = D_OUT; // result should be in frame_->out
 

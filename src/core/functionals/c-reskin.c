@@ -461,27 +461,32 @@ REBNATIVE(tweak)
 
     REBACT *act = VAL_ACTION(ARG(action));
     REBVAL *first = First_Unspecialized_Param(act);
-    if (not first)
-        fail ("Cannot TWEAK action enfix behavior unless it has >= 1 params");
 
-    Reb_Param_Class pclass = VAL_PARAM_CLASS(first);
+    Reb_Param_Class pclass = first
+        ? VAL_PARAM_CLASS(first)
+        : REB_P_NORMAL;  // imagine it as <end>able
+
     REBFLGS flag;
 
     switch (VAL_WORD_SYM(ARG(property))) {
-      case SYM_DEFER: // Special enfix behavior used by THEN, ELSE, ALSO...
+      case SYM_BARRIER:   // don't allow being taken as an argument, e.g. |
+        flag = PARAMLIST_FLAG_IS_BARRIER;
+        break;
+
+      case SYM_DEFER:  // Special enfix behavior used by THEN, ELSE, ALSO...
         if (pclass != REB_P_NORMAL)
             fail ("TWEAK defer only actions with evaluative 1st params");
         flag = PARAMLIST_FLAG_DEFERS_LOOKBACK;
         break;
 
-      case SYM_POSTPONE: // Wait as long as it can to run w/o changing order
+      case SYM_POSTPONE:  // Wait as long as it can to run w/o changing order
         if (pclass != REB_P_NORMAL and pclass != REB_P_SOFT_QUOTE)
             fail ("TWEAK postpone only actions with evaluative 1st params");
         flag = PARAMLIST_FLAG_POSTPONES_ENTIRELY;
         break;
 
       default:
-        fail ("TWEAK currently only supports [defer postpone]");
+        fail ("TWEAK currently only supports [barrier defer postpone]");
     }
 
     if (VAL_LOGIC(ARG(enable)))

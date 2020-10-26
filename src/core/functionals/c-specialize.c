@@ -215,7 +215,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             INIT_BINDING(ordered, varlist);
             INIT_WORD_INDEX_UNCHECKED(ordered, index);
 
-            if (not Is_Typeset_Invisible(param))  // needs argument
+            if (not Is_Typeset_Empty(param))  // needs argument
                 goto continue_unspecialized;
 
             // If refinement named on stack takes no arguments, then it can't
@@ -529,11 +529,6 @@ bool Specialize_Action_Throws(
         IDX_SPECIALIZER_MAX  // details array capacity
     );
     assert(CTX_KEYLIST(exemplar) == ACT_PARAMLIST(unspecialized));
-
-    assert(
-        GET_ACTION_FLAG(specialized, IS_INVISIBLE)
-        == GET_ACTION_FLAG(unspecialized, IS_INVISIBLE)
-    );
 
     // The "body" is the FRAME! value of the specialization.  It takes on the
     // binding we want to use (which we can't put in the exemplar archetype,

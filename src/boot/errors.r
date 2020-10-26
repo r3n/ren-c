@@ -184,6 +184,8 @@ Script: [
     bad-path-poke:      [{cannot poke} :arg1 {in path}]
     dup-vars:           [{duplicate variable specified:} :arg1]
 
+    expression-barrier: {expression barrier hit while fulfilling argument}
+
     index-out-of-range: {series index before head or after tail}
     missing-arg:        {missing a required argument or refinement}
     too-short:          {content too short (or just whitespace)}

@@ -433,10 +433,10 @@ inline static bool Typecheck_Including_Constraints(
 }
 
 
-inline static bool Is_Typeset_Invisible(const RELVAL *param) {
+inline static bool Is_Typeset_Empty(const RELVAL *param) {
     REBU64 bits = VAL_TYPESET_LOW_BITS(param);
     bits |= cast(REBU64, VAL_TYPESET_HIGH_BITS(param)) << 32;
-    return (bits & TS_OPT_VALUE) == 0;  // e.g. `return: []` or `[/refine]`
+    return (bits & TS_OPT_VALUE) == 0;  // e.g. `[/refine]`
 }
 
 
@@ -462,7 +462,7 @@ inline static void Typecheck_Refinement_And_Canonize(
         //
         // Not in use
     }
-    else if (Is_Typeset_Invisible(param)) {
+    else if (Is_Typeset_Empty(param)) {
         //
         // Refinements that don't have a corresponding argument are in a
         // sense LOGIC!-based.  But for convenience, Ren-C canonizes them as

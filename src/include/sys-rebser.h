@@ -312,13 +312,15 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(4)
 
 
-//=//// SERIES_INFO_5 /////////////////////////////////////////////////////=//
+//=//// SERIES_INFO_MISC2_BIT /////////////////////////////////////////////=//
 //
-#define SERIES_INFO_5 \
+// See remarks on SERIES_INFO_MISC_BIT.  Similar situation.
+//
+#define SERIES_INFO_MISC2_BIT \
     FLAG_LEFT_BIT(5)
 
 
-//=//// SERIES_INFO_FROZEN_DEEP ////////////////////////////////////////////////=//
+//=//// SERIES_INFO_FROZEN_DEEP ///////////////////////////////////////////=//
 //
 // Indicates that the length or values cannot be modified...ever.  It has been
 // locked and will never be released from that state for its lifetime, and if
@@ -409,21 +411,9 @@ STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(25)
 
 
-//=//// SERIES_INFO_TELEGRAPH_NO_LOOKAHEAD ////////////////////////////////=//
+//=//// SERIES_INFO_26 ////////////////////////////////////////////////////=//
 //
-// An "fully invisible" invisible function is one that has been enfixed.  It
-// manipulates frame state, with the expectation to return the evaluator back
-// to where it was when it is over.  But EVAL_FLAG_NO_LOOKAHEAD is erased in
-// the process of running the invisible, so it has to be put back somehow.
-// It stows the flag on the frame's varlist and when the R_INVISIBLE happens
-// at the end of the action it puts it back.
-//
-// !!! Is a similar telegraphing necessary for the "already deferred" enfix?
-//
-// !!! This should probably be a VARLIST_FLAG_XXX, not a generic info bit,
-// as it only applies to frame varlists and need not be taken for all series.
-//
-#define SERIES_INFO_TELEGRAPH_NO_LOOKAHEAD \
+#define SERIES_INFO_26 \
     FLAG_LEFT_BIT(26)
 
 

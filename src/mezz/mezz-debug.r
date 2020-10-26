@@ -14,7 +14,7 @@ REBOL [
 verify: function [
     {Verify all the conditions in the passed-in block are conditionally true}
 
-    return: []
+    return: <elide>
     conditions [block!]
         {Conditions to check}
     <local> result

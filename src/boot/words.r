@@ -261,8 +261,9 @@ let
 ;
 local
 
-; properties for action TWEAK function (passed as ISSUE!)
+; properties for action TWEAK function
 ;
+barrier
 defer
 postpone
 

@@ -161,7 +161,7 @@ void Dump_Stack(REBFRM *f, REBLEN level)
 //
 //  "Temporary debug dump"
 //
-//      return: []
+//      return: [<invisible>]
 //      :value [word!]
 //  ]
 //
@@ -189,6 +189,6 @@ REBNATIVE(dump)
             PROBE(var);
     }
 
-    return R_INVISIBLE;
+    RETURN_INVISIBLE;
 #endif
 }

@@ -253,10 +253,13 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         else
             arg = FRM_ARG(f, VAL_VARARGS_SIGNED_PARAM_INDEX(vararg));
 
+        bool hit_barrier = GET_FEED_FLAG(f->feed, BARRIER_HIT)
+            and (pclass != REB_P_SOFT_QUOTE) and (pclass != REB_P_HARD_QUOTE);
+
         if (Vararg_Op_If_No_Advance_Handled(
             out,
             op,
-            GET_FEED_FLAG(f->feed, BARRIER_HIT)
+            hit_barrier
                 ? END_NODE
                 : cast(const RELVAL *, f->feed->value), // might be END
             f->feed->specifier,

@@ -241,11 +241,6 @@ void Do_Process_Action_Checks_Debug(REBFRM *f) {
     //=//// v-- BELOW CHECKS ONLY APPLY WHEN FRM_PHASE() is VALID ////////=//
 
     assert(GET_ARRAY_FLAG(ACT_PARAMLIST(phase), IS_PARAMLIST));
-
-    if (NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
-        if (NOT_CELL_FLAG(f->out, OUT_MARKED_STALE))
-            assert(GET_ACTION_FLAG(phase, IS_INVISIBLE));
-    }
 }
 
 
@@ -260,13 +255,6 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
 
     REBACT *phase = FRM_PHASE(f);
 
-  #ifdef DEBUG_UTF8_EVERYWHERE
-    if (ANY_STRING(f->out)) {
-        REBLEN len = STR_LEN(VAL_STRING(f->out));
-        UNUSED(len); // just one invariant for now, SER_LEN checks it
-    }
-  #endif
-
     // Usermode functions check the return type via Returner_Dispatcher(),
     // with everything else assumed to return the correct type.  But this
     // double checks any function marked with RETURN in the debug build,
@@ -280,10 +268,10 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
         assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
         if (
             not Typecheck_Including_Constraints(typeset, f->out)
-            and not (
+       /*     and not (
                 GET_ACTION_FLAG(phase, IS_INVISIBLE)
                 and IS_NULLED(f->out) // this happens with `do [return]`
-            )
+            ) */
         ){
             printf("Native code violated return type contract!\n");
             panic (Error_Bad_Return_Type(f, VAL_TYPE(f->out)));

@@ -112,17 +112,23 @@
     ARRAY_FLAG_24
 
 
-//=//// PARAMLIST_FLAG_IS_INVISIBLE ///////////////////////////////////////=//
+//=//// PARAMLIST_FLAG_IS_BARRIER /////////////////////////////////////////=//
 //
-// This is a calculated property, which is cached by Make_Action().
+// Special action property set with TWEAK.  Used by |
 //
-// An "invisible" function is one that does not touch its frame output cell,
-// leaving it completely alone.  This is how `10 comment ["hi"] + 20` can
-// work...if COMMENT destroyed the 10 in the output cell it would be lost and
-// the addition could no longer work.
+// The "expression barrier" was once a built-in type (BAR!) in order to get
+// a property not possible to achieve with functions...that it would error
+// if it was used during FULFILL_ARG and would be transparent in evaluation.
 //
-#define PARAMLIST_FLAG_IS_INVISIBLE \
+// Transparency was eventually generalized as "invisibility".  But attempts
+// to intuit the barrier-ness from another property (e.g. "enfix but no args")
+// were confusing.  It seems an orthogonal feature in its own right, so it
+// was added to the TWEAK list pending a notation in function specs.
+//
+#define PARAMLIST_FLAG_IS_BARRIER \
     ARRAY_FLAG_25
+
+STATIC_ASSERT(PARAMLIST_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
 
 
 //=//// PARAMLIST_FLAG_DEFERS_LOOKBACK ////////////////////////////////////=//
@@ -206,7 +212,7 @@ STATIC_ASSERT(PARAMLIST_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 // These are the flags which are scanned for and set during Make_Action
 //
 #define PARAMLIST_MASK_CACHED \
-    (PARAMLIST_FLAG_IS_INVISIBLE | PARAMLIST_FLAG_RETURN_REQUOTES \
+    (PARAMLIST_FLAG_RETURN_REQUOTES \
         | PARAMLIST_FLAG_QUOTES_FIRST | PARAMLIST_FLAG_SKIPPABLE_FIRST)
 
 // These flags should be copied when specializing or adapting.  They may not

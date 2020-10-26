@@ -598,8 +598,6 @@ inline static void Prep_Frame_Core(
     struct Reb_Feed *feed,
     REBFLGS flags
 ){
-    assert(NOT_FEED_FLAG(feed, BARRIER_HIT));  // couldn't do anything
-
    if (f == nullptr)  // e.g. a failed allocation
        fail (Error_No_Memory(sizeof(REBFRM)));
 
@@ -657,19 +655,12 @@ inline static void Begin_Action_Core(
     assert(NOT_EVAL_FLAG(f, REQUOTE_NULL));
     f->requotes = 0;
 
-    // There's a current state for the FEED_FLAG_NO_LOOKAHEAD which invisible
-    // actions want to put back as it was when the invisible operation ends.
-    // (It gets overwritten during the invisible's own argument gathering).
-    // Cache it on the varlist and put it back when an R_INVISIBLE result
-    // comes back.
-    //
-    if (GET_ACTION_FLAG(f->original, IS_INVISIBLE)) {
-        if (GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)) {
-            assert(GET_EVAL_FLAG(f, FULFILLING_ARG));
-            CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
-            SET_SERIES_INFO(f->varlist, TELEGRAPH_NO_LOOKAHEAD);
-        }
-    }
+    // Cache the feed lookahead state so it can be restored in the event that
+    // the evaluation turns out to be invisible.
+    // 
+    STATIC_ASSERT(FEED_FLAG_NO_LOOKAHEAD == EVAL_FLAG_CACHE_NO_LOOKAHEAD);
+    assert(NOT_EVAL_FLAG(f, CACHE_NO_LOOKAHEAD));
+    f->flags.bits |= f->feed->flags.bits & FEED_FLAG_NO_LOOKAHEAD;
 
     if (enfix) {
         SET_EVAL_FLAG(f, RUNNING_ENFIX);  // set for duration of function call
@@ -716,6 +707,10 @@ inline static void Push_Action(
 ){
     assert(NOT_EVAL_FLAG(f, FULFILL_ONLY));
     assert(NOT_EVAL_FLAG(f, RUNNING_ENFIX));
+
+    STATIC_ASSERT(EVAL_FLAG_FULFILLING_ARG == PARAMLIST_FLAG_IS_BARRIER);
+    if (f->flags.bits & SER(act)->header.bits & PARAMLIST_FLAG_IS_BARRIER)
+        fail (Error_Expression_Barrier_Raw());
 
     f->param = ACT_PARAMS_HEAD(act); // Specializations hide some params...
     REBLEN num_args = ACT_NUM_PARAMS(act); // ...so see REB_TS_HIDDEN
@@ -825,6 +820,18 @@ inline static void Drop_Action(REBFRM *f) {
     if (NOT_EVAL_FLAG(f, FULFILLING_ARG))
         CLEAR_FEED_FLAG(f->feed, BARRIER_HIT);
 
+    if (f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE) {
+        //
+        // If the whole evaluation of the action turned out to be invisible,
+        // then refresh the feed's NO_LOOKAHEAD state to whatever it was
+        // before that invisible evaluation ran.
+        //
+        STATIC_ASSERT(FEED_FLAG_NO_LOOKAHEAD == EVAL_FLAG_CACHE_NO_LOOKAHEAD);
+        f->feed->flags.bits &= ~FEED_FLAG_NO_LOOKAHEAD;
+        f->feed->flags.bits |= f->flags.bits & EVAL_FLAG_CACHE_NO_LOOKAHEAD;
+    }
+    CLEAR_EVAL_FLAG(f, CACHE_NO_LOOKAHEAD);
+
     CLEAR_EVAL_FLAG(f, RUNNING_ENFIX);
     CLEAR_EVAL_FLAG(f, FULFILL_ONLY);
     CLEAR_EVAL_FLAG(f, REQUOTE_NULL);
@@ -895,12 +902,9 @@ inline static void Drop_Action(REBFRM *f) {
         // big enough for ensuing calls.  
         //
         // But no series bits we didn't set should be set...and right now,
-        // only PARAMLIST_FLAG_IS_NATIVE sets HOLD.  Clear that.  Also, it's
-        // possible for a "telegraphed" no lookahead bit used by an invisible
-        // to be left on, so clear it too.
+        // only PARAMLIST_FLAG_IS_NATIVE sets HOLD.  Clear that.
         //
         CLEAR_SERIES_INFO(f->varlist, HOLD);
-        CLEAR_SERIES_INFO(f->varlist, TELEGRAPH_NO_LOOKAHEAD);
 
         assert(0 == (SER(f->varlist)->info.bits & ~( // <- note bitwise not
             SERIES_INFO_0_IS_TRUE // parallels NODE_FLAG_NODE
@@ -998,6 +1002,10 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
 //
 #define RETURN(v) \
     return Move_Value(D_OUT, (v))
+
+#define RETURN_INVISIBLE \
+    assert(D_OUT->header.bits & CELL_FLAG_OUT_MARKED_STALE); \
+    return D_OUT
 
 
 // Shared code for type checking the return result.  It's used by the

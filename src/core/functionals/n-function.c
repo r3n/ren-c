@@ -53,8 +53,9 @@
 //   possible using CLOSURE which made a costly deep copy of the function's
 //   body on every invocation.  Ren-C's method does not require a copy.)
 //
-// * Invisible functions (return: []) that vanish completely, leaving whatever
-//   result was in the evaluation previous to the function call as-is.
+// * Invisible functions (return: <invisible>) that vanish completely,
+//   leaving whatever result was in the evaluation previous to the function
+//   call as-is.
 //
 // * A FRAME! object type that bundles together a function instance and its
 //   parameters, which can be invoked or turned into a specialized ACTION!.
@@ -97,11 +98,16 @@ REB_R Void_Dispatcher(REBFRM *f)
 // Runs the code in the ACT_DETAILS() array of the frame phase for the
 // function instance at the first index (hence "Details 0").
 //
-bool Interpreted_Dispatch_Details_0_Throws(
-    REBVAL *out,  // Note: Elider_Dispatcher() doesn't have `out = f->out`
-    REBFRM *f
-){
-    assert(out == f->out or out == FRM_SPARE(f));  // !!! relax this?
+bool Interpreted_Dispatch_Details_0_Throws(REBVAL *spare, REBFRM *f) {
+    //
+    // All callers have the output written into the frame's spare cell.  This
+    // is because we don't want to ovewrite the `f->out` contents in the case
+    // of a RETURN that wishes to be invisible.  The overwrite should only
+    // occur after the body has finished successfully (if it occurs at all,
+    // e.g. the Elider_Dispatcher() discards the body's evaluated result
+    // that gets calculated into spare).
+    //
+    assert(spare == FRM_SPARE(f));
 
     REBACT *phase = FRM_PHASE(f);
     REBARR *details = ACT_DETAILS(phase);
@@ -120,7 +126,7 @@ bool Interpreted_Dispatch_Details_0_Throws(
     // paramlist but do not have an instance of an action to line them up
     // with.  We use the frame (identified by varlist) as the "specifier".
     //
-    return Do_Any_Array_At_Throws(out, body, SPC(f->varlist));
+    return Do_Any_Array_At_Throws(spare, body, SPC(f->varlist));
 }
 
 
@@ -128,9 +134,6 @@ bool Interpreted_Dispatch_Details_0_Throws(
 //  Unchecked_Dispatcher: C
 //
 // Runs block, then no typechecking (e.g. had no RETURN: [...] type spec)
-//
-// Doubles as common behavior shared by dispatchers which execute on BLOCK!s
-// of code.  (Should it be called "Interpreted_Dispatcher" or similar?)
 //
 // In order to do additional checking or output tweaking, the best way is to
 // change the phase of the frame so that instead of re-entering this unchecked
@@ -141,9 +144,12 @@ bool Interpreted_Dispatch_Details_0_Throws(
 //
 REB_R Unchecked_Dispatcher(REBFRM *f)
 {
-    if (Interpreted_Dispatch_Details_0_Throws(f->out, f))
+    REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
+    if (Interpreted_Dispatch_Details_0_Throws(spare, f)) {
+        Move_Value(f->out, spare);
         return R_THROWN;
-    return f->out;
+    }
+    return Blit_Specific(f->out, spare);  // keep CELL_FLAG_UNEVALUATED
 }
 
 
@@ -154,8 +160,11 @@ REB_R Unchecked_Dispatcher(REBFRM *f)
 //
 REB_R Voider_Dispatcher(REBFRM *f)
 {
-    if (Interpreted_Dispatch_Details_0_Throws(f->out, f))
+    REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
+    if (Interpreted_Dispatch_Details_0_Throws(spare, f)) {
+        Move_Value(f->out, spare);
         return R_THROWN;
+    }
     return Init_Void(f->out);
 }
 
@@ -170,9 +179,13 @@ REB_R Voider_Dispatcher(REBFRM *f)
 //
 REB_R Returner_Dispatcher(REBFRM *f)
 {
-    if (Interpreted_Dispatch_Details_0_Throws(f->out, f))
+    REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
+    if (Interpreted_Dispatch_Details_0_Throws(spare, f)) {
+        Move_Value(f->out, spare);
         return R_THROWN;
+    }
 
+    Blit_Specific(f->out, spare);
     FAIL_IF_BAD_RETURN_TYPE(f);
     return f->out;
 }
@@ -188,7 +201,9 @@ REB_R Returner_Dispatcher(REBFRM *f)
 //
 REB_R Elider_Dispatcher(REBFRM *f)
 {
-    REBVAL * const discarded = FRM_SPARE(f);  // spare usable during dispatch
+    assert(f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE);
+
+    REBVAL *discarded = FRM_SPARE(f);  // spare usable during dispatch
 
     if (Interpreted_Dispatch_Details_0_Throws(discarded, f)) {
         //
@@ -207,7 +222,7 @@ REB_R Elider_Dispatcher(REBFRM *f)
             ){
                 CATCH_THROWN(discarded, discarded);
                 if (IS_NULLED(discarded)) // !!! catch loses "endish" flag
-                    return R_INVISIBLE;
+                    return f->out;  // has OUT_MARKED_STALE
 
                 fail ("Only 0-arity RETURN should be used in invisibles.");
             }
@@ -217,7 +232,7 @@ REB_R Elider_Dispatcher(REBFRM *f)
         return R_THROWN;
     }
 
-    return R_INVISIBLE;
+    return f->out;  // has OUT_MARKED_STALE
 }
 
 
@@ -233,7 +248,9 @@ REB_R Commenter_Dispatcher(REBFRM *f)
     RELVAL *body = ARR_HEAD(details);
     assert(VAL_LEN_AT(body) == 0);
     UNUSED(body);
-    return R_INVISIBLE;
+
+    assert(f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE);
+    return f->out;
 }
 
 
@@ -298,7 +315,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
     REBARR *copy;
     if (IS_END(VAL_ARRAY_AT(body))) {  // optimize empty body case
 
-        if (GET_ACTION_FLAG(a, IS_INVISIBLE)) {
+        if (SER(a)->info.bits & ARRAY_INFO_MISC_ELIDER) {
             ACT_DISPATCHER(a) = &Commenter_Dispatcher;
         }
         else if (SER(a)->info.bits & ARRAY_INFO_MISC_VOIDER) {
@@ -320,7 +337,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
     }
     else {  // body not empty, pick dispatcher based on output disposition
 
-        if (GET_ACTION_FLAG(a, IS_INVISIBLE))
+        if (SER(a)->info.bits & ARRAY_INFO_MISC_ELIDER)
             ACT_DISPATCHER(a) = &Elider_Dispatcher; // no f->out mutation
         else if (SER(a)->info.bits & ARRAY_INFO_MISC_VOIDER) // !!! see note
             ACT_DISPATCHER(a) = &Voider_Dispatcher; // forces f->out void
@@ -577,9 +594,12 @@ REBNATIVE(return)
     assert(VAL_PARAM_CLASS(typeset) == REB_P_LOCAL);
     assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
 
-    if (GET_ACTION_FLAG(target_fun, IS_INVISIBLE) and IS_ENDISH_NULLED(v)) {
+    if (TYPE_CHECK(typeset, REB_TS_INVISIBLE)) {
         //
         // The only legal way invisibles can use RETURN is with no argument.
+        //
+        if (not IS_ENDISH_NULLED(v))
+            fail ("Can't use a return value with invisibles yet");
     }
     else {
         if (IS_ENDISH_NULLED(v))

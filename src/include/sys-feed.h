@@ -44,14 +44,9 @@
     FLAG_LEFT_BIT(0)
 
 
-// Infix functions may (depending on the #tight or non-tight parameter
-// acquisition modes) want to suppress further infix lookahead while getting
-// a function argument.  This precedent was started in R3-Alpha, where with
-// `1 + 2 * 3` it didn't want infix `+` to "look ahead" past the 2 to see the
-// infix `*` when gathering its argument, that was saved until the `1 + 2`
-// finished its processing.
+// Available.
 //
-#define FEED_FLAG_NO_LOOKAHEAD \
+#define FEED_FLAG_1 \
     FLAG_LEFT_BIT(1)
 
 
@@ -92,8 +87,17 @@
     FLAG_LEFT_BIT(3)
 
 
-#define FEED_FLAG_4 \
+// Infix functions may (depending on the #tight or non-tight parameter
+// acquisition modes) want to suppress further infix lookahead while getting
+// a function argument.  This precedent was started in R3-Alpha, where with
+// `1 + 2 * 3` it didn't want infix `+` to "look ahead" past the 2 to see the
+// infix `*` when gathering its argument, that was saved until the `1 + 2`
+// finished its processing.
+//
+#define FEED_FLAG_NO_LOOKAHEAD \
     FLAG_LEFT_BIT(4)
+
+STATIC_ASSERT(EVAL_FLAG_CACHE_NO_LOOKAHEAD == FEED_FLAG_NO_LOOKAHEAD);
 
 
 // When processing something like enfix, the output cell of a frame is the

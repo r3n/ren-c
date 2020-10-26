@@ -202,7 +202,7 @@ REBLEN Try_Bind_Word(REBCTX *context, REBVAL *word)
 //
 //  {LET is noticed by FUNC to mean "create a local binding"}
 //
-//      return: []
+//      return: [<invisible>]
 //      :word [<skip> word!]
 //  ]
 //
@@ -216,7 +216,7 @@ REBNATIVE(let)
     INCLUDE_PARAMS_OF_LET;
     UNUSED(ARG(word));  // just skip over WORD!s (vs. look them up)
 
-    return R_INVISIBLE;
+    RETURN_INVISIBLE;
 }
 
 

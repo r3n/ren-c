@@ -148,8 +148,18 @@ inline static bool Did_Init_Inert_Optimize_Complete(
         if (
             not feed->gotten
             or not IS_ACTION(feed->gotten)
-            or NOT_ACTION_FLAG(VAL_ACTION(feed->gotten), ENFIXED)
         ){
+            CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
+            return true;  // not action
+        }
+
+        if (GET_ACTION_FLAG(VAL_ACTION(feed->gotten), IS_BARRIER)) {
+            SET_FEED_FLAG(feed, BARRIER_HIT);
+            CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
+            return true;  // is barrier
+        }
+
+        if (NOT_ACTION_FLAG(VAL_ACTION(feed->gotten), ENFIXED)) {
             CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
             return true;  // not enfixed
         }

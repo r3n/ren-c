@@ -236,6 +236,10 @@ e-types/emit {
         REB_TS_ENDABLE = REB_0,  /* bit set in typesets for endability */
         REB_P_DETECT = REB_0,  /* detect paramclass from vararg */
 
+        /*** TEMP FAKERY TO HAVE A TYPESET BIT FOR INVISIBILITY ***/
+
+        REB_TS_INVISIBLE = REB_BYTES,  /* can never occur in KIND3Q_BYTE */
+
         /*** PSEUDOTYPES ***/
 
         PSEUDOTYPE_ONE = REB_MAX,
