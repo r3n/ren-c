@@ -375,7 +375,7 @@ inline static bool Eval_Step_In_Va_Throws_Core(
 }
 
 
-inline static bool Eval_Value_Throws(
+inline static bool Eval_Value_Maybe_End_Throws(
     REBVAL *out,
     const RELVAL *value,  // e.g. a BLOCK! here would just evaluate to itself!
     REBSPC *specifier
@@ -407,17 +407,24 @@ inline static bool Eval_Value_Throws(
     bool threw = Eval_Throws(f);
     Drop_Frame(f);
 
-    // The callsites for Eval_Value_Throws() generally expect an evaluative
-    // result (at least null).  They might be able to give a better error, but
-    // they pretty much all need to give an error.
-    //
-    // In contrast, note that REEVAL itself errs on the side of voids, so:
-    //
-    //     >> type of reeval comment "hi"
-    //     == #[void!]
-    //
+    return threw;
+}
+
+
+// The callsites for Eval_Value_Throws() generally expect an evaluative
+// result (at least null).  They might be able to give a better error, but
+// they pretty much all need to give an error.
+//
+inline static bool Eval_Value_Throws(
+    REBVAL *out,
+    const RELVAL *value,  // e.g. a BLOCK! here would just evaluate to itself!
+    REBSPC *specifier
+){
+    if (Eval_Value_Maybe_End_Throws(out, value, specifier))
+        return true;
+
     if (IS_END(out))
         fail ("Single step EVAL produced no result (invisible or empty)");
 
-    return threw;
+    return false;
 }

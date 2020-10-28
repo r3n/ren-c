@@ -87,3 +87,20 @@
         ])/id
     )
 ]
+
+; Invisibility sensitivity
+;
+; Modal parameters use the unevaluated flag to inform callers that an
+; argument "dissolved", so they can differentiate @(comment "hi") and @(null)
+; The mechanism used is much like how <end> and <opt> are distinguished.
+[
+    (sensor: func [@arg [<opt> any-value!] /modal] [
+        reduce .try [arg modal semiquoted? 'arg]
+    ] true)
+
+    ([_ /modal #[false]] = sensor @(null))
+    ([_ /modal #[true]] = sensor @())
+    ([_ /modal #[true]] = sensor @(comment "hi"))
+
+    ; ([_ /modal #[true]] = sensor @nihil)  ; !!! maybe this should work?
+]

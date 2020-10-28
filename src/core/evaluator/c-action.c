@@ -342,10 +342,16 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     // Because the possibility of needing to see the uneval'd
     // value existed, the parameter had to act quoted.  Eval.
     //
-    if (Eval_Value_Throws(f->arg, f->out, SPECIFIED)) {
+    if (Eval_Value_Maybe_End_Throws(f->arg, f->out, SPECIFIED)) {
         Move_Value(f->arg, f->out);
         return true;
     }
+
+    // The modal parameter can test to see if an expression vaporized, e.g.
+    // `@(comment "hi")` or `@()`, and handle that case.
+    //
+    if (IS_END(f->arg))
+        Init_Endish_Nulled(f->arg);
 
     return false;
 }
