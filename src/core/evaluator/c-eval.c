@@ -270,10 +270,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
                 VAL_ACTION(f->u.reval.value),
                 VAL_BINDING(f->u.reval.value)
             );
-            Begin_Enfix_Action(subframe, nullptr);
+            Begin_Enfix_Action(subframe, VAL_ACTION_LABEL(f->u.reval.value));
                 // ^-- invisibles cache NO_LOOKAHEAD
-
-            Fetch_Next_Forget_Lookback(f);
 
             goto process_action;
         }

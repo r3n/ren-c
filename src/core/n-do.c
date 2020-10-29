@@ -174,8 +174,7 @@ REBNATIVE(shove)
     else
         enfix = false;
 
-    if (not enfix)
-        Fetch_Next_Forget_Lookback(f);
+    Fetch_Next_Forget_Lookback(f);
 
     // Trying to EVAL a SET-WORD! or SET-PATH! with no args would be an error.
     // So interpret it specially...GET the value and SET it back.  Note this
