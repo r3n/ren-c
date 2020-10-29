@@ -293,7 +293,7 @@ summarize-obj: function [
         all [
             any-array? :value
             contains-newline value
-            return
+            return @()
         ]
     ]
 ]

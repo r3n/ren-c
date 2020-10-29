@@ -98,7 +98,11 @@ REB_R Void_Dispatcher(REBFRM *f)
 // Runs the code in the ACT_DETAILS() array of the frame phase for the
 // function instance at the first index (hence "Details 0").
 //
-bool Interpreted_Dispatch_Details_0_Throws(REBVAL *spare, REBFRM *f) {
+bool Interpreted_Dispatch_Details_0_Throws(
+    bool *returned,
+    REBVAL *spare,
+    REBFRM *f
+){
     //
     // All callers have the output written into the frame's spare cell.  This
     // is because we don't want to ovewrite the `f->out` contents in the case
@@ -126,7 +130,29 @@ bool Interpreted_Dispatch_Details_0_Throws(REBVAL *spare, REBFRM *f) {
     // paramlist but do not have an instance of an action to line them up
     // with.  We use the frame (identified by varlist) as the "specifier".
     //
-    return Do_Any_Array_At_Throws(spare, body, SPC(f->varlist));
+    if (Do_Any_Array_At_Throws(spare, body, SPC(f->varlist))) {
+        const REBVAL *label = VAL_THROWN_LABEL(spare);
+        if (
+            IS_ACTION(label)
+            and VAL_ACTION(label) == NATIVE_ACT(unwind)
+            and VAL_BINDING(label) == NOD(f->varlist)
+        ){
+            // !!! Historically, UNWIND was caught by the main action
+            // evaluation loop.  However, because throws bubble up through
+            // f->out, it would destroy the stale previous value and inhibit
+            // invisible evaluation.  It's probably a better separation of
+            // concerns to handle the usermode RETURN here...but generic
+            // UNWIND is a nice feature too.  Revisit later.
+            //
+            CATCH_THROWN(spare, spare);  // preserves CELL_FLAG_UNEVALUATED
+            *returned = true;
+            return false;  // we caught the THROW
+        }
+        return true;  // we didn't catch the throw
+    }
+
+    *returned = false;
+    return false;  // didn't throw
 }
 
 
@@ -145,10 +171,14 @@ bool Interpreted_Dispatch_Details_0_Throws(REBVAL *spare, REBFRM *f) {
 REB_R Unchecked_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
-    if (Interpreted_Dispatch_Details_0_Throws(spare, f)) {
+    bool returned;
+    if (Interpreted_Dispatch_Details_0_Throws(&returned, spare, f)) {
         Move_Value(f->out, spare);
         return R_THROWN;
     }
+    UNUSED(returned);  // no additional work to bypass
+    if (IS_ENDISH_NULLED(spare))
+        return f->out;  // was invisible
     return Blit_Specific(f->out, spare);  // keep CELL_FLAG_UNEVALUATED
 }
 
@@ -161,10 +191,12 @@ REB_R Unchecked_Dispatcher(REBFRM *f)
 REB_R Voider_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
-    if (Interpreted_Dispatch_Details_0_Throws(spare, f)) {
+    bool returned;
+    if (Interpreted_Dispatch_Details_0_Throws(&returned, spare, f)) {
         Move_Value(f->out, spare);
         return R_THROWN;
     }
+    UNUSED(returned);  // no additional work to bypass
     return Init_Void(f->out);
 }
 
@@ -180,9 +212,16 @@ REB_R Voider_Dispatcher(REBFRM *f)
 REB_R Returner_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
-    if (Interpreted_Dispatch_Details_0_Throws(spare, f)) {
+    bool returned;
+    if (Interpreted_Dispatch_Details_0_Throws(&returned, spare, f)) {
         Move_Value(f->out, spare);
         return R_THROWN;
+    }
+    UNUSED(returned);  // no additional work to bypass
+
+    if (IS_ENDISH_NULLED(spare)) {
+        FAIL_IF_NO_INVISIBLE_RETURN(f);
+        return f->out;  // was invisible
     }
 
     Blit_Specific(f->out, spare);
@@ -194,10 +233,8 @@ REB_R Returner_Dispatcher(REBFRM *f)
 //
 //  Elider_Dispatcher: C
 //
-// Used by "invisible" functions (who in their spec say `RETURN: []`).  Runs
-// block but with no net change to f->out.
-//
-// !!! Review enforcement of arity-0 return in invisibles only!
+// Used by functions that in their spec say `RETURN: <elide>`.
+// Runs block but with no net change to f->out.
 //
 REB_R Elider_Dispatcher(REBFRM *f)
 {
@@ -205,34 +242,14 @@ REB_R Elider_Dispatcher(REBFRM *f)
 
     REBVAL *discarded = FRM_SPARE(f);  // spare usable during dispatch
 
-    if (Interpreted_Dispatch_Details_0_Throws(discarded, f)) {
-        //
-        // !!! In the implementation of invisibles, it seems reasonable to
-        // want to be able to RETURN to its own frame.  But in that case, we
-        // don't want to actually overwrite the f->out content or this would
-        // be no longer invisible.  Until a better idea comes along, repeat
-        // the work of catching here.  (Note this does not handle REDO too,
-        // and the hypothetical better idea should do so.)
-        //
-        const REBVAL *label = VAL_THROWN_LABEL(discarded);
-        if (IS_ACTION(label)) {
-            if (
-                VAL_ACTION(label) == NATIVE_ACT(unwind)
-                and VAL_BINDING(label) == NOD(f->varlist)
-            ){
-                CATCH_THROWN(discarded, discarded);
-                if (IS_NULLED(discarded)) // !!! catch loses "endish" flag
-                    return f->out;  // has OUT_MARKED_STALE
-
-                fail ("Only 0-arity RETURN should be used in invisibles.");
-            }
-        }
-
-        Move_Value(f->out, discarded);
+    bool returned;
+    if (Interpreted_Dispatch_Details_0_Throws(&returned, discarded, f))
         return R_THROWN;
-    }
+    UNUSED(returned);  // no additional work to bypass
 
-    return f->out;  // has OUT_MARKED_STALE
+    assert(f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE);
+
+    return f->out;
 }
 
 
@@ -546,7 +563,8 @@ REBNATIVE(unwind)
 //  {RETURN, giving a result to the caller}
 //
 //      value "If no argument is given, result will be a VOID!"
-//          [<end> <opt> any-value!]
+//          [<modal> <end> <opt> any-value!]
+//      /vanishable "Modal argument can allow return to disappear completely"
 //  ]
 //
 REBNATIVE(return)
@@ -594,35 +612,41 @@ REBNATIVE(return)
     assert(VAL_PARAM_CLASS(typeset) == REB_P_LOCAL);
     assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
 
-    if (TYPE_CHECK(typeset, REB_TS_INVISIBLE)) {
-        //
-        // The only legal way invisibles can use RETURN is with no argument.
-        //
-        if (not IS_ENDISH_NULLED(v))
-            fail ("Can't use a return value with invisibles yet");
-    }
-    else {
-        if (IS_ENDISH_NULLED(v))
+    // There are two ways you can get an "endish nulled".  One is a plain
+    // `RETURN` with nothing following it (which is interpreted as returning
+    // a void).  The other is like `return @()` or `return @(comment "hi")`,
+    // which are asking for a fully invisible return.
+    //
+    if (IS_ENDISH_NULLED(v)) {
+        if (REF(vanishable)) {
+            FAIL_IF_NO_INVISIBLE_RETURN(target_frame);
+
+            goto skip_type_check;  // already checked
+        }
+        else {
             Init_Void(v); // `do [return]` acts as `return void`
-
-        // Check type NOW instead of waiting and letting Eval_Core()
-        // check it.  Reasoning is that the error can indicate the callsite,
-        // e.g. the point where `return badly-typed-value` happened.
-        //
-        // !!! In the userspace formulation of this abstraction, it indicates
-        // it's not RETURN's type signature that is constrained, as if it were
-        // then RETURN would be implicated in the error.  Instead, RETURN must
-        // take [<opt> any-value!] as its argument, and then report the error
-        // itself...implicating the frame (in a way parallel to this native).
-        //
-        if (not TYPE_CHECK(typeset, VAL_TYPE(v)))
-            fail (Error_Bad_Return_Type(target_frame, VAL_TYPE(v)));
+        }
     }
 
+    // Check type NOW instead of waiting and letting Eval_Core()
+    // check it.  Reasoning is that the error can indicate the callsite,
+    // e.g. the point where `return badly-typed-value` happened.
+    //
+    // !!! In the userspace formulation of this abstraction, it indicates
+    // it's not RETURN's type signature that is constrained, as if it were
+    // then RETURN would be implicated in the error.  Instead, RETURN must
+    // take [<opt> any-value!] as its argument, and then report the error
+    // itself...implicating the frame (in a way parallel to this native).
+    //
+    if (not TYPE_CHECK(typeset, VAL_TYPE(v)))
+        fail (Error_Bad_Return_Type(target_frame, VAL_TYPE(v)));
+
+  skip_type_check: {
     assert(f_binding->header.bits & ARRAY_FLAG_IS_VARLIST);
 
     Move_Value(D_OUT, NATIVE_VAL(unwind)); // see also Make_Thrown_Unwind_Value
     INIT_BINDING_MAY_MANAGE(D_OUT, f_binding);
 
-    return Init_Thrown_With_Label(D_OUT, v, D_OUT);
+    return Init_Thrown_With_Label(D_OUT, v, D_OUT);  // preserves UNEVALUATED
+  }
 }

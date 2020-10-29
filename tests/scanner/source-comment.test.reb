@@ -16,8 +16,7 @@
 ;     >> 'a; illegal quoted word
 ;     ** Syntax Error: invalid "word" -- "a;"
 ;
-; This differs from Rebol2 and Red.  (R3-Alpha had an exception for URL!s, as
-; semicolons are legal in URL content.)
+; This differs from Rebol2 and Red.
 
 (
     issue: load "#; ; comment after a one-codepoint issue"
@@ -47,4 +46,19 @@
     ]
 )(
     'scan-invalid = (trap [load "'a; illegal quoted word"])/id
+)
+
+; Semicolons are technically legal in URL (though many things that auto-scan
+; code to find URLs in text won't include period, semicolon, quotes...)
+(
+    url: load "http://abc;"
+    http://abc; = url
+)
+
+(
+    b: load ";"
+    did all [
+        b = []
+        not new-line? b
+    ]
 )

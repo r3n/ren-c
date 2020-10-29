@@ -75,9 +75,16 @@ REB_R Adapter_Dispatcher(REBFRM *f)
 
     assert(IDX_ADAPTER_PRELUDE == 0);  // same location as interpreted bodies
 
-    if (Interpreted_Dispatch_Details_0_Throws(discarded, f)) {
+    bool returned;
+    if (Interpreted_Dispatch_Details_0_Throws(&returned, discarded, f)) {
         Move_Value(f->out, discarded);
         return R_THROWN;
+    }
+
+    if (returned) {
+        if (IS_ENDISH_NULLED(discarded))
+            return f->out;
+        return Move_Value(f->out, discarded);
     }
 
     // The second thing to do is update the phase and binding to run the

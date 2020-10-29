@@ -1022,3 +1022,12 @@ inline static void FAIL_IF_BAD_RETURN_TYPE(REBFRM *f) {
     if (not Typecheck_Including_Constraints(typeset, f->out))
         fail (Error_Bad_Return_Type(f, VAL_TYPE(f->out)));
 }
+
+inline static void FAIL_IF_NO_INVISIBLE_RETURN(REBFRM *f) {
+    REBACT *phase = FRM_PHASE(f);
+    REBVAL *typeset = ACT_PARAMS_HEAD(phase);
+    assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
+
+    if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE))
+        fail (Error_Bad_Invisible(f));
+}

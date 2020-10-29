@@ -39,7 +39,7 @@
 //
 //  {Process an evaluated argument *inline* as the evaluator loop would}
 //
-//      return: [<opt> any-value!]
+//      return: [<opt> <invisible> any-value!]
 //      value [any-value!]
 //          {BLOCK! passes-thru, ACTION! runs, SET-WORD! assigns...}
 //      expressions [<opt> any-value! <variadic>]
@@ -60,7 +60,7 @@ REBNATIVE(reeval)
 
     REBFLGS flags = EVAL_MASK_DEFAULT;
     if (Reevaluate_In_Subframe_Maybe_Stale_Throws(
-        Init_Void(D_OUT),  // `eval lit (comment "this gives void vs. error")`
+        D_OUT,  // reeval :comment "this should leave old input"
         frame_,
         ARG(value),
         flags,
@@ -68,8 +68,7 @@ REBNATIVE(reeval)
     ))
         return R_THROWN;
 
-    CLEAR_CELL_FLAG(D_OUT, OUT_MARKED_STALE);
-    return D_OUT;
+    return D_OUT;  // don't clear stale flag...act invisibly
 }
 
 

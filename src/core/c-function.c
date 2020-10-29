@@ -564,6 +564,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
                 REB_P_LOCAL,
                 Canon(SYM_RETURN),
                 TS_OPT_VALUE
+                    | FLAGIT_KIND(REB_TS_INVISIBLE)  // return @() intentional
             );
             definitional_return_dsp = DSP;
 

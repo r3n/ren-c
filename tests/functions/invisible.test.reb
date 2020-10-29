@@ -302,13 +302,14 @@
 ) 300 + 4))
 
 
-; It's likely more useful for EVAL to give VOID! than error if asked to
-; evaluate something that turns out to be invisible.
+; REEVAL has been tuned to be able to act invisibly if the thing being
+; reevaluated turns out to be invisible.
 ;
-(void? reeval lit (comment "void is better than failing here"))
+(integer? reeval lit (comment "this group vaporizes") 1020)
+(<before> = (<before> reeval :comment "erase me"))
 (
     x: <before>
-    void? reeval :elide x: <after>
+    equal? true reeval :elide x: <after>  ; picks up the `x = <after>`
     x = <after>
 )
 
@@ -328,11 +329,41 @@
 ((comment "one") 1 + (comment "two") 2 = (comment "three") 3)
 
 
-; !!! Should `;`-comment tests be grouped into their own file?
-(
-    b: load ";"
-    did all [
-        b = []
-        not new-line? b
-    ]
-)
+; "Opportunistic Invisibility" means that functions can treat invisibility as
+; a return type, decided on after they've already started running.  This means
+; using the @(...) form of RETURN, which can also be used for chaining.
+[
+    (vanish-if-odd: func [return: [<invisible> integer!] x] [
+        if even? x [return x]
+        return @()
+    ] true)
+
+    (2 = (<test> vanish-if-odd 2))
+    (<test> = (<test> vanish-if-odd 1))
+
+    (vanish-if-even: func [return: [<invisible> integer!] y] [
+       return @(vanish-if-odd y + 1)
+    ] true)
+
+    (<test> = (<test> vanish-if-even 2))
+    (2 = (<test> vanish-if-even 1))
+]
+
+
+; Invisibility is a checked return type, if you use a type spec...but allowed
+; by default if not.
+[
+    (
+        no-spec: func [x] [return @()]
+        <test> = (<test> no-spec 10)
+    )
+    (
+        int-spec: func [return: [integer!] x] [return @()]
+        e: trap [int-spec 10]
+        e/id = 'bad-invisible
+    )
+    (
+        invis-spec: func [return: [<invisible> integer!] x] [return @()]
+        <test> = (<test> invis-spec 10)
+    )
+]

@@ -107,6 +107,9 @@ inline static REB_R Init_Thrown_With_Label(
   #endif
 
     Move_Value(&TG_Thrown_Arg, arg);
+    if (GET_CELL_FLAG(arg, UNEVALUATED))
+        SET_CELL_FLAG(&TG_Thrown_Arg, UNEVALUATED);  // for invisible RETURN
+
     return R_THROWN; // for chaining to dispatcher output
 }
 
@@ -118,6 +121,8 @@ static inline void CATCH_THROWN(
 
     UNUSED(thrown);
     Move_Value(arg_out, &TG_Thrown_Arg);
+    if (GET_CELL_FLAG(&TG_Thrown_Arg, UNEVALUATED))
+        SET_CELL_FLAG(arg_out, UNEVALUATED);  // indicates invisible RETURN
 
   #if !defined(NDEBUG)
     SET_END(&TG_Thrown_Arg);
