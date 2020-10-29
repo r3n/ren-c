@@ -266,12 +266,18 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
     if (GET_ACTION_FLAG(phase, HAS_RETURN)) {
         REBVAL *typeset = ACT_PARAMS_HEAD(phase);
         assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
-        if (
+        if (GET_CELL_FLAG(f->out, OUT_MARKED_STALE)) {
+            if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE)) {
+                printf("Native code violated return type contract!\n");
+                panic (Error_Bad_Invisible(f));
+            }
+        }
+        else if (
             not Typecheck_Including_Constraints(typeset, f->out)
-       /*     and not (
-                GET_ACTION_FLAG(phase, IS_INVISIBLE)
-                and IS_NULLED(f->out) // this happens with `do [return]`
-            ) */
+            and not (
+                TYPE_CHECK(typeset, REB_TS_INVISIBLE)
+                and GET_EVAL_FLAG(f, RUNNING_ENFIX)
+            )  // exemption, e.g. `1 comment "hi" + 2` infix non-stale
         ){
             printf("Native code violated return type contract!\n");
             panic (Error_Bad_Return_Type(f, VAL_TYPE(f->out)));

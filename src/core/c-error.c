@@ -1338,6 +1338,17 @@ REBCTX *Error_Bad_Return_Type(REBFRM *f, enum Reb_Kind kind) {
 
 
 //
+//  Error_Bad_Invisible: C
+//
+REBCTX *Error_Bad_Invisible(REBFRM *f) {
+    DECLARE_LOCAL (label);
+    Get_Frame_Label_Or_Blank(label, f);
+
+    return Error_Bad_Invisible_Raw(label);
+}
+
+
+//
 //  Error_Bad_Make: C
 //
 REBCTX *Error_Bad_Make(enum Reb_Kind type, const REBVAL *spec)

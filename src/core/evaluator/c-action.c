@@ -1266,13 +1266,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     if (not (f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE))
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);
     else {
-        REBACT *phase = FRM_PHASE(f);
-        if (GET_ACTION_FLAG(phase, HAS_RETURN)) {
-            REBVAL *typeset = ACT_PARAMS_HEAD(phase);
-            assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
-            assert(TYPE_CHECK(typeset, REB_TS_INVISIBLE));
-        }
-
         // We didn't know before we ran the enfix function if it was going
         // to be invisible, so the output was expired.  Un-expire it if we
         // are supposed to do so.
@@ -1293,7 +1286,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             //     is-barrier?: func [x [<end> integer!]] [null? x]
             //     is-barrier? (<| 10)
             //
-            goto skip_output_check;
+            goto dispatch_completed;
         }
 
         // If the evaluation is being called by something like EVALUATE,
@@ -1306,8 +1299,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // wants all the invisibles processed.  So only do one-at-a-time
         // invisibles if we're not fulfilling arguments.
         //
-        if (NOT_EVAL_FLAG(f, FULFILLING_ARG))
-            goto skip_output_check;
+        if (GET_EVAL_FLAG(f, FULFILLING_ARG))
+            goto dispatch_completed;
 
         // Note that we do not do START_NEW_EXPRESSION() here when an
         // invisible is being processed as part of an argument.  They
