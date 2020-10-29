@@ -536,7 +536,7 @@ void Rebind_Values_Deep(
     for (; NOT_END(v); ++v) {
         if (ANY_ARRAY_OR_PATH(v)) {
             Rebind_Values_Deep(
-                VAL_ARRAY_AT_ENSURE_MUTABLE(v),
+                VAL_ARRAY_AT_MUTABLE_HACK(v),
                 src,
                 dst,
                 opt_binder
