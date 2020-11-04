@@ -188,6 +188,9 @@ inline static REBVAL *Init_Char_May_Fail(RELVAL *out, REBUNI c) {
 // it is also length 0.
 //
 
+#define Init_Blackhole(out) \
+    Init_Char_Unchecked(out, 0)
+
 inline static bool Is_Blackhole(const RELVAL *v) {
     if (not IS_CHAR(v))
         return false;

@@ -496,7 +496,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             REBDSP dsp = dsp_orig;
             while (dsp != DSP) {
                 const REBSTR *spelling = VAL_WORD_SPELLING(DS_AT(dsp + 1));
-                Init_Param(param, REB_P_LOCAL, spelling, 0);
+                Init_Param(param, REB_P_LOCAL, spelling, FLAGIT_KIND(REB_TS_HIDDEN));
                 ++dsp;
                 ++param;
 

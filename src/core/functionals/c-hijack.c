@@ -110,7 +110,10 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
 
     for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
         if (Is_Param_Hidden(f->param)) {  // specialized-out parameter
-            assert(GET_CELL_FLAG(f->special, ARG_MARKED_CHECKED));
+            assert(
+                GET_CELL_FLAG(f->special, ARG_MARKED_CHECKED)
+                or VAL_PARAM_CLASS(f->param) == REB_P_LOCAL
+            );
             continue;
         }
 

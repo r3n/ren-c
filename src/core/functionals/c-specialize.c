@@ -155,6 +155,12 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     for (; NOT_END(param); ++param, ++arg, ++special, ++index) {
         Prep_Cell(arg);
 
+        if (VAL_PARAM_CLASS(param) == REB_P_LOCAL) {
+            Init_Void(arg, SYM_LOCAL);
+            SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+            continue;
+        }
+
         if (Is_Param_Hidden(param)) {  // specialized out
             assert(GET_CELL_FLAG(special, ARG_MARKED_CHECKED));
             Move_Value(arg, special); // doesn't copy ARG_MARKED_CHECKED
@@ -442,8 +448,8 @@ bool Specialize_Action_Throws(
 
         switch (VAL_PARAM_CLASS(param)) {
           case REB_P_LOCAL:
-            assert(IS_NULLED(arg));  // no bindings, you can't set these
-            goto unspecialized_arg;
+            assert(IS_VOID(arg));  // no bindings, you can't set these
+            goto specialized_arg_no_typecheck;
 
           default:
             break;

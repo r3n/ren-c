@@ -263,14 +263,6 @@ Special internal defines used by RT, not Host-Kit developers:
     //
     #define DEBUG_TRACK_CELLS
 
-    // OUT_MARKED_STALE uses the same bit as ARG_MARKED_CHECKED.  But arg
-    // fulfillment uses END as the signal of when no evaluations are done,
-    // it doesn't need the stale bit.  The bit is cleared when evaluating in
-    // an arg slot in the debug build, to make it more rigorous to know that
-    // it was actually typechecked...vs just carrying the OUT_FLAG_STALE over.
-    //
-    #define DEBUG_STALE_ARGS
-
     // See debugbreak.h and REBNATIVE(c_debug_break)...useful!
     //
     #define INCLUDE_C_DEBUG_BREAK_NATIVE
