@@ -173,7 +173,7 @@ replace: function [
         any-array? :pattern [length of :pattern]
     ]
 
-    while [pos: find/(case_REPLACE) target :pattern] [
+    while [pos: find/(if case_REPLACE [/case]) target :pattern] [
         either action? :replacement [
             ;
             ; If arity-0 action, value gets replacement and pos discarded
@@ -506,9 +506,12 @@ collect-lines: redescribe [
     KEEPed blocks become spaced TEXT!.}
 ] adapt 'collect [  ; https://forum.rebol.info/t/945/1
     body: compose [
-        keep: adapt* specialize* 'keep [
-            line: true, only: false, part: _
-        ] [value: spaced try :value]
+        keep: adapt* specialize* 'keep/line/only [  ; specialize removes args
+            part: 1  ; will be changed to unused
+        ][
+            part: null
+            value: spaced try :value
+        ]
         (as group! body)
     ]
 ]
@@ -519,9 +522,12 @@ collect-text: redescribe [
 ] chain [  ; https://forum.rebol.info/t/945/2
     adapt 'collect [
         body: compose [
-            keep: adapt* specialize* 'keep [
-                line: false, only: false, part: _
+            keep: adapt* specialize* 'keep [  ; specialize removes args
+                line: #  ; will be changed to unused
+                only: #  ; will be changed to unused
+                part: 1  ; will be changed to unused
             ][
+                line: part: only: null
                 value: unspaced try :value
             ]
             (as group! body)

@@ -451,10 +451,7 @@ inline static bool Is_Typeset_Empty(const RELVAL *param) {
 // dequoting and requoting, etc.  Those are evaluator mechanics for filling
 // the slot--this happens after that.
 //
-inline static void Typecheck_Refinement_And_Canonize(
-    const RELVAL *param,
-    REBVAL *arg
-){
+inline static void Typecheck_Refinement(const RELVAL *param, REBVAL *arg) {
     assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
     assert(TYPE_CHECK(param, REB_TS_REFINEMENT));
 
@@ -463,33 +460,8 @@ inline static void Typecheck_Refinement_And_Canonize(
         // Not in use
     }
     else if (Is_Typeset_Empty(param)) {
-        //
-        // Refinements that don't have a corresponding argument are in a
-        // sense LOGIC!-based.  But for convenience, Ren-C canonizes them as
-        // either a NULL or a refinement-style PATH!--providing logical
-        // false/true behavior while making it easier to chain them, e.g.
-        //
-        //    keep: func [value /only] [... append/(only) ...]
-        //
-        // It might be argued that any truthy value should be fair game for
-        // being canonized, but be a bit more conservative to try and catch
-        // likely mistakes.  Accepting refinement-style paths means accepting
-        // one's own canonizations (which seems important) or being able to
-        // use one logic-seeming refinement to assign another.
-        if (
-            (IS_LOGIC(arg) and VAL_LOGIC(arg))
-            or IS_PATH(arg)  // !!! Is this too lax?
-        ){
-            Refinify(Init_Word(arg, VAL_PARAM_SPELLING(param)));
-        }
-        else if (IS_LOGIC(arg)) {
-            assert(not VAL_LOGIC(arg));
-            Init_Nulled(arg);
-        }
-        else if (IS_BLANK(arg))  // give an error to show where this is
-            fail ("Use NULL/FALSE for unused refinements, not BLANK!");
-        else
-            fail (Error_Invalid_Type(VAL_TYPE(arg)));
+        if (not Is_Blackhole(arg))
+            fail ("Parameterless Refinements Must be either # or NULL");
     }
     else if (not Typecheck_Including_Constraints(param, arg))
         fail (Error_Invalid_Type(VAL_TYPE(arg)));

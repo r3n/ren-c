@@ -926,7 +926,7 @@ import: function [
             no-share: :no-share
             no-lib: :no-lib
             no-user: :no-user
-            block: true
+            block: #
         ]
     ]
 
@@ -935,7 +935,7 @@ import: function [
         version: version
         no-share: no-share
         no-lib: no-lib
-        import: true  ; !!! original code always passed /IMPORT, should it?
+        import: #  ; !!! original code always passed /IMPORT, should it?
     ]
 
     case [

@@ -297,14 +297,14 @@ compile: function [
     ; would be to encap the executable you already have as a copy with the
     ; natives loaded into it.
 
-    librebol: _
+    librebol: false
 
     compilables: map-each item compilables [
         item: maybe if match [word! path!] :item [get item]
 
         switch type of :item [
             action! [
-                librebol: /librebol
+                librebol: true
                 :item
             ]
             text! [
@@ -381,7 +381,13 @@ compile: function [
     config/runtime-path: my file-to-local/full
     config/librebol-path: <taken-into-account>  ; COMPILE* does not read
 
-    result: compile*/(files)/(inspect)/(librebol) compilables config
+    result: applique 'compile* [
+        compilables: compilables
+        config: config
+        files: files
+        inspect: inspect
+        librebol: if librebol [#]
+    ]
 
     if inspect [
         print "== COMPILE/INSPECT CONFIGURATION =="
@@ -539,7 +545,7 @@ c99: function [
         print mold settings
     ]
 
-    compile/files/(inspect)/settings compilables settings
+    compile/files/(if inspect [/inspect])/settings compilables settings
     return 0  ; must translate errors into integer codes...
 ]
 

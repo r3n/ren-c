@@ -32,11 +32,11 @@
 ]
 
 (
-    append-123: specialize :append [value: [1 2 3] only: true]
+    append-123: specialize :append [value: [1 2 3] only: #]
     [a b c [1 2 3] [1 2 3]] = append-123/dup copy [a b c] 2
 )
 (
-    append-123: specialize :append [value: [1 2 3] only: true]
+    append-123: specialize :append/only [value: [1 2 3]]
     append-123-twice: specialize :append-123 [dup: 2]
     [a b c [1 2 3] [1 2 3]] = append-123-twice copy [a b c]
 )

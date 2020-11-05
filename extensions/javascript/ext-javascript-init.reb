@@ -16,6 +16,6 @@ REBOL [
 init-javascript-extension
 
 
-js-awaiter: specialize 'js-native [awaiter: true]
+js-awaiter: :js-native/awaiter
 
 sys/export [js-native js-awaiter]  ; !!! Hacky export scheme

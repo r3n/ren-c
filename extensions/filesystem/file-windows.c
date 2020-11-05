@@ -196,7 +196,7 @@ static int Read_Directory(REBREQ *dir_req, REBREQ *file_req)
     ReqFile(file_req)->path = rebValue(
         "applique 'local-to-file [",
             "path:", rebR(rebTextWide(info.cFileName)),
-            "dir:", rebL(file->modes & RFM_DIR),
+            "dir: if", rebL(file->modes & RFM_DIR), "'#",
         "]", rebEND
     );
 
@@ -266,10 +266,9 @@ DEVICE_CMD Open_File(REBREQ *file)
         rebJumps("FAIL {No access modes provided to Open_File()}", rebEND);
 
     WCHAR *path_wide = rebSpellWideQ(
-        "applique 'file-to-local [",
+        "applique 'file-to-local/full [",
             "path:", ReqFile(file)->path,
-            "wild:", rebL(req->modes & RFM_DIR),
-            "full: true",
+            "wild: if", rebL(req->modes & RFM_DIR), "'#",
         "]",
     rebEND);
 

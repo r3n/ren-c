@@ -128,7 +128,7 @@ inline static void Finalize_Arg(REBFRM *f) {
 
     // !!! Review when # is used here
     if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
-        Typecheck_Refinement_And_Canonize(f->param, f->arg);
+        Typecheck_Refinement(f->param, f->arg);
         return;
     }
 
@@ -138,40 +138,6 @@ inline static void Finalize_Arg(REBFRM *f) {
 
     SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
 }
-
-
-// While "checking" the variadic argument we actually re-stamp it with
-// this parameter and frame's signature.  It reuses whatever the original
-// data feed was (this frame, another frame, or just an array from MAKE
-// VARARGS!)
-//
-inline static void Finalize_Variadic_Arg_Core(REBFRM *f, bool enfix) {
-    assert(Is_Param_Variadic(f->param));  // use Finalize_Arg()
-
-    // Varargs are odd, because the type checking doesn't actually check the
-    // types inside the parameter--it always has to be a VARARGS!.
-    //
-    if (not IS_VARARGS(f->arg))
-        fail (Error_Not_Varargs(f, f->param, VAL_TYPE(f->arg)));
-
-    // Store the offset so that both the arg and param locations can quickly
-    // be recovered, while using only a single slot in the REBVAL.  But make
-    // the sign denote whether the parameter was enfixed or not.
-    //
-    VAL_VARARGS_SIGNED_PARAM_INDEX(f->arg) =
-        enfix
-            ? -(f->arg - FRM_ARGS_HEAD(f) + 1)
-            : f->arg - FRM_ARGS_HEAD(f) + 1;
-
-    VAL_VARARGS_PHASE_NODE(f->arg) = NOD(FRM_PHASE(f));
-    SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-}
-
-#define Finalize_Variadic_Arg(f) \
-    Finalize_Variadic_Arg_Core((f), false)
-
-#define Finalize_Enfix_Variadic_Arg(f) \
-    Finalize_Variadic_Arg_Core((f), true)
 
 
 #ifdef DEBUG_EXPIRED_LOOKBACK
@@ -427,13 +393,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
             used_refinement:  // can hit this on redo, copy its argument
 
-            if (f->special == f->arg) {
-                /* type checking */
-            }
-            else {
-                Prep_Cell(f->arg);
-                Refinify(Init_Word(f->arg, VAL_PARAM_SPELLING(f->param)));
-            }
+            Prep_Cell(f->arg);
+            Init_Blackhole(f->arg);  // # means refinement used, null not used
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             goto continue_fulfilling;
         }
@@ -538,10 +499,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // from the global empty array.
                 //
                 if (Is_Param_Variadic(f->param)) {
-                    RESET_CELL(f->arg, REB_VARARGS, CELL_MASK_VARARGS);
-                    INIT_BINDING(f->arg, EMPTY_ARRAY);  // feed finished
-
-                    Finalize_Enfix_Variadic_Arg(f);
+                    Init_Varargs_Untyped_Enfix(f->arg, END_NODE);
                     goto continue_fulfilling;
                 }
 
@@ -565,20 +523,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // gives out-of-order evaluation.
                 //
                 assert(NOT_END(f->out));
-                REBARR *array1;
-                if (IS_END(f->out))
-                    array1 = EMPTY_ARRAY;
-                else {
-                    REBARR *feed = Alloc_Singular(NODE_FLAG_MANAGED);
-                    Move_Value(ARR_SINGLE(feed), f->out);
-
-                    array1 = Alloc_Singular(NODE_FLAG_MANAGED);
-                    Init_Block(ARR_SINGLE(array1), feed);  // index 0
-                }
-
-                RESET_CELL(f->arg, REB_VARARGS, CELL_MASK_VARARGS);
-                INIT_BINDING(f->arg, array1);
-                Finalize_Enfix_Variadic_Arg(f);
+                Init_Varargs_Untyped_Enfix(f->arg, f->out);
             }
             else switch (pclass) {
               case REB_P_NORMAL:
@@ -676,10 +621,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // consume additional arguments during the function run.
         //
         if (Is_Param_Variadic(f->param)) {
-            RESET_CELL(f->arg, REB_VARARGS, CELL_MASK_VARARGS);
-            INIT_BINDING(f->arg, f->varlist);  // frame-based VARARGS!
-
-            Finalize_Variadic_Arg(f);
+            Init_Varargs_Untyped_Normal(f->arg, f);
             goto continue_fulfilling;
         }
 
@@ -990,13 +932,44 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             continue;
         }
 
+        // We can't a-priori typecheck the variadic argument, since the values
+        // aren't calculated until the function starts running.  Instead we
+        // stamp this instance of the varargs with a way to reach back and
+        // see the parameter type signature.
+        //
+        // The data feed is unchanged (can come from this frame, or another,
+        // or just an array from MAKE VARARGS! of a BLOCK!)
+        //
+        if (Is_Param_Variadic(f->param)) {
+            //
+            // The types on the parameter are for the values fetched later.
+            // Actual argument must be a VARARGS!
+            //
+            if (not IS_VARARGS(f->arg))
+                fail (Error_Not_Varargs(f, f->param, VAL_TYPE(f->arg)));
+
+            VAL_VARARGS_PHASE_NODE(f->arg) = NOD(FRM_PHASE(f));
+
+            // Store the offset so that both the arg and param locations can
+            // quickly be recovered, while using only a single slot in the
+            // REBVAL.  Sign denotes whether the parameter was enfixed or not.
+            //
+            bool enfix = false;  // !!! how does enfix matter?
+            VAL_VARARGS_SIGNED_PARAM_INDEX(f->arg) =
+                enfix
+                    ? -(f->arg - FRM_ARGS_HEAD(f) + 1)
+                    : f->arg - FRM_ARGS_HEAD(f) + 1;
+
+            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+            continue;
+        }
+
+        // Refinements have a special rule beyond plain type checking, in that
+        // they don't just want an ISSUE! or NULL, they want # or NULL.
+        //
         if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
             if (NOT_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
-                Typecheck_Refinement_And_Canonize(f->param, f->arg);
-        }
-        else if (Is_Param_Variadic(f->param)) {
-            //
-            // !!! Should have already been finalized
+                Typecheck_Refinement(f->param, f->arg);
         }
         else {
             // !!! In GCC 9.3.0-10 at -O2 optimization level in the C++ build

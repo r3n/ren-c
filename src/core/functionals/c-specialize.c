@@ -227,10 +227,9 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             // If refinement named on stack takes no arguments, then it can't
             // be partially specialized...only fully, and won't be bound:
             //
-            //     specialize 'append/only [only: false]  ; only not bound
+            //     specialize 'append/only [only: #]  ; only not bound
             //
-            Init_Word(arg, VAL_STORED_CANON(ordered));
-            Refinify(arg);
+            Init_Blackhole(arg);
             SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
             goto continue_specialized;
         }
@@ -428,20 +427,10 @@ bool Specialize_Action_Throws(
                 goto unspecialized_arg;  // ran out...no pre-empt needed
             }
 
-            if (GET_CELL_FLAG(arg, ARG_MARKED_CHECKED)) {
-                assert(
-                    IS_NULLED(arg)
-                    or (
-                        IS_REFINEMENT(arg)
-                        and (
-                            VAL_REFINEMENT_SPELLING(arg)
-                            == VAL_PARAM_SPELLING(param)
-                        )
-                    )
-                );
-            }
+            if (GET_CELL_FLAG(arg, ARG_MARKED_CHECKED))
+                assert(IS_NULLED(arg) or Is_Blackhole(arg));
             else
-                Typecheck_Refinement_And_Canonize(param, arg);
+                Typecheck_Refinement(param, arg);
 
             goto specialized_arg_no_typecheck;
         }
@@ -477,6 +466,9 @@ bool Specialize_Action_Throws(
         //
         if (Is_Param_Variadic(param))
             fail ("Cannot currently SPECIALIZE variadic arguments.");
+
+        if (not TYPE_CHECK(param, VAL_TYPE(arg)))
+            fail (arg);  // !!! merge w/Error_Invalid_Arg()
 
        SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
 

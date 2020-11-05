@@ -812,6 +812,8 @@ REBNATIVE(applique)
             continue; // shouldn't have been in the binder
         if (Is_Param_Hidden(key))
             continue; // was part of a specialization internal to the action
+        if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED))
+            continue;  // refined in argument
         Remove_Binder_Index(&binder, VAL_KEY_CANON(key));
     }
     SHUTDOWN_BINDER(&binder); // must do before running code that might BIND

@@ -64,6 +64,36 @@
 #define VAL_VARARGS_PHASE(v) \
     ACT(VAL_VARARGS_PHASE_NODE(v))
 
+inline static REBVAL *Init_Varargs_Untyped_Normal(RELVAL *out, REBFRM *f) {
+    RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
+    INIT_BINDING(out, f->varlist);  // frame-based VARARGS!
+    UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));
+    VAL_VARARGS_PHASE_NODE(out) = nullptr;  // set in typecheck
+    return cast(REBVAL*, out);
+}
+
+inline static REBVAL *Init_Varargs_Untyped_Enfix(
+    RELVAL *out,
+    const REBVAL *single
+){
+    REBARR *array1;
+    if (IS_END(single))
+        array1 = EMPTY_ARRAY;
+    else {
+        REBARR *feed = Alloc_Singular(NODE_FLAG_MANAGED);
+        Move_Value(ARR_SINGLE(feed), single);
+
+        array1 = Alloc_Singular(NODE_FLAG_MANAGED);
+        Init_Block(ARR_SINGLE(array1), feed);  // index 0
+    }
+
+    RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
+    INIT_BINDING(out, array1);
+    UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));
+    VAL_VARARGS_PHASE_NODE(out) = nullptr;  // set in typecheck
+    return cast(REBVAL*, out);
+}
+
 
 inline static bool Is_Block_Style_Varargs(
     REBVAL **shared_out,

@@ -497,15 +497,14 @@ me: enfixed redescribe [
 ](
     ; /ENFIX so `x: 1, x: me + 1 * 10` is 20, not 11
     ;
-    specialize 'shove [set: true, prefix: false]
+    specialize 'shove/set [prefix: false]
 )
 
 my: enfixed redescribe [
     {Update variable using it as the first argument to a prefix operator}
 ](
-    specialize 'shove [set: true, prefix: true]
+    specialize 'shove/set [prefix: true]
 )
-
 
 so: enfixed func [
     {Postfix assertion which won't keep running if left expression is false}
@@ -801,7 +800,7 @@ meth: enfixed func [
         fail [member "must be bound to an ANY-CONTEXT! to use METHOD"]
     ]
     set member bind (
-        func/(gather) compose [((spec)) <in> (context)] body
+        func/(if gather '/gather) compose [((spec)) <in> (context)] body
     ) context
 ]
 

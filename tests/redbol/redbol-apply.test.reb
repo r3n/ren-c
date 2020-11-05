@@ -68,22 +68,21 @@
 
 (error? redbol-apply :make [error! ""])
 
-(/a = redbol-apply func [/a] [a] [#[true]])
+(# = redbol-apply func [/a] [a] [#[true]])
 (null = redbol-apply func [/a] [a] [#[false]])
 (null = redbol-apply func [/a] [a] [])
-(/a = redbol-apply/only func [/a] [a] [#[true]])
+(# = redbol-apply/only func [/a] [a] [#[true]])
 
 (
-    comment {The WORD! false, not #[false]}
+    comment {The WORD! false, not #[false], but allowed in Rebol2}
 
-    e: trap [/a = redbol-apply/only func [/a] [a] [false]]
-    e/id = 'invalid-type
+    # = redbol-apply/only func [/a] [a] [false]
 )
 (null == redbol-apply/only func [/a] [a] [])
-(use [a] [a: true /a = redbol-apply func [/a] [a] [a]])
+(use [a] [a: true # = redbol-apply func [/a] [a] [a]])
 (use [a] [a: false null == redbol-apply func [/a] [a] [a]])
-(use [a] [a: false /a = redbol-apply func [/a] [a] [/a]])
-(use [a] [a: false /a = redbol-apply/only func [/a] [/a] [/a]])
+(use [a] [a: false # = redbol-apply func [/a] [a] [/a]])
+(use [a] [a: false # = redbol-apply/only func [/a] [/a] [/a]])
 (group! == redbol-apply/only (specialize 'of [property: 'type]) [()])
 ([1] == head of redbol-apply :insert [copy [] [1] blank blank])
 ([1] == head of redbol-apply :insert [copy [] [1] blank false])
