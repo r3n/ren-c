@@ -278,7 +278,7 @@ static REB_R Transport_Actor(
                 or req->command == RDC_CLOSE
             );
 
-        return Init_Void(D_OUT); }
+        return Init_Void(D_OUT, SYM_VOID); }
 
       case SYM_READ: {
         INCLUDE_PARAMS_OF_READ;
@@ -516,7 +516,7 @@ REBNATIVE(register_network_device)
     NETWORK_INCLUDE_PARAMS_OF_REGISTER_NETWORK_DEVICE;
 
     OS_Register_Device(&Dev_Net);
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 

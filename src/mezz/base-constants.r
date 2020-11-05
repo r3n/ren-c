@@ -59,9 +59,9 @@ abs: :absolute
 ; Note: NULL symbol is in lib context slot 1, is initialized on boot
 blank: _   ; e.g. sometimes `return blank` reads better than `return _`
 
-void: func* [
-    "Function returning void result (alternative for `#[void]`)"
-    return: <void>
-][
-    ; Note: actually *faster* than a native, due to Void_Dispatcher()
-]
+; Note: VOID would have to be a function that returned ~void~, since plain
+; `void: ~void~` would error on access.  In practice, this causes confusion
+; because `type of get/any 'void` winds up being ACTION!...and that isn't
+; really worth it.  Plus, encouraging people to label their voids with why
+; the value is "no good" helps places that receive those voids untangle the
+; reason for its existence.  So a VOID function is avoided in the box.

@@ -76,7 +76,9 @@ steal: func* [
 ]
 
 assert [null = binding of :return]  ; it's archetypal, nowhere to return to
-return: void  ; so don't let the archetype be visible
+return: func* [] [
+    fail "RETURN archetype called when no generator is providing it"
+]
 
 func: func* [
     {Make action with set-words as locals, <static>, <in>, <with>, <local>}
@@ -453,7 +455,7 @@ redescribe [
 unset: redescribe [
     {Clear the value of a word to null (in its current context.)}
 ](
-    adapt specialize 'set [value: <overwrite>] [value: null]  ; !!! fix
+    adapt specialize 'set [value: ~overwrite~] [value: null]  ; !!! fix
 )
 
 

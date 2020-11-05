@@ -125,13 +125,13 @@ REBVAL *Init_Near_For_Frame(RELVAL *out, REBFRM *f)
 
         if (count == FRM_INDEX(f) - start - 1) {
             //
-            // Leave a marker at the point of the error, currently `~~`.
+            // Leave a marker at the point of the error, currently `**`.
             //
             // This is the marker for an execution point, so it can either
             // mean "error source is to the left" or just "frame is at a
             // breakpoint at that position".
             //
-            Init_Word(DS_PUSH(), Canon(SYM__T_T));
+            Init_Word(DS_PUSH(), Canon(SYM__P_P));
         }
     }
 

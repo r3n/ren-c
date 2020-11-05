@@ -94,7 +94,6 @@ PVAR REBVAL PG_Nulled_Cell;
 PVAR REBVAL PG_Blank_Value;
 PVAR REBVAL PG_False_Value;
 PVAR REBVAL PG_True_Value;
-PVAR REBVAL PG_Void_Value;
 
 #ifdef DEBUG_TRASH_MEMORY
     PVAR REBVAL PG_Trash_Value_Debug;

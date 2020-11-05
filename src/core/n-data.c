@@ -546,7 +546,7 @@ inline static void Get_Var_May_Fail(
         fail (Error_Bad_Value_Core(source_orig, specifier));
 
     if (IS_VOID(out) and not any)
-        fail (Error_Need_Non_Void_Core(source_orig, specifier));
+        fail (Error_Need_Non_Void_Core(source_orig, specifier, out));
 }
 
 
@@ -593,7 +593,7 @@ REBNATIVE(get)
             did REF(hard)
         );
         if (IS_NULLED(temp))
-            Init_Void(dest);  // blocks can't contain nulls
+            Init_Void(dest, SYM_NULLED);  // blocks can't contain nulls
         else
             Move_Value(dest, temp);
     }
@@ -820,7 +820,7 @@ REBNATIVE(opt)
     // creating a likely error in those cases.  To get around it, OPT TRY
     //
     if (IS_NULLED(ARG(optional)))
-        return Init_Void(D_OUT);
+        return Init_Void(D_OUT, SYM_OPT);
 
     RETURN (ARG(optional));
 }
@@ -972,7 +972,7 @@ REBNATIVE(free)
         fail ("Cannot FREE already freed series");
 
     Decay_Series(s);
-    return Init_Void(D_OUT); // !!! Should it return the freed, not-useful value?
+    return Init_Void(D_OUT, SYM_VOID); // !!! Could return freed value
 }
 
 
@@ -1688,7 +1688,7 @@ REBNATIVE(voidify)
     INCLUDE_PARAMS_OF_VOIDIFY;
 
     if (IS_NULLED(ARG(optional)))
-        return Init_Void(D_OUT);
+        return Init_Void(D_OUT, SYM_NULLED);
 
     RETURN (ARG(optional));
 }

@@ -58,8 +58,8 @@
 )]
 (1 == redbol-apply :subtract [2 1])
 (1 = (redbol-apply :- [2 1]))
-(error? trap [redbol-apply func [a] [a] []])
-(error? trap [redbol-apply/only func [a] [a] []])
+(null = redbol-apply func [a] [a] [])
+(null = redbol-apply/only func [a] [a] [])
 
 [#2237
     (error? trap [redbol-apply func [a] [a] [1 2]])
@@ -139,7 +139,7 @@
     ][
         return get/any 'x
     ][
-        void
+        ~void~
     ]
 )
 (

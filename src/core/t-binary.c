@@ -829,7 +829,7 @@ REBTYPE(Binary)
             REBSIZ size;
             const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
             Set_Random(Compute_CRC24(data, size));
-            return Init_Void(D_OUT);
+            return Init_Void(D_OUT, SYM_VOID);
         }
 
         if (REF(only)) {

@@ -26,18 +26,14 @@
 
 
 //
-//  CT_Word: C
+//  Compare_Spellings: C
 //
-// Compare the names of two words and return the difference.
-// Note that words are kept UTF8 encoded.
+// Used in CT_Word() and CT_Void()
 //
-REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, bool strict)
+REBINT Compare_Spellings(const REBSTR *a, const REBSTR *b, bool strict)
 {
-    const REBYTE *sp = STR_HEAD(VAL_WORD_SPELLING(a));
-    const REBYTE *tp = STR_HEAD(VAL_WORD_SPELLING(b));
-
     if (strict) {
-        if (VAL_WORD_SPELLING(a) == VAL_WORD_SPELLING(b))
+        if (a == b)
             return 0;
 
         // !!! "Strict" is interpreted as "case-sensitive comparison".  Using
@@ -47,24 +43,44 @@ REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, bool strict)
         //
         // https://en.wikipedia.org/wiki/Unicode_equivalence#Normalization
         //
-        REBINT diff = strcmp(cs_cast(sp), cs_cast(tp));  // byte match check
+        REBINT diff = strcmp(STR_UTF8(a), STR_UTF8(b));  // byte match check
         if (diff == 0)
             return 0;
-        return diff > 0 ? 1 : -1;  // not strictly in [-1 0 1]
+        return diff > 0 ? 1 : -1;  // strcmp result not strictly in [-1 0 1]
     }
     else {
         // Different cases acceptable, only check for a canon match
         //
-        if (VAL_WORD_CANON(a) == VAL_WORD_CANON(b))
+        if (STR_CANON(a) == STR_CANON(b))
             return 0;
 
         // !!! "They must differ by case...."  This needs to account for
         // unicode "case folding", as well as "normalization".
         //
-        REBINT diff = Compare_UTF8(sp, tp, strsize(tp)) + 2;
-        assert(diff == 0 or diff == -1 or diff == 1);
-        return diff;
+        REBINT diff = Compare_UTF8(STR_HEAD(a), STR_HEAD(b), STR_SIZE(b));
+        if (diff >= 0) {
+            assert(diff == 0 or diff == 1 or diff == 3);
+            return 0;  // non-case match
+        }
+        assert(diff == -1 or diff == -3);  // no match
+        return diff + 2;
     }
+}
+
+
+//
+//  CT_Word: C
+//
+// Compare the names of two words and return the difference.
+// Note that words are kept UTF8 encoded.
+//
+REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, bool strict)
+{
+    return Compare_Spellings(
+        VAL_WORD_SPELLING(a),
+        VAL_WORD_SPELLING(b),
+        strict
+    );
 }
 
 

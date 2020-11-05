@@ -1170,7 +1170,7 @@ REBTYPE(String)
             REBSIZ utf8_size;
             REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
             Set_Random(Compute_CRC24(utf8, utf8_size));
-            return Init_Void(D_OUT);
+            return Init_Void(D_OUT, SYM_VOID);
         }
 
         if (REF(only)) {

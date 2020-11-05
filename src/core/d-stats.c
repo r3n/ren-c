@@ -171,7 +171,7 @@ REBNATIVE(callgrind)
       default:
         fail ("Currently CALLGRIND only supports ON and OFF");
     }
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
   #else
     UNUSED(ARG(instruction));
     fail ("This executable wasn't compiled with INCLUDE_CALLGRIND_NATIVE");

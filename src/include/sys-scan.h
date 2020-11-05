@@ -37,6 +37,7 @@ enum Reb_Token {
     TOKEN_END = 0,
     TOKEN_NEWLINE,
     TOKEN_BLANK,
+    TOKEN_VOID,
     TOKEN_COLON,
     TOKEN_AT,
     TOKEN_WORD,
@@ -107,6 +108,7 @@ enum LEX_DELIMIT_ENUM {
     LEX_DELIMIT_DOUBLE_QUOTE,       /* 22 " */
     LEX_DELIMIT_SLASH,              /* 2F / - date, path, file */
     LEX_DELIMIT_PERIOD,             /* 2E . - decimal, tuple, file */
+    LEX_DELIMIT_TILDE,              /* 7E ~ - named void */
 
     LEX_DELIMIT_UTF8_ERROR,
 
@@ -160,9 +162,6 @@ inline static bool IS_LEX_DELIMIT_HARD(REBYTE c) {
 
 //
 //  Special Chars (encoded in the LEX_VALUE field)
-//
-// !!! This used to have "LEX_SPECIAL_TILDE" for "7E ~ - complement number",
-// but that was removed at some point and it was made a legal word character.
 //
 enum LEX_SPECIAL_ENUM {             /* The order is important! */
     LEX_SPECIAL_AT,                 /* 40 @ - email */

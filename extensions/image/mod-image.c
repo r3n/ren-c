@@ -61,7 +61,7 @@ REBNATIVE(register_image_hooks)
         &MF_Image
     );
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -79,5 +79,5 @@ REBNATIVE(unregister_image_hooks)
 
     Unhook_Datatype(EG_Image_Type);
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }

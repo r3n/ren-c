@@ -30,15 +30,22 @@
 //
 //  "Converts a value to a human-readable string."
 //
-//      value [<opt> any-value!]
-//          "The value to form"
+//      value "The value to form (will error on VOID!)"
+//          [any-value!]
 //  ]
 //
 REBNATIVE(form)
 {
     INCLUDE_PARAMS_OF_FORM;
 
-    return Init_Text(D_OUT, Copy_Form_Value(ARG(value), 0));
+    REBVAL *v = ARG(value);
+    if (IS_VOID(v)) {
+        DECLARE_LOCAL (word);
+        Init_Word(word, VAL_PARAM_SPELLING(PAR(value)));
+        fail (Error_Need_Non_Void_Core(word, SPECIFIED, v));
+    }
+
+    return Init_Text(D_OUT, Copy_Form_Value(v, 0));
 }
 
 
@@ -47,6 +54,7 @@ REBNATIVE(form)
 //
 //  "Converts a value to a REBOL-readable string."
 //
+//      return: [text!]
 //      value "The value to mold"
 //          [any-value!]
 //      /only "For a block value, mold only its contents, no outer []"
@@ -128,7 +136,7 @@ REBNATIVE(write_stdout)
         assert(IS_CHAR(v));
         printf("%s", VAL_CHAR_ENCODED(v));
     }
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
   #endif
 }
 

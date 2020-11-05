@@ -216,6 +216,7 @@ REBNATIVE(enhex)
                   case LEX_DELIMIT_RIGHT_BRACKET:
                   case LEX_DELIMIT_SLASH:
                   case LEX_DELIMIT_PERIOD:
+                  case LEX_DELIMIT_TILDE:
                     goto leave_as_is;
 
                   case LEX_DELIMIT_SPACE:  // includes control characters
@@ -260,7 +261,7 @@ REBNATIVE(enhex)
                 if (
                     (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z')
                     or c == '?' or c == '!' or c == '&'
-                    or c == '*' or c == '=' or c == '~'
+                    or c == '*' or c == '='
                 ){
                     goto leave_as_is;  // this is all that's leftover
                 }

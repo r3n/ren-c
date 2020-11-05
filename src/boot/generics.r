@@ -51,7 +51,7 @@ add: generic [
     {Returns the addition of two values.}
     return: [<requote> char! any-scalar! date! binary!]
     value1 [<dequote> char! any-scalar! date! binary!]
-    value2
+    value2 [char! any-scalar! date!]
 ]
 
 subtract: generic [

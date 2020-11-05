@@ -86,7 +86,7 @@ bool Do_Breakpoint_Throws(
         // longer available.  Debugging is being reviewed in light of a
         // stackless model and is non-functional at time of writing.
 
-        Init_Void(out);
+        Init_Void(out, SYM_VOID);
         return false;  // no throw, run normally (but now, hooked)
     }
 
@@ -120,7 +120,7 @@ REBNATIVE(breakpoint_p)
     if (Do_Breakpoint_Throws(
         D_SPARE,
         false,  // not a Ctrl-C, it's an actual BREAKPOINT
-        VOID_VALUE  // default result if RESUME does not override
+        BLANK_VALUE  // default result if RESUME does not override
     )){
         return R_THROWN;
     }

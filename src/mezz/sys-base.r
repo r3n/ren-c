@@ -187,7 +187,7 @@ do*: func [
                 ;
                 ; https://github.com/rebol/rebol-issues/issues/2373
                 ;
-                result: void
+                result: ~
             ] then :finalizer/quit
         ][
             do-needs hdr  ; Load the script requirements

@@ -64,7 +64,7 @@ to-c-name: function [
         ; !!! Note: this was ... but that is now a TUPLE!  So this has to
         ; be changed for the moment.
         ;
-        "~~~" [copy "ellipsis"]
+        "***" [copy "ellipsis"]
 
         ; Used to make SYM_HYPHEN which is needed by `charset [#"A" - #"Z"]`
         ;
@@ -118,7 +118,6 @@ to-c-name: function [
                 ?   "_q"    ; (q)uestion
                 !   "_x"    ; e(x)clamation
                 +   "_a"    ; (a)ddition
-                ~   "_t"    ; (t)ilde
                 |   "_b"    ; (b)ar
 
             ][

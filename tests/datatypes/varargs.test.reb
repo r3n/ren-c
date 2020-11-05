@@ -85,7 +85,7 @@
 
     ([] = do [soft])
     (
-        a: void
+        a: ~void~
         (trap [a soft])/id = 'need-non-void
     )
     ([7] = do [:(1 + 2) :(3 + 4) soft])
@@ -103,7 +103,7 @@
 
     ([] = do [hard])
     (
-        a: void
+        a: ~void~
         (trap [a hard])/id = 'need-non-void
     )
     ([(3 + 4)] = do [(1 + 2) (3 + 4) hard])

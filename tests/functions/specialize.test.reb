@@ -154,20 +154,20 @@
 [
     (
         foo: function [/A [integer!] :/B [<skip> word!]] [
-            reduce [/A (A) /B (try :B)]
+            reduce [/A (try A) /B (try :B)]
         ]
         foob: enfixed :foo/b
         true
     )
 
-    ([/A #[void] /B word] = (word foob |))
-    ([/A #[void] /B _] = (<not a word> foob |))
+    ([/A _ /B word] = (word foob |))
+    ([/A _ /B _] = (<not a word> foob |))
     ([/A 20 /B word] = (word ->- foob/a 20))
 
     (comment [
         {Currently SHOVE and <skip> don't work together, maybe shouldn't}
         https://github.com/metaeducation/ren-c/issues/909
-        [/A 20 /B #[void]] = (<not a word> ->- foob/a 20)
+        [/A 20 /B _] = (<not a word> ->- foob/a 20)
     ] true)
 ]
 

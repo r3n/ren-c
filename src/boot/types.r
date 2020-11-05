@@ -67,16 +67,11 @@ REBOL [
 #null       "!!! `NULL!` isn't a datatype, `null` can't be stored in blocks"
             0           0       0       +       []
 
-
-; <ANY-UNIT> https://en.wikipedia.org/wiki/Unit_type
-
-void        "returned by actions with no result (neither true nor false)"
-            unit        -       -       +       []
+void        "value that triggers errors if accessed via WORD!/PATH!/TUPLE!"
+            void        -       +       +       []
 
 blank       "placeholder unit type which acts as conditionally false"
-            unit        +       -       +       [branch]
-
-; </ANY-UNIT>
+            blank       +       -       +       [branch]
 
 ; <ANY-SCALAR>
 

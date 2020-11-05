@@ -65,7 +65,7 @@ REBNATIVE(register_stdio_device)
 
     Free_Req(req);
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -210,5 +210,5 @@ REBNATIVE(write_stdout)
         Prin_OS_String(utf8, utf8_size, OPT_ENC_0);
     }
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }

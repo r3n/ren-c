@@ -219,7 +219,7 @@
         ("try library here")
         _
         |
-        #[void]
+        ~void~
     ][
         lit-item: quote get/any 'item
 
@@ -247,13 +247,9 @@
 )
 
 
-; Want to allow direct assignment from a quoted void, this assists in the
-; generality of MAKE OBJECT! being able to quote a void and thus represent
-; and object with fields in the void state.
-
 (
     did all [
-        void? x: '#[void]
+        void? x: ~void~
         void? get/any 'x
     ]
 )

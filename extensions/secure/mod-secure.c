@@ -249,5 +249,5 @@ REBNATIVE(init_secure)
 {
     SECURE_INCLUDE_PARAMS_OF_INIT_SECURE;
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }

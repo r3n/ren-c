@@ -230,7 +230,7 @@ rewrite-spec-and-body: helper [
         ; add support for an EXIT that's a synonym for returning void.
         ;
         insert body [
-            exit: specialize 'return [value: void]
+            exit: specialize 'return [value: ~unset!~]
         ]
         append spec [<local> exit]  ; FUNC needs it (function doesn't...)
     ]
@@ -381,7 +381,9 @@ null: emulate [
 ;
 ; https://forum.rebol.info/t/947
 ;
-unset!: emulate [:void!]
+; VOID! is also a more capable and interesting type, able to hold a symbol.
+;
+unset!: ~unset!~
 unset?: emulate [:void?]
 
 ; NONE is reserved for `if none [x = 1 | y = 2] [...]`
@@ -700,7 +702,7 @@ compose: emulate [
             ;    == unset!
             ;
             ;    rebol2> compose [(either true [] [])]
-            ;    == []  ; would be a #[void] in Ren-C
+            ;    == []  ; would be a ~void~ in Ren-C
             ;
             predicate: either only [:enblock-devoid] [:devoid]
         ]
@@ -1034,7 +1036,7 @@ or: emulate [enfixed :union]
 xor: emulate [enfixed :difference]
 
 ; Ren-C NULL means no branch ran, Rebol2 this is communicated by #[none]
-; Ren-C #[void] when branch ran w/null result, Rebol2 would call that #[unset]
+; Ren-C ~branched~ when branch ran w/null result, Rebol2 calls that #[unset]
 ;
 denuller: helper [
     func [action [action!]] [

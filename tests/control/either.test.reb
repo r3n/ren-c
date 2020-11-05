@@ -85,7 +85,7 @@
         true
     )
 
-    (takes-2-logics (void) = void false)
+    (takes-2-logics (~void~) = ~void~ false)
 
     ('expect-arg = (trap [takes-2-logics true infix-voider true false])/id)
 ]

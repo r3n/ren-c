@@ -247,7 +247,7 @@ REBNATIVE(generic)
     REBVAL *verb_var = Sink_Word_May_Fail(ARG(verb), SPECIFIED);
     Init_Action(verb_var, generic, VAL_WORD_SPELLING(ARG(verb)), UNBOUND);
 
-    return Init_Void(D_OUT);  // see ENFIX for why evaluate to void
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -676,7 +676,6 @@ static void Init_Root_Vars(void)
     Init_Blank(Prep_Cell(&PG_Blank_Value));
     Init_False(Prep_Cell(&PG_False_Value));
     Init_True(Prep_Cell(&PG_True_Value));
-    Init_Void(Prep_Cell(&PG_Void_Value));
 
   #ifdef DEBUG_TRASH_MEMORY
     TRASH_CELL_IF_DEBUG(Prep_Cell(&PG_Trash_Value_Debug));

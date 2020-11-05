@@ -58,15 +58,15 @@ REBNATIVE(quit)
 {
     INCLUDE_PARAMS_OF_QUIT;
 
-    // This returns VOID_VALUE if there is no arg, which means if it is caught
-    // by a script then that will seem like there was no return value.  This
-    // gives parity with things like RETURN w/no arg.
-    //
-    return Init_Thrown_With_Label(
-        D_OUT,
-        IS_NULLED(ARG(value)) ? VOID_VALUE : ARG(value),
-        NATIVE_VAL(quit)
-    );
+    if (IS_ENDISH_NULLED(ARG(value))) {
+        //
+        // This returns a VOID! if there is no arg, in sync with RETURN that
+        // has no arg.  But labels the void ~quit~.
+        //
+        Init_Void(ARG(value), SYM_QUIT);
+    }
+
+    return Init_Thrown_With_Label(D_OUT, ARG(value), NATIVE_VAL(quit));
 }
 
 

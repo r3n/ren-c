@@ -554,8 +554,8 @@ static inline const REBVAL *Get_Word_May_Fail(
     const REBVAL *var = Lookup_Word_May_Fail(any_word, specifier);
     if (IS_VOID(var))
         fail (Error_Need_Non_Void_Core(
-            cast(const REBVAL*, any_word),
-            specifier
+            cast(const REBVAL*, any_word), specifier,
+            var
         ));
 
     return Move_Value(out, var);

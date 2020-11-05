@@ -505,7 +505,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 assert(IS_NULLED(f->special) or IS_VOID(f->special));
 
             Prep_Cell(f->arg);  // Note: may be typechecking
-            Init_Void(f->arg);
+            Init_Void(f->arg, SYM_LOCAL);
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             goto continue_arg_loop;
 
@@ -831,9 +831,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             REBFLGS flags = EVAL_MASK_DEFAULT
                 | EVAL_FLAG_FULFILLING_ARG;
 
-            if (IS_VOID(f_next))  // Eval_Step() has callers test this
-                fail (Error_Void_Evaluation_Raw());  // must be quoted
-
             if (Eval_Step_In_Subframe_Throws(f->arg, f, flags)) {
                 Move_Value(f->out, f->arg);
                 goto abort_action;
@@ -937,9 +934,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     | EVAL_FLAG_FULFILLING_ARG
                     | FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
                     | EVAL_FLAG_INERT_OPTIMIZATION;
-
-                if (IS_VOID(f_next))  // Eval_Step() has callers test this
-                    fail (Error_Void_Evaluation_Raw());  // must be quoted
 
                 DECLARE_FRAME (subframe, f->feed, flags);
 

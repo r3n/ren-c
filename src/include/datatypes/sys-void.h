@@ -47,17 +47,33 @@
 // if that fill in never happens.
 //
 
-#define VOID_VALUE \
-    c_cast(const REBVAL*, &PG_Void_Value)
+inline static REBVAL *Init_Labeled_Void(RELVAL *out, const REBSTR *label) {
+    RESET_CELL(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
+    VAL_NODE(out) = NOD(label);
+    return cast(REBVAL*, out);
+}
 
-#define Init_Void(out) \
-    RESET_CELL((out), REB_VOID, CELL_MASK_NONE)
+#define Init_Void(out,sym) \
+    Init_Labeled_Void((out), Canon(sym))
+
+inline static REBVAL *Init_Unlabeled_Void(RELVAL *out) {
+    RESET_CELL(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
+    VAL_NODE(out) = nullptr;
+    return cast(REBVAL*, out);
+}
 
 inline static REBVAL *Voidify_If_Nulled(REBVAL *cell) {
     if (IS_NULLED(cell))
-        Init_Void(cell);
+        Init_Void(cell, SYM_NULLED);
     return cell;
 }
+
+inline static const REBSTR *VAL_VOID_OPT_LABEL(REBCEL(const*) v) {
+    assert(CELL_KIND(v) == REB_VOID);
+    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
+    return cast(const REBSTR*, VAL_NODE(v));
+}
+
 
 // Many loop constructs use BLANK! as a unique signal that the loop body
 // never ran, e.g. `for-each x [] [<unreturned>]` or `loop 0 [<unreturned>]`.
@@ -66,15 +82,17 @@ inline static REBVAL *Voidify_If_Nulled(REBVAL *cell) {
 // alongside NULL (reserved for BREAKing)
 //
 inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
-    if (IS_NULLED_OR_BLANK(cell))
-        Init_Void(cell);
+    if (IS_NULLED(cell))
+        Init_Void(cell, SYM_NULLED);
+    else if (IS_BLANK(cell))
+        Init_Void(cell, SYM_BLANKED);
     return cell;
 }
 
 
 #if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, same as plain VOID!
     #define Init_Unreadable_Void(v) \
-        Init_Void(v)
+        Init_Unlabeled_Void(v)
 
     #define IS_VOID_RAW(v) \
         IS_BLANK(v)
@@ -88,7 +106,13 @@ inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
     inline static REBVAL *Init_Unreadable_Void_Debug(
         RELVAL *out, const char *file, int line
     ){
-        RESET_CELL_Debug(out, REB_VOID, CELL_MASK_NONE, file, line);
+        RESET_CELL_Debug(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE, file, line);
+
+        // While SYM_UNREADABLE would be nice here, that prevents usage at
+        // boot time (e.g. data stack initialization).  It's usually clear
+        // from the assert that the void is unreadable, anyway.
+        //
+        VAL_NODE(out) = nullptr;  // needs flag for VAL_NODE() to not assert
         out->extra.tick = -1;  // even non-tick counting builds default to 1
         return cast(REBVAL*, out);
     }

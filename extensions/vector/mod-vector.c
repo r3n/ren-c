@@ -58,7 +58,7 @@ REBNATIVE(register_vector_hooks)
         &MF_Vector
     );
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -76,5 +76,5 @@ REBNATIVE(unregister_vector_hooks)
 
     Unhook_Datatype(EG_Vector_Type);
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }

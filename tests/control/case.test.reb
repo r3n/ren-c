@@ -114,5 +114,5 @@
 ; Errors on bad branches
 (
     e: trap [case [true #bad]]
-    e/id = 'bad-value
+    e/id = 'bad-branch-type
 )

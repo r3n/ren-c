@@ -53,19 +53,6 @@ void MF_Blank(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
 
 //
-//  MF_Void: C
-//
-// !!! No literal notation for VOID! values has been decided.
-//
-void MF_Void(REB_MOLD *mo, REBCEL(const*) v, bool form)
-{
-    UNUSED(form); // no distinction between MOLD and FORM
-    UNUSED(v);
-    Append_Ascii(mo->series, "#[void]");
-}
-
-
-//
 //  PD_Blank: C
 //
 // It is not possible to "poke" into a blank (and as an attempt at modifying
@@ -93,48 +80,18 @@ REB_R PD_Blank(
 
 
 //
-//  MAKE_Unit: C
-//
-// MAKE is disallowed, with the general rule that a blank in will give
-// a null out... for e.g. `make object! try select data spec else [...]`
-//
-REB_R MAKE_Unit(
-    REBVAL *out,
-    enum Reb_Kind kind,
-    const REBVAL *opt_parent,
-    const REBVAL *arg
-){
-    UNUSED(out);
-    UNUSED(opt_parent);
-
-    fail (Error_Bad_Make(kind, arg));
-}
-
-
-//
-//  TO_Unit: C
-//
-// TO is disallowed, e.g. you can't TO convert an integer of 0 to a blank.
-//
-REB_R TO_Unit(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
-    UNUSED(out);
-    fail (Error_Bad_Make(kind, data));
-}
-
-
-//
-//  CT_Unit: C
+//  CT_Blank: C
 //
 // Must have a comparison function, otherwise SORT would not work on arrays
-// with blanks or voids in them.
+// with blanks in them.
 //
-REBINT CT_Unit(REBCEL(const*) a, REBCEL(const*) b, bool strict)
+REBINT CT_Blank(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    UNUSED(strict);  // no lax form of comparison
+    UNUSED(strict);  // no strict form of comparison
+    UNUSED(a);
+    UNUSED(b);
 
-    if (CELL_KIND(a) == CELL_KIND(b))
-        return 0;
-    return (CELL_KIND(a) > CELL_KIND(b)) ? 1 : -1;
+    return 0;  // All blanks are equal
 }
 
 
@@ -144,9 +101,7 @@ REBINT CT_Unit(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 // While generics like SELECT are able to dispatch on BLANK! and return NULL,
 // they do so by not running at all...see REB_TS_NOOP_IF_BLANK.
 //
-// The only operations
-//
-REBTYPE(Unit)
+REBTYPE(Blank)
 {
     switch (VAL_WORD_SYM(verb)) {
       case SYM_REFLECT: {

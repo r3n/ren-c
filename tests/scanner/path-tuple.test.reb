@@ -59,11 +59,14 @@
 
         "a.1.(x)/[a b c]/<d>.2"  ->  [(a 1 @(x)) @[a b c] (<d> 2)]
 
+        "~/projects/"  ->  [~ projects _]
+        "~a~.~b~/~c~"  ->  [(~a~ ~b~) ~c~]
+
         ; === Bad Path Element Tests ===
         ;
         ; TUPLE! can go in PATH! but not vice-versa.  Besides that, only
-        ; INTEGER!, WORD!, GROUP!, BLOCK!, TEXT!, and TAG! are currently
-        ; allowed in either sequence form.
+        ; INTEGER!, WORD!, GROUP!, BLOCK!, TEXT!, TAG!, and VOID! are
+        ; currently allowed in either sequence form.
 
         "/#a"  !!  <scan-invalid>
         "blk/#{}"  !!  <scan-invalid>

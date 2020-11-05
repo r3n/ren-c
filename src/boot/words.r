@@ -34,6 +34,22 @@ any-branch!
 
 datatypes
 
+; === NAMED VOIDS ===
+; A new Ren-C feature is that voids are interned like WORD!, so they can be
+; more communicative.  These are standard symbols passed to Init_Void().
+;
+unreadable
+void
+undefined
+nulled
+blanked
+empty
+branched
+stopped
+matched
+; opt  ; OPT is positioned tactically in PARSE
+
+
 ; ...note that the words for types are created programmatically before
 ; this list is applied, so you only see typesets in this file.
 ;-----------------------------------------------------------------------------
@@ -70,7 +86,6 @@ self
 blank
 true
 false
-void
 on
 off
 yes
@@ -311,7 +326,7 @@ raw-size
 extern
 rebval
 
-~~~  ; !!! Temporary placeholder for ellipsis; will have to be special trick
+*** ; !!! Temporary placeholder for ellipsis; will have to be special trick
 varargs
 
 ; Gobs:
@@ -401,7 +416,7 @@ exit-code
 --optimized-out--
 
 ; used to indicate the execution point where an error or debug frame is
-~~
+**
 
 include
 source

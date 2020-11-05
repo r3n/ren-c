@@ -278,8 +278,8 @@ static bool Subparse_Throws(
 
     // Locals in frame would be void on entry if called by action dispatch.
     //
-    Init_Void(Prep_Cell(ARG(num_quotes)));
-    Init_Void(Prep_Cell(ARG(position)));
+    Init_Void(Prep_Cell(ARG(num_quotes)), SYM_LOCAL);
+    Init_Void(Prep_Cell(ARG(position)), SYM_LOCAL);
 
     // !!! By calling the subparse native here directly from its C function
     // vs. going through the evaluator, we don't get the opportunity to do
@@ -2303,7 +2303,8 @@ REBNATIVE(subparse)
                     fail ("DO rules currently cannot be iterated");
                 }
 
-                subrule = VOID_VALUE;  // cause an error if iterating
+                Init_Void(D_SPARE, SYM_VOID);
+                subrule = D_SPARE;  // cause an error if iterating
 
                 i = Do_Eval_Rule(f);  // changes P_RULE (should)
 
@@ -2813,7 +2814,8 @@ REBNATIVE(parse)
             // future in which a failed partial match could tell you how far
             // it got in the input before failing.
             //
-            rebElideQ("set", progress, VOID_VALUE, rebEND);
+            Init_Void(D_SPARE, SYM_VOID);
+            rebElideQ("set", progress, D_SPARE, rebEND);
         }
         return nullptr;
     }

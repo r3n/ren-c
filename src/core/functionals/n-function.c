@@ -87,7 +87,25 @@ REB_R Void_Dispatcher(REBFRM *f)
     assert(VAL_LEN_AT(ARR_HEAD(details)) == 0);
     UNUSED(details);
 
-    return Init_Void(f->out);
+    return Init_Void(f->out, SYM_VOID);
+}
+
+
+//
+//  Empty_Dispatcher: C
+//
+// If you write `func [...] []` it uses this dispatcher instead of running
+// Eval_Core() on an empty block.  The subtlety of returning ~empty~ instead
+// of ~void~ is to make sure that it acts the same as `do []`...and helps
+// to clue people into the importance of normalizing the return results.
+//
+REB_R Empty_Dispatcher(REBFRM *f)
+{
+    REBARR *details = ACT_DETAILS(FRM_PHASE(f));
+    assert(VAL_LEN_AT(ARR_HEAD(details)) == 0);
+    UNUSED(details);
+
+    return Init_Void(f->out, SYM_EMPTY);
 }
 
 
@@ -197,7 +215,7 @@ REB_R Voider_Dispatcher(REBFRM *f)
         return R_THROWN;
     }
     UNUSED(returned);  // no additional work to bypass
-    return Init_Void(f->out);
+    return Init_Void(f->out, SYM_VOID);
 }
 
 
@@ -319,7 +337,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
 
     REBACT *a = Make_Action(
         Make_Paramlist_Managed_May_Fail(spec, mkf_flags),
-        &Void_Dispatcher,  // will be overwritten if non-[] body
+        &Empty_Dispatcher,  // will be overwritten if non-[] body
         nullptr,  // no underlying action (use paramlist)
         nullptr,  // no specialization exemplar (or inherited exemplar)
         details_capacity  // we fill in details[0], caller fills any extra
@@ -548,12 +566,10 @@ REBNATIVE(unwind)
 {
     INCLUDE_PARAMS_OF_UNWIND;
 
-    return Init_Thrown_Unwind_Value(
-        D_OUT,
-        ARG(level),
-        IS_ENDISH_NULLED(ARG(result)) ? VOID_VALUE : ARG(result),
-        frame_
-    );
+    if (IS_ENDISH_NULLED(ARG(result)))
+        Init_Void(ARG(result), SYM_VOID);
+
+    return Init_Thrown_Unwind_Value(D_OUT, ARG(level), ARG(result), frame_);
 }
 
 
@@ -624,7 +640,7 @@ REBNATIVE(return)
             goto skip_type_check;  // already checked
         }
         else {
-            Init_Void(v); // `do [return]` acts as `return void`
+            Init_Void(v, SYM_VOID); // `do [return]` acts as `return void`
         }
     }
 

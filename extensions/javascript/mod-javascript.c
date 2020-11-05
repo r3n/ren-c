@@ -1195,7 +1195,7 @@ REBNATIVE(js_eval_p)
                 utf8
             );
 
-        return Init_Void(D_OUT);
+        return Init_Void(D_OUT, SYM_VOID);
     }
 
     // Currently, reb.Box() only translates to INTEGER!, TEXT!, VOID!, NULL
@@ -1271,7 +1271,7 @@ REBNATIVE(init_javascript_extension)
     ENDIFY_POINTER_IF_DEBUG(PG_Native_Result);
     PG_Native_State = NATIVE_STATE_NONE;
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -1294,7 +1294,7 @@ REBNATIVE(js_trace)
     fail ("JS-TRACE only if DEBUG_JAVASCRIPT_EXTENSION set in %emscripten.r");
   #endif
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 

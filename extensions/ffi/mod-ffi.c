@@ -130,7 +130,7 @@ REBNATIVE(register_struct_hooks)
         &MF_Struct
     );
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -148,7 +148,7 @@ REBNATIVE(unregister_struct_hooks)
 
     Unhook_Datatype(EG_Struct_Type);
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 

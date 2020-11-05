@@ -117,7 +117,7 @@ REBNATIVE(reduce)
         }
         else if (dispatcher == &N_voidify) {  // turn NULL into VOID!
             if (IS_NULLED(D_OUT))
-                Init_Void(DS_PUSH());
+                Init_Void(DS_PUSH(), SYM_NULLED);
             else
                 Move_Value(DS_PUSH(), D_OUT);
         }

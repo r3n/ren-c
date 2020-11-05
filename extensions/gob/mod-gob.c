@@ -62,7 +62,7 @@ REBNATIVE(register_gob_hooks)
         &MF_Gob
     );
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -80,7 +80,7 @@ REBNATIVE(unregister_gob_hooks)
 
     Unhook_Datatype(EG_Gob_Type);
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 

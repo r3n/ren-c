@@ -276,7 +276,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
             continue;
         }
         if (kind == REB_BYTES) {
-            Init_Void(value);
+            Init_Void(value, SYM_VOID);
             continue;
         }
         if (kind == REB_CUSTOM) {
@@ -287,7 +287,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
             // "not bindable" range.  (Is_Bindable() would be a slower test
             // if it had to account for it.)
             //
-            Init_Void(value);
+            Init_Void(value, SYM_VOID);
             continue;
         }
 

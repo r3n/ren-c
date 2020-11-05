@@ -188,7 +188,7 @@ const REBYTE Lex_Map[256] =
     /* 7B {   */    LEX_DELIMIT|LEX_DELIMIT_LEFT_BRACE,
     /* 7C |   */    LEX_SPECIAL|LEX_SPECIAL_BAR,
     /* 7D }   */    LEX_DELIMIT|LEX_DELIMIT_RIGHT_BRACE,
-    /* 7E ~   */    LEX_WORD, // !!! once belonged to LEX_SPECIAL
+    /* 7E ~   */    LEX_DELIMIT|LEX_DELIMIT_TILDE,
     /* 7F DEL */    LEX_DEFAULT,
 
     /* Odd Control Chars */
@@ -1196,6 +1196,23 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             TRASH_POINTER_IF_DEBUG(ss->end);
             goto acquisition_loop;
 
+          case LEX_DELIMIT_TILDE: {
+            ++cp;
+            if (IS_LEX_DELIMIT(*cp)) {  // nameless void, e.g. `~`
+                ss->end = cp;
+                return TOKEN_VOID;
+            }
+            if (*cp == '~')  // `~~` couldn't be converted to WORD!
+                fail (Error_Syntax(ss, TOKEN_VOID));
+            for (; *cp != '~'; ++cp) {
+                if (IS_LEX_DELIMIT(*cp)) {
+                    ss->end = cp;
+                    fail (Error_Syntax(ss, TOKEN_VOID));  // `[return ~a]`
+                }
+            }
+            ss->end = cp + 1;
+            return TOKEN_VOID; }
+
           case LEX_DELIMIT_UTF8_ERROR:
             fail (Error_Syntax(ss, TOKEN_WORD));
 
@@ -1258,7 +1275,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
                 ss->end = cp;
                 return token;
             }
-            while (*cp == '/' or *cp == '.') {  // deal path/tuple delimiters
+            while (*cp == '~' or *cp == '/' or *cp == '.') {  // "delimiters"
                 cp++;
 
                 while (IS_LEX_NOT_DELIMIT(*cp))
@@ -1843,6 +1860,18 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         Init_Blank(DS_PUSH());
         break;
 
+      case TOKEN_VOID: {
+        assert(len != 0);
+        if (len == 1)
+            Init_Unlabeled_Void(DS_PUSH());
+        else {
+            assert(*bp == '~');
+            assert(bp[len - 1] == '~');
+            const REBSTR *label = Intern_UTF8_Managed(bp + 1, len - 2);
+            Init_Labeled_Void(DS_PUSH(), label);
+        }
+        break; }
+
       case TOKEN_AT:
         assert(*bp == '@');
         goto token_prefixable_sigil;
@@ -2284,7 +2313,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
               case SYM_UNSET:  // !!! Should be under a LEGACY flag
                 case SYM_VOID:
-                Init_Void(DS_PUSH());
+                Init_Void(DS_PUSH(), SYM_VOID);
                 break;
 
               default: {
@@ -3092,6 +3121,7 @@ const REBYTE *Scan_Issue(RELVAL *out, const REBYTE *cp, REBSIZ size)
             switch (GET_LEX_VALUE(*bp)) {
               case LEX_DELIMIT_SLASH:  // internal slashes are legal
               case LEX_DELIMIT_PERIOD:  // internal dots also legal
+              case LEX_DELIMIT_TILDE:  // tildes allowed
                 break;
 
               default:

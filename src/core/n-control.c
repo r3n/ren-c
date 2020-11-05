@@ -656,8 +656,10 @@ REBNATIVE(match)
         // Instead it passes a VOID! back (test with `value?` or `null?`)
 
         if (IS_TRUTHY(temp)) {
+            if (IS_VOID(D_OUT))
+                return D_OUT;  // don't corrupt, so you can MATCH exact voids
             if (IS_FALSEY(D_OUT))
-                return Init_Void(D_OUT);
+                return Init_Void(D_OUT, SYM_MATCHED);
             return D_OUT;
         }
 
@@ -690,8 +692,10 @@ REBNATIVE(match)
         return R_THROWN;
 
     if (VAL_LOGIC(temp)) {
+        if (IS_VOID(D_OUT))
+            return D_OUT;  // don't corrupt, so you can MATCH exact voids
         if (IS_FALSEY(D_OUT)) // see above for why false match not passed thru
-            return Init_Void(D_OUT);
+            return Init_Void(D_OUT, SYM_MATCHED);
         return D_OUT;
     }
 

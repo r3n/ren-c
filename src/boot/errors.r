@@ -77,14 +77,12 @@ Syntax: [
 
 Script: [
     no-value:           [:arg1 {has no value}]
-    need-non-void:      [:arg1 {is VOID! (Note: use GET/ANY to GET voids)}]
+    need-non-void:      [:arg1 {is} :arg2 {(use GET/ANY to GET voids)}]
     need-non-null:      [:arg1 {needs a value, can't be null}]
     need-non-end:       [{end was reached while trying to set} :arg1]
     not-bound:          [:arg1 {word is not bound to a context}]
     no-relative:        [:arg1 {word is bound relative to context not on stack}]
     not-in-context:     [:arg1 {is not in the specified context}]
-
-    void-evaluation:    "VOID! cells cannot be evaluated"
 
     assertion-failure:  [{assertion failure:} :arg1]
 
@@ -118,6 +116,8 @@ Script: [
 
     bad-get-group:      {GET-GROUP! gets WORD!/PATH!/BLOCK!, arity-0 ACTION!}
     bad-set-group:      {SET-GROUP! sets WORD!/PATH!/BLOCK!, arity-1 ACTION!}
+
+    bad-branch-type:    {Bad branch type}
 
     do-running-frame:   [{Must COPY a FRAME! that's RUNNING? before DOing it}]
     expired-frame:      [{Cannot use a FRAME! whose stack storage expired}]

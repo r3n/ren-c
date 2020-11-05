@@ -95,6 +95,7 @@ inline static bool Is_Valid_Sequence_Element(
         or k == REB_BLOCK
         or k == REB_TEXT
         or k == REB_TAG
+        or k == REB_VOID  // legal because of UNIX home dir, e.g. `~/projects`
     ){
         return true;
     }

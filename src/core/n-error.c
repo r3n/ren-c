@@ -39,7 +39,7 @@ static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
     UNUSED(ARG(result));
 
     if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(code)))
-        return VOID_VALUE;
+        return BLANK_VALUE;  // signal thrown without corrupting D_OUT
 
     return nullptr;
 }
@@ -70,7 +70,7 @@ REBNATIVE(trap)
         return nullptr; // code didn't fail() or throw
     }
 
-    if (IS_VOID(error)) // signal used to indicate a throw
+    if (IS_BLANK(error)) // signal used to indicate a throw
         return R_THROWN;
 
     assert(IS_ERROR(error));

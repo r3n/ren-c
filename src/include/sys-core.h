@@ -268,7 +268,7 @@ enum Boot_Levels {
 enum {
     MKF_RETURN      = 1 << 0,   // give a RETURN (but local RETURN: overrides)
     MKF_KEYWORDS    = 1 << 1,   // respond to tags like <opt>, <with>, <local>
-    MKF_ANY_VALUE   = 1 << 2,   // args and return are [<opt> any-value!]
+    MKF_2           = 1 << 2,
 
     // These flags are set during the process of spec analysis.  It helps
     // avoid the inefficiency of creating documentation frames on functions
@@ -376,7 +376,6 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding);
 #include "datatypes/sys-value.h"  // these defines don't need series accessors
 
 #include "datatypes/sys-nulled.h"
-#include "datatypes/sys-void.h"
 #include "datatypes/sys-blank.h"
 #include "datatypes/sys-logic.h"
 #include "datatypes/sys-integer.h"
@@ -432,7 +431,9 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #include "datatypes/sys-char.h"  // use Init_Integer() for bad codepoint error
 #include "datatypes/sys-string.h"  // REBSYM needed for typesets
 #include "datatypes/sys-word.h"
+#include "datatypes/sys-void.h"  // REBSYM needed
 #include "datatypes/sys-token.h"
+
 
 #include "datatypes/sys-pair.h"
 #include "datatypes/sys-quoted.h"  // requires pairings for cell storage

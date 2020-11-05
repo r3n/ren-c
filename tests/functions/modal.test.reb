@@ -8,29 +8,29 @@
         reduce .voidify [x y]
     ])
 
-    ([3 #[void]] = foo 3)
+    ([3 ~nulled~] = foo 3)
     ([3 /y] = foo @(1 + 2))
-    ([@(1 + 2) #[void]] = foo '@(1 + 2))
+    ([@(1 + 2) ~nulled~] = foo '@(1 + 2))
 
     (did item: 300)
 
-    ([304 #[void]] = foo item + 4)
+    ([304 ~nulled~] = foo item + 4)
     ([304 /y] = foo @(item + 4))
-    ([@(item + 4) #[void]] = foo '@(item + 4))
+    ([@(item + 4) ~nulled~] = foo '@(item + 4))
 
-    ([300 #[void]] = foo item)
+    ([300 ~nulled~] = foo item)
     ([300 /y] = foo @item)
-    ([@item #[void]] = foo '@item)
+    ([@item ~nulled~] = foo '@item)
 
-    ([[a b] #[void]] = foo [a b])
+    ([[a b] ~nulled~] = foo [a b])
     ([[a b] /y] = foo @[a b])
-    ([@[a b] #[void]] = foo '@[a b])
+    ([@[a b] ~nulled~] = foo '@[a b])
 
     (did obj: make object! [field: 1020])
 
-    ([1020 #[void]] = foo obj/field)
+    ([1020 ~nulled~] = foo obj/field)
     ([1020 /y] = foo @obj/field)
-    ([@obj/field #[void]] = foo '@obj/field)
+    ([@obj/field ~nulled~] = foo '@obj/field)
 ]
 
 [
@@ -40,23 +40,23 @@
         reduce .voidify [x y]
     ])
 
-    (3 bar = [3 #[void]])
+    (3 bar = [3 ~nulled~])
     (@(1 + 2) bar = [3 /y])
 
     (did item: 300)
 
-    ((item + 4) bar = [304 #[void]])
+    ((item + 4) bar = [304 ~nulled~])
     (@(item + 4) bar = [304 /y])
 
-    (item bar = [300 #[void]])
+    (item bar = [300 ~nulled~])
     (@item bar = [300 /y])
 
-    ([a b] bar = [[a b] #[void]])
+    ([a b] bar = [[a b] ~nulled~])
     (@[a b] bar = [[a b] /y])
 
     (did obj: make object! [field: 1020])
 
-    (obj/field bar = [1020 #[void]])
+    (obj/field bar = [1020 ~nulled~])
     (@obj/field bar = [1020 /y])
 ]
 
@@ -69,7 +69,7 @@
 
     ([a @x /y] = parameters of :foo)
 
-    ([10 20 #[void]] = foo 10 20)
+    ([10 20 ~nulled~] = foo 10 20)
     ([10 20 /y] = foo 10 @(20))
 
     (did fooy: :foo/y)

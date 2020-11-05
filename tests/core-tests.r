@@ -20,6 +20,7 @@
 %datatypes/action.test.reb
 %datatypes/binary.test.reb
 %datatypes/bitset.test.reb
+%datatypes/blank.test.reb
 %datatypes/block.test.reb
 %datatypes/char.test.reb
 %datatypes/datatype.test.reb
@@ -29,7 +30,6 @@
 %datatypes/error.test.reb
 %datatypes/event.test.reb
 %datatypes/file.test.reb
-%datatypes/function.test.reb
 %datatypes/get-block.test.reb
 %datatypes/get-group.test.reb
 %datatypes/get-path.test.reb
@@ -39,17 +39,14 @@
 %datatypes/image.test.reb
 %datatypes/integer.test.reb
 %datatypes/issue.test.reb
-%datatypes/list.test.reb
 %datatypes/lit-path.test.reb
 %datatypes/lit-word.test.reb
 %datatypes/logic.test.reb
 %datatypes/map.test.reb
 %datatypes/module.test.reb
 %datatypes/money.test.reb
-%datatypes/native.test.reb
-%datatypes/none.test.reb
+%datatypes/null.test.reb
 %datatypes/object.test.reb
-%datatypes/op.test.reb
 %datatypes/pair.test.reb
 %datatypes/paren.test.reb
 %datatypes/path.test.reb
@@ -70,8 +67,8 @@
 %datatypes/time.test.reb
 %datatypes/tuple.test.reb
 %datatypes/typeset.test.reb
-%datatypes/unset.test.reb
 %datatypes/url.test.reb
+%datatypes/void.test.reb
 %datatypes/varargs.test.reb
 %datatypes/word.test.reb
 
@@ -155,11 +152,13 @@
 %functions/enclose.test.reb
 %functions/enfix.test.reb
 %functions/frame.test.reb
+%functions/function.test.reb
 %functions/hijack.test.reb
 %functions/invisible.test.reb
 %functions/let.test.reb
 %functions/modal.test.reb
 %functions/multi.test.reb
+%functions/native.test.reb
 %functions/oneshot.test.reb
 %functions/predicate.test.reb
 %functions/redescribe.test.reb

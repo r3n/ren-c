@@ -349,7 +349,7 @@ REBNATIVE(do)
         // the varargs came from.  It's still on the stack, and we don't want
         // to disrupt its state.  Use a subframe.
 
-        Init_Void(D_OUT);
+        Init_Void(D_OUT, SYM_VOID);
         if (IS_END(f->feed->value))
             return D_OUT;
 
@@ -514,7 +514,7 @@ REBNATIVE(evaluate)
         REBLEN index;
         if (VAL_LEN_AT(source) == 0) {  // `evaluate []` should return null
             Init_Nulled(D_OUT);
-            Init_Void(D_SPARE);
+            Init_Void(D_SPARE, SYM_EMPTY);
         }
         else {
             if (Eval_Step_In_Any_Array_At_Throws(
@@ -543,7 +543,7 @@ REBNATIVE(evaluate)
                 //
                 // https://forum.rebol.info/t/1173/
                 //
-                Init_Void(D_SPARE);
+                Init_Void(D_SPARE, SYM_EMPTY);
                 Quotify(D_OUT, 1);  // void-is-invisible signal on array
             }
             else {

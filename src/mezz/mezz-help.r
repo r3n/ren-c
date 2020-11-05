@@ -104,14 +104,20 @@ browse: function [
 help: function [
     "Prints information about words and values (if no args, general help)."
 
-    return: <void>
+    return: [void!]
     'topic [<end> any-value!]
         "WORD! whose value to explain, or other HELP target (try HELP HELP)"
-    /doc
-        "Open web browser to related documentation."
+    /doc "Open web browser to related documentation."
 ][
+    return: specialize 'return [value: ~]  ; unlabeled for no console display
+
     if undefined? 'topic [
-        print "#[void] is a literal VOID! value"
+        ;
+        ; !!! This should lead to a web page that offers help on the nature
+        ; of specific void usages, e.g. to explain what ~branched~ is and
+        ; how to use @[...] branches to avoid it.
+        ;
+        print [mold get/any 'topic "is a literal VOID! value"]
         return
     ]
 
@@ -399,6 +405,8 @@ help: function [
         print "REFINEMENTS:"
         print-args/indent-words refinements
     ]
+
+    return  ; use overridden return vs. fallout so void is unlabeled
 ]
 
 

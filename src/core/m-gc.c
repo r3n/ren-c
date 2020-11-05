@@ -248,13 +248,9 @@ static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v)
     // form.  So if '''a fits in a WORD! (despite being a QUOTED!), we want
     // to mark the cell as if it were a plain word.  Use the CELL_KIND.
     //
-    // See %types.r for how all the scalar types are at the bottom.  These
-    // kinds that don't need marking include REB_0_END.  REB_INTEGER will
-    // need marking when it becomes arbitrary precision and has a node...
-    //
     enum Reb_Kind heart = cast(enum Reb_Kind, HEART_BYTE(v));
-    if (heart < REB_PAIR)
-        return;
+    if (heart == REB_0_END)
+        return;  // no cell bits can be interpreted
 
   #if !defined(NDEBUG)  // see Queue_Mark_Node_Deep() for notes on recursion
     assert(not in_mark);

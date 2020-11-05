@@ -487,12 +487,7 @@ void Push_Paramlist_Triads_May_Fail(
                 DS_PUSH(),
                 pclass,
                 spelling,  // don't canonize, see #2258
-                (*flags & MKF_ANY_VALUE)
-                  ? TS_OPT_VALUE
-                  : TS_VALUE & ~(
-                        FLAGIT_KIND(REB_ACTION)
-                        | FLAGIT_KIND(REB_VOID)
-                    )
+                TS_OPT_VALUE  // By default <opt> ANY-VALUE! is legal
             );
 
         // All these would cancel a definitional return (leave has same idea):
@@ -1170,6 +1165,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
 
     if (
         ACT_DISPATCHER(a) == &Void_Dispatcher
+        or ACT_DISPATCHER(a) == &Empty_Dispatcher
         or ACT_DISPATCHER(a) == &Unchecked_Dispatcher
         or ACT_DISPATCHER(a) == &Voider_Dispatcher
         or ACT_DISPATCHER(a) == &Returner_Dispatcher

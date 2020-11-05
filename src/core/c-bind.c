@@ -758,7 +758,7 @@ void Virtual_Bind_Deep_To_New_Context(
             // unreadable void.  But since this code is also shared with USE,
             // it doesn't do any initialization...so go ahead and put void.
             //
-            Init_Void(var);
+            Init_Void(var, SYM_VOID);
 
             assert(rebinding); // shouldn't get here unless we're rebinding
 

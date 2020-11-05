@@ -592,7 +592,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
           case LOOP_MAP_EACH:
           case LOOP_MAP_EACH_SPLICED:
             if (IS_NULLED(les->out))
-                Init_Void(les->out);  // nulled used to signal breaking only
+                Init_Void(les->out, SYM_NULLED);  // null signals break only
             else if (
                 les->mode == LOOP_MAP_EACH_SPLICED
                 and IS_BLOCK(les->out)
@@ -992,13 +992,13 @@ REBNATIVE(stop)
 {
     INCLUDE_PARAMS_OF_STOP;
 
-    return Init_Thrown_With_Label(
-        D_OUT,
-        IS_ENDISH_NULLED(ARG(value))
-            ? VOID_VALUE  // `if true [stop]`
-            : ARG(value),  // `if true [stop 5]`, etc.
-        NATIVE_VAL(stop)
-    );
+    if (IS_ENDISH_NULLED(ARG(value)))
+        Init_Void(ARG(value), SYM_STOPPED);  // `if true [stop]`
+    else {
+        // `if true [stop 5]`, etc.
+    }
+
+    return Init_Thrown_With_Label(D_OUT, ARG(value), NATIVE_VAL(stop));
 }
 
 

@@ -160,7 +160,7 @@ REBNATIVE(register_library_hooks)
 
     Extend_Generics_Someday(ARG(generics));  // !!! See comments
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -215,5 +215,5 @@ REBNATIVE(unregister_library_hooks)
     Unhook_Datatype(EG_Library_Type);
     EG_Library_Type = nullptr;
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }

@@ -204,7 +204,11 @@ host-script-pre-load: function [
 ; document the issue.  So we make them SET-WORD!s added to lib up front, so
 ; the lib modification gets picked up.
 ;
-get-current-exec: file-to-local: local-to-file: what-dir: change-dir: void
+get-current-exec:
+file-to-local:
+local-to-file:
+what-dir:
+change-dir: ~undefined~
 
 
 main-startup: function [

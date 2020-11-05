@@ -493,20 +493,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         fail (Error_Evaluate_Null_Raw());
 
 
-    //=//// VOID! /////////////////////////////////////////////////////////=//
-    //
-    // "A void! is a means of giving a hot potato back that is a warning about
-    //  something, but you don't want to force an error 'in the moment'...in
-    //  case the returned information wasn't going to be used anyway."
-    //
-    // https://forum.rebol.info/t/947
-    //
-    // If we get here, the evaluator is seeing it, and it's time to fail.
-
-      case REB_VOID:
-        fail (Error_Void_Evaluation_Raw());
-
-
     //=//// ACTION! ///////////////////////////////////////////////////////=//
     //
     // If an action makes it to the SWITCH statement, that means it is either
@@ -628,7 +614,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         }
 
         if (IS_VOID(gotten))  // need GET/ANY if it's void ("undefined")
-            fail (Error_Need_Non_Void_Core(v, f_specifier));
+            fail (Error_Need_Non_Void_Core(v, f_specifier, gotten));
 
         Move_Value(f->out, gotten);  // no copy CELL_FLAG_UNEVALUATED
         break;
@@ -669,7 +655,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             gotten = Lookup_Word_May_Fail(v, f_specifier);
 
         if (IS_VOID(gotten))
-            fail (Error_Need_Non_Void_Core(v, f_specifier));
+            fail (Error_Need_Non_Void_Core(v, f_specifier, gotten));
 
         Move_Value(f->out, gotten);
 
@@ -846,7 +832,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         }
 
         if (IS_VOID(where))  // need `:x/y` if it's void (unset)
-            fail (Error_Need_Non_Void_Core(v, f_specifier));
+            fail (Error_Need_Non_Void_Core(v, f_specifier, where));
 
         if (where != f->out)
             Move_Value(f->out, where);  // won't move CELL_FLAG_UNEVALUATED
@@ -927,7 +913,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto return_thrown;
 
         if (IS_VOID(f->out))  // need GET/ANY if it's void ("undefined")
-            fail (Error_Need_Non_Void_Core(v, f_specifier));
+            fail (Error_Need_Non_Void_Core(v, f_specifier, f->out));
 
         // !!! This didn't appear to be true for `-- "hi" "hi"`, processing
         // GET-PATH! of a variadic.  Review if it should be true.
@@ -1119,7 +1105,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             "] ] func [f] [",
                 "for-each output", outputs, "[",
                     "if f/(output) [",  // void in case func doesn't (null?)
-                        "set f/(output) void",
+                        "set f/(output) ~undefined~",
                     "]",
                 "]",
                 "either first", f->out, "@[",
@@ -1183,12 +1169,26 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto inert;
 
 
-     //=///////////////////////////////////////////////////////////////////=//
-     //
-     // Treat all the other NOT Is_Bindable() types as inert
-     //
-     //=///////////////////////////////////////////////////////////////////=//
+    //=///////////////////////////////////////////////////////////////////=//
+    //
+    // Treat all the other NOT Is_Bindable() types as inert
+    //
+    //=///////////////////////////////////////////////////////////////////=//
 
+      case REB_VOID:
+        //
+        // "A void! is a means of giving a hot potato back that is a warning
+        //  something, but you don't want to force an error 'in the moment'...
+        //  in case the returned information wasn't going to be used anyway."
+        //
+        // https://forum.rebol.info/t/947
+        //
+        // So it was thought that voids might be something to error on if
+        // seen by the evaluator.  But in the balance of things, making them
+        // inert is more useful:
+        //
+        // https://forum.rebol.info/t/1383/8
+        //
       case REB_BLANK:
         //
       case REB_LOGIC:

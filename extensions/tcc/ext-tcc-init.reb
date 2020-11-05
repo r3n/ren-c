@@ -505,7 +505,7 @@ c99: function [
 
         parse/case command [some [rule [some space | end]]] else [
             fail [
-                elide trunc: void
+                elide trunc: ~void~
                 "Could not parse C99 command line at:"
                 append mold/limit/truncated last-pos 40 'trunc if trunc ["..."]
             ]

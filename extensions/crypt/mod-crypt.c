@@ -1309,5 +1309,5 @@ REBNATIVE(shutdown_crypto)
     }
   #endif
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }

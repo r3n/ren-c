@@ -160,7 +160,7 @@ REB_R Event_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         break; }
 
     case SYM_ON_WAKE_UP:
-        return Init_Void(D_OUT);
+        return Init_Void(D_OUT, SYM_VOID);
 
     // Normal block actions done on events:
     case SYM_POKE:

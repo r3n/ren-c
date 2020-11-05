@@ -229,7 +229,7 @@ REBNATIVE(sleep)
     usleep(msec * 1000);
   #endif
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -844,7 +844,7 @@ REBNATIVE(send_signal)
     //
     kill_process(pid, signal);
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 #endif // defined(TO_LINUX) || defined(TO_ANDROID) || defined(TO_POSIX) || defined(TO_OSX)

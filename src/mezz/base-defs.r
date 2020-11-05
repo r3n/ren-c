@@ -309,10 +309,12 @@ augment: enclose 'augment* func* [f] [
 ]
 
 ; The lower-level pointfree function separates out the action it takes, but
-; the higher level one uses a block.  Specialize out the action as void, and
-; then overwrite it in the enclosure with an action taken out of the block.
+; the higher level one uses a block.  Specialize out the action, and then
+; overwrite it in the enclosure with an action taken out of the block.
 ;
-pointfree: enclose (specialize* 'pointfree* [action: :void]) func* [f] [
+pointfree: enclose (specialize* 'pointfree* [
+    action: :panic-value  ; gets overwritten, best to make it something mean
+]) func* [f] [
     let action: f/action: (match action! any [
         if match [word! path!] :f/block/1 [get compose f/block/1]
         :f/block/1
@@ -559,7 +561,7 @@ print: func* [
         return write-stdout line
     ]
 
-    (write-stdout try spaced line) then [write-stdout newline]
+    (write-stdout try spaced line) then @[write-stdout newline]
 ]
 
 

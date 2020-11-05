@@ -9,7 +9,7 @@
     1 = do [1 comment "a"]
 )
 (
-    void = do [comment "a"]
+    ~empty~ = do [comment "a"]
 )
 
 (
@@ -55,7 +55,7 @@
     1 = do [1 elide "a"]
 )
 (
-    void = do [elide "a"]
+    ~empty~ = do [elide "a"]
 )
 
 (
@@ -112,7 +112,7 @@
 )
 
 (
-    void = do [|||]
+    ~empty~ = do [|||]
 )
 (
     3 = do [1 + 2 ||| 10 + 20 | 100 + 200]

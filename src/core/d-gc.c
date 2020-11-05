@@ -112,6 +112,9 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_MONEY:
         break;
 
+      case REB_BYTES:  // e.g. for ISSUE! when fits in cell
+        break;
+
       case REB_PAIR: {
         REBVAL *paired = VAL(VAL_NODE(v));
         assert(Is_Marked(paired));

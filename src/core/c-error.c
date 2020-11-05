@@ -959,15 +959,19 @@ REBCTX *Error_Need_Non_End_Core(const RELVAL *target, REBSPC *specifier) {
 //
 //  Error_Need_Non_Void_Core: C
 //
-REBCTX *Error_Need_Non_Void_Core(const RELVAL *target, REBSPC *specifier) {
-    //
+REBCTX *Error_Need_Non_Void_Core(
+    const RELVAL *target,
+    REBSPC *specifier,
+    const RELVAL *voided
+){
     // SET calls this, and doesn't work on just SET-WORD! and SET-PATH!
     //
     assert(ANY_WORD(target) or ANY_SEQUENCE(target) or ANY_BLOCK(target));
+    assert(IS_VOID(voided));
 
     DECLARE_LOCAL (specific);
     Derelativize(specific, target, specifier);
-    return Error_Need_Non_Void_Raw(specific);
+    return Error_Need_Non_Void_Raw(specific, SPECIFIC(voided));
 }
 
 

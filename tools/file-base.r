@@ -193,8 +193,9 @@ core: [
     t-time.c
     t-tuple.c
     t-typeset.c
-    t-varargs.c
     t-word.c
+    t-varargs.c
+    t-void.c
 
     ; (U)??? (3rd-party code extractions)
     u-compress.c

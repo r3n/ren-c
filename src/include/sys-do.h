@@ -71,7 +71,9 @@ inline static bool Do_Any_Array_At_Throws(
 ){
     DECLARE_FEED_AT_CORE (feed, any_array, specifier);
 
-    Init_Void(out);  // ^-- *after* feed initialization (if any_array == out)
+    // ^-- Voidify out *after* feed initialization (if any_array == out)
+    //
+    Init_Void(out, SYM_EMPTY);
 
     bool threw = Do_Feed_To_End_Maybe_Stale_Throws(out, feed);
     CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
@@ -113,7 +115,7 @@ inline static bool Do_At_Mutable_Throws(
     REBLEN index,
     REBSPC *specifier
 ){
-    Init_Void(out);
+    Init_Void(out, SYM_EMPTY);
 
     bool threw = Do_At_Mutable_Maybe_Stale_Throws(
         out,
@@ -225,11 +227,27 @@ inline static bool Do_Branch_Core_Throws(
         goto redo;
 
       default:
-        fail ("Bad branch type");
+        fail (Error_Bad_Branch_Type_Raw());
     }
 
-    if (voidify)
-        Voidify_If_Nulled(out);
+    // If we're not returning the branch result purely "as-is" then we change
+    // not just NULL to `~branched~`, but also any other void.  So:
+    //
+    //     >> if true [null]
+    //     == ~branched~
+    //
+    //     >> if true [print "relabeled"]
+    //     test
+    //     == ~branched~
+    //
+    // To get the original void label, you have to use the @ forms:
+    //
+    //     >> if true @[print "not relabeled"]
+    //     == ~void~  ; specific void result of PRINT
+    //
+    if (voidify and IS_NULLED_OR_VOID(out))
+        Init_Void(out, SYM_BRANCHED);
+
     return false;
 }
 
