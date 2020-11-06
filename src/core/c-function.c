@@ -1060,6 +1060,7 @@ REBACT *Make_Action(
     if (GET_ACTION_FLAG(act, HAS_RETURN)) {
         REBVAL *param = ACT_PARAMS_HEAD(act);
         assert(VAL_PARAM_SYM(param) == SYM_RETURN);
+        UNUSED(param);
     }
 
     REBVAL *first_unspecialized = First_Unspecialized_Param(act);
