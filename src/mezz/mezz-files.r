@@ -257,7 +257,7 @@ confirm: function [
 list-dir: function [
     "Print contents of a directory (ls)."
 
-    return: <void>
+    return: [void!]
     'path [<end> file! word! path! text!]
         "Accepts %file, :variables, and just words (as dirs)"
     /l "Line of info format"
@@ -289,7 +289,7 @@ list-dir: function [
     files: attempt [read %./] else [
         print ["Not found:" :path]
         change-dir save-dir
-        return
+        return ~  ; unlabeled void so console doesn't print result
     ]
 
     for-each file files [
@@ -317,6 +317,7 @@ list-dir: function [
     all [text? l, not empty? l] then [print l]
 
     change-dir save-dir
+    return ~  ; unlabeled void so console doesn't print result
 ]
 
 
