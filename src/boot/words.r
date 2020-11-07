@@ -38,16 +38,13 @@ datatypes
 ; A new Ren-C feature is that voids are interned like WORD!, so they can be
 ; more communicative.  These are standard symbols passed to Init_Void().
 ;
-unreadable
 void
 undefined
 nulled
 blanked
-empty
 branched
 stopped
 matched
-; opt  ; OPT is positioned tactically in PARSE
 
 
 ; ...note that the words for types are created programmatically before

@@ -9,7 +9,7 @@
     1 = do [1 comment "a"]
 )
 (
-    ~empty~ = do [comment "a"]
+    ~ = do [comment "a"]
 )
 
 (
@@ -55,7 +55,7 @@
     1 = do [1 elide "a"]
 )
 (
-    ~empty~ = do [elide "a"]
+    ~ = do [elide "a"]
 )
 
 (
@@ -144,7 +144,7 @@
 ]
 
 (
-    ~empty~ = do [|||]
+    ~ = do [|||]
 )
 (
     3 = do [1 + 2 ||| 10 + 20, 100 + 200]

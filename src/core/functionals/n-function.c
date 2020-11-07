@@ -95,8 +95,8 @@ REB_R Void_Dispatcher(REBFRM *f)
 //  Empty_Dispatcher: C
 //
 // If you write `func [...] []` it uses this dispatcher instead of running
-// Eval_Core() on an empty block.  The subtlety of returning ~empty~ instead
-// of ~void~ is to make sure that it acts the same as `do []`...and helps
+// Eval_Core() on an empty block.  The subtlety of returning ~ instead of
+// ~void~ is to make sure that it acts the same as `do []`...and helps
 // to clue people into the importance of normalizing the return results.
 //
 REB_R Empty_Dispatcher(REBFRM *f)
@@ -105,7 +105,7 @@ REB_R Empty_Dispatcher(REBFRM *f)
     assert(VAL_LEN_AT(ARR_HEAD(details)) == 0);
     UNUSED(details);
 
-    return Init_Void(f->out, SYM_EMPTY);
+    return Init_Unlabeled_Void(f->out);
 }
 
 

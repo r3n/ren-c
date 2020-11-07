@@ -73,7 +73,7 @@ inline static bool Do_Any_Array_At_Throws(
 
     // ^-- Voidify out *after* feed initialization (if any_array == out)
     //
-    Init_Void(out, SYM_EMPTY);
+    Init_Unlabeled_Void(out);
 
     bool threw = Do_Feed_To_End_Maybe_Stale_Throws(out, feed);
     CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
@@ -115,7 +115,7 @@ inline static bool Do_At_Mutable_Throws(
     REBLEN index,
     REBSPC *specifier
 ){
-    Init_Void(out, SYM_EMPTY);
+    Init_Unlabeled_Void(out);
 
     bool threw = Do_At_Mutable_Maybe_Stale_Throws(
         out,

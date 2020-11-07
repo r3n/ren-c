@@ -820,7 +820,7 @@ REBNATIVE(opt)
     // creating a likely error in those cases.  To get around it, OPT TRY
     //
     if (IS_NULLED(ARG(optional)))
-        return Init_Void(D_OUT, SYM_OPT);
+        return Init_Void(D_OUT, SYM_NULLED);
 
     RETURN (ARG(optional));
 }

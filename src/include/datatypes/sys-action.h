@@ -496,7 +496,7 @@ inline static REB_R Run_Generic_Dispatch(
 
 
 inline static bool Process_Action_Throws(REBFRM *f) {
-    Init_Void(f->out, SYM_EMPTY);
+    Init_Unlabeled_Void(f->out);
     SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
     bool threw = Process_Action_Maybe_Stale_Throws(f);
     CLEAR_CELL_FLAG(f->out, OUT_MARKED_STALE);

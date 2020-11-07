@@ -26,16 +26,16 @@
     ~void~ = f
 )
 
-; ~empty~ is the response for when there is no content; this applies to
-; functions as well if they do not explicitly force to void.
+; ~ is the response for when there is no content; this applies to functions as
+; well if they do not explicitly force to void.
 ;
-(~empty~ = do [])
+(~ = do [])
 (
     foo: func [] []
-    ~empty~ = foo
+    ~ = foo
 )
-(~empty~ = applique 'foo [])
-(~empty~ = do :foo)
+(~ = applique 'foo [])
+(~ = do :foo)
 
 ; ~void~ is the more formal convention for what you get by RETURN with no
 ; argument, or if the spec says <void> any result.
@@ -82,7 +82,7 @@
     (~branched~ = if true [~overwritten~])
 
     (null = if true @[null])
-    (~empty~ = if true @[])
+    (~ = if true @[])
     (~untouched~ = if true @[~untouched~])
 ]
 
