@@ -1183,28 +1183,18 @@ REBNATIVE(switch)
 
 
 //
-//  default: enfix native/body [
+//  default: enfix native [
 //
-//  {Set word or path to a default value if it is not set yet or blank.}
+//  {Set word or path to a default value if it is not set yet}
 //
 //      return: "Former value or branch result, can only be null if no target"
 //          [<opt> any-value!]
-//      :target "Word or path which might be set--no target always branches"
-//          [set-word! set-path!]
-//      'branch "If target not set already, this is evaluated and stored there"
+//      :target "Word or path which might be set appropriately (or not)"
+//          [set-word! set-path!]  ; to left of DEFAULT
+//      :predicate "Test beyond null/void for defaulting, else .NOT.BLANK?"
+//          [<skip> predicate! action!]  ; to right of DEFAULT
+//      'branch "If target needs default, this is evaluated and stored there"
 //          [any-branch!]
-//      /only "Consider target being BLANK! to be a value not to overwrite"
-//  ][
-//      if set-path? target [target: compose target]
-//      let gotten
-//      either all [
-//          value? gotten: get/hard target
-//          any [only  not blank? :gotten]  ; no comma in bootstrap
-//      ][
-//          :gotten  ; so that `x: y: default z` leads to `x = y`
-//      ][
-//          set/hard target do :branch
-//      ]
 //  ]
 //
 REBNATIVE(default)
@@ -1212,6 +1202,10 @@ REBNATIVE(default)
     INCLUDE_PARAMS_OF_DEFAULT;
 
     REBVAL *target = ARG(target);
+
+    REBVAL *predicate = ARG(predicate);
+    if (Cache_Predicate_Throws(D_OUT, predicate))
+        return R_THROWN;
 
     if (IS_SET_WORD(target))
         Move_Value(D_OUT, Lookup_Word_May_Fail(target, SPECIFIED));
@@ -1277,12 +1271,15 @@ REBNATIVE(default)
         }
     }
 
-    if (
-        not IS_VOID(D_OUT)
-        and not IS_NULLED(D_OUT)
-        and (not IS_BLANK(D_OUT) or REF(only))
-    ){
-        return D_OUT;  // count it as "already set" !!! is this right?
+    if (not IS_NULLED_OR_VOID(D_OUT)) {
+        if (not REF(predicate)) {  // no custom additional constraint
+            if (not IS_BLANK(D_OUT))  // acts as `x: default .not.blank? [...]`
+                return D_OUT;  // count it as "already set"
+        }
+        else {
+            if (rebDid(REF(predicate), rebQ(D_OUT), rebEND))
+                return D_OUT;
+        }
     }
 
     if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(branch)))

@@ -596,14 +596,6 @@ gunzip: redescribe [
     specialize 'inflate [envelope: 'gzip]  ; What about GZIP-BADSIZE?
 )
 
-
-default*: enfixed redescribe [
-    {Would be the same as DEFAULT/ONLY if paths could dispatch infix}
-](
-    specialize 'default [only: true]
-)
-
-
 ensure: redescribe [
     {Pass through value if it matches test, otherwise trigger a FAIL}
 ](

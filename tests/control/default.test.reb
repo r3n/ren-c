@@ -36,3 +36,15 @@
         x = 20
     ]
 )
+
+; Predicates allow the specification of an additional constraint, which if
+; not met, will also lead to defaulting.
+(
+    x: "not an integer"
+    x: default .integer? [10 + 20]
+    x = 30
+)(
+    x: 304
+    x: default .integer? [10 + 20]
+    x = 304
+)
