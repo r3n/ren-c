@@ -281,10 +281,9 @@ set-target-platform: func [
         'emscripten [
             target-platform: emscripten
         ]
-        default [
-            print ["Unknown platform:" platform "falling back to POSIX"]
-            target-platform: posix
-        ]
+    ] else [
+        print ["Unknown platform:" platform "falling back to POSIX"]
+        target-platform: posix
     ]
 ]
 
@@ -761,10 +760,9 @@ ld: make linker-class [
             #entry [
                 _
             ]
-            default [
-                dump dep
-                fail "unrecognized dependency"
-            ]
+        ] else [
+            dump dep
+            fail "unrecognized dependency"
         ]
     ]
 
@@ -856,10 +854,8 @@ llvm-link: make linker-class [
             #entry [
                 _
             ]
-            default [
-                dump dep
-                fail "unrecognized dependency"
-            ]
+            (elide dump dep)
+            fail "unrecognized dependency"
         ]
     ]
 ]
@@ -950,10 +946,8 @@ link: make linker-class [
             #entry [
                 _
             ]
-            default [
-                dump dep
-                fail "unrecognized dependency"
-            ]
+            (elide dump dep)
+            fail "unrecognized dependency"
         ]
     ]
 ]
@@ -1280,10 +1274,9 @@ generator-class: make object! [
                     copy project/output
                 ]
             ]
-            default [
-                basename: project/output
-                project/output: join basename suffix
-            ]
+        ] else [
+            basename: project/output
+            project/output: join basename suffix
         ]
 
         project/basename: basename
@@ -1312,10 +1305,7 @@ generator-class: make object! [
             #object-file [
                 setup-output project
             ]
-            default [
-                return
-            ]
-        ]
+        ] else [return]
     ]
 ]
 
@@ -1379,8 +1369,7 @@ makefile: make generator-class [
                             keep case [
                                 file? w [file-to-local w]
                                 file? w/output [file-to-local w/output]
-                                default [w/output]
-                            ]
+                            ] else [w/output]
                         ]
                     ]
                 ]
@@ -1473,10 +1462,8 @@ makefile: make generator-class [
                 #dynamic-extension #static-extension [
                     _
                 ]
-                default [
-                    dump dep
-                    fail ["unrecognized project type:" dep/class]
-                ]
+                (elide dump dep)
+                fail ["unrecognized project type:" dep/class]
             ]
         ]
     ]
@@ -1521,13 +1508,11 @@ Execution: make generator-class [
         'Linux [linux]
         'OSX [osx]
         'Android [android]
-
-        default [
-           print [
-               "Untested platform" system/platform "- assume POSIX compilant"
-           ]
-           posix
+    ] else [
+        print [
+            "Untested platform" system/platform "- assume POSIX compilant"
         ]
+        posix
     ]
 
     gen-cmd-create: :host/gen-cmd-create
@@ -1562,10 +1547,8 @@ Execution: make generator-class [
                     call/shell cmd
                 ]
             ]
-            default [
-                dump target
-                fail "Unrecognized target class"
-            ]
+            (elide dump target)
+            fail "Unrecognized target class"
         ]
     ]
 
@@ -1631,10 +1614,8 @@ Execution: make generator-class [
                     run dep
                 ]
             ]
-            default [
-                dump project
-                fail ["unrecognized project type:" project/class]
-            ]
+            (elide dump project)
+            fail ["unrecognized project type:" project/class]
         ]
     ]
 ]

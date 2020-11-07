@@ -99,8 +99,7 @@ read-sync-awake: function [return: [logic!] event [event!]] [
             event/port/error: _
             fail error
         ]
-        default [false]
-    ]
+    ] else [false]
 ]
 
 http-awake: function [return: [logic!] event [event!]] [
@@ -160,8 +159,7 @@ http-awake: function [return: [logic!] event [event!]] [
             close http-port
             res
         ]
-        default [true]
-    ]
+    ] else [true]
 ]
 
 make-http-error: func [

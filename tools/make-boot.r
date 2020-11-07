@@ -445,15 +445,14 @@ hookname: enfixed func [
 ][
     if t/(column) = 0 [return "nullptr"]
 
-    unspaced [prefix propercase-of switch ensure word! t/(column) [
+    unspaced [prefix propercase-of (switch ensure word! t/(column) [
         '+ [as text! t/name]  ; type has its own unique hook
         '* [t/class]        ; type uses common hook for class
         '? ['unhooked]      ; datatype provided by extension
         '- ['fail]          ; service unavailable for type
-        default [
-            t/(column)      ; override with word in column
-        ]
-    ]]
+    ] else [
+        t/(column)      ; override with word in column
+    ])]
 ]
 
 n: 0

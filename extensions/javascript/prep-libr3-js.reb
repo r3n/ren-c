@@ -424,7 +424,7 @@ map-each-api [
         ] else [
             copy {}
         ]
-        append return-code trim/auto copy switch js-returns [
+        append return-code trim/auto copy (switch js-returns [
           "'string'" [
             ;
             ; If `char *` is returned, it was rebAlloc'd and needs to be freed
@@ -448,14 +448,12 @@ map-each-api [
                 })
             }
           ]
+        ] else [
+            ; !!! Doing return and argument transformation needs more work!
+            ; See suggestions: https://forum.rebol.info/t/817
 
-          ; !!! Doing return and argument transformation needs more work!
-          ; See suggestions: https://forum.rebol.info/t/817
-
-          default [
             {return a}
-          ]
-        ]
+        ])
 
         e-cwrap/emit cscape/with {
             reb.$<No-Reb-Name>_qlevel = function() {

@@ -254,8 +254,7 @@ start-console: function [
     skin-file: case [
         file? skin [skin]
         object? skin [blank]
-        default [%console-skin.reb]
-    ]
+    ] else [%console-skin.reb]
 
     loud-print "Starting console..."
     loud-print newline
@@ -440,9 +439,8 @@ ext-console-impl: function [
             handle! [  ; means "evaluator hook request" (handle is the hook)
                 state
             ]
-            default [
-                emit [fail [{Bad console instruction:} (<*> mold state)]]
-            ]
+        ] else [
+            emit [fail [{Bad console instruction:} (<*> mold state)]]
         ]
     ]
 
@@ -498,8 +496,8 @@ ext-console-impl: function [
             integer! [result/arg1]  ; Note: may be too big for status range
 
             error! [1]  ; currently there's no default error-to-int mapping
-
-            default [1]  ; generic error code
+        ] else [
+            1  ; generic error code
         ]
     ]
 

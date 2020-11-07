@@ -11,10 +11,8 @@ depends: compose [
         'Windows [
             [%time/time-windows.c]
         ]
-
-        default [
-            [%time/time-posix.c]
-        ]
+    ] else [
+        [%time/time-posix.c]
     ])
 ]
 

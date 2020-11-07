@@ -503,8 +503,7 @@ SQLRETURN ODBC_BindParameter(
                 v, "> 4294967295 [", rebI(SQL_C_UBIGINT), "]",
                 v, "> 2147483647 [", rebI(SQL_C_ULONG), "]",
                 v, "< -2147483648 [", rebI(SQL_C_SBIGINT), "]",
-                "default [", rebI(SQL_C_LONG), "]",
-            "]",
+            "] else [", rebI(SQL_C_LONG), "]",
         "]",
         "decimal! [", rebI(SQL_C_DOUBLE), "]",
         "time! [", rebI(SQL_C_TYPE_TIME), "]",
@@ -517,7 +516,8 @@ SQLRETURN ODBC_BindParameter(
         "]",
         "text! [", rebI(SQL_C_WCHAR), "]",
         "binary! [", rebI(SQL_C_BINARY), "]",
-        "default [ fail {Non-SQL-mappable type used in parameter binding} ]",
+
+        "fail {Non-SQL-mappable type used in parameter binding}",
     "]");
 
     SQLSMALLINT sql_type;

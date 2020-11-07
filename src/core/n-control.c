@@ -1190,24 +1190,16 @@ REBNATIVE(switch)
 //      return: "Former value or branch result, can only be null if no target"
 //          [<opt> any-value!]
 //      :target "Word or path which might be set--no target always branches"
-//          [<skip> set-word! set-path!]
+//          [set-word! set-path!]
 //      'branch "If target not set already, this is evaluated and stored there"
 //          [any-branch!]
-//      :look "Variadic lookahead used to make sure at end if no target"
-//          [<variadic>]
 //      /only "Consider target being BLANK! to be a value not to overwrite"
 //  ][
-//      if unset? 'target [  ; `case [... default [...]]`
-//          if not tail? look [
-//              fail ["DEFAULT usage with no left hand side must be at <end>"]
-//          ]
-//          return do :branch
-//      ]
 //      if set-path? target [target: compose target]
 //      let gotten
 //      either all [
 //          value? gotten: get/hard target
-//          any [only | not blank? :gotten]
+//          any [only  not blank? :gotten]  ; no comma in bootstrap
 //      ][
 //          :gotten  ; so that `x: y: default z` leads to `x = y`
 //      ][
@@ -1220,17 +1212,6 @@ REBNATIVE(default)
     INCLUDE_PARAMS_OF_DEFAULT;
 
     REBVAL *target = ARG(target);
-
-    if (IS_NULLED(target)) { // e.g. `case [... default [...]]`
-        UNUSED(ARG(look));
-        if (NOT_END(frame_->feed->value))  // !!! shortcut w/variadic for now
-            fail ("DEFAULT usage with no left hand side must be at <end>");
-
-        if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(branch)))
-            return R_THROWN;
-
-        return D_OUT; // NULL is okay in this case
-    }
 
     if (IS_SET_WORD(target))
         Move_Value(D_OUT, Lookup_Word_May_Fail(target, SPECIFIED));

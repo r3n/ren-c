@@ -71,16 +71,16 @@ description-of: function [
     return: [<opt> text!]
     v [<blank> any-value!]
 ][
-    opt switch type of get/any 'v [
-        void! [blank]
+    switch type of get/any 'v [
+        void! @[null]  ; don't voidify, want actual NULL
         any-array! [spaced ["array of length:" length of v]]
         image! [spaced ["size:" v/size]]
         datatype! [
             spec: ensure object! spec of v  ; "type specs" need simplifying
             copy spec/title
         ]
-        action! [
-            try if meta: meta-of :v [
+        action! @[  ; want null when IF doesn't match
+            if meta: meta-of :v [
                 copy get 'meta/description
             ]
         ]
@@ -88,7 +88,6 @@ description-of: function [
         object! [mold words of v]
         typeset! [mold make block! v]
         port! [mold reduce [v/spec/title v/spec/ref]]
-        default [blank]
     ]
 ]
 

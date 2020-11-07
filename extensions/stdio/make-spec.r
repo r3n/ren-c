@@ -13,9 +13,7 @@ depends: compose [
         'Windows [
             [%stdio/stdio-windows.c %stdio/readline-windows.c]
         ]
-
-        default [
-            [%stdio/stdio-posix.c %stdio/readline-posix.c]
-        ]
+    ] else [
+        [%stdio/stdio-posix.c %stdio/readline-posix.c]
     ]))
 ]

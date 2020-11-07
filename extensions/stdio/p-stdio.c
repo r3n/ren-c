@@ -144,8 +144,7 @@ REBVAL *Read_Line(STD_TERM *t)
 
                     "'clear [#c]",
 
-                    "default [#]",
-                "]",
+                "] else [#]",  // unboxes as '\0'
             rebEND);
 
             switch (c) {

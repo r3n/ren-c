@@ -12,10 +12,8 @@ depends: switch system-config/os-base [
     'Windows [
         [%process/call-windows.c]
     ]
-
-    default [
-        [%process/call-posix.c]
-    ]
+] else [
+    [%process/call-posix.c]
 ]
 
 includes: copy [

@@ -844,9 +844,8 @@ redbol-form: form: emulate [
                     redbol-form :item
                 ]
             ]
-            default [
-                form value
-            ]
+        ] else [
+            form value
         ]
     ]
 ]
@@ -858,7 +857,8 @@ print: emulate [
     ][
         write-stdout case [
             block? :value [spaced value]
-            default [form :value]
+        ] else [
+            form :value
         ]
         write-stdout newline
     ]

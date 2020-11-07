@@ -80,11 +80,9 @@ make-file-block-parts: func [
                     ][
                         fail ["Doubled slash found in MAKE FILE! at" item]
                     ]
-
-                    default [
-                        last-was-slash: blank? last item
-                        keep to text! item
-                    ]
+                ] else [
+                    last-was-slash: blank? last item
+                    keep to text! item
                 ]
             ]
 
@@ -128,7 +126,8 @@ make-file-tuple-parts: func [
         item: switch type of tuple/1 [
             group! [do tuple/1]
             block! [fail "Blocks in tuples should reduce or something"]
-            default [tuple/1]
+        ] else [
+            tuple/1
         ]
 
         text: switch type of item [

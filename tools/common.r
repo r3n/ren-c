@@ -104,28 +104,26 @@ to-c-name: function [
         "xor_eq" [copy "_xor_eq_"]
 
         "did" [copy "_did_"]  ; Ren-C addition, replaces not-not `!!`
+    ] else [
+        ;
+        ; If these symbols occur composite in a longer word, they use a
+        ; shorthand; e.g. `foo?` => `foo_q`
 
-        default [
-            ;
-            ; If these symbols occur composite in a longer word, they use a
-            ; shorthand; e.g. `foo?` => `foo_q`
+        for-each [reb c] [
+            #"'"  ""      ; isn't => isnt, don't => dont
+            -   "_"     ; foo-bar => foo_bar
+            *   "_p"    ; !!! because it symbolizes a (p)ointer in C??
+            .   "_"     ; !!! same as hyphen?
+            ?   "_q"    ; (q)uestion
+            !   "_x"    ; e(x)clamation
+            +   "_a"    ; (a)ddition
+            |   "_b"    ; (b)ar
 
-            for-each [reb c] [
-              #"'"  ""      ; isn't => isnt, don't => dont
-                -   "_"     ; foo-bar => foo_bar
-                *   "_p"    ; !!! because it symbolizes a (p)ointer in C??
-                .   "_"     ; !!! same as hyphen?
-                ?   "_q"    ; (q)uestion
-                !   "_x"    ; e(x)clamation
-                +   "_a"    ; (a)ddition
-                |   "_b"    ; (b)ar
-
-            ][
-                replace/all string (form reb) c
-            ]
-
-            string
+        ][
+            replace/all string (form reb) c
         ]
+
+        string
     ]
 
     if empty? string [

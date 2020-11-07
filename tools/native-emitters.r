@@ -50,15 +50,13 @@ emit-native-proto: function [
             end
         ]
     ] then [
-        append case [
+        append (
             ;
             ; could do tests here to create special buffer categories to
             ; put certain natives first or last, etc. (not currently needed)
             ;
-            default [
-                unsorted-buffer
-            ]
-        ] unspaced [
+            unsorted-buffer
+        ) unspaced [
             newline newline
             {; !!! DO NOT EDIT HERE! This is generated from} _
                 mold the-file _ {line} _ line newline

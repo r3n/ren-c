@@ -107,9 +107,8 @@ array: function [
         action? :initial [
             loop size [append/only block initial]  ; Called every time
         ]
-        default [
-            append/only/dup block :initial size
-        ]
+    ] else [
+        append/only/dup block :initial size
     ]
     return block
 ]
@@ -252,10 +251,8 @@ reword: function [
                 fail ["Invalid /ESCAPE delimiter block" escape]
             ]
         ]
-
-        default [
-            prefix: ensure delimiter-types escape
-        ]
+    ] else [
+        prefix: ensure delimiter-types escape
     ]
 
     ; To be used in a parse rule, words must be turned into strings, though
@@ -342,7 +339,8 @@ reword: function [
                                 :result
                             ]
                             block! [do :v]
-                            default [:v]
+                        ] else [
+                            :v
                         ]
                     )
                     a:  ; Restart mark of text to copy verbatim to output
@@ -559,8 +557,7 @@ format: function [
             integer! [abs rule]
             text! [length of rule]
             char! [1]
-            default [0]
-        ]
+        ] else [0]
     ]
 
     out: make text! val
@@ -660,16 +657,15 @@ split: function [
                 end
             ]
         ]
-        default [
-            ensure [bitset! text! char! word! tag!] dlm
-            [
-                some [
-                    copy mk1: [to dlm | to end]
-                    (keep/only mk1)
-                    opt thru dlm
-                ]
-                end
+    ] else [
+        ensure [bitset! text! char! word! tag!] dlm
+        [
+            some [
+                copy mk1: [to dlm | to end]
+                (keep/only mk1)
+                opt thru dlm
             ]
+            end
         ]
     ]]
 

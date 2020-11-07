@@ -313,9 +313,7 @@ compile: function [
             file! [  ; Just an example idea... reading disk files?
                 as text! read item
             ]
-            default [
-                fail ["COMPILABLES currently must be TEXT!/ACTION!/FILE!"]
-            ]
+            fail ["COMPILABLES currently must be TEXT!/ACTION!/FILE!"]
         ]
     ]
 
@@ -364,9 +362,7 @@ compile: function [
                     {(e.g. in %make/prep/include)}
                 ]
             ]
-            default [
-                fail ["Invalid LIBREBOL_INCLUDE_DIR:" config/librebol-path]
-            ]
+            fail ["Invalid LIBREBOL_INCLUDE_DIR:" config/librebol-path]
         ]
 
         if not exists? config/librebol-path/rebol.h [

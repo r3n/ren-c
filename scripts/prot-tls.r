@@ -1176,10 +1176,10 @@ parse-messages: function [
                                         curve-list-length: grab-int 'bin 2
                                         curve-list: grab 'bin curve-list-length
                                     ]
-                                    default [
-                                        dummy: grab 'bin extension-length
-                                    ]
+                                ] else [
+                                    dummy: grab 'bin extension-length
                                 ]
+
                             ]
                             assert [check-length = extensions-list-length]
                         ]

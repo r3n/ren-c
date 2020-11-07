@@ -129,7 +129,8 @@ cscape: function [
                     case [
                         blank? sub [blank]
                         block? sub [unspaced sub]
-                        default [form sub]
+                    ] else [
+                        form sub
                     ]
                 ]
                 #delimit [try delimit (unspaced [suffix newline]) sub]

@@ -313,9 +313,8 @@ main-startup: function [
                 assert [empty? instruction]
                 state
             ]
-            default [
-                emit [fail [{Bad console instruction:} (<*> mold state)]]
-            ]
+        ] else [
+            emit [fail [{Bad console instruction:} (<*> mold state)]]
         ]
     ]
 

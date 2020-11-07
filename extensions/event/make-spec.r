@@ -12,9 +12,7 @@ depends: compose [
         'Windows [
             [%event/event-windows.c]
         ]
-
-        default [
-            [%event/event-posix.c]
-        ]
+    ] else [
+        [%event/event-posix.c]
     ])
 ]

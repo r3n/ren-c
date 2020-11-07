@@ -37,12 +37,11 @@ dump: function [
         case [
             null? :val ["\null\"]
             object? :val [unspaced ["make object! [" (summarize-obj val) "]"]]
-            default [
-                trunc: ~void~
-                append (
-                    mold/limit/truncated :val system/options/dump-size 'trunc
-                ) if trunc ["..."]
-            ]
+        ] else [
+            trunc: ~void~
+            append (
+                mold/limit/truncated :val system/options/dump-size 'trunc
+            ) if trunc ["..."]
         ]
     ]
 
@@ -97,8 +96,8 @@ dump: function [
                 ]
             ]
         ]
-
-        default [dump-one :value]
+    ] else [
+        dump-one :value
     ]
 ]
 

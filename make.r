@@ -119,10 +119,9 @@ for-each [name value] options [
                 ]
             ]
         ]
-        default [
-            set in user-config (to-word replace/all to text! name #"_" #"-")
-                attempt [load value] else [value]
-        ]
+    ] else [
+        set in user-config (to-word replace/all to text! name #"_" #"-")
+            attempt [load value] else [value]
     ]
 ]
 
@@ -577,7 +576,7 @@ gen-obj: func [
     ;
     if block? s [
         for-each flag next s [
-            append flags opt switch flag [
+            append flags opt (switch flag [  ; weird bootstrap ELSE needs ()
                 <no-uninitialized> [
                     [
                         <gnu:-Wno-uninitialized>
@@ -633,11 +632,9 @@ gen-obj: func [
                     standard: 'c
                     _
                 ]
-
-                default [
-                    ensure [text! tag!] flag
-                ]
-            ]
+            ] else [
+                try ensure [text! tag!] flag
+            ])
         ]
         s: s/1
     ]
@@ -649,8 +646,10 @@ gen-obj: func [
         source: to-file case [
             dir [join dir s]
             main [s]
-            default [join src-dir s]
+        ] else [
+            join src-dir s
         ]
+
         output: to-obj-path to text! ;\
             either main [
                 join %main/ (last ensure path! s)
@@ -934,7 +933,8 @@ help: function [topic [text! blank!]] [
         msg: select help-topics topic [
             print msg
         ]
-        default [print help-topics/usage]
+    ] else [
+        print help-topics/usage
     ]
 ]
 
@@ -1439,10 +1439,8 @@ process-module: func [
                     ; #object-library has already been taken care of above
                     ; if s/class = #object-library [s]
                 ]
-                default [
-                    dump s
-                    fail [type of s "can't be a dependency of a module"]
-                ]
+                (elide dump s)
+                fail [type of s "can't be a dependency of a module"]
             ]
         ]
         libraries: try all [
@@ -1459,12 +1457,7 @@ process-module: func [
                     ][
                         lib
                     ]
-                    default [
-                        fail [
-                            "unrecognized module library" lib
-                            "in module" mod
-                        ]
-                    ]
+                    fail ["unrecognized library" lib "in module" mod]
                 ]
             ]
         ]
@@ -1665,10 +1658,8 @@ add-new-obj-folders: function [
             #object-library [
                 lib: lib/depends
             ]
-            default [
-                dump lib
-                fail ["unexpected class"]
-            ]
+            (elide dump lib)
+            fail ["unexpected class"]
         ]
 
         for-each obj lib [

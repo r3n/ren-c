@@ -80,10 +80,9 @@ join: function [
     case [
         find any-sequence! type [base: to block! base]
         issue! = type [base: to text! base]
-        default [
-            base: copy base
-            type: _  ; don't apply any conversion at end
-        ]
+    ] else [
+        base: copy base
+        type: _  ; don't apply any conversion at end
     ]
 
     result: switch type of :value [
@@ -94,9 +93,8 @@ join: function [
         action! [
             fail 'base "Can't JOIN an ACTION! onto a series (use APPEND)."
         ]
-        default [
-            append/only base :value
-        ]
+    ] else [
+        append/only base :value
     ]
 
     if type [
@@ -202,7 +200,8 @@ trim: function [
             rule: case [
                 null? with [charset reduce [space tab]]
                 bitset? with [with]
-                default [charset with]
+            ] else [
+                charset with
             ]
 
             if any [all_TRIM lines head_TRIM tail_TRIM] [append rule newline]
@@ -216,7 +215,8 @@ trim: function [
             rule: case [
                 not with [#{00}]
                 bitset? with [with]
-                default [charset with]
+            ] else [
+                charset with
             ]
 
             if not any [head_TRIM tail_TRIM] [

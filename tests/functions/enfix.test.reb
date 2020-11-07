@@ -244,7 +244,7 @@
             fail [
                 {enifoo should not run; when arguments are skipped this}
                 {defers the enfix until the next evaluator step.  Otherwise}
-                {`case [1 = 1 [print "good"] default [print "bad"]`}
+                {`case [1 = 1 [print "good"]] else [print "bad"]`}
                 {would print both `good` and `bad`.}
             ]
         ]
@@ -310,7 +310,7 @@
             fail {
                 When arguments are skipped, this defers the enfix until the
                 next evaluator step.  Doing otherwise would mean that
-                `case [1 = 1 [print "good"] default [print "bad"]` would
+                `case [1 = 1 [print "good"]] else [print "bad"]` would
                 print both `good` and `bad`.
             }
         ]
