@@ -94,6 +94,18 @@
     (~unmodified~ = do "quit ~unmodified~")
 ]
 
+; Erroring modes of VOID! are being fetched by WORD! and logic tests.
+; They are inert values otherwise, so PARSE should treat them such.
+;
+(did parse [~foo~ ~foo~] [some ~foo~])  ; acceptable
+(
+    foo: ~foo~
+    e: trap [
+        parse [~foo~ ~foo~] [some foo]  ; not acceptable
+    ]
+    e/id = 'need-non-void
+)
+
 (
     is-barrier?: func [x [<end> integer!]] [null? x]
     is-barrier? ()

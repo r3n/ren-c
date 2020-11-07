@@ -664,7 +664,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         if (IS_NULLED(var))
             Append_Ascii(s, "'");  // `field: '` would evaluate to null
         else {
-            if (IS_VOID(var) or not ANY_INERT(var))  // needs quoting
+            if (not ANY_INERT(var))  // needs quoting
                 Append_Ascii(s, "'");
             Mold_Value(mo, var);
         }

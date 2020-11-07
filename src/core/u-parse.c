@@ -2035,8 +2035,6 @@ REBNATIVE(subparse)
         goto pre_rule;
     }
 
-    assert(not IS_VOID(rule));
-
     if (IS_BAR(rule))
         fail ("BAR! must be source level (else PARSE can't skip it)");
 
