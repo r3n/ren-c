@@ -95,15 +95,15 @@
             group! sym-group!
         ])
     ][
-        mtype: select/skip mapping (type of value) 2
+        mtype: select/skip mapping (type of get/any 'value) 2
         if mtype [
             value: to mtype collect [
                 for index 1 (length of value) 1 [
-                    keep transform value/(index)
+                    keep transform pick value index
                 ]
             ]
         ]
-        return value
+        return get/any 'value
     ]
 
 

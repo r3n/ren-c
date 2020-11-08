@@ -94,6 +94,11 @@
     (~unmodified~ = do "quit ~unmodified~")
 ]
 
+; It's tougher to write generic routines that handle VOID! than to error on
+; them, but a good general routine should probably do it.
+;
+([~abc~ ~def~] = collect [keep ~abc~, keep ~def~])
+
 ; Erroring modes of VOID! are being fetched by WORD! and logic tests.
 ; They are inert values otherwise, so PARSE should treat them such.
 ;

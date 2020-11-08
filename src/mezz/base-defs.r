@@ -38,12 +38,12 @@ probe: func* [
     value [<opt> any-value!]
 ][
     either set? 'value [
-        write-stdout mold :value
+        write-stdout mold get/any 'value
     ][
         write-stdout "; null"  ; MOLD won't take nulls
     ]
     write-stdout newline
-    :value
+    get/any 'value
 ]
 
 
