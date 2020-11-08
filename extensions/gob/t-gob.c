@@ -835,7 +835,8 @@ REB_R PD_Gob(
 
     if (IS_INTEGER(picker))
         return rebValueQ(
-            rebU(NATIVE_VAL(pick)), SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)), picker,
+            rebU(NATIVE_VAL(pick)),
+                SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)), SPECIFIC(picker),
         rebEND);
 
     return R_UNHANDLED;

@@ -775,27 +775,33 @@ e-lib/emit {
         #include <string>
         #include <type_traits>
 
+        inline static const void *to_rebarg(nullptr_t val)
+          { return val; }
+
         inline static const void *to_rebarg(const REBVAL *val)
-            { return val; }
+          { return val; }
 
         inline static const void *to_rebarg(const REBINS *ins)
-            { return ins; }
+          { return ins; }
 
         inline static const void *to_rebarg(const char *source)
-            { return source; }  /* not TEXT!, but LOADable source code */
+          { return source; }  /* not TEXT!, but LOADable source code */
 
         inline static const void *to_rebarg(bool b)
-            { return rebL(b); }
+          { return rebL(b); }
 
         inline static const void *to_rebarg(int i)
-            { return rebI(i); }
+          { return rebI(i); }
 
         inline static const void *to_rebarg(double d)
-            { return rebR(rebDecimal(d)); }
+          { return rebR(rebDecimal(d)); }
 
         inline static const void *to_rebarg(const std::string &text)
           { return rebT(text.c_str()); }  /* std::string acts as TEXT! */
 
+        /* !!! ideally this would not be included, but rebEND has to be
+         * handled, and it needs to be a void* (any alignment).  See remarks.
+         */
         inline static const void *to_rebarg(const void *end)
           { return end; }
 

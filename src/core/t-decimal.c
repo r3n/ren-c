@@ -199,8 +199,13 @@ REB_R MAKE_Decimal(
 
         DECLARE_LOCAL (temp1);  // decompress path from cell into values
         DECLARE_LOCAL (temp2);
-        const RELVAL *numerator = VAL_SEQUENCE_AT(temp1, arg, 0);
-        const RELVAL *denominator = VAL_SEQUENCE_AT(temp2, arg, 1);
+        const RELVAL *num = VAL_SEQUENCE_AT(temp1, arg, 0);
+        const RELVAL *den = VAL_SEQUENCE_AT(temp2, arg, 1);
+
+        DECLARE_LOCAL (numerator);
+        DECLARE_LOCAL (denominator);
+        Derelativize(numerator, num, VAL_SEQUENCE_SPECIFIER(arg));
+        Derelativize(denominator, den, VAL_SEQUENCE_SPECIFIER(arg));
         PUSH_GC_GUARD(numerator);  // might be GROUP!, so (1.2)/4
         PUSH_GC_GUARD(denominator);
 
