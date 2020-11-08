@@ -812,6 +812,13 @@ REBNATIVE(applique)
             continue; // shouldn't have been in the binder
         if (Is_Param_Hidden(key))
             continue; // was part of a specialization internal to the action
+
+        // !!! This is another case where if you want to literaly apply
+        // with ~undefined~ you have to manually hide the frame key.
+        //
+        if (Is_Void_With_Sym(var, SYM_UNDEFINED))
+            Init_Nulled(var);
+
         if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED))
             continue;  // refined in argument
         Remove_Binder_Index(&binder, VAL_KEY_CANON(key));

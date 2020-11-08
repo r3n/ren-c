@@ -507,9 +507,8 @@ collect-lines: redescribe [
 ] adapt 'collect [  ; https://forum.rebol.info/t/945/1
     body: compose [
         keep: adapt* specialize* 'keep/line/only [  ; specialize removes args
-            part: 1  ; will be changed to unused
-        ][
             part: null
+        ][
             value: spaced try :value
         ]
         (as group! body)
@@ -523,11 +522,10 @@ collect-text: redescribe [
     adapt 'collect [
         body: compose [
             keep: adapt* specialize* 'keep [  ; specialize removes args
-                line: #  ; will be changed to unused
-                only: #  ; will be changed to unused
-                part: 1  ; will be changed to unused
+                line: null
+                only: null
+                part: null
             ][
-                line: part: only: null
                 value: unspaced try :value
             ]
             (as group! body)

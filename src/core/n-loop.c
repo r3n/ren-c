@@ -1679,7 +1679,7 @@ REBNATIVE(until)
             // continue to run the loop.
         }
 
-        if (not REF(predicate)) {
+        if (IS_NULLED(predicate)) {
             if (IS_TRUTHY(D_OUT))  // fail on voids (neither true nor false)
                 return D_OUT;  // body evaluated truthily, return value
         }

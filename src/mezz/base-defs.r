@@ -268,7 +268,7 @@ inherit-meta: func* [
             m2/parameter-notes: make frame! :derived
             for-each [key value] :m1/parameter-notes [
                 if in m2/parameter-notes key [
-                    m2/parameter-notes/(key): :value
+                    m2/parameter-notes/(key): get* 'value  ; !!! VOID!s
                 ]
             ]
         ]
@@ -276,7 +276,7 @@ inherit-meta: func* [
             m2/parameter-types: make frame! :derived
             for-each [key value] :m1/parameter-types [
                 if in m2/parameter-types key [
-                    m2/parameter-types/(key): :value
+                    m2/parameter-types/(key): get* 'value  ; !!! VOID!s
                 ]
             ]
         ]

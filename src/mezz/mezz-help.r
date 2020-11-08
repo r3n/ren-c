@@ -84,7 +84,12 @@ description-of: function [
                 copy get 'meta/description
             ]
         ]
-        gob! [spaced ["offset:" v/offset "size:" v/size]]
+        gob! [
+            print ["GOB! is" mold get/any 'v]
+            print ["TYPE is" mold type of get/any 'v]
+            print ["GOB! itself is" mold gob!]
+            spaced ["offset:" v/offset "size:" v/size]
+        ]
         object! [mold words of v]
         typeset! [mold make block! v]
         port! [mold reduce [v/spec/title v/spec/ref]]

@@ -185,14 +185,14 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         SER(varlist)->info.bits = SER(old_varlist)->info.bits;
         INIT_VAL_CONTEXT_VARLIST(ARR_HEAD(varlist), varlist);
 
-        // We fill in the added parameters in the specialization as null for
-        // starters.  They are unspecialized.
+        // We fill in the added parameters in the specialization as undefined
+        // starters.  This is considered to be "unspecialized".
         //
         blockscope {
             RELVAL *temp = ARR_AT(varlist, old_len);
             REBLEN i;
             for (i = 0; i < delta; ++i) {
-                Init_Nulled(temp);
+                Init_Void(temp, SYM_UNDEFINED);
                 temp = temp + 1;
             }
             TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));

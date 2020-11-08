@@ -49,10 +49,10 @@
 (~void~ = applique 'foo [])
 (~void~ = do :foo)
 
-; ~local~ is the type of locals before they are assigned
+; ~undefined~ is the type of locals before they are assigned
 (
     f: func [<local> loc] [get/any 'loc]
-    f = ~local~
+    f = ~undefined~
 )
 
 ; ~undefined~ is the type of things that just were never declared

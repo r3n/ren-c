@@ -48,7 +48,7 @@
 // that order must be stored *somewhere*.
 //
 // It's solved with a simple mechanical trick--that may look counterintuitive
-// at first.  Since unspecialized slots would usually only contain NULL,
+// at first.  Since unspecialized slots would usually be `~undefined~`,
 // we sneak information into them without the ARG_MARKED_CHECKED bit.  This
 // disrupts the default ordering by pushing refinements that have higher
 // priority than fulfilling the unspecialized slot they are in.
@@ -64,8 +64,8 @@
 // * /B's slot would contain an instruction for /B.  This will push /B to now
 //   be first in line in fulfillment.
 //
-// * /C's slot would hold a null, having the typical appearance of not
-//   being specialized.
+// * /C's slot would hold the labeled VOID! `~undefined~`, having the typical
+//   appearance of not being specialized.
 //
 
 #include "sys-core.h"
@@ -103,11 +103,15 @@ REB_R Specializer_Dispatcher(REBFRM *f)
 //
 //  Make_Context_For_Action_Push_Partials: C
 //
-// This creates a FRAME! context with NULLED cells in the unspecialized slots
-// that are available to be filled.  For partial refinement specializations
-// in the action, it will push the refinement to the stack.  In this way it
-// retains the ordering information implicit in the partial refinements of an
-// action's existing specialization.
+// This creates a FRAME! context with `~undefined~` cells in unspecialized
+// slots.  The reason this is chosen instead of NULL is that specialization
+// with NULL is frequent, and this takes only *one* void state away.  Tricks
+// must be used to work past (e.g. to SPECIALIZE with `~replace-me~` but then
+// ADAPT and overwrite with ~undefined~).
+//
+// For partial refinement specializations in the action, this will push the
+// refinement to the stack.  In this way it retains the ordering information
+// implicit in the partial refinements of an action's existing specialization.
 //
 // It is able to take in more specialized refinements on the stack.  These
 // will be ordered *after* partial specializations in the function already.
@@ -156,7 +160,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         Prep_Cell(arg);
 
         if (VAL_PARAM_CLASS(param) == REB_P_LOCAL) {
-            Init_Void(arg, SYM_LOCAL);
+            Init_Void(arg, SYM_UNDEFINED);
             SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
             continue;
         }
@@ -180,7 +184,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
           continue_unspecialized:
 
-            Init_Nulled(arg);
+            Init_Void(arg, SYM_UNDEFINED);
             if (opt_binder) {
                 if (not Is_Param_Unbindable(param))
                     Add_Binder_Index(opt_binder, canon, index);
@@ -194,7 +198,10 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
         assert(
             (special == param and IS_PARAM(special))
-            or (IS_SYM_WORD(special) or IS_NULLED(special))
+            or (
+                IS_SYM_WORD(special)
+                or Is_Void_With_Sym(special, SYM_UNDEFINED)
+            )
         );
 
         if (IS_SYM_WORD(special)) {
@@ -378,18 +385,7 @@ bool Specialize_Action_Throws(
 
     for (; NOT_END(param); ++param, ++arg) {
         if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
-            if (IS_BLANK(arg)) {
-                //
-                // !!! Temporary compatibility solution... blank refinements
-                // are considered to be unusable ones that have been
-                // specialized out.
-                //
-                Init_Nulled(arg);
-                SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
-                goto specialized_arg_no_typecheck;
-            }
-
-            if (IS_NULLED(arg)) {
+            if (Is_Void_With_Sym(arg, SYM_UNDEFINED)) {
                 //
                 // A refinement that is nulled is a candidate for usage at the
                 // callsite.  Hence it must be pre-empted by our ordered
@@ -407,7 +403,8 @@ bool Specialize_Action_Throws(
 
                     REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
                     if (
-                        IS_NULLED(slot) or GET_CELL_FLAG(slot, PUSH_PARTIAL)
+                        Is_Void_With_Sym(slot, SYM_UNDEFINED)
+                        or GET_CELL_FLAG(slot, PUSH_PARTIAL)
                     ){
                         // It's still partial, so set up the pre-empt.
                         //
@@ -446,14 +443,14 @@ bool Specialize_Action_Throws(
 
         // It's an argument, either a normal one or a refinement arg.
 
-        if (not IS_NULLED(arg))
+        if (not Is_Void_With_Sym(arg, SYM_UNDEFINED))
             goto specialized_arg_with_check;
 
       unspecialized_arg:
 
         assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
         assert(
-            IS_NULLED(arg)
+            Is_Void_With_Sym(arg, SYM_UNDEFINED)
             or (IS_SYM_WORD(arg) and TYPE_CHECK(param, REB_TS_REFINEMENT))
         );
         Move_Value(DS_PUSH(), param);
@@ -1024,17 +1021,29 @@ REBACT *Alloc_Action_From_Exemplar(
     RELVAL *alias = archetype + 1;
     for (; NOT_END(param); ++param, ++arg, ++alias) {
         Move_Value(alias, param);
-        if (not IS_NULLED(arg)) {
-            //
-            // Don't show argument in the parameter list.
-            //
-            TYPE_SET(alias, REB_TS_HIDDEN);
-            TYPE_SET(alias, REB_TS_UNBINDABLE);
 
-            // Indicate that argument is specialized out.
-            //
-            SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+        if (TYPE_CHECK(param, REB_TS_HIDDEN))
+            continue;  // leave it as-is, even if ~undefined~
+
+        // !!! This mutation is slightly uncomfortable, as it transforms a
+        // literal value in the frame to a different value.  However, on
+        // balance it seems that giving up one VOID! state to do this is about
+        // the best tradeoff that can be made.  If you really want the
+        // action to go with ~undefined~, you need to hide the argument
+        // before calling MAKE ACTION!
+        //
+        if (Is_Void_With_Sym(arg, SYM_UNDEFINED)) {
+            continue;
         }
+
+        // Don't show argument in the parameter list.
+        //
+        TYPE_SET(alias, REB_TS_HIDDEN);
+        TYPE_SET(alias, REB_TS_UNBINDABLE);
+
+        // Indicate that argument is specialized out.
+        //
+        SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
     }
 
     TERM_ARRAY_LEN(paramlist, num_slots);

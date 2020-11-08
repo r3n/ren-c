@@ -74,6 +74,19 @@ inline static const REBSTR *VAL_VOID_OPT_LABEL(REBCEL(const*) v) {
     return cast(const REBSTR*, VAL_NODE(v));
 }
 
+// Don't let SYM_0 be used for unlabeled void, in case checking for a match
+// with a symbol extracted from a WORD! which has no symbol shorthand.
+//
+inline static bool Is_Void_With_Sym(const RELVAL *v, REBSYM sym) {
+    assert(sym != SYM_0);
+    if (not IS_VOID(v))
+        return false;
+    const REBSTR *label = VAL_VOID_OPT_LABEL(v);
+    if (not label)
+        return false;  // unlabeled
+    return cast(REBLEN, sym) == cast(REBLEN, STR_SYMBOL(label));
+}
+
 
 // Many loop constructs use BLANK! as a unique signal that the loop body
 // never ran, e.g. `for-each x [] [<unreturned>]` or `loop 0 [<unreturned>]`.

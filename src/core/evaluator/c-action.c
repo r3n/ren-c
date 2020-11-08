@@ -20,7 +20,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// This file contains Process_Actio_Throws(), which does the work of calling
+// This file contains Process_Action_Throws(), which does the work of calling
 // functions in the evaluator.
 //
 //=//// NOTES /////////////////////////////////////////////////////////////=//
@@ -298,6 +298,27 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
       fulfill_loop_body:
 
+  //=//// NEVER-FULFILLED ARGUMENTS ///////////////////////////////////////=//
+
+        // Parameters that are hidden from the public interface will never
+        // come from argument fulfillment.  If there is an exemplar, they are
+        // set from that, otherwise they are undefined.
+        //
+        // !!! REB_TS_HIDDEN means that the parameter convention bits (for
+        // quoted/etc.) are not needed.  They could thus be used for other
+        // information...like whether a parameter is sealed for lower phases
+        // only or is part of the still-visible interface when that particular 
+        // phase is running.
+        //
+        if (TYPE_CHECK(f->param, REB_TS_HIDDEN)) {
+            Prep_Cell(f->arg);
+            if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED)  // no exemplar
+                Init_Void(f->arg, SYM_UNDEFINED);
+            else
+                Move_Value(f->arg, f->special);
+            goto continue_fulfilling;
+        }
+
   //=//// A /REFINEMENT ARG ///////////////////////////////////////////////=//
 
         // Refinements can be tricky because the "visitation order" of the
@@ -348,7 +369,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 INIT_WORD_INDEX(DS_TOP, partial_index);
             }
             else
-                assert(IS_NULLED(f->special));
+                assert(Is_Void_With_Sym(f->special, SYM_UNDEFINED));
 
   //=//// UNSPECIALIZED REFINEMENT SLOT ///////////////////////////////////=//
 
@@ -421,7 +442,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 assert(IS_NULLED(f->special) or IS_VOID(f->special));
 
             Prep_Cell(f->arg);  // Note: may be typechecking
-            Init_Void(f->arg, SYM_LOCAL);
+            Init_Void(f->arg, SYM_UNDEFINED);
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             goto continue_fulfilling;
 
