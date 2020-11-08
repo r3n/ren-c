@@ -315,9 +315,12 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(27)
 
 
-//=//// EVAL_FLAG_28 //////////////////////////////////////////////////////=//
+//=//// EVAL_FLAG_TYPECHECK_ONLY //////////////////////////////////////////=//
 //
-#define EVAL_FLAG_28 \
+// This is used by <blank> to indicate that once the frame is fulfilled, the
+// only thing that should be done is typechecking...don't run the action.
+//
+#define EVAL_FLAG_TYPECHECK_ONLY \
     FLAG_LEFT_BIT(28)
 
 

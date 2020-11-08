@@ -45,7 +45,8 @@
 //
 // Also, a call to `fooBC/A 1 2 3` does not want /A = 1, because it should act
 // like `foo/B/C/A 1 2 3`.  Since the ordering matters, information encoding
-// that order must be stored *somewhere*.
+// that order must be stored *somewhere*.  This will cost more than something
+// like a simple bit on a parameter.
 //
 // It's solved with a simple mechanical trick--that may look counterintuitive
 // at first.  Since unspecialized slots would usually be `~undefined~`,
@@ -733,15 +734,15 @@ void For_Each_Unspecialized_Param(
 }
 
 
-struct First_Param_State {
+struct Find_Param_State {
     REBACT *act;
-    REBVAL *first_unspecialized;
+    REBVAL *param;
 };
 
 static bool First_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
 {
-    struct First_Param_State *s = cast(struct First_Param_State*, opaque);
-    assert(not s->first_unspecialized);  // should stop enumerating if found
+    struct Find_Param_State *s = cast(struct Find_Param_State*, opaque);
+    assert(not s->param);  // should stop enumerating if found
 
     if (not (flags & PHF_SORTED_PASS))
         return true;  // can't learn anything until second pass
@@ -749,8 +750,22 @@ static bool First_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
     if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
         return false;  // we know WORD!-based invocations will be 0 arity
 
-    s->first_unspecialized = param;
-    return false;  // found first_unspecialized, no need to look more
+    s->param = param;
+    return false;  // found first unspecialized, no need to look more
+}
+
+static bool Last_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
+{
+    struct Find_Param_State *s = cast(struct Find_Param_State*, opaque);
+
+    if (not (flags & PHF_SORTED_PASS))
+        return true;  // can't learn anything until second pass
+
+    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
+        return false;  // we know WORD!-based invocations will be 0 arity
+
+    s->param = param;
+    return true;  // keep looking and be left with the last
 }
 
 //
@@ -765,15 +780,31 @@ static bool First_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
 //
 REBVAL *First_Unspecialized_Param(REBACT *act)
 {
-    struct First_Param_State s;
+    struct Find_Param_State s;
     s.act = act;
-    s.first_unspecialized = nullptr;
+    s.param = nullptr;
 
     For_Each_Unspecialized_Param(act, &First_Param_Hook, &s);
 
-    return s.first_unspecialized;  // may be nullptr
+    return s.param;  // may be nullptr
 }
 
+
+//
+//  Last_Unspecialized_Param: C
+//
+// See notes on First_Unspecialized_Param() regarding complexity
+//
+REBVAL *Last_Unspecialized_Param(REBACT *act)
+{
+    struct Find_Param_State s;
+    s.act = act;
+    s.param = nullptr;
+
+    For_Each_Unspecialized_Param(act, &Last_Param_Hook, &s);
+
+    return s.param;  // may be nullptr
+}
 
 //
 //  First_Unspecialized_Arg: C
@@ -849,8 +880,6 @@ bool Make_Invocation_Frame_Throws(
 
     if (threw)
         return true;
-
-    assert(IS_NULLED(f->out)); // guaranteed by dummy, for the skipped action
 
     // === END SECOND PART OF CODE FROM DO_SUBFRAME ===
 

@@ -324,6 +324,11 @@ augment: enclose 'augment* func* [f] [
     inherit-meta/augment do f get 'augmentee spec  ; no :augmentee name cache
 ]
 
+reframer: enclose 'reframer* func* [f] [
+    let shim: f/shim: compose :f/shim
+    inherit-meta do f get 'shim
+]
+
 ; The lower-level pointfree function separates out the action it takes, but
 ; the higher level one uses a block.  Specialize out the action, and then
 ; overwrite it in the enclosure with an action taken out of the block.
@@ -342,6 +347,24 @@ pointfree: enclose (specialize* 'pointfree* [
     f/block: skip f/block 1  ; Note: NEXT not defined yet
 
     inherit-meta do f get 'action  ; no :action name cache
+]
+
+
+; REQUOTE is helpful when functions do not accept QUOTED! values.
+;
+requote: reframer func* [
+    {Remove Quoting Levels From First Argument and Re-Apply to Result}
+    f [frame!]
+    <local> p num-quotes result
+][
+    p: first words of f
+    num-quotes: quotes of f/(p)
+
+    f/(p): dequote f/(p)
+    
+    if null? result: do f [return null]
+
+    return quote/depth get/any 'result num-quotes
 ]
 
 

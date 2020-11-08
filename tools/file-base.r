@@ -34,6 +34,7 @@ core: [
     functionals/n-function.c
     functionals/c-hijack.c
     functionals/c-oneshot.c
+    functionals/c-reframer.c
     functionals/c-reskin.c
     functionals/c-specialize.c
     functionals/c-typechecker.c

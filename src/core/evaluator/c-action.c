@@ -113,7 +113,7 @@ inline static void Finalize_Arg(REBFRM *f) {
         and TYPE_CHECK(f->param, REB_TS_NOOP_IF_BLANK)  // e.g. <blank> param
     ){
         SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-        SET_EVAL_FLAG(f, FULFILL_ONLY);
+        SET_EVAL_FLAG(f, TYPECHECK_ONLY);
         return;
     }
 
@@ -926,6 +926,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             fail (Error_Literal_Left_Path_Raw());
     }
 
+    if (GET_EVAL_FLAG(f, FULFILL_ONLY)) {  // only fulfillment, no typecheck
+        assert(GET_CELL_FLAG(f->out, OUT_MARKED_STALE));  // didn't touch out
+        goto skip_output_check;
+    }
+
   //=//// ACTION! ARGUMENTS NOW GATHERED, DO TYPECHECK PASS ///////////////=//
 
     // It might seem convenient to type check arguments while they are being
@@ -1043,8 +1048,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         or IS_VALUE_IN_ARRAY_DEBUG(f->feed->array, f_next)
     );
 
-    if (GET_EVAL_FLAG(f, FULFILL_ONLY)) {
-        Init_Nulled(f->out);
+    if (GET_EVAL_FLAG(f, TYPECHECK_ONLY)) {  // <blank> uses this
+        Init_Nulled(f->out);  // by convention: BLANK! in, NULL out
         goto skip_output_check;
     }
 
