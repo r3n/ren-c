@@ -87,59 +87,6 @@
     (f->special != f->param and f->special != f->arg)
 
 
-// It's called "Finalize" because in addition to checking, any other handling
-// that an argument needs once being put into a frame is handled.  VARARGS!,
-// for instance, that may come from an APPLY need to have their linkage
-// updated to the parameter they are now being used in.
-//
-inline static void Finalize_Arg(REBFRM *f) {
-    assert(not Is_Param_Variadic(f->param));  // Use Finalize_Variadic_Arg()
-
-    if (IS_ENDISH_NULLED(f->arg)) {
-        //
-        // Note: `1 + comment "foo"` => `1 +`, arg is END
-        //
-        if (not Is_Param_Endable(f->param))
-            fail (Error_No_Arg(f, f->param));
-
-        SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-        return;
-    }
-
-    REBYTE kind_byte = KIND3Q_BYTE(f->arg);
-
-    if (
-        kind_byte == REB_BLANK
-        and TYPE_CHECK(f->param, REB_TS_NOOP_IF_BLANK)  // e.g. <blank> param
-    ){
-        SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-        SET_EVAL_FLAG(f, TYPECHECK_ONLY);
-        return;
-    }
-
-    // Apply constness if requested.
-    //
-    // !!! Should explicit mutability override, so people can say things like
-    // `foo: func [...] mutable [...]` ?  This seems bad, because the contract
-    // of the function hasn't been "tweaked", e.g. with reskinning.
-    //
-    if (TYPE_CHECK(f->param, REB_TS_CONST))
-        SET_CELL_FLAG(f->arg, CONST);
-
-    // !!! Review when # is used here
-    if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
-        Typecheck_Refinement(f->param, f->arg);
-        return;
-    }
-
-    if (not Typecheck_Including_Constraints(f->param, f->arg)) {
-        fail (Error_Arg_Type(f, f->param, VAL_TYPE(f->arg)));
-    }
-
-    SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-}
-
-
 #ifdef DEBUG_EXPIRED_LOOKBACK
     #define CURRENT_CHANGES_IF_FETCH_NEXT \
         (f->feed->stress != nullptr)
@@ -996,29 +943,67 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
             if (NOT_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
                 Typecheck_Refinement(f->param, f->arg);
+            continue;
         }
-        else {
-            // !!! In GCC 9.3.0-10 at -O2 optimization level in the C++ build
-            // this Finalize_Arg() call seems to trigger:
+
+        // !!! In GCC 9.3.0-10 at -O2 optimization level in the C++ build
+        // this seemed to trigger:
+        //
+        //   error: array subscript 2 is outside array bounds
+        //      of 'const char [9]'
+        //
+        // It points to the problem being at VAL_STRING_AT()'s line:
+        //
+        //     const REBSTR *s = VAL_STRING(v);
+        //
+        // Attempts to further isolate it down were made by deleting and
+        // inlining bits of code until one low-level line would trigger it.
+        // This led to seemingly unrelated declaration of an unused byte
+        // variable being able to cause it or not.  It may be a compiler
+        // optimization bug...in any cae, that warning is disabled for
+        // now on this file.  Review.
+
+        if (IS_ENDISH_NULLED(f->arg)) {
             //
-            //   error: array subscript 2 is outside array bounds
-            //      of 'const char [9]'
+            // Note: `1 + comment "foo"` => `1 +`, arg is END
             //
-            // It points to the problem being at VAL_STRING_AT()'s line:
-            //
-            //     const REBSTR *s = VAL_STRING(v);
-            //
-            // There was no indication that this Finalize_Arg() was involved,
-            // but commenting it out makes the complaint go away.  Attempts
-            // to further isolate it down were made by deleting and inlining
-            // bits of code until one low-level line would trigger it.  This
-            // led to seemingly unrelated declaration of an unused byte
-            // variable being able to cause it or not.  It may be a compiler
-            // optimization bug...in any cae, that warning is disabled for
-            // now on this file.  Review.
-            //
-            Finalize_Arg(f);
+            if (not Is_Param_Endable(f->param))
+                fail (Error_No_Arg(f, f->param));
+
+            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+            continue;
         }
+
+        REBYTE kind_byte = KIND3Q_BYTE(f->arg);
+
+        if (
+            kind_byte == REB_BLANK  // v-- e.g. <blank> param
+            and TYPE_CHECK(f->param, REB_TS_NOOP_IF_BLANK)
+        ){
+            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+            SET_EVAL_FLAG(f, TYPECHECK_ONLY);
+            continue;
+        }
+
+        // Apply constness if requested.
+        //
+        // !!! Should explicit mutability override, so people can say things
+        // like `foo: func [...] mutable [...]` ?  This seems bad, because the
+        // contract of the function hasn't been "tweaked" with reskinning.
+        //
+        if (TYPE_CHECK(f->param, REB_TS_CONST))
+            SET_CELL_FLAG(f->arg, CONST);
+
+        // !!! Review when # is used here
+        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
+            Typecheck_Refinement(f->param, f->arg);
+            continue;
+        }
+
+        if (not Typecheck_Including_Constraints(f->param, f->arg))
+            fail (Error_Arg_Type(f, f->param, VAL_TYPE(f->arg)));
+
+        SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
     }
 
 
