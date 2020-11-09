@@ -26,9 +26,11 @@
 // as it will always be appending 10.
 //
 // The method used is to store a FRAME! in the specialization's ACT_DETAILS().
-// Any of those items that have ARG_MARKED_CHECKED are copied from that
-// frame instead of gathered from the callsite.  Action_Executor() heeds this
-// when walking parameters (see `f->special`).
+// Parameters in that frame that are REB_TS_HIDDEN are considered to be
+// specialized out, and frame holds its specialized value.  For unspecialized
+// parameters, the value slots in the frame are available to serve as
+// instructions on how those parameters should be fulfilled.  %c-action.c
+// heeds this when walking parameters (see `f->special`).
 //
 // Code is shared between the SPECIALIZE native and specialization of a
 // GET-PATH! via refinements, such as `adp: :append/dup/part`.  However,
@@ -45,14 +47,14 @@
 //
 // Also, a call to `fooBC/A 1 2 3` does not want /A = 1, because it should act
 // like `foo/B/C/A 1 2 3`.  Since the ordering matters, information encoding
-// that order must be stored *somewhere*.  This will cost more than something
-// like a simple bit on a parameter.
+// that order must be stored *somewhere*.  This has a greater cost than a
+// single bit on a parameter can encode.
 //
 // It's solved with a simple mechanical trick--that may look counterintuitive
 // at first.  Since unspecialized slots would usually be `~undefined~`,
-// we sneak information into them without the ARG_MARKED_CHECKED bit.  This
-// disrupts the default ordering by pushing refinements that have higher
-// priority than fulfilling the unspecialized slot they are in.
+// we sneak information into them.  This disrupts the default ordering by
+// pushing refinements that have higher priority than fulfilling the
+// unspecialized slot they are in.
 //
 // So when looking at `fooBC: :foo/B/C`
 //
@@ -160,22 +162,17 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     for (; NOT_END(param); ++param, ++arg, ++special, ++index) {
         Prep_Cell(arg);
 
-        if (VAL_PARAM_CLASS(param) == REB_P_LOCAL) {
-            Init_Void(arg, SYM_UNDEFINED);
-            SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
-            continue;
-        }
-
-        if (Is_Param_Hidden(param)) {  // specialized out
-            assert(GET_CELL_FLAG(special, ARG_MARKED_CHECKED));
-            Move_Value(arg, special); // doesn't copy ARG_MARKED_CHECKED
-            SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+        if (Is_Param_Hidden(param)) {  // local or specialized
+            if (param == special) {  // no prior exemplar
+                Init_Void(arg, SYM_UNDEFINED);
+                SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+            }
+            else
+                Blit_Specific(arg, special);  // preserve ARG_MARKED_CHECKED
 
           continue_specialized:
 
-            // Note: used to `assert(not IS_NULLED(arg));`
-            assert(GET_CELL_FLAG(arg, ARG_MARKED_CHECKED));
-            continue;  // Eval_Core() double-checks type in debug build
+            continue;
         }
 
         assert(NOT_CELL_FLAG(special, ARG_MARKED_CHECKED));
@@ -185,7 +182,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
           continue_unspecialized:
 
-            Init_Void(arg, SYM_UNDEFINED);
+            Init_Void(arg, SYM_UNDEFINED);  // *not* ARG_MARKED_CHECKED
             if (opt_binder) {
                 if (not Is_Param_Unbindable(param))
                     Add_Binder_Index(opt_binder, canon, index);
@@ -310,6 +307,8 @@ bool Specialize_Action_Throws(
     // will be on the stack (including any we are adding "virtually", from
     // the current DSP down to the lowest_ordered_dsp).
     //
+    // All unspecialized slots (including partials) will be ~undefined~
+    //
     REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
         specializee,
         lowest_ordered_dsp,
@@ -385,6 +384,18 @@ bool Specialize_Action_Throws(
     REBDSP ordered_dsp = lowest_ordered_dsp;
 
     for (; NOT_END(param); ++param, ++arg) {
+        if (Is_Param_Hidden(param)) {
+            //
+            // !!! Currently we assume that a parameter that is hidden at
+            // the start is hidden at the end.  However, if someone wanted
+            // to actually specialize an ~undefined~ then allowing them to
+            // hide the key would be a way to do that.  It would require being
+            // tolerant of this in the binding diff.
+            //
+            Move_Value(DS_PUSH(), param);
+            continue;
+        }
+
         if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
             if (Is_Void_With_Sym(arg, SYM_UNDEFINED)) {
                 //
@@ -431,15 +442,6 @@ bool Specialize_Action_Throws(
                 Typecheck_Refinement(param, arg);
 
             goto specialized_arg_no_typecheck;
-        }
-
-        switch (VAL_PARAM_CLASS(param)) {
-          case REB_P_LOCAL:
-            assert(IS_VOID(arg));  // no bindings, you can't set these
-            goto specialized_arg_no_typecheck;
-
-          default:
-            break;
         }
 
         // It's an argument, either a normal one or a refinement arg.

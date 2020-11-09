@@ -222,6 +222,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// CONTINUES (AT TOP SO GOTOS DO NOT CROSS INITIALIZATIONS /////////=//
 
+        Prep_Cell(f->arg);
         goto fulfill_loop_body;  // optimized out
 
       continue_fulfilling:
@@ -237,7 +238,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
       skip_fulfilling_arg_for_now:  // the GC marks args up through f->arg...
 
-        Prep_Cell(f->arg);
         Init_Unreadable_Void(f->arg);  // ...so cell must have valid bits
         continue;
 
@@ -258,11 +258,22 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // phase is running.
         //
         if (TYPE_CHECK(f->param, REB_TS_HIDDEN)) {
-            Prep_Cell(f->arg);
-            if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED)  // no exemplar
+            if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED) {  // no exemplar
+                assert(VAL_PARAM_CLASS(f->param) == REB_P_LOCAL);
                 Init_Void(f->arg, SYM_UNDEFINED);
-            else
+                SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+            }
+            else {
+                // !!! Previously we assumed type checking was done at the
+                // time of specialization.  This is in preparation for when
+                // type checking might be an expensive proposition.  We might
+                // check here without erroring, patching back the bit onto
+                // `f->special`...which could contain type checking to this
+                // file and not burden SPECIALIZE/etc.  But we wouldn't want
+                // to raise an error unless the type check loop runs.
+                //
                 Move_Value(f->arg, f->special);
+            }
             goto continue_fulfilling;
         }
 
@@ -292,15 +303,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
             if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED)  // args from callsite
                 goto unspecialized_refinement;  // most common case (?)
-
-            // A specialization....
-
-            if (GET_CELL_FLAG(f->special, ARG_MARKED_CHECKED)) {
-                Prep_Cell(f->arg);
-                Move_Value(f->arg, f->special);
-                SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-                goto continue_fulfilling;  // !!! Double-check?
-            }
 
             // A non-checked SYM-WORD! with binding indicates a partial
             // refinement with parameter index that needs to be pushed
@@ -354,87 +356,23 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
           unused_refinement:  // Note: might get pushed by a later slot
 
-            Prep_Cell(f->arg);
-            Init_Nulled(f->arg);
+            Init_Nulled(f->arg);  // null means refinement not used
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             goto continue_fulfilling;
 
-            used_refinement:  // can hit this on redo, copy its argument
+          used_refinement:  // can hit this on redo, copy its argument
 
-            Prep_Cell(f->arg);
-            Init_Blackhole(f->arg);  // # means refinement used, null not used
+            Init_Blackhole(f->arg);  // # means refinement used
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             goto continue_fulfilling;
         }
 
-  //=//// "PURE" LOCAL: ARG ///////////////////////////////////////////////=//
-
-        // This takes care of locals, including "magic" RETURN cells that
-        // need to be pre-filled.  !!! Note nuances with compositions:
-        //
-        // https://github.com/metaeducation/ren-c/issues/823
+  //=//// ARGUMENT FULFILLMENT ////////////////////////////////////////////=//
 
       fulfill_arg: ;  // semicolon needed--next statement is declaration
 
         Reb_Param_Class pclass = VAL_PARAM_CLASS(f->param);
-
-        switch (pclass) {
-          case REB_P_LOCAL:
-            //
-            // When REDOing a function frame, it is sent back up to do
-            // SPECIAL_IS_ARG_SO_TYPECHECKING, and the check takes care
-            // of clearing the locals, they may not be null...
-            //
-            if (SPECIAL_IS_ARBITRARY_SO_SPECIALIZED)
-                assert(IS_NULLED(f->special) or IS_VOID(f->special));
-
-            Prep_Cell(f->arg);  // Note: may be typechecking
-            Init_Void(f->arg, SYM_UNDEFINED);
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-            goto continue_fulfilling;
-
-          default:
-            break;
-        }
-
-        if (GET_CELL_FLAG(f->special, ARG_MARKED_CHECKED)) {
-
-  //=//// SPECIALIZED OR OTHERWISE TYPECHECKED ARG ////////////////////////=//
-
-            assert(SPECIAL_IS_ARBITRARY_SO_SPECIALIZED);
-
-            // Specializing with VARARGS! is generally not a good
-            // idea unless that is an empty varargs...because each
-            // call will consume from it.  Specializations you use
-            // only once might make sense (?)
-            //
-            assert(
-                not Is_Param_Variadic(f->param)
-                or IS_VARARGS(f->special)
-            );
-
-            Prep_Cell(f->arg);
-            Move_Value(f->arg, f->special);  // won't copy checked bit
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-
-            // The flag's whole purpose is that it's not set if the type
-            // is invalid (excluding the narrow purpose of slipping types
-            // used for partial specialization into refinement slots).
-            // But this isn't a refinement slot.  Double check it's true.
-            //
-            // Note SPECIALIZE checks types at specialization time, to
-            // save us the time of doing it on each call.  Also note that
-            // NULL is not technically in the valid argument types for
-            // refinement arguments, but is legal in fulfilled frames.
-            //
-            assert(Typecheck_Including_Constraints(f->param, f->arg));
-
-            goto continue_fulfilling;
-        }
-
-  //=//// NOT JUST TYPECHECKING, SO PREPARE ARGUMENT CELL /////////////////=//
-
-        Prep_Cell(f->arg);
+        assert(pclass != REB_P_LOCAL);  // should have been handled by hidden
 
   //=//// HANDLE IF NEXT ARG IS IN OUT SLOT (e.g. ENFIX, CHAIN) ///////////=//
 
