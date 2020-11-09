@@ -1157,9 +1157,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // specializations and leave everything else alone.
                 //
                 REBCTX *exemplar;
+                REBACT *redo_phase = VAL_PHASE_ELSE_ARCHETYPE(f->out);
                 if (
-                    FRM_PHASE(f) != VAL_PHASE(f->out)
-                    and did (exemplar = ACT_EXEMPLAR(VAL_PHASE(f->out)))
+                    FRM_PHASE(f) != redo_phase
+                    and did (exemplar = ACT_EXEMPLAR(redo_phase))
                 ){
                     f->special = CTX_VARS_HEAD(exemplar);
                     f->arg = FRM_ARGS_HEAD(f);
@@ -1170,7 +1171,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     }
                 }
 
-                INIT_FRM_PHASE(f, VAL_PHASE(f->out));
+                INIT_FRM_PHASE(f, redo_phase);
                 FRM_BINDING(f) = VAL_BINDING(f->out);
                 CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
                 goto typecheck_then_dispatch;

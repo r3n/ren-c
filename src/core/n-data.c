@@ -418,12 +418,10 @@ bool Did_Get_Binding_Of(REBVAL *out, const REBVAL *v)
             assert(VAL_BINDING(out) == UNBOUND); // canons have no binding
         }
 
+        REBACT *phase = VAL_OPT_PHASE(out);
         assert(
-            VAL_PHASE(out) == nullptr
-            or GET_ARRAY_FLAG(
-                ACT_PARAMLIST(VAL_PHASE(out)),
-                IS_PARAMLIST
-            )
+            phase == nullptr
+            or GET_ARRAY_FLAG(ACT_PARAMLIST(phase), IS_PARAMLIST)
         );
     }
 

@@ -419,7 +419,7 @@ REBNATIVE(do)
 
       case REB_FRAME: {
         REBCTX *c = VAL_CONTEXT(source); // checks for INACCESSIBLE
-        REBACT *phase = VAL_PHASE(source);
+        REBACT *phase = VAL_PHASE_ELSE_ARCHETYPE(source);
 
         if (CTX_FRAME_IF_ON_STACK(c)) // see REDO for tail-call recursion
             fail ("Use REDO to restart a running FRAME! (not DO)");

@@ -94,7 +94,7 @@ REB_R Specializer_Dispatcher(REBFRM *f)
     REBVAL *exemplar = SPECIFIC(ARR_AT(details, IDX_SPECIALIZER_FRAME));
     assert(IS_FRAME(exemplar));
 
-    INIT_FRM_PHASE(f, VAL_PHASE(exemplar));
+    INIT_FRM_PHASE(f, VAL_PHASE_ELSE_ARCHETYPE(exemplar));
     FRM_BINDING(f) = VAL_BINDING(exemplar);
 
     return R_REDO_UNCHECKED; // redo uses the updated phase and binding

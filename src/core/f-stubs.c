@@ -296,7 +296,7 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     //
     if (CTX_TYPE(c) == REB_FRAME) {
         assert(IS_ACTION(CTX_ROOTKEY(c)));
-        assert(VAL_PHASE(archetype) != nullptr);
+        assert(VAL_PHASE_ELSE_ARCHETYPE(archetype) != nullptr);
     }
     else {
       #ifdef DEBUG_UNREADABLE_VOIDS

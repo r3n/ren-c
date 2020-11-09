@@ -613,6 +613,13 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
     }
     Push_Pointer_To_Series(TG_Mold_Stack, c);
 
+    // Simple rule for starters: don't honor the hidden status of parameters
+    // if the frame phase is executing.
+    //
+    bool honor_hidden = true;
+    if (CELL_KIND(v) == REB_FRAME)
+        honor_hidden = (VAL_OPT_PHASE(v) == nullptr);
+
     if (form) {
         //
         // Mold all words and their values ("key: <molded value>")
@@ -621,13 +628,14 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         REBVAL *var = CTX_VARS_HEAD(c);
         bool had_output = false;
         for (; NOT_END(key); key++, var++) {
-            if (not Is_Param_Hidden(key)) {
-                had_output = true;
-                Append_Spelling(mo->series, VAL_KEY_SPELLING(key));
-                Append_Ascii(mo->series, ": ");
-                Mold_Value(mo, var);
-                Append_Codepoint(mo->series, LF);
-            }
+            if (honor_hidden and Is_Param_Hidden(key))
+                continue;
+
+            Append_Spelling(mo->series, VAL_KEY_SPELLING(key));
+            Append_Ascii(mo->series, ": ");
+            Mold_Value(mo, var);
+            Append_Codepoint(mo->series, LF);
+            had_output = true;
         }
 
         // Remove the final newline...but only if WE added to the buffer
@@ -651,7 +659,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
     REBVAL *var = CTX_VARS_HEAD(VAL_CONTEXT(v));
 
     for (; NOT_END(key); ++key, ++var) {
-        if (Is_Param_Hidden(key))
+        if (honor_hidden and Is_Param_Hidden(key))
             continue;
 
         New_Indented_Line(mo);
@@ -756,6 +764,22 @@ REBTYPE(Context)
 
         REBVAL *property = ARG(property);
         REBSYM sym = VAL_WORD_SYM(property);
+
+        if (sym == SYM_LABEL) {
+            //
+            // Can be answered for frames that have no execution phase, if
+            // they were initialized with a label.
+            //
+            const REBSTR *label = VAL_FRAME_LABEL(v);
+            if (label)
+                return Init_Word(D_OUT, label);
+
+            // If the frame is executing, we can look at the label in the
+            // REBFRM*, which will tell us what the overall execution label
+            // would be.  This might be confusing, however...if the phase
+            // is drastically different.  Review.
+        }
+
         if (sym == SYM_ACTION) {
             //
             // Currently this can be answered for any frame, even if it is
@@ -766,7 +790,7 @@ REBTYPE(Context)
             //
             return Init_Action(
                 D_OUT,
-                VAL_PHASE(v),  // archetypal, so no binding
+                VAL_PHASE_ELSE_ARCHETYPE(v),  // archetypal, so no binding
                 VAL_FRAME_LABEL(v),
                 EXTRA(Binding, v).node  // e.g. where RETURN returns to
             );

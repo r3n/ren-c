@@ -257,10 +257,9 @@ inline static void FAIL_IF_INACCESSIBLE_CTX(REBCTX *c) {
 
 inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
     assert(ANY_CONTEXT_KIND(CELL_HEART(v)));
-    assert(
-        (VAL_FRAME_PHASE_OR_LABEL_NODE(v) != nullptr)
-        == (CELL_KIND(v) == REB_FRAME)
-    );
+    if (CELL_KIND(v) != REB_FRAME)
+        assert(VAL_FRAME_PHASE_OR_LABEL_NODE(v) == nullptr);
+
     REBCTX *c = CTX(PAYLOAD(Any, v).first.node);
     FAIL_IF_INACCESSIBLE_CTX(c);
     return c;
@@ -291,19 +290,32 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
 // and the string is the WORD! label cache to use as a name when an action
 // is extracted from the frame.
 //
-inline static REBACT *VAL_PHASE(const RELVAL *v) {
+inline static REBACT *VAL_OPT_PHASE(REBCEL(const*) v) {
+    assert(CELL_KIND(v) == REB_FRAME);
     REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
-    if (IS_SER_ARRAY(s))
-        return ACT(s);
-    assert(IS_SER_STRING(s));  // cached label
-    return ACT(CTX_KEYLIST(VAL_CONTEXT(v)));
+
+    if (s == nullptr or IS_SER_STRING(s))  // label or ANONYMOUS, no phase
+        return nullptr;
+
+    return ACT(s);  // an actual phase
+}
+
+inline static REBACT *VAL_PHASE_ELSE_ARCHETYPE(const RELVAL *v) {
+    REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
+
+    if (s == nullptr or IS_SER_STRING(s))  // label or ANONYMOUS, no phase
+        return ACT(CTX_KEYLIST(VAL_CONTEXT(v)));  // so return archetype
+
+    return ACT(s);  // an actual phase
 }
 
 inline static const REBSTR *VAL_FRAME_LABEL(const RELVAL *v) {
     REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
-    if (IS_SER_ARRAY(s))
+    if (s == nullptr)  // phaseless, but no label
         return ANONYMOUS;
-    return STR(s);
+    if (IS_SER_ARRAY(s))  // phase, so nowhere to put label in value
+        return ANONYMOUS;
+    return STR(s);  // no phase and label
 }
 
 inline static void INIT_VAL_FRAME_LABEL(RELVAL *v, const REBSTR *label) {
@@ -365,8 +377,7 @@ static inline REBVAL *Init_Any_Context(
 
 inline static REBVAL *Init_Frame(RELVAL *out, REBCTX *c, const REBSTR *label) {
     Init_Any_Context(out, REB_FRAME, c);
-    if (label)
-        INIT_VAL_FRAME_LABEL(out, label);
+    INIT_VAL_FRAME_LABEL(out, label);  // nullptr (ANONYMOUS) is okay
     return cast(REBVAL*, out);
 }
 

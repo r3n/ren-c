@@ -1453,7 +1453,8 @@ void Assert_Context_Core(REBCTX *c)
         // know what function the frame is actually for, one must look to
         // the "phase" field...held in the rootvar.
         //
-        if (ACT_UNDERLYING(VAL_PHASE(rootvar)) != VAL_ACTION(rootkey))
+        REBACT *phase = VAL_PHASE_ELSE_ARCHETYPE(rootvar);
+        if (ACT_UNDERLYING(phase) != VAL_ACTION(rootkey))
             panic (rootvar);
 
         REBFRM *f = CTX_FRAME_IF_ON_STACK(c);
@@ -1462,7 +1463,7 @@ void Assert_Context_Core(REBCTX *c)
             // If the frame is on the stack, the phase should be something
             // with the same underlying function as the rootkey.
             //
-            if (ACT_UNDERLYING(VAL_PHASE(rootvar)) != VAL_ACTION(rootkey))
+            if (ACT_UNDERLYING(phase) != VAL_ACTION(rootkey))
                 panic (rootvar);
         }
     }

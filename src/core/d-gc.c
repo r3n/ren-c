@@ -266,8 +266,6 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             assert(heart == REB_FRAME); // may be heap-based frame
             assert(Is_Marked(PAYLOAD(Any, v).second.node));  // phase or label
         }
-        else
-            assert(heart != REB_FRAME); // phase if-and-only-if frame
 
         if (GET_SERIES_INFO(context, INACCESSIBLE))
             break;
