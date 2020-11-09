@@ -26,7 +26,7 @@
 // as it will always be appending 10.
 //
 // The method used is to store a FRAME! in the specialization's ACT_DETAILS().
-// Parameters in that frame that are REB_TS_HIDDEN are considered to be
+// Parameters in that frame that are REB_P_LOCAL are considered to be
 // specialized out, and frame holds its specialized value.  For unspecialized
 // parameters, the value slots in the frame are available to serve as
 // instructions on how those parameters should be fulfilled.  %c-action.c
@@ -183,10 +183,9 @@ REBCTX *Make_Context_For_Action_Push_Partials(
           continue_unspecialized:
 
             Init_Void(arg, SYM_UNDEFINED);  // *not* ARG_MARKED_CHECKED
-            if (opt_binder) {
-                if (not Is_Param_Unbindable(param))
-                    Add_Binder_Index(opt_binder, canon, index);
-            }
+            if (opt_binder)
+                Add_Binder_Index(opt_binder, canon, index);
+
             continue;
         }
 
@@ -345,12 +344,9 @@ bool Specialize_Action_Throws(
         RELVAL *key = CTX_KEYS_HEAD(exemplar);
         REBVAL *var = CTX_VARS_HEAD(exemplar);
         for (; NOT_END(key); ++key, ++var) {
-            if (Is_Param_Unbindable(key))
-                continue;  // !!! is this flag still relevant?
-            if (Is_Param_Hidden(key)) {
-                assert(GET_CELL_FLAG(var, ARG_MARKED_CHECKED));
+            if (Is_Param_Hidden(key))
                 continue;
-            }
+
             if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED))
                 continue;  // maybe refinement from stack, now specialized out
             Remove_Binder_Index(&binder, VAL_KEY_CANON(key));
@@ -386,13 +382,21 @@ bool Specialize_Action_Throws(
     for (; NOT_END(param); ++param, ++arg) {
         if (Is_Param_Hidden(param)) {
             //
+            // We are producing a new paramlist, so we want to ensure that
+            // anything that was hidden on the paramlist we are deriving from
+            // gets completely sealed from visibility at the new layer.
+            // This opens up names for reuse and keeps from viewing the
+            // levels that should be private.
+            //
+            Move_Value(DS_PUSH(), param);
+            Seal_Param(param);
+
             // !!! Currently we assume that a parameter that is hidden at
             // the start is hidden at the end.  However, if someone wanted
             // to actually specialize an ~undefined~ then allowing them to
             // hide the key would be a way to do that.  It would require being
             // tolerant of this in the binding diff.
             //
-            Move_Value(DS_PUSH(), param);
             continue;
         }
 
@@ -480,7 +484,7 @@ bool Specialize_Action_Throws(
 
         assert(GET_CELL_FLAG(arg, ARG_MARKED_CHECKED));
         Move_Value(DS_PUSH(), param);
-        TYPE_SET(DS_TOP, REB_TS_HIDDEN);
+        Hide_Param(DS_TOP);
         continue;
     }
 
@@ -1053,7 +1057,7 @@ REBACT *Alloc_Action_From_Exemplar(
     for (; NOT_END(param); ++param, ++arg, ++alias) {
         Move_Value(alias, param);
 
-        if (TYPE_CHECK(param, REB_TS_HIDDEN))
+        if (Is_Param_Hidden(param))
             continue;  // leave it as-is, even if ~undefined~
 
         // !!! This mutation is slightly uncomfortable, as it transforms a
@@ -1069,8 +1073,7 @@ REBACT *Alloc_Action_From_Exemplar(
 
         // Don't show argument in the parameter list.
         //
-        TYPE_SET(alias, REB_TS_HIDDEN);
-        TYPE_SET(alias, REB_TS_UNBINDABLE);
+        Hide_Param(alias);
 
         // Indicate that argument is specialized out.
         //

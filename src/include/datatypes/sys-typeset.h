@@ -292,16 +292,33 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
 #define Is_Param_Skippable(v) \
     TYPE_CHECK((v), REB_TS_SKIPPABLE)
 
-// Can't be reflected (set with PROTECT/HIDE) or specialized out
+// Can't be reflected (set with PROTECT/HIDE) or specialized out, because it
+// is local or specialized out.
 //
 // !!! Note: Currently, the semantics of Is_Param_Hidden() are rather sketchy.
-// The flag (REB_TS_HIDDEN) is not put on REB_P_LOCAL and it hasn't been
-// figured out how such a flag would be managed on a per object or frame
-// instance while sharing the same paramlist/keylist (a method like
-// CELL_FLAG_PROTECTED might be needed if that feature is interesting).
+// It hasn't been figured out how such a flag would be managed on a per object
+// or frame instance while sharing the same paramlist/keylist (a method like
+// CELL_FLAG_PROTECTED would be needed if that feature were interesting).
 //
-#define Is_Param_Hidden(v) \
-    TYPE_CHECK((v), REB_TS_HIDDEN)
+inline static bool Is_Param_Hidden(const RELVAL *v) {
+    // Once a parameter is hidden, it is either visible in the frame or part
+    // of an embedded frame's internal state.  Anything invisible to the
+    // outside world from one layer will also be invisible to layers of
+    // functionals above it.
+    //
+    Reb_Param_Class pclass = VAL_PARAM_CLASS(v);
+    return pclass == REB_P_LOCAL or pclass == REB_P_SEALED;
+}
+
+inline static void Hide_Param(RELVAL *param) {
+    assert(VAL_PARAM_CLASS(param) != REB_P_SEALED);
+    mutable_KIND3Q_BYTE(param) = REB_P_LOCAL;
+}
+
+inline static void Seal_Param(RELVAL *param) {
+    mutable_KIND3Q_BYTE(param) = REB_P_SEALED;
+}
+
 
 // Can't be bound to beyond the current bindings.
 //
@@ -315,8 +332,8 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
 // solution to separate the property of bindability from visibility, as
 // the SELF solution shakes out--so that SELF may be hidden but bind.
 //
-#define Is_Param_Unbindable(v) \
-    TYPE_CHECK((v), REB_TS_UNBINDABLE)
+#define Is_Param_Sealed(v) \
+    (VAL_PARAM_CLASS(v) == REB_P_SEALED)
 
 // Parameters can be marked such that if they are blank, the action will not
 // be run at all.  This is done via the `<blank>` annotation, which indicates

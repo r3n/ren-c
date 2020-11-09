@@ -709,8 +709,8 @@ inline static void Push_Action(
     if (f->flags.bits & SER(act)->header.bits & PARAMLIST_FLAG_IS_BARRIER)
         fail (Error_Expression_Barrier_Raw());
 
-    f->param = ACT_PARAMS_HEAD(act); // Specializations hide some params...
-    REBLEN num_args = ACT_NUM_PARAMS(act); // ...so see REB_TS_HIDDEN
+    f->param = ACT_PARAMS_HEAD(act);
+    REBLEN num_args = ACT_NUM_PARAMS(act);  // includes specialized + locals
 
     REBSER *s;
     if (

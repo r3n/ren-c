@@ -625,7 +625,10 @@ REBNATIVE(return)
     // So TYPESET! bits in the RETURN param are used for legal return types.
     //
     REBVAL *typeset = ACT_PARAMS_HEAD(target_fun);
-    assert(VAL_PARAM_CLASS(typeset) == REB_P_LOCAL);
+    assert(
+        VAL_PARAM_CLASS(typeset) == REB_P_LOCAL
+        or VAL_PARAM_CLASS(typeset) == REB_P_SEALED  // !!! review reuse
+    );
     assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
 
     // There are two ways you can get an "endish nulled".  One is a plain

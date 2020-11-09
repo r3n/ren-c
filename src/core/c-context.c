@@ -583,15 +583,19 @@ REBARR *Collect_Keylist_Managed(
         ) {
             // No prior or no SELF in prior, so we'll add it as the first key
             //
-            RELVAL *self_key = Init_Context_Key(
-                ARR_AT(BUF_COLLECT, 1),
-                Canon(SYM_SELF)
+            RELVAL *self_key = ARR_AT(BUF_COLLECT, 1);
+            Init_Param(
+                self_key,
+                REB_P_LOCAL,
+                Canon(SYM_SELF),
+                TS_VALUE  // !!! Type meaningless in objects?
             );
 
-            // !!! See notes on the flags about why SELF is set hidden but
-            // not unbindable with REB_TS_UNBINDABLE.
+            // !!! Self is hidden, but not unbindable due to being a
+            // REB_P_LOCAL param class.  It would be different if it were
+            // REB_P_SEALED, which would then be not accessible.
             //
-            TYPE_SET(self_key, REB_TS_HIDDEN);
+            Hide_Param(self_key);
 
             assert(cl->index == 1);
             Add_Binder_Index(&cl->binder, VAL_KEY_CANON(self_key), cl->index);
@@ -1311,10 +1315,12 @@ REBLEN Find_Canon_In_Context(
     REBLEN n;
     for (n = 1; n <= len; n++, key++) {
         if (canon == VAL_KEY_CANON(key)) {
-            if (Is_Param_Unbindable(key)) {
-                if (not always)
-                    return 0;
-            }
+            if (Is_Param_Sealed(key))
+                continue;  // pretend this parameter is not there
+
+            if (Is_Param_Hidden(key) and not always)
+                return 0;
+
             return n;
         }
     }

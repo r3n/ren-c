@@ -808,8 +808,6 @@ REBNATIVE(applique)
     REBVAL *key = CTX_KEYS_HEAD(exemplar);
     REBVAL *var = CTX_VARS_HEAD(exemplar);
     for (; NOT_END(key); key++, ++var) {
-        if (Is_Param_Unbindable(key))
-            continue; // shouldn't have been in the binder
         if (Is_Param_Hidden(key))
             continue; // was part of a specialization internal to the action
 

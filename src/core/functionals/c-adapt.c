@@ -141,6 +141,13 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
     Sync_Paramlist_Archetype(paramlist);  // [0] cell must hold copied pointer
     MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
 
+    // Don't allow the adapted code access to the locals.
+    //
+    RELVAL *param = ARR_AT(paramlist, 1);
+    for (; NOT_END(param); ++param)
+        if (Is_Param_Hidden(param))
+            Seal_Param(param);
+
     REBACT *underlying = ACT_UNDERLYING(VAL_ACTION(adaptee));
 
     REBACT *adaptation = Make_Action(

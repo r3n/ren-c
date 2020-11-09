@@ -329,7 +329,7 @@ static void Init_Action_Meta_Shim(void) {
         Init_Blank(Append_Context(meta, nullptr, Canon(field_syms[i - 1])));
 
     Init_Object(CTX_VAR(meta, 1), meta); // it's "selfish"
-    TYPE_SET(CTX_KEY(meta, 1), REB_TS_HIDDEN);  // hide self
+    Hide_Param(CTX_KEY(meta, 1));  // hide self
 
     Root_Action_Meta = Init_Object(Alloc_Value(), meta);
     Force_Value_Frozen_Deep(Root_Action_Meta);

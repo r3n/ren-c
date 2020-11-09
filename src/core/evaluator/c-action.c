@@ -251,15 +251,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // come from argument fulfillment.  If there is an exemplar, they are
         // set from that, otherwise they are undefined.
         //
-        // !!! REB_TS_HIDDEN means that the parameter convention bits (for
-        // quoted/etc.) are not needed.  They could thus be used for other
-        // information...like whether a parameter is sealed for lower phases
-        // only or is part of the still-visible interface when that particular 
-        // phase is running.
-        //
-        if (TYPE_CHECK(f->param, REB_TS_HIDDEN)) {
+        if (Is_Param_Hidden(f->param)) {
             if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED) {  // no exemplar
-                assert(VAL_PARAM_CLASS(f->param) == REB_P_LOCAL);
                 Init_Void(f->arg, SYM_UNDEFINED);
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             }
@@ -836,12 +829,12 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
     for (; NOT_END(f->param); ++f->param, ++f->arg) {
         assert(NOT_END(f->arg));  // all END fulfilled as Init_Endish_Nulled()
-        if (VAL_PARAM_CLASS(f->param) == REB_P_LOCAL) {
+/*        if (VAL_PARAM_CLASS(f->param) == REB_P_LOCAL) {
             if (not IS_VOID(f->arg) and not IS_ACTION(f->arg))  // !!! TEMP TO TRY BOOT
                 fail ("locals must be void");
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             continue;
-        }
+        } */
 
         // We can't a-priori typecheck the variadic argument, since the values
         // aren't calculated until the function starts running.  Instead we
@@ -937,6 +930,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             Typecheck_Refinement(f->param, f->arg);
             continue;
         }
+
+        if (VAL_PARAM_SYM(f->param) == SYM_RETURN)
+            continue;  // !!! let whatever go for now
 
         if (not Typecheck_Including_Constraints(f->param, f->arg))
             fail (Error_Arg_Type(f, f->param, VAL_TYPE(f->arg)));

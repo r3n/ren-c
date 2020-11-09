@@ -950,7 +950,12 @@ static REBVAL *callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
         assert(IS_BLANK(RIN_RET_SCHEMA(inv->rin)));
     else {
         DECLARE_LOCAL (param);
-        Init_Param(param, REB_P_LOCAL, Canon(SYM_RETURN), FLAGIT_KIND(REB_TS_HIDDEN));
+        Init_Param(
+            param,
+            REB_P_LOCAL,
+            Canon(SYM_RETURN),
+            TS_OPT_VALUE  // *returned* types, not the return ACTION!
+        );
         arg_to_ffi(
             nullptr,  // store must be null if dest is non-null,
             inv->ret,  // destination pointer

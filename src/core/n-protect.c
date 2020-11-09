@@ -152,14 +152,10 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
 
         REBVAL *key = CTX_KEY(Force_Keylist_Unique(context), index);
 
-        if (flags & PROT_SET) {
-            TYPE_SET(key, REB_TS_HIDDEN);
-            TYPE_SET(key, REB_TS_UNBINDABLE);
-        }
-        else {
-            TYPE_CLEAR(key, REB_TS_HIDDEN);
-            TYPE_CLEAR(key, REB_TS_UNBINDABLE);
-        }
+        if (flags & PROT_SET)
+            Hide_Param(key);
+        else
+            fail ("Un-hiding is not supported");
     }
 }
 

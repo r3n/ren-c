@@ -344,8 +344,6 @@ void Push_Paramlist_Triads_May_Fail(
             );
             if (was_refinement)
                 TYPE_SET(param, REB_TS_REFINEMENT);
-            if (VAL_PARAM_CLASS(param) == REB_P_LOCAL)
-                TYPE_SET(param, REB_TS_HIDDEN);
 
             *flags |= MKF_HAS_TYPES;
             continue;
@@ -482,7 +480,6 @@ void Push_Paramlist_Triads_May_Fail(
                 REB_P_LOCAL,
                 spelling,  // don't canonize, see #2258
                 TS_OPT_VALUE
-                    | FLAGIT_KIND(REB_TS_HIDDEN)  // must preserve if type block
             );
         }
         else if (refinement) {
@@ -571,7 +568,6 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
                 Canon(SYM_RETURN),
                 TS_OPT_VALUE
                     | FLAGIT_KIND(REB_TS_INVISIBLE)  // return @() intentional
-                    | FLAGIT_KIND(REB_TS_HIDDEN)
             );
             definitional_return_dsp = DSP;
 

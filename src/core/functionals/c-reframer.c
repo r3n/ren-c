@@ -224,8 +224,7 @@ REBNATIVE(reframer_p)
     //
     if (not param)
         fail ("Could not find parameter for REFRAMER");
-    TYPE_SET(param, REB_TS_HIDDEN);
-    mutable_KIND3Q_BYTE(param) = REB_P_LOCAL;  // so it gets voided
+    Hide_Param(param);
 
     REBLEN param_index = param - ACT_PARAMS_HEAD(reframer);
 

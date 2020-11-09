@@ -416,7 +416,10 @@ REB_R PD_Context(
     if (VAL_BINDING(picker) == NOD(c))
         n = VAL_WORD_INDEX(picker);
     else {
-        const bool always = false;
+        bool always = true;
+        if (IS_FRAME(pvs->out))
+            always = (VAL_OPT_PHASE(pvs->out) != nullptr);
+
         n = Find_Canon_In_Context(c, VAL_WORD_CANON(picker), always);
 
         if (n == 0)
@@ -628,6 +631,8 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         REBVAL *var = CTX_VARS_HEAD(c);
         bool had_output = false;
         for (; NOT_END(key); key++, var++) {
+            if (Is_Param_Sealed(key))
+                continue;
             if (honor_hidden and Is_Param_Hidden(key))
                 continue;
 
@@ -659,6 +664,8 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
     REBVAL *var = CTX_VARS_HEAD(VAL_CONTEXT(v));
 
     for (; NOT_END(key); ++key, ++var) {
+        if (Is_Param_Sealed(key))
+            continue;
         if (honor_hidden and Is_Param_Hidden(key))
             continue;
 

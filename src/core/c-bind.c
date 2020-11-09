@@ -129,7 +129,7 @@ void Bind_Values_Core(
     REBLEN index = 1;
     REBVAL *key = CTX_KEYS_HEAD(context);
     for (; index <= CTX_LEN(context); key++, index++)
-        if (not Is_Param_Unbindable(key))
+        if (not Is_Param_Sealed(key))
             Add_Binder_Index(&binder, VAL_KEY_CANON(key), index);
   }
 
@@ -140,7 +140,7 @@ void Bind_Values_Core(
   blockscope {  // Reset all the binder indices to zero
     RELVAL *key = CTX_KEYS_HEAD(context);
     for (; NOT_END(key); key++)
-        if (not Is_Param_Unbindable(key))
+        if (not Is_Param_Sealed(key))
             Remove_Binder_Index(&binder, VAL_KEY_CANON(key));
   }
 
@@ -496,7 +496,12 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             REBDSP dsp = dsp_orig;
             while (dsp != DSP) {
                 const REBSTR *spelling = VAL_WORD_SPELLING(DS_AT(dsp + 1));
-                Init_Param(param, REB_P_LOCAL, spelling, FLAGIT_KIND(REB_TS_HIDDEN));
+                Init_Param(
+                    param,
+                    REB_P_LOCAL,
+                    spelling,
+                    FLAGIT_KIND(REB_VOID)
+                );
                 ++dsp;
                 ++param;
 
@@ -739,7 +744,7 @@ void Virtual_Bind_Deep_To_New_Context(
             if (dummy_sym == SYM_DUMMY9)
                 fail ("Current limitation: only up to 9 BLANK! keys");
             Init_Context_Key(key, Canon(dummy_sym));
-            TYPE_SET(key, REB_TS_HIDDEN);
+            Hide_Param(key);
             dummy_sym = cast(REBSYM, cast(int, dummy_sym) + 1);
 
             Init_Blank(var);
@@ -790,8 +795,7 @@ void Virtual_Bind_Deep_To_New_Context(
             // hide it from the context and binding.
             //
             Init_Context_Key(key, VAL_WORD_SPELLING(VAL_UNESCAPED(item)));
-            TYPE_SET(key, REB_TS_UNBINDABLE);
-            TYPE_SET(key, REB_TS_HIDDEN);
+            Hide_Param(key);
             Derelativize(var, item, specifier);
             SET_CELL_FLAG(var, BIND_MARKED_REUSE);
             SET_CELL_FLAG(var, PROTECTED);
