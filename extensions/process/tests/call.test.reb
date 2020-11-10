@@ -56,7 +56,7 @@
 
 ; Tests feeding input and taking output from various sources
 [
-    (did echoer: enclose specialize 'call/input/output [
+    (did echoer: enclose specialize :call/input/output [
         command: spaced [
             file-to-local system/options/boot {--suppress "*"} {-qs}
             {--do} {"write-stdout read system/ports/input"}

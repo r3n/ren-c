@@ -160,7 +160,7 @@
 (true = reeval true)
 (false = reeval false)
 ($1 == reeval $1)
-(null? reeval (specialize 'of [property: 'type]) null)
+(null? reeval (specialize :of [property: 'type]) null)
 (null? do _)
 (
     a-value: make object! []

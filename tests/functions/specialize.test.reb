@@ -3,7 +3,7 @@
 ; Note: GET-PATH! for partial specialization uses basically the same code
 ; path as SPECIALIZE does, e.g. these run the same code:
 ;
-;     specialize 'append/dup/part []
+;     specialize :append/dup/part []
 ;     :append/dup/part
 
 [
@@ -41,7 +41,7 @@
     [a b c [1 2 3] [1 2 3]] = append-123-twice copy [a b c]
 )
 (
-    append-10: specialize 'append [value: 10]
+    append-10: specialize :append [value: 10]
     f: make frame! :append-10
     f/series: copy [a b c]
 
@@ -57,7 +57,7 @@
 )
 (
     foo: func [] [
-        return-5: specialize 'return [value: 5]
+        return-5: specialize :return [value: 5]
         return-5
         "this shouldn't be returned"
     ]
@@ -67,8 +67,8 @@
 [
     (
         apd: :append/part/dup
-        apd3: specialize 'apd [dup: 3]
-        ap2d: specialize 'apd [part: 2]
+        apd3: specialize :apd [dup: 3]
+        ap2d: specialize :apd [part: 2]
 
         xy: [<X> #Y]
         abc: [A B C]
@@ -89,8 +89,8 @@
 [
     (
         adp: :append/dup/part
-        adp2: specialize 'adp [part: 2]
-        ad3p: specialize 'adp [dup: 3]
+        adp2: specialize :adp [part: 2]
+        ad3p: specialize :adp [dup: 3]
 
         xy: [<X> #Y]
         abc: [A B C]
@@ -109,7 +109,7 @@
 ]
 
 (
-    aopd3: specialize lit (specialize 'append/only [])/part [
+    aopd3: specialize lit (specialize :append/only [])/part [
         dup: 3
         part: 1
     ]
@@ -126,9 +126,9 @@
     is-bad: true
 
     for-each code [
-        [specialize 'append/only/only []]
-        [specialize 'append/asdf []]
-        [specialize lit (specialize 'append/only [])/only []]
+        [specialize :append/only/only []]
+        [specialize :append/asdf []]
+        [specialize lit (specialize :append/only [])/only []]
     ][
         is-bad: me and ['bad-refine = (trap [do code])/id]
     ]
@@ -138,7 +138,7 @@
 
 
 (
-    ap10d: specialize 'append/dup [value: 10]
+    ap10d: specialize :append/dup [value: 10]
     f: make frame! :ap10d
     f/series: copy [a b c]
     did all [

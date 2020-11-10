@@ -87,13 +87,13 @@ extreme-of: func [
 minimum-of: redescribe [
     {Finds the smallest value in a series}
 ](
-    specialize 'extreme-of [comparator: :lesser?]
+    specialize :extreme-of [comparator: :lesser?]
 )
 
 maximum-of: redescribe [
     {Finds the largest value in a series}
 ](
-    specialize 'extreme-of [comparator: :greater?]
+    specialize :extreme-of [comparator: :greater?]
 )
 
 

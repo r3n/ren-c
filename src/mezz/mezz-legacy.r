@@ -95,7 +95,7 @@ library?: typechecker library!
 ; ability to tolerate a spec of `[a:]` by transforming it to `[a: none].
 ; Ren-C hasn't decided yet, but will likely support `construct [a: b: c:]`
 ;
-context: specialize 'make [type: object!]
+context: specialize :make [type: object!]
 
 
 uneval: func [] [
@@ -127,23 +127,23 @@ uneval: func [] [
 ; no information about specific return types, which could be given here
 ; with REDESCRIBE.
 ;
-length-of: specialize 'reflect [property: 'length]
-words-of: specialize 'reflect [property: 'words]
-values-of: specialize 'reflect [property: 'values]
-index-of: specialize 'reflect [property: 'index]
-type-of: specialize 'reflect [property: 'type]
-binding-of: specialize 'reflect [property: 'binding]
-head-of: specialize 'reflect [property: 'head]
-tail-of: specialize 'reflect [property: 'tail]
-file-of: specialize 'reflect [property: 'file]
-line-of: specialize 'reflect [property: 'line]
-body-of: specialize 'reflect [property: 'body]
+length-of: specialize :reflect [property: 'length]
+words-of: specialize :reflect [property: 'words]
+values-of: specialize :reflect [property: 'values]
+index-of: specialize :reflect [property: 'index]
+type-of: specialize :reflect [property: 'type]
+binding-of: specialize :reflect [property: 'binding]
+head-of: specialize :reflect [property: 'head]
+tail-of: specialize :reflect [property: 'tail]
+file-of: specialize :reflect [property: 'file]
+line-of: specialize :reflect [property: 'line]
+body-of: specialize :reflect [property: 'body]
 
 
 ; General renamings away from non-LOGIC!-ending-in-?-functions
 ; https://trello.com/c/DVXmdtIb
 ;
-index?: specialize 'reflect [property: 'index]
+index?: specialize :reflect [property: 'index]
 offset?: :offset-of
 sign?: :sign-of
 suffix?: :suffix-of
@@ -254,7 +254,7 @@ apply: func [dummy:] [
 ]
 
 
-hijack 'find adapt copy :find [
+hijack :find adapt copy :find [
     if reverse or last [
         fail 'reverse [
             {/REVERSE and /LAST on FIND have been deprecated.  Use FIND-LAST}

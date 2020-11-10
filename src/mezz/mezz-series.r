@@ -66,7 +66,7 @@ join-all: function [
 remold: redescribe [
     {Reduces and converts a value to a REBOL-readable string.}
 ](
-    adapt 'mold [
+    adapt :mold [
         value: reduce :value
     ]
 )
@@ -464,7 +464,7 @@ collect*: func [
 ][
     let out: null
     let keeper: specialize* (  ; SPECIALIZE to hide series argument
-        enclose* 'append func* [  ; Derive from APPEND for /ONLY /LINE /DUP
+        enclose* :append func* [  ; Derive from APPEND for /ONLY /LINE /DUP
             f [frame!]
             <with> out
         ][
@@ -498,15 +498,17 @@ collect: redescribe [
 ] chain [  ; Gives empty block instead of null if no keeps
     :collect*
         |
-    specialize 'else [branch: [copy []]]
+    specialize :else [branch: [copy []]]
 ]
 
 collect-lines: redescribe [
     {Evaluate body, and return block of values collected via KEEP function.
     KEEPed blocks become spaced TEXT!.}
-] adapt 'collect [  ; https://forum.rebol.info/t/945/1
+] adapt :collect [  ; https://forum.rebol.info/t/945/1
     body: compose [
-        keep: adapt* specialize* 'keep/line/only [  ; specialize removes args
+        keep: adapt* specialize* :keep [
+            line: #
+            only: #
             part: null
         ][
             value: spaced try :value
@@ -519,9 +521,9 @@ collect-text: redescribe [
     {Evaluate body, and return block of values collected via KEEP function.
     Returns all values as a single spaced TEXT!, individual KEEPed blocks get UNSPACED.}
 ] chain [  ; https://forum.rebol.info/t/945/2
-    adapt 'collect [
+    adapt :collect [
         body: compose [
-            keep: adapt* specialize* 'keep [  ; specialize removes args
+            keep: adapt* specialize* :keep [
                 line: null
                 only: null
                 part: null
@@ -534,7 +536,7 @@ collect-text: redescribe [
         |
     :spaced
         |
-    specialize* 'else [branch: [copy ""]]
+    specialize* :else [branch: [copy ""]]
 ]
 
 format: function [

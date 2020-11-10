@@ -455,7 +455,7 @@ redescribe [
 unset: redescribe [
     {Clear the value of a word to null (in its current context.)}
 ](
-    specialize 'set [value: null]
+    specialize :set [value: null]
 )
 
 
@@ -484,8 +484,8 @@ unset: redescribe [
 ;    == 7
 ;
 >-: enfixed :shove
->--: enfixed specialize '>- [prefix: true]
-->-: enfixed specialize '>- [prefix: false]
+>--: enfixed specialize :>- [prefix: true]
+->-: enfixed specialize :>- [prefix: false]
 
 
 ; The -- and ++ operators were deemed too "C-like", so ME was created to allow
@@ -497,13 +497,13 @@ me: enfixed redescribe [
 ](
     ; /ENFIX so `x: 1, x: me + 1 * 10` is 20, not 11
     ;
-    specialize 'shove/set [prefix: false]
+    specialize :shove/set [prefix: false]
 )
 
 my: enfixed redescribe [
     {Update variable using it as the first argument to a prefix operator}
 ](
-    specialize 'shove/set [prefix: true]
+    specialize :shove/set [prefix: true]
 )
 
 so: enfixed func [
@@ -574,31 +574,31 @@ tweak :was 'postpone on
 zdeflate: redescribe [
     {Deflates data with zlib envelope: https://en.wikipedia.org/wiki/ZLIB}
 ](
-    specialize 'deflate [envelope: 'zlib]
+    specialize :deflate [envelope: 'zlib]
 )
 
 zinflate: redescribe [
     {Inflates data with zlib envelope: https://en.wikipedia.org/wiki/ZLIB}
 ](
-    specialize 'inflate [envelope: 'zlib]
+    specialize :inflate [envelope: 'zlib]
 )
 
 gzip: redescribe [
     {Deflates data with gzip envelope: https://en.wikipedia.org/wiki/Gzip}
 ](
-    specialize 'deflate [envelope: 'gzip]
+    specialize :deflate [envelope: 'gzip]
 )
 
 gunzip: redescribe [
     {Inflates data with gzip envelope: https://en.wikipedia.org/wiki/Gzip}
 ](
-    specialize 'inflate [envelope: 'gzip]  ; What about GZIP-BADSIZE?
+    specialize :inflate [envelope: 'gzip]  ; What about GZIP-BADSIZE?
 )
 
 ensure: redescribe [
     {Pass through value if it matches test, otherwise trigger a FAIL}
 ](
-    specialize 'either-match [
+    specialize :either-match [
         branch: func [arg [<opt> any-value!]] [
             ;
             ; !!! Can't use FAIL/WHERE until there is a good way to SPECIALIZE
@@ -617,7 +617,8 @@ ensure: redescribe [
 non: redescribe [
     {Pass through value if it *doesn't* match test, otherwise trigger a FAIL}
 ](
-    specialize 'either-match/not [
+    specialize :either-match [
+        not: #
         branch: func [arg [<opt> any-value!]] [
             ;
             ; !!! Can't use FAIL/WHERE until there is a good way to SPECIALIZE
@@ -651,8 +652,8 @@ really: func [
     :value
 ]
 
-oneshot: specialize 'n-shot [n: 1]
-upshot: specialize 'n-shot [n: -1]
+oneshot: specialize :n-shot [n: 1]
+upshot: specialize :n-shot [n: -1]
 
 ;
 ; !!! The /REVERSE and /LAST refinements of FIND and SELECT caused a lot of
@@ -663,13 +664,13 @@ upshot: specialize 'n-shot [n: -1]
 find-reverse: redescribe [
     {Variant of FIND that uses a /SKIP of -1}
 ](
-    specialize 'find [skip: -1]
+    specialize :find [skip: -1]
 )
 
 find-last: redescribe [
     {Variant of FIND that uses a /SKIP of -1 and seeks the TAIL of a series}
 ](
-    adapt 'find-reverse [
+    adapt :find-reverse [
         if not any-series? series [
             fail 'series "Can only use FIND-LAST on ANY-SERIES!"
         ]
@@ -694,19 +695,19 @@ attempt: func [
 for-next: redescribe [
     "Evaluates a block for each position until the end, using NEXT to skip"
 ](
-    specialize 'for-skip [skip: 1]
+    specialize :for-skip [skip: 1]
 )
 
 for-back: redescribe [
     "Evaluates a block for each position until the start, using BACK to skip"
 ](
-    specialize 'for-skip [skip: -1]
+    specialize :for-skip [skip: -1]
 )
 
 iterate-skip: redescribe [
     "Variant of FOR-SKIP that directly modifies a series variable in a word"
 ](
-    specialize enclose 'for-skip func [f] [
+    specialize enclose :for-skip func [f] [
         if blank? let word: f/word [return null]
         f/word: quote to word! word  ; do not create new virtual binding
         let saved: f/series: get word
@@ -732,26 +733,26 @@ iterate-skip: redescribe [
 iterate: iterate-next: redescribe [
     "Variant of FOR-NEXT that directly modifies a series variable in a word"
 ](
-    specialize 'iterate-skip [skip: 1]
+    specialize :iterate-skip [skip: 1]
 )
 
 iterate-back: redescribe [
     "Variant of FOR-BACK that directly modifies a series variable in a word"
 ](
-    specialize 'iterate-skip [skip: -1]
+    specialize :iterate-skip [skip: -1]
 )
 
 
 count-up: redescribe [
     "Loop the body, setting a word from 1 up to the end value given"
 ](
-    specialize 'for [start: 1, bump: 1]
+    specialize :for [start: 1, bump: 1]
 )
 
 count-down: redescribe [
     "Loop the body, setting a word from the end value given down to 1"
 ](
-    specialize adapt 'for [
+    specialize adapt :for [
         start: end
         end: 1
     ][
@@ -1077,7 +1078,7 @@ fail: func [
     do ensure error! error  ; raise to nearest TRAP up the stack (if any)
 ]
 
-unreachable: specialize 'fail [reason: "Unreachable code"]
+unreachable: specialize :fail [reason: "Unreachable code"]
 
 
 generate: func [ "Make a generator."

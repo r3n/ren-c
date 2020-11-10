@@ -5,6 +5,6 @@
 [#1659 (
     ; natives are active
     same? blank! do reduce [
-        (specialize 'of [property: 'type]) blank
+        (specialize :of [property: 'type]) blank
     ]
 )]

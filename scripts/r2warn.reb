@@ -164,7 +164,7 @@ unless: checked [
 ]
 
 switch: checked [
-    adapt 'switch [
+    adapt :switch [
         for-each c cases [
             lib/all [  ; SWITCH's /ALL would override
                 match [word! path!] c
@@ -249,7 +249,7 @@ op?: deprecated [
 ]
 
 also: checked [
-    adapt 'also [
+    adapt :also [
         all [
             block? :branch
             not semiquoted? 'branch
@@ -287,7 +287,7 @@ exit: deprecated [
 ]
 
 try: checked [
-    adapt 'try [
+    adapt :try [
         ;
         ; Most historical usages of TRY took literal blocks as arguments.
         ; This is a good way of catching them, while allowing new usages.

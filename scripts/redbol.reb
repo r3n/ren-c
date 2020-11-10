@@ -73,11 +73,11 @@ function?: emulate [:action?]
 
 string!: emulate [text!]
 string?: emulate [:text?]
-to-string: emulate [specialize 'to [type: text!]]
+to-string: emulate [specialize :to [type: text!]]
 
 paren!: emulate [group!]
 paren?: emulate [:group?]
-to-paren: emulate [specialize 'to [type: group!]]
+to-paren: emulate [specialize :to [type: group!]]
 
 number!: emulate [any-number!]
 number?: emulate [:any-number?]
@@ -230,7 +230,7 @@ rewrite-spec-and-body: helper [
         ; add support for an EXIT that's a synonym for returning void.
         ;
         insert body [
-            exit: specialize 'return [value: ~unset!~]
+            exit: specialize :return [value: ~unset!~]
         ]
         append spec [<local> exit]  ; FUNC needs it (function doesn't...)
     ]
@@ -566,7 +566,7 @@ do: emulate [
 ]
 
 to: emulate [
-    adapt 'to [
+    adapt :to [
         all [
             :value = group!
             find any-word! type
@@ -721,7 +721,7 @@ collect: emulate [
         let out: any [into, make block! 16]
 
         let keeper: specialize* (
-            enclose* 'insert func* [
+            enclose* :insert func* [
                 f [frame!]
                 <with> out
             ][
@@ -876,7 +876,7 @@ quit: emulate [
 ]
 
 does: emulate [
-    specialize 'redbol-func [spec: []]
+    specialize :redbol-func [spec: []]
 ]
 
 has: emulate [
@@ -895,7 +895,7 @@ has: emulate [
 ; https://forum.rebol.info/t/has-hasnt-worked-rethink-construct/1058
 ;
 object: emulate [
-    specialize 'make [type: object!]
+    specialize :make [type: object!]
 ]
 
 construct: emulate [
@@ -1051,11 +1051,11 @@ denuller: helper [
 ]
 
 if: emulate [denuller :if]
-unless: emulate [denuller adapt 'if [condition: not :condition]]
+unless: emulate [denuller adapt :if [condition: not :condition]]
 case: emulate [denuller :case]
 
 switch: emulate [  ; Ren-C evaluates cases: https://trello.com/c/9ChhSWC4/
-    enclose (augment 'switch [
+    enclose (augment :switch [
         /default "Default case if no others are found"
             [block!]
     ]) func [f [frame!]] [
@@ -1131,7 +1131,7 @@ pick: emulate [denuller :pick]
 
 first: emulate [denuller :first]
 first+: emulate [
-    enclose 'first func [f] [
+    enclose :first func [f] [
         use [loc] [
             loc: f/location
             do f
@@ -1151,8 +1151,8 @@ tenth: emulate [denuller :tenth]
 
 query: emulate [denuller :query]
 wait: emulate [denuller :wait]
-bind?: emulate [denuller specialize 'of [property: 'binding]]
-bound?: emulate [denuller specialize 'of [property: 'binding]]
+bind?: emulate [denuller specialize :of [property: 'binding]]
+bound?: emulate [denuller specialize :of [property: 'binding]]
 
 
 ; https://forum.rebol.info/t/justifiable-asymmetry-to-on-block/751
@@ -1273,7 +1273,7 @@ decloak: emulate [
     redescribe [
         {Decodes a binary string scrambled previously by encloak.}
     ](
-        specialize 'cloaker [decode: true]
+        specialize :cloaker [decode: true]
     )
 ]
 
@@ -1281,13 +1281,13 @@ encloak: emulate [
     redescribe [
         {Scrambles a binary string based on a key.}
     ](
-        specialize 'cloaker [decode: false]
+        specialize :cloaker [decode: false]
     )
 ]
 
 
 write: emulate [
-    adapt (augment 'write [
+    adapt (augment :write [
         /binary "Preserves contents exactly."
         /direct "Opens the port without buffering."
         /no-wait "Returns immediately without waiting if no data."
@@ -1319,7 +1319,7 @@ write: emulate [
 ]
 
 read: emulate [
-    enclose (augment 'read [
+    enclose (augment :read [
         /binary "Preserves contents exactly."
         /direct "Opens the port without buffering."
         /no-wait "Returns immediately without waiting if no data."
@@ -1367,7 +1367,7 @@ read: emulate [
 ; interpretation.  This means bad UTF-8 input that isn't Latin1 will be
 ; misinterpreted...but since Rebol2 would accept any bytes, it's no worse.
 ;
-hijack 'lib/transcode enclose copy :lib/transcode function [f [frame!]] [
+hijack :lib/transcode enclose copy :lib/transcode function [f [frame!]] [
     trap [
         result: lib/do copy f  ; COPY so we can DO it again if needed
     ] then e -> [

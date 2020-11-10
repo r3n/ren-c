@@ -83,12 +83,12 @@
 (use [a] [a: false null == redbol-apply func [/a] [a] [a]])
 (use [a] [a: false # = redbol-apply func [/a] [a] [/a]])
 (use [a] [a: false # = redbol-apply/only func [/a] [/a] [/a]])
-(group! == redbol-apply/only (specialize 'of [property: 'type]) [()])
+(group! == redbol-apply/only (specialize :of [property: 'type]) [()])
 ([1] == head of redbol-apply :insert [copy [] [1] blank blank])
 ([1] == head of redbol-apply :insert [copy [] [1] blank false])
 ([[1]] == head of redbol-apply :insert [copy [] [1] blank true])
-(action! == redbol-apply (specialize 'of [property: 'type]) [:print])
-(get-word! == redbol-apply/only (specialize 'of [property: 'type]) [:print])
+(action! == redbol-apply (specialize :of [property: 'type]) [:print])
+(get-word! == redbol-apply/only (specialize :of [property: 'type]) [:print])
 
 [
     #1760

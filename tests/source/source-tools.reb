@@ -158,7 +158,7 @@ rebsource: context [
                 data [binary!]
             ][
                 analysis: analyse/text file data
-                emit: specialize 'log-emit [log: analysis]
+                emit: specialize :log-emit [log: analysis]
 
                 data: as text! data
 
@@ -289,7 +289,7 @@ rebsource: context [
             data
         ][
             analysis: copy []
-            emit: specialize 'log-emit [log: analysis]
+            emit: specialize :log-emit [log: analysis]
 
             data: read src-folder/:file
 

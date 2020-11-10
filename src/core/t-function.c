@@ -189,8 +189,8 @@ void MF_Action(REB_MOLD *mo, REBCEL(const*) v, bool form)
 //
 REBTYPE(Action)
 {
-    REBVAL *value = D_ARG(1);
-    REBACT *act = VAL_ACTION(value);
+    REBVAL *action = D_ARG(1);
+    REBACT *act = VAL_ACTION(action);
 
     switch (VAL_WORD_SYM(verb)) {
       case SYM_COPY: {
@@ -243,7 +243,7 @@ REBTYPE(Action)
             Blit_Relative(dest, src);
         TERM_ARRAY_LEN(ACT_DETAILS(proxy), details_len);
 
-        Init_Action(D_OUT, proxy, VAL_ACTION_LABEL(value), VAL_BINDING(value));
+        Init_Action(D_OUT, proxy, VAL_ACTION_LABEL(action), VAL_BINDING(action));
         return D_OUT; }
 
       case SYM_REFLECT: {
@@ -254,26 +254,32 @@ REBTYPE(Action)
         REBSYM sym = VAL_WORD_SYM(property);
         switch (sym) {
           case SYM_BINDING: {
-            if (Did_Get_Binding_Of(D_OUT, value))
+            if (Did_Get_Binding_Of(D_OUT, action))
                 return D_OUT;
             return nullptr; }
+
+          case SYM_LABEL: {
+            const REBSTR *label = VAL_ACTION_LABEL(action);
+            if (not label)
+                return nullptr;
+            return Init_Word(D_OUT, label); }
 
           case SYM_WORDS:
           case SYM_PARAMETERS: {
             bool just_words = (sym == SYM_WORDS);
             return Init_Block(
                 D_OUT,
-                Make_Action_Parameters_Arr(VAL_ACTION(value), just_words)
+                Make_Action_Parameters_Arr(act, just_words)
             ); }
 
           case SYM_TYPESETS:
             return Init_Block(
                 D_OUT,
-                Make_Action_Typesets_Arr(VAL_ACTION(value))
+                Make_Action_Typesets_Arr(act)
             );
 
           case SYM_BODY:
-            Get_Maybe_Fake_Action_Body(D_OUT, value);
+            Get_Maybe_Fake_Action_Body(D_OUT, action);
             return D_OUT;
 
           case SYM_TYPES: {

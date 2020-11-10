@@ -21,11 +21,11 @@
 //
 // ENCLOSE gives a fully generic ability to make a function that wraps the
 // execution of another.  When the enclosure is executed, a frame is built
-// for the wrapped function--but not executed.  Then that frame is passed to
-// an "outer" function, which can modify the frame arguments and also operate
-// upon the result:
+// for the "inner" (wrapped) function--but not executed.  Then that frame is
+// passed to an "outer" function, which can modify the frame arguments and
+// also operate upon the result:
 //
-//     >> add2x3x+1: enclose 'add func [f [frame!]] [
+//     >> add2x3x+1: enclose :add func [f [frame!]] [
 //            f/value1: f/value1 * 2
 //            f/value2: f/value2 * 3
 //            return 1 + do f
@@ -39,7 +39,7 @@
 // Given the mechanics of FRAME!, it's also possible to COPY the frame for
 // multiple invocations.
 //
-//     >> print2x: enclose 'print func [f [frame!]] [
+//     >> print2x: enclose :print func [f [frame!]] [
 //            do copy f
 //            f/value: append f/value "again!"
 //            do f
@@ -147,9 +147,9 @@ REB_R Encloser_Dispatcher(REBFRM *f)
 //
 //      return: [action!]
 //      inner "Action that a FRAME! will be built for, then passed to OUTER"
-//          [action! word! path!]
+//          [action!]
 //      outer "Gets a FRAME! for INNER before invocation, can DO it (or not)"
-//          [action! word! path!]
+//          [action!]
 //  ]
 //
 REBNATIVE(enclose_p)  // see extended definition ENCLOSE in %base-defs.r
@@ -157,33 +157,7 @@ REBNATIVE(enclose_p)  // see extended definition ENCLOSE in %base-defs.r
     INCLUDE_PARAMS_OF_ENCLOSE_P;
 
     REBVAL *inner = ARG(inner);
-    const bool push_refinements = false;
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        inner,
-        SPECIFIED,
-        push_refinements
-    )){
-        return R_THROWN;
-    }
-
-    if (not IS_ACTION(D_OUT))
-        fail (PAR(inner));
-    Move_Value(inner, D_OUT); // Frees D_OUT, and GC safe (in ARG slot)
-
     REBVAL *outer = ARG(outer);
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        outer,
-        SPECIFIED,
-        push_refinements
-    )){
-        return R_THROWN;
-    }
-
-    if (not IS_ACTION(D_OUT))
-        fail (PAR(outer));
-    Move_Value(outer, D_OUT);  // Frees D_OUT, and GC safe (in ARG slot)
 
     REBARR *paramlist = Copy_Array_Shallow_Flags(
         VAL_ACT_PARAMLIST(inner),  // new function same interface as `inner`

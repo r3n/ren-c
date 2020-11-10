@@ -25,7 +25,7 @@ dump: function [
 
     <static> enablements (make map! [])
 ][
-    print: adapt 'lib/print [
+    print: adapt :lib/print [
         if prefix [
             if select enablements prefix <> #on [return]
             write-stdout prefix
@@ -116,7 +116,7 @@ contains-newline: function [return: [logic!] pos [block! group!]] [
     return false
 ]
 
-dump-to-newline: adapt 'dump [
+dump-to-newline: adapt :dump [
     if not tail? extra [
         ;
         ; Mutate VARARGS! into a BLOCK!, with passed-in value at the head
@@ -150,7 +150,7 @@ dumps: enfixed function [
         [<opt> any-value! <variadic>]
 ][
     if issue? value [
-        d: specialize 'dump-to-newline [prefix: as text! name]
+        d: specialize :dump-to-newline [prefix: as text! name]
         if value <> #off [d #on]  ; note: d hard quotes its argument
     ] else [
         ; Make it easy to declare and dump a variable at the same time.
@@ -170,7 +170,7 @@ dumps: enfixed function [
         ;
         d: function [return: <elide> /on /off <static> d'] compose/deep [
             d': default [
-                d'': specialize 'dump [prefix: (as text! name)]
+                d'': specialize :dump [prefix: (as text! name)]
                 d'' #on
             ]
             case [

@@ -8,7 +8,7 @@
 (
     returns-int: func [return: [integer!] x] [x]
 
-    returns-text: enclose 'returns-int func [f] [f/x: me + 1 to text! do f]
+    returns-text: enclose :returns-int func [f] [f/x: me + 1 to text! do f]
     returns-text-check: reskinned [return: [integer!]] :returns-text
 
     skin: reskinned [return: [integer! text!]] :returns-text-check

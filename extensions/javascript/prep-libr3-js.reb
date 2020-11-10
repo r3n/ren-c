@@ -896,7 +896,7 @@ e-cwrap/write-emitted
 
 json-collect: function [body [block!]] [
     results: collect compose [
-        keep: adapt 'keep [  ; Emscripten prefixes functions w/underscore
+        keep: adapt :keep [  ; Emscripten prefixes functions w/underscore
             value: unspaced [{"} {_} value {"}]
         ]
         ((body))

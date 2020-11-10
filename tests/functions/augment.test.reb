@@ -3,7 +3,7 @@
 
 (
     foo: func [x] [x]
-    bar: augment 'foo [y]
+    bar: augment :foo [y]
     did all [
         [x y] = parameters of :bar
         10 = bar 10 20
@@ -35,7 +35,7 @@
 
 ; Tests with ENCLOSE
 [
-    (switch-d: enclose (augment 'switch [
+    (switch-d: enclose (augment :switch [
         /default "Default case if no others are found"
             [block!]
     ]) func [f [frame!]] [
@@ -54,9 +54,9 @@
     two-a-plus-three-b: func [a [integer!] /b [integer!]] [
         (2 * a) + either b [3 * b] [0]
     ]
-    two-a-plus-six: specialize 'two-a-plus-three-b [b: 2]
+    two-a-plus-six: specialize :two-a-plus-three-b [b: 2]
 
-    two-a-plus-six-plus-four-c: enclose augment 'two-a-plus-six [
+    two-a-plus-six-plus-four-c: enclose augment :two-a-plus-six [
         /c [integer!]
     ] func [f [frame!]] [
         let old-c: f/c

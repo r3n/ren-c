@@ -150,7 +150,7 @@
 
 (
     vblock: collect [
-        log: adapt 'keep [value: reduce value]
+        log: adapt :keep [value: reduce value]
         variadic2: func [v [any-value! <variadic>]] [
            log [<1> take v]
            log [<2> take v]
@@ -162,7 +162,7 @@
     ]
 
     nblock: collect [
-        log: adapt 'keep [value: reduce value]
+        log: adapt :keep [value: reduce value]
         normal2: func [n1 n2] [
             log [<1> n1 <2> n2]
             return "returned"

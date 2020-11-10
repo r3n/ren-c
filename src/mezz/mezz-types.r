@@ -49,7 +49,7 @@ use [word] [
             set word redescribe compose [
                 (spaced ["Converts to" form type "value."])
             ](
-                specialize 'to [type: get type]
+                specialize :to [type: get type]
             )
         ]
     ]

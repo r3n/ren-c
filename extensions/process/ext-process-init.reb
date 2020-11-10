@@ -11,7 +11,7 @@ REBOL [
 ; amount of C code that CALL has to run.  So things like transforming any
 ; FILE! into local paths are done here.
 ;
-call*: adapt 'call-internal* [
+call*: adapt :call-internal* [
     command: switch type of command [
         text! [
             ; A TEXT! is passed through as-is, and will be interpreted by
@@ -141,6 +141,6 @@ browse*: function [
     fail "Could not open web browser"
 ]
 
-hijack 'browse :browse*
+hijack :browse :browse*
 
 sys/export [call call*]

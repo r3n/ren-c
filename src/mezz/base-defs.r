@@ -284,23 +284,23 @@ inherit-meta: func* [
     return get 'derived  ; no :derived name cache
 ]
 
-enclose: enclose* 'enclose* func* [f] [  ; uses low-level ENCLOSE* to make
+enclose: enclose* :enclose* func* [f] [  ; uses low-level ENCLOSE* to make
     let inner: f/inner: compose :f/inner
     inherit-meta do f get 'inner  ; no :inner name cache
 ]
-inherit-meta :enclose 'enclose*  ; needed since we used ENCLOSE*
+inherit-meta :enclose :enclose*  ; needed since we used ENCLOSE*
 
-specialize: enclose 'specialize* func* [f] [  ; now we have high-level ENCLOSE
+specialize: enclose :specialize* func* [f] [  ; now we have high-level ENCLOSE
     let specializee: f/specializee: compose :f/specializee
     inherit-meta do f get 'specializee  ; no :specializee name cache
 ]
 
-adapt: enclose 'adapt* func* [f] [
+adapt: enclose :adapt* func* [f] [
     let adaptee: f/adaptee: compose :f/adaptee
     inherit-meta do f get 'adaptee  ; no :adaptee name cache
 ]
 
-chain: enclose 'chain* func* [f] [
+chain: enclose :chain* func* [f] [
     ;
     ; !!! Historically CHAIN supported | for "pipe" but it was really just an
     ; expression barrier.  Review this idea, but for now let it work in a
@@ -318,13 +318,13 @@ chain: enclose 'chain* func* [f] [
     inherit-meta do f pick pipeline 1
 ]
 
-augment: enclose 'augment* func* [f] [
+augment: enclose :augment* func* [f] [
     let augmentee: f/augmentee: compose :f/augmentee
     let spec: :f/spec
     inherit-meta/augment do f get 'augmentee spec  ; no :augmentee name cache
 ]
 
-reframer: enclose 'reframer* func* [f] [
+reframer: enclose :reframer* func* [f] [
     let shim: f/shim: compose :f/shim
     inherit-meta do f get 'shim
 ]
@@ -333,7 +333,7 @@ reframer: enclose 'reframer* func* [f] [
 ; the higher level one uses a block.  Specialize out the action, and then
 ; overwrite it in the enclosure with an action taken out of the block.
 ;
-pointfree: enclose (specialize* 'pointfree* [
+pointfree: enclose (specialize* :pointfree* [
     action: :panic-value  ; gets overwritten, best to make it something mean
 ]) func* [f] [
     let action: f/action: (match action! any [
@@ -401,19 +401,19 @@ requote: reframer func* [
 ; specializations they don't fit easily into the NEXT OF SERIES model--this
 ; is a problem which hasn't been addressed.
 ;
-next: specialize 'skip [offset: 1]
-back: specialize 'skip [offset: -1]
+next: specialize :skip [offset: 1]
+back: specialize :skip [offset: -1]
 
-bound?: chain [specialize 'reflect [property: 'binding] | :value?]
+bound?: chain [specialize :reflect [property: 'binding] | :value?]
 
-unspaced: specialize 'delimit [delimiter: null]
-unspaced-text: chain [:unspaced | specialize 'else [branch: [copy ""]]]
+unspaced: specialize :delimit [delimiter: null]
+unspaced-text: chain [:unspaced | specialize :else [branch: [copy ""]]]
 
-spaced: specialize 'delimit [delimiter: space]
-spaced-text: chain [:spaced | specialize 'else [branch: [copy ""]]]
+spaced: specialize :delimit [delimiter: space]
+spaced-text: chain [:spaced | specialize :else [branch: [copy ""]]]
 
 newlined: chain [
-    adapt specialize 'delimit [delimiter: newline] [
+    adapt specialize :delimit [delimiter: newline] [
         if text? :line [
             fail 'line "NEWLINED on TEXT! semantics being debated"
         ]
@@ -451,10 +451,10 @@ an: func* [
 ; {Returns TRUE if port is open.}
 ; port [port!]
 
-head?: specialize 'reflect [property: 'head?]
-tail?: specialize 'reflect [property: 'tail?]
-past?: specialize 'reflect [property: 'past?]
-open?: specialize 'reflect [property: 'open?]
+head?: specialize :reflect [property: 'head?]
+tail?: specialize :reflect [property: 'tail?]
+past?: specialize :reflect [property: 'past?]
+open?: specialize :reflect [property: 'open?]
 
 
 empty?: func* [

@@ -34,7 +34,7 @@ register-event-hooks
 
 ; WAIT* expects block to be pre-reduced, to ease stackless implementation
 ;
-wait: adapt 'wait* [if block? :value [value: reduce value]]
+wait: adapt :wait* [if block? :value [value: reduce value]]
 
 
 sys/make-scheme [

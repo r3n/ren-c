@@ -39,7 +39,7 @@
 //     >> old-foo 10
 //     == 11
 //
-//     >> hijack 'foo func [x] [(old-foo x) + 20]
+//     >> hijack :foo func [x] [(old-foo x) + 20]
 //
 //     >> foo 10
 //     == 31  ; HIJACK'd!
@@ -199,12 +199,12 @@ REB_R Hijacker_Dispatcher(REBFRM *f)
 //
 //  {Cause all existing references to an ACTION! to invoke another ACTION!}
 //
-//      return: [<opt> action!]
-//          {The hijacked action value, null if self-hijack (no-op)}
-//      victim [action! word! path!]
-//          {Action value whose references are to be affected.}
-//      hijacker [action! word! path!]
-//          {The action to run in its place}
+//      return: "The hijacked action value, null if self-hijack (no-op)"
+//          [<opt> action!]
+//      victim "Action whose references are to be affected"
+//          [action!]
+//      hijacker "The action to run in its place"
+//          [action!]
 //  ]
 //
 REBNATIVE(hijack)
@@ -218,34 +218,8 @@ REBNATIVE(hijack)
 {
     INCLUDE_PARAMS_OF_HIJACK;
 
-    const bool push_refinements = false;
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        ARG(victim),
-        SPECIFIED,
-        push_refinements
-    )){
-        return R_THROWN;
-    }
-
-    if (not IS_ACTION(D_OUT))
-        fail ("Victim of HIJACK must be an ACTION!");
-    Move_Value(ARG(victim), D_OUT);  // Frees up D_OUT
-    REBACT *victim = VAL_ACTION(ARG(victim));  // GC safe (in ARG slot)
-
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        ARG(hijacker),
-        SPECIFIED,
-        push_refinements
-    )){
-        return R_THROWN;
-    }
-
-    if (not IS_ACTION(D_OUT))
-        fail ("Hijacker in HIJACK must be an ACTION!");
-    Move_Value(ARG(hijacker), D_OUT);  // Frees up D_OUT
-    REBACT *hijacker = VAL_ACTION(ARG(hijacker));  // GC safe (in ARG slot)
+    REBACT *victim = VAL_ACTION(ARG(victim));
+    REBACT *hijacker = VAL_ACTION(ARG(hijacker));
 
     if (victim == hijacker)
         return nullptr;  // permitting no-op hijack has some practical uses

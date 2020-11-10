@@ -23,7 +23,7 @@
 // that does some amount of pre-processing (which can include modifying the
 // arguments), before the original implementation is called:
 //
-//     >> ap1: adapt 'append [if integer? :value [value: value + 716]]
+//     >> ap1: adapt :append [if integer? :value [value: value + 716]]
 //
 //     >> ap1 [a b c] 304
 //     == [a b c 1020]
@@ -34,7 +34,7 @@
 // "adaptee", as failure to do so could pass bad bit patterns to natives
 // and lead to crashes.
 //
-//    >> negbad: adapt 'negate [number: to text! number]
+//    >> negbad: adapt :negate [number: to text! number]
 //
 //    >> negbad 1020
 //    ** Error: Internal phase disallows TEXT! for its `number` argument
@@ -105,8 +105,8 @@ REB_R Adapter_Dispatcher(REBFRM *f)
 //  {Create a variant of an ACTION! that preprocesses its arguments}
 //
 //      return: [action!]
-//      adaptee "Function or specifying word (preserves word for debug info)"
-//          [action! word! path!]
+//      adaptee "Function to be run after the prelude is complete"
+//          [action!]
 //      prelude "Code to run in constructed frame before adaptee runs"
 //          [block!]
 //  ]
@@ -116,20 +116,6 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
     INCLUDE_PARAMS_OF_ADAPT_P;
 
     REBVAL *adaptee = ARG(adaptee);
-
-    const bool push_refinements = false;
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        adaptee,
-        SPECIFIED,
-        push_refinements
-    )){
-        return R_THROWN;
-    }
-
-    if (not IS_ACTION(D_OUT))
-        fail (PAR(adaptee));
-    Move_Value(adaptee, D_OUT);  // Frees D_OUT, and GC safe (in ARG slot)
 
     REBARR *paramlist = Copy_Array_Shallow_Flags(
         VAL_ACT_PARAMLIST(adaptee),  // same interface as head of pipeline

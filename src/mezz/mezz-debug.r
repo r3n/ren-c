@@ -64,7 +64,7 @@ verify: function [
 ; copies of the function made at layer boundaries.
 ;
 native-assert: copy :assert
-hijack 'assert :verify
+hijack :assert :verify
 
 
 delta-time: function [
@@ -160,7 +160,7 @@ net-trace: function [
     val [logic!]
 ][
     either val [
-        hijack 'net-log func [txt /C /S][
+        hijack :net-log func [txt /C /S][
             print [
                 (if c ["C:"]) (if s ["S:"])
                     either block? txt [spaced txt] [txt]
@@ -169,6 +169,6 @@ net-trace: function [
         ]
         print "Net-trace is now on"
     ][
-        hijack 'net-log func [txt /C /S][txt]
+        hijack :net-log func [txt /C /S][txt]
     ]
 ]

@@ -1143,7 +1143,10 @@ pe-format: context [
         return (head of exe-data, elide reset)
     ]
 
-    update-embedding: specialize 'update-section [section-name: encap-section-name]
+    update-embedding: specialize :update-section [
+        section-name: encap-section-name
+    ]
+
     get-embedding: function [
         return: [<opt> binary!]
         file [file!]

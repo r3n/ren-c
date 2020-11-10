@@ -999,7 +999,7 @@ REBCTX *Error_Need_Non_Null_Core(const RELVAL *target, REBSPC *specifier) {
 // !!! This error is a placeholder for addressing the issue of using a value
 // to set a refinement that's not a good fit for the refinement type, e.g.
 //
-//     specialize 'append [only: 10]
+//     specialize :append [only: 10]
 //
 // It seems that LOGIC! should be usable, and for purposes of chaining a
 // refinement-style PATH! should be usable too (for using one refinement to

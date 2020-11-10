@@ -22,7 +22,7 @@ reeval function [:terms [tag! set-word! <variadic>]] [
         set w redescribe reduce [
             spaced [{Returns the} to word! w {value of a series}]
         ](
-            specialize 'pick [picker: n]
+            specialize :pick [picker: n]
         )
         n: n + 1
     ]
@@ -36,7 +36,7 @@ reeval function [:terms [tag! set-word! <variadic>]] [
 last: redescribe [
     {Returns the last value of a series.}
 ](
-    specialize adapt 'pick [
+    specialize adapt :pick [
         picker: length of get lit location:
     ][
         picker: <removed-parameter>
@@ -51,7 +51,7 @@ last: redescribe [
 repend: redescribe [
     "APPEND a reduced value to a series."
 ](
-    adapt 'append [
+    adapt :append [
         if set? 'value [
             value: reduce :value
         ]

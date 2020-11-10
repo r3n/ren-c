@@ -40,7 +40,7 @@
     (
         f-inside-prelude: ~
         private: <not-in-prelude>
-        adapted-foo: adapt 'foo [
+        adapted-foo: adapt :foo [
             f-inside-prelude: binding of 'public
             assert [private = <not-in-prelude>]  ; should not be bound
         ]
@@ -78,7 +78,7 @@
         f-inside-augment: ~
         private: <not-in-prelude>
 
-        augmented-foo: adapt (augment 'adapted-foo [
+        augmented-foo: adapt (augment :adapted-foo [
             additional [integer!]
             /private [tag!]  ; reusing name, for different variable!
         ]) [
@@ -125,7 +125,7 @@
 
         f-prelude: null
 
-        bar: adapt augment 'foo [/private [tag!]] [
+        bar: adapt augment :foo [/private [tag!]] [
             f-prelude: binding of 'private
         ]
 

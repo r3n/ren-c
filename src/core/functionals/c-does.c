@@ -66,7 +66,7 @@ enum {
 // don't need to do anything special to a BLOCK! passed to DO...no copying
 // or otherwise.  Just run it when the function gets called.
 //
-// Yet `does [...]` isn't *quite* like `specialize 'do [source: [...]]`.  The
+// Yet `does [...]` isn't *quite* like `specialize :do [source: [...]]`.  The
 // difference is subtle, but important when interacting with bindings to
 // fields in derived objects.  That interaction cannot currently resolve such
 // bindings without a copy, so it is made on demand.

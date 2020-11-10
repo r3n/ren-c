@@ -20,10 +20,10 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // REFRAMER allows one to define a function that does generalized transforms
-// on the input of other functions.  Unlike ENCLOSE, it does not specify the
-// exact function it does surgery on the frame of ahead of time.  Instead,
-// each invocation of the reframing action interacts with the instance that
-// follows it at the callsite.
+// on the input (and output) of other functions.  Unlike ENCLOSE, it does not
+// specify an exact function it does surgery on the frame of ahead of time.
+// Instead, each invocation of the reframing action interacts with the
+// instance that follows it at the callsite.
 //
 // A simple example is a function which removes quotes from the first
 // parameter to a function, and adds them back for the result:

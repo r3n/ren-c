@@ -22,7 +22,7 @@ REBOL [
 write-enlined: redescribe [
     {Write out a TEXT! with its LF sequences translated to CR LF}
 ](
-    adapt 'write [
+    adapt :write [
         if not text? data [
             fail ["WRITE-ENLINED only works on TEXT! data"]
         ]

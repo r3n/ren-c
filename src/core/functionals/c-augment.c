@@ -23,7 +23,7 @@
 // frame, adding new parameters.  It does so without affecting the execution:
 //
 //     >> foo-x: func [x [integer!]] [print ["x is" x]]
-//     >> foo-xy: augment 'foo-x [y [integer!]]
+//     >> foo-xy: augment :foo-x [y [integer!]]
 //
 //     >> foo-x 10
 //     x is 10
@@ -38,7 +38,7 @@
 // is only useful when combined with something like ADAPT or ENCLOSE... to
 // inject in phases of code at a higher level that see these parameters:
 //
-//     >> foo-xy: adapt (augment 'foo-x [y [integer!]]) [print ["y is" y]]
+//     >> foo-xy: adapt (augment :foo-x [y [integer!]]) [print ["y is" y]]
 //
 //     >> foo-xy 10 20
 //     y is 20
@@ -86,10 +86,10 @@ REB_R Augmenter_Dispatcher(REBFRM *f)
 //  {Create an ACTION! variant that acts the same, but has added parameters}
 //
 //      return: [action!]
-//      augmentee [action! word! path!]
-//          "Function or specifying word (preserves word name for debug info)"
-//      spec [block!]
-//          "Spec dialect for words to add to the derived function"
+//      augmentee "Function whose implementation is to be augmented"
+//          [action!]
+//      spec "Spec dialect for words to add to the derived function"
+//          [block!]
 //  ]
 //
 REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
@@ -97,20 +97,6 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     INCLUDE_PARAMS_OF_AUGMENT_P;
 
     REBVAL *augmentee = ARG(augmentee);
-
-    const bool push_refinements = false;
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        augmentee,
-        SPECIFIED,
-        push_refinements
-    )){
-        return R_THROWN;
-    }
-
-    if (not IS_ACTION(D_OUT))
-        fail (PAR(augmentee));
-    Move_Value(augmentee, D_OUT);  // Frees D_OUT, and GC safe (in ARG slot)
 
     // We reuse the process from Make_Paramlist_Managed_May_Fail(), which
     // pushes parameters to the stack in groups of three items per parameter.

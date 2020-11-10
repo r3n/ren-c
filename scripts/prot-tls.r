@@ -406,7 +406,7 @@ update-state: function [
     ctx/mode: new
 ]
 
-update-read-state: specialize 'update-state [
+update-read-state: specialize :update-state [
     direction: 'read
     transitions: [
         <client-hello> [<server-hello>]
@@ -422,7 +422,7 @@ update-read-state: specialize 'update-state [
     ]
 ]
 
-update-write-state: specialize 'update-state [
+update-write-state: specialize :update-state [
     direction: 'write
     transitions: [
         #server-hello-done [<client-key-exchange>]
@@ -997,7 +997,7 @@ grab: enfixed func [
     return set left result  ; must manually assign if SET-WORD! overridden
 ]
 
-grab-int: enfixed enclose 'grab func [f [frame!]] [
+grab-int: enfixed enclose :grab func [f [frame!]] [
     return set f/left (debin [be +] do copy f)
 ]
 

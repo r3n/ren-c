@@ -37,13 +37,13 @@ host-prot: default [_]
 boot-print: redescribe [
     "Prints during boot when not quiet."
 ](
-    enclose 'print func [f] [if not system/options/quiet [do f]]
+    enclose :print func [f] [if not system/options/quiet [do f]]
 )
 
 loud-print: redescribe [
     "Prints during boot when verbose."
 ](
-    enclose 'print func [f] [if system/options/verbose [do f]]
+    enclose :print func [f] [if system/options/verbose [do f]]
 )
 
 make-banner: function [
@@ -324,12 +324,12 @@ main-startup: function [
     ; calls, the rebPanic() API dispatches to PANIC and PANIC-VALUE.  Hook
     ; them just to show we can...use I/O to print a message.
     ;
-    hijack 'panic adapt (copy :panic) [
+    hijack :panic adapt (copy :panic) [
         print "PANIC ACTION! called (explicitly or by rebPanic() API)"
         ;
         ; ...adaptation falls through to our copy of the original PANIC
     ]
-    hijack 'panic-value adapt (copy :panic-value) [
+    hijack :panic-value adapt (copy :panic-value) [
         print "PANIC-VALUE ACTION! called (explicitly or by rebPanic() API)"
         ;
         ; ...adaptation falls through to our copy of the original PANIC-VALUE

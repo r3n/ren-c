@@ -72,7 +72,7 @@ unset first [=>]
 ; SET was changed to accept VOID!, use SET VAR NON VOID! (...EXPRESSION...)
 ; if that is what was intended.
 ;
-set: specialize 'lib/set [opt: true]
+set: specialize :lib/set [opt: true]
 
 ; PRINT was changed to tolerate NEWLINE to mean print a newline only
 ;
@@ -209,13 +209,13 @@ modernize-action: function [
     return reduce [spec body]
 ]
 
-func: adapt 'func [set [spec body] modernize-action spec body]
-function: adapt 'function [set [spec body] modernize-action spec body]
+func: adapt :func [set [spec body] modernize-action spec body]
+function: adapt :function [set [spec body] modernize-action spec body]
 
-meth: enfixed adapt 'meth [set [spec body] modernize-action spec body]
-method: enfixed adapt 'method [set [spec body] modernize-action spec body]
+meth: enfixed adapt :meth [set [spec body] modernize-action spec body]
+method: enfixed adapt :method [set [spec body] modernize-action spec body]
 
-trim: adapt 'trim [  ; there's a bug in TRIM/AUTO in 8994d23
+trim: adapt :trim [  ; there's a bug in TRIM/AUTO in 8994d23
     if auto [
         while [(not tail? series) and [series/1 = LF]] [
             take series
@@ -268,7 +268,7 @@ has: null
 const?: func [x] [return false]
 
 call*: :call
-call: specialize 'call* [wait: true]
+call: specialize :call* [wait: true]
 
 ; Due to various weaknesses in the historical Rebol APPLY, a frame-based
 ; method retook the name.  A usermode emulation of the old APPLY was written
@@ -284,7 +284,7 @@ redbol-apply: :applique
 applique: :apply
 apply: :redbol-apply
 
-find-reverse: specialize 'find [
+find-reverse: specialize :find [
     reverse: true
 
     ; !!! Specialize out /SKIP because it was not compatible--R3-Alpha
@@ -293,7 +293,7 @@ find-reverse: specialize 'find [
     skip: false
 ]
 
-find-last: specialize 'find [
+find-last: specialize :find [
     ;
     ; !!! Old Ren-C committed for bootstrap had a bug of its own (a big reason
     ; to kill these refinements): `find/reverse tail "abcd" "bc"` was blank.
@@ -311,7 +311,7 @@ find-last: specialize 'find [
 ; So augment the READ with a bit more information.
 ;
 lib-read: copy :lib/read
-lib/read: read: enclose 'lib-read function [f [frame!]] [
+lib/read: read: enclose :lib-read function [f [frame!]] [
     saved-source: :f/source
     if e: trap [bin: do f] [
         parse e/message [
@@ -441,8 +441,8 @@ delimit: func [
     text
 ]
 
-unspaced: specialize 'delimit [delimiter: _]
-spaced: specialize 'delimit [delimiter: space]
+unspaced: specialize :delimit [delimiter: _]
+spaced: specialize :delimit [delimiter: space]
 
 dequote: func [x] [
     switch type of x [

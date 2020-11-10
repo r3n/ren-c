@@ -60,7 +60,7 @@
 (if true [true])
 (null? if false [true])
 (if $1 [true])
-(if (specialize 'of [property: 'type]) [true])
+(if (specialize :of [property: 'type]) [true])
 (null? if blank [true])
 (if make object! [] [true])
 (if get '+ [true])

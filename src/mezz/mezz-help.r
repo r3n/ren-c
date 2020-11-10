@@ -108,7 +108,7 @@ help: function [
         "WORD! whose value to explain, or other HELP target (try HELP HELP)"
     /doc "Open web browser to related documentation."
 ][
-    return: specialize 'return [value: ~]  ; unlabeled for no console display
+    return: specialize :return [value: ~]  ; unlabeled for no console display
 
     if undefined? 'topic [
         ;
@@ -365,7 +365,7 @@ help: function [
     print newline
 
     print "DESCRIPTION:"
-    print [_ _ _ _ (:meta/description or '{(undocumented)})]
+    print [_ _ _ _ any [meta/description {(undocumented)}]]
     print [_ _ _ _ (uppercase mold topic) {is an ACTION!}]
 
     print-args: function [list /indent-words] [

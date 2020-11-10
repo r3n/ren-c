@@ -21,7 +21,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // A specialization is an ACTION! which has some of its parameters fixed.
-// e.g. `ap10: specialize 'append [value: 5 + 5]` makes ap10 have all the same
+// e.g. `ap10: specialize :append [value: 5 + 5]` makes ap10 have all the same
 // refinements available as APPEND, but otherwise just takes one series arg,
 // as it will always be appending 10.
 //
@@ -231,7 +231,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             // If refinement named on stack takes no arguments, then it can't
             // be partially specialized...only fully, and won't be bound:
             //
-            //     specialize 'append/only [only: #]  ; only not bound
+            //     specialize :append/only [only: #]  ; only not bound
             //
             Init_Blackhole(arg);
             SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
@@ -414,7 +414,7 @@ bool Specialize_Action_Throws(
                     ++ordered_dsp;
                     REBVAL *ordered = DS_AT(ordered_dsp);
 
-                    if (not IS_WORD_BOUND(ordered))  // specialize 'print/asdf
+                    if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
                         fail (Error_Bad_Refine_Raw(ordered));
 
                     REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
@@ -504,7 +504,7 @@ bool Specialize_Action_Throws(
     while (ordered_dsp != DSP) {
         ++ordered_dsp;
         REBVAL *ordered = DS_AT(ordered_dsp);
-        if (not IS_WORD_BOUND(ordered))  // specialize 'print/asdf
+        if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
             fail (Error_Bad_Refine_Raw(ordered));
 
         REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
@@ -543,8 +543,8 @@ bool Specialize_Action_Throws(
 //  {Create a new action through partial or full specialization of another}
 //
 //      return: [action!]
-//      specializee "Function or specifying word (keeps word for debug info)"
-//          [action! word! path!]
+//      specializee "Function whose parameters will be set to fixed values"
+//          [action!]
 //      def "Definition for FRAME! fields for args and refinements"
 //          [block!]
 //  ]
@@ -557,25 +557,15 @@ REBNATIVE(specialize_p)  // see extended definition SPECIALIZE in %base-defs.r
 
     // Refinement specializations via path are pushed to the stack, giving
     // order information that can't be meaningfully gleaned from an arbitrary
-    // code block (e.g. `specialize 'append [dup: x | if y [part: z]]`, we
+    // code block (e.g. `specialize :append [dup: x | if y [part: z]]`, we
     // shouldn't think that intends any ordering of /dup/part or /part/dup)
     //
     REBDSP lowest_ordered_dsp = DSP; // capture before any refinements pushed
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        specializee,
-        SPECIFIED,
-        true  // push_refines = true (don't generate temp specialization)
-    )){
-        return R_THROWN;  // e.g. `specialize 'append/(throw 10 'dup) [...]`
-    }
 
-    // Note: Even if there was a PATH! doesn't mean there were refinements
-    // used, e.g. `specialize 'lib/append [...]`.
-
-    if (not IS_ACTION(D_OUT))
-        fail (PAR(specializee));
-    Move_Value(specializee, D_OUT);  // Frees up D_OUT, GC guards action
+    // !!! When SPECIALIZE would take a PATH! instead of an action, this is
+    // where refinements could be pushed to weave into the specialization.
+    // To make the interface less confusing, we no longer do this...but we
+    // could push refinements here if we wanted to.
 
     if (Specialize_Action_Throws(
         D_OUT,
@@ -583,7 +573,7 @@ REBNATIVE(specialize_p)  // see extended definition SPECIALIZE in %base-defs.r
         ARG(def),
         lowest_ordered_dsp
     )){
-        return R_THROWN;  // e.g. `specialize 'append/dup [value: throw 10]`
+        return R_THROWN;  // e.g. `specialize :append/dup [value: throw 10]`
     }
 
     return D_OUT;
@@ -980,7 +970,7 @@ bool Make_Frame_From_Varargs_Throws(
     PUSH_GC_GUARD(action);
 
     // We interpret phrasings like `x: does all [...]` to mean something
-    // like `x: specialize 'all [block: [...]]`.  While this originated
+    // like `x: specialize :all [block: [...]]`.  While this originated
     // from the Rebmu code golfing language to eliminate a pair of bracket
     // characters from `x: does [all [...]]`, it actually has different
     // semantics...which can be useful in their own right, plus the

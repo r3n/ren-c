@@ -451,7 +451,7 @@ if 'Windows <> first system/platform [
     "za" "Zhuang; Chuang"
     "zu" "Zulu" ]
 
-    hijack 'locale function [
+    hijack :locale function [
         type [word!]
         <static>
         iso-639 (iso-639-table)
