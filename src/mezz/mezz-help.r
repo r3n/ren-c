@@ -75,13 +75,13 @@ description-of: function [
         void! @[null]  ; don't voidify, want actual NULL
         any-array! [spaced ["array of length:" length of v]]
         image! [spaced ["size:" v/size]]
-        datatype! [
+        datatype! @[
             spec: ensure object! spec of v  ; "type specs" need simplifying
-            copy spec/title
+            opt copy spec/title
         ]
         action! @[  ; want null when IF doesn't match
-            if meta: meta-of :v [
-                copy get 'meta/description
+            if meta: meta-of :v @[
+                opt copy get 'meta/description  ; can be BLANK!
             ]
         ]
         gob! [spaced ["offset:" v/offset "size:" v/size]]

@@ -1128,9 +1128,15 @@ REBNATIVE(switch)
             if (IS_END(f_value))
                 goto reached_end;
 
-            if (IS_BLOCK(f_value)) {  // f_value is RELVAL, can't Do_Branch
+            if (IS_BLOCK(f_value) or IS_SYM_BLOCK(f_value)) {
+                //
+                // f_value is RELVAL, can't Do_Branch
+                //
                 if (Do_Any_Array_At_Throws(D_OUT, f_value, f_specifier))
                     goto threw;
+                if (IS_BLOCK(f_value))
+                    if (IS_NULLED(D_OUT) or IS_VOID(D_OUT))
+                        Init_Void(D_OUT, SYM_BRANCHED);
                 break;
             }
 
@@ -1152,8 +1158,6 @@ REBNATIVE(switch)
 
             Fetch_Next_Forget_Lookback(f);
         }
-
-        Voidify_If_Nulled(D_OUT);  // null is reserved for no branch run
 
         if (not REF(all)) {
             Drop_Frame(f);

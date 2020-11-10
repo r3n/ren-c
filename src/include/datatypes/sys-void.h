@@ -62,12 +62,6 @@ inline static REBVAL *Init_Unlabeled_Void(RELVAL *out) {
     return cast(REBVAL*, out);
 }
 
-inline static REBVAL *Voidify_If_Nulled(REBVAL *cell) {
-    if (IS_NULLED(cell))
-        Init_Void(cell, SYM_NULLED);
-    return cell;
-}
-
 inline static const REBSTR *VAL_VOID_OPT_LABEL(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_VOID);
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
