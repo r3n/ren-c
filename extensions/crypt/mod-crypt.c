@@ -430,7 +430,11 @@ static int Mpi_From_Binary(mbedtls_mpi* X, const REBVAL *binary)
 
     int result = mbedtls_mpi_read_binary(X, buf, size);
 
-    assert(mbedtls_mpi_size(X) == size);  // should reflect what we set
+    // !!! It seems that `assert(mbedtls_mpi_size(X) == size)` is not always
+    // true, e.g. when the first byte is 0.
+    //
+    assert(mbedtls_mpi_size(X) <= size);
+
     rebFree(buf);  // !!! This could use a non-copying binary reader API
 
     return result;
