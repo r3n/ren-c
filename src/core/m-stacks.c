@@ -206,7 +206,7 @@ REBCTX *Get_Context_From_Stack(void)
     // you want the code to bind into the lib context.
     //
     if (NOT_ACTION_FLAG(phase, IS_NATIVE))
-        return Lib_Context;
+        return VAL_CONTEXT(Lib_Context);
 
     REBARR *details = ACT_DETAILS(phase);
     REBVAL *context = SPECIFIC(ARR_AT(details, 1));

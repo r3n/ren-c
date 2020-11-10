@@ -269,7 +269,7 @@ REBNATIVE(load_extension)
         //
         if (is_export) {
             Init_Word(DS_PUSH(), VAL_WORD_SPELLING(name));
-            if (0 == Try_Bind_Word(module_ctx, DS_TOP))
+            if (0 == Try_Bind_Word(module, DS_TOP))
                 panic ("Couldn't bind word just added -- problem");
         }
     }

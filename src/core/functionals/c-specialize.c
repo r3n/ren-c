@@ -484,7 +484,7 @@ bool Specialize_Action_Throws(
 
         assert(GET_CELL_FLAG(arg, ARG_MARKED_CHECKED));
         Move_Value(DS_PUSH(), param);
-        Hide_Param(DS_TOP);
+        Specialize_Param(DS_TOP);
         continue;
     }
 
@@ -891,26 +891,24 @@ bool Make_Invocation_Frame_Throws(
 
     *first_arg_ptr = nullptr;
 
-    REBVAL *refine = nullptr;
     REBVAL *param = CTX_KEYS_HEAD(CTX(f->varlist));
     REBVAL *arg = CTX_VARS_HEAD(CTX(f->varlist));
     for (; NOT_END(param); ++param, ++arg) {
         Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
-        if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
-            refine = param;
-        }
-        else switch (pclass) {
+        if (TYPE_CHECK(param, REB_TS_REFINEMENT))
+            continue;  // optional so doesn't count
+
+        switch (pclass) {
           case REB_P_NORMAL:
           case REB_P_HARD_QUOTE:
           case REB_P_MODAL:
           case REB_P_SOFT_QUOTE:
-            if (not refine or VAL_LOGIC(refine)) {
-                *first_arg_ptr = arg;
-                goto found_first_arg_ptr;
-            }
-            break;
+            *first_arg_ptr = arg;
+            goto found_first_arg_ptr;
 
           case REB_P_LOCAL:
+          case REB_P_SEALED:
+          case REB_P_SPECIALIZED:
             break;
 
           default:
@@ -1073,7 +1071,7 @@ REBACT *Alloc_Action_From_Exemplar(
 
         // Don't show argument in the parameter list.
         //
-        Hide_Param(alias);
+        Specialize_Param(alias);
 
         // Indicate that argument is specialized out.
         //

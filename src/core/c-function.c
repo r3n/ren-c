@@ -576,7 +576,10 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         }
         else {
             REBVAL *param = DS_AT(definitional_return_dsp);
-            assert(VAL_PARAM_CLASS(param) == REB_P_LOCAL);
+            assert(
+                VAL_PARAM_CLASS(param) == REB_P_LOCAL
+                or VAL_PARAM_CLASS(param) == REB_P_SEALED  // !!! review reuse
+            );
             assert(HEART_BYTE(param) == REB_TYPESET);
             UNUSED(param);
         }
@@ -658,8 +661,10 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     // Weird due to Spectre/MSVC: https://stackoverflow.com/q/50399940
     //
     for (; src != DS_TOP + 1; src += 3) {
-        if (not Try_Add_Binder_Index(&binder, VAL_PARAM_CANON(src), 1020))
-            duplicate = VAL_PARAM_SPELLING(src);
+        if (not Is_Param_Sealed(src)) {  // allow reuse of sealed names
+            if (not Try_Add_Binder_Index(&binder, VAL_PARAM_CANON(src), 1020))
+                duplicate = VAL_PARAM_SPELLING(src);
+        }
 
         if (definitional_return and src == definitional_return)
             continue;
@@ -675,6 +680,8 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     // Weird due to Spectre/MSVC: https://stackoverflow.com/q/50399940
     //
     for (; src != DS_TOP + 1; src += 3, ++dest) {
+        if (Is_Param_Sealed(src))
+            continue;
         if (
             Remove_Binder_Index_Else_0(&binder, VAL_PARAM_CANON(src))
             == 0

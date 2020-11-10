@@ -307,7 +307,7 @@ inline static bool Is_Param_Hidden(const RELVAL *v) {
     // functionals above it.
     //
     Reb_Param_Class pclass = VAL_PARAM_CLASS(v);
-    return pclass == REB_P_LOCAL or pclass == REB_P_SEALED;
+    return IS_HIDDEN_PARAM_KIND(pclass);
 }
 
 inline static void Hide_Param(RELVAL *param) {
@@ -317,6 +317,14 @@ inline static void Hide_Param(RELVAL *param) {
 
 inline static void Seal_Param(RELVAL *param) {
     mutable_KIND3Q_BYTE(param) = REB_P_SEALED;
+}
+
+inline static void Specialize_Param(RELVAL *param) {
+    assert(
+        VAL_PARAM_CLASS(param) != REB_P_SEALED
+        and VAL_PARAM_CLASS(param) != REB_P_LOCAL
+    );
+    mutable_KIND3Q_BYTE(param) = REB_P_SPECIALIZED;
 }
 
 

@@ -872,7 +872,14 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // they don't just want an ISSUE! or NULL, they want # or NULL.
         //
         if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
-            if (NOT_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
+            if (
+                GET_EVAL_FLAG(f, FULLY_SPECIALIZED)
+                and Is_Void_With_Sym(f->arg, SYM_UNDEFINED)
+            ){
+                Init_Nulled(f->arg);
+                SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+            }
+            else if (NOT_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
                 Typecheck_Refinement(f->param, f->arg);
             continue;
         }
@@ -1049,7 +1056,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 CATCH_THROWN(f->out, f->out);
                 assert(IS_FRAME(f->out));
 
-                // !!! We are reusing the frame and may be jumping to an
+                // We are reusing the frame and may be jumping to an
                 // "earlier phase" of a composite function, or even to
                 // a "not-even-earlier-just-compatible" phase of another
                 // function.  Type checking is necessary, as is zeroing
@@ -1060,33 +1067,35 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // Since dispatchers run arbitrary code to pick how (and
                 // if) they want to change the phase on each redo, we
                 // have no easy way to tell if a phase is "earlier" or
-                // "later".  The only thing we have is if it's the same
-                // we know we couldn't have touched the specialized args
-                // (no binding to them) so no need to fill those slots
-                // in via the exemplar.  Otherwise, we have to use the
-                // exemplar of the phase.
+                // "later".
                 //
-                // REDO is a fairly esoteric feature to start with, and
-                // REDO of a frame phase that isn't the running one even
-                // more esoteric, with REDO/OTHER being *extremely*
-                // esoteric.  So having a fourth state of how to handle
-                // f->special (in addition to the three described above)
-                // seems like more branching in the baseline argument
-                // loop.  Hence, do a pre-pass here to fill in just the
-                // specializations and leave everything else alone.
+                // !!! Consider folding this pass into an option for the
+                // typechecking loop itself.
                 //
-                REBCTX *exemplar;
                 REBACT *redo_phase = VAL_PHASE_ELSE_ARCHETYPE(f->out);
-                if (
-                    FRM_PHASE(f) != redo_phase
-                    and did (exemplar = ACT_EXEMPLAR(redo_phase))
-                ){
-                    f->special = CTX_VARS_HEAD(exemplar);
-                    f->arg = FRM_ARGS_HEAD(f);
-                    for (; NOT_END(f->arg); ++f->arg, ++f->special) {
-                        if (IS_NULLED(f->special))  // no specialization
-                            continue;
-                        Move_Value(f->arg, f->special);  // reset it
+                f->param = ACT_PARAMS_HEAD(redo_phase);
+                f->special = ACT_SPECIALTY_HEAD(redo_phase);
+                f->arg = FRM_ARGS_HEAD(f);
+                for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
+                    switch (VAL_PARAM_CLASS(f->param)) {
+                      case REB_P_LOCAL:
+                        Init_Void(f->arg, SYM_UNDEFINED);
+                        break;
+                      
+                      case REB_P_SEALED:
+                        if (f->param == f->special)  // sealed local
+                            Init_Void(f->arg, SYM_UNDEFINED);
+                        else
+                            Blit_Specific(f->arg, f->special);
+                        break;
+
+                      case REB_P_SPECIALIZED:
+                        assert(f->param != f->special);
+                        Blit_Specific(f->arg, f->special);
+                        break;
+
+                      default:
+                        break;
                     }
                 }
 

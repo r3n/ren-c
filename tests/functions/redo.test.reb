@@ -58,7 +58,8 @@
         redo 'return
     ]
 
-    error? trap [foo 100]
+    e: trap [foo 100 1020]
+    e/id = 'expect-arg
 )
 
 ; REDO phase test

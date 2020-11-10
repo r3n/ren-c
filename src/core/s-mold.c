@@ -326,7 +326,10 @@ void Form_Array_At(
         const RELVAL *item = ARR_AT(array, index + n);
         REBVAL *wval = nullptr;
         if (opt_context and (IS_WORD(item) or IS_GET_WORD(item))) {
-            wval = Select_Canon_In_Context(opt_context, VAL_WORD_CANON(item));
+            wval = Select_Canon_In_Context(
+                CTX_ARCHETYPE(opt_context),
+                VAL_WORD_CANON(item)
+            );
             if (wval)
                 item = wval;
         }

@@ -113,7 +113,7 @@ void Bind_Values_Inner_Loop(
 //
 void Bind_Values_Core(
     RELVAL *head,
-    REBCTX *context,
+    const RELVAL *context,
     REBU64 bind_types,
     REBU64 add_midstream_types,
     REBFLGS flags // see %sys-core.h for BIND_DEEP, etc.
@@ -127,18 +127,23 @@ void Bind_Values_Core(
     //
   blockscope {
     REBLEN index = 1;
-    REBVAL *key = CTX_KEYS_HEAD(context);
-    for (; index <= CTX_LEN(context); key++, index++)
+    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    for (; NOT_END(key); key++, index++)
         if (not Is_Param_Sealed(key))
             Add_Binder_Index(&binder, VAL_KEY_CANON(key), index);
   }
 
     Bind_Values_Inner_Loop(
-        &binder, head, context, bind_types, add_midstream_types, flags
+        &binder,
+        head,
+        VAL_CONTEXT(context),
+        bind_types,
+        add_midstream_types,
+        flags
     );
 
   blockscope {  // Reset all the binder indices to zero
-    RELVAL *key = CTX_KEYS_HEAD(context);
+    RELVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
     for (; NOT_END(key); key++)
         if (not Is_Param_Sealed(key))
             Remove_Binder_Index(&binder, VAL_KEY_CANON(key));
@@ -186,12 +191,12 @@ void Unbind_Values_Core(RELVAL *head, REBCTX *context, bool deep)
 // Returns 0 if word is not part of the context, otherwise the index of the
 // word in the context.
 //
-REBLEN Try_Bind_Word(REBCTX *context, REBVAL *word)
+REBLEN Try_Bind_Word(const RELVAL *context, REBVAL *word)
 {
-    REBLEN n = Find_Canon_In_Context(context, VAL_WORD_CANON(word), false);
+    REBLEN n = Find_Canon_In_Context(context, VAL_WORD_CANON(word));
     if (n != 0) {
-        INIT_BINDING(word, context); // binding may have been relative before
-        INIT_WORD_INDEX(word, n);
+        INIT_BINDING(word, VAL_CONTEXT(context));
+        INIT_WORD_INDEX(word, n);  // ^-- may have been relative bind before
     }
     return n;
 }
@@ -429,8 +434,11 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
   blockscope {  // Setup binding table from the argument word list
     RELVAL *param = ARR_AT(paramlist, 1);  // [0] is ACT_ARCHETYPE() ACTION!
-    for (; NOT_END(param); ++param, ++param_num)
+    for (; NOT_END(param); ++param, ++param_num) {
+        if (Is_Param_Sealed(param))
+            continue;
         Add_Binder_Index(&binder, VAL_KEY_CANON(param), param_num);
+    }
   }
 
     const REBARR *original = VAL_ARRAY(body);
@@ -516,8 +524,11 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
   blockscope {  // Reset binding table
     RELVAL *param = ARR_AT(paramlist, 1);  // [0] is ACT_ARCHETYPE() ACTION!
-    for (; NOT_END(param); param++)
+    for (; NOT_END(param); param++) {
+        if (Is_Param_Sealed(param))
+            continue;
         Remove_Binder_Index(&binder, VAL_KEY_CANON(param));
+    }
   }
 
     SHUTDOWN_BINDER(&binder);
@@ -936,8 +947,8 @@ void Init_Interning_Binder(
     // "imported" from there to the context, and adjusted in the binder to the
     // new positive index.
     //
-    if (ctx != Lib_Context) {
-        REBVAL *key = CTX_KEYS_HEAD(Lib_Context);
+    if (ctx != VAL_CONTEXT(Lib_Context)) {
+        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
         REBINT index = 1;
         for (; NOT_END(key); ++key, ++index) {
             const REBSTR *canon = VAL_KEY_CANON(key);
@@ -972,8 +983,8 @@ void Shutdown_Interning_Binder(struct Reb_Binder *binder, REBCTX *ctx)
     // The lib context keys may have been imported, so you won't necessarily
     // find them in the list any more.
     //
-    if (ctx != Lib_Context) {
-        REBVAL *key = CTX_KEYS_HEAD(Lib_Context);
+    if (ctx != VAL_CONTEXT(Lib_Context)) {
+        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
         REBINT index = 1;
         for (; NOT_END(key); ++key, ++index) {
             REBINT n = Remove_Binder_Index_Else_0(binder, VAL_KEY_CANON(key));

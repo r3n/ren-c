@@ -455,7 +455,7 @@ redescribe [
 unset: redescribe [
     {Clear the value of a word to null (in its current context.)}
 ](
-    adapt specialize 'set [value: ~overwrite~] [value: null]  ; !!! fix
+    specialize 'set [value: null]
 )
 
 

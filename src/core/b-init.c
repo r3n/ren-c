@@ -175,11 +175,13 @@ void Set_Stack_Limit(void *base, uintptr_t bounds) {
 //
 static void Startup_True_And_False(void)
 {
-    REBVAL *true_value = Append_Context(Lib_Context, 0, Canon(SYM_TRUE));
+    REBCTX *lib = VAL_CONTEXT(Lib_Context);
+
+    REBVAL *true_value = Append_Context(lib, 0, Canon(SYM_TRUE));
     Init_True(true_value);
     assert(IS_TRUTHY(true_value) and VAL_LOGIC(true_value) == true);
 
-    REBVAL *false_value = Append_Context(Lib_Context, 0, Canon(SYM_FALSE));
+    REBVAL *false_value = Append_Context(lib, 0, Canon(SYM_FALSE));
     Init_False(false_value);
     assert(IS_FALSEY(false_value) and VAL_LOGIC(false_value) == false);
 }
@@ -242,7 +244,7 @@ REBNATIVE(generic)
 
     REBARR *details = ACT_DETAILS(generic);
     Init_Word(ARR_AT(details, IDX_NATIVE_BODY), VAL_WORD_CANON(ARG(verb)));
-    Init_Object(ARR_AT(details, IDX_NATIVE_CONTEXT), Lib_Context);
+    Move_Value(ARR_AT(details, IDX_NATIVE_CONTEXT), Lib_Context);
 
     REBVAL *verb_var = Sink_Word_May_Fail(ARG(verb), SPECIFIED);
     Init_Action(verb_var, generic, VAL_WORD_SPELLING(ARG(verb)), UNBOUND);
@@ -519,7 +521,7 @@ static REBARR *Startup_Natives(const REBVAL *boot_natives)
             &item,
             specifier,
             Native_C_Funcs[n],
-            CTX_ARCHETYPE(Lib_Context)
+            Lib_Context
         );
 
         // While the lib context natives can be overwritten, the system
@@ -765,7 +767,7 @@ static void Init_System_Object(
 
     // Bind it so CONTEXT native will work (only used at topmost depth)
     //
-    Bind_Values_Shallow(spec_head, system);
+    Bind_Values_Shallow(spec_head, CTX_ARCHETYPE(system));
 
     // Evaluate the block (will eval CONTEXTs within).  Expects void result.
     //
@@ -779,7 +781,7 @@ static void Init_System_Object(
     // and have it bound in lines like `sys: system/contexts/sys`)
     //
     Init_Object(
-        Append_Context(Lib_Context, NULL, Canon(SYM_SYSTEM)),
+        Append_Context(VAL_CONTEXT(Lib_Context), NULL, Canon(SYM_SYSTEM)),
         system
     );
 
@@ -854,12 +856,10 @@ void Shutdown_System_Object(void)
 //
 static void Init_Contexts_Object(void)
 {
-    DROP_GC_GUARD(Sys_Context);
-    Init_Object(Get_System(SYS_CONTEXTS, CTX_SYS), Sys_Context);
+    Move_Value(Get_System(SYS_CONTEXTS, CTX_SYS), Sys_Context);
 
-    DROP_GC_GUARD(Lib_Context);
-    Init_Object(Get_System(SYS_CONTEXTS, CTX_LIB), Lib_Context);
-    Init_Object(Get_System(SYS_CONTEXTS, CTX_USER), Lib_Context);
+    Move_Value(Get_System(SYS_CONTEXTS, CTX_LIB), Lib_Context);
+    Move_Value(Get_System(SYS_CONTEXTS, CTX_USER), Lib_Context);
 }
 
 
@@ -1032,9 +1032,10 @@ static void Startup_Sys(REBARR *boot_sys) {
 //
 REBVAL *Get_Sys_Function_Debug(REBLEN index, const char *name)
 {
-    const char *key = STR_UTF8(VAL_KEY_SPELLING(CTX_KEY(Sys_Context, index)));
-    assert(strcmp(key, name) == 0);
-    return CTX_VAR(Sys_Context, index);
+    const REBVAL *key = VAL_CONTEXT_KEY(Sys_Context, index);
+    const char *key_utf8 = STR_UTF8(VAL_KEY_SPELLING(key));
+    assert(strcmp(key_utf8, name) == 0);
+    return VAL_CONTEXT_VAR(Sys_Context, index);
 }
 #endif
 
@@ -1247,11 +1248,13 @@ void Startup_Core(void)
 
     // !!! Have MAKE-BOOT compute # of words
     //
-    Lib_Context = Alloc_Context_Core(REB_OBJECT, 600, NODE_FLAG_MANAGED);
-    PUSH_GC_GUARD(Lib_Context);
+    REBCTX *lib = Alloc_Context_Core(REB_OBJECT, 600, NODE_FLAG_MANAGED);
+    Lib_Context = Alloc_Value();
+    Init_Object(Lib_Context, lib);
 
-    Sys_Context = Alloc_Context_Core(REB_OBJECT, 50, NODE_FLAG_MANAGED);
-    PUSH_GC_GUARD(Sys_Context);
+    REBCTX *sys = Alloc_Context_Core(REB_OBJECT, 50, NODE_FLAG_MANAGED);
+    Sys_Context = Alloc_Value();
+    Init_Object(Sys_Context, sys);
 
     REBARR *datatypes_catalog = Startup_Datatypes(
         VAL_ARRAY_KNOWN_MUTABLE(&boot->types),
@@ -1401,9 +1404,13 @@ void Shutdown_Core(void)
     Shutdown_Action_Spec_Tags();
     Shutdown_Root_Vars();
 
-    Shutdown_Frame_Stack();
-
     Shutdown_Datatypes();
+
+    rebRelease(Lib_Context);
+    rebRelease(Sys_Context);
+
+    Shutdown_Frame_Stack();  // all API calls (e.g. rebRelease()) before this
+    Shutdown_Api();
 
 //=//// ALL MANAGED SERIES MUST HAVE THE KEEPALIVE REFERENCES GONE NOW ////=//
 
@@ -1417,8 +1424,6 @@ void Shutdown_Core(void)
     Shutdown_String();
     Shutdown_Scanner();
     Shutdown_Char_Cases();
-
-    Shutdown_Api();
 
     Shutdown_Symbols();
     Shutdown_Interning();

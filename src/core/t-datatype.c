@@ -211,7 +211,7 @@ REBVAL *Datatype_From_Url(const REBVAL *url) {
 static void Startup_Fake_Type_Constraint(REBSYM sym)
 {
     const REBSTR *canon = Canon(sym);
-    REBVAL *char_x = Append_Context(Lib_Context, nullptr, canon);
+    REBVAL *char_x = Append_Context(VAL_CONTEXT(Lib_Context), nullptr, canon);
     Init_Sym_Word(char_x, canon);
 }
 
@@ -269,7 +269,11 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
     REBINT n;
     for (n = 1; NOT_END(word); word++, n++) {
         enum Reb_Kind kind = cast(enum Reb_Kind, n);
-        REBVAL *value = Append_Context(Lib_Context, SPECIFIC(word), nullptr);
+        REBVAL *value = Append_Context(
+            VAL_CONTEXT(Lib_Context),
+            SPECIFIC(word),
+            nullptr
+        );
 
         if (kind == REB_NULL) {
             Init_Nulled(value);
@@ -306,7 +310,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
         // a limited sense.)
         //
         assert(value == Datatype_From_Kind(kind));
-        assert(value == CTX_VAR(Lib_Context, n));
+        assert(value == VAL_CONTEXT_VAR(Lib_Context, n));
         SET_CELL_FLAG(value, PROTECTED);
 
         Append_Value(catalog, SPECIFIC(word));

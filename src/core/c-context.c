@@ -575,9 +575,8 @@ REBARR *Collect_Keylist_Managed(
         if (
             not prior or (
                 0 == (*self_index_out = Find_Canon_In_Context(
-                    prior,
-                    Canon(SYM_SELF),
-                    true
+                    CTX_ARCHETYPE(prior),
+                    Canon(SYM_SELF)
                 ))
             )
         ) {
@@ -923,7 +922,7 @@ REBCTX *Construct_Context_Managed(
     if (not head)
         return context;
 
-    Bind_Values_Shallow(head, context);
+    Bind_Values_Shallow(head, CTX_ARCHETYPE(context));
 
     const RELVAL *value = head;
     for (; NOT_END(value); value += 2) {
@@ -956,41 +955,50 @@ REBCTX *Construct_Context_Managed(
 //     2 for value
 //     3 for words and values
 //
-REBARR *Context_To_Array(REBCTX *context, REBINT mode)
+REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
 {
     REBDSP dsp_orig = DSP;
 
-    REBVAL *key = CTX_KEYS_HEAD(context);
-    REBVAL *var = CTX_VARS_HEAD(context);
+    bool always = false;  // default to not always showing hidden things
+    if (IS_FRAME(context))
+        always = (VAL_OPT_PHASE(context) != nullptr);
+
+    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
 
     assert(!(mode & 4));
 
     REBLEN n = 1;
     for (; NOT_END(key); n++, key++, var++) {
-        if (not Is_Param_Hidden(key)) {
-            if (mode & 1) {
-                Init_Any_Word_Bound(
-                    DS_PUSH(),
-                    (mode & 2) ? REB_SET_WORD : REB_WORD,
-                    VAL_KEY_SPELLING(key),
-                    context,
-                    n
-                );
+        if (Is_Param_Sealed(key))
+            continue;
 
-                if (mode & 2)
-                    SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
-            }
-            if (mode & 2) {
-                //
-                // Context might have voids, which denote the value have not
-                // been set.  These contexts cannot be converted to blocks,
-                // since user arrays may not contain void.
-                //
-                if (IS_NULLED(var))
-                    fail (Error_Null_Object_Block_Raw());
+        if (not always and Is_Param_Hidden(key))
+            continue;
 
-                Move_Value(DS_PUSH(), var);
-            }
+        if (mode & 1) {
+            Init_Any_Word_Bound(
+                DS_PUSH(),
+                (mode & 2) ? REB_SET_WORD : REB_WORD,
+                VAL_KEY_SPELLING(key),
+                VAL_CONTEXT(context),
+                n
+            );
+
+            if (mode & 2)
+                SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
+        }
+
+        if (mode & 2) {
+            //
+            // Context might have voids, which denote the value have not
+            // been set.  These contexts cannot be converted to blocks,
+            // since user arrays may not contain void.
+            //
+            if (IS_NULLED(var))
+                fail (Error_Null_Object_Block_Raw());
+
+            Move_Value(DS_PUSH(), var);
         }
     }
 
@@ -1133,7 +1141,10 @@ REBCTX *Merge_Contexts_Selfish_Managed(REBCTX *parent1, REBCTX *parent2)
 
     // We should have gotten a SELF in the results, one way or another.
     //
-    REBLEN self_index = Find_Canon_In_Context(merged, Canon(SYM_SELF), true);
+    REBLEN self_index = Find_Canon_In_Context(
+        CTX_ARCHETYPE(merged),
+        Canon(SYM_SELF)
+    );
     assert(self_index != 0);
     assert(CTX_KEY_SYM(merged, self_index) == SYM_SELF);
     Move_Value(CTX_VAR(merged, self_index), CTX_ARCHETYPE(merged));
@@ -1302,30 +1313,31 @@ void Resolve_Context(
 // Search a context looking for the given canon symbol.  Return the index or
 // 0 if not found.
 //
-REBLEN Find_Canon_In_Context(
-    REBCTX *context,
-    const REBSTR *canon,
-    bool always
-){
+// Note that since contexts like FRAME! can have multiple keys with the same
+// name, the VAL_PHASE() of the context has to be taken into account.
+//
+REBLEN Find_Canon_In_Context(const RELVAL *context, const REBSTR *canon) {
     assert(GET_SERIES_INFO(canon, STRING_CANON));
 
-    REBVAL *key = CTX_KEYS_HEAD(context);
-    REBLEN len = CTX_LEN(context);
+    bool always = true;
+    if (IS_FRAME(context))
+        always = (VAL_OPT_PHASE(context) != nullptr);
+
+    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
 
     REBLEN n;
-    for (n = 1; n <= len; n++, key++) {
+    for (n = 1; NOT_END(key); n++, key++) {
         if (canon == VAL_KEY_CANON(key)) {
             if (Is_Param_Sealed(key))
                 continue;  // pretend this parameter is not there
 
-            if (Is_Param_Hidden(key) and not always)
+            if (not always and Is_Param_Hidden(key))
                 return 0;
 
             return n;
         }
     }
 
-    // !!! Should this be changed to NOT_FOUND?
     return 0;
 }
 
@@ -1336,14 +1348,13 @@ REBLEN Find_Canon_In_Context(
 // Search a context's keylist looking for the given canon symbol, and return
 // the value for the word.  Return NULL if the canon is not found.
 //
-REBVAL *Select_Canon_In_Context(REBCTX *context, const REBSTR *canon)
+REBVAL *Select_Canon_In_Context(const RELVAL *context, const REBSTR *canon)
 {
-    const bool always = false;
-    REBLEN n = Find_Canon_In_Context(context, canon, always);
+    REBLEN n = Find_Canon_In_Context(context, canon);
     if (n == 0)
-        return NULL;
+        return nullptr;
 
-    return CTX_VAR(context, n);
+    return VAL_CONTEXT_VAR(context, n);
 }
 
 

@@ -201,7 +201,7 @@ REB_R MAKE_Array(
         return Init_Any_Array(out, kind, Map_To_Array(VAL_MAP(arg), 0));
     }
     else if (ANY_CONTEXT(arg)) {
-        return Init_Any_Array(out, kind, Context_To_Array(VAL_CONTEXT(arg), 3));
+        return Init_Any_Array(out, kind, Context_To_Array(arg, 3));
     }
     else if (IS_VARARGS(arg)) {
         //
@@ -671,7 +671,8 @@ void MF_Array(REB_MOLD *mo, REBCEL(const*) v, bool form)
     enum Reb_Kind kind = CELL_KIND(v);
 
     if (form) {
-        Form_Array_At(mo, VAL_ARRAY(v), VAL_INDEX(v), 0);
+        REBCTX *opt_context = nullptr;
+        Form_Array_At(mo, VAL_ARRAY(v), VAL_INDEX(v), opt_context);
         return;
     }
 

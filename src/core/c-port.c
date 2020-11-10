@@ -114,15 +114,11 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
     // Dispatch object function:
 
-    REBLEN n; // goto would cross initialization
-    n = Find_Canon_In_Context(
-        VAL_CONTEXT(actor),
-        VAL_WORD_CANON(verb),
-        false // !always
-    );
+  blockscope {
+    REBLEN n = Find_Canon_In_Context(actor, VAL_WORD_CANON(verb));
 
-    REBVAL *action;
-    if (n == 0 or not IS_ACTION(action = VAL_CONTEXT_VAR(actor, n)))
+    REBVAL *action = (n == 0) ? nullptr : VAL_CONTEXT_VAR(actor, n);
+    if (not action or not IS_ACTION(action))
         fail (Error_No_Port_Action_Raw(verb));
 
     if (Redo_Action_Throws_Maybe_Stale(frame_->out, frame_, VAL_ACTION(action)))
@@ -131,6 +127,7 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     CLEAR_CELL_FLAG(frame_->out, OUT_MARKED_STALE);
 
     r = D_OUT; // result should be in frame_->out
+  }
 
     // !!! READ's /LINES and /STRING refinements are something that should
     // work regardless of data source.  But R3-Alpha only implemented it in

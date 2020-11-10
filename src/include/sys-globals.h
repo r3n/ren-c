@@ -61,8 +61,8 @@ PVAR REBLEN PG_Num_Canon_Slots_In_Use; // Total canon hash slots (+ deleteds)
 #endif
 PVAR const REBSTR *PG_Bar_Canon;  // fast canon value for testing for `|`
 
-PVAR REBCTX *Lib_Context;
-PVAR REBCTX *Sys_Context;
+PVAR REBVAL *Lib_Context;
+PVAR REBVAL *Sys_Context;
 
 //-- Various char tables:
 PVAR REBYTE *White_Chars;

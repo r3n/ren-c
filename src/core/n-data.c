@@ -142,7 +142,7 @@ REBNATIVE(bind)
     else
         add_midstream_types = 0;
 
-    REBCTX *context;
+    const RELVAL *context;
 
     // !!! For now, force reification before doing any binding.
 
@@ -150,14 +150,15 @@ REBNATIVE(bind)
         //
         // Get target from an OBJECT!, ERROR!, PORT!, MODULE!, FRAME!
         //
-        context = VAL_CONTEXT(target);
+        context = target;
     }
     else {
         assert(ANY_WORD(target));
-        if (IS_WORD_UNBOUND(target))
+
+        if (not Did_Get_Binding_Of(D_SPARE, target))
             fail (Error_Not_Bound_Raw(target));
 
-        context = VAL_WORD_CONTEXT(target);
+        context = D_SPARE;
     }
 
     if (ANY_WORD(v)) {
@@ -170,7 +171,7 @@ REBNATIVE(bind)
         // not in context, bind/new means add it if it's not.
         //
         if (REF(new) or (IS_SET_WORD(v) and REF(set))) {
-            Append_Context(context, v, NULL);
+            Append_Context(VAL_CONTEXT(context), v, NULL);
             RETURN (v);
         }
 
@@ -184,7 +185,7 @@ REBNATIVE(bind)
     //
     if (IS_ACTION(v)) {
         Move_Value(D_OUT, v);
-        INIT_BINDING(D_OUT, context);
+        INIT_BINDING(D_OUT, VAL_CONTEXT(context));
         return D_OUT;
     }
 
@@ -263,16 +264,16 @@ REBNATIVE(in)
 
                 v = safe;
                 if (IS_OBJECT(v)) {
-                    REBCTX *context = VAL_CONTEXT(v);
                     REBLEN index = Find_Canon_In_Context(
-                        context, VAL_WORD_CANON(word), false
+                        v,
+                        VAL_WORD_CANON(word)
                     );
                     if (index != 0)
                         return Init_Any_Word_Bound(
                             D_OUT,
                             VAL_TYPE(word),
                             VAL_WORD_SPELLING(word),
-                            context,
+                            VAL_CONTEXT(v),
                             index
                         );
                 }
@@ -283,7 +284,7 @@ REBNATIVE(in)
         fail (word);
     }
 
-    REBCTX *context = VAL_CONTEXT(val);
+    REBVAL *context = val;
 
     // Special form: IN object block
     if (IS_BLOCK(word) or IS_GROUP(word)) {
@@ -292,7 +293,7 @@ REBNATIVE(in)
         RETURN (word);
     }
 
-    REBLEN index = Find_Canon_In_Context(context, VAL_WORD_CANON(word), false);
+    REBLEN index = Find_Canon_In_Context(context, VAL_WORD_CANON(word));
     if (index == 0)
         return nullptr;
 
@@ -300,7 +301,7 @@ REBNATIVE(in)
         D_OUT,
         VAL_TYPE(word),
         VAL_WORD_SPELLING(word),
-        context,
+        VAL_CONTEXT(context),
         index
     );
     return Quotify(D_OUT, num_quotes);
@@ -417,12 +418,6 @@ bool Did_Get_Binding_Of(REBVAL *out, const REBVAL *v)
             //
             assert(VAL_BINDING(out) == UNBOUND); // canons have no binding
         }
-
-        REBACT *phase = VAL_OPT_PHASE(out);
-        assert(
-            phase == nullptr
-            or GET_ARRAY_FLAG(ACT_PARAMLIST(phase), IS_PARAMLIST)
-        );
     }
 
     return true;

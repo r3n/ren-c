@@ -25,13 +25,15 @@
 #include "sys-core.h"
 
 
-static void Append_To_Context(REBCTX *context, REBVAL *arg)
+static void Append_To_Context(REBVAL *context, REBVAL *arg)
 {
+    REBCTX *c = VAL_CONTEXT(context);
+
     // Can be a word:
     if (ANY_WORD(arg)) {
-        if (0 == Find_Canon_In_Context(context, VAL_WORD_CANON(arg), true)) {
-            Expand_Context(context, 1); // copy word table also
-            Append_Context(context, 0, VAL_WORD_SPELLING(arg));
+        if (0 == Find_Canon_In_Context(context, VAL_WORD_CANON(arg))) {
+            Expand_Context(c, 1); // copy word table also
+            Append_Context(c, 0, VAL_WORD_SPELLING(arg));
             // default of Append_Context is that arg's value is void
         }
         return;
@@ -61,7 +63,7 @@ static void Append_To_Context(REBCTX *context, REBVAL *arg)
     // Setup binding table with obj words.  Binding table is empty so don't
     // bother checking for duplicates.
     //
-    Collect_Context_Keys(&collector, context, false);
+    Collect_Context_Keys(&collector, c, false);
 
     // Examine word/value argument block
 
@@ -90,12 +92,12 @@ static void Append_To_Context(REBCTX *context, REBVAL *arg)
     TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));
 
   blockscope {  // Append new words to obj
-    REBLEN len = CTX_LEN(context) + 1;
-    Expand_Context(context, ARR_LEN(BUF_COLLECT) - len);
+    REBLEN len = CTX_LEN(c) + 1;
+    Expand_Context(c, ARR_LEN(BUF_COLLECT) - len);
 
     RELVAL *collect_key = ARR_AT(BUF_COLLECT, len);
     for (; NOT_END(collect_key); ++collect_key)
-        Append_Context(context, NULL, VAL_KEY_SPELLING(collect_key));
+        Append_Context(c, NULL, VAL_KEY_SPELLING(collect_key));
   }
 
     // Set new values to obj words
@@ -105,8 +107,8 @@ static void Append_To_Context(REBCTX *context, REBVAL *arg)
         );
         assert(i != 0);
 
-        REBVAL *key = CTX_KEY(context, i);
-        REBVAL *var = CTX_VAR(context, i);
+        REBVAL *key = CTX_KEY(c, i);
+        REBVAL *var = CTX_VAR(c, i);
 
         if (GET_CELL_FLAG(var, PROTECTED)) {
             error = Error_Protected_Key(key);
@@ -323,7 +325,7 @@ REB_R MAKE_Context(
         // !!! This binds the actual body data, not a copy of it.  See
         // Virtual_Bind_Deep_To_New_Context() for future directions.
         //
-        Bind_Values_Deep(VAL_ARRAY_AT_MUTABLE_HACK(arg), ctx);
+        Bind_Values_Deep(VAL_ARRAY_AT_MUTABLE_HACK(arg), CTX_ARCHETYPE(ctx));
 
         DECLARE_LOCAL (dummy);
         if (Do_Any_Array_At_Throws(dummy, arg, SPECIFIED)) {
@@ -416,11 +418,7 @@ REB_R PD_Context(
     if (VAL_BINDING(picker) == NOD(c))
         n = VAL_WORD_INDEX(picker);
     else {
-        bool always = true;
-        if (IS_FRAME(pvs->out))
-            always = (VAL_OPT_PHASE(pvs->out) != nullptr);
-
-        n = Find_Canon_In_Context(c, VAL_WORD_CANON(picker), always);
+        n = Find_Canon_In_Context(pvs->out, VAL_WORD_CANON(picker));
 
         if (n == 0)
             return R_UNHANDLED;
@@ -627,7 +625,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         //
         // Mold all words and their values ("key: <molded value>")
         //
-        REBVAL *key = CTX_KEYS_HEAD(c);
+        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(v);
         REBVAL *var = CTX_VARS_HEAD(c);
         bool had_output = false;
         for (; NOT_END(key); key++, var++) {
@@ -660,7 +658,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     mo->indent++;
 
-    REBVAL *key = CTX_KEYS_HEAD(c);
+    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(v);
     REBVAL *var = CTX_VARS_HEAD(VAL_CONTEXT(v));
 
     for (; NOT_END(key); ++key, ++var) {
@@ -723,13 +721,13 @@ REB_R Context_Common_Action_Maybe_Unhandled(
             return Init_Logic(D_OUT, CTX_LEN(c) == 0);
 
           case SYM_WORDS:
-            return Init_Block(D_OUT, Context_To_Array(c, 1));
+            return Init_Block(D_OUT, Context_To_Array(v, 1));
 
           case SYM_VALUES:
-            return Init_Block(D_OUT, Context_To_Array(c, 2));
+            return Init_Block(D_OUT, Context_To_Array(v, 2));
 
           case SYM_BODY:
-            return Init_Block(D_OUT, Context_To_Array(c, 3));
+            return Init_Block(D_OUT, Context_To_Array(v, 3));
 
         // Noticeably not handled by average objects: SYM_OPEN_Q (`open?`)
 
@@ -758,15 +756,15 @@ REBTYPE(Context)
     if (r != R_UNHANDLED)
         return r;
 
-    REBVAL *v = D_ARG(1);
-    REBCTX *c = VAL_CONTEXT(v);
+    REBVAL *context = D_ARG(1);
+    REBCTX *c = VAL_CONTEXT(context);
 
     switch (VAL_WORD_SYM(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // covered by `v`
 
-        if (VAL_TYPE(v) != REB_FRAME)
+        if (VAL_TYPE(context) != REB_FRAME)
             break;
 
         REBVAL *property = ARG(property);
@@ -777,7 +775,7 @@ REBTYPE(Context)
             // Can be answered for frames that have no execution phase, if
             // they were initialized with a label.
             //
-            const REBSTR *label = VAL_FRAME_LABEL(v);
+            const REBSTR *label = VAL_FRAME_LABEL(context);
             if (label)
                 return Init_Word(D_OUT, label);
 
@@ -797,9 +795,9 @@ REBTYPE(Context)
             //
             return Init_Action(
                 D_OUT,
-                VAL_PHASE_ELSE_ARCHETYPE(v),  // archetypal, so no binding
-                VAL_FRAME_LABEL(v),
-                EXTRA(Binding, v).node  // e.g. where RETURN returns to
+                VAL_PHASE_ELSE_ARCHETYPE(context),  // archetypal, no binding
+                VAL_FRAME_LABEL(context),
+                VAL_BINDING(context)  // e.g. where RETURN returns to
             );
         }
 
@@ -843,23 +841,23 @@ REBTYPE(Context)
           default:
             break;
         }
-        fail (Error_Cannot_Reflect(VAL_TYPE(v), property)); }
+        fail (Error_Cannot_Reflect(VAL_TYPE(context), property)); }
 
 
       case SYM_APPEND: {
         REBVAL *arg = D_ARG(2);
         if (IS_NULLED_OR_BLANK(arg))
-            RETURN (v);  // don't fail on read only if it would be a no-op
+            RETURN (context);  // don't fail on R/O if it would be a no-op
 
-        ENSURE_MUTABLE(v);
-        if (not IS_OBJECT(v) and not IS_MODULE(v))
+        ENSURE_MUTABLE(context);
+        if (not IS_OBJECT(context) and not IS_MODULE(context))
             return R_UNHANDLED;
-        Append_To_Context(c, arg);
-        RETURN (v); }
+        Append_To_Context(context, arg);
+        RETURN (context); }
 
       case SYM_COPY: {  // Note: words are not copied and bindings not changed!
         INCLUDE_PARAMS_OF_COPY;
-        UNUSED(PAR(value));  // covered by `v`
+        UNUSED(PAR(value));  // covered by `context`
 
         if (REF(part))
             fail (Error_Bad_Refines_Raw());
@@ -878,7 +876,7 @@ REBTYPE(Context)
 
         return Init_Any_Context(
             D_OUT,
-            VAL_TYPE(v),
+            VAL_TYPE(context),
             Copy_Context_Core_Managed(c, types)
         ); }
 
@@ -888,7 +886,7 @@ REBTYPE(Context)
         if (not IS_WORD(arg))
             return nullptr;
 
-        REBLEN n = Find_Canon_In_Context(c, VAL_WORD_CANON(arg), false);
+        REBLEN n = Find_Canon_In_Context(context, VAL_WORD_CANON(arg));
         if (n == 0)
             return nullptr;
 
@@ -953,17 +951,17 @@ REBNATIVE(construct)
     // Scan the object for top-level set words in order to make an
     // appropriately sized context.
     //
-    REBCTX *context = Make_Selfish_Context_Detect_Managed(
+    REBCTX *ctx = Make_Selfish_Context_Detect_Managed(
         parent ? CTX_TYPE(parent) : REB_OBJECT,  // !!! Presume object?
         VAL_ARRAY_AT(spec),
         parent
     );
-    Init_Object(D_OUT, context);  // GC protects context
+    Init_Object(D_OUT, ctx);  // GC protects context
 
     // !!! This binds the actual body data, not a copy of it.  See
     // Virtual_Bind_Deep_To_New_Context() for future directions.
     //
-    Bind_Values_Deep(VAL_ARRAY_AT_ENSURE_MUTABLE(spec), context);
+    Bind_Values_Deep(VAL_ARRAY_AT_ENSURE_MUTABLE(spec), CTX_ARCHETYPE(ctx));
 
     DECLARE_LOCAL (dummy);
     if (Do_Any_Array_At_Throws(dummy, spec, SPECIFIED)) {

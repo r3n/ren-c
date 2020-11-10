@@ -122,7 +122,7 @@ const REBYTE *Security_Policy(
         fail (policies);
 
     const REBVAL *policy = Select_Canon_In_Context(
-        VAL_CONTEXT(policies),
+        policies,
         STR_CANON(subsystem)
     );
     if (not policy) {

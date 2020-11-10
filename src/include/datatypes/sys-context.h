@@ -300,7 +300,7 @@ inline static REBACT *VAL_OPT_PHASE(REBCEL(const*) v) {
     return ACT(s);  // an actual phase
 }
 
-inline static REBACT *VAL_PHASE_ELSE_ARCHETYPE(const RELVAL *v) {
+inline static REBACT *VAL_PHASE_ELSE_ARCHETYPE(REBCEL(const*) v) {
     REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
 
     if (s == nullptr or IS_SER_STRING(s))  // label or ANONYMOUS, no phase
@@ -330,6 +330,30 @@ inline static void INIT_VAL_FRAME_LABEL(RELVAL *v, const REBSTR *label) {
 
 #define VAL_CONTEXT_KEY(v,n) \
     CTX_KEY(VAL_CONTEXT(v), (n))
+
+#define VAL_CONTEXT_LEN(v) \
+    CTX_LEN(VAL_CONTEXT(v))
+
+
+// If a context is a frame, which keylist you see for it depends on what
+// phase that frame is for.  This means you need a full RELVAL* and not just
+// a REBCTX* to know all the information.
+//
+// If all you have is a REBCTX*, then if it's not a FRAME! that means you
+// can use CTX_ARCHETYPE().  If it's a frame and you know it should have
+// a phase, then the phase is the keylist.
+//
+inline static REBVAL *VAL_CONTEXT_KEYS_HEAD(REBCEL(*) context)
+{
+    if (CELL_KIND(context) != REB_FRAME)
+        return CTX_KEYS_HEAD(VAL_CONTEXT(context));
+
+    REBACT *phase = VAL_PHASE_ELSE_ARCHETYPE(context);
+    return ACT_PARAMS_HEAD(phase);
+}
+
+#define VAL_CONTEXT_VARS_HEAD(context) \
+    CTX_VARS_HEAD(VAL_CONTEXT(context))  // all views have same varlist
 
 
 // The movement of the SELF word into the domain of the object generators

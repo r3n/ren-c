@@ -30,6 +30,7 @@
 %datatypes/error.test.reb
 %datatypes/event.test.reb
 %datatypes/file.test.reb
+%datatypes/frame.test.reb
 %datatypes/get-block.test.reb
 %datatypes/get-group.test.reb
 %datatypes/get-path.test.reb

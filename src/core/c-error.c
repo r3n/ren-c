@@ -547,7 +547,7 @@ REB_R MAKE_Error(
     //
     REBCTX *root_error = VAL_CONTEXT(Get_System(SYS_STANDARD, STD_ERROR));
 
-    REBCTX *error;
+    REBCTX *e;
     ERROR_VARS *vars; // C struct mirroring fixed portion of error fields
 
     if (IS_ERROR(arg) or IS_OBJECT(arg)) {
@@ -557,8 +557,8 @@ REB_R MAKE_Error(
         // be inconsistent with a Rebol system error, an error will be
         // raised later in the routine.
 
-        error = Merge_Contexts_Selfish_Managed(root_error, VAL_CONTEXT(arg));
-        vars = ERR_VARS(error);
+        e = Merge_Contexts_Selfish_Managed(root_error, VAL_CONTEXT(arg));
+        vars = ERR_VARS(e);
     }
     else if (IS_BLOCK(arg)) {
         // If a block, then effectively MAKE OBJECT! on it.  Afterward,
@@ -567,7 +567,7 @@ REB_R MAKE_Error(
         // Bind and do an evaluation step (as with MAKE OBJECT! with A_MAKE
         // code in REBTYPE(Context) and code in REBNATIVE(construct))
 
-        error = Make_Selfish_Context_Detect_Managed(
+        e = Make_Selfish_Context_Detect_Managed(
             REB_ERROR, // type
             VAL_ARRAY_AT(arg), // values to scan for toplevel set-words
             root_error // parent
@@ -576,10 +576,10 @@ REB_R MAKE_Error(
         // Protect the error from GC by putting into out, which must be
         // passed in as a GC-protecting value slot.
         //
-        Init_Error(out, error);
+        Init_Error(out, e);
 
-        Rebind_Context_Deep(root_error, error, NULL); // NULL=>no more binds
-        Bind_Values_Deep(VAL_ARRAY_AT_MUTABLE_HACK(arg), error);
+        Rebind_Context_Deep(root_error, e, nullptr);  // NULL=>no more binds
+        Bind_Values_Deep(VAL_ARRAY_AT_MUTABLE_HACK(arg), CTX_ARCHETYPE(e));
 
         DECLARE_LOCAL (evaluated);
         if (Do_Any_Array_At_Throws(evaluated, arg, SPECIFIED)) {
@@ -587,7 +587,7 @@ REB_R MAKE_Error(
             return R_THROWN;
         }
 
-        vars = ERR_VARS(error);
+        vars = ERR_VARS(e);
     }
     else if (IS_TEXT(arg)) {
         //
@@ -600,9 +600,9 @@ REB_R MAKE_Error(
         //
         // Minus the message, this is the default state of root_error.
 
-        error = Copy_Context_Shallow_Managed(root_error);
+        e = Copy_Context_Shallow_Managed(root_error);
 
-        vars = ERR_VARS(error);
+        vars = ERR_VARS(e);
         assert(IS_BLANK(&vars->type));
         assert(IS_BLANK(&vars->id));
 
@@ -628,8 +628,10 @@ REB_R MAKE_Error(
         REBCTX *categories = VAL_CONTEXT(Get_System(SYS_CATALOG, CAT_ERRORS));
 
         // Find correct category for TYPE: (if any)
-        REBVAL *category
-            = Select_Canon_In_Context(categories, VAL_WORD_CANON(&vars->type));
+        REBVAL *category = Select_Canon_In_Context(
+            CTX_ARCHETYPE(categories),
+            VAL_WORD_CANON(&vars->type)
+        );
 
         if (category) {
             assert(IS_OBJECT(category));
@@ -638,7 +640,8 @@ REB_R MAKE_Error(
             // Find correct message for ID: (if any)
 
             REBVAL *message = Select_Canon_In_Context(
-                VAL_CONTEXT(category), VAL_WORD_CANON(&vars->id)
+                category,
+                VAL_WORD_CANON(&vars->id)
             );
 
             if (message) {
@@ -662,7 +665,7 @@ REB_R MAKE_Error(
                 //
                 //     make error! [type: 'script id: 'set-self]
 
-                fail (Error_Invalid_Error_Raw(CTX_ARCHETYPE(error)));
+                fail (Error_Invalid_Error_Raw(CTX_ARCHETYPE(e)));
             }
         }
         else {
@@ -688,11 +691,11 @@ REB_R MAKE_Error(
                 or IS_BLANK(&vars->message)
             )
         )){
-            fail (Error_Invalid_Error_Raw(CTX_ARCHETYPE(error)));
+            fail (Error_Invalid_Error_Raw(CTX_ARCHETYPE(e)));
         }
     }
 
-    return Init_Error(out, error);
+    return Init_Error(out, e);
 }
 
 

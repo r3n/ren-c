@@ -2348,8 +2348,8 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         if (not ss->feed->context) {
             ss->feed->context = Get_Context_From_Stack();
             ss->feed->lib =
-                (ss->feed->context != Lib_Context)
-                    ? Lib_Context
+                (ss->feed->context != VAL_CONTEXT(Lib_Context))
+                    ? VAL_CONTEXT(Lib_Context)
                     : nullptr;
 
             Init_Interning_Binder(ss->feed->binder, ss->feed->context);

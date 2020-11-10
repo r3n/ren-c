@@ -406,7 +406,7 @@ back: specialize 'skip [offset: -1]
 
 bound?: chain [specialize 'reflect [property: 'binding] | :value?]
 
-unspaced: adapt specialize 'delimit [delimiter: "null-me"] [delimiter: null]
+unspaced: specialize 'delimit [delimiter: null]
 unspaced-text: chain [:unspaced | specialize 'else [branch: [copy ""]]]
 
 spaced: specialize 'delimit [delimiter: space]
