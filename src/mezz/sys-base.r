@@ -90,7 +90,7 @@ do*: func [
         if original-script [system/script: original-script]
         if original-path [change-dir original-path]
 
-        if quit_FINALIZER and only [
+        if quit_FINALIZER and (only) [
             quit get/any 'value  ; "rethrow" the QUIT if DO/ONLY
         ]
 

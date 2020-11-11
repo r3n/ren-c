@@ -255,7 +255,7 @@ apply: func [dummy:] [
 
 
 hijack :find adapt copy :find [
-    if reverse or last [
+    if reverse or (last) [
         fail 'reverse [
             {/REVERSE and /LAST on FIND have been deprecated.  Use FIND-LAST}
             {or FIND-REVERSE specializations: https://forum.rebol.info/t/1126}

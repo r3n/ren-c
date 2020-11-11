@@ -65,78 +65,78 @@
 (error? trap [arccosine -1.1])
 
 
-; If SYM-BLOCK! is used for the right clause, it is short circuit.
+; GROUP! for the right clause, short circuit.
 ;
-(false and @[false] = false)
-(false and @[true] = false)
-(true and @[false] = false)
-(true and @[true] = true)
+(false and (false) = false)
+(false and (true) = false)
+(true and (false) = false)
+(true and (true) = true)
 (
     x: 1020
     did all [
-        true and @[x: _] = false
+        true and (x: _) = false
         x = _
     ]
 )
 (
     x: _
     did all [
-        true and @[x: 304] = true
+        true and (x: 304) = true
         x = 304
     ]
 )
 (
     x: 1020
     did all [
-        <truthy> and @[x: 304] = true
+        <truthy> and (x: 304) = true
         x = 304
     ]
 )
 (
     x: 1020
     did all [
-        <truthy> and @[x: _] = false
+        <truthy> and (x: _) = false
         x = _
     ]
 )
 
 
-(false or false = false)
-(false or true = true)
-(true or false = true)
-(true or true = true)
+(false or (false) = false)
+(false or (true) = true)
+(true or (false) = true)
+(true or (true) = true)
 (
     x: 1020
     did all [
-        false or @[x: _] = false
+        false or (x: _) = false
         x = _
     ]
 )
 (
     x: _
     did all [
-        false or @[x: 304] = true
+        false or (x: 304) = true
         x = 304
     ]
 )
 (
     x: 1020
     did all [
-        _ or @[x: 304] = true
+        _ or (x: 304) = true
         x = 304
     ]
 )
 (
     x: 1020
     did all [
-        _ or @[x: true] = true
+        _ or (x: true) = true
         x = true
     ]
 )
 
 
-; QUOTED! words and paths are allowed as the right hand side of AND/OR, as
-; a synonym for that word or path in a BLOCK!.
+; SYM-WORD! and SYM-PATH! are allowed as the right hand side of AND/OR, as
+; a synonym for that word or path in a GROUP.
 
 [
     (

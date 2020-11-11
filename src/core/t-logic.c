@@ -127,13 +127,12 @@ REBNATIVE(_not_)  // see TO-C-NAME
 //
 //  and: enfix native [
 //
-//  {Boolean AND, defaults to non-short-circuit unless /SHORT is used}
+//  {Boolean AND, right hand side must be in GROUP! to allow short-circuit}
 //
 //      return: [logic!]
 //      left [<opt> any-value!]
-//      right "Value to be conditionally evaluated, or branch if /SHORT"
-//          [<opt> <modal> any-value!]  ; bootstrap can't load @word
-//      /short "Use short-circuit evaluation on right argument"
+//      :right "Right is evaluated if left is true, or if GET-GROUP!"
+//          [group! get-group! sym-path! sym-word!]
 //  ]
 //
 REBNATIVE(_and_)  // see TO-C-NAME
@@ -147,15 +146,16 @@ REBNATIVE(_and_)  // see TO-C-NAME
         if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
             fail (Error_Unintended_Literal_Raw(left));
 
-    if (GET_CELL_FLAG(right, UNEVALUATED))
-        if (IS_BLOCK(right) and not REF(short))
-            fail (Error_Unintended_Literal_Raw(right));
-
-    if (IS_FALSEY(left))
+    if (IS_FALSEY(left)) {
+        if (IS_GET_GROUP(right)) {  // have to evaluate GET-GROUP! either way
+            if (Do_Any_Array_At_Throws(D_SPARE, right, SPECIFIED))
+                return R_THROWN;
+        }
         return Init_False(D_OUT);
+    }
 
-    if (not REF(short))
-        return Init_Logic(D_OUT, IS_TRUTHY(right));
+    if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
+        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
         return R_THROWN;
@@ -166,13 +166,12 @@ REBNATIVE(_and_)  // see TO-C-NAME
 
 //  or: enfix native [
 //
-//  {Boolean OR, defaults to non-short-circuit unless /SHORT is used}
+//  {Boolean OR, right hand side must be in GROUP! to allow short-circuit}
 //
 //      return: [logic!]
 //      left [<opt> any-value!]
-//      right "Value to be conditionally evaluated, or branch if /SHORT"
-//          [<opt> <modal> any-value!]  ; bootstrap can't load @word
-//      /short "Use short-circuit evaluation on right argument"
+//      :right "Right is evaluated if left is false, or if GET-GROUP!"
+//          [group! get-group! sym-path! sym-word!]
 //  ]
 //
 REBNATIVE(_or_)  // see TO-C-NAME
@@ -186,15 +185,16 @@ REBNATIVE(_or_)  // see TO-C-NAME
         if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
             fail (Error_Unintended_Literal_Raw(left));
 
-    if (GET_CELL_FLAG(right, UNEVALUATED))
-        if (IS_BLOCK(right) and not REF(short))
-            fail (Error_Unintended_Literal_Raw(right));
-
-    if (IS_TRUTHY(left))
+    if (IS_TRUTHY(left)) {
+        if (IS_GET_GROUP(right)) {  // have to evaluate GET-GROUP! either way
+            if (Do_Any_Array_At_Throws(D_SPARE, right, SPECIFIED))
+                return R_THROWN;
+        }
         return Init_True(D_OUT);
+    }
 
-    if (not REF(short))
-        return Init_Logic(D_OUT, IS_TRUTHY(right));
+    if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
+        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
         return R_THROWN;
@@ -206,22 +206,15 @@ REBNATIVE(_or_)  // see TO-C-NAME
 //
 //  xor: enfix native [
 //
-//  {Boolean XOR}
+//  {Boolean XOR (operation cannot be short-circuited)}
 //
 //      return: [logic!]
 //      left [<opt> any-value!]
-//      right "Value to be conditionally evaluated, or branch if /SHORT"
-//          [<opt> <modal> any-value!]
-//      /short "Short circut (not possible, but errors to let you know that)"
+//      :right "Always evaluated, but is a GROUP! for consistency with AND/OR"
+//          [group! get-group! sym-path! sym-word!]
 //  ]
 //
 REBNATIVE(_xor_)  // see TO-C-NAME
-//
-// The reason XOR has a /SHORT refinement even though you can't make a
-// short-circuiting XOR is so that `a xor @[...]` is interpreted as trying to
-// use a branch vs. having a plain true right-hand side.  This will catch
-// people trying to do a short-circuit XOR with an A-Ha of an error vs.
-// just having the unintended behavior of "not left".
 {
     INCLUDE_PARAMS_OF__XOR_;
 
@@ -232,13 +225,16 @@ REBNATIVE(_xor_)  // see TO-C-NAME
         if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
             fail (Error_Unintended_Literal_Raw(left));
 
-    if (REF(short))
-        fail ("XOR cannot run in short circuit mode");
+    if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
+        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
+
+    if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
+        return R_THROWN;
 
     if (IS_FALSEY(left))
-        return Init_Logic(D_OUT, IS_TRUTHY(right));
+        return Init_Logic(D_OUT, IS_TRUTHY(D_OUT));
 
-    return Init_Logic(D_OUT, IS_FALSEY(right));
+    return Init_Logic(D_OUT, IS_FALSEY(D_OUT));
 }
 
 

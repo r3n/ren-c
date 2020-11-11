@@ -92,7 +92,7 @@
         true [s1: true]
         true [s2: true]
     ]
-    s1 and s2
+    s1 and (s2)
 )]
 
 ; nested calls

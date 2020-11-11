@@ -722,7 +722,7 @@ load-module: func [
         name: :hdr/name
     ]
 
-    if (not no-lib) and @[not word? :name] [
+    if (not no-lib) and (not word? :name) [
         ;
         ; Requires name for full import
         ; Unnamed module can't be imported to lib, so /NO-LIB here
@@ -800,7 +800,7 @@ load-module: func [
     ]
 
     ; If no further processing is needed, shortcut return
-    if (not override?) and (mod or delay) [return reduce [name mod]]
+    if (not override?) and (mod or @delay) [return reduce [name mod]]
 
     ; If /DELAY, save the intermediate form
     if delay [

@@ -1043,24 +1043,23 @@ fail: func [
         null? reason so make error! compose [
             Type: 'Script
             ((case [
-                frame and [blame] '[
+                frame and (blame) '[
                     id: 'invalid-arg
                     arg1: label of frame
-                    arg2: blame
+                    arg2: as word! uppercase make text! blame
                     arg3: get blame
                 ]
-                frame and [not blame] '[
+                frame and (not blame) '[
                     id: 'no-arg
                     arg1: label of frame
-                    arg2: blame
+                    arg2: as word! uppercase make text! blame
                 ]
-                blame and [get blame] '[
+                blame and (get blame) '[
                     id: 'bad-value
                     arg1: get blame
                 ]
-                default '[
-                    id: 'unknown-error
-                ]
+            ] else '[
+                id: 'unknown-error
             ]))
         ]
     ]
