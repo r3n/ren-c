@@ -111,7 +111,7 @@ make-file-block-parts: func [
                 last-was-slash: #"/" = last item
             ]
 
-            fail 'item
+            fail ["Bad MAKE-FILE item:" item]
         ]
     ]]
 ]

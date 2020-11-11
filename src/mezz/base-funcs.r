@@ -46,7 +46,7 @@ maybe: enfixed func* [
         ; While DEFAULT requires a BLOCK!, MAYBE does not.  Catch mistakes
         ; such as `x: maybe [...]`
         ;
-        fail 'optional [
+        fail @optional [
             "Literal" type of :optional "used w/MAYBE, use () if intentional"
         ]
     ]
@@ -515,7 +515,7 @@ so: enfixed func [
     feed [<opt> <end> any-value! <variadic>]
 ][
     if not condition [
-        fail 'condition make error! [
+        fail @condition make error! [
             type: 'Script
             id: 'assertion-failure
             arg1: compose [((:condition)) so]
@@ -539,7 +539,7 @@ matched: enfixed redescribe [
         let value: :f/value  ; returned value
 
         if not do f [
-            fail 'f make error! [
+            fail @f make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [(:value) matches (:test)]
@@ -559,7 +559,7 @@ was: enfixed redescribe [
 ](
     func [left [<opt> any-value!] right [<opt> any-value!]] [
         if :left != :right [
-            fail 'return make error! [
+            fail @return make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [(:left) is (:right)]
@@ -644,7 +644,7 @@ really: func [
     ; as `x: really [...]`
     ;
     if semiquoted? 'value [
-        fail 'value [
+        fail @value [
             "Literal" type of :value "used w/REALLY, use () if intentional"
         ]
     ]
@@ -672,7 +672,7 @@ find-last: redescribe [
 ](
     adapt :find-reverse [
         if not any-series? series [
-            fail 'series "Can only use FIND-LAST on ANY-SERIES!"
+            fail @series "Can only use FIND-LAST on ANY-SERIES!"
         ]
 
         series: tail of series  ; can't use plain TAIL due to /TAIL refinement
@@ -1007,9 +1007,9 @@ fail: func [
     {Interrupts execution by reporting an error (a TRAP can intercept it).}
 
     :blame "Point to variable or parameter to blame"
-        [<skip> lit-word! lit-path!]
-    reason "ERROR! value, message text, or failure spec"
-        [<end> error! text! block!]
+        [<skip> sym-word! sym-path!]
+    reason "ERROR! value, ID, URL, message text, or failure spec"
+        [<end> error! word! path! url! text! block!]
     /where "Frame or parameter at which to indicate the error originated"
         [frame! any-word!]
 ][
@@ -1033,6 +1033,25 @@ fail: func [
     let error: switch type of :reason [
         error! [reason]
         text! [make error! reason]
+        word! [
+            make error! [
+                Type: 'User
+                id: reason
+                message: to text! reason
+            ]
+        ]
+        path! [
+            if word? last reason [
+                make error! [
+                    Type: 'User
+                    id: last reason
+                    message: to text! reason
+                ]
+            ] else [
+                make error! to text! reason
+            ]
+        ]
+        url! [make error! to text! reason]  ; should use URL! as ID
         block! [
             make error! (spaced reason else '[
                 Type: 'Script
