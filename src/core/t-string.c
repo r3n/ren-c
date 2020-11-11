@@ -154,39 +154,6 @@ static void reverse_string(REBSTR *str, REBLEN index, REBLEN len)
 }
 
 
-// Common behaviors for:
-//
-//     MAKE STRING! ...
-//     TO STRING! ...
-//
-// !!! MAKE and TO were not historically very clearly differentiated in
-// Rebol, and so often they would "just do the same thing".  Ren-C ultimately
-// will seek to limit the synonyms/polymorphism, e.g. MAKE or TO STRING! of a
-// STRING! acting as COPY, in favor of having the user call COPY explicilty.
-//
-// Note also the existence of AS should be able to reduce copying, e.g.
-// `print ["spelling is" as string! word]` will be cheaper than TO or MAKE.
-//
-static REBSTR *MAKE_TO_String_Common(
-    const REBVAL *arg,
-    enum Reb_Strmode strmode
-){
-    if (IS_BINARY(arg)) {
-        REBSIZ size;
-        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);
-        return Append_UTF8_May_Fail(nullptr, cs_cast(at), size, strmode);
-    }
-
-    if (ANY_STRING(arg))
-        return Copy_String_At(arg);
-
-    if (ANY_WORD(arg))
-        return Copy_Mold_Value(arg, MOLD_FLAG_0);
-
-    return Copy_Form_Value(arg, MOLD_FLAG_TIGHT);
-}
-
-
 //
 //  MAKE_String: C
 //
@@ -199,7 +166,7 @@ REB_R MAKE_String(
     if (opt_parent)
         fail (Error_Bad_Make_Parent(kind, opt_parent));
 
-    if (IS_INTEGER(def)) {
+    if (IS_INTEGER(def)) {  // new string with given integer capacity
         //
         // !!! We can't really know how many bytes to allocate for a certain
         // number of codepoints.  UTF-8 may take up to UNI_ENCODED_MAX bytes
@@ -211,6 +178,33 @@ REB_R MAKE_String(
         // Red continues this behavior.
         //
         return Init_Any_String(out, kind, Make_String(Int32s(def, 0)));
+    }
+
+    if (ANY_UTF8(def)) {  // new type for the UTF-8 data with new allocation
+        REBLEN len;
+        REBSIZ size;
+        const REBYTE *utf8 = VAL_UTF8_LEN_SIZE_AT(&len, &size, def);
+        UNUSED(len);  // !!! Data already valid and checked, should leverage
+        return Init_Any_String(
+            out,
+            kind,
+            Append_UTF8_May_Fail(  // !!! Should never fail
+                nullptr,
+                cs_cast(utf8),
+                size,
+                STRMODE_ALL_CODEPOINTS
+            )
+        );
+    }
+
+    if (IS_BINARY(def)) {  // not necessarily valid UTF-8, so must check
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, def);
+        return Init_Any_String(
+            out,
+            kind,
+            Append_UTF8_May_Fail(nullptr, cs_cast(at), size, STRMODE_NO_CR)
+        );
     }
 
     if (IS_BLOCK(def)) {
@@ -244,12 +238,6 @@ REB_R MAKE_String(
         return Init_Any_Series_At(out, kind, VAL_SERIES(first), i);
     }
 
-    return Init_Any_String(
-        out,
-        kind,
-        MAKE_TO_String_Common(def, STRMODE_NO_CR)
-    );
-
   bad_make:
     fail (Error_Bad_Make(kind, def));
 }
@@ -277,10 +265,28 @@ REB_R TO_String(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
         // Fall through
     }
 
+    if (IS_BINARY(arg)) {
+        //
+        // !!! Historically TO would convert binaries to strings.  But as
+        // the definition of TO has been questioned and evolving, that no
+        // longer seems to make sense (e.g. if `TO TEXT! 1` is "1", the
+        // concept of implementation transformations doesn't fit).  Keep
+        // compatible for right now, but ultimately MAKE or AS should be
+        // used for this.
+        //
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);
+        return Init_Any_String(
+            out,
+            kind,
+            Append_UTF8_May_Fail(nullptr, cs_cast(at), size, STRMODE_NO_CR)
+        );
+    }
+
     return Init_Any_String(
         out,
         kind,
-        MAKE_TO_String_Common(arg, STRMODE_NO_CR)
+        Copy_Form_Value(arg, MOLD_FLAG_TIGHT)
     );
 }
 
@@ -298,14 +304,22 @@ REBNATIVE(to_text)
 {
     INCLUDE_PARAMS_OF_TO_TEXT;
 
-    return Init_Any_String(
-        D_OUT,
-        REB_TEXT,
-        MAKE_TO_String_Common(
-            ARG(value),
-            REF(relax) ? STRMODE_ALL_CODEPOINTS : STRMODE_NO_CR
-        )
-    );
+    if (IS_BINARY(ARG(value)) and REF(relax)) {
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, ARG(value));
+        return Init_Any_String(
+            D_OUT,
+            REB_TEXT,
+            Append_UTF8_May_Fail(
+                nullptr,
+                cs_cast(at),
+                size,
+                STRMODE_ALL_CODEPOINTS
+            )
+        );
+    }
+
+    return rebValueQ("to text!", ARG(value), rebEND);
 }
 
 
