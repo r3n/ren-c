@@ -51,8 +51,8 @@ echo "$R3_EXIT_STATUS"
 #
 # (export is so that the child process can see the environment variable)
 #
-echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR}"
-export LIBREBOL_INCLUDE_DIR="${TOP_DIR}/build/prep/include"
+echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR} (missing tail slash allowed)"
+export LIBREBOL_INCLUDE_DIR="${TOP_DIR}/build/prep/include/"
 if [[ (! -z $TCC) && ($TCC != no) ]]; then
   if [[ $OS_ID = 0.4.40 ]]; then
     $RUNNER ./r3 ../extensions/tcc/tests/fib.r

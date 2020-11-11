@@ -1355,7 +1355,7 @@ makefile: make generator-class [
                         fail ["Unknown entry/target type" entry/target]
                     ]
                     for-each w (ensure [block! blank!] entry/depends) [
-                        switch w/class [
+                        switch pick (try match object! w) 'class [
                             #variable [
                                 keep ["$(" w/name ")"]
                             ]
@@ -1834,6 +1834,8 @@ visual-studio: make generator-class [
         output-dir [file!] {Solution directory}
         project [object!]
     ][
+        assert [dir? output-dir]
+
         project-name: if project/class = #entry [
             project/target
         ] else [
@@ -2186,7 +2188,7 @@ visual-studio: make generator-class [
 }
         ]
 
-        write out-file: output-dir/(unspaced [project-name ".vcxproj"]) xml
+        write (out-file: make-file [(output-dir) (project-name) .vcxproj]) xml
         ;print ["Wrote to" out-file]
     ]
 
@@ -2196,8 +2198,10 @@ visual-studio: make generator-class [
         solution [object!]
         /x86
     ][
-        buf: make binary! 2048
+        assert [dir? output-dir]
         assert [solution/class = #solution]
+
+        buf: make binary! 2048
 
         prepare solution
 
@@ -2271,7 +2275,7 @@ visual-studio: make generator-class [
 
         append buf "EndGlobal^/"
 
-        write output-dir/(unspaced [solution/name ".sln"]) buf
+        write (make-file [(output-dir) (solution/name) .sln]) buf
     ]
 ]
 

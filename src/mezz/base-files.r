@@ -142,7 +142,7 @@ make-dir: func [
     ; Create directories forward:
     created: copy []
     for-each dir dirs [
-        path: either empty? path [dir][path/(dir)]
+        path: if empty? path [dir] else [join path dir]
         append path slash
         trap [make-dir path] then (lambda e [
             for-each dir created [attempt [delete dir]]

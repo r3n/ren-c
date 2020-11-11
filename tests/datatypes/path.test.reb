@@ -146,7 +146,7 @@
 
 [#71 (
     a: "abcd"
-    "abcd/x" = a/x
+    error? trap [a/x]
 )]
 
 [#1820 ; Word USER can't be selected with path syntax

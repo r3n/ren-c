@@ -139,9 +139,9 @@ append output-buffer {REBOL [
 
 }
 
-boot-types: load src-dir/boot/types.r
+boot-types: load make-file [(src-dir) boot/types.r]
 
-append output-buffer mold/only load src-dir/boot/generics.r
+append output-buffer mold/only load make-file [(src-dir) boot/generics.r]
 
 append output-buffer unspaced [
     newline

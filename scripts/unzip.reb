@@ -238,7 +238,7 @@ ctx-zip: context [
             root+name: if find "\/" name/1 [
                 info ["Warning: absolute path" name]
                 name
-            ] else [root/:name]
+            ] else [%% (root)/(name)]
 
             no-modes: did any [url? root+name, dir? root+name]
 
@@ -246,7 +246,7 @@ ctx-zip: context [
                 name: dirize name
                 files: ensure block! read root+name
                 for-each file files [
-                    append source name/:file
+                    append source %% (name)/(file)
                 ]
                 continue
             ]
@@ -455,27 +455,27 @@ ctx-zip: context [
 
                     either any-array? where [
                         where: insert where name
-                        where: insert where either all [
+                        where: insert where all [
                             #"/" = last name
                             empty? uncompressed-data
-                        ][blank][uncompressed-data]
+                        ] then [blank] else [uncompressed-data]
                     ][
                         ; make directory and/or write file
                         either #"/" = last name [
-                            if not exists? where/:name [
-                                make-dir/deep where/:name
+                            if not exists? %% (where)/(name) [
+                                make-dir/deep %%(where)/(name)
                             ]
                         ][
                             set [path: file:] split-path name
-                            if not exists? where/:path [
-                                make-dir/deep where/:path
+                            if not exists? %% (where)/(path) [
+                                make-dir/deep %% (where)/(path)
                             ]
                             if uncompressed-data [
-                                write where/:name uncompressed-data
+                                write %% (where)/(name) uncompressed-data
 
                                 ; !!! R3-Alpha didn't support SET-MODES
                                 comment [
-                                    set-modes where/:name [
+                                    set-modes %% (where)/(name) [
                                         modification-date: date
                                     ]
                                 ]

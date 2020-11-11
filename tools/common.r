@@ -19,17 +19,12 @@ REBOL [
 
 do %bootstrap-shim.r
 
-do %make-file.r  ; Experimental!  Trying to replace PD_File...
 
 ; When you run a Rebol script, the `current-path` is the directory where the
 ; script is.  We assume that the Rebol source enlistment's root directory is
 ; one level above this file (which should be %tools/common.r)
 ;
-repo: context [
-    root: clean-path %../
-    source-root: root
-    tools: what-dir
-]
+repo-dir: clean-path %../
 
 spaced-tab: unspaced [space space space space]
 
@@ -325,29 +320,6 @@ parse-args: function [
     if empty? standalone [return ret]
     append ret '|
     append ret standalone
-]
-
-fix-win32-path: func [
-    path [file!]
-    <local> letter colon
-][
-    if 3 != fourth system/version [return path] ;non-windows system
-
-    drive: first path
-    colon: second path
-
-    all [
-        any [
-            (#"A" <= drive) and [#"Z" >= drive]
-            (#"a" <= drive) and [#"z" >= drive]
-        ]
-        #":" = colon
-    ] then [
-        insert path #"/"
-        remove skip path 2 ;remove ":"
-    ]
-
-    path
 ]
 
 uppercase-of: func [

@@ -204,6 +204,7 @@
 %misc/assert.test.reb
 %misc/help.test.reb
 %misc/fail.test.reb
+%misc/make-file.test.reb
 
 %network/http.test.reb
 

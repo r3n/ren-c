@@ -1,5 +1,6 @@
 REBOL [
     File: %make-file.r
+    Title: "MAKE-FILE Experiments"
     Description: {
         This is a very experimental starter file for defining a dialect that
         can take advantage of generic TUPLE! and PATH! to create FILE!s.
@@ -44,21 +45,43 @@ REBOL [
     }
 ]
 
+doubled-file-slash-error: func [item] [
+    make error! [
+        id: 'doubled-file-slash
+        message: ["Doubled / encountered while generating filename:" :arg1]
+        arg1: item
+    ]
+]
+
+embedded-file-slash-error: func [item] [
+    make error! [
+        id: 'embedded-file-slash
+        message: ["Embedded / encountered inside filename component:" :arg1]
+        arg1: item
+    ]
+]
+
 make-file-block-parts: func [
     return: [block!]
     block [block!]
-    <local> last-was-slash
+    predicate [action!]
+    <local> last-was-slash item
 ][
     ; Current idea is to analyze for "slash coherence"
 
     last-was-slash: false
 
     collect [iterate block [
-        item: either group? block/1 [do block/1] [block/1]
+        item: either group? block/1 [try do block/1] [block/1]
+
+        item: predicate item
+
         switch type of item [
+            blank! []
+
             refinement! [  ; bootstrap only
                 if last-was-slash [
-                    fail ["Doubled slash found in MAKE FILE! at" item]
+                    fail doubled-file-slash-error item
                 ]
                 keep to text! item
                 last-was-slash: false  ; does not end in slash
@@ -68,7 +91,7 @@ make-file-block-parts: func [
                 case [
                     item = '/ [
                         if last-was-slash [
-                            fail ["Doubled slash found in MAKE FILE! at" item]
+                            fail doubled-file-slash-error item
                         ]
                         keep "/"
                         last-was-slash: true
@@ -78,7 +101,7 @@ make-file-block-parts: func [
                         last-was-slash
                         blank? first item
                     ][
-                        fail ["Doubled slash found in MAKE FILE! at" item]
+                        fail doubled-file-slash-error item
                     ]
                 ] else [
                     last-was-slash: blank? last item
@@ -94,7 +117,7 @@ make-file-block-parts: func [
 
             text! [
                 if find item "/" [
-                    fail "Text components can't contain slashes in MAKE FILE!"
+                    fail embedded-file-slash-error item
                 ]
                 keep item
                 last-was-slash: false
@@ -105,7 +128,7 @@ make-file-block-parts: func [
                     last-was-slash
                     #"/" = first item
                 ] then [
-                    fail ["Doubled slash found in MAKE FILE! at" item]
+                    fail doubled-file-slash-error item
                 ]
                 keep to text! item
                 last-was-slash: #"/" = last item
@@ -119,7 +142,8 @@ make-file-block-parts: func [
 make-file-tuple-parts: func [
     return: [block!]
     tuple [tuple!]
-    <local> text
+    predicate [action!]
+    <local> text item
 ][
     tuple: as block! tuple
     collect [iterate tuple [
@@ -130,23 +154,22 @@ make-file-tuple-parts: func [
             tuple/1
         ]
 
+        item: predicate item
+
         text: switch type of item [
+            blank! [item]
             text! [item]
             file! [as text! item]
             word! [as text! item]
             integer! [to text! item]
-            tag! [  ; use as convenience for environment variables
-                (get-env as text! item) else [
-                    fail [item "environment variable not set"]
-                ]
-            ]
+            fail ["Unknown tuple component type"]
         ]
 
-        if find text "/" [
-            fail ["Can't have / in file component:" text]
+        if find text "/" [  ; BLANK! will opt out
+            fail embedded-file-slash-error text
         ]
 
-        keep text
+        keep opt text
 
         if not last? tuple [keep #"."]
     ]]
@@ -155,12 +178,18 @@ make-file-tuple-parts: func [
 make-file-path-parts: func [
     return: [block!]
     path [path!]
+    predicate [action!]
+    <local> item
 ][
     path: as block! path
     collect [iterate path [
         item: either group? path/1 [do path/1] [path/1]
 
+        item: predicate item
+
         switch type of item [
+            blank! []  ; just there as placeholder to get the "/"
+
             word! [
                 all [
                     not last? path
@@ -169,33 +198,29 @@ make-file-path-parts: func [
                     fail [item "WORD! cannot be used as directory"]
                 ]
                 keep as text! item
-                if not last? path [keep #"/"]
             ]
             text!
             file! [  ; GROUP!-only (couldn't be literally in PATH!)
                 all [
-                    not tail? path
+                    not last? path
                     #"/" <> last item
                 ] then [
                     fail [item "FILE! must end in / to be used as directory"]
                 ]
                 keep item
-            ]
-
-            tag! [  ; use as convenience for environment variables
-                (keep get-env as text! item) else [
-                    fail [item "environment variable not set"]
-                ]
+                continue  ; don't add slash, already accounted for
             ]
 
             tuple! [  ; not allowed to have slashes in it
-                keep make-file-tuple-parts item
+                keep make-file-tuple-parts item :predicate
             ]
 
             block! [
-                keep make-file-block-parts item
+                keep make-file-block-parts item :predicate
             ]
         ]
+
+        if not last? path [keep #"/"]
     ]]
 ]
 
@@ -203,24 +228,49 @@ make-file: func [
     {Create a FILE! using the file path specification dialect}
 
     return: [<opt> file!]
-    def [<blank> path! tuple! block!]
+    def [<blank> word! path! tuple! block!]
+    /predicate [action!]
+    <local> result
 ][
+    predicate: default [:identity]
+
     ; Note: The bootstrap executable has shaky support for quoting generic
     ; paths, and no support for generic tuples.  It only offers the BLOCK!
     ; dialect form.
 
-    (as file! try unspaced do [
+    result: as file! try unspaced do [
         def: switch type of def [  ; consolidate to BLOCK!-oriented file spec
-            path! [make-file-path-parts def]
-            tuple! [make-file-tuple-parts def]
-            block! [make-file-block-parts def]
+            word! [to text! predicate def]
+            path! [make-file-path-parts def :predicate]
+            tuple! [make-file-tuple-parts def :predicate]
+            block! [make-file-block-parts def :predicate]
         ]
         def
-    ]) also file -> [
-        if find file "//" [
-            fail ["MAKE-FILE of" def "produced double slashes:" file]
-        ]
-    ] else [
+    ]
+    else [
         fail "Empty filename produced in MAKE-FILE"
     ]
+
+    if find result "//" [
+        fail doubled-file-slash-error result
+    ]
+
+    ; The following adjustment was in code called "fix-win32-path" that was
+    ; in the bootstrap code.  It is either important and should be part of
+    ; mainstream file generation, or unnecessary.  Folding it in here for now.
+    ;
+    all [
+        3 = fourth system/version  ; Windows system
+        #":" = second result
+        drive: first path
+        any [
+            (#"A" <= drive) and [#"Z" >= drive]
+            (#"a" <= drive) and [#"z" >= drive]
+        ]
+    ] then [
+        insert result #"/"
+        remove skip result 2  ; remove ":"
+    ]
+
+    result
 ]

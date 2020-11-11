@@ -146,7 +146,7 @@ encap: compose [
 ]
 
 
-print ["MAKING ZIP FILE:" output-dir/tcc-encap.zip]
-zip/deep/verbose output-dir/tcc-encap.zip encap
+print ["MAKING ZIP FILE:" make-file [(output-dir) tcc-encap.zip]]
+zip/deep/verbose make-file [(output-dir) tcc-encap.zip] encap
 
 print ["(ULTIMATELY WE WANT TO ENCAP THAT DIRECTLY INTO THE TCC EXTENSION)"]

@@ -450,3 +450,9 @@ dequote: func [x] [
         lit-path! [to path! x]
     ] else [x]
 ]
+
+; This experimental MAKE-FILE is targeting behavior that should be in the
+; system core eventually.  Despite being very early in its design, it's
+; being built into new Ren-Cs to be tested...but bootstrap doesn't have it.
+;
+do %../scripts/make-file.r  ; Experimental!  Trying to replace PD_File...

@@ -155,7 +155,7 @@ process: func [file] [
 
 src-dir: %../src/core/
 
-process src-dir/a-lib.c
+process make-file [(src-dir) a-lib.c]
 
 
 === GENERATE LISTS USED TO BUILD REBOL.H ===
@@ -357,7 +357,7 @@ c99-or-c++11-macros: collect [ map-each-api [
 ; edit, since the Rebol codebase at large uses `//`-style comments.
 
 e-lib: (make-emitter
-    "Rebol External Library Interface" output-dir/rebol.h)
+    "Rebol External Library Interface" make-file [(output-dir) rebol.h])
 
 e-lib/emit {
     #ifndef REBOL_H_1020_0304  /* "include guard" allows multiple #includes */
@@ -940,7 +940,8 @@ e-lib/write-emitted
 ; one instance of this table should be linked into Rebol.
 
 e-table: (make-emitter
-    "REBOL Interface Table Singleton" output-dir/tmp-reb-lib-table.inc)
+    "REBOL Interface Table Singleton"
+    make-file [(output-dir) tmp-reb-lib-table.inc])
 
 table-init-items: map-each-api [
     unspaced ["RL_" name]
@@ -970,6 +971,6 @@ e-table/write-emitted
 ; The JavaScript extension actually mutates the API table, so run the TCC hook
 ; first...
 ;
-do repo/tools/../extensions/tcc/prep-libr3-tcc.reb
+do make-file [(repo-dir) tools/../extensions/tcc/prep-libr3-tcc.reb]
 
-do repo/tools/../extensions/javascript/prep-libr3-js.reb
+do make-file [(repo-dir) tools/../extensions/javascript/prep-libr3-js.reb]

@@ -13,9 +13,10 @@ REBOL [
     }
 ]
 
-do %tools/common.r  ; sets up `repo` object
+do %tools/common.r  ; Note: sets up `repo-dir`
 do %tools/systems.r
-file-base: make object! load %tools/file-base.r
+
+file-base: make object! load make-file [(repo-dir) tools/file-base.r]
 
 ; See notes on %rebmake.r for why it is not a module at this time, due to the
 ; need to have it inherit the shim behaviors of IF, CASE, FILE-TO-LOCAL, etc.
@@ -30,36 +31,38 @@ else [
 === GLOBALS ===
 
 ; When you run a Rebol script, the `current-path` is the directory where the
-; script is.  We assume that the Rebol source enlistment's root directory is
-; where %make.r is found.
+; script is.  %make.r lives in `repo-dir`
 ;
-repo-dir: system/options/current-path
+assert [what-dir = repo-dir]
 
 ; However, we assume the output directory where build products will be put
-; is wherever the path is that the shell was in when %make.r was invoked.
+; is wherever the path is that the shell was in when %make.r was *invoked*.
 ; (unless it's run in the same directory as %make.r--then default to %build/)
 ;
-output-dir: system/options/path
-if output-dir = repo-dir [
+if repo-dir = system/options/path [
     launched-from-root: true
-    output-dir: join repo-dir %build/
+    output-dir: make-file [(repo-dir) build /]
     make-dir output-dir
 ] else [
+    output-dir: system/options/path  ; out-of-source build
     launched-from-root: false
 ]
-change-dir output-dir
 
-tools-dir: repo-dir/tools
-src-dir: join repo-dir %src/
+change-dir output-dir  ; Change current directory to where we're writing data
 
-; We relativize directories to the output directory, where the build process
+
+; We relativize `repo-dir` to the output directory, where the build process
 ; is being run.  Using relative paths helps gloss over the Windows and Linux
 ; differences on file paths.
 ;
-src-dir: relative-to-path src-dir output-dir
 repo-dir: relative-to-path repo-dir output-dir
 
-user-config: make object! load repo-dir/configs/default-config.r
+tools-dir: make-file [(repo-dir) tools /]
+src-dir: make-file [(repo-dir) src /]
+
+; Start out with a default configuration (may be overridden)
+;
+user-config: make object! load make-file [(repo-dir) configs/default-config.r]
 
 === PROCESS ARGS ===
 
@@ -726,9 +729,9 @@ use [extension-dir entry][
     for-each entry read extension-dir [
         all [
             dir? entry
-            find read rejoin [extension-dir entry] %make-spec.r
+            find read make-file [(extension-dir) (entry)] %make-spec.r
         ] then [
-            spec: load rejoin [extension-dir entry/make-spec.r]
+            spec: load make-file [(extension-dir) (entry) make-spec.r]
             parsed: parse-ext-build-spec spec
             append available-extensions parsed
         ]
@@ -800,11 +803,11 @@ targets: [
     'vs2019
     'visual-studio [
         x86: try if system-config/os-name = 'Windows-x86 ['x86]
-        rebmake/visual-studio/generate/(x86) %. solution
+        rebmake/visual-studio/generate/(x86) output-dir solution
     ]
     'vs2015 [
         x86: try if system-config/os-name = 'Windows-x86 ['x86]
-        rebmake/vs2015/generate/(x86) %. solution
+        rebmake/vs2015/generate/(x86) output-dir solution
     ]
     'vs2017 [
         fail [
@@ -1053,7 +1056,7 @@ app-config: make object! [
     debug: off
     optimization: 2
     definitions: copy []
-    includes: reduce [src-dir/include %prep/include]
+    includes: reduce [make-file [(src-dir) include /] %prep/include/]
     searches: make block! 8
 ]
 
@@ -1572,7 +1575,7 @@ vars: reduce [
     ]
     make rebmake/var-class [
         name: {T}
-        value: src-dir/tools
+        value: make-file [(src-dir) tools /]
     ]
     make rebmake/var-class [
         name: {GIT_COMMIT}
@@ -1584,18 +1587,18 @@ prep: make rebmake/entry-class [
     target: 'prep ; phony target
 
     commands: collect-lines [
-        keep [{$(REBOL)} tools-dir/make-natives.r]
-        keep [{$(REBOL)} tools-dir/make-headers.r]
-        keep [{$(REBOL)} tools-dir/make-boot.r
+        keep [{$(REBOL)} make-file [(tools-dir) make-natives.r]]
+        keep [{$(REBOL)} make-file [(tools-dir) make-headers.r]]
+        keep [{$(REBOL)} make-file [(tools-dir) make-boot.r]
             unspaced [{OS_ID=} system-config/id]
             {GIT_COMMIT=$(GIT_COMMIT)}
         ]
-        keep [{$(REBOL)} tools-dir/make-reb-lib.r
+        keep [{$(REBOL)} make-file [(tools-dir) make-reb-lib.r]
             unspaced [{OS_ID=} system-config/id]
         ]
 
         for-each ext all-extensions [
-            keep [{$(REBOL)} tools-dir/prep-extension.r
+            keep [{$(REBOL)} make-file [(tools-dir) prep-extension.r]
                 unspaced [{MODULE=} ext/name]
                 unspaced [{SRC=extensions/} switch type of ext/source [
                     file! [ext/source]
@@ -1615,7 +1618,9 @@ prep: make rebmake/entry-class [
                 ; functions to make available with `tcc_add_symbol()`)
                 ;
                 hook-script: file-to-local/full (
-                    repo-dir/extensions/(ext/directory)/(ext/hook)
+                    make-file [
+                        (repo-dir) extensions / (ext/directory) (ext/hook)
+                    ]
                 )
                 keep [{$(REBOL)} hook-script
                     unspaced [{OS_ID=} system-config/id]
@@ -1623,7 +1628,7 @@ prep: make rebmake/entry-class [
             ]
         ]
 
-        keep [{$(REBOL)} tools-dir/make-boot-ext-header.r
+        keep [{$(REBOL)} make-file [(tools-dir) make-boot-ext-header.r]
             unspaced [
                 {EXTENSIONS=} delimit ":" map-each ext builtin-extensions [
                     to text! ext/name
@@ -1631,7 +1636,7 @@ prep: make rebmake/entry-class [
             ]
         ]
 
-        keep [{$(REBOL)} src-dir/main/prep-main.reb]
+        keep [{$(REBOL)} make-file [(src-dir) main/prep-main.reb]]
     ]
     depends: reduce [
         reb-tool

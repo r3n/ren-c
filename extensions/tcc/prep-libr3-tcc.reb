@@ -36,7 +36,8 @@ REBOL [
 ]
 
 e: (make-emitter
-    "libRebol exports for tcc_add_symbol()" output-dir/tmp-librebol-symbols.inc
+    "libRebol exports for tcc_add_symbol()"
+        make-file [(output-dir) tmp-librebol-symbols.inc]
 )
 
 map-each-api [

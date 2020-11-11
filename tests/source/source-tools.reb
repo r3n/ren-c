@@ -37,21 +37,16 @@ REBOL [
 ; This script makes some assumptions about the structure of the repo.
 ;
 
-ren-c-repo: clean-path %../
-
 do %../../tools/common.r
 
-do make-file '(repo/tools)/common-parsers.r
-do make-file '(repo/tools)/text-lines.reb
-do make-file '(repo/tools)/read-deep.reb
+do %% (repo-dir)/tools/common-parsers.r
+do %% (repo-dir)/tools/text-lines.reb
+do %% (repo-dir)/tools/read-deep.reb
 
 ; rebsource is organised along the lines of a context sensitive vocabulary.
 ;
 
 rebsource: context [
-
-    src-folder: clean-path repo/source-root
-    ; Path to rebol source files.
 
     logfn: func [message][print mold new-line/all compose/only message false]
     log: :logfn
@@ -143,7 +138,8 @@ rebsource: context [
             all [
                 filetype: select extensions extension-of file
                 type: in source filetype
-                reeval (ensure action! get type) file (read src-folder/:file)
+                (reeval (ensure action! get type) file
+                    (read %% (repo-dir)/src/(file))
             ]
         ]
 
@@ -291,7 +287,7 @@ rebsource: context [
             analysis: copy []
             emit: specialize :log-emit [log: analysis]
 
-            data: read src-folder/:file
+            data: read %% (repo-dir)/src/(file)
 
             bol: _
             line: _
@@ -401,8 +397,6 @@ rebsource: context [
         source-files: function [
             {Retrieves a list of source files (relative paths).}
         ][
-            if not src-folder [fail {Configuration of src-folder required.}]
-
             files: read-deep/full/strategy source-paths :source-files-seq
 
             sort files
@@ -419,7 +413,7 @@ rebsource: context [
             item: ensure file! take queue
 
             if equal? #"/" last item [
-                contents: read join src-folder item
+                contents: read %% (repo-dir)/src/(item)
                 insert queue map-each x contents [join item x]
                 item: _
             ] else [

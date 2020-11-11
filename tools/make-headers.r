@@ -31,7 +31,8 @@ change-dir %../src/core/
 
 print "------ Building headers"
 
-e-funcs: make-emitter "Internal API" output-dir/include/tmp-internals.h
+(e-funcs: make-emitter "Internal API"
+    make-file [(output-dir) include/tmp-internals.h])
 
 prototypes: make block! 10000 ; MAP! is buggy in R3-Alpha
 
@@ -142,7 +143,7 @@ process: function [
 ; more solid mechanism.
 
 
-boot-natives: load output-dir/boot/tmp-natives.r
+boot-natives: load make-file [(output-dir) boot/tmp-natives.r]
 
 e-funcs/emit {
     /*
@@ -302,9 +303,9 @@ sys-globals-parser/process read/string %../include/sys-globals.h
 
 e-params: (make-emitter
     "PARAM() and REFINE() Automatic Macros"
-    output-dir/include/tmp-paramlists.h)
+    make-file [(output-dir) include/tmp-paramlists.h])
 
-generic-list: load output-dir/boot/tmp-generics.r
+generic-list: load make-file [(output-dir) boot/tmp-generics.r]
 
 ; Search file for definition.  Will be `generic-name: generic [paramlist]`
 ;
@@ -317,7 +318,7 @@ iterate generic-list [
     ]
 ]
 
-native-list: load output-dir/boot/tmp-natives.r
+native-list: load make-file [(output-dir) boot/tmp-natives.r]
 parse native-list [
     some [
         opt 'export
@@ -341,7 +342,8 @@ e-params/write-emitted
 ;-------------------------------------------------------------------------
 
 e-strings: (make-emitter
-    "REBOL Constants with Global Linkage" output-dir/include/tmp-constants.h)
+    "REBOL Constants with Global Linkage"
+    make-file [(output-dir) include/tmp-constants.h])
 
 e-strings/emit {
     /*

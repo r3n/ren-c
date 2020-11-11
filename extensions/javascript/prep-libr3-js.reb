@@ -35,7 +35,7 @@ REBOL [
 ]
 
 e-cwrap: (make-emitter
-    "JavaScript C Wrapper functions" output-dir/reb-lib.js
+    "JavaScript C Wrapper functions" make-file [(output-dir) reb-lib.js]
 )
 
 === ASYNCIFY_BLACKLIST TOLERANT CWRAP ===
@@ -908,7 +908,7 @@ json-collect: function [body [block!]] [
     } 'results
 ]
 
-write output-dir/libr3.exports.json json-collect [
+write make-file [(output-dir) libr3.exports.json] json-collect [
     map-each-api [keep unspaced ["RL_" name]]
 ]
 
@@ -939,7 +939,7 @@ write output-dir/libr3.exports.json json-collect [
 ; the final return value of a JS-AWAITER can be returned with it.
 ; </review>
 
-write/lines output-dir/asyncify-blacklist.json collect-lines [
+write/lines make-file [(output-dir) asyncify-blacklist.json] collect-lines [
     keep "["
     for-next names load %asyncify-blacklist.r [
         keep unspaced [_ _ _ _ {"} names/1 {"} if not last? names [","]]
@@ -947,7 +947,7 @@ write/lines output-dir/asyncify-blacklist.json collect-lines [
     keep "]"
 ]
 
-write output-dir/emterpreter.blacklist.json json-collect [
+write make-file [(output-dir) emterpreter.blacklist.json] json-collect [
     map-each-api [
         all [
             is-variadic
@@ -1010,7 +1010,7 @@ write output-dir/emterpreter.blacklist.json json-collect [
 ;
 
 e-node-preload: (make-emitter
-    "Emterpreter Preload for Node.js" output-dir/node-preload.js
+    "Emterpreter Preload for Node.js" make-file [(output-dir) node-preload.js]
 )
 
 e-node-preload/emit {

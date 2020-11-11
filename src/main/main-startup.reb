@@ -748,12 +748,12 @@ main-startup: function [
     all [
         not find o/suppress %rebol.reb
         elide (loud-print ["Checking for rebol.reb file in" o/bin])
-        exists? o/bin/rebol.reb
+        exists? %% (o/bin)/rebol.reb
     ] then [
         trap [
-            do o/bin/rebol.reb
-            append o/loaded o/bin/rebol.reb
-            loud-print ["Finished evaluating script:" o/bin/rebol.reb]
+            do %% (o/bin)/rebol.reb
+            append o/loaded %% (o/bin)/rebol.reb
+            loud-print ["Finished evaluating script:" %% (o/bin)/rebol.reb]
         ] then e -> [
             die/error "Error found in rebol.reb script" e
         ]

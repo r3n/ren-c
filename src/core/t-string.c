@@ -415,76 +415,19 @@ REB_R PD_String(
             return pvs->out;
         }
 
-        if (IS_BLANK(picker)) {
-            //
-            // `f: %foo | f/bar/` should work
-            // https://github.com/rebol/rebol-issues/issues/2378
-            //
-            picker = EMPTY_TEXT;
-        }
-        else if (
-            not (IS_WORD(picker) or IS_TUPLE(picker) or ANY_STRING(picker))
+        if (
+            IS_BLANK(picker)
+            or IS_WORD(picker)
+            or IS_TUPLE(picker)
+            or ANY_STRING(picker)
         ){
-            return R_UNHANDLED;
+            fail (
+                "FILE! pathing replaced by %% and MAKE-FILE, see: "
+                "https://forum.rebol.info/t/1398"
+            );
         }
 
-        // !!! This is a historical and questionable feature, where path
-        // picking a string or word or otherwise out of a FILE! or URL! will
-        // generate a new FILE! or URL! with a slash in it.
-        //
-        //     >> x: %foo
-        //     >> type of 'x/bar
-        //     == path!
-        //
-        //     >> x/bar
-        //     == %foo/bar  ; a FILE!
-        //
-        // This can only be done with evaluations, since FILE! and URL! have
-        // slashes in their literal form:
-        //
-        //     >> type of '%foo/bar
-        //     == file!
-        //
-        // Because Ren-C unified picking and pathing, this somewhat odd
-        // feature is now part of PICKing a string from another string.
-
-        DECLARE_MOLD (mo);
-        Push_Mold(mo);
-
-        Form_Value(mo, pvs->out);
-
-        // This makes sure there's always a "/" at the end of the file before
-        // appending new material via a picker:
-        //
-        //     >> x: %foo
-        //     >> (x)/("bar")
-        //     == %foo/bar
-        //
-        if (STR_SIZE(mo->series) - mo->offset == 0)
-            Append_Codepoint(mo->series, '/');
-        else {
-            if (
-                *SER_AT(REBYTE, SER(mo->series), STR_SIZE(mo->series) - 1)
-                != '/'
-            ){
-                Append_Codepoint(mo->series, '/');
-            }
-        }
-
-        // !!! Code here previously would handle this case:
-        //
-        //     >> x/("/bar")
-        //     == %foo/bar
-        //
-        // It's changed, so now the way to do that would be to drop the last
-        // codepoint in the mold buffer, or advance the index position of the
-        // picker.  Punt on it for now, as it will be easier to write when
-        // UTF-8 Everywhere is actually in effect.
-
-        Form_Value(mo, picker);
-
-        Init_Any_String(pvs->out, VAL_TYPE(pvs->out), Pop_Molded_String(mo));
-        return pvs->out;
+        return R_UNHANDLED;
     }
 
     // Otherwise, POKE-ing
