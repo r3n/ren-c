@@ -1434,6 +1434,14 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             fail (Error_Syntax(ss, TOKEN_INTEGER));
 
           case LEX_SPECIAL_DOLLAR:
+            if (
+                cp[1] == '$' or cp[1] == ':' or IS_LEX_DELIMIT(cp[1])
+            ){
+                while (*cp == '$')
+                    ++cp;
+                ss->end = cp;
+                return TOKEN_WORD;
+            }
             if (HAS_LEX_FLAG(flags, LEX_SPECIAL_AT)) {
                 token = TOKEN_EMAIL;
                 goto prescan_subsume_all_dots;

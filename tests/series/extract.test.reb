@@ -6,7 +6,7 @@
 ([a [c] e] = extract [a b [c] [d] e f] 2)
 ("ace" = extract "abcdef" 2)
 
-([e [c] a] = extract tail [a b c d e f] -2)
+([e [c] a] = extract tail [a b [c] [d] e f] -2)
 ("eca" = extract tail "abcdef" -2)
 
 ; There is an /INDEX feature, but not clear why it is exists instead of SKIP

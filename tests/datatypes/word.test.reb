@@ -211,3 +211,18 @@
     ]
     true
 )]
+
+; Standalone dollar signs are allowed, especially useful in shell dialects
+[
+    ("$" = as text! match word! '$)
+    ("$" = as text! match set-word! '$:)
+    ("$" = as text! match get-word! ':$)
+    ("$" = as text! match sym-word! '@$)
+    ("$" = as text! match word! first [$])
+    ("$" = as text! match set-word! first [$:])
+    ("$" = as text! match get-word! first [:$])
+    ("$" = as text! match sym-word! first [@$])
+    ("$" = as text! match word! first [$ 1.00])
+    ("$$" = as text! match word! '$$)
+    ("$$$" = as text! match word! '$$$)
+]
