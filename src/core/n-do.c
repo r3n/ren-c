@@ -262,12 +262,14 @@ REBNATIVE(shove)
 //
 //  {Evaluates a block of source code (directly or fetched according to type)}
 //
-//      return: [<opt> any-value!]
+//      return: [<opt> <invisible> any-value!]
 //      source [
 //          <blank>  ; opts out of the DO, returns null
-//          block!  ; source code in block form
+//          block!  ; source code in block form, will be void if empty
+//          get-block!  ; same
 //          sym-block!  ; same
-//          group!  ; same as block (or should it have some other nuance?)
+//          group!  ; source code in group form, will vanish if empty
+//          get-group!  ; same
 //          sym-group!  ; same
 //          text!  ; source code in text form
 //          binary!  ; treated as UTF-8
@@ -309,11 +311,18 @@ REBNATIVE(do)
     switch (VAL_TYPE(source)) {
       case REB_BLOCK:
       case REB_SYM_BLOCK:
-      case REB_GROUP:
-      case REB_SYM_GROUP: {
+      case REB_GET_BLOCK: {  // `do []` and `do [comment "hi"]` return void
         if (Do_Any_Array_At_Throws(D_OUT, source, SPECIFIED))
             return R_THROWN;
         return D_OUT; }
+
+      case REB_GROUP:
+      case REB_SYM_GROUP:
+      case REB_GET_GROUP: {  // `do '()` and `do '(comment "hi")` vanish
+        DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
+        if (Do_Feed_To_End_Maybe_Stale_Throws(D_OUT, feed))
+            return R_THROWN;
+        return D_OUT; }  // may be stale, which would mean invisible
 
       case REB_VARARGS: {
         REBVAL *position;

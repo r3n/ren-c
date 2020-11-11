@@ -1,4 +1,24 @@
 ; functions/control/do.r
+
+; Empty BLOCK! forms will return void if empty
+; Empty GROUP! forms will vaporize
+[
+    (void? (1 + 2, do []))
+    (void? (1 + 2, do @[]))
+    (void? (1 + 2, do :[]))
+    (void? (1 + 2, do [comment "hi"]))
+    (void? (1 + 2, do @[comment "hi"]))
+    (void? (1 + 2, do :[comment "hi"]))
+
+    (3 = (1 + 2, do '()))
+    (3 = (1 + 2, do @()))
+    (3 = (1 + 2, do ':()))
+    (3 = (1 + 2, do '(comment "hi")))
+    (3 = (1 + 2, do @(comment "hi")))
+    (3 = (1 + 2, do ':(comment "hi")))
+]
+
+
 (
     success: false
     do [success: true]
@@ -14,7 +34,6 @@
     same? a-value reeval a-value
 )
 ; do block start
-(void? do [])
 (:abs = do [:abs])
 (
     a-value: #{}
