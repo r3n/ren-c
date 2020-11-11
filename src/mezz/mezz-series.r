@@ -388,42 +388,24 @@ extract: function [
     {Extracts a value from a series at regular intervals}
 
     series [any-series!]
-    width "Size of each entry (the skip)"
+    width "Size of each entry (the skip), negative for backwards step"
         [integer!]
-    /index "Extract from offset position(s)"
-        [any-number! logic! block!]
-    /default "Default value to use (will be called each time if a function)"
-        [any-value!]
+    /index "Extract from offset position"
+        [integer!]
 ][
-    value: default  ; Default value is "" for any-string! output
-    default: :lib/default
-
     if zero? width [return make (type of series) 0]  ; avoid an infinite loop
-    len: either positive? width [  ; Length to preallocate
+
+    len: to integer! either positive? width [  ; Length to preallocate
         divide (length of series) width  ; Forward loop, use length
     ][
         divide (index of series) negate width  ; Backward loop, use position
     ]
-    index: default [1]
-    if block? index [
-        parse index [some [any-number! | logic!]] else [
-            cause-error 'Script 'invalid-arg reduce [index]
-        ]
-        out: make (type of series) len * length of index
-        if (not :value) and [any-string? out] [value: copy ""]
-        iterate-skip series width [iterate index [
-            val: pick series index/1 else [value]
-            append/only out :val
-        ]]
-    ] else [
-        out: make (type of series) len
-        if (not :value) and [any-string? out] [value: copy ""]
-        iterate-skip series width [
-            val: pick series index else [value]
-            append/only out :val
-        ]
+
+    index: default '1
+    out: make (type of series) len
+    iterate-skip series width [
+        append/only out pick series index
     ]
-    out
 ]
 
 

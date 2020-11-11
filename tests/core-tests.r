@@ -230,6 +230,7 @@
 %series/delimit.test.reb
 %series/emptyq.test.reb
 %series/exclude.test.reb
+%series/extract.test.reb
 %series/find.test.reb
 %series/free.test.reb
 %series/indexq.test.reb
