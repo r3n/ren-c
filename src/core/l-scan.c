@@ -1262,6 +1262,15 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             panic ("@ dead end");
 
           case LEX_SPECIAL_PERCENT:  // %filename
+            if (cp[1] == '%') {  // %% is WORD! exception
+                if (not IS_LEX_DELIMIT(cp[2]) and cp[2] != ':') {
+                    ss->end = cp + 3;
+                    fail (Error_Syntax(ss, TOKEN_FILE));
+                }
+                ss->end = cp + 2;
+                return TOKEN_WORD;
+            }
+
             token = TOKEN_FILE;
 
           issue_or_file_token:  // issue jumps here, should set `token`

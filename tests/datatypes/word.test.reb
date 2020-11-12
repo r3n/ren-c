@@ -226,3 +226,22 @@
     ("$$" = as text! match word! '$$)
     ("$$$" = as text! match word! '$$$)
 ]
+
+; `%%` was added as a WORD! to serve as a quoting-based MAKE FILE! operator.
+;
+; Single % is not a good idea to have as a WORD!, because `%/foo` would be
+; ambiguous as a PATH! vs. FILE!.  Sacrificing %% as a shorthand for %"%"
+; and giving it to WORD! is worth it.  How many other forms would be worth
+; it is up in the air, so only %% is legal for now.
+[
+    ("%%" = as text! match word! '%%)
+    ("%%" = as text! match set-word! '%%:)
+    ("%%" = as text! match get-word! ':%%)
+    ("%%" = as text! match sym-word! '@%%)
+    ("%%" = as text! match word! first [%%])
+    ("%%" = as text! match set-word! first [%%:])
+    ("%%" = as text! match get-word! first [:%%])
+    ("%%" = as text! match sym-word! first [@%%])
+
+    ("%%/foo" = form match path! '%%/foo)
+]
