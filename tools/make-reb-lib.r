@@ -775,7 +775,7 @@ e-lib/emit {
         #include <string>
         #include <type_traits>
 
-        inline static const void *to_rebarg(nullptr_t val)
+        inline static const void *to_rebarg(std::nullptr_t val)
           { return val; }
 
         inline static const void *to_rebarg(const REBVAL *val)
