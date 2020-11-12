@@ -283,6 +283,18 @@ REB_R TO_String(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
         );
     }
 
+    // !!! Historical behavior for TO TEXT! of TAG! did not FORM:
+    //
+    //     >> to text! <abc>
+    //     == "abc"
+    //
+    // However, that behavior is likely to change, as this behavior should
+    // be covered by `make text!` or `copy as text!`.  For the present
+    // moment, it is kept as-is to avoid disruption.
+    //
+    if (IS_TAG(arg))
+        return MAKE_String(out, kind, nullptr, arg);
+
     return Init_Any_String(
         out,
         kind,
