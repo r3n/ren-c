@@ -122,6 +122,9 @@ int mbedtls_platform_set_snprintf( int (*snprintf_func)( char * s, size_t n,
 }
 #endif /* MBEDTLS_PLATFORM_SNPRINTF_ALT */
 
+// !!! This definition is causing problems for the MinGW built Ren-C, try
+// seeing if it can compile without it.
+#if 0
 #if defined(MBEDTLS_PLATFORM_HAS_NON_CONFORMING_VSNPRINTF)
 #include <stdarg.h>
 int mbedtls_platform_win32_vsnprintf( char *s, size_t n, const char *fmt, va_list arg )
@@ -146,6 +149,7 @@ int mbedtls_platform_win32_vsnprintf( char *s, size_t n, const char *fmt, va_lis
     return( ret );
 }
 #endif
+#endif // !if 0
 
 #if defined(MBEDTLS_PLATFORM_VSNPRINTF_ALT)
 #if !defined(MBEDTLS_PLATFORM_STD_VSNPRINTF)
