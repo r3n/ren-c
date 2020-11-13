@@ -46,41 +46,38 @@ REBOL [
     }
 ]
 
-; This script is run from %extensions/tcc
-; For now, just go back up a few steps
-
-change-dir %../../  ; assume this is the TOP_DIR
-top-dir: what-dir
-comment [
-    top-dir: try as file! try get-env "TOP_DIR"
-    if exists? top-dir [true] else [
-        print ["TOP_DIR does not exist" top-dir]
-        fail [
-            "TOP_DIR should be set to where the git repository for Rebol was"
-            "cloned into.  (This should be REBOL_SOURCE_DIR or something"
-            "more clear, but it's what was configured on Travis CI)"
-        ]
-    ]
-]
-
-output-dir: top-dir/build/
-
-do %tools/common.r
+do %../../tools/common.r
 args: parse-args system/script/args  ; either from command line or DO/ARGS
 
-do %tools/systems.r
+do %../../tools/systems.r
 system-config: config-system args/OS_ID
 
+; !!! For the moment, this script only works with the in-source output
+; directory.  It would have to be passed a directory by the caller otherwise.
+;
+output-dir: make-file [(repo-dir) build /]
+
+
 all [
-    config-tccdir: try local-to-file try get-env "CONFIG_TCCDIR"
+    config-tccdir: local-to-file try get-env "CONFIG_TCCDIR"
+
+    elide if #"/" <> last config-tccdir [
+        print [
+            "CONFIG_TCCDIR of" config-tccdir "doesn't end in / as the DIR?"
+            "convention requires, but TCC documentation doesn't put slash"
+            "in its examples so this is being tolerated."
+        ]
+        append config-tccdir "/"
+    ]
+
     if exists? config-tccdir [true] else [
         print ["CONFIG_TCCDIR setting is invalid" config-tccdir]
         false
     ]
 
-    tcc-libtcc1-file: as file! try (
-        get-env "TCC_LIBTCC1_FILE" else [config-tccdir/libtcc1.a]
-    )
+    tcc-libtcc1-file: (local-to-file try get-env "TCC_LIBTCC1_FILE") else [
+         make-file [(config-tccdir) libtcc1.a]
+    ]
     if exists? tcc-libtcc1-file [true] else [
         print ["TCC_LIBTCC1_FILE setting is invalid" tcc-libtcc1-file]
         false
@@ -95,6 +92,7 @@ all [
         http://github.com/metaeducation/ren-c/extensions/tcc/README.md
     ]
 ]
+
 
 ; !!! If you want to get the zip dialect to use a specific filename, you
 ; can do so by reading the binary data literally and storing a file.  But
@@ -118,7 +116,7 @@ encap: compose [
     ;
     ; !!! Is it worth it to put %rebol.h in a `rebol` subdirectory?
     ;
-    %rebol.h (read top-dir/build/prep/include/rebol.h)
+    %rebol.h (read make-file [(output-dir) prep/include/rebol.h])
 
     ; Only a few special headers needed for TCC, that are selectively
     ; used to override the system standard ones with `-I`:
@@ -126,7 +124,7 @@ encap: compose [
     ; https://repo.or.cz/tinycc.git/tree/HEAD:/include
     ; https://stackoverflow.com/q/53154898
     ;
-    %include/  ; (??? config-tccdir/include) - see dir note above
+    %include/  ; `(config-tccdir)/include/` see CHANGE-DIR note above
 
     ; See README.md for an explanation of %libtcc1.a
     ;
@@ -139,8 +137,8 @@ encap: compose [
     ((if system-config/os-base = 'Windows [
         compose [
             ; typically %(...)/win32/include
-            %win32/include/  ; (???) - see dir note above
-            %win32/lib/  ; (???) - see dir note above
+            %win32/include/  ; `(config-tccdir)/include/` see CHANGE_DIR above
+            %win32/lib/  ; `(config-tccdir)/lib/` see CHANGE-DIR above
         ]
     ]))
 ]

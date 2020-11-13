@@ -703,6 +703,26 @@ script:
   # check what is left in the build directory...
   - ls
 
+  # Ultimately we'd like extensions to have an easy standard way to encap
+  # resources that they use, and the TCC extension could pack up %rebol.h
+  # and %libtcc1.a, as well as other support files it needs right into the
+  # executable in a zip format.  But for now, we just make a zip file and
+  # those who want to use TCC compilation have to unpack that zip manually.
+  #
+  # Note: The script prints out a list of the files it stores.  If you unzip
+  # it you should be able to use the containing directory as both the
+  # CONFIG_TCCDIR and the LIBREBOL_INCLUDE_DIR path.
+  #
+  # !!! It should be able to be done with r3-make, but uses features of file
+  # paths and zip compression that are only available in newer builds.
+  # So this uses the built r3 (which ultimately it would have to then encap
+  # the data into).  Hence this is not possible for Windows builds ATM.
+  #
+  - |
+    if [[ (! -z $TCC) && ($OS_ID = 0.4.40 || $OS_ID = 0.4.4) ]]; then
+      ./r3 "${TOP_DIR}/extensions/tcc/encap-tcc-resources.reb" OS_ID="${OS_ID}"
+    fi
+
   # Name the executable based on the abbreviated commit, whether it is a
   # debug or release build, and if it was built using C++ or not.  Note that
   # the C++ debug builds have additional runtime checks in the debug
@@ -767,29 +787,11 @@ script:
          mv libr3.worker.js "${OS_ID}/lib${NEW_NAME}.worker.js"
     fi
 
-  # Ultimately we'd like extensions to have an easy standard way to encap
-  # resources that they use, and the TCC extension could pack up %rebol.h
-  # and %libtcc1.a, as well as other support files it needs right into the
-  # executable in a zip format.  But for now, we just make a zip file and
-  # those who want to use TCC compilation have to unpack that zip manually.
-  #
-  # Note: The script prints out a list of the files it stores.  If you unzip
-  # it you should be able to use the containing directory as both the
-  # CONFIG_TCCDIR and the LIBREBOL_INCLUDE_DIR path.
-  #
-  # !!! It should be able to be done with r3-make, but uses features of file
-  # paths and zip compression that are only available in newer builds.
-  # Temporarily grab a special build for this purpose.
-  #
-  - |
-    if [[ ! -z $TCC ]]; then
-      #
-      # Temporary solution on top of temporary solution (should be on s3,
-      # but can't upload there at the moment)
-      #
-      wget http://hostilefork.com/media/shared/prebuilt/r3-encap
-      chmod +x ./r3-encap
-      ./r3-encap "${TOP_DIR}/extensions/tcc/encap-tcc-resources.reb" OS_ID="${OS_ID}"
+    # Only TCC builds on linux produce tcc-encap.zip at the moment.
+    # (It's really supposed to embed the file into the executable, but as a
+    # short term solution you get the files as a separate .zip download)
+    #
+    if [[ -e tcc-encap.zip ]]; then
       mv tcc-encap.zip "${OS_ID}/${NEW_NAME_WITH_COMMIT}-tcc-encap.zip"
     fi
 
