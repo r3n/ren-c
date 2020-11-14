@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -40,7 +40,7 @@ inline static REBVAL *PAIRING_KEY(REBVAL *paired) {
 #define VAL_PAIR_NODE(v) \
     PAYLOAD(Any, (v)).first.node 
 
-inline static REBVAL *VAL_PAIRING(const REBCEL *v) {
+inline static REBVAL *VAL_PAIRING(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_PAIR);
     return VAL(VAL_NODE(v));
 }
@@ -51,25 +51,25 @@ inline static REBVAL *VAL_PAIRING(const REBCEL *v) {
 #define VAL_PAIR_Y(v) \
     VAL(VAL_PAIRING(v))
 
-inline static REBDEC VAL_PAIR_X_DEC(const REBCEL *v) {
+inline static REBDEC VAL_PAIR_X_DEC(REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_X(v)))
         return cast(REBDEC, VAL_INT64(VAL_PAIR_X(v)));
     return VAL_DECIMAL(VAL_PAIR_X(v));
 }
 
-inline static REBDEC VAL_PAIR_Y_DEC(const REBCEL *v) {
+inline static REBDEC VAL_PAIR_Y_DEC(REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_Y(v)))
         return cast(REBDEC, VAL_INT64(VAL_PAIR_Y(v)));
     return VAL_DECIMAL(VAL_PAIR_Y(v));
 }
 
-inline static REBI64 VAL_PAIR_X_INT(const REBCEL *v) {
+inline static REBI64 VAL_PAIR_X_INT(REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_X(v)))
         return VAL_INT64(VAL_PAIR_X(v));
     return ROUND_TO_INT(VAL_DECIMAL(VAL_PAIR_X(v)));
 }
 
-inline static REBDEC VAL_PAIR_Y_INT(const REBCEL *v) {
+inline static REBDEC VAL_PAIR_Y_INT(REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_Y(v)))
         return VAL_INT64(VAL_PAIR_Y(v));
     return ROUND_TO_INT(VAL_DECIMAL(VAL_PAIR_Y(v)));
@@ -85,11 +85,11 @@ inline static REBVAL *Init_Pair(
 
     RESET_CELL(out, REB_PAIR, CELL_FLAG_FIRST_IS_NODE);
     REBVAL *p = Alloc_Pairing();
-    Move_Value(PAIRING_KEY(p), SPECIFIC(x));
-    Move_Value(p, SPECIFIC(y));
+    Move_Value(PAIRING_KEY(p), cast(const REBVAL*, x));
+    Move_Value(p, cast(const REBVAL*, y));
     Manage_Pairing(p);
     VAL_PAIR_NODE(out) = NOD(p);
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 inline static REBVAL *Init_Pair_Int(RELVAL *out, REBI64 x, REBI64 y) {
@@ -99,7 +99,7 @@ inline static REBVAL *Init_Pair_Int(RELVAL *out, REBI64 x, REBI64 y) {
     Init_Integer(p, y);
     Manage_Pairing(p);
     VAL_PAIR_NODE(out) = NOD(p);
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 inline static REBVAL *Init_Pair_Dec(RELVAL *out, REBDEC x, REBDEC y) {
@@ -109,22 +109,5 @@ inline static REBVAL *Init_Pair_Dec(RELVAL *out, REBDEC x, REBDEC y) {
     Init_Decimal(p, y);
     Manage_Pairing(p);
     VAL_PAIR_NODE(out) = NOD(p);
-    return SPECIFIC(out);
-}
-
-inline static REBVAL *Init_Zeroed_Hack(RELVAL *out, enum Reb_Kind kind) {
-    //
-    // !!! This captures of a dodgy behavior of R3-Alpha, which was to assume
-    // that clearing the payload of a value and then setting the header made
-    // it the `zero?` of that type.  Review uses.
-    //
-    if (kind == REB_PAIR) {
-        Init_Pair_Int(out, 0, 0);
-    }
-    else {
-        RESET_CELL(out, kind, CELL_MASK_NONE);
-        CLEAR(&out->extra, sizeof(union Reb_Value_Extra));
-        CLEAR(&out->payload, sizeof(union Reb_Value_Payload));
-    }
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }

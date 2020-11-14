@@ -24,14 +24,14 @@ REBOL [
 ; Note that TO-LOGIC and TO-TEXT are currently their own natives (even with
 ; additional refinements), and thus should not be overwritten here.
 
-to-integer: to-decimal: to-percent: to-money: to-char: to-pair:
+to-integer: to-decimal: to-percent: to-money: to-pair:
 to-tuple: to-time: to-date: to-binary: to-file: to-email: to-url: to-tag:
 to-bitset: to-image: to-vector: to-block: to-group:
 to-path: to-set-path: to-get-path: to-map: to-datatype: to-typeset:
 to-word: to-set-word: to-get-word: to-issue:
 to-function: to-object: to-module: to-error: to-port:
 to-gob: to-event:
-    void
+    ~undefined~
 
 ; Auto-build the functions for the above TO-* words.
 use [word] [
@@ -42,11 +42,14 @@ use [word] [
         ; overwrite any NATIVE! implementations.  (e.g. TO-INTEGER is a
         ; native with a refinement for interpreting as unsigned.)
 
-        if (word: in lib word) and [undefined? word] [
+        all [
+            word: in lib word
+            undefined? word
+        ] then [
             set word redescribe compose [
                 (spaced ["Converts to" form type "value."])
             ](
-                specialize 'to [type: get type]
+                specialize :to [type: get type]
             )
         ]
     ]

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -199,14 +199,14 @@ void Decode_LZW(REBYTE *data, REBYTE **cpp, REBYTE *colortab, int32_t w, int32_t
 }
 
 
-static bool Has_Valid_GIF_Header(REBYTE *data, uint32_t len) {
+static bool Has_Valid_GIF_Header(const REBYTE *data, uint32_t len) {
     if (len < 5)
         return false;
 
-    if (strncmp(cast(char*, data), "GIF87", 5) == 0)
+    if (strncmp(cs_cast(data), "GIF87", 5) == 0)
         return true;
 
-    if (strncmp(cast(char*, data), "GIF89", 5) == 0)
+    if (strncmp(cs_cast(data), "GIF89", 5) == 0)
         return true;
 
     return false;
@@ -226,13 +226,13 @@ REBNATIVE(identify_gif_q)
 {
     GIF_INCLUDE_PARAMS_OF_IDENTIFY_GIF_Q;
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
-    uint32_t len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
 
     // Assume signature matching is good enough (will get a fail() on
     // decode if it's a false positive).
     //
-    return Init_Logic(D_OUT, Has_Valid_GIF_Header(data, len));
+    return Init_Logic(D_OUT, Has_Valid_GIF_Header(data, size));
 }
 
 
@@ -250,10 +250,10 @@ REBNATIVE(decode_gif)
 {
     GIF_INCLUDE_PARAMS_OF_DECODE_GIF;
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
-    uint32_t len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
 
-    if (not Has_Valid_GIF_Header(data, len))
+    if (not Has_Valid_GIF_Header(data, size))
         fail (Error_Bad_Media_Raw());
 
     int32_t  w, h;
@@ -263,8 +263,10 @@ REBNATIVE(decode_gif)
     uint32_t  colors;
     bool  interlaced;
 
-    REBYTE *cp = data;
-    REBYTE *end = data + len;
+    // !!! Decode_LZW is not const-correct, trust it won't modify
+    //
+    REBYTE *cp = m_cast(REBYTE*, data);
+    REBYTE *end = m_cast(REBYTE*, data) + size;
 
     global_colors = 0;
     global_colormap = (unsigned char *) NULL;
@@ -360,8 +362,7 @@ REBNATIVE(decode_gif)
     REBVAL *result = rebValue("case [",
         "empty?", frames, "[FAIL {No frames found in GIF}]",
         "1 = length of", frames, "[first", frames, "]",
-        "default [", frames, "]",
-    "]", rebEND);
+    "] else [", frames, "]", rebEND);
 
     rebRelease(frames);
 

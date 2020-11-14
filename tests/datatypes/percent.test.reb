@@ -6,7 +6,7 @@
 (percent? 1%)
 (percent? -1.0%)
 (percent? 2.2%)
-(0% = make percent! 0)
+('bad-make-arg = (trap [make percent! 0])/id)
 (0% = make percent! "0")
 (0% = to percent! 0)
 (0% = to percent! "0")
@@ -56,7 +56,7 @@
 (same? 9.9999999999999926e154% load mold/all 9.9999999999999926e154%)
 ; alternative form
 (1.1% == 1,1%)
-(110% = make percent! 110%)
-(110% = make percent! "110%")
+(110% = to percent! 110%)
+(110% = to percent! "110%")
 (1.1% = to percent! 1.1%)
 (1.1% = to percent! "1.1%")

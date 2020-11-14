@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -33,7 +33,7 @@
 // escaped NULL was renderable as its ticks, followed by nothing.  This is
 // the "nothing" part, saving on a special-case for that.
 //
-void MF_Null(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Null(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(mo);
     UNUSED(form);
@@ -44,24 +44,11 @@ void MF_Null(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 //  MF_Blank: C
 //
-void MF_Blank(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Blank(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form); // no distinction between MOLD and FORM
     UNUSED(v);
     Append_Ascii(mo->series, "_");
-}
-
-
-//
-//  MF_Void: C
-//
-// !!! No literal notation for VOID! values has been decided.
-//
-void MF_Void(REB_MOLD *mo, const REBCEL *v, bool form)
-{
-    UNUSED(form); // no distinction between MOLD and FORM
-    UNUSED(v);
-    Append_Ascii(mo->series, "#[void]");
 }
 
 
@@ -79,7 +66,7 @@ void MF_Void(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 REB_R PD_Blank(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     UNUSED(picker);
@@ -93,46 +80,18 @@ REB_R PD_Blank(
 
 
 //
-//  MAKE_Unit: C
-//
-// MAKE is disallowed, with the general rule that a blank in will give
-// a null out... for e.g. `make object! try select data spec else [...]`
-//
-REB_R MAKE_Unit(
-    REBVAL *out,
-    enum Reb_Kind kind,
-    const REBVAL *opt_parent,
-    const REBVAL *arg
-){
-    UNUSED(out);
-    UNUSED(opt_parent);
-
-    fail (Error_Bad_Make(kind, arg));
-}
-
-
-//
-//  TO_Unit: C
-//
-// TO is disallowed, e.g. you can't TO convert an integer of 0 to a blank.
-//
-REB_R TO_Unit(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
-    UNUSED(out);
-    fail (Error_Bad_Make(kind, data));
-}
-
-
-//
-//  CT_Unit: C
+//  CT_Blank: C
 //
 // Must have a comparison function, otherwise SORT would not work on arrays
-// with blanks or voids in them.
+// with blanks in them.
 //
-REBINT CT_Unit(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Blank(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0)
-        return (CELL_KIND(a) == CELL_KIND(b));
-    return -1;
+    UNUSED(strict);  // no strict form of comparison
+    UNUSED(a);
+    UNUSED(b);
+
+    return 0;  // All blanks are equal
 }
 
 
@@ -142,9 +101,7 @@ REBINT CT_Unit(const REBCEL *a, const REBCEL *b, REBINT mode)
 // While generics like SELECT are able to dispatch on BLANK! and return NULL,
 // they do so by not running at all...see REB_TS_NOOP_IF_BLANK.
 //
-// The only operations
-//
-REBTYPE(Unit)
+REBTYPE(Blank)
 {
     switch (VAL_WORD_SYM(verb)) {
       case SYM_REFLECT: {
@@ -193,7 +150,7 @@ REBTYPE(Unit)
 //
 //  MF_Handle: C
 //
-void MF_Handle(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Handle(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);  // !!! Handles have "no printable form", what to do here?
     UNUSED(v);
@@ -205,13 +162,13 @@ void MF_Handle(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 //  CT_Handle: C
 //
-REBINT CT_Handle(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Handle(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     // Would it be meaningful to allow user code to compare HANDLE!?
     //
     UNUSED(a);
     UNUSED(b);
-    UNUSED(mode);
+    UNUSED(strict);
     fail ("Currently comparing HANDLE! types is not allowed.");
 }
 

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 Atronix Engineering
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -229,7 +229,7 @@ REBNATIVE(sleep)
     usleep(msec * 1000);
   #endif
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -314,7 +314,7 @@ REBNATIVE(terminate)
 //      return: "String the variable was set to, or null if not set"
 //          [<opt> text!]
 //      variable "Name of variable to get (case-insensitive in Windows)"
-//          [text! word!]
+//          [<blank> text! word!]
 //  ]
 //
 REBNATIVE(get_env)
@@ -844,7 +844,7 @@ REBNATIVE(send_signal)
     //
     kill_process(pid, signal);
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 #endif // defined(TO_LINUX) || defined(TO_ANDROID) || defined(TO_POSIX) || defined(TO_OSX)

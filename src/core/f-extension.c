@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2018 Rebol Open Source Contributors
+// Copyright 2012-2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -129,7 +129,7 @@ REBNATIVE(load_extension)
     // and shutdown functions, as well as native specs and Rebol script
     // source, plus the REBNAT functions for each native.
     //
-    REBARR *details;
+    const REBARR *details;
 
     if (IS_BLOCK(ARG(where))) {  // It's one of the BUILTIN-EXTENSIONS
         Init_Blank(lib);
@@ -170,9 +170,12 @@ REBNATIVE(load_extension)
     // in the original extension model was very twisty and was a barrier
     // to enhancement.  So trying a monolithic rewrite for starters.
 
-    REBVAL *script_compressed = SPECIFIC(ARR_AT(details, IDX_COLLATOR_SCRIPT));
-    REBVAL *specs_compressed = SPECIFIC(ARR_AT(details, IDX_COLLATOR_SPECS));
-    REBVAL *dispatchers_handle = SPECIFIC(ARR_AT(details, IDX_COLLATOR_DISPATCHERS));
+    const REBVAL *script_compressed
+        = SPECIFIC(ARR_AT(details, IDX_COLLATOR_SCRIPT));
+    const REBVAL *specs_compressed
+        = SPECIFIC(ARR_AT(details, IDX_COLLATOR_SPECS));
+    const REBVAL *dispatchers_handle
+        = SPECIFIC(ARR_AT(details, IDX_COLLATOR_DISPATCHERS));
 
     REBLEN num_natives = VAL_HANDLE_LEN(dispatchers_handle);
     REBNAT *dispatchers = VAL_HANDLE_POINTER(REBNAT, dispatchers_handle);
@@ -266,7 +269,7 @@ REBNATIVE(load_extension)
         //
         if (is_export) {
             Init_Word(DS_PUSH(), VAL_WORD_SPELLING(name));
-            if (0 == Try_Bind_Word(module_ctx, DS_TOP))
+            if (0 == Try_Bind_Word(module, DS_TOP))
                 panic ("Couldn't bind word just added -- problem");
         }
     }

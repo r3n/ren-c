@@ -42,7 +42,7 @@ modulo: func [
     ; If r is "almost" b (i.e. negligible compared to b), the
     ; result will be 0. Otherwise the result will be r
     if any [
-        a + r = a | b + r = b ; 'almost zero'
+        a + r = a, b + r = b ; 'almost zero'
         all [ ; 'almost b'
             (a + r) = (a + b)
             positive? (r + r) - b
@@ -61,8 +61,7 @@ sign-of: func [
     case [
         positive? number [1]
         negative? number [-1]
-        default [0]
-    ]
+    ] else [0]
 ]
 
 extreme-of: func [
@@ -88,13 +87,13 @@ extreme-of: func [
 minimum-of: redescribe [
     {Finds the smallest value in a series}
 ](
-    specialize 'extreme-of [comparator: :lesser?]
+    specialize :extreme-of [comparator: :lesser?]
 )
 
 maximum-of: redescribe [
     {Finds the largest value in a series}
 ](
-    specialize 'extreme-of [comparator: :greater?]
+    specialize :extreme-of [comparator: :greater?]
 )
 
 

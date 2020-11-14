@@ -3,7 +3,7 @@ REBOL [
     Title: "Rebol2 and Red Compatibility Shim"
     Homepage: https://trello.com/b/l385BE7a/porting-guide
     Rights: {
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -73,11 +73,11 @@ function?: emulate [:action?]
 
 string!: emulate [text!]
 string?: emulate [:text?]
-to-string: emulate [specialize 'to [type: text!]]
+to-string: emulate [specialize :to [type: text!]]
 
 paren!: emulate [group!]
 paren?: emulate [:group?]
-to-paren: emulate [specialize 'to [type: group!]]
+to-paren: emulate [specialize :to [type: group!]]
 
 number!: emulate [any-number!]
 number?: emulate [:any-number?]
@@ -230,7 +230,7 @@ rewrite-spec-and-body: helper [
         ; add support for an EXIT that's a synonym for returning void.
         ;
         insert body [
-            exit: specialize 'return [value: void]
+            exit: specialize :return [value: ~unset!~]
         ]
         append spec [<local> exit]  ; FUNC needs it (function doesn't...)
     ]
@@ -325,12 +325,12 @@ apply: emulate [
         params: parameters of :action
         using-args: true
 
-        while [block: sync-invisibles block] [
+        while [block] [
             block: if only [
                 arg: block/1
                 try next block
             ] else [
-                try evaluate @(lit arg:) block
+                try evaluate/result block (lit arg:)
             ]
 
             if refinement? params/1 [
@@ -361,9 +361,13 @@ apply: emulate [
 
 ?: emulate [:help]
 
-to-local-file: emulate [:file-to-local]
+to-local-file: emulate [
+    get/any 'file-to-local  ; not available in web build
+]
 
-to-rebol-file: emulate [:local-to-file]
+to-rebol-file: emulate [
+    get/any 'local-to-file  ; not available in web build
+]
 
 why?: emulate [does [lib/why]]  ; not exported yet, :why not bound
 
@@ -377,10 +381,12 @@ null: emulate [
 ;
 ; https://forum.rebol.info/t/947
 ;
-unset!: emulate [:void!]
+; VOID! is also a more capable and interesting type, able to hold a symbol.
+;
+unset!: ~unset!~
 unset?: emulate [:void?]
 
-; NONE is reserved for `if none [x = 1 | y = 2] [...]`
+; NONE is reserved for `if none [x = 1, y = 2] [...]`
 ;
 none: emulate [:blank]
 none!: emulate [:blank!]
@@ -405,8 +411,8 @@ clos: emulate [:func]
 closure!: emulate [:action!]
 closure?: emulate [:action?]
 
-true?: emulate [:did?]  ; better name https://trello.com/c/Cz0qs5d7
-false?: emulate [:not?]  ; better name https://trello.com/c/Cz0qs5d7
+true?: emulate [:did]  ; better name https://trello.com/c/Cz0qs5d7
+false?: emulate [:not]  ; better name https://trello.com/c/Cz0qs5d7
 
 comment: emulate [
     func [
@@ -482,7 +488,7 @@ set: emulate [
 
 get: emulate [
     func [
-        {Now no OBJECT! support, unset vars always null, use <- to check}
+        {Now no OBJECT! support, unset vars always null}
         return: [<opt> any-value!]
         source {Legacy handles Rebol2 types, not *any* type like R3-Alpha}
             [blank! any-word! any-path! any-context! block!]
@@ -519,9 +525,9 @@ do: emulate [
         source [<opt> blank! block! group! text! binary! url! file! tag!
             error! action!
         ]
-        normals [any-value! <...>]
-        'softs [any-value! <...>]
-        :hards [any-value! <...>]
+        normals [any-value! <variadic>]
+        'softs [any-value! <variadic>]
+        :hards [any-value! <variadic>]
         /args [any-value!]
         /next [word!]
     ][
@@ -530,7 +536,7 @@ do: emulate [
 
         if var [  ; DO/NEXT
             if args [fail "Can't use DO/NEXT with ARGS"]
-            source: evaluate @(lit result:) :source
+            source: evaluate/result :source (lit result:)
             set var source  ; DO/NEXT put the *position* in the var
             return :result  ; DO/NEXT returned the *evaluative result*
         ]
@@ -560,7 +566,7 @@ do: emulate [
 ]
 
 to: emulate [
-    adapt 'to [
+    adapt :to [
         all [
             :value = group!
             find any-word! type
@@ -588,7 +594,7 @@ try: emulate [
     ][
         trap [
             result: do block
-        ] then err => [
+        ] then err -> [
             case [
                 blank? :except [err]
                 block? :except [do except]
@@ -606,7 +612,10 @@ default: emulate [
         'word [word! set-word! lit-word!]
         value
     ][
-        if (undefined? word) or [blank? get word] [
+        any [
+            undefined? word
+            blank? get word
+        ] then [
             set word :value
         ] else [
             :value
@@ -693,7 +702,7 @@ compose: emulate [
             ;    == unset!
             ;
             ;    rebol2> compose [(either true [] [])]
-            ;    == []  ; would be a #[void] in Ren-C
+            ;    == []  ; would be a ~void~ in Ren-C
             ;
             predicate: either only [:enblock-devoid] [:devoid]
         ]
@@ -709,15 +718,15 @@ collect: emulate [
         /into "https://forum.rebol.info/t/stopping-the-into-virus/705"
             [any-series!]
     ][
-        let out: any [into | make block! 16]
+        let out: any [into, make block! 16]
 
         let keeper: specialize* (
-            enclose* 'insert func [
+            enclose* :insert func* [
                 f [frame!]
                 <with> out
             ][
-                f/series: out
-                :f/value  ; capture before the DO to be return result
+                f/series: out  ; want new series position capture each time
+                :f/value  ; evalutate input before the DO to be return result
                 elide out: do f  ; update position on each insertion
 
                 ; original f/value will be returned due to ELIDE
@@ -726,7 +735,7 @@ collect: emulate [
             series: <remove-unused-series-parameter>
         ]
 
-        reeval func compose [(name) [action!] <with> return] body :keeper
+        reeval func* compose [(name) [action!] <with> return] body :keeper
         either into [out] [head of out]
     ]
 ]
@@ -747,7 +756,7 @@ repend: emulate [
         ;
         applique 'append/part/dup [
             series: series
-            value: (block? :value) and [reduce :value] or [:value]
+            value: either block? :value [reduce :value] [:value]
             part: part
             only: only
             dup: dup
@@ -835,9 +844,8 @@ redbol-form: form: emulate [
                     redbol-form :item
                 ]
             ]
-            default [
-                form value
-            ]
+        ] else [
+            form value
         ]
     ]
 ]
@@ -849,7 +857,8 @@ print: emulate [
     ][
         write-stdout case [
             block? :value [spaced value]
-            default [form :value]
+        ] else [
+            form :value
         ]
         write-stdout newline
     ]
@@ -867,7 +876,7 @@ quit: emulate [
 ]
 
 does: emulate [
-    specialize 'redbol-func [spec: []]
+    specialize :redbol-func [spec: []]
 ]
 
 has: emulate [
@@ -886,7 +895,7 @@ has: emulate [
 ; https://forum.rebol.info/t/has-hasnt-worked-rethink-construct/1058
 ;
 object: emulate [
-    specialize 'make [type: object!]
+    specialize :make [type: object!]
 ]
 
 construct: emulate [
@@ -922,7 +931,7 @@ break: emulate [
 
 ++: emulate [
     func [] [
-        fail 'return [
+        fail @return [
             {++ and -- are not in the Redbol layer by default, as they were}
             {not terribly popular to begin with...but also because `--` is}
             {a very useful and easy-to-type dumping construct in Ren-C, that}
@@ -1027,7 +1036,7 @@ or: emulate [enfixed :union]
 xor: emulate [enfixed :difference]
 
 ; Ren-C NULL means no branch ran, Rebol2 this is communicated by #[none]
-; Ren-C #[void] when branch ran w/null result, Rebol2 would call that #[unset]
+; Ren-C ~branched~ when branch ran w/null result, Rebol2 calls that #[unset]
 ;
 denuller: helper [
     func [action [action!]] [
@@ -1042,11 +1051,11 @@ denuller: helper [
 ]
 
 if: emulate [denuller :if]
-unless: emulate [denuller adapt 'if [condition: not :condition]]
+unless: emulate [denuller adapt :if [condition: not :condition]]
 case: emulate [denuller :case]
 
 switch: emulate [  ; Ren-C evaluates cases: https://trello.com/c/9ChhSWC4/
-    enclose (augment 'switch [
+    enclose (augment :switch [
         /default "Default case if no others are found"
             [block!]
     ]) func [f [frame!]] [
@@ -1122,7 +1131,7 @@ pick: emulate [denuller :pick]
 
 first: emulate [denuller :first]
 first+: emulate [
-    enclose 'first func [f] [
+    enclose :first func [f] [
         use [loc] [
             loc: f/location
             do f
@@ -1142,8 +1151,8 @@ tenth: emulate [denuller :tenth]
 
 query: emulate [denuller :query]
 wait: emulate [denuller :wait]
-bind?: emulate [denuller specialize 'of [property: 'binding]]
-bound?: emulate [denuller specialize 'of [property: 'binding]]
+bind?: emulate [denuller specialize :of [property: 'binding]]
+bound?: emulate [denuller specialize :of [property: 'binding]]
 
 
 ; https://forum.rebol.info/t/justifiable-asymmetry-to-on-block/751
@@ -1151,7 +1160,7 @@ bound?: emulate [denuller specialize 'of [property: 'binding]]
 oldsplicer: helper [
     func [action [action!]] [
         adapt :action [
-            all [not only | any-array? series | any-path? :value] then [
+            all [not only, any-array? series, any-path? :value] then [
                 value: as block! value  ; guarantees splicing
             ]
 
@@ -1264,7 +1273,7 @@ decloak: emulate [
     redescribe [
         {Decodes a binary string scrambled previously by encloak.}
     ](
-        specialize 'cloaker [decode: true]
+        specialize :cloaker [decode: true]
     )
 ]
 
@@ -1272,13 +1281,13 @@ encloak: emulate [
     redescribe [
         {Scrambles a binary string based on a key.}
     ](
-        specialize 'cloaker [decode: false]
+        specialize :cloaker [decode: false]
     )
 ]
 
 
 write: emulate [
-    adapt (augment 'write [
+    adapt (augment :write [
         /binary "Preserves contents exactly."
         /direct "Opens the port without buffering."
         /no-wait "Returns immediately without waiting if no data."
@@ -1293,7 +1302,7 @@ write: emulate [
         /as {(Red) Write with the specified encoding, default is 'UTF-8}
             [word!]
     ]) [
-        all [binary? data | not binary] then [
+        all [binary? data, not binary] then [
             fail [
                 {Rebol2 would do LF => CR LF substitution in BINARY! WRITE}
                 {unless you specified /BINARY.  Doing this quietly is a bad}
@@ -1310,7 +1319,7 @@ write: emulate [
 ]
 
 read: emulate [
-    enclose (augment 'read [
+    enclose (augment :read [
         /binary "Preserves contents exactly."
         /direct "Opens the port without buffering."
         /no-wait "Returns immediately without waiting if no data."
@@ -1358,10 +1367,10 @@ read: emulate [
 ; interpretation.  This means bad UTF-8 input that isn't Latin1 will be
 ; misinterpreted...but since Rebol2 would accept any bytes, it's no worse.
 ;
-hijack 'lib/transcode enclose copy :lib/transcode function [f [frame!]] [
+hijack :lib/transcode enclose copy :lib/transcode function [f [frame!]] [
     trap [
         result: lib/do copy f  ; COPY so we can DO it again if needed
-    ] then e => [
+    ] then e -> [
         if e/id != 'bad-utf8 [
             fail e
         ]
@@ -1387,8 +1396,8 @@ hijack 'lib/transcode enclose copy :lib/transcode function [f [frame!]] [
 ]
 
 
-call: emulate [
-    :call*  ; brings back the /WAIT switch (Ren-C waits by default)
+call: emulate [  ; brings back the /WAIT switch (Ren-C waits by default)
+    get/any 'call*  ; use GET/ANY because not available in web build
 ]
 
 

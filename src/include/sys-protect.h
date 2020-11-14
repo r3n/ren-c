@@ -6,16 +6,16 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2018 Rebol Open Source Contributors
+// Copyright 2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -43,10 +43,10 @@ enum {
     PROT_FREEZE = 1 << 4
 };
 
-inline static bool Is_Array_Frozen_Shallow(REBARR *a)
+inline static bool Is_Array_Frozen_Shallow(const REBARR *a)
   { return GET_SERIES_INFO(a, FROZEN_SHALLOW); }
 
-inline static bool Is_Array_Frozen_Deep(REBARR *a) {
+inline static bool Is_Array_Frozen_Deep(const REBARR *a) {
     if (NOT_SERIES_INFO(a, FROZEN_DEEP))
         return false;
 

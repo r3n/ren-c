@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -33,7 +33,7 @@
 // by giving an `extra` count of how many value cells one needs.
 //
 REBARR *Copy_Array_At_Extra_Shallow(
-    REBARR *original,
+    const REBARR *original,
     REBLEN index,
     REBSPC *specifier,
     REBLEN extra,
@@ -48,7 +48,7 @@ REBARR *Copy_Array_At_Extra_Shallow(
 
     REBARR *copy = Make_Array_For_Copy(len + extra, flags, original);
 
-    RELVAL *src = ARR_AT(original, index);
+    const RELVAL *src = ARR_AT(original, index);
     RELVAL *dest = ARR_HEAD(copy);
     REBLEN count = 0;
     for (; count < len; ++count, ++dest, ++src)
@@ -67,7 +67,7 @@ REBARR *Copy_Array_At_Extra_Shallow(
 // length (clipping if it exceeds the array length)
 //
 REBARR *Copy_Array_At_Max_Shallow(
-    REBARR *original,
+    const REBARR *original,
     REBLEN index,
     REBSPC *specifier,
     REBLEN max
@@ -113,7 +113,7 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
     const RELVAL *src = head;
     RELVAL *dest = ARR_HEAD(a);
     for (; count < len; ++count, ++src, ++dest) {
-        if (KIND_BYTE_UNCHECKED(src) == REB_NULLED)  // allow unreadable void
+        if (KIND3Q_BYTE_UNCHECKED(src) == REB_NULL)  // allow unreadable void
             assert(flags & ARRAY_FLAG_NULLEDS_LEGAL);
 
         Derelativize(dest, src, specifier);
@@ -157,53 +157,68 @@ void Clonify(
     REBLEN num_quotes = VAL_NUM_QUOTES(v);
     Dequotify(v);
 
-    enum Reb_Kind kind = CELL_KIND(cast(REBCEL*, v));
+    enum Reb_Kind kind = cast(enum Reb_Kind, KIND3Q_BYTE_UNCHECKED(v));
     assert(kind < REB_MAX_PLUS_MAX); // we dequoted it (pseudotypes ok)
+
+    enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), v));
 
     if (deep_types & FLAGIT_KIND(kind) & TS_SERIES_OBJ) {
         //
         // Objects and series get shallow copied at minimum
         //
         REBSER *series;
-        if (ANY_CONTEXT_KIND(kind)) {
+        bool would_need_deep;
+
+        if (ANY_CONTEXT_KIND(heart)) {
             INIT_VAL_CONTEXT_VARLIST(
                 v,
                 CTX_VARLIST(Copy_Context_Shallow_Managed(VAL_CONTEXT(v)))
             );
             series = SER(CTX_VARLIST(VAL_CONTEXT(v)));
+            would_need_deep = true;
+        }
+        else if (ANY_ARRAY_KIND(heart)) {
+            REBNOD *n = VAL_NODE(v);
+            assert(not (FIRST_BYTE(n->header.bits) & NODE_BYTEMASK_0x01_CELL));
+            series = SER(
+                Copy_Array_At_Extra_Shallow(
+                    ARR(n),
+                    0,  // index
+                    VAL_SPECIFIER(v),
+                    0,  // extra
+                    NODE_FLAG_MANAGED
+                )
+            );
+
+            // Despite their immutability, new instances of PATH! need to be
+            // able to bind their word components differently from the path
+            // they are copied from...which requires new cells.  (Also any
+            // nested blocks or groups need to be copied deeply.)
+            //
+            if (ANY_PATH_KIND(kind))
+                Freeze_Array_Shallow(ARR(series));
+
+            INIT_VAL_NODE(v, series);
+            INIT_BINDING(v, UNBOUND);  // copying w/specifier makes specific
+            would_need_deep = true;
+        }
+        else if (ANY_SERIES_KIND(heart)) {
+            series = Copy_Series_Core(
+                VAL_SERIES(v),
+                NODE_FLAG_MANAGED
+            );
+            INIT_VAL_NODE(v, series);
+            would_need_deep = false;
         }
         else {
-            if (IS_SER_ARRAY(VAL_SERIES(v))) {
-                series = SER(
-                    Copy_Array_At_Extra_Shallow(
-                        VAL_ARRAY(v),
-                        0, // !!! what if VAL_INDEX() is nonzero?
-                        VAL_SPECIFIER(v),
-                        0,
-                        NODE_FLAG_MANAGED
-                    )
-                );
-
-                INIT_VAL_NODE(v, series); // copies args
-
-                // If it was relative, then copying with a specifier
-                // means it isn't relative any more.
-                //
-                INIT_BINDING(v, UNBOUND);
-            }
-            else {
-                series = Copy_Sequence_Core(
-                    VAL_SERIES(v),
-                    NODE_FLAG_MANAGED
-                );
-                INIT_VAL_NODE(v, series);
-            }
+            series = nullptr;
+            would_need_deep = false;
         }
 
         // If we're going to copy deeply, we go back over the shallow
         // copied series and "clonify" the values in it.
         //
-        if (deep_types & FLAGIT_KIND(kind) & TS_ARRAYS_OBJ) {
+        if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
             REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
             for (; NOT_END(sub); ++sub)
                 Clonify(sub, flags, deep_types);
@@ -231,7 +246,7 @@ void Clonify(
 // cannot be freed with Free_Unmanaged_Series().
 //
 REBARR *Copy_Array_Core_Managed(
-    REBARR *original,
+    const REBARR *original,
     REBLEN index,
     REBSPC *specifier,
     REBLEN tail,
@@ -257,7 +272,7 @@ REBARR *Copy_Array_Core_Managed(
         original
     );
 
-    RELVAL *src = ARR_AT(original, index);
+    const RELVAL *src = ARR_AT(original, index);
     RELVAL *dest = ARR_HEAD(copy);
     REBLEN count = 0;
     for (; count < len; ++count, ++dest, ++src) {
@@ -292,14 +307,14 @@ REBARR *Copy_Array_Core_Managed(
 // paramlist to another.
 //
 REBARR *Copy_Rerelativized_Array_Deep_Managed(
-    REBARR *original,
+    const REBARR *original,
     REBACT *before, // references to `before` will be changed to `after`
     REBACT *after
 ){
     const REBFLGS flags = NODE_FLAG_MANAGED;
 
     REBARR *copy = Make_Array_For_Copy(ARR_LEN(original), flags, original);
-    RELVAL *src = ARR_HEAD(original);
+    const RELVAL *src = ARR_HEAD(original);
     RELVAL *dest = ARR_HEAD(copy);
 
     for (; NOT_END(src); ++src, ++dest) {
@@ -362,17 +377,18 @@ RELVAL *Alloc_Tail_Array(REBARR *a)
 //
 //  Uncolor_Array: C
 //
-void Uncolor_Array(REBARR *a)
+void Uncolor_Array(const REBARR *a)
 {
     if (Is_Series_White(SER(a)))
         return; // avoid loop
 
     Flip_Series_To_White(SER(a));
 
-    RELVAL *val;
-    for (val = ARR_HEAD(a); NOT_END(val); ++val)
-        if (ANY_ARRAY_OR_PATH(val) or IS_MAP(val) or ANY_CONTEXT(val))
-            Uncolor(val);
+    const RELVAL *v;
+    for (v = ARR_HEAD(a); NOT_END(v); ++v) {
+        if (ANY_PATH(v) or ANY_ARRAY(v) or IS_MAP(v) or ANY_CONTEXT(v))
+            Uncolor(v);
+    }
 }
 
 
@@ -381,18 +397,23 @@ void Uncolor_Array(REBARR *a)
 //
 // Clear the recusion markers for series and object trees.
 //
-void Uncolor(RELVAL *v)
+void Uncolor(const RELVAL *v)
 {
-    REBARR *array;
-
     if (ANY_ARRAY(v))
-        array = VAL_ARRAY(v);
-    else if (ANY_PATH(v))
-        array = VAL_PATH(v);
+        Uncolor_Array(VAL_ARRAY(v));
+    else if (ANY_PATH(v)) {
+        REBLEN len = VAL_SEQUENCE_LEN(v);
+        REBLEN i;
+        DECLARE_LOCAL (temp);
+        for (i = 0; i < len; ++i) {
+            const RELVAL *item = VAL_SEQUENCE_AT(temp, v, i);
+            Uncolor(item);
+        }
+    }
     else if (IS_MAP(v))
-        array = MAP_PAIRLIST(VAL_MAP(v));
+        Uncolor_Array(MAP_PAIRLIST(VAL_MAP(v)));
     else if (ANY_CONTEXT(v))
-        array = CTX_VARLIST(VAL_CONTEXT(v));
+        Uncolor_Array(CTX_VARLIST(VAL_CONTEXT(v)));
     else {
         // Shouldn't have marked recursively any non-array series (no need)
         //
@@ -400,8 +421,5 @@ void Uncolor(RELVAL *v)
             not ANY_SERIES(v)
             or Is_Series_White(VAL_SERIES(v))
         );
-        return;
     }
-
-    Uncolor_Array(array);
 }

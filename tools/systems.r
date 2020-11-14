@@ -3,7 +3,7 @@ REBOL [
     Title: "System build targets"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2017 Rebol Open Source Contributors
+        Copyright 2012-2017 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -275,7 +275,7 @@ systems: [
     0.16.02 pthread/emscripten "emscripten"
         #SG? #LEN
 
-    0.16.03 node/emscripten "node.js"
+    0.16.03 node/emscripten "nodejs"
         #SG? #LEN
 
     AIX: 17
@@ -507,18 +507,24 @@ use [
     used-flags: copy []
     for-each-system s [
         assert in s [
-            | word? platform-name
-            | integer? platform-number
-            | any [word? build-label | blank? build-label]
-            | tuple? id
-            | id/1 = 0 | id/2 = platform-number
-            | (to-text os-name) == (lowercase to-text os-name)
-            | (to-text os-base) == (lowercase to-text os-base)
-            | not find (to-text os-base) charset [#"-" #"_"]
-            | block? definitions
-            | block? cflags
-            | block? libraries
-            | block? ldflags
+            word? platform-name
+            integer? platform-number
+            any [
+                word? build-label
+                blank? build-label
+            ]
+            tuple? id
+            all [
+                id/1 = 0
+                id/2 = platform-number
+            ]
+            (to-text os-name) == (lowercase to-text os-name)
+            (to-text os-base) == (lowercase to-text os-base)
+            not find (to-text os-base) charset [#"-" #"_"]
+            block? definitions
+            block? cflags
+            block? libraries
+            block? ldflags
         ]
 
         for-each flag s/definitions [assert [word? flag]]

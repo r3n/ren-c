@@ -6,16 +6,16 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2018-2019 Rebol Open Source Contributors
+// Copyright 2018-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -44,14 +44,9 @@
     FLAG_LEFT_BIT(0)
 
 
-// Infix functions may (depending on the #tight or non-tight parameter
-// acquisition modes) want to suppress further infix lookahead while getting
-// a function argument.  This precedent was started in R3-Alpha, where with
-// `1 + 2 * 3` it didn't want infix `+` to "look ahead" past the 2 to see the
-// infix `*` when gathering its argument, that was saved until the `1 + 2`
-// finished its processing.
+// Available.
 //
-#define FEED_FLAG_NO_LOOKAHEAD \
+#define FEED_FLAG_1 \
     FLAG_LEFT_BIT(1)
 
 
@@ -92,8 +87,30 @@
     FLAG_LEFT_BIT(3)
 
 
-#define FEED_FLAG_4 \
+// Infix functions may (depending on the #tight or non-tight parameter
+// acquisition modes) want to suppress further infix lookahead while getting
+// a function argument.  This precedent was started in R3-Alpha, where with
+// `1 + 2 * 3` it didn't want infix `+` to "look ahead" past the 2 to see the
+// infix `*` when gathering its argument, that was saved until the `1 + 2`
+// finished its processing.
+//
+#define FEED_FLAG_NO_LOOKAHEAD \
     FLAG_LEFT_BIT(4)
+
+STATIC_ASSERT(EVAL_FLAG_CACHE_NO_LOOKAHEAD == FEED_FLAG_NO_LOOKAHEAD);
+
+
+// When processing something like enfix, the output cell of a frame is the
+// place to look for the "next" value.  This setting has to be managed
+// carefully in recursion, because the recursion must preserve the same
+// notion of what the "out" cell is for the frame.
+//
+// !!! It may be better to think of this as an EVAL_FLAG, but those per-frame
+// flags are running short.  Once this setting is on a feed, it has to be
+// consumed or there will be an error.
+//
+#define FEED_FLAG_NEXT_ARG_FROM_OUT \
+    FLAG_LEFT_BIT(5)
 
 
 //=//// BITS 8...15 ARE THE QUOTING LEVEL /////////////////////////////////=//
@@ -133,11 +150,13 @@
 #define FLAG_QUOTING_BYTE(quoting) \
     FLAG_SECOND_BYTE(quoting)
 
-#define QUOTING_BYTE(feed) \
-    SECOND_BYTE((feed)->flags.bits)
-
-#define mutable_QUOTING_BYTE(feed) \
-    mutable_SECOND_BYTE((feed)->flags.bits)
+#if !defined(__cplusplus)
+    #define QUOTING_BYTE(feed) \
+        mutable_SECOND_BYTE((feed)->flags.bits)
+#else
+    inline static REBYTE& QUOTING_BYTE(REBFED *feed)  // type checks feed...
+        { return mutable_SECOND_BYTE(feed->flags.bits); }  // ...but mutable
+#endif
 
 
 // The user is able to flip the constness flag explicitly with the CONST and
@@ -255,7 +274,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         Init_Va_Scan_Level_Core(
             &level,
             &ss,
-            Intern("sys-do.h"),
+            Intern_Unsized_Managed("sys-do.h"),
             start_line,
             cast(const REBYTE*, p),
             feed
@@ -347,7 +366,12 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             GC_Kill_Series(SER(inst1));  // not manuals-tracked
         }
         else if (GET_ARRAY_FLAG(inst1, SINGULAR_API_RELEASE)) {
-            assert(GET_SERIES_FLAG(inst1, MANAGED));
+            //
+            // !!! Originally this asserted it was a managed handle, but the
+            // needs of API-TRANSIENT are such that a handle which outlives
+            // the frame is returned as a SINGULAR_API_RELEASE.  Review.
+            //
+            /*assert(GET_SERIES_FLAG(inst1, MANAGED));*/
 
             // See notes above (duplicate code, fix!) about how we might like
             // to use the as-is value and wait to free until the next cycle
@@ -530,7 +554,7 @@ inline static const RELVAL *Fetch_Next_In_Feed(  // adds not-end checking
     struct Reb_Feed *feed,
     bool preserve
 ){
-    assert(KIND_BYTE_UNCHECKED(feed->value) != REB_0_END);
+    assert(KIND3Q_BYTE_UNCHECKED(feed->value) != REB_0_END);
         // ^-- faster than NOT_END()
     return Fetch_Next_In_Feed_Core(feed, preserve);
 }
@@ -592,7 +616,7 @@ inline static void Literal_Next_In_Feed(REBVAL *out, struct Reb_Feed *feed) {
 inline static void Prep_Array_Feed(
     struct Reb_Feed *feed,
     const RELVAL *opt_first,
-    REBARR *array,
+    const REBARR *array,
     REBLEN index,
     REBSPC *specifier,
     REBFLGS flags
@@ -609,7 +633,7 @@ inline static void Prep_Array_Feed(
         feed->value = opt_first;
         feed->index = index;
         feed->pending = ARR_AT(array, index);
-        assert(KIND_BYTE_UNCHECKED(feed->value) != REB_0_END);
+        assert(KIND3Q_BYTE_UNCHECKED(feed->value) != REB_0_END);
             // ^-- faster than NOT_END()
     }
     else {

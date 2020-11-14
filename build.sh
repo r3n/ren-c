@@ -2,6 +2,8 @@
 
 # Loaded into .travis.yml ("install" step)
 
+set -x  # turn on debug mode (want to see the command lines being run)
+
 ## INSTALL PRE-REQUISITES FOR BUILD ##
 
 # Fetch a Rebol binary to use as the "r3-make".
@@ -440,8 +442,8 @@ echo "$R3_EXIT_STATUS"
 #
 # (export is so that the child process can see the environment variable)
 #
-echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR}"
-export LIBREBOL_INCLUDE_DIR="${TOP_DIR}/build/prep/include"
+echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR} (missing tail slash allowed)"
+export LIBREBOL_INCLUDE_DIR="${TOP_DIR}/build/prep/include/"
 if [[ (! -z $TCC) && ($TCC != no) ]]; then
   if [[ $OS_ID = 0.4.40 ]]; then
     $RUNNER ./r3 ../extensions/tcc/tests/fib.r
@@ -470,5 +472,7 @@ if [[ $R3_EXIT_STATUS != 0 ]]; then
 fi
 
 cd $TOP_DIR
+
+set +x  # turn off debug mode (Travis outputs the commands in .travis.yml)
 
 # vim: set et sw=2:

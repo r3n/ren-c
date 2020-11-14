@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -173,7 +173,7 @@
 //=//// SERIES_FLAG_ALWAYS_DYNAMIC ////////////////////////////////////////=//
 //
 // The optimization which uses small series will fit the data into the series
-// node if it is small enough.  But doing this requires a test on SER_LEN()
+// node if it is small enough.  But doing this requires a test on SER_USED()
 // and SER_DATA() to see if the small optimization is in effect.  Some
 // code is more interested in the performance gained by being able to assume
 // where to look for the data pointer and the length (e.g. paramlists and
@@ -312,22 +312,15 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(4)
 
 
-//=//// SERIES_INFO_HOLD //////////////////////////////////////////////////=//
+//=//// SERIES_INFO_MISC2_BIT /////////////////////////////////////////////=//
 //
-// Set in the header whenever some stack-based operation wants a temporary
-// hold on a series, to give it a protected state.  This will happen with a
-// DO, or PARSE, or enumerations.  Even REMOVE-EACH will transition the series
-// it is operating on into a HOLD state while the removal signals are being
-// gathered, and apply all the removals at once before releasing the hold.
+// See remarks on SERIES_INFO_MISC_BIT.  Similar situation.
 //
-// It will be released when the execution is finished, which distinguishes it
-// from SERIES_INFO_FROZEN_DEEP, which will never be reset, as long as it lives...
-//
-#define SERIES_INFO_HOLD \
+#define SERIES_INFO_MISC2_BIT \
     FLAG_LEFT_BIT(5)
 
 
-//=//// SERIES_INFO_FROZEN_DEEP ////////////////////////////////////////////////=//
+//=//// SERIES_INFO_FROZEN_DEEP ///////////////////////////////////////////=//
 //
 // Indicates that the length or values cannot be modified...ever.  It has been
 // locked and will never be released from that state for its lifetime, and if
@@ -366,7 +359,7 @@ STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
     mutable_SECOND_BYTE((s)->info.bits)
 
 
-//=//// BITS 16-23 ARE SER_LEN() FOR NON-DYNAMIC SERIES ///////////////////=//
+//=//// BITS 16-23 ARE SER_USED() FOR NON-DYNAMIC SERIES //////////////////=//
 
 // 255 indicates that this series has a dynamically allocated portion.  If it
 // is another value, then it's the length of content which is found directly
@@ -418,21 +411,9 @@ STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(25)
 
 
-//=//// SERIES_INFO_TELEGRAPH_NO_LOOKAHEAD ////////////////////////////////=//
+//=//// SERIES_INFO_26 ////////////////////////////////////////////////////=//
 //
-// An "fully invisible" invisible function is one that has been enfixed.  It
-// manipulates frame state, with the expectation to return the evaluator back
-// to where it was when it is over.  But EVAL_FLAG_NO_LOOKAHEAD is erased in
-// the process of running the invisible, so it has to be put back somehow.
-// It stows the flag on the frame's varlist and when the R_INVISIBLE happens
-// at the end of the action it puts it back.
-//
-// !!! Is a similar telegraphing necessary for the "already deferred" enfix?
-//
-// !!! This should probably be a VARLIST_FLAG_XXX, not a generic info bit,
-// as it only applies to frame varlists and need not be taken for all series.
-//
-#define SERIES_INFO_TELEGRAPH_NO_LOOKAHEAD \
+#define SERIES_INFO_26 \
     FLAG_LEFT_BIT(26)
 
 
@@ -467,17 +448,30 @@ STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(28)
 
 
+//=//// SERIES_INFO_HOLD //////////////////////////////////////////////////=//
+//
+// Set in the header whenever some stack-based operation wants a temporary
+// hold on a series, to give it a protected state.  This will happen with a
+// DO, or PARSE, or enumerations.  Even REMOVE-EACH will transition the series
+// it is operating on into a HOLD state while the removal signals are being
+// gathered, and apply all the removals at once before releasing the hold.
+//
+// It will be released when the execution is finished, which distinguishes it
+// from SERIES_INFO_FROZEN_DEEP, which will never be cleared once set.
+//
+// Note: This is set to be the same bit as PARAMLIST_FLAG_NATIVE in order to
+// make it possible to use non-branching masking to set a frame to read-only
+// as far as usermode operations are concerned.
+//
+#define SERIES_INFO_HOLD \
+    FLAG_LEFT_BIT(29)
+
+
 //=//// SERIES_INFO_FROZEN_SHALLOW ////////////////////////////////////////=//
 //
 // A series can be locked permanently, but only at its own top level.
 //
 #define SERIES_INFO_FROZEN_SHALLOW \
-    FLAG_LEFT_BIT(29)
-
-
-//=//// SERIES_INFO_30 ////////////////////////////////////////////////////=//
-//
-#define SERIES_INFO_30 \
     FLAG_LEFT_BIT(30)
 
 
@@ -605,7 +599,7 @@ union Reb_Series_Content {
         //
         RELVAL values[1];
 
-      #if !defined(NDEBUG)  // https://en.wikipedia.org/wiki/Type_punning
+      #if defined(DEBUG_USE_UNION_PUNS)
         char utf8_pun[sizeof(RELVAL)];  // debug watchlist insight into UTF-8
         REBWCHAR ucs2_pun[sizeof(RELVAL)/sizeof(REBUNI)];  // wchar_t insight
       #endif
@@ -626,16 +620,6 @@ union Reb_Series_Link {
   #if !defined(NDEBUG)
     void *trash;
   #endif
-
-    // API handles use "singular" format arrays (see notes on that), which
-    // lay out the link field in the bytes preceding the REBVAL* payload.
-    // Because the API tries to have routines that work across arbitrary
-    // rebMalloc() memory as well as individual cells, the bytes preceding
-    // the pointer handed out to the client are examined to determine which
-    // it is.  If it's an array-type series, it is either the varlist of
-    // the owning frame *or* the EMPTY_ARRAY (to avoid a NULL check)
-    //
-    REBNOD *owner;
 
     // For a writable REBSTR, a list of entities that cache the mapping from
     // index to character offset is maintained.  Without some help, it would
@@ -695,12 +679,10 @@ union Reb_Series_Misc {
     //
     REBLIN line;
 
-    // Under UTF-8 everywhere, strings are byte-sized...so the series "size"
+    // Under UTF-8 everywhere, strings are byte-sized...so the series "used"
     // is actually counting *bytes*, not logical character codepoint units.
-    // SER_SIZE() and SER_LEN() can therefore be different...where SER_LEN()
-    // on a string series comes from here, vs. just report the size.
-    //
-    // !!! UTF-8 everywhere is a work-in-progress.
+    // SER_USED() and STR_LEN() can therefore be different...where STR_LEN()
+    // on a string series comes from here, vs. just report the used units.
     //
     REBLEN length;
 
@@ -858,7 +840,7 @@ struct Reb_Series {
 // co-opted for other purposes.
 //
 #define LINK(s) \
-    SER(s)->link_private
+    m_cast(REBSER*, SER(s))->link_private
 
 
 // A pending feature is that the series `->misc` field be used to track if
@@ -866,14 +848,14 @@ struct Reb_Series {
 // build could do a check in that case.
 //
 #if defined(CPLUSPLUS_11)
-    inline static union Reb_Series_Misc& Get_Series_Misc(REBSER *s) {
+    inline static union Reb_Series_Misc& Get_Series_Misc(const REBSER *s) {
         //
         // It would be nice here if we could do some kind of check like
         // `assert(not IS_POINTER_FREETRASH_DEBUG(s->misc_private.trash))`
         // but that would invoke undefined behavior (disengaged union access
         // once another field is assigned).  Valgrind and UBSAN complain.
         //
-        return s->misc_private;
+        return m_cast(REBSER*, s)->misc_private;
     }
 
     #define MISC(s) \
@@ -887,7 +869,7 @@ struct Reb_Series {
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define SER(p) \
-        ((REBSER*)(p))  // don't use `cast` so casting away const is allowed
+        m_cast(REBSER*, (const REBSER*)(p))  // don't check const in C or C++
 
 #else
 
@@ -937,13 +919,13 @@ struct Reb_Series {
 //
 
 #define SET_SERIES_FLAG(s,name) \
-    (SER(s)->header.bits |= SERIES_FLAG_##name)
+    (m_cast(REBSER*, SER(s))->header.bits |= SERIES_FLAG_##name)
 
 #define GET_SERIES_FLAG(s,name) \
     ((SER(s)->header.bits & SERIES_FLAG_##name) != 0)
 
 #define CLEAR_SERIES_FLAG(s,name) \
-    (SER(s)->header.bits &= ~SERIES_FLAG_##name)
+    (m_cast(REBSER*, SER(s))->header.bits &= ~SERIES_FLAG_##name)
 
 #define NOT_SERIES_FLAG(s,name) \
     ((SER(s)->header.bits & SERIES_FLAG_##name) == 0)
@@ -954,13 +936,13 @@ struct Reb_Series {
 //
 
 #define SET_SERIES_INFO(s,name) \
-    (SER(s)->info.bits |= SERIES_INFO_##name)
+    (m_cast(REBSER*, SER(s))->info.bits |= SERIES_INFO_##name)
 
 #define GET_SERIES_INFO(s,name) \
     ((SER(s)->info.bits & SERIES_INFO_##name) != 0)
 
 #define CLEAR_SERIES_INFO(s,name) \
-    (SER(s)->info.bits &= ~SERIES_INFO_##name)
+    (m_cast(REBSER*, SER(s))->info.bits &= ~SERIES_INFO_##name)
 
 #define NOT_SERIES_INFO(s,name) \
     ((SER(s)->info.bits & SERIES_INFO_##name) == 0)
@@ -984,7 +966,7 @@ struct Reb_Series {
 
 #define MAX_SERIES_WIDE 0x100
 
-inline static REBYTE SER_WIDE(REBSER *s) {
+inline static REBYTE SER_WIDE(const REBSER *s) {
     //
     // Arrays use 0 width as a strategic choice, so that the second byte of
     // the ->info flags is 0.  See Endlike_Header() for why.
@@ -1002,12 +984,12 @@ inline static REBYTE SER_WIDE(REBSER *s) {
 // Bias is empty space in front of head:
 //
 
-inline static REBLEN SER_BIAS(REBSER *s) {
+inline static REBLEN SER_BIAS(const REBSER *s) {
     assert(IS_SER_DYNAMIC(s));
     return cast(REBLEN, ((s)->content.dynamic.bias >> 16) & 0xffff);
 }
 
-inline static REBLEN SER_REST(REBSER *s) {
+inline static REBLEN SER_REST(const REBSER *s) {
     if (LEN_BYTE_OR_255(s) == 255)
         return s->content.dynamic.rest;
 
@@ -1036,11 +1018,11 @@ inline static void SER_SUB_BIAS(REBSER *s, REBLEN b) {
     s->content.dynamic.bias -= b << 16;
 }
 
-inline static size_t SER_TOTAL(REBSER *s) {
+inline static size_t SER_TOTAL(const REBSER *s) {
     return (SER_REST(s) + SER_BIAS(s)) * SER_WIDE(s);
 }
 
-inline static size_t SER_TOTAL_IF_DYNAMIC(REBSER *s) {
+inline static size_t SER_TOTAL_IF_DYNAMIC(const REBSER *s) {
     if (not IS_SER_DYNAMIC(s))
         return 0;
     return SER_TOTAL(s);

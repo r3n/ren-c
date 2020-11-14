@@ -2,14 +2,14 @@
 [#1763
     (
         a: <before>
-        [_] = set [a] reduce [null]
+        [_] = set [a] reduce .try [null]
         blank? :a
     )
 ]
 (
     a: <a-before>
     b: <b-before>
-    [2 _] = set [a b] reduce [2 null]
+    [2 _] = set [a b] reduce .try [2 null]
     a = 2
     blank? :b
 )
@@ -21,7 +21,7 @@
 (
     a: 10
     b: 20
-    did all [blank = set [a b] blank | blank? a | blank? b]
+    did all [blank = set [a b] blank, blank? a, blank? b]
 )
 (
     a: 10
@@ -37,14 +37,14 @@
     b: 20
     c: 30
     set [a b c] [_ 99]
-    did all [a = _ | b = 99 | c = _]
+    did all [a = _, b = 99, c = _]
 )
 (
     a: 10
     b: 20
     c: 30
     set/some [a b c] [_ 99]
-    did all [a = 10 | b = 99 | c = 30]
+    did all [a = 10, b = 99, c = 30]
 )
 
 ; #1745

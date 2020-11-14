@@ -3,7 +3,7 @@ REBOL [
     Title: "REBOL 3 Boot Base: Function Constructors"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Developers
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -20,7 +20,7 @@ REBOL [
 assert: func* [
     {Ensure conditions are conditionally true if hooked by debugging}
 
-    return: []
+    return: <elide>
     conditions [block!]
         {Block of conditions to evaluate and test for logical truth}
 ][
@@ -46,7 +46,7 @@ maybe: enfixed func* [
         ; While DEFAULT requires a BLOCK!, MAYBE does not.  Catch mistakes
         ; such as `x: maybe [...]`
         ;
-        fail 'optional [
+        fail @optional [
             "Literal" type of :optional "used w/MAYBE, use () if intentional"
         ]
     ]
@@ -66,9 +66,9 @@ steal: func* [
 
     return: [<opt> any-value!]
         {Value of the following SET-WORD! or SET-PATH! before assignment}
-    evaluation [<opt> any-value! <...>]
+    evaluation [<opt> any-value! <variadic>]
         {Used to take the assigned value}
-    :look [set-word! set-path! <...>]
+    :look [set-word! set-path! <variadic>]
 ][
     get first look  ; returned value
 
@@ -76,7 +76,9 @@ steal: func* [
 ]
 
 assert [null = binding of :return]  ; it's archetypal, nowhere to return to
-return: void  ; so don't let the archetype be visible
+return: func* [] [
+    fail "RETURN archetype called when no generator is providing it"
+]
 
 func: func* [
     {Make action with set-words as locals, <static>, <in>, <with>, <local>}
@@ -141,11 +143,10 @@ func: func* [
     parse spec [any [
         <void> (append new-spec <void>)
     |
+        <elide> (append new-spec <elide>)
+    |
         :(either var '[
-            set var: [
-                match [any-word! 'word!]
-                | ahead any-path! into [blank! word!]
-            ](
+            set var: [any-word! | lit-word! | refinement!] (
                 append new-spec var
 
                 ; exclude args/refines
@@ -287,7 +288,6 @@ func: func* [
     ][
         any [new-body body]
     ]
-    (elide if thing/1 = 'new-body [print mold new-spec print mold thing])
 ]
 
 
@@ -347,7 +347,7 @@ redescribe: func [
                 fail [{PARAMETER-NOTES in META-OF is not a FRAME!} notes]
             ]
 
-            if not equal? :value (action of notes) [
+            if :value <> (action of notes) [
                 fail [{PARAMETER-NOTES in META-OF frame mismatch} notes]
             ]
         ]
@@ -372,11 +372,14 @@ redescribe: func [
         opt [
             copy description any text! (
                 description: spaced description
-                either all [equal? description {} | not meta] [
+                all [
+                    description = {}
+                    not meta
+                ] then [
                     ; No action needed (no meta to delete old description in)
-                ][
+                ] else [
                     on-demand-meta
-                    meta/description: if equal? description {} [
+                    meta/description: if description = {} [
                         _
                     ] else [
                         description
@@ -400,13 +403,16 @@ redescribe: func [
             opt [[copy note some text!] (
                 note: spaced note
                 on-demand-meta
-                either equal? param (lit return:) [
+                if param = 'return: [
                     meta/return-note: all [
-                        not equal? note {}
+                        note <> {}
                         copy note
                     ]
-                ][
-                    if notes or [not equal? note {}] [
+                ] else [
+                    any [
+                        notes
+                        note <> {}
+                    ] then [
                         on-demand-notes
 
                         if not find notes as word! param [
@@ -414,11 +420,11 @@ redescribe: func [
                         ]
 
                         let actual: first find parameters of :value param
-                        if not strict-equal? param actual [
+                        if param !== actual [
                             fail [param {doesn't match word type of} actual]
                         ]
 
-                        notes/(as word! param): if not equal? note {} [note]
+                        notes/(as word! param): if note <> {} [note]
                     ]
                 ]
             )]
@@ -431,7 +437,10 @@ redescribe: func [
     ; If you kill all the notes then they will be cleaned up.  The meta
     ; object will be left behind, however.
     ;
-    if notes and [every [param note] notes [null? :note]] [
+    all [
+        notes
+        every [param note] notes [null? :note]
+    ] then [
         meta/parameter-notes: _
     ]
 
@@ -446,7 +455,55 @@ redescribe [
 unset: redescribe [
     {Clear the value of a word to null (in its current context.)}
 ](
-    adapt specialize 'set [value: <overwrite>] [value: null]  ; !!! fix
+    specialize :set [value: null]
+)
+
+
+; >- is the SHOVE operator.  It uses the item immediately to its left for
+; the first argument to whatever operation is on its right hand side.
+; Parameter conventions of that first argument apply when processing the
+; value, e.g. quoted arguments will act quoted.
+;
+; By default, the evaluation rules proceed according to the enfix mode of
+; the operation being shoved into:
+;
+;    >> 10 >- lib/= 5 + 5  ; as if you wrote `10 = 5 + 5`
+;    ** Script Error: + does not allow logic! for its value1 argument
+;
+;    >> 10 >- equal? 5 + 5  ; as if you wrote `equal? 10 5 + 5`
+;    == #[true]
+;
+; You can force processing to be enfix using `->-` (an infix-looking "icon"):
+;
+;    >> 1 ->- lib/add 2 * 3  ; as if you wrote `1 + 2 * 3`
+;    == 9
+;
+; Or force prefix processing using `>--` (multi-arg prefix "icon"):
+;
+;    >> 10 >-- lib/+ 2 * 3  ; as if you wrote `add 1 2 * 3`
+;    == 7
+;
+>-: enfixed :shove
+>--: enfixed specialize :>- [prefix: true]
+->-: enfixed specialize :>- [prefix: false]
+
+
+; The -- and ++ operators were deemed too "C-like", so ME was created to allow
+; `some-var: me + 1` or `some-var: me / 2` in a generic way.  They share code
+; with SHOVE, so it's folded into the implementation of that.
+
+me: enfixed redescribe [
+    {Update variable using it as the left hand argument to an enfix operator}
+](
+    ; /ENFIX so `x: 1, x: me + 1 * 10` is 20, not 11
+    ;
+    specialize :shove/set [prefix: false]
+)
+
+my: enfixed redescribe [
+    {Update variable using it as the first argument to a prefix operator}
+](
+    specialize :shove/set [prefix: true]
 )
 
 so: enfixed func [
@@ -455,18 +512,18 @@ so: enfixed func [
     return: [<opt> any-value!]
     condition "Condition to test, must resolve to a LOGIC! (use DID, NOT)"
         [logic!]
-    feed [<opt> <end> any-value! <...>]
+    feed [<opt> <end> any-value! <variadic>]
 ][
     if not condition [
-        fail 'condition make error! [
+        fail @condition make error! [
             type: 'Script
             id: 'assertion-failure
             arg1: compose [((:condition)) so]
         ]
     ]
     if tail? feed [return]
-    set 'feed take feed
-    if (block? :feed) and [semiquoted? 'feed] [
+    feed: take feed
+    all [block? :feed, semiquoted? 'feed] then [
         fail "Don't use literal block as SO right hand side, use ([...])"
     ]
     return :feed
@@ -482,7 +539,7 @@ matched: enfixed redescribe [
         let value: :f/value  ; returned value
 
         if not do f [
-            fail 'f make error! [
+            fail @f make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [(:value) matches (:test)]
@@ -502,7 +559,7 @@ was: enfixed redescribe [
 ](
     func [left [<opt> any-value!] right [<opt> any-value!]] [
         if :left != :right [
-            fail 'return make error! [
+            fail @return make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [(:left) is (:right)]
@@ -517,46 +574,31 @@ tweak :was 'postpone on
 zdeflate: redescribe [
     {Deflates data with zlib envelope: https://en.wikipedia.org/wiki/ZLIB}
 ](
-    specialize 'deflate [envelope: 'zlib]
+    specialize :deflate [envelope: 'zlib]
 )
 
 zinflate: redescribe [
     {Inflates data with zlib envelope: https://en.wikipedia.org/wiki/ZLIB}
 ](
-    specialize 'inflate [envelope: 'zlib]
+    specialize :inflate [envelope: 'zlib]
 )
 
 gzip: redescribe [
     {Deflates data with gzip envelope: https://en.wikipedia.org/wiki/Gzip}
 ](
-    specialize 'deflate [envelope: 'gzip]
+    specialize :deflate [envelope: 'gzip]
 )
 
 gunzip: redescribe [
     {Inflates data with gzip envelope: https://en.wikipedia.org/wiki/Gzip}
 ](
-    specialize 'inflate [envelope: 'gzip]  ; What about GZIP-BADSIZE?
+    specialize :inflate [envelope: 'gzip]  ; What about GZIP-BADSIZE?
 )
-
-
-default*: enfixed redescribe [
-    {Would be the same as DEFAULT/ONLY if paths could dispatch infix}
-](
-    specialize 'default [only: true]
-)
-
-
-skip*: redescribe [
-    {Variant of SKIP that returns NULL instead of clipping to series bounds}
-](
-    specialize 'skip [only: true]
-)
-
 
 ensure: redescribe [
     {Pass through value if it matches test, otherwise trigger a FAIL}
 ](
-    specialize 'either-match [
+    specialize :either-match [
         branch: func [arg [<opt> any-value!]] [
             ;
             ; !!! Can't use FAIL/WHERE until there is a good way to SPECIALIZE
@@ -566,7 +608,27 @@ ensure: redescribe [
             ;
             fail [
                 "ENSURE failed with argument of type"
-                    type of :arg else ["NULL"]
+                    type of get* 'arg else ["NULL"]
+            ]
+        ]
+    ]
+)
+
+non: redescribe [
+    {Pass through value if it *doesn't* match test, otherwise trigger a FAIL}
+](
+    specialize :either-match [
+        not: #
+        branch: func [arg [<opt> any-value!]] [
+            ;
+            ; !!! Can't use FAIL/WHERE until there is a good way to SPECIALIZE
+            ; a conditional with a branch referring to invocation parameters:
+            ;
+            ; https://github.com/metaeducation/ren-c/issues/587
+            ;
+            fail [
+                "NON failed with argument of type"
+                    type of get* 'arg else ["NULL"]
             ]
         ]
     ]
@@ -582,7 +644,7 @@ really: func [
     ; as `x: really [...]`
     ;
     if semiquoted? 'value [
-        fail 'value [
+        fail @value [
             "Literal" type of :value "used w/REALLY, use () if intentional"
         ]
     ]
@@ -590,8 +652,8 @@ really: func [
     :value
 ]
 
-oneshot: specialize 'n-shot [n: 1]
-upshot: specialize 'n-shot [n: -1]
+oneshot: specialize :n-shot [n: 1]
+upshot: specialize :n-shot [n: -1]
 
 ;
 ; !!! The /REVERSE and /LAST refinements of FIND and SELECT caused a lot of
@@ -602,15 +664,15 @@ upshot: specialize 'n-shot [n: -1]
 find-reverse: redescribe [
     {Variant of FIND that uses a /SKIP of -1}
 ](
-    specialize 'find [skip: -1]
+    specialize :find [skip: -1]
 )
 
 find-last: redescribe [
     {Variant of FIND that uses a /SKIP of -1 and seeks the TAIL of a series}
 ](
-    adapt 'find-reverse [
+    adapt :find-reverse [
         if not any-series? series [
-            fail 'series "Can only use FIND-LAST on ANY-SERIES!"
+            fail @series "Can only use FIND-LAST on ANY-SERIES!"
         ]
 
         series: tail of series  ; can't use plain TAIL due to /TAIL refinement
@@ -633,19 +695,19 @@ attempt: func [
 for-next: redescribe [
     "Evaluates a block for each position until the end, using NEXT to skip"
 ](
-    specialize 'for-skip [skip: 1]
+    specialize :for-skip [skip: 1]
 )
 
 for-back: redescribe [
     "Evaluates a block for each position until the start, using BACK to skip"
 ](
-    specialize 'for-skip [skip: -1]
+    specialize :for-skip [skip: -1]
 )
 
 iterate-skip: redescribe [
     "Variant of FOR-SKIP that directly modifies a series variable in a word"
 ](
-    specialize enclose 'for-skip func [f] [
+    specialize enclose :for-skip func [f] [
         if blank? let word: f/word [return null]
         f/word: quote to word! word  ; do not create new virtual binding
         let saved: f/series: get word
@@ -653,7 +715,7 @@ iterate-skip: redescribe [
         ; !!! https://github.com/rebol/rebol-issues/issues/2331
         comment [
             let result
-            trap [result: do f] then e => [
+            trap [result: do f] then e -> [
                 set word saved
                 fail e
             ]
@@ -671,26 +733,26 @@ iterate-skip: redescribe [
 iterate: iterate-next: redescribe [
     "Variant of FOR-NEXT that directly modifies a series variable in a word"
 ](
-    specialize 'iterate-skip [skip: 1]
+    specialize :iterate-skip [skip: 1]
 )
 
 iterate-back: redescribe [
     "Variant of FOR-BACK that directly modifies a series variable in a word"
 ](
-    specialize 'iterate-skip [skip: -1]
+    specialize :iterate-skip [skip: -1]
 )
 
 
 count-up: redescribe [
     "Loop the body, setting a word from 1 up to the end value given"
 ](
-    specialize 'for [start: 1 | bump: 1]
+    specialize :for [start: 1, bump: 1]
 )
 
 count-down: redescribe [
     "Loop the body, setting a word from the end value given down to 1"
 ](
-    specialize adapt 'for [
+    specialize adapt :for [
         start: end
         end: 1
     ][
@@ -709,34 +771,21 @@ lock-of: redescribe [
 eval-all: func [
     {Evaluate any number of expressions and discard them}
 
-    return: []
-    expressions [<opt> any-value! <...>]
+    return: <elide>
+    expressions [<opt> any-value! <variadic>]
         {Any number of expressions on the right.}
 ][
     do expressions
 ]
 
 
-once-bar: func [
-    {Expression barrier that's willing to only run one expression after it}
+; These constructs used to be enfix to complete their left hand side.  Yet
+; that form of completion was only one expression's worth, when they wanted
+; to allow longer runs of evaluation.  "Invisible functions" (those which
+; `return: <elide>`) permit a more flexible version of the mechanic.
 
-    return: [<opt> any-value!]
-    right [<opt> <end> any-value! <...>]
-    :lookahead [any-value! <...>]
-    look:
-][
-    take right  ; returned value
-
-    elide any [
-        tail? right
-            |
-        '|| = look: take lookahead  ; hack...recognize selfs
-    ] else [
-        fail 'right [
-            "|| expected single expression, found residual of" :look
-        ]
-    ]
-]
+<|: tweak copy :eval-all 'postpone on
+|>: tweak enfixed :shove 'postpone on
 
 
 meth: enfixed func [
@@ -752,7 +801,7 @@ meth: enfixed func [
         fail [member "must be bound to an ANY-CONTEXT! to use METHOD"]
     ]
     set member bind (
-        func/(gather) compose [((spec)) <in> (context)] body
+        func/(if gather '/gather) compose [((spec)) <in> (context)] body
     ) context
 ]
 
@@ -949,11 +998,8 @@ cause-error: func [
 
 
 ; !!! Should there be a special bit or dispatcher used on the FAIL to ensure
-; it does not continue running?  `return: []` is already taken for the
-; "invisible" meaning, but it could be an optimized dispatcher used in
-; wrapping, e.g.:
-;
-;     fail: noreturn func [...] [...]
+; it does not continue running?  `return: []` has been freed up as it no
+; longer means invisible...
 ;
 ; Though HIJACK would have to be aware of it and preserve the rule.
 ;
@@ -961,9 +1007,9 @@ fail: func [
     {Interrupts execution by reporting an error (a TRAP can intercept it).}
 
     :blame "Point to variable or parameter to blame"
-        [<skip> lit-word! lit-path!]
-    reason "ERROR! value, message text, or failure spec"
-        [<end> error! text! block!]
+        [<skip> sym-word! sym-path!]
+    reason "ERROR! value, ID, URL, message text, or failure spec"
+        [<end> error! word! path! url! text! block!]
     /where "Frame or parameter at which to indicate the error originated"
         [frame! any-word!]
 ][
@@ -987,6 +1033,25 @@ fail: func [
     let error: switch type of :reason [
         error! [reason]
         text! [make error! reason]
+        word! [
+            make error! [
+                Type: 'User
+                id: reason
+                message: to text! reason
+            ]
+        ]
+        path! [
+            if word? last reason [
+                make error! [
+                    Type: 'User
+                    id: last reason
+                    message: to text! reason
+                ]
+            ] else [
+                make error! to text! reason
+            ]
+        ]
+        url! [make error! to text! reason]  ; should use URL! as ID
         block! [
             make error! (spaced reason else '[
                 Type: 'Script
@@ -997,24 +1062,23 @@ fail: func [
         null? reason so make error! compose [
             Type: 'Script
             ((case [
-                frame and [blame] '[
+                frame and (blame) '[
                     id: 'invalid-arg
                     arg1: label of frame
-                    arg2: blame
+                    arg2: as word! uppercase make text! blame
                     arg3: get blame
                 ]
-                frame and [not blame] '[
+                frame and (not blame) '[
                     id: 'no-arg
                     arg1: label of frame
-                    arg2: blame
+                    arg2: as word! uppercase make text! blame
                 ]
-                blame and [get blame] '[
+                blame and (get blame) '[
                     id: 'bad-value
                     arg1: get blame
                 ]
-                default '[
-                    id: 'unknown-error
-                ]
+            ] else '[
+                id: 'unknown-error
             ]))
         ]
     ]
@@ -1024,7 +1088,7 @@ fail: func [
         ; If no specific location specified, and error doesn't already have a
         ; location, make it appear to originate from the frame calling FAIL.
         ;
-        where: default [frame or [binding of 'return]]
+        where: default [any [frame, binding of 'return]]
 
         set-location-of-error error where  ; !!! why is this native?
     ]
@@ -1032,7 +1096,7 @@ fail: func [
     do ensure error! error  ; raise to nearest TRAP up the stack (if any)
 ]
 
-unreachable: specialize 'fail [reason: "Unreachable code"]
+unreachable: specialize :fail [reason: "Unreachable code"]
 
 
 generate: func [ "Make a generator."

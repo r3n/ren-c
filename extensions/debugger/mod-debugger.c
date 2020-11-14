@@ -7,16 +7,16 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2015-2019 Rebol Open Source Contributors
+// Copyright 2015-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -80,16 +80,13 @@ bool Do_Breakpoint_Throws(
     if (IS_HANDLE(inst)) {
         CFUNC *cfunc = VAL_HANDLE_CFUNC(inst);
         rebRelease(inst);
+        UNUSED(cfunc);
 
-        // !!! Evaluator hooking is a very experimental concept, and there's
-        // no rigor yet for supporting more than one hook at a time.
-        //
-        assert(
-            PG_Eval_Maybe_Stale_Throws == &Eval_Internal_Maybe_Stale_Throws
-        );
+        // !!! This used to hook the evaluator, with a hook that is no
+        // longer available.  Debugging is being reviewed in light of a
+        // stackless model and is non-functional at time of writing.
 
-        PG_Eval_Maybe_Stale_Throws = cast(REBEVL*, cfunc);
-        Init_Void(out);
+        Init_Void(out, SYM_VOID);
         return false;  // no throw, run normally (but now, hooked)
     }
 
@@ -112,7 +109,7 @@ bool Do_Breakpoint_Throws(
 //
 //  "Signal breakpoint to the host, but do not participate in evaluation"
 //
-//      return: []
+//      return: [<invisible>]
 //          {Returns nothing, not even void ("invisible", like COMMENT)}
 //  ]
 //
@@ -121,9 +118,9 @@ REBNATIVE(breakpoint_p)
 // !!! Need definition to test for N_DEBUGGER_breakpoint function
 {
     if (Do_Breakpoint_Throws(
-        D_OUT,
+        D_SPARE,
         false,  // not a Ctrl-C, it's an actual BREAKPOINT
-        VOID_VALUE  // default result if RESUME does not override
+        BLANK_VALUE  // default result if RESUME does not override
     )){
         return R_THROWN;
     }
@@ -133,10 +130,10 @@ REBNATIVE(breakpoint_p)
     // return *either* a value or no-value...if breakpoint were variadic, it
     // could splice in a value in place of what comes after it.
     //
-    if (not IS_VOID(D_OUT))
+    if (not IS_VOID(D_SPARE))
         fail ("BREAKPOINT is invisible, can't RESUME/WITH code (use PAUSE)");
 
-    return R_INVISIBLE;
+    RETURN_INVISIBLE;
 }
 
 
@@ -204,14 +201,19 @@ REBNATIVE(resume)
         Init_Any_Array(expr, REB_SYM_GROUP, EMPTY_ARRAY);
     else {
         assert(IS_BLOCK(expr));
-        mutable_KIND_BYTE(expr) = mutable_MIRROR_BYTE(expr) = REB_SYM_GROUP;
+        mutable_KIND3Q_BYTE(expr) = mutable_HEART_BYTE(expr) = REB_SYM_GROUP;
     }
 
     // We throw with /NAME as identity of the RESUME function.  (Note: there
     // is no NATIVE_VAL() for extensions, yet...extract from current frame.)
     //
     DECLARE_LOCAL (resume);
-    Init_Action_Maybe_Bound(resume, FRM_PHASE(frame_), FRM_BINDING(frame_));
+    Init_Action(
+        resume,
+        FRM_PHASE(frame_),
+        FRM_LABEL(frame_),
+        FRM_BINDING(frame_)
+    );
 
     // We don't want to run the expression yet.  If we tried to run code from
     // this stack level--and it failed or threw--we'd stay stuck in the
@@ -220,106 +222,6 @@ REBNATIVE(resume)
     return Init_Thrown_With_Label(D_OUT, expr, resume);
 }
 
-
-REBVAL *Spawn_Interrupt_Dangerous(void *opaque)
-{
-    REBFRM *f = cast(REBFRM*, opaque);
-
-    REBVAL *interrupt = rebValue(":interrupt", rebEND);
-
-    // In SHOVE it passes EVAL_FLAG_NEXT_ARG_FROM_OUT.  We don't have a reason
-    // to do this if we pass interrupt via reevaluate.
-    //
-    REBFLGS flags = EVAL_MASK_DEFAULT;
-
-    f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
-
-    // This is calling an invisible, so it should not change f->out!
-    //
-    if (Reevaluate_In_Subframe_Maybe_Stale_Throws(
-        f->out,
-        f,
-        interrupt,
-        flags,
-        false  // interrupt is not enfixed
-    )){
-        rebRelease(interrupt);  // ok if nullptr
-        return R_THROWN;
-    }
-
-    rebRelease(interrupt);
-    return nullptr;
-}
-
-
-// It might seem that the "evaluator hook" could be a usermode function which
-// took a FRAME! as an argument.  This is true, but it would be invasive...
-// it would appear to be on the stack.  It would be a complex illusion to
-// work past.
-//
-// A nicer way of doing this would involve freezing the evaluator thread and
-// then passing control to a debugger thread, which had its own stack that
-// would not interfere.  But in a single-threaded model, we make sure we
-// don't add any stack levels in the hoook.
-//
-bool Stepper_Eval_Hook_Throws(REBFRM * const f)
-{
-    // At the moment, the only thing the stepper eval hook does is set a
-    // signal for a breakpoint to happen on the *next* instruction.
-    //
-    // This could be done with SIG_INTERRUPT.  Though it's not clear if we
-    // could just go ahead and run the breakpoint here (?)  The evaluator
-    // has finished a step.
-
-    // The stepper removes itself from evaluation because it wants to count
-    // "whole steps".  So if you say `print 1 + 2`, right now that will break
-    // after the whole expression is done.
-    //
-    PG_Eval_Maybe_Stale_Throws = &Eval_Internal_Maybe_Stale_Throws;
-
-    bool threw = Eval_Internal_Maybe_Stale_Throws(f);
-
-    // !!! We cannot run more code while in a thrown state, hence we could not
-    // invoke a nested console after a throw.  We have to either set a global
-    // variable requesting to break after the throw's jump.  -or- we can save
-    // the thrown state, spawn the console, and rethrow what we caught.  This
-    // is experimental code and dealing with what may be a fool's errand in
-    // the first place (a usermode debugger giving a coherent experience on
-    // one stack--no separate thread/stack for the debugger).  But for now,
-    // we freeze the thrown state and then rethrow.
-    //
-    DECLARE_LOCAL (thrown_label);
-    DECLARE_LOCAL (thrown_value);
-    if (threw) {
-        Move_Value(thrown_label, VAL_THROWN_LABEL(f->out));
-        CATCH_THROWN(thrown_value, f->out);
-        PUSH_GC_GUARD(thrown_label);
-        PUSH_GC_GUARD(thrown_value);
-    }
-
-    // !!! The API code (e.g. for Alloc_Value()) needs a reified frame in
-    // order to get a REBCTX* to attach API handles to.  However, we may be
-    // in the process of fulfilling a function frame...and forming a REBCTX*
-    // out of a partial frame is illegal (not all cells are filled, they have
-    // not even had their memory initialized).
-    //
-    // Hence we need to make a frame that isn't fulfilling to parent those
-    // handles to.  rebRescue() already does that work, so reuse it.
-    //
-    REBVAL *r = rebRescue(&Spawn_Interrupt_Dangerous, f);
-    if (threw) {
-        DROP_GC_GUARD(thrown_value);
-        DROP_GC_GUARD(thrown_label);
-    }
-
-    if (r == R_THROWN)
-        return true;  // beats rethrowing whatever execution throw there was
-
-    if (threw)
-        Init_Thrown_With_Label(f->out, thrown_value, thrown_label);
-
-    return threw;
-}
 
 
 //
@@ -335,35 +237,6 @@ bool Stepper_Eval_Hook_Throws(REBFRM * const f)
 REBNATIVE(step)
 {
     DEBUGGER_INCLUDE_PARAMS_OF_STEP;
-
-    REBVAL *amount = ARG(amount);
-    if (IS_NULLED(amount))
-        Init_Integer(amount, 1);
-
-    if (not IS_INTEGER(amount) and VAL_INT32(amount) == 1)
-        fail ("STEP is just getting started, can only STEP by 1");
-
-    // !!! The way stepping is supposed to work is to be able to hook the
-    // evaluator and check to see if the condition it's checking is met.
-    // This means doing something like a RESUME, but as part of that resume
-    // giving a hook to install.  The hook looks like the evaluator itself...
-    // it takes a REBFRM* and has to call the evaluator at some point.
-    //
-    DECLARE_LOCAL(hook);
-    Init_Handle_Cfunc(hook, cast(CFUNC*, &Stepper_Eval_Hook_Throws));
-
-    // We throw with /NAME as identity of the RESUME function.  (There is no
-    // NATIVE_VAL() for extensions at this time.)
-    //
-    REBVAL *resume = rebValue(":resume", rebEND);
-
-    REBVAL *thrown = Init_Thrown_With_Label(D_OUT, hook, resume);
-    rebRelease(resume);
-
-    // !!! It would be nice to be able to have a step over or step out return
-    // the value evaluated to.  This value would have to be passed to the
-    // spawned console loop when it restarted, however...as this needs to
-    // throw the hook we're going to install.
-    //
-    return thrown;
+    UNUSED(ARG(amount));
+    fail ("STEP's methodology was deprecated, it is being re-implemented");
 }

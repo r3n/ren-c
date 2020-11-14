@@ -2,7 +2,7 @@ REBOL [
     Title: "Rebol 'Lint'-style Checking Tool for source code invariants"
     Rights: {
         Copyright 2015 Brett Handley
-        Copyright 2015-2018 Rebol Open Source Contributors
+        Copyright 2015-2018 Ren-C Open Source Contributors
     }
     License: {
         Licensed under the Apache License, Version 2.0
@@ -37,20 +37,16 @@ REBOL [
 ; This script makes some assumptions about the structure of the repo.
 ;
 
-ren-c-repo: clean-path %../
-
 do %../../tools/common.r
-do repo/tools/common-parsers.r
-do repo/tools/text-lines.reb
-do repo/tools/%read-deep.reb
+
+do %% (repo-dir)/tools/common-parsers.r
+do %% (repo-dir)/tools/text-lines.reb
+do %% (repo-dir)/tools/read-deep.reb
 
 ; rebsource is organised along the lines of a context sensitive vocabulary.
 ;
 
 rebsource: context [
-
-    src-folder: clean-path repo/source-root
-    ; Path to rebol source files.
 
     logfn: func [message][print mold new-line/all compose/only message false]
     log: :logfn
@@ -142,7 +138,8 @@ rebsource: context [
             all [
                 filetype: select extensions extension-of file
                 type: in source filetype
-                reeval (ensure action! get type) file (read src-folder/:file)
+                (reeval (ensure action! get type) file
+                    (read %% (repo-dir)/src/(file))
             ]
         ]
 
@@ -157,12 +154,12 @@ rebsource: context [
                 data [binary!]
             ][
                 analysis: analyse/text file data
-                emit: specialize 'log-emit [log: analysis]
+                emit: specialize :log-emit [log: analysis]
 
                 data: as text! data
 
-                identifier: c.lexical/grammar/identifier
-                c-pp-token: c.lexical/grammar/c-pp-token
+                identifier: c-lexical/grammar/identifier
+                c-pp-token: c-lexical/grammar/c-pp-token
 
                 malloc-found: copy []
 
@@ -202,10 +199,10 @@ rebsource: context [
                                     position:
                                     to end
                                 ]
-                                same? position proto-parser/parse.position
+                                same? position proto-parser/parse-position
                             ] else [
                                 line: try (
-                                    text-line-of proto-parser/parse.position
+                                    text-line-of proto-parser/parse-position
                                 )
                                 append
                                     non-std-func-space: default [copy []]
@@ -226,8 +223,11 @@ rebsource: context [
                         ; `REBNATIVE(some_name_q)` to be correctly lined up
                         ; as the "to-c-name" of the Rebol set-word
                         ;
-                        if proto-parser/proto.arg.1 <> to-c-name name [
-                            line: try text-line-of proto-parser/parse.position
+                        if (
+                            proto-parser/proto-arg-1
+                            <> to-c-name/scope name #prefixed
+                        )[
+                            line: try text-line-of proto-parser/parse-position
                             emit <id-mismatch> [
                                 (mold proto-parser/data/1) (file) (line)
                             ]
@@ -237,14 +237,14 @@ rebsource: context [
                         ; ... ? (not a native)
                         ;
                         any [
-                            (proto-parser/proto.id =
+                            (proto-parser/proto-id =
                                 form to word! proto-parser/data/1)
-                            (proto-parser/proto.id
+                            (proto-parser/proto-id
                                 unspaced [
                                     "RL_" to word! proto-parser/data/1
                                 ])
                         ] else [
-                            line: try text-line-of proto-parser/parse.position
+                            line: try text-line-of proto-parser/parse-position
                             emit <id-mismatch> [
                                 (mold proto-parser/data/1) (file) (line)
                             ]
@@ -285,9 +285,9 @@ rebsource: context [
             data
         ][
             analysis: copy []
-            emit: specialize 'log-emit [log: analysis]
+            emit: specialize :log-emit [log: analysis]
 
-            data: read src-folder/:file
+            data: read %% (repo-dir)/src/(file)
 
             bol: _
             line: _
@@ -397,8 +397,6 @@ rebsource: context [
         source-files: function [
             {Retrieves a list of source files (relative paths).}
         ][
-            if not src-folder [fail {Configuration of src-folder required.}]
-
             files: read-deep/full/strategy source-paths :source-files-seq
 
             sort files
@@ -415,7 +413,7 @@ rebsource: context [
             item: ensure file! take queue
 
             if equal? #"/" last item [
-                contents: read join src-folder item
+                contents: read %% (repo-dir)/src/(item)
                 insert queue map-each x contents [join item x]
                 item: _
             ] else [
@@ -442,7 +440,7 @@ rebsource: context [
         braced: [lbrace any [braced | not rbrace skip] rbrace]
 
         function-spacing-rule: (
-            bind/copy standard/function-spacing c.lexical/grammar
+            bind/copy standard/function-spacing c-lexical/grammar
         )
 
         grammar/function-body: braced
@@ -456,7 +454,7 @@ rebsource: context [
             last-func-end: _
         )
 
-    ] proto-parser c.lexical/grammar
+    ] proto-parser c-lexical/grammar
 
     extension-of: function [
         {Return file extension for file.}

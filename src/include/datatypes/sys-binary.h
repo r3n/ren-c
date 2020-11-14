@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -40,19 +40,33 @@
 
 //=//// BINARY! SERIES ////////////////////////////////////////////////////=//
 
-#define BIN_AT(s,n) \
-    SER_AT(REBYTE, (s), (n))
+inline static REBYTE *BIN_AT(const_if_c REBBIN *bin, REBLEN n)
+  { return SER_AT(REBYTE, bin, n); }
 
-#define BIN_HEAD(s) \
-    SER_HEAD(REBYTE, (s))
+inline static REBYTE *BIN_HEAD(const_if_c REBBIN *bin)
+  { return SER_HEAD(REBYTE, bin); }
 
-#define BIN_TAIL(s) \
-    SER_TAIL(REBYTE, (s))
+inline static REBYTE *BIN_TAIL(const_if_c REBBIN *bin)
+  { return SER_TAIL(REBYTE, bin); }
 
-#define BIN_LAST(s) \
-    SER_LAST(REBYTE, (s))
+inline static REBYTE *BIN_LAST(const_if_c REBBIN *bin)
+  { return SER_LAST(REBYTE, bin); }
 
-inline static REBLEN BIN_LEN(REBBIN *s) {
+#ifdef __cplusplus
+    inline static const REBYTE *BIN_AT(const REBBIN *bin, REBLEN n)
+      { return SER_AT(const REBYTE, bin, n); }
+
+    inline static const REBYTE *BIN_HEAD(const REBBIN *bin)
+      { return SER_HEAD(const REBYTE, bin); }
+
+    inline static const REBYTE *BIN_TAIL(const REBBIN *bin)
+      { return SER_TAIL(const REBYTE, bin); }
+
+    inline static const REBYTE *BIN_LAST(const REBBIN *bin)
+      { return SER_LAST(const REBYTE, bin); }
+#endif
+
+inline static REBLEN BIN_LEN(const REBBIN *s) {
     assert(SER_WIDE(s) == 1);
     return SER_USED(s);
 }
@@ -87,29 +101,48 @@ inline static REBSER *Make_Binary_Core(REBLEN capacity, REBFLGS flags)
 
 //=//// BINARY! VALUES ////////////////////////////////////////////////////=//
 
-#define VAL_BIN_HEAD(v) \
-    BIN_HEAD(VAL_SERIES(v))
-
-inline static REBYTE *VAL_BIN_AT(const REBCEL *v) {
-    assert(CELL_KIND(v) == REB_BINARY or CELL_KIND(v) == REB_BITSET);
-    if (VAL_INDEX(v) > BIN_LEN(VAL_SERIES(v)))
-        fail (Error_Past_End_Raw());  // don't give deceptive return pointer
-    return BIN_AT(VAL_SERIES(v), VAL_INDEX(v));
+inline static const REBBIN *VAL_BINARY(REBCEL(const*) v) {
+    assert(CELL_KIND(v) == REB_BINARY);
+    return VAL_SERIES(v);
 }
 
-#define VAL_BIN_AT_HEAD(v,n) \
-    BIN_AT(VAL_SERIES(v), (n))  // see remarks on VAL_ARRAY_AT_HEAD()
+#define VAL_BINARY_ENSURE_MUTABLE(v) \
+    m_cast(REBBIN*, VAL_BINARY(ENSURE_MUTABLE(v)))
+
+#define VAL_BINARY_KNOWN_MUTABLE(v) \
+    m_cast(REBBIN*, VAL_BINARY(KNOWN_MUTABLE(v)))
+
+
+inline static const REBYTE *VAL_BINARY_SIZE_AT(
+    REBSIZ *size_at_out,
+    REBCEL(const*) v
+){
+    const REBBIN *bin = VAL_BINARY(v);
+    REBIDX i = VAL_INDEX_RAW(v);
+    REBSIZ size = BIN_LEN(bin);
+    if (i < 0 or i > cast(REBIDX, size))
+        fail (Error_Index_Out_Of_Range_Raw());
+    if (size_at_out)
+        *size_at_out = size - i;
+    return BIN_AT(bin, i);
+}
+
+#define VAL_BINARY_SIZE_AT_ENSURE_MUTABLE(size_out,v) \
+    m_cast(REBYTE*, VAL_BINARY_SIZE_AT((size_out), ENSURE_MUTABLE(v)))
+
+#define VAL_BINARY_AT(v) \
+    VAL_BINARY_SIZE_AT(nullptr, (v))
+
+#define VAL_BINARY_AT_ENSURE_MUTABLE(v) \
+    m_cast(REBYTE*, VAL_BINARY_AT(ENSURE_MUTABLE(v)))
+
+#define VAL_BINARY_AT_KNOWN_MUTABLE(v) \
+    m_cast(REBYTE*, VAL_BINARY_AT(KNOWN_MUTABLE(v)))
 
 #define Init_Binary(out,bin) \
     Init_Any_Series((out), REB_BINARY, (bin))
 
 #define Init_Binary_At(out,bin,offset) \
     Init_Any_Series_At((out), REB_BINARY, (bin), (offset))
-
-inline static REBBIN *VAL_BINARY(const REBCEL* v) {
-    assert(CELL_KIND(v) == REB_BINARY);
-    return VAL_SERIES(v);
-}
-
 
 #define BYTE_BUF TG_Byte_Buf

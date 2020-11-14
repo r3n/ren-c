@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -45,18 +45,18 @@
 //
 void Assert_Cell_Marked_Correctly(const RELVAL *v)
 {
-    if (KIND_BYTE_UNCHECKED(v) == REB_QUOTED) {
+    if (KIND3Q_BYTE_UNCHECKED(v) == REB_QUOTED) {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        assert(MIRROR_BYTE(v) == REB_QUOTED);
+        assert(HEART_BYTE(v) == REB_QUOTED);
         assert(Is_Marked(PAYLOAD(Any, v).first.node));
         return;
     }
-    enum Reb_Kind kind = CELL_KIND_UNCHECKED(cast(const REBCEL*, v));
-    assert(kind == MIRROR_BYTE(v));
+
+    enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), v));
 
     REBNOD *binding;
     if (
-        IS_BINDABLE_KIND(kind)
+        IS_BINDABLE_KIND(heart)
         and (binding = VAL_BINDING(v))
         and NOT_SERIES_INFO(binding, INACCESSIBLE)
     ){
@@ -98,11 +98,12 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
     // Since this is debug-only, it's not as important any more.  But it
     // still can speed things up to go in order.
     //
-    switch (kind) {
+    switch (heart) {
       case REB_0_END:
-      case REB_NULLED:
+      case REB_NULL:
       case REB_VOID:
       case REB_BLANK:
+      case REB_COMMA:
         break;
 
       case REB_LOGIC:
@@ -112,8 +113,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_MONEY:
         break;
 
-      case REB_CHAR:
-        assert(VAL_CHAR_ENCODED_SIZE(v) <= 4);
+      case REB_BYTES:  // e.g. for ISSUE! when fits in cell
         break;
 
       case REB_PAIR: {
@@ -121,7 +121,6 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(Is_Marked(paired));
         break; }
 
-      case REB_TUPLE:
       case REB_TIME:
       case REB_DATE:
         break;
@@ -146,7 +145,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
       case REB_MAP: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBMAP* map = VAL_MAP(v);
+        const REBMAP* map = VAL_MAP(v);
         assert(Is_Marked(map));
         assert(IS_SER_ARRAY(map));
         break; }
@@ -191,6 +190,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         break; }
 
       case REB_BINARY: {
+        assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         REBBIN *s = SER(PAYLOAD(Any, v).first.node);
         if (GET_SERIES_INFO(s, INACCESSIBLE))
             break;
@@ -204,13 +204,13 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_FILE:
       case REB_EMAIL:
       case REB_URL:
-      case REB_TAG:
-      case REB_ISSUE: {
+      case REB_TAG: {
+        assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         if (GET_SERIES_INFO(PAYLOAD(Any, v).first.node, INACCESSIBLE))
             break;
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBSER *s = VAL_SERIES(v);
+        const REBSER *s = VAL_SERIES(v);
 
         assert(SER_WIDE(s) == sizeof(REBYTE));
         assert(Is_Marked(s));
@@ -262,19 +262,16 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
                 assert(VAL_BINDING(v) == FRM_BINDING(f));
         }
 
-        REBACT *phase = ACT(PAYLOAD(Any, v).second.node);
-        if (phase) {
-            assert(kind == REB_FRAME); // may be heap-based frame
-            assert(Is_Marked(phase));
+        if (PAYLOAD(Any, v).second.node) {
+            assert(heart == REB_FRAME); // may be heap-based frame
+            assert(Is_Marked(PAYLOAD(Any, v).second.node));  // phase or label
         }
-        else
-            assert(kind != REB_FRAME); // phase if-and-only-if frame
 
         if (GET_SERIES_INFO(context, INACCESSIBLE))
             break;
 
-        REBVAL *archetype = CTX_ARCHETYPE(context);
-        assert(CTX_TYPE(context) == kind);
+        const REBVAL *archetype = CTX_ARCHETYPE(context);
+        assert(CTX_TYPE(context) == heart);
         assert(VAL_CONTEXT(archetype) == context);
 
         // Note: for VAL_CONTEXT_FRAME, the FRM_CALL is either on the stack
@@ -302,14 +299,23 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             break;
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBARR *a = VAL_ARRAY(v);
+        const REBARR *a = VAL_ARRAY(v);
         assert(Is_Marked(a));
         break; }
+
+      case REB_TUPLE:
+      case REB_SET_TUPLE:
+      case REB_GET_TUPLE:
+      case REB_SYM_TUPLE:
+        goto any_sequence;
 
       case REB_PATH:
       case REB_SET_PATH:
       case REB_GET_PATH:
-      case REB_SYM_PATH: {
+      case REB_SYM_PATH:
+        goto any_sequence;
+
+      any_sequence: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         REBARR *a = ARR(PAYLOAD(Any, v).first.node);
         assert(NOT_SERIES_INFO(a, INACCESSIBLE));
@@ -327,7 +333,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(ARR_LEN(a) >= 2);
         RELVAL *item = ARR_HEAD(a);
         for (; NOT_END(item); ++item)
-            assert(not ANY_PATH_KIND(KIND_BYTE_UNCHECKED(item)));
+            assert(not ANY_PATH_KIND(KIND3Q_BYTE_UNCHECKED(item)));
         assert(Is_Marked(a));
         break; }
 
@@ -337,7 +343,8 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_SYM_WORD: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
 
-        REBSTR *spelling = STR(PAYLOAD(Any, v).first.node);
+        const REBSTR *spelling = STR(PAYLOAD(Any, v).first.node);
+        assert(Is_Series_Frozen(SER(spelling)));
 
         // A word marks the specific spelling it uses, but not the canon
         // value.  That's because if the canon value gets GC'd, then
@@ -370,15 +377,14 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         REBACT *a = VAL_ACTION(v);
         REBARR *paramlist = ACT_PARAMLIST(a);
         assert(Is_Marked(paramlist));
-        REBARR *details = ACT_DETAILS(a);
-        assert(Is_Marked(details));
+
+        assert(Is_Marked(PAYLOAD(Any, v).second.node));
 
         // Make sure the [0] slot of the paramlist holds an archetype that is
         // consistent with the paramlist itself.
         //
         REBVAL *archetype = ACT_ARCHETYPE(a);
         assert(paramlist == VAL_ACT_PARAMLIST(archetype));
-        assert(details == VAL_ACT_DETAILS(archetype));
         break; }
 
       case REB_QUOTED:
@@ -386,7 +392,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         // REB_QUOTED should not be contained in a quoted; instead, the
         // depth of the existing literal should just have been incremented.
         //
-        panic ("REB_QUOTED with (KIND_BYTE() % REB_64) > 0");
+        panic ("REB_QUOTED with (KIND3Q_BYTE() % REB_64) > 0");
 
     //=//// BEGIN INTERNAL TYPES ////////////////////////////////////////=//
 
@@ -394,11 +400,10 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_P_HARD_QUOTE:
       case REB_P_MODAL:
       case REB_P_SOFT_QUOTE:
-      case REB_P_LOCAL:
-      case REB_P_RETURN: {
+      case REB_P_LOCAL: {
         REBSTR *s = VAL_TYPESET_STRING(v);
         assert(Is_Marked(s));
-        assert(MIRROR_BYTE(v) == REB_TYPESET);
+        assert(HEART_BYTE(v) == REB_TYPESET);
         break; }
 
       case REB_G_XYF:
@@ -421,14 +426,57 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         //
         break;
 
-      case REB_X_BOOKMARK:  // ANY-STRING! index and offset cache
-        break;
-
       case REB_CUSTOM:  // !!! Might it have an "integrity check" hook?
         break;
 
       default:
         panic (v);
+    }
+
+    enum Reb_Kind kind = CELL_KIND(cast(REBCEL(const*), v));
+    switch (kind) {
+      case REB_TUPLE:
+      case REB_SET_TUPLE:
+      case REB_GET_TUPLE:
+      case REB_SYM_TUPLE:
+      case REB_PATH:
+      case REB_SET_PATH:
+      case REB_GET_PATH:
+      case REB_SYM_PATH:
+         assert(
+            heart == REB_BYTES
+            or heart == REB_WORD
+            or heart == REB_GET_WORD
+            or heart == REB_SYM_WORD
+            or heart == REB_BLOCK
+         );
+         break;
+
+      case REB_ISSUE: {
+        if (heart == REB_TEXT) {
+            const REBSER *s = SER(VAL_STRING(v));
+            assert(Is_Series_Frozen(s));
+
+            // We do not want ISSUE!s to use series if the payload fits in
+            // a cell.  It would offer some theoretical benefits for reuse,
+            // e.g. an `as text! as issue! "foo"` would share the same
+            // small series...the way it would share a larger one.  But this
+            // fringe-ish benefit comes at the cost of keeping a GC reference
+            // live on something that doesn't need to be live, and also makes
+            // the invariants more complex.
+            //
+            assert(SER_USED(s) + 1 > sizeof(PAYLOAD(Bytes, v).at_least_8));
+        }
+        else {
+            assert(heart == REB_BYTES);
+            assert(NOT_CELL_FLAG(v, FIRST_IS_NODE));
+        }
+        break; }
+
+      default:
+        if (kind < REB_MAX)  // psuedotypes for parameter are actually typeset
+           assert(kind == heart);
+        break;
     }
 }
 
@@ -441,7 +489,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 // LINK() or MISC(), or which fields had been assigned to correctly use for
 // reading back what to mark.  This has been standardized.
 //
-void Assert_Array_Marked_Correctly(REBARR *a) {
+void Assert_Array_Marked_Correctly(const REBARR *a) {
     assert(Is_Marked(a));
 
     #ifdef HEAVY_CHECKS
@@ -461,7 +509,7 @@ void Assert_Array_Marked_Correctly(REBARR *a) {
     #endif
 
     if (GET_ARRAY_FLAG(a, IS_PARAMLIST)) {
-        RELVAL *archetype = ARR_HEAD(a);
+        const RELVAL *archetype = ARR_HEAD(a);
         assert(IS_ACTION(archetype));
         assert(not EXTRA(Binding, archetype).node);
 
@@ -469,7 +517,7 @@ void Assert_Array_Marked_Correctly(REBARR *a) {
         // because of the potential for overflowing the C stack with calls
         // to Queue_Mark_Function_Deep.
 
-        REBARR *details = VAL_ACT_DETAILS(archetype);
+        REBARR *details = ACT_DETAILS(VAL_ACTION(archetype));
         assert(Is_Marked(details));
 
         REBARR *specialty = LINK_SPECIALTY(details);
@@ -481,7 +529,7 @@ void Assert_Array_Marked_Correctly(REBARR *a) {
             assert(specialty == a);
     }
     else if (GET_ARRAY_FLAG(a, IS_VARLIST)) {
-        REBVAL *archetype = CTX_ARCHETYPE(CTX(a));
+        const REBVAL *archetype = CTX_ARCHETYPE(CTX(a));
 
         // Currently only FRAME! archetypes use binding
         //

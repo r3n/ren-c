@@ -9,7 +9,7 @@ REBOL [
 
     Rights: [
         "Copyright (C) 2010-2011 Christian Ensel" (MIT License)
-        "Copyright (C) 2017-2019 Rebol Open Source Developers" (Apache)
+        "Copyright (C) 2017-2019 Ren-C Open Source Contributors" (Apache)
     ]
 
     License: {Apache 2.0}
@@ -159,7 +159,7 @@ odbc-execute: func [
                 sym-group! [
                         reduce as group! item
                 ]
-            ] then value => [
+            ] then value -> [
                 append parameters :value
                 "?"
             ] else [

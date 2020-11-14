@@ -99,8 +99,7 @@ read-sync-awake: function [return: [logic!] event [event!]] [
             event/port/error: _
             fail error
         ]
-        default [false]
-    ]
+    ] else [false]
 ]
 
 http-awake: function [return: [logic!] event [event!]] [
@@ -160,8 +159,7 @@ http-awake: function [return: [logic!] event [event!]] [
             close http-port
             res
         ]
-        default [true]
-    ]
+    ] else [true]
 ]
 
 make-http-error: func [
@@ -187,11 +185,15 @@ make-http-request: func [
         {Request contents (Content-Length is created automatically).}
         {Empty string not exactly like blank.}
     <local> result
-] [
+][
+    ; The HTTP 1.1 protocol requires a `Host:` header.  Simple logic used
+    ; here is to fall back to requesting 1.0 only if there is no Host.
+    ; (though apparently often speakers of the 1.0 protocol require it too)
+    ;
     result: unspaced [
-        uppercase form method space
-        either file? target [next mold target] [target]
-        space "HTTP/1.0" CR LF
+        uppercase form method _
+            either file? target [next mold target] [target]
+            _ either headers/host ["HTTP/1.1"] ["HTTP/1.0"] CR LF
     ]
     for-each [word string] headers [
         append result unspaced [mold word _ string CR LF]
@@ -383,7 +385,7 @@ check-response: function [port] [
                 ]
             ] else [
                 res: check-data port
-                if (not res) and [state/mode = 'ready] [
+                all [not res, state/mode = 'ready] then [
                     res: any [
                         awake make event! [type: 'done port: port]
                         awake make event! [type: 'ready port: port]
@@ -410,7 +412,7 @@ check-response: function [port] [
                     state/mode: 'ready
                 ]
             ]
-            if (not res) and [state/mode = 'ready] [
+            all [not res, state/mode = 'ready] then [
                 all [
                     find [get head] spec/method else [all [
                         info/response-parsed = 'see-other
@@ -685,7 +687,7 @@ sys/make-scheme [
             ] else [
                 sync-op port []
             ]
-            if lines or 'string [
+            if lines or (string) [
                 ; !!! When READ is called on an http PORT! (directly or
                 ; indirectly) it bounces its parameters to this routine.  To
                 ; avoid making an error this tolerates the refinements but the
@@ -774,7 +776,7 @@ sys/make-scheme [
         reflect: func [port [port!] property [word!]] [
             switch property [
                 'open? [
-                    port/state and [open? port/state/connection]
+                    did all [port/state, open? port/state/connection]
                 ]
 
                 'length [

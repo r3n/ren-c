@@ -7,76 +7,21 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
 
 #include "sys-core.h"
-
-//
-//  Reduce_To_Stack_Throws: C
-//
-// Reduce array from the index position specified in the value.
-//
-bool Reduce_To_Stack_Throws(
-    REBVAL *out,
-    const RELVAL *any_array,
-    REBSPC *specifier
-){
-    REBDSP dsp_orig = DSP;
-
-    DECLARE_ARRAY_FEED (feed,
-        VAL_ARRAY(any_array),
-        VAL_INDEX(any_array),
-        specifier
-    );
-
-    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
-
-    Push_Frame(nullptr, f);
-
-    do {
-        bool line = IS_END(*v) ? false : GET_CELL_FLAG(*v, NEWLINE_BEFORE);
-
-        if (Eval_Step_Throws(out, f)) {
-            DS_DROP_TO(dsp_orig);
-            Abort_Frame(f);
-            return true;
-        }
-
-        if (IS_END(out)) {  // e.g. `reduce []` or `reduce [comment "hi"]`
-            assert(IS_END(*v));
-            break;
-        }
-
-        // We can't put nulls into array cells, so we put BLANK!.  This is
-        // compatible with historical behavior of `reduce [if 1 = 2 [<x>]]`
-        // which produced `[#[none]]`, and is generally more useful than
-        // putting VOID!, as more operations skip blanks vs. erroring.
-        //
-        if (IS_NULLED(out))
-            Init_Blank(DS_PUSH());
-        else
-            Move_Value(DS_PUSH(), out);
-
-        if (line)
-            SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
-    } while (NOT_END(*v));
-
-    Drop_Frame_Unbalanced(f); // Drop_Frame() asserts on accumulation
-    return false;
-}
 
 
 //
@@ -86,6 +31,8 @@ bool Reduce_To_Stack_Throws(
 //
 //      return: "New array or value"
 //          [<opt> any-value!]
+//      :predicate "Applied after evaluation, default is .NON.NULL"
+//          [<skip> predicate! action!]
 //      value "GROUP! and BLOCK! evaluate each item, single values evaluate"
 //          [any-value!]
 //  ]
@@ -96,33 +43,106 @@ REBNATIVE(reduce)
 
     REBVAL *v = ARG(value);
 
-    if (IS_BLOCK(v) or IS_GROUP(v)) {
-        REBDSP dsp_orig = DSP;
-
-        if (Reduce_To_Stack_Throws(D_OUT, v, VAL_SPECIFIER(v)))
-            return R_THROWN;
-
-        REBFLGS pop_flags = NODE_FLAG_MANAGED | ARRAY_MASK_HAS_FILE_LINE;
-        if (GET_ARRAY_FLAG(VAL_ARRAY(v), NEWLINE_AT_TAIL))
-            pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
-
-        return Init_Any_Array(
-            D_OUT,
-            VAL_TYPE(v),
-            Pop_Stack_Values_Core(dsp_orig, pop_flags)
-        );
-    }
+    REBVAL *predicate = ARG(predicate);
+    if (Cache_Predicate_Throws(D_OUT, predicate))
+        return R_THROWN;
 
     // Single element REDUCE does an EVAL, but doesn't allow arguments.
     // (R3-Alpha, would just return the input, e.g. `reduce :foo` => :foo)
     // If there are arguments required, Eval_Value_Throws() will error.
     //
     // !!! Should the error be more "reduce-specific" if args were required?
+    //
+    // !!! How should predicates interact with this case?
+    //
+    if (not IS_BLOCK(v) and not IS_GROUP(v)) {
+        if (Eval_Value_Throws(D_OUT, v, SPECIFIED))
+            return R_THROWN;
 
-    if (Eval_Value_Throws(D_OUT, v, SPECIFIED))
-        return R_THROWN;
+        return D_OUT;  // let caller worry about whether to error on nulls
+    }
 
-    return D_OUT; // let caller worry about whether to error on nulls
+    REBDSP dsp_orig = DSP;
+
+    DECLARE_FEED_AT (feed, v);
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+
+    Push_Frame(nullptr, f);
+
+    do {
+        bool line = IS_END(f_value)
+            ? false
+            : GET_CELL_FLAG(f_value, NEWLINE_BEFORE);
+
+        if (Eval_Step_Throws(D_OUT, f)) {
+            DS_DROP_TO(dsp_orig);
+            Abort_Frame(f);
+            return R_THROWN;
+        }
+
+        if (IS_END(D_OUT)) {
+            if (IS_END(f_value))
+                break;  // `reduce []`
+            continue;  // `reduce [comment "hi"]`
+        }
+
+        // Try and do some optimized dispatch for common combinations of
+        // functions with REDUCE (.identity, .try, .opt).  Bear in mind that
+        // the CFUNC* must be checked explicitly vs. the REBACT* identity,
+        // otherwise a HIJACK might be overlooked.
+
+        REBNAT dispatcher = IS_NULLED(predicate)
+            ? nullptr
+            : ACT_DISPATCHER(VAL_ACTION(predicate));
+
+        if (not dispatcher) {  // act as NON NULL, so error on NULLs
+            if (IS_NULLED(D_OUT))
+                fail (Error_Need_Non_Null_Raw(v));
+
+            Move_Value(DS_PUSH(), D_OUT);
+        }
+        else if (dispatcher == &N_identity) {  // NULLs dissolve
+            if (not IS_NULLED(D_OUT))
+                Move_Value(DS_PUSH(), D_OUT);
+        }
+        else if (dispatcher == &N_opt) {  // NULLs and BLANK!s dissolve
+            if (not IS_NULLED_OR_BLANK(D_OUT))
+                Move_Value(DS_PUSH(), D_OUT);
+        }
+        else if (dispatcher == &N_try) {  // turn NULL into BLANK!
+            if (IS_NULLED(D_OUT))
+                Init_Blank(DS_PUSH());
+            else
+                Move_Value(DS_PUSH(), D_OUT);
+        }
+        else if (dispatcher == &N_voidify) {  // turn NULL into VOID!
+            if (IS_NULLED(D_OUT))
+                Init_Void(DS_PUSH(), SYM_NULLED);
+            else
+                Move_Value(DS_PUSH(), D_OUT);
+        }
+        else {  // no optimization for general cases
+            REBVAL *processed = rebValue(ARG(predicate), rebQ(D_OUT), rebEND);
+            if (processed)
+                Move_Value(DS_PUSH(), processed);
+            rebRelease(processed);
+        }
+
+        if (line)
+            SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
+    } while (NOT_END(f_value));
+
+    Drop_Frame_Unbalanced(f);  // Drop_Frame() asserts on accumulation
+
+    REBFLGS pop_flags = NODE_FLAG_MANAGED | ARRAY_MASK_HAS_FILE_LINE;
+    if (GET_ARRAY_FLAG(VAL_ARRAY(v), NEWLINE_AT_TAIL))
+        pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
+
+    return Init_Any_Array(
+        D_OUT,
+        VAL_TYPE(v),
+        Pop_Stack_Values_Core(dsp_orig, pop_flags)
+    );
 }
 
 
@@ -135,11 +155,11 @@ bool Match_For_Compose(const RELVAL *group, const REBVAL *label) {
     if (VAL_LEN_AT(group) == 0) // you have a pattern, so leave `()` as-is
         return false;
 
-    RELVAL *first = VAL_ARRAY_AT(group);
+    const RELVAL *first = VAL_ARRAY_AT(group);
     if (VAL_TYPE(first) != VAL_TYPE(label))
         return false;
 
-    return (CT_String(label, first, 1) > 0);
+    return (CT_String(label, first, 1) == 0);
 }
 
 
@@ -162,7 +182,7 @@ bool Match_For_Compose(const RELVAL *group, const REBVAL *label) {
 //
 REB_R Compose_To_Stack_Core(
     REBVAL *out, // if return result is R_THROWN, will hold the thrown value
-    const RELVAL *any_array, // the template
+    const RELVAL *composee, // the template
     REBSPC *specifier, // specifier for relative any_array value
     const REBVAL *label, // e.g. if <*>, only match `(<*> ...)`
     bool deep, // recurse into sub-blocks
@@ -175,10 +195,28 @@ REB_R Compose_To_Stack_Core(
 
     bool changed = false;
 
+    // !!! At the moment, COMPOSE is written to use frame enumeration...and
+    // frames are only willing to enumerate arrays.  But the path may be in
+    // a more compressed form.  While this is being rethought, we just reuse
+    // the logic of AS so it's in one place and gets tested more.
+    //
+    const RELVAL *any_array;
+    if (ANY_PATH(composee)) {
+        DECLARE_LOCAL (temp);
+        Derelativize(temp, composee, specifier);
+        PUSH_GC_GUARD(temp);
+        any_array = rebValueQ("as block!", temp, rebEND);
+        DROP_GC_GUARD(temp);
+    }
+    else
+        any_array = composee;
+
     DECLARE_FEED_AT_CORE (feed, any_array, specifier);
 
+    if (ANY_PATH(composee))
+        rebRelease(cast(REBVAL*, m_cast(RELVAL*, any_array)));
+
     DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
 
     Push_Frame(nullptr, f);
 
@@ -186,29 +224,29 @@ REB_R Compose_To_Stack_Core(
     f->was_eval_called = true;  // lie since we're using frame for enumeration
   #endif
 
-    for (; NOT_END(*v); Fetch_Next_Forget_Lookback(f)) {
-        const REBCEL *cell = VAL_UNESCAPED(*v);
-        enum Reb_Kind kind = CELL_KIND(cell); // notice `''(...)`
+    for (; NOT_END(f_value); Fetch_Next_Forget_Lookback(f)) {
+        REBCEL(const*) cell = VAL_UNESCAPED(f_value);
+        enum Reb_Kind heart = CELL_HEART(cell); // notice `''(...)`
 
-        if (not ANY_ARRAY_OR_PATH_KIND(kind)) { // won't substitute/recurse
-            Derelativize(DS_PUSH(), *v, specifier); // keep newline flag
+        if (not ANY_ARRAY_OR_PATH_KIND(heart)) { // won't substitute/recurse
+            Derelativize(DS_PUSH(), f_value, specifier); // keep newline flag
             continue;
         }
 
-        REBLEN quotes = VAL_NUM_QUOTES(*v);
+        REBLEN quotes = VAL_NUM_QUOTES(f_value);
 
         bool doubled_group = false;  // override predicate with ((...))
 
         REBSPC *match_specifier = nullptr;
         const RELVAL *match = nullptr;
 
-        if (not ANY_GROUP_KIND(kind)) {
+        if (not ANY_GROUP_KIND(heart)) {
             //
             // Don't compose at this level, but may need to walk deeply to
             // find compositions inside it if /DEEP and it's an array
         }
-        else if (not only and Is_Any_Doubled_Group(*v)) {
-            RELVAL *inner = VAL_ARRAY_AT(*v);
+        else if (not only and Is_Any_Doubled_Group(f_value)) {
+            const RELVAL *inner = VAL_ARRAY_AT(f_value);
             if (Match_For_Compose(inner, label)) {
                 doubled_group = true;
                 match = inner;
@@ -216,8 +254,8 @@ REB_R Compose_To_Stack_Core(
             }
         }
         else {  // plain compose, if match
-            if (Match_For_Compose(*v, label)) {
-                match = *v;
+            if (Match_For_Compose(f_value, label)) {
+                match = f_value;
                 match_specifier = specifier;
             }
         }
@@ -249,7 +287,7 @@ REB_R Compose_To_Stack_Core(
             } else
                 insert = IS_NULLED(out) ? nullptr : out;
 
-            if (insert == nullptr and kind == REB_GROUP and quotes == 0) {
+            if (insert == nullptr and heart == REB_GROUP and quotes == 0) {
                 //
                 // compose [(unquoted "nulls *vanish*!" null)] => []
                 // compose [(elide "so do 'empty' composes")] => []
@@ -264,10 +302,10 @@ REB_R Compose_To_Stack_Core(
 
                 // compose [(([a b])) merges] => [a b merges]
 
-                if (quotes != 0 or kind != REB_GROUP)
+                if (quotes != 0 or heart != REB_GROUP)
                     fail ("Currently can only splice plain unquoted GROUP!s");
 
-                RELVAL *push = VAL_ARRAY_AT(insert);
+                const RELVAL *push = VAL_ARRAY_AT(insert);
                 if (NOT_END(push)) {
                     //
                     // Only proxy newline flag from the template on *first*
@@ -278,7 +316,7 @@ REB_R Compose_To_Stack_Core(
                     // that block to fit on one line?
                     //
                     Derelativize(DS_PUSH(), push, VAL_SPECIFIER(insert));
-                    if (GET_CELL_FLAG(*v, NEWLINE_BEFORE))
+                    if (GET_CELL_FLAG(f_value, NEWLINE_BEFORE))
                         SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
                     else
                         CLEAR_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
@@ -299,20 +337,20 @@ REB_R Compose_To_Stack_Core(
                 else
                     Move_Value(DS_PUSH(), insert);  // can't stack eval direct
 
-                if (kind == REB_SET_GROUP)
+                if (heart == REB_SET_GROUP)
                     Setify(DS_TOP);
-                else if (kind == REB_GET_GROUP)
+                else if (heart == REB_GET_GROUP)
                     Getify(DS_TOP);
-                else if (kind == REB_SYM_GROUP)
+                else if (heart == REB_SYM_GROUP)
                     Symify(DS_TOP);
                 else
-                    assert(kind == REB_GROUP);
+                    assert(heart == REB_GROUP);
 
                 Quotify(DS_TOP, quotes);  // match original quotes
 
                 // Use newline intent from the GROUP! in the compose pattern
                 //
-                if (GET_CELL_FLAG(*v, NEWLINE_BEFORE))
+                if (GET_CELL_FLAG(f_value, NEWLINE_BEFORE))
                     SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
                 else
                     CLEAR_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
@@ -354,33 +392,48 @@ REB_R Compose_To_Stack_Core(
                 // may be controlled by a switch if it turns out to be needed.
                 //
                 DS_DROP_TO(dsp_deep);
-                Derelativize(DS_PUSH(), *v, specifier);
+                Derelativize(DS_PUSH(), f_value, specifier);
                 continue;
             }
 
-            REBFLGS pop_flags = NODE_FLAG_MANAGED | ARRAY_MASK_HAS_FILE_LINE;
-            if (GET_ARRAY_FLAG(VAL_ARRAY(cell), NEWLINE_AT_TAIL))
-                pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
-
-            REBARR *popped = Pop_Stack_Values_Core(dsp_deep, pop_flags);
-            if (ANY_PATH_KIND(kind)) {
-                Freeze_Array_Shallow(popped);
-                Init_Any_Path(
-                    DS_PUSH(),
+            enum Reb_Kind kind = CELL_KIND(cell);
+            if (ANY_SEQUENCE_KIND(kind)) {
+                DECLARE_LOCAL (temp);
+                if (not Try_Pop_Sequence_Or_Element_Or_Nulled(
+                    temp,
                     kind,
-                    popped  // can't push and pop in same step, need variable
-                );
+                    dsp_deep
+                )){
+                    if (Is_Valid_Sequence_Element(kind, temp)) {
+                        //
+                        // `compose '(null)/1:` would leave beind 1:
+                        //
+                        fail (Error_Cant_Decorate_Type_Raw(temp));
+                    }
+
+                    fail (Error_Bad_Sequence_Init(DS_TOP));
+                }
+                Move_Value(DS_PUSH(), temp);
             }
-            else
+            else {
+                REBFLGS pop_flags
+                    = NODE_FLAG_MANAGED
+                    | ARRAY_MASK_HAS_FILE_LINE;
+
+                if (GET_ARRAY_FLAG(VAL_ARRAY(cell), NEWLINE_AT_TAIL))
+                    pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
+
+                REBARR *popped = Pop_Stack_Values_Core(dsp_deep, pop_flags);
                 Init_Any_Array(
                     DS_PUSH(),
                     kind,
                     popped  // can't push and pop in same step, need variable
                 );
+            }
 
             Quotify(DS_TOP, quotes);  // match original quoting
 
-            if (GET_CELL_FLAG(*v, NEWLINE_BEFORE))
+            if (GET_CELL_FLAG(f_value, NEWLINE_BEFORE))
                 SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
 
             changed = true;
@@ -388,7 +441,7 @@ REB_R Compose_To_Stack_Core(
         else {
             // compose [[(1 + 2)] (3 + 4)] => [[(1 + 2)] 7]  ; non-deep
             //
-            Derelativize(DS_PUSH(), *v, specifier);  // keep newline flag
+            Derelativize(DS_PUSH(), f_value, specifier);  // keep newline flag
         }
     }
 
@@ -402,13 +455,13 @@ REB_R Compose_To_Stack_Core(
 //
 //  {Evaluates only contents of GROUP!-delimited expressions in an array}
 //
-//      return: [any-array! any-path! any-word! action!]
+//      return: [blackhole! any-array! any-path! any-word! action!]
 //      :predicate [<skip> action!]  ; !!! PATH! may be meant as value (!)
 //          "Function to run on composed slots (default: ENBLOCK)"
 //      :label "Distinguish compose groups, e.g. [(plain) (<*> composed)]"
 //          [<skip> tag! file!]
-//      value "Array to use as the template (no-op if WORD! or ACTION!)"
-//          [any-array! any-path! any-word! action!]
+//      value "The template to fill in (no-op if WORD!, ACTION! or SPACE!)"
+//          [blackhole! any-array! any-path! any-word! action!]
 //      /deep "Compose deeply into nested arrays"
 //      /only "Do not exempt ((...)) from predicate application"
 //  ]
@@ -421,22 +474,11 @@ REBNATIVE(compose)
     INCLUDE_PARAMS_OF_COMPOSE;
 
     REBVAL *predicate = ARG(predicate);
-    if (not IS_NULLED(predicate)) {
-        REBSTR *opt_label;
-        if (Get_If_Word_Or_Path_Throws(
-            D_OUT,
-            &opt_label,
-            predicate,
-            SPECIFIED,
-            false  // push_refinements = false, specialize for multiple uses
-        )){
-            return R_THROWN;
-        }
-        if (not IS_ACTION(D_OUT))
-            fail ("PREDICATE provided to COMPOSE must look up to an ACTION!");
+    if (Cache_Predicate_Throws(D_OUT, predicate))
+        return R_THROWN;
 
-        Move_Value(predicate, D_OUT);
-    }
+    if (Is_Blackhole(ARG(value)))
+        RETURN (ARG(value));  // sink locations composed to avoid double eval
 
     if (ANY_WORD(ARG(value)) or IS_ACTION(ARG(value)))
         RETURN (ARG(value));  // makes it easier to `set/hard compose target`
@@ -465,6 +507,24 @@ REBNATIVE(compose)
     else
         assert(r == nullptr); // normal result, changed
 
+    if (ANY_SEQUENCE(ARG(value))) {
+        if (not Try_Pop_Sequence_Or_Element_Or_Nulled(
+            D_OUT,
+            VAL_TYPE(ARG(value)),
+            dsp_orig
+        )){
+            if (Is_Valid_Sequence_Element(VAL_TYPE(ARG(value)), D_OUT)) {
+                //
+                // `compose '(null)/1:` would leave behind 1:
+                //
+                fail (Error_Cant_Decorate_Type_Raw(D_OUT));
+            }
+
+            fail (Error_Bad_Sequence_Init(D_OUT));
+        }
+        return D_OUT;  // note: may not be an ANY-PATH!  See Try_Pop_Path...
+    }
+
     // The stack values contain N NEWLINE_BEFORE flags, and we need N + 1
     // flags.  Borrow the one for the tail directly from the input REBARR.
     //
@@ -473,12 +533,6 @@ REBNATIVE(compose)
         flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
 
     REBARR *popped = Pop_Stack_Values_Core(dsp_orig, flags);
-    if (ANY_PATH(ARG(value)))
-        return Init_Any_Path(
-            D_OUT,
-            VAL_TYPE(ARG(value)),
-            Freeze_Array_Shallow(popped)
-        );
 
     return Init_Any_Array(D_OUT, VAL_TYPE(ARG(value)), popped);
 }
@@ -501,7 +555,7 @@ static void Flatten_Core(
         if (IS_BLOCK(item) and level != FLATTEN_NOT) {
             REBSPC *derived = Derive_Specifier(specifier, item);
             Flatten_Core(
-                VAL_ARRAY_AT(item),
+                VAL_ARRAY_AT_ENSURE_MUTABLE(item),
                 derived,
                 level == FLATTEN_ONCE ? FLATTEN_NOT : FLATTEN_DEEP
             );
@@ -531,7 +585,7 @@ REBNATIVE(flatten)
     REBDSP dsp_orig = DSP;
 
     Flatten_Core(
-        VAL_ARRAY_AT(ARG(block)),
+        VAL_ARRAY_AT_ENSURE_MUTABLE(ARG(block)),
         VAL_SPECIFIER(ARG(block)),
         REF(deep) ? FLATTEN_DEEP : FLATTEN_ONCE
     );

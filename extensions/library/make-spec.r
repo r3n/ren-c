@@ -11,9 +11,7 @@ depends: compose [
         'Windows [
             [%library/library-windows.c]
         ]
-
-        default [
-            [%library/library-posix.c]
-        ]
+    ] else [
+        [%library/library-posix.c]
     ])
 ]

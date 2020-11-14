@@ -28,9 +28,9 @@
 ; bitset
 (
     a: make bitset! #{FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF}
-    a == negate negate a
+    a == complement complement a
 )
 (
     a: make bitset! #{0000000000000000000000000000000000000000000000000000000000000000}
-    a == negate negate a
+    a == complement complement a
 )

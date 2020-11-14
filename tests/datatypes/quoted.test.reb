@@ -31,7 +31,7 @@
         set 'y x
     ]
     foo
-    x = 10 and [y = 20]
+    (x = 10) and (y = 20)
 )
 
 ; Try again, but set a QUOTED! (and not WORD! that results from literal)
@@ -48,7 +48,7 @@
         set lit 'y x
     ]
     foo
-    x = 10 and [y = 20]
+    (x = 10) and (y = 20)
 )
 
 ; Now exceed the size of a literal that can be overlaid in a cell
@@ -65,7 +65,7 @@
         set lit '''''''y x
     ]
     foo
-    x = 10 and [y = 20]
+    (x = 10) and (y = 20)
 )
 
 
@@ -81,7 +81,7 @@
     word: ''''''''''a:
     w1: bind word o1
     w2: bind word o2
-    (0 = get word) and [1 = get w1] and [2 = get w2]
+    (0 = get word) and (1 = get w1) and (2 = get w2)
 )(
     foo: function [] [
         a: 0
@@ -90,7 +90,7 @@
         word: ''''''''''a:
         w1: bind word o1
         w2: bind word o2
-        (0 = get word) and [1 = get w1] and [2 = get w2]
+        (0 = get word) and (1 = get w1) and (2 = get w2)
     ]
     foo
 )
@@ -121,22 +121,23 @@
 ((type of lit ''[a b c]) = quote/depth block! 2)
 
 
-; Some generic actions have been tweaked to know to extend their
-; behavior and incorporate escaping into their results.  This is
-; not necessarily such a "weird" idea, given that you could do
-; things like append to a LIT-PATH!.  However, it should be
-; controlled by something in the function spec vs. be a random
-; list that added the behavior.
+; REQUOTE is a reframing action that removes quoting levels and then puts
+; them back on to the result.
 
-((lit ''''3) == add lit ''''1 2)
+((lit ''''3) == requote add lit ''''1 2)
 
-((lit '''[b c d]) == find ''''[a b c d] 'b)
+((lit '''[b c d]) == requote find ''''[a b c d] 'b)
 
-(null == find ''''[a b c d] 'q)
+(null == requote find ''''[a b c d] 'q)  ; nulls exempt
 
+((lit '(1 2 3 <four>)) == requote append ''(1 2 3) <four>)
+
+('''a/b/c/d/e/f = requote join lit '''a/b/c 'd/e/f)
+
+
+; COPY should be implemented for all types, QUOTED! included.
+;
 ((lit '''[a b c]) == copy lit '''[a b c])
-
-((lit '(1 2 3 <four>)) == append ''(1 2 3) <four>)
 
 
 ; All escaped values are truthy, regardless of what it is they are escaping
@@ -147,12 +148,6 @@
 (did lit ''''''''_)
 (did lit ''''''''#[false])
 (did lit '''''''')
-
-
-; Spliced-oriented processing should "see through" the quote of the appended
-; item, but preserve the quoting level of the appended-to item:
-
-('''a/b/c/d/e/f = join lit '''a/b/c 'd/e/f)
 
 
 ; An escaped word that can't fit in a cell and has to do an additional
@@ -219,17 +214,17 @@
         ("try library here")
         _
         |
-        #[void]
+        ~void~
     ][
         lit-item: quote get/any 'item
 
         comment "Just testing for crashes; discards mold result"
         mold :lit-item
 
-        (e1: try trap [equal1: equal? get/any 'item get/any 'item]) and [
+        (e1: trap [equal1: equal? get/any 'item get/any 'item]) also [
             e1/where: e1/near: _
         ]
-        (e2: try trap [equal2: :lit-item = :lit-item]) and [
+        (e2: trap [equal2: :lit-item = :lit-item]) also [
             e2/where: e2/near: _
         ]
         if :e1 != :e2 [
@@ -247,46 +242,9 @@
 )
 
 
-; Want to allow direct assignment from a quoted void, this assists in the
-; generality of MAKE OBJECT! being able to quote a void and thus represent
-; and object with fields in the void state.
-
 (
     did all [
-        void? x: '#[void]
+        void? x: ~void~
         void? get/any 'x
     ]
 )
-
-
-; <dequote> and <requote> make it more convenient to take and return QUOTED!
-
-[
-    (did f: func [
-        return: [<opt> <requote> integer!]
-        x [<dequote> integer!]
-    ][
-        if x > 304 [return null]
-        return x + 1
-    ])
-
-    ((lit '''304) = f lit '''303)
-    ((lit '''304) = :(specialize 'f [x: lit '''303]))
-    (null = f lit '''1020)
-    (null = :(specialize 'f [x: lit '''1020]))
-]
-
-[
-    (did f: func [
-        return: [<opt> <requote> integer!]
-        x [<dequote> <opt> integer!]
-    ][
-        if not set? 'x [return null]
-        return x + 1
-    ])
-
-    ((lit '''304) = f lit '''303)
-    ((lit '''304) = :(specialize 'f [x: lit '''303]))
-    ((lit ''') = f lit ''')
-    ((lit ''') = :(specialize 'f [x: lit ''']))
-]

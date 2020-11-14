@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -50,7 +50,7 @@ static void Query_Net(REBVAL *out, REBVAL *port, struct devreq_net *sock)
 
     REBCTX *ctx = VAL_CONTEXT(info);
 
-    Init_Tuple(
+    Init_Tuple_Bytes(
         CTX_VAR(ctx, STD_NET_INFO_LOCAL_IP),
         cast(REBYTE*, &sock->local_ip),
         4
@@ -60,7 +60,7 @@ static void Query_Net(REBVAL *out, REBVAL *port, struct devreq_net *sock)
         sock->local_port
     );
 
-    Init_Tuple(
+    Init_Tuple_Bytes(
         CTX_VAR(ctx, STD_NET_INFO_REMOTE_IP),
         cast(REBYTE*, &sock->remote_ip),
         4
@@ -163,7 +163,7 @@ static REB_R Transport_Actor(
                 //
                 // !!! Should not modify!
                 //
-                req->common.data = m_cast(REBYTE*, VAL_UTF8_AT(NULL, arg));
+                req->common.data = m_cast(REBCHR(*), VAL_UTF8_AT(arg));
 
                 ReqNet(sock)->remote_port =
                     IS_INTEGER(port_id) ? VAL_INT32(port_id) : 80;
@@ -182,7 +182,7 @@ static REB_R Transport_Actor(
             else if (IS_TUPLE(arg)) { // Host IP specified:
                 ReqNet(sock)->remote_port =
                     IS_INTEGER(port_id) ? VAL_INT32(port_id) : 80;
-                memcpy(&(ReqNet(sock)->remote_ip), VAL_TUPLE(arg), 4);
+                Get_Tuple_Bytes(&(ReqNet(sock)->remote_ip), arg, 4);
                 goto open_socket_actions;
             }
             else if (IS_BLANK(arg)) { // No host, must be a LISTEN socket:
@@ -278,7 +278,7 @@ static REB_R Transport_Actor(
                 or req->command == RDC_CLOSE
             );
 
-        return Init_Void(D_OUT); }
+        return Init_Void(D_OUT, SYM_VOID); }
 
       case SYM_READ: {
         INCLUDE_PARAMS_OF_READ;
@@ -339,7 +339,7 @@ static REB_R Transport_Actor(
             //         ]
             //     ]
             //
-            buffer = VAL_BINARY(port_data);
+            buffer = VAL_BINARY_KNOWN_MUTABLE(port_data);
 
             // !!! Port code doesn't skip the index, but what if user does?
             //
@@ -516,7 +516,7 @@ REBNATIVE(register_network_device)
     NETWORK_INCLUDE_PARAMS_OF_REGISTER_NETWORK_DEVICE;
 
     OS_Register_Device(&Dev_Net);
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -607,8 +607,8 @@ REBNATIVE(set_udp_multicast)
         rebJumps("FAIL {SET-UDP-MULTICAST used on non-UDP port}", rebEND);
 
     struct ip_mreq mreq;
-    memcpy(&mreq.imr_multiaddr.s_addr, VAL_TUPLE(ARG(group)), 4);
-    memcpy(&mreq.imr_interface.s_addr, VAL_TUPLE(ARG(member)), 4);
+    Get_Tuple_Bytes(&mreq.imr_multiaddr.s_addr, ARG(group), 4);
+    Get_Tuple_Bytes(&mreq.imr_interface.s_addr, ARG(member), 4);
 
     int result = setsockopt(
         req->requestee.socket,

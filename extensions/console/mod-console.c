@@ -7,16 +7,16 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2016-2019 Rebol Open Source Contributors
+// Copyright 2016-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -268,24 +268,6 @@ REBNATIVE(console)
     if (was_halting_enabled)
         Disable_Halting();
 
-    // The DO and APPLY hooks are used to implement things like tracing
-    // or debugging.  If they were allowed to run during the host
-    // console, they would create a fair amount of havoc (the console
-    // is supposed to be "invisible" and not show up on the stack...as if
-    // it were part of the C codebase, even though it isn't written in C)
-    //
-    REBEVL *saved_eval_hook = PG_Eval_Maybe_Stale_Throws;
-    REBNAT saved_dispatch_hook = PG_Dispatch;
-
-    // !!! While the new mode of TRACE (and other code hooking function
-    // execution) is covered by `saved_eval_hook/saved_apply_hook`, there
-    // is independent tracing code in PARSE which is also enabled by TRACE ON
-    // and has to be silenced during console-related code.  Review how hooks
-    // into PARSE and other services can be avoided by the console itself
-    //
-    REBINT Save_Trace_Level = Trace_Level;
-    REBINT Save_Trace_Depth = Trace_Depth;
-
     REBVAL *result = nullptr;
     bool no_recover = false;  // allow one try at HOST-CONSOLE internal error
 
@@ -370,18 +352,6 @@ REBNATIVE(console)
             // must not be broken beyond all repair.  So re-enable recovery.
             //
             no_recover = false;
-
-            // Restore custom DO and APPLY hooks, but only if it was a GROUP!
-            // initially (indicating running code initiated by the user).
-            //
-            // (We do not want to trace/debug/instrument Rebol code that the
-            // console is using to implement *itself*, which it does with
-            // BLOCK! Same for Trace_Level seen by PARSE.
-            //
-            PG_Eval_Maybe_Stale_Throws = saved_eval_hook;
-            PG_Dispatch = saved_dispatch_hook;
-            Trace_Level = Save_Trace_Level;
-            Trace_Depth = Save_Trace_Depth;
         }
 
         // Both console-initiated and user-initiated code is cancellable with
@@ -393,21 +363,6 @@ REBNATIVE(console)
         result = rebRescue(cast(REBDNG*, &Run_Sandboxed_Group), group);
         rebRelease(group);  // Note: does not release `code`
         Disable_Halting();
-
-        // If the custom DO and APPLY hooks were changed by the user code,
-        // then save them...but restore the unhooked versions for the next
-        // iteration of HOST-CONSOLE.  Same for Trace_Level seen by PARSE.
-        //
-        if (not is_console_instruction) {
-            saved_eval_hook = PG_Eval_Maybe_Stale_Throws;
-            saved_dispatch_hook = PG_Dispatch;
-            PG_Eval_Maybe_Stale_Throws = &Eval_Internal_Maybe_Stale_Throws;
-            PG_Dispatch = &Dispatch_Internal;
-            Save_Trace_Level = Trace_Level;
-            Save_Trace_Depth = Trace_Depth;
-            Trace_Level = 0;
-            Trace_Depth = 0;
-        }
     }
 
     // Exit code is now an INTEGER! or a resume instruction PATH!

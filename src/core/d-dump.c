@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -62,7 +62,7 @@ void Dump_Series(REBSER *s, const char *memo)
     printf(" size: %ld\n", cast(unsigned long, SER_TOTAL_IF_DYNAMIC(s)));
     if (IS_SER_DYNAMIC(s))
         printf(" bias: %d\n", cast(int, SER_BIAS(s)));
-    printf(" tail: %d\n", cast(int, SER_LEN(s)));
+    printf(" used: %d\n", cast(int, SER_USED(s)));
     printf(" rest: %d\n", cast(int, SER_REST(s)));
 
     // flags includes len if non-dynamic
@@ -94,7 +94,7 @@ void Dump_Info(void)
 
     printf("    Ballast: %d\n", cast(int, GC_Ballast));
     printf("    Disable: %s\n", GC_Disabled ? "yes" : "no");
-    printf("    Guarded Nodes: %d\n", cast(int, SER_LEN(GC_Guarded)));
+    printf("    Guarded Nodes: %d\n", cast(int, SER_USED(GC_Guarded)));
     fflush(stdout);
 }
 
@@ -118,7 +118,7 @@ void Dump_Stack(REBFRM *f, REBLEN level)
         "STACK[%d](%s) - %d\n",
         cast(int, level),
         Frame_Label_Or_Anonymous_UTF8(f),
-        KIND_BYTE(f->feed->value)
+        KIND3Q_BYTE(f->feed->value)
     );
 
     if (not Is_Action_Frame(f)) {
@@ -161,7 +161,7 @@ void Dump_Stack(REBFRM *f, REBLEN level)
 //
 //  "Temporary debug dump"
 //
-//      return: []
+//      return: [<invisible>]
 //      :value [word!]
 //  ]
 //
@@ -189,6 +189,6 @@ REBNATIVE(dump)
             PROBE(var);
     }
 
-    return R_INVISIBLE;
+    RETURN_INVISIBLE;
 #endif
 }

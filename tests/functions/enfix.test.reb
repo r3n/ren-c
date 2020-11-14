@@ -3,6 +3,15 @@
 (action! = type of :+)
 (true = enfixed? :+)
 
+(enfixed? :+)
+(error? trap [enfixed? 1])
+(action? get '+)
+
+; #1934
+(error? trap [do reduce [1 get '+ 2]])
+(3 = do reduce [:+ 1 2])
+
+
 (
     foo: :+
     did all [
@@ -52,9 +61,9 @@
         unset 'var
         block: [<tag> lefty "hi"]
         did all [
-            [lefty "hi"] = block: evaluate @var block
+            [lefty "hi"] = block: evaluate/result block 'var
             <tag> = var
-            [] = evaluate @var block
+            [] = evaluate/result block 'var
             [_ "hi"] = var
         ]
     )
@@ -66,9 +75,9 @@
         unset 'var
         block: [lit 1 lefty "hi"]
         did all [
-            [lefty "hi"] = block: evaluate @var block
+            [lefty "hi"] = block: evaluate/result block 'var
             1 = var
-            [] evaluate @var block
+            [] evaluate/result block 'var
             [_ "hi"] = var
         ]
     )
@@ -77,21 +86,21 @@
 ]
 
 
-; <- is the "STEAL" operation.  It lets any ACTION!...including one dispatched
+; ->- is the "SHOVE" operation.  It lets any ACTION!, including one dispatched
 ; from PATH!, receive its first argument from the left.  It uses the parameter
 ; conventions of that argument.
 
 ; NORMAL parameter
 ;
-(9 = (1 + 2 <- multiply 3))
-(7 = (add 1 2 <- multiply 3))
-(7 = (add 1 2 <- (:multiply) 3))
+(9 = (1 + 2 ->- multiply 3))
+(7 = (add 1 2 ->- multiply 3))
+(7 = (add 1 2 ->- (:multiply) 3))
 
 ; :HARD-QUOTE parameter
 (
     x: _
-    x: <- default [10 + 20]
-    x: <- default [1000000]
+    x: ->- default [10 + 20]
+    x: ->- default [1000000]
     x = 30
 )
 
@@ -105,12 +114,12 @@
 
     (error? trap [1 obj/magic 2])
 
-    (3 = (1 <- obj/magic 2))
-    (-1 = (1 <- obj/magic/minus 2))
+    (3 = (1 ->- obj/magic 2))
+    (-1 = (1 ->- obj/magic/minus 2))
 ]
 
 
-; PATH! cannot be directly quoted left, must use <-
+; PATH! cannot be directly quoted left, must use ->-
 
 [
     (
@@ -120,10 +129,10 @@
     )
 
     ((trap [o/i left-lit])/id = 'literal-left-path)
-    (o/i <- left-lit = 'o/i)
+    (o/i ->- left-lit = 'o/i)
 
     ((trap [o/f left-lit])/id = 'literal-left-path)
-    (o/f <- left-lit = 'o/f)
+    (o/f ->- left-lit = 'o/f)
 ]
 
 ; Rather than error when SET-WORD! or SET-PATH! are used as the left hand
@@ -139,44 +148,45 @@
     o: make object! [x: 10]
     count: 0
     o/(count: count + 1 'x): me + 20
-    (o/x = 30) and [count = 1]  ; shouldn't double-evaluate path group
+    (o/x = 30) and (count = 1)  ; shouldn't double-evaluate path group
 )
 
 
 ; Right enfix always wins over left, unless the right is at array end
 
-((lit <-) = first [<-])
-((lit <- lit) = 'lit)
-('x = (x <- lit))
-(1 = (1 <- lit))
+((lit ->-) = first [->-])
+((lit ->- lit) = 'lit)
+('x = (x >- lit))
+(1 = (1 ->- lit))
 
-(1 = (1 -> lit))
-('x = (x -> lit))
+(1 = (1 >- lit))
+('x = (x >- lit))
 
-; "Precedence" manipulation via <- and ->
+; "Precedence" manipulation via >- and ->-
 
-(9 = (1 + 2 <- multiply 3))
-(9 = (1 + 2 -> multiply 3))
-(9 = (1 + 2 -> lib/* 3))
-(9 = (1 + 2 <- lib/* 3))
+(9 = (1 + 2 ->- multiply 3))
+(9 = (1 + 2 >- multiply 3))
+(9 = (1 + 2 >-- lib/* 3))
+(9 = (1 + 2 ->- lib/* 3))
 
 (7 = (add 1 2 * 3))
-(7 = (add 1 2 <- lib/* 3))
-(7 = (add 1 2 -> lib/* 3))
+(7 = (add 1 2 ->- lib/* 3))
+(7 = (add 1 2 >- lib/* 3))
 
-((trap [10 <- lib/= 5 + 5])/id = 'expect-arg)
-(10 -> lib/= 5 + 5)
+((trap [10 ->- lib/= 5 + 5])/id = 'expect-arg)
+((trap [10 >- lib/= 5 + 5])/id = 'expect-arg)
+(10 >-- lib/= 5 + 5)
 
-((trap [add 1 + 2 -> multiply 3])/id = 'no-arg)
+((trap [add 1 + 2 >- multiply 3])/id = 'no-arg)
 (
-    x: add 1 + 2 3 + 4 -> multiply 5
+    x: add 1 + 2 3 + 4 >- multiply 5
     x = 38
 )
-(-38 = (negate x: add 1 + 2 3 + 4 -> multiply 5))
+(-38 = (negate x: add 1 + 2 3 + 4 >- multiply 5))
 (
-    (trap [divide negate x: add 1 + 2 3 + 4 -> multiply 5])/id = 'no-arg
+    (trap [divide negate x: add 1 + 2 3 + 4 >- multiply 5])/id = 'no-arg
 )
-(-1 = (divide negate x: add 1 + 2 3 + 4  2 -> multiply 5))
+(-1 = (divide negate x: add 1 + 2 3 + 4  2 >- multiply 5))
 
 
 (
@@ -188,7 +198,7 @@
     count: 0
     o: make object! [x: _]
     nuller: function [y] [null]
-    o/(count: count + 1 | first [x]): my nuller
+    o/(count: count + 1, first [x]): my nuller
     did all [
         :o/x = null
         count = 1
@@ -202,13 +212,13 @@
         foo: func [] [
             fail "foo should not run, it's prefix and runs on *next* step"]
         did all [
-            [foo 304] == evaluate @var [1020 foo 304]
+            [foo 304] == evaluate/result [1020 foo 304] 'var
             var == 1020
         ]
     )(
         enfoo: enfixed func [] [<enfoo>]
         did all [
-            [304] == evaluate @var [1020 enfoo 304]
+            [304] == evaluate/result [1020 enfoo 304] 'var
             var == <enfoo>
         ]
         comment "0-arity function, but enfixed so runs in *same* step"
@@ -224,7 +234,7 @@
                 return #ignored
             ]
             did all [
-                [ifoo 304] == evaluate @var [ignored ifoo 304]
+                [ifoo 304] == evaluate/result [ignored ifoo 304] 'var
                 var == #ignored
                 ignored == _
             ]
@@ -234,7 +244,7 @@
             fail [
                 {enifoo should not run; when arguments are skipped this}
                 {defers the enfix until the next evaluator step.  Otherwise}
-                {`case [1 = 1 [print "good"] default [print "bad"]`}
+                {`case [1 = 1 [print "good"]] else [print "bad"]`}
                 {would print both `good` and `bad`.}
             ]
         ]
@@ -244,7 +254,7 @@
                 return #ignored
             ]
             did all [
-                [enifoo 304] == evaluate @var [ignored enifoo 304]
+                [enifoo 304] == evaluate/result [ignored enifoo 304] 'var
                 var == #ignored
                 ignored == _
             ]
@@ -253,7 +263,7 @@
         enifoo: enfixed func [:i [<skip> integer!]] [compose '<enifoo>/(i)]
         did all [
             did all [
-                [304] == evaluate @var [1020 enifoo 304]
+                [304] == evaluate/result [1020 enifoo 304] 'var
                 var == '<enifoo>/1020
             ]
             comment {
@@ -264,17 +274,17 @@
     )
 
     (
-        bar: func [return: []] [bar: _]
+        bar: func [return: <elide>] [bar: _]
         did all [
-            [bar 304] == evaluate @var [1020 bar 304]
+            [bar 304] == evaluate/result [1020 bar 304] 'var
             var == 1020
             action? :bar
         ]
         comment {Invisible normal arity-0 function should run on next eval}
     )(
-        enbar: enfixed func [return: []] [enbar: _]
+        enbar: enfixed func [return: <elide>] [enbar: _]
         did all [
-            [304] == evaluate @var [1020 enbar 304]
+            [304] == evaluate/result [1020 enbar 304] 'var
             var == 1020
             enbar == _
         ]
@@ -289,18 +299,18 @@
                 return #ignored
             ]
             did all [
-                [ibar 304] == evaluate @var [ignored ibar 304]
+                [ibar 304] == evaluate/result [ignored ibar 304] 'var
                 var == #ignored
                 ignored == _
             ]
             comment {skip irrelevant (tests right on *next* step)}
         ]
     )(
-        enibar: enfixed func [return: [] :i [<skip> integer!]] [
+        enibar: enfixed func [return: <elide> :i [<skip> integer!]] [
             fail {
                 When arguments are skipped, this defers the enfix until the
                 next evaluator step.  Doing otherwise would mean that
-                `case [1 = 1 [print "good"] default [print "bad"]` would
+                `case [1 = 1 [print "good"]] else [print "bad"]` would
                 print both `good` and `bad`.
             }
         ]
@@ -310,16 +320,18 @@
                 return #kept
             ]
             did all [
-                [enibar 304] == evaluate @var [kept enibar 304]
+                [enibar 304] == evaluate/result [kept enibar 304] 'var
                 var == #kept
                 kept == _
             ]
         ]
     )(
-        enibar: enfixed func [return: [] :i [<skip> integer!]] [enibar: _]
+        enibar: enfixed func [return: <elide> :i [<skip> integer!]] [
+            enibar: _
+        ]
         did all [
             did all [
-                [304] == evaluate @var [1020 enibar 304]
+                [304] == evaluate/result [1020 enibar 304] 'var
                 var == 1020
                 enibar == _
             ]
@@ -347,7 +359,7 @@
         [<rightq> was [<leftq> was foo]] = rightq foo leftq
     )
 
-    ((1 then x => [x * 10]) = 10)
+    ((1 then x -> [x * 10]) = 10)
 ]
 
 

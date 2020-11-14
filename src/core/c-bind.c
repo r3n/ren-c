@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -44,13 +44,20 @@ void Bind_Values_Inner_Loop(
     REBFLGS flags
 ){
     for (; NOT_END(head); ++head) {
-        const REBCEL *cell = VAL_UNESCAPED(head); // may equal v, e.g. `\x`
+        REBCEL(const*) cell = VAL_UNESCAPED(head); // may equal v, e.g. `\x`
         enum Reb_Kind kind = CELL_KIND(cell);
+        UNUSED(kind);  // !!! TBD: be influenced by KIND vs HEART?
 
-        REBU64 type_bit = FLAGIT_KIND(kind);
+        enum Reb_Kind heart = CELL_HEART(cell);
+
+        // !!! Review use of `heart` bit here, e.g. when a REB_PATH has an
+        // REB_BLOCK heart, why would it be bound?  Problem is that if we
+        // do not bind `/` when REB_WORD is asked then `/` won't be bound.
+        //
+        REBU64 type_bit = FLAGIT_KIND(heart);
 
         if (type_bit & bind_types) {
-            REBSTR *canon = VAL_WORD_CANON(cell);
+            const REBSTR *canon = VAL_WORD_CANON(cell);
             REBINT n = Get_Binder_Index_Else_0(binder, canon);
             if (n > 0) {
                 //
@@ -79,18 +86,16 @@ void Bind_Values_Inner_Loop(
                 Quotify(head, depth); // new cell made for higher escapes
             }
         }
-        else if (
-            (ANY_ARRAY_OR_PATH_KIND(kind))
-            and (flags & BIND_DEEP)
-        ){
-            Bind_Values_Inner_Loop(
-                binder,
-                VAL_ARRAY_AT(cell),
-                context,
-                bind_types,
-                add_midstream_types,
-                flags
-            );
+        else if (flags & BIND_DEEP) {
+            if (ANY_ARRAY_KIND(heart))
+                Bind_Values_Inner_Loop(
+                    binder,
+                    VAL_ARRAY_AT_MUTABLE_HACK(CELL_TO_VAL(cell)),
+                    context,
+                    bind_types,
+                    add_midstream_types,
+                    flags
+                );
         }
     }
 }
@@ -108,7 +113,7 @@ void Bind_Values_Inner_Loop(
 //
 void Bind_Values_Core(
     RELVAL *head,
-    REBCTX *context,
+    const RELVAL *context,
     REBU64 bind_types,
     REBU64 add_midstream_types,
     REBFLGS flags // see %sys-core.h for BIND_DEEP, etc.
@@ -122,20 +127,25 @@ void Bind_Values_Core(
     //
   blockscope {
     REBLEN index = 1;
-    REBVAL *key = CTX_KEYS_HEAD(context);
-    for (; index <= CTX_LEN(context); key++, index++)
-        if (not Is_Param_Unbindable(key))
+    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    for (; NOT_END(key); key++, index++)
+        if (not Is_Param_Sealed(key))
             Add_Binder_Index(&binder, VAL_KEY_CANON(key), index);
   }
 
     Bind_Values_Inner_Loop(
-        &binder, head, context, bind_types, add_midstream_types, flags
+        &binder,
+        head,
+        VAL_CONTEXT(context),
+        bind_types,
+        add_midstream_types,
+        flags
     );
 
   blockscope {  // Reset all the binder indices to zero
-    RELVAL *key = CTX_KEYS_HEAD(context);
+    RELVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
     for (; NOT_END(key); key++)
-        if (not Is_Param_Unbindable(key))
+        if (not Is_Param_Sealed(key))
             Remove_Binder_Index(&binder, VAL_KEY_CANON(key));
   }
 
@@ -159,16 +169,16 @@ void Unbind_Values_Core(RELVAL *head, REBCTX *context, bool deep)
         // damage shared bindings; review more efficient means of doing this.
         //
         REBLEN num_quotes = Dequotify(v);
-        enum Reb_Kind kind = CELL_KIND(cast(REBCEL*, v));
+        enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), v));
 
         if (
-            ANY_WORD_KIND(kind)
+            ANY_WORD_KIND(heart)
             and (not context or VAL_BINDING(v) == NOD(context))
         ){
             Unbind_Any_Word(v);
         }
-        else if (ANY_ARRAY_OR_PATH_KIND(kind) and deep)
-            Unbind_Values_Core(VAL_ARRAY_AT(v), context, true);
+        else if (ANY_ARRAY_KIND(heart) and deep)
+            Unbind_Values_Core(VAL_ARRAY_AT_MUTABLE_HACK(v), context, true);
 
         Quotify(v, num_quotes);
     }
@@ -181,12 +191,12 @@ void Unbind_Values_Core(RELVAL *head, REBCTX *context, bool deep)
 // Returns 0 if word is not part of the context, otherwise the index of the
 // word in the context.
 //
-REBLEN Try_Bind_Word(REBCTX *context, REBVAL *word)
+REBLEN Try_Bind_Word(const RELVAL *context, REBVAL *word)
 {
-    REBLEN n = Find_Canon_In_Context(context, VAL_WORD_CANON(word), false);
+    REBLEN n = Find_Canon_In_Context(context, VAL_WORD_CANON(word));
     if (n != 0) {
-        INIT_BINDING(word, context); // binding may have been relative before
-        INIT_WORD_INDEX(word, n);
+        INIT_BINDING(word, VAL_CONTEXT(context));
+        INIT_WORD_INDEX(word, n);  // ^-- may have been relative bind before
     }
     return n;
 }
@@ -197,7 +207,7 @@ REBLEN Try_Bind_Word(REBCTX *context, REBVAL *word)
 //
 //  {LET is noticed by FUNC to mean "create a local binding"}
 //
-//      return: []
+//      return: [<invisible>]
 //      :word [<skip> word!]
 //  ]
 //
@@ -211,7 +221,7 @@ REBNATIVE(let)
     INCLUDE_PARAMS_OF_LET;
     UNUSED(ARG(word));  // just skip over WORD!s (vs. look them up)
 
-    return R_INVISIBLE;
+    RETURN_INVISIBLE;
 }
 
 
@@ -242,7 +252,7 @@ static void Clonify_And_Bind_Relative(
 
     if (param_num and IS_WORD(src) and VAL_WORD_SYM(src) == SYM_LET) {
         if (IS_WORD(src + 1) or IS_SET_WORD(src + 1)) {
-            REBSTR *canon = VAL_WORD_CANON(src + 1);
+            const REBSTR *canon = VAL_WORD_CANON(src + 1);
             if (Try_Add_Binder_Index(binder, canon, *param_num)) {
                 Init_Word(DS_PUSH(), canon);
                 ++(*param_num);
@@ -274,8 +284,10 @@ static void Clonify_And_Bind_Relative(
     REBLEN num_quotes = VAL_NUM_QUOTES(v);
     Dequotify(v);
 
-    enum Reb_Kind kind = CELL_KIND(cast(REBCEL*, v));
+    enum Reb_Kind kind = cast(enum Reb_Kind, KIND3Q_BYTE_UNCHECKED(v));
     assert(kind < REB_MAX_PLUS_MAX);  // we dequoted it (pseudotypes ok)
+
+    enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), v));
 
     if (deep_types & FLAGIT_KIND(kind) & TS_SERIES_OBJ) {
         //
@@ -283,52 +295,63 @@ static void Clonify_And_Bind_Relative(
         //
         REBSER *series;
         const RELVAL *sub_src;
-        if (ANY_CONTEXT_KIND(kind)) {
+
+        bool would_need_deep;
+
+        if (ANY_CONTEXT_KIND(heart)) {
             INIT_VAL_CONTEXT_VARLIST(
                 v,
                 CTX_VARLIST(Copy_Context_Shallow_Managed(VAL_CONTEXT(v)))
             );
             series = SER(CTX_VARLIST(VAL_CONTEXT(v)));
             sub_src = BLANK_VALUE;  // don't try to look for LETs
+
+            would_need_deep = true;
+        }
+        else if (ANY_ARRAY_KIND(heart)) {
+            series = SER(
+                Copy_Array_At_Extra_Shallow(
+                    VAL_ARRAY(v),
+                    0, // !!! what if VAL_INDEX() is nonzero?
+                    VAL_SPECIFIER(v),
+                    0,
+                    NODE_FLAG_MANAGED
+                )
+            );
+
+            INIT_VAL_NODE(v, series);  // copies args
+            INIT_BINDING(v, UNBOUND);  // copied w/specifier--not relative
+
+            sub_src = VAL_ARRAY_AT(v);  // look for LETs
+
+            // See notes in Clonify()...need to copy immutable paths so that
+            // binding pointers can be changed in the "immutable" copy.
+            //
+            if (ANY_PATH_KIND(kind))
+                Freeze_Array_Shallow(ARR(series));
+
+            would_need_deep = true;
+        }
+        else if (ANY_SERIES_KIND(heart)) {
+            series = Copy_Series_Core(
+                VAL_SERIES(v),
+                NODE_FLAG_MANAGED
+            );
+            INIT_VAL_NODE(v, series);
+            sub_src = BLANK_VALUE;  // don't try to look for LETs
+
+            would_need_deep = false;
         }
         else {
-            if (IS_SER_ARRAY(VAL_SERIES(v))) {
-                series = SER(
-                    Copy_Array_At_Extra_Shallow(
-                        VAL_ARRAY(v),
-                        0, // !!! what if VAL_INDEX() is nonzero?
-                        VAL_SPECIFIER(v),
-                        0,
-                        NODE_FLAG_MANAGED
-                    )
-                );
-
-                INIT_VAL_NODE(v, series); // copies args
-
-                // If it was relative, then copying with a specifier
-                // means it isn't relative any more.
-                //
-                INIT_BINDING(v, UNBOUND);
-
-                sub_src = VAL_ARRAY_AT(v);  // look for LETs
-
-                if (ANY_PATH_KIND(kind))  // must freeze the copy shallow
-                    Freeze_Array_Shallow(ARR(series));
-            }
-            else {
-                series = Copy_Sequence_Core(
-                    VAL_SERIES(v),
-                    NODE_FLAG_MANAGED
-                );
-                INIT_VAL_NODE(v, series);
-                sub_src = BLANK_VALUE;  // don't try to look for LETs
-            }
+            would_need_deep = false;
+            sub_src = nullptr;
+            series = nullptr;
         }
 
         // If we're going to copy deeply, we go back over the shallow
         // copied series and "clonify" the values in it.
         //
-        if (deep_types & FLAGIT_KIND(kind) & TS_ARRAYS_OBJ) {
+        if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
             REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
             for (; NOT_END(sub); ++sub, ++sub_src)
                 Clonify_And_Bind_Relative(
@@ -351,7 +374,9 @@ static void Clonify_And_Bind_Relative(
             v->header.bits |= (flags & ARRAY_FLAG_CONST_SHALLOW);
     }
 
-    if (FLAGIT_KIND(kind) & bind_types) {
+    // !!! Review use of `heart` here, in terms of meaning
+    //
+    if (FLAGIT_KIND(heart) & bind_types) {
         REBINT n = Get_Binder_Index_Else_0(binder, VAL_WORD_CANON(v));
         if (n != 0) {
             //
@@ -370,7 +395,7 @@ static void Clonify_And_Bind_Relative(
             INIT_WORD_INDEX_UNCHECKED(v, n);
         }
     }
-    else if (ANY_ARRAY_OR_PATH_KIND(kind)) {
+    else if (ANY_ARRAY_OR_PATH_KIND(heart)) {
 
         // !!! Technically speaking it is not necessary for an array to
         // be marked relative if it doesn't contain any relative words
@@ -409,11 +434,14 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
   blockscope {  // Setup binding table from the argument word list
     RELVAL *param = ARR_AT(paramlist, 1);  // [0] is ACT_ARCHETYPE() ACTION!
-    for (; NOT_END(param); ++param, ++param_num)
+    for (; NOT_END(param); ++param, ++param_num) {
+        if (Is_Param_Sealed(param))
+            continue;
         Add_Binder_Index(&binder, VAL_KEY_CANON(param), param_num);
+    }
   }
 
-    REBARR *original = VAL_ARRAY(body);
+    const REBARR *original = VAL_ARRAY(body);
     REBLEN index = VAL_INDEX(body);
     REBSPC *specifier = VAL_SPECIFIER(body);
     REBLEN tail = VAL_LEN_AT(body);
@@ -433,7 +461,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
     REBARR *copy = Make_Array_For_Copy(len, flags, original);
 
-    RELVAL *src = ARR_AT(original, index);
+    const RELVAL *src = ARR_AT(original, index);
     RELVAL *dest = ARR_HEAD(copy);
     REBLEN count = 0;
     for (; count < len; ++count, ++dest, ++src) {
@@ -475,8 +503,13 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
             REBDSP dsp = dsp_orig;
             while (dsp != DSP) {
-                REBSTR *spelling = VAL_WORD_SPELLING(DS_AT(dsp + 1));
-                Init_Param(param, REB_P_LOCAL, spelling, 0);
+                const REBSTR *spelling = VAL_WORD_SPELLING(DS_AT(dsp + 1));
+                Init_Param(
+                    param,
+                    REB_P_LOCAL,
+                    spelling,
+                    FLAGIT_KIND(REB_VOID)
+                );
                 ++dsp;
                 ++param;
 
@@ -491,8 +524,11 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
   blockscope {  // Reset binding table
     RELVAL *param = ARR_AT(paramlist, 1);  // [0] is ACT_ARCHETYPE() ACTION!
-    for (; NOT_END(param); param++)
+    for (; NOT_END(param); param++) {
+        if (Is_Param_Sealed(param))
+            continue;
         Remove_Binder_Index(&binder, VAL_KEY_CANON(param));
+    }
   }
 
     SHUTDOWN_BINDER(&binder);
@@ -507,15 +543,20 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 // Rebind is always deep.
 //
 void Rebind_Values_Deep(
+    RELVAL *head,
     REBCTX *src,
     REBCTX *dst,
-    RELVAL *head,
     struct Reb_Binder *opt_binder
 ) {
     RELVAL *v = head;
     for (; NOT_END(v); ++v) {
         if (ANY_ARRAY_OR_PATH(v)) {
-            Rebind_Values_Deep(src, dst, VAL_ARRAY_AT(v), opt_binder);
+            Rebind_Values_Deep(
+                VAL_ARRAY_AT_MUTABLE_HACK(v),
+                src,
+                dst,
+                opt_binder
+            );
         }
         else if (ANY_WORD(v) and VAL_BINDING(v) == NOD(src)) {
             INIT_BINDING(v, dst);
@@ -613,7 +654,7 @@ void Virtual_Bind_Deep_To_New_Context(
     REBCTX **context_out,
     const REBVAL *spec
 ) {
-    assert(IS_BLOCK(body_in_out));
+    assert(IS_BLOCK(body_in_out) or IS_SYM_BLOCK(body_in_out));
 
     REBLEN num_vars = IS_BLOCK(spec) ? VAL_LEN_AT(spec) : 1;
     if (num_vars == 0)
@@ -664,8 +705,9 @@ void Virtual_Bind_Deep_To_New_Context(
         // go BACK on it before the index.
         //
         bool in_const = GET_CELL_FLAG(body_in_out, CONST);
-        Init_Block(
+        Init_Any_Array(
             body_in_out,
+            VAL_TYPE(body_in_out),
             Copy_Array_Core_Managed(
                 VAL_ARRAY(body_in_out),
                 VAL_INDEX(body_in_out), // at
@@ -700,7 +742,7 @@ void Virtual_Bind_Deep_To_New_Context(
     if (rebinding)
         INIT_BINDER(&binder);
 
-    REBSTR *duplicate = NULL;
+    const REBSTR *duplicate = nullptr;
 
     REBVAL *key = CTX_KEYS_HEAD(c);
     REBVAL *var = CTX_VARS_HEAD(c);
@@ -713,7 +755,7 @@ void Virtual_Bind_Deep_To_New_Context(
             if (dummy_sym == SYM_DUMMY9)
                 fail ("Current limitation: only up to 9 BLANK! keys");
             Init_Context_Key(key, Canon(dummy_sym));
-            TYPE_SET(key, REB_TS_HIDDEN);
+            Hide_Param(key);
             dummy_sym = cast(REBSYM, cast(int, dummy_sym) + 1);
 
             Init_Blank(var);
@@ -732,7 +774,7 @@ void Virtual_Bind_Deep_To_New_Context(
             // unreadable void.  But since this code is also shared with USE,
             // it doesn't do any initialization...so go ahead and put void.
             //
-            Init_Void(var);
+            Init_Void(var, SYM_VOID);
 
             assert(rebinding); // shouldn't get here unless we're rebinding
 
@@ -764,8 +806,7 @@ void Virtual_Bind_Deep_To_New_Context(
             // hide it from the context and binding.
             //
             Init_Context_Key(key, VAL_WORD_SPELLING(VAL_UNESCAPED(item)));
-            TYPE_SET(key, REB_TS_UNBINDABLE);
-            TYPE_SET(key, REB_TS_HIDDEN);
+            Hide_Param(key);
             Derelativize(var, item, specifier);
             SET_CELL_FLAG(var, BIND_MARKED_REUSE);
             SET_CELL_FLAG(var, PROTECTED);
@@ -840,7 +881,12 @@ void Virtual_Bind_Deep_To_New_Context(
         // duplicates.
         //
         Bind_Values_Inner_Loop(
-            &binder, VAL_ARRAY_AT(body_in_out), c, TS_WORD, 0, BIND_DEEP
+            &binder,
+            VAL_ARRAY_AT_MUTABLE_HACK(body_in_out),
+            c,
+            TS_WORD,
+            0,
+            BIND_DEEP
         );
     }
 
@@ -901,11 +947,11 @@ void Init_Interning_Binder(
     // "imported" from there to the context, and adjusted in the binder to the
     // new positive index.
     //
-    if (ctx != Lib_Context) {
-        REBVAL *key = CTX_KEYS_HEAD(Lib_Context);
+    if (ctx != VAL_CONTEXT(Lib_Context)) {
+        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
         REBINT index = 1;
         for (; NOT_END(key); ++key, ++index) {
-            REBSTR *canon = VAL_KEY_CANON(key);
+            const REBSTR *canon = VAL_KEY_CANON(key);
             REBINT n = Get_Binder_Index_Else_0(binder, canon);
             if (n == 0)
                 Add_Binder_Index(binder, canon, - index);
@@ -937,8 +983,8 @@ void Shutdown_Interning_Binder(struct Reb_Binder *binder, REBCTX *ctx)
     // The lib context keys may have been imported, so you won't necessarily
     // find them in the list any more.
     //
-    if (ctx != Lib_Context) {
-        REBVAL *key = CTX_KEYS_HEAD(Lib_Context);
+    if (ctx != VAL_CONTEXT(Lib_Context)) {
+        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
         REBINT index = 1;
         for (; NOT_END(key); ++key, ++index) {
             REBINT n = Remove_Binder_Index_Else_0(binder, VAL_KEY_CANON(key));

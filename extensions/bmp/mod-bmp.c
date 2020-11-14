@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -297,13 +297,13 @@ REBNATIVE(identify_bmp_q)
 {
     BMP_INCLUDE_PARAMS_OF_IDENTIFY_BMP_Q;
 
-    const REBYTE *data = VAL_BIN_AT(ARG(data));
-    uint32_t len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
 
     // Assume signature matching is good enough (will get a fail() on
     // decode if it's a false positive).
     //
-    return Init_Logic(D_OUT, Has_Valid_BITMAPFILEHEADER(data, len));
+    return Init_Logic(D_OUT, Has_Valid_BITMAPFILEHEADER(data, size));
 }
 
 
@@ -320,10 +320,10 @@ REBNATIVE(decode_bmp)
 {
     BMP_INCLUDE_PARAMS_OF_DECODE_BMP;
 
-    const REBYTE *data = VAL_BIN_AT(ARG(data));
-    uint32_t len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
 
-    if (not Has_Valid_BITMAPFILEHEADER(data, len))
+    if (not Has_Valid_BITMAPFILEHEADER(data, size))
         fail (Error_Bad_Media_Raw());
 
     int32_t              i, j, x, y, c;
@@ -359,7 +359,7 @@ REBNATIVE(decode_bmp)
             colors = 0;
 
         if (colors) {
-            ctab = ALLOC_N(RGBQUAD, colors);
+            ctab = TRY_ALLOC_N(RGBQUAD, colors);
             for (i = 0; i<colors; i++) {
                 ctab[i].rgbBlue = *cp++;
                 ctab[i].rgbGreen = *cp++;
@@ -380,7 +380,7 @@ REBNATIVE(decode_bmp)
             colors = bmih.biClrUsed;
 
         if (colors) {
-            ctab = ALLOC_N(RGBQUAD, colors);
+            ctab = TRY_ALLOC_N(RGBQUAD, colors);
             memcpy(ctab, cp, colors * sizeof(RGBQUAD));
             cp += colors * sizeof(RGBQUAD);
         }

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -26,69 +26,38 @@
 
 
 //
-//  Compare_Binary_Vals: C
+//  Compare_Ascii_Uncased: C
 //
-// Compares bytes, not chars. Return the difference.
+// Variant of memcmp() that checks case-insensitively.  Just used to detect
+// months in the scanner.  Returns a positive value, negative value, or 0.
+// (Not clamped to [-1 0 1]!)
 //
-REBINT Compare_Binary_Vals(const REBCEL *v1, const REBCEL *v2)
-{
-    REBLEN l1 = VAL_LEN_AT(v1);
-    REBLEN l2 = VAL_LEN_AT(v2);
-    REBLEN len = MIN(l1, l2);
-
-    REBINT n = memcmp(
-        SER_DATA_AT(SER_WIDE(VAL_SERIES(v1)), VAL_SERIES(v1), VAL_INDEX(v1)),
-        SER_DATA_AT(SER_WIDE(VAL_SERIES(v2)), VAL_SERIES(v2), VAL_INDEX(v2)),
-        len
-    );
-
-    if (n != 0) return n;
-
-    return l1 - l2;
-}
-
-
+// !!! There have been suggestions that the system use the ISO date format,
+// in order to be purely numeric and not need to vary by locale.  Review.
 //
-//  Compare_Bytes: C
-//
-// Compare two byte-wide strings. Return lexical difference.
-//
-// Uncase: compare is case-insensitive.
-//
-REBINT Compare_Bytes(const REBYTE *b1, const REBYTE *b2, REBLEN len, bool uncase)
-{
-    REBINT d;
-
+REBINT Compare_Ascii_Uncased(
+    const REBYTE *b1,
+    const REBYTE *b2,
+    REBLEN len
+){
     for (; len > 0; len--, b1++, b2++) {
+        assert(*b1 < 0x80 and *b2 < 0x80);
 
-        if (uncase) {
-            //
-            // !!! This routine is being possibly preserved for when faster
-            // compare can be done on UTF-8 strings if the series caches if
-            // all bytes are ASCII.  It is not meant to do "case-insensitive"
-            // processing of binaries, however.
-            //
-            assert(*b1 < 0x80 and *b2 < 0x80);
-
-            d = LO_CASE(*b1) - LO_CASE(*b2);
-        }
-        else
-            d = *b1 - *b2;
-
-        if (d != 0) return d;
+        REBINT diff = LO_CASE(*b1) - LO_CASE(*b2);
+        if (diff != 0)
+            return diff;
     }
-
     return 0;
 }
 
 
 //
-//  Match_Bytes: C
+//  Try_Diff_Bytes_Uncased: C
 //
-// Compare two binary strings. Return where the first differed.
-// Case insensitive.
+// Compare two binary strings case insensitively, stopping at '\0' terminator.
+// Return where the first differed.
 //
-const REBYTE *Match_Bytes(const REBYTE *src, const REBYTE *pat)
+const REBYTE *Try_Diff_Bytes_Uncased(const REBYTE *src, const REBYTE *pat)
 {
     while (*src != '\0' and *pat != '\0') {
         if (LO_CASE(*src++) != LO_CASE(*pat++))
@@ -99,74 +68,6 @@ const REBYTE *Match_Bytes(const REBYTE *src, const REBYTE *pat)
         return 0; // if not at end of pat, then error
 
     return src;
-}
-
-
-//
-//  Compare_Uni_Str: C
-//
-// Compare two ranges of string data.  Return lexical difference.
-//
-// Uncase: compare is case-insensitive.
-//
-REBINT Compare_Uni_Str(
-    const REBYTE* bp1,
-    const REBYTE* bp2,
-    REBLEN len,
-    bool uncase
-){
-    REBCHR(const*) u1 = cast(REBCHR(const*), bp1);
-    REBCHR(const*) u2 = cast(REBCHR(const*), bp2);
-
-    for (; len > 0; len--) {
-        REBUNI c1;
-        REBUNI c2;
-
-        u1 = NEXT_CHR(&c1, u1);
-        u2 = NEXT_CHR(&c2, u2);
-
-        REBINT d;
-        if (uncase)
-            d = LO_CASE(c1) - LO_CASE(c2);
-        else
-            d = c1 - c2;
-
-        if (d != 0)
-            return d;
-    }
-
-    return 0;
-}
-
-
-//
-//  Compare_String_Vals: C
-//
-// Compare two string values. Either can be byte or unicode wide.
-//
-// Uncase: compare is case-insensitive.
-//
-// Used for: general string comparions (various places)
-//
-REBINT Compare_String_Vals(const REBCEL *v1, const REBCEL *v2, bool uncase)
-{
-    assert(CELL_KIND(v1) != REB_BINARY and CELL_KIND(v2) != REB_BINARY);
-
-    REBLEN l1  = VAL_LEN_AT(v1);
-    REBLEN l2  = VAL_LEN_AT(v2);
-    REBLEN len = MIN(l1, l2);
-
-    REBINT n = Compare_Uni_Str(
-        VAL_STRING_AT(v1),  // as a REBYTE* (can't put REBCHR(*) in %sys-core.h)
-        VAL_STRING_AT(v2),
-        len,
-        uncase
-    );
-
-    if (n != 0)
-        return n;
-
-    return l1 - l2;
 }
 
 
@@ -224,196 +125,131 @@ REBINT Compare_UTF8(const REBYTE *s1, const REBYTE *s2, REBSIZ l2)
 
 
 //
-//  Find_Bin_In_Bin: C
+//  Find_Binstr_In_Binstr: C
 //
-// Find an exact byte string within a byte string.
-// Returns starting position or NOT_FOUND.
+// General purpose find a substring.  Supports cased and uncased searches,
+// and forward/reverse (use negative skip for reverse).  Works with either
+// UTF-8 or binary values by sensing the types of the cells.
 //
-REBLEN Find_Bin_In_Bin(
-    REBSER *series,
-    REBLEN offset,
-    const REBYTE *bp2,
-    REBSIZ size2,
-    REBFLGS flags // AM_FIND_MATCH
+// IMPORTANT: You can search for a string in a binary but searching for binary
+// in string is *not* supported.  Such a search could match on a continuation
+// byte, and there'd be no way to return that match measured as a codepoint
+// position in the searched string (which is what FIND and PARSE require).
+//
+REBLEN Find_Binstr_In_Binstr(
+    REBLEN *len_out,  // length in output units of match
+    REBCEL(const*) binstr1,
+    REBLEN end1_unsigned,  // end binstr1 *index* (not a limiting *length*)
+    REBCEL(const*) binstr2,  // pattern to be found
+    REBLEN limit2,  // in units of binstr2 (usually VAL_LEN_AT(binstr2))
+    REBFLGS flags,  // AM_FIND_CASE, AM_FIND_MATCH
+    REBINT skip1  // in length units of binstr1 (bytes or codepoints)
 ){
-    assert(SER_LEN(series) >= offset);
-    assert((flags & ~AM_FIND_MATCH) == 0);  // no AM_FIND_CASE
-
-    if (size2 == 0 || (size2 + offset) > BIN_LEN(series))
-        return NOT_FOUND; // pattern empty or is longer than the target
-
-    REBYTE *bp1 = BIN_AT(series, offset);
-    REBLEN size1 = BIN_LEN(series) - offset;
-
-    REBYTE *end1 = bp1 + ((flags & AM_FIND_MATCH) ? 1 : size1 - (size2 - 1));
-
-    REBYTE b2 = *bp2; // first byte
-
-    while (bp1 != end1) {
-        if (*bp1 == b2) { // matched first byte
-            REBLEN n;
-            for (n = 1; n < size2; n++) {
-                if (bp1[n] != bp2[n])
-                    break;
-            }
-            if (n == size2)
-                return bp1 - BIN_HEAD(series);
-        }
-        ++bp1;
-    }
-
-    return NOT_FOUND;
-}
-
-
-//
-//  Find_Str_In_Bin: C
-//
-// Case-insensitive search for UTF-8 string within arbitrary BINARY! data.
-// Returns starting position (as a byte index in the binary) or NOT_FOUND.
-//
-// Use caution with this function.  Not all byte patterns in a BINARY! are
-// legal UTF-8, so this has to just kind of skip over any non-UTF-8 and
-// consider it as "not a match".  But a match might be found in the middle of
-// otherwise invalid UTF-8, so this might come as a surprise to some clients.
-//
-// NOTE: Series used must be > offset.
-//
-REBLEN Find_Str_In_Bin(
-    REBSER *series, // binary series to search in
-    REBLEN offset, // where to begin search at
-    const REBYTE *bp2, // pointer to UTF-8 data to search (guaranteed valid)
-    REBLEN len2, // codepoint count of the UTF-8 data of interest
-    REBSIZ size2, // encoded byte count of the UTF-8 data (not codepoints)
-    REBFLGS flags // AM_FIND_MATCH, AM_FIND_CASE
-){
-    assert((flags & ~(AM_FIND_MATCH | AM_FIND_CASE)) == 0);
-
-    // Due to the properties of UTF-8, a case-sensitive search on UTF-8 data
-    // inside a binary can be done with plain Find_Bin_In_Bin().  It's faster.
-    //
-    if (flags & AM_FIND_CASE) {
-        return Find_Bin_In_Bin(
-            series,
-            offset,
-            bp2,
-            size2,
-            flags & AM_FIND_MATCH  // Bin_In_Bin asserts on AM_FIND_CASE
-        );
-    }
-
-    if (size2 == 0 or (size2 + offset) > SER_LEN(series))
-        return NOT_FOUND; // pattern empty or is longer than the target
-
-    const REBYTE *bp1 = BIN_AT(series, offset);
-    REBSIZ size1 = BIN_LEN(series) - offset;
-
-    const REBYTE *end1
-        = bp1 + ((flags & AM_FIND_MATCH) ? 1 : size1 - (size2 - 1));
-
-    REBUNI c2_canon; // first codepoint, but only calculate lowercase once
-    REBCHR(const*) next2 = cast(REBCHR(const*), bp2);  // guaranteed valid
-    next2 = NEXT_CHR(&c2_canon, next2);
-    c2_canon = LO_CASE(c2_canon);
-
-    while (bp1 < end1) {
-        const REBYTE *next1;
-        REBUNI c1;
-        if (*bp1 < 0x80) {
-            c1 = *bp1;
-            next1 = bp1;
-        }
-        else {
-            next1 = Back_Scan_UTF8_Char(&c1, bp1, NULL);
-            if (next1 == NULL) {
-                ++bp1;
-                continue; // treat bad scans just as this byte not matching
-            }
-        }
-        ++next1; // needed: see notes on why it's called "Back_Scan"
-
-        if (LO_CASE(c1) == c2_canon) { // matched first char
-            const REBYTE *temp1 = next1;
-            REBCHR(const*) temp2 = next2;
-
-            REBLEN n;
-            for (n = 1; n < len2; n++) {
-                if (*temp1 < 0x80)
-                    c1 = *temp1;
-                else {
-                    temp1 = Back_Scan_UTF8_Char(&c1, temp1, NULL);
-                    if (temp1 == NULL)
-                        break; // again, treat bad scans same as no match
-                }
-                ++temp1; // needed: see notes on why it's called "Back_Scan"
-
-                REBUNI c2;
-                temp2 = NEXT_CHR(&c2, temp2);
-
-                if (LO_CASE(c1) != LO_CASE(c2))
-                    break;
-            }
-            if (n == len2)
-                return bp1 - BIN_HEAD(series);
-        }
-
-        bp1 = next1;
-    }
-
-    return NOT_FOUND;
-}
-
-
-//
-//  Find_Str_In_Str: C
-//
-// General purpose find a substring.
-//
-// Supports: forward/reverse with skip, cased/uncase.
-//
-// Skip can be set positive or negative (for reverse).
-//
-// Flags are set according to ALL_FIND_REFS
-//
-REBLEN Find_Str_In_Str(
-    REBSTR *str1,
-    REBLEN index_unsigned,
-    REBLEN limit_unsigned,
-    REBINT skip,
-    REBSTR *str2,
-    REBINT index2,
-    REBLEN len,
-    REBFLGS flags
-){
-    assert(index_unsigned <= STR_LEN(str1));
-    assert(index2 <= cast(REBINT, STR_LEN(str2)));
+  #if !defined(NDEBUG)
+    *len_out = 0xDECAFBAD;  // trash output length in case of no match
+  #endif
 
     assert((flags & ~(AM_FIND_CASE | AM_FIND_MATCH)) == 0);
-    bool uncase = not (flags & AM_FIND_CASE);  // case insenstive
 
-    // Signed quantities allow stepping outside of bounds (e.g. large /SKIP)
-    // and still comparing...but incoming parameters should not be negative.
-    //
-    REBINT index = index_unsigned;
-    REBINT end = limit_unsigned - len;
+    bool is_2_str = (CELL_KIND(binstr2) != REB_BINARY);
+    REBSIZ size2;
+    REBLEN len2;
+    const REBYTE* head2;
+    if (is_2_str) {
+        head2 = VAL_UTF8_LEN_SIZE_AT_LIMIT(
+            &len2,
+            &size2,
+            binstr2,
+            limit2
+        );
+    }
+    else {
+        head2 = VAL_BINARY_SIZE_AT(&size2, binstr2);
+        if (limit2 < size2)
+            size2 = limit2;
+        len2 = size2;
+    }
 
     // `str2` is always stepped through forwards in FIND, even with a negative
     // value for skip.  If the position is at the tail, it cannot be found.
     //
-    if (index2 == cast(REBINT, STR_LEN(str2)))
-        return NOT_FOUND;  // getting c2 would be '\0' (LO_CASE illegal)
+    if (len2 == 0) {
+        assert(size2 == 0);
+        return NOT_FOUND;  // Note: c2 at end of '\0' means LO_CASE illegal
+    }
 
+    bool is_1_str = (CELL_KIND(binstr1) != REB_BINARY);
+    assert(not (is_1_str and not is_2_str));  // see `IMPORTANT` comment above
+
+    // The search window size in units of binstr1.  It's the length or size of
+    // the search pattern...and it's the size in bytes for the only allowed
+    // mismatch case (where binstr1 is binary and binstr2 is string)
+    //
+    REBLEN window1 = is_1_str ? len2 : size2;
+
+    // Signed quantities allow stepping outside of bounds (e.g. large /SKIP)
+    // and still comparing...but incoming parameters should not be negative.
+    //
+    REBINT index1 = VAL_INDEX(binstr1);
+
+    // "`index` and `end` integrate the /PART.  If the /PART was negative,
+    // then index would have been swapped to be the lower value...making what
+    // was previously the index the limit.  However, that does not work with
+    // negative `skip` values, which by default considers 0 the limit of the
+    // backkwards search but otherwise presumably want a /PART to limit it.
+    // Passing in a real "limit" vs. an end which could be greater or less
+    // than the index would be one way of resolving this problem.  But it's
+    // a missing feature for now to do FIND/SKIP/PART with a negative skip."
+    //
+    // !!! ^-- is this comment still relevant?
+    //
+    assert(end1_unsigned >= cast(REBLEN, index1));
+    REBINT end1 = end1_unsigned - window1;
+
+    // If is_2_str then we have to treat the data in binstr1 as characters,
+    // even if it's not validated UTF-8.  This requires knowing the size_at
+    // to pass to the checked version of Back_Scan_UTF8_Char().
+    //
+    const REBYTE *cp1;  // binstr1 position that is current test head of match
+    REBLEN len_head1;
+    REBSIZ size_at1;
+    if (CELL_KIND(binstr1) == REB_ISSUE)  // no VAL_LEN_HEAD() atm
+        cp1 = VAL_UTF8_LEN_SIZE_AT(&len_head1, &size_at1, binstr1);
+    else if (CELL_KIND(binstr1) != REB_BINARY) {
+        len_head1 = VAL_LEN_HEAD(binstr1);
+        cp1 = VAL_UTF8_SIZE_AT(&size_at1, binstr1);
+    }
+    else {
+        cp1 = VAL_BINARY_SIZE_AT(&size_at1, binstr1);
+        len_head1 = VAL_LEN_HEAD(binstr1);
+    }
+
+    // The size of binary that can be used for checked UTF8 scans needs to
+    // be reset each skip step.  If skipping right, the size needs to shrink
+    // by the byte skip.  If skipping left, it needs to grow by the byte skip.
+    // This is only applicable when treating a binstr1 binary as text.
+    //
+    REBSIZ size = size_at1;
+
+    bool caseless = not (flags & AM_FIND_CASE);  // case insenstive
+    if (not is_2_str)
+        caseless = false;  // 
+
+    // Binary-compatible to: [next2 = NEXT_CHR(&c2_canon, head2)]
     REBUNI c2_canon;  // calculate first char lowercase once, vs. each step
-    REBCHR(const*) next2 = NEXT_CHR(&c2_canon, STR_AT(str2, index2));
-    if (uncase)
+    const REBYTE *next2;
+    if (not is_2_str or *head2 < 0x80) {
+        c2_canon = *head2;
+        next2 = head2;
+    } else
+        next2 = Back_Scan_UTF8_Char_Unchecked(&c2_canon, head2);
+    ++next2;
+
+    if (caseless)
         c2_canon = LO_CASE(c2_canon);
 
-    // cp1 is the position in str1 that is our current tested head of a match
-    //
-    REBCHR(const*) cp1 = STR_AT(str1, index);
-
     REBUNI c1;  // c1 is the currently tested character for str1
-    if (skip < 0) {
+    if (skip1 < 0) {
         //
         // Note: `find/skip tail "abcdef" "def" -3` is "def", so first search
         // position should be at the `d`.  We can reduce the amount of work
@@ -422,169 +258,155 @@ REBLEN Find_Str_In_Str(
         // e.g. `find/skip tail "abcdef" "cdef" -2` should start at `c`.
         //
         do {
-            index += skip;
-            if (index < 0)
+            index1 += skip1;
+            if (index1 < 0)
                 return NOT_FOUND;
-            cp1 = SKIP_CHR(&c1, cp1, skip);
-        } while (index + len > STR_LEN(str1));
+
+            if (is_1_str)
+                cp1 = SKIP_CHR(&c1, cast(REBCHR(const*), cp1), skip1);
+            else if (is_2_str) {  // have to treat binstr1 as a string anyway
+                cp1 += skip1;
+                size -= skip1;  // size grows by skip
+                const REBYTE* temp = Back_Scan_UTF8_Char(&c1, cp1, &size);
+                if (temp == nullptr)
+                    c1 = MAX_UNI + 1;  // won't match if `while` below breaks
+            }
+            else {  // treat binstr1 as the binary that it is
+                cp1 += skip1;
+                c1 = *cp1;
+            }
+        } while (index1 + window1 > len_head1);
     }
     else {
-        if (index + len > STR_LEN(str1))
+        if (index1 + window1 > len_head1)
             return NOT_FOUND;
 
-        c1 = CHR_CODE(cp1);
+        if (is_1_str)
+            c1 = CHR_CODE(cast(REBCHR(const*), cp1));
+        else if (is_2_str) {  // have to treat binstr1 as a string anyway
+            REBSIZ size_temp = size;
+            const REBYTE* temp = Back_Scan_UTF8_Char(&c1, cp1, &size_temp);
+            if (temp == nullptr)
+                goto no_match_at_this_position;
+        }
+        else
+            c1 = *cp1;
     }
 
     while (true) {
-        if (c1 == c2_canon or (uncase and LO_CASE(c1) == c2_canon)) {
+        if (c1 == c2_canon or (caseless and c1 and LO_CASE(c1) == c2_canon)) {
             //
             // The optimized first character match for str2 in str1 passed.
             // Now check subsequent positions, where both may need LO_CASE().
             //
-            REBCHR(const*) tp1 = NEXT_STR(cp1);
-            REBCHR(const*) tp2 = next2;  // next2 is second position in str2
-            REBLEN n;
-            for (n = 1; n < len; n++) {  // n = 0 (first char) already matched
-                tp1 = NEXT_CHR(&c1, tp1);
 
-                REBUNI c2;
-                tp2 = NEXT_CHR(&c2, tp2);
-                if (c1 == c2 or (uncase and LO_CASE(c1) == LO_CASE(c2)))
-                    continue;  // the `for`
-
-                break;  // the `for`
+            // Binary-compatible to: [tp1 = NEXT_STR(cp1)]
+            const REBYTE *tp1;
+            if (is_1_str)  // binstr2 can't be binary
+                tp1 = NEXT_STR(cast(REBCHR(const*), cp1));
+            else if (is_2_str) {  // searching binary as if it's a string
+                REBSIZ encoded_c1_size = Encoded_Size_For_Codepoint(c1);
+                tp1 = cp1 + encoded_c1_size;
+                size -= encoded_c1_size;
             }
-            if (n == len)
-                return index;
+            else
+                tp1 = cp1 + 1;
+
+            const REBYTE *tp2 = next2;  // next2 is second position in str2
+
+            REBLEN n;
+            for (n = 1; n < len2; n++) {  // n=0 (first item) already matched
+
+                // Binary-compatible to: [tp1 = NEXT_CHR(&c1, tp1)]
+                if (not is_2_str or *tp1 < 0x80)
+                    c1 = *tp1;
+                else if (is_1_str)
+                    tp1 = Back_Scan_UTF8_Char_Unchecked(&c1, tp1);
+                else {  // treating binstr1 as UTF-8 despite being binary
+                    const REBYTE* temp = Back_Scan_UTF8_Char(&c1, tp1, &size);
+                    if (temp == nullptr)  // invalid or incomplete UTF-8
+                        goto no_match_at_this_position;
+                    tp1 = temp;
+                }
+                ++tp1;
+
+                // Binary-compatible to: [tp2 = NEXT_CHR(&c2, tp2)]
+                REBUNI c2;
+                if (not is_2_str or *tp2 < 0x80)
+                    c2 = *tp2;
+                else
+                    tp2 = Back_Scan_UTF8_Char_Unchecked(&c2, tp2);
+                ++tp2;
+
+                if (c1 == c2)
+                    continue;
+
+                if (caseless and LO_CASE(c1) == LO_CASE(c2))
+                    continue;
+
+                goto no_match_at_this_position;
+            }
+            if (n == len2) {
+                *len_out = window1;
+                return index1;
+            }
         }
+
+      no_match_at_this_position:
 
         // The /MATCH flag historically indicates only considering the first
         // position, so exit loop on first mismatch.  (!!! Better name "/AT"?)
         //
         if (flags & AM_FIND_MATCH)
-            goto not_found;
+            return NOT_FOUND;
 
-        index += skip;
+        index1 += skip1;
 
-        if (skip < 0) {
-            if (index < 0)  // !!! What about /PART with negative skips?
-                goto not_found;
-            assert(cp1 >= STR_AT(str1, - skip));
+        if (skip1 < 0) {
+            if (index1 < 0)  // !!! What about /PART with negative skips?
+                return NOT_FOUND;
+
+            if (is_1_str)
+                assert(cp1 >= STR_AT(VAL_STRING(binstr1), - skip1));
+            else
+                assert(cp1 >= BIN_AT(VAL_BINARY(binstr1), - skip1));
         } else {
-            if (index > end)
-                goto not_found;
-            assert(cp1 <= STR_AT(str1, STR_LEN(str1) - skip));
+            if (index1 > end1)
+                return NOT_FOUND;
+
+            if (is_1_str)
+                assert(cp1 <= STR_AT(VAL_STRING(binstr1), len_head1 - skip1));
+            else
+                assert(cp1 <= BIN_AT(VAL_BINARY(binstr1), len_head1 - skip1));
         }
-        cp1 = SKIP_CHR(&c1, cp1, skip);
+
+        // Regardless of whether we are searching in binstr1 as a string even
+        // when it is a binary, the `skip` is in binstr1 units...so skip by
+        // codepoints if string or bytes if not.
+        //
+        if (is_1_str)
+            cp1 = SKIP_CHR(&c1, cast(REBCHR(const*), cp1), skip1);
+        else {
+            // When binstr2 is a string and binstr1 isn't, we are treating
+            // binstr1 as a string despite being unchecked bytes.  Reset the
+            // size bound for doing the character skcanning.
+            //
+            if (is_2_str)
+                size = size_at1 - skip1;
+
+            cp1 += skip1;
+            c1 = *cp1;
+        }
     }
 
-  not_found:
     return NOT_FOUND;
 }
 
 
 //
-//  Find_Char_In_Str: C
+//  Find_Bitset_In_Binstr: C
 //
-// Supports AM_FIND_CASE for case-sensitivity and AM_FIND_MATCH to check only
-// the character at the current position and then stop.
-//
-// Skip can be set positive or negative (for reverse), and will be bounded
-// by the `start` and `end`.
-//
-// Note that features like "/LAST" are handled at a higher level and
-// translated into SKIP=(-1) and starting at (highest - 1).
-//
-REBLEN Find_Char_In_Str(
-    REBUNI uni,         // character to look for
-    REBSTR *s,          // UTF-8 string series
-    REBLEN index_orig,  // first index to examine (if out of range, NOT_FOUND)
-    REBLEN highest,     // *one past* highest return result (e.g. SER_LEN)
-    REBINT skip,        // step amount while searching, can be negative!
-    REBFLGS flags       // AM_FIND_CASE, AM_FIND_MATCH
-){
-    assert((flags & ~(AM_FIND_CASE | AM_FIND_MATCH)) == 0);
-
-    // !!! In UTF-8, finding a char in a string is really just like finding a
-    // string in a string.  Optimize as this all folds together.
-
-    if (uni == 0)
-        return NOT_FOUND;  // there can be no `\0` codepoints in ANY-STRING!
-
-    REBSTR *temp = Make_Codepoint_String(uni);
-
-    REBLEN i = Find_Str_In_Str(
-        s,
-        index_orig,
-        highest,
-        skip,
-        temp,
-        0,
-        1,
-        flags
-    );
-    Free_Unmanaged_Series(SER(temp));
-
-    return i;
-}
-
-
-//
-//  Find_Char_In_Bin: C
-//
-REBLEN Find_Char_In_Bin(
-    REBUNI uni,         // character to look for
-    REBBIN *bin,        // binary series
-    REBLEN lowest,      // lowest return index
-    REBLEN index_orig,  // first index to examine (if out of range, NOT_FOUND)
-    REBLEN highest,     // *one past* highest return result (e.g. SER_LEN)
-    REBINT skip,        // step amount while searching, can be negative!
-    REBFLGS flags       // AM_FIND_CASE, AM_FIND_MATCH
-){
-    assert((flags & ~(AM_FIND_CASE | AM_FIND_MATCH)) == 0);
-
-    // !!! In UTF-8, finding a char in a string is really just like finding a
-    // string in a string.  Optimize as this all folds together.
-
-    if (skip != 1)
-        fail ("Find_Char_In_Bin() does not support SKIP <> 1 at the moment");
-
-    if (highest != BIN_LEN(bin))
-        fail ("Find_Char_In_Bin() only searches the whole binary for now");
-
-    UNUSED(lowest);
-
-    if (uni == 0) {  // can't Make a REBSTR with 0 byte in it
-        return Find_Bin_In_Bin(
-            bin,
-            index_orig,
-            cb_cast(""),  // NUL terminator only
-            1,  // 1 byte
-            flags
-        );
-    }
-
-    REBSTR *temp = Make_Codepoint_String(uni);
-
-    REBLEN i = Find_Str_In_Bin(
-        bin,
-        index_orig,
-        STR_HEAD(temp),
-        1, // 1 character
-        STR_SIZE(temp),
-        flags
-    );
-
-    Free_Unmanaged_Series(SER(temp));
-
-    return i;
-}
-
-
-//
-//  Find_Bin_Bitset: C
-//
-// General purpose find a bitset char in a binary.
+// General purpose find a bitset char in a string or binary.
 //
 // Supports: forward/reverse with skip, cased/uncase, Unicode/byte.
 //
@@ -592,84 +414,68 @@ REBLEN Find_Char_In_Bin(
 //
 // Flags are set according to ALL_FIND_REFS
 //
-REBLEN Find_Bin_Bitset(
-    REBSER *bin,
-    REBINT head,
-    REBINT offset,
-    REBINT tail,
-    REBINT skip,
-    REBSER *bset,
-    REBFLGS flags
-){
-    assert(head >= 0 && tail >= 0 && offset >= 0);
-
-    assert((flags & ~AM_FIND_MATCH) == 0); // no AM_FIND_CASE
-
-    REBYTE *bp1 = BIN_AT(bin, offset);
-
-    while (skip < 0 ? offset >= head : offset < tail) {
-        const bool uncase = false;
-        if (Check_Bit(bset, *bp1, uncase))
-            return offset;
-
-        if (flags & AM_FIND_MATCH)
-            break;
-
-        bp1 += skip;
-        offset += skip;
-    }
-
-    return NOT_FOUND;
-
-}
-
-
-//
-//  Find_Str_Bitset: C
-//
-// General purpose find a bitset char in a string.
-//
-// Supports: forward/reverse with skip, cased/uncase, Unicode/byte.
-//
-// Skip can be set positive or negative (for reverse).
-//
-// Flags are set according to ALL_FIND_REFS
-//
-REBLEN Find_Str_Bitset(
-    REBSTR *str,
-    REBLEN index_unsigned,
+REBLEN Find_Bitset_In_Binstr(
+    REBLEN *len_out,
+    REBCEL(const*) binstr,
     REBLEN end_unsigned,
     REBINT skip,
-    REBSER *bset,
+    const REBSER *bset,
     REBFLGS flags
 ){
-    REBINT index = index_unsigned;
+  #if !defined(NDEBUG)
+    *len_out = 0xDECAFBAD;
+  #endif
+
+    REBINT index = VAL_INDEX(binstr);
     REBINT end = end_unsigned;
 
     REBINT start;
-    if (skip < 0) {
+    if (skip < 0)
         start = 0;
-    }
     else
         start = index;
 
     bool uncase = not (flags & AM_FIND_CASE); // case insensitive
 
-    REBCHR(const*) cp1 = STR_AT(str, index);
+    bool is_str = (CELL_KIND(binstr) != REB_BINARY);
+
+    const REBYTE *cp1 = is_str ? VAL_STRING_AT(binstr) : VAL_BINARY_AT(binstr);
     REBUNI c1;
-    if (skip > 0)
-        c1 = CHR_CODE(cp1);  // skip 1 will pass over cp1, so leave as is
-    else
-        cp1 = BACK_CHR(&c1, cp1);
+    if (skip > 0) {  // skip 1 will pass over cp1, so leave as is
+        if (is_str)
+            c1 = CHR_CODE(cast(REBCHR(const*), cp1));
+        else
+            c1 = *cp1;
+    }
+    else {
+        if (is_str)
+            cp1 = BACK_CHR(&c1, cast(REBCHR(const*), cp1));
+        else {
+            --cp1;
+            c1 = *cp1;
+        }
+    }
 
     while (skip < 0 ? index >= start : index < end) {
-        if (Check_Bit(bset, c1, uncase))
+        if (Check_Bit(bset, c1, uncase)) {
+            //
+            // !!! Now the output will always match 1 character or 1 byte.
+            // If you were matching BINARY! in a mode that would match a
+            // character codepoint, this length might be longer.  Review.
+            //
+            *len_out = 1;
             return index;
+        }
 
         if (flags & AM_FIND_MATCH)
             break;
 
-        cp1 = SKIP_CHR(&c1, cp1, skip);
+        if (is_str) 
+            cp1 = SKIP_CHR(&c1, cast(REBCHR(const*), cp1), skip);
+        else {
+            cp1 += skip;
+            c1 = *cp1;
+        }
         index += skip;
     }
 
@@ -678,82 +484,86 @@ REBLEN Find_Str_Bitset(
 
 
 //
-//  Count_Lines: C
+//  Find_Value_In_Binstr: C
 //
-// Count lines in a UTF-8 file.
+// Service routine for both FIND and PARSE for searching in an ANY-STRING!,
+// ISSUE!, or BINARY!
 //
-REBLEN Count_Lines(REBYTE *bp, REBLEN len)
-{
-    REBLEN count = 0;
-
-    for (; len > 0; bp++, len--) {
-        if (*bp == CR) {
-            count++;
-            if (len == 1) break;
-            if (bp[1] == LF) bp++, len--;
-        }
-        else if (*bp == LF) count++;
-    }
-
-    return count;
-}
-
-
-//
-//  Next_Line: C
-//
-// Find next line termination. Advance the bp; return bin length.
-//
-REBLEN Next_Line(REBYTE **bin)
-{
-    REBLEN count = 0;
-    REBYTE *bp = *bin;
-
-    for (; *bp; bp++) {
-        if (*bp == CR) {
-            bp++;
-            if (*bp == LF) bp++;
-            break;
-        }
-        else if (*bp == LF) {
-            bp++;
-            break;
-        }
-        else count++;
-    }
-
-    *bin = bp;
-    return count;
-}
-
-
-//
-//  Find_In_Any_Sequence: C
-//
-// !!! In R3-Alpha, the code for PARSE shared some of the same subroutines in
-// %s-find.c as the FIND action.  However, there was still a lot of parallel
-// logic in their invocation.  This is an attempt to further factor the common
-// code, which hopefully will mean more consistency (as well as less code).
-//
-REBLEN Find_In_Any_Sequence(
-    REBLEN *len,  // length of match (e.g. if pattern is a TAG!, includes <>)
-    const RELVAL *any_series,
-    const REBCEL *pattern,
-    REBFLGS flags
+REBLEN Find_Value_In_Binstr(
+    REBLEN *len,
+    REBCEL(const*) binstr,
+    REBLEN end,
+    REBCEL(const*) pattern,
+    REBLEN flags,
+    REBINT skip
 ){
-    REBLEN index = VAL_INDEX(any_series);
-    REBLEN end = VAL_LEN_HEAD(any_series);
-    REBINT skip = 1;
+    enum Reb_Kind kind = CELL_KIND(pattern);
+    if (REB_BINARY == kind) {
+        //
+        // Can't search for BINARY! in an ANY-STRING! (might match on a "half
+        // codepoint").  Solution is to alias input as UTF-8 binary.
+        //
+        if (CELL_KIND(binstr) != REB_BINARY)
+            fail (Error_Find_String_Binary_Raw());
+        goto find_binstr_in_binstr;
+    }
 
-    if (IS_BINARY(any_series))
-        return find_binary(  // Note: returned len is in bytes here
-            len, VAL_SERIES(any_series), index, end, pattern, flags, skip
+    if (
+        ANY_STRING_KIND(kind)
+        or ANY_WORD_KIND(kind)
+        or REB_INTEGER == kind  // `find "ab10cd" 10` -> "10cd"
+        or REB_ISSUE == kind
+    ){
+      find_binstr_in_binstr: ;
+
+        // !!! A TAG! does not have its delimiters in it.  The logic of the
+        // find would have to be rewritten to accomodate this, and it's a
+        // bit tricky as it is.  Let it settle down before trying that--and
+        // for now just form the tag into a temporary alternate series.
+
+        REBSTR *formed = nullptr;
+        if (
+            CELL_KIND(pattern) != REB_ISSUE
+            and CELL_KIND(pattern) != REB_TEXT
+            and CELL_KIND(pattern) != REB_BINARY
+         ){
+            // !!! `<tag>`, `set-word:` but FILE!, etc?
+            //
+            formed = Copy_Form_Cell(pattern, 0);
+        }
+
+        DECLARE_LOCAL (temp);  // !!! Note: unmanaged
+        if (formed) {
+            RESET_CELL(temp, REB_TEXT, CELL_FLAG_FIRST_IS_NODE);
+            PAYLOAD(Any, temp).first.node = NOD(formed);
+            PAYLOAD(Any, temp).second.u = 0;  // index
+        }
+
+        REBLEN result = Find_Binstr_In_Binstr(
+            len,
+            binstr,  // not all_ascii, has multibyte utf-8 sequences
+            end,
+            formed ? temp : pattern,
+            UNLIMITED,
+            flags & (AM_FIND_MATCH | AM_FIND_CASE),
+            skip
         );
 
-    if (ANY_STRING(any_series))
-        return find_string(  // Note: returned len is in codepoints here
-            len, VAL_STRING(any_series), index, end, pattern, flags, skip
-        );
+        if (formed)
+            Free_Unmanaged_Series(SER(formed));
 
-    fail ("Unknown sequence type for Find_In_Any_Sequence()");
+        return result;
+    }
+    else if (kind == REB_BITSET) {
+        return Find_Bitset_In_Binstr(
+            len,
+            binstr,
+            end,
+            skip,
+            VAL_BITSET(pattern),
+            flags & (AM_FIND_MATCH | AM_FIND_CASE)
+        );
+    }
+    else
+        fail ("Find_Value_In_Binstr() received unknown pattern datatype");
 }

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -28,18 +28,22 @@
 //
 //  CT_Datatype: C
 //
-REBINT CT_Datatype(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Datatype(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode < 0)
-        return -1;  // !!! R3-Alpha-ism (compare never made much sense)
+    UNUSED(strict);
 
     if (VAL_TYPE_KIND_OR_CUSTOM(a) != VAL_TYPE_KIND_OR_CUSTOM(b))
-        return 0;
+        return VAL_TYPE_KIND_OR_CUSTOM(a) > VAL_TYPE_KIND_OR_CUSTOM(b)
+            ? 1
+            : -1;
 
-    if (VAL_TYPE_KIND_OR_CUSTOM(a) == REB_CUSTOM)
-        return VAL_TYPE_HOOKS_NODE(a) == VAL_TYPE_HOOKS_NODE(b);
+    if (VAL_TYPE_KIND_OR_CUSTOM(a) == REB_CUSTOM) {
+        if (VAL_TYPE_HOOKS_NODE(a) == VAL_TYPE_HOOKS_NODE(b))
+            return 0;
+        return 1;  // !!! all cases of "just return greater" are bad
+    }
 
-    return 1;
+    return 0;
 }
 
 
@@ -84,12 +88,12 @@ REB_R TO_Datatype(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
 //
 //  MF_Datatype: C
 //
-void MF_Datatype(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Datatype(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     if (not form)
         Pre_Mold_All(mo, v);  // e.g. `#[datatype!`
 
-    REBSTR *name = Canon(VAL_TYPE_SYM(v));
+    const REBSTR *name = Canon(VAL_TYPE_SYM(v));
     Append_Spelling(mo->series, name);
 
     if (not form)
@@ -180,8 +184,66 @@ REBVAL *Datatype_From_Url(const REBVAL *url) {
     rebEND);
 
     if (i != -1)
-        return SPECIFIC(ARR_AT(PG_Extension_Types, i));
+        return cast(REBVAL*, ARR_AT(PG_Extension_Types, i));
     return nullptr;
+}
+
+
+//
+//  Startup_Fake_Type_Constraints: C
+//
+// Consolidating types like REFINEMENT! into a specific instance of PATH!,
+// or CHAR! into a specific instance of ISSUE!, reduces the total number of
+// fundamental datatypes and offers consistency and flexibility.  But there
+// is no standard mechanism for expressing a type constraint in a function
+// spec (e.g. "integer!, but it must be even") so the unification causes
+// a loss of that check.
+//
+// A true solution to the problem needs to be found.  But until it is, this
+// creates some fake values that can be used by function specs which at least
+// give an annotation of the constraint.  They are in Lib_Context so that
+// native specs can use them.
+//
+// While they have no teeth in typeset creation (they only verify that the
+// unconstrained form of the type matches), PARSE recognizes the symbol and
+// enforces it.
+//
+static void Startup_Fake_Type_Constraint(REBSYM sym)
+{
+    const REBSTR *canon = Canon(sym);
+    REBVAL *char_x = Append_Context(VAL_CONTEXT(Lib_Context), nullptr, canon);
+    Init_Sym_Word(char_x, canon);
+}
+
+
+//
+//  Matches_Fake_Type_Constraint: C
+//
+// Called on SYM-WORD!s by PARSE and MATCH.
+//
+bool Matches_Fake_Type_Constraint(const RELVAL *v, enum Reb_Symbol sym) {
+    switch (sym) {
+      case SYM_CHAR_X:
+        return IS_CHAR(v);
+
+      case SYM_BLACKHOLE_X:
+        return IS_CHAR(v) and VAL_CHAR(v) == 0;
+
+      case SYM_LIT_WORD_X:
+        return IS_QUOTED_WORD(v);
+
+      case SYM_LIT_PATH_X:
+        return IS_QUOTED_PATH(v);
+
+      case SYM_REFINEMENT_X:
+        return IS_REFINEMENT(v);
+
+      case SYM_PREDICATE_X:
+        return IS_PREDICATE(v);
+
+      default:
+        fail ("Invalid fake type constraint");
+    }
 }
 
 
@@ -194,32 +256,33 @@ REBVAL *Datatype_From_Url(const REBVAL *url) {
 //
 REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
 {
-    if (ARR_LEN(boot_types) != REB_MAX - 2)  // exclude REB_0_END, REB_NULLED
-        panic (boot_types);  // every other type should have a WORD!
+    if (ARR_LEN(boot_types) != REB_MAX - 1)  // exclude REB_0_END
+        panic (boot_types);  // other types/internals should have a WORD!
 
     RELVAL *word = ARR_HEAD(boot_types);
 
-    if (VAL_WORD_SYM(word) != SYM_VOID_X)
-        panic (word);  // First "real" type should be VOID!
+    if (VAL_WORD_SYM(word) != SYM_NULL)
+        panic (word);  // First internal byte type is NULL at 1
 
-    REBARR *catalog = Make_Array(REB_MAX - 2);
-
-    // Put a nulled cell in position [1], just to have something there (the
-    // 0 slot is reserved in contexts, so there's no worry about filling space
-    // to line up with REB_0_END).  Note this is different from NULL the
-    // native, which generates a null (since you'd have to type :NULLED to
-    // get a null value, which is awkward).
-    //
-    REBVAL *nulled = Append_Context(Lib_Context, nullptr, Canon(SYM_NULLED));
-    Init_Nulled(nulled);
+    REBARR *catalog = Make_Array(REB_MAX - 1);
 
     REBINT n;
-    for (n = 2; NOT_END(word); word++, n++) {
-        assert(n < REB_MAX);
-
+    for (n = 1; NOT_END(word); word++, n++) {
         enum Reb_Kind kind = cast(enum Reb_Kind, n);
+        REBVAL *value = Append_Context(
+            VAL_CONTEXT(Lib_Context),
+            SPECIFIC(word),
+            nullptr
+        );
 
-        REBVAL *value = Append_Context(Lib_Context, SPECIFIC(word), NULL);
+        if (kind == REB_NULL) {
+            Init_Nulled(value);
+            continue;
+        }
+        if (kind == REB_BYTES) {
+            Init_Void(value, SYM_VOID);
+            continue;
+        }
         if (kind == REB_CUSTOM) {
             //
             // There shouldn't be any literal CUSTOM! datatype instances.
@@ -228,14 +291,14 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
             // "not bindable" range.  (Is_Bindable() would be a slower test
             // if it had to account for it.)
             //
-            Init_Nulled(value);
+            Init_Void(value, SYM_VOID);
             continue;
         }
 
         RESET_CELL(value, REB_DATATYPE, CELL_FLAG_FIRST_IS_NODE);
         VAL_TYPE_KIND_ENUM(value) = kind;
         VAL_TYPE_SPEC_NODE(value) = NOD(
-            VAL_ARRAY(ARR_AT(boot_typespecs, n - 2))
+            VAL_ARRAY_KNOWN_MUTABLE(ARR_AT(boot_typespecs, n - 2))
         );
 
         // !!! The system depends on these definitions, as they are used by
@@ -247,38 +310,20 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
         // a limited sense.)
         //
         assert(value == Datatype_From_Kind(kind));
-        assert(value == CTX_VAR(Lib_Context, n));
+        assert(value == VAL_CONTEXT_VAR(Lib_Context, n));
         SET_CELL_FLAG(value, PROTECTED);
 
         Append_Value(catalog, SPECIFIC(word));
     }
 
-    // !!! Near-term hack to create LIT-WORD! and LIT-PATH!, to try and keep
-    // the typechecks working in function specs.  They are set to the words
-    // themselves, so that parse rules will work with them (e.g. bootstrap)
-
-    REBVAL *lit_word = Append_Context(
-        Lib_Context,
-        nullptr,
-        Canon(SYM_LIT_WORD_X)
-    );
-    Init_Builtin_Datatype(lit_word, REB_WORD);
-    Quotify(lit_word, 1);
-
-    REBVAL *lit_path = Append_Context(
-        Lib_Context,
-        nullptr,
-        Canon(SYM_LIT_PATH_X)
-    );
-    Init_Builtin_Datatype(lit_path, REB_PATH);
-    Quotify(lit_path, 1);
-
-    REBVAL *refinement = Append_Context(
-        Lib_Context,
-        nullptr,
-        Canon(SYM_REFINEMENT_X)
-    );
-    Init_Sym_Word(refinement, Canon(SYM_REFINEMENT_X));
+    // !!! Temporary solution until actual type constraints exist.
+    //
+    Startup_Fake_Type_Constraint(SYM_CHAR_X);
+    Startup_Fake_Type_Constraint(SYM_LIT_WORD_X);
+    Startup_Fake_Type_Constraint(SYM_LIT_PATH_X);
+    Startup_Fake_Type_Constraint(SYM_REFINEMENT_X);
+    Startup_Fake_Type_Constraint(SYM_PREDICATE_X);
+    Startup_Fake_Type_Constraint(SYM_BLACKHOLE_X);
 
     // Extensions can add datatypes.  These types are not identified by a
     // single byte, but give up the `extra` portion of their cell to hold

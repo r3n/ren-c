@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -25,77 +25,15 @@
 #include "sys-core.h"
 
 
-
-static bool Equal_Context(const REBCEL *v1, const REBCEL *v2)
+static void Append_To_Context(REBVAL *context, REBVAL *arg)
 {
-    if (CELL_KIND(v1) != CELL_KIND(v2)) // e.g. ERROR! won't equal OBJECT!
-        return false;
+    REBCTX *c = VAL_CONTEXT(context);
 
-    REBCTX *c1 = VAL_CONTEXT(v1);
-    REBCTX *c2 = VAL_CONTEXT(v2);
-    if (c1 == c2)
-        return true; // short-circuit, always equal if same context pointer
-
-    // Note: can't short circuit on unequal frame lengths alone, as hidden
-    // fields of objects (notably `self`) do not figure into the `equal?`
-    // of their public portions.
-
-    const REBVAL *key1 = CTX_KEYS_HEAD(c1);
-    const REBVAL *key2 = CTX_KEYS_HEAD(c2);
-    const REBVAL *var1 = CTX_VARS_HEAD(c1);
-    const REBVAL *var2 = CTX_VARS_HEAD(c2);
-
-    // Compare each entry, in order.  Skip any hidden fields, field names are
-    // compared case-insensitively.
-    //
-    // !!! The order dependence suggests that `make object! [a: 1 b: 2]` will
-    // not be equal to `make object! [b: 1 a: 2]`.  See #2341
-    //
-    for (; NOT_END(key1) && NOT_END(key2); key1++, key2++, var1++, var2++) {
-      no_advance:
-        if (Is_Param_Hidden(key1)) {
-            key1++; var1++;
-            if (IS_END(key1)) break;
-            goto no_advance;
-        }
-        if (Is_Param_Hidden(key2)) {
-            key2++; var2++;
-            if (IS_END(key2)) break;
-            goto no_advance;
-        }
-
-        if (VAL_KEY_CANON(key1) != VAL_KEY_CANON(key2)) // case-insensitive
-            return false;
-
-        const bool is_case = false;
-        if (Cmp_Value(var1, var2, is_case) != 0) // case-insensitive
-            return false;
-    }
-
-    // Either key1 or key2 is at the end here, but the other might contain
-    // all hidden values.  Which is okay.  But if a value isn't hidden,
-    // they don't line up.
-    //
-    for (; NOT_END(key1); key1++, var1++) {
-        if (not Is_Param_Hidden(key1))
-            return false;
-    }
-    for (; NOT_END(key2); key2++, var2++) {
-        if (not Is_Param_Hidden(key2))
-            return false;
-    }
-
-    return true;
-}
-
-
-static void Append_To_Context(REBCTX *context, REBVAL *arg)
-{
     // Can be a word:
     if (ANY_WORD(arg)) {
-        if (0 == Find_Canon_In_Context(context, VAL_WORD_CANON(arg), true)) {
-            Expand_Context(context, 1); // copy word table also
-            Append_Context(context, 0, VAL_WORD_SPELLING(arg));
+        if (0 == Find_Canon_In_Context(context, VAL_WORD_CANON(arg))) {
+            Expand_Context(c, 1); // copy word table also
+            Append_Context(c, 0, VAL_WORD_SPELLING(arg));
             // default of Append_Context is that arg's value is void
         }
         return;
@@ -106,7 +44,7 @@ static void Append_To_Context(REBCTX *context, REBVAL *arg)
 
     // Process word/value argument block:
 
-    RELVAL *item = VAL_ARRAY_AT(arg);
+    const RELVAL *item = VAL_ARRAY_AT(arg);
 
     // Can't actually fail() during a collect, so make sure any errors are
     // set and then jump to a Collect_End()
@@ -125,18 +63,18 @@ static void Append_To_Context(REBCTX *context, REBVAL *arg)
     // Setup binding table with obj words.  Binding table is empty so don't
     // bother checking for duplicates.
     //
-    Collect_Context_Keys(&collector, context, false);
+    Collect_Context_Keys(&collector, c, false);
 
     // Examine word/value argument block
 
-    RELVAL *word;
+    const RELVAL *word;
     for (word = item; NOT_END(word); word += 2) {
         if (!IS_WORD(word) && !IS_SET_WORD(word)) {
             error = Error_Bad_Value_Core(word, VAL_SPECIFIER(arg));
             goto collect_end;
         }
 
-        REBSTR *canon = VAL_WORD_CANON(word);
+        const REBSTR *canon = VAL_WORD_CANON(word);
 
         if (Try_Add_Binder_Index(
             &collector.binder, canon, ARR_LEN(BUF_COLLECT))
@@ -154,12 +92,12 @@ static void Append_To_Context(REBCTX *context, REBVAL *arg)
     TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));
 
   blockscope {  // Append new words to obj
-    REBLEN len = CTX_LEN(context) + 1;
-    Expand_Context(context, ARR_LEN(BUF_COLLECT) - len);
+    REBLEN len = CTX_LEN(c) + 1;
+    Expand_Context(c, ARR_LEN(BUF_COLLECT) - len);
 
     RELVAL *collect_key = ARR_AT(BUF_COLLECT, len);
     for (; NOT_END(collect_key); ++collect_key)
-        Append_Context(context, NULL, VAL_KEY_SPELLING(collect_key));
+        Append_Context(c, NULL, VAL_KEY_SPELLING(collect_key));
   }
 
     // Set new values to obj words
@@ -169,8 +107,8 @@ static void Append_To_Context(REBCTX *context, REBVAL *arg)
         );
         assert(i != 0);
 
-        REBVAL *key = CTX_KEY(context, i);
-        REBVAL *var = CTX_VAR(context, i);
+        REBVAL *key = CTX_KEY(c, i);
+        REBVAL *var = CTX_VAR(c, i);
 
         if (GET_CELL_FLAG(var, PROTECTED)) {
             error = Error_Protected_Key(key);
@@ -201,10 +139,75 @@ collect_end:
 //
 //  CT_Context: C
 //
-REBINT CT_Context(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode < 0) return -1;
-    return Equal_Context(a, b) ? 1 : 0;
+    assert(ANY_CONTEXT_KIND(CELL_KIND(a)));
+    assert(ANY_CONTEXT_KIND(CELL_KIND(b)));
+
+    if (CELL_KIND(a) != CELL_KIND(b))  // e.g. ERROR! won't equal OBJECT!
+        return CELL_KIND(a) > CELL_KIND(b) ? 1 : 0;
+
+    REBCTX *c1 = VAL_CONTEXT(a);
+    REBCTX *c2 = VAL_CONTEXT(b);
+    if (c1 == c2)
+        return 0;  // short-circuit, always equal if same context pointer
+
+    // Note: can't short circuit on unequal frame lengths alone, as hidden
+    // fields of objects (notably `self`) do not figure into the `equal?`
+    // of their public portions.
+
+    const REBVAL *key1 = CTX_KEYS_HEAD(c1);
+    const REBVAL *key2 = CTX_KEYS_HEAD(c2);
+    const REBVAL *var1 = CTX_VARS_HEAD(c1);
+    const REBVAL *var2 = CTX_VARS_HEAD(c2);
+
+    // Compare each entry, in order.  Skip any hidden fields, field names are
+    // compared case-insensitively.
+    //
+    // !!! The order dependence suggests that `make object! [a: 1 b: 2]` will
+    // not be equal to `make object! [b: 1 a: 2]`.  See #2341
+    //
+    for (; NOT_END(key1) && NOT_END(key2); key1++, key2++, var1++, var2++) {
+      no_advance:
+        if (Is_Param_Hidden(key1)) {
+            ++key1;
+            ++var1;
+            if (IS_END(key1))
+                break;
+            goto no_advance;
+        }
+        if (Is_Param_Hidden(key2)) {
+            ++key2;
+            ++var2;
+            if (IS_END(key2))
+                break;
+            goto no_advance;
+        }
+
+        const REBSTR *canon1 = VAL_KEY_CANON(key1);
+        const REBSTR *canon2 = VAL_KEY_CANON(key2);
+        if (canon1 != canon2)  // case-insensitive, even in `strict` compare
+            return canon1 > canon2 ? 1 : -1;
+
+        REBINT diff = Cmp_Value(var1, var2, strict);
+        if (diff != 0)
+            return diff;
+    }
+
+    // Either key1 or key2 is at the end here, but the other might contain
+    // all hidden values.  Which is okay.  But if a value isn't hidden,
+    // they don't line up.
+    //
+    for (; NOT_END(key1); key1++, var1++) {
+        if (not Is_Param_Hidden(key1))
+            return 1;
+    }
+    for (; NOT_END(key2); key2++, var2++) {
+        if (not Is_Param_Hidden(key2))
+            return -1;
+    }
+
+    return 0;
 }
 
 
@@ -256,10 +259,8 @@ REB_R MAKE_Frame(
 
     REBDSP lowest_ordered_dsp = DSP; // Data stack gathers any refinements
 
-    REBSTR *opt_label;
     if (Get_If_Word_Or_Path_Throws( // Allows `MAKE FRAME! 'APPEND/DUP`, etc.
         out,
-        &opt_label,
         arg,
         SPECIFIED,
         true // push_refinements (e.g. don't auto-specialize ACTION! if PATH!)
@@ -280,7 +281,7 @@ REB_R MAKE_Frame(
     // put /REFINEMENTs in refinement slots (instead of true/false/null)
     // to preserve the order of execution.
 
-    return Init_Frame(out, exemplar);
+    return Init_Frame(out, exemplar, VAL_ACTION_LABEL(out));
 }
 
 
@@ -324,7 +325,7 @@ REB_R MAKE_Context(
         // !!! This binds the actual body data, not a copy of it.  See
         // Virtual_Bind_Deep_To_New_Context() for future directions.
         //
-        Bind_Values_Deep(VAL_ARRAY_AT(arg), ctx);
+        Bind_Values_Deep(VAL_ARRAY_AT_MUTABLE_HACK(arg), CTX_ARCHETYPE(ctx));
 
         DECLARE_LOCAL (dummy);
         if (Do_Any_Array_At_Throws(dummy, arg, SPECIFIED)) {
@@ -402,7 +403,7 @@ REB_R TO_Context(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 REB_R PD_Context(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     REBCTX *c = VAL_CONTEXT(pvs->out);
@@ -410,20 +411,37 @@ REB_R PD_Context(
     if (not IS_WORD(picker))
         return R_UNHANDLED;
 
-    const bool always = false;
-    REBLEN n = Find_Canon_In_Context(c, VAL_WORD_CANON(picker), always);
+    // See if the binding of the word is already to the context (so there's
+    // no need to go hunting).  'x
+    //
+    REBLEN n;
+    if (VAL_BINDING(picker) == NOD(c))
+        n = VAL_WORD_INDEX(picker);
+    else {
+        n = Find_Canon_In_Context(pvs->out, VAL_WORD_CANON(picker));
 
-    if (n == 0)
-        return R_UNHANDLED;
+        if (n == 0)
+            return R_UNHANDLED;
 
+        // !!! As an experiment, try caching the binding index in the word.
+        // This "corrupts" it, but if we say paths effectively own their
+        // top-level words that could be all right.  Note this won't help if
+        // the word is an evaluative product, as the bits live in the cell
+        // and it will be discarded.
+        //
+        INIT_BINDING(m_cast(RELVAL*, picker), NOD(c));
+        INIT_WORD_INDEX(m_cast(RELVAL*, picker), n);
+    }
+
+    REBVAL *var = CTX_VAR(c, n);
     if (opt_setval) {
         ENSURE_MUTABLE(pvs->out);
 
-        if (GET_CELL_FLAG(CTX_VAR(c, n), PROTECTED))
-            fail (Error_Protected_Word_Raw(picker));
+        if (GET_CELL_FLAG(var, PROTECTED))
+            fail (Error_Protected_Word_Raw(rebUnrelativize(picker)));
     }
 
-    pvs->u.ref.cell = CTX_VAR(c, n);
+    pvs->u.ref.cell = var;
     pvs->u.ref.specifier = SPECIFIED;
     return R_REFERENCE;
 }
@@ -446,7 +464,7 @@ REBNATIVE(meta_of)  // see notes on MISC_META()
 
     REBCTX *meta;
     if (IS_ACTION(v))
-        meta = VAL_ACT_META(v);
+        meta = MISC_META(VAL_ACT_PARAMLIST_NODE(v));
     else {
         assert(ANY_CONTEXT(v));
         meta = MISC_META(VAL_CONTEXT(v));
@@ -573,7 +591,7 @@ REBCTX *Copy_Context_Core_Managed(REBCTX *original, REBU64 types)
 //
 //  MF_Context: C
 //
-void MF_Context(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     REBSTR *s = mo->series;
 
@@ -596,21 +614,31 @@ void MF_Context(REB_MOLD *mo, const REBCEL *v, bool form)
     }
     Push_Pointer_To_Series(TG_Mold_Stack, c);
 
+    // Simple rule for starters: don't honor the hidden status of parameters
+    // if the frame phase is executing.
+    //
+    bool honor_hidden = true;
+    if (CELL_KIND(v) == REB_FRAME)
+        honor_hidden = (VAL_OPT_PHASE(v) == nullptr);
+
     if (form) {
         //
         // Mold all words and their values ("key: <molded value>")
         //
-        REBVAL *key = CTX_KEYS_HEAD(c);
+        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(v);
         REBVAL *var = CTX_VARS_HEAD(c);
         bool had_output = false;
         for (; NOT_END(key); key++, var++) {
-            if (not Is_Param_Hidden(key)) {
-                had_output = true;
-                Append_Spelling(mo->series, VAL_KEY_SPELLING(key));
-                Append_Ascii(mo->series, ": ");
-                Mold_Value(mo, var);
-                Append_Codepoint(mo->series, LF);
-            }
+            if (Is_Param_Sealed(key))
+                continue;
+            if (honor_hidden and Is_Param_Hidden(key))
+                continue;
+
+            Append_Spelling(mo->series, VAL_KEY_SPELLING(key));
+            Append_Ascii(mo->series, ": ");
+            Mold_Value(mo, var);
+            Append_Codepoint(mo->series, LF);
+            had_output = true;
         }
 
         // Remove the final newline...but only if WE added to the buffer
@@ -630,16 +658,18 @@ void MF_Context(REB_MOLD *mo, const REBCEL *v, bool form)
 
     mo->indent++;
 
-    REBVAL *key = CTX_KEYS_HEAD(c);
+    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(v);
     REBVAL *var = CTX_VARS_HEAD(VAL_CONTEXT(v));
 
     for (; NOT_END(key); ++key, ++var) {
-        if (Is_Param_Hidden(key))
+        if (Is_Param_Sealed(key))
+            continue;
+        if (honor_hidden and Is_Param_Hidden(key))
             continue;
 
         New_Indented_Line(mo);
 
-        REBSTR *spelling = VAL_KEY_SPELLING(key);
+        const REBSTR *spelling = VAL_KEY_SPELLING(key);
         Append_Utf8(s, STR_UTF8(spelling), STR_SIZE(spelling));
 
         Append_Ascii(s, ": ");
@@ -647,7 +677,7 @@ void MF_Context(REB_MOLD *mo, const REBCEL *v, bool form)
         if (IS_NULLED(var))
             Append_Ascii(s, "'");  // `field: '` would evaluate to null
         else {
-            if (IS_VOID(var) or not ANY_INERT(var))  // needs quoting
+            if (not ANY_INERT(var))  // needs quoting
                 Append_Ascii(s, "'");
             Mold_Value(mo, var);
         }
@@ -691,13 +721,13 @@ REB_R Context_Common_Action_Maybe_Unhandled(
             return Init_Logic(D_OUT, CTX_LEN(c) == 0);
 
           case SYM_WORDS:
-            return Init_Block(D_OUT, Context_To_Array(c, 1));
+            return Init_Block(D_OUT, Context_To_Array(v, 1));
 
           case SYM_VALUES:
-            return Init_Block(D_OUT, Context_To_Array(c, 2));
+            return Init_Block(D_OUT, Context_To_Array(v, 2));
 
           case SYM_BODY:
-            return Init_Block(D_OUT, Context_To_Array(c, 3));
+            return Init_Block(D_OUT, Context_To_Array(v, 3));
 
         // Noticeably not handled by average objects: SYM_OPEN_Q (`open?`)
 
@@ -726,19 +756,35 @@ REBTYPE(Context)
     if (r != R_UNHANDLED)
         return r;
 
-    REBVAL *v = D_ARG(1);
-    REBCTX *c = VAL_CONTEXT(v);
+    REBVAL *context = D_ARG(1);
+    REBCTX *c = VAL_CONTEXT(context);
 
     switch (VAL_WORD_SYM(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // covered by `v`
 
-        if (VAL_TYPE(v) != REB_FRAME)
+        if (VAL_TYPE(context) != REB_FRAME)
             break;
 
         REBVAL *property = ARG(property);
         REBSYM sym = VAL_WORD_SYM(property);
+
+        if (sym == SYM_LABEL) {
+            //
+            // Can be answered for frames that have no execution phase, if
+            // they were initialized with a label.
+            //
+            const REBSTR *label = VAL_FRAME_LABEL(context);
+            if (label)
+                return Init_Word(D_OUT, label);
+
+            // If the frame is executing, we can look at the label in the
+            // REBFRM*, which will tell us what the overall execution label
+            // would be.  This might be confusing, however...if the phase
+            // is drastically different.  Review.
+        }
+
         if (sym == SYM_ACTION) {
             //
             // Currently this can be answered for any frame, even if it is
@@ -747,10 +793,11 @@ REBTYPE(Context)
             // GC'd if all the frames pointing to them were expired but still
             // referenced somewhere.
             //
-            return Init_Action_Maybe_Bound(
+            return Init_Action(
                 D_OUT,
-                VAL_PHASE(v),  // archetypal, so no binding
-                EXTRA(Binding, v).node  // e.g. where RETURN returns to
+                VAL_PHASE_ELSE_ARCHETYPE(context),  // archetypal, no binding
+                VAL_FRAME_LABEL(context),
+                VAL_BINDING(context)  // e.g. where RETURN returns to
             );
         }
 
@@ -781,12 +828,9 @@ REBTYPE(Context)
             //
             // Only want action frames (though `pending? = true` ones count).
             //
-            assert(FRM_PHASE(f) != PG_Dummy_Action); // not exposed
             REBFRM *parent = f;
             while ((parent = parent->prior) != FS_BOTTOM) {
                 if (not Is_Action_Frame(parent))
-                    continue;
-                if (FRM_PHASE(parent) == PG_Dummy_Action)
                     continue;
 
                 REBCTX* ctx_parent = Context_For_Frame_May_Manage(parent);
@@ -797,23 +841,23 @@ REBTYPE(Context)
           default:
             break;
         }
-        fail (Error_Cannot_Reflect(VAL_TYPE(v), property)); }
+        fail (Error_Cannot_Reflect(VAL_TYPE(context), property)); }
 
 
       case SYM_APPEND: {
         REBVAL *arg = D_ARG(2);
         if (IS_NULLED_OR_BLANK(arg))
-            RETURN (v);  // don't fail on read only if it would be a no-op
+            RETURN (context);  // don't fail on R/O if it would be a no-op
 
-        ENSURE_MUTABLE(v);
-        if (not IS_OBJECT(v) and not IS_MODULE(v))
+        ENSURE_MUTABLE(context);
+        if (not IS_OBJECT(context) and not IS_MODULE(context))
             return R_UNHANDLED;
-        Append_To_Context(c, arg);
-        RETURN (v); }
+        Append_To_Context(context, arg);
+        RETURN (context); }
 
       case SYM_COPY: {  // Note: words are not copied and bindings not changed!
         INCLUDE_PARAMS_OF_COPY;
-        UNUSED(PAR(value));  // covered by `v`
+        UNUSED(PAR(value));  // covered by `context`
 
         if (REF(part))
             fail (Error_Bad_Refines_Raw());
@@ -832,7 +876,7 @@ REBTYPE(Context)
 
         return Init_Any_Context(
             D_OUT,
-            VAL_TYPE(v),
+            VAL_TYPE(context),
             Copy_Context_Core_Managed(c, types)
         ); }
 
@@ -842,7 +886,7 @@ REBTYPE(Context)
         if (not IS_WORD(arg))
             return nullptr;
 
-        REBLEN n = Find_Canon_In_Context(c, VAL_WORD_CANON(arg), false);
+        REBLEN n = Find_Canon_In_Context(context, VAL_WORD_CANON(arg));
         if (n == 0)
             return nullptr;
 
@@ -896,7 +940,7 @@ REBNATIVE(construct)
             D_OUT,
             Construct_Context_Managed(
                 REB_OBJECT,
-                VAL_ARRAY_AT(spec),
+                VAL_ARRAY_AT_MUTABLE_HACK(spec),  // warning: modifies binding!
                 VAL_SPECIFIER(spec),
                 parent
             )
@@ -907,17 +951,17 @@ REBNATIVE(construct)
     // Scan the object for top-level set words in order to make an
     // appropriately sized context.
     //
-    REBCTX *context = Make_Selfish_Context_Detect_Managed(
+    REBCTX *ctx = Make_Selfish_Context_Detect_Managed(
         parent ? CTX_TYPE(parent) : REB_OBJECT,  // !!! Presume object?
         VAL_ARRAY_AT(spec),
         parent
     );
-    Init_Object(D_OUT, context);  // GC protects context
+    Init_Object(D_OUT, ctx);  // GC protects context
 
     // !!! This binds the actual body data, not a copy of it.  See
     // Virtual_Bind_Deep_To_New_Context() for future directions.
     //
-    Bind_Values_Deep(VAL_ARRAY_AT(spec), context);
+    Bind_Values_Deep(VAL_ARRAY_AT_ENSURE_MUTABLE(spec), CTX_ARCHETYPE(ctx));
 
     DECLARE_LOCAL (dummy);
     if (Do_Any_Array_At_Throws(dummy, spec, SPECIFIED)) {

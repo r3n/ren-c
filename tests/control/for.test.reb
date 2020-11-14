@@ -15,9 +15,9 @@
     num: 0
     for i 1 10 1 [
         num: num + 1
-        success: success and [i = num]
+        success: success and (i = num)
     ]
-    success and [10 = num]
+    success and (10 = num)
 )
 ; cycle return value
 (false = for i 1 1 1 [false])
@@ -33,13 +33,13 @@
 ; continue cycle
 [#58 (
     success: true
-    for i 1 1 1 [continue | success: false]
+    for i 1 1 1 [continue, success: false]
     success
 )]
 (
     success: true
     x: "a"
-    for i x tail of x 1 [continue | success: false]
+    for i x tail of x 1 [continue, success: false]
     success
 )
 ; text! test
@@ -219,7 +219,7 @@
             either num > 1 [break] [true]
         ]
     ]
-    (error? e) and [e/id = 'overflow]
+    e/id = 'overflow
 )]
 (
     e: trap [
@@ -229,7 +229,7 @@
             either num > 1 [break] [true]
         ]
     ]
-    (error? e) and [e/id = 'overflow]
+    e/id = 'overflow
 )
 
 [#1994 (
@@ -241,7 +241,7 @@
             true
         ]
     ]
-    (error? e) and [e/id = 'overflow]
+    e/id = 'overflow
 )]
 (
     e: trap [
@@ -252,7 +252,7 @@
             true
         ]
     ]
-    (error? e) and [e/id = 'overflow]
+    e/id = 'overflow
 )
 
 [#1993

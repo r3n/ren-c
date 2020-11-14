@@ -62,7 +62,7 @@
         elide (flag: true)
         true [fail "shouldn't get here"]
     ]
-    (not flag) and [result = 1020]
+    (not flag) and (result = 1020)
 )
 
 
@@ -92,7 +92,7 @@
         true [s1: true]
         true [s2: true]
     ]
-    s1 and @s2
+    s1 and (s2)
 )]
 
 ; nested calls
@@ -105,14 +105,14 @@
 )
 
 
-; New feature for specifying predicates with a refinement
+; New feature for specifying predicates with a TUPLE!
 
-(<a> = case /not [1 = 2 [<a>]])
-(<b> = case /even? [1 [<a>] 2 [<b>]])
-(<b> = case /not [1 = 1 [<a>] default [<b>]])
+(<a> = case .not [1 = 2 [<a>]])
+(<b> = case .even? [1 [<a>] 2 [<b>]])
+(<b> = case .not [1 = 1 [<a>]] else [<b>])
 
 ; Errors on bad branches
 (
     e: trap [case [true #bad]]
-    e/id = 'bad-value
+    e/id = 'bad-branch-type
 )

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -65,22 +65,22 @@ const REBYTE *Analyze_String_For_Scan(
     const REBVAL *any_string,
     REBLEN max_len  // maximum length in *codepoints*
 ){
-    REBCHR(const*) up = VAL_STRING_AT(any_string);
-    REBLEN index = VAL_INDEX(any_string);
-    REBLEN len = VAL_LEN_AT(any_string);
+    REBLEN len;
+    REBCHR(const*) up = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, any_string);
     if (len == 0)
-        fail (Error_Past_End_Raw());
-
-    REBUNI c;  // we know there is at least one character
-    up = NEXT_CHR(&c, up);
+        fail (Error_Index_Out_Of_Range_Raw());
 
     // Skip leading whitespace
     //
-    for (; index < len; ++index, --len) {
-        if (not IS_SPACE(c))
-            break;
-        up = NEXT_CHR(&c, up);
-    }
+    REBUNI c;
+    REBUNI i;
+    for (i = 0; IS_SPACE(c = CHR_CODE(up)) and (i < len); ++i, --len)
+        up = NEXT_STR(up);
+
+    if (len == 0)
+        fail (Error_Index_Out_Of_Range_Raw());
+
+    REBCHR(const*) at_index = up;
 
     // Skip up to max_len non-space characters.
     //
@@ -97,11 +97,11 @@ const REBYTE *Analyze_String_For_Scan(
             fail (Error_Too_Long_Raw());
 
         --len;
-        if (len == 0)
-            break;
+        up = NEXT_STR(up);
+    } while (len > 0 and not IS_SPACE(c = CHR_CODE(up)));
 
-        up = NEXT_CHR(&c, up);
-    } while (not IS_SPACE(c));
+    if (opt_size_out)  // give back byte size before trailing spaces
+        *opt_size_out = up - at_index;
 
     // Rest better be just spaces
     //
@@ -111,143 +111,7 @@ const REBYTE *Analyze_String_For_Scan(
         up = NEXT_CHR(&c, up);
     }
 
-    if (num_chars == 0)
-        fail (Error_Past_End_Raw());
-
-    DECLARE_LOCAL (reindexed);
-    Move_Value(reindexed, any_string);
-    VAL_INDEX(reindexed) = index;
-
-    return VAL_UTF8_AT(opt_size_out, reindexed);
-}
-
-
-//
-//  Xandor_Binary: C
-//
-// Only valid for BINARY data.
-//
-REBSER *Xandor_Binary(const REBVAL *verb, REBVAL *value, REBVAL *arg)
-{
-    REBYTE *p0 = VAL_BIN_AT(value);
-    REBYTE *p1 = VAL_BIN_AT(arg);
-
-    REBLEN t0 = VAL_LEN_AT(value);
-    REBLEN t1 = VAL_LEN_AT(arg);
-
-    REBLEN mt = MIN(t0, t1); // smaller array size
-
-    // !!! This used to say "For AND - result is size of shortest input:" but
-    // the code was commented out
-    /*
-        if (verb == A_AND || (verb == 0 && t1 >= t0))
-            t2 = mt;
-        else
-            t2 = MAX(t0, t1);
-    */
-
-    REBLEN t2 = MAX(t0, t1);
-
-    REBSER *series;
-    if (IS_BITSET(value)) {
-        //
-        // Although bitsets and binaries share some implementation here,
-        // they have distinct allocation functions...and bitsets need
-        // to set the REBSER.misc.negated union field (BITS_NOT) as
-        // it would be illegal to read it if it were cleared via another
-        // element of the union.
-        //
-        assert(IS_BITSET(arg));
-        series = Make_Bitset(t2 * 8);
-    }
-    else {
-        // Ordinary binary
-        //
-        series = Make_Binary(t2);
-        TERM_SEQUENCE_LEN(series, t2);
-    }
-
-    REBYTE *p2 = BIN_HEAD(series);
-
-    switch (VAL_WORD_SYM(verb)) {
-    case SYM_INTERSECT: { // and
-        REBLEN i;
-        for (i = 0; i < mt; i++)
-            *p2++ = *p0++ & *p1++;
-        CLEAR(p2, t2 - mt);
-        return series; }
-
-    case SYM_UNION: { // or
-        REBLEN i;
-        for (i = 0; i < mt; i++)
-            *p2++ = *p0++ | *p1++;
-        break; }
-
-    case SYM_DIFFERENCE: { // xor
-        REBLEN i;
-        for (i = 0; i < mt; i++)
-            *p2++ = *p0++ ^ *p1++;
-        break; }
-
-    case SYM_EXCLUDE: { // !!! not a "type action", word manually in %words.r
-        REBLEN i;
-        for (i = 0; i < mt; i++)
-            *p2++ = *p0++ & ~*p1++;
-        if (t0 > t1)
-            memcpy(p2, p0, t0 - t1); // residual from first only
-        return series; }
-
-    default:
-        fail (Error_Cannot_Use_Raw(verb, Datatype_From_Kind(REB_BINARY)));
-    }
-
-    // Copy the residual
-    //
-    memcpy(p2, ((t0 > t1) ? p0 : p1), t2 - mt);
-    return series;
-}
-
-
-//
-//  Complement_Binary: C
-//
-// Only valid for BINARY data.
-//
-REBSER *Complement_Binary(REBVAL *value)
-{
-    const REBYTE *bp = VAL_BIN_AT(value);
-    REBLEN len = VAL_LEN_AT(value);
-
-    REBSER *bin = Make_Binary(len);
-    TERM_SEQUENCE_LEN(bin, len);
-
-    REBYTE *dp = BIN_HEAD(bin);
-    for (; len > 0; len--, ++bp, ++dp)
-        *dp = ~(*bp);
-
-    return bin;
-}
-
-
-//
-//  Shuffle_String: C
-//
-// Randomize a string. Return a new string series.
-// Handles both BYTE and UNICODE strings.
-//
-void Shuffle_String(REBVAL *value, bool secure)
-{
-    REBSTR *s = VAL_STRING(value);
-    REBLEN idx = VAL_INDEX(value);
-
-    REBLEN n;
-    for (n = VAL_LEN_AT(value); n > 1;) {
-        REBLEN k = idx + cast(REBLEN, Random_Int(secure)) % n;
-        n--;
-        REBUNI swap = GET_CHAR_AT(s, k);
-        SET_CHAR_AT(s, k, GET_CHAR_AT(s, n + idx));
-        SET_CHAR_AT(s, n + idx, swap);
-    }
+    return at_index;
 }
 
 
@@ -291,7 +155,6 @@ void Change_Case(
     }
 
     assert(ANY_STRING(val));
-    ENSURE_MUTABLE(val);
 
     // This is a mutating operation, and we want to return the same series at
     // the same index.  However, R3-Alpha code would use Partial() and may
@@ -310,7 +173,7 @@ void Change_Case(
     // be possible, only contractions (is that true?)  Review when UTF-8
     // Everywhere is more mature to the point this is worth worrying about.
     //
-    REBCHR(*) up = VAL_STRING_AT(val);
+    REBCHR(*) up = VAL_STRING_AT_ENSURE_MUTABLE(val);
     REBCHR(*) dp;
     if (upper) {
         REBLEN n;

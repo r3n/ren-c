@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -58,15 +58,15 @@ REBNATIVE(quit)
 {
     INCLUDE_PARAMS_OF_QUIT;
 
-    // This returns VOID_VALUE if there is no arg, which means if it is caught
-    // by a script then that will seem like there was no return value.  This
-    // gives parity with things like RETURN w/no arg.
-    //
-    return Init_Thrown_With_Label(
-        D_OUT,
-        IS_NULLED(ARG(value)) ? VOID_VALUE : ARG(value),
-        NATIVE_VAL(quit)
-    );
+    if (IS_ENDISH_NULLED(ARG(value))) {
+        //
+        // This returns a VOID! if there is no arg, in sync with RETURN that
+        // has no arg.  But labels the void ~quit~.
+        //
+        Init_Void(ARG(value), SYM_QUIT);
+    }
+
+    return Init_Thrown_With_Label(D_OUT, ARG(value), NATIVE_VAL(quit));
 }
 
 
@@ -144,7 +144,7 @@ REBNATIVE(recycle)
       #else
         REBSER *sweeplist = Make_Series(100, sizeof(REBNOD*));
         count = Recycle_Core(false, sweeplist);
-        assert(count == SER_LEN(sweeplist));
+        assert(count == SER_USED(sweeplist));
 
         REBLEN index = 0;
         for (index = 0; index < count; ++index) {
@@ -253,7 +253,7 @@ REBNATIVE(check)
     }
     else if (IS_ACTION(value)) {
         ASSERT_ARRAY(VAL_ACT_PARAMLIST(value));
-        ASSERT_ARRAY(VAL_ACT_DETAILS(value));
+        ASSERT_ARRAY(ACT_DETAILS(VAL_ACTION(value)));
     }
 
     return Init_True(D_OUT);
@@ -386,7 +386,7 @@ REBNATIVE(c_debug_break_at)
 //
 //  "Break at next evaluation point (only use when running under C debugger)"
 //
-//      return: []
+//      return: [<invisible>]
 //          {Invisibly returns what the expression to the right would have}
 //  ]
 //
@@ -405,14 +405,14 @@ REBNATIVE(c_debug_break)
         // happened and has been passed as an argument.
         //
         TG_Break_At_Tick = frame_->tick + 1;
-        return R_INVISIBLE;
+        RETURN_INVISIBLE;
      #else
         // No tick counting or tick-break checking, but still want some
         // debug break functionality (e.g. callgrind build).  Break here--
         // you'll have to step up out into the evaluator stack.
         //
         debug_break();
-        return R_INVISIBLE;
+        RETURN_INVISIBLE;
       #endif
   #else
     fail (Error_Debug_Only_Raw());

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -87,7 +87,7 @@ REB_R MAKE_Unhooked(
 //
 //      return: [<opt> any-value!]
 //          "Constructed value, or null if BLANK! input"
-//      type [<blank> any-value!]
+//      type [<blank> sym-word! any-value!]
 //          {The datatype or parent value to construct from}
 //      def [<blank> any-value!]
 //          {Definition or size of the new value (binding may be modified)}
@@ -99,6 +99,17 @@ REBNATIVE(make)
 
     REBVAL *type = ARG(type);
     REBVAL *arg = ARG(def);
+
+    if (IS_SYM_WORD(type)) {  // hack for MAKE CHAR! 0
+        switch (VAL_WORD_SYM(type)) {
+          case SYM_CHAR_X:
+            Move_Value(type, Datatype_From_Kind(REB_ISSUE));
+            break;
+
+          default:
+            fail ("MAKE only supports CHAR! fake type constraint");
+        }
+    }
 
     // See notes in REBNATIVE(do) for why this is the easiest way to pass
     // a flag to Do_Any_Array(), to help us discern the likes of:
@@ -174,8 +185,8 @@ REB_R TO_Unhooked(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 //      return: "VALUE converted to TYPE, null if type or value are blank"
 //          [<opt> any-value!]
-//      'type [<blank> quoted! word! path! datatype!]
-//      value [<blank> <dequote> any-value!]
+//      type [<blank> datatype! sym-word!]
+//      value [<blank> any-value!]
 //  ]
 //
 REBNATIVE(to)
@@ -185,39 +196,30 @@ REBNATIVE(to)
     REBVAL *v = ARG(value);
     REBVAL *type = ARG(type);
 
-    REBLEN new_quotes = VAL_NUM_QUOTES(type);
-    Dequotify(type);
+    if (IS_SYM_WORD(type)) {  // hack for TO CHAR! XXX
+        switch (VAL_WORD_SYM(type)) {
+          case SYM_CHAR_X:
+            fail ("Convert INTEGER! to codepoint with MAKE ISSUE!, not TO");
 
-    REBSTR *opt_name;
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        &opt_name,
-        type,
-        SPECIFIED,
-        true // push refinements, we'll just drop on error as we don't run
-    )){
-        return R_THROWN;
+          default:
+            fail ("TO only supports CHAR! fake type constraint");
+        }
     }
-    new_quotes += VAL_NUM_QUOTES(D_OUT);
-    Dequotify(D_OUT);
 
-    if (not IS_DATATYPE(D_OUT))
-        fail (PAR(type));
-
-    enum Reb_Kind new_kind = VAL_TYPE_KIND(D_OUT);
+    enum Reb_Kind new_kind = VAL_TYPE_KIND(type);
     enum Reb_Kind old_kind = VAL_TYPE(v);
 
     if (
         new_kind == old_kind
         and (
             new_kind != REB_CUSTOM
-            or CELL_CUSTOM_TYPE(D_OUT) == CELL_CUSTOM_TYPE(v)
+            or CELL_CUSTOM_TYPE(type) == CELL_CUSTOM_TYPE(v)
         )
     ){
         return rebValueQ("copy", v, rebEND);
     }
 
-    TO_HOOK* hook = To_Hook_For_Type(D_OUT);
+    TO_HOOK* hook = To_Hook_For_Type(type);
 
     REB_R r = hook(D_OUT, new_kind, v); // may fail();
     if (r == R_THROWN) {
@@ -228,7 +230,7 @@ REBNATIVE(to)
         assert(!"TO conversion did not return intended type");
         fail (Error_Invalid_Type(VAL_TYPE(r)));
     }
-    return Quotify(r, new_quotes); // must be either D_OUT or an API handle
+    return r; // must be either D_OUT or an API handle
 }
 
 
@@ -261,8 +263,8 @@ REB_R Reflect_Core(REBFRM *frame_)
     INCLUDE_PARAMS_OF_REFLECT;
 
     REBVAL *v = ARG(value);
-    const REBCEL *cell = VAL_UNESCAPED(v);
-    enum Reb_Kind kind = CELL_TYPE(cell);
+    REBCEL(const*) cell = VAL_UNESCAPED(v);
+    enum Reb_Kind kind = CELL_KIND(cell);
 
     switch (VAL_WORD_SYM(ARG(property))) {
       case SYM_0:
@@ -275,12 +277,12 @@ REB_R Reflect_Core(REBFRM *frame_)
         fail (Error_Cannot_Reflect(kind, ARG(property)));
 
       case SYM_KIND: // simpler answer, low-level datatype (e.g. QUOTED!)
-        if (kind == REB_NULLED)
+        if (kind == REB_NULL)
             return nullptr;
         return Init_Builtin_Datatype(D_OUT, VAL_TYPE(v));
 
       case SYM_TYPE: // higher order-answer, may build structured result
-        if (kind == REB_NULLED)  // not a real "datatype"
+        if (kind == REB_NULL)  // not a real "datatype"
             Init_Nulled(D_OUT);  // `null = type of null`
         else if (kind == REB_CUSTOM)
             Init_Custom_Datatype(D_OUT, CELL_CUSTOM_TYPE(cell));
@@ -306,7 +308,7 @@ REB_R Reflect_Core(REBFRM *frame_)
     // but in general actions should not allow null first arguments...there's
     // no entry in the dispatcher table for them.
     //
-    if (kind == REB_NULLED)  // including escaped nulls, `''''`
+    if (kind == REB_NULL)  // including escaped nulls, `''''`
         fail ("NULL isn't valid for REFLECT, except for TYPE OF ()");
     if (kind == REB_BLANK)
         return nullptr; // only TYPE OF works on blank, otherwise it's null
@@ -830,7 +832,8 @@ const REBYTE *Scan_Date(
             return_NULL;
 
         for (num = 0; num != 12; ++num) {
-            if (!Compare_Bytes(cb_cast(Month_Names[num]), cp, size, true))
+            const REBYTE *month_name = cb_cast(Month_Names[num]);
+            if (0 == Compare_Ascii_Uncased(month_name, cp, size))
                 break;
         }
         month = num + 1;
@@ -1167,57 +1170,6 @@ const REBYTE *Scan_Pair(
 
 
 //
-//  Scan_Tuple: C
-//
-// Scan and convert a tuple.
-//
-const REBYTE *Scan_Tuple(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
-    const REBYTE *cp,
-    REBLEN len
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
-    if (len == 0)
-        return_NULL;
-
-    const REBYTE *ep;
-    REBLEN size = 1;
-    REBINT n;
-    for (n = cast(REBINT, len), ep = cp; n > 0; n--, ep++) { // count '.'
-        if (*ep == '.')
-            ++size;
-    }
-
-    if (size > MAX_TUPLE)
-        return_NULL;
-
-    if (size < 3)
-        size = 3;
-
-    Init_Tuple(out, nullptr, 0);
-
-    REBYTE *tp = VAL_TUPLE(out);
-    for (ep = cp; len > cast(REBLEN, ep - cp); ++ep) {
-        ep = Grab_Int(ep, &n);
-        if (n < 0 || n > 255)
-            return_NULL;
-
-        *tp++ = cast(REBYTE, n);
-        if (*ep != '.')
-            break;
-    }
-
-    if (len > cast(REBLEN, ep - cp))
-        return_NULL;
-
-    VAL_TUPLE_LEN(out) = cast(REBYTE, size);
-
-    return ep;
-}
-
-
-//
 //  Scan_Binary: C
 //
 // Scan and convert binary strings.
@@ -1323,13 +1275,13 @@ REBNATIVE(scan_net_header)
 
     REBVAL *header = ARG(header);
     REBLEN index = VAL_INDEX(header);
-    REBSER *utf8 = VAL_SERIES(header);
+    const REBSER *utf8 = VAL_SERIES(header);
 
-    REBYTE *cp = BIN_HEAD(utf8) + index;
+    const REBYTE *cp = BIN_HEAD(utf8) + index;
 
     while (IS_LEX_ANY_SPACE(*cp)) cp++; // skip white space
 
-    REBYTE *start;
+    const REBYTE *start;
     REBINT len;
 
     while (true) {
@@ -1352,7 +1304,7 @@ REBNATIVE(scan_net_header)
 
         REBVAL *val = NULL; // rigorous checks worry it could be uninitialized
 
-        REBSTR *name = Intern_UTF8_Managed(start, cp - start);
+        const REBSTR *name = Intern_UTF8_Managed(start, cp - start);
         RELVAL *item;
 
         cp++;
@@ -1364,7 +1316,7 @@ REBNATIVE(scan_net_header)
                 if (IS_BLOCK(item + 1)) {
                     // Block of values already exists:
                     val = Init_Unreadable_Void(
-                        Alloc_Tail_Array(VAL_ARRAY(item + 1))
+                        Alloc_Tail_Array(VAL_ARRAY_ENSURE_MUTABLE(item + 1))
                     );
                 }
                 else {

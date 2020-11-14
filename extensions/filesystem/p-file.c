@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -190,8 +190,12 @@ static void Read_File_Port(
 // !!! `len` comes from /PART, it should be in characters if a string and
 // in bytes if a BINARY!.  It seems to disregard it if the data is BLOCK!
 //
-static void Write_File_Port(REBREQ *file, REBVAL *data, REBLEN len, bool lines)
-{
+static void Write_File_Port(
+    REBREQ *file,
+    REBVAL *data,
+    REBLEN limit,
+    bool lines
+){
     struct rebol_devreq *req = Req(file);
 
     if (IS_BLOCK(data)) {
@@ -204,20 +208,27 @@ static void Write_File_Port(REBREQ *file, REBVAL *data, REBLEN len, bool lines)
             SET_MOLD_FLAG(mo, MOLD_FLAG_LINES);
         Form_Value(mo, data);
         Init_Text(data, Pop_Molded_String(mo)); // fall to next section
-        len = VAL_LEN_HEAD(data);
+        limit = VAL_LEN_HEAD(data);
     }
 
     if (IS_TEXT(data)) {
-        REBSIZ offset = VAL_OFFSET_FOR_INDEX(data, VAL_INDEX(data));
-        REBSIZ size = VAL_SIZE_LIMIT_AT(NULL, data, len);
+        REBSIZ size;
+        REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT_LIMIT(
+            nullptr,
+            &size,
+            data,
+            limit
+        );
 
-        req->common.data = BIN_AT(VAL_SERIES(data), offset);
+        req->common.data = m_cast(REBYTE*,  // writing only
+            cast(const REBYTE*, utf8)
+        );
         req->length = size;
         req->modes |= RFM_TEXT; // do LF => CR LF, e.g. on Windows
     }
     else {
-        req->common.data = VAL_BIN_AT(data);
-        req->length = len;
+        req->common.data = m_cast(REBYTE*, VAL_BINARY_AT(data));
+        req->length = limit;
         req->modes &= ~RFM_TEXT; // don't do LF => CR LF, e.g. on Windows
     }
 
@@ -597,7 +608,7 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         INCLUDE_PARAMS_OF_SKIP;
 
         UNUSED(PAR(series));
-        UNUSED(REF(only)); // !!! Should /ONLY behave differently?
+        UNUSED(REF(unbounded));  // !!! Should /UNBOUNDED behave differently?
 
         ReqFile(file)->index += Get_Num_From_Arg(ARG(offset));
         req->modes |= RFM_RESEEK;

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologiesg
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -64,7 +64,7 @@ REBNATIVE(register_event_hooks)
 
     Startup_Event_Scheme();
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -93,7 +93,7 @@ REBNATIVE(unregister_event_hooks)
     Builtin_Type_Hooks[k][IDX_TO_HOOK] = cast(CFUNC*, &TO_Unhooked);
     Builtin_Type_Hooks[k][IDX_MOLD_HOOK] = cast(CFUNC*, &MF_Unhooked);
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -257,7 +257,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     REBVAL *ports = nullptr;
     REBINT n = 0;
 
-    RELVAL *val;
+    const RELVAL *val;
     if (not IS_BLOCK(ARG(value)))
         val = ARG(value);
     else {
@@ -313,7 +313,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     // Waiting opens the doors to pressing Ctrl-C, which may get this code
     // to throw an error.  There needs to be a state to catch it.
     //
-    assert(Saved_State != nullptr);
+    assert(TG_Jump_List != nullptr);
 
     REBVAL *system_port = Get_System(SYS_PORTS, PORTS_SYSTEM);
     if (not IS_PORT(system_port))
@@ -341,7 +341,9 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
         Append_Value(a, awake);
         Init_Word(Alloc_Tail_Array(a), Canon(SYM_ONLY));
 
-        Init_Path(D_SPARE, a);
+        REBVAL *p = Try_Init_Path_Arraylike(D_SPARE, a);
+        assert(p);  // `awake/only` doesn't contain any non-path-elements
+        UNUSED(p);
     }
     else {
       #if !defined(NDEBUG)
@@ -429,7 +431,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
   post_wait_loop:
 
     if (not did_port_action) {  // timeout
-        RESET_ARRAY(VAL_ARRAY(waked));  // just reset the waked list
+        RESET_ARRAY(VAL_ARRAY_KNOWN_MUTABLE(waked));  // just reset the waked list
         return nullptr;
     }
 
@@ -446,12 +448,12 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     Move_Value(D_OUT, sieved);
     rebRelease(sieved);
 
-    RESET_ARRAY(VAL_ARRAY(waked));  // clear waked list
+    RESET_ARRAY(VAL_ARRAY_KNOWN_MUTABLE(waked));  // clear waked list
 
     if (REF(all))
         return D_OUT;  // caller wants all the ports that waked us
 
-    RELVAL *first = VAL_ARRAY_AT(D_OUT);
+    const RELVAL *first = VAL_ARRAY_AT(D_OUT);
     if (not IS_PORT(first)) {
         assert(!"First element of intersection not port, does this happen?");
         return nullptr;

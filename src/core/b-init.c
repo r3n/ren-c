@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -175,11 +175,13 @@ void Set_Stack_Limit(void *base, uintptr_t bounds) {
 //
 static void Startup_True_And_False(void)
 {
-    REBVAL *true_value = Append_Context(Lib_Context, 0, Canon(SYM_TRUE));
+    REBCTX *lib = VAL_CONTEXT(Lib_Context);
+
+    REBVAL *true_value = Append_Context(lib, 0, Canon(SYM_TRUE));
     Init_True(true_value);
     assert(IS_TRUTHY(true_value) and VAL_LOGIC(true_value) == true);
 
-    REBVAL *false_value = Append_Context(Lib_Context, 0, Canon(SYM_FALSE));
+    REBVAL *false_value = Append_Context(lib, 0, Canon(SYM_FALSE));
     Init_False(false_value);
     assert(IS_FALSEY(false_value) and VAL_LOGIC(false_value) == false);
 }
@@ -242,19 +244,19 @@ REBNATIVE(generic)
 
     REBARR *details = ACT_DETAILS(generic);
     Init_Word(ARR_AT(details, IDX_NATIVE_BODY), VAL_WORD_CANON(ARG(verb)));
-    Init_Object(ARR_AT(details, IDX_NATIVE_CONTEXT), Lib_Context);
+    Move_Value(ARR_AT(details, IDX_NATIVE_CONTEXT), Lib_Context);
 
     REBVAL *verb_var = Sink_Word_May_Fail(ARG(verb), SPECIFIED);
-    Init_Action_Unbound(verb_var, generic);  // set the word to the action
+    Init_Action(verb_var, generic, VAL_WORD_SPELLING(ARG(verb)), UNBOUND);
 
-    return Init_Void(D_OUT);  // see ENFIX for why evaluate to void
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
 static REBVAL *Make_Locked_Tag(const char *utf8) { // helper
     REBVAL *t = rebText(utf8);
-    mutable_KIND_BYTE(t) = REB_TAG;
-    mutable_MIRROR_BYTE(t) = REB_TAG;
+    mutable_KIND3Q_BYTE(t) = REB_TAG;
+    mutable_HEART_BYTE(t) = REB_TAG;
 
     Force_Value_Frozen_Deep(t);
     return t;
@@ -271,16 +273,16 @@ static void Init_Action_Spec_Tags(void)
 {
     Root_Void_Tag = Make_Locked_Tag("void");
     Root_With_Tag = Make_Locked_Tag("with");
-    Root_Ellipsis_Tag = Make_Locked_Tag("...");
+    Root_Variadic_Tag = Make_Locked_Tag("variadic");
     Root_Opt_Tag = Make_Locked_Tag("opt");
     Root_End_Tag = Make_Locked_Tag("end");
     Root_Blank_Tag = Make_Locked_Tag("blank");
     Root_Local_Tag = Make_Locked_Tag("local");
     Root_Skip_Tag = Make_Locked_Tag("skip");
-    Root_Dequote_Tag = Make_Locked_Tag("dequote");
-    Root_Requote_Tag = Make_Locked_Tag("requote");
     Root_Const_Tag = Make_Locked_Tag("const");
     Root_Output_Tag = Make_Locked_Tag("output");
+    Root_Invisible_Tag = Make_Locked_Tag("invisible");
+    Root_Elide_Tag = Make_Locked_Tag("elide");
 
     // !!! Needed for bootstrap, as `@arg` won't LOAD in old r3
     //
@@ -291,16 +293,16 @@ static void Shutdown_Action_Spec_Tags(void)
 {
     rebRelease(Root_Void_Tag);
     rebRelease(Root_With_Tag);
-    rebRelease(Root_Ellipsis_Tag);
+    rebRelease(Root_Variadic_Tag);
     rebRelease(Root_Opt_Tag);
     rebRelease(Root_End_Tag);
     rebRelease(Root_Blank_Tag);
     rebRelease(Root_Local_Tag);
     rebRelease(Root_Skip_Tag);
-    rebRelease(Root_Dequote_Tag);
-    rebRelease(Root_Requote_Tag);
     rebRelease(Root_Const_Tag);
     rebRelease(Root_Output_Tag);
+    rebRelease(Root_Invisible_Tag);
+    rebRelease(Root_Elide_Tag);
 
     rebRelease(Root_Modal_Tag);  // !!! only needed for bootstrap with old r3
 }
@@ -329,7 +331,7 @@ static void Init_Action_Meta_Shim(void) {
         Init_Blank(Append_Context(meta, nullptr, Canon(field_syms[i - 1])));
 
     Init_Object(CTX_VAR(meta, 1), meta); // it's "selfish"
-    TYPE_SET(CTX_KEY(meta, 1), REB_TS_HIDDEN);  // hide self
+    Hide_Param(CTX_KEY(meta, 1));  // hide self
 
     Root_Action_Meta = Init_Object(Alloc_Value(), meta);
     Force_Value_Frozen_Deep(Root_Action_Meta);
@@ -369,7 +371,7 @@ REBVAL *Make_Native(
     RELVAL **item, // the item will be advanced as necessary
     REBSPC *specifier,
     REBNAT dispatcher,
-    REBVAL *module
+    const REBVAL *module
 ){
     assert(specifier == SPECIFIED); // currently a requirement
 
@@ -398,13 +400,10 @@ REBVAL *Make_Native(
         has_body = false;
     }
     else {
+        DECLARE_LOCAL (temp);
         if (
-            not IS_PATH(*item)
-            or VAL_LEN_HEAD(*item) != 2
-            or not IS_WORD(ARR_HEAD(VAL_ARRAY(*item)))
-            or VAL_WORD_SYM(ARR_HEAD(VAL_ARRAY(*item))) != SYM_NATIVE
-            or not IS_WORD(ARR_AT(VAL_ARRAY(*item), 1))
-            or VAL_WORD_SYM(ARR_AT(VAL_ARRAY(*item), 1)) != SYM_BODY
+            VAL_WORD_SYM(VAL_SEQUENCE_AT(temp, *item, 0)) != SYM_NATIVE
+            or VAL_WORD_SYM(VAL_SEQUENCE_AT(temp, *item, 1)) != SYM_BODY
         ){
             panic (*item);
         }
@@ -412,7 +411,7 @@ REBVAL *Make_Native(
     }
     ++*item;
 
-    REBVAL *spec = SPECIFIC(*item);
+    const REBVAL *spec = SPECIFIC(*item);
     ++*item;
     if (not IS_BLOCK(spec))
         panic (spec);
@@ -462,7 +461,7 @@ REBVAL *Make_Native(
     // Append the native to the module under the name given.
     //
     REBVAL *var = Append_Context(VAL_CONTEXT(module), name, 0);
-    Init_Action_Unbound(var, act);
+    Init_Action(var, act, VAL_WORD_SPELLING(name), UNBOUND);
 
     return var;
 }
@@ -496,7 +495,7 @@ static REBARR *Startup_Natives(const REBVAL *boot_natives)
     Init_Action_Meta_Shim();
 
     assert(VAL_INDEX(boot_natives) == 0); // should be at head, sanity check
-    RELVAL *item = VAL_ARRAY_AT(boot_natives);
+    RELVAL *item = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_natives);
     REBSPC *specifier = VAL_SPECIFIER(boot_natives);
 
     // Although the natives are not being "executed", there are typesets
@@ -522,7 +521,7 @@ static REBARR *Startup_Natives(const REBVAL *boot_natives)
             &item,
             specifier,
             Native_C_Funcs[n],
-            CTX_ARCHETYPE(Lib_Context)
+            Lib_Context
         );
 
         // While the lib context natives can be overwritten, the system
@@ -532,8 +531,8 @@ static REBARR *Startup_Natives(const REBVAL *boot_natives)
         Natives[n] = VAL_ACTION(native);  // Note: Loses enfixedness (!)
 
         REBVAL *catalog_item = Move_Value(Alloc_Tail_Array(catalog), name);
-        mutable_KIND_BYTE(catalog_item) = REB_WORD;
-        mutable_MIRROR_BYTE(catalog_item) = REB_WORD;
+        mutable_KIND3Q_BYTE(catalog_item) = REB_WORD;
+        mutable_HEART_BYTE(catalog_item) = REB_WORD;
 
         if (VAL_WORD_SYM(name) == SYM_GENERIC)
             generic_word = name;
@@ -559,7 +558,7 @@ static REBARR *Startup_Natives(const REBVAL *boot_natives)
 static REBARR *Startup_Generics(const REBVAL *boot_generics)
 {
     assert(VAL_INDEX(boot_generics) == 0); // should be at head, sanity check
-    RELVAL *head = VAL_ARRAY_AT(boot_generics);
+    RELVAL *head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_generics);
     REBSPC *specifier = VAL_SPECIFIER(boot_generics);
 
     // Add SET-WORD!s that are top-level in the generics block to the lib
@@ -594,8 +593,8 @@ static REBARR *Startup_Generics(const REBVAL *boot_generics)
     for (; NOT_END(item); ++item)
         if (IS_SET_WORD(item)) {
             Derelativize(DS_PUSH(), item, specifier);
-            mutable_KIND_BYTE(DS_TOP) = REB_WORD; // change pushed to WORD!
-            mutable_MIRROR_BYTE(DS_TOP) = REB_WORD;
+            mutable_KIND3Q_BYTE(DS_TOP) = REB_WORD; // change pushed to WORD!
+            mutable_HEART_BYTE(DS_TOP) = REB_WORD;
         }
 
     return Pop_Stack_Values(dsp_orig); // catalog of generics
@@ -612,7 +611,7 @@ static REBARR *Startup_Generics(const REBVAL *boot_generics)
 static void Startup_End_Node(void)
 {
     PG_End_Node.header = Endlike_Header(0); // no NODE_FLAG_CELL, R/O
-    TRACK_CELL_IF_DEBUG(&PG_End_Node, __FILE__, __LINE__);
+    TRACK_CELL_IF_DEBUG_EVIL_MACRO(&PG_End_Node, __FILE__, __LINE__);
     assert(IS_END(END_NODE)); // sanity check that it took
 }
 
@@ -675,7 +674,10 @@ static void Init_Root_Vars(void)
     Init_Blank(Prep_Cell(&PG_Blank_Value));
     Init_False(Prep_Cell(&PG_False_Value));
     Init_True(Prep_Cell(&PG_True_Value));
-    Init_Void(Prep_Cell(&PG_Void_Value));
+
+  #ifdef DEBUG_TRASH_MEMORY
+    TRASH_CELL_IF_DEBUG(Prep_Cell(&PG_Trash_Value_Debug));
+  #endif
 
     RESET_CELL(Prep_Cell(&PG_R_Thrown), REB_R_THROWN, CELL_MASK_NONE);
     RESET_CELL(Prep_Cell(&PG_R_Invisible), REB_R_INVISIBLE, CELL_MASK_NONE);
@@ -716,24 +718,10 @@ static void Init_Root_Vars(void)
 
     Root_Space_Char = rebChar(' ');
     Root_Newline_Char = rebChar('\n');
-
-    // !!! Putting the stats map in a root object is a temporary solution
-    // to allowing a native coded routine to have a static which is guarded
-    // by the GC.  While it might seem better to move the stats into a
-    // mostly usermode implementation that hooks apply, this could preclude
-    // doing performance analysis on boot--when it would be too early for
-    // most user code to be running.  It may be that the debug build has
-    // this form of mechanism that can diagnose boot, while release builds
-    // rely on a usermode stats module.
-    //
-    Root_Stats_Map = Init_Map(Alloc_Value(), Make_Map(10));
 }
 
 static void Shutdown_Root_Vars(void)
 {
-    rebRelease(Root_Stats_Map);
-    Root_Stats_Map = nullptr;
-
     rebRelease(Root_Space_Char);
     Root_Space_Char = nullptr;
     rebRelease(Root_Newline_Char);
@@ -765,7 +753,7 @@ static void Init_System_Object(
     REBCTX *errors_catalog
 ) {
     assert(VAL_INDEX(boot_sysobj_spec) == 0);
-    RELVAL *spec_head = VAL_ARRAY_AT(boot_sysobj_spec);
+    RELVAL *spec_head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_sysobj_spec);
 
     // Create the system object from the sysobj block (defined in %sysobj.r)
     //
@@ -779,7 +767,7 @@ static void Init_System_Object(
 
     // Bind it so CONTEXT native will work (only used at topmost depth)
     //
-    Bind_Values_Shallow(spec_head, system);
+    Bind_Values_Shallow(spec_head, CTX_ARCHETYPE(system));
 
     // Evaluate the block (will eval CONTEXTs within).  Expects void result.
     //
@@ -793,7 +781,7 @@ static void Init_System_Object(
     // and have it bound in lines like `sys: system/contexts/sys`)
     //
     Init_Object(
-        Append_Context(Lib_Context, NULL, Canon(SYM_SYSTEM)),
+        Append_Context(VAL_CONTEXT(Lib_Context), NULL, Canon(SYM_SYSTEM)),
         system
     );
 
@@ -808,10 +796,10 @@ static void Init_System_Object(
     // made is actually identical to the definition in %sysobj.r.
     //
     assert(
-        1 == CT_Context(
+        0 == CT_Context(
             Get_System(SYS_STANDARD, STD_ACTION_META),
             Root_Action_Meta,
-            1 // "strict equality"
+            true  // "strict equality"
         )
     );
 
@@ -835,13 +823,13 @@ static void Init_System_Object(
     //
     REBVAL *std_error = Get_System(SYS_STANDARD, STD_ERROR);
     assert(IS_OBJECT(std_error));
-    mutable_KIND_BYTE(std_error) = REB_ERROR;
-    mutable_MIRROR_BYTE(std_error) = REB_ERROR;
-    mutable_KIND_BYTE(CTX_ARCHETYPE(VAL_CONTEXT(std_error))) = REB_ERROR;
-    mutable_MIRROR_BYTE(CTX_ARCHETYPE(VAL_CONTEXT(std_error))) = REB_ERROR;
+    mutable_KIND3Q_BYTE(std_error) = REB_ERROR;
+    mutable_HEART_BYTE(std_error) = REB_ERROR;
+    mutable_KIND3Q_BYTE(CTX_ROOTVAR(VAL_CONTEXT(std_error))) = REB_ERROR;
+    mutable_HEART_BYTE(CTX_ROOTVAR(VAL_CONTEXT(std_error))) = REB_ERROR;
     assert(CTX_KEY_SYM(VAL_CONTEXT(std_error), 1) == SYM_SELF);
-    mutable_KIND_BYTE(VAL_CONTEXT_VAR(std_error, 1)) = REB_ERROR;
-    mutable_MIRROR_BYTE(VAL_CONTEXT_VAR(std_error, 1)) = REB_ERROR;
+    mutable_KIND3Q_BYTE(VAL_CONTEXT_VAR(std_error, 1)) = REB_ERROR;
+    mutable_HEART_BYTE(VAL_CONTEXT_VAR(std_error, 1)) = REB_ERROR;
 }
 
 void Shutdown_System_Object(void)
@@ -868,12 +856,10 @@ void Shutdown_System_Object(void)
 //
 static void Init_Contexts_Object(void)
 {
-    DROP_GC_GUARD(Sys_Context);
-    Init_Object(Get_System(SYS_CONTEXTS, CTX_SYS), Sys_Context);
+    Move_Value(Get_System(SYS_CONTEXTS, CTX_SYS), Sys_Context);
 
-    DROP_GC_GUARD(Lib_Context);
-    Init_Object(Get_System(SYS_CONTEXTS, CTX_LIB), Lib_Context);
-    Init_Object(Get_System(SYS_CONTEXTS, CTX_USER), Lib_Context);
+    Move_Value(Get_System(SYS_CONTEXTS, CTX_LIB), Lib_Context);
+    Move_Value(Get_System(SYS_CONTEXTS, CTX_USER), Lib_Context);
 }
 
 
@@ -895,7 +881,7 @@ static void Init_Contexts_Object(void)
 void Startup_Task(void)
 {
     Trace_Level = 0;
-    Saved_State = 0;
+    TG_Jump_List = nullptr;
 
     Eval_Cycles = 0;
     Eval_Dose = EVAL_DOSE;
@@ -1046,9 +1032,10 @@ static void Startup_Sys(REBARR *boot_sys) {
 //
 REBVAL *Get_Sys_Function_Debug(REBLEN index, const char *name)
 {
-    const char *key = STR_UTF8(VAL_KEY_SPELLING(CTX_KEY(Sys_Context, index)));
-    assert(strcmp(key, name) == 0);
-    return CTX_VAR(Sys_Context, index);
+    const REBVAL *key = VAL_CONTEXT_KEY(Sys_Context, index);
+    const char *key_utf8 = STR_UTF8(VAL_KEY_SPELLING(key));
+    assert(strcmp(key_utf8, name) == 0);
+    return VAL_CONTEXT_VAR(Sys_Context, index);
 }
 #endif
 
@@ -1059,9 +1046,9 @@ REBVAL *Get_Sys_Function_Debug(REBLEN index, const char *name)
 //
 static REBVAL *Startup_Mezzanine(BOOT_BLK *boot)
 {
-    Startup_Base(VAL_ARRAY(&boot->base));
+    Startup_Base(VAL_ARRAY_KNOWN_MUTABLE(&boot->base));
 
-    Startup_Sys(VAL_ARRAY(&boot->sys));
+    Startup_Sys(VAL_ARRAY_KNOWN_MUTABLE(&boot->sys));
 
     REBVAL *finish_init = Get_Sys_Function(FINISH_INIT_CORE);
     assert(IS_ACTION(finish_init));
@@ -1164,9 +1151,9 @@ void Startup_Core(void)
     PG_Boot_Level = BOOT_LEVEL_FULL;
     PG_Mem_Usage = 0;
     PG_Mem_Limit = 0;
-    Reb_Opts = ALLOC(REB_OPTS);
+    Reb_Opts = TRY_ALLOC(REB_OPTS);
     CLEAR(Reb_Opts, sizeof(REB_OPTS));
-    Saved_State = NULL;
+    TG_Jump_List = nullptr;
 
     Check_Basics();
 
@@ -1230,10 +1217,10 @@ void Startup_Core(void)
         SYM_GZIP
     );
 
-    Startup_Slash_1_Symbol();  // see notes--needed before scanning
+    Startup_Sequence_1_Symbol();  // see notes--needed before scanning
 
     REBARR *boot_array = Scan_UTF8_Managed(
-        Intern("tmp-boot.r"),
+        Intern_Unsized_Managed("tmp-boot.r"),
         utf8,
         utf8_size
     );
@@ -1241,9 +1228,10 @@ void Startup_Core(void)
 
     rebFree(utf8); // don't need decompressed text after it's scanned
 
-    BOOT_BLK *boot = cast(BOOT_BLK*, VAL_ARRAY_HEAD(ARR_HEAD(boot_array)));
+    BOOT_BLK *boot =
+        cast(BOOT_BLK*, ARR_HEAD(VAL_ARRAY_KNOWN_MUTABLE(ARR_HEAD(boot_array))));
 
-    Startup_Symbols(VAL_ARRAY(&boot->words));
+    Startup_Symbols(VAL_ARRAY_KNOWN_MUTABLE(&boot->words));
 
     // STR_SYMBOL(), VAL_WORD_SYM() and Canon(SYM_XXX) now available
 
@@ -1260,14 +1248,17 @@ void Startup_Core(void)
 
     // !!! Have MAKE-BOOT compute # of words
     //
-    Lib_Context = Alloc_Context_Core(REB_OBJECT, 600, NODE_FLAG_MANAGED);
-    PUSH_GC_GUARD(Lib_Context);
+    REBCTX *lib = Alloc_Context_Core(REB_OBJECT, 600, NODE_FLAG_MANAGED);
+    Lib_Context = Alloc_Value();
+    Init_Object(Lib_Context, lib);
 
-    Sys_Context = Alloc_Context_Core(REB_OBJECT, 50, NODE_FLAG_MANAGED);
-    PUSH_GC_GUARD(Sys_Context);
+    REBCTX *sys = Alloc_Context_Core(REB_OBJECT, 50, NODE_FLAG_MANAGED);
+    Sys_Context = Alloc_Value();
+    Init_Object(Sys_Context, sys);
 
     REBARR *datatypes_catalog = Startup_Datatypes(
-        VAL_ARRAY(&boot->types), VAL_ARRAY(&boot->typespecs)
+        VAL_ARRAY_KNOWN_MUTABLE(&boot->types),
+        VAL_ARRAY_KNOWN_MUTABLE(&boot->typespecs)
     );
     Manage_Array(datatypes_catalog);
     PUSH_GC_GUARD(datatypes_catalog);
@@ -1280,13 +1271,6 @@ void Startup_Core(void)
     Startup_True_And_False();
 
 //=//// RUN CODE BEFORE ERROR HANDLING INITIALIZED ////////////////////////=//
-
-    // Initialize eval handler and ACTION! dispatcher to the default internal
-    // routines.  These routines have no tracing, no debug handling, etc.  If
-    // those features are needed, augmented functions must be substituted.
-    //
-    PG_Eval_Maybe_Stale_Throws = &Eval_Internal_Maybe_Stale_Throws;
-    PG_Dispatch = &Dispatch_Internal;
 
     // boot->natives is from the automatically gathered list of natives found
     // by scanning comments in the C sources for `native: ...` declarations.
@@ -1400,7 +1384,7 @@ void Shutdown_Core(void)
     Check_Memory_Debug(); // old R3-Alpha check, call here to keep it working
   #endif
 
-    assert(Saved_State == NULL);
+    assert(TG_Jump_List == nullptr);
 
     // !!! Currently the molding logic uses a test of the Boot_Phase to know
     // if it's safe to check the system object for how many digits to mold.
@@ -1420,9 +1404,13 @@ void Shutdown_Core(void)
     Shutdown_Action_Spec_Tags();
     Shutdown_Root_Vars();
 
-    Shutdown_Frame_Stack();
-
     Shutdown_Datatypes();
+
+    rebRelease(Lib_Context);
+    rebRelease(Sys_Context);
+
+    Shutdown_Frame_Stack();  // all API calls (e.g. rebRelease()) before this
+    Shutdown_Api();
 
 //=//// ALL MANAGED SERIES MUST HAVE THE KEEPALIVE REFERENCES GONE NOW ////=//
 
@@ -1436,8 +1424,6 @@ void Shutdown_Core(void)
     Shutdown_String();
     Shutdown_Scanner();
     Shutdown_Char_Cases();
-
-    Shutdown_Api();
 
     Shutdown_Symbols();
     Shutdown_Interning();

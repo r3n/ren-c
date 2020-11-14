@@ -35,7 +35,7 @@ REBOL [
 ]
 
 e-cwrap: (make-emitter
-    "JavaScript C Wrapper functions" output-dir/reb-lib.js
+    "JavaScript C Wrapper functions" make-file [(output-dir) reb-lib.js]
 )
 
 === ASYNCIFY_BLACKLIST TOLERANT CWRAP ===
@@ -247,7 +247,7 @@ to-js-type: func [
         ; !!! These APIs can also return nulls.  rebSpell("second [{a}]") is
         ; now null, as a way of doing passthru on failures.
         ;
-        (s = "char *") or [s = "const char *"] ["'string'"]
+        (s = "char *") or (s = "const char *") ["'string'"]
 
         ; Other pointer types aren't strings.  `unsigned char *` is a byte
         ; array, and should perhaps use ArrayBuffer.  But for now, just assume
@@ -289,7 +289,7 @@ to-js-type: func [
         ; The differences between undefined and null are subtle and easy to
         ; get wrong, but a void-returning function should map to undefined.
         ;
-        parse s ["void" any space end] ["undefined"]
+        parse s ["void" any space] ["undefined"]
     ]
 ]
 
@@ -424,7 +424,7 @@ map-each-api [
         ] else [
             copy {}
         ]
-        append return-code trim/auto copy switch js-returns [
+        append return-code trim/auto copy (switch js-returns [
           "'string'" [
             ;
             ; If `char *` is returned, it was rebAlloc'd and needs to be freed
@@ -448,14 +448,12 @@ map-each-api [
                 })
             }
           ]
+        ] else [
+            ; !!! Doing return and argument transformation needs more work!
+            ; See suggestions: https://forum.rebol.info/t/817
 
-          ; !!! Doing return and argument transformation needs more work!
-          ; See suggestions: https://forum.rebol.info/t/817
-
-          default [
             {return a}
-          ]
-        ]
+        ])
 
         e-cwrap/emit cscape/with {
             reb.$<No-Reb-Name>_qlevel = function() {
@@ -898,7 +896,7 @@ e-cwrap/write-emitted
 
 json-collect: function [body [block!]] [
     results: collect compose [
-        keep: adapt 'keep [  ; Emscripten prefixes functions w/underscore
+        keep: adapt :keep [  ; Emscripten prefixes functions w/underscore
             value: unspaced [{"} {_} value {"}]
         ]
         ((body))
@@ -910,7 +908,7 @@ json-collect: function [body [block!]] [
     } 'results
 ]
 
-write output-dir/libr3.exports.json json-collect [
+write make-file [(output-dir) libr3.exports.json] json-collect [
     map-each-api [keep unspaced ["RL_" name]]
 ]
 
@@ -941,7 +939,7 @@ write output-dir/libr3.exports.json json-collect [
 ; the final return value of a JS-AWAITER can be returned with it.
 ; </review>
 
-write/lines output-dir/asyncify-blacklist.json collect-lines [
+write/lines make-file [(output-dir) asyncify-blacklist.json] collect-lines [
     keep "["
     for-next names load %asyncify-blacklist.r [
         keep unspaced [_ _ _ _ {"} names/1 {"} if not last? names [","]]
@@ -949,9 +947,12 @@ write/lines output-dir/asyncify-blacklist.json collect-lines [
     keep "]"
 ]
 
-write output-dir/emterpreter.blacklist.json json-collect [
+write make-file [(output-dir) emterpreter.blacklist.json] json-collect [
     map-each-api [
-        if is-variadic and [name != "rebPromise"] [
+        all [
+            is-variadic
+            name != "rebPromise"
+        ] then [
             ;
             ; Currently, all variadic APIs are variadic because they evaluate.
             ; The exception is rebPromise, which takes its variadic list as
@@ -1009,7 +1010,7 @@ write output-dir/emterpreter.blacklist.json json-collect [
 ;
 
 e-node-preload: (make-emitter
-    "Emterpreter Preload for Node.js" output-dir/node-preload.js
+    "Emterpreter Preload for Node.js" make-file [(output-dir) node-preload.js]
 )
 
 e-node-preload/emit {

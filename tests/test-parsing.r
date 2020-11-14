@@ -92,7 +92,8 @@ make object! [
                 change-dir first split-path test-file
             ]
             test-sources: get in load-testfile test-file 'contents
-        ] then err => [
+            ensure binary! test-sources  ; this is how they are passed ATM
+        ] then err -> [
             ; probe err
             append collected-tests reduce [
                 test-file 'dialect {^/"failed, cannot read the file"^/}
@@ -204,7 +205,7 @@ make object! [
             position: (type: value: _)
         ]
 
-        rule: [any token end]
+        rule: [any token]
 
         parse test-sources rule else [
             append collected-tests reduce [

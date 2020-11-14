@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -40,7 +40,7 @@
 // !!! Find a better place for this!
 //
 inline static bool IS_QUOTABLY_SOFT(const RELVAL *v) {
-    return IS_GROUP(v) or IS_GET_WORD(v) or IS_GET_PATH(v);
+    return IS_GET_GROUP(v) or IS_GET_WORD(v) or IS_GET_PATH(v);
 }
 
 
@@ -51,11 +51,36 @@ inline static bool IS_QUOTABLY_SOFT(const RELVAL *v) {
 //=////////////////////////////////////////////////////////////////////////=//
 
 
+// When Push_Action() happens, it sets f->original, but it's guaranteed to be
+// null if an action is not running.  This is tested via a macro because the
+// debug build doesn't do any inlining, and it's called often.
+//
+#define Is_Action_Frame(f) \
+    ((f)->original != nullptr)
+
+
+// While a function frame is fulfilling its arguments, the `f->param` will
+// be pointing to a typeset.  The invariant that is maintained is that
+// `f->param` will *not* be a typeset when the function is actually in the
+// process of running.  (So no need to set/clear/test another "mode".)
+//
+// Some cases in debug code call this all the way up the call stack, and when
+// the debug build doesn't inline functions it's best to use as a macro.
+
+#define Is_Action_Frame_Fulfilling_Unchecked(f) \
+    NOT_END((f)->param)
+
+inline static bool Is_Action_Frame_Fulfilling(REBFRM *f) {
+    assert(Is_Action_Frame(f));
+    return Is_Action_Frame_Fulfilling_Unchecked(f);
+}
+
+
 inline static bool FRM_IS_VARIADIC(REBFRM *f) {
     return f->feed->vaptr != nullptr or f->feed->packed != nullptr;
 }
 
-inline static REBARR *FRM_ARRAY(REBFRM *f) {
+inline static const REBARR *FRM_ARRAY(REBFRM *f) {
     assert(IS_END(f->feed->value) or not FRM_IS_VARIADIC(f));
     return f->feed->array;
 }
@@ -123,8 +148,15 @@ inline static int FRM_LINE(REBFRM *f) {
 #define FRM_PRIOR(f) \
     ((f)->prior + 0) // prevent assignment via this macro
 
+// The "phase" slot of a FRAME! value is the second node pointer in PAYLOAD().
+// If a frame value is non-archetypal, this slot may be occupied by a REBSTR*
+// which represents the cached name of the action from which the frame
+// was created.  This FRAME! value is archetypal, however...which never holds
+// such a cache.  For performance (even in the debug build, where this is
+// called *a lot*) this is a macro and is unchecked.
+//
 #define FRM_PHASE(f) \
-    VAL_PHASE_UNCHECKED((f)->rootvar)  // shoud be valid--unchecked for speed
+    cast(REBACT*, VAL_FRAME_PHASE_OR_LABEL_NODE((f)->rootvar))
 
 #define INIT_FRM_PHASE(f,phase) \
     INIT_VAL_CONTEXT_PHASE((f)->rootvar, (phase))
@@ -132,11 +164,28 @@ inline static int FRM_LINE(REBFRM *f) {
 #define FRM_BINDING(f) \
     EXTRA(Binding, (f)->rootvar).node
 
+inline static const REBSTR *FRM_LABEL(REBFRM *f) {
+    assert(Is_Action_Frame(f));
+    return f->opt_label;
+}
+
 #define FRM_UNDERLYING(f) \
     ACT_UNDERLYING((f)->original)
 
 #define FRM_DSP_ORIG(f) \
     ((f)->dsp_orig + 0) // prevent assignment via this macro
+
+
+#if !defined(__cplusplus)
+    #define STATE_BYTE(f) \
+        mutable_SECOND_BYTE((f)->flags)
+#else
+    inline static REBYTE& STATE_BYTE(REBFRM *f)  // type checks f...
+      { return mutable_SECOND_BYTE(f->flags); }  // ...but mutable
+#endif
+
+#define FLAG_STATE_BYTE(state) \
+    FLAG_SECOND_BYTE(state)
 
 
 // ARGS is the parameters and refinements
@@ -151,13 +200,31 @@ inline static int FRM_LINE(REBFRM *f) {
 #else
     inline static REBVAL *FRM_ARG(REBFRM *f, REBLEN n) {
         assert(n != 0 and n <= FRM_NUM_ARGS(f));
-
-        REBVAL *var = f->rootvar + n; // 1-indexed
-        assert(not IS_RELATIVE(cast(RELVAL*, var)));
-        return var;
+        return f->rootvar + n;  // 1-indexed
     }
 #endif
 
+
+// These shorthands help you when your frame is named "f".  While such macros
+// are a bit "evil", they are extremely helpful for code readability.  They
+// may be #undef'd if they are causing a problem somewhere.
+
+#define f_value f->feed->value
+#define f_specifier f->feed->specifier
+#define f_spare FRM_SPARE(f)
+#define f_gotten f->feed->gotten
+#define f_index FRM_INDEX(f)
+
+
+
+inline static REBCTX *Context_For_Frame_May_Manage(REBFRM *f) {
+    assert(not Is_Action_Frame_Fulfilling(f));
+    SET_SERIES_FLAG(f->varlist, MANAGED);
+    return CTX(f->varlist);
+}
+
+
+//=//// FRAME LABELING ////////////////////////////////////////////////////=//
 
 inline static void Get_Frame_Label_Or_Blank(RELVAL *out, REBFRM *f) {
     assert(Is_Action_Frame(f));
@@ -172,6 +239,60 @@ inline static const char* Frame_Label_Or_Anonymous_UTF8(REBFRM *f) {
     if (f->opt_label != NULL)
         return STR_UTF8(f->opt_label);
     return "[anonymous]";
+}
+
+
+//=//// VARLIST CONSERVATION //////////////////////////////////////////////=//
+//
+// If a varlist does not become managed over the course of its usage, it is
+// put into a list of reusable ones.  You can reuse the series node identity
+// (avoiding the call to Alloc_Series_Node()) and also possibly the data
+// (avoiding the call to Did_Series_Data_Alloc() and other initialization).
+//
+// This optimization is not necessarily trivial, because freeing even an
+// unmanaged series has cost...in particular with Decay_Series().  Removing
+// it and changing to just use `GC_Kill_Series()` degrades performance on
+// simple examples like `x: 0 loop 1000000 [x: x + 1]` by at least 20%.
+// Broader studies might reveal better approaches--but point is, it does at
+// least do *something*.
+
+inline static bool Did_Reuse_Varlist_Of_Unknown_Size(
+    REBFRM *f,
+    REBLEN size_hint  // !!! Currently ignored, smaller sizes can come back
+){
+    // !!! At the moment, the reuse is not very intelligent and just picks the
+    // last one...which could commonly be wastefully big or too small.  But it
+    // is a proof of concept to show an axis for performance work.
+    //
+    UNUSED(size_hint);
+
+    assert(f->varlist == nullptr);
+
+    if (not TG_Reuse)
+        return false;
+
+    f->varlist = TG_Reuse;
+    TG_Reuse = LINK(TG_Reuse).reuse;
+    f->rootvar = cast(REBVAL*, SER(f->varlist)->content.dynamic.data);
+    LINK_KEYSOURCE(f->varlist) = NOD(f);
+    assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
+    return true;
+}
+
+inline static void Conserve_Varlist(REBARR *varlist)
+{
+  #if !defined(NDEBUG)
+    assert(NOT_SERIES_INFO(varlist, INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(varlist, MANAGED));
+
+    RELVAL *rootvar = ARR_HEAD(varlist);
+    assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == varlist);
+    TRASH_POINTER_IF_DEBUG(PAYLOAD(Any, rootvar).second.node);  // phase
+    TRASH_POINTER_IF_DEBUG(EXTRA(Binding, rootvar).node);
+  #endif
+
+    LINK(varlist).reuse = TG_Reuse;
+    TG_Reuse = varlist;
 }
 
 
@@ -200,21 +321,33 @@ inline static const char* Frame_Label_Or_Anonymous_UTF8(REBFRM *f) {
 // This privileged level of access can be used by natives that feel they can
 // optimize performance by working with the evaluator directly.
 
-inline static void Reuse_Varlist_If_Available(REBFRM *f) {
-    assert(IS_POINTER_TRASH_DEBUG(f->varlist));
-    if (not TG_Reuse)
-        f->varlist = nullptr;
-    else {
-        f->varlist = TG_Reuse;
-        TG_Reuse = LINK(TG_Reuse).reuse;
-        f->rootvar = cast(REBVAL*, SER(f->varlist)->content.dynamic.data);
-        LINK_KEYSOURCE(f->varlist) = NOD(f);
-    }
+inline static void Free_Frame_Internal(REBFRM *f) {
+    if (f->varlist and NOT_SERIES_FLAG(f->varlist, MANAGED))
+        Conserve_Varlist(f->varlist);
+    TRASH_POINTER_IF_DEBUG(f->varlist);
+
+    assert(IS_POINTER_TRASH_DEBUG(f->alloc_value_list));
+
+    Free_Node(FRM_POOL, f);
 }
 
-inline static void Push_Frame_No_Varlist(REBVAL *out, REBFRM *f)
+
+inline static void Push_Frame(REBVAL *out, REBFRM *f)
 {
     assert(f->feed->value != nullptr);
+
+    // All calls through to Eval_Core() are assumed to happen at the same C
+    // stack level for a pushed frame (though this is not currently enforced).
+    // Hence it's sufficient to check for C stack overflow only once, e.g.
+    // not on each Eval_Step_Throws() for `reduce [a | b | ... | z]`.
+    //
+    // !!! This method is being replaced by "stackless", as there is no
+    // reliable platform independent method for detecting stack overflows.
+    //
+    if (C_STACK_OVERFLOWING(&f)) {
+        Free_Frame_Internal(f);  // not in stack, feed + frame wouldn't free
+        Fail_Stack_Overflow();
+    }
 
     // Frames are pushed to reuse for several sequential operations like
     // ANY, ALL, CASE, REDUCE.  It is allowed to change the output cell for
@@ -222,17 +355,6 @@ inline static void Push_Frame_No_Varlist(REBVAL *out, REBFRM *f)
     // slot at all times; use null until first eval call if needed
     //
     f->out = out;
-
-    // All calls through to Eval_Core() are assumed to happen at the same C
-    // stack level for a pushed frame (though this is not currently enforced).
-    // Hence it's sufficient to check for C stack overflow only once, e.g.
-    // not on each Eval_Step_Throws() for `reduce [a | b | ... | z]`.
-    //
-    if (C_STACK_OVERFLOWING(&f))
-        Fail_Stack_Overflow();
-
-    assert(SECOND_BYTE(f->flags) == 0); // END signal
-    assert(not (f->flags.bits & NODE_FLAG_CELL));
 
     // Though we can protect the value written into the target pointer 'out'
     // from GC during the course of evaluation, we can't protect the
@@ -340,18 +462,12 @@ inline static void Push_Frame_No_Varlist(REBVAL *out, REBFRM *f)
     f->state.dsp = f->dsp_orig;
   #endif
 
-    // Eval_Core() expects a varlist to be in the frame, therefore it must
-    // be filled in by Reuse_Varlist(), or if this is something like a DO
-    // of a FRAME! it needs to be filled in from that frame before eval'ing.
-    //
-    TRASH_POINTER_IF_DEBUG(f->varlist);
+    assert(f->varlist == nullptr);  // Prep_Frame_Core() set to nullptr
+
+    assert(IS_POINTER_TRASH_DEBUG(f->alloc_value_list));
+    f->alloc_value_list = NOD(f);  // doubly link list, terminates in `f`
 }
 
-inline static void Push_Frame(REBVAL *out, REBFRM *f)
-{
-    Push_Frame_No_Varlist(out, f);
-    Reuse_Varlist_If_Available(f);
-}
 
 inline static void UPDATE_EXPRESSION_START(REBFRM *f) {
     f->expr_index = f->feed->index; // this is garbage if EVAL_FLAG_VA_LIST
@@ -362,9 +478,17 @@ inline static void UPDATE_EXPRESSION_START(REBFRM *f) {
     Literal_Next_In_Feed((out), (f)->feed)
 
 inline static void Abort_Frame(REBFRM *f) {
-    if (f->varlist and NOT_SERIES_FLAG(f->varlist, MANAGED))
-        GC_Kill_Series(SER(f->varlist));  // not alloc'd with manuals tracking
-    TRASH_POINTER_IF_DEBUG(f->varlist);
+    //
+    // If a frame is aborted, then we allow its API handles to leak.
+    //
+    REBNOD *n = f->alloc_value_list;
+    while (n != NOD(f)) {
+        REBARR *a = ARR(n);
+        n = LINK(n).custom.node;
+        TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
+        GC_Kill_Series(SER(a));
+    }
+    TRASH_POINTER_IF_DEBUG(f->alloc_value_list);
 
     // Abort_Frame() handles any work that wouldn't be done done naturally by
     // feeding a frame to its natural end.
@@ -410,9 +534,10 @@ inline static void Abort_Frame(REBFRM *f) {
     }
 
   pop:
-
     assert(TG_Top_Frame == f);
     TG_Top_Frame = f->prior;
+
+    Free_Frame_Internal(f);
 }
 
 
@@ -431,15 +556,21 @@ inline static void Drop_Frame_Core(REBFRM *f) {
         CLEAR_EVAL_FLAG(f, TOOK_HOLD);  // needed?
     }
 
-    if (f->varlist) {
-        assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
-        LINK(f->varlist).reuse = TG_Reuse;
-        TG_Reuse = f->varlist;
-    }
-    TRASH_POINTER_IF_DEBUG(f->varlist);
-
     assert(TG_Top_Frame == f);
+
+    REBNOD *n = f->alloc_value_list;
+    while (n != NOD(f)) {
+        REBARR *a = ARR(n);
+      #if defined(DEBUG_STDIO_OK)
+        printf("API handle was allocated but not freed, panic'ing leak\n");
+      #endif
+        panic (a);
+    }
+    TRASH_POINTER_IF_DEBUG(f->alloc_value_list);
+
     TG_Top_Frame = f->prior;
+
+    Free_Frame_Internal(f);
 }
 
 inline static void Drop_Frame_Unbalanced(REBFRM *f) {
@@ -467,35 +598,47 @@ inline static void Prep_Frame_Core(
     struct Reb_Feed *feed,
     REBFLGS flags
 ){
-    assert(NOT_FEED_FLAG(feed, BARRIER_HIT));  // couldn't do anything
+   if (f == nullptr)  // e.g. a failed allocation
+       fail (Error_No_Memory(sizeof(REBFRM)));
+
+    assert(
+        (flags & EVAL_MASK_DEFAULT) ==
+            (EVAL_FLAG_0_IS_TRUE | EVAL_FLAG_7_IS_TRUE)
+    );
+    f->flags.bits = flags;
 
     f->feed = feed;
     Prep_Cell(&f->spare);
     Init_Unreadable_Void(&f->spare);
     f->dsp_orig = DS_Index;
-    f->flags = Endlike_Header(flags);
     TRASH_POINTER_IF_DEBUG(f->out);
 
   #ifdef DEBUG_ENSURE_FRAME_EVALUATES
     f->was_eval_called = false;
   #endif
+
+    f->varlist = nullptr;
+
+    TRASH_POINTER_IF_DEBUG(f->alloc_value_list);
 }
 
 #define DECLARE_FRAME(name,feed,flags) \
-    REBFRM name##struct; \
-    Prep_Frame_Core(&name##struct, feed, flags); \
-    REBFRM * const name = &name##struct
+    REBFRM * name = cast(REBFRM*, Alloc_Node(FRM_POOL)); \
+    Prep_Frame_Core(name, feed, flags);
 
 #define DECLARE_FRAME_AT(name,any_array,flags) \
     DECLARE_FEED_AT (name##feed, any_array); \
     DECLARE_FRAME (name, name##feed, flags)
 
 #define DECLARE_END_FRAME(name,flags) \
-    DECLARE_FRAME(name, &TG_Frame_Feed_End, flags)
+    DECLARE_FRAME (name, &TG_Frame_Feed_End, flags)
 
 
-inline static void Begin_Action_Core(REBFRM *f, REBSTR *opt_label, bool enfix)
-{
+inline static void Begin_Action_Core(
+    REBFRM *f,
+    const REBSTR *opt_label,
+    bool enfix
+){
     assert(NOT_EVAL_FLAG(f, RUNNING_ENFIX));
     assert(NOT_FEED_FLAG(f->feed, DEFERRING_ENFIX));
 
@@ -509,26 +652,16 @@ inline static void Begin_Action_Core(REBFRM *f, REBSTR *opt_label, bool enfix)
     f->label_utf8 = cast(const char*, Frame_Label_Or_Anonymous_UTF8(f));
   #endif
 
-    assert(NOT_EVAL_FLAG(f, REQUOTE_NULL));
-    f->requotes = 0;
-
-    // There's a current state for the FEED_FLAG_NO_LOOKAHEAD which invisible
-    // actions want to put back as it was when the invisible operation ends.
-    // (It gets overwritten during the invisible's own argument gathering).
-    // Cache it on the varlist and put it back when an R_INVISIBLE result
-    // comes back.
-    //
-    if (GET_ACTION_FLAG(f->original, IS_INVISIBLE)) {
-        if (GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)) {
-            assert(GET_EVAL_FLAG(f, FULFILLING_ARG));
-            CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
-            SET_SERIES_INFO(f->varlist, TELEGRAPH_NO_LOOKAHEAD);
-        }
-    }
+    // Cache the feed lookahead state so it can be restored in the event that
+    // the evaluation turns out to be invisible.
+    // 
+    STATIC_ASSERT(FEED_FLAG_NO_LOOKAHEAD == EVAL_FLAG_CACHE_NO_LOOKAHEAD);
+    assert(NOT_EVAL_FLAG(f, CACHE_NO_LOOKAHEAD));
+    f->flags.bits |= f->feed->flags.bits & FEED_FLAG_NO_LOOKAHEAD;
 
     if (enfix) {
         SET_EVAL_FLAG(f, RUNNING_ENFIX);  // set for duration of function call
-        SET_EVAL_FLAG(f, NEXT_ARG_FROM_OUT);  // only set during first arg
+        SET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);  // only set for first arg
 
         // All the enfix call sites cleared this flag on the feed, so it was
         // moved into the Begin_Enfix_Action() case.  Note this has to be done
@@ -572,14 +705,32 @@ inline static void Push_Action(
     assert(NOT_EVAL_FLAG(f, FULFILL_ONLY));
     assert(NOT_EVAL_FLAG(f, RUNNING_ENFIX));
 
-    f->param = ACT_PARAMS_HEAD(act); // Specializations hide some params...
-    REBLEN num_args = ACT_NUM_PARAMS(act); // ...so see REB_TS_HIDDEN
+    STATIC_ASSERT(EVAL_FLAG_FULFILLING_ARG == PARAMLIST_FLAG_IS_BARRIER);
+    if (f->flags.bits & SER(act)->header.bits & PARAMLIST_FLAG_IS_BARRIER)
+        fail (Error_Expression_Barrier_Raw());
 
-    // !!! Note: Should pick "smart" size when allocating varlist storage due
-    // to potential reuse--but use exact size for *this* action, for now.
-    //
+    f->param = ACT_PARAMS_HEAD(act);
+    REBLEN num_args = ACT_NUM_PARAMS(act);  // includes specialized + locals
+
     REBSER *s;
-    if (not f->varlist) { // usually means first action call in the REBFRM
+    if (
+        f->varlist  // !!! May be going to point of assuming nullptr
+        or Did_Reuse_Varlist_Of_Unknown_Size(f, num_args)  // want `num_args`
+    ){
+        s = SER(f->varlist);
+        if (s->content.dynamic.rest >= num_args + 1 + 1) // +roovar, +end
+            goto sufficient_allocation;
+            
+        // It wasn't big enough for `num_args`, so we free the data.
+        // But at least we can reuse the series node.
+
+        //assert(SER_BIAS(s) == 0);
+        Free_Unbiased_Series_Data(
+            s->content.dynamic.data,
+            SER_TOTAL(s)
+        );
+    }
+    else {
         s = Alloc_Series_Node(
             SERIES_MASK_VARLIST
                 | SERIES_FLAG_FIXED_SIZE // FRAME!s don't expand ATM
@@ -592,20 +743,13 @@ inline static void Push_Action(
         MISC_META_NODE(s) = nullptr; // GC will sees this
         f->varlist = ARR(s);
     }
-    else {
-        s = SER(f->varlist);
-        if (s->content.dynamic.rest >= num_args + 1 + 1) // +roovar, +end
-            goto sufficient_allocation;
 
-        //assert(SER_BIAS(s) == 0);
-        Free_Unbiased_Series_Data(
-            s->content.dynamic.data,
-            SER_TOTAL(s)
-        );
+    if (not Did_Series_Data_Alloc(s, num_args + 1 + 1)) {  // +rootvar, +end
+        s->info.bits |= SERIES_INFO_INACCESSIBLE;
+        GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
+        f->varlist = nullptr;
+        fail (Error_No_Memory(sizeof(REBVAL) * (num_args + 1 + 1)));
     }
-
-    if (not Did_Series_Data_Alloc(s, num_args + 1 + 1)) // +rootvar, +end
-        fail ("Out of memory in Push_Action()");
 
     f->rootvar = cast(REBVAL*, s->content.dynamic.data);
     f->rootvar->header.bits =
@@ -613,9 +757,9 @@ inline static void Push_Action(
             | NODE_FLAG_CELL
             | CELL_FLAG_PROTECTED  // payload/binding tweaked, but not by user
             | CELL_MASK_CONTEXT
-            | FLAG_KIND_BYTE(REB_FRAME)
-            | FLAG_MIRROR_BYTE(REB_FRAME);
-    TRACK_CELL_IF_DEBUG(f->rootvar, __FILE__, __LINE__);
+            | FLAG_KIND3Q_BYTE(REB_FRAME)
+            | FLAG_HEART_BYTE(REB_FRAME);
+    TRACK_CELL_IF_DEBUG_EVIL_MACRO(f->rootvar, __FILE__, __LINE__);
     INIT_VAL_CONTEXT_VARLIST(f->rootvar, f->varlist);
 
   sufficient_allocation:
@@ -625,22 +769,22 @@ inline static void Push_Action(
 
     s->content.dynamic.used = num_args + 1;
     RELVAL *tail = ARR_TAIL(f->varlist);
-    tail->header.bits = FLAG_KIND_BYTE(REB_0);  // no NODE_FLAG_CELL
-    TRACK_CELL_IF_DEBUG(tail, __FILE__, __LINE__);
+    tail->header.bits = FLAG_KIND3Q_BYTE(REB_0);  // no NODE_FLAG_CELL
+    TRACK_CELL_IF_DEBUG_EVIL_MACRO(tail, __FILE__, __LINE__);
 
     // Current invariant for all arrays (including fixed size), last cell in
     // the allocation is an end.
     RELVAL *ultimate = ARR_AT(f->varlist, s->content.dynamic.rest - 1);
     ultimate->header = Endlike_Header(0); // unreadable
-    TRACK_CELL_IF_DEBUG(ultimate, __FILE__, __LINE__);
+    TRACK_CELL_IF_DEBUG_EVIL_MACRO(ultimate, __FILE__, __LINE__);
 
   #if !defined(NDEBUG)
     RELVAL *prep = ultimate - 1;
     for (; prep > tail; --prep) {
         prep->header.bits =
-            FLAG_KIND_BYTE(REB_T_TRASH)
-            | FLAG_MIRROR_BYTE(REB_T_TRASH); // unreadable
-        TRACK_CELL_IF_DEBUG(prep, __FILE__, __LINE__);
+            FLAG_KIND3Q_BYTE(REB_T_TRASH)
+            | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
+        TRACK_CELL_IF_DEBUG_EVIL_MACRO(prep, __FILE__, __LINE__);
     }
   #endif
 
@@ -665,8 +809,6 @@ inline static void Push_Action(
 
 
 inline static void Drop_Action(REBFRM *f) {
-    assert(NOT_SERIES_FLAG(f->varlist, VARLIST_FRAME_FAILED));
-
     assert(
         not f->opt_label
         or GET_SERIES_FLAG(f->opt_label, IS_STRING)
@@ -675,9 +817,20 @@ inline static void Drop_Action(REBFRM *f) {
     if (NOT_EVAL_FLAG(f, FULFILLING_ARG))
         CLEAR_FEED_FLAG(f->feed, BARRIER_HIT);
 
+    if (f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE) {
+        //
+        // If the whole evaluation of the action turned out to be invisible,
+        // then refresh the feed's NO_LOOKAHEAD state to whatever it was
+        // before that invisible evaluation ran.
+        //
+        STATIC_ASSERT(FEED_FLAG_NO_LOOKAHEAD == EVAL_FLAG_CACHE_NO_LOOKAHEAD);
+        f->feed->flags.bits &= ~FEED_FLAG_NO_LOOKAHEAD;
+        f->feed->flags.bits |= f->flags.bits & EVAL_FLAG_CACHE_NO_LOOKAHEAD;
+    }
+    CLEAR_EVAL_FLAG(f, CACHE_NO_LOOKAHEAD);
+
     CLEAR_EVAL_FLAG(f, RUNNING_ENFIX);
     CLEAR_EVAL_FLAG(f, FULFILL_ONLY);
-    CLEAR_EVAL_FLAG(f, REQUOTE_NULL);
 
     assert(
         GET_SERIES_INFO(f->varlist, INACCESSIBLE)
@@ -695,7 +848,7 @@ inline static void Drop_Action(REBFRM *f) {
         if (GET_SERIES_FLAG(f->varlist, MANAGED))
             f->varlist = nullptr; // references exist, let a new one alloc
         else {
-            // This node could be reused vs. calling Make_Node() on the next
+            // This node could be reused vs. calling Alloc_Node() on the next
             // action invocation...but easier for the moment to let it go.
             //
             Free_Node(SER_POOL, NOD(f->varlist));
@@ -745,12 +898,9 @@ inline static void Drop_Action(REBFRM *f) {
         // big enough for ensuing calls.  
         //
         // But no series bits we didn't set should be set...and right now,
-        // only Enter_Native() sets HOLD.  Clear that.  Also, it's possible
-        // for a "telegraphed" no lookahead bit used by an invisible to be
-        // left on, so clear it too.
+        // only PARAMLIST_FLAG_IS_NATIVE sets HOLD.  Clear that.
         //
         CLEAR_SERIES_INFO(f->varlist, HOLD);
-        CLEAR_SERIES_INFO(f->varlist, TELEGRAPH_NO_LOOKAHEAD);
 
         assert(0 == (SER(f->varlist)->info.bits & ~( // <- note bitwise not
             SERIES_INFO_0_IS_TRUE // parallels NODE_FLAG_NODE
@@ -777,37 +927,6 @@ inline static void Drop_Action(REBFRM *f) {
   #if defined(DEBUG_FRAME_LABELS)
     TRASH_POINTER_IF_DEBUG(f->label_utf8);
   #endif
-}
-
-
-// Partially-filled function frames that only have some of their arguments
-// evaluated cannot be "reified" into the form that can be persistently linked
-// as a parent to API handles.  "Dummy frames" exist to look like a fulfilled
-// call to a function with no arguments.  This is helpful if you ever try
-// to do something like call the libRebol API from the guts of the evaluator.
-//
-inline static void Push_Dummy_Frame(REBFRM *f) {
-    Push_Frame(nullptr, f);
-
-    REBSTR *opt_label = NULL;
-
-    Push_Action(f, PG_Dummy_Action, UNBOUND);
-    Begin_Prefix_Action(f, opt_label);
-    assert(IS_END(f->arg));
-    f->param = END_NODE;  // signal all arguments gathered
-    f->arg = m_cast(REBVAL*, END_NODE);
-    f->special = END_NODE;
-}
-
-inline static void Drop_Dummy_Frame_Unbalanced(REBFRM *f) {
-    Drop_Action(f);
-
-    // !!! To abstract how the system deals with exception handling, the
-    // rebRescue() routine started being used in lieu of PUSH_TRAP/DROP_TRAP
-    // internally to the system.  Some of these system routines accumulate
-    // stack state, so Drop_Frame_Unbalanced() must be used.
-    //
-    Drop_Frame_Unbalanced(f);
 }
 
 
@@ -880,26 +999,9 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
 #define RETURN(v) \
     return Move_Value(D_OUT, (v))
 
-
-// The native entry prelude makes sure that once native code starts running,
-// then the frame's stub is flagged to indicate access via a FRAME! should
-// not have write access to variables.  That could cause crashes, as raw C
-// code is not insulated against having bit patterns for types in cells that
-// aren't expected.
-//
-// !!! Debug injection of bad types into usermode code may cause havoc as
-// well, and should be considered a security/permissions issue.  It just won't
-// (or shouldn't) crash the evaluator itself.
-//
-// This is automatically injected by the INCLUDE_PARAMS_OF_XXX macros.  The
-// reason this is done with code inlined into the native itself instead of
-// based on an IS_NATIVE() test is to avoid the cost of the testing--which
-// is itself a bit dodgy to tell a priori if a dispatcher is native or not.
-// This way there is no test and only natives pay the cost of flag setting.
-//
-inline static void Enter_Native(REBFRM *f) {
-    SET_SERIES_INFO(f->varlist, HOLD); // may or may not be managed
-}
+#define RETURN_INVISIBLE \
+    assert(D_OUT->header.bits & CELL_FLAG_OUT_MARKED_STALE); \
+    return D_OUT
 
 
 // Shared code for type checking the return result.  It's used by the
@@ -913,6 +1015,15 @@ inline static void FAIL_IF_BAD_RETURN_TYPE(REBFRM *f) {
     // Typeset bits for locals in frames are usually ignored, but the RETURN:
     // local uses them for the return types of a function.
     //
-    if (not Typecheck_Including_Quoteds(typeset, f->out))
+    if (not Typecheck_Including_Constraints(typeset, f->out))
         fail (Error_Bad_Return_Type(f, VAL_TYPE(f->out)));
+}
+
+inline static void FAIL_IF_NO_INVISIBLE_RETURN(REBFRM *f) {
+    REBACT *phase = FRM_PHASE(f);
+    REBVAL *typeset = ACT_PARAMS_HEAD(phase);
+    assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
+
+    if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE))
+        fail (Error_Bad_Invisible(f));
 }

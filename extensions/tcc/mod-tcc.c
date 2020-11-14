@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2016 Atronix Engineering
-// Copyright 2016-2019 Rebol Open Source Contributors
+// Copyright 2016-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -207,7 +207,7 @@ static void Process_Block_Helper(
         "ensure block! select", config, "as word!", rebT(label),
     rebEND);
 
-    RELVAL *text;
+    const RELVAL *text;
     for (text = VAL_ARRAY_AT(block); NOT_END(text); ++text)
         Process_Text_Helper_Core(some_tcc_api, state, SPECIFIC(text), label);
 
@@ -370,7 +370,7 @@ REBNATIVE(make_native)
     Init_Blank(ARR_AT(details, IDX_TCC_NATIVE_STATE)); // no TCC_State, yet...
 
     SET_ACTION_FLAG(native, IS_NATIVE);
-    return Init_Action_Unbound(D_OUT, native);
+    return Init_Action(D_OUT, native, ANONYMOUS, UNBOUND);
 }
 
 
@@ -488,7 +488,7 @@ REBNATIVE(compile_p)
     REBDSP dsp_orig = DSP;  // natives are pushed to the stack
 
     if (REF(files)) {
-        RELVAL *item;
+        const RELVAL *item;
         for (item = VAL_ARRAY_AT(compilables); NOT_END(item); ++item) {
             if (not IS_TEXT(item))
                 fail ("If COMPILE*/FILES, compilables must be TEXT! paths");
@@ -515,7 +515,7 @@ REBNATIVE(compile_p)
         DECLARE_MOLD (mo);  // Note: mold buffer is UTF-8
         Push_Mold(mo);
 
-        RELVAL *item;
+        const RELVAL *item;
         for (item = VAL_ARRAY_AT(compilables); NOT_END(item); ++item) {
             if (IS_ACTION(item)) {
                 assert(Is_User_Native(VAL_ACTION(item)));
@@ -526,7 +526,7 @@ REBNATIVE(compile_p)
                 //
                 Move_Value(DS_PUSH(), SPECIFIC(item));
 
-                REBARR *details = VAL_ACT_DETAILS(item);
+                REBARR *details = ACT_DETAILS(VAL_ACTION(item));
                 RELVAL *source = ARR_AT(details, IDX_NATIVE_BODY);
                 RELVAL *linkname = ARR_AT(details, IDX_TCC_NATIVE_LINKNAME);
 
@@ -542,10 +542,10 @@ REBNATIVE(compile_p)
                 // https://forum.rebol.info/t/817
                 //
                 Append_Ascii(mo->series, "const REBVAL *");
-                Append_String(mo->series, linkname, VAL_LEN_AT(linkname));
+                Append_String(mo->series, linkname);
                 Append_Ascii(mo->series, "(void *frame_)\n{");
 
-                Append_String(mo->series, source, VAL_LEN_AT(source));
+                Append_String(mo->series, source);
 
                 Append_Ascii(mo->series, "}\n\n");
             }
@@ -558,7 +558,7 @@ REBNATIVE(compile_p)
                 // macros or constants.  The string will appear at the point
                 // in the compile where it is given in the list.
                 //
-                Append_String(mo->series, item, VAL_LEN_AT(item));
+                Append_String(mo->series, item);
                 Append_Ascii(mo->series, "\n");
             }
             else {
@@ -651,7 +651,7 @@ REBNATIVE(compile_p)
         REBVAL *native = DS_TOP;
         assert(IS_ACTION(native) and Is_User_Native(VAL_ACTION(native)));
 
-        REBARR *details = VAL_ACT_DETAILS(native);
+        REBARR *details = ACT_DETAILS(VAL_ACTION(native));
         REBVAL *linkname = SPECIFIC(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME));
 
         char *name_utf8 = rebSpell("ensure text!", linkname, rebEND);

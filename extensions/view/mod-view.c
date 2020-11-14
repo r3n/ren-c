@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 Atronix Engineering
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -140,7 +140,7 @@ REBNATIVE(request_file_p)
         DECLARE_MOLD (mo);
         Push_Mold(mo);
 
-        RELVAL *item;
+        const RELVAL *item;
         for (item = VAL_ARRAY_AT(ARG(filter)); NOT_END(item); ++item) {
             Form_Value(mo, item);
             Append_Codepoint(mo->series, '\0');

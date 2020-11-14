@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -31,11 +31,13 @@
 //
 //  CT_Integer: C
 //
-REBINT CT_Integer(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Integer(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0)  return (VAL_INT64(a) == VAL_INT64(b));
-    if (mode == -1) return (VAL_INT64(a) >= VAL_INT64(b));
-    return (VAL_INT64(a) > VAL_INT64(b));
+    UNUSED(strict);  // no lax form of comparison
+
+    if (VAL_INT64(a) == VAL_INT64(b))
+        return 0;
+    return (VAL_INT64(a) > VAL_INT64(b)) ? 1 : -1;
 }
 
 
@@ -87,8 +89,37 @@ REB_R TO_Integer(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
     assert(kind == REB_INTEGER);
     UNUSED(kind);
 
+    if (IS_ISSUE(arg))
+        fail ("Use CODEPOINT OF for INTEGER! from single-character ISSUE!");
+
     Value_To_Int64(out, arg, false);
     return out;
+}
+
+
+// Like converting a binary, except uses a string of ASCII characters.  Does
+// not allow for signed interpretations, e.g. #FFFF => 65535, not -1.
+// Unsigned makes more sense as these would be hexes likely typed in by users,
+// who rarely do 2s-complement math in their head.
+//
+void Hex_String_To_Integer(REBVAL *out, const REBVAL *value)
+{
+    REBSIZ utf8_size;
+    REBCHR(const*) bp = VAL_UTF8_SIZE_AT(&utf8_size, value);
+
+    if (utf8_size > MAX_HEX_LEN) {
+        // Lacks BINARY!'s accommodation of leading 00s or FFs
+        fail (Error_Out_Of_Range_Raw(value));
+    }
+
+    if (not Scan_Hex(out, bp, utf8_size, utf8_size))
+        fail (Error_Bad_Make(REB_INTEGER, value));
+
+    // !!! Unlike binary, always assumes unsigned (should it?).  Yet still
+    // might run afoul of 64-bit range limit.
+    //
+    if (VAL_INT64(out) < 0)
+        fail (Error_Out_Of_Range_Raw(value));
 }
 
 
@@ -141,8 +172,8 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
         // This is a stopgap while ENBIN and DEBIN are hammered out which
         // preserves the old behavior in the TO INTEGER! case.
         //
-        REBYTE *bp = VAL_BIN_AT(value);
-        REBLEN n = VAL_LEN_AT(value);
+        REBSIZ n;
+        const REBYTE *bp = VAL_BINARY_SIZE_AT(&n, value);
         if (n == 0) {
             Init_Integer(out, 0);
             return;
@@ -157,35 +188,7 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
         rebRelease(result);
         return;
     }
-    else if (IS_ISSUE(value)) {
-        //
-        // Like converting a binary, except uses a string of codepoints
-        // from the word name conversion.  Does not allow for signed
-        // interpretations, e.g. #FFFF => 65535, not -1.  Unsigned makes
-        // more sense as these would be hexes likely typed in by users,
-        // who rarely do 2s-complement math in their head.
-
-        REBSTR *spelling = VAL_STRING(value);
-        const REBYTE *bp = STR_HEAD(spelling);
-        size_t size = STR_SIZE(spelling);
-
-        if (size > MAX_HEX_LEN) {
-            // Lacks BINARY!'s accommodation of leading 00s or FFs
-            fail (Error_Out_Of_Range_Raw(value));
-        }
-
-        if (!Scan_Hex(out, bp, size, size))
-            fail (Error_Bad_Make(REB_INTEGER, value));
-
-        // !!! Unlike binary, always assumes unsigned (should it?).  Yet still
-        // might run afoul of 64-bit range limit.
-        //
-        if (VAL_INT64(out) < 0)
-            fail (Error_Out_Of_Range_Raw(value));
-
-        return;
-    }
-    else if (ANY_STRING(value)) {
+    else if (IS_ISSUE(value) or ANY_STRING(value)) {
         REBSIZ size;
         const REBLEN max_len = VAL_LEN_AT(value); // e.g. "no maximum"
         const REBYTE *bp = Analyze_String_For_Scan(&size, value, max_len);
@@ -220,10 +223,6 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
         //
         fail (Error_Bad_Make(REB_INTEGER, value));
     }
-    else if (IS_CHAR(value)) {
-        Init_Integer(out, VAL_CHAR(value)); // always unsigned
-        return;
-    }
     else if (IS_TIME(value)) {
         Init_Integer(out, SECS_FROM_NANO(VAL_NANO(value))); // always unsigned
         return;
@@ -240,7 +239,7 @@ check_sign:
 //
 //  MF_Integer: C
 //
-void MF_Integer(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Integer(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -271,9 +270,10 @@ REBTYPE(Integer)
         or sym == SYM_MULTIPLY
         or sym == SYM_DIVIDE
         or sym == SYM_POWER
-        or sym == SYM_INTERSECT
-        or sym == SYM_UNION
-        or sym == SYM_DIFFERENCE
+        or sym == SYM_BITWISE_AND
+        or sym == SYM_BITWISE_OR
+        or sym == SYM_BITWISE_XOR
+        or sym == SYM_BITWISE_AND_NOT
         or sym == SYM_REMAINDER
     ){
         REBVAL *val2 = D_ARG(2);
@@ -370,21 +370,24 @@ REBTYPE(Integer)
             fail (Error_Zero_Divide_Raw());
         return Init_Integer(D_OUT, (arg != -1) ? (num % arg) : 0);
 
-    case SYM_INTERSECT:
+    case SYM_BITWISE_AND:
         return Init_Integer(D_OUT, num & arg);
 
-    case SYM_UNION:
+    case SYM_BITWISE_OR:
         return Init_Integer(D_OUT, num | arg);
 
-    case SYM_DIFFERENCE:
+    case SYM_BITWISE_XOR:
         return Init_Integer(D_OUT, num ^ arg);
+
+    case SYM_BITWISE_AND_NOT:
+        return Init_Integer(D_OUT, num & ~arg);
 
     case SYM_NEGATE:
         if (num == INT64_MIN)
             fail (Error_Overflow_Raw());
         return Init_Integer(D_OUT, -num);
 
-    case SYM_COMPLEMENT:
+    case SYM_BITWISE_NOT:
         return Init_Integer(D_OUT, ~num);
 
     case SYM_ABSOLUTE:

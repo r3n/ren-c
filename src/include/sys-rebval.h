@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -227,12 +227,15 @@
 // After 8 bits for node flags, 8 bits for the datatype, and 8 generic value
 // bits...there's only 8 more bits left on 32-bit platforms in the header.
 //
-// !!! This is slated for an interesting feature of fitting an immutable
-// single element array into a cell.  The proposal is called "mirror bytes".
+// This is used for the `HEART` byte.  The heart byte corresponds to the
+// actual bit layout of the cell; it's what the GC marks a cell as.  The
+// CELL_HEART() will often match the CELL_KIND(), but won't in cases where
+// the KIND is REB_PATH but the HEART is REB_BLOCK...indicating that the
+// path is using the underlying implementation of a block.
 
-#define FLAG_MIRROR_BYTE(b)         FLAG_FOURTH_BYTE(b)
-#define MIRROR_BYTE(v)              FOURTH_BYTE((v)->header)
-#define mutable_MIRROR_BYTE(v)      mutable_FOURTH_BYTE((v)->header)
+#define FLAG_HEART_BYTE(b)         FLAG_FOURTH_BYTE(b)
+#define HEART_BYTE(v)              FOURTH_BYTE((v)->header)
+#define mutable_HEART_BYTE(v)      mutable_FOURTH_BYTE((v)->header)
 
 
 // Endlike headers have the second byte clear (to pass the IS_END() test).
@@ -364,16 +367,19 @@ union Reb_Any {  // needed to beat strict aliasing, used in payload
     // the only field that should be assigned and read.  These "type puns"
     // are unreliable, and for debug viewing only--in case they help.
     //
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_USE_UNION_PUNS)
     REBSER *rebser_pun;
     REBVAL *rebval_pun;
   #endif
 };
 
 union Reb_Bytes_Extra {
-    REBYTE common[sizeof(uint32_t) * 1];
-    REBYTE varies[sizeof(void*) * 1];
+    REBYTE exactly_4[sizeof(uint32_t) * 1];
+    REBYTE at_least_4[sizeof(void*) * 1];
 };
+
+#define IDX_EXTRA_USED 0  // index into exactly_4 when used for in cell storage
+#define IDX_EXTRA_LEN 1  // index into exactly_4 when used for in cell storage
 
 union Reb_Value_Extra { //=/////////////////// ACTUAL EXTRA DEFINITION ////=//
 
@@ -386,7 +392,7 @@ union Reb_Value_Extra { //=/////////////////// ACTUAL EXTRA DEFINITION ////=//
     union Reb_Any Any;
     union Reb_Bytes_Extra Bytes;
 
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_COUNT_TICKS)
     //
     // A tick field is included in all debug builds, not just those which
     // DEBUG_TRACK_CELLS...because negative signs are used to give a distinct
@@ -446,15 +452,10 @@ struct Reb_Any_Payload  // generic, for adding payloads after-the-fact
     union Reb_Any second;
 };
 
-struct Reb_Bookmark_Payload {   // see %sys-string.h (used w/REB_X_BOOKMARK)
-    REBLEN index;
-    REBSIZ offset;
-};
-
 union Reb_Bytes_Payload  // IMPORTANT: Do not cast, use `Pointers` instead
 {
-    REBYTE common[sizeof(uint32_t) * 2];  // same on 32-bit/64-bit platforms
-    REBYTE varies[sizeof(void*) * 2];  // size depends on platform
+    REBYTE exactly_8[sizeof(uint32_t) * 2];  // same on 32-bit/64-bit platforms
+    REBYTE at_least_8[sizeof(void*) * 2];  // size depends on platform
 };
 
 #if defined(DEBUG_TRACK_CELLS)
@@ -507,8 +508,6 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     struct Reb_Decimal_Payload Decimal;
     struct Reb_Time_Payload Time;
 
-    struct Reb_Bookmark_Payload Bookmark;  // internal (see REB_X_BOOKMARK)
-
     union Reb_Bytes_Payload Bytes;
 
   #if defined(DEBUG_TRACK_CELLS) && !defined(DEBUG_TRACK_EXTEND_CELLS)
@@ -543,7 +542,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 //
 // Goal is that the mechanics are managed with low-level C, so the C++ build
 // is just there to notice when you try to use a raw byte copy.  Use functions
-// instead.  (See: Move_Value(), Blit_Cell(), Derelativize())
+// instead.  (See: Move_Value(), Blit_Relative(), Derelativize())
 //
 // Note: It is annoying that this means any structure that embeds a value cell
 // cannot be assigned.  However, `struct Reb_Value` must be the type exported
@@ -588,7 +587,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     //
     // A Reb_Relative_Value is a point of view on a cell where VAL_TYPE() can
     // be called and will always give back a value in range < REB_MAX.  All
-    // KIND_BYTE() > REB_64 are considered to be REB_QUOTED variants of the
+    // KIND3Q_BYTE() > REB_64 are considered to be REB_QUOTED variants of the
     // byte modulo 64.
     //
     struct Reb_Relative_Value : public Reb_Cell {};

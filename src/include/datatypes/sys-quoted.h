@@ -6,16 +6,16 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2018 Rebol Open Source Contributors
+// Copyright 2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -32,7 +32,7 @@
 // remove quote levels to the same value a new node isn't required...the cell
 // just has a different count.
 //
-// HOWEVER... there is an efficiency trick, which uses the KIND_BYTE() div 4
+// HOWEVER... there is an efficiency trick, which uses the KIND3Q_BYTE() div 4
 // as the "lit level" of a value.  Then the byte mod 4 becomes the actual
 // type.  So only an actual REB_QUOTED at "apparent lit-level 0" has its own
 // payload...as a last resort if the level exceeded what the type byte can
@@ -46,20 +46,20 @@
 //
 
 inline static REBVAL* VAL_QUOTED_PAYLOAD_CELL(const RELVAL *v) {
-    assert(KIND_BYTE(v) == REB_QUOTED);
+    assert(KIND3Q_BYTE(v) == REB_QUOTED);
     assert(PAYLOAD(Any, v).second.u > 3);  // else quote fits entirely in cell
     return VAL(VAL_NODE(v));
 }
 
 inline static REBLEN VAL_QUOTED_PAYLOAD_DEPTH(const RELVAL *v) {
-    assert(KIND_BYTE(v) == REB_QUOTED);
+    assert(KIND3Q_BYTE(v) == REB_QUOTED);
     assert(PAYLOAD(Any, v).second.u > 3);  // else quote fits entirely in cell
     return PAYLOAD(Any, v).second.u;
 }
 
 inline static REBLEN VAL_QUOTED_DEPTH(const RELVAL *v) {
-    if (KIND_BYTE(v) >= REB_64)  // shallow enough to use type byte trick...
-        return KIND_BYTE(v) / REB_64;  // ...see explanation above
+    if (KIND3Q_BYTE(v) >= REB_64)  // shallow enough to use type byte trick...
+        return KIND3Q_BYTE(v) / REB_64;  // ...see explanation above
     return VAL_QUOTED_PAYLOAD_DEPTH(v);
 }
 
@@ -76,22 +76,20 @@ inline static RELVAL *Quotify_Core(
     RELVAL *v,
     REBLEN depth
 ){
-    if (KIND_BYTE(v) == REB_QUOTED) {  // reuse payload, bump count
-        assert(PAYLOAD(Any, v).second.u > 3);  // or should've used kind byte
+    if (KIND3Q_BYTE_UNCHECKED(v) == REB_QUOTED) {  // reuse payload
+        assert(PAYLOAD(Any, v).second.u > 3);  // or else whould be "in-situ"
         PAYLOAD(Any, v).second.u += depth;
         return v;
     }
 
-    // Note: Not CELL_KIND(), may differ from what MIRROR_BYTE() says
-    //
-    enum Reb_Kind type = cast(enum Reb_Kind, KIND_BYTE(v) % REB_64);
-    if (type >= REB_MAX)  // e.g. REB_P_XXX for params
+    REBYTE kind = KIND3Q_BYTE_UNCHECKED(v) % REB_64;  // HEART_BYTE may differ
+    if (kind >= REB_MAX)  // e.g. REB_P_XXX for params
         assert(depth == 0);
 
-    depth += KIND_BYTE(v) / REB_64;
+    depth += KIND3Q_BYTE_UNCHECKED(v) / REB_64;
 
     if (depth <= 3) { // can encode in a cell with no REB_QUOTED payload
-        mutable_KIND_BYTE(v) = type + (REB_64 * depth);
+        mutable_KIND3Q_BYTE(v) = kind + (REB_64 * depth);
     }
     else {
         // An efficiency trick here could point to VOID_VALUE, BLANK_VALUE,
@@ -107,7 +105,7 @@ inline static RELVAL *Quotify_Core(
 
         REBVAL *paired = Alloc_Pairing();
         Move_Value_Header(paired, v);
-        mutable_KIND_BYTE(paired) = type;  // escaping only in literal
+        mutable_KIND3Q_BYTE(paired) = kind;  // escaping only in literal
         paired->extra = v->extra;
         paired->payload = v->payload;
  
@@ -142,7 +140,7 @@ inline static RELVAL *Quotify_Core(
     #define Quotify Quotify_Core
 #else
     inline static REBVAL *Quotify(REBVAL *v, REBLEN depth)
-        { return SPECIFIC(Quotify_Core(v, depth)); }
+        { return cast(REBVAL*, Quotify_Core(v, depth)); }
 
     inline static RELVAL *Quotify(RELVAL *v, REBLEN depth)
         { return Quotify_Core(v, depth); }
@@ -157,9 +155,9 @@ inline static RELVAL *Quotify_Core(
 //
 inline static RELVAL *Unquotify_In_Situ(RELVAL *v, REBLEN unquotes)
 {
-    assert(KIND_BYTE(v) >= REB_64);  // not an in-situ quoted value otherwise
-    assert(cast(REBLEN, KIND_BYTE(v) / REB_64) >= unquotes);
-    mutable_KIND_BYTE(v) -= REB_64 * unquotes;
+    assert(KIND3Q_BYTE(v) >= REB_64);  // not an in-situ quoted value otherwise
+    assert(cast(REBLEN, KIND3Q_BYTE(v) / REB_64) >= unquotes);
+    mutable_KIND3Q_BYTE(v) -= REB_64 * unquotes;
     return v;
 }
 
@@ -173,7 +171,7 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
     if (unquotes == 0)
         return v;
 
-    if (KIND_BYTE(v) != REB_QUOTED)
+    if (KIND3Q_BYTE(v) != REB_QUOTED)
         return Unquotify_In_Situ(v, unquotes);
 
     REBLEN depth = VAL_QUOTED_PAYLOAD_DEPTH(v);
@@ -182,16 +180,16 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
 
     REBVAL *cell = VAL_QUOTED_PAYLOAD_CELL(v);
     assert(
-        KIND_BYTE(cell) != REB_0
-        and KIND_BYTE(cell) != REB_QUOTED
-        and KIND_BYTE(cell) < REB_MAX
+        KIND3Q_BYTE(cell) != REB_0
+        and KIND3Q_BYTE(cell) != REB_QUOTED
+        and KIND3Q_BYTE(cell) < REB_MAX
     );
 
     if (depth > 3) // still can't do in-situ escaping within a single cell
         PAYLOAD(Any, v).second.u = depth;
     else {
         Move_Value_Header(v, cell);
-        mutable_KIND_BYTE(v) += (REB_64 * depth);
+        mutable_KIND3Q_BYTE(v) += (REB_64 * depth);
         assert(
             not Is_Bindable(cell) or
             EXTRA(Binding, v).node == EXTRA(Binding, cell).node // must sync
@@ -206,15 +204,15 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
     #define Unquotify Unquotify_Core
 #else
     inline static REBVAL *Unquotify(REBVAL *v, REBLEN depth)
-        { return SPECIFIC(Unquotify_Core(v, depth)); }
+        { return cast(REBVAL*, Unquotify_Core(v, depth)); }
 
     inline static RELVAL *Unquotify(RELVAL *v, REBLEN depth)
         { return Unquotify_Core(v, depth); }
 #endif
 
 
-inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v) {
-    if (KIND_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable voids
+inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v) {
+    if (KIND3Q_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable voids
         return v;  // Note: kind byte may be > 64
 
     // The reason this routine returns `const` is because you can't modify
@@ -227,15 +225,15 @@ inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v) {
 
 
 inline static REBLEN Dequotify(RELVAL *v) {
-    if (KIND_BYTE(v) != REB_QUOTED) {
-        REBLEN depth = KIND_BYTE(v) / REB_64;
-        mutable_KIND_BYTE(v) %= REB_64;
+    if (KIND3Q_BYTE(v) != REB_QUOTED) {
+        REBLEN depth = KIND3Q_BYTE(v) / REB_64;
+        mutable_KIND3Q_BYTE(v) %= REB_64;
         return depth;
     }
 
     REBLEN depth = VAL_QUOTED_PAYLOAD_DEPTH(v);
     RELVAL *cell = VAL_QUOTED_PAYLOAD_CELL(v);
-    assert(KIND_BYTE(cell) != REB_QUOTED and KIND_BYTE(cell) < REB_64);
+    assert(KIND3Q_BYTE(cell) != REB_QUOTED and KIND3Q_BYTE(cell) < REB_64);
 
     Move_Value_Header(v, cell);
   #if !defined(NDEBUG)

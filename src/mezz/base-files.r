@@ -116,7 +116,7 @@ make-dir: func [
 
     if exists? path [return path]
 
-    if (not deep) or [url? path] [
+    any [not deep, url? path] then [
         create path
         return path
     ]
@@ -142,7 +142,7 @@ make-dir: func [
     ; Create directories forward:
     created: copy []
     for-each dir dirs [
-        path: either empty? path [dir][path/:dir]
+        path: if empty? path [dir] else [join path dir]
         append path slash
         trap [make-dir path] then (lambda e [
             for-each dir created [attempt [delete dir]]
@@ -201,8 +201,7 @@ split-path: func [
         [#"/" | 1 2 #"." opt #"/"] end (dir: dirize target) |
         pos: any [thru #"/" [end | pos:]] (
             all [
-                empty? dir: copy/part target at head of target index of pos
-                    |
+                empty? dir: copy/part target (at head of target index of pos),
                 dir: %./
             ]
             all [find [%. %..] pos: to file! pos insert tail of pos #"/"]

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2018 Rebol Open Source Contributors
+// Copyright 2012-2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -54,7 +54,7 @@
 //          [<opt> any-value!]
 //      condition [<opt> any-value!]
 //      'branch "If arity-1 ACTION!, receives the evaluated condition"
-//          [block! action! quoted! sym-word! sym-path! sym-group! blank!]
+//          [any-branch!]
 //  ]
 //
 REBNATIVE(if)
@@ -67,7 +67,7 @@ REBNATIVE(if)
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(condition)))
         return R_THROWN;
 
-    return Voidify_If_Nulled(D_OUT); // null means no branch (cues ELSE, etc.)
+    return D_OUT;  // Note: NULL means no branch (cues ELSE, etc.)
 }
 
 
@@ -80,9 +80,9 @@ REBNATIVE(if)
 //          "Returns null if either branch returns null (unlike IF...ELSE)"
 //      condition [<opt> any-value!]
 //      'true-branch "If arity-1 ACTION!, receives the evaluated condition"
-//          [block! action! quoted! sym-word! sym-path! sym-group! blank!]
+//          [any-branch!]
 //      'false-branch
-//          [block! action! quoted! sym-word! sym-path! sym-group! blank!]
+//          [any-branch!]
 //  ]
 //
 REBNATIVE(either)
@@ -126,10 +126,10 @@ inline static bool Single_Test_Throws(
     //
     sum_quotes += VAL_NUM_QUOTES(test);
 
-    const REBCEL *test_cell = VAL_UNESCAPED(test);
-    const REBCEL *arg_cell = VAL_UNESCAPED(arg);
+    REBCEL(const*) test_cell = VAL_UNESCAPED(test);
+    REBCEL(const*) arg_cell = VAL_UNESCAPED(arg);
 
-    enum Reb_Kind test_kind = CELL_TYPE(test_cell);
+    enum Reb_Kind test_kind = CELL_KIND(test_cell);
 
     // If test is a WORD! or PATH! then GET it.  To help keep things clear,
     // require GET-WORD! or GET-PATH! for actions to convey they are not being
@@ -148,11 +148,9 @@ inline static bool Single_Test_Throws(
         DECLARE_LOCAL (dequoted_test); // wouldn't need if Get took any escape
         Dequotify(Derelativize(dequoted_test, test, test_specifier));
 
-        REBSTR *opt_label = NULL;
         REBDSP lowest_ordered_dsp = DSP;
         if (Get_If_Word_Or_Path_Throws( // !!! take any escape level?
             out,
-            &opt_label,
             dequoted_test,
             SPECIFIED,
             push_refinements // !!! Look into pushing e.g. `match :foo?/bar x`
@@ -162,9 +160,6 @@ inline static bool Single_Test_Throws(
 
         assert(lowest_ordered_dsp == DSP); // would have made specialization
         UNUSED(lowest_ordered_dsp);
-
-        if (IS_NULLED(out))
-            fail (Error_No_Value_Raw(dequoted_test));
 
         if (IS_ACTION(out)) {
             if (IS_GET_WORD(dequoted_test) or IS_GET_PATH(dequoted_test)) {
@@ -184,16 +179,41 @@ inline static bool Single_Test_Throws(
     }
 
     switch (test_kind) {
+      case REB_NULL:  // more useful for NON NULL XXX than MATCH NULL XXX
+        Init_Logic(
+            out,
+            CELL_KIND(arg_cell) == REB_NULL
+                and VAL_NUM_QUOTES(arg) == sum_quotes
+        );
+        return false;
+
+      case REB_VOID:
+        //
+        // Was considered because NON VOID XXX is shorter than NON VOID! XXX.
+        // However, that encourages a habit of passing void values where they
+        // probably are better caught as errors.
+        //
+        break;
+
       case REB_PATH: { // AND the tests together
-        RELVAL *item = VAL_ARRAY_AT(test_cell);
         REBSPC *specifier = Derive_Specifier(test_specifier, test);
 
-        for (; NOT_END(item); ++item) {
-            if (IS_GET_WORD(item))
-                fail ("GET-WORD! may be slated to be illegal in PATH!s");
+        // !!! The array case can extract VAL_ARRAY() from the test and
+        // reuse `out`, but paths may not have series to extract... have to
+        // cache the test in a GC-safe slot
+        //
+        DECLARE_LOCAL (test_cache);  // have to keep `out` alive
+        Move_Value(test_cache, SPECIFIC(CELL_TO_VAL(test_cell)));
+        PUSH_GC_GUARD(test_cache);
 
-            if (IS_QUOTED(item))
-                fail ("QUOTED! items may be slated to be illegal in PATH!s");
+        DECLARE_LOCAL (temp);  // path element extraction buffer (if needed)
+        SET_END(temp);
+        PUSH_GC_GUARD(temp);
+
+        REBLEN len = VAL_SEQUENCE_LEN(test_cache);
+        REBLEN i;
+        for (i = 0; i < len; ++i) {
+            const RELVAL *item = VAL_SEQUENCE_AT(temp, test_cache, i);
 
             if (Single_Test_Throws(
                 out,
@@ -203,17 +223,24 @@ inline static bool Single_Test_Throws(
                 arg_specifier,
                 sum_quotes
             )){
+                DROP_GC_GUARD(temp);
+                DROP_GC_GUARD(test_cache);
                 return true;
             }
 
-            if (not VAL_LOGIC(out)) // any ANDing failing skips block
-                return false; // false=no throw
+            if (not VAL_LOGIC(out))  {  // any ANDing failing skips block
+                DROP_GC_GUARD(temp);
+                DROP_GC_GUARD(test_cache);
+                return false;  // false=no throw
+            }
         }
+        DROP_GC_GUARD(temp);
+        DROP_GC_GUARD(test_cache);
         assert(VAL_LOGIC(out)); // if all tests succeeded in block
         return false; } // return the LOGIC! truth, false=no throw
 
       case REB_BLOCK: { // OR the tests together
-        RELVAL *item = VAL_ARRAY_AT(test_cell);
+        const RELVAL *item = VAL_ARRAY_AT(test_cell);
         REBSPC *specifier = Derive_Specifier(test_specifier, test);
         for (; NOT_END(item); ++item) {
             if (Single_Test_Throws(
@@ -271,7 +298,7 @@ inline static bool Single_Test_Throws(
       case REB_DATATYPE:
         Init_Logic(
             out,
-            VAL_TYPE_KIND(test_cell) == CELL_TYPE(arg_cell)
+            VAL_TYPE_KIND(test_cell) == CELL_KIND(arg_cell)
                 and VAL_NUM_QUOTES(arg) == sum_quotes
         );
         return false;
@@ -279,19 +306,20 @@ inline static bool Single_Test_Throws(
       case REB_TYPESET:
         Init_Logic(
             out,
-            TYPE_CHECK(test_cell, CELL_TYPE(arg_cell))
+            TYPE_CHECK(test_cell, CELL_KIND(arg_cell))
                 and VAL_NUM_QUOTES(arg) == sum_quotes
         );
         return false;
 
-     case REB_TAG: // just support <opt> for now
+     case REB_TAG: {  // just support <opt> for now
+        bool strict = false;
         Init_Logic(
             out,
-            CELL_KIND(arg_cell) == REB_NULLED
-            and 0 == Compare_String_Vals(test_cell, Root_Opt_Tag, true)
+            CELL_KIND(arg_cell) == REB_NULL
+            and 0 == CT_String(test_cell, Root_Opt_Tag, strict)
             and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg)
         );
-        return false;
+        return false; }
 
       case REB_INTEGER: // interpret as length
         Init_Logic(
@@ -303,22 +331,15 @@ inline static bool Single_Test_Throws(
         return false;
 
       case REB_SYM_WORD: {
-        //
-        // !!! Currently a hack for the absence of higher-level typecheck
-        // functions.  e.g. there's no way to make a typecheck that says
-        // "PATH! with a BLANK! at the head".  You can only say PATH.  So
-        // for now, @REFINEMENT is that test.  Generalizations of typechecks
-        // should improve the state of this.
-        //
-        if (VAL_WORD_SYM(test_cell) == SYM_REFINEMENT_X) {
-            Init_Logic(
-                out,
-                REB_PATH == CELL_KIND(arg_cell)
-                    and IS_BLANK(ARR_AT(VAL_ARRAY(arg_cell), 0))
-            );
+        if (Matches_Fake_Type_Constraint(
+            arg,
+            cast(enum Reb_Symbol, VAL_WORD_SYM(test_cell))
+        )){
+            Init_True(out);
             return false;
         }
-        break; }
+        Init_False(out);
+        return false; }
 
       default:
         break;
@@ -385,7 +406,7 @@ bool Match_Core_Throws(
 //          [<opt> any-value!]
 //      optional "<deferred argument> Run branch if this is null"
 //          [<opt> any-value!]
-//      'branch [block! action! quoted! blank!]
+//      'branch [any-branch!]
 //  ]
 //
 REBNATIVE(else)  // see `tweak :else #defer on` in %base-defs.r
@@ -398,7 +419,7 @@ REBNATIVE(else)  // see `tweak :else #defer on` in %base-defs.r
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), NULLED_CELL))
         return R_THROWN;
 
-    return D_OUT;  // don't voidify, allows chaining: `else [...] then [...]`
+    return D_OUT;
 }
 
 
@@ -412,7 +433,7 @@ REBNATIVE(else)  // see `tweak :else #defer on` in %base-defs.r
 //      optional "<deferred argument> Run branch if this is not null"
 //          [<opt> any-value!]
 //      'branch "If arity-1 ACTION!, receives value that triggered branch"
-//          [block! action! quoted! blank!]
+//          [any-branch!]
 //  ]
 //
 REBNATIVE(then)  // see `tweak :then #defer on` in %base-defs.r
@@ -425,7 +446,7 @@ REBNATIVE(then)  // see `tweak :then #defer on` in %base-defs.r
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(optional)))
         return R_THROWN;
 
-    return D_OUT;  // don't voidify, allows chaining: `then [...] then [...]`
+    return D_OUT;  // nominally voidifies, avoids mistakes w/`then [] else []`
 }
 
 
@@ -439,7 +460,7 @@ REBNATIVE(then)  // see `tweak :then #defer on` in %base-defs.r
 //      optional "<deferred argument> Run branch if this is not null"
 //          [<opt> any-value!]
 //      'branch "If arity-1 ACTION!, receives value that triggered branch"
-//          [blank! block! action! quoted!]
+//          [any-branch!]
 //  ]
 //
 REBNATIVE(also)  // see `tweak :also #defer on` in %base-defs.r
@@ -477,7 +498,8 @@ REBNATIVE(also)  // see `tweak :also #defer on` in %base-defs.r
 //          ]
 //       value [<opt> any-value!]
 //      'branch "Branch to run on non-matches, passed VALUE if ACTION!"
-//          [block! action! quoted!]
+//          [any-branch!]
+//      /not "Invert the result of the the test (used by NON)"
 //  ]
 //
 REBNATIVE(either_match)
@@ -487,8 +509,12 @@ REBNATIVE(either_match)
     if (Match_Core_Throws(D_OUT, ARG(test), SPECIFIED, ARG(value), SPECIFIED))
         return R_THROWN;
 
-    if (VAL_LOGIC(D_OUT))
+    if (
+        (not REF(_not_) and VAL_LOGIC(D_OUT))
+        or (REF(_not_) and not VAL_LOGIC(D_OUT)
+    )){
         RETURN (ARG(value));
+    }
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(value)))
         return R_THROWN;
@@ -516,7 +542,7 @@ REBNATIVE(either_match)
 //              integer!  ; matches length of series
 //              quoted!  ; same test, but make quote level part of the test
 //          ]
-//      :args [<opt> any-value! <...>]
+//      :args [<opt> any-value! <variadic>]
 //  ]
 //
 REBNATIVE(match)
@@ -546,32 +572,33 @@ REBNATIVE(match)
 
     assert(Is_Action_Frame(parent));
 
-    // REBFRM whose built FRAME! context we will steal
-
-    DECLARE_FRAME (f, parent->feed, EVAL_MASK_DEFAULT);  // capture DSP *now*
-
     REBVAL *test = ARG(test);
 
-    switch (KIND_BYTE(test)) {
+    switch (KIND3Q_BYTE(test)) {
       case REB_WORD:
       case REB_PATH: {
         if (NOT_CELL_FLAG(test, UNEVALUATED)) // soft quote eval'd
             goto either_match; // allow `MATCH ('NULL?) ...`
 
-        REBSTR *opt_label = NULL;
+        // REBFRM whose built FRAME! context we will steal
+        //
+        DECLARE_FRAME (f, parent->feed, EVAL_MASK_DEFAULT);  // capture DSP
+        Push_Frame(D_OUT, f);
+
         if (Get_If_Word_Or_Path_Throws(
             D_OUT,
-            &opt_label,
             test,
             SPECIFIED,
             true  // push_refinements, DECLARE_FRAME() captured original DSP
         )){
+            Drop_Frame(f);
             return R_THROWN;
         }
 
         Move_Value(test, D_OUT);
 
         if (not IS_ACTION(test)) {
+            Drop_Frame(f);
             if (
                 IS_WORD(test) or IS_GET_WORD(test) or IS_SET_WORD(test)
                 or ANY_PATH(test)  // ^-- we allow ISSUE!
@@ -589,8 +616,10 @@ REBNATIVE(match)
         // return value if the filter function returns a truthy result.
 
         REBVAL *first_arg;
-        if (Make_Invocation_Frame_Throws(D_OUT, f, &first_arg, test))
+        if (Make_Invocation_Frame_Throws(f, &first_arg, test)) {
+            Drop_Frame(f);
             return R_THROWN;
+        }
 
         if (not first_arg)
             fail ("MATCH with a function pattern must take at least 1 arg");
@@ -600,18 +629,17 @@ REBNATIVE(match)
         DECLARE_LOCAL (temp);
         f->out = SET_END(temp);
 
-        f->rootvar = CTX_ARCHETYPE(CTX(f->varlist));
+        f->rootvar = CTX_ROOTVAR(CTX(f->varlist));
         f->param = ACT_PARAMS_HEAD(VAL_ACTION(test));
         f->arg = f->rootvar + 1;
         f->special = f->arg;
 
         f->flags.bits = EVAL_MASK_DEFAULT
-            | EVAL_FLAG_FULLY_SPECIALIZED
-            | EVAL_FLAG_PROCESS_ACTION;
+            | EVAL_FLAG_FULLY_SPECIALIZED;
 
-        Begin_Prefix_Action(f, opt_label);
+        Begin_Prefix_Action(f, VAL_ACTION_LABEL(test));
 
-        bool threw = Eval_Throws(f);
+        bool threw = Process_Action_Throws(f);
 
         Drop_Frame(f);
 
@@ -628,8 +656,10 @@ REBNATIVE(match)
         // Instead it passes a VOID! back (test with `value?` or `null?`)
 
         if (IS_TRUTHY(temp)) {
+            if (IS_VOID(D_OUT))
+                return D_OUT;  // don't corrupt, so you can MATCH exact voids
             if (IS_FALSEY(D_OUT))
-                return Init_Void(D_OUT);
+                return Init_Void(D_OUT, SYM_MATCHED);
             return D_OUT;
         }
 
@@ -662,8 +692,10 @@ REBNATIVE(match)
         return R_THROWN;
 
     if (VAL_LOGIC(temp)) {
+        if (IS_VOID(D_OUT))
+            return D_OUT;  // don't corrupt, so you can MATCH exact voids
         if (IS_FALSEY(D_OUT)) // see above for why false match not passed thru
-            return Init_Void(D_OUT);
+            return Init_Void(D_OUT, SYM_MATCHED);
         return D_OUT;
     }
 
@@ -706,46 +738,6 @@ REBNATIVE(matches)
 
 
 //
-//  non: native [
-//
-//  {Make sure a value does NOT match a type constraint (see also: ENSURE)}
-//
-//      return: "Input value if it passes the type test"
-//          [<opt> any-value!]
-//      test "The test to apply (limited to DATATYPE! and NULL at this time)"
-//          [<opt> datatype!]
-//      value "Value to test (will either be returned as result or error)"
-//          [<opt> any-value!]
-// ]
-//
-REBNATIVE(non)
-//
-// !!! This is a partial implementation of NON implemented for R3C, just good
-// enough for `non void!` and `non null` cases to give validation options to
-// those wanting a less permissive SET (now that it has no /ANY refinement).
-{
-    INCLUDE_PARAMS_OF_NON;
-
-    REBVAL *test = ARG(test);
-    REBVAL *value = ARG(value);
-
-    if (IS_NULLED(test)) {  // not a datatype, needs special case
-        if (IS_NULLED(value))
-            fail ("NON expected value to not be NULL, but it was");
-    }
-    else if (VAL_TYPE_KIND(test) == REB_VOID) {  // specialize common case
-        if (IS_VOID(value))
-            fail ("NON expected value to not be VOID!, but it was");
-    }
-    else if (TYPE_CHECK(value, VAL_TYPE_KIND(test))) {
-        fail ("NON expected value to not match a type, but it did match");
-    }
-
-    RETURN (value);
-}
-
-
-//
 //  all: native [
 //
 //  {Short-circuiting variant of AND, using a block of expressions as input}
@@ -769,6 +761,11 @@ REBNATIVE(all)
         if (Eval_Step_Maybe_Stale_Throws(D_OUT, f)) {
             Abort_Frame(f);
             return R_THROWN;
+        }
+        if (GET_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
+            if (IS_END(f->feed->value))  // `all []`
+                break;
+            continue;  // `all [comment "hi" 1]`, first step is stale
         }
 
         if (IS_FALSEY(D_OUT)) {  // any false/blank/null will trigger failure
@@ -808,6 +805,11 @@ REBNATIVE(any)
         if (Eval_Step_Maybe_Stale_Throws(D_OUT, f)) {
             Abort_Frame(f);
             return R_THROWN;
+        }
+        if (GET_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
+            if (IS_END(f->feed->value))  // `any []`
+                break;
+            continue;  // `any [comment "hi" 1]`, first step is stale
         }
 
         if (IS_TRUTHY(D_OUT)) { // successful ANY returns the value
@@ -849,6 +851,12 @@ REBNATIVE(none)
             Abort_Frame(f);
             return R_THROWN;
         }
+        if (GET_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
+            if (IS_END(f->feed->value))  // `none []`
+                break;
+            continue;  // `none [comment "hi" 1]`, first step is stale
+        }
+
 
         if (IS_TRUTHY(D_OUT)) {  // any true results mean failure
             Abort_Frame(f);
@@ -869,10 +877,11 @@ REBNATIVE(none)
 //      return: "Last matched case evaluation, or null if no cases matched"
 //          [<opt> any-value!]
 //      :predicate "Unary case-processing action (default is /DID)"
-//          [refinement! action! <skip>]
+//          [<skip> predicate! action!]
 //      cases "Conditions followed by branches"
 //          [block!]
 //      /all "Do not stop after finding first logically true case"
+//      <local> branch last  ; temp GC-safe holding locations
 //  ]
 //
 REBNATIVE(case)
@@ -880,29 +889,12 @@ REBNATIVE(case)
     INCLUDE_PARAMS_OF_CASE;
 
     REBVAL *predicate = ARG(predicate);
-    if (not IS_NULLED(predicate)) {
-        REBSTR *opt_label;
-        if (Get_If_Word_Or_Path_Throws(
-            D_OUT,
-            &opt_label,
-            predicate,
-            SPECIFIED,
-            false  // push_refinements = false, specialize for multiple uses
-        )){
-            return R_THROWN;
-        }
-        if (not IS_ACTION(D_OUT))
-            fail ("PREDICATE provided to CASE must look up to an ACTION!");
-
-        Move_Value(predicate, D_OUT);
-    }
+    if (Cache_Predicate_Throws(D_OUT, predicate))
+        return R_THROWN;
 
     DECLARE_FRAME_AT (f, ARG(cases), EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
-    REBVAL *last_branch_result = ARG(cases);  // can reuse--frame holds cases
-    Init_Nulled(last_branch_result);  // default return result
+    Init_Nulled(ARG(last));  // default return result
 
     Push_Frame(nullptr, f);
 
@@ -920,7 +912,7 @@ REBNATIVE(case)
         if (Eval_Step_Maybe_Stale_Throws(D_OUT, f))
             goto threw;
 
-        if (IS_END(*v)) {
+        if (IS_END(f_value)) {
             CLEAR_CELL_FLAG(D_OUT, OUT_MARKED_STALE);
             goto reached_end;
         }
@@ -946,72 +938,51 @@ REBNATIVE(case)
             matched = IS_TRUTHY(temp);
         }
 
+        if (IS_GET_GROUP(f_value)) {
+            //
+            // IF evaluates branches that are GET-GROUP! even if it does
+            // not run them.  This implies CASE should too.
+            //
+            // Note: Can't evaluate directly into ARG(branch)...frame cell.
+            //
+            if (Eval_Value_Throws(D_SPARE, f_value, f_specifier)) {
+                Move_Value(D_OUT, D_SPARE);
+                goto threw;
+            }
+            Move_Value(ARG(branch), D_SPARE);
+        }
+        else
+            Derelativize(ARG(branch), f_value, f_specifier);
+
+        Fetch_Next_Forget_Lookback(f);  // branch now in ARG(branch), so skip
+
         if (not matched) {
-            if (IS_BLOCK(*v) or IS_ACTION(*v) or IS_QUOTED(*v)) {
+            if (not (FLAGIT_KIND(VAL_TYPE(ARG(branch))) & TS_BRANCH)) {
                 //
-                // Accepted branches for IF/etc. that are skipped on no match
-            }
-            else if (IS_GROUP(*v)) {
-                //
-                // IF evaluates branches that are GROUP! even if it does not
-                // run them.  This implies CASE should too.
-                //
-                if (Eval_Value_Throws(D_SPARE, *v, *specifier)) {
-                    Move_Value(D_OUT, D_SPARE);
-                    goto threw;
-                }
-            }
-            else {
-                //
-                // Maintain symmetry with IF's on non-taken branches:
+                // Maintain symmetry with IF on non-taken branches:
                 //
                 // >> if false <some-tag>
                 // ** Script Error: if does not allow tag! for its branch...
                 //
-                fail (Error_Bad_Value_Core(*v, *specifier));
+                fail (Error_Bad_Value_Raw(ARG(branch)));
             }
 
-            Fetch_Next_Forget_Lookback(f); // skip next, whatever it is
             continue;
         }
 
-        // Can't use Do_Branch(), *v is unevaluated RELVAL...simulate it
-
-        if (IS_GROUP(*v)) {
-            if (Do_Any_Array_At_Throws(D_SPARE, *v, *specifier)) {
-                Move_Value(D_OUT, D_SPARE);
-                goto threw;
-            }
-            *v = D_SPARE;
-        }
-
-        if (IS_QUOTED(*v)) {
-            Unquotify(Derelativize(D_OUT, *v, *specifier), 1);
-        }
-        else if (IS_BLOCK(*v)) {
-            if (Do_Any_Array_At_Throws(D_OUT, *v, *specifier))
-                goto threw;
-        }
-        else if (IS_ACTION(*v)) {
-            DECLARE_LOCAL (temp);
-            if (Do_Branch_With_Throws(temp, nullptr, SPECIFIC(*v), D_OUT)) {
-                Move_Value(D_OUT, temp);
-                goto threw;
-            }
+        DECLARE_LOCAL (temp);
+        if (Do_Branch_With_Throws(temp, D_SPARE, ARG(branch), D_OUT)) {
             Move_Value(D_OUT, temp);
+            goto threw;
         }
-        else
-            fail (Error_Bad_Value_Core(*v, *specifier));
-
-        Voidify_If_Nulled(D_OUT); // null is reserved for no branch taken
+        Move_Value(D_OUT, temp);
 
         if (not REF(all)) {
             Drop_Frame(f);
             return D_OUT;
         }
 
-        Move_Value(last_branch_result, D_OUT);
-        Fetch_Next_Forget_Lookback(f);  // keep matching if /ALL
+        Move_Value(ARG(last), D_OUT);
     }
 
   reached_end:;
@@ -1020,13 +991,13 @@ REBNATIVE(case)
 
     // Last evaluation will "fall out" if there is no branch:
     //
-    //     case /not [1 < 2 [...] 3 < 4 [...] 10 + 20] = 30
+    //     case .not [1 < 2 [...] 3 < 4 [...] 10 + 20] = 30
     //
     if (not IS_NULLED(D_OUT)) // prioritize fallout result
         return D_OUT;
 
-    assert(REF(all) or IS_NULLED(last_branch_result));
-    RETURN (last_branch_result);  // else last branch "falls out", may be null
+    assert(REF(all) or IS_NULLED(ARG(last)));
+    RETURN (ARG(last));  // else last branch "falls out", may be null
 
   threw:;
 
@@ -1044,11 +1015,12 @@ REBNATIVE(case)
 //          [<opt> any-value!]
 //      value "Target value"
 //          [<opt> any-value!]
-//      :predicate "Binary switch-processing action (default is /EQUAL?)"
-//          [refinement! action! <skip>]
+//      :predicate "Binary switch-processing action (default is .EQUAL?)"
+//          [<skip> predicate! action!]
 //      cases "Block of cases (comparison lists followed by block branches)"
 //          [block!]
 //      /all "Evaluate all matches (not just first one)"
+//      <local> last  ; GC-safe storage loation
 //  ]
 //
 REBNATIVE(switch)
@@ -1056,30 +1028,14 @@ REBNATIVE(switch)
     INCLUDE_PARAMS_OF_SWITCH;
 
     REBVAL *predicate = ARG(predicate);
-    if (not IS_NULLED(predicate)) {
-        REBSTR *opt_label;
-        if (Get_If_Word_Or_Path_Throws(
-            D_OUT,
-            &opt_label,
-            predicate,
-            SPECIFIED,
-            false  // push_refinements = false, specialize for multiple uses
-        )){
-            return R_THROWN;
-        }
-        if (not IS_ACTION(D_OUT))
-            fail ("COMPARE provided to SWITCH must look up to an ACTION!");
-
-        Move_Value(predicate, D_OUT);
-    }
+    if (Cache_Predicate_Throws(D_OUT, predicate))
+        return R_THROWN;
 
     DECLARE_FRAME_AT (f, ARG(cases), EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
     Push_Frame(nullptr, f);
-    REBVAL *last_branch_result = ARG(cases); // frame holds cases, can reuse
-    Init_Nulled(last_branch_result);
+
+    Init_Nulled(ARG(last));
 
     REBVAL *left = ARG(value);
     if (IS_BLOCK(left) and GET_CELL_FLAG(left, UNEVALUATED))
@@ -1087,9 +1043,9 @@ REBNATIVE(switch)
 
     Init_Nulled(D_OUT);  // fallout result if no branches run
 
-    while (NOT_END(*v)) {
+    while (NOT_END(f_value)) {
 
-        if (IS_BLOCK(*v) or IS_ACTION(*v)) {
+        if (IS_BLOCK(f_value) or IS_ACTION(f_value)) {
             Fetch_Next_Forget_Lookback(f);
             Init_Nulled(D_OUT);  // reset fallout output to null
             continue;
@@ -1108,12 +1064,14 @@ REBNATIVE(switch)
         if (Eval_Step_Throws(SET_END(D_OUT), f))
             goto threw;
 
-        if (IS_END(D_OUT)) {  // nothing left, or was just COMMENT/etc.
-            assert(IS_END(*v));
-            Drop_Frame(f);
+        if (IS_END(D_OUT)) {
+            if (NOT_END(f_value))  // was just COMMENT/etc. so more to go
+                continue;
 
-            assert(REF(all) or IS_NULLED(last_branch_result));
-            RETURN (last_branch_result);
+            Drop_Frame(f);  // nothing left, so drop frame and return
+
+            assert(REF(all) or IS_NULLED(ARG(last)));
+            RETURN (ARG(last));
         }
 
         if (IS_NULLED(predicate)) {
@@ -1131,13 +1089,14 @@ REBNATIVE(switch)
             // !!! A branch composed into the switch cases block may want to
             // see the un-mutated condition value.
             //
-            if (not Compare_Modify_Values(left, D_OUT, 0))  // 0 => lax
+            const bool strict = false;
+            if (0 != Compare_Modify_Values(left, D_OUT, strict))
                 continue;
         }
         else {
             assert(IS_ACTION(predicate));  // entry code should guarantee
 
-            // `switch x /greater? [10 [...]]` acts like `case [x > 10 [...]]
+            // `switch x .greater? [10 [...]]` acts like `case [x > 10 [...]]
             // The ARG(value) passed in is the left/first argument to compare.
             //
             // !!! Using Run_Throws loses the labeling of the function we were
@@ -1166,21 +1125,27 @@ REBNATIVE(switch)
         // Skip ahead to try and find BLOCK!/ACTION! branch to take the match
         //
         while (true) {
-            if (IS_END(*v))
+            if (IS_END(f_value))
                 goto reached_end;
 
-            if (IS_BLOCK(*v)) {  // *v is RELVAL, can't Do_Branch
-                if (Do_Any_Array_At_Throws(D_OUT, *v, *specifier))
+            if (IS_BLOCK(f_value) or IS_SYM_BLOCK(f_value)) {
+                //
+                // f_value is RELVAL, can't Do_Branch
+                //
+                if (Do_Any_Array_At_Throws(D_OUT, f_value, f_specifier))
                     goto threw;
+                if (IS_BLOCK(f_value))
+                    if (IS_NULLED(D_OUT) or IS_VOID(D_OUT))
+                        Init_Void(D_OUT, SYM_BRANCHED);
                 break;
             }
 
-            if (IS_ACTION(*v)) {  // must have been COMPOSE'd in cases
+            if (IS_ACTION(f_value)) {  // must have been COMPOSE'd in cases
                 DECLARE_LOCAL (temp);
                 if (RunQ_Throws(
                     temp,
                     false,  // fully = false, e.g. arity-0 functions are ok
-                    rebU(SPECIFIC(*v)),  // actions don't need specifiers
+                    rebU(SPECIFIC(f_value)),  // actions don't need specifiers
                     D_OUT,
                     rebEND
                 )){
@@ -1194,14 +1159,12 @@ REBNATIVE(switch)
             Fetch_Next_Forget_Lookback(f);
         }
 
-        Voidify_If_Nulled(D_OUT);  // null is reserved for no branch run
-
         if (not REF(all)) {
             Drop_Frame(f);
             return D_OUT;
         }
 
-        Move_Value(last_branch_result, D_OUT);  // save in case no fallout
+        Move_Value(ARG(last), D_OUT);  // save in case no fallout
         Init_Nulled(D_OUT);  // switch back to using for fallout
         Fetch_Next_Forget_Lookback(f);  // keep matching if /ALL
     }
@@ -1213,8 +1176,8 @@ REBNATIVE(switch)
     if (not IS_NULLED(D_OUT)) // prioritize fallout result
         return D_OUT;
 
-    assert(REF(all) or IS_NULLED(last_branch_result));
-    RETURN (last_branch_result);  // else last branch "falls out", may be null
+    assert(REF(all) or IS_NULLED(ARG(last)));
+    RETURN (ARG(last));  // else last branch "falls out", may be null
 
   threw:;
 
@@ -1224,36 +1187,18 @@ REBNATIVE(switch)
 
 
 //
-//  default: enfix native/body [
+//  default: enfix native [
 //
-//  {Set word or path to a default value if it is not set yet or blank.}
+//  {Set word or path to a default value if it is not set yet}
 //
 //      return: "Former value or branch result, can only be null if no target"
 //          [<opt> any-value!]
-//      :target "Word or path which might be set--no target always branches"
-//          [<skip> set-word! set-path!]
-//      'branch "If target not set already, this is evaluated and stored there"
-//          [block! action! quoted!]
-//      :look "Variadic lookahead used to make sure at end if no target"
-//          [<...>]
-//      /only "Consider target being BLANK! to be a value not to overwrite"
-//  ][
-//      if unset? 'target [  ; `case [... default [...]]`
-//          if not tail? look [
-//              fail ["DEFAULT usage with no left hand side must be at <end>"]
-//          ]
-//          return do :branch
-//      ]
-//      if set-path? target [target: compose target]
-//      let gotten
-//      either all [
-//          value? gotten: get/hard target
-//          only or [not blank? :gotten]
-//      ][
-//          :gotten  ; so that `x: y: default z` leads to `x = y`
-//      ][
-//          set/hard target do :branch
-//      ]
+//      :target "Word or path which might be set appropriately (or not)"
+//          [set-word! set-path!]  ; to left of DEFAULT
+//      :predicate "Test beyond null/void for defaulting, else .NOT.BLANK?"
+//          [<skip> predicate! action!]  ; to right of DEFAULT
+//      'branch "If target needs default, this is evaluated and stored there"
+//          [any-branch!]
 //  ]
 //
 REBNATIVE(default)
@@ -1262,16 +1207,9 @@ REBNATIVE(default)
 
     REBVAL *target = ARG(target);
 
-    if (IS_NULLED(target)) { // e.g. `case [... default [...]]`
-        UNUSED(ARG(look));
-        if (NOT_END(frame_->feed->value))  // !!! shortcut w/variadic for now
-            fail ("DEFAULT usage with no left hand side must be at <end>");
-
-        if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(branch)))
-            return R_THROWN;
-
-        return D_OUT; // NULL is okay in this case
-    }
+    REBVAL *predicate = ARG(predicate);
+    if (Cache_Predicate_Throws(D_OUT, predicate))
+        return R_THROWN;
 
     if (IS_SET_WORD(target))
         Move_Value(D_OUT, Lookup_Word_May_Fail(target, SPECIFIED));
@@ -1283,56 +1221,69 @@ REBNATIVE(default)
         // COMPOSE on the PATH! and then use GET/HARD and SET/HARD.  To make
         // a faster native we just do a more optimal version of that.
         //
+        REBLEN len = VAL_SEQUENCE_LEN(target);
         bool has_groups = false;
-        RELVAL *item = VAL_ARRAY_AT(target);
-        for (; NOT_END(item); ++item) {
+        REBLEN i;
+        for (i = 0; i < len; ++i) {
+            const RELVAL *item = VAL_SEQUENCE_AT(D_SPARE, target, i);
+
             if (IS_GROUP(item))
                 has_groups = true;
         }
         if (has_groups) {
-            REBARR *composed = Make_Array(VAL_LEN_AT(target));
+            REBARR *composed = Make_Array(len);
             RELVAL *dest = ARR_HEAD(composed);
-            item = VAL_ARRAY_AT(target);
             REBSPC *specifier = VAL_SPECIFIER(target);
-            for (; NOT_END(item); ++item, ++dest) {
+            for (i = 0; i < len; ++i, ++dest) {
+                const RELVAL *item = VAL_SEQUENCE_AT(D_SPARE, target, i);
+
                 if (not IS_GROUP(item))
-                    Derelativize(dest, item, VAL_SPECIFIER(target));
+                    Derelativize(dest, CELL_TO_VAL(item), VAL_SPECIFIER(target));
                 else {
-                    // !!! This only does GROUP!s, but if there are GET-WORD!
-                    // in the path the group evaluation could have side
-                    // effects that change them as they go.  That's a weird
-                    // edge case...not going to address it yet, as perhaps
-                    // GET-WORD! in paths aren't good anyway.
-                    //
                     if (Do_Any_Array_At_Throws(D_OUT, item, specifier))
                         return R_THROWN;
                     Move_Value(dest, D_OUT);
                 }
             }
-            TERM_ARRAY_LEN(composed, VAL_LEN_AT(target));
+            TERM_ARRAY_LEN(composed, len);
             Freeze_Array_Shallow(composed);
-            Init_Any_Path(target, REB_SET_PATH, composed);
+            Force_Array_Managed(composed);
+
+            // !!! The limiting of path contents messes this up; you cannot
+            // generically store path picking info if it's an arbitrary value
+            // because not all values are allowed in paths.  This will require
+            // rethinking!
+            //
+            if (not Try_Init_Any_Sequence_Arraylike(
+                target,
+                REB_SET_PATH,
+                composed
+            )){
+                fail ("Cannot compose arbitrary path, review implications");
+            }
         }
 
         if (Eval_Path_Throws_Core(
             D_OUT,
-            NULL, // not requesting symbol means refinements not allowed
-            VAL_ARRAY(target),
-            VAL_INDEX(target),
+            target,  // !!! May not be array-based
             VAL_SPECIFIER(target),
             NULL, // not requesting value to set means it's a get
-            EVAL_FLAG_PATH_HARD_QUOTE // pre-COMPOSE'd, so GROUP!s are literal
+            EVAL_MASK_DEFAULT
+                | EVAL_FLAG_PATH_HARD_QUOTE // pre-COMPOSE'd, GROUP!s literal
         )){
             panic (D_OUT); // shouldn't be possible... no executions!
         }
     }
 
-    if (
-        not IS_VOID(D_OUT)
-        and not IS_NULLED(D_OUT)
-        and (not IS_BLANK(D_OUT) or REF(only))
-    ){
-        return D_OUT;  // count it as "already set" !!! is this right?
+    if (not IS_NULLED_OR_VOID(D_OUT)) {
+        if (not REF(predicate)) {  // no custom additional constraint
+            if (not IS_BLANK(D_OUT))  // acts as `x: default .not.blank? [...]`
+                return D_OUT;  // count it as "already set"
+        }
+        else {
+            if (rebDid(REF(predicate), rebQ(D_OUT), rebEND))
+                return D_OUT;
+        }
     }
 
     if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(branch)))
@@ -1345,12 +1296,11 @@ REBNATIVE(default)
         DECLARE_LOCAL (dummy);
         if (Eval_Path_Throws_Core(
             dummy,
-            NULL, // not requesting symbol means refinements not allowed
-            VAL_ARRAY(target),
-            VAL_INDEX(target),
+            target,  // !!! may not be array-based
             VAL_SPECIFIER(target),
             D_OUT,
-            EVAL_FLAG_PATH_HARD_QUOTE  // precomposed, no double evaluating
+            EVAL_MASK_DEFAULT
+                | EVAL_FLAG_PATH_HARD_QUOTE  // precomposed, no double eval
         )){
             panic (dummy); // shouldn't be possible, no executions!
         }
@@ -1369,7 +1319,7 @@ REBNATIVE(default)
 //      block "Block to evaluate"
 //          [block!]
 //      /result "Evaluation result if not thrown"
-//          [<output>]
+//          [<output> <opt> any-value!]
 //      /name "Catches a named throw (single name if not block)"
 //          [block! word! action! object!]
 //      /quit "Special catch for QUIT native"
@@ -1402,14 +1352,14 @@ REBNATIVE(catch)
 
     if (REF(any) and not (
         IS_ACTION(label)
-        and VAL_ACT_DISPATCHER(label) == &N_quit
+        and ACT_DISPATCHER(VAL_ACTION(label)) == &N_quit
     )){
         goto was_caught;
     }
 
     if (REF(quit) and (
         IS_ACTION(label)
-        and VAL_ACT_DISPATCHER(label) == &N_quit
+        and ACT_DISPATCHER(VAL_ACTION(label)) == &N_quit
     )){
         goto was_caught;
     }
@@ -1426,7 +1376,7 @@ REBNATIVE(catch)
             //
             // Test all the words in the block for a match to catch
 
-            RELVAL *candidate = VAL_ARRAY_AT(ARG(name));
+            const RELVAL *candidate = VAL_ARRAY_AT(ARG(name));
             for (; NOT_END(candidate); candidate++) {
                 //
                 // !!! Should we test a typeset for illegal name types?
@@ -1438,9 +1388,9 @@ REBNATIVE(catch)
                 Move_Value(temp2, label);
 
                 // Return the THROW/NAME's arg if the names match
-                // !!! 0 means equal?, but strict-equal? might be better
                 //
-                if (Compare_Modify_Values(temp1, temp2, 0))
+                bool strict = false;  // e.g. EQUAL?, better if STRICT-EQUAL?
+                if (0 == Compare_Modify_Values(temp1, temp2, strict))
                     goto was_caught;
             }
         }
@@ -1449,16 +1399,16 @@ REBNATIVE(catch)
             Move_Value(temp2, label);
 
             // Return the THROW/NAME's arg if the names match
-            // !!! 0 means equal?, but strict-equal? might be better
             //
-            if (Compare_Modify_Values(temp1, temp2, 0))
+            bool strict = false;  // e.g. EQUAL?, better if STRICT-EQUAL?
+            if (0 == Compare_Modify_Values(temp1, temp2, strict))
                 goto was_caught;
         }
     }
     else {
         // Return THROW's arg only if it did not have a /NAME supplied
         //
-        if (IS_NULLED(label))
+        if (IS_NULLED(label) and (REF(any) or not REF(quit)))
             goto was_caught;
     }
 

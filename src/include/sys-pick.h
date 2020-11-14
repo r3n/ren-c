@@ -1,22 +1,22 @@
 //
-//  File: %sys-path.h
-//  Summary: "Definition of Structures for Path Processing"
+//  File: %sys-pick.h
+//  Summary: "Definitions for Processing Sequence Picking/Poking"
 //  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
 //  Homepage: https://github.com/metaeducation/ren-c/
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -67,15 +67,6 @@
 // been updated during investigation of what was being done.
 //
 
-// Note that paths can be initialized with an array, which they will then
-// take as immutable...or you can create a `/foo`-style path in a more
-// optimized fashion using Refinify()
-
-#define Init_Any_Path(v,k,a) \
-    Init_Any_Path_At_Core((v), (k), (a), 0, nullptr)
-
-#define Init_Path(v,a) \
-    Init_Any_Path((v), REB_PATH, (a))
 
 #define PVS_OPT_SETVAL(pvs) \
     pvs->special
@@ -84,7 +75,7 @@
     (PVS_OPT_SETVAL(pvs) != nullptr)
 
 #define PVS_PICKER(pvs) \
-    FRM_SPARE(pvs)
+    pvs->param
 
 inline static bool Get_Path_Throws_Core(
     REBVAL *out,
@@ -93,12 +84,10 @@ inline static bool Get_Path_Throws_Core(
 ){
     return Eval_Path_Throws_Core(
         out,
-        NULL, // not requesting symbol means refinements not allowed
-        VAL_ARRAY(any_path),
-        VAL_INDEX(any_path),
-        Derive_Specifier(specifier, any_path),
+        any_path,  // !!! may not be array-based
+        specifier,
         NULL, // not requesting value to set means it's a get
-        0 // Name contains Get_Path_Throws() so it shouldn't be neutral
+        EVAL_MASK_DEFAULT  // "Throws"() so it shouldn't be inert on groups
     );
 }
 
@@ -112,12 +101,10 @@ inline static void Get_Path_Core(
 
     if (Eval_Path_Throws_Core(
         out,
-        NULL, // not requesting symbol means refinements not allowed
-        VAL_ARRAY(any_path),
-        VAL_INDEX(any_path),
-        Derive_Specifier(specifier, any_path),
+        any_path,  // !!! may not be array-based
+        specifier,
         NULL, // not requesting value to set means it's a get
-        EVAL_FLAG_NO_PATH_GROUPS
+        EVAL_MASK_DEFAULT | EVAL_FLAG_NO_PATH_GROUPS
     )){
         panic (out); // shouldn't be possible... no executions!
     }
@@ -134,12 +121,10 @@ inline static bool Set_Path_Throws_Core(
 
     return Eval_Path_Throws_Core(
         out,
-        NULL, // not requesting symbol means refinements not allowed
-        VAL_ARRAY(any_path),
-        VAL_INDEX(any_path),
-        Derive_Specifier(specifier, any_path),
+        any_path,  // !!! may not be array-based
+        specifier,
         setval,
-        0 // Name contains Set_Path_Throws() so it shouldn't be neutral
+        EVAL_MASK_DEFAULT  // "Throws"() so groups shouldn't be inert
     );
 }
 
@@ -156,87 +141,15 @@ inline static void Set_Path_Core(  // !!! Appears to be unused.  Unnecessary?
     //
     DECLARE_LOCAL (out);
 
-    REBFLGS flags = EVAL_FLAG_NO_PATH_GROUPS;
+    REBFLGS flags = EVAL_MASK_DEFAULT | EVAL_FLAG_NO_PATH_GROUPS;
 
     if (Eval_Path_Throws_Core(
         out,
-        NULL, // not requesting symbol means refinements not allowed
-        VAL_ARRAY(any_path),
-        VAL_INDEX(any_path),
-        Derive_Specifier(specifier, any_path),
+        any_path,  // !!! may not be array-based
+        specifier,
         setval,
         flags
     )){
         panic (out); // shouldn't be possible, no executions!
     }
-}
-
-
-// If a value cell holding a PATH! is to a shorthand form (e.g. WORD! cell)
-// then turn that into an array.  (We don't want to destructively reify
-// paths, e.g. there should be no actual PG_2_Blanks_Array paths existing.)
-//
-inline static REBARR *VAL_PATH(const RELVAL *path)
-{
-    assert(ANY_PATH_KIND(CELL_TYPE(path)));
-    if (MIRROR_BYTE(path) == REB_WORD) {
-        assert(VAL_WORD_SYM(VAL_UNESCAPED(path)) == SYM__SLASH_1_);
-        return PG_2_Blanks_Array;
-    }
-    REBARR *a = VAL_ARRAY(path);
-    assert(ARR_LEN(a) >= 2);
-    assert(Is_Array_Frozen_Shallow(a));
-    return a;
-}
-
-inline static REBSPC *VAL_PATH_SPECIFIER(const RELVAL *path)
-{
-    assert(ANY_PATH_KIND(CELL_TYPE(path)));
-    if (MIRROR_BYTE(path) == REB_WORD) {
-        assert(VAL_WORD_SYM(VAL_UNESCAPED(path)) == SYM__SLASH_1_);
-        return SPECIFIED;
-    }
-    return VAL_SPECIFIER(path);
-}
-
-
-// Ren-C has no REFINEMENT! datatype, so `/foo` is a PATH!, which generalizes
-// to where `/foo/bar` is a PATH! as well, etc.
-//
-// !!! Optimizations are planned to allow single element paths to fit in just
-// *one* array cell.  This will make use of the fourth header byte, to
-// encode when the type byte is a container for what is inside.  Use of this
-// routine to mutate cells into refinements marks places where that will
-// be applied.
-//
-inline static REBVAL *Refinify(REBVAL *v) {
-    //
-    // Making something into a refinement is not a generically applicable
-    // operation like Quotify that you can do any number of times.  Note
-    // you can't put paths in paths in the first place.
-    //
-    assert(CELL_KIND(VAL_UNESCAPED(v)) != REB_PATH);
-
-    if (IS_BLANK(v)) {  // !!! Special handling needed, review callsites
-        Init_Word(v, PG_Slash_1_Canon);
-        mutable_KIND_BYTE(v) = REB_PATH;
-        return v;
-    }
-
-    REBARR *a = Make_Array(2);
-    Init_Blank(Alloc_Tail_Array(a));
-    Move_Value(Alloc_Tail_Array(a), v);
-    return Init_Path(v, Freeze_Array_Shallow(a));
-}
-
-inline static bool IS_REFINEMENT(const RELVAL *v) {
-    return IS_PATH(v)
-        and VAL_LEN_HEAD(v) == 2
-        and IS_BLANK(VAL_ARRAY_AT_HEAD(v, 0))
-        and IS_WORD(VAL_ARRAY_AT_HEAD(v, 1));
-}
-
-inline static REBSTR *VAL_REFINEMENT_SPELLING(const RELVAL *v) {
-    assert(IS_REFINEMENT(v));
-    return VAL_WORD_SPELLING(VAL_ARRAY_AT_HEAD(v, 1));
 }

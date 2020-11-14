@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -43,6 +43,12 @@
 
 #include "sys-core.h"
 
+#undef f_value
+#undef f_gotten
+
+#define f_next f->feed->value
+#define f_next_gotten f->feed->gotten
+
 #if defined(DEBUG_COUNT_TICKS) && defined(DEBUG_HAS_PROBE)
 
 //
@@ -50,20 +56,17 @@
 //
 void Dump_Frame_Location(const RELVAL *v, REBFRM *f)
 {
-    SHORTHAND (next, f->feed->value, NEVERNULL(const RELVAL*));
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
-
     DECLARE_LOCAL (dump);
 
     if (v) {
-        Derelativize(dump, v, *specifier);
+        Derelativize(dump, v, f_specifier);
         printf("Dump_Frame_Location() current\n");
         PROBE(dump);
     }
 
-    if (IS_END(*next)) {
+    if (IS_END(f_next)) {
         printf("...then Dump_Frame_Location() is at end of array\n");
-        if (not v and not *next) { // well, that wasn't informative
+        if (not v and not f_next) { // well, that wasn't informative
             if (not f->prior)
                 printf("...and no parent frame, so you're out of luck\n");
             else {
@@ -73,7 +76,7 @@ void Dump_Frame_Location(const RELVAL *v, REBFRM *f)
         }
     }
     else {
-        Derelativize(dump, *next, *specifier);
+        Derelativize(dump, f_next, f_specifier);
         printf("Dump_Frame_Location() next\n");
         PROBE(dump);
 
@@ -94,8 +97,8 @@ void Dump_Frame_Location(const RELVAL *v, REBFRM *f)
             dump,
             REB_BLOCK,
             SER(f->feed->array),
-            cast(REBLEN, f->feed->index),
-            *specifier
+            cast(REBLEN, f_index),
+            f_specifier
         );
         PROBE(dump);
     }
@@ -117,17 +120,12 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
     // on the data stack or mold stack/etc.  See Drop_Frame() for the actual
     // balance check.
 
-    SHORTHAND (next, f->feed->value, NEVERNULL(const RELVAL*));
-    SHORTHAND (next_gotten, f->feed->gotten, const REBVAL*);
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
-    SHORTHAND (index, f->feed->index, REBLEN);
-
     // See notes on f->feed->gotten about the coherence issues in the face
     // of arbitrary function execution.
     //
-    if (*next_gotten) {
-        assert(IS_WORD(*next));
-        assert(Try_Lookup_Word(*next, *specifier) == *next_gotten);
+    if (f_next_gotten) {
+        assert(IS_WORD(f_next));
+        assert(Try_Lookup_Word(f_next, f_specifier) == f_next_gotten);
     }
 
     assert(f == FS_TOP);
@@ -135,10 +133,10 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
 
     if (f->feed->array) {
         assert(not IS_POINTER_TRASH_DEBUG(f->feed->array));
-        assert(*index != TRASHED_INDEX);
+        assert(f->feed->index != TRASHED_INDEX);
     }
     else
-        assert(*index == TRASHED_INDEX);
+        assert(f->feed->index == TRASHED_INDEX);
 
     // If this fires, it means that Flip_Series_To_White was not called an
     // equal number of times after Flip_Series_To_Black, which means that
@@ -159,7 +157,7 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
 
     //=//// ^-- ABOVE CHECKS *ALWAYS* APPLY ///////////////////////////////=//
 
-    if (IS_END(*next))
+    if (IS_END(f_next))
         return;
 
     if (NOT_END(f->out) and Is_Evaluator_Throwing_Debug())
@@ -167,8 +165,8 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
 
     //=//// v-- BELOW CHECKS ONLY APPLY IN EXITS CASE WITH MORE CODE //////=//
 
-    assert(NOT_END(*next));
-    assert(*next != f->out);
+    assert(NOT_END(f_next));
+    assert(f_next != f->out);
 
     //=//// ^-- ADD CHECKS EARLIER THAN HERE IF THEY SHOULD ALWAYS RUN ////=//
 }
@@ -238,16 +236,11 @@ void Do_Process_Action_Checks_Debug(REBFRM *f) {
     assert(IS_FRAME(f->rootvar));
     assert(f->arg == f->rootvar + 1);
 
-    REBACT *phase = VAL_PHASE(f->rootvar);
+    REBACT *phase = VAL_PHASE_ELSE_ARCHETYPE(f->rootvar);
 
     //=//// v-- BELOW CHECKS ONLY APPLY WHEN FRM_PHASE() is VALID ////////=//
 
     assert(GET_ARRAY_FLAG(ACT_PARAMLIST(phase), IS_PARAMLIST));
-
-    if (NOT_EVAL_FLAG(f, NEXT_ARG_FROM_OUT)) {
-        if (NOT_CELL_FLAG(f->out, OUT_MARKED_STALE))
-            assert(GET_ACTION_FLAG(phase, IS_INVISIBLE));
-    }
 }
 
 
@@ -255,20 +248,12 @@ void Do_Process_Action_Checks_Debug(REBFRM *f) {
 //  Do_After_Action_Checks_Debug: C
 //
 void Do_After_Action_Checks_Debug(REBFRM *f) {
-    assert(NOT_END(f->out));
     assert(not Is_Evaluator_Throwing_Debug());
 
     if (GET_SERIES_INFO(f->varlist, INACCESSIBLE)) // e.g. ENCLOSE
         return;
 
     REBACT *phase = FRM_PHASE(f);
-
-  #ifdef DEBUG_UTF8_EVERYWHERE
-    if (ANY_STRING(f->out)) {
-        REBLEN len = STR_LEN(VAL_STRING(f->out));
-        UNUSED(len); // just one invariant for now, SER_LEN checks it
-    }
-  #endif
 
     // Usermode functions check the return type via Returner_Dispatcher(),
     // with everything else assumed to return the correct type.  But this
@@ -281,12 +266,18 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
     if (GET_ACTION_FLAG(phase, HAS_RETURN)) {
         REBVAL *typeset = ACT_PARAMS_HEAD(phase);
         assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
-        if (
-            not Typecheck_Including_Quoteds(typeset, f->out)
+        if (GET_CELL_FLAG(f->out, OUT_MARKED_STALE)) {
+            if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE)) {
+                printf("Native code violated return type contract!\n");
+                panic (Error_Bad_Invisible(f));
+            }
+        }
+        else if (
+            not Typecheck_Including_Constraints(typeset, f->out)
             and not (
-                GET_ACTION_FLAG(phase, IS_INVISIBLE)
-                and IS_NULLED(f->out) // this happens with `do [return]`
-            )
+                TYPE_CHECK(typeset, REB_TS_INVISIBLE)
+                and GET_EVAL_FLAG(f, RUNNING_ENFIX)
+            )  // exemption, e.g. `1 comment "hi" + 2` infix non-stale
         ){
             printf("Native code violated return type contract!\n");
             panic (Error_Bad_Return_Type(f, VAL_TYPE(f->out)));
@@ -302,15 +293,13 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
 void Eval_Core_Exit_Checks_Debug(REBFRM *f) {
     Eval_Core_Shared_Checks_Debug(f);
 
-    SHORTHAND (next, f->feed->value, NEVERNULL(const RELVAL*));
-
-    if (NOT_END(*next) and not FRM_IS_VARIADIC(f)) {
-        if (f->feed->index > ARR_LEN(f->feed->array)) {
+    if (NOT_END(f_next) and not FRM_IS_VARIADIC(f)) {
+        if (f_index > ARR_LEN(f->feed->array)) {
             assert(
                 (f->feed->pending and IS_END(f->feed->pending))
                 or Is_Evaluator_Throwing_Debug()
             );
-            assert(f->feed->index == ARR_LEN(f->feed->array) + 1);
+            assert(f_index == ARR_LEN(f->feed->array) + 1);
         }
     }
 

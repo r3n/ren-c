@@ -4,7 +4,7 @@ REBOL [
     File: %make-boot.r  ; used by EMIT-HEADER to indicate emitting script
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -47,18 +47,16 @@ if args/GIT_COMMIT = "unknown" [
 
 === SETUP PATHS AND MAKE DIRECTORIES (IF NEEDED) ===
 
-output-dir: system/options/path/prep
-inc: output-dir/include
-core: output-dir/core
-boot: output-dir/boot
-mkdir/deep probe inc
-mkdir/deep probe boot
-mkdir/deep probe core
+prep-dir: make-file [(system/options/path) prep /]
+
+mkdir/deep make-file [(prep-dir) include /]
+mkdir/deep make-file [(prep-dir) boot /]
+mkdir/deep make-file [(prep-dir) core /]
 
 Title: {
     REBOL
     Copyright 2012 REBOL Technologies
-    Copyright 2012-2019 Rebol Open Source Contributors
+    Copyright 2012-2019 Ren-C Open Source Contributors
     REBOL is a trademark of REBOL Technologies
     Licensed under the Apache License, Version 2.0
 }
@@ -90,7 +88,10 @@ args: any [
     fail "No platform specified."
 ]
 
-product: to-word any [try get 'args/PRODUCT | "core"]
+product: to-word any [
+    try get 'args/PRODUCT
+    "core"
+]
 
 platform-data: context [type: 'windows]
 build: context [features: [help-strings]]
@@ -105,11 +106,13 @@ comment [
 
 === MAKE VERSION INFORMATION AVAILABLE TO CORE C CODE ===
 
-e-version: make-emitter "Version Information" inc/tmp-version.h
+(e-version: make-emitter "Version Information"
+    make-file [(prep-dir) include/tmp-version.h])
 
 version: load %version.r
-version/4: config/id/2
-version/5: config/id/3
+version: to tuple! reduce [
+    version/1 version/2 version/3 config/id/2 config/id/3
+ ]
 
 e-version/emit {
     /*
@@ -143,7 +146,8 @@ e-version/write-emitted
 ; recompiled with changes to the core.  These symbols aren't in libRebol,
 ; however, so it only affects clients of the core API for now.
 
-e-symbols: make-emitter "Symbol Numbers" inc/tmp-symbols.h
+(e-symbols: make-emitter "Symbol Numbers"
+    make-file [(prep-dir) include/tmp-symbols.h])
 
 syms: copy []
 
@@ -171,29 +175,33 @@ add-sym: function [
     return null
 ]
 
-add-sym 'nulled  ; make SYM_NULLED the first symbol (lines up with REB_NULLED)
-
 
 === DATATYPE DEFINITIONS ===
 
 type-table: load %types.r
 
-e-types: make-emitter "Datatype Definitions" inc/tmp-kinds.h
+(e-types: make-emitter "Datatype Definitions"
+    make-file [(prep-dir) include/tmp-kinds.h])
 
 n: 0
 
 rebs: collect [
     for-each-record t type-table [
-        if issue? t/name [
-            assert [t/class = 0]  ; REB_0_END and REB_NULLED
-        ] else [
-            ensure word! t/name
+        if is-real-type: word? t/name [
             ensure word! t/class
-
-            assert [sym-n == n]  ; SYM_XXX should equal REB_XXX value
-            add-sym to-word unspaced [ensure word! t/name "!"]
-            keep cscape/with {REB_${T/NAME} = $<n>} [n t]
+        ] else [
+            ensure issue! t/name
+            assert [t/class = 0]  ; e.g. REB_NULL
+            t/name: as text! t/name  ; TO TEXT! of ISSUE! has # in bootstrap
         ]
+
+        if n <> 0 [
+            assert [sym-n == n]  ; SYM_XXX should equal REB_XXX value
+            add-sym to-word unspaced [t/name (if is-real-type ["!"])]
+        ]
+
+        keep cscape/with {REB_${T/NAME} = $<n>} [n t]
+
         n: n + 1
     ]
 ]
@@ -210,7 +218,7 @@ e-types/emit {
      * While REB_MAX indicates the maximum legal VAL_TYPE(), there is also a
      * list of PSEUDOTYPE_ONE, PSEUDOTYPE_TWO, etc. values which are used
      * for special internal states and flags.  Some of these are used in the
-     * KIND_BYTE() of value cells to mark their usage of alternate payloads
+     * KIND3Q_BYTE() of value cells to mark their usage of alternate payloads
      * during algorithmic transformations (e.g. specialization).  Others are
      * used to signal special behaviors when returned from native dispatchers.
      * Still others are used as special indicators in typeset bitsets.
@@ -220,17 +228,21 @@ e-types/emit {
      * can make based on knowing a value is only in the range of the enum.
      */
     enum Reb_Kind {
-        REB_0 = 0,  /* reserved for internal purposes */
-        REB_0_END = REB_0,  /* ...most commonly array termination cells... */
-        REB_TS_ENDABLE = REB_0,  /* bit set in typesets for endability */
-        REB_P_DETECT = REB_0,  /* detect paramclass from vararg */
 
-        REB_NULLED = 1,  /* special null signal, not technically a "type" */
-
-        /*** REAL TYPES ***/
+        /*** TYPES AND INTERNALS GENERATED FROM %TYPES.R ***/
 
         $[Rebs],
         REB_MAX, /* one past valid types */
+
+        /*** ALIASES FOR REB_0_END ***/
+
+        REB_0 = REB_0_END,  /* REB_0 when used for signals besides ENDness */
+        REB_TS_ENDABLE = REB_0,  /* bit set in typesets for endability */
+        REB_P_DETECT = REB_0,  /* detect paramclass from vararg */
+
+        /*** TEMP FAKERY TO HAVE A TYPESET BIT FOR INVISIBILITY ***/
+
+        REB_TS_INVISIBLE = REB_BYTES,  /* can never occur in KIND3Q_BYTE */
 
         /*** PSEUDOTYPES ***/
 
@@ -250,12 +262,12 @@ e-types/emit {
         PSEUDOTYPE_THREE,
         REB_R_REDO = PSEUDOTYPE_THREE,
         REB_P_MODAL = PSEUDOTYPE_THREE,  /* can act like REB_P_HARD_QUOTE */
-        REB_TS_HIDDEN = PSEUDOTYPE_THREE,
+        REB_TS_3 = PSEUDOTYPE_THREE,
 
         PSEUDOTYPE_FOUR,
         REB_R_REFERENCE = PSEUDOTYPE_FOUR,
         REB_P_SOFT_QUOTE = PSEUDOTYPE_FOUR,
-        REB_TS_UNBINDABLE = PSEUDOTYPE_FOUR,
+        REB_TS_4 = PSEUDOTYPE_FOUR,
 
         PSEUDOTYPE_FIVE,
         REB_R_IMMEDIATE = PSEUDOTYPE_FIVE,
@@ -263,29 +275,17 @@ e-types/emit {
         REB_TS_NOOP_IF_BLANK = PSEUDOTYPE_FIVE,
 
         PSEUDOTYPE_SIX,
-        REB_P_RETURN = PSEUDOTYPE_SIX,
-        REB_TS_QUOTED_WORD = PSEUDOTYPE_SIX,  /* !!! temp compatibility */
+        REB_P_SEALED = PSEUDOTYPE_SIX,
+        REB_G_XYF = PSEUDOTYPE_SIX,  /* used by GOB, compact 2xfloat */
+        REB_TS_CONST = PSEUDOTYPE_SIX,
 
         PSEUDOTYPE_SEVEN,
-        REB_TS_QUOTED_PATH = PSEUDOTYPE_SEVEN,  /* !!! temp compatibility */
-        REB_G_XYF = PSEUDOTYPE_SEVEN,  /* used by GOB, compact 2xfloat */
+        REB_P_SPECIALIZED = PSEUDOTYPE_SEVEN,
+        REB_V_SIGN_INTEGRAL_WIDE = PSEUDOTYPE_SEVEN,  /* used by VECTOR! */
+        REB_TS_REFINEMENT = PSEUDOTYPE_SEVEN,
 
         PSEUDOTYPE_EIGHT,
-        REB_TS_SKIN_EXPANDED = PSEUDOTYPE_EIGHT,
-        REB_V_SIGN_INTEGRAL_WIDE = PSEUDOTYPE_EIGHT,  /* used by VECTOR! */
-
-        PSEUDOTYPE_NINE,
-        REB_TS_DEQUOTE_REQUOTE = PSEUDOTYPE_NINE,
-        REB_X_BOOKMARK = PSEUDOTYPE_NINE,
-
-        PSEUDOTYPE_TEN,
-        REB_TS_REFINED_PATH = PSEUDOTYPE_TEN,  /* !!! temp (?) compatibility */
-
-        PSEUDOTYPE_ELEVEN,
-        REB_TS_CONST = PSEUDOTYPE_ELEVEN,
-
-        PSEUDOTYPE_TWELVE,
-        REB_TS_REFINEMENT = PSEUDOTYPE_TWELVE,
+        REB_TS_PREDICATE = PSEUDOTYPE_EIGHT,
 
         REB_MAX_PLUS_MAX
     };
@@ -315,12 +315,12 @@ e-types/emit {
      * SINGLE TYPE CHECK MACROS, e.g. IS_BLOCK() or IS_TAG()
      *
      * These routines are based on VAL_TYPE(), which is distinct and costs
-     * more than KIND_BYTE() in the debug build.  In some commonly called
+     * more than KIND3Q_BYTE() in the debug build.  In some commonly called
      * routines that don't differentiate literal types, it may be worth it
-     * to use KIND_BYTE() for optimization purposes.
+     * to use KIND3Q_BYTE() for optimization purposes.
      *
      * Note that due to a raw type encoding trick, IS_QUOTED() is unusual.
-     * `KIND_BYTE(v) == REB_QUOTED` isn't `VAL_TYPE(v) == REB_QUOTED`,
+     * `KIND3Q_BYTE(v) == REB_QUOTED` isn't `VAL_TYPE(v) == REB_QUOTED`,
      * they mean different things.  This is because raw types > REB_64 are
      * used to encode literals whose escaping level is low enough that it
      * can use the same cell bits as the escaped value.
@@ -328,47 +328,65 @@ e-types/emit {
 }
 e-types/emit newline
 
-boot-types: copy []
-n: 1
+boot-types: copy []  ; includes internal types like REB_NULL (but not END)
+n: 0
+
 for-each-record t type-table [
-    if issue? t/name [
-        continue  ; IS_END(), IS_NULLED(), special tests
+    if n != 0 [
+        append boot-types either issue? t/name [
+            to-word t/name
+        ][
+            to-word unspaced [form t/name "!"]
+        ]
     ]
 
-    if t/name != 'quoted [  ; see IS_QUOTED(), handled specially
+    all [
+        not issue? t/name  ; internal type
+        t/name != 'quoted  ; see IS_QUOTED(), handled specially
+    ] then [
         e-types/emit 't {
             #define IS_${T/NAME}(v) \
-                (KIND_BYTE(v) == REB_${T/NAME})  /* $<n> */
+                (KIND3Q_BYTE(v) == REB_${T/NAME})  /* $<n> */
         }
         e-types/emit newline
     ]
 
-    append boot-types to-word unspaced [form t/name "!"]
     n: n + 1
+]
+
+nontypes: collect [
+    for-each-record t type-table [
+        if issue? t/name [
+            nontype: mold t/name
+            keep cscape/with {FLAGIT_KIND(REB_${AS TEXT! T/NAME})} 't
+        ]
+    ]
+]
+
+value-flagnots: compose [
+    "(FLAGIT_KIND(REB_MAX) - 1)"  ; Subtract 1 to get mask for everything
+    ((nontypes))  ; take out all nontypes
 ]
 
 e-types/emit {
     /*
      * TYPESET DEFINITIONS (e.g. TS_ARRAY or TS_STRING)
-     *
-     * Note: User-facing typesets, such as ANY-VALUE!, do not include null
-     * (absence of a value), nor do they include the internal "REB_0" type.
      */
 
     /*
-     * Subtract 1 to get mask for everything
-     * Subtract 1 again to take out REB_0_END (signal for "endability")
-     * Subtract 2 to take out REB_1_NULLED
+     * Typeset for ANY-VALUE!
      */
     #define TS_VALUE \
-        (((FLAGIT_KIND(REB_MAX) - 1) - 1) - 2)
+        ($<Delimit "&~" Value-Flagnots>)
 
     /*
-     * Similar to TS_VALUE but accept NULL (as REB_MAX)
+     * Typeset for [<OPT> ANY-VALUE!] (similar to TS_VALUE but accept NULL)
      */
     #define TS_OPT_VALUE \
-        ((FLAGIT_KIND(REB_MAX) - 1) - 1)
+        (TS_VALUE | FLAGIT_KIND(REB_NULL))
+
 }
+
 typeset-sets: copy []
 
 for-each-record t type-table [
@@ -420,7 +438,8 @@ e-types/write-emitted
 
 === BUILT-IN TYPE HOOKS TABLE ===
 
-e-hooks: make-emitter "Built-in Type Hooks" core/tmp-type-hooks.c
+(e-hooks: make-emitter "Built-in Type Hooks"
+    make-file [(prep-dir) core/tmp-type-hooks.c])
 
 hookname: enfixed func [
     return: [text!]
@@ -430,21 +449,20 @@ hookname: enfixed func [
 ][
     if t/(column) = 0 [return "nullptr"]
 
-    unspaced [prefix propercase-of switch ensure word! t/(column) [
+    unspaced [prefix propercase-of (switch ensure word! t/(column) [
         '+ [as text! t/name]  ; type has its own unique hook
         '* [t/class]        ; type uses common hook for class
         '? ['unhooked]      ; datatype provided by extension
         '- ['fail]          ; service unavailable for type
-        default [
-            t/(column)      ; override with word in column
-        ]
-    ]]
+    ] else [
+        t/(column)      ; override with word in column
+    ])]
 ]
 
 n: 0
 hook-list: collect [
     for-each-record t type-table [
-        name: either issue? t/name [as word! t/name] [unspaced [t/name "!"]]
+        name: either issue? t/name [as text! t/name] [unspaced [t/name "!"]]
 
         keep cscape/with {
             {  /* $<NAME> = $<n> */
@@ -491,7 +509,7 @@ for-each word wordlist [
 
 first-generic-sym: sym-n
 
-boot-generics: load boot/tmp-generics.r
+boot-generics: load make-file [(prep-dir) boot/tmp-generics.r]
 for-each item boot-generics [
     if set-word? :item [
         if first-generic-sym < ((add-sym/exists to-word item) else [0]) [
@@ -503,7 +521,8 @@ for-each item boot-generics [
 
 === SYSTEM OBJECT SELECTORS ===
 
-e-sysobj: make-emitter "System Object" inc/tmp-sysobj.h
+(e-sysobj: make-emitter "System Object"
+    make-file [(prep-dir) include/tmp-sysobj.h])
 
 at-value: func ['field] [next find boot-sysobj to-set-word field]
 
@@ -514,8 +533,8 @@ change at-value build now/utc
 change at-value product quote to word! product
 
 change/only at-value platform reduce [
-    any [config/platform-name | "Unknown"]
-    any [config/build-label | ""]
+    any [config/platform-name "Unknown"]
+    any [config/build-label ""]
 ]
 
 ob: make object! boot-sysobj
@@ -605,7 +624,8 @@ evks: collect [
 
 === ERROR STRUCTURE AND CONSTANTS ===
 
-e-errfuncs: make-emitter "Error structure and functions" inc/tmp-error-funcs.h
+(e-errfuncs: make-emitter "Error structure and functions"
+    make-file [(prep-dir) include/tmp-error-funcs.h])
 
 fields: collect [
     keep {RELVAL self}
@@ -730,7 +750,8 @@ for-each section [boot-base boot-sys boot-mezz] [
     mezz-files: next mezz-files
 ]
 
-e-sysctx: make-emitter "Sys Context" inc/tmp-sysctx.h
+(e-sysctx: make-emitter "Sys Context"
+    make-file [(prep-dir) include/tmp-sysctx.h])
 
 ; We heuristically gather top level declarations in the system context, vs.
 ; trying to use LOAD and look at actual object keys.  Because this process
@@ -771,7 +792,8 @@ e-sysctx/write-emitted
 ; %tmp-boot-block.c is just a C file containing a literal constant of the
 ; compressed representation of %tmp-boot-block.r
 
-e-bootblock: make-emitter "Natives and Bootstrap" core/tmp-boot-block.c
+(e-bootblock: make-emitter "Natives and Bootstrap"
+    make-file [(prep-dir) core/tmp-boot-block.c])
 
 sections: [
     boot-types
@@ -786,7 +808,7 @@ sections: [
     :boot-mezz
 ]
 
-boot-natives: load boot/tmp-natives.r
+boot-natives: load make-file [(prep-dir) boot/tmp-natives.r]
 
 nats: collect [
     for-each val boot-natives [
@@ -832,7 +854,7 @@ for-each sec sections [
 ]
 append/line boot-molded "]"
 
-write-if-changed boot/tmp-boot-block.r boot-molded
+write-if-changed make-file [(prep-dir) boot/tmp-boot-block.r] boot-molded
 data: as binary! boot-molded
 
 compressed: gzip data
@@ -856,7 +878,8 @@ e-bootblock/write-emitted
 
 === BOOT HEADER FILE ===
 
-e-boot: make-emitter "Bootstrap Structure and Root Module" inc/tmp-boot.h
+(e-boot: make-emitter "Bootstrap Structure and Root Module"
+    make-file [(prep-dir) include/tmp-boot.h])
 
 nat-index: 0
 nids: collect [

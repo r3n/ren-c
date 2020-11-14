@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -38,13 +38,13 @@
 #else
     // C++ has reference types--use them and add extra assert it's a date
 
-    inline static REBYMD& VAL_DATE(REBCEL *v) {
+    inline static REBYMD VAL_DATE(REBCEL(const*) v) {
         assert(CELL_KIND(v) == REB_DATE);
         return EXTRA(Date, v).ymdz; // mutable reference
     }
 
-    inline static const REBYMD& VAL_DATE(const REBCEL *v) {
-        assert(CELL_KIND(v) == REB_DATE);
+    inline static REBYMD & VAL_DATE(RELVAL *v) {
+        assert(VAL_TYPE(v) == REB_DATE);
         return EXTRA(Date, v).ymdz; // const reference
     }
 #endif
@@ -79,7 +79,7 @@
 //
 #define NO_DATE_ZONE -64
 
-inline static bool Does_Date_Have_Time(const REBCEL *v)
+inline static bool Does_Date_Have_Time(REBCEL(const*) v)
 {
     assert(CELL_KIND(v) == REB_DATE);
     if (PAYLOAD(Time, v).nanoseconds == NO_DATE_TIME) {
@@ -89,7 +89,7 @@ inline static bool Does_Date_Have_Time(const REBCEL *v)
     return true;
 }
 
-inline static bool Does_Date_Have_Zone(const REBCEL *v)
+inline static bool Does_Date_Have_Zone(REBCEL(const*) v)
 {
     assert(CELL_KIND(v) == REB_DATE);
     if (VAL_DATE(v).zone == NO_DATE_ZONE)  // out of band of 7-bit field
@@ -98,7 +98,7 @@ inline static bool Does_Date_Have_Zone(const REBCEL *v)
     return true;
 }
 
-inline static int VAL_ZONE(const REBCEL *v) {
+inline static int VAL_ZONE(REBCEL(const*) v) {
     assert(Does_Date_Have_Zone(v));
     return VAL_DATE(v).zone;
 }
@@ -110,7 +110,7 @@ inline static int VAL_ZONE(const REBCEL *v) {
 //
 //=////////////////////////////////////////////////////////////////////////=//
 
-inline static REBI64 VAL_NANO(const REBCEL *v) {
+inline static REBI64 VAL_NANO(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_TIME or Does_Date_Have_Time(v));
     return PAYLOAD(Time, v).nanoseconds;
 }

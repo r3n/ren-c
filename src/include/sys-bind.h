@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -89,11 +89,8 @@
         return cast(REBSPC*, c);
     }
 
-    inline static REBSPC *VAL_SPECIFIER(const REBCEL *v) {
-        if (ANY_PATH_KIND(CELL_KIND(v)))
-            assert(VAL_INDEX_UNCHECKED(v) == 0);
-        else
-            assert(ANY_ARRAY_KIND(CELL_KIND(v)));
+    inline static REBSPC *VAL_SPECIFIER(REBCEL(const*) v) {
+        assert(ANY_ARRAY_KIND(CELL_HEART(v)));
 
         if (not EXTRA(Binding, v).node)
             return SPECIFIED;
@@ -219,7 +216,7 @@ inline static void SHUTDOWN_BINDER(struct Reb_Binder *binder) {
 //
 inline static bool Try_Add_Binder_Index(
     struct Reb_Binder *binder,
-    REBSTR *canon,
+    const REBSTR *canon,
     REBINT index
 ){
     assert(index != 0);
@@ -244,7 +241,7 @@ inline static bool Try_Add_Binder_Index(
 
 inline static void Add_Binder_Index(
     struct Reb_Binder *binder,
-    REBSTR *canon,
+    const REBSTR *canon,
     REBINT index
 ){
     bool success = Try_Add_Binder_Index(binder, canon, index);
@@ -255,7 +252,7 @@ inline static void Add_Binder_Index(
 
 inline static REBINT Get_Binder_Index_Else_0( // 0 if not present
     struct Reb_Binder *binder,
-    REBSTR *canon
+    const REBSTR *canon
 ){
     assert(GET_SERIES_INFO(canon, STRING_CANON));
 
@@ -268,7 +265,7 @@ inline static REBINT Get_Binder_Index_Else_0( // 0 if not present
 
 inline static REBINT Remove_Binder_Index_Else_0( // return old value if there
     struct Reb_Binder *binder,
-    REBSTR *canon
+    const REBSTR *canon
 ){
     assert(GET_SERIES_INFO(canon, STRING_CANON));
 
@@ -296,7 +293,7 @@ inline static REBINT Remove_Binder_Index_Else_0( // return old value if there
 
 inline static void Remove_Binder_Index(
     struct Reb_Binder *binder,
-    REBSTR *canon
+    const REBSTR *canon
 ){
     REBINT old_index = Remove_Binder_Index_Else_0(binder, canon);
     assert(old_index != 0);
@@ -337,7 +334,7 @@ struct Reb_Collector {
 inline static REBNOD *SPC_BINDING(REBSPC *specifier)
 {
     assert(specifier != UNBOUND);
-    REBVAL *rootvar = CTX_ARCHETYPE(CTX(specifier)); // works even if Decay()d
+    const REBVAL *rootvar = CTX_ARCHETYPE(CTX(specifier));  // ok if Decay()'d
     assert(IS_FRAME(rootvar));
     return EXTRA(Binding, rootvar).node;
 }
@@ -356,7 +353,7 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
     // may be shared with other REB_QUOTED instances, that can't have their
     // bindings corrupted.  A new payload must be made in that case.
     //
-    if (KIND_BYTE(out) == REB_QUOTED) {  // always claims to be bindable
+    if (KIND3Q_BYTE(out) == REB_QUOTED) {  // always claims to be bindable
         RELVAL *old = VAL_QUOTED_PAYLOAD_CELL(out);
         if (not Is_Bindable(old))
             return;  // unescaped value isn't *actually* a bindable type
@@ -420,7 +417,7 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
 // The Lookup_Word_May_Fail() function takes the conservative default that
 // only const access is needed.  A const pointer to a REBVAL is given back
 // which may be inspected, but the contents not modified.  While a bound
-// variable that is not currently set will return a REB_NULLED value,
+// variable that is not currently set will return a REB_NULL value,
 // Lookup_Word_May_Fail() on an *unbound* word will raise an error.
 //
 // Lookup_Mutable_Word_May_Fail() offers a parallel facility for getting a
@@ -435,10 +432,10 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
 // that is applicable.
 //
 inline static REBCTX *Get_Word_Context(
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
-    assert(ANY_WORD_KIND(CELL_KIND(any_word)));
+    assert(ANY_WORD_KIND(CELL_HEART(any_word)));
 
     REBNOD *binding = VAL_BINDING(any_word);
     assert(binding); // caller should check so context won't be null
@@ -506,7 +503,7 @@ inline static REBCTX *Get_Word_Context(
         // up with the body it intended to reuse.
         //
         assert(
-            ACT_UNDERLYING(NOD(binding))
+            ACT_UNDERLYING(binding)
             == ACT_UNDERLYING(VAL_ACTION(CTX_ROOTKEY(c)))
         );
     }
@@ -522,11 +519,11 @@ inline static REBCTX *Get_Word_Context(
 }
 
 static inline const REBVAL *Lookup_Word_May_Fail(
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
-        fail (Error_Not_Bound_Raw(SPECIFIC(any_word)));
+        fail (Error_Not_Bound_Raw(SPECIFIC(CELL_TO_VAL(any_word))));
 
     REBCTX *c = Get_Word_Context(any_word, specifier);
     if (GET_SERIES_INFO(c, INACCESSIBLE))
@@ -536,7 +533,7 @@ static inline const REBVAL *Lookup_Word_May_Fail(
 }
 
 static inline const REBVAL *Try_Lookup_Word(
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
@@ -551,25 +548,25 @@ static inline const REBVAL *Try_Lookup_Word(
 
 static inline const REBVAL *Get_Word_May_Fail(
     RELVAL *out,
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     const REBVAL *var = Lookup_Word_May_Fail(any_word, specifier);
     if (IS_VOID(var))
         fail (Error_Need_Non_Void_Core(
-            cast(const REBVAL*, any_word),
-            specifier
+            cast(const REBVAL*, any_word), specifier,
+            var
         ));
 
     return Move_Value(out, var);
 }
 
 static inline REBVAL *Lookup_Mutable_Word_May_Fail(
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
-        fail (Error_Not_Bound_Raw(SPECIFIC(any_word)));
+        fail (Error_Not_Bound_Raw(SPECIFIC(CELL_TO_VAL(any_word))));
 
     REBCTX *ctx = Get_Word_Context(any_word, specifier);
 
@@ -597,7 +594,7 @@ static inline REBVAL *Lookup_Mutable_Word_May_Fail(
 }
 
 inline static REBVAL *Sink_Word_May_Fail(
-    const REBCEL *any_word,
+    REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     REBVAL *var = Lookup_Mutable_Word_May_Fail(any_word, specifier);
@@ -641,7 +638,7 @@ inline static REBVAL *Derelativize(
 
     if (not Is_Bindable(v)) {
         out->extra = v->extra; // extra.binding union field isn't even active
-        return SPECIFIC(out);
+        return cast(REBVAL*, out);
     }
 
     REBNOD *binding = EXTRA(Binding, v).node;
@@ -655,8 +652,8 @@ inline static REBVAL *Derelativize(
         // needs to be a frame to have a precise invocation to lookup in.
 
       #if !defined(NDEBUG)
-        enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(v));
-        assert(ANY_WORD_KIND(kind) or ANY_ARRAY_OR_PATH_KIND(kind));
+        enum Reb_Kind heart = CELL_HEART(VAL_UNESCAPED(v));
+        assert(ANY_WORD_KIND(heart) or ANY_ARRAY_OR_PATH_KIND(heart));
 
         if (not specifier) {
             printf("Relative item used with SPECIFIED\n");
@@ -714,7 +711,7 @@ inline static REBVAL *Derelativize(
     // in case the caller had a relative value slot and wants to use its
     // known non-relative form... this is inline, so no cost if not used.
     //
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -749,9 +746,9 @@ inline static REBVAL *Derelativize(
 // would need such derivation.
 //
 
-inline static REBSPC *Derive_Specifier(REBSPC *parent, const REBCEL *item) {
+inline static REBSPC *Derive_Specifier(REBSPC *parent, REBCEL(const*) item) {
     if (IS_SPECIFIC(item))
-        return VAL_SPECIFIER(SPECIFIC(item));
+        return VAL_SPECIFIER(SPECIFIC(CELL_TO_VAL(item)));
     return parent;
 }
 
@@ -775,7 +772,7 @@ inline static REBSPC *Derive_Specifier(REBSPC *parent, const REBCEL *item) {
 //
 // Instead write:
 //
-//     Bind_Values_Deep(VAL_ARRAY_HEAD(block), context);
+//     Bind_Values_Deep(ARR_HEAD(VAL_ARRAY(block)), context);
 //
 // That will pass the address of the first value element of the block's
 // contents.  You could use a later value element, but note that the interface

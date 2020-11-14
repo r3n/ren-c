@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -33,10 +33,10 @@
 //  {Joins a block of values into TEXT! with delimiters}
 //
 //      return: "Null if blank input or block's contents are all null"
-//          [<opt> text!]
+//          [<opt> text! issue!]
 //      delimiter [<opt> blank! char! text!]
 //      line "Will be copied if already a text value"
-//          [<blank> text! block!]
+//          [<blank> text! block! issue!]
 //  ]
 //
 REBNATIVE(delimit)
@@ -44,7 +44,7 @@ REBNATIVE(delimit)
     INCLUDE_PARAMS_OF_DELIMIT;
 
     REBVAL *line = ARG(line);
-    if (IS_TEXT(line))
+    if (IS_TEXT(line) or IS_ISSUE(line))
         return rebValueQ("copy", line, rebEND); // !!! Review performance
 
     assert(IS_BLOCK(line));
@@ -176,8 +176,8 @@ REBNATIVE(enhex)
     DECLARE_MOLD (mo);
     Push_Mold (mo);
 
-    REBLEN len = VAL_LEN_AT(ARG(string));
-    REBCHR(const*) cp = VAL_STRING_AT(ARG(string));
+    REBLEN len;
+    REBCHR(const*) cp = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, ARG(string));
 
     REBUNI c;
     cp = NEXT_CHR(&c, cp);
@@ -208,62 +208,67 @@ REBNATIVE(enhex)
             encoded_size = 1;
 
             switch (GET_LEX_CLASS(c)) {
-            case LEX_CLASS_DELIMIT:
+              case LEX_CLASS_DELIMIT:
                 switch (GET_LEX_VALUE(c)) {
-                case LEX_DELIMIT_LEFT_PAREN:
-                case LEX_DELIMIT_RIGHT_PAREN:
-                case LEX_DELIMIT_LEFT_BRACKET:
-                case LEX_DELIMIT_RIGHT_BRACKET:
-                case LEX_DELIMIT_SLASH:
-                case LEX_DELIMIT_SEMICOLON:
+                  case LEX_DELIMIT_LEFT_PAREN:
+                  case LEX_DELIMIT_RIGHT_PAREN:
+                  case LEX_DELIMIT_LEFT_BRACKET:
+                  case LEX_DELIMIT_RIGHT_BRACKET:
+                  case LEX_DELIMIT_SLASH:
+                  case LEX_DELIMIT_PERIOD:
+                  case LEX_DELIMIT_TILDE:
+                  case LEX_DELIMIT_COMMA:
                     goto leave_as_is;
 
-                case LEX_DELIMIT_SPACE: // includes control characters
-                case LEX_DELIMIT_END: // 00 null terminator
-                case LEX_DELIMIT_LINEFEED:
-                case LEX_DELIMIT_RETURN: // e.g. ^M
-                case LEX_DELIMIT_LEFT_BRACE:
-                case LEX_DELIMIT_RIGHT_BRACE:
-                case LEX_DELIMIT_DOUBLE_QUOTE:
+                  case LEX_DELIMIT_SPACE:  // includes control characters
+                  case LEX_DELIMIT_END:  // 00 null terminator
+                  case LEX_DELIMIT_LINEFEED:
+                  case LEX_DELIMIT_RETURN:  // e.g. ^M
+                  case LEX_DELIMIT_LEFT_BRACE:
+                  case LEX_DELIMIT_RIGHT_BRACE:
+                  case LEX_DELIMIT_DOUBLE_QUOTE:
                     goto needs_encoding;
 
-                case LEX_DELIMIT_UTF8_ERROR: // not for c < 0x80
-                default:
+                  case LEX_DELIMIT_UTF8_ERROR:  // not for c < 0x80
+                  default:
                     panic ("Internal LEX_DELIMIT table error");
                 }
                 goto leave_as_is;
 
-            case LEX_CLASS_SPECIAL:
+              case LEX_CLASS_SPECIAL:
                 switch (GET_LEX_VALUE(c)) {
-                case LEX_SPECIAL_AT:
-                case LEX_SPECIAL_COLON:
-                case LEX_SPECIAL_APOSTROPHE:
-                case LEX_SPECIAL_PLUS:
-                case LEX_SPECIAL_MINUS:
-                case LEX_SPECIAL_BLANK:
-                case LEX_SPECIAL_PERIOD:
-                case LEX_SPECIAL_COMMA:
-                case LEX_SPECIAL_POUND:
-                case LEX_SPECIAL_DOLLAR:
+                  case LEX_SPECIAL_AT:
+                  case LEX_SPECIAL_COLON:
+                  case LEX_SPECIAL_APOSTROPHE:
+                  case LEX_SPECIAL_PLUS:
+                  case LEX_SPECIAL_MINUS:
+                  case LEX_SPECIAL_BLANK:
+                  case LEX_SPECIAL_POUND:
+                  case LEX_SPECIAL_DOLLAR:
+                  case LEX_SPECIAL_SEMICOLON:
                     goto leave_as_is;
 
-                default:
-                    goto needs_encoding; // what is LEX_SPECIAL_WORD?
+                  case LEX_SPECIAL_WORD:
+                    assert(false);  // only occurs in use w/Prescan_Token()
+                    goto leave_as_is;
+
+                  default:
+                    goto needs_encoding;
                 }
                 goto leave_as_is;
 
-            case LEX_CLASS_WORD:
+              case LEX_CLASS_WORD:
                 if (
                     (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z')
                     or c == '?' or c == '!' or c == '&'
-                    or c == '*' or c == '=' or c == '~'
+                    or c == '*' or c == '='
                 ){
-                    goto leave_as_is; // this is all that's leftover
+                    goto leave_as_is;  // this is all that's leftover
                 }
                 goto needs_encoding;
 
-            case LEX_CLASS_NUMBER:
-                goto leave_as_is; // 0-9 needs no encoding.
+              case LEX_CLASS_NUMBER:
+                goto leave_as_is;  // 0-9 needs no encoding.
             }
 
         leave_as_is:;
@@ -324,8 +329,8 @@ REBNATIVE(dehex)
     REBYTE scan[5];
     REBSIZ scan_size = 0;
 
-    REBLEN len = VAL_LEN_AT(ARG(string));
-    REBCHR(const*) cp = VAL_STRING_AT(ARG(string));
+    REBLEN len;
+    REBCHR(const*) cp = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, ARG(string));
 
     REBUNI c;
     cp = NEXT_CHR(&c, cp);
@@ -455,12 +460,12 @@ REBNATIVE(deline)
         return D_OUT;
     }
 
-    REBSTR *s = VAL_STRING(input);
+    REBSTR *s = VAL_STRING_ENSURE_MUTABLE(input);
     REBLEN len_head = STR_LEN(s);
 
     REBLEN len_at = VAL_LEN_AT(input);
 
-    REBCHR(*) dest = VAL_STRING_AT(input);
+    REBCHR(*) dest = VAL_STRING_AT_KNOWN_MUTABLE(input);
     REBCHR(const*) src = dest;
 
     // DELINE tolerates either LF or CR LF, in order to avoid disincentivizing
@@ -522,11 +527,11 @@ REBNATIVE(enline)
 
     REBVAL *val = ARG(string);
 
-    REBSTR *s = VAL_STRING(val);
+    REBSTR *s = VAL_STRING_ENSURE_MUTABLE(val);
     REBLEN idx = VAL_INDEX(val);
 
     REBLEN len;
-    REBSIZ size = VAL_SIZE_LIMIT_AT(&len, val, UNKNOWN);
+    REBSIZ size = VAL_SIZE_LIMIT_AT(&len, val, UNLIMITED);
 
     REBLEN delta = 0;
 
@@ -788,13 +793,13 @@ REBNATIVE(to_hex)
     if (REF(size))
         len = cast(REBLEN, VAL_INT64(ARG(size)));
     else
-        len = UNKNOWN;
+        len = UNLIMITED;
 
     DECLARE_MOLD (mo);
     Push_Mold(mo);
 
     if (IS_INTEGER(arg)) {
-        if (len == UNKNOWN || len > MAX_HEX_LEN)
+        if (len == UNLIMITED || len > MAX_HEX_LEN)
             len = MAX_HEX_LEN;
 
         Form_Hex_Pad(mo, VAL_INT64(arg), len);
@@ -802,14 +807,14 @@ REBNATIVE(to_hex)
     else if (IS_TUPLE(arg)) {
         REBLEN n;
         if (
-            len == UNKNOWN
+            len == UNLIMITED
             || len > 2 * MAX_TUPLE
-            || len > cast(REBLEN, 2 * VAL_TUPLE_LEN(arg))
+            || len > cast(REBLEN, 2 * VAL_SEQUENCE_LEN(arg))
         ){
-            len = 2 * VAL_TUPLE_LEN(arg);
+            len = 2 * VAL_SEQUENCE_LEN(arg);
         }
-        for (n = 0; n != VAL_TUPLE_LEN(arg); n++)
-            Form_Hex2(mo, VAL_TUPLE(arg)[n]);
+        for (n = 0; n != VAL_SEQUENCE_LEN(arg); n++)
+            Form_Hex2(mo, VAL_SEQUENCE_BYTE_AT(arg, n));
         for (; n < 3; n++)
             Form_Hex2(mo, 0);
     }
@@ -853,7 +858,7 @@ REBNATIVE(find_script)
     Move_Value(D_OUT, arg);
 
     if (IS_BINARY(arg)) {  // may not all be valid UTF-8
-        VAL_INDEX(D_OUT) += offset;
+        VAL_INDEX_RAW(D_OUT) += offset;
         return D_OUT;
     }
 
@@ -866,11 +871,11 @@ REBNATIVE(find_script)
     const REBYTE *header_bp = bp + offset;
 
     REBLEN index = VAL_INDEX(arg);
-    REBCHR(*) cp = VAL_STRING_AT(arg);
+    REBCHR(const*) cp = VAL_STRING_AT(arg);
     for (; cp != header_bp; cp = NEXT_STR(cp))
         ++index;
 
-    VAL_INDEX(D_OUT) = index;
+    VAL_INDEX_RAW(D_OUT) = index;
     return D_OUT;
 }
 
@@ -901,17 +906,18 @@ REBNATIVE(invalid_utf8_q)
     INCLUDE_PARAMS_OF_INVALID_UTF8_Q;
 
     REBVAL *arg = ARG(data);
-    REBYTE *utf8 = VAL_BIN_AT(arg);
-    REBSIZ size = VAL_LEN_AT(arg);
 
-    REBYTE *end = utf8 + size;
+    REBSIZ size;
+    const REBYTE *utf8 = VAL_BINARY_SIZE_AT(&size, arg);
+
+    const REBYTE *end = utf8 + size;
 
     REBLEN trail;
     for (; utf8 != end; utf8 += trail) {
         trail = trailingBytesForUTF8[*utf8] + 1;
         if (utf8 + trail > end or not isLegalUTF8(utf8, trail)) {
             Move_Value(D_OUT, arg);
-            VAL_INDEX(D_OUT) = utf8 - VAL_BIN_HEAD(arg);
+            VAL_INDEX_RAW(D_OUT) = utf8 - BIN_HEAD(VAL_BINARY(arg));
             return D_OUT;
         }
     }

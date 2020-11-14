@@ -3,7 +3,7 @@ REBOL [
     Title: "Generate native specifications"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2020 Rebol Open Source Developers
+        Copyright 2012-2020 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -66,9 +66,9 @@ do %native-emitters.r ;for emit-native-proto
 
 print "------ Generate tmp-natives.r"
 
-src-dir: %../src
-output-dir: system/options/path/prep
-mkdir/deep output-dir/boot
+src-dir: %../src/
+output-dir: make-file [(system/options/path) prep /]
+mkdir/deep make-file [(output-dir) boot /]
 
 verbose: false
 
@@ -81,9 +81,9 @@ process: function [
     the-file: file
     if verbose [probe [file]]
 
-    source.text: read/string file
+    source-text: read/string file
     proto-parser/emit-proto: :emit-native-proto
-    proto-parser/process source.text
+    proto-parser/process source-text
 ]
 
 ;-------------------------------------------------------------------------
@@ -108,12 +108,12 @@ gather-natives: func [dir] [
     ]
 ]
 
-gather-natives src-dir/core/%
+gather-natives make-file [(src-dir) core /]
 
 
 append output-buffer unsorted-buffer
 
-write-if-changed output-dir/boot/tmp-natives.r output-buffer
+write-if-changed make-file [(output-dir) boot/tmp-natives.r] output-buffer
 
 print [proto-count "natives"]
 print newline
@@ -139,9 +139,9 @@ append output-buffer {REBOL [
 
 }
 
-boot-types: load src-dir/boot/types.r
+boot-types: load make-file [(src-dir) boot/types.r]
 
-append output-buffer mold/only load src-dir/boot/generics.r
+append output-buffer mold/only load make-file [(src-dir) boot/generics.r]
 
 append output-buffer unspaced [
     newline
@@ -149,4 +149,4 @@ append output-buffer unspaced [
     newline
 ]
 
-write-if-changed output-dir/boot/tmp-generics.r output-buffer
+write-if-changed make-file [(output-dir) boot/tmp-generics.r] output-buffer

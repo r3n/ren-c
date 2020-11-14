@@ -3,7 +3,7 @@ REBOL [
     Title: "REBOL 3 Boot Base: Other Definitions"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Developers
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -29,17 +29,6 @@ c-break-debug: :c-debug-break  ; easy to mix up
 
 lit: :literal  ; because it's shorter
 
-|: enfixed func* [
-    "Expression barrier - invisible so it vanishes, but blocks evaluation"
-    return: []
-    discarded [<opt> <end> any-value!]
-][
-    ; Note: actually *faster* than a native, due to Commenter_Dispatcher()
-]
-
-tweak :| 'postpone on
-
-
 ??:  ; shorthand form to use in debug sessions, not intended to be committed
 probe: func* [
     {Debug print a molded value and returns that same value.}
@@ -49,12 +38,12 @@ probe: func* [
     value [<opt> any-value!]
 ][
     either set? 'value [
-        write-stdout mold :value
+        write-stdout mold get/any 'value
     ][
         write-stdout "; null"  ; MOLD won't take nulls
     ]
     write-stdout newline
-    :value
+    get/any 'value
 ]
 
 
@@ -69,15 +58,55 @@ tweak :then 'defer on
 tweak :also 'defer on
 
 
+; ARITHMETIC OPERATORS
+;
+; Note that `/` is actually path containing two elements, both of which are
+; BLANK! so they do not render.  A special mechanism through a word binding
+; hidden in the cell allows it to dispatch.  See Startup_Sequence_1_Symbol()
+
++: enfixed :add
+-: enfixed :subtract
+*: enfixed :multiply
+-slash-1-: enfixed :divide  ; TBD: make `/: enfixed :divide` act equivalently
+
+
+; SET OPERATORS
+
+not+: :bitwise-not
+and+: enfixed :bitwise-and
+or+: enfixed :bitwise-or
+xor+: enfixed :bitwise-xor
+and-not+: enfixed :bitwise-and-not
+
+
+; COMPARISON OPERATORS
+;
+; !!! See discussion about the future of comparison operators:
+; https://forum.rebol.info/t/349
+
+=: enfixed :equal?
+<>: enfixed :not-equal?
+<: enfixed :lesser?
+>: enfixed :greater?
+
+>=: enfixed :greater-or-equal?
+=<: <=: enfixed :equal-or-lesser?  ; https://forum.rebol.info/t/349/11
+!=: enfixed :not-equal?  ; http://www.rebol.net/r3blogs/0017.html
+==: enfixed :strict-equal?  ; !!! https://forum.rebol.info/t/349
+!==: enfixed :strict-not-equal?  ; !!! bad pairing, most would think !=
+
+=?: enfixed :same?
+
+
 ; Common "Invisibles"
 
 comment: enfixed func* [
     {Ignores the argument value, but does no evaluation (see also ELIDE).}
 
-    return: []
+    return: <elide>
         {The evaluator will skip over the result (not seen, not even void)}
     returned [<opt> <end> any-value!]
-        {The returned value.}  ; by protocol of enfixed `return: []`
+        {The returned value.}  ; by protocol of enfixed `return: <invisible>`
     :discarded [block! any-string! binary! any-scalar!]
         "Literal value to be ignored."  ; `comment print "hi"` disallowed
 ][
@@ -86,7 +115,7 @@ comment: enfixed func* [
 elide: func* [
     {Argument is evaluative, but discarded (see also COMMENT).}
 
-    return: []
+    return: <elide>
         {The evaluator will skip over the result (not seen, not even void)}
     discarded [<opt> any-value!]
         {Evaluated value to be ignored.}
@@ -95,7 +124,7 @@ elide: func* [
 
 nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
     {Arity-0 COMMENT (use to replace an arity-0 function with side effects)}
-    return: [] {Evaluator will skip result}
+    return: <elide> {Evaluator will skip result}
 ][
     ; https://github.com/metaeducation/ren-c/issues/581#issuecomment-562875470
 ]
@@ -104,17 +133,30 @@ nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
 ; it could dump those remarks out...perhaps based on how many == there are.
 ; (This is a good reason for retaking ==, as that looks like a divider.)
 ;
-===: func* [:remarks [any-value! <...>]] [
+===: func* [:remarks [any-value! <variadic>]] [
     until [
         equal? '=== take remarks
     ]
 ]
 
+; COMMA! is the new expression barrier.  But `||` is included as a redefine of
+; the old `|`, so that the barrier-making properties of a usermode entity can
+; stay tested.  But outside of testing, use `,` instead.
+;
+||: func* [
+    "Expression barrier - invisible so it vanishes, but blocks evaluation"
+    return: <elide>
+][
+    ; Note: actually *faster* than a native, due to Commenter_Dispatcher()
+]
+
+tweak :|| 'barrier on
+
 |||: func* [
     {Inertly consumes all subsequent data, evaluating to previous result.}
 
-    return: []
-    :omit [any-value! <...>]
+    return: <elide>
+    :omit [any-value! <variadic>]
 ][
     until [null? take omit]
 ]
@@ -144,7 +186,7 @@ pointfree*: func* [
         match [word! lit-word! get-word!] w  ; !!! what about skippable params?
     ]
 
-    frame: make frame! :action  ; all frame fields default to NULL
+    frame: make frame! get 'action  ; use GET to avoid :action name cache
 
     ; Step through the block we are given--first looking to see if there is
     ; a BLANK! in the slot where a parameter was accepted.  If it is blank,
@@ -155,10 +197,11 @@ pointfree*: func* [
     for-skip p params 1 [
         case [
             ; !!! Have to use STRICT-EQUAL?, else '_ says type equal to blank
-            strict-equal? blank! type of :block/1 [block: skip block 1]
+            blank! == type of :block/1 [block: skip block 1]
 
             match word! p/1 [
-                if not block: try evaluate @var block [
+                until [not quoted? block: try evaluate/result block 'var]
+                if not block [
                     break  ; ran out of args, assume remaining unspecialized
                 ]
                 frame/(p/1): :var
@@ -181,7 +224,7 @@ pointfree*: func* [
     ]
 
     if :block/1 [
-        fail 'block ["Unused argument data at end of POINTFREE block"]
+        fail @block ["Unused argument data at end of POINTFREE block"]
     ]
 
     ; We now create an action out of the frame.  NULL parameters are taken as
@@ -218,14 +261,14 @@ inherit-meta: func* [
     /augment "Additional spec information to scan"
         [block!]
 ][
-    if not equal? action! reflect :original 'type [original: get original]
+    if action! <> reflect :original 'type [original: get original]
     if let m1: meta-of :original [
         set-meta :derived let m2: copy :m1  ; shallow copy
         if in m1 'parameter-notes [  ; shallow copy, but make frame match
             m2/parameter-notes: make frame! :derived
             for-each [key value] :m1/parameter-notes [
                 if in m2/parameter-notes key [
-                    m2/parameter-notes/(key): :value
+                    m2/parameter-notes/(key): get* 'value  ; !!! VOID!s
                 ]
             ]
         ]
@@ -233,46 +276,66 @@ inherit-meta: func* [
             m2/parameter-types: make frame! :derived
             for-each [key value] :m1/parameter-types [
                 if in m2/parameter-types key [
-                    m2/parameter-types/(key): :value
+                    m2/parameter-types/(key): get* 'value  ; !!! VOID!s
                 ]
             ]
         ]
     ]
-    return :derived
+    return get 'derived  ; no :derived name cache
 ]
 
-enclose: enclose* 'enclose* func* [f] [  ; uses low-level ENCLOSE* to make
+enclose: enclose* :enclose* func* [f] [  ; uses low-level ENCLOSE* to make
     let inner: f/inner: compose :f/inner
-    inherit-meta do f :inner
+    inherit-meta do f get 'inner  ; no :inner name cache
 ]
-inherit-meta :enclose 'enclose*  ; needed since we used ENCLOSE*
+inherit-meta :enclose :enclose*  ; needed since we used ENCLOSE*
 
-specialize: enclose 'specialize* func* [f] [  ; now we have high-level ENCLOSE
+specialize: enclose :specialize* func* [f] [  ; now we have high-level ENCLOSE
     let specializee: f/specializee: compose :f/specializee
-    inherit-meta do f :specializee
+    inherit-meta do f get 'specializee  ; no :specializee name cache
 ]
 
-adapt: enclose 'adapt* func* [f] [
+adapt: enclose :adapt* func* [f] [
     let adaptee: f/adaptee: compose :f/adaptee
-    inherit-meta do f :adaptee
+    inherit-meta do f get 'adaptee  ; no :adaptee name cache
 ]
 
-chain: enclose 'chain* func* [f] [
+chain: enclose :chain* func* [f] [
+    ;
+    ; !!! Historically CHAIN supported | for "pipe" but it was really just an
+    ; expression barrier.  Review this idea, but for now let it work in a
+    ; dialect way by replacing with commas.
+    ;
+    f/pipeline: map-each x f/pipeline [
+        either :x = '| [
+            ',
+        ][
+            :x
+        ]
+    ]
+
     let pipeline: f/pipeline: reduce :f/pipeline
     inherit-meta do f pick pipeline 1
 ]
 
-augment: enclose 'augment* func* [f] [
+augment: enclose :augment* func* [f] [
     let augmentee: f/augmentee: compose :f/augmentee
     let spec: :f/spec
-    inherit-meta/augment do f :augmentee spec
+    inherit-meta/augment do f get 'augmentee spec  ; no :augmentee name cache
+]
+
+reframer: enclose :reframer* func* [f] [
+    let shim: f/shim: compose :f/shim
+    inherit-meta do f get 'shim
 ]
 
 ; The lower-level pointfree function separates out the action it takes, but
-; the higher level one uses a block.  Specialize out the action as void, and
-; then overwrite it in the enclosure with an action taken out of the block.
+; the higher level one uses a block.  Specialize out the action, and then
+; overwrite it in the enclosure with an action taken out of the block.
 ;
-pointfree: enclose (specialize* 'pointfree* [action: :void]) func* [f] [
+pointfree: enclose (specialize* :pointfree* [
+    action: :panic-value  ; gets overwritten, best to make it something mean
+]) func* [f] [
     let action: f/action: (match action! any [
         if match [word! path!] :f/block/1 [get compose f/block/1]
         :f/block/1
@@ -283,30 +346,53 @@ pointfree: enclose (specialize* 'pointfree* [action: :void]) func* [f] [
     ; rest of block is invocation by example
     f/block: skip f/block 1  ; Note: NEXT not defined yet
 
-    inherit-meta do f :action
+    inherit-meta do f get 'action  ; no :action name cache
 ]
 
 
-=>: enfixed lambda: func* [
-    {Convenience variadic wrapper for MAKE ACTION! or POINTFREE}
+; REQUOTE is helpful when functions do not accept QUOTED! values.
+;
+requote: reframer func* [
+    {Remove Quoting Levels From First Argument and Re-Apply to Result}
+    f [frame!]
+    <local> p num-quotes result
+][
+    p: first words of f
+    num-quotes: quotes of f/(p)
+
+    f/(p): dequote f/(p)
+    
+    if null? result: do f [return null]
+
+    return quote/depth get/any 'result num-quotes
+]
+
+
+->: enfixed lambda: func* [
+    {Convenience wrapper for MAKE ACTION! (Note: does not provide RETURN)}
 
     return: [action!]
-    :args [<end> word! block!]
-        {Block of argument words, or a single word (if only one argument)}
-    :body [any-value! <...>]
-        {Block that serves as the body, or pointfree expression if no block}
+    'args "Block of argument words, or a single word (if one argument)"
+        [<end> word! block!]
+    body "Block that serves as the body"
+        [block!]
 ][
-    if strict-equal? block! type of pick body 1 [
-        make action! compose [  ; use MAKE ACTION! for no RETURN handling
-            (blockify :args)
-            (const take body)
-        ]
-    ] else [
-        if :args [
-            fail 'args ["=> without block on right hand side can't take args"]
-        ]
-        pointfree make block! body  ; !!! Allow varargs direct for efficiency?
+    make action! reduce [  ; use MAKE ACTION! for no RETURN handling
+        blockify dequote args  ; note NULL for <end> produces `[]`
+        body
     ]
+]
+
+<-: enfixed func* [
+    {Declare action by example instantiation, missing args left unspecialized}
+
+    return: [action!]
+    :left "Enforces nothing to the left of the pointfree expression"
+        [<end>]
+    :expression "POINTFREE expression, BLANK!s are unspecialized arg slots"
+        [any-value! <...>]
+][
+    pointfree make block! expression  ; !!! Allow Vararg param for efficiency?
 ]
 
 
@@ -315,27 +401,21 @@ pointfree: enclose (specialize* 'pointfree* [action: :void]) func* [f] [
 ; specializations they don't fit easily into the NEXT OF SERIES model--this
 ; is a problem which hasn't been addressed.
 ;
-next: specialize 'skip [
-    offset: 1
-    only: true  ; don't clip (return null if already at head of series)
-]
-back: specialize 'skip [
-    offset: -1
-    only: true  ; don't clip (return null if already at tail of series)
-]
+next: specialize :skip [offset: 1]
+back: specialize :skip [offset: -1]
 
-bound?: chain [specialize 'reflect [property: 'binding] | :value?]
+bound?: chain [specialize :reflect [property: 'binding] | :value?]
 
-unspaced: adapt specialize 'delimit [delimiter: "null-me"] [delimiter: null]
-unspaced-text: chain [:unspaced | specialize 'else [branch: [copy ""]]]
+unspaced: specialize :delimit [delimiter: null]
+unspaced-text: chain [:unspaced | specialize :else [branch: [copy ""]]]
 
-spaced: specialize 'delimit [delimiter: space]
-spaced-text: chain [:spaced | specialize 'else [branch: [copy ""]]]
+spaced: specialize :delimit [delimiter: space]
+spaced-text: chain [:spaced | specialize :else [branch: [copy ""]]]
 
 newlined: chain [
-    adapt specialize 'delimit [delimiter: newline] [
+    adapt specialize :delimit [delimiter: newline] [
         if text? :line [
-            fail 'line "NEWLINED on TEXT! semantics being debated"
+            fail @line "NEWLINED on TEXT! semantics being debated"
         ]
     ]
         |
@@ -371,10 +451,10 @@ an: func* [
 ; {Returns TRUE if port is open.}
 ; port [port!]
 
-head?: specialize 'reflect [property: 'head?]
-tail?: specialize 'reflect [property: 'tail?]
-past?: specialize 'reflect [property: 'past?]
-open?: specialize 'reflect [property: 'open?]
+head?: specialize :reflect [property: 'head?]
+tail?: specialize :reflect [property: 'tail?]
+past?: specialize :reflect [property: 'past?]
+open?: specialize :reflect [property: 'open?]
 
 
 empty?: func* [
@@ -382,18 +462,18 @@ empty?: func* [
     return: [logic!]
     series [any-series! object! port! bitset! map! blank!]
 ][
-    did any [blank? series | tail? series]
+    did any [blank? series, tail? series]
 ]
 
 
 reeval func* [
     {Make fast type testing functions (variadic to quote "top-level" words)}
     return: <void>
-    'set-word... [set-word! tag! <...>]
+    'set-words [<variadic> set-word! tag!]
     <local>
         set-word type-name tester meta
 ][
-    while [not equal? <end> set-word: take set-word...] [
+    while [<end> != set-word: take set-words] [
         type-name: copy as text! set-word
         change back tail of type-name "!"  ; change ? at tail to !
         tester: typechecker (get bind (as word! type-name) set-word)
@@ -407,12 +487,12 @@ reeval func* [
 ]
     void?:
     blank?:
+    comma?:
     logic?:
     integer?:
     decimal?:
     percent?:
     money?:
-    char?:
     pair?:
     tuple?:
     time?:
@@ -472,13 +552,19 @@ reeval func* [
 ; %words.r for bootstrap compatibility as a parse keyword.
 
 lit-word?: func* [value [<opt> any-value!]] [
-    lit-word! == type of :value  ; note plain = would not work here
+    did all [
+        quoted? :value
+        word! = type of unquote value
+    ]
 ]
 to-lit-word: func* [value [any-value!]] [
     quote to word! dequote :value
 ]
 lit-path?: func* [value [<opt> any-value!]] [
-    lit-path! == type of :value  ; note plain = would not work here
+    did all [
+        quoted? :value
+        path! = type of unquote value
+    ]
 ]
 to-lit-path: func* [value [any-value!]] [
     quote to path! dequote :value
@@ -487,12 +573,18 @@ to-lit-path: func* [value [any-value!]] [
 refinement?: func* [value [<opt> any-value!]] [
     did all [
         path? :value
-        equal? length of value 2  ; Called by FUNCTION when = not defined yet
+        2 = length of value
         blank? :value/1
         word? :value/2
     ]
 ]
-; !!! refinement! is set to #refinement! during boot; signals a PATH! filter
+
+char?: func* [value [<opt> any-value!]] [
+    did all [
+        issue? :value
+        1 >= length of value
+    ]
+]
 
 print: func* [
     {Textually output spaced line (evaluating elements if a block)}
@@ -503,13 +595,13 @@ print: func* [
         [<blank> char! text! block!]
 ][
     if char? line [
-        if not equal? line newline [
+        if line <> newline [
             fail "PRINT only allows CHAR! of newline (see WRITE-STDOUT)"
         ]
         return write-stdout line
     ]
 
-    (write-stdout try spaced line) then [write-stdout newline]
+    (write-stdout try spaced line) then @[write-stdout newline]
 ]
 
 

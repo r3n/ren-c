@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -42,7 +42,7 @@
 
 
 #define VAL_EVENT_TYPE(v) \
-    cast(const REBSYM, FIRST_UINT16(EXTRA(Any, (v)).u))
+    cast(REBSYM, FIRST_UINT16(EXTRA(Any, (v)).u))
 
 inline static void SET_VAL_EVENT_TYPE(REBVAL *v, REBSYM sym) {
     SET_FIRST_UINT16(EXTRA(Any, (v)).u, sym);
@@ -150,12 +150,12 @@ inline static void SET_VAL_EVENT_Y(REBVAL *v, uint16_t y) {
 // !!! These hooks allow the REB_GOB cell type to dispatch to code in the
 // EVENT! extension if it is loaded.
 //
-extern REBINT CT_Event(const REBCEL *a, const REBCEL *b, REBINT mode);
+extern REBINT CT_Event(REBCEL(const*) a, REBCEL(const*) b, bool strict);
 extern REB_R MAKE_Event(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
 extern REB_R TO_Event(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
-extern void MF_Event(REB_MOLD *mo, const REBCEL *v, bool form);
+extern void MF_Event(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Event);
-extern REB_R PD_Event(REBPVS *pvs, const REBVAL *picker, const REBVAL *opt_setval);
+extern REB_R PD_Event(REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval);
 
 // !!! The port scheme is also being included in the extension.
 
@@ -195,7 +195,7 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
 
     mutable_VAL_GOB(out) = g;
     VAL_GOB_INDEX(out) = 0;
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

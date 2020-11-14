@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -32,15 +32,15 @@
 //
 //  CT_Date: C
 //
-REBINT CT_Date(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     REBYMD dat_a = VAL_DATE(a);
     REBYMD dat_b = VAL_DATE(b);
 
-    if (mode == 1) {
+    if (strict) {
         if (Does_Date_Have_Zone(a)) {
             if (not Does_Date_Have_Zone(b))
-                return 0; // can't be equal
+                return 1;  // can't be equal
 
             if (
                 dat_a.year != dat_b.year
@@ -48,12 +48,12 @@ REBINT CT_Date(const REBCEL *a, const REBCEL *b, REBINT mode)
                 or dat_a.day != dat_b.year
                 or dat_a.zone != dat_b.zone
             ){
-                return 0; // both have zones, all bits must be equal
+                return 1;  // both have zones, all bits must be equal
             }
         }
         else {
             if (Does_Date_Have_Zone(b))
-                return 0; // a doesn't have, b does, can't be equal
+                return 1;  // a doesn't have, b does, can't be equal
 
             if (
                 dat_a.year != dat_b.year
@@ -61,43 +61,54 @@ REBINT CT_Date(const REBCEL *a, const REBCEL *b, REBINT mode)
                 or dat_a.day != dat_b.day
                 // old code here ignored .zone
             ){
-                return 0; // canonized to 0 zone not equal
+                return 1;  // canonized to 0 zone not equal
             }
         }
 
         if (Does_Date_Have_Time(a)) {
             if (not Does_Date_Have_Time(b))
-                return 0; // can't be equal;
+                return 1;  // can't be equal;
 
             if (VAL_NANO(a) != VAL_NANO(b))
-                return 0; // both have times, all bits must be equal
+                return 1;  // both have times, all bits must be equal
         }
         else {
             if (Does_Date_Have_Time(b))
-                return 0; // a doesn't have, b, does, can't be equal
+                return 1; // a doesn't have, b, does, can't be equal
 
             // neither have times so equal
         }
-        return 1;
+        return 0;
     }
 
-    REBINT num = Cmp_Date(a, b);
-    if (mode >= 0)  return (num == 0);
-    if (mode == -1) return (num >= 0);
-    return (num > 0);
+    REBINT diff = Diff_Date(VAL_DATE(a), VAL_DATE(b));
+    if (diff != 0)
+        return diff;
+
+    if (not Does_Date_Have_Time(a)) {
+        if (not Does_Date_Have_Time(b))
+            return 0;  // equal if no diff and neither has a time
+
+        return -1;  // b is bigger if no time on a
+    }
+
+    if (not Does_Date_Have_Time(b))
+        return 1;  // a is bigger if no time on b
+
+    return CT_Time(a, b, strict);
 }
 
 
 //
 //  MF_Date: C
 //
-void MF_Date(REB_MOLD *mo, const REBCEL *v_orig, bool form)
+void MF_Date(REB_MOLD *mo, REBCEL(const*) v_orig, bool form)
 {
     // We can't/shouldn't modify the incoming date value we are molding, so we
     // make a copy that we can tweak during the emit process
 
     DECLARE_LOCAL (v);
-    Move_Value(v, SPECIFIC(v_orig));
+    Move_Value(v, SPECIFIC(CELL_TO_VAL(v_orig)));
 
     if (
         VAL_MONTH(v) == 0
@@ -419,29 +430,6 @@ void Subtract_Date(REBVAL *d1, REBVAL *d2, REBVAL *result)
 
 
 //
-//  Cmp_Date: C
-//
-REBINT Cmp_Date(const REBCEL *d1, const REBCEL *d2)
-{
-    REBINT diff = Diff_Date(VAL_DATE(d1), VAL_DATE(d2));
-    if (diff != 0)
-        return diff;
-
-    if (not Does_Date_Have_Time(d1)) {
-        if (not Does_Date_Have_Time(d2))
-            return 0; // equal if no diff and neither has a time
-
-        return -1; // d2 is bigger if no time on d1
-    }
-
-    if (not Does_Date_Have_Time(d2))
-        return 1; // d1 is bigger if no time on d2
-
-    return Cmp_Time(d1, d2);
-}
-
-
-//
 //  MAKE_Date: C
 //
 REB_R MAKE_Date(
@@ -465,8 +453,14 @@ REB_R MAKE_Date(
         return out;
     }
 
-    if (ANY_ARRAY(arg) and VAL_ARRAY_LEN_AT(arg) >= 3) {
-        const RELVAL *item = VAL_ARRAY_AT(arg);
+    if (not ANY_ARRAY(arg))
+        goto bad_make;
+
+  blockscope {
+    REBLEN len;
+    const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
+
+    if (len >= 3) {
         if (not IS_INTEGER(item))
             goto bad_make;
 
@@ -549,6 +543,7 @@ REB_R MAKE_Date(
         Adjust_Date_Zone(out, to_utc);
         return out;
     }
+  }
 
   bad_make:
     fail (Error_Bad_Make(REB_DATE, arg));
@@ -580,7 +575,7 @@ static REBINT Int_From_Date_Arg(const REBVAL *opt_poke) {
 void Pick_Or_Poke_Date(
     REBVAL *opt_out,
     REBVAL *v,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_poke
 ){
     REBSYM sym;
@@ -602,11 +597,11 @@ void Pick_Or_Poke_Date(
         case 11: sym = SYM_MINUTE; break;
         case 12: sym = SYM_SECOND; break;
         default:
-            fail (picker);
+            fail (SPECIFIC(picker));
         }
     }
     else
-        fail (picker);
+        fail (rebUnrelativize(picker));
 
     if (opt_poke == NULL) {
         assert(opt_out != NULL);
@@ -785,7 +780,7 @@ void Pick_Or_Poke_Date(
         case SYM_JULIAN:
         case SYM_WEEKDAY:
         case SYM_UTC:
-            fail (picker);
+            fail (rebUnrelativize(picker));
 
         case SYM_DATE:
             if (!IS_DATE(opt_poke))
@@ -835,7 +830,7 @@ void Pick_Or_Poke_Date(
             break; }
 
         default:
-            fail (picker);
+            fail (rebUnrelativize(picker));
         }
 
         // !!! We've gone through and updated the date or time, but we could
@@ -865,7 +860,7 @@ void Pick_Or_Poke_Date(
 //
 REB_R PD_Date(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     if (opt_setval != NULL) {

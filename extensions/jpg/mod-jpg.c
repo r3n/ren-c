@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -56,11 +56,13 @@ REBNATIVE(identify_jpeg_q)
         return Init_False(D_OUT);
     }
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
-    REBLEN len = VAL_LEN_AT(ARG(data));
+    // !!! jpeg_info is not const-correct; we trust it not to modify data
+    //
+    REBSIZ size;
+    REBYTE *data = m_cast(REBYTE*, VAL_BINARY_SIZE_AT(&size, ARG(data)));
 
     int w, h;
-    jpeg_info(s_cast(data), len, &w, &h); // may longjmp above
+    jpeg_info(s_cast(data), size, &w, &h); // may longjmp above
     return Init_True(D_OUT);
 }
 
@@ -82,15 +84,17 @@ REBNATIVE(decode_jpeg)
     if (setjmp(jpeg_state))
         fail (Error_Bad_Media_Raw()); // generic
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
-    REBLEN len = VAL_LEN_AT(ARG(data));
+    // !!! jpeg code is not const-correct, we trust it not to modify data
+    //
+    REBSIZ size;
+    REBYTE *data = m_cast(REBYTE*, VAL_BINARY_SIZE_AT(&size, ARG(data)));
 
     int w, h;
-    jpeg_info(s_cast(data), len, &w, &h); // may longjmp above
+    jpeg_info(s_cast(data), size, &w, &h); // may longjmp above
 
     char *image_bytes = rebAllocN(char, (w * h) * 4);  // RGBA is 4 bytes
 
-    jpeg_load(s_cast(data), len, image_bytes);
+    jpeg_load(s_cast(data), size, image_bytes);
 
     REBVAL *binary = rebRepossess(image_bytes, (w * h) * 4);
 

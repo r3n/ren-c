@@ -3,7 +3,7 @@ REBOL [
     Title: "Standard Error IDs and Display Templates"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2018 Rebol Open Source Contributors
+        Copyright 2012-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -77,14 +77,12 @@ Syntax: [
 
 Script: [
     no-value:           [:arg1 {has no value}]
-    need-non-void:      [:arg1 {is VOID! (Note: use GET/ANY to GET voids)}]
+    need-non-void:      [:arg1 {is} :arg2 {(use GET/ANY to GET voids)}]
     need-non-null:      [:arg1 {needs a value, can't be null}]
     need-non-end:       [{end was reached while trying to set} :arg1]
     not-bound:          [:arg1 {word is not bound to a context}]
     no-relative:        [:arg1 {word is bound relative to context not on stack}]
     not-in-context:     [:arg1 {is not in the specified context}]
-
-    void-evaluation:    "VOID! cells cannot be evaluated"
 
     assertion-failure:  [{assertion failure:} :arg1]
 
@@ -94,6 +92,8 @@ Script: [
     illegal-cr:         [{Illegal CR: See DELINE, and TO-TEXT/RELAX:} :arg1]
     mixed-cr-lf-found:  {DELINE requires files to be CR LF or LF consistently}
     bad-utf8-bin-edit:  {String aliased as BINARY! can't become invalid UTF-8}
+
+    find-string-binary: {Can't search binary in string (must convert input)}
 
     phase-bad-arg-type:
         [:arg1 {internal phase disallows} :arg2 {for its} :arg3 {argument}]
@@ -105,10 +105,19 @@ Script: [
     cannot-use:         [{cannot use} :arg1 {on} :arg2 {value}]
 
     ambiguous-infix:    {Ambiguous infix expression--use GROUP! to clarify}
-    literal-left-path:  {Use -> to pass literal left PATH! parameters right}
+    literal-left-path:  {Use >- to pass literal left PATH! parameters right}
+
+    sequence-too-short: {ANY-PATH! and ANY-TUPLE! must have more than 2 items}
+    bad-sequence-item:  [{Value is not a valid ANY-SEQUENCE! element:} :arg1]
+    cant-decorate-type: [{Cannot apply `:` or `@` decoration to:} :arg1]
+
+    action-with-dotted: {ACTION! used with dotted sequence access form}
+    inert-with-slashed: {ANY-INERT! used with slashed sequence access form}
 
     bad-get-group:      {GET-GROUP! gets WORD!/PATH!/BLOCK!, arity-0 ACTION!}
     bad-set-group:      {SET-GROUP! sets WORD!/PATH!/BLOCK!, arity-1 ACTION!}
+
+    bad-branch-type:    {Bad branch type}
 
     do-running-frame:   [{Must COPY a FRAME! that's RUNNING? before DOing it}]
     expired-frame:      [{Cannot use a FRAME! whose stack storage expired}]
@@ -126,7 +135,7 @@ Script: [
 
     break-not-continue: {Use BREAK/WITH when body is the breaking condition}
 
-    use-eval-for-eval:  {Use EVAL or APPLY on actions of arity > 0, not DO}
+    do-arity-non-zero:  {Use REEVAL or APPLY on actions of arity > 0, not DO}
 
     limited-fail-input: {FAIL requires complex expressions to be in a GROUP!}
 
@@ -153,6 +162,9 @@ Script: [
     needs-return-opt:   [:arg1 {can't return null (see RETURN: [<opt> ...])}]
     needs-return-value: [:arg1 {can't return void! (see RETURN: <void>)}]
     bad-return-type:    [:arg1 {doesn't have RETURN: enabled for} :arg2]
+    bad-invisible:      [:arg1 {doesn't have invisible RETURN @() enabled}]
+
+    unintended-literal: [{Likely unintended literal, use quote/group:} :arg1]
 
     no-refine:          [:arg1 {has no refinement called} :arg2]
     bad-refines:        {incompatible or invalid refinements}
@@ -173,7 +185,9 @@ Script: [
     bad-path-poke:      [{cannot poke} :arg1 {in path}]
     dup-vars:           [{duplicate variable specified:} :arg1]
 
-    past-end:           {out of range or past end}
+    expression-barrier: {expression barrier hit while fulfilling argument}
+
+    index-out-of-range: {series index before head or after tail}
     missing-arg:        {missing a required argument or refinement}
     too-short:          {content too short (or just whitespace)}
     too-long:           {content too long}

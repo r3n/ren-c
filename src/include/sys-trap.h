@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -148,13 +148,13 @@
 // passed which it will write into--which is a black box that clients
 // shouldn't inspect.
 //
-// The routine also takes a pointer-to-a-REBCTX-pointer which represents
-// an error.  Using the tricky mechanisms of setjmp/longjmp, there will
-// be a first pass of execution where the line of code after the PUSH_TRAP
-// will see the error pointer as being NULL.  If a trap occurs during
-// code before the paired DROP_TRAP happens, then the C state will be
-// magically teleported back to the line after the PUSH_TRAP with the
-// error context now non-null and usable.
+// Jump buffers contain a pointer-to-a-REBCTX which represents an error.
+// Using the tricky mechanisms of setjmp/longjmp, there will be a first pass
+// of execution where the line of code after the PUSH_TRAP will see the
+// `jump->error` pointer as being `nullptr`.  If a trap occurs during code
+// before the paired DROP_TRAP happens, then the C state will be magically
+// teleported back to the line after the PUSH_TRAP with the error context now
+// non-null and usable.
 //
 // Note: The implementation of this macro was chosen stylistically to
 // hide the result of the setjmp call.  That's because you really can't
@@ -173,23 +173,17 @@
 // According to the developers, "This is not a bug as if you inline it, the
 // place setjmp goes to could be not where you want to goto."
 //
-// !!! An assertion that you don't try to push a trap with no saved state
-// unless FS_TOP == FS_BOTTOM is commented out for this moment, because a
-// top level rebValue() currently executes and then runs a trap inside of it.
-// The API model is still being worked out, and so this is tolerated while
-// the code settles--until the right answer can be seen more clearly.
-//
-#define PUSH_TRAP(e,s) \
+#define PUSH_TRAP_SO_FAIL_CAN_JUMP_BACK_HERE(j) \
     do { \
-        /* assert(Saved_State or (DSP == 0 and FS_TOP == FS_BOTTOM)); */ \
-        Snap_State_Core(s); \
-        (s)->last_state = Saved_State; \
-        Saved_State = (s); \
-        if (!SET_JUMP((s)->cpu_state)) \
-            *(e) = NULL; /* this branch will always be run */ \
-        else { \
-            Trapped_Helper(s); \
-            *(e) = (s)->error; \
+        assert(TG_Jump_List or DSP == 0); \
+        Snap_State_Core(j); \
+        (j)->frame = FS_TOP; \
+        (j)->last_jump = TG_Jump_List; \
+        TG_Jump_List = (j); \
+        if (0 == SET_JUMP((j)->cpu_state))  /* initial setjmp branch */ \
+            (j)->error = nullptr;  /* this branch will always be run */ \
+        else {  /* the longjmp happened */ \
+            Trapped_Helper(j); \
         } \
     } while (0)
 
@@ -206,14 +200,9 @@
 //
 //      http://en.cppreference.com/w/c/program/longjmp
 //
-// Note: There used to be more aggressive balancing-oriented asserts, making
-// this a point where outstanding manuals or guarded values and series would
-// have to be balanced.  Those seemed to be more irritating than helpful,
-// so the asserts have been left to the evaluator's bracketing.
-//
-inline static void DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(struct Reb_State *s) {
-    assert(!s->error);
-    Saved_State = s->last_state;
+inline static void DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(struct Reb_State *j) {
+    assert(j->error == nullptr);
+    TG_Jump_List = j->last_jump;
 }
 
 

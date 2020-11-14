@@ -11,10 +11,8 @@ depends: compose [
         'Windows [
             [%serial/serial-windows.c]
         ]
-
-        default [
-            [%serial/serial-posix.c]
-        ]
+    ] else [
+        [%serial/serial-posix.c]
     ])
 ]
 

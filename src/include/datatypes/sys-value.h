@@ -6,17 +6,17 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2020 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2018 Rebol Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -27,12 +27,12 @@
 // See notes in %sys-rebval.h for the definition of the REBVAL structure.
 //
 // While some REBVALs are in C stack variables, most reside in the allocated
-// memory block for a Rebol series.  The memory block for a series can be
+// memory block for a Rebol array.  The memory block for an array can be
 // resized and require a reallocation, or it may become invalid if the
 // containing series is garbage-collected.  This means that many pointers to
 // REBVAL are unstable, and could become invalid if arbitrary user code
 // is run...this includes values on the data stack, which is implemented as
-// a series under the hood.  (See %sys-stack.h)
+// an array under the hood.  (See %sys-stack.h)
 //
 // A REBVAL in a C stack variable does not have to worry about its memory
 // address becoming invalid--but by default the garbage collector does not
@@ -121,30 +121,34 @@
     // In the debug build, functions aren't inlined, and the overhead actually
     // adds up very quickly of getting the 3 parameters passed in.  Run the
     // risk of repeating macro arguments to speed up this critical test.
+    //
+    // Note this isn't in a `do {...} while (0)` either, also for speed.
 
     #define ASSERT_CELL_READABLE_EVIL_MACRO(c,file,line) \
-        do { \
-            if (not ((c)->header.bits & NODE_FLAG_CELL)) { \
+        if ( \
+            (FIRST_BYTE(c->header) & ( \
+                NODE_BYTEMASK_0x01_CELL | NODE_BYTEMASK_0x80_NODE \
+                    | NODE_BYTEMASK_0x40_FREE \
+            )) != 0x81 \
+        ){ \
+            if (not ((c)->header.bits & NODE_FLAG_CELL)) \
                 printf("Non-cell passed to cell read/write routine\n"); \
-                panic_at ((c), (file), (line)); \
-            } \
-            else if (not ((c)->header.bits & NODE_FLAG_NODE)) { \
+            else if (not ((c)->header.bits & NODE_FLAG_NODE)) \
                 printf("Non-node passed to cell read/write routine\n"); \
-                panic_at ((c), (file), (line)); \
-            } \
-        } while (0) // assume trash-oriented checks will catch "free" cells
+            else \
+                printf("Free node passed to cell read/write routine\n"); \
+            panic_at ((c), (file), (line)); \
+        }
 
     #define ASSERT_CELL_WRITABLE_EVIL_MACRO(c,file,line) \
-        do { \
-            ASSERT_CELL_READABLE_EVIL_MACRO(c, file, line); \
-            if ((c)->header.bits & (CELL_FLAG_PROTECTED | NODE_FLAG_FREE)) { \
-                printf("Protected/free cell passed to writing routine\n"); \
-                panic_at ((c), (file), (line)); \
-            } \
-        } while (0)
+        ASSERT_CELL_READABLE_EVIL_MACRO(c, file, line); \
+        if ((c)->header.bits & CELL_FLAG_PROTECTED) { \
+            printf("Protected cell passed to writing routine\n"); \
+            panic_at ((c), (file), (line)); \
+        }
 
-    inline static const REBCEL *READABLE(
-        const REBCEL *c,
+    inline static REBCEL(const*) READABLE(
+        REBCEL(const*) c,
         const char *file,
         int line
     ){
@@ -152,8 +156,8 @@
         return c;
     }
 
-    inline static REBCEL *WRITABLE(
-        REBCEL *c,
+    inline static RELVAL *WRITABLE(
+        RELVAL *c,
         const char *file,
         int line
     ){
@@ -169,7 +173,7 @@
 #endif
 
 
-//=//// "KIND" HEADER BYTE (a REB_XXX type or variation) //////////////////=//
+//=//// "KIND3Q" HEADER BYTE [REB_XXX + (n * REB_64)] /////////////////////=//
 //
 // The "kind" of fundamental datatype a cell is lives in the second byte for
 // a very deliberate reason.  This means that the signal for an end can be
@@ -182,17 +186,22 @@
 // escaping levels.  Up to 3 encoding levels can be in the cell itself, with
 // additional levels achieved with REB_QUOTED and pointing to another cell.
 //
+// The "3Q" in the name is to remind usage sites that the byte may contain
+// "up to 3 levels of quoting", in addition to the "KIND", which can be masked
+// out with `% REB_64`.  (Be sure to use REB_64 for this purpose instead of
+// just `64`, to make it easier to find places that are doing this.)
+//
 
-#define FLAG_KIND_BYTE(kind) \
+#define FLAG_KIND3Q_BYTE(kind) \
     FLAG_SECOND_BYTE(kind)
 
-#define KIND_BYTE_UNCHECKED(v) \
+#define KIND3Q_BYTE_UNCHECKED(v) \
     SECOND_BYTE((v)->header)
 
 #if defined(NDEBUG)
-    #define KIND_BYTE KIND_BYTE_UNCHECKED
+    #define KIND3Q_BYTE KIND3Q_BYTE_UNCHECKED
 #else
-    inline static REBYTE KIND_BYTE_Debug(
+    inline static REBYTE KIND3Q_BYTE_Debug(
         const RELVAL *v,
         const char *file,
         int line
@@ -206,9 +215,9 @@
         ){
             // Unreadable void is signified in the Extra by a negative tick
             //
-            if (KIND_BYTE_UNCHECKED(v) == REB_VOID) {
+            if (KIND3Q_BYTE_UNCHECKED(v) == REB_VOID) {
                 if (v->extra.tick < 0) {
-                    printf("KIND_BYTE() called on unreadable VOID!\n");
+                    printf("KIND3Q_BYTE() called on unreadable VOID!\n");
                   #ifdef DEBUG_COUNT_TICKS
                     printf("Made on tick: %d\n", cast(int, -v->extra.tick));
                   #endif
@@ -217,7 +226,7 @@
                 return REB_VOID;
             }
 
-            return KIND_BYTE_UNCHECKED(v);  // majority return here
+            return KIND3Q_BYTE_UNCHECKED(v);  // majority return here
         }
 
         // Non-cells are allowed to signal REB_END; see Init_Endlike_Header.
@@ -225,37 +234,37 @@
         // a REBVAL*, and rebEND is a 2-byte character string that can be
         // at any alignment...not necessarily that of a Reb_Header union!)
         //
-        if (KIND_BYTE_UNCHECKED(v) == REB_0_END)
+        if (KIND3Q_BYTE_UNCHECKED(v) == REB_0_END)
             if (v->header.bits & NODE_FLAG_NODE)
                 return REB_0_END;
 
         if (not (v->header.bits & NODE_FLAG_CELL)) {
-            printf("KIND_BYTE() called on non-cell\n");
+            printf("KIND3Q_BYTE() called on non-cell\n");
             panic_at (v, file, line);
         }
         if (v->header.bits & NODE_FLAG_FREE) {
-            printf("KIND_BYTE() called on invalid cell--marked FREE\n");
+            printf("KIND3Q_BYTE() called on invalid cell--marked FREE\n");
             panic_at (v, file, line);
         }
-        return KIND_BYTE_UNCHECKED(v);
+        return KIND3Q_BYTE_UNCHECKED(v);
     }
 
   #ifdef CPLUSPLUS_11
     //
-    // Since KIND_BYTE() is used by checks like IS_WORD() for efficiency, we
+    // Since KIND3Q_BYTE() is used by checks like IS_WORD() for efficiency, we
     // don't want that to contaminate the use with cells, because if you
     // bothered to change the type view to a cell you did so because you
     // were interested in its unquoted kind.
     //
-    inline static REBYTE KIND_BYTE_Debug(
-        const REBCEL *v,
+    inline static REBYTE KIND3Q_BYTE_Debug(
+        REBCEL(const*) v,
         const char *file,
         int line
     ) = delete;
   #endif
 
-    #define KIND_BYTE(v) \
-        KIND_BYTE_Debug((v), __FILE__, __LINE__)
+    #define KIND3Q_BYTE(v) \
+        KIND3Q_BYTE_Debug((v), __FILE__, __LINE__)
 #endif
 
 // Note: Only change bits of existing cells if the new type payload matches
@@ -263,52 +272,48 @@
 // value-specific flags might be misinterpreted.
 //
 #if !defined(__cplusplus)
-    #define mutable_KIND_BYTE(v) \
+    #define mutable_KIND3Q_BYTE(v) \
         mutable_SECOND_BYTE((v)->header)
 #else
-    inline static REBYTE& mutable_KIND_BYTE(RELVAL *v) {
+    inline static REBYTE& mutable_KIND3Q_BYTE(RELVAL *v) {
         ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);
         return mutable_SECOND_BYTE((v)->header);
     }
 #endif
 
 
-// A cell may have a larger KIND_BYTE() than legal Reb_Kind to represent a
+// A cell may have a larger KIND3Q_BYTE() than legal Reb_Kind to represent a
 // literal in-situ...the actual kind comes from that byte % 64.  But if you
 // are interested in the kind of *cell* (for purposes of knowing its bit
-// layout expectations) that is stored in the MIRROR_BYTE().
+// layout expectations) that is stored in the HEART_BYTE().
 
-inline static const REBCEL *VAL_UNESCAPED(const RELVAL *v);
+inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v);
 
 #define CELL_KIND_UNCHECKED(cell) \
-    cast(enum Reb_Kind, MIRROR_BYTE(cell))
+    cast(enum Reb_Kind, KIND3Q_BYTE_UNCHECKED(cell) % REB_64)
 
-#define CELL_TYPE_UNCHECKED(cell) \
-    cast(enum Reb_Kind, KIND_BYTE_UNCHECKED(cell) % REB_64)
+#define CELL_HEART_UNCHECKED(cell) \
+    cast(enum Reb_Kind, HEART_BYTE(cell))
 
 
-#if defined(NDEBUG)
+#if defined(NDEBUG) or !defined(CPLUSPLUS_11)
     #define CELL_KIND CELL_KIND_UNCHECKED
-    #define CELL_TYPE CELL_TYPE_UNCHECKED
+    #define CELL_HEART CELL_HEART_UNCHECKED
 #else
-    #define CELL_TYPE CELL_TYPE_UNCHECKED  // develop this more rigorously
+    inline static enum Reb_Kind CELL_KIND(REBCEL(const*) cell)
+        { return CELL_KIND_UNCHECKED(cell); }
 
-    #if !defined(CPLUSPLUS_11)
-        #define CELL_KIND(cell) \
-            cast(enum Reb_Kind, MIRROR_BYTE(cast(const RELVAL*, cell)))
-    #else
-        inline static enum Reb_Kind CELL_KIND(const REBCEL *cell) {
-            return cast(enum Reb_Kind, MIRROR_BYTE(cast(const RELVAL*, cell)));
-        }
+    inline static enum Reb_Kind CELL_HEART(REBCEL(const*) cell)
+      { return CELL_HEART_UNCHECKED(cell); }
 
-        // Don't want to ask an ordinary value cell its kind modulo 64 is;
-        // it may be REB_QUOTED and we need to call VAL_UNESCAPED() first!
-        //
-        inline static enum Reb_Kind CELL_KIND(const RELVAL *v) = delete;
-    #endif
+    // We want to disable asking for low level implementation details on a
+    // cell that may be a REB_QUOTED; you have to call VAL_UNESCAPED() first.
+    //
+    inline static enum Reb_Kind CELL_KIND(const RELVAL *v) = delete;
+    inline static enum Reb_Kind CELL_HEART(const RELVAL *v) = delete;
 #endif
 
-inline static REBTYP *CELL_CUSTOM_TYPE(const REBCEL *v) {
+inline static REBTYP *CELL_CUSTOM_TYPE(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_CUSTOM);
     return SER(EXTRA(Any, v).node);
 }
@@ -319,7 +324,7 @@ inline static REBTYP *CELL_CUSTOM_TYPE(const REBCEL *v) {
 // cell then it won't be quoted at all.  Main thing to know is that you don't
 // necessarily get the original value you had back.
 //
-inline static const RELVAL* CELL_TO_VAL(const REBCEL* cell)
+inline static const RELVAL* CELL_TO_VAL(REBCEL(const*) cell)
   { return cast(const RELVAL*, cell); }
 
 
@@ -336,9 +341,9 @@ inline static const RELVAL* CELL_TO_VAL(const REBCEL* cell)
 
 #if defined(NDEBUG)
     inline static enum Reb_Kind VAL_TYPE(const RELVAL *v) {
-        if (KIND_BYTE(v) >= REB_64)
+        if (KIND3Q_BYTE(v) >= REB_64)
             return REB_QUOTED;
-        return cast(enum Reb_Kind, KIND_BYTE(v));
+        return cast(enum Reb_Kind, KIND3Q_BYTE(v));
     }
 #else
     inline static enum Reb_Kind VAL_TYPE_Debug(
@@ -346,16 +351,16 @@ inline static const RELVAL* CELL_TO_VAL(const REBCEL* cell)
         const char *file,
         int line
     ){
-        REBYTE kind_byte = KIND_BYTE(v);
+        REBYTE kind_byte = KIND3Q_BYTE(v);
 
         // Special messages for END and trash (as these are common)
         //
         if (kind_byte == REB_0_END) {
-            printf("VAL_TYPE() on END marker (use IS_END() or KIND_BYTE())\n");
+            printf("VAL_TYPE() on END marker (use IS_END() or KIND3Q_BYTE())\n");
             panic_at (v, file, line);
         }
         if (kind_byte % REB_64 >= REB_MAX) {
-            printf("VAL_TYPE() on pseudotype/garbage (use KIND_BYTE())\n");
+            printf("VAL_TYPE() on pseudotype/garbage (use KIND3Q_BYTE())\n");
             panic_at (v, file, line);
         }
 
@@ -417,7 +422,7 @@ inline static REBVAL *RESET_VAL_HEADER_at(
     ASSERT_CELL_WRITABLE_EVIL_MACRO(v, file, line);
 
     v->header.bits &= CELL_MASK_PERSIST;
-    v->header.bits |= FLAG_KIND_BYTE(k) | FLAG_MIRROR_BYTE(k) | extra;
+    v->header.bits |= FLAG_KIND3Q_BYTE(k) | FLAG_HEART_BYTE(k) | extra;
     return cast(REBVAL*, v);
 }
 
@@ -439,6 +444,11 @@ inline static REBVAL *RESET_VAL_HEADER_at(
     // even if you overwrite the Payload/Extra immediately afterward; it also
     // corrupts the data to help ensure all relevant fields are overwritten.)
     //
+    // Note: RESET_VAL_HEADER is manually inlined here for efficiency in the
+    // debug build, since it winds up being two lines of code and the debug
+    // build wouldn't inline it itself...so it makes a performance difference
+    // for this very frequently called routine.
+    //
     inline static REBVAL *RESET_CELL_Debug(
         RELVAL *out,
         enum Reb_Kind kind,
@@ -446,13 +456,13 @@ inline static REBVAL *RESET_VAL_HEADER_at(
         const char *file,
         int line
     ){
-      #ifdef DEBUG_CELL_WRITABILITY
-        RESET_VAL_HEADER_at(out, kind, extra, file, line);
-      #else
-        RESET_VAL_HEADER(out, kind, extra);
-      #endif
+        ASSERT_CELL_WRITABLE_EVIL_MACRO(out, file, line);
 
-        TRACK_CELL_IF_DEBUG(out, file, line);
+        out->header.bits &= CELL_MASK_PERSIST;
+        out->header.bits |=
+            FLAG_KIND3Q_BYTE(kind) | FLAG_HEART_BYTE(kind) | extra;
+
+        TRACK_CELL_IF_DEBUG_EVIL_MACRO(out, file, line);
         return cast(REBVAL*, out);
     }
 
@@ -502,8 +512,8 @@ inline static REBVAL *RESET_CUSTOM_CELL(
 
 #define CELL_MASK_PREP_END \
     (CELL_MASK_PREP \
-        | FLAG_KIND_BYTE(REB_0) \
-        | FLAG_MIRROR_BYTE(REB_0))  // a more explicit CELL_MASK_PREP
+        | FLAG_KIND3Q_BYTE(REB_0) \
+        | FLAG_HEART_BYTE(REB_0))  // a more explicit CELL_MASK_PREP
 
 inline static RELVAL *Prep_Cell_Core(
     RELVAL *c
@@ -518,7 +528,7 @@ inline static RELVAL *Prep_Cell_Core(
   #endif
 
     c->header.bits = CELL_MASK_PREP;
-    TRACK_CELL_IF_DEBUG(cast(RELVAL*, c), file, line);
+    TRACK_CELL_IF_DEBUG_EVIL_MACRO(cast(RELVAL*, c), file, line);
     return c;
 }
 
@@ -541,6 +551,10 @@ inline static RELVAL *Prep_Cell_Core(
 //
 
 #if defined(DEBUG_TRASH_MEMORY)
+
+    #define TRASH_VALUE \
+        cast(const REBVAL*, &PG_Trash_Value_Debug)
+
     inline static RELVAL *Set_Trash_Debug(
         RELVAL *v
 
@@ -553,10 +567,10 @@ inline static RELVAL *Prep_Cell_Core(
 
         v->header.bits &= CELL_MASK_PERSIST;
         v->header.bits |=
-            FLAG_KIND_BYTE(REB_T_TRASH)
-                | FLAG_MIRROR_BYTE(REB_T_TRASH);
+            FLAG_KIND3Q_BYTE(REB_T_TRASH)
+                | FLAG_HEART_BYTE(REB_T_TRASH);
 
-        TRACK_CELL_IF_DEBUG(v, file, line);
+        TRACK_CELL_IF_DEBUG_EVIL_MACRO(v, file, line);
         return v;
     }
 
@@ -565,7 +579,7 @@ inline static RELVAL *Prep_Cell_Core(
 
     inline static bool IS_TRASH_DEBUG(const RELVAL *v) {
         assert(v->header.bits & NODE_FLAG_CELL);
-        return KIND_BYTE_UNCHECKED(v) == REB_T_TRASH;
+        return KIND3Q_BYTE_UNCHECKED(v) == REB_T_TRASH;
     }
 #else
     inline static REBVAL *TRASH_CELL_IF_DEBUG(RELVAL *v) {
@@ -603,10 +617,10 @@ inline static RELVAL *Prep_Cell_Core(
     ){
         ASSERT_CELL_WRITABLE_EVIL_MACRO(v, file, line);
 
-        mutable_KIND_BYTE(v) = REB_0_END; // release build behavior
-        mutable_MIRROR_BYTE(v) = REB_0_END;
+        mutable_KIND3Q_BYTE(v) = REB_0_END; // release build behavior
+        mutable_HEART_BYTE(v) = REB_0_END;
 
-        TRACK_CELL_IF_DEBUG(v, file, line);
+        TRACK_CELL_IF_DEBUG_EVIL_MACRO(v, file, line);
         return cast(REBVAL*, v);
     }
 
@@ -614,30 +628,34 @@ inline static RELVAL *Prep_Cell_Core(
         SET_END_Debug((v), __FILE__, __LINE__)
 #else
     inline static REBVAL *SET_END(RELVAL *v) {
-        mutable_KIND_BYTE(v) = REB_0_END; // must be a prepared cell
-        mutable_MIRROR_BYTE(v) = REB_0_END;
+        mutable_KIND3Q_BYTE(v) = REB_0_END; // must be a prepared cell
+        mutable_HEART_BYTE(v) = REB_0_END;
         return cast(REBVAL*, v);
     }
 #endif
 
-#ifdef NDEBUG
+// IS_END()/NOT_END() are called *a lot*, and adding costly checks to it will
+// slow down the debug build dramatically--taking up to 10% of the total time.
+// Hence DEBUG_CHECK_ENDS is disabled in the default debug build.
+//
+#if !defined(DEBUG_CHECK_ENDS)
     #define IS_END(p) \
-        (cast(const REBYTE*, p)[1] == REB_0_END)
+        (((const REBYTE*)(p))[1] == REB_0_END)  // Note: needs (p) parens!
 #else
     inline static bool IS_END_Debug(
-        const void *p, // may not have NODE_FLAG_CELL, may be short as 2 bytes
+        const void *p,  // may not have NODE_FLAG_CELL, maybe short as 2 bytes
         const char *file,
         int line
     ){
-        if (cast(const REBYTE*, p)[0] & 0x40) { // e.g. NODE_FLAG_FREE
+        if (((const REBYTE*)(p))[0] & NODE_BYTEMASK_0x40_FREE) {
             printf("NOT_END() called on garbage\n");
             panic_at(p, file, line);
         }
 
-        if (cast(const REBYTE*, p)[1] == REB_0_END)
+        if (((const REBYTE*)(p))[1] == REB_0_END)
             return true;
 
-        if (not (cast(const REBYTE*, p)[0] & 0x01)) { // e.g. NODE_FLAG_CELL
+        if (not (((const REBYTE*)(p))[0] & NODE_BYTEMASK_0x01_CELL)) {
             printf("IS_END() found non-END pointer that's not a cell\n");
             panic_at(p, file, line);
         }
@@ -671,9 +689,13 @@ inline static RELVAL *Prep_Cell_Core(
 //
 
 
-inline static void INIT_VAL_NODE(RELVAL *v, void *p) {
+// Note: If incoming p is mutable, we currently assume that's allowed by the
+// flag bits of the node.  This could have a runtime check in debug build
+// with a C++ variation that only takes mutable pointers.
+//
+inline static void INIT_VAL_NODE(RELVAL *v, const void *p) {
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    PAYLOAD(Any, v).first.node = NOD(p);
+    PAYLOAD(Any, v).first.node = NOD(m_cast(void*, p));
 }
 
 #define VAL_NODE(v) \
@@ -686,7 +708,7 @@ inline static void INIT_VAL_NODE(RELVAL *v, void *p) {
 // An ANY-ARRAY! in the deep copy of a function body must be relative also to
 // the same function if it contains any instances of such relative words.
 //
-inline static bool IS_RELATIVE(const REBCEL *v) {
+inline static bool IS_RELATIVE(REBCEL(const*) v) {
     if (not Is_Bindable(v) or not EXTRA(Binding, v).node)
         return false; // INTEGER! and other types are inherently "specific"
 
@@ -701,7 +723,7 @@ inline static bool IS_RELATIVE(const REBCEL *v) {
     // should be, but it's a pretty good trick so it subverts debug checks.
     // Review if this category of trick can be checked for more cleanly.
     if (
-        KIND_BYTE_UNCHECKED(v) == REB_ACTION  // v-- VAL_NODE() is paramlist
+        KIND3Q_BYTE_UNCHECKED(v) == REB_ACTION  // v-- VAL_NODE() is paramlist
         and NOD(Natives[N_skinner_return_helper_ID]) == VAL_NODE(v)
     ){
         return false;
@@ -734,8 +756,13 @@ inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
 // You can use SPECIFIC to cast it if you are *sure* that it has been
 // derelativized -or- is a value type that doesn't have a specifier (e.g. an
 // integer).  If the value is actually relative, this will assert at runtime!
+//
+// Because SPECIFIC has cost in the debug build, there may be situations where
+// one is sure that the value is specific, and `cast(REBVAL*, v`) is a better
+// choice for efficiency.  This applies to things like `Move_Value()`, which
+// is called often and already knew its input was a REBVAL* to start with.
 
-inline static REBVAL *SPECIFIC(const_if_c REBCEL *v) {
+inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
     //
     // Note: END is tolerated to help in specified array enumerations, e.g.
     //
@@ -746,7 +773,7 @@ inline static REBVAL *SPECIFIC(const_if_c REBCEL *v) {
 }
 
 #if defined(__cplusplus)
-    inline static const REBVAL *SPECIFIC(const REBCEL *v) {
+    inline static const REBVAL *SPECIFIC(const RELVAL *v) {
         assert(IS_END(v) or IS_SPECIFIC(v));  // ^-- see note about END
         return cast(const REBVAL*, v);
     }
@@ -797,22 +824,22 @@ inline static REBVAL *SPECIFIC(const_if_c REBCEL *v) {
 #define UNBOUND \
    ((REBNOD*)nullptr)  // cast() doesn't like nullptr, fix
 
-inline static REBNOD *VAL_BINDING(const REBCEL *v) {
+inline static REBNOD *VAL_BINDING(REBCEL(const*) v) {
     assert(Is_Bindable(v));
     return EXTRA(Binding, v).node;
 }
 
-inline static void INIT_BINDING(RELVAL *v, void *p) {
-    assert(Is_Bindable(v)); // works on partially formed values
-
-    REBNOD *binding = cast(REBNOD*, p);
-    EXTRA(Binding, v).node = binding;
+inline static void INIT_BINDING(RELVAL *v, const void *p) {
+    const REBNOD *binding = cast(const REBNOD*, p);
+    EXTRA(Binding, v).node = m_cast(REBNOD*, binding);
 
   #if !defined(NDEBUG)
     if (not binding)
-        return; // e.g. UNBOUND
+        return;  // e.g. UNBOUND
 
-    assert(not (binding->header.bits & NODE_FLAG_CELL)); // not currently used
+    assert(Is_Bindable(v));  // works on partially formed values
+
+    assert(not (binding->header.bits & NODE_FLAG_CELL));  // not currently used
 
     if (binding->header.bits & NODE_FLAG_MANAGED) {
         assert(
@@ -820,7 +847,7 @@ inline static void INIT_BINDING(RELVAL *v, void *p) {
             or binding->header.bits & ARRAY_FLAG_IS_VARLIST  // specific
             or (
                 IS_VARARGS(v) and not IS_SER_DYNAMIC(binding)
-            ) // varargs from MAKE VARARGS! [...], else is a varlist
+            )  // varargs from MAKE VARARGS! [...], else is a varlist
         );
     }
     else
@@ -831,7 +858,7 @@ inline static void INIT_BINDING(RELVAL *v, void *p) {
 inline static void Move_Value_Header(RELVAL *out, const RELVAL *v)
 {
     assert(out != v);  // usually a sign of a mistake; not worth supporting
-    assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
+    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
 
     // Note: Pseudotypes are legal to move, but none of them are bindable
 
@@ -871,7 +898,7 @@ inline static REBVAL *Move_Value(RELVAL *out, const REBVAL *v)
     else
         out->extra = v->extra; // extra isn't a binding (INTEGER! MONEY!...)
 
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -891,7 +918,7 @@ inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
     out->header.bits |= (
         v->header.bits & (CELL_FLAG_ARG_MARKED_CHECKED)
     );
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -900,25 +927,40 @@ inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
 // for the rare cases where it's legal, e.g. shuffling a cell from one place
 // in an array to another cell in the same array.
 //
-inline static void Blit_Cell(RELVAL *out, const RELVAL *v)
+inline static RELVAL *Blit_Relative(RELVAL *out, const RELVAL *v)
 {
-    assert(out != v);  // usually a sign of a mistake; not worth supporting
-    assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
-
-    ASSERT_CELL_WRITABLE_EVIL_MACRO(out, __FILE__, __LINE__);
-
-    // Examine just the cell's preparation bits.  Are they identical?  If so,
-    // we are not losing any information by blindly copying the header in
-    // the release build.
+    // It's imaginable that you might try to blit a cell from a source that
+    // could be an API node.  But it should never be *actually* relative
+    // (just tunneled down through some chain of RELVAL*-accepting functions).
     //
-    assert(
-        (out->header.bits & CELL_MASK_PERSIST)
-        == (v->header.bits & CELL_MASK_PERSIST)
-    );
+    assert(not ((v->header.bits & NODE_FLAG_ROOT) and IS_RELATIVE(v)));
 
-    out->header = v->header;
+    // However, you should not write relative bits into API destinations,
+    // not even hypothetically.  The target should not be an API cell.
+    //
+    assert(not (out->header.bits & (NODE_FLAG_ROOT | NODE_FLAG_MANAGED)));
+
+    Move_Value_Header(out, v);
+
     out->payload = v->payload;
     out->extra = v->extra;
+
+    return out;  // still (potentially) relative!
+}
+
+#ifdef __cplusplus  // avoid blitting into REBVAL*, and use without specifier
+    inline static RELVAL *Blit_Relative(REBVAL *out, const RELVAL *v) = delete;
+#endif
+
+// !!! Should this replace Move_Var() ?
+//
+inline static REBVAL *Blit_Specific(REBVAL *out, const REBVAL *v)
+{
+    Move_Value_Header(out, v);
+    out->header.bits |= (v->header.bits & NODE_FLAG_MARKED);
+    out->payload = v->payload;
+    out->extra = v->extra;
+    return out;
 }
 
 

@@ -20,16 +20,32 @@ any-value!  ; signal typesets start (SYM_ANY_VALUE_X hardcoded reference)
 any-word!
 any-path!
 any-number!
+any-sequence!
+any-tuple!
 any-scalar!
 any-series!
 any-string!
 any-context!
 any-array!  ; replacement for ANY-BLOCK! that doesn't conflate with BLOCK!
+any-branch!
 
 ;-----------------------------------------------------------------------------
 ; Signal that every earlier numbered symbol is for a typeset or datatype...
 
 datatypes
+
+; === NAMED VOIDS ===
+; A new Ren-C feature is that voids are interned like WORD!, so they can be
+; more communicative.  These are standard symbols passed to Init_Void().
+;
+void
+undefined
+nulled
+blanked
+branched
+stopped
+matched
+
 
 ; ...note that the words for types are created programmatically before
 ; this list is applied, so you only see typesets in this file.
@@ -44,7 +60,6 @@ vector!  ; !!! for molding, temporary
 gob!  ; !!! for molding, temporary
 struct!  ; !!! for molding, temporary
 library!  ; !!! for molding, temporary
-
 
 generic  ; used in boot, see %generics.r
 
@@ -68,7 +83,6 @@ self
 blank
 true
 false
-void
 on
 off
 yes
@@ -86,8 +100,9 @@ system
 ;
 index
 xy  ; !!! There was an INDEX?/XY, which is an XY reflector for the time being
-bytes  ; IMAGE! uses this to give back the underlying BINARY!
+;bytes  ; IMAGE! uses this to give back the underlying BINARY!--in %types.r
 length
+codepoint
 head
 tail
 head?
@@ -183,8 +198,8 @@ keep
 some
 any
 opt
-not
-and
+not  ; turned to _not_ for SYM__NOT_, see TO-C-NAME for why this is weird
+and  ; turned to _and_ for SYM__AND_, see TO-C-NAME for why this is weird
 ahead  ; Ren-C addition (also in Red)
 then
 remove
@@ -210,9 +225,12 @@ thru
 quote
 literal  ; should both LIT and LITERAL be supported, or just LIT?
 lit
-lit-word!  ; !!! compatibility hack; not a DATATYPE!, so parse keyword
-lit-path!  ; !!! compatibility hack; not a DATATYPE!, so parse keyword
-refinement!  ; !!! compatibility hack; not a DATATYPE!, so parse keyword
+lit-word!  ; !!! simulated datatype constraint (a QUOTED! like 'x)
+lit-path!  ; !!! simulated datatype costraint (a QUOTED! like 'x/y)
+refinement!  ; !!! simulated datatype constraint (a PATH! like `/word`)
+predicate!  ; !!! simulated datatype constraint (a TUPLE! like `.word`)
+blackhole!  ; !!! simulated datatype constraint (the ISSUE! `#`)
+char!  ; !!! simulated datatype constraint (single-element ISSUE!)
 match
 do
 into
@@ -255,8 +273,9 @@ let
 ;
 local
 
-; properties for action TWEAK function (passed as ISSUE!)
+; properties for action TWEAK function
 ;
+barrier
 defer
 postpone
 
@@ -304,7 +323,7 @@ raw-size
 extern
 rebval
 
-...
+*** ; !!! Temporary placeholder for ellipsis; will have to be special trick
 varargs
 
 ; Gobs:
@@ -394,7 +413,7 @@ exit-code
 --optimized-out--
 
 ; used to indicate the execution point where an error or debug frame is
-~~
+**
 
 include
 source
@@ -418,13 +437,6 @@ reflect
 kind
 quotes
 
-; There was a special case in R3-Alpha for REBNATIVE(exclude) which wasn't an
-; "ACTION!" (which meant no enum value) but it called a common routine that
-; expected an action number.  So it passed zero.  Now that "type actions"
-; use symbols as identity, this formalizes the hack by adding exclude.
-;
-exclude
-
 ; !!! The SECURE feature in R3-Alpha was unfinished.  While the policies for
 ; security were conveyed with words, those words were mapped into an enum
 ; to pack as bit flags.  However, those bit flags have been moved to being
@@ -434,7 +446,8 @@ exclude
 ;write  ; covered above
 exec
 
-; This word is the actual underlying cell for `/` paths, which allows for
-; binding and execution of operations like division, in spite of being PATH!.
+; Actual underlying words for cells in lone `/` paths and lone `.` tuples,
+; allowing binding and execution of operations like division or identity.
 ;
 -slash-1-
+-dot-1-

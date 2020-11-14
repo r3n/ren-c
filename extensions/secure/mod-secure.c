@@ -12,11 +12,11 @@
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -56,7 +56,7 @@ enum Reb_Security_Byte_Offsets {
 //
 // !!! This C code would likely be better as Rebol in %ext-secure-init.reb
 //
-bool Match_Sub_Path(REBSTR *s1, REBSTR *s2)
+bool Match_Sub_Path(const REBSTR *s1, const REBSTR *s2)
 {
     REBLEN len1 = STR_LEN(s1);
     if (len1 > STR_LEN(s2))
@@ -122,7 +122,7 @@ const REBYTE *Security_Policy(
         fail (policies);
 
     const REBVAL *policy = Select_Canon_In_Context(
-        VAL_CONTEXT(policies),
+        policies,
         STR_CANON(subsystem)
     );
     if (not policy) {
@@ -132,7 +132,7 @@ const REBYTE *Security_Policy(
     }
 
     if (IS_TUPLE(policy))  // just a tuple (e.g. [file rrrr.wwww.xxxx])
-        return VAL_TUPLE(policy);
+        fail ("This returned VAL_TUPLE(policy)...review");
 
     if (not IS_BLOCK(policy))  // only other form is detailed block
         fail (policy);
@@ -144,7 +144,7 @@ const REBYTE *Security_Policy(
 
     // !!! Comment said "no relatives in STATE_POLICIES"
     //
-    const RELVAL *item = VAL_ARRAY_HEAD(policy);
+    const RELVAL *item = ARR_HEAD(VAL_ARRAY(policy));
 
     for (; NOT_END(item); item += 2) {
         if (IS_END(item + 1) or not IS_TUPLE(item + 1))  // must map to tuple
@@ -152,7 +152,7 @@ const REBYTE *Security_Policy(
 
         if (IS_WORD(item)) { // !!! Comment said "any word works here"
             if (len == 0)  // !!! "If no strings found, use the default"
-                flags = VAL_TUPLE(item + 1);
+                fail ("This set flags = VAL_TUPLE(item + 1), review");
         }
         else if (name and (IS_TEXT(item) or IS_FILE(item))) {
             //
@@ -161,7 +161,7 @@ const REBYTE *Security_Policy(
             if (Match_Sub_Path(VAL_STRING(item), VAL_STRING(name))) {
                 if (VAL_LEN_HEAD(name) >= len) {  // "Is the match adequate?"
                     len = VAL_LEN_HEAD(name);
-                    flags = VAL_TUPLE(item + 1);
+                    fail ("This set flags = VAL_TUPLE(item + 1), review");
                 }
             }
         }
@@ -249,5 +249,5 @@ REBNATIVE(init_secure)
 {
     SECURE_INCLUDE_PARAMS_OF_INIT_SECURE;
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }

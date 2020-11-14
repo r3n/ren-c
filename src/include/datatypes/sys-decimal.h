@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -37,12 +37,12 @@
 #else
     // allows an assert, but also lvalue: `VAL_DECIMAL(v) = xxx`
     //
-    inline static REBDEC & VAL_DECIMAL(REBCEL *v) { // C++ reference type
+    inline static REBDEC VAL_DECIMAL(REBCEL(const*) v) { // C++ reference type
         assert(CELL_KIND(v) == REB_DECIMAL or CELL_KIND(v) == REB_PERCENT);
         return PAYLOAD(Decimal, v).dec;
     }
-    inline static REBDEC VAL_DECIMAL(const REBCEL *v) {
-        assert(CELL_KIND(v) == REB_DECIMAL or CELL_KIND(v) == REB_PERCENT);
+    inline static REBDEC & VAL_DECIMAL(RELVAL *v) {
+        assert(VAL_TYPE(v) == REB_DECIMAL or VAL_TYPE(v) == REB_PERCENT);
         return PAYLOAD(Decimal, v).dec;
     }
 #endif

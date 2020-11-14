@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2010-2011 Christian Ensel
-// Copyright 2017-2019 Rebol Open Source Contributors
+// Copyright 2017-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -503,8 +503,7 @@ SQLRETURN ODBC_BindParameter(
                 v, "> 4294967295 [", rebI(SQL_C_UBIGINT), "]",
                 v, "> 2147483647 [", rebI(SQL_C_ULONG), "]",
                 v, "< -2147483648 [", rebI(SQL_C_SBIGINT), "]",
-                "default [", rebI(SQL_C_LONG), "]",
-            "]",
+            "] else [", rebI(SQL_C_LONG), "]",
         "]",
         "decimal! [", rebI(SQL_C_DOUBLE), "]",
         "time! [", rebI(SQL_C_TYPE_TIME), "]",
@@ -517,7 +516,8 @@ SQLRETURN ODBC_BindParameter(
         "]",
         "text! [", rebI(SQL_C_WCHAR), "]",
         "binary! [", rebI(SQL_C_BINARY), "]",
-        "default [ fail {Non-SQL-mappable type used in parameter binding} ]",
+
+        "fail {Non-SQL-mappable type used in parameter binding}",
     "]");
 
     SQLSMALLINT sql_type;
@@ -1061,7 +1061,7 @@ void ODBC_DescribeResults(
             fail ("Unknown column SQL_XXX type");
         }
 
-        col->buffer = ALLOC_N(char, col->buffer_size);
+        col->buffer = TRY_ALLOC_N(char, col->buffer_size);
         if (col->buffer == nullptr)
             fail ("Couldn't allocate column buffer!");
     }

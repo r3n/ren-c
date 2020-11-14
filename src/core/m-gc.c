@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -100,14 +100,14 @@ static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v);
 
 inline static void Queue_Mark_Opt_Value_Deep(const RELVAL *v)
 {
-    assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
+    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
     Queue_Mark_Opt_End_Cell_Deep(v);  // nulled cell & unreadable void are ok
 }
 
 inline static void Queue_Mark_Value_Deep(const RELVAL *v)
 {
-    assert(KIND_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
-    assert(KIND_BYTE_UNCHECKED(v) != REB_NULLED);  // faster than IS_NULLED()
+    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
+    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_NULL);  // faster than IS_NULLED()
     Queue_Mark_Opt_End_Cell_Deep(v);  // unreadable void is ok
 }
 
@@ -165,7 +165,7 @@ static void Queue_Mark_Pairing_Deep(REBVAL *paired)
 //
 static void Queue_Mark_Node_Deep(void *p)
 {
-    REBYTE first = *cast(REBYTE*, p);
+    REBYTE first = *cast(const REBYTE*, p);
     if (first & NODE_BYTEMASK_0x10_MARKED)
         return;  // may not be finished marking yet, but has been queued
 
@@ -248,20 +248,16 @@ static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v)
     // form.  So if '''a fits in a WORD! (despite being a QUOTED!), we want
     // to mark the cell as if it were a plain word.  Use the CELL_KIND.
     //
-    // See %types.r for how all the scalar types are at the bottom.  These
-    // kinds that don't need marking include REB_0_END.  REB_INTEGER will
-    // need marking when it becomes arbitrary precision and has a node...
-    //
-    enum Reb_Kind kind = CELL_KIND_UNCHECKED(v);
-    if (kind < REB_PAIR)
-        return;
+    enum Reb_Kind heart = cast(enum Reb_Kind, HEART_BYTE(v));
+    if (heart == REB_0_END)
+        return;  // no cell bits can be interpreted
 
   #if !defined(NDEBUG)  // see Queue_Mark_Node_Deep() for notes on recursion
     assert(not in_mark);
     in_mark = true;
   #endif
 
-    if (IS_BINDABLE_KIND(kind)) {
+    if (IS_BINDABLE_KIND(heart)) {
         REBNOD *binding = EXTRA(Binding, v).node;
         if (binding != UNBOUND and (binding->header.bits & NODE_FLAG_MANAGED))
             Queue_Mark_Node_Deep(ARR(binding));
@@ -325,7 +321,7 @@ static void Propagate_All_GC_Marks(void)
             // reified C va_lists as Eval_Core() sources can have them.
             //
             if (
-                KIND_BYTE_UNCHECKED(v) == REB_NULLED
+                KIND3Q_BYTE_UNCHECKED(v) == REB_NULL
                 and NOT_ARRAY_FLAG(a, IS_VARLIST)
                 and NOT_ARRAY_FLAG(a, NULLEDS_LEGAL)
             ){
@@ -402,8 +398,8 @@ void Reify_Va_To_Array_In_Frame(
     if (DSP == dsp_orig)
         f->feed->array = EMPTY_ARRAY;  // don't bother making new empty array
     else {
-        f->feed->array = Pop_Stack_Values(dsp_orig);
-        Manage_Array(f->feed->array);  // held alive while frame running
+        REBARR *a = Pop_Stack_Values_Core(dsp_orig, SERIES_FLAG_MANAGED);
+        f->feed->array = a;  // held alive while frame running
     }
 
     if (truncated)
@@ -464,31 +460,9 @@ static void Mark_Root_Series(void)
                 //
                 assert(not (s->header.bits & NODE_FLAG_MARKED));
                 assert(not IS_SER_DYNAMIC(s));
-                assert(
-                    not LINK(s).owner
-                    or (LINK(s).owner->header.bits & NODE_FLAG_MANAGED)
-                );
 
                 if (not (s->header.bits & NODE_FLAG_MANAGED)) {
-                    assert(not LINK(s).owner);
-                }
-                else if (
-                    GET_SERIES_FLAG(LINK(s).owner, VARLIST_FRAME_FAILED)
-                ){
-                    GC_Kill_Series(s);  // auto-free API handles on failure
-                    continue;
-                }
-                else if (not Is_Frame_On_Stack(CTX(LINK(s).owner))) {
-                    //
-                    // Long term, it is likely that implicit managed-ness
-                    // will allow users to leak API handles.  It will
-                    // always be more efficient to not do that, so having
-                    // the code be strict for now is better.
-                    //
-                  #if !defined(NDEBUG)
-                    printf("handle not rebReleased(), not legal ATM\n");
-                  #endif
-                    panic (s);
+                    // if it's not managed, don't mark it (don't have to?)
                 }
                 else  // Note that Mark_Frame_Stack_Deep() will mark the owner
                     s->header.bits |= NODE_FLAG_MARKED;
@@ -674,7 +648,7 @@ static void Mark_Frame_Stack_Deep(void)
         // it may be trash (e.g. if it's an apply).  GC can ignore it.
         //
         if (f->feed->array)
-            Queue_Mark_Node_Deep(f->feed->array);
+            Queue_Mark_Node_Deep(m_cast(REBARR*, f->feed->array));
 
         // END is possible, because the frame could be sitting at the end of
         // a block when a function runs, e.g. `do [zero-arity]`.  That frame
@@ -725,8 +699,8 @@ static void Mark_Frame_Stack_Deep(void)
 
         Queue_Mark_Node_Deep(f->original);  // never nullptr
 
-        if (f->opt_label)
-            Queue_Mark_Node_Deep(f->opt_label);  // nullptr if anonymous
+        if (f->opt_label)  // nullptr if anonymous
+            Queue_Mark_Node_Deep(m_cast(REBSTR*, f->opt_label));
 
         // special can be used to GC protect an arbitrary value while a
         // function is running, currently.  nullptr is permitted as well
@@ -1247,7 +1221,7 @@ void Startup_GC(void)
     // The marking queue used in lieu of recursion to ensure that deeply
     // nested structures don't cause the C stack to overflow.
     //
-    GC_Mark_Stack = Make_Series(100, sizeof(REBARR*));
+    GC_Mark_Stack = Make_Series(100, sizeof(const REBNOD*));
     TERM_SEQUENCE(GC_Mark_Stack);
 }
 

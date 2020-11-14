@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -32,13 +32,13 @@
 #define TRUE_VALUE \
     c_cast(const REBVAL*, &PG_True_Value)
 
-inline static bool VAL_LOGIC(const REBCEL *v) {
+inline static bool VAL_LOGIC(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_LOGIC);
     return PAYLOAD(Logic, v).flag;
 }
 
 inline static bool IS_TRUTHY(const RELVAL *v) {
-    if (KIND_BYTE(v) > REB_LOGIC)
+    if (KIND3Q_BYTE(v) > REB_LOGIC)
         return true;  // includes QUOTED: `if lit '_ [-- "this is truthy"]`
     if (IS_VOID(v))
         fail (Error_Void_Conditional_Raw());
@@ -54,7 +54,7 @@ inline static bool IS_TRUTHY(const RELVAL *v) {
 inline static REBVAL *Init_Logic(RELVAL *out, bool flag) {
     RESET_CELL(out, REB_LOGIC, CELL_MASK_NONE);
     PAYLOAD(Logic, out).flag = flag;
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 #define Init_True(out) \
@@ -73,9 +73,9 @@ inline static REBVAL *Init_Logic(RELVAL *out, bool flag) {
 inline static bool IS_CONDITIONAL_TRUE(const REBVAL *v) {
     if (IS_FALSEY(v))
         return false;
-    if (KIND_BYTE(v) == REB_BLOCK)
+    if (KIND3Q_BYTE(v) == REB_BLOCK)
         if (GET_CELL_FLAG(v, UNEVALUATED))
-            fail (Error_Block_Conditional_Raw(v));
+            fail (Error_Block_Conditional_Raw(v));  // !!! Unintended_Literal?
     return true;
 }
 

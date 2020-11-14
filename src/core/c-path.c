@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -28,35 +28,83 @@
 
 
 //
-//  Init_Any_Path_At_Core: C
+//  Try_Init_Any_Sequence_At_Arraylike_Core: C
 //
-REBVAL *Init_Any_Path_At_Core(
-    RELVAL *out,
+REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
+    RELVAL *out,  // NULL if array is too short, violating value otherwise
     enum Reb_Kind kind,
-    REBARR *a,
-    REBLEN index,
-    REBNOD *binding
+    const REBARR *a,
+    REBSPC *specifier,
+    REBLEN index
 ){
-    assert(ANY_PATH_KIND(kind));
-    Force_Series_Managed(SER(a));
+    assert(ANY_SEQUENCE_KIND(kind));
+    assert(GET_SERIES_FLAG(a, MANAGED));
     ASSERT_SERIES_TERM(SER(a));
     assert(index == 0);  // !!! current rule
     assert(Is_Array_Frozen_Shallow(a));  // must be immutable (may be aliased)
 
-    RESET_CELL(out, kind, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, a);
-    VAL_INDEX(out) = index;
-    INIT_BINDING(out, binding);
+    assert(index < ARR_LEN(a));
+    REBLEN len_at = ARR_LEN(a) - index;
 
-    if (ARR_LEN(a) < 2)
-        panic (a);
+    if (len_at < 2) {
+        Init_Nulled(out);  // signal that array is too short
+        return nullptr;
+    }
 
-    assert(a != PG_2_Blanks_Array);  // should always be SYM__SLASH_1_ cell
-    assert(not (  // v-- also should never be initialized like this
-        ARR_LEN(a) == 2 and IS_BLANK(ARR_AT(a, 0)) and IS_BLANK(ARR_AT(a, 1))
-    ));
+    if (len_at == 2) {
+        if (a == PG_2_Blanks_Array) {  // can get passed back in
+            assert(specifier == SPECIFIED);
+            return Init_Any_Sequence_1(out, kind);
+        }
 
-    return SPECIFIC(out);
+        // !!! Note: at time of writing, this may just fall back and make
+        // a 2-element array vs. a pair optimization.
+        //
+        if (Try_Init_Any_Sequence_Pairlike_Core(
+            out,
+            kind,
+            ARR_AT(a, index),
+            ARR_AT(a, index + 1),
+            specifier
+        )){
+            return cast(REBVAL*, out);
+        }
+
+        return nullptr;
+    }
+
+    if (Try_Init_Any_Sequence_All_Integers(
+        out,
+        kind,
+        ARR_AT(a, index),
+        len_at
+    )){
+        return cast(REBVAL*, out);
+    }
+
+    const RELVAL *v = ARR_HEAD(a);
+    for (; NOT_END(v); ++v) {
+        if (not Is_Valid_Sequence_Element(kind, v)) {
+            Derelativize(out, v, specifier);
+            return nullptr;
+        }
+    }
+
+    // Since sequences are always at their head, it might seem the index
+    // could be storage space for other forms of compaction (like counting
+    // blanks at head and tail).  Otherwise it just sits at zero.
+    //
+    // One *big* reason to not use the space is because that creates a new
+    // basic type that would require special handling in things like binding
+    // code, vs. just running the paths for blocks.  A smaller reason not to
+    // do it is that leaving it as an index allows for aliasing BLOCK! as
+    // PATH! from non-head positions.
+
+    Init_Any_Series_At_Core(out, REB_BLOCK, SER(a), index, specifier);
+    mutable_KIND3Q_BYTE(out) = kind;
+    assert(HEART_BYTE(out) == REB_BLOCK);
+
+    return cast(REBVAL*, out);
 }
 
 
@@ -68,7 +116,7 @@ REBVAL *Init_Any_Path_At_Core(
 //
 REB_R PD_Fail(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     UNUSED(picker);
@@ -86,7 +134,7 @@ REB_R PD_Fail(
 //
 REB_R PD_Unhooked(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     UNUSED(picker);
@@ -112,47 +160,99 @@ REB_R PD_Unhooked(
 //
 bool Next_Path_Throws(REBPVS *pvs)
 {
-    SHORTHAND (v, pvs->feed->value, NEVERNULL(const RELVAL *));
-    SHORTHAND (specifier, pvs->feed->specifier, REBSPC *);
+    REBFRM * const f = pvs;  // to use the f_xxx macros
 
     if (IS_NULLED(pvs->out))
-        fail (Error_No_Value_Core(*v, *specifier));
+        fail (Error_No_Value_Core(f_value, f_specifier));
 
-    if (IS_GET_WORD(*v)) {  // e.g. object/:field
-        Get_Word_May_Fail(PVS_PICKER(pvs), *v, *specifier);
+    bool actions_illegal = false;
+
+    if (IS_BLANK(f_value) and not IS_FILE(pvs->out)) {  // !!! File hack...
+        //
+        // !!! Literal BLANK!s in sequences are for internal "doubling up"
+        // of delimiters, like `a..b`, or they can be used for prefixes like
+        // `/foo` or suffixes like `bar/` -- the meaning of blanks at prefixes
+        // is to cause the sequence to behave inertly.  But terminal blanks
+        // were conceived as ensuring things are either actions or not.
+        //
+        // At the moment this point in the code doesn't know if we're dealing
+        // with a PATH! or a TUPLE!, but assume we're dealing with slashes and
+        // raise an error if the thing on the left of a slash is not a
+        // function when we are at the end.
+        //
+        Fetch_Next_Forget_Lookback(pvs);  // may be at end
+
+        if (NOT_END(f_value))
+           fail ("Literal BLANK!s not executable internal to sequences ATM");
+
+        if (not IS_ACTION(pvs->out))
+            fail (Error_Inert_With_Slashed_Raw());
+
+        PVS_PICKER(pvs) = NULLED_CELL;  // no-op
+        goto redo;
+    }
+    else if (ANY_TUPLE(f_value) and not IS_FILE(pvs->out)) {  // ignore file hack
+        //
+        // !!! Tuples in PATH!s will require some thinking...especially since
+        // it's not necessarily going to be useful to reflect the hierarchy
+        // of tuples-in-paths for picking.  However, the special case of
+        // a terminal tuple enforcing a non-action is very useful.  This
+        // tweak implements *just that*.
+        //
+        DECLARE_LOCAL (temp);
+        if (
+            VAL_SEQUENCE_LEN(f_value) != 2 or
+            not IS_BLANK(VAL_SEQUENCE_AT(temp, f_value, 1))
+        ){
+            fail ("TUPLE! support in PATH! processing limited to `a.` forms");
+        }
+        Derelativize(
+            f_spare,
+            VAL_SEQUENCE_AT(temp, f_value, 0),
+            VAL_SEQUENCE_SPECIFIER(f_value)
+        );
+        PVS_PICKER(pvs) = f_spare;
+        actions_illegal = true;
+    }
+    else if (IS_GET_WORD(f_value)) {  // e.g. object/:field
+        PVS_PICKER(pvs) = Get_Word_May_Fail(f_spare, f_value, f_specifier);
     }
     else if (
-        IS_GROUP(*v)  // object/(expr) case:
+        IS_GROUP(f_value)  // object/(expr) case:
         and NOT_EVAL_FLAG(pvs, PATH_HARD_QUOTE)  // not precomposed
     ){
         if (GET_EVAL_FLAG(pvs, NO_PATH_GROUPS))
             fail ("GROUP! in PATH! used with GET or SET (use REDUCE/EVAL)");
 
-        REBSPC *derived = Derive_Specifier(*specifier, *v);
-        if (Do_Any_Array_At_Throws(PVS_PICKER(pvs), *v, derived)) {
-            Move_Value(pvs->out, PVS_PICKER(pvs));
+        REBSPC *derived = Derive_Specifier(f_specifier, f_value);
+        if (Do_Any_Array_At_Throws(f_spare, f_value, derived)) {
+            Move_Value(pvs->out, f_spare);
             return true; // thrown
         }
+        PVS_PICKER(pvs) = f_spare;
     }
     else { // object/word and object/value case:
-        Derelativize(PVS_PICKER(pvs), *v, *specifier);
+        PVS_PICKER(pvs) = f_value;  // relative value--cannot look up
     }
 
     Fetch_Next_Forget_Lookback(pvs);  // may be at end
 
   redo:;
 
-    bool was_custom = (KIND_BYTE(pvs->out) == REB_CUSTOM);  // !!! for hack
+    bool was_custom = (KIND3Q_BYTE(pvs->out) == REB_CUSTOM);  // !!! for hack
     PATH_HOOK *hook = Path_Hook_For_Type_Of(pvs->out);
 
-    if (IS_END(*v) and PVS_IS_SET_PATH(pvs)) {
+    if (IS_END(f_value) and PVS_IS_SET_PATH(pvs)) {
 
         const REBVAL *r = hook(pvs, PVS_PICKER(pvs), PVS_OPT_SETVAL(pvs));
 
-        switch (KIND_BYTE(r)) {
-          case REB_0_END: // unhandled
+        switch (KIND3Q_BYTE(r)) {
+          case REB_0_END: { // unhandled
             assert(r == R_UNHANDLED); // shouldn't be other ends
-            fail (Error_Bad_Path_Poke_Raw(PVS_PICKER(pvs)));
+            DECLARE_LOCAL (specific);
+            Derelativize(specific, PVS_PICKER(pvs), f_specifier);
+            fail (Error_Bad_Path_Poke_Raw(specific));
+          }
 
           case REB_R_THROWN:
             panic ("Path dispatch isn't allowed to throw, only GROUP!s");
@@ -218,12 +318,14 @@ bool Next_Path_Throws(REBPVS *pvs)
         else if (r == R_UNHANDLED) {
             if (IS_NULLED(PVS_PICKER(pvs)))
                 fail ("NULL used in path picking but was not handled");
-            fail (Error_Bad_Path_Pick_Raw(PVS_PICKER(pvs)));
+            DECLARE_LOCAL (specific);
+            Derelativize(specific, PVS_PICKER(pvs), f_specifier);
+            fail (Error_Bad_Path_Pick_Raw(specific));
         }
         else if (GET_CELL_FLAG(r, ROOT)) { // API, from Alloc_Value()
             Handle_Api_Dispatcher_Result(pvs, r);
         }
-        else switch (KIND_BYTE(r)) {
+        else switch (KIND3Q_BYTE(r)) {
           case REB_R_THROWN:
             panic ("Path dispatch isn't allowed to throw, only GROUP!s");
 
@@ -239,7 +341,7 @@ bool Next_Path_Throws(REBPVS *pvs)
             // while they still have memory of what the struct and variable
             // are (which would be lost in this protocol otherwise).
             //
-            assert(IS_END(*v));
+            assert(IS_END(f_value));
             break;
 
           case REB_R_REFERENCE: {
@@ -270,12 +372,19 @@ bool Next_Path_Throws(REBPVS *pvs)
     // be captured the first time the function is seen, otherwise it would
     // capture the last refinement's name, so check label for non-NULL.
     //
-    if (IS_ACTION(pvs->out) and IS_WORD(PVS_PICKER(pvs))) {
-        if (not pvs->opt_label)
-            pvs->opt_label = VAL_WORD_SPELLING(PVS_PICKER(pvs));
+    if (IS_ACTION(pvs->out)) {
+        if (actions_illegal)
+            fail (Error_Action_With_Dotted_Raw());
+
+        if (IS_WORD(PVS_PICKER(pvs))) {
+            if (not pvs->opt_label) {  // !!! only used for this "bit" signal
+                pvs->opt_label = VAL_WORD_SPELLING(PVS_PICKER(pvs));
+                INIT_ACTION_LABEL(pvs->out, pvs->opt_label);
+            }
+        }
     }
 
-    if (IS_END(*v))
+    if (IS_END(f_value))
         return false; // did not throw
 
     return Next_Path_Throws(pvs);
@@ -308,25 +417,103 @@ bool Next_Path_Throws(REBPVS *pvs)
 //
 bool Eval_Path_Throws_Core(
     REBVAL *out, // if opt_setval, this is only used to return a thrown value
-    REBSTR **label_out,
-    REBARR *array,
-    REBLEN index,
-    REBSPC *specifier,
+    const RELVAL *sequence,
+    REBSPC *sequence_specifier,
     const REBVAL *opt_setval, // Note: may be the same as out!
     REBFLGS flags
 ){
-    assert(index == 0); // !!! current rule, immutable proxy w/AS may relax it
+    REBLEN index = 0;
 
-    while (KIND_BYTE(ARR_AT(array, index)) == REB_BLANK)
+    enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), sequence));
+
+    // The evaluator has the behavior that inert-headed paths will just
+    // give themselves back.  But this code path is for GET, where getting
+    // something like `/a` will actually look up the word.
+
+    switch (heart) {
+      case REB_ISSUE:
+        fail ("Cannot GET or SET a numeric-headed ANY-SEQUENCE!");
+
+      case REB_WORD:  // get or set `'/` or `'.`
+        assert(
+            VAL_WORD_SPELLING(sequence) == PG_Slash_1_Canon
+            or VAL_WORD_SPELLING(sequence) == PG_Dot_1_Canon
+        );
+        goto handle_word;
+
+      case REB_GET_WORD:  // get or set `/foo` or `.foo`
+        //
+        // The idea behind terminal dots and slashes is to distinguish "never
+        // a function" vs. "always a function".  These sequence forms fit
+        // entirely inside a cell, so they make this a relatively cheap way
+        // to make asserts which can help toughen library code.
+        //
+        goto handle_word;
+
+      case REB_SYM_WORD:  // get or set `foo/` or `foo.`
+      handle_word: {
+        if (opt_setval) {  // nullptr is GET (note IS_NULLED() to set NULLED)
+            //
+            // This is the SET case, which means the `foo.:` and `foo/:`
+            // forms pre-check the action status of the value being assigned.
+            //
+            if (heart == REB_SYM_WORD) {
+                if (ANY_TUPLE_KIND(VAL_TYPE(sequence))) {
+                    if (IS_ACTION(opt_setval))
+                        fail (Error_Action_With_Dotted_Raw());
+                }
+                else {
+                    if (not IS_ACTION(opt_setval))
+                        fail (Error_Inert_With_Slashed_Raw());
+                }
+            }
+
+            Move_Value(
+                Lookup_Mutable_Word_May_Fail(sequence, sequence_specifier),
+                opt_setval
+            );
+        }
+        else {
+            Get_Word_May_Fail(out, sequence, sequence_specifier);
+
+            if (heart == REB_SYM_WORD) {
+                if (ANY_TUPLE_KIND(VAL_TYPE(sequence))) {
+                    if (IS_ACTION(out))
+                        fail (Error_Action_With_Dotted_Raw());
+                }
+                else {
+                    if (not IS_ACTION(out))
+                        fail (Error_Inert_With_Slashed_Raw());
+                }
+            }
+        }
+        return false; }
+
+      case REB_BLOCK:
+        break;
+
+      default:
+        panic (nullptr);
+    }
+
+    // We extract the array.  Note that if the input value was a REBVAL* it
+    // may have been "specific" because it was coupled with a specifier that
+    // was passed in, but to get the specifier of the embedded array we have
+    // to use Derive_Specifier().
+    //
+    const REBARR *array = VAL_ARRAY(sequence);
+    REBSPC *specifier = Derive_Specifier(sequence_specifier, sequence);
+
+    while (KIND3Q_BYTE(ARR_AT(array, index)) == REB_BLANK)
         ++index; // pre-feed any blanks
 
     assert(NOT_END(ARR_AT(array, index)));
 
     DECLARE_ARRAY_FEED (feed, array, index, specifier);
     DECLARE_FRAME (pvs, feed, flags | EVAL_FLAG_PATH_MODE);
+    REBFRM * const f = pvs;  // to use the f_xxx macros
 
-    SHORTHAND (v, pvs->feed->value, NEVERNULL(const RELVAL*));
-    assert(NOT_END(*v));  // tested 0-length path previously
+    assert(NOT_END(f_value));  // tested 0-length path previously
 
     SET_END(out);
     Push_Frame(out, pvs);
@@ -337,7 +524,7 @@ bool Eval_Path_Throws_Core(
         not opt_setval
         or not IN_DATA_STACK_DEBUG(opt_setval) // evaluation might relocate it
     );
-    assert(out != opt_setval and out != PVS_PICKER(pvs));
+    assert(out != opt_setval and out != FRM_SPARE(pvs));
 
     pvs->special = opt_setval; // a.k.a. PVS_OPT_SETVAL()
     assert(PVS_OPT_SETVAL(pvs) == opt_setval);
@@ -347,41 +534,71 @@ bool Eval_Path_Throws_Core(
     // Seed the path evaluation process by looking up the first item (to
     // get a datatype to dispatch on for the later path items)
     //
-    if (IS_WORD(*v)) {
+    if (IS_TUPLE(f_value)) {
+        //
+        // !!! As commented upon multiple times in this work-in-progress,
+        // the meaning of a TUPLE! in a PATH! needs work as it's a "new thing"
+        // but a few limited forms are supported for now.  In this case,
+        // we allow a leading TUPLE! in a PATH! of the form `.a` to act like
+        // `a` when requested via GET or SET (the whole path would be inert
+        // in the evaluator with such a tuple in the first position)
+        //
+        DECLARE_LOCAL (temp);
+        if (
+            VAL_SEQUENCE_LEN(f_value) != 2
+            or not IS_BLANK(VAL_SEQUENCE_AT(temp, f_value, 0))
+        ){
+            fail ("Head TUPLE! support in PATH! limited to `.a` at moment");
+        }
+        const RELVAL *second = VAL_SEQUENCE_AT(temp, f_value, 1);
+        if (not IS_WORD(second))
+            fail ("Head TUPLE support in PATH! limited to `.a` at moment");
+
+        pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(
+            second,
+            VAL_SEQUENCE_SPECIFIER(f_value)
+        );
+        Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
+        if (IS_ACTION(pvs->out))
+            pvs->opt_label = VAL_WORD_SPELLING(second);
+    }
+    else if (IS_WORD(f_value)) {
         //
         // Remember the actual location of this variable, not just its value,
         // in case we need to do R_IMMEDIATE writeback (e.g. month/day: 1)
         //
-        pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(*v, specifier);
+        pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(f_value, specifier);
 
         Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
 
-        if (IS_ACTION(pvs->out))
-            pvs->opt_label = VAL_WORD_SPELLING(*v);
+        if (IS_ACTION(pvs->out)) {
+            pvs->opt_label = VAL_WORD_SPELLING(f_value);
+            INIT_ACTION_LABEL(pvs->out, pvs->opt_label);
+        }
     }
     else if (
-        IS_GROUP(*v)
-         and NOT_EVAL_FLAG(pvs, PATH_HARD_QUOTE)  // not precomposed
+        IS_GROUP(f_value)
+        and NOT_EVAL_FLAG(pvs, PATH_HARD_QUOTE)  // not precomposed
     ){
         pvs->u.ref.cell = nullptr; // nowhere to R_IMMEDIATE write back to
 
         if (GET_EVAL_FLAG(pvs, NO_PATH_GROUPS))
             fail ("GROUP! in PATH! used with GET or SET (use REDUCE/EVAL)");
 
-        REBSPC *derived = Derive_Specifier(specifier, *v);
-        if (Do_Any_Array_At_Throws(pvs->out, *v, derived))
+        REBSPC *derived = Derive_Specifier(specifier, f_value);
+        if (Do_Any_Array_At_Throws(pvs->out, f_value, derived))
             goto return_thrown;
     }
     else {
         pvs->u.ref.cell = nullptr; // nowhere to R_IMMEDIATE write back to
 
-        Derelativize(pvs->out, *v, specifier);
+        Derelativize(pvs->out, f_value, specifier);
     }
 
     const RELVAL *lookback;
     lookback = Lookback_While_Fetching_Next(pvs);
 
-    if (IS_END(*v)) {
+    if (IS_END(f_value)) {
         //
         // We want `set /a` and `get /a` to work.  The GET case should work
         // with just what we loaded in pvs->out being returned (which may be
@@ -408,7 +625,7 @@ bool Eval_Path_Throws_Core(
         if (Next_Path_Throws(pvs))
             goto return_thrown;
 
-        assert(IS_END(*v));
+        assert(IS_END(f_value));
     }
 
     TRASH_POINTER_IF_DEBUG(lookback);  // goto crosses it, don't use below
@@ -435,7 +652,7 @@ bool Eval_Path_Throws_Core(
             // It's faster to just swap the spellings.  (If binding
             // mattered, we'd need to swap the whole cells).
             //
-            REBSTR *temp = VAL_WORD_SPELLING(bottom);
+            const REBSTR *temp = VAL_WORD_SPELLING(bottom);
             INIT_VAL_NODE(bottom, VAL_WORD_SPELLING(top));
             INIT_VAL_NODE(top, temp);
 
@@ -461,23 +678,19 @@ bool Eval_Path_Throws_Core(
             // pushes to the stack itself, hence may move it on expansion.)
             //
             if (Specialize_Action_Throws(
-                PVS_PICKER(pvs),
+                FRM_SPARE(pvs),
                 pvs->out,
-                pvs->opt_label,
-                NULL, // opt_def
+                nullptr, // opt_def
                 dsp_orig // first_refine_dsp
             )){
                 panic ("REFINE-only specializations should not THROW");
             }
 
-            Move_Value(pvs->out, PVS_PICKER(pvs));
+            Move_Value(pvs->out, FRM_SPARE(pvs));
         }
     }
 
   return_not_thrown:;
-    if (label_out)
-        *label_out = pvs->opt_label;
-
     Abort_Frame(pvs);
     assert(not Is_Evaluator_Throwing_Debug());
     return false; // not thrown
@@ -524,24 +737,29 @@ void Get_Simple_Value_Into(REBVAL *out, const RELVAL *val, REBSPC *specifier)
 //
 REBCTX *Resolve_Path(const REBVAL *path, REBLEN *index_out)
 {
-    REBARR *array = VAL_ARRAY(path);
-    RELVAL *picker = ARR_HEAD(array);
+    REBLEN len = VAL_SEQUENCE_LEN(path);
+    if (len == 0)  // !!! e.g. `/`, what should this do?
+        return nullptr;
+    if (len == 1)  // !!! "does not handle single element paths"
+        return nullptr;
 
-    if (IS_END(picker) or not ANY_WORD(picker))
-        return NULL; // !!! only handles heads of paths that are ANY-WORD!
+    DECLARE_LOCAL (temp);
+
+    REBLEN index = 0;
+    const RELVAL *picker = VAL_SEQUENCE_AT(temp, path, index);
+
+    if (not ANY_WORD(picker))
+        return nullptr;  // !!! only handles heads of paths that are ANY-WORD!
 
     const RELVAL *var = Lookup_Word_May_Fail(picker, VAL_SPECIFIER(path));
 
-    ++picker;
-    if (IS_END(picker))
-        return NULL; // !!! does not handle single-element paths
+    ++index;
+    picker = VAL_SEQUENCE_AT(temp, path, index);
 
     while (ANY_CONTEXT(var) and IS_WORD(picker)) {
-        REBLEN i = Find_Canon_In_Context(
-            VAL_CONTEXT(var), VAL_WORD_CANON(picker), false
-        );
-        ++picker;
-        if (IS_END(picker)) {
+        REBLEN i = Find_Canon_In_Context(var, VAL_WORD_CANON(picker));
+        ++index;
+        if (index == len) {
             *index_out = i;
             return VAL_CONTEXT(var);
         }
@@ -549,7 +767,7 @@ REBCTX *Resolve_Path(const REBVAL *path, REBLEN *index_out)
         var = CTX_VAR(VAL_CONTEXT(var), i);
     }
 
-    return NULL;
+    return nullptr;
 }
 
 
@@ -592,10 +810,10 @@ REBNATIVE(pick)
 
     DECLARE_END_FRAME (pvs, EVAL_MASK_DEFAULT);
 
+    Push_Frame(D_OUT, pvs);
     Move_Value(D_OUT, location);
-    pvs->out = D_OUT;
 
-    Move_Value(PVS_PICKER(pvs), ARG(picker));
+    PVS_PICKER(pvs) = ARG(picker);
 
     pvs->opt_label = NULL; // applies to e.g. :append/only returning APPEND
     pvs->special = NULL;
@@ -605,16 +823,23 @@ REBNATIVE(pick)
     PATH_HOOK *hook = Path_Hook_For_Type_Of(D_OUT);
 
     REB_R r = hook(pvs, PVS_PICKER(pvs), NULL);
-    if (not r or r == pvs->out)  // common cases
-        return r;
-    if (IS_END(r)) {
-        assert(r == R_UNHANDLED);
-        fail (Error_Bad_Path_Pick_Raw(PVS_PICKER(pvs)));
-    }
-    if (GET_CELL_FLAG(r, ROOT))
-        return r;
 
-    switch (KIND_BYTE(r)) {
+    if (not r or r == pvs->out) {
+        // Do nothing, let caller handle
+    }
+    else if (IS_END(r)) {
+        assert(r == R_UNHANDLED);
+        fail (Error_Bad_Path_Pick_Raw(rebUnrelativize(PVS_PICKER(pvs))));
+    }
+    else if (GET_CELL_FLAG(r, ROOT)) {  // API value
+        //
+        // It was parented to the PVS frame, we have to read it out.
+        //
+        Move_Value(D_OUT, r);
+        rebRelease(r);
+        r = D_OUT;
+    }
+    else switch (CELL_KIND_UNCHECKED(r)) {
       case REB_R_INVISIBLE:
         assert(false); // only SETs should do this
         break;
@@ -629,7 +854,8 @@ REBNATIVE(pick)
         );
         if (was_const) // can't Inherit_Const(), flag would be overwritten
             SET_CELL_FLAG(D_OUT, CONST);
-        return D_OUT; }
+        r = D_OUT;
+        break; }
 
       case REB_R_REDO:
         goto redo;
@@ -638,6 +864,7 @@ REBNATIVE(pick)
         panic ("Unsupported return value in Path Dispatcher");
     }
 
+    Drop_Frame(pvs);
     return r;
 }
 
@@ -679,180 +906,37 @@ REBNATIVE(poke)
 
     DECLARE_END_FRAME (pvs, EVAL_MASK_DEFAULT);
 
+    Push_Frame(D_OUT, pvs);
     Move_Value(D_OUT, location);
-    pvs->out = D_OUT;
 
-    Move_Value(PVS_PICKER(pvs), ARG(picker));
+    PVS_PICKER(pvs) = ARG(picker);
 
-    pvs->opt_label = NULL; // applies to e.g. :append/only returning APPEND
+    pvs->opt_label = nullptr;  // e.g. :append/only returning APPEND
     pvs->special = ARG(value);
 
     PATH_HOOK *hook = Path_Hook_For_Type_Of(location);
 
     const REBVAL *r = hook(pvs, PVS_PICKER(pvs), ARG(value));
-    switch (KIND_BYTE(r)) {
-    case REB_0_END:
+    switch (KIND3Q_BYTE(r)) {
+      case REB_0_END:
         assert(r == R_UNHANDLED);
-        fail (Error_Bad_Path_Poke_Raw(PVS_PICKER(pvs)));
+        fail (Error_Bad_Path_Poke_Raw(rebUnrelativize(PVS_PICKER(pvs))));
 
-    case REB_R_INVISIBLE: // is saying it did the write already
+      case REB_R_INVISIBLE:  // is saying it did the write already
         break;
 
-    case REB_R_REFERENCE: // wants us to write it
+      case REB_R_REFERENCE:  // wants us to write it
         Move_Value(pvs->u.ref.cell, ARG(value));
         break;
 
-    default:
-        assert(false); // shouldn't happen, complain in the debug build
-        fail (PVS_PICKER(pvs)); // raise error in release build
+      default:
+        assert(false);  // shouldn't happen, complain in the debug build
+        fail (rebUnrelativize(PVS_PICKER(pvs)));  // error in release build
     }
+
+    Drop_Frame(pvs);
 
     RETURN (ARG(value)); // return the value we got in
-}
-
-
-//
-//  PD_Path: C
-//
-// A PATH! is not an array, but if it is implemented as one it may choose to
-// dispatch path handling to its array.
-//
-REB_R PD_Path(
-    REBPVS *pvs,
-    const REBVAL *picker,
-    const REBVAL *opt_setval
-){
-    if (opt_setval)
-        fail ("PATH!s are immutable (convert to GROUP! or BLOCK! to mutate)");
-
-    Init_Block(pvs->out, VAL_PATH(pvs->out));
-
-    return PD_Array(pvs, picker, opt_setval);
-}
-
-
-//
-//  REBTYPE: C
-//
-// The concept of PATH! is now that it is an immediate value.  While it
-// permits picking and enumeration, it may or may not have an actual REBARR*
-// node backing it.
-//
-REBTYPE(Path)
-{
-    REBVAL *path = D_ARG(1);
-
-    switch (VAL_WORD_SYM(verb)) {
-      case SYM_REFLECT: {
-        INCLUDE_PARAMS_OF_REFLECT;
-        UNUSED(ARG(value));
-
-        switch (VAL_WORD_SYM(ARG(property))) {
-          case SYM_LENGTH:
-            if (MIRROR_BYTE(path) == REB_WORD) {
-                assert(VAL_WORD_SYM(path) == SYM__SLASH_1_);
-                return Init_Integer(frame_->out, 2);
-            }
-            return Series_Common_Action_Maybe_Unhandled(frame_, verb);
-
-          // !!! Any other interesting reflectors?
-
-          case SYM_INDEX: // not legal, paths always at head, no index
-          default:
-            break;
-        }
-        break; }
-
-        // Since ANY-PATH! is immutable, a shallow copy should be cheap, but
-        // it should be cheap for any similarly marked array.  Also, a /DEEP
-        // copy of a path may copy groups that are mutable.
-        //
-      case SYM_COPY:
-        if (MIRROR_BYTE(path) == REB_WORD) {
-            assert(VAL_WORD_SYM(path) == SYM__SLASH_1_);
-            return Move_Value(frame_->out, path);
-        }
-
-        goto retrigger;
-
-      default:
-        break;
-    }
-
-    return R_UNHANDLED;
-
-  retrigger:
-
-    return T_Array(frame_, verb);
-}
-
-
-//
-//  MF_Path: C
-//
-void MF_Path(REB_MOLD *mo, const REBCEL *v, bool form)
-{
-    UNUSED(form);
-
-    enum Reb_Kind kind = CELL_TYPE(v);  // Note: CELL_KIND() might be WORD!
-
-    if (kind == REB_GET_PATH)
-        Append_Codepoint(mo->series, ':');
-    else if (kind == REB_SYM_PATH)
-        Append_Codepoint(mo->series, '@');
-
-    if (MIRROR_BYTE(v) == REB_WORD) {  // optimized for `/`, allows binding
-        assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
-        Append_Ascii(mo->series, "/");
-    }
-    else {
-        REBARR *a = VAL_ARRAY(v);
-
-        // Recursion check:
-        if (Find_Pointer_In_Series(TG_Mold_Stack, a) != NOT_FOUND) {
-            Append_Ascii(mo->series, ".../...");
-            return;
-        }
-        Push_Pointer_To_Series(TG_Mold_Stack, a);
-
-        assert(VAL_INDEX(v) == 0);  // new rule, not ANY-ARRAY!, always head
-        assert(ARR_LEN(a) >= 2); // another rule, even / is `make path! [_ _]`
-
-        RELVAL *item = ARR_HEAD(a);
-        while (NOT_END(item)) {
-            assert(not ANY_PATH(item)); // another new rule
-
-            if (not IS_BLANK(item)) { // no blank molding; slashes convey it
-                //
-                // !!! Molding of items in paths which have slashes in them,
-                // like URL! or FILE! (or some historical date formats) need
-                // some kind of escaping, otherwise they have to be outlawed
-                // too.  FILE! has the option of `a/%"dir/file.txt"/b` to put
-                // the file in quotes, but URL does not.
-                //
-                Mold_Value(mo, item);
-
-                // Note: Ignore VALUE_FLAG_NEWLINE_BEFORE here for ANY-PATH,
-                // but any embedded BLOCK! or GROUP! which do have newlines in
-                // them can make newlines, e.g.:
-                //
-                //     a/[
-                //        b c d
-                //     ]/e
-            }
-
-            ++item;
-            if (IS_END(item))
-                break;
-
-            Append_Codepoint(mo->series, '/');
-        }
-
-        Drop_Pointer_From_Series(TG_Mold_Stack, a);
-    }
-
-    if (kind == REB_SET_PATH)
-        Append_Codepoint(mo->series, ':');
 }
 
 
@@ -899,7 +983,7 @@ REB_R MAKE_Path(
         }
         else { // Splice any generated paths, so there are no paths-in-paths.
 
-            RELVAL *item = VAL_ARRAY_AT(out);
+            const RELVAL *item = VAL_ARRAY_AT(out);
             if (IS_BLANK(item) and DSP != dsp_orig) {
                 if (IS_BLANK(DS_TOP)) // make path! ['a/b/ `/c`]
                     fail ("Cannot merge slashes in MAKE PATH!");
@@ -913,115 +997,184 @@ REB_R MAKE_Path(
         }
     }
 
-    REBARR *arr = Pop_Stack_Values_Core(dsp_orig, NODE_FLAG_MANAGED);
+    REBVAL *p = Try_Pop_Sequence_Or_Element_Or_Nulled(out, kind, dsp_orig);
+
     Drop_Frame_Unbalanced(f); // !!! f->dsp_orig got captured each loop
 
-    if (ARR_LEN(arr) < 2) // !!! Should pass produced array as BLOCK! to error
-        fail ("MAKE PATH! must produce path of at least length 2");
+    if (not p)
+        fail (Error_Bad_Sequence_Init(out));
 
-    // Need special case code if the array needs to be a disguised WORD!
-    // (See -SLASH-1- for details)
-    //
-    if (ARR_LEN(arr) == 2)
-        if (IS_BLANK(ARR_AT(arr, 0)) and IS_BLANK(ARR_AT(arr, 1))) {
-            Free_Unmanaged_Array(arr);
-            Init_Word(out, PG_Slash_1_Canon);
-            mutable_KIND_BYTE(out) = REB_PATH;
-            return out;
-        }
+    if (not ANY_PATH(out))  // e.g. `make path! ['x]` giving us the WORD! `x`
+        fail (Error_Sequence_Too_Short_Raw());
 
-    return Init_Any_Path(out, kind, Freeze_Array_Shallow(arr));
-}
-
-
-static void Push_Path_Recurses(RELVAL *path, REBSPC *specifier)
-{
-    RELVAL *item = ARR_HEAD(VAL_PATH(path));
-    for (; NOT_END(item); ++item) {
-        if (IS_PATH(item)) {
-            if (IS_SPECIFIC(item))
-                Push_Path_Recurses(item, VAL_SPECIFIER(item));
-            else
-                Push_Path_Recurses(item, specifier);
-        }
-        else
-            Derelativize(DS_PUSH(), item, specifier);
-    }
+    return out;
 }
 
 
 //
 //  TO_Path: C
 //
-REB_R TO_Path(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
-    if (ANY_PATH(arg)) {  // e.g. `to set-path! 'a/b/c`
-        assert(kind != VAL_TYPE(arg));  // TO should have called COPY
+// BLOCK! is the "universal container".  So note the following behavior:
+//
+//     >> to path! 'a
+//     == /a
+//
+//     >> to path! '(a b c)
+//     == /(a b c)  ; does not splice
+//
+//     >> to path! [a b c]
+//     == a/b/c  ; not /[a b c]
+//
+// There is no "TO/ONLY" to address this as with APPEND.  But there are
+// other options:
+//
+//     >> to path! [_ [a b c]]
+//     == /[a b c]
+//
+//     >> compose /(block)
+//     == /[a b c]
+//
+// TO must return the exact type requested, so this wouldn't be legal:
+//
+//     >> to path! 'a:
+//     == /a:  ; !!! a SET-PATH!, which is not the promised PATH! return type
+//
+// So the only choice is to discard the decorators, or error.  Discarding is
+// consistent with ANY-WORD! interconversion, and also allows another avenue
+// for putting blocks as-is in paths by using the decorated type:
+//
+//     >> to path! @[a b c]
+//     == /[a b c]
+//
+REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
+    enum Reb_Kind arg_kind = VAL_TYPE(arg);
 
+    if (IS_TEXT(arg)) {
+        //
+        // R3-Alpha considered `to tuple "1.2.3"` to be 1.2.3, consistent with
+        // `to path "a/b/c"` being `a/b/c`...but it allowed `to path "a b c"`
+        // as well.  :-/
+        //
+        // Essentially, this sounds like "if it's a string, invoke the
+        // scanner and then see if the thing you get back can be converted".
+        // Try something along those lines for now...use LOAD so that it
+        // gets TUPLE! on "1.2.3" and a BLOCK! on both "[1 2 3]" and "1 2 3".
+        // (Inefficient!  But just see how it feels before optimizing.)
+        //
+        return rebValue(
+            "as", Datatype_From_Kind(kind), "load", arg,
+        rebEND);
+    }
+
+    if (ANY_PATH_KIND(arg_kind)) {  // e.g. `to set-path! 'a/b/c`
+        assert(arg_kind != VAL_TYPE(arg));  // TO should have called COPY
+
+        // !!! If we don't copy an array, we don't get a new form to use for
+        // new bindings in lookups.  Review!
+        //
         Move_Value(out, arg);
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = kind;
+        mutable_KIND3Q_BYTE(out) = arg_kind;
         return out;
     }
 
-    if (not ANY_ARRAY(arg)) {  // e.g. `to path! foo` becomes `/foo`
-        //
-        // !!! This is slated to be able to fit into a single cell, with no
-        // array allocation.
-        //
-        REBARR *a = Make_Array(2);
-        Init_Blank(ARR_AT(a, 0));
-        Move_Value(ARR_AT(a, 1), arg);
-        TERM_ARRAY_LEN(a, 2);
-        return Init_Any_Path(out, kind, Freeze_Array_Shallow(a));
+    if (arg_kind != REB_BLOCK) {
+        Move_Value(out, arg);  // move value so we can modify it
+        Dequotify(out);  // remove quotes (should TO take a REBCEL()?)
+        Plainify(out);  // remove any decorations like @ or :
+        if (not Try_Leading_Blank_Pathify(out, kind))
+            fail (Error_Bad_Sequence_Init(out));
+        return out;
     }
 
-    REBDSP dsp_orig = DSP;
-    RELVAL *item = VAL_ARRAY_AT(arg);
-    for (; NOT_END(item); ++item) {
-        if (IS_PATH(item))
-            Push_Path_Recurses(item, VAL_SPECIFIER(arg));
-        else
-            Derelativize(DS_PUSH(), item, VAL_SPECIFIER(arg));
-    }
+    // BLOCK! is universal container, and the only type that is converted.
+    // Paths are not allowed... use MAKE PATH! for that.  Not all paths
+    // will be valid here, so the Init_Any_Path_Arraylike may fail (should
+    // probably be Try_Init_Any_Path_Arraylike()...)
 
-    if (DSP - dsp_orig < 2)
-        fail ("TO PATH! must produce a path of at least length 2");
+    REBLEN len = VAL_LEN_AT(arg);
+    if (len < 2)
+        fail (Error_Sequence_Too_Short_Raw());
 
-    if (DSP - dsp_orig == 2)
-        if (IS_BLANK(DS_TOP) and IS_BLANK(DS_TOP - 1)) {
-            DS_DROP_TO(dsp_orig);
-            Init_Word(out, PG_Slash_1_Canon);
-            mutable_KIND_BYTE(out) = REB_PATH;
-            return out;
+    if (len == 2) {
+        if (not Try_Init_Any_Sequence_Pairlike_Core(
+            out,
+            kind,
+            VAL_ARRAY_AT(arg),
+            VAL_ARRAY_AT(arg) + 1,
+            VAL_SPECIFIER(arg)
+        )){
+            fail (Error_Bad_Sequence_Init(out));
         }
+    }
+    else {
+        // Assume it needs an array.  This might be a wrong assumption, e.g.
+        // if it knows other compressions (if there's no index, it could have
+        // "head blank" and "tail blank" bits, for instance).
 
-    REBARR *a = Pop_Stack_Values(dsp_orig);
-    return Init_Any_Path(out, kind, Freeze_Array_Shallow(a));
+        REBARR *a = Copy_Array_At_Shallow(
+            VAL_ARRAY(arg),
+            VAL_INDEX(arg),
+            VAL_SPECIFIER(arg)
+        );
+        Freeze_Array_Shallow(a);
+        Force_Series_Managed(a);
+
+        if (not Try_Init_Any_Sequence_Arraylike(out, kind, a))
+            fail (Error_Bad_Sequence_Init(out));
+    }
+
+    return out;
 }
 
 
 //
-//  CT_Path: C
+//  CT_Sequence: C
 //
-// "Compare Type" dispatcher for the following types: (list here to help
-// text searches)
+// "Compare Type" dispatcher for ANY-PATH! and ANY-TUPLE!.
 //
-//     CT_Set_Path()
-//     CT_Get_Path()
-//     CT_Lit_Path()
+// Note: R3-Alpha considered TUPLE! with any number of trailing zeros to
+// be equivalent.  This meant `255.255.255.0` was equal to `255.255.255`.
+// Why this was considered useful is not clear...as that would make a
+// fully transparent alpha channel pixel equal to a fully opaque color.
+// This behavior is not preserved in Ren-C, so `same-color?` or something
+// else would be needed to get that intent.
 //
-REBINT CT_Path(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Sequence(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBINT num;
-    if (MIRROR_BYTE(a) == REB_WORD and MIRROR_BYTE(b) == REB_WORD)
-        num = Compare_Word(a, b, mode == 1);
-    else if (MIRROR_BYTE(a) != REB_WORD and MIRROR_BYTE(b) != REB_WORD)
-        num = Cmp_Array(a, b, mode == 1);
-    else
-        num = -1;  // !!! what is the right answer here?
+    // If the internal representations used do not match, then the sequences
+    // can't match.  For this to work reliably, there can't be aliased
+    // internal representations like [1 2] the array and #{0102} the bytes.
+    // See the Try_Init_Sequence() pecking order for how this is guaranteed.
+    //
+    int heart_diff = cast(int, HEART_BYTE(a)) - HEART_BYTE(b);
+    if (heart_diff != 0)
+        return heart_diff > 0 ? 1 : -1;
 
-    if (mode >= 0)
-        return (num == 0);
-    if (mode == -1)
-        return (num >= 0);
-    return (num > 0);
+    switch (HEART_BYTE(a)) {  // now known to be same as HEART_BYTE(b)
+      case REB_BYTES: {  // packed bytes
+        REBLEN a_len = VAL_SEQUENCE_LEN(a);
+        int diff = cast(int, a_len) - VAL_SEQUENCE_LEN(b);
+        if (diff != 0)
+            return diff > 0 ? 1 : -1;
+
+        int cmp = memcmp(
+            &PAYLOAD(Bytes, a).at_least_8,
+            &PAYLOAD(Bytes, b).at_least_8,
+            a_len  // same as b_len at this point
+        );
+        if (cmp == 0)
+            return 0;
+        return cmp > 0 ? 1 : -1; }
+
+      case REB_WORD:  // `/` or `.`
+      case REB_GET_WORD:  // `/foo` or `.foo`
+      case REB_SYM_WORD:  // `foo/ or `foo.`
+        return CT_Word(a, b, strict);
+
+      case REB_BLOCK:
+        return CT_Array(a, b, strict);
+
+      default:
+        panic (nullptr);
+    }
 }

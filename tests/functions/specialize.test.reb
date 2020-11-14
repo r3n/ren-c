@@ -3,7 +3,7 @@
 ; Note: GET-PATH! for partial specialization uses basically the same code
 ; path as SPECIALIZE does, e.g. these run the same code:
 ;
-;     specialize 'append/dup/part []
+;     specialize :append/dup/part []
 ;     :append/dup/part
 
 [
@@ -32,16 +32,16 @@
 ]
 
 (
-    append-123: specialize :append [value: [1 2 3] only: true]
+    append-123: specialize :append [value: [1 2 3] only: #]
     [a b c [1 2 3] [1 2 3]] = append-123/dup copy [a b c] 2
 )
 (
-    append-123: specialize :append [value: [1 2 3] only: true]
+    append-123: specialize :append/only [value: [1 2 3]]
     append-123-twice: specialize :append-123 [dup: 2]
     [a b c [1 2 3] [1 2 3]] = append-123-twice copy [a b c]
 )
 (
-    append-10: specialize 'append [value: 10]
+    append-10: specialize :append [value: 10]
     f: make frame! :append-10
     f/series: copy [a b c]
 
@@ -57,7 +57,7 @@
 )
 (
     foo: func [] [
-        return-5: specialize 'return [value: 5]
+        return-5: specialize :return [value: 5]
         return-5
         "this shouldn't be returned"
     ]
@@ -67,8 +67,8 @@
 [
     (
         apd: :append/part/dup
-        apd3: specialize 'apd [dup: 3]
-        ap2d: specialize 'apd [part: 2]
+        apd3: specialize :apd [dup: 3]
+        ap2d: specialize :apd [part: 2]
 
         xy: [<X> #Y]
         abc: [A B C]
@@ -77,20 +77,20 @@
     )
 
     (r = apd copy xy abc 2 3)
-    (r = applique 'apd [series: copy xy | value: abc | part: 2 | dup: 3])
+    (r = applique 'apd [series: copy xy, value: abc, part: 2, dup: 3])
 
     (r = apd3 copy xy abc 2)
-    (r = applique 'apd3 [series: copy xy | value: abc | part: 2])
+    (r = applique 'apd3 [series: copy xy, value: abc, part: 2])
 
     (r = ap2d copy xy abc 3)
-    (r = applique 'ap2d [series: copy xy | value: abc | dup: 3])
+    (r = applique 'ap2d [series: copy xy, value: abc, dup: 3])
 ]
 
 [
     (
         adp: :append/dup/part
-        adp2: specialize 'adp [part: 2]
-        ad3p: specialize 'adp [dup: 3]
+        adp2: specialize :adp [part: 2]
+        ad3p: specialize :adp [dup: 3]
 
         xy: [<X> #Y]
         abc: [A B C]
@@ -99,17 +99,17 @@
     )
 
     (r = adp copy xy abc 3 2)
-    (r = applique 'adp [series: copy xy | value: abc | dup: 3 | part: 2])
+    (r = applique 'adp [series: copy xy, value: abc, dup: 3, part: 2])
 
     (r = adp2 copy xy abc 3)
-    (r = applique 'adp2 [series: copy xy | value: abc | dup: 3])
+    (r = applique 'adp2 [series: copy xy, value: abc, dup: 3])
 
     (r = ad3p copy xy abc 2)
-    (r = applique 'ad3p [series: copy xy | value: abc | part: 2])
+    (r = applique 'ad3p [series: copy xy, value: abc, part: 2])
 ]
 
 (
-    aopd3: specialize lit (specialize 'append/only [])/part [
+    aopd3: specialize lit (specialize :append/only [])/part [
         dup: 3
         part: 1
     ]
@@ -117,8 +117,8 @@
     r: [a b c [d e] [d e] [d e]]
 
     did all [
-        | r = aopd3 copy [a b c] [d e]
-        | r = applique 'aopd3 [series: copy [a b c] value: [d e]]
+        , r = aopd3 copy [a b c] [d e]
+        , r = applique 'aopd3 [series: copy [a b c] value: [d e]]
     ]
 )
 
@@ -126,9 +126,9 @@
     is-bad: true
 
     for-each code [
-        [specialize 'append/only/only []]
-        [specialize 'append/asdf []]
-        [specialize lit (specialize 'append/only [])/only []]
+        [specialize :append/only/only []]
+        [specialize :append/asdf []]
+        [specialize lit (specialize :append/only [])/only []]
     ][
         is-bad: me and ['bad-refine = (trap [do code])/id]
     ]
@@ -138,7 +138,7 @@
 
 
 (
-    ap10d: specialize 'append/dup [value: 10]
+    ap10d: specialize :append/dup [value: 10]
     f: make frame! :ap10d
     f/series: copy [a b c]
     did all [
@@ -154,20 +154,20 @@
 [
     (
         foo: function [/A [integer!] :/B [<skip> word!]] [
-            reduce [/A (A) /B (try :B)]
+            reduce [/A (try A) /B (try :B)]
         ]
         foob: enfixed :foo/b
         true
     )
 
-    ([/A _ /B word] = (word foob |))
-    ([/A _ /B _] = (<not a word> foob |))
-    ([/A 20 /B word] = (word <- foob/a 20))
+    ([/A _ /B word] = (word foob ||))
+    ([/A _ /B _] = (<not a word> foob ||))
+    ([/A 20 /B word] = (word ->- foob/a 20))
 
     (comment [
         {Currently SHOVE and <skip> don't work together, maybe shouldn't}
         https://github.com/metaeducation/ren-c/issues/909
-        [/A 20 /B _] = (<not a word> <- foob/a 20)
+        [/A 20 /B _] = (<not a word> ->- foob/a 20)
     ] true)
 ]
 

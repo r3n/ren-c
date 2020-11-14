@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -34,24 +34,24 @@
 // Allow multiple types. Throw error if not valid.
 // Note that the result is one-based.
 //
-REBINT Get_Num_From_Arg(const REBVAL *val)
+REBINT Get_Num_From_Arg(const RELVAL *val)
 {
     REBINT n;
 
     if (IS_INTEGER(val)) {
         if (VAL_INT64(val) > INT32_MAX or VAL_INT64(val) < INT32_MIN)
-            fail (Error_Out_Of_Range(val));
+            fail (Error_Out_Of_Range(SPECIFIC(val)));
         n = VAL_INT32(val);
     }
     else if (IS_DECIMAL(val) or IS_PERCENT(val)) {
         if (VAL_DECIMAL(val) > INT32_MAX or VAL_DECIMAL(val) < INT32_MIN)
-            fail (Error_Out_Of_Range(val));
+            fail (Error_Out_Of_Range(SPECIFIC(val)));
         n = cast(REBINT, VAL_DECIMAL(val));
     }
     else if (IS_LOGIC(val))
         n = (VAL_LOGIC(val) ? 1 : 2);
     else
-        fail (val);
+        fail (rebUnrelativize(val));
 
     return n;
 }
@@ -213,7 +213,7 @@ REBI64 Int64s(const REBVAL *val, REBINT sign)
 const REBVAL *Datatype_From_Kind(enum Reb_Kind kind)
 {
     assert(kind > REB_0 and kind < REB_MAX);
-    REBVAL *type = CTX_VAR(Lib_Context, SYM_FROM_KIND(kind));
+    REBVAL *type = VAL_CONTEXT_VAR(Lib_Context, SYM_FROM_KIND(kind));
     assert(IS_DATATYPE(type));
     return type;
 }
@@ -227,7 +227,7 @@ const REBVAL *Datatype_From_Kind(enum Reb_Kind kind)
 //
 REBVAL *Type_Of(const RELVAL *value)
 {
-    return CTX_VAR(Lib_Context, SYM_FROM_KIND(VAL_TYPE(value)));
+    return VAL_CONTEXT_VAR(Lib_Context, SYM_FROM_KIND(VAL_TYPE(value)));
 }
 
 
@@ -260,90 +260,6 @@ REBINT Get_System_Int(REBLEN i1, REBLEN i2, REBINT default_int)
 }
 
 
-//
-//  Init_Any_Series_At_Core: C
-//
-// Common function.
-//
-REBVAL *Init_Any_Series_At_Core(
-    RELVAL *out,
-    enum Reb_Kind type,
-    REBSER *s,
-    REBLEN index,
-    REBNOD *binding
-){
-    assert(ANY_SERIES_KIND(type));
-    Force_Series_Managed(s);
-
-    // Note: a R3-Alpha Make_Binary() comment said:
-    //
-    //     Make a binary string series. For byte, C, and UTF8 strings.
-    //     Add 1 extra for terminator.
-    //
-    // One advantage of making all binaries terminate in 0 is that it means
-    // that if they were valid UTF-8, they could be aliased as Rebol strings,
-    // which are zero terminated.  For now, it's the rule.
-    //
-    ASSERT_SERIES_TERM(s);
-
-    RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, s);
-    VAL_INDEX(out) = index;
-    if (ANY_ARRAY_KIND(type))
-        INIT_BINDING(out, binding);
-    else
-        assert(binding == UNBOUND);
-
-  #if !defined(NDEBUG)
-    if (ANY_STRING_KIND(type) or type == REB_BINARY)
-        if (SER_WIDE(s) != 1)
-            panic(s);
-  #endif
-
-    return SPECIFIC(out);
-}
-
-
-//
-//  Init_Any_String_At: C
-//
-// Common function.
-//
-REBVAL *Init_Any_String_At(
-    RELVAL *out,
-    enum Reb_Kind type,
-    REBSTR *s,
-    REBLEN index
-){
-    if (ANY_WORD_KIND(type))
-        assert(IS_STR_SYMBOL(s));
-    else
-        assert(ANY_STRING_KIND(type));
-
-    // Note: a R3-Alpha Make_Binary() comment said:
-    //
-    //     Make a binary string series. For byte, C, and UTF8 strings.
-    //     Add 1 extra for terminator.
-    //
-    // One advantage of making all binaries terminate in 0 is that it means
-    // that if they were valid UTF-8, they could be aliased as Rebol strings,
-    // which are zero terminated.  For now, it's the rule.
-    //
-    ASSERT_SERIES_TERM(SER(s));
-  #if !defined(NDEBUG)
-    if (SER_WIDE(SER(s)) != 1)
-        panic(s);
-  #endif
-
-    Force_Series_Managed(s);
-
-    RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, s);
-    VAL_INDEX(out) = index;
-    return SPECIFIC(out);
-}
-
-
 #if !defined(NDEBUG)
 
 //
@@ -356,7 +272,7 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
         (SER(c)->header.bits & SERIES_MASK_VARLIST) == SERIES_MASK_VARLIST
     );
 
-    REBVAL *archetype = CTX_ARCHETYPE(c);
+    const REBVAL *archetype = CTX_ARCHETYPE(c);
     assert(VAL_CONTEXT(archetype) == c);
     assert(CTX_TYPE(c) == kind);
 
@@ -380,13 +296,13 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     //
     if (CTX_TYPE(c) == REB_FRAME) {
         assert(IS_ACTION(CTX_ROOTKEY(c)));
-        assert(VAL_PHASE(archetype) != nullptr);
+        assert(VAL_PHASE_ELSE_ARCHETYPE(archetype) != nullptr);
     }
     else {
       #ifdef DEBUG_UNREADABLE_VOIDS
         assert(IS_UNREADABLE_DEBUG(CTX_ROOTKEY(c)));
       #endif
-        assert(VAL_PHASE(archetype) == nullptr);
+        assert(PAYLOAD(Any, archetype).second.node == nullptr);
     }
 
     // Keylists are uniformly managed, or certain routines would return
@@ -423,20 +339,34 @@ void Extra_Init_Action_Checks_Debug(REBACT *a) {
 
 
 //
-//  Part_Len_Core: C
+//  Part_Len_May_Modify_Index: C
 //
-// When an ACTION! that takes a series also takes a /PART argument, this
-// determines if the position for the part is before or after the series
+// This is the common way of normalizing a series with a position against a
+// /PART limit, so that the series index points to the beginning of the
+// subsetted range and gives back a length to the end of that subset.
+//
+// It determines if the position for the part is before or after the series
 // position.  If it is before (e.g. a negative integer limit was passed in,
 // or a prior position) the series value will be updated to the earlier
 // position, so that a positive length for the partial region is returned.
 //
-static REBLEN Part_Len_Core(
+REBLEN Part_Len_May_Modify_Index(
     REBVAL *series,  // ANY-SERIES! value whose index may be modified
     const REBVAL *part  // /PART (number, position in value, or BLANK! cell)
 ){
+    if (ANY_SEQUENCE(series)) {
+        if (not IS_NULLED(part))
+            fail ("/PART cannot be used with ANY-SEQUENCE");
+
+        return VAL_SEQUENCE_LEN(series);
+    }
+
+    assert(ANY_SERIES(series));
+
     if (IS_NULLED(part))  // indicates /PART refinement unused
         return VAL_LEN_AT(series);  // leave index alone, use plain length
+
+    REBLEN iseries = VAL_INDEX(series);  // checked for in-bounds
 
     REBI64 len;
     if (IS_INTEGER(part) or IS_DECIMAL(part))
@@ -449,7 +379,7 @@ static REBLEN Part_Len_Core(
             fail (Error_Invalid_Part_Raw(part));
         }
 
-        len = cast(REBINT, VAL_INDEX(part)) - cast(REBINT, VAL_INDEX(series));
+        len = cast(REBINT, VAL_INDEX(part)) - cast(REBINT, iseries);
     }
 
     // Restrict length to the size available
@@ -461,9 +391,9 @@ static REBLEN Part_Len_Core(
     }
     else {
         len = -len;
-        if (len > cast(REBINT, VAL_INDEX(series)))
-            len = cast(REBINT, VAL_INDEX(series));
-        VAL_INDEX(series) -= cast(REBLEN, len);
+        if (len > cast(REBI64, iseries))
+            len = iseries;
+        VAL_INDEX_RAW(series) -= cast(REBLEN, len);
     }
 
     if (len > UINT32_MAX) {
@@ -478,19 +408,6 @@ static REBLEN Part_Len_Core(
     assert(len >= 0);
     assert(VAL_LEN_HEAD(series) >= cast(REBLEN, len));
     return cast(REBLEN, len);
-}
-
-
-//
-//  Part_Len_May_Modify_Index: C
-//
-// This is the common way of normalizing a series with a position against a
-// /PART limit, so that the series index points to the beginning of the
-// subsetted range and gives back a length to the end of that subset.
-//
-REBLEN Part_Len_May_Modify_Index(REBVAL *series, const REBVAL *limit) {
-    assert(ANY_SERIES(series) or ANY_PATH(series));
-    return Part_Len_Core(series, limit);
 }
 
 
@@ -576,18 +493,21 @@ REBVAL *Setify(REBVAL *out) {
 
     enum Reb_Kind kind = VAL_TYPE(out);
     if (ANY_WORD_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SET_WORD;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SET_WORD;
     }
-    else if (ANY_PATH_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SET_PATH;
+    else if (ANY_PATH_KIND(kind)) {  // Don't change "heart"!
+        mutable_KIND3Q_BYTE(out) = REB_SET_PATH;
+    }
+    else if (ANY_TUPLE_KIND(kind)) {  // Don't change "heart"!
+        mutable_KIND3Q_BYTE(out) = REB_SET_TUPLE;
     }
     else if (ANY_BLOCK_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SET_BLOCK;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SET_BLOCK;
     }
     else if (ANY_GROUP_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SET_GROUP;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SET_GROUP;
     }
-    else if (kind == REB_NULLED) {
+    else if (kind == REB_NULL) {
         fail ("Cannot SETIFY a NULL");
     }
     else {
@@ -609,7 +529,7 @@ REBVAL *Setify(REBVAL *out) {
 //
 //  {If possible, convert a value to a SET-XXX! representation}
 //
-//      return: [<opt> set-word! set-path! set-group! set-block!]
+//      return: [<opt> set-word! set-path! set-tuple! set-group! set-block!]
 //      value [<blank> any-value!]
 //  ]
 //
@@ -631,18 +551,21 @@ REBVAL *Getify(REBVAL *out) {
 
     enum Reb_Kind kind = VAL_TYPE(out);
     if (ANY_BLOCK_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GET_BLOCK;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_GET_BLOCK;
     }
     else if (ANY_GROUP_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GET_GROUP;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_GET_GROUP;
     }
-    else if (ANY_PATH_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GET_PATH;
+    else if (ANY_PATH_KIND(kind)) {  // Don't change "heart"
+        mutable_KIND3Q_BYTE(out) = REB_GET_PATH;
+    }
+    else if (ANY_TUPLE_KIND(kind)) {    // Don't change "heart"
+        mutable_KIND3Q_BYTE(out) = REB_GET_TUPLE;
     }
     else if (ANY_WORD_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_GET_WORD;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_GET_WORD;
     }
-    else if (kind == REB_NULLED) {
+    else if (kind == REB_NULL) {
         fail ("Cannot GETIFY a NULL");
     }
     else {
@@ -662,7 +585,7 @@ REBVAL *Getify(REBVAL *out) {
 //
 //  {If possible, convert a value to a GET-XXX! representation}
 //
-//      return: [<opt> get-word! get-path! get-group! get-block!]
+//      return: [<opt> get-word! get-path! get-tuple! get-group! get-block!]
 //      value [<blank> any-value!]
 //  ]
 //
@@ -686,18 +609,21 @@ REBVAL *Symify(REBVAL *out) {
 
     enum Reb_Kind kind = VAL_TYPE(out);
     if (ANY_WORD_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SYM_WORD;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_WORD;
     }
-    else if (ANY_PATH_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SYM_PATH;
+    else if (ANY_PATH_KIND(kind)) {  // Don't change "heart"!
+        mutable_KIND3Q_BYTE(out) = REB_SYM_PATH;
+    }
+    else if (ANY_TUPLE_KIND(kind)) {    // Don't change "heart"
+        mutable_KIND3Q_BYTE(out) = REB_SYM_TUPLE;
     }
     else if (ANY_BLOCK_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SYM_BLOCK;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_BLOCK;
     }
     else if (ANY_GROUP_KIND(kind)) {
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = REB_SYM_GROUP;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_GROUP;
     }
-    else if (kind == REB_NULLED) {
+    else if (kind == REB_NULL) {
         fail ("Cannot SYMIFY a NULL");
     }
     else {
@@ -719,7 +645,7 @@ REBVAL *Symify(REBVAL *out) {
 //
 //  {If possible, convert a value to a SYM-XXX! representation}
 //
-//      return: [<opt> sym-word! sym-path! sym-group! sym-block!]
+//      return: [<opt> sym-word! sym-path! sym-tuple! sym-group! sym-block!]
 //      value [<blank> any-value!]
 //  ]
 //
@@ -730,3 +656,33 @@ REBNATIVE(symify)
     RETURN (Symify(ARG(value)));
 }
 
+
+//
+//  Plainify: C
+//
+// Turn a value into its "plain" equivalent.  This works for all values.
+//
+REBVAL *Plainify(REBVAL *out) {
+    REBLEN quotes = Dequotify(out);
+
+    enum Reb_Kind kind = VAL_TYPE(out);
+    if (ANY_WORD_KIND(kind)) {
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_WORD;
+    }
+    else if (ANY_PATH_KIND(kind)) {  // Don't change "heart"!
+        mutable_KIND3Q_BYTE(out) = REB_PATH;
+    }
+    else if (ANY_TUPLE_KIND(kind)) {  // Don't change "heart"!
+        mutable_KIND3Q_BYTE(out) = REB_TUPLE;
+    }
+    else if (ANY_BLOCK_KIND(kind)) {
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_BLOCK;
+    }
+    else if (ANY_GROUP_KIND(kind)) {
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_GROUP;
+    }
+    else if (kind == REB_NULL)
+        fail ("Cannot PLAINIFY a NULL");
+
+    return Quotify(out, quotes);
+}

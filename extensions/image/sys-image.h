@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -35,9 +35,9 @@
 
 extern REBTYP* EG_Image_Type;
 
-inline static REBVAL *VAL_IMAGE_BIN(const REBCEL *v) {
+inline static REBVAL *VAL_IMAGE_BIN(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
-    return SPECIFIC(ARR_SINGLE(ARR(PAYLOAD(Any, v).first.node)));
+    return cast(REBVAL*, ARR_SINGLE(ARR(PAYLOAD(Any, v).first.node)));
 }
 
 #define VAL_IMAGE_WIDTH(v) \
@@ -46,12 +46,12 @@ inline static REBVAL *VAL_IMAGE_BIN(const REBCEL *v) {
 #define VAL_IMAGE_HEIGHT(v) \
     MISC(ARR(PAYLOAD(Any, v).first.node)).custom.i
 
-inline static REBYTE *VAL_IMAGE_HEAD(const REBCEL *v) {
+inline static REBYTE *VAL_IMAGE_HEAD(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
-    return SER_DATA(VAL_BINARY(VAL_IMAGE_BIN(v)));
+    return SER_DATA(VAL_BINARY_ENSURE_MUTABLE(VAL_IMAGE_BIN(v)));
 }
 
-inline static REBYTE *VAL_IMAGE_AT_HEAD(const REBCEL *v, REBLEN pos) {
+inline static REBYTE *VAL_IMAGE_AT_HEAD(REBCEL(const*) v, REBLEN pos) {
     return VAL_IMAGE_HEAD(v) + (pos * 4);
 }
 
@@ -63,18 +63,18 @@ inline static REBYTE *VAL_IMAGE_AT_HEAD(const REBCEL *v, REBLEN pos) {
 // a lot of sense.
 
 #define VAL_IMAGE_POS(v) \
-    VAL_INDEX(VAL_IMAGE_BIN(v))
+    VAL_INDEX_UNBOUNDED(VAL_IMAGE_BIN(v))
 
-inline static REBYTE *VAL_IMAGE_AT(const REBCEL *v) {
+inline static REBYTE *VAL_IMAGE_AT(REBCEL(const*) v) {
     return VAL_IMAGE_AT_HEAD(v, VAL_IMAGE_POS(v));
 }
 
-inline static REBLEN VAL_IMAGE_LEN_HEAD(const REBCEL *v) {
+inline static REBLEN VAL_IMAGE_LEN_HEAD(REBCEL(const*) v) {
     return VAL_IMAGE_HEIGHT(v) * VAL_IMAGE_WIDTH(v);
 }
 
-inline static REBLEN VAL_IMAGE_LEN_AT(const REBCEL *v) {
-    if (VAL_IMAGE_POS(v) >= VAL_IMAGE_LEN_HEAD(v))
+inline static REBLEN VAL_IMAGE_LEN_AT(REBCEL(const*) v) {
+    if (VAL_IMAGE_POS(v) >= cast(REBIDX, VAL_IMAGE_LEN_HEAD(v)))
         return 0;  // avoid negative position
     return VAL_IMAGE_LEN_HEAD(v) - VAL_IMAGE_POS(v);
 }
@@ -90,7 +90,7 @@ inline static bool IS_IMAGE(const RELVAL *v) {
 
 inline static REBVAL *Init_Image(
     RELVAL *out,
-    REBSER *bin,
+    const REBSER *bin,
     REBLEN width,
     REBLEN height
 ){
@@ -106,7 +106,7 @@ inline static REBVAL *Init_Image(
 
     assert(VAL_IMAGE_POS(out) == 0);  // !!! sketchy concept, is in BINARY!
 
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 inline static void RESET_IMAGE(REBYTE *p, REBLEN num_pixels) {
@@ -139,9 +139,9 @@ inline static REBVAL *Init_Image_Black_Opaque(RELVAL *out, REBLEN w, REBLEN h)
 // !!! These hooks allow the REB_IMAGE cell type to dispatch to code in the
 // IMAGE! extension if it is loaded.
 //
-extern REBINT CT_Image(const REBCEL *a, const REBCEL *b, REBINT mode);
+extern REBINT CT_Image(REBCEL(const*) a, REBCEL(const*) b, bool strict);
 extern REB_R MAKE_Image(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
 extern REB_R TO_Image(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
-extern void MF_Image(REB_MOLD *mo, const REBCEL *v, bool form);
+extern void MF_Image(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Image);
-extern REB_R PD_Image(REBPVS *pvs, const REBVAL *picker, const REBVAL *opt_setval);
+extern REB_R PD_Image(REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval);

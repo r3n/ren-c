@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -263,14 +263,6 @@ Special internal defines used by RT, not Host-Kit developers:
     //
     #define DEBUG_TRACK_CELLS
 
-    // OUT_MARKED_STALE uses the same bit as ARG_MARKED_CHECKED.  But arg
-    // fulfillment uses END as the signal of when no evaluations are done,
-    // it doesn't need the stale bit.  The bit is cleared when evaluating in
-    // an arg slot in the debug build, to make it more rigorous to know that
-    // it was actually typechecked...vs just carrying the OUT_FLAG_STALE over.
-    //
-    #define DEBUG_STALE_ARGS
-
     // See debugbreak.h and REBNATIVE(c_debug_break)...useful!
     //
     #define INCLUDE_C_DEBUG_BREAK_NATIVE
@@ -337,6 +329,14 @@ Special internal defines used by RT, not Host-Kit developers:
   #if 0
     #define DEBUG_BINDING_NAME_MATCH
   #endif
+
+    // It can be nice to see aliases of platform pointers as if they were
+    // individual bytes, through union "puns".  Though this behavior is not
+    // well defined, it can be useful a lot of the time.
+    //
+    // https://en.wikipedia.org/wiki/Type_punning
+    //
+    #define DEBUG_USE_UNION_PUNS
 
     // Bitfields are poorly specified, and so even if it looks like your bits
     // should pack into a struct exactly, they might not.  Only try this on

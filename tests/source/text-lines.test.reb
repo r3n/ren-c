@@ -3,7 +3,7 @@
 
 (; Setup test.
     do %../../tools/common.r
-    do repo/tools/text-lines.reb
+    do %% (repo-dir)/tools/text-lines.reb
     true
 )
 

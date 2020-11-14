@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -45,8 +45,15 @@
 //   datatypes.  However, the series used to store UTF-8 strings also store
 //   information about their length in codepoints in their series nodes (the
 //   main "number of bytes used" in the series conveys bytes, not codepoints).
-//   See the distinction between SER_USED() and SER_LEN()
+//   See the distinction between SER_USED() and STR_LEN().
 //
+
+// Some places permit an optional label (such as the names of function
+// invocations, which may not have an associated name).  To make the callsite
+// intent clearer for passing in a null REBSTR*, use ANONYMOUS instead.
+//
+#define ANONYMOUS \
+    ((REBSTR*)nullptr)
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -74,9 +81,6 @@
 //
 // The code that runs behind the scenes is typical UTF-8 forward and backward
 // scanning code, minus any need for error handling.
-//
-// !!! Error handling is still included due to running common routines, but
-// should be factored out for efficiency.
 //
 #if !defined(CPLUSPLUS_11) or !defined(DEBUG_UTF8_EVERYWHERE)
     //
@@ -192,7 +196,7 @@
         RebchrPtr (nullptr_t n) : bp (n) {}
         explicit RebchrPtr (const REBYTE *bp) : bp (bp) {}
         explicit RebchrPtr (const char *cstr)
-            : bp (cast(const REBYTE*, cstr)) {}
+            : bp (reinterpret_cast<const REBYTE*>(cstr)) {}
 
         RebchrPtr next(REBUNI *out) {
             const REBYTE *t = bp;
@@ -285,7 +289,8 @@
         operator bool() { return bp != nullptr; }  // implicit
         operator const void*() { return bp; }  // implicit
         operator const REBYTE*() { return bp; }  // implicit
-        operator const char*() { return cast(const char*, bp); }  // implicit
+        operator const char*()
+          { return reinterpret_cast<const char*>(bp); }  // implicit
     };
 
     template<>
@@ -295,10 +300,10 @@
         explicit RebchrPtr (REBYTE *bp)
             : RebchrPtr<const REBYTE*> (bp) {}
         explicit RebchrPtr (char *cstr)
-            : RebchrPtr<const REBYTE*> (cast(REBYTE*, cstr)) {}
+            : RebchrPtr<const REBYTE*> (reinterpret_cast<REBYTE*>(cstr)) {}
 
         static REBCHR(*) nonconst(REBCHR(const*) cp)
-          { return RebchrPtr {m_cast(REBYTE*, cp.bp)}; }
+          { return RebchrPtr {const_cast<REBYTE*>(cp.bp)}; }
 
         RebchrPtr back(REBUNI *out)
           { return nonconst(REBCHR(const*)::back(out)); }
@@ -317,13 +322,14 @@
 
         RebchrPtr write(REBUNI c) {
             REBSIZ size = Encoded_Size_For_Codepoint(c);
-            Encode_UTF8_Char(m_cast(REBYTE*, bp), c, size);
-            return RebchrPtr {m_cast(REBYTE*, bp) + size};
+            Encode_UTF8_Char(const_cast<REBYTE*>(bp), c, size);
+            return RebchrPtr {const_cast<REBYTE*>(bp) + size};
         }
 
-        operator void*() { return m_cast(REBYTE*, bp); }  // implicit
-        operator REBYTE*() { return m_cast(REBYTE*, bp); }  // implicit
-        explicit operator char*() { return m_cast(char*, bp); }
+        operator void*() { return const_cast<REBYTE*>(bp); }  // implicit
+        operator REBYTE*() { return const_cast<REBYTE*>(bp); }  // implicit
+        explicit operator char*()
+            { return const_cast<char*>(reinterpret_cast<const char*>(bp)); }
     };
 
     #define NEXT_CHR(out, cp)               (cp).next(out)
@@ -333,6 +339,20 @@
     #define CHR_CODE(cp)                    (cp).code()
     #define SKIP_CHR(out,cp,delta)          (cp).skip((out), (delta))
     #define WRITE_CHR(cp, c)                (cp).write(c)
+
+  #if defined(DEBUG_CHECK_CASTS)
+    //
+    // const_cast<> and reinterpret_cast<> don't work with user-defined
+    // conversion operators.  But since this codebase uses m_cast, we can
+    // cheat when the class is being used with the helpers.
+    //
+    template <>
+    inline REBCHR(*) m_cast_helper(REBCHR(const*) v)
+      { return RebchrPtr<REBYTE*> {const_cast<REBYTE*>(v.bp)}; }
+  #else
+    #error "DEBUG_UTF8_EVERYWHERE currently requires DEBUG_CHECK_CASTS"
+  #endif
+
 #endif
 
 
@@ -345,7 +365,7 @@ struct Reb_String {
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define STR(p) \
-        ((REBSTR*)(p))  // don't use `cast` so casting away const is allowed
+        m_cast(REBSTR*, (const REBSTR*)(p))  // don't check const in C or C++
 
 #else  // !!! Enhance with more checks, like SER() does.
 
@@ -358,7 +378,7 @@ struct Reb_String {
 #endif
 
 
-inline static bool IS_SER_STRING(REBSER *s) {
+inline static bool IS_SER_STRING(const REBSER *s) {
     if (NOT_SERIES_FLAG((s), IS_STRING))
         return false;
     assert(SER_WIDE(s) == 1);
@@ -394,27 +414,34 @@ inline static bool IS_SER_STRING(REBSER *s) {
 
 #define Is_Definitely_Ascii(s) false
 
-inline static bool Is_String_Definitely_ASCII(const RELVAL *str) {
+inline static bool Is_String_Definitely_ASCII(const REBSTR *str) {
     UNUSED(str);
     return false;
 }
 
-inline static const char *STR_UTF8(REBSTR *s) {
-    return cast(const char*, BIN_HEAD(SER(s)));
-}
+inline static const char *STR_UTF8(const REBSTR *s)
+  { return cast(const char*, BIN_HEAD(SER(s))); }
+
+inline static size_t STR_SIZE(const REBSTR *s)  // e.g. encoded UTF-8 size
+  { return SER_USED(SER(s)); }
 
 
-inline static size_t STR_SIZE(REBSTR *s) {
-    return SER_USED(SER(s)); // number of bytes in series is the UTF-8 size
-}
+inline static REBCHR(*) STR_HEAD(const_if_c REBSTR *s)
+  { return cast(REBCHR(*), SER_HEAD(REBYTE, SER(s))); }
 
-#define STR_HEAD(s) \
-    cast(REBCHR(*), SER_HEAD(REBYTE, SER(s)))
+inline static REBCHR(*) STR_TAIL(const_if_c REBSTR *s)
+  { return cast(REBCHR(*), SER_TAIL(REBYTE, SER(s))); }
 
-#define STR_TAIL(s) \
-    cast(REBCHR(*), SER_TAIL(REBYTE, SER(s)))
+#ifdef __cplusplus
+    inline static REBCHR(const*) STR_HEAD(const REBSTR *s)
+      { return STR_HEAD(m_cast(REBSTR*, s)); }
 
-inline static REBLEN STR_LEN(REBSTR *s) {
+    inline static REBCHR(const*) STR_TAIL(const REBSTR *s)
+      { return STR_TAIL(m_cast(REBSTR*, s)); }
+#endif
+
+
+inline static REBLEN STR_LEN(const REBSTR *s) {
     if (Is_Definitely_Ascii(s))
         return STR_SIZE(s);
 
@@ -439,7 +466,7 @@ inline static REBLEN STR_LEN(REBSTR *s) {
     return len;
 }
 
-inline static REBLEN STR_INDEX_AT(REBSTR *s, REBSIZ offset) {
+inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
     if (Is_Definitely_Ascii(s))
         return offset;
 
@@ -470,16 +497,6 @@ inline static REBLEN STR_INDEX_AT(REBSTR *s, REBSIZ offset) {
     return index;
 }
 
-// If you already know what kind of series you have, you should call STR_LEN()
-// or SER_USED() (aliased as BIN_LEN(), ARR_LEN(), etc.)  It's rare that you
-// don't actually know which it should be.
-//
-inline static REBLEN SER_LEN(REBSER *s) {  // Generic REBSER length
-    if (NOT_SERIES_FLAG(s, IS_STRING))
-        return SER_USED(s);
-    return STR_LEN(STR(s));
-}
-
 inline static void SET_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
     assert(not IS_STR_SYMBOL(s));
 
@@ -493,39 +510,47 @@ inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
 }
 
 
-
 //=//// CACHED ACCESSORS AND BOOKMARKS ////////////////////////////////////=//
 //
-// A "bookmark" in this terminology is simply a small REBSER-sized node which
-// holds a mapping from an index to an offset in a string.  It is pointed to
-// by the string's LINK() field in the series node.
+// A "bookmark" in this terminology is simply a REBSER which contains a list
+// of indexes and offsets.  This helps to accelerate finding positions in
+// UTF-8 strings based on index, vs. having to necessarily search from the
+// beginning.
+//
+// !!! At the moment, only one bookmark is in effect at a time.  Even though
+// it's just two numbers, there's only one pointer's worth of space in the
+// series node otherwise.  Bookmarks aren't generated for strings that are
+// very short, or that are never enumerated.
+
+struct Reb_Bookmark {
+    REBLEN index;
+    REBSIZ offset;
+};
 
 #define BMK_INDEX(b) \
-    PAYLOAD(Bookmark, ARR_SINGLE(b)).index
+    SER_HEAD(struct Reb_Bookmark, (b))->index
 
 #define BMK_OFFSET(b) \
-    PAYLOAD(Bookmark, ARR_SINGLE(b)).offset
+    SER_HEAD(struct Reb_Bookmark, (b))->offset
 
 inline static REBBMK* Alloc_Bookmark(void) {
-    REBARR *bookmark = Alloc_Singular(SERIES_FLAG_MANAGED);
-    CLEAR_SERIES_FLAG(bookmark, MANAGED);  // so it's manual but untracked
-    LINK(bookmark).bookmarks = nullptr;
-    RESET_CELL(ARR_SINGLE(bookmark), REB_X_BOOKMARK, CELL_MASK_NONE);
-
-    // For the moment, REB_X_BOOKMARK is a high numbered type, which keeps
-    // it out of the type list *but* means it claims bindability.  Setting
-    // its mirror byte to claim it is REB_LOGIC preserves some debuggability
-    // (its main type is still bookmark) but makes Is_Bindable() false
-    //
-    mutable_MIRROR_BYTE(ARR_SINGLE(bookmark)) = REB_LOGIC;
-    return bookmark;
+    REBSER *s = Make_Series_Core(
+        1,
+        sizeof(struct Reb_Bookmark),
+        SERIES_FLAG_MANAGED  // LINK_NODE_NEEDS_MARK not neded if is bookmark
+    );
+    LINK(s).bookmarks = nullptr;  // !!! efficiency by linking bookmarks?
+    SET_SERIES_LEN(s, 1);
+    CLEAR_SERIES_FLAG(s, MANAGED);  // manual but untracked (avoid leak error)
+    return s;
 }
 
-inline static void Free_Bookmarks_Maybe_Null(REBSTR *s) {
-    assert(not IS_STR_SYMBOL(s));  // call on string
-    if (LINK(s).bookmarks)
-        GC_Kill_Series(SER(LINK(s).bookmarks));  // recursive free whole list
-    LINK(s).bookmarks = nullptr;
+inline static void Free_Bookmarks_Maybe_Null(REBSTR *str) {
+    assert(not IS_STR_SYMBOL(str));  // call on string
+    if (LINK(str).bookmarks) {
+        GC_Kill_Series(SER(LINK(str).bookmarks));
+        LINK(str).bookmarks = nullptr;
+    }
 }
 
 #if !defined(NDEBUG)
@@ -533,8 +558,6 @@ inline static void Free_Bookmarks_Maybe_Null(REBSTR *s) {
         REBBMK *bookmark = LINK(s).bookmarks;
         if (not bookmark)
             return;
-
-        assert(not LINK(SER(bookmark)).bookmarks);
 
         REBLEN index = BMK_INDEX(bookmark);
         REBSIZ offset = BMK_OFFSET(bookmark);
@@ -567,7 +590,7 @@ inline static void Free_Bookmarks_Maybe_Null(REBSTR *s) {
 // iterate much faster, and most of the strings in the system might be able
 // to get away with not having any bookmarks at all.
 //
-inline static REBCHR(*) STR_AT(REBSTR *s, REBLEN at) {
+inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     assert(at <= STR_LEN(s));
 
     if (Is_Definitely_Ascii(s)) {  // can't have any false positives
@@ -723,56 +746,83 @@ inline static REBCHR(*) STR_AT(REBSTR *s, REBLEN at) {
     return cp;
 }
 
-#define VAL_STRING_HEAD(v) \
-    STR_HEAD(VAL_SERIES(v))
+#ifdef __cplusplus
+    inline static REBCHR(const*) STR_AT(const REBSTR *s, REBLEN at)
+      { return STR_AT(m_cast(REBSTR*, s), at); }
+#endif
 
-#define VAL_STRING_TAIL(v) \
-    STR_TAIL(VAL_SERIES(v))
-
-inline static REBSTR *VAL_STRING(const REBCEL *v) {
-    assert(ANY_STRING_KIND(CELL_KIND(v)) or ANY_WORD_KIND(CELL_KIND(v)));
+inline static const REBSTR *VAL_STRING(REBCEL(const*) v) {
+    assert(ANY_STRING_KIND(CELL_HEART(v)) or ANY_WORD_KIND(CELL_HEART(v)));
     return STR(VAL_NODE(v));  // VAL_SERIES() would assert
 }
 
-inline static REBLEN VAL_LEN_HEAD(const REBCEL *v) {
-    if (REB_BINARY == CELL_KIND(v))
-        return SER_USED(VAL_SERIES(v));  // binaries can alias strings...
-    return SER_LEN(VAL_SERIES(v));  // senses strings, not optimal.  :-/
+#define VAL_STRING_ENSURE_MUTABLE(v) \
+    m_cast(REBSTR*, VAL_STRING(ENSURE_MUTABLE(v)))
+
+// This routine works with the notion of "length" that corresponds to the
+// idea of the datatype which the series index is for.  Notably, a BINARY!
+// can alias an ANY-STRING! or ANY-WORD! and address the individual bytes of
+// that type.  So if the series is a string and not a binary, the special
+// cache of the length in the series node for strings must be used.
+//
+inline static REBLEN VAL_LEN_HEAD(REBCEL(const*) v) {
+    const REBSER *s = VAL_SERIES(v);
+    if (GET_SERIES_FLAG(s, IS_STRING) and CELL_KIND(v) != REB_BINARY)
+        return STR_LEN(STR(s));
+    return SER_USED(s);
 }
 
-inline static bool VAL_PAST_END(const REBCEL *v)
+inline static bool VAL_PAST_END(REBCEL(const*) v)
    { return VAL_INDEX(v) > VAL_LEN_HEAD(v); }
 
-inline static REBLEN VAL_LEN_AT(const REBCEL *v) {
+inline static REBLEN VAL_LEN_AT(REBCEL(const*) v) {
     //
     // !!! At present, it is considered "less of a lie" to tell people the
     // length of a series is 0 if its index is actually past the end, than
     // to implicitly clip the data pointer on out of bounds access.  It's
     // still going to be inconsistent, as if the caller extracts the index
-    // and low level SER_LEN() themselves, they'll find it doesn't add up.
+    // and low level length themselves, they'll find it doesn't add up.
     // This is a longstanding historical Rebol issue that needs review.
     //
-    if (VAL_INDEX(v) >= VAL_LEN_HEAD(v))
-        return 0;  // avoid negative index
+    REBIDX i = VAL_INDEX(v);
+    if (i > cast(REBIDX, VAL_LEN_HEAD(v)))
+        fail ("Index past end of series");
+    if (i < 0)
+        fail ("Index before beginning of series");
 
-    return VAL_LEN_HEAD(v) - VAL_INDEX(v);  // take current index into account
+    return VAL_LEN_HEAD(v) - i;  // take current index into account
 }
 
-inline static REBCHR(*) VAL_STRING_AT(const REBCEL *v) {
-    REBSTR *s = VAL_STRING(v);  // debug build checks that it's ANY-STRING!
-    if (VAL_INDEX(v) == 0)
-        return STR_HEAD(s);  // common case, try and be fast
-    if (VAL_PAST_END(v))
-        fail (Error_Past_End_Raw());  // don't give deceptive return pointer
-    return STR_AT(s, VAL_INDEX(v));
+inline static REBCHR(const*) VAL_STRING_AT(REBCEL(const*) v) {
+    const REBSTR *str = VAL_STRING(v);  // checks that it's ANY-STRING!
+    REBIDX i = VAL_INDEX_RAW(v);
+    REBLEN len = STR_LEN(str);
+    if (i < 0 or i > cast(REBIDX, len))
+        fail (Error_Index_Out_Of_Range_Raw());
+    return i == 0 ? STR_HEAD(str) : STR_AT(str, i);
 }
+
+
+inline static REBCHR(const*) VAL_STRING_TAIL(REBCEL(const*) v) {
+    const REBSTR *s = VAL_STRING(v);  // debug build checks it's ANY-STRING!
+    return STR_TAIL(s);
+}
+
+
+
+#define VAL_STRING_AT_ENSURE_MUTABLE(v) \
+    m_cast(REBCHR(*), VAL_STRING_AT(ENSURE_MUTABLE(v)))
+
+#define VAL_STRING_AT_KNOWN_MUTABLE(v) \
+    m_cast(REBCHR(*), VAL_STRING_AT(KNOWN_MUTABLE(v)))
+
 
 inline static REBSIZ VAL_SIZE_LIMIT_AT(
     REBLEN *length, // length in chars to end (including limit)
-    const REBCEL *v,
-    REBLEN limit  // UNKNOWN (e.g. a very large number) for no limit
+    REBCEL(const*) v,
+    REBLEN limit  // UNLIMITED (e.g. a very large number) for no limit
 ){
-    assert(ANY_STRING_KIND(CELL_KIND(v)));
+    assert(ANY_STRING_KIND(CELL_HEART(v)));
 
     REBCHR(const*) at = VAL_STRING_AT(v);  // !!! update cache if needed
     REBCHR(const*) tail;
@@ -795,21 +845,21 @@ inline static REBSIZ VAL_SIZE_LIMIT_AT(
 }
 
 #define VAL_SIZE_AT(v) \
-    VAL_SIZE_LIMIT_AT(NULL, v, UNKNOWN)
+    VAL_SIZE_LIMIT_AT(NULL, v, UNLIMITED)
 
 inline static REBSIZ VAL_OFFSET(const RELVAL *v) {
-    return VAL_STRING_AT(v) - VAL_STRING_HEAD(v);
+    return VAL_STRING_AT(v) - STR_HEAD(VAL_STRING(v));
 }
 
-inline static REBSIZ VAL_OFFSET_FOR_INDEX(const REBCEL *v, REBLEN index) {
-    assert(ANY_STRING_KIND(CELL_KIND(v)));
+inline static REBSIZ VAL_OFFSET_FOR_INDEX(REBCEL(const*) v, REBLEN index) {
+    assert(ANY_STRING_KIND(CELL_HEART(v)));
 
     REBCHR(const*) at;
 
     if (index == VAL_INDEX(v))
         at = VAL_STRING_AT(v); // !!! update cache if needed
     else if (index == VAL_LEN_HEAD(v))
-        at = VAL_STRING_TAIL(v);
+        at = STR_TAIL(VAL_STRING(v));
     else {
         // !!! arbitrary seeking...this technique needs to be tuned, e.g.
         // to look from the head or the tail depending on what's closer
@@ -817,7 +867,7 @@ inline static REBSIZ VAL_OFFSET_FOR_INDEX(const REBCEL *v, REBLEN index) {
         at = STR_AT(VAL_STRING(v), index);
     }
 
-    return at - VAL_STRING_HEAD(v);
+    return at - STR_HEAD(VAL_STRING(v));
 }
 
 
@@ -831,7 +881,7 @@ inline static REBSIZ VAL_OFFSET_FOR_INDEX(const REBCEL *v, REBLEN index) {
 // should probably lock the input series against modification...or at least
 // hold a cache that it throws away whenever it runs a GROUP!.
 
-inline static REBUNI GET_CHAR_AT(REBSTR *s, REBLEN n) {
+inline static REBUNI GET_CHAR_AT(const REBSTR *s, REBLEN n) {
     REBCHR(const*) up = STR_AT(s, n);
     REBUNI c;
     NEXT_CHR(&c, up);
@@ -924,6 +974,35 @@ inline static REBLEN Num_Codepoints_For_Bytes(
 
 
 //=//// ANY-STRING! CONVENIENCE MACROS ////////////////////////////////////=//
+//
+// Declaring as inline with type signature ensures you use a REBSTR* to
+// initialize, and the C++ build can also validate managed consistent w/const.
+
+inline static REBVAL *Init_Any_String_At(
+    RELVAL *out,
+    enum Reb_Kind kind,
+    const_if_c REBSTR *str,
+    REBLEN index
+){
+    return Init_Any_Series_At_Core(
+        out,
+        kind,
+        Force_Series_Managed_Core(str),
+        index,
+        UNBOUND
+    );
+}
+
+#ifdef __cplusplus
+    inline static REBVAL *Init_Any_String_At(
+        RELVAL *out,
+        enum Reb_Kind kind,
+        const REBSTR *str,
+        REBLEN index
+    ){
+        return Init_Any_Series_At_Core(out, kind, SER(str), index, UNBOUND);
+    }
+#endif
 
 #define Init_Any_String(v,t,s) \
     Init_Any_String_At((v), (t), (s), 0)
@@ -933,8 +1012,6 @@ inline static REBLEN Num_Codepoints_For_Bytes(
 #define Init_Email(v,s)     Init_Any_String((v), REB_EMAIL, (s))
 #define Init_Tag(v,s)       Init_Any_String((v), REB_TAG, (s))
 #define Init_Url(v,s)       Init_Any_String((v), REB_URL, (s))
-#define Init_Issue(v,s)     Init_Any_String((v), REB_ISSUE, (s))
-
 
 
 //=//// REBSTR CREATION HELPERS ///////////////////////////////////////////=//
@@ -957,7 +1034,7 @@ inline static REBSTR *Make_Sized_String_UTF8(const char *utf8, size_t size) {
 
 //=//// REBSTR HASHING ////////////////////////////////////////////////////=//
 
-inline static REBINT Hash_String(REBSTR *str)
+inline static REBINT Hash_String(const REBSTR *str)
     { return Hash_UTF8(STR_HEAD(str), STR_SIZE(str)); }
 
 inline static REBINT First_Hash_Candidate_Slot(
@@ -977,12 +1054,12 @@ inline static REBINT First_Hash_Candidate_Slot(
 #define Copy_String_At(v) \
     Copy_String_At_Limit((v), -1)
 
-inline static REBSER *Copy_Sequence_At_Len(
-    REBSER *s,
+inline static REBSER *Copy_Series_At_Len(
+    const REBSER *s,
     REBLEN index,
     REBLEN len
 ){
-    return Copy_Sequence_At_Len_Extra(s, index, len, 0);
+    return Copy_Series_At_Len_Extra(s, index, len, 0);
 }
 
 
@@ -1046,3 +1123,6 @@ inline static bool Should_Skip_Ascii_Byte_May_Fail(
 
 #define Validate_Ascii_Byte(bp,strmode,start) \
     cast(void, Should_Skip_Ascii_Byte_May_Fail((bp), (strmode), (start)))
+
+#define Append_String(dest,string) \
+    Append_String_Limit((dest), (string), UNLIMITED)

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -49,10 +49,13 @@ const struct {
     {SYM_ANY_PATH_X, TS_PATH},
     {SYM_ANY_NUMBER_X, TS_NUMBER},
     {SYM_ANY_SCALAR_X, TS_SCALAR},
+    {SYM_ANY_SEQUENCE_X, TS_SEQUENCE},
+    {SYM_ANY_TUPLE_X, TS_TUPLE},
     {SYM_ANY_SERIES_X, TS_SERIES},
     {SYM_ANY_STRING_X, TS_STRING},
     {SYM_ANY_CONTEXT_X, TS_CONTEXT},
     {SYM_ANY_ARRAY_X, TS_ARRAY},
+    {SYM_ANY_BRANCH_X, TS_BRANCH},
 
     {SYM_0, 0}
 };
@@ -61,10 +64,12 @@ const struct {
 //
 //  CT_Typeset: C
 //
-REBINT CT_Typeset(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Typeset(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode < 0) return -1;
-    return EQUAL_TYPESET(a, b);
+    UNUSED(strict);
+    if (EQUAL_TYPESET(a, b))
+        return 0;
+    return a > b ? 1 : -1;  // !!! Bad arbitrary comparison, review
 }
 
 
@@ -77,6 +82,8 @@ REBINT CT_Typeset(const REBCEL *a, const REBCEL *b, REBINT mode)
 //
 void Startup_Typesets(void)
 {
+    REBCTX *lib = VAL_CONTEXT(Lib_Context);
+
     REBDSP dsp_orig = DSP;
 
     REBINT n;
@@ -84,7 +91,7 @@ void Startup_Typesets(void)
         Init_Typeset(DS_PUSH(), Typesets[n].bits);
 
         Move_Value(
-            Append_Context(Lib_Context, NULL, Canon(Typesets[n].sym)),
+            Append_Context(lib, nullptr, Canon(Typesets[n].sym)),
             DS_TOP
         );
     }
@@ -129,33 +136,59 @@ bool Add_Typeset_Bits_Core(
 
     const RELVAL *maybe_word = head;
     for (; NOT_END(maybe_word); ++maybe_word) {
-        REBLEN num_quotes = VAL_NUM_QUOTES(maybe_word);
-        const REBCEL *unescaped = VAL_UNESCAPED(maybe_word);
-
         const RELVAL *item;
-        if (CELL_KIND(unescaped) == REB_WORD)
-            item = Lookup_Word_May_Fail(unescaped, specifier);
+        if (IS_WORD(maybe_word))
+            item = Lookup_Word_May_Fail(maybe_word, specifier);
         else
             item = maybe_word; // wasn't variable
 
+        if (IS_TUPLE(item)) {
+            DECLARE_LOCAL (specific);
+            Derelativize(specific, item, VAL_SEQUENCE_SPECIFIER(item));
+            if (rebDidQ("equal?", specific, "'<...>", rebEND)) {
+                //
+                // !!! The actual final notation for variadics is not decided
+                // on, so there is compatibility for now with the <...> form
+                // from when that was a TAG! vs. a 5-element TUPLE!  While
+                // core sources were changed to `<variadic>`, asking users
+                // to shuffle should only be done once (when final is known).
+                //
+                TYPE_SET(typeset, REB_TS_VARIADIC);
+                continue;
+            }
+        }
+
         if (IS_TAG(item)) {
-            if (0 == Compare_String_Vals(item, Root_Ellipsis_Tag, true)) {
+            bool strict = false;
+
+            if (
+                0 == CT_String(item, Root_Variadic_Tag, strict)
+            ){
+                // !!! The actual final notation for variadics is not decided
+                // on, so there is compatibility for now with the <...> form
+                // from when that was a TAG! vs. a 5-element TUPLE!  While
+                // core sources were changed to `<variadic>`, asking users
+                // to shuffle should only be done once (when final is known).
+                //
                 TYPE_SET(typeset, REB_TS_VARIADIC);
             }
-            else if (0 == Compare_String_Vals(item, Root_End_Tag, true)) {
+            else if (0 == CT_String(item, Root_End_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_ENDABLE);
             }
-            else if (0 == Compare_String_Vals(item, Root_Blank_Tag, true)) {
+            else if (0 == CT_String(item, Root_Blank_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_NOOP_IF_BLANK);
             }
-            else if (0 == Compare_String_Vals(item, Root_Opt_Tag, true)) {
+            else if (0 == CT_String(item, Root_Opt_Tag, strict)) {
                 //
                 // !!! Review if this makes sense to allow with MAKE TYPESET!
                 // instead of just function specs.
                 //
-                TYPE_SET(typeset, REB_NULLED);
+                TYPE_SET(typeset, REB_NULL);
             }
-            else if (0 == Compare_String_Vals(item, Root_Output_Tag, true)) {
+            else if (0 == CT_String(item, Root_Invisible_Tag, strict)) {
+                TYPE_SET(typeset, REB_TS_INVISIBLE);  // !!! REB_BYTES hack
+            }
+            else if (0 == CT_String(item, Root_Output_Tag, strict)) {
                 //
                 // !!! Typeset bits are currently scarce, so output is being
                 // indicated solely by being a refinement and having this
@@ -164,86 +197,71 @@ bool Add_Typeset_Bits_Core(
                 // the multiple return values prototyping stage, because it
                 // only has an effect when you use a SET-BLOCK! to the left.
                 //
-                TYPE_SET(typeset, REB_NULLED);
+                CLEAR_ALL_TYPESET_BITS(typeset);
+                TYPE_SET(typeset, REB_TS_REFINEMENT);
+                TYPE_SET(typeset, REB_NULL);
+                TYPE_SET(typeset, REB_ISSUE);  // see Is_Blackhole()
                 TYPE_SET(typeset, REB_WORD);
                 TYPE_SET(typeset, REB_PATH);
+                break;
             }
-            else if (0 == Compare_String_Vals(item, Root_Skip_Tag, true)) {
+            else if (0 == CT_String(item, Root_Skip_Tag, strict)) {
                 if (VAL_PARAM_CLASS(typeset) != REB_P_HARD_QUOTE)
                     fail ("Only hard-quoted parameters are <skip>-able");
 
                 TYPE_SET(typeset, REB_TS_SKIPPABLE);
                 TYPE_SET(typeset, REB_TS_ENDABLE); // skip => null
-                TYPE_SET(typeset, REB_NULLED);  // null if specialized
+                TYPE_SET(typeset, REB_NULL);  // null if specialized
             }
-            else if (0 == Compare_String_Vals(item, Root_Dequote_Tag, true)) {
-                TYPE_SET(typeset, REB_TS_DEQUOTE_REQUOTE);
-            }
-            else if (0 == Compare_String_Vals(item, Root_Requote_Tag, true)) {
-                TYPE_SET(typeset, REB_TS_DEQUOTE_REQUOTE);
-            }
-            else if (0 == Compare_String_Vals(item, Root_Const_Tag, true)) {
+            else if (0 == CT_String(item, Root_Const_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_CONST);
             }
-            else if (0 == Compare_String_Vals(item, Root_Modal_Tag, true)) {
+            else if (0 == CT_String(item, Root_Modal_Tag, strict)) {
                 //
                 // !!! <modal> is not the general way to make modal args (the
                 // `@arg` notation is used), but the native specs are loaded
                 // by a boostrap r3 that can't read them.
                 //
-                mutable_KIND_BYTE(typeset) = REB_P_MODAL;
+                mutable_KIND3Q_BYTE(typeset) = REB_P_MODAL;
             }
         }
         else if (IS_DATATYPE(item)) {
-            if (num_quotes == 0) {
-                //
-                // !!! For the moment, all REB_CUSTOM types are glommed
-                // together into the same typeset test.  Doing better will
-                // involve a redesign of typesets from R3-Alpha's 64 bits.
-                //
-                TYPE_SET(typeset, VAL_TYPE_KIND_OR_CUSTOM(item));
-            }
-            else {
-                const REBCEL *cell = VAL_UNESCAPED(item);
-                if (num_quotes > 1)
-                   fail ("General type quoting not supported, use QUOTED!");
-
-                if (VAL_TYPE_KIND(cell) == REB_WORD)
-                    TYPE_SET(typeset, REB_TS_QUOTED_WORD);
-                else if (VAL_TYPE_KIND(cell) == REB_PATH)
-                    TYPE_SET(typeset, REB_TS_QUOTED_PATH);
-                else
-                    fail ("WORD!/PATH! quote typechecking only, use QUOTED!");
-            }
+            //
+            // !!! For the moment, all REB_CUSTOM types are glommed
+            // together into the same typeset test.  Doing better will
+            // involve a redesign of typesets from R3-Alpha's 64 bits.
+            //
+            TYPE_SET(typeset, VAL_TYPE_KIND_OR_CUSTOM(item));
         }
         else if (IS_TYPESET(item)) {
-            if (num_quotes != 0)
-                fail ("General typeset quoting not supported, use QUOTED!");
-
             VAL_TYPESET_LOW_BITS(typeset) |= VAL_TYPESET_LOW_BITS(item);
             VAL_TYPESET_HIGH_BITS(typeset) |= VAL_TYPESET_HIGH_BITS(item);
         }
-        else if (IS_QUOTED(item)) {
-            const REBCEL *cell = VAL_UNESCAPED(item);
-            if (CELL_KIND(cell) != REB_DATATYPE)
-                fail ("General typeset quoting not supported, use QUOTED!");
+        else if (IS_SYM_WORD(item)) {  // see Startup_Fake_Type_Constraint()
+            switch (VAL_WORD_SYM(item)) {
+              case SYM_CHAR_X:
+              case SYM_BLACKHOLE_X:
+                TYPE_SET(typeset, REB_ISSUE);
+                break;
 
-            if (VAL_TYPE_KIND(cell) == REB_WORD)
-                TYPE_SET(typeset, REB_TS_QUOTED_WORD);
-            else if (VAL_TYPE_KIND(cell) == REB_PATH)
-                TYPE_SET(typeset, REB_TS_QUOTED_PATH);
-            else
-                fail ("WORD!/PATH! quote typechecking only, use QUOTED!");
+              case SYM_LIT_WORD_X:
+              case SYM_LIT_PATH_X:
+                TYPE_SET(typeset, REB_QUOTED);
+                break;
+
+              case SYM_REFINEMENT_X:
+                TYPE_SET(typeset, REB_PATH);
+                break;
+
+              case SYM_PREDICATE_X:
+                TYPE_SET(typeset, REB_TS_PREDICATE);
+                break;
+
+              default:
+                fail ("Unknown fake type constraint!");
+            }
         }
-        else if (IS_SYM_WORD(item)) {  // !!! Hacks !!!
-            //
-            // Allow type-checking to filter on paths which start with BLANK!,
-            // especially useful to combine with <skip>, e.g. `switch /equal?`
-            //
-            if (VAL_WORD_SYM(item) == SYM_REFINEMENT_X)
-                TYPE_SET(typeset, REB_TS_REFINED_PATH);
-        }
-        else if (IS_NULLED(item))
+        else
             fail (Error_Bad_Value_Core(maybe_word, specifier));
 
         // !!! Review erroring policy--should probably not just be ignoring
@@ -302,7 +320,7 @@ REBARR *Typeset_To_Array(const REBVAL *tset)
     REBINT n;
     for (n = 1; n < REB_MAX; ++n) {
         if (TYPE_CHECK(tset, cast(enum Reb_Kind, n))) {
-            if (n == REB_NULLED) {
+            if (n == REB_NULL) {
                 //
                 // !!! A BLANK! value is currently supported in typesets to
                 // indicate that they take optional values.  This may wind up
@@ -322,7 +340,7 @@ REBARR *Typeset_To_Array(const REBVAL *tset)
 //
 //  MF_Typeset: C
 //
-void MF_Typeset(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Typeset(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     REBINT n;
 
@@ -339,14 +357,14 @@ void MF_Typeset(REB_MOLD *mo, const REBCEL *v, bool form)
     if (TYPE_CHECK(v, REB_0_END))
         Append_Ascii(mo->series, "<end> ");
 
-    STATIC_ASSERT(REB_NULLED == 1);
-    if (TYPE_CHECK(v, REB_NULLED))
+    STATIC_ASSERT(REB_NULL == 1);
+    if (TYPE_CHECK(v, REB_NULL))
         Append_Ascii(mo->series, "<opt> ");
 
     // !!! What about REB_TS_SKIPPABLE and other parameter properties, that
     // don't really fit into "types", but you can get with TYPESETS OF action?
 
-    for (n = REB_NULLED + 1; n < REB_MAX; n++) {
+    for (n = REB_NULL + 1; n < REB_MAX; n++) {
         enum Reb_Kind kind = cast(enum Reb_Kind, n);
         if (TYPE_CHECK(v, kind)) {
             if (kind == REB_CUSTOM) {
@@ -402,36 +420,45 @@ REBTYPE(Typeset)
 
         return nullptr; }
 
+      case SYM_UNIQUE:
+        RETURN (v);  // typesets unique by definition
+
       case SYM_INTERSECT:
       case SYM_UNION:
-      case SYM_DIFFERENCE: {
+      case SYM_DIFFERENCE:
+      case SYM_EXCLUDE: {
         REBVAL *arg = D_ARG(2);
 
-        if (IS_DATATYPE(arg)) {
-            REBYTE n = cast(REBYTE, VAL_TYPE(arg));
-            if (n < 32)
-                VAL_TYPESET_LOW_BITS(arg) = FLAGIT_KIND(n);
-            else {
-                assert(n < REB_MAX_PLUS_MAX);
-                VAL_TYPESET_HIGH_BITS(arg) = FLAGIT_KIND(n - 32);
-            }
-        }
+        if (IS_DATATYPE(arg))
+            Init_Typeset(arg, FLAGIT_KIND(VAL_TYPE(arg)));
         else if (not IS_TYPESET(arg))
             fail (arg);
 
-        if (VAL_WORD_SYM(verb) == SYM_UNION) {
+        switch (VAL_WORD_SYM(verb)) {
+          case SYM_UNION:
             VAL_TYPESET_LOW_BITS(v) |= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) |= VAL_TYPESET_HIGH_BITS(arg);
-        }
-        else if (VAL_WORD_SYM(verb) == SYM_INTERSECT) {
+            break;
+        
+          case SYM_INTERSECT:
             VAL_TYPESET_LOW_BITS(v) &= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) &= VAL_TYPESET_HIGH_BITS(arg);
-        }
-        else {
-            assert(VAL_WORD_SYM(verb) == SYM_DIFFERENCE);
+            break;
+
+          case SYM_DIFFERENCE:
             VAL_TYPESET_LOW_BITS(v) ^= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) ^= VAL_TYPESET_HIGH_BITS(arg);
+            break;
+
+          case SYM_EXCLUDE:
+            VAL_TYPESET_LOW_BITS(v) &= ~VAL_TYPESET_LOW_BITS(arg);
+            VAL_TYPESET_HIGH_BITS(v) &= ~VAL_TYPESET_HIGH_BITS(arg);
+            break;
+
+          default:
+            assert(false);
         }
+
         RETURN (v); }
 
       case SYM_COMPLEMENT: {

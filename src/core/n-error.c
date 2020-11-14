@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -39,7 +39,7 @@ static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
     UNUSED(ARG(result));
 
     if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(code)))
-        return VOID_VALUE;
+        return BLANK_VALUE;  // signal thrown without corrupting D_OUT
 
     return nullptr;
 }
@@ -55,7 +55,7 @@ static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
 //      code "Code to execute and monitor"
 //          [block! action!]
 //      /result "The optional output result of the evaluation"
-//          [<output>]
+//          [<output> <opt> any-value!]
 //  ]
 //
 REBNATIVE(trap)
@@ -70,7 +70,7 @@ REBNATIVE(trap)
         return nullptr; // code didn't fail() or throw
     }
 
-    if (IS_VOID(error)) // signal used to indicate a throw
+    if (IS_BLANK(error)) // signal used to indicate a throw
         return R_THROWN;
 
     assert(IS_ERROR(error));
@@ -112,6 +112,9 @@ static REBVAL *Entrap_Dangerous(REBFRM *frame_) {
 REBNATIVE(entrap)
 {
     INCLUDE_PARAMS_OF_ENTRAP;
+
+    if (IS_BLOCK(ARG(code)))
+        Symify(ARG(code));  // request that branch is not voidified
 
     REB_R error = rebRescue(cast(REBDNG*, &Entrap_Dangerous), frame_);
     UNUSED(ARG(code)); // gets used by the above call, via the frame_ pointer

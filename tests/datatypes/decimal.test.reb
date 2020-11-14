@@ -136,13 +136,13 @@
 
 [#1753 (
     c: last mold/all 1e16
-    (#"0" <= c) and [#"9" >= c]
+    (#0 <= c) and (#9 >= c)
 )]
 
 ; alternative form
 (1.1 == 1,1)
-(1.1 = make decimal! 1.1)
 (1.1 = make decimal! "1.1")
+('bad-make-arg = (trap [make decimal! 1.1])/id)
 (1.1 = to decimal! 1.1)
 (1.1 = to decimal! "1.1")
 (error? trap [to decimal! "t"])
@@ -154,3 +154,16 @@
 [#747 (
     equal? #{3FF0000000000009} to binary! to decimal! #{3FF0000000000009}
 )]
+
+; TO DECIMAL! of 2-element INTEGER! PATH! treats as fraction
+[
+    (0.5 = to decimal! 1/2)
+    ('bad-cast = (trap [to decimal! 1/2/3])/id)
+    ('zero-divide = (trap [to decimal! 1/0])/id)
+]
+
+; Unsupported experiment: MAKE DECIMAL! of 2-element path run DIVIDE code
+; (Don't depend on this, not very useful since you have to quote anyway)
+[
+    (0.175 = make decimal! '(50% + 20%)/(1 + 3))
+]

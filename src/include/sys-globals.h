@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -50,17 +50,19 @@ PVAR REBU64 PG_Mem_Limit;   // Memory limit set by SECURE
 // forms of words are created, and removed when they are GC'd.  It is scaled
 // according to the total number of canons in the system.
 //
-PVAR REBSTR *PG_Slash_1_Canon;  // Finesse preallocated
+PVAR const REBSTR *PG_Slash_1_Canon;  // Preallocated "fake" word for `/`
+PVAR const REBSTR *PG_Dot_1_Canon;  // Preallocated "fake" word for `.`
+
 PVAR REBSER *PG_Symbol_Canons; // Canon symbol pointers for words in %words.r
 PVAR REBSER *PG_Canons_By_Hash; // Canon REBSER pointers indexed by hash
 PVAR REBLEN PG_Num_Canon_Slots_In_Use; // Total canon hash slots (+ deleteds)
 #if !defined(NDEBUG)
     PVAR REBLEN PG_Num_Canon_Deleteds; // Deleted canon hash slots "in use"
 #endif
-PVAR REBSTR *PG_Bar_Canon;  // fast canon value for testing for `|`
+PVAR const REBSTR *PG_Bar_Canon;  // fast canon value for testing for `|`
 
-PVAR REBCTX *Lib_Context;
-PVAR REBCTX *Sys_Context;
+PVAR REBVAL *Lib_Context;
+PVAR REBVAL *Sys_Context;
 
 //-- Various char tables:
 PVAR REBYTE *White_Chars;
@@ -92,7 +94,10 @@ PVAR REBVAL PG_Nulled_Cell;
 PVAR REBVAL PG_Blank_Value;
 PVAR REBVAL PG_False_Value;
 PVAR REBVAL PG_True_Value;
-PVAR REBVAL PG_Void_Value;
+
+#ifdef DEBUG_TRASH_MEMORY
+    PVAR REBVAL PG_Trash_Value_Debug;
+#endif
 
 PVAR REBVAL PG_R_Invisible;  // has "pseudotype" REB_R_INVISIBLE
 PVAR REBVAL PG_R_Immediate;  // has "pseudotype" REB_R_IMMEDIATE
@@ -111,16 +116,16 @@ PVAR REBVAL *Root_Typesets;
 
 PVAR REBVAL *Root_Void_Tag; // used with RETURN: <void> to suppress results
 PVAR REBVAL *Root_With_Tag; // overrides locals gathering (can disable RETURN)
-PVAR REBVAL *Root_Ellipsis_Tag; // marks variadic argument <...>
+PVAR REBVAL *Root_Variadic_Tag; // marks variadic argument <variadic>
 PVAR REBVAL *Root_Opt_Tag; // marks optional argument (can be NULL)
 PVAR REBVAL *Root_End_Tag; // marks endable argument (NULL if at end of input)
 PVAR REBVAL *Root_Blank_Tag; // marks that passing blank won't run the action
 PVAR REBVAL *Root_Local_Tag; // marks beginning of a list of "pure locals"
 PVAR REBVAL *Root_Skip_Tag; // marks a hard quote as "skippable" if wrong type
-PVAR REBVAL *Root_Dequote_Tag; // remove quotes before typecheck
-PVAR REBVAL *Root_Requote_Tag; // add quotes that were dequoted back to return
 PVAR REBVAL *Root_Const_Tag; // pass a CONST version of the input argument
 PVAR REBVAL *Root_Output_Tag;  // argument goes to set-block! output
+PVAR REBVAL *Root_Invisible_Tag;  // return value can be invisible
+PVAR REBVAL *Root_Elide_Tag;  // will make any return result act invisibly
 PVAR REBVAL *Root_Modal_Tag;  // !!! needed for bootstrap, vs @arg modal
 
 PVAR REBVAL *Root_Empty_Text; // read-only ""
@@ -135,29 +140,14 @@ PVAR REBVAL *Root_Newline_Char; // '\n' as a CHAR!
 
 PVAR REBVAL *Root_Action_Meta;
 
-PVAR REBVAL *Root_Stats_Map;
-
-PVAR REBVAL *Root_Stackoverflow_Error; // made in advance, avoids extra calls
+PVAR REBVAL *Root_Stackoverflow_Error;  // made in advance, avoids extra calls
+PVAR REBVAL *Root_No_Memory_Error;  // also must be made in advance
 
 PVAR REBARR *PG_Extension_Types;  // array of datatypes created by extensions
 
 // This signal word should be thread-local, but it will not work
 // when implemented that way. Needs research!!!!
 PVAR REBFLGS Eval_Signals;   // Signal flags
-
-// The "dummy" action is used in frames which are marked as being action
-// frames because they need a varlist, that don't actually execute.
-//
-PVAR REBACT *PG_Dummy_Action;
-
-// It is possible to swap out the evaluator for one that does tracing, or
-// single step debugging, etc.
-//
-// !!! This is a work in progress, and demos have had shown varying levels
-// of success.  But it is believed to be the correct long term approach.
-//
-PVAR REBEVL *PG_Eval_Maybe_Stale_Throws;  // Evaluator (REBFRM* in, bool out)
-PVAR REBNAT PG_Dispatch;  // Dispatcher (REBFRM* in, returns REBVAL*)
 
 PVAR REBDEV *PG_Device_List;  // Linked list of R3-Alpha-style "devices"
 
@@ -193,6 +183,10 @@ TVAR bool GC_Disabled;      // true when RECYCLE/OFF is run
 TVAR REBSER *GC_Guarded; // A stack of GC protected series and values
 PVAR REBSER *GC_Mark_Stack; // Series pending to mark their reachables as live
 TVAR REBSER **Prior_Expand; // Track prior series expansions (acceleration)
+
+#if !defined(NDEBUG)  // Used by the FUZZ native to inject memory failures
+    TVAR REBINT PG_Fuzz_Factor;  // (-) => a countdown, (+) percent of 10000
+#endif
 
 TVAR REBSER *TG_Mold_Stack; // Used to prevent infinite loop in cyclical molds
 
@@ -235,7 +229,7 @@ TVAR REBARR *DS_Array;
 TVAR REBDSP DS_Index;
 TVAR REBVAL *DS_Movable_Top;
 
-TVAR struct Reb_State *Saved_State; // Saved state for Catch (CPU state, etc.)
+TVAR struct Reb_State *TG_Jump_List; // Saved state for TRAP (CPU state, etc.)
 
 #if !defined(NDEBUG)
     TVAR bool TG_Pushing_Mold; // Push_Mold should not directly recurse

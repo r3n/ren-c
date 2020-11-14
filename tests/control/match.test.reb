@@ -7,8 +7,8 @@
 ; https://github.com/metaeducation/ren-c/pull/730
 ;
 
-("aaa" = match parse "aaa" [some "a" end])
-(null = match parse "aaa" [some "b" end])
+("aaa" = match parse "aaa" [some "a"])
+(null = match parse "aaa" [some "b"])
 
 (10 = match integer! 10)
 (null = match integer! "ten")
@@ -68,3 +68,43 @@
     even-int: 'integer!/[:even?]
     lit '304 = match '[block!/3 even-int] lit '304
 )
+
+; Falsey things are turned to VOID! in order to avoid cases like:
+;
+;     if match logic! flag [...]
+;
+; But can still be tested for value? since they are VOID!, and can be used
+; with THEN and ELSE.
+[
+    (void? match null null)
+    (void? match blank! blank)
+    (true = match logic! true)
+    (void? match logic! false)
+]
+
+[
+    (10 = match integer! 10)
+    (null = match integer! <tag>)
+
+    ('a/b: = match any-path! 'a/b:)
+    ('a/b: = match any-sequence! 'a/b:)
+    (null = match any-array! 'a/b:)
+]
+
+; ENSURE is a version of MATCH that fails vs. returning NULL on no match
+[
+    (error? trap [ensure action! 10])
+    (10 = ensure integer! 10)
+]
+
+; NON is an inverted form of ENSURE, that fails when the argument *matches*
+[
+    (error? trap [non action! :append])
+    (10 = non action! 10)
+
+    (error? trap [non integer! 10])
+    (:append = non integer! :append)
+
+    (10 = non null 10)
+    (error? trap [non null null])
+]

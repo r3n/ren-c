@@ -149,7 +149,7 @@
     same? :a-value a-value
 )
 (
-    a-value: void
+    a-value: ~void~
     e: trap [a-value]
     e/id = 'need-non-void
 )
@@ -159,7 +159,9 @@
 )
 
 [#1461 #1478 (
-    for-each [str] [
+    for-each str [
+        {<>} {<+>} {<|>} {<=>} {<->} {<>>} {<<>}
+
         {<} {+} {|} {=} {-} {>}
 
         {>=} {=|<} {<><} {-=>} {<-<=}
@@ -199,4 +201,47 @@
         assert [l = as get-word! word]
     ]
     true)
+]
+
+[(
+    for-each bad [  ; !!! This could be a much longer list of bad things!
+        {<ab>cd} {>ab<cd} {<<ab-cd} {>abcd}
+    ][
+        assert ['scan-invalid = (trap [load bad])/id]
+    ]
+    true
+)]
+
+; Standalone dollar signs are allowed, especially useful in shell dialects
+[
+    ("$" = as text! match word! '$)
+    ("$" = as text! match set-word! '$:)
+    ("$" = as text! match get-word! ':$)
+    ("$" = as text! match sym-word! '@$)
+    ("$" = as text! match word! first [$])
+    ("$" = as text! match set-word! first [$:])
+    ("$" = as text! match get-word! first [:$])
+    ("$" = as text! match sym-word! first [@$])
+    ("$" = as text! match word! first [$ 1.00])
+    ("$$" = as text! match word! '$$)
+    ("$$$" = as text! match word! '$$$)
+]
+
+; `%%` was added as a WORD! to serve as a quoting-based MAKE FILE! operator.
+;
+; Single % is not a good idea to have as a WORD!, because `%/foo` would be
+; ambiguous as a PATH! vs. FILE!.  Sacrificing %% as a shorthand for %"%"
+; and giving it to WORD! is worth it.  How many other forms would be worth
+; it is up in the air, so only %% is legal for now.
+[
+    ("%%" = as text! match word! '%%)
+    ("%%" = as text! match set-word! '%%:)
+    ("%%" = as text! match get-word! ':%%)
+    ("%%" = as text! match sym-word! '@%%)
+    ("%%" = as text! match word! first [%%])
+    ("%%" = as text! match set-word! first [%%:])
+    ("%%" = as text! match get-word! first [:%%])
+    ("%%" = as text! match sym-word! first [@%%])
+
+    ("%%/foo" = form match path! '%%/foo)
 ]

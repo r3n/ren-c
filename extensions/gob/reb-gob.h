@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -154,7 +154,7 @@ inline static REBVAL *Init_XYF(
     REBD32 y   // there's no standard: https://stackoverflow.com/a/18705626/
 ){
     RESET_CELL(out, REB_G_XYF, CELL_MASK_NONE);
-    mutable_MIRROR_BYTE(out) = REB_LOGIC;  // fools Is_Bindable()
+    mutable_HEART_BYTE(out) = REB_LOGIC;  // fools Is_Bindable()
     VAL_XYF_X(out) = x;
     VAL_XYF_Y(out) = y;
     return cast(REBVAL*, out);
@@ -204,13 +204,13 @@ typedef struct gob_window {  // Maps gob to window
 #define CLR_GOB_FLAG(g,f)       cast(void, GOB_FLAGS(g) &= ~(f))
 
 #define GOB_ALPHA(g) \
-    EXTRA(Bytes, ARR_AT((g), IDX_GOB_SIZE_AND_ALPHA)).common[0]
+    EXTRA(Bytes, ARR_AT((g), IDX_GOB_SIZE_AND_ALPHA)).exactly_4[0]
 
 #define GOB_CONTENT(g)              SPECIFIC(ARR_AT((g), IDX_GOB_CONTENT))
 #define mutable_GOB_CONTENT(g)      ARR_AT((g), IDX_GOB_CONTENT)
 
 #define GOB_TYPE(g) \
-    EXTRA(Bytes, ARR_AT(g, IDX_GOB_TYPE_AND_OLD_SIZE)).common[0]
+    EXTRA(Bytes, ARR_AT(g, IDX_GOB_TYPE_AND_OLD_SIZE)).exactly_4[0]
 
 #define SET_GOB_TYPE(g,t)       (GOB_TYPE(g) = (t))
 
@@ -231,7 +231,7 @@ inline static REBARR *GOB_PANE(REBGOB *g) {
 
     assert(IS_BLOCK(v));  // only other legal thing that can be in pane cell
     assert(VAL_INDEX(v) == 0);  // pane array shouldn't have an index
-    return VAL_ARRAY(v);
+    return VAL_ARRAY_KNOWN_MUTABLE(v);
 }
 
 #define GOB_PARENT(g) \
@@ -279,18 +279,18 @@ inline static bool IS_GOB(const RELVAL *v)  // Note: QUOTED! does not count
     #define VAL_GOB_INDEX(v) \
         PAYLOAD(Any, v).second.u
 #else
-    inline static REBGOB* VAL_GOB(const REBCEL *v) {
+    inline static REBGOB* VAL_GOB(REBCEL(const*) v) {
         assert(CELL_CUSTOM_TYPE(v) == EG_Gob_Type);
         return cast(REBGOB*, VAL_NODE(v));
     }
 
-    inline static uintptr_t const &VAL_GOB_INDEX(const REBCEL *v) {
+    inline static uintptr_t VAL_GOB_INDEX(REBCEL(const*) v) {
         assert(CELL_CUSTOM_TYPE(v) == EG_Gob_Type);
         return PAYLOAD(Any, v).second.u;
     }
 
-    inline static uintptr_t &VAL_GOB_INDEX(REBCEL *v) {
-        assert(CELL_CUSTOM_TYPE(v) == EG_Gob_Type);
+    inline static uintptr_t & VAL_GOB_INDEX(RELVAL *v) {
+        assert(CELL_CUSTOM_TYPE(VAL_UNESCAPED(v)) == EG_Gob_Type);
         return PAYLOAD(Any, v).second.u;
     }
 #endif
@@ -301,16 +301,16 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
     RESET_CUSTOM_CELL(out, EG_Gob_Type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, g);
     VAL_GOB_INDEX(out) = 0;
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
 // !!! These hooks allow the GOB! cell type to dispatch to code in the
 // GOB! extension if it is loaded.
 //
-extern REBINT CT_Gob(const REBCEL *a, const REBCEL *b, REBINT mode);
+extern REBINT CT_Gob(REBCEL(const*) a, REBCEL(const*) b, bool strict);
 extern REB_R MAKE_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
 extern REB_R TO_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
-extern void MF_Gob(REB_MOLD *mo, const REBCEL *v, bool form);
+extern void MF_Gob(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Gob);
-extern REB_R PD_Gob(REBPVS *pvs, const REBVAL *picker, const REBVAL *opt_setval);
+extern REB_R PD_Gob(REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval);

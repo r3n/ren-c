@@ -3,7 +3,7 @@ REBOL [
     Title: "REBOL 3 Mezzanine: Legacy compatibility"
     Homepage: https://trello.com/b/l385BE7a/porting-guide
     Rights: {
-        Copyright 2012-2018 Rebol Open Source Contributors
+        Copyright 2012-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -18,16 +18,25 @@ REBOL [
 
 
 REBOL: function [] [
-    fail 'return [
+    fail @return [
         "The REBOL [] header of a script must be interpreted by LOAD (and"
         "functions like DO).  It cannot be executed directly."
     ]
 ]
 
 eval: function [] [
-    fail 'return [
+    fail @return [
         "EVAL is now REEVAL (EVAL is slated to be a synonym for EVALUATE):"
         https://forum.rebol.info/t/eval-evaluate-and-reeval-reevaluate/1173
+    ]
+]
+
+void: func [] [
+    fail @return [
+        "VOID is not a function, so that `action! <> type of get/any 'void`"
+        "You can now choose freely ~ for unlabeled void, or labeled as ~xxx~"
+        https://forum.rebol.info/t/another-lingering-idea-named-void-s/1383
+        "(Note that `void: ~void~` would cause errors on referencing VOID.)"
     ]
 ]
 
@@ -86,13 +95,16 @@ library?: typechecker library!
 ; ability to tolerate a spec of `[a:]` by transforming it to `[a: none].
 ; Ren-C hasn't decided yet, but will likely support `construct [a: b: c:]`
 ;
-context: specialize 'make [type: object!]
+context: specialize :make [type: object!]
 
 
 uneval: func [] [
-    fail 'return "QUOTE has replaced UNEVAL"
+    fail @return "QUOTE has replaced UNEVAL"
 ]
 
+=>: func [] [
+    fail @return "=> for lambda has been replaced by ->"
+]
 
 ; To be more visually pleasing, properties like LENGTH can be extracted using
 ; a reflector as simply `length of series`, with no hyphenation.  This is
@@ -115,23 +127,23 @@ uneval: func [] [
 ; no information about specific return types, which could be given here
 ; with REDESCRIBE.
 ;
-length-of: specialize 'reflect [property: 'length]
-words-of: specialize 'reflect [property: 'words]
-values-of: specialize 'reflect [property: 'values]
-index-of: specialize 'reflect [property: 'index]
-type-of: specialize 'reflect [property: 'type]
-binding-of: specialize 'reflect [property: 'binding]
-head-of: specialize 'reflect [property: 'head]
-tail-of: specialize 'reflect [property: 'tail]
-file-of: specialize 'reflect [property: 'file]
-line-of: specialize 'reflect [property: 'line]
-body-of: specialize 'reflect [property: 'body]
+length-of: specialize :reflect [property: 'length]
+words-of: specialize :reflect [property: 'words]
+values-of: specialize :reflect [property: 'values]
+index-of: specialize :reflect [property: 'index]
+type-of: specialize :reflect [property: 'type]
+binding-of: specialize :reflect [property: 'binding]
+head-of: specialize :reflect [property: 'head]
+tail-of: specialize :reflect [property: 'tail]
+file-of: specialize :reflect [property: 'file]
+line-of: specialize :reflect [property: 'line]
+body-of: specialize :reflect [property: 'body]
 
 
 ; General renamings away from non-LOGIC!-ending-in-?-functions
 ; https://trello.com/c/DVXmdtIb
 ;
-index?: specialize 'reflect [property: 'index]
+index?: specialize :reflect [property: 'index]
 offset?: :offset-of
 sign?: :sign-of
 suffix?: :suffix-of
@@ -164,61 +176,61 @@ prin: function [
         null [return]
         text! char! [value]
         block! [spaced value]
-
-        default [form :value]
+    ] else [
+        form :value
     ]
 ]
 
 
 join-of: func [] [
-    fail 'return [
+    fail @return [
         "JOIN has returned to Rebol2 semantics, JOIN-OF is no longer needed"
         https://forum.rebol.info/t/its-time-to-join-together/1030
     ]
 ]
 
 
-; REJOIN in R3-Alpha meant "reduce and join"; the idea of JOIN in Ren-C
-; already implies reduction of the appended data.  JOIN-ALL is a friendlier
+; REJOIN in R3-Alpha meant "reduce and join".  JOIN-ALL is a friendlier
 ; name, suggesting the join result is the type of the first reduced element.
 ;
 ; But JOIN-ALL doesn't act exactly the same as REJOIN--in fact, most cases
 ; of REJOIN should be replaced not with JOIN-ALL, but with UNSPACED.  Note
-; that although UNSPACED always returns a STRING!, the AS operator allows
+; that although UNSPACED always returns a TEXT!, the AS operator allows
 ; aliasing to other string types (`as tag! unspaced [...]` will not create a
 ; copy of the series data the way TO TAG! would).
 ;
-rejoin: function [
-    "Reduces and joins a block of values."
-    return: [any-series!]
-        "Will be the type of the first non-null series produced by evaluation"
-    block [block!]
-        "Values to reduce and join together"
+rejoin: func [
+    {Reduces and joins a block of values}
+
+    return: "Same type as first non-null item produced by evaluation"
+        [issue! any-series! any-sequence!]
+    block "Values to reduce and join together"
+        [block!]
+    <local> base
 ][
-    ; An empty block should result in an empty block.
-    ;
-    if empty? block [return copy []]
+    cycle [  ; Keep evaluating until a usable BASE is found
 
-    ; Act like REDUCE of expression, but where null does not cause an error.
-    ;
-    values: copy []
-    pos: block
-    while [pos: evaluate @(lit evaluated:) pos][
-        append/only values :evaluated
+        if not block: evaluate/result block 'base [
+            return copy []  ; we exhausted block without finding a base value
+        ]
+
+        any [
+            quoted? block  ; just ran an invisible like COMMENT or ELIDE
+            null? :base  ; consider to have dissolved
+            blank? :base  ; treat same as NULL
+        ] then [
+            continue  ; do another evaluation step
+        ]
+
+        ; !!! Historical Rebol would default to a TEXT! if the first thing
+        ; found wasn't JOIN-able.  This is questionable.
+        ;
+        if not match [issue! any-sequence! any-series!] :base [
+            base: to text! :base
+        ]
+
+        return join base block  ; JOIN with what's left of the block
     ]
-
-    ; An empty block of values should result in an empty string.
-    ;
-    if empty? values [return copy {}]
-
-    ; Take type of the first element for the result, or default to string.
-    ;
-    result: if any-series? first values [
-        copy first values
-    ] else [
-        form first values
-    ]
-    append result next values
 ]
 
 
@@ -231,7 +243,7 @@ forever: :cycle
 
 
 apply: func [dummy:] [
-    fail 'dummy [
+    fail @dummy [
         {APPLY is being reverted to a reimagination of the positional}
         {APPLY from Rebol2/R3-Alpha, but with a different way of dealing with}
         {refinements.  The Ren-C APPLY experiment has been moved to the name}
@@ -242,9 +254,9 @@ apply: func [dummy:] [
 ]
 
 
-hijack 'find adapt copy :find [
-    if reverse or @last [
-        fail 'reverse [
+hijack :find adapt copy :find [
+    if reverse or (last) [
+        fail @reverse [
             {/REVERSE and /LAST on FIND have been deprecated.  Use FIND-LAST}
             {or FIND-REVERSE specializations: https://forum.rebol.info/t/1126}
         ]

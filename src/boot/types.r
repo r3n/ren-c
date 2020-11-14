@@ -3,7 +3,7 @@ REBOL [
     Title: "Rebol datatypes and their related attributes"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Developers
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -49,27 +49,29 @@ REBOL [
 
 ; REB_0_END is an array terminator, and not a "type".  It has the 0 as part
 ; of the name to indicate its zero-ness and C falsey-ness is intrinsic to the
-; design--huge parts of the system would not work if it were not zero.
+; design--huge parts of the system would not work if it were not zero.  Plus,
+; making it a leading digit means it's an invalid word, catching if anything
+; leaks it to being an actual word (it can't have a symbol, due to SYM_0
+; having other purposes in the system).
 
-#end        "!!! `END!` isn't a datatype, this isn't exposed to the user"
+#0-end      "!!! `END!` isn't a datatype, this isn't exposed to the user"
             0           0       0       0       []
 
-; REB_NULLED takes value 1, but it being 1 is less intrinsic.  It is also not
-; a "type"...but it is falsey, hence it has to be before LOGIC! in the table
+; REB_NULL takes value 1, but it being 1 is less intrinsic.  It is also not
+; a "type"...but it is falsey, hence it has to be before LOGIC! in the table.
+; In the API, a cell isn't used but it is transformed into the language NULL.
+; To help distinguish it from C's NULL in places where it is undecorated,
+; functions are given names like `Init_Nulled` or `IS_NULLED()`, but the
+; type itself is simply called REB_NULL...which is distinct enough.
 
 #null       "!!! `NULL!` isn't a datatype, `null` can't be stored in blocks"
             0           0       0       +       []
 
-
-; <ANY-UNIT> https://en.wikipedia.org/wiki/Unit_type
-
-void        "returned by actions with no result (neither true nor false)"
-            unit        -       -       +       []
+void        "value that triggers errors if accessed via WORD!/PATH!/TUPLE!"
+            void        -       +       +       []
 
 blank       "placeholder unit type which acts as conditionally false"
-            unit        +       -       +       []
-
-; </ANY-UNIT>
+            blank       +       -       +       [branch]
 
 ; <ANY-SCALAR>
 
@@ -80,6 +82,9 @@ logic       "boolean true or false"
 ; BEGIN TYPES THAT ARE ALWAYS "TRUTHY" - IS_TRUTHY()/IS_CONDITIONALLY_TRUE()
 ; ============================================================================
 
+#bytes      "!!! `BYTES!` isn't a datatype, `heart` type  for optimizations"
+            0           0       0       0       []
+
 decimal     "64bit floating point number (IEEE standard)"
             decimal     -       *       +       [number scalar]
 
@@ -88,9 +93,6 @@ percent     "special form of decimals (used mainly for layout)"
 
 money       "high precision decimals with denomination (opt)"
             money       -       +       +       [scalar]
-
-char        "single unicode codepoint (up to 0x0010FFFF)"
-            char        -       +       +       [scalar]
 
 time        "time of day or duration"
             time        +       +       +       [scalar]
@@ -101,16 +103,13 @@ date        "day, month, year, time of day, and timezone"
 integer     "64 bit integer"
             integer     -       +       +       [number scalar]
 
-tuple       "sequence of small integers (colors, versions, IP)"
-            tuple       +       +       +       [scalar]
 
 ; ============================================================================
 ; BEGIN TYPES THAT NEED TO BE GC-MARKED
 ; ============================================================================
 ;
 ; !!! Note that INTEGER! may become arbitrary precision, and thus could have
-; a node in it to mark in some cases.  TUPLE! will be changing categories
-; entirely and becoming more like PATH!.
+; a node in it to mark in some cases.
 
 pair        "two dimensional point or size"
             pair        +       +       +       [scalar]
@@ -177,8 +176,8 @@ url         "uniform resource locator or identifier"
 tag         "markup string (HTML or XML)"
             string      *       *       *       [series string]
 
-issue       "identifying marker"
-            string      *       *       *       [series string]
+issue       "immutable codepoint or codepoint sequence"
+            issue       *       *       *       []  ; !!! sequence of INTEGER?
 
 ; </ANY-STRING>
 
@@ -219,16 +218,19 @@ varargs     "evaluator position for variable numbers of arguments"
 ; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
 
 sym-block   "alternative form of block (that also doesn't evaluate)"
-            array       *       *       *       [block array series]
+            array       *       *       *       [block array series branch]
 
 sym-group   "symbolic form of group! that does not evaluate"
-            array       *       *       *       [group array series]
+            array       *       *       *       [group array series branch]
 
 sym-path    "symbolic form of path! that does not evaluate"
-            path        *       *       *       [path]
+            sequence    *       *       *       [path sequence branch]
+
+sym-tuple   "symbolic form of tuple! that does not evaluate"
+            sequence    *       *       *       [tuple sequence branch]
 
 sym-word    "symbolic form of word! that does not evaluate"
-            word        -       *       +       [word]
+            word        -       *       +       [word branch]
 
 ; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
 
@@ -236,17 +238,20 @@ sym-word    "symbolic form of word! that does not evaluate"
 ; <ANY-PLAIN> (order matters, see UNSETIFY_ANY_XXX_KIND())
 
 block       "array of values that blocks evaluation unless DO is used"
-            array       *       *       *       [block array series]
+            array       *       *       *       [block array series branch]
 
 ; ============================================================================
 ; BEGIN EVALUATOR ACTIVE TYPES, SEE ANY_EVALUATIVE()
 ; ============================================================================
 
 group       "array that evaluates expressions as an isolated group"
-            array       *       *       *       [group array series]
+            array       *       *       *       [group array series branch]
 
-path        "refinements to functions, objects, files"
-            path        *       *       *       [path]
+path        "member or refinement selection with execution bias"
+            sequence    *       *       *       [path sequence]
+
+tuple       "member selection with inert bias"
+            sequence    *       *       *       [tuple sequence scalar]
 
 word        "evaluates a variable or action"
             word        -       *       +       [word]
@@ -263,7 +268,10 @@ set-group   "array that evaluates and runs SET on the resulting word/path"
             array       *       *       *       [group array series]
 
 set-path    "definition of a path's value"
-            path        *       *       *       [path]
+            sequence    *       *       *       [path sequence]
+
+set-tuple   "definition of a tuple's value"
+            sequence    *       *       *       [tuple sequence]
 
 set-word    "definition of a word's value"
             word        -       *       +       [word]
@@ -280,18 +288,28 @@ get-group   "array that evaluates and runs GET on the resulting word/path"
             array       *       *       *       [group array series]
 
 get-path    "the value of a path"
-            path        *       *       *       [path]
+            sequence    *       *       *       [path sequence branch]
+
+get-tuple   "the value of a tuple"
+            sequence    *       *       *       [tuple sequence]
 
 get-word    "the value of a word (variable)"
-            word        -       *       +       [word]
+            word        -       *       +       [word branch]
 
 ; </ANY-GET> (except for ISSUE!)
+
+
+; COMMA! has a high number with bindable types it's evaluative, and the
+; desire is to make the ANY_INERT() test fast with a single comparison.
+
+comma       "separator between full evaluations (that is otherwise invisible)"
+            comma       -       -       +       []
 
 
 ; ACTION! is the "OneFunction" type in Ren-C https://forum.rebol.info/t/596
 
 action      "an invokable Rebol subroutine"
-            action      +       +       +       []
+            action      +       +       +       [branch]
 
 ; ============================================================================
 ; BEGIN QUOTED RANGE (> 64) AND PSEUDOTYPES (REB_QUOTED < type < 64)
@@ -302,4 +320,4 @@ action      "an invokable Rebol subroutine"
 ; which use the value + REB_64, + REB_64*2, or + REB_64*3)
 
 quoted     "container for arbitrary levels of quoting"
-            quoted       +       +       -      [quoted]
+            quoted       +       +       -      [branch]

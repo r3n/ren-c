@@ -59,7 +59,7 @@
 (error? make error! [type: 'script id: 'bad-path-poke])
 (error? make error! [type: 'script id: 'bad-field-set])
 (error? make error! [type: 'script id: 'dup-vars])
-(error? make error! [type: 'script id: 'past-end])
+(error? make error! [type: 'script id: 'index-out-of-range])
 (error? make error! [type: 'script id: 'missing-arg])
 (error? make error! [type: 'script id: 'too-short])
 (error? make error! [type: 'script id: 'too-long])

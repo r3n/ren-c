@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -87,225 +87,154 @@ REBNATIVE(nand_q)
 
 
 //
-//  did?: native [
-//
-//  "Clamps a value to LOGIC! (e.g. a synonym for NOT? NOT? or TO-LOGIC)"
-//
-//      return: [logic!]
-//          "Only LOGIC!'s FALSE and BLANK! for value return FALSE"
-//      value [any-value!]
-//  ]
-//
-REBNATIVE(did_q)
-{
-    INCLUDE_PARAMS_OF_DID_Q;
-
-    return Init_Logic(D_OUT, IS_TRUTHY(ARG(value)));
-}
-
-
-//
 //  did: native/body [
 //
-//  "Variant of TO-LOGIC which considers null values to also be false"
+//  "Synonym for TO-LOGIC"
 //
-//      return: [logic!]
-//          {true if value is NOT a LOGIC! false, BLANK!, or null}
+//      return: "true if value is NOT a LOGIC! false, BLANK!, or NULL"
+//          [logic!]
 //      optional [<opt> any-value!]
 //  ][
 //      not not :optional
 //  ]
 //
-REBNATIVE(did)
+REBNATIVE(_did_)  // see TO-C-NAME
 {
-    INCLUDE_PARAMS_OF_DID;
+    INCLUDE_PARAMS_OF__DID_;
 
     return Init_Logic(D_OUT, IS_TRUTHY(ARG(optional)));
 }
 
 
 //
-//  not?: native [
+//  not: native [
 //
 //  "Returns the logic complement."
 //
-//      return: [logic!]
-//          "Only LOGIC!'s FALSE and BLANK! for value return TRUE"
-//      value [any-value!]
-//  ]
-//
-REBNATIVE(not_q)
-{
-    INCLUDE_PARAMS_OF_NOT_Q;
-
-    return Init_Logic(D_OUT, IS_FALSEY(ARG(value)));
-}
-
-
-//
-//  not: native [
-//
-//  "Returns the logic complement, considering voids to be false."
-//
-//      return: [logic!]
-//          "Only LOGIC!'s FALSE, BLANK!, and void for cell return TRUE"
+//      return: "Only LOGIC!'s FALSE, BLANK!, and NULL return TRUE"
+//          [logic!]
 //      optional [<opt> any-value!]
 //  ]
 //
-REBNATIVE(not)
+REBNATIVE(_not_)  // see TO-C-NAME
 {
-    INCLUDE_PARAMS_OF_NOT;
+    INCLUDE_PARAMS_OF__NOT_;
 
     return Init_Logic(D_OUT, IS_FALSEY(ARG(optional)));
 }
 
 
 //
-//  or?: native [
-//
-//  {Returns true if either value is conditionally true (no "short-circuit")}
-//
-//      value1 [any-value!]
-//      value2 [any-value!]
-//  ]
-//
-REBNATIVE(or_q)
-{
-    INCLUDE_PARAMS_OF_OR_Q;
-
-    return Init_Logic(
-        D_OUT,
-        IS_TRUTHY(ARG(value1)) or IS_TRUTHY(ARG(value2))
-    );
-}
-
-
-//
-//  xor?: native [
-//
-//  {Returns true if only one of the two values is conditionally true.}
-//
-//      value1 [any-value!]
-//      value2 [any-value!]
-//  ]
-//
-REBNATIVE(xor_q)
-{
-    INCLUDE_PARAMS_OF_XOR_Q;
-
-    // Note: no boolean ^^ in C; check unequal
-    //
-    return Init_Logic(
-        D_OUT,
-        IS_TRUTHY(ARG(value1)) != IS_TRUTHY(ARG(value2))
-    );
-}
-
-
-//
 //  and: enfix native [
 //
-//  {Boolean AND, with short-circuit if right hand side is BLOCK!}
+//  {Boolean AND, right hand side must be in GROUP! to allow short-circuit}
 //
-//      return: "Conditionally true or false value (not coerced to LOGIC!)"
-//          [<opt> any-value!]
-//      left "Expression which will always be evaluated"
-//          [<opt> any-value!]
-//      'right "Evaluated as a branch only if LEFT is logically true"
-//          [block! action! quoted! sym-word! sym-path! sym-group! blank!]
+//      return: [logic!]
+//      left [<opt> any-value!]
+//      :right "Right is evaluated if left is true, or if GET-GROUP!"
+//          [group! get-group! sym-path! sym-word!]
 //  ]
 //
-REBNATIVE(and)
+REBNATIVE(_and_)  // see TO-C-NAME
 {
-    INCLUDE_PARAMS_OF_AND;
+    INCLUDE_PARAMS_OF__AND_;
 
     REBVAL *left = ARG(left);
     REBVAL *right = ARG(right);
 
-    if (IS_BLOCK(left))
-        if (GET_CELL_FLAG(left, UNEVALUATED))
-            fail ("left side of AND should not be literal block or quote");
+    if (GET_CELL_FLAG(left, UNEVALUATED))
+        if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
+            fail (Error_Unintended_Literal_Raw(left));
 
-    if (IS_FALSEY(left))
-        RETURN (left);  // preserve falsey value
+    if (IS_FALSEY(left)) {
+        if (IS_GET_GROUP(right)) {  // have to evaluate GET-GROUP! either way
+            if (Do_Any_Array_At_Throws(D_SPARE, right, SPECIFIED))
+                return R_THROWN;
+        }
+        return Init_False(D_OUT);
+    }
+
+    if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
+        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
         return R_THROWN;
 
-    return D_OUT;  // preserve the exact truthy or falsey value
+    return Init_Logic(D_OUT, IS_TRUTHY(D_OUT));
 }
 
 
 //  or: enfix native [
 //
-//  {Boolean OR, with short-circuit mode if right hand side is BLOCK!}
+//  {Boolean OR, right hand side must be in GROUP! to allow short-circuit}
 //
-//      return: "Conditionally true or false value (not coerced to LOGIC!)"
-//          [<opt> any-value!]
-//      left "Expression which will always be evaluated"
-//          [<opt> any-value!]
-//      'right "Evaluated as a branch only if LEFT is logically false"
-//          [block! group! quoted! sym-word! sym-path! sym-group! blank!]
+//      return: [logic!]
+//      left [<opt> any-value!]
+//      :right "Right is evaluated if left is false, or if GET-GROUP!"
+//          [group! get-group! sym-path! sym-word!]
 //  ]
-REBNATIVE(or)
+//
+REBNATIVE(_or_)  // see TO-C-NAME
 {
-    INCLUDE_PARAMS_OF_OR;
+    INCLUDE_PARAMS_OF__OR_;
 
     REBVAL *left = ARG(left);
     REBVAL *right = ARG(right);
 
-    if (IS_BLOCK(left) or IS_QUOTED(left))
-        if (GET_CELL_FLAG(left, UNEVALUATED))
-            fail ("left side of OR should not be literal block or quote");
+    if (GET_CELL_FLAG(left, UNEVALUATED))
+        if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
+            fail (Error_Unintended_Literal_Raw(left));
 
-    if (IS_TRUTHY(left))
-        RETURN (left);
+    if (IS_TRUTHY(left)) {
+        if (IS_GET_GROUP(right)) {  // have to evaluate GET-GROUP! either way
+            if (Do_Any_Array_At_Throws(D_SPARE, right, SPECIFIED))
+                return R_THROWN;
+        }
+        return Init_True(D_OUT);
+    }
+
+    if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
+        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
         return R_THROWN;
 
-    return D_OUT;  // preserve the exact truthy or falsey value
+    return Init_Logic(D_OUT, IS_TRUTHY(D_OUT));
 }
 
 
 //
 //  xor: enfix native [
 //
-//  {Boolean XOR}
+//  {Boolean XOR (operation cannot be short-circuited)}
 //
-//      return: "Conditionally true value, or LOGIC! false for failure case"
-//          [<opt> any-value!]
-//      left "Expression which will always be evaluated"
-//          [<opt> any-value!]
-//      'right "Expression that's also always evaluated (can't short circuit)"
-//          [block! group! quoted! sym-word! sym-path! sym-group! blank!]
+//      return: [logic!]
+//      left [<opt> any-value!]
+//      :right "Always evaluated, but is a GROUP! for consistency with AND/OR"
+//          [group! get-group! sym-path! sym-word!]
 //  ]
 //
-REBNATIVE(xor)
+REBNATIVE(_xor_)  // see TO-C-NAME
 {
-    INCLUDE_PARAMS_OF_XOR;
+    INCLUDE_PARAMS_OF__XOR_;
 
     REBVAL *left = ARG(left);
+    REBVAL *right = ARG(right);
 
-    if (IS_BLOCK(left) and GET_CELL_FLAG(left, UNEVALUATED))
-        fail ("left hand side of XOR should not be literal block");
+    if (GET_CELL_FLAG(left, UNEVALUATED))
+        if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
+            fail (Error_Unintended_Literal_Raw(left));
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(right), left))
-        return R_THROWN;  // ^-- we *always* evaluate the right hand side
+    if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
+        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
-    REBVAL *right = D_OUT;
+    if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
+        return R_THROWN;
 
-    if (IS_FALSEY(left)) {
-        if (IS_FALSEY(right))
-            return Init_False(D_OUT);  // default to logic false if both false
+    if (IS_FALSEY(left))
+        return Init_Logic(D_OUT, IS_TRUTHY(D_OUT));
 
-        return right;
-    }
-
-    if (IS_TRUTHY(right))
-        return Init_False(D_OUT);  // default to logic false if both true
-
-    RETURN (left);
+    return Init_Logic(D_OUT, IS_FALSEY(D_OUT));
 }
 
 
@@ -340,10 +269,13 @@ REBNATIVE(unless)
 //
 //  CT_Logic: C
 //
-REBINT CT_Logic(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Logic(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0)  return (VAL_LOGIC(a) == VAL_LOGIC(b));
-    return -1;
+    UNUSED(strict);
+
+    if (VAL_LOGIC(a) == VAL_LOGIC(b))
+        return 0;
+    return VAL_LOGIC(a) ? 1 : -1;  // only one is true
 }
 
 
@@ -412,7 +344,7 @@ static inline bool Math_Arg_For_Logic(REBVAL *arg)
 //
 //  MF_Logic: C
 //
-void MF_Logic(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Logic(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     if (not form)
         Append_Ascii(mo->series, "#[");
@@ -437,19 +369,23 @@ REBTYPE(Logic)
 
     switch (VAL_WORD_SYM(verb)) {
 
-    case SYM_INTERSECT:
+    case SYM_BITWISE_AND:
         b2 = Math_Arg_For_Logic(D_ARG(2));
         return Init_Logic(D_OUT, b1 and b2);
 
-    case SYM_UNION:
+    case SYM_BITWISE_OR:
         b2 = Math_Arg_For_Logic(D_ARG(2));
         return Init_Logic(D_OUT, b1 or b2);
 
-    case SYM_DIFFERENCE:
+    case SYM_BITWISE_XOR:
         b2 = Math_Arg_For_Logic(D_ARG(2));
         return Init_Logic(D_OUT, b1 != b2);
 
-    case SYM_COMPLEMENT:
+    case SYM_BITWISE_AND_NOT:
+        b2 = Math_Arg_For_Logic(D_ARG(2));
+        return Init_Logic(D_OUT, b1 and not b2);
+
+    case SYM_BITWISE_NOT:
         return Init_Logic(D_OUT, not b1);
 
     case SYM_RANDOM: {

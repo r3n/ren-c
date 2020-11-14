@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -75,13 +75,18 @@ REBSER *Copy_Bytes(const REBYTE *src, REBINT len)
 //
 REBSTR *Copy_String_At_Limit(const RELVAL *src, REBINT limit)
 {
-    REBLEN length_limit;
-    REBSIZ size = VAL_SIZE_LIMIT_AT(&length_limit, src, limit);
-    assert(length_limit <= size);
+    REBSIZ limited_size;
+    REBLEN limited_length;
+    REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT_LIMIT(
+        &limited_length,
+        &limited_size,
+        src,
+        limit
+    );
 
-    REBSTR *dst = Make_String(size);
-    memcpy(STR_HEAD(dst), VAL_STRING_AT(src), size);
-    TERM_STR_LEN_SIZE(dst, length_limit, size);
+    REBSTR *dst = Make_String(limited_size);
+    memcpy(STR_HEAD(dst), utf8, limited_size);
+    TERM_STR_LEN_SIZE(dst, limited_length, limited_size);
 
     return dst;
 }
@@ -205,34 +210,33 @@ REBSTR *Append_Utf8(REBSTR *dst, const char *utf8, size_t size)
 //
 // Append the spelling of a REBSTR to a UTF8 binary.  Terminates.
 //
-void Append_Spelling(REBSTR *dst, REBSTR *spelling)
+void Append_Spelling(REBSTR *dst, const REBSTR *spelling)
 {
     Append_Utf8(dst, STR_UTF8(spelling), STR_SIZE(spelling));
 }
 
 
 //
-//  Append_String: C
+//  Append_String_Limit: C
 //
-// Append a partial string to a UTF-8 binary series.
+// Append a partial string to a REBSTR*.
 //
-void Append_String(REBSTR *dst, const REBCEL *src, REBLEN limit)
+void Append_String_Limit(REBSTR *dst, REBCEL(const*) src, REBLEN limit)
 {
     assert(not IS_STR_SYMBOL(dst));
-    assert(ANY_STRING_KIND(CELL_KIND(src)));
+    assert(ANY_UTF8_KIND(CELL_KIND(src)));
 
-    REBSIZ offset = VAL_OFFSET_FOR_INDEX(src, VAL_INDEX(src));
+    REBLEN len;
+    REBSIZ size;
+    REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT_LIMIT(&len, &size, src, limit);
 
     REBLEN old_len = STR_LEN(dst);
     REBSIZ old_used = STR_SIZE(dst);
 
-    REBLEN len;
-    REBSIZ size = VAL_SIZE_LIMIT_AT(&len, src, limit);
-
     REBLEN tail = STR_SIZE(dst);
     Expand_Series(SER(dst), tail, size);  // series USED changes too
 
-    memcpy(BIN_AT(SER(dst), tail), BIN_AT(VAL_SERIES(src), offset), size);
+    memcpy(BIN_AT(SER(dst), tail), utf8, size);
     TERM_STR_LEN_SIZE(dst, old_len + len, old_used + size);
 }
 
@@ -379,7 +383,7 @@ void Join_Binary_In_Byte_Buf(const REBVAL *blk, REBINT limit)
 
     SET_SERIES_LEN(buf, 0);
 
-    RELVAL *val;
+    const RELVAL *val;
     for (val = VAL_ARRAY_AT(blk); limit > 0; val++, limit--) {
         switch (VAL_TYPE(val)) {
         case REB_INTEGER:
@@ -388,43 +392,31 @@ void Join_Binary_In_Byte_Buf(const REBVAL *blk, REBINT limit)
             break;
 
         case REB_BINARY: {
-            REBLEN len = VAL_LEN_AT(val);
-            EXPAND_SERIES_TAIL(buf, len);
-            memcpy(BIN_AT(buf, tail), VAL_BIN_AT(val), len);
+            REBSIZ size;
+            const REBYTE *data = VAL_BINARY_SIZE_AT(&size, val);
+            EXPAND_SERIES_TAIL(buf, size);
+            memcpy(BIN_AT(buf, tail), data, size);
             break; }
 
+        case REB_ISSUE:
         case REB_TEXT:
         case REB_FILE:
         case REB_EMAIL:
         case REB_URL:
         case REB_TAG: {
-            REBLEN val_len;
-            REBSIZ utf8_size = VAL_SIZE_LIMIT_AT(&val_len, val, UNKNOWN);
-
-            REBSIZ offset = VAL_OFFSET_FOR_INDEX(val, VAL_INDEX(val));
+            REBSIZ utf8_size;
+            REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, val);
 
             EXPAND_SERIES_TAIL(buf, utf8_size);
-            memcpy(
-                BIN_AT(buf, tail),
-                BIN_AT(VAL_SERIES(val), offset),
-                utf8_size
-            );
+            memcpy(BIN_AT(buf, tail), utf8, utf8_size);
             SET_SERIES_LEN(buf, tail + utf8_size);
-            break; }
-
-        case REB_CHAR: {
-            REBUNI c = VAL_CHAR(val);
-            REBSIZ encoded_size = Encoded_Size_For_Codepoint(c);
-            EXPAND_SERIES_TAIL(buf, encoded_size);
-            Encode_UTF8_Char(BIN_AT(buf, tail), c, encoded_size);
-            SET_SERIES_LEN(buf, tail + encoded_size);
             break; }
 
         default:
             fail (Error_Bad_Value_Core(val, VAL_SPECIFIER(blk)));
         }
 
-        tail = SER_LEN(buf);
+        tail = SER_USED(buf);
     }
 
     *BIN_AT(buf, tail) = 0;

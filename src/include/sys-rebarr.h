@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -161,16 +161,16 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 // they don't have to say ARRAY and FLAG twice.
 
 #define SET_ARRAY_FLAG(s,name) \
-    (cast(REBSER*, ARR(s))->header.bits |= ARRAY_FLAG_##name)
+    (m_cast(REBSER*, SER(ARR(s)))->header.bits |= ARRAY_FLAG_##name)
 
 #define GET_ARRAY_FLAG(s,name) \
-    ((cast(REBSER*, ARR(s))->header.bits & ARRAY_FLAG_##name) != 0)
+    ((cast(const REBSER*, ARR(s))->header.bits & ARRAY_FLAG_##name) != 0)
 
 #define CLEAR_ARRAY_FLAG(s,name) \
-    (cast(REBSER*, ARR(s))->header.bits &= ~ARRAY_FLAG_##name)
+    (m_cast(REBSER*, SER(ARR(s)))->header.bits &= ~ARRAY_FLAG_##name)
 
 #define NOT_ARRAY_FLAG(s,name) \
-    ((cast(REBSER*, ARR(s))->header.bits & ARRAY_FLAG_##name) == 0)
+    ((cast(const REBSER*, ARR(s))->header.bits & ARRAY_FLAG_##name) == 0)
 
 
 // !!! While SERIES_INFO_XXX bits supposedly apply to any kind of series, they
@@ -179,6 +179,7 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 // there is a "INFO_MISC" bit needed due to array flag saturation.
 //
 #define ARRAY_INFO_MISC_VOIDER SERIES_INFO_MISC_BIT
+#define ARRAY_INFO_MISC_ELIDER SERIES_INFO_MISC2_BIT
 
 
 // Ordinary source arrays use their ->link field to point to an interned file
@@ -193,7 +194,7 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define ARR(p) \
-        ((REBARR*)(p))  // don't use `cast` so casting away const is allowed
+        m_cast(REBARR*, (const REBARR*)(p))  // don't check const in C or C++
 
 #else
 

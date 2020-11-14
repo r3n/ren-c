@@ -56,7 +56,7 @@ join-all: function [
     <local> position base
 ][
     until [
-        block: (evaluate @base block) else [return null]
+        block: (evaluate/result block 'base) else [return null]
         set? 'base  ; skip NULL evaluations
     ]
     join base block
@@ -66,7 +66,7 @@ join-all: function [
 remold: redescribe [
     {Reduces and converts a value to a REBOL-readable string.}
 ](
-    adapt 'mold [
+    adapt :mold [
         value: reduce :value
     ]
 )
@@ -90,7 +90,7 @@ array: function [
             fail "Empty ARRAY dimensions (file issue if you want a meaning)"
         ]
         if not integer? size: size/1 [
-            fail 'size ["Expect INTEGER! size in BLOCK!, not" type of size]
+            fail @size ["Expect INTEGER! size in BLOCK!, not" type of size]
         ]
         if tail? rest [rest: null]  ; want `array [2]` => `[_ _]`, no recurse
     ]
@@ -107,9 +107,8 @@ array: function [
         action? :initial [
             loop size [append/only block initial]  ; Called every time
         ]
-        default [
-            append/only/dup block :initial size
-        ]
+    ] else [
+        append/only/dup block :initial size
     ]
     return block
 ]
@@ -174,7 +173,7 @@ replace: function [
         any-array? :pattern [length of :pattern]
     ]
 
-    while [pos: find/(case_REPLACE) target :pattern] [
+    while [pos: find/(if case_REPLACE [/case]) target :pattern] [
         either action? :replacement [
             ;
             ; If arity-0 action, value gets replacement and pos discarded
@@ -231,8 +230,8 @@ reword: function [
 
     out: make (type of source) length of source
 
-    prefix: _
-    suffix: _
+    prefix: null
+    suffix: null
     case [
         null? escape [prefix: "$"]  ; refinement not used, so use default
 
@@ -240,7 +239,7 @@ reword: function [
             escape = ""
             escape = []
         ][
-            prefix: _  ; pure search and replace, no prefix/suffix
+            prefix: null  ; pure search and replace, no prefix/suffix
         ]
 
         block? escape [
@@ -252,10 +251,8 @@ reword: function [
                 fail ["Invalid /ESCAPE delimiter block" escape]
             ]
         ]
-
-        default [
-            prefix: ensure delimiter-types escape
-        ]
+    ] else [
+        prefix: ensure delimiter-types escape
     ]
 
     ; To be used in a parse rule, words must be turned into strings, though
@@ -297,23 +294,23 @@ reword: function [
     ;         | "10" (keyword-match: '10)
     ;    ] suffix  ; ...but then it's at "0>" and not ">", so it fails
     ;
-    keyword-match: _  ; variable that gets set by rule
+    keyword-match: null  ; variable that gets set by rule
     any-keyword-suffix-rule: collect [
         for-each [keyword value] values [
             if not match keyword-types keyword [
                 fail ["Invalid keyword type:" keyword]
             ]
 
-            keep reduce [
-                if match [integer! word!] keyword [
+            keep compose/deep <*> [
+                (<*> if match [integer! word!] keyword [
                     to-text keyword  ; `parse "a1" ['a '1]` illegal for now
                 ] else [
                     keyword
-                ]
+                ])
 
-                suffix
+                (<*> suffix)
 
-                compose '(keyword-match: '(keyword))
+                (keyword-match: '(<*> keyword))
             ]
 
             keep/line '|
@@ -342,7 +339,8 @@ reword: function [
                                 :result
                             ]
                             block! [do :v]
-                            default [:v]
+                        ] else [
+                            :v
                         ]
                     )
                     a:  ; Restart mark of text to copy verbatim to output
@@ -390,42 +388,24 @@ extract: function [
     {Extracts a value from a series at regular intervals}
 
     series [any-series!]
-    width "Size of each entry (the skip)"
+    width "Size of each entry (the skip), negative for backwards step"
         [integer!]
-    /index "Extract from offset position(s)"
-        [any-number! logic! block!]
-    /default "Default value to use (will be called each time if a function)"
-        [any-value!]
+    /index "Extract from offset position"
+        [integer!]
 ][
-    value: default  ; Default value is "" for any-string! output
-    default: :lib/default
-
     if zero? width [return make (type of series) 0]  ; avoid an infinite loop
-    len: either positive? width [  ; Length to preallocate
+
+    len: to integer! either positive? width [  ; Length to preallocate
         divide (length of series) width  ; Forward loop, use length
     ][
         divide (index of series) negate width  ; Backward loop, use position
     ]
-    index: default [1]
-    if block? index [
-        parse index [some [any-number! | logic!] end] else [
-            cause-error 'Script 'invalid-arg reduce [index]
-        ]
-        out: make (type of series) len * length of index
-        if (not :value) and [any-string? out] [value: copy ""]
-        iterate-skip series width [iterate index [
-            val: pick series index/1 else [value]
-            append/only out :val
-        ]]
-    ] else [
-        out: make (type of series) len
-        if (not :value) and [any-string? out] [value: copy ""]
-        iterate-skip series width [
-            val: pick series index else [value]
-            append/only out :val
-        ]
+
+    index: default '1
+    out: make (type of series) len
+    iterate-skip series width [
+        append/only out pick series index
     ]
-    out
 ]
 
 
@@ -466,14 +446,14 @@ collect*: func [
 ][
     let out: null
     let keeper: specialize* (  ; SPECIALIZE to hide series argument
-        enclose* 'append func* [  ; Derive from APPEND for /ONLY /LINE /DUP
+        enclose* :append func* [  ; Derive from APPEND for /ONLY /LINE /DUP
             f [frame!]
             <with> out
         ][
-            :f/value then [  ; null won't run block, nor "count" as collected
+            (get/any 'f/value) then @[  ; null won't run block (not collected)
                 f/series: out: default [make block! 16]  ; no null return now
-                :f/value  ; ELIDE leaves as result (DO F invalidates F/VALUE)
-                elide do f
+                get/any 'f/value  ; ELIDE leaves as result
+                elide do f  ; would invalidate f/value (hence ELIDE)
             ]
             ; ^-- failed THEN returns NULL
         ]
@@ -483,7 +463,7 @@ collect*: func [
 
     ; use FUNC for binding work of connecting KEEP with the keeper function
     ;
-    reeval func compose [keep [action!] <with> return] body :keeper
+    reeval func* [keep [action!] <with> return] body :keeper
 
     :out
 ]
@@ -500,17 +480,21 @@ collect: redescribe [
 ] chain [  ; Gives empty block instead of null if no keeps
     :collect*
         |
-    specialize 'else [branch: [copy []]]
+    specialize :else [branch: [copy []]]
 ]
 
 collect-lines: redescribe [
     {Evaluate body, and return block of values collected via KEEP function.
     KEEPed blocks become spaced TEXT!.}
-] adapt 'collect [  ; https://forum.rebol.info/t/945/1
+] adapt :collect [  ; https://forum.rebol.info/t/945/1
     body: compose [
-        keep: adapt* specialize* 'keep [
-            line: true | only: false | part: _
-        ] [value: spaced try :value]
+        keep: adapt* specialize* :keep [
+            line: #
+            only: #
+            part: null
+        ][
+            value: spaced try :value
+        ]
         (as group! body)
     ]
 ]
@@ -519,10 +503,12 @@ collect-text: redescribe [
     {Evaluate body, and return block of values collected via KEEP function.
     Returns all values as a single spaced TEXT!, individual KEEPed blocks get UNSPACED.}
 ] chain [  ; https://forum.rebol.info/t/945/2
-    adapt 'collect [
+    adapt :collect [
         body: compose [
-            keep: adapt* specialize* 'keep [
-                line: false | only: false | part: _
+            keep: adapt* specialize* :keep [
+                line: null
+                only: null
+                part: null
             ][
                 value: unspaced try :value
             ]
@@ -532,7 +518,7 @@ collect-text: redescribe [
         |
     :spaced
         |
-    specialize* 'else [branch: [copy ""]]
+    specialize* :else [branch: [copy ""]]
 ]
 
 format: function [
@@ -559,8 +545,7 @@ format: function [
             integer! [abs rule]
             text! [length of rule]
             char! [1]
-            default [0]
-        ]
+        ] else [0]
     ]
 
     out: make text! val
@@ -575,7 +560,9 @@ format: function [
                 pad: rule
                 val: form first values
                 values: my next
-                clear at val 1 + abs rule
+                if (abs rule) < length of val [
+                    clear at val 1 + abs rule
+                ]
                 if negative? rule [
                     pad: rule + length of val
                     if negative? pad [out: skip out negate pad]
@@ -615,7 +602,7 @@ split: function [
         [block! integer! char! bitset! text! tag! word!]
     /into "If dlm is integer, split in n pieces (vs. pieces of length n)"
 ][
-    parse (try match block! dlm) [some integer! end] then [
+    parse (try match block! dlm) [some integer!] then [
         return map-each len dlm [
             if len <= 0 [
                 series: skip series negate len
@@ -643,7 +630,7 @@ split: function [
                     copy series to end (keep/only series)
                 ]
             ] else [
-                [any [copy series 1 size skip (keep/only series)] end]
+                [any [copy series 1 size skip (keep/only series)]]
             ]
         ]
         block? dlm [
@@ -658,16 +645,15 @@ split: function [
                 end
             ]
         ]
-        default [
-            ensure [bitset! text! char! word! tag!] dlm
-            [
-                some [
-                    copy mk1: [to dlm | to end]
-                    (keep/only mk1)
-                    opt thru dlm
-                ]
-                end
+    ] else [
+        ensure [bitset! text! char! word! tag!] dlm
+        [
+            some [
+                copy mk1: [to dlm | to end]
+                (keep/only mk1)
+                opt thru dlm
             ]
+            end
         ]
     ]]
 
@@ -692,15 +678,18 @@ split: function [
         ; If the last thing in the series is a delimiter, there is an
         ; implied empty field after it, which we add here.
         ;
-        (switch type of dlm [
+        switch type of dlm [
             bitset! [did find dlm try last series]
             char! [dlm = last series]
             text! tag! word! [
-                (did find series dlm) and [empty? find-last/tail series dlm]
+                did all [
+                    find series dlm
+                    empty? find-last/tail series dlm
+                ]
             ]
             block! [false]
-        ]) and [
-            add-fill-val
+        ] then fill -> [
+            if fill [add-fill-val]
         ]
     ]
 
@@ -719,8 +708,8 @@ find-all: function [
 ][
     verify [any-series? orig: get series]
     while [any [
-        | set series find get series :value
-        | (set series orig | false)  ; reset series and break loop
+        , set series find get series :value
+        , (set series orig, false)  ; reset series and break loop
     ]][
         do body
         series: next series

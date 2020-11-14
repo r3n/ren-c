@@ -2,7 +2,7 @@ REBOL [
     System: "REBOL [R3] Language Interpreter and Run-time Environment"
     Title: "Host Script and Resource Embedding Services ('encapping')"
     Rights: {
-        Copyright 2017 Rebol Open Source Contributors
+        Copyright 2017 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -109,8 +109,8 @@ elf-format: context [
     mode: _
     handler: function [name [word!] num-bytes [integer!]] [
         assert [
-            binary? begin | num-bytes <= length of begin
-            | find [read write] mode
+            binary? begin, num-bytes <= length of begin,
+            find [read write] mode
         ]
 
         either mode = 'read [
@@ -229,7 +229,7 @@ elf-format: context [
     ]
 
     find-section: function [
-        return: [blank! integer!]
+        return: [<opt> integer!]
             {The index of the section header with encap (sh_xxx vars set)}
         name [text!]
         section-headers [binary!]
@@ -254,7 +254,7 @@ elf-format: context [
             ]
             end
         ]
-        return blank
+        return null
     ]
 
     update-offsets: function [
@@ -526,7 +526,7 @@ elf-format: context [
                 encap-section-name
                 section-headers-data
                 string-section-data
-        ) or [
+        ) else [
             return null
         ]
 
@@ -825,7 +825,7 @@ pe-format: context [
         reset
         parse exe-data exe-rule
         if err [
-            fail ["err:" err | "at:" copy/part fail-at 16]
+            fail ["err:" err, "at:" copy/part fail-at 16]
         ]
         true
     ]
@@ -888,13 +888,16 @@ pe-format: context [
         ;print ["Section headers end at:" index of end-of-section-header]
         sort/compare sections func [a b][a/physical-offset < b/physical-offset]
 
-        first-section-by-phy-offset: sections/1 or [ catch [
-            for-each sec sections [
-                if not zero? sec/physical-offset [
-                    throw sec
+        first-section-by-phy-offset: any [
+            sections/1
+            catch [
+                for-each sec sections [
+                    if not zero? sec/physical-offset [
+                        throw sec
+                    ]
                 ]
             ]
-        ] ]
+        ]
 
         ;dump first-section-by-phy-offset
         gap: (
@@ -999,7 +1002,7 @@ pe-format: context [
     ][
         trap [
             parse-exe exe-data
-        ] then err => [
+        ] then err -> [
             ;print ["Failed to parse exe:" err]
             return null
         ]
@@ -1078,7 +1081,7 @@ pe-format: context [
         ]
         insert pos section-data
 
-        return (head of exe-data | elide reset)
+        return (head of exe-data, elide reset)
     ]
 
     remove-section: function [
@@ -1137,10 +1140,13 @@ pe-format: context [
 
         remove/part skip exe-data target-sec/physical-offset target-sec/physical-size
 
-        return (head of exe-data | elide reset)
+        return (head of exe-data, elide reset)
     ]
 
-    update-embedding: specialize 'update-section [section-name: encap-section-name]
+    update-embedding: specialize :update-section [
+        section-name: encap-section-name
+    ]
+
     get-embedding: function [
         return: [<opt> binary!]
         file [file!]
@@ -1148,7 +1154,7 @@ pe-format: context [
         ;print ["Geting embedded from" mold file]
         exe-data: read file
 
-        return (find-section/data exe-data encap-section-name | elide reset)
+        return (find-section/data exe-data encap-section-name, elide reset)
     ]
 ]
 
@@ -1187,14 +1193,15 @@ generic-format: context [
             print "Binary contains no pre-existing encap data block"
         ]
 
-        (while [0 != modulo (length of executable) 4096] [
+        while [0 != modulo (length of executable) 4096] [
             append executable #{00}
             true
-        ]) and [
-            print [{Executable padded to} length of executable {bytes long.}]
-            true
-        ] or [
-            print {No padding of executable length required.}
+        ] then padded -> [
+            if padded [
+                print [{Executable padded to} length of executable {bytes.}]
+            ] else [
+                print {No padding of executable length required.}
+            ]
         ]
 
         append executable embedding
@@ -1308,7 +1315,7 @@ encap: function [
 
     ; !!! Currently only test the extraction for single-file, easier.
     ;
-    if single-script and [embed != extracted: get-encap out-rebol-path] [
+    all [single-script, embed != extracted: get-encap out-rebol-path] then [
         print ["Test extraction size:" length of extracted]
         print ["Embedded bytes" mold embed]
         print ["Extracted bytes" mold extracted]
@@ -1328,18 +1335,16 @@ get-encap: function [
 ][
     trap [
         read/part rebol-path 1
-    ] then (func [e <with> return] [
+    ] then e -> [
         print [e]
         print ["Can't check for embedded code in Rebol path:" rebol-path]
         return blank
-    ])
+    ]
 
     compressed-data: any [
-        elf-format/get-embedding rebol-path
-            |
-        pe-format/get-embedding rebol-path
-            |
-        generic-format/get-embedding rebol-path
+        , elf-format/get-embedding rebol-path
+        , pe-format/get-embedding rebol-path
+        , generic-format/get-embedding rebol-path
     ] else [
         return blank
     ]

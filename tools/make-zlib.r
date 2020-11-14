@@ -2,7 +2,7 @@ REBOL [
     System: "REBOL [R3] Language Interpreter and Run-time Environment"
     Title: "Make sys-zlib.h and u-zlib.c"
     Rights: {
-        Copyright 2012-2018 Rebol Open Source Contributors
+        Copyright 2012-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -165,7 +165,7 @@ fix-kr: function [
             any white-space
             any [#"*" any white-space]
         ]
-    ] c.lexical/grammar
+    ] c-lexical/grammar
 
     parse source bind [
         while [
@@ -296,7 +296,7 @@ fix-kr: function [
             | skip
         ]
         end
-    ] c.lexical/grammar
+    ] c-lexical/grammar
 
     source
 ]
@@ -313,7 +313,7 @@ fix-const-char: func [
             | skip
         ]
         end
-    ] c.lexical/grammar
+    ] c-lexical/grammar
     source
 ]
 

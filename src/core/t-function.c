@@ -8,29 +8,28 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
 
 #include "sys-core.h"
 
-static bool Same_Action(const REBCEL *a, const REBCEL *b)
+static bool Same_Action(REBCEL(const*) a, REBCEL(const*) b)
 {
     assert(CELL_KIND(a) == REB_ACTION and CELL_KIND(b) == REB_ACTION);
 
     if (VAL_ACT_PARAMLIST(a) == VAL_ACT_PARAMLIST(b)) {
-        assert(VAL_ACT_DETAILS(a) == VAL_ACT_DETAILS(b));
-
+        //
         // All actions that have the same paramlist are not necessarily the
         // "same action".  For instance, every RETURN shares a common
         // paramlist, but the binding is different in the REBVAL instances
@@ -46,11 +45,14 @@ static bool Same_Action(const REBCEL *a, const REBCEL *b)
 //
 //  CT_Action: C
 //
-REBINT CT_Action(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Action(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0)
-        return Same_Action(a, b) ? 1 : 0;
-    return -1;
+    UNUSED(strict);  // no lax form of comparison
+
+    if (Same_Action(a, b))
+        return 0;
+    assert(VAL_ACTION(a) != VAL_ACTION(b));
+    return a > b ? 1 : -1;  // !!! Review arbitrary ordering
 }
 
 
@@ -91,9 +93,10 @@ REB_R MAKE_Action(
         REBCTX *exemplar = VAL_CONTEXT(frame_copy);
         rebRelease(frame_copy);
 
-        return Init_Action_Maybe_Bound(
+        return Init_Action(
             out,
             Make_Action_From_Exemplar(exemplar),
+            VAL_FRAME_LABEL(arg),
             VAL_BINDING(arg)  // is this right?
         );
     }
@@ -122,10 +125,11 @@ REB_R MAKE_Action(
     REBACT *act = Make_Interpreted_Action_May_Fail(
         spec,
         body,
-        MKF_ANY_VALUE
+        MKF_MASK_NONE,
+        1  // details capacity, just the slot filled by the relativized body
     );
 
-    return Init_Action_Unbound(out, act);
+    return Init_Action(out, act, ANONYMOUS, UNBOUND);
 }
 
 
@@ -150,7 +154,7 @@ REB_R TO_Action(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 //  MF_Action: C
 //
-void MF_Action(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Action(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -185,7 +189,8 @@ void MF_Action(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 REBTYPE(Action)
 {
-    REBVAL *value = D_ARG(1);
+    REBVAL *action = D_ARG(1);
+    REBACT *act = VAL_ACTION(action);
 
     switch (VAL_WORD_SYM(verb)) {
       case SYM_COPY: {
@@ -200,8 +205,6 @@ REBTYPE(Action)
             // !!! always "deep", allow it?
         }
 
-        REBACT *act = VAL_ACTION(value);
-
         // Copying functions creates another handle which executes the same
         // code, yet has a distinct identity.  This means it would not be
         // HIJACK'd if the function that it was copied from was.
@@ -209,7 +212,9 @@ REBTYPE(Action)
         REBARR *proxy_paramlist = Copy_Array_Deep_Flags_Managed(
             ACT_PARAMLIST(act),
             SPECIFIED,  // !!! Note: not actually "deep", just typesets
-            SERIES_MASK_PARAMLIST
+            SERIES_MASK_PARAMLIST | (
+                SER(act)->header.bits & PARAMLIST_FLAG_IS_NATIVE
+            )
         );
         Sync_Paramlist_Archetype(proxy_paramlist);
         MISC_META_NODE(proxy_paramlist) = NOD(ACT_META(act));
@@ -235,10 +240,11 @@ REBTYPE(Action)
         RELVAL *src = ARR_HEAD(ACT_DETAILS(act));
         RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy));
         for (; NOT_END(src); ++src, ++dest)
-            Blit_Cell(dest, src);
+            Blit_Relative(dest, src);
         TERM_ARRAY_LEN(ACT_DETAILS(proxy), details_len);
 
-        return Init_Action_Maybe_Bound(D_OUT, proxy, VAL_BINDING(value)); }
+        Init_Action(D_OUT, proxy, VAL_ACTION_LABEL(action), VAL_BINDING(action));
+        return D_OUT; }
 
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
@@ -248,37 +254,43 @@ REBTYPE(Action)
         REBSYM sym = VAL_WORD_SYM(property);
         switch (sym) {
           case SYM_BINDING: {
-            if (Did_Get_Binding_Of(D_OUT, value))
+            if (Did_Get_Binding_Of(D_OUT, action))
                 return D_OUT;
             return nullptr; }
+
+          case SYM_LABEL: {
+            const REBSTR *label = VAL_ACTION_LABEL(action);
+            if (not label)
+                return nullptr;
+            return Init_Word(D_OUT, label); }
 
           case SYM_WORDS:
           case SYM_PARAMETERS: {
             bool just_words = (sym == SYM_WORDS);
             return Init_Block(
                 D_OUT,
-                Make_Action_Parameters_Arr(VAL_ACTION(value), just_words)
+                Make_Action_Parameters_Arr(act, just_words)
             ); }
 
           case SYM_TYPESETS:
             return Init_Block(
                 D_OUT,
-                Make_Action_Typesets_Arr(VAL_ACTION(value))
+                Make_Action_Typesets_Arr(act)
             );
 
           case SYM_BODY:
-            Get_Maybe_Fake_Action_Body(D_OUT, value);
+            Get_Maybe_Fake_Action_Body(D_OUT, action);
             return D_OUT;
 
           case SYM_TYPES: {
-            REBARR *copy = Make_Array(VAL_ACT_NUM_PARAMS(value));
+            REBARR *copy = Make_Array(ACT_NUM_PARAMS(act));
 
             // The typesets have a symbol in them for the parameters, and
             // ordinary typesets aren't supposed to have it--that's a
             // special feature for object keys and paramlists!  So clear
             // that symbol out before giving it back.
             //
-            REBVAL *param = VAL_ACT_PARAMS_HEAD(value);
+            REBVAL *param = ACT_PARAMS_HEAD(act);
             REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
             for (; NOT_END(param); ++param, ++typeset) {
                 assert(IS_PARAM(param));
@@ -286,7 +298,7 @@ REBTYPE(Action)
                 VAL_TYPESET_LOW_BITS(typeset) = VAL_TYPESET_LOW_BITS(param);
                 VAL_TYPESET_HIGH_BITS(typeset) = VAL_TYPESET_HIGH_BITS(param);
             }
-            TERM_ARRAY_LEN(copy, VAL_ACT_NUM_PARAMS(value));
+            TERM_ARRAY_LEN(copy, ACT_NUM_PARAMS(act));
             assert(IS_END(typeset));
 
             return Init_Block(D_OUT, copy); }
@@ -298,11 +310,11 @@ REBTYPE(Action)
             // is a series with the file and line bits set, then that's what
             // it returns for FILE OF and LINE OF.
 
-            REBARR *details = VAL_ACT_DETAILS(value);
+            REBARR *details = ACT_DETAILS(act);
             if (ARR_LEN(details) < 1 or not ANY_ARRAY(ARR_HEAD(details)))
                 return nullptr;
 
-            REBARR *a = VAL_ARRAY(ARR_HEAD(details));
+            const REBARR *a = VAL_ARRAY(ARR_HEAD(details));
             if (NOT_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED))
                 return nullptr;
 
@@ -316,7 +328,7 @@ REBTYPE(Action)
             return D_OUT; }
 
           default:
-            fail (Error_Cannot_Reflect(VAL_TYPE(value), property));
+            fail (Error_Cannot_Reflect(REB_ACTION, property));
         }
         break; }
 
@@ -343,7 +355,7 @@ REBTYPE(Action)
 //
 REB_R PD_Action(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     UNUSED(opt_setval);
@@ -368,13 +380,13 @@ REB_R PD_Action(
     // general path mechanic before reaching this dispatch.  So if it's not
     // a word/refinement or or one of those that evaluated it, then error.
     //
-    REBSTR *spelling;
+    const REBSTR *spelling;
     if (IS_WORD(picker))
         spelling = VAL_WORD_SPELLING(picker);
     else if (IS_REFINEMENT(picker))
         spelling = VAL_REFINEMENT_SPELLING(picker);
     else
-        fail (Error_Bad_Refine_Raw(picker));
+        fail (Error_Bad_Refine_Raw(rebUnrelativize(picker)));
 
     Init_Sym_Word(DS_PUSH(), STR_CANON(spelling)); // canonize just once
 

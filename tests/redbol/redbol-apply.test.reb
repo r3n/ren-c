@@ -1,21 +1,26 @@
 ; functions/control/apply.r
 
-(did redbol-apply: function [
+(did redbol-apply: func [
     return: [<opt> any-value!]
     action [action!]
     block [block!]
     /only
+    <local> arg frame params using-args
 ][
     frame: make frame! :action
     params: parameters of :action
     using-args: true
 
-    while [block: sync-invisibles block] [
+    while [not tail? block] [
         block: if only [
             arg: get* 'block/1
             try next block
         ] else [
-            try evaluate @(lit arg:) block
+            ; Skip comments and other invisibles.
+            ; (note: could be result IF when `until .not.quoted? [...]`
+            ;
+            until [not quoted? [block arg]: evaluate block]
+            try block
         ]
 
         if refinement? params/1 [
@@ -53,8 +58,8 @@
 )]
 (1 == redbol-apply :subtract [2 1])
 (1 = (redbol-apply :- [2 1]))
-(error? trap [redbol-apply func [a] [a] []])
-(error? trap [redbol-apply/only func [a] [a] []])
+(null = redbol-apply func [a] [a] [])
+(null = redbol-apply/only func [a] [a] [])
 
 [#2237
     (error? trap [redbol-apply func [a] [a] [1 2]])
@@ -63,28 +68,27 @@
 
 (error? redbol-apply :make [error! ""])
 
-(/a = redbol-apply func [/a] [a] [#[true]])
+(# = redbol-apply func [/a] [a] [#[true]])
 (null = redbol-apply func [/a] [a] [#[false]])
 (null = redbol-apply func [/a] [a] [])
-(/a = redbol-apply/only func [/a] [a] [#[true]])
+(# = redbol-apply/only func [/a] [a] [#[true]])
 
 (
-    comment {The WORD! false, not #[false]}
+    comment {The WORD! false, not #[false], but allowed in Rebol2}
 
-    e: trap [/a = redbol-apply/only func [/a] [a] [false]]
-    e/id = 'invalid-type
+    # = redbol-apply/only func [/a] [a] [false]
 )
 (null == redbol-apply/only func [/a] [a] [])
-(use [a] [a: true /a = redbol-apply func [/a] [a] [a]])
+(use [a] [a: true # = redbol-apply func [/a] [a] [a]])
 (use [a] [a: false null == redbol-apply func [/a] [a] [a]])
-(use [a] [a: false /a = redbol-apply func [/a] [a] [/a]])
-(use [a] [a: false /a = redbol-apply/only func [/a] [/a] [/a]])
-(group! == redbol-apply/only (specialize 'of [property: 'type]) [()])
+(use [a] [a: false # = redbol-apply func [/a] [a] [/a]])
+(use [a] [a: false # = redbol-apply/only func [/a] [/a] [/a]])
+(group! == redbol-apply/only (specialize :of [property: 'type]) [()])
 ([1] == head of redbol-apply :insert [copy [] [1] blank blank])
 ([1] == head of redbol-apply :insert [copy [] [1] blank false])
 ([[1]] == head of redbol-apply :insert [copy [] [1] blank true])
-(action! == redbol-apply (specialize 'of [property: 'type]) [:print])
-(get-word! == redbol-apply/only (specialize 'of [property: 'type]) [:print])
+(action! == redbol-apply (specialize :of [property: 'type]) [:print])
+(get-word! == redbol-apply/only (specialize :of [property: 'type]) [:print])
 
 [
     #1760
@@ -134,7 +138,7 @@
     ][
         return get/any 'x
     ][
-        void
+        ~void~
     ]
 )
 (

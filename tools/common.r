@@ -2,7 +2,7 @@ REBOL [
     System: "Ren-C Core Extraction of the Rebol System"
     Title: "Common Routines for Tools"
     Rights: {
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -19,15 +19,12 @@ REBOL [
 
 do %bootstrap-shim.r
 
+
 ; When you run a Rebol script, the `current-path` is the directory where the
 ; script is.  We assume that the Rebol source enlistment's root directory is
 ; one level above this file (which should be %tools/common.r)
 ;
-repo: context [
-    root: clean-path %../
-    source-root: root
-    tools: what-dir
-]
+repo-dir: clean-path %../
 
 spaced-tab: unspaced [space space space space]
 
@@ -37,7 +34,7 @@ to-c-name: function [
     return: [<opt> text!]
     value "Will be converted to text (via UNSPACED if BLOCK!)"
         [<blank> text! block! word!]
-    /scope "#global or #local, see http://stackoverflow.com/questions/228783/"
+    /scope "[#global #local #prefixed] see http://stackoverflow.com/q/228783/"
         [issue!]
 ][
     all [
@@ -59,7 +56,10 @@ to-c-name: function [
     string: switch string [
         ; Used specifically by t-routine.c to make SYM_ELLIPSIS
         ;
-        "..." [copy "ellipsis"]
+        ; !!! Note: this was ... but that is now a TUPLE!  So this has to
+        ; be changed for the moment.
+        ;
+        "***" [copy "ellipsis"]
 
         ; Used to make SYM_HYPHEN which is needed by `charset [#"A" - #"Z"]`
         ;
@@ -78,28 +78,47 @@ to-c-name: function [
         "~" [copy "tilde"]
         "|" [copy "bar"]
 
-        default [
-            ;
-            ; If these symbols occur composite in a longer word, they use a
-            ; shorthand; e.g. `foo?` => `foo_q`
+        ; These are in the set of what are known as "alterative tokens".  They
+        ; aren't exactly keywords (and in C they're just done with #define).
+        ; Hence they are involved with the preproessor which means that
+        ; "clever" macros like ARG(not) or REF(and) will be invoked as
+        ; ARG(!) or REF(&&).  So instead use ARG(_not_) and REF(_and_), etc.
+        ;
+        ; (Complete list here for completeness, despite many being unused.)
+        ;
+        "and" [copy "_and_"]
+        "and_eq" [copy "_and_eq_"]
+        "bitand" [copy "_bitand_"]
+        "bitor" [copy "_bitor_"]
+        "compl" [copy "_compl_"]
+        "not" [copy "_not_"]
+        "not_eq" [copy "_not_eq_"]
+        "or" [copy "_or_"]
+        "or_eq" [copy "_or_eq_"]
+        "xor" [copy "_xor_"]
+        "xor_eq" [copy "_xor_eq_"]
 
-            for-each [reb c] [
-              #"'"  ""      ; isn't => isnt, don't => dont
-                -   "_"     ; foo-bar => foo_bar
-                *   "_p"    ; !!! because it symbolizes a (p)ointer in C??
-                .   "_"     ; !!! same as hyphen?
-                ?   "_q"    ; (q)uestion
-                !   "_x"    ; e(x)clamation
-                +   "_a"    ; (a)ddition
-                ~   "_t"    ; (t)ilde
-                |   "_b"    ; (b)ar
+        "did" [copy "_did_"]  ; Ren-C addition, replaces not-not `!!`
+    ] else [
+        ;
+        ; If these symbols occur composite in a longer word, they use a
+        ; shorthand; e.g. `foo?` => `foo_q`
 
-            ][
-                replace/all string (form reb) c
-            ]
+        for-each [reb c] [
+            #"'"  ""      ; isn't => isnt, don't => dont
+            -   "_"     ; foo-bar => foo_bar
+            *   "_p"    ; !!! because it symbolizes a (p)ointer in C??
+            .   "_"     ; !!! same as hyphen?
+            ?   "_q"    ; (q)uestion
+            !   "_x"    ; e(x)clamation
+            +   "_a"    ; (a)ddition
+            |   "_b"    ; (b)ar
 
-            string
+        ][
+            replace/all string (form reb) c
         ]
+
+        string
     ]
 
     if empty? string [
@@ -109,8 +128,14 @@ to-c-name: function [
         ]
     ]
 
+    scope: default [#global]
+
     repeat s string [
-        (head? s) and [find charset [#"0" - #"9"] s/1] and [
+        all [
+            scope <> #prefixed
+            head? s
+            find charset [#"0" - #"9"] s/1
+        ] then [
             fail ["identifier" string "starts with digit in to-c-name"]
         ]
 
@@ -119,18 +144,21 @@ to-c-name: function [
         ]
     ]
 
-    scope: default [#global]
-
     case [
-        string/1 != "_" [<ok>]
+        scope = #prefixed [<ok>]  ; assume legitimate prefix
 
-        scope = 'global [
-            fail "global C ids starting with _ are reserved"
+        string/1 != #"_" [<ok>]
+
+        scope = #global [
+            fail ["global C ids starting with _ are reserved:" string]
         ]
 
-        scope = 'local [
+        scope = #local [
             find charset [#"A" - #"Z"] string/2 then [
-                fail "local C ids starting with _ and uppercase are reserved"
+                fail [
+                    "local C ids starting with _ and uppercase are reserved:"
+                        string
+                ]
             ]
         ]
 
@@ -151,9 +179,12 @@ binary-to-c: function [
 
     return: [text!]
     data [binary!]
+    <local> data-len
 ][
+    data-len: length of data
+
     out: make text! 6 * (length of data)
-    while [not tail? data] [
+    while [not empty? try data] [
         ; grab hexes in groups of 8 bytes
         hexed: enbase/base (copy/part data 8) 16
         data: skip data 8
@@ -162,7 +193,7 @@ binary-to-c: function [
         ]
 
         take/last out  ; drop the last space
-        if tail? data [
+        if empty? try data [
             take/last out  ; lose that last comma
         ]
         append out newline  ; newline after each group, and at end
@@ -174,7 +205,7 @@ binary-to-c: function [
         some [thru "," (comma-count: comma-count + 1)]
         to end
     ]
-    assert [(comma-count + 1) = (length of head of data)]
+    assert [(comma-count + 1) = data-len]
 
     out
 ]
@@ -291,29 +322,6 @@ parse-args: function [
     append ret standalone
 ]
 
-fix-win32-path: func [
-    path [file!]
-    <local> letter colon
-][
-    if 3 != fourth system/version [return path] ;non-windows system
-
-    drive: first path
-    colon: second path
-
-    all [
-        any [
-            (#"A" <= drive) and [#"Z" >= drive]
-            (#"a" <= drive) and [#"z" >= drive]
-        ]
-        #":" = colon
-    ] then [
-        insert path #"/"
-        remove skip path 2 ;remove ":"
-    ]
-
-    path
-]
-
 uppercase-of: func [
     {Copying variant of UPPERCASE, also FORMs words}
     string [text! word!]
@@ -357,6 +365,8 @@ relative-to-path: func [
     target [file!]
     base [file!]
 ][
+    assert [dir? target]
+    assert [dir? base]
     target: split clean-path target "/"
     base: split clean-path base "/"
     if "" = last base [take/last base]
@@ -370,7 +380,10 @@ relative-to-path: func [
     ]
     iterate base [base/1: %..]
     append base target
-    to-file delimit "/" base
+
+    base: to-file delimit "/" base
+    assert [dir? base]
+    return base
 ]
 
 

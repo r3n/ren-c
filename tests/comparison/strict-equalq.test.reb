@@ -90,12 +90,15 @@
     a-value: []
     strict-equal? a-value a-value
 )
-; reflexivity for past-tail blocks
+
+; error for past-tail blocks
 (
     a-value: tail of [1]
     clear head of a-value
-    strict-equal? a-value a-value
+    e: trap [strict-equal? a-value a-value]
+    e/id = 'index-out-of-range
 )
+
 ; reflexivity for cyclic blocks
 (
     a-value: copy []

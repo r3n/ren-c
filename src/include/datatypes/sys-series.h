@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -140,7 +140,7 @@
 // "content", there's room for a length in the node.
 //
 
-inline static REBLEN SER_USED(REBSER *s) {
+inline static REBLEN SER_USED(const REBSER *s) {
     REBYTE len_byte = LEN_BYTE_OR_255(s);
     return len_byte == 255 ? s->content.dynamic.used : len_byte;
 }
@@ -176,7 +176,7 @@ inline static void SET_SERIES_LEN(REBSER *s, REBLEN len) {
 // for instance a generic debugging routine might just want a byte pointer
 // but have no element type pointer to pass in.
 //
-inline static REBYTE *SER_DATA(REBSER *s) {
+inline static REBYTE *SER_DATA(const_if_c REBSER *s) {
     // if updating, also update manual inlining in SER_AT_RAW
 
     // The VAL_CONTEXT(), VAL_SERIES(), VAL_ARRAY() extractors do the failing
@@ -189,7 +189,7 @@ inline static REBYTE *SER_DATA(REBSER *s) {
         : cast(REBYTE*, &s->content);
 }
 
-inline static REBYTE *SER_DATA_AT(REBYTE w, REBSER *s, REBLEN i) {
+inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
   #if !defined(NDEBUG)
     if (w != SER_WIDE(s)) {  // will be "unusual" value if free
         if (IS_FREE_NODE(s))
@@ -212,6 +212,18 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, REBSER *s, REBLEN i) {
         );
 }
 
+#ifdef __cplusplus
+    inline static const REBYTE *SER_DATA(const REBSER *s)  // "SER_DATA_HEAD"
+      { return SER_DATA(m_cast(REBSER*, s)); }
+
+    inline static const REBYTE *SER_DATA_AT(
+        REBYTE w,
+        const REBSER *s,
+        REBLEN i
+    ){
+        return SER_DATA_AT(w, m_cast(REBSER*, s), i);
+    }
+#endif
 
 //
 // In general, requesting a pointer into the series data requires passing in
@@ -225,25 +237,36 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, REBSER *s, REBLEN i) {
 // this is used very frequently.
 
 #define SER_AT(t,s,i) \
-    ((t*)SER_DATA_AT(sizeof(t), (s), (i)))
+    cast(t*, SER_DATA_AT(sizeof(t), (s), (i)))
 
 #define SER_HEAD(t,s) \
-    SER_AT(t, (s), 0)
+    SER_AT(t, (s), 0)  // using SER_DATA_AT() vs. just SER_DATA() checks width
 
-inline static REBYTE *SER_DATA_TAIL(size_t wide, REBSER *s) {
-    return SER_DATA_AT(wide, s, SER_USED(s));
-}
+inline static REBYTE *SER_DATA_TAIL(size_t w, const_if_c REBSER *s)
+  { return SER_DATA_AT(w, s, SER_USED(s)); }
+
+#ifdef __cplusplus
+    inline static const REBYTE *SER_DATA_TAIL(size_t w, const REBSER *s)
+      { return SER_DATA_AT(w, s, SER_USED(s)); }
+#endif
 
 #define SER_TAIL(t,s) \
-    ((t*)SER_DATA_TAIL(sizeof(t), (s)))
+    cast(t*, SER_DATA_TAIL(sizeof(t), (s)))
 
-inline static REBYTE *SER_DATA_LAST(size_t wide, REBSER *s) {
+inline static REBYTE *SER_DATA_LAST(size_t wide, const_if_c REBSER *s) {
     assert(SER_USED(s) != 0);
     return SER_DATA_AT(wide, s, SER_USED(s) - 1);
 }
 
+#ifdef __cplusplus
+    inline static const REBYTE *SER_DATA_LAST(size_t wide, const REBSER *s) {
+        assert(SER_USED(s) != 0);
+        return SER_DATA_AT(wide, s, SER_USED(s) - 1);
+    }
+#endif
+
 #define SER_LAST(t,s) \
-    ((t*)SER_DATA_LAST(sizeof(t), (s)))
+    cast(t*, SER_DATA_LAST(sizeof(t), (s)))
 
 
 #define SER_FULL(s) \
@@ -339,40 +362,21 @@ inline static void TERM_SEQUENCE_LEN(REBSER *s, REBLEN len) {
 #define NOTE_SERIES_MAYBE_TERM(s) NOOP
 
 
-//=////////////////////////////////////////////////////////////////////////=//
-//
-//  SERIES MANAGED MEMORY
-//
-//=////////////////////////////////////////////////////////////////////////=//
+//=//// SERIES MANAGED MEMORY /////////////////////////////////////////////=//
 //
 // If NODE_FLAG_MANAGED is not explicitly passed to Make_Series_Core, a
-// series will be manually memory-managed by default.  Thus, you don't need
+// series will be manually memory-managed by default.  Hence you don't need
 // to worry about the series being freed out from under you while building it.
-// But to keep from leaking it, must be freed with Free_Unmanaged_Series() or
-// delegated to the GC to manage with Manage_Series().
+// Manual series are tracked, and automatically freed in the case of a fail().
 //
-// (In debug builds, there is a test at the end of every Rebol function
-// dispatch that checks to make sure one of those two things happened for any
-// series allocated during the call.)
-//
-// Manual series will be automatically freed in the case of a fail().  But
-// there are several cases in the system where series are not GC managed, but
-// also not in the manuals tracking list.  These are particularly tricky and
-// done for efficiency...so they must have their cleanup in the case of fail()
-// through other means.
+// All manual series *must* either be freed with Free_Unmanaged_Series() or
+// delegated to the GC with Manage_Series() before the frame ends.  Once a
+// series is managed, only the GC is allowed to free it.
 //
 // Manage_Series() is shallow--it only sets a bit on that *one* series, not
-// any series referenced by values inside of it.  This means that you cannot
-// build a hierarchical structure that isn't visible to the GC and then do a
-// single Manage_Series() call on the root to hand it over to the garbage
-// collector.  While it would be technically possible to deeply walk the
-// structure, the efficiency gained from pre-building the structure with the
-// managed bit set is significant...so that's how deep copies and the
-// scanner/load do it.
-//
-// (In debug builds, if any unmanaged series are found inside of values
-// reachable by the GC, it will raise an alert.)
-//
+// any series referenced by values inside of it.  Hence many routines that
+// build hierarchical structures (like the scanner) only return managed
+// results, since they can manage it as they build them.
 
 inline static void Untrack_Manual_Series(REBSER *s)
 {
@@ -390,7 +394,7 @@ inline static void Untrack_Manual_Series(REBSER *s)
         // (instead of keeping the series we want to free).
         //
         REBSER **current_ptr = last_ptr - 1;
-        while (*current_ptr != s) {
+        for (; *current_ptr != s; --current_ptr) {
           #if !defined(NDEBUG)
             if (
                 current_ptr
@@ -400,7 +404,6 @@ inline static void Untrack_Manual_Series(REBSER *s)
                 panic(s);
             }
           #endif
-            --current_ptr;
         }
         *current_ptr = *last_ptr;
     }
@@ -410,39 +413,44 @@ inline static void Untrack_Manual_Series(REBSER *s)
     --GC_Manuals->content.dynamic.used;
 }
 
-// Rather than free a series, this function can be used--which will transition
-// a manually managed series to be one managed by the GC.  There is no way to
-// transition back--once a series has become managed, only the GC can free it.
-//
-inline static REBSER *Manage_Series(REBSER *s)
+inline static REBSER *Manage_Series(REBSER *s)  // give manual series to GC
 {
   #if !defined(NDEBUG)
-    if (GET_SERIES_FLAG(s, MANAGED)) {
-        printf("Attempt to manage already managed series\n");
-        panic (s);
-    }
+    if (GET_SERIES_FLAG(s, MANAGED))
+        panic (s);  // shouldn't manage an already managed series
   #endif
 
     s->header.bits |= NODE_FLAG_MANAGED;
-
     Untrack_Manual_Series(s);
     return s;
 }
 
-inline static REBSER *Force_Series_Managed(void *p) {
-    REBSER *s = SER(p);
+#ifdef NDEBUG
+    #define ASSERT_SERIES_MANAGED(s)
+#else
+    inline static void ASSERT_SERIES_MANAGED(const void *s) {
+        if (NOT_SERIES_FLAG(s, MANAGED))
+            panic (s);
+    }
+#endif
+
+inline static REBSER *Force_Series_Managed(const_if_c void *p) {
+    REBSER *s = m_cast(REBSER*, SER(p));
     if (NOT_SERIES_FLAG(s, MANAGED))
         Manage_Series(s);
     return s;
 }
 
-#ifdef NDEBUG
-    #define ASSERT_SERIES_MANAGED(s) \
-        NOOP
+#if !defined(__cplusplus)
+    #define Force_Series_Managed_Core Force_Series_Managed
 #else
-    inline static void ASSERT_SERIES_MANAGED(void *s) {
-        if (NOT_SERIES_FLAG(s, MANAGED))
-            panic (s);
+    inline static REBSER *Force_Series_Managed_Core(void *p)
+      { return Force_Series_Managed(p); }  // mutable series may be unmanaged
+
+    inline static REBSER *Force_Series_Managed_Core(const void *p) {
+        const REBSER *s = SER(p);
+        ASSERT_SERIES_MANAGED(s);  // const series should already be managed
+        return m_cast(REBSER*, s);
     }
 #endif
 
@@ -473,15 +481,15 @@ inline static REBSER *Force_Series_Managed(void *p) {
 // are and asserts it's 0 by the time each evaluation ends, to ensure balance.
 //
 
-static inline bool Is_Series_Black(REBSER *s) {
+static inline bool Is_Series_Black(const REBSER *s) {
     return GET_SERIES_INFO(s, BLACK);
 }
 
-static inline bool Is_Series_White(REBSER *s) {
+static inline bool Is_Series_White(const REBSER *s) {
     return NOT_SERIES_INFO(s, BLACK);
 }
 
-static inline void Flip_Series_To_Black(REBSER *s) {
+static inline void Flip_Series_To_Black(const REBSER *s) {
     assert(NOT_SERIES_INFO(s, BLACK));
     SET_SERIES_INFO(s, BLACK);
 #if !defined(NDEBUG)
@@ -489,7 +497,7 @@ static inline void Flip_Series_To_Black(REBSER *s) {
 #endif
 }
 
-static inline void Flip_Series_To_White(REBSER *s) {
+static inline void Flip_Series_To_White(const REBSER *s) {
     assert(GET_SERIES_INFO(s, BLACK));
     CLEAR_SERIES_INFO(s, BLACK);
 #if !defined(NDEBUG)
@@ -502,13 +510,13 @@ static inline void Flip_Series_To_White(REBSER *s) {
 // Freezing and Locking
 //
 
-inline static void Freeze_Sequence(REBSER *s) { // there is no unfreeze!
+inline static void Freeze_Series(const REBSER *s) {  // there is no unfreeze
     assert(not IS_SER_ARRAY(s)); // use Deep_Freeze_Array
     SET_SERIES_INFO(s, FROZEN_SHALLOW);
     SET_SERIES_INFO(s, FROZEN_DEEP);  // so generic deep frozen checks faster
 }
 
-inline static bool Is_Series_Frozen(REBSER *s) {
+inline static bool Is_Series_Frozen(const REBSER *s) {
     assert(not IS_SER_ARRAY(s));  // use Is_Array_Deeply_Frozen
     if (NOT_SERIES_INFO(s, FROZEN_SHALLOW))
         return false;
@@ -516,7 +524,7 @@ inline static bool Is_Series_Frozen(REBSER *s) {
     return true;
 }
 
-inline static bool Is_Series_Read_Only(REBSER *s) { // may be temporary...
+inline static bool Is_Series_Read_Only(const REBSER *s) {  // may be temporary
     return 0 != (s->info.bits &
         (SERIES_INFO_HOLD | SERIES_INFO_PROTECTED
         | SERIES_INFO_FROZEN_SHALLOW | SERIES_INFO_FROZEN_DEEP)
@@ -567,8 +575,16 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
         out->payload = v->payload;
         EXTRA(Binding, out).node = NOD(expired);
     }
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
+
+// This is a super lazy version of unrelativization, which can be used to
+// hand a relative value to something like fail(), since fail will clean up
+// the stray alloc.
+//
+#define rebUnrelativize(v) \
+    Unrelativize(Alloc_Value(), (v))
+
 
 #if defined(NDEBUG)
     #define KNOWN_MUTABLE(v) v
@@ -625,7 +641,7 @@ inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
 #define PUSH_GC_GUARD(p) \
     Push_Guard_Node(NOD(p))
 
-inline static void DROP_GC_GUARD(void *p) {
+inline static void DROP_GC_GUARD(const void *p) {
   #if defined(NDEBUG)
     UNUSED(p);
   #else
@@ -648,53 +664,118 @@ inline static void DROP_GC_GUARD(void *p) {
 // Uses "evil macro" variations because it is called so frequently, that in
 // the debug build (which doesn't inline functions) there's a notable cost.
 //
-inline static REBSER *VAL_SERIES(const REBCEL *v) {
+inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
   #if !defined(NDEBUG)
-    enum Reb_Kind k = CELL_KIND(v);
-    assert(ANY_SERIES_KIND_EVIL_MACRO or ANY_PATH_KIND_EVIL_MACRO);
+    enum Reb_Kind k = CELL_HEART(v);
+    assert(ANY_SERIES_KIND_EVIL_MACRO);
   #endif
-    REBSER *s = SER(PAYLOAD(Any, v).first.node);
+    const REBSER *s = SER(PAYLOAD(Any, v).first.node);
     if (GET_SERIES_INFO(s, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return s;
 }
 
-#define VAL_INDEX_UNCHECKED(v) \
-    PAYLOAD(Any, (v)).second.u32
+#define VAL_SERIES_ENSURE_MUTABLE(v) \
+    m_cast(REBSER*, VAL_SERIES(ENSURE_MUTABLE(v)))
+
+#define VAL_SERIES_KNOWN_MUTABLE(v) \
+    m_cast(REBSER*, VAL_SERIES(KNOWN_MUTABLE(v)))
+
+
+#define VAL_INDEX_RAW(v) \
+    PAYLOAD(Any, (v)).second.i
 
 #if defined(NDEBUG) || !defined(CPLUSPLUS_11)
-    #define VAL_INDEX(v) \
-        VAL_INDEX_UNCHECKED(v)
+    #define VAL_INDEX_UNBOUNDED(v) \
+        VAL_INDEX_RAW(v)
 #else
-    // allows an assert, but also lvalue: `VAL_INDEX(v) = xxx`
+    // allows an assert, but uses C++ reference for lvalue:
+    //
+    //     VAL_INDEX_UNBOUNDED(v) = xxx;  // ensures v is ANY_SERIES!
     //
     // uses "evil macro" variants because the cost of this basic operation
     // becomes prohibitive when the functions aren't inlined and checks wind
     // up getting done 
     //
-    inline static REBLEN & VAL_INDEX(REBCEL *v) { // C++ reference type
-        enum Reb_Kind k = CELL_KIND(v);
-        assert(ANY_SERIES_KIND_EVIL_MACRO or ANY_PATH_KIND_EVIL_MACRO);
-        return VAL_INDEX_UNCHECKED(v);
-    }
-    inline static REBLEN VAL_INDEX(const REBCEL *v) {
-        enum Reb_Kind k = CELL_KIND(v);
-        if (ANY_PATH_KIND_EVIL_MACRO) {
-            assert(VAL_INDEX_UNCHECKED(v) == 0);
-            return 0;
-        }
+    inline static REBIDX VAL_INDEX_UNBOUNDED(REBCEL(const*) v) {
+        enum Reb_Kind k = CELL_HEART(v);  // only const access if heart!
         assert(ANY_SERIES_KIND_EVIL_MACRO);
-        return VAL_INDEX_UNCHECKED(v);
+        assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
+        return VAL_INDEX_RAW(v);
+    }
+    inline static REBIDX & VAL_INDEX_UNBOUNDED(RELVAL *v) {
+        enum Reb_Kind k = VAL_TYPE(v);  // mutable allowed if nonquoted
+        assert(k == REB_ISSUE or ANY_SERIES_KIND_EVIL_MACRO);
+        assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
+        return VAL_INDEX_RAW(v);  // returns a C++ reference
     }
 #endif
 
 
-inline static REBYTE *VAL_DATA_AT(const REBCEL *v) {
+inline static REBLEN VAL_LEN_HEAD(REBCEL(const*) v);  // forward decl
+
+// Unlike VAL_INDEX_UNBOUNDED() that may give a negative number or past the
+// end of series, VAL_INDEX() does bounds checking and always returns an
+// unsigned REBLEN.
+//
+inline static REBLEN VAL_INDEX(REBCEL(const*) v) { // C++ reference type
+    enum Reb_Kind k = CELL_HEART(v);  // only const access if heart!
+    assert(ANY_SERIES_KIND_EVIL_MACRO);
+    UNUSED(k);
+    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
+    REBIDX i = VAL_INDEX_RAW(v);
+    if (i < 0 or i > cast(REBIDX, VAL_LEN_HEAD(v)))
+        fail (Error_Index_Out_Of_Range_Raw());
+    return i;
+}
+
+
+inline static const REBYTE *VAL_DATA_AT(REBCEL(const*) v) {
     return SER_DATA_AT(SER_WIDE(VAL_SERIES(v)), VAL_SERIES(v), VAL_INDEX(v));
 }
 
+
+inline static REBVAL *Init_Any_Series_At_Core(
+    RELVAL *out,
+    enum Reb_Kind type,
+    const REBSER *s,  // ensured managed by calling macro
+    REBLEN index,
+    REBNOD *binding
+){
+  #if !defined(NDEBUG)
+    assert(ANY_SERIES_KIND(type));
+    assert(GET_SERIES_FLAG(s, MANAGED));
+
+    // Note: a R3-Alpha Make_Binary() comment said:
+    //
+    //     Make a binary string series. For byte, C, and UTF8 strings.
+    //     Add 1 extra for terminator.
+    //
+    // One advantage of making all binaries terminate in 0 is that it means
+    // that if they were valid UTF-8, they could be aliased as Rebol strings,
+    // which are zero terminated.  So it's the rule.
+    //
+    ASSERT_SERIES_TERM(s);
+
+    if (ANY_ARRAY_KIND(type))
+        assert(IS_SER_ARRAY(s));
+    else if (ANY_STRING_KIND(type))
+        assert(GET_SERIES_FLAG(s, IS_STRING));
+    else {
+        // Note: Binaries are allowed to alias strings
+    }
+  #endif
+
+    RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
+    INIT_VAL_NODE(out, s);
+    VAL_INDEX_RAW(out) = index;
+    INIT_BINDING(out, binding);  // asserts if unbindable type tries to bind
+    return cast(REBVAL*, out);
+}
+
 #define Init_Any_Series_At(v,t,s,i) \
-    Init_Any_Series_At_Core((v), (t), (s), (i), UNBOUND)
+    Init_Any_Series_At_Core((v), (t), \
+        Force_Series_Managed_Core(s), (i), UNBOUND)
 
 #define Init_Any_Series(v,t,s) \
     Init_Any_Series_At((v), (t), (s), 0)
@@ -711,7 +792,7 @@ inline static REBYTE *VAL_DATA_AT(const REBCEL *v) {
 inline static REBSER *Alloc_Series_Node(REBFLGS flags) {
     assert(not (flags & NODE_FLAG_CELL));
 
-    REBSER *s = cast(REBSER*, Make_Node(SER_POOL));
+    REBSER *s = cast(REBSER*, Alloc_Node(SER_POOL));
     if ((GC_Ballast -= sizeof(REBSER)) <= 0)
         SET_SIGNAL(SIG_RECYCLE);
 
@@ -765,7 +846,7 @@ inline static REBLEN FIND_POOL(size_t size) {
 // This routine can thus be used for an initial construction or an operation
 // like expansion.
 //
-inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN length) {
+inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN capacity) {
     //
     // Currently once a series becomes dynamic, it never goes back.  There is
     // no shrinking process that will pare it back to fit completely inside
@@ -776,19 +857,22 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN length) {
     REBYTE wide = SER_WIDE(s);
     assert(wide != 0);
 
+    if (cast(REBU64, capacity) * wide > INT32_MAX)  // R3-Alpha said "too big"
+        return false;
+
     REBSIZ size; // size of allocation (possibly bigger than we need)
 
-    REBLEN pool_num = FIND_POOL(length * wide);
+    REBLEN pool_num = FIND_POOL(capacity * wide);
     if (pool_num < SYSTEM_POOL) {
         // ...there is a pool designated for allocations of this size range
-        s->content.dynamic.data = cast(char*, Make_Node(pool_num));
+        s->content.dynamic.data = cast(char*, Try_Alloc_Node(pool_num));
         if (not s->content.dynamic.data)
             return false;
 
         // The pooled allocation might wind up being larger than we asked.
         // Don't waste the space...mark as capacity the series could use.
         size = Mem_Pools[pool_num].wide;
-        assert(size >= length * wide);
+        assert(size >= capacity * wide);
 
         // We don't round to power of 2 for allocations in memory pools
         CLEAR_SERIES_FLAG(s, POWER_OF_2);
@@ -799,7 +883,7 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN length) {
         // for, the system does some second-guessing to align to 2Kb
         // boundaries (or choose a power of 2, if requested).
 
-        size = length * wide;
+        size = capacity * wide;
         if (GET_SERIES_FLAG(s, POWER_OF_2)) {
             REBSIZ size2 = 2048;
             while (size2 < size)
@@ -813,7 +897,7 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN length) {
                 CLEAR_SERIES_FLAG(s, POWER_OF_2);
         }
 
-        s->content.dynamic.data = ALLOC_N(char, size);
+        s->content.dynamic.data = TRY_ALLOC_N(char, size);
         if (not s->content.dynamic.data)
             return false;
 
@@ -830,7 +914,7 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN length) {
     // The allocation may have returned more than we requested, so we note
     // that in 'rest' so that the series can expand in and use the space.
     //
-    assert(size % wide == 0);
+    /*assert(size % wide == 0);*/  // allow irregular sizes
     s->content.dynamic.rest = size / wide;
 
     // We set the tail of all series to zero initially, but currently do
@@ -843,7 +927,7 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN length) {
     if ((GC_Ballast -= size) <= 0)
         SET_SIGNAL(SIG_RECYCLE);
 
-    assert(SER_TOTAL(s) == size);
+    assert(SER_TOTAL(s) <= size);  // irregular sizes won't use all the space
     return true;
 }
 
@@ -875,17 +959,22 @@ inline static REBSER *Make_Series_Core(
         | FLAG_WIDE_BYTE_OR_0(wide);
 
     if (
-        (flags & SERIES_FLAG_ALWAYS_DYNAMIC) // inlining will constant fold
+        (flags & SERIES_FLAG_ALWAYS_DYNAMIC)  // inlining will constant fold
         or (capacity * wide > sizeof(s->content))
     ){
-        //
         // Data won't fit in a REBSER node, needs a dynamic allocation.  The
         // capacity given back as the ->rest may be larger than the requested
         // size, because the memory pool reports the full rounded allocation.
 
-        mutable_LEN_BYTE_OR_255(s) = 255; // alloc caller sets
-        if (not Did_Series_Data_Alloc(s, capacity))
+        mutable_LEN_BYTE_OR_255(s) = 255;  // dynamic
+
+        if (not Did_Series_Data_Alloc(s, capacity)) {
+            s->header.bits &= ~NODE_FLAG_MANAGED;
+            s->info.bits |= SERIES_INFO_INACCESSIBLE;
+            GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
+
             fail (Error_No_Memory(capacity * wide));
+        }
 
       #if !defined(NDEBUG)
         PG_Reb_Stats->Series_Memory += capacity * wide;

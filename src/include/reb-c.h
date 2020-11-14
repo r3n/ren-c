@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -405,7 +405,7 @@
 // a CFUNC*, and non-C++14 builds are allowing cast of `const void*` to
 // non-const `char` with plain `cast()`.  Investigate as time allows.
 
-#if !defined(__cplusplus) or !defined(DEBUG_CHECK_CASTS)
+#if !defined(__cplusplus)
     /* These macros are easier-to-spot variants of the parentheses cast.
      * The 'm_cast' is when getting [M]utablity on a const is okay (RARELY!)
      * Plain 'cast' can do everything else (except remove volatile)
@@ -420,7 +420,7 @@
      * access.  Stray writes to that can cause even time-traveling bugs, with
      * effects *before* that write is made...due to "undefined behavior".
      */
-#elif !defined(CPLUSPLUS_11)
+#elif !defined(CPLUSPLUS_11) || !defined(DEBUG_CHECK_CASTS)
     /* Well-intentioned macros aside, C has no way to enforce that you can't
      * cast away a const without m_cast. C++98 builds can do that, at least:
      */
@@ -615,7 +615,7 @@
     (sizeof(double) > sizeof(void*) ? sizeof(double) : sizeof(void*))
 
 #define ALIGN(s,a) \
-    (((s) + (a) - 1) & ~((a) - 1)) // !!! this macro not used anywhere ATM
+    (((s) + (a) - 1) & ~((a) - 1))
 
 
 //=//// C FUNCTION TYPE (__cdecl) /////////////////////////////////////////=//
@@ -673,7 +673,10 @@
 
 //=//// PREVENT NULL ASSIGNMENTS /////////////////////////////////////////=//
 //
-// This came in handly for a debugging scenario, and isn't bad documentation.
+// This came in handly for a debugging scenario.  But because it uses deep
+// voodoo to accomplish its work (like overloading -> and &), it interferes
+// with more important applications of that voodoo.  So it shouldn't be used
+// on types that depend on that (like REBVAL pointers).
 //
 
 #if !defined(CPLUSPLUS_11) || defined(NDEBUG)
@@ -977,37 +980,6 @@
 #undef MAX
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
-
-
-//=//// SHORTHAND FOR DEEPLY NESTED FIELDS ////////////////////////////////=//
-//
-// If a field is deeply nested in a structure and referred to many times in
-// C, it is possible to create a local pointer to that field and then use
-// a dereference to that pointer (which works for both assigning and reads).
-// Since it's a `const` pointer, the compiler should optimize it out.
-//
-// But there's a risk that one might say `if (shorthand)` and test for the
-// nullness or non-nullness of the shorthand vs. of the thing pointed to.
-// This adds a check in the C++ build that you always say `if (*shorthand)`
-//
-
-#if !defined(CPLUSPLUS_11)
-    #define SHORTHAND(name,ref,type) \
-        type* const name = &ref
-#else
-    template <typename T>
-    class Must_Dereference {  // named so error message hints what's wrong
-        T &ref;
-
-      public:
-        Must_Dereference (T& ref) : ref (ref) {}
-        T & operator*() { return ref; }
-        operator bool () = delete;  // !!! Could this static_assert()?
-    };
-
-    #define SHORTHAND(name,ref,type) \
-        Must_Dereference<type> name = ref
-#endif
 
 
 //=//// BYTE STRINGS VS UNENCODED CHARACTER STRINGS ///////////////////////=//

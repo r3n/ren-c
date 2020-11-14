@@ -171,7 +171,16 @@ compile: function [
         ]
     ]
 
-    if not exists? (config/runtime-path)/include [
+    if not dir? config/runtime-path [
+        print [
+            {Runtime path} config/runtime-path {doesn't end in a slash,}
+            {which violates the DIR? protocol, but as CONFIG_TCCDIR is often}
+            {documented as being used without slashes we're allowing it.}
+        ]
+        append config/runtime-path "/"
+    ]
+
+    if not exists? make-file [(config/runtime-path) include /] [
         fail [
             {Runtime path} config/runtime-path {does not have an %include/}
             {directory.  It should have files like %stddef.h and %stdarg.h}
@@ -193,12 +202,14 @@ compile: function [
 
     if 3 = fourth system/version [  ; e.g. Windows (32-bit or 64-bit)
         if empty? config/include-path [
-            append config/include-path
-                file-to-local/full (config/runtime-path)/win32/include
+            append config/include-path file-to-local/full make-file [
+                (config/runtime-path) win32/include /
+            ]
         ]
         if empty? config/library-path [
-            append config/library-path
-                file-to-local/full (config/runtime-path)/win32/library
+            append config/library-path file-to-local/full make-file [
+                (config/runtime-path) win32/library /
+            ]
         ]
 
         ; !!! For unknown reasons, on Win32 it does not seem that the API
@@ -216,7 +227,9 @@ compile: function [
     ;
     ; https://stackoverflow.com/questions/53154898/
 
-    insert config/include-path file-to-local/full config/runtime-path/include
+    insert config/include-path file-to-local/full make-file [
+        (config/runtime-path) include /
+    ]
 
     ; The other complicating factor is that once emitted code has these
     ; references to TCC-specific internal routines not in libc, the
@@ -297,14 +310,14 @@ compile: function [
     ; would be to encap the executable you already have as a copy with the
     ; natives loaded into it.
 
-    librebol: _
+    librebol: false
 
     compilables: map-each item compilables [
         item: maybe if match [word! path!] :item [get item]
 
         switch type of :item [
             action! [
-                librebol: /librebol
+                librebol: true
                 :item
             ]
             text! [
@@ -313,9 +326,7 @@ compile: function [
             file! [  ; Just an example idea... reading disk files?
                 as text! read item
             ]
-            default [
-                fail ["COMPILABLES currently must be TEXT!/ACTION!/FILE!"]
-            ]
+            fail ["COMPILABLES currently must be TEXT!/ACTION!/FILE!"]
         ]
     ]
 
@@ -343,7 +354,7 @@ compile: function [
         ; variable, if it wasn't explicitly passed in the options.
 
         config/librebol-path: default [try any [
-            local-to-file try get-env "LIBREBOL_INCLUDE_DIR"
+            get-env "LIBREBOL_INCLUDE_DIR"
 
             ; Guess it is in the runtime directory (%encap-tcc-resources.reb
             ; puts it into the root of the zip file at the moment)
@@ -364,12 +375,17 @@ compile: function [
                     {(e.g. in %make/prep/include)}
                 ]
             ]
-            default [
-                fail ["Invalid LIBREBOL_INCLUDE_DIR:" config/librebol-path]
+            fail ["Invalid LIBREBOL_INCLUDE_DIR:" config/librebol-path]
+        ]
+
+        if not dir? config/librebol-path [
+            fail [
+                {LIBREBOL_INCLUDE_DIR or LIBREBOL-PATH} config/librebol-path
+                {should end in a slash to follow the DIR? protocol}
             ]
         ]
 
-        if not exists? config/librebol-path/rebol.h [
+        if not exists? make-file [(config/librebol-path) rebol.h] [
             fail [
                 {Looked for %rebol.h in} config/librebol-path {and did not}
                 {find it.  Check your definition of LIBREBOL_INCLUDE_DIR}
@@ -383,9 +399,15 @@ compile: function [
     ; want local paths.  Convert.
     ;
     config/runtime-path: my file-to-local/full
-    config/librebol-path: <taken-into-account>  ; COMPILE* does not read
+    config/librebol-path: ~taken-into-account~  ; COMPILE* does not read
 
-    result: compile*/(files)/(inspect)/(librebol) compilables config
+    result: applique 'compile* [
+        compilables: compilables
+        config: config
+        files: files
+        inspect: inspect
+        librebol: if librebol [#]
+    ]
 
     if inspect [
         print "== COMPILE/INSPECT CONFIGURATION =="
@@ -505,7 +527,7 @@ c99: function [
 
         parse/case command [some [rule [some space | end]]] else [
             fail [
-                elide trunc: void
+                elide trunc: ~void~
                 "Could not parse C99 command line at:"
                 append mold/limit/truncated last-pos 40 'trunc if trunc ["..."]
             ]
@@ -543,7 +565,7 @@ c99: function [
         print mold settings
     ]
 
-    compile/files/(inspect)/settings compilables settings
+    compile/files/(if inspect [/inspect])/settings compilables settings
     return 0  ; must translate errors into integer codes...
 ]
 

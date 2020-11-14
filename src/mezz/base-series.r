@@ -16,13 +16,13 @@ REBOL [
     }
 ]
 
-reeval function [:terms [tag! set-word! <...>]] [
+reeval function [:terms [tag! set-word! <variadic>]] [
     n: 1
     while [<end> != w: take terms] [
         set w redescribe reduce [
             spaced [{Returns the} to word! w {value of a series}]
         ](
-            specialize 'pick [picker: n]
+            specialize :pick [picker: n]
         )
         n: n + 1
     ]
@@ -36,7 +36,7 @@ reeval function [:terms [tag! set-word! <...>]] [
 last: redescribe [
     {Returns the last value of a series.}
 ](
-    specialize adapt 'pick [
+    specialize adapt :pick [
         picker: length of get lit location:
     ][
         picker: <removed-parameter>
@@ -51,7 +51,7 @@ last: redescribe [
 repend: redescribe [
     "APPEND a reduced value to a series."
 ](
-    adapt 'append [
+    adapt :append [
         if set? 'value [
             value: reduce :value
         ]
@@ -69,37 +69,36 @@ join: function [
     {Concatenates values to the end of a copy of a value}
 
     return:
-        [<requote> any-series! any-path! tuple! port!
+        [any-series! issue! any-sequence! port!
             map! object! module! bitset!]
-    head
-        [<dequote> any-series! any-path! tuple! port!
+    base
+        [any-series! issue! any-sequence! port!
             map! object! module! bitset!]
     value [<opt> any-value!]
 ][
-    type: type of head
-    head: copy if find reduce [path! set-path! get-path! tuple!] type [
-        to block! head
+    type: type of base  ; to set output type back to original if transformed
+    case [
+        find any-sequence! type [base: to block! base]
+        issue! = type [base: to text! base]
     ] else [
-        type: _
-        head
+        base: copy base
+        type: _  ; don't apply any conversion at end
     ]
 
     result: switch type of :value [
-        block! [append head reduce :value]
+        block! [append base reduce .identity :value]
         group! [
-            fail 'value "Can't JOIN a GROUP! onto a series (use AS BLOCK!)."
+            fail @base "Can't JOIN a GROUP! onto a series (use AS BLOCK!)."
         ]
         action! [
-            fail 'value "Can't JOIN an ACTION! onto a series (use APPEND)."
+            fail @base "Can't JOIN an ACTION! onto a series (use APPEND)."
         ]
-        default [
-            append/only head :value
-        ]
+    ] else [
+        append/only base :value
     ]
 
     if type [
-        assert [block? result]
-        result: to type result
+        result: as type result
     ]
 
     return result
@@ -201,7 +200,8 @@ trim: function [
             rule: case [
                 null? with [charset reduce [space tab]]
                 bitset? with [with]
-                default [charset with]
+            ] else [
+                charset with
             ]
 
             if any [all_TRIM lines head_TRIM tail_TRIM] [append rule newline]
@@ -215,7 +215,8 @@ trim: function [
             rule: case [
                 not with [#{00}]
                 bitset? with [with]
-                default [charset with]
+            ] else [
+                charset with
             ]
 
             if not any [head_TRIM tail_TRIM] [
@@ -229,7 +230,7 @@ trim: function [
     ; /ALL just removes all whitespace entirely.  No subtlety needed.
     ;
     if all_TRIM [
-        parse series [while [remove rule | skip | end break] end]
+        parse series [while [remove rule | skip | end break]]
         return series
     ]
 
@@ -239,7 +240,7 @@ trim: function [
         ]
 
         tail_TRIM [
-            parse series [while [remove [some rule end] | skip] end]  ; #2289
+            parse series [while [remove [some rule end] | skip]]  ; #2289
         ]
     ] then [
         return series
@@ -251,7 +252,7 @@ trim: function [
     ; with leading and trailing whitespace removed.
     ;
     if lines [
-        parse series [while [change [some rule] space skip | skip] end]
+        parse series [while [change [some rule] space skip | skip]]
         if space = first series [take series]
         if space = last series [take/last series]
         return series

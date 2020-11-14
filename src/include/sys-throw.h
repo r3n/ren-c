@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -107,6 +107,9 @@ inline static REB_R Init_Thrown_With_Label(
   #endif
 
     Move_Value(&TG_Thrown_Arg, arg);
+    if (GET_CELL_FLAG(arg, UNEVALUATED))
+        SET_CELL_FLAG(&TG_Thrown_Arg, UNEVALUATED);  // for invisible RETURN
+
     return R_THROWN; // for chaining to dispatcher output
 }
 
@@ -118,6 +121,8 @@ static inline void CATCH_THROWN(
 
     UNUSED(thrown);
     Move_Value(arg_out, &TG_Thrown_Arg);
+    if (GET_CELL_FLAG(&TG_Thrown_Arg, UNEVALUATED))
+        SET_CELL_FLAG(arg_out, UNEVALUATED);  // indicates invisible RETURN
 
   #if !defined(NDEBUG)
     SET_END(&TG_Thrown_Arg);

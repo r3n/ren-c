@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -117,7 +117,7 @@ void Append_Values_Len(REBARR *a, const REBVAL *head, REBLEN len)
 
 
 //
-//  Copy_Sequence_Core: C
+//  Copy_Series_Core: C
 //
 // Copy underlying series that *isn't* an "array" (such as STRING!, BINARY!,
 // BITSET!, VECTOR!...).  Includes the terminator.
@@ -130,7 +130,7 @@ void Append_Values_Len(REBARR *a, const REBVAL *head, REBLEN len)
 // middle of a UTF-8 codepoint, hence a string series aliased as a binary
 // could only have its copy used in a BINARY!.
 //
-REBSER *Copy_Sequence_Core(REBSER *s, REBFLGS flags)
+REBSER *Copy_Series_Core(const REBSER *s, REBFLGS flags)
 {
     assert(not IS_SER_ARRAY(s));
 
@@ -160,7 +160,7 @@ REBSER *Copy_Sequence_Core(REBSER *s, REBFLGS flags)
 
 
 //
-//  Copy_Sequence_At_Len_Extra: C
+//  Copy_Series_At_Len_Extra: C
 //
 // Copy a subseries out of a series that is not an array.  Includes the
 // terminator for it.
@@ -173,8 +173,8 @@ REBSER *Copy_Sequence_Core(REBSER *s, REBFLGS flags)
 // boundary.  This is a low-level routine, so the caller must fix up the
 // length information, or Init_Any_String() will complain.
 //
-REBSER *Copy_Sequence_At_Len_Extra(
-    REBSER *s,
+REBSER *Copy_Series_At_Len_Extra(
+    const REBSER *s,
     REBLEN index,
     REBLEN len,
     REBLEN extra
@@ -314,7 +314,7 @@ void Remove_Any_Series_Len(REBVAL *v, REBLEN index, REBINT len)
         );
     }
     else  // ANY-ARRAY! is more straightforward
-        Remove_Series_Units(VAL_SERIES(v), index, len);
+        Remove_Series_Units(VAL_SERIES_ENSURE_MUTABLE(v), index, len);
 }
 
 
@@ -403,13 +403,13 @@ REBYTE *Reset_Buffer(REBSER *buf, REBLEN len)
 //
 //  Assert_Series_Term_Core: C
 //
-void Assert_Series_Term_Core(REBSER *s)
+void Assert_Series_Term_Core(const REBSER *s)
 {
     if (IS_SER_ARRAY(s)) {
         //
         // END values aren't canonized to zero bytes, check IS_END explicitly
         //
-        RELVAL *tail = ARR_TAIL(ARR(s));
+        const RELVAL *tail = ARR_TAIL(ARR(s));
         if (NOT_END(tail))
             panic (tail);
     }
@@ -431,7 +431,7 @@ void Assert_Series_Term_Core(REBSER *s)
 //
 //  Assert_Series_Core: C
 //
-void Assert_Series_Core(REBSER *s)
+void Assert_Series_Core(const REBSER *s)
 {
     if (IS_FREE_NODE(s))
         panic (s);

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -182,13 +182,13 @@ REBINT Hash_UTF8(const REBYTE *utf8, REBSIZ size)
 //
 uint32_t Hash_Value(const RELVAL *v)
 {
-    const REBCEL *cell = VAL_UNESCAPED(v); // hash contained quoted content
+    REBCEL(const*) cell = VAL_UNESCAPED(v); // hash contained quoted content
     enum Reb_Kind kind = CELL_KIND(cell);
 
     uint32_t hash;
 
     switch (kind) {
-      case REB_NULLED:
+      case REB_NULL:
         panic ("Cannot hash NULL");  // nulls can't be values or keys in MAP!s
 
       case REB_VOID:
@@ -226,17 +226,9 @@ uint32_t Hash_Value(const RELVAL *v)
         hash ^= EXTRA(Any, cell).u;
         break; }
 
-      case REB_CHAR:
-        hash = LO_CASE(VAL_CHAR(cell));
-        break;
-
       case REB_PAIR:
         hash = Hash_Value(VAL_PAIR_X(cell));
         hash ^= Hash_Value(VAL_PAIR_Y(cell));
-        break;
-
-      case REB_TUPLE:
-        hash = Hash_Bytes(VAL_TUPLE(cell), VAL_TUPLE_LEN(cell));
         break;
 
       case REB_TIME:
@@ -256,26 +248,55 @@ uint32_t Hash_Value(const RELVAL *v)
         }
         break;
 
-      case REB_BINARY:
-        hash = Hash_Bytes(VAL_BIN_AT(cell), VAL_LEN_AT(cell));
-        break;
+      case REB_BINARY: {
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, cell);
+        hash = Hash_Bytes(data, size);
+        break; }
 
       case REB_TEXT:
       case REB_FILE:
       case REB_EMAIL:
       case REB_URL:
       case REB_TAG:
-      case REB_ISSUE:
-        hash = Hash_UTF8_Caseless(
-            VAL_STRING_AT(cell),
-            VAL_LEN_AT(cell)
-        );
-        break;
+      case REB_ISSUE: {  // ISSUE! heart may be REB_BYTES, VAL_UTF8_X handles
+        REBSIZ size;
+        REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&size, cell);
+        hash = Hash_UTF8_Caseless(utf8, size);
+        break; }
 
+      case REB_TUPLE:
+      case REB_SET_TUPLE:
+      case REB_GET_TUPLE:
+      case REB_SYM_TUPLE:
+        //
       case REB_PATH:
       case REB_SET_PATH:
       case REB_GET_PATH:
-      case REB_SYM_PATH:
+      case REB_SYM_PATH: {
+        enum Reb_Kind heart = CELL_HEART(cell);  // use correct hash for heart
+        switch (heart) {
+          case REB_BYTES:
+            hash = Hash_Bytes(
+                PAYLOAD(Bytes, cell).at_least_8,
+                EXTRA(Bytes, cell).exactly_4[IDX_EXTRA_USED]
+            );
+            break;
+
+          case REB_WORD:
+          case REB_GET_WORD:
+          case REB_SYM_WORD:
+            goto hash_any_word;
+
+          case REB_BLOCK:
+            goto hash_any_array;
+
+          default:
+            panic (nullptr);
+        }
+        break; }
+
+      hash_any_array:
         //
       case REB_GROUP:
       case REB_SET_GROUP:
@@ -303,18 +324,20 @@ uint32_t Hash_Value(const RELVAL *v)
         break;
 
       case REB_DATATYPE: {
-        hash = Hash_String(Canon(SYM_FROM_KIND(kind)));
+        hash = Hash_String(Canon(SYM_FROM_KIND(VAL_TYPE_KIND(cell))));
         break; }
 
       case REB_BITSET:
       case REB_TYPESET:
         //
-        // These types are currently not supported.
+        // "These types are currently not supported."
         //
         // !!! Why not?
         //
         fail (Error_Invalid_Type(kind));
 
+      hash_any_word:
+        //
       case REB_WORD:
       case REB_SET_WORD:
       case REB_GET_WORD:
@@ -394,9 +417,9 @@ uint32_t Hash_Value(const RELVAL *v)
 
 
 //
-//  Make_Hash_Sequence: C
+//  Make_Hash_Series: C
 //
-REBSER *Make_Hash_Sequence(REBLEN len)
+REBSER *Make_Hash_Series(REBLEN len)
 {
     REBLEN n = Get_Hash_Prime_May_Fail(len * 2);  // best when 2X # of keys
     REBSER *ser = Make_Series(n + 1, sizeof(REBLEN));
@@ -425,7 +448,7 @@ REBVAL *Init_Map(RELVAL *out, REBMAP *map)
     INIT_VAL_NODE(out, MAP_PAIRLIST(map));
     // second payload pointer not used
 
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -439,26 +462,29 @@ REBVAL *Init_Map(RELVAL *out, REBMAP *map)
 //
 REBSER *Hash_Block(const REBVAL *block, REBLEN skip, bool cased)
 {
-    REBLEN n;
-    REBSER *hashlist;
-    REBLEN *hashes;
-    REBARR *array = VAL_ARRAY(block);
-    RELVAL *value;
-
     // Create the hash array (integer indexes):
-    hashlist = Make_Hash_Sequence(VAL_LEN_AT(block));
-    hashes = SER_HEAD(REBLEN, hashlist);
+    REBSER *hashlist = Make_Hash_Series(VAL_LEN_AT(block));
 
-    value = VAL_ARRAY_AT(block);
+    const RELVAL *value = VAL_ARRAY_AT(block);
     if (IS_END(value))
         return hashlist;
 
-    n = VAL_INDEX(block);
+    REBLEN *hashes = SER_HEAD(REBLEN, hashlist);
+
+    const REBARR *array = VAL_ARRAY(block);
+    REBLEN n = VAL_INDEX(block);
+
     while (true) {
         REBLEN skip_index = skip;
 
         REBLEN hash = Find_Key_Hashed(
-            array, hashlist, value, VAL_SPECIFIER(block), 1, cased, 0
+            m_cast(REBARR*, array),  // mode == 0, no modification, cast ok
+            hashlist,
+            value,
+            VAL_SPECIFIER(block),
+            1,
+            cased,
+            0  // mode
         );
         hashes[hash] = (n / skip) + 1;
 
@@ -583,7 +609,7 @@ REBINT Hash_UTF8_Caseless(const REBYTE *utf8, REBLEN len) {
 //
 void Startup_CRC(void)
 {
-    crc24_table = ALLOC_N(REBLEN, 256);
+    crc24_table = TRY_ALLOC_N(REBLEN, 256);
     Make_CRC24_Table(PRZCRC);
 
     // If Zlib is built with DYNAMIC_CRC_TABLE, then the first call to

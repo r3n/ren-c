@@ -3,7 +3,7 @@ REBOL [
     Title: "Warnings for Rebol2 users who are using Ren-C"
     Homepage: https://trello.com/b/l385BE7a/porting-guide
     Rights: {
-        Copyright 2012-2018 Rebol Open Source Contributors
+        Copyright 2012-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -47,7 +47,7 @@ repurposed: deprecated: func [block [block!]] [
     append block {Emulation of the old meanings available via %redbol.reb}
 
     return func [] compose/only [
-        fail 'return (delimit LF block)
+        fail @return (delimit LF block)
     ]
 ]
 
@@ -134,12 +134,16 @@ unless: checked [
 
         return: [<opt> any-value!]
         left [<end> any-value!]
-        :right [any-value! <...>]
-        :look [any-value! <...>]
+        :right [any-value! <variadic>]
+        :look [any-value! <variadic>]
     ][
         right: take right
-        if (unset? 'left) or [not group? right] or [block? first look] [
-            fail 'look [
+        any [
+            unset? 'left
+            not group? right
+            block? first look
+        ] then [
+            fail @look [
                 "UNLESS has been repurposed in Ren-C as an infix operator"
                 "which defaults to the left hand side, unless the right"
                 "side has a value which overrides it.  You may use IF-NOT"
@@ -152,12 +156,15 @@ unless: checked [
             ]
         ]
 
-        (do as block! right) or [:left]
+        any [
+            do as block! right
+            :left
+        ]
     ]
 ]
 
 switch: checked [
-    adapt 'switch [
+    adapt :switch [
         for-each c cases [
             lib/all [  ; SWITCH's /ALL would override
                 match [word! path!] c
@@ -165,7 +172,7 @@ switch: checked [
                 'null <> c
                 not datatype? get c
             ] then [
-                fail 'cases [
+                fail @cases [
                     {Temporarily disabled word/path SWITCH clause:} :c LF
 
                     {You may have meant to use a LIT-WORD! / LIT-PATH!} LF
@@ -242,12 +249,12 @@ op?: deprecated [
 ]
 
 also: checked [
-    adapt 'also [
+    adapt :also [
         all [
             block? :branch
             not semiquoted? 'branch
 
-            fail 'branch [
+            fail @branch [
                 {ALSO serves a different purpose in Ren-C, so use ELIDE for}
                 {old-ALSO-like tasks.}
                 {See: https://trello.com/c/Y03HJTY4}
@@ -280,7 +287,7 @@ exit: deprecated [
 ]
 
 try: checked [
-    adapt 'try [
+    adapt :try [
         ;
         ; Most historical usages of TRY took literal blocks as arguments.
         ; This is a good way of catching them, while allowing new usages.

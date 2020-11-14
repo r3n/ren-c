@@ -20,7 +20,7 @@ clean-path: function [
     /dir "Add a trailing / if missing"
 ][
     file: case [
-        only or [not file? file] [
+        any [only, not file? file] [
             copy file
         ]
 
@@ -42,7 +42,7 @@ clean-path: function [
         append what-dir file
     ]
 
-    if dir and [not dir? file] [append file #"/"]
+    all [dir, not dir? file] then [append file #"/"]
 
     out: make type of file length of file ; same datatype
     count: 0 ; back dir counter
@@ -52,7 +52,7 @@ clean-path: function [
             "../" (count: me + 1)
             | "./"
             | "/" (
-                if (not file? file) or [#"/" <> last out] [
+                any [not file? file, #"/" <> last out] then [
                     append out #"/"
                 ]
             )
@@ -69,7 +69,7 @@ clean-path: function [
         end
     ]
 
-    if (#"/" = last out) and [#"/" <> last file] [
+    all [#/ = last out, #/ <> last file] then [
         remove back tail of out
     ]
 
@@ -113,7 +113,7 @@ read-line: function [
 
     all [
         1 = length of data
-        escape = to-char data/1
+        escape = as issue! data/1
     ] then [
         ; Input Aborted--this does not try and HALT the program overall like
         ; Ctrl-C, but gives the caller the chance to process NULL as distinct
@@ -236,7 +236,7 @@ confirm: function [
         block? with
         length of with > 2
 
-        fail 'with [
+        fail @with [
             "maximum 2 arguments allowed for with [true false]"
             "got:" mold with
         ]
@@ -257,7 +257,7 @@ confirm: function [
 list-dir: function [
     "Print contents of a directory (ls)."
 
-    return: <void>
+    return: [void!]
     'path [<end> file! word! path! text!]
         "Accepts %file, :variables, and just words (as dirs)"
     /l "Line of info format"
@@ -289,13 +289,13 @@ list-dir: function [
     files: attempt [read %./] else [
         print ["Not found:" :path]
         change-dir save-dir
-        return
+        return ~  ; unlabeled void so console doesn't print result
     ]
 
     for-each file files [
         any [
-            f and [dir? file]
-            d and [not dir? file]
+            all [f, dir? file]
+            all [d, not dir? file]
         ] then [
             continue
         ]
@@ -308,15 +308,16 @@ list-dir: function [
             info: get (words of query file)
             change info second split-path info/1
             printf [i 16 -8 #" " 24 #" " 6] info
-            if all [r | dir? file] [
+            if all [r, dir? file] [
                 list-dir/l/r/i :file join i "    "
             ]
         ]
     ]
 
-    if (text? l) and [not empty? l] [print l]
+    all [text? l, not empty? l] then [print l]
 
     change-dir save-dir
+    return ~  ; unlabeled void so console doesn't print result
 ]
 
 

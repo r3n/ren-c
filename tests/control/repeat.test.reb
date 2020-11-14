@@ -4,9 +4,9 @@
     num: 0
     repeat i 10 [
         num: num + 1
-        success: success and [i = num]
+        success: success and (i = num)
     ]
-    success and [10 = num]
+    success and (10 = num)
 )
 ; cycle return value
 (false = repeat i 1 [false])
@@ -21,17 +21,17 @@
 ; continue cycle
 (
     success: true
-    repeat i 1 [continue | success: false]
+    repeat i 1 [continue, success: false]
     success
 )
 (
     success: true
-    repeat i "a" [continue | success: false]
+    repeat i "a" [continue, success: false]
     success
 )
 (
     success: true
-    repeat i [a] [continue | success: false]
+    repeat i [a] [continue, success: false]
     success
 )
 ; decimal! test

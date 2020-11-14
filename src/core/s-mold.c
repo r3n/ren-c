@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -104,7 +104,7 @@ REBYTE *Prep_Mold_Overestimated(REB_MOLD *mo, REBLEN num_bytes)
 //
 // Emit the initial datatype function, depending on /ALL option
 //
-void Pre_Mold_Core(REB_MOLD *mo, const REBCEL *v, bool all)
+void Pre_Mold_Core(REB_MOLD *mo, REBCEL(const*) v, bool all)
 {
     if (all)
         Append_Ascii(mo->series, "#[");
@@ -112,11 +112,11 @@ void Pre_Mold_Core(REB_MOLD *mo, const REBCEL *v, bool all)
         Append_Ascii(mo->series, "make ");
 
     // If asked for the type name of a PARAM in a paramlist, VAL_TYPE()
-    // will report an invalid value.  So use MIRROR_BYTE() so that TYPESET!
+    // will report an invalid value.  So use HEART_BYTE() so that TYPESET!
     // comes back as the answer.
     //
-    REBSTR *type_name = Canon(
-        SYM_FROM_KIND(cast(enum Reb_Kind, MIRROR_BYTE(v)))
+    const REBSTR *type_name = Canon(
+        SYM_FROM_KIND(cast(enum Reb_Kind, HEART_BYTE(v)))
     );
     Append_Spelling(mo->series, type_name);
 
@@ -142,7 +142,7 @@ void End_Mold_Core(REB_MOLD *mo, bool all)
 // For series that has an index, add the index for mold/all.
 // Add closing block.
 //
-void Post_Mold(REB_MOLD *mo, const REBCEL *v)
+void Post_Mold(REB_MOLD *mo, REBCEL(const*) v)
 {
     if (VAL_INDEX(v)) {
         Append_Codepoint(mo->series, ' ');
@@ -201,10 +201,10 @@ void New_Indented_Line(REB_MOLD *mo)
 //
 //  Find_Pointer_In_Series: C
 //
-REBLEN Find_Pointer_In_Series(REBSER *s, void *p)
+REBLEN Find_Pointer_In_Series(REBSER *s, const void *p)
 {
     REBLEN index = 0;
-    for (; index < SER_LEN(s); ++index) {
+    for (; index < SER_USED(s); ++index) {
         if (*SER_AT(void*, s, index) == p)
             return index;
     }
@@ -214,22 +214,22 @@ REBLEN Find_Pointer_In_Series(REBSER *s, void *p)
 //
 //  Push_Pointer_To_Series: C
 //
-void Push_Pointer_To_Series(REBSER *s, void *p)
+void Push_Pointer_To_Series(REBSER *s, const void *p)
 {
     if (SER_FULL(s))
         Extend_Series(s, 8);
-    *SER_AT(void*, s, SER_LEN(s)) = p;
-    SET_SERIES_LEN(s, SER_LEN(s) + 1);
+    *SER_AT(const void*, s, SER_USED(s)) = p;
+    SET_SERIES_USED(s, SER_USED(s) + 1);
 }
 
 //
 //  Drop_Pointer_From_Series: C
 //
-void Drop_Pointer_From_Series(REBSER *s, void *p)
+void Drop_Pointer_From_Series(REBSER *s, const void *p)
 {
-    assert(p == *SER_AT(void*, s, SER_LEN(s) - 1));
+    assert(p == *SER_AT(void*, s, SER_USED(s) - 1));
     UNUSED(p);
-    SET_SERIES_LEN(s, SER_LEN(s) - 1);
+    SET_SERIES_USED(s, SER_USED(s) - 1);
 
     // !!! Could optimize so mold stack is always dynamic, and just use
     // s->content.dynamic.len--
@@ -243,7 +243,7 @@ void Drop_Pointer_From_Series(REBSER *s, void *p)
 //
 void Mold_Array_At(
     REB_MOLD *mo,
-    REBARR *a,
+    const REBARR *a,
     REBLEN index,
     const char *sep
 ){
@@ -266,7 +266,7 @@ void Mold_Array_At(
 
     bool first_item = true;
 
-    RELVAL *item = ARR_AT(a, index);
+    const RELVAL *item = ARR_AT(a, index);
     while (NOT_END(item)) {
         if (GET_CELL_FLAG(item, NEWLINE_BEFORE)) {
            if (not indented and (sep[1] != '\0')) {
@@ -312,7 +312,7 @@ void Mold_Array_At(
 //
 void Form_Array_At(
     REB_MOLD *mo,
-    REBARR *array,
+    const REBARR *array,
     REBLEN index,
     REBCTX *opt_context
 ){
@@ -323,10 +323,13 @@ void Form_Array_At(
 
     REBINT n;
     for (n = 0; n < len;) {
-        RELVAL *item = ARR_AT(array, index + n);
+        const RELVAL *item = ARR_AT(array, index + n);
         REBVAL *wval = nullptr;
         if (opt_context and (IS_WORD(item) or IS_GET_WORD(item))) {
-            wval = Select_Canon_In_Context(opt_context, VAL_WORD_CANON(item));
+            wval = Select_Canon_In_Context(
+                CTX_ARCHETYPE(opt_context),
+                VAL_WORD_CANON(item)
+            );
             if (wval)
                 item = wval;
         }
@@ -352,7 +355,7 @@ void Form_Array_At(
 //
 //  MF_Fail: C
 //
-void MF_Fail(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Fail(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -378,7 +381,7 @@ void MF_Fail(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 //  MF_Unhooked: C
 //
-void MF_Unhooked(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Unhooked(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(mo);
     UNUSED(form);
@@ -395,7 +398,7 @@ void MF_Unhooked(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 // Variation which molds a cell, e.g. no quoting is considered.
 //
-void Mold_Or_Form_Cell(REB_MOLD *mo, const REBCEL *cell, bool form)
+void Mold_Or_Form_Cell(REB_MOLD *mo, REBCEL(const*) cell, bool form)
 {
     REBSTR *s = mo->series;
     ASSERT_SERIES_TERM(SER(s));
@@ -466,7 +469,7 @@ REBSTR *Copy_Mold_Or_Form_Value(const RELVAL *v, REBFLGS opts, bool form)
 //
 // Form a value based on the mold opts provided.
 //
-REBSTR *Copy_Mold_Or_Form_Cell(const REBCEL *cell, REBFLGS opts, bool form)
+REBSTR *Copy_Mold_Or_Form_Cell(REBCEL(const*) cell, REBFLGS opts, bool form)
 {
     DECLARE_MOLD (mo);
     mo->opts = opts;
@@ -493,24 +496,14 @@ REBSTR *Copy_Mold_Or_Form_Cell(const REBCEL *cell, REBFLGS opts, bool form)
 //
 bool Form_Reduce_Throws(
     REBVAL *out,
-    REBARR *array,
+    const REBARR *array,
     REBLEN index,
     REBSPC *specifier,
     const REBVAL *delimiter
 ){
     assert(
-        IS_NULLED(delimiter) or IS_BLANK(delimiter)
-        or IS_CHAR(delimiter) or IS_TEXT(delimiter)
+        IS_NULLED(delimiter) or IS_CHAR(delimiter) or IS_TEXT(delimiter)
     );
-
-    // Initially Ren-C advocated treating blank the same as null, to be the
-    // "less noisy" null since it was legal to fetch with plain WORD!.  Now
-    // that plain words fetch nulls without error, it's more interesting for
-    // dialects to leverage blanks for unique meaning.  Space is particularly
-    // nice when used in DELIMIT scenarios.
-    //
-    if (IS_BLANK(delimiter))
-        delimiter = SPACE_VALUE;
 
     DECLARE_MOLD (mo);
     Push_Mold(mo);
@@ -524,28 +517,39 @@ bool Form_Reduce_Throws(
     bool nothing = true;  // any elements seen so far have been null or blank
 
     do {
+        // See philosophy on handling blanks differently from nulls, but only
+        // at dialect "source level".
+        // https://forum.rebol.info/t/1348
+        //
+        if (KIND3Q_BYTE_UNCHECKED(f->feed->value) == REB_BLANK) {
+            Literal_Next_In_Frame(out, f);
+            Append_Codepoint(mo->series, ' ');
+            pending = false;
+            nothing = false;
+            continue;
+        }
+
         if (Eval_Step_Throws(out, f)) {
             Drop_Mold(mo);
             Abort_Frame(f);
             return true;
         }
 
-        if (IS_END(out)) {  // e.g. forming `[]`, `[()]`, `[comment "hi"]`
-            assert(nothing);
-            break;
+        if (IS_END(out)) {
+            if (IS_END(f->feed->value)) {  // spaced []
+                assert(nothing);
+                break;
+            }
+            continue;  // spaced [comment "a" ...]
         }
 
-        if (IS_NULLED(out))
+        if (IS_NULLED(out) or IS_BLANK(out))  // see note above on BLANK!
             continue;  // opt-out and maybe keep option open to return NULL
 
         nothing = false;
 
-        if (IS_CHAR(out)) {  // don't delimit CHAR! (e.g. space, newline)
-            Append_Codepoint(mo->series, VAL_CHAR(out));
-            pending = false;
-        }
-        else if (IS_BLANK(out)) {
-            Append_Codepoint(mo->series, ' ');
+        if (IS_ISSUE(out)) {  // do not delimit (unified w/char)
+            Form_Value(mo, out);
             pending = false;
         }
         else if (IS_NULLED(delimiter))
@@ -618,7 +622,7 @@ void Push_Mold(REB_MOLD *mo)
         // the contents, as there may be important mold data behind the
         // ->start index in the stack!
         //
-        REBLEN len = SER_LEN(s);
+        REBLEN len = STR_LEN(MOLD_BUF);
         Remake_Series(
             s,
             SER_USED(s) + MIN_COMMON,
@@ -801,7 +805,7 @@ void Drop_Mold_Core(
 //
 void Startup_Mold(REBLEN size)
 {
-    TG_Mold_Stack = Make_Series(10, sizeof(void*));
+    TG_Mold_Stack = Make_Series(10, sizeof(const void*));
 
     // Most string code tries to optimize "bookmarks" that help map indices
     // to encoded codepoint positions in such a way that when the string

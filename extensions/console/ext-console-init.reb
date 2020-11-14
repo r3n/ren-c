@@ -7,7 +7,7 @@ REBOL [
     Options: []  ; !!! If ISOLATE, wouldn't see LIB/PRINT changes, etc.
 
     Rights: {
-        Copyright 2016-2018 Rebol Open Source Contributors
+        Copyright 2016-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -53,14 +53,14 @@ boot-print: redescribe [
     "Prints during boot when not quiet."
 ](
     ; !!! Duplicates code in %main-startup.reb, where this isn't exported.
-    enclose 'print func [f] [if not system/options/quiet [do f]]
+    enclose :print func [f] [if not system/options/quiet [do f]]
 )
 
 loud-print: redescribe [
     "Prints during boot when verbose."
 ](
     ; !!! Duplicates code in %main-startup.reb, where this isn't exported.
-    enclose 'print func [f] [if system/options/verbose [do f]]
+    enclose :print func [f] [if system/options/verbose [do f]]
 )
 
 
@@ -74,7 +74,7 @@ console!: make object! [
     repl: true  ; used to identify this as a console! object
     is-loaded: false  ; if true then this is a loaded (external) skin
     was-updated: false  ; if true then console! object found in loaded skin
-    last-result: void  ; last evaluated result (sent by HOST-CONSOLE)
+    last-result: ~startup~  ; last evaluated result (sent by HOST-CONSOLE)
 
     === APPEARANCE (can be overridden) ===
 
@@ -116,8 +116,16 @@ console!: make object! [
     ]
 
     print-result: method [return: <void> v [<opt> any-value!]] [
-        if void? last-result: get/any 'v [
-            return  ; e.g. result of PRINT or HELP, best to output nothing.
+        switch match void! last-result: get/any 'v [
+            null [
+                ; not a void, fall through to other printing
+            ]
+            ~ [
+                return  ; e.g. result of HELP, understood as output *nothing*
+            ]
+        ] else [  ; any other labeled VOID!
+            print [result mold get/any 'v]
+            return
         ]
 
         case [
@@ -246,8 +254,7 @@ start-console: function [
     skin-file: case [
         file? skin [skin]
         object? skin [blank]
-        default [%console-skin.reb]
-    ]
+    ] else [%console-skin.reb]
 
     loud-print "Starting console..."
     loud-print newline
@@ -277,7 +284,7 @@ start-console: function [
             proto-skin/name: default ["loaded"]
             append o/loaded skin-file
 
-        ] then e => [
+        ] then e -> [
             skin-error: e  ; show error later if `--verbose`
             proto-skin/name: "error"
         ]
@@ -366,14 +373,14 @@ ext-console-impl: function [
     ][
         switch type of item [
             issue! [
-                if not empty? instruction [append/line instruction '|]
+                if not empty? instruction [append/line instruction ',]
                 insert instruction item
             ]
             text! [
                 append/line instruction compose [comment (item)]
             ]
             block! [
-                if not empty? instruction [append/line instruction '|]
+                if not empty? instruction [append/line instruction ',]
                 append/line instruction compose/deep <*> item
             ]
             fail
@@ -432,9 +439,8 @@ ext-console-impl: function [
             handle! [  ; means "evaluator hook request" (handle is the hook)
                 state
             ]
-            default [
-                emit [fail [{Bad console instruction:} (<*> mold state)]]
-            ]
+        ] else [
+            emit [fail [{Bad console instruction:} (<*> mold state)]]
         ]
     ]
 
@@ -449,7 +455,10 @@ ext-console-impl: function [
         ; care of that.
         ;
         assert [blank? :result]
-        if (unset? 'system/console) or [not system/console] [
+        any [
+            undefined? 'system/console
+            not system/console
+        ] then [
             emit [start-console/skin '(<*> skin)]
         ]
         return <prompt>
@@ -487,8 +496,8 @@ ext-console-impl: function [
             integer! [result/arg1]  ; Note: may be too big for status range
 
             error! [1]  ; currently there's no default error-to-int mapping
-
-            default [1]  ; generic error code
+        ] else [
+            1  ; generic error code
         ]
     ]
 
@@ -637,7 +646,7 @@ ext-console-impl: function [
         ; behavior), Ctrl-D on Windows (because ReadConsole() can't trap ESC),
         ; Ctrl-D on POSIX (just to be compatible with Windows).
         ;
-        emit [system/console/print-result void]
+        emit [system/console/print-result ~]
         return <prompt>
     ]
 
@@ -648,7 +657,7 @@ ext-console-impl: function [
         code: load/all delimit newline result
         assert [block? code]
 
-    ] then error => [
+    ] then error -> [
         ;
         ; If loading the string gave back an error, check to see if it
         ; was the kind of error that comes from having partial input
@@ -665,7 +674,7 @@ ext-console-impl: function [
                 "}" ["{"]
                 ")" ["("]
                 "]" ["["]
-            ] also unclosed => [
+            ] also unclosed -> [
                 ;
                 ; Backslash is used in the second column to help make a
                 ; pattern that isn't legal in Rebol code, which is also

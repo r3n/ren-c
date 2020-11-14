@@ -9,12 +9,14 @@
     1 = do [1 comment "a"]
 )
 (
-    void = do [comment "a"]
+    ~ = do [comment "a"]
 )
 
 (
     val: <overwritten>
-    pos: evaluate @val [1 + comment "a" comment "b" 2 * 3 fail "too far"]
+    pos: evaluate/result [
+        1 + comment "a" comment "b" 2 * 3 fail "too far"
+    ] 'val
     did all [
         val = 9
         pos = [fail "too far"]
@@ -22,7 +24,9 @@
 )
 (
     val: <overwritten>
-    pos: evaluate @val [1 comment "a" + comment "b" 2 * 3 fail "too far"]
+    pos: evaluate/result [
+        1 comment "a" + comment "b" 2 * 3 fail "too far"
+    ] 'val
     did all [
         val = 9
         pos = [fail "too far"]
@@ -30,7 +34,9 @@
 )
 (
     val: <overwritten>
-    pos: evaluate @val [1 comment "a" comment "b" + 2 * 3 fail "too far"]
+    pos: evaluate/result [
+        1 comment "a" comment "b" + 2 * 3 fail "too far"
+    ] 'val
     did all [
         val = 9
         pos = [fail "too far"]
@@ -49,21 +55,23 @@
     1 = do [1 elide "a"]
 )
 (
-    void = do [elide "a"]
+    ~ = do [elide "a"]
 )
 
 (
-    error? trap [
+    e: trap [
         evaluate evaluate [1 elide "a" + elide "b" 2 * 3 fail "too far"]
     ]
+    e/id = 'expect-arg
 )
 (
-    error? trap [
-        evaluate evaluate [1 elide "a" elide "b" + 2 * 3 fail "too far"]
-    ]
+    pos: evaluate evaluate [1 elide "a" elide "b" + 2 * 3 fail "too far"]
+    pos = lit '[elide "b" + 2 * 3 fail "too far"]
 )
 (
-    pos: evaluate @val [1 + 2 * 3 elide "a" elide "b" fail "too far"]
+    pos: evaluate [
+        1 + 2 * 3 elide "a" elide "b" fail "too far"
+    ] 'val
     did all [
         val = 9
         pos = [elide "a" elide "b" fail "too far"]
@@ -76,7 +84,7 @@
     x: 1 + 2 * 3
     elide (y: :x)
 
-    did all [x = 9 | y = 9]
+    did all [x = 9, y = 9]
 )
 (
     unset 'x
@@ -103,11 +111,43 @@
     ]
 )
 
+; ONCE-BAR was an experiment created to see if it could be done, and was
+; thought about putting in the box.  Notationally it was || to correspond as
+; a stronger version of |.  Not only was it not used, but since COMMA! has
+; overtaken the | it no longer makes sense.
+;
+; Keeping as a test of the variadic feature it exercised.
+[
+    (|1|: func [
+        {Barrier that's willing to only run one expression after it}
+
+        return: [<opt> any-value!]
+        right [<opt> <end> any-value! <variadic>]
+        :lookahead [any-value! <variadic>]
+        look:
+    ][
+        take right  ; returned value
+
+        elide any [
+            tail? right,
+            '|1| = look: take lookahead  ; hack...recognize selfs
+        ] else [
+            fail @right [
+                "|1| expected single expression, found residual of" :look
+            ]
+        ]
+    ]
+    true)
+
+    (7 = (1 + 2 |1| 3 + 4))
+    (error? trap [1 + 2 |1| 3 + 4 5 + 6])
+]
+
 (
-    void = do [|||]
+    ~ = do [|||]
 )
 (
-    3 = do [1 + 2 ||| 10 + 20 | 100 + 200]
+    3 = do [1 + 2 ||| 10 + 20, 100 + 200]
 )
 (
     ok? trap [reeval (func [x [<end>]] []) ||| 1 2 3]
@@ -121,12 +161,14 @@
 )
 
 
-; BAR! is invisible, and acts as an expression barrier
+; Test expression barrier invisibility
 
 (
-    3 = (1 + 2 |)
+    3 = (1 + 2,)  ; COMMA! barrier
 )(
-    3 = (1 + 2 | comment "invisible")
+    3 = (1 + 2 ||)  ; usermode expression barrier
+)(
+    3 = (1 + 2 comment "invisible")
 )
 
 ; Non-variadic
@@ -153,32 +195,38 @@
         true
     )
 
-    ('no-arg = (trap [right-normal |])/id)
-    (null? do [right-normal* |])
+    ('no-arg = (trap [right-normal ||])/id)
+    (null? do [right-normal* ||])
     (null? do [right-normal*])
 
-    ('no-arg = (trap [| left-normal])/id)
-    (null? do [| left-normal*])
+    ('no-arg = (trap [|| left-normal])/id)
+    (null? do [|| left-normal*])
     (null? do [left-normal*])
 
-    ('no-arg = (trap [| left-defer])/id)
-    (null? do [| left-defer*])
+    ('no-arg = (trap [|| left-defer])/id)
+    (null? do [|| left-defer*])
     (null? do [left-defer*])
 
-    ('| = do [right-soft |])
-    ('| = do [right-soft* |])
+    ('|| = do [right-soft ||])
+    ('|| = do [right-soft* ||])
     (null? do [right-soft*])
 
-    (<bug> 'left-soft = do [| left-soft])
-    (<bug> 'left-soft* = do [| left-soft*])
+    ; !!! This was legal at one point, but the special treatment of left
+    ; quotes when there is nothing to their right means you now get errors.
+    ; It's not clear what the best behavior is, so punting for now.
+    ;
+    ('literal-left-path = (trap [<bug> 'left-soft = do [|| left-soft]])/id)
+    ('literal-left-path = (trap [<bug> 'left-soft* = do [|| left-soft*]])/id)
     (null? do [left-soft*])
 
-    ('| = do [right-hard |])
-    ('| = do [right-hard* |])
+    ('|| = do [right-hard ||])
+    ('|| = do [right-hard* ||])
     (null? do [right-hard*])
 
-    (<bug> 'left-hard = do [| left-hard])
-    (<bug> 'left-hard* = do [| left-hard*])
+    ; !!! See notes above.
+    ;
+    ('literal-left-path = (trap [<bug> 'left-hard = do [|| left-hard]])/id)
+    ('literal-left-path = (trap [<bug> 'left-hard* = do [|| left-hard*]])/id)
     (null? do [left-hard*])
 ]
 
@@ -187,19 +235,22 @@
 [
     (
         left-normal: enfixed right-normal:
-            func [return: [<opt> word!] x [word! <...>]] [take x]
+            func [return: [<opt> word!] x [word! <variadic>]] [take x]
         left-normal*: enfixed right-normal*:
-            func [return: [<opt> word!] x [word! <...> <end>]] [take x]
+            func [return: [<opt> word!] x [word! <variadic> <end>]] [take x]
+
+        left-defer: enfixed tweak (copy :left-normal) 'defer on
+        left-defer*: enfixed tweak (copy :left-normal*) 'defer on
 
         left-soft: enfixed right-soft:
-            func [return: [<opt> word!] 'x [word! <...>]] [take x]
+            func [return: [<opt> word!] 'x [word! <variadic>]] [take x]
         left-soft*: enfixed right-soft*:
-            func [return: [<opt> word!] 'x [word! <...> <end>]] [take x]
+            func [return: [<opt> word!] 'x [word! <variadic> <end>]] [take x]
 
         left-hard: enfixed right-hard:
-            func [return: [<opt> word!] :x [word! <...>]] [take x]
+            func [return: [<opt> word!] :x [word! <variadic>]] [take x]
         left-hard*: enfixed right-hard*:
-            func [return: [<opt> word!] :x [word! <...> <end>]] [take x]
+            func [return: [<opt> word!] :x [word! <variadic> <end>]] [take x]
 
         true
     )
@@ -209,33 +260,39 @@
 ; fuzzy:
 ; https://github.com/metaeducation/ren-c/issues/1057
 ;
-;    (error? trap [right-normal |])
-;    (error? trap [| left-normal])
+;    (error? trap [right-normal ||])
+;    (error? trap [|| left-normal])
 
-    (null? do [right-normal* |])
+    (null? do [right-normal* ||])
     (null? do [right-normal*])
 
-    (null? do [| left-normal*])
+    (null? do [|| left-normal*])
     (null? do [left-normal*])
 
-    (error? trap [| left-defer])
-    (null? do [| left-defer*])
+    (null? trap [|| left-defer])  ; !!! Should likely be an error, as above
+    (null? do [|| left-defer*])
     (null? do [left-defer*])
 
-    ('| = do [right-soft |])
-    ('| = do [right-soft* |])
+    ('|| = do [right-soft ||])
+    ('|| = do [right-soft* ||])
     (null? do [right-soft*])
 
-    (<bug> 'left-soft = do [| left-soft])
-    (<bug> 'left-soft* = do [| left-soft*])
+    ; !!! This was legal at one point, but the special treatment of left
+    ; quotes when there is nothing to their right means you now get errors.
+    ; It's not clear what the best behavior is, so punting for now.
+    ;
+    ('literal-left-path = (trap [<bug> 'left-soft = do [|| left-soft]])/id)
+    ('literal-left-path = (trap [<bug> 'left-soft* = do [|| left-soft*]])/id)
     (null? do [left-soft*])
 
-    ('| = do [right-hard |])
-    ('| = do [right-hard* |])
+    ('|| = do [right-hard ||])
+    ('|| = do [right-hard* ||])
     (null? do [right-hard*])
 
-    ('left-hard = do [| left-hard])
-    ('left-hard* = do [| left-hard*])
+    ; !!! See notes above.
+    ;
+    ('literal-left-path = (trap [<bug> 'left-hard = do [|| left-hard]])/id)
+    ('literal-left-path = (trap [<bug> 'left-hard* = do [|| left-hard*]])/id)
     (null? do [left-hard*])
 ]
 
@@ -269,9 +326,9 @@
 (void? (if true [] else [<else>]))
 (void? (if true [comment <true-branch>] else [<else>]))
 
-(1 = all [1 elide <invisible>])
-(1 = any [1 elide <invisible>])
-([1] = reduce [1 elide <invisible>])
+(1 = all [1 elide <vaporize>])
+(1 = any [1 elide <vaporize>])
+([1] = reduce [1 elide <vaporize>])
 
 (304 = (1000 + 20 (** foo <baz> (bar)) 300 + 4))
 (304 = (1000 + 20 ** (
@@ -279,13 +336,14 @@
 ) 300 + 4))
 
 
-; It's likely more useful for EVAL to give VOID! than error if asked to
-; evaluate something that turns out to be invisible.
+; REEVAL has been tuned to be able to act invisibly if the thing being
+; reevaluated turns out to be invisible.
 ;
-(void? reeval lit (comment "void is better than failing here"))
+(integer? reeval lit (comment "this group vaporizes") 1020)
+(<before> = (<before> reeval :comment "erase me"))
 (
     x: <before>
-    void? reeval :elide x: <after>
+    equal? true reeval :elide x: <after>  ; picks up the `x = <after>`
     x = <after>
 )
 
@@ -305,11 +363,41 @@
 ((comment "one") 1 + (comment "two") 2 = (comment "three") 3)
 
 
-; !!! Should `;`-comment tests be grouped into their own file?
-(
-    b: load ";"
-    did all [
-        b = []
-        not new-line? b
-    ]
-)
+; "Opportunistic Invisibility" means that functions can treat invisibility as
+; a return type, decided on after they've already started running.  This means
+; using the @(...) form of RETURN, which can also be used for chaining.
+[
+    (vanish-if-odd: func [return: [<invisible> integer!] x] [
+        if even? x [return x]
+        return @()
+    ] true)
+
+    (2 = (<test> vanish-if-odd 2))
+    (<test> = (<test> vanish-if-odd 1))
+
+    (vanish-if-even: func [return: [<invisible> integer!] y] [
+       return @(vanish-if-odd y + 1)
+    ] true)
+
+    (<test> = (<test> vanish-if-even 2))
+    (2 = (<test> vanish-if-even 1))
+]
+
+
+; Invisibility is a checked return type, if you use a type spec...but allowed
+; by default if not.
+[
+    (
+        no-spec: func [x] [return @()]
+        <test> = (<test> no-spec 10)
+    )
+    (
+        int-spec: func [return: [integer!] x] [return @()]
+        e: trap [int-spec 10]
+        e/id = 'bad-invisible
+    )
+    (
+        invis-spec: func [return: [<invisible> integer!] x] [return @()]
+        <test> = (<test> invis-spec 10)
+    )
+]

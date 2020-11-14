@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -51,11 +51,10 @@ const struct {
 //
 //  CT_Gob: C
 //
-REBINT CT_Gob(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Gob(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0)
-        return VAL_GOB(a) == VAL_GOB(b) && VAL_GOB_INDEX(a) == VAL_GOB_INDEX(b);
-    return -1;
+    UNUSED(strict);
+    return VAL_GOB(a) == VAL_GOB(b) && VAL_GOB_INDEX(a) == VAL_GOB_INDEX(b);
 }
 
 //
@@ -100,7 +99,7 @@ REBGOB *Make_Gob(void)
 //
 //  Cmp_Gob: C
 //
-REBINT Cmp_Gob(const REBCEL *g1, const REBCEL *g2)
+REBINT Cmp_Gob(REBCEL(const*) g1, REBCEL(const*) g2)
 {
     REBINT n;
 
@@ -314,7 +313,7 @@ static REBARR *Gob_Flags_To_Array(REBGOB *gob)
 //
 //  Set_Gob_Flag: C
 //
-static void Set_Gob_Flag(REBGOB *gob, REBSTR *name)
+static void Set_Gob_Flag(REBGOB *gob, const REBSTR *name)
 {
     REBSYM sym = STR_SYMBOL(name);
     if (sym == SYM_0) return; // !!! fail?
@@ -357,7 +356,7 @@ static void Set_Gob_Flag(REBGOB *gob, REBSTR *name)
 //
 //  Did_Set_GOB_Var: C
 //
-static bool Did_Set_GOB_Var(REBGOB *gob, const REBVAL *word, const REBVAL *val)
+static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
 {
     switch (VAL_WORD_SYM(word)) {
       case SYM_OFFSET:
@@ -428,8 +427,12 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const REBVAL *word, const REBVAL *val)
         CLR_GOB_OPAQUE(gob);
         if (IS_TUPLE(val)) {
             SET_GOB_TYPE(gob, GOBT_COLOR);
-            if (VAL_TUPLE_LEN(val) < 4 or VAL_TUPLE(val)[3] == 0)
+            if (
+                VAL_SEQUENCE_LEN(val) < 4
+                or VAL_SEQUENCE_BYTE_AT(val, 3) == 0
+            ){
                 SET_GOB_OPAQUE(gob);
+            }
         }
         else if (IS_BLANK(val))
             SET_GOB_TYPE(gob, GOBT_NONE);
@@ -443,10 +446,11 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const REBVAL *word, const REBVAL *val)
         if (GOB_PANE(gob))
             Clear_Series(SER(GOB_PANE(gob)));
 
-        if (IS_BLOCK(val))
-            Insert_Gobs(
-                gob, VAL_ARRAY_AT(val), 0, VAL_ARRAY_LEN_AT(val), false
-            );
+        if (IS_BLOCK(val)) {
+            REBLEN len;
+            const RELVAL *head = VAL_ARRAY_LEN_AT(&len, val);
+            Insert_Gobs(gob, head, 0, len, false);
+        }
         else if (IS_GOB(val))
             Insert_Gobs(gob, val, 0, 1, false);
         else if (IS_BLANK(val))
@@ -489,8 +493,8 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const REBVAL *word, const REBVAL *val)
             for (i = 0; Gob_Flag_Words[i].sym != 0; ++i)
                 CLR_GOB_FLAG(gob, Gob_Flag_Words[i].flags);
 
-            RELVAL* item;
-            for (item = VAL_ARRAY_HEAD(val); NOT_END(item); item++)
+            const RELVAL* item;
+            for (item = ARR_HEAD(VAL_ARRAY(val)); NOT_END(item); item++)
                 if (IS_WORD(item)) Set_Gob_Flag(gob, VAL_WORD_CANON(item));
         }
         break;
@@ -515,7 +519,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const REBVAL *word, const REBVAL *val)
 // !!! Things like this Get_GOB_Var routine could be replaced with ordinary
 // OBJECT!-style access if GOB! was an ANY-CONTEXT.
 //
-static REBVAL *Get_GOB_Var(RELVAL *out, REBGOB *gob, const REBVAL *word)
+static REBVAL *Get_GOB_Var(RELVAL *out, REBGOB *gob, const RELVAL *word)
 {
     switch (VAL_WORD_SYM(word)) {
       case SYM_OFFSET:
@@ -781,7 +785,7 @@ REB_R TO_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 REB_R PD_Gob(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     REBGOB *gob = VAL_GOB(pvs->out);
@@ -807,7 +811,7 @@ REB_R PD_Gob(
                 // Have to copy -and- protect.
                 //
                 DECLARE_LOCAL (orig_picker);
-                Move_Value(orig_picker, picker);
+                Blit_Relative(cast(RELVAL*, orig_picker), picker);
                 PUSH_GC_GUARD(orig_picker);
 
                 if (Next_Path_Throws(pvs)) // sets value in pvs->store
@@ -831,7 +835,8 @@ REB_R PD_Gob(
 
     if (IS_INTEGER(picker))
         return rebValueQ(
-            rebU(NATIVE_VAL(pick)), SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)), picker,
+            rebU(NATIVE_VAL(pick)),
+                SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)), SPECIFIC(picker),
         rebEND);
 
     return R_UNHANDLED;
@@ -841,7 +846,7 @@ REB_R PD_Gob(
 //
 //  MF_Gob: C
 //
-void MF_Gob(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Gob(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -942,7 +947,7 @@ REBTYPE(Gob)
             fail (Error_Bad_Refines_Raw());
 
         if (!GOB_PANE(gob) || index >= tail)
-            fail (Error_Past_End_Raw());
+            fail (Error_Index_Out_Of_Range_Raw());
         if (
             VAL_WORD_SYM(verb) == SYM_CHANGE
             && (REF(part) || REF(only) || REF(dup))
@@ -965,7 +970,7 @@ REBTYPE(Gob)
         INCLUDE_PARAMS_OF_INSERT;
         UNUSED(PAR(series));  // covered by `v`
 
-        REBVAL *value = ARG(value);
+        RELVAL *value = ARG(value);
 
         if (IS_NULLED_OR_BLANK(value))
             RETURN (v);  // don't fail on read only if it would be a no-op
@@ -981,8 +986,7 @@ REBTYPE(Gob)
             len = 1;
         }
         else if (IS_BLOCK(value)) {
-            len = VAL_ARRAY_LEN_AT(value);
-            value = SPECIFIC(VAL_ARRAY_AT(value)); // !!! REVIEW
+            value = VAL_ARRAY_KNOWN_MUTABLE_LEN_AT(&len, value);  // !!!
         }
         else
             fail (PAR(value));

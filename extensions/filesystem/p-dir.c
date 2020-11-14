@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -66,32 +66,6 @@ static REBARR *Read_Dir_May_Fail(REBREQ *dir)
     }
 
     Free_Req(file);
-
-    // !!! This is some kind of error tolerance, review what it is for.
-    //
-    bool enabled = false;
-    if (enabled
-        and (
-            NOT_FOUND != Find_Char_In_Str(
-                '*',
-                VAL_STRING(ReqFile(dir)->path),
-                VAL_INDEX(ReqFile(dir)->path), // first index to examine
-                STR_LEN(VAL_STRING(ReqFile(dir)->path)) + 1, // highest return + 1
-                0, // skip
-                AM_FIND_CASE // not relevant
-            )
-            or NOT_FOUND != Find_Char_In_Str(
-                '?',
-                VAL_STRING(ReqFile(dir)->path),
-                VAL_INDEX(ReqFile(dir)->path), // first index to examine
-                STR_LEN(VAL_STRING(ReqFile(dir)->path)) + 1, // highest return + 1
-                0, // skip
-                AM_FIND_CASE // not relevant
-            )
-        )
-    ){
-        // no matches found, but not an error
-    }
 
     return Pop_Stack_Values(dsp_orig);
 }
@@ -159,7 +133,10 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         switch (property) {
         case SYM_LENGTH: {
-            REBLEN len = IS_BLOCK(state) ? VAL_ARRAY_LEN_AT(state) : 0;
+            if (not IS_BLOCK(state))
+                return 0;
+            REBLEN len;
+            VAL_ARRAY_LEN_AT(&len, state);
             return Init_Integer(D_OUT, len); }
 
         case SYM_OPEN_Q:
@@ -194,13 +171,16 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         else {
             // !!! This copies the strings in the block, shallowly.  What is
             // the purpose of doing this?  Why copy at all?
+
+            REBLEN len;
+            VAL_ARRAY_LEN_AT(&len, state);
             Init_Block(
                 D_OUT,
                 Copy_Array_Core_Managed(
                     VAL_ARRAY(state),
                     0, // at
                     VAL_SPECIFIER(state),
-                    VAL_ARRAY_LEN_AT(state), // tail
+                    len, // tail
                     0, // extra
                     ARRAY_MASK_HAS_FILE_LINE, // flags
                     TS_STRING // types

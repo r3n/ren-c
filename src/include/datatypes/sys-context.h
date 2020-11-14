@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2018 Rebol Open Source Contributors
+// Copyright 2012-2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -74,20 +74,11 @@
         | CELL_FLAG_SECOND_IS_NODE  /* phase (for FRAME!) */)
 
 
-//=//// SERIES_FLAG_VARLIST_FRAME_FAILED //////////////////////////////////=//
+//=//// SERIES_FLAG_VARLIST_23 ////////////////////////////////////////////=//
 //
-// In the specific case of a frame being freed due to a failure, this mark
-// is put on the context node.  What this allows is for the system to account
-// for which nodes are being GC'd due to lack of a rebRelease(), as opposed
-// to those being GC'd due to failure.
+// (Note: This is where varlist-specific flags could start being defined.)
 //
-// What this means is that the system can use managed handles by default
-// while still letting "rigorous" code track cases where it made use of the
-// GC facility vs. doing explicit tracking.  Essentially, it permits a kind
-// of valgrind/address-sanitizer way of looking at a codebase vs. just taking
-// for granted that it will GC things.
-//
-#define SERIES_FLAG_VARLIST_FRAME_FAILED \
+#define SERIES_FLAG_VARLIST_23 \
     ARRAY_FLAG_23
 
 
@@ -110,34 +101,28 @@
 #define CTX_VARLIST(c) \
     (&(c)->varlist)
 
-#define VAL_PHASE_NODE(v) \
+#define VAL_FRAME_PHASE_OR_LABEL_NODE(v) \
     PAYLOAD(Any, (v)).second.node
-
-#define VAL_PHASE_UNCHECKED(v) \
-    ACT(VAL_PHASE_NODE(v))
-
-inline static REBACT *VAL_PHASE(REBVAL *frame) {
-    assert(IS_FRAME(frame));
-    REBACT *phase = VAL_PHASE_UNCHECKED(frame);
-    assert(phase != nullptr);
-    return phase;
-}
 
 // There may not be any dynamic or stack allocation available for a stack
 // allocated context, and in that case it will have to come out of the
 // REBSER node data itself.
 //
-inline static REBVAL *CTX_ARCHETYPE(REBCTX *c) {
-    REBSER *varlist = SER(CTX_VARLIST(c));
+inline static const REBVAL *CTX_ARCHETYPE(const REBCTX *c) {
+    const REBSER *varlist = SER(CTX_VARLIST(c));
     if (not IS_SER_DYNAMIC(varlist))
-        return cast(REBVAL*, &varlist->content.fixed);
+        return cast(const REBVAL*, &varlist->content.fixed);
 
     // If a context has its data freed, it must be converted into non-dynamic
     // form if it wasn't already (e.g. if it wasn't a FRAME!)
     //
     assert(NOT_SERIES_INFO(varlist, INACCESSIBLE));
-    return cast(REBVAL*, varlist->content.dynamic.data);
+    return cast(const REBVAL*, varlist->content.dynamic.data);
 }
+
+inline static REBVAL *CTX_ROOTVAR(REBCTX *c)  // mutable archetype access
+  { return m_cast(REBVAL*, CTX_ARCHETYPE(c)); }
+
 
 // CTX_KEYLIST is called often, and it's worth it to make it as fast as
 // possible--even in an unoptimized build.
@@ -154,7 +139,13 @@ inline static REBARR *CTX_KEYLIST(REBCTX *c) {
     // phase changes, a fixed value can't be put into the keylist...that is
     // just the keylist of the underlying function.
     //
-    return ACT_PARAMLIST(VAL_PHASE(CTX_ARCHETYPE(c)));
+    // Although the phase node can be used in non-archetypal FRAME! values to
+    // store a symbol of the starting phase of the function uses, that is
+    // not true of archetypal frames...which store the phase for efficiency.
+    // Again, due to the frequent calls of this routine it is assumed even
+    // in the debug build w/o an assert.
+    //
+    return ARR(VAL_FRAME_PHASE_OR_LABEL_NODE(CTX_ARCHETYPE(c)));
 }
 
 static inline void INIT_CTX_KEYLIST_SHARED(REBCTX *c, REBARR *keylist) {
@@ -232,11 +223,11 @@ inline static REBVAL *CTX_VAR(REBCTX *c, REBLEN n) {
     return cast(REBVAL*, cast(REBSER*, c)->content.dynamic.data) + n;
 }
 
-inline static REBSTR *CTX_KEY_SPELLING(REBCTX *c, REBLEN n) {
+inline static const REBSTR *CTX_KEY_SPELLING(REBCTX *c, REBLEN n) {
     return VAL_TYPESET_STRING(CTX_KEY(c, n));
 }
 
-inline static REBSTR *CTX_KEY_CANON(REBCTX *c, REBLEN n) {
+inline static const REBSTR *CTX_KEY_CANON(REBCTX *c, REBLEN n) {
     return STR_CANON(CTX_KEY_SPELLING(c, n));
 }
 
@@ -264,11 +255,11 @@ inline static void FAIL_IF_INACCESSIBLE_CTX(REBCTX *c) {
     }
 }
 
-inline static REBCTX *VAL_CONTEXT(const REBCEL *v) {
-    assert(ANY_CONTEXT_KIND(CELL_KIND(v)));
-    assert(
-        (VAL_PHASE_UNCHECKED(v) != nullptr) == (CELL_KIND(v) == REB_FRAME)
-    );
+inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
+    assert(ANY_CONTEXT_KIND(CELL_HEART(v)));
+    if (CELL_KIND(v) != REB_FRAME)
+        assert(VAL_FRAME_PHASE_OR_LABEL_NODE(v) == nullptr);
+
     REBCTX *c = CTX(PAYLOAD(Any, v).first.node);
     FAIL_IF_INACCESSIBLE_CTX(c);
     return c;
@@ -291,10 +282,46 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
     (PAYLOAD(Any, (v)).first.node = NOD(varlist))
 
 #define INIT_VAL_CONTEXT_PHASE(v,phase) \
-    (PAYLOAD(Any, (v)).second.node = NOD(phase))
+    (VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(phase))
 
-#define VAL_PHASE(v) \
-    ACT(PAYLOAD(Any, (v)).second.node)
+// A frame's phase is usually a pointer to which component action is in
+// effect.  But if the node where a phase would usually be found is a REBSTR*
+// then that implies the actual phase is the archetypal one for the frame...
+// and the string is the WORD! label cache to use as a name when an action
+// is extracted from the frame.
+//
+inline static REBACT *VAL_OPT_PHASE(REBCEL(const*) v) {
+    assert(CELL_KIND(v) == REB_FRAME);
+    REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
+
+    if (s == nullptr or IS_SER_STRING(s))  // label or ANONYMOUS, no phase
+        return nullptr;
+
+    return ACT(s);  // an actual phase
+}
+
+inline static REBACT *VAL_PHASE_ELSE_ARCHETYPE(REBCEL(const*) v) {
+    REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
+
+    if (s == nullptr or IS_SER_STRING(s))  // label or ANONYMOUS, no phase
+        return ACT(CTX_KEYLIST(VAL_CONTEXT(v)));  // so return archetype
+
+    return ACT(s);  // an actual phase
+}
+
+inline static const REBSTR *VAL_FRAME_LABEL(const RELVAL *v) {
+    REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
+    if (s == nullptr)  // phaseless, but no label
+        return ANONYMOUS;
+    if (IS_SER_ARRAY(s))  // phase, so nowhere to put label in value
+        return ANONYMOUS;
+    return STR(s);  // no phase and label
+}
+
+inline static void INIT_VAL_FRAME_LABEL(RELVAL *v, const REBSTR *label) {
+    VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, label));
+}
+
 
 // Convenience macros to speak in terms of object values instead of the context
 //
@@ -303,6 +330,30 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
 
 #define VAL_CONTEXT_KEY(v,n) \
     CTX_KEY(VAL_CONTEXT(v), (n))
+
+#define VAL_CONTEXT_LEN(v) \
+    CTX_LEN(VAL_CONTEXT(v))
+
+
+// If a context is a frame, which keylist you see for it depends on what
+// phase that frame is for.  This means you need a full RELVAL* and not just
+// a REBCTX* to know all the information.
+//
+// If all you have is a REBCTX*, then if it's not a FRAME! that means you
+// can use CTX_ARCHETYPE().  If it's a frame and you know it should have
+// a phase, then the phase is the keylist.
+//
+inline static REBVAL *VAL_CONTEXT_KEYS_HEAD(REBCEL(*) context)
+{
+    if (CELL_KIND(context) != REB_FRAME)
+        return CTX_KEYS_HEAD(VAL_CONTEXT(context));
+
+    REBACT *phase = VAL_PHASE_ELSE_ARCHETYPE(context);
+    return ACT_PARAMS_HEAD(phase);
+}
+
+#define VAL_CONTEXT_VARS_HEAD(context) \
+    CTX_VARS_HEAD(VAL_CONTEXT(context))  // all views have same varlist
 
 
 // The movement of the SELF word into the domain of the object generators
@@ -348,8 +399,11 @@ static inline REBVAL *Init_Any_Context(
 #define Init_Port(out,c) \
     Init_Any_Context((out), REB_PORT, (c))
 
-#define Init_Frame(out,c) \
-    Init_Any_Context((out), REB_FRAME, (c))
+inline static REBVAL *Init_Frame(RELVAL *out, REBCTX *c, const REBSTR *label) {
+    Init_Any_Context(out, REB_FRAME, c);
+    INIT_VAL_FRAME_LABEL(out, label);  // nullptr (ANONYMOUS) is okay
+    return cast(REBVAL*, out);
+}
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -476,7 +530,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
     REBSER *stub = SER(c);
 
     // Rather than memcpy() and touch up the header and info to remove
-    // SERIES_INFO_HOLD put on by Enter_Native(), or NODE_FLAG_MANAGED,
+    // SERIES_INFO_HOLD from PARAMLIST_FLAG_IS_NATIVE, or NODE_FLAG_MANAGED,
     // etc.--use constant assignments and only copy the remaining fields.
     //
     REBSER *copy = Alloc_Series_Node(
@@ -514,8 +568,8 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
     REBVAL *single = cast(REBVAL*, &stub->content.fixed);
     single->header.bits =
         NODE_FLAG_NODE | NODE_FLAG_CELL
-            | FLAG_KIND_BYTE(REB_FRAME)
-            | FLAG_MIRROR_BYTE(REB_FRAME)
+            | FLAG_KIND3Q_BYTE(REB_FRAME)
+            | FLAG_HEART_BYTE(REB_FRAME)
             | CELL_MASK_CONTEXT;
     INIT_BINDING(single, VAL_BINDING(rootvar));
     INIT_VAL_CONTEXT_VARLIST(single, ARR(stub));

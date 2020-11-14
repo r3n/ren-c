@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -28,17 +28,15 @@
 //
 //  CT_Pair: C
 //
-REBINT CT_Pair(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Pair(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0)
-        return Cmp_Pair(a, b) == 0; // works for INTEGER=0 too (spans x y)
+    UNUSED(strict);  // !!! Should this be heeded for the decimal?
 
-    if (0 == VAL_INT64(b)) { // for negative? and positive?
-        if (mode == -1)
-            return (VAL_PAIR_X_DEC(a) >= 0 || VAL_PAIR_Y_DEC(a) >= 0); // not LT
-        return (VAL_PAIR_X_DEC(a) > 0 && VAL_PAIR_Y_DEC(a) > 0); // NOT LTE
-    }
-    return -1;
+    REBDEC diff;
+
+    if ((diff = VAL_PAIR_Y_DEC(a) - VAL_PAIR_Y_DEC(b)) == 0)
+        diff = VAL_PAIR_X_DEC(a) - VAL_PAIR_X_DEC(b);
+    return (diff > 0.0) ? 1 : ((diff < 0.0) ? -1 : 0);
 }
 
 
@@ -80,7 +78,7 @@ REB_R MAKE_Pair(
         y = arg;
     }
     else if (IS_BLOCK(arg)) {
-        RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *item = VAL_ARRAY_AT(arg);
 
         if (ANY_NUMBER(item))
             x = item;
@@ -119,21 +117,6 @@ REB_R TO_Pair(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 
 
 //
-//  Cmp_Pair: C
-//
-// Given two pairs, compare them.
-//
-REBINT Cmp_Pair(const REBCEL *t1, const REBCEL *t2)
-{
-    REBDEC diff;
-
-    if ((diff = VAL_PAIR_Y_DEC(t1) - VAL_PAIR_Y_DEC(t2)) == 0)
-        diff = VAL_PAIR_X_DEC(t1) - VAL_PAIR_X_DEC(t2);
-    return (diff > 0.0) ? 1 : ((diff < 0.0) ? -1 : 0);
-}
-
-
-//
 //  Min_Max_Pair: C
 //
 // Note: compares on the basis of decimal value, but preserves the DECIMAL!
@@ -162,7 +145,7 @@ void Min_Max_Pair(REBVAL *out, const REBVAL *a, const REBVAL *b, bool maxed)
 //
 REB_R PD_Pair(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     REBINT n = 0;
@@ -222,7 +205,7 @@ REB_R PD_Pair(
 //
 //  MF_Pair: C
 //
-void MF_Pair(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Pair(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     Mold_Or_Form_Value(mo, VAL_PAIR_X(v), form);
 
@@ -282,7 +265,11 @@ REBTYPE(Pair)
     // mechanical trick vs. the standard DO, because the frame thinks it is
     // already running...and the check for that would be subverted.
 
-    REBVAL *frame = Init_Frame(D_OUT, Context_For_Frame_May_Manage(frame_));
+    REBVAL *frame = Init_Frame(
+        D_OUT,
+        Context_For_Frame_May_Manage(frame_),
+        FRM_LABEL(frame_)
+    );
 
     Move_Value(D_ARG(1), x1);
     if (x2)

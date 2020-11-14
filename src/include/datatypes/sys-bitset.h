@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -40,23 +40,26 @@
 
 #define MAX_BITSET 0x7fffffff
 
-inline static bool BITS_NOT(REBSER *s)
+inline static bool BITS_NOT(const REBSER *s)
   { return MISC(s).negated; }
 
 inline static void INIT_BITS_NOT(REBSER *s, bool negated)
   { MISC(s).negated = negated; }
 
 
-inline static REBBIN *VAL_BITSET(const REBCEL *v) {
+inline static REBBIN *VAL_BITSET(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_BITSET);
     return SER(VAL_NODE(v));
 }
+
+#define VAL_BITSET_ENSURE_MUTABLE(v) \
+    m_cast(REBBIN*, VAL_BITSET(ENSURE_MUTABLE(v)))
 
 inline static REBVAL *Init_Bitset(RELVAL *out, REBBIN *bits) {
     RESET_CELL(out, REB_BITSET, CELL_FLAG_FIRST_IS_NODE);
     ASSERT_SERIES_MANAGED(bits);
     INIT_VAL_NODE(out, bits);
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 

@@ -148,10 +148,24 @@ make-port*: function [
                     ; !!! This code was also broken in R3-Alpha, because the
                     ; captured content in PARSE of a URL! was a URL! and not
                     ; a STRING!, and so the attempt to convert `s1` to TUPLE!
-                    ; would always fail.  Ren-C permits this conversion.
+                    ; would always fail.
 
                     if not empty? trim s1 [
-                        attempt [s1: to tuple! s1]
+                        use [tup] [
+                            ;
+                            ; !!! In R3-Alpha this TO conversion was wrapped
+                            ; in a TRAP as it wasn't expected for non-numeric
+                            ; tuples to work.  But now they do...most of the
+                            ; time (to tuple "localhost" is a WORD! and can't
+                            ; be a TUPLE!)  In the interests of preserving
+                            ; the experiment, use LOAD and test to see if
+                            ; it made a tuple with an integer as last value.
+                            ;
+                            tup: load as text! s1  ; was "textlike" URL!
+                            if all [tuple? tup, integer? last tup] [
+                                s1: tup
+                            ]
+                        ]
                         emit host s1
                     ]
                 )

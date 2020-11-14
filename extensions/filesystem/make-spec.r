@@ -14,14 +14,12 @@ depends: compose [
         'Windows [
             [%filesystem/file-windows.c]
         ]
-
-        default [
-            ; Linux and OS/X stick to POSIX for file I/O for now
-            ; Other options exist, e.g. "aio.h"
-            ; https://fwheel.net/aio.html
-            ;
-            [%filesystem/file-posix.c]
-        ]
+    ] else [
+        ; Linux and OS/X stick to POSIX for file I/O for now
+        ; Other options exist, e.g. "aio.h"
+        ; https://fwheel.net/aio.html
+        ;
+        [%filesystem/file-posix.c]
     ])
 
     (if "1" = get-env "USE_BACKDATED_GLIBC" [

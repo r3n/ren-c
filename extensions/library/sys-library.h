@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2014 Atronix Engineering, Inc.
-// Copyright 2014-2017 Rebol Open Source Contributors
+// Copyright 2014-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -42,7 +42,7 @@ inline static void *LIB_FD(REBLIB *l)
 inline static bool IS_LIB_CLOSED(REBLIB *l)
   { return LINK(l).fd == nullptr; }
 
-inline static REBLIB *VAL_LIBRARY(const REBCEL *v) {
+inline static REBLIB *VAL_LIBRARY(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Library_Type);
     return ARR(VAL_NODE(v));
 }
@@ -50,13 +50,13 @@ inline static REBLIB *VAL_LIBRARY(const REBCEL *v) {
 #define VAL_LIBRARY_META_NODE(v) \
     MISC_META_NODE(VAL_NODE(v))
 
-inline static REBCTX *VAL_LIBRARY_META(const REBCEL *v) {
+inline static REBCTX *VAL_LIBRARY_META(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Library_Type);
     return CTX(VAL_LIBRARY_META_NODE(v));
 }
 
 
-inline static void *VAL_LIBRARY_FD(const REBCEL *v) {
+inline static void *VAL_LIBRARY_FD(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Library_Type);
     return LIB_FD(VAL_LIBRARY(v));
 }

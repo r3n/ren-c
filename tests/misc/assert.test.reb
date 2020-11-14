@@ -7,9 +7,9 @@
     e: trap [assert [1 = 2]]
     e/id = 'assertion-failure
 )(
-    null? e: trap [assert [1 = 1 | 2 = 2]]
+    null? e: trap [assert [1 = 1, 2 = 2]]
 )(
-    e: trap [assert [1 = 1 | 304 = 1020]]
+    e: trap [assert [1 = 1, 304 = 1020]]
     e/id = 'assertion-failure
 )(
     10 = all [
@@ -45,7 +45,7 @@
 )(
     40 = (10 + 30 was 20 + 20)
 )(
-    e: trap [10 + 20 -> was 20 + 20]
+    e: trap [(10 + 20) was 20 + 20]
     e/id = 'assertion-failure
 )
 
@@ -59,3 +59,12 @@
     e: trap [10 + 10 matched text!]
     e/id = 'assertion-failure
 )
+
+; Invisibles
+[
+    (assert [] true)
+    (assert [comment "hi" 1] true)
+    (assert [1 elide 2 + 3] true)
+    (assert [comment "hi" (true)] true)
+    (assert [(true) elide 2 + 3] true)
+]

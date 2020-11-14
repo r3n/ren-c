@@ -57,10 +57,11 @@ opts: [
     ; This can be specified with LIBREBOL_INCLUDE_DIR as an environment
     ; variable, but you can also do it here for convenience.
     ;
-    ;;librebol-path %/home/hostilefork/Projects/ren-c/build/prep/include
+    ;;librebol-path %/home/hostilefork/Projects/ren-c/build/prep/include/
 
     ; This can be specified with CONFIG_TCCDIR as an environment variable,
-    ; but you can also do it here for convenience.
+    ; but you can also do it here for convenience.  Lack of a trailing
+    ; slash is tolerated as that is CONFIG_TCCDIR convention in TCC.
     ;
     ;;runtime-path %/home/hostilefork/Projects/tcc
 ]

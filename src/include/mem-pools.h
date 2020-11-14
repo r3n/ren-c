@@ -7,25 +7,25 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // In R3-Alpha, the memory pool details were not exported to most of the
-// system.  However, Make_Node() takes a pool ID, so things that want to make
+// system.  However, Alloc_Node() takes a pool ID, so things that want to make
 // nodes need to know about SER_POOL.  And in order to take advantage of
 // inlining, the system has to put a lot of things in header files.  Not
 // being able to do so leads to a lot of pushing and popping overhead for
-// parameters to commonly called routines (e.g. Make_Node())
+// parameters to commonly called routines (e.g. Alloc_Node())
 //
 // Hence if there are rules on which file is supposed to be calling which,
 // those should be implemented in %source-analysis.r.
@@ -79,6 +79,7 @@ enum Mem_Pool_Specs {
   #else
     PAR_POOL = SER_POOL,
   #endif
+    FRM_POOL,
     SYSTEM_POOL,
     MAX_POOLS
 };

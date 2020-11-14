@@ -4,7 +4,7 @@ REBOL [
     File: %make-headers.r
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2017 Rebol Open Source Contributors
+        Copyright 2012-2017 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -21,17 +21,18 @@ do %native-emitters.r ; for emit-include-params-macro
 file-base: make object! load %file-base.r
 
 tools-dir: system/options/current-path
-output-dir: system/options/path/prep
-mkdir/deep output-dir/include
+output-dir: make-file [(system/options/path) prep /]
+mkdir/deep make-file [(output-dir) include /]
 
-mkdir/deep output-dir/include
-mkdir/deep output-dir/core
+mkdir/deep make-file [(output-dir) include /]
+mkdir/deep make-file [(output-dir) core /]
 
 change-dir %../src/core/
 
 print "------ Building headers"
 
-e-funcs: make-emitter "Internal API" output-dir/include/tmp-internals.h
+(e-funcs: make-emitter "Internal API"
+    make-file [(output-dir) include/tmp-internals.h])
 
 prototypes: make block! 10000 ; MAP! is buggy in R3-Alpha
 
@@ -119,7 +120,7 @@ process-conditional: function [
 ]
 
 emit-directive: function [return: <void> directive] [
-    process-conditional directive proto-parser/parse.position e-funcs
+    process-conditional directive proto-parser/parse-position e-funcs
 ]
 
 process: function [
@@ -142,7 +143,7 @@ process: function [
 ; more solid mechanism.
 
 
-boot-natives: load output-dir/boot/tmp-natives.r
+boot-natives: load make-file [(output-dir) boot/tmp-natives.r]
 
 e-funcs/emit {
     /*
@@ -164,7 +165,7 @@ e-funcs/emit {
      * system-wide header in order to allow recognizing a given native by
      * identity in the C code, e.g.:
      *
-     *     if (VAL_ACT_DISPATCHER(native) == &N_parse) { ... }
+     *     if (ACT_DISPATCHER(VAL_ACTION(native)) == &N_parse) { ... }
      */
 }
 e-funcs/emit newline
@@ -209,9 +210,9 @@ for-each item file-base/core [
     ]
 
     assert [
-        | %.c = suffix? file
-        | not find/match file "host-"
-        | not find/match file "os-"
+        %.c = suffix? file
+        not find/match file "host-"
+        not find/match file "os-"
     ]
 
     process file
@@ -231,11 +232,11 @@ print [length of prototypes "function prototypes"]
 
 ;-------------------------------------------------------------------------
 
-sys-globals.parser: context [
+sys-globals-parser: context [
 
     emit-directive: _
     emit-identifier: _
-    parse.position: _
+    parse-position: _
     id: _
 
     process: func [return: <void> text] [
@@ -246,7 +247,7 @@ sys-globals.parser: context [
 
         rule: [
             any [
-                parse.position:
+                parse-position:
                 segment
             ]
         ]
@@ -284,27 +285,27 @@ sys-globals.parser: context [
                 ; preprocessor, so things that were #ifdef'd out would not
                 ; make it into the list.
                 ;
-                comment [process-conditional data parse.position e-syms]
+                comment [process-conditional data parse-position e-syms]
             )
         ]
 
         other-segment: [thru newline]
 
-    ] c.lexical/grammar
+    ] c-lexical/grammar
 
 ]
 
 
 the-file: %sys-globals.h
-sys-globals.parser/process read/string %../include/sys-globals.h
+sys-globals-parser/process read/string %../include/sys-globals.h
 
 ;-------------------------------------------------------------------------
 
 e-params: (make-emitter
     "PARAM() and REFINE() Automatic Macros"
-    output-dir/include/tmp-paramlists.h)
+    make-file [(output-dir) include/tmp-paramlists.h])
 
-generic-list: load output-dir/boot/tmp-generics.r
+generic-list: load make-file [(output-dir) boot/tmp-generics.r]
 
 ; Search file for definition.  Will be `generic-name: generic [paramlist]`
 ;
@@ -317,7 +318,7 @@ iterate generic-list [
     ]
 ]
 
-native-list: load output-dir/boot/tmp-natives.r
+native-list: load make-file [(output-dir) boot/tmp-natives.r]
 parse native-list [
     some [
         opt 'export
@@ -341,7 +342,8 @@ e-params/write-emitted
 ;-------------------------------------------------------------------------
 
 e-strings: (make-emitter
-    "REBOL Constants with Global Linkage" output-dir/include/tmp-constants.h)
+    "REBOL Constants with Global Linkage"
+    make-file [(output-dir) include/tmp-constants.h])
 
 e-strings/emit {
     /*

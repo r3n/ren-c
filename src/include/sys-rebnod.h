@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -131,6 +131,9 @@
 // `unsigned char` is used below, as opposed to `uint8_t`, to coherently
 // access the bytes despite being written via a `uintptr_t`, due to the strict
 // aliasing exemption for character types (some say uint8_t should count...)
+//
+// mutable and immutable variations are needed, because sometimes the flags
+// are const (e.g. of a header in a `const REBVAL*`)
 
 #define FIRST_BYTE(flags)       ((const unsigned char*)&(flags))[0]
 #define SECOND_BYTE(flags)      ((const unsigned char*)&(flags))[1]
@@ -341,7 +344,7 @@ union Reb_Header {
     // array in the header.  There's probably a workaround, but for now skip
     // this debugging pun if __TINYC__ is defined.
     //
-  #if !defined(NDEBUG) && !defined(__TINYC__)
+  #if defined(DEBUG_USE_UNION_PUNS) && !defined(__TINYC__)
     char bytes_pun[4];
 
     #ifdef DEBUG_USE_BITFIELD_HEADER_PUNS
@@ -518,11 +521,11 @@ struct Reb_Node {
 
 #ifdef NDEBUG
     #define IS_FREE_NODE(p) \
-        (did (FIRST_BYTE(cast(struct Reb_Node*, (p))->header) \
+        (did (FIRST_BYTE(cast(const struct Reb_Node*, (p))->header) \
             & NODE_BYTEMASK_0x40_FREE))  // byte access defeats strict alias
 #else
-    inline static bool IS_FREE_NODE(void *p) {
-        REBYTE first = FIRST_BYTE(cast(struct Reb_Node*, p)->header);
+    inline static bool IS_FREE_NODE(const void *p) {
+        REBYTE first = FIRST_BYTE(cast(const struct Reb_Node*, p)->header);
 
         if (not (first & NODE_BYTEMASK_0x40_FREE))
             return false;  // byte access defeats strict alias
@@ -536,12 +539,12 @@ struct Reb_Node {
 //=//// MEMORY ALLOCATION AND FREEING MACROS //////////////////////////////=//
 //
 // Rebol's internal memory management is done based on a pooled model, which
-// use Alloc_Mem and Free_Mem instead of calling malloc directly.  (See the
-// comments on those routines for explanations of why this was done--even in
-// an age of modern thread-safe allocators--due to Rebol's ability to exploit
-// extra data in its pool block when a series grows.)
+// use Try_Alloc_Mem() and Free_Mem() instead of calling malloc directly.
+// (Comments on those routines explain why this was done--even in an age of
+// modern thread-safe allocators--due to Rebol's ability to exploit extra
+// data in its pool block when a series grows.)
 //
-// Since Free_Mem requires the caller to pass in the size of the memory being
+// Since Free_Mem() requires callers to pass in the size of the memory being
 // freed, it can be tricky.  These macros are modeled after C++'s new/delete
 // and new[]/delete[], and allocations take either a type or a type and a
 // length.  The size calculation is done automatically, and the result is cast
@@ -552,17 +555,17 @@ struct Reb_Node {
 // FREE or FREE_N lines up with the type of pointer being freed.
 //
 
-#define ALLOC(t) \
-    cast(t *, Alloc_Mem(sizeof(t)))
+#define TRY_ALLOC(t) \
+    cast(t *, Try_Alloc_Mem(sizeof(t)))
 
-#define ALLOC_ZEROFILL(t) \
+#define TRY_ALLOC_ZEROFILL(t) \
     cast(t *, memset(ALLOC(t), '\0', sizeof(t)))
 
-#define ALLOC_N(t,n) \
-    cast(t *, Alloc_Mem(sizeof(t) * (n)))
+#define TRY_ALLOC_N(t,n) \
+    cast(t *, Try_Alloc_Mem(sizeof(t) * (n)))
 
-#define ALLOC_N_ZEROFILL(t,n) \
-    cast(t *, memset(ALLOC_N(t, (n)), '\0', sizeof(t) * (n)))
+#define TRY_ALLOC_N_ZEROFILL(t,n) \
+    cast(t *, memset(TRY_ALLOC_N(t, (n)), '\0', sizeof(t) * (n)))
 
 #ifdef CPLUSPLUS_11
     #define FREE(t,p) \

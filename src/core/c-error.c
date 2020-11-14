@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -44,10 +44,10 @@ void Snap_State_Core(struct Reb_State *s)
     //
     assert(ARR_LEN(BUF_COLLECT) == 0);
 
-    s->guarded_len = SER_LEN(GC_Guarded);
+    s->guarded_len = SER_USED(GC_Guarded);
     s->frame = FS_TOP;
 
-    s->manuals_len = SER_LEN(GC_Manuals);
+    s->manuals_len = SER_USED(GC_Manuals);
     s->mold_buf_len = STR_LEN(STR(MOLD_BUF));
     s->mold_buf_size = STR_SIZE(STR(MOLD_BUF));
     s->mold_loop_tail = ARR_LEN(TG_Mold_Stack);
@@ -84,15 +84,15 @@ void Assert_State_Balanced_Debug(
 
     assert(ARR_LEN(BUF_COLLECT) == 0);
 
-    if (s->guarded_len != SER_LEN(GC_Guarded)) {
+    if (s->guarded_len != SER_USED(GC_Guarded)) {
         printf(
             "PUSH_GC_GUARD()x%d without DROP_GC_GUARD()\n",
-            cast(int, SER_LEN(GC_Guarded) - s->guarded_len)
+            cast(int, SER_USED(GC_Guarded) - s->guarded_len)
         );
         REBNOD *guarded = *SER_AT(
             REBNOD*,
             GC_Guarded,
-            SER_LEN(GC_Guarded) - 1
+            SER_USED(GC_Guarded) - 1
         );
         panic_at (guarded, file, line);
     }
@@ -104,7 +104,7 @@ void Assert_State_Balanced_Debug(
     // this in general for things that may not need "series" overhead,
     // e.g. a contiguous pointer stack.
     //
-    if (s->manuals_len > SER_LEN(GC_Manuals)) {
+    if (s->manuals_len > SER_USED(GC_Manuals)) {
         //
         // Note: Should this ever actually happen, panic() on the series won't
         // do any real good in helping debug it.  You'll probably need
@@ -113,15 +113,15 @@ void Assert_State_Balanced_Debug(
         //
         panic_at ("manual series freed outside checkpoint", file, line);
     }
-    else if (s->manuals_len < SER_LEN(GC_Manuals)) {
+    else if (s->manuals_len < SER_USED(GC_Manuals)) {
         printf(
             "Make_Series()x%d w/o Free_Unmanaged_Series or Manage_Series\n",
-            cast(int, SER_LEN(GC_Manuals) - s->manuals_len)
+            cast(int, SER_USED(GC_Manuals) - s->manuals_len)
         );
         REBSER *manual = *(SER_AT(
             REBSER*,
             GC_Manuals,
-            SER_LEN(GC_Manuals) - 1
+            SER_USED(GC_Manuals) - 1
         ));
         panic_at (manual, file, line);
     }
@@ -176,11 +176,11 @@ void Trapped_Helper(struct Reb_State *s)
     // any arglist series in call frames that have been wiped off the stack.
     // (Closure series will be managed.)
     //
-    assert(SER_LEN(GC_Manuals) >= s->manuals_len);
-    while (SER_LEN(GC_Manuals) != s->manuals_len) {
+    assert(SER_USED(GC_Manuals) >= s->manuals_len);
+    while (SER_USED(GC_Manuals) != s->manuals_len) {
         // Freeing the series will update the tail...
         Free_Unmanaged_Series(
-            *SER_AT(REBSER*, GC_Manuals, SER_LEN(GC_Manuals) - 1)
+            *SER_AT(REBSER*, GC_Manuals, SER_USED(GC_Manuals) - 1)
         );
     }
 
@@ -202,7 +202,7 @@ void Trapped_Helper(struct Reb_State *s)
 
     Eval_Sigmask = s->saved_sigmask;
 
-    Saved_State = s->last_state;
+    TG_Jump_List = s->last_jump;
 }
 
 
@@ -317,14 +317,20 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     // There should be a PUSH_TRAP of some kind in effect if a `fail` can
     // ever be run.
     //
-    if (Saved_State == NULL)
+    if (TG_Jump_List == nullptr)
         panic (error);
 
     // If the error doesn't have a where/near set, set it from stack
     //
-    ERROR_VARS *vars = ERR_VARS(error);
-    if (IS_NULLED_OR_BLANK(&vars->where))
-        Set_Location_Of_Error(error, FS_TOP);
+    // !!! Do not do this for out off memory errors, as it allocates memory.
+    // If this were to be done there would have to be a preallocated array
+    // to use for it.
+    //
+    if (error != Error_No_Memory(1020)) {  // static global, review
+        ERROR_VARS *vars = ERR_VARS(error);
+        if (IS_NULLED_OR_BLANK(&vars->where))
+            Set_Location_Of_Error(error, FS_TOP);
+    }
 
     // The information for the Rebol call frames generally is held in stack
     // variables, so the data will go bad in the longjmp.  We have to free
@@ -334,12 +340,10 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     // the way R3-Alpha handles stack overflows, and alternative plans.)
     //
     REBFRM *f = FS_TOP;
-    while (f != Saved_State->frame) {
+    while (f != TG_Jump_List->frame) {
         if (Is_Action_Frame(f)) {
             assert(f->varlist); // action must be running
-            REBARR *stub = f->varlist; // will be stubbed, info bits reset
             Drop_Action(f);
-            SET_SERIES_FLAG(stub, VARLIST_FRAME_FAILED); // API leaks o.k.
         }
 
         REBFRM *prior = f->prior;
@@ -349,7 +353,7 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
 
     TG_Top_Frame = f; // TG_Top_Frame is writable FS_TOP
 
-    Saved_State->error = error;
+    TG_Jump_List->error = error;
 
     // If a throw was being processed up the stack when the error was raised,
     // then it had the thrown argument set.  Trash it in debug builds.  (The
@@ -359,7 +363,7 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     SET_END(&TG_Thrown_Arg);
   #endif
 
-    LONG_JUMP(Saved_State->cpu_state, 1);
+    LONG_JUMP(TG_Jump_List->cpu_state, 1);
 }
 
 
@@ -403,7 +407,7 @@ REBLEN Stack_Depth(void)
 //
 const REBVAL *Find_Error_For_Sym(enum Reb_Symbol id_sym)
 {
-    REBSTR *id_canon = Canon(id_sym);
+    const REBSTR *id_canon = Canon(id_sym);
 
     REBCTX *categories = VAL_CONTEXT(Get_System(SYS_CATALOG, CAT_ERRORS));
     assert(CTX_KEY_SYM(categories, 1) == SYM_SELF);
@@ -461,8 +465,6 @@ void Set_Location_Of_Error(
         if (not Is_Action_Frame(f))
             continue;
         if (Is_Action_Frame_Fulfilling(f))
-            continue;
-        if (f->original == PG_Dummy_Action)
             continue;
 
         Get_Frame_Label_Or_Blank(DS_PUSH(), f);
@@ -545,7 +547,7 @@ REB_R MAKE_Error(
     //
     REBCTX *root_error = VAL_CONTEXT(Get_System(SYS_STANDARD, STD_ERROR));
 
-    REBCTX *error;
+    REBCTX *e;
     ERROR_VARS *vars; // C struct mirroring fixed portion of error fields
 
     if (IS_ERROR(arg) or IS_OBJECT(arg)) {
@@ -555,8 +557,8 @@ REB_R MAKE_Error(
         // be inconsistent with a Rebol system error, an error will be
         // raised later in the routine.
 
-        error = Merge_Contexts_Selfish_Managed(root_error, VAL_CONTEXT(arg));
-        vars = ERR_VARS(error);
+        e = Merge_Contexts_Selfish_Managed(root_error, VAL_CONTEXT(arg));
+        vars = ERR_VARS(e);
     }
     else if (IS_BLOCK(arg)) {
         // If a block, then effectively MAKE OBJECT! on it.  Afterward,
@@ -565,7 +567,7 @@ REB_R MAKE_Error(
         // Bind and do an evaluation step (as with MAKE OBJECT! with A_MAKE
         // code in REBTYPE(Context) and code in REBNATIVE(construct))
 
-        error = Make_Selfish_Context_Detect_Managed(
+        e = Make_Selfish_Context_Detect_Managed(
             REB_ERROR, // type
             VAL_ARRAY_AT(arg), // values to scan for toplevel set-words
             root_error // parent
@@ -574,10 +576,10 @@ REB_R MAKE_Error(
         // Protect the error from GC by putting into out, which must be
         // passed in as a GC-protecting value slot.
         //
-        Init_Error(out, error);
+        Init_Error(out, e);
 
-        Rebind_Context_Deep(root_error, error, NULL); // NULL=>no more binds
-        Bind_Values_Deep(VAL_ARRAY_AT(arg), error);
+        Rebind_Context_Deep(root_error, e, nullptr);  // NULL=>no more binds
+        Bind_Values_Deep(VAL_ARRAY_AT_MUTABLE_HACK(arg), CTX_ARCHETYPE(e));
 
         DECLARE_LOCAL (evaluated);
         if (Do_Any_Array_At_Throws(evaluated, arg, SPECIFIED)) {
@@ -585,7 +587,7 @@ REB_R MAKE_Error(
             return R_THROWN;
         }
 
-        vars = ERR_VARS(error);
+        vars = ERR_VARS(e);
     }
     else if (IS_TEXT(arg)) {
         //
@@ -598,9 +600,9 @@ REB_R MAKE_Error(
         //
         // Minus the message, this is the default state of root_error.
 
-        error = Copy_Context_Shallow_Managed(root_error);
+        e = Copy_Context_Shallow_Managed(root_error);
 
-        vars = ERR_VARS(error);
+        vars = ERR_VARS(e);
         assert(IS_BLANK(&vars->type));
         assert(IS_BLANK(&vars->id));
 
@@ -626,8 +628,10 @@ REB_R MAKE_Error(
         REBCTX *categories = VAL_CONTEXT(Get_System(SYS_CATALOG, CAT_ERRORS));
 
         // Find correct category for TYPE: (if any)
-        REBVAL *category
-            = Select_Canon_In_Context(categories, VAL_WORD_CANON(&vars->type));
+        REBVAL *category = Select_Canon_In_Context(
+            CTX_ARCHETYPE(categories),
+            VAL_WORD_CANON(&vars->type)
+        );
 
         if (category) {
             assert(IS_OBJECT(category));
@@ -636,7 +640,8 @@ REB_R MAKE_Error(
             // Find correct message for ID: (if any)
 
             REBVAL *message = Select_Canon_In_Context(
-                VAL_CONTEXT(category), VAL_WORD_CANON(&vars->id)
+                category,
+                VAL_WORD_CANON(&vars->id)
             );
 
             if (message) {
@@ -660,7 +665,7 @@ REB_R MAKE_Error(
                 //
                 //     make error! [type: 'script id: 'set-self]
 
-                fail (Error_Invalid_Error_Raw(CTX_ARCHETYPE(error)));
+                fail (Error_Invalid_Error_Raw(CTX_ARCHETYPE(e)));
             }
         }
         else {
@@ -686,11 +691,11 @@ REB_R MAKE_Error(
                 or IS_BLANK(&vars->message)
             )
         )){
-            fail (Error_Invalid_Error_Raw(CTX_ARCHETYPE(error)));
+            fail (Error_Invalid_Error_Raw(CTX_ARCHETYPE(e)));
         }
     }
 
-    return Init_Error(out, error);
+    return Init_Error(out, e);
 }
 
 
@@ -765,7 +770,7 @@ REBCTX *Make_Error_Managed_Core(
 
     REBLEN expected_args = 0;
     if (IS_BLOCK(message)) { // GET-WORD!s in template should match va_list
-        RELVAL *temp = VAL_ARRAY_HEAD(message);
+        const RELVAL *temp = ARR_HEAD(VAL_ARRAY(message));
         for (; NOT_END(temp); ++temp) {
             if (IS_GET_WORD(temp))
                 ++expected_args;
@@ -807,7 +812,7 @@ REBCTX *Make_Error_Managed_Core(
         REBVAL *value = CTX_VAR(error, root_len) + 1;
 
     #ifdef NDEBUG
-        const RELVAL *temp = VAL_ARRAY_HEAD(message);
+        const RELVAL *temp = ARR_HEAD(VAL_ARRAY(message));
     #else
         // Will get here even for a parameterless string due to throwing in
         // the extra "arguments" of the __FILE__ and __LINE__
@@ -815,7 +820,7 @@ REBCTX *Make_Error_Managed_Core(
         const RELVAL *temp =
             IS_TEXT(message)
                 ? cast(const RELVAL*, END_NODE) // gcc/g++ 2.95 needs (bug)
-                : VAL_ARRAY_HEAD(message);
+                : ARR_HEAD(VAL_ARRAY(message));
     #endif
 
         for (; NOT_END(temp); ++temp) {
@@ -869,8 +874,8 @@ REBCTX *Make_Error_Managed_Core(
         assert(IS_END(value)); // ...same
     }
 
-    mutable_KIND_BYTE(CTX_ARCHETYPE(error)) = REB_ERROR;
-    mutable_MIRROR_BYTE(CTX_ARCHETYPE(error)) = REB_ERROR;
+    mutable_KIND3Q_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
+    mutable_HEART_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
 
     // C struct mirroring fixed portion of error fields
     //
@@ -957,15 +962,19 @@ REBCTX *Error_Need_Non_End_Core(const RELVAL *target, REBSPC *specifier) {
 //
 //  Error_Need_Non_Void_Core: C
 //
-REBCTX *Error_Need_Non_Void_Core(const RELVAL *target, REBSPC *specifier) {
-    //
+REBCTX *Error_Need_Non_Void_Core(
+    const RELVAL *target,
+    REBSPC *specifier,
+    const RELVAL *voided
+){
     // SET calls this, and doesn't work on just SET-WORD! and SET-PATH!
     //
-    assert(ANY_WORD(target) or ANY_PATH(target) or ANY_BLOCK(target));
+    assert(ANY_WORD(target) or ANY_SEQUENCE(target) or ANY_BLOCK(target));
+    assert(IS_VOID(voided));
 
     DECLARE_LOCAL (specific);
     Derelativize(specific, target, specifier);
-    return Error_Need_Non_Void_Raw(specific);
+    return Error_Need_Non_Void_Raw(specific, SPECIFIC(voided));
 }
 
 
@@ -990,7 +999,7 @@ REBCTX *Error_Need_Non_Null_Core(const RELVAL *target, REBSPC *specifier) {
 // !!! This error is a placeholder for addressing the issue of using a value
 // to set a refinement that's not a good fit for the refinement type, e.g.
 //
-//     specialize 'append [only: 10]
+//     specialize :append [only: 10]
 //
 // It seems that LOGIC! should be usable, and for purposes of chaining a
 // refinement-style PATH! should be usable too (for using one refinement to
@@ -1041,19 +1050,22 @@ REBCTX *Error_No_Arg(REBFRM *f, const RELVAL *param)
 //
 //  Error_No_Memory: C
 //
+// !!! Historically, Rebol had a stack overflow error that didn't want to
+// create new C function stack levels.  So the error was preallocated.  The
+// same needs to apply to out of memory errors--they shouldn't be allocating
+// a new error object.
+//
 REBCTX *Error_No_Memory(REBLEN bytes)
 {
-    DECLARE_LOCAL (bytes_value);
-
-    Init_Integer(bytes_value, bytes);
-    return Error_No_Memory_Raw(bytes_value);
+    UNUSED(bytes);  // !!! Revisit how this information could be tunneled
+    return VAL_CONTEXT(Root_No_Memory_Error);
 }
 
 
 //
 //  Error_No_Relative_Core: C
 //
-REBCTX *Error_No_Relative_Core(const REBCEL *any_word)
+REBCTX *Error_No_Relative_Core(REBCEL(const*) any_word)
 {
     DECLARE_LOCAL (unbound);
     Init_Any_Word(
@@ -1077,7 +1089,7 @@ REBCTX *Error_Not_Varargs(
     assert(Is_Param_Variadic(param));
     assert(kind != REB_VARARGS);
 
-    // Since the "types accepted" are a lie (an [integer! <...>] takes
+    // Since the "types accepted" are a lie (an [integer! <variadic>] takes
     // VARARGS! when fulfilled in a frame directly, not INTEGER!) then
     // an "honest" parameter has to be made to give the error.
     //
@@ -1211,6 +1223,11 @@ REBCTX *Error_No_Catch_For_Throw(REBVAL *thrown)
 //
 REBCTX *Error_Invalid_Type(enum Reb_Kind kind)
 {
+    if (kind == REB_NULL) {
+        DECLARE_LOCAL (null_word);
+        Init_Word(null_word, Canon(SYM_NULL));
+        fail (Error_Invalid_Type_Raw(null_word));
+    }
     return Error_Invalid_Type_Raw(Datatype_From_Kind(kind));
 }
 
@@ -1289,7 +1306,7 @@ REBCTX *Error_Arg_Type(
         // it's confusing to say that the original function didn't take that
         // type--it was on its interface.  A different message is needed.
         //
-        if (actual == REB_NULLED)
+        if (actual == REB_NULL)
             return Error_Phase_No_Arg_Raw(label, param_word);
 
         return Error_Phase_Bad_Arg_Type_Raw(
@@ -1299,7 +1316,7 @@ REBCTX *Error_Arg_Type(
         );
     }
 
-    if (actual == REB_NULLED)  // no Datatype_From_Kind()
+    if (actual == REB_NULL)  // no Datatype_From_Kind()
         return Error_Arg_Required_Raw(label, param_word);
 
     return Error_Expect_Arg_Raw(
@@ -1317,13 +1334,24 @@ REBCTX *Error_Bad_Return_Type(REBFRM *f, enum Reb_Kind kind) {
     DECLARE_LOCAL (label);
     Get_Frame_Label_Or_Blank(label, f);
 
-    if (kind == REB_NULLED)
+    if (kind == REB_NULL)
         return Error_Needs_Return_Opt_Raw(label);
 
     if (kind == REB_VOID)
         return Error_Needs_Return_Value_Raw(label);
 
     return Error_Bad_Return_Type_Raw(label, Datatype_From_Kind(kind));
+}
+
+
+//
+//  Error_Bad_Invisible: C
+//
+REBCTX *Error_Bad_Invisible(REBFRM *f) {
+    DECLARE_LOCAL (label);
+    Get_Frame_Label_Or_Blank(label, f);
+
+    return Error_Bad_Invisible_Raw(label);
 }
 
 
@@ -1400,7 +1428,7 @@ REBCTX *Startup_Errors(const REBVAL *boot_errors)
     assert(VAL_INDEX(boot_errors) == 0);
     REBCTX *catalog = Construct_Context_Managed(
         REB_OBJECT,
-        VAL_ARRAY_AT(boot_errors),
+        VAL_ARRAY_KNOWN_MUTABLE_AT(boot_errors),  // modifies bindings
         VAL_SPECIFIER(boot_errors),
         NULL
     );
@@ -1412,7 +1440,7 @@ REBCTX *Startup_Errors(const REBVAL *boot_errors)
     for (val = CTX_VAR(catalog, SELFISH(1)); NOT_END(val); val++) {
         REBCTX *error = Construct_Context_Managed(
             REB_OBJECT,
-            VAL_ARRAY_HEAD(val),
+            ARR_HEAD(VAL_ARRAY_KNOWN_MUTABLE(val)),  // modifies bindings
             SPECIFIED, // source array not in a function body
             NULL
         );
@@ -1432,6 +1460,20 @@ void Startup_Stackoverflow(void)
         Alloc_Value(),
         Error_Stack_Overflow_Raw()
     );
+
+    // !!! The original "No memory" error let you supply the size of the
+    // request that could not be fulfilled.  But if you are creating a new
+    // out of memory error with that identity, you need to do an allocation...
+    // and out of memory errors can't work this way.  It may be that the
+    // error is generated after the stack is unwound and memory freed up.
+    //
+    DECLARE_LOCAL (temp);
+    Init_Integer(temp, 1020);
+
+    Root_No_Memory_Error = Init_Error(
+        Alloc_Value(),
+        Error_No_Memory_Raw(temp)
+    );
 }
 
 
@@ -1441,7 +1483,10 @@ void Startup_Stackoverflow(void)
 void Shutdown_Stackoverflow(void)
 {
     rebRelease(Root_Stackoverflow_Error);
-    Root_Stackoverflow_Error = NULL;
+    Root_Stackoverflow_Error = nullptr;
+
+    rebRelease(Root_No_Memory_Error);
+    Root_No_Memory_Error = nullptr;
 }
 
 
@@ -1462,7 +1507,9 @@ static void Mold_Value_Limit(REB_MOLD *mo, RELVAL *v, REBLEN limit)
     REBLEN end_len = STR_LEN(str);
 
     if (end_len - start_len > limit) {
-        REBCHR(*) at = STR_HEAD(str) + start_size;
+        REBCHR(const*) at = cast(REBCHR(const*),
+            cast(const REBYTE*, STR_HEAD(str)) + start_size
+        );
         REBLEN n = 0;
         for (; n < limit; ++n)
             at = NEXT_STR(at);
@@ -1478,7 +1525,7 @@ static void Mold_Value_Limit(REB_MOLD *mo, RELVAL *v, REBLEN limit)
 //
 //  MF_Error: C
 //
-void MF_Error(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Error(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     // Protect against recursion. !!!!
     //
@@ -1534,7 +1581,7 @@ void MF_Error(REB_MOLD *mo, const REBCEL *v, bool form)
             // error, because otherwise it obscures the LOAD call where the
             // scanner was invoked.  Review.
             //
-            Append_String(mo->series, nearest, VAL_LEN_HEAD(nearest));
+            Append_String(mo->series, nearest);
         }
         else if (ANY_ARRAY(nearest) or ANY_PATH(nearest))
             Mold_Value_Limit(mo, nearest, 60);

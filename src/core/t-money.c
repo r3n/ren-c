@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -58,21 +58,18 @@ const REBYTE *Scan_Money(
 //
 //  CT_Money: C
 //
-REBINT CT_Money(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Money(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
+    UNUSED(strict);
+
     bool e = deci_is_equal(VAL_MONEY_AMOUNT(a), VAL_MONEY_AMOUNT(b));
+    if (e)
+        return 0;
 
-    if (mode < 0) {
-        bool g = deci_is_lesser_or_equal(
-            VAL_MONEY_AMOUNT(b), VAL_MONEY_AMOUNT(a)
-        );
-        if (mode == -1)
-            e = (e or g);
-        else
-            e = (g and not e);
-    }
-
-    return e ? 1 : 0;
+    bool g = deci_is_lesser_or_equal(
+        VAL_MONEY_AMOUNT(b), VAL_MONEY_AMOUNT(a)
+    );
+    return g ? 1 : -1;
 }
 
 
@@ -138,7 +135,7 @@ REB_R TO_Money(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 //  MF_Money: C
 //
-void MF_Money(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Money(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -163,14 +160,15 @@ void Bin_To_Money_May_Fail(REBVAL *result, const REBVAL *val)
     if (not IS_BINARY(val))
         fail (val);
 
-    REBLEN len = VAL_LEN_AT(val);
-    if (len > 12)
-        len = 12;
+    REBSIZ size;
+    const REBYTE *at = VAL_BINARY_SIZE_AT(&size, val);
+    if (size > 12)
+        size = 12;
 
     REBYTE buf[MAX_HEX_LEN+4] = {0}; // binary to convert
-    memcpy(buf, VAL_BIN_AT(val), len);
-    memcpy(buf + 12 - len, buf, len); // shift to right side
-    memset(buf, 0, 12 - len);
+    memcpy(buf, at, size);
+    memcpy(buf + 12 - size, buf, size); // shift to right side
+    memset(buf, 0, 12 - size);
     Init_Money(result, binary_to_deci(buf));
 }
 

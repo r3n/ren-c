@@ -14,19 +14,24 @@ REBOL [
 verify: function [
     {Verify all the conditions in the passed-in block are conditionally true}
 
-    return: []
+    return: <elide>
     conditions [block!]
         {Conditions to check}
     <local> result
 ][
-    while [pos: evaluate @result conditions] [
-        if (void? :result) or [not :result] [
-            ;
-            ; including bars in the failure report looks messy, skip them
-            ;
-            while ['| = first conditions] [conditions: my next]
+    while [pos: evaluate/result conditions 'result] [
+        if quoted? pos [  ; invisible that vaporized
+            conditions: pos
+            continue
+        ]
 
-            fail 'conditions make error! [
+        any [void? :result, not :result] then [
+            ;
+            ; including commas in the failure report looks messy, skip them
+            ;
+            while [', = first conditions] [conditions: my next]
+
+            fail @conditions make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [
@@ -59,7 +64,7 @@ verify: function [
 ; copies of the function made at layer boundaries.
 ;
 native-assert: copy :assert
-hijack 'assert :verify
+hijack :assert :verify
 
 
 delta-time: function [
@@ -155,7 +160,7 @@ net-trace: function [
     val [logic!]
 ][
     either val [
-        hijack 'net-log func [txt /C /S][
+        hijack :net-log func [txt /C /S][
             print [
                 (if c ["C:"]) (if s ["S:"])
                     either block? txt [spaced txt] [txt]
@@ -164,6 +169,6 @@ net-trace: function [
         ]
         print "Net-trace is now on"
     ][
-        hijack 'net-log func [txt /C /S][txt]
+        hijack :net-log func [txt /C /S][txt]
     ]
 ]

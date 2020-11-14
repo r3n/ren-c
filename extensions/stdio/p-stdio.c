@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2020 Rebol Open Source Contributors
+// Copyright 2012-2020 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -120,35 +120,34 @@ REBVAL *Read_Line(STD_TERM *t)
             Term_Insert(t, e);
         }
         else if (rebDidQ("word?", e, rebEND)) {  // recognized "virtual key"
-            uint32_t ch = rebUnboxChar(
-                "to char! switch", rebQ(e), "[",
-                    "'escape ['E]",
+            uint32_t c = rebUnboxChar(
+                "switch", rebQ(e), "[",
+                    "'escape [#E]",
 
-                    "'up ['U]",
-                    "'down ['D]",
+                    "'up [#U]",
+                    "'down [#D]",
                     "'ctrl-b",  // Backward One Character (bash)
-                        "'left ['L]",
+                        "'left [#L]",
                     "'ctrl-f",  // Forward One Character (bash)
-                        "'right ['R]",
+                        "'right [#R]",
 
-                    "'backspace ['b]",
+                    "'backspace [#b]",
                     "'ctrl-d",  // Delete Character Under Cursor (bash)
-                        "'delete ['d]",
+                        "'delete [#d]",
 
-                    "'tab ['t]",  // completion logic (bash)
+                    "'tab [#t]",  // completion logic (bash)
 
                     "'ctrl-a",  // Beginning of Line (bash)
-                        "'home ['h]",
+                        "'home [#h]",
                     "'ctrl-e",  // CTRL-E, end of Line (bash)
-                        "'end ['e]",
+                        "'end [#e]",
 
-                    "'clear ['c]",
+                    "'clear [#c]",
 
-                    "default [0]",
-                "]",
+                "] else [#]",  // unboxes as '\0'
             rebEND);
 
-            switch (ch) {
+            switch (c) {
               case 0:  // Ignored (e.g. unknown Ctrl-XXX)
                 break;
 

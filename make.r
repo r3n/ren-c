@@ -5,7 +5,7 @@ REBOL [
         Rebol 3 Language Interpreter and Run-time Environment
         "Ren-C" branch @ https://github.com/metaeducation/ren-c
 
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     Description: {
@@ -13,9 +13,10 @@ REBOL [
     }
 ]
 
-do %tools/common.r  ; sets up `repo` object
+do %tools/common.r  ; Note: sets up `repo-dir`
 do %tools/systems.r
-file-base: make object! load %tools/file-base.r
+
+file-base: make object! load make-file [(repo-dir) tools/file-base.r]
 
 ; See notes on %rebmake.r for why it is not a module at this time, due to the
 ; need to have it inherit the shim behaviors of IF, CASE, FILE-TO-LOCAL, etc.
@@ -30,36 +31,38 @@ else [
 === GLOBALS ===
 
 ; When you run a Rebol script, the `current-path` is the directory where the
-; script is.  We assume that the Rebol source enlistment's root directory is
-; where %make.r is found.
+; script is.  %make.r lives in `repo-dir`
 ;
-repo-dir: system/options/current-path
+assert [what-dir = repo-dir]
 
 ; However, we assume the output directory where build products will be put
-; is wherever the path is that the shell was in when %make.r was invoked.
+; is wherever the path is that the shell was in when %make.r was *invoked*.
 ; (unless it's run in the same directory as %make.r--then default to %build/)
 ;
-output-dir: system/options/path
-if output-dir = repo-dir [
+if repo-dir = system/options/path [
     launched-from-root: true
-    output-dir: join repo-dir %build/
+    output-dir: make-file [(repo-dir) build /]
     make-dir output-dir
 ] else [
+    output-dir: system/options/path  ; out-of-source build
     launched-from-root: false
 ]
-change-dir output-dir
 
-tools-dir: repo-dir/tools
-src-dir: join repo-dir %src/
+change-dir output-dir  ; Change current directory to where we're writing data
 
-; We relativize directories to the output directory, where the build process
+
+; We relativize `repo-dir` to the output directory, where the build process
 ; is being run.  Using relative paths helps gloss over the Windows and Linux
 ; differences on file paths.
 ;
-src-dir: relative-to-path src-dir output-dir
 repo-dir: relative-to-path repo-dir output-dir
 
-user-config: make object! load repo-dir/configs/default-config.r
+tools-dir: make-file [(repo-dir) tools /]
+src-dir: make-file [(repo-dir) src /]
+
+; Start out with a default configuration (may be overridden)
+;
+user-config: make object! load make-file [(repo-dir) configs/default-config.r]
 
 === PROCESS ARGS ===
 
@@ -119,10 +122,9 @@ for-each [name value] options [
                 ]
             ]
         ]
-        default [
-            set in user-config (to-word replace/all to text! name #"_" #"-")
-                attempt [load value] else [value]
-        ]
+    ] else [
+        set in user-config (to-word replace/all to text! name #"_" #"-")
+            attempt [load value] else [value]
     ]
 ]
 
@@ -145,6 +147,8 @@ to-obj-path: func [
 ]
 
 gen-obj: func [
+    return: "Rebmake specification object for OBJ"
+        [object!]
     s
     /dir "directory" [any-string!]
     /D "definitions" [block!]
@@ -575,7 +579,7 @@ gen-obj: func [
     ;
     if block? s [
         for-each flag next s [
-            append flags opt switch flag [
+            append flags opt (switch flag [  ; weird bootstrap ELSE needs ()
                 <no-uninitialized> [
                     [
                         <gnu:-Wno-uninitialized>
@@ -631,11 +635,9 @@ gen-obj: func [
                     standard: 'c
                     _
                 ]
-
-                default [
-                    ensure [text! tag!] flag
-                ]
-            ]
+            ] else [
+                try ensure [text! tag!] flag
+            ])
         ]
         s: s/1
     ]
@@ -647,8 +649,10 @@ gen-obj: func [
         source: to-file case [
             dir [join dir s]
             main [s]
-            default [join src-dir s]
+        ] else [
+            join src-dir s
         ]
+
         output: to-obj-path to text! ;\
             either main [
                 join %main/ (last ensure path! s)
@@ -721,13 +725,13 @@ parse-ext-build-spec: function [
 
 ; Discover extensions:
 use [extension-dir entry][
-    extension-dir: repo-dir/extensions/%
+    extension-dir: make-file [(repo-dir) extensions /]
     for-each entry read extension-dir [
         all [
             dir? entry
-            find read rejoin [extension-dir entry] %make-spec.r
+            find read make-file [(extension-dir) (entry)] %make-spec.r
         ] then [
-            spec: load rejoin [extension-dir entry/make-spec.r]
+            spec: load make-file [(extension-dir) (entry) make-spec.r]
             parsed: parse-ext-build-spec spec
             append available-extensions parsed
         ]
@@ -799,11 +803,11 @@ targets: [
     'vs2019
     'visual-studio [
         x86: try if system-config/os-name = 'Windows-x86 ['x86]
-        rebmake/visual-studio/generate/(x86) %. solution
+        rebmake/visual-studio/generate/(x86) output-dir solution
     ]
     'vs2015 [
         x86: try if system-config/os-name = 'Windows-x86 ['x86]
-        rebmake/vs2015/generate/(x86) %. solution
+        rebmake/vs2015/generate/(x86) output-dir solution
     ]
     'vs2017 [
         fail [
@@ -816,7 +820,7 @@ targets: [
 target-names: make block! 16
 for-each x targets [
     if lit-word? x [
-        append target-names to word! x
+        append target-names dequote x
         append target-names '|
     ] else [
         take/last target-names
@@ -862,7 +866,7 @@ MORE HELP:^/
 FILES IN %make/configs/ SUBFOLDER:^/
     }
     indent/space form sort map-each x ;\
-        load repo-dir/configs/%
+        load make-file [(repo-dir) configs /]
         [to-text x]
     newline ]
 
@@ -932,7 +936,8 @@ help: function [topic [text! blank!]] [
         msg: select help-topics topic [
             print msg
         ]
-        default [print help-topics/usage]
+    ] else [
+        print help-topics/usage
     ]
 ]
 
@@ -1031,10 +1036,16 @@ switch rebmake/default-compiler/name [
     fail ["Unrecognized compiler (gcc, clang or cl):" cc]
 ]
 
-all [set? 'cc-exec | cc-exec] then [
+all [
+    set? 'cc-exec
+    cc-exec
+] then [
     set-exec-path rebmake/default-compiler cc-exec
 ]
-all [set? 'linker-exec | linker-exec] then [
+all [
+    set? 'linker-exec
+    linker-exec
+] then [
     set-exec-path rebmake/default-linker linker-exec
 ]
 
@@ -1045,7 +1056,7 @@ app-config: make object! [
     debug: off
     optimization: 2
     definitions: copy []
-    includes: reduce [src-dir/include %prep/include]
+    includes: reduce [make-file [(src-dir) include /] %prep/include/]
     searches: make block! 8
 ]
 
@@ -1068,6 +1079,7 @@ switch user-config/debug [
     ]
     'symbols [ ; No asserts, just symbols.
         app-config/debug: on
+        cfg-symbols: true
         append app-config/definitions ["NDEBUG"]
     ]
     'normal [
@@ -1128,6 +1140,7 @@ switch user-config/debug [
             ;
             "DEBUG_STDIO_OK"
             "DEBUG_HAS_PROBE"
+            "DEBUG_USE_UNION_PUNS"
             "INCLUDE_C_DEBUG_BREAK_NATIVE"
 
             ; Adds CALLGRIND, see REBNATIVE(callgrind) for implementation
@@ -1261,7 +1274,7 @@ libr3-core: make rebmake/object-library-class [
     optimization: app-config/optimization
     debug: app-config/debug
     depends: map-each w file-base/core [
-        gen-obj/dir w src-dir/core/%
+        gen-obj/dir w make-file [(src-dir) core /]
     ]
     append depends map-each w file-base/generated [
         gen-obj/dir w "prep/core/"
@@ -1276,9 +1289,11 @@ main: make libr3-core [
     cflags: copy app-config/cflags  ; generator may modify
 
     depends: reduce [
-        either user-config/main
-        [gen-obj/main user-config/main]
-        [gen-obj/dir file-base/main src-dir/main/%]
+        either user-config/main [
+            gen-obj/main user-config/main
+        ][
+            gen-obj/dir file-base/main make-file [(src-dir) main /]
+        ]
     ]
 ]
 
@@ -1420,17 +1435,15 @@ process-module: func [
         depends: map-each s (append reduce [mod/source] opt mod/depends) [
             case [
                 match [file! block!] s [
-                    gen-obj/dir s repo-dir/extensions/%
+                    gen-obj/dir s make-file [(repo-dir) extensions /]
                 ]
                 (object? s) and [find [#object-library #object-file] s/class] [
                     s
                     ; #object-library has already been taken care of above
                     ; if s/class = #object-library [s]
                 ]
-                default [
-                    dump s
-                    fail [type of s "can't be a dependency of a module"]
-                ]
+                (elide dump s)
+                fail [type of s "can't be a dependency of a module"]
             ]
         ]
         libraries: try all [
@@ -1447,12 +1460,7 @@ process-module: func [
                     ][
                         lib
                     ]
-                    default [
-                        fail [
-                            "unrecognized module library" lib
-                            "in module" mod
-                        ]
-                    ]
+                    fail ["unrecognized library" lib "in module" mod]
                 ]
             ]
         ]
@@ -1478,7 +1486,10 @@ for-each ext builtin-extensions [
         not empty? ext/depends
     ] then [
         append ext-objs map-each s ext/depends [
-            all [object? s | s/class = #object-library] then [s]
+            all [
+                object? s
+                s/class = #object-library
+            ] then [s]
         ]
     ]
 
@@ -1564,7 +1575,7 @@ vars: reduce [
     ]
     make rebmake/var-class [
         name: {T}
-        value: src-dir/tools
+        value: make-file [(src-dir) tools /]
     ]
     make rebmake/var-class [
         name: {GIT_COMMIT}
@@ -1576,18 +1587,18 @@ prep: make rebmake/entry-class [
     target: 'prep ; phony target
 
     commands: collect-lines [
-        keep [{$(REBOL)} tools-dir/make-natives.r]
-        keep [{$(REBOL)} tools-dir/make-headers.r]
-        keep [{$(REBOL)} tools-dir/make-boot.r
+        keep [{$(REBOL)} make-file [(tools-dir) make-natives.r]]
+        keep [{$(REBOL)} make-file [(tools-dir) make-headers.r]]
+        keep [{$(REBOL)} make-file [(tools-dir) make-boot.r]
             unspaced [{OS_ID=} system-config/id]
             {GIT_COMMIT=$(GIT_COMMIT)}
         ]
-        keep [{$(REBOL)} tools-dir/make-reb-lib.r
+        keep [{$(REBOL)} make-file [(tools-dir) make-reb-lib.r]
             unspaced [{OS_ID=} system-config/id]
         ]
 
         for-each ext all-extensions [
-            keep [{$(REBOL)} tools-dir/prep-extension.r
+            keep [{$(REBOL)} make-file [(tools-dir) prep-extension.r]
                 unspaced [{MODULE=} ext/name]
                 unspaced [{SRC=extensions/} switch type of ext/source [
                     file! [ext/source]
@@ -1607,7 +1618,9 @@ prep: make rebmake/entry-class [
                 ; functions to make available with `tcc_add_symbol()`)
                 ;
                 hook-script: file-to-local/full (
-                    repo-dir/extensions/(ext/directory)/(ext/hook)
+                    make-file [
+                        (repo-dir) extensions / (ext/directory) (ext/hook)
+                    ]
                 )
                 keep [{$(REBOL)} hook-script
                     unspaced [{OS_ID=} system-config/id]
@@ -1615,7 +1628,7 @@ prep: make rebmake/entry-class [
             ]
         ]
 
-        keep [{$(REBOL)} tools-dir/make-boot-ext-header.r
+        keep [{$(REBOL)} make-file [(tools-dir) make-boot-ext-header.r]
             unspaced [
                 {EXTENSIONS=} delimit ":" map-each ext builtin-extensions [
                     to text! ext/name
@@ -1623,7 +1636,7 @@ prep: make rebmake/entry-class [
             ]
         ]
 
-        keep [{$(REBOL)} src-dir/main/prep-main.reb]
+        keep [{$(REBOL)} make-file [(src-dir) main/prep-main.reb]]
     ]
     depends: reduce [
         reb-tool
@@ -1650,10 +1663,8 @@ add-new-obj-folders: function [
             #object-library [
                 lib: lib/depends
             ]
-            default [
-                dump lib
-                fail ["unexpected class"]
-            ]
+            (elide dump lib)
+            fail ["unexpected class"]
         ]
 
         for-each obj lib [
@@ -1680,16 +1691,20 @@ for-each [category entries] file-base [
         continue  ; these categories are taken care of elsewhere
     ]
     switch type of entries [
-        word! [
+        word!  ; if bootstrap
+        tuple! [  ; if generic-tuple enabled
             assert [entries = 'main.c]  ; !!! anomaly, ignore it for now
         ]
         block! [
             for-each entry entries [
                 entry: maybe if block? entry [first entry]
                 switch type of entry [
-                    word! []  ; assume taken care of
+                    word!  ; if bootstrap executable
+                    tuple! [  ; if generic-tuple enabled
+                        ; assume taken care of
+                    ]
                     path! [
-                        dir: first split-path to file! entry
+                        dir: first split-path make-file entry
                         if not find folders dir [
                             append folders join %objs/ dir
                         ]
@@ -1776,7 +1791,7 @@ for-each ext dynamic-extensions [
     if ext/source [
         append mod-objs gen-obj/dir/I/D/F
             ext/source
-            repo-dir/extensions/%
+            make-file [(repo-dir) extensions /]
             opt ext/includes
             append copy ["EXT_DLL"] opt ext/definitions
             opt ext/cflags

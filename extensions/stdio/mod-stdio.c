@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -65,7 +65,7 @@ REBNATIVE(register_stdio_device)
 
     Free_Req(req);
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -194,30 +194,21 @@ REBNATIVE(write_stdout)
         // from UTF-8 to wide characters, or not having CR turned into CR LF
         // sequences).
         //
-        Prin_OS_String(VAL_BIN_AT(v), VAL_LEN_AT(v), OPT_ENC_RAW);
-    }
-    else if (IS_CHAR(v)) {
-        //
-        // Useful for `write-stdout newline`, etc.
-        //
-        // !!! Temporarily just support ASCII codepoints, since making a
-        // codepoint out of a string pre-UTF8-everywhere makes a REBUNI string.
-        //
-        if (VAL_CHAR(v) > 0x7f)
-            fail ("non-ASCII CHAR! output temporarily disabled.");
-        Prin_OS_String(cast(REBYTE*, &VAL_CHAR(v)), 1, OPT_ENC_0);
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
+        Prin_OS_String(data, size, OPT_ENC_RAW);
     }
     else {
-        assert(IS_TEXT(v));
+        assert(IS_TEXT(v) or IS_ISSUE(v));
 
         // !!! Should be passing the STRING!, so the printing port gets the
         // number of codepoints as well as the UTF-8 size.
         //
         REBSIZ utf8_size;
-        const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
+        REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
 
         Prin_OS_String(utf8, utf8_size, OPT_ENC_0);
     }
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }

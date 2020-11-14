@@ -4,7 +4,7 @@ REBOL [
     File: %make-reb-lib.r
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -21,8 +21,8 @@ do %common-emitter.r
 print "--- Make Reb-Lib Headers ---"
 
 args: parse-args system/script/args  ; either from command line or DO/ARGS
-output-dir: system/options/path/prep
-output-dir: output-dir/include
+output-dir: make-file [(system/options/path) prep /]
+output-dir: make-file [(output-dir) include /]
 mkdir/deep output-dir
 
 ver: load %../src/boot/version.r
@@ -155,7 +155,7 @@ process: func [file] [
 
 src-dir: %../src/core/
 
-process src-dir/a-lib.c
+process make-file [(src-dir) a-lib.c]
 
 
 === GENERATE LISTS USED TO BUILD REBOL.H ===
@@ -357,7 +357,7 @@ c99-or-c++11-macros: collect [ map-each-api [
 ; edit, since the Rebol codebase at large uses `//`-style comments.
 
 e-lib: (make-emitter
-    "Rebol External Library Interface" output-dir/rebol.h)
+    "Rebol External Library Interface" make-file [(output-dir) rebol.h])
 
 e-lib/emit {
     #ifndef REBOL_H_1020_0304  /* "include guard" allows multiple #includes */
@@ -775,27 +775,33 @@ e-lib/emit {
         #include <string>
         #include <type_traits>
 
+        inline static const void *to_rebarg(std::nullptr_t val)
+          { return val; }
+
         inline static const void *to_rebarg(const REBVAL *val)
-            { return val; }
+          { return val; }
 
         inline static const void *to_rebarg(const REBINS *ins)
-            { return ins; }
+          { return ins; }
 
         inline static const void *to_rebarg(const char *source)
-            { return source; }  /* not TEXT!, but LOADable source code */
+          { return source; }  /* not TEXT!, but LOADable source code */
 
         inline static const void *to_rebarg(bool b)
-            { return rebL(b); }
+          { return rebL(b); }
 
         inline static const void *to_rebarg(int i)
-            { return rebI(i); }
+          { return rebI(i); }
 
         inline static const void *to_rebarg(double d)
-            { return rebR(rebDecimal(d)); }
+          { return rebR(rebDecimal(d)); }
 
         inline static const void *to_rebarg(const std::string &text)
           { return rebT(text.c_str()); }  /* std::string acts as TEXT! */
 
+        /* !!! ideally this would not be included, but rebEND has to be
+         * handled, and it needs to be a void* (any alignment).  See remarks.
+         */
         inline static const void *to_rebarg(const void *end)
           { return end; }
 
@@ -934,7 +940,8 @@ e-lib/write-emitted
 ; one instance of this table should be linked into Rebol.
 
 e-table: (make-emitter
-    "REBOL Interface Table Singleton" output-dir/tmp-reb-lib-table.inc)
+    "REBOL Interface Table Singleton"
+    make-file [(output-dir) tmp-reb-lib-table.inc])
 
 table-init-items: map-each-api [
     unspaced ["RL_" name]
@@ -964,6 +971,6 @@ e-table/write-emitted
 ; The JavaScript extension actually mutates the API table, so run the TCC hook
 ; first...
 ;
-do repo/tools/../extensions/tcc/prep-libr3-tcc.reb
+do make-file [(repo-dir) tools/../extensions/tcc/prep-libr3-tcc.reb]
 
-do repo/tools/../extensions/javascript/prep-libr3-js.reb
+do make-file [(repo-dir) tools/../extensions/javascript/prep-libr3-js.reb]

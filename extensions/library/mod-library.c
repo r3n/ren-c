@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2014 Atronix Engineering, Inc.
-// Copyright 2014-2017 Rebol Open Source Contributors
+// Copyright 2014-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -35,12 +35,10 @@ REBTYP *EG_Library_Type = nullptr;  // (E)xtension (G)lobal LIBRARY! type
 //
 //  CT_Library: C
 //
-REBINT CT_Library(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Library(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    if (mode >= 0) {
-        return VAL_LIBRARY(a) == VAL_LIBRARY(b);
-    }
-    return -1;
+    UNUSED(strict);
+    return VAL_LIBRARY(a) == VAL_LIBRARY(b);
 }
 
 
@@ -91,7 +89,7 @@ REB_R TO_Library(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 //  MF_Library: C
 //
-void MF_Library(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Library(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -162,7 +160,7 @@ REBNATIVE(register_library_hooks)
 
     Extend_Generics_Someday(ARG(generics));  // !!! See comments
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -217,5 +215,5 @@ REBNATIVE(unregister_library_hooks)
     Unhook_Datatype(EG_Library_Type);
     EG_Library_Type = nullptr;
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }

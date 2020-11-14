@@ -168,6 +168,8 @@ standard: make object! [
 
     proc-return-type: [void!]
 
+    elider-return-type: [<invisible>]
+
     proc-body: [
         return: make action! [
             [{Returns a value from an action} value [<opt> <end> any-value!]]

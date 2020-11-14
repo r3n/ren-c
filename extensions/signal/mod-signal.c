@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2014 Atronix Engineering, Inc.
-// Copyright 2014-2017 Rebol Open Source Contributors
+// Copyright 2014-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -41,7 +41,7 @@ static void update(REBREQ *signal, REBINT len, REBVAL *arg)
     const REBYTE source_pid[] = "source-pid";
     const REBYTE source_uid[] = "source-uid";
 
-    Extend_Series(VAL_SERIES(arg), len);
+    Extend_Series(VAL_SERIES_KNOWN_MUTABLE(arg), len);
 
     for (i = 0; i < len; i ++) {
         REBCTX *obj = Alloc_Context(REB_OBJECT, 8);
@@ -63,13 +63,13 @@ static void update(REBREQ *signal, REBINT len, REBVAL *arg)
         );
         Init_Integer(val, sig[i].si_uid);
 
-        Init_Object(Alloc_Tail_Array(VAL_ARRAY(arg)), obj);
+        Init_Object(Alloc_Tail_Array(VAL_ARRAY_KNOWN_MUTABLE(arg)), obj);
     }
 
     req->actual = 0; /* avoid duplicate updates */
 }
 
-static int sig_word_num(REBSTR *canon)
+static int sig_word_num(const REBSTR *canon)
 {
     switch (STR_SYMBOL(canon)) {
         case SYM_SIGALRM:
@@ -178,7 +178,7 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
             sigemptyset(&ReqPosixSignal(signal)->mask);
 
-            RELVAL *item;
+            const RELVAL *item;
             for (item = VAL_ARRAY_AT_HEAD(val, 0); NOT_END(item); ++item) {
                 DECLARE_LOCAL (sig);
                 Derelativize(sig, item, VAL_SPECIFIER(val));
@@ -250,7 +250,7 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
                 update(signal, len, arg);
             }
         }
-        return Init_Void(D_OUT); }
+        return Init_Void(D_OUT, SYM_VOID); }
 
     case SYM_READ: {
         // This device is opened on the READ:

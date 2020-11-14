@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2018 Rebol Open Source Contributors
+// Copyright 2012-2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -96,78 +96,70 @@
 #endif
 
 
-// Simple helper solving two problems that Eval_Internal_Maybe_Stale_Throws()
-// has such a long name to warn about:
+// The evaluator publishes its internal states in this header file, so that
+// a frame can be made with e.g. `FLAG_STATE_BYTE(ST_EVALUATOR_REEVALUATING)`
+// to start in various points of the evaluation process.  When doing so, be
+// sure the expected frame variables for that state are initialized.
 //
-//    (1) It calls through a function pointer, so that if there is a hook
-//    for tracing or debug stepping it won't be skipped.
-//
-//    (2) Clears off OUT_MARKED_STALE--an alias for NODE_FLAG_MARKED that
-//    is used for generic purposes and may be misinterpreted if it leaked.
+enum {
+    ST_EVALUATOR_INITIAL_ENTRY = 0,
+    ST_EVALUATOR_LOOKING_AHEAD,
+    ST_EVALUATOR_REEVALUATING
+};
+
+
+// Simple helper for Eval_Maybe_Stale_Throws() that clears OUT_MARKED_STALE
+// (an alias for NODE_FLAG_MARKED that is used for generic purposes and may be
+// misinterpreted if it leaked.)
 //
 // (Note that it is wasteful to clear the stale flag if running in a loop,
 // so the Do_XXX() versions don't use this.)
 //
 inline static bool Eval_Throws(REBFRM *f) {
-    if ((*PG_Eval_Maybe_Stale_Throws)(f))
+    if (Eval_Maybe_Stale_Throws(f))
         return true;
     CLEAR_CELL_FLAG(f->out, OUT_MARKED_STALE);
     return false;
 }
 
-// If you're sure the evaluator isn't hooked, it seems no point in asking to
-// "evaluate" a 1 (if there's nothing enfix after it).  You can take an inert
-// optimization.  But if the evaluator is hooked with a trace or stepwise
-// debugging, you can't skip out on the real call--it would skip the hook.
-//
-// Note that some optimizations can be dangerous beyond skipping tracing or
-// debugging.  e.g. if `cycle []` runs, even if it's not hooked to see the
-// trace of "I'm running an empty block", the tight loop without calling the
-// evaluator could miss the check for if a halt via Ctrl-C/etc. was requested:
-//
-// https://github.com/rebol/rebol-issues/issues/2229
-//
-// It would be possible to ask routines like CYCLE to do explicit checks for
-// the halt signal.  But the choice made is simply not to optimize a DO of an
-// empty block--considering the case to be too rare to be worth optimizing,
-// when weighed against predictable evaluator behavior.  So code using this
-// should be very rare instances.
-//
-// !!! In the spirit of simplification, it may be that this test should not
-// exist at all.  It is included for the sake of experimentation, but may
-// be removed if there appears to be no point in maintaining the complexity.
-//
-#define OPTIMIZATIONS_OK \
-    (PG_Eval_Maybe_Stale_Throws == &Eval_Internal_Maybe_Stale_Throws)
-
 
 // Even though ANY_INERT() is a quick test, you can't skip the cost of frame
 // processing--due to enfix.  But a feed only looks ahead one unit at a time,
 // so advancing the frame past an inert item to find an enfix function means
-// you have to enter the frame specially with EVAL_FLAG_POST_SWITCH.
+// you have to enter the frame specially with ST_EVALUATOR_LOOKING_AHEAD.
 //
 inline static bool Did_Init_Inert_Optimize_Complete(
     REBVAL *out,
     struct Reb_Feed *feed,
     REBFLGS *flags
 ){
-    assert(not (*flags & EVAL_FLAG_POST_SWITCH));  // we might set it
+    assert(SECOND_BYTE(*flags) == 0);  // we might set the STATE_BYTE
     assert(not IS_END(feed->value));  // would be wasting time to call
 
-    if (not ANY_INERT(feed->value) or not OPTIMIZATIONS_OK) {
+    if (not ANY_INERT(feed->value)) {
         SET_END(out);  // Have to Init() `out` one way or another...
         return false;  // general case evaluation requires a frame
     }
 
     Literal_Next_In_Feed(out, feed);
 
-    if (KIND_BYTE_UNCHECKED(feed->value) == REB_WORD) {
+    if (KIND3Q_BYTE_UNCHECKED(feed->value) == REB_WORD) {
         feed->gotten = Try_Lookup_Word(feed->value, feed->specifier);
         if (
             not feed->gotten
             or not IS_ACTION(feed->gotten)
-            or NOT_ACTION_FLAG(VAL_ACTION(feed->gotten), ENFIXED)
         ){
+            CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
+            return true;  // not action
+        }
+
+        if (GET_ACTION_FLAG(VAL_ACTION(feed->gotten), IS_BARRIER)) {
+            SET_FEED_FLAG(feed, BARRIER_HIT);
+            CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
+            return true;  // is barrier
+        }
+
+        if (NOT_ACTION_FLAG(VAL_ACTION(feed->gotten), ENFIXED)) {
             CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
             return true;  // not enfixed
         }
@@ -178,7 +170,9 @@ inline static bool Did_Init_Inert_Optimize_Complete(
             // Quoting defeats NO_LOOKAHEAD but only on soft quotes.
             //
             if (NOT_FEED_FLAG(feed, NO_LOOKAHEAD)) {
-                *flags |= EVAL_FLAG_POST_SWITCH | EVAL_FLAG_INERT_OPTIMIZATION;
+                *flags |=
+                    FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
+                    | EVAL_FLAG_INERT_OPTIMIZATION;
                 return false;
             }
 
@@ -188,7 +182,9 @@ inline static bool Did_Init_Inert_Optimize_Complete(
             if (VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE)
                 return true;  // don't look back, yield the lookahead
 
-            *flags |= EVAL_FLAG_POST_SWITCH | EVAL_FLAG_INERT_OPTIMIZATION;
+            *flags |=
+                FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
+                | EVAL_FLAG_INERT_OPTIMIZATION;
             return false;
         }
 
@@ -197,17 +193,19 @@ inline static bool Did_Init_Inert_Optimize_Complete(
             return true;   // we're done!
         }
 
-        // EVAL_FLAG_POST_SWITCH assumes that if the first arg were quoted and
-        // skippable, that the skip check has already been done.  So we have
-        // to do that check here.
+        // ST_EVALUATOR_LOOKING_AHEAD assumes that if the first arg were
+        // quoted and skippable, that the skip check has already been done.
+        // So we have to do that check here.
         //
         if (GET_ACTION_FLAG(action, SKIPPABLE_FIRST)) {
             REBVAL *first = First_Unspecialized_Param(action);
-            if (not TYPE_CHECK(first, KIND_BYTE(out)))
+            if (not TYPE_CHECK(first, KIND3Q_BYTE(out)))
                 return true;  // didn't actually want this parameter type
         }
 
-        *flags |= EVAL_FLAG_POST_SWITCH | EVAL_FLAG_INERT_OPTIMIZATION;
+        *flags |=
+            FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
+            | EVAL_FLAG_INERT_OPTIMIZATION;
         return false;  // do normal enfix handling
     }
 
@@ -216,13 +214,17 @@ inline static bool Did_Init_Inert_Optimize_Complete(
         return true;   // we're done!
     }
 
-    if (KIND_BYTE_UNCHECKED(feed->value) != REB_PATH)
+    if (KIND3Q_BYTE_UNCHECKED(feed->value) != REB_PATH)
         return true;  // paths do enfix processing if '/'
 
-    if (MIRROR_BYTE(feed->value) == REB_WORD) {
-        assert(VAL_WORD_SYM(feed->value) == SYM__SLASH_1_);
-        *flags |= EVAL_FLAG_POST_SWITCH | EVAL_FLAG_INERT_OPTIMIZATION;
-        return false;  // Let evaluator handle `/`
+    if (HEART_BYTE(feed->value) == REB_WORD) {
+        if (VAL_WORD_SPELLING(feed->value) == PG_Slash_1_Canon) {
+            *flags |=
+                FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
+                | EVAL_FLAG_INERT_OPTIMIZATION;
+            return false;  // Let evaluator handle `/`
+        }
+        return true;  // refinement!s are inert, we're done
     }
 
     return true;
@@ -241,7 +243,7 @@ inline static bool Eval_Step_Maybe_Stale_Throws(
 
     f->out = out;
     f->dsp_orig = DSP;
-    return (*PG_Eval_Maybe_Stale_Throws)(f); // should already be pushed;
+    return Eval_Maybe_Stale_Throws(f);  // should already be pushed
 }
 
 inline static bool Eval_Step_Throws(REBVAL *out, REBFRM *f) {
@@ -287,14 +289,16 @@ inline static bool Reevaluate_In_Subframe_Maybe_Stale_Throws(
     REBFLGS flags,
     bool enfix
 ){
+    assert(SECOND_BYTE(flags) == 0);
+    flags |= FLAG_STATE_BYTE(ST_EVALUATOR_REEVALUATING);
     if (enfix)
         flags |= EVAL_FLAG_RUNNING_ENFIX;
 
-    DECLARE_FRAME (subframe, f->feed, flags | EVAL_FLAG_REEVALUATE_CELL);
+    DECLARE_FRAME (subframe, f->feed, flags);
     subframe->u.reval.value = reval;
 
     Push_Frame(out, subframe);
-    bool threw = (*PG_Eval_Maybe_Stale_Throws)(subframe);
+    bool threw = Eval_Maybe_Stale_Throws(subframe);
     Drop_Frame(subframe);
 
     return threw;
@@ -321,15 +325,15 @@ inline static bool Eval_Step_In_Any_Array_At_Throws(
 
     Push_Frame(out, f);
     bool threw = Eval_Throws(f);
+
+    if (threw)
+        *index_out = TRASHED_INDEX;
+    else
+        *index_out = f->feed->index - 1;
+
     Drop_Frame(f);
 
-    if (threw) {
-        *index_out = 0xDECAFBAD;
-        return true;
-    }
-
-    *index_out = f->feed->index - 1;
-    return false;
+    return threw;
 }
 
 
@@ -381,12 +385,12 @@ inline static bool Eval_Step_In_Va_Throws_Core(
 }
 
 
-inline static bool Eval_Value_Throws(
+inline static bool Eval_Value_Maybe_End_Throws(
     REBVAL *out,
     const RELVAL *value,  // e.g. a BLOCK! here would just evaluate to itself!
     REBSPC *specifier
 ){
-    if (ANY_INERT(value) and OPTIMIZATIONS_OK) {
+    if (ANY_INERT(value)) {
         Derelativize(out, value, specifier);
         return false;  // fast things that don't need frames (should inline)
     }
@@ -413,17 +417,24 @@ inline static bool Eval_Value_Throws(
     bool threw = Eval_Throws(f);
     Drop_Frame(f);
 
-    // The callsites for Eval_Value_Throws() generally expect an evaluative
-    // result (at least null).  They might be able to give a better error, but
-    // they pretty much all need to give an error.
-    //
-    // In contrast, note that REEVAL itself errs on the side of voids, so:
-    //
-    //     >> type of reeval comment "hi"
-    //     == #[void!]
-    //
+    return threw;
+}
+
+
+// The callsites for Eval_Value_Throws() generally expect an evaluative
+// result (at least null).  They might be able to give a better error, but
+// they pretty much all need to give an error.
+//
+inline static bool Eval_Value_Throws(
+    REBVAL *out,
+    const RELVAL *value,  // e.g. a BLOCK! here would just evaluate to itself!
+    REBSPC *specifier
+){
+    if (Eval_Value_Maybe_End_Throws(out, value, specifier))
+        return true;
+
     if (IS_END(out))
         fail ("Single step EVAL produced no result (invisible or empty)");
 
-    return threw;
+    return false;
 }

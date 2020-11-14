@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -46,11 +46,6 @@
 //
 
 
-// Default for Eval_Core_May_Throw() is just a single EVALUATE step.
-//
-#define EVAL_MASK_DEFAULT 0
-
-
 // See Endlike_Header() for why these are chosen the way they are.  This
 // means that the Reb_Frame->flags field can function as an implicit END for
 // Reb_Frame->cell, as well as be distinguished from a REBVAL*, a REBSER*, or
@@ -69,60 +64,85 @@ STATIC_ASSERT(EVAL_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(2)
 
 
-//=//// EVAL_FLAG_3 ///////////////////////////////////////////////////////=//
+//=//// EVAL_FLAG_UNDO_MARKED_STALE ///////////////////////////////////////=//
 //
-// !!! Unused.  This bit is the same as NODE_FLAG_MARKED, which may make it
-// interesting for lining up with OUT_MARKED_STALE or ARG_MARKED_CHECKED.
+// Note: This bit is the same as NODE_FLAG_MARKED, so it lines up directly
+// with CELL_FLAG_OUT_MARKED_STALE.
 //
-#define EVAL_FLAG_3 \
+#define EVAL_FLAG_UNDO_MARKED_STALE \
     FLAG_LEFT_BIT(3)
 
+STATIC_ASSERT(EVAL_FLAG_UNDO_MARKED_STALE == CELL_FLAG_OUT_MARKED_STALE);
 
-//=//// EVAL_FLAG_REEVALUATE_CELL /////////////////////////////////////////=//
+
+//=//// EVAL_FLAG_CACHE_NO_LOOKAHEAD //////////////////////////////////////=//
 //
-// Function dispatchers have a special return value used by EVAL, which tells
-// it to use the frame's cell as the head of the next evaluation (before
-// what f->value would have ordinarily run.)
+// Without intervention, running an invisible will consume the state of the
+// FEED_FLAG_NO_LOOKAHEAD.  That creates a problem for things like:
 //
-// This allows EVAL/ONLY to be implemented by entering a new subframe with
-// new flags, and may have other purposes as well.
+//     >> 1 + comment "a" comment "b" 2 * 3
+//     == 7  ; you'll get 7 and not 9 if FEED_FLAG_NO_LOOKAHEAD is erased
 //
-#define EVAL_FLAG_REEVALUATE_CELL \
+// Originally invisible functions were pre-announced as purely invisible, and
+// would un-set the flag while the invisible ran...then restore it to the
+// previous state.  But this has changed to were it's not known until after
+// a function has executed if it was invisible.
+//
+// The current logic is to cache the *feed* flag in this *frame* flag before
+// each function runs, and then restore it in the event the execution turns
+// out to be invisible.
+//
+// Note: This is the same flag value as FEED_FLAG_NO_LOOKAHEAD.
+//
+// !!! This could lead to "multiplying" the influences of the flag across
+// several invisible evaluations; this should be reviewed to see if it makes
+// any actual problems in practice.
+//
+#define EVAL_FLAG_CACHE_NO_LOOKAHEAD \
     FLAG_LEFT_BIT(4)
 
 
-//=//// EVAL_FLAG_POST_SWITCH /////////////////////////////////////////////=//
+//=//// EVAL_FLAG_5 ///////////////////////////////////////////////////////=//
 //
-// This jump allows a deferred lookback to compensate for the lack of the
-// evaluator's ability to (easily) be psychic about when it is gathering the
-// last argument of a function.  It allows re-entery to argument gathering at
-// the point after the switch() statement, with a preloaded f->out.
-//
-#define EVAL_FLAG_POST_SWITCH \
+#define EVAL_FLAG_5 \
     FLAG_LEFT_BIT(5)
 
 
-//=//// EVAL_FLAG_FULFILLING_ARG //////////////////////////////////////////=//
+//=//// EVAL_FLAG_FULLY_SPECIALIZED ///////////////////////////////////////=//
 //
-// Deferred lookback operations need to know when they are dealing with an
-// argument fulfillment for a function, e.g. `summation 1 2 3 |> 100` should
-// be `(summation 1 2 3) |> 100` and not `summation 1 2 (3 |> 100)`.  This
-// also means that `add 1 <| 2` will act as an error.
+// When a null is seen in f->special, the question is whether that is an
+// intentional "null specialization" or if it means the argument should be
+// gathered normally (if applicable), as it would in a typical invocation.
+// If the frame is considered fully specialized (as with DO F) then there
+// will be no further argument gathered at the callsite, nulls are as-is.
 //
-#define EVAL_FLAG_FULFILLING_ARG \
+#define EVAL_FLAG_FULLY_SPECIALIZED \
     FLAG_LEFT_BIT(6)
 
 
-#define EVAL_FLAG_7_IS_FALSE FLAG_LEFT_BIT(7) // is NOT a cell
-STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
+// !!! Historically frames have identified as being "cells" even though they
+// are not, in order to use that flag as a distinction when in bindings
+// from the non-cell choices like contexts and paramlists.  This may not be
+// the best way to flag frames; alternatives are in consideration.
+//
+#define EVAL_FLAG_7_IS_TRUE FLAG_LEFT_BIT(7)
+STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
 
 
-//=//// BITS 8-15 ARE 0 FOR END SIGNAL ////////////////////////////////////=//
+//=//// FLAGS 8-15 ARE USED FOR THE STATE_BYTE() //////////////////////////=//
+//
+// One byte's worth is used to encode a "frame state" that can be used by
+// natives or dispatchers, e.g. to encode which step they are on.
+//
 
-// The flags are resident in the frame after the frame's cell.  In order to
-// let the cell act like a terminated array (if one needs that), the flags
-// have the byte for the IS_END() signal set to 0.  This sacrifices some
-// flags, and may or may not be worth it for the feature.
+#undef EVAL_FLAG_8
+#undef EVAL_FLAG_9
+#undef EVAL_FLAG_10
+#undef EVAL_FLAG_11
+#undef EVAL_FLAG_12
+#undef EVAL_FLAG_13
+#undef EVAL_FLAG_14
+#undef EVAL_FLAG_15
 
 
 //=//// EVAL_FLAG_RUNNING_ENFIX ///////////////////////////////////////////=//
@@ -135,7 +155,7 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
 // as normal.  There's no good place to hold the memory that one is doing an
 // enfix fulfillment besides a bit on the frame itself.
 //
-// It is also used to indicate to a EVAL_FLAG_REEVALUATE_CELL frame whether
+// It is also used to indicate to a ST_EVALUATOR_REEVALUATING frame whether
 // to run an ACTION! cell as enfix or not.  The reason this may be overridden
 // on what's in the action can be seen in the REBNATIVE(shove) code.
 //
@@ -167,12 +187,9 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(17)
 
 
-//=//// EVAL_FLAG_PROCESS_ACTION //////////////////////////////////////////=//
+//=//// EVAL_FLAG_18 //////////////////////////////////////////////////////=//
 //
-// Used to indicate that the Eval_Core code is being jumped into directly to
-// process an ACTION!, in a varlist that has already been set up.
-//
-#define EVAL_FLAG_PROCESS_ACTION \
+#define EVAL_FLAG_18 \
     FLAG_LEFT_BIT(18)
 
 
@@ -213,9 +230,9 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
 
 //=//// EVAL_FLAG_INERT_OPTIMIZATION //////////////////////////////////////=//
 //
-// If EVAL_FLAG_POST_SWITCH is being used due to an inert optimization, this
-// flag is set, so that the quoting machinery can realize the lookback quote
-// is not actually too late.
+// If ST_EVALUATOR_LOOKING_AHEAD is being used due to an inert optimization,
+// this flag is set, so that the quoting machinery can realize the lookback
+// quote is not actually too late.
 //
 #define EVAL_FLAG_INERT_OPTIMIZATION \
     FLAG_LEFT_BIT(22)
@@ -228,7 +245,7 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
 // cases are designed to operate in isolation, and are incompatible with the
 // idea of enfix operations that stay pending in the evaluation queue, e.g.
 //
-//     match parse "aab" [some "a" end] else [print "what should this do?"]
+//     match parse "aab" [some "a"] else [print "what should this do?"]
 //
 // MATCH is variadic, and in one step asks to make a frame from the right
 // hand side.  But it's 99% likely intent of this was to attach the ELSE to
@@ -248,30 +265,20 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(23)
 
 
-//=//// EVAL_FLAG_REQUOTE_NULL ////////////////////////////////////////////=//
+//=//// EVAL_FLAG_24 //////////////////////////////////////////////////////=//
 //
-// Most routines that try to pass through the quoted level of their input
-// can't process a dequoted null (e.g. don't have <opt> input).  Hence if
-// a quoted input comes in like '''FOO, but the routine decides to return
-// null as a signal, it wants to give back plain null and not ''' as a
-// triple-quoted null.
-//
-// But we use the heuristic that if a routine intentionally takes nulls, then
-// a quoted null on input signals requoting a null on output.
-//
-#define EVAL_FLAG_REQUOTE_NULL \
+#define EVAL_FLAG_24 \
     FLAG_LEFT_BIT(24)
 
 
-//=//// EVAL_FLAG_FULLY_SPECIALIZED ///////////////////////////////////////=//
+//=//// EVAL_FLAG_FULFILLING_ARG //////////////////////////////////////////=//
 //
-// When a null is seen in f->special, the question is whether that is an
-// intentional "null specialization" or if it means the argument should be
-// gathered normally (if applicable), as it would in a typical invocation.
-// If the frame is considered fully specialized (as with DO F) then there
-// will be no further argument gathered at the callsite, nulls are as-is.
+// Deferred lookback operations need to know when they are dealing with an
+// argument fulfillment for a function, e.g. `summation 1 2 3 |> 100` should
+// be `(summation 1 2 3) |> 100` and not `summation 1 2 (3 |> 100)`.  This
+// also means that `add 1 <| 2` will act as an error.
 //
-#define EVAL_FLAG_FULLY_SPECIALIZED \
+#define EVAL_FLAG_FULFILLING_ARG \
     FLAG_LEFT_BIT(25)
 
 
@@ -308,9 +315,12 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(27)
 
 
-//=//// EVAL_FLAG_NEXT_ARG_FROM_OUT ///////////////////////////////////=//
+//=//// EVAL_FLAG_TYPECHECK_ONLY //////////////////////////////////////////=//
 //
-#define EVAL_FLAG_NEXT_ARG_FROM_OUT \
+// This is used by <blank> to indicate that once the frame is fulfilled, the
+// only thing that should be done is typechecking...don't run the action.
+//
+#define EVAL_FLAG_TYPECHECK_ONLY \
     FLAG_LEFT_BIT(28)
 
 
@@ -371,7 +381,18 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_FALSE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(31)
 
 
-STATIC_ASSERT(31 < 32); // otherwise EVAL_FLAG_XXX too high
+STATIC_ASSERT(31 < 32);  // otherwise EVAL_FLAG_XXX too high
+
+
+// All frames must include EVAL_MASK_DEFAULT in their flags.  This is not
+// done automatically for two reasons: one is to make the calls more clear
+// with `DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT)` vs just saying 0.  Also,
+// it would permit there to be negative-default flags if some efficiency
+// trick favored the flag being truthy for its "unused" state, where you'd
+// say `DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT & ~EVAL_FLAG_SOME_SETTING)`.
+//
+#define EVAL_MASK_DEFAULT \
+    (EVAL_FLAG_0_IS_TRUE | EVAL_FLAG_7_IS_TRUE)
 
 
 #define SET_EVAL_FLAG(f,name) \
@@ -452,7 +473,7 @@ struct Reb_Feed {
     // messages to reach backwards and present more context of where the
     // error is located.
     //
-    REBARR *array;
+    const REBARR *array;
 
     // This holds the index of the *next* item in the array to fetch as
     // f->value for processing.  It's invalid if the frame is for a C va_list.
@@ -486,7 +507,7 @@ struct Reb_Feed {
     // !!! Review impacts on debugging; e.g. a debug mode should hold onto
     // the initial value in order to display full error messages.
     //
-    NEVERNULL(const RELVAL *) value;
+    const RELVAL *value;  // is never nullptr (ends w/END cells or rebEND)
 
     // There is a lookahead step to see if the next item in an array is a
     // WORD!.  If so it is checked to see if that word is a "lookback word"
@@ -534,8 +555,9 @@ struct Reb_Feed {
     //
     RELVAL *stress;
   #endif
-
 };
+
+
 // NOTE: The ordering of the fields in `Reb_Frame` are specifically done so
 // as to accomplish correct 64-bit alignment of pointers on 64-bit systems.
 //
@@ -547,6 +569,27 @@ struct Reb_Feed {
 //
 struct Reb_Frame {
     //
+    // These are EVAL_FLAG_XXX or'd together--see their documentation above.
+    // A Reb_Header is used so that it can implicitly terminate `cell`, if
+    // that comes in useful (e.g. there's an apparent END after cell)
+    //
+    // Note: In order to use the memory pools, this must be in first position,
+    // and it must not have the NODE_FLAG_FREE bit set when in use.
+    //
+    union Reb_Header flags;  // See Endlike_Header()
+
+    // This is the source from which new values will be fetched.  In addition
+    // to working with an array, it is also possible to feed the evaluator
+    // arbitrary REBVAL*s through a variable argument list on the C stack.
+    // This means no array needs to be dynamically allocated (though some
+    // conditions require the va_list to be converted to an array, see notes
+    // on Reify_Va_To_Array_In_Frame().)
+    //
+    // Since frames may share source information, this needs to be done with
+    // a dereference.
+    //
+    struct Reb_Feed *feed;
+
     // The frame's "spare" is used for different purposes.  PARSE uses it as a
     // scratch storage space.  Path evaluation uses it as where the calculated
     // "picker" goes (so if `foo/(1 + 2)`, the 3 would be stored there to be
@@ -560,12 +603,6 @@ struct Reb_Frame {
     // space for things other than evaluation.)
     //
     RELVAL spare;
-
-    // These are EVAL_FLAG_XXX or'd together--see their documentation above.
-    // A Reb_Header is used so that it can implicitly terminate `cell`, if
-    // that comes in useful (e.g. there's an apparent END after cell)
-    //
-    union Reb_Header flags; // See Endlike_Header()
 
     // The prior call frame.  This never needs to be checked against nullptr,
     // because the bottom of the stack is FS_BOTTOM which is allocated at
@@ -586,18 +623,6 @@ struct Reb_Frame {
     // a final result, due to being GC-safe during function evaluation.
     //
     REBVAL *out;
-
-    // This is the source from which new values will be fetched.  In addition
-    // to working with an array, it is also possible to feed the evaluator
-    // arbitrary REBVAL*s through a variable argument list on the C stack.
-    // This means no array needs to be dynamically allocated (though some
-    // conditions require the va_list to be converted to an array, see notes
-    // on Reify_Va_To_Array_In_Frame().)
-    //
-    // Since frames may share source information, this needs to be done with
-    // a dereference.
-    //
-    struct Reb_Feed *feed;
 
     // The error reporting machinery doesn't want where `index` is right now,
     // but where it was at the beginning of a single EVALUATE step.
@@ -623,7 +648,7 @@ struct Reb_Frame {
     // The evaluator only enforces that the symbol be set during function
     // calls--in the release build, it is allowed to be garbage otherwise.
     //
-    REBSTR *opt_label;
+    const REBSTR *opt_label;
 
     // The varlist is where arguments for the frame are kept.  Though it is
     // ultimately usable as an ordinary CTX_VARLIST() for a FRAME! value, it
@@ -685,8 +710,6 @@ struct Reb_Frame {
     //
     const REBVAL *special;
 
-    REBLEN requotes; // negative means null result should be requoted
-
   union {
     //
     // References are used by path dispatch.
@@ -702,6 +725,18 @@ struct Reb_Frame {
         const REBVAL *value;
     } reval;
   } u;
+
+    // While a frame is executing, any Alloc_Value() calls are linked into
+    // a doubly-linked list.  This keeps them alive, and makes it quick for
+    // them to be released.  In the case of an abrupt fail() call, they will
+    // be automatically freed.
+    //
+    // In order to make a handle able to find the frame whose linked list it
+    // belongs to (in order to update the head of the list) the terminator on
+    // the ends is not nullptr, but a pointer to the REBFRM* itself (which
+    // can be noticed via NODE_FLAG_FRAME as not being an API handle).
+    //
+    REBNOD *alloc_value_list;
 
    #if defined(DEBUG_COUNT_TICKS)
     //
@@ -755,13 +790,6 @@ struct Reb_Frame {
 
 #define FS_TOP (TG_Top_Frame + 0) // avoid assign to FS_TOP via + 0
 #define FS_BOTTOM (TG_Bottom_Frame + 0) // avoid assign to FS_BOTTOM via + 0
-
-
-// Hookable evaluator core function (see PG_Eval_Maybe_Stale_Throws)
-// Unlike a dispatcher, its result is always in the frame's ->out cell, and
-// the boolean result only tells you whether or not it threw.
-//
-typedef bool (REBEVL)(REBFRM * const);
 
 
 #if !defined(DEBUG_CHECK_CASTS)

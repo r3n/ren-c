@@ -4,7 +4,7 @@ REBOL [
     File: %main-startup.r
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -37,13 +37,13 @@ host-prot: default [_]
 boot-print: redescribe [
     "Prints during boot when not quiet."
 ](
-    enclose 'print func [f] [if not system/options/quiet [do f]]
+    enclose :print func [f] [if not system/options/quiet [do f]]
 )
 
 loud-print: redescribe [
     "Prints during boot when verbose."
 ](
-    enclose 'print func [f] [if system/options/verbose [do f]]
+    enclose :print func [f] [if system/options/verbose [do f]]
 )
 
 make-banner: function [
@@ -82,7 +82,7 @@ boot-banner: [
     "REBOL 3.0 (Ren-C branch)"
     -
     = Copyright: "2012 REBOL Technologies"
-    = Copyright: "2012-2017 Rebol Open Source Contributors"
+    = Copyright: "2012-2017 Ren-C Open Source Contributors"
     = "" "Apache 2.0 License, see LICENSE."
     = Website:  "http://github.com/metaeducation/ren-c"
     -
@@ -204,7 +204,11 @@ host-script-pre-load: function [
 ; document the issue.  So we make them SET-WORD!s added to lib up front, so
 ; the lib modification gets picked up.
 ;
-get-current-exec: file-to-local: local-to-file: what-dir: change-dir: void
+get-current-exec:
+file-to-local:
+local-to-file:
+what-dir:
+change-dir: ~undefined~
 
 
 main-startup: function [
@@ -246,14 +250,14 @@ main-startup: function [
     ][
         switch type of item [
             issue! [
-                if not empty? instruction [append/line instruction '|]
+                if not empty? instruction [append/line instruction ',]
                 insert instruction item
             ]
             text! [
                 append/line instruction compose [comment (item)]
             ]
             block! [
-                if not empty? instruction [append/line instruction '|]
+                if not empty? instruction [append/line instruction ',]
                 append/line instruction compose/deep <*> item
             ]
             unreachable
@@ -309,9 +313,8 @@ main-startup: function [
                 assert [empty? instruction]
                 state
             ]
-            default [
-                emit [fail [{Bad console instruction:} (<*> mold state)]]
-            ]
+        ] else [
+            emit [fail [{Bad console instruction:} (<*> mold state)]]
         ]
     ]
 
@@ -321,12 +324,12 @@ main-startup: function [
     ; calls, the rebPanic() API dispatches to PANIC and PANIC-VALUE.  Hook
     ; them just to show we can...use I/O to print a message.
     ;
-    hijack 'panic adapt (copy :panic) [
+    hijack :panic adapt (copy :panic) [
         print "PANIC ACTION! called (explicitly or by rebPanic() API)"
         ;
         ; ...adaptation falls through to our copy of the original PANIC
     ]
-    hijack 'panic-value adapt (copy :panic-value) [
+    hijack :panic-value adapt (copy :panic-value) [
         print "PANIC-VALUE ACTION! called (explicitly or by rebPanic() API)"
         ;
         ; ...adaptation falls through to our copy of the original PANIC-VALUE
@@ -694,7 +697,7 @@ main-startup: function [
     ; As long as there was no `--script` or `--do` passed on the command line
     ; explicitly, the first item after the options is implicitly the script.
     ;
-    if is-script-implicit and [not tail? argv] [
+    all [is-script-implicit, not tail? argv] then [
         o/script: local-to-file take argv
         quit-when-done: default [true]
     ]
@@ -745,13 +748,13 @@ main-startup: function [
     all [
         not find o/suppress %rebol.reb
         elide (loud-print ["Checking for rebol.reb file in" o/bin])
-        exists? o/bin/rebol.reb
+        exists? %% (o/bin)/rebol.reb
     ] then [
         trap [
-            do o/bin/rebol.reb
-            append o/loaded o/bin/rebol.reb
-            loud-print ["Finished evaluating script:" o/bin/rebol.reb]
-        ] then e => [
+            do %% (o/bin)/rebol.reb
+            append o/loaded %% (o/bin)/rebol.reb
+            loud-print ["Finished evaluating script:" %% (o/bin)/rebol.reb]
+        ] then e -> [
             die/error "Error found in rebol.reb script" e
         ]
     ]
@@ -769,14 +772,14 @@ main-startup: function [
             do o/resources/user.reb
             append o/loaded o/resources/user.reb
             loud-print ["Finished evaluating script:" o/resources/user.reb]
-        ] then e => [
+        ] then e -> [
             die/error "Error found in user.reb script" e
         ]
     ]
 
-    (switch type of boot-embedded [
+    switch type of boot-embedded [
         blank! [
-            false  ; signal the `AND []` that there's no embedded code
+            false  ; signal that there's no embedded code
         ]
         binary! [ ; single script
             [code header]: load/type boot-embedded 'unbound
@@ -801,24 +804,28 @@ main-startup: function [
         ]
 
         die "Bad embedded boot data (not a BLOCK! or a BINARY!)"
-    ]) and [
-        ;boot-print ["executing embedded script:" mold code]
-        system/script: make system/standard/script [
-            title: select first code 'title
-            header: first code
-            parent: _
-            path: what-dir
-            args: script-args
+    ] then execute -> [
+        if execute [
+            ;boot-print ["executing embedded script:" mold code]
+            system/script: make system/standard/script [
+                title: select first code 'title
+                header: first code
+                parent: _
+                path: what-dir
+                args: script-args
+            ]
+            if 'module = select first code 'type [
+                code: reduce [first code, next code]
+                if object? tmp: sys/do-needs/no-user first code [
+                    append code tmp
+                ]
+                import do compose [module (code)]
+            ] else [
+                sys/do-needs first code
+                do intern next code
+            ]
+            quit ;ignore user script and "--do" argument
         ]
-        if 'module = select first code 'type [
-            code: reduce [first code | next code]
-            if object? tmp: sys/do-needs/no-user first code [append code tmp]
-            import do compose [module (code)]
-        ] else [
-            sys/do-needs first code
-            do intern next code
-        ]
-        quit ;ignore user script and "--do" argument
     ]
 
     ; Evaluate any script argument, e.g. `r3 test.r` or `r3 --script test.r`

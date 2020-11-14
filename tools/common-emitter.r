@@ -2,7 +2,7 @@ REBOL [
     System: "REBOL [R3] Language Interpreter and Run-time Environment"
     Title: "Common Code for Emitting Text Files"
     Rights: {
-        Copyright 2016-2018 Rebol Open Source Contributors
+        Copyright 2016-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -107,7 +107,7 @@ cscape: function [
 
             code: load/all expr
             if with [
-                if lit-word? with [with: to word! with]
+                if lit-word? with [with: dequote with]
 
                 with: compose [((with))]  ; convert to block
                 for-each item with [
@@ -117,12 +117,20 @@ cscape: function [
             sub: try do code
 
             sub: switch mode [  ; still want to make sure mode is good
-                #cname [try to-c-name sub]
+                #cname [
+                    ; !!! The #prefixed scope is unchecked for valid global or
+                    ; local identifiers.  This is okay for cases that actually
+                    ; are prefixed, like `cscape {SYM_${...}}`.  But if there
+                    ; is no prefix, then the check might be helpful.  Review.
+                    ;
+                    try to-c-name/scope sub #prefixed
+                ]
                 #unspaced [
                     case [
                         blank? sub [blank]
                         block? sub [unspaced sub]
-                        default [form sub]
+                    ] else [
+                        form sub
                     ]
                 ]
                 #delimit [try delimit (unspaced [suffix newline]) sub]
@@ -132,14 +140,24 @@ cscape: function [
             sub: default [copy "/* _ */"]  ; replaced in post phase
 
             case [
-                all [any-upper | not any-lower] [uppercase sub]
-                all [any-lower | not any-upper] [lowercase sub]
+                all [
+                    any-upper
+                    not any-lower
+                ] [uppercase sub]
+
+                all [
+                    any-lower
+                    not any-upper
+                ] [lowercase sub]
             ]
 
             ; If the substitution started at a certain column, make any line
             ; breaks continue at the same column.
             ;
-            indent: unspaced collect [keep newline | keep prefix]
+            indent: unspaced collect [
+                keep newline
+                keep prefix
+            ]
             replace/all sub newline indent
 
             keep sub
@@ -165,7 +183,10 @@ cscape: function [
                 ; IF deprecated in Ren-C, but :(...) with logic not available
                 ; in the bootstrap build.
                 ;
-                if (did all [not nonwhite | removed])
+                if (did all [
+                    not nonwhite
+                    removed
+                ])
 
                 :start-line remove thru [newline | end]
                 |
@@ -210,7 +231,10 @@ make-emitter: function [
 
     stem: second split-path file
 
-    temporary: did any [temporary | parse stem ["tmp-" to end]]
+    temporary: did any [
+        temporary
+        parse stem ["tmp-" to end]
+    ]
 
     is-c: did parse stem [thru [".c" | ".h" | ".inc"] end]
 
@@ -232,8 +256,8 @@ make-emitter: function [
             {Write data to the emitter using CSCAPE templating (see HELP)}
 
             return: <void>
-            :look [any-value! <...>]
-            data [text! char! <...>]
+            :look [any-value! <variadic>]
+            data [text! char! <variadic>]
             <with> buf-emit
         ][
             context: _
@@ -287,13 +311,13 @@ make-emitter: function [
         ]
     ]
 
-    if (is-c or [is-js]) [
+    any [is-c is-js] then [
         e/emit 'return {
             /**********************************************************************
             **
             **  REBOL [R3] Language Interpreter and Run-time Environment
             **  Copyright 2012 REBOL Technologies
-            **  Copyright 2012-2018 Rebol Open Source Contributors
+            **  Copyright 2012-2018 Ren-C Open Source Contributors
             **  REBOL is a trademark of REBOL Technologies
             **  Licensed under the Apache License, Version 2.0
             **
@@ -327,7 +351,7 @@ make-emitter: function [
                 File: (stem)
                 Rights: {
                     Copyright 2012 REBOL Technologies
-                    Copyright 2012-2018 Rebol Open Source Contributors
+                    Copyright 2012-2018 Ren-C Open Source Contributors
                     REBOL is a trademark of REBOL Technologies
                 }
                 License: {

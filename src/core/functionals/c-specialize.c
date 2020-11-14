@@ -7,28 +7,30 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2015-2019 Rebol Open Source Contributors
+// Copyright 2015-2020 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // A specialization is an ACTION! which has some of its parameters fixed.
-// e.g. `ap10: specialize 'append [value: 5 + 5]` makes ap10 have all the same
+// e.g. `ap10: specialize :append [value: 5 + 5]` makes ap10 have all the same
 // refinements available as APPEND, but otherwise just takes one series arg,
 // as it will always be appending 10.
 //
-// The method used is to store a FRAME! in the specialization's ACT_BODY.
-// Any of those items that have ARG_MARKED_CHECKED are copied from
-// that frame instead of gathered from the callsite.  Eval_Core() heeds this
-// when walking parameters (see `f->special`).
+// The method used is to store a FRAME! in the specialization's ACT_DETAILS().
+// Parameters in that frame that are REB_P_LOCAL are considered to be
+// specialized out, and frame holds its specialized value.  For unspecialized
+// parameters, the value slots in the frame are available to serve as
+// instructions on how those parameters should be fulfilled.  %c-action.c
+// heeds this when walking parameters (see `f->special`).
 //
 // Code is shared between the SPECIALIZE native and specialization of a
 // GET-PATH! via refinements, such as `adp: :append/dup/part`.  However,
@@ -45,17 +47,18 @@
 //
 // Also, a call to `fooBC/A 1 2 3` does not want /A = 1, because it should act
 // like `foo/B/C/A 1 2 3`.  Since the ordering matters, information encoding
-// that order must be stored *somewhere*.
+// that order must be stored *somewhere*.  This has a greater cost than a
+// single bit on a parameter can encode.
 //
 // It's solved with a simple mechanical trick--that may look counterintuitive
-// at first.  Since unspecialized slots would usually only contain NULL,
-// we sneak information into them without the ARG_MARKED_CHECKED bit.  This
-// disrupts the default ordering by pushing refinements that have higher
-// priority than fulfilling the unspecialized slot they are in.
+// at first.  Since unspecialized slots would usually be `~undefined~`,
+// we sneak information into them.  This disrupts the default ordering by
+// pushing refinements that have higher priority than fulfilling the
+// unspecialized slot they are in.
 //
 // So when looking at `fooBC: :foo/B/C`
 //
-// * /A's slot would contain an instruction for /C.  As Eval_Core() visits the
+// * /A's slot would contain an instruction for /C.  As the evaluator visits
 //   arguments in order it pushes /C as the current first-in-line to take
 //   an argument at the callsite.  Yet /A has not been "specialized out", so
 //   a call like `fooBC/A` is legal...it's just that pushing /C from the
@@ -64,21 +67,54 @@
 // * /B's slot would contain an instruction for /B.  This will push /B to now
 //   be first in line in fulfillment.
 //
-// * /C's slot would hold a null, having the typical appearance of not
-//   being specialized.
+// * /C's slot would hold the labeled VOID! `~undefined~`, having the typical
+//   appearance of not being specialized.
 //
 
 #include "sys-core.h"
+
+enum {
+    IDX_SPECIALIZER_FRAME = 0,  // Partially or fully filled FRAME! to run
+    IDX_SPECIALIZER_MAX
+};
+
+
+//
+//  Specializer_Dispatcher: C
+//
+// The evaluator does not do any special "running" of a specialized frame.
+// All of the contribution that the specialization had to make was taken care
+// of when Eval_Core() used f->special to fill from the exemplar.  So all this
+// does is change the phase and binding to match the function this layer was
+// specializing.
+//
+REB_R Specializer_Dispatcher(REBFRM *f)
+{
+    REBARR *details = ACT_DETAILS(FRM_PHASE(f));
+    assert(ARR_LEN(details) == IDX_SPECIALIZER_MAX);
+
+    REBVAL *exemplar = SPECIFIC(ARR_AT(details, IDX_SPECIALIZER_FRAME));
+    assert(IS_FRAME(exemplar));
+
+    INIT_FRM_PHASE(f, VAL_PHASE_ELSE_ARCHETYPE(exemplar));
+    FRM_BINDING(f) = VAL_BINDING(exemplar);
+
+    return R_REDO_UNCHECKED; // redo uses the updated phase and binding
+}
 
 
 //
 //  Make_Context_For_Action_Push_Partials: C
 //
-// This creates a FRAME! context with NULLED cells in the unspecialized slots
-// that are available to be filled.  For partial refinement specializations
-// in the action, it will push the refinement to the stack.  In this way it
-// retains the ordering information implicit in the partial refinements of an
-// action's existing specialization.
+// This creates a FRAME! context with `~undefined~` cells in unspecialized
+// slots.  The reason this is chosen instead of NULL is that specialization
+// with NULL is frequent, and this takes only *one* void state away.  Tricks
+// must be used to work past (e.g. to SPECIALIZE with `~replace-me~` but then
+// ADAPT and overwrite with ~undefined~).
+//
+// For partial refinement specializations in the action, this will push the
+// refinement to the stack.  In this way it retains the ordering information
+// implicit in the partial refinements of an action's existing specialization.
 //
 // It is able to take in more specialized refinements on the stack.  These
 // will be ordered *after* partial specializations in the function already.
@@ -126,30 +162,30 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     for (; NOT_END(param); ++param, ++arg, ++special, ++index) {
         Prep_Cell(arg);
 
-        if (Is_Param_Hidden(param)) {  // specialized out
-            assert(GET_CELL_FLAG(special, ARG_MARKED_CHECKED));
-            Move_Value(arg, special); // doesn't copy ARG_MARKED_CHECKED
-            SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+        if (Is_Param_Hidden(param)) {  // local or specialized
+            if (param == special) {  // no prior exemplar
+                Init_Void(arg, SYM_UNDEFINED);
+                SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+            }
+            else
+                Blit_Specific(arg, special);  // preserve ARG_MARKED_CHECKED
 
           continue_specialized:
 
-            // Note: used to `assert(not IS_NULLED(arg));`
-            assert(GET_CELL_FLAG(arg, ARG_MARKED_CHECKED));
-            continue;  // Eval_Core() double-checks type in debug build
+            continue;
         }
 
         assert(NOT_CELL_FLAG(special, ARG_MARKED_CHECKED));
 
-        REBSTR *canon = VAL_PARAM_CANON(param);  // for adding to binding
+        const REBSTR *canon = VAL_PARAM_CANON(param);  // to add to binding
         if (not TYPE_CHECK(param, REB_TS_REFINEMENT)) {  // nothing to push
 
           continue_unspecialized:
 
-            Init_Nulled(arg);
-            if (opt_binder) {
-                if (not Is_Param_Unbindable(param))
-                    Add_Binder_Index(opt_binder, canon, index);
-            }
+            Init_Void(arg, SYM_UNDEFINED);  // *not* ARG_MARKED_CHECKED
+            if (opt_binder)
+                Add_Binder_Index(opt_binder, canon, index);
+
             continue;
         }
 
@@ -159,7 +195,10 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
         assert(
             (special == param and IS_PARAM(special))
-            or (IS_SYM_WORD(special) or IS_NULLED(special))
+            or (
+                IS_SYM_WORD(special)
+                or Is_Void_With_Sym(special, SYM_UNDEFINED)
+            )
         );
 
         if (IS_SYM_WORD(special)) {
@@ -186,16 +225,15 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             INIT_BINDING(ordered, varlist);
             INIT_WORD_INDEX_UNCHECKED(ordered, index);
 
-            if (not Is_Typeset_Invisible(param))  // needs argument
+            if (not Is_Typeset_Empty(param))  // needs argument
                 goto continue_unspecialized;
 
             // If refinement named on stack takes no arguments, then it can't
             // be partially specialized...only fully, and won't be bound:
             //
-            //     specialize 'append/only [only: false]  ; only not bound
+            //     specialize :append/only [only: #]  ; only not bound
             //
-            Init_Word(arg, VAL_STORED_CANON(ordered));
-            Refinify(arg);
+            Init_Blackhole(arg);
             SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
             goto continue_specialized;
         }
@@ -253,12 +291,10 @@ REBCTX *Make_Context_For_Action(
 bool Specialize_Action_Throws(
     REBVAL *out,
     REBVAL *specializee,
-    REBSTR *opt_specializee_name,
     REBVAL *opt_def,  // !!! REVIEW: binding modified directly (not copied)
     REBDSP lowest_ordered_dsp
 ){
     assert(out != specializee);
-    UNUSED(opt_specializee_name);  // was used when this did META as well
 
     struct Reb_Binder binder;
     if (opt_def)
@@ -269,6 +305,8 @@ bool Specialize_Action_Throws(
     // This produces a context where partially specialized refinement slots
     // will be on the stack (including any we are adding "virtually", from
     // the current DSP down to the lowest_ordered_dsp).
+    //
+    // All unspecialized slots (including partials) will be ~undefined~
     //
     REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
         specializee,
@@ -293,7 +331,7 @@ bool Specialize_Action_Throws(
 
         Bind_Values_Inner_Loop(
             &binder,
-            VAL_ARRAY_AT(opt_def),
+            VAL_ARRAY_AT_MUTABLE_HACK(opt_def),
             exemplar,
             FLAGIT_KIND(REB_SET_WORD),  // types to bind (just set-word!)
             0,  // types to "add midstream" to binding as we go (nothing)
@@ -306,12 +344,9 @@ bool Specialize_Action_Throws(
         RELVAL *key = CTX_KEYS_HEAD(exemplar);
         REBVAL *var = CTX_VARS_HEAD(exemplar);
         for (; NOT_END(key); ++key, ++var) {
-            if (Is_Param_Unbindable(key))
-                continue;  // !!! is this flag still relevant?
-            if (Is_Param_Hidden(key)) {
-                assert(GET_CELL_FLAG(var, ARG_MARKED_CHECKED));
+            if (Is_Param_Hidden(key))
                 continue;
-            }
+
             if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED))
                 continue;  // maybe refinement from stack, now specialized out
             Remove_Binder_Index(&binder, VAL_KEY_CANON(key));
@@ -345,19 +380,28 @@ bool Specialize_Action_Throws(
     REBDSP ordered_dsp = lowest_ordered_dsp;
 
     for (; NOT_END(param); ++param, ++arg) {
-        if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
-            if (IS_BLANK(arg)) {
-                //
-                // !!! Temporary compatibility solution... blank refinements
-                // are considered to be unusable ones that have been
-                // specialized out.
-                //
-                Init_Nulled(arg);
-                SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
-                goto specialized_arg_no_typecheck;
-            }
+        if (Is_Param_Hidden(param)) {
+            //
+            // We are producing a new paramlist, so we want to ensure that
+            // anything that was hidden on the paramlist we are deriving from
+            // gets completely sealed from visibility at the new layer.
+            // This opens up names for reuse and keeps from viewing the
+            // levels that should be private.
+            //
+            Move_Value(DS_PUSH(), param);
+            Seal_Param(param);
 
-            if (IS_NULLED(arg)) {
+            // !!! Currently we assume that a parameter that is hidden at
+            // the start is hidden at the end.  However, if someone wanted
+            // to actually specialize an ~undefined~ then allowing them to
+            // hide the key would be a way to do that.  It would require being
+            // tolerant of this in the binding diff.
+            //
+            continue;
+        }
+
+        if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
+            if (Is_Void_With_Sym(arg, SYM_UNDEFINED)) {
                 //
                 // A refinement that is nulled is a candidate for usage at the
                 // callsite.  Hence it must be pre-empted by our ordered
@@ -370,12 +414,13 @@ bool Specialize_Action_Throws(
                     ++ordered_dsp;
                     REBVAL *ordered = DS_AT(ordered_dsp);
 
-                    if (not IS_WORD_BOUND(ordered))  // specialize 'print/asdf
+                    if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
                         fail (Error_Bad_Refine_Raw(ordered));
 
                     REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
                     if (
-                        IS_NULLED(slot) or GET_CELL_FLAG(slot, PUSH_PARTIAL)
+                        Is_Void_With_Sym(slot, SYM_UNDEFINED)
+                        or GET_CELL_FLAG(slot, PUSH_PARTIAL)
                     ){
                         // It's still partial, so set up the pre-empt.
                         //
@@ -395,44 +440,24 @@ bool Specialize_Action_Throws(
                 goto unspecialized_arg;  // ran out...no pre-empt needed
             }
 
-            if (GET_CELL_FLAG(arg, ARG_MARKED_CHECKED)) {
-                assert(
-                    IS_NULLED(arg)
-                    or (
-                        IS_REFINEMENT(arg)
-                        and (
-                            VAL_REFINEMENT_SPELLING(arg)
-                            == VAL_PARAM_SPELLING(param)
-                        )
-                    )
-                );
-            }
+            if (GET_CELL_FLAG(arg, ARG_MARKED_CHECKED))
+                assert(IS_NULLED(arg) or Is_Blackhole(arg));
             else
-                Typecheck_Refinement_And_Canonize(param, arg);
+                Typecheck_Refinement(param, arg);
 
             goto specialized_arg_no_typecheck;
         }
 
-        switch (VAL_PARAM_CLASS(param)) {
-          case REB_P_RETURN:
-          case REB_P_LOCAL:
-            assert(IS_NULLED(arg));  // no bindings, you can't set these
-            goto unspecialized_arg;
-
-          default:
-            break;
-        }
-
         // It's an argument, either a normal one or a refinement arg.
 
-        if (not IS_NULLED(arg))
+        if (not Is_Void_With_Sym(arg, SYM_UNDEFINED))
             goto specialized_arg_with_check;
 
       unspecialized_arg:
 
         assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
         assert(
-            IS_NULLED(arg)
+            Is_Void_With_Sym(arg, SYM_UNDEFINED)
             or (IS_SYM_WORD(arg) and TYPE_CHECK(param, REB_TS_REFINEMENT))
         );
         Move_Value(DS_PUSH(), param);
@@ -446,14 +471,7 @@ bool Specialize_Action_Throws(
         if (Is_Param_Variadic(param))
             fail ("Cannot currently SPECIALIZE variadic arguments.");
 
-        if (TYPE_CHECK(param, REB_TS_DEQUOTE_REQUOTE) and IS_QUOTED(arg)) {
-            //
-            // Have to leave the quotes on, but still want to type check.
-
-            if (not TYPE_CHECK(param, CELL_KIND(VAL_UNESCAPED(arg))))
-                fail (arg);  // !!! merge w/Error_Invalid_Arg()
-        }
-        else if (not TYPE_CHECK(param, VAL_TYPE(arg)))
+        if (not TYPE_CHECK(param, VAL_TYPE(arg)))
             fail (arg);  // !!! merge w/Error_Invalid_Arg()
 
        SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
@@ -466,7 +484,7 @@ bool Specialize_Action_Throws(
 
         assert(GET_CELL_FLAG(arg, ARG_MARKED_CHECKED));
         Move_Value(DS_PUSH(), param);
-        TYPE_SET(DS_TOP, REB_TS_HIDDEN);
+        Specialize_Param(DS_TOP);
         continue;
     }
 
@@ -486,7 +504,7 @@ bool Specialize_Action_Throws(
     while (ordered_dsp != DSP) {
         ++ordered_dsp;
         REBVAL *ordered = DS_AT(ordered_dsp);
-        if (not IS_WORD_BOUND(ordered))  // specialize 'print/asdf
+        if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
             fail (Error_Bad_Refine_Raw(ordered));
 
         REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
@@ -500,50 +518,22 @@ bool Specialize_Action_Throws(
         &Specializer_Dispatcher,
         ACT_UNDERLYING(unspecialized),  // same underlying action as this
         exemplar,  // also provide a context of specialization values
-        1  // details array capacity
+        IDX_SPECIALIZER_MAX  // details array capacity
     );
     assert(CTX_KEYLIST(exemplar) == ACT_PARAMLIST(unspecialized));
-
-    assert(
-        GET_ACTION_FLAG(specialized, IS_INVISIBLE)
-        == GET_ACTION_FLAG(unspecialized, IS_INVISIBLE)
-    );
 
     // The "body" is the FRAME! value of the specialization.  It takes on the
     // binding we want to use (which we can't put in the exemplar archetype,
     // that binding has to be UNBOUND).  It also remembers the original
     // action in the phase, so Specializer_Dispatcher() knows what to call.
     //
-    RELVAL *body = ARR_HEAD(ACT_DETAILS(specialized));
+    RELVAL *body = ARR_AT(ACT_DETAILS(specialized), IDX_SPECIALIZER_FRAME);
     Move_Value(body, CTX_ARCHETYPE(exemplar));
     INIT_BINDING(body, VAL_BINDING(specializee));
     INIT_VAL_CONTEXT_PHASE(body, unspecialized);
 
-    Init_Action_Unbound(out, specialized);
+    Init_Action(out, specialized, VAL_ACTION_LABEL(specializee), UNBOUND);
     return false;  // code block did not throw
-}
-
-
-//
-//  Specializer_Dispatcher: C
-//
-// The evaluator does not do any special "running" of a specialized frame.
-// All of the contribution that the specialization had to make was taken care
-// of when Eval_Core() used f->special to fill from the exemplar.  So all this
-// does is change the phase and binding to match the function this layer wa
-// specializing.
-//
-REB_R Specializer_Dispatcher(REBFRM *f)
-{
-    REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-
-    REBVAL *exemplar = SPECIFIC(ARR_HEAD(details));
-    assert(IS_FRAME(exemplar));
-
-    INIT_FRM_PHASE(f, VAL_PHASE(exemplar));
-    FRM_BINDING(f) = VAL_BINDING(exemplar);
-
-    return R_REDO_UNCHECKED; // redo uses the updated phase and binding
 }
 
 
@@ -553,8 +543,8 @@ REB_R Specializer_Dispatcher(REBFRM *f)
 //  {Create a new action through partial or full specialization of another}
 //
 //      return: [action!]
-//      specializee "Function or specifying word (keeps word for debug info)"
-//          [action! word! path!]
+//      specializee "Function whose parameters will be set to fixed values"
+//          [action!]
 //      def "Definition for FRAME! fields for args and refinements"
 //          [block!]
 //  ]
@@ -567,36 +557,23 @@ REBNATIVE(specialize_p)  // see extended definition SPECIALIZE in %base-defs.r
 
     // Refinement specializations via path are pushed to the stack, giving
     // order information that can't be meaningfully gleaned from an arbitrary
-    // code block (e.g. `specialize 'append [dup: x | if y [part: z]`, we
+    // code block (e.g. `specialize :append [dup: x | if y [part: z]]`, we
     // shouldn't think that intends any ordering of /dup/part or /part/dup)
     //
     REBDSP lowest_ordered_dsp = DSP; // capture before any refinements pushed
-    REBSTR *opt_name;
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        &opt_name,
-        specializee,
-        SPECIFIED,
-        true // push_refines = true (don't generate temp specialization)
-    )){
-        return R_THROWN; // e.g. `specialize 'append/(throw 10 'dup) [...]`
-    }
 
-    // Note: Even if there was a PATH! doesn't mean there were refinements
-    // used, e.g. `specialize 'lib/append [...]`.
-
-    if (not IS_ACTION(D_OUT))
-        fail (PAR(specializee));
-    Move_Value(specializee, D_OUT); // Frees up D_OUT, GC guards action
+    // !!! When SPECIALIZE would take a PATH! instead of an action, this is
+    // where refinements could be pushed to weave into the specialization.
+    // To make the interface less confusing, we no longer do this...but we
+    // could push refinements here if we wanted to.
 
     if (Specialize_Action_Throws(
         D_OUT,
         specializee,
-        opt_name,
         ARG(def),
         lowest_ordered_dsp
     )){
-        return R_THROWN; // e.g. `specialize 'append/dup [value: throw 10]`
+        return R_THROWN;  // e.g. `specialize :append/dup [value: throw 10]`
     }
 
     return D_OUT;
@@ -647,7 +624,7 @@ void For_Each_Unspecialized_Param(
             continue;  // specialized out, not in interface
 
         Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
-        if (pclass == REB_P_RETURN or pclass == REB_P_LOCAL)
+        if (pclass == REB_P_LOCAL)
             continue;  // locals not in interface
 
         if (not hook(param, PHF_MASK_NONE, opaque)) {  // unsorted pass
@@ -676,7 +653,7 @@ void For_Each_Unspecialized_Param(
             continue;
 
         Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
-        if (pclass == REB_P_LOCAL or pclass == REB_P_RETURN)
+        if (pclass == REB_P_LOCAL)
             continue;
 
         // If the modal parameter has had its refinement specialized out, it
@@ -753,15 +730,15 @@ void For_Each_Unspecialized_Param(
 }
 
 
-struct First_Param_State {
+struct Find_Param_State {
     REBACT *act;
-    REBVAL *first_unspecialized;
+    REBVAL *param;
 };
 
 static bool First_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
 {
-    struct First_Param_State *s = cast(struct First_Param_State*, opaque);
-    assert(not s->first_unspecialized);  // should stop enumerating if found
+    struct Find_Param_State *s = cast(struct Find_Param_State*, opaque);
+    assert(not s->param);  // should stop enumerating if found
 
     if (not (flags & PHF_SORTED_PASS))
         return true;  // can't learn anything until second pass
@@ -769,8 +746,22 @@ static bool First_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
     if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
         return false;  // we know WORD!-based invocations will be 0 arity
 
-    s->first_unspecialized = param;
-    return false;  // found first_unspecialized, no need to look more
+    s->param = param;
+    return false;  // found first unspecialized, no need to look more
+}
+
+static bool Last_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
+{
+    struct Find_Param_State *s = cast(struct Find_Param_State*, opaque);
+
+    if (not (flags & PHF_SORTED_PASS))
+        return true;  // can't learn anything until second pass
+
+    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
+        return false;  // we know WORD!-based invocations will be 0 arity
+
+    s->param = param;
+    return true;  // keep looking and be left with the last
 }
 
 //
@@ -785,89 +776,49 @@ static bool First_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
 //
 REBVAL *First_Unspecialized_Param(REBACT *act)
 {
-    struct First_Param_State s;
+    struct Find_Param_State s;
     s.act = act;
-    s.first_unspecialized = nullptr;
+    s.param = nullptr;
 
     For_Each_Unspecialized_Param(act, &First_Param_Hook, &s);
 
-    return s.first_unspecialized;  // may be nullptr
+    return s.param;  // may be nullptr
 }
 
 
 //
-//  Block_Dispatcher: C
+//  Last_Unspecialized_Param: C
 //
-// There are no arguments or locals to worry about in a DOES, nor does it
-// heed any definitional RETURN.  This means that in many common cases we
-// don't need to do anything special to a BLOCK! passed to DO...no copying
-// or otherwise.  Just run it when the function gets called.
+// See notes on First_Unspecialized_Param() regarding complexity
 //
-// Yet `does [...]` isn't *quite* like `specialize 'do [source: [...]]`.  The
-// difference is subtle, but important when interacting with bindings to
-// fields in derived objects.  That interaction cannot currently resolve such
-// bindings without a copy, so it is made on demand.
-//
-// (Luckily these copies are often not needed, such as when the DOES is not
-// used in a method... -AND- it only needs to be made once.)
-//
-REB_R Block_Dispatcher(REBFRM *f)
+REBVAL *Last_Unspecialized_Param(REBACT *act)
 {
-    REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-    RELVAL *block = ARR_HEAD(details);  // note NON-CONST, may get updated!
-    assert(IS_BLOCK(block) and VAL_INDEX(block) == 0);
+    struct Find_Param_State s;
+    s.act = act;
+    s.param = nullptr;
 
-    if (IS_SPECIFIC(block)) {
-        if (FRM_BINDING(f) == UNBOUND) {
-            if (Do_Any_Array_At_Throws(f->out, SPECIFIC(block), SPECIFIED))
-                return R_THROWN;
-            return f->out;
-        }
+    For_Each_Unspecialized_Param(act, &Last_Param_Hook, &s);
 
-        // Until "virtual binding" is implemented, we would lose f->binding's
-        // ability to influence any variable lookups in the block if we did
-        // not relativize it to this frame.  This is the only current way to
-        // "beam down" influence of the binding for cases like:
-        //
-        // What forces us to copy the block are cases like this:
-        //
-        //     o1: make object! [a: 10 b: does [if true [a]]]
-        //     o2: make o1 [a: 20]
-        //     o2/b = 20
-        //
-        // While o2/b's ACTION! has a ->binding to o2, the only way for the
-        // [a] block to get the memo is if it is relative to o2/b.  It won't
-        // be relative to o2/b if it didn't have its existing relativism
-        // Derelativize()'d out to make it specific, and then re-relativized
-        // through a copy on behalf of o2/b.
+    return s.param;  // may be nullptr
+}
 
-        REBARR *body_array = Copy_And_Bind_Relative_Deep_Managed(
-            SPECIFIC(block),
-            ACT_PARAMLIST(FRM_PHASE(f)),
-            TS_WORD,
-            false  // do not gather LETs
-        );
+//
+//  First_Unspecialized_Arg: C
+//
+// Helper built on First_Unspecialized_Param(), can also give you the param.
+//
+REBVAL *First_Unspecialized_Arg(REBVAL **opt_param_out, REBFRM *f)
+{
+    REBACT *phase = FRM_PHASE(f);
+    REBVAL *param = First_Unspecialized_Param(phase);
+    if (opt_param_out)
+        *opt_param_out = param;
 
-        // Preserve file and line information from the original, if present.
-        //
-        if (GET_ARRAY_FLAG(VAL_ARRAY(block), HAS_FILE_LINE_UNMASKED)) {
-            LINK_FILE_NODE(body_array) = LINK_FILE_NODE(VAL_ARRAY(block));
-            MISC(body_array).line = MISC(VAL_ARRAY(block)).line;
-            SET_ARRAY_FLAG(body_array, HAS_FILE_LINE_UNMASKED);
-        }
+    if (param == nullptr)
+        return nullptr;
 
-        // Update block cell as a relativized copy (we won't do this again).
-        //
-        REBACT *phase = FRM_PHASE(f);
-        Init_Relative_Block(block, phase, body_array);
-    }
-
-    assert(IS_RELATIVE(block));
-
-    if (Do_Any_Array_At_Throws(f->out, block, SPC(f->varlist)))
-        return R_THROWN;
-
-    return f->out;
+    REBLEN index = param - ACT_PARAMS_HEAD(phase);
+    return FRM_ARGS_HEAD(f) + index;
 }
 
 
@@ -879,20 +830,18 @@ REB_R Block_Dispatcher(REBFRM *f)
 // call EVALUATE via Eval_Core() yet introspect the evaluator step.
 //
 bool Make_Invocation_Frame_Throws(
-    REBVAL *out, // in case there is a throw
     REBFRM *f,
-    REBVAL **first_arg_ptr, // returned so that MATCH can steal it
+    REBVAL **first_arg_ptr,  // returned so that MATCH can steal it
     const REBVAL *action
 ){
     assert(IS_ACTION(action));
+    assert(f == FS_TOP);
 
     // It is desired that any nulls encountered be processed as if they are
     // not specialized...and gather at the callsite if necessary.
     //
-    f->flags.bits |= EVAL_FLAG_PROCESS_ACTION
-        | EVAL_FLAG_ERROR_ON_DEFERRED_ENFIX;  // can't deal with ELSE/THEN/etc.
-
-    Push_Frame(out, f);
+    f->flags.bits |=
+        EVAL_FLAG_ERROR_ON_DEFERRED_ENFIX;  // can't deal with ELSE/THEN/etc.
 
     // === END FIRST PART OF CODE FROM DO_SUBFRAME ===
 
@@ -908,7 +857,7 @@ bool Make_Invocation_Frame_Throws(
 
     assert(FRM_BINDING(f) == VAL_BINDING(action));  // no invoke to change it
 
-    bool threw = Eval_Throws(f);
+    bool threw = Process_Action_Throws(f);
 
     assert(NOT_EVAL_FLAG(f, FULFILL_ONLY));  // cleared by the evaluator
 
@@ -928,33 +877,28 @@ bool Make_Invocation_Frame_Throws(
     if (threw)
         return true;
 
-    assert(IS_NULLED(f->out)); // guaranteed by dummy, for the skipped action
-
     // === END SECOND PART OF CODE FROM DO_SUBFRAME ===
 
     *first_arg_ptr = nullptr;
 
-    REBVAL *refine = nullptr;
     REBVAL *param = CTX_KEYS_HEAD(CTX(f->varlist));
     REBVAL *arg = CTX_VARS_HEAD(CTX(f->varlist));
     for (; NOT_END(param); ++param, ++arg) {
         Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
-        if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
-            refine = param;
-        }
-        else switch (pclass) {
+        if (TYPE_CHECK(param, REB_TS_REFINEMENT))
+            continue;  // optional so doesn't count
+
+        switch (pclass) {
           case REB_P_NORMAL:
           case REB_P_HARD_QUOTE:
           case REB_P_MODAL:
           case REB_P_SOFT_QUOTE:
-            if (not refine or VAL_LOGIC(refine)) {
-                *first_arg_ptr = arg;
-                goto found_first_arg_ptr;
-            }
-            break;
+            *first_arg_ptr = arg;
+            goto found_first_arg_ptr;
 
           case REB_P_LOCAL:
-          case REB_P_RETURN:
+          case REB_P_SEALED:
+          case REB_P_SPECIALIZED:
             break;
 
           default:
@@ -964,7 +908,7 @@ bool Make_Invocation_Frame_Throws(
 
     fail ("ACTION! has no args to MAKE FRAME! from...");
 
-found_first_arg_ptr:
+  found_first_arg_ptr:
 
     // DS_DROP_TO(lowest_ordered_dsp);
 
@@ -1004,36 +948,39 @@ bool Make_Frame_From_Varargs_Throws(
     // REBFRM whose built FRAME! context we will steal
 
     DECLARE_FRAME (f, parent->feed, EVAL_MASK_DEFAULT);
+    Push_Frame(out, f);
 
-    REBSTR *opt_label;
     if (Get_If_Word_Or_Path_Throws(
         out,
-        &opt_label,
         specializee,
         SPECIFIED,
         true  // push_refinements = true (DECLARE_FRAME captured original DSP)
     )){
+        Drop_Frame(f);
         return true;
     }
-    UNUSED(opt_label); // not used here
 
     if (not IS_ACTION(out))
         fail (specializee);
+
+    const REBSTR *label = VAL_ACTION_LABEL(out);
 
     DECLARE_LOCAL (action);
     Move_Value(action, out);
     PUSH_GC_GUARD(action);
 
     // We interpret phrasings like `x: does all [...]` to mean something
-    // like `x: specialize 'all [block: [...]]`.  While this originated
+    // like `x: specialize :all [block: [...]]`.  While this originated
     // from the Rebmu code golfing language to eliminate a pair of bracket
     // characters from `x: does [all [...]]`, it actually has different
     // semantics...which can be useful in their own right, plus the
     // resulting function will run faster.
 
     REBVAL *first_arg;
-    if (Make_Invocation_Frame_Throws(out, f, &first_arg, action))
+    if (Make_Invocation_Frame_Throws(f, &first_arg, action)) {
+        DROP_GC_GUARD(action);
         return true;
+    }
 
     UNUSED(first_arg); // MATCH uses to get its answer faster, we don't need
 
@@ -1052,8 +999,8 @@ bool Make_Frame_From_Varargs_Throws(
 
     // May not be at end or thrown, e.g. (x: does lit y x = 'y)
     //
+    DROP_GC_GUARD(action);  // before drop to balance at right time
     Drop_Frame(f);
-    DROP_GC_GUARD(action); // has to be after drop to balance at right time
 
     // The exemplar may or may not be managed as of yet.  We want it
     // managed, but Push_Action() does not use ordinary series creation to
@@ -1061,16 +1008,21 @@ bool Make_Frame_From_Varargs_Throws(
     //
     SET_SERIES_FLAG(exemplar, MANAGED); // can't use Manage_Series
 
-    Init_Frame(out, exemplar);
+    Init_Frame(out, exemplar, label);
     return false;
 }
 
 
 //
-//  Make_Action_From_Exemplar: C
+//  Alloc_Action_From_Exemplar: C
 //
-REBACT *Make_Action_From_Exemplar(REBCTX *exemplar)
-{
+// Leaves details blank, and lets you specify the dispatcher.
+//
+REBACT *Alloc_Action_From_Exemplar(
+    REBCTX *exemplar,
+    REBNAT dispatcher,
+    REBLEN details_capacity
+){
     REBACT *unspecialized = ACT(CTX_KEYLIST(exemplar));
 
     REBLEN num_slots = ACT_NUM_PARAMS(unspecialized) + 1;
@@ -1092,17 +1044,28 @@ REBACT *Make_Action_From_Exemplar(REBCTX *exemplar)
     RELVAL *alias = archetype + 1;
     for (; NOT_END(param); ++param, ++arg, ++alias) {
         Move_Value(alias, param);
-        if (not IS_NULLED(arg)) {
-            //
-            // Don't show argument in the parameter list.
-            //
-            TYPE_SET(alias, REB_TS_HIDDEN);
-            TYPE_SET(alias, REB_TS_UNBINDABLE);
 
-            // Indicate that argument is specialized out.
-            //
-            SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+        if (Is_Param_Hidden(param))
+            continue;  // leave it as-is, even if ~undefined~
+
+        // !!! This mutation is slightly uncomfortable, as it transforms a
+        // literal value in the frame to a different value.  However, on
+        // balance it seems that giving up one VOID! state to do this is about
+        // the best tradeoff that can be made.  If you really want the
+        // action to go with ~undefined~, you need to hide the argument
+        // before calling MAKE ACTION!
+        //
+        if (Is_Void_With_Sym(arg, SYM_UNDEFINED)) {
+            continue;
         }
+
+        // Don't show argument in the parameter list.
+        //
+        Specialize_Param(alias);
+
+        // Indicate that argument is specialized out.
+        //
+        SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
     }
 
     TERM_ARRAY_LEN(paramlist, num_slots);
@@ -1112,122 +1075,32 @@ REBACT *Make_Action_From_Exemplar(REBCTX *exemplar)
 
     REBACT *action = Make_Action(
         paramlist,
-        &Specializer_Dispatcher,
-        ACT_UNDERLYING(unspecialized), // common underlying action
-        exemplar, // also provide a context of specialization values
-        1 // details array capacity
+        dispatcher,
+        ACT_UNDERLYING(unspecialized),  // common underlying action
+        exemplar,  // also provide a context of specialization values
+        details_capacity
     );
 
-    Init_Frame(ARR_HEAD(ACT_DETAILS(action)), exemplar);
     return action;
 }
 
 
 //
-//  does: native [
+//  Make_Action_From_Exemplar: C
 //
-//  {Specializes DO for a value (or for args of another named function)}
+// Assumes you want a Specializer_Dispatcher with the exemplar in details.
 //
-//      return: [action!]
-//      'specializee [any-value!]
-//          {WORD! or PATH! names function to specialize, else arg to DO}
-//      :args [any-value! <...>]
-//          {arguments which will be consumed to fulfill a named function}
-//  ]
-//
-REBNATIVE(does)
+REBACT *Make_Action_From_Exemplar(REBCTX *exemplar)
 {
-    INCLUDE_PARAMS_OF_DOES;
-
-    REBVAL *specializee = ARG(specializee);
-
-    if (IS_BLOCK(specializee)) {
-        REBARR *paramlist = Make_Array_Core(
-            1, // archetype only...DOES always makes action with no arguments
-            SERIES_MASK_PARAMLIST
-        );
-
-        REBVAL *archetype = RESET_CELL(
-            Alloc_Tail_Array(paramlist),
-            REB_ACTION,
-            CELL_MASK_ACTION
-        );
-        VAL_ACT_PARAMLIST_NODE(archetype) = NOD(paramlist);
-        INIT_BINDING(archetype, UNBOUND);
-        TERM_ARRAY_LEN(paramlist, 1);
-
-        MISC_META_NODE(paramlist) = nullptr;  // REDESCRIBE can add help
-
-        // `does [...]` and `does do [...]` are not exactly the same.  The
-        // generated ACTION! of the first form uses Block_Dispatcher() and
-        // does on-demand relativization, so it's "kind of like" a `func []`
-        // in forwarding references to members of derived objects.  Also, it
-        // is optimized to not run the block with the DO native...hence a
-        // HIJACK of DO won't be triggered by invocations of the first form.
-        //
-        Manage_Array(paramlist);
-        REBACT *doer = Make_Action(
-            paramlist,
-            &Block_Dispatcher, // **SEE COMMENTS**, not quite like plain DO!
-            nullptr, // no underlying action (use paramlist)
-            nullptr, // no specialization exemplar (or inherited exemplar)
-            1 // details array capacity
-        );
-
-        // Block_Dispatcher() *may* copy at an indeterminate time, so to keep
-        // things invariant we have to lock it.
-        //
-        RELVAL *body = ARR_HEAD(ACT_DETAILS(doer));
-        Force_Value_Frozen_Deep(specializee);
-        Move_Value(body, specializee);
-
-        return Init_Action_Unbound(D_OUT, doer);
-    }
-
-    REBCTX *exemplar;
-    if (
-        GET_CELL_FLAG(specializee, UNEVALUATED)
-        and (IS_WORD(specializee) or IS_PATH(specializee))
-    ){
-        if (Make_Frame_From_Varargs_Throws(
-            D_OUT,
-            specializee,
-            ARG(args)
-        )){
-            return R_THROWN;
-        }
-        exemplar = VAL_CONTEXT(D_OUT);
-    }
-    else {
-        // On all other types, we just make it act like a specialized call to
-        // DO for that value.  But since we're manually specializing it, we
-        // are responsible for type-checking...the evaluator expects any
-        // specialization process to do so (otherwise it would have to pay
-        // for type checking on each call).
-        //
-        // !!! The error reports that DOES doesn't accept the type for its
-        // specializee argument, vs. that DO doesn't accept it.
-        //
-        REBVAL *typeset = ACT_PARAM(NATIVE_ACT(do), 1);
-        REBVAL *param = PAR(specializee);
-        if (not TYPE_CHECK(typeset, VAL_TYPE(specializee)))
-            fail (Error_Arg_Type(frame_, param, VAL_TYPE(specializee)));
-
-        exemplar = Make_Context_For_Action(
-            NATIVE_VAL(do),
-            DSP, // lower dsp would be if we wanted to add refinements
-            nullptr // don't set up a binder; just poke specializee in frame
-        );
-        assert(GET_SERIES_FLAG(exemplar, MANAGED));
-
-        // Put argument into DO's *second* frame slot (first is RETURN)
-        //
-        assert(VAL_KEY_SYM(CTX_KEY(exemplar, 1)) == SYM_RETURN);
-        Move_Value(CTX_VAR(exemplar, 2), specializee);
-        SET_CELL_FLAG(CTX_VAR(exemplar, 2), ARG_MARKED_CHECKED);
-        Move_Value(specializee, NATIVE_VAL(do));
-    }
-
-    REBACT *doer = Make_Action_From_Exemplar(exemplar);
-    return Init_Action_Unbound(D_OUT, doer);
+    REBACT *action = Alloc_Action_From_Exemplar(
+        exemplar,
+        &Specializer_Dispatcher,
+        IDX_SPECIALIZER_MAX  // details capacity
+    );
+    Init_Frame(
+        ARR_AT(ACT_DETAILS(action), IDX_SPECIALIZER_FRAME),
+        exemplar,
+        ANONYMOUS
+    );
+    return action;
 }

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -49,16 +49,40 @@ enum {
 //
 //  CT_String: C
 //
-REBINT CT_String(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_String(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    assert(ANY_STRING_KIND(CELL_KIND(a)));
-    assert(ANY_STRING_KIND(CELL_KIND(b)));
+    assert(ANY_STRING_KIND(CELL_KIND(a)) or REB_ISSUE == CELL_KIND(a));
+    assert(ANY_STRING_KIND(CELL_KIND(b)) or REB_ISSUE == CELL_KIND(b));
 
-    REBINT num = Compare_String_Vals(a, b, mode != 1);
+    REBLEN l1;
+    REBCHR(const*) cp1 = VAL_UTF8_LEN_SIZE_AT(&l1, nullptr, a);
 
-    if (mode >= 0) return (num == 0) ? 1 : 0;
-    if (mode == -1) return (num >= 0) ? 1 : 0;
-    return (num > 0) ? 1 : 0;
+    REBLEN l2;
+    REBCHR(const*) cp2 = VAL_UTF8_LEN_SIZE_AT(&l2, nullptr, b);
+
+    REBLEN len = MIN(l1, l2);
+
+    for (; len > 0; len--) {
+        REBUNI c1;
+        REBUNI c2;
+
+        cp1 = NEXT_CHR(&c1, cp1);
+        cp2 = NEXT_CHR(&c2, cp2);
+
+        REBINT d;
+        if (strict)
+            d = c1 - c2;
+        else
+            d = LO_CASE(c1) - LO_CASE(c2);
+
+        if (d != 0)
+            return d > 0 ? 1 : -1;
+    }
+
+    if (l1 == l2)
+        return 0;
+
+    return l1 > l2 ? 1 : -1;
 }
 
 
@@ -69,39 +93,22 @@ REBINT CT_String(const REBCEL *a, const REBCEL *b, REBINT mode)
 ***********************************************************************/
 
 
-static void swap_chars(REBVAL *val1, REBVAL *val2)
-{
-    REBSTR *s1 = VAL_STRING(val1);
-    REBSTR *s2 = VAL_STRING(val2);
-
-    REBUNI c1 = GET_CHAR_AT(s1, VAL_INDEX(val1));
-    REBUNI c2 = GET_CHAR_AT(s2, VAL_INDEX(val2));
-
-    SET_CHAR_AT(s1, VAL_INDEX(val1), c2);
-    SET_CHAR_AT(s2, VAL_INDEX(val2), c1);
-}
-
-static void reverse_binary(REBVAL *v, REBLEN len)
-{
-    REBYTE *bp = VAL_BIN_AT(v);
-
-    REBLEN n = 0;
-    REBLEN m = len - 1;
-    for (; n < len / 2; n++, m--) {
-        REBYTE b = bp[n];
-        bp[n] = bp[m];
-        bp[m] = b;
-    }
-}
-
-
-static void reverse_string(REBVAL *v, REBLEN len)
+static void reverse_string(REBSTR *str, REBLEN index, REBLEN len)
 {
     if (len == 0)
         return; // if non-zero, at least one character in the string
 
-    if (Is_String_Definitely_ASCII(v))
-        reverse_binary(v, len);
+    if (Is_String_Definitely_ASCII(str)) {
+        REBYTE *bp = STR_AT(str, index);
+
+        REBLEN n = 0;
+        REBLEN m = len - 1;
+        for (; n < len / 2; n++, m--) {
+            REBYTE b = bp[n];
+            bp[n] = bp[m];
+            bp[m] = b;
+        }
+    }
     else {
         // !!! This is an inefficient method for reversing strings with
         // variable size codepoints.  Better way could work in place:
@@ -111,10 +118,9 @@ static void reverse_string(REBVAL *v, REBLEN len)
         DECLARE_MOLD (mo);
         Push_Mold(mo);
 
-        REBLEN val_len_head = VAL_LEN_HEAD(v);
+        REBLEN val_len_head = STR_LEN(str);
 
-        REBSTR *s = VAL_STRING(v);
-        REBCHR(const*) up = STR_TAIL(s);  // last exists due to len != 0
+        REBCHR(const*) up = STR_TAIL(str);  // last exists due to len != 0
         REBLEN n;
         for (n = 0; n < len; ++n) {
             REBUNI c;
@@ -128,8 +134,10 @@ static void reverse_string(REBVAL *v, REBLEN len)
         // Effectively do a CHANGE/PART to overwrite the reversed portion of
         // the string (from the input value's index to the tail).
 
+        DECLARE_LOCAL (string);  // !!! Temp value, string type is irrelevant
+        Init_Any_String_At(string, REB_TEXT, str, index);
         Modify_String_Or_Binary(
-            v,
+            string,
             SYM_CHANGE,
             temp,
             AM_PART,  // heed len for deletion
@@ -140,238 +148,9 @@ static void reverse_string(REBVAL *v, REBLEN len)
         // Regardless of whether the whole string was reversed or just some
         // part from the index to the tail, the length shouldn't change.
         //
-        assert(VAL_LEN_HEAD(v) == val_len_head);
+        assert(VAL_LEN_HEAD(string) == val_len_head);
         UNUSED(val_len_head);
     }
-}
-
-
-//
-//  find_string: C
-//
-// Service routine for the FIND native on an ANY-STRING!
-//
-REBLEN find_string(
-    REBLEN *len,
-    REBSTR *str,
-    REBLEN index,
-    REBLEN end,
-    const REBCEL *pattern,
-    REBLEN flags,
-    REBINT skip
-){
-    // !!! `index` and `end` integrate the /PART.  If the /PART was negative,
-    // then index would have been swapped to be the lower value...making what
-    // was previously the index the limit.  However, that does not work with
-    // negative `skip` values, which by default considers 0 the limit of the
-    // backkwards search but otherwise presumably want a /PART to limit it.
-    // Passing in a real "limit" vs. an end which could be greater or less
-    // than the index would be one way of resolving this problem.  But it's
-    // a missing feature for now to do FIND/SKIP/PART with a negative skip.
-    //
-    assert(end >= index);
-
-    if (
-        ANY_STRING_KIND(CELL_KIND(pattern))
-        or ANY_WORD_KIND(CELL_KIND(pattern))
-        or REB_INTEGER == CELL_KIND(pattern)  // `find "ab10cd" 10` -> "10cd"
-    ){
-        bool str_is_all_ascii = false;  // !!! future string flag feature
-        bool pattern_is_all_ascii = false;
-        if (str_is_all_ascii and not pattern_is_all_ascii)
-            return NOT_FOUND;  // can't possibly find non-ascii in ascii
-
-        // !!! A TAG! does not have its delimiters in it.  The logic of the
-        // find would have to be rewritten to accomodate this, and it's a
-        // bit tricky as it is.  Let it settle down before trying that--and
-        // for now just form the tag into a temporary alternate series.
-
-        REBSTR *formed = nullptr;
-        const REBYTE *bp2;
-        REBSIZ size2;
-        if (
-            CELL_KIND(pattern) != REB_TEXT
-            and CELL_KIND(pattern) != REB_WORD
-         ){
-            // !!! `<tag>`, `set-word:` but FILE!, etc?
-            //
-            formed = Copy_Form_Cell(pattern, 0);
-            *len = STR_LEN(formed);
-            bp2 = STR_HEAD(formed);
-            size2 = STR_SIZE(formed);
-        }
-        else
-            bp2 = VAL_UTF8_LIMIT_AT(len, &size2, pattern, UNKNOWN);
-
-        REBLEN result;
-
-        if (
-            str_is_all_ascii
-            and skip == 1  // optimizations not written for skips
-        ){
-            if (*len > end - index)  // series not long enough for pattern
-                return NOT_FOUND;
-
-            assert(pattern_is_all_ascii);  // checked above
-
-            // If one knew that the series being searched in was all ASCII,
-            // then the same search code can be used as for binary...because
-            // the binary offset can be used as a character position.
-
-            if (flags & AM_FIND_CASE)
-                result = Find_Bin_In_Bin(
-                    SER(str),  // all_ascii can be treated same as binary
-                    index,
-                    bp2,
-                    size2,
-                    flags & AM_FIND_MATCH
-                );
-            else
-                return Find_Str_In_Bin(
-                    SER(str),  // all_ascii can be treated same as binary
-                    index,
-                    bp2,
-                    *len,
-                    size2,
-                    flags & AM_FIND_MATCH
-                );
-        }
-        else {
-            REBSTR *pattern_str;
-            REBLEN pattern_index;
-            if (formed) {
-                pattern_str = formed;
-                pattern_index = 0;
-            }
-            else if (ANY_STRING_KIND(CELL_KIND(pattern))) {
-                pattern_str = VAL_STRING(pattern);
-                pattern_index = VAL_INDEX(pattern);
-            }
-            else {
-                assert(ANY_WORD_KIND(CELL_KIND(pattern)));
-                pattern_str = VAL_WORD_SPELLING(pattern);
-                pattern_index = 0;
-            }
-
-            result = Find_Str_In_Str(
-                str,  // not all_ascii, has multibyte utf-8 sequences
-                index,
-                end,
-                skip,
-                pattern_str,
-                pattern_index,
-                *len,
-                flags & (AM_FIND_MATCH | AM_FIND_CASE)
-            );
-        }
-
-        if (formed)
-            Free_Unmanaged_Series(SER(formed));
-
-        return result;
-    }
-    else if (CELL_KIND(pattern) == REB_CHAR) {
-        *len = 1;
-
-        return Find_Char_In_Str(
-            VAL_CHAR(pattern),
-            str,
-            index,
-            end,
-            skip,
-            flags & (AM_FIND_MATCH | AM_FIND_CASE)
-        );
-    }
-    else if (CELL_KIND(pattern) == REB_BITSET) {
-        *len = 1;
-
-        return Find_Str_Bitset(
-            str,
-            index,
-            end,
-            skip,
-            VAL_BITSET(pattern),
-            flags & (AM_FIND_MATCH | AM_FIND_CASE)
-        );
-    }
-    else if (CELL_KIND(pattern) == REB_BINARY) {
-        //
-        // Finding an arbitrary binary (which may not be UTF-8) in a string
-        // is probably most sensibly done by thinking of the string itself
-        // as a binary, and then searching in that.  Invalid UTF-8 patterns
-        // simply would not be found.
-        //
-        REBSIZ psize = VAL_LEN_AT(pattern);
-        if (psize == 0)
-            return index;  // empty binaries / strings are matches
-
-        const REBYTE *pbytes = VAL_BIN_AT(pattern);
-        REBSIZ offset =
-            cast(REBYTE*, STR_AT(str, index)) - cast(REBYTE*, STR_HEAD(str));
-        REBLEN result = Find_Bin_In_Bin(
-            SER(str),
-            offset,
-            pbytes,
-            psize,
-            flags & (AM_FIND_MATCH)
-        );
-        if (result == NOT_FOUND)
-            return NOT_FOUND;
-
-        // We found a match, but the binary find did not count how many
-        // codepoints that was.  But what we know now is that it was valid.
-        // step through it to get the length.
-
-        REBCHR(const*) cp = cast(REBCHR(const*), pbytes);
-        REBCHR(const*) ep = cast(REBCHR(const*), pbytes + psize);
-
-        REBUNI c;
-        cp = NEXT_CHR(&c, cp);
-        *len = 1;
-        for (; cp != ep; cp = NEXT_CHR(&c, cp))
-            ++(*len);
-        return result;
-    }
-    else
-        fail ("find_string() received unknown pattern datatype");
-}
-
-
-// Common behaviors for:
-//
-//     MAKE STRING! ...
-//     TO STRING! ...
-//
-// !!! MAKE and TO were not historically very clearly differentiated in
-// Rebol, and so often they would "just do the same thing".  Ren-C ultimately
-// will seek to limit the synonyms/polymorphism, e.g. MAKE or TO STRING! of a
-// STRING! acting as COPY, in favor of having the user call COPY explicilty.
-//
-// Note also the existence of AS should be able to reduce copying, e.g.
-// `print ["spelling is" as string! word]` will be cheaper than TO or MAKE.
-//
-static REBSTR *MAKE_TO_String_Common(
-    const REBVAL *arg,
-    enum Reb_Strmode strmode
-){
-    if (IS_BINARY(arg))
-        return Append_UTF8_May_Fail(
-            nullptr,
-            cs_cast(VAL_BIN_AT(arg)),
-            VAL_LEN_AT(arg),
-            strmode
-        );
-
-    if (ANY_STRING(arg))
-        return Copy_String_At(arg);
-
-    if (ANY_WORD(arg))
-        return Copy_Mold_Value(arg, MOLD_FLAG_0);
-
-    if (IS_CHAR(arg))
-        return Make_Codepoint_String(VAL_CHAR(arg));
-
-    return Copy_Form_Value(arg, MOLD_FLAG_TIGHT);
 }
 
 
@@ -387,7 +166,7 @@ REB_R MAKE_String(
     if (opt_parent)
         fail (Error_Bad_Make_Parent(kind, opt_parent));
 
-    if (IS_INTEGER(def)) {
+    if (IS_INTEGER(def)) {  // new string with given integer capacity
         //
         // !!! We can't really know how many bytes to allocate for a certain
         // number of codepoints.  UTF-8 may take up to UNI_ENCODED_MAX bytes
@@ -401,6 +180,33 @@ REB_R MAKE_String(
         return Init_Any_String(out, kind, Make_String(Int32s(def, 0)));
     }
 
+    if (ANY_UTF8(def)) {  // new type for the UTF-8 data with new allocation
+        REBLEN len;
+        REBSIZ size;
+        const REBYTE *utf8 = VAL_UTF8_LEN_SIZE_AT(&len, &size, def);
+        UNUSED(len);  // !!! Data already valid and checked, should leverage
+        return Init_Any_String(
+            out,
+            kind,
+            Append_UTF8_May_Fail(  // !!! Should never fail
+                nullptr,
+                cs_cast(utf8),
+                size,
+                STRMODE_ALL_CODEPOINTS
+            )
+        );
+    }
+
+    if (IS_BINARY(def)) {  // not necessarily valid UTF-8, so must check
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, def);
+        return Init_Any_String(
+            out,
+            kind,
+            Append_UTF8_May_Fail(nullptr, cs_cast(at), size, STRMODE_NO_CR)
+        );
+    }
+
     if (IS_BLOCK(def)) {
         //
         // The construction syntax for making strings that are preloaded with
@@ -412,14 +218,16 @@ REB_R MAKE_String(
         // while #[string ["abcd" 2]] would join the pieces together in order
         // to produce #{abcd2}.  That behavior is not available in Ren-C.
 
-        if (VAL_ARRAY_LEN_AT(def) != 2)
+        REBLEN len;
+        const RELVAL *first = VAL_ARRAY_LEN_AT(&len, def);
+
+        if (len != 2)
             goto bad_make;
 
-        RELVAL *first = VAL_ARRAY_AT(def);
         if (not ANY_STRING(first))
             goto bad_make;
 
-        RELVAL *index = VAL_ARRAY_AT(def) + 1;
+        const RELVAL *index = first + 1;
         if (!IS_INTEGER(index))
             goto bad_make;
 
@@ -429,12 +237,6 @@ REB_R MAKE_String(
 
         return Init_Any_Series_At(out, kind, VAL_SERIES(first), i);
     }
-
-    return Init_Any_String(
-        out,
-        kind,
-        MAKE_TO_String_Common(def, STRMODE_NO_CR)
-    );
 
   bad_make:
     fail (Error_Bad_Make(kind, def));
@@ -446,10 +248,57 @@ REB_R MAKE_String(
 //
 REB_R TO_String(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
+    if (kind == REB_ISSUE) {  // encompasses what would have been TO CHAR!
+        if (IS_INTEGER(arg)) {
+            //
+            // `to issue! 1` is slated to keep the visual consistency intact,
+            // so that you'd get #1 back.  With issue! and char! unified,
+            // that means a way to get a codepoint is needed.  Since this is
+            // more about capturing an internal implementation, that falls
+            // under AS ISSUE!, which could handle multi-codepoint TUPLE! too.
+            //
+            fail ("Use AS ISSUE! to convert integer codepoint to ISSUE!");
+        }
+        if (IS_CHAR(arg) and VAL_CHAR(arg) == 0)
+            fail (Error_Illegal_Zero_Byte_Raw());  // `#` acts as codepoint 0
+
+        // Fall through
+    }
+
+    if (IS_BINARY(arg)) {
+        //
+        // !!! Historically TO would convert binaries to strings.  But as
+        // the definition of TO has been questioned and evolving, that no
+        // longer seems to make sense (e.g. if `TO TEXT! 1` is "1", the
+        // concept of implementation transformations doesn't fit).  Keep
+        // compatible for right now, but ultimately MAKE or AS should be
+        // used for this.
+        //
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);
+        return Init_Any_String(
+            out,
+            kind,
+            Append_UTF8_May_Fail(nullptr, cs_cast(at), size, STRMODE_NO_CR)
+        );
+    }
+
+    // !!! Historical behavior for TO TEXT! of TAG! did not FORM:
+    //
+    //     >> to text! <abc>
+    //     == "abc"
+    //
+    // However, that behavior is likely to change, as this behavior should
+    // be covered by `make text!` or `copy as text!`.  For the present
+    // moment, it is kept as-is to avoid disruption.
+    //
+    if (IS_TAG(arg))
+        return MAKE_String(out, kind, nullptr, arg);
+
     return Init_Any_String(
         out,
         kind,
-        MAKE_TO_String_Common(arg, STRMODE_NO_CR)
+        Copy_Form_Value(arg, MOLD_FLAG_TIGHT)
     );
 }
 
@@ -467,14 +316,22 @@ REBNATIVE(to_text)
 {
     INCLUDE_PARAMS_OF_TO_TEXT;
 
-    return Init_Any_String(
-        D_OUT,
-        REB_TEXT,
-        MAKE_TO_String_Common(
-            ARG(value),
-            REF(relax) ? STRMODE_ALL_CODEPOINTS : STRMODE_NO_CR
-        )
-    );
+    if (IS_BINARY(ARG(value)) and REF(relax)) {
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, ARG(value));
+        return Init_Any_String(
+            D_OUT,
+            REB_TEXT,
+            Append_UTF8_May_Fail(
+                nullptr,
+                cs_cast(at),
+                size,
+                STRMODE_ALL_CODEPOINTS
+            )
+        );
+    }
+
+    return rebValueQ("to text!", ARG(value), rebEND);
 }
 
 
@@ -519,67 +376,13 @@ static int Compare_Chr(void *thunk, const void *v1, const void *v2)
 
 
 //
-//  Sort_String: C
-//
-static void Sort_String(
-    REBVAL *string,
-    bool ccase,
-    REBVAL *skipv,
-    REBVAL *compv,
-    REBVAL *part,
-    bool rev
-){
-    // !!! System appears to boot without a sort of a string.  A different
-    // method will be needed for UTF-8... qsort() cannot work with variable
-    // sized codepoints.  However, it could work if all the codepoints were
-    // known to be ASCII range in the memory of interest, maybe common case.
-
-    if (not IS_NULLED(compv))
-        fail (Error_Bad_Refine_Raw(compv)); // !!! didn't seem to be supported (?)
-
-    REBLEN skip = 1;
-    REBLEN size = 1;
-    REBLEN thunk = 0;
-
-    REBLEN len = Part_Len_May_Modify_Index(string, part);  // length of sort
-    if (len <= 1)
-        return;
-
-    if (not IS_NULLED(skipv)) {
-        skip = Get_Num_From_Arg(skipv);
-        if (skip <= 0 or len % skip != 0 or skip > len)
-            fail (skipv);
-    }
-
-    // Use fast quicksort library function:
-    if (skip > 1) {
-        len /= skip;
-        size *= skip;
-    }
-
-    if (ccase) thunk |= CC_FLAG_CASE;
-    if (rev) thunk |= CC_FLAG_REVERSE;
-
-    reb_qsort_r(
-        VAL_STRING_AT(string),
-        len,
-        size * SER_WIDE(VAL_SERIES(string)),
-        &thunk,
-        Compare_Chr
-    );
-}
-
-
-//
 //  PD_String: C
 //
 REB_R PD_String(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
-    REBSTR *s = VAL_STRING(pvs->out);
-
     // Note: There was some more careful management of overflow here in the
     // PICK and POKE actions, before unification.  But otherwise the code
     // was less thorough.  Consider integrating this bit, though it seems
@@ -597,6 +400,7 @@ REB_R PD_String(
     */
 
     if (opt_setval == NULL) { // PICK-ing
+        const REBSTR *s = VAL_STRING(pvs->out);
         if (IS_INTEGER(picker) or IS_DECIMAL(picker)) { // #2312
             REBINT n = Int32(picker);
             if (n == 0)
@@ -611,90 +415,36 @@ REB_R PD_String(
             return pvs->out;
         }
 
-        if (IS_BLANK(picker)) {
-            //
-            // `f: %foo | f/bar/` should work
-            // https://github.com/rebol/rebol-issues/issues/2378
-            //
-            picker = EMPTY_TEXT;
-        }
-        else if (not (IS_WORD(picker) or ANY_STRING(picker)))
-            return R_UNHANDLED;
-
-        // !!! This is a historical and questionable feature, where path
-        // picking a string or word or otherwise out of a FILE! or URL! will
-        // generate a new FILE! or URL! with a slash in it.
-        //
-        //     >> x: %foo
-        //     >> type of 'x/bar
-        //     == path!
-        //
-        //     >> x/bar
-        //     == %foo/bar  ; a FILE!
-        //
-        // This can only be done with evaluations, since FILE! and URL! have
-        // slashes in their literal form:
-        //
-        //     >> type of '%foo/bar
-        //     == file!
-        //
-        // Because Ren-C unified picking and pathing, this somewhat odd
-        // feature is now part of PICKing a string from another string.
-
-        DECLARE_MOLD (mo);
-        Push_Mold(mo);
-
-        Form_Value(mo, pvs->out);
-
-        // This makes sure there's always a "/" at the end of the file before
-        // appending new material via a picker:
-        //
-        //     >> x: %foo
-        //     >> (x)/("bar")
-        //     == %foo/bar
-        //
-        if (STR_SIZE(mo->series) - mo->offset == 0)
-            Append_Codepoint(mo->series, '/');
-        else {
-            if (
-                *SER_AT(REBYTE, SER(mo->series), STR_SIZE(mo->series) - 1)
-                != '/'
-            ){
-                Append_Codepoint(mo->series, '/');
-            }
+        if (
+            IS_BLANK(picker)
+            or IS_WORD(picker)
+            or IS_TUPLE(picker)
+            or ANY_STRING(picker)
+        ){
+            fail (
+                "FILE! pathing replaced by %% and MAKE-FILE, see: "
+                "https://forum.rebol.info/t/1398"
+            );
         }
 
-        // !!! Code here previously would handle this case:
-        //
-        //     >> x/("/bar")
-        //     == %foo/bar
-        //
-        // It's changed, so now the way to do that would be to drop the last
-        // codepoint in the mold buffer, or advance the index position of the
-        // picker.  Punt on it for now, as it will be easier to write when
-        // UTF-8 Everywhere is actually in effect.
-
-        Form_Value(mo, picker);
-
-        Init_Any_String(pvs->out, VAL_TYPE(pvs->out), Pop_Molded_String(mo));
-        return pvs->out;
+        return R_UNHANDLED;
     }
 
     // Otherwise, POKE-ing
 
-    ENSURE_MUTABLE(pvs->out);
+    REBSTR *s = VAL_STRING_ENSURE_MUTABLE(pvs->out);
 
     if (not IS_INTEGER(picker))
         return R_UNHANDLED;
 
     REBINT n = Int32(picker);
     if (n == 0)
-        fail (Error_Out_Of_Range(picker)); // Rebol2/Red convention for 0
+        fail (Error_Out_Of_Range(SPECIFIC(picker))); // Rebol2/Red convention
     if (n < 0)
         ++n;
     n += VAL_INDEX(pvs->out) - 1;
     if (n < 0 or cast(REBLEN, n) >= STR_LEN(s))
-        fail (Error_Out_Of_Range(picker));
+        fail (Error_Out_Of_Range(SPECIFIC(picker)));
 
 
     if (IS_CHAR(opt_setval)) {
@@ -818,7 +568,7 @@ void Mold_Uni_Char(REB_MOLD *mo, REBUNI c, bool parened)
 //
 //  Mold_Text_Series_At: C
 //
-void Mold_Text_Series_At(REB_MOLD *mo, REBSTR *s, REBLEN index) {
+void Mold_Text_Series_At(REB_MOLD *mo, const REBSTR *s, REBLEN index) {
     REBSTR *buf = mo->series;
 
     if (index >= STR_LEN(s)) {
@@ -951,19 +701,19 @@ void Mold_Text_Series_At(REB_MOLD *mo, REBSTR *s, REBLEN index) {
 // wishes to preserve round-trip copy-and-paste from URL bars in browsers
 // to source and back.  Encoding concerns are handled elsewhere.
 //
-static void Mold_Url(REB_MOLD *mo, const REBCEL *v)
+static void Mold_Url(REB_MOLD *mo, REBCEL(const*) v)
 {
-    Append_String(mo->series, v, VAL_LEN_AT(v));
+    Append_String(mo->series, v);
 }
 
 
-static void Mold_File(REB_MOLD *mo, const REBCEL *v)
+static void Mold_File(REB_MOLD *mo, REBCEL(const*) v)
 {
-    REBLEN len = VAL_LEN_AT(v);
 
     Append_Codepoint(mo->series, '%');
 
-    REBCHR(const*) cp = VAL_STRING_AT(v);
+    REBLEN len;
+    REBCHR(const*) cp = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, v);
 
     REBLEN n;
     for (n = 0; n < len; ++n) {
@@ -978,10 +728,10 @@ static void Mold_File(REB_MOLD *mo, const REBCEL *v)
 }
 
 
-static void Mold_Tag(REB_MOLD *mo, const REBCEL *v)
+static void Mold_Tag(REB_MOLD *mo, REBCEL(const*) v)
 {
     Append_Codepoint(mo->series, '<');
-    Append_String(mo->series, v, VAL_LEN_AT(v));
+    Append_String(mo->series, v);
     Append_Codepoint(mo->series, '>');
 }
 
@@ -989,7 +739,7 @@ static void Mold_Tag(REB_MOLD *mo, const REBCEL *v)
 //
 //  MF_String: C
 //
-void MF_String(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_String(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     REBSTR *buf = mo->series;
 
@@ -1009,7 +759,7 @@ void MF_String(REB_MOLD *mo, const REBCEL *v, bool form)
     // would form with no delimiters, e.g. `form #foo` is just foo
     //
     if (form and kind != REB_TAG) {
-        Append_String(buf, v, VAL_LEN_AT(v));
+        Append_String(buf, v);
         return;
     }
 
@@ -1035,11 +785,6 @@ void MF_String(REB_MOLD *mo, const REBCEL *v, bool form)
         Mold_Tag(mo, v);
         break;
 
-      case REB_ISSUE:
-        Append_Codepoint(mo->series, '#');
-        Append_String(mo->series, v, VAL_LEN_AT(v));
-        break;
-
       default:
         panic (v);
     }
@@ -1056,17 +801,29 @@ REBTYPE(String)
     REBVAL *v = D_ARG(1);
     assert(ANY_STRING(v));
 
+    REBSYM sym = VAL_WORD_SYM(verb);
+
     REBLEN index = VAL_INDEX(v);
     REBLEN tail = VAL_LEN_HEAD(v);
 
-    REBFLGS sop_flags;  // SOP_XXX "Set Operation" flags
-
-    REBSYM sym = VAL_WORD_SYM(verb);
     switch (sym) {
+      case SYM_REFLECT: {
+        INCLUDE_PARAMS_OF_REFLECT;
+        UNUSED(ARG(value));  // accounted for by `v`
+
+        if (VAL_WORD_SYM(ARG(property)) == SYM_SIZE) {
+            REBSIZ size;
+            VAL_UTF8_SIZE_AT(&size, v);
+            return Init_Integer(D_OUT, size);
+        }
+        return Series_Common_Action_Maybe_Unhandled(frame_, verb); }
+
+      case SYM_UNIQUE:
+      case SYM_INTERSECT:
+      case SYM_UNION:
+      case SYM_DIFFERENCE:
+      case SYM_EXCLUDE:
         //
-        // !!! INTERSECT, UNION, DIFFERENCE temporarily unavailable on STRING!
-        //
-      case SYM_REFLECT:
       case SYM_SKIP:
       case SYM_AT:
         return Series_Common_Action_Maybe_Unhandled(frame_, verb);
@@ -1076,8 +833,7 @@ REBTYPE(String)
 
         UNUSED(PAR(series)); // already accounted for
 
-        REBSTR *s = VAL_STRING(v);
-        ENSURE_MUTABLE(v);
+        REBSTR *s = VAL_STRING_ENSURE_MUTABLE(v);
 
         REBINT limit;
         if (REF(part))
@@ -1121,7 +877,7 @@ REBTYPE(String)
         //
         if (IS_NULLED(ARG(value)) and len == 0) {  // only nulls bypass
             if (sym == SYM_APPEND) // append always returns head
-                VAL_INDEX(v) = 0;
+                VAL_INDEX_RAW(v) = 0;
             RETURN (v); // don't fail on read only if it would be a no-op
         }
 
@@ -1131,7 +887,7 @@ REBTYPE(String)
         if (REF(line))
             flags |= AM_LINE;
 
-        VAL_INDEX(v) = Modify_String_Or_Binary(  // does read-only check
+        VAL_INDEX_RAW(v) = Modify_String_Or_Binary(  // does read-only check
             v,
             cast(enum Reb_Symbol, sym),
             ARG(value),
@@ -1172,8 +928,8 @@ REBTYPE(String)
             skip = 1;
 
         REBLEN len;
-        REBLEN ret = find_string(
-            &len, VAL_STRING(v), index, tail, ARG(pattern), flags, skip
+        REBLEN ret = Find_Value_In_Binstr(
+            &len, v, tail, ARG(pattern), flags, skip
         );
 
         if (ret == NOT_FOUND)
@@ -1220,11 +976,11 @@ REBTYPE(String)
 
         if (REF(last)) {
             if (len > tail) {
-                VAL_INDEX(v) = 0;
+                VAL_INDEX_RAW(v) = 0;
                 len = tail;
             }
             else
-                VAL_INDEX(v) = cast(REBLEN, tail - len);
+                VAL_INDEX_RAW(v) = cast(REBLEN, tail - len);
         }
 
         if (VAL_INDEX(v) >= tail) {
@@ -1246,8 +1002,7 @@ REBTYPE(String)
         return D_OUT; }
 
       case SYM_CLEAR: {
-        ENSURE_MUTABLE(v);
-        REBSTR *s = VAL_STRING(v);
+        REBSTR *s = VAL_STRING_ENSURE_MUTABLE(v);
 
         if (index >= tail)
             RETURN (v);  // clearing after available data has no effect
@@ -1284,86 +1039,94 @@ REBTYPE(String)
             Copy_String_At_Limit(v, len)
         ); }
 
-    //-- Bitwise:
-
-      case SYM_INTERSECT:
-        sop_flags = SOP_FLAG_CHECK;
-        goto set_operation;
-
-      case SYM_UNION:
-        sop_flags = SOP_FLAG_BOTH;
-        goto set_operation;
-
-      case SYM_DIFFERENCE:
-        sop_flags = SOP_FLAG_BOTH | SOP_FLAG_CHECK | SOP_FLAG_INVERT;
-        goto set_operation;
-
-      set_operation: {
-        INCLUDE_PARAMS_OF_DIFFERENCE;  // should all have same spec
-
-        UNUSED(ARG(value1)); // covered by value
-
-        return Init_Any_Series(
-            D_OUT,
-            VAL_TYPE(v),
-            Make_Set_Operation_Series(
-                v,
-                ARG(value2),
-                sop_flags,
-                did REF(case),
-                REF(skip) ? Int32s(ARG(skip), 1) : 1
-            )
-        ); }
-
     //-- Special actions:
 
       case SYM_SWAP: {
-        ENSURE_MUTABLE(v);
-
         REBVAL *arg = D_ARG(2);
 
         if (VAL_TYPE(v) != VAL_TYPE(arg))
             fail (Error_Not_Same_Type_Raw());
 
-        ENSURE_MUTABLE(arg);
+        REBSTR *v_str = VAL_STRING_ENSURE_MUTABLE(v);
+        REBSTR *arg_str = VAL_STRING_ENSURE_MUTABLE(arg);
 
-        if (index < tail and VAL_INDEX(arg) < VAL_LEN_HEAD(arg))
-            swap_chars(v, arg);
+        if (index < tail and VAL_INDEX(arg) < VAL_LEN_HEAD(arg)) {
+            REBUNI v_c = GET_CHAR_AT(v_str, VAL_INDEX(v));
+            REBUNI arg_c = GET_CHAR_AT(arg_str, VAL_INDEX(arg));
+
+            SET_CHAR_AT(v_str, VAL_INDEX(v), arg_c);
+            SET_CHAR_AT(arg_str, VAL_INDEX(arg), v_c);
+        }
         RETURN (v); }
 
       case SYM_REVERSE: {
         INCLUDE_PARAMS_OF_REVERSE;
         UNUSED(ARG(series));
 
-        ENSURE_MUTABLE(v);
+        REBSTR *str = VAL_STRING_ENSURE_MUTABLE(v);
 
+        Move_Value(D_OUT, v);  // save before index adjustment
         REBINT len = Part_Len_May_Modify_Index(v, ARG(part));
         if (len > 0)
-            reverse_string(v, len);
-        RETURN (v); }
+            reverse_string(str, VAL_INDEX(v), len);
+        return D_OUT; }
 
       case SYM_SORT: {
         INCLUDE_PARAMS_OF_SORT;
 
-        ENSURE_MUTABLE(v);
+        REBYTE *data_at = VAL_STRING_AT_ENSURE_MUTABLE(v);
 
         UNUSED(PAR(series));
 
         if (REF(all))
             fail (Error_Bad_Refine_Raw(ARG(all)));
 
-        if (not Is_String_Definitely_ASCII(v))
+        if (not Is_String_Definitely_ASCII(VAL_STRING(v)))
             fail ("UTF-8 Everywhere: String sorting temporarily unavailable");
 
-        Sort_String(
-            v,
-            did REF(case),
-            ARG(skip),  // blank! if not /SKIP
-            ARG(compare),  // blank! if not /COMPARE
-            ARG(part),  // blank! if not /PART
-            did REF(reverse)
+        // !!! A different method will be needed for UTF-8... qsort() can't
+        // work with variable sized codepoints.  However, it could work if all
+        // the codepoints were known to be ASCII range in the memory of
+        // interest, maybe common case.
+
+        if (REF(compare))
+            fail (Error_Bad_Refine_Raw(PAR(compare))); // !!! not in R3-Alpha
+
+        Move_Value(D_OUT, v);  // before index modification
+        REBLEN len = Part_Len_May_Modify_Index(v, ARG(part));
+        if (len <= 1)
+            return D_OUT;
+
+        REBLEN skip;
+        if (not REF(skip))
+            skip = 1;
+        else {
+            skip = Get_Num_From_Arg(ARG(skip));
+            if (skip <= 0 or len % skip != 0 or skip > len)
+                fail (PAR(skip));
+        }
+
+        // Use fast quicksort library function:
+        REBLEN size = 1;
+        if (skip > 1) {
+            len /= skip;
+            size *= skip;
+        }
+
+        REBLEN thunk = 0;
+        if (REF(case))
+            thunk |= CC_FLAG_CASE;
+        if (REF(reverse))
+            thunk |= CC_FLAG_REVERSE;
+
+        reb_qsort_r(
+            data_at,
+            len,
+            size * sizeof(REBYTE),  // only ASCII for now
+            &thunk,
+            Compare_Chr
         );
-        RETURN (v); }
+        return D_OUT; }
 
       case SYM_RANDOM: {
         INCLUDE_PARAMS_OF_RANDOM;
@@ -1374,12 +1137,10 @@ REBTYPE(String)
             assert(ANY_STRING(v));
 
             REBSIZ utf8_size;
-            const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
+            REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
             Set_Random(Compute_CRC24(utf8, utf8_size));
-            return Init_Void(D_OUT);
+            return Init_Void(D_OUT, SYM_VOID);
         }
-
-        ENSURE_MUTABLE(v);
 
         if (REF(only)) {
             if (index >= tail)
@@ -1393,12 +1154,21 @@ REBTYPE(String)
             );
         }
 
-        if (not Is_String_Definitely_ASCII(v))
+        REBSTR *str = VAL_STRING_ENSURE_MUTABLE(v);
+
+        if (not Is_String_Definitely_ASCII(str))
             fail ("UTF-8 Everywhere: String shuffle temporarily unavailable");
 
-        ENSURE_MUTABLE(v);
+        bool secure = did REF(secure);
 
-        Shuffle_String(v, did REF(secure));
+        REBLEN n;
+        for (n = STR_LEN(str) - index; n > 1;) {
+            REBLEN k = index + cast(REBLEN, Random_Int(secure)) % n;
+            n--;
+            REBUNI swap = GET_CHAR_AT(str, k);
+            SET_CHAR_AT(str, k, GET_CHAR_AT(str, n + index));
+            SET_CHAR_AT(str, n + index, swap);
+        }
         RETURN (v); }
 
       default:
@@ -1417,7 +1187,7 @@ REBTYPE(String)
 //
 void Startup_String(void)
 {
-    Char_Escapes = ALLOC_N_ZEROFILL(REBYTE, MAX_ESC_CHAR + 1);
+    Char_Escapes = TRY_ALLOC_N_ZEROFILL(REBYTE, MAX_ESC_CHAR + 1);
 
     REBYTE *cp = Char_Escapes;
     REBYTE c;
@@ -1429,7 +1199,7 @@ void Startup_String(void)
     Char_Escapes[cast(REBYTE, '"')] = '"';
     Char_Escapes[cast(REBYTE, '^')] = '^';
 
-    URL_Escapes = ALLOC_N_ZEROFILL(REBYTE, MAX_URL_CHAR + 1);
+    URL_Escapes = TRY_ALLOC_N_ZEROFILL(REBYTE, MAX_URL_CHAR + 1);
 
     for (c = 0; c <= ' '; c++)
         URL_Escapes[c] = ESC_URL | ESC_FILE;

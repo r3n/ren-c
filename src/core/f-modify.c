@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -80,7 +80,7 @@ REBLEN Modify_Array(
 
     // Check /PART, compute LEN:
     if (flags & AM_SPLICE) {
-        const REBCEL *unescaped = VAL_UNESCAPED(src_val);
+        REBCEL(const*) unescaped = VAL_UNESCAPED(src_val);
         assert(ANY_ARRAY_KIND(CELL_KIND(unescaped)));
 
         ilen = VAL_LEN_AT(unescaped);
@@ -92,7 +92,7 @@ REBLEN Modify_Array(
         }
 
         if (not tail_newline) {
-            RELVAL *tail_cell = VAL_ARRAY_AT(unescaped) + ilen;
+            const RELVAL *tail_cell = VAL_ARRAY_AT(unescaped) + ilen;
             if (IS_END(tail_cell)) {
                 tail_newline = GET_ARRAY_FLAG(
                     VAL_ARRAY(src_val),
@@ -234,9 +234,9 @@ REBLEN Modify_String_Or_Binary(
 ){
     assert(sym == SYM_INSERT or sym == SYM_CHANGE or sym == SYM_APPEND);
 
-    ENSURE_MUTABLE(dst);  // rules out symbol strings (e.g. from ANY-WORD!)
+    ENSURE_MUTABLE(dst);  // note this also rules out ANY-WORD!s
 
-    REBSER *dst_ser = VAL_SERIES(dst);
+    REBSER *dst_ser = VAL_SERIES_ENSURE_MUTABLE(dst);
     REBLEN dst_idx = VAL_INDEX(dst);
     REBSIZ dst_used = SER_USED(dst_ser);
 
@@ -304,16 +304,54 @@ REBLEN Modify_String_Or_Binary(
 
     REBYTE src_byte;  // only used by BINARY! (mold buffer is UTF-8 legal)
 
-    if (IS_CHAR(src)) {  // characters store their encoding in their payload
-        if (VAL_CHAR(src) == '\0' and IS_SER_STRING(dst_ser))
-            fail (Error_Illegal_Zero_Byte_Raw());
+    if (IS_ISSUE(src)) {  // characters store their encoding in their payload
+        //
+        // !!! We pass in UNLIMITED for the limit of how long the input is
+        // because currently /PART speaks in terms of the destination series.
+        // However, if that were changed to /LIMIT then we would want to
+        // be cropping the /PART of the input via passing a parameter here.
+        //
+        src_ptr = VAL_UTF8_LEN_SIZE_AT_LIMIT(
+            &src_len_raw,
+            &src_size_raw,
+            src,
+            UNLIMITED
+        );
 
-        src_ptr = VAL_CHAR_ENCODED(src);
-        src_size_raw = VAL_CHAR_ENCODED_SIZE(src);
+        if (IS_SER_STRING(dst_ser)) {
+            if (src_len_raw == 0)
+                fail (Error_Illegal_Zero_Byte_Raw());  // no '\0' in strings
+        }
+        else {
+            if (src_len_raw == 0)
+                src_len_raw = src_size_raw = 1;  // Use the '\0' null term
+            else
+                src_len_raw = src_size_raw;  // binary counts length in bytes
+        }
+    }
+    else if (
+        ANY_STRING(src)
+        and not IS_TAG(src)  // tags need `<` and `>` to render
+    ){
+        // !!! Branch is very similar to the one for ISSUE! above (merge?)
 
-        if (IS_SER_STRING(dst_ser))
-            src_len_raw = 1;
-        else
+        // If Source == Destination we must prevent possible conflicts in
+        // the memory regions being moved.  Clone the series just to be safe.
+        //
+        // !!! It may be possible to optimize special cases like append.
+        //
+        if (VAL_SERIES(dst) == VAL_SERIES(src))
+            goto form;
+
+        src_ptr = VAL_STRING_AT(src);
+
+        // !!! We pass in UNLIMITED for the limit of how long the input is
+        // because currently /PART speaks in terms of the destination series.
+        // However, if that were changed to /LIMIT then we would want to
+        // be cropping the /PART of the input via passing a parameter here.
+        //
+        src_size_raw = VAL_SIZE_LIMIT_AT(&src_len_raw, src, UNLIMITED);
+        if (not IS_SER_STRING(dst_ser))
             src_len_raw = src_size_raw;
     }
     else if (IS_INTEGER(src)) {
@@ -330,7 +368,7 @@ REBLEN Modify_String_Or_Binary(
         src_len_raw = src_size_raw = 1;
     }
     else if (IS_BINARY(src)) {
-        REBSER *bin = VAL_BINARY(src);
+        const REBBIN *bin = VAL_BINARY(src);
         REBLEN offset = VAL_INDEX(src);
 
         src_ptr = BIN_AT(bin, offset);
@@ -343,7 +381,7 @@ REBLEN Modify_String_Or_Binary(
         }
         else {
             if (IS_SER_STRING(bin)) {  // guaranteed valid UTF-8
-                REBSTR *str = STR(bin);
+                const REBSTR *str = STR(bin);
                 if (Is_Continuation_Byte_If_Utf8(*src_ptr))
                     fail (Error_Bad_Utf8_Bin_Edit_Raw());
 
@@ -429,34 +467,11 @@ REBLEN Modify_String_Or_Binary(
             // between.  There is some rationale to this, though implications
             // for operations like TO TEXT! of a BLOCK! are unclear...
             //
-            RELVAL *item;
+            const RELVAL *item;
             for (item = VAL_ARRAY_AT(src); NOT_END(item); ++item)
                 Form_Value(mo, item);
             goto use_mold_buffer;
         }
-    }
-    else if (
-        ANY_STRING(src)
-        and not IS_TAG(src)  // tags need `<` and `>` to render
-    ){
-        // If Source == Destination we must prevent possible conflicts in
-        // the memory regions being moved.  Clone the series just to be safe.
-        //
-        // !!! It may be possible to optimize special cases like append.
-        //
-        if (VAL_SERIES(dst) == VAL_SERIES(src))
-            goto form;
-
-        src_ptr = VAL_STRING_AT(src);
-
-        // !!! We pass in an UNKNOWN for the limit of how long the input is
-        // because currently /PART speaks in terms of the destination series.
-        // However, if that were changed to /LIMIT then we would want to
-        // be cropping the /PART of the input via passing a parameter here.
-        //
-        src_size_raw = VAL_SIZE_LIMIT_AT(&src_len_raw, src, UNKNOWN);
-        if (not IS_SER_STRING(dst_ser))
-            src_len_raw = src_size_raw;
     }
     else { form:
 
@@ -508,9 +523,14 @@ REBLEN Modify_String_Or_Binary(
         src_len_total = src_len_raw * dups;
     }
 
+  //=//// BELOW THIS LINE, BE CAREFUL WITH BOOKMARK-USING ROUTINES //////=//
+
+    // We extract the destination's bookmarks for updating.  This may conflict
+    // with other updating functions.  Be careful not to use any of the
+    // functions like VAL_UTF8_SIZE_AT() etc. that leverage bookmarks after
+    // the extraction occurs.
+
     REBBMK *bookmark = nullptr;
-    if (IS_SER_STRING(dst_ser))
-        bookmark = LINK(dst_ser).bookmarks;
 
     // For strings, we should have generated a bookmark in the process of this
     // modification in most cases where the size is notable.  If we had not,
@@ -522,6 +542,8 @@ REBLEN Modify_String_Or_Binary(
         SET_SERIES_USED(dst_ser, dst_used + src_size_total);
 
         if (IS_SER_STRING(dst_ser)) {
+            bookmark = LINK(dst_ser).bookmarks;
+
             if (bookmark and BMK_INDEX(bookmark) > dst_idx) {  // only INSERT
                 BMK_INDEX(bookmark) += src_len_total;
                 BMK_OFFSET(bookmark) += src_size_total;
@@ -545,7 +567,11 @@ REBLEN Modify_String_Or_Binary(
                 dst_len_at = STR_INDEX_AT(STR(dst_ser), dst_size_at);
             }
             else
-                dst_size_at = VAL_SIZE_LIMIT_AT(&dst_len_at, dst, UNKNOWN);
+                dst_size_at = VAL_SIZE_LIMIT_AT(&dst_len_at, dst, UNLIMITED);
+
+            // Note: above functions may update the bookmarks --^
+            //
+            bookmark = LINK(dst_ser).bookmarks;
         }
         else {
             dst_len_at = VAL_LEN_AT(dst);
@@ -581,9 +607,11 @@ REBLEN Modify_String_Or_Binary(
                 }
                 else {  // count how many codepoints are in the `part`
                     part_size = part;
-                    REBCHR(*) cp = BIN_AT(dst_ser, dst_off);
-                    REBCHR(*) pp = BIN_AT(dst_ser, dst_off + part_size);
-                    if (Is_Continuation_Byte_If_Utf8(*pp))
+                    REBCHR(*) cp = cast(REBCHR(*), BIN_AT(dst_ser, dst_off));
+                    REBCHR(*) pp = cast(REBCHR(*),
+                        BIN_AT(dst_ser, dst_off + part_size)
+                    );
+                    if (Is_Continuation_Byte_If_Utf8(*cast(REBYTE*, pp)))
                         fail (Error_Bad_Utf8_Bin_Edit_Raw());
 
                     part = 0;
@@ -597,7 +625,7 @@ REBLEN Modify_String_Or_Binary(
                     part_size = dst_size_at;
                 }
                 else {
-                    REBLEN check;
+                    REBLEN check;  // v-- !!! This call uses bookmark, review
                     part_size = VAL_SIZE_LIMIT_AT(&check, dst, part);
                     assert(check == part);
                     UNUSED(check);
@@ -645,6 +673,8 @@ REBLEN Modify_String_Or_Binary(
         // good a cache as any to be relevant for the next operation.
         //
         if (IS_SER_STRING(dst_ser)) {
+            bookmark = LINK(dst_ser).bookmarks;
+
             if (bookmark and BMK_INDEX(bookmark) > dst_idx) {
                 BMK_INDEX(bookmark) = dst_idx;
                 BMK_OFFSET(bookmark) = dst_off;

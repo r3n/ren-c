@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -131,7 +131,7 @@ static void Expand_Word_Table(void)
     // The only full list of canon words available is the old hash table.
     // Hold onto it while creating the new hash table.
 
-    REBLEN old_num_slots = SER_LEN(PG_Canons_By_Hash);
+    REBLEN old_num_slots = SER_USED(PG_Canons_By_Hash);
     REBSTR* *old_canons_by_hash = SER_HEAD(REBSTR*, PG_Canons_By_Hash);
 
     REBLEN num_slots = Get_Hash_Prime_May_Fail(old_num_slots + 1);
@@ -196,7 +196,7 @@ static void Expand_Word_Table(void)
 // one "canon" interning to use for fast case-insensitive compares.  If that
 // canon form is GC'd, the agreed upon canon for the group will change.
 //
-REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
+const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
 {
     // The hashing technique used is called "linear probing":
     //
@@ -207,10 +207,10 @@ REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
     // actually kept larger than that, but to be on the right side of theory,
     // the table is always checked for expansion needs *before* the search.)
     //
-    REBLEN num_slots = SER_LEN(PG_Canons_By_Hash);
+    REBLEN num_slots = SER_USED(PG_Canons_By_Hash);
     if (PG_Num_Canon_Slots_In_Use > num_slots / 2) {
         Expand_Word_Table();
-        num_slots = SER_LEN(PG_Canons_By_Hash); // got larger
+        num_slots = SER_USED(PG_Canons_By_Hash);  // got larger
     }
 
     REBSTR* *canons_by_hash = SER_HEAD(REBSTR*, PG_Canons_By_Hash);
@@ -296,7 +296,7 @@ REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
     // The UTF-8 series can be aliased with AS to become an ANY-STRING! or a
     // BINARY!.  If it is, then it should not be modified.
     //
-    Freeze_Sequence(s);
+    Freeze_Series(s);
 
     if (not canon) {  // no canon found, so this interning must become canon
         SET_SERIES_INFO(s, STRING_CANON);
@@ -360,6 +360,33 @@ REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
 
 
 //
+//  Intern_Any_String_Managed: C
+//
+// The main use of interning ANY-STRING! is FILE! for ARRAY_FLAG_FILE_LINE.
+// It's important to make a copy, because you would not want the change of
+// `file` to affect the filename references in already loaded sources:
+//
+//     file: copy %test
+//     x: transcode/file data1 file
+//     append file "-2"  ; shouldn't change FILE OF X answer
+//     y: transcode/file data2 file
+//
+// So mutable series shouldn't be used directly.  Reusing the string interning
+// mechanics also cuts down on storage of redundant data (though it needs to
+// allow spaces).
+//
+// !!! With UTF-8 Everywhere, could locked strings be used here?  Should all
+// locked strings become interned, and forward pointers to the old series in
+// the background to the interned version?
+//
+const REBSTR *Intern_Any_String_Managed(const RELVAL *v) {
+    REBSIZ utf8_size;
+    REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
+    return Intern_UTF8_Managed(utf8, utf8_size);
+}
+
+
+//
 //  GC_Kill_Interning: C
 //
 // Unlink this spelling out of the circularly linked list of synonyms.
@@ -383,7 +410,7 @@ void GC_Kill_Interning(REBSTR *intern)
     assert(MISC(intern).bind_index.high == 0);  // shouldn't GC during binds?
     assert(MISC(intern).bind_index.low == 0);
 
-    REBLEN num_slots = SER_LEN(PG_Canons_By_Hash);
+    REBLEN num_slots = SER_USED(PG_Canons_By_Hash);
     REBSTR* *canons_by_hash = SER_HEAD(REBSTR*, PG_Canons_By_Hash);
 
     REBLEN skip;
@@ -443,36 +470,6 @@ void GC_Kill_Interning(REBSTR *intern)
 
 
 //
-//  Compare_Word: C
-//
-// Compare the names of two words and return the difference.
-// Note that words are kept UTF8 encoded.
-// Positive result if s > t and negative if s < t.
-//
-REBINT Compare_Word(const REBCEL *s, const REBCEL *t, bool strict)
-{
-    const REBYTE *sp = STR_HEAD(VAL_WORD_SPELLING(s));
-    const REBYTE *tp = STR_HEAD(VAL_WORD_SPELLING(t));
-
-    // !!! "Strict" is generally interpreted as "case-sensitive comparison".
-    // Using strcmp() means the two pointers must be to '\0'-terminated byte
-    // arrays, and they are checked byte-for-byte.  This does not account
-    // for unicode normalization.  Review.
-    //
-    // https://en.wikipedia.org/wiki/Unicode_equivalence#Normalization
-    //
-    if (strict)
-        return strcmp(cs_cast(sp), cs_cast(tp));
-
-    if (VAL_WORD_CANON(s) == VAL_WORD_CANON(t))
-        return 0; // equivalent canon forms are considered equal
-
-    // They must differ by case....
-    return Compare_UTF8(sp, tp, strsize(tp)) + 2;
-}
-
-
-//
 //  Startup_Interning: C
 //
 // Get the engine ready to do Intern_UTF8_Managed(), which is required to
@@ -516,7 +513,7 @@ void Startup_Interning(void)
 
 
 //
-//  Startup_Slash_1_Symbol: C
+//  Startup_Sequence_1_Symbol: C
 //
 // It's very desirable to have `/`, `/foo`, `/foo/`, `/foo/(bar)` etc. be
 // instances of the same datatype of PATH!.  In this scheme, `/` would act
@@ -540,11 +537,15 @@ void Startup_Interning(void)
 // available during scanning.  But scanning is what loads the %words.r symbol
 // list!  Break the Catch-22 by manually interning the symbol used.
 //
-void Startup_Slash_1_Symbol(void)
+void Startup_Sequence_1_Symbol(void)
 {
     const char *slash1 = "-slash-1-";
     assert(PG_Slash_1_Canon == nullptr);
     PG_Slash_1_Canon = Intern_UTF8_Managed(cb_cast(slash1), strsize(slash1));
+
+    const char *dot1 = "-dot-1-";
+    assert(PG_Dot_1_Canon == nullptr);
+    PG_Dot_1_Canon = Intern_UTF8_Managed(cb_cast(dot1), strsize(dot1));
 }
 
 
@@ -584,6 +585,7 @@ void Startup_Symbols(REBARR *words)
 
     RELVAL *word = ARR_HEAD(words);
     for (; NOT_END(word); ++word) {
+        assert(IS_WORD(word));  // real word, not fake (e.g. `/` as -slash-0-)
         REBSTR *canon = VAL_STORED_CANON(word);
 
         sym = cast(REBSYM, cast(REBLEN, sym) + 1);
@@ -591,6 +593,8 @@ void Startup_Symbols(REBARR *words)
 
         if (sym == SYM__SLASH_1_)
             assert(canon == PG_Slash_1_Canon);  // make sure it lined up!
+        else if (sym == SYM__DOT_1_)
+            assert(canon == PG_Dot_1_Canon);
 
         // More code was loaded than just the word list, and it might have
         // included alternate-case forms of the %words.r words.  Walk any
@@ -612,8 +616,8 @@ void Startup_Symbols(REBARR *words)
 
     *SER_AT(REBSTR*, PG_Symbol_Canons, cast(REBLEN, sym)) = NULL; // terminate
 
-    SET_SERIES_LEN(PG_Symbol_Canons, 1 + cast(REBLEN, sym));
-    assert(SER_LEN(PG_Symbol_Canons) == 1 + ARR_LEN(words));
+    SET_SERIES_USED(PG_Symbol_Canons, 1 + cast(REBLEN, sym));
+    assert(SER_USED(PG_Symbol_Canons) == 1 + ARR_LEN(words));
 
     // Do some sanity checks.  !!! Fairly critical, is debug-only appropriate?
 
@@ -639,6 +643,7 @@ void Shutdown_Symbols(void)
     PG_Symbol_Canons = nullptr;
 
     PG_Slash_1_Canon = nullptr;
+    PG_Dot_1_Canon = nullptr;
 }
 
 
@@ -664,7 +669,7 @@ void Shutdown_Interning(void)
         fflush(stdout);
 
         REBLEN slot;
-        for (slot = 0; slot < SER_LEN(PG_Canons_By_Hash); ++slot) {
+        for (slot = 0; slot < SER_USED(PG_Canons_By_Hash); ++slot) {
             REBSTR *canon = *SER_AT(REBSTR*, PG_Canons_By_Hash, slot);
             if (canon and canon != DELETED_CANON)
                 panic (canon);

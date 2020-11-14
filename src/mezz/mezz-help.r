@@ -71,24 +71,23 @@ description-of: function [
     return: [<opt> text!]
     v [<blank> any-value!]
 ][
-    opt switch type of get/any 'v [
-        void! [blank]
+    switch type of get/any 'v [
+        void! @[null]  ; don't voidify, want actual NULL
         any-array! [spaced ["array of length:" length of v]]
         image! [spaced ["size:" v/size]]
-        datatype! [
+        datatype! @[
             spec: ensure object! spec of v  ; "type specs" need simplifying
-            copy spec/title
+            opt copy spec/title
         ]
-        action! [
-            try if meta: meta-of :v [
-                copy get 'meta/description
+        action! @[  ; want null when IF doesn't match
+            if meta: meta-of :v @[
+                opt copy get 'meta/description  ; can be BLANK!
             ]
         ]
         gob! [spaced ["offset:" v/offset "size:" v/size]]
         object! [mold words of v]
         typeset! [mold make block! v]
         port! [mold reduce [v/spec/title v/spec/ref]]
-        default [blank]
     ]
 ]
 
@@ -104,14 +103,20 @@ browse: function [
 help: function [
     "Prints information about words and values (if no args, general help)."
 
-    return: <void>
+    return: [void!]
     'topic [<end> any-value!]
         "WORD! whose value to explain, or other HELP target (try HELP HELP)"
-    /doc
-        "Open web browser to related documentation."
+    /doc "Open web browser to related documentation."
 ][
+    return: specialize :return [value: ~]  ; unlabeled for no console display
+
     if undefined? 'topic [
-        print "#[void] is a literal VOID! value"
+        ;
+        ; !!! This should lead to a web page that offers help on the nature
+        ; of specific void usages, e.g. to explain what ~branched~ is and
+        ; how to use @[...] branches to avoid it.
+        ;
+        print [mold get/any 'topic "is a literal VOID! value"]
         return
     ]
 
@@ -186,8 +191,8 @@ help: function [
     make-libuser: does [
         libuser: copy system/contexts/lib
         for-each [key val] system/contexts/user [
-            if not void? get/any 'val [
-               append libuser reduce [key :val]
+            if set? 'val [
+               append libuser reduce [key get/any 'val]
             ]
         ]
         libuser
@@ -237,7 +242,7 @@ help: function [
             ] then [
                 return
             ]
-            enfixed: did all [action? :value | enfixed? :value]
+            enfixed: did all [action? :value, enfixed? :value]
         ]
     ] else [
         ; !!! There may be interesting meanings to apply to things like
@@ -254,7 +259,7 @@ help: function [
     ]
 
     ; Open the web page for it?
-    if doc and [match [action! datatype!] :value] [
+    all [doc, match [action! datatype!] :value] then [
         item: form :topic
         if action? get :topic [
             ;
@@ -349,7 +354,7 @@ help: function [
     ; Output exemplar calling string, e.g. LEFT + RIGHT or FOO A B C
     ; !!! Should refinement args be shown for enfixed case??
     ;
-    if enfixed and [not empty? args] [
+    all [enfixed, not empty? args] then [
         print [_ _ _ _ args/1 (uppercase mold topic) next args]
     ] else [
         print [_ _ _ _ (uppercase mold topic) args refinements]
@@ -360,16 +365,16 @@ help: function [
     print newline
 
     print "DESCRIPTION:"
-    print [_ _ _ _ (:meta/description or '{(undocumented)})]
+    print [_ _ _ _ any [meta/description {(undocumented)}]]
     print [_ _ _ _ (uppercase mold topic) {is an ACTION!}]
 
     print-args: function [list /indent-words] [
         for-each param list [
             type: ensure [<opt> block!] (
-                select try :meta/parameter-types to-word param
+                select try :meta/parameter-types to-word dequote param
             )
             note: ensure [<opt> text!] (
-                select try :meta/parameter-notes to-word param
+                select try :meta/parameter-notes to-word dequote param
             )
 
             print [_ _ _ _ param (if type [unspaced ["[" type "]"]])]
@@ -399,6 +404,8 @@ help: function [
         print "REFINEMENTS:"
         print-args/indent-words refinements
     ]
+
+    return  ; use overridden return vs. fallout so void is unlabeled
 ]
 
 
@@ -563,7 +570,7 @@ require-commit: function [
     ; If there's a specific ID then assume that if the current build does not
     ; have that ID then there *could* be a problem.
     ;
-    if (id: select c 'id) and [id <> commit] [
+    all [id: select c 'id, id <> commit] then [
         print [
             "This script has only been tested again commit" id LF
 

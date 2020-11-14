@@ -9,16 +9,16 @@
 //
 // Copyright 2012 REBOL Technologies
 // Copyright 2012 Saphirion AG
-// Copyright 2012-2020 Rebol Open Source Contributors
+// Copyright 2012-2020 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -197,6 +197,8 @@ REBNATIVE(checksum)
 {
     CRYPT_INCLUDE_PARAMS_OF_CHECKSUM;
 
+    Dequotify(ARG(settings));
+
     REBLEN len = Part_Len_May_Modify_Index(ARG(data), ARG(part));
 
     REBSIZ size;
@@ -358,9 +360,12 @@ REBNATIVE(rc4_key)
 {
     CRYPT_INCLUDE_PARAMS_OF_RC4_KEY;
 
-    struct mbedtls_arc4_context *ctx = ALLOC(struct mbedtls_arc4_context);
+    struct mbedtls_arc4_context *ctx = TRY_ALLOC(struct mbedtls_arc4_context);
     mbedtls_arc4_init(ctx);
-    mbedtls_arc4_setup(ctx, VAL_BIN_AT(ARG(key)), VAL_LEN_AT(ARG(key)));
+
+    REBSIZ key_len;
+    const REBYTE *key = VAL_BINARY_SIZE_AT(&key_len, ARG(key));
+    mbedtls_arc4_setup(ctx, key, key_len);
 
     return Init_Handle_Cdata_Managed(
         D_OUT,
@@ -397,11 +402,14 @@ REBNATIVE(rc4_stream)
 
     REBVAL *error = nullptr;
 
+    REBSIZ length;
+    REBYTE *output = VAL_BINARY_SIZE_AT_ENSURE_MUTABLE(&length, data);
+    const REBYTE *input = output;
     IF_NOT_0(cleanup, error, mbedtls_arc4_crypt(
         ctx,
-        VAL_LEN_AT(data),
-        VAL_BIN_AT(data),  // input "message"
-        VAL_BIN_AT(data)  // output (same, since it modifies)
+        length,
+        input,  // input "message"
+        output  // output (same, since it modifies)
     ));
 
   cleanup:
@@ -409,6 +417,27 @@ REBNATIVE(rc4_stream)
         rebJumps ("fail", error, rebEND);
 
     return rebVoid();
+}
+
+
+// For turning a BINARY! into an mbedTLS multiple-precision-integer ("bignum")
+// Returns an mbedTLS error code if there is a problem (use with IF_NOT_0)
+//
+static int Mpi_From_Binary(mbedtls_mpi* X, const REBVAL *binary)
+{
+    size_t size;
+    REBYTE *buf = rebBytes(&size, binary, rebEND);  // allocates w/rebMalloc()
+
+    int result = mbedtls_mpi_read_binary(X, buf, size);
+
+    // !!! It seems that `assert(mbedtls_mpi_size(X) == size)` is not always
+    // true, e.g. when the first byte is 0.
+    //
+    assert(mbedtls_mpi_size(X) <= size);
+
+    rebFree(buf);  // !!! This could use a non-copying binary reader API
+
+    return result;
 }
 
 
@@ -441,18 +470,17 @@ REBNATIVE(rsa)
     REBVAL *error = nullptr;
     REBVAL *result = nullptr;
 
-    size_t binary_len = rebUnbox("length of", n, rebEND);
+    REBSIZ binary_len;  // goto would cross initialization
 
     // Public exponents - required
     //
-    IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-        &ctx.N, VAL_BIN_AT(n), binary_len));
-    IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-        &ctx.E, VAL_BIN_AT(e), rebUnbox("length of", e, rebEND)));
+    IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.N, n));
+    IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.E, e));
+
+    binary_len = rebUnboxInteger("length of", n, rebEND);
+    ctx.len = binary_len;
     rebRelease(n);
     rebRelease(e);
-
-    ctx.len = binary_len;
 
     if (REF(private)) {
         REBVAL *d = rebValue("ensure binary! pick", obj, "'d", rebEND);
@@ -466,32 +494,20 @@ REBNATIVE(rsa)
         REBVAL *dq = rebValue("ensure binary! pick", obj, "'dq", rebEND);
         REBVAL *qinv = rebValue("ensure binary! pick", obj, "'qinv", rebEND);
 
-        // !!! Because BINARY! is not locked in memory or safe from GC, the
-        // libRebol API doesn't allow direct pointer access.  Use the
-        // internal VAL_BIN_AT for now, but consider if a temporary locking
-        // should be possible...locked until released.
-        //
         binary_len = rebUnbox("length of", d, rebEND);
 
-        IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-            &ctx.D, VAL_BIN_AT(d), binary_len));
+        IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.D, d));
 
         if (p)
-            IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-                &ctx.P, VAL_BIN_AT(p), rebUnbox("length of", p, rebEND)));
+            IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.P, p));
         if (q)
-            IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-                &ctx.Q, VAL_BIN_AT(q), rebUnbox("length of", q, rebEND)));
+            IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.Q, q));
         if (dp)
-            IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-                &ctx.DP, VAL_BIN_AT(dp), rebUnbox("length of", dp, rebEND)));
+            IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.DP, dp));
         if (dq)
-            IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-                &ctx.DQ, VAL_BIN_AT(dq), rebUnbox("length of", dq, rebEND)));
+            IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.DQ, dq));
         if (qinv)
-            IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(
-                &ctx.QP, VAL_BIN_AT(qinv),
-                rebUnbox("length of", qinv, rebEND)));
+            IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.QP, qinv));
 
         IF_NOT_0(cleanup, error, mbedtls_rsa_gen_key(
             &ctx,
@@ -509,11 +525,14 @@ REBNATIVE(rsa)
         rebRelease(qinv);
     }
 
-    // !!! See notes above about direct binary access via libRebol
-    //
   blockscope {
-    REBYTE *dataBuffer = VAL_BIN_AT(ARG(data));
-    REBINT data_len = rebUnbox("length of", ARG(data), rebEND);
+    //
+    // !!! This makes a copy of the data being encrypted.  The API should
+    // likely offer "raw" data access under some constraints (e.g. locking
+    // the data from relocation or resize).
+    //
+    REBSIZ data_len;
+    REBYTE *dataBuffer = rebBytes(&data_len, ARG(data), rebEND);
 
     // Buffer suitable for recapturing as a BINARY! for either the encrypted
     // or decrypted data
@@ -546,6 +565,8 @@ REBNATIVE(rsa)
         ));
     }
 
+    rebFree(dataBuffer);
+
     result = rebRepossess(crypted, binary_len);
   }
 
@@ -577,12 +598,7 @@ REBNATIVE(dh_generate_keypair)
     CRYPT_INCLUDE_PARAMS_OF_DH_GENERATE_KEYPAIR;
 
     REBVAL *g = ARG(base);
-    REBYTE *g_data = VAL_BIN_AT(g);
-    REBLEN g_size = rebUnbox("length of", g, rebEND);
-
     REBVAL *p = ARG(modulus);
-    REBYTE *p_data = VAL_BIN_AT(p);
-    REBLEN p_size = rebUnbox("length of", p, rebEND);
 
     struct mbedtls_dhm_context ctx;
     mbedtls_dhm_init(&ctx);
@@ -590,14 +606,17 @@ REBNATIVE(dh_generate_keypair)
     REBVAL *result = nullptr;
     REBVAL *error = nullptr;
 
+    REBSIZ p_size;  // goto would cross initialization
+
     // We avoid calling mbedtls_dhm_set_group() to assign the `G`, `P`, and
     // `len` fields, to not need intermediate mbedtls_mpi variables.  At time
     // of writing the code is equivalent--but if this breaks, use that method.
     //
-    IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(&ctx.G, g_data, g_size));
-    IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(&ctx.P, p_data, p_size));
-    assert(mbedtls_mpi_size(&ctx.P) == p_size);  // should reflect what we set
-    ctx.len = p_size;  // length of P is length of private and public keys
+    IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.G, g));
+    IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.P, p));
+
+    p_size = mbedtls_mpi_size(&ctx.P);
+    ctx.len = p_size;  // length of private and public keys
 
     // !!! OpenSSL includes a DH_check() routine that checks for suitability
     // of the Diffie Hellman parameters.  There doesn't appear to be an
@@ -769,36 +788,28 @@ REBNATIVE(dh_compute_secret)
     // otherwise gave Error(RE_EXT_CRYPT_INVALID_KEY_FIELD)
     //
     REBVAL *p = rebValue("ensure binary! pick", obj, "'modulus", rebEND);
-    REBYTE *p_data = VAL_BIN_AT(p);
-    REBLEN p_size = rebUnbox("length of", p, rebEND);
-
     REBVAL *x = rebValue("ensure binary! pick", obj, "'private-key", rebEND);
-    REBYTE *x_data = VAL_BIN_AT(x);
-    REBLEN x_size = rebUnbox("length of", x, rebEND);
 
     REBVAL *gy = ARG(peer_key);
-    REBYTE *gy_data = VAL_BIN_AT(gy);
-    REBLEN gy_size = rebUnbox("length of", x, rebEND);
 
     REBVAL *result = nullptr;
     REBVAL *error = nullptr;
 
+    REBSIZ p_size;  // goto would cross initialization
+
     struct mbedtls_dhm_context ctx;
     mbedtls_dhm_init(&ctx);
 
-    IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(&ctx.P, p_data, p_size));
-    assert(mbedtls_mpi_size(&ctx.P) == p_size);  // should reflect what we set
-    ctx.len = p_size;  // length of P is length of private and public keys
+    IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.P, p));
     rebRelease(p);
 
-    IF_NOT_0(cleanup, error, mbedtls_mpi_read_binary(&ctx.X, x_data, x_size));
+    p_size = mbedtls_mpi_size(&ctx.P);
+    ctx.len = p_size;  // length of private and public keys
+
+    IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.X, x));
     rebRelease(x);
 
-    IF_NOT_0(
-        cleanup,
-        error,
-        mbedtls_mpi_read_binary(&ctx.GY, gy_data, gy_size)
-    );
+    IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.GY, gy));
 
   blockscope {
     REBLEN s_size = ctx.len;  // shared key is same size as modulus/etc.
@@ -883,8 +894,10 @@ REBNATIVE(aes_key)
 {
     CRYPT_INCLUDE_PARAMS_OF_AES_KEY;
 
-    REBYTE *p_key = VAL_BIN_AT(ARG(key));
-    REBINT keybits = VAL_LEN_AT(ARG(key)) << 3;
+    REBSIZ p_size;
+    REBYTE *p_key = rebBytes(&p_size, ARG(key), rebEND);
+
+    REBINT keybits = p_size * 8;
     if (keybits != 128 and keybits != 192 and keybits != 256) {
         DECLARE_LOCAL (i);
         Init_Integer(i, keybits);
@@ -900,7 +913,7 @@ REBNATIVE(aes_key)
     );
 
     struct mbedtls_cipher_context_t *ctx
-        = ALLOC(struct mbedtls_cipher_context_t);
+        = TRY_ALLOC(struct mbedtls_cipher_context_t);
     mbedtls_cipher_init(ctx);
 
     REBVAL *error = nullptr;
@@ -913,6 +926,7 @@ REBNATIVE(aes_key)
         keybits,
         REF(decrypt) ? MBEDTLS_DECRYPT : MBEDTLS_ENCRYPT
     ));
+    rebFree(p_key);
 
     // Default padding mode is PKCS7, but TLS won't work unless you use zeros.
     // (Shown also by the %ssl_tls.c file for mbedTLS, see AES CBC ciphers.)
@@ -923,20 +937,22 @@ REBNATIVE(aes_key)
 
   blockscope {
     size_t blocksize = mbedtls_cipher_get_block_size(ctx);
-    if (IS_BINARY(ARG(iv))) {
-        if (VAL_LEN_AT(ARG(iv)) != blocksize) {
+    if (rebDid("binary?", ARG(iv), rebEND)) {
+        REBSIZ iv_size;
+        REBYTE *iv = rebBytes(&iv_size, ARG(iv), rebEND);
+
+        if (iv_size != blocksize) {
             error = rebValue("make error! [",
                 "Initialization vector block size not", rebI(blocksize),
             "]", rebEND);
             goto cleanup;
         }
 
-        IF_NOT_0(cleanup, error,
-            mbedtls_cipher_set_iv(ctx, VAL_BIN_AT(ARG(iv)), blocksize)
-        );
+        IF_NOT_0(cleanup, error, mbedtls_cipher_set_iv(ctx, iv, blocksize));
+        rebFree(iv);
     }
     else
-        assert(IS_BLANK(ARG(iv)));
+        assert(rebDid("blank?", ARG(iv), rebEND));
   }
 
   cleanup:
@@ -978,11 +994,13 @@ REBNATIVE(aes_stream)
     struct mbedtls_cipher_context_t *ctx
         = VAL_HANDLE_POINTER(struct mbedtls_cipher_context_t, ARG(ctx));
 
-    REBYTE *input = VAL_BIN_AT(ARG(data));
-    REBINT ilen = VAL_LEN_AT(ARG(data));
+    REBSIZ ilen;
+    REBYTE *input = rebBytes(&ilen, ARG(data), rebEND);
 
-    if (ilen == 0)
+    if (ilen == 0) {
+        rebFree(input);
         return nullptr;  // !!! Is NULL a good result for 0 data?
+    }
 
     REBVAL *error = nullptr;
     REBVAL *result = nullptr;
@@ -1000,7 +1018,7 @@ REBNATIVE(aes_stream)
     // the old AES implementation--but this needs to change, maybe to
     // a PORT! model of some kind.
     //
-    REBINT pad_len = (((ilen - 1) >> 4) << 4) + blocksize;
+    REBSIZ pad_len = (((ilen - 1) >> 4) << 4) + blocksize;
 
     REBYTE *pad_data;
     if (ilen < pad_len) {
@@ -1021,6 +1039,8 @@ REBNATIVE(aes_stream)
     IF_NOT_0(cleanup, error,
         mbedtls_cipher_update(ctx, input, pad_len, output, &olen)
     );
+
+    rebFree(input);
 
     result = rebRepossess(output, olen);
 
@@ -1207,12 +1227,7 @@ REBNATIVE(ecdh_shared_secret)
     rebEND);
 
     IF_NOT_0(cleanup, error,
-        mbedtls_mpi_read_binary(
-            &ctx.ctx.mbed_ecdh.d,
-            VAL_BIN_AT(ARG(private)),
-            num_bytes
-        )
-    );
+        Mpi_From_Binary(&ctx.ctx.mbed_ecdh.d, ARG(private)));
 
   blockscope {
     uint8_t *secret = rebAllocN(uint8_t, num_bytes);
@@ -1300,5 +1315,5 @@ REBNATIVE(shutdown_crypto)
     }
   #endif
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -30,15 +30,22 @@
 //
 //  "Converts a value to a human-readable string."
 //
-//      value [<opt> any-value!]
-//          "The value to form"
+//      value "The value to form (will error on VOID!)"
+//          [any-value!]
 //  ]
 //
 REBNATIVE(form)
 {
     INCLUDE_PARAMS_OF_FORM;
 
-    return Init_Text(D_OUT, Copy_Form_Value(ARG(value), 0));
+    REBVAL *v = ARG(value);
+    if (IS_VOID(v)) {
+        DECLARE_LOCAL (word);
+        Init_Word(word, VAL_PARAM_SPELLING(PAR(value)));
+        fail (Error_Need_Non_Void_Core(word, SPECIFIED, v));
+    }
+
+    return Init_Text(D_OUT, Copy_Form_Value(v, 0));
 }
 
 
@@ -47,6 +54,7 @@ REBNATIVE(form)
 //
 //  "Converts a value to a REBOL-readable string."
 //
+//      return: [text!]
 //      value "The value to mold"
 //          [any-value!]
 //      /only "For a block value, mold only its contents, no outer []"
@@ -54,8 +62,8 @@ REBNATIVE(form)
 //      /flat "No indentation"
 //      /limit "Limit to a certain length"
 //          [integer!]
-//      /truncated "Returns LOGIC! of whether the mold was truncated"
-//          [<output>]
+//      /truncated "Whether the mold was truncated"
+//          [<output> logic!]
 //  ]
 //
 REBNATIVE(mold)
@@ -128,7 +136,7 @@ REBNATIVE(write_stdout)
         assert(IS_CHAR(v));
         printf("%s", VAL_CHAR_ENCODED(v));
     }
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
   #endif
 }
 
@@ -154,9 +162,7 @@ REBNATIVE(new_line)
     bool mark = VAL_LOGIC(ARG(mark));
 
     REBVAL *pos = ARG(position);
-    ENSURE_MUTABLE(pos);
-
-    RELVAL *item = VAL_ARRAY_AT(pos);
+    RELVAL *item = VAL_ARRAY_AT_ENSURE_MUTABLE(pos);
 
     REBINT skip;
     if (REF(all))
@@ -209,7 +215,7 @@ REBNATIVE(new_line_q)
 
     REBVAL *pos = ARG(position);
 
-    REBARR *arr;
+    const REBARR *arr;
     const RELVAL *item;
 
     if (IS_VARARGS(pos)) {

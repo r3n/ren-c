@@ -12,7 +12,7 @@ REBOL [
 
     Rights: {
         Copyright 2017 Atronix Engineering
-        Copyright 2017-2018 Rebol Open Source Developers
+        Copyright 2017-2018 Ren-C Open Source Contributors
     }
     License: {
         Licensed under the Apache License, Version 2.0
@@ -82,7 +82,10 @@ filter-flag: function [
         fail ["Tag must be <prefix:flag> ->" (flag)]
     ]
 
-    return all [prefix = header | to-text option]
+    return all [
+        prefix = header
+        to-text option
+    ]
 ]
 
 run-command: function [
@@ -278,10 +281,9 @@ set-target-platform: func [
         'emscripten [
             target-platform: emscripten
         ]
-        default [
-            print ["Unknown platform:" platform "falling back to POSIX"]
-            target-platform: posix
-        ]
+    ] else [
+        print ["Unknown platform:" platform "falling back to POSIX"]
+        target-platform: posix
     ]
 ]
 
@@ -345,7 +347,10 @@ application-class: make project-class [
     ]
 
     command: method [return: [text!]] [
-        ld: linker or [default-linker]
+        ld: any [
+            linker
+            default-linker
+        ]
         ld/command
             output
             depends
@@ -372,7 +377,10 @@ dynamic-library-class: make project-class [
         <with>
         default-linker
     ][
-        l: linker or [default-linker]
+        l: any [
+            linker
+            default-linker
+        ]
         l/command/dynamic
             output
             depends
@@ -532,7 +540,10 @@ gcc: make compiler-class [
 
             output: file-to-local output
 
-            if (E or [ends-with? output target-platform/obj-suffix]) [
+            any [
+                E
+                ends-with? output target-platform/obj-suffix
+            ] then [
                 keep output
             ] else [
                 keep [output target-platform/obj-suffix]
@@ -618,7 +629,10 @@ cl: make compiler-class [
             output: file-to-local output
             keep unspaced [
                 either E ["/Fi"]["/Fo"]
-                if (E or [ends-with? output target-platform/obj-suffix]) [
+                any [
+                    E
+                    ends-with? output target-platform/obj-suffix
+                ] then [
                     output
                 ] else [
                     unspaced [output target-platform/obj-suffix]
@@ -746,10 +760,9 @@ ld: make linker-class [
             #entry [
                 _
             ]
-            default [
-                dump dep
-                fail "unrecognized dependency"
-            ]
+        ] else [
+            dump dep
+            fail "unrecognized dependency"
         ]
     ]
 
@@ -841,10 +854,8 @@ llvm-link: make linker-class [
             #entry [
                 _
             ]
-            default [
-                dump dep
-                fail "unrecognized dependency"
-            ]
+            (elide dump dep)
+            fail "unrecognized dependency"
         ]
     ]
 ]
@@ -935,10 +946,8 @@ link: make linker-class [
             #entry [
                 _
             ]
-            default [
-                dump dep
-                fail "unrecognized dependency"
-            ]
+            (elide dump dep)
+            fail "unrecognized dependency"
         ]
     ]
 ]
@@ -1047,7 +1056,14 @@ object-file-class: make object! [
             target: output
             depends: append copy either depends [depends][[]] source
             commands: reduce [command/I/D/F/O/g/(
-                try if (PIC or [parent/class = #dynamic-library]) ['PIC]
+                any [
+                    PIC
+                    parent/class = #dynamic-library
+                ] then [
+                    'PIC
+                ] else [
+                    _
+                ]
             )
                 opt parent/includes
                 opt parent/definitions
@@ -1258,10 +1274,9 @@ generator-class: make object! [
                     copy project/output
                 ]
             ]
-            default [
-                basename: project/output
-                project/output: join basename suffix
-            ]
+        ] else [
+            basename: project/output
+            project/output: join basename suffix
         ]
 
         project/basename: basename
@@ -1290,10 +1305,7 @@ generator-class: make object! [
             #object-file [
                 setup-output project
             ]
-            default [
-                return
-            ]
-        ]
+        ] else [return]
     ]
 ]
 
@@ -1343,7 +1355,7 @@ makefile: make generator-class [
                         fail ["Unknown entry/target type" entry/target]
                     ]
                     for-each w (ensure [block! blank!] entry/depends) [
-                        switch w/class [
+                        switch pick (try match object! w) 'class [
                             #variable [
                                 keep ["$(" w/name ")"]
                             ]
@@ -1357,8 +1369,7 @@ makefile: make generator-class [
                             keep case [
                                 file? w [file-to-local w]
                                 file? w/output [file-to-local w/output]
-                                default [w/output]
-                            ]
+                            ] else [w/output]
                         ]
                     ]
                 ]
@@ -1451,10 +1462,8 @@ makefile: make generator-class [
                 #dynamic-extension #static-extension [
                     _
                 ]
-                default [
-                    dump dep
-                    fail ["unrecognized project type:" dep/class]
-                ]
+                (elide dump dep)
+                fail ["unrecognized project type:" dep/class]
             ]
         ]
     ]
@@ -1499,13 +1508,11 @@ Execution: make generator-class [
         'Linux [linux]
         'OSX [osx]
         'Android [android]
-
-        default [
-           print [
-               "Untested platform" system/platform "- assume POSIX compilant"
-           ]
-           posix
+    ] else [
+        print [
+            "Untested platform" system/platform "- assume POSIX compilant"
         ]
+        posix
     ]
 
     gen-cmd-create: :host/gen-cmd-create
@@ -1545,10 +1552,8 @@ Execution: make generator-class [
                     call/shell cmd
                 ]
             ]
-            default [
-                dump target
-                fail "Unrecognized target class"
-            ]
+            (elide dump target)
+            fail "Unrecognized target class"
         ]
     ]
 
@@ -1614,10 +1619,8 @@ Execution: make generator-class [
                     run dep
                 ]
             ]
-            default [
-                dump project
-                fail ["unrecognized project type:" project/class]
-            ]
+            (elide dump project)
+            fail ["unrecognized project type:" project/class]
         ]
     ]
 ]
@@ -1836,6 +1839,8 @@ visual-studio: make generator-class [
         output-dir [file!] {Solution directory}
         project [object!]
     ][
+        assert [dir? output-dir]
+
         project-name: if project/class = #entry [
             project/target
         ] else [
@@ -2188,7 +2193,7 @@ visual-studio: make generator-class [
 }
         ]
 
-        write out-file: output-dir/(unspaced [project-name ".vcxproj"]) xml
+        write (out-file: make-file [(output-dir) (project-name) .vcxproj]) xml
         ;print ["Wrote to" out-file]
     ]
 
@@ -2198,8 +2203,10 @@ visual-studio: make generator-class [
         solution [object!]
         /x86
     ][
-        buf: make binary! 2048
+        assert [dir? output-dir]
         assert [solution/class = #solution]
+
+        buf: make binary! 2048
 
         prepare solution
 
@@ -2273,7 +2280,7 @@ visual-studio: make generator-class [
 
         append buf "EndGlobal^/"
 
-        write output-dir/(unspaced [solution/name ".sln"]) buf
+        write (make-file [(output-dir) (solution/name) .sln]) buf
     ]
 ]
 

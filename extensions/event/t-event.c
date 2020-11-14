@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -37,7 +37,7 @@
 // It doesn't check key codes, doesn't check if EVF_HAS_XY but still compares
 // the x and y coordinates anyway...
 //
-REBINT Cmp_Event(const REBCEL *t1, const REBCEL *t2)
+REBINT Cmp_Event(REBCEL(const*) t1, REBCEL(const*) t2)
 {
     REBINT  diff;
 
@@ -55,11 +55,10 @@ REBINT Cmp_Event(const REBCEL *t1, const REBCEL *t2)
 //
 //  CT_Event: C
 //
-REBINT CT_Event(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Event(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBINT diff = Cmp_Event(a, b);
-    if (mode >=0) return diff == 0;
-    return -1;
+    UNUSED(strict);
+    return Cmp_Event(a, b);
 }
 
 
@@ -67,7 +66,7 @@ REBINT CT_Event(const REBCEL *a, const REBCEL *b, REBINT mode)
 //
 //  Set_Event_Var: C
 //
-static bool Set_Event_Var(REBVAL *event, const REBVAL *word, const REBVAL *val)
+static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
 {
     switch (VAL_WORD_SYM(word)) {
       case SYM_TYPE: {
@@ -172,8 +171,8 @@ static bool Set_Event_Var(REBVAL *event, const REBVAL *word, const REBVAL *val)
         mutable_VAL_EVENT_FLAGS(event)
             &= ~(EVF_DOUBLE | EVF_CONTROL | EVF_SHIFT);
 
-        RELVAL *item;
-        for (item = VAL_ARRAY_HEAD(val); NOT_END(item); ++item) {
+        const RELVAL *item;
+        for (item = ARR_HEAD(VAL_ARRAY(val)); NOT_END(item); ++item) {
             if (not IS_WORD(item))
                 continue;
 
@@ -207,24 +206,24 @@ static bool Set_Event_Var(REBVAL *event, const REBVAL *word, const REBVAL *val)
 //
 //  Set_Event_Vars: C
 //
-void Set_Event_Vars(REBVAL *evt, RELVAL *blk, REBSPC *specifier)
+void Set_Event_Vars(REBVAL *evt, const RELVAL *head, REBSPC *specifier)
 {
     DECLARE_LOCAL (var);
     DECLARE_LOCAL (val);
 
-    while (NOT_END(blk)) {
-        Derelativize(var, blk, specifier);
-        ++blk;
+    while (NOT_END(head)) {
+        Derelativize(var, head, specifier);
+        ++head;
 
         if (not IS_SET_WORD(var))
             fail (var);
 
-        if (IS_END(blk))
+        if (IS_END(head))
             Init_Blank(val);
         else
-            Get_Simple_Value_Into(val, blk, specifier);
+            Get_Simple_Value_Into(val, head, specifier);
 
-        ++blk;
+        ++head;
 
         if (!Set_Event_Var(evt, var, val))
             fail (Error_Bad_Field_Set_Raw(var, Type_Of(val)));
@@ -237,9 +236,12 @@ void Set_Event_Vars(REBVAL *evt, RELVAL *blk, REBSPC *specifier)
 //
 // Will return BLANK! if the variable is not available.
 //
-static REBVAL *Get_Event_Var(RELVAL *out, const REBCEL *v, REBSTR *name)
-{
-    switch (STR_SYMBOL(name)) {
+static REBVAL *Get_Event_Var(
+    RELVAL *out,
+    REBCEL(const*) v,
+    const REBSTR *canon
+){
+    switch (STR_SYMBOL(canon)) {
       case SYM_TYPE: {
         if (VAL_EVENT_TYPE(v) == SYM_NONE)  // !!! Should this ever happen?
             return nullptr;
@@ -329,7 +331,7 @@ static REBVAL *Get_Event_Var(RELVAL *out, const REBCEL *v, REBSTR *name)
             // string series when seen here.  This flips a bit to say the
             // conversion has been done.  Review this implementation.
             //
-            REBVAL *writable = m_cast(REBVAL*, SPECIFIC(v));
+            REBVAL *writable = m_cast(REBVAL*, SPECIFIC(CELL_TO_VAL(v)));
 
             SET_VAL_EVENT_NODE(writable, Copy_Bytes(cast(REBYTE*, str), -1));
             mutable_VAL_EVENT_FLAGS(writable) |= EVF_COPIED;
@@ -397,7 +399,7 @@ REB_R TO_Event(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 REB_R PD_Event(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     if (IS_WORD(picker)) {
@@ -433,7 +435,7 @@ REBTYPE(Event)
 //
 //  MF_Event: C
 //
-void MF_Event(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Event(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -455,7 +457,7 @@ void MF_Event(REB_MOLD *mo, const REBCEL *v, bool form)
 
         New_Indented_Line(mo);
 
-        REBSTR *canon = Canon(fields[field]);
+        const REBSTR *canon = Canon(fields[field]);
         Append_Utf8(mo->series, STR_UTF8(canon), STR_SIZE(canon));
         Append_Ascii(mo->series, ": ");
         if (IS_WORD(var))

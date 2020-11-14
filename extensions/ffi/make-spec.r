@@ -45,7 +45,7 @@ comment [
 ]
 
 includes: compose [
-    %prep/extensions/ffi
+    %prep/extensions/ffi/
 
     ; For the FFI to be used, you pretty much require the ability to load a
     ; DLL or shared library.  Currently the `Find_Function()` API is linked
@@ -54,7 +54,7 @@ includes: compose [
     ; pointer can be extracted).  Hence headers must be directly included.
     ; But that could be changed.
     ;
-    (repo-dir/extensions/library)
+    (make-file [(repo-dir) extensions/library /])
 
     ; Vectors are used to model C array structures, and thus for the moment
     ; one must build the vector extension into the executable if you want
@@ -64,7 +64,7 @@ includes: compose [
     ; to do this via libRebol, asking for a HANDLE! memory pointer for the
     ; vector...but for now we go through the internal includes of the type.
     ;
-    (repo-dir/extensions/vector)
+    (make-file [(repo-dir) extensions/vector /])
 ]
 
 definitions: []

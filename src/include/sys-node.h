@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -31,7 +31,7 @@
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define NOD(p) \
-        ((REBNOD*)p)  // Note: cast() currently won't work w/nullptr (!)
+        m_cast(REBNOD*, (const REBNOD*)(p))  // don't check const in C or C++
 
 #else
 
@@ -53,6 +53,7 @@
         constexpr bool derived =
             std::is_same<T0, REBNOD>::value
             or std::is_same<T0, REBVAL>::value
+            or std::is_same<T0, RELVAL>::value
             or std::is_same<T0, REBSER>::value
             or std::is_same<T0, REBSTR>::value
             or std::is_same<T0, REBARR>::value
@@ -107,11 +108,27 @@
 // is required for correct functioning of some types.  (See notes on
 // alignment in %sys-rebval.h.)
 //
-inline static void *Make_Node(REBLEN pool_id)
+inline static void *Try_Alloc_Node(REBLEN pool_id)
 {
     REBPOL *pool = &Mem_Pools[pool_id];
-    if (not pool->first) // pool has run out of nodes
-        Fill_Pool(pool); // refill it
+    if (not pool->first) {  // pool has run out of nodes
+        if (not Try_Fill_Pool(pool))  // attempt to refill it
+            return nullptr;
+    }
+
+  #if !defined(NDEBUG)
+    if (PG_Fuzz_Factor != 0) {
+        if (PG_Fuzz_Factor < 0) {
+            ++PG_Fuzz_Factor;
+            if (PG_Fuzz_Factor == 0)
+                return nullptr;
+        }
+        else if ((TG_Tick % 10000) <= cast(REBLEN, PG_Fuzz_Factor)) {
+            PG_Fuzz_Factor = 0;
+            return nullptr;
+        }
+    }
+  #endif
 
     assert(pool->first);
 
@@ -143,12 +160,23 @@ inline static void *Make_Node(REBLEN pool_id)
 }
 
 
+inline static void *Alloc_Node(REBLEN pool_id) {
+    void *node = Try_Alloc_Node(pool_id);
+    if (node)
+        return node;
+
+    REBPOL *pool = &Mem_Pools[pool_id];
+    fail (Error_No_Memory(pool->wide * pool->units));
+}
+
 // Free a node, returning it to its pool.  Once it is freed, its header will
 // have NODE_FLAG_FREE...which will identify the node as not in use to anyone
 // who enumerates the nodes in the pool (such as the garbage collector).
 //
-inline static void Free_Node(REBLEN pool_id, REBNOD *node)
+inline static void Free_Node(REBLEN pool_id, void *p)
 {
+    REBNOD* node = cast(REBNOD*, p);
+
   #ifdef DEBUG_MONITOR_SERIES
     if (
         pool_id == SER_POOL
@@ -177,18 +205,32 @@ inline static void Free_Node(REBLEN pool_id, REBNOD *node)
     // cache usage, but makes the "poisoning" nearly useless.
     //
     // This code was added to insert an empty segment, such that this node
-    // won't be picked by the next Make_Node.  That enlongates the poisonous
+    // won't be picked by the next Alloc_Node.  That enlongates the poisonous
     // time of this area to catch stale pointers.  But doing this in the
     // debug build only creates a source of variant behavior.
 
-    if (not pool->last) // Fill pool if empty
-        Fill_Pool(pool);
+    bool out_of_memory = false;
 
-    assert(pool->last);
+    if (not pool->last) {  // Fill pool if empty
+        if (not Try_Fill_Pool(pool))
+            out_of_memory = true;
+    }
 
-    pool->last->next_if_free = node;
-    pool->last = node;
-    node->next_if_free = nullptr;
+    if (out_of_memory) {
+        //
+        // We don't want Free_Node to fail with an "out of memory" error, so
+        // just fall back to the release build behavior in this case.
+        //
+        node->next_if_free = pool->first;
+        pool->first = node;
+    }
+    else {
+        assert(pool->last);
+
+        pool->last->next_if_free = node;
+        pool->last = node;
+        node->next_if_free = nullptr;
+    }
   #endif
 
     pool->free++;

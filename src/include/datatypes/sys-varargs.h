@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -64,10 +64,40 @@
 #define VAL_VARARGS_PHASE(v) \
     ACT(VAL_VARARGS_PHASE_NODE(v))
 
+inline static REBVAL *Init_Varargs_Untyped_Normal(RELVAL *out, REBFRM *f) {
+    RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
+    INIT_BINDING(out, f->varlist);  // frame-based VARARGS!
+    UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));
+    VAL_VARARGS_PHASE_NODE(out) = nullptr;  // set in typecheck
+    return cast(REBVAL*, out);
+}
+
+inline static REBVAL *Init_Varargs_Untyped_Enfix(
+    RELVAL *out,
+    const REBVAL *single
+){
+    REBARR *array1;
+    if (IS_END(single))
+        array1 = EMPTY_ARRAY;
+    else {
+        REBARR *feed = Alloc_Singular(NODE_FLAG_MANAGED);
+        Move_Value(ARR_SINGLE(feed), single);
+
+        array1 = Alloc_Singular(NODE_FLAG_MANAGED);
+        Init_Block(ARR_SINGLE(array1), feed);  // index 0
+    }
+
+    RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
+    INIT_BINDING(out, array1);
+    UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));
+    VAL_VARARGS_PHASE_NODE(out) = nullptr;  // set in typecheck
+    return cast(REBVAL*, out);
+}
+
 
 inline static bool Is_Block_Style_Varargs(
     REBVAL **shared_out,
-    const REBCEL *vararg
+    REBCEL(const*) vararg
 ){
     assert(CELL_KIND(vararg) == REB_VARARGS);
 
@@ -77,7 +107,7 @@ inline static bool Is_Block_Style_Varargs(
     }
 
     // Came from MAKE VARARGS! on some random block, hence not implicitly
-    // filled by the evaluator on a <...> parameter.  Should be a singular
+    // filled by the evaluator on a <variadic> parameter.  Should be a singular
     // array with one BLOCK!, that is the actual array and index to advance.
     //
     REBARR *array1 = ARR(EXTRA(Binding, vararg).node);
@@ -93,7 +123,7 @@ inline static bool Is_Block_Style_Varargs(
 
 inline static bool Is_Frame_Style_Varargs_Maybe_Null(
     REBFRM **f_out,
-    const REBCEL *vararg
+    REBCEL(const*) vararg
 ){
     assert(CELL_KIND(vararg) == REB_VARARGS);
 
@@ -142,18 +172,18 @@ inline static bool Is_Frame_Style_Varargs_May_Fail(
     (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0)
 
 
-inline static const REBVAL *Param_For_Varargs_Maybe_Null(const REBCEL *v) {
+inline static const REBVAL *Param_For_Varargs_Maybe_Null(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_VARARGS);
 
     REBACT *phase = VAL_VARARGS_PHASE(v);
     if (phase) {
         REBARR *paramlist = ACT_PARAMLIST(phase);
         if (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0) // e.g. enfix
-            return SPECIFIC(ARR_AT(
+            return cast(REBVAL*, ARR_AT(
                 paramlist,
                 - VAL_VARARGS_SIGNED_PARAM_INDEX(v)
             ));
-        return SPECIFIC(ARR_AT(
+        return cast(REBVAL*, ARR_AT(
             paramlist,
             VAL_VARARGS_SIGNED_PARAM_INDEX(v)
         ));

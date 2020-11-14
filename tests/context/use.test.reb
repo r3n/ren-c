@@ -51,5 +51,5 @@
 (
     o: binding of use [x] ['x]
     e: trap [append o 'self]
-    (error? e) and [e/id = 'locked-series]
+    e/id = 'locked-series
 )

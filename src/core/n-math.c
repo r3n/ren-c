@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -417,11 +417,11 @@ REBNATIVE(shift)
 
 //  CT_Fail: C
 //
-REBINT CT_Fail(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Fail(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     UNUSED(a);
     UNUSED(b);
-    UNUSED(mode);
+    UNUSED(strict);
 
     fail ("Cannot compare type");
 }
@@ -429,11 +429,11 @@ REBINT CT_Fail(const REBCEL *a, const REBCEL *b, REBINT mode)
 
 //  CT_Unhooked: C
 //
-REBINT CT_Unhooked(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Unhooked(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     UNUSED(a);
     UNUSED(b);
-    UNUSED(mode);
+    UNUSED(strict);
 
     fail ("Datatype does not have type comparison handler registered");
 }
@@ -442,25 +442,14 @@ REBINT CT_Unhooked(const REBCEL *a, const REBCEL *b, REBINT mode)
 //
 //  Compare_Modify_Values: C
 //
-// Compare 2 values depending on level of strictness.  It leans
-// upon the per-type comparison functions (that have a more typical
-// interface of returning [1, 0, -1] and taking a CASE parameter)
-// but adds a layer of being able to check for specific types
-// of equality...which those comparison functions do not discern.
-//
-// Strictness:
-//     0 - coerced equality
-//     1 - strict equality
-//
-//    -1 - greater or equal
-//    -2 - greater
+// Compare 2 values depending on level of strictness.
 //
 // !!! This routine (may) modify the value cells for 'a' and 'b' in
 // order to coerce them for easier comparison.  Most usages are
 // in native code that can overwrite its argument values without
 // that being a problem, so it doesn't matter.
 //
-REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, REBINT strictness)
+REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, bool strict)
 {
     // !!! `(first ['a]) = (first [a])` was true in historical Rebol, due
     // the rules of "lax equality".  These rules are up in the air as they
@@ -468,50 +457,31 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, REBINT strictness)
     // worry about changing all the tests right now, this defines quoted
     // equality as only worryig about the depth in strict equalty.
     //
-    if (strictness == 1)
+    if (strict)
         if (VAL_NUM_QUOTES(a) != VAL_NUM_QUOTES(b))
-            return 0;
+            return VAL_NUM_QUOTES(a) > VAL_NUM_QUOTES(b) ? 1 : -1;
 
     // This code wants to modify the value, but we can't modify the
     // embedded values in highly-escaped literals.  Move the data out.
 
-    enum Reb_Kind ta;
-    if (KIND_BYTE(a) == REB_QUOTED) { // 4 or more quote levels
-        const REBCEL *acell = VAL_UNESCAPED(a);
-        Move_Value_Header(a, cast(const RELVAL*, acell));
-        a->extra = acell->extra;
-        a->payload = acell->payload;
-        ta = CELL_KIND(acell);
-    }
-    else {
-        mutable_KIND_BYTE(a)
-            = ta
-            = CELL_KIND_UNCHECKED(a); // quoted or not
-        assert(ta == MIRROR_BYTE(a));
-    }
+    Dequotify(a);
+    Dequotify(b);
 
-    enum Reb_Kind tb;
-    if (KIND_BYTE(b) == REB_QUOTED) { // 4 or more quote levels
-        const REBCEL *bcell = VAL_UNESCAPED(b);
-        Move_Value_Header(b, cast(const RELVAL*, bcell));
-        b->extra = bcell->extra;
-        b->payload = bcell->payload;
-        tb = CELL_KIND(bcell);
-    }
-    else {
-        mutable_KIND_BYTE(b)
-            = tb
-            = CELL_KIND_UNCHECKED(b); // quoted or not
-        assert(tb == MIRROR_BYTE(b));
-    }
+    enum Reb_Kind ta = cast(enum Reb_Kind, KIND3Q_BYTE_UNCHECKED(a));
+    enum Reb_Kind tb = cast(enum Reb_Kind, KIND3Q_BYTE_UNCHECKED(b));
+
+    assert(ta < REB_MAX);  // we dequoted it
+    assert(tb < REB_MAX);  // we dequoted this as well
 
     if (ta != tb) {
-        if (strictness == 1)
-            return 0;
-
+        //
+        // If types not matching is a problem, callers to this routine should
+        // check that for themselves before calling.  It is assumed that
+        // "strict" here still allows coercion, e.g. `1 < 1.1` should work.
+        //
         switch (ta) {
-          case REB_NULLED:
-            return 0; // nothing coerces to void
+          case REB_NULL:
+            return -1;  // consider always less than anything else
 
           case REB_INTEGER:
             if (tb == REB_DECIMAL || tb == REB_PERCENT) {
@@ -564,7 +534,6 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, REBINT strictness)
           case REB_EMAIL:
           case REB_URL:
           case REB_TAG:
-          case REB_ISSUE:
             if (ANY_STRING(b)) goto compare;
             break;
 
@@ -572,7 +541,8 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, REBINT strictness)
             break;
         }
 
-        if (strictness == 0) return 0;
+        if (not strict)
+            return ta > tb ? 1 : -1;  // !!! Review
 
         fail (Error_Invalid_Compare_Raw(Type_Of(a), Type_Of(b)));
     }
@@ -581,9 +551,9 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, REBINT strictness)
 
     enum Reb_Kind kind = VAL_TYPE(a);
 
-    if (kind == REB_NULLED) {
-        assert(VAL_TYPE(b) == REB_NULLED);
-        return 1;  // nulls always equal
+    if (kind == REB_NULL) {
+        assert(VAL_TYPE(b) == REB_NULL);
+        return 0;  // nulls always equal
     }
 
     // At this point, the types should match...e.g. be able to be passed to
@@ -592,10 +562,9 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, REBINT strictness)
     COMPARE_HOOK *hook = Compare_Hook_For_Type_Of(a);
     assert(Compare_Hook_For_Type_Of(b) == hook);
 
-    REBINT result = hook(a, b, strictness);
-    if (result < 0)
-        fail (Error_Invalid_Compare_Raw(Type_Of(a), Type_Of(b)));
-    return result;
+    REBINT diff = hook(a, b, strict);
+    assert(diff == 0 or diff == 1 or diff == -1);
+    return diff;
 }
 
 
@@ -615,10 +584,9 @@ REBNATIVE(equal_q)
 {
     INCLUDE_PARAMS_OF_EQUAL_Q;
 
-    if (Compare_Modify_Values(ARG(value1), ARG(value2), 0))
-        return Init_True(D_OUT);
-
-    return Init_False(D_OUT);
+    bool strict = false;
+    REBINT diff = Compare_Modify_Values(ARG(value1), ARG(value2), strict);
+    return Init_Logic(D_OUT, diff == 0);
 }
 
 
@@ -636,10 +604,9 @@ REBNATIVE(not_equal_q)
 {
     INCLUDE_PARAMS_OF_NOT_EQUAL_Q;
 
-    if (Compare_Modify_Values(ARG(value1), ARG(value2), 0))
-        return Init_False(D_OUT);
-
-    return Init_True(D_OUT);
+    bool strict = false;
+    REBINT diff = Compare_Modify_Values(ARG(value1), ARG(value2), strict);
+    return Init_Logic(D_OUT, diff != 0);
 }
 
 
@@ -657,10 +624,12 @@ REBNATIVE(strict_equal_q)
 {
     INCLUDE_PARAMS_OF_STRICT_EQUAL_Q;
 
-    if (Compare_Modify_Values(ARG(value1), ARG(value2), 1))
-        return Init_True(D_OUT);
+    if (VAL_TYPE(ARG(value1)) != VAL_TYPE(ARG(value2)))
+        return Init_False(D_OUT);  // don't allow coercion
 
-    return Init_False(D_OUT);
+    bool strict = true;
+    REBINT diff = Compare_Modify_Values(ARG(value1), ARG(value2), strict);
+    return Init_Logic(D_OUT, diff == 0);
 }
 
 
@@ -678,10 +647,12 @@ REBNATIVE(strict_not_equal_q)
 {
     INCLUDE_PARAMS_OF_STRICT_NOT_EQUAL_Q;
 
-    if (Compare_Modify_Values(ARG(value1), ARG(value2), 1))
-        return Init_False(D_OUT);
+    if (VAL_TYPE(ARG(value1)) != VAL_TYPE(ARG(value2)))
+        return Init_True(D_OUT);  // don't allow coercion
 
-    return Init_True(D_OUT);
+    bool strict = true;
+    REBINT diff = Compare_Modify_Values(ARG(value1), ARG(value2), strict);
+    return Init_Logic(D_OUT, diff != 0);
 }
 
 
@@ -718,7 +689,7 @@ REBNATIVE(same_q)
         return Init_Logic(
             D_OUT,
             VAL_SERIES(v1) == VAL_SERIES(v2)
-                and VAL_INDEX(v1) == VAL_INDEX(v2)
+                and VAL_INDEX_RAW(v1) == VAL_INDEX_RAW(v2)  // permissive
         );
 
     if (ANY_CONTEXT(v1))  // same if varlists match
@@ -768,7 +739,8 @@ REBNATIVE(same_q)
     // seems that "sameness" should go through whatever extension mechanism
     // for comparison user defined types would have.
     //
-    return Init_Logic(D_OUT, Compare_Modify_Values(v1, v2, 1) != 0);
+    bool strict = true;
+    return Init_Logic(D_OUT, Compare_Modify_Values(v1, v2, strict) == 0);
 }
 
 
@@ -785,10 +757,21 @@ REBNATIVE(lesser_q)
 {
     INCLUDE_PARAMS_OF_LESSER_Q;
 
-    if (Compare_Modify_Values(ARG(value1), ARG(value2), -1))
-        return Init_False(D_OUT);
-
-    return Init_True(D_OUT);
+    // !!! R3-Alpha and Red both behave thusly:
+    //
+    //     >> -4.94065645841247E-324 < 0.0
+    //     == true
+    //
+    //     >> -4.94065645841247E-324 = 0.0
+    //     == true
+    //
+    // This is to say that the `=` is operating under non-strict rules, while
+    // the `<` is still strict to see the difference.  Kept this way for
+    // compatibility for now.
+    //
+    bool strict = true;
+    REBINT diff = Compare_Modify_Values(ARG(value1), ARG(value2), strict);
+    return Init_Logic(D_OUT, diff == -1);
 }
 
 
@@ -805,10 +788,9 @@ REBNATIVE(equal_or_lesser_q)
 {
     INCLUDE_PARAMS_OF_EQUAL_OR_LESSER_Q;
 
-    if (Compare_Modify_Values(ARG(value1), ARG(value2), -2))
-        return Init_False(D_OUT);
-
-    return Init_True(D_OUT);
+    bool strict = true;  // see notes in LESSER?
+    REBINT diff = Compare_Modify_Values(ARG(value1), ARG(value2), strict);
+    return Init_Logic(D_OUT, diff == -1 or diff == 0);
 }
 
 
@@ -825,10 +807,9 @@ REBNATIVE(greater_q)
 {
     INCLUDE_PARAMS_OF_GREATER_Q;
 
-    if (Compare_Modify_Values(ARG(value1), ARG(value2), -2))
-        return Init_True(D_OUT);
-
-    return Init_False(D_OUT);
+    bool strict = true;  // see notes in LESSER?
+    REBINT diff = Compare_Modify_Values(ARG(value1), ARG(value2), strict);
+    return Init_Logic(D_OUT, diff == 1);
 }
 
 
@@ -845,10 +826,9 @@ REBNATIVE(greater_or_equal_q)
 {
     INCLUDE_PARAMS_OF_GREATER_OR_EQUAL_Q;
 
-    if (Compare_Modify_Values(ARG(value1), ARG(value2), -1))
-        return Init_True(D_OUT);
-
-    return Init_False(D_OUT);
+    bool strict = true;  // see notes in LESSER?
+    REBINT diff = Compare_Modify_Values(ARG(value1), ARG(value2), strict);
+    return Init_Logic(D_OUT, diff == 1 or diff == 0);
 }
 
 
@@ -877,7 +857,8 @@ REBNATIVE(maximum)
         DECLARE_LOCAL (coerced2);
         Move_Value(coerced2, value2);
 
-        if (Compare_Modify_Values(coerced1, coerced2, -1))
+        bool strict = false;
+        if (-1 == Compare_Modify_Values(coerced1, coerced2, strict))
             Move_Value(D_OUT, value1);
         else
             Move_Value(D_OUT, value2);
@@ -911,12 +892,31 @@ REBNATIVE(minimum)
         DECLARE_LOCAL (coerced2);
         Move_Value(coerced2, value2);
 
-        if (Compare_Modify_Values(coerced1, coerced2, -1))
-            Move_Value(D_OUT, value2);
-        else
+        bool strict = false;
+        if (1 == Compare_Modify_Values(coerced1, coerced2, strict))
             Move_Value(D_OUT, value1);
+        else
+            Move_Value(D_OUT, value2);
     }
     return D_OUT;
+}
+
+
+inline static REBVAL *Init_Zeroed_Hack(RELVAL *out, enum Reb_Kind kind) {
+    //
+    // !!! This captures of a dodgy behavior of R3-Alpha, which was to assume
+    // that clearing the payload of a value and then setting the header made
+    // it the `zero?` of that type.  Review uses.
+    //
+    if (kind == REB_PAIR) {
+        Init_Pair_Int(out, 0, 0);
+    }
+    else {
+        RESET_CELL(out, kind, CELL_MASK_NONE);
+        CLEAR(&out->extra, sizeof(union Reb_Value_Extra));
+        CLEAR(&out->payload, sizeof(union Reb_Value_Payload));
+    }
+    return cast(REBVAL*, out);
 }
 
 
@@ -935,10 +935,9 @@ REBNATIVE(negative_q)
     DECLARE_LOCAL (zero);
     Init_Zeroed_Hack(zero, VAL_TYPE(ARG(number)));
 
-    if (Compare_Modify_Values(ARG(number), zero, -1))
-        return Init_False(D_OUT);
-
-    return Init_True(D_OUT);
+    bool strict = true;  // don't report "close to zero" as "equal to zero"
+    REBINT diff = Compare_Modify_Values(ARG(number), zero, strict);
+    return Init_Logic(D_OUT, diff == -1);
 }
 
 
@@ -957,10 +956,9 @@ REBNATIVE(positive_q)
     DECLARE_LOCAL (zero);
     Init_Zeroed_Hack(zero, VAL_TYPE(ARG(number)));
 
-    if (Compare_Modify_Values(ARG(number), zero, -2))
-        return Init_True(D_OUT);
-
-    return Init_False(D_OUT);
+    bool strict = true;  // don't report "close to zero" as "equal to zero"
+    REBINT diff = Compare_Modify_Values(ARG(number), zero, strict);
+    return Init_Logic(D_OUT, diff == 1);
 }
 
 
@@ -976,14 +974,33 @@ REBNATIVE(zero_q)
 {
     INCLUDE_PARAMS_OF_ZERO_Q;
 
-    enum Reb_Kind type = VAL_TYPE(ARG(value));
+    REBVAL *v = ARG(value);
+    enum Reb_Kind type = VAL_TYPE(v);
 
-    if (ANY_SCALAR_KIND(type)) {
-        DECLARE_LOCAL (zero);
-        Init_Zeroed_Hack(zero, type);
+    if (type == REB_ISSUE)  // special case, `#` represents the '\0' codepoint
+        return Init_Logic(
+            D_OUT,
+            IS_CHAR(cast(REBCEL(const*), v)) and VAL_CHAR(v) == 0
+        );
 
-        if (Compare_Modify_Values(ARG(value), zero, 1))
-            return Init_True(D_OUT);
+    if (not ANY_SCALAR_KIND(type))
+        return Init_False(D_OUT);
+
+    if (type == REB_TUPLE) {
+        REBLEN len = VAL_SEQUENCE_LEN(v);
+        REBLEN i;
+        for (i = 0; i < len; ++i) {
+            const RELVAL *item = VAL_SEQUENCE_AT(D_SPARE, v, i);
+            if (not IS_INTEGER(item) or VAL_INT64(item) != 0)
+                return Init_False(D_OUT);
+        }
+        return Init_True(D_OUT);
     }
-    return Init_False(D_OUT);
+
+    DECLARE_LOCAL (zero);
+    Init_Zeroed_Hack(zero, type);
+
+    bool strict = true;  // don't report "close to zero" as "equal to zero"
+    REBINT diff = Compare_Modify_Values(ARG(value), zero, strict);
+    return Init_Logic(D_OUT, diff == 0);
 }

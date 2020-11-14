@@ -4,7 +4,7 @@ REBOL [
     File: %natives-emitters.r
     Rights: {
         Copyright 2017 Atronix Engineering
-        Copyright 2017 Rebol Open Source Contributors
+        Copyright 2017 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -20,7 +20,7 @@ emit-native-proto: function [
     proto
     <with> proto-count
 ][
-    line: try text-line-of proto-parser/parse.position
+    line: try text-line-of proto-parser/parse-position
 
     all [
         block? proto-parser/data
@@ -50,15 +50,13 @@ emit-native-proto: function [
             end
         ]
     ] then [
-        append case [
+        append (
             ;
             ; could do tests here to create special buffer categories to
             ; put certain natives first or last, etc. (not currently needed)
             ;
-            default [
-                unsorted-buffer
-            ]
-        ] unspaced [
+            unsorted-buffer
+        ) unspaced [
             newline newline
             {; !!! DO NOT EDIT HERE! This is generated from} _
                 mold the-file _ {line} _ line newline
@@ -105,7 +103,7 @@ emit-include-params-macro: function [
                 continue
             ]
 
-            param-name: as text! to word! item
+            param-name: as text! to word! dequote item
             keep cscape/with {PARAM($<n>, ${param-name})} [n param-name]
             n: n + 1
         ]
@@ -115,7 +113,7 @@ emit-include-params-macro: function [
     e/emit [prefix word items] {
         #define ${PREFIX}INCLUDE_PARAMS_OF_${WORD} \
             $[Items]; \
-            Enter_Native(frame_);
+            assert(GET_SERIES_INFO(frame_->varlist, HOLD))
     }
     e/emit newline
 ]

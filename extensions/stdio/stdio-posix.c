@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -202,7 +202,7 @@ DEVICE_CMD Read_IO(REBREQ *io)
     assert(VAL_INDEX(req->common.binary) == 0);
     assert(VAL_LEN_AT(req->common.binary) == 0);
 
-    REBSER *bin = VAL_BINARY(req->common.binary);
+    REBSER *bin = VAL_BINARY_ENSURE_MUTABLE(req->common.binary);
     assert(SER_AVAIL(bin) >= req->length);
 
     // Null redirection (should be handled at PORT! level to not ask for read)

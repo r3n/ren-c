@@ -4,7 +4,7 @@ REBOL [
     File: %prep-extension.r  ; EMIT-HEADER uses to indicate emitting script
     Rights: {
         Copyright 2017 Atronix Engineering
-        Copyright 2017-2018 Rebol Open Source Contributors
+        Copyright 2017-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -49,9 +49,9 @@ do %native-emitters.r ; for emit-include-params-macro
 ; include path for the build of the extension
 
 args: parse-args system/script/args  ; either from command line or DO/ARGS
-src: fix-win32-path to file! :args/SRC
+src: to file! :args/SRC
 set [in-dir file-name] split-path src
-output-dir: system/options/path/prep/:in-dir
+output-dir: make-file [(system/options/path) prep / (in-dir)]
 insert src %../
 mkdir/deep output-dir
 
@@ -63,13 +63,13 @@ m-name: mod
 l-m-name: lowercase copy m-name
 u-m-name: uppercase copy m-name
 
-c-src: join %../ fix-win32-path to file! ensure text! args/SRC
+c-src: make-file [../ (as file! ensure text! args/SRC)]
 
 print ["building" m-name "from" c-src]
 
 
 e1: (make-emitter "Module C Header File Preface"
-    ensure file! join-all [output-dir/tmp-mod- l-m-name %.h])
+    make-file [(output-dir) tmp-mod- (l-m-name) .h])
 
 
 verbose: false
@@ -77,7 +77,7 @@ verbose: false
 proto-count: 0
 module-header: _
 
-source.text: read/string c-src
+source-text: read/string c-src
 
 ; When the header information in the comments at the top of the file is
 ; seen, save it into a variable.
@@ -94,7 +94,7 @@ proto-parser/emit-proto: :emit-native-proto
 
 the-file: c-src  ; global used for comments in the native emitter
 
-proto-parser/process source.text
+proto-parser/process source-text
 
 
 ;
@@ -259,7 +259,7 @@ iterate native-list [
     if tail? next native-list [break]
     any [
         'native = native-list/2
-        (path? native-list/2) and ['native = first native-list/2]
+        all [path? native-list/2 | 'native = first native-list/2]
     ] then [
         assert [set-word? native-list/1]
         (emit-include-params-macro/ext e1
@@ -320,11 +320,7 @@ parse inc-name [
     ]  ; auto-generating version of initial (and poor) manual naming scheme
 ]
 
-dest: join output-dir inc-name
-
-if is-cpp [print [mold dest] wait 2]
-
-e: make-emitter "Ext custom init code" dest
+e: make-emitter "Ext custom init code" make-file [(output-dir) (inc-name)]
 
 ; Review: This does not use STRIPLOAD but encodes the script as C bytes
 ; verbatim--comments and whitespace and all.  That may be desirable if there

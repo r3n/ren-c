@@ -17,7 +17,6 @@ REBOL [
     %base-constants.r
     %base-defs.r
     %base-funcs.r
-    %base-infix.r
     %base-series.r
     %base-files.r
 ]

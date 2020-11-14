@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -179,7 +179,7 @@ const REBYTE *Scan_Time(RELVAL *out, const REBYTE *cp, REBLEN len)
 //
 //  MF_Time: C
 //
-void MF_Time(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Time(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);  // no difference between MOLD and FORM at this time
 
@@ -216,12 +216,18 @@ void MF_Time(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 //  CT_Time: C
 //
-REBINT CT_Time(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Time(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBINT num = Cmp_Time(a, b);
-    if (mode >= 0)  return (num == 0);
-    if (mode == -1) return (num >= 0);
-    return (num > 0);
+    UNUSED(strict);
+
+    REBI64 t1 = VAL_NANO(a);
+    REBI64 t2 = VAL_NANO(b);
+
+    if (t2 == t1)
+        return 0;
+    if (t1 > t2)
+        return 1;
+    return -1;
 }
 
 
@@ -267,10 +273,12 @@ REB_R MAKE_Time(
         return Init_Time_Nanoseconds(out, DEC_TO_SECS(VAL_DECIMAL(arg)));
 
     case REB_BLOCK: { // [hh mm ss]
-        if (VAL_ARRAY_LEN_AT(arg) > 3)
+        REBLEN len;
+        const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
+
+        if (len > 3)
             goto no_time;
 
-        RELVAL *item = VAL_ARRAY_AT(arg);
         if (not IS_INTEGER(item))
             goto no_time;
 
@@ -350,27 +358,9 @@ REB_R TO_Time(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 
 
 //
-//  Cmp_Time: C
-//
-// Given two TIME!s (or DATE!s with a time componet), compare them.
-//
-REBINT Cmp_Time(const REBCEL *v1, const REBCEL *v2)
-{
-    REBI64 t1 = VAL_NANO(v1);
-    REBI64 t2 = VAL_NANO(v2);
-
-    if (t2 == t1)
-        return 0;
-    if (t1 > t2)
-        return 1;
-    return -1;
-}
-
-
-//
 //  Pick_Time: C
 //
-void Pick_Time(REBVAL *out, const REBVAL *value, const REBVAL *picker)
+void Pick_Time(REBVAL *out, const REBVAL *value, const RELVAL *picker)
 {
     REBINT i;
     if (IS_WORD(picker)) {
@@ -379,13 +369,13 @@ void Pick_Time(REBVAL *out, const REBVAL *value, const REBVAL *picker)
         case SYM_MINUTE: i = 1; break;
         case SYM_SECOND: i = 2; break;
         default:
-            fail (picker);
+            fail (rebUnrelativize(picker));
         }
     }
     else if (IS_INTEGER(picker))
         i = VAL_INT32(picker) - 1;
     else
-        fail (picker);
+        fail (rebUnrelativize(picker));
 
     REB_TIMEF tf;
     Split_Time(VAL_NANO(value), &tf); // loses sign
@@ -414,7 +404,7 @@ void Pick_Time(REBVAL *out, const REBVAL *value, const REBVAL *picker)
 //
 void Poke_Time_Immediate(
     REBVAL *value,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *poke
 ) {
     REBINT i;
@@ -424,13 +414,13 @@ void Poke_Time_Immediate(
         case SYM_MINUTE: i = 1; break;
         case SYM_SECOND: i = 2; break;
         default:
-            fail (picker);
+            fail (rebUnrelativize(picker));
         }
     }
     else if (IS_INTEGER(picker))
         i = VAL_INT32(picker) - 1;
     else
-        fail (picker);
+        fail (rebUnrelativize(picker));
 
     REB_TIMEF tf;
     Split_Time(VAL_NANO(value), &tf); // loses sign
@@ -466,7 +456,7 @@ void Poke_Time_Immediate(
         break;
 
     default:
-        fail (picker);
+        fail (rebUnrelativize(picker));
     }
 
     PAYLOAD(Time, value).nanoseconds = Join_Time(&tf, false);
@@ -478,7 +468,7 @@ void Poke_Time_Immediate(
 //
 REB_R PD_Time(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     if (opt_setval) {

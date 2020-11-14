@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -47,51 +47,48 @@
 // View this information in the debugging watchlist under the `track` union
 // member of a value's payload.  It is also reported by panic().
 //
+// Note: Due to the lack of inlining in the debug build, the EVIL_MACRO form
+// of this is used.  It actually makes a significant difference, vs. using
+// a function...for this important debugging tool that's used very often.
+// (It's actually also a bit easier to read what's going on this way.)
 
 #if defined(DEBUG_TRACK_CELLS)
-    #if defined(DEBUG_COUNT_TICKS) && defined(DEBUG_TRACK_EXTEND_CELLS)
-        #define TOUCH_CELL(c) \
-            ((c)->touch = TG_Tick)
-    #endif
 
-    inline static void Set_Track_Payload_Extra_Debug(
-        RELVAL *c,
-        const char *file,
-        int line
-    ){
-      #ifdef DEBUG_TRACK_EXTEND_CELLS // cell is made bigger to hold it
-        c->track.file = file;
-        c->track.line = line;
+  #if defined(DEBUG_TRACK_EXTEND_CELLS)  // assume DEBUG_COUNT_TICKS
 
-        #ifdef DEBUG_COUNT_TICKS
-            c->extra.tick = c->tick = TG_Tick;
-            c->touch = 0;
-        #else
-            c->extra.tick = 1;  // unreadable void needs for debug payload
-        #endif
-      #else  // in space that is overwritten for cells that fill in payloads 
-        PAYLOAD(Track, c).file = file;
-        PAYLOAD(Track, c).line = line;
-          
-        #ifdef DEBUG_COUNT_TICKS
-            c->extra.tick = TG_Tick;
-        #else
-            c->extra.tick = 1;  // unreadable void needs for debug payload
-        #endif
-      #endif
-    }
+    #define TOUCH_CELL(c) \
+        ((c)->touch = TG_Tick)
 
-    #define TRACK_CELL_IF_DEBUG(c,file,line) \
-        Set_Track_Payload_Extra_Debug((c), (file), (line))
+    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
+        (c)->track.file = _file; \
+        (c)->track.line = _line; \
+        (c)->extra.tick = (c)->tick = TG_Tick; \
+        (c)->touch = 0;
+
+  #elif defined(DEBUG_COUNT_TICKS)
+
+    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
+        (c)->extra.tick = TG_Tick; \
+        PAYLOAD(Track, (c)).file = _file; \
+        PAYLOAD(Track, (c)).line = _line;
+
+  #else  // not counting ticks, and not using extended cell format
+
+    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
+        (c)->extra.tick = 1; \
+        PAYLOAD(Track, (c)).file = _file; \
+        PAYLOAD(Track, (c)).line = _line;
+
+  #endif
 
 #elif !defined(NDEBUG)
 
-    #define TRACK_CELL_IF_DEBUG(c,file,line) \
+    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
         ((c)->extra.tick = 1)  // unreadable void needs for debug payload
 
 #else
 
-    #define TRACK_CELL_IF_DEBUG(c,file,line) \
+    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
         NOOP
 
 #endif

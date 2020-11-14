@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -56,7 +56,7 @@ inline static enum Reb_Kind KIND_FROM_SYM(REBSYM s) {
 #define SYM_FROM_KIND(k) \
     cast(REBSYM, cast(enum Reb_Kind, (k)))
 
-inline static REBSYM VAL_TYPE_SYM(const REBCEL *v) {
+inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
     //
     // !!! The extension type list is limited to a finite set as a first step
     // of generalizing the approach.  Bridge compatibility for things like
@@ -98,7 +98,9 @@ inline static REBSYM VAL_TYPE_SYM(const REBCEL *v) {
 #define VAL_TYPESET_HIGH_BITS(v) \
     EXTRA(Typeset, (v)).high_bits
 
-inline static bool TYPE_CHECK(const REBCEL *v, REBYTE n) {
+inline static bool TYPE_CHECK(REBCEL(const*) v, REBYTE n) {
+    assert(HEART_BYTE(v) == REB_TYPESET);
+
     if (n < 32)
         return did (VAL_TYPESET_LOW_BITS(v) & FLAGIT_KIND(n));
 
@@ -106,7 +108,9 @@ inline static bool TYPE_CHECK(const REBCEL *v, REBYTE n) {
     return did (VAL_TYPESET_HIGH_BITS(v) & FLAGIT_KIND(n - 32));
 }
 
-inline static bool TYPE_CHECK_BITS(const REBCEL *v, REBU64 bits) {
+inline static bool TYPE_CHECK_BITS(REBCEL(const*) v, REBU64 bits) {
+    assert(HEART_BYTE(v) == REB_TYPESET);
+
     uint_fast32_t low = bits & cast(uint32_t, 0xFFFFFFFF);
     if (low & VAL_TYPESET_LOW_BITS(v))
         return true;
@@ -118,7 +122,9 @@ inline static bool TYPE_CHECK_BITS(const REBCEL *v, REBU64 bits) {
     return false;
 }
 
-inline static bool TYPE_CHECK_EXACT_BITS(const REBCEL *v, REBU64 bits) {
+inline static bool TYPE_CHECK_EXACT_BITS(REBCEL(const*) v, REBU64 bits) {
+    assert(HEART_BYTE(v) == REB_TYPESET);
+
     uint_fast32_t low = bits & cast(uint32_t, 0xFFFFFFFF);
     if (low != VAL_TYPESET_LOW_BITS(v))
         return false;
@@ -130,7 +136,9 @@ inline static bool TYPE_CHECK_EXACT_BITS(const REBCEL *v, REBU64 bits) {
     return true;
 }
 
-inline static void TYPE_SET(REBCEL *v, REBYTE n) {
+inline static void TYPE_SET(RELVAL *v, REBYTE n) {
+    assert(HEART_BYTE(v) == REB_TYPESET);
+
     if (n < 32) {
         VAL_TYPESET_LOW_BITS(v) |= FLAGIT_KIND(n);
         return;
@@ -139,7 +147,9 @@ inline static void TYPE_SET(REBCEL *v, REBYTE n) {
     VAL_TYPESET_HIGH_BITS(v) |= FLAGIT_KIND(n - 32);
 }
 
-inline static void TYPE_CLEAR(REBCEL *v, REBYTE n) {
+inline static void TYPE_CLEAR(RELVAL *v, REBYTE n) {
+    assert(HEART_BYTE(v) == REB_TYPESET);
+
     if (n < 32) {
         VAL_TYPESET_HIGH_BITS(v) &= ~FLAGIT_KIND(n);
         return;
@@ -148,12 +158,22 @@ inline static void TYPE_CLEAR(REBCEL *v, REBYTE n) {
     VAL_TYPESET_HIGH_BITS(v) &= ~FLAGIT_KIND(n - 32);
 }
 
-inline static bool EQUAL_TYPESET(const REBCEL *v1, const REBCEL *v2) {
+inline static bool EQUAL_TYPESET(REBCEL(const*) v1, REBCEL(const*) v2) {
+    assert(HEART_BYTE(v1) == REB_TYPESET);
+    assert(HEART_BYTE(v2) == REB_TYPESET);
+
     if (VAL_TYPESET_LOW_BITS(v1) != VAL_TYPESET_LOW_BITS(v2))
         return false;
     if (VAL_TYPESET_HIGH_BITS(v1) != VAL_TYPESET_HIGH_BITS(v2))
         return false;
     return true;
+}
+
+inline static void CLEAR_ALL_TYPESET_BITS(RELVAL *v) {
+    assert(HEART_BYTE(v) == REB_TYPESET);
+
+    VAL_TYPESET_HIGH_BITS(v) = 0;
+    VAL_TYPESET_LOW_BITS(v) = 0;
 }
 
 
@@ -209,10 +229,6 @@ typedef enum Reb_Kind Reb_Param_Class;
     // `REB_P_REFINEMENT`
     //
 
-    // REB_P_RETURN acts like a pure local, but is pre-filled with a
-    // ACTION! bound to the frame, that takes 0 or 1 arg and returns it.
-    //
-
     // `REB_P_SOFT_QUOTE` is cued by a LIT-WORD! in the function spec
     // dialect.  It quotes with the exception of GROUP!, GET-WORD!, and
     // GET-PATH!...which will be evaluated:
@@ -232,8 +248,8 @@ typedef enum Reb_Kind Reb_Param_Class;
 
 
 inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
-    assert(IS_PARAM(v));
-    return cast(Reb_Param_Class, KIND_BYTE_UNCHECKED(v));
+    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
+    return cast(Reb_Param_Class, KIND3Q_BYTE_UNCHECKED(v));
 }
 
 
@@ -276,16 +292,41 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
 #define Is_Param_Skippable(v) \
     TYPE_CHECK((v), REB_TS_SKIPPABLE)
 
-// Can't be reflected (set with PROTECT/HIDE) or specialized out
+// Can't be reflected (set with PROTECT/HIDE) or specialized out, because it
+// is local or specialized out.
 //
 // !!! Note: Currently, the semantics of Is_Param_Hidden() are rather sketchy.
-// The flag (REB_TS_HIDDEN) is not put on REB_P_LOCAL/REB_P_RETURN
-// and it hasn't been figured out how such a flag would be managed on a per
-// object or frame instance while sharing the same paramlist/keylist (a method
-// like CELL_FLAG_PROTECTED might be needed if that feature is interesting).
+// It hasn't been figured out how such a flag would be managed on a per object
+// or frame instance while sharing the same paramlist/keylist (a method like
+// CELL_FLAG_PROTECTED would be needed if that feature were interesting).
 //
-#define Is_Param_Hidden(v) \
-    TYPE_CHECK((v), REB_TS_HIDDEN)
+inline static bool Is_Param_Hidden(const RELVAL *v) {
+    // Once a parameter is hidden, it is either visible in the frame or part
+    // of an embedded frame's internal state.  Anything invisible to the
+    // outside world from one layer will also be invisible to layers of
+    // functionals above it.
+    //
+    Reb_Param_Class pclass = VAL_PARAM_CLASS(v);
+    return IS_HIDDEN_PARAM_KIND(pclass);
+}
+
+inline static void Hide_Param(RELVAL *param) {
+    assert(VAL_PARAM_CLASS(param) != REB_P_SEALED);
+    mutable_KIND3Q_BYTE(param) = REB_P_LOCAL;
+}
+
+inline static void Seal_Param(RELVAL *param) {
+    mutable_KIND3Q_BYTE(param) = REB_P_SEALED;
+}
+
+inline static void Specialize_Param(RELVAL *param) {
+    assert(
+        VAL_PARAM_CLASS(param) != REB_P_SEALED
+        and VAL_PARAM_CLASS(param) != REB_P_LOCAL
+    );
+    mutable_KIND3Q_BYTE(param) = REB_P_SPECIALIZED;
+}
+
 
 // Can't be bound to beyond the current bindings.
 //
@@ -299,8 +340,8 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
 // solution to separate the property of bindability from visibility, as
 // the SELF solution shakes out--so that SELF may be hidden but bind.
 //
-#define Is_Param_Unbindable(v) \
-    TYPE_CHECK((v), REB_TS_UNBINDABLE)
+#define Is_Param_Sealed(v) \
+    (VAL_PARAM_CLASS(v) == REB_P_SEALED)
 
 // Parameters can be marked such that if they are blank, the action will not
 // be run at all.  This is done via the `<blank>` annotation, which indicates
@@ -310,24 +351,29 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
 #define Is_Param_Noop_If_Blank(v) \
     TYPE_CHECK((v), REB_TS_NOOP_IF_BLANK
 
+// !!! TBD: find a bit to store this in (param is full at the moment, so we
+// force all parameters to be rechecked in a skin.
+//
+#define Set_Param_Skin_Expanded(v) NOOP
+#define Is_Param_Skin_Expanded(v) true
 
 
 //=//// PARAMETER SYMBOL //////////////////////////////////////////////////=//
 //
 // Name should be NULL unless typeset in object keylist or func paramlist
 
-inline static REBSTR *VAL_KEY_SPELLING(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND_BYTE_UNCHECKED(v)));
+inline static const REBSTR *VAL_KEY_SPELLING(const RELVAL *v) {
+    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
     return VAL_TYPESET_STRING(v);
 }
 
-inline static REBSTR *VAL_KEY_CANON(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND_BYTE_UNCHECKED(v)));
+inline static const REBSTR *VAL_KEY_CANON(const RELVAL *v) {
+    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
     return STR_CANON(VAL_KEY_SPELLING(v));
 }
 
 inline static OPT_REBSYM VAL_KEY_SYM(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND_BYTE_UNCHECKED(v)));
+    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
     return STR_SYMBOL(VAL_KEY_SPELLING(v)); // mirrors canon's symbol
 }
 
@@ -353,13 +399,13 @@ inline static REBVAL *Init_Typeset(RELVAL *out, REBU64 bits)
 inline static REBVAL *Init_Param(
     RELVAL *out,
     Reb_Param_Class pclass,
-    REBSTR *spelling,
+    const REBSTR *spelling,
     REBU64 bits
 ){
     RESET_CELL(out, REB_TYPESET, CELL_FLAG_FIRST_IS_NODE);
-    mutable_KIND_BYTE(out) = pclass;
+    mutable_KIND3Q_BYTE(out) = pclass;
 
-    VAL_TYPESET_STRING_NODE(out) = NOD(spelling);
+    VAL_TYPESET_STRING_NODE(out) = NOD(m_cast(REBSTR*, spelling));
     VAL_TYPESET_LOW_BITS(out) = bits & cast(uint32_t, 0xFFFFFFFF);
     VAL_TYPESET_HIGH_BITS(out) = bits >> 32;
     assert(IS_PARAM(out));
@@ -381,47 +427,42 @@ inline static REBVAL *Init_Param(
     Init_Param((out), REB_P_NORMAL, (spelling), TS_VALUE)
 
 
-// !!! Temporary workaround--there were natives that depend on type checking
-// LIT-WORD! and LIT-PATH! or would crash.  We could change those to use
-// QUOTED! and force them to manually check in the native dispatcher, but
-// instead keep it going with the hopes that in the future typesets will
-// become more sophisticated and be able to expand beyond their 64-bit limit
-// to account for generic quoting.
+inline static REBVAL *Refinify(REBVAL *v);  // forward declaration
+inline static bool IS_REFINEMENT(const RELVAL *v);  // forward declaration
+inline static bool IS_PREDICATE(const RELVAL *v);  // forward declaration
+
+
+// This is an interim workaround for the need to be able check constrained
+// data types (e.g. PATH!-with-BLANK!-at-head being REFINEMENT!).  See
+// Startup_Fake_Type_Constraint() for an explanation.
 //
-// !!! Extended to also support checking for "refinement-style" paths, which
-// we consider anything starting with a slash (/foo, /foo/bar, /1234, etc.)
+// !!! All type constraints have been temporarily removed from typesets in
+// order to reclaim bits.  However, type checks that want to ultimately
+// include parameter constraints (e.g. function arguments) should call this
+// instead of checking typeset bit flags directly.
 //
-inline static bool Typecheck_Including_Quoteds(
+inline static bool Typecheck_Including_Constraints(
     const RELVAL *param,
     const RELVAL *v
 ){
     if (TYPE_CHECK(param, VAL_TYPE(v)))
         return true;
 
-    if (KIND_BYTE(v) == REB_WORD + REB_64)  // what was a "lit word"
-        if (TYPE_CHECK(param, REB_TS_QUOTED_WORD))
-            return true;
+    if (TYPE_CHECK(param, REB_TS_REFINEMENT) and IS_REFINEMENT(v))
+        return true;
 
-    if (KIND_BYTE(v) == REB_PATH + REB_64) // what was a "lit path"
-        if (TYPE_CHECK(param, REB_TS_QUOTED_PATH))
-            return true;
-
-    if (KIND_BYTE(v) == REB_PATH and IS_BLANK(ARR_HEAD(VAL_ARRAY(v))))
-        if (TYPE_CHECK(param, REB_TS_REFINED_PATH))
-            return true;
+    if (TYPE_CHECK(param, REB_TS_PREDICATE) and IS_PREDICATE(v))
+        return true;
 
     return false;
 }
 
 
-inline static bool Is_Typeset_Invisible(const RELVAL *param) {
+inline static bool Is_Typeset_Empty(const RELVAL *param) {
     REBU64 bits = VAL_TYPESET_LOW_BITS(param);
     bits |= cast(REBU64, VAL_TYPESET_HIGH_BITS(param)) << 32;
-    return (bits & TS_OPT_VALUE) == 0;  // e.g. `return: []` or `[/refine]`
+    return (bits & TS_OPT_VALUE) == 0;  // e.g. `[/refine]`
 }
-
-
-inline static REBVAL *Refinify(REBVAL *v);  // forward declaration needed
 
 
 // During the process of specialization, a NULL refinement means that it has
@@ -435,10 +476,7 @@ inline static REBVAL *Refinify(REBVAL *v);  // forward declaration needed
 // dequoting and requoting, etc.  Those are evaluator mechanics for filling
 // the slot--this happens after that.
 //
-inline static void Typecheck_Refinement_And_Canonize(
-    const RELVAL *param,
-    REBVAL *arg
-){
+inline static void Typecheck_Refinement(const RELVAL *param, REBVAL *arg) {
     assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
     assert(TYPE_CHECK(param, REB_TS_REFINEMENT));
 
@@ -446,36 +484,11 @@ inline static void Typecheck_Refinement_And_Canonize(
         //
         // Not in use
     }
-    else if (Is_Typeset_Invisible(param)) {
-        //
-        // Refinements that don't have a corresponding argument are in a
-        // sense LOGIC!-based.  But for convenience, Ren-C canonizes them as
-        // either a NULL or a refinement-style PATH!--providing logical
-        // false/true behavior while making it easier to chain them, e.g.
-        //
-        //    keep: func [value /only] [... append/(only) ...]
-        //
-        // It might be argued that any truthy value should be fair game for
-        // being canonized, but be a bit more conservative to try and catch
-        // likely mistakes.  Accepting refinement-style paths means accepting
-        // one's own canonizations (which seems important) or being able to
-        // use one logic-seeming refinement to assign another.
-        if (
-            (IS_LOGIC(arg) and VAL_LOGIC(arg))
-            or IS_PATH(arg)  // !!! Is this too lax?
-        ){
-            Refinify(Init_Word(arg, VAL_PARAM_SPELLING(param)));
-        }
-        else if (IS_LOGIC(arg)) {
-            assert(not VAL_LOGIC(arg));
-            Init_Nulled(arg);
-        }
-        else if (IS_BLANK(arg))  // give an error to show where this is
-            fail ("Use NULL/FALSE for unused refinements, not BLANK!");
-        else
-            fail (Error_Invalid_Type(VAL_TYPE(arg)));
+    else if (Is_Typeset_Empty(param)) {
+        if (not Is_Blackhole(arg))
+            fail ("Parameterless Refinements Must be either # or NULL");
     }
-    else if (not Typecheck_Including_Quoteds(param, arg))
+    else if (not Typecheck_Including_Constraints(param, arg))
         fail (Error_Invalid_Type(VAL_TYPE(arg)));
 
     SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);

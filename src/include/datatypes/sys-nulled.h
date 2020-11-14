@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -34,17 +34,17 @@
 // But that's the API.  Internal to Rebol, cells are the currency used, and
 // if they are to represent an "optional" value, there must be a special
 // bit pattern used to mark them as not containing any value at all.  These
-// are called "nulled cells" and marked by means of their KIND_BYTE().
+// are called "nulled cells" and marked by means of their KIND3Q_BYTE().
 //
 
 #define NULLED_CELL \
     c_cast(const REBVAL*, &PG_Nulled_Cell)
 
 #define IS_NULLED(v) \
-    (VAL_TYPE(v) == REB_NULLED)
+    (VAL_TYPE(v) == REB_NULL)
 
 #define Init_Nulled(out) \
-    RESET_CELL((out), REB_NULLED, CELL_MASK_NONE)
+    RESET_CELL((out), REB_NULL, CELL_MASK_NONE)
 
 // !!! A theory was that the "evaluated" flag would help a function that took
 // both <opt> and <end>, which are converted to nulls, distinguish what kind
@@ -52,7 +52,7 @@
 // here just to make a note of the concept, and tag it via the callsites.
 //
 #define Init_Endish_Nulled(out) \
-    RESET_CELL((out), REB_NULLED, CELL_FLAG_UNEVALUATED)
+    RESET_CELL((out), REB_NULL, CELL_FLAG_UNEVALUATED)
 
 inline static bool IS_ENDISH_NULLED(const RELVAL *v)
     { return IS_NULLED(v) and GET_CELL_FLAG(v, UNEVALUATED); }
@@ -62,7 +62,7 @@ inline static bool IS_ENDISH_NULLED(const RELVAL *v)
 // be a "nulled cell" must translate any such cells to nullptr.
 //
 inline static const REBVAL *NULLIFY_NULLED(const REBVAL *cell)
-  { return VAL_TYPE(cell) == REB_NULLED ? nullptr : cell; }
+  { return VAL_TYPE(cell) == REB_NULL ? nullptr : cell; }
 
 inline static const REBVAL *REIFY_NULL(const REBVAL *cell)
   { return cell == nullptr ? NULLED_CELL : cell; }

@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2014 Atronix Engineering, Inc.
-// Copyright 2014-2019 Rebol Open Source Contributors
+// Copyright 2014-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -174,7 +174,7 @@ enum {
 #define FLD_AT(a, n) \
     SER_AT(REBVAL, SER(a), (n))  // locate index access
 
-inline static REBSTR *FLD_NAME(REBFLD *f) {
+inline static const REBSTR *FLD_NAME(REBFLD *f) {
     if (IS_BLANK(FLD_AT(f, IDX_FIELD_NAME)))
         return nullptr;
     return VAL_WORD_SPELLING(FLD_AT(f, IDX_FIELD_NAME));
@@ -202,7 +202,7 @@ inline static REBSYM FLD_TYPE_SYM(REBFLD *f) {
 
 inline static REBARR *FLD_FIELDLIST(REBFLD *f) {
     assert(FLD_IS_STRUCT(f));
-    return VAL_ARRAY(FLD_AT(f, IDX_FIELD_TYPE));
+    return VAL_ARRAY_KNOWN_MUTABLE(FLD_AT(f, IDX_FIELD_TYPE));
 }
 
 inline static bool FLD_IS_ARRAY(REBFLD *f) {
@@ -234,7 +234,7 @@ inline static REBLEN FLD_LEN_BYTES_TOTAL(REBFLD *f) {
 
 inline static ffi_type* SCHEMA_FFTYPE(const RELVAL *schema) {
     if (IS_BLOCK(schema)) {
-        REBFLD *field = VAL_ARRAY(schema);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(schema);
         return FLD_FFTYPE(field);
     }
     return Get_FFType_For_Sym(VAL_WORD_SYM(schema));
@@ -291,7 +291,7 @@ inline static REBLEN STU_SIZE(REBSTU *stu)
 inline static REBYTE *STU_DATA_HEAD(REBSTU *stu) {
     REBVAL *data = STU_DATA(stu);
     if (IS_BINARY(data))
-        return VAL_BIN_HEAD(data);
+        return BIN_HEAD(VAL_BINARY_KNOWN_MUTABLE(data));
 
     assert(VAL_HANDLE_LEN(data) != 0);  // is HANDLE!
     return VAL_HANDLE_POINTER(REBYTE, data);
@@ -475,9 +475,9 @@ inline static REBLIB *RIN_LIB(REBRIN *r) {
     return VAL_LIBRARY(RIN_AT(r, IDX_ROUTINE_ORIGIN));
 }
 
-inline static REBACT *RIN_CALLBACK_ACTION(REBRIN *r) {
+inline static REBVAL *RIN_CALLBACK_ACTION(REBRIN *r) {
     assert(RIN_IS_CALLBACK(r));
-    return VAL_ACTION(RIN_AT(r, IDX_ROUTINE_ORIGIN));
+    return RIN_AT(r, IDX_ROUTINE_ORIGIN);
 }
 
 inline static REBVAL *RIN_RET_SCHEMA(REBRIN *r)
@@ -487,7 +487,8 @@ inline static REBLEN RIN_NUM_FIXED_ARGS(REBRIN *r)
     { return VAL_LEN_HEAD(RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS)); }
 
 inline static REBVAL *RIN_ARG_SCHEMA(REBRIN *r, REBLEN n) { // 0-based index
-    return SPECIFIC(VAL_ARRAY_AT_HEAD(RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS), n));
+    REBVAL *arg_schemas = RIN_AT(r, IDX_ROUTINE_ARG_SCHEMAS);
+    return cast(REBVAL*, ARR_AT(VAL_ARRAY_KNOWN_MUTABLE(arg_schemas), n));
 }
 
 inline static ffi_cif *RIN_CIF(REBRIN *r)
@@ -520,14 +521,14 @@ extern void callback_dispatcher(
 extern void cleanup_ffi_closure(const REBVAL *v);
 
 extern REB_R T_Struct(REBFRM *frame_, const REBVAL *verb);
-extern REB_R PD_Struct(REBPVS *pvs, const REBVAL *picker, const REBVAL *opt_setval);
-extern REBINT CT_Struct(const REBCEL *a, const REBCEL *b, REBINT mode);
+extern REB_R PD_Struct(REBPVS *pvs, const RELVAL* picker, const REBVAL *opt_setval);
+extern REBINT CT_Struct(REBCEL(const*) a, REBCEL(const*) b, bool strict);
 extern REB_R MAKE_Struct(REBVAL *out, enum Reb_Kind kind,const REBVAL *opt_parent, const REBVAL *arg);
 extern REB_R TO_Struct(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
-extern void MF_Struct(REB_MOLD *mo, const REBCEL *v, bool form);
+extern void MF_Struct(REB_MOLD *mo, REBCEL(const*) v, bool form);
 
 extern REB_R Routine_Dispatcher(REBFRM *f);
 
 inline static bool IS_ACTION_RIN(const RELVAL *v)
-    { return VAL_ACT_DISPATCHER(v) == &Routine_Dispatcher; }
+    { return ACT_DISPATCHER(VAL_ACTION(v)) == &Routine_Dispatcher; }
 

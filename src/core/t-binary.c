@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,16 +37,27 @@
 //
 //  CT_Binary: C
 //
-REBINT CT_Binary(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Binary(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    assert(CELL_KIND(a) == REB_BINARY);
-    assert(CELL_KIND(b) == REB_BINARY);
+    UNUSED(strict);  // no lax form of comparison
 
-    REBINT num = Compare_Binary_Vals(a, b);
+    REBSIZ size1;
+    const REBYTE *data1 = VAL_BINARY_SIZE_AT(&size1, a);
 
-    if (mode >= 0) return (num == 0) ? 1 : 0;
-    if (mode == -1) return (num >= 0) ? 1 : 0;
-    return (num > 0) ? 1 : 0;
+    REBSIZ size2;
+    const REBYTE *data2 = VAL_BINARY_SIZE_AT(&size2, b);
+
+    REBLEN size = MIN(size1, size2);
+
+    REBINT n = memcmp(data1, data2, size);
+
+    if (n != 0)  // not guaranteed to be strictly in [-1 0 1]
+        return n > 0 ? 1 : -1;
+
+    if (size1 == size2)
+        return 0;
+
+    return size1 > size2 ? 1 : -1;
 }
 
 
@@ -55,142 +66,6 @@ REBINT CT_Binary(const REBCEL *a, const REBCEL *b, REBINT mode)
 **  Local Utility Functions
 **
 ***********************************************************************/
-
-
-static void reverse_binary(REBVAL *v, REBLEN len)
-{
-    REBYTE *bp = VAL_BIN_AT(v);
-
-    REBLEN n = 0;
-    REBLEN m = len - 1;
-    for (; n < len / 2; n++, m--) {
-        REBYTE b = bp[n];
-        bp[n] = bp[m];
-        bp[m] = b;
-    }
-}
-
-
-//
-//  find_binary: C
-//
-REBLEN find_binary(
-    REBLEN *size,  // match size (if TAG! pattern, not VAL_LEN_AT(pattern))
-    REBSER *bin,
-    REBLEN index,
-    REBLEN end,
-    const REBCEL *pattern,
-    REBLEN flags,
-    REBINT skip
-) {
-    assert(end >= index);
-
-    REBLEN start;
-    if (skip < 0)
-        start = 0;
-    else
-        start = index;
-
-    if (ANY_STRING_KIND(CELL_KIND(pattern))) {
-        if (skip != 1)
-            fail ("String search in BINARY! only supports /SKIP 1 for now.");
-
-        REBSTR *formed = nullptr;
-
-        REBYTE *bp2;
-        REBLEN len2;
-        if (CELL_KIND(pattern) != REB_TEXT) { // !!! <tag>...but FILE! etc?
-            formed = Copy_Form_Cell(pattern, 0);
-            len2 = STR_LEN(formed);
-            bp2 = STR_HEAD(formed);
-            *size = STR_SIZE(formed);
-        }
-        else {
-            len2 = VAL_LEN_AT(pattern);
-            bp2 = VAL_STRING_AT(pattern);
-            *size = VAL_SIZE_LIMIT_AT(NULL, pattern, len2);
-        }
-
-        if (*size > end - index)  // series not long enough for pattern
-            return NOT_FOUND;
-
-        REBLEN result = Find_Str_In_Bin(
-            bin,
-            start,
-            bp2,
-            len2,
-            *size,
-            flags & (AM_FIND_MATCH | AM_FIND_CASE)
-        );
-
-        if (formed)
-            Free_Unmanaged_Series(SER(formed));
-
-        return result;
-    }
-    else if (CELL_KIND(pattern) == REB_BINARY) {
-        if (skip != 1)
-            fail ("Search for BINARY! in BINARY! only supports /SKIP 1 ATM");
-
-        *size = VAL_LEN_AT(pattern);
-        return Find_Bin_In_Bin(
-            bin,
-            start,
-            VAL_BIN_AT(pattern),
-            *size,
-            flags & AM_FIND_MATCH
-        );
-    }
-    else if (CELL_KIND(pattern) == REB_CHAR) {
-        //
-        // Technically speaking the upper and lowercase sizes of a character
-        // may not be the same.  It's okay here since we only do cased.
-        //
-        // https://stackoverflow.com/q/14792841/
-        //
-        *size = VAL_CHAR_ENCODED_SIZE(pattern);
-        return Find_Char_In_Bin(
-            VAL_CHAR(pattern),
-            bin,
-            start,
-            index,
-            end,
-            skip,
-            flags & (AM_FIND_CASE | AM_FIND_MATCH)
-        );
-    }
-    else if (CELL_KIND(pattern) == REB_INTEGER) {  // specific byte (exact)
-        if (VAL_INT64(pattern) < 0 or VAL_INT64(pattern) > 255)
-            fail (Error_Out_Of_Range(SPECIFIC(pattern)));
-
-        *size = 1;
-
-        REBYTE byte = cast(REBYTE, VAL_INT64(pattern));
-
-        return Find_Bin_In_Bin(
-            bin,
-            start,
-            &byte,
-            *size,
-            flags & AM_FIND_MATCH
-        );
-    }
-    else if (CELL_KIND(pattern) == REB_BITSET) {
-        *size = 1;
-
-        return Find_Bin_Bitset(
-            bin,
-            start,
-            index,
-            end,
-            skip,
-            VAL_BITSET(pattern),
-            flags & AM_FIND_MATCH  // no AM_FIND_CASE
-        );
-    }
-    else
-        fail ("Unsupported pattern type passed to find_binary()");
-}
 
 
 static REBSER *Make_Binary_BE64(const REBVAL *arg)
@@ -246,41 +121,40 @@ static REBSER *Make_Binary_BE64(const REBVAL *arg)
 static REBSER *MAKE_TO_Binary_Common(const REBVAL *arg)
 {
     switch (VAL_TYPE(arg)) {
-    case REB_BINARY:
-        return Copy_Bytes(VAL_BIN_AT(arg), VAL_LEN_AT(arg));
+    case REB_BINARY: {
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, arg);
+        return Copy_Bytes(data, size); }
 
     case REB_TEXT:
     case REB_FILE:
     case REB_EMAIL:
     case REB_URL:
-    case REB_TAG: {  // !!! What should REB_ISSUE do?
-        REBSIZ offset = VAL_OFFSET_FOR_INDEX(arg, VAL_INDEX(arg));
+    case REB_TAG:
+    case REB_ISSUE: {
+        REBSIZ utf8_size;
+        REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, arg);
 
-        REBSIZ size = VAL_SIZE_LIMIT_AT(NULL, arg, UNKNOWN);
-
-        REBSER *bin = Make_Binary(size);
-        memcpy(BIN_HEAD(bin), BIN_AT(VAL_SERIES(arg), offset), size);
-        TERM_BIN_LEN(bin, size);
+        REBSER *bin = Make_Binary(utf8_size);
+        memcpy(BIN_HEAD(bin), utf8, utf8_size);
+        TERM_BIN_LEN(bin, utf8_size);
         return bin; }
 
     case REB_BLOCK:
         Join_Binary_In_Byte_Buf(arg, -1);
-        return Copy_Sequence_Core(BYTE_BUF, SERIES_FLAGS_NONE);
+        return Copy_Series_Core(BYTE_BUF, SERIES_FLAGS_NONE);
 
-    case REB_TUPLE:
-        return Copy_Bytes(VAL_TUPLE(arg), VAL_TUPLE_LEN(arg));
-
-    case REB_CHAR: {
-        REBUNI c = VAL_CHAR(arg);
-        REBSIZ encoded_size = Encoded_Size_For_Codepoint(c);
-        REBSER *bin = Make_Binary(encoded_size);
-        Encode_UTF8_Char(BIN_HEAD(bin), c, encoded_size);
-        TERM_SEQUENCE_LEN(bin, encoded_size);
-        return bin;
-    }
+    case REB_TUPLE: {
+        REBLEN len = VAL_SEQUENCE_LEN(arg);
+        REBBIN *bin = Make_Binary(len);
+        if (Did_Get_Sequence_Bytes(BIN_HEAD(bin), arg, len)) {
+            TERM_BIN_LEN(bin, len);
+            return bin;
+        }
+        fail ("TUPLE! did not consist entirely of INTEGER! values 0-255"); }
 
     case REB_BITSET:
-        return Copy_Bytes(VAL_BIN_HEAD(arg), VAL_LEN_HEAD(arg));
+        return Copy_Bytes(BIN_HEAD(VAL_BINARY(arg)), VAL_LEN_HEAD(arg));
 
     case REB_MONEY: {
         REBSER *bin = Make_Binary(12);
@@ -329,14 +203,16 @@ REB_R MAKE_Binary(
         // while #[binary [#{0001} 2]] would join the pieces together in order
         // to produce #{000102}.  That behavior is not available in Ren-C.
 
-        if (VAL_ARRAY_LEN_AT(def) != 2)
+        REBLEN len;
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, def);
+        if (len != 2)
             goto bad_make;
 
-        RELVAL *first = VAL_ARRAY_AT(def);
+        const RELVAL *first = at;
         if (not IS_BINARY(first))
             goto bad_make;
 
-        RELVAL *index = VAL_ARRAY_AT(def) + 1;
+        const RELVAL *index = at + 1;
         if (not IS_INTEGER(index))
             goto bad_make;
 
@@ -398,64 +274,13 @@ static int Compare_Byte(void *thunk, const void *v1, const void *v2)
 
 
 //
-//  Sort_Binary: C
-//
-static void Sort_Binary(
-    REBVAL *binary,
-    REBVAL *skipv,
-    REBVAL *compv,
-    REBVAL *part,
-    bool rev
-){
-    assert(IS_BINARY(binary));
-
-    if (not IS_NULLED(compv))
-        fail (Error_Bad_Refine_Raw(compv));  // !!! R3-Alpha didn't support
-
-    REBFLGS thunk = 0;
-
-    REBLEN len = Part_Len_May_Modify_Index(binary, part);  // length of sort
-    if (len <= 1)
-        return;
-
-    REBLEN skip;
-    if (IS_NULLED(skipv))
-        skip = 1;
-    else {
-        skip = Get_Num_From_Arg(skipv);
-        if (skip <= 0 or (len % skip != 0) or skip > len)
-            fail (skipv);
-    }
-
-    REBSIZ size = 1;
-    if (skip > 1) {
-        len /= skip;
-        size *= skip;
-    }
-
-    if (rev)
-        thunk |= CC_FLAG_REVERSE;
-
-    reb_qsort_r(
-        VAL_BIN_AT(binary),
-        len,
-        size,
-        &thunk,
-        Compare_Byte
-    );
-}
-
-
-//
 //  PD_Binary: C
 //
 REB_R PD_Binary(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
-    REBSER *ser = VAL_SERIES(pvs->out);
-
     // Note: There was some more careful management of overflow here in the
     // PICK and POKE actions, before unification.  But otherwise the code
     // was less thorough.  Consider integrating this bit, though it seems
@@ -473,12 +298,13 @@ REB_R PD_Binary(
     */
 
     if (not opt_setval) { // PICK-ing
+        const REBBIN *bin = VAL_BINARY(pvs->out);
         if (IS_INTEGER(picker)) {
             REBINT n = Int32(picker) + VAL_INDEX(pvs->out) - 1;
-            if (n < 0 or cast(REBLEN, n) >= SER_LEN(ser))
+            if (n < 0 or cast(REBLEN, n) >= BIN_LEN(bin))
                 return nullptr;
 
-            Init_Integer(pvs->out, *BIN_AT(ser, n));
+            Init_Integer(pvs->out, *BIN_AT(bin, n));
             return pvs->out;
         }
 
@@ -487,14 +313,14 @@ REB_R PD_Binary(
 
     // Otherwise, POKE-ing
 
-    ENSURE_MUTABLE(pvs->out);
+    REBBIN *bin = VAL_BINARY_ENSURE_MUTABLE(pvs->out);
 
     if (not IS_INTEGER(picker))
         return R_UNHANDLED;
 
     REBINT n = Int32(picker) + VAL_INDEX(pvs->out) - 1;
-    if (n < 0 or cast(REBLEN, n) >= SER_LEN(ser))
-        fail (Error_Out_Of_Range(picker));
+    if (n < 0 or cast(REBLEN, n) >= BIN_LEN(bin))
+        fail (Error_Out_Of_Range(SPECIFIC(picker)));
 
     if (IS_CHAR(opt_setval)) {
         Init_Integer(pvs->out, VAL_CHAR(opt_setval));
@@ -513,7 +339,7 @@ REB_R PD_Binary(
     if (i > 0xff)
         fail (Error_Out_Of_Range(opt_setval));
 
-    BIN_HEAD(ser)[n] = cast(REBYTE, i);
+    BIN_HEAD(bin)[n] = cast(REBYTE, i);
     return R_INVISIBLE;
 }
 
@@ -521,36 +347,37 @@ REB_R PD_Binary(
 //
 //  MF_Binary: C
 //
-void MF_Binary(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Binary(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
     if (GET_MOLD_FLAG(mo, MOLD_FLAG_ALL) and VAL_INDEX(v) != 0)
         Pre_Mold(mo, v); // #[binary!
 
-    REBLEN len = VAL_LEN_AT(v);
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
 
     switch (Get_System_Int(SYS_OPTIONS, OPTIONS_BINARY_BASE, 16)) {
       default:
       case 16: {
         Append_Ascii(mo->series, "#{"); // default, so #{...} not #16{...}
 
-        const bool brk = (len > 32);
-        Form_Base16(mo, VAL_BIN_AT(v), len, brk);
+        const bool brk = (size > 32);
+        Form_Base16(mo, data, size, brk);
         break; }
 
       case 64: {
         Append_Ascii(mo->series, "64#{");
 
-        const bool brk = (len > 64);
-        Form_Base64(mo, VAL_BIN_AT(v), len, brk);
+        const bool brk = (size > 64);
+        Form_Base64(mo, data, size, brk);
         break; }
 
       case 2: {
         Append_Ascii(mo->series, "2#{");
 
-        const bool brk = (len > 8);
-        Form_Base2(mo, VAL_BIN_AT(v), len, brk);
+        const bool brk = (size > 8);
+        Form_Base2(mo, data, size, brk);
         break; }
     }
 
@@ -576,8 +403,11 @@ REBTYPE(Binary)
 
     REBSYM sym = VAL_WORD_SYM(verb);
     switch (sym) {
-
-        // Note: INTERSECT, UNION, DIFFERENCE handled later in the switch
+      case SYM_UNIQUE:
+      case SYM_INTERSECT:
+      case SYM_UNION:
+      case SYM_DIFFERENCE:
+      case SYM_EXCLUDE:
         //
       case SYM_REFLECT:
       case SYM_SKIP:
@@ -591,8 +421,6 @@ REBTYPE(Binary)
       case SYM_CHANGE: {
         INCLUDE_PARAMS_OF_INSERT;  // compatible frame with APPEND, CHANGE
         UNUSED(PAR(series));  // covered by `v`
-
-        ENSURE_MUTABLE(v);
 
         if (REF(only)) {
             // !!! Doesn't pay attention...all binary appends are /ONLY
@@ -610,7 +438,7 @@ REBTYPE(Binary)
         if (REF(line))
             flags |= AM_LINE;
 
-        VAL_INDEX(v) = Modify_String_Or_Binary(
+        VAL_INDEX_RAW(v) = Modify_String_Or_Binary(
             v,
             cast(enum Reb_Symbol, sym),
             ARG(value),
@@ -639,20 +467,18 @@ REBTYPE(Binary)
             | (REF(case) ? AM_FIND_CASE : 0)
         );
 
-        flags |= AM_FIND_CASE;
-
         if (REF(part))
             tail = Part_Tail_May_Modify_Index(v, ARG(part));
 
-        REBLEN skip;
+        REBINT skip;
         if (REF(skip))
-            skip = Part_Len_May_Modify_Index(v, ARG(part));
+            skip = VAL_INT32(ARG(skip));
         else
             skip = 1;
 
-        REBLEN len;
-        REBLEN ret = find_binary(
-            &len, VAL_SERIES(v), index, tail, pattern, flags, skip
+        REBLEN size;
+        REBLEN ret = Find_Value_In_Binstr(  // returned length is byte index
+            &size, v, tail, pattern, flags, skip
         );
 
         if (ret >= cast(REBLEN, tail))
@@ -660,7 +486,7 @@ REBTYPE(Binary)
 
         if (sym == SYM_FIND) {
             if (REF(tail) or REF(match))
-                ret += len;
+                ret += size;
             return Init_Any_Series_At(D_OUT, REB_BINARY, VAL_SERIES(v), ret);
         }
 
@@ -673,7 +499,7 @@ REBTYPE(Binary)
       case SYM_TAKE: {
         INCLUDE_PARAMS_OF_TAKE;
 
-        ENSURE_MUTABLE(v);
+        REBBIN *bin = VAL_BINARY_ENSURE_MUTABLE(v);
 
         UNUSED(PAR(series));
 
@@ -692,11 +518,11 @@ REBTYPE(Binary)
 
         if (REF(last)) {
             if (tail - len < 0) {
-                VAL_INDEX(v) = 0;
+                VAL_INDEX_RAW(v) = 0;
                 len = tail;
             }
             else
-                VAL_INDEX(v) = cast(REBLEN, tail - len);
+                VAL_INDEX_RAW(v) = cast(REBLEN, tail - len);
         }
 
         if (cast(REBINT, VAL_INDEX(v)) >= tail) {
@@ -711,20 +537,19 @@ REBTYPE(Binary)
         // if no /PART, just return value, else return string
         //
         if (not REF(part)) {
-            Init_Integer(D_OUT, *VAL_BIN_AT(v));
+            Init_Integer(D_OUT, *VAL_BINARY_AT(v));
         }
         else {
             Init_Binary(
                 D_OUT,
-                Copy_Sequence_At_Len(VAL_SERIES(v), VAL_INDEX(v), len)
+                Copy_Series_At_Len(bin, VAL_INDEX(v), len)
             );
         }
         Remove_Any_Series_Len(v, VAL_INDEX(v), len);  // bad UTF-8 alias fails
         return D_OUT; }
 
       case SYM_CLEAR: {
-        REBSER *ser = VAL_SERIES(v);
-        ENSURE_MUTABLE(v);
+        REBBIN *bin = VAL_BINARY_ENSURE_MUTABLE(v);
 
         if (index >= tail)
             RETURN (v); // clearing after available data has no effect
@@ -733,10 +558,10 @@ REBTYPE(Binary)
         // series is now empty, it reclaims the "bias" (unused capacity at
         // the head of the series).  One of many behaviors worth reviewing.
         //
-        if (index == 0 and IS_SER_DYNAMIC(ser))
-            Unbias_Series(ser, false);
+        if (index == 0 and IS_SER_DYNAMIC(bin))
+            Unbias_Series(bin, false);
 
-        TERM_SEQUENCE_LEN(ser, cast(REBLEN, index));
+        TERM_SEQUENCE_LEN(bin, cast(REBLEN, index));
         RETURN (v); }
 
     //-- Creation:
@@ -754,34 +579,81 @@ REBTYPE(Binary)
         return Init_Any_Series(
             D_OUT,
             REB_BINARY,
-            Copy_Sequence_At_Len(VAL_SERIES(v), VAL_INDEX(v), len)
+            Copy_Series_At_Len(VAL_SERIES(v), VAL_INDEX(v), len)
         ); }
 
     //-- Bitwise:
 
-      case SYM_INTERSECT:
-      case SYM_UNION:
-      case SYM_DIFFERENCE: {
+      case SYM_BITWISE_AND:
+      case SYM_BITWISE_OR:
+      case SYM_BITWISE_XOR:
+      case SYM_BITWISE_AND_NOT: {
         REBVAL *arg = D_ARG(2);
+        if (not IS_BINARY(arg))
+            fail (Error_Math_Args(VAL_TYPE(arg), verb));
 
-        if (VAL_INDEX(v) > VAL_LEN_HEAD(v))
-            VAL_INDEX(v) = VAL_LEN_HEAD(v);
+        REBSIZ t0;
+        const REBYTE *p0 = VAL_BINARY_SIZE_AT(&t0, v);
 
-        if (VAL_INDEX(arg) > VAL_LEN_HEAD(arg))
-            VAL_INDEX(arg) = VAL_LEN_HEAD(arg);
+        REBSIZ t1;
+        const REBYTE *p1 = VAL_BINARY_SIZE_AT(&t1, arg);
 
-        return Init_Any_Series(
-            D_OUT,
-            REB_BINARY,
-            Xandor_Binary(verb, v, arg)
-        ); }
+        REBSIZ smaller = MIN(t0, t1);  // smaller array size
+        REBSIZ larger = MAX(t0, t1);
 
-      case SYM_COMPLEMENT: {
-        return Init_Any_Series(
-            D_OUT,
-            REB_BINARY,
-            Complement_Binary(v)
-        ); }
+        REBSER *series = Make_Binary(larger);
+        TERM_SEQUENCE_LEN(series, larger);
+
+        REBYTE *dest = BIN_HEAD(series);
+
+        switch (VAL_WORD_SYM(verb)) {
+          case SYM_BITWISE_AND: {
+            REBLEN i;
+            for (i = 0; i < smaller; i++)
+                *dest++ = *p0++ & *p1++;
+            CLEAR(dest, larger - smaller);
+            break; }
+
+          case SYM_BITWISE_OR: {
+            REBLEN i;
+            for (i = 0; i < smaller; i++)
+                *dest++ = *p0++ | *p1++;
+            memcpy(dest, ((t0 > t1) ? p0 : p1), larger - smaller);
+            break; }
+
+          case SYM_BITWISE_XOR: {
+            REBLEN i;
+            for (i = 0; i < smaller; i++)
+                *dest++ = *p0++ ^ *p1++;
+            memcpy(dest, ((t0 > t1) ? p0 : p1), larger - smaller);
+            break; }
+
+          case SYM_BITWISE_AND_NOT: {
+            REBLEN i;
+            for (i = 0; i < smaller; i++)
+                *dest++ = *p0++ & ~*p1++;
+            if (t0 > t1)
+                memcpy(dest, p0, t0 - t1);
+            break; }
+
+          default:
+            assert(false);  // not reachable
+        }
+
+        return Init_Any_Series(D_OUT, REB_BINARY, series); }
+
+      case SYM_BITWISE_NOT: {
+        REBSIZ size;
+        const REBYTE *bp = VAL_BINARY_SIZE_AT(&size, v);
+
+        REBBIN *bin = Make_Binary(size);
+        TERM_SEQUENCE_LEN(bin, size);
+
+        REBYTE *dp = BIN_HEAD(bin);
+        for (; size > 0; --size, ++bp, ++dp)
+            *dp = ~(*bp);
+
+        return Init_Any_Series(D_OUT, REB_BINARY, bin); }
 
     // Arithmetic operations are allowed on BINARY!, because it's too limiting
     // to not allow `#{4B} + 1` => `#{4C}`.  Allowing the operations requires
@@ -807,8 +679,8 @@ REBTYPE(Binary)
 
       case SYM_SUBTRACT:
       case SYM_ADD: {
-        ENSURE_MUTABLE(v);
         REBVAL *arg = D_ARG(2);
+        REBBIN *bin = VAL_BINARY_ENSURE_MUTABLE(v);
 
         REBINT amount;
         if (IS_INTEGER(arg))
@@ -830,7 +702,7 @@ REBTYPE(Binary)
         while (amount != 0) {
             REBLEN wheel = VAL_LEN_HEAD(v) - 1;
             while (true) {
-                REBYTE *b = VAL_BIN_AT_HEAD(v, wheel);
+                REBYTE *b = BIN_AT(bin, wheel);
                 if (amount > 0) {
                     if (*b == 255) {
                         if (wheel == VAL_INDEX(v))
@@ -864,19 +736,18 @@ REBTYPE(Binary)
     //-- Special actions:
 
       case SYM_SWAP: {
-        ENSURE_MUTABLE(v);
-
         REBVAL *arg = D_ARG(2);
 
         if (VAL_TYPE(v) != VAL_TYPE(arg))
             fail (Error_Not_Same_Type_Raw());
 
-        ENSURE_MUTABLE(arg);
+        REBYTE *v_at = VAL_BINARY_AT_ENSURE_MUTABLE(v);
+        REBYTE *arg_at = VAL_BINARY_AT_ENSURE_MUTABLE(arg);
 
         if (index < tail and VAL_INDEX(arg) < VAL_LEN_HEAD(arg)) {
-            REBYTE temp = *VAL_BIN_AT(v);
-            *VAL_BIN_AT(v) = *VAL_BIN_AT(arg);
-            *VAL_BIN_AT(arg) = temp;
+            REBYTE temp = *v_at;
+            *v_at = *arg_at;
+            *arg_at = temp;
         }
         RETURN (v); }
 
@@ -884,18 +755,22 @@ REBTYPE(Binary)
         INCLUDE_PARAMS_OF_REVERSE;
         UNUSED(ARG(series));
 
-        ENSURE_MUTABLE(v);
+        REBLEN len = Part_Len_May_Modify_Index(v, ARG(part));
+        REBYTE *bp = VAL_BINARY_AT_ENSURE_MUTABLE(v);  // index may've changed
 
-        REBINT len = Part_Len_May_Modify_Index(v, ARG(part));
-        if (len > 0)
-            reverse_binary(v, len);
+        if (len > 0) {
+            REBLEN n = 0;
+            REBLEN m = len - 1;
+            for (; n < len / 2; n++, m--) {
+                REBYTE b = bp[n];
+                bp[n] = bp[m];
+                bp[m] = b;
+            }
+        }
         RETURN (v); }
 
       case SYM_SORT: {
         INCLUDE_PARAMS_OF_SORT;
-
-        ENSURE_MUTABLE(v);
-
         UNUSED(PAR(series));
 
         if (REF(all))
@@ -905,14 +780,45 @@ REBTYPE(Binary)
             // Ignored...all BINARY! sorts are case-sensitive.
         }
 
-        Sort_Binary(
-            v,
-            ARG(skip),  // blank! if not /SKIP
-            ARG(compare),  // (blank! if not /COMPARE)
-            ARG(part),   // (blank! if not /PART)
-            did REF(reverse)
+        if (REF(compare))
+            fail (Error_Bad_Refine_Raw(ARG(compare)));  // !!! not in R3-Alpha
+
+        REBFLGS thunk = 0;
+
+        Move_Value(D_OUT, v);  // copy to output before index adjustment
+
+        REBLEN len = Part_Len_May_Modify_Index(v, ARG(part));
+        REBYTE *data_at = VAL_BINARY_AT_ENSURE_MUTABLE(v);  // ^ index changes
+
+        if (len <= 1)
+            return D_OUT;
+
+        REBLEN skip;
+        if (not REF(skip))
+            skip = 1;
+        else {
+            skip = Get_Num_From_Arg(ARG(skip));
+            if (skip <= 0 or (len % skip != 0) or skip > len)
+                fail (PAR(skip));
+        }
+
+        REBSIZ size = 1;
+        if (skip > 1) {
+            len /= skip;
+            size *= skip;
+        }
+
+        if (did REF(reverse))
+            thunk |= CC_FLAG_REVERSE;
+
+        reb_qsort_r(
+            data_at,
+            len,
+            size,
+            &thunk,
+            Compare_Byte
         );
-        RETURN (v); }
+        return D_OUT; }
 
       case SYM_RANDOM: {
         INCLUDE_PARAMS_OF_RANDOM;
@@ -920,11 +826,11 @@ REBTYPE(Binary)
         UNUSED(PAR(value));
 
         if (REF(seed)) { // binary contents are the seed
-            Set_Random(Compute_CRC24(VAL_BIN_AT(v), VAL_LEN_AT(v)));
-            return Init_Void(D_OUT);
+            REBSIZ size;
+            const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
+            Set_Random(Compute_CRC24(data, size));
+            return Init_Void(D_OUT, SYM_VOID);
         }
-
-        ENSURE_MUTABLE(v);
 
         if (REF(only)) {
             if (index >= tail)
@@ -932,10 +838,21 @@ REBTYPE(Binary)
 
             index += cast(REBLEN, Random_Int(did REF(secure)))
                 % (tail - index);
-            return Init_Integer(D_OUT, *VAL_BIN_AT_HEAD(v, index)); // PICK
+            const REBBIN *bin = VAL_BINARY(v);
+            return Init_Integer(D_OUT, *BIN_AT(bin, index));  // PICK
         }
 
-        Shuffle_String(v, did REF(secure));
+        REBBIN *bin = VAL_BINARY_ENSURE_MUTABLE(v);
+
+        bool secure = did REF(secure);
+        REBLEN n;
+        for (n = BIN_LEN(bin) - index; n > 1;) {
+            REBLEN k = index + cast(REBLEN, Random_Int(secure)) % n;
+            n--;
+            REBYTE swap = *BIN_AT(bin, k);
+            *BIN_AT(bin, k) = *BIN_AT(bin, n + index);
+            *BIN_AT(bin, n + index) = swap;
+        }
         RETURN (v); }
 
       default:
@@ -982,7 +899,7 @@ REBNATIVE(enbin)
             "fail {Second element of ENBIN settings must be + or +/-}",
         "]",
         rebEND);
-    RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
+    const RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
     if (not IS_INTEGER(third))
         fail ("Third element of ENBIN settings must be an integer}");
     REBINT num_bytes = VAL_INT32(third);
@@ -1070,6 +987,9 @@ REBNATIVE(debin)
 {
     INCLUDE_PARAMS_OF_DEBIN;
 
+    REBSIZ bin_size;
+    const REBYTE *bin_data = VAL_BINARY_SIZE_AT(&bin_size, ARG(binary));
+
     REBVAL* settings = rebValue("compose", ARG(settings), rebEND);
     if (VAL_LEN_AT(settings) != 2 and VAL_LEN_AT(settings) != 3)
         fail("DEBIN requires array of length 2 or 3 for settings for now");
@@ -1087,14 +1007,14 @@ REBNATIVE(debin)
         "]",
         rebEND);
     REBLEN num_bytes;
-    RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
+    const RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
     if (IS_END(third))
-        num_bytes = VAL_LEN_AT(ARG(binary));
+        num_bytes = bin_size;
     else {
         if (not IS_INTEGER(third))
             fail ("Third element of DEBIN settings must be an integer}");
         num_bytes = VAL_INT32(third);
-        if (VAL_LEN_AT(ARG(binary)) != num_bytes)
+        if (bin_size != num_bytes)
             fail ("Input binary is longer than number of bytes to DEBIN");
     }
     if (num_bytes <= 0) {
@@ -1112,7 +1032,7 @@ REBNATIVE(debin)
     // to be correct for starters...
 
     REBINT delta = little ? -1 : 1;
-    REBYTE* bp = VAL_BIN_AT(ARG(binary));
+    const REBYTE* bp = bin_data;
     if (little)
         bp += num_bytes - 1;  // go backwards
 

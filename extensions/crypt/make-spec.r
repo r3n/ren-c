@@ -4,9 +4,9 @@ name: 'Crypt
 loadable: no ;tls depends on this, so it has to be builtin
 source: %crypt/mod-crypt.c
 includes: reduce [
-    repo-dir/extensions/crypt
-    repo-dir/extensions/crypt/mbedtls/include  ; w/subdir %mbedtls
-    %prep/extensions/crypt  ; for %tmp-extensions-crypt-init.inc
+    make-file [(repo-dir) extensions/crypt /]
+    make-file [(repo-dir) extensions/crypt/mbedtls/include /]  ; sub %mbedtls/
+    %prep/extensions/crypt/  ; for %tmp-extensions-crypt-init.inc
 ]
 definitions: [
     {MBEDTLS_CONFIG_FILE="mbedtls-rebol-config.h"}

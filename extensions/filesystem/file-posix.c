@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -330,7 +330,7 @@ static int Read_Directory(REBREQ *dir, REBREQ *file)
     ReqFile(file)->path = rebValue(
         "applique 'local-to-file [",
             "path:", rebT(file_utf8),
-            "dir:", rebL(file_req->modes & RFM_DIR),
+            "dir: if", rebL(file_req->modes & RFM_DIR), "'#",
         "]", rebEND
     );
 
@@ -394,10 +394,9 @@ DEVICE_CMD Open_File(REBREQ *file)
     // printf("Open: %s %d %d\n", path, modes, access);
 
     char *path_utf8 = rebSpell(
-        "applique 'file-to-local [",
+        "applique 'file-to-local/full [",
             "path:", ReqFile(file)->path,
-            "wild:", rebL(req->modes & RFM_DIR),  // !!! necessary?
-            "full: true"
+            "wild: if", rebL(req->modes & RFM_DIR), "'#",  // !!! necessary?
         "]", rebEND
     );
 

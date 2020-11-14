@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -28,24 +28,24 @@
 //
 //  CT_Array: C
 //
-// "Compare Type" dispatcher for the following types: (list here to help
-// text searches)
+// "Compare Type" dispatcher for arrays.
 //
-//     CT_Block()
-//     CT_Group()
-//     CT_Path()
-//     CT_Set_Path()
-//     CT_Get_Path()
-//     CT_Lit_Path()
+// Note this routine is delegated to by CT_Path() when it's using an array for
+// its implementation, so ANY_ARRAY(CELL_KIND()) may not be true...just
+// ANY_ARRAY(CELL_HEART()).
 //
-REBINT CT_Array(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Array(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBINT num = Cmp_Array(a, b, mode == 1);
-    if (mode >= 0)
-        return (num == 0);
-    if (mode == -1)
-        return (num >= 0);
-    return (num > 0);
+    if (C_STACK_OVERFLOWING(&strict))
+        Fail_Stack_Overflow();
+
+    return Compare_Arrays_At_Indexes(
+        VAL_ARRAY(a),
+        VAL_INDEX(a),
+        VAL_ARRAY(b),
+        VAL_INDEX(b),
+        strict
+    );
 }
 
 
@@ -80,13 +80,14 @@ REB_R MAKE_Array(
         //
         // `make block! "a <b> #c"` => `[a <b> #c]`, scans as code (unbound)
         //
-        REBSIZ size = VAL_SIZE_LIMIT_AT(nullptr, arg, UNKNOWN);
+        REBSIZ size;
+        REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&size, arg);
 
-        REBSTR * const filename = Canon(SYM___ANONYMOUS__);
+        const REBSTR *file = Canon(SYM___ANONYMOUS__);
         Init_Any_Array(
             out,
             kind,
-            Scan_UTF8_Managed(filename, VAL_STRING_AT(arg), size)
+            Scan_UTF8_Managed(file, utf8, size)
         );
         return out;
     }
@@ -121,16 +122,14 @@ REB_R MAKE_Array(
         // then it can be somewhat confusing as to why [[a b c]] is needed
         // instead of just [a b c] as the construction spec.
         //
-        if (
-            VAL_ARRAY_LEN_AT(arg) != 2
-            or not ANY_ARRAY(VAL_ARRAY_AT(arg))
-            or not IS_INTEGER(VAL_ARRAY_AT(arg) + 1)
-        ) {
-            goto bad_make;
-        }
+        REBLEN len;
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
 
-        RELVAL *any_array = VAL_ARRAY_AT(arg);
-        REBINT index = VAL_INDEX(any_array) + Int32(VAL_ARRAY_AT(arg) + 1) - 1;
+        if (len != 2 or not ANY_ARRAY(at) or not IS_INTEGER(at + 1))
+            goto bad_make;
+
+        const RELVAL *any_array = at;
+        REBINT index = VAL_INDEX(any_array) + Int32(at + 1) - 1;
 
         if (index < 0 or index > cast(REBINT, VAL_LEN_HEAD(any_array)))
             goto bad_make;
@@ -164,12 +163,12 @@ REB_R MAKE_Array(
         // position and change the type.  (Note: MAKE does not copy the
         // data, but aliases it under a new kind.)
         //
+        REBLEN len;
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
         return Init_Any_Array(
             out,
             kind,
-            Copy_Values_Len_Shallow(
-                VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg), VAL_ARRAY_LEN_AT(arg)
-            )
+            Copy_Values_Len_Shallow(at, VAL_SPECIFIER(arg), len)
         );
     }
     else if (IS_TEXT(arg)) {
@@ -178,12 +177,12 @@ REB_R MAKE_Array(
         // get an unbound code array.
         //
         REBSIZ utf8_size;
-        const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, arg);
-        REBSTR * const filename = Canon(SYM___ANONYMOUS__);
+        REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, arg);
+        const REBSTR *file = Canon(SYM___ANONYMOUS__);
         return Init_Any_Array(
             out,
             kind,
-            Scan_UTF8_Managed(filename, utf8, utf8_size)
+            Scan_UTF8_Managed(file, utf8, utf8_size)
         );
     }
     else if (IS_BINARY(arg)) {
@@ -191,18 +190,18 @@ REB_R MAKE_Array(
         // `to block! #{00BDAE....}` assumes the binary data is UTF8, and
         // goes directly to the scanner to make an unbound code array.
         //
-        REBSTR * const filename = Canon(SYM___ANONYMOUS__);
-        return Init_Any_Array(
-            out,
-            kind,
-            Scan_UTF8_Managed(filename, VAL_BIN_AT(arg), VAL_LEN_AT(arg))
-        );
+        const REBSTR *file = Canon(SYM___ANONYMOUS__);
+
+        REBSIZ size;
+        const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);
+
+        return Init_Any_Array(out, kind, Scan_UTF8_Managed(file, at, size));
     }
     else if (IS_MAP(arg)) {
         return Init_Any_Array(out, kind, Map_To_Array(VAL_MAP(arg), 0));
     }
     else if (ANY_CONTEXT(arg)) {
-        return Init_Any_Array(out, kind, Context_To_Array(VAL_CONTEXT(arg), 3));
+        return Init_Any_Array(out, kind, Context_To_Array(arg, 3));
     }
     else if (IS_VARARGS(arg)) {
         //
@@ -240,7 +239,7 @@ REB_R MAKE_Array(
             else
                 param += VAL_VARARGS_SIGNED_PARAM_INDEX(arg);
 
-            if (TYPE_CHECK(param, REB_NULLED))
+            if (TYPE_CHECK(param, REB_NULL))
                 fail (Error_Null_Vararg_Array_Raw());
         }
 
@@ -289,20 +288,25 @@ REB_R MAKE_Array(
 //  TO_Array: C
 //
 REB_R TO_Array(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
-    if (ANY_PATH(arg)) {
-        return Init_Any_Array(
-            out,
-            kind,
-            Copy_Array_Shallow(VAL_PATH(arg), VAL_PATH_SPECIFIER(arg))
-        );
+    if (ANY_SEQUENCE(arg)) {
+        REBDSP dsp_orig = DSP;
+        REBLEN len = VAL_SEQUENCE_LEN(arg);
+        REBLEN i;
+        for (i = 0; i < len; ++i)
+            Derelativize(
+                DS_PUSH(),
+                VAL_SEQUENCE_AT(out, arg, i),
+                VAL_SEQUENCE_SPECIFIER(arg)
+            );
+        return Init_Any_Array(out, kind, Pop_Stack_Values(dsp_orig));
     }
     else if (ANY_ARRAY(arg)) {
+        REBLEN len;
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
         return Init_Any_Array(
             out,
             kind,
-            Copy_Values_Len_Shallow(
-                VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg), VAL_ARRAY_LEN_AT(arg)
-            )
+            Copy_Values_Len_Shallow(at, VAL_SPECIFIER(arg), len)
         );
     }
     else {
@@ -322,7 +326,7 @@ REB_R TO_Array(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
 // SELECT - (value that follows)".  It's not clear what this meant.
 //
 REBLEN Find_In_Array(
-    REBARR *array,
+    const REBARR *array,
     REBLEN index_unsigned, // index to start search
     REBLEN end_unsigned, // ending position
     const RELVAL *target,
@@ -345,8 +349,8 @@ REBLEN Find_In_Array(
     //
     if (ANY_WORD(target)) {
         for (; index >= start and index < end; index += skip) {
-            RELVAL *item = ARR_AT(array, index);
-            REBSTR *target_canon = VAL_WORD_CANON(target); // canonize once
+            const RELVAL *item = ARR_AT(array, index);
+            const REBSTR *target_canon = VAL_WORD_CANON(target);
             if (ANY_WORD(item)) {
                 if (flags & AM_FIND_CASE) { // Must be same type and spelling
                     if (
@@ -371,10 +375,10 @@ REBLEN Find_In_Array(
     //
     if (ANY_ARRAY(target) and not (flags & AM_FIND_ONLY)) {
         for (; index >= start and index < end; index += skip) {
-            RELVAL *item = ARR_AT(array, index);
+            const RELVAL *item = ARR_AT(array, index);
 
             REBLEN count = 0;
-            RELVAL *other = VAL_ARRAY_AT(target);
+            const RELVAL *other = VAL_ARRAY_AT(target);
             for (; NOT_END(other); ++other, ++item) {
                 if (
                     IS_END(item) or
@@ -395,7 +399,7 @@ REBLEN Find_In_Array(
     //
     if (IS_DATATYPE(target) or IS_TYPESET(target)) {
         for (; index >= start and index < end; index += skip) {
-            RELVAL *item = ARR_AT(array, index);
+            const RELVAL *item = ARR_AT(array, index);
 
             if (IS_DATATYPE(target)) {
                 if (VAL_TYPE(item) == VAL_TYPE_KIND(target))
@@ -428,7 +432,7 @@ REBLEN Find_In_Array(
     // All other cases
 
     for (; index >= start and index < end; index += skip) {
-        RELVAL *item = ARR_AT(array, index);
+        const RELVAL *item = ARR_AT(array, index);
         if (0 == Cmp_Value(item, target, did (flags & AM_FIND_CASE)))
             return index;
 
@@ -520,99 +524,33 @@ static int Compare_Val_Custom(void *arg, const void *v1, const void *v2)
 
 
 //
-//  Sort_Block: C
+//  Shuffle_Array: C
 //
-// series [any-series!]
-// /case {Case sensitive sort}
-// /skip {Treat the series as records of fixed size}
-// size [integer!] {Size of each record}
-// /compare  {Comparator offset, block or action}
-// comparator [integer! block! action!]
-// /part {Sort only part of a series}
-// limit [any-number! any-series!] {Length of series to sort}
-// /all {Compare all fields}
-// /reverse {Reverse sort order}
-//
-static void Sort_Block(
-    REBVAL *block,
-    bool ccase,
-    REBVAL *skipv,
-    REBVAL *compv,
-    REBVAL *part,
-    bool all,
-    bool rev
-) {
-    struct sort_flags flags;
-    flags.cased = ccase;
-    flags.reverse = rev;
-    flags.all = all; // !!! not used?
-
-    if (IS_ACTION(compv)) {
-        flags.comparator = compv;
-        flags.offset = 0;
-    }
-    else if (IS_INTEGER(compv)) {
-        flags.comparator = NULL;
-        flags.offset = Int32(compv) - 1;
-    }
-    else {
-        assert(IS_NULLED(compv));
-        flags.comparator = NULL;
-        flags.offset = 0;
-    }
-
-    REBLEN len = Part_Len_May_Modify_Index(block, part); // length of sort
-    if (len <= 1)
-        return;
-
-    // Skip factor:
-    REBLEN skip;
-    if (not IS_NULLED(skipv)) {
-        skip = Get_Num_From_Arg(skipv);
-        if (skip <= 0 or len % skip != 0 or skip > len)
-            fail (Error_Out_Of_Range(skipv));
-    }
-    else
-        skip = 1;
-
-    reb_qsort_r(
-        VAL_ARRAY_AT(block),
-        len / skip,
-        sizeof(REBVAL) * skip,
-        &flags,
-        flags.comparator != NULL ? &Compare_Val_Custom : &Compare_Val
-    );
-}
-
-
-//
-//  Shuffle_Block: C
-//
-void Shuffle_Block(REBVAL *value, bool secure)
+void Shuffle_Array(REBARR *arr, REBLEN idx, bool secure)
 {
     REBLEN n;
     REBLEN k;
-    REBLEN idx = VAL_INDEX(value);
-    RELVAL *data = VAL_ARRAY_HEAD(value);
+    RELVAL *data = ARR_HEAD(arr);
 
     // Rare case where RELVAL bit copying is okay...between spots in the
     // same array.
     //
     RELVAL swap;
 
-    for (n = VAL_LEN_AT(value); n > 1;) {
+    for (n = ARR_LEN(arr) - idx; n > 1;) {
         k = idx + (REBLEN)Random_Int(secure) % n;
         n--;
 
         // Only do the following block when an actual swap occurs.
-        // Otherwise an assertion will fail when trying to Blit_Cell() a
-    // value to itself.
+        // Otherwise an assertion will fail when trying to Blit_Relative() a
+        // value to itself.
+        //
         if (k != (n + idx)) {
             swap.header = data[k].header;
             swap.payload = data[k].payload;
             swap.extra = data[k].extra;
-            Blit_Cell(&data[k], &data[n + idx]);
-            Blit_Cell(&data[n + idx], &swap);
+            Blit_Relative(&data[k], &data[n + idx]);
+            Blit_Relative(&data[n + idx], &swap);
     }
     }
 }
@@ -621,20 +559,14 @@ void Shuffle_Block(REBVAL *value, bool secure)
 //
 //  PD_Array: C
 //
-// Path dispatch for the following types:
+// Path dispatch for ANY-ARRAY! (covers ANY-BLOCK! and ANY-GROUP!)
 //
-//     PD_Block
-//     PD_Group
-//
-// It is delegated to by path dispatch if the path payload is an array:
-//
-//     PD_Path
-//     PD_Get_Path
-//     PD_Set_Path
+// !!! There is currently some delegation to this routine by ANY-SEQUENCE! if
+// the underlying implementation is a REBARR*.
 //
 REB_R PD_Array(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     REBINT n;
@@ -654,8 +586,8 @@ REB_R PD_Array(
         //
         n = -1;
 
-        REBSTR *canon = VAL_WORD_CANON(picker);
-        RELVAL *item = VAL_ARRAY_AT(pvs->out);
+        const REBSTR *canon = VAL_WORD_CANON(picker);
+        const RELVAL *item = VAL_ARRAY_AT(pvs->out);
         REBLEN index = VAL_INDEX(pvs->out);
         for (; NOT_END(item); ++item, ++index) {
             if (ANY_WORD(item) and canon == VAL_WORD_CANON(item)) {
@@ -698,7 +630,9 @@ REB_R PD_Array(
     if (opt_setval)
         ENSURE_MUTABLE(pvs->out);
 
-    pvs->u.ref.cell = VAL_ARRAY_AT_HEAD(pvs->out, n);
+    // assume it will only write if opt_setval (mutability checked for)
+    //
+    pvs->u.ref.cell = m_cast(RELVAL*, VAL_ARRAY_AT_HEAD(pvs->out, n));
     pvs->u.ref.specifier = VAL_SPECIFIER(pvs->out);
     return R_REFERENCE;
 }
@@ -709,7 +643,7 @@ REB_R PD_Array(
 //
 // Fills out with void if no pick.
 //
-RELVAL *Pick_Block(REBVAL *out, const REBVAL *block, const REBVAL *picker)
+RELVAL *Pick_Block(REBVAL *out, const REBVAL *block, const RELVAL *picker)
 {
     REBINT n = Get_Num_From_Arg(picker);
     n += VAL_INDEX(block) - 1;
@@ -718,16 +652,16 @@ RELVAL *Pick_Block(REBVAL *out, const REBVAL *block, const REBVAL *picker)
         return NULL;
     }
 
-    RELVAL *slot = VAL_ARRAY_AT_HEAD(block, n);
+    const RELVAL *slot = VAL_ARRAY_AT_HEAD(block, n);
     Derelativize(out, slot, VAL_SPECIFIER(block));
-    return slot;
+    return out;
 }
 
 
 //
 //  MF_Array: C
 //
-void MF_Array(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Array(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     // Routine may be called on value that reports REB_QUOTED, even if it
     // has no additional payload and is aliasing the cell itself.  Checking
@@ -737,7 +671,8 @@ void MF_Array(REB_MOLD *mo, const REBCEL *v, bool form)
     enum Reb_Kind kind = CELL_KIND(v);
 
     if (form) {
-        Form_Array_At(mo, VAL_ARRAY(v), VAL_INDEX(v), 0);
+        REBCTX *opt_context = nullptr;
+        Form_Array_At(mo, VAL_ARRAY(v), VAL_INDEX(v), opt_context);
         return;
     }
 
@@ -814,27 +749,21 @@ void MF_Array(REB_MOLD *mo, const REBCEL *v, bool form)
 //
 //  REBTYPE: C
 //
-// Implementation of type dispatch of the following:
-//
-//     REBTYPE(Block)
-//     REBTYPE(Group)
-//     REBTYPE(Path)
-//     REBTYPE(Get_Path)
-//     REBTYPE(Set_Path)
-//     REBTYPE(Lit_Path)
+// Implementation of type dispatch for ANY-ARRAY! (ANY-BLOCK! and ANY-GROUP!)
 //
 REBTYPE(Array)
 {
     REBVAL *array = D_ARG(1);
 
-    REBARR *arr = VAL_ARRAY(array);
     REBSPC *specifier = VAL_SPECIFIER(array);
 
     REBSYM sym = VAL_WORD_SYM(verb);
     switch (sym) {
+      case SYM_UNIQUE:
       case SYM_INTERSECT:
       case SYM_UNION:
       case SYM_DIFFERENCE:
+      case SYM_EXCLUDE:
         //
       case SYM_REFLECT:
       case SYM_SKIP:
@@ -849,7 +778,7 @@ REBTYPE(Array)
         if (REF(deep))
             fail (Error_Bad_Refines_Raw());
 
-        ENSURE_MUTABLE(array);
+        REBARR *arr = VAL_ARRAY_ENSURE_MUTABLE(array);
 
         REBLEN len;
         if (REF(part)) {
@@ -894,10 +823,15 @@ REBTYPE(Array)
 
         REBVAL *pattern = ARG(pattern);
 
-        REBINT len = ANY_ARRAY(pattern) ? VAL_ARRAY_LEN_AT(pattern) : 1;
+        REBLEN len;
+        if (ANY_ARRAY(pattern))
+            VAL_ARRAY_LEN_AT(&len, pattern);
+        else
+            len = 1;
 
         REBLEN limit = Part_Tail_May_Modify_Index(array, ARG(part));
 
+        const REBARR *arr = VAL_ARRAY(array);
         REBLEN index = VAL_INDEX(array);
 
         REBFLGS flags = (
@@ -930,7 +864,7 @@ REBTYPE(Array)
         if (VAL_WORD_SYM(verb) == SYM_FIND) {
             if (REF(tail) or REF(match))
                 ret += len;
-            VAL_INDEX(array) = ret;
+            VAL_INDEX_RAW(array) = ret;
             Move_Value(D_OUT, array);
         }
         else {
@@ -960,11 +894,11 @@ REBTYPE(Array)
         //
         if (IS_NULLED(ARG(value)) and len == 0) {  // only nulls bypass writes
             if (sym == SYM_APPEND) // append always returns head
-                VAL_INDEX(array) = 0;
+                VAL_INDEX_RAW(array) = 0;
             RETURN (array); // don't fail on read only if it would be a no-op
         }
-        ENSURE_MUTABLE(array);
 
+        REBARR *arr = VAL_ARRAY_ENSURE_MUTABLE(array);
         REBLEN index = VAL_INDEX(array);
 
         REBFLGS flags = 0;
@@ -976,7 +910,7 @@ REBTYPE(Array)
             flags |= AM_LINE;
 
         Move_Value(D_OUT, array);
-        VAL_INDEX(D_OUT) = Modify_Array(
+        VAL_INDEX_RAW(D_OUT) = Modify_Array(
             arr,
             index,
             cast(enum Reb_Symbol, sym),
@@ -988,13 +922,14 @@ REBTYPE(Array)
         return D_OUT; }
 
       case SYM_CLEAR: {
-        ENSURE_MUTABLE(array);
+        REBARR *arr = VAL_ARRAY_ENSURE_MUTABLE(array);
         REBLEN index = VAL_INDEX(array);
+
         if (index < VAL_LEN_HEAD(array)) {
             if (index == 0) Reset_Array(arr);
             else {
                 SET_END(ARR_AT(arr, index));
-                SET_SERIES_LEN(VAL_SERIES(array), cast(REBLEN, index));
+                SET_SERIES_LEN(SER(arr), cast(REBLEN, index));
             }
         }
         RETURN (array);
@@ -1009,6 +944,7 @@ REBTYPE(Array)
         REBU64 types = 0;
         REBLEN tail = Part_Tail_May_Modify_Index(array, ARG(part));
 
+        const REBARR *arr = VAL_ARRAY(array);
         REBLEN index = VAL_INDEX(array);
 
         if (REF(deep))
@@ -1051,9 +987,6 @@ REBTYPE(Array)
         if (not ANY_ARRAY(arg))
             fail (arg);
 
-        ENSURE_MUTABLE(array);
-        ENSURE_MUTABLE(arg);
-
         REBLEN index = VAL_INDEX(array);
 
         if (
@@ -1062,13 +995,14 @@ REBTYPE(Array)
         ){
             // RELVAL bits can be copied within the same array
             //
-            RELVAL *a = VAL_ARRAY_AT(array);
+            RELVAL *a = VAL_ARRAY_AT_ENSURE_MUTABLE(array);
+            RELVAL *b = VAL_ARRAY_AT_ENSURE_MUTABLE(arg);
             RELVAL temp;
             temp.header = a->header;
             temp.payload = a->payload;
             temp.extra = a->extra;
-            Blit_Cell(VAL_ARRAY_AT(array), VAL_ARRAY_AT(arg));
-            Blit_Cell(VAL_ARRAY_AT(arg), &temp);
+            Blit_Relative(a, b);
+            Blit_Relative(b, &temp);
         }
         RETURN (array); }
 
@@ -1076,13 +1010,14 @@ REBTYPE(Array)
         INCLUDE_PARAMS_OF_REVERSE;
         UNUSED(ARG(series));  // covered by `v`
 
-        ENSURE_MUTABLE(array);
+        REBARR *arr = VAL_ARRAY_ENSURE_MUTABLE(array);
+        REBLEN index = VAL_INDEX(array);
 
         REBLEN len = Part_Len_May_Modify_Index(array, ARG(part));
         if (len == 0)
             RETURN (array); // !!! do 1-element reversals update newlines?
 
-        RELVAL *front = VAL_ARRAY_AT(array);
+        RELVAL *front = ARR_AT(arr, index);
         RELVAL *back = front + len - 1;
 
         // We must reverse the sense of the newline markers as well, #2326
@@ -1107,7 +1042,7 @@ REBTYPE(Array)
             // When we move the back cell to the front position, it gets the
             // newline flag based on the flag state that was *after* it.
             //
-            Blit_Cell(front, back);
+            Blit_Relative(front, back);
             if (line_back)
                 SET_CELL_FLAG(front, NEWLINE_BEFORE);
             else
@@ -1117,7 +1052,7 @@ REBTYPE(Array)
             // that was on the back will be the after for the next blit.
             //
             line_back = GET_CELL_FLAG(back, NEWLINE_BEFORE);
-            Blit_Cell(back, &temp);
+            Blit_Relative(back, &temp);
             if (line_front)
                 SET_CELL_FLAG(back, NEWLINE_BEFORE);
             else
@@ -1129,18 +1064,54 @@ REBTYPE(Array)
         INCLUDE_PARAMS_OF_SORT;
         UNUSED(PAR(series));  // covered by `v`
 
-        ENSURE_MUTABLE(array);
+        REBARR *arr = VAL_ARRAY_ENSURE_MUTABLE(array);
 
-        Sort_Block(
-            array,
-            did REF(case),
-            ARG(skip),   // blank! if no /SKIP
-            ARG(compare),  // blank! if no /COMPARE
-            ARG(part),  // blank! if no /PART
-            did REF(all),
-            did REF(reverse)
+        struct sort_flags flags;
+        flags.cased = did REF(case);
+        flags.reverse = did REF(reverse);
+        flags.all = did REF(all);  // !!! not used?
+
+        REBVAL *cmp = ARG(compare);  // null if no /COMPARE
+        if (IS_ACTION(cmp)) {
+            flags.comparator = cmp;
+            flags.offset = 0;
+        }
+        else if (IS_INTEGER(cmp)) {
+            flags.comparator = nullptr;
+            flags.offset = Int32(cmp) - 1;
+        }
+        else {
+            assert(IS_NULLED(cmp));
+            flags.comparator = nullptr;
+            flags.offset = 0;
+        }
+
+        Move_Value(D_OUT, array);  // save array before messing with index
+
+        REBLEN len = Part_Len_May_Modify_Index(array, ARG(part));
+        if (len <= 1)
+            return D_OUT;
+        REBLEN index = VAL_INDEX(array);  // ^-- may have been modified
+
+        // Skip factor:
+        REBLEN skip;
+        if (IS_NULLED(ARG(skip)))
+            skip = 1;
+        else {
+            skip = Get_Num_From_Arg(ARG(skip));
+            if (skip <= 0 or len % skip != 0 or skip > len)
+                fail (Error_Out_Of_Range(ARG(skip)));
+        }
+
+        reb_qsort_r(
+            ARR_AT(arr, index),
+            len / skip,
+            sizeof(REBVAL) * skip,
+            &flags,
+            flags.comparator != nullptr ? &Compare_Val_Custom : &Compare_Val
         );
-        RETURN (array); }
+
+        return D_OUT; }
 
       case SYM_RANDOM: {
         INCLUDE_PARAMS_OF_RANDOM;
@@ -1170,8 +1141,8 @@ REBTYPE(Array)
             return Inherit_Const(D_OUT, array);
         }
 
-        ENSURE_MUTABLE(array);
-        Shuffle_Block(array, did REF(secure));
+        REBARR *arr = VAL_ARRAY_ENSURE_MUTABLE(array);
+        Shuffle_Array(arr, VAL_INDEX(array), did REF(secure));
         RETURN (array); }
 
       default:
@@ -1323,7 +1294,7 @@ REBNATIVE(engroup)
 //
 //  Assert_Array_Core: C
 //
-void Assert_Array_Core(REBARR *a)
+void Assert_Array_Core(const REBARR *a)
 {
     // Basic integrity checks (series is not marked free, etc.)  Note that
     // we don't use ASSERT_SERIES the macro here, because that checks to
@@ -1334,7 +1305,7 @@ void Assert_Array_Core(REBARR *a)
     if (not IS_SER_ARRAY(a))
         panic (a);
 
-    RELVAL *item = ARR_HEAD(a);
+    const RELVAL *item = ARR_HEAD(a);
     REBLEN i;
     REBLEN len = ARR_LEN(a);
     for (i = 0; i < len; ++i, ++item) {
@@ -1343,8 +1314,8 @@ void Assert_Array_Core(REBARR *a)
             panic (a);
         }
         if (not GET_ARRAY_FLAG(a, IS_PARAMLIST)) {  // uses > REB_MAX for PTYPE
-            if (KIND_BYTE_UNCHECKED(item) % REB_64 >= REB_MAX) {
-                printf("Invalid KIND_BYTE at index %d\n", cast(int, i));
+            if (KIND3Q_BYTE_UNCHECKED(item) % REB_64 >= REB_MAX) {
+                printf("Invalid KIND3Q_BYTE at index %d\n", cast(int, i));
                 panic (a);
             }
         }
@@ -1376,7 +1347,7 @@ void Assert_Array_Core(REBARR *a)
         }
         assert(item == ARR_AT(a, rest - 1));
 
-        RELVAL *ultimate = ARR_AT(a, rest - 1);
+        const RELVAL *ultimate = ARR_AT(a, rest - 1);
         if (NOT_END(ultimate) or (ultimate->header.bits & NODE_FLAG_CELL)) {
             printf("Implicit termination/unwritable END missing from array\n");
             panic (a);

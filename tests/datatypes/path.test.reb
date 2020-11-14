@@ -27,12 +27,8 @@
     2 == blk/:abs
 )
 (
-    blk: [#{} 2]
-    2 == blk/#{}
-)
-(
     blk: reduce [charset "a" 3]
-    3 == do reduce [to path! reduce ['blk charset "a"]]
+    'bad-sequence-item = (trap [to path! reduce ['blk charset "a"]])/id
 )
 (
     blk: [[] 3]
@@ -40,7 +36,7 @@
 )
 (
     blk: [_ 3]
-    3 == do [blk/_]
+    3 == do [blk/(_)]
 )
 (
     blk: [blank 3]
@@ -48,7 +44,11 @@
 )
 (
     a-value: 1/Jan/0000
-    0 == a-value/1
+    did all [
+        1 == a-value/1
+        'Jan == a-value/2
+        0 == a-value/3
+    ]
 )
 (
     a-value: me@here.com
@@ -146,7 +146,7 @@
 
 [#71 (
     a: "abcd"
-    "abcd/x" = a/x
+    error? trap [a/x]
 )]
 
 [#1820 ; Word USER can't be selected with path syntax
@@ -156,7 +156,7 @@
     )
 ]
 [#1977
-    (f: func [/r] [1] error? trap [f/r/%])
+    (f: func [/r] [1] error? trap [do load "f/r/%"])
 ]
 
 ; path evaluation order
@@ -172,20 +172,21 @@
 ; PATH! beginning with an inert item will itself be inert
 ;
 [
-    (/ref/inement/path = to path! [/ref inement path])
-    (/refinement/2 = to path! [/refinement 2])
+    ('bad-sequence-item = (trap [to path! [/ref inement path]])/id)
+    ('bad-sequence-item = (trap [to path! [/refinement 2]])/id)
     ((/refinement)/2 = 'refinement)
-    (r: /refinement | r/2 = 'refinement)
-][
-    (#iss/ue/path = to path! [#iss ue path])
-    (#issue/3 = to path! [#issue 3])
+    (r: /refinement, r/2 = 'refinement)
 ][
     ("te"/xt/path = to path! ["te" xt path])
     ("text"/3 = to path! ["text" 3])
     (("text")/3 = #"x")
-    (t: "text" | t/3 = #"x")
+    (t: "text", t/3 = #"x")
 ]
 
+; ISSUE! has internal slashes (like FILE!), and does not load as a path
+[
+    ("iss/ue/path" = as text! ensure issue! load "#iss/ue/path")
+]
 
 ; https://gitter.im/red/red?at=5b23be5d1ee2d149ecc4c3fd
 (

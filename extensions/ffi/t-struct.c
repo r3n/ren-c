@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2014 Atronix Engineering, Inc.
-// Copyright 2014-2017 Rebol Open Source Contributors
+// Copyright 2014-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -155,13 +155,13 @@ static void get_scalar(
 //
 //  Get_Struct_Var: C
 //
-static bool Get_Struct_Var(REBVAL *out, REBSTU *stu, const REBVAL *word)
+static bool Get_Struct_Var(REBVAL *out, REBSTU *stu, const RELVAL *word)
 {
     REBARR *fieldlist = STU_FIELDLIST(stu);
 
     RELVAL *item = ARR_HEAD(fieldlist);
     for (; NOT_END(item); ++item) {
-        REBFLD *field = VAL_ARRAY(item);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
         if (STR_CANON(FLD_NAME(field)) != VAL_WORD_CANON(word))
             continue;
 
@@ -211,7 +211,7 @@ REBARR *Struct_To_Array(REBSTU *stu)
     // fail_if_non_accessible(STU_TO_VAL(stu));
 
     for(; NOT_END(item); ++item) {
-        REBFLD *field = VAL_ARRAY(item);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         Init_Set_Word(DS_PUSH(), FLD_NAME(field)); // required name
 
@@ -269,7 +269,7 @@ REBARR *Struct_To_Array(REBSTU *stu)
 }
 
 
-void MF_Struct(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Struct(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
@@ -292,8 +292,8 @@ static bool same_fields(REBARR *tgt_fieldlist, REBARR *src_fieldlist)
     RELVAL *src_item = ARR_HEAD(src_fieldlist);
 
     for (; NOT_END(src_item); ++src_item, ++tgt_item) {
-        REBFLD *src_field = VAL_ARRAY(src_item);
-        REBFLD *tgt_field = VAL_ARRAY(tgt_item);
+        REBFLD *src_field = VAL_ARRAY_KNOWN_MUTABLE(src_item);
+        REBFLD *tgt_field = VAL_ARRAY_KNOWN_MUTABLE(tgt_item);
 
         if (FLD_IS_STRUCT(tgt_field))
             if (not same_fields(
@@ -486,7 +486,7 @@ inline static bool assign_scalar(
 //
 static bool Set_Struct_Var(
     REBSTU *stu,
-    const REBVAL *word,
+    const RELVAL *word,
     const REBVAL *elem,
     const REBVAL *val
 ){
@@ -494,7 +494,7 @@ static bool Set_Struct_Var(
     RELVAL *item = ARR_HEAD(fieldlist);
 
     for (; NOT_END(item); ++item) {
-        REBFLD *field = VAL_ARRAY(item);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         if (VAL_WORD_CANON(word) != STR_CANON(FLD_NAME(field)))
             continue;
@@ -534,9 +534,12 @@ static bool Set_Struct_Var(
 
 
 /* parse struct attribute */
-static void parse_attr (REBVAL *blk, REBINT *raw_size, uintptr_t *raw_addr)
-{
-    REBVAL *attr = SPECIFIC(VAL_ARRAY_AT(blk));
+static void parse_attr(
+    const RELVAL *blk,
+    REBINT *raw_size,
+    uintptr_t *raw_addr
+){
+    const REBVAL *attr = SPECIFIC(VAL_ARRAY_AT(blk));
 
     *raw_size = -1;
     *raw_addr = 0;
@@ -577,22 +580,22 @@ static void parse_attr (REBVAL *blk, REBINT *raw_size, uintptr_t *raw_addr)
             if (IS_END(attr) or not IS_BLOCK(attr) or VAL_LEN_AT(attr) != 2)
                 fail (attr);
 
-            REBVAL *lib = SPECIFIC(VAL_ARRAY_AT_HEAD(attr, 0));
+            const RELVAL *lib = VAL_ARRAY_AT_HEAD(attr, 0);
             if (not IS_LIBRARY(lib))
                 fail (attr);
             if (IS_LIB_CLOSED(VAL_LIBRARY(lib)))
                 fail (Error_Bad_Library_Raw());
 
-            REBVAL *sym = SPECIFIC(VAL_ARRAY_AT_HEAD(attr, 1));
-            if (not IS_BINARY(sym) and not ANY_STRING(sym))
-                fail (sym);
+            const RELVAL *sym = VAL_ARRAY_AT_HEAD(attr, 1);
+            if (not ANY_STRING(sym))
+                fail (rebUnrelativize(sym));
 
             CFUNC *addr = Find_Function(
                 VAL_LIBRARY_FD(lib),
-                cs_cast(VAL_UTF8_AT(nullptr, sym))
+                cs_cast(VAL_UTF8_AT(sym))
             );
             if (addr == nullptr)
-                fail (Error_Symbol_Not_Found_Raw(sym));
+                fail (Error_Symbol_Not_Found_Raw(rebUnrelativize(sym)));
 
             *raw_addr = cast(uintptr_t, addr);
             break; }
@@ -673,7 +676,7 @@ static REBLEN Total_Struct_Dimensionality(REBARR *fields)
 
     RELVAL *item = ARR_HEAD(fields);
     for (; NOT_END(item); ++item) {
-        REBFLD *field = VAL_ARRAY(item);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         if (FLD_IS_STRUCT(field))
             n_fields += Total_Struct_Dimensionality(FLD_FIELDLIST(field));
@@ -737,7 +740,7 @@ static void Prepare_Field_For_FFI(REBFLD *schema)
 
     REBLEN j = 0;
     for (; NOT_END(item); ++item) {
-        REBFLD *field = VAL_ARRAY(item);
+        REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
         REBLEN dimension = FLD_IS_ARRAY(field) ? FLD_DIMENSION(field) : 1;
 
         REBLEN n = 0;
@@ -772,7 +775,7 @@ static void Parse_Field_Type_May_Fail(
 ){
     TRASH_CELL_IF_DEBUG(inner);
 
-    RELVAL *val = VAL_ARRAY_AT(spec);
+    const RELVAL *val = VAL_ARRAY_AT(spec);
 
     if (IS_END(val))
         fail ("Empty field type in FFI");
@@ -953,10 +956,10 @@ static void Parse_Field_Type_May_Fail(
 //
 void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
 {
-    REBVAL *spec_item = SPECIFIC(VAL_ARRAY_AT(spec));
+    const RELVAL *spec_item = VAL_ARRAY_AT(spec);
 
     while (NOT_END(spec_item)) {
-        REBVAL *word;
+        const RELVAL *word;
         if (IS_BLOCK(spec_item)) { // options: raw-memory, etc
             REBINT raw_size = -1;
             uintptr_t raw_addr = 0;
@@ -977,18 +980,18 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
         else {
             word = spec_item;
             if (not IS_SET_WORD(word))
-                fail (word);
+                fail (rebUnrelativize(word));
         }
 
-        REBVAL *fld_val = spec_item + 1;
+        const RELVAL *fld_val = spec_item + 1;
         if (IS_END(fld_val))
-            fail (Error_Need_Non_End_Raw(fld_val));
+            fail (Error_Need_Non_End_Raw(rebUnrelativize(fld_val)));
 
         REBARR *fieldlist = VAL_STRUCT_FIELDLIST(ret);
         RELVAL *item = ARR_HEAD(fieldlist);
 
         for (; NOT_END(item); ++item) {
-            REBFLD *field = VAL_ARRAY(item);
+            REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
             if (STR_CANON(FLD_NAME(field)) != VAL_WORD_CANON(word))
                 continue;
@@ -998,7 +1001,7 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
                     REBLEN dimension = FLD_DIMENSION(field);
 
                     if (VAL_LEN_AT(fld_val) != dimension)
-                        fail (fld_val);
+                        fail (rebUnrelativize(fld_val));
 
                     REBLEN n = 0;
                     for (n = 0; n < dimension; ++n) {
@@ -1008,7 +1011,7 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
                             n,
                             SPECIFIC(VAL_ARRAY_AT_HEAD(fld_val, n))
                         )){
-                            fail (fld_val);
+                            fail (rebUnrelativize(fld_val));
                         }
                     }
                 }
@@ -1025,11 +1028,17 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
                     );
                 }
                 else
-                    fail (fld_val);
+                    fail (rebUnrelativize(fld_val));
             }
             else {
-                if (not assign_scalar(VAL_STRUCT(ret), field, 0, fld_val))
-                    fail (fld_val);
+                if (not assign_scalar(
+                    VAL_STRUCT(ret),
+                    field,
+                    0,
+                    SPECIFIC(fld_val)
+                )){
+                    fail (rebUnrelativize(fld_val));
+                }
             }
             goto next_spec_pair;
         }
@@ -1069,8 +1078,6 @@ REB_R MAKE_Struct(
         fail (arg);
 
     DECLARE_FRAME_AT (f, arg, EVAL_MASK_DEFAULT);
-    SHORTHAND (v, f->feed->value, NEVERNULL(const RELVAL*));
-    SHORTHAND (specifier, f->feed->specifier, REBSPC*);
 
     Push_Frame(nullptr, f);
 
@@ -1104,7 +1111,7 @@ REB_R MAKE_Struct(
     REBINT raw_size = -1;
     uintptr_t raw_addr = 0;
 
-    if (NOT_END(*v) and IS_BLOCK(*v)) {
+    if (NOT_END(f_value) and IS_BLOCK(f_value)) {
         //
         // !!! This would suggest raw-size, raw-addr, or extern can be leading
         // in the struct definition, perhaps as:
@@ -1112,7 +1119,7 @@ REB_R MAKE_Struct(
         //     make struct! [[raw-size] ...]
         //
         DECLARE_LOCAL (specific);
-        Derelativize(specific, *v, VAL_SPECIFIER(arg));
+        Derelativize(specific, f_value, VAL_SPECIFIER(arg));
         parse_attr(specific, &raw_size, &raw_addr);
         Fetch_Next_Forget_Lookback(f);
     }
@@ -1132,7 +1139,7 @@ REB_R MAKE_Struct(
     DECLARE_LOCAL (spec);
     DECLARE_LOCAL (init); // for result to save in data
 
-    while (NOT_END(*v)) {
+    while (NOT_END(f_value)) {
 
         // Add another field...although we don't manage the array (so it won't
         // get GC'd) we do run evaluations, so it must be GC-valid.
@@ -1149,25 +1156,25 @@ REB_R MAKE_Struct(
         // Must be a word or a set-word, with set-words initializing
 
         bool expect_init;
-        if (IS_SET_WORD(*v)) {
+        if (IS_SET_WORD(f_value)) {
             expect_init = true;
             if (raw_addr) {
                 // initialization is not allowed for raw memory struct
-                fail (Error_Bad_Value_Core(*v, *specifier));
+                fail (Error_Bad_Value_Core(f_value, f_specifier));
             }
         }
-        else if (IS_WORD(*v))
+        else if (IS_WORD(f_value))
             expect_init = false;
         else
-            fail (Error_Invalid_Type(VAL_TYPE(*v)));
+            fail (Error_Invalid_Type(VAL_TYPE(f_value)));
 
-        Init_Word(FLD_AT(field, IDX_FIELD_NAME), VAL_WORD_SPELLING(*v));
+        Init_Word(FLD_AT(field, IDX_FIELD_NAME), VAL_WORD_SPELLING(f_value));
 
         Fetch_Next_Forget_Lookback(f);
-        if (IS_END(*v) or not IS_BLOCK(*v))
-            fail (Error_Bad_Value_Core(*v, VAL_SPECIFIER(arg)));
+        if (IS_END(f_value) or not IS_BLOCK(f_value))
+            fail (Error_Bad_Value_Core(f_value, f_specifier));
 
-        Derelativize(spec, *v, VAL_SPECIFIER(arg));
+        Derelativize(spec, f_value, VAL_SPECIFIER(arg));
 
         // Fills in the width, dimension, type, and ffi_type (if needed)
         //
@@ -1193,15 +1200,19 @@ REB_R MAKE_Struct(
             EXPAND_SERIES_TAIL(data_bin, step);
 
         if (expect_init) {
-            if (IS_END(*v))
+            if (IS_END(f_value))
                fail (arg);
 
-            if (IS_BLOCK(*v)) {
-                REBDSP dsp_reduce = DSP;
-                if (Reduce_To_Stack_Throws(out, *v, VAL_SPECIFIER(arg)))
-                    fail (Error_No_Catch_For_Throw(init));
+            if (IS_BLOCK(f_value)) {
+                DECLARE_LOCAL (specific);
+                Derelativize(specific, f_value, f_specifier);
 
-                Init_Block(init, Pop_Stack_Values(dsp_reduce));
+                PUSH_GC_GUARD(specific);
+                REBVAL *reduced = rebValue("reduce", specific, rebEND);
+                DROP_GC_GUARD(specific);
+
+                Move_Value(init, reduced);
+                rebRelease(reduced);
 
                 Fetch_Next_Forget_Lookback(f);
             }
@@ -1241,7 +1252,7 @@ REB_R MAKE_Struct(
                     }
                 }
                 else
-                    fail (Error_Unexpected_Type(REB_BLOCK, VAL_TYPE(*v)));
+                    fail (Error_Unexpected_Type(REB_BLOCK, VAL_TYPE(f_value)));
             }
             else {
                 // scalar
@@ -1344,7 +1355,7 @@ REB_R TO_Struct(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 REB_R PD_Struct(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     REBSTU *stu = VAL_STRUCT(pvs->out);
@@ -1385,7 +1396,7 @@ REB_R PD_Struct(
             // evaluation may not protect the result...)
             //
             DECLARE_LOCAL (sel_orig);
-            Move_Value(sel_orig, picker);
+            Blit_Relative(cast(RELVAL*, sel_orig), picker);
             PUSH_GC_GUARD(sel_orig);
 
             if (Next_Path_Throws(pvs)) { // updates pvs->out, PVS_PICKER()
@@ -1425,7 +1436,7 @@ REB_R PD_Struct(
 //
 //  Cmp_Struct: C
 //
-REBINT Cmp_Struct(const REBCEL *s, const REBCEL *t)
+REBINT Cmp_Struct(REBCEL(const*) s, REBCEL(const*) t)
 {
     REBINT n = VAL_STRUCT_FIELDLIST(s) - VAL_STRUCT_FIELDLIST(t);
     fail_if_non_accessible(VAL_STRUCT(s));
@@ -1441,34 +1452,27 @@ REBINT Cmp_Struct(const REBCEL *s, const REBCEL *t)
 //
 //  CT_Struct: C
 //
-REBINT CT_Struct(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Struct(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    switch (mode) {
-    case 1: // strict equality
-        return 0 == Cmp_Struct(a, b);
+    if (strict)
+        return Cmp_Struct(a, b);
 
-    case 0: // coerced equality
-        if (Cmp_Struct(a, b) == 0)
-            return 1;
+    if (Cmp_Struct(a, b) == 0)
+        return 0;
 
-        return (
-            CELL_KIND(a) == REB_CUSTOM
-            and CELL_KIND(b) == REB_CUSTOM
-            and CELL_CUSTOM_TYPE(a) == EG_Struct_Type
-            and CELL_CUSTOM_TYPE(b) == EG_Struct_Type
-            and same_fields(VAL_STRUCT_FIELDLIST(a), VAL_STRUCT_FIELDLIST(b))
-            and VAL_STRUCT_SIZE(a) == VAL_STRUCT_SIZE(b)
-            and not memcmp(
-                VAL_STRUCT_DATA_HEAD(a),
-                VAL_STRUCT_DATA_HEAD(b),
-                VAL_STRUCT_SIZE(a)
-            )
-        );
-
-    default:
-        ; // let fall through to -1 case
-    }
-    return -1;
+    return (
+        CELL_KIND(a) == REB_CUSTOM
+        and CELL_KIND(b) == REB_CUSTOM
+        and CELL_CUSTOM_TYPE(a) == EG_Struct_Type
+        and CELL_CUSTOM_TYPE(b) == EG_Struct_Type
+        and same_fields(VAL_STRUCT_FIELDLIST(a), VAL_STRUCT_FIELDLIST(b))
+        and VAL_STRUCT_SIZE(a) == VAL_STRUCT_SIZE(b)
+        and not memcmp(
+            VAL_STRUCT_DATA_HEAD(a),
+            VAL_STRUCT_DATA_HEAD(b),
+            VAL_STRUCT_SIZE(a)
+        )
+    ) ? 0 : 1;  // !!! > or < result needed, but comparison is under review
 }
 
 

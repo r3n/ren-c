@@ -37,7 +37,7 @@
 ; continue cycle
 (
     success: true
-    for-each i [1] [continue | success: false]
+    for-each i [1] [continue, success: false]
     success
 )
 ; zero repetition
@@ -79,20 +79,20 @@
     x: 10
     sum: 0
     for-each x [1 2 3] [sum: sum + x]
-    did all [x = 10 | sum = 6]
+    did all [x = 10, sum = 6]
 )
 (
     x: 10
     sum: 0
     for-each 'x [1 2 3] [sum: sum + x]
-    did all [x = 3 | sum = 6]
+    did all [x = 3, sum = 6]
 )
 (
     x: 10
     y: 20
     sum: 0
     for-each ['x y] [1 2 3 4] [sum: sum + x + y]
-    did all [x = 3 | y = 20 | sum = 10]
+    did all [x = 3, y = 20, sum = 10]
 )
 
 ; Redundancy is checked for.  LIT-WORD! redundancy is legal because those
@@ -109,7 +109,7 @@
     did all [
         error? trap [for-each [x x] [1 2 3 4] [sum: sum + x]]
         error? trap [
-            for-each (compose [  ; see above
+            for-each :(compose [  ; see above
                 x (bind lit 'x obj1)
             ])[
                 1 2 3 4
@@ -118,7 +118,7 @@
             ]
         ]
         error? trap [
-            for-each (compose [  ; see above
+            for-each :(compose [  ; see above
                 (bind lit 'x obj2) x
             ])[
                 1 2 3 4
@@ -127,7 +127,7 @@
             ]
         ]
         not error? trap [
-            for-each (compose [  ; see above
+            for-each :(compose [  ; see above
                 (bind lit 'x obj1) (bind lit 'x obj2)
             ])[
                 1 2 3 4

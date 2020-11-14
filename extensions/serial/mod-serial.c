@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2013 REBOL Technologies
-// Copyright 2013-2017 Rebol Open Source Contributors
+// Copyright 2013-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -166,7 +166,7 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         if (!IS_BINARY(data))
             Init_Binary(data, Make_Binary(32000));
 
-        REBSER *ser = VAL_SERIES(data);
+        REBSER *ser = VAL_SERIES_KNOWN_MUTABLE(data);
         req->length = SER_AVAIL(ser); // space available
         if (req->length < 32000 / 2)
             Extend_Series(ser, 32000);
@@ -213,7 +213,7 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         Move_Value(CTX_VAR(ctx, STD_PORT_DATA), data); // keep it GC safe
         req->length = len;
-        req->common.data = VAL_BIN_AT(data);
+        req->common.data = VAL_BINARY_AT_KNOWN_MUTABLE(data);
         req->actual = 0;
 
         // "send can happen immediately"
@@ -230,7 +230,7 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         if (req->command == RDC_READ) {
             if (IS_BINARY(data)) {
                 SET_SERIES_LEN(
-                    VAL_SERIES(data),
+                    VAL_SERIES_KNOWN_MUTABLE(data),
                     VAL_LEN_HEAD(data) + req->actual
                 );
             }
@@ -238,7 +238,7 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         else if (req->command == RDC_WRITE) {
             Init_Blank(data);  // Write is done.
         }
-        return Init_Void(D_OUT); }
+        return Init_Void(D_OUT, SYM_VOID); }
 
       case SYM_CLOSE:
         if (req->flags & RRF_OPEN) {

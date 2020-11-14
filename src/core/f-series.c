@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -42,14 +42,12 @@ REB_R Series_Common_Action_Maybe_Unhandled(
     REBFRM *frame_,
     const REBVAL *verb
 ){
-    REBVAL *value = D_ARG(1);
-
-    REBINT index = cast(REBINT, VAL_INDEX(value));
-    REBINT tail = cast(REBINT, VAL_LEN_HEAD(value));
+    REBVAL *v = D_ARG(1);
 
     REBFLGS sop_flags;  // "SOP_XXX" Set Operation Flags
 
-    switch (VAL_WORD_SYM(verb)) {
+    REBSYM sym = VAL_WORD_SYM(verb);
+    switch (sym) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(PAR(value));  // covered by `value`
@@ -59,32 +57,41 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
         switch (property) {
           case SYM_INDEX:
-            return Init_Integer(D_OUT, cast(REBI64, index) + 1);
+            return Init_Integer(D_OUT, VAL_INDEX_RAW(v) + 1);
 
-          case SYM_LENGTH:
-            return Init_Integer(D_OUT, tail > index ? tail - index : 0);
+          case SYM_LENGTH: {
+            REBI64 len_head = VAL_LEN_HEAD(v);
+            if (VAL_INDEX_RAW(v) < 0 or VAL_INDEX_RAW(v) > len_head)
+                return Init_Void(D_OUT, SYM_VOID);  // !!! better than error?
+            return Init_Integer(D_OUT, len_head - VAL_INDEX_RAW(v)); }
 
           case SYM_HEAD:
-            Move_Value(D_OUT, value);
-            VAL_INDEX(D_OUT) = 0;
+            Move_Value(D_OUT, v);
+            VAL_INDEX_RAW(D_OUT) = 0;
             return Trust_Const(D_OUT);
 
           case SYM_TAIL:
-            Move_Value(D_OUT, value);
-            VAL_INDEX(D_OUT) = cast(REBLEN, tail);
+            Move_Value(D_OUT, v);
+            VAL_INDEX_RAW(D_OUT) = VAL_LEN_HEAD(v);
             return Trust_Const(D_OUT);
 
           case SYM_HEAD_Q:
-            return Init_Logic(D_OUT, index == 0);
+            return Init_Logic(D_OUT, VAL_INDEX_RAW(v) == 0);
 
           case SYM_TAIL_Q:
-            return Init_Logic(D_OUT, index >= tail);
+            return Init_Logic(
+                D_OUT,
+                VAL_INDEX_RAW(v) == cast(REBIDX, VAL_LEN_HEAD(v))
+            );
 
           case SYM_PAST_Q:
-            return Init_Logic(D_OUT, index > tail);
+            return Init_Logic(
+                D_OUT,
+                VAL_INDEX_RAW(v) > cast(REBIDX, VAL_LEN_HEAD(v))
+            );
 
           case SYM_FILE: {
-            REBSER *s = VAL_SERIES(value);
+            const REBSER *s = VAL_SERIES(v);
             if (not IS_SER_ARRAY(s))
                 return nullptr;
             if (NOT_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED))
@@ -92,7 +99,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
             return Init_File(D_OUT, LINK_FILE(s)); }
 
           case SYM_LINE: {
-            REBSER *s = VAL_SERIES(value);
+            const REBSER *s = VAL_SERIES(v);
             if (not IS_SER_ARRAY(s))
                 return nullptr;
             if (NOT_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED))
@@ -105,77 +112,92 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
         break; }
 
-      case SYM_SKIP:
-      case SYM_AT: {
-        INCLUDE_PARAMS_OF_SKIP; // must be compatible with AT
-        UNUSED(ARG(series)); // is already `value`
+      case SYM_SKIP: {
+        INCLUDE_PARAMS_OF_SKIP;
+        UNUSED(ARG(series));  // covered by `v`
 
-        REBVAL *offset = ARG(offset);
-
-        REBINT len = Get_Num_From_Arg(offset);
+        // `skip x logic` means `either logic [skip x] [x]` (this is reversed
+        // from R3-Alpha and Rebol2, which skipped when false)
+        //
         REBI64 i;
-        if (VAL_WORD_SYM(verb) == SYM_SKIP) {
-            //
-            // `skip x logic` means `either logic [skip x] [x]` (this is
-            // reversed from R3-Alpha and Rebol2, which skipped when false)
-            //
-            if (IS_LOGIC(offset)) {
-                if (VAL_LOGIC(offset))
-                    i = cast(REBI64, index) + 1;
-                else
-                    i = cast(REBI64, index);
-            }
-            else {
-                // `skip series 1` means second element, add the len as-is
-                //
-                i = cast(REBI64, index) + cast(REBI64, len);
-            }
+        if (IS_LOGIC(ARG(offset))) {
+            if (VAL_LOGIC(ARG(offset)))
+                i = cast(REBI64, VAL_INDEX_RAW(v)) + 1;
+            else
+                i = cast(REBI64, VAL_INDEX_RAW(v));
         }
         else {
-            assert(VAL_WORD_SYM(verb) == SYM_AT);
-
-            // `at series 1` means first element, adjust index
+            // `skip series 1` means second element, add offset as-is
             //
-            // !!! R3-Alpha did this differently for values > 0 vs not, is
-            // this what's intended?
-            //
-            if (len > 0)
-                i = cast(REBI64, index) + cast(REBI64, len) - 1;
-            else
-                i = cast(REBI64, index) + cast(REBI64, len);
+            REBINT offset = Get_Num_From_Arg(ARG(offset));
+            i = cast(REBI64, VAL_INDEX_RAW(v)) + cast(REBI64, offset);
         }
 
-        if (i > cast(REBI64, tail)) {
-            if (REF(only))
+        if (not REF(unbounded)) {
+            if (i < 0 or i > cast(REBI64, VAL_LEN_HEAD(v)))
                 return nullptr;
-            i = cast(REBI64, tail); // past tail clips to tail if not /ONLY
-        }
-        else if (i < 0) {
-            if (REF(only))
-                return nullptr;
-            i = 0; // past head clips to head if not /ONLY
         }
 
-        VAL_INDEX(value) = cast(REBLEN, i);
-        RETURN (Trust_Const(value)); }
+        VAL_INDEX_RAW(v) = i;
+        RETURN (Trust_Const(v)); }
+
+      case SYM_AT: {
+        INCLUDE_PARAMS_OF_AT;
+        UNUSED(ARG(series));  // covered by `v`
+
+        REBINT offset = Get_Num_From_Arg(ARG(index));
+        REBI64 i;
+
+        // `at series 1` is first element, e.g. [0] in C.  Adjust offset.
+        //
+        // Note: Rebol2 and Red treat AT 1 and AT 0 as being the same:
+        //
+        //     rebol2>> at next next "abcd" 1
+        //     == "cd"
+        //
+        //     rebol2>> at next next "abcd" 0
+        //     == "cd"
+        //
+        // That doesn't make a lot of sense...but since `series/0` will always
+        // return NULL and `series/-1` returns the previous element, it hints
+        // at special treatment for index 0 (which is C-index -1).
+        //
+        // !!! Currently left as an open question.
+
+        if (offset > 0)
+            i = cast(REBI64, VAL_INDEX_RAW(v)) + cast(REBI64, offset) - 1;
+        else
+            i = cast(REBI64, VAL_INDEX_RAW(v)) + cast(REBI64, offset);
+
+        if (REF(bounded)) {
+            if (i < 0 or i > cast(REBI64, VAL_LEN_HEAD(v)))
+                return nullptr;
+        }
+
+        VAL_INDEX_RAW(v) = i;
+        RETURN (Trust_Const(v)); }
 
       case SYM_REMOVE: {
         INCLUDE_PARAMS_OF_REMOVE;
         UNUSED(PAR(series));  // accounted for by `value`
 
-        ENSURE_MUTABLE(value);
+        ENSURE_MUTABLE(v);  // !!! Review making this extract
 
         REBINT len;
         if (REF(part))
-            len = Part_Len_May_Modify_Index(value, ARG(part));
+            len = Part_Len_May_Modify_Index(v, ARG(part));
         else
             len = 1;
 
-        index = cast(REBINT, VAL_INDEX(value));
-        if (index < tail and len != 0)
-            Remove_Any_Series_Len(value, VAL_INDEX(value), len);
+        REBIDX index = VAL_INDEX_RAW(v);
+        if (index < cast(REBIDX, VAL_LEN_HEAD(v)) and len != 0)
+            Remove_Any_Series_Len(v, index, len);
 
-        RETURN (value); }
+        RETURN (v); }
+
+      case SYM_UNIQUE:  // Note: only has 1 argument, so dummy second arg
+        sop_flags = SOP_NONE;
+        goto set_operation;
 
       case SYM_INTERSECT:
         sop_flags = SOP_FLAG_CHECK;
@@ -189,19 +211,25 @@ REB_R Series_Common_Action_Maybe_Unhandled(
         sop_flags = SOP_FLAG_BOTH | SOP_FLAG_CHECK | SOP_FLAG_INVERT;
         goto set_operation;
 
-      set_operation: {
-        INCLUDE_PARAMS_OF_DIFFERENCE;  // should all have same spec
-        UNUSED(ARG(value1));  // covered by `value`
+      case SYM_EXCLUDE:
+        sop_flags = SOP_FLAG_CHECK | SOP_FLAG_INVERT;
+        goto set_operation;
 
-        if (IS_BINARY(value))
-            return R_UNHANDLED; // !!! unhandled; use bitwise math, for now
+      set_operation: {
+        //
+        // Note: All set operations share a compatible spec.  The way that
+        // UNIQUE is compatible is via a dummy argument in the second
+        // parameter slot, so that the /CASE and /SKIP arguments line up.
+        //
+        INCLUDE_PARAMS_OF_DIFFERENCE;  // should all have compatible specs
+        UNUSED(ARG(value1));  // covered by `value`
 
         return Init_Any_Series(
             D_OUT,
-            VAL_TYPE(value),
+            VAL_TYPE(v),
             Make_Set_Operation_Series(
-                value,
-                ARG(value2),
+                v,
+                (sym == SYM_UNIQUE) ? nullptr : ARG(value2),
                 sop_flags,
                 did REF(case),
                 REF(skip) ? Int32s(ARG(skip), 1) : 1
@@ -217,25 +245,23 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
 
 //
-//  Cmp_Array: C
+// Compare_Arrays_At_Indexes: C
 //
-// Compare two arrays and return the difference of the first
-// non-matching value.
-//
-REBINT Cmp_Array(const REBCEL *sval, const REBCEL *tval, bool is_case)
-{
+REBINT Compare_Arrays_At_Indexes(
+    const REBARR *s_array,
+    REBLEN s_index,
+    const REBARR *t_array,
+    REBLEN t_index,
+    bool is_case
+){
     if (C_STACK_OVERFLOWING(&is_case))
         Fail_Stack_Overflow();
 
-    if (
-        VAL_SERIES(sval) == VAL_SERIES(tval)
-        and VAL_INDEX(sval) == VAL_INDEX(tval)
-    ){
+    if (s_array == t_array and s_index == t_index)
          return 0;
-    }
 
-    RELVAL *s = VAL_ARRAY_AT(sval);
-    RELVAL *t = VAL_ARRAY_AT(tval);
+    const RELVAL *s = ARR_AT(s_array, s_index);
+    const RELVAL *t = ARR_AT(t_array, t_index);
 
     if (IS_END(s) or IS_END(t))
         goto diff_of_ends;
@@ -255,9 +281,10 @@ REBINT Cmp_Array(const REBCEL *sval, const REBCEL *tval, bool is_case)
             goto diff_of_ends;
     }
 
-    return VAL_TYPE(s) - VAL_TYPE(t);
+    return VAL_TYPE(s) > VAL_TYPE(t) ? 1 : -1;
 
-diff_of_ends:
+  diff_of_ends:
+    //
     // Treat end as if it were a REB_xxx type of 0, so all other types would
     // compare larger than it.
     //
@@ -277,13 +304,15 @@ diff_of_ends:
 //
 // is_case should be true for case sensitive compare
 //
-REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
+REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool strict)
 {
-    if (is_case and (VAL_NUM_QUOTES(sval) != VAL_NUM_QUOTES(tval)))
-        return VAL_NUM_QUOTES(sval) - VAL_NUM_QUOTES(tval);
+    REBLEN squotes = VAL_NUM_QUOTES(sval);
+    REBLEN tquotes = VAL_NUM_QUOTES(tval);
+    if (strict and (squotes != tquotes))
+        return squotes > tquotes ? 1 : -1;
 
-    const REBCEL *s = VAL_UNESCAPED(sval);
-    const REBCEL *t = VAL_UNESCAPED(tval);
+    REBCEL(const*) s = VAL_UNESCAPED(sval);
+    REBCEL(const*) t = VAL_UNESCAPED(tval);
     enum Reb_Kind s_kind = CELL_KIND(s);
     enum Reb_Kind t_kind = CELL_KIND(t);
 
@@ -291,7 +320,7 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
         s_kind != t_kind
         and not (ANY_NUMBER_KIND(s_kind) and ANY_NUMBER_KIND(t_kind))
     ){
-        return s_kind - t_kind;
+        return s_kind > t_kind ? 1 : -1;
     }
 
     // !!! The strange and ad-hoc way this routine was written has some
@@ -310,25 +339,10 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
             d2 = VAL_DECIMAL(t);
             goto chkDecimal;
         }
-        return THE_SIGN(VAL_INT64(s) - VAL_INT64(t));
+        return CT_Integer(s, t, strict);
 
       case REB_LOGIC:
-        return VAL_LOGIC(s) - VAL_LOGIC(t);
-
-      case REB_CHAR: { // REBUNI is unsigned, use compares vs. cast+THE_SIGN
-        if (is_case) {
-            if (VAL_CHAR(s) > VAL_CHAR(t))
-                return 1;
-            if (VAL_CHAR(s) < VAL_CHAR(t))
-                return -1;
-            return 0;
-        }
-
-        if (UP_CASE(VAL_CHAR(s)) > UP_CASE(VAL_CHAR(t)))
-            return 1;
-        if (UP_CASE(VAL_CHAR(s)) < UP_CASE(VAL_CHAR(t)))
-            return -1;
-        return 0; }
+        return CT_Logic(s, t, strict);
 
       case REB_PERCENT:
       case REB_DECIMAL:
@@ -353,16 +367,13 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
         return 1;
 
       case REB_PAIR:
-        return Cmp_Pair(s, t);
-
-      case REB_TUPLE:
-        return Cmp_Tuple(s, t);
+        return CT_Pair(s, t, strict);
 
       case REB_TIME:
-        return Cmp_Time(s, t);
+        return CT_Time(s, t, strict);
 
       case REB_DATE:
-        return Cmp_Date(s, t);
+        return CT_Date(s, t, strict);
 
       case REB_BLOCK:
       case REB_SET_BLOCK:
@@ -372,14 +383,20 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
       case REB_SET_GROUP:
       case REB_GET_GROUP:
       case REB_SYM_GROUP:
+        return CT_Array(s, t, strict);
+
       case REB_PATH:
       case REB_SET_PATH:
       case REB_GET_PATH:
       case REB_SYM_PATH:
-        return Cmp_Array(s, t, is_case);
+      case REB_TUPLE:
+      case REB_SET_TUPLE:
+      case REB_GET_TUPLE:
+      case REB_SYM_TUPLE:
+        return CT_Sequence(s, t, strict);
 
       case REB_MAP:
-        return Cmp_Array(s, t, is_case);  // !!! Fails if wrong hash size (!)
+        return CT_Map(s, t, strict);  // !!! Not implemented
 
       case REB_TEXT:
       case REB_FILE:
@@ -387,35 +404,31 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
       case REB_URL:
       case REB_TAG:
       case REB_ISSUE:
-        return Compare_String_Vals(s, t, not is_case);
+        return CT_String(s, t, strict);
 
-      case REB_BITSET: {  // !!! Temporarily init as binaries at index 0
-        DECLARE_LOCAL (stemp);
-        DECLARE_LOCAL (ttemp);
-        Init_Binary(stemp, VAL_BITSET(s));
-        Init_Binary(ttemp, VAL_BITSET(t));
-        return Compare_Binary_Vals(stemp, ttemp); }
+      case REB_BITSET:
+        return CT_Bitset(s, t, strict);
 
       case REB_BINARY:
-        return Compare_Binary_Vals(s, t);
+        return CT_Binary(s, t, strict);
 
       case REB_DATATYPE:
-        return VAL_TYPE_KIND(s) - VAL_TYPE_KIND(t);
+        return CT_Datatype(s, t, strict);
 
       case REB_WORD:
       case REB_SET_WORD:
       case REB_GET_WORD:
       case REB_SYM_WORD:
-        return Compare_Word(s,t,is_case);
+        return CT_Word(s, t, strict);
 
       case REB_ERROR:
       case REB_OBJECT:
       case REB_MODULE:
       case REB_PORT:
-        return VAL_CONTEXT(s) - VAL_CONTEXT(t);
+        return CT_Context(s, t, strict);
 
       case REB_ACTION:
-        return VAL_ACT_PARAMLIST(s) - VAL_ACT_PARAMLIST(t);
+        return CT_Action(s, t, strict);
 
       case REB_CUSTOM:
         //
@@ -430,15 +443,24 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
         /* return VAL_LIBRARY(s) - VAL_LIBRARY(t); */
         fail ("Temporary disablement of CUSTOM! comparisons");
 
+      case REB_NULL: // !!! should nulls be allowed at this level?
+        return 0;  // nulls always equal to each other
+
       case REB_BLANK:
-      case REB_NULLED: // !!! should nulls be allowed at this level?
+        assert(CT_Blank(s, t, strict) == 0);
+        return 0;  // shortcut call to comparison
+
       case REB_VOID:
-        break;
+        return CT_Void(s, t, strict);
+
+      case REB_HANDLE:
+        return CT_Handle(s, t, strict);
 
       default:
-        panic (nullptr); // all cases should be handled above
+        break;
     }
-    return 0;
+
+    panic (nullptr);  // all cases should be handled above
 }
 
 
@@ -448,9 +470,12 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool is_case)
 // Simple search for a value in an array. Return the index of
 // the value or the TAIL index if not found.
 //
-REBLEN Find_In_Array_Simple(REBARR *array, REBLEN index, const RELVAL *target)
-{
-    RELVAL *value = ARR_HEAD(array);
+REBLEN Find_In_Array_Simple(
+    const REBARR *array,
+    REBLEN index,
+    const RELVAL *target
+){
+    const RELVAL *value = ARR_HEAD(array);
 
     for (; index < ARR_LEN(array); index++) {
         if (0 == Cmp_Value(value + index, target, false))

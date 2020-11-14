@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -35,7 +35,7 @@
 // Ren-C vectors are built on type of BINARY!.  This means that the memory
 // must be read via memcpy() in order to avoid strict aliasing violations.
 //
-REBVAL *Get_Vector_At(RELVAL *out, const REBCEL *vec, REBLEN n)
+REBVAL *Get_Vector_At(RELVAL *out, REBCEL(const*) vec, REBLEN n)
 {
     REBYTE *data = VAL_VECTOR_HEAD(vec);
 
@@ -112,7 +112,7 @@ REBVAL *Get_Vector_At(RELVAL *out, const REBCEL *vec, REBLEN n)
 }
 
 
-static void Set_Vector_At(const REBCEL *vec, REBLEN n, const RELVAL *set) {
+static void Set_Vector_At(REBCEL(const*) vec, REBLEN n, const RELVAL *set) {
     assert(IS_INTEGER(set) or IS_DECIMAL(set));  // caller should error
 
     REBYTE *data = VAL_VECTOR_HEAD(vec);
@@ -230,13 +230,13 @@ static void Set_Vector_At(const REBCEL *vec, REBLEN n, const RELVAL *set) {
 }
 
 
-void Set_Vector_Row(const REBCEL *vec, const REBVAL *blk) // !!! can not be BLOCK!?
+void Set_Vector_Row(REBCEL(const*) vec, const REBVAL *blk) // !!! can not be BLOCK!?
 {
     REBLEN idx = VAL_INDEX(blk);
-    REBLEN len = VAL_LEN_AT(blk);
 
     if (IS_BLOCK(blk)) {
-        RELVAL *val = VAL_ARRAY_AT(blk);
+        REBLEN len;
+        const RELVAL *val = VAL_ARRAY_LEN_AT(&len, blk);
 
         REBLEN n = 0;
         for (; NOT_END(val); val++) {
@@ -246,12 +246,13 @@ void Set_Vector_Row(const REBCEL *vec, const REBVAL *blk) // !!! can not be BLOC
         }
     }
     else { // !!! This would just interpet the data as int64_t pointers (???)
-        REBYTE *data = VAL_BIN_AT(blk);
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, blk);
 
         DECLARE_LOCAL (temp);
 
         REBLEN n = 0;
-        for (; len > 0; len--, idx++) {
+        for (; size > 0; --size, ++idx) {
             Init_Integer(temp, cast(REBI64, data[idx]));
             Set_Vector_At(vec, n++, temp);
         }
@@ -291,7 +292,7 @@ REBARR *Vector_To_Array(const REBVAL *vect)
 // <, however the REBINT returned here is supposed to.  Review if this code
 // ever becomes relevant.
 //
-REBINT Compare_Vector(const REBCEL *v1, const REBCEL *v2)
+REBINT Compare_Vector(REBCEL(const*) v1, REBCEL(const*) v2)
 {
     bool non_integer1 = not VAL_VECTOR_INTEGRAL(v1);
     bool non_integer2 = not VAL_VECTOR_INTEGRAL(v2);
@@ -311,8 +312,10 @@ REBINT Compare_Vector(const REBCEL *v1, const REBCEL *v2)
     for (n = 0; n < len; n++) {
         Get_Vector_At(temp1, v1, n + VAL_VECTOR_INDEX(v1));
         Get_Vector_At(temp2, v2, n + VAL_VECTOR_INDEX(v2));
-        if (not Compare_Modify_Values(temp1, temp2, 1)) // strict equality
-            return 1; // arbitrary (compare didn't discern > or <)
+        const bool strict = true;
+        REBINT diff = Compare_Modify_Values(temp1, temp2, strict);
+        if (diff != 0)
+            return diff;
     }
 
     return l1 - l2;
@@ -516,26 +519,22 @@ REB_R MAKE_Vector(
 //
 //  CT_Vector: C
 //
-REBINT CT_Vector(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Vector(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBINT n = Compare_Vector(a, b);  // needs to be expanded for equality
-    if (mode >= 0) {
-        return n == 0;
-    }
-    if (mode == -1) return n >= 0;
-    return n > 0;
+    UNUSED(strict);
+    return Compare_Vector(a, b);
 }
 
 
 //
 //  Pick_Vector: C
 //
-void Pick_Vector(REBVAL *out, const REBVAL *value, const REBVAL *picker) {
+void Pick_Vector(REBVAL *out, const REBVAL *value, const RELVAL *picker) {
     REBINT n;
     if (IS_INTEGER(picker) or IS_DECIMAL(picker)) // #2312
         n = Int32(picker);
     else
-        fail (picker);
+        fail (rebUnrelativize(picker));
 
     if (n == 0) {
         Init_Nulled(out);
@@ -561,7 +560,7 @@ void Pick_Vector(REBVAL *out, const REBVAL *value, const REBVAL *picker) {
 //
 void Poke_Vector_Fail_If_Read_Only(
     REBVAL *value,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *poke
 ){
     // Because the vector uses Alloc_Pairing() for its 2-cells-of value,
@@ -578,17 +577,17 @@ void Poke_Vector_Fail_If_Read_Only(
     if (IS_INTEGER(picker) or IS_DECIMAL(picker)) // #2312
         n = Int32(picker);
     else
-        fail (picker);
+        fail (rebUnrelativize(picker));
 
     if (n == 0)
-        fail (Error_Out_Of_Range(picker)); // Rebol2/Red convention
+        fail (Error_Out_Of_Range(SPECIFIC(picker)));  // Rebol2/Red convention
     if (n < 0)
         ++n; // Rebol2/Red convention, poking -1 from tail sets last item
 
     n += VAL_VECTOR_INDEX(value);
 
     if (n <= 0 or cast(REBLEN, n) > VAL_VECTOR_LEN_AT(value))
-        fail (Error_Out_Of_Range(picker));
+        fail (Error_Out_Of_Range(SPECIFIC(picker)));
 
     Set_Vector_At(value, n - 1, poke);
 }
@@ -601,7 +600,7 @@ void Poke_Vector_Fail_If_Read_Only(
 //
 REB_R PD_Vector(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     if (opt_setval) {
@@ -644,7 +643,7 @@ REBTYPE(Vector)
         if (REF(part) or REF(deep) or REF(types))
             fail (Error_Bad_Refines_Raw());
 
-        REBBIN *bin = Copy_Sequence_Core(
+        REBBIN *bin = Copy_Series_Core(
             VAL_BINARY(VAL_VECTOR_BINARY(v)),
             NODE_FLAG_MANAGED
         );
@@ -680,7 +679,7 @@ REBTYPE(Vector)
 //
 //  MF_Vector: C
 //
-void MF_Vector(REB_MOLD *mo, const REBCEL *v, bool form)
+void MF_Vector(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     REBLEN len;
     REBLEN n;

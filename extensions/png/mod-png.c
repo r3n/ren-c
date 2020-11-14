@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -158,14 +158,17 @@ REBNATIVE(identify_png_q)
     int arg = 5;
     state.decoder.zlibsettings.custom_context = &arg;
 
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
+
     unsigned width;
     unsigned height;
     unsigned error = lodepng_inspect(
         &width,
         &height,
         &state,
-        VAL_BIN_AT(ARG(data)), // PNG data
-        VAL_LEN_AT(ARG(data)) // PNG data length
+        data,  // PNG data
+        size  // PNG data length
     );
 
     // state contains extra information about the PNG such as text chunks
@@ -218,6 +221,9 @@ REBNATIVE(decode_png)
     state.info_png.color.colortype = LCT_RGBA;
     state.info_png.color.bitdepth = 8;
 
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
+
     unsigned char* image_bytes;
     unsigned w;
     unsigned h;
@@ -226,8 +232,8 @@ REBNATIVE(decode_png)
         &w,
         &h,
         &state,
-        VAL_BIN_AT(ARG(data)), // PNG data
-        VAL_LEN_AT(ARG(data)) // PNG data length
+        data,  // PNG data
+        size  // PNG data length
     );
 
     // `state` can contain potentially interesting information, such as

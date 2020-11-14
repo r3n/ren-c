@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -35,7 +35,7 @@
 // The size is that of a binary structure used by
 // the port for storing internal information.
 //
-REBREQ *Force_Get_Port_State(REBVAL *port, void *device)
+REBREQ *Force_Get_Port_State(const REBVAL *port, void *device)
 {
     REBDEV *dev = cast(REBDEV*, device);
     REBCTX *ctx = VAL_CONTEXT(port);
@@ -46,7 +46,7 @@ REBREQ *Force_Get_Port_State(REBVAL *port, void *device)
     if (IS_BINARY(state)) {
         assert(VAL_INDEX(state) == 0);  // should always be at head
         assert(VAL_LEN_HEAD(state) == dev->req_size);  // should be right size
-        req = VAL_BINARY(state);
+        req = VAL_BINARY_KNOWN_MUTABLE(state);
     }
     else {
         assert(IS_BLANK(state));
@@ -72,115 +72,12 @@ bool Pending_Port(const RELVAL *port)
         REBVAL *state = CTX_VAR(VAL_CONTEXT(port), STD_PORT_STATE);
 
         if (IS_BINARY(state)) {
-            REBREQ *req = VAL_BINARY(state);
+            REBREQ *req = VAL_BINARY_KNOWN_MUTABLE(state);
             if (not (Req(req)->flags & RRF_PENDING))
                 return false;
         }
     }
     return true;
-}
-
-
-//
-//  Redo_Action_Throws: C
-//
-// This code takes a running call frame that has been built for one action
-// and then tries to map its parameters to invoke another action.  The new
-// action may have different orders and names of parameters.
-//
-// R3-Alpha had a rather brittle implementation, that had no error checking
-// and repetition of logic in Eval_Core.  Ren-C more simply builds a PATH! of
-// the target function and refinements, passing args with EVAL_FLAG_EVAL_ONLY.
-//
-// !!! This could be done more efficiently now by pushing the refinements to
-// the stack and using an APPLY-like technique.
-//
-// !!! This still isn't perfect and needs reworking, as it won't stand up in
-// the face of targets that are "adversarial" to the archetype:
-//
-//     foo: func [a /b c] [...]  =>  bar: func [/b d e] [...]
-//                    foo/b 1 2  =>  bar/b 1 2
-//
-bool Redo_Action_Throws(REBVAL *out, REBFRM *f, REBACT *run)
-{
-    REBARR *code_arr = Make_Array(FRM_NUM_ARGS(f)); // max, e.g. no refines
-    RELVAL *code = ARR_HEAD(code_arr);
-
-    // !!! For the moment, if refinements are needed we generate a PATH! with
-    // the ACTION! at the head, and have the evaluator rediscover the stack
-    // of refinements.  This would be better if we left them on the stack
-    // and called into the evaluator with Begin_Action() already in progress
-    // on a new frame.  Improve when time permits.
-    //
-    REBDSP dsp_orig = DSP; // we push refinements as we find them
-    Move_Value(DS_PUSH(), ACT_ARCHETYPE(run)); // !!! Review: binding?
-
-    assert(IS_END(f->param)); // okay to reuse, if it gets put back...
-    f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
-    f->arg = FRM_ARGS_HEAD(f);
-    f->special = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
-
-    for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
-        if (Is_Param_Hidden(f->param)) {  // specialized-out parameter
-            assert(GET_CELL_FLAG(f->special, ARG_MARKED_CHECKED));
-            continue;
-        }
-
-        Reb_Param_Class pclass = VAL_PARAM_CLASS(f->param);
-
-        if (
-            pclass == REB_P_LOCAL
-            or pclass == REB_P_RETURN
-        ){
-             continue; // don't add a callsite expression for it (can't)!
-        }
-
-        if (TYPE_CHECK(f->param, REB_TS_SKIPPABLE) and IS_NULLED(f->arg))
-            continue;  // don't throw in skippable args that are nulled out
-
-        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
-            if (IS_NULLED(f->arg))  // don't add to PATH!
-                continue;
-
-            Init_Word(DS_PUSH(), VAL_PARAM_SPELLING(f->param));
-
-            if (Is_Typeset_Invisible(f->param)) {
-                assert(IS_REFINEMENT(f->arg));  // used but argless refinement
-                continue;
-            }
-        }
-
-        // The arguments were already evaluated to put them in the frame, do
-        // not evaluate them again.
-        //
-        // !!! This tampers with the VALUE_FLAG_UNEVALUATED bit, which is
-        // another good reason this should probably be done another way.  It
-        // also loses information about the const bit.
-        //
-        Quotify(Move_Value(code, f->arg), 1);
-        ++code;
-    }
-
-    TERM_ARRAY_LEN(code_arr, code - ARR_HEAD(code_arr));
-    Manage_Array(code_arr);
-
-    DECLARE_LOCAL (first);
-    if (DSP == dsp_orig + 1) { // no refinements, just use ACTION!
-        DS_DROP_TO(dsp_orig);
-        Move_Value(first, ACT_ARCHETYPE(run));
-    }
-    else
-        Init_Path(first, Freeze_Array_Shallow(Pop_Stack_Values(dsp_orig)));
-
-    bool threw = Do_At_Mutable_Maybe_Stale_Throws(
-        out,  // invisibles allow for out to not be Init_Void()'d
-        first, // path not in array, will be "virtual" first element
-        code_arr,
-        0, // index
-        SPECIFIED // reusing existing REBVAL arguments, no relative values
-    );
-    CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
-    return threw;
 }
 
 
@@ -217,21 +114,20 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
     // Dispatch object function:
 
-    REBLEN n; // goto would cross initialization
-    n = Find_Canon_In_Context(
-        VAL_CONTEXT(actor),
-        VAL_WORD_CANON(verb),
-        false // !always
-    );
+  blockscope {
+    REBLEN n = Find_Canon_In_Context(actor, VAL_WORD_CANON(verb));
 
-    REBVAL *action;
-    if (n == 0 or not IS_ACTION(action = VAL_CONTEXT_VAR(actor, n)))
+    REBVAL *action = (n == 0) ? nullptr : VAL_CONTEXT_VAR(actor, n);
+    if (not action or not IS_ACTION(action))
         fail (Error_No_Port_Action_Raw(verb));
 
-    if (Redo_Action_Throws(frame_->out, frame_, VAL_ACTION(action)))
+    if (Redo_Action_Throws_Maybe_Stale(frame_->out, frame_, VAL_ACTION(action)))
         return R_THROWN;
 
+    CLEAR_CELL_FLAG(frame_->out, OUT_MARKED_STALE);
+
     r = D_OUT; // result should be in frame_->out
+  }
 
     // !!! READ's /LINES and /STRING refinements are something that should
     // work regardless of data source.  But R3-Alpha only implemented it in
@@ -265,10 +161,9 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             if (not IS_BINARY(D_OUT))
                 fail ("/STRING or /LINES used on a non-BINARY!/STRING! read");
 
-            REBSTR *decoded = Make_Sized_String_UTF8(
-                cs_cast(VAL_BIN_AT(D_OUT)),
-                VAL_LEN_AT(D_OUT)
-            );
+            REBSIZ size;
+            const REBYTE *data = VAL_BINARY_SIZE_AT(&size, D_OUT);
+            REBSTR *decoded = Make_Sized_String_UTF8(cs_cast(data), size);
             Init_Text(D_OUT, decoded);
         }
 
@@ -302,7 +197,7 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 // matter at the moment--but is a placeholder for finding the right place.
 //
 void Secure_Port(
-    REBSTR *kind,
+    const REBSTR *kind,
     REBREQ *req,
     const REBVAL *name
     /* , const REBVAL *path */

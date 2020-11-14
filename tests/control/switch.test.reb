@@ -24,7 +24,7 @@
     11 = reeval func [] [switch/all 1 [1 [return 11 88]] 99]
 )]
 
-(t: 1 | 1 = switch t [(t)])
+(t: 1, 1 = switch t [(t)])
 (1 = switch 1 [1])
 
 
@@ -41,9 +41,9 @@
 (<fallout> = switch/all 10 [0 + 0 [<a>] 0 + 0 [<b>] <fallout>])
 
 
-; New feature for specifying comparison functions via a refinement
+; New feature for specifying comparison functions via a TUPLE!
 
-(<b> = switch 10 /(reduce pick [:greater? :lesser?] 1) [20 [<a>] 5 [<b>]])
-(<a> = switch 10 /(reduce pick [:greater? :lesser?] 2) [20 [<a>] 5 [<b>]])
-(<yep> = switch 10 /greater? [20 [<nope>] 5 [<yep>]])
-(<yep> = switch 10 /> [20 [<nope>] 5 [<yep>]])
+(<b> = switch 10 .(reduce pick [:greater? :lesser?] 1) [20 [<a>] 5 [<b>]])
+(<a> = switch 10 .(reduce pick [:greater? :lesser?] 2) [20 [<a>] 5 [<b>]])
+(<yep> = switch 10 .greater? [20 [<nope>] 5 [<yep>]])
+(<yep> = switch 10 .> [20 [<nope>] 5 [<yep>]])

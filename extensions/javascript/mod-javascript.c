@@ -7,7 +7,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2018-2019 Rebol Open Source Contributors
+// Copyright 2018-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -406,7 +406,7 @@ EXTERN_C intptr_t RL_rebPromise(REBFLGS flags, void *p, va_list *vaptr)
     // the long run, there's no ordering guarantee of promises (e.g. if they
     // were running on individual threads).
 
-    struct Reb_Promise_Info *info = ALLOC(struct Reb_Promise_Info);
+    struct Reb_Promise_Info *info = TRY_ALLOC(struct Reb_Promise_Info);
     info->state = PROMISE_STATE_QUEUEING;
     info->promise_id = cast(intptr_t, code);
     info->next = PG_Promises;
@@ -1061,7 +1061,7 @@ REBNATIVE(js_native)
     // reb.ArgR() must be used to access the arguments out of the frame.
     //
     Append_Ascii(mo->series, "function () {");
-    Append_String(mo->series, source, VAL_LEN_AT(source));
+    Append_String(mo->series, source);
     Append_Ascii(mo->series, "};\n");  // end `function() {`
 
     if (REF(awaiter))
@@ -1145,7 +1145,7 @@ REBNATIVE(js_native)
     TERM_ARRAY_LEN(details, IDX_JS_NATIVE_MAX);
     SET_ACTION_FLAG(native, IS_NATIVE);
 
-    return Init_Action_Unbound(D_OUT, native);
+    return Init_Action(D_OUT, native, ANONYMOUS, UNBOUND);
 }
 
 
@@ -1172,7 +1172,7 @@ REBNATIVE(js_eval_p)
 {
     JAVASCRIPT_INCLUDE_PARAMS_OF_JS_EVAL_P;
 
-    const char *utf8 = s_cast(VAL_STRING_AT(ARG(source)));
+    const char *utf8 = s_cast(VAL_UTF8_AT(ARG(source)));
 
     // Methods for global evaluation:
     // http://perfectionkills.com/global-eval-what-are-the-options/
@@ -1195,7 +1195,7 @@ REBNATIVE(js_eval_p)
                 utf8
             );
 
-        return Init_Void(D_OUT);
+        return Init_Void(D_OUT, SYM_VOID);
     }
 
     // Currently, reb.Box() only translates to INTEGER!, TEXT!, VOID!, NULL
@@ -1271,7 +1271,7 @@ REBNATIVE(init_javascript_extension)
     ENDIFY_POINTER_IF_DEBUG(PG_Native_Result);
     PG_Native_State = NATIVE_STATE_NONE;
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -1294,7 +1294,7 @@ REBNATIVE(js_trace)
     fail ("JS-TRACE only if DEBUG_JAVASCRIPT_EXTENSION set in %emscripten.r");
   #endif
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 

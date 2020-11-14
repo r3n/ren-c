@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -36,12 +36,12 @@
 #define VAL_TYPE_KIND_ENUM(v) \
     EXTRA(Datatype, (v)).kind
 
-inline static enum Reb_Kind VAL_TYPE_KIND_OR_CUSTOM(const REBCEL *v) {
+inline static enum Reb_Kind VAL_TYPE_KIND_OR_CUSTOM(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_DATATYPE);
     return VAL_TYPE_KIND_ENUM(v);
 }
 
-inline static enum Reb_Kind VAL_TYPE_KIND(const REBCEL *v) {
+inline static enum Reb_Kind VAL_TYPE_KIND(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_DATATYPE);
     enum Reb_Kind k = VAL_TYPE_KIND_ENUM(v);
     assert(k != REB_CUSTOM);
@@ -71,7 +71,7 @@ inline static REBVAL *Init_Builtin_Datatype(RELVAL *out, enum Reb_Kind kind) {
     assert(VAL_TYPE_KIND(out) == kind);
     assert(GET_CELL_FLAG(out, FIRST_IS_NODE));
     assert(NOT_CELL_FLAG(out, SECOND_IS_NODE));  // only custom types have
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -87,7 +87,7 @@ inline static REBVAL *Init_Custom_Datatype(RELVAL *out, REBTYP *type) {
     VAL_TYPE_KIND_ENUM(out) = REB_CUSTOM;
     VAL_TYPE_SPEC_NODE(out) = NOD(EMPTY_ARRAY);
     VAL_TYPE_HOOKS_NODE(out) = NOD(type);
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -146,8 +146,8 @@ inline static CFUNC** VAL_TYPE_HOOKS(const RELVAL *type) {
     return cast(CFUNC**, SER_DATA(VAL_TYPE_CUSTOM(type)));
 }
 
-inline static CFUNC** HOOKS_FOR_TYPE_OF(const REBCEL *v) {
-    enum Reb_Kind k = CELL_TYPE(v);
+inline static CFUNC** HOOKS_FOR_TYPE_OF(REBCEL(const*) v) {
+    enum Reb_Kind k = CELL_KIND(v);
     if (k != REB_CUSTOM)
         return Builtin_Type_Hooks[k];
     return cast(CFUNC**, SER_DATA(CELL_CUSTOM_TYPE(v)));

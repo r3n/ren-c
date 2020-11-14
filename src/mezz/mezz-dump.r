@@ -3,7 +3,7 @@ REBOL [
     Title: "REBOL 3 Mezzanine: Dump"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2018 Rebol Open Source Contributors
+        Copyright 2012-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -15,17 +15,17 @@ REBOL [
 dump: function [
     {Show the name of a value or expressions with the value (See Also: --)}
 
-    return: "Doesn't return anything, not even void (so like a COMMENT)"
-        []
+    return: <elide>
+        "Doesn't return anything, not even void (so like a COMMENT)"
     :value [any-value!]
     :extra "Optional variadic data for SET-WORD!, e.g. `dump x: 1 + 2`"
-        [any-value! <...>]
+        [any-value! <variadic>]
     /prefix "Put a custom marker at the beginning of each output line"
         [text!]
 
     <static> enablements (make map! [])
 ][
-    print: adapt 'lib/print [
+    print: adapt :lib/print [
         if prefix [
             if select enablements prefix <> #on [return]
             write-stdout prefix
@@ -37,12 +37,11 @@ dump: function [
         case [
             null? :val ["\null\"]
             object? :val [unspaced ["make object! [" (summarize-obj val) "]"]]
-            default [
-                trunc: void
-                append (
-                    mold/limit/truncated :val system/options/dump-size 'trunc
-                ) if trunc ["..."]
-            ]
+        ] else [
+            trunc: ~void~
+            append (
+                mold/limit/truncated :val system/options/dump-size 'trunc
+            ) if trunc ["..."]
         ]
     ]
 
@@ -51,29 +50,29 @@ dump: function [
             refinement!  ; treat as label, /a no shift and shorter than "a"
             text! [  ; good for longer labeling when you need spaces/etc.
                 print unspaced [
-                    elide trunc: void
+                    elide trunc: ~void~
                     mold/limit/truncated item system/options/dump-size 'trunc
                     if trunc ["..."]
                 ]
             ]
 
             word! [
-                print [to set-word! item | val-to-text get item]
+                print [to set-word! item, val-to-text get item]
             ]
 
             path! [
-                print [to set-path! item | val-to-text reduce item]
+                print [to set-path! item, val-to-text reduce item]
             ]
 
             group! [
-                print [unspaced [mold item ":"] | val-to-text reeval item]
+                print [unspaced [mold item ":"], val-to-text reeval item]
             ]
 
             issue! [
                 enablements/(prefix): item
             ]
 
-            fail 'value [
+            fail @value [
                 "Item not TEXT!, INTEGER!, WORD!, PATH!, GROUP!:" :item
             ]
         ]
@@ -81,24 +80,24 @@ dump: function [
 
     case [
         swp: match [set-word! set-path!] :value [ ; `dump x: 1 + 2`
-            pos: evaluate @(lit result:) extra
+            pos: evaluate/result extra (lit result:)
             set swp :result
-            print [swp | result]
+            print [swp, result]
         ]
 
         b: match block! :value [
             while [not tail? b] [
                 if swp: match [set-word! set-path!] :b/1 [ ; `dump [x: 1 + 2]`
-                    b: evaluate @(lit result:) b
-                    print [swp | result]
+                    b: evaluate/result b (lit result:)
+                    print [swp, result]
                 ] else [
                     dump-one b/1
                     b: next b
                 ]
             ]
         ]
-
-        default [dump-one :value]
+    ] else [
+        dump-one :value
     ]
 ]
 
@@ -106,7 +105,10 @@ contains-newline: function [return: [logic!] pos [block! group!]] [
     while [pos] [
         any [
             new-line? pos
-            (match [block! group!] :pos/1) and [contains-newline :pos/1]
+            all [
+                match [block! group!] :pos/1
+                contains-newline :pos/1
+            ]
         ] then [return true]
 
         pos: try next pos
@@ -114,13 +116,17 @@ contains-newline: function [return: [logic!] pos [block! group!]] [
     return false
 ]
 
-dump-to-newline: adapt 'dump [
+dump-to-newline: adapt :dump [
     if not tail? extra [
         ;
         ; Mutate VARARGS! into a BLOCK!, with passed-in value at the head
         ;
         value: reduce [:value]
-        while [not (new-line? extra) or [tail? extra] or ['| = extra/1]] [
+        while [any [
+            not new-line? extra
+            tail? extra
+            '| = extra/1
+        ]] [
             append/only value extra/1
             all [
                 match [block! group!] :extra/1
@@ -141,16 +147,16 @@ dumps: enfixed function [
     :value "If issue, create non-specialized dumper...#on or #off by default"
         [issue! text! integer! word! set-word! set-path! group! block!]
     extra "Optional variadic data for SET-WORD!, e.g. `dv: dump var: 1 + 2`"
-        [<opt> any-value! <...>]
+        [<opt> any-value! <variadic>]
 ][
     if issue? value [
-        d: specialize 'dump-to-newline [prefix: as text! name]
+        d: specialize :dump-to-newline [prefix: as text! name]
         if value <> #off [d #on]  ; note: d hard quotes its argument
     ] else [
         ; Make it easy to declare and dump a variable at the same time.
         ;
         if match [set-word! set-path!] value [
-            evaluate @value extra
+            evaluate/result extra 'value
             value: either set-word? value [as word! value] [as path! value]
         ]
 
@@ -160,11 +166,11 @@ dumps: enfixed function [
         ;
         ; !!! This actually can't work as invisibles with refinements do not
         ; have a way to be called--in spirit they are like enfix functions,
-        ; so SHOVE (->) would be used, but it doesn't work yet...review.)
+        ; so SHOVE (>-) would be used, but it doesn't work yet...review.)
         ;
-        d: function [return: [] /on /off <static> d'] compose/deep [
+        d: function [return: <elide> /on /off <static> d'] compose/deep [
             d': default [
-                d'': specialize 'dump [prefix: (as text! name)]
+                d'': specialize :dump [prefix: (as text! name)]
                 d'' #on
             ]
             case [
@@ -223,7 +229,7 @@ summarize-obj: function [
             type: type of get/any 'val
 
             str: if match [object!] type [
-                spaced [word | words of :val]
+                spaced [word, words of :val]
             ] else [
                 form word
             ]
@@ -242,7 +248,7 @@ summarize-obj: function [
                     if not find str pattern [continue]
                 ]
 
-                fail 'pattern
+                fail @pattern
             ]
 
             if desc: description-of try get/any 'val [
@@ -274,16 +280,19 @@ summarize-obj: function [
 **: enfixed function [
     {Comment until end of line, or end of current BLOCK!/GROUP!}
 
-    return: []
+    return: <elide>
     left "Enfix required for 'fully invisible' enfix behavior (ignored)"
         [<opt> <end> any-value!]
-    :args [any-value! <...>]
+    :args [any-value! <variadic>]
 ][
-    while [(not new-line? args) and [value: take args]] [
+    while [all [
+        not new-line? args
+        value: take args
+    ]] [
         all [
             any-array? :value
             contains-newline value
-            return
+            return @()
         ]
     ]
 ]

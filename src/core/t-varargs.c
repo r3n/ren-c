@@ -6,16 +6,16 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2016-2017 Rebol Open Source Contributors
+// Copyright 2016-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -52,6 +52,11 @@ inline static bool Vararg_Op_If_No_Advance_Handled(
 ){
     if (IS_END(opt_look)) {
         Init_For_Vararg_End(out, op); // exhausted
+        return true;
+    }
+
+    if (pclass == REB_P_NORMAL and IS_COMMA(opt_look)) {
+        Init_For_Vararg_End(out, op);  // non-quoted COMMA!
         return true;
     }
 
@@ -200,7 +205,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
                 // effectively "undo the prefetch" by taking it down by 1.
                 //
                 assert(f_temp->feed->index > 0);
-                VAL_INDEX(shared) = f_temp->feed->index - 1; // all sharings
+                VAL_INDEX_UNBOUNDED(shared) = f_temp->feed->index - 1;
             }
 
             Drop_Frame(f_temp);
@@ -209,7 +214,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         case REB_P_HARD_QUOTE:
             Derelativize(out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared));
             SET_CELL_FLAG(out, UNEVALUATED);
-            VAL_INDEX(shared) += 1;
+            VAL_INDEX_UNBOUNDED(shared) += 1;
             break;
 
         case REB_P_MODAL:
@@ -227,7 +232,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
                 Derelativize(out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared));
                 SET_CELL_FLAG(out, UNEVALUATED);
             }
-            VAL_INDEX(shared) += 1;
+            VAL_INDEX_UNBOUNDED(shared) += 1;
             break;
 
         default:
@@ -253,10 +258,13 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         else
             arg = FRM_ARG(f, VAL_VARARGS_SIGNED_PARAM_INDEX(vararg));
 
+        bool hit_barrier = GET_FEED_FLAG(f->feed, BARRIER_HIT)
+            and (pclass != REB_P_SOFT_QUOTE) and (pclass != REB_P_HARD_QUOTE);
+
         if (Vararg_Op_If_No_Advance_Handled(
             out,
             op,
-            GET_FEED_FLAG(f->feed, BARRIER_HIT)
+            hit_barrier
                 ? END_NODE
                 : cast(const RELVAL *, f->feed->value), // might be END
             f->feed->specifier,
@@ -405,13 +413,13 @@ REB_R TO_Varargs(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 REB_R PD_Varargs(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     UNUSED(opt_setval);
 
     if (not IS_INTEGER(picker))
-        fail (picker);
+        fail (rebUnrelativize(picker));
 
     if (VAL_INT32(picker) != 1)
         fail (Error_Varargs_No_Look_Raw());
@@ -534,9 +542,9 @@ REBTYPE(Varargs)
 // Simple comparison function stub (required for every type--rules TBD for
 // levels of "exactness" in equality checking, or sort-stable comparison.)
 //
-REBINT CT_Varargs(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Varargs(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    UNUSED(mode);
+    UNUSED(strict);
 
     // !!! For the moment, say varargs are the same if they have the same
     // source feed from which the data comes.  (This check will pass even
@@ -544,8 +552,8 @@ REBINT CT_Varargs(const REBCEL *a, const REBCEL *b, REBINT mode)
     // long as its identity is needed).
     //
     if (VAL_BINDING(a) == VAL_BINDING(b))
-        return 1;
-    return 0;
+        return 0;
+    return VAL_BINDING(a) > VAL_BINDING(b) ? 1 : -1;
 }
 
 
@@ -558,7 +566,7 @@ REBINT CT_Varargs(const REBCEL *a, const REBCEL *b, REBINT mode)
 // has reached its end, or if the frame the varargs is attached to is no
 // longer on the stack.
 //
-void MF_Varargs(REB_MOLD *mo, const REBCEL *v, bool form) {
+void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
 
     Pre_Mold(mo, v);  // #[varargs! or make varargs!
@@ -634,4 +642,27 @@ void MF_Varargs(REB_MOLD *mo, const REBCEL *v, bool form) {
     Append_Codepoint(mo->series, ']');
 
     End_Mold(mo);
+}
+
+
+//
+//  variadic?: native [
+//
+//  {Returns TRUE if an ACTION! may take a variable number of arguments.}
+//
+//      return: [logic!]
+//      action [action!]
+//  ]
+//
+REBNATIVE(variadic_q)
+{
+    INCLUDE_PARAMS_OF_VARIADIC_Q;
+
+    REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(ARG(action)));
+    for (; NOT_END(param); ++param) {
+        if (Is_Param_Variadic(param))
+            return Init_True(D_OUT);
+    }
+
+    return Init_False(D_OUT);
 }

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -152,14 +152,10 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
 
         REBVAL *key = CTX_KEY(Force_Keylist_Unique(context), index);
 
-        if (flags & PROT_SET) {
-            TYPE_SET(key, REB_TS_HIDDEN);
-            TYPE_SET(key, REB_TS_UNBINDABLE);
-        }
-        else {
-            TYPE_CLEAR(key, REB_TS_HIDDEN);
-            TYPE_CLEAR(key, REB_TS_UNBINDABLE);
-        }
+        if (flags & PROT_SET)
+            Hide_Param(key);
+        else
+            fail ("Un-hiding is not supported");
     }
 }
 
@@ -169,7 +165,7 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
 //
 // Anything that calls this must call Uncolor() when done.
 //
-void Protect_Value(RELVAL *v, REBFLGS flags)
+void Protect_Value(const RELVAL *v, REBFLGS flags)
 {
     if (ANY_SERIES(v))
         Protect_Series(VAL_SERIES(v), VAL_INDEX(v), flags);
@@ -185,7 +181,7 @@ void Protect_Value(RELVAL *v, REBFLGS flags)
 //
 // Anything that calls this must call Uncolor() when done.
 //
-void Protect_Series(REBSER *s, REBLEN index, REBFLGS flags)
+void Protect_Series(const REBSER *s, REBLEN index, REBFLGS flags)
 {
     if (Is_Series_Black(s))
         return; // avoid loop
@@ -209,7 +205,7 @@ void Protect_Series(REBSER *s, REBLEN index, REBFLGS flags)
 
     Flip_Series_To_Black(s); // recursion protection
 
-    RELVAL *val = ARR_AT(ARR(s), index);
+    const RELVAL *val = ARR_AT(ARR(s), index);
     for (; NOT_END(val); val++)
         Protect_Value(val, flags);
 }
@@ -317,7 +313,7 @@ static REB_R Protect_Unprotect_Core(REBFRM *frame_, REBFLGS flags)
 
     if (IS_BLOCK(value)) {
         if (REF(words)) {
-            RELVAL *val;
+            const RELVAL *val;
             for (val = VAL_ARRAY_AT(value); NOT_END(val); val++) {
                 DECLARE_LOCAL (word); // need binding, can't pass RELVAL
                 Derelativize(word, val, VAL_SPECIFIER(value));
@@ -327,7 +323,7 @@ static REB_R Protect_Unprotect_Core(REBFRM *frame_, REBFLGS flags)
         }
         if (REF(values)) {
             REBVAL *var;
-            RELVAL *item;
+            const RELVAL *item;
 
             DECLARE_LOCAL (safe);
 
@@ -452,29 +448,20 @@ REBNATIVE(unprotect)
 // in order to do things like use blocks as map keys, etc.
 //
 bool Is_Value_Frozen_Deep(const RELVAL *v) {
-    const REBCEL *cell = VAL_UNESCAPED(v);
+    REBCEL(const*) cell = VAL_UNESCAPED(v);
     UNUSED(v); // debug build trashes, to avoid accidental usage below
 
-    enum Reb_Kind kind = CELL_KIND(cell);
-    if (
-        kind == REB_BLANK
-        or ANY_SCALAR_KIND(kind)
-        or ANY_WORD_KIND(kind)
-        or kind == REB_ACTION // paramlist is identity, hash
-    ){
-        return true;
-    }
+    if (NOT_CELL_FLAG(cell, FIRST_IS_NODE))
+        return true;  // payloads that live in cell are immutable
 
-    if (ANY_ARRAY_OR_PATH_KIND(kind))
-        return Is_Array_Frozen_Deep(VAL_ARRAY(cell));
+    REBNOD *node = VAL_NODE(cell);
+    if (node->header.bits & NODE_BYTEMASK_0x01_CELL)
+        return true;  // !!! Will all non-quoted Pairings be frozen?
 
-    if (ANY_CONTEXT_KIND(kind))
-        return Is_Context_Frozen_Deep(VAL_CONTEXT(cell));
-
-    if (ANY_SERIES_KIND(kind))
-        return Is_Series_Frozen(VAL_SERIES(cell));
-
-    return false;
+    // Frozen deep should be set even on non-arrays, e.g. all frozen shallow
+    // strings should also have SERIES_INFO_FROZEN_DEEP.
+    //
+    return GET_SERIES_INFO(SER(node), FROZEN_DEEP);
 }
 
 
@@ -505,6 +492,10 @@ REBNATIVE(locked_q)
 // moment, etc.  Just put a flag at the top level for now, since that is
 // "better than nothing", and revisit later in the design.
 //
+// !!! Note this is currently allowed to freeze CONST values.  Review, as
+// the person who gave const access may have intended to prevent changes
+// that would prevent *them* from later mutating it.
+//
 void Force_Value_Frozen_Core(
     const RELVAL *v,
     bool deep,
@@ -513,14 +504,14 @@ void Force_Value_Frozen_Core(
     if (Is_Value_Frozen_Deep(v))
         return;
 
-    const REBCEL *cell = VAL_UNESCAPED(v);
+    REBCEL(const*) cell = VAL_UNESCAPED(v);
     enum Reb_Kind kind = CELL_KIND(cell);
 
     if (ANY_ARRAY_KIND(kind)) {
         if (deep)
-            Freeze_Array_Deep(VAL_ARRAY(cell));
+            Freeze_Array_Deep(m_cast(REBARR*, VAL_ARRAY(cell)));
         else
-            Freeze_Array_Shallow(VAL_ARRAY(cell));
+            Freeze_Array_Shallow(m_cast(REBARR*, VAL_ARRAY(cell)));
         if (opt_locker)
             SET_SERIES_INFO(VAL_ARRAY(cell), AUTO_LOCKED);
     }
@@ -533,7 +524,7 @@ void Force_Value_Frozen_Core(
             SET_SERIES_INFO(VAL_CONTEXT(cell), AUTO_LOCKED);
     }
     else if (ANY_SERIES_KIND(kind)) {
-        Freeze_Sequence(VAL_SERIES(cell));
+        Freeze_Series(VAL_SERIES(cell));
         UNUSED(deep);
         if (opt_locker)
             SET_SERIES_INFO(VAL_SERIES(cell), AUTO_LOCKED);

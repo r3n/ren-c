@@ -58,7 +58,8 @@
         redo 'return
     ]
 
-    error? trap [foo 100]
+    e: trap [foo 100 1020]
+    e/id = 'expect-arg
 )
 
 ; REDO phase test
@@ -72,7 +73,7 @@
         redo 'n  comment {should redo INNER, not outer}
     ]
 
-    outer: adapt 'inner [
+    outer: adapt :inner [
         if n = 0 [
             return "outer phase run by redo"
         ]
@@ -90,7 +91,7 @@
         redo captured-frame  comment {should redo OUTER, not INNER}
     ]
 
-    outer: adapt 'inner [
+    outer: adapt :inner [
         if n = 0 [
             return <success>
         ]
@@ -178,7 +179,7 @@
     ]
 
     c: chain [
-        adapt 'base [
+        adapt :base [
            log [{C} n delta]
 
            captured-frame: binding of 'n
@@ -196,7 +197,7 @@
         ]
     ]
 
-    s: specialize adapt 'base [
+    s: specialize adapt :base [
         log [{S} n delta]
 
         if n = 1 [n: 10]

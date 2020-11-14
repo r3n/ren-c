@@ -7,16 +7,16 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2019 Rebol Open Source Contributors
+// Copyright 2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -71,5 +71,80 @@ REBNATIVE(test_librebol)
     Init_Logic(DS_PUSH(), rebDidQ("{Hello} =", getter_node, rebEND));
 
     return Init_Block(D_OUT, Pop_Stack_Values(dsp_orig));
+  #endif
+}
+
+
+//
+//  diagnose: native [
+//
+//  {Prints some basic internal information about the value (debug only)}
+//
+//      return: "Same as input value (for passthru similar to PROBE)"
+//          [<opt> any-value!]
+//      value [<opt> any-value!]
+//  ]
+//
+REBNATIVE(diagnose)
+{
+  INCLUDE_PARAMS_OF_DIAGNOSE;
+
+  #if defined(NDEBUG)
+    UNUSED(ARG(value));
+    fail ("DIAGNOSE is only available in debug builds");
+  #else
+    REBVAL *v = ARG(value);
+
+  #if defined(DEBUG_COUNT_TICKS)
+    REBTCK tick = frame_->tick;
+  #else
+    REBTCK tick = 0
+  #endif
+
+    printf(
+        ">>> DIAGNOSE @ tick %ld in file %s at line %d\n",
+        cast(long, tick),
+        frame_->file,
+        frame_->line
+    );
+
+    Dump_Value_Debug(v);
+
+    return Init_Void(D_OUT, SYM_VOID);
+  #endif
+}
+
+
+//
+//  fuzz: native [
+//
+//  {Introduce periodic or deterministic fuzzing of out of memory errors}
+//
+//      return: [void!]
+//      factor "Ticks or percentage of time to cause allocation errors"
+//          [integer! percent!]
+//  ]
+//
+REBNATIVE(fuzz)
+{
+    INCLUDE_PARAMS_OF_FUZZ;
+
+  #if defined(NDEBUG)
+    UNUSED(ARG(factor));
+    fail ("FUZZ is only availble in DEBUG builds");
+  #else
+    if (IS_INTEGER(ARG(factor))) {
+        PG_Fuzz_Factor = - VAL_INT32(ARG(factor));  // negative counts ticks
+    }
+    else {
+        // Positive number is used with SPORADICALLY(10000) as the number
+        // it is compared against.  If the result is less than the specified
+        // amount it's a hit.  1.0 is thus 10000, which will always trigger.
+        // 0.0 is thus 0, which never will.
+        //
+        assert(IS_PERCENT(ARG(factor)));
+        PG_Fuzz_Factor = 10000 * VAL_DECIMAL(ARG(factor));
+    }
+    return Init_Void(D_OUT, SYM_VOID);
   #endif
 }

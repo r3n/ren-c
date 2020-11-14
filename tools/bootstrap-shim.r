@@ -4,7 +4,7 @@ REBOL [
         Rebol 3 Language Interpreter and Run-time Environment
         "Ren-C" branch @ https://github.com/metaeducation/ren-c
 
-        Copyright 2012-2018 Rebol Open Source Contributors
+        Copyright 2012-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -49,16 +49,30 @@ trap [
     ; Bypass the voidification for the refinement sake.
     ;
     opt: func [v [<opt> any-value!]] [
-        either blank? :v [null] [:v]
+        if blank? :v [return null]
+        return :v
     ]
 
     QUIT
 ]
 
+; Lambda was redefined to `->` to match Haskell/Elm vs. `=>` for JavaScript.
+; It is lighter to look at, but also if the symbol `<=` is deemed to be
+; "less than or equal" there's no real reason why `=>` shouldn't be "equal
+; or greater".  So it's more consistent to make the out-of-the-box definition
+; not try to suggest `<=` and `=>` are "arrows".
+;
+; !!! Due to scanner problems in the bootstrap build inherited from R3-Alpha,
+; and a notion that ENFIX is applied to SET-WORD!s not ACTION!s (which was
+; later overturned), remapping lambda to `->` is complicated.
+;
+do compose [(to set-word! first [->]) enfix :lambda]
+unset first [=>]
+
 ; SET was changed to accept VOID!, use SET VAR NON VOID! (...EXPRESSION...)
 ; if that is what was intended.
 ;
-set: specialize 'lib/set [opt: true]
+set: specialize :lib/set [opt: true]
 
 ; PRINT was changed to tolerate NEWLINE to mean print a newline only
 ;
@@ -171,6 +185,12 @@ modernize-action: function [
                     spec: my next
                     continue
                 ]
+
+                if find (try match block! spec/1) <variadic> [
+                    keep/only replace copy spec/1 <variadic> <...>
+                    spec: my next
+                    continue
+                ]
             ]
 
             if refinement? spec/1 [
@@ -189,13 +209,13 @@ modernize-action: function [
     return reduce [spec body]
 ]
 
-func: adapt 'func [set [spec body] modernize-action spec body]
-function: adapt 'function [set [spec body] modernize-action spec body]
+func: adapt :func [set [spec body] modernize-action spec body]
+function: adapt :function [set [spec body] modernize-action spec body]
 
-meth: enfixed adapt 'meth [set [spec body] modernize-action spec body]
-method: enfixed adapt 'method [set [spec body] modernize-action spec body]
+meth: enfixed adapt :meth [set [spec body] modernize-action spec body]
+method: enfixed adapt :method [set [spec body] modernize-action spec body]
 
-trim: adapt 'trim [  ; there's a bug in TRIM/AUTO in 8994d23
+trim: adapt :trim [  ; there's a bug in TRIM/AUTO in 8994d23
     if auto [
         while [(not tail? series) and [series/1 = LF]] [
             take series
@@ -226,10 +246,10 @@ quote: func [x [<opt> any-value!]] [
 
 join: :join-of
 join-of: func [] [
-    fail 'return [  ; bootstrap EXE does not support @word
+    fail/where [  ; bootstrap EXE does not support @word
         "JOIN has returned to Rebol2 semantics, JOIN-OF is no longer needed"
         https://forum.rebol.info/t/its-time-to-join-together/1030
-    ]
+    ] 'return
 ]
 
 ; https://forum.rebol.info/t/has-hasnt-worked-rethink-construct/1058
@@ -239,7 +259,7 @@ has: null
 ; it could dump those remarks out...perhaps based on how many == there are.
 ; (This is a good reason for retaking ==, as that looks like a divider.)
 ;
-===: func [:remarks [any-value! <...>]] [
+===: func [:remarks [any-value! <...>]] [  ; note: <...> is now a TUPLE!
     until [
         equal? '=== take remarks
     ]
@@ -248,7 +268,7 @@ has: null
 const?: func [x] [return false]
 
 call*: :call
-call: specialize 'call* [wait: true]
+call: specialize :call* [wait: true]
 
 ; Due to various weaknesses in the historical Rebol APPLY, a frame-based
 ; method retook the name.  A usermode emulation of the old APPLY was written
@@ -264,7 +284,7 @@ redbol-apply: :applique
 applique: :apply
 apply: :redbol-apply
 
-find-reverse: specialize 'find [
+find-reverse: specialize :find [
     reverse: true
 
     ; !!! Specialize out /SKIP because it was not compatible--R3-Alpha
@@ -273,7 +293,7 @@ find-reverse: specialize 'find [
     skip: false
 ]
 
-find-last: specialize 'find [
+find-last: specialize :find [
     ;
     ; !!! Old Ren-C committed for bootstrap had a bug of its own (a big reason
     ; to kill these refinements): `find/reverse tail "abcd" "bc"` was blank.
@@ -291,7 +311,7 @@ find-last: specialize 'find [
 ; So augment the READ with a bit more information.
 ;
 lib-read: copy :lib/read
-lib/read: read: enclose 'lib-read function [f [frame!]] [
+lib/read: read: enclose :lib-read function [f [frame!]] [
     saved-source: :f/source
     if e: trap [bin: do f] [
         parse e/message [
@@ -340,10 +360,10 @@ transcode: function [
 
 reeval: :eval
 eval: func [] [
-    fail 'return [
+    fail/where [
         "EVAL is now REEVAL:"
         https://forum.rebol.info/t/eval-evaluate-and-reeval-reevaluate/1173
-    ]
+    ] 'return
 ]
 
 split: function [
@@ -373,3 +393,66 @@ split: function [
     apply :lib/split [series: series dlm: dlm into: into]
 ]
 
+; Unfortunately, bootstrap delimit treated "" as not wanting a delimiter.
+; Also it didn't have the "literal BLANK!s are space characters" behavior.
+;
+delimit: func [
+    return: [<opt> text!]
+    delimiter [<opt> blank! char! text!]
+    line [blank! text! block!]
+    <local> text value pending anything
+][
+    if blank? line [return null]
+    if text? line [return copy line]
+
+    text: copy ""
+    pending: false
+    anything: false
+
+    cycle [
+        if tail? line [stop]
+        if blank? line/1 [
+            append text space
+            line: next line
+            anything: true
+            pending: false
+            continue
+        ]
+        line: evaluate/set line 'value
+        any [unset? 'value | blank? value] then [continue]
+        any [char? value | issue? value] then [
+            append text form value
+            anything: true
+            pending: false
+            continue
+        ]
+        if pending [
+            if delimiter [append text delimiter]
+            pending: false
+        ]
+        append text form value
+        anything: true
+        pending: true
+    ]
+    if not anything [
+        assert [text = ""]
+        return null
+    ]
+    text
+]
+
+unspaced: specialize :delimit [delimiter: _]
+spaced: specialize :delimit [delimiter: space]
+
+dequote: func [x] [
+    switch type of x [
+        lit-word! [to word! x]
+        lit-path! [to path! x]
+    ] else [x]
+]
+
+; This experimental MAKE-FILE is targeting behavior that should be in the
+; system core eventually.  Despite being very early in its design, it's
+; being built into new Ren-Cs to be tested...but bootstrap doesn't have it.
+;
+do %../scripts/make-file.r  ; Experimental!  Trying to replace PD_File...

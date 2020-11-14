@@ -5,7 +5,7 @@ REBOL [
     Version: 0.7.0
     Rights: {
         Copyright 2012 Richard "Cyphre" Smolak (TLS 1.0)
-        Copyright 2012-2018 Rebol Open Source Developers
+        Copyright 2012-2018 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -195,22 +195,29 @@ debug: (comment [:print] blank)
 emit: function [
     {Emits binary data, optionally marking positions with SET-WORD!}
 
+    return: [void!]
     ctx [object!]
     code [block! binary!]
     <local> result
 ][
-    if block? code [
-        while [code: sync-invisibles code] [
-            if set-word? code/1 [
-                set code/1 tail ctx/msg  ; save position
-                code: my next
-            ] else [
-                code: evaluate @result code else [break]
+    if binary? code [
+        append ctx/msg code
+        return
+    ]
+
+    while [code] [
+        if set-word? code/1 [
+            set code/1 tail ctx/msg  ; save position
+            code: my next
+        ]
+        else [
+            ; Keep evaluating so long as returned code pos is quoted, as
+            ; it indicates invisible eval (`emit ctx [comment "X" ...]`)
+            ;
+            if until .not.quoted? [[code result]: evaluate code] [
                 append ctx/msg ensure binary! result
             ]
         ]
-    ] else [
-        append ctx/msg code
     ]
 ]
 
@@ -222,11 +229,11 @@ emit: function [
 ; !!! These shorthands cover what's needed and are chosen to clearly separate
 ; the number of bytes from the number being encoded (both integers).
 ;
-to-1bin: (=> enbin [be + 1])
-to-2bin: (=> enbin [be + 2])
-to-3bin: (=> enbin [be + 3])
-to-4bin: (=> enbin [be + 4])
-to-8bin: (=> enbin [be + 8])
+to-1bin: (<- enbin [be + 1])
+to-2bin: (<- enbin [be + 2])
+to-3bin: (<- enbin [be + 3])
+to-4bin: (<- enbin [be + 4])
+to-8bin: (<- enbin [be + 8])
 
 make-tls-error: func [
     message [text! block!]
@@ -392,14 +399,14 @@ update-state: function [
     old: ensure [blank! issue! tag!] ctx/mode
     debug [mold old unspaced ["=" direction "=>"] new]
 
-    if old and [not find (legal: select transitions old) new] [
+    all [old, not find (legal: select transitions old) new] then [
         fail ["Invalid write state transition, expected one of:" mold legal]
     ]
 
     ctx/mode: new
 ]
 
-update-read-state: specialize 'update-state [
+update-read-state: specialize :update-state [
     direction: 'read
     transitions: [
         <client-hello> [<server-hello>]
@@ -415,7 +422,7 @@ update-read-state: specialize 'update-state [
     ]
 ]
 
-update-write-state: specialize 'update-state [
+update-write-state: specialize :update-state [
     direction: 'write
     transitions: [
         #server-hello-done [<client-key-exchange>]
@@ -444,7 +451,7 @@ client-hello: function [
     set [ctx/min-version: ctx/max-version:] case [
         decimal? version [reduce [version version]]
         block? version [
-            parse version [decimal! decimal! end] else [
+            parse version [decimal! decimal!] else [
                 fail "BLOCK! /VERSION must be two DECIMAL! (min ver, max ver)"
             ]
             version
@@ -990,7 +997,7 @@ grab: enfixed func [
     return set left result  ; must manually assign if SET-WORD! overridden
 ]
 
-grab-int: enfixed enclose 'grab func [f [frame!]] [
+grab-int: enfixed enclose :grab func [f [frame!]] [
     return set f/left (debin [be +] do copy f)
 ]
 
@@ -1051,7 +1058,7 @@ parse-messages: function [
     data: proto/messages
 
     if ctx/encrypted? [
-        if ctx/block-size and [ctx/version > 1.0] [
+        all [ctx/block-size, ctx/version > 1.0] then [
             ;
             ; Grab the server's initialization vector, which will be new for
             ; each message.
@@ -1169,10 +1176,10 @@ parse-messages: function [
                                         curve-list-length: grab-int 'bin 2
                                         curve-list: grab 'bin curve-list-length
                                     ]
-                                    default [
-                                        dummy: grab 'bin extension-length
-                                    ]
+                                ] else [
+                                    dummy: grab 'bin extension-length
                                 ]
+
                             ]
                             assert [check-length = extensions-list-length]
                         ]
@@ -1509,7 +1516,7 @@ prf: function [
         ; cipher suite used: https://tools.ietf.org/html/rfc4346#section-5
 
         len: length of secret
-        mid: to integer! (.5 * (len + either odd? len [1] [0]))
+        mid: to integer! (0.5 * (len + either odd? len [1] [0]))
 
         s-1: copy/part secret mid
         s-2: copy at secret mid + either odd? len [0] [1]
@@ -1675,13 +1682,13 @@ tls-read-data: function [
             break
         ]
 
-        debug ["received bytes:" length of fragment | "parsing response..."]
+        debug ["received bytes:" length of fragment, "parsing response..."]
 
         append ctx/resp parse-response ctx fragment
 
         data: skip data len
 
-        if (tail? data) and [issue? ctx/mode] [
+        all [tail? data, issue? ctx/mode] then [
             debug [
                 "READING FINISHED"
                 length of head of ctx/data-buffer
@@ -1968,7 +1975,7 @@ sys/make-scheme [
         reflect: func [port [port!] property [word!]] [
             switch property [
                 'open? [
-                    port/state and [open? port/state/connection]
+                    did all [port/state, open? port/state/connection]
                 ]
 
                 'length [

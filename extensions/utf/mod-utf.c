@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -190,8 +190,9 @@ REBNATIVE(decode_text)
     // is to UTF-8 for source code, a .TXT file is a different beast, so
     // having wider format support might be a good thing.
 
-    Init_Text(D_OUT, Make_String_UTF8(cs_cast(VAL_BIN_AT(ARG(data)))));
-    return D_OUT;
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
+    return rebSizedText(cs_cast(data), size);
 }
 
 
@@ -291,11 +292,11 @@ REBNATIVE(decode_utf16le)
 {
     UTF_INCLUDE_PARAMS_OF_DECODE_UTF16LE;
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
-    REBLEN len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
 
     const bool little_endian = true;
-    Init_Text(D_OUT, Decode_UTF16(data, len, little_endian, false));
+    Init_Text(D_OUT, Decode_UTF16(data, size, little_endian, false));
 
     // Drop byte-order marker, if present
     //
@@ -320,15 +321,11 @@ REBNATIVE(encode_utf16le)
 {
     UTF_INCLUDE_PARAMS_OF_ENCODE_UTF16LE;
 
+    REBLEN len;
+    REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, ARG(text));
+
     const bool little_endian = true;
-    Init_Binary(
-        D_OUT,
-        Encode_Utf16(
-            VAL_STRING_AT(ARG(text)),
-            VAL_LEN_AT(ARG(text)),
-            little_endian
-        )
-    );
+    Init_Binary(D_OUT, Encode_Utf16(utf8, len, little_endian));
 
     // !!! Should probably by default add a byte order mark, but given this
     // is weird "userspace" encoding it should be an option to the codec.
@@ -375,11 +372,11 @@ REBNATIVE(decode_utf16be)
 {
     UTF_INCLUDE_PARAMS_OF_DECODE_UTF16BE;
 
-    REBYTE *data = VAL_BIN_AT(ARG(data));
-    REBLEN len = VAL_LEN_AT(ARG(data));
+    REBSIZ size;
+    const REBYTE *data = VAL_BINARY_SIZE_AT(&size, ARG(data));
 
     const bool little_endian = false;
-    Init_Text(D_OUT, Decode_UTF16(data, len, little_endian, false));
+    Init_Text(D_OUT, Decode_UTF16(data, size, little_endian, false));
 
     // Drop byte-order marker, if present
     //
@@ -404,15 +401,11 @@ REBNATIVE(encode_utf16be)
 {
     UTF_INCLUDE_PARAMS_OF_ENCODE_UTF16BE;
 
+    REBLEN len;
+    REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, ARG(text));
+
     const bool little_endian = false;
-    Init_Binary(
-        D_OUT,
-        Encode_Utf16(
-            VAL_STRING_AT(ARG(text)),
-            VAL_LEN_AT(ARG(text)),
-            little_endian
-        )
-    );
+    Init_Binary(D_OUT, Encode_Utf16(utf8, len, little_endian));
 
     // !!! Should probably by default add a byte order mark, but given this
     // is weird "userspace" encoding it should be an option to the codec.

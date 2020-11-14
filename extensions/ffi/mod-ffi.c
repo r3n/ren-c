@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 Atronix Engineering
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -92,7 +92,7 @@ static ffi_abi Abi_From_Word(const REBVAL *word) {
       #endif  // X86_WIN64
 
         "fail [{Unknown ABI for platform:}", rebQ(word), "]",
-      "]", 
+      "]",
       rebEND  // <-- rebEND required, call is not a macro (LIBREBOL_NOMACRO)
     );
 
@@ -130,7 +130,7 @@ REBNATIVE(register_struct_hooks)
         &MF_Struct
     );
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -148,7 +148,7 @@ REBNATIVE(unregister_struct_hooks)
 
     Unhook_Datatype(EG_Struct_Type);
 
-    return Init_Void(D_OUT);
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -185,7 +185,7 @@ REBNATIVE(make_routine)
     //
     // !!! Should it error if any bytes aren't ASCII?
     //
-    const REBYTE *utf8 = VAL_UTF8_AT(nullptr, ARG(name));
+    REBCHR(const*) utf8 = VAL_UTF8_AT(ARG(name));
 
     CFUNC *cfunc = Find_Function(LIB_FD(lib), cast(const char*, utf8));
     if (cfunc == nullptr)
@@ -200,7 +200,7 @@ REBNATIVE(make_routine)
     Init_Blank(RIN_AT(r, IDX_ROUTINE_CLOSURE));
     Move_Value(RIN_AT(r, IDX_ROUTINE_ORIGIN), ARG(lib));
 
-    return Init_Action_Unbound(D_OUT, routine);
+    return Init_Action(D_OUT, routine, ANONYMOUS, UNBOUND);
 }
 
 
@@ -241,7 +241,7 @@ REBNATIVE(make_routine_raw)
     Init_Blank(RIN_AT(r, IDX_ROUTINE_CLOSURE));
     Init_Blank(RIN_AT(r, IDX_ROUTINE_ORIGIN)); // no LIBRARY! in this case.
 
-    return Init_Action_Unbound(D_OUT, routine);
+    return Init_Action(D_OUT, routine, ANONYMOUS, UNBOUND);
 }
 
 
@@ -307,7 +307,7 @@ REBNATIVE(wrap_callback)
     );
     Move_Value(RIN_AT(r, IDX_ROUTINE_ORIGIN), ARG(action));
 
-    return Init_Action_Unbound(D_OUT, callback);
+    return Init_Action(D_OUT, callback, ANONYMOUS, UNBOUND);
 }
 
 
@@ -334,7 +334,7 @@ REBNATIVE(addr_of) {
         // The CFUNC is fabricated by the FFI if it's a callback, or
         // just the wrapped DLL function if it's an ordinary routine
         //
-        REBRIN *rin = VAL_ACT_DETAILS(v);
+        REBRIN *rin = ACT_DETAILS(VAL_ACTION(v));
         return Init_Integer(
             D_OUT, cast(intptr_t, RIN_CFUNC(rin))
         );

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -26,39 +26,61 @@
 
 
 //
-//  CT_Word: C
+//  Compare_Spellings: C
 //
-// !!! The R3-Alpha code did a non-ordering comparison; it only tells whether
-// the words are equal or not (1 or 0).  This creates bad invariants for
-// sorting etc.  Review.
+// Used in CT_Word() and CT_Void()
 //
-REBINT CT_Word(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT Compare_Spellings(const REBSTR *a, const REBSTR *b, bool strict)
 {
-    REBINT e;
-    REBINT diff;
-    if (mode >= 0) {
-        if (mode == 1) {
-            //
-            // Symbols must be exact match, case-sensitively
-            //
-            if (VAL_WORD_SPELLING(a) != VAL_WORD_SPELLING(b))
-                return 0;
-        }
-        else {
-            // Different cases acceptable, only check for a canon match
-            //
-            if (VAL_WORD_CANON(a) != VAL_WORD_CANON(b))
-                return 0;
-        }
+    if (strict) {
+        if (a == b)
+            return 0;
 
-        return 1;
+        // !!! "Strict" is interpreted as "case-sensitive comparison".  Using
+        // strcmp() means the two pointers must be to '\0'-terminated byte
+        // arrays, and they are checked byte-for-byte.  This does not account
+        // for unicode normalization.  Review.
+        //
+        // https://en.wikipedia.org/wiki/Unicode_equivalence#Normalization
+        //
+        REBINT diff = strcmp(STR_UTF8(a), STR_UTF8(b));  // byte match check
+        if (diff == 0)
+            return 0;
+        return diff > 0 ? 1 : -1;  // strcmp result not strictly in [-1 0 1]
     }
     else {
-        diff = Compare_Word(a, b, false);
-        if (mode == -1) e = diff >= 0;
-        else e = diff > 0;
+        // Different cases acceptable, only check for a canon match
+        //
+        if (STR_CANON(a) == STR_CANON(b))
+            return 0;
+
+        // !!! "They must differ by case...."  This needs to account for
+        // unicode "case folding", as well as "normalization".
+        //
+        REBINT diff = Compare_UTF8(STR_HEAD(a), STR_HEAD(b), STR_SIZE(b));
+        if (diff >= 0) {
+            assert(diff == 0 or diff == 1 or diff == 3);
+            return 0;  // non-case match
+        }
+        assert(diff == -1 or diff == -3);  // no match
+        return diff + 2;
     }
-    return e;
+}
+
+
+//
+//  CT_Word: C
+//
+// Compare the names of two words and return the difference.
+// Note that words are kept UTF8 encoded.
+//
+REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, bool strict)
+{
+    return Compare_Spellings(
+        VAL_WORD_SPELLING(a),
+        VAL_WORD_SPELLING(b),
+        strict
+    );
 }
 
 
@@ -82,11 +104,19 @@ REB_R MAKE_Word(
         // Rethink what it means to preserve the bits vs. not.
         //
         Move_Value(out, arg);
-        mutable_KIND_BYTE(out) = mutable_MIRROR_BYTE(out) = kind;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = kind;
         return out;
     }
 
     if (ANY_STRING(arg)) {
+        if (Is_Series_Frozen(SER(VAL_STRING(arg))))
+            goto as_word;  // just reuse AS mechanics on frozen strings
+
+        // Otherwise, we'll have to copy the data for a TO conversion
+        //
+        // !!! Note this permits `TO WORD! "    spaced-out"` ... it's not
+        // clear that it should do so.  Review `Analyze_String_For_Scan()`
+
         REBSIZ size;
         const REBYTE *bp = Analyze_String_For_Scan(&size, arg, MAX_SCAN_WORD);
 
@@ -95,13 +125,17 @@ REB_R MAKE_Word(
 
         return out;
     }
-    else if (IS_CHAR(arg)) {  // CHAR! caches the UTF-8 encoding in the cell
-        const REBYTE *encoded = VAL_CHAR_ENCODED(arg);
-        REBSIZ encoded_size = VAL_CHAR_ENCODED_SIZE(arg);
+    else if (IS_ISSUE(arg)) {
+        //
+        // Run the same mechanics that AS WORD! would, since it's immutable.
+        //
+      as_word: {
+        REBVAL *as = rebValue("as", Datatype_From_Kind(kind), arg, rebEND);
+        Move_Value(out, as);
+        rebRelease(as);
 
-        if (nullptr == Scan_Any_Word(out, kind, encoded, encoded_size))
-            fail (Error_Bad_Char_Raw(arg));
         return out;
+      }
     }
     else if (IS_DATATYPE(arg)) {
         return Init_Any_Word(out, kind, Canon(VAL_TYPE_SYM(arg)));
@@ -132,33 +166,37 @@ REB_R TO_Word(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
     // a generalization of "refinement paths"
     //
     if (IS_PATH(arg)) {
-        REBARR *a = VAL_ARRAY(arg);
-        REBLEN index = 0;
-        while (KIND_BYTE(ARR_AT(a, index)) == REB_BLANK)
-            ++index;
-        if (IS_END(ARR_AT(a, index)))
+        SET_END(out);
+
+        DECLARE_LOCAL (temp);
+
+        REBLEN len = VAL_SEQUENCE_LEN(arg);
+        REBLEN i;
+        for (i = 0; i < len; ++i) {
+            const RELVAL *item = VAL_SEQUENCE_AT(temp, arg, i);
+            if (IS_BLANK(item))
+                continue;
+            if (not IS_WORD(item))
+                fail ("Can't make ANY-WORD! from path unless it's one WORD!");
+            if (not IS_END(out))
+                fail ("Can't make ANY-WORD! from path w/more than one WORD!");
+            Derelativize(out, item, VAL_SEQUENCE_SPECIFIER(arg));
+        }
+
+        if (IS_END(out))
             fail ("Can't MAKE ANY-WORD! from PATH! that's all BLANK!s");
 
-        RELVAL *non_blank = ARR_AT(a, index);
-        ++index;
-        while (KIND_BYTE(ARR_AT(a, index)) == REB_BLANK)
-            ++index;
-
-        if (NOT_END(ARR_AT(a, index)))
-            fail ("Can't MAKE ANY-WORD! from PATH! with > 1 non-BLANK! item");
-
-        DECLARE_LOCAL (solo);
-        Derelativize(solo, non_blank, VAL_SPECIFIER(arg));
-        return MAKE_Word(out, kind, nullptr, solo);
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = kind;
+        return out;
     }
 
     return MAKE_Word(out, kind, nullptr, arg);
 }
 
 
-inline static void Mold_Word(REB_MOLD *mo, const REBCEL *v)
+inline static void Mold_Word(REB_MOLD *mo, REBCEL(const*) v)
 {
-    REBSTR *spelling = VAL_WORD_SPELLING(v);
+    const REBSTR *spelling = VAL_WORD_SPELLING(v);
     Append_Utf8(mo->series, STR_UTF8(spelling), STR_SIZE(spelling));
 }
 
@@ -166,7 +204,7 @@ inline static void Mold_Word(REB_MOLD *mo, const REBCEL *v)
 //
 //  MF_Word: C
 //
-void MF_Word(REB_MOLD *mo, const REBCEL *v, bool form) {
+void MF_Word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
     Mold_Word(mo, v);
 }
@@ -175,7 +213,7 @@ void MF_Word(REB_MOLD *mo, const REBCEL *v, bool form) {
 //
 //  MF_Set_word: C
 //
-void MF_Set_word(REB_MOLD *mo, const REBCEL *v, bool form) {
+void MF_Set_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
     Mold_Word(mo, v);
     Append_Codepoint(mo->series, ':');
@@ -185,7 +223,7 @@ void MF_Set_word(REB_MOLD *mo, const REBCEL *v, bool form) {
 //
 //  MF_Get_word: C
 //
-void MF_Get_word(REB_MOLD *mo, const REBCEL *v, bool form) {
+void MF_Get_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
     Append_Codepoint(mo->series, ':');
     Mold_Word(mo, v);
@@ -195,7 +233,7 @@ void MF_Get_word(REB_MOLD *mo, const REBCEL *v, bool form) {
 //
 //  MF_Sym_word: C
 //
-void MF_Sym_word(REB_MOLD *mo, const REBCEL *v, bool form) {
+void MF_Sym_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
     Append_Codepoint(mo->series, '@');
     Mold_Word(mo, v);
@@ -226,7 +264,7 @@ REBTYPE(Word)
 
         switch (property) {
         case SYM_LENGTH: {
-            REBSTR *spelling = VAL_WORD_SPELLING(v);
+            const REBSTR *spelling = VAL_WORD_SPELLING(v);
             const REBYTE *bp = STR_HEAD(spelling);
             REBSIZ size = STR_SIZE(spelling);
             REBLEN len = 0;

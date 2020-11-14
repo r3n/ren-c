@@ -4,7 +4,7 @@ REBOL [
     File: %make-embedded-header.r
     Rights: {
         Copyright 2017 Atronix Engineering
-        Copyright 2017 Rebol Open Source Contributors
+        Copyright 2017 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -21,9 +21,9 @@ do %common-parsers.r
 print "------ Building embedded header file"
 args: parse-args system/script/args  ; either from command line or DO/ARGS
 output-dir: system/options/path/prep
-mkdir/deep output-dir/core
+mkdir/deep make-file [(output-dir) core /]
 
-inp: read fix-win32-path to file! output-dir/include/sys-core.i
+inp: read make-file [(output-dir) include/sys-core.i]
 replace/all inp "// #define" "#define"
 replace/all inp "// #undef" "#undef"
 replace/all inp "<ce>" "##" ;bug in tcc??
@@ -51,7 +51,7 @@ remove/part inp -1 + index? find inp to binary! "#define DEBUG_STDIO_OK"
 ;write %/tmp/sys-core.i inp
 
 e: (make-emitter
-    "Embedded sys-core.h" output-dir/core/tmp-embedded-header.c)
+    "Embedded sys-core.h" make-file [(output-dir) core/tmp-embedded-header.c])
 
 e/emit {
     #include "sys-core.h"

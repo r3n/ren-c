@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2018 Rebol Open Source Contributors
+// Copyright 2012-2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -67,6 +67,7 @@ typedef unsigned char REBYTE; // don't change to uint8_t, see note
 // representation for 32-bit integers...even if that might be larger.
 //
 typedef int_fast32_t REBINT; // series index, signed, at *least* 32 bits
+typedef intptr_t REBIDX; // series index, signed, at *least* 32 bits
 typedef uint_fast32_t REBLEN; // series length, unsigned, at *least* 32 bits
 typedef size_t REBSIZ; // 32 bit (size in bytes)
 typedef int64_t REBI64; // 64 bit integer
@@ -86,7 +87,7 @@ typedef uintptr_t REBTCK; // type the debug build uses for evaluator "ticks"
 // https://github.com/LambdaSchool/CS-Wiki/wiki/Casting-Signed-to-Unsigned-in-C
 //
 #define NOT_FOUND ((REBLEN)-1)
-#define UNKNOWN ((REBLEN)-1)
+#define UNLIMITED ((REBLEN)-1)
 
 
 // !!! Review this choice from R3-Alpha:
@@ -138,13 +139,62 @@ typedef struct Reb_Node REBNOD;
 // the "type that it is" and use CELL_KIND() and not VAL_TYPE(), this alias
 // for RELVAL prevents VAL_TYPE() operations.
 //
+// Because a REBCEL can be linked to by a QUOTED!, it's important not to
+// modify the potentially-shared escaped data.  So all REBCEL* should be
+// const.  That's enforced in the C++ debug build, and a wrapping class is
+// used for the pointer to make sure one doesn't assume it lives in an array
+// and try to do pointer math on it...since it may be a singular allocation.
+//
 #if !defined(CPLUSPLUS_11)
-    #define REBCEL \
-        struct Reb_Value // same as RELVAL, no checking in C build
+
+    #define REBCEL(const_star) \
+        const struct Reb_Value *  // same as RELVAL, no checking in C build
+
+#elif !defined(DEBUG_CHECK_CASTS)
+    //
+    // The %sys-internals.h API is used by core extensions, and we may want
+    // to build the executable with C++ but an extension with C.  If there
+    // are "trick" pointer types that are classes with methods passed in
+    // the API, that would inhibit such an implementation.
+    //
+    // Making it easy to configure such a mixture isn't a priority at this
+    // time.  But just make sure some C++ builds are possible without
+    // using the active pointer class.  Choose debug builds for now.
+    //
+    struct Reb_Cell;  // won't implicitly downcast to RELVAL
+    #define REBCEL(const_star) \
+        const struct Reb_Cell *  // not a class instance in %sys-internals.h
 #else
-    struct Reb_Cell; // won't implicitly downcast to RELVAL
-    #define REBCEL \
-        struct Reb_Cell // *might* have KIND_BYTE() > REB_64
+    // This heavier wrapper form of Reb_Cell() can be costly...empirically
+    // up to 10% of the runtime, since it's called so often.  But it protects
+    // against pointer arithmetic on REBCEL().
+    //
+    struct Reb_Cell;  // won't implicitly downcast to RELVAL
+    template<typename T>
+    struct RebcellPtr {
+        T p;
+        static_assert(
+            std::is_same<const Reb_Cell*, T>::value,
+            "Instantiations of REBCEL only work as REBCEL(const*)"
+        );
+
+        RebcellPtr () { }
+        RebcellPtr (const Reb_Cell *p) : p (p) {}
+
+        const Reb_Cell **operator&() { return &p; }
+        const Reb_Cell *operator->() { return p; }
+        const Reb_Cell &operator*() { return *p; }
+
+        operator const Reb_Cell* () { return p; }
+
+        explicit operator const Reb_Value* ()
+          { return reinterpret_cast<const Reb_Value*>(p); }
+
+        explicit operator const Reb_Relative_Value* ()
+          { return reinterpret_cast<const Reb_Relative_Value*>(p); }
+    };
+    #define REBCEL(const_star) \
+        struct RebcellPtr<Reb_Cell const_star>
 #endif
 
 
@@ -176,7 +226,7 @@ typedef struct Reb_Action REBACT;
 struct Reb_Map;
 typedef struct Reb_Map REBMAP;
 
-typedef REBARR REBBMK;  // "bookmark" (list of UTF-8 index=>offset singulars)
+typedef REBSER REBBMK;  // "bookmark" (list of UTF-8 index=>offsets)
 
 typedef REBSER REBTYP;  // Rebol Type (list of hook function pointers)
 
@@ -201,6 +251,8 @@ struct Reb_Frame;
 
 typedef struct Reb_Frame REBFRM;
 typedef struct Reb_Frame REBPVS;
+
+typedef struct Reb_Feed REBFED;
 
 struct Reb_State;
 
@@ -227,7 +279,7 @@ typedef REBVAL *REB_R;
 // no overrides for individual types (only if they are the only type in
 // their class).
 //
-typedef REBINT (COMPARE_HOOK)(const REBCEL *a, const REBCEL *b, REBINT s);
+typedef REBINT (COMPARE_HOOK)(REBCEL(const*) a, REBCEL(const*) b, bool strict);
 
 
 // PER-TYPE MAKE HOOKS: for `make datatype def`
@@ -301,7 +353,7 @@ typedef struct rebol_mold REB_MOLD;
 // has a different handler than strings.  So not all molds are driven by
 // their class entirely.
 //
-typedef void (MOLD_HOOK)(REB_MOLD *mo, const REBCEL *v, bool form);
+typedef void (MOLD_HOOK)(REB_MOLD *mo, REBCEL(const*) v, bool form);
 
 
 //=//// PARAMETER ENUMERATION /////////////////////////////////////////////=//
@@ -353,7 +405,7 @@ typedef REB_R (GENERIC_HOOK)(REBFRM *frame_, const REBVAL *verb);
 // PER-TYPE PATH HOOKS: for `a/b`, `:a/b`, `a/b:`, `pick a b`, `poke a b`
 //
 typedef REB_R (PATH_HOOK)(
-    REBPVS *pvs, const REBVAL *picker, const REBVAL *opt_setval
+    REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval
 );
 
 

@@ -1,4 +1,24 @@
 ; functions/control/do.r
+
+; Empty BLOCK! forms will return void if empty
+; Empty GROUP! forms will vaporize
+[
+    (void? (1 + 2, do []))
+    (void? (1 + 2, do @[]))
+    (void? (1 + 2, do :[]))
+    (void? (1 + 2, do [comment "hi"]))
+    (void? (1 + 2, do @[comment "hi"]))
+    (void? (1 + 2, do :[comment "hi"]))
+
+    (3 = (1 + 2, do '()))
+    (3 = (1 + 2, do @()))
+    (3 = (1 + 2, do ':()))
+    (3 = (1 + 2, do '(comment "hi")))
+    (3 = (1 + 2, do @(comment "hi")))
+    (3 = (1 + 2, do ':(comment "hi")))
+]
+
+
 (
     success: false
     do [success: true]
@@ -14,7 +34,6 @@
     same? a-value reeval a-value
 )
 ; do block start
-(void? do [])
 (:abs = do [:abs])
 (
     a-value: #{}
@@ -160,7 +179,7 @@
 (true = reeval true)
 (false = reeval false)
 ($1 == reeval $1)
-(null? reeval (specialize 'of [property: 'type]) null)
+(null? reeval (specialize :of [property: 'type]) null)
 (null? do _)
 (
     a-value: make object! []
@@ -236,21 +255,21 @@
     success
 )
 (
-    b: evaluate @value [1 2]
+    [b value]: evaluate [1 2]
     did all [
         1 = value
         [2] = b
     ]
 )
 (
-    value: <untouched>
+    value: <overwritten>
     did all [
-        null? evaluate @value []
-        value = <untouched>
+        null? [_ value]: evaluate []
+        undefined? 'value
     ]
 )
 (
-    evaluate @value [trap [1 / 0]]
+    [_ value]: evaluate [trap [1 / 0]]
     error? value
 )
 (
@@ -276,4 +295,10 @@
 (
     blk: [b: evaluate blk]
     error? trap blk
+)
+
+; evaluating quoted argument
+(
+    rtest: func ['op [word!] 'thing] [reeval op thing]
+    -1 = rtest negate 1
 )

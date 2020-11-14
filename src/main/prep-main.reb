@@ -4,7 +4,7 @@ REBOL [
     File: %prep-main.reb
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -27,8 +27,8 @@ do %../../tools/common.r  ; for PARSE-ARGS, STRIPLOAD, BINARY-TO-C...
 do %../../tools/common-emitter.r  ; for splicing Rebol into templated strings
 
 args: parse-args system/script/args  ; either from command line or DO/ARGS
-output-dir: system/options/path/prep
-mkdir/deep output-dir/main
+output-dir: make-file [(system/options/path) prep /]
+mkdir/deep make-file [(output-dir) main /]
 
 
 ; !!! The "host protocols" are embedded in a way that is very similar to the
@@ -50,16 +50,17 @@ append/line buf "host-prot: ["
 
 
 for-each file [
-    %../../scripts/prot-tls.r  ; TLS (a.k.a. the "S" in HTTPS)
-    %../../scripts/prot-http.r  ; HTTP Client (HTTPS if used with TLS)
+    %prot-tls.r  ; TLS (a.k.a. the "S" in HTTPS)
+    %prot-http.r  ; HTTP Client (HTTPS if used with TLS)
 ][
     header: _  ; was a SET-WORD!...for locals gathering?
-    contents: stripload/header (join %../mezz/ file) 'header
+    contents: stripload/header (join %../../scripts/ file) 'header
 
     ; We go ahead and LOAD the header in this case, so we can write only the
     ; module fields we care about ("Description" is not needed, for instance.)
     ;
     header: load header
+
     append/line buf mold/flat compose [
         Title: (header/title)
         Version: (header/version)
@@ -86,6 +87,10 @@ append/line buf "]"
 for-each file [
     %../../scripts/encap.reb
     %../../scripts/unzip.reb
+
+    %../../scripts/make-file.r  ; Work in progress for FILE! conversion
+    %../../scripts/shell.r  ; SHELL dialect (requires CALL, here for editing)
+
     %main-startup.reb
 ][
     print ["loading:" file]
@@ -93,7 +98,7 @@ for-each file [
     header: _  ; !!! Was a SET-WORD!...for locals gathering?
     contents: stripload/header file 'header
 
-    is-module: false  ; currently none of these three files are modules
+    is-module: false  ; currently none of these files are modules
     if is-module [
         append/line buf "import module ["
         append/line buf header
@@ -117,12 +122,12 @@ append/line buf ":main-startup"
 ; It's helpful to have an uncompressed readable copy of the bundled and
 ; stripped init code for inspection.
 ;
-write-if-changed output-dir/main/tmp-main-startup.r buf
+write-if-changed make-file [(output-dir) main /tmp-main-startup.r] buf
 
 
 (e: make-emitter
     "r3 console executable embedded Rebol code bundle"
-    output-dir/main/tmp-main-startup.inc)
+    make-file [(output-dir) main/tmp-main-startup.inc])
 
 compressed: gzip buf
 

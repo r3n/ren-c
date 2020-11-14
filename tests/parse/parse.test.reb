@@ -1,6 +1,7 @@
 ; Is PARSE working at all?
 
-(did parse "abc" ["abc" end])
+(did parse "abc" ["abc"])
+(did [_ pos]: parse "abc" ["abc" end])
 
 ; Edge case of matching END with TO or THRU
 ;
@@ -14,10 +15,11 @@
     any-char: complement charset ""
     repeat n 512 [
         if n = 1 [continue]
-        if "" != parse (append copy "" to char! n - 1) [set c any-char end] [
+
+        if not parse (append copy "" make char! n - 1) [set c any-char end] [
             fail "Parse didn't work"
         ]
-        if c != to char! n - 1 [fail "Char didn't match"]
+        if c != make char! n - 1 [fail "Char didn't match"]
     ]
     true
 )]
@@ -25,7 +27,7 @@
 
 ; Don't leak internal detail that BINARY! or ANY-STRING! are 0-terminated
 [
-    (NUL = to char! 0)
+    (NUL = as issue! 0)
 
     (null = parse "" [to NUL])
     (null = parse "" [thru NUL])
@@ -39,77 +41,98 @@
 ]
 
 
-; Are null rules raising the right error?
-
+; Plain voids cause an error, quoted voids match literal voids
 (
-    foo: null
+    foo: ~void~
     e: trap [parse "a" [foo]]
-    e/id = 'no-value
+    e/id = 'need-non-void
+)(
+    foo: quote ~void~
+    did parse [~void~] [foo end]
 )
 
-; Blank and empty block case handling
+; Empty block case handling
 
-(did parse [] [end])
-(did parse [] [[[]] end])
-(did parse [] [_ _ _ end])
-(not parse [x] [end])
-(not parse [x] [_ _ _ end])
-(not parse [x] [[[]] end])
-(did parse [] [[[_ _ _] end]])
-(did parse [x] ['x _ end])
-(did parse [x] [_ 'x end])
-(did parse [x] [[] 'x [] end])
+(did parse [] [])
+(did parse [] [[[]]])
+(not parse [x] [])
+(not parse [x] [[[]]])
+(did parse [x] [[] 'x []])
+
+; Literal blank vs. fetched blank/null handling.
+; Literal blank means "skip" at source level, but if retrieved from a variable
+; it means the same as null.
+; https://forum.rebol.info/t/1348
+[
+    (did parse [x] ['x null])
+    (did [_ pos]: parse [x] [blank 'x end])
+
+    (did parse [] [blank blank blank])
+    (not parse [] [_ _ _])
+    (did parse [x <y> "z"] [_ _ _])
+
+    (not parse [x <y> "z"] ['_ '_ '_])
+    (did parse [_ _ _] ['_ '_ '_])
+    (
+        q-blank: quote _
+        did parse [_ _ _] [q-blank q-blank q-blank]
+    )
+
+    (not parse [] [[[_ _ _]]])
+    (did parse [] [[[blank blank blank]]])
+    (did parse [] [[[null null null]]])
+]
 
 ; SET-WORD! (store current input position)
 
 (
-    res: did parse ser: [x y] [pos: skip skip end]
-    all [res | pos = ser]
+    res: did parse ser: [x y] [pos: skip skip]
+    all [res, pos = ser]
 )
 (
-    res: did parse ser: [x y] [skip pos: skip end]
-    all [res | pos = next ser]
+    res: did parse ser: [x y] [skip pos: skip]
+    all [res, pos = next ser]
 )
 (
-    res: did parse ser: [x y] [skip skip pos: end]
-    all [res | pos = tail of ser]
+    res: did parse ser: [x y] [skip skip pos:]
+    all [res, pos = tail of ser]
 )
 [#2130 (
-    res: did parse ser: [x] [set val pos: word! end]
-    all [res | val = 'x | pos = ser]
+    res: did parse ser: [x] [set val pos: word!]
+    all [res, val = 'x, pos = ser]
 )]
 [#2130 (
-    res: did parse ser: [x] [set val: pos: word! end]
-    all [res | val = 'x | pos = ser]
+    res: did parse ser: [x] [set val: pos: word!]
+    all [res, val = 'x, pos = ser]
 )]
 [#2130 (
-    res: did parse ser: "foo" [copy val pos: skip end]
-    all [not res | val = "f" | pos = ser]
+    res: did parse ser: "foo" [copy val pos: skip]
+    all [not res, val = "f", pos = ser]
 )]
 [#2130 (
-    res: did parse ser: "foo" [copy val: pos: skip end]
-    all [not res | val = "f" | pos = ser]
+    res: did parse ser: "foo" [copy val: pos: skip]
+    all [not res, val = "f", pos = ser]
 )]
 
 ; SEEK INTEGER! (replaces TO/THRU integer!
 
-(did parse "abcd" [seek 3 "cd" end])
-(did parse "abcd" [seek 5 end])
-(did parse "abcd" [seek 128 end])
+(did parse "abcd" [seek 3 "cd"])
+(did parse "abcd" [seek 5])
+(did parse "abcd" [seek 128])
 
 [#1965
-    (did parse "abcd" [seek 3 skip "d" end])
-    (did parse "abcd" [seek 4 skip end])
-    (did parse "abcd" [seek 128 end])
-    (did parse "abcd" ["ab" seek 1 "abcd" end])
-    (did parse "abcd" ["ab" seek 1 skip "bcd" end])
+    (did parse "abcd" [seek 3 skip "d"])
+    (did parse "abcd" [seek 4 skip])
+    (did parse "abcd" [seek 128])
+    (did parse "abcd" ["ab" seek 1 "abcd"])
+    (did parse "abcd" ["ab" seek 1 skip "bcd"])
 ]
 
 ; parse THRU tag!
 
 [#682 (
     t: _
-    parse "<tag>text</tag>" [thru <tag> copy t to </tag> end]
+    parse "<tag>text</tag>" [thru <tag> copy t to </tag>]
     t == "text"
 )]
 
@@ -125,44 +148,44 @@
 )
 
 [#1959
-    (did parse "abcd" [thru "d" end])
+    (did parse "abcd" [thru "d"])
 ]
 [#1959
-    (did parse "abcd" [to "d" skip end])
+    (did parse "abcd" [to "d" skip])
 ]
 
 [#1959
-    (did parse "<abcd>" [thru <abcd> end])
+    (did parse "<abcd>" [thru <abcd>])
 ]
 [#1959
-    (did parse [a b c d] [thru 'd end])
+    (did parse [a b c d] [thru 'd])
 ]
 [#1959
-    (did parse [a b c d] [to 'd skip end])
+    (did parse [a b c d] [to 'd skip])
 ]
 
 ; self-invoking rule
 
 [#1672 (
-    a: [a end]
+    a: [a]
     error? trap [parse [] a]
 )]
 
 ; repetition
 
 [#1280 (
-    parse "" [(i: 0) 3 [["a" |] (i: i + 1)] end]
+    parse "" [(i: 0) 3 [["a" |] (i: i + 1)]]
     i == 3
 )]
 [#1268 (
     i: 0
     <infinite?> = catch [
-        parse "a" [any [(i: i + 1) (if i > 100 [throw <infinite?>])] end]
+        parse "a" [any [(i: i + 1) (if i > 100 [throw <infinite?>])]]
     ]
 )]
 [#1268 (
     i: 0
-    parse "a" [while [(i: i + 1 j: to-value if i = 2 [[fail]]) j] end]
+    parse "a" [while [(i: i + 1 j: to-value if i = 2 [[fail]]) j]]
     i == 2
 )]
 
@@ -171,111 +194,111 @@
 [#1267 (
     b: "abc"
     c: ["a" | "b"]
-    a2: [any [b e: (d: [:e]) then fail | [c | (d: [fail]) fail]] d end]
-    a4: [any [b then e: (d: [:e]) fail | [c | (d: [fail]) fail]] d end]
+    a2: [any [b e: (d: [:e]) then fail | [c | (d: [fail]) fail]] d]
+    a4: [any [b then e: (d: [:e]) fail | [c | (d: [fail]) fail]] d]
     equal? parse "aaaaabc" a2 parse "aaaaabc" a4
 )]
 
 ; NOT rule
 
 [#1246
-    (did parse "1" [not not "1" "1" end])
+    (did parse "1" [not not "1" "1"])
 ]
 [#1246
-    (did parse "1" [not [not "1"] "1" end])
+    (did parse "1" [not [not "1"] "1"])
 ]
 [#1246
-    (not parse "" [not 0 "a" end])
+    (not parse "" [not 0 "a"])
 ]
 [#1246
-    (not parse "" [not [0 "a"] end])
+    (not parse "" [not [0 "a"]])
 ]
 [#1240
-    (did parse "" [not "a" end])
+    (did parse "" [not "a"])
 ]
 [#1240
-    (did parse "" [not skip end])
+    (did parse "" [not skip])
 ]
 [#1240
-    (did parse "" [not fail end])
+    (did parse "" [not fail])
 ]
 
 
 ; TO/THRU + bitset!/charset!
 
 [#1457
-    (did parse "a" compose [thru (charset "a") end])
+    (did parse "a" compose [thru (charset "a")])
 ]
 [#1457
-    (not parse "a" compose [thru (charset "a") skip end])
+    (not parse "a" compose [thru (charset "a") skip])
 ]
 [#1457
-    (did parse "ba" compose [to (charset "a") skip end])
+    (did parse "ba" compose [to (charset "a") skip])
 ]
 [#1457
-    (not parse "ba" compose [to (charset "a") "ba" end])
+    (not parse "ba" compose [to (charset "a") "ba"])
 ]
 [#2141 (
     xset: charset "x"
-    did parse "x" [thru [xset] end]
+    did parse "x" [thru [xset]]
 )]
 
 ; self-modifying rule, not legal in Ren-C if it's during the parse
 
 (error? trap [
-    not parse "abcd" rule: ["ab" (remove back tail of rule) "cd" end]
+    not parse "abcd" rule: ["ab" (remove back tail of rule) "cd"]
 ])
 
 [https://github.com/metaeducation/ren-c/issues/377 (
     o: make object! [a: 1]
-    parse s: "a" [o/a: skip end]
+    parse s: "a" [o/a: skip]
     o/a = s
 )]
 
 ; A couple of tests for the problematic DO operation
 
-(did parse [1 + 2] [do [lit 3] end])
-(did parse [1 + 2] [do integer! end])
-(did parse [1 + 2] [do [integer!] end])
-(not parse [1 + 2] [do [lit 100] end])
-(did parse [reverse copy [a b c]] [do [into ['c 'b 'a]] end])
-(not parse [reverse copy [a b c]] [do [into ['a 'b 'c]] end])
+(did parse [1 + 2] [do [lit 3]])
+(did parse [1 + 2] [do integer!])
+(did parse [1 + 2] [do [integer!]])
+(not parse [1 + 2] [do [lit 100]])
+(did parse [reverse copy [a b c]] [do [into ['c 'b 'a]]])
+(not parse [reverse copy [a b c]] [do [into ['a 'b 'c]]])
 
 ; AHEAD and AND are synonyms
 ;
-(did parse ["aa"] [ahead text! into ["a" "a"] end])
-(did parse ["aa"] [and text! into ["a" "a"] end])
+(did parse ["aa"] [ahead text! into ["a" "a"]])
+(did parse ["aa"] [and text! into ["a" "a"]])
 
 ; INTO is not legal if a string parse is already running
 ;
-(error? trap [parse "aa" [into ["a" "a"]] end])
+(error? trap [parse "aa" [into ["a" "a"]]])
 
 
 ; Should return the same series type as input (Rebol2 did not do this)
 ; PATH! cannot be PARSE'd due to restrictions of the implementation
 (
     a-value: first [a/b]
-    parse as block! a-value [b-value: end]
+    parse as block! a-value [b-value:]
     a-value = to path! b-value
 )
 (
     a-value: first [()]
-    parse a-value [b-value: end]
+    parse a-value [b-value:]
     same? a-value b-value
 )
 
 ; This test works in Rebol2 even if it starts `i: 0`, presumably a bug.
 (
     i: 1
-    parse "a" [any [(i: i + 1 j: if i = 2 [[end skip]]) j] end]
+    parse "a" [any [(i: i + 1 j: if i = 2 [[end skip]]) j]]
     i == 2
 )
 
 ; Use experimental MATCH to get input on success, see #2165
 ; !!! This is a speculative feature, and is not confirmed for Beta/One
 
-("abc" = match parse "abc" ["a" "b" "c" end])
-(null? match parse "abc" ["a" "b" "d" end])
+("abc" = match parse "abc" ["a" "b" "c"])
+(null? match parse "abc" ["a" "b" "d"])
 
 
 ; GET-GROUP!
@@ -284,12 +307,12 @@
 
 (did parse "aaabbb" [:([some "a"]) :([some "b"])])
 (did parse "aaabbb" [:([some "a"]) :(if false [some "c"]) :([some "b"])])
-(did parse "aaa" [:('some) "a" end])
-(not parse "aaa" [:(1 + 1) "a" end])
-(did parse "aaa" [:(1 + 2) "a" end])
+(did parse "aaa" [:('some) "a"])
+(not parse "aaa" [:(1 + 1) "a"])
+(did parse "aaa" [:(1 + 2) "a"])
 (
     count: 0
-    did parse ["a" "aa" "aaa"] [some [into [:(count: count + 1) "a"]] end]
+    did parse ["a" "aa" "aaa"] [some [into [:(count: count + 1) "a"]]]
 )
 
 ; SET-GROUP!
@@ -309,24 +332,30 @@
 ; LOGIC! BEHAVIOR
 ; A logic true acts as a no-op, while a logic false causes matches to fail
 
-(did parse "ab" ["a" true "b" end])
-(not parse "ab" ["a" false "b" end])
-(did parse "ab" ["a" :(1 = 1) "b" end])
-(not parse "ab" ["a" :(1 = 2) "b" end])
+(did parse "ab" ["a" true "b"])
+(not parse "ab" ["a" false "b"])
+(did parse "ab" ["a" :(1 = 1) "b"])
+(not parse "ab" ["a" :(1 = 2) "b"])
 
 
 ; QUOTED! BEHAVIOR
 ; Support for the new literal types
 
-([[a b]] == parse [... [a b]] [to '[a b]])
-(did parse [... [a b]] [thru '[a b] end])
-(did parse [1 1 1] [some '1 end])
+(
+    did all [
+        [_ pos]: parse [... [a b]] [to '[a b]]
+        pos = [[a b]]
+    ]
+)
+(did parse [... [a b]] [thru '[a b]])
+(did parse [1 1 1] [some '1])
 
 ; Quote level is currently retained by the return value, but not by the
 ; captured content.
 ;
 (did all [
-    lit ''[] == parse lit ''[1 + 2] [copy x to end]
+    [_ pos]: parse lit ''[1 + 2] [copy x to end]
+    (lit ''[]) == pos
     x == [1 + 2]
 ])
 
@@ -360,16 +389,17 @@
 ; are better than nothing...
 (
     catchar: #"🐱"
-    did parse #{F09F90B1} [catchar end]
+    did parse #{F09F90B1} [catchar]
 )(
     cattext: "🐱"
-    did parse #{F09F90B1} [cattext end]
+    did parse #{F09F90B1} [cattext]
 )(
     catbin: #{F09F90B1}
-    did parse "🐱" [catbin end]
+    e: trap [did parse "🐱" [catbin]]
+    'find-string-binary = e/id
 )(
     catchar: #"🐱"
-    did parse "🐱" [catchar end]
+    did parse "🐱" [catchar]
 )
 
 [
@@ -378,9 +408,9 @@
         bincat = #{43F09F98BA54}
     )
 
-    (did parse bincat [{C😺T} end])
+    (did parse bincat [{C😺T}])
 
-    (did parse bincat [{c😺t} end])
+    (did parse bincat [{c😺t}])
 
     (not parse/case bincat [{c😺t} end])
 ]
@@ -478,23 +508,32 @@
 ; these tests pass.  Ren-C is questioning the progress rule, believing the
 ; benefit of infinite-loop-avoidance is not worth the sacrifice of logic.
 [
-    (not parse "ab" [to [""] "ab" end])
-    (did parse "ab" [to ["a"] "ab" end])
-    (did parse "ab" [to ["ab"] "ab" end])
-    (not parse "ab" [thru [""] "ab" end])
-    (did parse "ab" [thru ["a"] "b" end])
-    (not parse "ab" [thru ["ab"] "" end])
+    (not parse "ab" [to [""] "ab"])
+    (did parse "ab" [to ["a"] "ab"])
+    (did parse "ab" [to ["ab"] "ab"])
+    (not parse "ab" [thru [""] "ab"])
+    (did parse "ab" [thru ["a"] "b"])
+    (not parse "ab" [thru ["ab"] ""])
 ]
 
 ; Ren-C made it possible to use quoted WORD!s in place of CHAR! or TEXT! to
 ; match in strings.  This gives a cleaner look, as you drop off 3 vertical
 ; tick marks from everything like ["ab"] to become just ['ab]
 ;
-("c" = parse "abbbbbc" ['a some ['b]])
-("" = parse "abbbbc" ['ab some ['bc | 'b]])
-("def" = parse "abc10def" ['abc '10])
+(did all [
+    [_ pos]: parse "abbbbbc" ['a some ['b]]
+    "c" = pos
+])
+(did all [
+    [_ pos]: parse "abbbbc" ['ab some ['bc | 'b]]
+    "" = pos
+])
+(did all [
+    [_ pos]: parse "abc10def" ['abc '10]
+    "def" = pos
+])
 
 (
     byteset: make bitset! [0 16 32]
-    did parse #{001020} [some byteset end]
+    did parse #{001020} [some byteset]
 )

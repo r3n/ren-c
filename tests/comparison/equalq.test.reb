@@ -94,7 +94,7 @@
 (equal? equal? #{00} to integer! #{00} equal? to integer! #{00} #{00})
 ; issue! vs. text!
 ; RAMBO #3518
-(equal? a-value: #a to text! a-value)
+(not equal? a-value: #a to text! a-value)
 (
     a-value: #a
     equal? equal? a-value to text! a-value equal? to text! a-value a-value
@@ -112,21 +112,6 @@
     a-value: to tag! ""
     equal? equal? a-value to text! a-value equal? to text! a-value a-value
 )
-(equal? 0.0.0 0.0.0)
-(not equal? 0.0.1 0.0.0)
-; tuple! right-pads with 0
-(equal? 1.0.0 1.0.0.0.0.0.0)
-; tuple! right-pads with 0
-(equal? 1.0.0.0.0.0.0 1.0.0)
-; No implicit to binary! from tuple!
-(
-    a-value: 0.0.0.0
-    not equal? to binary! a-value a-value
-)
-(
-    a-value: 0.0.0.0
-    equal? equal? to binary! a-value a-value equal? a-value to binary! a-value
-)
 (equal? #[bitset! #{00}] #[bitset! #{00}])
 ; bitset! with no bits set does not equal empty bitset
 ; This is because of the COMPLEMENT problem: bug#1085.
@@ -136,13 +121,16 @@
 (equal? equal? #[bitset! #{00}] #{00} equal? #{00} #[bitset! #{00}])
 (equal? [] [])
 (equal? a-value: [] a-value)
+
 ; Reflexivity for past-tail blocks
-; Error in R2.
+; Error in R2, but not R3-Alpha.  Error again in Ren-C.  (SAME? allowed)
 (
     a-value: tail of [1]
     clear head of a-value
-    equal? a-value a-value
+    e: trap [equal? a-value a-value]
+    e/id = 'index-out-of-range
 )
+
 ; Reflexivity for cyclic blocks
 (
     a-value: copy []
@@ -416,11 +404,11 @@
 ; char! vs. decimal! symmetry
 (equal? equal? #"a" 97.0 equal? 97.0 #"a")
 ; char! case
-(equal? #"a" #"A")
+(not equal? #"a" #"A")
 ; text! case
 (equal? "a" "A")
 ; issue! case
-(equal? #a #A)
+(not equal? #a #A)
 ; tag! case
 (equal? <a a="a"> <A A="A">)
 ; url! case
@@ -557,17 +545,17 @@
 
 ; VOID is legal to test with equality (as is UNSET! in R3-Alpha/Red)
 [
-    (equal? void void)
-    (not-equal? void blank)
-    (not-equal? blank void)
-    (equal? (equal? blank void) (equal? void blank))
-    (not (void = blank))
-    (void <> blank)
-    (not (blank = void))
-    (blank != void)
-    (void = void)
-    (not (void != void))
-    (equal? (blank = void) (void = blank))
+    (equal? ~void~ ~void~)
+    (not-equal? ~void~ blank)
+    (not-equal? blank ~void~)
+    (equal? (equal? blank ~void~) (equal? ~void~ blank))
+    (not (~void~ = blank))
+    (~void~ <> blank)
+    (not (blank = ~void~))
+    (blank != ~void~)
+    (~void~ = ~void~)
+    (not (~void~ != ~void~))
+    (equal? (blank = ~void~) (~void~ = blank))
 ]
 
 ; NULL is legal to test with equality (as is UNSET! in R3-Alpha/Red)

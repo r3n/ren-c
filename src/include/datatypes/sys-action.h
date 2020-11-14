@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -112,17 +112,23 @@
     ARRAY_FLAG_24
 
 
-//=//// PARAMLIST_FLAG_IS_INVISIBLE ///////////////////////////////////////=//
+//=//// PARAMLIST_FLAG_IS_BARRIER /////////////////////////////////////////=//
 //
-// This is a calculated property, which is cached by Make_Action().
+// Special action property set with TWEAK.  Used by |
 //
-// An "invisible" function is one that does not touch its frame output cell,
-// leaving it completely alone.  This is how `10 comment ["hi"] + 20` can
-// work...if COMMENT destroyed the 10 in the output cell it would be lost and
-// the addition could no longer work.
+// The "expression barrier" was once a built-in type (BAR!) in order to get
+// a property not possible to achieve with functions...that it would error
+// if it was used during FULFILL_ARG and would be transparent in evaluation.
 //
-#define PARAMLIST_FLAG_IS_INVISIBLE \
+// Transparency was eventually generalized as "invisibility".  But attempts
+// to intuit the barrier-ness from another property (e.g. "enfix but no args")
+// were confusing.  It seems an orthogonal feature in its own right, so it
+// was added to the TWEAK list pending a notation in function specs.
+//
+#define PARAMLIST_FLAG_IS_BARRIER \
     ARRAY_FLAG_25
+
+STATIC_ASSERT(PARAMLIST_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
 
 
 //=//// PARAMLIST_FLAG_DEFERS_LOOKBACK ////////////////////////////////////=//
@@ -172,8 +178,14 @@
 // rebValue() etc. should consider for binding, in addition to lib.  A BLANK!
 // in the 1 slot means no additional consideration...bind to lib only.
 //
+// Note: This is tactially set to be the same as SERIES_INFO_HOLD to make it
+// possible to branchlessly mask in the bit to stop frames from being mutable
+// by user code once native code starts running.
+//
 #define PARAMLIST_FLAG_IS_NATIVE \
     ARRAY_FLAG_29
+
+STATIC_ASSERT(PARAMLIST_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
 
 //=//// PARAMLIST_FLAG_ENFIXED ////////////////////////////////////////////=//
@@ -186,22 +198,16 @@
     ARRAY_FLAG_30
 
 
-//=//// PARAMLIST_FLAG_RETURN_REQUOTES ////////////////////////////////////=//
+//=//// PARAMLIST_FLAG_31 /////////////////////////////////////////////////=//
 //
-// This is a cached property with a slight performance advantage for the
-// evaluator, as it doesn't have to go find the RETURN parameter to know if
-// it should apply the requote.  It is a minor optimization, and could be
-// sacrificed if this bit were needed for something else.
-//
-#define PARAMLIST_FLAG_RETURN_REQUOTES \
+#define PARAMLIST_FLAG_31 \
     ARRAY_FLAG_31
 
 
 // These are the flags which are scanned for and set during Make_Action
 //
 #define PARAMLIST_MASK_CACHED \
-    (PARAMLIST_FLAG_IS_INVISIBLE | PARAMLIST_FLAG_RETURN_REQUOTES \
-        | PARAMLIST_FLAG_QUOTES_FIRST | PARAMLIST_FLAG_SKIPPABLE_FIRST)
+    (PARAMLIST_FLAG_QUOTES_FIRST | PARAMLIST_FLAG_SKIPPABLE_FIRST)
 
 // These flags should be copied when specializing or adapting.  They may not
 // be derivable from the paramlist (e.g. a native with no RETURN does not
@@ -300,13 +306,9 @@
 #define VAL_ACT_PARAMLIST_NODE(v) \
     PAYLOAD(Any, (v)).first.node  // lvalue, but a node
 
-#define VAL_ACT_DETAILS_NODE(v) \
+#define VAL_ACTION_DETAILS_OR_LABEL_NODE(v) \
     PAYLOAD(Any, (v)).second.node  // lvalue, but a node
 
-inline static REBARR *VAL_ACT_DETAILS(const REBCEL *v) {
-    assert(CELL_KIND(v) == REB_ACTION);
-    return ARR(VAL_ACT_DETAILS_NODE(v));
-}
 
 inline static REBARR *ACT_PARAMLIST(REBACT *a) {
     assert(GET_ARRAY_FLAG(&a->paramlist, IS_PARAMLIST));
@@ -327,14 +329,11 @@ inline static void Sync_Paramlist_Archetype(REBARR *paramlist)
   { VAL_ACT_PARAMLIST_NODE(ARR_HEAD(paramlist)) = NOD(paramlist); }
 
 
-#define ACT_DETAILS_NODE(a) \
-    PAYLOAD(Any, ACT_ARCHETYPE(a)).second.node  // assignable, but is a node
-
 #define ACT_DETAILS(a) \
-    ARR(ACT_DETAILS_NODE(a))  // array, but is unassignable
+    ARR(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE(a)))
 
 #define ACT_DISPATCHER(a) \
-    (MISC(VAL_ACT_DETAILS(ACT_ARCHETYPE(a))).dispatcher)
+    (MISC(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE(a))).dispatcher)
 
 // These are indices into the details array agreed upon by actions which have
 // the PARAMLIST_FLAG_IS_NATIVE set.
@@ -371,8 +370,7 @@ inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {
 // This makes Push_Action() slightly faster in assigning f->special.
 //
 inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
-    REBARR *details = VAL_ACT_DETAILS(ACT_ARCHETYPE(a));
-    REBARR *specialty = LINK_SPECIALTY(details);
+    REBARR *specialty = LINK_SPECIALTY(ACT_DETAILS(a));
     if (GET_ARRAY_FLAG(specialty, IS_VARLIST))
         return CTX(specialty);
 
@@ -380,7 +378,7 @@ inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
 }
 
 inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
-    REBARR *details = VAL_ACT_DETAILS(ACT_ARCHETYPE(a));
+    REBARR *details = ACT_DETAILS(a);
     REBSER *s = SER(LINK_SPECIALTY_NODE(details));
     return cast(REBVAL*, s->content.dynamic.data) + 1; // skip archetype/root
 }
@@ -392,7 +390,7 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 #define ACT_PARAMS_HEAD(a) \
     (cast(REBVAL*, SER(ACT_PARAMLIST(a))->content.dynamic.data) + 1)
 
-inline static REBACT *VAL_ACTION(const REBCEL *v) {
+inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION); // so it works on literals
     REBSER *s = SER(VAL_ACT_PARAMLIST_NODE(v));
     if (GET_SERIES_INFO(s, INACCESSIBLE))
@@ -403,24 +401,31 @@ inline static REBACT *VAL_ACTION(const REBCEL *v) {
 #define VAL_ACT_PARAMLIST(v) \
     ACT_PARAMLIST(VAL_ACTION(v))
 
-#define VAL_ACT_NUM_PARAMS(v) \
-    ACT_NUM_PARAMS(VAL_ACTION(v))
-
-#define VAL_ACT_PARAMS_HEAD(v) \
-    ACT_PARAMS_HEAD(VAL_ACTION(v))
-
-#define VAL_ACT_PARAM(v,n) \
-    ACT_PARAM(VAL_ACTION(v), n)
-
-
-inline static REBNAT VAL_ACT_DISPATCHER(const REBCEL *v) {
-    assert(CELL_KIND(v) == REB_ACTION);
-    return MISC(VAL_ACT_DETAILS_NODE(v)).dispatcher;
+// When an ACTION! is stored in a cell (e.g. not an "archetype"), it can
+// contain a label of the ANY-WORD! it was taken from.  If it is an array
+// node, it is presumed an archetype and has no label.
+//
+// !!! Theoretically, longer forms like `.not.equal?` for PREDICATE! could
+// use an array node here.  But since CHAINs store ACTION!s that can cache
+// the words, you get the currently executing label instead...which may
+// actually make more sense.
+//
+inline static const REBSTR *VAL_ACTION_LABEL(const RELVAL *v) {
+    assert(IS_ACTION(v));
+    REBSER *s = SER(VAL_ACTION_DETAILS_OR_LABEL_NODE(v));
+    if (IS_SER_ARRAY(s))
+        return ANONYMOUS;  // archetype (e.g. may live in paramlist[0] itself)
+    return STR(s);
 }
 
-inline static REBCTX *VAL_ACT_META(const REBCEL *v) {
-    assert(CELL_KIND(v) == REB_ACTION);
-    return MISC_META(VAL_ACT_PARAMLIST_NODE(v));
+inline static void INIT_ACTION_LABEL(RELVAL *v, const REBSTR *label)
+{
+    // !!! How to be certain this isn't an archetype node?  The GC should
+    // catch any violations when a paramlist[0] isn't an array...
+    //
+    ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);
+    assert(label != nullptr);  // avoid needing to worry about null case
+    VAL_ACTION_DETAILS_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, label));
 }
 
 
@@ -437,34 +442,28 @@ inline static REBCTX *VAL_ACT_META(const REBCEL *v) {
 
 // A fully constructed action can reconstitute the ACTION! REBVAL
 // that is its canon form from a single pointer...the REBVAL sitting in
-// the 0 slot of the action's paramlist.
+// the 0 slot of the action's paramlist.  That action has no binding and
+// no label.
 //
-static inline REBVAL *Init_Action_Unbound(
-    RELVAL *out,
-    REBACT *a
-){
-  #if !defined(NDEBUG)
-    Extra_Init_Action_Checks_Debug(a);
-  #endif
-    Force_Array_Managed(ACT_PARAMLIST(a));
-    Move_Value(out, ACT_ARCHETYPE(a));
-    assert(VAL_BINDING(out) == UNBOUND);
-    return SPECIFIC(out);
-}
-
-static inline REBVAL *Init_Action_Maybe_Bound(
+static inline REBVAL *Init_Action(
     RELVAL *out,
     REBACT *a,
-    REBNOD *binding // allowed to be UNBOUND
+    const REBSTR *label,  // allowed to be ANONYMOUS
+    REBNOD *binding  // allowed to be UNBOUND
 ){
   #if !defined(NDEBUG)
     Extra_Init_Action_Checks_Debug(a);
   #endif
     Force_Array_Managed(ACT_PARAMLIST(a));
     Move_Value(out, ACT_ARCHETYPE(a));
+    if (label)
+        INIT_ACTION_LABEL(out, label);
+    else {
+        // leave as the array from the archetype (array means not a label)
+    }
     assert(VAL_BINDING(out) == UNBOUND);
     INIT_BINDING(out, binding);
-    return SPECIFIC(out);
+    return cast(REBVAL*, out);
 }
 
 
@@ -475,7 +474,9 @@ inline static REB_R Run_Generic_Dispatch(
 ){
     assert(IS_WORD(verb));
 
-    GENERIC_HOOK *hook = Generic_Hook_For_Type_Of(first_arg);
+    GENERIC_HOOK *hook = IS_QUOTED(first_arg)
+        ? &T_Quoted  // a few things like COPY are supported by QUOTED!
+        : Generic_Hook_For_Type_Of(first_arg);
 
     REB_R r = hook(f, verb);  // Note that QUOTED! has its own hook & handling
     if (r == R_UNHANDLED) {
@@ -491,4 +492,13 @@ inline static REB_R Run_Generic_Dispatch(
     }
 
     return r;
+}
+
+
+inline static bool Process_Action_Throws(REBFRM *f) {
+    Init_Unlabeled_Void(f->out);
+    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
+    bool threw = Process_Action_Maybe_Stale_Throws(f);
+    CLEAR_CELL_FLAG(f->out, OUT_MARKED_STALE);
+    return threw;
 }

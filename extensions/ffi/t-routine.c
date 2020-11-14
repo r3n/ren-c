@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2014 Atronix Engineering, Inc.
-// Copyright 2014-2017 Rebol Open Source Contributors
+// Copyright 2014-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -50,7 +50,7 @@ static struct {
     {
         SYM_POINTER,
         FLAGIT_KIND(REB_INTEGER)
-            | FLAGIT_KIND(REB_NULLED)   // Rebol's null as 0 seems sensible
+            | FLAGIT_KIND(REB_NULL)   // Rebol's null seems sensible for NULL
             | FLAGIT_KIND(REB_TEXT)
             | FLAGIT_KIND(REB_BINARY)
             | FLAGIT_KIND(REB_CUSTOM)  // !!! Was REB_VECTOR, must narrow (!)
@@ -69,7 +69,7 @@ static void Schema_From_Block_May_Fail(
     RELVAL *schema_out,  // => INTEGER! or HANDLE! for struct
     RELVAL *opt_param_out,  // => parameter for use in ACTION!s
     const REBVAL *blk,
-    REBSTR *opt_spelling
+    const REBSTR *opt_spelling
 ){
     TRASH_CELL_IF_DEBUG(schema_out);
     if (not opt_spelling)
@@ -83,7 +83,7 @@ static void Schema_From_Block_May_Fail(
     if (VAL_LEN_AT(blk) == 0)
         fail (blk);
 
-    RELVAL *item = VAL_ARRAY_AT(blk);
+    const RELVAL *item = VAL_ARRAY_AT(blk);
 
     DECLARE_LOCAL (def);
     DECLARE_LOCAL (temp);
@@ -193,21 +193,21 @@ static void Schema_From_Block_May_Fail(
 inline static void *Expand_And_Align_Core(
     uintptr_t *offset_out,
     REBLEN align,
-    REBSER *store,
+    REBBIN *store,
     REBLEN size
 ){
-    REBLEN padding = SER_LEN(store) % align;
+    REBLEN padding = BIN_LEN(store) % align;
     if (padding != 0)
         padding = align - padding;
 
-    *offset_out = SER_LEN(store) + padding;
+    *offset_out = BIN_LEN(store) + padding;
     EXPAND_SERIES_TAIL(store, padding + size);
     return SER_DATA(store) + *offset_out;
 }
 
 inline static void *Expand_And_Align(
     uintptr_t *offset_out,
-    REBSER *store,
+    REBBIN *store,
     REBLEN size // assumes align == size
 ){
     return Expand_And_Align_Core(offset_out, size, store, size);
@@ -220,7 +220,7 @@ inline static void *Expand_And_Align(
 // INTEGER! into the appropriate representation of an `int` in memory.)
 //
 static uintptr_t arg_to_ffi(
-    REBSER *store,
+    REBBIN *store,
     void *dest,
     const REBVAL *arg,
     const REBVAL *schema,
@@ -256,7 +256,7 @@ static uintptr_t arg_to_ffi(
         offset = 10200304;  // shouldn't be used, but avoid warning
 
     if (IS_BLOCK(schema)) {
-        REBFLD *top = VAL_ARRAY(schema);
+        REBFLD *top = VAL_ARRAY_KNOWN_MUTABLE(schema);
 
         assert(FLD_IS_STRUCT(top));
         assert(not FLD_IS_ARRAY(top));  // !!! wasn't supported--should be?
@@ -416,7 +416,7 @@ static uintptr_t arg_to_ffi(
             buffer.ipt = 0xDECAFBAD;  // return value, make space (but init)
         }
         else switch (VAL_TYPE(arg)) {
-          case REB_NULLED:
+          case REB_NULL:
             buffer.ipt = 0;
             break;
 
@@ -430,7 +430,7 @@ static uintptr_t arg_to_ffi(
         // GC compaction even if not changed)...so the memory is not "stable".
         //
           case REB_TEXT:  // !!! copies a *pointer*!
-            buffer.ipt = cast(intptr_t, VAL_UTF8_AT(nullptr, arg));
+            buffer.ipt = cast(intptr_t, VAL_UTF8_AT(arg));
             break;
 
           case REB_BINARY:  // !!! copies a *pointer*!
@@ -445,7 +445,7 @@ static uintptr_t arg_to_ffi(
             if (not IS_ACTION_RIN(arg))
                 fail (Error_Only_Callback_Ptr_Raw());  // but routines, too
 
-            REBRIN *rin = VAL_ACT_DETAILS(arg);
+            REBRIN *rin = ACT_DETAILS(VAL_ACTION(arg));
             CFUNC* cfunc = RIN_CFUNC(rin);
             size_t sizeof_cfunc = sizeof(cfunc);  // avoid conditional const
             if (sizeof_cfunc != sizeof(intptr_t))  // not necessarily true
@@ -532,7 +532,7 @@ static void ffi_to_rebol(
     void *ffi_rvalue
 ){
     if (IS_BLOCK(schema)) {
-        REBFLD *top = VAL_ARRAY(schema);
+        REBFLD *top = VAL_ARRAY_KNOWN_MUTABLE(schema);
 
         assert(FLD_IS_STRUCT(top));
         assert(not FLD_IS_ARRAY(top));  // !!! wasn't supported, should be?
@@ -713,7 +713,7 @@ REB_R Routine_Dispatcher(REBFRM *f)
     // base of the series.  Hence the offsets must be mutated into pointers
     // at the last minute before the FFI call.
     //
-    REBSER *store = Make_Series(1, sizeof(REBYTE));
+    REBBIN *store = Make_Binary(1);
 
     void *ret_offset;
     if (not IS_BLANK(RIN_RET_SCHEMA(rin))) {
@@ -852,8 +852,8 @@ REB_R Routine_Dispatcher(REBFRM *f)
     REBLEN i;
     for (i = 0; i < num_args; ++i) {
         uintptr_t off = cast(uintptr_t, *SER_AT(void*, arg_offsets, i));
-        assert(off == 0 or off < SER_LEN(store));
-        *SER_AT(void*, arg_offsets, i) = SER_DATA(store) + off;
+        assert(off == 0 or off < BIN_LEN(store));
+        *SER_AT(void*, arg_offsets, i) = BIN_AT(store, off);
     }
   }
 
@@ -932,7 +932,7 @@ static REBVAL *callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
     //
     REBARR *code = Make_Array(1 + inv->cif->nargs);
     RELVAL *elem = ARR_HEAD(code);
-    Init_Action_Unbound(elem, RIN_CALLBACK_ACTION(inv->rin));
+    Move_Value(elem, RIN_CALLBACK_ACTION(inv->rin));
     ++elem;
 
     REBLEN i;
@@ -950,7 +950,12 @@ static REBVAL *callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
         assert(IS_BLANK(RIN_RET_SCHEMA(inv->rin)));
     else {
         DECLARE_LOCAL (param);
-        Init_Param(param, REB_P_NORMAL, Canon(SYM_RETURN), 0);
+        Init_Param(
+            param,
+            REB_P_LOCAL,
+            Canon(SYM_RETURN),
+            TS_OPT_VALUE  // *returned* types, not the return ACTION!
+        );
         arg_to_ffi(
             nullptr,  // store must be null if dest is non-null,
             inv->ret,  // destination pointer
@@ -1065,14 +1070,14 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
     REBLEN num_fixed = 0;  // number of fixed (non-variadic) arguments
     bool is_variadic = false;  // default to not being variadic
 
-    RELVAL *item = VAL_ARRAY_AT(ffi_spec);
+    const RELVAL *item = VAL_ARRAY_AT(ffi_spec);
     for (; NOT_END(item); ++item) {
         if (IS_TEXT(item))
             continue;  // !!! TBD: extract ACT_META info from spec notes
 
         switch (VAL_TYPE(item)) {
           case REB_WORD: {
-            REBSTR *name = VAL_WORD_SPELLING(item);
+            const REBSTR *name = VAL_WORD_SPELLING(item);
 
             if (SAME_STR(name, Canon(SYM_ELLIPSIS))) {  // variadic
                 if (is_variadic)
@@ -1202,13 +1207,13 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
         // not variadic.  The CIF must stay alive for the entire the lifetime
         // of the args_fftypes, apparently.
         //
-        ffi_cif *cif = ALLOC(ffi_cif);
+        ffi_cif *cif = TRY_ALLOC(ffi_cif);
 
         ffi_type **args_fftypes;
         if (num_fixed == 0)
             args_fftypes = nullptr;
         else
-            args_fftypes = ALLOC_N(ffi_type*, num_fixed);
+            args_fftypes = TRY_ALLOC_N(ffi_type*, num_fixed);
 
         REBLEN i;
         for (i = 0; i < num_fixed; ++i)

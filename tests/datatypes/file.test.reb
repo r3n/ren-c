@@ -25,5 +25,5 @@
 
 [#2378 (
     some-file: %foo/baz/
-    %foo/baz/bar/ = some-file/bar/
+    error? trap [some-file/bar/]
 )]

@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -37,20 +37,17 @@ enum Reb_Token {
     TOKEN_END = 0,
     TOKEN_NEWLINE,
     TOKEN_BLANK,
-    TOKEN_GET,
-    TOKEN_SET,
-    TOKEN_SYM,
+    TOKEN_VOID,
+    TOKEN_COMMA,
+    TOKEN_COLON,
+    TOKEN_AT,
     TOKEN_WORD,
     TOKEN_LOGIC,
     TOKEN_INTEGER,
     TOKEN_DECIMAL,
     TOKEN_PERCENT,
-    TOKEN_GET_GROUP_BEGIN,
-    TOKEN_SYM_GROUP_BEGIN,
     TOKEN_GROUP_END,
     TOKEN_GROUP_BEGIN,
-    TOKEN_GET_BLOCK_BEGIN,
-    TOKEN_SYM_BLOCK_BEGIN,
     TOKEN_BLOCK_END,
     TOKEN_BLOCK_BEGIN,
     TOKEN_MONEY,
@@ -61,52 +58,16 @@ enum Reb_Token {
     TOKEN_STRING,
     TOKEN_BINARY,
     TOKEN_PAIR,
-    TOKEN_TUPLE,
+    TOKEN_TUPLE,  // only triggered in leading dot cases (. .. .foo .foo.bar)
     TOKEN_FILE,
     TOKEN_EMAIL,
     TOKEN_URL,
     TOKEN_ISSUE,
     TOKEN_TAG,
-    TOKEN_PATH,
+    TOKEN_PATH,  // only triggered in leading slash cases (/ // /foo /foo.bar)
     TOKEN_CONSTRUCT,
     TOKEN_MAX
 };
-
-inline static enum Reb_Kind KIND_OF_WORD_FROM_TOKEN(enum Reb_Token t) {
-
-    // !!! Temporarily disable optimization due to type table rearrangement
-
-    if (t == TOKEN_WORD)
-        return REB_WORD;
-    if (t == TOKEN_SET)
-        return REB_SET_WORD;
-    if (t == TOKEN_GET)
-        return REB_GET_WORD;
-    if (t == TOKEN_SYM)
-        return REB_SYM_WORD;
-    assert(!"Bad token passed to KIND_OF_WORD_FROM_TOKEN()");
-    return REB_0_END;
-}
-
-inline static enum Reb_Kind KIND_OF_ARRAY_FROM_TOKEN(enum Reb_Token t) {
-
-    // !!! Temporarily disable optimization due to type table rearrangement
-
-    if (t == TOKEN_GROUP_BEGIN)
-        return REB_GROUP;
-    if (t == TOKEN_BLOCK_BEGIN)
-        return REB_BLOCK;
-    if (t == TOKEN_GET_GROUP_BEGIN)
-        return REB_GET_GROUP;
-    if (t == TOKEN_GET_BLOCK_BEGIN)
-        return REB_GET_BLOCK;
-    if (t == TOKEN_SYM_GROUP_BEGIN)
-        return REB_SYM_GROUP;
-    if (t == TOKEN_SYM_BLOCK_BEGIN)
-        return REB_SYM_BLOCK;
-    assert(!"Bad token passed to KIND_OF_ARRAY_FROM_TOKEN()");
-    return REB_0_END;
-}
 
 
 /*
@@ -129,30 +90,35 @@ enum LEX_DELIMIT_ENUM {
     LEX_DELIMIT_END,                /* 00 null terminator, end of input */
     LEX_DELIMIT_LINEFEED,           /* 0A line-feed */
     LEX_DELIMIT_RETURN,             /* 0D return */
+    LEX_DELIMIT_COMMA,              /* 2C , - expression barrier */
     LEX_DELIMIT_LEFT_PAREN,         /* 28 ( */
     LEX_DELIMIT_RIGHT_PAREN,        /* 29 ) */
     LEX_DELIMIT_LEFT_BRACKET,       /* 5B [ */
     LEX_DELIMIT_RIGHT_BRACKET,      /* 5D ] */
-    LEX_DELIMIT_SEMICOLON,          /* 3B ; */
-
-    // As a step toward "Plan -4", the above delimiters are considered to
+    
+    LEX_DELIMIT_HARD = LEX_DELIMIT_RIGHT_BRACKET,
+    //
+    // ^-- As a step toward "Plan -4", the above delimiters are considered to
     // always terminate, e.g. a URL `http://example.com/a)` will not pick up
     // the parenthesis as part of the URL.  But the below delimiters will be
     // picked up, so that `http://example.com/{a} is valid:
     //
     // https://github.com/metaeducation/ren-c/issues/1046
-    //
-    // Note: If you rearrange these, update IS_LEX_DELIMIT_HARD !
 
     LEX_DELIMIT_LEFT_BRACE,         /* 7B } */
     LEX_DELIMIT_RIGHT_BRACE,        /* 7D } */
     LEX_DELIMIT_DOUBLE_QUOTE,       /* 22 " */
     LEX_DELIMIT_SLASH,              /* 2F / - date, path, file */
+    LEX_DELIMIT_PERIOD,             /* 2E . - decimal, tuple, file */
+    LEX_DELIMIT_TILDE,              /* 7E ~ - named void */
 
     LEX_DELIMIT_UTF8_ERROR,
 
     LEX_DELIMIT_MAX
 };
+
+STATIC_ASSERT(LEX_DELIMIT_MAX <= 16);
+
 
 
 /*
@@ -193,14 +159,11 @@ typedef uint16_t LEXFLAGS;  // 16 flags per lex class
 
 inline static bool IS_LEX_DELIMIT_HARD(REBYTE c) {
     assert(IS_LEX_DELIMIT(c));
-    return GET_LEX_VALUE(c) <= LEX_DELIMIT_RIGHT_BRACKET;
+    return GET_LEX_VALUE(c) <= LEX_DELIMIT_HARD;
 }
 
 //
 //  Special Chars (encoded in the LEX_VALUE field)
-//
-// !!! This used to have "LEX_SPECIAL_TILDE" for "7E ~ - complement number",
-// but that was removed at some point and it was made a legal word character.
 //
 enum LEX_SPECIAL_ENUM {             /* The order is important! */
     LEX_SPECIAL_AT,                 /* 40 @ - email */
@@ -216,10 +179,9 @@ enum LEX_SPECIAL_ENUM {             /* The order is important! */
     LEX_SPECIAL_BLANK,              /* 5F _ - blank */
 
                                     /** Any of these can follow - or ~ : */
-    LEX_SPECIAL_PERIOD,             /* 2E . - decimal number */
-    LEX_SPECIAL_COMMA,              /* 2C , - decimal number */
     LEX_SPECIAL_POUND,              /* 23 # - hex number */
     LEX_SPECIAL_DOLLAR,             /* 24 $ - money */
+    LEX_SPECIAL_SEMICOLON,          /* 3B ; - comment */
 
     // LEX_SPECIAL_WORD is not a LEX_VALUE() of anything in LEX_CLASS_SPECIAL,
     // it is used to set a flag by Prescan_Token().
@@ -230,6 +192,9 @@ enum LEX_SPECIAL_ENUM {             /* The order is important! */
 
     LEX_SPECIAL_MAX
 };
+
+STATIC_ASSERT(LEX_SPECIAL_MAX <= 16);
+
 
 /*
 **  Special Encodings
@@ -250,10 +215,10 @@ enum LEX_SPECIAL_ENUM {             /* The order is important! */
 #define LEX_WORD_FLAGS (LEX_FLAG(LEX_SPECIAL_AT) |              \
                         LEX_FLAG(LEX_SPECIAL_PERCENT) |         \
                         LEX_FLAG(LEX_SPECIAL_BACKSLASH) |       \
-                        LEX_FLAG(LEX_SPECIAL_COMMA) |           \
                         LEX_FLAG(LEX_SPECIAL_POUND) |           \
                         LEX_FLAG(LEX_SPECIAL_DOLLAR) |          \
-                        LEX_FLAG(LEX_SPECIAL_COLON))
+                        LEX_FLAG(LEX_SPECIAL_COLON) |           \
+                        LEX_FLAG(LEX_SPECIAL_SEMICOLON))
 
 enum rebol_esc_codes {
     // Must match Esc_Names[]!
@@ -301,7 +266,7 @@ typedef struct rebol_scan_state {  // shared across all levels of a scan
     //
     struct Reb_Feed *feed;
 
-    REBSTR *file;  // file currently being scanned (or anonymous)
+    const REBSTR *file;  // file currently being scanned (or anonymous)
 
     REBLIN line;  // line number where current scan position is
     const REBYTE *line_head;  // pointer to head of current line (for errors)
@@ -330,13 +295,14 @@ typedef struct rebol_scan_level {  // each array scan corresponds to a level
 
     // '\0' => top level scan
     // ']' => this level is scanning a block
-    // '/' => this level is scanning a path
     // ')' => this level is scanning a group
+    // '/' => this level is scanning a path
+    // '.' => this level is scanning a tuple
     //
     // (Chosen as the terminal character to use in error messages for the
     // character we are seeking to find a match for).
     //
-    REBYTE mode_char;
+    REBYTE mode;
 
     REBLEN start_line;
     const REBYTE *start_line_head;

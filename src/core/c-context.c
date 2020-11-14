@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -209,7 +209,7 @@ void Expand_Context(REBCTX *context, REBLEN delta)
 REBVAL *Append_Context(
     REBCTX *context,
     RELVAL *opt_any_word,
-    REBSTR *opt_spelling
+    const REBSTR *opt_spelling
 ) {
     REBARR *keylist = CTX_KEYLIST(context);
 
@@ -231,7 +231,7 @@ REBVAL *Append_Context(
     //
     EXPAND_SERIES_TAIL(SER(CTX_VARLIST(context)), 1);
 
-    REBVAL *value = Init_Void(ARR_LAST(CTX_VARLIST(context)));
+    REBVAL *value = Init_Void(ARR_LAST(CTX_VARLIST(context)), SYM_UNDEFINED);
     TERM_ARRAY_LEN(CTX_VARLIST(context), ARR_LEN(CTX_VARLIST(context)));
 
     if (not opt_any_word)
@@ -304,7 +304,7 @@ REBCTX *Copy_Context_Shallow_Extra_Managed(REBCTX *src, REBLEN extra) {
         INIT_CTX_KEYLIST_UNIQUE(dest, keylist);
     }
 
-    INIT_VAL_CONTEXT_VARLIST(CTX_ARCHETYPE(dest), CTX_VARLIST(dest));
+    INIT_VAL_CONTEXT_VARLIST(CTX_ROOTVAR(dest), CTX_VARLIST(dest));
 
     // !!! Should the new object keep the meta information, or should users
     // have to copy that manually?  If it's copied would it be a shallow or
@@ -385,7 +385,7 @@ void Collect_End(struct Reb_Collector *cl)
             ? ARR_HEAD(BUF_COLLECT) + 1
             : ARR_HEAD(BUF_COLLECT);
     for (; NOT_END(v); ++v) {
-        REBSTR *canon =
+        const REBSTR *canon =
             (cl == NULL or (cl->flags & COLLECT_AS_TYPESET))
                 ? VAL_KEY_CANON(v)
                 : VAL_WORD_CANON(v);
@@ -432,7 +432,7 @@ void Collect_Context_Keys(
 
     assert(cl->index >= 1); // 0 in bind table means "not present"
 
-    // This is necessary so Blit_Cell() below isn't overwriting memory that
+    // This is necessary so Blit_Relative() below isn't overwriting memory that
     // BUF_COLLECT does not own.  (It may make the buffer capacity bigger than
     // necessary if duplicates are found, but the actual buffer length will be
     // set correctly by the end.)
@@ -444,13 +444,13 @@ void Collect_Context_Keys(
 
     if (check_dups) {
         for (; NOT_END(key); key++) {
-            REBSTR *canon = VAL_KEY_CANON(key);
+            const REBSTR *canon = VAL_KEY_CANON(key);
             if (not Try_Add_Binder_Index(&cl->binder, canon, cl->index))
                 continue; // don't collect if already in bind table
 
             ++cl->index;
 
-            Blit_Cell(collect, key); // fast copy, matching cell formats
+            Blit_Relative(collect, key); // fast copy, matching cell formats
             ++collect;
         }
 
@@ -466,7 +466,7 @@ void Collect_Context_Keys(
         // Optimized add of all keys to bind table and collect buffer.
         //
         for (; NOT_END(key); ++key, ++collect, ++cl->index) {
-            Blit_Cell(collect, key);
+            Blit_Relative(collect, key);
             Add_Binder_Index(&cl->binder, VAL_KEY_CANON(key), cl->index);
         }
         SET_ARRAY_LEN_NOTERM(
@@ -487,14 +487,14 @@ void Collect_Context_Keys(
 static void Collect_Inner_Loop(struct Reb_Collector *cl, const RELVAL *head)
 {
     for (; NOT_END(head); ++head) {
-        const REBCEL *cell = VAL_UNESCAPED(head); // cell of X from '''X
+        REBCEL(const*) cell = VAL_UNESCAPED(head); // cell of X from '''X
         enum Reb_Kind kind = CELL_KIND(cell);
 
         if (ANY_WORD_KIND(kind)) {
             if (kind != REB_SET_WORD and not (cl->flags & COLLECT_ANY_WORD))
                 continue; // kind of word we're not interested in collecting
 
-            REBSTR *canon = VAL_WORD_CANON(cell);
+            const REBSTR *canon = VAL_WORD_CANON(cell);
             if (not Try_Add_Binder_Index(&cl->binder, canon, cl->index)) {
                 if (cl->flags & COLLECT_NO_DUP) {
                     DECLARE_LOCAL (duplicate);
@@ -521,11 +521,12 @@ static void Collect_Inner_Loop(struct Reb_Collector *cl, const RELVAL *head)
         if (not (cl->flags & COLLECT_DEEP))
             continue;
 
-        // Recurse into arrays and groups (R3-Alpha did not consider PATH!s,
-        // but a path may have a group in it):
+        // !!! Should this consider paths, or their embedded groups/arrays?
+        // This is less certain as the purpose of collect words is not clear
+        // given stepping away from SET-WORD! gathering as locals.
         // https://github.com/rebol/rebol-issues/issues/2276
         //
-        if (ANY_ARRAY_OR_PATH_KIND(kind))
+        if (ANY_ARRAY_KIND(kind))
             Collect_Inner_Loop(cl, VAL_ARRAY_AT(cell));
     }
 }
@@ -574,23 +575,26 @@ REBARR *Collect_Keylist_Managed(
         if (
             not prior or (
                 0 == (*self_index_out = Find_Canon_In_Context(
-                    prior,
-                    Canon(SYM_SELF),
-                    true
+                    CTX_ARCHETYPE(prior),
+                    Canon(SYM_SELF)
                 ))
             )
         ) {
             // No prior or no SELF in prior, so we'll add it as the first key
             //
-            RELVAL *self_key = Init_Context_Key(
-                ARR_AT(BUF_COLLECT, 1),
-                Canon(SYM_SELF)
+            RELVAL *self_key = ARR_AT(BUF_COLLECT, 1);
+            Init_Param(
+                self_key,
+                REB_P_LOCAL,
+                Canon(SYM_SELF),
+                TS_VALUE  // !!! Type meaningless in objects?
             );
 
-            // !!! See notes on the flags about why SELF is set hidden but
-            // not unbindable with REB_TS_UNBINDABLE.
+            // !!! Self is hidden, but not unbindable due to being a
+            // REB_P_LOCAL param class.  It would be different if it were
+            // REB_P_SEALED, which would then be not accessible.
             //
-            TYPE_SET(self_key, REB_TS_HIDDEN);
+            Hide_Param(self_key);
 
             assert(cl->index == 1);
             Add_Binder_Index(&cl->binder, VAL_KEY_CANON(self_key), cl->index);
@@ -653,7 +657,7 @@ REBARR *Collect_Unique_Words_Managed(
     // any non-words in a block the user passed in.
     //
     if (not IS_NULLED(ignore)) {
-        RELVAL *check = VAL_ARRAY_AT(ignore);
+        const RELVAL *check = VAL_ARRAY_AT(ignore);
         for (; NOT_END(check); ++check) {
             if (not ANY_WORD_KIND(CELL_KIND(VAL_UNESCAPED(check))))
                 fail (Error_Bad_Value_Core(check, VAL_SPECIFIER(ignore)));
@@ -674,10 +678,10 @@ REBARR *Collect_Unique_Words_Managed(
     // an error...so they will just be skipped when encountered.
     //
     if (IS_BLOCK(ignore)) {
-        RELVAL *item = VAL_ARRAY_AT(ignore);
+        const RELVAL *item = VAL_ARRAY_AT(ignore);
         for (; NOT_END(item); ++item) {
-            const REBCEL *unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
-            REBSTR *canon = VAL_WORD_CANON(unescaped);
+            REBCEL(const*) unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
+            const REBSTR *canon = VAL_WORD_CANON(unescaped);
 
             // A block may have duplicate words in it (this situation could
             // arise when `function [/test /test] []` calls COLLECT-WORDS
@@ -712,10 +716,10 @@ REBARR *Collect_Unique_Words_Managed(
     REBARR *array = Grab_Collected_Array_Managed(cl, SERIES_FLAGS_NONE);
 
     if (IS_BLOCK(ignore)) {
-        RELVAL *item = VAL_ARRAY_AT(ignore);
+        const RELVAL *item = VAL_ARRAY_AT(ignore);
         for (; NOT_END(item); ++item) {
-            const REBCEL *unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
-            REBSTR *canon = VAL_WORD_CANON(unescaped);
+            REBCEL(const*) unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
+            const REBSTR *canon = VAL_WORD_CANON(unescaped);
 
           #if !defined(NDEBUG)
             REBINT i = Get_Binder_Index_Else_0(&cl->binder, canon);
@@ -754,7 +758,7 @@ void Rebind_Context_Deep(
     REBCTX *dest,
     struct Reb_Binder *opt_binder
 ) {
-    Rebind_Values_Deep(source, dest, CTX_VARS_HEAD(dest), opt_binder);
+    Rebind_Values_Deep(CTX_VARS_HEAD(dest), source, dest, opt_binder);
 }
 
 
@@ -918,7 +922,7 @@ REBCTX *Construct_Context_Managed(
     if (not head)
         return context;
 
-    Bind_Values_Shallow(head, context);
+    Bind_Values_Shallow(head, CTX_ARCHETYPE(context));
 
     const RELVAL *value = head;
     for (; NOT_END(value); value += 2) {
@@ -951,41 +955,50 @@ REBCTX *Construct_Context_Managed(
 //     2 for value
 //     3 for words and values
 //
-REBARR *Context_To_Array(REBCTX *context, REBINT mode)
+REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
 {
     REBDSP dsp_orig = DSP;
 
-    REBVAL *key = CTX_KEYS_HEAD(context);
-    REBVAL *var = CTX_VARS_HEAD(context);
+    bool always = false;  // default to not always showing hidden things
+    if (IS_FRAME(context))
+        always = (VAL_OPT_PHASE(context) != nullptr);
+
+    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
 
     assert(!(mode & 4));
 
     REBLEN n = 1;
     for (; NOT_END(key); n++, key++, var++) {
-        if (not Is_Param_Hidden(key)) {
-            if (mode & 1) {
-                Init_Any_Word_Bound(
-                    DS_PUSH(),
-                    (mode & 2) ? REB_SET_WORD : REB_WORD,
-                    VAL_KEY_SPELLING(key),
-                    context,
-                    n
-                );
+        if (Is_Param_Sealed(key))
+            continue;
 
-                if (mode & 2)
-                    SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
-            }
-            if (mode & 2) {
-                //
-                // Context might have voids, which denote the value have not
-                // been set.  These contexts cannot be converted to blocks,
-                // since user arrays may not contain void.
-                //
-                if (IS_NULLED(var))
-                    fail (Error_Null_Object_Block_Raw());
+        if (not always and Is_Param_Hidden(key))
+            continue;
 
-                Move_Value(DS_PUSH(), var);
-            }
+        if (mode & 1) {
+            Init_Any_Word_Bound(
+                DS_PUSH(),
+                (mode & 2) ? REB_SET_WORD : REB_WORD,
+                VAL_KEY_SPELLING(key),
+                VAL_CONTEXT(context),
+                n
+            );
+
+            if (mode & 2)
+                SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
+        }
+
+        if (mode & 2) {
+            //
+            // Context might have voids, which denote the value have not
+            // been set.  These contexts cannot be converted to blocks,
+            // since user arrays may not contain void.
+            //
+            if (IS_NULLED(var))
+                fail (Error_Null_Object_Block_Raw());
+
+            Move_Value(DS_PUSH(), var);
         }
     }
 
@@ -1128,7 +1141,10 @@ REBCTX *Merge_Contexts_Selfish_Managed(REBCTX *parent1, REBCTX *parent2)
 
     // We should have gotten a SELF in the results, one way or another.
     //
-    REBLEN self_index = Find_Canon_In_Context(merged, Canon(SYM_SELF), true);
+    REBLEN self_index = Find_Canon_In_Context(
+        CTX_ARCHETYPE(merged),
+        Canon(SYM_SELF)
+    );
     assert(self_index != 0);
     assert(CTX_KEY_SYM(merged, self_index) == SYM_SELF);
     Move_Value(CTX_VAR(merged, self_index), CTX_ARCHETYPE(merged));
@@ -1179,7 +1195,7 @@ void Resolve_Context(
     }
     else if (IS_BLOCK(only_words)) {
         // Limit exports to only these words:
-        RELVAL *word = VAL_ARRAY_AT(only_words);
+        const RELVAL *word = VAL_ARRAY_AT(only_words);
         for (; NOT_END(word); word++) {
             if (IS_WORD(word) or IS_SET_WORD(word)) {
                 Add_Binder_Index(&binder, VAL_WORD_CANON(word), -1);
@@ -1214,7 +1230,7 @@ void Resolve_Context(
     REBVAL *key = CTX_KEYS_HEAD(source);
     REBINT n = 1;
     for (; NOT_END(key); n++, key++) {
-        REBSTR *canon = VAL_KEY_CANON(key);
+        const REBSTR *canon = VAL_KEY_CANON(key);
         if (IS_NULLED(only_words))
             Add_Binder_Index(&binder, canon, n);
         else {
@@ -1238,7 +1254,7 @@ void Resolve_Context(
 
             if (NOT_CELL_FLAG(var, PROTECTED) and (all or IS_VOID(var))) {
                 if (m < 0)
-                    Init_Void(var);  // no value in source context
+                    Init_Void(var, SYM_UNDEFINED);  // not in source context
                 else
                     Move_Var(var, CTX_VAR(source, m));  // preserves flags
             }
@@ -1251,7 +1267,7 @@ void Resolve_Context(
         REBVAL *key = CTX_KEYS_HEAD(source);
         REBINT n = 1;
         for (; NOT_END(key); n++, key++) {
-            REBSTR *canon = VAL_KEY_CANON(key);
+            const REBSTR *canon = VAL_KEY_CANON(key);
             if (Remove_Binder_Index_Else_0(&binder, canon) != 0) {
                 //
                 // Note: no protect check is needed here
@@ -1274,7 +1290,7 @@ void Resolve_Context(
                 Remove_Binder_Index_Else_0(&binder, VAL_KEY_CANON(key));
         }
         else if (IS_BLOCK(only_words)) {
-            RELVAL *word = VAL_ARRAY_AT(only_words);
+            const RELVAL *word = VAL_ARRAY_AT(only_words);
             for (; NOT_END(word); word++) {
                 if (IS_WORD(word) or IS_SET_WORD(word))
                     Remove_Binder_Index_Else_0(&binder, VAL_WORD_CANON(word));
@@ -1297,25 +1313,31 @@ void Resolve_Context(
 // Search a context looking for the given canon symbol.  Return the index or
 // 0 if not found.
 //
-REBLEN Find_Canon_In_Context(REBCTX *context, REBSTR *canon, bool always)
-{
+// Note that since contexts like FRAME! can have multiple keys with the same
+// name, the VAL_PHASE() of the context has to be taken into account.
+//
+REBLEN Find_Canon_In_Context(const RELVAL *context, const REBSTR *canon) {
     assert(GET_SERIES_INFO(canon, STRING_CANON));
 
-    REBVAL *key = CTX_KEYS_HEAD(context);
-    REBLEN len = CTX_LEN(context);
+    bool always = true;
+    if (IS_FRAME(context))
+        always = (VAL_OPT_PHASE(context) != nullptr);
+
+    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
 
     REBLEN n;
-    for (n = 1; n <= len; n++, key++) {
+    for (n = 1; NOT_END(key); n++, key++) {
         if (canon == VAL_KEY_CANON(key)) {
-            if (Is_Param_Unbindable(key)) {
-                if (not always)
-                    return 0;
-            }
+            if (Is_Param_Sealed(key))
+                continue;  // pretend this parameter is not there
+
+            if (not always and Is_Param_Hidden(key))
+                return 0;
+
             return n;
         }
     }
 
-    // !!! Should this be changed to NOT_FOUND?
     return 0;
 }
 
@@ -1326,14 +1348,13 @@ REBLEN Find_Canon_In_Context(REBCTX *context, REBSTR *canon, bool always)
 // Search a context's keylist looking for the given canon symbol, and return
 // the value for the word.  Return NULL if the canon is not found.
 //
-REBVAL *Select_Canon_In_Context(REBCTX *context, REBSTR *canon)
+REBVAL *Select_Canon_In_Context(const RELVAL *context, const REBSTR *canon)
 {
-    const bool always = false;
-    REBLEN n = Find_Canon_In_Context(context, canon, always);
+    REBLEN n = Find_Canon_In_Context(context, canon);
     if (n == 0)
-        return NULL;
+        return nullptr;
 
-    return CTX_VAR(context, n);
+    return VAL_CONTEXT_VAR(context, n);
 }
 
 
@@ -1401,7 +1422,7 @@ void Assert_Context_Core(REBCTX *c)
     if (keylist == NULL)
         panic (c);
 
-    REBVAL *rootvar = CTX_ARCHETYPE(c);
+    REBVAL *rootvar = CTX_ROOTVAR(c);
     if (not ANY_CONTEXT(rootvar))
         panic (rootvar);
 
@@ -1449,7 +1470,8 @@ void Assert_Context_Core(REBCTX *c)
         // know what function the frame is actually for, one must look to
         // the "phase" field...held in the rootvar.
         //
-        if (ACT_UNDERLYING(VAL_PHASE(rootvar)) != VAL_ACTION(rootkey))
+        REBACT *phase = VAL_PHASE_ELSE_ARCHETYPE(rootvar);
+        if (ACT_UNDERLYING(phase) != VAL_ACTION(rootkey))
             panic (rootvar);
 
         REBFRM *f = CTX_FRAME_IF_ON_STACK(c);
@@ -1458,7 +1480,7 @@ void Assert_Context_Core(REBCTX *c)
             // If the frame is on the stack, the phase should be something
             // with the same underlying function as the rootkey.
             //
-            if (ACT_UNDERLYING(VAL_PHASE(rootvar)) != VAL_ACTION(rootkey))
+            if (ACT_UNDERLYING(phase) != VAL_ACTION(rootkey))
                 panic (rootvar);
         }
     }

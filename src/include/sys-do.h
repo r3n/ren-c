@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -56,7 +56,7 @@ inline static bool Do_Feed_To_End_Maybe_Stale_Throws(
     bool threw;
     Push_Frame(out, f);
     do {
-        threw = (*PG_Eval_Maybe_Stale_Throws)(f);
+        threw = Eval_Maybe_Stale_Throws(f);
     } while (not threw and NOT_END(feed->value));
     Drop_Frame(f);
 
@@ -71,7 +71,9 @@ inline static bool Do_Any_Array_At_Throws(
 ){
     DECLARE_FEED_AT_CORE (feed, any_array, specifier);
 
-    Init_Void(out);  // ^-- *after* feed initialization (if any_array == out)
+    // ^-- Voidify out *after* feed initialization (if any_array == out)
+    //
+    Init_Unlabeled_Void(out);
 
     bool threw = Do_Feed_To_End_Maybe_Stale_Throws(out, feed);
     CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
@@ -113,7 +115,7 @@ inline static bool Do_At_Mutable_Throws(
     REBLEN index,
     REBSPC *specifier
 ){
-    Init_Void(out);
+    Init_Unlabeled_Void(out);
 
     bool threw = Do_At_Mutable_Maybe_Stale_Throws(
         out,
@@ -176,77 +178,77 @@ inline static bool Do_Branch_Core_Throws(
     assert(branch != out and condition != out);
 
     enum Reb_Kind kind = VAL_TYPE(branch);
+    bool voidify = not (kind == REB_QUOTED or ANY_SYM_KIND(kind));
 
   redo:
 
     switch (kind) {
+      case REB_BLANK:
+        Init_Nulled(out);  // !!! Is this a good idea?  Gets voidified...
+        break;
+
       case REB_QUOTED:
         Unquotify(Move_Value(out, branch), 1);
-        return false;
+        break;
 
       case REB_BLOCK:
-        return Do_Any_Array_At_Throws(out, branch, SPECIFIED);
+      case REB_SYM_BLOCK:
+        if (Do_Any_Array_At_Throws(out, branch, SPECIFIED))
+            return true;
+        break;
 
       case REB_ACTION:
-        return RunQ_Throws(
+        if (RunQ_Throws(
             out,
             false, // !fully, e.g. arity-0 functions can ignore condition
             rebU(branch),
             condition, // may be an END marker, if not Do_Branch_With() case
             rebEND // ...but if condition wasn't an END marker, we need one
-        );
-
-      case REB_BLANK:
-        Init_Nulled(out);
-        return false;
-
-      case REB_SYM_WORD:
-      case REB_SYM_PATH: {
-        REBSTR *name;
-        const bool push_refinements = false;
-        if (Get_If_Word_Or_Path_Throws(
-            out,
-            &name,
-            branch,
-            SPECIFIED,
-            push_refinements
-        )) {
+        )){
             return true;
         }
+        break;
 
-        if (IS_VOID(out))  // need `[:x]` if it's void (unset)
-            fail (Error_Need_Non_Void_Core(branch, SPECIFIED));
+      case REB_SYM_WORD:
+      case REB_SYM_PATH:
+        Plainify(Move_Value(cell, branch));
+        if (Eval_Value_Throws(out, cell, SPECIFIED))
+            return true;
+        break;
 
-        return false; }
-
-      case REB_SYM_GROUP: {
-        assert(cell != nullptr);  // needs GC-safe cell for this case
-
-        // A SYM-GROUP! can be used for opportunistic double-evaluation, e.g.
-        // code which generates a branch -but- that code is run only if the
-        // branch is applicable:
-        //
-        //    >> either 1 (print "prints" [2 + 3]) (print "this too" [4 + 5])
-        //    prints
-        //    this too
-        //    == 5
-        //
-        //    >> either 1 @(print "prints" [2 + 3]) @(print "doesn't" [4 + 5])
-        //    prints
-        //    == 5
-        //
+      case REB_SYM_GROUP:
+      case REB_GROUP:
         if (Do_Any_Array_At_Throws(cell, branch, SPECIFIED))
             return true;
-
+        if (ANY_GROUP(cell))
+            fail ("Branch evaluation cannot produce GROUP!");
         branch = cell;
         kind = VAL_TYPE(branch);
-        goto redo; }  // Note: Could potentially infinite loop if SYM-GROUP!
+        goto redo;
 
       default:
-        break;
+        fail (Error_Bad_Branch_Type_Raw());
     }
 
-    fail ("Bad branch type");
+    // If we're not returning the branch result purely "as-is" then we change
+    // not just NULL to `~branched~`, but also any other void.  So:
+    //
+    //     >> if true [null]
+    //     == ~branched~
+    //
+    //     >> if true [print "relabeled"]
+    //     test
+    //     == ~branched~
+    //
+    // To get the original void label, you have to use the @ forms:
+    //
+    //     >> if true @[print "not relabeled"]
+    //     == ~void~  ; specific void result of PRINT
+    //
+    if (voidify and IS_NULLED_OR_VOID(out))
+        Init_Void(out, SYM_BRANCHED);
+
+    return false;
 }
 
 #define Do_Branch_With_Throws(out,cell,branch,condition) \

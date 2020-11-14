@@ -1,7 +1,39 @@
 ; datatypes/char.r
+(issue! = type of #"a")
+
 (char? #"a")
+(char? #a)
 (not char? 1)
-(char! = type of #"a")
+(not char? #aa)
+
+; Only length 1 issues should register as CHAR?
+(
+    for-each [issue length size] [
+        #b 1 1
+        #à 1 2
+        #漢 1 3
+        #😺 1 4
+
+        #bà 2 3
+        #😺😺 2 8
+        #漢à😺 3 9
+
+        #12345678901234567890 20 20  ; longer than fits in cell
+    ][
+        assert [length = length of issue]
+        assert [size = size of issue]
+        assert [(char? issue) == (1 = length of issue)]
+        assert [issue = copy issue]
+    ]
+    true
+)
+
+; Math operations should only work on single characters
+[
+    (#a + 1 = #b)
+    ('cannot-use = (trap [#aa + 1])/id)
+]
+
 
 ; !!! Workaround for test scanner's use of TRANSCODE that violates the ability
 ; to actually work with 0 byte representations in strings (even for a test
@@ -149,19 +181,22 @@
 (#"^(esc)" = #"^(1B)")
 (#"^(back)" = #"^(08)")
 (#"^(del)" = #"^(7f)")
-({#"a"} = mold #"a")
+
+; Quotes are removed if not necessary in molding
+({#a} = mold #"a")
+({#a} = mold #a)
 
 (
     c: make char! 0
     did all [
         char? c
-        0 = to integer! c
+        0 = codepoint of c
     ]
 )(
-    c: to char! 0
+    c: as issue! 0
     did all [
         char? c
-        0 = to integer! c
+        0 = codepoint of c
     ]
 )
 
@@ -237,18 +272,18 @@
 
 [#1031
     ; 1 UTF-8 byte
-    (#"b" = to char! #{62})
+    (#"b" = make char! #{62})
     (#{62} = to binary! #"b")
 
     ; 2 UTF-8 bytes
-    (#"à" = to char! #{C3A0})
+    (#"à" = make char! #{C3A0})
     (#{C3A0} = to binary! #"à")
 
     ; 3 UTF-8 bytes
-    (#"漢" = to char! #{E6BCA2})
+    (#"漢" = make char! #{E6BCA2})
     (#{E6BCA2} = to binary! #"漢")
 
     ; 4 UTF-8 bytes
-    (#"😺" = to char! #{F09F98BA})
+    (#"😺" = make char! #{F09F98BA})
     (#{F09F98BA} = to binary! #"😺")
 ]

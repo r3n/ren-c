@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -120,7 +120,15 @@
     //
     // `stdin` is required to be macro https://en.cppreference.com/w/c/io
     //
-    #if defined(stdin) and !defined(REBOL_ALLOW_STDIO_IN_RELEASE_BUILD)
+    #if defined(__clang__)
+        //
+        // !!! At least as of XCode 12.0 and Clang 9.0.1, including basic
+        // system headers will force the inclusion of <stdio.h>.  If someone
+        // wants to dig into why that is, they may...but tolerate it for now.
+        // Checking if `printf` and such makes it into the link would require
+        // dumping the library symbols, in general anyway...
+        //
+    #elif defined(stdin) and !defined(REBOL_ALLOW_STDIO_IN_RELEASE_BUILD)
         #error "<stdio.h> included prior to %sys-core.h in release build"
     #endif
 
@@ -260,7 +268,7 @@ enum Boot_Levels {
 enum {
     MKF_RETURN      = 1 << 0,   // give a RETURN (but local RETURN: overrides)
     MKF_KEYWORDS    = 1 << 1,   // respond to tags like <opt>, <with>, <local>
-    MKF_ANY_VALUE   = 1 << 2,   // args and return are [<opt> any-value!]
+    MKF_2           = 1 << 2,
 
     // These flags are set during the process of spec analysis.  It helps
     // avoid the inefficiency of creating documentation frames on functions
@@ -273,7 +281,12 @@ enum {
     // These flags are also set during the spec analysis process.
     //
     MKF_IS_VOIDER = 1 << 6,
-    MKF_HAS_RETURN = 1 << 7
+    MKF_IS_ELIDER = 1 << 7,
+    MKF_HAS_RETURN = 1 << 8,
+
+    // Gather "LET" statements, done during body relativization
+    //
+    MKF_GATHER_LETS = 1 << 9
 };
 
 #define MKF_MASK_NONE 0 // no special handling (e.g. MAKE ACTION!)
@@ -363,11 +376,11 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding);
 #include "datatypes/sys-value.h"  // these defines don't need series accessors
 
 #include "datatypes/sys-nulled.h"
-#include "datatypes/sys-void.h"
 #include "datatypes/sys-blank.h"
+#include "datatypes/sys-comma.h"
+
 #include "datatypes/sys-logic.h"
 #include "datatypes/sys-integer.h"
-#include "datatypes/sys-char.h"  // use Init_Integer() for bad codepoint error
 #include "datatypes/sys-decimal.h"
 
 enum rebol_signals {
@@ -417,8 +430,12 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #include "datatypes/sys-datatype.h"
 
 #include "datatypes/sys-binary.h"  // BIN_XXX(), etc. used by strings
+#include "datatypes/sys-char.h"  // use Init_Integer() for bad codepoint error
 #include "datatypes/sys-string.h"  // REBSYM needed for typesets
 #include "datatypes/sys-word.h"
+#include "datatypes/sys-void.h"  // REBSYM needed
+#include "datatypes/sys-token.h"
+
 
 #include "datatypes/sys-pair.h"
 #include "datatypes/sys-quoted.h"  // requires pairings for cell storage
@@ -430,7 +447,9 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #include "datatypes/sys-bitset.h"
 
 #include "sys-stack.h"
+
 #include "sys-bind.h" // needs DS_PUSH() and DS_TOP from %sys-stack.h
+#include "datatypes/sys-sequence.h"  // also needs DS_PUSH()
 
 #include "sys-roots.h"
 
@@ -449,8 +468,7 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #include "sys-eval.h"  // low-level single-step evaluation API
 #include "sys-do.h"  // higher-level evaluate-until-end API
 
-#include "datatypes/sys-path.h"
-#include "datatypes/sys-tuple.h"
+#include "sys-pick.h"
 
 
 // !!! The SECURE dialect and subsystem is now in an extension.  But
@@ -459,7 +477,7 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 // from having to be documented that it's effectively a no-op.
 //
 inline static void Check_Security_Placeholder(
-    REBSTR *subsystem,
+    const REBSTR *subsystem,
     enum Reb_Symbol policy,
     const REBVAL *value
 ){

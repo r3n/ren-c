@@ -7,16 +7,16 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2018 Rebol Open Source Contributors
+// Copyright 2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -39,12 +39,12 @@
 //
 // !!! Currently, in order to have a GENERIC dispatcher (e.g. REBTYPE())
 // then one also must implement a comparison function.  However, compare
-// functions specifically take REBCEL, so you can't pass REB_LITERAL to them.
+// functions specifically take REBCEL, so you can't pass REB_QUOTED to them.
 // The handling for QUOTED! is in the comparison dispatch itself.
 //
-REBINT CT_Quoted(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Quoted(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    UNUSED(a); UNUSED(b); UNUSED(mode);
+    UNUSED(a); UNUSED(b); UNUSED(strict);
     assert(!"CT_Quoted should never be called");
     return 0;
 }
@@ -101,20 +101,20 @@ REB_R TO_Quoted(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
 //
 REB_R PD_Quoted(
     REBPVS *pvs,
-    const REBVAL *picker,
+    const RELVAL *picker,
     const REBVAL *opt_setval
 ){
     UNUSED(picker);
     UNUSED(opt_setval);
 
-    if (KIND_BYTE(pvs->out) == REB_QUOTED)
+    if (KIND3Q_BYTE(pvs->out) == REB_QUOTED)
         Move_Value(pvs->out, VAL_QUOTED_PAYLOAD_CELL(pvs->out));
     else {
-        assert(KIND_BYTE(pvs->out) >= REB_MAX);
-        mutable_KIND_BYTE(pvs->out) %= REB_64;
+        assert(KIND3Q_BYTE(pvs->out) >= REB_MAX);
+        mutable_KIND3Q_BYTE(pvs->out) %= REB_64;
         assert(
-            mutable_MIRROR_BYTE(pvs->out)
-            == mutable_KIND_BYTE(pvs->out)
+            mutable_HEART_BYTE(pvs->out)
+            == mutable_KIND3Q_BYTE(pvs->out)
         );
     }
 
@@ -129,25 +129,39 @@ REB_R PD_Quoted(
 //
 //  REBTYPE: C
 //
-// There is no obvious general rule for what a "generic" should do when
-// faced with a QUOTED!.  Since they are very new, currently just a fixed
-// list of actions are chosen to mean "do whatever the non-quoted version
-// would do, then add the quotedness onto the result".
+// It was for a time considered whether generics should be willing to operate
+// on QUOTED!.  e.g. "do whatever the non-quoted version would do, then add
+// the quotedness onto the result".
 //
 //     >> add lit '''1 2
 //     == '''3
 //
-// It seems to make sense to do this for FIND but not SELECT, for example.
-// Long term, if there's any patterns found they should probably become
-// annotations on the generic itself, and are probably useful for non-generics
-// as well.
+// While a bit outlandish for ADD, it might seem to make more sense for FIND
+// and SELECT when you have a QUOTED! block or GROUP!.  However, the solution
+// that emerged after trying other options was to make REQUOTE:
+//
+// https://forum.rebol.info/t/1035
+//
+// So the number of things supported by QUOTED is limited to COPY.
 //
 REBTYPE(Quoted)
 {
-    UNUSED(verb);
-    UNUSED(frame_);
+    // Note: SYM_REFLECT is handled directly in the REFLECT native
+    //
+    switch (VAL_WORD_SYM(verb)) {
+      case SYM_COPY: {  // D_ARG(1) skips RETURN in first arg slot
+        REBLEN num_quotes = Dequotify(D_ARG(1));
+        REB_R r = Run_Generic_Dispatch(D_ARG(1), frame_, verb);
+        assert(r != R_THROWN);  // can't throw
+        if (r == nullptr)
+            r = Init_Nulled(FRM_OUT(frame_));
+        return Quotify(r, num_quotes); }
 
-    fail ("QUOTED! only supported in generics via <dequote> / <requote>");
+      default:
+        break;
+    } 
+
+    fail ("QUOTED! has no GENERIC operations (use DEQUOTE/REQUOTE)");
 }
 
 
@@ -212,8 +226,9 @@ REBNATIVE(quote)
 //
 //  {Remove quoting levels from the evaluated argument}
 //
-//      return: [<opt> any-value!]
-//      optional [<opt> any-value!]
+//      return: "Value with quotes removed (NULL is passed through as NULL)"
+//          [<opt> any-value!]
+//      value [<opt> any-value!]
 //      /depth "Number of quoting levels to remove (default 1)"
 //          [integer!]
 //  ]
@@ -222,13 +237,18 @@ REBNATIVE(unquote)
 {
     INCLUDE_PARAMS_OF_UNQUOTE;
 
+    REBVAL *v = ARG(value);
+
+    if (IS_NULLED(v))
+        return nullptr;  // It's more convenient to allow NULL than not
+
     REBINT depth = REF(depth) ? VAL_INT32(ARG(depth)) : 1;
     if (depth < 0)
         fail (PAR(depth));
-    if (cast(REBLEN, depth) > VAL_NUM_QUOTES(ARG(optional)))
-        fail (PAR(depth));
+    if (cast(REBLEN, depth) > VAL_NUM_QUOTES(v))
+        fail ("Value not quoted enough for unquote depth requested");
 
-    return Unquotify(Move_Value(D_OUT, ARG(optional)), depth);
+    return Unquotify(Move_Value(D_OUT, v), depth);
 }
 
 

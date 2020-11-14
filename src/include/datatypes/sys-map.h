@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -51,10 +51,15 @@ struct Reb_Map {
 #define LINK_HASHLIST(s)            SER(LINK(s).custom.node)
 
 
-inline static REBARR *MAP_PAIRLIST(REBMAP *m) {
+inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
     assert(GET_ARRAY_FLAG(&(m)->pairlist, IS_PAIRLIST));
-    return (&(m)->pairlist);
+    return (&m_cast(REBMAP*, m)->pairlist);
 }
+
+#ifdef __cplusplus
+    inline static const REBARR *MAP_PAIRLIST(const REBMAP *m)
+      { return MAP_PAIRLIST(m_cast(REBMAP*, m)); }
+#endif
 
 #define MAP_HASHLIST(m) \
     LINK_HASHLIST(MAP_PAIRLIST(m))
@@ -69,7 +74,7 @@ inline static REBMAP *MAP(void *p) {
 }
 
 
-inline static REBMAP *VAL_MAP(const REBCEL *v) {
+inline static const REBMAP *VAL_MAP(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_MAP);
 
     REBARR *a = ARR(PAYLOAD(Any, v).first.node);
@@ -79,9 +84,15 @@ inline static REBMAP *VAL_MAP(const REBCEL *v) {
     return MAP(a);
 }
 
-inline static REBLEN Length_Map(REBMAP *map)
+#define VAL_MAP_ENSURE_MUTABLE(v) \
+    m_cast(REBMAP*, VAL_MAP(ENSURE_MUTABLE(v)))
+
+#define VAL_MAP_KNOWN_MUTABLE(v) \
+    m_cast(REBMAP*, VAL_MAP(KNOWN_MUTABLE(v)))
+
+inline static REBLEN Length_Map(const REBMAP *map)
 {
-    REBVAL *v = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    const REBVAL *v = cast(const REBVAL*, ARR_HEAD(MAP_PAIRLIST(map)));
 
     REBLEN count = 0;
     for (; NOT_END(v); v += 2) {

@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Rebol Open Source Contributors
+// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -462,7 +462,7 @@ REBVAL *RL_rebVoid(void)
 {
     ENTER_API;
 
-    return Init_Void(Alloc_Value());
+    return Init_Void(Alloc_Value(), SYM_VOID);
 }
 
 
@@ -604,7 +604,7 @@ unsigned char *RL_rebBinaryHead_internal(const REBVAL *binary)
 {
     ENTER_API;
 
-    return VAL_BIN_HEAD(binary);
+    return BIN_HEAD(VAL_BINARY_KNOWN_MUTABLE(binary));
 }
 
 
@@ -615,7 +615,7 @@ unsigned char *RL_rebBinaryAt_internal(const REBVAL *binary)
 {
     ENTER_API;
 
-    return VAL_BIN_AT(binary);
+    return VAL_BINARY_AT_KNOWN_MUTABLE(binary);
 }
 
 
@@ -638,7 +638,7 @@ unsigned int RL_rebBinarySizeAt_internal(const REBVAL *binary)
 // !!! Should there be variants for Strict/Relaxed, e.g. a version that does
 // not accept CR and one that does?
 //
-REBVAL *RL_rebSizedText(const char *utf8, size_t size) 
+REBVAL *RL_rebSizedText(const char *utf8, size_t size)
 {
     ENTER_API;
 
@@ -760,7 +760,7 @@ const void *RL_rebArgR(unsigned char quotes, const void *p, va_list *vaptr)
     if (Detect_Rebol_Pointer(p2) != DETECTED_AS_END)
         fail ("rebArg() isn't actually variadic, it's arity-1");
 
-    REBSTR *spelling = Intern_UTF8_Managed(cb_cast(name), strsize(name));
+    const REBSTR *spelling = Intern_UTF8_Managed(cb_cast(name), strsize(name));
 
     REBVAL *param = ACT_PARAMS_HEAD(act);
     REBVAL *arg = FRM_ARGS_HEAD(f);
@@ -830,7 +830,7 @@ static void Run_Va_May_Fail_Core(
     const void *p,  // first pointer (may be END, nullptr means NULLED)
     va_list *vaptr  // va_end() handled by feed for all cases (throws, fails)
 ){
-    Init_Void(out);
+    Init_Unlabeled_Void(out);
 
     REBFLGS flags = EVAL_MASK_DEFAULT | FLAG_QUOTING_BYTE(quotes);
 
@@ -1036,7 +1036,7 @@ intptr_t RL_rebUnbox(unsigned char quotes, const void *p, va_list *vaptr)
       case REB_INTEGER:
         return VAL_INT64(result);
 
-      case REB_CHAR:
+      case REB_ISSUE:
         return VAL_CHAR(result);
 
       case REB_LOGIC:
@@ -1102,8 +1102,8 @@ uint32_t RL_rebUnboxChar(
     DECLARE_LOCAL (result);
     Run_Va_May_Fail(result, quotes, p, vaptr);  // calls va_end()
 
-    if (VAL_TYPE(result) != REB_CHAR)
-        fail ("rebUnboxChar() called on non-CHAR!");
+    if (not IS_CHAR(result))
+        fail ("rebUnboxChar() called on non-CHAR");
 
     return VAL_CHAR(result);
 }
@@ -1137,11 +1137,11 @@ static size_t Spell_Into(
     size_t buf_size,  // number of bytes
     const REBVAL *v
 ){
-    if (not (ANY_STRING(v) or ANY_WORD(v)))
-        fail ("rebSpell() APIs only accept ANY-STRING! or ANY-WORD!");
+    if (not ANY_UTF8(v))
+        fail ("rebSpell() APIs require UTF-8 types (strings, words, tokens)");
 
     REBSIZ utf8_size;
-    const REBYTE *utf8 = VAL_UTF8_AT(&utf8_size, v);
+    REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
 
     if (not buf) {
         assert(buf_size == 0);
@@ -1201,7 +1201,7 @@ char *RL_rebSpell(
     size_t size = Spell_Into(nullptr, 0, v);
     char *result = rebAllocN(char, size);  // no +1 for term needed...
     assert(result[size] == '\0');  // ...see rebRepossess() for why this is
-    
+
     size_t check = Spell_Into(result, size, v);
     assert(check == size);
     UNUSED(check);
@@ -1217,27 +1217,11 @@ static unsigned int Spell_Into_Wide(
     unsigned int buf_chars,  // chars buf can hold (not including terminator)
     const REBVAL *v
 ){
-    REBCHR(const*) cp;
-    REBLEN len;
-    if (ANY_STRING(v)) {
-        cp = VAL_STRING_AT(v);
-        len = VAL_LEN_AT(v);
-    }
-    else if (ANY_WORD(v)) {
-        REBSTR *spelling = VAL_WORD_SPELLING(v);
-        cp = STR_HEAD(spelling);
+    if (not ANY_UTF8(v))
+        fail ("rebSpell() APIs require UTF-8 types (strings, words, tokens)");
 
-        // !!! Inefficient way of asking "how long is this UTF-8 series", fix!
-        //
-        REBSTR *s = Make_Sized_String_UTF8(
-            STR_UTF8(spelling),
-            STR_SIZE(spelling)
-        );
-        len = STR_LEN(s);
-        Free_Unmanaged_Series(SER(s));
-    }
-    else
-        fail ("rebSpell() APIs only accept ANY-STRING! or ANY-WORD!");
+    REBLEN len;
+    REBCHR(const*) cp = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, v);
 
     if (not buf) {  // querying for size
         assert(buf_chars == 0);
@@ -1339,14 +1323,15 @@ static size_t Bytes_Into(
     const REBVAL *v
 ){
     if (IS_BINARY(v)) {
-        REBSIZ size = VAL_LEN_AT(v);
+        REBSIZ size;
+        const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
         if (buf == nullptr) {
             assert(buf_size == 0);
             return size;
         }
 
         REBSIZ limit = MIN(buf_size, size);
-        memcpy(buf, VAL_BIN_AT(v), limit);
+        memcpy(buf, data, limit);
         return size;
     }
 
@@ -1489,75 +1474,7 @@ REBVAL *RL_rebRescue(
     REBDNG *dangerous, // !!! pure C function only if not using throw/catch!
     void *opaque
 ){
-    ENTER_API;
-
-    struct Reb_State state;
-    REBCTX *error_ctx;
-
-    PUSH_TRAP(&error_ctx, &state);
-
-    // We want allocations that occur in the body of the C function for the
-    // rebRescue() to be automatically cleaned up in the case of an error.
-    //
-    // !!! This is currently done by knowing what frame an error occurred in
-    // and marking any allocations while that frame was in effect as being
-    // okay to "leak" (in the sense of leaking to be GC'd).  So we have to
-    // make a dummy frame here, and unfortunately the frame must be reified
-    // so it has to be an "action frame".  Improve mechanic later, but for
-    // now pretend to be applying a dummy native.
-    //
-    DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT);  // not FULLY_SPECIALIZED
-    Push_Dummy_Frame(f);
-
-  #ifdef DEBUG_ENSURE_FRAME_EVALUATES
-    f->was_eval_called = true;  // "fake" frame, okay to lie
-  #endif
-
-    // The first time through the following code 'error' will be null, but...
-    // `fail` can longjmp here, so 'error' won't be null *if* that happens!
-    //
-    if (error_ctx) {
-        assert(f->varlist);  // action must be running
-        REBARR *stub = f->varlist;  // will be stubbed, with info bits reset
-        Drop_Action(f);
-        SET_SERIES_FLAG(stub, VARLIST_FRAME_FAILED);  // signal API leaks ok
-        Abort_Frame(f);
-        return Init_Error(Alloc_Value(), error_ctx);
-    }
-
-    REBVAL *result = (*dangerous)(opaque);
-
-    Drop_Dummy_Frame_Unbalanced(f);
-
-    DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
-
-    if (not result)
-        return nullptr;  // null is considered a legal result
-
-    // Analogous to how TRAP works, if you don't have a handler for the
-    // error case then you can't return an ERROR!, since all errors indicate
-    // a failure.  Use KIND_BYTE() since R_THROWN or other special things can
-    // be used internally, and literal errors don't count either.
-    //
-    if (KIND_BYTE(result) == REB_ERROR) {
-        if (Is_Api_Value(result))
-            rebRelease(result);
-        return rebVoid();
-    }
-
-    if (not Is_Api_Value(result))
-        return result;  // no proxying needed
-
-    assert(not IS_NULLED(result));  // leaked API nulled cell (not nullptr)
-
-    // !!! We automatically proxy the ownership of any managed handles to the
-    // caller.  Any other handles that leak out (e.g. via state) will not be
-    // covered by this, and would have to be unmanaged.  Do another allocation
-    // just for the sake of it.
-
-    REBVAL *proxy = Move_Value(Alloc_Value(), result);  // parent is not f
-    rebRelease(result);
-    return proxy;
+    return RL_rebRescueWith(dangerous, nullptr, opaque);
 }
 
 
@@ -1575,29 +1492,83 @@ REBVAL *RL_rebRescueWith(
 ){
     ENTER_API;
 
-    struct Reb_State state;
-    REBCTX *error_ctx;
+    struct Reb_State jump;
+    PUSH_TRAP_SO_FAIL_CAN_JUMP_BACK_HERE(&jump);
 
-    PUSH_TRAP(&error_ctx, &state);
+    // We want API allocations via rebValue() or rebMalloc() that occur in the
+    // body of the C function for the rebRescue() to be automatically cleaned
+    // up in the case of an error.  There must be a frame to attach them to.
+    //
+    DECLARE_END_FRAME (dummy, EVAL_MASK_DEFAULT);
+    Push_Frame(nullptr, dummy);
+
+  #ifdef DEBUG_ENSURE_FRAME_EVALUATES
+    f->was_eval_called = true;  // "fake" frame, okay to lie
+  #endif
 
     // The first time through the following code 'error' will be null, but...
     // `fail` can longjmp here, so 'error' won't be null *if* that happens!
     //
-    if (error_ctx) {
-        REBVAL *error = Init_Error(Alloc_Value(), error_ctx);
+    if (jump.error) {
+        Abort_Frame(dummy);
+
+        REBVAL *error = Init_Error(Alloc_Value(), jump.error);
+        if (not rescuer)
+            return error;  // plain rebRescue() behavior
 
         REBVAL *result = (*rescuer)(error, opaque);  // *not* guarded by trap!
-
         rebRelease(error);
         return result;  // no special handling, may be null
     }
 
-    REBVAL *result = (*dangerous)(opaque);  // guarded by trap
-    assert(not IS_NULLED(result));  // nulled cells not exposed by API
+    REBVAL *result = (*dangerous)(opaque);
 
-    DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&state);
+    if (not result) {
+        // null is considered a legal result
+    }
+    else if (rescuer == nullptr and KIND3Q_BYTE(result) == REB_ERROR) {
+        //
+        // Analogous to how TRAP works, if you don't have a handler for the
+        // error case then you can't return an ERROR!, since all errors
+        // indicate a failure.  Use KIND3Q_BYTE() since R_THROWN or other
+        // special things can be used internally, and literal errors don't
+        // count either.
+        //
+        if (Is_Api_Value(result))
+            rebRelease(result);
 
-    return result;  // no special handling, may be NULL
+        result = rebVoid();
+        goto proxy_result;
+    }
+    else {
+        if (not Is_Api_Value(result)) {
+            // no proxying needed
+        }
+        else {
+            assert(not IS_NULLED(result));  // leaked API nulled cell
+
+            // !!! Automatically proxy the ownership of any managed handles
+            // to the caller.  Any other handles that leak out (e.g. via
+            // state) won't be covered by this, and must be unmanaged.
+
+          proxy_result: {
+            REBARR *a = Singular_From_Cell(result);
+            Unlink_Api_Handle_From_Frame(a);  // e.g. linked to f
+            Link_Api_Handle_To_Frame(a, dummy->prior);  // link to caller
+          }
+        }
+    }
+
+    DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(&jump);
+
+    // !!! To abstract how the system deals with exception handling, the
+    // rebRescue() routine started being used in lieu of PUSH_TRAP/DROP_TRAP
+    // internally to the system.  Some of these system routines accumulate
+    // stack state, so Drop_Frame_Unbalanced() must be used.
+    //
+    Drop_Frame_Unbalanced(dummy);
+
+    return result;
 }
 
 
@@ -1830,8 +1801,7 @@ REBVAL *RL_rebManage(REBVAL *v)
         fail ("Attempt to rebManage() a handle that's already managed.");
 
     SET_SERIES_FLAG(a, MANAGED);
-    assert(not LINK(a).owner);
-    LINK(a).owner = NOD(Context_For_Frame_May_Manage(FS_TOP));
+    Link_Api_Handle_To_Frame(a, FS_TOP);
 
     return v;
 }
@@ -1866,8 +1836,10 @@ void RL_rebUnmanage(void *p)
     // own risk to do this, and not use those pointers after a free.
     //
     CLEAR_SERIES_FLAG(a, MANAGED);
-    assert(GET_ARRAY_FLAG(LINK(a).owner, IS_VARLIST));
-    LINK(a).owner = UNBOUND;
+    Unlink_Api_Handle_From_Frame(a);
+
+    TRASH_POINTER_IF_DEBUG(LINK(a).custom.node);
+    TRASH_POINTER_IF_DEBUG(MISC(a).custom.node);
 }
 
 
@@ -2124,6 +2096,7 @@ REBNATIVE(api_transient)
     INCLUDE_PARAMS_OF_API_TRANSIENT;
 
     REBVAL *v = Move_Value(Alloc_Value(), ARG(value));
+    rebUnmanage(v);  // has to survive the API-TRANSIENT's frame
     REBARR *a = Singular_From_Cell(v);
     SET_ARRAY_FLAG(a, SINGULAR_API_RELEASE);
 

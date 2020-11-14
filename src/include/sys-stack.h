@@ -7,16 +7,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2018 Rebol Open Source Contributors
+// Copyright 2012-2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -37,9 +37,9 @@
 // system.  But there is a rule that when that piece is finished, it must
 // "balance" the stack back to where it was when it was called!  There is
 // a check in the main evaluator loop that the stack has been balanced to
-// wherever it started by the time a function call ends.  However, it is not
+// wherever it started by the time a function call ends.  It's not necessary
 // necessary to balance the stack in the case of calling a `fail`--because
-// it will be automatically restored to where it was at the PUSH_TRAP().
+// it is restored to where it was at PUSH_TRAP_SO_FAIL_CAN_JUMP_BACK_HERE().
 //
 // To speed pushes and pops to the stack while also making sure that each
 // push is tested to see if an expansion is needed, a trick is used.  This

@@ -24,27 +24,54 @@ core: [
     ; (B)oot
     b-init.c
 
+    ; Function Generators
+    ;
+    functionals/c-adapt.c
+    functionals/c-augment.c
+    functionals/c-chain.c
+    functionals/c-does.c
+    functionals/c-enclose.c
+    functionals/n-function.c
+    functionals/c-hijack.c
+    functionals/c-oneshot.c
+    functionals/c-reframer.c
+    functionals/c-reskin.c
+    functionals/c-specialize.c
+    functionals/c-typechecker.c
+
     ; (C)ore
     c-bind.c
     c-do.c
     c-context.c
     c-error.c
-    [
-        c-eval.c
 
-        ; There are several good reasons to optimize the evaluator itself even
-        ; if one is doing a "size-biased" build.  It's not just about wanting
-        ; the critical code to be faster--but also, since it recurses, if
-        ; stack frames aren't flattened out then they add up...and may blow
-        ; internal limits (like in a web browser for JS/WASM calls)
+    ; EVALUATOR
+    ;
+    ; Uses `#prefer-O2-optimization`.  There are several good reasons to
+    ; optimize the evaluator itself even if one is doing a "size-biased"
+    ; build.  It's not just about wanting the critical code to be faster--but
+    ; also, since it recurses, if stack frames aren't flattened out then they
+    ; add up...and may blow internal limits (like in a web browser for
+    ; JS/WASM calls)
+    ;
+    ; !!! Note: this will not apply when the stackless branch is merged, which
+    ; does not recurse the evaluator and hence avoids the problem entirely.
+    [
+        evaluator/c-eval.c  #prefer-O2-optimization
+
+    ][
+        evaluator/c-action.c  #prefer-O2-optimization
+
+        ; !!! See notes on Finalize_Arg() call in %c-eval.c; investigations
+        ; make the need to disable this seem like a possible optimizer bug.
         ;
-        #prefer-O2-optimization
+        <gnu:-Wno-array-bounds>
     ]
+
     c-function.c
     c-path.c
     c-port.c
     c-signal.c
-    c-specialize.c
     c-value.c
     c-word.c
 
@@ -128,7 +155,6 @@ core: [
     n-data.c
     n-do.c
     n-error.c
-    n-function.c
     n-io.c
     n-loop.c
     n-math.c
@@ -152,6 +178,7 @@ core: [
     t-blank.c
     t-block.c
     t-char.c
+    t-comma.c
     t-datatype.c
     t-date.c
     t-decimal.c
@@ -168,8 +195,9 @@ core: [
     t-time.c
     t-tuple.c
     t-typeset.c
-    t-varargs.c
     t-word.c
+    t-varargs.c
+    t-void.c
 
     ; (U)??? (3rd-party code extractions)
     u-compress.c

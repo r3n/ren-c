@@ -8,16 +8,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Rebol Open Source Contributors
+// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Lesser GPL, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// https://www.gnu.org/licenses/lgpl-3.0.html
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -28,10 +28,12 @@
 //
 //  CT_Port: C
 //
-REBINT CT_Port(const REBCEL *a, const REBCEL *b, REBINT mode)
+REBINT CT_Port(REBCEL(const*) a, REBCEL(const*) b, REBINT strict)
 {
-    if (mode < 0) return -1;
-    return VAL_CONTEXT(a) == VAL_CONTEXT(b);
+    UNUSED(strict);
+    if (VAL_CONTEXT(a) == VAL_CONTEXT(b))
+        return 0;
+    return VAL_CONTEXT(a) > VAL_CONTEXT(b) ? 1 : -1;  // !!! Review
 }
 
 
@@ -86,7 +88,7 @@ REB_R TO_Port(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
     //
     REBCTX *context = Copy_Context_Shallow_Managed(VAL_CONTEXT(arg));
     RESET_VAL_HEADER(
-        CTX_ARCHETYPE(context),
+        CTX_ROOTVAR(context),
         REB_PORT,
         CELL_MASK_CONTEXT
     );

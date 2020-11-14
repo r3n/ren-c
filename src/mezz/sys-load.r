@@ -3,7 +3,7 @@ REBOL [
     Title: "REBOL 3 Boot Sys: Load, Import, Modules"
     Rights: {
         Copyright 2012 REBOL Technologies
-        Copyright 2012-2019 Rebol Open Source Contributors
+        Copyright 2012-2019 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -98,9 +98,9 @@ load-header: function [
         [file! url!]
     /only "Only process header, don't decompress body"
     /required "Script header is required"
-    /body [<output>]  ; [binary! block!]
-    /line [<output>]  ; integer!
-    /final [<output>]  ; binary!
+    /body [<output> binary! block!]
+    /line [<output> integer!]
+    /final [<output> binary!]
 
     <static>
     non-ws (make bitset! [not 1 - 32])
@@ -189,7 +189,7 @@ load-header: function [
         append hdr compose [content (data)]  ; as of start of header
     ]
 
-    if 10 = rest/1 [rest: next rest | line: me + 1]  ; skip LF
+    if 10 = rest/1 [rest: next rest, line: me + 1]  ; skip LF
 
     if integer? tmp: select hdr 'length [
         end: skip rest tmp
@@ -254,12 +254,6 @@ load-header: function [
 ]
 
 
-; !!! This is an idiom that should be done with something like <unbound>
-;
-no-all: make object! [all: _]
-no-all/all: void
-protect 'no-all/all
-
 load: function [
     {Loads code or data from a file, URL, text string, or binary.}
 
@@ -268,13 +262,13 @@ load: function [
     source "Source or block of sources"
         [file! url! text! binary! block!]
     /header "Request the Rebol header object be returned as well"
-        [<output>]
-    /all "Load all values (cannot be used with /HEADER)"
+        [<output> object!]
+    /all "Load all values (cannot be used with /HEADER)"  ; use all_LOAD
     /type "E.g. rebol, text, markup, jpeg... (by default, auto-detected)"
         [word!]
-    <in> no-all  ; !!! temporary fake of <unbind> option
 ][
-    self: binding of 'return  ; so you can say SELF/ALL
+    all_LOAD: :all
+    all: :lib/all
 
     ; Note that code or data can be embedded in other datatypes, including
     ; not just text, but any binary data, including images, etc. The type
@@ -289,19 +283,18 @@ load: function [
     ; Note that IMPORT has its own loader, and does not use LOAD directly.
     ; /TYPE with anything other than 'EXTENSION disables extension loading.
 
-    if header and [self/all] [
+    all [header, all_LOAD] then [
         fail "Cannot use /ALL and /HEADER refinements together"
     ]
 
     if block? source [
         ; A BLOCK! means multiple sources, calls LOAD recursively for each
 
-        a: self/all  ; !!! Some bad interaction requires this, review
         return map-each s source [
             applique 'load [
                 source: s
                 header: header
-                all: a
+                all: all_LOAD
                 type: :type
             ]
         ]
@@ -363,7 +356,7 @@ load: function [
 
     ; Try to load the header, handle error
 
-    if not self/all [
+    if not all_LOAD [
         hdr: line: _  ; for SET-WORD! gathering, evolving...
         either object? data [
             fail "Code has not been updated for LOAD-EXT-MODULE"
@@ -402,7 +395,7 @@ load: function [
     ; the process have some variability to it that makes it a poor default.
     ;
     none [
-        self/all
+        all_LOAD
         header  ; technically doesn't prevent returning single value (?)
         (length of data) <> 1
     ] then [
@@ -509,7 +502,7 @@ do-needs: function [
         ]
 
         ; Collect any mixins into the object (if we are doing that)
-        if all [set? 'mixins | mixin? mod] [
+        if all [set? 'mixins, mixin? mod] [
             resolve/extend/only mixins mod select meta-of mod 'exports
         ]
         mod
@@ -585,7 +578,7 @@ load-module: func [
 
             ; If no further processing is needed, shortcut return
 
-            if (not version) and [delay or [module? :mod]] [
+            all [not version, any [delay, module? :mod]] then [
                 return reduce [source (try match module! :mod)]
             ]
         ]
@@ -729,7 +722,7 @@ load-module: func [
         name: :hdr/name
     ]
 
-    if (not no-lib) and [not word? :name] [
+    if (not no-lib) and (not word? :name) [
         ;
         ; Requires name for full import
         ; Unnamed module can't be imported to lib, so /NO-LIB here
@@ -781,7 +774,7 @@ load-module: func [
                 pos: _   ; just override, don't replace
                 if ver0 >= modver [
                     ; it's at least as new, use it instead
-                    mod: mod0 | hdr: hdr0 | code: _
+                    mod: mod0, hdr: hdr0, code: _
                     modver: ver0
                     override?: false
                 ]
@@ -802,12 +795,12 @@ load-module: func [
         mod: _   ; don't need/want the block reference now
     ]
 
-    if version and [ver > modver] [
-        cause-error 'syntax 'needs reduce [name ver]
+    all [version, version > modver] then [
+        cause-error 'syntax 'needs reduce [name version]
     ]
 
     ; If no further processing is needed, shortcut return
-    if (not override?) and [mod or [delay]] [return reduce [name mod]]
+    if (not override?) and (mod or @delay) [return reduce [name mod]]
 
     ; If /DELAY, save the intermediate form
     if delay [
@@ -851,7 +844,10 @@ load-module: func [
         ]
     ]
 
-    if (not no-lib) and [override?] [
+    all [
+        not no-lib
+        override?
+    ] then [
         if pos [
             pos/2: mod  ; replace delayed module
         ] else [
@@ -901,7 +897,7 @@ import: function [
     ; is forced to `import <mod2>`
     ;
     if tag? module [set 'force-remote-import true]
-    if all [force-remote-import | word? module] [
+    if all [force-remote-import, word? module] [
         module: to tag! module
     ]
     if tag? module [
@@ -930,7 +926,7 @@ import: function [
             no-share: :no-share
             no-lib: :no-lib
             no-user: :no-user
-            block: true
+            block: #
         ]
     ]
 
@@ -939,7 +935,7 @@ import: function [
         version: version
         no-share: no-share
         no-lib: no-lib
-        import: true  ; !!! original code always passed /IMPORT, should it?
+        import: #  ; !!! original code always passed /IMPORT, should it?
     ]
 
     case [

@@ -1,25 +1,25 @@
 (
-    foo: func [x [integer! <...>]] [
+    foo: func [x [integer! <variadic>]] [
         sum: 0
         while [not tail? x] [
             sum: sum + take x
         ]
     ]
-    y: (z: foo 1 2 3 | 4 5)
-    all [y = 5 | z = 6]
+    y: (z: foo 1 2 3, 4 5)
+    all [y = 5, z = 6]
 )
 (
-    foo: func [x [integer! <...>]] [make block! x]
+    foo: func [x [integer! <variadic>]] [make block! x]
     [1 2 3 4] = foo 1 2 3 4
 )
 
 ; leaked VARARGS! cannot be accessed after call is over
 (
-    error? trap [take reeval (foo: func [x [integer! <...>]] [x])]
+    error? trap [take reeval (foo: func [x [integer! <variadic>]] [x])]
 )
 
 (
-    f: func [args [any-value! <opt> <...>]] [
+    f: func [args [any-value! <opt> <variadic>]] [
        b: take args
        either tail? args [b] ["not at end"]
     ]
@@ -28,7 +28,7 @@
 )
 
 (
-    f: func [:look [<...>]] [to-value first look]
+    f: func [:look [<variadic>]] [to-value first look]
     blank? applique 'f [look: make varargs! []]
 )
 
@@ -38,7 +38,7 @@
 ; the TAKE is called, but theorized that's still more useful than erroring.
 [
     (
-        normal: enfixed function [v [integer! <...>]] [
+        normal: enfixed function [v [integer! <variadic>]] [
             sum: 0
             while [not tail? v] [
                 sum: sum + take v
@@ -51,11 +51,11 @@
     (1 = do [normal])
     (11 = do [10 normal])
     (21 = do [10 20 normal])
-    (31 = do [x: 30 | y: 'x | 1 2 x normal])
+    (31 = do [x: 30, y: 'x, 1 2 x normal])
     (30 = do [multiply 3 9 normal])  ; seen as ((multiply 3 (9 normal))
 ][
     (
-        defers: enfixed function [v [integer! <...>]] [
+        defers: enfixed function [v [integer! <variadic>]] [
             sum: 0
             while [not tail? v] [
                 sum: sum + take v
@@ -69,11 +69,11 @@
     (1 = do [defers])
     (11 = do [10 defers])
     (21 = do [10 20 defers])
-    (31 = do [x: 30 | y: 'x | 1 2 x defers])
+    (31 = do [x: 30, y: 'x, 1 2 x defers])
     (28 = do [multiply 3 9 defers])  ; seen as (multiply 3 9) defers))
 ][
     (
-        soft: enfixed function ['v [any-value! <...>]] [
+        soft: enfixed function ['v [any-value! <variadic>]] [
             collect [
                 while [not tail? v] [
                     keep/only take v
@@ -85,13 +85,13 @@
 
     ([] = do [soft])
     (
-        a: void
+        a: ~void~
         (trap [a soft])/id = 'need-non-void
     )
-    ([7] = do [(1 + 2) (3 + 4) soft])
+    ([7] = do [:(1 + 2) :(3 + 4) soft])
 ][
     (
-        hard: enfixed function [:v [any-value! <...>]] [
+        hard: enfixed function [:v [any-value! <variadic>]] [
             collect [
                 while [not tail? v] [
                     keep/only take v
@@ -103,7 +103,7 @@
 
     ([] = do [hard])
     (
-        a: void
+        a: ~void~
         (trap [a hard])/id = 'need-non-void
     )
     ([(3 + 4)] = do [(1 + 2) (3 + 4) hard])
@@ -121,7 +121,7 @@
 
     3 = (value: 1 + 2 <| 30 + 40 x: value  () ())
 
-    did all [value = 3 | x = 3]
+    did all [value = 3, x = 3]
 )
 (
     unset 'value
@@ -140,7 +140,7 @@
 )
 
 (
-    1 = (1 <| 2 | 3 + 4 | 5 + 6)
+    1 = (1 <| 2, 3 + 4, 5 + 6)
 )
 
 ; WATERSHED TEST: This involves the parity of variadics with normal actions,
@@ -150,24 +150,24 @@
 
 (
     vblock: collect [
-        log: adapt 'keep [value: reduce value]
-        variadic2: func [v [any-value! <...>]] [
+        log: adapt :keep [value: reduce value]
+        variadic2: func [v [any-value! <variadic>]] [
            log [<1> take v]
            log [<2> take v]
            if not tail? v [fail "THEN SHOULD APPEAR AS IF IT IS VARARGS END"]
            return "returned"
        ]
-       result: variadic2 "a" "b" then t => [log [<t> t] "then"]
+       result: variadic2 "a" "b" then t -> [log [<t> t] "then"]
        log [<result> result]
     ]
 
     nblock: collect [
-        log: adapt 'keep [value: reduce value]
+        log: adapt :keep [value: reduce value]
         normal2: func [n1 n2] [
             log [<1> n1 <2> n2]
             return "returned"
         ]
-        result: normal2 "a" "b" then t => [log [<t> t] "then"]
+        result: normal2 "a" "b" then t -> [log [<t> t] "then"]
         log [<result> result]
     ]
 
@@ -183,8 +183,8 @@
 
         return: "Input if it matched, otherwise null (void if falsey match)"
             [<opt> any-value!]
-        :args [<opt> any-value! <...>]
-        :args-normal [<opt> any-value! <...>]
+        :args [<opt> any-value! <variadic>]
+        :args-normal [<opt> any-value! <variadic>]
         <local> first-arg
     ][
         test: first args
@@ -199,7 +199,7 @@
             ]
         ]
 
-        either-match (take args) (take args-normal) [null]
+        either-match :(take args) (take args-normal) @null
     ]
     true)
 
