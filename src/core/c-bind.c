@@ -160,7 +160,7 @@ void Bind_Values_Core(
 // bound to a particular target (if target is NULL, then all
 // words will be unbound regardless of their VAL_WORD_CONTEXT).
 //
-void Unbind_Values_Core(RELVAL *head, REBCTX *context, bool deep)
+void Unbind_Values_Core(RELVAL *head, option(REBCTX*) context, bool deep)
 {
     RELVAL *v = head;
     for (; NOT_END(v); ++v) {
@@ -173,7 +173,7 @@ void Unbind_Values_Core(RELVAL *head, REBCTX *context, bool deep)
 
         if (
             ANY_WORD_KIND(heart)
-            and (not context or VAL_BINDING(v) == NOD(context))
+            and (not context or VAL_BINDING(v) == NOD(unwrap(context)))
         ){
             Unbind_Any_Word(v);
         }
@@ -546,7 +546,7 @@ void Rebind_Values_Deep(
     RELVAL *head,
     REBCTX *src,
     REBCTX *dst,
-    struct Reb_Binder *opt_binder
+    option(struct Reb_Binder*) binder
 ) {
     RELVAL *v = head;
     for (; NOT_END(v); ++v) {
@@ -555,16 +555,16 @@ void Rebind_Values_Deep(
                 VAL_ARRAY_AT_MUTABLE_HACK(v),
                 src,
                 dst,
-                opt_binder
+                binder
             );
         }
         else if (ANY_WORD(v) and VAL_BINDING(v) == NOD(src)) {
             INIT_BINDING(v, dst);
 
-            if (opt_binder != NULL) {
+            if (binder) {
                 INIT_WORD_INDEX(
                     v,
-                    Get_Binder_Index_Else_0(opt_binder, VAL_WORD_CANON(v))
+                    Get_Binder_Index_Else_0(unwrap(binder), VAL_WORD_CANON(v))
                 );
             }
         }

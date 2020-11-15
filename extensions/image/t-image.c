@@ -235,11 +235,11 @@ void Copy_Image_Value(REBVAL *out, const REBVAL *arg, REBINT len)
 REB_R MAKE_Image(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_IMAGE(arg)) {
         //
@@ -1367,10 +1367,10 @@ void Poke_Image_Fail_If_Read_Only(
 REB_R PD_Image(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval != NULL) {
-        Poke_Image_Fail_If_Read_Only(pvs->out, picker, opt_setval);
+    if (setval) {
+        Poke_Image_Fail_If_Read_Only(pvs->out, picker, unwrap(setval));
         return R_INVISIBLE;
     }
 

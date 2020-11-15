@@ -460,10 +460,10 @@ REBNATIVE(unbind)
     if (ANY_WORD(word))
         Unbind_Any_Word(word);
     else {
-        REBCTX *opt_context = nullptr;
+        option(REBCTX*) context = nullptr;
         Unbind_Values_Core(
             VAL_ARRAY_AT_ENSURE_MUTABLE(word),
-            opt_context,
+            context,
             did REF(deep)
         );
     }

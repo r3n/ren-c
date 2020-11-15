@@ -72,12 +72,12 @@ REBINT CT_Action(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Action(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_ACTION);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     // MAKE ACTION! on a FRAME! will create an action where the NULLs are
     // assumed to be unspecialized.
@@ -358,9 +358,9 @@ REBTYPE(Action)
 REB_R PD_Action(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    UNUSED(opt_setval);
+    UNUSED(setval);
 
     assert(IS_ACTION(pvs->out));
 

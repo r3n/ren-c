@@ -176,13 +176,13 @@ static REBSER *MAKE_TO_Binary_Common(const REBVAL *arg)
 REB_R MAKE_Binary(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *def
 ){
     assert(kind == REB_BINARY);
 
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_INTEGER(def)) {
         //
@@ -279,7 +279,7 @@ static int Compare_Byte(void *thunk, const void *v1, const void *v2)
 REB_R PD_Binary(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     // Note: There was some more careful management of overflow here in the
     // PICK and POKE actions, before unification.  But otherwise the code
@@ -297,7 +297,7 @@ REB_R PD_Binary(
         }
     */
 
-    if (not opt_setval) { // PICK-ing
+    if (not setval) { // PICK-ing
         const REBBIN *bin = VAL_BINARY(pvs->out);
         if (IS_INTEGER(picker)) {
             REBINT n = Int32(picker) + VAL_INDEX(pvs->out) - 1;
@@ -322,11 +322,11 @@ REB_R PD_Binary(
     if (n < 0 or cast(REBLEN, n) >= BIN_LEN(bin))
         fail (Error_Out_Of_Range(SPECIFIC(picker)));
 
-    if (IS_CHAR(opt_setval)) {
-        Init_Integer(pvs->out, VAL_CHAR(opt_setval));
+    if (IS_CHAR(unwrap(setval))) {
+        Init_Integer(pvs->out, VAL_CHAR(unwrap(setval)));
     }
-    else if (IS_INTEGER(opt_setval)) {
-        Move_Value(pvs->out, opt_setval);
+    else if (IS_INTEGER(unwrap(setval))) {
+        Move_Value(pvs->out, unwrap(setval));
     }
     else {
         // !!! See notes in the REBTYPE(String) about alternate cases
@@ -337,7 +337,7 @@ REB_R PD_Binary(
 
     REBINT i = Int32(pvs->out);
     if (i > 0xff)
-        fail (Error_Out_Of_Range(opt_setval));
+        fail (Error_Out_Of_Range(unwrap(setval)));
 
     BIN_HEAD(bin)[n] = cast(REBYTE, i);
     return R_INVISIBLE;

@@ -160,11 +160,11 @@ static void reverse_string(REBSTR *str, REBLEN index, REBLEN len)
 REB_R MAKE_String(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL* opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *def
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_INTEGER(def)) {  // new string with given integer capacity
         //
@@ -381,7 +381,7 @@ static int Compare_Chr(void *thunk, const void *v1, const void *v2)
 REB_R PD_String(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     // Note: There was some more careful management of overflow here in the
     // PICK and POKE actions, before unification.  But otherwise the code
@@ -399,7 +399,7 @@ REB_R PD_String(
         }
     */
 
-    if (opt_setval == NULL) { // PICK-ing
+    if (not setval) { // PICK-ing
         const REBSTR *s = VAL_STRING(pvs->out);
         if (IS_INTEGER(picker) or IS_DECIMAL(picker)) { // #2312
             REBINT n = Int32(picker);
@@ -447,11 +447,11 @@ REB_R PD_String(
         fail (Error_Out_Of_Range(SPECIFIC(picker)));
 
 
-    if (IS_CHAR(opt_setval)) {
-        Move_Value(pvs->out, opt_setval);
+    if (IS_CHAR(unwrap(setval))) {
+        Move_Value(pvs->out, unwrap(setval));
     }
-    else if (IS_INTEGER(opt_setval)) {
-        Init_Char_May_Fail(pvs->out, Int32(opt_setval));
+    else if (IS_INTEGER(unwrap(setval))) {
+        Init_Char_May_Fail(pvs->out, Int32(unwrap(setval)));
     }
     else {
         // !!! This used to allow setting to a string to set to the first

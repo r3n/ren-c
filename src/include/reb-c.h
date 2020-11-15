@@ -708,6 +708,92 @@
 #endif
 
 
+//=//// OPTIONAL POINTER TRICK ////////////////////////////////////////////=//
+//
+// There are some pointers in the system which can be `nullptr` and others
+// that are not.  To make it clear when a pointer must be tested for null,
+// this gives an annotation that will work in special builds.
+//
+// This is similar to `std::optional` and Rust's `Option` (and uses the Rust
+// term `unwrap` to get access to the "contained" pointer).  However, it
+// just uses `nullptr` for the none state (instead of `std::nullopt` or a
+// `None` type).  Construction and comparison are also more lenient, allowing
+// direct comparison to the contained pointer type.
+//
+// It uses Rust's naming in order to stay out of the way of C++ codebases that
+// do `using std::optional;`  These are also macros, so they can be redefined
+// out of the way even further if needed.
+//
+// Note: This needs special handling in %make-headers.r to recognize the
+// format.  See the `typemacro_parentheses` rule.
+//
+#ifdef DEBUG_CHECK_OPTIONALS
+    #include <optional>
+
+    // Trying to use `std::optional` is more trouble than it's worth; we'd
+    // have to deal with the `nullopt` state which overlaps `nullptr`,
+    // and there's all kinds of issues the moment you derive from it.
+    // Just write a simple class specific to the purpose instead.
+    //
+    template<typename TP>
+    struct optional_pointer {
+        static_assert(
+            std::is_pointer<TP>::value,
+            "The intended use of Ren-C's option() is with pointers only"
+        );
+        typedef typename std::remove_pointer<TP>::type T;
+
+        T* p;
+
+        optional_pointer () {}  // garbage (or nullptr if in global scope)
+        optional_pointer (T* p) : p (p) {}
+
+        T* try_unwrap_helper() const { return p; }  // null ok
+
+        T* unwrap_helper() const {
+            assert(p != nullptr);  // asserts only on DEBUG_CHECK_OPTIONALS
+            return p;
+        }
+
+        operator bool() const { return p != nullptr; }
+    };
+
+    // Ugly combinatorics.  But yes, it's how std::optional does it too.
+
+    template<typename L, typename R>
+    bool operator==(optional_pointer<L*> left, optional_pointer<R*> right)
+        { return left.p == right.p; }
+
+    template<typename L, typename R>
+    bool operator==(optional_pointer<L*> left, R* right)
+        { return left.p == right; }
+
+    template<typename L, typename R>
+    bool operator==(L* left, optional_pointer<R*> right)
+        { return left == right.p; }
+
+    template<typename L, typename R>
+    bool operator!=(optional_pointer<L*> left, optional_pointer<R*> right)
+        { return left.p != right.p; }
+
+    template<typename L, typename R>
+    bool operator!=(optional_pointer<L*> left, R* right)
+        { return left.p != right; }
+
+    template<typename L, typename R>
+    bool operator!=(L* left, optional_pointer<R*> right)
+        { return left != right.p; }
+
+    #define option(TP) optional_pointer<TP>
+    #define unwrap(v) (v).unwrap_helper()
+    #define try_unwrap(v) (v).try_unwrap_helper()
+#else
+    #define option(T) T
+    #define unwrap(v) (v)
+    #define try_unwrap(v) (v)
+#endif
+
+
 //=//// MEMORY POISONING and POINTER TRASHING /////////////////////////////=//
 //
 // If one wishes to indicate a region of memory as being "off-limits", modern
@@ -757,12 +843,21 @@
 #endif
 
 #ifdef NDEBUG
-    #define TRASH_POINTER_IF_DEBUG(p) \
-        NOOP
-
-    #define TRASH_CFUNC_IF_DEBUG(T,p) \
-        NOOP
+    #define TRASH_POINTER_IF_DEBUG(p)       NOOP
+    #define TRASH_OPTION_IF_DEBUG(o)      NOOP
+    #define TRASH_CFUNC_IF_DEBUG(T,p)       NOOP
 #else
+    #if defined(DEBUG_CHECK_OPTIONALS)
+        #define TRASH_OPTION_IF_DEBUG(o) \
+            TRASH_POINTER_IF_DEBUG((o).p)
+
+        #define IS_OPTION_TRASH_DEBUG(o) \
+            IS_POINTER_TRASH_DEBUG((o).p)
+    #else
+        #define TRASH_OPTION_IF_DEBUG TRASH_POINTER_IF_DEBUG
+        #define IS_OPTION_TRASH_DEBUG IS_POINTER_TRASH_DEBUG
+    #endif
+
     #if defined(__cplusplus) // needed even if not C++11
         template<class T>
         inline static void TRASH_POINTER_IF_DEBUG(T* &p) {

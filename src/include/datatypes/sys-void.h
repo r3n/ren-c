@@ -65,7 +65,9 @@ inline static REBVAL *Init_Unlabeled_Void(unstable RELVAL *out) {
     return cast(REBVAL*, out);
 }
 
-inline static const REBSTR *VAL_VOID_OPT_LABEL(unstable REBCEL(const*) v) {
+inline static option(const REBSTR*) VAL_VOID_LABEL(
+    unstable REBCEL(const*) v
+){
     assert(CELL_KIND(v) == REB_VOID);
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
     return cast(const REBSTR*, VAL_NODE(v));
@@ -78,10 +80,10 @@ inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
     assert(sym != SYM_0);
     if (not IS_VOID(v))
         return false;
-    const REBSTR *label = VAL_VOID_OPT_LABEL(v);
+    option(const REBSTR*) label = VAL_VOID_LABEL(v);
     if (not label)
         return false;  // unlabeled
-    return cast(REBLEN, sym) == cast(REBLEN, STR_SYMBOL(label));
+    return cast(REBLEN, sym) == cast(REBLEN, STR_SYMBOL(unwrap(label)));
 }
 
 

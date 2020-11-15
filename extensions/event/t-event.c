@@ -355,17 +355,17 @@ static REBVAL *Get_Event_Var(
 REB_R MAKE_Event(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_EVENT);
     UNUSED(kind);
 
-    if (opt_parent) {  // faster shorthand for COPY and EXTEND
+    if (parent) {  // faster shorthand for COPY and EXTEND
         if (not IS_BLOCK(arg))
             fail (Error_Bad_Make(REB_EVENT, arg));
 
-        Move_Value(out, opt_parent);  // !!! "shallow" clone of the event
+        Move_Value(out, unwrap(parent));  // !!! "shallow" event clone
         Set_Event_Vars(out, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
         return out;
     }
@@ -403,16 +403,16 @@ REB_R TO_Event(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R PD_Event(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     if (IS_WORD(picker)) {
-        if (opt_setval == NULL) {
+        if (not setval) {
             return Get_Event_Var(
                 pvs->out, pvs->out, VAL_WORD_CANON(picker)
             );
         }
         else {
-            if (!Set_Event_Var(pvs->out, picker, opt_setval))
+            if (!Set_Event_Var(pvs->out, picker, unwrap(setval)))
                 return R_UNHANDLED;
 
             return R_INVISIBLE;

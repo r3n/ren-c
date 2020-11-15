@@ -125,7 +125,7 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
     //
     if (f_next_gotten) {
         assert(IS_WORD(f_next));
-        assert(Try_Lookup_Word(f_next, f_specifier) == f_next_gotten);
+        assert(Lookup_Word(f_next, f_specifier) == f_next_gotten);
     }
 
     assert(f == FS_TOP);
@@ -148,7 +148,7 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
     // and if we're not running a function then f->original should be null.
     //
     assert(not f->original);
-    assert(IS_POINTER_TRASH_DEBUG(f->opt_label));
+    assert(IS_POINTER_TRASH_DEBUG(unwrap(f->label)));
 
     if (f->varlist) {
         assert(NOT_SERIES_FLAG(f->varlist, MANAGED));

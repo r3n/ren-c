@@ -231,7 +231,7 @@ static bool Subparse_Throws(
     const RELVAL *input,
     REBSPC *input_specifier,
     struct Reb_Feed *rules_feed,
-    REBARR *opt_collection,
+    option(REBARR*) collection,
     REBFLGS flags
 ){
     assert(ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(input))));
@@ -267,9 +267,9 @@ static bool Subparse_Throws(
     // passing it between frames.
     //
     REBLEN collect_tail;
-    if (opt_collection) {
-        Init_Block(Prep_Cell(ARG(collection)), opt_collection);
-        collect_tail = ARR_LEN(opt_collection);  // roll back here on failure
+    if (collection) {
+        Init_Block(Prep_Cell(ARG(collection)), unwrap(collection));
+        collect_tail = ARR_LEN(unwrap(collection));  // rollback here on fail
     }
     else {
         Init_Nulled(Prep_Cell(ARG(collection)));
@@ -290,8 +290,8 @@ static bool Subparse_Throws(
     Drop_Action(f);
     Drop_Frame(f);
 
-    if ((r == R_THROWN or IS_NULLED(out)) and opt_collection)
-        TERM_ARRAY_LEN(opt_collection, collect_tail);  // roll back on abort
+    if ((r == R_THROWN or IS_NULLED(out)) and collection)
+        TERM_ARRAY_LEN(unwrap(collection), collect_tail);  // abort rollback
 
     if (r == R_THROWN) {
         //

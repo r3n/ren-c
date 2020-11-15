@@ -282,7 +282,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
 
         REBVAL *error = rebRescue(cast(REBDNG*, &Scan_To_Stack), &level);
         if (feed->context)
-            Shutdown_Interning_Binder(&binder, feed->context);
+            Shutdown_Interning_Binder(&binder, unwrap(feed->context));
 
         if (error) {
             REBCTX *error_ctx = VAL_CONTEXT(error);
@@ -299,7 +299,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             // value out of the va_list and keep going.
             //
             if (feed->vaptr)
-                p = va_arg(*feed->vaptr, const void*);
+                p = va_arg(*unwrap(feed->vaptr), const void*);
             else
                 p = *feed->packed++;
             goto detect_again;
@@ -420,7 +420,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         // is taken care of by Abort_Frame_Core()
         //
         if (feed->vaptr) {
-            va_end(*feed->vaptr);
+            va_end(*unwrap(feed->vaptr));
             feed->vaptr = nullptr;
         }
         else {
@@ -505,7 +505,7 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         // and handled in different ways.  Notably, a UTF-8 string can be
         // differentiated and loaded.
         //
-        const void *p = va_arg(*feed->vaptr, const void*);
+        const void *p = va_arg(*unwrap(feed->vaptr), const void*);
        // feed->index = TRASHED_INDEX; // avoids warning in release build
         lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
     }
@@ -615,7 +615,7 @@ inline static void Literal_Next_In_Feed(REBVAL *out, struct Reb_Feed *feed) {
 
 inline static void Prep_Array_Feed(
     struct Reb_Feed *feed,
-    const RELVAL *opt_first,
+    option(const RELVAL*) first,
     const REBARR *array,
     REBLEN index,
     REBSPC *specifier,
@@ -629,8 +629,8 @@ inline static void Prep_Array_Feed(
     feed->array = array;
     feed->specifier = specifier;
     feed->flags.bits = flags;
-    if (opt_first) {
-        feed->value = opt_first;
+    if (first) {
+        feed->value = unwrap(first);
         feed->index = index;
         feed->pending = STABLE(ARR_AT(array, index));
         assert(KIND3Q_BYTE_UNCHECKED(feed->value) != REB_0_END);
@@ -659,7 +659,7 @@ inline static void Prep_Array_Feed(
 inline static void Prep_Va_Feed(
     struct Reb_Feed *feed,
     const void *p,
-    va_list *vaptr,
+    option(va_list*) vaptr,
     REBFLGS flags
 ){
     Init_Unreadable_Void(Prep_Cell(&feed->fetched));
@@ -668,7 +668,7 @@ inline static void Prep_Va_Feed(
     feed->index = TRASHED_INDEX;  // avoid warning in release build
     feed->array = nullptr;
     feed->flags.bits = flags;
-    if (vaptr == nullptr) {  // `p` should be treated as a packed void* array
+    if (not vaptr) {  // `p` should be treated as a packed void* array
         feed->vaptr = nullptr;
         feed->packed = cast(const void* const*, p);
         p = *feed->packed++;
@@ -686,7 +686,7 @@ inline static void Prep_Va_Feed(
 }
 
 // The flags is passed in by the macro here by default, because it does a
-// fetch as part of the initialization from the opt_first...and if you want
+// fetch as part of the initialization from the `first`...and if you want
 // FLAG_QUOTING_BYTE() to take effect, it must be passed in up front.
 //
 #define DECLARE_VA_FEED(name,p,vaptr,flags) \
@@ -712,7 +712,7 @@ inline static void Prep_Any_Array_Feed(
 
     Prep_Array_Feed(
         feed,
-        nullptr,  // opt_first = nullptr, don't inject arbitrary 1st element
+        nullptr,  // `first` = nullptr, don't inject arbitrary 1st element
         VAL_ARRAY(any_array),
         VAL_INDEX(any_array),
         Derive_Specifier(specifier, any_array),

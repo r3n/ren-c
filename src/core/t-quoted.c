@@ -61,12 +61,12 @@ REBINT CT_Quoted(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Quoted(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_QUOTED);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     return Quotify(Move_Value(out, arg), 1);
 }
@@ -102,10 +102,10 @@ REB_R TO_Quoted(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
 REB_R PD_Quoted(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     UNUSED(picker);
-    UNUSED(opt_setval);
+    UNUSED(setval);
 
     if (KIND3Q_BYTE(pvs->out) == REB_QUOTED)
         Move_Value(pvs->out, VAL_QUOTED_PAYLOAD_CELL(pvs->out));

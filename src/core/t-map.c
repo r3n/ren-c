@@ -322,7 +322,7 @@ REBLEN Find_Map_Entry(
 REB_R PD_Map(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     assert(IS_MAP(pvs->out));
 
@@ -338,14 +338,14 @@ REB_R PD_Map(
     //
     const bool cased = false;
 
-    if (opt_setval) {
+    if (setval) {
         REBMAP *m = VAL_MAP_ENSURE_MUTABLE(pvs->out);
 
         REBINT n = Find_Map_Entry(
             m,  // modified (if not located in map)
             picker,
             SPECIFIED,
-            opt_setval,  // value to set
+            unwrap(setval),  // value to set
             SPECIFIED,
             cased
         );
@@ -421,11 +421,11 @@ static void Append_Map(
 REB_R MAKE_Map(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (ANY_NUMBER(arg)) {
         return Init_Map(out, Make_Map(Int32s(arg, 0)));

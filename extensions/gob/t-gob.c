@@ -729,7 +729,7 @@ void Extend_Gob_Core(REBGOB *gob, const REBVAL *arg) {
 REB_R MAKE_Gob(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_CUSTOM);
@@ -742,8 +742,8 @@ REB_R MAKE_Gob(
         return Init_Gob(out, gob);
     }
 
-    if (opt_parent) {
-        assert(IS_GOB(opt_parent));  // current invariant for MAKE dispatch
+    if (parent) {
+        assert(IS_GOB(unwrap(parent)));  // invariant for MAKE dispatch
 
         if (not IS_BLOCK(arg))
             fail (arg);
@@ -754,7 +754,7 @@ REB_R MAKE_Gob(
         // or keep any parent linkage--could be done in user code as a copy
         // and then apply the difference.
         //
-        REBGOB *gob = Copy_Array_Shallow(VAL_GOB(opt_parent), SPECIFIED);
+        REBGOB *gob = Copy_Array_Shallow(VAL_GOB(unwrap(parent)), SPECIFIED);
         Init_Blank(ARR_AT(gob, IDX_GOB_PANE));
         SET_GOB_PARENT(gob, nullptr);
         Extend_Gob_Core(gob, arg);
@@ -792,12 +792,12 @@ REB_R TO_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R PD_Gob(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     REBGOB *gob = VAL_GOB(pvs->out);
 
     if (IS_WORD(picker)) {
-        if (opt_setval == NULL) {
+        if (not setval) {
             if (IS_BLANK(Get_GOB_Var(pvs->out, gob, picker)))
                 return R_UNHANDLED;
 
@@ -833,7 +833,7 @@ REB_R PD_Gob(
             return pvs->out;
         }
         else {
-            if (not Did_Set_GOB_Var(gob, picker, opt_setval))
+            if (not Did_Set_GOB_Var(gob, picker, unwrap(setval)))
                 return R_UNHANDLED;
             return R_INVISIBLE;
         }

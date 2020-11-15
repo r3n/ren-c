@@ -74,7 +74,9 @@ inline static bool Vararg_Op_If_No_Advance_Handled(
         // and the rules apply.  Note the raw check is faster, no need to
         // separately test for IS_END()
 
-        const REBVAL *child_gotten = Try_Lookup_Word(opt_look, specifier);
+        const REBVAL *child_gotten = try_unwrap(
+            Lookup_Word(opt_look, specifier)
+        );
 
         if (child_gotten and VAL_TYPE(child_gotten) == REB_ACTION) {
             if (GET_ACTION_FLAG(VAL_ACTION(child_gotten), ENFIXED)) {
@@ -146,7 +148,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
 
     REBVAL *arg; // for updating CELL_FLAG_UNEVALUATED
 
-    REBFRM *opt_vararg_frame;
+    option(REBFRM*) vararg_frame;
 
     REBFRM *f;
     REBVAL *shared;
@@ -157,8 +159,8 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         // MAKE ANY-ARRAY! on a varargs (which reified the varargs into an
         // array during that creation, flattening its entire output).
 
-        opt_vararg_frame = NULL;
-        arg = NULL; // no corresponding varargs argument either
+        vararg_frame = nullptr;
+        arg = nullptr; // no corresponding varargs argument either
 
         if (Vararg_Op_If_No_Advance_Handled(
             out,
@@ -252,7 +254,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         //
         assert(not Is_Varargs_Enfix(vararg));
 
-        opt_vararg_frame = f;
+        vararg_frame = f;
         if (VAL_VARARGS_SIGNED_PARAM_INDEX(vararg) < 0)
             arg = FRM_ARG(f, - VAL_VARARGS_SIGNED_PARAM_INDEX(vararg));
         else
@@ -328,10 +330,10 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         // binding.  So that means only one frame can be pointed to per
         // vararg.  Revisit the question of how to give better errors.
         //
-        if (opt_vararg_frame == NULL)
+        if (not vararg_frame)
             fail (out);
 
-        fail (Error_Arg_Type(opt_vararg_frame, param, VAL_TYPE(out)));
+        fail (Error_Arg_Type(unwrap(vararg_frame), param, VAL_TYPE(out)));
     }
 
     if (arg) {
@@ -353,12 +355,12 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
 REB_R MAKE_Varargs(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_VARARGS);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     // With MAKE VARARGS! on an ANY-ARRAY!, the array is the backing store
     // (shared) that the varargs interface cannot affect, but changes to
@@ -414,9 +416,9 @@ REB_R TO_Varargs(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R PD_Varargs(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    UNUSED(opt_setval);
+    UNUSED(setval);
 
     if (not IS_INTEGER(picker))
         fail (rebUnrelativize(picker));

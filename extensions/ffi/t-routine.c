@@ -67,16 +67,16 @@ static struct {
 //
 static void Schema_From_Block_May_Fail(
     RELVAL *schema_out,  // => INTEGER! or HANDLE! for struct
-    RELVAL *opt_param_out,  // => parameter for use in ACTION!s
+    option(RELVAL*) param_out,  // => parameter for use in ACTION!s
     const REBVAL *blk,
-    const REBSTR *opt_spelling
+    option(const REBSTR*) spelling
 ){
     TRASH_CELL_IF_DEBUG(schema_out);
-    if (not opt_spelling)
-        assert(not opt_param_out);
+    if (not spelling)
+        assert(param_out);
     else {
-        assert(opt_param_out);
-        TRASH_CELL_IF_DEBUG(opt_param_out);
+        assert(param_out);
+        TRASH_CELL_IF_DEBUG(unwrap(param_out));
     }
 
     assert(IS_BLOCK(blk));
@@ -116,11 +116,11 @@ static void Schema_From_Block_May_Fail(
         // one structure in the place of another.  Actual struct compatibility
         // is not checked until runtime, when the call happens.
         //
-        if (opt_spelling)
+        if (spelling)
             Init_Param(
-                opt_param_out,
+                unwrap(param_out),
                 REB_P_NORMAL,
-                opt_spelling,
+                unwrap(spelling),
                 FLAGIT_KIND(REB_CUSTOM)  // !!! Was REB_STRUCT, must narrow!
             );
         return;
@@ -128,11 +128,11 @@ static void Schema_From_Block_May_Fail(
 
     if (IS_STRUCT(item)) {
         Init_Block(schema_out, VAL_STRUCT_SCHEMA(item));
-        if (opt_spelling)
+        if (spelling)
             Init_Param(
-                opt_param_out,
+                unwrap(param_out),
                 REB_P_NORMAL,
-                opt_spelling,
+                unwrap(spelling),
                 FLAGIT_KIND(REB_CUSTOM)  // !!! Was REB_STRUCT, must narrow!
             );
         return;
@@ -153,13 +153,13 @@ static void Schema_From_Block_May_Fail(
     REBSYM sym = VAL_WORD_SYM(item);
     if (sym == SYM_VOID) {
         assert(
-            not opt_param_out
-            or VAL_PARAM_SYM(opt_param_out) == SYM_RETURN
+            not param_out
+            or VAL_PARAM_SYM(unwrap(param_out)) == SYM_RETURN
         );  // can only do void for return types
         Init_Blank(schema_out);
     }
 
-    if (opt_spelling) {
+    if (spelling) {
         int index = 0;
         for (; ; ++index) {
             if (syms_to_typesets[index].sym == REB_0)
@@ -167,9 +167,9 @@ static void Schema_From_Block_May_Fail(
 
             if (SAME_SYM_NONZERO(syms_to_typesets[index].sym, sym)) {
                 Init_Param(
-                    opt_param_out,
+                    unwrap(param_out),
                     REB_P_NORMAL,
-                    opt_spelling,
+                    unwrap(spelling),
                     syms_to_typesets[index].bits
                 );
                 break;

@@ -64,11 +64,11 @@ REBINT CT_Array(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Array(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_INTEGER(arg) or IS_DECIMAL(arg)) {
         //
@@ -575,7 +575,7 @@ void Shuffle_Array(REBARR *arr, REBLEN idx, bool secure)
 REB_R PD_Array(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     REBINT n;
 
@@ -629,16 +629,16 @@ REB_R PD_Array(
     }
 
     if (n < 0 or n >= cast(REBINT, VAL_LEN_HEAD(pvs->out))) {
-        if (opt_setval)
+        if (setval)
             return R_UNHANDLED;
 
         return nullptr;
     }
 
-    if (opt_setval)
+    if (setval)
         ENSURE_MUTABLE(pvs->out);
 
-    // assume it will only write if opt_setval (mutability checked for)
+    // assume it will only write if setval (mutability checked for)
     //
     pvs->u.ref.cell = m_cast(RELVAL*, VAL_ARRAY_AT_HEAD(pvs->out, n));
     pvs->u.ref.specifier = VAL_SPECIFIER(pvs->out);
@@ -679,8 +679,8 @@ void MF_Array(REB_MOLD *mo, REBCEL(const*) v, bool form)
     enum Reb_Kind kind = CELL_KIND(v);
 
     if (form) {
-        REBCTX *opt_context = nullptr;
-        Form_Array_At(mo, VAL_ARRAY(v), VAL_INDEX(v), opt_context);
+        option(REBCTX*) context = nullptr;
+        Form_Array_At(mo, VAL_ARRAY(v), VAL_INDEX(v), context);
         return;
     }
 

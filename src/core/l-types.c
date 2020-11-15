@@ -44,12 +44,12 @@
 REB_R MAKE_Fail(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     UNUSED(out);
     UNUSED(kind);
-    UNUSED(opt_parent);
+    UNUSED(parent);
     UNUSED(arg);
 
     fail ("Datatype does not have a MAKE handler registered");
@@ -66,11 +66,11 @@ REB_R MAKE_Fail(
 REB_R MAKE_Unhooked(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     UNUSED(out);
-    UNUSED(opt_parent);
+    UNUSED(parent);
     UNUSED(arg);
 
     const REBVAL *type = Datatype_From_Kind(kind);
@@ -127,21 +127,21 @@ REBNATIVE(make)
 
     MAKE_HOOK *hook;
 
-    REBVAL *opt_parent;
+    option(const REBVAL*) parent;
     enum Reb_Kind kind;
     if (IS_DATATYPE(type)) {
         hook = Make_Hook_For_Type(type);
         kind = VAL_TYPE_KIND_OR_CUSTOM(type);
-        opt_parent = nullptr;
+        parent = nullptr;
     }
     else {
         kind = VAL_TYPE(type);
-        opt_parent = type;
+        parent = type;
         hook = Make_Hook_For_Kind(kind);
     }
 
 
-    REB_R r = hook(D_OUT, kind, opt_parent, arg);  // might throw, fail...
+    REB_R r = hook(D_OUT, kind, parent, arg);  // might throw, fail...
     if (r == R_THROWN)
         return r;
     if (r == nullptr or VAL_TYPE(r) != kind)

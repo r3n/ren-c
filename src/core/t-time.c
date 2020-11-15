@@ -236,12 +236,12 @@ REBINT CT_Time(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Time(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_TIME);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     switch (VAL_TYPE(arg)) {
     case REB_TIME: // just copy it (?)
@@ -468,16 +468,16 @@ void Poke_Time_Immediate(
 REB_R PD_Time(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval) {
+    if (setval) {
         //
         // Returning R_IMMEDIATE means that we aren't actually changing a
         // variable directly, and it will be up to the caller to decide if
         // they can meaningfully determine what variable to copy the update
         // we're making to.
         //
-        Poke_Time_Immediate(pvs->out, picker, opt_setval);
+        Poke_Time_Immediate(pvs->out, picker, unwrap(setval));
         return R_IMMEDIATE;
     }
 

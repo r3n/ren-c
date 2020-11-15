@@ -90,11 +90,11 @@ REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Word(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (ANY_WORD(arg)) {
         //

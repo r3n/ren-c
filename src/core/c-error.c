@@ -534,14 +534,14 @@ void Set_Location_Of_Error(
 REB_R MAKE_Error(
     REBVAL *out,  // output location **MUST BE GC SAFE**!
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_ERROR);
     UNUSED(kind);
 
-    if (opt_parent)  // !!! Should probably be able to work!
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)  // !!! Should probably be able to work!
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     // Frame from the error object template defined in %sysobj.r
     //
@@ -1133,10 +1133,10 @@ REBCTX *Error_Invalid_Arg(REBFRM *f, const RELVAL *param)
     assert(param <= rootparam + 1 + FRM_NUM_ARGS(f));
 
     DECLARE_LOCAL (label);
-    if (not f->opt_label)
+    if (not f->label)
         Init_Blank(label);
     else
-        Init_Word(label, f->opt_label);
+        Init_Word(label, unwrap(f->label));
 
     DECLARE_LOCAL (param_name);
     Init_Word(param_name, VAL_PARAM_SPELLING(param));

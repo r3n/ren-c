@@ -985,7 +985,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
 
         const void *p;
         if (ss->feed->vaptr)
-            p = va_arg(*ss->feed->vaptr, const void*);
+            p = va_arg(*unwrap(ss->feed->vaptr), const void*);
         else
             p = *ss->feed->packed++;
 
@@ -2359,7 +2359,8 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
     // are into the user context (which we will expand).
     //
     if (ss->feed and ss->feed->binder and ANY_WORD(DS_TOP)) {
-        //
+        struct Reb_Binder *binder = unwrap(ss->feed->binder);
+
         // We don't initialize the binder until the first WORD! seen.
         //
         if (not ss->feed->context) {
@@ -2369,16 +2370,19 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     ? VAL_CONTEXT(Lib_Context)
                     : nullptr;
 
-            Init_Interning_Binder(ss->feed->binder, ss->feed->context);
+            Init_Interning_Binder(binder, unwrap(ss->feed->context));
         }
 
+        REBCTX *context = unwrap(ss->feed->context);
+        REBCTX *lib = try_unwrap(ss->feed->lib);
+
         const REBSTR *canon = VAL_WORD_CANON(DS_TOP);
-        REBINT n = Get_Binder_Index_Else_0(ss->feed->binder, canon);
+        REBINT n = Get_Binder_Index_Else_0(binder, canon);
         if (n > 0) {
             //
             // Exists in user context at the given positive index.
             //
-            INIT_BINDING(DS_TOP, ss->feed->context);
+            INIT_BINDING(DS_TOP, context);
             INIT_WORD_INDEX(DS_TOP, n);
         }
         else if (n < 0) {
@@ -2386,35 +2390,24 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             // Index is the negative of where the value exists in lib.
             // A proxy needs to be imported from lib to context.
             //
-            Expand_Context(ss->feed->context, 1);
+            Expand_Context(context, 1);
             Move_Var(  // preserve enfix state
-                Append_Context(ss->feed->context, DS_TOP, 0),
-                CTX_VAR(ss->feed->lib, -n)  // -n is positive
+                Append_Context(context, DS_TOP, 0),
+                CTX_VAR(lib, -n)  // -n is positive
             );
-            REBINT check = Remove_Binder_Index_Else_0(
-                ss->feed->binder,
-                canon
-            );
+            REBINT check = Remove_Binder_Index_Else_0(binder, canon);
             assert(check == n);  // n is negative
             UNUSED(check);
-            Add_Binder_Index(
-                ss->feed->binder,
-                canon,
-                VAL_WORD_INDEX(DS_TOP)
-            );
+            Add_Binder_Index(binder, canon, VAL_WORD_INDEX(DS_TOP));
         }
         else {
             // Doesn't exist in either lib or user, create a new binding
             // in user (this is not the preferred behavior for modules
             // and isolation, but going with it for the API for now).
             //
-            Expand_Context(ss->feed->context, 1);
-            Append_Context(ss->feed->context, DS_TOP, 0);
-            Add_Binder_Index(
-                ss->feed->binder,
-                canon,
-                VAL_WORD_INDEX(DS_TOP)
-            );
+            Expand_Context(context, 1);
+            Append_Context(context, DS_TOP, 0);
+            Add_Binder_Index(binder, canon, VAL_WORD_INDEX(DS_TOP));
         }
     }
 

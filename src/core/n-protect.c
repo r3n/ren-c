@@ -485,7 +485,7 @@ REBNATIVE(locked_q)
 //
 //  Force_Value_Frozen: C
 //
-// !!! The concept behind `opt_locker` is that it might be able to give the
+// !!! The concept behind `locker` is that it might be able to give the
 // user more information about why data would be automatically locked, e.g.
 // if locked for reason of using as a map key...for instance.  It could save
 // the map, or the file and line information for the interpreter at that
@@ -499,7 +499,7 @@ REBNATIVE(locked_q)
 void Force_Value_Frozen_Core(
     unstable const RELVAL *v,
     bool deep,
-    REBSER *opt_locker
+    option(REBSER*) locker
 ){
     if (Is_Value_Frozen_Deep(v))
         return;
@@ -512,7 +512,7 @@ void Force_Value_Frozen_Core(
             Freeze_Array_Deep(m_cast(REBARR*, VAL_ARRAY(cell)));
         else
             Freeze_Array_Shallow(m_cast(REBARR*, VAL_ARRAY(cell)));
-        if (opt_locker)
+        if (locker)
             SET_SERIES_INFO(VAL_ARRAY(cell), AUTO_LOCKED);
     }
     else if (ANY_CONTEXT_KIND(kind)) {
@@ -520,13 +520,13 @@ void Force_Value_Frozen_Core(
             Deep_Freeze_Context(VAL_CONTEXT(cell));
         else
             fail ("What does a shallow freeze of a context mean?");
-        if (opt_locker)
+        if (locker)
             SET_SERIES_INFO(VAL_CONTEXT(cell), AUTO_LOCKED);
     }
     else if (ANY_SERIES_KIND(kind)) {
         Freeze_Series(VAL_SERIES(cell));
         UNUSED(deep);
-        if (opt_locker)
+        if (locker)
             SET_SERIES_INFO(VAL_SERIES(cell), AUTO_LOCKED);
     } else
         fail (Error_Invalid_Type(kind)); // not yet implemented

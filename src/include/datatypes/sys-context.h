@@ -320,9 +320,9 @@ inline static const REBSTR *VAL_FRAME_LABEL(unstable const RELVAL *v) {
 
 inline static void INIT_VAL_FRAME_LABEL(
     unstable RELVAL *v,
-    const REBSTR *label
+    option(const REBSTR*) label
 ){
-    VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, label));
+    VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, try_unwrap(label)));
 }
 
 
@@ -405,10 +405,10 @@ static inline REBVAL *Init_Any_Context(
 inline static REBVAL *Init_Frame(
     unstable RELVAL *out,
     REBCTX *c,
-    const REBSTR *label
+    option(const REBSTR*) label  // nullptr (ANONYMOUS) is okay
 ){
     Init_Any_Context(out, REB_FRAME, c);
-    INIT_VAL_FRAME_LABEL(out, label);  // nullptr (ANONYMOUS) is okay
+    INIT_VAL_FRAME_LABEL(out, label);
     return cast(REBVAL*, out);
 }
 

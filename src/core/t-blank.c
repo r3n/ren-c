@@ -67,12 +67,12 @@ void MF_Blank(REB_MOLD *mo, REBCEL(const*) v, bool form)
 REB_R PD_Blank(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     UNUSED(picker);
     UNUSED(pvs);
 
-    if (opt_setval != NULL)
+    if (setval)
         return R_UNHANDLED;
 
     return nullptr;

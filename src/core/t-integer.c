@@ -47,12 +47,12 @@ REBINT CT_Integer(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Integer(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_INTEGER);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_LOGIC(arg)) {
         //

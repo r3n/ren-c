@@ -1067,12 +1067,12 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
 REB_R MAKE_Struct(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_CUSTOM);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (not IS_BLOCK(arg))
         fail (arg);
@@ -1356,7 +1356,7 @@ REB_R TO_Struct(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R PD_Struct(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     REBSTU *stu = VAL_STRUCT(pvs->out);
     fail_if_non_accessible(stu);
@@ -1364,7 +1364,7 @@ REB_R PD_Struct(
     if (not IS_WORD(picker))
         return R_UNHANDLED;
 
-    if (opt_setval == nullptr) {
+    if (not setval) {
         if (not Get_Struct_Var(pvs->out, stu, picker))
             return R_UNHANDLED;
 
@@ -1425,7 +1425,7 @@ REB_R PD_Struct(
         return pvs->out;
     }
     else {
-        if (not Set_Struct_Var(stu, picker, nullptr, opt_setval))
+        if (not Set_Struct_Var(stu, picker, nullptr, unwrap(setval)))
             return R_UNHANDLED;
 
         return R_INVISIBLE;

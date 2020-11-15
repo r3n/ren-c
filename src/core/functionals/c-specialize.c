@@ -129,7 +129,7 @@ REB_R Specializer_Dispatcher(REBFRM *f)
 REBCTX *Make_Context_For_Action_Push_Partials(
     const REBVAL *action,  // need ->binding, so can't just be a REBACT*
     REBDSP lowest_ordered_dsp,  // caller can add refinement specializations
-    struct Reb_Binder *opt_binder
+    option(struct Reb_Binder*) binder
 ){
     REBDSP highest_ordered_dsp = DSP;
 
@@ -183,8 +183,8 @@ REBCTX *Make_Context_For_Action_Push_Partials(
           continue_unspecialized:
 
             Init_Void(arg, SYM_UNDEFINED);  // *not* ARG_MARKED_CHECKED
-            if (opt_binder)
-                Add_Binder_Index(opt_binder, canon, index);
+            if (binder)
+                Add_Binder_Index(unwrap(binder), canon, index);
 
             continue;
         }
@@ -261,12 +261,12 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 REBCTX *Make_Context_For_Action(
     const REBVAL *action, // need ->binding, so can't just be a REBACT*
     REBDSP lowest_ordered_dsp,
-    struct Reb_Binder *opt_binder
+    option(struct Reb_Binder*) binder
 ){
     REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
         action,
         lowest_ordered_dsp,
-        opt_binder
+        binder
     );
 
     Manage_Array(CTX_VARLIST(exemplar));  // !!! was needed before, review
@@ -291,13 +291,13 @@ REBCTX *Make_Context_For_Action(
 bool Specialize_Action_Throws(
     REBVAL *out,
     REBVAL *specializee,
-    REBVAL *opt_def,  // !!! REVIEW: binding modified directly (not copied)
+    option(REBVAL*) def,  // !!! REVIEW: binding modified directly, not copied
     REBDSP lowest_ordered_dsp
 ){
     assert(out != specializee);
 
     struct Reb_Binder binder;
-    if (opt_def)
+    if (def)
         INIT_BINDER(&binder);
 
     REBACT *unspecialized = VAL_ACTION(specializee);
@@ -311,11 +311,11 @@ bool Specialize_Action_Throws(
     REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
         specializee,
         lowest_ordered_dsp,
-        opt_def ? &binder : nullptr
+        def ? &binder : nullptr
     );
     Manage_Array(CTX_VARLIST(exemplar)); // destined to be managed, guarded
 
-    if (opt_def) { // code that fills the frame...fully or partially
+    if (def) { // code that fills the frame...fully or partially
         //
         // Bind all the SET-WORD! in the body that match params in the frame
         // into the frame.  This means `value: value` can very likely have
@@ -331,7 +331,7 @@ bool Specialize_Action_Throws(
 
         Bind_Values_Inner_Loop(
             &binder,
-            VAL_ARRAY_AT_MUTABLE_HACK(opt_def),
+            VAL_ARRAY_AT_MUTABLE_HACK(unwrap(def)),
             exemplar,
             FLAGIT_KIND(REB_SET_WORD),  // types to bind (just set-word!)
             0,  // types to "add midstream" to binding as we go (nothing)
@@ -356,7 +356,7 @@ bool Specialize_Action_Throws(
         // Run block and ignore result (unless it is thrown)
         //
         PUSH_GC_GUARD(exemplar);
-        bool threw = Do_Any_Array_At_Throws(out, opt_def, SPECIFIED);
+        bool threw = Do_Any_Array_At_Throws(out, unwrap(def), SPECIFIED);
         DROP_GC_GUARD(exemplar);
 
         if (threw) {
@@ -810,12 +810,12 @@ REBVAL *Last_Unspecialized_Param(REBACT *act)
 //
 // Helper built on First_Unspecialized_Param(), can also give you the param.
 //
-REBVAL *First_Unspecialized_Arg(REBVAL **opt_param_out, REBFRM *f)
+REBVAL *First_Unspecialized_Arg(option(REBVAL **) param_out, REBFRM *f)
 {
     REBACT *phase = FRM_PHASE(f);
     REBVAL *param = First_Unspecialized_Param(phase);
-    if (opt_param_out)
-        *opt_param_out = param;
+    if (param_out)
+        *unwrap(param_out) = param;
 
     if (param == nullptr)
         return nullptr;
@@ -848,9 +848,9 @@ bool Make_Invocation_Frame_Throws(
 
     // === END FIRST PART OF CODE FROM DO_SUBFRAME ===
 
-    REBSTR *opt_label = nullptr; // !!! for now
+    option(const REBSTR*) label = nullptr;  // !!! for now
     Push_Action(f, VAL_ACTION(action), VAL_BINDING(action));
-    Begin_Prefix_Action(f, opt_label);
+    Begin_Prefix_Action(f, label);
 
     // Use this special mode where we ask the dispatcher not to run, just to
     // gather the args.  Push_Action() checks that it's not set, so we don't

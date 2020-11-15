@@ -453,7 +453,7 @@ inline static void INIT_ACTION_LABEL(unstable RELVAL *v, const REBSTR *label)
 static inline REBVAL *Init_Action(
     unstable RELVAL *out,
     REBACT *a,
-    const REBSTR *label,  // allowed to be ANONYMOUS
+    option(const REBSTR*) label,  // allowed to be ANONYMOUS
     REBNOD *binding  // allowed to be UNBOUND
 ){
   #if !defined(NDEBUG)
@@ -462,7 +462,7 @@ static inline REBVAL *Init_Action(
     Force_Array_Managed(ACT_PARAMLIST(a));
     Move_Value(out, ACT_ARCHETYPE(a));
     if (label)
-        INIT_ACTION_LABEL(out, label);
+        INIT_ACTION_LABEL(out, unwrap(label));
     else {
         // leave as the array from the archetype (array means not a label)
     }

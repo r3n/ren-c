@@ -314,7 +314,7 @@ void Form_Array_At(
     REB_MOLD *mo,
     const REBARR *array,
     REBLEN index,
-    REBCTX *opt_context
+    option(REBCTX*) context
 ){
     // Form a series (part_mold means mold non-string values):
     REBINT len = ARR_LEN(array) - index;
@@ -325,9 +325,9 @@ void Form_Array_At(
     for (n = 0; n < len;) {
         unstable const RELVAL *item = ARR_AT(array, index + n);
         REBVAL *wval = nullptr;
-        if (opt_context and (IS_WORD(item) or IS_GET_WORD(item))) {
+        if (context and (IS_WORD(item) or IS_GET_WORD(item))) {
             wval = Select_Canon_In_Context(
-                CTX_ARCHETYPE(opt_context),
+                CTX_ARCHETYPE(unwrap(context)),
                 VAL_WORD_CANON(item)
             );
             if (wval)

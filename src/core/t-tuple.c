@@ -35,15 +35,15 @@
 REB_R MAKE_Sequence(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     if (kind == REB_TEXT or ANY_PATH_KIND(kind))  // delegate for now
-        return MAKE_Path(out, kind, opt_parent, arg);
+        return MAKE_Path(out, kind, parent, arg);
 
     assert(kind == REB_TUPLE);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_TUPLE(arg))
         return Move_Value(out, arg);
@@ -425,9 +425,9 @@ REBTYPE(Sequence)
 REB_R PD_Sequence(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval)
+    if (setval)
         fail ("PATH!s are immutable (convert to GROUP! or BLOCK! to mutate)");
 
     REBINT n;

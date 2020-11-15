@@ -144,27 +144,27 @@ inline static bool Did_Init_Inert_Optimize_Complete(
     Literal_Next_In_Feed(out, feed);
 
     if (KIND3Q_BYTE_UNCHECKED(feed->value) == REB_WORD) {
-        feed->gotten = Try_Lookup_Word(feed->value, feed->specifier);
+        feed->gotten = Lookup_Word(feed->value, feed->specifier);
         if (
             not feed->gotten
-            or not IS_ACTION(feed->gotten)
+            or not IS_ACTION(unwrap(feed->gotten))
         ){
             CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
             return true;  // not action
         }
 
-        if (GET_ACTION_FLAG(VAL_ACTION(feed->gotten), IS_BARRIER)) {
+        if (GET_ACTION_FLAG(VAL_ACTION(unwrap(feed->gotten)), IS_BARRIER)) {
             SET_FEED_FLAG(feed, BARRIER_HIT);
             CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
             return true;  // is barrier
         }
 
-        if (NOT_ACTION_FLAG(VAL_ACTION(feed->gotten), ENFIXED)) {
+        if (NOT_ACTION_FLAG(VAL_ACTION(unwrap(feed->gotten)), ENFIXED)) {
             CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
             return true;  // not enfixed
         }
 
-        REBACT *action = VAL_ACTION(feed->gotten);
+        REBACT *action = VAL_ACTION(unwrap(feed->gotten));
         if (GET_ACTION_FLAG(action, QUOTES_FIRST)) {
             //
             // Quoting defeats NO_LOOKAHEAD but only on soft quotes.
@@ -400,11 +400,11 @@ inline static bool Eval_Value_Maybe_End_Throws(
 
     SET_END(out);
 
-    struct Reb_Feed feed_struct;  // opt_first so can't use DECLARE_ARRAY_FEED
+    struct Reb_Feed feed_struct;  // first so can't use DECLARE_ARRAY_FEED
     struct Reb_Feed *feed = &feed_struct;
     Prep_Array_Feed(
         feed,
-        value,  // opt_first--in this case, the only value in the feed...
+        value,  // first--in this case, the only value in the feed...
         EMPTY_ARRAY,  // ...because we're using the empty array after that
         0,  // ...at index 0
         specifier,

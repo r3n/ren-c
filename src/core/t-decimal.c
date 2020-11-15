@@ -146,12 +146,12 @@ REBVAL *Init_Decimal_Bits(RELVAL *out, const REBYTE *bp)
 REB_R MAKE_Decimal(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_DECIMAL or kind == REB_PERCENT);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     REBDEC d;
 

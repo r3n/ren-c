@@ -77,12 +77,12 @@ REBINT CT_Money(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Money(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_MONEY);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     switch (VAL_TYPE(arg)) {
       case REB_INTEGER:

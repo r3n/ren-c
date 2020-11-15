@@ -491,11 +491,11 @@ REB_R TO_Vector(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R MAKE_Vector(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_INTEGER(arg) or IS_DECIMAL(arg)) {  // e.g. `make vector! 100`
         REBINT len = Int32s(arg, 0);
@@ -606,10 +606,10 @@ void Poke_Vector_Fail_If_Read_Only(
 REB_R PD_Vector(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval) {
-        Poke_Vector_Fail_If_Read_Only(pvs->out, picker, opt_setval);
+    if (setval) {
+        Poke_Vector_Fail_If_Read_Only(pvs->out, picker, unwrap(setval));
         return R_INVISIBLE;
     }
 

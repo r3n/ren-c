@@ -435,12 +435,12 @@ void Subtract_Date(REBVAL *d1, REBVAL *d2, REBVAL *result)
 REB_R MAKE_Date(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_DATE);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_DATE(arg))
         return Move_Value(out, arg);
@@ -558,14 +558,14 @@ REB_R TO_Date(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
 }
 
 
-static REBINT Int_From_Date_Arg(const REBVAL *opt_poke) {
-    if (IS_INTEGER(opt_poke) or IS_DECIMAL(opt_poke))
-        return Int32s(opt_poke, 0);
+static REBINT Int_From_Date_Arg(const REBVAL *poke) {
+    if (IS_INTEGER(poke) or IS_DECIMAL(poke))
+        return Int32s(poke, 0);
 
-    if (IS_BLANK(opt_poke))
+    if (IS_BLANK(poke))
         return 0;
 
-    fail (opt_poke);
+    fail (poke);
 }
 
 
@@ -573,10 +573,10 @@ static REBINT Int_From_Date_Arg(const REBVAL *opt_poke) {
 //  Pick_Or_Poke_Date: C
 //
 void Pick_Or_Poke_Date(
-    REBVAL *opt_out,
+    option(REBVAL*) opt_out,
     REBVAL *v,
     const RELVAL *picker,
-    const REBVAL *opt_poke
+    option(const REBVAL*) opt_poke
 ){
     REBSYM sym;
     if (IS_WORD(picker)) {
@@ -603,115 +603,117 @@ void Pick_Or_Poke_Date(
     else
         fail (rebUnrelativize(picker));
 
-    if (opt_poke == NULL) {
-        assert(opt_out != NULL);
-        TRASH_CELL_IF_DEBUG(opt_out);
+    if (not opt_poke) {
+        assert(opt_out);
+        REBVAL *out = unwrap(opt_out);
+        TRASH_CELL_IF_DEBUG(out);
 
         switch (sym) {
         case SYM_YEAR:
-            Init_Integer(opt_out, VAL_YEAR(v));
+            Init_Integer(out, VAL_YEAR(v));
             break;
 
         case SYM_MONTH:
-            Init_Integer(opt_out, VAL_MONTH(v));
+            Init_Integer(out, VAL_MONTH(v));
             break;
 
         case SYM_DAY:
-            Init_Integer(opt_out, VAL_DAY(v));
+            Init_Integer(out, VAL_DAY(v));
             break;
 
         case SYM_TIME:
             if (not Does_Date_Have_Time(v))
-                Init_Nulled(opt_out);
+                Init_Nulled(out);
             else {
-                Move_Value(opt_out, v); // want v's adjusted VAL_NANO()
-                Adjust_Date_Zone(opt_out, false);
-                RESET_VAL_HEADER(opt_out, REB_TIME, CELL_MASK_NONE);
+                Move_Value(out, v); // want v's adjusted VAL_NANO()
+                Adjust_Date_Zone(out, false);
+                RESET_VAL_HEADER(out, REB_TIME, CELL_MASK_NONE);
             }
             break;
 
         case SYM_ZONE:
             if (not Does_Date_Have_Zone(v)) {
-                Init_Nulled(opt_out);
+                Init_Nulled(out);
             }
             else {
                 assert(Does_Date_Have_Time(v));
 
                 Init_Time_Nanoseconds(
-                    opt_out,
+                    out,
                     cast(int64_t, VAL_ZONE(v)) * ZONE_MINS * MIN_SEC
                 );
             }
             break;
 
         case SYM_DATE: {
-            Move_Value(opt_out, v);
+            Move_Value(out, v);
 
             const bool to_utc = false;
-            Adjust_Date_Zone(opt_out, to_utc); // !!! necessary?
+            Adjust_Date_Zone(out, to_utc); // !!! necessary?
 
-            PAYLOAD(Time, opt_out).nanoseconds = NO_DATE_TIME;
-            VAL_DATE(opt_out).zone = NO_DATE_ZONE;
+            PAYLOAD(Time, out).nanoseconds = NO_DATE_TIME;
+            VAL_DATE(out).zone = NO_DATE_ZONE;
             break; }
 
         case SYM_WEEKDAY:
-            Init_Integer(opt_out, Week_Day(VAL_DATE(v)));
+            Init_Integer(out, Week_Day(VAL_DATE(v)));
             break;
 
         case SYM_JULIAN:
         case SYM_YEARDAY:
-            Init_Integer(opt_out, cast(REBINT, Julian_Date(VAL_DATE(v))));
+            Init_Integer(out, cast(REBINT, Julian_Date(VAL_DATE(v))));
             break;
 
         case SYM_UTC: {
-            Move_Value(opt_out, v);
-            VAL_DATE(opt_out).zone = 0;
+            Move_Value(out, v);
+            VAL_DATE(out).zone = 0;
             const bool to_utc = true;
-            Adjust_Date_Zone(opt_out, to_utc);
+            Adjust_Date_Zone(out, to_utc);
             break; }
 
         case SYM_HOUR:
             if (not Does_Date_Have_Time(v))
-                Init_Nulled(opt_out);
+                Init_Nulled(out);
             else {
                 REB_TIMEF time;
                 Split_Time(VAL_NANO(v), &time);
-                Init_Integer(opt_out, time.h);
+                Init_Integer(out, time.h);
             }
             break;
 
         case SYM_MINUTE:
             if (not Does_Date_Have_Time(v))
-                Init_Nulled(opt_out);
+                Init_Nulled(out);
             else {
                 REB_TIMEF time;
                 Split_Time(VAL_NANO(v), &time);
-                Init_Integer(opt_out, time.m);
+                Init_Integer(out, time.m);
             }
             break;
 
         case SYM_SECOND:
             if (not Does_Date_Have_Time(v))
-                Init_Nulled(opt_out);
+                Init_Nulled(out);
             else {
                 REB_TIMEF time;
                 Split_Time(VAL_NANO(v), &time);
                 if (time.n == 0)
-                    Init_Integer(opt_out, time.s);
+                    Init_Integer(out, time.s);
                 else
                     Init_Decimal(
-                        opt_out,
+                        out,
                         cast(REBDEC, time.s) + (time.n * NANO)
                     );
             }
             break;
 
         default:
-            Init_Nulled(opt_out); // "out of range" PICK semantics
+            Init_Nulled(out); // "out of range" PICK semantics
         }
     }
     else {
-        assert(opt_out == NULL);
+        assert(not opt_out);
+        const REBVAL *poke = unwrap(opt_poke);
 
         // Here the desire is to modify the incoming date directly.  This is
         // done by changing the components that need to change which were
@@ -730,36 +732,36 @@ void Pick_Or_Poke_Date(
 
         switch (sym) {
         case SYM_YEAR:
-            year = Int_From_Date_Arg(opt_poke);
+            year = Int_From_Date_Arg(poke);
             break;
 
         case SYM_MONTH:
-            month = Int_From_Date_Arg(opt_poke) - 1;
+            month = Int_From_Date_Arg(poke) - 1;
             break;
 
         case SYM_DAY:
-            day = Int_From_Date_Arg(opt_poke) - 1;
+            day = Int_From_Date_Arg(poke) - 1;
             break;
 
         case SYM_TIME:
-            if (IS_NULLED(opt_poke)) { // clear out the time component
+            if (IS_NULLED(poke)) { // clear out the time component
                 PAYLOAD(Time, v).nanoseconds = NO_DATE_TIME;
                 VAL_DATE(v).zone = NO_DATE_ZONE;
                 return;
             }
 
-            if (IS_TIME(opt_poke) or IS_DATE(opt_poke))
-                secs = VAL_NANO(opt_poke);
-            else if (IS_INTEGER(opt_poke))
-                secs = Int_From_Date_Arg(opt_poke) * SEC_SEC;
-            else if (IS_DECIMAL(opt_poke))
-                secs = DEC_TO_SECS(VAL_DECIMAL(opt_poke));
+            if (IS_TIME(poke) or IS_DATE(poke))
+                secs = VAL_NANO(poke);
+            else if (IS_INTEGER(poke))
+                secs = Int_From_Date_Arg(poke) * SEC_SEC;
+            else if (IS_DECIMAL(poke))
+                secs = DEC_TO_SECS(VAL_DECIMAL(poke));
             else
-                fail (opt_poke);
+                fail (poke);
             break;
 
         case SYM_ZONE:
-            if (IS_NULLED(opt_poke)) { // clear out the zone component
+            if (IS_NULLED(poke)) { // clear out the zone component
                 VAL_DATE(v).zone = NO_DATE_ZONE;
                 return;
             }
@@ -767,14 +769,14 @@ void Pick_Or_Poke_Date(
             if (not Does_Date_Have_Time(v))
                 fail ("Can't set /ZONE in a DATE! with no time component");
 
-            if (IS_TIME(opt_poke))
-                tz = cast(REBINT, VAL_NANO(opt_poke) / (ZONE_MINS * MIN_SEC));
-            else if (IS_DATE(opt_poke))
-                tz = VAL_ZONE(opt_poke);
+            if (IS_TIME(poke))
+                tz = cast(REBINT, VAL_NANO(poke) / (ZONE_MINS * MIN_SEC));
+            else if (IS_DATE(poke))
+                tz = VAL_ZONE(poke);
             else
-                tz = Int_From_Date_Arg(opt_poke) * (60 / ZONE_MINS);
+                tz = Int_From_Date_Arg(poke) * (60 / ZONE_MINS);
             if (tz > MAX_ZONE or tz < -MAX_ZONE)
-                fail (Error_Out_Of_Range(opt_poke));
+                fail (Error_Out_Of_Range(poke));
             break;
 
         case SYM_JULIAN:
@@ -783,11 +785,11 @@ void Pick_Or_Poke_Date(
             fail (rebUnrelativize(picker));
 
         case SYM_DATE:
-            if (!IS_DATE(opt_poke))
-                fail (opt_poke);
-            VAL_DATE(v) = VAL_DATE(opt_poke);
+            if (not IS_DATE(poke))
+                fail (poke);
+            VAL_DATE(v) = VAL_DATE(poke);
 
-            assert(Does_Date_Have_Zone(opt_poke) == Does_Date_Have_Zone(v));
+            assert(Does_Date_Have_Zone(poke) == Does_Date_Have_Zone(v));
             return;
 
         case SYM_HOUR: {
@@ -796,7 +798,7 @@ void Pick_Or_Poke_Date(
 
             REB_TIMEF time;
             Split_Time(secs, &time);
-            time.h = Int_From_Date_Arg(opt_poke);
+            time.h = Int_From_Date_Arg(poke);
             secs = Join_Time(&time, false);
             break; }
 
@@ -806,7 +808,7 @@ void Pick_Or_Poke_Date(
 
             REB_TIMEF time;
             Split_Time(secs, &time);
-            time.m = Int_From_Date_Arg(opt_poke);
+            time.m = Int_From_Date_Arg(poke);
             secs = Join_Time(&time, false);
             break; }
 
@@ -816,15 +818,15 @@ void Pick_Or_Poke_Date(
 
             REB_TIMEF time;
             Split_Time(secs, &time);
-            if (IS_INTEGER(opt_poke)) {
-                time.s = Int_From_Date_Arg(opt_poke);
+            if (IS_INTEGER(poke)) {
+                time.s = Int_From_Date_Arg(poke);
                 time.n = 0;
             }
             else {
                 //if (f < 0.0) fail (Error_Out_Of_Range(setval));
-                time.s = cast(REBINT, VAL_DECIMAL(opt_poke));
+                time.s = cast(REBINT, VAL_DECIMAL(poke));
                 time.n = cast(REBINT,
-                    (VAL_DECIMAL(opt_poke) - time.s) * SEC_SEC);
+                    (VAL_DECIMAL(poke) - time.s) * SEC_SEC);
             }
             secs = Join_Time(&time, false);
             break; }
@@ -861,15 +863,15 @@ void Pick_Or_Poke_Date(
 REB_R PD_Date(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval != NULL) {
+    if (setval) {
         //
         // Updates pvs->out; R_IMMEDIATE means path dispatch will write it
         // back to whatever the originating variable location was, or error
         // if it didn't come from a variable.
         //
-        Pick_Or_Poke_Date(NULL, pvs->out, picker, opt_setval);
+        Pick_Or_Poke_Date(nullptr, pvs->out, picker, setval);
         return R_IMMEDIATE;
     }
 
@@ -877,7 +879,7 @@ REB_R PD_Date(
     //
     DECLARE_LOCAL (temp);
     Move_Value(temp, pvs->out);
-    Pick_Or_Poke_Date(pvs->out, temp, picker, NULL);
+    Pick_Or_Poke_Date(pvs->out, temp, picker, nullptr);
     return pvs->out;
 }
 

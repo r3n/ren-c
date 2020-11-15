@@ -93,12 +93,12 @@ void MF_Bitset(REB_MOLD *mo, REBCEL(const*) v, bool form)
 REB_R MAKE_Bitset(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_BITSET);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     REBLEN len = Find_Max_Bit(arg);
     if (len == NOT_FOUND)
@@ -518,9 +518,9 @@ bool Check_Bits(const REBSER *bset, unstable const RELVAL *val, bool uncased)
 REB_R PD_Bitset(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval == NULL) {
+    if (not setval) {
         const REBSER *ser = VAL_SERIES(pvs->out);
         if (Check_Bits(ser, picker, false))
             return Init_True(pvs->out);
@@ -532,8 +532,8 @@ REB_R PD_Bitset(
         ser,
         picker,
         BITS_NOT(ser)
-            ? IS_FALSEY(opt_setval)
-            : IS_TRUTHY(opt_setval)
+            ? IS_FALSEY(unwrap(setval))
+            : IS_TRUTHY(unwrap(setval))
     )){
         return R_INVISIBLE;
     }

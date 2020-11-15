@@ -240,8 +240,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     const RELVAL *v;  // shorthand for the value we are switch()-ing on
     TRASH_POINTER_IF_DEBUG(v);
 
-    const REBVAL *gotten;
-    TRASH_POINTER_IF_DEBUG(gotten);
+    option(const REBVAL*) gotten;
+    TRASH_OPTION_IF_DEBUG(gotten);
 
     // Given how the evaluator is written, it's inevitable that there will
     // have to be a test for points to `goto` before running normal eval.
@@ -346,12 +346,12 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto give_up_backward_quote_priority;
 
     assert(not f_next_gotten);  // Fetch_Next_In_Frame() cleared it
-    f_next_gotten = Try_Lookup_Word(f_next, f_specifier);
+    f_next_gotten = Lookup_Word(f_next, f_specifier);
 
-    if (not f_next_gotten or not IS_ACTION(f_next_gotten))
+    if (not f_next_gotten or not IS_ACTION(unwrap(f_next_gotten)))
         goto give_up_backward_quote_priority;  // note only ACTION! is ENFIXED
 
-    if (GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), IS_BARRIER)) {
+    if (GET_ACTION_FLAG(VAL_ACTION(unwrap(f_next_gotten)), IS_BARRIER)) {
         //
         // In a situation like `foo |`, we want FOO to be able to run...it
         // may take 0 args or it may be able to tolerate END.  But we should
@@ -362,10 +362,13 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto give_up_backward_quote_priority;
     }
 
-    if (NOT_ACTION_FLAG(VAL_ACTION(f_next_gotten), ENFIXED))
+    if (NOT_ACTION_FLAG(VAL_ACTION(unwrap(f_next_gotten)), ENFIXED))
         goto give_up_backward_quote_priority;
 
-    if (NOT_ACTION_FLAG(VAL_ACTION(f_next_gotten), QUOTES_FIRST))
+  blockscope {
+    REBACT *enfixed = VAL_ACTION(unwrap(f_next_gotten));
+
+    if (NOT_ACTION_FLAG(enfixed, QUOTES_FIRST))
         goto give_up_backward_quote_priority;
 
     // If the action soft quotes its left, that means it's aware that its
@@ -373,7 +376,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // material on the left, treat it like it's in a group.
     //
     if (
-        GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), POSTPONES_ENTIRELY)
+        GET_ACTION_FLAG(enfixed, POSTPONES_ENTIRELY)
         or (
             GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)
             and not ANY_SET_KIND(kind_current)  // not SET-WORD!, SET-PATH!...
@@ -381,7 +384,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     ){
         // !!! cache this test?
         //
-        REBVAL *first = First_Unspecialized_Param(VAL_ACTION(f_next_gotten));
+        REBVAL *first = First_Unspecialized_Param(enfixed);
         if (
             VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE
             or VAL_PARAM_CLASS(first) == REB_P_MODAL
@@ -395,8 +398,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // such that `case [condition [...] default [...]]` does not interfere
     // with the BLOCK! on the left, but `x: default [...]` gets the SET-WORD!
     //
-    if (GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), SKIPPABLE_FIRST)) {
-        REBVAL *first = First_Unspecialized_Param(VAL_ACTION(f_next_gotten));
+    if (GET_ACTION_FLAG(enfixed, SKIPPABLE_FIRST)) {
+        REBVAL *first = First_Unspecialized_Param(enfixed);
         if (not TYPE_CHECK(first, kind_current))  // left's kind
             goto give_up_backward_quote_priority;
     }
@@ -444,13 +447,18 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         goto give_up_backward_quote_priority;  // run PATH!/WORD! normal
     }
+  }
 
     // Wasn't the at-end exception, so run normal enfix with right winning.
     //
   blockscope {
     DECLARE_ACTION_SUBFRAME (subframe, f);
     Push_Frame(f->out, subframe);
-    Push_Action(subframe, VAL_ACTION(gotten), VAL_BINDING(gotten));
+    Push_Action(
+        subframe, 
+        VAL_ACTION(unwrap(gotten)),
+        VAL_BINDING(unwrap(gotten))
+    );
     Begin_Enfix_Action(subframe, VAL_WORD_SPELLING(v));
 
     goto process_action; }
@@ -598,8 +606,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, f_specifier);
 
-        if (IS_ACTION(gotten)) {  // before IS_VOID() is common case
-            REBACT *act = VAL_ACTION(gotten);
+        if (IS_ACTION(unwrap(gotten))) {  // before IS_VOID() is common case
+            REBACT *act = VAL_ACTION(unwrap(gotten));
 
             if (GET_ACTION_FLAG(act, ENFIXED)) {
                 if (
@@ -617,7 +625,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
             DECLARE_ACTION_SUBFRAME (subframe, f);
             Push_Frame(f->out, subframe);
-            Push_Action(subframe, act, VAL_BINDING(gotten));
+            Push_Action(subframe, act, VAL_BINDING(unwrap(gotten)));
             Begin_Action_Core(
                 subframe,
                 VAL_WORD_SPELLING(v),  // use word as label
@@ -626,10 +634,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto process_action;
         }
 
-        if (IS_VOID(gotten))  // need GET/ANY if it's void ("undefined")
-            fail (Error_Need_Non_Void_Core(v, f_specifier, gotten));
+        if (IS_VOID(unwrap(gotten)))  // need GET/ANY if it's void ("undefined")
+            fail (Error_Need_Non_Void_Core(v, f_specifier, unwrap(gotten)));
 
-        Move_Value(f->out, gotten);  // no copy CELL_FLAG_UNEVALUATED
+        Move_Value(f->out, unwrap(gotten));  // no copy CELL_FLAG_UNEVALUATED
         break;
 
 
@@ -667,12 +675,12 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, f_specifier);
 
-        if (IS_VOID(gotten))
-            fail (Error_Need_Non_Void_Core(v, f_specifier, gotten));
+        if (IS_VOID(unwrap(gotten)))
+            fail (Error_Need_Non_Void_Core(v, f_specifier, unwrap(gotten)));
 
-        Move_Value(f->out, gotten);
+        Move_Value(f->out, unwrap(gotten));
 
-        if (IS_ACTION(gotten))  // cache the word's label in the cell
+        if (IS_ACTION(unwrap(gotten)))  // cache the word's label in the cell
             INIT_ACTION_LABEL(f->out, VAL_WORD_SPELLING(v));
         break;
 
@@ -1371,9 +1379,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // we can see if it looks up to any kind of ACTION! at all.
 
     if (not f_next_gotten)
-        f_next_gotten = Try_Lookup_Word(f_next, f_specifier);
+        f_next_gotten = Lookup_Word(f_next, f_specifier);
     else
-        assert(f_next_gotten == Try_Lookup_Word(f_next, f_specifier));
+        assert(f_next_gotten == Lookup_Word(f_next, f_specifier));
 
   //=//// NEW EXPRESSION IF UNBOUND, NON-FUNCTION, OR NON-ENFIX ///////////=//
 
@@ -1384,8 +1392,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
     if (
         not f_next_gotten
-        or not IS_ACTION(f_next_gotten)
-        or not GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), ENFIXED)
+        or not IS_ACTION(unwrap(f_next_gotten))
+        or not GET_ACTION_FLAG(VAL_ACTION(unwrap(f_next_gotten)), ENFIXED)
     ){
       lookback_quote_too_late: // run as if starting new expression
 
@@ -1399,7 +1407,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// IS WORD ENFIXEDLY TIED TO A FUNCTION (MAY BE "INVISIBLE") ///////=//
 
-    if (GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), QUOTES_FIRST)) {
+  blockscope {
+    REBACT *enfixed = VAL_ACTION(unwrap(f_next_gotten));
+
+    if (GET_ACTION_FLAG(enfixed, QUOTES_FIRST)) {
         //
         // Left-quoting by enfix needs to be done in the lookahead before an
         // evaluation, not this one that's after.  This happens in cases like:
@@ -1415,7 +1426,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))
             fail (Error_Literal_Left_Path_Raw());
 
-        REBVAL *first = First_Unspecialized_Param(VAL_ACTION(f_next_gotten));
+        REBVAL *first = First_Unspecialized_Param(enfixed);
         if (VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE) {
             if (GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)) {
                 CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
@@ -1428,8 +1439,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
     if (
         GET_EVAL_FLAG(f, FULFILLING_ARG)
-        and not (
-            GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), DEFERS_LOOKBACK)
+        and not (GET_ACTION_FLAG(enfixed, DEFERS_LOOKBACK)
                                        // ^-- `1 + if false [2] else [3]` => 4
 /*            or GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), IS_INVISIBLE)
                                        // ^-- `1 + 2 + comment "foo" 3` => 6 */
@@ -1461,9 +1471,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     if (
         GET_EVAL_FLAG(f, FULFILLING_ARG)
         and (
-            GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), POSTPONES_ENTIRELY)
+            GET_ACTION_FLAG(enfixed, POSTPONES_ENTIRELY)
             or (
-                GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), DEFERS_LOOKBACK)
+                GET_ACTION_FLAG(enfixed, DEFERS_LOOKBACK)
                 and NOT_FEED_FLAG(f->feed, DEFERRING_ENFIX)
             )
         )
@@ -1512,13 +1522,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // of parameter fulfillment.  We want to reuse the f->out value and get it
     // into the new function's frame.
 
-  blockscope {
     DECLARE_ACTION_SUBFRAME (subframe, f);
     Push_Frame(f->out, subframe);
-    Push_Action(subframe,
-        VAL_ACTION(f_next_gotten),
-        VAL_BINDING(f_next_gotten)
-    );
+    Push_Action(subframe, enfixed, VAL_BINDING(unwrap(f_next_gotten)));
     Begin_Enfix_Action(subframe, VAL_WORD_SPELLING(f_next));
 
     Fetch_Next_Forget_Lookback(f);  // advances next

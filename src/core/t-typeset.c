@@ -278,12 +278,12 @@ bool Add_Typeset_Bits_Core(
 REB_R MAKE_Typeset(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_TYPESET);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_TYPESET(arg))
         return Move_Value(out, arg);

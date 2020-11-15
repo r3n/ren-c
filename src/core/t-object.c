@@ -222,11 +222,11 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Frame(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     // MAKE FRAME! on a VARARGS! supports the userspace authoring of ACTION!s
     // like MATCH.  However, MATCH is kept as a native for performance--as
@@ -305,20 +305,22 @@ REB_R TO_Frame(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R MAKE_Context(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     // Other context kinds (FRAME!, ERROR!, PORT!) have their own hooks.
     //
     assert(kind == REB_OBJECT or kind == REB_MODULE);
 
-    REBCTX *parent = opt_parent ? VAL_CONTEXT(opt_parent) : nullptr;
+    option(REBCTX*) parent_ctx = parent
+        ? VAL_CONTEXT(unwrap(parent))
+        : nullptr;
 
     if (IS_BLOCK(arg)) {
         REBCTX *ctx = Make_Selfish_Context_Detect_Managed(
             REB_OBJECT,
             VAL_ARRAY_AT(arg),
-            parent
+            parent_ctx
         );
         Init_Any_Context(out, kind, ctx); // GC guards it
 
@@ -348,7 +350,7 @@ REB_R MAKE_Context(
         REBCTX *context = Make_Selfish_Context_Detect_Managed(
             kind,
             END_NODE,  // values to scan for toplevel set-words (empty)
-            parent
+            parent_ctx
         );
 
         // !!! Allocation when SELF is not the responsibility of MAKE
@@ -364,8 +366,8 @@ REB_R MAKE_Context(
         return Init_Any_Context(out, kind, context);
     }
 
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     // make object! map!
     if (IS_MAP(arg)) {
@@ -404,7 +406,7 @@ REB_R TO_Context(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R PD_Context(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     REBCTX *c = VAL_CONTEXT(pvs->out);
 
@@ -434,7 +436,7 @@ REB_R PD_Context(
     }
 
     REBVAL *var = CTX_VAR(c, n);
-    if (opt_setval) {
+    if (setval) {
         ENSURE_MUTABLE(pvs->out);
 
         if (GET_CELL_FLAG(var, PROTECTED))
@@ -817,9 +819,9 @@ REBTYPE(Context)
             return Init_Integer(D_OUT, line); }
 
           case SYM_LABEL: {
-            if (not f->opt_label)
+            if (not f->label)
                 return nullptr;
-            return Init_Word(D_OUT, f->opt_label); }
+            return Init_Word(D_OUT, unwrap(f->label)); }
 
           case SYM_NEAR:
             return Init_Near_For_Frame(D_OUT, f);

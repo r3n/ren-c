@@ -124,15 +124,15 @@ bool Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
     if (not IS_WORD(feed->value))
         return false;
 
-    feed->gotten = Try_Lookup_Word(feed->value, feed->specifier);
+    feed->gotten = Lookup_Word(feed->value, feed->specifier);
 
-    if (not feed->gotten or not IS_ACTION(feed->gotten))
+    if (not feed->gotten or not IS_ACTION(unwrap(feed->gotten)))
         return false;
 
-    if (NOT_ACTION_FLAG(VAL_ACTION(feed->gotten), ENFIXED))
+    if (NOT_ACTION_FLAG(VAL_ACTION(unwrap(feed->gotten)), ENFIXED))
         return false;
 
-    if (GET_ACTION_FLAG(VAL_ACTION(feed->gotten), DEFERS_LOOKBACK))
+    if (GET_ACTION_FLAG(VAL_ACTION(unwrap(feed->gotten)), DEFERS_LOOKBACK))
         SET_FEED_FLAG(feed, DEFERRING_ENFIX);
     return true;
 }
@@ -688,8 +688,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // https://forum.rebol.info/t/1361
             //
             if (
-                Lookahead_To_Sync_Enfix_Defer_Flag(f->feed) and
-                GET_ACTION_FLAG(VAL_ACTION(f->feed->gotten), QUOTES_FIRST)
+                Lookahead_To_Sync_Enfix_Defer_Flag(f->feed) and  // ensure got
+                GET_ACTION_FLAG(
+                    VAL_ACTION(unwrap(f->feed->gotten)),  // ensured
+                    QUOTES_FIRST
+                )
             ){
                 // We need to defer and let the right hand quote that is
                 // quoting leftward win.  We use ST_EVALUATOR_LOOKING_AHEAD

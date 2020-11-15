@@ -285,12 +285,12 @@ REBINT CT_Logic(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Logic(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_LOGIC);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     // As a construction routine, MAKE takes more liberties in the
     // meaning of its parameters, so it lets zero values be false.

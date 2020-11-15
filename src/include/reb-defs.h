@@ -145,6 +145,9 @@ typedef struct Reb_Node REBNOD;
 // used for the pointer to make sure one doesn't assume it lives in an array
 // and try to do pointer math on it...since it may be a singular allocation.
 //
+// Note: This needs special handling in %make-headers.r to recognize the
+// format.  See the `typemacro_parentheses` rule.
+//
 #if !defined(CPLUSPLUS_11)
 
     #define REBCEL(const_star) \
@@ -291,7 +294,7 @@ typedef REBINT (COMPARE_HOOK)(REBCEL(const*) a, REBCEL(const*) b, bool strict);
 typedef REB_R (MAKE_HOOK)(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) opt_parent,
     const REBVAL *def
 );
 
@@ -405,7 +408,7 @@ typedef REB_R (GENERIC_HOOK)(REBFRM *frame_, const REBVAL *verb);
 // PER-TYPE PATH HOOKS: for `a/b`, `:a/b`, `a/b:`, `pick a b`, `poke a b`
 //
 typedef REB_R (PATH_HOOK)(
-    REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval
+    REBPVS *pvs, const RELVAL *picker, option(const REBVAL*) setval
 );
 
 

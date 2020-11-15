@@ -208,8 +208,8 @@ void Expand_Context(REBCTX *context, REBLEN delta)
 //
 REBVAL *Append_Context(
     REBCTX *context,
-    unstable RELVAL *opt_any_word,
-    const REBSTR *opt_spelling
+    option(unstable RELVAL*) any_word,
+    option(const REBSTR*) spelling
 ) {
     REBARR *keylist = CTX_KEYLIST(context);
 
@@ -223,7 +223,7 @@ REBVAL *Append_Context(
     EXPAND_SERIES_TAIL(SER(keylist), 1);
     Init_Context_Key(
         ARR_LAST(keylist),
-        opt_spelling ? opt_spelling : VAL_WORD_SPELLING(opt_any_word)
+        spelling ? unwrap(spelling) : VAL_WORD_SPELLING(unwrap(any_word))
     );
     TERM_ARRAY_LEN(keylist, ARR_LEN(keylist));
 
@@ -234,17 +234,17 @@ REBVAL *Append_Context(
     REBVAL *value = Init_Void(ARR_LAST(CTX_VARLIST(context)), SYM_UNDEFINED);
     TERM_ARRAY_LEN(CTX_VARLIST(context), ARR_LEN(CTX_VARLIST(context)));
 
-    if (not opt_any_word)
-        assert(opt_spelling);
+    if (not any_word)
+        assert(spelling);
     else {
         // We want to not just add a key/value pairing to the context, but we
         // want to bind a word while we are at it.  Make sure symbol is valid.
         //
-        assert(not opt_spelling);
+        assert(not spelling);
 
         REBLEN len = CTX_LEN(context); // length we just bumped
-        INIT_BINDING(opt_any_word, context);
-        INIT_WORD_INDEX(opt_any_word, len);
+        INIT_BINDING(unwrap(any_word), context);
+        INIT_WORD_INDEX(unwrap(any_word), len);
     }
 
     return value;  // location we just added (void cell)
@@ -558,7 +558,7 @@ static void Collect_Inner_Loop(
 REBARR *Collect_Keylist_Managed(
     REBLEN *self_index_out, // which context index SELF is in (if COLLECT_SELF)
     unstable const RELVAL *head,
-    REBCTX *prior,
+    option(REBCTX*) prior,
     REBFLGS flags // see %sys-core.h for COLLECT_ANY_WORD, etc.
 ) {
     struct Reb_Collector collector;
@@ -577,7 +577,7 @@ REBARR *Collect_Keylist_Managed(
         if (
             not prior or (
                 0 == (*self_index_out = Find_Canon_In_Context(
-                    CTX_ARCHETYPE(prior),
+                    CTX_ARCHETYPE(unwrap(prior)),
                     Canon(SYM_SELF)
                 ))
             )
@@ -616,7 +616,7 @@ REBARR *Collect_Keylist_Managed(
     // Setup binding table with existing words, no need to check duplicates
     //
     if (prior)
-        Collect_Context_Keys(cl, prior, false);
+        Collect_Context_Keys(cl, unwrap(prior), false);
 
     // Scan for words, adding them to BUF_COLLECT and bind table:
     Collect_Inner_Loop(cl, head);
@@ -626,8 +626,8 @@ REBARR *Collect_Keylist_Managed(
     // array, otherwise reuse the original
     //
     REBARR *keylist;
-    if (prior != NULL and ARR_LEN(CTX_KEYLIST(prior)) == ARR_LEN(BUF_COLLECT))
-        keylist = CTX_KEYLIST(prior);
+    if (prior and ARR_LEN(CTX_KEYLIST(unwrap(prior))) == ARR_LEN(BUF_COLLECT))
+        keylist = CTX_KEYLIST(unwrap(prior));
     else
         keylist = Grab_Collected_Array_Managed(cl, SERIES_MASK_KEYLIST);
 
@@ -758,9 +758,9 @@ REBARR *Collect_Unique_Words_Managed(
 void Rebind_Context_Deep(
     REBCTX *source,
     REBCTX *dest,
-    struct Reb_Binder *opt_binder
-) {
-    Rebind_Values_Deep(CTX_VARS_HEAD(dest), source, dest, opt_binder);
+    option(struct Reb_Binder*) binder
+){
+    Rebind_Values_Deep(CTX_VARS_HEAD(dest), source, dest, binder);
 }
 
 
@@ -789,13 +789,13 @@ void Rebind_Context_Deep(
 REBCTX *Make_Selfish_Context_Detect_Managed(
     enum Reb_Kind kind,
     unstable const RELVAL *head,
-    REBCTX *opt_parent
+    option(REBCTX*) parent
 ) {
     REBLEN self_index;
     REBARR *keylist = Collect_Keylist_Managed(
         &self_index,
         head,
-        opt_parent,
+        parent,
         COLLECT_ONLY_SET_WORDS | COLLECT_ENSURE_SELF
     );
 
@@ -815,12 +815,12 @@ REBCTX *Make_Selfish_Context_Detect_Managed(
     // else, so it could probably be inlined here and it would be more
     // obvious what's going on.
     //
-    if (opt_parent == NULL) {
+    if (not parent) {
         INIT_CTX_KEYLIST_UNIQUE(context, keylist);
         LINK_ANCESTOR_NODE(keylist) = NOD(keylist);
     }
     else {
-        if (keylist == CTX_KEYLIST(opt_parent)) {
+        if (keylist == CTX_KEYLIST(unwrap(parent))) {
             INIT_CTX_KEYLIST_SHARED(context, keylist);
 
             // We leave the ancestor link as-is in the shared keylist--so
@@ -830,7 +830,7 @@ REBCTX *Make_Selfish_Context_Detect_Managed(
         }
         else {
             INIT_CTX_KEYLIST_UNIQUE(context, keylist);
-            LINK_ANCESTOR_NODE(keylist) = NOD(CTX_KEYLIST(opt_parent));
+            LINK_ANCESTOR_NODE(keylist) = NOD(CTX_KEYLIST(unwrap(parent)));
         }
     }
 
@@ -850,13 +850,13 @@ REBCTX *Make_Selfish_Context_Detect_Managed(
     for (; len > 1; --len, ++var) // [0] is rootvar (context), already done
         Init_Nulled(var);
 
-    if (opt_parent != NULL) {
+    if (parent) {
         //
         // Copy parent values, and for values we copied that were blocks and
         // strings, replace their series components with deep copies.
         //
         REBVAL *dest = CTX_VARS_HEAD(context);
-        REBVAL *src = CTX_VARS_HEAD(opt_parent);
+        REBVAL *src = CTX_VARS_HEAD(unwrap(parent));
         for (; NOT_END(src); ++dest, ++src) {
             REBFLGS flags = NODE_FLAG_MANAGED;  // !!! Review, what flags?
             Move_Value(dest, src);
@@ -872,8 +872,8 @@ REBCTX *Make_Selfish_Context_Detect_Managed(
     assert(CTX_KEY_SYM(context, self_index) == SYM_SELF);
     Move_Value(CTX_VAR(context, self_index), CTX_ARCHETYPE(context));
 
-    if (opt_parent)
-        Rebind_Context_Deep(opt_parent, context, NULL); // NULL=no more binds
+    if (parent)  // v-- passing in nullptr to indicate no more binds
+        Rebind_Context_Deep(unwrap(parent), context, nullptr);
 
     ASSERT_CONTEXT(context);
 
@@ -913,12 +913,12 @@ REBCTX *Construct_Context_Managed(
     enum Reb_Kind kind,
     unstable RELVAL *head,  // !!! Warning: modified binding
     REBSPC *specifier,
-    REBCTX *opt_parent
-) {
+    option(REBCTX*) parent
+){
     REBCTX *context = Make_Selfish_Context_Detect_Managed(
         kind, // type
         head, // values to scan for toplevel set-words
-        opt_parent // parent
+        parent // parent
     );
 
     if (not head)

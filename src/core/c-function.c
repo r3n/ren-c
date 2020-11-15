@@ -991,8 +991,8 @@ REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
 REBACT *Make_Action(
     REBARR *paramlist,
     REBNAT dispatcher, // native C function called by Eval_Core
-    REBACT *opt_underlying, // optional underlying function
-    REBCTX *opt_exemplar, // if provided, should be consistent w/next level
+    option(REBACT*) underlying, // optional underlying function
+    option(REBCTX*) exemplar, // if provided, make consistent w/next level
     REBLEN details_capacity // desired capacity of the ACT_DETAILS() array
 ){
     ASSERT_ARRAY_MANAGED(paramlist);
@@ -1018,12 +1018,12 @@ REBACT *Make_Action(
 
     assert(IS_POINTER_SAFETRASH_DEBUG(LINK(paramlist).trash));
 
-    if (opt_underlying) {
-        LINK_UNDERLYING_NODE(paramlist) = NOD(opt_underlying);
+    if (underlying) {
+        LINK_UNDERLYING_NODE(paramlist) = NOD(unwrap(underlying));
 
         // Note: paramlist still incomplete, don't use SET_ACTION_FLAG....
         //
-        if (GET_ACTION_FLAG(opt_underlying, HAS_RETURN))
+        if (GET_ACTION_FLAG(unwrap(underlying), HAS_RETURN))
             SER(paramlist)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
     }
     else {
@@ -1033,7 +1033,7 @@ REBACT *Make_Action(
         LINK_UNDERLYING_NODE(paramlist) = NOD(paramlist);
     }
 
-    if (not opt_exemplar) {
+    if (not exemplar) {
         //
         // No exemplar is used as a cue to set the "specialty" to paramlist,
         // so that Push_Action() can assign f->special directly from it in
@@ -1046,10 +1046,10 @@ REBACT *Make_Action(
         // the exemplar (though some of these parameters may be hidden due to
         // specialization, see REB_TS_HIDDEN).
         //
-        assert(GET_SERIES_FLAG(opt_exemplar, MANAGED));
-        assert(CTX_LEN(opt_exemplar) == ARR_LEN(paramlist) - 1);
+        assert(GET_SERIES_FLAG(unwrap(exemplar), MANAGED));
+        assert(CTX_LEN(unwrap(exemplar)) == ARR_LEN(paramlist) - 1);
 
-        LINK_SPECIALTY_NODE(details) = NOD(CTX_VARLIST(opt_exemplar));
+        LINK_SPECIALTY_NODE(details) = NOD(CTX_VARLIST(unwrap(exemplar)));
     }
 
     // The meta information may already be initialized, since the native

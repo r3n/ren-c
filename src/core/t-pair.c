@@ -46,12 +46,12 @@ REBINT CT_Pair(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Pair(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_PAIR);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_PAIR(arg))
         return Move_Value(out, arg);
@@ -146,7 +146,7 @@ void Min_Max_Pair(REBVAL *out, const REBVAL *a, const REBVAL *b, bool maxed)
 REB_R PD_Pair(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     REBINT n = 0;
 
@@ -166,7 +166,7 @@ REB_R PD_Pair(
     else
         return R_UNHANDLED;
 
-    if (not opt_setval) {
+    if (not setval) {
         if (n == 1)
             Move_Value(pvs->out, VAL_PAIR_X(pvs->out));
         else
@@ -181,13 +181,13 @@ REB_R PD_Pair(
     // rendering formats for other-valued pairs has been proposed.  So only
     // integers and decimals are accepted for now.
     //
-    if (not IS_INTEGER(opt_setval) and not IS_DECIMAL(opt_setval))
+    if (not IS_INTEGER(unwrap(setval)) and not IS_DECIMAL(unwrap(setval)))
         return R_UNHANDLED;
 
     if (n == 1)
-        Move_Value(VAL_PAIR_X(pvs->out), opt_setval);
+        Move_Value(VAL_PAIR_X(pvs->out), unwrap(setval));
     else
-        Move_Value(VAL_PAIR_Y(pvs->out), opt_setval);
+        Move_Value(VAL_PAIR_Y(pvs->out), unwrap(setval));
 
     // Using R_IMMEDIATE means that although we've updated pvs->out, we'll
     // leave it to the path dispatch to figure out if that can be written back

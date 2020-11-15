@@ -447,20 +447,20 @@ struct Reb_Feed {
     // is a going to stick around.  But it is slow and smarter methods are
     // going to be necessary.
     //
-    struct Reb_Binder *binder;
-    REBCTX *lib;  // does not expand, has negative indices in binder
-    REBCTX *context;  // expands, has positive indices in binder
+    option(struct Reb_Binder*) binder;
+    option(REBCTX*) lib;  // does not expand, has negative indices in binder
+    option(REBCTX*) context;  // expands, has positive indices in binder
 
     // A frame may be sourced from a va_list of pointers, or not.  If this is
     // NULL it is assumed that the values are sourced from a simple array.
     //
-    va_list *vaptr;
+    option(va_list*) vaptr;
 
     // The feed could also be coming from a packed array of pointers...this
     // is used by the C++ interface, which creates a `std::array` on the
     // C stack of the processed variadic arguments it enumerated.
     //
-    const void* const *packed;
+    const void* const* packed;
 
     // This contains an IS_END() marker if the next fetch should be an attempt
     // to consult the va_list (if any).  That end marker may be resident in
@@ -535,7 +535,7 @@ struct Reb_Feed {
     // !!! Review how often gotten has hits vs. misses, and what the benefit
     // of the feature actually is.
     //
-    const REBVAL *gotten;
+    option(const REBVAL*) gotten;
 
   #if defined(DEBUG_EXPIRED_LOOKBACK)
     //
@@ -643,12 +643,15 @@ struct Reb_Frame {
 
     // Functions don't have "names", though they can be assigned to words.
     // However, not all function invocations are through words or paths, so
-    // the label may not be known.  It is NULL to indicate anonymity.
+    // the label may not be known.  Mechanics with labeling try to make sure
+    // that *some* name is known, but a few cases can't be, e.g.:
+    //
+    //     reeval func [x] [print "This function never got a label"]
     //
     // The evaluator only enforces that the symbol be set during function
     // calls--in the release build, it is allowed to be garbage otherwise.
     //
-    const REBSTR *opt_label;
+    option(const REBSTR*) label;
 
     // The varlist is where arguments for the frame are kept.  Though it is
     // ultimately usable as an ordinary CTX_VARLIST() for a FRAME! value, it

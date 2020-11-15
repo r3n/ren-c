@@ -90,16 +90,16 @@ inline static bool Do_Any_Array_At_Throws(
 //
 inline static bool Do_At_Mutable_Maybe_Stale_Throws(
     REBVAL *out,
-    const RELVAL *opt_first,  // optional element to inject *before* the array
+    option(const RELVAL*) first,  // element to inject *before* the array
     REBARR *array,
     REBLEN index,
-    REBSPC *specifier  // must match array, but also opt_first if relative
+    REBSPC *specifier  // must match array, but also first if relative
 ){
-    struct Reb_Feed feed_struct;  // opt_first so can't use DECLARE_ARRAY_FEED
+    struct Reb_Feed feed_struct;  // first so can't use DECLARE_ARRAY_FEED
     struct Reb_Feed *feed = &feed_struct;
     Prep_Array_Feed(
         feed,
-        opt_first,
+        first,
         array,
         index,
         specifier,

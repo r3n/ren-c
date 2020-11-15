@@ -111,8 +111,8 @@ inline static REBVAL *Init_Vector(
 // VECTOR! extension if it is loaded.
 //
 extern REBINT CT_Vector(REBCEL(const*) a, REBCEL(const*) b, bool strict);
-extern REB_R MAKE_Vector(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
+extern REB_R MAKE_Vector(REBVAL *out, enum Reb_Kind kind, option(const REBVAL*) parent, const REBVAL *arg);
 extern REB_R TO_Vector(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
 extern void MF_Vector(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Vector);
-extern REB_R PD_Vector(REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval);
+extern REB_R PD_Vector(REBPVS *pvs, const RELVAL *picker, option(const REBVAL*) setval);

@@ -77,7 +77,7 @@ inline static bool Is_Action_Frame_Fulfilling(REBFRM *f) {
 
 
 inline static bool FRM_IS_VARIADIC(REBFRM *f) {
-    return f->feed->vaptr != nullptr or f->feed->packed != nullptr;
+    return f->feed->vaptr or f->feed->packed != nullptr;
 }
 
 inline static const REBARR *FRM_ARRAY(REBFRM *f) {
@@ -86,7 +86,7 @@ inline static const REBARR *FRM_ARRAY(REBFRM *f) {
 }
 
 // !!! Though the evaluator saves its `index`, the index is not meaningful
-// in a valist.  Also, if `opt_head` values are used to prefetch before an
+// in a valist.  Also, if `option(head)` values are used to prefetch before an
 // array, those will be lost too.  A true debugging mode would need to
 // convert these cases to ordinary arrays before running them, in order
 // to accurately present any errors.
@@ -164,9 +164,9 @@ inline static int FRM_LINE(REBFRM *f) {
 #define FRM_BINDING(f) \
     EXTRA(Binding, (f)->rootvar).node
 
-inline static const REBSTR *FRM_LABEL(REBFRM *f) {
+inline static option(const REBSTR*) FRM_LABEL(REBFRM *f) {
     assert(Is_Action_Frame(f));
-    return f->opt_label;
+    return f->label;
 }
 
 #define FRM_UNDERLYING(f) \
@@ -228,16 +228,16 @@ inline static REBCTX *Context_For_Frame_May_Manage(REBFRM *f) {
 
 inline static void Get_Frame_Label_Or_Blank(unstable RELVAL *out, REBFRM *f) {
     assert(Is_Action_Frame(f));
-    if (f->opt_label != NULL)
-        Init_Word(out, f->opt_label); // invoked via WORD! or PATH!
+    if (f->label)
+        Init_Word(out, unwrap(f->label));  // WORD!, PATH!, or stored invoke
     else
-        Init_Blank(out); // anonymous invocation
+        Init_Blank(out);  // anonymous invocation
 }
 
 inline static const char* Frame_Label_Or_Anonymous_UTF8(REBFRM *f) {
     assert(Is_Action_Frame(f));
-    if (f->opt_label != NULL)
-        return STR_UTF8(f->opt_label);
+    if (f->label)
+        return STR_UTF8(unwrap(f->label));
     return "[anonymous]";
 }
 
@@ -395,7 +395,7 @@ inline static void Push_Frame(
     //
     f->original = nullptr;
 
-    TRASH_POINTER_IF_DEBUG(f->opt_label);
+    TRASH_OPTION_IF_DEBUG(f->label);
   #if defined(DEBUG_FRAME_LABELS)
     TRASH_POINTER_IF_DEBUG(f->label_utf8);
   #endif
@@ -615,7 +615,7 @@ inline static void Prep_Frame_Core(
 
 inline static void Begin_Action_Core(
     REBFRM *f,
-    const REBSTR *opt_label,
+    option(const REBSTR*) label,
     bool enfix
 ){
     assert(NOT_EVAL_FLAG(f, RUNNING_ENFIX));
@@ -624,9 +624,9 @@ inline static void Begin_Action_Core(
     assert(not f->original);
     f->original = FRM_PHASE(f);
 
-    assert(IS_POINTER_TRASH_DEBUG(f->opt_label)); // only valid w/REB_ACTION
-    assert(not opt_label or GET_SERIES_FLAG(opt_label, IS_STRING));
-    f->opt_label = opt_label;
+    assert(IS_OPTION_TRASH_DEBUG(f->label));  // ACTION! makes valid
+    assert(not label or GET_SERIES_FLAG(unwrap(label), IS_STRING));
+    f->label = label;
   #if defined(DEBUG_FRAME_LABELS) // helpful for looking in the debugger
     f->label_utf8 = cast(const char*, Frame_Label_Or_Anonymous_UTF8(f));
   #endif
@@ -650,11 +650,11 @@ inline static void Begin_Action_Core(
     }
 }
 
-#define Begin_Enfix_Action(f,opt_label) \
-    Begin_Action_Core((f), (opt_label), true)
+#define Begin_Enfix_Action(f,label) \
+    Begin_Action_Core((f), (label), true)
 
-#define Begin_Prefix_Action(f,opt_label) \
-    Begin_Action_Core((f), (opt_label), false)
+#define Begin_Prefix_Action(f,label) \
+    Begin_Action_Core((f), (label), false)
 
 
 // Allocate the series of REBVALs inspected by a function when executed (the
@@ -789,8 +789,8 @@ inline static void Push_Action(
 
 inline static void Drop_Action(REBFRM *f) {
     assert(
-        not f->opt_label
-        or GET_SERIES_FLAG(f->opt_label, IS_STRING)
+        not f->label
+        or GET_SERIES_FLAG(unwrap(f->label), IS_STRING)
     );
 
     if (NOT_EVAL_FLAG(f, FULFILLING_ARG))
@@ -902,7 +902,7 @@ inline static void Drop_Action(REBFRM *f) {
 
     f->original = nullptr; // signal an action is no longer running
 
-    TRASH_POINTER_IF_DEBUG(f->opt_label);
+    TRASH_OPTION_IF_DEBUG(f->label);
   #if defined(DEBUG_FRAME_LABELS)
     TRASH_POINTER_IF_DEBUG(f->label_utf8);
   #endif

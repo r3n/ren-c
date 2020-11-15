@@ -1100,7 +1100,7 @@ REBNATIVE(switch)
             // The ARG(value) passed in is the left/first argument to compare.
             //
             // !!! Using Run_Throws loses the labeling of the function we were
-            // given (opt_label).  Consider how it might be passed through
+            // given (label).  Consider how it might be passed through
             // for better stack traces and error messages.
             //
             // !!! We'd like to run this faster, so we aim to be able to

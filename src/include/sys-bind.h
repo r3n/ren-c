@@ -535,7 +535,7 @@ static inline const REBVAL *Lookup_Word_May_Fail(
     return CTX_VAR(c, VAL_WORD_INDEX(any_word));
 }
 
-static inline const REBVAL *Try_Lookup_Word(
+static inline option(const REBVAL*) Lookup_Word(
     REBCEL(const*) any_word,
     REBSPC *specifier
 ){

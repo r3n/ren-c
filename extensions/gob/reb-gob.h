@@ -315,8 +315,8 @@ inline static REBVAL *Init_Gob(unstable RELVAL *out, REBGOB *g) {
 // GOB! extension if it is loaded.
 //
 extern REBINT CT_Gob(REBCEL(const*) a, REBCEL(const*) b, bool strict);
-extern REB_R MAKE_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
-extern REB_R TO_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
+extern REB_R MAKE_Gob(REBVAL *out, enum Reb_Kind kind, option(const REBVAL*) parent, const REBVAL *arg);
+extern REB_R TO_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL* arg);
 extern void MF_Gob(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Gob);
-extern REB_R PD_Gob(REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval);
+extern REB_R PD_Gob(REBPVS *pvs, const RELVAL *picker, option(const REBVAL*) setval);

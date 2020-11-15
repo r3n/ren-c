@@ -117,10 +117,10 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
 REB_R PD_Fail(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     UNUSED(picker);
-    UNUSED(opt_setval);
+    UNUSED(setval);
 
     fail (pvs->out);
 }
@@ -135,10 +135,10 @@ REB_R PD_Fail(
 REB_R PD_Unhooked(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     UNUSED(picker);
-    UNUSED(opt_setval);
+    UNUSED(setval);
 
     const REBVAL *type = Datatype_From_Kind(VAL_TYPE(pvs->out));
     UNUSED(type); // !!! put in error message?
@@ -257,7 +257,7 @@ bool Next_Path_Throws(REBPVS *pvs)
           case REB_R_THROWN:
             panic ("Path dispatch isn't allowed to throw, only GROUP!s");
 
-          case REB_R_INVISIBLE: // dispatcher assigned target with opt_setval
+          case REB_R_INVISIBLE: // dispatcher assigned target with setval
             break; // nothing left to do, have to take the dispatcher's word
 
           case REB_R_REFERENCE: { // dispatcher wants a set *if* at end of path
@@ -377,9 +377,9 @@ bool Next_Path_Throws(REBPVS *pvs)
             fail (Error_Action_With_Dotted_Raw());
 
         if (IS_WORD(PVS_PICKER(pvs))) {
-            if (not pvs->opt_label) {  // !!! only used for this "bit" signal
-                pvs->opt_label = VAL_WORD_SPELLING(PVS_PICKER(pvs));
-                INIT_ACTION_LABEL(pvs->out, pvs->opt_label);
+            if (not pvs->label) {  // !!! only used for this "bit" signal
+                pvs->label = VAL_WORD_SPELLING(PVS_PICKER(pvs));
+                INIT_ACTION_LABEL(pvs->out, unwrap(pvs->label));
             }
         }
     }
@@ -406,7 +406,7 @@ bool Next_Path_Throws(REBPVS *pvs)
 // will be allocated, in the style of the REFINE native, which will have the
 // behavior of refinement partial specialization.
 //
-// If `opt_setval` is given, the path operation will be done as a "SET-PATH!"
+// If `setval` is given, the path operation will be done as a "SET-PATH!"
 // if the path evaluation did not throw or error.  HOWEVER the set value
 // is NOT put into `out`.  This provides more flexibility on performance in
 // the evaluator, which may already have the `val` where it wants it, and
@@ -416,10 +416,10 @@ bool Next_Path_Throws(REBPVS *pvs)
 // vetted very heavily by Ren-C, and needs a review and overhaul.
 //
 bool Eval_Path_Throws_Core(
-    REBVAL *out, // if opt_setval, this is only used to return a thrown value
+    REBVAL *out, // if setval, this is only used to return a thrown value
     const RELVAL *sequence,
     REBSPC *sequence_specifier,
-    const REBVAL *opt_setval, // Note: may be the same as out!
+    option(const REBVAL*) setval, // Note: may be the same as out!
     REBFLGS flags
 ){
     REBLEN index = 0;
@@ -452,25 +452,25 @@ bool Eval_Path_Throws_Core(
 
       case REB_SYM_WORD:  // get or set `foo/` or `foo.`
       handle_word: {
-        if (opt_setval) {  // nullptr is GET (note IS_NULLED() to set NULLED)
+        if (setval) {  // nullptr is GET (note IS_NULLED() to set NULLED)
             //
             // This is the SET case, which means the `foo.:` and `foo/:`
             // forms pre-check the action status of the value being assigned.
             //
             if (heart == REB_SYM_WORD) {
                 if (ANY_TUPLE_KIND(VAL_TYPE(sequence))) {
-                    if (IS_ACTION(opt_setval))
+                    if (IS_ACTION(unwrap(setval)))
                         fail (Error_Action_With_Dotted_Raw());
                 }
                 else {
-                    if (not IS_ACTION(opt_setval))
+                    if (not IS_ACTION(unwrap(setval)))
                         fail (Error_Inert_With_Slashed_Raw());
                 }
             }
 
             Move_Value(
                 Lookup_Mutable_Word_May_Fail(sequence, sequence_specifier),
-                opt_setval
+                unwrap(setval)
             );
         }
         else {
@@ -520,12 +520,12 @@ bool Eval_Path_Throws_Core(
 
     REBDSP dsp_orig = DSP;
 
-    assert(out != opt_setval and out != FRM_SPARE(pvs));
+    assert(out != setval and out != FRM_SPARE(pvs));
 
-    pvs->special = opt_setval; // a.k.a. PVS_OPT_SETVAL()
-    assert(PVS_OPT_SETVAL(pvs) == opt_setval);
+    pvs->special = setval ? unwrap(setval) : nullptr; // a.k.a. PVS_OPT_SETVAL()
+    assert(PVS_OPT_SETVAL(pvs) == setval);
 
-    pvs->opt_label = NULL;
+    pvs->label = nullptr;
 
     // Seed the path evaluation process by looking up the first item (to
     // get a datatype to dispatch on for the later path items)
@@ -556,7 +556,7 @@ bool Eval_Path_Throws_Core(
         );
         Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
         if (IS_ACTION(pvs->out))
-            pvs->opt_label = VAL_WORD_SPELLING(second);
+            pvs->label = VAL_WORD_SPELLING(second);
     }
     else if (IS_WORD(f_value)) {
         //
@@ -568,8 +568,8 @@ bool Eval_Path_Throws_Core(
         Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
 
         if (IS_ACTION(pvs->out)) {
-            pvs->opt_label = VAL_WORD_SPELLING(f_value);
-            INIT_ACTION_LABEL(pvs->out, pvs->opt_label);
+            pvs->label = VAL_WORD_SPELLING(f_value);
+            INIT_ACTION_LABEL(pvs->out, unwrap(pvs->label));
         }
     }
     else if (
@@ -626,7 +626,7 @@ bool Eval_Path_Throws_Core(
 
     TRASH_POINTER_IF_DEBUG(lookback);  // goto crosses it, don't use below
 
-    if (opt_setval) {
+    if (setval) {
         // If SET then we don't return anything
         goto return_not_thrown;
     }
@@ -676,7 +676,7 @@ bool Eval_Path_Throws_Core(
             if (Specialize_Action_Throws(
                 FRM_SPARE(pvs),
                 pvs->out,
-                nullptr, // opt_def
+                nullptr, // optional def
                 dsp_orig // first_refine_dsp
             )){
                 panic ("REFINE-only specializations should not THROW");
@@ -819,8 +819,8 @@ REBNATIVE(pick)
 
     PVS_PICKER(pvs) = ARG(picker);
 
-    pvs->opt_label = NULL; // applies to e.g. :append/only returning APPEND
-    pvs->special = NULL;
+    pvs->label = nullptr; // applies to e.g. :append/only returning APPEND
+    pvs->special = nullptr;
 
   redo: ;  // semicolon is intentional, next line is declaration
 
@@ -915,7 +915,7 @@ REBNATIVE(poke)
 
     PVS_PICKER(pvs) = ARG(picker);
 
-    pvs->opt_label = nullptr;  // e.g. :append/only returning APPEND
+    pvs->label = nullptr;  // e.g. :append/only returning APPEND
     pvs->special = ARG(value);
 
     PATH_HOOK *hook = Path_Hook_For_Type_Of(location);
@@ -954,11 +954,11 @@ REBNATIVE(poke)
 REB_R MAKE_Path(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (not IS_BLOCK(arg))
         fail (Error_Bad_Make(kind, arg)); // "make path! 0" has no meaning
