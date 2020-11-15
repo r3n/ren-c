@@ -255,6 +255,7 @@ struct Reb_Frame;
 typedef struct Reb_Frame REBFRM;
 typedef struct Reb_Frame REBPVS;
 
+struct Reb_Feed;
 typedef struct Reb_Feed REBFED;
 
 struct Reb_State;

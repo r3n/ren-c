@@ -273,7 +273,8 @@
 #include "sys-rebctx.h"  // context structure definition (subclass of REBSER)
 
 #include "sys-state.h"
-#include "sys-rebfrm.h"  // REBFRM definition (also used by value)
+#include "sys-rebfed.h"  // REBFED (feed) definitio, used by REBFRM
+#include "sys-rebfrm.h"  // REBFRM (frame) definition, also used by value
 
 #include "sys-mold.h"
 
