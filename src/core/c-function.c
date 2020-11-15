@@ -1187,7 +1187,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // Interpreted code, the body is a block with some bindings relative
         // to the action.
 
-        RELVAL *body = DETAILS_AT(details, IDX_DETAILS_0);
+        unstable RELVAL *body = ARR_AT(details, IDX_DETAILS_0);
 
         // The PARAMLIST_HAS_RETURN tricks for definitional return make it
         // seem like a generator authored more code in the action's body...but
