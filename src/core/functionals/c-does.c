@@ -79,7 +79,7 @@ REB_R Block_Dispatcher(REBFRM *f)
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_DOES_MAX);
 
-    RELVAL *block = ARR_AT(details, IDX_DOES_BLOCK);
+    RELVAL *block = STABLE(ARR_AT(details, IDX_DOES_BLOCK));
         // ^-- note not a `const RELVAL *block`, may get updated!
     assert(IS_BLOCK(block) and VAL_INDEX(block) == 0);
 
@@ -191,7 +191,7 @@ REBNATIVE(does)
         // Block_Dispatcher() *may* copy at an indeterminate time, so to keep
         // things invariant we have to lock it.
         //
-        RELVAL *body = ARR_AT(ACT_DETAILS(doer), IDX_DOES_BLOCK);
+        unstable RELVAL *body = ARR_AT(ACT_DETAILS(doer), IDX_DOES_BLOCK);
         Force_Value_Frozen_Deep(specializee);
         Move_Value(body, specializee);
 

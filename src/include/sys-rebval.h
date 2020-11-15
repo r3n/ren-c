@@ -249,16 +249,14 @@
 //
 // https://stackoverflow.com/q/51846048
 //
-inline static union Reb_Header Endlike_Header(uintptr_t bits) {
+inline static uintptr_t Endlike_Header(uintptr_t bits) {
     assert(
         0 == (bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
             | FLAG_SECOND_BYTE(255)
         ))
     );
-    union Reb_Header h;
-    h.bits = bits | NODE_FLAG_NODE;
-    return h;
+    return bits | NODE_FLAG_NODE;
 }
 
 

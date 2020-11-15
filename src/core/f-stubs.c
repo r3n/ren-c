@@ -75,7 +75,7 @@ REBINT Float_Int16(REBD32 f)
 //
 //  Int32: C
 //
-REBINT Int32(const RELVAL *val)
+REBINT Int32(unstable const RELVAL *val)
 {
     if (IS_DECIMAL(val)) {
         if (VAL_DECIMAL(val) > INT32_MAX or VAL_DECIMAL(val) < INT32_MIN)
@@ -105,7 +105,7 @@ out_of_range:
 //     1: >  0
 //    -1: <  0
 //
-REBINT Int32s(const RELVAL *val, REBINT sign)
+REBINT Int32s(unstable const RELVAL *val, REBINT sign)
 {
     REBINT n;
 
@@ -141,7 +141,7 @@ out_of_range:
 //
 //  Int64: C
 //
-REBI64 Int64(const REBVAL *val)
+REBI64 Int64(unstable const REBVAL *val)
 {
     if (IS_INTEGER(val))
         return VAL_INT64(val);
@@ -150,14 +150,14 @@ REBI64 Int64(const REBVAL *val)
     if (IS_MONEY(val))
         return deci_to_int(VAL_MONEY_AMOUNT(val));
 
-    fail (val);
+    fail (STABLE_HACK(val));
 }
 
 
 //
 //  Dec64: C
 //
-REBDEC Dec64(const REBVAL *val)
+REBDEC Dec64(unstable const REBVAL *val)
 {
     if (IS_DECIMAL(val) or IS_PERCENT(val))
         return VAL_DECIMAL(val);
@@ -166,7 +166,7 @@ REBDEC Dec64(const REBVAL *val)
     if (IS_MONEY(val))
         return deci_to_decimal(VAL_MONEY_AMOUNT(val));
 
-    fail (val);
+    fail (STABLE_HACK(val));
 }
 
 
@@ -179,7 +179,7 @@ REBDEC Dec64(const REBVAL *val)
 //     1: >  0
 //    -1: <  0
 //
-REBI64 Int64s(const REBVAL *val, REBINT sign)
+REBI64 Int64s(unstable const REBVAL *val, REBINT sign)
 {
     REBI64 n;
     if (IS_DECIMAL(val)) {
@@ -225,7 +225,7 @@ const REBVAL *Datatype_From_Kind(enum Reb_Kind kind)
 // Returns the datatype value for the given value.
 // The datatypes are all at the head of the context.
 //
-REBVAL *Type_Of(const RELVAL *value)
+REBVAL *Type_Of(unstable const RELVAL *value)
 {
     return VAL_CONTEXT_VAR(Lib_Context, SYM_FROM_KIND(VAL_TYPE(value)));
 }
@@ -351,7 +351,7 @@ void Extra_Init_Action_Checks_Debug(REBACT *a) {
 // position, so that a positive length for the partial region is returned.
 //
 REBLEN Part_Len_May_Modify_Index(
-    REBVAL *series,  // ANY-SERIES! value whose index may be modified
+    unstable REBVAL *series,  // ANY-SERIES! value whose index may be modified
     const REBVAL *part  // /PART (number, position in value, or BLANK! cell)
 ){
     if (ANY_SEQUENCE(series)) {
@@ -417,7 +417,7 @@ REBLEN Part_Len_May_Modify_Index(
 // Simple variation that instead of returning the length, returns the absolute
 // tail position in the series of the partial sequence.
 //
-REBLEN Part_Tail_May_Modify_Index(REBVAL *series, const REBVAL *limit)
+REBLEN Part_Tail_May_Modify_Index(unstable REBVAL *series, const REBVAL *limit)
 {
     REBLEN len = Part_Len_May_Modify_Index(series, limit);
     return len + VAL_INDEX(series); // uses the possibly-updated index
@@ -439,7 +439,7 @@ REBLEN Part_Tail_May_Modify_Index(REBVAL *series, const REBVAL *limit)
 //
 // https://github.com/rebol/rebol-issues/issues/1570
 //
-REBLEN Part_Limit_Append_Insert(const REBVAL *part) {
+REBLEN Part_Limit_Append_Insert(unstable const REBVAL *part) {
     if (IS_NULLED(part))
         return UINT32_MAX;  // treat as no limit
 
@@ -488,7 +488,7 @@ int64_t Mul_Max(enum Reb_Kind type, int64_t n, int64_t m, int64_t maxi)
 // "be smart" so even a TEXT! can be turned into a SET-WORD! (just an
 // unbound one).
 //
-REBVAL *Setify(REBVAL *out) {
+REBVAL *Setify(unstable_ok REBVAL *out) {
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);
@@ -546,7 +546,7 @@ REBNATIVE(setify)
 //
 // Like Setify() but Makes GET-XXX! instead of SET-XXX!.
 //
-REBVAL *Getify(REBVAL *out) {
+REBVAL *Getify(unstable_ok REBVAL *out) {
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);
@@ -604,7 +604,7 @@ REBNATIVE(getify)
 // "be smart" so even a TEXT! can be turned into a SYM-WORD! (just an
 // unbound one).
 //
-REBVAL *Symify(REBVAL *out) {
+REBVAL *Symify(unstable_ok REBVAL *out) {
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);
@@ -662,7 +662,7 @@ REBNATIVE(symify)
 //
 // Turn a value into its "plain" equivalent.  This works for all values.
 //
-REBVAL *Plainify(REBVAL *out) {
+REBVAL *Plainify(unstable_ok REBVAL *out) {
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);

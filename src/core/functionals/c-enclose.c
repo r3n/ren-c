@@ -86,10 +86,10 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_ENCLOSER_MAX);
 
-    REBVAL *inner = SPECIFIC(ARR_AT(details, 0));  // same args as f
-    assert(IS_ACTION(inner));
-    REBVAL *outer = SPECIFIC(ARR_AT(details, 1));  // takes 1 arg (a FRAME!)
-    assert(IS_ACTION(outer));
+    REBVAL *inner = DETAILS_AT(details, IDX_ENCLOSER_INNER);
+    assert(IS_ACTION(inner));  // same args as f
+    REBVAL *outer = DETAILS_AT(details, IDX_ENCLOSER_OUTER);
+    assert(IS_ACTION(outer));  // takes 1 arg (a FRAME!)
 
     // We want to call OUTER with a FRAME! value that will dispatch to INNER
     // when (and if) it runs DO on it.  That frame is the one built for this

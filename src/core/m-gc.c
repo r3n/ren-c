@@ -96,15 +96,15 @@ static void Mark_Devices_Deep(void);
     assert(SER_USED(GC_Mark_Stack) == 0)
 
 
-static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v);
+static void Queue_Mark_Opt_End_Cell_Deep(unstable const RELVAL *v);
 
-inline static void Queue_Mark_Opt_Value_Deep(const RELVAL *v)
+inline static void Queue_Mark_Opt_Value_Deep(unstable const RELVAL *v)
 {
     assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
     Queue_Mark_Opt_End_Cell_Deep(v);  // nulled cell & unreadable void are ok
 }
 
-inline static void Queue_Mark_Value_Deep(const RELVAL *v)
+inline static void Queue_Mark_Value_Deep(unstable const RELVAL *v)
 {
     assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
     assert(KIND3Q_BYTE_UNCHECKED(v) != REB_NULL);  // faster than IS_NULLED()
@@ -242,7 +242,7 @@ static void Queue_Mark_Node_Deep(void *p)
 // If a slot is not supposed to allow END, use Queue_Mark_Opt_Value_Deep()
 // If a slot allows neither END nor NULLED cells, use Queue_Mark_Value_Deep()
 //
-static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v)
+static void Queue_Mark_Opt_End_Cell_Deep(unstable const RELVAL *v)
 {
     // We mark based on the type of payload in the cell, e.g. its "unescaped"
     // form.  So if '''a fits in a WORD! (despite being a QUOTED!), we want
@@ -310,7 +310,7 @@ static void Propagate_All_GC_Marks(void)
          //
         assert(SER(a)->header.bits & NODE_FLAG_MARKED);
 
-        RELVAL *v = ARR_HEAD(a);
+        unstable RELVAL *v = ARR_HEAD(a);
         for (; NOT_END(v); ++v) {
             Queue_Mark_Opt_Value_Deep(v);
 
@@ -403,9 +403,9 @@ void Reify_Va_To_Array_In_Frame(
     }
 
     if (truncated)
-        f->feed->value = ARR_AT(f->feed->array, 1);  // skip `--optimized--`
+        f->feed->value = STABLE(ARR_AT(f->feed->array, 1));  // skip trunc
     else
-        f->feed->value = ARR_HEAD(f->feed->array);
+        f->feed->value = STABLE(ARR_HEAD(f->feed->array));
 
     // The array just popped into existence, and it's tied to a running
     // frame...so safe to say we're holding it (if not at the end).
@@ -513,7 +513,7 @@ static void Mark_Root_Series(void)
                     if (MISC(s).custom.node)
                         Queue_Mark_Node_Deep(MISC(s).custom.node);
 
-                RELVAL *item = ARR_HEAD(cast(REBARR*, s));
+                unstable RELVAL *item = ARR_HEAD(cast(REBARR*, s));
                 for (; NOT_END(item); ++item)
                     Queue_Mark_Value_Deep(item);
             }
@@ -544,10 +544,10 @@ static void Mark_Root_Series(void)
 //
 static void Mark_Data_Stack(void)
 {
-    REBVAL *head = SPECIFIC(ARR_HEAD(DS_Array));
+    unstable REBVAL *head = SPECIFIC(ARR_HEAD(DS_Array));
     ASSERT_UNREADABLE_IF_DEBUG(head);  // DS_AT(0) is deliberately invalid
 
-    REBVAL *stackval = DS_TOP;
+    unstable REBVAL *stackval = DS_TOP;
     for (; stackval != head; --stackval)  // stop before DS_AT(0)
         Queue_Mark_Value_Deep(stackval);
 

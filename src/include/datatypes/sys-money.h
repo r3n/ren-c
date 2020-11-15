@@ -55,7 +55,7 @@
 //     unsigned m0:32; /* significand, lowest part */
 //
 
-inline static deci VAL_MONEY_AMOUNT(REBCEL(const*) v) {
+inline static deci VAL_MONEY_AMOUNT(unstable REBCEL(const*) v) {
     deci amount;
 
     uintptr_t u = EXTRA(Any, v).u;
@@ -98,6 +98,11 @@ inline static REBVAL *Init_Money(RELVAL *out, deci amount) {
 
     return cast(REBVAL*, out);
 }
+
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable REBVAL* Init_Money(unstable RELVAL *out, deci amount)
+      { return Init_Money(STABLE(out), amount); }
+#endif
 
 
 /* unary operators - logic */

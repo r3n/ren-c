@@ -266,7 +266,7 @@ void Mold_Array_At(
 
     bool first_item = true;
 
-    const RELVAL *item = ARR_AT(a, index);
+    unstable const RELVAL *item = ARR_AT(a, index);
     while (NOT_END(item)) {
         if (GET_CELL_FLAG(item, NEWLINE_BEFORE)) {
            if (not indented and (sep[1] != '\0')) {
@@ -323,7 +323,7 @@ void Form_Array_At(
 
     REBINT n;
     for (n = 0; n < len;) {
-        const RELVAL *item = ARR_AT(array, index + n);
+        unstable const RELVAL *item = ARR_AT(array, index + n);
         REBVAL *wval = nullptr;
         if (opt_context and (IS_WORD(item) or IS_GET_WORD(item))) {
             wval = Select_Canon_In_Context(
@@ -398,8 +398,11 @@ void MF_Unhooked(REB_MOLD *mo, REBCEL(const*) v, bool form)
 //
 // Variation which molds a cell, e.g. no quoting is considered.
 //
-void Mold_Or_Form_Cell(REB_MOLD *mo, REBCEL(const*) cell, bool form)
-{
+void Mold_Or_Form_Cell(
+    REB_MOLD *mo,
+    unstable REBCEL(const*) cell,
+    bool form
+){
     REBSTR *s = mo->series;
     ASSERT_SERIES_TERM(SER(s));
 
@@ -422,7 +425,7 @@ void Mold_Or_Form_Cell(REB_MOLD *mo, REBCEL(const*) cell, bool form)
     }
 
     MOLD_HOOK *hook = Mold_Or_Form_Hook_For_Type_Of(cell);
-    hook(mo, cell, form);
+    hook(mo, STABLE_HACK(cell), form);
 
     ASSERT_SERIES_TERM(SER(s));
 }
@@ -433,7 +436,7 @@ void Mold_Or_Form_Cell(REB_MOLD *mo, REBCEL(const*) cell, bool form)
 //
 // Mold or form any value to string series tail.
 //
-void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
+void Mold_Or_Form_Value(REB_MOLD *mo, unstable const RELVAL *v, bool form)
 {
     // Mold hooks take a REBCEL* and not a RELVAL*, so they expect any quotes
     // applied to have already been done.

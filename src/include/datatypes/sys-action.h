@@ -335,6 +335,11 @@ inline static void Sync_Paramlist_Archetype(REBARR *paramlist)
 #define ACT_DISPATCHER(a) \
     (MISC(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE(a))).dispatcher)
 
+#define DETAILS_AT(a,n) \
+    SPECIFIC(STABLE(ARR_AT((a), (n))))
+
+#define IDX_DETAILS_0 0  // Common index used for code body location
+
 // These are indices into the details array agreed upon by actions which have
 // the PARAMLIST_FLAG_IS_NATIVE set.
 //
@@ -390,7 +395,7 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 #define ACT_PARAMS_HEAD(a) \
     (cast(REBVAL*, SER(ACT_PARAMLIST(a))->content.dynamic.data) + 1)
 
-inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
+inline static REBACT *VAL_ACTION(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION); // so it works on literals
     REBSER *s = SER(VAL_ACT_PARAMLIST_NODE(v));
     if (GET_SERIES_INFO(s, INACCESSIBLE))
@@ -410,7 +415,7 @@ inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
 // the words, you get the currently executing label instead...which may
 // actually make more sense.
 //
-inline static const REBSTR *VAL_ACTION_LABEL(const RELVAL *v) {
+inline static const REBSTR *VAL_ACTION_LABEL(unstable const RELVAL *v) {
     assert(IS_ACTION(v));
     REBSER *s = SER(VAL_ACTION_DETAILS_OR_LABEL_NODE(v));
     if (IS_SER_ARRAY(s))
@@ -418,7 +423,7 @@ inline static const REBSTR *VAL_ACTION_LABEL(const RELVAL *v) {
     return STR(s);
 }
 
-inline static void INIT_ACTION_LABEL(RELVAL *v, const REBSTR *label)
+inline static void INIT_ACTION_LABEL(unstable RELVAL *v, const REBSTR *label)
 {
     // !!! How to be certain this isn't an archetype node?  The GC should
     // catch any violations when a paramlist[0] isn't an array...
@@ -446,7 +451,7 @@ inline static void INIT_ACTION_LABEL(RELVAL *v, const REBSTR *label)
 // no label.
 //
 static inline REBVAL *Init_Action(
-    RELVAL *out,
+    unstable RELVAL *out,
     REBACT *a,
     const REBSTR *label,  // allowed to be ANONYMOUS
     REBNOD *binding  // allowed to be UNBOUND

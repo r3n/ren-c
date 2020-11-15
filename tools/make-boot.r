@@ -699,7 +699,14 @@ for-each [sw-cat list] boot-errors [
             args: ["rebEND"]
         ] else [
             params: collect [
-                count-up i arity [keep unspaced ["const REBVAL *arg" i]]
+                ;
+                ; Stack values (`unstable`) are allowed as arguments to the
+                ; error generator, as they are copied before any evaluator
+                ; calls are made.
+                ;
+                count-up i arity [
+                    keep unspaced ["unstable const REBVAL *arg" i]
+                ]
             ]
             args: collect [
                 count-up i arity [keep unspaced ["arg" i]]

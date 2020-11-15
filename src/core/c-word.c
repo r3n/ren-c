@@ -583,7 +583,7 @@ void Startup_Symbols(REBARR *words)
         *SER_AT(REBSTR*, PG_Symbol_Canons, cast(REBLEN, sym))
     );
 
-    RELVAL *word = ARR_HEAD(words);
+    unstable RELVAL *word = ARR_HEAD(words);
     for (; NOT_END(word); ++word) {
         assert(IS_WORD(word));  // real word, not fake (e.g. `/` as -slash-0-)
         REBSTR *canon = VAL_STORED_CANON(word);
@@ -689,7 +689,7 @@ void Shutdown_Interning(void)
 // Previously used VAL_WORD_CONTEXT() to check that the spelling was legit.
 // However, that would incarnate running frames.
 //
-void INIT_WORD_INDEX_Extra_Checks_Debug(RELVAL *v, REBLEN i)
+void INIT_WORD_INDEX_Extra_Checks_Debug(unstable RELVAL *v, REBLEN i)
 {
     assert(IS_WORD_BOUND(v));
     REBNOD *binding = VAL_BINDING(v);

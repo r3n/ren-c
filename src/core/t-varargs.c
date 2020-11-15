@@ -163,7 +163,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         if (Vararg_Op_If_No_Advance_Handled(
             out,
             op,
-            IS_END(shared) ? END_NODE : VAL_ARRAY_AT(shared),
+            IS_END(shared) ? END_NODE : STABLE_HACK(VAL_ARRAY_AT(shared)),
             IS_END(shared) ? SPECIFIED : VAL_SPECIFIER(shared),
             pclass
         )){
@@ -223,7 +223,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         case REB_P_SOFT_QUOTE:
             if (IS_QUOTABLY_SOFT(VAL_ARRAY_AT(shared))) {
                 if (Eval_Value_Throws(
-                    out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared)
+                    out, STABLE(VAL_ARRAY_AT(shared)), VAL_SPECIFIER(shared)
                 )){
                     return true;
                 }
@@ -374,7 +374,7 @@ REB_R MAKE_Varargs(
         //
         REBARR *array1 = Alloc_Singular(NODE_FLAG_MANAGED);
         if (IS_END(VAL_ARRAY_AT(arg)))
-            SET_END(ARR_SINGLE(array1));
+            SET_END(STABLE(ARR_SINGLE(array1)));
         else
             Move_Value(ARR_SINGLE(array1), arg);
 

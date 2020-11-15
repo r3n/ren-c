@@ -114,7 +114,7 @@ REBINT Cmp_Gob(REBCEL(const*) g1, REBCEL(const*) g2)
 //
 //  Did_Set_XYF: C
 //
-static bool Did_Set_XYF(RELVAL *xyf, const REBVAL *val)
+static bool Did_Set_XYF(unstable RELVAL *xyf, const REBVAL *val)
 {
     if (IS_PAIR(val)) {
         VAL_XYF_X(xyf) = VAL_PAIR_X_DEC(val);
@@ -145,7 +145,7 @@ static REBLEN Find_Gob(REBGOB *gob, REBGOB *target)
         return NOT_FOUND;
 
     REBLEN len = GOB_LEN(gob);
-    REBVAL *item = GOB_HEAD(gob);
+    unstable REBVAL *item = GOB_HEAD(gob);
 
     REBLEN n;
     for (n = 0; n < len; ++n, ++item)
@@ -252,7 +252,7 @@ static void Insert_Gobs(
         }
     }
 
-    RELVAL *item = ARR_AT(pane, index);
+    RELVAL *item = STABLE_HACK(ARR_AT(pane, index));
     for (n = 0; n < len; n++) {
         val = arg++;
         if (IS_WORD(val)) {
@@ -283,7 +283,7 @@ static void Insert_Gobs(
 //
 static void Remove_Gobs(REBGOB *gob, REBLEN index, REBLEN len)
 {
-    REBVAL *item = GOB_AT(gob, index);
+    REBVAL *item = STABLE_HACK(GOB_AT(gob, index));
 
     REBLEN n;
     for (n = 0; n < len; ++n, ++item)
@@ -448,7 +448,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
 
         if (IS_BLOCK(val)) {
             REBLEN len;
-            const RELVAL *head = VAL_ARRAY_LEN_AT(&len, val);
+            const RELVAL *head = STABLE_HACK(VAL_ARRAY_LEN_AT(&len, val));
             Insert_Gobs(gob, head, 0, len, false);
         }
         else if (IS_GOB(val))
@@ -493,7 +493,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
             for (i = 0; Gob_Flag_Words[i].sym != 0; ++i)
                 CLR_GOB_FLAG(gob, Gob_Flag_Words[i].flags);
 
-            const RELVAL* item;
+            unstable const RELVAL* item;
             for (item = ARR_HEAD(VAL_ARRAY(val)); NOT_END(item); item++)
                 if (IS_WORD(item)) Set_Gob_Flag(gob, VAL_WORD_CANON(item));
         }
@@ -519,8 +519,11 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
 // !!! Things like this Get_GOB_Var routine could be replaced with ordinary
 // OBJECT!-style access if GOB! was an ANY-CONTEXT.
 //
-static REBVAL *Get_GOB_Var(RELVAL *out, REBGOB *gob, const RELVAL *word)
-{
+static unstable REBVAL *Get_GOB_Var(
+    unstable RELVAL *out,
+    REBGOB *gob,
+    unstable const RELVAL *word
+){
     switch (VAL_WORD_SYM(word)) {
       case SYM_OFFSET:
         return Init_Pair_Dec(out, GOB_X(gob), GOB_Y(gob));
@@ -608,8 +611,11 @@ static REBVAL *Get_GOB_Var(RELVAL *out, REBGOB *gob, const RELVAL *word)
 //
 //  Set_GOB_Vars: C
 //
-static void Set_GOB_Vars(REBGOB *gob, const RELVAL *blk, REBSPC *specifier)
-{
+static void Set_GOB_Vars(
+    REBGOB *gob,
+    unstable const RELVAL *blk,
+    REBSPC *specifier
+){
     DECLARE_LOCAL (var);
     DECLARE_LOCAL (val);
 
@@ -836,7 +842,8 @@ REB_R PD_Gob(
     if (IS_INTEGER(picker))
         return rebValueQ(
             rebU(NATIVE_VAL(pick)),
-                SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)), SPECIFIC(picker),
+                SPECIFIC(STABLE_HACK(ARR_AT(gob, IDX_GOB_PANE))),
+                SPECIFIC(picker),
         rebEND);
 
     return R_UNHANDLED;
@@ -1024,7 +1031,7 @@ REBTYPE(Gob)
         // !!! Could make the indexed pane into a local if we had a spare
         // local, but its' good to exercise the API as much as possible).
         //
-        REBVAL *pane = SPECIFIC(ARR_AT(gob, IDX_GOB_PANE));
+        REBVAL *pane = SPECIFIC(STABLE_HACK(ARR_AT(gob, IDX_GOB_PANE)));
         return rebValue(
             "applique :take [",
                 "series: at", pane, rebI(index + 1),
@@ -1052,7 +1059,7 @@ REBTYPE(Gob)
 
     case SYM_REVERSE:
         return rebValueQ(
-            "reverse", SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)),
+            "reverse", SPECIFIC(STABLE_HACK(ARR_AT(gob, IDX_GOB_PANE))),
         rebEND);
 
     default:

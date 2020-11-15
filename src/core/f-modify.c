@@ -43,7 +43,7 @@ REBLEN Modify_Array(
 
     REBLEN tail = ARR_LEN(dst_arr);
 
-    const RELVAL *src_rel;
+    unstable const RELVAL *src_rel;
     REBSPC *specifier;
 
     if (IS_NULLED(src_val) and sym == SYM_CHANGE) {
@@ -80,7 +80,7 @@ REBLEN Modify_Array(
 
     // Check /PART, compute LEN:
     if (flags & AM_SPLICE) {
-        REBCEL(const*) unescaped = VAL_UNESCAPED(src_val);
+        unstable REBCEL(const*) unescaped = VAL_UNESCAPED(src_val);
         assert(ANY_ARRAY_KIND(CELL_KIND(unescaped)));
 
         ilen = VAL_LEN_AT(unescaped);
@@ -92,7 +92,7 @@ REBLEN Modify_Array(
         }
 
         if (not tail_newline) {
-            const RELVAL *tail_cell = VAL_ARRAY_AT(unescaped) + ilen;
+            unstable const RELVAL *tail_cell = VAL_ARRAY_AT(unescaped) + ilen;
             if (IS_END(tail_cell)) {
                 tail_newline = GET_ARRAY_FLAG(
                     VAL_ARRAY(src_val),
@@ -467,7 +467,7 @@ REBLEN Modify_String_Or_Binary(
             // between.  There is some rationale to this, though implications
             // for operations like TO TEXT! of a BLOCK! are unclear...
             //
-            const RELVAL *item;
+            unstable const RELVAL *item;
             for (item = VAL_ARRAY_AT(src); NOT_END(item); ++item)
                 Form_Value(mo, item);
             goto use_mold_buffer;

@@ -82,7 +82,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
         return cast(REBVAL*, out);
     }
 
-    const RELVAL *v = ARR_HEAD(a);
+    unstable const RELVAL *v = ARR_HEAD(a);
     for (; NOT_END(v); ++v) {
         if (not Is_Valid_Sequence_Element(kind, v)) {
             Derelativize(out, v, specifier);
@@ -520,10 +520,6 @@ bool Eval_Path_Throws_Core(
 
     REBDSP dsp_orig = DSP;
 
-    assert(
-        not opt_setval
-        or not IN_DATA_STACK_DEBUG(opt_setval) // evaluation might relocate it
-    );
     assert(out != opt_setval and out != FRM_SPARE(pvs));
 
     pvs->special = opt_setval; // a.k.a. PVS_OPT_SETVAL()
@@ -642,8 +638,8 @@ bool Eval_Path_Throws_Core(
         // This way we can just pop them as we go, and know if they weren't
         // all consumed if not back to `dsp_orig` by the end.
 
-        REBVAL *bottom = DS_AT(dsp_orig + 1);
-        REBVAL *top = DS_TOP;
+        unstable REBVAL *bottom = DS_AT(dsp_orig + 1);
+        unstable REBVAL *top = DS_TOP;
 
         while (top > bottom) {
             assert(IS_SYM_WORD(bottom) and not IS_WORD_BOUND(bottom));
@@ -711,12 +707,20 @@ bool Eval_Path_Throws_Core(
 // were `get x` would look up a variable but `get 3` would give you 3.
 // At time of writing it seems to appear in only two places.
 //
-void Get_Simple_Value_Into(REBVAL *out, const RELVAL *val, REBSPC *specifier)
-{
+void Get_Simple_Value_Into(
+    REBVAL *out,
+    unstable const RELVAL *val,
+    REBSPC *specifier
+){
     if (IS_WORD(val) or IS_GET_WORD(val))
         Get_Word_May_Fail(out, val, specifier);
-    else if (IS_PATH(val) or IS_GET_PATH(val))
-        Get_Path_Core(out, val, specifier);
+    else if (IS_PATH(val) or IS_GET_PATH(val)) {
+        //
+        // !!! This is an example case where the pointer being passed in
+        // may move.  Review.
+        //
+        Get_Path_Core(out, STABLE_HACK(val), specifier);
+    }
     else
         Derelativize(out, val, specifier);
 }
@@ -983,7 +987,7 @@ REB_R MAKE_Path(
         }
         else { // Splice any generated paths, so there are no paths-in-paths.
 
-            const RELVAL *item = VAL_ARRAY_AT(out);
+            const RELVAL *item = STABLE_HACK(VAL_ARRAY_AT(out));  // safe?
             if (IS_BLANK(item) and DSP != dsp_orig) {
                 if (IS_BLANK(DS_TOP)) // make path! ['a/b/ `/c`]
                     fail ("Cannot merge slashes in MAKE PATH!");

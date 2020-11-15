@@ -86,7 +86,7 @@ enum {
 bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
 {
     REBARR *code_arr = Make_Array(FRM_NUM_ARGS(f)); // max, e.g. no refines
-    RELVAL *code = ARR_HEAD(code_arr);
+    RELVAL *code = STABLE(ARR_HEAD(code_arr));
 
     // !!! For the moment, if refinements are needed we generate a PATH! with
     // the ACTION! at the head, and have the evaluator rediscover the stack
@@ -182,7 +182,7 @@ REB_R Hijacker_Dispatcher(REBFRM *f)
 {
     REBACT *phase = FRM_PHASE(f);
     REBARR *details = ACT_DETAILS(phase);
-    RELVAL *hijacker = ARR_HEAD(details);
+    REBVAL *hijacker = DETAILS_AT(details, IDX_HIJACKER_HIJACKER);
 
     // We need to build a new frame compatible with the hijacker, and
     // transform the parameters we've gathered to be compatible with it.
@@ -263,8 +263,8 @@ REBNATIVE(hijack)
                 details_len + 1 - SER_REST(SER(victim_details))
             );
 
-        RELVAL *src = ARR_HEAD(hijacker_details);
-        RELVAL *dest = ARR_HEAD(victim_details);
+        unstable RELVAL *src = ARR_HEAD(hijacker_details);
+        unstable RELVAL *dest = ARR_HEAD(victim_details);
         for (; NOT_END(src); ++src, ++dest)
             Blit_Relative(dest, src);
         TERM_ARRAY_LEN(victim_details, details_len);

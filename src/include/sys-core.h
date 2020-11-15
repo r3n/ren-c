@@ -164,6 +164,70 @@
 #define MAX_EXPAND_LIST 5       // number of series-1 in Prior_Expand list
 
 
+//=//// "UNSTABLE" TYPE CHECKING TRICK ////////////////////////////////////=//
+//
+// Some cells in Ren-C will potentially move if an evaluation is run.  This
+// includes cells on the stack, or in arrays that are controlled by the user.
+//
+// Code should not be holding onto such cells across an evaluation, as they
+// will become invalid.  To help make it clearer, this is an annotation put
+// on any cell with an "unstable" address.  It's given to cells on the data
+// stack, and pessimistically by any value accessed in an array with ARR_AT().
+//
+// In order to give the annotation some checking power, a debug mode will
+// match it to the C qualifier `volatile`.  As with `const` there is some
+// transitive power in the check...since a volatile can only be passed to
+// a parameter that also accepts a volatile.
+//
+// A FUNCTION THAT TAKES AN `UNSTABLE` INPUT IS THEREFORE EFFECTIVELY
+// PROMISING THAT IT WILL NOT CALL INTO THE EVALUATOR.
+//
+// Keeping the volatile setting on at run-time would have performance
+// implications, as it disables optimizations.  So this is purely a type
+// checking construct.  It should be disabled in other situations.
+//
+// TERMINOLOGY NOTE: Originally this was called `movable` and `FIXED()` was
+// used to annotate places where it would be okay to pass the movable pointer.
+// However, Windows API uses "FIXED" and movable means other things.  The
+// somewhat more foreboding name of "unstable" is a little jarring, but,
+// maybe it should be...you can't call evaluation or DS_PUSH() so long as
+// you expect these values to stay good!
+//
+#ifdef DEBUG_UNSTABLE_CELLS
+    #define unstable volatile
+    #define unstable_ok  // help annotate that there's a movable version
+
+    template<typename T>
+    inline static typename std::remove_volatile<T>::type* STABLE(T* v) {
+        static_assert(
+            std::is_volatile<T>::value,
+            "you should only use STABLE() on unstable pointers"
+        );
+        return const_cast<typename std::remove_volatile<T>::type*>(v);
+    }
+
+    // When you are done with an unstable value, trash its contents before
+    // calling into the evaluator.  This makes that clear.
+    //
+    #define FORGET(v) UNUSED(v)
+
+    // !!! There are parts in the code where a cell in a usermode array is
+    // held onto while arbitrary evaluation code is allowed to run.  This
+    // must ultimately make sure that array has at least a temporary hold
+    // on it, to avoid problems (this is what `unstable` is there to catch!)
+    // But since the codebase is being gradually improved, some parts don't
+    // do this yet.  Review these locations.
+    //
+    #define STABLE_HACK(v) STABLE(v)
+#else
+    #define unstable
+    #define unstable_ok
+    #define FORGET(v) UNUSED(v)
+    #define STABLE(v) (v)
+    #define STABLE_HACK(v) (v)
+#endif
+
+
 // This does all the forward definitions that are necessary for the compiler
 // to be willing to build %tmp-internals.h.  Some structures are fully defined
 // and some are only forward declared.
@@ -370,7 +434,10 @@ extern void reb_qsort_r(void *a, size_t n, size_t es, void *thunk, cmp_t *cmp);
 
 // Lives in %sys-bind.h, but needed for Move_Value() and Derelativize()
 //
-inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding);
+inline static void INIT_BINDING_MAY_MANAGE(
+    unstable RELVAL *out,
+    REBNOD* binding
+);
 
 #include "datatypes/sys-track.h"
 #include "datatypes/sys-value.h"  // these defines don't need series accessors

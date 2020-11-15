@@ -216,7 +216,7 @@ REBNATIVE(new_line_q)
     REBVAL *pos = ARG(position);
 
     const REBARR *arr;
-    const RELVAL *item;
+    unstable const RELVAL *item;
 
     if (IS_VARARGS(pos)) {
         REBFRM *f;

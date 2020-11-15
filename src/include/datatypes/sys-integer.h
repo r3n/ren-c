@@ -40,7 +40,7 @@
 #else
     // allows an assert, but also lvalue: `VAL_INT64(v) = xxx`
     //
-    inline static REBI64 VAL_INT64(REBCEL(const*) v) { // C++ reference type
+    inline static REBI64 VAL_INT64(unstable REBCEL(const*) v) {
         assert(CELL_KIND(v) == REB_INTEGER);
         return PAYLOAD(Integer, v).i64;
     }
@@ -48,27 +48,33 @@
         assert(VAL_TYPE(v) == REB_INTEGER);
         return PAYLOAD(Integer, v).i64;
     }
+  #ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable REBI64 & VAL_INT64(unstable RELVAL *v) {
+        assert(VAL_TYPE(v) == REB_INTEGER);
+        return PAYLOAD(Integer, STABLE(v)).i64;
+    }
+  #endif
 #endif
 
-inline static REBVAL *Init_Integer(RELVAL *out, REBI64 i64) {
+inline static REBVAL *Init_Integer(unstable RELVAL *out, REBI64 i64) {
     RESET_CELL(out, REB_INTEGER, CELL_MASK_NONE);
     PAYLOAD(Integer, out).i64 = i64;
     return cast(REBVAL*, out);
 }
 
-inline static int32_t VAL_INT32(REBCEL(const*) v) {
+inline static int32_t VAL_INT32(unstable REBCEL(const*) v) {
     if (VAL_INT64(v) > INT32_MAX or VAL_INT64(v) < INT32_MIN)
         fail (Error_Out_Of_Range(SPECIFIC(CELL_TO_VAL(v))));
     return cast(int32_t, VAL_INT64(v));
 }
 
-inline static uint32_t VAL_UINT32(REBCEL(const*) v) {
+inline static uint32_t VAL_UINT32(unstable REBCEL(const*) v) {
     if (VAL_INT64(v) < 0 or VAL_INT64(v) > UINT32_MAX)
         fail (Error_Out_Of_Range(SPECIFIC(CELL_TO_VAL(v))));
     return cast(uint32_t, VAL_INT64(v));
 }
 
-inline static REBYTE VAL_UINT8(REBCEL(const*) v) {
+inline static REBYTE VAL_UINT8(unstable REBCEL(const*) v) {
     if (VAL_INT64(v) > 255 or VAL_INT64(v) < 0)
         fail (Error_Out_Of_Range(SPECIFIC(CELL_TO_VAL(v))));
     return cast(REBYTE, VAL_INT32(v));

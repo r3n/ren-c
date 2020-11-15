@@ -133,7 +133,7 @@ bool Interpreted_Dispatch_Details_0_Throws(
 
     REBACT *phase = FRM_PHASE(f);
     REBARR *details = ACT_DETAILS(phase);
-    RELVAL *body = ARR_AT(details, 0);  // code to run (hence "details 0")
+    RELVAL *body = STABLE(ARR_AT(details, IDX_DETAILS_0));  // code to run
     assert(IS_BLOCK(body) and IS_RELATIVE(body) and VAL_INDEX(body) == 0);
 
     if (GET_ACTION_FLAG(phase, HAS_RETURN)) {
@@ -280,7 +280,7 @@ REB_R Elider_Dispatcher(REBFRM *f)
 REB_R Commenter_Dispatcher(REBFRM *f)
 {
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-    RELVAL *body = ARR_HEAD(details);
+    RELVAL *body = STABLE(ARR_AT(details, IDX_DETAILS_0));
     assert(VAL_LEN_AT(body) == 0);
     UNUSED(body);
 
@@ -414,7 +414,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
     //
     REBARR *details = ACT_DETAILS(a);
     RELVAL *rebound = Init_Relative_Block(
-        ARR_AT(details, IDX_NATIVE_BODY),
+        STABLE(ARR_AT(details, IDX_NATIVE_BODY)),
         a,
         copy
     );

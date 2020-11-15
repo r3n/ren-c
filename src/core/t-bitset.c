@@ -137,7 +137,7 @@ REB_R TO_Bitset(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 // Return integer number for the maximum bit number defined by
 // the value. Used to determine how much space to allocate.
 //
-REBLEN Find_Max_Bit(const RELVAL *val)
+REBLEN Find_Max_Bit(unstable const RELVAL *val)
 {
     REBLEN maxi = 0;
 
@@ -260,7 +260,7 @@ void Set_Bit(REBSER *bset, REBLEN n, bool set)
 //
 // Set/clear bits indicated by strings and chars and ranges.
 //
-bool Set_Bits(REBSER *bset, const RELVAL *val, bool set)
+bool Set_Bits(REBSER *bset, unstable const RELVAL *val, bool set)
 {
     if (IS_INTEGER(val)) {
         REBLEN n = Int32s(val, 0);
@@ -295,7 +295,7 @@ bool Set_Bits(REBSER *bset, const RELVAL *val, bool set)
     if (!ANY_ARRAY(val))
         fail (Error_Invalid_Type(VAL_TYPE(val)));
 
-    const RELVAL *item = VAL_ARRAY_AT(val);
+    unstable const RELVAL *item = VAL_ARRAY_AT(val);
 
     if (
         NOT_END(item)
@@ -406,7 +406,7 @@ bool Set_Bits(REBSER *bset, const RELVAL *val, bool set)
 // Check bits indicated by strings and chars and ranges.
 // If uncased is true, try to match either upper or lower case.
 //
-bool Check_Bits(const REBSER *bset, const RELVAL *val, bool uncased)
+bool Check_Bits(const REBSER *bset, unstable const RELVAL *val, bool uncased)
 {
     if (IS_CHAR(val))
         return Check_Bit(bset, VAL_CHAR(val), uncased);
@@ -441,7 +441,7 @@ bool Check_Bits(const REBSER *bset, const RELVAL *val, bool uncased)
 
     // Loop through block of bit specs
 
-    const RELVAL *item;
+    unstable const RELVAL *item;
     for (item = VAL_ARRAY_AT(val); NOT_END(item); item++) {
 
         switch (VAL_TYPE(item)) {

@@ -421,13 +421,15 @@ inline static bool Eval_Value_Maybe_End_Throws(
 }
 
 
+// Evaluate one cell (e.g. a BLOCK! here would just evaluate to itself!)
+//
 // The callsites for Eval_Value_Throws() generally expect an evaluative
 // result (at least null).  They might be able to give a better error, but
 // they pretty much all need to give an error.
 //
 inline static bool Eval_Value_Throws(
     REBVAL *out,
-    const RELVAL *value,  // e.g. a BLOCK! here would just evaluate to itself!
+    const RELVAL *value,  // note this is not `unstable`, direct pointer used
     REBSPC *specifier
 ){
     if (Eval_Value_Maybe_End_Throws(out, value, specifier))

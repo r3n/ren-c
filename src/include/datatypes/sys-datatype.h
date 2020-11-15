@@ -36,12 +36,12 @@
 #define VAL_TYPE_KIND_ENUM(v) \
     EXTRA(Datatype, (v)).kind
 
-inline static enum Reb_Kind VAL_TYPE_KIND_OR_CUSTOM(REBCEL(const*) v) {
+inline static enum Reb_Kind VAL_TYPE_KIND_OR_CUSTOM(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_DATATYPE);
     return VAL_TYPE_KIND_ENUM(v);
 }
 
-inline static enum Reb_Kind VAL_TYPE_KIND(REBCEL(const*) v) {
+inline static enum Reb_Kind VAL_TYPE_KIND(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_DATATYPE);
     enum Reb_Kind k = VAL_TYPE_KIND_ENUM(v);
     assert(k != REB_CUSTOM);
@@ -65,7 +65,10 @@ inline static enum Reb_Kind VAL_TYPE_KIND(REBCEL(const*) v) {
 // We can quickly find them in the lib context, because the types take up
 // the early 64-ish symbol IDs in lib, so just use kind as an index.
 //
-inline static REBVAL *Init_Builtin_Datatype(RELVAL *out, enum Reb_Kind kind) {
+inline static REBVAL *Init_Builtin_Datatype(
+    unstable_ok RELVAL *out,
+    enum Reb_Kind kind
+){
     assert(kind > REB_0 and kind < REB_MAX);
     Move_Value(out, Datatype_From_Kind(kind));
     assert(VAL_TYPE_KIND(out) == kind);
@@ -74,11 +77,23 @@ inline static REBVAL *Init_Builtin_Datatype(RELVAL *out, enum Reb_Kind kind) {
     return cast(REBVAL*, out);
 }
 
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable REBVAL *Init_Builtin_Datatype(
+        unstable RELVAL *out,
+        enum Reb_Kind kind
+    ){
+        return Init_Builtin_Datatype(STABLE(out), kind);
+    }
+#endif
+
 
 // Custom types have to be registered by extensions.  They are identified by
 // a URL, so that there is a way of MAKE-ing them.
 //
-inline static REBVAL *Init_Custom_Datatype(RELVAL *out, REBTYP *type) {
+inline static REBVAL *Init_Custom_Datatype(
+    unstable_ok RELVAL *out,
+    REBTYP *type
+){
     RESET_CELL(
         out,
         REB_DATATYPE,
@@ -89,6 +104,15 @@ inline static REBVAL *Init_Custom_Datatype(RELVAL *out, REBTYP *type) {
     VAL_TYPE_HOOKS_NODE(out) = NOD(type);
     return cast(REBVAL*, out);
 }
+
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable REBVAL *Init_Custom_Datatype(
+        unstable RELVAL *out,
+        REBTYP *type
+    ){
+        return Init_Custom_Datatype(STABLE(out), type);
+    }
+#endif
 
 
 //=//// TYPE HOOK ACCESS //////////////////////////////////////////////////=//
@@ -139,14 +163,14 @@ enum Reb_Type_Hook_Index {
 extern CFUNC* Builtin_Type_Hooks[REB_MAX][IDX_HOOKS_MAX];
 
 
-inline static CFUNC** VAL_TYPE_HOOKS(const RELVAL *type) {
+inline static CFUNC** VAL_TYPE_HOOKS(unstable const RELVAL *type) {
     enum Reb_Kind k = VAL_TYPE_KIND_OR_CUSTOM(type);
     if (k != REB_CUSTOM)
         return Builtin_Type_Hooks[k];
     return cast(CFUNC**, SER_DATA(VAL_TYPE_CUSTOM(type)));
 }
 
-inline static CFUNC** HOOKS_FOR_TYPE_OF(REBCEL(const*) v) {
+inline static CFUNC** HOOKS_FOR_TYPE_OF(unstable REBCEL(const*) v) {
     enum Reb_Kind k = CELL_KIND(v);
     if (k != REB_CUSTOM)
         return Builtin_Type_Hooks[k];

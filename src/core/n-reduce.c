@@ -146,7 +146,7 @@ REBNATIVE(reduce)
 }
 
 
-bool Match_For_Compose(const RELVAL *group, const REBVAL *label) {
+bool Match_For_Compose(unstable const RELVAL *group, const REBVAL *label) {
     if (IS_NULLED(label))
         return true;
 
@@ -155,11 +155,11 @@ bool Match_For_Compose(const RELVAL *group, const REBVAL *label) {
     if (VAL_LEN_AT(group) == 0) // you have a pattern, so leave `()` as-is
         return false;
 
-    const RELVAL *first = VAL_ARRAY_AT(group);
+    unstable const RELVAL *first = VAL_ARRAY_AT(group);
     if (VAL_TYPE(first) != VAL_TYPE(label))
         return false;
 
-    return (CT_String(label, first, 1) == 0);
+    return (CT_String(label, STABLE_HACK(first), 1) == 0);
 }
 
 
@@ -238,7 +238,7 @@ REB_R Compose_To_Stack_Core(
         bool doubled_group = false;  // override predicate with ((...))
 
         REBSPC *match_specifier = nullptr;
-        const RELVAL *match = nullptr;
+        unstable const RELVAL *match = nullptr;
 
         if (not ANY_GROUP_KIND(heart)) {
             //
@@ -246,7 +246,7 @@ REB_R Compose_To_Stack_Core(
             // find compositions inside it if /DEEP and it's an array
         }
         else if (not only and Is_Any_Doubled_Group(f_value)) {
-            const RELVAL *inner = VAL_ARRAY_AT(f_value);
+            unstable const RELVAL *inner = VAL_ARRAY_AT(f_value);
             if (Match_For_Compose(inner, label)) {
                 doubled_group = true;
                 match = inner;
@@ -305,7 +305,7 @@ REB_R Compose_To_Stack_Core(
                 if (quotes != 0 or heart != REB_GROUP)
                     fail ("Currently can only splice plain unquoted GROUP!s");
 
-                const RELVAL *push = VAL_ARRAY_AT(insert);
+                unstable const RELVAL *push = VAL_ARRAY_AT(insert);
                 if (NOT_END(push)) {
                     //
                     // Only proxy newline flag from the template on *first*

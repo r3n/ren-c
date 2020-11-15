@@ -171,7 +171,7 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
         mutable_VAL_EVENT_FLAGS(event)
             &= ~(EVF_DOUBLE | EVF_CONTROL | EVF_SHIFT);
 
-        const RELVAL *item;
+        unstable const RELVAL *item;
         for (item = ARR_HEAD(VAL_ARRAY(val)); NOT_END(item); ++item) {
             if (not IS_WORD(item))
                 continue;
@@ -206,8 +206,11 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
 //
 //  Set_Event_Vars: C
 //
-void Set_Event_Vars(REBVAL *evt, const RELVAL *head, REBSPC *specifier)
-{
+void Set_Event_Vars(
+    REBVAL *evt,
+    unstable const RELVAL *head,
+    REBSPC *specifier
+){
     DECLARE_LOCAL (var);
     DECLARE_LOCAL (val);
 

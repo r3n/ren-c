@@ -32,15 +32,21 @@
 // two numbers.
 //
 
-inline static REBVAL *PAIRING_KEY(REBVAL *paired) {
+inline static REBVAL *PAIRING_KEY(unstable_ok REBVAL *paired) {
     return paired + 1;
 }
+
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable REBVAL *PAIRING_KEY(unstable REBVAL *paired) {
+        return paired + 1;
+    }
+#endif
 
 
 #define VAL_PAIR_NODE(v) \
     PAYLOAD(Any, (v)).first.node 
 
-inline static REBVAL *VAL_PAIRING(REBCEL(const*) v) {
+inline static REBVAL *VAL_PAIRING(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_PAIR);
     return VAL(VAL_NODE(v));
 }
@@ -51,25 +57,25 @@ inline static REBVAL *VAL_PAIRING(REBCEL(const*) v) {
 #define VAL_PAIR_Y(v) \
     VAL(VAL_PAIRING(v))
 
-inline static REBDEC VAL_PAIR_X_DEC(REBCEL(const*) v) {
+inline static REBDEC VAL_PAIR_X_DEC(unstable REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_X(v)))
         return cast(REBDEC, VAL_INT64(VAL_PAIR_X(v)));
     return VAL_DECIMAL(VAL_PAIR_X(v));
 }
 
-inline static REBDEC VAL_PAIR_Y_DEC(REBCEL(const*) v) {
+inline static REBDEC VAL_PAIR_Y_DEC(unstable REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_Y(v)))
         return cast(REBDEC, VAL_INT64(VAL_PAIR_Y(v)));
     return VAL_DECIMAL(VAL_PAIR_Y(v));
 }
 
-inline static REBI64 VAL_PAIR_X_INT(REBCEL(const*) v) {
+inline static REBI64 VAL_PAIR_X_INT(unstable REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_X(v)))
         return VAL_INT64(VAL_PAIR_X(v));
     return ROUND_TO_INT(VAL_DECIMAL(VAL_PAIR_X(v)));
 }
 
-inline static REBDEC VAL_PAIR_Y_INT(REBCEL(const*) v) {
+inline static REBDEC VAL_PAIR_Y_INT(unstable REBCEL(const*) v) {
     if (IS_INTEGER(VAL_PAIR_Y(v)))
         return VAL_INT64(VAL_PAIR_Y(v));
     return ROUND_TO_INT(VAL_DECIMAL(VAL_PAIR_Y(v)));
@@ -77,8 +83,8 @@ inline static REBDEC VAL_PAIR_Y_INT(REBCEL(const*) v) {
 
 inline static REBVAL *Init_Pair(
     RELVAL *out,
-    const RELVAL *x,
-    const RELVAL *y
+    unstable const RELVAL *x,
+    unstable const RELVAL *y
 ){
     assert(ANY_NUMBER(x));
     assert(ANY_NUMBER(y));
@@ -92,7 +98,7 @@ inline static REBVAL *Init_Pair(
     return cast(REBVAL*, out);
 }
 
-inline static REBVAL *Init_Pair_Int(RELVAL *out, REBI64 x, REBI64 y) {
+inline static REBVAL *Init_Pair_Int(unstable RELVAL *out, REBI64 x, REBI64 y) {
     RESET_CELL(out, REB_PAIR, CELL_FLAG_FIRST_IS_NODE);
     REBVAL *p = Alloc_Pairing();
     Init_Integer(PAIRING_KEY(p), x);
@@ -102,7 +108,7 @@ inline static REBVAL *Init_Pair_Int(RELVAL *out, REBI64 x, REBI64 y) {
     return cast(REBVAL*, out);
 }
 
-inline static REBVAL *Init_Pair_Dec(RELVAL *out, REBDEC x, REBDEC y) {
+inline static REBVAL *Init_Pair_Dec(unstable RELVAL *out, REBDEC x, REBDEC y) {
     RESET_CELL(out, REB_PAIR, CELL_FLAG_FIRST_IS_NODE);
     REBVAL *p = Alloc_Pairing();
     Init_Decimal(PAIRING_KEY(p), x);

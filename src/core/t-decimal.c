@@ -227,7 +227,7 @@ REB_R MAKE_Decimal(
 
       case REB_BLOCK: {
         REBLEN len;
-        const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
+        unstable const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
 
         if (len != 2)
             fail (Error_Bad_Make(kind, arg));

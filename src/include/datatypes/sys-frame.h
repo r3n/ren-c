@@ -39,7 +39,7 @@
 
 // !!! Find a better place for this!
 //
-inline static bool IS_QUOTABLY_SOFT(const RELVAL *v) {
+inline static bool IS_QUOTABLY_SOFT(unstable const RELVAL *v) {
     return IS_GET_GROUP(v) or IS_GET_WORD(v) or IS_GET_PATH(v);
 }
 
@@ -226,7 +226,7 @@ inline static REBCTX *Context_For_Frame_May_Manage(REBFRM *f) {
 
 //=//// FRAME LABELING ////////////////////////////////////////////////////=//
 
-inline static void Get_Frame_Label_Or_Blank(RELVAL *out, REBFRM *f) {
+inline static void Get_Frame_Label_Or_Blank(unstable RELVAL *out, REBFRM *f) {
     assert(Is_Action_Frame(f));
     if (f->opt_label != NULL)
         Init_Word(out, f->opt_label); // invoked via WORD! or PATH!
@@ -285,7 +285,7 @@ inline static void Conserve_Varlist(REBARR *varlist)
     assert(NOT_SERIES_INFO(varlist, INACCESSIBLE));
     assert(NOT_SERIES_FLAG(varlist, MANAGED));
 
-    RELVAL *rootvar = ARR_HEAD(varlist);
+    RELVAL *rootvar = STABLE(ARR_HEAD(varlist));
     assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == varlist);
     TRASH_POINTER_IF_DEBUG(PAYLOAD(Any, rootvar).second.node);  // phase
     TRASH_POINTER_IF_DEBUG(EXTRA(Binding, rootvar).node);
@@ -332,8 +332,10 @@ inline static void Free_Frame_Internal(REBFRM *f) {
 }
 
 
-inline static void Push_Frame(REBVAL *out, REBFRM *f)
-{
+inline static void Push_Frame(
+    REBVAL *out,  // type check prohibits passing `unstable` cells for output
+    REBFRM *f
+){
     assert(f->feed->value != nullptr);
 
     // All calls through to Eval_Core() are assumed to happen at the same C
@@ -355,29 +357,6 @@ inline static void Push_Frame(REBVAL *out, REBFRM *f)
     // slot at all times; use null until first eval call if needed
     //
     f->out = out;
-
-    // Though we can protect the value written into the target pointer 'out'
-    // from GC during the course of evaluation, we can't protect the
-    // underlying value from relocation.  Technically this would be a problem
-    // for any series which might be modified while this call is running, but
-    // most notably it applies to the data stack--where output used to always
-    // be returned.
-    //
-    // !!! A non-contiguous data stack which is not a series is a possibility.
-    //
-  #ifdef STRESS_CHECK_DO_OUT_POINTER
-    REBNOD *containing;
-    if (
-        did (containing = Try_Find_Containing_Node_Debug(f->out))
-        and not (containing->header.bits & NODE_FLAG_CELL)
-        and NOT_SERIES_FLAG(containing, DONT_RELOCATE)
-    ){
-        printf("Request for ->out location in movable series memory\n");
-        panic (containing);
-    }
-  #else
-    assert(not IN_DATA_STACK_DEBUG(f->out));
-  #endif
 
   #ifdef DEBUG_EXPIRED_LOOKBACK
     f->stress = nullptr;
@@ -735,7 +714,7 @@ inline static void Push_Action(
             SERIES_MASK_VARLIST
                 | SERIES_FLAG_FIXED_SIZE // FRAME!s don't expand ATM
         );
-        s->info = Endlike_Header(
+        s->info.bits = Endlike_Header(
             FLAG_WIDE_BYTE_OR_0(0) // signals array, also implicit terminator
                 | FLAG_LEN_BYTE_OR_255(255) // signals dynamic
         );
@@ -768,18 +747,18 @@ inline static void Push_Action(
     EXTRA(Binding, f->rootvar).node = binding; // FRM_BINDING()
 
     s->content.dynamic.used = num_args + 1;
-    RELVAL *tail = ARR_TAIL(f->varlist);
+    unstable RELVAL *tail = ARR_TAIL(f->varlist);
     tail->header.bits = FLAG_KIND3Q_BYTE(REB_0);  // no NODE_FLAG_CELL
     TRACK_CELL_IF_DEBUG_EVIL_MACRO(tail, __FILE__, __LINE__);
 
     // Current invariant for all arrays (including fixed size), last cell in
     // the allocation is an end.
-    RELVAL *ultimate = ARR_AT(f->varlist, s->content.dynamic.rest - 1);
-    ultimate->header = Endlike_Header(0); // unreadable
+    unstable RELVAL *ultimate = ARR_AT(f->varlist, s->content.dynamic.rest - 1);
+    ultimate->header.bits = Endlike_Header(0); // unreadable
     TRACK_CELL_IF_DEBUG_EVIL_MACRO(ultimate, __FILE__, __LINE__);
 
   #if !defined(NDEBUG)
-    RELVAL *prep = ultimate - 1;
+    unstable RELVAL *prep = ultimate - 1;
     for (; prep > tail; --prep) {
         prep->header.bits =
             FLAG_KIND3Q_BYTE(REB_T_TRASH)
@@ -914,7 +893,7 @@ inline static void Drop_Action(REBFRM *f) {
         assert(NOT_SERIES_INFO(f->varlist, INACCESSIBLE));
         assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
 
-        RELVAL *rootvar = ARR_HEAD(f->varlist);
+        RELVAL *rootvar = STABLE(ARR_HEAD(f->varlist));
         assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == f->varlist);
         TRASH_POINTER_IF_DEBUG(PAYLOAD(Any, rootvar).second.node);  // phase
         TRASH_POINTER_IF_DEBUG(EXTRA(Binding, rootvar).node);

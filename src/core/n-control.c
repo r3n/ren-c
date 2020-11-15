@@ -240,7 +240,7 @@ inline static bool Single_Test_Throws(
         return false; } // return the LOGIC! truth, false=no throw
 
       case REB_BLOCK: { // OR the tests together
-        const RELVAL *item = VAL_ARRAY_AT(test_cell);
+        const RELVAL *item = STABLE_HACK(VAL_ARRAY_AT(test_cell));
         REBSPC *specifier = Derive_Specifier(test_specifier, test);
         for (; NOT_END(item); ++item) {
             if (Single_Test_Throws(
@@ -1232,7 +1232,7 @@ REBNATIVE(default)
         }
         if (has_groups) {
             REBARR *composed = Make_Array(len);
-            RELVAL *dest = ARR_HEAD(composed);
+            RELVAL *dest = STABLE(ARR_HEAD(composed));
             REBSPC *specifier = VAL_SPECIFIER(target);
             for (i = 0; i < len; ++i, ++dest) {
                 const RELVAL *item = VAL_SEQUENCE_AT(D_SPARE, target, i);
@@ -1376,7 +1376,7 @@ REBNATIVE(catch)
             //
             // Test all the words in the block for a match to catch
 
-            const RELVAL *candidate = VAL_ARRAY_AT(ARG(name));
+            unstable const RELVAL *candidate = VAL_ARRAY_AT(ARG(name));
             for (; NOT_END(candidate); candidate++) {
                 //
                 // !!! Should we test a typeset for illegal name types?

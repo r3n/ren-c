@@ -32,12 +32,12 @@
 #define TRUE_VALUE \
     c_cast(const REBVAL*, &PG_True_Value)
 
-inline static bool VAL_LOGIC(REBCEL(const*) v) {
+inline static bool VAL_LOGIC(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_LOGIC);
     return PAYLOAD(Logic, v).flag;
 }
 
-inline static bool IS_TRUTHY(const RELVAL *v) {
+inline static bool IS_TRUTHY(unstable const RELVAL *v) {
     if (KIND3Q_BYTE(v) > REB_LOGIC)
         return true;  // includes QUOTED: `if lit '_ [-- "this is truthy"]`
     if (IS_VOID(v))
@@ -51,7 +51,7 @@ inline static bool IS_TRUTHY(const RELVAL *v) {
 #define IS_FALSEY(v) \
     (not IS_TRUTHY(v))
 
-inline static REBVAL *Init_Logic(RELVAL *out, bool flag) {
+inline static REBVAL *Init_Logic(unstable RELVAL *out, bool flag) {
     RESET_CELL(out, REB_LOGIC, CELL_MASK_NONE);
     PAYLOAD(Logic, out).flag = flag;
     return cast(REBVAL*, out);
@@ -70,7 +70,7 @@ inline static REBVAL *Init_Logic(RELVAL *out, bool flag) {
 // evaluations safe would be limiting, e.g. `foo: any [false-thing []]`...
 // So ANY and ALL use IS_TRUTHY() directly
 //
-inline static bool IS_CONDITIONAL_TRUE(const REBVAL *v) {
+inline static bool IS_CONDITIONAL_TRUE(unstable const REBVAL *v) {
     if (IS_FALSEY(v))
         return false;
     if (KIND3Q_BYTE(v) == REB_BLOCK)

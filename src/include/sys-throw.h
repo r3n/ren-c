@@ -114,7 +114,7 @@ inline static REB_R Init_Thrown_With_Label(
 }
 
 static inline void CATCH_THROWN(
-    RELVAL *arg_out,
+    unstable RELVAL *arg_out,
     REBVAL *thrown // Note: may be same pointer as arg_out
 ){
     assert(NOT_END(&TG_Thrown_Arg));

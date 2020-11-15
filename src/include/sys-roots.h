@@ -69,7 +69,7 @@
 // What distinguishes an API value is that it has both the NODE_FLAG_CELL and
 // NODE_FLAG_ROOT bits set.
 //
-inline static bool Is_Api_Value(const RELVAL *v) {
+inline static bool Is_Api_Value(unstable const RELVAL *v) {
     assert(v->header.bits & NODE_FLAG_CELL);
     return did (v->header.bits & NODE_FLAG_ROOT);
 }
@@ -138,7 +138,7 @@ inline static REBVAL *Alloc_Value(void)
     // Giving the cell itself NODE_FLAG_ROOT lets a REBVAL* be discerned as
     // either an API handle or not.  The flag is not copied by Move_Value().
     //
-    REBVAL *v = SPECIFIC(ARR_SINGLE(a));
+    REBVAL *v = SPECIFIC(STABLE(ARR_SINGLE(a)));
 
     // We are introducing this series to the GC and can't leave it trash.
     // If a pattern like `Do_Evaluation_Into(Alloc_Value(), ...)` is used,
@@ -188,7 +188,7 @@ inline static REBARR *Alloc_Instruction(enum Reb_Api_Opcode opcode) {
         SERIES_FLAG_FIXED_SIZE // not tracked as stray manual, but unmanaged
         /* ... */
     );
-    s->info = Endlike_Header(
+    s->info.bits = Endlike_Header(
         FLAG_WIDE_BYTE_OR_0(0) // signals array, also implicit terminator
             | FLAG_LEN_BYTE_OR_255(1) // signals singular
     );

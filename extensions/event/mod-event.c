@@ -262,7 +262,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
         val = ARG(value);
     else {
         ports = ARG(value);
-        val = VAL_ARRAY_AT(ports);
+        val = STABLE_HACK(VAL_ARRAY_AT(ports));
         for (; NOT_END(val); val++) {  // find timeout
             if (Pending_Port(val))
                 ++n;
@@ -453,7 +453,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     if (REF(all))
         return D_OUT;  // caller wants all the ports that waked us
 
-    const RELVAL *first = VAL_ARRAY_AT(D_OUT);
+    unstable const RELVAL *first = VAL_ARRAY_AT(D_OUT);
     if (not IS_PORT(first)) {
         assert(!"First element of intersection not port, does this happen?");
         return nullptr;

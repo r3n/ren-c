@@ -203,7 +203,7 @@ inline static bool SAME_STR(const REBSTR *s1, const REBSTR *s2) {
 }
 
 
-inline static bool IS_WORD_UNBOUND(REBCEL(const*) v) {
+inline static bool IS_WORD_UNBOUND(unstable REBCEL(const*) v) {
     assert(ANY_WORD_KIND(CELL_HEART(v)));
     return not EXTRA(Binding, v).node;
 }
@@ -211,12 +211,12 @@ inline static bool IS_WORD_UNBOUND(REBCEL(const*) v) {
 #define IS_WORD_BOUND(v) \
     (not IS_WORD_UNBOUND(v))
 
-inline static const REBSTR *VAL_WORD_SPELLING(REBCEL(const*) v) {
+inline static const REBSTR *VAL_WORD_SPELLING(unstable REBCEL(const*) v) {
     assert(ANY_WORD_KIND(CELL_HEART(v)));
     return STR(PAYLOAD(Any, v).first.node);
 }
 
-inline static const REBSTR *VAL_WORD_CANON(REBCEL(const*) v) {
+inline static const REBSTR *VAL_WORD_CANON(unstable REBCEL(const*) v) {
     assert(ANY_WORD_KIND(CELL_HEART(v)));
     return STR_CANON(STR(PAYLOAD(Any, v).first.node));
 }
@@ -229,14 +229,14 @@ inline static const REBSTR *VAL_WORD_CANON(REBCEL(const*) v) {
 // But they won't if there are any words outstanding that hold that spelling,
 // so this is a safe technique as long as these words are GC-mark-visible.
 //
-inline static REBSTR *VAL_STORED_CANON(REBCEL(const*) v) {
+inline static REBSTR *VAL_STORED_CANON(unstable REBCEL(const*) v) {
     assert(ANY_WORD_KIND(CELL_HEART(v)));
     REBSTR *str = STR(PAYLOAD(Any, v).first.node);
     assert(GET_SERIES_INFO(str, STRING_CANON));
     return str;
 }
 
-inline static OPT_REBSYM VAL_WORD_SYM(REBCEL(const*) v) {
+inline static OPT_REBSYM VAL_WORD_SYM(unstable REBCEL(const*) v) {
     assert(PG_Symbol_Canons);  // all syms are 0 prior to Init_Symbols()
     assert(ANY_WORD_KIND(CELL_HEART(v)));
     return STR_SYMBOL(STR(PAYLOAD(Any, v).first.node));
@@ -245,21 +245,21 @@ inline static OPT_REBSYM VAL_WORD_SYM(REBCEL(const*) v) {
 #define INIT_WORD_INDEX_UNCHECKED(v,i) \
     PAYLOAD(Any, (v)).second.i32 = cast(REBINT, i)
 
-inline static void INIT_WORD_INDEX(RELVAL *v, REBLEN i) {
+inline static void INIT_WORD_INDEX(unstable RELVAL *v, REBLEN i) {
   #if !defined(NDEBUG)
     INIT_WORD_INDEX_Extra_Checks_Debug(v, i); // not inline, needs FRM_PHASE()
   #endif
     INIT_WORD_INDEX_UNCHECKED(v, i);
 }
 
-inline static REBLEN VAL_WORD_INDEX(REBCEL(const*) v) {
+inline static REBLEN VAL_WORD_INDEX(unstable REBCEL(const*) v) {
     assert(IS_WORD_BOUND(v));
     REBINT i = PAYLOAD(Any, v).second.i32;
     assert(i > 0);
     return cast(REBLEN, i);
 }
 
-inline static void Unbind_Any_Word(RELVAL *v) {
+inline static void Unbind_Any_Word(unstable RELVAL *v) {
     INIT_BINDING(v, UNBOUND);
   #if !defined(NDEBUG)
     INIT_WORD_INDEX_UNCHECKED(v, -1);
@@ -267,7 +267,7 @@ inline static void Unbind_Any_Word(RELVAL *v) {
 }
 
 inline static REBVAL *Init_Any_Word(
-    RELVAL *out,
+    unstable RELVAL *out,
     enum Reb_Kind kind,
     const REBSTR *spelling
 ){
@@ -286,7 +286,7 @@ inline static REBVAL *Init_Any_Word(
 #define Init_Sym_Word(out,str)      Init_Any_Word((out), REB_SYM_WORD, (str))
 
 inline static REBVAL *Init_Any_Word_Bound(
-    RELVAL *out,
+    unstable RELVAL *out,
     enum Reb_Kind type,
     const REBSTR *spelling,
     REBCTX *context,
@@ -305,3 +305,18 @@ inline static REBVAL *Init_Any_Word_Bound(
 //
 inline static const REBSTR *Intern_Unsized_Managed(const char *utf8)
   { return Intern_UTF8_Managed(cb_cast(utf8), strsize(utf8)); }
+
+
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable REBVAL *Plainify(unstable REBVAL *out)
+      { return Plainify(STABLE(out)); }
+
+    inline static unstable REBVAL *Getify(unstable REBVAL *out)
+      { return Getify(STABLE(out)); }
+
+    inline static unstable REBVAL *Setify(unstable REBVAL *out)
+      { return Setify(STABLE(out)); }
+
+    inline static unstable REBVAL *Symify(unstable REBVAL *out)
+      { return Symify(STABLE(out)); }
+#endif

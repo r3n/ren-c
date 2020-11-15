@@ -33,12 +33,16 @@
 //
 // Read BLOCK! of TUPLE! into sequential RGBA memory runs.
 //
-void Tuples_To_RGBA(REBYTE *rgba, REBLEN size, const REBVAL *head, REBLEN len)
-{
+void Tuples_To_RGBA(
+    REBYTE *rgba,
+    REBLEN size,
+    unstable const RELVAL *head,
+    REBLEN len
+){
     if (len > size)
         len = size;  // avoid over-run
 
-    const REBVAL *item = head;
+    unstable const RELVAL *item = head;
     for (; len > 0; len--, rgba += 4, ++head)
         Get_Tuple_Bytes(rgba, item, 4);
 }
@@ -257,7 +261,7 @@ REB_R MAKE_Image(
         Init_Image_Black_Opaque(out, w, h);
     }
     else if (IS_BLOCK(arg)) {  // make image! [size rgba index]
-        const RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *item = STABLE_HACK(VAL_ARRAY_AT(arg));
         if (not IS_PAIR(item))
             goto bad_make;
 
@@ -328,7 +332,7 @@ REB_R MAKE_Image(
 
             REBYTE *ip = VAL_IMAGE_HEAD(out);  // image pointer
             Tuples_To_RGBA(
-                ip, w * h, SPECIFIC(VAL_ARRAY_AT(item)), VAL_LEN_AT(item)
+                ip, w * h, VAL_ARRAY_AT(item), VAL_LEN_AT(item)
             );
         }
         else

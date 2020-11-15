@@ -78,10 +78,10 @@ REB_R Reframer_Dispatcher(REBFRM *f)
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_REFRAMER_MAX);
 
-    REBVAL* shim = SPECIFIC(ARR_AT(details, IDX_REFRAMER_SHIM));
+    REBVAL* shim = DETAILS_AT(details, IDX_REFRAMER_SHIM);
     assert(IS_ACTION(shim));
 
-    REBVAL* param_index = SPECIFIC(ARR_AT(details, IDX_REFRAMER_PARAM_INDEX));
+    REBVAL* param_index = DETAILS_AT(details, IDX_REFRAMER_PARAM_INDEX);
     assert(IS_INTEGER(param_index));
 
     if (IS_END(f_value) or not (IS_WORD(f_value) or IS_PATH(f_value)))

@@ -237,11 +237,13 @@ REBTYPE(Action)
         // A new body_holder was created inside Make_Action().  Rare case
         // where we can bit-copy a possibly-relative value.
         //
-        RELVAL *src = ARR_HEAD(ACT_DETAILS(act));
-        RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy));
+      blockscope {
+        unstable RELVAL *src = ARR_HEAD(ACT_DETAILS(act));
+        unstable RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy));
         for (; NOT_END(src); ++src, ++dest)
             Blit_Relative(dest, src);
         TERM_ARRAY_LEN(ACT_DETAILS(proxy), details_len);
+      }
 
         Init_Action(D_OUT, proxy, VAL_ACTION_LABEL(action), VAL_BINDING(action));
         return D_OUT; }
@@ -291,7 +293,7 @@ REBTYPE(Action)
             // that symbol out before giving it back.
             //
             REBVAL *param = ACT_PARAMS_HEAD(act);
-            REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
+            unstable REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
             for (; NOT_END(param); ++param, ++typeset) {
                 assert(IS_PARAM(param));
                 RESET_CELL(typeset, REB_TYPESET, CELL_MASK_NONE);

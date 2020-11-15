@@ -32,12 +32,10 @@
 // Scan and convert money.  Return zero if error.
 //
 const REBYTE *Scan_Money(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    unstable RELVAL *out,
     const REBYTE *cp,
     REBLEN len
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
+){
     const REBYTE *end;
 
     if (*cp == '$') {

@@ -90,7 +90,7 @@ REB_R Adapter_Dispatcher(REBFRM *f)
     // The second thing to do is update the phase and binding to run the
     // function that is being adapted, and pass it to the evaluator to redo.
 
-    REBVAL* adaptee = SPECIFIC(ARR_AT(details, IDX_ADAPTER_ADAPTEE));
+    REBVAL* adaptee = DETAILS_AT(details, IDX_ADAPTER_ADAPTEE);
 
     INIT_FRM_PHASE(f, VAL_ACTION(adaptee));
     FRM_BINDING(f) = VAL_BINDING(adaptee);
@@ -129,7 +129,7 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
 
     // Don't allow the adapted code access to the locals.
     //
-    RELVAL *param = ARR_AT(paramlist, 1);
+    unstable RELVAL *param = ARR_AT(paramlist, 1);
     for (; NOT_END(param); ++param)
         if (Is_Param_Hidden(param))
             Seal_Param(param);
@@ -162,7 +162,7 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
     //
     REBARR *details = ACT_DETAILS(adaptation);
     Init_Relative_Block(
-        ARR_AT(details, IDX_ADAPTER_PRELUDE),
+        STABLE(ARR_AT(details, IDX_ADAPTER_PRELUDE)),
         underlying,
         prelude
     );

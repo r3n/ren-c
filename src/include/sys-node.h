@@ -273,7 +273,9 @@ enum Reb_Pointer_Detect {
 // invalid Rebol-oriented cases gave illegal codepoints...that way, it could
 // already be on its first step of a UTF-8 decode otherwise.
 //
-inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(const void *p) {
+inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(
+    unstable const void *p
+){
     const REBYTE* bp = cast(const REBYTE*, p);
 
     switch (bp[0] >> 4) {  // switch on the left 4 bits of the byte

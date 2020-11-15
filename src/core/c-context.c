@@ -208,7 +208,7 @@ void Expand_Context(REBCTX *context, REBLEN delta)
 //
 REBVAL *Append_Context(
     REBCTX *context,
-    RELVAL *opt_any_word,
+    unstable RELVAL *opt_any_word,
     const REBSTR *opt_spelling
 ) {
     REBARR *keylist = CTX_KEYLIST(context);
@@ -380,7 +380,7 @@ void Collect_End(struct Reb_Collector *cl)
 
     // Reset binding table (note BUF_COLLECT may have expanded)
     //
-    RELVAL *v =
+    unstable RELVAL *v =
         (cl == NULL or (cl->flags & COLLECT_AS_TYPESET))
             ? ARR_HEAD(BUF_COLLECT) + 1
             : ARR_HEAD(BUF_COLLECT);
@@ -440,7 +440,7 @@ void Collect_Context_Keys(
     EXPAND_SERIES_TAIL(SER(BUF_COLLECT), CTX_LEN(context));
     SET_ARRAY_LEN_NOTERM(BUF_COLLECT, cl->index);
 
-    RELVAL *collect = ARR_TAIL(BUF_COLLECT); // get address *after* expansion
+    unstable RELVAL *collect = ARR_TAIL(BUF_COLLECT);  // *after* expansion
 
     if (check_dups) {
         for (; NOT_END(key); key++) {
@@ -484,10 +484,12 @@ void Collect_Context_Keys(
 //
 // The inner recursive loop used for collecting context keys or ANY-WORD!s.
 //
-static void Collect_Inner_Loop(struct Reb_Collector *cl, const RELVAL *head)
-{
+static void Collect_Inner_Loop(
+    struct Reb_Collector *cl,
+    unstable const RELVAL *head
+){
     for (; NOT_END(head); ++head) {
-        REBCEL(const*) cell = VAL_UNESCAPED(head); // cell of X from '''X
+        unstable REBCEL(const*) cell = VAL_UNESCAPED(head);  // X from ''''X
         enum Reb_Kind kind = CELL_KIND(cell);
 
         if (ANY_WORD_KIND(kind)) {
@@ -555,7 +557,7 @@ static void Collect_Inner_Loop(struct Reb_Collector *cl, const RELVAL *head)
 //
 REBARR *Collect_Keylist_Managed(
     REBLEN *self_index_out, // which context index SELF is in (if COLLECT_SELF)
-    const RELVAL *head,
+    unstable const RELVAL *head,
     REBCTX *prior,
     REBFLGS flags // see %sys-core.h for COLLECT_ANY_WORD, etc.
 ) {
@@ -582,7 +584,7 @@ REBARR *Collect_Keylist_Managed(
         ) {
             // No prior or no SELF in prior, so we'll add it as the first key
             //
-            RELVAL *self_key = ARR_AT(BUF_COLLECT, 1);
+            unstable RELVAL *self_key = ARR_AT(BUF_COLLECT, 1);
             Init_Param(
                 self_key,
                 REB_P_LOCAL,
@@ -646,7 +648,7 @@ REBARR *Collect_Keylist_Managed(
 // Collect unique words from a block, possibly deeply...maybe just SET-WORD!s.
 //
 REBARR *Collect_Unique_Words_Managed(
-    const RELVAL *head,
+    unstable const RELVAL *head,
     REBFLGS flags,  // See COLLECT_XXX
     const REBVAL *ignore  // BLOCK!, ANY-CONTEXT!, or BLANK! for none
 ){
@@ -657,7 +659,7 @@ REBARR *Collect_Unique_Words_Managed(
     // any non-words in a block the user passed in.
     //
     if (not IS_NULLED(ignore)) {
-        const RELVAL *check = VAL_ARRAY_AT(ignore);
+        unstable const RELVAL *check = VAL_ARRAY_AT(ignore);
         for (; NOT_END(check); ++check) {
             if (not ANY_WORD_KIND(CELL_KIND(VAL_UNESCAPED(check))))
                 fail (Error_Bad_Value_Core(check, VAL_SPECIFIER(ignore)));
@@ -678,10 +680,10 @@ REBARR *Collect_Unique_Words_Managed(
     // an error...so they will just be skipped when encountered.
     //
     if (IS_BLOCK(ignore)) {
-        const RELVAL *item = VAL_ARRAY_AT(ignore);
+        unstable const RELVAL *item = VAL_ARRAY_AT(ignore);
         for (; NOT_END(item); ++item) {
-            REBCEL(const*) unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
-            const REBSTR *canon = VAL_WORD_CANON(unescaped);
+            unstable REBCEL(const*) cell = VAL_UNESCAPED(item);
+            const REBSTR *canon = VAL_WORD_CANON(cell);
 
             // A block may have duplicate words in it (this situation could
             // arise when `function [/test /test] []` calls COLLECT-WORDS
@@ -716,10 +718,10 @@ REBARR *Collect_Unique_Words_Managed(
     REBARR *array = Grab_Collected_Array_Managed(cl, SERIES_FLAGS_NONE);
 
     if (IS_BLOCK(ignore)) {
-        const RELVAL *item = VAL_ARRAY_AT(ignore);
+        unstable const RELVAL *item = VAL_ARRAY_AT(ignore);
         for (; NOT_END(item); ++item) {
-            REBCEL(const*) unescaped = VAL_UNESCAPED(item); // allow 'X, ''#Y
-            const REBSTR *canon = VAL_WORD_CANON(unescaped);
+            unstable REBCEL(const*) cell = VAL_UNESCAPED(item);
+            const REBSTR *canon = VAL_WORD_CANON(cell);
 
           #if !defined(NDEBUG)
             REBINT i = Get_Binder_Index_Else_0(&cl->binder, canon);
@@ -786,7 +788,7 @@ void Rebind_Context_Deep(
 //
 REBCTX *Make_Selfish_Context_Detect_Managed(
     enum Reb_Kind kind,
-    const RELVAL *head,
+    unstable const RELVAL *head,
     REBCTX *opt_parent
 ) {
     REBLEN self_index;
@@ -909,7 +911,7 @@ REBCTX *Make_Selfish_Context_Detect_Managed(
 //
 REBCTX *Construct_Context_Managed(
     enum Reb_Kind kind,
-    RELVAL *head, // !!! Warning: modified binding
+    unstable RELVAL *head,  // !!! Warning: modified binding
     REBSPC *specifier,
     REBCTX *opt_parent
 ) {
@@ -924,7 +926,7 @@ REBCTX *Construct_Context_Managed(
 
     Bind_Values_Shallow(head, CTX_ARCHETYPE(context));
 
-    const RELVAL *value = head;
+    unstable const RELVAL *value = head;
     for (; NOT_END(value); value += 2) {
         if (not IS_SET_WORD(value))
             fail (Error_Invalid_Type(VAL_TYPE(value)));
@@ -1195,7 +1197,7 @@ void Resolve_Context(
     }
     else if (IS_BLOCK(only_words)) {
         // Limit exports to only these words:
-        const RELVAL *word = VAL_ARRAY_AT(only_words);
+        unstable const RELVAL *word = VAL_ARRAY_AT(only_words);
         for (; NOT_END(word); word++) {
             if (IS_WORD(word) or IS_SET_WORD(word)) {
                 Add_Binder_Index(&binder, VAL_WORD_CANON(word), -1);
@@ -1290,7 +1292,7 @@ void Resolve_Context(
                 Remove_Binder_Index_Else_0(&binder, VAL_KEY_CANON(key));
         }
         else if (IS_BLOCK(only_words)) {
-            const RELVAL *word = VAL_ARRAY_AT(only_words);
+            unstable const RELVAL *word = VAL_ARRAY_AT(only_words);
             for (; NOT_END(word); word++) {
                 if (IS_WORD(word) or IS_SET_WORD(word))
                     Remove_Binder_Index_Else_0(&binder, VAL_WORD_CANON(word));

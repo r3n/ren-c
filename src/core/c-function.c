@@ -51,7 +51,7 @@ static bool Params_Of_Hook(
 
     if (not s->arr) {  // if first step on second pass, make the array
         s->arr = Make_Array(s->num_visible);
-        s->dest = ARR_HEAD(s->arr);
+        s->dest = STABLE(ARR_HEAD(s->arr));
     }
 
     Init_Any_Word(s->dest, REB_WORD, VAL_PARAM_SPELLING(param));
@@ -131,7 +131,7 @@ static bool Typesets_Of_Hook(
 
     if (not s->arr) {  // if first step on second pass, make the array
         s->arr = Make_Array(s->num_visible);
-        s->dest = ARR_HEAD(s->arr);
+        s->dest = STABLE(ARR_HEAD(s->arr));
     }
 
     // It's already a typeset, but remove the parameter spelling.
@@ -198,10 +198,10 @@ void Push_Paramlist_Triads_May_Fail(
 
     bool refinement_seen = false;
 
-    const RELVAL* value = VAL_ARRAY_AT(spec);
+    unstable const RELVAL* value = VAL_ARRAY_AT(spec);
 
     while (NOT_END(value)) {
-        const RELVAL* item = value;  // "faked", e.g. <return> => RETURN:
+        const RELVAL* item = STABLE_HACK(value);  // "faked"
         ++value;  // go ahead and consume next
 
     //=//// STRING! FOR FUNCTION DESCRIPTION OR PARAMETER NOTE ////////////=//
@@ -288,7 +288,7 @@ void Push_Paramlist_Triads_May_Fail(
 
             // Save the block for parameter types.
             //
-            REBVAL* param;
+            unstable REBVAL* param;
             if (IS_PARAM(DS_TOP)) {
                 REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
                 Init_Block(
@@ -575,7 +575,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             Move_Value(DS_PUSH(), EMPTY_TEXT);
         }
         else {
-            REBVAL *param = DS_AT(definitional_return_dsp);
+            unstable REBVAL *param = DS_AT(definitional_return_dsp);
             assert(
                 VAL_PARAM_CLASS(param) == REB_P_LOCAL
                 or VAL_PARAM_CLASS(param) == REB_P_SEALED  // !!! review reuse
@@ -597,7 +597,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     // There should be no more pushes past this point, so a stable pointer
     // into the stack for the definitional return can be found.
     //
-    REBVAL *definitional_return =
+    unstable REBVAL *definitional_return =
         definitional_return_dsp == 0
             ? nullptr
             : DS_AT(definitional_return_dsp);
@@ -650,7 +650,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     const REBSTR *duplicate = nullptr;
 
-    REBVAL *src = DS_AT(dsp_orig + 1) + 3;
+    unstable REBVAL *src = DS_AT(dsp_orig + 1) + 3;
 
     if (definitional_return) {
         assert(flags & MKF_RETURN);
@@ -739,7 +739,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         INIT_CTX_KEYLIST_SHARED(CTX(types_varlist), paramlist);
 
         REBVAL *rootvar = RESET_CELL(
-            ARR_HEAD(types_varlist),
+            STABLE(ARR_HEAD(types_varlist)),
             REB_FRAME,
             CELL_MASK_CONTEXT
         );
@@ -749,7 +749,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
         REBVAL *dest = rootvar + 1;
 
-        REBVAL *src = DS_AT(dsp_orig + 2);
+        unstable REBVAL *src = DS_AT(dsp_orig + 2);
         src += 3;
 
         if (definitional_return) {
@@ -814,7 +814,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
         REBVAL *dest = rootvar + 1;
 
-        REBVAL *src = DS_AT(dsp_orig + 3);
+        unstable REBVAL *src = DS_AT(dsp_orig + 3);
         src += 3;
 
         if (definitional_return) {
@@ -954,7 +954,7 @@ REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
 {
     const REBSTR *canon = STR_CANON(spelling); // don't recalculate each time
 
-    RELVAL *param = ARR_AT(paramlist, 1);
+    RELVAL *param = STABLE(ARR_AT(paramlist, 1));
     REBLEN len = ARR_LEN(paramlist);
 
     REBLEN n;
@@ -997,7 +997,7 @@ REBACT *Make_Action(
 ){
     ASSERT_ARRAY_MANAGED(paramlist);
 
-    RELVAL *rootparam = ARR_HEAD(paramlist);
+    RELVAL *rootparam = STABLE(ARR_HEAD(paramlist));
     assert(KIND3Q_BYTE(rootparam) == REB_ACTION); // !!! not fully formed...
     assert(VAL_ACT_PARAMLIST(rootparam) == paramlist);
     assert(EXTRA(Binding, rootparam).node == UNBOUND); // archetype
@@ -1187,7 +1187,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // Interpreted code, the body is a block with some bindings relative
         // to the action.
 
-        RELVAL *body = ARR_HEAD(details);
+        RELVAL *body = DETAILS_AT(details, IDX_DETAILS_0);
 
         // The PARAMLIST_HAS_RETURN tricks for definitional return make it
         // seem like a generator authored more code in the action's body...but
@@ -1227,7 +1227,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
             // To give it the appearance of executing code in place, we use
             // a GROUP!.
 
-            RELVAL *slot = ARR_AT(fake, real_body_index); // #BODY
+            RELVAL *slot = STABLE(ARR_AT(fake, real_body_index));  // #BODY
             assert(IS_ISSUE(slot));
 
             // Note: clears VAL_FLAG_LINE
@@ -1255,14 +1255,14 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // The FRAME! stored in the body for the specialization has a phase
         // which is actually the function to be run.
         //
-        REBVAL *frame = SPECIFIC(ARR_HEAD(details));
+        REBVAL *frame = DETAILS_AT(details, 0);
         assert(IS_FRAME(frame));
         Move_Value(out, frame);
         return;
     }
 
     if (ACT_DISPATCHER(a) == &Generic_Dispatcher) {
-        REBVAL *verb = SPECIFIC(ARR_HEAD(details));
+        REBVAL *verb = DETAILS_AT(details, 0);
         assert(IS_WORD(verb));
         Move_Value(out, verb);
         return;
@@ -1293,6 +1293,8 @@ REBTYPE(Fail)
 }
 
 
+#define IDX_GENERIC_VERB 0
+
 //
 //  Generic_Dispatcher: C
 //
@@ -1319,7 +1321,7 @@ REB_R Generic_Dispatcher(REBFRM *f)
 {
     REBACT *phase = FRM_PHASE(f);
     REBARR *details = ACT_DETAILS(phase);
-    REBVAL *verb = SPECIFIC(ARR_HEAD(details));
+    REBVAL *verb = DETAILS_AT(details, IDX_GENERIC_VERB);
     assert(IS_WORD(verb));
 
     // !!! It's technically possible to throw in locals or refinements at

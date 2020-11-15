@@ -53,7 +53,7 @@
 // coverity[+kill]
 //
 ATTRIBUTE_NO_RETURN void Panic_Core(
-    const void *p, // REBSER* (array, context, etc), REBVAL*, or UTF-8 char*
+    unstable const void *p,  // REBSER*, REBVAL*, or UTF-8 char*
     REBTCK tick,
     const char *file, // UTF8
     int line

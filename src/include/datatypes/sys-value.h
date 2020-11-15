@@ -147,8 +147,8 @@
             panic_at ((c), (file), (line)); \
         }
 
-    inline static REBCEL(const*) READABLE(
-        REBCEL(const*) c,
+    inline static unstable REBCEL(const*) READABLE(
+        unstable REBCEL(const*) c,
         const char *file,
         int line
     ){
@@ -156,8 +156,8 @@
         return c;
     }
 
-    inline static RELVAL *WRITABLE(
-        RELVAL *c,
+    inline static unstable RELVAL *WRITABLE(
+        unstable RELVAL *c,
         const char *file,
         int line
     ){
@@ -202,7 +202,7 @@
     #define KIND3Q_BYTE KIND3Q_BYTE_UNCHECKED
 #else
     inline static REBYTE KIND3Q_BYTE_Debug(
-        const RELVAL *v,
+        unstable const RELVAL *v,
         const char *file,
         int line
     ){
@@ -257,7 +257,7 @@
     // were interested in its unquoted kind.
     //
     inline static REBYTE KIND3Q_BYTE_Debug(
-        REBCEL(const*) v,
+        unstable REBCEL(const*) v,
         const char *file,
         int line
     ) = delete;
@@ -275,7 +275,7 @@
     #define mutable_KIND3Q_BYTE(v) \
         mutable_SECOND_BYTE((v)->header)
 #else
-    inline static REBYTE& mutable_KIND3Q_BYTE(RELVAL *v) {
+    inline static REBYTE& mutable_KIND3Q_BYTE(unstable RELVAL *v) {
         ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);
         return mutable_SECOND_BYTE((v)->header);
     }
@@ -300,20 +300,20 @@ inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v);
     #define CELL_KIND CELL_KIND_UNCHECKED
     #define CELL_HEART CELL_HEART_UNCHECKED
 #else
-    inline static enum Reb_Kind CELL_KIND(REBCEL(const*) cell)
+    inline static enum Reb_Kind CELL_KIND(unstable REBCEL(const*) cell)
         { return CELL_KIND_UNCHECKED(cell); }
 
-    inline static enum Reb_Kind CELL_HEART(REBCEL(const*) cell)
+    inline static enum Reb_Kind CELL_HEART(unstable REBCEL(const*) cell)
       { return CELL_HEART_UNCHECKED(cell); }
 
     // We want to disable asking for low level implementation details on a
     // cell that may be a REB_QUOTED; you have to call VAL_UNESCAPED() first.
     //
-    inline static enum Reb_Kind CELL_KIND(const RELVAL *v) = delete;
-    inline static enum Reb_Kind CELL_HEART(const RELVAL *v) = delete;
+    inline static enum Reb_Kind CELL_KIND(unstable const RELVAL *v) = delete;
+    inline static enum Reb_Kind CELL_HEART(unstable const RELVAL *v) = delete;
 #endif
 
-inline static REBTYP *CELL_CUSTOM_TYPE(REBCEL(const*) v) {
+inline static REBTYP *CELL_CUSTOM_TYPE(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_CUSTOM);
     return SER(EXTRA(Any, v).node);
 }
@@ -324,8 +324,16 @@ inline static REBTYP *CELL_CUSTOM_TYPE(REBCEL(const*) v) {
 // cell then it won't be quoted at all.  Main thing to know is that you don't
 // necessarily get the original value you had back.
 //
-inline static const RELVAL* CELL_TO_VAL(REBCEL(const*) cell)
+inline static const RELVAL* CELL_TO_VAL(unstable_ok REBCEL(const*) cell)
   { return cast(const RELVAL*, cell); }
+
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static const unstable RELVAL* CELL_TO_VAL(
+        unstable REBCEL(const*) cell
+    ){
+        return cast(unstable const RELVAL*, cell);
+    }
+#endif
 
 
 //=//// VALUE TYPE (always REB_XXX <= REB_MAX) ////////////////////////////=//
@@ -340,14 +348,14 @@ inline static const RELVAL* CELL_TO_VAL(REBCEL(const*) cell)
 //
 
 #if defined(NDEBUG)
-    inline static enum Reb_Kind VAL_TYPE(const RELVAL *v) {
+    inline static enum Reb_Kind VAL_TYPE(unstable const RELVAL *v) {
         if (KIND3Q_BYTE(v) >= REB_64)
             return REB_QUOTED;
         return cast(enum Reb_Kind, KIND3Q_BYTE(v));
     }
 #else
     inline static enum Reb_Kind VAL_TYPE_Debug(
-        const RELVAL *v,
+        unstable const RELVAL *v,
         const char *file,
         int line
     ){
@@ -410,7 +418,7 @@ inline static const RELVAL* CELL_TO_VAL(REBCEL(const*) cell)
 //
 
 inline static REBVAL *RESET_VAL_HEADER_at(
-    RELVAL *v,
+    unstable RELVAL *v,
     enum Reb_Kind k,
     uintptr_t extra
 
@@ -450,7 +458,7 @@ inline static REBVAL *RESET_VAL_HEADER_at(
     // for this very frequently called routine.
     //
     inline static REBVAL *RESET_CELL_Debug(
-        RELVAL *out,
+        unstable RELVAL *out,
         enum Reb_Kind kind,
         uintptr_t extra,
         const char *file,
@@ -474,7 +482,7 @@ inline static REBVAL *RESET_VAL_HEADER_at(
 #endif
 
 inline static REBVAL *RESET_CUSTOM_CELL(
-    RELVAL *out,
+    unstable RELVAL *out,
     REBTYP *type,
     REBFLGS flags
 ){
@@ -516,7 +524,7 @@ inline static REBVAL *RESET_CUSTOM_CELL(
         | FLAG_HEART_BYTE(REB_0))  // a more explicit CELL_MASK_PREP
 
 inline static RELVAL *Prep_Cell_Core(
-    RELVAL *c
+    unstable_ok RELVAL *c
 
   #if defined(DEBUG_TRACK_CELLS)
   , const char *file
@@ -531,6 +539,25 @@ inline static RELVAL *Prep_Cell_Core(
     TRACK_CELL_IF_DEBUG_EVIL_MACRO(cast(RELVAL*, c), file, line);
     return c;
 }
+
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable RELVAL *Prep_Cell_Core(
+        unstable RELVAL *c
+
+      #if defined(DEBUG_TRACK_CELLS)
+      , const char *file
+      , int line
+      #endif
+    ){
+      #ifdef DEBUG_MEMORY_ALIGN
+        ALIGN_CHECK_CELL_EVIL_MACRO(c, file, line);
+      #endif
+
+        c->header.bits = CELL_MASK_PREP;
+        TRACK_CELL_IF_DEBUG_EVIL_MACRO(cast(RELVAL*, c), file, line);
+        return c;
+    }
+#endif
 
 #if defined(DEBUG_TRACK_CELLS)
     #define Prep_Cell(c) \
@@ -555,8 +582,8 @@ inline static RELVAL *Prep_Cell_Core(
     #define TRASH_VALUE \
         cast(const REBVAL*, &PG_Trash_Value_Debug)
 
-    inline static RELVAL *Set_Trash_Debug(
-        RELVAL *v
+    inline static RELVAL *Init_Trash_Debug(
+        unstable_ok RELVAL *v
 
       #ifdef DEBUG_TRACK_CELLS
       , const char *file
@@ -574,8 +601,29 @@ inline static RELVAL *Prep_Cell_Core(
         return v;
     }
 
+  #ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable RELVAL *Init_Trash_Debug(
+        unstable RELVAL *v
+
+      #ifdef DEBUG_TRACK_CELLS
+      , const char *file
+      , int line
+      #endif
+    ){
+        ASSERT_CELL_WRITABLE_EVIL_MACRO(v, file, line);
+
+        v->header.bits &= CELL_MASK_PERSIST;
+        v->header.bits |=
+            FLAG_KIND3Q_BYTE(REB_T_TRASH)
+                | FLAG_HEART_BYTE(REB_T_TRASH);
+
+        TRACK_CELL_IF_DEBUG_EVIL_MACRO(v, file, line);
+        return v;
+    }
+  #endif
+
     #define TRASH_CELL_IF_DEBUG(v) \
-        Set_Trash_Debug((v), __FILE__, __LINE__)
+        Init_Trash_Debug((v), __FILE__, __LINE__)
 
     inline static bool IS_TRASH_DEBUG(const RELVAL *v) {
         assert(v->header.bits & NODE_FLAG_CELL);
@@ -693,7 +741,7 @@ inline static RELVAL *Prep_Cell_Core(
 // flag bits of the node.  This could have a runtime check in debug build
 // with a C++ variation that only takes mutable pointers.
 //
-inline static void INIT_VAL_NODE(RELVAL *v, const void *p) {
+inline static void INIT_VAL_NODE(unstable RELVAL *v, const void *p) {
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
     PAYLOAD(Any, v).first.node = NOD(m_cast(void*, p));
 }
@@ -708,7 +756,7 @@ inline static void INIT_VAL_NODE(RELVAL *v, const void *p) {
 // An ANY-ARRAY! in the deep copy of a function body must be relative also to
 // the same function if it contains any instances of such relative words.
 //
-inline static bool IS_RELATIVE(REBCEL(const*) v) {
+inline static bool IS_RELATIVE(unstable REBCEL(const*) v) {
     if (not Is_Bindable(v) or not EXTRA(Binding, v).node)
         return false; // INTEGER! and other types are inherently "specific"
 
@@ -743,7 +791,7 @@ inline static bool IS_RELATIVE(REBCEL(const*) v) {
 #define IS_SPECIFIC(v) \
     (not IS_RELATIVE(v))
 
-inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
+inline static REBACT *VAL_RELATIVE(unstable const RELVAL *v) {
     assert(IS_RELATIVE(v));
     return ACT(EXTRA(Binding, v).node);
 }
@@ -777,6 +825,18 @@ inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
         assert(IS_END(v) or IS_SPECIFIC(v));  // ^-- see note about END
         return cast(const REBVAL*, v);
     }
+
+  #ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable REBVAL *SPECIFIC(unstable RELVAL *v) {
+        assert(IS_END(v) or IS_SPECIFIC(v));  // ^-- see note about END
+        return cast(REBVAL*, v);
+    }
+
+    inline static unstable const REBVAL *SPECIFIC(unstable const RELVAL *v) {
+        assert(IS_END(v) or IS_SPECIFIC(v));  // ^-- see note about END
+        return cast(const REBVAL*, v);
+    }
+  #endif
 
     inline static REBVAL *SPECIFIC(const REBVAL *v) = delete;
 #endif
@@ -824,12 +884,12 @@ inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
 #define UNBOUND \
    ((REBNOD*)nullptr)  // cast() doesn't like nullptr, fix
 
-inline static REBNOD *VAL_BINDING(REBCEL(const*) v) {
+inline static REBNOD *VAL_BINDING(unstable REBCEL(const*) v) {
     assert(Is_Bindable(v));
     return EXTRA(Binding, v).node;
 }
 
-inline static void INIT_BINDING(RELVAL *v, const void *p) {
+inline static void INIT_BINDING(unstable RELVAL *v, const void *p) {
     const REBNOD *binding = cast(const REBNOD*, p);
     EXTRA(Binding, v).node = m_cast(REBNOD*, binding);
 
@@ -855,8 +915,10 @@ inline static void INIT_BINDING(RELVAL *v, const void *p) {
   #endif
 }
 
-inline static void Move_Value_Header(RELVAL *out, const RELVAL *v)
-{
+inline static void Move_Value_Header(
+    unstable RELVAL *out,
+    unstable const RELVAL *v
+){
     assert(out != v);  // usually a sign of a mistake; not worth supporting
     assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
 
@@ -882,8 +944,10 @@ inline static void Move_Value_Header(RELVAL *out, const RELVAL *v)
 //
 // Interface designed to line up with Derelativize()
 //
-inline static REBVAL *Move_Value(RELVAL *out, const REBVAL *v)
-{
+inline static REBVAL *Move_Value(
+    unstable_ok RELVAL *out,
+    unstable const REBVAL *v
+){
     Move_Value_Header(out, v);
 
     // Payloads cannot hold references to stackvars, raw bit transfer ok.
@@ -891,16 +955,24 @@ inline static REBVAL *Move_Value(RELVAL *out, const REBVAL *v)
     // Note: must be copied over *before* INIT_BINDING_MAY_MANAGE is called,
     // so that if it's a REB_QUOTED it can find the literal->cell.
     //
-    out->payload = v->payload;
+    out->payload = STABLE(v)->payload;
 
-    if (Is_Bindable(v))
+    if (Is_Bindable(v))  // extra is either a binding or a plain C value/ptr
         INIT_BINDING_MAY_MANAGE(out, EXTRA(Binding, v).node);
     else
-        out->extra = v->extra; // extra isn't a binding (INTEGER! MONEY!...)
+        out->extra = STABLE(v)->extra;
 
     return cast(REBVAL*, out);
 }
 
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static REBVAL *Move_Value(
+        unstable RELVAL *out,
+        unstable const REBVAL *v
+    ){
+        return Move_Value(STABLE(out), v);
+    }
+#endif
 
 // When doing something like a COPY of an OBJECT!, the var cells have to be
 // handled specially, e.g. by preserving CELL_FLAG_ARG_MARKED_CHECKED.
@@ -927,8 +999,10 @@ inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
 // for the rare cases where it's legal, e.g. shuffling a cell from one place
 // in an array to another cell in the same array.
 //
-inline static RELVAL *Blit_Relative(RELVAL *out, const RELVAL *v)
-{
+inline static RELVAL *Blit_Relative(
+    unstable_ok RELVAL *out,
+    unstable const RELVAL *v
+){
     // It's imaginable that you might try to blit a cell from a source that
     // could be an API node.  But it should never be *actually* relative
     // (just tunneled down through some chain of RELVAL*-accepting functions).
@@ -942,15 +1016,25 @@ inline static RELVAL *Blit_Relative(RELVAL *out, const RELVAL *v)
 
     Move_Value_Header(out, v);
 
-    out->payload = v->payload;
-    out->extra = v->extra;
+    out->payload = STABLE(v)->payload;
+    out->extra = STABLE(v)->extra;
 
     return out;  // still (potentially) relative!
 }
 
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable RELVAL *Blit_Relative(
+        unstable RELVAL *out,
+        unstable const RELVAL *v
+    ){
+        return Blit_Relative(STABLE(out), v);
+    }
+#endif
+
 #ifdef __cplusplus  // avoid blitting into REBVAL*, and use without specifier
     inline static RELVAL *Blit_Relative(REBVAL *out, const RELVAL *v) = delete;
 #endif
+
 
 // !!! Should this replace Move_Var() ?
 //

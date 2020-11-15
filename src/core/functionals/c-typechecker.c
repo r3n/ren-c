@@ -56,7 +56,7 @@ REB_R Datatype_Checker_Dispatcher(REBFRM *f)
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_TYPECHECKER_MAX);
 
-    RELVAL *datatype = ARR_AT(details, IDX_TYPECHECKER_TYPE);
+    REBVAL *datatype = DETAILS_AT(details, IDX_TYPECHECKER_TYPE);
 
     if (VAL_TYPE_KIND_OR_CUSTOM(datatype) == REB_CUSTOM) {
         if (VAL_TYPE(FRM_ARG(f, 1)) != REB_CUSTOM)
@@ -86,7 +86,7 @@ REB_R Typeset_Checker_Dispatcher(REBFRM *f)
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_TYPECHECKER_MAX);
 
-    RELVAL *typeset = ARR_AT(details, IDX_TYPECHECKER_TYPE);
+    REBVAL *typeset = DETAILS_AT(details, IDX_TYPECHECKER_TYPE);
     assert(IS_TYPESET(typeset));
 
     return Init_Logic(f->out, TYPE_CHECK(typeset, VAL_TYPE(FRM_ARG(f, 1))));

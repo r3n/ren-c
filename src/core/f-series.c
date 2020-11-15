@@ -260,8 +260,8 @@ REBINT Compare_Arrays_At_Indexes(
     if (s_array == t_array and s_index == t_index)
          return 0;
 
-    const RELVAL *s = ARR_AT(s_array, s_index);
-    const RELVAL *t = ARR_AT(t_array, t_index);
+    unstable const RELVAL *s = ARR_AT(s_array, s_index);
+    unstable const RELVAL *t = ARR_AT(t_array, t_index);
 
     if (IS_END(s) or IS_END(t))
         goto diff_of_ends;
@@ -271,7 +271,7 @@ REBINT Compare_Arrays_At_Indexes(
         or (ANY_NUMBER(s) and ANY_NUMBER(t))
     ){
         REBINT diff;
-        if ((diff = Cmp_Value(s, t, is_case)) != 0)
+        if ((diff = Cmp_Value(STABLE_HACK(s), STABLE_HACK(t), is_case)) != 0)
             return diff;
 
         s++;
@@ -475,10 +475,10 @@ REBLEN Find_In_Array_Simple(
     REBLEN index,
     const RELVAL *target
 ){
-    const RELVAL *value = ARR_HEAD(array);
+    unstable const RELVAL *value = ARR_HEAD(array);
 
     for (; index < ARR_LEN(array); index++) {
-        if (0 == Cmp_Value(value + index, target, false))
+        if (0 == Cmp_Value(STABLE_HACK(value + index), target, false))
             return index;
     }
 

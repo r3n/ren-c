@@ -227,7 +227,7 @@ TVAR REBARR *TG_Reuse;
 //-- Evaluation stack:
 TVAR REBARR *DS_Array;
 TVAR REBDSP DS_Index;
-TVAR REBVAL *DS_Movable_Top;
+TVAR unstable REBVAL *DS_Movable_Top;
 
 TVAR struct Reb_State *TG_Jump_List; // Saved state for TRAP (CPU state, etc.)
 

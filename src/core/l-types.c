@@ -562,13 +562,11 @@ const REBYTE *Scan_Dec_Buf(
 // Scan and convert a decimal value.  Return zero if error.
 //
 const REBYTE *Scan_Decimal(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    unstable RELVAL *out,
     const REBYTE *cp,
     REBLEN len,
     bool dec_only
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
+){
     REBYTE buf[MAX_NUM_LEN + 4];
     REBYTE *ep = buf;
     if (len > MAX_NUM_LEN)
@@ -656,12 +654,10 @@ const REBYTE *Scan_Decimal(
 // Allow preceding + - and any combination of ' marks.
 //
 const REBYTE *Scan_Integer(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    unstable RELVAL *out,
     const REBYTE *cp,
     REBLEN len
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
+){
     // Super-fast conversion of zero and one (most common cases):
     if (len == 1) {
         if (*cp == '0') {
@@ -751,7 +747,7 @@ const REBYTE *Scan_Integer(
 // Scan and convert a date. Also can include a time and zone.
 //
 const REBYTE *Scan_Date(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    unstable RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
@@ -990,7 +986,7 @@ const REBYTE *Scan_Date(
 // Scan and convert a file name.
 //
 const REBYTE *Scan_File(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    unstable RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
@@ -1033,12 +1029,10 @@ const REBYTE *Scan_File(
 // Scan and convert email.
 //
 const REBYTE *Scan_Email(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    unstable RELVAL *out,
     const REBYTE *cp,
     REBLEN len
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
+){
     REBSTR *s = Make_String(len * 2);  // !!! guess...use mold buffer instead?
     REBCHR(*) up = STR_HEAD(s);
 
@@ -1105,7 +1099,7 @@ const REBYTE *Scan_Email(
 // on Windows, are expressed as TEXT!.)
 //
 const REBYTE *Scan_URL(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    unstable RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ){
@@ -1119,12 +1113,10 @@ const REBYTE *Scan_URL(
 // Scan and convert a pair
 //
 const REBYTE *Scan_Pair(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    unstable RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
-    TRASH_CELL_IF_DEBUG(out);
-
     REBYTE buf[MAX_NUM_LEN + 4];
 
     bool is_integral;
@@ -1175,12 +1167,10 @@ const REBYTE *Scan_Pair(
 // Scan and convert binary strings.
 //
 const REBYTE *Scan_Binary(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    unstable RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
-    TRASH_CELL_IF_DEBUG(out);
-
     REBINT base = 16;
 
     if (*cp != '#') {
@@ -1215,14 +1205,12 @@ const REBYTE *Scan_Binary(
 // Scan any string that does not require special decoding.
 //
 const REBYTE *Scan_Any(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    unstable RELVAL *out,
     const REBYTE *cp,
     REBLEN num_bytes,
     enum Reb_Kind type,
     enum Reb_Strmode strmode
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
+){
     // The range for a curly braced string may span multiple lines, and some
     // files may have CR and LF in the data:
     //
@@ -1305,7 +1293,7 @@ REBNATIVE(scan_net_header)
         REBVAL *val = NULL; // rigorous checks worry it could be uninitialized
 
         const REBSTR *name = Intern_UTF8_Managed(start, cp - start);
-        RELVAL *item;
+        unstable RELVAL *item;
 
         cp++;
         // Search if word already present:

@@ -255,7 +255,7 @@ inline static void FAIL_IF_INACCESSIBLE_CTX(REBCTX *c) {
     }
 }
 
-inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
+inline static REBCTX *VAL_CONTEXT(unstable REBCEL(const*) v) {
     assert(ANY_CONTEXT_KIND(CELL_HEART(v)));
     if (CELL_KIND(v) != REB_FRAME)
         assert(VAL_FRAME_PHASE_OR_LABEL_NODE(v) == nullptr);
@@ -265,7 +265,7 @@ inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
     return c;
 }
 
-inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
+inline static REBCTX *VAL_WORD_CONTEXT(unstable const REBVAL *v) {
     assert(IS_WORD_BOUND(v));
     REBNOD *binding = VAL_BINDING(v);
     assert(
@@ -290,7 +290,7 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
 // and the string is the WORD! label cache to use as a name when an action
 // is extracted from the frame.
 //
-inline static REBACT *VAL_OPT_PHASE(REBCEL(const*) v) {
+inline static REBACT *VAL_OPT_PHASE(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_FRAME);
     REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
 
@@ -300,7 +300,7 @@ inline static REBACT *VAL_OPT_PHASE(REBCEL(const*) v) {
     return ACT(s);  // an actual phase
 }
 
-inline static REBACT *VAL_PHASE_ELSE_ARCHETYPE(REBCEL(const*) v) {
+inline static REBACT *VAL_PHASE_ELSE_ARCHETYPE(unstable REBCEL(const*) v) {
     REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
 
     if (s == nullptr or IS_SER_STRING(s))  // label or ANONYMOUS, no phase
@@ -309,7 +309,7 @@ inline static REBACT *VAL_PHASE_ELSE_ARCHETYPE(REBCEL(const*) v) {
     return ACT(s);  // an actual phase
 }
 
-inline static const REBSTR *VAL_FRAME_LABEL(const RELVAL *v) {
+inline static const REBSTR *VAL_FRAME_LABEL(unstable const RELVAL *v) {
     REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
     if (s == nullptr)  // phaseless, but no label
         return ANONYMOUS;
@@ -318,7 +318,10 @@ inline static const REBSTR *VAL_FRAME_LABEL(const RELVAL *v) {
     return STR(s);  // no phase and label
 }
 
-inline static void INIT_VAL_FRAME_LABEL(RELVAL *v, const REBSTR *label) {
+inline static void INIT_VAL_FRAME_LABEL(
+    unstable RELVAL *v,
+    const REBSTR *label
+){
     VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, label));
 }
 
@@ -343,7 +346,7 @@ inline static void INIT_VAL_FRAME_LABEL(RELVAL *v, const REBSTR *label) {
 // can use CTX_ARCHETYPE().  If it's a frame and you know it should have
 // a phase, then the phase is the keylist.
 //
-inline static REBVAL *VAL_CONTEXT_KEYS_HEAD(REBCEL(*) context)
+inline static REBVAL *VAL_CONTEXT_KEYS_HEAD(unstable REBCEL(*) context)
 {
     if (CELL_KIND(context) != REB_FRAME)
         return CTX_KEYS_HEAD(VAL_CONTEXT(context));
@@ -380,7 +383,7 @@ inline static REBVAL *VAL_CONTEXT_KEYS_HEAD(REBCEL(*) context)
 // the 0 slot of the context's varlist.
 //
 static inline REBVAL *Init_Any_Context(
-    RELVAL *out,
+    unstable RELVAL *out,
     enum Reb_Kind kind,
     REBCTX *c
 ){
@@ -399,7 +402,11 @@ static inline REBVAL *Init_Any_Context(
 #define Init_Port(out,c) \
     Init_Any_Context((out), REB_PORT, (c))
 
-inline static REBVAL *Init_Frame(RELVAL *out, REBCTX *c, const REBSTR *label) {
+inline static REBVAL *Init_Frame(
+    unstable RELVAL *out,
+    REBCTX *c,
+    const REBSTR *label
+){
     Init_Any_Context(out, REB_FRAME, c);
     INIT_VAL_FRAME_LABEL(out, label);  // nullptr (ANONYMOUS) is okay
     return cast(REBVAL*, out);
@@ -537,7 +544,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
         SERIES_MASK_VARLIST
             | SERIES_FLAG_FIXED_SIZE
     );
-    copy->info = Endlike_Header(
+    copy->info.bits = Endlike_Header(
         FLAG_WIDE_BYTE_OR_0(0) // implicit termination, and indicates array
             | FLAG_LEN_BYTE_OR_255(255) // indicates dynamic (varlist rule)
     );
@@ -559,7 +566,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
     // now those marking failure are asked to do so manually to the stub
     // after this returns (hence they need to cache the varlist first).
     //
-    stub->info = Endlike_Header(
+    stub->info.bits = Endlike_Header(
         SERIES_INFO_INACCESSIBLE // args memory now "stolen" by copy
             | FLAG_WIDE_BYTE_OR_0(0) // width byte is 0 for array series
             | FLAG_LEN_BYTE_OR_255(1) // not dynamic any more, new len is 1

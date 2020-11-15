@@ -70,15 +70,15 @@ REB_R MAKE_Pair(
         return out;
     }
 
-    const RELVAL *x;
-    const RELVAL *y;
+    unstable const RELVAL *x;
+    unstable const RELVAL *y;
 
     if (ANY_NUMBER(arg)) {
         x = arg;
         y = arg;
     }
     else if (IS_BLOCK(arg)) {
-        const RELVAL *item = VAL_ARRAY_AT(arg);
+        unstable const RELVAL *item = VAL_ARRAY_AT(arg);
 
         if (ANY_NUMBER(item))
             x = item;

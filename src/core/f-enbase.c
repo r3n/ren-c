@@ -345,7 +345,7 @@ err:
 // Scan and convert a binary string.
 //
 const REBYTE *Decode_Binary(
-    RELVAL *out,
+    unstable RELVAL *out,
     const REBYTE *src,
     REBLEN len,
     REBINT base,

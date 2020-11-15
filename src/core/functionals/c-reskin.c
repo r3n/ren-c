@@ -120,7 +120,7 @@ REB_R Skinner_Dispatcher(REBFRM *f)
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_SKINNER_MAX);
 
-    REBVAL *skinned = SPECIFIC(ARR_AT(details, IDX_SKINNER_SKINNED));
+    REBVAL *skinned = DETAILS_AT(details, IDX_SKINNER_SKINNED);
 
     REBVAL *param = ACT_PARAMS_HEAD(FRM_PHASE(f));
     REBVAL *arg = FRM_ARGS_HEAD(f);
@@ -223,8 +223,8 @@ REBNATIVE(reskinned)
 
     bool need_skin_phase = false;  // only needed if types were broadened
 
-    RELVAL *param = ARR_AT(paramlist, 1);  // first param (0 is ACT_ARCHETYPE)
-    const RELVAL *item = VAL_ARRAY_AT(ARG(skin));
+    unstable RELVAL *param = ARR_AT(paramlist, 1);  // 0 is ACT_ARCHETYPE
+    unstable const RELVAL *item = VAL_ARRAY_AT(ARG(skin));
     Reb_Param_Class pclass;
     while (NOT_END(item)) {
         bool change;
@@ -390,7 +390,7 @@ REBNATIVE(reskinned)
         SER(paramlist)->header.bits
             |= SER(original)->header.bits & PARAMLIST_FLAG_IS_NATIVE;
 
-    RELVAL *rootparam = ARR_HEAD(paramlist);
+    RELVAL *rootparam = STABLE(ARR_HEAD(paramlist));
     SER(paramlist)->header.bits &= ~PARAMLIST_MASK_CACHED;
     VAL_ACT_PARAMLIST_NODE(rootparam) = NOD(paramlist);
     INIT_BINDING(rootparam, UNBOUND);
@@ -430,8 +430,8 @@ REBNATIVE(reskinned)
         // on the source and target are the same, and it preserves relative
         // value information (rarely what you meant, but it's meant here).
         //
-        RELVAL *src = ARR_HEAD(ACT_DETAILS(original));
-        RELVAL *dest = ARR_HEAD(ACT_DETAILS(defers));
+        unstable RELVAL *src = ARR_HEAD(ACT_DETAILS(original));
+        unstable RELVAL *dest = ARR_HEAD(ACT_DETAILS(defers));
         for (; NOT_END(src); ++src, ++dest)
             Blit_Relative(dest, src);
     }

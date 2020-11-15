@@ -37,14 +37,14 @@
 //
 void Bind_Values_Inner_Loop(
     struct Reb_Binder *binder,
-    RELVAL *head,
+    unstable RELVAL *head,
     REBCTX *context,
     REBU64 bind_types, // !!! REVIEW: force word types low enough for 32-bit?
     REBU64 add_midstream_types,
     REBFLGS flags
 ){
     for (; NOT_END(head); ++head) {
-        REBCEL(const*) cell = VAL_UNESCAPED(head); // may equal v, e.g. `\x`
+        unstable REBCEL(const*) cell = VAL_UNESCAPED(head);
         enum Reb_Kind kind = CELL_KIND(cell);
         UNUSED(kind);  // !!! TBD: be influenced by KIND vs HEART?
 
@@ -112,7 +112,7 @@ void Bind_Values_Inner_Loop(
 // bindings that come after the added value is seen will be bound.
 //
 void Bind_Values_Core(
-    RELVAL *head,
+    unstable RELVAL *head,
     const RELVAL *context,
     REBU64 bind_types,
     REBU64 add_midstream_types,
@@ -239,7 +239,7 @@ REBNATIVE(let)
 //
 static void Clonify_And_Bind_Relative(
     REBVAL *v,  // Note: incoming value is not relative
-    const RELVAL *src,
+    unstable const RELVAL *src,
     REBFLGS flags,
     REBU64 deep_types,
     struct Reb_Binder *binder,
@@ -294,7 +294,7 @@ static void Clonify_And_Bind_Relative(
         // Objects and series get shallow copied at minimum
         //
         REBSER *series;
-        const RELVAL *sub_src;
+        unstable const RELVAL *sub_src;
 
         bool would_need_deep;
 
@@ -352,7 +352,7 @@ static void Clonify_And_Bind_Relative(
         // copied series and "clonify" the values in it.
         //
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
-            REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
+            REBVAL *sub = SPECIFIC(STABLE(ARR_HEAD(ARR(series))));
             for (; NOT_END(sub); ++sub, ++sub_src)
                 Clonify_And_Bind_Relative(
                     sub,
@@ -433,7 +433,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     REBLEN param_num = 1;
 
   blockscope {  // Setup binding table from the argument word list
-    RELVAL *param = ARR_AT(paramlist, 1);  // [0] is ACT_ARCHETYPE() ACTION!
+    RELVAL *param = STABLE(ARR_AT(paramlist, 1));  // [0] is ACT_ARCHETYPE()
     for (; NOT_END(param); ++param, ++param_num) {
         if (Is_Param_Sealed(param))
             continue;
@@ -461,8 +461,8 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
     REBARR *copy = Make_Array_For_Copy(len, flags, original);
 
-    const RELVAL *src = ARR_AT(original, index);
-    RELVAL *dest = ARR_HEAD(copy);
+    unstable const RELVAL *src = ARR_AT(original, index);
+    RELVAL *dest = STABLE(ARR_HEAD(copy));
     REBLEN count = 0;
     for (; count < len; ++count, ++dest, ++src) {
         Clonify_And_Bind_Relative(
@@ -499,7 +499,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
             REBLEN old_paramlist_len = ARR_LEN(paramlist);
             EXPAND_SERIES_TAIL(SER(paramlist), num_lets);
-            RELVAL *param = ARR_AT(paramlist, old_paramlist_len);
+            RELVAL *param = STABLE(ARR_AT(paramlist, old_paramlist_len));
 
             REBDSP dsp = dsp_orig;
             while (dsp != DSP) {
@@ -523,7 +523,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     }
 
   blockscope {  // Reset binding table
-    RELVAL *param = ARR_AT(paramlist, 1);  // [0] is ACT_ARCHETYPE() ACTION!
+    RELVAL *param = STABLE(ARR_AT(paramlist, 1));  // [0] is ACT_ARCHETYPE()
     for (; NOT_END(param); param++) {
         if (Is_Param_Sealed(param))
             continue;
@@ -652,15 +652,15 @@ void Rebind_Values_Deep(
 void Virtual_Bind_Deep_To_New_Context(
     REBVAL *body_in_out, // input *and* output parameter
     REBCTX **context_out,
-    const REBVAL *spec
-) {
+    unstable const REBVAL *spec
+){
     assert(IS_BLOCK(body_in_out) or IS_SYM_BLOCK(body_in_out));
 
     REBLEN num_vars = IS_BLOCK(spec) ? VAL_LEN_AT(spec) : 1;
     if (num_vars == 0)
-        fail (spec);
+        fail (STABLE_HACK(spec));  // !!! should fail() take unstable?
 
-    const RELVAL *item;
+    unstable const RELVAL *item;
     REBSPC *specifier;
     bool rebinding;
     if (IS_BLOCK(spec)) {

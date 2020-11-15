@@ -38,15 +38,22 @@
 #else
     // C++ has reference types--use them and add extra assert it's a date
 
-    inline static REBYMD VAL_DATE(REBCEL(const*) v) {
+    inline static const REBYMD & VAL_DATE(unstable REBCEL(const*) v) {
         assert(CELL_KIND(v) == REB_DATE);
-        return EXTRA(Date, v).ymdz; // mutable reference
+        return EXTRA(Date, STABLE(v)).ymdz;
     }
 
     inline static REBYMD & VAL_DATE(RELVAL *v) {
         assert(VAL_TYPE(v) == REB_DATE);
         return EXTRA(Date, v).ymdz; // const reference
     }
+
+  #ifdef DEBUG_UNSTABLE_CELLS
+    inline static REBYMD & VAL_DATE(unstable RELVAL *v) {
+        assert(VAL_TYPE(v) == REB_DATE);
+        return EXTRA(Date, STABLE(v)).ymdz;  // !!! careful, movable
+    }
+  #endif
 #endif
 
 #define MAX_YEAR 0x3fff
@@ -79,7 +86,7 @@
 //
 #define NO_DATE_ZONE -64
 
-inline static bool Does_Date_Have_Time(REBCEL(const*) v)
+inline static bool Does_Date_Have_Time(unstable REBCEL(const*) v)
 {
     assert(CELL_KIND(v) == REB_DATE);
     if (PAYLOAD(Time, v).nanoseconds == NO_DATE_TIME) {
@@ -89,7 +96,7 @@ inline static bool Does_Date_Have_Time(REBCEL(const*) v)
     return true;
 }
 
-inline static bool Does_Date_Have_Zone(REBCEL(const*) v)
+inline static bool Does_Date_Have_Zone(unstable REBCEL(const*) v)
 {
     assert(CELL_KIND(v) == REB_DATE);
     if (VAL_DATE(v).zone == NO_DATE_ZONE)  // out of band of 7-bit field
@@ -98,7 +105,7 @@ inline static bool Does_Date_Have_Zone(REBCEL(const*) v)
     return true;
 }
 
-inline static int VAL_ZONE(REBCEL(const*) v) {
+inline static int VAL_ZONE(unstable REBCEL(const*) v) {
     assert(Does_Date_Have_Zone(v));
     return VAL_DATE(v).zone;
 }
@@ -110,7 +117,7 @@ inline static int VAL_ZONE(REBCEL(const*) v) {
 //
 //=////////////////////////////////////////////////////////////////////////=//
 
-inline static REBI64 VAL_NANO(REBCEL(const*) v) {
+inline static REBI64 VAL_NANO(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_TIME or Does_Date_Have_Time(v));
     return PAYLOAD(Time, v).nanoseconds;
 }
@@ -161,7 +168,10 @@ inline static REBI64 VAL_NANO(REBCEL(const*) v) {
 #define TIME_IN_DAY \
     SEC_TIME(cast(REBI64, SECS_IN_DAY))
 
-inline static REBVAL *Init_Time_Nanoseconds(RELVAL *v, REBI64 nanoseconds) {
+inline static REBVAL *Init_Time_Nanoseconds(
+    unstable RELVAL *v,
+    REBI64 nanoseconds
+){
     RESET_CELL(v, REB_TIME, CELL_MASK_NONE);
     PAYLOAD(Time, v).nanoseconds = nanoseconds;
     return cast(REBVAL*, v);

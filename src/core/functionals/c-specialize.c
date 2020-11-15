@@ -93,7 +93,7 @@ REB_R Specializer_Dispatcher(REBFRM *f)
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_SPECIALIZER_MAX);
 
-    REBVAL *exemplar = SPECIFIC(ARR_AT(details, IDX_SPECIALIZER_FRAME));
+    REBVAL *exemplar = DETAILS_AT(details, IDX_SPECIALIZER_FRAME);
     assert(IS_FRAME(exemplar));
 
     INIT_FRM_PHASE(f, VAL_PHASE_ELSE_ARCHETYPE(exemplar));
@@ -217,7 +217,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         //
         REBDSP dsp = highest_ordered_dsp;
         for (; dsp != lowest_ordered_dsp; --dsp) {
-            REBVAL *ordered = DS_AT(dsp);
+            unstable REBVAL *ordered = DS_AT(dsp);
             if (VAL_STORED_CANON(ordered) != canon)
                 continue;  // just continuing this loop
 
@@ -412,7 +412,7 @@ bool Specialize_Action_Throws(
                 //
                 while (ordered_dsp != dsp_paramlist) {
                     ++ordered_dsp;
-                    REBVAL *ordered = DS_AT(ordered_dsp);
+                    unstable REBVAL *ordered = DS_AT(ordered_dsp);
 
                     if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
                         fail (Error_Bad_Refine_Raw(ordered));
@@ -494,7 +494,7 @@ bool Specialize_Action_Throws(
             | (SER(unspecialized)->header.bits & PARAMLIST_MASK_INHERIT)
     );
     Manage_Array(paramlist);
-    RELVAL *rootparam = ARR_HEAD(paramlist);
+    RELVAL *rootparam = STABLE(ARR_HEAD(paramlist));
     VAL_ACT_PARAMLIST_NODE(rootparam) = NOD(paramlist);
 
     MISC_META_NODE(paramlist) = nullptr;
@@ -503,7 +503,7 @@ bool Specialize_Action_Throws(
     //
     while (ordered_dsp != DSP) {
         ++ordered_dsp;
-        REBVAL *ordered = DS_AT(ordered_dsp);
+        unstable REBVAL *ordered = DS_AT(ordered_dsp);
         if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
             fail (Error_Bad_Refine_Raw(ordered));
 
@@ -527,7 +527,10 @@ bool Specialize_Action_Throws(
     // that binding has to be UNBOUND).  It also remembers the original
     // action in the phase, so Specializer_Dispatcher() knows what to call.
     //
-    RELVAL *body = ARR_AT(ACT_DETAILS(specialized), IDX_SPECIALIZER_FRAME);
+    RELVAL *body = STABLE(ARR_AT(
+        ACT_DETAILS(specialized),
+        IDX_SPECIALIZER_FRAME
+    ));
     Move_Value(body, CTX_ARCHETYPE(exemplar));
     INIT_BINDING(body, VAL_BINDING(specializee));
     INIT_VAL_CONTEXT_PHASE(body, unspecialized);

@@ -149,7 +149,7 @@ enum Reb_Gob_Type {
 #define VAL_XYF_Y(v)    PAYLOAD(Any, (v)).second.d32
 
 inline static REBVAL *Init_XYF(
-    RELVAL *out,
+    unstable RELVAL *out,
     REBD32 x,  // 32-bit floating point type, typically just `float`...
     REBD32 y   // there's no standard: https://stackoverflow.com/a/18705626/
 ){
@@ -157,7 +157,7 @@ inline static REBVAL *Init_XYF(
     mutable_HEART_BYTE(out) = REB_LOGIC;  // fools Is_Bindable()
     VAL_XYF_X(out) = x;
     VAL_XYF_Y(out) = y;
-    return cast(REBVAL*, out);
+    return SPECIFIC(STABLE_HACK(out));
 }
 
 typedef struct gob_window {  // Maps gob to window
@@ -206,7 +206,7 @@ typedef struct gob_window {  // Maps gob to window
 #define GOB_ALPHA(g) \
     EXTRA(Bytes, ARR_AT((g), IDX_GOB_SIZE_AND_ALPHA)).exactly_4[0]
 
-#define GOB_CONTENT(g)              SPECIFIC(ARR_AT((g), IDX_GOB_CONTENT))
+#define GOB_CONTENT(g)              SPECIFIC(STABLE_HACK(ARR_AT((g), IDX_GOB_CONTENT)))
 #define mutable_GOB_CONTENT(g)      ARR_AT((g), IDX_GOB_CONTENT)
 
 #define GOB_TYPE(g) \
@@ -225,7 +225,7 @@ typedef struct gob_window {  // Maps gob to window
 #define GOB_PANE_VALUE(g)       ARR_AT((g), IDX_GOB_PANE)
 
 inline static REBARR *GOB_PANE(REBGOB *g) {
-    RELVAL *v = GOB_PANE_VALUE(g);
+    unstable RELVAL *v = GOB_PANE_VALUE(g);
     if (IS_BLANK(v))
         return nullptr;
 
@@ -279,12 +279,12 @@ inline static bool IS_GOB(const RELVAL *v)  // Note: QUOTED! does not count
     #define VAL_GOB_INDEX(v) \
         PAYLOAD(Any, v).second.u
 #else
-    inline static REBGOB* VAL_GOB(REBCEL(const*) v) {
+    inline static REBGOB* VAL_GOB(unstable REBCEL(const*) v) {
         assert(CELL_CUSTOM_TYPE(v) == EG_Gob_Type);
         return cast(REBGOB*, VAL_NODE(v));
     }
 
-    inline static uintptr_t VAL_GOB_INDEX(REBCEL(const*) v) {
+    inline static uintptr_t VAL_GOB_INDEX(unstable REBCEL(const*) v) {
         assert(CELL_CUSTOM_TYPE(v) == EG_Gob_Type);
         return PAYLOAD(Any, v).second.u;
     }
@@ -293,15 +293,21 @@ inline static bool IS_GOB(const RELVAL *v)  // Note: QUOTED! does not count
         assert(CELL_CUSTOM_TYPE(VAL_UNESCAPED(v)) == EG_Gob_Type);
         return PAYLOAD(Any, v).second.u;
     }
+  #ifdef DEBUG_UNSTABLE_CELLS
+    inline static uintptr_t & VAL_GOB_INDEX(unstable RELVAL *v) {
+        assert(CELL_CUSTOM_TYPE(VAL_UNESCAPED(v)) == EG_Gob_Type);
+        return PAYLOAD(Any, STABLE(v)).second.u;  // !!! careful, unstable
+    }
+  #endif
 #endif
 
-inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
+inline static REBVAL *Init_Gob(unstable RELVAL *out, REBGOB *g) {
     assert(GET_SERIES_FLAG(g, MANAGED));
 
     RESET_CUSTOM_CELL(out, EG_Gob_Type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, g);
     VAL_GOB_INDEX(out) = 0;
-    return cast(REBVAL*, out);
+    return cast(REBVAL*, STABLE_HACK(out));
 }
 
 

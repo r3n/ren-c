@@ -361,7 +361,7 @@ static REBYMD Normalize_Date(REBINT day, REBINT month, REBINT year, REBINT tz)
 // Adjust date and time for the timezone.
 // The result should be used for output, not stored.
 //
-void Adjust_Date_Zone(RELVAL *d, bool to_utc)
+void Adjust_Date_Zone(unstable RELVAL *d, bool to_utc)
 {
     if (not Does_Date_Have_Zone(d))
         return;
@@ -458,7 +458,7 @@ REB_R MAKE_Date(
 
   blockscope {
     REBLEN len;
-    const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
+    unstable const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
 
     if (len >= 3) {
         if (not IS_INTEGER(item))

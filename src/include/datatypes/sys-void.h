@@ -47,7 +47,10 @@
 // if that fill in never happens.
 //
 
-inline static REBVAL *Init_Labeled_Void(RELVAL *out, const REBSTR *label) {
+inline static REBVAL *Init_Labeled_Void(
+    unstable RELVAL *out,
+    const REBSTR *label
+){
     RESET_CELL(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
     VAL_NODE(out) = NOD(label);
     return cast(REBVAL*, out);
@@ -56,13 +59,13 @@ inline static REBVAL *Init_Labeled_Void(RELVAL *out, const REBSTR *label) {
 #define Init_Void(out,sym) \
     Init_Labeled_Void((out), Canon(sym))
 
-inline static REBVAL *Init_Unlabeled_Void(RELVAL *out) {
+inline static REBVAL *Init_Unlabeled_Void(unstable RELVAL *out) {
     RESET_CELL(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
     VAL_NODE(out) = nullptr;
     return cast(REBVAL*, out);
 }
 
-inline static const REBSTR *VAL_VOID_OPT_LABEL(REBCEL(const*) v) {
+inline static const REBSTR *VAL_VOID_OPT_LABEL(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_VOID);
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
     return cast(const REBSTR*, VAL_NODE(v));
@@ -71,7 +74,7 @@ inline static const REBSTR *VAL_VOID_OPT_LABEL(REBCEL(const*) v) {
 // Don't let SYM_0 be used for unlabeled void, in case checking for a match
 // with a symbol extracted from a WORD! which has no symbol shorthand.
 //
-inline static bool Is_Void_With_Sym(const RELVAL *v, REBSYM sym) {
+inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
     assert(sym != SYM_0);
     if (not IS_VOID(v))
         return false;
@@ -88,13 +91,21 @@ inline static bool Is_Void_With_Sym(const RELVAL *v, REBSYM sym) {
 // than it is to be able to return BLANK! from a loop, so blanks are voidified
 // alongside NULL (reserved for BREAKing)
 //
-inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
+inline static REBVAL *Voidify_If_Nulled_Or_Blank(unstable_ok REBVAL *cell) {
     if (IS_NULLED(cell))
         Init_Void(cell, SYM_NULLED);
     else if (IS_BLANK(cell))
         Init_Void(cell, SYM_BLANKED);
     return cell;
 }
+
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static unstable REBVAL *Voidify_If_Nulled_Or_Blank(
+        unstable REBVAL *cell
+    ){
+        return Voidify_If_Nulled_Or_Blank(STABLE(cell));
+    }
+#endif
 
 
 #if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, same as plain VOID!
@@ -111,7 +122,7 @@ inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
         NOOP
 #else
     inline static REBVAL *Init_Unreadable_Void_Debug(
-        RELVAL *out, const char *file, int line
+        unstable RELVAL *out, const char *file, int line
     ){
         RESET_CELL_Debug(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE, file, line);
 
@@ -130,7 +141,7 @@ inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
     #define IS_VOID_RAW(v) \
         (KIND3Q_BYTE_UNCHECKED(v) == REB_VOID)
 
-    inline static bool IS_UNREADABLE_DEBUG(const RELVAL *v) {
+    inline static bool IS_UNREADABLE_DEBUG(unstable const RELVAL *v) {
         if (KIND3Q_BYTE_UNCHECKED(v) != REB_VOID)
             return false;
         return v->extra.tick < 0;

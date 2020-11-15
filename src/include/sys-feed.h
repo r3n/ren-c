@@ -325,7 +325,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         //
         Manage_Array(reified);
 
-        feed->value = ARR_HEAD(reified);
+        feed->value = STABLE(ARR_HEAD(reified));
         feed->pending = feed->value + 1;  // may be END
         feed->array = reified;
         feed->index = 1;
@@ -354,7 +354,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             if (ARR_LEN(inst1) > 1)
                 panic ("rebU() of more than one value splice not written");
 
-            REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
+            REBVAL *single = SPECIFIC(STABLE(ARR_SINGLE(inst1)));
             Move_Value(&feed->fetched, single);
             Quotify(
                 &feed->fetched,
@@ -378,12 +378,12 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             // vs. putting it in fetched/MARKED_TEMPORARY...but that makes
             // this more convoluted.  Review.
 
-            REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
+            REBVAL *single = SPECIFIC(STABLE(ARR_SINGLE(inst1)));
             Move_Value(&feed->fetched, single);
             Quotify(&feed->fetched, QUOTING_BYTE(feed));
             SET_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);
             feed->value = &feed->fetched;
-            rebRelease(cast(const REBVAL*, single));  // *is* the instruction
+            rebRelease(single);  // *is* the instruction
         }
         else
             panic (inst1);
@@ -632,12 +632,12 @@ inline static void Prep_Array_Feed(
     if (opt_first) {
         feed->value = opt_first;
         feed->index = index;
-        feed->pending = ARR_AT(array, index);
+        feed->pending = STABLE(ARR_AT(array, index));
         assert(KIND3Q_BYTE_UNCHECKED(feed->value) != REB_0_END);
             // ^-- faster than NOT_END()
     }
     else {
-        feed->value = ARR_AT(array, index);
+        feed->value = STABLE(ARR_AT(array, index));
         feed->index = index + 1;
         feed->pending = feed->value + 1;
     }
@@ -696,7 +696,7 @@ inline static void Prep_Va_Feed(
 
 inline static void Prep_Any_Array_Feed(
     struct Reb_Feed *feed,
-    const RELVAL *any_array,
+    unstable const RELVAL *any_array,  // array is extracted and HOLD put on
     REBSPC *specifier,
     REBFLGS parent_flags  // only reads FEED_FLAG_CONST out of this
 ){

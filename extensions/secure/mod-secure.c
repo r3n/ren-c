@@ -144,7 +144,7 @@ const REBYTE *Security_Policy(
 
     // !!! Comment said "no relatives in STATE_POLICIES"
     //
-    const RELVAL *item = ARR_HEAD(VAL_ARRAY(policy));
+    const RELVAL *item = STABLE_HACK(ARR_HEAD(VAL_ARRAY(policy)));
 
     for (; NOT_END(item); item += 2) {
         if (IS_END(item + 1) or not IS_TUPLE(item + 1))  // must map to tuple
@@ -184,11 +184,9 @@ const REBYTE *Security_Policy(
 //
 void Trap_Security(REBLEN flag, REBSTR *subsystem, const REBVAL *value)
 {
+    UNUSED(subsystem);
     if (flag == SEC_THROW) {
-        if (value == nullptr) {
-            Init_Word(DS_PUSH(), subsystem);
-            value = DS_TOP;
-        }
+        assert(value != nullptr);
         fail (Error_Security_Raw(value));
     }
     else if (flag == SEC_QUIT)

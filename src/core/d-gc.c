@@ -43,7 +43,7 @@
 //
 // Note: We assume the binding was marked correctly if the type was bindable.
 //
-void Assert_Cell_Marked_Correctly(const RELVAL *v)
+void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
 {
     if (KIND3Q_BYTE_UNCHECKED(v) == REB_QUOTED) {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
@@ -164,7 +164,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             assert(v->header.bits & CELL_FLAG_FIRST_IS_NODE);
             assert(Is_Marked(a));
 
-            RELVAL *single = ARR_SINGLE(a);
+            RELVAL *single = STABLE(ARR_SINGLE(a));
             assert(IS_HANDLE(single));
             assert(VAL_HANDLE_SINGULAR(single) == a);
             if (v != single) {
@@ -331,7 +331,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         // !!! Optimization abandoned
 
         assert(ARR_LEN(a) >= 2);
-        RELVAL *item = ARR_HEAD(a);
+        unstable RELVAL *item = ARR_HEAD(a);
         for (; NOT_END(item); ++item)
             assert(not ANY_PATH_KIND(KIND3Q_BYTE_UNCHECKED(item)));
         assert(Is_Marked(a));
@@ -509,7 +509,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
     #endif
 
     if (GET_ARRAY_FLAG(a, IS_PARAMLIST)) {
-        const RELVAL *archetype = ARR_HEAD(a);
+        const RELVAL *archetype = STABLE(ARR_HEAD(a));
         assert(IS_ACTION(archetype));
         assert(not EXTRA(Binding, archetype).node);
 

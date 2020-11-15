@@ -488,8 +488,8 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
               case REB_MAP: {
                 assert(les->data_idx % 2 == 0);  // should be on key slot
 
-                const REBVAL *key;
-                const REBVAL *val;
+                unstable const REBVAL *key;
+                unstable const REBVAL *val;
                 while (true) {  // pass over the unused map slots
                     key = SPECIFIC(ARR_AT(ARR(les->data_ser), les->data_idx));
                     ++les->data_idx;
@@ -597,7 +597,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 les->mode == LOOP_MAP_EACH_SPLICED
                 and IS_BLOCK(les->out)
             ){
-                const RELVAL *v = VAL_ARRAY_AT(les->out);
+                unstable const RELVAL *v = VAL_ARRAY_AT(les->out);
                 for (; NOT_END(v); ++v)
                     Derelativize(DS_PUSH(), v, VAL_SPECIFIER(les->out));
             }

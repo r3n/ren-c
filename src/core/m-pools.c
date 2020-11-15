@@ -1178,7 +1178,7 @@ void Decay_Series(REBSER *s)
         // opposed to the specific singular made for the handle's GC awareness)
 
         if (IS_SER_ARRAY(s)) {
-            RELVAL *v = ARR_HEAD(ARR(s));
+            unstable RELVAL *v = ARR_HEAD(ARR(s));
             if (CELL_KIND_UNCHECKED(v) == REB_HANDLE) {
                 if (VAL_HANDLE_SINGULAR(v) == ARR(s)) {
                     //
@@ -1189,7 +1189,7 @@ void Decay_Series(REBSER *s)
                     // !!! Would a no-op cleaner be more efficient for those?
                     //
                     if (MISC(s).cleaner)
-                        (MISC(s).cleaner)(SPECIFIC(v));
+                        (MISC(s).cleaner)(SPECIFIC(STABLE_HACK(v)));
                 }
             }
         }

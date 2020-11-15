@@ -171,11 +171,11 @@ REBNATIVE(load_extension)
     // to enhancement.  So trying a monolithic rewrite for starters.
 
     const REBVAL *script_compressed
-        = SPECIFIC(ARR_AT(details, IDX_COLLATOR_SCRIPT));
+        = DETAILS_AT(details, IDX_COLLATOR_SCRIPT);
     const REBVAL *specs_compressed
-        = SPECIFIC(ARR_AT(details, IDX_COLLATOR_SPECS));
+        = DETAILS_AT(details, IDX_COLLATOR_SPECS);
     const REBVAL *dispatchers_handle
-        = SPECIFIC(ARR_AT(details, IDX_COLLATOR_DISPATCHERS));
+        = DETAILS_AT(details, IDX_COLLATOR_DISPATCHERS);
 
     REBLEN num_natives = VAL_HANDLE_LEN(dispatchers_handle);
     REBNAT *dispatchers = VAL_HANDLE_POINTER(REBNAT, dispatchers_handle);
@@ -220,7 +220,7 @@ REBNATIVE(load_extension)
 
     REBDSP dsp_orig = DSP; // for accumulating exports
 
-    RELVAL *item = ARR_HEAD(specs);
+    RELVAL *item = STABLE_HACK(ARR_HEAD(specs));
     REBLEN i;
     for (i = 0; i < num_natives; ++i) {
         //
@@ -268,9 +268,14 @@ REBNATIVE(load_extension)
         // the list of the exports and pass it to the module code.
         //
         if (is_export) {
-            Init_Word(DS_PUSH(), VAL_WORD_SPELLING(name));
-            if (0 == Try_Bind_Word(module, DS_TOP))
+            //
+            // We don't want to necessarily make binding work on stack values.
+            // So get to stack by way of the spare cell.
+            //
+            Init_Word(D_SPARE, VAL_WORD_SPELLING(name));
+            if (0 == Try_Bind_Word(module, D_SPARE))
                 panic ("Couldn't bind word just added -- problem");
+            Move_Value(DS_PUSH(), D_SPARE);
         }
     }
 

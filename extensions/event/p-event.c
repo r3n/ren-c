@@ -106,7 +106,7 @@ const REBVAL *Find_Last_Event(REBINT model, uint32_t type)
     REBVAL *state = VAL_CONTEXT_VAR(port, STD_PORT_STATE);
     if (!IS_BLOCK(state)) return NULL;
 
-    const RELVAL *value = VAL_ARRAY_TAIL(state) - 1;
+    unstable const RELVAL *value = VAL_ARRAY_TAIL(state) - 1;
     for (; value >= ARR_HEAD(VAL_ARRAY(state)); --value) {
         if (VAL_EVENT_MODEL(value) == model) {
             if (cast(uint32_t, VAL_EVENT_TYPE(value)) == type) {

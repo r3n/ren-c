@@ -64,7 +64,7 @@ REB_R Chainer_Dispatcher(REBFRM *f)
     // Go in reverse order, so the function to apply last is at the bottom of
     // the stack.
     //
-    const RELVAL *chained = ARR_LAST(pipeline);
+    unstable const RELVAL *chained = ARR_LAST(pipeline);
     for (; chained != ARR_HEAD(pipeline); --chained) {
         assert(IS_ACTION(chained));
         Move_Value(DS_PUSH(), SPECIFIC(chained));
@@ -96,13 +96,13 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
     REBVAL *out = D_OUT;  // plan ahead for factoring into Chain_Action(out..
 
     REBVAL *pipeline = ARG(pipeline);
-    const RELVAL *first = VAL_ARRAY_AT(pipeline);
+    unstable const RELVAL *first = VAL_ARRAY_AT(pipeline);
 
     // !!! Current validation is that all are actions.  Should there be other
     // checks?  (That inputs match outputs in the chain?)  Should it be
     // a dialect and allow things other than functions?
     //
-    const RELVAL *check = first;
+    unstable const RELVAL *check = first;
     for (; NOT_END(check); ++check) {
         if (not IS_ACTION(check)) {
             DECLARE_LOCAL (specific);
@@ -198,14 +198,16 @@ bool Cache_Predicate_Throws(
 
     REBARR *reversed = Make_Array(len - 1);
 
-    RELVAL *dst = ARR_HEAD(reversed);
-    RELVAL *src = ARR_AT(items, len - 1);
+  blockscope {
+    unstable RELVAL *dst = ARR_HEAD(reversed);
+    unstable RELVAL *src = ARR_AT(items, len - 1);
     REBLEN i;
     for (i = 1; i < len; ++i, --src, ++dst) {
         if (not IS_WORD(src) and not IS_GROUP(src))
             fail ("Predicate elements can only be WORD! or GROUP!");
         Getify(Derelativize(dst, src, specifier));
     }
+  }
 
     TERM_ARRAY_LEN(reversed, len - 1);
     Init_Block(out, reversed);
@@ -217,6 +219,6 @@ bool Cache_Predicate_Throws(
     Move_Value(predicate, chain);
     rebRelease(chain);
 
-    UNUSED(out);
+    TRASH_CELL_IF_DEBUG(out);
     return false;
 }

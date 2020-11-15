@@ -71,7 +71,7 @@ REB_R Augmenter_Dispatcher(REBFRM *f)
     REBARR *details = ACT_DETAILS(phase);
     assert(ARR_LEN(details) == IDX_AUGMENTER_MAX);
 
-    RELVAL *augmentee = ARR_AT(details, IDX_AUGMENTER_AUGMENTEE);
+    REBVAL *augmentee = DETAILS_AT(details, IDX_AUGMENTER_AUGMENTEE);
 
     INIT_FRM_PHASE(f, VAL_ACTION(augmentee));
     FRM_BINDING(f) = VAL_BINDING(augmentee);
@@ -177,7 +177,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         // starters.  This is considered to be "unspecialized".
         //
         blockscope {
-            RELVAL *temp = ARR_AT(varlist, old_len);
+            unstable RELVAL *temp = ARR_AT(varlist, old_len);
             REBLEN i;
             for (i = 0; i < delta; ++i) {
                 Init_Void(temp, SYM_UNDEFINED);
@@ -192,8 +192,8 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         // poorly here alongside the copy that should be parameterized.
         //
         blockscope {
-            RELVAL *src = ARR_HEAD(old_varlist) + 1;
-            RELVAL *dest = ARR_HEAD(varlist) + 1;
+            unstable RELVAL *src = ARR_HEAD(old_varlist) + 1;
+            unstable RELVAL *dest = ARR_HEAD(varlist) + 1;
             REBLEN i;
             for (i = 1; i < old_len; ++i, ++src, ++dest) {
                 if (GET_CELL_FLAG(src, ARG_MARKED_CHECKED))

@@ -89,7 +89,7 @@
         return cast(REBSPC*, c);
     }
 
-    inline static REBSPC *VAL_SPECIFIER(REBCEL(const*) v) {
+    inline static REBSPC *VAL_SPECIFIER(unstable REBCEL(const*) v) {
         assert(ANY_ARRAY_KIND(CELL_HEART(v)));
 
         if (not EXTRA(Binding, v).node)
@@ -345,7 +345,10 @@ inline static REBNOD *SPC_BINDING(REBSPC *specifier)
 //
 // Payload and header should be valid prior to making this call.
 //
-inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
+inline static void INIT_BINDING_MAY_MANAGE(
+    unstable RELVAL *out,
+    REBNOD* binding
+){
     EXTRA(Binding, out).node = binding;
 
     // If a QUOTED! cell is 4 quotes or more, then the VAL_UNESCAPED() payload
@@ -432,7 +435,7 @@ inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding) {
 // that is applicable.
 //
 inline static REBCTX *Get_Word_Context(
-    REBCEL(const*) any_word,
+    unstable REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     assert(ANY_WORD_KIND(CELL_HEART(any_word)));
@@ -519,7 +522,7 @@ inline static REBCTX *Get_Word_Context(
 }
 
 static inline const REBVAL *Lookup_Word_May_Fail(
-    REBCEL(const*) any_word,
+    unstable REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
@@ -548,7 +551,7 @@ static inline const REBVAL *Try_Lookup_Word(
 
 static inline const REBVAL *Get_Word_May_Fail(
     RELVAL *out,
-    REBCEL(const*) any_word,
+    unstable REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     const REBVAL *var = Lookup_Word_May_Fail(any_word, specifier);
@@ -562,7 +565,7 @@ static inline const REBVAL *Get_Word_May_Fail(
 }
 
 static inline REBVAL *Lookup_Mutable_Word_May_Fail(
-    REBCEL(const*) any_word,
+    unstable REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     if (not VAL_BINDING(any_word))
@@ -594,7 +597,7 @@ static inline REBVAL *Lookup_Mutable_Word_May_Fail(
 }
 
 inline static REBVAL *Sink_Word_May_Fail(
-    REBCEL(const*) any_word,
+    unstable REBCEL(const*) any_word,
     REBSPC *specifier
 ){
     REBVAL *var = Lookup_Mutable_Word_May_Fail(any_word, specifier);
@@ -629,15 +632,15 @@ inline static REBVAL *Sink_Word_May_Fail(
 //
 
 inline static REBVAL *Derelativize(
-    RELVAL *out, // relative destinations are overwritten with specified value
-    const RELVAL *v,
+    unstable_ok RELVAL *out,  // relative dest overwritten w/specific value
+    unstable const RELVAL *v,
     REBSPC *specifier
 ){
     Move_Value_Header(out, v);
-    out->payload = v->payload;
+    out->payload = STABLE(v)->payload;
 
     if (not Is_Bindable(v)) {
-        out->extra = v->extra; // extra.binding union field isn't even active
+        out->extra = STABLE(v)->extra;
         return cast(REBVAL*, out);
     }
 
@@ -714,6 +717,16 @@ inline static REBVAL *Derelativize(
     return cast(REBVAL*, out);
 }
 
+#ifdef DEBUG_UNSTABLE_CELLS
+    inline static REBVAL *Derelativize(
+        unstable RELVAL *out,
+        unstable const RELVAL *v,
+        REBSPC *specifier
+    ){
+        return Derelativize(STABLE(out), v, specifier);
+    }
+#endif
+
 
 // In the C++ build, defining this overload that takes a REBVAL* instead of
 // a RELVAL*, and then not defining it...will tell you that you do not need
@@ -746,7 +759,10 @@ inline static REBVAL *Derelativize(
 // would need such derivation.
 //
 
-inline static REBSPC *Derive_Specifier(REBSPC *parent, REBCEL(const*) item) {
+inline static REBSPC *Derive_Specifier(
+    REBSPC *parent,
+    unstable REBCEL(const*) item
+){
     if (IS_SPECIFIC(item))
         return VAL_SPECIFIER(SPECIFIC(CELL_TO_VAL(item)));
     return parent;
