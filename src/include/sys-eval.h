@@ -130,7 +130,7 @@ inline static bool Eval_Throws(REBFRM *f) {
 //
 inline static bool Did_Init_Inert_Optimize_Complete(
     REBVAL *out,
-    struct Reb_Feed *feed,
+    REBFED *feed,
     REBFLGS *flags
 ){
     assert(SECOND_BYTE(*flags) == 0);  // we might set the STATE_BYTE
@@ -321,7 +321,7 @@ inline static bool Eval_Step_In_Any_Array_At_Throws(
         return false;
     }
 
-    DECLARE_FRAME (f, feed, flags);
+    DECLARE_FRAME (f, feed, flags | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(out, f);
     bool threw = Eval_Throws(f);
@@ -364,16 +364,20 @@ inline static bool Eval_Step_In_Va_Throws_Core(
 ){
     DECLARE_VA_FEED (feed, p, vaptr, feed_flags);
 
-    DECLARE_FRAME (f, feed, eval_flags);
+    DECLARE_FRAME (f, feed, eval_flags | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(out, f);
     bool threw = Eval_Throws(f);
+
+    bool too_many = (eval_flags & EVAL_FLAG_NO_RESIDUE)
+        and NOT_END(feed->value);  // feed will be freed in Drop_Frame()
+
     Drop_Frame(f); // will va_end() if not reified during evaluation
 
     if (threw)
         return true;
 
-    if ((eval_flags & EVAL_FLAG_NO_RESIDUE) and NOT_END(feed->value))
+    if (too_many)
         fail (Error_Apply_Too_Many_Raw());
 
     // A va_list-based feed has a lookahead, and also may be spooled due to
@@ -400,8 +404,8 @@ inline static bool Eval_Value_Maybe_End_Throws(
 
     SET_END(out);
 
-    struct Reb_Feed feed_struct;  // first so can't use DECLARE_ARRAY_FEED
-    struct Reb_Feed *feed = &feed_struct;
+    // Passes `first` so can't use DECLARE_ARRAY_FEED
+    REBFED *feed = Alloc_Feed();
     Prep_Array_Feed(
         feed,
         value,  // first--in this case, the only value in the feed...
@@ -411,7 +415,7 @@ inline static bool Eval_Value_Maybe_End_Throws(
         FEED_MASK_DEFAULT | (value->header.bits & FEED_FLAG_CONST)
     );
 
-    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(out, f);
     bool threw = Eval_Throws(f);

@@ -748,8 +748,13 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // However, it sets OUT_MARKED_STALE in that case (note we may be
         // leaving an END in f->out by doing this.)
         //
-        if (Do_Feed_To_End_Maybe_Stale_Throws(f->out, subfeed))
+        if (Do_Feed_To_End_Maybe_Stale_Throws(
+            f->out,
+            subfeed,
+            EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+        )){
             goto return_thrown;
+        }
 
         // We want `3 = (1 + 2 ()) 4` to not treat the 1 + 2 as "stale", thus
         // skipping it and trying to compare `3 = 4`.  But `3 = () 1 + 2`

@@ -37,9 +37,18 @@ STATIC_ASSERT(EVAL_FLAG_0_IS_TRUE == NODE_FLAG_NODE);
 STATIC_ASSERT(EVAL_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
 
 
-//=//// EVAL_FLAG_2 ///////////////////////////////////////////////////////=//
+//=//// EVAL_FLAG_ALLOCATED_FEED //////////////////////////////////////////=//
 //
-#define EVAL_FLAG_2 \
+// Some frame recursions re-use a feed that already existed, while others will
+// allocate them.  This re-use allows recursions to keep index positions and
+// fetched "gotten" values in sync.  The dynamic allocation means that feeds
+// can be kept alive across contiuations--which wouldn't be possible if they
+// were on the C stack.
+//
+// If a frame allocated a feed, then it has to be freed...which is done when
+// the frame is dropped or aborted.
+//
+#define EVAL_FLAG_ALLOCATED_FEED \
     FLAG_LEFT_BIT(2)
 
 
@@ -420,7 +429,7 @@ struct Reb_Frame {
     // Since frames may share source information, this needs to be done with
     // a dereference.
     //
-    struct Reb_Feed *feed;
+    REBFED *feed;
 
     // The frame's "spare" is used for different purposes.  PARSE uses it as a
     // scratch storage space.  Path evaluation uses it as where the calculated

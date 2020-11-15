@@ -65,7 +65,7 @@ REBNATIVE(reduce)
     REBDSP dsp_orig = DSP;
 
     DECLARE_FEED_AT (feed, v);
-    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(nullptr, f);
 
@@ -216,7 +216,7 @@ REB_R Compose_To_Stack_Core(
     if (ANY_PATH(composee))
         rebRelease(cast(REBVAL*, m_cast(RELVAL*, any_array)));
 
-    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(nullptr, f);
 
@@ -270,7 +270,11 @@ REB_R Compose_To_Stack_Core(
                 Fetch_Next_In_Feed(subfeed, false);  // wasn't possibly at END
 
             Init_Nulled(out);  // want empty `()` to vanish as a null would
-            if (Do_Feed_To_End_Maybe_Stale_Throws(out, subfeed)) {
+            if (Do_Feed_To_End_Maybe_Stale_Throws(
+                out,
+                subfeed,
+                EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+            )){
                 DS_DROP_TO(dsp_orig);
                 Abort_Frame(f);
                 return R_THROWN;

@@ -320,8 +320,13 @@ REBNATIVE(do)
       case REB_SYM_GROUP:
       case REB_GET_GROUP: {  // `do '()` and `do '(comment "hi")` vanish
         DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
-        if (Do_Feed_To_End_Maybe_Stale_Throws(D_OUT, feed))
+        if (Do_Feed_To_End_Maybe_Stale_Throws(
+            D_OUT,
+            feed,
+            EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+        )){
             return R_THROWN;
+        }
         return D_OUT; }  // may be stale, which would mean invisible
 
       case REB_VARARGS: {

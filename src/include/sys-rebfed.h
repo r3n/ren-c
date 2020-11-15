@@ -26,16 +26,13 @@
 
 #define FEED_MASK_DEFAULT 0
 
-// Available.
-//
-#define FEED_FLAG_0 \
+#define FEED_FLAG_0_IS_TRUE \
     FLAG_LEFT_BIT(0)
+STATIC_ASSERT(FEED_FLAG_0_IS_TRUE == NODE_FLAG_NODE);
 
-
-// Available.
-//
-#define FEED_FLAG_1 \
+#define FEED_FLAG_1_IS_FALSE \
     FLAG_LEFT_BIT(1)
+STATIC_ASSERT(FEED_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
 
 
 // Defer notes when there is a pending enfix operation that was seen while an
@@ -154,7 +151,7 @@ STATIC_ASSERT(FEED_FLAG_CONST == CELL_FLAG_CONST);
 #if !defined __cplusplus
     #define FEED(f) f
 #else
-    #define FEED(f) static_cast<struct Reb_Feed*>(f)
+    #define FEED(f) static_cast<REBFED*>(f)
 #endif
 
 #define SET_FEED_FLAG(f,name) \
@@ -317,5 +314,9 @@ struct Reb_Feed {
     // !!! Test currently leaks on shutdown, review how to not leak.
     //
     RELVAL *stress;
+  #endif
+
+  #ifdef DEBUG_COUNT_TICKS
+    REBTCK tick;
   #endif
 };

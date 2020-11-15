@@ -322,6 +322,9 @@ inline static void Conserve_Varlist(REBARR *varlist)
 // optimize performance by working with the evaluator directly.
 
 inline static void Free_Frame_Internal(REBFRM *f) {
+    if (GET_EVAL_FLAG(f, ALLOCATED_FEED))
+        Free_Feed(f->feed);  // didn't inherit from parent, and not END_FRAME
+
     if (f->varlist and NOT_SERIES_FLAG(f->varlist, MANAGED))
         Conserve_Varlist(f->varlist);
     TRASH_POINTER_IF_DEBUG(f->varlist);
@@ -574,7 +577,7 @@ inline static void Drop_Frame(REBFRM *f)
 
 inline static void Prep_Frame_Core(
     REBFRM *f,
-    struct Reb_Feed *feed,
+    REBFED *feed,
     REBFLGS flags
 ){
    if (f == nullptr)  // e.g. a failed allocation
@@ -607,10 +610,14 @@ inline static void Prep_Frame_Core(
 
 #define DECLARE_FRAME_AT(name,any_array,flags) \
     DECLARE_FEED_AT (name##feed, any_array); \
-    DECLARE_FRAME (name, name##feed, flags)
+    DECLARE_FRAME (name, name##feed, (flags) | EVAL_FLAG_ALLOCATED_FEED)
+
+#define DECLARE_FRAME_AT_CORE(name,any_array,specifier,flags) \
+    DECLARE_FEED_AT_CORE (name##feed, (any_array), (specifier)); \
+    DECLARE_FRAME (name, name##feed, (flags) | EVAL_FLAG_ALLOCATED_FEED)
 
 #define DECLARE_END_FRAME(name,flags) \
-    DECLARE_FRAME (name, &TG_Frame_Feed_End, flags)
+    DECLARE_FRAME (name, TG_End_Feed, flags)
 
 
 inline static void Begin_Action_Core(

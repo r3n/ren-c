@@ -230,13 +230,11 @@ static bool Subparse_Throws(
     REBVAL *out,
     const RELVAL *input,
     REBSPC *input_specifier,
-    struct Reb_Feed *rules_feed,
+    REBFRM *f,
     option(REBARR*) collection,
     REBFLGS flags
 ){
     assert(ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(input))));
-
-    DECLARE_FRAME (f, rules_feed, EVAL_MASK_DEFAULT);
 
     Push_Frame(out, f);  // checks for C stack overflow
     Push_Action(f, NATIVE_ACT(subparse), UNBOUND);
@@ -559,10 +557,10 @@ static REB_R Parse_One_Rule(
         REBLEN pos_before = P_POS;
         P_POS = pos;  // modify input position
 
-        DECLARE_ARRAY_FEED(subfeed,
-            VAL_ARRAY(rule),
-            VAL_INDEX(rule),
-            P_RULE_SPECIFIER
+        DECLARE_FRAME_AT_CORE (
+            subframe,
+            rule, P_RULE_SPECIFIER,
+            EVAL_MASK_DEFAULT
         );
 
         DECLARE_LOCAL (subresult);
@@ -572,7 +570,7 @@ static REB_R Parse_One_Rule(
             SET_END(subresult),
             ARG(position),  // affected by P_POS assignment above
             SPECIFIED,
-            subfeed,
+            subframe,
             P_COLLECTION,
             (P_FLAGS & PF_FIND_MASK)
         )){
@@ -1668,6 +1666,8 @@ REBNATIVE(subparse)
                 );
                 PUSH_GC_GUARD(collection);
 
+                DECLARE_FRAME (subframe, f->feed, EVAL_MASK_DEFAULT);
+
                 bool interrupted;
                 assert(IS_END(D_OUT));  // invariant until finished
                 bool threw = Subparse_Throws(
@@ -1675,7 +1675,7 @@ REBNATIVE(subparse)
                     D_OUT,
                     ARG(position),  // affected by P_POS assignment above
                     SPECIFIED,
-                    f->feed,
+                    subframe,
                     collection,
                     (P_FLAGS & PF_FIND_MASK) | PF_ONE_RULE
                 );
@@ -1759,6 +1759,8 @@ REBNATIVE(subparse)
                 }
                 else {  // Ordinary rule (may be block, may not be)
 
+                    DECLARE_FRAME (subframe, f->feed, EVAL_MASK_DEFAULT);
+
                     bool interrupted;
                     assert(IS_END(D_OUT));  // invariant until finished
                     bool threw = Subparse_Throws(
@@ -1766,7 +1768,7 @@ REBNATIVE(subparse)
                         D_OUT,
                         ARG(position),
                         SPECIFIED,
-                        f->feed,
+                        subframe,
                         P_COLLECTION,
                         (P_FLAGS & PF_FIND_MASK) | PF_ONE_RULE
                     );
@@ -2277,10 +2279,10 @@ REBNATIVE(subparse)
                     break;
                 }
 
-                DECLARE_ARRAY_FEED (subrules_feed,
-                    VAL_ARRAY(subrule),
-                    VAL_INDEX(subrule),
-                    P_RULE_SPECIFIER
+                DECLARE_FRAME_AT_CORE (
+                    subframe,
+                    subrule, P_RULE_SPECIFIER,
+                    EVAL_MASK_DEFAULT
                 );
 
                 bool interrupted;
@@ -2289,7 +2291,7 @@ REBNATIVE(subparse)
                     SET_END(D_OUT),
                     into,
                     P_INPUT_SPECIFIER,  // harmless if specified API value
-                    subrules_feed,
+                    subframe,
                     P_COLLECTION,
                     (P_FLAGS & PF_FIND_MASK)  // PF_ONE_RULE?
                 )){
@@ -2340,10 +2342,10 @@ REBNATIVE(subparse)
         }
         else if (IS_BLOCK(rule)) {  // word fetched block, or inline block
 
-            DECLARE_ARRAY_FEED (subrules_feed,
-                VAL_ARRAY(rule),
-                VAL_INDEX(rule),
-                P_RULE_SPECIFIER
+            DECLARE_FRAME_AT_CORE (
+                subframe,
+                rule, P_RULE_SPECIFIER,
+                EVAL_MASK_DEFAULT
             );
 
             bool interrupted;
@@ -2352,7 +2354,7 @@ REBNATIVE(subparse)
                 SET_END(D_SPARE),
                 ARG(position),
                 SPECIFIED,
-                subrules_feed,
+                subframe,
                 P_COLLECTION,
                 (P_FLAGS & PF_FIND_MASK)  // no PF_ONE_RULE
             )) {
@@ -2795,18 +2797,14 @@ REBNATIVE(parse)
     if (not ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(input))))
         fail ("PARSE input must be an ANY-SERIES! (use AS BLOCK! for PATH!)");
 
-    DECLARE_ARRAY_FEED (rules_feed,
-        VAL_ARRAY(ARG(rules)),
-        VAL_INDEX(ARG(rules)),
-        VAL_SPECIFIER(ARG(rules))
-    );
+    DECLARE_FRAME_AT (subframe, ARG(rules), EVAL_MASK_DEFAULT);
 
     bool interrupted;
     if (Subparse_Throws(
         &interrupted,
         SET_END(D_OUT),
         input, SPECIFIED,
-        rules_feed,
+        subframe,
         nullptr,  // start out with no COLLECT in effect, so no P_COLLECTION
         REF(case) ? AM_FIND_CASE : 0
         //

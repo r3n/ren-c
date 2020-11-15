@@ -849,7 +849,11 @@ static void Run_Va_May_Fail_Core(
         Eval_Sigmask &= ~SIG_HALT;  // disable
 
     DECLARE_VA_FEED (feed, p, vaptr, flags);
-    bool threw = Do_Feed_To_End_Maybe_Stale_Throws(out, feed);
+    bool threw = Do_Feed_To_End_Maybe_Stale_Throws(
+        out,
+        feed,
+        EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+    );
 
     // (see also Reb_State->saved_sigmask RE: if a longjmp happens)
     Eval_Sigmask = saved_sigmask;
@@ -1708,6 +1712,8 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
 
         a = Pop_Stack_Values_Core(dsp_orig, NODE_FLAG_MANAGED);
         CLEAR_SERIES_FLAG(a, MANAGED);  // see notes above on why we lied
+
+        Free_Feed(feed);
     }
 
     // !!! Although you can do `rebU("[", a, b, "]"), you cannot do

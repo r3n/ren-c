@@ -90,14 +90,10 @@ void Startup_Frame_Stack(void)
     TG_Top_Frame = TG_Bottom_Frame = nullptr;
   #endif
 
-    TG_Frame_Feed_End.index = 0;
-    TG_Frame_Feed_End.vaptr = nullptr;
-    TG_Frame_Feed_End.array = EMPTY_ARRAY; // for HOLD flag in Push_Frame
-    TG_Frame_Feed_End.value = END_NODE;
-    TG_Frame_Feed_End.specifier = SPECIFIED;
-    TRASH_POINTER_IF_DEBUG(TG_Frame_Feed_End.pending);
+    DECLARE_ARRAY_FEED (end_feed, EMPTY_ARRAY, 0, SPECIFIED);
+    TG_End_Feed = end_feed;  // used by DECLARE_END_FRAME
 
-    DECLARE_FRAME (f, &TG_Frame_Feed_End, EVAL_MASK_DEFAULT);
+    DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT);
 
     Push_Frame(nullptr, f);
 
@@ -125,6 +121,9 @@ void Shutdown_Frame_Stack(void)
     //
     assert(IS_POINTER_TRASH_DEBUG(TG_Bottom_Frame->prior));
     TG_Bottom_Frame->prior = nullptr;
+
+    Free_Feed(TG_End_Feed);
+    TG_End_Feed = nullptr;
 
   blockscope {
     REBFRM *f = FS_TOP;
@@ -159,6 +158,29 @@ void Shutdown_Frame_Stack(void)
             );
           #else
             assert(!"** FRAME LEAKED but DEBUG_COUNT_TICKS not enabled");
+          #endif
+        }
+    }
+  }
+  #endif
+
+  #if !defined(NDEBUG)
+  blockscope {
+    REBSEG *seg = Mem_Pools[FED_POOL].segs;
+    for (; seg != nullptr; seg = seg->next) {
+        REBLEN n = Mem_Pools[FED_POOL].units;
+        REBYTE *bp = cast(REBYTE*, seg + 1);
+        for (; n > 0; --n, bp += Mem_Pools[FED_POOL].wide) {
+            REBFED *feed = cast(REBFED*, bp);
+            if (IS_FREE_NODE(feed))
+                continue;
+          #ifdef DEBUG_COUNT_TICKS
+            printf(
+                "** FEED LEAKED at tick %lu\n",
+                cast(unsigned long, feed->tick)
+            );
+          #else
+            assert(!"** FEED LEAKED but no DEBUG_COUNT_TICKS enabled\n");
           #endif
         }
     }

@@ -80,6 +80,7 @@ enum Mem_Pool_Specs {
     PAR_POOL = SER_POOL,
   #endif
     FRM_POOL,
+    FED_POOL,
     SYSTEM_POOL,
     MAX_POOLS
 };

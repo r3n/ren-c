@@ -227,6 +227,7 @@ const REBPOOLSPEC Mem_Pool_Spec[MAX_POOLS] =
   #endif
 
     DEF_POOL(ALIGN(sizeof(REBFRM), sizeof(REBI64)), 128),  // Frames
+    DEF_POOL(ALIGN(sizeof(REBFED), sizeof(REBI64)), 128),  // Feeds
 
     DEF_POOL(sizeof(REBI64), 1), // Just used for tracking main memory
 };
