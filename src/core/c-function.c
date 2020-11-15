@@ -1293,64 +1293,6 @@ REBTYPE(Fail)
 }
 
 
-#define IDX_GENERIC_VERB 0
-
-//
-//  Generic_Dispatcher: C
-//
-// A "generic" is what R3-Alpha/Rebol2 had called "ACTION!" (until Ren-C took
-// that as the umbrella term for all "invokables").  This kind of dispatch is
-// based on the first argument's type, with the idea being a single C function
-// for the type has a switch() statement in it and can handle many different
-// such actions for that type.
-//
-// (e.g. APPEND copy [a b c] [d] would look at the type of the first argument,
-// notice it was a BLOCK!, and call the common C function for arrays with an
-// append instruction--where that instruction also handles insert, length,
-// etc. for BLOCK!s.)
-//
-// !!! This mechanism is a very primitive kind of "multiple dispatch".  Rebol
-// will certainly need to borrow from other languages to develop a more
-// flexible idea for user-defined types, vs. this very limited concept.
-//
-// https://en.wikipedia.org/wiki/Multiple_dispatch
-// https://en.wikipedia.org/wiki/Generic_function
-// https://stackoverflow.com/q/53574843/
-//
-REB_R Generic_Dispatcher(REBFRM *f)
-{
-    REBACT *phase = FRM_PHASE(f);
-    REBARR *details = ACT_DETAILS(phase);
-    REBVAL *verb = DETAILS_AT(details, IDX_GENERIC_VERB);
-    assert(IS_WORD(verb));
-
-    // !!! It's technically possible to throw in locals or refinements at
-    // any point in the sequence.  So this should really be using something
-    // like a First_Unspecialized_Arg() call.  For now, we just handle the
-    // case of a RETURN: sitting in the first parameter slot.
-    //
-    REBVAL *first_arg = GET_ACTION_FLAG(phase, HAS_RETURN)
-        ? FRM_ARG(f, 2)
-        : FRM_ARG(f, 1);
-
-    return Run_Generic_Dispatch(first_arg, f, verb);
-}
-
-
-//
-//  Dummy_Dispatcher: C
-//
-// Used for frame levels that want a varlist solely for the purposes of tying
-// API handle lifetimes to.  These levels should be ignored by stack walks
-// that the user sees, and this associated dispatcher should never run.
-//
-REB_R Dummy_Dispatcher(REBFRM *f)
-{
-    UNUSED(f);
-    panic ("Dummy_Dispatcher() ran, but it never should get called");
-}
-
-
 //
 //  Get_If_Word_Or_Path_Throws: C
 //
