@@ -624,10 +624,7 @@ static void Mark_Guarded_Nodes(void)
 // Mark values being kept live by all call frames.  If a function is running,
 // then this will keep the function itself live, as well as the arguments.
 // There is also an "out" slot--which may point to an arbitrary REBVAL cell
-// on the C stack.  The out slot is initialized to an END marker at the
-// start of every function call, so that it won't be uninitialized bits
-// which would crash the GC...but it must be turned into a value (or a void)
-// by the time the function is finished running.
+// on the C stack (and must contain valid GC-readable bits at all times).
 //
 // Since function argument slots are not pre-initialized, how far the function
 // has gotten in its fulfillment must be taken into account.  Only those
@@ -645,13 +642,11 @@ static void Mark_Frame_Stack_Deep(void)
         // Note: MISC_PENDING() should either live in FEED_ARRAY(), or
         // it may be trash (e.g. if it's an apply).  GC can ignore it.
         //
-        if (not FRM_IS_VARIADIC(f)) {
-            REBARR *singular = FEED_SINGULAR(f->feed);
-            do {
-                Queue_Mark_Value_Deep(ARR_SINGLE(singular));
-                singular = LINK_SPLICE(singular);
-            } while (singular);
-        }
+        REBARR *singular = FEED_SINGULAR(f->feed);
+        do {
+            Queue_Mark_Value_Deep(ARR_SINGLE(singular));
+            singular = LINK_SPLICE(singular);
+        } while (singular);
 
         // END is possible, because the frame could be sitting at the end of
         // a block when a function runs, e.g. `do [zero-arity]`.  That frame

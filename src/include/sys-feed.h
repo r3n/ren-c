@@ -87,35 +87,11 @@
 // code has to be factored out to just take a void* (because a C va_list
 // cannot have its first parameter in the variadic, va_list* is insufficient)
 //
-inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
+inline static void Detect_Feed_Pointer_Maybe_Fetch(
     REBFED *feed,
-    const void *p,
-    bool preserve
+    const void *p
 ){
     assert(FEED_PENDING(feed) == nullptr);
-
-    const RELVAL *lookback;
-
-    if (not preserve)
-        lookback = nullptr;
-    else {
-        assert(READABLE(feed->value, __FILE__, __LINE__));  // ensure cell
-
-        if (GET_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY)) {
-            //
-            // f->value was transient and hence constructed into f->fetched.
-            // We may overwrite it below for this fetch.  So save the old one
-            // into f->lookback, where it will be safe until the next fetch.
-            //
-            assert(feed->value == &feed->fetched);
-            lookback = Move_Value(&feed->lookback, SPECIFIC(&feed->fetched));
-        }
-        else {
-            // pointer they had should be stable, GC-safe
-
-            lookback = feed->value;
-        }
-    }
 
   detect_again:;
 
@@ -132,7 +108,6 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         assert(FEED_SPECIFIER(feed) == SPECIFIED);
 
         Quotify(Init_Nulled(&feed->fetched), 1);
-        SET_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);
         feed->value = &feed->fetched;
 
     } else switch (Detect_Rebol_Pointer(p)) {
@@ -212,8 +187,6 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
 
         feed->value = STABLE(ARR_HEAD(reified));
         Init_Any_Array_At(FEED_SINGLE(feed), REB_BLOCK, reified, 1);
-
-        CLEAR_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);
         break; }
 
       case DETECTED_AS_SERIES: {  // e.g. rebQ, rebU, or a rebR() handle
@@ -243,7 +216,6 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
                 &feed->fetched,
                 QUOTING_BYTE(feed) + MISC(inst1).quoting_delta
             );
-            SET_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);
             feed->value = &feed->fetched;
 
             GC_Kill_Series(SER(inst1));  // not manuals-tracked
@@ -264,7 +236,6 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             REBVAL *single = SPECIFIC(STABLE(ARR_SINGLE(inst1)));
             Move_Value(&feed->fetched, single);
             Quotify(&feed->fetched, QUOTING_BYTE(feed));
-            SET_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);
             feed->value = &feed->fetched;
             rebRelease(single);  // *is* the instruction
         }
@@ -290,7 +261,6 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             // it into the fetched cell and quote it.
             //
             Quotify(Move_Value(&feed->fetched, cell), QUOTING_BYTE(feed));
-            SET_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);
             feed->value = &feed->fetched;  // note END is detected separately
         }
         break; }
@@ -313,8 +283,6 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         // a way to present errors in context.  Fake an empty array for now.
         //
         Init_Block(FEED_SINGLE(feed), EMPTY_ARRAY);
-
-        CLEAR_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);  // needed?
         break; }
 
       case DETECTED_AS_FREED_SERIES:
@@ -322,33 +290,18 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
       default:
         panic (p);
     }
-
-    return lookback;
 }
 
 
 //
-// Fetch_Next_In_Feed_Core() (see notes above)
+// Fetch_Next_In_Feed()
 //
 // Once a va_list is "fetched", it cannot be "un-fetched".  Hence only one
-// unit of fetch is done at a time, into f->value.  FEED_PENDING() thus
-// must hold a signal that data remains in the va_list and it should be
-// consulted further.  That signal is an END marker.
+// unit of fetch is done at a time, into f->value.
 //
-// More generally, an END marker in FEED_PENDING() for this routine is a
-// signal that the vaptr (if any) should be consulted next.
-//
-inline static const RELVAL *Fetch_Next_In_Feed_Core(
-    REBFED *feed,
-    bool preserve
-){
-  #ifdef DEBUG_EXPIRED_LOOKBACK
-    if (feed->stress) {
-        TRASH_CELL_IF_DEBUG(feed->stress);
-        free(feed->stress);
-        feed->stress = nullptr;
-    }
-  #endif
+inline static void Fetch_Next_In_Feed(REBFED *feed) {
+    assert(KIND3Q_BYTE_UNCHECKED(feed->value) != REB_0_END);
+        // ^-- faster than NOT_END()
 
     // We are changing ->value, and thus by definition any ->gotten value
     // will be invalid.  It might be "wasteful" to always set this to null,
@@ -359,13 +312,10 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
     //
     feed->gotten = nullptr;
 
-    const RELVAL *lookback;
-
   retry_splice:
     if (FEED_PENDING(feed)) {
         assert(NOT_END(FEED_PENDING(feed)));
 
-        lookback = feed->value;  // should have been stable
         feed->value = FEED_PENDING(feed);
         FEED_PENDING(feed) = nullptr;
     }
@@ -377,7 +327,7 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         //
         if (FEED_VAPTR(feed)) {
             const void *p = va_arg(*unwrap(FEED_VAPTR(feed)), const void*);
-            lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
+            Detect_Feed_Pointer_Maybe_Fetch(feed, p);
         }
         else {
             //
@@ -386,12 +336,10 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
             // no (standard) way to construct a C va_list programmatically.
             //
             const void *p = *FEED_PACKED(feed)++;
-            lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
+            Detect_Feed_Pointer_Maybe_Fetch(feed, p);
         }
     }
     else {
-        lookback = feed->value;
-
         feed->value = ARR_AT(FEED_ARRAY(feed), FEED_INDEX(feed));
         ++FEED_INDEX(feed);
 
@@ -410,12 +358,47 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
             }
         }
     }
+}
 
-    assert(
-        IS_END(feed->value)
-        or NOT_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY)
-        or feed->value == &feed->fetched
-    );
+
+// Most calls to Fetch_Next_In_Frame() are no longer interested in the
+// cell backing the pointer that used to be in f->value (this is enforced
+// by a rigorous test in DEBUG_EXPIRED_LOOKBACK).  Special care must be
+// taken when one is interested in that data, because it may have to be
+// moved.  So current can be returned from Fetch_Next_In_Frame_Core().
+
+inline static const RELVAL *Lookback_While_Fetching_Next(REBFRM *f) {
+  #ifdef DEBUG_EXPIRED_LOOKBACK
+    if (feed->stress) {
+        TRASH_CELL_IF_DEBUG(feed->stress);
+        free(feed->stress);
+        feed->stress = nullptr;
+    }
+  #endif
+
+    assert(READABLE(f->feed->value, __FILE__, __LINE__));  // ensure cell
+
+    // f->value may be synthesized, in which case its bits are in the
+    // `f->feed->fetched` cell.  That synthesized value would be overwritten
+    // by another fetch, which would mess up lookback...so we cache those
+    // bits in the lookback cell in that case.
+    //
+    // The reason we do this conditionally isn't just to avoid moving 4
+    // platform pointers worth of data.  It's also to keep from reifying
+    // array cells unconditionally with Derelativize().  (How beneficial
+    // this is currently kind of an unknown, but in the scheme of things it
+    // seems like it must be something favorable to optimization.)
+    //
+    const RELVAL *lookback;
+    if (f->feed->value == &f->feed->fetched) {
+        Blit_Specific(&f->feed->lookback, SPECIFIC(&f->feed->fetched));
+        lookback = &f->feed->lookback;
+        Init_Unreadable_Void(&f->feed->fetched);
+    }
+    else
+        lookback = f->feed->value;
+
+    Fetch_Next_In_Feed(f->feed);
 
   #ifdef DEBUG_EXPIRED_LOOKBACK
     if (preserve) {
@@ -428,30 +411,8 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
     return lookback;
 }
 
-#define Fetch_First_In_Feed(feed) \
-    Fetch_Next_In_Feed_Core((feed), false)  // !!! not used at time of writing
-
-inline static const RELVAL *Fetch_Next_In_Feed(  // adds not-end checking
-    REBFED *feed,
-    bool preserve
-){
-    assert(KIND3Q_BYTE_UNCHECKED(feed->value) != REB_0_END);
-        // ^-- faster than NOT_END()
-    return Fetch_Next_In_Feed_Core(feed, preserve);
-}
-
-
-// Most calls to Fetch_Next_In_Frame() are no longer interested in the
-// cell backing the pointer that used to be in f->value (this is enforced
-// by a rigorous test in DEBUG_EXPIRED_LOOKBACK).  Special care must be
-// taken when one is interested in that data, because it may have to be
-// moved.  So current can be returned from Fetch_Next_In_Frame_Core().
-
-#define Lookback_While_Fetching_Next(f) \
-    Fetch_Next_In_Feed(FRM(f)->feed, true)
-
 #define Fetch_Next_Forget_Lookback(f) \
-    ((void)Fetch_Next_In_Feed(FRM(f)->feed, false))
+    Fetch_Next_In_Feed(f->feed)
 
 
 // This code is shared by Literal_Next_In_Feed(), and used without a feed
@@ -478,7 +439,7 @@ inline static void Inertly_Derelativize_Inheriting_Const(
 
 inline static void Literal_Next_In_Feed(REBVAL *out, struct Reb_Feed *feed) {
     Inertly_Derelativize_Inheriting_Const(out, feed->value, feed);
-    (void)(Fetch_Next_In_Feed(feed, false));
+    Fetch_Next_In_Feed(feed);
 }
 
 
@@ -527,7 +488,7 @@ inline static void Free_Feed(REBFED *feed) {
     // the frame processing the array will take the other branch.
 
     while (NOT_END(feed->value))
-        Fetch_Next_In_Feed(feed, false);
+        Fetch_Next_In_Feed(feed);
 
     assert(IS_END(feed->value));
     assert(FEED_PENDING(feed) == nullptr);
@@ -621,7 +582,7 @@ inline static void Prep_Va_Feed(
         FEED_VAPTR(feed) = vaptr;
         FEED_PACKED(feed) = nullptr;
     }
-    Detect_Feed_Pointer_Maybe_Fetch(feed, p, false);
+    Detect_Feed_Pointer_Maybe_Fetch(feed, p);
 
     feed->gotten = nullptr;
     assert(IS_END(feed->value) or READABLE(feed->value, __FILE__, __LINE__));

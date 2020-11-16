@@ -1002,7 +1002,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             // suggests we might need a better way of doing things, but it
             // shows the general gist for now.
             //
-            Detect_Feed_Pointer_Maybe_Fetch(ss->feed, p, false);
+            Detect_Feed_Pointer_Maybe_Fetch(ss->feed, p);
 
             if (IS_END(ss->feed->value))
                 return TOKEN_END;

@@ -1707,7 +1707,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
 
         while (NOT_END(feed->value)) {
             Move_Value(DS_PUSH(), SPECIFIC(feed->value));
-            Fetch_Next_In_Feed(feed, false);
+            Fetch_Next_In_Feed(feed);
         }
 
         a = Pop_Stack_Values_Core(dsp_orig, NODE_FLAG_MANAGED);

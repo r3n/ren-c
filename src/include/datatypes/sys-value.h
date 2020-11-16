@@ -1038,13 +1038,13 @@ inline static RELVAL *Blit_Relative(
 
 // !!! Should this replace Move_Var() ?
 //
-inline static REBVAL *Blit_Specific(REBVAL *out, const REBVAL *v)
+inline static REBVAL *Blit_Specific(RELVAL *out, const REBVAL *v)
 {
     Move_Value_Header(out, v);
     out->header.bits |= (v->header.bits & NODE_FLAG_MARKED);
     out->payload = v->payload;
     out->extra = v->extra;
-    return out;
+    return cast(REBVAL*, out);
 }
 
 

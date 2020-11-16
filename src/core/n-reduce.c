@@ -267,7 +267,7 @@ REB_R Compose_To_Stack_Core(
             //
             DECLARE_FEED_AT_CORE (subfeed, match, match_specifier);
             if (not IS_NULLED(label))
-                Fetch_Next_In_Feed(subfeed, false);  // wasn't possibly at END
+                Fetch_Next_In_Feed(subfeed);  // wasn't possibly at END
 
             Init_Nulled(out);  // want empty `()` to vanish as a null would
             if (Do_Feed_To_End_Maybe_Stale_Throws(
