@@ -98,7 +98,7 @@
     USED(ARG(position))
 
 #define P_RULE              (frame_->feed->value + 0)  // rvalue
-#define P_RULE_SPECIFIER    (frame_->feed->specifier + 0)  // rvalue
+#define P_RULE_SPECIFIER    FRM_SPECIFIER(frame_)
 
 #define P_TYPE              VAL_TYPE(ARG(input))
 #define P_INPUT             VAL_SERIES(ARG(input))

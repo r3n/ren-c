@@ -368,27 +368,29 @@ void Reify_Va_To_Array_In_Frame(
         Init_Word(DS_TOP, Canon(SYM___OPTIMIZED_OUT__));
     }
 
-    if (NOT_END(f->feed->value)) {
-        assert(f->feed->pending == END_NODE);
+    REBLEN index;
+
+    if (NOT_END(f_value)) {
+        assert(FEED_PENDING(f->feed) == END_NODE);
 
         do {
-            Derelativize(DS_PUSH(), f->feed->value, f->feed->specifier);
+            Derelativize(DS_PUSH(), f_value, f_specifier);
             assert(not IS_NULLED(DS_TOP));
             Fetch_Next_Forget_Lookback(f);
-        } while (NOT_END(f->feed->value));
+        } while (NOT_END(f_value));
 
         if (truncated)
-            f->feed->index = 2;  // skip the --optimized-out--
+            index = 2;  // skip the --optimized-out--
         else
-            f->feed->index = 1;  // position at start of the extracted values
+            index = 1;  // position at start of the extracted values
     }
     else {
-        assert(IS_POINTER_TRASH_DEBUG(f->feed->pending));
+        assert(IS_POINTER_TRASH_DEBUG(FEED_PENDING(f->feed)));
 
         // Leave at end of frame, but give back the array to serve as
         // notice of the truncation (if it was truncated)
         //
-        f->feed->index = 0;
+        index = 0;
     }
 
     // feeding forward should have called va_end
@@ -396,27 +398,27 @@ void Reify_Va_To_Array_In_Frame(
     assert(not f->feed->vaptr and not f->feed->packed);
 
     if (DSP == dsp_orig)
-        f->feed->array = EMPTY_ARRAY;  // don't bother making new empty array
+        Init_Block(FEED_SINGLE(f->feed), EMPTY_ARRAY);  // no new array needed
     else {
         REBARR *a = Pop_Stack_Values_Core(dsp_orig, SERIES_FLAG_MANAGED);
-        f->feed->array = a;  // held alive while frame running
+        Init_Any_Array_At(FEED_SINGLE(f->feed), REB_BLOCK, a, index);
     }
 
     if (truncated)
-        f->feed->value = STABLE(ARR_AT(f->feed->array, 1));  // skip trunc
+        f->feed->value = STABLE(ARR_AT(f_array, 1));  // skip trunc
     else
-        f->feed->value = STABLE(ARR_HEAD(f->feed->array));
+        f->feed->value = STABLE(ARR_HEAD(f_array));
 
     // The array just popped into existence, and it's tied to a running
     // frame...so safe to say we're holding it (if not at the end).
     //
-    if (IS_END(f->feed->value))
-        TRASH_POINTER_IF_DEBUG(f->feed->pending);
+    if (IS_END(f_value))
+        TRASH_POINTER_IF_DEBUG(FEED_PENDING(f->feed));
     else {
-        f->feed->pending = f->feed->value + 1;
+        FEED_PENDING(f->feed) = f_value + 1;
 
         assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
-        SET_SERIES_INFO(f->feed->array, HOLD);
+        SET_SERIES_INFO(f_array, HOLD);
         SET_EVAL_FLAG(f, TOOK_HOLD);
     }
 }
@@ -644,11 +646,16 @@ static void Mark_Frame_Stack_Deep(void)
 
     while (true) { // mark all frames (even FS_BOTTOM)
         //
-        // Note: f->feed->pending should either live in f->feed->array, or
+        // Note: MISC_PENDING() should either live in FEED_ARRAY(), or
         // it may be trash (e.g. if it's an apply).  GC can ignore it.
         //
-        if (f->feed->array)
-            Queue_Mark_Node_Deep(m_cast(REBARR*, f->feed->array));
+        if (not FRM_IS_VARIADIC(f)) {
+            REBARR *singular = FEED_SINGULAR(f->feed);
+            do {
+                Queue_Mark_Value_Deep(ARR_SINGLE(singular));
+                singular = LINK_SPLICE(singular);
+            } while (singular);
+        }
 
         // END is possible, because the frame could be sitting at the end of
         // a block when a function runs, e.g. `do [zero-arity]`.  That frame
@@ -662,17 +669,14 @@ static void Mark_Frame_Stack_Deep(void)
         // code that a frame runs that might disrupt that relationship so it
         // would fetch differently should have meant clearing ->gotten.
         //
-        if (f->feed->gotten)
-            assert(
-                f->feed->gotten
-                == Lookup_Word(f->feed->value, f->feed->specifier)
-            );
+        if (f_gotten)
+            assert(f_gotten == Lookup_Word(f_value, f_specifier));
 
         if (
-            f->feed->specifier != SPECIFIED
-            and (f->feed->specifier->header.bits & NODE_FLAG_MANAGED)
+            f_specifier != SPECIFIED
+            and (f_specifier->header.bits & NODE_FLAG_MANAGED)
         ){
-            Queue_Mark_Node_Deep(CTX(f->feed->specifier));
+            Queue_Mark_Node_Deep(CTX(f_specifier));
         }
 
         // f->out can be nullptr at the moment, when a frame is created that

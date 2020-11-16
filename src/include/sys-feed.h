@@ -45,6 +45,37 @@
 #endif
 
 
+#define FEED_SINGULAR(feed)     ARR(&(feed)->singular)
+#define FEED_SINGLE(feed)       &(feed)->singular.content.fixed.values[0]
+
+#define LINK_SPLICE(s)          *cast(REBARR**, &LINK(s).custom.node)
+#define MISC_PENDING(s)         *cast(const RELVAL**, &MISC(s).custom.node)
+
+#define FEED_SPLICE(feed)       LINK_SPLICE(&(feed)->singular)
+
+// This contains an IS_END() marker if the next fetch should be an attempt
+// to consult the va_list (if any).  That end marker may be resident in
+// an array, or if it's a plain va_list source it may be the global END.
+//
+#define FEED_PENDING(feed)      MISC_PENDING(&(feed)->singular)
+
+
+// For performance, we always get the specifier from the same location, even
+// if we're not using an array.  So for the moment, that means using a
+// COMMA! (which for technical reasons has a nullptr binding and is thus
+// always SPECIFIED).  However, VAL_SPECIFIER() only runs on arrays, so
+// we sneak past that by accessing the node directly.
+//
+#define FEED_SPECIFIER(feed) \
+    EXTRA(Binding, FEED_SINGLE(feed)).node
+
+#define FEED_ARRAY(feed) \
+    VAL_ARRAY(FEED_SINGLE(feed))
+
+#define FEED_INDEX(feed) \
+    VAL_INDEX_UNBOUNDED(FEED_SINGLE(feed))
+
+
 // Ordinary Rebol internals deal with REBVAL* that are resident in arrays.
 // But a va_list can contain UTF-8 string components or special instructions
 // that are other Detect_Rebol_Pointer() types.  Anyone who wants to set or
@@ -92,7 +123,8 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         // !!! We could make a global QUOTED_NULLED_VALUE with a stable
         // pointer and not have to use fetched or FETCHED_MARKED_TEMPORARY.
         //
-        feed->array = nullptr;
+        Init_Comma(FEED_SINGLE(feed));  // for VAL_SPECIFIER() = SPECIFIED
+
         Quotify(Init_Nulled(&feed->fetched), 1);
         SET_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);
         feed->value = &feed->fetched;
@@ -118,7 +150,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         feed->context = nullptr;  // made non-nullptr when binder initialized
         feed->lib = nullptr;
 
-        feed->specifier = SPECIFIED;
+        Init_Comma(FEED_SINGLE(feed));  // for VAL_SPECIFIER() = SPECIFIED
 
         SCAN_LEVEL level;
         SCAN_STATE ss;
@@ -178,9 +210,8 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         Manage_Array(reified);
 
         feed->value = STABLE(ARR_HEAD(reified));
-        feed->pending = feed->value + 1;  // may be END
-        feed->array = reified;
-        feed->index = 1;
+        FEED_PENDING(feed) = feed->value + 1;  // may be END
+        Init_Any_Array_At(FEED_SINGLE(feed), REB_BLOCK, reified, 1);
 
         CLEAR_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);
         break; }
@@ -246,7 +277,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         const REBVAL *cell = cast(const REBVAL*, p);
         assert(not IS_RELATIVE(cast(const RELVAL*, cell)));
 
-        feed->array = nullptr;
+        Init_Comma(FEED_SINGLE(feed));  // for VAL_SPECIFIER() = SPECIFIED
 
         if (IS_NULLED(cell))  // API enforces use of C's nullptr (0) for NULL
             assert(!"NULLED cell API leak, see NULLIFY_NULLED() in C source");
@@ -266,7 +297,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
 
       case DETECTED_AS_END: {  // end of variadic input, so that's it for this
         feed->value = END_NODE;
-        TRASH_POINTER_IF_DEBUG(feed->pending);
+        TRASH_POINTER_IF_DEBUG(FEED_PENDING(feed));
 
         // The va_end() is taken care of here, or if there is a throw/fail it
         // is taken care of by Abort_Frame_Core()
@@ -286,8 +317,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         // are reified from the beginning, else there's not going to be
         // a way to present errors in context.  Fake an empty array for now.
         //
-        feed->array = EMPTY_ARRAY;
-        feed->index = 0;
+        Init_Block(FEED_SINGLE(feed), EMPTY_ARRAY);
 
         CLEAR_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);  // needed?
         break; }
@@ -306,11 +336,11 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
 // Fetch_Next_In_Feed_Core() (see notes above)
 //
 // Once a va_list is "fetched", it cannot be "un-fetched".  Hence only one
-// unit of fetch is done at a time, into f->value.  f->feed->pending thus
+// unit of fetch is done at a time, into f->value.  FEED_PENDING() thus
 // must hold a signal that data remains in the va_list and it should be
 // consulted further.  That signal is an END marker.
 //
-// More generally, an END marker in f->feed->pending for this routine is a
+// More generally, an END marker in FEED_PENDING() for this routine is a
 // signal that the vaptr (if any) should be consulted next.
 //
 inline static const RELVAL *Fetch_Next_In_Feed_Core(
@@ -336,20 +366,22 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
 
     const RELVAL *lookback;
 
-    if (NOT_END(feed->pending)) {
+    if (NOT_END(FEED_PENDING(feed))) {
         //
         // We assume the ->pending value lives in a source array, and can
         // just be incremented since the array has SERIES_INFO_HOLD while it
         // is being executed hence won't be relocated or modified.  This
         // means the release build doesn't need to call ARR_AT().
         //
-        assert(feed->pending == ARR_AT(feed->array, feed->index));
+        assert(
+            FEED_PENDING(feed) == ARR_AT(FEED_ARRAY(feed), FEED_INDEX(feed))
+        );
 
         lookback = feed->value;  // should have been stable
-        feed->value = feed->pending;
+        feed->value = FEED_PENDING(feed);
 
-        ++feed->pending; // might be becoming an END marker, here
-        ++feed->index;
+        ++FEED_PENDING(feed);  // might be becoming an END marker, here
+        ++FEED_INDEX(feed);
     }
     else if (feed->vaptr) {
         //
@@ -377,9 +409,9 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
 
         lookback = feed->value;
         feed->value = END_NODE;
-        TRASH_POINTER_IF_DEBUG(feed->pending);
+        TRASH_POINTER_IF_DEBUG(FEED_PENDING(feed));
 
-        ++feed->index; // for consistency in index termination state
+        ++FEED_INDEX(feed);  // for consistency in index termination state
     }
 
     assert(
@@ -441,7 +473,7 @@ inline static void Inertly_Derelativize_Inheriting_Const(
     const RELVAL *v,
     REBFED *feed
 ){
-    Derelativize(out, v, feed->specifier);
+    Derelativize(out, v, FEED_SPECIFIER(feed));
     SET_CELL_FLAG(out, UNEVALUATED);
     if (not GET_CELL_FLAG(v, EXPLICITLY_MUTABLE))
         out->header.bits |= (feed->flags.bits & FEED_FLAG_CONST);
@@ -458,6 +490,20 @@ inline static REBFED* Alloc_Feed(void) {
   #ifdef DEBUG_COUNT_TICKS
     feed->tick = TG_Tick;
   #endif
+
+    Init_Unreadable_Void(Prep_Cell(&feed->fetched));
+    Init_Unreadable_Void(Prep_Cell(&feed->lookback));
+
+    REBSER *s = SER(FEED_SINGULAR(feed));
+    s->header.bits = NODE_FLAG_NODE
+                        | SERIES_FLAG_8_IS_TRUE;
+    s->info.bits = Endlike_Header(
+        FLAG_WIDE_BYTE_OR_0(0)  // implicit termination
+            | FLAG_LEN_BYTE_OR_255(0)
+    );
+    Prep_Cell(FEED_SINGLE(feed));
+    FEED_SPLICE(feed) = nullptr;
+
     return feed;
 }
 
@@ -485,30 +531,29 @@ inline static void Prep_Array_Feed(
     REBSPC *specifier,
     REBFLGS flags
 ){
-    Init_Unreadable_Void(Prep_Cell(&feed->fetched));
-    Init_Unreadable_Void(Prep_Cell(&feed->lookback));
-
     feed->vaptr = nullptr;
     feed->packed = nullptr;
-    feed->array = array;
-    feed->specifier = specifier;
     feed->flags.bits = flags;
     if (first) {
         feed->value = unwrap(first);
-        feed->index = index;
-        feed->pending = STABLE(ARR_AT(array, index));
+        Init_Any_Array_At_Core(
+            FEED_SINGLE(feed), REB_BLOCK, array, index, specifier
+        );
+        FEED_PENDING(feed) = STABLE(ARR_AT(array, index));
         assert(KIND3Q_BYTE_UNCHECKED(feed->value) != REB_0_END);
             // ^-- faster than NOT_END()
     }
     else {
         feed->value = STABLE(ARR_AT(array, index));
-        feed->index = index + 1;
-        feed->pending = feed->value + 1;
+        Init_Any_Array_At_Core(
+            FEED_SINGLE(feed), REB_BLOCK, array, index + 1, specifier
+        );
+        FEED_PENDING(feed) = feed->value + 1;
     }
 
     feed->gotten = nullptr;
     if (IS_END(feed->value))
-        TRASH_POINTER_IF_DEBUG(feed->pending);
+        TRASH_POINTER_IF_DEBUG(FEED_PENDING(feed));
     else
         assert(READABLE(feed->value, __FILE__, __LINE__));
 }
@@ -525,11 +570,11 @@ inline static void Prep_Va_Feed(
     option(va_list*) vaptr,
     REBFLGS flags
 ){
-    Init_Unreadable_Void(Prep_Cell(&feed->fetched));
-    Init_Unreadable_Void(Prep_Cell(&feed->lookback));
+    // We want to initialize with something that will give back SPECIFIED.
+    // It must therefore be bindable.  Try a COMMA!
+    //
+    Init_Comma(FEED_SINGLE(feed));
 
-    feed->index = TRASHED_INDEX;  // avoid warning in release build
-    feed->array = nullptr;
     feed->flags.bits = flags;
     if (not vaptr) {  // `p` should be treated as a packed void* array
         feed->vaptr = nullptr;
@@ -540,8 +585,7 @@ inline static void Prep_Va_Feed(
         feed->vaptr = vaptr;
         feed->packed = nullptr;
     }
-    feed->pending = END_NODE;  // signal next fetch comes from va_list
-    feed->specifier = SPECIFIED;  // relative values not allowed
+    FEED_PENDING(feed) = END_NODE;  // signal next fetch comes from va_list
     Detect_Feed_Pointer_Maybe_Fetch(feed, p, false);
 
     feed->gotten = nullptr;

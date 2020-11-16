@@ -195,6 +195,7 @@ struct Reb_Feed {
     const RELVAL *value;  // is never nullptr (ends w/END cells or rebEND)
 
     //=//// ^-- be sure above fields align cells below to 64-bits --v /////=//
+    // (two intptr_t sized things should take care of it on both 32/64-bit) //
 
     // Sometimes the frame can be advanced without keeping track of the
     // last cell.  And sometimes the last cell lives in an array that is
@@ -213,6 +214,26 @@ struct Reb_Feed {
     // be applied without corrupting the value they operate on.
     //
     RELVAL fetched;
+
+    // Feeds are maintained in REBSER-sized "splice" units.  This is big
+    // enough for a REBVAL to hold an array and an index, but it also lets
+    // you point to other singulars that can hold arrays and indices.
+    //
+    // If values are being sourced from an array, this holds the pointer to
+    // that array.  By knowing the array it is possible for error and debug
+    // messages to reach backwards and present more context of where the
+    // error is located.
+    //
+    // This holds the index of the *next* item in the array to fetch as
+    // f->value for processing.  It's invalid if the frame is for a C va_list.
+    //
+    // This is used for relatively bound words to be looked up to become
+    // specific.  Typically the specifier is extracted from the payload of the
+    // ANY-ARRAY! value that provided the source.array for the call to DO.
+    // It may also be NULL if it is known that there are no relatively bound
+    // words that will be encountered from the source--as in va_list calls.
+    //
+    REBSER singular;
 
     // If the binder isn't NULL, then any words or arrays are bound into it
     // during the loading process.  
@@ -242,32 +263,6 @@ struct Reb_Feed {
     // C stack of the processed variadic arguments it enumerated.
     //
     const void* const* packed;
-
-    // This contains an IS_END() marker if the next fetch should be an attempt
-    // to consult the va_list (if any).  That end marker may be resident in
-    // an array, or if it's a plain va_list source it may be the global END.
-    //
-    const RELVAL *pending;
-
-    // If values are being sourced from an array, this holds the pointer to
-    // that array.  By knowing the array it is possible for error and debug
-    // messages to reach backwards and present more context of where the
-    // error is located.
-    //
-    const REBARR *array;
-
-    // This holds the index of the *next* item in the array to fetch as
-    // f->value for processing.  It's invalid if the frame is for a C va_list.
-    //
-    REBLEN index;
-
-    // This is used for relatively bound words to be looked up to become
-    // specific.  Typically the specifier is extracted from the payload of the
-    // ANY-ARRAY! value that provided the source.array for the call to DO.
-    // It may also be NULL if it is known that there are no relatively bound
-    // words that will be encountered from the source--as in va_list calls.
-    //
-    REBSPC *specifier;
 
     // There is a lookahead step to see if the next item in an array is a
     // WORD!.  If so it is checked to see if that word is a "lookback word"

@@ -392,9 +392,9 @@ EXTERN_C intptr_t RL_rebPromise(REBFLGS flags, void *p, va_list *vaptr)
 
     REBDSP dsp_orig = DSP;
     while (NOT_END(feed->value)) {
-        Derelativize(DS_PUSH(), feed->value, feed->specifier);
+        Derelativize(DS_PUSH(), feed->value, FEED_SPECIFIER(feed));
         SET_CELL_FLAG(DS_TOP, UNEVALUATED);
-        Fetch_Next_In_Feed(feed, false);
+        Fetch_Next_In_Feed(feed);
     }
     // Note: exhausting feed should take care of the va_end()
 

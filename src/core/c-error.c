@@ -489,7 +489,7 @@ void Set_Location_Of_Error(
     //
     f = where;
     for (; f != FS_BOTTOM; f = f->prior) {
-        if (not f->feed->array) {
+        if (FRM_IS_VARIADIC(f)) {
             //
             // !!! We currently skip any calls from C (e.g. rebValue()) and look
             // for calls from Rebol files for the file and line.  However,
@@ -498,13 +498,13 @@ void Set_Location_Of_Error(
             //
             continue;
         }
-        if (NOT_ARRAY_FLAG(f->feed->array, HAS_FILE_LINE_UNMASKED))
+        if (NOT_ARRAY_FLAG(FRM_ARRAY(f), HAS_FILE_LINE_UNMASKED))
             continue;
         break;
     }
     if (f != FS_BOTTOM) {
-        REBSTR *file = LINK_FILE(f->feed->array);
-        REBLIN line = MISC(f->feed->array).line;
+        REBSTR *file = LINK_FILE(FRM_ARRAY(f));
+        REBLIN line = MISC(FRM_ARRAY(f)).line;
 
         REBSYM file_sym = STR_SYMBOL(file);
         if (IS_NULLED_OR_BLANK(&vars->file)) {

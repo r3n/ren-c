@@ -1007,7 +1007,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             if (IS_END(ss->feed->value))
                 return TOKEN_END;
 
-            Derelativize(DS_PUSH(), ss->feed->value, ss->feed->specifier);
+            Derelativize(DS_PUSH(), ss->feed->value, FEED_SPECIFIER(ss->feed));
 
             if (level->newline_pending) {
                 level->newline_pending = false;

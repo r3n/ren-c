@@ -93,10 +93,10 @@ void Dump_Frame_Location(const RELVAL *v, REBFRM *f)
             Reify_Va_To_Array_In_Frame(f, truncated);
         }
 
-        Init_Any_Series_At_Core(
+        Init_Any_Array_At_Core(
             dump,
             REB_BLOCK,
-            SER(f->feed->array),
+            f_array,
             cast(REBLEN, f_index),
             f_specifier
         );
@@ -130,13 +130,6 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
 
     assert(f == FS_TOP);
     assert(DSP == f->dsp_orig);
-
-    if (f->feed->array) {
-        assert(not IS_POINTER_TRASH_DEBUG(f->feed->array));
-        assert(f->feed->index != TRASHED_INDEX);
-    }
-    else
-        assert(f->feed->index == TRASHED_INDEX);
 
     // If this fires, it means that Flip_Series_To_White was not called an
     // equal number of times after Flip_Series_To_Black, which means that
@@ -294,12 +287,12 @@ void Eval_Core_Exit_Checks_Debug(REBFRM *f) {
     Eval_Core_Shared_Checks_Debug(f);
 
     if (NOT_END(f_next) and not FRM_IS_VARIADIC(f)) {
-        if (f_index > ARR_LEN(f->feed->array)) {
+        if (f_index > ARR_LEN(f_array)) {
             assert(
-                (f->feed->pending and IS_END(f->feed->pending))
+                IS_END(FEED_PENDING(f->feed))
                 or Is_Evaluator_Throwing_Debug()
             );
-            assert(f_index == ARR_LEN(f->feed->array) + 1);
+            assert(f_index == ARR_LEN(f_array) + 1);
         }
     }
 

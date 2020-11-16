@@ -296,11 +296,11 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
     if (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED) { // most callsites fold
         assert(flags & SERIES_FLAG_LINK_NODE_NEEDS_MARK);
         if (
-            FS_TOP->feed->array and
-            GET_ARRAY_FLAG(FS_TOP->feed->array, HAS_FILE_LINE_UNMASKED)
+            not FRM_IS_VARIADIC(FS_TOP) and
+            GET_ARRAY_FLAG(FRM_ARRAY(FS_TOP), HAS_FILE_LINE_UNMASKED)
         ){
-            LINK_FILE_NODE(s) = LINK_FILE_NODE(FS_TOP->feed->array);
-            MISC(s).line = MISC(FS_TOP->feed->array).line;
+            LINK_FILE_NODE(s) = LINK_FILE_NODE(FRM_ARRAY(FS_TOP));
+            MISC(s).line = MISC(FRM_ARRAY(FS_TOP)).line;
         }
         else {
             CLEAR_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED);

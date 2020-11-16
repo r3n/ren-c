@@ -82,8 +82,13 @@ inline static bool FRM_IS_VARIADIC(REBFRM *f) {
 
 inline static const REBARR *FRM_ARRAY(REBFRM *f) {
     assert(IS_END(f->feed->value) or not FRM_IS_VARIADIC(f));
-    return f->feed->array;
+    return FEED_ARRAY(f->feed);
 }
+
+inline static REBSPC *FRM_SPECIFIER(REBFRM *f) {
+    return FEED_SPECIFIER(f->feed);
+}
+
 
 // !!! Though the evaluator saves its `index`, the index is not meaningful
 // in a valist.  Also, if `option(head)` values are used to prefetch before an
@@ -93,10 +98,10 @@ inline static const REBARR *FRM_ARRAY(REBFRM *f) {
 //
 inline static REBLEN FRM_INDEX(REBFRM *f) {
     if (IS_END(f->feed->value))
-        return ARR_LEN(f->feed->array);
+        return ARR_LEN(FRM_ARRAY(f));
 
     assert(not FRM_IS_VARIADIC(f));
-    return f->feed->index - 1;
+    return FEED_INDEX(f->feed) - 1;
 }
 
 inline static REBLEN FRM_EXPR_INDEX(REBFRM *f) {
@@ -105,11 +110,11 @@ inline static REBLEN FRM_EXPR_INDEX(REBFRM *f) {
 }
 
 inline static REBSTR* FRM_FILE(REBFRM *f) { // https://trello.com/c/K3vntyPx
-    if (not f->feed->array)
+    if (FRM_IS_VARIADIC(f))
         return nullptr;
-    if (NOT_ARRAY_FLAG(f->feed->array, HAS_FILE_LINE_UNMASKED))
+    if (NOT_ARRAY_FLAG(FRM_ARRAY(f), HAS_FILE_LINE_UNMASKED))
         return nullptr;
-    return STR(LINK(f->feed->array).custom.node);
+    return STR(LINK(FRM_ARRAY(f)).custom.node);
 }
 
 inline static const char* FRM_FILE_UTF8(REBFRM *f) {
@@ -121,11 +126,11 @@ inline static const char* FRM_FILE_UTF8(REBFRM *f) {
 }
 
 inline static int FRM_LINE(REBFRM *f) {
-    if (not f->feed->array)
+    if (FRM_IS_VARIADIC(f))
         return 0;
-    if (NOT_ARRAY_FLAG(f->feed->array, HAS_FILE_LINE_UNMASKED))
+    if (NOT_ARRAY_FLAG(FRM_ARRAY(f), HAS_FILE_LINE_UNMASKED))
         return 0;
-    return MISC(SER(f->feed->array)).line;
+    return MISC(SER(FRM_ARRAY(f))).line;
 }
 
 #define FRM_OUT(f) \
@@ -210,11 +215,11 @@ inline static option(const REBSTR*) FRM_LABEL(REBFRM *f) {
 // may be #undef'd if they are causing a problem somewhere.
 
 #define f_value f->feed->value
-#define f_specifier f->feed->specifier
+#define f_specifier FEED_SPECIFIER(f->feed)
 #define f_spare FRM_SPARE(f)
 #define f_gotten f->feed->gotten
 #define f_index FRM_INDEX(f)
-
+#define f_array FRM_ARRAY(f)
 
 
 inline static REBCTX *Context_For_Frame_May_Manage(REBFRM *f) {
@@ -418,7 +423,7 @@ inline static void Push_Frame(
     // lock that array against mutations.  
     //
     if (IS_END(f->feed->value)) {  // don't take hold on empty feeds
-        assert(IS_POINTER_TRASH_DEBUG(f->feed->pending));
+        assert(IS_POINTER_TRASH_DEBUG(FEED_PENDING(f->feed)));
         assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
     }
     else if (FRM_IS_VARIADIC(f)) {
@@ -431,10 +436,10 @@ inline static void Push_Frame(
         assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
     }
     else {
-        if (GET_SERIES_INFO(f->feed->array, HOLD))
+        if (GET_SERIES_INFO(FRM_ARRAY(f), HOLD))
             NOOP; // already temp-locked
         else {
-            SET_SERIES_INFO(f->feed->array, HOLD);
+            SET_SERIES_INFO(FRM_ARRAY(f), HOLD);
             SET_EVAL_FLAG(f, TOOK_HOLD);
         }
     }
@@ -452,7 +457,8 @@ inline static void Push_Frame(
 
 
 inline static void UPDATE_EXPRESSION_START(REBFRM *f) {
-    f->expr_index = f->feed->index; // this is garbage if EVAL_FLAG_VA_LIST
+    if (not FRM_IS_VARIADIC(f))
+        f->expr_index = FRM_INDEX(f);
 }
 
 
@@ -509,8 +515,8 @@ inline static void Abort_Frame(REBFRM *f) {
             // The frame was either never variadic, or it was but got spooled
             // into an array by Reify_Va_To_Array_In_Frame()
             //
-            assert(GET_SERIES_INFO(f->feed->array, HOLD));
-            CLEAR_SERIES_INFO(f->feed->array, HOLD);
+            assert(GET_SERIES_INFO(FRM_ARRAY(f), HOLD));
+            CLEAR_SERIES_INFO(FRM_ARRAY(f), HOLD);
             CLEAR_EVAL_FLAG(f, TOOK_HOLD); // !!! needed?
         }
     }
@@ -533,8 +539,8 @@ inline static void Drop_Frame_Core(REBFRM *f) {
   #endif
 
     if (GET_EVAL_FLAG(f, TOOK_HOLD)) {
-        assert(GET_SERIES_INFO(f->feed->array, HOLD));
-        CLEAR_SERIES_INFO(f->feed->array, HOLD);
+        assert(GET_SERIES_INFO(FRM_ARRAY(f), HOLD));
+        CLEAR_SERIES_INFO(FRM_ARRAY(f), HOLD);
         CLEAR_EVAL_FLAG(f, TOOK_HOLD);  // needed?
     }
 

@@ -206,8 +206,8 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
                 // be ready to use again we're throwing it away, and need to
                 // effectively "undo the prefetch" by taking it down by 1.
                 //
-                assert(f_temp->feed->index > 0);
-                VAL_INDEX_UNBOUNDED(shared) = f_temp->feed->index - 1;
+                assert(FRM_INDEX(f_temp) > 0);
+                VAL_INDEX_UNBOUNDED(shared) = FRM_INDEX(f_temp) - 1;
             }
 
             Drop_Frame(f_temp);
@@ -269,7 +269,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
             hit_barrier
                 ? END_NODE
                 : cast(const RELVAL *, f->feed->value), // might be END
-            f->feed->specifier,
+            f_specifier,
             pclass
         )){
             goto type_check_and_return;
@@ -291,11 +291,11 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
             break;
 
         case REB_P_SOFT_QUOTE:
-            if (IS_QUOTABLY_SOFT(f->feed->value)) {
+            if (IS_QUOTABLY_SOFT(f_value)) {
                 if (Eval_Value_Throws(
                     SET_END(out),
-                    f->feed->value,
-                    f->feed->specifier
+                    f_value,
+                    f_specifier
                 )){
                     return true;
                 }

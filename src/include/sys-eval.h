@@ -144,7 +144,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
     Literal_Next_In_Feed(out, feed);
 
     if (KIND3Q_BYTE_UNCHECKED(feed->value) == REB_WORD) {
-        feed->gotten = Lookup_Word(feed->value, feed->specifier);
+        feed->gotten = Lookup_Word(feed->value, FEED_SPECIFIER(feed));
         if (
             not feed->gotten
             or not IS_ACTION(unwrap(feed->gotten))
@@ -329,7 +329,7 @@ inline static bool Eval_Step_In_Any_Array_At_Throws(
     if (threw)
         *index_out = TRASHED_INDEX;
     else
-        *index_out = f->feed->index - 1;
+        *index_out = FRM_INDEX(f);
 
     Drop_Frame(f);
 

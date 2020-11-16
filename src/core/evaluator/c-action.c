@@ -124,7 +124,7 @@ bool Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
     if (not IS_WORD(feed->value))
         return false;
 
-    feed->gotten = Lookup_Word(feed->value, feed->specifier);
+    feed->gotten = Lookup_Word(feed->value, FEED_SPECIFIER(feed));
 
     if (not feed->gotten or not IS_ACTION(unwrap(feed->gotten)))
         return false;
@@ -974,7 +974,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     assert(
         IS_END(f_next)
         or FRM_IS_VARIADIC(f)
-        or IS_VALUE_IN_ARRAY_DEBUG(f->feed->array, f_next)
+        or IS_VALUE_IN_ARRAY_DEBUG(FEED_ARRAY(f->feed), f_next)
     );
 
     if (GET_EVAL_FLAG(f, TYPECHECK_ONLY)) {  // <blank> uses this

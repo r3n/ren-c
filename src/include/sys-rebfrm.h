@@ -631,6 +631,13 @@ struct Reb_Frame {
   #endif
 };
 
+// These are needed protoyped by the array code because it wants to put file
+// and line numbers into arrays based on the frame in effect at their time
+// of allocation.
+
+inline static const REBARR *FRM_ARRAY(REBFRM *f);
+inline static bool FRM_IS_VARIADIC(REBFRM *f);
+
 
 #define FS_TOP (TG_Top_Frame + 0) // avoid assign to FS_TOP via + 0
 #define FS_BOTTOM (TG_Bottom_Frame + 0) // avoid assign to FS_BOTTOM via + 0
