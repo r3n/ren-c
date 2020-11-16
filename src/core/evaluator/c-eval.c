@@ -217,7 +217,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     REBFLGS initial_flags = f->flags.bits & ~(
         EVAL_FLAG_FULFILL_ONLY  // can be requested or <blank> can trigger
         | EVAL_FLAG_RUNNING_ENFIX  // can be requested with REEVALUATE_CELL
-        | EVAL_FLAG_TOOK_HOLD  // can be set by va_list reification
     );  // should be unchanged on exit
   #endif
 
@@ -1559,9 +1558,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
   #if !defined(NDEBUG)
     Eval_Core_Exit_Checks_Debug(f);  // called unless a fail() longjmps
     assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));
-    assert(
-        (f->flags.bits & ~EVAL_FLAG_TOOK_HOLD) == initial_flags
-    );  // any change should be restored, but va_list reification may hold
+    assert(f->flags.bits == initial_flags);  // any change should be restored
   #endif
 
     return false;  // false => not thrown

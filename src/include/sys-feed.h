@@ -396,6 +396,12 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         ++FEED_INDEX(feed);
 
         if (IS_END(feed->value)) {
+            if (GET_FEED_FLAG(feed, TOOK_HOLD)) {
+                assert(GET_SERIES_INFO(FEED_ARRAY(feed), HOLD));
+                CLEAR_SERIES_INFO(FEED_ARRAY(feed), HOLD);
+                CLEAR_FEED_FLAG(feed, TOOK_HOLD);
+            }
+
             if (FEED_SPLICE(feed)) {  // one or more additional splices to go
                 REBARR *splice = FEED_SPLICE(feed);
                 memcpy(FEED_SINGULAR(feed), FEED_SPLICE(feed), sizeof(REBARR));
@@ -499,8 +505,36 @@ inline static REBFED* Alloc_Feed(void) {
     return feed;
 }
 
-inline static void Free_Feed(REBFED *feed)
-  { Free_Node(FED_POOL, cast(REBNOD*, feed)); }
+inline static void Free_Feed(REBFED *feed) {
+    //
+    // Aborting valist frames is done by just feeding all the values
+    // through until the end.  This is assumed to do any work, such
+    // as SINGULAR_FLAG_API_RELEASE, which might be needed on an item.  It
+    // also ensures that va_end() is called, which happens when the frame
+    // manages to feed to the end.
+    //
+    // Note: While on many platforms va_end() is a no-op, the C standard
+    // is clear it must be called...it's undefined behavior to skip it:
+    //
+    // http://stackoverflow.com/a/32259710/211160
+
+    // !!! Since we're not actually fetching things to run them, this is
+    // overkill.  A lighter sweep of the va_list pointers that did just
+    // enough work to handle rebR() releases, and va_end()ing the list
+    // would be enough.  But for the moment, it's more important to keep
+    // all the logic in one place than to make variadic interrupts
+    // any faster...they're usually reified into an array anyway, so
+    // the frame processing the array will take the other branch.
+
+    while (NOT_END(feed->value))
+        Fetch_Next_In_Feed(feed, false);
+
+    assert(IS_END(feed->value));
+    assert(FEED_PENDING(feed) == nullptr);
+    assert(NOT_FEED_FLAG(feed, TOOK_HOLD));
+
+    Free_Node(FED_POOL, cast(REBNOD*, feed));
+}
 
 
 // It is more pleasant to have a uniform way of speaking of frames by pointer,
@@ -524,6 +558,7 @@ inline static void Prep_Array_Feed(
     REBFLGS flags
 ){
     feed->flags.bits = flags;
+
     if (first) {
         feed->value = unwrap(first);
         Init_Any_Array_At_Core(
@@ -537,6 +572,19 @@ inline static void Prep_Array_Feed(
         Init_Any_Array_At_Core(
             FEED_SINGLE(feed), REB_BLOCK, array, index + 1, specifier
         );
+    }
+
+    // !!! The temp locking was not done on end positions, because the feed
+    // is not advanced (and hence does not get to the "drop hold" point).
+    // This could be an issue for splices, as they could be modified while
+    // their time to run comes up to not be END anymore.  But if we put a
+    // hold on conservatively, it won't be dropped by Free_Feed() time.
+    //
+    if (IS_END(feed->value) or GET_SERIES_INFO(array, HOLD))
+        NOOP;  // already temp-locked
+    else {
+        SET_SERIES_INFO(array, HOLD);
+        SET_FEED_FLAG(feed, TOOK_HOLD);
     }
 
     feed->gotten = nullptr;

@@ -35,6 +35,8 @@ STATIC_ASSERT(FEED_FLAG_0_IS_TRUE == NODE_FLAG_NODE);
 STATIC_ASSERT(FEED_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
 
 
+//=//// FEED_FLAG_DEFERRING_ENFIX /////////////////////////////////////////=//
+//
 // Defer notes when there is a pending enfix operation that was seen while an
 // argument was being gathered, that decided not to run yet.  It will run only
 // if it turns out that was the last argument that was being gathered...
@@ -57,6 +59,8 @@ STATIC_ASSERT(FEED_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(2)
 
 
+//=//// FEED_FLAG_BARRIER_HIT /////////////////////////////////////////////=//
+//
 // Evaluation of arguments can wind up seeing a barrier and "consuming" it.
 // This is true of a BAR!, but also GROUP!s which have no effective content:
 //
@@ -72,6 +76,8 @@ STATIC_ASSERT(FEED_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(3)
 
 
+//=//// FEED_FLAG_NO_LOOKAHEAD ////////////////////////////////////////////=//
+//
 // Infix functions may (depending on the #tight or non-tight parameter
 // acquisition modes) want to suppress further infix lookahead while getting
 // a function argument.  This precedent was started in R3-Alpha, where with
@@ -83,6 +89,8 @@ STATIC_ASSERT(FEED_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(4)
 
 
+//=//// FEED_FLAG_NEXT_ARG_FROM_OUT ///////////////////////////////////////=//
+//
 // When processing something like enfix, the output cell of a frame is the
 // place to look for the "next" value.  This setting has to be managed
 // carefully in recursion, because the recursion must preserve the same
@@ -94,6 +102,22 @@ STATIC_ASSERT(FEED_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
 //
 #define FEED_FLAG_NEXT_ARG_FROM_OUT \
     FLAG_LEFT_BIT(5)
+
+
+//=//// FEED_FLAG_TOOK_HOLD ///////////////////////////////////////////////=//
+//
+// If a feed takes SERIES_INFO_HOLD on an array it is enumerating, it has to
+// remember that it did so it can release it when it is done processing.
+// Note that this has to be a flag on the frame, not the feed--as a feed can
+// be shared among many frames.
+//
+// !!! This is undermined by work in stackless, where a single bit is not
+// sufficient since the stacks do not cleanly unwind:
+//
+// https://forum.rebol.info/t/1317
+//
+#define FEED_FLAG_TOOK_HOLD \
+    FLAG_LEFT_BIT(6)
 
 
 //=//// BITS 8...15 ARE THE QUOTING LEVEL /////////////////////////////////=//
@@ -134,6 +158,8 @@ STATIC_ASSERT(FEED_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_SECOND_BYTE(quoting)
 
 
+//=//// FEED_FLAG_CONST ///////////////////////////////////////////////////=//
+//
 // The user is able to flip the constness flag explicitly with the CONST and
 // MUTABLE functions explicitly.  However, if a feed has FEED_FLAG_CONST,
 // the system imposes it's own constness as part of the "wave of evaluation"

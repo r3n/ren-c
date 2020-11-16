@@ -355,19 +355,9 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(30)
 
 
-//=//// EVAL_FLAG_TOOK_HOLD ///////////////////////////////////////////////=//
+//=//// EVAL_FLAG_31 //////////////////////////////////////////////////////=//
 //
-// If a frame takes SERIES_INFO_HOLD on an array it is enumerating, it has to
-// remember that it did so it can release it when it is done processing.
-// Note that this has to be a flag on the frame, not the feed--as a feed can
-// be shared among many frames.
-//
-// !!! This is undermined by work in stackless, where a single bit is not
-// sufficient since the stacks do not cleanly unwind:
-//
-// https://forum.rebol.info/t/1317
-//
-#define EVAL_FLAG_TOOK_HOLD \
+#define EVAL_FLAG_31 \
     FLAG_LEFT_BIT(31)
 
 

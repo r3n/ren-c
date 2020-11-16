@@ -419,31 +419,6 @@ inline static void Push_Frame(
     f->prior = TG_Top_Frame;
     TG_Top_Frame = f;
 
-    // If the source for the frame is a REBARR*, then we want to temporarily
-    // lock that array against mutations.  
-    //
-    if (IS_END(f->feed->value)) {  // don't take hold on empty feeds
-        assert(FEED_PENDING(f->feed) == nullptr);
-        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
-    }
-    else if (FRM_IS_VARIADIC(f)) {
-        //
-        // There's nothing to put a hold on while it's a va_list-based frame.
-        // But a GC might occur and "Reify" it, in which case the array
-        // which is created will have a hold put on it to be released when
-        // the frame is finished.
-        //
-        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
-    }
-    else {
-        if (GET_SERIES_INFO(FRM_ARRAY(f), HOLD))
-            NOOP; // already temp-locked
-        else {
-            SET_SERIES_INFO(FRM_ARRAY(f), HOLD);
-            SET_EVAL_FLAG(f, TOOK_HOLD);
-        }
-    }
-
   #if defined(DEBUG_BALANCE_STATE)
     SNAP_STATE(&f->state); // to make sure stack balances, etc.
     f->state.dsp = f->dsp_orig;
@@ -484,43 +459,6 @@ inline static void Abort_Frame(REBFRM *f) {
     if (IS_END(f->feed->value))
         goto pop;
 
-    if (FRM_IS_VARIADIC(f)) {
-        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
-
-        // Aborting valist frames is done by just feeding all the values
-        // through until the end.  This is assumed to do any work, such
-        // as SINGULAR_FLAG_API_RELEASE, which might be needed on an item.  It
-        // also ensures that va_end() is called, which happens when the frame
-        // manages to feed to the end.
-        //
-        // Note: While on many platforms va_end() is a no-op, the C standard
-        // is clear it must be called...it's undefined behavior to skip it:
-        //
-        // http://stackoverflow.com/a/32259710/211160
-
-        // !!! Since we're not actually fetching things to run them, this is
-        // overkill.  A lighter sweep of the va_list pointers that did just
-        // enough work to handle rebR() releases, and va_end()ing the list
-        // would be enough.  But for the moment, it's more important to keep
-        // all the logic in one place than to make variadic interrupts
-        // any faster...they're usually reified into an array anyway, so
-        // the frame processing the array will take the other branch.
-
-        while (NOT_END(f->feed->value))
-            Fetch_Next_Forget_Lookback(f);
-    }
-    else {
-        if (GET_EVAL_FLAG(f, TOOK_HOLD)) {
-            //
-            // The frame was either never variadic, or it was but got spooled
-            // into an array by Reify_Va_To_Array_In_Frame()
-            //
-            assert(GET_SERIES_INFO(FRM_ARRAY(f), HOLD));
-            CLEAR_SERIES_INFO(FRM_ARRAY(f), HOLD);
-            CLEAR_EVAL_FLAG(f, TOOK_HOLD); // !!! needed?
-        }
-    }
-
   pop:
     assert(TG_Top_Frame == f);
     TG_Top_Frame = f->prior;
@@ -537,12 +475,6 @@ inline static void Drop_Frame_Core(REBFRM *f) {
   #if defined(DEBUG_EXPIRED_LOOKBACK)
     free(f->stress);
   #endif
-
-    if (GET_EVAL_FLAG(f, TOOK_HOLD)) {
-        assert(GET_SERIES_INFO(FRM_ARRAY(f), HOLD));
-        CLEAR_SERIES_INFO(FRM_ARRAY(f), HOLD);
-        CLEAR_EVAL_FLAG(f, TOOK_HOLD);  // needed?
-    }
 
     assert(TG_Top_Frame == f);
 
