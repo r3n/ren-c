@@ -77,7 +77,7 @@ inline static bool Is_Action_Frame_Fulfilling(REBFRM *f) {
 
 
 inline static bool FRM_IS_VARIADIC(REBFRM *f) {
-    return f->feed->vaptr or f->feed->packed != nullptr;
+    return FEED_IS_VARIADIC(f->feed);
 }
 
 inline static const REBARR *FRM_ARRAY(REBFRM *f) {

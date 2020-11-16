@@ -253,17 +253,6 @@ struct Reb_Feed {
     option(REBCTX*) lib;  // does not expand, has negative indices in binder
     option(REBCTX*) context;  // expands, has positive indices in binder
 
-    // A frame may be sourced from a va_list of pointers, or not.  If this is
-    // NULL it is assumed that the values are sourced from a simple array.
-    //
-    option(va_list*) vaptr;
-
-    // The feed could also be coming from a packed array of pointers...this
-    // is used by the C++ interface, which creates a `std::array` on the
-    // C stack of the processed variadic arguments it enumerated.
-    //
-    const void* const* packed;
-
     // There is a lookahead step to see if the next item in an array is a
     // WORD!.  If so it is checked to see if that word is a "lookback word"
     // (e.g. one that refers to an ACTION! value set with SET/ENFIX).

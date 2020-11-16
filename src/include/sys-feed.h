@@ -59,6 +59,10 @@
 //
 #define FEED_PENDING(feed)      MISC_PENDING(&(feed)->singular)
 
+#define FEED_IS_VARIADIC(feed)  IS_COMMA(FEED_SINGLE(feed))
+#define FEED_VAPTR(feed)        PAYLOAD(Comma, FEED_SINGLE(feed)).vaptr
+#define FEED_PACKED(feed)       PAYLOAD(Comma, FEED_SINGLE(feed)).packed
+
 
 // For performance, we always get the specifier from the same location, even
 // if we're not using an array.  So for the moment, that means using a
@@ -123,7 +127,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         // !!! We could make a global QUOTED_NULLED_VALUE with a stable
         // pointer and not have to use fetched or FETCHED_MARKED_TEMPORARY.
         //
-        Init_Comma(FEED_SINGLE(feed));  // for VAL_SPECIFIER() = SPECIFIED
+        assert(FEED_SPECIFIER(feed) == SPECIFIED);
 
         Quotify(Init_Nulled(&feed->fetched), 1);
         SET_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);
@@ -149,8 +153,6 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         feed->binder = &binder;
         feed->context = nullptr;  // made non-nullptr when binder initialized
         feed->lib = nullptr;
-
-        Init_Comma(FEED_SINGLE(feed));  // for VAL_SPECIFIER() = SPECIFIED
 
         SCAN_LEVEL level;
         SCAN_STATE ss;
@@ -182,20 +184,17 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
             // feed is actually over so as to put null... so get another
             // value out of the va_list and keep going.
             //
-            if (feed->vaptr)
-                p = va_arg(*unwrap(feed->vaptr), const void*);
+            if (FEED_VAPTR(feed))
+                p = va_arg(*unwrap(FEED_VAPTR(feed)), const void*);
             else
-                p = *feed->packed++;
+                p = *FEED_PACKED(feed)++;
             goto detect_again;
         }
 
         // !!! for now, assume scan went to the end; ultimately it would need
         // to pass the feed in as a parameter for partial scans
         //
-        if (feed->vaptr)
-            feed->vaptr = nullptr;
-        else
-            feed->packed = nullptr;
+        assert(not FEED_IS_VARIADIC(feed));
 
         REBARR *reified = Pop_Stack_Values(dsp_orig);
 
@@ -277,7 +276,7 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         const REBVAL *cell = cast(const REBVAL*, p);
         assert(not IS_RELATIVE(cast(const RELVAL*, cell)));
 
-        Init_Comma(FEED_SINGLE(feed));  // for VAL_SPECIFIER() = SPECIFIED
+        assert(FEED_SPECIFIER(feed) == SPECIFIED);
 
         if (IS_NULLED(cell))  // API enforces use of C's nullptr (0) for NULL
             assert(!"NULLED cell API leak, see NULLIFY_NULLED() in C source");
@@ -302,14 +301,10 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         // The va_end() is taken care of here, or if there is a throw/fail it
         // is taken care of by Abort_Frame_Core()
         //
-        if (feed->vaptr) {
-            va_end(*unwrap(feed->vaptr));
-            feed->vaptr = nullptr;
-        }
-        else {
-            assert(feed->packed);
-            feed->packed = nullptr;
-        }
+        if (FEED_VAPTR(feed))
+            va_end(*unwrap(FEED_VAPTR(feed)));
+        else
+            assert(FEED_PACKED(feed));
 
         // !!! Error reporting expects there to be an array.  The whole story
         // of errors when there's a va_list is not told very well, and what
@@ -383,24 +378,25 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         ++FEED_PENDING(feed);  // might be becoming an END marker, here
         ++FEED_INDEX(feed);
     }
-    else if (feed->vaptr) {
+    else if (FEED_IS_VARIADIC(feed)) {
         //
         // A variadic can source arbitrary pointers, which can be detected
         // and handled in different ways.  Notably, a UTF-8 string can be
         // differentiated and loaded.
         //
-        const void *p = va_arg(*unwrap(feed->vaptr), const void*);
-       // feed->index = TRASHED_INDEX; // avoids warning in release build
-        lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
-    }
-    else if (feed->packed) {
-        //
-        // C++ variadics use an ordinary packed array of pointers, because
-        // they do more ambitious things with the arguments and there is no
-        // (standard) way to construct a C va_list programmatically.
-        //
-        const void *p = *feed->packed++;
-        lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
+        if (FEED_VAPTR(feed)) {
+            const void *p = va_arg(*unwrap(FEED_VAPTR(feed)), const void*);
+            lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
+        }
+        else {
+            //
+            // C++ variadics use an ordinary packed array of pointers, because
+            // they do more ambitious things with the arguments and there is
+            // no (standard) way to construct a C va_list programmatically.
+            //
+            const void *p = *FEED_PACKED(feed)++;
+            lookback = Detect_Feed_Pointer_Maybe_Fetch(feed, p, preserve);
+        }
     }
     else {
         // The frame was either never variadic, or it was but got spooled into
@@ -531,8 +527,6 @@ inline static void Prep_Array_Feed(
     REBSPC *specifier,
     REBFLGS flags
 ){
-    feed->vaptr = nullptr;
-    feed->packed = nullptr;
     feed->flags.bits = flags;
     if (first) {
         feed->value = unwrap(first);
@@ -577,13 +571,13 @@ inline static void Prep_Va_Feed(
 
     feed->flags.bits = flags;
     if (not vaptr) {  // `p` should be treated as a packed void* array
-        feed->vaptr = nullptr;
-        feed->packed = cast(const void* const*, p);
-        p = *feed->packed++;
+        FEED_VAPTR(feed) = nullptr;
+        FEED_PACKED(feed) = cast(const void* const*, p);
+        p = *FEED_PACKED(feed)++;
     }
     else {
-        feed->vaptr = vaptr;
-        feed->packed = nullptr;
+        FEED_VAPTR(feed) = vaptr;
+        FEED_PACKED(feed) = nullptr;
     }
     FEED_PENDING(feed) = END_NODE;  // signal next fetch comes from va_list
     Detect_Feed_Pointer_Maybe_Fetch(feed, p, false);

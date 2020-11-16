@@ -456,6 +456,25 @@ union Reb_Bytes_Payload  // IMPORTANT: Do not cast, use `Pointers` instead
     REBYTE at_least_8[sizeof(void*) * 2];  // size depends on platform
 };
 
+// COMMA! is evaluative, but you wouldn't usually think of it as being
+// bindable because of its "inert-seeming" content.  To make the ANY_INERT()
+// test fast, REB_COMMA is pushed to a high value, making it bindable.  That
+// is exploited by feeds, which use it to store va_list information along
+// with a specifier in a value cell slot.  (Most commas don't have this.)
+//
+struct Reb_Comma_Payload {
+    // A frame may be sourced from a va_list of pointers, or not.  If this is
+    // NULL it is assumed that the values are sourced from a simple array.
+    //
+    option(va_list*) vaptr;
+
+    // The feed could also be coming from a packed array of pointers...this
+    // is used by the C++ interface, which creates a `std::array` on the
+    // C stack of the processed variadic arguments it enumerated.
+    //
+    const void* const* packed;
+};
+
 #if defined(DEBUG_TRACK_CELLS)
     struct Reb_Track_Payload  // see %sys-track.h
     {
@@ -507,6 +526,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     struct Reb_Time_Payload Time;
 
     union Reb_Bytes_Payload Bytes;
+    struct Reb_Comma_Payload Comma;
 
   #if defined(DEBUG_TRACK_CELLS) && !defined(DEBUG_TRACK_EXTEND_CELLS)
     //

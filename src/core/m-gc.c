@@ -395,7 +395,7 @@ void Reify_Va_To_Array_In_Frame(
 
     // feeding forward should have called va_end
     //
-    assert(not f->feed->vaptr and not f->feed->packed);
+    assert(not FEED_IS_VARIADIC(f->feed));
 
     if (DSP == dsp_orig)
         Init_Block(FEED_SINGLE(f->feed), EMPTY_ARRAY);  // no new array needed
