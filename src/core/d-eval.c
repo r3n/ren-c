@@ -288,10 +288,7 @@ void Eval_Core_Exit_Checks_Debug(REBFRM *f) {
 
     if (NOT_END(f_next) and not FRM_IS_VARIADIC(f)) {
         if (f_index > ARR_LEN(f_array)) {
-            assert(
-                IS_END(FEED_PENDING(f->feed))
-                or Is_Evaluator_Throwing_Debug()
-            );
+            assert(Is_Evaluator_Throwing_Debug());
             assert(f_index == ARR_LEN(f_array) + 1);
         }
     }

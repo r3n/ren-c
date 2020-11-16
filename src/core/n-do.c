@@ -24,7 +24,7 @@
 // Ren-C's philosophy of DO is that the argument to it represents a place to
 // find source code.  Hence `DO 3` does not evaluate to the number 3, any
 // more than `DO "print hello"` would evaluate to `"print hello"`.  If a
-// generalized evaluator is needed, use the special-purpose function EVAL.
+// generalized evaluator is needed, use the special-purpose REEVAL(UATE).
 //
 // Note that although the code for running blocks and frames is implemented
 // here as C, the handler for processing STRING!, FILE!, TAG!, URL!, etc. is

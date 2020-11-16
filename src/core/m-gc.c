@@ -371,8 +371,6 @@ void Reify_Va_To_Array_In_Frame(
     REBLEN index;
 
     if (NOT_END(f_value)) {
-        assert(FEED_PENDING(f->feed) == END_NODE);
-
         do {
             Derelativize(DS_PUSH(), f_value, f_specifier);
             assert(not IS_NULLED(DS_TOP));
@@ -385,7 +383,7 @@ void Reify_Va_To_Array_In_Frame(
             index = 1;  // position at start of the extracted values
     }
     else {
-        assert(IS_POINTER_TRASH_DEBUG(FEED_PENDING(f->feed)));
+        assert(FEED_PENDING(f->feed) == nullptr);
 
         // Leave at end of frame, but give back the array to serve as
         // notice of the truncation (if it was truncated)
@@ -413,10 +411,8 @@ void Reify_Va_To_Array_In_Frame(
     // frame...so safe to say we're holding it (if not at the end).
     //
     if (IS_END(f_value))
-        TRASH_POINTER_IF_DEBUG(FEED_PENDING(f->feed));
+        assert(FEED_PENDING(f->feed) == nullptr);
     else {
-        FEED_PENDING(f->feed) = f_value + 1;
-
         assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
         SET_SERIES_INFO(f_array, HOLD);
         SET_EVAL_FLAG(f, TOOK_HOLD);

@@ -423,7 +423,7 @@ inline static void Push_Frame(
     // lock that array against mutations.  
     //
     if (IS_END(f->feed->value)) {  // don't take hold on empty feeds
-        assert(IS_POINTER_TRASH_DEBUG(FEED_PENDING(f->feed)));
+        assert(FEED_PENDING(f->feed) == nullptr);
         assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
     }
     else if (FRM_IS_VARIADIC(f)) {

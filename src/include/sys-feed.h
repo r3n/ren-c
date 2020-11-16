@@ -92,6 +92,8 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
     const void *p,
     bool preserve
 ){
+    assert(FEED_PENDING(feed) == nullptr);
+
     const RELVAL *lookback;
 
     if (not preserve)
@@ -209,7 +211,6 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
         Manage_Array(reified);
 
         feed->value = STABLE(ARR_HEAD(reified));
-        FEED_PENDING(feed) = feed->value + 1;  // may be END
         Init_Any_Array_At(FEED_SINGLE(feed), REB_BLOCK, reified, 1);
 
         CLEAR_CELL_FLAG(&feed->fetched, FETCHED_MARKED_TEMPORARY);
@@ -296,7 +297,6 @@ inline static const RELVAL *Detect_Feed_Pointer_Maybe_Fetch(
 
       case DETECTED_AS_END: {  // end of variadic input, so that's it for this
         feed->value = END_NODE;
-        TRASH_POINTER_IF_DEBUG(FEED_PENDING(feed));
 
         // The va_end() is taken care of here, or if there is a throw/fail it
         // is taken care of by Abort_Frame_Core()
@@ -361,22 +361,13 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
 
     const RELVAL *lookback;
 
-    if (NOT_END(FEED_PENDING(feed))) {
-        //
-        // We assume the ->pending value lives in a source array, and can
-        // just be incremented since the array has SERIES_INFO_HOLD while it
-        // is being executed hence won't be relocated or modified.  This
-        // means the release build doesn't need to call ARR_AT().
-        //
-        assert(
-            FEED_PENDING(feed) == ARR_AT(FEED_ARRAY(feed), FEED_INDEX(feed))
-        );
+  retry_splice:
+    if (FEED_PENDING(feed)) {
+        assert(NOT_END(FEED_PENDING(feed)));
 
         lookback = feed->value;  // should have been stable
         feed->value = FEED_PENDING(feed);
-
-        ++FEED_PENDING(feed);  // might be becoming an END marker, here
-        ++FEED_INDEX(feed);
+        FEED_PENDING(feed) = nullptr;
     }
     else if (FEED_IS_VARIADIC(feed)) {
         //
@@ -399,15 +390,19 @@ inline static const RELVAL *Fetch_Next_In_Feed_Core(
         }
     }
     else {
-        // The frame was either never variadic, or it was but got spooled into
-        // an array by Reify_Va_To_Array_In_Frame().  The first END we hit
-        // is the full stop end.
-
         lookback = feed->value;
-        feed->value = END_NODE;
-        TRASH_POINTER_IF_DEBUG(FEED_PENDING(feed));
 
-        ++FEED_INDEX(feed);  // for consistency in index termination state
+        feed->value = ARR_AT(FEED_ARRAY(feed), FEED_INDEX(feed));
+        ++FEED_INDEX(feed);
+
+        if (IS_END(feed->value)) {
+            if (FEED_SPLICE(feed)) {  // one or more additional splices to go
+                REBARR *splice = FEED_SPLICE(feed);
+                memcpy(FEED_SINGULAR(feed), FEED_SPLICE(feed), sizeof(REBARR));
+                GC_Kill_Series(SER(splice));
+                goto retry_splice;
+            }
+        }
     }
 
     assert(
@@ -499,6 +494,7 @@ inline static REBFED* Alloc_Feed(void) {
     );
     Prep_Cell(FEED_SINGLE(feed));
     FEED_SPLICE(feed) = nullptr;
+    FEED_PENDING(feed) = nullptr;
 
     return feed;
 }
@@ -533,7 +529,6 @@ inline static void Prep_Array_Feed(
         Init_Any_Array_At_Core(
             FEED_SINGLE(feed), REB_BLOCK, array, index, specifier
         );
-        FEED_PENDING(feed) = STABLE(ARR_AT(array, index));
         assert(KIND3Q_BYTE_UNCHECKED(feed->value) != REB_0_END);
             // ^-- faster than NOT_END()
     }
@@ -542,12 +537,11 @@ inline static void Prep_Array_Feed(
         Init_Any_Array_At_Core(
             FEED_SINGLE(feed), REB_BLOCK, array, index + 1, specifier
         );
-        FEED_PENDING(feed) = feed->value + 1;
     }
 
     feed->gotten = nullptr;
     if (IS_END(feed->value))
-        TRASH_POINTER_IF_DEBUG(FEED_PENDING(feed));
+        assert(FEED_PENDING(feed) == nullptr);
     else
         assert(READABLE(feed->value, __FILE__, __LINE__));
 }
@@ -579,7 +573,6 @@ inline static void Prep_Va_Feed(
         FEED_VAPTR(feed) = vaptr;
         FEED_PACKED(feed) = nullptr;
     }
-    FEED_PENDING(feed) = END_NODE;  // signal next fetch comes from va_list
     Detect_Feed_Pointer_Maybe_Fetch(feed, p, false);
 
     feed->gotten = nullptr;
