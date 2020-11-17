@@ -157,6 +157,7 @@
 %functions/hijack.test.reb
 %functions/invisible.test.reb
 %functions/let.test.reb
+%functions/macro.test.reb
 %functions/modal.test.reb
 %functions/multi.test.reb
 %functions/native.test.reb

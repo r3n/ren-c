@@ -344,13 +344,21 @@ inline static void Fetch_Next_In_Feed(REBFED *feed) {
         ++FEED_INDEX(feed);
 
         if (IS_END(feed->value)) {
-            if (GET_FEED_FLAG(feed, TOOK_HOLD)) {
-                assert(GET_SERIES_INFO(FEED_ARRAY(feed), HOLD));
-                CLEAR_SERIES_INFO(FEED_ARRAY(feed), HOLD);
-                CLEAR_FEED_FLAG(feed, TOOK_HOLD);
-            }
+            //
+            // !!! At first this dropped the hold here; but that created
+            // problems if you write `do code: [clear code]`, because END
+            // is reached when CODE is fulfilled as an argument to CLEAR but
+            // before CLEAR runs.  This subverted the series hold mechanic.
+            // Instead we do the drop in Free_Feed(), though drops on splices
+            // happen here.  It's not perfect, but holds need systemic review.
 
             if (FEED_SPLICE(feed)) {  // one or more additional splices to go
+                if (GET_FEED_FLAG(feed, TOOK_HOLD)) {  // see note above
+                    assert(GET_SERIES_INFO(FEED_ARRAY(feed), HOLD));
+                    CLEAR_SERIES_INFO(FEED_ARRAY(feed), HOLD);
+                    CLEAR_FEED_FLAG(feed, TOOK_HOLD);
+                }
+
                 REBARR *splice = FEED_SPLICE(feed);
                 memcpy(FEED_SINGULAR(feed), FEED_SPLICE(feed), sizeof(REBARR));
                 GC_Kill_Series(SER(splice));
@@ -492,7 +500,17 @@ inline static void Free_Feed(REBFED *feed) {
 
     assert(IS_END(feed->value));
     assert(FEED_PENDING(feed) == nullptr);
-    assert(NOT_FEED_FLAG(feed, TOOK_HOLD));
+
+    // !!! See notes in Fetch_Next regarding the somewhat imperfect way in
+    // which splices release their holds.  (We wait until Free_Feed() so that
+    // `do code: [clear code]` doesn't drop the hold until the block frame
+    // is actually fully dropped.)
+    //
+    if (GET_FEED_FLAG(feed, TOOK_HOLD)) {
+        assert(GET_SERIES_INFO(FEED_ARRAY(feed), HOLD));
+        CLEAR_SERIES_INFO(FEED_ARRAY(feed), HOLD);
+        CLEAR_FEED_FLAG(feed, TOOK_HOLD);
+    }
 
     Free_Node(FED_POOL, cast(REBNOD*, feed));
 }

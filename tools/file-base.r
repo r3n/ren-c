@@ -34,6 +34,7 @@ core: [
     functionals/n-function.c
     functionals/c-generic.c
     functionals/c-hijack.c
+    functionals/c-macro.c
     functionals/c-native.c
     functionals/c-oneshot.c
     functionals/c-reframer.c

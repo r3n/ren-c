@@ -15,7 +15,13 @@
 (
     result: test-librebol
     did any [
-        text? result
-        all match block! result
+        text? result  ; informational string
+
+        result =  [
+            1 #[true]
+            2 #[true]
+            3 [1 2 3 d]
+            4 [1 2 3 d]
+        ]
     ]
 )
