@@ -643,7 +643,7 @@ static void Mark_Frame_Stack_Deep(void)
         REBARR *singular = FEED_SINGULAR(f->feed);
         do {
             Queue_Mark_Value_Deep(ARR_SINGLE(singular));
-            singular = LINK_SPLICE(singular);
+            singular = ARR(LINK_SPLICE_NODE(singular));
         } while (singular);
 
         // END is possible, because the frame could be sitting at the end of

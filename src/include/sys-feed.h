@@ -48,16 +48,18 @@
 #define FEED_SINGULAR(feed)     ARR(&(feed)->singular)
 #define FEED_SINGLE(feed)       &(feed)->singular.content.fixed.values[0]
 
-#define LINK_SPLICE(s)          *cast(REBARR**, &LINK(s).custom.node)
-#define MISC_PENDING(s)         *cast(const RELVAL**, &MISC(s).custom.node)
+#define LINK_SPLICE_NODE(s)     LINK(s).custom.node
+#define MISC_PENDING_NODE(s)    MISC(s).custom.node
 
-#define FEED_SPLICE(feed)       LINK_SPLICE(&(feed)->singular)
+#define FEED_SPLICE(feed) \
+    cast(REBARR*, LINK_SPLICE_NODE(&(feed)->singular))
 
 // This contains an IS_END() marker if the next fetch should be an attempt
 // to consult the va_list (if any).  That end marker may be resident in
 // an array, or if it's a plain va_list source it may be the global END.
 //
-#define FEED_PENDING(feed)      MISC_PENDING(&(feed)->singular)
+#define FEED_PENDING(feed) \
+    cast(const RELVAL*, MISC_PENDING_NODE(&(feed)->singular))
 
 #define FEED_IS_VARIADIC(feed)  IS_COMMA(FEED_SINGLE(feed))
 #define FEED_VAPTR(feed)        PAYLOAD(Comma, FEED_SINGLE(feed)).vaptr
@@ -220,6 +222,18 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
 
             GC_Kill_Series(SER(inst1));  // not manuals-tracked
         }
+        else if (GET_ARRAY_FLAG(inst1, INSTRUCTION_SPLICE)) {
+            REBVAL *single = SPECIFIC(STABLE(ARR_SINGLE(inst1)));
+            if (IS_BLOCK(single)) {
+                feed->value = nullptr;  // will become FEED_PENDING(), ignored
+                Splice_Block_Into_Feed(feed, single);
+            }
+            else {
+                Move_Value(&feed->fetched, single);
+                feed->value = &feed->fetched;
+            }
+            GC_Kill_Series(SER(inst1));
+        }
         else if (GET_ARRAY_FLAG(inst1, SINGULAR_API_RELEASE)) {
             //
             // !!! Originally this asserted it was a managed handle, but the
@@ -317,7 +331,7 @@ inline static void Fetch_Next_In_Feed(REBFED *feed) {
         assert(NOT_END(FEED_PENDING(feed)));
 
         feed->value = FEED_PENDING(feed);
-        FEED_PENDING(feed) = nullptr;
+        MISC_PENDING_NODE(&feed->singular) = nullptr;
     }
     else if (FEED_IS_VARIADIC(feed)) {
         //
@@ -468,8 +482,8 @@ inline static REBFED* Alloc_Feed(void) {
             | FLAG_LEN_BYTE_OR_255(0)
     );
     Prep_Cell(FEED_SINGLE(feed));
-    FEED_SPLICE(feed) = nullptr;
-    FEED_PENDING(feed) = nullptr;
+    LINK_SPLICE_NODE(&feed->singular) = nullptr;
+    MISC_PENDING_NODE(&feed->singular) = nullptr;
 
     return feed;
 }

@@ -66,6 +66,15 @@
     ARRAY_FLAG_24
 
 
+//=//// ARRAY_FLAG_INSTRUCTION_SPLICE /////////////////////////////////////=//
+//
+// This is used by rebINLINE() to place an array of content as raw material
+// to execute.
+//
+#define ARRAY_FLAG_INSTRUCTION_SPLICE \
+    ARRAY_FLAG_25
+
+
 // What distinguishes an API value is that it has both the NODE_FLAG_CELL and
 // NODE_FLAG_ROOT bits set.
 //

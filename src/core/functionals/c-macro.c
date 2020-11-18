@@ -63,19 +63,20 @@ void Splice_Block_Into_Feed(REBFED *feed, const REBVAL *splice) {
         memcpy(saved, FEED_SINGULAR(feed), sizeof(REBARR));
         assert(NOT_SERIES_FLAG(saved, MANAGED));
 
-        FEED_SPLICE(feed) = saved;  // old feed data resumes after the splice
+        // old feed data resumes after the splice
+        LINK_SPLICE_NODE(&feed->singular) = NOD(saved);
 
         // The feed->value which would have been seen next has to be preserved
         // as the first thing to run when the next splice happens.
         //
-        MISC_PENDING(saved) = feed->value;
+        MISC_PENDING_NODE(saved) = NOD(feed->value);
     }
 
     feed->value = VAL_ARRAY_AT(splice);
     Move_Value(FEED_SINGLE(feed), splice);
     ++VAL_INDEX_UNBOUNDED(FEED_SINGLE(feed));
  
-    FEED_PENDING(feed) = nullptr;
+    MISC_PENDING_NODE(&feed->singular) = nullptr;
 
     // !!! See remarks above about this per-feed hold logic that should be
     // per-splice hold logic.  Pending whole system review of iteration.
