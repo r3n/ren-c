@@ -380,7 +380,7 @@ load: function [
 
     ; Bind code to user context
 
-    none [
+    all .not [
         'unbound = type
         'module = select hdr 'type
         find try get 'hdr/options 'unbound
@@ -394,7 +394,7 @@ load: function [
     ; load "10" and getting `10`, not `[10]`.  But it seems like this makes
     ; the process have some variability to it that makes it a poor default.
     ;
-    none [
+    all .not [
         all_LOAD
         header  ; technically doesn't prevent returning single value (?)
         (length of data) <> 1

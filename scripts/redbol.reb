@@ -386,7 +386,9 @@ null: emulate [
 unset!: ~unset!~
 unset?: emulate [:void?]
 
-; NONE is reserved for `if none [x = 1, y = 2] [...]`
+; Note: Ren-C once reserved NONE for `if none [x = 1, y = 2] [...]`
+; Currently that is covered by `ALL .NOT [...]`, but a specialization may
+; wind up being defined for it.
 ;
 none: emulate [:blank]
 none!: emulate [:blank!]

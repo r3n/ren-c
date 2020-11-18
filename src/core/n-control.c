@@ -742,8 +742,10 @@ REBNATIVE(matches)
 //
 //  {Short-circuiting variant of AND, using a block of expressions as input}
 //
-//      return: "Product of last evaluation if all truthy, else null"
+//      return: "Product of last passing evaluation if all truthy, else null"
 //          [<opt> any-value!]
+//      :predicate "Test for whether an evaluation passes (default is .DID)"
+//          [<skip> predicate! action!]
 //      block "Block of expressions"
 //          [block!]
 //  ]
@@ -751,6 +753,10 @@ REBNATIVE(matches)
 REBNATIVE(all)
 {
     INCLUDE_PARAMS_OF_ALL;
+
+    REBVAL *predicate = ARG(predicate);
+    if (Cache_Predicate_Throws(D_OUT, predicate))
+        return R_THROWN;
 
     DECLARE_FRAME_AT (f, ARG(block), EVAL_MASK_DEFAULT);
     Push_Frame(nullptr, f);
@@ -768,16 +774,47 @@ REBNATIVE(all)
             continue;  // `all [comment "hi" 1]`, first step is stale
         }
 
-        if (IS_FALSEY(D_OUT)) {  // any false/blank/null will trigger failure
-            Abort_Frame(f);
-            return nullptr;
+        if (IS_NULLED(predicate)) {  // default predicate effectively .DID
+            if (IS_FALSEY(D_OUT)) {  // false/blank/null triggers failure
+                Abort_Frame(f);
+                return nullptr;
+            }
+        }
+        else {
+            if (RunQ_Throws(
+                D_SPARE,
+                true,
+                rebINLINE(predicate),
+                NULLIFY_NULLED(D_OUT),
+                rebEND
+            )){
+                return R_THROWN;
+            }
+
+            if (IS_FALSEY(D_SPARE)) {
+                Abort_Frame(f);
+                return nullptr;
+            }
         }
     } while (NOT_END(f->feed->value));
 
     Drop_Frame(f);
 
+    if (IS_NULLED(D_OUT)) {
+        if (NOT_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
+            //
+            // The only way a NULL evaluation that isn't the initial loaded
+            // NULL should make it to the end is if a predicate passed it,
+            // so we voidify it for: `all .not [null] then [<runs>]`
+            //
+            assert(not IS_NULLED(predicate));
+            return Init_Void(D_OUT, SYM_ALL);
+        }
+    }
+
     CLEAR_CELL_FLAG(D_OUT, OUT_MARKED_STALE);  // `all [true elide 1 + 2]`
-    return D_OUT;  // successful ALL when the last D_OUT assignment is truthy
+
+    return D_OUT;  // successful ALL when the last D_OUT assignment passed
 }
 
 
@@ -786,8 +823,10 @@ REBNATIVE(all)
 //
 //  {Short-circuiting version of OR, using a block of expressions as input}
 //
-//      return: "First truthy evaluative result, or null if all falsey"
+//      return: "First passing evaluative result, or null if none pass"
 //          [<opt> any-value!]
+//      :predicate "Test for whether an evaluation passes (default is .DID)"
+//          [<skip> predicate! action!]
 //      block "Block of expressions"
 //          [block!]
 //  ]
@@ -795,6 +834,10 @@ REBNATIVE(all)
 REBNATIVE(any)
 {
     INCLUDE_PARAMS_OF_ANY;
+
+    REBVAL *predicate = ARG(predicate);
+    if (Cache_Predicate_Throws(D_OUT, predicate))
+        return R_THROWN;
 
     DECLARE_FRAME_AT (f, ARG(block), EVAL_MASK_DEFAULT);
     Push_Frame(nullptr, f);
@@ -812,60 +855,34 @@ REBNATIVE(any)
             continue;  // `any [comment "hi" 1]`, first step is stale
         }
 
-        if (IS_TRUTHY(D_OUT)) { // successful ANY returns the value
-            Abort_Frame(f);
-            return D_OUT;
+        if (IS_NULLED(predicate)) {  // default predicate effectively .DID
+            if (IS_TRUTHY(D_OUT)) {
+                Abort_Frame(f);
+                return D_OUT;  // successful ANY returns the value
+            }
+        }
+        else {
+            if (RunQ_Throws(
+                D_SPARE,
+                true,
+                rebINLINE(predicate),
+                NULLIFY_NULLED(D_OUT),
+                rebEND
+            )){
+                return R_THROWN;
+            }
+
+            if (IS_TRUTHY(D_SPARE)) {
+                Abort_Frame(f);
+                if (IS_NULLED(D_OUT))  // `any .not [null] then [<runs>]`
+                    return Init_Void(D_OUT, SYM_ANY);
+                return D_OUT;  // return input to the test, not result
+            }
         }
     } while (NOT_END(f->feed->value));
 
     Drop_Frame(f);
     return nullptr;
-}
-
-
-//
-//  none: native [
-//
-//  {Short circuiting version of NOR, using a block of expressions as input}
-//
-//      return: "true if all expressions are falsey, null if any are truthy"
-//          [<opt> logic!]
-//      block "Block of expressions."
-//          [block!]
-//  ]
-//
-REBNATIVE(none)
-//
-// !!! In order to reduce confusion and accidents in the near term, the
-// %mezz-legacy.r renames this to NONE-OF and makes NONE report an error.
-{
-    INCLUDE_PARAMS_OF_NONE;
-
-    DECLARE_FRAME_AT (f, ARG(block), EVAL_MASK_DEFAULT);
-    Push_Frame(nullptr, f);
-
-    Init_Nulled(D_OUT);  // preload output with falsey value
-
-    do {
-        if (Eval_Step_Maybe_Stale_Throws(D_OUT, f)) {
-            Abort_Frame(f);
-            return R_THROWN;
-        }
-        if (GET_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
-            if (IS_END(f->feed->value))  // `none []`
-                break;
-            continue;  // `none [comment "hi" 1]`, first step is stale
-        }
-
-
-        if (IS_TRUTHY(D_OUT)) {  // any true results mean failure
-            Abort_Frame(f);
-            return nullptr;
-        }
-    } while (NOT_END(f->feed->value));
-
-    Drop_Frame(f);
-    return Init_True(D_OUT);  // !!! suggests LOGIC! on failure, bad?
 }
 
 
