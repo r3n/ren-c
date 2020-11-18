@@ -112,6 +112,21 @@ typedef struct rebol_mem_pool REBPOL;
 typedef struct Reb_Node REBNOD;
 
 
+//=//// "RAW" CELLS ///////////////////////////////////////////////////////=//
+//
+// A raw cell is just the structure, with no additional protections.  This
+// makes it useful for embedding in REBSER, because if it had disablement of
+// things like assignment then it would also carry disablement of memcpy()
+// of containing structures...which would limit that definition.  These
+// cells should not be used for any other purposes.
+//
+#if !defined(CPLUSPLUS_11)
+    #define REBRAW struct Reb_Value
+#else
+    #define REBRAW struct Reb_Cell  // usually only const, see REBCEL(const*)
+#endif
+
+
 //=//// RELATIVE VALUES ///////////////////////////////////////////////////=//
 //
 // Note that in the C build, %rebol.h forward-declares `struct Reb_Value` and

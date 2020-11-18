@@ -590,14 +590,6 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
         uintptr_t tick; // stored in the Reb_Value_Extra for basic tracking
         uintptr_t touch; // see TOUCH_CELL(), pads out to 4 * sizeof(void*)
       #endif
-
-      #ifdef CPLUSPLUS_11
-      public:
-        Reb_Cell () = default;
-      private:
-        Reb_Cell (Reb_Cell const & other) = delete;
-        void operator= (Reb_Cell const &rhs) = delete;
-      #endif
     };
 
 #ifdef CPLUSPLUS_11
@@ -607,7 +599,15 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     // KIND3Q_BYTE() > REB_64 are considered to be REB_QUOTED variants of the
     // byte modulo 64.
     //
-    struct Reb_Relative_Value : public Reb_Cell {};
+    struct Reb_Relative_Value : public Reb_Cell {
+      #ifdef CPLUSPLUS_11
+      public:
+        Reb_Relative_Value () = default;
+      private:
+        Reb_Relative_Value (Reb_Relative_Value const & other) = delete;
+        void operator= (Reb_Relative_Value const &rhs) = delete;
+      #endif
+    };
 #endif
 
 

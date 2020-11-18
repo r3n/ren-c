@@ -46,7 +46,7 @@
 
 
 #define FEED_SINGULAR(feed)     ARR(&(feed)->singular)
-#define FEED_SINGLE(feed)       &(feed)->singular.content.fixed.values[0]
+#define FEED_SINGLE(feed)       SER_CELL(&(feed)->singular)
 
 #define LINK_SPLICE_NODE(s)     LINK(s).custom.node
 #define MISC_PENDING_NODE(s)    MISC(s).custom.node

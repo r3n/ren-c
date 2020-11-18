@@ -592,12 +592,12 @@ union Reb_Series_Content {
     // done, see Endlike_Header()
     //
     union {
-        // Due to strict aliasing requirements, this has to be a RELVAL to
-        // read cell data.  Unfortunately this means Reb_Series_Content can't
-        // be copied by simple assignment, because in the C++ build it is
-        // disallowed to say (`*value1 = *value2;`).  Use memcpy().
+        // Due to strict aliasing requirements, this has to be initialized
+        // as a value to read cell data.  It is a Reb_Cell in order to let
+        // series nodes be memcpy()'d as part of their mechanics, but this
+        // should not be used to actually "move" cells!  Use Move_Value()
         //
-        RELVAL values[1];
+        REBRAW cells[1];
 
       #if defined(DEBUG_USE_UNION_PUNS)
         char utf8_pun[sizeof(RELVAL)];  // debug watchlist insight into UTF-8
@@ -607,7 +607,7 @@ union Reb_Series_Content {
 };
 
 #define SER_CELL(s) \
-    (&(s)->content.fixed.values[0]) // unchecked ARR_SINGLE(), used for init
+    cast(RELVAL*, &(s)->content.fixed.cells[0])  // unchecked ARR_SINGLE()
 
 
 union Reb_Series_Link {
