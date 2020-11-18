@@ -447,7 +447,11 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
             heart == REB_BYTES
             or heart == REB_WORD
             or heart == REB_GET_WORD
+            or heart == REB_GET_GROUP
+            or heart == REB_GET_BLOCK
             or heart == REB_SYM_WORD
+            or heart == REB_SYM_GROUP
+            or heart == REB_SYM_BLOCK
             or heart == REB_BLOCK
          );
          break;

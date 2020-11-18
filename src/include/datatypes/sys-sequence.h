@@ -79,6 +79,15 @@
 //        (REB_SET_WORD is currently avoided due to complications if binding
 //        were to see this "gimmick" as if it were a real SET-WORD! and
 //        treat this binding unusually...review)
+//   - REB_GET_BLOCK and REB_SYM_BLOCK for /[a] .[a] and [a]/ [a].
+//   - REB_GET_GROUP and REB_SYM_GROUP for /(a) .(a) and (a)/ (a).
+//
+// Beyond that, how creative one gets to using the HEART_BYTE() depends on
+// how much complication you want to bear in code like binding.
+//
+// !!! This should probably use a plain form for the `/x` so that `/1` and
+// `/<foo>` are at least able to be covered by the same technique, although
+// there is something consistent about treating `/` as the plain WORD! case.
 //
 
 inline static bool Is_Valid_Sequence_Element(
@@ -171,15 +180,14 @@ inline static REBVAL *Try_Leading_Blank_Pathify(
     if (not Is_Valid_Sequence_Element(kind, v))
         return nullptr;  // leave element in v to indicate "the bad element"
 
-    // The current optimization only covers WORD!s, to get parity with
-    // R3-Alpha on REFINEMENT! fitting in a cell (plus `a/`, `.a`, `a.`) 
-    // How creative one gets to using the HEART_BYTE() depends on how much
-    // complication you want to bear in code like binding.
+    // See notes at top of file regarding optimizing `/a`, `(a).`, `/[a]`,
+    // into a single cell by using special values for the HEART_BYTE().
     //
-    if (VAL_TYPE(v) == REB_WORD) {
-        assert(HEART_BYTE(v) == REB_WORD);
-        mutable_HEART_BYTE(v) = REB_GET_WORD;  // "refinement-style" signal
-        mutable_KIND3Q_BYTE(v) = kind;
+    enum Reb_Kind inner = VAL_TYPE(v);
+    if (inner == REB_WORD or inner == REB_GROUP or inner == REB_BLOCK) {
+        assert(HEART_BYTE(v) == inner);
+        mutable_HEART_BYTE(v) = GETIFY_ANY_PLAIN_KIND(inner);  // "refinement"
+        mutable_KIND3Q_BYTE(v) = kind;  // give it the veneer of a sequence
         return v;
     }
 
@@ -303,10 +311,17 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
         return nullptr;
     }
 
-    if (IS_WORD(v1) and IS_BLANK(v2)) {  // `foo.` and `foo/` cases
+    // See notes at top of file regarding optimizing `/a`, `(a).`, `/[a]`,
+    // into a single cell by using special values for the HEART_BYTE().
+    //
+    enum Reb_Kind inner = VAL_TYPE(v1);
+    if (
+        IS_BLANK(v2)
+        and (inner == REB_WORD or inner == REB_BLOCK or inner == REB_GROUP)
+    ){
         Derelativize(out, v1, specifier);
         mutable_KIND3Q_BYTE(out) = kind;
-        mutable_HEART_BYTE(out) = REB_SYM_WORD;  // signal trailing
+        mutable_HEART_BYTE(out) = SYMIFY_ANY_PLAIN_KIND(inner);
         return cast(REBVAL*, out);
     }
 
@@ -454,7 +469,11 @@ inline static REBLEN VAL_SEQUENCE_LEN(unstable REBCEL(const*) sequence) {
 
       case REB_WORD:  // simulated [_ _] sequence (`/`, `.`)
       case REB_GET_WORD:  // compressed [_ word] sequence (`.foo`, `/foo`)
+      case REB_GET_GROUP:
+      case REB_GET_BLOCK:
       case REB_SYM_WORD:  // compressed [word _] sequence (`foo.`, `foo.`)
+      case REB_SYM_GROUP:
+      case REB_SYM_BLOCK:
         return 2;
 
       case REB_BLOCK: {
@@ -505,12 +524,11 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         );
         return BLANK_VALUE; }
 
-      case REB_GET_WORD:
-      case REB_SYM_WORD: {
+      case REB_GET_WORD:  // `/a` or `.a`
+      case REB_GET_GROUP:  // `/(a)` or `.(a)`
+      case REB_GET_BLOCK: {  // `/[a]` or `.[a]`
         assert(n < 2);
-        if (heart == REB_SYM_WORD and n == 1)
-            return BLANK_VALUE;
-        if (heart == REB_GET_WORD and n == 0)
+        if (n == 0)
             return BLANK_VALUE;
 
         // Because the cell is being viewed as a PATH!, we cannot view it as
@@ -518,8 +536,24 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         //
         if (sequence != store)
             Blit_Relative(store, CELL_TO_VAL(sequence));
-        mutable_KIND3Q_BYTE(store) = REB_WORD;  // not ANY-SEQUENCE!
-        mutable_HEART_BYTE(store) = REB_WORD;  // not the fake REB_GET_WORD
+        mutable_KIND3Q_BYTE(store)
+            = mutable_HEART_BYTE(store) = PLAINIFY_ANY_GET_KIND(heart);
+        return store; }
+
+      case REB_SYM_WORD:  // `a/` or `a.`
+      case REB_SYM_GROUP:  // `(a)/` or `(a).`
+      case REB_SYM_BLOCK: {  // `[a]/` or `[a].`
+        assert(n < 2);
+        if (n == 1)
+            return BLANK_VALUE;
+ 
+        // Because the cell is being viewed as a PATH!, we cannot view it as
+        // a WORD! also unless we fiddle the bits at a new location.
+        //
+        if (sequence != store)
+            Blit_Relative(store, CELL_TO_VAL(sequence));
+        mutable_KIND3Q_BYTE(store)
+            = mutable_HEART_BYTE(store) = PLAINIFY_ANY_SYM_KIND(heart);
         return store; }
 
       case REB_BLOCK: {
@@ -551,10 +585,20 @@ inline static REBSPC *VAL_SEQUENCE_SPECIFIER(
     assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));
 
     switch (CELL_HEART(sequence)) {
+        //
+        // Getting the specifier for any of the optimized types means getting
+        // the specifier for *that item in the sequence*; the sequence itself
+        // does not provide a layer of communication connecting the insides
+        // to a frame instance (because there is no actual layer).
+        //
       case REB_BYTES:
       case REB_WORD:
       case REB_GET_WORD:
+      case REB_GET_GROUP:
+      case REB_GET_BLOCK:
       case REB_SYM_WORD:
+      case REB_SYM_GROUP:
+      case REB_SYM_BLOCK:
         return SPECIFIED;
 
       case REB_BLOCK:
