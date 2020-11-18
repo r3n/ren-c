@@ -666,7 +666,15 @@ inline static RELVAL *Prep_Cell_Core(
         ASSERT_CELL_WRITABLE_EVIL_MACRO(v, file, line);
 
         mutable_KIND3Q_BYTE(v) = REB_0_END; // release build behavior
-        mutable_HEART_BYTE(v) = REB_0_END;
+
+        // Detection of END is designed to only be signaled by one byte.
+        // See the definition of `rebEND` for how this is used to make a
+        // small C string signal, and Init_Endlike_Header() for how a singular
+        // array sacrifices just one byte of its SERIES_INFO bits to signal
+        // an END to its contents.  Hence you cannot count on the heart
+        // byte being anything in an END cell.  Set to trash in debug.
+        //
+        mutable_HEART_BYTE(v) = REB_T_TRASH;
 
         TRACK_CELL_IF_DEBUG_EVIL_MACRO(v, file, line);
         return cast(REBVAL*, v);
@@ -677,7 +685,6 @@ inline static RELVAL *Prep_Cell_Core(
 #else
     inline static REBVAL *SET_END(RELVAL *v) {
         mutable_KIND3Q_BYTE(v) = REB_0_END; // must be a prepared cell
-        mutable_HEART_BYTE(v) = REB_0_END;
         return cast(REBVAL*, v);
     }
 #endif

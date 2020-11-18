@@ -96,19 +96,17 @@ static void Mark_Devices_Deep(void);
     assert(SER_USED(GC_Mark_Stack) == 0)
 
 
-static void Queue_Mark_Opt_End_Cell_Deep(unstable const RELVAL *v);
+static void Queue_Mark_Opt_Value_Deep(unstable const RELVAL *v);
 
-inline static void Queue_Mark_Opt_Value_Deep(unstable const RELVAL *v)
-{
-    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
-    Queue_Mark_Opt_End_Cell_Deep(v);  // nulled cell & unreadable void are ok
+inline static void Queue_Mark_Opt_End_Cell_Deep(unstable const RELVAL *v) {
+    if (KIND3Q_BYTE_UNCHECKED(v) != REB_0_END)  // faster than NOT_END()
+        Queue_Mark_Opt_Value_Deep(v);
 }
 
 inline static void Queue_Mark_Value_Deep(unstable const RELVAL *v)
 {
-    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
     assert(KIND3Q_BYTE_UNCHECKED(v) != REB_NULL);  // faster than IS_NULLED()
-    Queue_Mark_Opt_End_Cell_Deep(v);  // unreadable void is ok
+    Queue_Mark_Opt_Value_Deep(v);  // unreadable void is ok
 }
 
 
@@ -237,20 +235,20 @@ static void Queue_Mark_Node_Deep(void *p)
 
 
 //
-//  Queue_Mark_Opt_End_Cell_Deep: C
+//  Queue_Mark_Opt_Value_Deep: C
 //
 // If a slot is not supposed to allow END, use Queue_Mark_Opt_Value_Deep()
 // If a slot allows neither END nor NULLED cells, use Queue_Mark_Value_Deep()
 //
-static void Queue_Mark_Opt_End_Cell_Deep(unstable const RELVAL *v)
+static void Queue_Mark_Opt_Value_Deep(unstable const RELVAL *v)
 {
+    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
+
     // We mark based on the type of payload in the cell, e.g. its "unescaped"
     // form.  So if '''a fits in a WORD! (despite being a QUOTED!), we want
     // to mark the cell as if it were a plain word.  Use the CELL_KIND.
     //
     enum Reb_Kind heart = cast(enum Reb_Kind, HEART_BYTE(v));
-    if (heart == REB_0_END)
-        return;  // no cell bits can be interpreted
 
   #if !defined(NDEBUG)  // see Queue_Mark_Node_Deep() for notes on recursion
     assert(not in_mark);
