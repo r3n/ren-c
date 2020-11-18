@@ -86,43 +86,16 @@ REBNATIVE(reduce)
             continue;  // `reduce [comment "hi"]`
         }
 
-        // Try and do some optimized dispatch for common combinations of
-        // functions with REDUCE (.identity, .try, .opt).  Bear in mind that
-        // the CFUNC* must be checked explicitly vs. the REBACT* identity,
-        // otherwise a HIJACK might be overlooked.
-
-        REBNAT dispatcher = IS_NULLED(predicate)
-            ? nullptr
-            : ACT_DISPATCHER(VAL_ACTION(predicate));
-
-        if (not dispatcher) {  // act as NON NULL, so error on NULLs
+        if (IS_NULLED(ARG(predicate))) {  // be .NON.NULL, so error on NULLs
             if (IS_NULLED(D_OUT))
                 fail (Error_Need_Non_Null_Raw(v));
 
             Move_Value(DS_PUSH(), D_OUT);
         }
-        else if (dispatcher == &N_identity) {  // NULLs dissolve
-            if (not IS_NULLED(D_OUT))
-                Move_Value(DS_PUSH(), D_OUT);
-        }
-        else if (dispatcher == &N_opt) {  // NULLs and BLANK!s dissolve
-            if (not IS_NULLED_OR_BLANK(D_OUT))
-                Move_Value(DS_PUSH(), D_OUT);
-        }
-        else if (dispatcher == &N_try) {  // turn NULL into BLANK!
-            if (IS_NULLED(D_OUT))
-                Init_Blank(DS_PUSH());
-            else
-                Move_Value(DS_PUSH(), D_OUT);
-        }
-        else if (dispatcher == &N_voidify) {  // turn NULL into VOID!
-            if (IS_NULLED(D_OUT))
-                Init_Void(DS_PUSH(), SYM_NULLED);
-            else
-                Move_Value(DS_PUSH(), D_OUT);
-        }
-        else {  // no optimization for general cases
-            REBVAL *processed = rebValue(ARG(predicate), rebQ(D_OUT), rebEND);
+        else {
+            REBVAL *processed = rebValue(
+                rebINLINE(predicate), rebQ(D_OUT),
+            rebEND);
             if (processed)
                 Move_Value(DS_PUSH(), processed);
             rebRelease(processed);
@@ -285,9 +258,8 @@ REB_R Compose_To_Stack_Core(
             if (
                 predicate
                 and not doubled_group
-                and VAL_ACTION(predicate) != NATIVE_ACT(identity)
             ){
-                insert = rebValue(predicate, rebQ(out), rebEND);
+                insert = rebValue(rebINLINE(predicate), rebQ(out), rebEND);
             } else
                 insert = IS_NULLED(out) ? nullptr : out;
 
@@ -495,7 +467,7 @@ REBNATIVE(compose)
         VAL_SPECIFIER(ARG(value)),
         ARG(label),
         did REF(deep),
-        NULLIFY_NULLED(predicate),
+        REF(predicate),
         did REF(only)
     );
 

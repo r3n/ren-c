@@ -929,7 +929,7 @@ REBNATIVE(case)
             if (RunQ_Throws(
                 temp,
                 true,  // fully = true (e.g. argument must be taken)
-                rebU(predicate),
+                rebINLINE(predicate),
                 D_OUT,  // argument
                 rebEND
             )){
@@ -1013,10 +1013,10 @@ REBNATIVE(case)
 //
 //      return: "Last case evaluation, or null if no cases matched"
 //          [<opt> any-value!]
-//      value "Target value"
-//          [<opt> any-value!]
 //      :predicate "Binary switch-processing action (default is .EQUAL?)"
 //          [<skip> predicate! action!]
+//      value "Target value"
+//          [<opt> any-value!]
 //      cases "Block of cases (comparison lists followed by block branches)"
 //          [block!]
 //      /all "Evaluate all matches (not just first one)"
@@ -1094,8 +1094,6 @@ REBNATIVE(switch)
                 continue;
         }
         else {
-            assert(IS_ACTION(predicate));  // entry code should guarantee
-
             // `switch x .greater? [10 [...]]` acts like `case [x > 10 [...]]
             // The ARG(value) passed in is the left/first argument to compare.
             //
@@ -1111,7 +1109,7 @@ REBNATIVE(switch)
             if (RunQ_Throws(
                 temp,
                 true,  // fully = true (e.g. both arguments must be taken)
-                rebU(predicate),
+                rebINLINE(predicate),
                 left,  // first arg (left hand side if infix)
                 D_OUT,  // second arg (right hand side if infix)
                 rebEND
@@ -1281,7 +1279,7 @@ REBNATIVE(default)
                 return D_OUT;  // count it as "already set"
         }
         else {
-            if (rebDid(REF(predicate), rebQ(D_OUT), rebEND))
+            if (rebDid(rebINLINE(predicate), rebQ(D_OUT), rebEND))
                 return D_OUT;
         }
     }
