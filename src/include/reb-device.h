@@ -121,19 +121,6 @@ enum {
     RDM_NULL = 1 << 0 // !!! "Null device", can this just be a boolean?
 };
 
-// Serial Parity
-enum {
-    SERIAL_PARITY_NONE,
-    SERIAL_PARITY_ODD,
-    SERIAL_PARITY_EVEN
-};
-
-// Serial Flow Control
-enum {
-    SERIAL_FLOW_CONTROL_NONE,
-    SERIAL_FLOW_CONTROL_HARDWARE,
-    SERIAL_FLOW_CONTROL_SOFTWARE
-};
 
 // Commands:
 typedef int32_t (*DEVICE_CMD_CFUNC)(REBREQ *req);
