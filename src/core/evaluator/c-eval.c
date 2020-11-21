@@ -843,7 +843,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             // Plus with GROUP!s in a path, their evaluations can't be undone.
             //
             if (GET_ACTION_FLAG(act, ENFIXED))
-                fail ("Use `<-` to shove left enfix operands into PATH!s");
+                fail ("Use `>-` to shove left enfix operands into PATH!s");
 
             DECLARE_ACTION_SUBFRAME (subframe, f);
             Push_Frame(f->out, subframe);
