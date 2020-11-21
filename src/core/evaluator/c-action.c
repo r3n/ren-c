@@ -209,8 +209,19 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     Do_Process_Action_Checks_Debug(f);
   #endif
 
-    if (f->special == f->arg)  // !!! now, a bad way to say "type check"
+    if (IS_END(f->param))  // STATE_BYTE() belongs to the dispatcher if END
+        goto dispatch;
+
+    switch (STATE_BYTE(f)) {
+      case ST_ACTION_INITIAL_ENTRY:
+        goto fulfill;
+
+      case ST_ACTION_TYPECHECKING:
         goto typecheck_then_dispatch;
+
+      default:
+        assert(false);
+    }
 
   fulfill:
 
@@ -802,11 +813,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     CLEAR_EVAL_FLAG(f, DOING_PICKUPS);  // reevaluate may set flag again
     assert(IS_END(f->param));  // signals !Is_Action_Frame_Fulfilling()
 
-    if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
-        if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))
-            fail (Error_Literal_Left_Path_Raw());
-    }
-
     if (GET_EVAL_FLAG(f, FULFILL_ONLY)) {  // only fulfillment, no typecheck
         assert(GET_CELL_FLAG(f->out, OUT_MARKED_STALE));  // didn't touch out
         goto skip_output_check;
@@ -954,6 +960,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   //=//// ACTION! ARGUMENTS NOW GATHERED, DISPATCH PHASE //////////////////=//
 
   dispatch:
+
+    if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
+        if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))  // see notes on flag
+            fail (Error_Literal_Left_Path_Raw());
+    }
 
     // This happens if you have something intending to act as enfix but
     // that does not consume arguments, e.g. `x: enfixed func [] []`.

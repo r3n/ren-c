@@ -500,6 +500,18 @@ inline static REB_R Run_Generic_Dispatch(
 }
 
 
+// The action frame run dispatchers, which get to take over the STATE_BYTE()
+// of the frame for their own use.  But before then, the state byte is used
+// by action dispatch itself.
+//
+// So if f->param is END, then this state is not meaningful.
+//
+enum {
+    ST_ACTION_INITIAL_ENTRY = 0,  // is separate "fulfilling" state needed?
+    ST_ACTION_TYPECHECKING
+};
+
+
 inline static bool Process_Action_Throws(REBFRM *f) {
     Init_Unlabeled_Void(f->out);
     SET_CELL_FLAG(f->out, OUT_MARKED_STALE);

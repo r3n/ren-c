@@ -635,7 +635,8 @@ REBNATIVE(match)
         f->special = f->arg;
 
         f->flags.bits = EVAL_MASK_DEFAULT
-            | EVAL_FLAG_FULLY_SPECIALIZED;
+            | EVAL_FLAG_FULLY_SPECIALIZED
+            | FLAG_STATE_BYTE(ST_ACTION_TYPECHECKING);
 
         Begin_Prefix_Action(f, VAL_ACTION_LABEL(test));
 

@@ -444,7 +444,8 @@ REBNATIVE(do)
         // the context's memory in the cases where a copy isn't needed.
 
         REBFLGS flags = EVAL_MASK_DEFAULT
-            | EVAL_FLAG_FULLY_SPECIALIZED;
+            | EVAL_FLAG_FULLY_SPECIALIZED
+            | FLAG_STATE_BYTE(ST_ACTION_TYPECHECKING);
 
         DECLARE_END_FRAME (f, flags);
 
@@ -762,11 +763,13 @@ REBNATIVE(applique)
 
     REBVAL *applicand = ARG(applicand);
 
-    // Need to do this up front, because it captures f->dsp.  Note that the
-    // EVAL_FLAG_PROCESS_ACTION causes the evaluator to jump straight to the
-    // point in the switch() where a function is invoked.
+    // Need to do this up front, because it captures f->dsp.
     //
-    DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT);
+    DECLARE_END_FRAME (
+        f,
+        EVAL_MASK_DEFAULT
+            | FLAG_STATE_BYTE(ST_ACTION_TYPECHECKING)  // skips fulfillment
+    );
 
     // Argument can be a literal action (APPLY :APPEND) or a WORD!/PATH!.
     // If it is a path, we push the refinements to the stack so they can
