@@ -522,21 +522,26 @@ REBNATIVE(set_meta)
 
 
 //
-//  Copy_Context_Core_Managed: C
+//  Copy_Context_Extra_Managed: C
 //
-// Copying a generic context is not as simple as getting the original varlist
-// and duplicating that.  For instance, a "live" FRAME! context (e.g. one
-// which is created by a function call on the stack) has to have its "vars"
-// (the args and locals) copied from the chunk stack.  Several other things
-// have to be touched up to ensure consistency of the rootval and the
-// relevant ->link and ->misc fields in the series node.
+// If no extra space is requested, the same keylist will be reused.
 //
-REBCTX *Copy_Context_Core_Managed(REBCTX *original, REBU64 types)
-{
+// !!! Copying a context used to be more different from copying an ordinary
+// array.  But at the moment, much of the difference is that the marked bit
+// in cells gets duplicated (so new context has the same ARG_MARKED_CHECKED
+// settings on its variables).  Review if the copying can be cohered better.
+//
+REBCTX *Copy_Context_Extra_Managed(
+    REBCTX *original,
+    REBLEN extra,
+    REBU64 types
+){
+    assert(GET_ARRAY_FLAG(CTX_VARLIST(original), IS_VARLIST));
+    ASSERT_ARRAY_MANAGED(CTX_KEYLIST(original));
     assert(NOT_SERIES_INFO(original, INACCESSIBLE));
 
     REBARR *varlist = Make_Array_For_Copy(
-        CTX_LEN(original) + 1,
+        CTX_LEN(original) + extra + 1,
         SERIES_MASK_VARLIST | NODE_FLAG_MANAGED,
         nullptr // original_array, N/A because LINK()/MISC() used otherwise
     );
@@ -567,11 +572,23 @@ REBCTX *Copy_Context_Core_Managed(REBCTX *original, REBU64 types)
 
     REBCTX *copy = CTX(varlist); // now a well-formed context
 
-    // Reuse the keylist of the original.  (If the context of the source or
-    // the copy are expanded, the sharing is unlinked and a copy is made).
-    // This goes into the ->link field of the REBSER node.
-    //
-    INIT_CTX_KEYLIST_SHARED(copy, CTX_KEYLIST(original));
+    if (extra == 0)
+        INIT_CTX_KEYLIST_SHARED(copy, CTX_KEYLIST(original));  // ->link field
+    else {
+        assert(CTX_TYPE(original) != REB_FRAME);  // can't expand FRAME!s
+
+        REBARR *keylist = Copy_Array_At_Extra_Shallow(
+            CTX_KEYLIST(original),
+            0,
+            SPECIFIED,
+            extra,
+            SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
+        );
+
+        LINK_ANCESTOR_NODE(keylist) = NOD(CTX_KEYLIST(original));
+
+        INIT_CTX_KEYLIST_UNIQUE(copy, keylist);  // ->link field
+    }
 
     // A FRAME! in particular needs to know if it points back to a stack
     // frame.  The pointer is NULLed out when the stack level completes.
@@ -879,7 +896,7 @@ REBTYPE(Context)
         return Init_Any_Context(
             D_OUT,
             VAL_TYPE(context),
-            Copy_Context_Core_Managed(c, types)
+            Copy_Context_Extra_Managed(c, 0, types)
         ); }
 
       case SYM_SELECT:

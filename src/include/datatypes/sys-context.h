@@ -424,7 +424,7 @@ inline static REBVAL *Init_Frame(
 //
 
 #define Copy_Context_Shallow_Managed(src) \
-    Copy_Context_Shallow_Extra_Managed((src), 0)
+    Copy_Context_Extra_Managed((src), 0, 0)
 
 // Make sure a context's keylist is not shared.  Note any CTX_KEY() values
 // may go stale from this context after this call.

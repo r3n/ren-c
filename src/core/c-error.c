@@ -786,9 +786,11 @@ REBCTX *Make_Error_Managed_Core(
     // any name?  (e.g. NEAR and WHERE?)  In that case, we would be copying
     // the "standard format" error as a meta object instead.
     //
-    REBCTX *error = Copy_Context_Shallow_Extra_Managed(
+    REBU64 types = 0;
+    REBCTX *error = Copy_Context_Extra_Managed(
         root_error,
-        expected_args  // Note: won't make new keylist if expected_args is 0
+        expected_args,  // Note: won't make new keylist if expected_args is 0
+        types
     );
 
     // Copying with extra reserved the capacity, but didn't bump the length.
