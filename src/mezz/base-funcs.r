@@ -161,7 +161,7 @@ func: func* [
                 append/only new-spec spaced other  ; spec notes
             )
         ] '[
-            set var: set-word! (  ; locals legal anywhere
+            set var: tuple! (  ; locals legal anywhere
                 append exclusions var
                 append new-spec var
                 var: _
@@ -188,7 +188,7 @@ func: func* [
     |
         <local>
         any [set var: word! (other: _) opt set other: group! (
-            append new-spec as set-word! var
+            append new-spec to tuple! var
             append exclusions var
             if other [
                 defaulters: default [copy []]
@@ -265,12 +265,11 @@ func: func* [
     ]
 
     ; !!! The words that come back from COLLECT-WORDS are all WORD!, but we
-    ; need SET-WORD! to specify pure locals to the generators.  Review the
-    ; COLLECT-WORDS interface to efficiently give this result, as well as
-    ; a possible COLLECT-WORDS/INTO
+    ; need blank-headed-TUPLE! for pure locals to the generators.  Review the
+    ; COLLECT-WORDS interface to efficiently give this result.
     ;
     for-each loc locals [
-        append new-spec to set-word! loc
+        append new-spec to tuple! loc
     ]
 
     append new-spec opt with-return  ; if FUNC* suppresses return generation

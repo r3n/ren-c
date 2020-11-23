@@ -673,6 +673,14 @@ inline static bool IS_REFINEMENT_CELL(REBCEL(const*) v)
 inline static bool IS_REFINEMENT(const RELVAL *v)
   { return IS_PATH(v) and HEART_BYTE(v) == REB_GET_WORD; }
 
+inline static bool IS_PREDICATE1_CELL(REBCEL(const*) cell)
+  { return CELL_KIND(cell) == REB_TUPLE and CELL_HEART(cell) == REB_GET_WORD; }
+
+inline static const REBSTR *VAL_PREDICATE1_SPELLING(REBCEL(const*) cell) {
+    assert(IS_PREDICATE1_CELL(cell));
+    return VAL_WORD_SPELLING(cell);
+}
+
 inline static bool IS_PREDICATE(const RELVAL *v) {
     if (not IS_TUPLE(v))
         return false;

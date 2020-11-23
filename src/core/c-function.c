@@ -359,12 +359,13 @@ void Push_Paramlist_Triads_May_Fail(
         }
 
         REBCEL(const*) cell = VAL_UNESCAPED(item);
+        enum Reb_Kind kind = CELL_KIND(cell);
 
-        const REBSTR* spelling;
-        Reb_Param_Class pclass = REB_P_DETECT;
+        const REBSTR* spelling = nullptr;  // avoids compiler warning
+        Reb_Param_Class pclass = REB_P_DETECT;  // error if not changed below
 
         bool refinement = false;  // paths with blanks at head are refinements
-        if (ANY_PATH_KIND(CELL_KIND(cell))) {
+        if (ANY_PATH_KIND(kind)) {
             if (not IS_REFINEMENT_CELL(cell))
                 fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
 
@@ -394,9 +395,22 @@ void Push_Paramlist_Triads_May_Fail(
                     pclass = REB_P_NORMAL;
             }
         }
-        else if (ANY_WORD_KIND(CELL_KIND(cell))) {
+        else if (ANY_TUPLE_KIND(kind)) {
+            //
+            // !!! Tuples are theorized as a way to "name parameters out of
+            // the way" so there can be an interface name, but then a local
+            // name...so that something like /ALL can be named out of the
+            // way without disrupting use of ALL.  That's not implemented yet,
+            // but it's now another way to name locals.
+            //
+            if (IS_PREDICATE1_CELL(cell) and not quoted) {
+                pclass = REB_P_LOCAL;
+                spelling = VAL_PREDICATE1_SPELLING(cell);
+            }
+        }
+        else if (ANY_WORD_KIND(kind)) {
             spelling = VAL_WORD_SPELLING(cell);
-            if (CELL_KIND(cell) == REB_SET_WORD) {
+            if (kind == REB_SET_WORD) {
                 if (not quoted)
                     pclass = REB_P_LOCAL;
             }
@@ -404,17 +418,17 @@ void Push_Paramlist_Triads_May_Fail(
                 if (refinement_seen and mode == SPEC_MODE_NORMAL)
                     fail (Error_Legacy_Refinement_Raw(spec));
 
-                if (CELL_KIND(cell) == REB_GET_WORD) {
+                if (kind == REB_GET_WORD) {
                     if (not quoted)
                         pclass = REB_P_HARD_QUOTE;
                 }
-                else if (CELL_KIND(cell) == REB_WORD) {
+                else if (kind == REB_WORD) {
                     if (quoted)
                         pclass = REB_P_SOFT_QUOTE;
                     else
                         pclass = REB_P_NORMAL;
                 }
-                else if (CELL_KIND(cell) == REB_SYM_WORD) {
+                else if (kind == REB_SYM_WORD) {
                     if (not quoted)
                         pclass = REB_P_MODAL;
                 }

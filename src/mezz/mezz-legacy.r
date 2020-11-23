@@ -242,7 +242,7 @@ rejoin: func [
 forever: :cycle
 
 
-apply: func [dummy:] [
+apply: func [.dummy] [
     fail @dummy [
         {APPLY is being reverted to a reimagination of the positional}
         {APPLY from Rebol2/R3-Alpha, but with a different way of dealing with}
