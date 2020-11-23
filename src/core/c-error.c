@@ -781,98 +781,68 @@ REBCTX *Make_Error_Managed_Core(
     else // Just a string, no arguments expected.
         assert(IS_TEXT(message));
 
-    REBCTX *error;
-    if (expected_args == 0) {
+    // !!! Should things like NEAR and WHERE be in the META and not in the
+    // object for the ERROR! itself, so the error could have arguments with
+    // any name?  (e.g. NEAR and WHERE?)  In that case, we would be copying
+    // the "standard format" error as a meta object instead.
+    //
+    REBCTX *error = Copy_Context_Shallow_Extra_Managed(
+        root_error,
+        expected_args  // Note: won't make new keylist if expected_args is 0
+    );
 
-        // If there are no arguments, we don't need to make a new keylist...
-        // just a new varlist to hold this instance's settings.
+    // Copying with extra reserved the capacity, but didn't bump the length.
+    // Do it now so CTX_KEY/CTX_VAR don't assert on out of bounds access.
+    //
+    REBLEN root_len = CTX_LEN(root_error);
+    TERM_ARRAY_LEN(CTX_VARLIST(error), root_len + expected_args + 1);
+    TERM_ARRAY_LEN(CTX_KEYLIST(error), root_len + expected_args + 1);
 
-        error = Copy_Context_Shallow_Managed(root_error);
-    }
-    else {
-        // !!! See remarks on how the modern way to handle this may be to
-        // put error arguments in the error object, and then have the META-OF
-        // hold the generic error parameters.  Investigate how this ties in
-        // with user-defined types.
+    REBVAL *key = CTX_KEY(error, root_len) + 1;  // 1-based indexing
+    REBVAL *var = CTX_VAR(error, root_len) + 1;
 
-        REBLEN root_len = CTX_LEN(root_error);
+    unstable const RELVAL *msg_item =
+        IS_TEXT(message)
+            ? cast(const RELVAL*, END_NODE)  // gcc/g++ 2.95 needs (bug)
+            : ARR_HEAD(VAL_ARRAY(message));
 
-        // Should the error be well-formed, we'll need room for the new
-        // expected values *and* their new keys in the keylist.
-        //
-        error = Copy_Context_Shallow_Extra_Managed(root_error, expected_args);
+    // Arrays from errors.r look like `["The value" :arg1 "is not" :arg2]`
+    // They can also be a single TEXT! (which will just bypass this loop).
+    //
+    for (; NOT_END(msg_item); ++msg_item) {
+        if (IS_GET_WORD(msg_item)) {
+            Init_Context_Key(key, VAL_WORD_SPELLING(msg_item));
 
-        // Fix up the tail first so CTX_KEY and CTX_VAR don't complain
-        // in the debug build that they're accessing beyond the error length
-        //
-        TERM_ARRAY_LEN(CTX_VARLIST(error), root_len + expected_args + 1);
-        TERM_ARRAY_LEN(CTX_KEYLIST(error), root_len + expected_args + 1);
+            const void *p = va_arg(*vaptr, const void*);
 
-        REBVAL *key = CTX_KEY(error, root_len) + 1;
-        REBVAL *value = CTX_VAR(error, root_len) + 1;
-
-    #ifdef NDEBUG
-        const RELVAL *temp = ARR_HEAD(VAL_ARRAY(message));
-    #else
-        // Will get here even for a parameterless string due to throwing in
-        // the extra "arguments" of the __FILE__ and __LINE__
-        //
-        unstable const RELVAL *temp =
-            IS_TEXT(message)
-                ? cast(const RELVAL*, END_NODE) // gcc/g++ 2.95 needs (bug)
-                : ARR_HEAD(VAL_ARRAY(message));
-    #endif
-
-        for (; NOT_END(temp); ++temp) {
-            if (IS_GET_WORD(temp)) {
-                const void *p = va_arg(*vaptr, const void*);
-
+            if (p == nullptr) {
+                //
                 // !!! Variadic Error() predates rebNull...but should possibly
                 // be adapted to take nullptr instead of "nulled cells".  For
                 // the moment, though, it still takes nulled cells.
                 //
-                assert(p != nullptr);
-
-                if (IS_END(p)) {
-                  #ifdef NDEBUG
-                    //
-                    // If the C code passed too few args in a debug build,
-                    // prevent a crash in the release build by filling it.
-                    //
-                    p = BLANK_VALUE; // ...or perhaps ISSUE! `#404` ?
-                  #else
-                    //
-                    // Termination is currently optional, but catches mistakes
-                    // (requiring it could check for too *many* arguments.)
-                    //
-                    panic ("too few args passed for error");
-                  #endif
-                }
-
-              #if !defined(NDEBUG)
-                if (IS_RELATIVE(cast(const RELVAL*, p))) {
-                    //
-                    // Make_Error doesn't have any way to pass in a specifier,
-                    // so only specific values should be used.
-                    //
-                    printf("Relative value passed to Make_Error()\n");
-                    panic (p);
-                }
-              #endif
-
-                const REBVAL *arg = cast(const REBVAL*, p);
-
-                Init_Context_Key(key, VAL_WORD_SPELLING(temp));
-                Move_Value(value, arg);
-
-                key++;
-                value++;
+                assert(!"nullptr passed to Make_Error_Managed_Core()");
+                Init_Nulled(var);
             }
-        }
+            else if (IS_END(p)) {
+                assert(!"Not enough arguments in Make_Error_Managed_Core()");
+                Init_Void(var, SYM_END);
+            }
+            else if (IS_RELATIVE(cast(const RELVAL*, p))) {
+                assert(!"Relative argument in Make_Error_Managed_Core()");
+                Init_Void(var, SYM_VOID);
+            }
+            else {
+                const REBVAL *arg = cast(const REBVAL*, p);
+                Move_Value(var, arg);
+            }
 
-        assert(IS_END(key)); // set above by TERM_ARRAY_LEN
-        assert(IS_END(value)); // ...same
+            ++key;
+            ++var;
+        }
     }
+    assert(IS_END(key));
+    assert(IS_END(var));
 
     mutable_KIND3Q_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
     mutable_HEART_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
