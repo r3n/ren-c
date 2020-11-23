@@ -52,10 +52,11 @@ static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
 //
 //      return: "ERROR! if raised, else null"
 //          [<opt> error!]
+//      result: "<output> The optional result of the evaluation"
+//          [<opt> any-value!]
+//
 //      code "Code to execute and monitor"
 //          [block! action!]
-//      /result "The optional output result of the evaluation"
-//          [<output> <opt> any-value!]
 //  ]
 //
 REBNATIVE(trap)

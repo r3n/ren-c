@@ -55,6 +55,9 @@ REBNATIVE(form)
 //  "Converts a value to a REBOL-readable string."
 //
 //      return: [text!]
+//      truncated: "<output> Whether the mold was truncated"
+//          [logic!]
+//
 //      value "The value to mold"
 //          [any-value!]
 //      /only "For a block value, mold only its contents, no outer []"
@@ -62,8 +65,6 @@ REBNATIVE(form)
 //      /flat "No indentation"
 //      /limit "Limit to a certain length"
 //          [integer!]
-//      /truncated "Whether the mold was truncated"
-//          [<output> logic!]
 //  ]
 //
 REBNATIVE(mold)

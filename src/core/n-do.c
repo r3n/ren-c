@@ -501,6 +501,9 @@ REBNATIVE(do)
 //
 //      return: "Next position (quoted if result requested and invisible)"
 //          [<opt> quoted! block! group! varargs!]
+//      result: "<output> Value from the step (invisibles quote return pos)"
+//          [<opt> any-value!]
+//
 //      source [
 //          <blank>  ; useful for `evaluate try ...` scenarios when no match
 //          quoted!  ; accepts quoted source (may carry bit from prior eval)
@@ -508,8 +511,6 @@ REBNATIVE(do)
 //          group!  ; same as block (or should it have some other nuance?)
 //          varargs!  ; simulates as if frame! or block! is being executed
 //      ]
-//      /result "Value from the step (VOID! + quoted return pos if invisible)"
-//          [<output> <opt> any-value!]
 //  ]
 //
 REBNATIVE(evaluate)

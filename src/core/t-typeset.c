@@ -188,23 +188,6 @@ bool Add_Typeset_Bits_Core(
             else if (0 == CT_String(item, Root_Invisible_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_INVISIBLE);  // !!! REB_BYTES hack
             }
-            else if (0 == CT_String(item, Root_Output_Tag, strict)) {
-                //
-                // !!! Typeset bits are currently scarce, so output is being
-                // indicated solely by being a refinement and having this
-                // set of potential argument types.  It represents little
-                // risk at time of writing to disrupting existing code during
-                // the multiple return values prototyping stage, because it
-                // only has an effect when you use a SET-BLOCK! to the left.
-                //
-                CLEAR_ALL_TYPESET_BITS(typeset);
-                TYPE_SET(typeset, REB_TS_REFINEMENT);
-                TYPE_SET(typeset, REB_NULL);
-                TYPE_SET(typeset, REB_ISSUE);  // see Is_Blackhole()
-                TYPE_SET(typeset, REB_WORD);
-                TYPE_SET(typeset, REB_PATH);
-                break;
-            }
             else if (0 == CT_String(item, Root_Skip_Tag, strict)) {
                 if (VAL_PARAM_CLASS(typeset) != REB_P_HARD_QUOTE)
                     fail ("Only hard-quoted parameters are <skip>-able");
@@ -215,6 +198,12 @@ bool Add_Typeset_Bits_Core(
             }
             else if (0 == CT_String(item, Root_Const_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_CONST);
+            }
+            else if (0 == CT_String(item, Root_In_Out_Tag, strict)) {
+                if (VAL_PARAM_CLASS(typeset) != REB_P_OUTPUT)
+                    fail ("Only output parameters can be marked <in-out>");
+
+                TYPE_SET(typeset, REB_TS_IN_OUT);
             }
             else if (0 == CT_String(item, Root_Modal_Tag, strict)) {
                 //

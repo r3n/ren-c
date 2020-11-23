@@ -98,7 +98,7 @@ emit-include-params-macro: function [
         for-each item paramlist [
             any [
                 not match [any-word! refinement! lit-word!] item
-                set-word? item
+                item = lit return:
             ] then [
                 continue
             ]

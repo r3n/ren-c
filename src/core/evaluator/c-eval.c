@@ -1090,19 +1090,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (not IS_ACTION(f_spare))
             fail ("SET-BLOCK! is only allowed to have ACTION! on right ATM.");
 
-        // Find all the "output" parameters.  Right now that's any parameter
-        // which is marked as being legal to be word! or path! *specifically*.
-        //
-        const REBU64 ts_out = FLAGIT_KIND(REB_TS_REFINEMENT)
-            | FLAGIT_KIND(REB_NULL)
-            | FLAGIT_KIND(REB_ISSUE)  // for Is_Blackhole() use with SET
-            | FLAGIT_KIND(REB_WORD)
-            | FLAGIT_KIND(REB_PATH);
-
         REBDSP dsp_outputs = DSP;
         REBVAL *temp = ACT_PARAMS_HEAD(VAL_ACTION(f_spare));
         for (; NOT_END(temp); ++temp) {
-            if (not TYPE_CHECK_EXACT_BITS(temp, ts_out))
+            if (VAL_PARAM_CLASS(temp) != REB_P_OUTPUT)
                 continue;
             Init_Word(DS_PUSH(), VAL_TYPESET_STRING(temp));
         }

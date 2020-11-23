@@ -66,6 +66,7 @@ static bool Params_Of_Hook(
 
         switch (VAL_PARAM_CLASS(param)) {
           case REB_P_NORMAL:
+          case REB_P_OUTPUT:
             break;
 
           case REB_P_HARD_QUOTE:
@@ -410,9 +411,15 @@ void Push_Paramlist_Triads_May_Fail(
         }
         else if (ANY_WORD_KIND(kind)) {
             spelling = VAL_WORD_SPELLING(cell);
+
             if (kind == REB_SET_WORD) {
-                if (not quoted)
+                if (VAL_WORD_SYM(cell) == SYM_RETURN and not quoted) {
                     pclass = REB_P_LOCAL;
+                }
+                else if (not quoted) {
+                    refinement = true;  // sets REB_TS_REFINEMENT (optional)
+                    pclass = REB_P_OUTPUT;
+                }
             }
             else {
                 if (refinement_seen and mode == SPEC_MODE_NORMAL)
@@ -1096,6 +1103,7 @@ REBACT *Make_Action(
     if (first_unspecialized) {
         switch (VAL_PARAM_CLASS(first_unspecialized)) {
           case REB_P_NORMAL:
+          case REB_P_OUTPUT:
             break;
 
           case REB_P_HARD_QUOTE:

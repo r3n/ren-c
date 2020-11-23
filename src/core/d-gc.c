@@ -131,8 +131,11 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
         assert(VAL_TYPE_KIND_OR_CUSTOM(v) != REB_0);
         break;
 
-      case REB_TYPESET: // !!! Currently just 64-bits of bitset
-        break;
+      case REB_TYPESET: {  // bitset bits don't need marking, but symbol may
+        REBSTR *s = VAL_TYPESET_STRING(v);
+        if (GET_CELL_FLAG(v, FIRST_IS_NODE))
+            assert(s == nullptr or Is_Marked(s));
+        break; }
 
       case REB_BITSET: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
@@ -395,16 +398,6 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
         panic ("REB_QUOTED with (KIND3Q_BYTE() % REB_64) > 0");
 
     //=//// BEGIN INTERNAL TYPES ////////////////////////////////////////=//
-
-      case REB_P_NORMAL:
-      case REB_P_HARD_QUOTE:
-      case REB_P_MODAL:
-      case REB_P_SOFT_QUOTE:
-      case REB_P_LOCAL: {
-        REBSTR *s = VAL_TYPESET_STRING(v);
-        assert(Is_Marked(s));
-        assert(HEART_BYTE(v) == REB_TYPESET);
-        break; }
 
       case REB_G_XYF:
         //

@@ -5,7 +5,7 @@
 ; variable that is then set by the code.
 ;
 ; The difference is that it offers the ability to specifically label such
-; refinements as <output>, and if this is done then it will participate
+; refinements as outputs, and if this is done then it will participate
 ; in the evaluator with the SET-BLOCK! construct, which will do an ordered
 ; injection of parameters from the left-hand side.  It takes care of
 ; pre-composing any PATH!s with GROUP!s in them, as well as voiding the
@@ -15,7 +15,7 @@
 ; that can take advantage of the shorthand.
 
 [
-    (test: func [x /y [<output>] /z [<output>]] [
+    (test: func [x y: z:] [
         if not null? y [
             assert [void? get/any y]
             set y <y-result>

@@ -437,6 +437,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             }
             else switch (pclass) {
               case REB_P_NORMAL:
+              case REB_P_OUTPUT:
                 enfix_normal_handling:
 
                 Move_Value(f->arg, f->out);
@@ -594,6 +595,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   //=//// REGULAR ARG-OR-REFINEMENT-ARG (consumes 1 EVALUATE's worth) /////=//
 
           case REB_P_NORMAL:
+          case REB_P_OUTPUT:
           normal_handling: {
             if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
                 Init_Endish_Nulled(f->arg);

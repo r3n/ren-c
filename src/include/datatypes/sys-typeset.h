@@ -460,6 +460,20 @@ inline static bool Typecheck_Including_Constraints(
     const RELVAL *param,
     const RELVAL *v
 ){
+    if (VAL_PARAM_CLASS(param) == REB_P_OUTPUT) {
+        //
+        // !!! For the moment, output parameters don't actually check the
+        // typeset for the value being written... they just check that you've
+        // given a location to write.
+        //
+        const REBU64 ts_out = FLAGIT_KIND(REB_TS_REFINEMENT)
+            | FLAGIT_KIND(REB_NULL)
+            | FLAGIT_KIND(REB_ISSUE)  // for Is_Blackhole() use with SET
+            | FLAGIT_KIND(REB_WORD)
+            | FLAGIT_KIND(REB_PATH);
+        return (ts_out & FLAGIT_KIND(VAL_TYPE(v))) != 0;
+    }
+
     if (TYPE_CHECK(param, VAL_TYPE(v)))
         return true;
 
@@ -499,7 +513,10 @@ inline static void Typecheck_Refinement(const RELVAL *param, REBVAL *arg) {
         //
         // Not in use
     }
-    else if (Is_Typeset_Empty(param)) {
+    else if (
+        Is_Typeset_Empty(param)
+        and VAL_PARAM_CLASS(param) != REB_P_OUTPUT
+    ){
         if (not Is_Blackhole(arg))
             fail ("Parameterless Refinements Must be either # or NULL");
     }

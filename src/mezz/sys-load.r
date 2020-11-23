@@ -92,15 +92,19 @@ load-header: function [
 
     return: "header OBJECT! if present, or error WORD!"
         [<opt> object! word!]
+    body: "<output>"
+        [binary! block!]
+    line: "<output>"
+        [integer!]
+    final: "<output>"
+        [<output> binary!]
+
     source "Source code (text! will be UTF-8 encoded)"
         [binary! text!]
     /file "Where source is being loaded from"
         [file! url!]
     /only "Only process header, don't decompress body"
     /required "Script header is required"
-    /body [<output> binary! block!]
-    /line [<output> integer!]
-    /final [<output> binary!]
 
     <static>
     non-ws (make bitset! [not 1 - 32])
@@ -259,10 +263,11 @@ load: function [
 
     return: "Loaded code (may be single-value if /header or /all not used)"
         [any-value!]
+    header: "<output> Request the Rebol header object be returned as well"
+        [object!]
+
     source "Source or block of sources"
         [file! url! text! binary! block!]
-    /header "Request the Rebol header object be returned as well"
-        [<output> object!]
     /all "Load all values (cannot be used with /HEADER)"  ; use all_LOAD
     /type "E.g. rebol, text, markup, jpeg... (by default, auto-detected)"
         [word!]

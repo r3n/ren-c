@@ -2777,13 +2777,14 @@ REBNATIVE(subparse)
 //
 //      return: "null if rules failed, else terminal position of match"
 //          [<opt> any-series!]
+//      progress: "<output> Allow partial matches; returns progress position"
+//          [<opt> any-series!]
+//
 //      input "Input series to parse"
 //          [<blank> any-series!]
 //      rules "Rules to parse by"
 //          [<blank> block!]
 //      /case "Uses case-sensitive comparison"
-//      /progress "Allow partial matches; set to how far a match progressed"
-//          [<output> <opt> any-series! quoted!]
 //  ]
 //
 REBNATIVE(parse)
