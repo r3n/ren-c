@@ -422,8 +422,12 @@ void Push_Paramlist_Triads_May_Fail(
                 }
             }
             else {
-                if (refinement_seen and mode == SPEC_MODE_NORMAL)
+                if (  // let RETURN: presence indicate you know new rules
+                    refinement_seen and mode == SPEC_MODE_NORMAL
+                    and *definitional_return_dsp == 0
+                ){
                     fail (Error_Legacy_Refinement_Raw(spec));
+                }
 
                 if (kind == REB_GET_WORD) {
                     if (not quoted)
@@ -769,6 +773,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         INIT_BINDING(rootvar, UNBOUND);
 
         REBVAL *dest = rootvar + 1;
+        const RELVAL *param = ARR_AT(paramlist, 1);
 
         unstable REBVAL *src = DS_AT(dsp_orig + 2);
         src += 3;
@@ -790,7 +795,9 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             }
 
             Init_Nulled(dest); // clear the local RETURN: var's description
+            SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
             ++dest;
+            ++param;
         }
 
         for (; src <= DS_TOP; src += 3) {
@@ -802,8 +809,13 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
                 Init_Nulled(dest);
             else
                 Move_Value(dest, src);
+
+            if (Is_Param_Hidden(param, param))  // special = param
+                SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
             ++dest;
+            ++param;
         }
+        assert(IS_END(param));
 
         TERM_ARRAY_LEN(types_varlist, num_slots);
 
@@ -833,6 +845,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         INIT_VAL_CONTEXT_PHASE(rootvar, ACT(paramlist));
         INIT_BINDING(rootvar, UNBOUND);
 
+        const RELVAL *param = ARR_AT(paramlist, 1);
         REBVAL *dest = rootvar + 1;
 
         unstable REBVAL *src = DS_AT(dsp_orig + 3);
@@ -854,7 +867,9 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             }
 
             Init_Nulled(dest);
+            SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
             ++dest;
+            ++param;
         }
 
         for (; src <= DS_TOP; src += 3) {
@@ -866,8 +881,13 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
                 Init_Nulled(dest);
             else
                 Move_Value(dest, src);
+
+            if (Is_Param_Hidden(param, param))  // param = special
+                SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
             ++dest;
+            ++param;
         }
+        assert(IS_END(param));
 
         TERM_ARRAY_LEN(notes_varlist, num_slots);
 

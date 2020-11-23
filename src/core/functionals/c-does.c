@@ -216,18 +216,7 @@ REBNATIVE(does)
     }
     else {
         // On all other types, we just make it act like a specialized call to
-        // DO for that value.  But since we're manually specializing it, we
-        // are responsible for type-checking...the evaluator expects any
-        // specialization process to do so (otherwise it would have to pay
-        // for type checking on each call).
-        //
-        // !!! The error reports that DOES doesn't accept the type for its
-        // specializee argument, vs. that DO doesn't accept it.
-        //
-        REBVAL *typeset = ACT_PARAM(NATIVE_ACT(do), 1);
-        REBVAL *param = PAR(specializee);
-        if (not TYPE_CHECK(typeset, VAL_TYPE(specializee)))
-            fail (Error_Arg_Type(frame_, param, VAL_TYPE(specializee)));
+        // DO for that value.
 
         exemplar = Make_Context_For_Action(
             NATIVE_VAL(do),
@@ -240,7 +229,6 @@ REBNATIVE(does)
         //
         assert(VAL_KEY_SYM(CTX_KEY(exemplar, 1)) == SYM_RETURN);
         Move_Value(CTX_VAR(exemplar, 2), specializee);
-        SET_CELL_FLAG(CTX_VAR(exemplar, 2), ARG_MARKED_CHECKED);
         Move_Value(specializee, NATIVE_VAL(do));
         label = ANONYMOUS;
     }

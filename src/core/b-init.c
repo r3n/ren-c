@@ -266,6 +266,7 @@ static void Init_Action_Meta_Shim(void) {
 
     Init_Object(CTX_VAR(meta, 1), meta); // it's "selfish"
     Hide_Param(CTX_KEY(meta, 1));  // hide self
+    SET_CELL_FLAG(CTX_VAR(meta, 1), ARG_MARKED_CHECKED);
 
     Root_Action_Meta = Init_Object(Alloc_Value(), meta);
     Force_Value_Frozen_Deep(Root_Action_Meta);

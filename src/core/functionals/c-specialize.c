@@ -162,7 +162,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     for (; NOT_END(param); ++param, ++arg, ++special, ++index) {
         Prep_Cell(arg);
 
-        if (Is_Param_Hidden(param)) {  // local or specialized
+        if (Is_Param_Hidden(param, special)) {  // local or specialized
             if (param == special) {  // no prior exemplar
                 Init_Void(arg, SYM_UNDEFINED);
                 SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
@@ -344,11 +344,9 @@ bool Specialize_Action_Throws(
         RELVAL *key = CTX_KEYS_HEAD(exemplar);
         REBVAL *var = CTX_VARS_HEAD(exemplar);
         for (; NOT_END(key); ++key, ++var) {
-            if (Is_Param_Hidden(key))
-                continue;
-
-            if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED))
+            if (Is_Param_Hidden(key, var))
                 continue;  // maybe refinement from stack, now specialized out
+
             Remove_Binder_Index(&binder, VAL_KEY_CANON(key));
         }
         SHUTDOWN_BINDER(&binder);
@@ -365,52 +363,57 @@ bool Specialize_Action_Throws(
         }
     }
 
-    REBVAL *rootkey = CTX_ROOTKEY(exemplar);
+    // The paramlist for the specialization is an exact clone of the original
+    // but with a new identity.  Knowledge of which arguments should now be
+    // invisible on the external interface come from checking bits in the
+    // ACT_SPECIALTY(), e.g. this comes from ARG_MARKED_CHECKED.
+    //
+    // !!! Investigate how to avoid making a copy of the paramlist, maybe by
+    // having a mechanism for sharing data pointers (or wilder ideas, like an
+    // ACTION! with a heart byte that's actually a FRAME?)  Note that having
+    // different memory cells for the parameters permits their mutation with
+    // things like TWEAK, but that might not be a great idea.
+    //
+    REBARR *paramlist = Copy_Array_Shallow_Flags(
+        ACT_PARAMLIST(unspecialized),
+        SPECIFIED,
+        SERIES_MASK_PARAMLIST
+            | (SER(unspecialized)->header.bits & PARAMLIST_MASK_INHERIT)
+            | NODE_FLAG_MANAGED
+    );
+    Sync_Paramlist_Archetype(paramlist);  // [0] cell must hold copied pointer
+    MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
 
-    // Build up the paramlist for the specialized function on the stack.
-    // The same walk used for that is used to link and process REB_X_PARTIAL
-    // arguments for whether they become fully specialized or not.
-
-    REBDSP dsp_paramlist = DSP;
-    Move_Value(DS_PUSH(), ACT_ARCHETYPE(unspecialized));
-
-    REBVAL *param = rootkey + 1;
+    const RELVAL *param = ARR_AT(paramlist, 1);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
 
     REBDSP ordered_dsp = lowest_ordered_dsp;
 
     for (; NOT_END(param); ++param, ++arg) {
-        if (Is_Param_Hidden(param)) {
-            //
-            // We are producing a new paramlist, so we want to ensure that
-            // anything that was hidden on the paramlist we are deriving from
-            // gets completely sealed from visibility at the new layer.
-            // This opens up names for reuse and keeps from viewing the
-            // levels that should be private.
-            //
-            Move_Value(DS_PUSH(), param);
-            Seal_Param(param);
+        //
+        // Note: We don't want to immediately accept the ARG_MARKED_CHECKED as
+        // hidden and done, because if the parameter wasn't hidden at the
+        // outset it hasn't been typechecked yet.
+        //
+        // !!! Should PROTECT/HIDE do the type checking at the PROTECT if it
+        // detects the field is in a FRAME!?
 
-            // !!! Currently we assume that a parameter that is hidden at
-            // the start is hidden at the end.  However, if someone wanted
-            // to actually specialize an ~undefined~ then allowing them to
-            // hide the key would be a way to do that.  It would require being
-            // tolerant of this in the binding diff.
-            //
+        if (Is_Param_Hidden(param, param))  // ^-- note why special = param
             continue;
-        }
 
         if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
-            if (Is_Void_With_Sym(arg, SYM_UNDEFINED)) {
+            if (
+                Is_Void_With_Sym(arg, SYM_UNDEFINED)
+                and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
+            ){
+                // Undefined refinements not explicitly marked hidden are
+                // still candidates for usage at the callsite.  Hence it must
+                // be pre-empted by our ordered overrides.  BUT the overrides
+                // only apply if their slot wasn't filled by the user code.
+                // Yet these values we are putting in disrupt that detection,
+                // so use another flag (PUSH_PARTIAL) to reflect this state.
                 //
-                // A refinement that is nulled is a candidate for usage at the
-                // callsite.  Hence it must be pre-empted by our ordered
-                // overrides.  -but- the overrides only apply if their slot
-                // wasn't filled by the user code.  Yet these values we are
-                // putting in disrupt that detection (!), so use another
-                // flag (PUSH_PARTIAL) to reflect this state.
-                //
-                while (ordered_dsp != dsp_paramlist) {
+                while (ordered_dsp != DSP) {
                     ++ordered_dsp;
                     unstable REBVAL *ordered = DS_AT(ordered_dsp);
 
@@ -450,8 +453,14 @@ bool Specialize_Action_Throws(
 
         // It's an argument, either a normal one or a refinement arg.
 
-        if (not Is_Void_With_Sym(arg, SYM_UNDEFINED))
-            goto specialized_arg_with_check;
+        if (
+            Is_Void_With_Sym(arg, SYM_UNDEFINED)
+            and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
+        ){
+            goto unspecialized_arg;
+        }
+
+        goto specialized_arg_with_check;
 
       unspecialized_arg:
 
@@ -460,7 +469,6 @@ bool Specialize_Action_Throws(
             Is_Void_With_Sym(arg, SYM_UNDEFINED)
             or (IS_SYM_WORD(arg) and TYPE_CHECK(param, REB_TS_REFINEMENT))
         );
-        Move_Value(DS_PUSH(), param);
         continue;
 
       specialized_arg_with_check:
@@ -483,21 +491,8 @@ bool Specialize_Action_Throws(
         // of the underlying function.
 
         assert(GET_CELL_FLAG(arg, ARG_MARKED_CHECKED));
-        Move_Value(DS_PUSH(), param);
-        Specialize_Param(DS_TOP);
         continue;
     }
-
-    REBARR *paramlist = Pop_Stack_Values_Core(
-        dsp_paramlist,
-        SERIES_MASK_PARAMLIST
-            | (SER(unspecialized)->header.bits & PARAMLIST_MASK_INHERIT)
-    );
-    Manage_Array(paramlist);
-    RELVAL *rootparam = STABLE(ARR_HEAD(paramlist));
-    VAL_ACT_PARAMLIST_NODE(rootparam) = NOD(paramlist);
-
-    MISC_META_NODE(paramlist) = nullptr;
 
     // Everything should have balanced out for a valid specialization
     //
@@ -623,7 +618,7 @@ void For_Each_Unspecialized_Param(
 
     REBLEN index = 1;
     for (; NOT_END(param); ++param, ++special, ++index) {
-        if (Is_Param_Hidden(param))
+        if (Is_Param_Hidden(param, special))
             continue;  // specialized out, not in interface
 
         Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
@@ -649,7 +644,7 @@ void For_Each_Unspecialized_Param(
     param = ACT_PARAMS_HEAD(act);
     special = ACT_SPECIALTY_HEAD(act);
     for (; NOT_END(param); ++param, ++special) {
-        if (Is_Param_Hidden(param))
+        if (Is_Param_Hidden(param, special))
             continue;
 
         if (TYPE_CHECK(param, REB_TS_REFINEMENT))
@@ -700,10 +695,10 @@ void For_Each_Unspecialized_Param(
     // Finally, output any fully unspecialized refinements
 
     param = ACT_PARAMS_HEAD(act);
-    UNUSED(special);  // stack is enough
+    special = ACT_SPECIALTY_HEAD(act);
 
-    for (; NOT_END(param); ++param) {
-        if (Is_Param_Hidden(param))
+    for (; NOT_END(param); ++param, ++special) {
+        if (Is_Param_Hidden(param, special))
             continue;
 
         if (not TYPE_CHECK(param, REB_TS_REFINEMENT))
@@ -901,9 +896,9 @@ bool Make_Invocation_Frame_Throws(
 
           case REB_P_LOCAL:
           case REB_P_SEALED:
-          case REB_P_SPECIALIZED:
             break;
 
+          case REB_P_OUTPUT:  // should always have REB_TS_REFINEMENT
           default:
             panic ("Unknown PARAM_CLASS");
         }
@@ -1048,26 +1043,28 @@ REBACT *Alloc_Action_From_Exemplar(
     for (; NOT_END(param); ++param, ++arg, ++alias) {
         Move_Value(alias, param);
 
-        if (Is_Param_Hidden(param))
-            continue;  // leave it as-is, even if ~undefined~
-
-        // !!! This mutation is slightly uncomfortable, as it transforms a
-        // literal value in the frame to a different value.  However, on
-        // balance it seems that giving up one VOID! state to do this is about
-        // the best tradeoff that can be made.  If you really want the
-        // action to go with ~undefined~, you need to hide the argument
-        // before calling MAKE ACTION!
-        //
-        if (Is_Void_With_Sym(arg, SYM_UNDEFINED)) {
+        if (GET_CELL_FLAG(arg, ARG_MARKED_CHECKED))
             continue;
-        }
 
-        // Don't show argument in the parameter list.
-        //
-        Specialize_Param(alias);
+        assert(not Is_Param_Hidden(param, param));  // param = special
 
-        // Indicate that argument is specialized out.
+        // We leave non-hidden undefineds as-is to be handled by the evaluator
+        // as unspecialized:
         //
+        // https://forum.rebol.info/t/default-values-and-make-frame/1412
+        //
+        // !!! Should this be `~` instead of `~undefined~`?
+        //
+        // https://forum.rebol.info/t/1413
+        //
+        if (Is_Void_With_Sym(arg, SYM_UNDEFINED))
+            continue;
+
+        if (TYPE_CHECK(param, REB_TS_REFINEMENT))
+            Typecheck_Refinement(param, arg);
+        else
+            Typecheck_Including_Constraints(param, arg);
+
         SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
     }
 

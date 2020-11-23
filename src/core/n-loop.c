@@ -454,7 +454,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                     bind_index = les->data_idx;
                     if (++les->data_idx == les->data_len)
                         more_data = false;
-                    if (not Is_Param_Hidden(key))
+                    if (not Is_Param_Hidden(key, val))
                         break;
                     if (not more_data)
                         goto finished;

@@ -315,7 +315,7 @@ REBNATIVE(reskinned)
         }
 
         REBSPC *specifier = VAL_SPECIFIER(item);
-        bool hidden = Is_Param_Hidden(param);
+        bool hidden = Is_Param_Hidden(param, param);  // special = param
 
         switch (sym) {
           case SYM_0:  // completely override type bits

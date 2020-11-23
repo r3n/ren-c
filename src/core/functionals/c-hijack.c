@@ -109,7 +109,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     f->special = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
 
     for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
-        if (Is_Param_Hidden(f->param))  // specialized or local
+        if (Is_Param_Hidden(f->param, f->special))  // specialized or local
             continue;
 
         if (TYPE_CHECK(f->param, REB_TS_SKIPPABLE) and IS_NULLED(f->arg))

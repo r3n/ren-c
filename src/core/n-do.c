@@ -826,7 +826,7 @@ REBNATIVE(applique)
     REBVAL *key = CTX_KEYS_HEAD(exemplar);
     REBVAL *var = CTX_VARS_HEAD(exemplar);
     for (; NOT_END(key); key++, ++var) {
-        if (Is_Param_Hidden(key))
+        if (Is_Param_Hidden(key, var))
             continue; // was part of a specialization internal to the action
 
         // !!! This is another case where if you want to literaly apply
@@ -835,8 +835,6 @@ REBNATIVE(applique)
         if (Is_Void_With_Sym(var, SYM_UNDEFINED))
             Init_Nulled(var);
 
-        if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED))
-            continue;  // refined in argument
         Remove_Binder_Index(&binder, VAL_KEY_CANON(key));
     }
     SHUTDOWN_BINDER(&binder); // must do before running code that might BIND

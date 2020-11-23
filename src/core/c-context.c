@@ -779,6 +779,7 @@ REBCTX *Make_Selfish_Context_Detect_Managed(
     INIT_VAL_CONTEXT_VARLIST(var, varlist);
     INIT_VAL_CONTEXT_PHASE(var, nullptr);
     INIT_BINDING(var, UNBOUND);
+    SET_CELL_FLAG(var, ARG_MARKED_CHECKED);
 
     ++var;
 
@@ -806,6 +807,7 @@ REBCTX *Make_Selfish_Context_Detect_Managed(
     //
     assert(CTX_KEY_SYM(context, self_index) == SYM_SELF);
     Move_Value(CTX_VAR(context, self_index), CTX_ARCHETYPE(context));
+    SET_CELL_FLAG(CTX_VAR(context, self_index), ARG_MARKED_CHECKED);
 
     if (parent)  // v-- passing in nullptr to indicate no more binds
         Rebind_Context_Deep(unwrap(parent), context, nullptr);
@@ -910,7 +912,7 @@ REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
         if (Is_Param_Sealed(key))
             continue;
 
-        if (not always and Is_Param_Hidden(key))
+        if (not always and Is_Param_Hidden(key, var))
             continue;
 
         if (mode & 1) {
@@ -1259,16 +1261,22 @@ REBLEN Find_Canon_In_Context(const RELVAL *context, const REBSTR *canon) {
     bool always = true;
     if (IS_FRAME(context))
         always = (VAL_OPT_PHASE(context) != nullptr);
+    else {
+        // !!! Defaulting to TRUE means that you can find things like SELF
+        // even though they are not displayed.  But you can also find things
+        // that are hidden with PROTECT/HIDE.  SELF needs a lot of review.
+    }
 
     REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
 
     REBLEN n;
-    for (n = 1; NOT_END(key); n++, key++) {
+    for (n = 1; NOT_END(key); ++n, ++key, ++var) {
         if (canon == VAL_KEY_CANON(key)) {
             if (Is_Param_Sealed(key))
                 continue;  // pretend this parameter is not there
 
-            if (not always and Is_Param_Hidden(key))
+            if (not always and Is_Param_Hidden(key, var))
                 return 0;
 
             return n;

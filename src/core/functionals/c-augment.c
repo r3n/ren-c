@@ -122,7 +122,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(augmentee));
     for (; NOT_END(param); ++param) {
         Move_Value(DS_PUSH(), param);
-        if (Is_Param_Hidden(param))
+        if (Is_Param_Hidden(param, param))  // special = param
             Seal_Param(DS_TOP);
         Move_Value(DS_PUSH(), EMPTY_BLOCK);
         Move_Value(DS_PUSH(), EMPTY_TEXT);

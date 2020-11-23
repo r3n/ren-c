@@ -262,21 +262,19 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // come from argument fulfillment.  If there is an exemplar, they are
         // set from that, otherwise they are undefined.
         //
-        if (Is_Param_Hidden(f->param)) {
+        if (Is_Param_Hidden(f->param, f->special)) {
             if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED) {  // no exemplar
                 Init_Void(f->arg, SYM_UNDEFINED);
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             }
             else {
-                // !!! Previously we assumed type checking was done at the
-                // time of specialization.  This is in preparation for when
-                // type checking might be an expensive proposition.  We might
-                // check here without erroring, patching back the bit onto
-                // `f->special`...which could contain type checking to this
-                // file and not burden SPECIALIZE/etc.  But we wouldn't want
-                // to raise an error unless the type check loop runs.
+                // For specialized cases, we assume type checking was done
+                // when the parameter is hidden.  It cannot be manipulated
+                // from the outside (e.g. by REFRAMER) so there is no benefit
+                // to deferring the check, only extra cost on each invocation.
                 //
-                Move_Value(f->arg, f->special);
+                Blit_Specific(f->arg, f->special);  // keep ARG_MARKED_CHECKED
+                assert(GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED));
             }
             goto continue_fulfilling;
         }
@@ -361,13 +359,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
           unused_refinement:  // Note: might get pushed by a later slot
 
             Init_Nulled(f->arg);  // null means refinement not used
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             goto continue_fulfilling;
 
           used_refinement:  // can hit this on redo, copy its argument
 
             Init_Blackhole(f->arg);  // # means refinement used
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             goto continue_fulfilling;
         }
 
@@ -840,6 +836,17 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
     for (; NOT_END(f->param); ++f->param, ++f->arg) {
         assert(NOT_END(f->arg));  // all END fulfilled as Init_Endish_Nulled()
+
+        // Note that if you have a redo situation as with an ENCLOSE, a
+        // specialized out parameter becomes visible in the frame and can be
+        // modified.  Even though it's hidden, it may need to be typechecked
+        // again, unless it was fully hidden.
+        //
+        if (GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
+            continue;
+
+        assert(VAL_PARAM_CLASS(f->param) != REB_P_SEALED);
+
 /*        if (VAL_PARAM_CLASS(f->param) == REB_P_LOCAL) {
             if (not IS_VOID(f->arg) and not IS_ACTION(f->arg))  // !!! TEMP TO TRY BOOT
                 fail ("locals must be void");
@@ -1093,25 +1100,15 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 f->special = ACT_SPECIALTY_HEAD(redo_phase);
                 f->arg = FRM_ARGS_HEAD(f);
                 for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
-                    switch (VAL_PARAM_CLASS(f->param)) {
-                      case REB_P_LOCAL:
-                        Init_Void(f->arg, SYM_UNDEFINED);
-                        break;
-                      
-                      case REB_P_SEALED:
-                        if (f->param == f->special)  // sealed local
+                    if (Is_Param_Hidden(f->param, f->special)) {
+                        if (f->param == f->special) {
                             Init_Void(f->arg, SYM_UNDEFINED);
-                        else
+                            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+                        }
+                        else {
                             Blit_Specific(f->arg, f->special);
-                        break;
-
-                      case REB_P_SPECIALIZED:
-                        assert(f->param != f->special);
-                        Blit_Specific(f->arg, f->special);
-                        break;
-
-                      default:
-                        break;
+                            assert(GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED));
+                        }
                     }
                 }
 

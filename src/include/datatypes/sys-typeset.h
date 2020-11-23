@@ -298,22 +298,54 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(unstable const RELVAL *v) {
 #define Is_Param_Skippable(v) \
     TYPE_CHECK((v), REB_TS_SKIPPABLE)
 
-// Can't be reflected (set with PROTECT/HIDE) or specialized out, because it
-// is local or specialized out.
+// Whether a parameter is considered "hidden" depends on the point of view.
+// For instance: a local is hidden to the interface outside a function, but
+// if a FRAME! holds a phase for a function then anything the body of that
+// function has available should also be shown.
 //
-// !!! Note: Currently, the semantics of Is_Param_Hidden() are rather sketchy.
-// It hasn't been figured out how such a flag would be managed on a per object
-// or frame instance while sharing the same paramlist/keylist (a method like
-// CELL_FLAG_PROTECTED would be needed if that feature were interesting).
+// Some aspects of determining hiddenness come from a parameter's properties,
+// which is common to all FRAME!s and invocations of the function which has
+// that parameter.  But it is also possible for specific instances to hide
+// parameters, which is used by specialization to allow ANY-VALUE! including
+// undefineds to be specialized:
 //
-inline static bool Is_Param_Hidden(unstable const RELVAL *v) {
+//     >> f: make frame! :append
+//     >> f/value: ~undefined~  ; typically this would mean "unspecialized"
+//     >> protect/hide 'f/value  ; hiding it means "no, it's the final value"
+//     >> apu: make action! f
+//     >> apu [a b c]
+//     == [a b c ~undefined~]
+//
+// For this mechanic to work, there has to be a bit on frames that tracks
+// visibility on a per-instance basis.  To avoid having to make a new keylist
+// each time this happens, the NODE_FLAG_MARKED bit on a context is taken
+// to mean this.  It won't be copied by Move_Value() that reads the variable,
+// and it is heeded here as ARG_MARKED_CHECKED if a value cell is given.
+//
+// However, not all calls have an associated value cell to test for hiddenness
+// so the "special" (see ACT_SPECIALTY()) is allowed to be the same as param.
+//
+inline static bool Is_Param_Hidden(
+    unstable const RELVAL *param,
+    const RELVAL *special  // should be param -or- the context value
+){
     // Once a parameter is hidden, it is either visible in the frame or part
     // of an embedded frame's internal state.  Anything invisible to the
     // outside world from one layer will also be invisible to layers of
     // functionals above it.
     //
-    Reb_Param_Class pclass = VAL_PARAM_CLASS(v);
-    return IS_HIDDEN_PARAM_KIND(pclass);
+    Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
+    if (special == param)
+        return IS_HIDDEN_PARAM_KIND(pclass);
+
+    if (IS_HIDDEN_PARAM_KIND(pclass))
+        assert(GET_CELL_FLAG(special, ARG_MARKED_CHECKED));
+
+    // In order for MAKE FRAME! to be able to hide arguments, it can't muck
+    // with any paramlists...the bit has to be set on the values.  It hides
+    // the argument with a flag on the cell.
+    //
+    return GET_CELL_FLAG(special, ARG_MARKED_CHECKED);
 }
 
 inline static void Hide_Param(unstable RELVAL *param) {
@@ -323,14 +355,6 @@ inline static void Hide_Param(unstable RELVAL *param) {
 
 inline static void Seal_Param(unstable RELVAL *param) {
     mutable_KIND3Q_BYTE(param) = REB_P_SEALED;
-}
-
-inline static void Specialize_Param(unstable RELVAL *param) {
-    assert(
-        VAL_PARAM_CLASS(param) != REB_P_SEALED
-        and VAL_PARAM_CLASS(param) != REB_P_LOCAL
-    );
-    mutable_KIND3Q_BYTE(param) = REB_P_SPECIALIZED;
 }
 
 

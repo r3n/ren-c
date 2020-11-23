@@ -145,15 +145,12 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
 
     if (flags & PROT_HIDE) {
         //
-        // !!! For the moment, hiding is still implemented via typeset flags.
-        // Since PROTECT/HIDE is something of an esoteric feature, keep it
-        // that way for now, even though it means the keylist has to be
-        // made unique.
-
-        REBVAL *key = CTX_KEY(Force_Keylist_Unique(context), index);
+        // R3-Alpha implemented hiding via typeset flags, which would have
+        // meant making a new keylist.  Ren-C does this with a flag that lives
+        // in the cell of the variable; see `Is_Param_Hidden()`.
 
         if (flags & PROT_SET)
-            Hide_Param(key);
+            var->header.bits |= CELL_FLAG_ARG_MARKED_CHECKED;
         else
             fail ("Un-hiding is not supported");
     }
