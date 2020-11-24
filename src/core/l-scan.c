@@ -2063,32 +2063,32 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         fail (Error_Extra(ss, ')')); }
 
       case TOKEN_INTEGER:
+        //
+        // We treat `10.20.30` as a TUPLE!, but `10.20` has a cultural lock on
+        // being a DECIMAL! number.  Due to the overlap, Locate_Token() does
+        // not have enough information in hand to discern TOKEN_DECIMAL; it
+        // just returns TOKEN_INTEGER and the decision is made here.
+        //
+        // (Imagine we're in a tuple scan and INTEGER! 10 was pushed, and are
+        // at "20.30" in the 10.20.30 case.  Locate_Token() would need access
+        // to level->mode to know that the tuple scan was happening, else
+        // it would have to conclude "20.30" was TOKEN_DECIMAL.  Deeper study
+        // would be needed to know if giving Locate_Token() more information
+        // is wise.  But that study would likely lead to the conclusion that
+        // the whole R3-Alpha scanner concept needs a full rewrite!)
+        //
+        // Note: We can't merely start with assuming it's a TUPLE!, scan the
+        // values, and then decide it's a DECIMAL! when the tuple is popped
+        // if it's two INTEGER!.  Because the integer scanning will lose
+        // leading digits on the second number (1.002 would become 1.2).
+        //
         if (
-            (*ep == '.' or *ep == ',')
-            and not Is_Dot_Or_Slash(level->mode)
-            and IS_LEX_NUMBER(ep[1])
+            (*ep == '.' or *ep == ',')  // still allow `1,2` as `1.2` synonym
+            and not Is_Dot_Or_Slash(level->mode)  // not in PATH!/TUPLE! (yet)
+            and IS_LEX_NUMBER(ep[1])  // If # digit, we're seeing `###.#???`
         ){
-            // If we're scanning a TUPLE!, then we're at the head of it.
-            // But it could also be a DECIMAL!.
-            //
-            // We can't merely start with assuming it's a TUPLE!, scan
-            // two integers, and then decide it's a DECIMAL! if both are
-            // integer.  Because integer scanning will lose leading digits
-            // on the second number (1.002 would become 1.2 as a decimal).
-            //
-            // So we scan ahead to see if it's a case followed by just
-            // one dot, and is actually a DECIMAL!.  We don't want
-            // Locate_Token() to do this, because if as we scanned the
-            // tuple one element at a time it looked ahead to see if only
-            // one dot was ahead of it...all TUPLE!s would seem to end
-            // with a DECIMAL!.  It has to be done uniquely when looking
-            // at the first element.
-            //
-            // For Locate_Token() to realize if it was at the head it
-            // would have to use `level->mode`, which it was not designed
-            // to do.  This is one of the many things that should be
-            // revisited with a state-machine-based proper rewrite of the
-            // R3 scanner, but this is just a patch to prove the concept.
+            // If we will be scanning a TUPLE!, then we're at the head of it.
+            // But it could also be a DECIMAL! if there aren't any more dots.
             //
             const REBYTE *temp = ep + 1;
             REBLEN temp_len = len + 1;
@@ -2100,31 +2100,12 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     goto scan_decimal;
                 }
             }
-            goto scan_integer;
         }
-        else if (*ep == '-') {
-            token = TOKEN_DATE;
-            while (*ep == '/' or IS_LEX_NOT_DELIMIT(*ep))
-                ++ep;
-            len = cast(REBLEN, ep - bp);
-            if (ep != Scan_Date(DS_PUSH(), bp, len))
-                fail (Error_Syntax(ss, token));
 
-            ss->begin = ep;
-        }
-        else if (*ep == '/') {
-            //
-            // Historically  might be PATH!, or might be DATE!.  But the
-            // date format of 1/2/3 is inferior to 12-Dec-2012, and we
-            // want things like 1/2 to be a PATH! (good for fractions)
-            //
-            goto scan_integer;
-        }
-        else {
-          scan_integer:
-            if (ep != Scan_Integer(DS_PUSH(), bp, len))
-                fail (Error_Syntax(ss, token));
-        }
+        // Wasn't beginning of a DECIMAL!, so scan as a normal INTEGER!
+        //
+        if (ep != Scan_Integer(DS_PUSH(), bp, len))
+            fail (Error_Syntax(ss, token));
         break;
 
       case TOKEN_DECIMAL:
@@ -2168,7 +2149,8 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
       case TOKEN_DATE:
         while (*ep == '/' and level->mode != '/') {  // Is date/time?
             ep++;
-            while (IS_LEX_NOT_DELIMIT(*ep)) ep++;
+            while (*ep == '.' or IS_LEX_NOT_DELIMIT(*ep))
+                ++ep;
             len = cast(REBLEN, ep - bp);
             if (len > 50) {
                 // prevent infinite loop, should never be longer than this
