@@ -34,56 +34,41 @@
 //
 REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBYMD dat_a = VAL_DATE(a);
-    REBYMD dat_b = VAL_DATE(b);
+    // If the dates are in different time zones, they have to be canonized
+    // to compare them.
+    //
+    // !!! How should dates and times without time zones be treated?  It
+    // seems bad to make them dependent on the system time zone.
+    //
+    // !!! This comparison doesn't know if it's being asked on behalf of
+    // equality or not; and `strict` is passed in as true for plain > and <.
+    // In those cases, strictness needs to be accurate for inequality but
+    // never side for exact equality unless they really are equal (time zones
+    // and all).  This is suboptimal, a redesign is needed:
+    //
+    // https://forum.rebol.info/t/comparison-semantics/1318
+    //
+    REBINT tiebreaker = 0;
 
-    if (strict) {
-        if (Does_Date_Have_Zone(a)) {
-            if (not Does_Date_Have_Zone(b))
-                return 1;  // can't be equal
+    DECLARE_LOCAL (adjusted_a);
+    DECLARE_LOCAL (adjusted_b);
+    if (VAL_DATE(a).zone != VAL_DATE(b).zone) {
+        tiebreaker = VAL_DATE(a).zone > VAL_DATE(b).zone ? 1 : -1;
 
-            if (
-                dat_a.year != dat_b.year
-                or dat_a.month != dat_b.month
-                or dat_a.day != dat_b.year
-                or dat_a.zone != dat_b.zone
-            ){
-                return 1;  // both have zones, all bits must be equal
-            }
-        }
-        else {
-            if (Does_Date_Have_Zone(b))
-                return 1;  // a doesn't have, b does, can't be equal
+        Dequotify(Move_Value(adjusted_a, SPECIFIC(CELL_TO_VAL(a))));
+        Dequotify(Move_Value(adjusted_b, SPECIFIC(CELL_TO_VAL(b))));
 
-            if (
-                dat_a.year != dat_b.year
-                or dat_a.month != dat_b.month
-                or dat_a.day != dat_b.day
-                // old code here ignored .zone
-            ){
-                return 1;  // canonized to 0 zone not equal
-            }
-        }
+        const bool to_utc = true;
+        Adjust_Date_Zone(adjusted_a, to_utc);
+        Adjust_Date_Zone(adjusted_a, to_utc);
 
-        if (Does_Date_Have_Time(a)) {
-            if (not Does_Date_Have_Time(b))
-                return 1;  // can't be equal;
-
-            if (VAL_NANO(a) != VAL_NANO(b))
-                return 1;  // both have times, all bits must be equal
-        }
-        else {
-            if (Does_Date_Have_Time(b))
-                return 1; // a doesn't have, b, does, can't be equal
-
-            // neither have times so equal
-        }
-        return 0;
+        a = adjusted_a;
+        b = adjusted_b;
     }
 
-    REBINT diff = Diff_Date(VAL_DATE(a), VAL_DATE(b));
-    if (diff != 0)
-        return diff;
+    REBINT days_diff = Diff_Date(VAL_DATE(a), VAL_DATE(b));  // delta in days
+    if (days_diff != 0)
+        return days_diff > 0 ? 1 : -1;
 
     if (not Does_Date_Have_Time(a)) {
         if (not Does_Date_Have_Time(b))
@@ -95,7 +80,10 @@ REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     if (not Does_Date_Have_Time(b))
         return 1;  // a is bigger if no time on b
 
-    return CT_Time(a, b, strict);
+    REBINT time_ct = CT_Time(a, b, strict);  // guaranteed [-1 0 1]
+    if (time_ct == 0 and strict)
+        return tiebreaker;  // don't allow equal unless time zones equal
+    return time_ct;
 }
 
 
