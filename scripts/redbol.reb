@@ -418,7 +418,7 @@ false?: emulate [:not]  ; better name https://trello.com/c/Cz0qs5d7
 
 comment: emulate [
     func [
-        return: [<opt>] {Not invisible: https://trello.com/c/dWQnsspG}
+        return: <void> {Not invisible: https://trello.com/c/dWQnsspG}
         :discarded [block! any-string! binary! any-scalar!]
     ][
     ]
@@ -1403,5 +1403,15 @@ call: emulate [  ; brings back the /WAIT switch (Ren-C waits by default)
 ]
 
 
-=== LEAVE AS LAST LINE ===
-void  ; so that `do <redbol>` doesn't show any output
+=== LEAVE ~ AS LAST LINE ===
+;
+; So that `do <redbol>` doesn't show any output.  This currently instructs
+; the console that it is a nameless VOID! that should suppress display.
+;
+; !!! It's being debated to use a specially-named void for this protocol, and
+; save the ~ for ~undefined~, which would be briefer and avoid system 
+; awareness of an English word in evaluator internals.)
+;
+; https://forum.rebol.info/t/1413
+
+~
