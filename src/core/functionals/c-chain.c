@@ -28,10 +28,6 @@
 //     >> negadd 2 2
 //     == -4
 //
-// Its design is relatively efficient, because it is supported by the action
-// executor directly--which looks for ACTION!s pushed to the stack by
-// dispatchers and assumes that means the calls should be chained.
-//
 // For more complex post-processing which may involve access to the original
 // inputs to the first function (or other memory in the process), consider
 // using ENCLOSE...which is less efficient, but more powerful.
@@ -49,9 +45,73 @@ enum {
 
 
 //
+//  Push_Downshifted_Frame: C
+//
+// When a derived function dispatcher receives a frame built for the function
+// it derived from, sometimes it can do some work...update the phase...and
+// keep running in that same REBFRM* allocation.
+//
+// But if it wants to stay in control and do post-processing (as CHAIN does)
+// then it needs to remain linked into the stack.  This function helps to
+// move the built frame into a new frame that can be executed with a new
+// entry to Process_Action().  The ability is also used by RESKINNED.
+//
+REBFRM *Push_Downshifted_Frame(REBVAL *out, REBFRM *f) {
+    DECLARE_FRAME (
+        sub,
+        f->feed,
+        EVAL_MASK_DEFAULT
+            | FLAG_STATE_BYTE(ST_ACTION_DISPATCHING)  // don't typecheck again
+    );
+    Push_Frame(out, sub);
+    assert(sub->varlist == nullptr);
+    sub->varlist = f->varlist;
+    assert(LINK_KEYSOURCE(sub->varlist) == NOD(f));
+    INIT_LINK_KEYSOURCE(sub->varlist, NOD(sub));
+    sub->rootvar = SPECIFIC(ARR_HEAD(sub->varlist));
+
+    // !!! This leaks a dummy varlist, could just reuse a global one that
+    // shows as INACCESSIBLE.
+    //
+    f->varlist = Alloc_Singular(SERIES_FLAG_MANAGED);
+    SET_SERIES_INFO(f->varlist, INACCESSIBLE);
+    f->rootvar = nullptr;
+
+    sub->param = END_NODE;
+    sub->arg = sub->rootvar + 1;  // !!! enforced by entering Process_Action()
+    sub->special = END_NODE;
+
+    return sub;
+}
+
+
+//
 //  Chainer_Dispatcher: C
 //
-// When a function created with CHAIN is invoked, this dispatcher is run.
+// The frame built for the CHAIN matches the arguments needed by the first
+// function in the pipeline.  Having the same interface as that function
+// makes a chained function specializable.
+//
+// A first cut at implementing CHAIN did it all within one REBFRM.  It changed
+// the FRM_PHASE() and returned a REDO signal--with actions pushed to the data
+// stack that the evaluator was complicit in processing as "things to run
+// afterward".  This baked awareness of chaining into %c-eval.c, when it is
+// better if the process was localized inside the dispatcher.
+//
+// Handling it inside the dispatcher means the Chainer_Dispatcher() stays on
+// the stack and in control.  This means either unhooking the current `f` and
+// putting a new REBFRM* above it, or stealing the content of the `f` into a
+// new frame to put beneath it.  The latter is chosen to avoid disrupting
+// existing pointers to `f`.
+//
+// (Having a separate frame for the overall chain has an advantage in error
+// messages too, as there is a frame with the label of the function that the
+// user invoked in the stack trace...instead of just the chained item that
+// causes an error.)
+//
+// !!! Note: Stealing the built varlist to give to a new REBFRM for the head
+// of the chain leaves the actual chainer frame with no varlist content.  That
+// means debuggers introspecting the stack may see a "stolen" frame state.
 //
 REB_R Chainer_Dispatcher(REBFRM *f)
 {
@@ -59,23 +119,63 @@ REB_R Chainer_Dispatcher(REBFRM *f)
     assert(ARR_LEN(details) == IDX_CHAINER_MAX);
 
     const REBARR *pipeline = VAL_ARRAY(ARR_AT(details, IDX_CHAINER_PIPELINE));
+    unstable const REBVAL *chained = SPECIFIC(ARR_HEAD(pipeline));
 
-    // The post-processing pipeline has to be "pushed" so it is not forgotten.
-    // Go in reverse order, so the function to apply last is at the bottom of
-    // the stack.
+    Init_Void(FRM_SPARE(f), SYM_UNDEFINED);
+    REBFRM *sub = Push_Downshifted_Frame(FRM_SPARE(f), f);
+
+    INIT_FRM_PHASE(sub, VAL_ACTION(chained));
+    FRM_BINDING(sub) = VAL_BINDING(chained);
+
+    sub->original = VAL_ACTION(chained);
+    sub->label = VAL_ACTION_LABEL(chained);
+  #if !defined(NDEBUG)
+    sub->label_utf8 = sub->label ? STR_UTF8(sub->label) : "(anonymous)";
+  #endif
+
+    // Now apply the functions that follow.  The original code reused the
+    // frame of the chain, this reuses the subframe.
     //
-    unstable const RELVAL *chained = ARR_LAST(pipeline);
-    for (; chained != ARR_HEAD(pipeline); --chained) {
-        assert(IS_ACTION(chained));
-        Move_Value(DS_PUSH(), SPECIFIC(chained));
+    // (On the head of the chain we start at the dispatching phase since the
+    // frame is already filled, but each step after that uses enfix and
+    // runs from the top.)
+
+    assert(STATE_BYTE(sub) == ST_ACTION_DISPATCHING);
+    while (true) {
+        if (Process_Action_Maybe_Stale_Throws(sub)) {
+            Abort_Frame(sub);
+            return R_THROWN;
+        }
+
+        // We reuse the subframe's REBFRM structure, but have to drop the
+        // action args, as the paramlist is almost certainly completely
+        // incompatible with the next chain step.
+
+        ++chained;
+        if (IS_END(chained))
+            break;
+
+        Push_Action(sub, VAL_ACTION(chained), VAL_BINDING(chained));
+
+        // We use the same mechanism as enfix operations do...give the
+        // next chain step its first argument coming from f->out
+        //
+        // !!! One side effect of this is that unless CHAIN is changed
+        // to check, your chains can consume more than one argument.
+        // This might be interesting or it might be bugs waiting to
+        // happen, trying it out of curiosity for now.
+        //
+        Begin_Prefix_Action(sub, VAL_ACTION_LABEL(chained));
+        assert(NOT_FEED_FLAG(sub->feed, NEXT_ARG_FROM_OUT));
+        SET_FEED_FLAG(sub->feed, NEXT_ARG_FROM_OUT);
+
+        STATE_BYTE(sub) = ST_ACTION_INITIAL_ENTRY;
     }
 
-    // Extract the first function, itself which might be a chain.
-    //
-    INIT_FRM_PHASE(f, VAL_ACTION(chained));
-    FRM_BINDING(f) = VAL_BINDING(chained);
+    Drop_Frame(sub);
 
-    return R_REDO_UNCHECKED;  // signatures should match
+    Move_Value(f->out, FRM_SPARE(f));
+    return f->out;
 }
 
 

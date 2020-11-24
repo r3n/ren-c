@@ -1213,39 +1213,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
     CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
 
-    // If we have functions pending to run on the outputs (e.g. this was
-    // the result of a CHAIN) we can run those chained functions in the
-    // same REBFRM, for efficiency.
-    //
-    while (DSP != f->dsp_orig) {
-        //
-        // We want to keep the label that the function was invoked with,
-        // because the other phases in the chain are implementation
-        // details...and if there's an error, it should still show the
-        // name the user invoked the function with.  But we have to drop
-        // the action args, as the paramlist is likely be completely
-        // incompatible with this next chain step.
-        //
-        Drop_Action(f);
-        Push_Action(f, VAL_ACTION(DS_TOP), VAL_BINDING(DS_TOP));
-
-        // We use the same mechanism as enfix operations do...give the
-        // next chain step its first argument coming from f->out
-        //
-        // !!! One side effect of this is that unless CHAIN is changed
-        // to check, your chains can consume more than one argument.
-        // This might be interesting or it might be bugs waiting to
-        // happen, trying it out of curiosity for now.
-        //
-        Begin_Prefix_Action(f, VAL_ACTION_LABEL(DS_TOP));
-        assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
-        SET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
-
-        DS_DROP();
-
-        goto fulfill;
-    }
-
     Drop_Action(f);
 
     // Want to keep this flag between an operation and an ensuing enfix in

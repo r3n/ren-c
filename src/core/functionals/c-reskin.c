@@ -72,39 +72,6 @@ enum {
 
 
 //
-//   skinner-return-helper: native [
-//
-//   {Internal function that pushes a deferred callback for return type check}
-//
-//       returned [<opt> any-value!]
-//   ]
-//
-REBNATIVE(skinner_return_helper)
-{
-    INCLUDE_PARAMS_OF_SKINNER_RETURN_HELPER;
-
-    REBFRM *f = frame_;
-    REBVAL *v = ARG(returned);
-
-    // !!! Same code as in Returner_Dispatcher()...should it be moved to a
-    // shared inline location?
-
-    REBACT *phase = ACT(FRM_BINDING(f));
-
-    REBVAL *param = ACT_PARAMS_HEAD(phase);
-    assert(VAL_PARAM_SYM(param) == SYM_RETURN);
-
-    // Typeset bits for locals in frames are usually ignored, but the RETURN:
-    // local uses them for the return types of a function.
-    //
-    if (not Typecheck_Including_Constraints(param, v))
-        fail (Error_Bad_Return_Type(f, VAL_TYPE(v)));
-
-    RETURN (v);
-}
-
-
-//
 //  Skinner_Dispatcher: C
 //
 // Reskinned functions may expand what types the original function took, in
@@ -117,49 +84,67 @@ REBNATIVE(skinner_return_helper)
 //
 REB_R Skinner_Dispatcher(REBFRM *f)
 {
+    REBACT *phase = FRM_PHASE(f);
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_SKINNER_MAX);
 
     REBVAL *skinned = DETAILS_AT(details, IDX_SKINNER_SKINNED);
 
-    REBVAL *param = ACT_PARAMS_HEAD(FRM_PHASE(f));
+    REBVAL *param = ACT_PARAMS_HEAD(phase);
     REBVAL *arg = FRM_ARGS_HEAD(f);
     for (; NOT_END(param); ++param, ++arg) {
         if (Is_Param_Skin_Expanded(param))  // !!! always says true (for now)
             CLEAR_CELL_FLAG(arg, ARG_MARKED_CHECKED);
     }
 
-    // If the return type has been expanded, then the only way we're going to
-    // get a chance to check it is by pushing some kind of handler here for
-    // it.  It has to be a 1-argument function, and it needs enough of an
-    // identity to know which return type it's checking.  :-/  We cheat and
-    // use the binding to find the paramlist we wish to check.
-    //
-    // !!! This is kind of an ugly hack, because this action is now a
-    // "relative value"...and no actions are supposed to be relative to
-    // parameter lists.  But we couldn't use the frame even if we wanted to,
-    // the phase is getting overwritten so we couldn't find the return.  So
-    // just hope that it stays on the stack and doesn't do much besides
-    // get dropped by that processing, which can account for it.
-    //
-    Init_Action(
-        DS_PUSH(),
-        NATIVE_ACT(skinner_return_helper),
-        FRM_LABEL(f),
-        NOD(FRM_PHASE(f))
-    );
-
-    INIT_FRM_PHASE(f, VAL_ACTION(skinned));
-
     // We captured the binding for the skin when the action was made; if the
     // user rebound the action, then don't overwrite with the one in the
     // initial skin--assume they meant to change it.
 
-    // If we frame checked now, we'd fail, because we just put the new phase
-    // into place with more restricted types.  Let the *next* check kick in,
-    // and it will now react to the cleared ARG_MARKED_CHECKED flags.
+    // If the return type has been altered, then we need to check the value
+    // against the returned type.
+
+    param = ACT_PARAMS_HEAD(phase);
+    assert(VAL_PARAM_SYM(param) == SYM_RETURN);
+
+    if (not Is_Param_Skin_Expanded(param)) {  // don't need to retain control
+        //
+        // If we frame checked now, we'd fail, because we just put the new
+        // phase into place with more restricted types.  Let the *next* check
+        // kick in, and it will now react to the cleared ARG_MARKED_CHECKED
+        // flags.
+        //
+        INIT_FRM_PHASE(f, VAL_ACTION(skinned));
+        return R_REDO_UNCHECKED;
+    }
+
+    // We move the built `f` contents into a REBFRM* underneath this one.
     //
-    return R_REDO_UNCHECKED;
+    Init_Void(FRM_SPARE(f), SYM_UNDEFINED);
+    REBFRM *sub = Push_Downshifted_Frame(FRM_SPARE(f), f);
+
+    INIT_FRM_PHASE(sub, VAL_ACTION(skinned));
+    sub->original = VAL_ACTION(skinned);
+    sub->label = VAL_ACTION_LABEL(skinned);
+  #if !defined(NDEBUG)
+    sub->label_utf8 = sub->label ? STR_UTF8(sub->label) : "(anonymous)";
+  #endif
+
+    if (Process_Action_Throws(sub)) {
+        Abort_Frame(sub);
+        return R_THROWN;
+    }
+
+    Drop_Frame(sub);
+
+    // Typeset bits for locals in frames are usually ignored, but the RETURN:
+    // local uses them for the return types of a function.
+    //
+    if (not Typecheck_Including_Constraints(param, FRM_SPARE(f)))
+        fail (Error_Bad_Return_Type(f, VAL_TYPE(FRM_SPARE(f))));
+
+    Move_Value(f->out, FRM_SPARE(f));
+    return f->out;
 }
 
 

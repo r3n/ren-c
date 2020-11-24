@@ -767,24 +767,6 @@ inline static bool IS_RELATIVE(unstable REBCEL(const*) v) {
     if (not Is_Bindable(v) or not EXTRA(Binding, v).node)
         return false; // INTEGER! and other types are inherently "specific"
 
-  #if !defined(NDEBUG)
-    //
-    // !!! A trick used by RESKINNED for checking return types after its
-    // dispatcher is no longer on a stack uses CHAIN's mechanics to run a
-    // single argument function that does the test.  To avoid creating a new
-    // ACTION! for each such scenario, it makes the value it queues distinct
-    // by putting the paramlist that has the return to check in the binding.
-    // Ordinarily this would make it a "relative value" which actions never
-    // should be, but it's a pretty good trick so it subverts debug checks.
-    // Review if this category of trick can be checked for more cleanly.
-    if (
-        KIND3Q_BYTE_UNCHECKED(v) == REB_ACTION  // v-- VAL_NODE() is paramlist
-        and NOD(Natives[N_skinner_return_helper_ID]) == VAL_NODE(v)
-    ){
-        return false;
-    }
-  #endif
-
     if (EXTRA(Binding, v).node->header.bits & ARRAY_FLAG_IS_PARAMLIST)
         return true;
 

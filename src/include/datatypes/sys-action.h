@@ -508,7 +508,8 @@ inline static REB_R Run_Generic_Dispatch(
 //
 enum {
     ST_ACTION_INITIAL_ENTRY = 0,  // is separate "fulfilling" state needed?
-    ST_ACTION_TYPECHECKING
+    ST_ACTION_TYPECHECKING,
+    ST_ACTION_DISPATCHING
 };
 
 
