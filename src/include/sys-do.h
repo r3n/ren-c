@@ -187,7 +187,7 @@ inline static bool Do_Branch_Core_Throws(
     assert(branch != out and condition != out);
 
     enum Reb_Kind kind = VAL_TYPE(branch);
-    bool voidify = not (kind == REB_QUOTED or ANY_SYM_KIND(kind));
+    bool as_is = (kind == REB_QUOTED or ANY_SYM_KIND(kind));
 
   redo:
 
@@ -240,22 +240,21 @@ inline static bool Do_Branch_Core_Throws(
     }
 
     // If we're not returning the branch result purely "as-is" then we change
-    // not just NULL to `~branched~`, but also any other void.  So:
+    // NULL to NULL-2:
     //
     //     >> if true [null]
-    //     == ~branched~
+    //     ; null-2
     //
-    //     >> if true [print "relabeled"]
-    //     test
-    //     == ~branched~
+    // To get things to pass through unmodified, you have to use the @ forms:
     //
-    // To get the original void label, you have to use the @ forms:
+    //     >> if true @[null]
+    //     ; null
     //
-    //     >> if true @[print "not relabeled"]
-    //     == ~void~  ; specific void result of PRINT
+    // The corollary is that RETURN will strip off the isotope status of
+    // values unless the RETURN @(...) form is used.
     //
-    if (voidify and IS_NULLED_OR_VOID(out))
-        Init_Void(out, SYM_BRANCHED);
+    if (not as_is)
+        Isotopify_If_Nulled(out);
 
     return false;
 }

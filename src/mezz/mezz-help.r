@@ -72,15 +72,15 @@ description-of: function [
     v [<blank> any-value!]
 ][
     switch type of get/any 'v [
-        void! @[null]  ; don't voidify, want actual NULL
+        void! [null]
         any-array! [spaced ["array of length:" length of v]]
         image! [spaced ["size:" v/size]]
-        datatype! @[
+        datatype! [
             spec: ensure object! spec of v  ; "type specs" need simplifying
             opt copy spec/title
         ]
-        action! @[  ; want null when IF doesn't match
-            if meta: meta-of :v @[
+        action! [
+            if meta: meta-of :v [
                 opt copy get 'meta/description  ; can be BLANK!
             ]
         ]
@@ -113,8 +113,7 @@ help: function [
     if undefined? 'topic [
         ;
         ; !!! This should lead to a web page that offers help on the nature
-        ; of specific void usages, e.g. to explain what ~branched~ is and
-        ; how to use @[...] branches to avoid it.
+        ; of specific void usages.
         ;
         print [mold get/any 'topic "is a literal VOID! value"]
         return

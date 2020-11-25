@@ -87,29 +87,6 @@ inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
 }
 
 
-// Many loop constructs use BLANK! as a unique signal that the loop body
-// never ran, e.g. `for-each x [] [<unreturned>]` or `loop 0 [<unreturned>]`.
-// It's more valuable to have that signal be unique and have it be falsey
-// than it is to be able to return BLANK! from a loop, so blanks are voidified
-// alongside NULL (reserved for BREAKing)
-//
-inline static REBVAL *Voidify_If_Nulled_Or_Blank(unstable_ok REBVAL *cell) {
-    if (IS_NULLED(cell))
-        Init_Void(cell, SYM_NULLED);
-    else if (IS_BLANK(cell))
-        Init_Void(cell, SYM_BLANKED);
-    return cell;
-}
-
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Voidify_If_Nulled_Or_Blank(
-        unstable REBVAL *cell
-    ){
-        return Voidify_If_Nulled_Or_Blank(STABLE(cell));
-    }
-#endif
-
-
 #if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, same as plain VOID!
     #define Init_Unreadable_Void(v) \
         Init_Unlabeled_Void(v)

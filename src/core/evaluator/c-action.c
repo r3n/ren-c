@@ -143,14 +143,11 @@ bool Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
 //
 static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     switch (VAL_TYPE(f->out)) {
-      case REB_SYM_WORD:
-      case REB_SYM_PATH:
-        Getify(f->out);  // don't run @append or @append/only
-        goto enable_modal;
-
-      case REB_SYM_GROUP:
-      case REB_SYM_BLOCK:
-        Plainify(f->out);  // run GROUP!, pass block as-is
+      case REB_SYM_WORD:  // run @APPEND
+      case REB_SYM_PATH:  // run @APPEND/ONLY
+      case REB_SYM_GROUP:  // run @(GR O UP)
+      case REB_SYM_BLOCK:  // pass @[BL O CK] as-is
+        Plainify(f->out);
         goto enable_modal;
 
       default:

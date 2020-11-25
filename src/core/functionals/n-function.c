@@ -121,7 +121,6 @@ bool Interpreted_Dispatch_Details_0_Throws(
     REBVAL *spare,
     REBFRM *f
 ){
-    //
     // All callers have the output written into the frame's spare cell.  This
     // is because we don't want to ovewrite the `f->out` contents in the case
     // of a RETURN that wishes to be invisible.  The overwrite should only
@@ -194,7 +193,9 @@ REB_R Unchecked_Dispatcher(REBFRM *f)
         Move_Value(f->out, spare);
         return R_THROWN;
     }
-    UNUSED(returned);  // no additional work to bypass
+    if (not returned)  // assume if it was returned, it was decayed if needed
+        Decay_If_Nulled(spare);
+
     if (IS_ENDISH_NULLED(spare))
         return f->out;  // was invisible
     return Blit_Specific(f->out, spare);  // keep CELL_FLAG_UNEVALUATED
@@ -235,7 +236,8 @@ REB_R Returner_Dispatcher(REBFRM *f)
         Move_Value(f->out, spare);
         return R_THROWN;
     }
-    UNUSED(returned);  // no additional work to bypass
+    if (not returned)  // assume if it was returned, it was decayed if needed
+        Decay_If_Nulled(spare);
 
     if (IS_ENDISH_NULLED(spare)) {
         FAIL_IF_NO_INVISIBLE_RETURN(f);
@@ -646,6 +648,11 @@ REBNATIVE(return)
             Init_Void(v, SYM_VOID); // `do [return]` acts as `return void`
         }
     }
+
+    // The only way to get a function to return a NULL-2 is with RETURN @(...)
+    //
+    if (not REF(vanishable))
+        Decay_If_Nulled(v);
 
     // Check type NOW instead of waiting and letting Eval_Core()
     // check it.  Reasoning is that the error can indicate the callsite,

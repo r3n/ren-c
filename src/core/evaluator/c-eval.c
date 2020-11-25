@@ -637,6 +637,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             fail (Error_Need_Non_Void_Core(v, f_specifier, unwrap(gotten)));
 
         Move_Value(f->out, unwrap(gotten));  // no copy CELL_FLAG_UNEVALUATED
+        Decay_If_Nulled(f->out);
         break;
 
 
@@ -678,6 +679,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             fail (Error_Need_Non_Void_Core(v, f_specifier, unwrap(gotten)));
 
         Move_Value(f->out, unwrap(gotten));
+        Decay_If_Nulled(f->out);
 
         if (IS_ACTION(unwrap(gotten)))  // cache the word's label in the cell
             INIT_ACTION_LABEL(f->out, VAL_WORD_SPELLING(v));
@@ -863,6 +865,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             Move_Value(f->out, where);  // won't move CELL_FLAG_UNEVALUATED
         else
             CLEAR_CELL_FLAG(f->out, UNEVALUATED);
+        Decay_If_Nulled(f->out);
         break; }
 
 
@@ -945,6 +948,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         /* assert(NOT_CELL_FLAG(f->out, CELL_FLAG_UNEVALUATED)); */
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);
+        Decay_If_Nulled(f->out);
         break;
 
 

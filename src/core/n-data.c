@@ -540,6 +540,9 @@ inline static void Get_Var_May_Fail(
 
     if (IS_VOID(out) and not any)
         fail (Error_Need_Non_Void_Core(source_orig, specifier, out));
+
+    if (not any)  // default to not letting NULL-2 out unless /ANY is used
+        Decay_If_Nulled(out);
 }
 
 
@@ -1666,6 +1669,55 @@ REBNATIVE(null_q)
     INCLUDE_PARAMS_OF_NULL_Q;
 
     return Init_Logic(D_OUT, IS_NULLED(ARG(optional)));
+}
+
+
+//
+//  null-2: native [
+//
+//  {Make the heavy form of NULL (can't be WORD!-fetched, must be ACTION!)}
+//
+//      return: [<opt>]
+//  ]
+//
+REBNATIVE(null_2) {
+    INCLUDE_PARAMS_OF_NULL_2;
+
+    return Init_Heavy_Nulled(D_OUT);
+}
+
+
+//
+//  null-2?: native [
+//
+//  "Tells you if the argument is the heavy isotope of NULL (triggers THEN)"
+//
+//      return: [logic!]
+//      optional [<opt> any-value!]
+//  ]
+//
+REBNATIVE(null_2_q)
+{
+    INCLUDE_PARAMS_OF_NULL_2_Q;
+
+    return Init_Logic(D_OUT, Is_Heavy_Nulled(ARG(optional)));
+}
+
+
+//
+//  isotope?: native [
+//
+//  {Determine if a NULL is an isotope}
+//
+//      return: [logic!]
+//      var [word!]
+//  ]
+//
+REBNATIVE(isotope_q) {
+    INCLUDE_PARAMS_OF_ISOTOPE_Q;
+
+    const REBVAL *var = Lookup_Word_May_Fail(ARG(var), SPECIFIED);
+    return Init_Logic(D_OUT, Is_Heavy_Nulled(var));
 }
 
 

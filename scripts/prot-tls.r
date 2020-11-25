@@ -195,7 +195,7 @@ debug: (comment [:print] blank)
 emit: function [
     {Emits binary data, optionally marking positions with SET-WORD!}
 
-    return: [void!]
+    return: <void>
     ctx [object!]
     code [block! binary!]
     <local> result

@@ -67,6 +67,7 @@ bool Catching_Break_Or_Continue(REBVAL *val, bool *broke)
         //
         *broke = false;
         CATCH_THROWN(val, val);
+        Isotopify_If_Nulled(val);  // reserve NULL-1 for BREAK
         return true;
     }
 
@@ -129,7 +130,7 @@ static REB_R Loop_Series_Common(
     REBINT end,
     REBINT bump
 ){
-    Init_Blank(out); // result if body never runs
+    Init_Heavy_Nulled(out);  // result if body never runs
 
     // !!! This bounds incoming `end` inside the array.  Should it assert?
     //
@@ -156,7 +157,7 @@ static REB_R Loop_Series_Common(
             if (broke)
                 return nullptr;
         }
-        return Voidify_If_Nulled_Or_Blank(out); // null->BREAK, blank->empty
+        return out;  // BREAK -> NULL
     }
 
     // As per #1993, start relative to end determines the "direction" of the
@@ -179,7 +180,6 @@ static REB_R Loop_Series_Common(
             if (broke)
                 return nullptr;
         }
-        Voidify_If_Nulled_Or_Blank(out); // null->BREAK, blank->empty
         if (
             VAL_TYPE(var) != VAL_TYPE(start)
             or VAL_SERIES(var) != VAL_SERIES(start)
@@ -212,7 +212,7 @@ static REB_R Loop_Integer_Common(
     REBI64 end,
     REBI64 bump
 ){
-    Init_Blank(out);  // result if body never runs
+    Init_Heavy_Nulled(out);  // result if body never runs
 
     // A value cell exposed to the user is used to hold the state.  This means
     // if they change `var` during the loop, it affects the iteration.  Hence
@@ -232,7 +232,7 @@ static REB_R Loop_Integer_Common(
             if (broke)
                 return nullptr;
         }
-        return Voidify_If_Nulled_Or_Blank(out); // null->BREAK, blank->empty
+        return out;  // BREAK -> NULL
     }
 
     // As per #1993, start relative to end determines the "direction" of the
@@ -251,7 +251,6 @@ static REB_R Loop_Integer_Common(
             if (broke)
                 return nullptr;
         }
-        Voidify_If_Nulled_Or_Blank(out);  // null->BREAK, blank->empty
 
         if (not IS_INTEGER(var))
             fail (Error_Invalid_Type(VAL_TYPE(var)));
@@ -275,7 +274,7 @@ static REB_R Loop_Number_Common(
     REBVAL *end,
     REBVAL *bump
 ){
-    Init_Blank(out); // result if body never runs
+    Init_Heavy_Nulled(out);  // result if body never runs
 
     REBDEC s;
     if (IS_INTEGER(start))
@@ -318,14 +317,14 @@ static REB_R Loop_Number_Common(
             if (broke)
                 return nullptr;
         }
-        return Voidify_If_Nulled_Or_Blank(out);  // null->BREAK, blank->empty
+        return out;  // BREAK -> NULL
     }
 
     // As per #1993, see notes in Loop_Integer_Common()
     //
     const bool counting_up = (s < e); // equal checked above
     if ((counting_up and b <= 0) or (not counting_up and b >= 0))
-        return Init_Blank(out);  // avoid infinite loop, blank means never ran
+        return Init_Heavy_Nulled(out);  // avoid inf. loop, means never ran
 
     while (counting_up ? *state <= e : *state >= e) {
         if (Do_Branch_Throws(out, nullptr, body)) {
@@ -335,7 +334,6 @@ static REB_R Loop_Number_Common(
             if (broke)
                 return nullptr;
         }
-        Voidify_If_Nulled_Or_Blank(out);  // null->BREAK, blank->empty
 
         if (not IS_DECIMAL(var))
             fail (Error_Invalid_Type(VAL_TYPE(var)));
@@ -582,7 +580,6 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
 
         switch (les->mode) {
           case LOOP_FOR_EACH:
-            Voidify_If_Nulled_Or_Blank(les->out);  // null=BREAK, blank=empty
             break;
 
           case LOOP_EVERY:
@@ -633,7 +630,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
 {
     INCLUDE_PARAMS_OF_FOR_EACH;  // MAP-EACH & EVERY must subset interface
 
-    Init_Blank(D_OUT);  // result if body never runs (MAP-EACH gives [])
+    Init_Heavy_Nulled(D_OUT);  // if body never runs (MAP-EACH gives [])
 
     if (ANY_SEQUENCE(ARG(data))) {
         //
@@ -708,7 +705,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
             SET_SERIES_INFO(les.data_ser, HOLD);
 
         if (les.data_idx >= les.data_len) {
-            assert(IS_BLANK(D_OUT));  // result if loop body never runs
+            assert(Is_Heavy_Nulled(D_OUT));  // result if loop body never runs
             r = nullptr;
             goto cleanup;
         }
@@ -769,7 +766,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
 
       case LOOP_MAP_EACH:
       case LOOP_MAP_EACH_SPLICED:
-        if (IS_NULLED(D_OUT)) {  // e.g. there was a BREAK. *must* return null
+        if (Is_Light_Nulled(D_OUT)) {  // BREAK, so *must* return null
             DS_DROP_TO(dsp_orig);
             return nullptr;
         }
@@ -886,7 +883,7 @@ REBNATIVE(for_skip)
 
     REBVAL *series = ARG(series);
 
-    Init_Blank(D_OUT);  // result if body never runs, `while [null] [...]`
+    Init_Heavy_Nulled(D_OUT);  // if body never runs, `while [null] [...]`
 
     REBINT skip = Int32(ARG(skip));
     if (skip == 0) {
@@ -939,7 +936,6 @@ REBNATIVE(for_skip)
             if (broke)
                 return nullptr;
         }
-        Voidify_If_Nulled_Or_Blank(D_OUT);  // null->BREAK, blank->empty
 
         // Modifications to var are allowed, to another ANY-SERIES! value.
         //
@@ -1521,9 +1517,7 @@ REBNATIVE(map_each)
     INCLUDE_PARAMS_OF_MAP_EACH;
     UNUSED(PAR(vars));
     UNUSED(PAR(data));
-
-    if (IS_BLOCK(ARG(body)))
-        Symify(ARG(body));  // request not to voidify body execution as branch 
+    UNUSED(PAR(body));
 
     return Loop_Each(
         frame_,
@@ -1549,7 +1543,7 @@ REBNATIVE(loop)
 {
     INCLUDE_PARAMS_OF_LOOP;
 
-    Init_Blank(D_OUT);  // result if body never runs, `while [null] [...]`
+    Init_Heavy_Nulled(D_OUT);  // if body never runs, `loop 0 [...]`
 
     if (IS_FALSEY(ARG(count))) {
         assert(IS_LOGIC(ARG(count)));  // is false (opposite of infinite loop)
@@ -1579,7 +1573,6 @@ REBNATIVE(loop)
             if (broke)
                 return nullptr;
         }
-        Voidify_If_Nulled_Or_Blank(D_OUT);  // null->BREAK, blank->empty
     }
 
     if (IS_LOGIC(ARG(count)))
@@ -1631,7 +1624,7 @@ REBNATIVE(repeat)
 
     REBI64 n = VAL_INT64(value);
     if (n < 1)  // Loop_Integer from 1 to 0 with bump of 1 is infinite
-        return Init_Blank(D_OUT);  // blank if loop condition never runs
+        return Init_Heavy_Nulled(D_OUT);  // if loop condition never runs
 
     return Loop_Integer_Common(
         D_OUT, var, ARG(body), 1, VAL_INT64(value), 1
@@ -1658,9 +1651,6 @@ REBNATIVE(until)
     REBVAL *predicate = ARG(predicate);
     if (Cache_Predicate_Throws(D_OUT, predicate))
         return R_THROWN;
-
-    if (IS_BLOCK(ARG(body)))
-        Symify(ARG(body));  // request no branch voidification
 
     do {
         if (Do_Branch_Throws(D_OUT, nullptr, ARG(body))) {
@@ -1707,10 +1697,7 @@ REBNATIVE(while)
 {
     INCLUDE_PARAMS_OF_WHILE;
 
-    Init_Blank(D_OUT); // result if body never runs
-
-    if (IS_BLOCK(ARG(condition)))
-        Symify(ARG(condition));  // request no branch voidification
+    Init_Heavy_Nulled(D_OUT); // result if body never runs
 
     do {
         if (Do_Branch_Throws(D_SPARE, nullptr, ARG(condition))) {
@@ -1729,8 +1716,6 @@ REBNATIVE(while)
             if (broke)
                 return Init_Nulled(D_OUT);
         }
-
-        Voidify_If_Nulled_Or_Blank(D_OUT);  // null->BREAK, blank->never ran
 
     } while (true);
 }

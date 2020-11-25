@@ -411,15 +411,32 @@ bool Match_Core_Throws(
 //
 REBNATIVE(else)  // see `tweak :else #defer on` in %base-defs.r
 {
-    INCLUDE_PARAMS_OF_ELSE;  // faster than EITHER-TEST specialized w/`VALUE?`
+    INCLUDE_PARAMS_OF_ELSE;
 
-    if (not IS_NULLED(ARG(optional)))  // Note: VOID!s are crucially non-NULL
+    if (not Is_Light_Nulled(ARG(optional)))
         RETURN (ARG(optional));
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), NULLED_CELL))
         return R_THROWN;
 
-    return D_OUT;
+    return D_OUT;  // note NULL branches will have been converted to NULL-2
+}
+
+
+//
+//  else?: native [
+//
+//  {Determine if argument would have triggered an ELSE branch}
+//
+//      return: [logic!]
+//      optional "Argument to test (note that WORD!-fetch would decay NULL-2)"
+//          [<opt> any-value!]
+//  ]
+//
+REBNATIVE(else_q)
+{
+    INCLUDE_PARAMS_OF_ELSE_Q;
+    return Init_Logic(D_OUT, Is_Light_Nulled(ARG(optional)));
 }
 
 
@@ -438,15 +455,32 @@ REBNATIVE(else)  // see `tweak :else #defer on` in %base-defs.r
 //
 REBNATIVE(then)  // see `tweak :then #defer on` in %base-defs.r
 {
-    INCLUDE_PARAMS_OF_THEN;  // faster than EITHER-TEST specialized w/`NULL?`
+    INCLUDE_PARAMS_OF_THEN;
 
-    if (IS_NULLED(ARG(optional)))  // Note: VOID!s are crucially non-NULL
+    if (Is_Light_Nulled(ARG(optional)))
         return nullptr;  // left didn't run, so signal THEN didn't run either
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(optional)))
         return R_THROWN;
 
-    return D_OUT;  // nominally voidifies, avoids mistakes w/`then [] else []`
+    return D_OUT;  // note NULL branches will have been converted to NULL-2
+}
+
+
+//
+//  then?: native [
+//
+//  {Determine if argument would have triggered a THEN branch}
+//
+//      return: [logic!]
+//      optional "Argument to test (note that WORD!-fetch would decay NULL-2)"
+//          [<opt> any-value!]
+//  ]
+//
+REBNATIVE(then_q)
+{
+    INCLUDE_PARAMS_OF_THEN_Q;
+    return Init_Logic(D_OUT, not Is_Light_Nulled(ARG(optional)));
 }
 
 
@@ -467,7 +501,7 @@ REBNATIVE(also)  // see `tweak :also #defer on` in %base-defs.r
 {
     INCLUDE_PARAMS_OF_ALSO;  // `then func [x] [(...) :x]` => `also [...]`
 
-    if (IS_NULLED(ARG(optional)))  // Note: VOID!s are crucially non-NULL
+    if (Is_Light_Nulled(ARG(optional)))
         return nullptr;  // telegraph original input, but don't run
 
     if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(optional)))
@@ -809,7 +843,7 @@ REBNATIVE(all)
             // so we voidify it for: `all .not [null] then [<runs>]`
             //
             assert(not IS_NULLED(predicate));
-            return Init_Void(D_OUT, SYM_ALL);
+            return Init_Heavy_Nulled(D_OUT);
         }
     }
 
@@ -874,9 +908,8 @@ REBNATIVE(any)
             }
 
             if (IS_TRUTHY(D_SPARE)) {
+                Isotopify_If_Nulled(D_OUT);  // `any .not [null] then [<run>]`
                 Abort_Frame(f);
-                if (IS_NULLED(D_OUT))  // `any .not [null] then [<runs>]`
-                    return Init_Void(D_OUT, SYM_ANY);
                 return D_OUT;  // return input to the test, not result
             }
         }
@@ -1151,8 +1184,7 @@ REBNATIVE(switch)
                 if (Do_Any_Array_At_Throws(D_OUT, f_value, f_specifier))
                     goto threw;
                 if (IS_BLOCK(f_value))
-                    if (IS_NULLED(D_OUT) or IS_VOID(D_OUT))
-                        Init_Void(D_OUT, SYM_BRANCHED);
+                    Isotopify_If_Nulled(D_OUT);
                 break;
             }
 

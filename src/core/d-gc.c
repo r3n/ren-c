@@ -428,6 +428,10 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
 
     enum Reb_Kind kind = CELL_KIND(cast(REBCEL(const*), v));
     switch (kind) {
+      case REB_NULL:
+        assert(heart == REB_NULL or heart == REB_BLANK);  // may be "isotope"
+        break;
+
       case REB_TUPLE:
       case REB_SET_TUPLE:
       case REB_GET_TUPLE:

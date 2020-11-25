@@ -33,3 +33,37 @@
     e: trap [form null]
     'arg-required = e/id
 )
+
+; There are two "isotopes" of NULL (NULL-1 and NULL-2).
+; Both answer to being NULL?  A variable assigned with NULL-2 will decay
+; to a regular NULL when accessed via a WORD!/GET-WORD!/etc.
+;
+; The specific role of NULL-2 is to be reactive with THEN and not ELSE, so
+; that branches may be purposefully NULL.
+[
+    (null? null)
+    (null? null-2)
+    (null-1? null)
+    (null-2? null-2)
+
+    (x: null-2, null-1? x)
+    (x: null-2, null-1? :x)
+
+    (304 = (null then [1020] else [304]))
+    (1020 = (null-2 then [1020] else [304]))
+]
+
+; Conditionals return NULL-1 on failure, and NULL-2 on a branch that executes
+; and evaluates to either NULL-1 or NULL-2.  If the branch wishes to pass
+; the null "as-is" it should use the @ forms.
+[
+    (null-2? if true [null])
+    (null-2? if true [null-2])
+    (~ = if true [])
+    (~custom~ = if true [~custom~])
+
+    (null-1? if true @[null])
+    (null-2? if true @[null-2])
+    (~ = if true @[])
+    (~custom~ = if true @[~custom~])
+]

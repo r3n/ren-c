@@ -80,7 +80,7 @@
 
 ; recursive behaviour
 
-(void? if true [if false [1]])
+(null-2? if true [if false [1]])
 (1 = if true [if true [1]])
 
 ; infinite recursion

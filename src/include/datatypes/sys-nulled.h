@@ -6,8 +6,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
+// Copyright 2012-2020 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -20,8 +19,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Rebol's null is a transient evaluation product.  It is used as a signal for
-// "soft failure", e.g. `find [a b] 'c` is null, hence they are conditionally
+// NULL is a transient evaluation product.  It is used as a signal for
+// "soft failure", e.g. `find [a b] 'c` is NULL, hence they are conditionally
 // false.  But null isn't an "ANY-VALUE!", and can't be stored in BLOCK!s that
 // are seen by the user.
 //
@@ -31,10 +30,10 @@
 // and be sure that there's not some nonzero address of a "null-valued cell".
 // So there is no `isRebolNull()` API.
 //
-// But that's the API.  Internal to Rebol, cells are the currency used, and
-// if they are to represent an "optional" value, there must be a special
-// bit pattern used to mark them as not containing any value at all.  These
-// are called "nulled cells" and marked by means of their KIND3Q_BYTE().
+// But that's the API.  Internally, cells are the currency used, and if they
+// are to represent an "optional" value, there must be a special bit pattern
+// used to mark them as not containing any value at all.  These are called
+// "nulled cells" and marked by means of their KIND3Q_BYTE().
 //
 
 #define NULLED_CELL \
@@ -45,6 +44,72 @@
 
 #define Init_Nulled(out) \
     RESET_CELL((out), REB_NULL, CELL_MASK_NONE)
+
+
+//=//// NULL ISOTOPE (NULL-2) /////////////////////////////////////////////=//
+//
+// There was considerable deliberation about how to handle branches that
+// actually want to return NULL without triggering ELSE:
+//
+//     >> if true [null] else [print "Don't want this to print"]
+//     ; null (desired result)
+//
+// Making branch results NULL if-and-only-if the branch ran would mean having
+// to distort the result (e.g. into a void).
+//
+// The ultimate solution to this was to introduce a slight variant of NULL
+// which would be short-lived (e.g. "decay" to a normal NULL) but carry the
+// additional information that it was an intended branch result.  While this
+// seems sketchy, holistic survey of alternatives made it seem pretty much
+// the best option in the bunch.  Everything else just shifted the same
+// complexity around, in a way that would wind up burdening usages that were
+// not involving ELSE or then whatsoever.
+//
+// The "decay" of NULL isotopes occurs on variable retrieval.  Hence:
+//
+//     >> x: if true [null]
+//     ; null-2
+//
+//     >> x
+//     ; null
+//
+// This means getting one's hands on a NULL isotope to start with is tricky,
+// and has to be done with a function (NULL-2).
+//
+//     >> null-2
+//     ; null-2
+//
+// As with the natural concept of radiation, working with NULL isotopes is
+// risky, and should be avoided by code that doesn't need to do it.
+//
+// In order to avoid taking a relatively precious CELL_FLAG for this purpose,
+// the isotope indication is done by making the HEART_BYTE() of the cell
+// REB_BLANK, while keeping the surface byte REB_NULL.
+
+inline static REBVAL *Init_Heavy_Nulled(RELVAL *out) {
+    RESET_CELL(out, REB_NULL, CELL_MASK_NONE);
+    mutable_HEART_BYTE(out) = REB_BLANK;
+    return cast(REBVAL*, out);
+}
+
+inline static bool Is_Light_Nulled(const RELVAL *v)
+  { return IS_NULLED(v) and HEART_BYTE(v) == REB_NULL; }
+
+inline static bool Is_Heavy_Nulled(const RELVAL *v)
+  { return IS_NULLED(v) and HEART_BYTE(v) == REB_BLANK; }
+
+inline static RELVAL *Decay_If_Nulled(RELVAL *v) {
+    if (IS_NULLED(v))  // cheaper to overwrite whether already REB_NULL or not
+        mutable_HEART_BYTE(v) = REB_NULL;
+    return v;
+}
+
+inline static RELVAL *Isotopify_If_Nulled(RELVAL *v) {
+    if (IS_NULLED(v))  // cheaper to overwrite whether already REB_NULL or not
+        mutable_HEART_BYTE(v) = REB_BLANK;
+    return v;
+}
+
 
 // !!! A theory was that the "evaluated" flag would help a function that took
 // both <opt> and <end>, which are converted to nulls, distinguish what kind

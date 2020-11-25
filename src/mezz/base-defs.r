@@ -601,7 +601,7 @@ print: func* [
         return write-stdout line
     ]
 
-    (write-stdout try spaced line) then @[write-stdout newline]
+    (write-stdout try spaced line) then [write-stdout newline]
 ]
 
 

@@ -129,8 +129,8 @@ console!: make object! [
         ]
 
         case [
-            null? :v [
-                print "; null"  ; no representation, use comment
+            null? :v [  ; no representation, use comment
+                print ["; null" if isotope? 'v [#-2]]
             ]
 
             free? :v [
@@ -611,7 +611,7 @@ ext-console-impl: function [
     === HANDLE RESULT FROM EXECUTION OF CODE ON USER'S BEHALF ===
 
     if group? prior [
-        emit [system/console/print-result (<*> result)]
+        emit [system/console/print-result (<*> get/any 'result)]
         return <prompt>
     ]
 

@@ -73,19 +73,6 @@
     (null = cycle [break])
 ]
 
-; ~branched~ is used both as a way to give conditionals whose branches yield
-; NULL a non-null result, as well as a "relabeling" of voids that are in
-; the branch.  To avoid the relabeling, use the @ forms of branch.
-[
-    (~branched~ = if true [null])
-    (~branched~ = if true [])
-    (~branched~ = if true [~overwritten~])
-
-    (null = if true @[null])
-    (~ = if true @[])
-    (~untouched~ = if true @[~untouched~])
-]
-
 ; ~quit~ is the label of the VOID! you get by default from QUIT
 ; Note: DO of BLOCK! does not catch quits, so TEXT! is used here.
 [
