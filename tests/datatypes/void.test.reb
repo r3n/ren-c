@@ -34,7 +34,7 @@
     foo: func [] []
     ~ = foo
 )
-(~ = applique 'foo [])
+(~ = applique :foo [])
 (~ = do :foo)
 
 ; ~void~ is the more formal convention for what you get by RETURN with no
@@ -46,7 +46,7 @@
     foo: func [] [return]
     ~void~ = foo
 )
-(~void~ = applique 'foo [])
+(~void~ = applique :foo [])
 (~void~ = do :foo)
 
 ; ~undefined~ is the type of locals before they are assigned

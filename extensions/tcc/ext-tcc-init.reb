@@ -401,7 +401,7 @@ compile: function [
     config/runtime-path: my file-to-local/full
     config/librebol-path: ~taken-into-account~  ; COMPILE* does not read
 
-    result: applique 'compile* [
+    result: applique :compile* [
         compilables: compilables
         config: config
         files: files

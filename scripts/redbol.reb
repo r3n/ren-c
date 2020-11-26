@@ -480,7 +480,7 @@ set: emulate [
             fail "Can't SET a value to UNSET! unless SET/ANY is used"
         ]
 
-        applique 'set [
+        applique :set [
             target: either any-context? target [words of target] [target]
             value: :value
             some: some
@@ -559,7 +559,7 @@ do: emulate [
             ]
             do code
         ] else [
-            applique 'do [
+            applique :do [
                 source: :source
                 args: :args
             ]
@@ -691,7 +691,7 @@ compose: emulate [
     ][
         if not block? :value [return :value]  ; `compose 1` is `1` in Rebol2
 
-        composed: applique 'compose [
+        composed: applique :compose [
             value: :value
             deep: deep
 
@@ -756,7 +756,7 @@ repend: emulate [
     ][
         ; R3-alpha REPEND with block behavior called out
         ;
-        applique 'append/part/dup [
+        applique :append/part/dup [
             series: series
             value: either block? :value [reduce :value] [:value]
             part: part
@@ -773,7 +773,7 @@ join: emulate [
     ][
         ; double-inline of R3-alpha `repend value :rest`
         ;
-        applique 'append [
+        applique :append [
             series: if series? :value [copy value] else [form :value]
             value: if block? :rest [reduce :rest] else [rest]
         ]
@@ -871,7 +871,7 @@ quit: emulate [
         /return "Ren-C is variadic, 0 or 1 arg: https://trello.com/c/3hCNux3z"
             [<opt> any-value!]
     ][
-        applique 'quit [
+        applique :quit [
             value: :return
         ]
     ]

@@ -751,8 +751,8 @@ REBNATIVE(redo)
 //  {Invoke an ACTION! with all required arguments specified}
 //
 //      return: [<opt> any-value!]
-//      applicand "Literal action, or location to find one (preserves name)"
-//          [action! word! path!]
+//      applicand "Action to apply"
+//          [action!]
 //      def "Frame definition block (will be bound and evaluated)"
 //          [block!]
 //      /opt "Treat nulls as unspecialized <<experimental!>>"
@@ -772,23 +772,7 @@ REBNATIVE(applique)
             | FLAG_STATE_BYTE(ST_ACTION_TYPECHECKING)  // skips fulfillment
     );
 
-    // Argument can be a literal action (APPLY :APPEND) or a WORD!/PATH!.
-    // If it is a path, we push the refinements to the stack so they can
-    // be taken into account, e.g. APPLY 'APPEND/ONLY/DUP pushes /ONLY, /DUP
-    //
-    REBDSP lowest_ordered_dsp = DSP;
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        applicand,
-        SPECIFIED,
-        true // push_refinements, don't specialize ACTION! on 'APPEND/ONLY/DUP
-    )){
-        return R_THROWN;
-    }
-
-    if (not IS_ACTION(D_OUT))
-        fail (PAR(applicand));
-    Move_Value(applicand, D_OUT);
+    REBDSP lowest_ordered_dsp = DSP;  // could push refinements here
 
     // Make a FRAME! for the ACTION!, weaving in the ordered refinements
     // collected on the stack (if any).  Any refinements that are used in

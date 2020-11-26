@@ -257,23 +257,14 @@ REB_R MAKE_Frame(
         return threw ? R_THROWN : out;
     }
 
-    REBDSP lowest_ordered_dsp = DSP; // Data stack gathers any refinements
+    REBDSP lowest_ordered_dsp = DSP;  // Data stack gathers any refinements
 
-    if (Get_If_Word_Or_Path_Throws( // Allows `MAKE FRAME! 'APPEND/DUP`, etc.
-        out,
-        arg,
-        SPECIFIED,
-        true // push_refinements (e.g. don't auto-specialize ACTION! if PATH!)
-    )){
-        return out;
-    }
-
-    if (not IS_ACTION(out))
+    if (not IS_ACTION(arg))
         fail (Error_Bad_Make(kind, arg));
 
     REBCTX *exemplar = Make_Context_For_Action(
-        out, // being used here as input (e.g. the ACTION!)
-        lowest_ordered_dsp, // will weave in the refinements pushed
+        arg, // being used here as input (e.g. the ACTION!)
+        lowest_ordered_dsp, // will weave in any refinements pushed
         nullptr // no binder needed, not running any code
     );
 
@@ -281,7 +272,7 @@ REB_R MAKE_Frame(
     // put /REFINEMENTs in refinement slots (instead of true/false/null)
     // to preserve the order of execution.
 
-    return Init_Frame(out, exemplar, VAL_ACTION_LABEL(out));
+    return Init_Frame(out, exemplar, VAL_ACTION_LABEL(arg));
 }
 
 

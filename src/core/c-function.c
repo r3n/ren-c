@@ -1338,16 +1338,20 @@ REBTYPE(Fail)
 //
 //  Get_If_Word_Or_Path_Throws: C
 //
-// Some routines like APPLY and SPECIALIZE are willing to take a WORD! or
-// PATH! instead of just the value type they are looking for, and perform
-// the GET for you.  By doing the GET inside the function, they are able
-// to preserve the symbol:
+// Originally this routine was used by APPLY and SPECIALIZE type routines
+// to allow them to take WORD!s and PATH!s, since there had been no way to
+// get the label for an ACTION! after it had been fetched:
 //
-//     >> applique 'append [value: 'c]
-//     ** Script error: append is missing its series argument
+//     >> applique 'append [value: 'c]  ; APPLIQUE would see the word APPEND
+//     ** Script error: append is missing its series argument  ; so name here
 //
-// If push_refinements is used, then it avoids intermediate specializations...
-// e.g. `specialize :append/dup [part: true]` can be done with one FRAME!.
+// That became unnecessary once the mechanics behind VAL_ACTION_LABEL() were
+// introduced.  So the interfaces were changed to only take ACTION!, so as
+// to be more clear.
+//
+// This function remains as a utility for other purposes.  It is able to push
+// refinements in the process of its fetching, if you want to avoid an
+// intermediate specialization when used in apply-like scenarios.
 //
 bool Get_If_Word_Or_Path_Throws(
     REBVAL *out,

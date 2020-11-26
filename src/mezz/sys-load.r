@@ -296,7 +296,7 @@ load: function [
         ; A BLOCK! means multiple sources, calls LOAD recursively for each
 
         return map-each s source [
-            applique 'load [
+            applique :load [
                 source: s
                 header: header
                 all: all_LOAD
@@ -495,7 +495,7 @@ do-needs: function [
     ; Import the modules:
     ;
     mods: map-each [name vers hash] mods [
-        mod: applique 'import [
+        mod: applique :import [
             module: name
 
             version: true  ; !!! automatic from VERS?
@@ -663,7 +663,7 @@ load-module: func [
             ]
 
             return map-each [mod ver name] source [
-                applique 'load-module [
+                applique :load-module [
                     source: mod
                     version: version
                     as: name
@@ -926,7 +926,7 @@ import: function [
     ;
     if block? module [
         assert [not version] ; can only apply to one module
-        return applique 'do-needs [
+        return applique :do-needs [
             needs: module
             no-share: :no-share
             no-lib: :no-lib
@@ -935,7 +935,7 @@ import: function [
         ]
     ]
 
-    set [name: mod:] applique 'load-module [
+    set [name: mod:] applique :load-module [
         source: module
         version: version
         no-share: no-share
@@ -956,7 +956,7 @@ import: function [
 
             for-each path system/options/module-paths [
                 if set [name: mod:] (
-                    applique 'load-module [
+                    applique :load-module [
                         source: path/:file
                         version: version
                         no-share: :no-share
