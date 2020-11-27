@@ -928,9 +928,9 @@ import: function [
         assert [not version] ; can only apply to one module
         return applique :do-needs [
             needs: module
-            no-share: :no-share
-            no-lib: :no-lib
-            no-user: :no-user
+            no-share: no-share
+            no-lib: no-lib
+            no-user: no-user
             block: #
         ]
     ]
@@ -957,11 +957,11 @@ import: function [
             for-each path system/options/module-paths [
                 if set [name: mod:] (
                     applique :load-module [
-                        source: path/:file
+                        source: join path file  ; Note: %% not defined yet
                         version: version
-                        no-share: :no-share
-                        no-lib: :no-lib
-                        import: true
+                        no-share: no-share
+                        no-lib: no-lib
+                        import: #
                     ]
                 ) [
                     break
