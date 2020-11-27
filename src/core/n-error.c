@@ -38,7 +38,7 @@ static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
     INCLUDE_PARAMS_OF_TRAP;
     UNUSED(ARG(result));
 
-    if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(code)))
+    if (Do_Branch_Throws(D_OUT, ARG(code)))
         return BLANK_VALUE;  // signal thrown without corrupting D_OUT
 
     return nullptr;
@@ -82,7 +82,7 @@ REBNATIVE(trap)
 static REBVAL *Entrap_Dangerous(REBFRM *frame_) {
     INCLUDE_PARAMS_OF_ENTRAP;
 
-    if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(code))) {
+    if (Do_Branch_Throws(D_OUT, ARG(code))) {
         Init_Error(D_OUT, Error_No_Catch_For_Throw(D_OUT));
         return nullptr;
     }

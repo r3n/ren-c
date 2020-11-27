@@ -61,13 +61,13 @@ REBNATIVE(if)
 {
     INCLUDE_PARAMS_OF_IF;
 
-    if (IS_CONDITIONAL_FALSE(ARG(condition))) // fails on void, literal blocks
-        return nullptr;
+    if (IS_CONDITIONAL_FALSE(ARG(condition)))
+        return nullptr;  // ^-- truth test fails on voids, literal blocks
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(condition)))
-        return R_THROWN;
+    if (Do_Branch_With_Throws(D_OUT, ARG(branch), ARG(condition)))
+        return R_THROWN;  // ^-- condition is passed to branch if function
 
-    return D_OUT;  // Note: NULL means no branch (cues ELSE, etc.)
+    return D_OUT;  // most branch executions mark NULL as "heavy" isotope
 }
 
 
@@ -89,18 +89,14 @@ REBNATIVE(either)
 {
     INCLUDE_PARAMS_OF_EITHER;
 
-    if (Do_Branch_With_Throws(
-        D_OUT,
-        D_SPARE,
-        IS_CONDITIONAL_TRUE(ARG(condition)) // fails on void, literal blocks
-            ? ARG(true_branch)
-            : ARG(false_branch),
-        ARG(condition)
-    )){
-        return R_THROWN;
-    }
+    REBVAL *branch = IS_CONDITIONAL_TRUE(ARG(condition))
+        ? ARG(true_branch)  // ^-- truth test fails on voids, literal blocks
+        : ARG(false_branch);
 
-    return D_OUT;
+    if (Do_Branch_With_Throws(D_OUT, branch, ARG(condition)))
+        return R_THROWN;  // ^-- condition is passed to branch if function
+
+    return D_OUT;  // most branch executions mark NULL as "heavy" isotope
 }
 
 
@@ -416,7 +412,7 @@ REBNATIVE(else)  // see `tweak :else #defer on` in %base-defs.r
     if (not Is_Light_Nulled(ARG(optional)))
         RETURN (ARG(optional));
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), NULLED_CELL))
+    if (Do_Branch_With_Throws(D_OUT, ARG(branch), NULLED_CELL))
         return R_THROWN;
 
     return D_OUT;  // note NULL branches will have been converted to NULL-2
@@ -460,7 +456,7 @@ REBNATIVE(then)  // see `tweak :then #defer on` in %base-defs.r
     if (Is_Light_Nulled(ARG(optional)))
         return nullptr;  // left didn't run, so signal THEN didn't run either
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(optional)))
+    if (Do_Branch_With_Throws(D_OUT, ARG(branch), ARG(optional)))
         return R_THROWN;
 
     return D_OUT;  // note NULL branches will have been converted to NULL-2
@@ -504,7 +500,7 @@ REBNATIVE(also)  // see `tweak :also #defer on` in %base-defs.r
     if (Is_Light_Nulled(ARG(optional)))
         return nullptr;  // telegraph original input, but don't run
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(optional)))
+    if (Do_Branch_With_Throws(D_OUT, ARG(branch), ARG(optional)))
         return R_THROWN;
 
     RETURN (ARG(optional));  // ran, but pass thru the original input
@@ -550,7 +546,7 @@ REBNATIVE(either_match)
         RETURN (ARG(value));
     }
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, ARG(branch), ARG(value)))
+    if (Do_Branch_With_Throws(D_OUT, ARG(branch), ARG(value)))
         return R_THROWN;
 
     return D_OUT;
@@ -1021,12 +1017,11 @@ REBNATIVE(case)
             continue;
         }
 
-        DECLARE_LOCAL (temp);
-        if (Do_Branch_With_Throws(temp, D_SPARE, ARG(branch), D_OUT)) {
-            Move_Value(D_OUT, temp);
+        if (Do_Branch_With_Throws(D_SPARE, ARG(branch), D_OUT)) {
+            Move_Value(D_OUT, D_SPARE);
             goto threw;
         }
-        Move_Value(D_OUT, temp);
+        Move_Value(D_OUT, D_SPARE);
 
         if (not REF(all)) {
             Drop_Frame(f);
@@ -1334,7 +1329,7 @@ REBNATIVE(default)
         }
     }
 
-    if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(branch)))
+    if (Do_Branch_Throws(D_OUT, ARG(branch)))
         return R_THROWN;
 
     if (IS_SET_WORD(target))

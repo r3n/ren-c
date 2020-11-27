@@ -180,11 +180,12 @@ inline static bool RunQ_Throws(
 //
 inline static bool Do_Branch_Core_Throws(
     REBVAL *out,
-    REBVAL *cell,  // mutable temporary scratch cell, only if SYM-GROUP! legal
     const REBVAL *branch,
     const REBVAL *condition  // can be END, but use nullptr vs. a NULLED cell!
 ){
     assert(branch != out and condition != out);
+
+    DECLARE_LOCAL (cell);
 
     enum Reb_Kind kind = VAL_TYPE(branch);
     bool as_is = (kind == REB_QUOTED or ANY_SYM_KIND(kind));
@@ -206,17 +207,19 @@ inline static bool Do_Branch_Core_Throws(
             return true;
         break;
 
-      case REB_ACTION:
-        if (RunQ_Throws(
+      case REB_ACTION: {
+        PUSH_GC_GUARD(branch);  // may be stored in `cell`, needs protection
+        bool threw = RunQ_Throws(
             out,
             false, // !fully, e.g. arity-0 functions can ignore condition
             rebU(branch),
             condition, // may be an END marker, if not Do_Branch_With() case
             rebEND // ...but if condition wasn't an END marker, we need one
-        )){
+        );
+        DROP_GC_GUARD(branch);
+        if (threw)
             return true;
-        }
-        break;
+        break; }
 
       case REB_SYM_WORD:
       case REB_SYM_PATH:
@@ -259,8 +262,8 @@ inline static bool Do_Branch_Core_Throws(
     return false;
 }
 
-#define Do_Branch_With_Throws(out,cell,branch,condition) \
-    Do_Branch_Core_Throws((out), (cell), (branch), NULLIFY_NULLED(condition))
+#define Do_Branch_With_Throws(out,branch,condition) \
+    Do_Branch_Core_Throws((out), (branch), NULLIFY_NULLED(condition))
 
-#define Do_Branch_Throws(out,cell,branch) \
-    Do_Branch_Core_Throws((out), (cell), (branch), END_NODE)
+#define Do_Branch_Throws(out,branch) \
+    Do_Branch_Core_Throws((out), (branch), END_NODE)

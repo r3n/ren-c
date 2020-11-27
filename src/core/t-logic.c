@@ -157,7 +157,7 @@ REBNATIVE(_and_)  // see TO-C-NAME
     if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
         mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
+    if (Do_Branch_With_Throws(D_OUT, right, left))
         return R_THROWN;
 
     return Init_Logic(D_OUT, IS_TRUTHY(D_OUT));
@@ -196,7 +196,7 @@ REBNATIVE(_or_)  // see TO-C-NAME
     if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
         mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
+    if (Do_Branch_With_Throws(D_OUT, right, left))
         return R_THROWN;
 
     return Init_Logic(D_OUT, IS_TRUTHY(D_OUT));
@@ -228,7 +228,7 @@ REBNATIVE(_xor_)  // see TO-C-NAME
     if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
         mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
+    if (Do_Branch_With_Throws(D_OUT, right, left))
         return R_THROWN;
 
     if (IS_FALSEY(left))
