@@ -7,8 +7,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2020 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -30,9 +30,9 @@
 //
 // * If a branch *does* run--and that branch evaluation produces a NULL--then
 //   conditionals designed to be used with branching (like IF or CASE) will
-//   return a VOID! result.  Voids are neither true nor false, and since they
-//   are values (unlike NULL), they distinguish the signal of a branch that
-//   evaluated to NULL from no branch at all.
+//   return a special variant of NULL (tentatively called "NULL-2").  It acts
+//   just like NULL in most cases, but for the purposes of ELSE and THEN it
+//   is considered a signal that a branch ran.
 //
 // * Zero-arity function values used as branches will be executed, and
 //   single-arity functions used as branches will also be executed--but passed
