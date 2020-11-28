@@ -203,24 +203,6 @@ inline static bool SAME_STR(const REBSTR *s1, const REBSTR *s2) {
 }
 
 
-inline static bool IS_WORD_UNBOUND(unstable REBCEL(const*) v) {
-    assert(ANY_WORD_KIND(CELL_HEART(v)));
-    return not EXTRA(Binding, v).node;
-}
-
-#define IS_WORD_BOUND(v) \
-    (not IS_WORD_UNBOUND(v))
-
-inline static const REBSTR *VAL_WORD_SPELLING(unstable REBCEL(const*) v) {
-    assert(ANY_WORD_KIND(CELL_HEART(v)));
-    return STR(PAYLOAD(Any, v).first.node);
-}
-
-inline static const REBSTR *VAL_WORD_CANON(unstable REBCEL(const*) v) {
-    assert(ANY_WORD_KIND(CELL_HEART(v)));
-    return STR_CANON(STR(PAYLOAD(Any, v).first.node));
-}
-
 // Some scenarios deliberately store canon spellings in words, to avoid
 // needing to re-canonize them.  If you have one of those words, use this to
 // add a check that your assumption about them is correct.
@@ -250,20 +232,6 @@ inline static void INIT_WORD_INDEX(unstable RELVAL *v, REBLEN i) {
     INIT_WORD_INDEX_Extra_Checks_Debug(v, i); // not inline, needs FRM_PHASE()
   #endif
     INIT_WORD_INDEX_UNCHECKED(v, i);
-}
-
-inline static REBLEN VAL_WORD_INDEX(unstable REBCEL(const*) v) {
-    assert(IS_WORD_BOUND(v));
-    REBINT i = PAYLOAD(Any, v).second.i32;
-    assert(i > 0);
-    return cast(REBLEN, i);
-}
-
-inline static void Unbind_Any_Word(unstable RELVAL *v) {
-    INIT_BINDING(v, UNBOUND);
-  #if !defined(NDEBUG)
-    INIT_WORD_INDEX_UNCHECKED(v, -1);
-  #endif
 }
 
 inline static REBVAL *Init_Any_Word(

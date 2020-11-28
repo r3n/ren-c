@@ -517,6 +517,10 @@ inline static bool Is_Typeset_Empty(const RELVAL *param) {
     return (bits & TS_OPT_VALUE) == 0;  // e.g. `[/refine]`
 }
 
+// Forward definition needed...
+//
+inline static bool Is_Blackhole(unstable const RELVAL *v);
+
 
 // During the process of specialization, a NULL refinement means that it has
 // not been specified one way or the other (MAKE FRAME! creates a frame with

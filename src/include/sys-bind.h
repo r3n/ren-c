@@ -398,6 +398,50 @@ inline static void INIT_BINDING_MAY_MANAGE(
 }
 
 
+inline static bool IS_WORD_UNBOUND(unstable REBCEL(const*) v) {
+    assert(ANY_WORD_KIND(CELL_HEART(v)));
+    return not EXTRA(Binding, v).node;
+}
+
+#define IS_WORD_BOUND(v) \
+    (not IS_WORD_UNBOUND(v))
+
+inline static const REBSTR *VAL_WORD_SPELLING(unstable REBCEL(const*) v) {
+    assert(ANY_WORD_KIND(CELL_HEART(v)));
+    return STR(PAYLOAD(Any, v).first.node);
+}
+
+#define VAL_WORD_CANON(v) \
+    STR_CANON(VAL_WORD_SPELLING(v))
+
+inline static REBLEN VAL_WORD_INDEX(unstable REBCEL(const*) v) {
+    assert(IS_WORD_BOUND(v));
+    REBINT i = PAYLOAD(Any, v).second.i32;
+    assert(i > 0);
+    return cast(REBLEN, i);
+}
+
+inline static void Unbind_Any_Word(unstable RELVAL *v) {
+    INIT_BINDING(v, UNBOUND);
+  #if !defined(NDEBUG)
+    INIT_WORD_INDEX_UNCHECKED(v, -1);
+  #endif
+}
+
+inline static REBCTX *VAL_WORD_CONTEXT(unstable const REBVAL *v) {
+    assert(IS_WORD_BOUND(v));
+    REBNOD *binding = VAL_BINDING(v);
+    assert(
+        GET_SERIES_FLAG(binding, MANAGED)
+        or IS_END(FRM(LINK_KEYSOURCE(binding))->param)  // not "fulfilling"
+    );
+    binding->header.bits |= NODE_FLAG_MANAGED;  // !!! review managing needs
+    REBCTX *c = CTX(binding);
+    FAIL_IF_INACCESSIBLE_CTX(c);
+    return c;
+}
+
+
 //=////////////////////////////////////////////////////////////////////////=//
 //
 //  VARIABLE ACCESS

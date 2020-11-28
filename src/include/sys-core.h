@@ -502,7 +502,6 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #include "datatypes/sys-string.h"  // REBSYM needed for typesets
 #include "datatypes/sys-word.h"
 #include "datatypes/sys-void.h"  // REBSYM needed
-#include "datatypes/sys-token.h"
 
 
 #include "datatypes/sys-pair.h"
@@ -517,6 +516,7 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #include "sys-stack.h"
 
 #include "sys-bind.h" // needs DS_PUSH() and DS_TOP from %sys-stack.h
+#include "datatypes/sys-token.h"
 #include "datatypes/sys-sequence.h"  // also needs DS_PUSH()
 
 #include "sys-roots.h"

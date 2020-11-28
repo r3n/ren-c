@@ -265,19 +265,6 @@ inline static REBCTX *VAL_CONTEXT(unstable REBCEL(const*) v) {
     return c;
 }
 
-inline static REBCTX *VAL_WORD_CONTEXT(unstable const REBVAL *v) {
-    assert(IS_WORD_BOUND(v));
-    REBNOD *binding = VAL_BINDING(v);
-    assert(
-        GET_SERIES_FLAG(binding, MANAGED)
-        or IS_END(FRM(LINK_KEYSOURCE(binding))->param)  // not "fulfilling"
-    );
-    binding->header.bits |= NODE_FLAG_MANAGED;  // !!! review managing needs
-    REBCTX *c = CTX(binding);
-    FAIL_IF_INACCESSIBLE_CTX(c);
-    return c;
-}
-
 #define INIT_VAL_CONTEXT_VARLIST(v,varlist) \
     (PAYLOAD(Any, (v)).first.node = NOD(varlist))
 
