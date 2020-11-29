@@ -238,8 +238,10 @@ REBTYPE(Action)
         // where we can bit-copy a possibly-relative value.
         //
       blockscope {
-        unstable RELVAL *src = ARR_HEAD(ACT_DETAILS(act));
-        unstable RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy));
+        Move_Value(ARR_HEAD(ACT_DETAILS(proxy)), ACT_ARCHETYPE_OLD(proxy));
+
+        unstable RELVAL *src = ARR_HEAD(ACT_DETAILS(act)) + 1;
+        unstable RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy)) + 1;
         for (; NOT_END(src); ++src, ++dest)
             Blit_Relative(dest, src);
         TERM_ARRAY_LEN(ACT_DETAILS(proxy), details_len);

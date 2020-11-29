@@ -1052,10 +1052,10 @@ REBACT *Make_Action(
         details_capacity,  // leave room for archetype
         SERIES_MASK_DETAILS | NODE_FLAG_MANAGED
     );
-    Init_Unreadable_Void(ARR_HEAD(details));  // !!! archetype TBD
     TERM_ARRAY_LEN(details, details_capacity);
-
     VAL_ACTION_DETAILS_OR_LABEL_NODE(rootparam) = NOD(details);
+    // !!! v-- This is part of the migration to actions being details
+    Move_Value(ARR_HEAD(details), SPECIFIC(ARR_HEAD(paramlist)));
 
     MISC(details).dispatcher = dispatcher; // level of indirection, hijackable
 

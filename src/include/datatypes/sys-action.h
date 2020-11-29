@@ -322,18 +322,21 @@ inline static REBARR *ACT_PARAMLIST(REBACT *a) {
 // to make a new paramlist from another, you must ensure the new array's
 // archetype is updated to match its container.
 
-#define ACT_ARCHETYPE(a) \
+#define ACT_ARCHETYPE_OLD(a) \
     VAL(SER(ACT_PARAMLIST(a))->content.dynamic.data)
+
+#define ACT_ARCHETYPE(a) \
+    SPECIFIC(ARR_AT(ACT_DETAILS(a), 0))
 
 inline static void Sync_Paramlist_Archetype(REBARR *paramlist)
   { VAL_ACT_PARAMLIST_NODE(ARR_HEAD(paramlist)) = NOD(paramlist); }
 
 
 #define ACT_DETAILS(a) \
-    ARR(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE(a)))
+    ARR(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE_OLD(a)))
 
 #define ACT_DISPATCHER(a) \
-    (MISC(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE(a))).dispatcher)
+    (MISC(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE_OLD(a))).dispatcher)
 
 #define DETAILS_AT(a,n) \
     SPECIFIC(STABLE(ARR_AT((a), (n))))
