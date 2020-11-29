@@ -46,8 +46,8 @@
 #include "sys-core.h"
 
 enum {
-    IDX_ADAPTER_PRELUDE = 0,  // Relativized block to run before Adaptee
-    IDX_ADAPTER_ADAPTEE = 1,  // The ACTION! being adapted
+    IDX_ADAPTER_PRELUDE = 1,  // Relativized block to run before Adaptee
+    IDX_ADAPTER_ADAPTEE,  // The ACTION! being adapted
     IDX_ADAPTER_MAX
 };
 
@@ -73,10 +73,10 @@ REB_R Adapter_Dispatcher(REBFRM *f)
 
     REBVAL *discarded = FRM_SPARE(f);
 
-    assert(IDX_ADAPTER_PRELUDE == 0);  // same location as interpreted bodies
+    assert(IDX_ADAPTER_PRELUDE == IDX_DETAILS_1);  // same as interpreted body
 
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, discarded, f)) {
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, discarded, f)) {
         Move_Value(f->out, discarded);
         return R_THROWN;
     }

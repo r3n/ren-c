@@ -338,13 +338,13 @@ inline static void Sync_Paramlist_Archetype(REBARR *paramlist)
 #define DETAILS_AT(a,n) \
     SPECIFIC(STABLE(ARR_AT((a), (n))))
 
-#define IDX_DETAILS_0 0  // Common index used for code body location
+#define IDX_DETAILS_1 1  // Common index used for code body location
 
 // These are indices into the details array agreed upon by actions which have
 // the PARAMLIST_FLAG_IS_NATIVE set.
 //
-#define IDX_NATIVE_BODY 0 // text string source code of native (for SOURCE)
-#define IDX_NATIVE_CONTEXT 1 // libRebol binds strings here (and lib)
+#define IDX_NATIVE_BODY 1 // text string source code of native (for SOURCE)
+#define IDX_NATIVE_CONTEXT 2 // libRebol binds strings here (and lib)
 #define IDX_NATIVE_MAX (IDX_NATIVE_CONTEXT + 1)
 
 inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {

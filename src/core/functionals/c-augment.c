@@ -52,7 +52,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_AUGMENTER_AUGMENTEE = 0,  // Function with briefer frame to dispatch
+    IDX_AUGMENTER_AUGMENTEE = 1,  // Function with briefer frame to dispatch
     IDX_AUGMENTER_MAX
 };
 
@@ -211,7 +211,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         &Augmenter_Dispatcher,
         ACT_UNDERLYING(VAL_ACTION(augmentee)),
         exemplar,
-        1  // size of the ACT_DETAILS array
+        IDX_AUGMENTER_MAX  // size of the ACT_DETAILS array
     );
 
     Move_Value(

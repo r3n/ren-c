@@ -1034,9 +1034,10 @@ REBACT *Make_Action(
     REBNAT dispatcher, // native C function called by Eval_Core
     option(REBACT*) underlying, // optional underlying function
     option(REBCTX*) exemplar, // if provided, make consistent w/next level
-    REBLEN details_capacity // desired capacity of the ACT_DETAILS() array
+    REBLEN details_capacity // capacity of ACT_DETAILS (including archetype)
 ){
     ASSERT_ARRAY_MANAGED(paramlist);
+    assert(details_capacity >= 1);  // must have room for archetype
 
     RELVAL *rootparam = STABLE(ARR_HEAD(paramlist));
     assert(KIND3Q_BYTE(rootparam) == REB_ACTION); // !!! not fully formed...
@@ -1048,9 +1049,10 @@ REBACT *Make_Action(
     // at the given length implicitly.
 
     REBARR *details = Make_Array_Core(
-        details_capacity,
+        details_capacity,  // leave room for archetype
         SERIES_MASK_DETAILS | NODE_FLAG_MANAGED
     );
+    Init_Unreadable_Void(ARR_HEAD(details));  // !!! archetype TBD
     TERM_ARRAY_LEN(details, details_capacity);
 
     VAL_ACTION_DETAILS_OR_LABEL_NODE(rootparam) = NOD(details);
@@ -1207,7 +1209,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
     // the top of the returned body?
     //
     while (ACT_DISPATCHER(a) == &Hijacker_Dispatcher) {
-        a = VAL_ACTION(ARR_HEAD(ACT_DETAILS(a)));
+        a = VAL_ACTION(ARR_AT(ACT_DETAILS(a), 1));
         // !!! Review what should happen to binding
     }
 
@@ -1229,7 +1231,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // Interpreted code, the body is a block with some bindings relative
         // to the action.
 
-        unstable RELVAL *body = ARR_AT(details, IDX_DETAILS_0);
+        unstable RELVAL *body = ARR_AT(details, IDX_DETAILS_1);
 
         // The PARAMLIST_HAS_RETURN tricks for definitional return make it
         // seem like a generator authored more code in the action's body...but
@@ -1297,14 +1299,14 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // The FRAME! stored in the body for the specialization has a phase
         // which is actually the function to be run.
         //
-        REBVAL *frame = DETAILS_AT(details, 0);
+        REBVAL *frame = DETAILS_AT(details, 1);
         assert(IS_FRAME(frame));
         Move_Value(out, frame);
         return;
     }
 
     if (ACT_DISPATCHER(a) == &Generic_Dispatcher) {
-        REBVAL *verb = DETAILS_AT(details, 0);
+        REBVAL *verb = DETAILS_AT(details, 1);
         assert(IS_WORD(verb));
         Move_Value(out, verb);
         return;

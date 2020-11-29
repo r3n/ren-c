@@ -44,7 +44,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_ONESHOT_COUNTER = 0,  // Count that is going down to 0
+    IDX_ONESHOT_COUNTER = 1,  // Count that is going down to 0
     IDX_ONESHOT_MAX
 };
 
@@ -74,7 +74,7 @@ REB_R Upshot_Dispatcher(REBFRM *f)  // won't run until count is reached
 
     RELVAL *n = DETAILS_AT(details, IDX_ONESHOT_COUNTER);
     if (VAL_INT64(n) < 0) {
-        ++VAL_INT64(ARR_HEAD(details));
+        ++VAL_INT64(n);
         return nullptr;  // return null until 0 is reached
     }
 

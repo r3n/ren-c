@@ -74,7 +74,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_SPECIALIZER_FRAME = 0,  // Partially or fully filled FRAME! to run
+    IDX_SPECIALIZER_FRAME = 1,  // Partially or fully filled FRAME! to run
     IDX_SPECIALIZER_MAX
 };
 

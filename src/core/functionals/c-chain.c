@@ -39,7 +39,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_CHAINER_PIPELINE = 0,  // Chain of functions to execute
+    IDX_CHAINER_PIPELINE = 1,  // Chain of functions to execute
     IDX_CHAINER_MAX
 };
 

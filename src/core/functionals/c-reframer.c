@@ -57,8 +57,8 @@
 #include "sys-core.h"
 
 enum {
-    IDX_REFRAMER_SHIM = 0,  // action that can manipulate the reframed frame
-    IDX_REFRAMER_PARAM_INDEX = 1,  // index in shim that receives FRAME!
+    IDX_REFRAMER_SHIM = 1,  // action that can manipulate the reframed frame
+    IDX_REFRAMER_PARAM_INDEX,  // index in shim that receives FRAME!
     IDX_REFRAMER_MAX
 };
 

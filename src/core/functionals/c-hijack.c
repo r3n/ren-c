@@ -58,7 +58,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_HIJACKER_HIJACKER = 0,  // Relativized block to run before Adaptee
+    IDX_HIJACKER_HIJACKER = 1,  // Relativized block to run before Adaptee
     IDX_HIJACKER_MAX
 };
 
@@ -263,8 +263,8 @@ REBNATIVE(hijack)
                 details_len + 1 - SER_REST(SER(victim_details))
             );
 
-        unstable RELVAL *src = ARR_HEAD(hijacker_details);
-        unstable RELVAL *dest = ARR_HEAD(victim_details);
+        unstable RELVAL *src = ARR_HEAD(hijacker_details) + 1;
+        unstable RELVAL *dest = ARR_HEAD(victim_details) + 1;
         for (; NOT_END(src); ++src, ++dest)
             Blit_Relative(dest, src);
         TERM_ARRAY_LEN(victim_details, details_len);
@@ -282,13 +282,13 @@ REBNATIVE(hijack)
         //
         MISC(victim_details).dispatcher = &Hijacker_Dispatcher;
 
-        if (ARR_LEN(victim_details) < 1)
+        if (ARR_LEN(victim_details) < 2)
             Alloc_Tail_Array(victim_details);
         Move_Value(
             ARR_AT(victim_details, IDX_HIJACKER_HIJACKER),
             ARG(hijacker)
         );
-        TERM_ARRAY_LEN(victim_details, 1);
+        TERM_ARRAY_LEN(victim_details, 2);
     }
 
     // !!! What should be done about MISC(victim_paramlist).meta?  Leave it

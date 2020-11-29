@@ -95,7 +95,7 @@ REB_R Macro_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare, return will be invisible
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, spare, f)) {
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
         Move_Value(f->out, spare);
         return R_THROWN;
     }
@@ -130,7 +130,7 @@ REBNATIVE(macro)
         ARG(spec),
         ARG(body),
         MKF_RETURN | MKF_KEYWORDS | MKF_GATHER_LETS,
-        1  // details capacity... just the one array slot (will be filled)
+        IDX_DETAILS_1 + 1  // details capacity, just body slot (and archetype)
     );
 
     ACT_DISPATCHER(macro) = &Macro_Dispatcher;

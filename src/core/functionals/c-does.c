@@ -53,7 +53,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_DOES_BLOCK = 0,  // Special case of BLOCK! to be executed
+    IDX_DOES_BLOCK = 1,  // Special case of BLOCK! to be executed
     IDX_DOES_MAX
 };
 

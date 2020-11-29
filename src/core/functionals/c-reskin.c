@@ -66,7 +66,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_SKINNER_SKINNED = 0,  // Underlying function that was reskinned
+    IDX_SKINNER_SKINNED = 1,  // Underlying function that was reskinned
     IDX_SKINNER_MAX
 };
 

@@ -64,8 +64,8 @@
 #include "sys-core.h"
 
 enum {
-    IDX_ENCLOSER_INNER = 0,  // The ACTION! being enclosed
-    IDX_ENCLOSER_OUTER = 1,  // ACTION! that gets control of inner's FRAME!
+    IDX_ENCLOSER_INNER = 1,  // The ACTION! being enclosed
+    IDX_ENCLOSER_OUTER,  // ACTION! that gets control of inner's FRAME!
     IDX_ENCLOSER_MAX
 };
 

@@ -126,7 +126,7 @@ REB_R MAKE_Action(
         spec,
         body,
         MKF_MASK_NONE,
-        1  // details capacity, just the slot filled by the relativized body
+        1 + IDX_DETAILS_1  // details, archetype plus relativized body
     );
 
     return Init_Action(out, act, ANONYMOUS, UNBOUND);

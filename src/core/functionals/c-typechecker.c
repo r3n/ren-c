@@ -41,7 +41,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_TYPECHECKER_TYPE = 0,  // datatype or typeset to check
+    IDX_TYPECHECKER_TYPE = 1,  // datatype or typeset to check
     IDX_TYPECHECKER_MAX
 };
 

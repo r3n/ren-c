@@ -44,7 +44,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_GENERIC_VERB = 0,  // Word whose symbol is being dispatched
+    IDX_GENERIC_VERB = 1,  // Word whose symbol is being dispatched
     IDX_GENERIC_MAX
 };
 

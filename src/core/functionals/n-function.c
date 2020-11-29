@@ -102,7 +102,7 @@ REB_R Void_Dispatcher(REBFRM *f)
 REB_R Empty_Dispatcher(REBFRM *f)
 {
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-    assert(VAL_LEN_AT(ARR_HEAD(details)) == 0);
+    assert(VAL_LEN_AT(ARR_AT(details, IDX_DETAILS_1)) == 0);  // empty body
     UNUSED(details);
 
     return Init_Unlabeled_Void(f->out);
@@ -110,13 +110,13 @@ REB_R Empty_Dispatcher(REBFRM *f)
 
 
 //
-//  Interpreted_Dispatch_Details_0_Throws: C
+//  Interpreted_Dispatch_Details_1_Throws: C
 //
 // Common behavior shared by dispatchers which execute on BLOCK!s of code.
 // Runs the code in the ACT_DETAILS() array of the frame phase for the
 // function instance at the first index (hence "Details 0").
 //
-bool Interpreted_Dispatch_Details_0_Throws(
+bool Interpreted_Dispatch_Details_1_Throws(
     bool *returned,
     REBVAL *spare,
     REBFRM *f
@@ -132,7 +132,7 @@ bool Interpreted_Dispatch_Details_0_Throws(
 
     REBACT *phase = FRM_PHASE(f);
     REBARR *details = ACT_DETAILS(phase);
-    RELVAL *body = STABLE(ARR_AT(details, IDX_DETAILS_0));  // code to run
+    RELVAL *body = STABLE(ARR_AT(details, IDX_DETAILS_1));  // code to run
     assert(IS_BLOCK(body) and IS_RELATIVE(body) and VAL_INDEX(body) == 0);
 
     if (GET_ACTION_FLAG(phase, HAS_RETURN)) {
@@ -189,7 +189,7 @@ REB_R Unchecked_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, spare, f)) {
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
         Move_Value(f->out, spare);
         return R_THROWN;
     }
@@ -211,7 +211,7 @@ REB_R Voider_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, spare, f)) {
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
         Move_Value(f->out, spare);
         return R_THROWN;
     }
@@ -232,7 +232,7 @@ REB_R Returner_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, spare, f)) {
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
         Move_Value(f->out, spare);
         return R_THROWN;
     }
@@ -263,7 +263,7 @@ REB_R Elider_Dispatcher(REBFRM *f)
     REBVAL *discarded = FRM_SPARE(f);  // spare usable during dispatch
 
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, discarded, f))
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, discarded, f))
         return R_THROWN;
     UNUSED(returned);  // no additional work to bypass
 
@@ -282,7 +282,7 @@ REB_R Elider_Dispatcher(REBFRM *f)
 REB_R Commenter_Dispatcher(REBFRM *f)
 {
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-    RELVAL *body = STABLE(ARR_AT(details, IDX_DETAILS_0));
+    RELVAL *body = STABLE(ARR_AT(details, IDX_DETAILS_1));
     assert(VAL_LEN_AT(body) == 0);
     UNUSED(body);
 
@@ -470,7 +470,7 @@ REBNATIVE(func_p)
         ARG(spec),
         ARG(body),
         MKF_RETURN | MKF_KEYWORDS | MKF_GATHER_LETS,
-        1  // details capacity... just the one array slot (will be filled)
+        1 + IDX_DETAILS_1  // archetype and one array slot (will be filled)
     );
 
     return Init_Action(D_OUT, func, ANONYMOUS, UNBOUND);
