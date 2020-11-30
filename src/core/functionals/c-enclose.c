@@ -96,8 +96,11 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     // call to the encloser.  If it isn't managed, there's no worries about
     // user handles on it...so just take it.  Otherwise, "steal" its vars.
     //
-    REBCTX *c = Steal_Context_Vars(CTX(f->varlist), NOD(FRM_PHASE(f)));
-    INIT_LINK_KEYSOURCE(c, NOD(VAL_ACTION(inner)));
+    REBCTX *c = Steal_Context_Vars(
+        CTX(f->varlist),
+        NOD(ACT_PARAMLIST(FRM_PHASE(f)))
+    );
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(c), NOD(ACT_PARAMLIST(VAL_ACTION(inner))));
 
     assert(GET_SERIES_INFO(f->varlist, INACCESSIBLE));  // look dead
 
@@ -164,7 +167,6 @@ REBNATIVE(enclose_p)  // see extended definition ENCLOSE in %base-defs.r
         SPECIFIED,
         SERIES_MASK_PARAMLIST | NODE_FLAG_MANAGED
     );
-    Sync_Paramlist_Archetype(paramlist);  // [0] cell must hold copied pointer
     MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
 
     REBACT *enclosure = Make_Action(

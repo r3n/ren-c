@@ -696,7 +696,7 @@ void INIT_WORD_INDEX_Extra_Checks_Debug(unstable RELVAL *v, REBLEN i)
     REBARR *keysource;
     if (NOT_SERIES_FLAG(binding, MANAGED))
         keysource = ACT_PARAMLIST(FRM_PHASE(FRM(LINK_KEYSOURCE(binding))));
-    else if (GET_ARRAY_FLAG(binding, IS_PARAMLIST))
+    else if (GET_ARRAY_FLAG(binding, IS_DETAILS))
         keysource = ACT_PARAMLIST(ACT(binding));
     else
         keysource = CTX_KEYLIST(CTX(binding));

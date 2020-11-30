@@ -112,21 +112,14 @@ REBNATIVE(typechecker)
         2,
         SERIES_MASK_PARAMLIST | NODE_FLAG_MANAGED
     );
-
-    REBVAL *archetype = RESET_CELL(
-        Alloc_Tail_Array(paramlist),
-        REB_ACTION,
-        CELL_MASK_ACTION
-    );
-    VAL_ACT_PARAMLIST_NODE(archetype) = NOD(paramlist);
-    INIT_BINDING(archetype, UNBOUND);
-
+    REBVAL *rootparam = Voidify_Rootparam(paramlist);
     Init_Param(
-        Alloc_Tail_Array(paramlist),
+        rootparam + 1,
         REB_P_NORMAL,
         Canon(SYM_VALUE),
         TS_OPT_VALUE  // Allow null (e.g. <opt>), returns false
     );
+    TERM_ARRAY_LEN(paramlist, 2);
 
     MISC_META_NODE(paramlist) = nullptr;  // !!! auto-generate info for HELP?
 

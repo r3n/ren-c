@@ -498,7 +498,7 @@ static void Mark_Root_Series(void)
                 //
                 assert(
                     NOT_ARRAY_FLAG(s, IS_VARLIST)
-                    and NOT_ARRAY_FLAG(s, IS_PARAMLIST)
+                    and NOT_ARRAY_FLAG(s, IS_DETAILS)
                     and NOT_ARRAY_FLAG(s, IS_PAIRLIST)
                 );
 

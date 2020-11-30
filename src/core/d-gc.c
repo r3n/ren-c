@@ -75,7 +75,7 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
                 REBNOD *keysource = LINK_KEYSOURCE(binding);
                 if (
                     not Is_Node_Cell(keysource)
-                    and GET_ARRAY_FLAG(keysource, IS_PARAMLIST)
+                    and GET_ARRAY_FLAG(keysource, IS_DETAILS)
                 ){
                     if (
                         (keysource->header.bits & SERIES_MASK_PARAMLIST)
@@ -378,16 +378,15 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
         assert((v->header.bits & CELL_MASK_ACTION) == CELL_MASK_ACTION);
 
         REBACT *a = VAL_ACTION(v);
-        REBARR *paramlist = ACT_PARAMLIST(a);
-        assert(Is_Marked(paramlist));
-
-        assert(Is_Marked(PAYLOAD(Any, v).second.node));
+        assert(Is_Marked(PAYLOAD(Any, v).first.node));
+        if (PAYLOAD(Any, v).second.node)
+            assert(Is_Marked(PAYLOAD(Any, v).second.node));
 
         // Make sure the [0] slot of the paramlist holds an archetype that is
         // consistent with the paramlist itself.
         //
         REBVAL *archetype = ACT_ARCHETYPE(a);
-        assert(paramlist == VAL_ACT_PARAMLIST(archetype));
+        assert(ACT_PARAMLIST(a) == VAL_ACT_PARAMLIST(archetype));
         break; }
 
       case REB_QUOTED:
@@ -509,7 +508,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         assert(IS_SER_ARRAY(a));
     #endif
 
-    if (GET_ARRAY_FLAG(a, IS_PARAMLIST)) {
+    if (GET_ARRAY_FLAG(a, IS_DETAILS)) {
         const RELVAL *archetype = STABLE(ARR_HEAD(a));
         assert(IS_ACTION(archetype));
         assert(not EXTRA(Binding, archetype).node);
@@ -527,7 +526,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
             UNUSED(ctx_specialty);
         }
         else
-            assert(specialty == a);
+            assert(specialty == ACT_PARAMLIST(ACT(a)));
     }
     else if (GET_ARRAY_FLAG(a, IS_VARLIST)) {
         const REBVAL *archetype = CTX_ARCHETYPE(CTX(a));
@@ -558,16 +557,13 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         }
         else {
             REBARR *keylist = ARR(keysource);
-            if (IS_FRAME(archetype)) {
-                assert(GET_ARRAY_FLAG(keylist, IS_PARAMLIST));
+            ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(keylist));  // reserved
 
+            if (IS_FRAME(archetype)) {
                 // Frames use paramlists as their "keylist", there is no
                 // place to put an ancestor link.
             }
             else {
-                assert(NOT_ARRAY_FLAG(keylist, IS_PARAMLIST));
-                ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(keylist));
-
                 REBARR *ancestor = LINK_ANCESTOR(keylist);
                 UNUSED(ancestor);  // maybe keylist
             }

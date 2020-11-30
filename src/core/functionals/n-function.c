@@ -385,7 +385,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
 
         copy = Copy_And_Bind_Relative_Deep_Managed(
             body,  // new copy has locals bound relatively to the new action
-            ACT_PARAMLIST(a),
+            a,
             TS_WORD,
             did (mkf_flags & MKF_GATHER_LETS) // transitional LET technique
         );

@@ -109,7 +109,7 @@ REB_R Block_Dispatcher(REBFRM *f)
 
         REBARR *body_array = Copy_And_Bind_Relative_Deep_Managed(
             SPECIFIC(block),
-            ACT_PARAMLIST(FRM_PHASE(f)),
+            FRM_PHASE(f),
             TS_WORD,
             false  // do not gather LETs
         );
@@ -161,13 +161,7 @@ REBNATIVE(does)
             SERIES_MASK_PARAMLIST
         );
 
-        REBVAL *archetype = RESET_CELL(
-            Alloc_Tail_Array(paramlist),
-            REB_ACTION,
-            CELL_MASK_ACTION
-        );
-        VAL_ACT_PARAMLIST_NODE(archetype) = NOD(paramlist);
-        INIT_BINDING(archetype, UNBOUND);
+        Voidify_Rootparam(paramlist);
         TERM_ARRAY_LEN(paramlist, 1);
 
         MISC_META_NODE(paramlist) = nullptr;  // REDESCRIBE can add help

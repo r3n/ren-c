@@ -76,12 +76,12 @@ struct Reb_Array {
     FLAG_LEFT_BIT(17)
 
 
-//=//// ARRAY_FLAG_IS_PARAMLIST ///////////////////////////////////////////=//
+//=//// ARRAY_FLAG_IS_DETAILS /////////////////////////////////////////////=//
 //
-// ARRAY_FLAG_IS_PARAMLIST indicates the array is the parameter list
-// of a ACTION! (the first element will be a canon value of the function)
+// ARRAY_FLAG_IS_DETAILS indicates the array is the details list of an ACTION!
+// (The first element will be a canon value for the ACTION!)
 //
-#define ARRAY_FLAG_IS_PARAMLIST \
+#define ARRAY_FLAG_IS_DETAILS \
     FLAG_LEFT_BIT(18)
 
 

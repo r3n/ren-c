@@ -216,7 +216,6 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
         SPECIFIED,
         SERIES_MASK_PARAMLIST | NODE_FLAG_MANAGED  // flags not auto-copied
     );
-    Sync_Paramlist_Archetype(paramlist);  // [0] cell must hold copied pointer
     MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
 
     REBACT *chain = Make_Action(

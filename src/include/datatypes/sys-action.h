@@ -72,7 +72,6 @@
 // an adaptation).
 //
 #define LINK_UNDERLYING_NODE(s)  LINK(s).custom.node
-#define LINK_UNDERLYING(s)       ACT(LINK_UNDERLYING_NODE(s))
 
 
 // ACTION! paramlists and ANY-CONTEXT! varlists can store a "meta"
@@ -303,16 +302,16 @@ STATIC_ASSERT(PARAMLIST_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 #define CELL_MASK_ACTION \
     (CELL_FLAG_FIRST_IS_NODE | CELL_FLAG_SECOND_IS_NODE)
 
-#define VAL_ACT_PARAMLIST_NODE(v) \
+#define VAL_ACT_DETAILS_NODE(v) \
     PAYLOAD(Any, (v)).first.node  // lvalue, but a node
 
-#define VAL_ACTION_DETAILS_OR_LABEL_NODE(v) \
+#define VAL_ACTION_PARAMLIST_OR_LABEL_NODE(v) \
     PAYLOAD(Any, (v)).second.node  // lvalue, but a node
 
 
-inline static REBARR *ACT_PARAMLIST(REBACT *a) {
-    assert(GET_ARRAY_FLAG(&a->paramlist, IS_PARAMLIST));
-    return &a->paramlist;
+inline static REBARR *ACT_DETAILS(REBACT *a) {
+    assert(GET_ARRAY_FLAG(&a->details, IS_DETAILS));
+    return &a->details;
 }
 
 
@@ -328,15 +327,15 @@ inline static REBARR *ACT_PARAMLIST(REBACT *a) {
 #define ACT_ARCHETYPE(a) \
     SPECIFIC(ARR_AT(ACT_DETAILS(a), 0))
 
-inline static void Sync_Paramlist_Archetype(REBARR *paramlist)
-  { VAL_ACT_PARAMLIST_NODE(ARR_HEAD(paramlist)) = NOD(paramlist); }
+inline static REBVAL *Voidify_Rootparam(REBARR *paramlist)
+  { return Init_Unreadable_Void(ARR_HEAD(paramlist)); }
 
 
-#define ACT_DETAILS(a) \
-    ARR(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE_OLD(a)))
+#define ACT_PARAMLIST(a) \
+    ARR(VAL_ACTION_PARAMLIST_OR_LABEL_NODE(ACT_ARCHETYPE(a)))
 
 #define ACT_DISPATCHER(a) \
-    (MISC(VAL_ACTION_DETAILS_OR_LABEL_NODE(ACT_ARCHETYPE_OLD(a))).dispatcher)
+    (MISC(ACT_DETAILS(a)).dispatcher)
 
 #define DETAILS_AT(a,n) \
     SPECIFIC(STABLE(ARR_AT((a), (n))))
@@ -359,7 +358,7 @@ inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {
     (cast(REBSER*, ACT_PARAMLIST(a))->content.dynamic.used - 1) // dynamic
 
 #define ACT_META(a) \
-    MISC_META(a)
+    MISC_META(ACT_PARAMLIST(a))
 
 
 // The concept of the "underlying" function is the one which has the actual
@@ -370,7 +369,7 @@ inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {
 // parameter list would write variables the adapted code wouldn't read.
 //
 #define ACT_UNDERLYING(a) \
-    LINK_UNDERLYING(a)
+    ACT(LINK_UNDERLYING_NODE(ACT_PARAMLIST(a)))
 
 
 // An efficiency trick makes functions that do not have exemplars NOT store
@@ -400,7 +399,7 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 
 inline static REBACT *VAL_ACTION(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION); // so it works on literals
-    REBSER *s = SER(VAL_ACT_PARAMLIST_NODE(v));
+    REBSER *s = SER(VAL_ACT_DETAILS_NODE(v));
     if (GET_SERIES_INFO(s, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return ACT(s);
@@ -420,7 +419,7 @@ inline static REBACT *VAL_ACTION(unstable REBCEL(const*) v) {
 //
 inline static const REBSTR *VAL_ACTION_LABEL(unstable const RELVAL *v) {
     assert(IS_ACTION(v));
-    REBSER *s = SER(VAL_ACTION_DETAILS_OR_LABEL_NODE(v));
+    REBSER *s = SER(VAL_ACTION_PARAMLIST_OR_LABEL_NODE(v));
     if (IS_SER_ARRAY(s))
         return ANONYMOUS;  // archetype (e.g. may live in paramlist[0] itself)
     return STR(s);
@@ -433,7 +432,7 @@ inline static void INIT_ACTION_LABEL(unstable RELVAL *v, const REBSTR *label)
     //
     ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);
     assert(label != nullptr);  // avoid needing to worry about null case
-    VAL_ACTION_DETAILS_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, label));
+    VAL_ACTION_PARAMLIST_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, label));
 }
 
 
@@ -462,7 +461,7 @@ static inline REBVAL *Init_Action(
   #if !defined(NDEBUG)
     Extra_Init_Action_Checks_Debug(a);
   #endif
-    Force_Array_Managed(ACT_PARAMLIST(a));
+    Force_Array_Managed(ACT_DETAILS(a));
     Move_Value(out, ACT_ARCHETYPE(a));
     if (label)
         INIT_ACTION_LABEL(out, unwrap(label));

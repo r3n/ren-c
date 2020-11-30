@@ -80,7 +80,7 @@ struct Reb_Context {
         if (b and p and (reinterpret_cast<const REBNOD*>(p)->header.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
                 | ARRAY_FLAG_IS_VARLIST
-                | ARRAY_FLAG_IS_PARAMLIST
+                | ARRAY_FLAG_IS_DETAILS
                 | ARRAY_FLAG_IS_PAIRLIST
                 | ARRAY_FLAG_HAS_FILE_LINE_UNMASKED
         )) != (

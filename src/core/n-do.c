@@ -451,8 +451,9 @@ REBNATIVE(do)
 
         assert(CTX_KEYS_HEAD(c) == ACT_PARAMS_HEAD(phase));
         f->param = CTX_KEYS_HEAD(c);
-        REBCTX *stolen = Steal_Context_Vars(c, NOD(phase));
-        INIT_LINK_KEYSOURCE(stolen, NOD(f));  // changes CTX_KEYS_HEAD()
+        REBCTX *stolen = Steal_Context_Vars(c, NOD(ACT_PARAMLIST(phase)));
+        INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(f));
+            // ^-- changes CTX_KEYS_HEAD()
 
         // Its data stolen, the context's node should now be GC'd when
         // references in other FRAME! value cells have all gone away.
@@ -834,9 +835,10 @@ REBNATIVE(applique)
     f->param = CTX_KEYS_HEAD(exemplar);
     REBCTX *stolen = Steal_Context_Vars(
         exemplar,
-        NOD(VAL_ACTION(applicand))
+        NOD(ACT_PARAMLIST(VAL_ACTION(applicand)))
     );
-    INIT_LINK_KEYSOURCE(stolen, NOD(f));  // changes CTX_KEYS_HEAD result
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(f));
+        // ^-- changes CTX_KEYS_HEAD result
 
     if (def_threw) {
         Free_Unmanaged_Array(CTX_VARLIST(stolen)); // could TG_Reuse it

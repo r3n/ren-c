@@ -123,6 +123,9 @@ inline static const REBVAL *CTX_ARCHETYPE(const REBCTX *c) {
 inline static REBVAL *CTX_ROOTVAR(REBCTX *c)  // mutable archetype access
   { return m_cast(REBVAL*, CTX_ARCHETYPE(c)); }
 
+#define CTX_ACTION(c) \
+    ACT(VAL_FRAME_PHASE_OR_LABEL_NODE(CTX_ARCHETYPE(c)))
+
 
 // CTX_KEYLIST is called often, and it's worth it to make it as fast as
 // possible--even in an unoptimized build.
@@ -145,17 +148,17 @@ inline static REBARR *CTX_KEYLIST(REBCTX *c) {
     // Again, due to the frequent calls of this routine it is assumed even
     // in the debug build w/o an assert.
     //
-    return ARR(VAL_FRAME_PHASE_OR_LABEL_NODE(CTX_ARCHETYPE(c)));
+    return ACT_PARAMLIST(CTX_ACTION(c));
 }
 
 static inline void INIT_CTX_KEYLIST_SHARED(REBCTX *c, REBARR *keylist) {
     SET_SERIES_INFO(keylist, KEYLIST_SHARED);
-    INIT_LINK_KEYSOURCE(c, NOD(keylist));
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(c), NOD(keylist));
 }
 
 static inline void INIT_CTX_KEYLIST_UNIQUE(REBCTX *c, REBARR *keylist) {
     assert(NOT_SERIES_INFO(keylist, KEYLIST_SHARED));
-    INIT_LINK_KEYSOURCE(c, NOD(keylist));
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(c), NOD(keylist));
 }
 
 // Navigate from context to context components.  Note that the context's
@@ -268,8 +271,10 @@ inline static REBCTX *VAL_CONTEXT(unstable REBCEL(const*) v) {
 #define INIT_VAL_CONTEXT_VARLIST(v,varlist) \
     (PAYLOAD(Any, (v)).first.node = NOD(varlist))
 
-#define INIT_VAL_CONTEXT_PHASE(v,phase) \
-    (VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(phase))
+inline static void INIT_VAL_CONTEXT_PHASE(RELVAL *v, REBACT *phase) {
+    assert(phase == nullptr or GET_ARRAY_FLAG(phase, IS_DETAILS));
+    VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(phase);
+}
 
 // A frame's phase is usually a pointer to which component action is in
 // effect.  But if the node where a phase would usually be found is a REBSTR*
@@ -290,8 +295,10 @@ inline static REBACT *VAL_OPT_PHASE(unstable REBCEL(const*) v) {
 inline static REBACT *VAL_PHASE_ELSE_ARCHETYPE(unstable REBCEL(const*) v) {
     REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
 
-    if (s == nullptr or IS_SER_STRING(s))  // label or ANONYMOUS, no phase
-        return ACT(CTX_KEYLIST(VAL_CONTEXT(v)));  // so return archetype
+    if (s == nullptr or IS_SER_STRING(s)) {  // label or ANONYMOUS, no phase
+        REBVAL *rootvar = CTX_ROOTVAR(VAL_CONTEXT(v));
+        return ACT(VAL_FRAME_PHASE_OR_LABEL_NODE(rootvar));  // archetype
+    }
 
     return ACT(s);  // an actual phase
 }
@@ -574,7 +581,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
     // Disassociate the stub from the frame, by degrading the link field
     // to a keylist.  !!! Review why this was needed, vs just nullptr
     //
-    INIT_LINK_KEYSOURCE(CTX(stub), keysource);
+    INIT_LINK_KEYSOURCE(ARR(stub), keysource);
 
     return CTX(copy);
 }

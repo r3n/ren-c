@@ -381,7 +381,6 @@ bool Specialize_Action_Throws(
             | (SER(unspecialized)->header.bits & PARAMLIST_MASK_INHERIT)
             | NODE_FLAG_MANAGED
     );
-    Sync_Paramlist_Archetype(paramlist);  // [0] cell must hold copied pointer
     MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
 
     const RELVAL *param = ARR_AT(paramlist, 1);
@@ -987,10 +986,13 @@ bool Make_Frame_From_Varargs_Throws(
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED)); // not invoked yet
     assert(FRM_BINDING(f) == VAL_BINDING(action));
 
-    REBCTX *exemplar = Steal_Context_Vars(CTX(f->varlist), NOD(act));
+    REBCTX *exemplar = Steal_Context_Vars(
+        CTX(f->varlist),
+        NOD(ACT_PARAMLIST(act))
+    );
     assert(ACT_NUM_PARAMS(act) == CTX_LEN(exemplar));
 
-    INIT_LINK_KEYSOURCE(exemplar, NOD(act));
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(exemplar), NOD(ACT_PARAMLIST(act)));
 
     SET_SERIES_FLAG(f->varlist, MANAGED); // is inaccessible
     f->varlist = nullptr; // just let it GC, for now
@@ -1021,25 +1023,18 @@ REBACT *Alloc_Action_From_Exemplar(
     REBNAT dispatcher,
     REBLEN details_capacity
 ){
-    REBACT *unspecialized = ACT(CTX_KEYLIST(exemplar));
+    REBACT *unspecialized = CTX_ACTION(exemplar);
 
     REBLEN num_slots = ACT_NUM_PARAMS(unspecialized) + 1;
     REBARR *paramlist = Make_Array_Core(num_slots, SERIES_MASK_PARAMLIST);
-
-    RELVAL *archetype = RESET_CELL(
-        ARR_HEAD(paramlist),
-        REB_ACTION,
-        CELL_MASK_ACTION
-    );
-    VAL_ACT_PARAMLIST_NODE(archetype) = NOD(paramlist);
-    INIT_BINDING(archetype, UNBOUND);
+    RELVAL *rootparam = Voidify_Rootparam(paramlist);
     TERM_ARRAY_LEN(paramlist, 1);
 
     MISC_META_NODE(paramlist) = nullptr;  // REDESCRIBE can add help
 
     REBVAL *param = ACT_PARAMS_HEAD(unspecialized);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
-    RELVAL *alias = archetype + 1;
+    RELVAL *alias = rootparam + 1;
     for (; NOT_END(param); ++param, ++arg, ++alias) {
         Move_Value(alias, param);
 

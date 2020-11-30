@@ -212,12 +212,9 @@ REBTYPE(Action)
         REBARR *proxy_paramlist = Copy_Array_Deep_Flags_Managed(
             ACT_PARAMLIST(act),
             SPECIFIED,  // !!! Note: not actually "deep", just typesets
-            SERIES_MASK_PARAMLIST | (
-                SER(act)->header.bits & PARAMLIST_FLAG_IS_NATIVE
-            )
+            SERIES_MASK_PARAMLIST
         );
-        Sync_Paramlist_Archetype(proxy_paramlist);
-        MISC_META_NODE(proxy_paramlist) = NOD(ACT_META(act));
+        MISC_META_NODE(proxy_paramlist) = MISC_META_NODE(ACT_PARAMLIST(act));
 
         // If the function had code, then that code will be bound relative
         // to the original paramlist that's getting hijacked.  So when the
@@ -234,12 +231,13 @@ REBTYPE(Action)
             details_len  // details array capacity
         );
 
+        if (GET_ACTION_FLAG(act, IS_NATIVE))
+            SET_ACTION_FLAG(proxy, IS_NATIVE);
+
         // A new body_holder was created inside Make_Action().  Rare case
         // where we can bit-copy a possibly-relative value.
         //
       blockscope {
-        Move_Value(ARR_HEAD(ACT_DETAILS(proxy)), ACT_ARCHETYPE_OLD(proxy));
-
         unstable RELVAL *src = ARR_HEAD(ACT_DETAILS(act)) + 1;
         unstable RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy)) + 1;
         for (; NOT_END(src); ++src, ++dest)
@@ -247,8 +245,12 @@ REBTYPE(Action)
         TERM_ARRAY_LEN(ACT_DETAILS(proxy), details_len);
       }
 
-        Init_Action(D_OUT, proxy, VAL_ACTION_LABEL(action), VAL_BINDING(action));
-        return D_OUT; }
+        return Init_Action(
+            D_OUT,
+            proxy,
+            VAL_ACTION_LABEL(action),  // keep symbol (if any) from original
+            VAL_BINDING(action)  // same binding (e.g. RETURN to same frame)
+        ); }
 
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;

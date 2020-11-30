@@ -243,7 +243,7 @@ static void Clonify_And_Bind_Relative(
     REBFLGS flags,
     REBU64 deep_types,
     struct Reb_Binder *binder,
-    REBARR *paramlist,
+    REBACT *relative,
     REBU64 bind_types,
     REBLEN *param_num  // if not null, gathering LETs (next index for LET)
 ){
@@ -360,7 +360,7 @@ static void Clonify_And_Bind_Relative(
                     flags,
                     deep_types,
                     binder,
-                    paramlist,
+                    relative,
                     bind_types,
                     param_num
                 );
@@ -384,7 +384,7 @@ static void Clonify_And_Bind_Relative(
             // (clear out existing binding flags first).
             //
             Unbind_Any_Word(v);
-            INIT_BINDING(v, paramlist); // incomplete func
+            INIT_BINDING(v, relative);  // "incomplete func" (LETs gathering?)
 
             // !!! Right now we don't actually add the parameters as we go.
             // This means INIT_WORD_INDEX() will complain when binding the
@@ -403,7 +403,7 @@ static void Clonify_And_Bind_Relative(
         // easiest to debug if there is a clear mark on arrays that are
         // part of a deep copy of a function body either way.
         //
-        INIT_BINDING(v, paramlist); // incomplete func
+        INIT_BINDING(v, relative);  // "incomplete func" (LETs gathering?)
     }
 
     Quotify_Core(v, num_quotes);  // Quotify() won't work on RELVAL*
@@ -423,7 +423,7 @@ static void Clonify_And_Bind_Relative(
 //
 REBARR *Copy_And_Bind_Relative_Deep_Managed(
     const REBVAL *body,
-    REBARR *paramlist,  // body of function is not actually ready yet
+    REBACT *relative,
     REBU64 bind_types,
     bool gather_lets
 ){
@@ -433,7 +433,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     REBLEN param_num = 1;
 
   blockscope {  // Setup binding table from the argument word list
-    RELVAL *param = STABLE(ARR_AT(paramlist, 1));  // [0] is ACT_ARCHETYPE()
+    RELVAL *param = ACT_PARAMS_HEAD(relative);
     for (; NOT_END(param); ++param, ++param_num) {
         if (Is_Param_Sealed(param))
             continue;
@@ -471,7 +471,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             flags | NODE_FLAG_MANAGED,
             deep_types,
             &binder,
-            paramlist,
+            relative,
             bind_types,
             gather_lets
                 ? &param_num  // next bind index for a LET to use
@@ -494,6 +494,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             // flag, then the cells will be formatted such that the flag cannot
             // be taken off.
             //
+            REBARR *paramlist = ACT_PARAMLIST(relative);
             assert(GET_SERIES_FLAG(paramlist, FIXED_SIZE));
             CLEAR_SERIES_FLAG(paramlist, FIXED_SIZE);
 
@@ -523,7 +524,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     }
 
   blockscope {  // Reset binding table
-    RELVAL *param = STABLE(ARR_AT(paramlist, 1));  // [0] is ACT_ARCHETYPE()
+    RELVAL *param = ACT_PARAMS_HEAD(relative);
     for (; NOT_END(param); param++) {
         if (Is_Param_Sealed(param))
             continue;

@@ -123,7 +123,7 @@ bool Expand_Context_Keylist_Core(REBCTX *context, REBLEN delta)
 {
     REBARR *keylist = CTX_KEYLIST(context);
 
-    assert(NOT_ARRAY_FLAG(keylist, IS_PARAMLIST)); // can't expand FRAME! list
+    assert(NOT_ARRAY_FLAG(keylist, IS_DETAILS)); // can't expand FRAME! list
 
     if (GET_SERIES_INFO(keylist, KEYLIST_SHARED)) {
         //

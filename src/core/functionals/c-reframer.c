@@ -130,10 +130,13 @@ REB_R Reframer_Dispatcher(REBFRM *f)
     assert(NOT_SERIES_FLAG(sub->varlist, MANAGED)); // not invoked yet
     assert(FRM_BINDING(sub) == VAL_BINDING(action));
 
-    REBCTX *stolen = Steal_Context_Vars(CTX(sub->varlist), NOD(act));
+    REBCTX *stolen = Steal_Context_Vars(
+        CTX(sub->varlist),
+        NOD(ACT_PARAMLIST(act))
+    );
     assert(ACT_NUM_PARAMS(act) == CTX_LEN(stolen));
 
-    INIT_LINK_KEYSOURCE(stolen, NOD(act));
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(ACT_PARAMLIST(act)));
 
     SET_SERIES_FLAG(sub->varlist, MANAGED); // is inaccessible
     sub->varlist = nullptr; // just let it GC, for now
@@ -188,7 +191,6 @@ REBNATIVE(reframer_p)
             | (SER(VAL_ACTION(shim))->header.bits & PARAMLIST_MASK_INHERIT)
             | NODE_FLAG_MANAGED
     );
-    Sync_Paramlist_Archetype(paramlist);  // [0] cell must hold copied pointer
     MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
 
     REBACT *underlying = ACT_UNDERLYING(VAL_ACTION(shim));

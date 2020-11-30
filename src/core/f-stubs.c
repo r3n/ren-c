@@ -297,16 +297,14 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     // REBVAL is reserved for future use in other context types...so make
     // sure it's null at this point in time.
     //
-    if (CTX_TYPE(c) == REB_FRAME) {
-        assert(IS_ACTION(CTX_ROOTKEY(c)));
+    if (CTX_TYPE(c) == REB_FRAME)
         assert(VAL_PHASE_ELSE_ARCHETYPE(archetype) != nullptr);
-    }
-    else {
-      #ifdef DEBUG_UNREADABLE_VOIDS
-        assert(IS_UNREADABLE_DEBUG(CTX_ROOTKEY(c)));
-      #endif
+    else
         assert(PAYLOAD(Any, archetype).second.node == nullptr);
-    }
+
+  #ifdef DEBUG_UNREADABLE_VOIDS
+    assert(IS_UNREADABLE_DEBUG(CTX_ROOTKEY(c)));  // unused at this time
+  #endif
 
     // Keylists are uniformly managed, or certain routines would return
     // "sometimes managed, sometimes not" keylists...a bad invariant.
@@ -321,12 +319,14 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
 // !!! Overlaps with ASSERT_ACTION, review folding them together.
 //
 void Extra_Init_Action_Checks_Debug(REBACT *a) {
-    assert((SER(a)->header.bits & SERIES_MASK_PARAMLIST) == SERIES_MASK_PARAMLIST);
-
     REBVAL *archetype = ACT_ARCHETYPE(a);
     assert(VAL_ACTION(archetype) == a);
 
     REBARR *paramlist = ACT_PARAMLIST(a);
+    assert(
+        (SER(paramlist)->header.bits & SERIES_MASK_PARAMLIST)
+        == SERIES_MASK_PARAMLIST
+    );
     assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
 
     // !!! Currently only a context can serve as the "meta" information,

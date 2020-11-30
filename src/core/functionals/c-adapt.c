@@ -124,7 +124,6 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
             | (SER(VAL_ACTION(adaptee))->header.bits & PARAMLIST_MASK_INHERIT)
             | NODE_FLAG_MANAGED
     );
-    Sync_Paramlist_Archetype(paramlist);  // [0] cell must hold copied pointer
     MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
 
     // Don't allow the adapted code access to the locals.
@@ -150,7 +149,7 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
     //
     REBARR *prelude = Copy_And_Bind_Relative_Deep_Managed(
         ARG(prelude),
-        paramlist,
+        adaptation,
         TS_WORD,
         false  // do not gather LETs
     );

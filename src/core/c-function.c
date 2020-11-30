@@ -652,15 +652,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         SER(paramlist)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
 
   blockscope {
-    REBVAL *archetype = RESET_CELL(
-        ARR_HEAD(paramlist),
-        REB_ACTION,
-        CELL_MASK_ACTION
-    );
-    Sync_Paramlist_Archetype(paramlist);
-    INIT_BINDING(archetype, UNBOUND);
-
-    REBVAL *dest = archetype + 1;
+    REBVAL *dest = Voidify_Rootparam(paramlist) + 1;
 
     // We want to check for duplicates and a Binder can be used for that
     // purpose--but note that a fail () cannot happen while binders are
@@ -765,11 +757,11 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
         REBVAL *rootvar = RESET_CELL(
             STABLE(ARR_HEAD(types_varlist)),
-            REB_FRAME,
+            REB_OBJECT,
             CELL_MASK_CONTEXT
         );
         INIT_VAL_CONTEXT_VARLIST(rootvar, types_varlist);  // "canon FRAME!"
-        INIT_VAL_CONTEXT_PHASE(rootvar, ACT(paramlist));
+        INIT_VAL_CONTEXT_PHASE(rootvar, nullptr);
         INIT_BINDING(rootvar, UNBOUND);
 
         REBVAL *dest = rootvar + 1;
@@ -819,9 +811,8 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
         TERM_ARRAY_LEN(types_varlist, num_slots);
 
-        Init_Any_Context(
+        Init_Object(
             CTX_VAR(meta, STD_ACTION_META_PARAMETER_TYPES),
-            REB_FRAME,
             CTX(types_varlist)
         );
     }
@@ -838,11 +829,11 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
         REBVAL *rootvar = RESET_CELL(
             ARR_HEAD(notes_varlist),
-            REB_FRAME,
+            REB_OBJECT,
             CELL_MASK_CONTEXT
         );
         INIT_VAL_CONTEXT_VARLIST(rootvar, notes_varlist); // canon FRAME!
-        INIT_VAL_CONTEXT_PHASE(rootvar, ACT(paramlist));
+        INIT_VAL_CONTEXT_PHASE(rootvar, nullptr);
         INIT_BINDING(rootvar, UNBOUND);
 
         const RELVAL *param = ARR_AT(paramlist, 1);
@@ -891,10 +882,9 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
         TERM_ARRAY_LEN(notes_varlist, num_slots);
 
-        Init_Frame(
+        Init_Object(
             CTX_VAR(meta, STD_ACTION_META_PARAMETER_NOTES),
-            CTX(notes_varlist),
-            ANONYMOUS  // !!! this frame is a pun, what should this be?
+            CTX(notes_varlist)
         );
     }
 
@@ -1036,26 +1026,28 @@ REBACT *Make_Action(
     option(REBCTX*) exemplar, // if provided, make consistent w/next level
     REBLEN details_capacity // capacity of ACT_DETAILS (including archetype)
 ){
-    ASSERT_ARRAY_MANAGED(paramlist);
     assert(details_capacity >= 1);  // must have room for archetype
 
-    RELVAL *rootparam = STABLE(ARR_HEAD(paramlist));
-    assert(KIND3Q_BYTE(rootparam) == REB_ACTION); // !!! not fully formed...
-    assert(VAL_ACT_PARAMLIST(rootparam) == paramlist);
-    assert(EXTRA(Binding, rootparam).node == UNBOUND); // archetype
+    ASSERT_ARRAY_MANAGED(paramlist);  // paramlists/keylists, can be shared
+    ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(paramlist));  // unused at this time
 
     // "details" for an action is an array of cells which can be anything
     // the dispatcher understands it to be, by contract.  Terminate it
     // at the given length implicitly.
-
+    //
     REBARR *details = Make_Array_Core(
         details_capacity,  // leave room for archetype
         SERIES_MASK_DETAILS | NODE_FLAG_MANAGED
     );
+    RELVAL *archetype = STABLE(ARR_HEAD(details));
+    RESET_CELL(archetype, REB_ACTION, CELL_MASK_ACTION);
+    VAL_ACT_DETAILS_NODE(archetype) = NOD(details);
+    VAL_ACTION_PARAMLIST_OR_LABEL_NODE(archetype) = NOD(paramlist);
+    EXTRA(Binding, archetype).node = UNBOUND;
+    //
+    // Leave rest of the cells in the capacity uninitialized (caller fills in)
+    //
     TERM_ARRAY_LEN(details, details_capacity);
-    VAL_ACTION_DETAILS_OR_LABEL_NODE(rootparam) = NOD(details);
-    // !!! v-- This is part of the migration to actions being details
-    Move_Value(ARR_HEAD(details), SPECIFIC(ARR_HEAD(paramlist)));
 
     MISC(details).dispatcher = dispatcher; // level of indirection, hijackable
 
@@ -1067,13 +1059,13 @@ REBACT *Make_Action(
         // Note: paramlist still incomplete, don't use SET_ACTION_FLAG....
         //
         if (GET_ACTION_FLAG(unwrap(underlying), HAS_RETURN))
-            SER(paramlist)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
+            SER(details)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
     }
     else {
         // To avoid NULL checking when a function is called and looking for
         // underlying, just use the action's own paramlist if needed.
         //
-        LINK_UNDERLYING_NODE(paramlist) = NOD(paramlist);
+        LINK_UNDERLYING_NODE(paramlist) = NOD(details);
     }
 
     if (not exemplar) {
@@ -1107,7 +1099,7 @@ REBACT *Make_Action(
     assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
     assert(NOT_ARRAY_FLAG(details, HAS_FILE_LINE_UNMASKED));
 
-    REBACT *act = ACT(paramlist); // now it's a legitimate REBACT
+    REBACT *act = ACT(details); // now it's a legitimate REBACT
 
     // Precalculate cached function flags.  This involves finding the first
     // unspecialized argument which would be taken at a callsite, which can
@@ -1115,11 +1107,22 @@ REBACT *Make_Action(
     // the work of doing that is factored into a routine (`PARAMETERS OF`
     // uses it as well).
 
-    if (GET_ACTION_FLAG(act, HAS_RETURN)) {
+    if (SER(paramlist)->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
         REBVAL *param = ACT_PARAMS_HEAD(act);
         assert(VAL_PARAM_SYM(param) == SYM_RETURN);
         UNUSED(param);
+
+        // !!! Lousy workaround, migrate flag onto the details
+        SER(details)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
     }
+
+    // !!! More lousy workarounds!  Time to clean this junk up!
+    //
+    if (SER(paramlist)->info.bits & ARRAY_INFO_MISC_ELIDER)
+        SER(details)->info.bits |= ARRAY_INFO_MISC_ELIDER;
+    if (SER(paramlist)->info.bits & ARRAY_INFO_MISC_VOIDER)
+        SER(details)->info.bits |= ARRAY_INFO_MISC_VOIDER;
+
 
     REBVAL *first_unspecialized = First_Unspecialized_Param(act);
     if (first_unspecialized) {

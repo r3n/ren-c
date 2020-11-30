@@ -62,9 +62,11 @@
 //
 #define LINK_KEYSOURCE(s)       LINK(s).custom.node
 
-#define INIT_LINK_KEYSOURCE(a,keysource) \
-    LINK_KEYSOURCE(a) = (keysource)  // helpful macro for injecting debugging
-
+inline static void INIT_LINK_KEYSOURCE(REBARR *varlist, REBNOD *keysource) {
+    if (not Is_Node_Cell(keysource))
+        assert(KIND3Q_BYTE_UNCHECKED(ARR_HEAD(ARR(keysource))) == REB_VOID);
+    LINK_KEYSOURCE(varlist) = keysource;
+}
 
 // For a *read-only* REBSTR, circularly linked list of othEr-CaSed string
 // forms.  It should be relatively quick to find the canon form on

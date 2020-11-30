@@ -767,7 +767,7 @@ inline static bool IS_RELATIVE(unstable REBCEL(const*) v) {
     if (not Is_Bindable(v) or not EXTRA(Binding, v).node)
         return false; // INTEGER! and other types are inherently "specific"
 
-    if (EXTRA(Binding, v).node->header.bits & ARRAY_FLAG_IS_PARAMLIST)
+    if (EXTRA(Binding, v).node->header.bits & ARRAY_FLAG_IS_DETAILS)
         return true;
 
     return false;
@@ -892,7 +892,7 @@ inline static void INIT_BINDING(unstable RELVAL *v, const void *p) {
 
     if (binding->header.bits & NODE_FLAG_MANAGED) {
         assert(
-            binding->header.bits & ARRAY_FLAG_IS_PARAMLIST  // relative
+            binding->header.bits & ARRAY_FLAG_IS_DETAILS  // relative
             or binding->header.bits & ARRAY_FLAG_IS_VARLIST  // specific
             or (
                 IS_VARARGS(v) and not IS_SER_DYNAMIC(binding)

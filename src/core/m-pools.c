@@ -1118,7 +1118,7 @@ void Decay_Series(REBSER *s)
         if (IS_SER_ARRAY(s))
             if (
                 GET_ARRAY_FLAG(s, IS_VARLIST)
-                or GET_ARRAY_FLAG(s, IS_PARAMLIST)
+                or GET_ARRAY_FLAG(s, IS_DETAILS)
             ){
                 s->content.fixed.cells[0] = *ARR_HEAD(ARR(s));
             }

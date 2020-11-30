@@ -46,7 +46,7 @@
 // The binding will be either a REBACT (relative to a function) or a
 // REBCTX (specific to a context), or simply a plain REBARR such as
 // EMPTY_ARRAY which indicates UNBOUND.  ARRAY_FLAG_IS_VARLIST and
-// ARRAY_FLAG_IS_PARAMLIST can be used to tell which it is.
+// ARRAY_FLAG_IS_DETAILS can be used to tell which it is.
 //
 //     ANY-WORD!: binding is the word's binding
 //
@@ -141,9 +141,9 @@ inline static bool Is_Overriding_Context(REBCTX *stored, REBCTX *override)
     // !!! Note that in virtual binding, something like a FOR-EACH would
     // wind up overriding words bound to FRAME!s, even though not "derived".
     //
-    if (stored_source->header.bits & ARRAY_FLAG_IS_PARAMLIST)
+    if (stored_source->header.bits & ARRAY_FLAG_IS_DETAILS)
         return false;
-    if (temp->header.bits & ARRAY_FLAG_IS_PARAMLIST)
+    if (temp->header.bits & ARRAY_FLAG_IS_DETAILS)
         return false;
 
     while (true) {
@@ -525,7 +525,7 @@ inline static REBCTX *Get_Word_Context(
         }
     }
     else {
-        assert(binding->header.bits & ARRAY_FLAG_IS_PARAMLIST);
+        assert(binding->header.bits & ARRAY_FLAG_IS_DETAILS);
 
         // RELATIVE BINDING: The word was made during a deep copy of the block
         // that was given as a function's body, and stored a reference to that
@@ -549,10 +549,7 @@ inline static REBCTX *Get_Word_Context(
         // code, because the identity of the derived function would not match
         // up with the body it intended to reuse.
         //
-        assert(
-            ACT_UNDERLYING(binding)
-            == ACT_UNDERLYING(VAL_ACTION(CTX_ROOTKEY(c)))
-        );
+        assert(ACT_UNDERLYING(ACT(binding)) == ACT_UNDERLYING(CTX_ACTION(c)));
     }
 
   #ifdef DEBUG_BINDING_NAME_MATCH // this is expensive, and hasn't happened
@@ -693,7 +690,7 @@ inline static REBVAL *Derelativize(
     if (not binding) {
         EXTRA(Binding, out).node = UNBOUND;
     }
-    else if (binding->header.bits & ARRAY_FLAG_IS_PARAMLIST) {
+    else if (binding->header.bits & ARRAY_FLAG_IS_DETAILS) {
         //
         // The stored binding is relative to a function, and so the specifier
         // needs to be a frame to have a precise invocation to lookup in.
@@ -715,10 +712,9 @@ inline static REBVAL *Derelativize(
         // but it would break the "black box" quality of function composition.
         //
         if (NOT_SERIES_INFO(specifier, INACCESSIBLE)) {
-            REBVAL *rootkey = CTX_ROOTKEY(CTX(specifier));
             if (
                 ACT_UNDERLYING(ACT(binding))
-                != ACT_UNDERLYING(VAL_ACTION(rootkey))
+                != ACT_UNDERLYING(CTX_ACTION(CTX(specifier)))
             ){
                 printf("Function mismatch in specific binding, expected:\n");
                 PROBE(ACT_ARCHETYPE(ACT(binding)));

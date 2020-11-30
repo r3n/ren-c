@@ -1157,13 +1157,7 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
 
     // Now fill in the canon value of the paramlist so it is an actual REBACT
     //
-    REBVAL *rootparam = RESET_CELL(
-        ARR_HEAD(paramlist),
-        REB_ACTION,
-        CELL_MASK_ACTION
-    );
-    Sync_Paramlist_Archetype(paramlist);
-    INIT_BINDING(rootparam, UNBOUND);
+    REBVAL *rootparam = Voidify_Rootparam(paramlist);
 
     MISC_META_NODE(paramlist) = nullptr;
 

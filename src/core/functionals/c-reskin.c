@@ -371,14 +371,7 @@ REBNATIVE(reskinned)
         fail ("Type-expanding RESKIN only works on ADAPT/ENCLOSE actions");
     }
 
-    if (not need_skin_phase)  // inherit the native flag if no phase change
-        SER(paramlist)->header.bits
-            |= SER(original)->header.bits & PARAMLIST_FLAG_IS_NATIVE;
-
-    RELVAL *rootparam = STABLE(ARR_HEAD(paramlist));
     SER(paramlist)->header.bits &= ~PARAMLIST_MASK_CACHED;
-    VAL_ACT_PARAMLIST_NODE(rootparam) = NOD(paramlist);
-    INIT_BINDING(rootparam, UNBOUND);
 
     // !!! This does not make a unique copy of the meta information context.
     // Hence updates to the title/parameter-descriptions/etc. of the tightened
@@ -404,6 +397,10 @@ REBNATIVE(reskinned)
         details_len  // details array capacity
     );
 
+    if (not need_skin_phase)  // inherit the native flag if no phase change
+        SER(defers)->header.bits
+            |= SER(original)->header.bits & PARAMLIST_FLAG_IS_NATIVE;
+
     if (need_skin_phase)
         Move_Value(
             ARR_AT(ACT_DETAILS(defers), IDX_SKINNER_SKINNED),
@@ -415,8 +412,8 @@ REBNATIVE(reskinned)
         // on the source and target are the same, and it preserves relative
         // value information (rarely what you meant, but it's meant here).
         //
-        unstable RELVAL *src = ARR_HEAD(ACT_DETAILS(original));
-        unstable RELVAL *dest = ARR_HEAD(ACT_DETAILS(defers));
+        unstable RELVAL *src = ARR_HEAD(ACT_DETAILS(original)) + 1;
+        unstable RELVAL *dest = ARR_HEAD(ACT_DETAILS(defers)) + 1;
         for (; NOT_END(src); ++src, ++dest)
             Blit_Relative(dest, src);
     }

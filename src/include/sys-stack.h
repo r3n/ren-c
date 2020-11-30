@@ -147,7 +147,7 @@ inline static unstable REBVAL *DS_AT(REBDSP d) {
 // If Pop_Stack_Values_Core is used ARRAY_HAS_FILE_LINE, it means the system
 // will try to capture the file and line number associated with the current
 // frame into the generated array.  But if there are other flags--like
-// ARRAY_FLAG_IS_PARAMLIST or ARRAY_FLAG_IS_VARLIST--you don't want to do
+// ARRAY_FLAG_IS_DETAILS or ARRAY_FLAG_IS_VARLIST--you don't want to do
 // this, because the ->link and ->misc fields have other uses.
 //
 #define Pop_Stack_Values(dsp) \
