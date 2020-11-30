@@ -381,7 +381,7 @@ REBNATIVE(rc4_key)
 //
 //  "Encrypt/decrypt data (modifies) using RC4 algorithm."
 //
-//      return: <void>
+//      return: [void!]
 //      ctx "Stream cipher context"
 //          [handle!]
 //      data "Data to encrypt/decrypt (modified)"
@@ -446,6 +446,7 @@ static int Mpi_From_Binary(mbedtls_mpi* X, const REBVAL *binary)
 //
 //  "Encrypt/decrypt data using the RSA algorithm."
 //
+//      return: [binary!]
 //      data [binary!]
 //      key-object [object!]
 //      /decrypt "Decrypts the data (default is to encrypt)"

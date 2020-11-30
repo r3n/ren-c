@@ -95,7 +95,7 @@ REBNATIVE(zmq_init) {
 //
 //  {Terminate 0MQ context}
 //
-//      return: <void>
+//      return: [void!]
 //      ctx [handle!]
 //  ]
 //
@@ -138,7 +138,7 @@ REBNATIVE(zmq_msg_alloc) {
 //
 //  {Free the memory previously allocated for a 0MQ message object}
 //
-//      return: <void>
+//      return: [void!]
 //      msg [handle!]
 //  ]
 //
@@ -156,7 +156,7 @@ REBNATIVE(zmq_msg_free) {
 //
 //  {Initialise empty 0MQ message}
 //
-//      return: <void>
+//      return: [void!]
 //      msg [handle!]
 //  ]
 //
@@ -178,7 +178,7 @@ REBNATIVE(zmq_msg_init) {
 //
 //  {Initialise 0MQ message of a specified size}
 //
-//      return: <void>
+//      return: [void!]
 //      msg [handle!]
 //      size [integer!]
 //  ]
@@ -207,7 +207,7 @@ void free_msg_data(void *data, void *hint) {
 //
 //  {Initialise 0MQ message with (a copy of) supplied data}
 //
-//      return: <void>
+//      return: [void!]
 //      msg [handle!]
 //      data [binary!]
 //  ]
@@ -245,7 +245,7 @@ REBNATIVE(zmq_msg_init_data) {
 //
 //  {Release 0MQ message}
 //
-//      return: <void>
+//      return: [void!]
 //      msg [handle!]
 //  ]
 //
@@ -308,7 +308,7 @@ REBNATIVE(zmq_msg_size) {
 //
 //  {Copy content of a message to another message}
 //
-//      return: <void>
+//      return: [void!]
 //      msg-dest [handle!]
 //      msg-src [handle!]
 //  ]
@@ -332,7 +332,7 @@ REBNATIVE(zmq_msg_copy) {
 //
 //  {Move content of a message to another message}
 //
-//      return: <void>
+//      return: [void!]
 //      msg-dest [handle!]
 //      msg-src [handle!]
 //  ]
@@ -395,7 +395,7 @@ REBNATIVE(zmq_socket) {
 //
 //  {Close 0MQ socket}
 //
-//      return: <void>
+//      return: [void!]
 //      socket [handle!]
 //  ]
 //
@@ -513,7 +513,7 @@ static REBVAL *Make_Sockopts_Table(void) {
 //
 //  {Set 0MQ socket options}
 //
-//      return: <void>
+//      return: [void!]
 //      socket [handle!]
 //      name [word! integer!]
 //          "see http://api.zeromq.org/4-1:zmq-setsockopt"
@@ -666,7 +666,7 @@ REBNATIVE(zmq_getsockopt) {
 //
 //  {Accept connections on a socket}
 //
-//      return: <void>
+//      return: [void!]
 //      socket [handle!]
 //      endpoint [text! url!]
 //  ]
@@ -692,7 +692,7 @@ REBNATIVE(zmq_bind) {
 //
 //  {Connect a socket}
 //
-//      return: <void>
+//      return: [void!]
 //      socket [handle!]
 //      endpoint [text! url!]
 //  ]
@@ -870,7 +870,7 @@ REBNATIVE(zmq_poll)
 //
 //  {Start built-in 0MQ proxy in the current application thread}
 //
-//      return: <void>
+//      return: [void!]
 //      frontend [handle!] {Socket handle}
 //      backend [handle!] {Socket handle}
 //      /capture
