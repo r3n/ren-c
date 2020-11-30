@@ -119,11 +119,21 @@ REBVAL *Make_Native(
     // table built in the bootstrap scripts, `Native_C_Funcs`.
 
     REBCTX *meta;
+    REBFLGS flags = MKF_KEYWORDS | MKF_RETURN;
     REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
         &meta,
         spec,
-        MKF_KEYWORDS | MKF_RETURN  // return type checked only in debug build
+        &flags  // return type checked only in debug build
     );
+
+    // Natives are their own dispatchers; there is no point of interjection
+    // to force their outputs to anything but what they return.  Instead of
+    // `return: <void>` use `return: [void!]` and `return Init_Void(D_OUT);`
+    // And instead of `return: <elide>` use `return: [<invisible>]` along
+    // with `return D_OUT;`...having made no modifications to D_OUT.
+    //
+    assert(not (flags & MKF_IS_VOIDER));
+    assert(not (flags & MKF_IS_ELIDER));
 
     REBACT *act = Make_Action(
         paramlist,

@@ -203,7 +203,6 @@ REBNATIVE(reskinned)
         ACT_PARAMLIST(original),
         SPECIFIED,  // no relative values in parameter lists
         SERIES_MASK_PARAMLIST
-            | (SER(original)->header.bits & PARAMLIST_MASK_INHERIT)
     );
 
     // Indicate "safe" relationship for frames; e.g. that a frame built for
@@ -376,7 +375,8 @@ REBNATIVE(reskinned)
         fail ("Type-expanding RESKIN only works on ADAPT/ENCLOSE actions");
     }
 
-    SER(paramlist)->header.bits &= ~PARAMLIST_MASK_CACHED;
+    if (ACT_HAS_RETURN(original))
+        SER(paramlist)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
 
     // !!! This does not make a unique copy of the meta information context.
     // Hence updates to the title/parameter-descriptions/etc. of the tightened
@@ -404,7 +404,7 @@ REBNATIVE(reskinned)
 
     if (not need_skin_phase)  // inherit the native flag if no phase change
         SER(defers)->header.bits
-            |= SER(original)->header.bits & PARAMLIST_FLAG_IS_NATIVE;
+            |= SER(original)->header.bits & DETAILS_FLAG_IS_NATIVE;
 
     if (need_skin_phase)
         Move_Value(
@@ -461,19 +461,19 @@ REBNATIVE(tweak)
 
     switch (VAL_WORD_SYM(ARG(property))) {
       case SYM_BARRIER:   // don't allow being taken as an argument, e.g. |
-        flag = PARAMLIST_FLAG_IS_BARRIER;
+        flag = DETAILS_FLAG_IS_BARRIER;
         break;
 
       case SYM_DEFER:  // Special enfix behavior used by THEN, ELSE, ALSO...
         if (pclass != REB_P_NORMAL)
             fail ("TWEAK defer only actions with evaluative 1st params");
-        flag = PARAMLIST_FLAG_DEFERS_LOOKBACK;
+        flag = DETAILS_FLAG_DEFERS_LOOKBACK;
         break;
 
       case SYM_POSTPONE:  // Wait as long as it can to run w/o changing order
         if (pclass != REB_P_NORMAL and pclass != REB_P_SOFT_QUOTE)
             fail ("TWEAK postpone only actions with evaluative 1st params");
-        flag = PARAMLIST_FLAG_POSTPONES_ENTIRELY;
+        flag = DETAILS_FLAG_POSTPONES_ENTIRELY;
         break;
 
       default:

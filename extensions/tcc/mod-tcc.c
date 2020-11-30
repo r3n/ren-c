@@ -314,10 +314,11 @@ REBNATIVE(make_native)
     REBVAL *source = ARG(source);
 
     REBCTX *meta;
+    REBFLGS flags = MKF_MASK_NONE;  // natives can't use <elide>, <void>
     REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
         &meta,
         ARG(spec),
-        MKF_MASK_NONE
+        &flags
     );
     REBACT *native = Make_Action(
         paramlist,

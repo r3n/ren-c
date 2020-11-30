@@ -83,24 +83,25 @@
 
 //=//// PARAMLIST_FLAG_HAS_RETURN /////////////////////////////////////////=//
 //
-// Has a definitional RETURN in the first paramlist slot.
+// See ACT_HAS_RETURN() for remarks.  Note: This is a flag on PARAMLIST, not
+// on DETAILS.
 //
 #define PARAMLIST_FLAG_HAS_RETURN \
     ARRAY_FLAG_23
 
 
-//=//// PARAMLIST_FLAG_POSTPONES_ENTIRELY /////////////////////////////////=//
+//=//// DETAILS_FLAG_POSTPONES_ENTIRELY ///////////////////////////////////=//
 //
 // A postponing operator causes everything on its left to run before it will.
 // Like a deferring operator, it is only allowed to appear after the last
 // parameter of an expression except it closes out *all* the parameters on
 // the stack vs. just one.
 //
-#define PARAMLIST_FLAG_POSTPONES_ENTIRELY \
+#define DETAILS_FLAG_POSTPONES_ENTIRELY \
     ARRAY_FLAG_24
 
 
-//=//// PARAMLIST_FLAG_IS_BARRIER /////////////////////////////////////////=//
+//=//// DETAILS_FLAG_IS_BARRIER ///////////////////////////////////////////=//
 //
 // Special action property set with TWEAK.  Used by |
 //
@@ -113,13 +114,13 @@
 // were confusing.  It seems an orthogonal feature in its own right, so it
 // was added to the TWEAK list pending a notation in function specs.
 //
-#define PARAMLIST_FLAG_IS_BARRIER \
+#define DETAILS_FLAG_IS_BARRIER \
     ARRAY_FLAG_25
 
-STATIC_ASSERT(PARAMLIST_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
+STATIC_ASSERT(DETAILS_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
 
 
-//=//// PARAMLIST_FLAG_DEFERS_LOOKBACK ////////////////////////////////////=//
+//=//// DETAILS_FLAG_DEFERS_LOOKBACK //////////////////////////////////////=//
 //
 // Special action property set with TWEAK.  Used by THEN, ELSE, and ALSO.
 //
@@ -127,11 +128,11 @@ STATIC_ASSERT(PARAMLIST_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
 // lookback.  Because lookback dispatches cannot use refinements, the answer
 // is always the same for invocation via a plain word.
 //
-#define PARAMLIST_FLAG_DEFERS_LOOKBACK \
+#define DETAILS_FLAG_DEFERS_LOOKBACK \
     ARRAY_FLAG_26
 
 
-//=//// PARAMLIST_FLAG_QUOTES_FIRST ///////////////////////////////////////=//
+//=//// DETAILS_FLAG_QUOTES_FIRST /////////////////////////////////////////=//
 //
 // This is a calculated property, which is cached by Make_Action().
 //
@@ -139,11 +140,11 @@ STATIC_ASSERT(PARAMLIST_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
 // so frequently, and it's quicker to check a bit on the function than to
 // walk the parameter list every time that function is called.
 //
-#define PARAMLIST_FLAG_QUOTES_FIRST \
+#define DETAILS_FLAG_QUOTES_FIRST \
     ARRAY_FLAG_27
 
 
-//=//// PARAMLIST_FLAG_SKIPPABLE_FIRST ////////////////////////////////////=//
+//=//// DETAILS_FLAG_SKIPPABLE_FIRST //////////////////////////////////////=//
 //
 // This is a calculated property, which is cached by Make_Action().
 //
@@ -153,11 +154,11 @@ STATIC_ASSERT(PARAMLIST_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
 // for SET-WORD! and SET-PATH! to its left, but `case [... default [x]]` can
 // work too when it doesn't see a SET-WORD! or SET-PATH! to the left.)
 //
-#define PARAMLIST_FLAG_SKIPPABLE_FIRST \
+#define DETAILS_FLAG_SKIPPABLE_FIRST \
     ARRAY_FLAG_28
 
 
-//=//// PARAMLIST_FLAG_IS_NATIVE //////////////////////////////////////////=//
+//=//// DETAILS_FLAG_IS_NATIVE ////////////////////////////////////////////=//
 //
 // Native functions are flagged that their dispatcher represents a native in
 // order to say that their ACT_DETAILS() follow the protocol that the [0]
@@ -170,52 +171,52 @@ STATIC_ASSERT(PARAMLIST_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
 // possible to branchlessly mask in the bit to stop frames from being mutable
 // by user code once native code starts running.
 //
-#define PARAMLIST_FLAG_IS_NATIVE \
+#define DETAILS_FLAG_IS_NATIVE \
     ARRAY_FLAG_29
 
-STATIC_ASSERT(PARAMLIST_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
+STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
 
-//=//// PARAMLIST_FLAG_ENFIXED ////////////////////////////////////////////=//
+//=//// DETAILS_FLAG_ENFIXED //////////////////////////////////////////////=//
 //
 // An enfix function gets its first argument from its left.  For a time, this
 // was the property of a binding and not an ACTION! itself.  This was an
 // attempt at simplification which caused more problems than it solved.
 //
-#define PARAMLIST_FLAG_ENFIXED \
+#define DETAILS_FLAG_ENFIXED \
     ARRAY_FLAG_30
 
 
-//=//// PARAMLIST_FLAG_31 /////////////////////////////////////////////////=//
+//=//// DETAILS_FLAG_31 ///////////////////////////////////////////////////=//
 //
-#define PARAMLIST_FLAG_31 \
+#define DETAILS_FLAG_31 \
     ARRAY_FLAG_31
 
 
 // These are the flags which are scanned for and set during Make_Action
 //
-#define PARAMLIST_MASK_CACHED \
-    (PARAMLIST_FLAG_QUOTES_FIRST | PARAMLIST_FLAG_SKIPPABLE_FIRST)
+#define DETAILS_MASK_CACHED \
+    (DETAILS_FLAG_QUOTES_FIRST | DETAILS_FLAG_SKIPPABLE_FIRST)
 
 // These flags should be copied when specializing or adapting.  They may not
 // be derivable from the paramlist (e.g. a native with no RETURN does not
 // track if it requotes beyond the paramlist).
 //
-#define PARAMLIST_MASK_INHERIT \
-    (PARAMLIST_FLAG_DEFERS_LOOKBACK | PARAMLIST_FLAG_POSTPONES_ENTIRELY)
+#define DETAILS_MASK_INHERIT \
+    (DETAILS_FLAG_DEFERS_LOOKBACK | DETAILS_FLAG_POSTPONES_ENTIRELY)
 
 
 #define SET_ACTION_FLAG(s,name) \
-    (cast(REBSER*, ACT(s))->header.bits |= PARAMLIST_FLAG_##name)
+    (cast(REBSER*, ACT(s))->header.bits |= DETAILS_FLAG_##name)
 
 #define GET_ACTION_FLAG(s,name) \
-    ((cast(REBSER*, ACT(s))->header.bits & PARAMLIST_FLAG_##name) != 0)
+    ((cast(REBSER*, ACT(s))->header.bits & DETAILS_FLAG_##name) != 0)
 
 #define CLEAR_ACTION_FLAG(s,name) \
-    (cast(REBSER*, ACT(s))->header.bits &= ~PARAMLIST_FLAG_##name)
+    (cast(REBSER*, ACT(s))->header.bits &= ~DETAILS_FLAG_##name)
 
 #define NOT_ACTION_FLAG(s,name) \
-    ((cast(REBSER*, ACT(s))->header.bits & PARAMLIST_FLAG_##name) == 0)
+    ((cast(REBSER*, ACT(s))->header.bits & DETAILS_FLAG_##name) == 0)
 
 
 //=//// PSEUDOTYPES FOR RETURN VALUES /////////////////////////////////////=//
@@ -234,9 +235,6 @@ STATIC_ASSERT(PARAMLIST_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 #define R_THROWN \
     cast(REBVAL*, &PG_R_Thrown)
 
-// See PARAMLIST_FLAG_INVISIBLE...this is what any function with that flag
-// needs to return.
-//
 // It is also used by path dispatch when it has taken performing a SET-PATH!
 // into its own hands, but doesn't want to bother saying to move the value
 // into the output slot...instead leaving that to the evaluator (as a
@@ -478,6 +476,43 @@ inline static REBVAL *Voidify_Rootparam(REBARR *paramlist) {
 
     return Init_Unreadable_Void(ARR_HEAD(paramlist)); 
 }
+
+
+//=//// RETURN HANDLING (WIP) /////////////////////////////////////////////=//
+//
+// The well-understood and working part of definitional return handling is
+// that function frames have a local slot named RETURN.  This slot is filled
+// by the dispatcher before running the body, with a function bound to the
+// executing frame.  This way it knows where to return to.
+//
+// !!! Lots of other things are not worked out (yet):
+//
+// * How do function derivations share this local cell (or do they at all?)
+//   e.g. if an ADAPT has prelude code, that code runs before the original
+//   dispatcher would fill in the RETURN.  Does the cell hold a return whose
+//   phase meaning changes based on which phase is running (which the user
+//   could not do themselves)?  Or does ADAPT need its own RETURN?  Or do
+//   ADAPTs just not have returns?
+//
+// * The typeset in the RETURN local key is where legal return types are
+//   stored (in lieu of where a parameter would storelegal argument types).
+//   Derivations may wish to change this.  Needing to generate a whole new
+//   paramlist just to change the return type seems excessive.
+//
+// * To make the position of RETURN consistent and easy to find, it is moved
+//   to the first parameter slot of the paramlist (regardless of where it
+//   is declared).  This complicates the paramlist building code, and being
+//   at that position means it often needs to be skipped over (e.g. by a
+//   GENERIC which wants to dispatch on the type of the first actual argument)
+//   The ability to create functions that don't have a return complicates
+//   this mechanic as well.
+//
+// The only bright idea in practice right now is that parameter lists which
+// have a definitional return in the first slot have a flag saying so.  Much
+// more design work on this is needed.
+
+#define ACT_HAS_RETURN(a) \
+    (did (SER(ACT_PARAMLIST(a))->header.bits & PARAMLIST_FLAG_HAS_RETURN))
 
 
 //=//// NATIVE ACTION ACCESS //////////////////////////////////////////////=//

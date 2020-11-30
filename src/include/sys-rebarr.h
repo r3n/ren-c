@@ -173,15 +173,6 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
     ((cast(const REBSER*, ARR(s))->header.bits & ARRAY_FLAG_##name) == 0)
 
 
-// !!! While SERIES_INFO_XXX bits supposedly apply to any kind of series, they
-// are less scarce than the FLAG bits and may have to be given multiple
-// meanings based on series type in the long run.  For instance, right now
-// there is a "INFO_MISC" bit needed due to array flag saturation.
-//
-#define ARRAY_INFO_MISC_VOIDER SERIES_INFO_MISC_BIT
-#define ARRAY_INFO_MISC_ELIDER SERIES_INFO_MISC2_BIT
-
-
 // Ordinary source arrays use their ->link field to point to an interned file
 // name string (or URL string) from which the code was loaded.  If a series
 // was not created from a file, then the information from the source that was

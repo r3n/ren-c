@@ -1157,7 +1157,7 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
 
     // Now fill in the canon value of the paramlist so it is an actual REBACT
     //
-    REBVAL *rootparam = Voidify_Rootparam(paramlist);
+    Voidify_Rootparam(paramlist);
 
     REBACT *action = Make_Action(
         paramlist,

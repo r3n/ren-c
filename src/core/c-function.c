@@ -643,12 +643,6 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     );
     SET_SERIES_FLAG(paramlist, FIXED_SIZE);
 
-    // Note: not a valid ACTION! paramlist yet, don't use SET_ACTION_FLAG()
-    //
-    if (flags & MKF_IS_VOIDER)
-        SER(paramlist)->info.bits |= ARRAY_INFO_MISC_VOIDER;  // !!! see note
-    if (flags & MKF_IS_ELIDER)
-        SER(paramlist)->info.bits |= ARRAY_INFO_MISC_ELIDER;  // !!! see note
     if (flags & MKF_HAS_RETURN)
         SER(paramlist)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
 
@@ -936,7 +930,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 REBARR *Make_Paramlist_Managed_May_Fail(
     REBCTX **meta,
     const REBVAL *spec,
-    REBFLGS flags
+    REBFLGS *flags  // flags may be modified to carry additional information
 ){
     REBDSP dsp_orig = DSP;
     assert(DS_TOP == DS_AT(dsp_orig));
@@ -960,14 +954,14 @@ REBARR *Make_Paramlist_Managed_May_Fail(
     //
     Push_Paramlist_Triads_May_Fail(
         spec,
-        &flags,
+        flags,
         dsp_orig,
         &definitional_return_dsp
     );
     REBARR *paramlist = Pop_Paramlist_With_Meta_May_Fail(
         meta,
         dsp_orig,
-        flags,
+        *flags,
         definitional_return_dsp
     );
 
@@ -1037,6 +1031,12 @@ REBACT *Make_Action(
 
     ASSERT_ARRAY_MANAGED(paramlist);  // paramlists/keylists, can be shared
     ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(paramlist));  // unused at this time
+    assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
+    if (SER(paramlist)->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
+        RELVAL *param = STABLE(ARR_AT(paramlist, 1));
+        assert(VAL_PARAM_SYM(param) == SYM_RETURN);
+        UNUSED(param);
+    }
 
     // "details" for an action is an array of cells which can be anything
     // the dispatcher understands it to be, by contract.  Terminate it
@@ -1079,7 +1079,6 @@ REBACT *Make_Action(
             = NOD(CTX_VARLIST(unwrap(exemplar)));
     }
 
-    assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
     assert(NOT_ARRAY_FLAG(details, HAS_FILE_LINE_UNMASKED));
 
     REBACT *act = ACT(details); // now it's a legitimate REBACT
@@ -1089,23 +1088,6 @@ REBACT *Make_Action(
     // be tricky to figure out with partial refinement specialization.  So
     // the work of doing that is factored into a routine (`PARAMETERS OF`
     // uses it as well).
-
-    if (SER(paramlist)->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
-        REBVAL *param = ACT_PARAMS_HEAD(act);
-        assert(VAL_PARAM_SYM(param) == SYM_RETURN);
-        UNUSED(param);
-
-        // !!! Lousy workaround, migrate flag onto the details
-        SER(details)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
-    }
-
-    // !!! More lousy workarounds!  Time to clean this junk up!
-    //
-    if (SER(paramlist)->info.bits & ARRAY_INFO_MISC_ELIDER)
-        SER(details)->info.bits |= ARRAY_INFO_MISC_ELIDER;
-    if (SER(paramlist)->info.bits & ARRAY_INFO_MISC_VOIDER)
-        SER(details)->info.bits |= ARRAY_INFO_MISC_VOIDER;
-
 
     REBVAL *first_unspecialized = First_Unspecialized_Param(act);
     if (first_unspecialized) {
@@ -1231,7 +1213,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
             example = Get_System(SYS_STANDARD, STD_PROC_BODY);
             real_body_index = 4;
         }
-        else if (GET_ACTION_FLAG(a, HAS_RETURN)) {
+        else if (ACT_HAS_RETURN(a)) {
             example = Get_System(SYS_STANDARD, STD_FUNC_BODY);
             real_body_index = 4;
         }

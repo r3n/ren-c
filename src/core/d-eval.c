@@ -256,7 +256,7 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
     // !!! PG_Dispatcher() should do this, so every phase gets checked.
     //
   #ifdef DEBUG_NATIVE_RETURNS
-    if (GET_ACTION_FLAG(phase, HAS_RETURN)) {
+    if (ACT_HAS_RETURN(phase)) {
         REBVAL *typeset = ACT_PARAMS_HEAD(phase);
         assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
         if (GET_CELL_FLAG(f->out, OUT_MARKED_STALE)) {

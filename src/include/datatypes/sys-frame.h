@@ -627,8 +627,8 @@ inline static void Push_Action(
     assert(NOT_EVAL_FLAG(f, FULFILL_ONLY));
     assert(NOT_EVAL_FLAG(f, RUNNING_ENFIX));
 
-    STATIC_ASSERT(EVAL_FLAG_FULFILLING_ARG == PARAMLIST_FLAG_IS_BARRIER);
-    if (f->flags.bits & SER(act)->header.bits & PARAMLIST_FLAG_IS_BARRIER)
+    STATIC_ASSERT(EVAL_FLAG_FULFILLING_ARG == DETAILS_FLAG_IS_BARRIER);
+    if (f->flags.bits & SER(act)->header.bits & DETAILS_FLAG_IS_BARRIER)
         fail (Error_Expression_Barrier_Raw());
 
     f->param = ACT_PARAMS_HEAD(act);
@@ -820,7 +820,7 @@ inline static void Drop_Action(REBFRM *f) {
         // big enough for ensuing calls.  
         //
         // But no series bits we didn't set should be set...and right now,
-        // only PARAMLIST_FLAG_IS_NATIVE sets HOLD.  Clear that.
+        // only DETAILS_FLAG_IS_NATIVE sets HOLD.  Clear that.
         //
         CLEAR_SERIES_INFO(f->varlist, HOLD);
 
@@ -907,7 +907,7 @@ inline static void Drop_Action(REBFRM *f) {
 // measure, we just sense whether the phase has a return or not.
 //
 inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
-    return GET_ACTION_FLAG(FRM_PHASE(f), HAS_RETURN)
+    return ACT_HAS_RETURN(FRM_PHASE(f))
         ? FRM_ARG(f, n + 1)
         : FRM_ARG(f, n);
 }

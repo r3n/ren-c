@@ -1015,7 +1015,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // flag the same as the HOLD info bit, we can make sure the frame gets
     // marked protected if it's a native...without needing an if() branch.
     //
-    STATIC_ASSERT(PARAMLIST_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
+    STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
     SER(f->varlist)->info.bits |= SER(phase)->header.bits & SERIES_INFO_HOLD;
 
     REBNAT dispatcher = ACT_DISPATCHER(phase);

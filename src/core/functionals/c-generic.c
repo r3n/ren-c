@@ -64,9 +64,11 @@ REB_R Generic_Dispatcher(REBFRM *f)
     // like a First_Unspecialized_Arg() call.  For now, we just handle the
     // case of a RETURN: sitting in the first parameter slot.
     //
-    REBVAL *first_arg = GET_ACTION_FLAG(phase, HAS_RETURN)
-        ? FRM_ARG(f, 2)
-        : FRM_ARG(f, 1);
+    REBVAL *first_arg;
+    if (ACT_HAS_RETURN(phase))
+        first_arg = FRM_ARG(f, 2);
+    else
+        first_arg = FRM_ARG(f, 1);
 
     return Run_Generic_Dispatch(first_arg, f, verb);
 }
@@ -95,11 +97,14 @@ REBNATIVE(generic)
     REBVAL *spec = ARG(spec);
 
     REBCTX *meta;
+    REBFLGS flags = MKF_KEYWORDS | MKF_RETURN;
     REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
         &meta,
         spec,
-        MKF_KEYWORDS | MKF_RETURN  // return type checked only in debug build
+        &flags  // return type checked only in debug build
     );
+    assert(not (flags & MKF_IS_VOIDER));
+    assert(not (flags & MKF_IS_ELIDER));
 
     // !!! There is no system yet for extension types to register which of
     // the generic actions they can handle.  So for the moment, we just say

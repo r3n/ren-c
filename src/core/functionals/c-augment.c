@@ -111,7 +111,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     Move_Value(DS_PUSH(), EMPTY_TEXT);  // param_notes[0] (desc, then canon)
 
     REBFLGS flags = MKF_KEYWORDS;
-    if (GET_ACTION_FLAG(augmentee, HAS_RETURN)) {
+    if (ACT_HAS_RETURN(augmentee)) {
         flags |= MKF_RETURN;
         definitional_return_dsp = DSP + 1;
     }

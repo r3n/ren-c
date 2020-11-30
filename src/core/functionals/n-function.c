@@ -135,7 +135,7 @@ bool Interpreted_Dispatch_Details_1_Throws(
     RELVAL *body = STABLE(ARR_AT(details, IDX_DETAILS_1));  // code to run
     assert(IS_BLOCK(body) and IS_RELATIVE(body) and VAL_INDEX(body) == 0);
 
-    if (GET_ACTION_FLAG(phase, HAS_RETURN)) {
+    if (ACT_HAS_RETURN(phase)) {
         assert(VAL_PARAM_SYM(ACT_PARAMS_HEAD(phase)) == SYM_RETURN);
         REBVAL *cell = FRM_ARG(f, 1);
         Move_Value(cell, NATIVE_VAL(return));
@@ -341,7 +341,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
     REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
         &meta,
         spec,
-        mkf_flags
+        &mkf_flags
     );
 
     REBACT *a = Make_Action(
@@ -359,13 +359,13 @@ REBACT *Make_Interpreted_Action_May_Fail(
     REBARR *copy;
     if (IS_END(VAL_ARRAY_AT(body))) {  // optimize empty body case
 
-        if (SER(a)->info.bits & ARRAY_INFO_MISC_ELIDER) {
+        if (mkf_flags & MKF_IS_ELIDER) {
             ACT_DISPATCHER(a) = &Commenter_Dispatcher;
         }
-        else if (SER(a)->info.bits & ARRAY_INFO_MISC_VOIDER) {
+        else if (mkf_flags & MKF_IS_VOIDER) {
             ACT_DISPATCHER(a) = &Voider_Dispatcher;  // !!! ^-- see info note
         }
-        else if (GET_ACTION_FLAG(a, HAS_RETURN)) {
+        else if (ACT_HAS_RETURN(a)) {
             REBVAL *typeset = ACT_PARAMS_HEAD(a);
             assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
             if (not TYPE_CHECK(typeset, REB_VOID))  // `do []` returns
@@ -381,11 +381,11 @@ REBACT *Make_Interpreted_Action_May_Fail(
     }
     else {  // body not empty, pick dispatcher based on output disposition
 
-        if (SER(a)->info.bits & ARRAY_INFO_MISC_ELIDER)
+        if (mkf_flags & MKF_IS_ELIDER)
             ACT_DISPATCHER(a) = &Elider_Dispatcher; // no f->out mutation
-        else if (SER(a)->info.bits & ARRAY_INFO_MISC_VOIDER) // !!! see note
+        else if (mkf_flags & MKF_IS_VOIDER) // !!! see note
             ACT_DISPATCHER(a) = &Voider_Dispatcher; // forces f->out void
-        else if (GET_ACTION_FLAG(a, HAS_RETURN))
+        else if (ACT_HAS_RETURN(a))
             ACT_DISPATCHER(a) = &Returner_Dispatcher; // type checks f->out
         else
             ACT_DISPATCHER(a) = &Unchecked_Dispatcher; // unchecked f->out

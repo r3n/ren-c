@@ -999,11 +999,22 @@ REBNATIVE(js_native)
     REBVAL *source = ARG(source);
 
     REBCTX *meta;
+    REBFLGS flags = MKF_RETURN | MKF_KEYWORDS;
     REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
         &meta,
         spec,
-        MKF_RETURN | MKF_KEYWORDS
+        &flags
     );
+
+    // !!! There's some question as to whether the <elide> and <void> feature
+    // available in user functions is a good idea.  They are analyzed out of
+    // the spec, and would require additional support in JavaScript_Dispatcher
+    // but since JS functions don't have results "fall out" of the bottom,
+    // they will produce undefined (e.g. void) by default anyway.  So it's
+    // less of an issue.  Punt on it for now.
+    //
+    if ((flags & MKF_IS_VOIDER) or (flags & MKF_IS_ELIDER))
+        fail ("<elide> and <void> not supported, use [void!] / [<invisible>]");
 
     REBACT *native = Make_Action(
         paramlist,
