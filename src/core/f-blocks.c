@@ -149,6 +149,11 @@ void Clonify(
     //
     assert(not (deep_types & FLAGIT_KIND(REB_ACTION)));
 
+  #if !defined(NDEBUG)
+    if (IS_UNREADABLE_DEBUG(v))
+        return;
+  #endif
+
     // !!! It may be possible to do this faster/better, the impacts on higher
     // quoting levels could be incurring more cost than necessary...but for
     // now err on the side of correctness.  Unescape the value while cloning

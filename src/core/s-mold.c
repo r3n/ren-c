@@ -441,6 +441,19 @@ void Mold_Or_Form_Value(REB_MOLD *mo, unstable const RELVAL *v, bool form)
     // Mold hooks take a REBCEL* and not a RELVAL*, so they expect any quotes
     // applied to have already been done.
 
+  #if !defined(NDEBUG)
+    if (IS_UNREADABLE_DEBUG(v)) {  // keylists and paramlists have unreadables
+        Append_Ascii(mo->series, "~unreadable~");
+        return;
+    }
+    if (IS_PARAM(v)) {  // > REB_MAX, has no molding dispatch
+        Append_Ascii(mo->series, "<<");
+        Append_Spelling(mo->series, VAL_PARAM_SPELLING(v));
+        Append_Ascii(mo->series, ">>");
+        return;
+    }
+  #endif
+
     REBLEN depth = VAL_NUM_QUOTES(v);
 
     REBLEN i;
