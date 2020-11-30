@@ -1159,12 +1159,10 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
     //
     REBVAL *rootparam = Voidify_Rootparam(paramlist);
 
-    MISC_META_NODE(paramlist) = nullptr;
-
     REBACT *action = Make_Action(
         paramlist,
+        nullptr,  // no meta
         &Routine_Dispatcher,
-        nullptr,  // no underlying action (use paramlist)
         nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_ROUTINE_MAX  // details array len
     );

@@ -558,6 +558,7 @@ void Push_Paramlist_Triads_May_Fail(
 // as part of this popping process.
 //
 REBARR *Pop_Paramlist_With_Meta_May_Fail(
+    REBCTX **meta,
     REBDSP dsp_orig,
     REBFLGS flags,
     REBDSP definitional_return_dsp
@@ -727,12 +728,10 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     // !!! See notes on ACTION-META in %sysobj.r
 
-    REBCTX *meta = nullptr;
-
     if (flags & (MKF_HAS_DESCRIPTION | MKF_HAS_TYPES | MKF_HAS_NOTES))
-        meta = Copy_Context_Shallow_Managed(VAL_CONTEXT(Root_Action_Meta));
-
-    MISC_META_NODE(paramlist) = NOD(meta);
+        *meta = Copy_Context_Shallow_Managed(VAL_CONTEXT(Root_Action_Meta));
+    else
+        *meta = nullptr;
 
     // If a description string was gathered, it's sitting in the first string
     // slot, the third cell we pushed onto the stack.  Extract it if so.
@@ -740,7 +739,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     if (flags & MKF_HAS_DESCRIPTION) {
         assert(IS_TEXT(DS_AT(dsp_orig + 3)));
         Move_Value(
-            CTX_VAR(meta, STD_ACTION_META_DESCRIPTION),
+            CTX_VAR(*meta, STD_ACTION_META_DESCRIPTION),
             DS_AT(dsp_orig + 3)
         );
     }
@@ -781,7 +780,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             //
             if (NOT_END(VAL_ARRAY_AT(definitional_return + 1))) {
                 Move_Value(
-                    CTX_VAR(meta, STD_ACTION_META_RETURN_TYPE),
+                    CTX_VAR(*meta, STD_ACTION_META_RETURN_TYPE),
                     &definitional_return[1]
                 );
             }
@@ -812,7 +811,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         TERM_ARRAY_LEN(types_varlist, num_slots);
 
         Init_Object(
-            CTX_VAR(meta, STD_ACTION_META_PARAMETER_TYPES),
+            CTX_VAR(*meta, STD_ACTION_META_PARAMETER_TYPES),
             CTX(types_varlist)
         );
     }
@@ -849,10 +848,10 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             // parameter in the list
             //
             if (VAL_LEN_HEAD(definitional_return + 2) == 0)
-                Init_Nulled(CTX_VAR(meta, STD_ACTION_META_RETURN_NOTE));
+                Init_Nulled(CTX_VAR(*meta, STD_ACTION_META_RETURN_NOTE));
             else {
                 Move_Value(
-                    CTX_VAR(meta, STD_ACTION_META_RETURN_NOTE),
+                    CTX_VAR(*meta, STD_ACTION_META_RETURN_NOTE),
                     &definitional_return[2]
                 );
             }
@@ -883,7 +882,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         TERM_ARRAY_LEN(notes_varlist, num_slots);
 
         Init_Object(
-            CTX_VAR(meta, STD_ACTION_META_PARAMETER_NOTES),
+            CTX_VAR(*meta, STD_ACTION_META_PARAMETER_NOTES),
             CTX(notes_varlist)
         );
     }
@@ -935,6 +934,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 // in the Make_Action() step.
 //
 REBARR *Make_Paramlist_Managed_May_Fail(
+    REBCTX **meta,
     const REBVAL *spec,
     REBFLGS flags
 ){
@@ -964,11 +964,18 @@ REBARR *Make_Paramlist_Managed_May_Fail(
         dsp_orig,
         &definitional_return_dsp
     );
-    return Pop_Paramlist_With_Meta_May_Fail(
+    REBARR *paramlist = Pop_Paramlist_With_Meta_May_Fail(
+        meta,
         dsp_orig,
         flags,
         definitional_return_dsp
     );
+
+    // By default, all paramlists point to themselves as the termination of
+    // the ancestor chain.
+    //
+    LINK_ANCESTOR_NODE(paramlist) = NOD(paramlist);
+    return paramlist;
 }
 
 
@@ -1021,8 +1028,8 @@ REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
 //
 REBACT *Make_Action(
     REBARR *paramlist,
+    REBCTX *meta,
     REBNAT dispatcher, // native C function called by Eval_Core
-    option(REBACT*) underlying, // optional underlying function
     option(REBCTX*) exemplar, // if provided, make consistent w/next level
     REBLEN details_capacity // capacity of ACT_DETAILS (including archetype)
 ){
@@ -1042,31 +1049,15 @@ REBACT *Make_Action(
     RELVAL *archetype = STABLE(ARR_HEAD(details));
     RESET_CELL(archetype, REB_ACTION, CELL_MASK_ACTION);
     VAL_ACT_DETAILS_NODE(archetype) = NOD(details);
-    VAL_ACTION_PARAMLIST_OR_LABEL_NODE(archetype) = NOD(paramlist);
+
     EXTRA(Binding, archetype).node = UNBOUND;
     //
     // Leave rest of the cells in the capacity uninitialized (caller fills in)
     //
     TERM_ARRAY_LEN(details, details_capacity);
 
-    MISC(details).dispatcher = dispatcher; // level of indirection, hijackable
-
-    assert(IS_POINTER_SAFETRASH_DEBUG(LINK(paramlist).trash));
-
-    if (underlying) {
-        LINK_UNDERLYING_NODE(paramlist) = NOD(unwrap(underlying));
-
-        // Note: paramlist still incomplete, don't use SET_ACTION_FLAG....
-        //
-        if (GET_ACTION_FLAG(unwrap(underlying), HAS_RETURN))
-            SER(details)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
-    }
-    else {
-        // To avoid NULL checking when a function is called and looking for
-        // underlying, just use the action's own paramlist if needed.
-        //
-        LINK_UNDERLYING_NODE(paramlist) = NOD(details);
-    }
+    LINK(details).dispatcher = dispatcher; // level of indirection, hijackable
+    MISC_META_NODE(details) = NOD(meta);
 
     if (not exemplar) {
         //
@@ -1074,7 +1065,7 @@ REBACT *Make_Action(
         // so that Push_Action() can assign f->special directly from it in
         // dispatch, and be equal to f->param.
         //
-        LINK_SPECIALTY_NODE(details) = NOD(paramlist);
+        VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype) = NOD(paramlist);
     }
     else {
         // The parameters of the paramlist should line up with the slots of
@@ -1084,17 +1075,9 @@ REBACT *Make_Action(
         assert(GET_SERIES_FLAG(unwrap(exemplar), MANAGED));
         assert(CTX_LEN(unwrap(exemplar)) == ARR_LEN(paramlist) - 1);
 
-        LINK_SPECIALTY_NODE(details) = NOD(CTX_VARLIST(unwrap(exemplar)));
+        VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype)
+            = NOD(CTX_VARLIST(unwrap(exemplar)));
     }
-
-    // The meta information may already be initialized, since the native
-    // version of paramlist construction sets up the FUNCTION-META information
-    // used by HELP.  If so, it must be a valid REBCTX*.  Otherwise NULL.
-    //
-    assert(
-        not MISC_META(paramlist)
-        or GET_ARRAY_FLAG(CTX_VARLIST(MISC_META(paramlist)), IS_VARLIST)
-    );
 
     assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
     assert(NOT_ARRAY_FLAG(details, HAS_FILE_LINE_UNMASKED));
@@ -1145,6 +1128,7 @@ REBACT *Make_Action(
             SET_ACTION_FLAG(act, SKIPPABLE_FIRST);
     }
 
+    assert(ACT_PARAMLIST(act) == paramlist);  // via specialty
     return act;
 }
 

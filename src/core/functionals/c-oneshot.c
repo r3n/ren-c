@@ -118,12 +118,10 @@ REBNATIVE(n_shot)
     );
     TERM_ARRAY_LEN(paramlist, 2);
 
-    MISC_META_NODE(paramlist) = nullptr;  // !!! auto-generate info for HELP?
-
     REBACT *n_shot = Make_Action(
         paramlist,
+        nullptr,  // !!! no meta, should this auto-generate info for HELP?
         n >= 0 ? &Downshot_Dispatcher : &Upshot_Dispatcher,
-        nullptr,  // no underlying action (use paramlist)
         nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_ONESHOT_MAX  // details array capacity
     );

@@ -206,6 +206,11 @@ REBNATIVE(reskinned)
             | (SER(original)->header.bits & PARAMLIST_MASK_INHERIT)
     );
 
+    // Indicate "safe" relationship for frames; e.g. that a frame built for
+    // the reskinned function is safe to use with the original function.
+    //
+    LINK_ANCESTOR_NODE(paramlist) = NOD(ACT_PARAMLIST(original));
+
     bool need_skin_phase = false;  // only needed if types were broadened
 
     unstable RELVAL *param = ARR_AT(paramlist, 1);  // 0 is ACT_ARCHETYPE
@@ -377,7 +382,7 @@ REBNATIVE(reskinned)
     // Hence updates to the title/parameter-descriptions/etc. of the tightened
     // function will affect the original, and vice-versa.
     //
-    MISC_META_NODE(paramlist) = NOD(ACT_META(original));
+    REBCTX *meta = ACT_META(original);
 
     Manage_Array(paramlist);
 
@@ -391,8 +396,8 @@ REBNATIVE(reskinned)
 
     REBACT *defers = Make_Action(
         paramlist,
+        meta,
         need_skin_phase ? &Skinner_Dispatcher : ACT_DISPATCHER(original),
-        ACT_UNDERLYING(original),  // !!! ^-- notes above may be outdated
         ACT_EXEMPLAR(original),  // don't add to the original's specialization
         details_len  // details array capacity
     );

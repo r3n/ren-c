@@ -174,8 +174,6 @@ inline static option(const REBSTR*) FRM_LABEL(REBFRM *f) {
     return f->label;
 }
 
-#define FRM_UNDERLYING(f) \
-    ACT_UNDERLYING((f)->original)
 
 #define FRM_DSP_ORIG(f) \
     ((f)->dsp_orig + 0) // prevent assignment via this macro

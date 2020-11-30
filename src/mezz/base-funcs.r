@@ -342,11 +342,11 @@ redescribe: func [
         ]
 
         if notes: try select meta 'parameter-notes [
-            if not frame? notes [
+            if not any-context? notes [  ; !!! Sometimes OBJECT!, else FRAME!
                 fail [{PARAMETER-NOTES in META-OF is not a FRAME!} notes]
             ]
 
-            if :value <> (action of notes) [
+            all [frame? notes, :value <> (action of notes)] then [
                 fail [{PARAMETER-NOTES in META-OF frame mismatch} notes]
             ]
         ]

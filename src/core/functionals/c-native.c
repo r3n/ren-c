@@ -118,15 +118,17 @@ REBVAL *Make_Native(
     // the Natives table.  The associated C function is provided by a
     // table built in the bootstrap scripts, `Native_C_Funcs`.
 
+    REBCTX *meta;
     REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
+        &meta,
         spec,
         MKF_KEYWORDS | MKF_RETURN  // return type checked only in debug build
     );
 
     REBACT *act = Make_Action(
         paramlist,
+        meta,
         dispatcher, // "dispatcher" is unique to this "native"
-        nullptr, // no underlying action (use paramlist)
         nullptr, // no specialization exemplar (or inherited exemplar)
         IDX_NATIVE_MAX // details array capacity
     );

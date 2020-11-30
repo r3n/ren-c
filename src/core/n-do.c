@@ -724,7 +724,7 @@ REBNATIVE(redo)
     //
     if (REF(other)) {
         REBVAL *sibling = ARG(other);
-        if (FRM_UNDERLYING(f) != ACT_UNDERLYING(VAL_ACTION(sibling)))
+        if (ACT_PARAMLIST(f->original) != ACT_PARAMLIST(VAL_ACTION(sibling)))
             fail ("/OTHER function passed to REDO has incompatible FRAME!");
 
         INIT_VAL_CONTEXT_PHASE(restartee, VAL_ACTION(sibling));

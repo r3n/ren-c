@@ -121,14 +121,12 @@ REBNATIVE(typechecker)
     );
     TERM_ARRAY_LEN(paramlist, 2);
 
-    MISC_META_NODE(paramlist) = nullptr;  // !!! auto-generate info for HELP?
-
     REBACT *typechecker = Make_Action(
         paramlist,
+        nullptr,  // no meta !!! auto-generate info for HELP?
         IS_DATATYPE(type)
             ? &Datatype_Checker_Dispatcher
             : &Typeset_Checker_Dispatcher,
-        nullptr,  // no underlying action (use paramlist)
         nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_TYPECHECKER_MAX  // details array capacity
     );

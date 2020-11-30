@@ -284,14 +284,10 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     //
     assert(VAL_BINDING(archetype) == UNBOUND or CTX_TYPE(c) == REB_FRAME);
 
-    REBARR *varlist = CTX_VARLIST(c);
     REBARR *keylist = CTX_KEYLIST(c);
     assert(NOT_ARRAY_FLAG(keylist, HAS_FILE_LINE_UNMASKED));
 
-    assert(
-        not MISC_META(varlist)
-        or ANY_CONTEXT(CTX_ARCHETYPE(MISC_META(varlist)))  // current rule
-    );
+    assert(not CTX_META(c) or ANY_CONTEXT_KIND(CTX_TYPE(CTX_META(c))));
 
     // FRAME!s must always fill in the phase slot, but that piece of the
     // REBVAL is reserved for future use in other context types...so make
@@ -332,10 +328,7 @@ void Extra_Init_Action_Checks_Debug(REBACT *a) {
     // !!! Currently only a context can serve as the "meta" information,
     // though the interface may expand.
     //
-    assert(
-        not MISC_META(paramlist)
-        or ANY_CONTEXT(CTX_ARCHETYPE(MISC_META(paramlist)))
-    );
+    assert(not ACT_META(a) or ANY_CONTEXT_KIND(CTX_TYPE(ACT_META(a))));
 }
 
 #endif

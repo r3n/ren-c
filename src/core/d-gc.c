@@ -520,7 +520,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         REBARR *details = ACT_DETAILS(VAL_ACTION(archetype));
         assert(Is_Marked(details));
 
-        REBARR *specialty = LINK_SPECIALTY(details);
+        REBARR *specialty = ACT_SPECIALTY(VAL_ACTION(archetype));
         if (GET_ARRAY_FLAG(specialty, IS_VARLIST)) {
             REBCTX *ctx_specialty = CTX(specialty);
             UNUSED(ctx_specialty);

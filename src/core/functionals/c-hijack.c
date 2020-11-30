@@ -122,7 +122,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
             Init_Word(DS_PUSH(), VAL_PARAM_SPELLING(f->param));
 
             if (Is_Typeset_Empty(f->param)) {
-                assert(IS_REFINEMENT(f->arg));  // used but argless refinement
+                assert(Is_Blackhole(f->arg));  // used but argless refinement
                 continue;
             }
         }
@@ -208,13 +208,6 @@ REB_R Hijacker_Dispatcher(REBFRM *f)
 //  ]
 //
 REBNATIVE(hijack)
-//
-// Hijacking an action does not change its interface--and cannot.  While
-// it may seem tempting to use low-level tricks to keep the same paramlist
-// but add or remove parameters, parameter lists can be referenced many
-// places in the system (frames, specializations, adaptations) and can't
-// be corrupted...or the places that rely on their properties (number and
-// types of parameters) would get out of sync.
 {
     INCLUDE_PARAMS_OF_HIJACK;
 
@@ -224,34 +217,28 @@ REBNATIVE(hijack)
     if (victim == hijacker)
         return nullptr;  // permitting no-op hijack has some practical uses
 
-    REBARR *victim_paramlist = ACT_PARAMLIST(victim);
     REBARR *victim_details = ACT_DETAILS(victim);
-    REBARR *hijacker_paramlist = ACT_PARAMLIST(hijacker);
     REBARR *hijacker_details = ACT_DETAILS(hijacker);
 
-    if (
-        ACT_UNDERLYING(hijacker) == ACT_UNDERLYING(victim)
-        and (ACT_NUM_PARAMS(hijacker) == ACT_NUM_PARAMS(victim))
-    ){
-        // Should the underliers of the hijacker and victim match, that means
+    REBVAL *victim_archetype = ACT_ARCHETYPE(victim);
+
+    if (Action_Is_Base_Of(victim, hijacker)) {
+        //
+        // Should the paramlists of the hijacker and victim match, that means
         // any ADAPT or CHAIN or SPECIALIZE of the victim can work equally
         // well if we just use the hijacker's dispatcher directly.  This is a
         // reasonably common case, and especially common when putting the
         // originally hijacked function back.
 
-        LINK_UNDERLYING_NODE(victim_paramlist)
-            = LINK_UNDERLYING_NODE(hijacker_paramlist);
-        if (LINK_SPECIALTY(hijacker_details) == hijacker_paramlist)
-            LINK_SPECIALTY_NODE(victim_details) = NOD(victim_paramlist);
-        else
-            LINK_SPECIALTY_NODE(victim_details)
-                = LINK_SPECIALTY_NODE(hijacker_details);
+        LINK(victim_details).dispatcher = LINK(hijacker_details).dispatcher;
 
-        MISC(victim_details).dispatcher = MISC(hijacker_details).dispatcher;
-
-        // All function info arrays should live in cells with the same
-        // underlying formatting.  Blit_Relative ensures that's the case.
+        // For the victim to act like the hijacker, it must use the same
+        // exemplar.  Update the specialty regardless of whether the paramlist
+        // matched *exactly* (Note: paramlist determined from the specialty)
         //
+        VAL_ACTION_SPECIALTY_OR_LABEL_NODE(victim_archetype)
+            = NOD(ACT_SPECIALTY(hijacker));
+
         // !!! It may be worth it to optimize some dispatchers to depend on
         // ARR_SINGLE(info) being correct.  That would mean hijack reversals
         // would need to restore the *exact* capacity.  Review.
@@ -266,7 +253,7 @@ REBNATIVE(hijack)
         unstable RELVAL *src = ARR_HEAD(hijacker_details) + 1;
         unstable RELVAL *dest = ARR_HEAD(victim_details) + 1;
         for (; NOT_END(src); ++src, ++dest)
-            Blit_Relative(dest, src);
+            Blit_Relative(dest, src);  // details may contain relative values
         TERM_ARRAY_LEN(victim_details, details_len);
     }
     else {
@@ -280,7 +267,7 @@ REBNATIVE(hijack)
         // process of building a new frame.  But in general one basically
         // needs to do a new function call.
         //
-        MISC(victim_details).dispatcher = &Hijacker_Dispatcher;
+        LINK(victim_details).dispatcher = &Hijacker_Dispatcher;
 
         if (ARR_LEN(victim_details) < 2)
             Alloc_Tail_Array(victim_details);
@@ -295,10 +282,21 @@ REBNATIVE(hijack)
     // alone?  Add a note about the hijacking?  Also: how should binding and
     // hijacking interact?
 
+    // We do not return a copy of the original function that can be used to
+    // restore the behavior.  Because you can make such a copy yourself if
+    // you intend to put the behavior back:
+    //
+    //     foo-saved: copy :foo
+    //     hijack :foo :bar
+    //     ...
+    //     hijack :foo :foo-saved
+    //
+    // Making such a copy in this routine would be wasteful if it wasn't used.
+    //
     return Init_Action(
         D_OUT,
         victim,
-        VAL_ACTION_LABEL(ARG(hijacker)),
+        VAL_ACTION_LABEL(ARG(victim)),
         VAL_BINDING(ARG(hijacker))
     );
 }

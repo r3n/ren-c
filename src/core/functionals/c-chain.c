@@ -211,17 +211,17 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
         }
     }
 
-    REBARR *paramlist = Copy_Array_Shallow_Flags(
-        VAL_ACT_PARAMLIST(first),  // same interface as head of the chain
-        SPECIFIED,
-        SERIES_MASK_PARAMLIST | NODE_FLAG_MANAGED  // flags not auto-copied
-    );
-    MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
+    // The chained function has the same interface as head of the chain.
+    //
+    // !!! Output (RETURN) should match the *tail* of the chain.  Is this
+    // worth a new paramlist?  Should this be reviewed?
+    //
+    REBARR *paramlist = VAL_ACT_PARAMLIST(first);
 
     REBACT *chain = Make_Action(
         paramlist,
+        nullptr,  // meta inherited by CHAIN helper to CHAIN*
         &Chainer_Dispatcher,
-        ACT_UNDERLYING(VAL_ACTION(first)),  // same underlying as first action
         ACT_EXEMPLAR(VAL_ACTION(first)),  // same exemplar as first action
         IDX_CHAINER_MAX  // details array capacity
     );

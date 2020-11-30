@@ -117,28 +117,16 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
 
     REBVAL *adaptee = ARG(adaptee);
 
-    REBARR *paramlist = Copy_Array_Shallow_Flags(
-        VAL_ACT_PARAMLIST(adaptee),  // same interface as head of pipeline
-        SPECIFIED,
-        SERIES_MASK_PARAMLIST
-            | (SER(VAL_ACTION(adaptee))->header.bits & PARAMLIST_MASK_INHERIT)
-            | NODE_FLAG_MANAGED
-    );
-    MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
+    REBARR *paramlist = VAL_ACT_PARAMLIST(adaptee);
 
-    // Don't allow the adapted code access to the locals.
-    //
-    unstable RELVAL *param = ARR_AT(paramlist, 1);
-    for (; NOT_END(param); ++param)
-        if (Is_Param_Hidden(param, param))  // special = param
-            Seal_Param(param);
-
-    REBACT *underlying = ACT_UNDERLYING(VAL_ACTION(adaptee));
+    // !!! There was code here which would hide it so adapted code had no
+    // access to the locals.  That requires creating a new paramlist.  Is
+    // there a better way to do that with phasing?
 
     REBACT *adaptation = Make_Action(
         paramlist,
+        nullptr,  // meta inherited by ADAPT helper to ADAPT*
         &Adapter_Dispatcher,
-        underlying,  // same underlying as adaptee
         ACT_EXEMPLAR(VAL_ACTION(adaptee)),  // same exemplar as adaptee
         IDX_ADAPTER_MAX  // details array capacity => [prelude, adaptee]
     );
@@ -162,7 +150,7 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
     REBARR *details = ACT_DETAILS(adaptation);
     Init_Relative_Block(
         STABLE(ARR_AT(details, IDX_ADAPTER_PRELUDE)),
-        underlying,
+        adaptation,
         prelude
     );
     Move_Value(ARR_AT(details, IDX_ADAPTER_ADAPTEE), adaptee);

@@ -647,6 +647,10 @@ union Reb_Series_Link {
     //
     void *fd;
 
+    // native dispatcher code, the LINK() on ACT_DETAILS() for actions
+    //
+    REBNAT dispatcher;
+
     // If a REBSER is used by a custom cell type, it can use the LINK()
     // field how it likes.  But if it is a node and needs to be GC-marked,
     // it has to tell the system with SERIES_INFO_LINK_NODE_NEEDS_MARK.
@@ -724,10 +728,6 @@ union Reb_Series_Misc {
     // field is kept here to keep track of the idea.
     //
     REBDSP forwarding;
-
-    // native dispatcher code, see Reb_Function's body_holder
-    //
-    REBNAT dispatcher;
 
     // Used on arrays for special instructions to Fetch_Next_In_Frame().
     //

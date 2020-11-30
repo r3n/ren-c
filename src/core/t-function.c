@@ -209,12 +209,9 @@ REBTYPE(Action)
         // code, yet has a distinct identity.  This means it would not be
         // HIJACK'd if the function that it was copied from was.
 
-        REBARR *proxy_paramlist = Copy_Array_Deep_Flags_Managed(
-            ACT_PARAMLIST(act),
-            SPECIFIED,  // !!! Note: not actually "deep", just typesets
-            SERIES_MASK_PARAMLIST
-        );
-        MISC_META_NODE(proxy_paramlist) = MISC_META_NODE(ACT_PARAMLIST(act));
+        REBARR *paramlist = ACT_PARAMLIST(act);
+
+        REBCTX *meta = ACT_META(act);  // !!! Note: not a copy of meta
 
         // If the function had code, then that code will be bound relative
         // to the original paramlist that's getting hijacked.  So when the
@@ -224,9 +221,9 @@ REBTYPE(Action)
 
         REBLEN details_len = ARR_LEN(ACT_DETAILS(act));
         REBACT *proxy = Make_Action(
-            proxy_paramlist,
+            paramlist,
+            meta,
             ACT_DISPATCHER(act),
-            ACT_UNDERLYING(act),  // !!! ^-- see notes above RE: frame pushing
             ACT_EXEMPLAR(act),  // not changing the specialization
             details_len  // details array capacity
         );

@@ -184,21 +184,12 @@ REBNATIVE(reframer_p)
     // store the implementation phase and which parameter to fill with the
     // frame.
     //
-    REBARR *paramlist = Copy_Array_Shallow_Flags(
-        VAL_ACT_PARAMLIST(shim),  // same interface as head of pipeline
-        SPECIFIED,
-        SERIES_MASK_PARAMLIST
-            | (SER(VAL_ACTION(shim))->header.bits & PARAMLIST_MASK_INHERIT)
-            | NODE_FLAG_MANAGED
-    );
-    MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
-
-    REBACT *underlying = ACT_UNDERLYING(VAL_ACTION(shim));
+    REBARR *paramlist = VAL_ACT_PARAMLIST(shim);
 
     REBACT *reframer = Make_Action(
         paramlist,
+        nullptr,  // meta inherited by REFRAMER helper to REFRAMER*
         &Reframer_Dispatcher,
-        underlying,  // same underlying as shim
         ACT_EXEMPLAR(VAL_ACTION(shim)),  // same exemplar as shim
         IDX_REFRAMER_MAX  // details array capacity => [shim, param_index]
     );

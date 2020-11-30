@@ -338,8 +338,8 @@ inline static bool Is_Param_Hidden(
     if (special == param)
         return IS_HIDDEN_PARAM_KIND(pclass);
 
-    if (IS_HIDDEN_PARAM_KIND(pclass))
-        assert(GET_CELL_FLAG(special, ARG_MARKED_CHECKED));
+  /*  if (IS_HIDDEN_PARAM_KIND(pclass))
+        assert(GET_CELL_FLAG(special, ARG_MARKED_CHECKED)); */
 
     // In order for MAKE FRAME! to be able to hide arguments, it can't muck
     // with any paramlists...the bit has to be set on the values.  It hides

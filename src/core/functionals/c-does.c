@@ -164,8 +164,6 @@ REBNATIVE(does)
         Voidify_Rootparam(paramlist);
         TERM_ARRAY_LEN(paramlist, 1);
 
-        MISC_META_NODE(paramlist) = nullptr;  // REDESCRIBE can add help
-
         // `does [...]` and `does do [...]` are not exactly the same.  The
         // generated ACTION! of the first form uses Block_Dispatcher() and
         // does on-demand relativization, so it's "kind of like" a `func []`
@@ -176,8 +174,8 @@ REBNATIVE(does)
         Manage_Array(paramlist);
         REBACT *doer = Make_Action(
             paramlist,
+            nullptr,  // no meta (REDESCRIBE can add help)
             &Block_Dispatcher,  // **SEE COMMENTS**, not quite like plain DO!
-            nullptr,  // no underlying action (use paramlist)
             nullptr,  // no specialization exemplar (or inherited exemplar)
             IDX_DOES_MAX  // details array capacity
         );

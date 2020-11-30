@@ -1392,45 +1392,11 @@ void Assert_Context_Core(REBCTX *c)
         return;
     }
 
+    // Note that in the future the rootkey for OBJECT!/ERROR!/FRAME!/PORT!
+    // may be more used.  Reserved as unreadable for now.
+    //
     REBVAL *rootkey = CTX_ROOTKEY(c);
-    if (IS_VOID_RAW(rootkey)) {
-        //
-        // Note that in the future the rootkey for ordinary OBJECT! or ERROR!
-        // PORT! etc. may be more interesting than BLANK.  But it uses that
-        // for now--unreadable.
-        //
-        if (IS_FRAME(rootvar))
-            panic (c);
-    }
-    else if (IS_ACTION(rootkey)) {
-        //
-        // At the moment, only FRAME! is able to reuse an ACTION!'s keylist.
-        // There may be reason to relax this, if you wanted to make an
-        // ordinary object that was a copy of a FRAME! but not a FRAME!.
-        //
-        if (not IS_FRAME(rootvar))
-            panic (rootvar);
-
-        // In a FRAME!, the keylist is for the underlying function.  So to
-        // know what function the frame is actually for, one must look to
-        // the "phase" field...held in the rootvar.
-        //
-        REBACT *phase = VAL_PHASE_ELSE_ARCHETYPE(rootvar);
-        if (ACT_UNDERLYING(phase) != VAL_ACTION(rootkey))
-            panic (rootvar);
-
-        REBFRM *f = CTX_FRAME_IF_ON_STACK(c);
-        if (f) {
-            //
-            // If the frame is on the stack, the phase should be something
-            // with the same underlying function as the rootkey.
-            //
-            if (ACT_UNDERLYING(phase) != VAL_ACTION(rootkey))
-                panic (rootvar);
-        }
-    }
-    else
-        panic (rootkey);
+    assert(IS_UNREADABLE_DEBUG(rootkey));
 
     REBVAL *key = CTX_KEYS_HEAD(c);
     REBVAL *var = CTX_VARS_HEAD(c);

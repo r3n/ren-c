@@ -313,10 +313,16 @@ REBNATIVE(make_native)
 
     REBVAL *source = ARG(source);
 
+    REBCTX *meta;
+    REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
+        &meta,
+        ARG(spec),
+        MKF_MASK_NONE
+    );
     REBACT *native = Make_Action(
-        Make_Paramlist_Managed_May_Fail(ARG(spec), MKF_MASK_NONE),
+        paramlist,
+        meta,
         &Pending_Native_Dispatcher, // will be replaced e.g. by COMPILE
-        nullptr, // no facade (use paramlist)
         nullptr, // no specialization exemplar (or inherited exemplar)
         IDX_TCC_NATIVE_MAX // details len [source module linkname tcc_state]
     );

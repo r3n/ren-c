@@ -73,9 +73,14 @@
 
 #include "sys-core.h"
 
+// Originally, the ACT_DETAILS() of a paramlist held the partially or fully
+// filled FRAME! to be executed.  However, it turned out that since a
+// specialization's exemplar is available through ACT_SPECIALTY(), there's
+// no need to have a redundant copy.  This means a specialization can use
+// the compact singular array form for ACT_DETAILS()
+//
 enum {
-    IDX_SPECIALIZER_FRAME = 1,  // Partially or fully filled FRAME! to run
-    IDX_SPECIALIZER_MAX
+    IDX_SPECIALIZER_MAX = 1  // has just ACT_DETAILS[0], the ACT_ARCHETYPE()
 };
 
 
@@ -91,13 +96,13 @@ enum {
 REB_R Specializer_Dispatcher(REBFRM *f)
 {
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-    assert(ARR_LEN(details) == IDX_SPECIALIZER_MAX);
+    assert(ARR_LEN(details) == IDX_SPECIALIZER_MAX);  // just archetype!
+    UNUSED(details);
 
-    REBVAL *exemplar = DETAILS_AT(details, IDX_SPECIALIZER_FRAME);
-    assert(IS_FRAME(exemplar));
+    REBCTX *exemplar = CTX(ACT_SPECIALTY(FRM_PHASE(f)));
 
-    INIT_FRM_PHASE(f, VAL_PHASE_ELSE_ARCHETYPE(exemplar));
-    FRM_BINDING(f) = VAL_BINDING(exemplar);
+    INIT_FRM_PHASE(f, CTX_ACTION(exemplar));
+    FRM_BINDING(f) = VAL_BINDING(CTX_ARCHETYPE(exemplar));
 
     return R_REDO_UNCHECKED; // redo uses the updated phase and binding
 }
@@ -363,25 +368,7 @@ bool Specialize_Action_Throws(
         }
     }
 
-    // The paramlist for the specialization is an exact clone of the original
-    // but with a new identity.  Knowledge of which arguments should now be
-    // invisible on the external interface come from checking bits in the
-    // ACT_SPECIALTY(), e.g. this comes from ARG_MARKED_CHECKED.
-    //
-    // !!! Investigate how to avoid making a copy of the paramlist, maybe by
-    // having a mechanism for sharing data pointers (or wilder ideas, like an
-    // ACTION! with a heart byte that's actually a FRAME?)  Note that having
-    // different memory cells for the parameters permits their mutation with
-    // things like TWEAK, but that might not be a great idea.
-    //
-    REBARR *paramlist = Copy_Array_Shallow_Flags(
-        ACT_PARAMLIST(unspecialized),
-        SPECIFIED,
-        SERIES_MASK_PARAMLIST
-            | (SER(unspecialized)->header.bits & PARAMLIST_MASK_INHERIT)
-            | NODE_FLAG_MANAGED
-    );
-    MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
+    REBARR *paramlist = ACT_PARAMLIST(unspecialized);
 
     const RELVAL *param = ARR_AT(paramlist, 1);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
@@ -509,25 +496,12 @@ bool Specialize_Action_Throws(
 
     REBACT *specialized = Make_Action(
         paramlist,
+        nullptr,  // meta inherited by SPECIALIZE helper to SPECIALIZE*
         &Specializer_Dispatcher,
-        ACT_UNDERLYING(unspecialized),  // same underlying action as this
         exemplar,  // also provide a context of specialization values
         IDX_SPECIALIZER_MAX  // details array capacity
     );
     assert(CTX_KEYLIST(exemplar) == ACT_PARAMLIST(unspecialized));
-
-    // The "body" is the FRAME! value of the specialization.  It takes on the
-    // binding we want to use (which we can't put in the exemplar archetype,
-    // that binding has to be UNBOUND).  It also remembers the original
-    // action in the phase, so Specializer_Dispatcher() knows what to call.
-    //
-    RELVAL *body = STABLE(ARR_AT(
-        ACT_DETAILS(specialized),
-        IDX_SPECIALIZER_FRAME
-    ));
-    Move_Value(body, CTX_ARCHETYPE(exemplar));
-    INIT_BINDING(body, VAL_BINDING(specializee));
-    INIT_VAL_CONTEXT_PHASE(body, unspecialized);
 
     Init_Action(out, specialized, VAL_ACTION_LABEL(specializee), UNBOUND);
     return false;  // code block did not throw
@@ -1025,19 +999,11 @@ REBACT *Alloc_Action_From_Exemplar(
 ){
     REBACT *unspecialized = CTX_ACTION(exemplar);
 
-    REBLEN num_slots = ACT_NUM_PARAMS(unspecialized) + 1;
-    REBARR *paramlist = Make_Array_Core(num_slots, SERIES_MASK_PARAMLIST);
-    RELVAL *rootparam = Voidify_Rootparam(paramlist);
-    TERM_ARRAY_LEN(paramlist, 1);
-
-    MISC_META_NODE(paramlist) = nullptr;  // REDESCRIBE can add help
+    REBARR *paramlist = ACT_PARAMLIST(unspecialized);
 
     REBVAL *param = ACT_PARAMS_HEAD(unspecialized);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
-    RELVAL *alias = rootparam + 1;
-    for (; NOT_END(param); ++param, ++arg, ++alias) {
-        Move_Value(alias, param);
-
+    for (; NOT_END(param); ++param, ++arg) {
         if (GET_CELL_FLAG(arg, ARG_MARKED_CHECKED))
             continue;
 
@@ -1063,15 +1029,12 @@ REBACT *Alloc_Action_From_Exemplar(
         SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
     }
 
-    TERM_ARRAY_LEN(paramlist, num_slots);
-    Manage_Array(paramlist);
-
     // This code parallels Specialize_Action_Throws(), see comments there
 
     REBACT *action = Make_Action(
         paramlist,
+        nullptr,  // no meta, REDESCRIBE can add help
         dispatcher,
-        ACT_UNDERLYING(unspecialized),  // common underlying action
         exemplar,  // also provide a context of specialization values
         details_capacity
     );
@@ -1091,11 +1054,6 @@ REBACT *Make_Action_From_Exemplar(REBCTX *exemplar)
         exemplar,
         &Specializer_Dispatcher,
         IDX_SPECIALIZER_MAX  // details capacity
-    );
-    Init_Frame(
-        ARR_AT(ACT_DETAILS(action), IDX_SPECIALIZER_FRAME),
-        exemplar,
-        ANONYMOUS
     );
     return action;
 }

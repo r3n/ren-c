@@ -94,7 +94,9 @@ REBNATIVE(generic)
 
     REBVAL *spec = ARG(spec);
 
+    REBCTX *meta;
     REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
+        &meta,
         spec,
         MKF_KEYWORDS | MKF_RETURN  // return type checked only in debug build
     );
@@ -119,8 +121,8 @@ REBNATIVE(generic)
 
     REBACT *generic = Make_Action(
         paramlist,
+        meta,
         &Generic_Dispatcher,  // return type is only checked in debug build
-        nullptr,  // no underlying action (use paramlist)
         nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_NATIVE_MAX  // details array capacity
     );

@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2020 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
@@ -20,31 +20,36 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Using a technique strongly parallel to contexts, an action is identified
-// by an array which acts as its "paramlist".  The 0th element of that array
-// is an archetypal value of the ACTION!.  That is followed by 1..NUM_PARAMS
-// cells that have REB_XXX types higher than REB_MAX (e.g. "pseudotypes").
-// These PARAM cells are not intended to be leaked to the user...they
-// indicate the parameter type (normal, quoted, local).  The parameter cell's
-// payload holds a typeset, and the extra holds the symbol.
+// Using a technique parallel to contexts, an action is a combination of an
+// array of named keys (that is potentially shared) as well as an array that
+// represents the identity of the action.  The 0th element of that array
+// is an archetypal value of the ACTION!.
 //
-// Each ACTION! instance cell (including the one that can be found in the [0]
-// slot of the parameter list) has also a "details" field.  This is another
-// array that holds the instance data used by the C native "dispatcher"
-// function, which lives in MISC(details).dispatcher).  The details are how
-// the same dispatcher can have different effects:
+// The keylist for an action is referred to as a "paramlist", but it has the
+// same form as a keylist so that it can be used -as- a keylist for FRAME!
+// contexts, that represent the instantiated state of an action.  The [0]
+// cell is currently unused, while the 1..NUM_PARAMS cells have REB_XXX types
+// higher than REB_MAX (e.g. "pseudotypes").  These PARAM cells are not
+// intended to be leaked to the user...they indicate the parameter type
+// (normal, quoted, local).  The parameter cell's payload holds a typeset, and
+// the extra holds the symbol.
 //
-// What the details array holds varies by dispatcher:
+// The identity array for an action is called its "details".  Beyond having
+// an archetype in the [0] position, it is different from a varlist because
+// the values have no correspondence with the keys.  Instead, this is the
+// instance data used by the C native "dispatcher" function (which lives in
+// LINK(details).dispatcher).
+//
+// What the details array holds varies by dispatcher.  Some examples:
 //
 //     USER FUNCTIONS: 1-element array w/a BLOCK!, the body of the function
 //     GENERICS: 1-element array w/WORD! "verb" (OPEN, APPEND, etc)
-//     SPECIALIZATIONS: 1-element array containing an exemplar FRAME! value
+//     SPECIALIZATIONS: no contents needed besides the archetype
 //     ROUTINES/CALLBACKS: stylized array (REBRIN*)
 //     TYPECHECKERS: the TYPESET! to check against
 //
-// Since plain natives only need the C function, the body is optionally used
-// to store a block of Rebol code that is equivalent to the native, for
-// illustrative purposes.  (a "fake" answer for SOURCE)
+// See the comments in the %src/core/functionals/ directory for each function
+// variation for descriptions of how they use their details arrays.
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -58,38 +63,22 @@
 //   because they have to have the right number of slots to line up with the
 //   frame of the underlying function.
 //
-// * The `misc.meta` field of the paramlist holds a meta object (if any) that
-//   describes the function.  This is read by help.
+// * The `misc.meta` field of the details holds a meta object (if any) that
+//   describes the function.  This is read by help.  A similar facility is
+//   enabled by the `misc.meta` field of varlists.
 //
 // * By storing the C function dispatcher pointer in the `details` array node
 //   instead of in the value cell itself, it also means the dispatcher can be
 //   HIJACKed--or otherwise hooked to affect all instances of a function.
 //
 
+#define LINK_ANCESTOR_NODE(keylist_or_paramlist) \
+    LINK(keylist_or_paramlist).custom.node
 
-// An underlying function is one whose frame is compatible with a
-// derived function (e.g. the underlying function of a specialization or
-// an adaptation).
-//
-#define LINK_UNDERLYING_NODE(s)  LINK(s).custom.node
+#define MISC_META_NODE(varlist_or_details)  \
+    MISC(varlist_or_details).custom.node
 
-
-// ACTION! paramlists and ANY-CONTEXT! varlists can store a "meta"
-// object.  It's where information for HELP is saved, and it's how modules
-// store out-of-band information that doesn't appear in their body.
-//
-#define MISC_META_NODE(s)       SER(s)->misc_private.custom.node
-#define MISC_META(s)            CTX(MISC_META_NODE(s))
-
-
-// REBACT uses this.  It can hold either the varlist of a frame containing
-// specialized values (e.g. an "exemplar"), with ARRAY_FLAG_IS_VARLIST set.
-// Or just hold the paramlist.  This speeds up Push_Action() because
-// if this were `REBCTX *exemplar;` then it would have to test it for null
-// explicitly to default f->special to f->param.
-//
-#define LINK_SPECIALTY_NODE(s)   LINK(s).custom.node
-#define LINK_SPECIALTY(s)        ARR(LINK_SPECIALTY_NODE(s))
+// Note: LINK on details is the DISPATCHER, on varlists it's KEYSOURCE
 
 
 //=//// PARAMLIST_FLAG_HAS_RETURN /////////////////////////////////////////=//
@@ -305,7 +294,7 @@ STATIC_ASSERT(PARAMLIST_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 #define VAL_ACT_DETAILS_NODE(v) \
     PAYLOAD(Any, (v)).first.node  // lvalue, but a node
 
-#define VAL_ACTION_PARAMLIST_OR_LABEL_NODE(v) \
+#define VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v) \
     PAYLOAD(Any, (v)).second.node  // lvalue, but a node
 
 
@@ -321,21 +310,22 @@ inline static REBARR *ACT_DETAILS(REBACT *a) {
 // to make a new paramlist from another, you must ensure the new array's
 // archetype is updated to match its container.
 
-#define ACT_ARCHETYPE_OLD(a) \
-    VAL(SER(ACT_PARAMLIST(a))->content.dynamic.data)
-
 #define ACT_ARCHETYPE(a) \
     SPECIFIC(ARR_AT(ACT_DETAILS(a), 0))
 
-inline static REBVAL *Voidify_Rootparam(REBARR *paramlist)
-  { return Init_Unreadable_Void(ARR_HEAD(paramlist)); }
 
+#define ACT_SPECIALTY(a) \
+    ARR(VAL_ACTION_SPECIALTY_OR_LABEL_NODE(ACT_ARCHETYPE(a)))
 
-#define ACT_PARAMLIST(a) \
-    ARR(VAL_ACTION_PARAMLIST_OR_LABEL_NODE(ACT_ARCHETYPE(a)))
+inline static REBARR *ACT_PARAMLIST(REBACT *a) {
+    REBARR *specialty = ACT_SPECIALTY(a);
+    if (GET_ARRAY_FLAG(specialty, IS_VARLIST))
+        return ARR(LINK_KEYSOURCE(specialty));
+    return specialty;
+}
 
 #define ACT_DISPATCHER(a) \
-    (MISC(ACT_DETAILS(a)).dispatcher)
+    (LINK(ACT_DETAILS(a)).dispatcher)
 
 #define DETAILS_AT(a,n) \
     SPECIFIC(STABLE(ARR_AT((a), (n))))
@@ -357,19 +347,15 @@ inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {
 #define ACT_NUM_PARAMS(a) \
     (cast(REBSER*, ACT_PARAMLIST(a))->content.dynamic.used - 1) // dynamic
 
+
+//=//// META OBJECT ///////////////////////////////////////////////////////=//
+//
+// ACTION! details and ANY-CONTEXT! varlists can store a "meta" object.  It's
+// where information for HELP is saved, and it's how modules store out-of-band
+// information that doesn't appear in their body.
+
 #define ACT_META(a) \
-    MISC_META(ACT_PARAMLIST(a))
-
-
-// The concept of the "underlying" function is the one which has the actual
-// correct paramlist identity to use for binding in adaptations.
-//
-// e.g. if you adapt an adaptation of a function, the keylist referred to in
-// the frame has to be the one for the inner function.  Using the adaptation's
-// parameter list would write variables the adapted code wouldn't read.
-//
-#define ACT_UNDERLYING(a) \
-    ACT(LINK_UNDERLYING_NODE(ACT_PARAMLIST(a)))
+    CTX(MISC_META_NODE(ACT_DETAILS(a)))
 
 
 // An efficiency trick makes functions that do not have exemplars NOT store
@@ -377,7 +363,7 @@ inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {
 // This makes Push_Action() slightly faster in assigning f->special.
 //
 inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
-    REBARR *specialty = LINK_SPECIALTY(ACT_DETAILS(a));
+    REBARR *specialty = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(specialty, IS_VARLIST))
         return CTX(specialty);
 
@@ -385,8 +371,7 @@ inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
 }
 
 inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
-    REBARR *details = ACT_DETAILS(a);
-    REBSER *s = SER(LINK_SPECIALTY_NODE(details));
+    REBSER *s = SER(ACT_SPECIALTY(a));
     return cast(REBVAL*, s->content.dynamic.data) + 1; // skip archetype/root
 }
 
@@ -408,6 +393,9 @@ inline static REBACT *VAL_ACTION(unstable REBCEL(const*) v) {
 #define VAL_ACT_PARAMLIST(v) \
     ACT_PARAMLIST(VAL_ACTION(v))
 
+
+//=//// ACTION LABELING ///////////////////////////////////////////////////=//
+//
 // When an ACTION! is stored in a cell (e.g. not an "archetype"), it can
 // contain a label of the ANY-WORD! it was taken from.  If it is an array
 // node, it is presumed an archetype and has no label.
@@ -416,10 +404,10 @@ inline static REBACT *VAL_ACTION(unstable REBCEL(const*) v) {
 // use an array node here.  But since CHAINs store ACTION!s that can cache
 // the words, you get the currently executing label instead...which may
 // actually make more sense.
-//
+
 inline static const REBSTR *VAL_ACTION_LABEL(unstable const RELVAL *v) {
     assert(IS_ACTION(v));
-    REBSER *s = SER(VAL_ACTION_PARAMLIST_OR_LABEL_NODE(v));
+    REBSER *s = SER(VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v));
     if (IS_SER_ARRAY(s))
         return ANONYMOUS;  // archetype (e.g. may live in paramlist[0] itself)
     return STR(s);
@@ -432,10 +420,68 @@ inline static void INIT_ACTION_LABEL(unstable RELVAL *v, const REBSTR *label)
     //
     ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);
     assert(label != nullptr);  // avoid needing to worry about null case
-    VAL_ACTION_PARAMLIST_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, label));
+    VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v) = NOD(m_cast(REBSTR*, label));
 }
 
 
+//=//// ANCESTRY / FRAME COMPATIBILITY ////////////////////////////////////=//
+//
+// On the keylist of an object, LINK_ANCESTOR points at a keylist which has
+// the same number of keys or fewer, which represents an object which this
+// object is derived from.  Note that when new object instances are
+// created which do not require expanding the object, their keylist will
+// be the same as the object they are derived from.
+//
+// Paramlists have the same relationship, with each expansion (e.g. via
+// AUGMENT) having larger frames pointing to the potentially shorter frames.
+// (Something that reskins a paramlist might have the same size frame, with
+// members that have different properties.)
+//
+// When you build a frame for an expanded action (e.g. with an AUGMENT) then
+// it can be used to run phases that are from before it in the ancestry chain.
+// This informs low-level asserts inside of the specific binding machinery, as
+// well as determining whether higher-level actions can be taken (like if a
+// sibling tail call would be legal, or if a certain HIJACK would be safe).
+//
+// !!! When ancestors were introduced, it was prior to AUGMENT and so frames
+// did not have a concept of expansion.  So they only applied to keylists.
+// The code for processing derivation is slightly different; it should be
+// unified more if possible.
+
+#define LINK_ANCESTOR(s)            ARR(LINK_ANCESTOR_NODE(s))
+
+inline static bool Action_Is_Base_Of(REBACT *base, REBACT *derived) {
+    if (derived == base)
+        return true;  // fast common case (review how common)
+
+    REBARR *paramlist_test = ACT_PARAMLIST(derived);
+    REBARR *paramlist_base = ACT_PARAMLIST(base);
+    while (true) {
+        if (paramlist_test == paramlist_base)
+            return true;
+
+        REBARR *ancestor = LINK_ANCESTOR(paramlist_test);
+        if (ancestor == paramlist_test)
+            return false;  // signals end of the chain, no match found
+
+        paramlist_test = ancestor;
+    }
+}
+
+inline static REBVAL *Voidify_Rootparam(REBARR *paramlist) {
+    //
+    // !!! Since the voidification is to comply with systemic rules, we also
+    // comply with the rule that the ancestor can't be trash here.  Review.
+    //
+    assert(IS_POINTER_SAFETRASH_DEBUG(LINK_ANCESTOR_NODE(paramlist)));
+    LINK_ANCESTOR_NODE(paramlist) = NOD(paramlist);
+
+    return Init_Unreadable_Void(ARR_HEAD(paramlist)); 
+}
+
+
+//=//// NATIVE ACTION ACCESS //////////////////////////////////////////////=//
+//
 // Native values are stored in an array at boot time.  These are convenience
 // routines for accessing them, which should compile to be as efficient as
 // fetching any global pointer.
@@ -449,7 +495,7 @@ inline static void INIT_ACTION_LABEL(unstable RELVAL *v, const REBSTR *label)
 
 // A fully constructed action can reconstitute the ACTION! REBVAL
 // that is its canon form from a single pointer...the REBVAL sitting in
-// the 0 slot of the action's paramlist.  That action has no binding and
+// the 0 slot of the action's details.  That action has no binding and
 // no label.
 //
 static inline REBVAL *Init_Action(

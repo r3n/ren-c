@@ -162,17 +162,16 @@ REBNATIVE(enclose_p)  // see extended definition ENCLOSE in %base-defs.r
     REBVAL *inner = ARG(inner);
     REBVAL *outer = ARG(outer);
 
-    REBARR *paramlist = Copy_Array_Shallow_Flags(
-        VAL_ACT_PARAMLIST(inner),  // new function same interface as `inner`
-        SPECIFIED,
-        SERIES_MASK_PARAMLIST | NODE_FLAG_MANAGED
-    );
-    MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
+    // The new function has the same interface as `inner`
+    //
+    // !!! Return result may differ; similar issue comes up with CHAIN
+    //
+    REBARR *paramlist = VAL_ACT_PARAMLIST(inner);
 
     REBACT *enclosure = Make_Action(
         paramlist,
+        nullptr,  // meta inherited by ENCLOSE helper to ENCLOSE*
         &Encloser_Dispatcher,
-        ACT_UNDERLYING(VAL_ACTION(inner)),  // same underlying as inner
         ACT_EXEMPLAR(VAL_ACTION(inner)),  // same exemplar as inner
         IDX_ENCLOSER_MAX  // details array capacity => [inner, outer]
     );

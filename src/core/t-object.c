@@ -457,10 +457,10 @@ REBNATIVE(meta_of)  // see notes on MISC_META()
 
     REBCTX *meta;
     if (IS_ACTION(v))
-        meta = MISC_META(VAL_ACT_PARAMLIST(v));
+        meta = ACT_META(VAL_ACTION(v));
     else {
         assert(ANY_CONTEXT(v));
-        meta = MISC_META(VAL_CONTEXT(v));
+        meta = CTX_META(VAL_CONTEXT(v));
     }
 
     if (not meta)
@@ -501,9 +501,9 @@ REBNATIVE(set_meta)
     REBVAL *v = ARG(value);
 
     if (IS_ACTION(v))
-        MISC_META_NODE(VAL_ACT_PARAMLIST(v)) = NOD(meta);
+        MISC_META_NODE(ACT_DETAILS(VAL_ACTION(v))) = NOD(meta);
     else
-        MISC_META_NODE(VAL_CONTEXT(v)) = NOD(meta);
+        MISC_META_NODE(CTX_VARLIST(VAL_CONTEXT(v))) = NOD(meta);
 
     if (not meta)
         return nullptr;

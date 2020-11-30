@@ -96,7 +96,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
 {
     INCLUDE_PARAMS_OF_AUGMENT_P;
 
-    REBVAL *augmentee = ARG(augmentee);
+    REBACT *augmentee = VAL_ACTION(ARG(augmentee));
 
     // We reuse the process from Make_Paramlist_Managed_May_Fail(), which
     // pushes parameters to the stack in groups of three items per parameter.
@@ -111,7 +111,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     Move_Value(DS_PUSH(), EMPTY_TEXT);  // param_notes[0] (desc, then canon)
 
     REBFLGS flags = MKF_KEYWORDS;
-    if (GET_ACTION_FLAG(VAL_ACTION(augmentee), HAS_RETURN)) {
+    if (GET_ACTION_FLAG(augmentee, HAS_RETURN)) {
         flags |= MKF_RETURN;
         definitional_return_dsp = DSP + 1;
     }
@@ -119,7 +119,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     // For each parameter in the original function, we push a corresponding
     // "triad".
     //
-    REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(augmentee));
+    REBVAL *param = ACT_PARAMS_HEAD(augmentee);
     for (; NOT_END(param); ++param) {
         Move_Value(DS_PUSH(), param);
         if (Is_Param_Hidden(param, param))  // special = param
@@ -140,23 +140,31 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         &definitional_return_dsp
     );
 
+    REBCTX *meta;
     REBARR *paramlist = Pop_Paramlist_With_Meta_May_Fail(
+        &meta,
         dsp_orig,
         flags,
         definitional_return_dsp
     );
+
+    // Keep track that this derived paramlist is related to the original, so
+    // that it's possible to tell a frame built for the augmented function is
+    // compatible with the original function (and its ancestors, too)
+    //
+    LINK_ANCESTOR_NODE(paramlist) = NOD(paramlist);
 
     // We have to inject a simple dispatcher to flip the phase to one that has
     // the more limited frame.  But we have to make an expanded exemplar if
     // there is one.  (We can't expand the existing exemplar, because more
     // than one AUGMENT might happen to the same function).  :-/
 
-    REBCTX *old_exemplar = ACT_EXEMPLAR(VAL_ACTION(augmentee));
+    REBCTX *old_exemplar = ACT_EXEMPLAR(augmentee);
     REBCTX *exemplar;
     if (not old_exemplar)
         exemplar = nullptr;
     else {
-        REBLEN old_len = ARR_LEN(ACT_PARAMLIST(VAL_ACTION(augmentee)));
+        REBLEN old_len = ARR_LEN(ACT_PARAMLIST(augmentee));
         REBLEN delta = ARR_LEN(paramlist) - old_len;
         assert(delta > 0);
 
@@ -208,17 +216,21 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
 
     REBACT* augmentated = Make_Action(
         paramlist,
+        meta,
         &Augmenter_Dispatcher,
-        ACT_UNDERLYING(VAL_ACTION(augmentee)),
         exemplar,
         IDX_AUGMENTER_MAX  // size of the ACT_DETAILS array
     );
 
     Move_Value(
         ARR_AT(ACT_DETAILS(augmentated), IDX_AUGMENTER_AUGMENTEE),
-        augmentee
+        ARG(augmentee)
     );
 
-    Init_Action(D_OUT, augmentated, VAL_ACTION_LABEL(augmentee), UNBOUND);
-    return D_OUT;
+    return Init_Action(
+        D_OUT,
+        augmentated,
+        VAL_ACTION_LABEL(ARG(augmentee)),
+        UNBOUND
+    );
 }

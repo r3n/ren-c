@@ -998,15 +998,17 @@ REBNATIVE(js_native)
     REBVAL *spec = ARG(spec);
     REBVAL *source = ARG(source);
 
+    REBCTX *meta;
     REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
+        &meta,
         spec,
         MKF_RETURN | MKF_KEYWORDS
     );
 
     REBACT *native = Make_Action(
         paramlist,
+        meta,
         &JavaScript_Dispatcher,
-        nullptr,  // no underlying action (use paramlist)
         nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_JS_NATIVE_MAX  // details len [source module handle]
     );

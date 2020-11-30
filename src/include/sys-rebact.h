@@ -38,14 +38,14 @@ struct Reb_Action {
 //
 #define SERIES_MASK_PARAMLIST \
     (NODE_FLAG_NODE | SERIES_FLAG_ALWAYS_DYNAMIC | SERIES_FLAG_FIXED_SIZE \
-        | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* underlying */ \
-        | SERIES_FLAG_MISC_NODE_NEEDS_MARK  /* meta */ )
+        | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* ancestor */ \
+        /* misc is not currently used */ )
 
 #define SERIES_MASK_DETAILS \
     (NODE_FLAG_NODE  /* not fixed size, may expand via HIJACK etc.*/ \
-        | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* speciality */ \
+        | SERIES_FLAG_MISC_NODE_NEEDS_MARK  /* meta */ \
         | ARRAY_FLAG_IS_DETAILS \
-        /* dispatcher is a c function pointer, should not mark */ )
+        /* LINK is dispatcher, a c function pointer, should not mark */ )
 
 #if !defined(DEBUG_CHECK_CASTS)
 

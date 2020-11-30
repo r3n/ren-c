@@ -337,10 +337,17 @@ REBACT *Make_Interpreted_Action_May_Fail(
     assert(IS_BLOCK(spec) and IS_BLOCK(body));
     assert(details_capacity >= 1);  // relativized body put in details[0]
 
+    REBCTX *meta;
+    REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
+        &meta,
+        spec,
+        mkf_flags
+    );
+
     REBACT *a = Make_Action(
-        Make_Paramlist_Managed_May_Fail(spec, mkf_flags),
+        paramlist,
+        meta,
         &Empty_Dispatcher,  // will be overwritten if non-[] body
-        nullptr,  // no underlying action (use paramlist)
         nullptr,  // no specialization exemplar (or inherited exemplar)
         details_capacity  // we fill in details[0], caller fills any extra
     );
@@ -619,7 +626,7 @@ REBNATIVE(return)
     // that an ENCLOSE'd function can't return any types the original function
     // could not.  :-(
     //
-    REBACT *target_fun = FRM_UNDERLYING(target_frame);
+    REBACT *target_fun = target_frame->original;
 
     REBVAL *v = ARG(value);
 
