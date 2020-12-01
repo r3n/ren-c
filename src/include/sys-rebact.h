@@ -1,14 +1,14 @@
 //
-//  File: %sys-action.h
-//  Summary: "action! defs BEFORE %tmp-internals.h (see: %sys-action.h)"
+//  File: %sys-rebact.h
+//  Summary: "action! defs BEFORE %tmp-internals.h"
 //  Section: core
 //  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
 //  Homepage: https://github.com/metaeducation/ren-c/
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2020 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -21,11 +21,160 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// See %sys-action.h for information about the workings of REBACT and ACTION!.
+// This file just defines basic structures and flags.
+//
 
 
 struct Reb_Action {
     struct Reb_Array details;
 };
+
+
+#define LINK_ANCESTOR_NODE(keylist_or_paramlist) \
+    LINK(keylist_or_paramlist).custom.node
+
+#define MISC_META_NODE(varlist_or_details)  \
+    MISC(varlist_or_details).custom.node
+
+// Note: LINK on details is the DISPATCHER, on varlists it's KEYSOURCE
+
+
+//=//// PARAMLIST_FLAG_HAS_RETURN /////////////////////////////////////////=//
+//
+// See ACT_HAS_RETURN() for remarks.  Note: This is a flag on PARAMLIST, not
+// on DETAILS.
+//
+#define PARAMLIST_FLAG_HAS_RETURN \
+    ARRAY_FLAG_23
+
+
+//=//// DETAILS_FLAG_POSTPONES_ENTIRELY ///////////////////////////////////=//
+//
+// A postponing operator causes everything on its left to run before it will.
+// Like a deferring operator, it is only allowed to appear after the last
+// parameter of an expression except it closes out *all* the parameters on
+// the stack vs. just one.
+//
+#define DETAILS_FLAG_POSTPONES_ENTIRELY \
+    ARRAY_FLAG_24
+
+
+//=//// DETAILS_FLAG_IS_BARRIER ///////////////////////////////////////////=//
+//
+// Special action property set with TWEAK.  Used by |
+//
+// The "expression barrier" was once a built-in type (BAR!) in order to get
+// a property not possible to achieve with functions...that it would error
+// if it was used during FULFILL_ARG and would be transparent in evaluation.
+//
+// Transparency was eventually generalized as "invisibility".  But attempts
+// to intuit the barrier-ness from another property (e.g. "enfix but no args")
+// were confusing.  It seems an orthogonal feature in its own right, so it
+// was added to the TWEAK list pending a notation in function specs.
+//
+#define DETAILS_FLAG_IS_BARRIER \
+    ARRAY_FLAG_25
+
+
+//=//// DETAILS_FLAG_DEFERS_LOOKBACK //////////////////////////////////////=//
+//
+// Special action property set with TWEAK.  Used by THEN, ELSE, and ALSO.
+//
+// Tells you whether a function defers its first real argument when used as a
+// lookback.  Because lookback dispatches cannot use refinements, the answer
+// is always the same for invocation via a plain word.
+//
+#define DETAILS_FLAG_DEFERS_LOOKBACK \
+    ARRAY_FLAG_26
+
+
+//=//// DETAILS_FLAG_QUOTES_FIRST /////////////////////////////////////////=//
+//
+// This is a calculated property, which is cached by Make_Action().
+//
+// This is another cached property, needed because lookahead/lookback is done
+// so frequently, and it's quicker to check a bit on the function than to
+// walk the parameter list every time that function is called.
+//
+#define DETAILS_FLAG_QUOTES_FIRST \
+    ARRAY_FLAG_27
+
+
+//=//// DETAILS_FLAG_SKIPPABLE_FIRST //////////////////////////////////////=//
+//
+// This is a calculated property, which is cached by Make_Action().
+//
+// It is good for the evaluator to have a fast test for knowing if the first
+// argument to a function is willing to be skipped, as this comes into play
+// in quote resolution.  (It's why `x: default [10]` can have default looking
+// for SET-WORD! and SET-PATH! to its left, but `case [... default [x]]` can
+// work too when it doesn't see a SET-WORD! or SET-PATH! to the left.)
+//
+#define DETAILS_FLAG_SKIPPABLE_FIRST \
+    ARRAY_FLAG_28
+
+
+//=//// DETAILS_FLAG_IS_NATIVE ////////////////////////////////////////////=//
+//
+// Native functions are flagged that their dispatcher represents a native in
+// order to say that their ACT_DETAILS() follow the protocol that the [0]
+// slot is "equivalent source" (may be a TEXT!, as in user natives, or a
+// BLOCK!).  The [1] slot is a module or other context into which APIs like
+// rebValue() etc. should consider for binding, in addition to lib.  A BLANK!
+// in the 1 slot means no additional consideration...bind to lib only.
+//
+// Note: This is tactially set to be the same as SERIES_INFO_HOLD to make it
+// possible to branchlessly mask in the bit to stop frames from being mutable
+// by user code once native code starts running.
+//
+#define DETAILS_FLAG_IS_NATIVE \
+    ARRAY_FLAG_29
+
+STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
+
+
+//=//// DETAILS_FLAG_ENFIXED //////////////////////////////////////////////=//
+//
+// An enfix function gets its first argument from its left.  For a time, this
+// was the property of a binding and not an ACTION! itself.  This was an
+// attempt at simplification which caused more problems than it solved.
+//
+#define DETAILS_FLAG_ENFIXED \
+    ARRAY_FLAG_30
+
+
+//=//// DETAILS_FLAG_31 ///////////////////////////////////////////////////=//
+//
+#define DETAILS_FLAG_31 \
+    ARRAY_FLAG_31
+
+
+// These are the flags which are scanned for and set during Make_Action
+//
+#define DETAILS_MASK_CACHED \
+    (DETAILS_FLAG_QUOTES_FIRST | DETAILS_FLAG_SKIPPABLE_FIRST)
+
+// These flags should be copied when specializing or adapting.  They may not
+// be derivable from the paramlist (e.g. a native with no RETURN does not
+// track if it requotes beyond the paramlist).
+//
+#define DETAILS_MASK_INHERIT \
+    (DETAILS_FLAG_DEFERS_LOOKBACK | DETAILS_FLAG_POSTPONES_ENTIRELY)
+
+
+#define SET_ACTION_FLAG(s,name) \
+    (cast(REBSER*, ACT(s))->header.bits |= DETAILS_FLAG_##name)
+
+#define GET_ACTION_FLAG(s,name) \
+    ((cast(REBSER*, ACT(s))->header.bits & DETAILS_FLAG_##name) != 0)
+
+#define CLEAR_ACTION_FLAG(s,name) \
+    (cast(REBSER*, ACT(s))->header.bits &= ~DETAILS_FLAG_##name)
+
+#define NOT_ACTION_FLAG(s,name) \
+    ((cast(REBSER*, ACT(s))->header.bits & DETAILS_FLAG_##name) == 0)
+
 
 
 // Includes SERIES_FLAG_ALWAYS_DYNAMIC because an action's paramlist is always

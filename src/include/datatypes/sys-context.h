@@ -69,18 +69,6 @@
 //   the module's contents (e.g. the processed header)
 //
 
-#define CELL_MASK_CONTEXT \
-    (CELL_FLAG_FIRST_IS_NODE  /* varlist */ \
-        | CELL_FLAG_SECOND_IS_NODE  /* phase (for FRAME!) */)
-
-
-//=//// SERIES_FLAG_VARLIST_23 ////////////////////////////////////////////=//
-//
-// (Note: This is where varlist-specific flags could start being defined.)
-//
-#define SERIES_FLAG_VARLIST_23 \
-    ARRAY_FLAG_23
-
 
 #ifdef NDEBUG
     #define ASSERT_CONTEXT(c) cast(void, 0)

@@ -1,13 +1,13 @@
 //
 //  File: %sys-rebctx.h
-//  Summary: {context! defs BEFORE %tmp-internals.h (see: %sys-context.h)}
+//  Summary: "context! defs BEFORE %tmp-internals.h"
 //  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
 //  Homepage: https://github.com/metaeducation/ren-c/
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2020 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2018 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
@@ -20,6 +20,22 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// See %sys-action.h for information about the workings of REBACT and CONTEXT!
+// This file just defines basic structures and flags.
+//
+
+
+#define CELL_MASK_CONTEXT \
+    (CELL_FLAG_FIRST_IS_NODE  /* varlist */ \
+        | CELL_FLAG_SECOND_IS_NODE  /* phase (for FRAME!) */)
+
+
+//=//// SERIES_FLAG_VARLIST_23 ////////////////////////////////////////////=//
+//
+// (Note: This is where varlist-specific flags could start being defined.)
+//
+#define SERIES_FLAG_VARLIST_23 \
+    ARRAY_FLAG_23
 
 
 #define BUF_COLLECT TG_Buf_Collect
