@@ -398,8 +398,8 @@
 // purpose is static analysis.  This means the cast macros add a headache when
 // stepping through the debugger, and also they consume a measurable amount
 // of runtime.  Hence we sacrifice cast checking in the debug builds...and the
-// release C++ builds on Travis are relied upon to do the proper optimizations
-// as well as report any static analysis errors.  See DEBUG_CHECK_CASTS.
+// release C++ builds are relied upon to do the proper optimizations as well
+// as report any static analysis errors.  See DEBUG_CHECK_CASTS.
 //
 // !!! C++14 gcc release builds seem to trigger bad behavior on cast() to
 // a CFUNC*, and non-C++14 builds are allowing cast of `const void*` to

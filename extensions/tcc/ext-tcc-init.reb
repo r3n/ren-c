@@ -61,8 +61,8 @@ compile: function [
     /inspect "Return the C source code as text, but don't compile it"
 ][
     ; !!! Due to module dependencies there's some problem with GET-ENV not
-    ; being available in some builds (e.g. on Travis).  It gets added to
-    ; lib but is somehow not available here.  This is a bug to look into.
+    ; being available in some builds.  It gets added to lib but is somehow not
+    ; available here.  This is a bug to look into.
     ;
     get-env: :lib/get-env
 
@@ -241,7 +241,7 @@ compile: function [
         "1" = get-env "REBOL_TCC_EXTENSION_32BIT_ON_64BIT" [
             ;
             ; This is the verbatim list of library overrides that `-v` dumps
-            ; on 64-bit multilib Travis compiling `int main() {}` with -m32:
+            ; on 64-bit multilib Liux compiling `int main() {}` with -m32:
             ;
             ;     gcc -v -m32 main.c -o main
             ;
@@ -249,7 +249,7 @@ compile: function [
             ; then the link step of TCC would try to link to the 64-bit libs.
             ; This rarely comes up, because most people runnning a 32-bit
             ; Rebol are only doing so because they can't run on 64-bits.  But
-            ; Travis containers are 64-bit, so this helps test 32-bit builds.
+            ; if you cross-compile to 32-bit and want to test, you need this.
             ;
             ; Better suggestions on how to do this are of course welcome.  :-/
             ;

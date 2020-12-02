@@ -24,10 +24,7 @@ the "extensions" section of the config (or EXTENSIONS command-line switch).
 
 Passing configuration parameters to the per-extension make script is a work
 in progress.  In the meantime, environment variables can be a good way to
-configure extensions with complex building needs.  Consult the Travis build
-file for up-to-date usages of common extensions:
-
-https://github.com/metaeducation/ren-c/blob/master/.travis.yml
+configure extensions with complex building needs.
 
 ### API Choices
 

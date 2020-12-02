@@ -339,7 +339,7 @@ if (is_debug) {
 if (!base_dir) {
     //
     // Default to using the base directory as wherever the %load-r3.js was
-    // fetched from.  Today, that is typically on Travis.
+    // fetched from.  Today, that is typically on AWS.
     //
     // The directory should have subdirectories %0.16.2/ (for WASM threading)
     // and %0.16.1/ (for emterpreter files).

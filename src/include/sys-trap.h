@@ -107,7 +107,7 @@
     // https://sourceforge.net/p/mingw-w64/bugs/406/
     //
     // Bending to the bugs of broken compilers is usually not interesting, but
-    // the Travis CI cross-platform builds on Linux targeting Windows were set
+    // the some cross-platform builds on Linux targeting Windows were set
     // up on this old version--which otherwise is a good test the codebase
     // hasn't picked up dependencies that are too "modern".
 
