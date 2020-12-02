@@ -1,114 +1,35 @@
 #!/usr/bin/env bash
 
-# Root directory of this script
-rdir=$(cd `dirname $0` && pwd)
+#
+# make.sh
+#
+# This is a simple script that will kick off a default build process that
+# should work on many systems.
+#
 
-echo "Prepare the build directory $rdir/build"
-mkdir -p "$rdir/build"
+# The utility scripts in %bash/ all expect $repo_dir to be set
+# Note Ren-C conventions always include slashes in directory names
+#
+repo_dir=$(cd `dirname $0` && pwd)/
 
-# Go to prebuilt directory to check available binaries
-# for the current OS or download one
-cd "$rdir/prebuilt"
+source ${repo_dir}tools/bash/log.sh
+source ${repo_dir}tools/bash/fetch-prebuilt.sh
 
-# Identify OS
-usys=$(uname -s | tr '[:upper:]' '[:lower:]')
-
-case $usys in
-    *cygwin*)  localsys="windows";;
-    *mingw*)   localsys="windows";;
-    *msys*)    localsys="windows";;
-    *windows*) localsys="windows";;
-    *linux*)   localsys="linux"
-        case $(uname -o | tr '[:upper:]' '[:lower:]') in
-            *android*) localsys="android";;
-            *)         localsys="linux";;
-        esac
-    ;;
-    *openbsd*) localsys="openbsd";;
-    *darwin*)  localsys="osx";;
-    *)         localsys="none";;
-esac
-
-if [ $localsys = "none" ] ; then
-    echo "Error: Sorry there is still no precompiled binary for your operating system ($usys)."
-    exit 1
-else
-    echo "Identified OS: $localsys ($usys)"
-    echo "Search a prebuilt binary for your OS"
-
-    if [[ -n "$(find . -name "*$localsys*" | head -n 1)" ]] ; then
-        echo ""
-    else
-        echo "Clear last downloaded prebuilt binaries"
-        rm -f r3-*
-        
-        # Search for curl or wget
-        which curl > /dev/null
-        
-        if [ $? -eq 0 ] ; then
-            dltool="curl"
-        else
-            which wget > /dev/null
-            if [ $? -eq 0 ] ; then
-                dltool="wget"
-            else
-                echo "Error: you need curl or wget to download binaries."
-                exit 1
-            fi
-        fi
-        
-        
-        echo "Get the list of available prebuilt binaries from S3"
-        s3url=https://r3bootstraps.s3.amazonaws.com/
-        
-        if [ $dltool = "wget" ] ; then
-            xml=$(wget -q $s3url -O -)
-        else
-            xml=$(curl -s $s3url)
-        fi
-        
-        # Use tr instead of sed to replace newlines because sed is not really powerful on Mac/BSD
-        pblist=$(echo "$xml" |  tr "<" "\n" | sed -n -e 's/^Key>\(+*\)/\1/p')
-        
-        echo "Download prebuilt binaries"
-        echo ""
-        
-        for pb in $pblist
-        do
-            # Download only prebuilt binaries for the current OS
-            if [[ $pb == *"$localsys"* ]]; then
-                s3pb="$s3url$pb"
-                
-                if [ $dltool = "wget" ] ; then
-                    wget -nv -o - "$s3pb"
-                else
-                    echo "$s3pb"
-                    curl "$s3pb" > "$pb"
-                    echo ""
-                fi
-            fi
-        done
-        
-        
-        echo ""
-        echo "Make executable prebuilt binaries"
-        chmod -f +x r3-*
-    fi
-fi
-
-
-# Go to build directory and resolve the path
-# of the prebuilt binary from that place
-cd "$rdir/build"
-r3bin=$(find ../prebuilt -name "*$localsys*" | head -n 1)
-
-if [[ -n $r3bin ]] ; then
-    echo "Selected prebuilt binary: $r3bin"
+# Check available build binaries for the current OS or download one.
+#
+r3make=$(fetch_prebuilt)
+if [[ -n $r3make ]]; then
+    echo "Selected prebuilt binary: $r3make"
 else
     echo "Error: no prebuilt binary available"
     exit 1
 fi
 
-echo "Run a build with yours parameters"
-echo "$r3bin ../make.r $@"
-$r3bin ../make.r $@
+
+echo "Prepare the build directory ${repo_dir}build"
+mkdir -p "${repo_dir}build"
+cd "${repo_dir}build"
+
+echo "Run a build with your parameters"
+echo "$r3make ../make.r $@"
+"$r3make" ../make.r $@
