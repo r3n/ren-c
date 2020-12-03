@@ -411,7 +411,7 @@ let assign_git_commit_promiser = (os_id) => {  // assigns, but no return value
 let lib_suffixes = [
     ".js", ".wasm",  // all builds
     ".wast", ".temp.asm.js",  // debug only
-    ".js.mem", ".worker.js"  // non-emterpreter builds only
+    ".worker.js"  // pthreads builds only
 ]
 
 
@@ -431,7 +431,7 @@ function libRebolComponentURL(suffix) {  // suffix includes the dot
         throw Error("Unknown libRebol component extension: " + suffix)
 
     if (use_asyncify) {
-        if (suffix == ".worker.js" || suffix == ".js.mem")
+        if (suffix == ".worker.js")
             throw Error(
                 "Asking for " + suffix + " file "
                 + " in an emterpreter build (should only be for pthreads)"
