@@ -367,6 +367,31 @@ let load_js_promiser = (url) => new Promise(function(resolve, reject) {
     script.src = url
     script.onload = () => { resolve(url) }
     script.onerror = () => { reject(url) }
+
+    if (!use_asyncify) {
+        //
+        // SharedArrayBuffer is needed to implement a threading model in
+        // Emscripten, but issues with the Spectre vulnerability and other
+        // problems means the feature is disabled unless you jump through
+        // a number of hoops.  The main page must be `https` and served with
+        // special HTTP headers (set in the server's .htaccess or elsewhere).
+        // And each foreign resource has to be served with those headers -or-
+        // carry this marking on the tag:
+        //
+        // https://web.dev/coop-coep/
+        //
+        // At the time of writing, amazon S3 doesn't provide the ability to
+        // add the label...and it might be hard to add in other deployments.
+        // So we have to put the label on here.
+        //
+        // Note: `crossorigin` is the name on the HTML tag, but `crossOrigin`
+        // is the name of the attribute on dynamically created elements.
+        //
+        // https://stackoverflow.com/a/28907499/
+        //
+        script.crossOrigin = "anonymous"
+    }
+
     if (document.body)
         document.body.appendChild(script)
     else {

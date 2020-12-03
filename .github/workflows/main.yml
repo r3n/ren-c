@@ -1,7 +1,7 @@
 #
 # main.yml
 #
-# GitHub Actions Workflow for building the WASM version of Ren-C.  It builds
+# GitHub Actions Workflow for building the Wasm version of Ren-C.  It builds
 # all pull requests to master, but only deploys commits that are accepted to
 # the master branch.
 #
@@ -398,7 +398,6 @@ jobs:
         #
         ######################################################################
         #
-        export FF_SHARED_MEMORY=false
 
         # The way to set `about:config` flags in preferences is via %user.js
         #
@@ -421,13 +420,17 @@ jobs:
         # overridden on the command line by `--marionette-port <port>`.  But
         # to show another place to set it, here's the profile setting.
         #
-        # Unfortunately Travis and HereDoc aren't very compatible, so we use
-        # plain ECHO instead to make our user.js file:
+        # Yaml and HereDoc aren't always compatible, so we use plain ECHO
+        # instead to make our user.js file:
         #
         # https://en.wikipedia.org/wiki/Here_document#Unix_shells
         # https://travis-ci.community/t/2756
         {
-            echo "user_pref(\"javascript.options.shared_memory\", ${FF_SHARED_MEMORY});"
+            if [[ $OS_ID = 0.16.2 ]]; then
+              echo "user_pref(\"javascript.options.shared_memory\", true);"
+            else
+              echo "user_pref(\"javascript.options.shared_memory\", false);"
+            fi
             echo "user_pref(\"marionette.port\", 2828);"  # should be default
         } > $(pwd)/ff-profile/user.js
 
