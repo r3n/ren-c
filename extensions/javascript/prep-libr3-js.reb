@@ -10,9 +10,9 @@ REBOL [
     ; to extensions (also needed by the TCC extension)
 
     Version: 0.1.0
-    Date: 15-Sep-2018
+    Date: 15-Sep-2020
 
-    Rights: "Copyright (C) 2018-2019 hostilefork.com"
+    Rights: "Copyright (C) 2018-2020 hostilefork.com"
 
     License: {LGPL 3.0}
 
@@ -25,12 +25,10 @@ REBOL [
         https://emscripten.org/docs/porting/connecting_cpp_and_javascript/Interacting-with-code.html
 
         However, libRebol makes extensive use of variadic functions, which
-        means it needs to do interact with the `va_list()` convention.
-        This is beyond the C standard and each compiler can implement it
-        differently.  But it was reverse-engineered from emcc/clang build
-        output for a simple variadic function.  Since that's the only
-        compiler Emscripten works with, we mimic its method of allocation
-        with a custom variant of the cwrap helper.
+        means it needs do custom wrapping code.  Once it used a reverse
+        engineered form of `va_list` (which is beyond the C standard, and each
+        compiler could implement it differently).  But now it does it with
+        an ordinary packed array of C pointers.
     }
 ]
 
@@ -41,7 +39,7 @@ e-cwrap: (make-emitter
 === ASYNCIFY_BLACKLIST TOLERANT CWRAP ===
 
 ; Emscripten's `cwrap` is based on a version of ccall which does not allow
-; syncronous function calls in the Asyncify build while emscripten_sleep() is
+; synchronous function calls in the Asyncify build while emscripten_sleep() is
 ; in effect.  However, this is an overly conservative assert when the function
 ; is on the blacklist and known to not yield:
 ;
@@ -91,11 +89,11 @@ e-cwrap/emit {
       var cArgs = [];
       var stack = 0;
 
-    /* <ren-c modification>  // See Note: drop since we never do this
+/* <ren-c modification>  // See Note: drop since we never do this
     #if ASSERTIONS
       assert(returnType !== 'array', 'Return type should not be "array".');
     #endif
-    </ren-c modification> */
+   </ren-c modification> */
 
       if (args) {
         for (var i = 0; i < args.length; i++) {
@@ -110,7 +108,7 @@ e-cwrap/emit {
       }
       var ret = func.apply(null, cArgs);
 
-    /* <ren-c modification>  // See Note: drop since no Emterpreter build
+/* <ren-c modification>  // See Note: drop since no Emterpreter build
     #if EMTERPRETIFY_ASYNC
       if (typeof EmterpreterAsync === 'object' && EmterpreterAsync.state) {
     #if ASSERTIONS
@@ -126,7 +124,7 @@ e-cwrap/emit {
         });
       }
     #endif
-    </ren-c modification> */
+   </ren-c modification> */
 
     // This is the part we need to cut out.  If we are in an asyncify yield
     // situation (e.g. waiting on a JS-AWAITER resolve) we know we can't
@@ -135,7 +133,7 @@ e-cwrap/emit {
     // ASYNCIFY_BLACKLIST.  But the main cwrap/ccall() does not account for
     // that fact.  Hence we have to patch out the assert.
     //
-    /* <ren-c modification>  // See Note: couldn't use #if if we wanted to
+/* <ren-c modification>  // See Note: couldn't use #if if we wanted to
     #if ASYNCIFY && WASM_BACKEND
       if (typeof Asyncify === 'object' && Asyncify.currData) {
         // The WASM function ran asynchronous and unwound its stack.
@@ -155,24 +153,24 @@ e-cwrap/emit {
         });
       }
     #endif
-    </ren-c modification> */
+   </ren-c modification> */
 
       ret = convertReturnValue(ret);
       if (stack !== 0) stackRestore(stack);
 
-    /* <ren-c modification>  // See Note: drop since feature is unused
+/* <ren-c modification>  // See Note: drop since feature is unused
     #if EMTERPRETIFY_ASYNC || (ASYNCIFY && WASM_BACKEND)
       // If this is an async ccall, ensure we return a promise
       if (opts && opts.async) return Promise.resolve(ret);
     #endif
-    </ren-c modification> */
+   </ren-c modification> */
 
       return ret;
     }
 
     function cwrap_tolerant(ident, returnType, argTypes, opts) {
 
-    /* <ren-c modification>  // See Note: drop since optimization unused
+/* <ren-c modification>  // See Note: drop since optimization unused
     #if !ASSERTIONS
       argTypes = argTypes || [];
       // When the function takes numbers and returns a number, we can just return
@@ -183,7 +181,7 @@ e-cwrap/emit {
         return getCFunc(ident);
       }
     #endif
-    </ren-c modification> */
+   </ren-c modification> */
 
       return function() {
         return ccall_tolerant(ident, returnType, argTypes, arguments, opts);
@@ -332,26 +330,13 @@ append api-objects make object! [
     is-variadic: false
 ]
 
-if args/OS_ID = "0.16.2" [  ; APIs for only for pthreads build
-    append api-objects make object! [
-        spec: _  ; e.g. `name: RL_API [...this is the spec, if any...]`
-        name: "rebTakeAwaitLock_internal"  ; !!! see %mod-javascript.c
-        returns: "void"
-        paramlist: ["intptr_t" native_id]
-        proto: unspaced [
-            "void rebTakeAwaitLock_internal(void)"
-        ]
-        is-variadic: false
-    ]
-] else [  ; APIs only for emterpreter build
-    append api-objects make object! [
-        spec: _  ; e.g. `name: RL_API [...this is the spec, if any...]`
-        name: "rebIdle_internal"  ; !!! see %mod-javascript.c
-        returns: "void"
-        paramlist: []
-        proto: "void rebIdle_internal(void)"
-        is-variadic: false
-    ]
+append api-objects make object! [
+    spec: _  ; e.g. `name: RL_API [...this is the spec, if any...]`
+    name: "rebIdle_internal"  ; !!! see %mod-javascript.c
+    returns: "void"
+    paramlist: []
+    proto: "void rebIdle_internal(void)"
+    is-variadic: false
 ]
 
 if false [  ; Only used if DEBUG_JAVASCRIPT_SILENT_TRACE (how to know here?)
@@ -947,66 +932,19 @@ write/lines make-file [(output-dir) asyncify-blacklist.json] collect-lines [
     keep "]"
 ]
 
-write make-file [(output-dir) emterpreter.blacklist.json] json-collect [
-    map-each-api [
-        all [
-            is-variadic
-            name != "rebPromise"
-        ] then [
-            ;
-            ; Currently, all variadic APIs are variadic because they evaluate.
-            ; The exception is rebPromise, which takes its variadic list as
-            ; a set of instructions to run later.  Blacklisting that means
-            ; it is safe to call from a JS-AWAITER (though you cannot *await*
-            ; on it inside a JS-AWAITER, see rebPromise() and this post:
-            ;
-            ; https://stackoverflow.com/q/55186667/
-            ;
-            continue
-        ]
-
-        any [
-            name = "rebRescue"
-            name = "rebRescueWith"
-        ]
-        then [
-            ; While not variadic, the rescue functions are API functions
-            ; which are called from internal code that needs to be emterpreted
-            ; and hence can't be blacklisted from being turned to bytecode.
-            ;
-            continue
-        ]
-
-        if name = "rebIdle_internal" [
-            ;
-            ; When rebPromise() decides not to run an evaluation (hence why
-            ; it can be blacklisted), it queues a setTimeout() to the GUI
-            ; thread to come back later and run the evaluation.  What it
-            ; queues is the "idle" function...which will do evaluations and
-            ; will be on the stack during an `emscripten_sleep_with_yield()`.
-            ; Hence it can't be blacklisted from being turned to bytecode.
-            ;
-            continue
-        ]
-
-        keep unspaced ["RL_" name]
-    ]
-]
-
 
 === GENERATE %NODE-PRELOAD.JS ===
 
-; While Node.JS has worker support and SharedArrayBuffer support, Emscripten
-; does not currently support ENVIRONMENT=node USE_PTHREADS=1:
+; !!! Node.js support lapsed for a time, due to no pthreads support:
 ;
 ; https://groups.google.com/d/msg/emscripten-discuss/NxpEjP0XYiA/xLPiXEaTBQAJ
 ;
-; Hence if any simulated synchronousness is to be possible under node, one
-; must use the emterpreter (hopefully this is a temporary state of affairs).
-; In any case, the emterpreter bytecode file must be loaded, and it seems
-; that load has to happen in the `--pre-js` section:
+; When it did work, it required code to be run in the `--pre-js` section.
 ;
 ; https://github.com/emscripten-core/emscripten/issues/4240
+;
+; However, much has changed (e.g. the emterpreter no longer is used due to
+; asyncify).  This code is non-working, and needs review.
 ;
 
 e-node-preload: (make-emitter

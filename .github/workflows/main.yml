@@ -79,12 +79,14 @@ jobs:
     #
     # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-environment-variables-in-a-matrix
     #
+    # Note: This matrix once included `0.16.2` for a pthreads enabled build,
+    # but that was omitted for simplicity.  The matrix scaffolding is left
+    # here to show how it would be done if another build variation was needed.
+    #
     strategy:
       matrix:
        include:
-         - os-id: 0.16.1  # "asyncify" Emscripten build
-           config-file: asyncify.r
-         - os-id: 0.16.2  # "pthreads" Emscripten build
+         - os-id: 0.16.1  # "asyncify" Emscripten build (only variant ATM)
            config-file: emscripten.r
 
 
@@ -261,8 +263,18 @@ jobs:
     #
     # http://hostilefork.com/media/shared/replpad-js/?git_commit=<<shorthash>>
     #
-    # All web builds generate .js and .wasm files.
-    # Only pthreads builds produce .worker.js
+    # The .js file contains the loading and setup code, which includes "cwrap"
+    # functions that offer friendly JS function interfaces that take types
+    # like JS strings, instead of being limited to the "integer heap address
+    # parameters only" nature of Wasm functions.
+    #
+    # The .wasm file bundles both the compiled C code for the interpreter and
+    # memory image (C constants, including compressed mezzanine code).
+    #
+    # There used to be more files, but this has streamlined over time...and
+    # the pthread build is no longer supported so there's no `.worker.js`.
+    # The only remaining potential build products would be debug files.  (This
+    # would change if extensions are built as their own "DLL"s.)
     #
     # Note: %load-r3.js is a weak link in the test-before-greenlight strategy.
     # There's not a way to select the singular loader, so any changes must be
@@ -284,10 +296,6 @@ jobs:
 
         cp libr3.js "${OS_ID}/lib${new_name_with_commit}.js"
         cp libr3.wasm "${OS_ID}/lib${new_name_with_commit}.wasm"
-
-        if [[ ${OS_ID} = 0.16.2 ]]; then
-          cp libr3.worker.js "${OS_ID}/lib${new_name_with_commit}.worker.js"
-        fi
 
         # (not in subdir of 0.16.x because loader needs to pick between them)
         # See note above about how changes to this file undermines greenlight
@@ -381,40 +389,10 @@ jobs:
         #
         firefox -headless -CreateProfile "ff-profile $(pwd)/ff-profile"
 
-        ######################################################################
-        #
-        # !!! We'd like 0.16.1 to pass the pthread builds test by configuring
-        # Firefox to use pthreads.  We can do the configuration--but right now
-        # pthreads are not working in Firefox due to issues with headers:
-        #
-        # https://bugzilla.mozilla.org/show_bug.cgi?id=1586217
-        # https://github.com/emscripten-core/emscripten/issues/10014
-        #
-        # Until that is sorted out, we're just going to have to hope that the
-        # Asyncify build test is good enough to mark passing both builds.
-        # So what we're really testing is if Firefox is downgrading the
-        # build to Asyncify.  :-(  Chrome with pthreads will just need to be
-        # hoped to work.
-        #
-        ######################################################################
-        #
-
         # The way to set `about:config` flags in preferences is via %user.js
         #
         # https://askubuntu.com/a/313662/137769
         # http://kb.mozillazine.org/User.js_file
-        #
-        # Rebol's more optimal "Pthreads" web build requires shared memory
-        # and WebAssembly threads, which Firefox does not enable by default
-        # at time of writing (Mar-2020).  Hence the less-optimial "Asyncify"
-        # build provides a fallback, and %load-r3.js detects which to use.
-        #
-        # Even if this default changes, explicitly setting the flag to `true`
-        # for the Pthreads deployment test and `false` for the Asyncify test
-        # gives the right coverage for the corresponding build.
-        #
-        # !!! See above comments about why we only test the 0.16.2 build
-        # (non-pthreads) due to 0.16.1 not working in Firefox at the moment.
         #
         # The Marionette port for control defaults to 2828, and can be
         # overridden on the command line by `--marionette-port <port>`.  But
@@ -426,11 +404,12 @@ jobs:
         # https://en.wikipedia.org/wiki/Here_document#Unix_shells
         # https://travis-ci.community/t/2756
         {
-            if [[ $OS_ID = 0.16.2 ]]; then
-              echo "user_pref(\"javascript.options.shared_memory\", true);"
-            else
-              echo "user_pref(\"javascript.options.shared_memory\", false);"
-            fi
+            # !!! At one time we turned on shared_memory for the pthreads
+            # build.  But the pthreads build has been scrapped.  There's not
+            # really a need to turn shared memory off, but do it just to show
+            # another setting...and that we don't require it.
+            #
+            echo "user_pref(\"javascript.options.shared_memory\", false);"
             echo "user_pref(\"marionette.port\", 2828);"  # should be default
         } > $(pwd)/ff-profile/user.js
 
