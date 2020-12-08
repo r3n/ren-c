@@ -648,8 +648,6 @@ return assign_git_commit_promiser(os_id)  // sets git_commit
   }).then(() => {  // we now know r3_module_promiser is available
 
     config.info('Loading/Running ' + libRebolComponentURL(".js") + '...')
-    if (use_asyncify)
-        config.warn("The Asyncify build is bigger/slower, be patient...")
 
     return r3_module_promiser(reb.m)  // at first, `reb.m` is defaults...
 
