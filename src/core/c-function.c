@@ -1268,7 +1268,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // The FRAME! stored in the body for the specialization has a phase
         // which is actually the function to be run.
         //
-        REBVAL *frame = DETAILS_AT(details, 1);
+        const REBVAL *frame = CTX_ARCHETYPE(ACT_EXEMPLAR(a));
         assert(IS_FRAME(frame));
         Move_Value(out, frame);
         return;

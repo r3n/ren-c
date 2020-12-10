@@ -47,11 +47,11 @@ spec-of: function [
             ]
         ]
 
-        types: try ensure [<opt> frame!] any [
+        types: try ensure [<opt> frame! object!] any [
             select meta 'parameter-types
             select original-meta 'parameter-types
         ]
-        notes: try ensure [<opt> frame!] any [
+        notes: try ensure [<opt> frame! object!] any [
             select meta 'parameter-notes
             select original-meta 'parameter-notes
         ]
