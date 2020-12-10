@@ -646,7 +646,7 @@ ext-console-impl: function [
         ; behavior), Ctrl-D on Windows (because ReadConsole() can't trap ESC),
         ; Ctrl-D on POSIX (just to be compatible with Windows).
         ;
-        emit [system/console/print-result ~]
+        emit [system/console/print-result '~void~]
         return <prompt>
     ]
 
