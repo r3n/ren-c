@@ -157,7 +157,16 @@ cipher-suites: compose [
     ; TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384 (0xc028)  "weak"
     ; TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256 (0xc027)  "weak"
     ;
-    ; We don't have "GCM" or SHA384 at this time.
+    ; We don't have "GCM" at this time.  However, due to @gchiu's use of
+    ; `schedule.pharmac.govt.nz` we do the suite they have that we can.
+    ; Since it's defined outside the TLS 1.2 spec it can have a different
+    ; HMAC and PRF hash, and... it does, it uses SHA384:
+    ; https://tools.ietf.org/html/rfc5289
+    ;
+    #{C0 28} [
+        TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384
+        <ecdhe-rsa> @aes [size 32 block 16 iv 16] #sha384 [size 48]
+    ]
 
     #{00 2F} [
         TLS_RSA_WITH_AES_128_CBC_SHA
@@ -828,9 +837,7 @@ finished: function [
         ; cipher suite which defines a different PRF MUST also define the
         ; Hash to use in the Finished computation."
         ;
-        ; For now, assume all supported cipher suites use SHA256.
-        ;
-        checksum 'sha256 ctx/handshake-messages
+        checksum/method ctx/handshake-messages ctx/prf-method
     ]
 
     return join-all [
@@ -882,7 +889,7 @@ encrypt-data: function [
         ctx/ver-bytes                       ; version
         to-2bin length of content           ; msg content length
         content                             ; msg content
-    ] (to word! ctx/hash-method) ctx/client-mac-key
+    ] ctx/hash-method ctx/client-mac-key
 
     data: join-all [content MAC]
 
@@ -1162,7 +1169,16 @@ parse-messages: function [
                             ; sure only extensions we asked for come back in
                             ; this list...but punt on that check for now.
 
-                            extensions-list-length: grab-int 'bin 2
+                            ; "The presence of extensions can be detected by
+                            ; determining whether there are bytes following
+                            ; the compression_method field at the end of
+                            ; the ServerHello.
+                            ;
+                            if tail? bin [
+                                extensions-list-length: 0
+                            ] else [
+                                extensions-list-length: grab-int 'bin 2
+                            ]
                             check-length: 0
 
                             curve-list: _
@@ -1303,6 +1319,9 @@ parse-messages: function [
                                     y: grab 'bin 32
 
                                     ; https://crypto.stackexchange.com/a/26355
+                                    ; This is for digital signatures, e.g. it
+                                    ; does not relate to the hash in the
+                                    ; cipher suite.
                                     ;
                                     hash-algorithm: grab-int 'bin 1
                                     hash-algorithm: select [
@@ -1382,7 +1401,7 @@ parse-messages: function [
                                 checksum 'sha1 ctx/handshake-messages
                             ]
                         ] else [
-                            checksum 'sha256 ctx/handshake-messages
+                            checksum/method ctx/handshake-messages ctx/hmac-method
                         ]
                         if (
                             bin <> applique :prf [
@@ -1417,7 +1436,7 @@ parse-messages: function [
                         ctx/ver-bytes           ; version
                         to-2bin len + 4         ; msg content length
                         copy/part data len + 4
-                    ] (to word! ctx/hash-method) ctx/server-mac-key
+                    ] ctx/hash-method ctx/server-mac-key
 
                     if mac <> mac-check [
                         fail "Bad handshake record MAC"
@@ -1452,7 +1471,7 @@ parse-messages: function [
                 ctx/ver-bytes           ; version
                 to-2bin len             ; msg content length
                 msg-obj/content         ; content
-            ] (to word! ctx/hash-method) ctx/server-mac-key
+            ] ctx/hash-method ctx/server-mac-key
 
             if mac <> mac-check [
                 fail "Bad application record MAC"
@@ -1540,20 +1559,16 @@ prf: function [
         )
     ]
 
-    ; TLS 1.2 includes the pseudorandom function as part of its cipher
-    ; suite definition.  No cipher suites assume the md5/sha1 combination
-    ; used above by TLS 1.0 and 1.1.  All cipher suites listed in the
-    ; TLS 1.2 spec use `P_SHA256`, which is driven by the single SHA256
-    ; hash function: https://tools.ietf.org/html/rfc5246#section-5
-
-    p-sha256: copy #{}
+    ; See notes on PRF-METHOD; P_SHA256 is usually--but not always the method.
+    ;
+    p-shaX: copy #{}  ; P_SHA256, P_SHA384..whichever
     a: seed  ; A(0)
-    while [output-length > length of p-sha256] [
-        a: checksum/key 'sha256 a secret
-        append p-sha256 checksum/key 'sha256 join-all [a seed] secret
+    while [output-length > length of p-shaX] [
+        a: checksum/key/method a secret ctx/prf-method
+        append p-shaX checksum/key/method join-all [a seed] secret ctx/prf-method
     ]
-    take/last/part p-sha256 ((length of p-sha256) - output-length)
-    return p-sha256
+    take/last/part p-shaX ((length of p-shaX) - output-length)
+    return p-shaX
 ]
 
 
@@ -1895,9 +1910,30 @@ sys/make-scheme [
 
                 key-method: does [first find suite tag!]
 
-                hash-method: does [first find suite issue!]
+                hash-method: does [to word! first find suite issue!]
                 hash-size: does [
                     select (ensure block! second find suite issue!) 'size
+                ]
+
+                ; TLS 1.2 includes the pseudorandom function as part of its
+                ; cipher suite definition.  No cipher suites assume the
+                ; md5/sha1 combination used by TLS 1.0 and 1.1.  All cipher
+                ; suites listed in the TLS 1.2 spec use `P_SHA256`, which is
+                ; driven by the single SHA256 hash function:
+                ;
+                ; https://tools.ietf.org/html/rfc5246#section-5
+                ;
+                ; Spec addendums can use their own, we accomodate the SHA384
+                ; exception for this cipher suite...which also uses a distinct
+                ; method for the hmac:
+                ;
+                ; https://tools.ietf.org/html/rfc5289
+                ;
+                prf-method: does [
+                    either hash-method = 'sha384 ['sha384] ['sha256]
+                ]
+                hmac-method: does [
+                    either hash-method = 'sha384 ['sha384] ['sha256]
                 ]
 
                 crypt-method: does [first find suite sym-word!]
