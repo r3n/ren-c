@@ -87,7 +87,7 @@ shell: func [
     ; the environment might change by the time it is reached.
     ;
     let shellify-tag: func [value [any-value!]] [
-        either-match/not tag! get/any 'value [
+        either-match/not tag! value [
             if system/version/4 = 3 [   ; Windows
                 unspaced ["%" as text! value "%"]
             ] else [
@@ -103,16 +103,11 @@ shell: func [
     ;
     let process-tag: func [container [path! tuple! block!]] [
         to type-of-container map-each item container [
-            if group? get/any 'item [
+            if group? item [
                 item: do item
             ]
 
-            switch type of get/any 'item [
-                void! []  ; ~/foo is legal
-                tag! [item: shellify-tag item]
-            ]
-
-            get/any 'item
+            either-match/not tag! item [shellify-tag item]
         ]
     ]
 
@@ -126,10 +121,7 @@ shell: func [
             break
         ]
 
-        ; Make tilde easier to work with early on, e.g. `cd ~`, so the rest
-        ; of the code need not go through GET/ANY every time
-        ;
-        let item: either-match/not void! get/any 'pos/1 [#~]
+        let item: :pos/1
 
         ; The default behaviors for each type may either splice or not.
         ; But when you use a GROUP! or a BLOCK!, it will put things in quotes.
@@ -188,7 +180,7 @@ shell: func [
 
     if not pipe [
         lib/call/shell command  ; must use LIB (binding issue)
-        return ~  ; don't show any result in console
+        return  ; don't show any result in console
     ]
 
     let output: copy ""

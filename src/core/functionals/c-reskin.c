@@ -120,7 +120,7 @@ REB_R Skinner_Dispatcher(REBFRM *f)
 
     // We move the built `f` contents into a REBFRM* underneath this one.
     //
-    Init_Void(FRM_SPARE(f), SYM_UNDEFINED);
+    Init_Void(FRM_SPARE(f), SYM_UNSET);
     REBFRM *sub = Push_Downshifted_Frame(FRM_SPARE(f), f);
 
     INIT_FRM_PHASE(sub, VAL_ACTION(skinned));

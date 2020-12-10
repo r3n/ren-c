@@ -1125,7 +1125,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             "] ] func [f] [",
                 "for-each output", outputs, "[",
                     "if f/(output) [",  // void in case func doesn't (null?)
-                        "set f/(output) ~undefined~",
+                        "set f/(output) '~unset~",
                     "]",
                 "]",
                 "either first", f->out, "@[",
@@ -1189,26 +1189,27 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto inert;
 
 
+    //=//// VOID! /////////////////////////////////////////////////////////=//
+    //
+    // To use a VOID! literally in something like an assignment, it should
+    // be quoted:
+    //
+    //     foo: ~unset~  ; will raise an error
+    //     foo: '~unset~  ; will not raise an error
+    //
+    // It was tried to allow voids as inert to be "prettier", but this is not
+    // worth the loss of the value of the alarm that void is meant to raise.
+
+      case REB_VOID:
+        fail (Error_Void_Evaluation_Raw());
+
+
     //=///////////////////////////////////////////////////////////////////=//
     //
     // Treat all the other NOT Is_Bindable() types as inert
     //
     //=///////////////////////////////////////////////////////////////////=//
 
-      case REB_VOID:
-        //
-        // "A void! is a means of giving a hot potato back that is a warning
-        //  something, but you don't want to force an error 'in the moment'...
-        //  in case the returned information wasn't going to be used anyway."
-        //
-        // https://forum.rebol.info/t/947
-        //
-        // So it was thought that voids might be something to error on if
-        // seen by the evaluator.  But in the balance of things, making them
-        // inert is more useful:
-        //
-        // https://forum.rebol.info/t/1383/8
-        //
       case REB_BLANK:
         //
       case REB_LOGIC:

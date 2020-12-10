@@ -390,12 +390,7 @@ union Reb_Value_Extra { //=/////////////////// ACTUAL EXTRA DEFINITION ////=//
     union Reb_Bytes_Extra Bytes;
 
   #if defined(DEBUG_COUNT_TICKS)
-    //
-    // A tick field is included in all debug builds, not just those which
-    // DEBUG_TRACK_CELLS...because negative signs are used to give a distinct
-    // state to unreadable voids.  See %sys-track.h and %sys-void.h
-    //
-    intptr_t tick;  // Note: will be negative for unreadable voids
+    uintptr_t tick;  // cells that don't use their bindings can show this
   #endif
 
     // The release build doesn't put anything in the ->extra field by default,

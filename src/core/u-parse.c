@@ -276,8 +276,8 @@ static bool Subparse_Throws(
 
     // Locals in frame would be void on entry if called by action dispatch.
     //
-    Init_Void(Prep_Cell(ARG(num_quotes)), SYM_UNDEFINED);
-    Init_Void(Prep_Cell(ARG(position)), SYM_UNDEFINED);
+    Init_Void(Prep_Cell(ARG(num_quotes)), SYM_UNSET);
+    Init_Void(Prep_Cell(ARG(position)), SYM_UNSET);
 
     // !!! By calling the subparse native here directly from its C function
     // vs. going through the evaluator, we don't get the opportunity to do

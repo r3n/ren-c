@@ -310,11 +310,11 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(unstable const RELVAL *v) {
 // undefineds to be specialized:
 //
 //     >> f: make frame! :append
-//     >> f/value: ~undefined~  ; typically this would mean "unspecialized"
+//     >> f/value: '~unset~  ; typically this would mean "unspecialized"
 //     >> protect/hide 'f/value  ; hiding it means "no, it's the final value"
 //     >> apu: make action! f
 //     >> apu [a b c]
-//     == [a b c ~undefined~]
+//     == [a b c ~unset~]
 //
 // For this mechanic to work, there has to be a bit on frames that tracks
 // visibility on a per-instance basis.  To avoid having to make a new keylist

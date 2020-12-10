@@ -230,7 +230,7 @@ rewrite-spec-and-body: helper [
         ; add support for an EXIT that's a synonym for returning void.
         ;
         insert body [
-            exit: specialize :return [value: ~unset!~]
+            exit: specialize :return [value: '~unset~]
         ]
         append spec [<local> exit]  ; FUNC needs it (function doesn't...)
     ]
@@ -383,7 +383,7 @@ null: emulate [
 ;
 ; VOID! is also a more capable and interesting type, able to hold a symbol.
 ;
-unset!: ~unset!~
+unset!: void!
 unset?: emulate [:void?]
 
 ; Note: Ren-C once reserved NONE for `if none [x = 1, y = 2] [...]`
@@ -1403,15 +1403,13 @@ call: emulate [  ; brings back the /WAIT switch (Ren-C waits by default)
 ]
 
 
-=== LEAVE ~ AS LAST LINE ===
+=== LEAVE VOID AS LAST LINE ===
 ;
-; So that `do <redbol>` doesn't show any output.  This currently instructs
-; the console that it is a nameless VOID! that should suppress display.
+; So that `do <redbol>` doesn't show any output.  While the console displays
+; most voids, by default it won't display ones specifically labeled ~void~
 ;
-; !!! It's being debated to use a specially-named void for this protocol, and
-; save the ~ for ~undefined~, which would be briefer and avoid system 
-; awareness of an English word in evaluator internals.)
+; !!! This may not be the last word on what signals the console's silence.
 ;
 ; https://forum.rebol.info/t/1413
 
-~
+'~void~

@@ -105,7 +105,7 @@ REB_R Empty_Dispatcher(REBFRM *f)
     assert(VAL_LEN_AT(ARR_AT(details, IDX_DETAILS_1)) == 0);  // empty body
     UNUSED(details);
 
-    return Init_Unlabeled_Void(f->out);
+    return Init_Empty_Void(f->out);
 }
 
 

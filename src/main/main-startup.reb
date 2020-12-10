@@ -208,7 +208,7 @@ get-current-exec:
 file-to-local:
 local-to-file:
 what-dir:
-change-dir: ~undefined~
+change-dir: '~unset~
 
 
 main-startup: function [

@@ -39,12 +39,11 @@ datatypes
 ; more communicative.  These are standard symbols passed to Init_Void().
 ;
 void
-undefined
+unset
 nulled
 blanked
-branched
-stopped
 matched
+unreadable  ; only release build uses, debug build uses NULL as the label
 
 
 ; ...note that the words for types are created programmatically before
@@ -54,7 +53,6 @@ matched
 ;=== LEGACY HELPERS ===
 
 none  ; !!! for LOAD #[none]
-unset  ; !!! for LOAD #[unset]
 image!  ; !!! for LOAD #[image! [...]] (used in tests), and molding, temporary
 vector!  ; !!! for molding, temporary
 gob!  ; !!! for molding, temporary

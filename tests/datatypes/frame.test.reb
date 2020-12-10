@@ -38,7 +38,7 @@
     ; interesting if possible to rename them, and then reset them to
     ; undefined while typechecking for lower level phases.  Think about it.
     (
-        f-inside-prelude: ~
+        f-inside-prelude: '~trash~
         private: <not-in-prelude>
         adapted-foo: adapt :foo [
             f-inside-prelude: binding of 'public
@@ -100,7 +100,7 @@
 
     (f-outside-augment/public = 1020)
     (f-outside-augment/additional = 1020304)
-    (~undefined~ = get/any 'f-outside-augment/private)  ; we didn't assign it
+    ('~unset~ = get/any 'f-outside-augment/private)  ; we didn't assign it
 
     (f-inside-augment/public = 1020)
     (f-inside-augment/additional = 1020304)

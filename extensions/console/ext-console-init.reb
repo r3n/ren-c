@@ -74,7 +74,7 @@ console!: make object! [
     repl: true  ; used to identify this as a console! object
     is-loaded: false  ; if true then this is a loaded (external) skin
     was-updated: false  ; if true then console! object found in loaded skin
-    last-result: ~startup~  ; last evaluated result (sent by HOST-CONSOLE)
+    last-result: '~startup~  ; last evaluated result (sent by HOST-CONSOLE)
 
     === APPEARANCE (can be overridden) ===
 
@@ -120,8 +120,8 @@ console!: make object! [
             null [
                 ; not a void, fall through to other printing
             ]
-            ~ [
-                return  ; e.g. result of HELP, understood as output *nothing*
+            '~void~ [
+                return  ; understood this *specific* void as output *nothing*
             ]
         ] else [  ; any other labeled VOID!
             print [result mold get/any 'v]

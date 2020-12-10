@@ -188,7 +188,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
             unstable RELVAL *temp = ARR_AT(varlist, old_len);
             REBLEN i;
             for (i = 0; i < delta; ++i) {
-                Init_Void(temp, SYM_UNDEFINED);
+                Init_Void(temp, SYM_UNSET);
                 temp = temp + 1;
             }
             TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));

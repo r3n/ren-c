@@ -43,11 +43,11 @@
 
 ; Plain voids cause an error, quoted voids match literal voids
 (
-    foo: ~void~
+    foo: '~void~
     e: trap [parse "a" [foo]]
     e/id = 'need-non-void
 )(
-    foo: quote ~void~
+    foo: quote '~void~
     did parse [~void~] [foo end]
 )
 

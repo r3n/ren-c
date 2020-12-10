@@ -533,7 +533,7 @@ REBNATIVE(evaluate)
         REBLEN index;
         if (VAL_LEN_AT(source) == 0) {  // `evaluate []` should return null
             Init_Nulled(D_OUT);
-            Init_Unlabeled_Void(D_SPARE);
+            Init_Empty_Void(D_SPARE);
         }
         else {
             if (Eval_Step_In_Any_Array_At_Throws(
@@ -562,7 +562,7 @@ REBNATIVE(evaluate)
                 //
                 // https://forum.rebol.info/t/1173/
                 //
-                Init_Unlabeled_Void(D_SPARE);
+                Init_Empty_Void(D_SPARE);
                 Quotify(D_OUT, 1);  // void-is-invisible signal on array
             }
             else {
@@ -815,9 +815,9 @@ REBNATIVE(applique)
             continue; // was part of a specialization internal to the action
 
         // !!! This is another case where if you want to literaly apply
-        // with ~undefined~ you have to manually hide the frame key.
+        // with ~unset~ you have to manually hide the frame key.
         //
-        if (Is_Void_With_Sym(var, SYM_UNDEFINED))
+        if (Is_Void_With_Sym(var, SYM_UNSET))
             Init_Nulled(var);
 
         Remove_Binder_Index(&binder, VAL_KEY_CANON(key));

@@ -244,7 +244,7 @@
 
 (
     did all [
-        void? x: ~void~
+        void? x: '~void~
         void? get/any 'x
     ]
 )

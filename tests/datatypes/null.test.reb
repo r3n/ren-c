@@ -59,11 +59,11 @@
 [
     (null-2? if true [null])
     (null-2? if true [null-2])
-    (~ = if true [])
-    (~custom~ = if true [~custom~])
+    ('~void~ = if true [])
+    ('~custom~ = if true ['~custom~])
 
     (null-1? if true @[null])
     (null-2? if true @[null-2])
-    (~ = if true @[])
-    (~custom~ = if true @[~custom~])
+    ('~void~ = if true @[])
+    ('~custom~ = if true @['~custom~])
 ]

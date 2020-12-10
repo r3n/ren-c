@@ -86,7 +86,7 @@ inline static bool IS_QUOTED_KIND(REBYTE k)
 //
 
 inline static bool ANY_INERT_KIND(REBYTE k) {
-    assert(k >= REB_VOID);  // can't call on end/null
+    assert(k >= REB_BLANK);  // can't call on end/null/void
     return k <= REB_BLOCK;
 }
 

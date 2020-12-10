@@ -37,15 +37,14 @@ void MF_Void(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     Append_Codepoint(mo->series, '~');
 
-    option(const REBSTR*) label = VAL_VOID_LABEL(v);
-    if (label) {
-        Append_Utf8(
-            mo->series,
-            STR_UTF8(unwrap(label)),
-            STR_SIZE(unwrap(label))
-        );
-        Append_Codepoint(mo->series, '~');
-    }
+    const REBSTR* label = VAL_VOID_LABEL(v);
+    Append_Utf8(
+        mo->series,
+        STR_UTF8(unwrap(label)),
+        STR_SIZE(unwrap(label))
+    );
+
+    Append_Codepoint(mo->series, '~');
 }
 
 
@@ -64,7 +63,7 @@ REB_R MAKE_Void(
     UNUSED(parent);
 
     if (IS_WORD(arg))
-        return Init_Labeled_Void(out, VAL_WORD_SPELLING(arg));
+        return Init_Void_Core(out, VAL_WORD_SPELLING(arg));
 
     fail (Error_Bad_Make(kind, arg));
 }
@@ -90,14 +89,8 @@ REB_R TO_Void(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
 //
 REBINT CT_Void(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    option(const REBSTR*) label_a = VAL_VOID_LABEL(a);
-    option(const REBSTR*) label_b = VAL_VOID_LABEL(b);
-
-    if (label_a == label_b)
-        return 0;  // always equal, in nullptr or non-nullptr case, if same
-
-    if (not label_a or not label_b)
-        return unwrap(label_a) > unwrap(label_b) ? 1 : -1;
+    const REBSTR* label_a = VAL_VOID_LABEL(a);
+    const REBSTR* label_b = VAL_VOID_LABEL(b);
 
     return Compare_Spellings(unwrap(label_a), unwrap(label_b), strict);
 }
@@ -116,11 +109,8 @@ REBTYPE(Void)
         UNUSED(ARG(value)); // taken care of by `voided` above.
 
         switch (VAL_WORD_SYM(ARG(property))) {
-          case SYM_LABEL: {
-            option(const REBSTR*) label = VAL_VOID_LABEL(voided);
-            if (not label)
-                return nullptr;
-            return Init_Word(D_OUT, unwrap(label)); }
+          case SYM_LABEL:
+            return Init_Word(D_OUT, VAL_VOID_LABEL(voided));
 
           default:
             break;

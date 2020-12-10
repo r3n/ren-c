@@ -988,12 +988,6 @@ REBNATIVE(stop)
 {
     INCLUDE_PARAMS_OF_STOP;
 
-    if (IS_ENDISH_NULLED(ARG(value)))
-        Init_Void(ARG(value), SYM_STOPPED);  // `if true [stop]`
-    else {
-        // `if true [stop 5]`, etc.
-    }
-
     return Init_Thrown_With_Label(D_OUT, ARG(value), NATIVE_VAL(stop));
 }
 
@@ -1026,7 +1020,8 @@ REBNATIVE(cycle)
                     // constructs, with a BREAK variant that returns a value.
                     //
                     CATCH_THROWN(D_OUT, D_OUT);
-                    return D_OUT;  // special case: null allowed (like break)
+                    Isotopify_If_Nulled(D_OUT);  // NULL reserved for BREAK
+                    return D_OUT;
                 }
 
                 return R_THROWN;

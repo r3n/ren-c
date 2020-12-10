@@ -20,7 +20,7 @@
 (null? catch/name [()] 'catch)
 (null? catch/name [trap [1 / 0]] 'catch)
 (null? catch/name [1] 'catch)
-([catch ~void~] = catch/name [throw/name (~void~) 'catch] 'catch)
+([catch '~void~] = catch/name [throw/name ('~void~) 'catch] 'catch)
 (error? first second catch/name [throw/name reduce [trap [1 / 0]] 'catch] 'catch)
 ([catch 1] = catch/name [throw/name 1 'catch] 'catch)
 ; recursive cases

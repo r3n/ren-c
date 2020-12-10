@@ -216,10 +216,10 @@
             // Unreadable void is signified in the Extra by a negative tick
             //
             if (KIND3Q_BYTE_UNCHECKED(v) == REB_VOID) {
-                if (v->extra.tick < 0) {
+                if (v->payload.Any.first.node == nullptr) {
                     printf("KIND3Q_BYTE() called on unreadable VOID!\n");
                   #ifdef DEBUG_COUNT_TICKS
-                    printf("Made on tick: %d\n", cast(int, -v->extra.tick));
+                    printf("Made on tick: %d\n", cast(int, v->extra.tick));
                   #endif
                     panic_at (v, file, line);
                 }

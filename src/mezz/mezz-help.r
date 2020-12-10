@@ -108,8 +108,6 @@ help: function [
         "WORD! whose value to explain, or other HELP target (try HELP HELP)"
     /doc "Open web browser to related documentation."
 ][
-    return: specialize :return [value: ~]  ; unlabeled for no console display
-
     if undefined? 'topic [
         ;
         ; !!! This should lead to a web page that offers help on the nature

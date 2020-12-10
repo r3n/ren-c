@@ -20,21 +20,17 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// "VOID! is a means of giving a hot potato back that is a warning of
+//  something, but you don't want to force an error 'in the moment'...
+//  in case the returned information wasn't going to be used anyway."
+//
+// https://forum.rebol.info/t/947
+//
 // Void! results are the default for `do []`, and unlike NULL a void! *is*
 // a value...however a somewhat unfriendly one.  While NULLs are falsey, void!
 // is *neither* truthy nor falsey.  Though a void! can be put in an array (a
 // NULL can't) if the evaluator tries to run a void! cell in an array, it will
 // trigger an error.
-//
-// Void! also comes into play in what is known as "voidification" of NULLs.
-// Loops wish to reserve NULL as the return result if there is a BREAK, and
-// conditionals like IF and SWITCH want to reserve NULL to mean there was no
-// branch taken.  So when branches or loop bodies produce null, they need
-// to be converted to some ANY-VALUE!.
-//
-// The console doesn't print anything for void! evaluation results by default,
-// so that routines like HELP won't have additional output than what they
-// print out.
 //
 // In the debug build, it is possible to make an "unreadable" void!.  This
 // will behave neutrally as far as the garbage collector is concerned, so
@@ -47,7 +43,7 @@
 // if that fill in never happens.
 //
 
-inline static REBVAL *Init_Labeled_Void(
+inline static REBVAL *Init_Void_Core(
     unstable RELVAL *out,
     const REBSTR *label
 ){
@@ -57,15 +53,20 @@ inline static REBVAL *Init_Labeled_Void(
 }
 
 #define Init_Void(out,sym) \
-    Init_Labeled_Void((out), Canon(sym))
+    Init_Void_Core((out), Canon(sym))
 
-inline static REBVAL *Init_Unlabeled_Void(unstable RELVAL *out) {
-    RESET_CELL(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
-    VAL_NODE(out) = nullptr;
-    return cast(REBVAL*, out);
-}
+// This helps find callsites that are following the convention for what
+// `do []` sould do (current answer: use ~void~ to reflect emptiness):
+//
+// https://forum.rebol.info/t/what-should-do-do/1426
+//
+// This is also chosen as the form of void that the console won't display
+// by default (others, like ~unset~, are visible results)
+//
+#define Init_Empty_Void(out) \
+    Init_Void((out), SYM_VOID)
 
-inline static option(const REBSTR*) VAL_VOID_LABEL(
+inline static const REBSTR* VAL_VOID_LABEL(
     unstable REBCEL(const*) v
 ){
     assert(CELL_KIND(v) == REB_VOID);
@@ -73,23 +74,17 @@ inline static option(const REBSTR*) VAL_VOID_LABEL(
     return cast(const REBSTR*, VAL_NODE(v));
 }
 
-// Don't let SYM_0 be used for unlabeled void, in case checking for a match
-// with a symbol extracted from a WORD! which has no symbol shorthand.
-//
 inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
     assert(sym != SYM_0);
     if (not IS_VOID(v))
         return false;
-    option(const REBSTR*) label = VAL_VOID_LABEL(v);
-    if (not label)
-        return false;  // unlabeled
-    return cast(REBLEN, sym) == cast(REBLEN, STR_SYMBOL(unwrap(label)));
+    return cast(REBLEN, sym) == cast(REBLEN, STR_SYMBOL(VAL_VOID_LABEL(v)));
 }
 
 
-#if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, same as plain VOID!
+#if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, non-crashing VOID!
     #define Init_Unreadable_Void(v) \
-        Init_Unlabeled_Void(v)
+        Init_Void_Core(v, SYM_UNREADABLE)
 
     #define IS_VOID_RAW(v) \
         IS_BLANK(v)
@@ -105,12 +100,12 @@ inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
     ){
         RESET_CELL_Debug(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE, file, line);
 
-        // While SYM_UNREADABLE would be nice here, that prevents usage at
-        // boot time (e.g. data stack initialization).  It's usually clear
+        // While SYM_UNREADABLE might be nice here, that prevents usage at
+        // boot time (e.g. data stack initialization)...and it's a good way
+        // to crash sites that expect normal voids.  It's usually clear
         // from the assert that the void is unreadable, anyway.
         //
         VAL_NODE(out) = nullptr;  // needs flag for VAL_NODE() to not assert
-        out->extra.tick = -1;  // even non-tick counting builds default to 1
         return cast(REBVAL*, out);
     }
 
@@ -123,7 +118,7 @@ inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
     inline static bool IS_UNREADABLE_DEBUG(unstable const RELVAL *v) {
         if (KIND3Q_BYTE_UNCHECKED(v) != REB_VOID)
             return false;
-        return v->extra.tick < 0;
+        return VAL_NODE(v) == nullptr;
     }
 
     #define ASSERT_UNREADABLE_IF_DEBUG(v) \

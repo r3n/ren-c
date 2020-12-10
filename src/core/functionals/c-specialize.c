@@ -51,10 +51,10 @@
 // single bit on a parameter can encode.
 //
 // It's solved with a simple mechanical trick--that may look counterintuitive
-// at first.  Since unspecialized slots would usually be `~undefined~`,
-// we sneak information into them.  This disrupts the default ordering by
-// pushing refinements that have higher priority than fulfilling the
-// unspecialized slot they are in.
+// at first.  Since unspecialized slots would usually be `~unset~`, we sneak
+// information into them.  This disrupts the default ordering by pushing
+// refinements that have higher priority than fulfilling the unspecialized
+// slot they are in.
 //
 // So when looking at `fooBC: :foo/B/C`
 //
@@ -67,7 +67,7 @@
 // * /B's slot would contain an instruction for /B.  This will push /B to now
 //   be first in line in fulfillment.
 //
-// * /C's slot would hold the labeled VOID! `~undefined~`, having the typical
+// * /C's slot would hold the labeled VOID! `~unset~`, having the typical
 //   appearance of not being specialized.
 //
 
@@ -111,11 +111,12 @@ REB_R Specializer_Dispatcher(REBFRM *f)
 //
 //  Make_Context_For_Action_Push_Partials: C
 //
-// This creates a FRAME! context with `~undefined~` cells in unspecialized
+// This creates a FRAME! context with `~unset~` cells in the unspecialized
 // slots.  The reason this is chosen instead of NULL is that specialization
-// with NULL is frequent, and this takes only *one* void state away.  Tricks
-// must be used to work past (e.g. to SPECIALIZE with `~replace-me~` but then
-// ADAPT and overwrite with ~undefined~).
+// with NULL is frequent, and this takes only *one* void state away.  To
+// actually specialize with `~unset~` one must either write a temporary
+// value and then adapt over it, or use the PROTECT/HIDE mechanic to hide
+// the field from view (thus making it presumed specialized).
 //
 // For partial refinement specializations in the action, this will push the
 // refinement to the stack.  In this way it retains the ordering information
@@ -169,7 +170,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
         if (Is_Param_Hidden(param, special)) {  // local or specialized
             if (param == special) {  // no prior exemplar
-                Init_Void(arg, SYM_UNDEFINED);
+                Init_Void(arg, SYM_UNSET);
                 SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
             }
             else
@@ -187,7 +188,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
           continue_unspecialized:
 
-            Init_Void(arg, SYM_UNDEFINED);  // *not* ARG_MARKED_CHECKED
+            Init_Void(arg, SYM_UNSET);  // *not* ARG_MARKED_CHECKED
             if (binder)
                 Add_Binder_Index(unwrap(binder), canon, index);
 
@@ -202,7 +203,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             (special == param and IS_PARAM(special))
             or (
                 IS_SYM_WORD(special)
-                or Is_Void_With_Sym(special, SYM_UNDEFINED)
+                or Is_Void_With_Sym(special, SYM_UNSET)
             )
         );
 
@@ -311,7 +312,7 @@ bool Specialize_Action_Throws(
     // will be on the stack (including any we are adding "virtually", from
     // the current DSP down to the lowest_ordered_dsp).
     //
-    // All unspecialized slots (including partials) will be ~undefined~
+    // All unspecialized slots (including partials) will be ~unset~
     //
     REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
         specializee,
@@ -389,7 +390,7 @@ bool Specialize_Action_Throws(
 
         if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
             if (
-                Is_Void_With_Sym(arg, SYM_UNDEFINED)
+                Is_Void_With_Sym(arg, SYM_UNSET)
                 and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
             ){
                 // Undefined refinements not explicitly marked hidden are
@@ -408,7 +409,7 @@ bool Specialize_Action_Throws(
 
                     REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
                     if (
-                        Is_Void_With_Sym(slot, SYM_UNDEFINED)
+                        Is_Void_With_Sym(slot, SYM_UNSET)
                         or GET_CELL_FLAG(slot, PUSH_PARTIAL)
                     ){
                         // It's still partial, so set up the pre-empt.
@@ -440,7 +441,7 @@ bool Specialize_Action_Throws(
         // It's an argument, either a normal one or a refinement arg.
 
         if (
-            Is_Void_With_Sym(arg, SYM_UNDEFINED)
+            Is_Void_With_Sym(arg, SYM_UNSET)
             and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
         ){
             goto unspecialized_arg;
@@ -452,7 +453,7 @@ bool Specialize_Action_Throws(
 
         assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
         assert(
-            Is_Void_With_Sym(arg, SYM_UNDEFINED)
+            Is_Void_With_Sym(arg, SYM_UNSET)
             or (IS_SYM_WORD(arg) and TYPE_CHECK(param, REB_TS_REFINEMENT))
         );
         continue;
@@ -1009,16 +1010,13 @@ REBACT *Alloc_Action_From_Exemplar(
 
         assert(not Is_Param_Hidden(param, param));  // param = special
 
-        // We leave non-hidden undefineds as-is to be handled by the evaluator
+        // We leave non-hidden ~unset~ as-is to be handled by the evaluator
         // as unspecialized:
         //
         // https://forum.rebol.info/t/default-values-and-make-frame/1412
-        //
-        // !!! Should this be `~` instead of `~undefined~`?
-        //
         // https://forum.rebol.info/t/1413
         //
-        if (Is_Void_With_Sym(arg, SYM_UNDEFINED))
+        if (Is_Void_With_Sym(arg, SYM_UNSET))
             continue;
 
         if (TYPE_CHECK(param, REB_TS_REFINEMENT))

@@ -1198,12 +1198,24 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
 
           case LEX_DELIMIT_TILDE: {
             ++cp;
-            if (IS_LEX_DELIMIT(*cp)) {  // nameless void, e.g. `~`
+            if (*cp == '~') {  // only legal multi-tilde is the `~~~` VOID!
+                ++cp;
+                if (*cp != '~') {
+                    ss->end = cp;
+                    fail (Error_Syntax(ss, TOKEN_VOID));
+                }
+                ++cp;
+                if (*cp == '~' or not IS_LEX_DELIMIT(*cp)) {
+                    ss->end = cp;
+                    fail (Error_Syntax(ss, TOKEN_VOID));
+                }
                 ss->end = cp;
                 return TOKEN_VOID;
             }
-            if (*cp == '~')  // `~~` couldn't be converted to WORD!
-                fail (Error_Syntax(ss, TOKEN_VOID));
+            if (IS_LEX_DELIMIT(*cp)) {
+                ss->end = cp;
+                return TOKEN_WORD;  // single `~` is a WORD!
+            }
             for (; *cp != '~'; ++cp) {
                 if (IS_LEX_DELIMIT(*cp)) {
                     ss->end = cp;
@@ -1879,15 +1891,11 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         break;
 
       case TOKEN_VOID: {
-        assert(len != 0);
-        if (len == 1)
-            Init_Unlabeled_Void(DS_PUSH());
-        else {
-            assert(*bp == '~');
-            assert(bp[len - 1] == '~');
-            const REBSTR *label = Intern_UTF8_Managed(bp + 1, len - 2);
-            Init_Labeled_Void(DS_PUSH(), label);
-        }
+        assert(len >= 3);
+        assert(*bp == '~');
+        assert(bp[len - 1] == '~');
+        const REBSTR *label = Intern_UTF8_Managed(bp + 1, len - 2);
+        Init_Void_Core(DS_PUSH(), label);
         break; }
 
       case TOKEN_COMMA:

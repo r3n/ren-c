@@ -261,7 +261,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         //
         if (Is_Param_Hidden(f->param, f->special)) {
             if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED) {  // no exemplar
-                Init_Void(f->arg, SYM_UNDEFINED);
+                Init_Void(f->arg, SYM_UNSET);
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             }
             else {
@@ -317,7 +317,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 INIT_WORD_INDEX(DS_TOP, partial_index);
             }
             else
-                assert(Is_Void_With_Sym(f->special, SYM_UNDEFINED));
+                assert(Is_Void_With_Sym(f->special, SYM_UNSET));
 
   //=//// UNSPECIALIZED REFINEMENT SLOT ///////////////////////////////////=//
 
@@ -598,6 +598,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             REBFLGS flags = EVAL_MASK_DEFAULT
                 | EVAL_FLAG_FULFILLING_ARG;
 
+            if (IS_VOID(f_next))  // Eval_Step() has callers test this
+                fail (Error_Void_Evaluation_Raw());  // must be quoted
+
             if (Eval_Step_In_Subframe_Throws(f->arg, f, flags)) {
                 Move_Value(f->out, f->arg);
                 goto abort_action;
@@ -709,6 +712,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     | EVAL_FLAG_FULFILLING_ARG
                     | FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
                     | EVAL_FLAG_INERT_OPTIMIZATION;
+
+                if (IS_VOID(f_next))  // Eval_Step() has callers test this
+                    fail (Error_Void_Evaluation_Raw());  // must be quoted
 
                 DECLARE_FRAME (subframe, f->feed, flags);
 
@@ -889,7 +895,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
             if (
                 GET_EVAL_FLAG(f, FULLY_SPECIALIZED)
-                and Is_Void_With_Sym(f->arg, SYM_UNDEFINED)
+                and Is_Void_With_Sym(f->arg, SYM_UNSET)
             ){
                 Init_Nulled(f->arg);
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
@@ -1099,7 +1105,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
                     if (Is_Param_Hidden(f->param, f->special)) {
                         if (f->param == f->special) {
-                            Init_Void(f->arg, SYM_UNDEFINED);
+                            Init_Void(f->arg, SYM_UNSET);
                             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
                         }
                         else {
