@@ -55,17 +55,6 @@ inline static REBVAL *Init_Void_Core(
 #define Init_Void(out,sym) \
     Init_Void_Core((out), Canon(sym))
 
-// This helps find callsites that are following the convention for what
-// `do []` sould do (current answer: use ~void~ to reflect emptiness):
-//
-// https://forum.rebol.info/t/what-should-do-do/1426
-//
-// This is also chosen as the form of void that the console won't display
-// by default (others, like ~unset~, are visible results)
-//
-#define Init_Empty_Void(out) \
-    Init_Void((out), SYM_VOID)
-
 inline static const REBSTR* VAL_VOID_LABEL(
     unstable REBCEL(const*) v
 ){

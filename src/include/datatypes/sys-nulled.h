@@ -45,6 +45,15 @@
 #define Init_Nulled(out) \
     RESET_CELL((out), REB_NULL, CELL_MASK_NONE)
 
+// This helps find callsites that are following the convention for what
+// `do []` should do.  This has changed to be NULL from the historical choice
+// to make it an "ornery" value (e.g. `~unset~`):
+//
+// https://forum.rebol.info/t/what-should-do-do/1426
+//
+#define Init_Empty_Nulled(out) \
+    Init_Nulled(out)
+
 
 //=//// NULL ISOTOPE (NULL-2) /////////////////////////////////////////////=//
 //

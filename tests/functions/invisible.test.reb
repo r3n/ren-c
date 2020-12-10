@@ -9,7 +9,7 @@
     1 = do [1 comment "a"]
 )
 (
-    '~void~ = do [comment "a"]
+    null? do [comment "a"]
 )
 
 (
@@ -55,7 +55,7 @@
     1 = do [1 elide "a"]
 )
 (
-    '~void~ = do [elide "a"]
+    null? do [elide "a"]
 )
 
 (
@@ -144,7 +144,7 @@
 ]
 
 (
-    '~void~ = do [|||]
+    null? do [|||]
 )
 (
     3 = do [1 + 2 ||| 10 + 20, 100 + 200]
@@ -323,8 +323,8 @@
     ]
 )
 
-(void? (if true [] else [<else>]))
-(void? (if true [comment <true-branch>] else [<else>]))
+(null-2? (if true [] else [<else>]))
+(null-2? (if true [comment <true-branch>] else [<else>]))
 
 (1 = all [1 elide <vaporize>])
 (1 = any [1 elide <vaporize>])

@@ -9,7 +9,7 @@
 ; return-less return value tests
 (
     f: does []
-    void? f
+    null? f
 )
 (
     f: does [:abs]
@@ -184,7 +184,7 @@
 )
 (
     f: does [()]
-    void? f
+    null? f
 )
 (
     f: does ['a]

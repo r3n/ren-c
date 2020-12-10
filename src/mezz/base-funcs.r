@@ -681,14 +681,14 @@ find-last: redescribe [
 attempt: func [
     {Tries to evaluate a block and returns result or NULL on error.}
 
-    return: "null on error, if code runs and produces null it becomes void"
+    return: "NULL on error"
         [<opt> any-value!]
     code [block! action!]
 ][
     trap [
-        return do code  ; VOIDIFY of null avoids conflation, but is overkill
+        return @(do code else [null])  ; want NULL-2 if was NULL
     ]
-    null  ; don't look at trapped error value, just return null
+    return null
 ]
 
 for-next: redescribe [

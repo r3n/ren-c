@@ -22,18 +22,18 @@
 (void? first [~~~])
 ('~ = label of '~~~)
 
-; ~void~ is the response for when there is no content:
+; NULL is the response for when there is no content:
 ; https://forum.rebol.info/t/what-should-do-do/1426
 ;
-('~void~ = do [])
+(null? do [])
 (
     foo: func [] []
-    '~void~ = foo
+    null? foo
 )
-('~void~ = applique :foo [])
-('~void~ = do :foo)
+(null? applique :foo [])
+(null? do :foo)
 
-; ~void~ also the convention for what you get by RETURN with no argument, or
+; ~void~ is the convention for what you get by RETURN with no argument, or
 ; if the spec says <void> any result.
 (
     foo: func [return: <void>] []

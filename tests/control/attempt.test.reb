@@ -3,7 +3,8 @@
     (null? attempt [1 / 0])
 ]
 (1 = attempt [1])
-(void? attempt [])
+(null-2? attempt [])
+
 ; RETURN stops attempt evaluation
 (
     f1: func [] [attempt [return 1 2] 2]

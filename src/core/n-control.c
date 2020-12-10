@@ -1473,6 +1473,7 @@ REBNATIVE(catch)
     }
 
     CATCH_THROWN(D_OUT, D_OUT); // thrown value
+    Isotopify_If_Nulled(D_OUT);  // a caught NULL triggers THEN, not ELSE
     return D_OUT;
 }
 
