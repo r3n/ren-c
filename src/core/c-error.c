@@ -284,16 +284,24 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
       case DETECTED_AS_CELL: {
         const REBVAL *v = cast(const REBVAL*, p);
         if (IS_PARAM(v)) {
-            const REBVAL *v_seek = v;
-            while (not IS_ACTION(v_seek))
-                --v_seek;
+            //
+            // If the PAR() style parameter is used, that parameter must be
+            // for a function running on the stack.
+            //
             REBFRM *f_seek = FS_TOP;
-            REBACT *act = VAL_ACTION(v_seek);
-            while (f_seek->original != act) {
-                --f_seek;
+            while (true) {
                 if (f_seek == FS_BOTTOM)
                     panic ("fail (PAR(name)); issued for param not on stack");
+
+                const REBVAL *v_seek = ACT_PARAMS_HEAD(FRM_PHASE(f_seek));
+                for (; NOT_END(v_seek); ++v_seek) {
+                    if (v_seek == v)
+                        goto found_param;
+                }
+                f_seek = f_seek->prior;
             }
+
+          found_param:
             error = Error_Invalid_Arg(f_seek, v);
         }
         else
@@ -1100,7 +1108,7 @@ REBCTX *Error_Invalid_Arg(REBFRM *f, const RELVAL *param)
     assert(IS_PARAM(param));
 
     RELVAL *rootparam = STABLE(ARR_HEAD(ACT_PARAMLIST(FRM_PHASE(f))));
-    assert(IS_ACTION(rootparam));
+    assert(IS_UNREADABLE_DEBUG(rootparam));
     assert(param > rootparam);
     assert(param <= rootparam + 1 + FRM_NUM_ARGS(f));
 
