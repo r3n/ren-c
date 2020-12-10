@@ -45,9 +45,11 @@
 
 ; === PREDICATES ===
 ;
-; Predicates influence the handling of NULLs, which error by default.
+; Predicates influence the handling of NULLs, which vaporize by default.
 
-('need-non-null = (trap [reduce [null]])/id)
+([] = reduce [null])
+
+(error? trap [reduce .non.null [null]])
 
 ([3 _ 300] = reduce .try [1 + 2 if false [10 + 20] 100 + 200])
 ([3 ~nulled~ 300] = reduce .voidify [1 + 2 if false [10 + 20] 100 + 200])

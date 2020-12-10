@@ -627,7 +627,7 @@ non: redescribe [
             ;
             fail [
                 "NON failed with argument of type"
-                    type of get* 'arg else ["NULL"]
+                    (type of get* 'arg) else ["NULL"]
             ]
         ]
     ]

@@ -31,7 +31,7 @@
 //
 //      return: "New array or value"
 //          [<opt> any-value!]
-//      :predicate "Applied after evaluation, default is .NON.NULL"
+//      :predicate "Applied after evaluation, default is .IDENTITY"
 //          [<skip> predicate! action!]
 //      value "GROUP! and BLOCK! evaluate each item, single values evaluate"
 //          [any-value!]
@@ -86,11 +86,22 @@ REBNATIVE(reduce)
             continue;  // `reduce [comment "hi"]`
         }
 
-        if (IS_NULLED(ARG(predicate))) {  // be .NON.NULL, so error on NULLs
-            if (IS_NULLED(D_OUT))
-                fail (Error_Need_Non_Null_Raw(v));
-
-            Move_Value(DS_PUSH(), D_OUT);
+        if (IS_NULLED(ARG(predicate))) {
+            //
+            // Ren-C breaks with historical precedent in making the default
+            // for REDUCE to not strictly output a number of results equal
+            // to the number of input expressions, as NULL is "non-valued":
+            //
+            //     >> append [<a> <b>] reduce [<c> if false [<d>]]
+            //     == [<a> <b> <c>]  ; two expressions added just one result
+            //
+            // A predicate like .NON.NULL could error on NULLs, or they could
+            // be converted to blanks/etc.  See rationale for the change:
+            //
+            // https://forum.rebol.info/t/what-should-do-do/1426
+            //
+            if (not IS_NULLED(D_OUT))
+                Move_Value(DS_PUSH(), D_OUT);
         }
         else {
             REBVAL *processed = rebValue(

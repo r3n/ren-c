@@ -400,7 +400,7 @@ ext-console-impl: function [
                 emit [system/console/print-gap]
                 emit [system/console/print-prompt]
                 emit [reduce [
-                    try system/console/input-hook
+                    system/console/input-hook
                 ]]  ; gather first line (or null), put in BLOCK!
             ]
             <halt> [
