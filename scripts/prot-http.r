@@ -583,6 +583,13 @@ check-data: function [
                 ; forming a hex string.  DEBASE to get a BINARY! and then
                 ; DEBIN to get an integer.
                 ;
+                ; It's not guaranteed that the chunk size is an even number
+                ; of hex digits!  If it's not, insert a 0, since DEBASE 16
+                ; would reject it otherwise.
+                ;
+                if odd? length of chunk-size [
+                    insert chunk-size #0
+                ]
                 chunk-size: debin [be +] (debase/base as text! chunk-size 16)
 
                 if chunk-size = 0 [
@@ -591,8 +598,8 @@ check-data: function [
                             |
                         copy trailer to crlf2bin to end
                     ] then [
-                        trailer: construct/only trailer
-                        append headers body-of trailer
+                        trailer: scan-net-header as binary! trailer
+                        append headers trailer
                         state/mode: 'ready
                         res: state/awake make event! [
                             type: 'custom
@@ -608,7 +615,7 @@ check-data: function [
                         break
                     ]
 
-                    insert/part tail of out mk1 mk2
+                    append/part out mk1 ((index of mk2) - (index of mk1))
                     remove/part data skip mk2 2
                     empty? data
                 ]
