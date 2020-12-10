@@ -766,12 +766,12 @@ main-startup: function [
         o/resources
         not find o/suppress %user.reb
         elide (loud-print ["Checking for user.reb file in" o/resources])
-        exists? o/resources/user.reb
+        exists? join o/resources %user.reb
     ] then [
         trap [
-            do o/resources/user.reb
-            append o/loaded o/resources/user.reb
-            loud-print ["Finished evaluating script:" o/resources/user.reb]
+            do join o/resources %user.reb
+            append o/loaded join o/resources %user.reb
+            loud-print ["Finished evaluating:" join o/resources %user.reb]
         ] then e -> [
             die/error "Error found in user.reb script" e
         ]
