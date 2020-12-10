@@ -50,7 +50,7 @@
     [a b c 10 10] = do f
 )
 (
-    f: make frame! 'append/only
+    f: make frame! :append/only
     f/series: copy [a b c]
     f/value: [d e f]
     [a b c [d e f]] = do f

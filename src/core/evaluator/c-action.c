@@ -182,7 +182,7 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     // value existed, the parameter had to act quoted.  Eval.
     //
     if (Eval_Value_Maybe_End_Throws(f->arg, f->out, SPECIFIED)) {
-        Move_Value(f->arg, f->out);
+        Move_Value(f->out, f->arg);
         return true;
     }
 
