@@ -52,6 +52,7 @@ PVAR REBU64 PG_Mem_Limit;   // Memory limit set by SECURE
 //
 PVAR const REBSTR *PG_Slash_1_Canon;  // Preallocated "fake" word for `/`
 PVAR const REBSTR *PG_Dot_1_Canon;  // Preallocated "fake" word for `.`
+PVAR const REBSTR *PG_Unreadable_Canon;  // Preallocated ~unreadable~ void
 
 PVAR REBSER *PG_Symbol_Canons; // Canon symbol pointers for words in %words.r
 PVAR REBSER *PG_Canons_By_Hash; // Canon REBSER pointers indexed by hash

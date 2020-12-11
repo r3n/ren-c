@@ -513,7 +513,7 @@ void Startup_Interning(void)
 
 
 //
-//  Startup_Sequence_1_Symbol: C
+//  Startup_Early_Symbols: C
 //
 // It's very desirable to have `/`, `/foo`, `/foo/`, `/foo/(bar)` etc. be
 // instances of the same datatype of PATH!.  In this scheme, `/` would act
@@ -537,7 +537,11 @@ void Startup_Interning(void)
 // available during scanning.  But scanning is what loads the %words.r symbol
 // list!  Break the Catch-22 by manually interning the symbol used.
 //
-void Startup_Sequence_1_Symbol(void)
+// (Same issue applies to the symbol in ~unreadable~ in release builds, used
+// e.g. by the data stack initialization.  In debug builds NULL is used to
+// detect the errors on reads.)
+//
+void Startup_Early_Symbols(void)
 {
     const char *slash1 = "-slash-1-";
     assert(PG_Slash_1_Canon == nullptr);
@@ -546,6 +550,13 @@ void Startup_Sequence_1_Symbol(void)
     const char *dot1 = "-dot-1-";
     assert(PG_Dot_1_Canon == nullptr);
     PG_Dot_1_Canon = Intern_UTF8_Managed(cb_cast(dot1), strsize(dot1));
+
+    const char *unreadable = "unreadable";
+    assert(PG_Unreadable_Canon == nullptr);
+    PG_Unreadable_Canon = Intern_UTF8_Managed(
+        cb_cast(unreadable),
+        strsize(unreadable)
+    );
 }
 
 
@@ -595,6 +606,8 @@ void Startup_Symbols(REBARR *words)
             assert(canon == PG_Slash_1_Canon);  // make sure it lined up!
         else if (sym == SYM__DOT_1_)
             assert(canon == PG_Dot_1_Canon);
+        else if (sym == SYM_UNREADABLE)
+            assert(canon == PG_Unreadable_Canon);
 
         // More code was loaded than just the word list, and it might have
         // included alternate-case forms of the %words.r words.  Walk any
@@ -644,6 +657,7 @@ void Shutdown_Symbols(void)
 
     PG_Slash_1_Canon = nullptr;
     PG_Dot_1_Canon = nullptr;
+    PG_Unreadable_Canon = nullptr;
 }
 
 

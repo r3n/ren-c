@@ -977,6 +977,7 @@ void Startup_Core(void)
     Startup_CRC();             // For word hashing
     Set_Random(0);
     Startup_Interning();
+    Startup_Early_Symbols();  // see notes--need before data stack or scan
 
     Startup_End_Node();
     Startup_Empty_Array();
@@ -1020,8 +1021,6 @@ void Startup_Core(void)
         max,
         SYM_GZIP
     );
-
-    Startup_Sequence_1_Symbol();  // see notes--needed before scanning
 
     REBARR *boot_array = Scan_UTF8_Managed(
         Intern_Unsized_Managed("tmp-boot.r"),

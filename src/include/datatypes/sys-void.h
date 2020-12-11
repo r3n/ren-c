@@ -73,10 +73,10 @@ inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
 
 #if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, non-crashing VOID!
     #define Init_Unreadable_Void(v) \
-        Init_Void(v, SYM_UNREADABLE)
+        Init_Void_Core(v, PG_Unreadable_Canon)  // canon available early
 
     #define IS_VOID_RAW(v) \
-        IS_BLANK(v)
+        IS_VOID(v)
 
     #define ASSERT_UNREADABLE_IF_DEBUG(v) \
         assert(IS_VOID(v))  // would have to be a void even if not unreadable

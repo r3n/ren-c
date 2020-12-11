@@ -57,6 +57,7 @@ trap [
     ;
     if find parameters of :load /all [
         load-all: :load/all
+        load-value: :load  ; imperfect...works for rebmake
     ] else [
         load-all: :load
     ]
