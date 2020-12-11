@@ -14,7 +14,7 @@ request-file: adapt :request-file* [
     ; !!! What notation should be used to indicate the default filter?
     ; Perhaps put in a GROUP!?
     ;
-    filter: default [
+    filter: default '[
         "All files"         %*.*
         "Rebol scripts"     %*.r
         ; ("Default idea"   %*.xxx)
@@ -39,3 +39,5 @@ request-dir: chain [
         ]
     ]
 ]
+
+export [request-file request-dir]
