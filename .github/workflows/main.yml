@@ -227,7 +227,7 @@ jobs:
             git_commit="$GIT_COMMIT" \
             rigorous=no \
             static=no \
-            extensions=-
+            extensions=""
 
         make prep
         make folders
