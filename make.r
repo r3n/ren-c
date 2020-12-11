@@ -1454,9 +1454,9 @@ process-module: func [
                             output: lib
                         ]
                     ]
-                    (object? lib) and [
+                    (object? lib) and (
                         find [#dynamic-extension #static-extension] lib/class
-                    ][
+                    )[
                         lib
                     ]
                     fail ["unrecognized library" lib "in module" mod]

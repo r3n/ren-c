@@ -602,7 +602,7 @@ cl: make compiler-class [
             if O [
                 case [
                     O = true [keep "/O2"]
-                    O and [not zero? O] [
+                    all [O (not zero? O)] [
                         keep ["/O" O]
                     ]
                 ]

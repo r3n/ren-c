@@ -130,7 +130,7 @@
         [specialize :append/asdf []]
         [specialize lit (specialize :append/only [])/only []]
     ][
-        is-bad: me and ['bad-refine = (trap [do code])/id]
+        is-bad: me and ('bad-refine = (trap [do code])/id)
     ]
 
     is-bad

@@ -467,7 +467,7 @@ do-needs: function [
     ; Temporary object to collect exports of "mixins" (private modules).
     ; Don't bother if returning all the modules in a block, or if in user mode.
     ;
-    if no-user and [not block] [
+    if no-user and (not block) [
         mixins: make object! 0  ; Minimal length since it may persist later
     ]
 

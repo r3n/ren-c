@@ -170,11 +170,11 @@ backtrace*: function [
         ]
 
         if not pending? f [
-            if first-frame and [any [
+            if first-frame and (any [
                 true  ; !!! Now these are ADAPT, try just zeroing first frame
                 :a = :pause
                 :a = :breakpoint
-            ]][
+            ])[
                 ; Omitting breakpoints from the list entirely presents a
                 ; skewed picture of what's going on.  But giving them
                 ; "index 1" means that inspecting the frame you're actually
