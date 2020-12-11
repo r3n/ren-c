@@ -56,7 +56,6 @@ state: make object! [
         net:     ; network access
         eval:    ; evaluation limit
         memory:  ; memory limit
-        secure:  ; secure changes
         protect: ; protect function
         debug:   ; debugging features
         envr:    ; read/write
@@ -119,7 +118,6 @@ options: make object! [  ; Options supplied to REBOL during startup
     script: _       ; Filename of script to evaluate
     args: _         ; Command line arguments passed to script
     debug: _        ; debug flags
-    secure: _       ; security policy
     version: _      ; script version needed
 
     dump-size: 68   ; used by dump
