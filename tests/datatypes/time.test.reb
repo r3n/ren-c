@@ -11,7 +11,7 @@
 (
     did any [
         error? trap [t: -596522:0:0 - 1:00]
-        t = load mold t
+        t = load-value mold t
     ]
 )
 
@@ -19,7 +19,7 @@
 (
     did any [
         error? trap [t: 596522:0:0 + 1:00]
-        t = load mold t
+        t = load-value mold t
     ]
 )
 

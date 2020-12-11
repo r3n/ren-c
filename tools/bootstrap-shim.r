@@ -53,8 +53,22 @@ trap [
         return :v
     ]
 
+    ; LOAD changed to have no /ALL so enforcing getting a block is weird
+    ;
+    if find parameters of :load /all [
+        load-all: :load/all
+    ] else [
+        load-all: :load
+    ]
+
     QUIT
 ]
+
+; !!! This isn't perfect, but it should work for the cases in rebmake
+;
+load-value: :load
+load-all: :load/all
+
 
 ; Lambda was redefined to `->` to match Haskell/Elm vs. `=>` for JavaScript.
 ; It is lighter to look at, but also if the symbol `<=` is deemed to be
@@ -443,6 +457,7 @@ delimit: func [
 
 unspaced: specialize :delimit [delimiter: _]
 spaced: specialize :delimit [delimiter: space]
+
 
 dequote: func [x] [
     switch type of x [

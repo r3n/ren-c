@@ -105,7 +105,7 @@ cscape: function [
             any-lower: did find/case expr charset [#"a" - #"z"]
             keep pattern
 
-            code: load/all expr
+            code: load-all expr  ; compatibility hack needed, /ALL deprecated
             if with [
                 if lit-word? with [with: dequote with]
 
@@ -206,7 +206,7 @@ cscape: function [
 ]
 
 
-boot-version: load %../src/boot/version.r
+boot-version: load-value %../src/boot/version.r
 
 make-emitter: function [
     {Create a buffered output text file emitter}

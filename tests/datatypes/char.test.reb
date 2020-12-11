@@ -39,9 +39,9 @@
 ; to actually work with 0 byte representations in strings (even for a test
 ; that is character based).
 ;
-(do load #{23225E4022203D2023225E2830302922})  ; ^ @ = ^ (00)
-(do load #{23225E286E756C6C2922203D2023225E2830302922})  ; ^ (null) = ^ (00)
-((load #{23225E2830302922}) = make char! 0)  ; ^ (00)
+(true = do load #{23225E4022203D2023225E2830302922})  ; ^ @ = ^ (00)
+(true = do load #{23225E286E756C6C2922203D2023225E2830302922})  ; ^ (null) = ^ (00)
+((load-value #{23225E2830302922}) = make char! 0)  ; ^ (00)
 
 (#"^A" = #"^(01)")
 (#"^B" = #"^(02)")

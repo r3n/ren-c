@@ -104,7 +104,6 @@ for-each [name value] options [
             ; [+|-|*] [NAME {+|-|*|[modules]}]... 
             use [ext-file user-ext][
                 user-ext: load value
-                if word? user-ext [user-ext: reduce [user-ext]]
                 if not block? user-ext [
                     fail [
                         "Selected extensions must be a block, not"
@@ -124,7 +123,7 @@ for-each [name value] options [
         ]
     ] else [
         set in user-config (to-word replace/all to text! name #"_" #"-")
-            attempt [load value] else [value]
+            attempt [load-value value] else [value]
     ]
 ]
 

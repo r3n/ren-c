@@ -261,20 +261,16 @@ load-header: function [
 load: function [
     {Loads code or data from a file, URL, text string, or binary.}
 
-    return: "Loaded code (may be single-value if /header or /all not used)"
+    return: "BLOCK! if Rebol code, otherwise value(s) appropriate for codec"
         [any-value!]
     header: "<output> Request the Rebol header object be returned as well"
         [object!]
 
-    source "Source or block of sources"
-        [file! url! text! binary! block!]
-    /all "Load all values (cannot be used with /HEADER)"  ; use all_LOAD
+    source "Source of the information being loaded"
+        [file! url! text! binary!]
     /type "E.g. rebol, text, markup, jpeg... (by default, auto-detected)"
         [word!]
 ][
-    all_LOAD: :all
-    all: :lib/all
-
     ; Note that code or data can be embedded in other datatypes, including
     ; not just text, but any binary data, including images, etc. The type
     ; argument can be used to control how the raw source is converted.
@@ -287,23 +283,6 @@ load: function [
     ;
     ; Note that IMPORT has its own loader, and does not use LOAD directly.
     ; /TYPE with anything other than 'EXTENSION disables extension loading.
-
-    all [header, all_LOAD] then [
-        fail "Cannot use /ALL and /HEADER refinements together"
-    ]
-
-    if block? source [
-        ; A BLOCK! means multiple sources, calls LOAD recursively for each
-
-        return map-each s source [
-            applique :load [
-                source: s
-                header: header
-                all: all_LOAD
-                type: :type
-            ]
-        ]
-    ]
 
     ; Detect file type, and decode the data
 
@@ -361,17 +340,15 @@ load: function [
 
     ; Try to load the header, handle error
 
-    if not all_LOAD [
-        hdr: line: _  ; for SET-WORD! gathering, evolving...
-        either object? data [
-            fail "Code has not been updated for LOAD-EXT-MODULE"
-            load-ext-module data
-        ][
-            [hdr data line]: load-header/file data file
-        ]
-
-        if word? hdr [cause-error 'syntax hdr source]
+    hdr: line: _  ; for SET-WORD! gathering, evolving...
+    either object? data [
+        fail "Code has not been updated for LOAD-EXT-MODULE"
+        load-ext-module data
+    ][
+        [hdr data line]: load-header/file data file
     ]
+
+    if word? hdr [cause-error 'syntax hdr source]
 
     ensure [blank! object!] hdr: default [_]
     ensure [binary! block! text!] data
@@ -393,25 +370,27 @@ load: function [
         data: intern data
     ]
 
-    ; If appropriate and possible, return singular data value.
-    ;
-    ; !!! How good an idea is this, really?  People are used to saying
-    ; load "10" and getting `10`, not `[10]`.  But it seems like this makes
-    ; the process have some variability to it that makes it a poor default.
-    ;
-    all .not [
-        all_LOAD
-        header  ; technically doesn't prevent returning single value (?)
-        (length of data) <> 1
-    ] then [
-        data: first data
-    ]
-
     if header [
         set header opt hdr
     ]
     return :data
 ]
+
+load-value: redescribe [
+    {Do a LOAD of a single value}
+](
+    chain [
+        :load
+            |
+        func [x] [
+            assert [block? x]
+            if 1 <> length of x [
+                fail ["LOAD-VALUE got length" length of x "block, not 1"]
+            ]
+            first x
+        ]
+    ]
+)
 
 
 do-needs: function [
@@ -1014,4 +993,4 @@ import: function [
 ]
 
 
-export [load import]
+export [load load-value import]

@@ -574,7 +574,7 @@ config-system: function [
         blank! [  ; Try same version as this r3-make was built with
             to tuple! reduce [0 system/version/4 system/version/5]
         ]
-        text! [load hint]
+        text! [load-value hint]
         tuple! [hint]
     ]
 

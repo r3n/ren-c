@@ -47,7 +47,7 @@ make object! compose [
 
         let result
         case [
-            error? trap [test-block: as block! load source] [
+            error? trap [test-block: as block! load-value source] [
                 "cannot load test source"
             ]
 

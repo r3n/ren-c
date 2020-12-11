@@ -109,7 +109,7 @@ comment [
 (e-version: make-emitter "Version Information"
     make-file [(prep-dir) include/tmp-version.h])
 
-version: load %version.r
+version: load-value %version.r
 version: to tuple! reduce [
     version/1 version/2 version/3 config/id/2 config/id/3
  ]

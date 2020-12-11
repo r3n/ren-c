@@ -651,10 +651,10 @@ ext-console-impl: function [
     ]
 
     trap [
-        ; Note that LOAD/ALL makes BLOCK! even for a single item,
-        ; e.g. `load/all "word"` => `[word]`
+        ; Note LOAD now makes BLOCK! even for a single item,
+        ; e.g. `load "word"` => `[word]`
         ;
-        code: load/all delimit newline result
+        code: load delimit newline result
         assert [block? code]
 
     ] then error -> [

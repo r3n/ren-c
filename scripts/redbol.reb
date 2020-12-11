@@ -1403,6 +1403,32 @@ call: emulate [  ; brings back the /WAIT switch (Ren-C waits by default)
 ]
 
 
+; Ren-C's LOAD uses "ALL" semantics by default to give back a BLOCK! of code
+; always.  Extracting single values is done with LOAD-VALUE.
+;
+; Historical Redbol is more unpredictable in the name of "convenience":
+;
+;    rebol2> load "1"
+;    == 1
+;
+;    rebol2> load "1 2"
+;    == [1 2]
+;
+; This augments LOAD with the /ALL refinement and tweaks the behavior.
+;
+load: emulate [
+    enclose (augment :load [/all]) func [f <local> try-one-item] [
+        try-one-item: not f/all
+        result: do f  ; now always BLOCK! if LOADing Rebol code
+
+        if try-one-item and (block? result) and (length of result = 1) [
+            return first result  ; "1" loads as `[1]`, change it to `1`
+        ]
+        return result  ; "1 2" loads as `[1 2]`, leave it that way
+    ]
+]
+
+
 === LEAVE VOID AS LAST LINE ===
 ;
 ; So that `do <redbol>` doesn't show any output.  While the console displays

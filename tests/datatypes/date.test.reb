@@ -22,13 +22,13 @@
 (
     did any [
         error? trap [date-d: 1-Jan-0000 - 1]
-        date-d = load mold date-d
+        date-d = load-value mold date-d
     ]
 )
 (
     did any [
         error? trap [date-d: 31-Dec-16383 + 1]
-        date-d = load mold date-d
+        date-d = load-value mold date-d
     ]
 )
 
@@ -36,7 +36,7 @@
     did all [
         error? trap [load "1/11--00"]
         error? trap [load "1/11--0"]
-        (load "1-11-0") = (load "1-11-00")
+        (load-value "1-11-0") = (load-value "1-11-00")
     ]
 )]
 

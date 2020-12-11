@@ -4,14 +4,14 @@
 (set-path! = type of first [a/b:])
 ; the minimum
 [#1947
-    (set-path? load "#[set-path! [[a] 1]]")
+    (set-path? load-value "#[set-path! [[a] 1]]")
 ]
 
 ; ANY-PATH! are no longer positional
 ;
 ;(
 ;    all [
-;        set-path? a: load "#[set-path! [[a b c] 2]]"
+;        set-path? a: load-value "#[set-path! [[a b c] 2]]"
 ;        2 == index? a
 ;    ]
 ;)

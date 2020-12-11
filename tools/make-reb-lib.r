@@ -25,7 +25,7 @@ output-dir: make-file [(system/options/path) prep /]
 output-dir: make-file [(output-dir) include /]
 mkdir/deep output-dir
 
-ver: load %../src/boot/version.r
+ver: load-value %../src/boot/version.r
 
 
 === PROCESS %a-lib.h TO PRODUCE DESCRIPTION OBJECTS FOR EACH API ===

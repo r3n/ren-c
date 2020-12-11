@@ -18,7 +18,7 @@
 ; So ~ is the only "~-word"
 ;
 (word? first [~])
-('scan-invalid = ((trap [load "~~"])/id))
+('scan-invalid = ((trap [load-value "~~"])/id))
 (void? first [~~~])
 ('~ = label of '~~~)
 

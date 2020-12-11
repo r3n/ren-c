@@ -43,7 +43,7 @@
 ; Due to the spacing rule, the traditional "comma means decimal point" rule
 ; is still able to work--though it is less desirable for it to do so.
 ;
-(1.1 = load "1,1")
+(1.1 = load-value "1,1")
 
 ; Because we're using `,` and not `|`, it can be used in the PARSE dialect.
 ; R3-Alpha's PARSE implementation was not particularly orderly in terms of
