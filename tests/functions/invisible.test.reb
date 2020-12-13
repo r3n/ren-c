@@ -123,7 +123,7 @@
 
         return: [<opt> any-value!]
         right [<opt> <end> any-value! <variadic>]
-        :lookahead [any-value! <variadic>]
+        'lookahead [any-value! <variadic>]
         look:
     ][
         take right  ; returned value

@@ -93,11 +93,11 @@ for-each [name value] options [
             while [config] [
                 set [path: f:] split-path config
                 bak: system/options/current-path
-                cd :path
+                change-dir path
                 user-config/config: _
                 user-config: make user-config load f
                 config: try attempt [clean-path user-config/config]
-                cd :bak
+                change-dir bak
             ]
         ]
         'EXTENSIONS [
