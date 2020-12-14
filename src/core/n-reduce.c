@@ -86,34 +86,34 @@ REBNATIVE(reduce)
             continue;  // `reduce [comment "hi"]`
         }
 
-        if (IS_NULLED(ARG(predicate))) {
-            //
-            // Ren-C breaks with historical precedent in making the default
-            // for REDUCE to not strictly output a number of results equal
-            // to the number of input expressions, as NULL is "non-valued":
-            //
-            //     >> append [<a> <b>] reduce [<c> if false [<d>]]
-            //     == [<a> <b> <c>]  ; two expressions added just one result
-            //
-            // A predicate like .NON.NULL could error on NULLs, or they could
-            // be converted to blanks/etc.  See rationale for the change:
-            //
-            // https://forum.rebol.info/t/what-should-do-do/1426
-            //
-            if (not IS_NULLED(D_OUT))
-                Move_Value(DS_PUSH(), D_OUT);
-        }
-        else {
+        if (not IS_NULLED(ARG(predicate))) {  // post-process result if needed
             REBVAL *processed = rebValue(
                 rebINLINE(predicate), rebQ(D_OUT),
             rebEND);
             if (processed)
-                Move_Value(DS_PUSH(), processed);
+                Move_Value(D_OUT, processed);
+            else
+                Init_Nulled(D_OUT);
             rebRelease(processed);
         }
 
-        if (line)
-            SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
+        // Ren-C breaks with historical precedent in making the default
+        // for REDUCE to not strictly output a number of results equal
+        // to the number of input expressions, as NULL is "non-valued":
+        //
+        //     >> append [<a> <b>] reduce [<c> if false [<d>]]
+        //     == [<a> <b> <c>]  ; two expressions added just one result
+        //
+        // A predicate like .NON.NULL could error on NULLs, or they could
+        // be converted to blanks/etc.  See rationale for the change:
+        //
+        // https://forum.rebol.info/t/what-should-do-do/1426
+        //
+        if (not IS_NULLED(D_OUT)) {
+            Move_Value(DS_PUSH(), D_OUT);
+            if (line)
+                SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
+        }
     } while (NOT_END(f_value));
 
     Drop_Frame_Unbalanced(f);  // Drop_Frame() asserts on accumulation

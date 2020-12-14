@@ -400,7 +400,7 @@ ext-console-impl: function [
                 emit [system/console/print-gap]
                 emit [system/console/print-prompt]
                 emit [reduce [
-                    system/console/input-hook
+                    try system/console/input-hook  ; can return be NULL
                 ]]  ; gather first line (or null), put in BLOCK!
             ]
             <halt> [
@@ -642,9 +642,12 @@ ext-console-impl: function [
 
     if blank? last result [
         ;
-        ; It was aborted.  This comes from ESC on POSIX (which is the ideal
-        ; behavior), Ctrl-D on Windows (because ReadConsole() can't trap ESC),
-        ; Ctrl-D on POSIX (just to be compatible with Windows).
+        ; It was aborted.  This comes from ESC (NULL from ASK TEXT!, + TRY)
+        ;
+        ; Note: At one time it had to be Ctrl-D on Windows, as ReadConsole()
+        ; could not trap escape.  But input was changed to use more granular
+        ; APIs on windows, on a keystroke-by-keystroke basis vs reading a
+        ; whole line at a time.
         ;
         emit [system/console/print-result '~void~]
         return <prompt>

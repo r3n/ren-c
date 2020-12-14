@@ -49,6 +49,17 @@
 
 ([] = reduce [null])
 
+; There was a bug pertaining to trying to set the new line flag on the output
+; in the case of a non-existent null, test that.
+[
+    ([] = reduce [
+        null
+    ])
+    ([] = reduce .identity [
+        null
+    ])
+]
+
 (error? trap [reduce .non.null [null]])
 
 ([3 _ 300] = reduce .try [1 + 2 if false [10 + 20] 100 + 200])
