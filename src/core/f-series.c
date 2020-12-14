@@ -456,6 +456,9 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool strict)
       case REB_HANDLE:
         return CT_Handle(s, t, strict);
 
+      case REB_COMMA:
+        return CT_Comma(s, t, strict);
+
       default:
         break;
     }
