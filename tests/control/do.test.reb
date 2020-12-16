@@ -165,7 +165,7 @@
     all [
         lit-path? a-value
         path? reeval :a-value
-        (as path! :a-value) == (reeval :a-value)
+        (as path! unquote :a-value) == (reeval :a-value)
     ]
 )]
 
@@ -174,7 +174,7 @@
     all [
         lit-word? a-value
         word? reeval :a-value
-        (to-word :a-value) == (reeval :a-value)
+        (to-word unquote :a-value) == (reeval :a-value)
     ]
 )
 (true = reeval true)

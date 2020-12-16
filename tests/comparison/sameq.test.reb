@@ -116,7 +116,7 @@
     #1068 #1066
     ; https://forum.rebol.info/t/1084
     (
-        a-value: first ['a/b]
+        a-value: first [a/b]
         parse as block! :a-value [b-value: end]
         same? as block! :a-value :b-value
     )

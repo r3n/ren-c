@@ -521,6 +521,7 @@
         test a-value b-value
         not null? for-each [w v] a-value [
             if not test :v select b-value w [break]
+            true
         ]
 )(
     a-value: construct/only [
@@ -540,6 +541,7 @@
         test a-value b-value
         not null? for-each [w v] a-value [
             if not test :v select b-value w [break]
+            true
         ]
 )]
 

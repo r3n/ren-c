@@ -106,7 +106,7 @@ REBNATIVE(as_pair)
 //
 //      return: [action! any-array! any-path! any-word!]
 //      value "Value whose binding is to be set (modified) (returned)"
-//          [action! any-array! any-path! any-word!]
+//          [action! any-array! any-path! any-word! quoted!]
 //      target "Target context or a word whose binding should be the target"
 //          [any-word! any-context!]
 //      /copy "Bind and return a deep copy of a block, don't modify original"
@@ -120,6 +120,7 @@ REBNATIVE(bind)
     INCLUDE_PARAMS_OF_BIND;
 
     REBVAL *v = ARG(value);
+    REBLEN num_quotes = Dequotify(v);
 
     REBVAL *target = ARG(target);
     if (IS_QUOTED(target)) {
@@ -172,7 +173,7 @@ REBNATIVE(bind)
         //
         if (REF(new) or (IS_SET_WORD(v) and REF(set))) {
             Append_Context(VAL_CONTEXT(context), v, NULL);
-            RETURN (v);
+            RETURN (Quotify(v, num_quotes));
         }
 
         fail (Error_Not_In_Context_Raw(v));
@@ -186,11 +187,13 @@ REBNATIVE(bind)
     if (IS_ACTION(v)) {
         Move_Value(D_OUT, v);
         INIT_BINDING(D_OUT, VAL_CONTEXT(context));
-        return D_OUT;
+        return Quotify(D_OUT, num_quotes);
     }
 
-    if (not ANY_ARRAY_OR_PATH(v))
-        fail (PAR(value)); // QUOTED! could have been any type
+    if (not ANY_ARRAY_OR_PATH(v)) {  // QUOTED! could have wrapped any type
+        Quotify(v, num_quotes);  // put quotes back on
+        fail (Error_Invalid_Arg(frame_, PAR(value)));
+    }
 
     unstable RELVAL *at;
     if (REF(copy)) {
@@ -219,7 +222,7 @@ REBNATIVE(bind)
         flags
     );
 
-    return D_OUT;
+    return Quotify(D_OUT, num_quotes);
 }
 
 
