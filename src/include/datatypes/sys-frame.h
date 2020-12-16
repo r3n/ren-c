@@ -39,7 +39,9 @@
 
 // !!! Find a better place for this!
 //
-inline static bool IS_QUOTABLY_SOFT(unstable const RELVAL *v) {
+inline static bool ANY_ESCAPABLE_GET(unstable const RELVAL *v) {
+    if (IS_GET_BLOCK(v))
+        fail ("GET-BLOCK! in escapable parameter slots currently reserved");
     return IS_GET_GROUP(v) or IS_GET_WORD(v) or IS_GET_PATH(v);
 }
 

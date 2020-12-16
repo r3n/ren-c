@@ -377,7 +377,7 @@ REBNATIVE(of)
 
     REBVAL *prop = ARG(property);
 
-    if (IS_GROUP(prop)) {
+    if (ANY_ESCAPABLE_GET(prop)) {  // !!! See note above
         if (Eval_Value_Throws(D_SPARE, prop, SPECIFIED))
             return R_THROWN;
         if (not IS_WORD(D_SPARE)) {

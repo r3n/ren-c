@@ -189,7 +189,7 @@ REBNATIVE(literal) // aliased in %base-defs.r as LIT
 
     REBVAL *v = ARG(value);
 
-    if (REF(soft) and IS_QUOTABLY_SOFT(v))
+    if (REF(soft) and ANY_ESCAPABLE_GET(v))
         fail ("LITERAL/SOFT not currently implemented, should clone EVAL");
 
     Move_Value(D_OUT, v);

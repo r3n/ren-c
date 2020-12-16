@@ -385,7 +385,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         REBVAL *first = First_Unspecialized_Param(enfixed);
         if (
-            VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE
+            VAL_PARAM_CLASS(first) == REB_P_SOFT
             or VAL_PARAM_CLASS(first) == REB_P_MODAL
         ){
             goto give_up_backward_quote_priority;  // yield as an exemption
@@ -1427,7 +1427,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             fail (Error_Literal_Left_Path_Raw());
 
         REBVAL *first = First_Unspecialized_Param(enfixed);
-        if (VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE) {
+        if (VAL_PARAM_CLASS(first) == REB_P_SOFT) {
             if (GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)) {
                 CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
                 goto finished;

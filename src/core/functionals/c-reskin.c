@@ -233,7 +233,7 @@ REBNATIVE(reskinned)
         else if (IS_SET_WORD(item))
             pclass = REB_P_LOCAL;
         else if (IS_GET_WORD(item))
-            pclass = REB_P_SOFT_QUOTE;
+            pclass = REB_P_SOFT;
         else if (IS_SYM_WORD(item))
             pclass = REB_P_MODAL;
         else if (
@@ -241,7 +241,7 @@ REBNATIVE(reskinned)
             and VAL_NUM_QUOTES(item) == 1
             and CELL_KIND(VAL_UNESCAPED(item)) == REB_WORD
         ){
-            pclass = REB_P_HARD_QUOTE;
+            pclass = REB_P_HARD;
         }
         else
             fail (Error_Bad_Value_Core(item, VAL_SPECIFIER(ARG(skin))));
@@ -471,7 +471,7 @@ REBNATIVE(tweak)
         break;
 
       case SYM_POSTPONE:  // Wait as long as it can to run w/o changing order
-        if (pclass != REB_P_NORMAL and pclass != REB_P_SOFT_QUOTE)
+        if (pclass != REB_P_NORMAL and pclass != REB_P_SOFT)
             fail ("TWEAK postpone only actions with evaluative 1st params");
         flag = DETAILS_FLAG_POSTPONES_ENTIRELY;
         break;

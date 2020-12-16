@@ -438,7 +438,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
                 break;
 
-              case REB_P_HARD_QUOTE:
+              case REB_P_HARD:
                 if (not GET_CELL_FLAG(f->out, UNEVALUATED)) {
                     //
                     // This can happen e.g. with `x: 10 | x >- lit`.  We
@@ -465,15 +465,27 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
                 break; }
 
-              case REB_P_SOFT_QUOTE:
+              case REB_P_SOFT:
                 //
-                // Note: This permits f->out to not carry the UNEVALUATED
+                // SOFT permits f->out to not carry the UNEVALUATED
                 // flag--enfixed operations which have evaluations on
                 // their left are treated as if they were in a GROUP!.
                 // This is important to `1 + 2 ->- lib/* 3` being 9, while
                 // also allowing `1 + x: ->- lib/default [...]` to work.
+                //
+                goto escapable;
 
-                if (IS_QUOTABLY_SOFT(f->out)) {
+              case REB_P_MEDIUM:
+                //
+                // MEDIUM escapability means that it only allows the escape
+                // of one unit.  Thus when reaching this point, it must carry
+                // the UENEVALUATED FLAG.
+                //
+                assert(GET_CELL_FLAG(f->out, UNEVALUATED));
+                goto escapable;
+
+              escapable:
+                if (ANY_ESCAPABLE_GET(f->out)) {
                     if (Eval_Value_Throws(f->arg, f->out, SPECIFIED)) {
                         Move_Value(f->out, f->arg);
                         goto abort_action;
@@ -612,7 +624,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// HARD QUOTED ARG-OR-REFINEMENT-ARG ///////////////////////////////=//
 
-          case REB_P_HARD_QUOTE:
+          case REB_P_HARD:
             if (not Is_Param_Skippable(f->param))
                 Literal_Next_In_Frame(f->arg, f);  // CELL_FLAG_UNEVALUATED
             else {
@@ -661,14 +673,14 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // Quotes from the right already "win" over quotes from the left, in
     // a case like `help left-quoter` where they point at teach other.
     // But there's also an issue where something sits between quoting
-    // constructs like the `[x]` in between the `else` and `->`:
+    // constructs like the `x` in between the `else` and `->`:
     //
-    //     if condition [...] else [x] -> [...]
+    //     if condition [...] else x -> [...]
     //
-    // Here the neutral [x] is meant to be a left argument to the lambda,
+    // Here the neutral `x` is meant to be a left argument to the lambda,
     // producing the effect of:
     //
-    //     if condition [...] else ([x] -> [...])
+    //     if condition [...] else (`x` -> [...])
     //
     // To get this effect, we need a different kind of deferment that
     // hops over a unit of material.  Soft quoting is unique in that it
@@ -681,7 +693,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // notice a quoting enfix construct afterward looking left, we call
     // into a nested evaluator before finishing the operation.
 
-          case REB_P_SOFT_QUOTE:
+          case REB_P_SOFT:
+          case REB_P_MEDIUM:
             Literal_Next_In_Frame(f->arg, f);  // CELL_FLAG_UNEVALUATED
 
             // See remarks on Lookahead_To_Sync_Enfix_Defer_Flag().  We
@@ -698,10 +711,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             //
             if (
                 Lookahead_To_Sync_Enfix_Defer_Flag(f->feed) and  // ensure got
-                GET_ACTION_FLAG(
+                (pclass == REB_P_SOFT and GET_ACTION_FLAG(
                     VAL_ACTION(unwrap(f->feed->gotten)),  // ensured
                     QUOTES_FIRST
-                )
+                ))
             ){
                 // We need to defer and let the right hand quote that is
                 // quoting leftward win.  We use ST_EVALUATOR_LOOKING_AHEAD
@@ -727,7 +740,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     goto abort_action;
                 }
             }
-            else if (IS_QUOTABLY_SOFT(f->arg)) {
+            else if (ANY_ESCAPABLE_GET(f->arg)) {
                 //
                 // We did not defer the quoted argument.  If the argument
                 // is something like a GROUP!, GET-WORD!, or GET-PATH!...

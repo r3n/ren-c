@@ -277,24 +277,76 @@
     )
 ]
 
-; Argument passing of "soft literal arguments"
+; Argument passing of "medium literal arguments"
 [
     (
-        soft: func [:x] [:x]
+        medium: func [':x <with> got] [got: :x, 1000]
+        Lmedium: enfixed :medium
+
+        got: null
+        test: func [expr [block!]] [
+            got: '~trash~
+            compose [(do expr), (:got)]
+        ]
         true
     )
 
-    (10 == soft 10)
-    ('a == soft a)
-    (lit 'a == soft 'a)
-    (a: 10, 10 == soft :a)
-    (lit a: == soft a:)
-    ('(10 + 20) = soft (10 + 20))
-    (30 == soft :(10 + 20))
+    ([1000, 1] = test [medium 1])
+    ([1000, a] = test [medium a])
+    ([1000, 'a] = test [medium 'a])
+    ([1000, 304] = test [medium :(300 + 4)])
+    ([1000, (300 + 4)] = test [medium (300 + 4)])
+    ([1000, o/f] = test [medium o/f])
     (
-        o: context [f: 10]
-        10 == soft :o/f
+        o: context [f: 304]
+        [1000, 304] = test [medium :o/f]
     )
+
+    ; Key point on which MEDIUM and SOFT differ, enfix quote handling
+    (
+        +Q: enfix func ['x [<end> integer!] y] [if x [x + y] else [<null>]]
+        [<null>, 10] = test [medium 10 +Q 20]
+    )
+
+    ([1001, 2] = test [1 + 2 Lmedium])
+    ([1001, <hi>] = test [1 + :(first [<hi>]) Lmedium])
+
+]
+
+; Argument passing of "soft literal arguments"
+[
+    (
+        soft: func [:x <with> got] [got: :x, 1000]
+        Lsoft: enfixed :soft
+
+        got: null
+        test: func [expr [block!]] [
+            got: '~trash~
+            compose [(do expr), (:got)]
+        ]
+        true
+    )
+
+    ([1000, 1] = test [soft 1])
+    ([1000, a] = test [soft a])
+    ([1000, 'a] = test [soft 'a])
+    ([1000, a:] = test [soft a:])
+    ([1000, 304] = test [soft :(300 + 4)])
+    ([1000, (300 + 4)] = test [soft (300 + 4)])
+    ([1000, o/f] = test [soft o/f])
+    (
+        o: context [f: 304]
+        [1000, 304] = test [soft :o/f]
+    )
+
+    ; Key point on which MEDIUM and SOFT differ, enfix quote handling
+    (
+        +Q: enfix func ['x y] [x + y]
+        [1000, 30] = test [soft 10 +Q 20]
+    )
+
+    ([1000, 3] = test [1 + 2 Lsoft])
+    ([1000, 6] = test [1 + :(2 + 3) Lsoft])
 ]
 
 ; basic test for recursive action! invocation

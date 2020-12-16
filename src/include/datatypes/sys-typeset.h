@@ -219,11 +219,11 @@ typedef enum Reb_Kind Reb_Param_Class;
     //     ** Script error: + does not allow void! for its value1 argument
     //
 
-    // `REB_P_HARD_QUOTE` is cued by a quoted WORD! in the function spec
+    // `REB_P_HARD` is cued by a quoted WORD! in the function spec
     // dialect.  It indicates that a single value of content at the callsite
     // should be passed through *literally*, without any evaluation:
     //
-    //     >> foo: function [:a] [print [{a is} a]]
+    //     >> foo: function ['a] [print [{a is} a]]
     //
     //     >> foo (1 + 2)
     //     a is (1 + 2)
@@ -235,11 +235,11 @@ typedef enum Reb_Kind Reb_Param_Class;
     // `REB_P_REFINEMENT`
     //
 
-    // `REB_P_SOFT_QUOTE` is cued by a GET-WORD! in the function spec
+    // `REB_P_MEDIUM` is cued by a QUOTED GET-WORD! in the function spec
     // dialect.  It quotes with the exception of GET-GROUP!, GET-WORD!, and
     // GET-PATH!...which will be evaluated:
     //
-    //     >> foo: function ['a] [print [{a is} a]
+    //     >> foo: function [':a] [print [{a is} a]
     //
     //     >> foo (1 + 2)
     //     a is (1 + 2)
@@ -250,7 +250,27 @@ typedef enum Reb_Kind Reb_Param_Class;
     // Although possible to implement soft quoting with hard quoting, it is
     // a convenient way to allow callers to "escape" a quoted context when
     // they need to.
+
+    // `REB_P_SOFT` is cued by a PLAIN GET-WORD!.  It acts as a more nuanced
+    // version of REB_P_MEDIUM which is escapable but will defer to enfix.
+    // This covers cases like:
     //
+    //     if true [...] then :(func [...] [...])  ; want escapability
+    //     if true [...] then x -> [...]  ; but want enfix -> lookback to win
+    //
+    // Hence it is the main mode of quoting for branches.  It would be
+    // unsuitable for cases like OF, however, due to this problem:
+    //
+    //     integer! = type of 1  ; want left quoting semantics on `type` WORD!
+    //     integer! = :(first [type length]) of 1  ; want escapability
+    //
+    // OF wants its left hand side to be escapable, however it wants the
+    // quoting behavior to out-prioritize the completion of enfix on the
+    // left.  Contrast this with how THEN wants the enfix on the right to
+    // win out ahead of its quoting.
+    //
+    // This is a subtlety that most functions don't have to worry about.  But
+    // when they do have to worry about it, it 
 
 
 inline static Reb_Param_Class VAL_PARAM_CLASS(unstable const RELVAL *v) {

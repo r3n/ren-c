@@ -146,11 +146,11 @@ func: func* [
         <elide> (append new-spec <elide>)
     |
         :(either var '[
-            set var: [any-word! | lit-word! | refinement!] (
+            set var: [any-word! | quoted! | refinement!] (
                 append new-spec var
 
                 ; exclude args/refines
-                append exclusions either any-path? var [var/2] [var]
+                append exclusions either any-path? var [var/2] [dequote var]
             )
             |
             set other: block! (

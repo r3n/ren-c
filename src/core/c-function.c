@@ -65,12 +65,8 @@ static bool Params_Of_Hook(
         }
 
         switch (VAL_PARAM_CLASS(param)) {
-          case REB_P_NORMAL:
           case REB_P_OUTPUT:
-            break;
-
-          case REB_P_HARD_QUOTE:
-            Quotify(SPECIFIC(s->dest), 1);
+          case REB_P_NORMAL:
             break;
 
           case REB_P_MODAL:
@@ -81,8 +77,16 @@ static bool Params_Of_Hook(
                 Symify(SPECIFIC(s->dest));
             break;
 
-          case REB_P_SOFT_QUOTE:
+          case REB_P_SOFT:
             Getify(SPECIFIC(s->dest));
+            break;
+
+          case REB_P_MEDIUM:
+            Quotify(Getify(SPECIFIC(s->dest)), 1);
+            break;
+
+          case REB_P_HARD:
+            Quotify(SPECIFIC(s->dest), 1);
             break;
 
           default:
@@ -386,12 +390,14 @@ void Push_Paramlist_Triads_May_Fail(
                     fail (Error_Legacy_Local_Raw(spec));  // -> <local>
 
             if (CELL_KIND(cell) == REB_GET_PATH) {
-                if (not quoted)
-                    pclass = REB_P_SOFT_QUOTE;
+                if (quoted)
+                    pclass = REB_P_MEDIUM;
+                else
+                    pclass = REB_P_SOFT;
             }
             else if (CELL_KIND(cell) == REB_PATH) {
                 if (quoted)
-                    pclass = REB_P_HARD_QUOTE;
+                    pclass = REB_P_HARD;
                 else
                     pclass = REB_P_NORMAL;
             }
@@ -430,12 +436,14 @@ void Push_Paramlist_Triads_May_Fail(
                 }
 
                 if (kind == REB_GET_WORD) {
-                    if (not quoted)
-                        pclass = REB_P_SOFT_QUOTE;
+                    if (quoted)
+                        pclass = REB_P_MEDIUM;
+                    else
+                        pclass = REB_P_SOFT;
                 }
                 else if (kind == REB_WORD) {
                     if (quoted)
-                        pclass = REB_P_HARD_QUOTE;
+                        pclass = REB_P_HARD;
                     else
                         pclass = REB_P_NORMAL;
                 }
@@ -1092,13 +1100,14 @@ REBACT *Make_Action(
     REBVAL *first_unspecialized = First_Unspecialized_Param(act);
     if (first_unspecialized) {
         switch (VAL_PARAM_CLASS(first_unspecialized)) {
-          case REB_P_NORMAL:
           case REB_P_OUTPUT:
+          case REB_P_NORMAL:
             break;
 
-          case REB_P_HARD_QUOTE:
           case REB_P_MODAL:
-          case REB_P_SOFT_QUOTE:
+          case REB_P_SOFT:
+          case REB_P_MEDIUM:
+          case REB_P_HARD:
             SET_ACTION_FLAG(act, QUOTES_FIRST);
             break;
 

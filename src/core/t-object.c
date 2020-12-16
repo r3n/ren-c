@@ -242,7 +242,7 @@ REB_R MAKE_Frame(
             temp,
             VARARG_OP_TAKE,
             arg,
-            REB_P_HARD_QUOTE
+            REB_P_HARD
         )){
             assert(!"Hard quoted vararg ops should not throw");
         }

@@ -179,7 +179,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
             CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
 
             REBVAL *first = First_Unspecialized_Param(action);  // cache test?
-            if (VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE)
+            if (VAL_PARAM_CLASS(first) == REB_P_SOFT)
                 return true;  // don't look back, yield the lookahead
 
             *flags |=

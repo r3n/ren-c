@@ -862,9 +862,10 @@ bool Make_Invocation_Frame_Throws(
 
         switch (pclass) {
           case REB_P_NORMAL:
-          case REB_P_HARD_QUOTE:
+          case REB_P_HARD:
           case REB_P_MODAL:
-          case REB_P_SOFT_QUOTE:
+          case REB_P_MEDIUM:
+          case REB_P_SOFT:
             *first_arg_ptr = arg;
             goto found_first_arg_ptr;
 

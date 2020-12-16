@@ -100,7 +100,7 @@ inline static bool Vararg_Op_If_No_Advance_Handled(
     }
 
     if (op == VARARG_OP_FIRST) {
-        if (pclass != REB_P_HARD_QUOTE)
+        if (pclass != REB_P_HARD)
             fail (Error_Varargs_No_Look_Raw()); // hard quote only
 
         Derelativize(out, opt_look, specifier);
@@ -213,7 +213,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
             Drop_Frame(f_temp);
             break; }
 
-        case REB_P_HARD_QUOTE:
+        case REB_P_HARD:
             Derelativize(out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared));
             SET_CELL_FLAG(out, UNEVALUATED);
             VAL_INDEX_UNBOUNDED(shared) += 1;
@@ -222,8 +222,11 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         case REB_P_MODAL:
             fail ("Variadic modal parameters not yet implemented");
 
-        case REB_P_SOFT_QUOTE:
-            if (IS_QUOTABLY_SOFT(VAL_ARRAY_AT(shared))) {
+        case REB_P_MEDIUM:
+            fail ("Variadic medium parameters not yet implemented");
+
+        case REB_P_SOFT:
+            if (ANY_ESCAPABLE_GET(VAL_ARRAY_AT(shared))) {
                 if (Eval_Value_Throws(
                     out, STABLE(VAL_ARRAY_AT(shared)), VAL_SPECIFIER(shared)
                 )){
@@ -261,7 +264,9 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
             arg = FRM_ARG(f, VAL_VARARGS_SIGNED_PARAM_INDEX(vararg));
 
         bool hit_barrier = GET_FEED_FLAG(f->feed, BARRIER_HIT)
-            and (pclass != REB_P_SOFT_QUOTE) and (pclass != REB_P_HARD_QUOTE);
+            and (pclass != REB_P_SOFT)
+            and (pclass != REB_P_MEDIUM)
+            and (pclass != REB_P_HARD);
 
         if (Vararg_Op_If_No_Advance_Handled(
             out,
@@ -286,12 +291,13 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
                 return true;
             break; }
 
-        case REB_P_HARD_QUOTE:
+        case REB_P_HARD:
             Literal_Next_In_Frame(out, f);
             break;
 
-        case REB_P_SOFT_QUOTE:
-            if (IS_QUOTABLY_SOFT(f_value)) {
+        case REB_P_MEDIUM:  // !!! Review nuance
+        case REB_P_SOFT:
+            if (ANY_ESCAPABLE_GET(f_value)) {
                 if (Eval_Value_Throws(
                     SET_END(out),
                     f_value,
@@ -578,7 +584,7 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     Reb_Param_Class pclass;
     const RELVAL *param = Param_For_Varargs_Maybe_Null(v);
     if (param == NULL) {
-        pclass = REB_P_HARD_QUOTE;
+        pclass = REB_P_HARD;
         Append_Ascii(mo->series, "???"); // never bound to an argument
     }
     else {
@@ -589,12 +595,17 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
             kind = REB_WORD;
             break;
 
-        case REB_P_HARD_QUOTE:
+        case REB_P_HARD:
             kind = REB_WORD;
             quoted = true;
             break;
 
-        case REB_P_SOFT_QUOTE:
+        case REB_P_MEDIUM:
+            kind = REB_GET_WORD;
+            quoted = true;
+            break;
+
+        case REB_P_SOFT:
             kind = REB_GET_WORD;
             break;
 
@@ -616,7 +627,7 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     if (Is_Block_Style_Varargs(&shared, v)) {
         if (IS_END(shared))
             Append_Ascii(mo->series, "[]");
-        else if (pclass == REB_P_HARD_QUOTE)
+        else if (pclass == REB_P_HARD)
             Mold_Value(mo, shared); // full feed can be shown if hard quoted
         else
             Append_Ascii(mo->series, "[...]"); // can't look ahead
@@ -630,7 +641,7 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
         ){
             Append_Ascii(mo->series, "[]");
         }
-        else if (pclass == REB_P_HARD_QUOTE) {
+        else if (pclass == REB_P_HARD) {
             Append_Ascii(mo->series, "[");
             Mold_Value(mo, f->feed->value); // one value shown if hard quoted
             Append_Ascii(mo->series, " ...]");

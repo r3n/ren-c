@@ -189,7 +189,7 @@ bool Add_Typeset_Bits_Core(
                 TYPE_SET(typeset, REB_TS_INVISIBLE);  // !!! REB_BYTES hack
             }
             else if (0 == CT_String(item, Root_Skip_Tag, strict)) {
-                if (VAL_PARAM_CLASS(typeset) != REB_P_HARD_QUOTE)
+                if (VAL_PARAM_CLASS(typeset) != REB_P_HARD)
                     fail ("Only hard-quoted parameters are <skip>-able");
 
                 TYPE_SET(typeset, REB_TS_SKIPPABLE);
