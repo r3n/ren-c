@@ -131,7 +131,7 @@ REBNATIVE(_not_)  // see TO-C-NAME
 //
 //      return: [logic!]
 //      left [<opt> any-value!]
-//      :right "Right is evaluated if left is true, or if GET-GROUP!"
+//      'right "Right is evaluated if left is true, or if GET-GROUP!"
 //          [group! get-group! sym-path! sym-word!]
 //  ]
 //
@@ -170,7 +170,7 @@ REBNATIVE(_and_)  // see TO-C-NAME
 //
 //      return: [logic!]
 //      left [<opt> any-value!]
-//      :right "Right is evaluated if left is false, or if GET-GROUP!"
+//      'right "Right is evaluated if left is false, or if GET-GROUP!"
 //          [group! get-group! sym-path! sym-word!]
 //  ]
 //
@@ -210,7 +210,7 @@ REBNATIVE(_or_)  // see TO-C-NAME
 //
 //      return: [logic!]
 //      left [<opt> any-value!]
-//      :right "Always evaluated, but is a GROUP! for consistency with AND/OR"
+//      'right "Always evaluated, but is a GROUP! for consistency with AND/OR"
 //          [group! get-group! sym-path! sym-word!]
 //  ]
 //

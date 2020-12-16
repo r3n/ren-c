@@ -349,13 +349,25 @@ REBNATIVE(reflect)
 //  {Infix form of REFLECT which quotes its left (X OF Y => REFLECT Y 'X)}
 //
 //      return: [<opt> any-value!]
-//      'property "Hard quoted so that `integer! = type of 1` works`"
-//          [word! group!]
+//      'property "Will be escapable, ':property (bootstrap permitting)"
+//          [word! get-word! get-path! get-group!]
 //      value "Accepts null so TYPE OF NULL can be returned as null"
 //          [<opt> any-value!]
 //  ]
 //
 REBNATIVE(of)
+//
+// !!! ':PROPERTY is not loadable by the bootstrap executable at time of
+// writing.  But that is desired over 'PROPERTY or :PROPERTY so that both
+// these cases would work:
+//
+//     >> integer! = type of 1
+//     == #[true]
+//
+//     >> integer! = :(second [length type]) of 1
+//     == #[true]
+//
+// For the moment the behavior is manually simulated.
 //
 // Common enough to be worth it to do some kind of optimization so it's not
 // much slower than a REFLECT; e.g. you don't want it building a separate
@@ -368,6 +380,10 @@ REBNATIVE(of)
     if (IS_GROUP(prop)) {
         if (Eval_Value_Throws(D_SPARE, prop, SPECIFIED))
             return R_THROWN;
+        if (not IS_WORD(D_SPARE)) {
+            Move_Value(prop, D_SPARE);
+            fail (Error_Invalid_Arg(frame_, PAR(property)));
+        }
     }
     else
         Move_Value(D_SPARE, prop);
