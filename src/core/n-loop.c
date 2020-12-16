@@ -1043,7 +1043,7 @@ REBNATIVE(cycle)
 //
 //      return: "Last body result, or null if BREAK"
 //          [<opt> any-value!]
-//      'vars "Word or block of words to set each time, no new var if quoted"
+//      :vars "Word or block of words to set each time, no new var if quoted"
 //          [blank! word! lit-word! block!]
 //      data "The series to traverse"
 //          [<blank> any-series! any-context! map! any-path!
@@ -1065,7 +1065,7 @@ REBNATIVE(for_each)
 //
 //      return: [<opt> any-value!]
 //          {null on BREAK, blank on empty, false or the last truthy value}
-//      'vars [word! block!]
+//      :vars [word! block!]
 //          "Word or block of words to set each time (local)"
 //      data [<blank> any-series! any-context! map! datatype! action!]
 //          "The series to traverse"
@@ -1367,7 +1367,7 @@ static REB_R Remove_Each_Core(struct Remove_Each_State *res)
 //
 //      return: [<opt> integer!]
 //          {Number of removed series items, or null if BREAK}
-//      'vars [blank! word! block!]
+//      :vars [blank! word! block!]
 //          "Word or block of words to set each time (local)"
 //      data [<blank> any-series!]
 //          "The series to traverse (modified)" ; should BLANK! opt-out?
@@ -1498,7 +1498,7 @@ REBNATIVE(remove_each)
 //
 //      return: [<opt> block!]
 //          {Collected block (BREAK/WITH can add a final result to block)}
-//      'vars [blank! word! block!]
+//      :vars [blank! word! block!]
 //          "Word or block of words to set each time (local)"
 //      data [<blank> any-series! any-path! action!]
 //          "The series to traverse"
