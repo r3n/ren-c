@@ -115,6 +115,11 @@
 ('''[a b c] == '''[a b c])
 ('''[a b c] = '''''[a b c])
 
+; No quote levels is legal for QUOTE to add also, if /DEPTH is 0
+[
+    (null = quote/depth null 0)
+    (<x> = quote/depth <x> 0)
+]
 
 (quoted! = kind of lit 'foo)  ; low level "KIND"
 ((quote word!) = type of lit 'foo)  ; higher-level "TYPE"

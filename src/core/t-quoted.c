@@ -203,7 +203,8 @@ REBNATIVE(literal) // aliased in %base-defs.r as LIT
 //
 //  {Constructs a quoted form of the evaluated argument}
 //
-//      return: [quoted!]
+//      return: "Quoted value (if depth = 0, may not be quoted)"
+//          [<opt> any-value!]
 //      optional [<opt> any-value!]
 //      /depth "Number of quoting levels to apply (default 1)"
 //          [integer!]
