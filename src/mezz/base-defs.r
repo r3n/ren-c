@@ -357,11 +357,14 @@ requote: reframer func* [
     f [frame!]
     <local> p num-quotes result
 ][
-    p: first words of f
+    if not p: first parameters of action of f [
+        fail ["REQUOTE must have an argument to process"]
+    ]
+
     num-quotes: quotes of f/(p)
 
     f/(p): dequote f/(p)
-    
+
     if null? result: do f [return null]
 
     return quote/depth get/any 'result num-quotes

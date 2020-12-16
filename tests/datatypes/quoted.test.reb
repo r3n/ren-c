@@ -139,6 +139,8 @@
 
 ('''a/b/c/d/e/f = requote join lit '''a/b/c 'd/e/f)
 
+((lit '[1]) = (requote parse lit '[1] [some integer!]))
+
 
 ; COPY should be implemented for all types, QUOTED! included.
 ;
