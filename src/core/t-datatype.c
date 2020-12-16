@@ -236,7 +236,7 @@ bool Matches_Fake_Type_Constraint(const RELVAL *v, enum Reb_Symbol sym) {
         return IS_QUOTED_PATH(v);
 
       case SYM_REFINEMENT_X:
-        return IS_REFINEMENT(v);
+        return IS_PATH(v) and IS_REFINEMENT(v);
 
       case SYM_PREDICATE_X:
         return IS_PREDICATE(v);

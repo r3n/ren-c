@@ -666,11 +666,15 @@ inline static REBVAL *Refinify(REBVAL *v) {
     return v;
 }
 
-inline static bool IS_REFINEMENT_CELL(REBCEL(const*) v)
-  { return CELL_KIND(v) == REB_PATH and CELL_HEART(v) == REB_GET_WORD; }
+inline static bool IS_REFINEMENT_CELL(REBCEL(const*) v) {
+    assert(ANY_PATH_KIND(CELL_KIND(v)));
+    return CELL_HEART(v) == REB_GET_WORD;
+}
 
-inline static bool IS_REFINEMENT(const RELVAL *v)
-  { return IS_PATH(v) and HEART_BYTE(v) == REB_GET_WORD; }
+inline static bool IS_REFINEMENT(const RELVAL *v) {
+    assert(ANY_PATH(v));
+    return HEART_BYTE(v) == REB_GET_WORD;
+}
 
 inline static bool IS_PREDICATE1_CELL(REBCEL(const*) cell)
   { return CELL_KIND(cell) == REB_TUPLE and CELL_HEART(cell) == REB_GET_WORD; }

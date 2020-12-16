@@ -521,8 +521,13 @@ inline static bool Typecheck_Including_Constraints(
     if (TYPE_CHECK(param, VAL_TYPE(v)))
         return true;
 
-    if (TYPE_CHECK(param, REB_TS_REFINEMENT) and IS_REFINEMENT(v))
+    if (
+        TYPE_CHECK(param, REB_TS_REFINEMENT)
+        and IS_PATH(v)
+        and IS_REFINEMENT(v)
+    ){
         return true;
+    }
 
     if (TYPE_CHECK(param, REB_TS_PREDICATE) and IS_PREDICATE(v))
         return true;

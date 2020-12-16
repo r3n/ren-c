@@ -146,11 +146,26 @@ func: func* [
         <elide> (append new-spec <elide>)
     |
         :(either var '[
-            set var: [any-word! | quoted! | refinement!] (
-                append new-spec var
+            set var: [any-word! | any-path! | quoted!] (
+                append new-spec var  ; need quote level as-is in new spec
 
-                ; exclude args/refines
-                append exclusions either any-path? var [var/2] [dequote var]
+                var: dequote var
+                case [
+                    match [get-path! path!] var [
+                        if (length of var != 2) or (_ <> first var) [
+                            fail ["Bad path in spec:" var]
+                        ]
+                        append exclusions var/2  ; exclude args/refines
+                    ]
+
+                    any-word? var [
+                        append exclusions var  ; exclude args/refines
+                    ]
+
+                    true [  ; QUOTED! could have been anything
+                        fail ["Bad spec item" var]
+                    ]
+                ]
             )
             |
             set other: block! (

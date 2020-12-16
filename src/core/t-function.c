@@ -386,7 +386,7 @@ REB_R PD_Action(
     const REBSTR *spelling;
     if (IS_WORD(picker))
         spelling = VAL_WORD_SPELLING(picker);
-    else if (IS_REFINEMENT(picker))
+    else if (IS_PATH(picker) and IS_REFINEMENT(picker))
         spelling = VAL_REFINEMENT_SPELLING(picker);
     else
         fail (Error_Bad_Refine_Raw(rebUnrelativize(picker)));

@@ -109,7 +109,7 @@
 ]
 
 (
-    aopd3: specialize lit (specialize :append/only [])/part [
+    aopd3: specialize :append/only [
         dup: 3
         part: 1
     ]
@@ -128,7 +128,10 @@
     for-each code [
         [specialize :append/only/only []]
         [specialize :append/asdf []]
-        [specialize lit (specialize :append/only [])/only []]
+        [
+            apo: specialize :append/only []
+            specialize :apo/only []
+        ]
     ][
         is-bad: me and ('bad-refine = (trap [do code])/id)
     ]
@@ -153,8 +156,8 @@
 ; and other enfix situations.
 [
     (
-        foo: function [/A [integer!] :/B [<skip> word!]] [
-            reduce [/A (try A) /B (try :B)]
+        foo: function [/A [integer!] '/B [<skip> word!]] [
+            reduce [/A (try A) /B (try B)]
         ]
         foob: enfixed :foo/b
         true
