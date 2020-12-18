@@ -62,3 +62,14 @@
         not new-line? b
     ]
 )
+
+(['] = transcode "';")
+(
+    data: transcode "';^/a"
+    did all [
+        data = [' a]
+        not new-line? data
+        new-line? next data
+        not new-line? next next data
+    ]
+)

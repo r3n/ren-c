@@ -1972,10 +1972,11 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         if (prefix_pending != TOKEN_END)  // can't do @'foo: or :'foo
             fail (Error_Syntax(ss, token));
 
-        if (IS_LEX_ANY_SPACE(*ep) or *ep == ']' or *ep == ')') {
+        if (IS_LEX_ANY_SPACE(*ep) or *ep == ']' or *ep == ')' or *ep == ';') {
             //
             // If we have something like ['''] there won't be another token
             // push coming along to apply the quotes to, so quote a null.
+            // This also applies to comments.
             //
             assert(quotes_pending == 0);
             Quotify(Init_Nulled(DS_PUSH()), len);
