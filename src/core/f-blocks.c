@@ -114,7 +114,7 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
     RELVAL *dest = STABLE(ARR_HEAD(a));
     for (; count < len; ++count, ++src, ++dest) {
         if (KIND3Q_BYTE_UNCHECKED(src) == REB_NULL)  // allow unreadable void
-            assert(flags & ARRAY_FLAG_NULLEDS_LEGAL);
+            assert(flags & ARRAY_FLAG_IS_VARLIST);  // usually not legal
 
         Derelativize(dest, src, specifier);
     }

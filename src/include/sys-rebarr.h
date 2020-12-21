@@ -62,17 +62,9 @@ struct Reb_Array {
     (ARRAY_FLAG_HAS_FILE_LINE_UNMASKED | SERIES_FLAG_LINK_NODE_NEEDS_MARK)
 
 
-//=//// ARRAY_FLAG_NULLEDS_LEGAL //////////////////////////////////////////=//
+//=//// ARRAY_FLAG_17 /////////////////////////////////////////////////////=//
 //
-// Identifies arrays in which it is legal to have nulled elements.
-// ARRAY_FLAG_IS_VARLIST also implies legality of nulleds, which in that case
-// are used to represent unset variables.
-//
-// Note: This is a debug-only flag at this time.  At one point it was used in
-// concert with reified `va_list` of values to indicate nulls that were safe
-// for the evaluator, but that is now covered by QUOTED! nulls.
-//
-#define ARRAY_FLAG_NULLEDS_LEGAL \
+#define ARRAY_FLAG_17 \
     FLAG_LEFT_BIT(17)
 
 

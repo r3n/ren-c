@@ -315,13 +315,11 @@ static void Propagate_All_GC_Marks(void)
           #if !defined(NDEBUG)
             //
             // Nulls are illegal in most arrays, but context varlists use
-            // "nulled cells" to denote that the variable is not set.  Also
-            // reified C va_lists as Eval_Core() sources can have them.
+            // "nulled cells" to denote that the variable is not set.
             //
             if (
                 KIND3Q_BYTE_UNCHECKED(v) == REB_NULL
                 and NOT_ARRAY_FLAG(a, IS_VARLIST)
-                and NOT_ARRAY_FLAG(a, NULLEDS_LEGAL)
             ){
                 panic(a);
             }
