@@ -34,19 +34,19 @@ lib: system/contexts/lib
 
 ; Char constants
 
-NUL:       #"^(NULL)"
+nul: NUL:  #"^(NULL)"
 space:     #" "
-SP:        space
+sp: SP:    space
 backspace: #"^(BACK)"
-BS:        backspace
+bs: BS:    backspace
 tab:       #"^-"
 newline:   #"^/"
 newpage:   #"^l"
 slash:     #"/"
 backslash: #"\"
 escape:    #"^(ESC)"
-CR:        #"^M"
-LF:        newline
+cr: CR:    #"^M"
+lf: LF:    newline
 
 ; Function synonyms
 
