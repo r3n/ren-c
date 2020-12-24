@@ -82,17 +82,45 @@
     append o compose [b: "b" b: (c)]
     same? c o/b
 )
+
+; SELF was a word added automatically by the system, which had some strange
+; internal guts.  This made it a "reserved word", which is against the
+; principles of the core.  While object generators may choose to make a
+; SELF (the way FUNC chooses to define RETURN), it's no longer built in.
+; So these scenarios no longer apply:
+;
+; [#2076 (
+;     o: make object! [x: 10]
+;     e: trap [append o [self: 1]]
+;     e/id = 'hidden
+; )]
+;
+; [#187 (
+;     o: make object! [self]
+;     [] = words of o
+; )]
+;
+; [#1553 (
+;    o: make object! [a: _]
+;    same? (binding of in o 'self) (binding of in o 'a)
+; )]
+;
+; [#1756
+;     (reeval does [reduce reduce [:self] true])
+; ]
+;
+; [#1528
+;     (action? func [self] [])
+; ]
 (
     o: make object! []
     append o 'self
-    true
-)
-(
+    '~unset~ = get/any 'o/self
+)(
     o: make object! []
-    ; currently disallowed..."would expose or modify hidden values"
-    error? trap [append o [self: 1]]
+    append o [self: 1]
+    o/self = 1
 )
-
 
 
 ; Change from R3-Alpha, FUNC and FUNCTION do not by default participate in
@@ -165,21 +193,6 @@
     (o/b)/1 = 'o
 )]
 
-[#2076 (
-    o: make object! [x: 10]
-    e: trap [append o [self: 1]]
-    e/id = 'hidden
-)]
-
-[#187 (
-    o: make object! [self]
-    [] = words of o
-)]
-
-[#1553 (
-    o: make object! [a: _]
-    same? (binding of in o 'self) (binding of in o 'a)
-)]
 
 [
     https://github.com/metaeducation/ren-c/issues/907

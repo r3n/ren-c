@@ -404,12 +404,6 @@
         1 = f 2
     ]
 )
-[#1528
-    (action? func [self] [])
-]
-[#1756
-    (reeval does [reduce reduce [:self] true])
-]
 [#2025 (
     ; ensure x and y are unset from previous tests, as the test here
     ; is trying to cause an error...
