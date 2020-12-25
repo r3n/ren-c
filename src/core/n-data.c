@@ -104,7 +104,7 @@ REBNATIVE(as_pair)
 //
 //  {Binds words or words in arrays to the specified context}
 //
-//      return: [action! any-array! any-path! any-word!]
+//      return: [action! any-array! any-path! any-word! quoted!]
 //      value "Value whose binding is to be set (modified) (returned)"
 //          [action! any-array! any-path! any-word! quoted!]
 //      target "Target context or a word whose binding should be the target"
@@ -123,11 +123,6 @@ REBNATIVE(bind)
     REBLEN num_quotes = Dequotify(v);
 
     REBVAL *target = ARG(target);
-    if (IS_QUOTED(target)) {
-        Dequotify(target);
-        if (not IS_WORD(target))
-            fail ("Only quoted as BIND target is WORD! (replaces ANY-WORD!)");
-    }
 
     REBLEN flags = REF(only) ? BIND_0 : BIND_DEEP;
 
@@ -167,7 +162,7 @@ REBNATIVE(bind)
         // Bind a single word
 
         if (Try_Bind_Word(context, v))
-            RETURN (v);
+            RETURN (Quotify(v, num_quotes));
 
         // not in context, bind/new means add it if it's not.
         //
@@ -515,13 +510,12 @@ REBNATIVE(collect_words)
 
 inline static void Get_Var_May_Fail(
     REBVAL *out,
-    unstable const RELVAL *source_orig,  // ANY-WORD! or ANY-PATH!
+    unstable const RELVAL *source,  // ANY-WORD! or ANY-PATH! (maybe quoted)
     REBSPC *specifier,
     bool any,  // should a VOID! value be gotten normally vs. error
     bool hard  // should GROUP!s in paths not be evaluated
 ){
-    unstable REBCEL(const*) source = VAL_UNESCAPED(source_orig);
-    enum Reb_Kind kind = CELL_KIND(source);
+    enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(source));
 
     if (ANY_WORD_KIND(kind)) {
         Move_Value(out, Lookup_Word_May_Fail(source, specifier));
@@ -534,7 +528,7 @@ inline static void Get_Var_May_Fail(
         //
         if (Eval_Path_Throws_Core(
             out,
-            STABLE_HACK(CELL_TO_VAL(source)),  // !!! Review
+            STABLE_HACK(source),  // !!! Review
             specifier,
             NULL, // not requesting value to set means it's a get
             EVAL_MASK_DEFAULT
@@ -544,10 +538,10 @@ inline static void Get_Var_May_Fail(
         }
     }
     else
-        fail (Error_Bad_Value_Core(source_orig, specifier));
+        fail (Error_Bad_Value_Core(source, specifier));
 
     if (IS_VOID(out) and not any)
-        fail (Error_Need_Non_Void_Core(source_orig, specifier, out));
+        fail (Error_Need_Non_Void_Core(source, specifier, out));
 
     if (not any)  // default to not letting NULL-2 out unless /ANY is used
         Decay_If_Nulled(out);
@@ -642,17 +636,16 @@ REBNATIVE(get_p)
 // Note this is used by both SET and the SET-BLOCK! data type in %c-eval.c
 //
 void Set_Var_May_Fail(
-    const RELVAL *target_orig,
+    const RELVAL *target,
     REBSPC *target_specifier,
     const RELVAL *setval,
     REBSPC *setval_specifier,
     bool hard
 ){
-    if (Is_Blackhole(target_orig))  // name for a space-bearing ISSUE! ('#')
+    if (Is_Blackhole(target))  // name for a space-bearing ISSUE! ('#')
         return;
 
-    REBCEL(const*) target = VAL_UNESCAPED(target_orig);
-    enum Reb_Kind kind = CELL_KIND(target);
+    enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(target));
 
     if (ANY_WORD_KIND(kind)) {
         REBVAL *var = Sink_Word_May_Fail(target, target_specifier);
@@ -691,7 +684,7 @@ void Set_Var_May_Fail(
         DROP_GC_GUARD(specific);
     }
     else
-        fail (Error_Bad_Value_Core(target_orig, target_specifier));
+        fail (Error_Bad_Value_Core(target, target_specifier));
 }
 
 
@@ -1011,7 +1004,7 @@ REBNATIVE(free_q)
     // !!! Technically speaking a PAIR! could be freed as an array could, it
     // would mean converting the node.  Review.
     //
-    if (Is_Node_Cell(n))
+    if (n == nullptr or Is_Node_Cell(n))  // VAL_WORD_CACHE() can be null
         return Init_False(D_OUT);
 
     return Init_Logic(D_OUT, GET_SERIES_INFO(n, INACCESSIBLE));
