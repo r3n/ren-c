@@ -1088,7 +1088,6 @@ bool Try_As_String(
 
                 ++num_codepoints;
             }
-            SET_SERIES_FLAG(bin, UTF8_NONWORD);
             SET_SERIES_FLAG(m_cast(REBSER*, bin), IS_STRING);
             str = STR(bin);
 
