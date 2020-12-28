@@ -205,8 +205,16 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
         if (GET_ARRAY_FLAG(inst1, INSTRUCTION_ADJUST_QUOTING)) {
             assert(NOT_SERIES_FLAG(inst1, MANAGED));
 
-            if (QUOTING_BYTE(feed) + MISC(inst1).quoting_delta < 0)
-                panic ("rebU() can't unquote a feed splicing plain values");
+            // !!! Previously this didn't allow the case of:
+            //
+            //    QUOTING_BYTE(feed) + MISC(inst1).quoting_delta < 0
+            //
+            // Because it said rebU() "couldn't unquote a feed splicing plain
+            // values".  However, there was a mechanical problem because it
+            // was putting plain NULLs into the instruction array...and nulls
+            // aren't valid in most arrays.  Rather than make an exception,
+            // everything was quoted up one and the delta decremented.  See
+            // rebQUOTING for this, which needs more design attention.
 
             assert(ARR_LEN(inst1) > 0);
             if (ARR_LEN(inst1) > 1)

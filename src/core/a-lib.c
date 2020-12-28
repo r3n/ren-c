@@ -1676,6 +1676,10 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
     // just calling rebQ(value) to get a quote on a single value.  Sense
     // that situation and make it faster.
     //
+    // !!! In order to avoid putting `null` in arrays here and needing to
+    // make exceptions for that in the instruction arrays, we quote everything
+    // by 1 and then decrement the delta by 1.
+    //
     const void* const *packed;
     if (vaptr)
         packed = nullptr;
@@ -1692,10 +1696,10 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         if (p and Detect_Rebol_Pointer(p) == DETECTED_AS_END) {
             a = Alloc_Singular(NODE_FLAG_MANAGED);
             CLEAR_SERIES_FLAG(a, MANAGED);  // see notes above on why we lied
-            Move_Value(ARR_SINGLE(a), first);
+            Quotify(Move_Value(ARR_SINGLE(a), first), 1);
         }
-        else {
-            Move_Value(DS_PUSH(), first);  // no shortcut, push and keep going
+        else {  // no shortcut, push and keep going
+            Quotify(Move_Value(DS_PUSH(), first), 1);
             goto no_shortcut;
         }
     }
@@ -1706,7 +1710,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         DECLARE_VA_FEED (feed, p, vaptr, feed_flags);
 
         while (NOT_END(feed->value)) {
-            Move_Value(DS_PUSH(), SPECIFIC(feed->value));
+            Quotify(Move_Value(DS_PUSH(), SPECIFIC(feed->value)), 1);
             Fetch_Next_In_Feed(feed);
         }
 
@@ -1726,7 +1730,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         fail ("rebU() and rebQ() currently can't splice more than one value");
 
     SET_ARRAY_FLAG(a, INSTRUCTION_ADJUST_QUOTING);
-    MISC(a).quoting_delta = delta;
+    MISC(a).quoting_delta = delta - 1;
     return NOD(a);
 }
 
