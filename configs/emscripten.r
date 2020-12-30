@@ -168,6 +168,20 @@ ldflags: compose [
         {-s ASSERTIONS=0}
     ])
 
+    ; The recursive interpreter loop can easily exceed the available stack in
+    ; the browser and in asyncify itself.  The long term plan to mitigate this
+    ; is to go "stackless":
+    ;
+    ; https://forum.rebol.info/t/switching-to-stackless-why-this-why-now/1247
+    ;
+    ; !!! Even as a workaround, this may be excessive...or not enough?  There's
+    ; not any guidance on what the default is.  It's enough to allow you to
+    ; run `do <chess>` which then runs `do <popupdemo>` inside of it.
+    ;
+    (if use-asyncify [
+        {-s ASYNCIFY_STACK_SIZE=128000}
+    ])
+
     ((if false [[
         ; In theory, using the closure compiler will reduce the amount of
         ; unused support code in %libr3.js, at the cost of slower compilation. 
