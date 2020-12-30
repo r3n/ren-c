@@ -26,6 +26,50 @@
 
 
 //
+//  just: native [
+//
+//  {Optimized native for creating a single-element wrapper block}
+//
+//     return: "Top-level immutable block, containing value"
+//          [block!]
+//     value "If NULL, the resulting block will be empty"
+//          [<opt> any-value!]
+//  ]
+//
+REBNATIVE(just)  // https://forum.rebol.info/t/1182/11
+//
+// Conceived as the replacement tool for the likes of APPEND/ONLY, e.g.
+//
+//     >> just [d]
+//     == [[d]]
+//
+//     >> append [a b c] just [d]
+//     == [a b c [d]]
+{
+    INCLUDE_PARAMS_OF_JUST;
+
+    if (IS_NULLED(ARG(value)))
+        return Init_Block(D_OUT, EMPTY_ARRAY);  // global immutable array
+
+    // This uses a "singular" array which is the size of a node (8 platform
+    // pointers).  The cell is put in the portion of the node where tracking
+    // information for a dynamically allocated series would ordinarily be.
+    //
+    // !!! This is more optimized than most array the user might create.  But
+    // an even more aggressive optimization is being planned.  The idea is
+    // to let a cell be annotated to say it's actually a block containing its
+    // payload.  Much like generic quoting, this would exploit bit(s) in the
+    // cell that aren't used otherwise to express this state...and it would
+    // only work for limited levels of such boxing--likely just one level.
+    //
+    REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);
+    Move_Value(ARR_SINGLE(a), ARG(value));
+    Freeze_Array_Shallow(a);  // immutable (to permit future optimized case)
+    return Init_Block(D_OUT, a);
+}
+
+
+//
 //  CT_Array: C
 //
 // "Compare Type" dispatcher for arrays.
