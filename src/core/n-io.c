@@ -22,6 +22,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 
+// !!! It is difficult to debug booting the emscripten build without some
+// form of IO available.  printf() will write to the JS console in the JS
+// build, so leverage that in WRITE-STDOUT.
+//
+#ifdef TO_EMSCRIPTEN
+    #if !defined(DEBUG_STDIO_OK)
+        #define DEBUG_STDIO_OK
+    #endif
+#endif
+
 #include "sys-core.h"
 
 
@@ -122,20 +132,24 @@ REBNATIVE(write_stdout)
 
     REBVAL *v = ARG(value);
 
-  #if defined(NDEBUG)
+  #if !defined(DEBUG_STDIO_OK)
     UNUSED(v);
-    fail ("Boot cannot print output in release build, must load I/O module");
+    fail ("Boot WRITE-STDOUT needs DEBUG_STDIO_OK or loaded I/O module");
   #else
-    if (IS_BINARY(v)) {
-        PROBE(v);
-    }
-    else if (IS_TEXT(v)) {
-        printf("%s", cast(const char*, STR_HEAD(VAL_STRING(v))));
+    if (IS_TEXT(v)) {
+        printf("WRITE-STDOUT: %s\n", cast(const char*, STR_HEAD(VAL_STRING(v))));
         fflush(stdout);
     }
+    else if (IS_CHAR(v)) {
+        printf("WRITE-STDOUT: char %d\n", VAL_CHAR(v));
+    }
     else {
-        assert(IS_CHAR(v));
-        printf("%s", VAL_CHAR_ENCODED(v));
+        assert(IS_BINARY(v));
+      #ifdef DEBUG_HAS_PROBE
+        PROBE(v);
+      #else
+        fail ("Boot WRITE-STDOUT received BINARY!, needs DEBUG_HAS_PROBE");
+      #endif
     }
     return Init_Void(D_OUT, SYM_VOID);
   #endif
