@@ -44,3 +44,7 @@
             (compose [source (w)])
     ]
 ])
+
+[https://github.com/metaeducation/ren-c/issues/1106
+    (not error? trap [help "any"])
+]

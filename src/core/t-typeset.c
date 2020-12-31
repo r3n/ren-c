@@ -302,6 +302,11 @@ REB_R TO_Typeset(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 // Converts typeset value to a block of datatypes, no order is guaranteed.
 //
+// !!! Typesets are likely to be scrapped in their current form; this is just
+// here to try and keep existing code running for now.
+//
+// https://forum.rebol.info/t/the-typeset-representation-problem/1300
+//
 REBARR *Typeset_To_Array(const REBVAL *tset)
 {
     REBDSP dsp_orig = DSP;
@@ -311,11 +316,19 @@ REBARR *Typeset_To_Array(const REBVAL *tset)
         if (TYPE_CHECK(tset, cast(enum Reb_Kind, n))) {
             if (n == REB_NULL) {
                 //
-                // !!! A BLANK! value is currently supported in typesets to
-                // indicate that they take optional values.  This may wind up
-                // as a feature of MAKE ACTION! only.
+                // !!! NULL is used in parameter list typesets to indicate
+                // that they can take optional values.  Hence this can occur
+                // in typesets coming from ACTION!
                 //
-                Init_Blank(DS_PUSH());
+                Move_Value(DS_PUSH(), Root_Opt_Tag);
+            }
+            else if (n == REB_CUSTOM) {
+                //
+                // !!! Among TYPESET!'s many design weaknesses, there is no
+                // support in the 64-bit representation for individual
+                // custom types.  So all custom types typecheck together.
+                //
+                Init_Void(DS_PUSH(), SYM_CUSTOM_X);
             }
             else
                 Init_Builtin_Datatype(DS_PUSH(), cast(enum Reb_Kind, n));
