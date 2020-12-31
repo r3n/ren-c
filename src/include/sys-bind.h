@@ -599,6 +599,15 @@ inline static option(REBCTX*) Get_Word_Context(
                 if (VAL_KEY_SPELLING(key) != spelling)
                     continue;
 
+                // !!! FOR-EACH uses the slots in an object to count how
+                // many arguments there are...and if a slot is reusing an
+                // existing variable it holds that variable.  This ties into
+                // general questions of hiding which is the same bit.  Don't
+                // count it as a hit.
+                //
+                if (GET_CELL_FLAG(CTX_VAR(overload, index), BIND_MARKED_REUSE))
+                    break;
+
                 // Found a match!  Cache it to speed up next time.  Note that
                 // since specifier chains change frames for relativization,
                 // we have to store the head of the chain.  Review.

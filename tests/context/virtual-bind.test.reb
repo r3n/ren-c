@@ -104,3 +104,46 @@
     (110 = use [x] [x: 1000, use [y] compose [y: 100, (group)]])
     (1100 = use [x] compose/deep [x: 1000, use [y] [y: 100, do [(group)]]])
 ]
+
+
+; This was a little test made to compare speed with R3-Alpha, keeping it.
+(
+    data: array/initial 20 1
+    sum: 0
+    for-each x data [
+        code: copy []
+        for-each y data [
+            append code compose [sum: sum + do [(x) + (y) + z]]
+        ]
+        for-each z data code
+    ]
+    sum = 24000
+)
+
+
+; Virtual Binding gives back a CONST value, because it can't assure you that
+; mutable bindings would have an effect.  You can second-guess it.
+; https://forum.rebol.info/t/765/2
+[
+    (
+        e: trap [bind use [x] [x: 10, [x + 1]] make object! [x: 20]]
+        e/id = 'const-value
+    )
+
+    ; It tried to warn you that the X binding wouldn't be updated... but
+    ; using MUTABLE overrides the warning.
+    ;
+    (11 = do bind mutable use [x] [x: 10, [x + 1]] make object! [x: 20])
+
+    ; Quoted values elude the CONST inheritance (this is a general mechanism
+    ; that is purposeful, and used heavily by the API).  The more cautious
+    ; approach is not to use quotes as part of inline evaluations.
+    ;
+    ; https://forum.rebol.info/t/1062/4
+    ;
+    (11 = do bind use [x] [x: 10, '(x + 1)] make object! [x: 20])
+    (
+        e: trap [bind use [x] [x: 10, lit (x + 1)] make object! [x: 20]]
+        e/id = 'const-value
+    )
+]

@@ -813,7 +813,7 @@ sys/make-scheme [
                 port/state
             ]
             then [
-                reduce bind [name size date] port/state/info
+                reduce in port/state/info [name size date]
             ]
             else [
                 copy port/data  ; may be BLANK!, returns null

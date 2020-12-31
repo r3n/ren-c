@@ -205,7 +205,8 @@ REBNATIVE(bind)
         Init_Any_Array(D_OUT, VAL_TYPE(v), copy);
     }
     else {
-        at = VAL_ARRAY_AT_MUTABLE_HACK(v);  // only affects bindings after index
+        ENSURE_MUTABLE(v);  // use IN for virtual binding
+        at = VAL_ARRAY_AT_MUTABLE_HACK(v);  // !!! only binds *after* index!
         Move_Value(D_OUT, v);
     }
 
@@ -224,14 +225,37 @@ REBNATIVE(bind)
 //
 //  Virtual_Bind_Patchify: C
 //
-void Virtual_Bind_Patchify(RELVAL *block, REBCTX *context, enum Reb_Kind kind)
+// Update the binding in an array so that it adds the given context as
+// overriding the bindings.  This is done without actually mutating the
+// structural content of the array...but means words in the array will need
+// additional calculations that take the virtual binding chain into account
+// as part of Get_Word_Context().
+//
+// !!! There is a performance tradeoff we could tinker with here, where we
+// could build a binder which hashed words to object indices, and then walk
+// the block with that binding information to cache in words the virtual
+// binding "hits" and "misses".  With small objects this is likely a poor
+// tradeoff, as searching them is cheap.  Also it preemptively presumes all
+// words would be looked up (many might not be, or might not be intended to
+// be looked up with this specifier).  But if the binding chain contains very
+// large objects the linear searches might be expensive enough to be worth it.
+//
+void Virtual_Bind_Patchify(REBVAL *any_array, REBCTX *ctx, enum Reb_Kind kind)
 {
-    // Should we walk the block to say "hey, you've been virtualized" on the
-    // words?  The pre-walk could set a bit corresponding to what virtual
-    // steps apply.
+    assert(kind == REB_WORD or kind == REB_SET_WORD);
 
-    if (CTX_LEN(context) == 0)  // no keys in context
-        return;  // nothing to bind to
+    // The way virtual binding works, it remembers the length of the context
+    // at the time the virtual binding occurred.  This means any keys added
+    // after the bind will not be visible.  Hence if the context is empty,
+    // this virtual bind can be a no-op.
+    //
+    // (Note: While it may or may not be desirable to see added variables,
+    // allowing that would make it impractical to trust cached virtual bind
+    // data that is embedded into words...making caching worthless.  So
+    // it is chosen to match the "at that moment" behavior of mutable BIND.)
+    //
+    if (CTX_LEN(ctx) == 0)
+        return;
 
     REBARR *patch = Alloc_Singular(
         NODE_FLAG_MANAGED
@@ -239,12 +263,14 @@ void Virtual_Bind_Patchify(RELVAL *block, REBCTX *context, enum Reb_Kind kind)
         //
         // MISC is a node, but it's used for linking patches to variants
         // with different chains underneath them...and shouldn't keep that
-        // alternate version alive.
+        // alternate version alive.  So no SERIES_FLAG_MISC_NODE_NEEDS_MARK.
         //
         | ARRAY_FLAG_IS_PATCH
     );
 
-    // Virtual binds are done with a bound WORD!.  Reasons are:
+    // A virtual bind patch array is a singular node holding an ANY-WORD!
+    // bound to the OBJECT! being virtualized against.  The reason for holding
+    // the WORD! instead of the OBJECT! in the array cell are:
     //
     // * Gives more header information than storing information already
     //   available in the archetypal context.  So we can assume things like
@@ -262,33 +288,31 @@ void Virtual_Bind_Patchify(RELVAL *block, REBCTX *context, enum Reb_Kind kind)
     //   because the standard error object starts life as an object.  (This
     //   mechanism needs revisiting, but it's just another reason.)
     //
-    assert(kind == REB_WORD or kind == REB_SET_WORD);
-    Init_Any_Word_Bound(
-        ARR_SINGLE(patch),
-        kind,
-        context,
-        CTX_LEN(context)
-    );
+    Init_Any_Word_Bound(ARR_SINGLE(patch), kind, ctx, CTX_LEN(ctx));
 
     // The way it is designed, the list of patches terminates in either a
     // nullptr or a context pointer that represents the specifying frame for
     // the chain.  So we can simply point to the existing specifier...whether
     // it is a patch, a frame context, or nullptr.
     //
-    LINK_PATCH_NEXT_NODE(patch) = VAL_SPECIFIER(block);
+    LINK_PATCH_NEXT_NODE(patch) = VAL_SPECIFIER(any_array);
 
     // A circularly linked list of variations of this patch with different
-    // LINK_PATCH_NEXT_NODE() is maintained.  Since this is the moment of
-    // fresh patch creation, there are no variants.  Note that GC_Kill_Series
-    // will remove this patch from the list.
+    // LINK_PATCH_NEXT_NODE() is maintained, to assist in avoiding creating
+    // unnecessary duplicates.  But since this is the moment of fresh patch
+    // creation, there shouldn't be any variants (yet).  Note Decay_Series()
+    // will remove this patch from the list when it is being GC'd.
     //
     MISC(patch).variant = patch;
 
-    // This leaves us with VAL_WORD_CACHE_NODE() and MISC() free.
-    // The concept is to use these to find related chains to avoid creating
-    // too many redundant ones.  Think through that.
-
-    INIT_BINDING_MAY_MANAGE(block, NOD(patch));  // bound to the patch
+    // Update array's binding.  Note that once virtually bound, mutating BIND
+    // operations might apepar to be ignored if applied to the block.  This
+    // makes CONST a good default...and MUTABLE can be used if people are
+    // not concerned and want to try binding it through the virtualized
+    // reference anyway.
+    //
+    INIT_BINDING_MAY_MANAGE(any_array, NOD(patch));
+    Constify(any_array);
 }
 
 

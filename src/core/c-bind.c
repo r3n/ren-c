@@ -624,7 +624,6 @@ void Rebind_Values_Deep(
 // LIT-WORD! specified.  If all loop variables are of this form, then no
 // copy will be made.
 //
-//
 // !!! Loops should probably free their objects by default when finished
 //
 void Virtual_Bind_Deep_To_New_Context(
