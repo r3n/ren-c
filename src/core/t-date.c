@@ -1082,3 +1082,39 @@ REBNATIVE(make_date_ymdsnz)
     assert(Does_Date_Have_Time(D_OUT));
     return D_OUT;
 }
+
+
+//
+//  make-time-sn: native [
+//
+//  {Make a TIME! from Seconds and Nanoseconds}
+//
+//      return: [time!]
+//      seconds "3600 for each hour, 60 for each minute"
+//          [integer!]
+//      nano "Nanoseconds"
+//          [blank! integer!]
+//  ]
+//
+REBNATIVE(make_time_sn)
+//
+// !!! The MAKE TIME! as defined by historical Rebol lacked granularity to
+// to add fractions of seconds (it was `make time! [hour minutes seconds]`).
+// This primitive is added to facilitate implementation of NOW/TIME/PRECISE
+// in the near term without committing anything new about MAKE TIME! [].
+//
+// https://github.com/rebol/rebol-issues/issues/2313
+//
+// !!! Is there a reason why time zones can only be put on times when they
+// are coupled with a DATE! ?
+{
+    INCLUDE_PARAMS_OF_MAKE_TIME_SN;
+
+    RESET_CELL(D_OUT, REB_TIME, CELL_MASK_NONE);
+
+    REBI64 nano = IS_BLANK(ARG(nano)) ? 0 : VAL_INT64(ARG(nano));
+    PAYLOAD(Time, D_OUT).nanoseconds
+        = SECS_TO_NANO(VAL_INT64(ARG(seconds))) + nano;
+
+    return D_OUT;
+}
