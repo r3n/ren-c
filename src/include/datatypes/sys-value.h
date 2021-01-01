@@ -119,14 +119,15 @@
 #if defined(DEBUG_CELL_WRITABILITY)
     //
     // In the debug build, functions aren't inlined, and the overhead actually
-    // adds up very quickly of getting the 3 parameters passed in.  Run the
-    // risk of repeating macro arguments to speed up this critical test.
+    // adds up very quickly.  Run the risk of repeating macro arguments to
+    // speed up this critical test, then wrap in READABLE() and WRITABLE()
+    // functions for higher-level callers that don't mind the cost.
     //
     // Note this isn't in a `do {...} while (0)` either, also for speed.
 
-    #define ASSERT_CELL_READABLE_EVIL_MACRO(c,file,line) \
+    #define ASSERT_CELL_READABLE_EVIL_MACRO(c) \
         if ( \
-            (FIRST_BYTE(c->header) & ( \
+            (FIRST_BYTE((c)->header) & ( \
                 NODE_BYTEMASK_0x01_CELL | NODE_BYTEMASK_0x80_NODE \
                     | NODE_BYTEMASK_0x40_FREE \
             )) != 0x81 \
@@ -137,39 +138,31 @@
                 printf("Non-node passed to cell read/write routine\n"); \
             else \
                 printf("Free node passed to cell read/write routine\n"); \
-            panic_at ((c), (file), (line)); \
+            panic (c); \
         }
 
-    #define ASSERT_CELL_WRITABLE_EVIL_MACRO(c,file,line) \
-        ASSERT_CELL_READABLE_EVIL_MACRO(c, file, line); \
+    #define ASSERT_CELL_WRITABLE_EVIL_MACRO(c) \
+        ASSERT_CELL_READABLE_EVIL_MACRO(c); \
         if ((c)->header.bits & CELL_FLAG_PROTECTED) { \
             printf("Protected cell passed to writing routine\n"); \
-            panic_at ((c), (file), (line)); \
+            panic (c); \
         }
 
-    inline static unstable REBCEL(const*) READABLE(
-        unstable REBCEL(const*) c,
-        const char *file,
-        int line
-    ){
-        ASSERT_CELL_READABLE_EVIL_MACRO(c, file, line);
+    inline static unstable REBCEL(const*) READABLE(unstable REBCEL(const*) c) {
+        ASSERT_CELL_READABLE_EVIL_MACRO(c);
         return c;
     }
 
-    inline static unstable RELVAL *WRITABLE(
-        unstable RELVAL *c,
-        const char *file,
-        int line
-    ){
-        ASSERT_CELL_WRITABLE_EVIL_MACRO(c, file, line);
+    inline static unstable RELVAL *WRITABLE(unstable RELVAL *c) {
+        ASSERT_CELL_WRITABLE_EVIL_MACRO(c);
         return c;
     }
 #else
-    #define ASSERT_CELL_READABLE_EVIL_MACRO(c,file,line)    NOOP
-    #define ASSERT_CELL_WRITABLE_EVIL_MACRO(c,file,line)    NOOP
+    #define ASSERT_CELL_READABLE_EVIL_MACRO(c)    NOOP
+    #define ASSERT_CELL_WRITABLE_EVIL_MACRO(c)    NOOP
 
-    #define READABLE(c,file,line) (c)
-    #define WRITABLE(c,file,ilne) (c)
+    #define READABLE(c) (c)
+    #define WRITABLE(c) (c)
 #endif
 
 
@@ -271,15 +264,8 @@
 // the type and bits (e.g. ANY-WORD! to another ANY-WORD!).  Otherwise the
 // value-specific flags might be misinterpreted.
 //
-#if !defined(__cplusplus)
-    #define mutable_KIND3Q_BYTE(v) \
-        mutable_SECOND_BYTE((v)->header)
-#else
-    inline static REBYTE& mutable_KIND3Q_BYTE(unstable RELVAL *v) {
-        ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);
-        return mutable_SECOND_BYTE((v)->header);
-    }
-#endif
+#define mutable_KIND3Q_BYTE(v) \
+    mutable_SECOND_BYTE(WRITABLE(v)->header)
 
 
 // A cell may have a larger KIND3Q_BYTE() than legal Reb_Kind to represent a
@@ -399,16 +385,16 @@ inline static const RELVAL* CELL_TO_VAL(unstable_ok REBCEL(const*) cell)
 //
 
 #define SET_CELL_FLAG(v,name) \
-    (WRITABLE(v, __FILE__, __LINE__)->header.bits |= CELL_FLAG_##name)
+    (WRITABLE(v)->header.bits |= CELL_FLAG_##name)
 
 #define GET_CELL_FLAG(v,name) \
-    ((READABLE(v, __FILE__, __LINE__)->header.bits & CELL_FLAG_##name) != 0)
+    ((READABLE(v)->header.bits & CELL_FLAG_##name) != 0)
 
 #define CLEAR_CELL_FLAG(v,name) \
-    (WRITABLE(v, __FILE__, __LINE__)->header.bits &= ~CELL_FLAG_##name)
+    (WRITABLE(v)->header.bits &= ~CELL_FLAG_##name)
 
 #define NOT_CELL_FLAG(v,name) \
-    ((READABLE(v, __FILE__, __LINE__)->header.bits & CELL_FLAG_##name) == 0)
+    ((READABLE(v)->header.bits & CELL_FLAG_##name) == 0)
 
 
 //=//// CELL HEADERS AND PREPARATION //////////////////////////////////////=//
@@ -417,73 +403,33 @@ inline static const RELVAL* CELL_TO_VAL(unstable_ok REBCEL(const*) cell)
 // new type.  The type takes up the full second byte of the header (see
 // details in %sys-quoted.h for how this byte is used).
 //
+// RESET_CELL is a variant of RESET_VAL_HEADER that overwrites the entire
+// cell payload with tracking information.  It should not be used if the
+// intent is to preserve the payload and extra.
+//
+// (Note: RESET_CELL is used more often than it should right now in Init_XXX()
+// routines.  They should be phrased in terms of macros that pass in the
+// result of TRACK_CELL_IF_DEBUG() or TRACK_CELL_IF_EXTEND_DEBUG() at the
+// init callsite, so it captures the right __FILE__ and __LINE__.  This is
+// an ongoing cleanup effort, to be pursued as those routines are audited.)
+//
 // The value is expected to already be "pre-formatted" with the NODE_FLAG_CELL
 // bit, so that is left as-is.  See also CELL_MASK_PERSIST.
 //
 
-inline static REBVAL *RESET_VAL_HEADER_at(
+inline static REBVAL *RESET_VAL_HEADER(
     unstable RELVAL *v,
     enum Reb_Kind k,
     uintptr_t extra
-
-  #if defined(DEBUG_CELL_WRITABILITY)
-  , const char *file
-  , int line
-  #endif
 ){
-    ASSERT_CELL_WRITABLE_EVIL_MACRO(v, file, line);
-
+    ASSERT_CELL_WRITABLE_EVIL_MACRO(v);
     v->header.bits &= CELL_MASK_PERSIST;
     v->header.bits |= FLAG_KIND3Q_BYTE(k) | FLAG_HEART_BYTE(k) | extra;
     return cast(REBVAL*, v);
 }
 
-#if defined(DEBUG_CELL_WRITABILITY)
-    #define RESET_VAL_HEADER(v,kind,extra) \
-        RESET_VAL_HEADER_at((v), (kind), (extra), __FILE__, __LINE__)
-#else
-    #define RESET_VAL_HEADER(v,kind,extra) \
-        RESET_VAL_HEADER_at((v), (kind), (extra))
-#endif
-
-#ifdef DEBUG_TRACK_CELLS
-    //
-    // RESET_CELL is a variant of RESET_VAL_HEADER that overwrites the entire
-    // cell payload with tracking information.  It should not be used if the
-    // intent is to preserve the payload and extra.
-    //
-    // (Because of DEBUG_TRACK_EXTEND_CELLS, it's not necessarily a waste
-    // even if you overwrite the Payload/Extra immediately afterward; it also
-    // corrupts the data to help ensure all relevant fields are overwritten.)
-    //
-    // Note: RESET_VAL_HEADER is manually inlined here for efficiency in the
-    // debug build, since it winds up being two lines of code and the debug
-    // build wouldn't inline it itself...so it makes a performance difference
-    // for this very frequently called routine.
-    //
-    inline static REBVAL *RESET_CELL_Debug(
-        unstable RELVAL *out,
-        enum Reb_Kind kind,
-        uintptr_t extra,
-        const char *file,
-        int line
-    ){
-        ASSERT_CELL_WRITABLE_EVIL_MACRO(out, file, line);
-
-        out->header.bits &= CELL_MASK_PERSIST;
-        out->header.bits |=
-            FLAG_KIND3Q_BYTE(kind) | FLAG_HEART_BYTE(kind) | extra;
-
-        TRACK_CELL_IF_DEBUG_EVIL_MACRO(out, file, line);
-        return cast(REBVAL*, out);
-    }
-
-    #define RESET_CELL(out,kind,flags) \
-        RESET_CELL_Debug((out), (kind), (flags), __FILE__, __LINE__)
-#else
-    #define RESET_CELL(out,kind,flags) \
-       RESET_VAL_HEADER((out), (kind), (flags))
-#endif
+#define RESET_CELL(out,kind,flags) \
+    RESET_VAL_HEADER(TRACK_CELL_IF_DEBUG(out), (kind), (flags))
 
 inline static REBVAL *RESET_CUSTOM_CELL(
     unstable RELVAL *out,
@@ -499,22 +445,20 @@ inline static REBVAL *RESET_CUSTOM_CELL(
 // See notes on ALIGN_SIZE regarding why we check this, and when it does and
 // does not apply (some platforms need this invariant for `double` to work).
 //
-// This is another case where the debug build doesn't inline functions, and
-// for such central routines the overhead of passing 3 args is on the radar.
+// This is another case where the debug build doesn't inline functions.
 // Run the risk of repeating macro args to speed up this critical check.
 //
 #ifdef DEBUG_DONT_CHECK_ALIGN
-    #define ALIGN_CHECK_CELL_EVIL_MACRO(c,file,line) \
-        NOOP
+    #define ALIGN_CHECK_CELL_EVIL_MACRO(c)    NOOP
 #else
-    #define ALIGN_CHECK_CELL_EVIL_MACRO(c,file,line) \
+    #define ALIGN_CHECK_CELL_EVIL_MACRO(c) \
         if (cast(uintptr_t, (c)) % ALIGN_SIZE != 0) { \
             printf( \
                 "Cell address %p not aligned to %d bytes\n", \
                 cast(const void*, (c)), \
                 cast(int, ALIGN_SIZE) \
             ); \
-            panic_at ((c), file, line); \
+            panic (c); \
         }
 #endif
 
@@ -527,49 +471,14 @@ inline static REBVAL *RESET_CUSTOM_CELL(
         | FLAG_KIND3Q_BYTE(REB_0) \
         | FLAG_HEART_BYTE(REB_0))  // a more explicit CELL_MASK_PREP
 
-inline static RELVAL *Prep_Cell_Core(
-    unstable_ok RELVAL *c
-
-  #if defined(DEBUG_TRACK_CELLS)
-  , const char *file
-  , int line
-  #endif
-){
-  #ifdef DEBUG_MEMORY_ALIGN
-    ALIGN_CHECK_CELL_EVIL_MACRO(c, file, line);
-  #endif
-
+inline static RELVAL *Prep_Cell_Core(unstable_ok RELVAL *c) {
+    ALIGN_CHECK_CELL_EVIL_MACRO(c);
     c->header.bits = CELL_MASK_PREP;
-    TRACK_CELL_IF_DEBUG_EVIL_MACRO(cast(RELVAL*, c), file, line);
     return c;
 }
 
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable RELVAL *Prep_Cell_Core(
-        unstable RELVAL *c
-
-      #if defined(DEBUG_TRACK_CELLS)
-      , const char *file
-      , int line
-      #endif
-    ){
-      #ifdef DEBUG_MEMORY_ALIGN
-        ALIGN_CHECK_CELL_EVIL_MACRO(c, file, line);
-      #endif
-
-        c->header.bits = CELL_MASK_PREP;
-        TRACK_CELL_IF_DEBUG_EVIL_MACRO(cast(RELVAL*, c), file, line);
-        return c;
-    }
-#endif
-
-#if defined(DEBUG_TRACK_CELLS)
-    #define Prep_Cell(c) \
-        Prep_Cell_Core((c), __FILE__, __LINE__)
-#else
-    #define Prep_Cell(c) \
-        Prep_Cell_Core(c)
-#endif
+#define Prep_Cell(c) \
+    Prep_Cell_Core(TRACK_CELL_IF_DEBUG(c))
 
 
 //=//// TRASH CELLS ///////////////////////////////////////////////////////=//
@@ -586,48 +495,28 @@ inline static RELVAL *Prep_Cell_Core(
     #define TRASH_VALUE \
         cast(const REBVAL*, &PG_Trash_Value_Debug)
 
-    inline static RELVAL *Init_Trash_Debug(
-        unstable_ok RELVAL *v
-
-      #ifdef DEBUG_TRACK_CELLS
-      , const char *file
-      , int line
-      #endif
-    ){
-        ASSERT_CELL_WRITABLE_EVIL_MACRO(v, file, line);
-
+    inline static RELVAL *Init_Trash_Debug(unstable_ok RELVAL *v) {
+        ASSERT_CELL_WRITABLE_EVIL_MACRO(v);
         v->header.bits &= CELL_MASK_PERSIST;
         v->header.bits |=
             FLAG_KIND3Q_BYTE(REB_T_TRASH)
                 | FLAG_HEART_BYTE(REB_T_TRASH);
-
-        TRACK_CELL_IF_DEBUG_EVIL_MACRO(v, file, line);
         return v;
     }
 
   #ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable RELVAL *Init_Trash_Debug(
-        unstable RELVAL *v
-
-      #ifdef DEBUG_TRACK_CELLS
-      , const char *file
-      , int line
-      #endif
-    ){
-        ASSERT_CELL_WRITABLE_EVIL_MACRO(v, file, line);
-
+    inline static unstable RELVAL *Init_Trash_Debug(unstable RELVAL *v) {
+        ASSERT_CELL_WRITABLE_EVIL_MACRO(v);
         v->header.bits &= CELL_MASK_PERSIST;
         v->header.bits |=
             FLAG_KIND3Q_BYTE(REB_T_TRASH)
                 | FLAG_HEART_BYTE(REB_T_TRASH);
-
-        TRACK_CELL_IF_DEBUG_EVIL_MACRO(v, file, line);
         return v;
     }
   #endif
 
     #define TRASH_CELL_IF_DEBUG(v) \
-        Init_Trash_Debug((v), __FILE__, __LINE__)
+        Init_Trash_Debug(TRACK_CELL_IF_DEBUG(v))
 
     inline static bool IS_TRASH_DEBUG(const RELVAL *v) {
         assert(v->header.bits & NODE_FLAG_CELL);
@@ -659,15 +548,8 @@ inline static RELVAL *Prep_Cell_Core(
     cast(const REBVAL*, &PG_End_Node) // rebEND is char*, not REBVAL* aligned!
 
 #if defined(DEBUG_TRACK_CELLS) || defined(DEBUG_CELL_WRITABILITY)
-    inline static REBVAL *SET_END_Debug(
-        RELVAL *v
-
-      #if defined(DEBUG_TRACK_CELLS) || defined(DEBUG_CELL_WRITABILITY)
-      , const char *file
-      , int line
-      #endif
-    ){
-        ASSERT_CELL_WRITABLE_EVIL_MACRO(v, file, line);
+    inline static REBVAL *SET_END_Debug(RELVAL *v) {
+        ASSERT_CELL_WRITABLE_EVIL_MACRO(v);
 
         mutable_KIND3Q_BYTE(v) = REB_0_END; // release build behavior
 
@@ -679,13 +561,11 @@ inline static RELVAL *Prep_Cell_Core(
         // byte being anything in an END cell.  Set to trash in debug.
         //
         mutable_HEART_BYTE(v) = REB_T_TRASH;
-
-        TRACK_CELL_IF_DEBUG_EVIL_MACRO(v, file, line);
         return cast(REBVAL*, v);
     }
 
     #define SET_END(v) \
-        SET_END_Debug((v), __FILE__, __LINE__)
+        SET_END_Debug(TRACK_CELL_IF_DEBUG(v))
 #else
     inline static REBVAL *SET_END(RELVAL *v) {
         mutable_KIND3Q_BYTE(v) = REB_0_END; // must be a prepared cell
@@ -962,7 +842,7 @@ inline static void Move_Value_Header(
 
     // Note: Pseudotypes are legal to move, but none of them are bindable
 
-    ASSERT_CELL_WRITABLE_EVIL_MACRO(out, __FILE__, __LINE__);
+    ASSERT_CELL_WRITABLE_EVIL_MACRO(out);
 
     out->header.bits &= CELL_MASK_PERSIST;
     out->header.bits |= v->header.bits & CELL_MASK_COPY;

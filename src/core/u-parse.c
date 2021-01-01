@@ -1939,7 +1939,6 @@ REBNATIVE(subparse)
                 //
                 DECLARE_LOCAL (thrown_arg);
                 Init_Integer(thrown_arg, P_POS);
-                thrown_arg->extra.trash = thrown_arg;  // see notes
 
                 Init_Thrown_With_Label(
                     D_OUT,

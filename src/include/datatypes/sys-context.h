@@ -414,7 +414,7 @@ inline static void INIT_VAL_FRAME_LABEL(
     option(const REBSTR*) label
 ){
     assert(IS_FRAME(v));
-    ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);
+    ASSERT_CELL_WRITABLE_EVIL_MACRO(v);
     if (label)
         VAL_FRAME_PHASE_OR_LABEL_NODE(v)
             = NOD(m_cast(REBSTR*, unwrap(label)));

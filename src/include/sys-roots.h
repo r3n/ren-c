@@ -203,9 +203,8 @@ inline static REBARR *Alloc_Instruction(enum Reb_Api_Opcode opcode) {
     );
     MISC(s).opcode = opcode;
 
-    RELVAL *cell = SER_CELL(s);
+    RELVAL *cell = TRACK_CELL_IF_DEBUG(SER_CELL(s));
     cell->header.bits = CELL_MASK_PREP_END | NODE_FLAG_ROOT;
-    TRACK_CELL_IF_DEBUG_EVIL_MACRO(cell, "<<instruction>>", 0);
     return ARR(s);
 }
 

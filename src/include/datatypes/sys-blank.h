@@ -39,5 +39,15 @@
 #define BLANK_VALUE \
     c_cast(const REBVAL*, &PG_Blank_Value)
 
+inline static REBVAL *Init_Blank_Core(RELVAL *v) {
+    RESET_VAL_HEADER(v, REB_BLANK, CELL_MASK_NONE);
+  #ifdef ZERO_UNUSED_CELL_FIELDS
+    EXTRA(Any, v).trash = nullptr;
+    PAYLOAD(Any, v).first.trash = nullptr;
+    PAYLOAD(Any, v).second.trash = nullptr;
+  #endif
+    return cast(REBVAL*, v);
+}
+
 #define Init_Blank(v) \
-    RESET_CELL((v), REB_BLANK, CELL_MASK_NONE)
+    Init_Blank_Core(TRACK_CELL_IF_DEBUG(v))

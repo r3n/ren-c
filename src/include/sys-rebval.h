@@ -368,6 +368,8 @@ union Reb_Any {  // needed to beat strict aliasing, used in payload
     REBSER *rebser_pun;
     REBVAL *rebval_pun;
   #endif
+
+    void *trash;  // see remarks in ZERO_UNUSED_CELL_FIELDS regarding this
 };
 
 union Reb_Bytes_Extra {
@@ -392,16 +394,6 @@ union Reb_Value_Extra { //=/////////////////// ACTUAL EXTRA DEFINITION ////=//
   #if defined(DEBUG_COUNT_TICKS)
     uintptr_t tick;  // cells that don't use their bindings can show this
   #endif
-
-    // The release build doesn't put anything in the ->extra field by default,
-    // so sensitive compilers notice when cells are moved without that
-    // initialization.  Rather than disable the warning, this can be used to
-    // put some junk into it, but TRASH_POINTER_IF_DEBUG() won't subvert the
-    // warning.  So just poke whatever pointer is at hand that is likely to
-    // already be in a register and not meaningful (e.g. nullptr is a poor
-    // choice, because that could look like a valid non-binding)
-    //
-    void *trash;
 };
 
 

@@ -338,6 +338,7 @@ inline static REBNOD *SPC_BINDING(REBSPC *specifier)
     assert(specifier != UNBOUND);
     const REBVAL *rootvar = CTX_ARCHETYPE(CTX(specifier));  // ok if Decay()'d
     assert(IS_FRAME(rootvar));
+    assert(not EXTRA(Binding, rootvar).node or ((intptr_t)EXTRA(Binding, rootvar).node > 300000));
     return EXTRA(Binding, rootvar).node;
 }
 

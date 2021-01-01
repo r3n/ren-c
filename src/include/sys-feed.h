@@ -411,7 +411,7 @@ inline static const RELVAL *Lookback_While_Fetching_Next(REBFRM *f) {
     }
   #endif
 
-    assert(READABLE(f->feed->value, __FILE__, __LINE__));  // ensure cell
+    assert(READABLE(f->feed->value));  // ensure cell
 
     // f->value may be synthesized, in which case its bits are in the
     // `f->feed->fetched` cell.  That synthesized value would be overwritten
@@ -597,7 +597,7 @@ inline static void Prep_Array_Feed(
     if (IS_END(feed->value))
         assert(FEED_PENDING(feed) == nullptr);
     else
-        assert(READABLE(feed->value, __FILE__, __LINE__));
+        assert(READABLE(feed->value));
 }
 
 #define DECLARE_ARRAY_FEED(name,array,index,specifier) \
@@ -630,7 +630,7 @@ inline static void Prep_Va_Feed(
     Detect_Feed_Pointer_Maybe_Fetch(feed, p);
 
     feed->gotten = nullptr;
-    assert(IS_END(feed->value) or READABLE(feed->value, __FILE__, __LINE__));
+    assert(IS_END(feed->value) or READABLE(feed->value));
 }
 
 // The flags is passed in by the macro here by default, because it does a

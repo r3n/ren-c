@@ -449,7 +449,7 @@ inline static REBVAL *Init_Typeset(unstable_ok RELVAL *out, REBU64 bits)
 // typesets more complex (the original "64 bit flags" design is insufficient
 // for a generalized typeset!)
 //
-inline static REBVAL *Init_Param(
+inline static REBVAL *Init_Param_Core(
     unstable RELVAL *out,
     Reb_Param_Class pclass,
     const REBSTR *spelling,
@@ -464,6 +464,11 @@ inline static REBVAL *Init_Param(
     assert(IS_PARAM(out));
     return cast(REBVAL*, out);
 }
+
+#define Init_Param(out,pclass,spelling,bits) \
+    Init_Param_Core( \
+        TRACK_CELL_IF_EXTENDED_DEBUG(out), (pclass), (spelling), (bits))
+
 
 // Context keys and action parameters use a compatible representation (this
 // enables using action paramlists as FRAME! context keylists).  However,

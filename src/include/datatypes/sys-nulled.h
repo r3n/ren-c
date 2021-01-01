@@ -42,8 +42,18 @@
 #define IS_NULLED(v) \
     (VAL_TYPE(v) == REB_NULL)
 
+inline static REBVAL *Init_Nulled_Core(unstable RELVAL *out) {
+    RESET_VAL_HEADER(out, REB_NULL, CELL_MASK_NONE);
+  #ifdef ZERO_UNUSED_CELL_FIELDS
+    EXTRA(Any, out).trash = nullptr;
+    PAYLOAD(Any, out).first.node = nullptr;
+    PAYLOAD(Any, out).second.node = nullptr;
+  #endif
+    return cast(REBVAL*, out);
+}
+
 #define Init_Nulled(out) \
-    RESET_CELL((out), REB_NULL, CELL_MASK_NONE)
+    Init_Nulled_Core(TRACK_CELL_IF_DEBUG(out))
 
 // This helps find callsites that are following the convention for what
 // `do []` should do.  This has changed to be NULL from the historical choice

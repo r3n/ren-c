@@ -47,13 +47,17 @@ inline static REBVAL *Init_Void_Core(
     unstable RELVAL *out,
     const REBSTR *label
 ){
-    RESET_CELL(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
+    RESET_VAL_HEADER(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
     VAL_NODE(out) = NOD(m_cast(REBSTR*, label));
+  #ifdef ZERO_UNUSED_CELL_FIELDS
+    EXTRA(Any, out).trash = nullptr;
+    PAYLOAD(Any, out).second.trash = nullptr;
+  #endif
     return cast(REBVAL*, out);
 }
 
 #define Init_Void(out,sym) \
-    Init_Void_Core((out), Canon(sym))
+    Init_Void_Core(TRACK_CELL_IF_DEBUG(out), Canon(sym))
 
 inline static const REBSTR* VAL_VOID_LABEL(
     unstable REBCEL(const*) v
@@ -73,7 +77,7 @@ inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
 
 #if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, non-crashing VOID!
     #define Init_Unreadable_Void(v) \
-        Init_Void_Core(v, PG_Unreadable_Canon)  // canon available early
+        Init_Void_Core(TRACK_CELL_IF_DEBUG(v), PG_Unreadable_Canon)
 
     #define IS_VOID_RAW(v) \
         IS_VOID(v)
@@ -84,10 +88,8 @@ inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
     #define ASSERT_READABLE_IF_DEBUG(v) \
         NOOP
 #else
-    inline static REBVAL *Init_Unreadable_Void_Debug(
-        unstable RELVAL *out, const char *file, int line
-    ){
-        RESET_CELL_Debug(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE, file, line);
+    inline static REBVAL *Init_Unreadable_Void_Debug(unstable RELVAL *out) {
+        RESET_VAL_HEADER(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
 
         // While SYM_UNREADABLE might be nice here, that prevents usage at
         // boot time (e.g. data stack initialization)...and it's a good way
@@ -99,7 +101,7 @@ inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
     }
 
     #define Init_Unreadable_Void(out) \
-        Init_Unreadable_Void_Debug((out), __FILE__, __LINE__)
+        Init_Unreadable_Void_Debug(TRACK_CELL_IF_DEBUG(out))
 
     #define IS_VOID_RAW(v) \
         (KIND3Q_BYTE_UNCHECKED(v) == REB_VOID)

@@ -136,7 +136,7 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
     // from any objects that were sharing it.
     //
     if (flags & PROT_WORD) {
-        ASSERT_CELL_READABLE_EVIL_MACRO(var, __FILE__, __LINE__);
+        assert(READABLE(var));
         if (flags & PROT_SET)
             var->header.bits |= CELL_FLAG_PROTECTED;
         else

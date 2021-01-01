@@ -291,7 +291,7 @@ inline static void INIT_VAL_ACTION_LABEL(
     unstable RELVAL *v,
     option(const REBSTR*) label
 ){
-    ASSERT_CELL_WRITABLE_EVIL_MACRO(v, __FILE__, __LINE__);  // archetype R/O
+    ASSERT_CELL_WRITABLE_EVIL_MACRO(v);  // archetype R/O
     if (label)
         VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v)
             = NOD(m_cast(REBSTR*, unwrap(label)));

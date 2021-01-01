@@ -219,12 +219,12 @@ inline static void INIT_VAL_WORD_VIRTUAL_MONDEX(
     VAL_WORD_INDEXES_U32(m_cast(RELVAL*, v)) |= mondex << 20;
 }
 
-inline static REBVAL *Init_Any_Word(
+inline static REBVAL *Init_Any_Word_Core(
     unstable RELVAL *out,
     enum Reb_Kind kind,
     const REBSTR *spelling
 ){
-    RESET_CELL(out, kind, CELL_FLAG_FIRST_IS_NODE);
+    RESET_VAL_HEADER(out, kind, CELL_FLAG_FIRST_IS_NODE);
     VAL_WORD_BINDING_NODE(out) = NOD(m_cast(REBSTR*, spelling));
     VAL_WORD_INDEXES_U32(out) = 0;
     VAL_WORD_CACHE_NODE(out) = UNSPECIFIED;
@@ -232,24 +232,31 @@ inline static REBVAL *Init_Any_Word(
     return cast(REBVAL*, out);
 }
 
+#define Init_Any_Word(out,kind,spelling) \
+    Init_Any_Word_Core(TRACK_CELL_IF_EXTENDED_DEBUG(out), (kind), (spelling))
+
 #define Init_Word(out,str)          Init_Any_Word((out), REB_WORD, (str))
 #define Init_Get_Word(out,str)      Init_Any_Word((out), REB_GET_WORD, (str))
 #define Init_Set_Word(out,str)      Init_Any_Word((out), REB_SET_WORD, (str))
 #define Init_Sym_Word(out,str)      Init_Any_Word((out), REB_SYM_WORD, (str))
 
-inline static REBVAL *Init_Any_Word_Bound(
+inline static REBVAL *Init_Any_Word_Bound_Core(
     unstable RELVAL *out,
     enum Reb_Kind type,
     REBCTX *context,  // spelling determined by context and index
     REBLEN index
 ){
-    RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
+    RESET_VAL_HEADER(out, type, CELL_FLAG_FIRST_IS_NODE);
     VAL_WORD_BINDING_NODE(out) = NOD(context);
     VAL_WORD_INDEXES_U32(out) = index;
     VAL_WORD_CACHE_NODE(out) = UNSPECIFIED;
 
     return cast(REBVAL*, out);
 }
+
+#define Init_Any_Word_Bound(out,type,context,index) \
+    Init_Any_Word_Bound_Core( \
+        TRACK_CELL_IF_EXTENDED_DEBUG(out), (type), (context), (index))
 
 
 // Helper calls strsize() so you can more easily use literals at callsite.

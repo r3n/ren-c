@@ -6,9 +6,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
-// REBOL is a trademark of REBOL Technologies
+// Copyright 2012-2020 Ren-C Open Source Contributors
 //
 // See README.md and CREDITS.md for more information.
 //
@@ -23,8 +21,11 @@
 // `Reb_Track_Payload` is the value payload in debug builds for any REBVAL
 // whose VAL_TYPE() doesn't need any information beyond the header.  This
 // offers a chance to inject some information into the payload to help
-// know where the value originated.  It is used by NULL cells, VOID!, BLANK!,
-// LOGIC!, and BAR!.
+// know where the value originated.  It is used by NULL(ed) cells, VOID!,
+// BLANK!, and LOGIC!...as well as "trashed" cells.
+//
+// View this information in the debugging watchlist under the `track` union
+// member of a value's payload.  It is also reported by panic().
 //
 // In addition to the file and line number where the assignment was made,
 // the "tick count" of the DO loop is also saved.  This means that it can
@@ -32,25 +33,14 @@
 // the value--and at what place in the source.  Repro cases can be set to
 // break on that tick count, if it is deterministic.
 //
-// If tracking information is desired for all cell types, that means the cell
-// size has to be increased.  See DEBUG_TRACK_EXTEND_CELLS for this setting,
-// which can be useful in extreme debugging cases.
+// If tracking information is desired for *all* cell types--including those
+// that use their payload bits--that means the cell size has to be increased.
+// See DEBUG_TRACK_EXTEND_CELLS for this setting, which can be extremely
+// useful in tougher debugging cases.
 //
-// In the debug build, "Trash" cells (NODE_FLAG_FREE) can use their payload to
-// store where and when they were initialized.  This also applies to some
-// datatypes like BLANK!, BAR!, LOGIC!, or VOID!--since they only use their
-// header bits, they can also use the payload for this in the debug build.
+// See notes on ZERO_UNUSED_CELL_FIELDS below for why release builds pay the
+// cost of initializing unused fields to null, vs. leaving them random.
 //
-// (Note: The release build does not canonize unused bits of payloads, so
-// they are left as random data in that case.)
-//
-// View this information in the debugging watchlist under the `track` union
-// member of a value's payload.  It is also reported by panic().
-//
-// Note: Due to the lack of inlining in the debug build, the EVIL_MACRO form
-// of this is used.  It actually makes a significant difference, vs. using
-// a function...for this important debugging tool that's used very often.
-// (It's actually also a bit easier to read what's going on this way.)
 
 #if defined(DEBUG_TRACK_CELLS)
 
@@ -59,36 +49,91 @@
     #define TOUCH_CELL(c) \
         ((c)->touch = TG_Tick)
 
-    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
-        (c)->track.file = _file; \
-        (c)->track.line = _line; \
-        (c)->extra.tick = (c)->tick = TG_Tick; \
-        (c)->touch = 0;
+    inline static unstable RELVAL *Track_Cell_If_Debug(
+        unstable RELVAL *v,
+        const char *file,
+        int line
+    ){
+        v->track.file = file;
+        v->track.line = line;
+        v->extra.tick = v->tick = TG_Tick;
+        v->touch = 0;
+        return v;
+    }
+
+    #define TRACK_CELL_IF_DEBUG(v) \
+        Track_Cell_If_Debug((v), __FILE__, __LINE__)
+
+    #define TRACK_CELL_IF_EXTENDED_DEBUG TRACK_CELL_IF_DEBUG
 
   #elif defined(DEBUG_COUNT_TICKS)
 
-    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
-        (c)->extra.tick = TG_Tick; \
-        PAYLOAD(Track, (c)).file = _file; \
-        PAYLOAD(Track, (c)).line = _line;
+    inline static unstable RELVAL *Track_Cell_If_Debug(
+        unstable RELVAL *v,
+        const char *file,
+        int line
+    ){
+        v->extra.tick = TG_Tick;
+        PAYLOAD(Track, v).file = file;
+        PAYLOAD(Track, v).line = line;
+        return v;
+    }
+
+    #define TRACK_CELL_IF_DEBUG(v) \
+        Track_Cell_If_Debug((v), __FILE__, __LINE__)
+
+    #define TRACK_CELL_IF_EXTENDED_DEBUG(v) (v)
 
   #else  // not counting ticks, and not using extended cell format
 
-    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
-        (c)->extra.tick = 1; \
-        PAYLOAD(Track, (c)).file = _file; \
-        PAYLOAD(Track, (c)).line = _line;
+    inline static unstable RELVAL *Track_Cell_If_Debug(
+        unstable RELVAL *v,
+        const char *file,
+        int line
+    ){
+        v->extra.tick = 1;
+        PAYLOAD(Track, v).file = file;
+        PAYLOAD(Track, v).line = line;
+        return v;
+    }
+
+    #define TRACK_CELL_IF_DEBUG(v) \
+        Track_Cell_If_Debug((v), __FILE__, __LINE__)
+
+    #define TRACK_CELL_IF_EXTENDED_DEBUG(v) (v)
 
   #endif
 
-#elif !defined(NDEBUG)
-
-    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
-        ((c)->extra.tick = 1)  // unreadable void needs for debug payload
-
 #else
 
-    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
-        NOOP
+    // While debug builds fill the ->extra and ->payload with potentially
+    // useful information, it would seem that cells like REB_BLANK which
+    // don't use them could just leave them uninitialized...saving time on
+    // the assignments.
+    //
+    // Unfortunately, this is a technically gray area in C.  If you try to
+    // copy the memory of that cell (as cells are often copied), it might be a
+    // "trap representation".  Reading such representations to copy them...
+    // even if not interpreted... is undefined behavior:
+    //
+    // https://stackoverflow.com/q/60112841
+    // https://stackoverflow.com/q/33393569/
+    //
+    // Odds are it would still work fine if you didn't zero them.  However,
+    // compilers will warn you--especially at higher optimization levels--if
+    // they notice uninitialized values being used in copies.  This is a bad
+    // warning to turn off, because it often points out defective code.
+    //
+    // So to play it safe and make use of the warnings, fields are zeroed out.
+    // But it's set up as its own independent flag, so that someone looking
+    // to squeak out a tiny bit more optimization could turn this off in a
+    // release build.  It would save on a few null assignments.
+    //
+    #if !defined(DEBUG_TRACK_EXTEND_CELLS)
+        #define ZERO_UNUSED_CELL_FIELDS
+    #endif
+
+    #define TRACK_CELL_IF_DEBUG(v) (v)
+    #define TRACK_CELL_IF_EXTENDED_DEBUG(v) (v)
 
 #endif

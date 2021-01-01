@@ -51,17 +51,20 @@ inline static bool IS_TRUTHY(unstable const RELVAL *v) {
 #define IS_FALSEY(v) \
     (not IS_TRUTHY(v))
 
-inline static REBVAL *Init_Logic(unstable RELVAL *out, bool flag) {
+inline static REBVAL *Init_Logic_Core(unstable RELVAL *out, bool flag) {
     RESET_CELL(out, REB_LOGIC, CELL_MASK_NONE);
     PAYLOAD(Logic, out).flag = flag;
+  #ifdef ZERO_UNUSED_CELL_FIELDS
+    EXTRA(Any, out).trash = nullptr;
+  #endif
     return cast(REBVAL*, out);
 }
 
-#define Init_True(out) \
-    Init_Logic((out), true)
+#define Init_Logic(out,flag) \
+    Init_Logic_Core(TRACK_CELL_IF_DEBUG(out), (flag))
 
-#define Init_False(out) \
-    Init_Logic((out), false)
+#define Init_True(out)      Init_Logic((out), true)
+#define Init_False(out)     Init_Logic((out), false)
 
 
 // Although a BLOCK! value is true, some constructs are safer by not allowing

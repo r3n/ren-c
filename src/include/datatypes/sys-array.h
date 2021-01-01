@@ -127,7 +127,7 @@ inline static void TERM_ARRAY_LEN(REBARR *a, REBLEN len) {
 
   #if !defined(NDEBUG)
     if (NOT_END(ARR_AT(a, len)))
-        ASSERT_CELL_WRITABLE_EVIL_MACRO(ARR_AT(a, len), __FILE__, __LINE__);
+        ASSERT_CELL_WRITABLE_EVIL_MACRO(ARR_AT(a, len));
   #endif
     mutable_SECOND_BYTE(ARR_AT(a, len)->header.bits) = REB_0_END;
 }
@@ -202,15 +202,14 @@ inline static void Prep_Array(
         // the debug build.
         //
         prep->header.bits = Endlike_Header(0); // unwritable
-        TRACK_CELL_IF_DEBUG_EVIL_MACRO(prep, __FILE__, __LINE__);
+        USED(TRACK_CELL_IF_DEBUG(prep));
       #if !defined(NDEBUG)
         while (n < SER(a)->content.dynamic.rest) { // no -1 (n is 1-based)
             ++n;
-            ++prep;
+            prep = TRACK_CELL_IF_DEBUG(prep + 1);
             prep->header.bits =
                 FLAG_KIND3Q_BYTE(REB_T_TRASH)
                 | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
-            TRACK_CELL_IF_DEBUG_EVIL_MACRO(prep, __FILE__, __LINE__);
         }
       #endif
 
@@ -229,7 +228,7 @@ inline static void Prep_Array(
     // an unwritable end--to leave flexibility to use the rest of the cell.
     //
     prep->header.bits = Endlike_Header(0);
-    TRACK_CELL_IF_DEBUG_EVIL_MACRO(prep, __FILE__, __LINE__);
+    USED(TRACK_CELL_IF_DEBUG(prep));
 }
 
 
@@ -265,9 +264,8 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
       #endif
     }
     else {
-        RELVAL *cell = SER_CELL(s);
+        RELVAL *cell = TRACK_CELL_IF_DEBUG(SER_CELL(s));
         cell->header.bits = CELL_MASK_PREP_END;
-        TRACK_CELL_IF_DEBUG_EVIL_MACRO(cell, "<<make>>", 0);
 
         s->info.bits = Endlike_Header(
             FLAG_WIDE_BYTE_OR_0(0)  // implicit termination
