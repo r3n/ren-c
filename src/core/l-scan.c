@@ -2547,7 +2547,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         // including the zero.  This doesn't put any decision in stone, but
         // reserves the right to make a decision at a later time.
         //
-        if (VAL_SEQUENCE_LEN(DS_TOP) == 2) {
+        if (IS_TUPLE(DS_TOP) and VAL_SEQUENCE_LEN(DS_TOP) == 2) {
             if (
                 IS_INTEGER(VAL_SEQUENCE_AT(temp, DS_TOP, 0))
                 and IS_BLANK(VAL_SEQUENCE_AT(temp, DS_TOP, 1))
