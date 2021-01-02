@@ -13,7 +13,7 @@
 )
 
 (
-    make-x: does lit x
+    make-x: does just x
     make-x = 'x
 )
 

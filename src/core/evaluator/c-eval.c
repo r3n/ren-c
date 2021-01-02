@@ -426,7 +426,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // We make a special exemption for left-stealing arguments, when
         // they have nothing to their right.  They lose their priority
         // and we run the left hand side with them as a priority instead.
-        // This lets us do e.g. `(lit =>)` or `help of`
+        // This lets us do e.g. `(just =>)` or `help of`
         //
         // Swap it around so that what we had put in the f->out goes back
         // to being in the lookback cell and can be used as current.  Then put
@@ -1423,8 +1423,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // Left-quoting by enfix needs to be done in the lookahead before an
         // evaluation, not this one that's after.  This happens in cases like:
         //
-        //     left-lit: enfix func [:value] [:value]
-        //     lit <something> left-lit
+        //     left-just: enfix func [:value] [:value]
+        //     just <something> just-lit
         //
         // But due to the existence of <end>-able and <skip>-able parameters,
         // the left quoting function might be okay with seeing nothing on the
@@ -1552,9 +1552,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // Want to keep this flag between an operation and an ensuing enfix in
     // the same frame, so can't clear in Drop_Action(), e.g. due to:
     //
-    //     left-lit: enfix :lit
+    //     left-just: enfix :Just
     //     o: make object! [f: does [1]]
-    //     o/f left-lit  ; want error suggesting >- here, need flag for that
+    //     o/f left-just  ; want error suggesting >- here, need flag for that
     //
     CLEAR_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);
     assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));  // must be consumed

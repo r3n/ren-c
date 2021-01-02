@@ -617,7 +617,7 @@
 ; Error in R2 (could be fixed).
 (not equal? make port! http:// make port! http://)
 [#859 (
-    a: copy lit ()
+    a: copy just ()
     insert/only a a
     error? trap [do a]
 )]

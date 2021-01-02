@@ -354,6 +354,43 @@ REBNATIVE(in)
 
 
 //
+//  without: native [
+//
+//  "Remove a virtual binding from a value"
+//
+//      return: [<opt> any-word! any-array!]
+//      context "If integer, then removes that number of virtual bindings"
+//          [integer! any-context!]
+//      value [<const> <blank> any-word! any-array!]  ; QUOTED! support?
+//  ]
+//
+REBNATIVE(without)
+{
+    INCLUDE_PARAMS_OF_IN;
+
+    REBCTX *ctx = VAL_CONTEXT(ARG(context));
+    REBVAL *v = ARG(value);
+
+    // !!! Note that BIND of a WORD! in historical Rebol/Red would return the
+    // input word as-is if the word wasn't in the requested context, while
+    // IN would return NONE! on failure.  We carry forward the NULL-failing
+    // here in IN, but BIND's behavior on words may need revisiting.
+    //
+    if (ANY_WORD(v)) {
+        const REBSTR *spelling = VAL_WORD_SPELLING(v);
+        const bool strict = true;
+        REBLEN index = Find_Symbol_In_Context(ARG(context), spelling, strict);
+        if (index == 0)
+            return nullptr;
+        return Init_Any_Word_Bound(D_OUT, VAL_TYPE(v), ctx, index);
+    }
+
+    assert(ANY_ARRAY(v));
+    Virtual_Bind_Deep_To_Existing_Context(v, ctx, nullptr, REB_WORD);
+    RETURN (v);
+}
+
+//
 //  use: native [
 //
 //  {Defines words local to a block.}

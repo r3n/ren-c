@@ -65,13 +65,13 @@
 ; You can change the conventions of a function from quoting to non, etc.
 
 (
-    skin: reskinned [@change value] :lit
+    skin: reskinned [@change value] :just
     3 = skin 1 + 2
 )
 
 (
-    append-lit: reskinned [@change :value] :append
-    [a b c d] = append-lit [a b c] d
+    append-just: reskinned [@change :value] :append
+    [a b c d] = append-just [a b c] d
 )
 
 ; Ordinarily, when you ADAPT or ENCLOSE a function, the frame filling that is

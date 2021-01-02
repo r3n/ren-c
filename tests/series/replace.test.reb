@@ -51,7 +51,7 @@
 (<tag xyXx> = replace/case <tag xXXx> "X" "y")
 (<tag xyyx> = replace/case/all <tag xXXx> "X" "y")
 (["a" "B" "x"] = replace/case/all ["a" "B" "a" "b"] ["a" "b"] "x")
-((lit (x A x)) = replace/case/all lit (a A a) 'a 'x)
+((just (x A x)) = replace/case/all lit (a A a) 'a 'x)
 
 ;((make hash! [x a b [a B]]) = replace/case make hash! [a B a b [a B]] [a B] 'x)
 
@@ -70,17 +70,17 @@
 
 ; REPLACE/DEEP - /DEEP not (yet?) implemented in Ren-C
 
-;([1 2 3 [8 5]] = replace/deep [1 2 3 [4 5]] [lit 4] 8)
-;([1 2 3 [4 8 9]] = replace/deep [1 2 3 [4 5]] [lit 5] [8 9])
-;([1 2 3 [8 9]] = replace/deep [1 2 3 [4 5]] [lit 4 lit 5] [8 9])
-;([1 2 3 [8]] = replace/deep [1 2 3 [4 5]] [lit 4 lit 5] 8)
-;([1 2 a 4 5] = replace/deep [1 2 3 4 5] [lit 8 | lit 4 | lit 3] 'a)
+;([1 2 3 [8 5]] = replace/deep [1 2 3 [4 5]] [just 4] 8)
+;([1 2 3 [4 8 9]] = replace/deep [1 2 3 [4 5]] [just 5] [8 9])
+;([1 2 3 [8 9]] = replace/deep [1 2 3 [4 5]] [just 4 just 5] [8 9])
+;([1 2 3 [8]] = replace/deep [1 2 3 [4 5]] [just 4 just 5] 8)
+;([1 2 a 4 5] = replace/deep [1 2 3 4 5] [just 8 | just 4 | just 3] 'a)
 ;([a g h c d] = replace/deep [a b c d] ['b | 'd] [g h])
 
 ; REPLACE/DEEP/ALL - /DEEP not (yet?) implemented in Ren-C
 
-;([1 8 3 [4 8]] = replace/deep/all [1 2 3 [4 2]] [lit 2] 8)
-;([1 8 9 3 [4 8 9]] = replace/deep/all [1 2 3 [4 5]] [lit 5 | lit 2] [8 9])
+;([1 8 3 [4 8]] = replace/deep/all [1 2 3 [4 2]] [just 2] 8)
+;([1 8 9 3 [4 8 9]] = replace/deep/all [1 2 3 [4 5]] [just 5 | just 2] [8 9])
 ;([i j c [i j]] = replace/deep/all [a b c [d e]] ['d 'e | 'a 'b] [i j])
 ;([a [<tag> [<tag>]]] = replace/all/deep [a [b c [d b]]] ['d 'b | 'b 'c] <tag>)
 
@@ -102,4 +102,4 @@
 ; REPLACE/CASE/DEEP - /DEEP not (yet?) implemented in Ren-C
 
 ;([x A x B [x A x B]] = replace/case/deep/all [a A b B [a A b B]] ['a | 'b] 'x)
-;((lit (x A x B (x A x B))) = replace/case/deep/all lit (a A b B (a A b B)) ['a | 'b] 'x)
+;((just (x A x B (x A x B))) = replace/case/deep/all lit (a A b B (a A b B)) ['a | 'b] 'x)

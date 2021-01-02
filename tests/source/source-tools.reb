@@ -450,7 +450,7 @@ rebsource: context [
             any [nl | eol | wsp]
         ]
 
-        append/only grammar/other-segment lit (
+        append/only grammar/other-segment just (
             last-func-end: _
         )
 

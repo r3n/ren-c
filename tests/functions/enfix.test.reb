@@ -73,7 +73,7 @@
     ; type matched what it was looking for.
     (
         unset 'var
-        block: [lit 1 lefty "hi"]
+        block: [just 1 lefty "hi"]
         did all [
             [lefty "hi"] = block: evaluate/result block 'var
             1 = var
@@ -123,16 +123,16 @@
 
 [
     (
-        left-lit: enfixed :lit
+        left-just: enfixed :just
         o: make object! [i: 10 f: does [20]]
         true
     )
 
-    ((trap [o/i left-lit])/id = 'literal-left-path)
-    (o/i ->- left-lit = 'o/i)
+    ((trap [o/i left-just])/id = 'literal-left-path)
+    (o/i ->- left-just = 'o/i)
 
-    ((trap [o/f left-lit])/id = 'literal-left-path)
-    (o/f ->- left-lit = 'o/f)
+    ((trap [o/f left-just])/id = 'literal-left-path)
+    (o/f ->- left-just = 'o/f)
 ]
 
 ; Rather than error when SET-WORD! or SET-PATH! are used as the left hand
@@ -154,13 +154,13 @@
 
 ; Right enfix always wins over left, unless the right is at array end
 
-((lit ->-) = first [->-])
-((lit ->- lit) = 'lit)
-('x = (x >- lit))
-(1 = (1 ->- lit))
+((just ->-) = first [->-])
+((just ->- just) = 'just)
+('x = (x >- just))
+(1 = (1 ->- just))
 
-(1 = (1 >- lit))
-('x = (x >- lit))
+(1 = (1 >- just))
+('x = (x >- just))
 
 ; "Precedence" manipulation via >- and ->-
 

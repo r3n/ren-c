@@ -330,7 +330,7 @@ apply: emulate [
                 arg: block/1
                 try next block
             ] else [
-                try evaluate/result block (lit arg:)
+                try evaluate/result block (just arg:)
             ]
 
             if refinement? params/1 [
@@ -538,7 +538,7 @@ do: emulate [
 
         if var [  ; DO/NEXT
             if args [fail "Can't use DO/NEXT with ARGS"]
-            source: evaluate/result :source (lit result:)
+            source: evaluate/result :source (just result:)
             set var source  ; DO/NEXT put the *position* in the var
             return :result  ; DO/NEXT returned the *evaluative result*
         ]
@@ -1191,7 +1191,7 @@ append: emulate [oldsplicer :append]
 insert: emulate [oldsplicer :insert]
 change: emulate [oldsplicer :change]
 
-quote: emulate [:lit]
+quote: emulate [:just]
 
 cloaker: helper [function [  ; specialized as CLOAK and DECLOAK
     {Simple and insecure data scrambler, was native C code in Rebol2/R3-Alpha}

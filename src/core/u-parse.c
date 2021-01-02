@@ -837,7 +837,7 @@ static REBIXO To_Thru_Block_Rule(
                         goto next_alternate_rule;
                     }
                     else if (
-                        cmd == SYM_LIT or cmd == SYM_LITERAL
+                        cmd == SYM_JUST
                         or cmd == SYM_QUOTE // temporarily same for bootstrap
                     ){
                         rule = ++blk;  // next rule is the literal value
@@ -1110,7 +1110,7 @@ static REBIXO To_Thru_Non_Block_Rule(
 // Perform an EVALAUTE on the *input* as a code block, and match the following
 // rule against the evaluative result.
 //
-//     parse [1 + 2] [do [lit 3]] => true
+//     parse [1 + 2] [do [just 3]] => true
 //
 // The rule may be in a block or inline.
 //
@@ -1133,7 +1133,7 @@ static REBIXO To_Thru_Non_Block_Rule(
 // !!! The way this feature was expressed in R3-Alpha isolates it from
 // participating in iteration or as the target of an outer rule, e.g.
 //
-//     parse [1 + 2] [set var do [lit 3]]  ; var gets 1, not 3
+//     parse [1 + 2] [set var do [just 3]]  ; var gets 1, not 3
 //
 // Other problems arise since the caller doesn't know about the trickiness
 // of this evaluation, e.g. this won't work either:
@@ -1195,7 +1195,7 @@ static REBIXO Do_Eval_Rule(REBFRM *frame_)
     }
 
     // We want to reuse the same frame we're in, because if you say
-    // something like `parse [1 + 2] [do [lit 3]]`, the `[lit 3]` rule
+    // something like `parse [1 + 2] [do [just 3]]`, the `[just 3]` rule
     // should be consumed.  We also want to be able to use a nested rule
     // inline, such as `do skip` not only allow `do [skip]`.
     //
@@ -1269,7 +1269,7 @@ static void Handle_Mark_Rule(
     // !!! Experiment: Put the quote level of the original series back on when
     // setting positions (then remove)
     //
-    //     parse lit '''{abc} ["a" mark x:]` => '''{bc}
+    //     parse just '''{abc} ["a" mark x:]` => '''{bc}
 
     Quotify(ARG(position), P_NUM_QUOTES);
 
@@ -1400,7 +1400,7 @@ REBNATIVE(subparse)
 
     REBFRM *f = frame_;  // nice alias of implicit native parameter
 
-    // If the input is quoted, e.g. `parse lit ''''[...] [rules]`, we dequote
+    // If the input is quoted, e.g. `parse just ''''[...] [rules]`, we dequote
     // it while we are processing the ARG().  This is because we are trying
     // to update and maintain the value as we work in a way that can be shown
     // in the debug stack frame.  Calling VAL_UNESCAPED() constantly would be
@@ -1548,7 +1548,7 @@ REBNATIVE(subparse)
 
         // Code below may jump here to re-process groups, consider:
         //
-        //    rule: lit (print "Hi")
+        //    rule: just (print "Hi")
         //    parse "a" [:('rule) "a"]
         //
         // First it processes the group to get RULE, then it looks that
@@ -2101,9 +2101,9 @@ REBNATIVE(subparse)
 
         if (IS_INTEGER(rule)) {
             //
-            // `parse [1 1] [1 3 1]` must be `parse [1 1] [1 3 lit 1]`
+            // `parse [1 1] [1 3 1]` must be `parse [1 1] [1 3 just 1]`
             //
-            fail ("For matching, INTEGER!s must be literal with QUOTE");
+            fail ("For matching, INTEGER!s must be literal with JUST");
         }
         break;
 
@@ -2176,8 +2176,7 @@ REBNATIVE(subparse)
                 break; }
 
               case SYM_QUOTE:  // temporarily behaving like LIT for bootstrap
-              case SYM_LITERAL:
-              case SYM_LIT: {
+              case SYM_JUST: {
                 if (not IS_SER_ARRAY(P_INPUT))
                     fail (Error_Parse_Rule());  // see #2253
 

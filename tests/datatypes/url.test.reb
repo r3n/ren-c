@@ -36,7 +36,7 @@
 [#2380 (
     url: decode-url http://example.com/get?q=ščř#kovtička
     did all [
-        url/scheme == lit 'http  ; Note: DECODE-URL returns BLOCK! with 'http
+        url/scheme == just 'http  ; Note: DECODE-URL returns BLOCK! with 'http
         url/host == "example.com"
         url/path == "/get?q=ščř"
         url/tag == "kovtička"
@@ -44,7 +44,7 @@
 )(
     url: decode-url http://švéd:břéťa@example.com:8080/get?q=ščř#kovtička
     did all [
-        url/scheme == lit 'http
+        url/scheme == just 'http
         url/user == "švéd"
         url/pass == "břéťa"
         url/host == "example.com"
@@ -55,7 +55,7 @@
 )(
     url: decode-url http://host?query
     did all [
-        url/scheme == lit 'http
+        url/scheme == just 'http
         url/host == "host"
         url/path == "?query"
     ]

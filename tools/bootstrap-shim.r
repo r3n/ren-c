@@ -53,6 +53,13 @@ trap [
         return :v
     ]
 
+    ; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
+    ; bootstrap executable on github actions doesn't have this change
+    ;
+    if undefined? 'just [
+        just: :literal
+    ]
+
     ; LOAD changed to have no /ALL so enforcing getting a block is weird
     ;
     if find parameters of :load /all [
@@ -259,10 +266,10 @@ mutable: func [x [any-value!]] [
     :x
 ]
 
-lit: :quote  ; Renamed due to the QUOTED! datatype
+just: :quote  ; Renamed due to the QUOTED! datatype
 quote: func [x [<opt> any-value!]] [
     switch type of x [
-        null [lit ()]
+        null [just ()]
         word! [to lit-word! x]
         path! [to lit-path! x]
 

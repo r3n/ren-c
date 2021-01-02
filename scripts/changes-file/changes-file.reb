@@ -154,7 +154,7 @@ notable?: function [
         | "Deprecate"                (category: 'Deprecated)
         | "Security"                 (category: 'Security)
     ] end]
-    append c compose [type: lit (category)]
+    append c compose [type: just (category)]
 
     ; record any bug#NNNN or CC (CureCode) found
     cc: make block! 0

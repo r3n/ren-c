@@ -3,7 +3,7 @@
     ([1] = load "1")
 ]
 [#22 ; a
-    ((quote lit :a) = load-value "':a")
+    ((quote just :a) = load-value "':a")
 ]
 [#22 ; b
     (error? trap [load-value "':a:"])

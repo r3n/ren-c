@@ -242,10 +242,10 @@
 %series/indexq.test.reb
 %series/insert.test.reb
 %series/intersect.test.reb
-%series/just.test.reb
 %series/last.test.reb
 %series/lengthq.test.reb
 %series/next.test.reb
+%series/only.test.reb
 %series/ordinals.test.reb
 %series/pick.test.reb
 %series/poke.test.reb

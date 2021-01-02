@@ -62,7 +62,7 @@
     m: make map! 10
     set/hard 'm/(1 + 2) <hard>
     did all [
-        <hard> = pick m lit (1 + 2)
+        <hard> = pick m just (1 + 2)
         <hard> = get/hard 'm/(1 + 2)
     ]
 )

@@ -46,7 +46,7 @@
 
 
 #define xrebWord(cstr) \
-    rebValue("lit", cstr)
+    rebValue("just", cstr)
 
 
 //=//// CONFIGURATION /////////////////////////////////////////////////////=//

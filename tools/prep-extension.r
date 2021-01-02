@@ -132,7 +132,7 @@ native-defs: collect [
         (
             keep make natdef compose/only [
                 export: (n-export)
-                name: lit (to word! n-name)
+                name: just (to word! n-name)
                 spec: (n-spec)  ; includes NATIVE or NATIVE/BODY
                 platforms: (try copy n-platforms)
             ]

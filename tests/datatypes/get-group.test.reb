@@ -10,13 +10,13 @@
 (
     m: 1020
     word: 'm
-    :(word) = lit 'm
+    :(word) = just 'm
 )
 
 (
     o: make object! [f: 304]
     path: 'o/f
-    :(path) = lit 'o/f
+    :(path) = just 'o/f
 )
 
 (

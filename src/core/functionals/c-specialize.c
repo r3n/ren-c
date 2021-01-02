@@ -962,7 +962,7 @@ bool Make_Frame_From_Varargs_Throws(
     SET_SERIES_FLAG(f->varlist, MANAGED); // is inaccessible
     f->varlist = nullptr; // just let it GC, for now
 
-    // May not be at end or thrown, e.g. (x: does lit y x = 'y)
+    // May not be at end or thrown, e.g. (x: does just y x = 'y)
     //
     DROP_GC_GUARD(action);  // before drop to balance at right time
     Drop_Frame(f);

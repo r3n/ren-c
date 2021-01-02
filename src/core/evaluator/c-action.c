@@ -106,7 +106,7 @@ inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
 // noticing when to defer enfix:
 //
 //     foo: func [...] [
-//          return lit 1 then ["this needs to be returned"]
+//          return just 1 then ["this needs to be returned"]
 //     ]
 //
 // If the first time the THEN was seen was not after the 1, but when the
@@ -641,7 +641,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
             // Have to account for enfix deferrals in cases like:
             //
-            //     return lit 1 then (x => [x + 1])
+            //     return just 1 then (x => [x + 1])
             //
             Lookahead_To_Sync_Enfix_Defer_Flag(f->feed);
 
@@ -1234,9 +1234,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // Want to keep this flag between an operation and an ensuing enfix in
     // the same frame, so can't clear in Drop_Action(), e.g. due to:
     //
-    //     left-lit: enfix :lit
+    //     left-just: enfix :just
     //     o: make object! [f: does [1]]
-    //     o/f left-lit  ; want error suggesting -> here, need flag for that
+    //     o/f left-just  ; want error suggesting -> here, need flag for that
     //
     CLEAR_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);
     assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));  // must be consumed

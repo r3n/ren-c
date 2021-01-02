@@ -201,15 +201,15 @@
 )
 
 ; / is a length 2 PATH! in Ren-C
-(path! = type of lit /)
-(2 = length of lit /)
-(lit / = to path! [_ _])
+(path! = type of just /)
+(2 = length of just /)
+(just / = to path! [_ _])
 
 ; foo/ is also a length 2 PATH! in Ren-C
-(path! = type of lit foo/ )
-(2 = length of lit foo/ )
-(lit foo/ = to path! [foo _])
+(path! = type of just foo/ )
+(2 = length of just foo/ )
+(just foo/ = to path! [foo _])
 
 ; Not currently true, TO BLOCK! is acting like BLOCKIFY, review
-; ([_ _] = to block! lit /)
-; ([foo _] = to block! lit foo/ )  ; !!! low priority scanner bug on /)
+; ([_ _] = to block! just /)
+; ([foo _] = to block! just foo/ )  ; !!! low priority scanner bug on /)

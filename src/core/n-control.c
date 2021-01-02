@@ -117,7 +117,7 @@ inline static bool Single_Test_Throws(
     // We may need to add in the quotes of the dereference.  e.g.
     //
     //     >> quoted-word!: quote word!
-    //     >> match ['quoted-word!] lit ''foo
+    //     >> match ['quoted-word!] just ''foo
     //     == ''foo
     //
     sum_quotes += VAL_NUM_QUOTES(test);

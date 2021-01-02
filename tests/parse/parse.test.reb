@@ -257,10 +257,10 @@
 
 ; A couple of tests for the problematic DO operation
 
-(did parse [1 + 2] [do [lit 3]])
+(did parse [1 + 2] [do [just 3]])
 (did parse [1 + 2] [do integer!])
 (did parse [1 + 2] [do [integer!]])
-(not parse [1 + 2] [do [lit 100]])
+(not parse [1 + 2] [do [just 100]])
 (did parse [reverse copy [a b c]] [do [into ['c 'b 'a]]])
 (not parse [reverse copy [a b c]] [do [into ['a 'b 'c]]])
 

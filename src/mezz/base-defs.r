@@ -27,8 +27,6 @@ REBOL [
 
 c-break-debug: :c-debug-break  ; easy to mix up
 
-lit: :literal  ; because it's shorter
-
 ??:  ; shorthand form to use in debug sessions, not intended to be committed
 probe: func* [
     {Debug print a molded value and returns that same value.}

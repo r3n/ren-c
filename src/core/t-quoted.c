@@ -28,8 +28,8 @@
 // Ren-C has a generic QUOTED! datatype, a container which can be arbitrarily
 // deep in escaping.  This faciliated a more succinct way to QUOTE, as well as
 // new features.  It also cleared up a naming issue (1 is a "literal integer",
-// not `'1`).  They are "quoted", while LITERAL and LIT take the place of the
-// former QUOTE operator (e.g. `lit 1` => `1`).
+// not `'1`).  They are "quoted", while JUST takes the place of the former
+// QUOTE operator (e.g. `just 1` => `1`).
 //
 
 #include "sys-core.h"
@@ -91,7 +91,7 @@ REB_R TO_Quoted(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
 // like any other path.  So it seems types wrapped in QUOTED! should respond
 // more or less like their non-quoted counterparts...
 //
-//     >> first lit '[a b c]
+//     >> first just '[a b c]
 //     == a
 //
 // !!! It might be interesting if the answer were 'a instead, adding on a
@@ -133,7 +133,7 @@ REB_R PD_Quoted(
 // on QUOTED!.  e.g. "do whatever the non-quoted version would do, then add
 // the quotedness onto the result".
 //
-//     >> add lit '''1 2
+//     >> add (just '''1) 2
 //     == '''3
 //
 // While a bit outlandish for ADD, it might seem to make more sense for FIND
@@ -166,15 +166,14 @@ REBTYPE(Quoted)
 
 
 //
-//  literal: native/body [
+//  just: native/body [
 //
 //  "Returns value passed in without evaluation"
 //
-//      return: {The input value, verbatim--unless /SOFT and soft quoted type}
+//      return: "Input value, verbatim--unless /SOFT and soft quoted type"
 //          [<opt> any-value!]
-//      'value {Value to quote}
-//          [any-value!]
-//      /soft {Evaluate if a GET-GROUP!, GET-WORD!, or GET-PATH!}
+//      'value [any-value!]
+//      /soft "Evaluate if a GET-GROUP!, GET-WORD!, or GET-PATH!"
 //  ][
 //      if soft and (match [get-group! get-word! get-path!] :value) [
 //          reeval value
@@ -183,14 +182,17 @@ REBTYPE(Quoted)
 //      ]
 //  ]
 //
-REBNATIVE(literal) // aliased in %base-defs.r as LIT
+REBNATIVE(just)
 {
-    INCLUDE_PARAMS_OF_LITERAL;
+    INCLUDE_PARAMS_OF_JUST;
 
     REBVAL *v = ARG(value);
 
-    if (REF(soft) and ANY_ESCAPABLE_GET(v))
-        fail ("LITERAL/SOFT not currently implemented, should clone EVAL");
+    if (REF(soft) and ANY_ESCAPABLE_GET(v)) {
+        if (Eval_Value_Throws(D_OUT, v, SPECIFIED))
+            return R_THROWN;
+        return D_OUT;  // Don't set UNEVALUATED flag
+    }
 
     Move_Value(D_OUT, v);
     SET_CELL_FLAG(D_OUT, UNEVALUATED);

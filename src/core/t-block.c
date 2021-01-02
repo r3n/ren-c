@@ -26,7 +26,7 @@
 
 
 //
-//  just: native [
+//  only: native [
 //
 //  {Optimized native for creating a single-element wrapper block}
 //
@@ -36,17 +36,17 @@
 //          [<opt> any-value!]
 //  ]
 //
-REBNATIVE(just)  // https://forum.rebol.info/t/1182/11
+REBNATIVE(only)  // https://forum.rebol.info/t/1182/11
 //
 // Conceived as the replacement tool for the likes of APPEND/ONLY, e.g.
 //
-//     >> just [d]
+//     >> only [d]
 //     == [[d]]
 //
-//     >> append [a b c] just [d]
+//     >> append [a b c] only [d]
 //     == [a b c [d]]
 {
-    INCLUDE_PARAMS_OF_JUST;
+    INCLUDE_PARAMS_OF_ONLY;
 
     if (IS_NULLED(ARG(value)))
         return Init_Block(D_OUT, EMPTY_ARRAY);  // global immutable array

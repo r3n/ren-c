@@ -219,9 +219,8 @@ break
 skip
 to
 thru
-quote
-literal  ; should both LIT and LITERAL be supported, or just LIT?
-lit
+quote  ; !!! kept for compatibility, but use JUST instead
+just
 lit-word!  ; !!! simulated datatype constraint (a QUOTED! like 'x)
 lit-path!  ; !!! simulated datatype costraint (a QUOTED! like 'x/y)
 refinement!  ; !!! simulated datatype constraint (a PATH! like `/word`)

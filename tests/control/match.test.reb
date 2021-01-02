@@ -38,15 +38,15 @@
 ; Quoting levels are taken into account with the rule, and the number of
 ; quotes is summed with whatever is found in the lookup.
 
-(lit 'foo = match 'word! lit 'foo)
-(null = match 'word! lit foo)
+(just 'foo = match 'word! just 'foo)
+(null = match 'word! just foo)
 
 [
     (did quoted-word!: quote word!)
 
-    (''foo = match ['quoted-word!] lit ''foo)
-    (null = match ['quoted-word!] lit '''foo)
-    ('''foo = match '['quoted-word!] lit '''foo)
+    (''foo = match ['quoted-word!] just ''foo)
+    (null = match ['quoted-word!] just '''foo)
+    ('''foo = match '['quoted-word!] just '''foo)
 ]
 
 
@@ -66,7 +66,7 @@
 
 (
     even-int: 'integer!/[:even?]
-    lit '304 = match '[block!/3 even-int] lit '304
+    just '304 = match '[block!/3 even-int] just '304
 )
 
 ; Falsey things are turned to VOID! in order to avoid cases like:

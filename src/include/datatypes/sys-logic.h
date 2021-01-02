@@ -39,7 +39,7 @@ inline static bool VAL_LOGIC(unstable REBCEL(const*) v) {
 
 inline static bool IS_TRUTHY(unstable const RELVAL *v) {
     if (KIND3Q_BYTE(v) > REB_LOGIC)
-        return true;  // includes QUOTED: `if lit '_ [-- "this is truthy"]`
+        return true;  // includes JUST: `if just '_ [-- "this is truthy"]`
     if (IS_VOID(v))
         fail (Error_Void_Conditional_Raw());
     if (IS_LOGIC(v))

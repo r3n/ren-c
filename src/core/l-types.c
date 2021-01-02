@@ -289,7 +289,7 @@ REB_R Reflect_Core(REBFRM *frame_)
         else
             Init_Builtin_Datatype(D_OUT, kind);
 
-        // `type of lit '''[a b c]` is `'''#[block!]`.  Until datatypes get
+        // `type of just '''[a b c]` is `'''#[block!]`.  Until datatypes get
         // a firm literal notation, you can say `quote quote block!`
         //
         // If the escaping count of the value is zero, this returns it as is.
