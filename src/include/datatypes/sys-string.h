@@ -1059,6 +1059,12 @@ inline static REBSTR *Make_Sized_String_UTF8(const char *utf8, size_t size) {
 }
 
 
+//=//// GLOBAL STRING CONSTANTS //////////////////////////////////////////=//
+
+#define EMPTY_TEXT \
+    Root_Empty_Text
+
+
 //=//// REBSTR HASHING ////////////////////////////////////////////////////=//
 
 inline static REBINT Hash_String(const REBSTR *str)

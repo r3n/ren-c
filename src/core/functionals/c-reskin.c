@@ -386,7 +386,7 @@ REBNATIVE(reskinned)
     //
     REBCTX *meta = ACT_META(original);
 
-    Manage_Array(paramlist);
+    Manage_Series(paramlist);
 
     // If we only *narrowed* the type conventions, then we don't need to put
     // in a new dispatcher.  But if we *expanded* them, the type checking

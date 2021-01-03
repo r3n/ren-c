@@ -1224,7 +1224,7 @@ void Pick_Image(REBVAL *out, const REBVAL *value, const RELVAL *picker)
             REBBIN *nser = Make_Binary(len * 3);
             SET_SERIES_LEN(nser, len * 3);
             RGB_To_Bin(BIN_HEAD(nser), src, len, false);
-            TERM_SERIES(nser);
+            TERM_BIN(nser);
             Init_Binary(out, nser);
             break; }
 
@@ -1232,7 +1232,7 @@ void Pick_Image(REBVAL *out, const REBVAL *value, const RELVAL *picker)
             REBBIN *nser = Make_Binary(len);
             SET_SERIES_LEN(nser, len);
             Alpha_To_Bin(BIN_HEAD(nser), src, len);
-            TERM_SERIES(nser);
+            TERM_BIN(nser);
             Init_Binary(out, nser);
             break; }
 

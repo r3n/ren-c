@@ -171,7 +171,7 @@ REBNATIVE(does)
         // is optimized to not run the block with the DO native...hence a
         // HIJACK of DO won't be triggered by invocations of the first form.
         //
-        Manage_Array(paramlist);
+        Manage_Series(paramlist);
         REBACT *doer = Make_Action(
             paramlist,
             nullptr,  // no meta (REDESCRIBE can add help)

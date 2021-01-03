@@ -718,7 +718,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     }
 
     TERM_ARRAY_LEN(paramlist, num_slots);
-    Manage_Array(paramlist);
+    Manage_Series(paramlist);
   }
 
     //=///////////////////////////////////////////////////////////////////=//
@@ -1018,7 +1018,7 @@ REBACT *Make_Action(
 ){
     assert(details_capacity >= 1);  // must have room for archetype
 
-    ASSERT_ARRAY_MANAGED(paramlist);  // paramlists/keylists, can be shared
+    ASSERT_SERIES_MANAGED(paramlist);  // paramlists/keylists, can be shared
     ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(paramlist));  // unused at this time
     assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
     if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {

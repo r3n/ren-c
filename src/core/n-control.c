@@ -1290,7 +1290,7 @@ REBNATIVE(default)
             }
             TERM_ARRAY_LEN(composed, len);
             Freeze_Array_Shallow(composed);
-            Force_Array_Managed(composed);
+            Force_Series_Managed(composed);
 
             // !!! The limiting of path contents messes this up; you cannot
             // generically store path picking info if it's an arbitrary value

@@ -99,7 +99,7 @@ bool Expand_Context_Keylist_Core(REBCTX *context, REBLEN delta)
         else
             LINK_ANCESTOR_NODE(copy) = LINK_ANCESTOR_NODE(keylist);
 
-        Manage_Array(copy);
+        Manage_Series(copy);
         INIT_CTX_KEYLIST_UNIQUE(context, copy);
 
         return true;

@@ -42,7 +42,7 @@ REBSTR *Make_String_Core(REBSIZ encoded_capacity, REBFLGS flags)
     );
     MISC(s).length = 0;
     LINK(s).bookmarks = nullptr;  // generated on demand
-    TERM_SERIES(s);
+    TERM_SEQUENCE(s);
     return STR(s);
 }
 

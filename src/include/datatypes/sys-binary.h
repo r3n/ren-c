@@ -155,4 +155,10 @@ inline static const REBYTE *VAL_BINARY_SIZE_AT(
 #define Init_Binary_At(out,bin,offset) \
     Init_Any_Series_At((out), REB_BINARY, (bin), (offset))
 
+
+//=//// GLOBAL BINARIES //////////////////////////////////////////////////=//
+
+#define EMPTY_BINARY \
+    Root_Empty_Binary
+
 #define BYTE_BUF TG_Byte_Buf

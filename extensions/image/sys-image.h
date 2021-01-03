@@ -126,8 +126,7 @@ inline static REBVAL *Init_Image_Black_Opaque(RELVAL *out, REBLEN w, REBLEN h)
 {
     REBSIZ size = (w * h) * 4;  // RGBA pixels, 4 bytes each
     REBBIN *bin = Make_Binary(size);
-    SET_SERIES_LEN(bin, size);
-    TERM_SERIES(bin);
+    TERM_BIN_LEN(bin, size);
     Manage_Series(bin);
 
     RESET_IMAGE(SER_DATA(bin), (w * h));  // length in 'pixels'

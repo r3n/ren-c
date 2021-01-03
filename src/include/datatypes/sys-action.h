@@ -421,7 +421,7 @@ static inline REBVAL *Init_Action(
   #if !defined(NDEBUG)
     Extra_Init_Action_Checks_Debug(a);
   #endif
-    Force_Array_Managed(ACT_DETAILS(a));
+    Force_Series_Managed(ACT_DETAILS(a));
 
     RESET_CELL(out, REB_ACTION, CELL_MASK_ACTION);
     VAL_ACTION_DETAILS_NODE(out) = NOD(ACT_DETAILS(a));

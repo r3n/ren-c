@@ -940,7 +940,7 @@ static REBVAL *callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
         ffi_to_rebol(elem, RIN_ARG_SCHEMA(inv->rin, i), inv->args[i]);
 
     TERM_ARRAY_LEN(code, 1 + inv->cif->nargs);
-    Manage_Array(code);  // DO requires managed arrays (guarded while running)
+    Manage_Series(code);  // DO requires managed arrays (guarded while running)
 
     DECLARE_LOCAL (result);
     if (Do_At_Mutable_Throws(result, code, 0, SPECIFIED))
@@ -1060,7 +1060,7 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
     //
     const REBLEN capacity_guess = 8;  // !!! Magic number...why 8? (can grow)
     REBARR *args_schemas = Make_Array(capacity_guess);
-    Manage_Array(args_schemas);
+    Manage_Series(args_schemas);
     PUSH_GC_GUARD(args_schemas);
 
     DECLARE_LOCAL (ret_schema);

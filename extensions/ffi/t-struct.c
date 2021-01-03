@@ -1318,7 +1318,7 @@ REB_R MAKE_Struct(
     REBSTU *stu = Alloc_Singular(
         NODE_FLAG_MANAGED | SERIES_FLAG_LINK_NODE_NEEDS_MARK
     );
-    Manage_Array(schema);
+    Manage_Series(schema);
     LINK_SCHEMA_NODE(stu) = NOD(schema);
 
     if (raw_addr) {
@@ -1502,7 +1502,7 @@ REBSTU *Copy_Struct_Managed(REBSTU *src)
     TERM_BIN_LEN(bin_copy, STU_DATA_LEN(src));
     Init_Binary(ARR_SINGLE(copy), bin_copy);
 
-    Manage_Array(copy);
+    Manage_Series(copy);
     return copy;
 }
 

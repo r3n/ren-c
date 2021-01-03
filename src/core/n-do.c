@@ -784,7 +784,7 @@ REBNATIVE(applique)
         f->dsp_orig, // lowest_ordered_dsp of refinements to weave in
         &binder
     );
-    Manage_Array(CTX_VARLIST(exemplar)); // binding code into it
+    Manage_Series(CTX_VARLIST(exemplar)); // binding code into it
 
     Virtual_Bind_Deep_To_Existing_Context(
         ARG(def),

@@ -87,7 +87,7 @@ void Append_Series(REBSER *s, const void *data, REBLEN len)
     EXPAND_SERIES_TAIL(s, len);
     memcpy(SER_DATA(s) + (wide * used_old), data, wide * len);
 
-    TERM_SERIES(s);
+    TERM_SEQUENCE(s);
 }
 
 

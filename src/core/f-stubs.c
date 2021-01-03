@@ -310,7 +310,7 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     // Keylists are uniformly managed, or certain routines would return
     // "sometimes managed, sometimes not" keylists...a bad invariant.
     //
-    ASSERT_ARRAY_MANAGED(CTX_KEYLIST(c));
+    ASSERT_SERIES_MANAGED(CTX_KEYLIST(c));
 }
 
 

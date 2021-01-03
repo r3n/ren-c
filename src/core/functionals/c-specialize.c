@@ -273,7 +273,7 @@ REBCTX *Make_Context_For_Action(
         binder
     );
 
-    Manage_Array(CTX_VARLIST(exemplar));  // !!! was needed before, review
+    Manage_Series(CTX_VARLIST(exemplar));  // !!! was needed before, review
     DS_DROP_TO(lowest_ordered_dsp);
     return exemplar;
 }
@@ -317,7 +317,7 @@ bool Specialize_Action_Throws(
         lowest_ordered_dsp,
         def ? &binder : nullptr
     );
-    Manage_Array(CTX_VARLIST(exemplar)); // destined to be managed, guarded
+    Manage_Series(CTX_VARLIST(exemplar)); // destined to be managed, guarded
 
     if (def) { // code that fills the frame...fully or partially
         //

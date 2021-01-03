@@ -523,7 +523,7 @@ REBCTX *Copy_Context_Extra_Managed(
     REBU64 types
 ){
     assert(GET_ARRAY_FLAG(CTX_VARLIST(original), IS_VARLIST));
-    ASSERT_ARRAY_MANAGED(CTX_KEYLIST(original));
+    ASSERT_SERIES_MANAGED(CTX_KEYLIST(original));
     assert(NOT_SERIES_INFO(CTX_VARLIST(original), INACCESSIBLE));
 
     REBARR *varlist = Make_Array_For_Copy(

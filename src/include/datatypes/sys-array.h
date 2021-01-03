@@ -148,15 +148,6 @@ inline static void TERM_SERIES(REBSER *s) {
 }
 
 
-// !!! PLEASE NOTE: !!! These variants do not cast the result to ARR() in
-// order to chain it, because `gcc (Ubuntu/Linaro 4.6.3-1ubuntu5) 4.6.3`
-// complained about "value computed but not used".  The chaining feature
-// wasn't really being used anyway, so it wasn't worth it to workaround.
-//
-#define Manage_Array(a)             Manage_Series(a)  // SEE NOTE
-#define Force_Array_Managed(a)      Force_Series_Managed(a)  // SEE NOTE
-
-
 //
 // REBVAL cells cannot be written to unless they carry CELL_FLAG_CELL, and
 // have been "formatted" to convey their lifetime (stack or array).  This
@@ -464,12 +455,6 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
 #define EMPTY_ARRAY \
     PG_Empty_Array // Note: initialized from VAL_ARRAY(Root_Empty_Block)
 
-#define EMPTY_TEXT \
-    Root_Empty_Text
-
-#define EMPTY_BINARY \
-    Root_Empty_Binary
-
 
 // These operations do not need to take the value's index position into
 // account; they strictly operate on the array series
@@ -673,20 +658,11 @@ inline static bool Is_Any_Doubled_Group(unstable REBCEL(const*) group) {
 
 
 #ifdef NDEBUG
-    #define ASSERT_ARRAY(s) \
-        NOOP
-
-    #define ASSERT_ARRAY_MANAGED(array) \
-        NOOP
-
-    #define ASSERT_SERIES(s) \
-        NOOP
+    #define ASSERT_ARRAY(s)     NOOP
+    #define ASSERT_SERIES(s)    NOOP
 #else
     #define ASSERT_ARRAY(s) \
         Assert_Array_Core(s)
-
-    #define ASSERT_ARRAY_MANAGED(array) \
-        ASSERT_SERIES_MANAGED(array)
 
     static inline void ASSERT_SERIES(const REBSER *s) {
         if (IS_SER_ARRAY(s))

@@ -442,7 +442,7 @@ REBVAL *Init_Map(RELVAL *out, REBMAP *map)
     if (MAP_HASHLIST(map))
         Force_Series_Managed(MAP_HASHLIST(map));
 
-    Force_Array_Managed(MAP_PAIRLIST(map));
+    Force_Series_Managed(MAP_PAIRLIST(map));
 
     RESET_CELL(out, REB_MAP, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, MAP_PAIRLIST(map));

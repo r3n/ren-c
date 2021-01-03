@@ -139,7 +139,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     }
 
     TERM_ARRAY_LEN(code_arr, code - ARR_HEAD(code_arr));
-    Manage_Array(code_arr);
+    Manage_Series(code_arr);
 
     DECLARE_LOCAL (first);
     if (DSP == dsp_orig + 1) {  // no refinements, just use ACTION!
@@ -148,7 +148,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     }
     else {
         REBARR *a = Freeze_Array_Shallow(Pop_Stack_Values(dsp_orig));
-        Force_Array_Managed(a);
+        Force_Series_Managed(a);
         REBVAL *p = Try_Init_Path_Arraylike(first, a);
         assert(p);
         UNUSED(p);

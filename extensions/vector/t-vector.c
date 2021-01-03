@@ -459,8 +459,7 @@ bool Make_Vector_Spec(
     REBLEN num_bytes = len * (bitsize / 8);
     REBBIN *bin = Make_Binary(num_bytes);
     CLEAR(BIN_HEAD(bin), num_bytes);  // !!! 0 bytes -> 0 int/float?
-    SET_SERIES_LEN(bin, num_bytes);
-    TERM_SERIES(bin);
+    TERM_BIN_LEN(bin, num_bytes);
 
     Init_Vector(out, bin, sign, integral, bitsize);
     UNUSED(index);  // !!! Not currently used, may (?) be added later

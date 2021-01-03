@@ -190,7 +190,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
         // !!! Scans that produce only one value (which are likely very
         // common) can go into feed->fetched and not make an array at all.
         //
-        Manage_Array(reified);
+        Manage_Series(reified);
 
         feed->value = STABLE(ARR_HEAD(reified));
         Init_Any_Array_At(FEED_SINGLE(feed), REB_BLOCK, reified, 1);
