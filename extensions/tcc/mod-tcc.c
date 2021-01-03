@@ -589,7 +589,7 @@ REBNATIVE(compile_p)
         if (
             tcc_compile_string(
                 state,
-                cs_cast(BIN_AT(SER(mo->series), mo->offset))
+                cs_cast(BIN_AT(mo->series, mo->offset))
             ) < 0
         ){
             rebJumps ("fail [",

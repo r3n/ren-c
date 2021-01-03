@@ -542,12 +542,12 @@ static void ffi_to_rebol(
         );
         LINK_SCHEMA_NODE(stu) = NOD(top);
 
-        REBSER *data = Make_Series_Core(
+        REBBIN *data = BIN(Make_Series_Core(
             FLD_WIDE(top),  // !!! what about FLD_LEN_BYTES_TOTAL ?
             sizeof(REBYTE),
             NODE_FLAG_MANAGED
-        );
-        memcpy(SER_HEAD(REBYTE, data), ffi_rvalue, FLD_WIDE(top));
+        ));
+        memcpy(BIN_HEAD(data), ffi_rvalue, FLD_WIDE(top));
 
         RESET_CUSTOM_CELL(out, EG_Struct_Type, CELL_FLAG_FIRST_IS_NODE);
         INIT_VAL_NODE(out, stu);

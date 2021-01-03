@@ -2567,7 +2567,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         if (
             GET_CELL_FLAG(DS_TOP, FIRST_IS_NODE)
             and VAL_NODE(DS_TOP) != nullptr  // null legal in node slots ATM
-            and IS_SER_ARRAY(VAL_NODE(DS_TOP))
+            and IS_SER_ARRAY(SER(VAL_NODE(DS_TOP)))
         ){
             REBARR *a = ARR(VAL_NODE(DS_TOP));
             MISC(a).line = ss->line;
@@ -2750,7 +2750,7 @@ bool Scan_To_Stack_Relaxed_Failed(SCAN_LEVEL *level) {
         // and if this becomes a problem, implement ss->limit.
         //
         REBLEN limit = ss->begin - ss_before.begin;
-        REBSER *bin = Make_Binary(limit);
+        REBBIN *bin = Make_Binary(limit);
         memcpy(BIN_HEAD(bin), ss_before.begin, limit);
         TERM_BIN_LEN(bin, limit);
 
@@ -3016,7 +3016,7 @@ REBNATIVE(transcode)
         );
         MISC(a).line = ss.line;
         LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss.file));
-        SER(a)->header.bits |= ARRAY_MASK_HAS_FILE_LINE;
+        a->header.bits |= ARRAY_MASK_HAS_FILE_LINE;
 
         Init_Block(D_OUT, a);
     }
@@ -3049,7 +3049,7 @@ REBNATIVE(transcode)
             if (ss.begin != 0)
                 VAL_INDEX_RAW(var) += Num_Codepoints_For_Bytes(bp, ss.begin);
             else
-                VAL_INDEX_RAW(var) += BIN_TAIL(VAL_SERIES(var)) - bp;
+                VAL_INDEX_RAW(var) += BIN_TAIL(VAL_STRING(var)) - bp;
         }
     }
 

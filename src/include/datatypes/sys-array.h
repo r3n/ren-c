@@ -54,38 +54,38 @@
 // valid for writing a full REBVAL.
 
 inline static unstable RELVAL *ARR_AT(const_if_c REBARR *a, REBLEN n)
-  { return SER_AT(RELVAL, SER(a), n); }
+  { return SER_AT(RELVAL, a, n); }
 
 inline static unstable RELVAL *ARR_HEAD(const_if_c REBARR *a)
-  { return SER_HEAD(RELVAL, SER(a)); }
+  { return SER_HEAD(RELVAL, a); }
 
 inline static unstable RELVAL *ARR_TAIL(const_if_c REBARR *a)
-  { return SER_TAIL(RELVAL, SER(a)); }
+  { return SER_TAIL(RELVAL, a); }
 
 inline static unstable RELVAL *ARR_LAST(const_if_c REBARR *a)
-  { return SER_LAST(RELVAL, SER(a)); }
+  { return SER_LAST(RELVAL, a); }
 
 inline static unstable RELVAL *ARR_SINGLE(const_if_c REBARR *a) {
     assert(not IS_SER_DYNAMIC(a));
-    return cast(RELVAL*, &SER(a)->content.fixed);
+    return cast(RELVAL*, &a->content.fixed);
 }
 
 #ifdef __cplusplus
     inline static unstable const RELVAL *ARR_AT(const REBARR *a, REBLEN n)
-        { return SER_AT(const RELVAL, SER(a), n); }
+        { return SER_AT(const RELVAL, a, n); }
 
     inline static unstable const RELVAL *ARR_HEAD(const REBARR *a)
-        { return SER_HEAD(const RELVAL, SER(a)); }
+        { return SER_HEAD(const RELVAL, a); }
 
     inline static unstable const RELVAL *ARR_TAIL(const REBARR *a)
-        { return SER_TAIL(const RELVAL, SER(a)); }
+        { return SER_TAIL(const RELVAL, a); }
 
     inline static unstable const RELVAL *ARR_LAST(const REBARR *a)
-        { return SER_LAST(const RELVAL, SER(a)); }
+        { return SER_LAST(const RELVAL, a); }
 
     inline static unstable const RELVAL *ARR_SINGLE(const REBARR *a) {
         assert(not IS_SER_DYNAMIC(a));
-        return cast(const RELVAL*, &SER(a)->content.fixed);
+        return cast(const RELVAL*, &a->content.fixed);
     }
 #endif
 
@@ -109,7 +109,7 @@ inline static REBARR *Singular_From_Cell(const RELVAL *v) {
 // sync these independently for performance reasons (for better or worse).
 //
 #define ARR_LEN(a) \
-    SER_USED(SER(a))
+    SER_USED(a)
 
 
 // Set length and also terminate.  This routine avoids conditionality in the
@@ -122,8 +122,8 @@ inline static REBARR *Singular_From_Cell(const RELVAL *v) {
 // efficient if they didn't use any "appending" operators to get built.
 //
 inline static void TERM_ARRAY_LEN(REBARR *a, REBLEN len) {
-    assert(len < SER_REST(SER(a)));
-    SET_SERIES_LEN(SER(a), len);
+    assert(len < SER_REST(a));
+    SET_SERIES_LEN(a, len);
 
   #if !defined(NDEBUG)
     if (NOT_END(ARR_AT(a, len)))
@@ -133,7 +133,7 @@ inline static void TERM_ARRAY_LEN(REBARR *a, REBLEN len) {
 }
 
 inline static void SET_ARRAY_LEN_NOTERM(REBARR *a, REBLEN len) {
-    SET_SERIES_LEN(SER(a), len); // call out non-terminating usages
+    SET_SERIES_LEN(a, len);  // call out non-terminating usages
 }
 
 inline static void RESET_ARRAY(REBARR *a) {
@@ -153,8 +153,8 @@ inline static void TERM_SERIES(REBSER *s) {
 // complained about "value computed but not used".  The chaining feature
 // wasn't really being used anyway, so it wasn't worth it to workaround.
 //
-#define Manage_Array(a)             Manage_Series(SER(a))  // SEE NOTE
-#define Force_Array_Managed(a)     Force_Series_Managed(SER(a))  // SEE NOTE
+#define Manage_Array(a)             Manage_Series(a)  // SEE NOTE
+#define Force_Array_Managed(a)      Force_Series_Managed(a)  // SEE NOTE
 
 
 //
@@ -187,7 +187,7 @@ inline static void Prep_Array(
         // expansion and un-prepping them on every shrink.
         //
         REBLEN n;
-        for (n = 0; n < SER(a)->content.dynamic.rest - 1; ++n, ++prep)
+        for (n = 0; n < a->content.dynamic.rest - 1; ++n, ++prep)
             Prep_Cell(prep);
     }
     else {
@@ -204,7 +204,7 @@ inline static void Prep_Array(
         prep->header.bits = Endlike_Header(0); // unwritable
         USED(TRACK_CELL_IF_DEBUG(prep));
       #if !defined(NDEBUG)
-        while (n < SER(a)->content.dynamic.rest) { // no -1 (n is 1-based)
+        while (n < a->content.dynamic.rest) { // no -1 (n is 1-based)
             ++n;
             prep = TRACK_CELL_IF_DEBUG(prep + 1);
             prep->header.bits =
@@ -217,7 +217,7 @@ inline static void Prep_Array(
         // It may not be necessary, but doing it for now to have an easier
         // invariant to work with.  Review.
         //
-        prep = STABLE(ARR_AT(a, SER(a)->content.dynamic.rest - 1));
+        prep = STABLE(ARR_AT(a, a->content.dynamic.rest - 1));
         // fallthrough
     }
 
@@ -301,7 +301,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
             MISC(s).line = MISC(FRM_ARRAY(FS_TOP)).line;
         }
         else {
-            CLEAR_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED);
+            CLEAR_ARRAY_FLAG(ARR(s), HAS_FILE_LINE_UNMASKED);
             CLEAR_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK);
         }
     }
@@ -366,7 +366,7 @@ inline static REBARR *Make_Array_For_Copy(
 inline static REBARR *Alloc_Singular(REBFLGS flags) {
     assert(not (flags & SERIES_FLAG_ALWAYS_DYNAMIC));
     REBARR *a = Make_Array_Core(1, flags | SERIES_FLAG_FIXED_SIZE);
-    mutable_LEN_BYTE_OR_255(SER(a)) = 1; // non-dynamic length (default was 0)
+    mutable_LEN_BYTE_OR_255(a) = 1;  // non-dynamic length (default was 0)
     return a;
 }
 
@@ -445,7 +445,7 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
 }
 
 #define Free_Unmanaged_Array(a) \
-    Free_Unmanaged_Series(SER(a))
+    Free_Unmanaged_Series(a)
 
 
 
@@ -480,7 +480,7 @@ inline static const REBARR *VAL_ARRAY(unstable REBCEL(const*) v) {
     const REBARR *a = ARR(PAYLOAD(Any, v).first.node);
     if (GET_SERIES_INFO(a, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
-    return ARR(a);
+    return a;
 }
 
 #define VAL_ARRAY_ENSURE_MUTABLE(v) \
@@ -590,7 +590,7 @@ inline static REBVAL *Init_Any_Array_At_Core(
         REBLEN index,
         REBNOD *binding
     ){
-        return Init_Any_Series_At_Core(out, kind, SER(array), index, binding);
+        return Init_Any_Series_At_Core(out, kind, array, index, binding);
     }
 
   #ifdef DEBUG_UNSTABLE_CELLS
@@ -686,7 +686,7 @@ inline static bool Is_Any_Doubled_Group(unstable REBCEL(const*) group) {
         Assert_Array_Core(s)
 
     #define ASSERT_ARRAY_MANAGED(array) \
-        ASSERT_SERIES_MANAGED(SER(array))
+        ASSERT_SERIES_MANAGED(array)
 
     static inline void ASSERT_SERIES(const REBSER *s) {
         if (IS_SER_ARRAY(s))

@@ -233,7 +233,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             );
             feed->value = &feed->fetched;
 
-            GC_Kill_Series(SER(inst1));  // not manuals-tracked
+            GC_Kill_Series(inst1);  // not manuals-tracked
         }
         else if (GET_ARRAY_FLAG(inst1, INSTRUCTION_SPLICE)) {
             REBVAL *single = SPECIFIC(STABLE(ARR_SINGLE(inst1)));
@@ -245,7 +245,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
                 Move_Value(&feed->fetched, single);
                 feed->value = &feed->fetched;
             }
-            GC_Kill_Series(SER(inst1));
+            GC_Kill_Series(inst1);
         }
         else if (GET_ARRAY_FLAG(inst1, SINGULAR_API_RELEASE)) {
             //
@@ -382,13 +382,13 @@ inline static void Fetch_Next_In_Feed(REBFED *feed) {
             if (FEED_SPLICE(feed)) {  // one or more additional splices to go
                 if (GET_FEED_FLAG(feed, TOOK_HOLD)) {  // see note above
                     assert(GET_SERIES_INFO(FEED_ARRAY(feed), HOLD));
-                    CLEAR_SERIES_INFO(FEED_ARRAY(feed), HOLD);
+                    CLEAR_SERIES_INFO(m_cast(REBARR*, FEED_ARRAY(feed)), HOLD);
                     CLEAR_FEED_FLAG(feed, TOOK_HOLD);
                 }
 
                 REBARR *splice = FEED_SPLICE(feed);
                 memcpy(FEED_SINGULAR(feed), FEED_SPLICE(feed), sizeof(REBARR));
-                GC_Kill_Series(SER(splice));
+                GC_Kill_Series(splice);
                 goto retry_splice;
             }
         }
@@ -535,7 +535,7 @@ inline static void Free_Feed(REBFED *feed) {
     //
     if (GET_FEED_FLAG(feed, TOOK_HOLD)) {
         assert(GET_SERIES_INFO(FEED_ARRAY(feed), HOLD));
-        CLEAR_SERIES_INFO(FEED_ARRAY(feed), HOLD);
+        CLEAR_SERIES_INFO(m_cast(REBARR*, FEED_ARRAY(feed)), HOLD);
         CLEAR_FEED_FLAG(feed, TOOK_HOLD);
     }
 
@@ -589,7 +589,7 @@ inline static void Prep_Array_Feed(
     if (IS_END(feed->value) or GET_SERIES_INFO(array, HOLD))
         NOOP;  // already temp-locked
     else {
-        SET_SERIES_INFO(array, HOLD);
+        SET_SERIES_INFO(m_cast(REBARR*, array), HOLD);
         SET_FEED_FLAG(feed, TOOK_HOLD);
     }
 

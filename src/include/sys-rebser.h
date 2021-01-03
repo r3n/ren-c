@@ -618,14 +618,14 @@ union Reb_Series_Link {
     // should be reigned in proportionally to the length of the series.  As
     // a first try of this strategy, singular arrays are being used.
     //
-    REBBMK *bookmarks;
+    struct Reb_Series *bookmarks;
 
     // The REBFRM's `varlist` field holds a ready-made varlist for a frame,
     // which may be reused.  However, when a stack frame is dropped it can
     // only be reused by putting it in a place that future pushes can find
     // it.  This is used to link a varlist into the reusable list.
     //
-    REBARR *reuse;
+    struct Reb_Series *reuse;  // actually a REBARR
 
     // For LIBRARY!, the file descriptor.  This is set to NULL when the
     // library is not loaded.
@@ -743,7 +743,7 @@ union Reb_Series_Misc {
     // can look through that list before creating an equivalent chain to one
     // that already exists.
     //
-    REBARR *variant;
+    struct Reb_Series *variant;  // actually a REBARR*
 
     // If a REBSER is used by a custom cell type, it can use the MISC()
     // field how it likes.  But if it is a node and needs to be GC-marked,
@@ -831,194 +831,54 @@ struct Reb_Series {
 };
 
 
-// No special assertion needed for link at this time, since it is never
-// co-opted for other purposes.
+// In C++, REBSTR and REBARR are declared as derived from REBSER.  This gives
+// desirable type checking properties (like being able to pass an array to
+// a routine that needs a series, but not vice versa).  And it also means
+// that the fields are available.
 //
-#define LINK(s) \
-    m_cast(REBSER*, SER(s))->link_private
-
-
-// A pending feature is that the series `->misc` field be used to track if
-// a series is being forwarded as part of a group of copied series.  The C++
-// build could do a check in that case.
+// In order for the inheritance to be known, these definitions cannot occur
+// until Reb_Series is fully defined.  So this is the earliest it can be done:
 //
-#if defined(CPLUSPLUS_11)
-    inline static union Reb_Series_Misc& Get_Series_Misc(const REBSER *s) {
-        //
-        // It would be nice here if we could do some kind of check like
-        // `assert(not IS_POINTER_FREETRASH_DEBUG(s->misc_private.trash))`
-        // but that would invoke undefined behavior (disengaged union access
-        // once another field is assigned).  Valgrind and UBSAN complain.
-        //
-        return m_cast(REBSER*, s)->misc_private;
-    }
+// https://stackoverflow.com/q/2159390/
+//
+#ifdef __cplusplus
+    struct Reb_Binary : public Reb_Series {};
+    typedef struct Reb_Binary REBBIN;
 
-    #define MISC(s) \
-        Get_Series_Misc(SER(s))
+    struct Reb_String : public Reb_Binary {};  // strings can act as binaries
+    typedef struct Reb_String REBSTR;
+
+    struct Reb_Array : public Reb_Series {};
+    typedef struct Reb_Array REBARR;
 #else
-    #define MISC(s) \
-        SER(s)->misc_private
+    typedef struct Reb_Series REBBIN;
+    typedef struct Reb_Series REBSTR;
+    typedef struct Reb_Series REBARR;
 #endif
 
 
-#if !defined(DEBUG_CHECK_CASTS)
-
-    #define SER(p) \
-        m_cast(REBSER*, (const REBSER*)(p))  // don't check const in C or C++
-
-#else
-
-    template <
-        typename T,
-        typename T0 = typename std::remove_const<T>::type,
-        typename S = typename std::conditional<
-            std::is_const<T>::value,  // boolean
-            const REBSER,  // true branch
-            REBSER  // false branch
-        >::type
-    >
-    inline S *SER(T *p) {
-        constexpr bool derived = std::is_same<T0, REBSER>::value
-            or std::is_same<T0, REBSTR>::value
-            or std::is_same<T0, REBARR>::value
-            or std::is_same<T0, REBCTX>::value
-            or std::is_same<T0, REBACT>::value
-            or std::is_same<T0, REBMAP>::value;
-
-        constexpr bool base = std::is_same<T0, void>::value
-            or std::is_same<T0, REBNOD>::value;
-
-        static_assert(
-            derived or base, 
-            "SER() works on "
-                "void/REBNOD/REBSER/REBSTR/REBARR/REBCTX/REBACT/REBMAP"
-        );
-
-        bool b = base;  // needed to avoid compiler constexpr warning
-        if (b and p and ((reinterpret_cast<const REBNOD*>(p)->header.bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
-        )) != (
-            NODE_FLAG_NODE
-        ))){
-            panic (p);
-        }
-
-        return reinterpret_cast<S*>(p);
-    }
-
-#endif
-
-
+// To help document places in the core that are complicit in the "extension
+// hack", alias arrays being used for the FFI and GOB to another name.
 //
-// Series header FLAGs (distinct from INFO bits)
+typedef REBARR REBGOB;
+
+typedef REBARR REBSTU;
+typedef REBARR REBFLD;
+
+typedef REBSER REBBMK;  // "bookmark" (list of UTF-8 index=>offsets)
+
+typedef REBBIN REBTYP;  // Rebol Type (list of hook function pointers)
+
+
+//=//// DON'T PUT ANY CODE (OR MACROS THAT MAY NEED CODE) IN THIS FILE! ///=//
 //
-
-#define SET_SERIES_FLAG(s,name) \
-    (SER(s)->header.bits |= SERIES_FLAG_##name)
-
-#define GET_SERIES_FLAG(s,name) \
-    ((SER(s)->header.bits & SERIES_FLAG_##name) != 0)
-
-#define CLEAR_SERIES_FLAG(s,name) \
-    (SER(s)->header.bits &= ~SERIES_FLAG_##name)
-
-#define NOT_SERIES_FLAG(s,name) \
-    ((SER(s)->header.bits & SERIES_FLAG_##name) == 0)
-
-
+// The %tmp-internals.h file has not been included, and hence none of the
+// prototypes (even for things like Panic_Core()) are available.
 //
-// Series INFO bits (distinct from header FLAGs)
+// Even if a macro seems like it doesn't need code right at this moment, you
+// might want to put some instrumentation into it, and that becomes a pain of
+// manual forward declarations.
 //
-
-#define SET_SERIES_INFO(s,name) \
-    (m_cast(REBSER*, SER(s))->info.bits |= SERIES_INFO_##name)
-
-#define GET_SERIES_INFO(s,name) \
-    ((SER(s)->info.bits & SERIES_INFO_##name) != 0)
-
-#define CLEAR_SERIES_INFO(s,name) \
-    (m_cast(REBSER*, SER(s))->info.bits &= ~SERIES_INFO_##name)
-
-#define NOT_SERIES_INFO(s,name) \
-    ((SER(s)->info.bits & SERIES_INFO_##name) == 0)
-
-
-
-#define IS_SER_ARRAY(s) \
-    (WIDE_BYTE_OR_0(SER(s)) == 0)
-
-#define IS_SER_DYNAMIC(s) \
-    (LEN_BYTE_OR_255(SER(s)) == 255)
-
-// These are series implementation details that should not be used by most
-// code.  But in order to get good inlining, they have to be in the header
-// files (of the *internal* API, not of libRebol).  Generally avoid it.
+// So keep this file limited to structs and constants.  It's too long already.
 //
-// !!! Can't `assert((w) < MAX_SERIES_WIDE)` without triggering "range of
-// type makes this always false" warning; C++ build could sense if it's a
-// REBYTE and dodge the comparison if so.
-//
-
-#define MAX_SERIES_WIDE 0x100
-
-inline static REBYTE SER_WIDE(const REBSER *s) {
-    //
-    // Arrays use 0 width as a strategic choice, so that the second byte of
-    // the ->info flags is 0.  See Endlike_Header() for why.
-    //
-    REBYTE wide = WIDE_BYTE_OR_0(s);
-    if (wide == 0) {
-        assert(IS_SER_ARRAY(s));
-        return sizeof(REBVAL);
-    }
-    return wide;
-}
-
-
-//
-// Bias is empty space in front of head:
-//
-
-inline static REBLEN SER_BIAS(const REBSER *s) {
-    assert(IS_SER_DYNAMIC(s));
-    return cast(REBLEN, ((s)->content.dynamic.bias >> 16) & 0xffff);
-}
-
-inline static REBLEN SER_REST(const REBSER *s) {
-    if (LEN_BYTE_OR_255(s) == 255)
-        return s->content.dynamic.rest;
-
-    if (IS_SER_ARRAY(s))
-        return 2; // includes info bits acting as trick "terminator"
-
-    assert(sizeof(s->content) % SER_WIDE(s) == 0);
-    return sizeof(s->content) / SER_WIDE(s);
-}
-
-#define MAX_SERIES_BIAS 0x1000
-
-inline static void SER_SET_BIAS(REBSER *s, REBLEN bias) {
-    assert(IS_SER_DYNAMIC(s));
-    s->content.dynamic.bias =
-        (s->content.dynamic.bias & 0xffff) | (bias << 16);
-}
-
-inline static void SER_ADD_BIAS(REBSER *s, REBLEN b) {
-    assert(IS_SER_DYNAMIC(s));
-    s->content.dynamic.bias += b << 16;
-}
-
-inline static void SER_SUB_BIAS(REBSER *s, REBLEN b) {
-    assert(IS_SER_DYNAMIC(s));
-    s->content.dynamic.bias -= b << 16;
-}
-
-inline static size_t SER_TOTAL(const REBSER *s) {
-    return (SER_REST(s) + SER_BIAS(s)) * SER_WIDE(s);
-}
-
-inline static size_t SER_TOTAL_IF_DYNAMIC(const REBSER *s) {
-    if (not IS_SER_DYNAMIC(s))
-        return 0;
-    return SER_TOTAL(s);
-}
+//=////////////////////////////////////////////////////////////////////////=//

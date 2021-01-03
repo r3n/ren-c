@@ -971,7 +971,7 @@ bool Make_Frame_From_Varargs_Throws(
     // managed, but Push_Action() does not use ordinary series creation to
     // make its nodes, so manual ones don't wind up in the tracking list.
     //
-    SET_SERIES_FLAG(exemplar, MANAGED); // can't use Manage_Series
+    SET_SERIES_FLAG(CTX_VARLIST(exemplar), MANAGED);  // can't Manage_Series()
 
     Init_Frame(out, exemplar, label);
     return false;

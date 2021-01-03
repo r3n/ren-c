@@ -53,7 +53,7 @@ REBREQ *Force_Get_Port_State(const REBVAL *port, void *device)
         req = OS_Make_Devreq(dev);
         ReqPortCtx(req) = ctx;  // Guarded: SERIES_INFO_MISC_NODE_NEEDS_MARK
 
-        Init_Binary(state, SER(req));
+        Init_Binary(state, req);
     }
 
     return req;

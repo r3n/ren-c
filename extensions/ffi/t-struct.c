@@ -162,7 +162,7 @@ static bool Get_Struct_Var(REBVAL *out, REBSTU *stu, const RELVAL *word)
     RELVAL *item = ARR_HEAD(fieldlist);
     for (; NOT_END(item); ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
-        if (STR_CANON(FLD_NAME(field)) != VAL_WORD_CANON(word))
+        if (FLD_NAME(field) != VAL_WORD_SPELLING(word))
             continue;
 
         if (FLD_IS_ARRAY(field)) {
@@ -496,7 +496,7 @@ static bool Set_Struct_Var(
     for (; NOT_END(item); ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
-        if (VAL_WORD_CANON(word) != STR_CANON(FLD_NAME(field)))
+        if (VAL_WORD_SPELLING(word) != FLD_NAME(field))
             continue;
 
         if (FLD_IS_ARRAY(field)) {
@@ -993,7 +993,7 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
         for (; NOT_END(item); ++item) {
             REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
-            if (STR_CANON(FLD_NAME(field)) != VAL_WORD_CANON(word))
+            if (FLD_NAME(field) != VAL_WORD_SPELLING(word))
                 continue;
 
             if (FLD_IS_ARRAY(field)) {
@@ -1126,7 +1126,7 @@ REB_R MAKE_Struct(
 
     // !!! This makes binary data for each struct level? ???
     //
-    REBSER *data_bin;
+    REBBIN *data_bin;
     if (raw_addr == 0)
         data_bin = Make_Binary(max_fields << 2);
     else
@@ -1497,7 +1497,7 @@ REBSTU *Copy_Struct_Managed(REBSTU *src)
     // !!! Note that the offset is left intact, and as written will make a
     // copy as big as struct the instance is embedded into if nonzero offset.
     //
-    REBSER *bin_copy = Make_Binary(STU_DATA_LEN(src));
+    REBBIN *bin_copy = Make_Binary(STU_DATA_LEN(src));
     memcpy(BIN_HEAD(bin_copy), STU_DATA_HEAD(src), STU_DATA_LEN(src));
     TERM_BIN_LEN(bin_copy, STU_DATA_LEN(src));
     Init_Binary(ARR_SINGLE(copy), bin_copy);
@@ -1527,7 +1527,7 @@ REBTYPE(Struct)
 
         memcpy(
             VAL_STRUCT_DATA_HEAD(val),
-            BIN_HEAD(VAL_SERIES(arg)),
+            BIN_HEAD(VAL_BINARY(arg)),
             VAL_STRUCT_DATA_LEN(val)
         );
         Move_Value(D_OUT, val);
@@ -1546,7 +1546,7 @@ REBTYPE(Struct)
 
         case SYM_VALUES: {
             fail_if_non_accessible(VAL_STRUCT(val));
-            REBSER *bin = Make_Binary(VAL_STRUCT_SIZE(val));
+            REBBIN *bin = Make_Binary(VAL_STRUCT_SIZE(val));
             memcpy(
                 BIN_HEAD(bin),
                 VAL_STRUCT_DATA_AT(val),

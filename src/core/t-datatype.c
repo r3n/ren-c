@@ -404,7 +404,7 @@ REBTYP *Hook_Datatype(
 //
 //  Unhook_Datatype: C
 //
-void Unhook_Datatype(REBSER *type)
+void Unhook_Datatype(REBTYP *type)
 {
     // need to fail if not hooked
 

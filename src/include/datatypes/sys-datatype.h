@@ -58,7 +58,7 @@ inline static enum Reb_Kind VAL_TYPE_KIND(unstable REBCEL(const*) v) {
     PAYLOAD(Any, (v)).second.node
 
 #define VAL_TYPE_CUSTOM(v) \
-    SER(VAL_TYPE_HOOKS_NODE(v))
+    BIN(VAL_TYPE_HOOKS_NODE(v))
 
 
 // Built in types have their specs initialized from data in the boot block.

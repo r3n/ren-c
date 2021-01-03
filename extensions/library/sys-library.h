@@ -48,7 +48,7 @@ inline static REBLIB *VAL_LIBRARY(REBCEL(const*) v) {
 }
 
 #define VAL_LIBRARY_META_NODE(v) \
-    MISC_META_NODE(VAL_NODE(v))
+    MISC_META_NODE(SER(VAL_NODE(v)))
 
 inline static REBCTX *VAL_LIBRARY_META(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Library_Type);

@@ -301,7 +301,7 @@ inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v);
 
 inline static REBTYP *CELL_CUSTOM_TYPE(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_CUSTOM);
-    return SER(EXTRA(Any, v).node);
+    return cast(REBBIN*, EXTRA(Any, v).node);
 }
 
 // Sometimes you have a REBCEL* and need to pass a REBVAL* to something.  It
@@ -792,39 +792,6 @@ inline static void INIT_VAL_WORD_BINDING(unstable RELVAL *v, const void *p) {
         assert(
             binding->header.bits & ARRAY_FLAG_IS_DETAILS  // relative
             or binding->header.bits & ARRAY_FLAG_IS_VARLIST  // specific
-        );
-    }
-    else
-        assert(binding->header.bits & ARRAY_FLAG_IS_VARLIST);
-  #endif
-}
-
-
-inline static void INIT_SPECIFIER(unstable RELVAL *v, const void *p) {
-    //
-    // can be called on non-bindable series, but p must be nullptr
-
-    const REBNOD *binding = cast(const REBNOD*, p);
-    EXTRA(Binding, v).node = m_cast(REBNOD*, binding);
-
-  #if !defined(NDEBUG)
-    if (not binding or (binding->header.bits & SERIES_FLAG_IS_STRING))
-        return;  // e.g. UNBOUND (words use strings to indicate unbounds)
-
-    assert(Is_Bindable(v));  // works on partially formed values
-
-    assert(not (binding->header.bits & NODE_FLAG_CELL));  // not currently used
-
-    if (binding->header.bits & NODE_FLAG_MANAGED) {
-        assert(
-            binding->header.bits & ARRAY_FLAG_IS_DETAILS  // relative
-            or binding->header.bits & ARRAY_FLAG_IS_VARLIST  // specific
-            or (
-                ANY_ARRAY(v)
-                and (binding->header.bits & ARRAY_FLAG_IS_PATCH)  // virtual
-            ) or (
-                IS_VARARGS(v) and not IS_SER_DYNAMIC(binding)
-            )  // varargs from MAKE VARARGS! [...], else is a varlist
         );
     }
     else

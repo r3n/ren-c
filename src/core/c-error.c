@@ -276,7 +276,7 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
 
       case DETECTED_AS_SERIES: {
         REBSER *s = m_cast(REBSER*, cast(const REBSER*, p));  // don't mutate
-        if (not IS_SER_ARRAY(s) or NOT_ARRAY_FLAG(s, IS_VARLIST))
+        if (not IS_SER_ARRAY(s) or NOT_ARRAY_FLAG(ARR(s), IS_VARLIST))
             panic (s);
         error = CTX(s);
         break; }

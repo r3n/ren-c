@@ -651,7 +651,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     SET_SERIES_FLAG(paramlist, FIXED_SIZE);
 
     if (flags & MKF_HAS_RETURN)
-        SER(paramlist)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
+        paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
 
   blockscope {
     REBVAL *dest = Voidify_Rootparam(paramlist) + 1;
@@ -1021,7 +1021,7 @@ REBACT *Make_Action(
     ASSERT_ARRAY_MANAGED(paramlist);  // paramlists/keylists, can be shared
     ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(paramlist));  // unused at this time
     assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
-    if (SER(paramlist)->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
+    if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
         RELVAL *param = STABLE(ARR_AT(paramlist, 1));
         assert(VAL_PARAM_SYM(param) == SYM_RETURN);
         UNUSED(param);
@@ -1064,7 +1064,7 @@ REBACT *Make_Action(
         // the exemplar (though some of these parameters may be hidden due to
         // specialization, see REB_TS_HIDDEN).
         //
-        assert(GET_SERIES_FLAG(unwrap(exemplar), MANAGED));
+        assert(GET_SERIES_FLAG(CTX_VARLIST(unwrap(exemplar)), MANAGED));
         assert(CTX_LEN(unwrap(exemplar)) == ARR_LEN(paramlist) - 1);
 
         VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype)
@@ -1130,7 +1130,7 @@ REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
     // overridden by SERIES_INFO_INACCESSIBLE.
     //
     REBARR *varlist = Alloc_Singular(NODE_FLAG_MANAGED);
-    SER(varlist)->header.bits |= SERIES_MASK_VARLIST;
+    varlist->header.bits |= SERIES_MASK_VARLIST;
     SET_SERIES_INFO(varlist, INACCESSIBLE);
     MISC_META_NODE(varlist) = nullptr;
 

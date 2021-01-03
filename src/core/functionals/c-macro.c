@@ -49,7 +49,7 @@ void Splice_Block_Into_Feed(REBFED *feed, const REBVAL *splice) {
     //
     if (GET_FEED_FLAG(feed, TOOK_HOLD)) {
         assert(GET_SERIES_INFO(FEED_ARRAY(feed), HOLD));
-        CLEAR_SERIES_INFO(FEED_ARRAY(feed), HOLD);
+        CLEAR_SERIES_INFO(m_cast(REBARR*, FEED_ARRAY(feed)), HOLD);
         CLEAR_FEED_FLAG(feed, TOOK_HOLD);
     }
 
@@ -82,7 +82,7 @@ void Splice_Block_Into_Feed(REBFED *feed, const REBVAL *splice) {
     // per-splice hold logic.  Pending whole system review of iteration.
     //
     if (NOT_END(feed->value) and NOT_SERIES_INFO(FEED_ARRAY(feed), HOLD)) {
-        SET_SERIES_INFO(FEED_ARRAY(feed), HOLD);
+        SET_SERIES_INFO(m_cast(REBARR*, FEED_ARRAY(feed)), HOLD);
         SET_FEED_FLAG(feed, TOOK_HOLD);
     }
 }

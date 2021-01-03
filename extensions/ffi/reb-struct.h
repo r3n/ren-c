@@ -171,8 +171,8 @@ enum {
     IDX_FIELD_MAX
 };
 
-#define FLD_AT(a, n) \
-    SER_AT(REBVAL, SER(a), (n))  // locate index access
+#define FLD_AT(a,n) \
+    SER_AT(REBVAL, (a), (n))  // locate index access
 
 inline static const REBSTR *FLD_NAME(REBFLD *f) {
     if (IS_BLANK(FLD_AT(f, IDX_FIELD_NAME)))
@@ -444,8 +444,8 @@ enum {
     IDX_ROUTINE_MAX
 };
 
-#define RIN_AT(a, n) \
-    SER_AT(REBVAL, SER(a), (n)) // locate index access
+#define RIN_AT(a,n) \
+    SER_AT(REBVAL, (a), (n))  // locate index access
 
 inline static CFUNC *RIN_CFUNC(REBRIN *r)
     { return VAL_HANDLE_CFUNC(RIN_AT(r, IDX_ROUTINE_CFUNC)); }

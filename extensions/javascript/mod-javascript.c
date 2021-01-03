@@ -790,8 +790,8 @@ REBNATIVE(js_native)
     // The javascript code for registering the function body is now the last
     // thing in the mold buffer.  Get a pointer to it.
     //
-    TERM_SERIES(SER(mo->series));
-    const char *js = cs_cast(BIN_AT(SER(mo->series), mo->offset));
+    TERM_SERIES(mo->series);
+    const char *js = cs_cast(BIN_AT(mo->series, mo->offset));
 
     TRACE("Registering native_id %ld", cast(long, native_id));
 

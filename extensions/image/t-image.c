@@ -581,7 +581,7 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
     REBVAL *value = ARG(series);  // !!! confusing name
     REBVAL *arg = ARG(value);
 
-    REBSER *bin = VAL_BINARY_ENSURE_MUTABLE(VAL_IMAGE_BIN(value));
+    REBBIN *bin = VAL_BINARY_ENSURE_MUTABLE(VAL_IMAGE_BIN(value));
 
     REBLEN index = VAL_IMAGE_POS(value);
     REBLEN tail = VAL_IMAGE_LEN_HEAD(value);
@@ -1221,7 +1221,7 @@ void Pick_Image(REBVAL *out, const REBVAL *value, const RELVAL *picker)
             break;
 
         case SYM_RGB: {
-            REBSER *nser = Make_Binary(len * 3);
+            REBBIN *nser = Make_Binary(len * 3);
             SET_SERIES_LEN(nser, len * 3);
             RGB_To_Bin(BIN_HEAD(nser), src, len, false);
             TERM_SERIES(nser);
@@ -1229,7 +1229,7 @@ void Pick_Image(REBVAL *out, const REBVAL *value, const RELVAL *picker)
             break; }
 
         case SYM_ALPHA: {
-            REBSER *nser = Make_Binary(len);
+            REBBIN *nser = Make_Binary(len);
             SET_SERIES_LEN(nser, len);
             Alpha_To_Bin(BIN_HEAD(nser), src, len);
             TERM_SERIES(nser);

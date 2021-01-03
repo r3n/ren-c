@@ -272,7 +272,8 @@ REBINT Get_System_Int(REBLEN i1, REBLEN i2, REBINT default_int)
 //
 void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     assert(
-        (SER(c)->header.bits & SERIES_MASK_VARLIST) == SERIES_MASK_VARLIST
+        (CTX_VARLIST(c)->header.bits & SERIES_MASK_VARLIST)
+        == SERIES_MASK_VARLIST
     );
 
     const REBVAL *archetype = CTX_ARCHETYPE(c);
@@ -298,7 +299,7 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     //
     REBNOD *archetype_phase = VAL_FRAME_PHASE_OR_LABEL_NODE(archetype);
     if (CTX_TYPE(c) == REB_FRAME)
-        assert(GET_ARRAY_FLAG(archetype_phase, IS_DETAILS));
+        assert(GET_ARRAY_FLAG(ARR(archetype_phase), IS_DETAILS));
     else
         assert(archetype_phase == nullptr);
 
@@ -324,7 +325,7 @@ void Extra_Init_Action_Checks_Debug(REBACT *a) {
 
     REBARR *paramlist = ACT_PARAMLIST(a);
     assert(
-        (SER(paramlist)->header.bits & SERIES_MASK_PARAMLIST)
+        (paramlist->header.bits & SERIES_MASK_PARAMLIST)
         == SERIES_MASK_PARAMLIST
     );
     assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));

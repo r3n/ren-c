@@ -298,20 +298,18 @@ static void Clonify_And_Bind_Relative(
                 v,
                 CTX_VARLIST(Copy_Context_Shallow_Managed(VAL_CONTEXT(v)))
             );
-            series = SER(CTX_VARLIST(VAL_CONTEXT(v)));
+            series = CTX_VARLIST(VAL_CONTEXT(v));
             sub_src = BLANK_VALUE;  // don't try to look for LETs
 
             would_need_deep = true;
         }
         else if (ANY_ARRAY_KIND(heart)) {
-            series = SER(
-                Copy_Array_At_Extra_Shallow(
-                    VAL_ARRAY(v),
-                    0, // !!! what if VAL_INDEX() is nonzero?
-                    VAL_SPECIFIER(v),
-                    0,
-                    NODE_FLAG_MANAGED
-                )
+            series = Copy_Array_At_Extra_Shallow(
+                VAL_ARRAY(v),
+                0, // !!! what if VAL_INDEX() is nonzero?
+                VAL_SPECIFIER(v),
+                0,
+                NODE_FLAG_MANAGED
             );
 
             INIT_VAL_NODE(v, series);  // copies args
@@ -486,7 +484,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             CLEAR_SERIES_FLAG(paramlist, FIXED_SIZE);
 
             REBLEN old_paramlist_len = ARR_LEN(paramlist);
-            EXPAND_SERIES_TAIL(SER(paramlist), num_lets);
+            EXPAND_SERIES_TAIL(paramlist, num_lets);
             RELVAL *param = STABLE(ARR_AT(paramlist, old_paramlist_len));
 
             REBDSP dsp = dsp_orig;

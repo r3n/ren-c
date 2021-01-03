@@ -150,7 +150,7 @@ REB_R Reframer_Dispatcher(REBFRM *f)
     // managed, but Push_Action() does not use ordinary series creation to
     // make its nodes, so manual ones don't wind up in the tracking list.
     //
-    SET_SERIES_FLAG(stolen, MANAGED); // can't use Manage_Series
+    SET_SERIES_FLAG(CTX_VARLIST(stolen), MANAGED); // can't use Manage_Series
 
     REBVAL *arg = FRM_ARGS_HEAD(f) + VAL_INT32(param_index);
     Init_Frame(arg, stolen, label);

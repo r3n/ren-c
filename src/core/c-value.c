@@ -134,7 +134,7 @@ ATTRIBUTE_NO_RETURN void Panic_Value_Debug(const RELVAL *v) {
     }
 
     printf("No containing series for value, panicking for stack dump:\n");
-    Panic_Series_Debug(SER(EMPTY_ARRAY));
+    Panic_Series_Debug(EMPTY_ARRAY);
 }
 
 #endif // !defined(NDEBUG)
@@ -217,18 +217,19 @@ void* Probe_Core_Debug(
                 Mold_Text_Series_At(mo, str, 0);  // or could be TAG!, etc.
             }
             else {
+                REBBIN *bin = BIN(s);
                 Probe_Print_Helper(p, expr, "Byte-Size Series", file, line);
 
                 // !!! Duplication of code in MF_Binary
                 //
-                const bool brk = (BIN_LEN(s) > 32);
+                const bool brk = (BIN_LEN(bin) > 32);
                 Append_Ascii(mo->series, "#{");
-                Form_Base16(mo, BIN_HEAD(s), BIN_LEN(s), brk);
+                Form_Base16(mo, BIN_HEAD(bin), BIN_LEN(bin), brk);
                 Append_Ascii(mo->series, "}");
             }
         }
         else if (IS_SER_ARRAY(s)) {
-            if (GET_ARRAY_FLAG(s, IS_VARLIST)) {
+            if (GET_ARRAY_FLAG(ARR(s), IS_VARLIST)) {
                 Probe_Print_Helper(p, expr, "Context Varlist", file, line);
                 Probe_Molded_Value(CTX_ARCHETYPE(CTX(s)));
             }

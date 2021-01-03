@@ -241,6 +241,29 @@
 #include "tmp-symbols.h"
 
 
+
+#include "tmp-version.h"  // historical 5 numbers in a TUPLE! (see %systems.r)
+
+#include "sys-panic.h"  // "blue screen of death"-style termination
+
+#include "mem-pools.h"
+
+#include "sys-rebnod.h"
+
+#include "sys-rebval.h"  // low level Rebol cell structure definition
+#include "sys-rebser.h"  // series structure definition (embeds REBVAL)
+
+
+// REBCHR(*) is defined in %sys-scan.h, along with SCAN_STATE, and both are
+// referenced by internal API functions.
+//
+// (Note: %sys-do.h needs to call into the scanner if Fetch_Next_In_Frame() is
+// to be inlined at all--at its many time-critical callsites--so the scanner
+// has to be in the internal API)
+//
+#include "sys-scan.h"
+
+
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // #INCLUDE THE AUTO-GENERATED FUNCTION PROTOTYPES FOR THE INTERNAL API
@@ -257,17 +280,6 @@
 //
 #include "tmp-internals.h"
 
-
-#include "tmp-version.h"  // historical 5 numbers in a TUPLE! (see %systems.r)
-
-#include "sys-panic.h"  // "blue screen of death"-style termination
-
-#include "mem-pools.h"
-
-#include "sys-rebnod.h"
-
-#include "sys-rebval.h"  // low level Rebol cell structure definition
-#include "sys-rebser.h"  // series structure definition (embeds REBVAL)
 #include "sys-rebarr.h"  // array structure definition (subclass of REBSER)
 #include "sys-rebact.h"  // action structure definition (subclass of REBSER)
 #include "sys-rebctx.h"  // context structure definition (subclass of REBSER)
@@ -495,9 +507,11 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 
 #include "sys-protect.h"
 
-#include "datatypes/sys-datatype.h"
 
 #include "datatypes/sys-binary.h"  // BIN_XXX(), etc. used by strings
+
+#include "datatypes/sys-datatype.h"  // uses BIN()
+
 #include "datatypes/sys-char.h"  // use Init_Integer() for bad codepoint error
 #include "datatypes/sys-string.h"  // REBSYM needed for typesets
 #include "datatypes/sys-word.h"

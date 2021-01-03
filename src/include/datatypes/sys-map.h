@@ -42,7 +42,7 @@
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* hashlist */)
 
 struct Reb_Map {
-    struct Reb_Array pairlist;  // hashlist is held in ->link.hashlist
+    REBARR pairlist;  // hashlist is held in ->link.hashlist
 };
 
 // The MAP! datatype uses this.
@@ -52,7 +52,7 @@ struct Reb_Map {
 
 
 inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
-    assert(GET_ARRAY_FLAG(&(m)->pairlist, IS_PAIRLIST));
+    assert(GET_ARRAY_FLAG(&(m->pairlist), IS_PAIRLIST));
     return (&m_cast(REBMAP*, m)->pairlist);
 }
 

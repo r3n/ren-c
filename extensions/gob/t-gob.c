@@ -171,7 +171,7 @@ static void Detach_Gob(REBGOB *gob)
     if (GOB_PANE(par)) {
         REBLEN i = Find_Gob(par, gob);
         if (i != NOT_FOUND)
-            Remove_Series_Units(SER(GOB_PANE(par)), i, 1);
+            Remove_Series_Units(GOB_PANE(par), i, 1);
         else
             assert(!"Detaching GOB from parent that didn't find it"); // !!! ?
     }
@@ -243,10 +243,10 @@ static void Insert_Gobs(
     else {
         if (change) {
             if (index + count > ARR_LEN(pane)) {
-                EXPAND_SERIES_TAIL(SER(pane), index + count - ARR_LEN(pane));
+                EXPAND_SERIES_TAIL(pane, index + count - ARR_LEN(pane));
             }
         } else {
-            Expand_Series(SER(pane), index, count);
+            Expand_Series(pane, index, count);
             if (index >= ARR_LEN(pane))
                 index = ARR_LEN(pane) - 1;
         }
@@ -289,7 +289,7 @@ static void Remove_Gobs(REBGOB *gob, REBLEN index, REBLEN len)
     for (n = 0; n < len; ++n, ++item)
         SET_GOB_PARENT(VAL_GOB(item), nullptr);
 
-    Remove_Series_Units(SER(GOB_PANE(gob)), index, len);
+    Remove_Series_Units(GOB_PANE(gob), index, len);
 }
 
 
@@ -444,7 +444,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
 
       case SYM_PANE:
         if (GOB_PANE(gob))
-            Clear_Series(SER(GOB_PANE(gob)));
+            Clear_Series(GOB_PANE(gob));
 
         if (IS_BLOCK(val)) {
             REBLEN len;

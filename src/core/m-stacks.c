@@ -264,7 +264,7 @@ unstable REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
     // If adding in the requested amount would overflow the stack limit, then
     // give a data stack overflow error.
     //
-    if (SER_REST(SER(DS_Array)) + amount >= STACK_LIMIT) {
+    if (SER_REST(DS_Array) + amount >= STACK_LIMIT) {
         //
         // Because the stack pointer was incremented and hit the END marker
         // before the expansion, we have to decrement it if failing.
@@ -273,7 +273,7 @@ unstable REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
         Fail_Stack_Overflow(); // !!! Should this be a "data stack" message?
     }
 
-    Extend_Series(SER(DS_Array), amount);
+    Extend_Series(DS_Array, amount);
 
     // Update the pointer used for fast access to the top of the stack that
     // likely was moved by the above allocation (needed before using DS_TOP)

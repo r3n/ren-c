@@ -1096,14 +1096,14 @@ void Decay_Series(REBSER *s)
         else
             Free_Bookmarks_Maybe_Null(STR(s));
     }
-    else if (IS_SER_ARRAY(s) and GET_ARRAY_FLAG(s, IS_PATCH)) {
+    else if (IS_SER_ARRAY(s) and GET_ARRAY_FLAG(ARR(s), IS_PATCH)) {
         //
         // Remove patch from circularly linked list of variants.
         // (if it's the last one, this winds up making no meaningful change)
         //
-        REBARR *temp = MISC(s).variant;
-        while (SER(MISC(temp).variant) != s) {
-            temp = MISC(temp).variant;
+        REBARR *temp = ARR(MISC(s).variant);
+        while (MISC(temp).variant != s) {
+            temp = ARR(MISC(temp).variant);
         }
         MISC(temp).variant = MISC(s).variant;
     }
@@ -1128,8 +1128,8 @@ void Decay_Series(REBSER *s)
         //
         if (IS_SER_ARRAY(s))
             if (
-                GET_ARRAY_FLAG(s, IS_VARLIST)
-                or GET_ARRAY_FLAG(s, IS_DETAILS)
+                GET_ARRAY_FLAG(ARR(s), IS_VARLIST)
+                or GET_ARRAY_FLAG(ARR(s), IS_DETAILS)
             ){
                 s->content.fixed.cells[0] = *ARR_HEAD(ARR(s));
             }

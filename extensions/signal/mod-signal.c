@@ -258,8 +258,8 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         REBVAL *arg = CTX_VAR(ctx, STD_PORT_DATA);
 
         size_t len = req->length = 8;
-        REBSER *ser = Make_Binary(len * sizeof(siginfo_t));
-        req->common.data = BIN_HEAD(ser);
+        REBBIN *bin = Make_Binary(len * sizeof(siginfo_t));
+        req->common.data = BIN_HEAD(bin);
 
         OS_DO_DEVICE_SYNC(signal, RDC_READ);
 
@@ -270,12 +270,12 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         len = req->actual;
 
         if (len <= 0) {
-            Free_Unmanaged_Series(ser);
+            Free_Unmanaged_Series(bin);
             return nullptr;
         }
 
         update(signal, len, arg);
-        Free_Unmanaged_Series(ser);
+        Free_Unmanaged_Series(bin);
         RETURN (port); }
 
     case SYM_CLOSE: {

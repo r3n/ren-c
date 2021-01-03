@@ -282,7 +282,7 @@ DEVICE_CMD Read_Serial(REBREQ *serial)
     rebElide(
         "insert system/ports/system make event! [",
             "type: 'read",
-            "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(serial))),
+            "port:", CTX_ARCHETYPE(ReqPortCtx(serial)),
         "]",
     rebEND);
 
@@ -323,7 +323,7 @@ DEVICE_CMD Write_Serial(REBREQ *serial)
         rebElide(
             "insert system/ports/system make event! [",
                 "type: 'wrote",
-                "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(serial))),
+                "port:", CTX_ARCHETYPE(ReqPortCtx(serial)),
             "]",
         rebEND);
 

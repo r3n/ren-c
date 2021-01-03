@@ -114,7 +114,7 @@ REBSER *Make_Set_Operation_Series(
         // a new buffer every time, but reusing one might be slightly more
         // efficient.
         //
-        REBSER *buffer = SER(Make_Array(i));
+        REBSER *buffer = Make_Array(i);
         hret = Make_Hash_Series(i);   // allocated
 
         // Optimization note: !!
@@ -193,7 +193,7 @@ REBSER *Make_Set_Operation_Series(
         // The buffer may have been allocated too large, so copy it at the
         // used capacity size
         //
-        out_ser = SER(Copy_Array_Shallow(ARR(buffer), SPECIFIED));
+        out_ser = Copy_Array_Shallow(ARR(buffer), SPECIFIED);
         Free_Unmanaged_Array(ARR(buffer));
     }
     else if (ANY_STRING(val1)) {
@@ -270,12 +270,12 @@ REBSER *Make_Set_Operation_Series(
             val2 = temp;
         } while (true);
 
-        out_ser = SER(Pop_Molded_String(mo));
+        out_ser = Pop_Molded_String(mo);
     }
     else {
         assert(IS_BINARY(val1) and IS_BINARY(val2));
 
-        REBSER *buf = BYTE_BUF;
+        REBBIN *buf = BYTE_BUF;
         REBLEN buf_start_len = BIN_LEN(buf);
         EXPAND_SERIES_TAIL(buf, i);  // ask for at least `i` capacity
         REBLEN buf_at = buf_start_len;
@@ -351,9 +351,10 @@ REBSER *Make_Set_Operation_Series(
         } while (true);
 
         REBLEN out_len = buf_at - buf_start_len;
-        out_ser = Make_Binary(out_len);
-        memcpy(BIN_HEAD(out_ser), BIN_AT(buf, buf_start_len), out_len);
-        TERM_BIN_LEN(out_ser, out_len);
+        REBBIN *out_bin = Make_Binary(out_len);
+        memcpy(BIN_HEAD(out_bin), BIN_AT(buf, buf_start_len), out_len);
+        TERM_BIN_LEN(out_bin, out_len);
+        out_ser = out_bin;
 
         TERM_BIN_LEN(buf, buf_start_len);
     }

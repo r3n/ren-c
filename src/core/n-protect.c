@@ -167,7 +167,7 @@ void Protect_Value(unstable const RELVAL *v, REBFLGS flags)
     if (ANY_SERIES(v))
         Protect_Series(VAL_SERIES(v), VAL_INDEX(v), flags);
     else if (IS_MAP(v))
-        Protect_Series(SER(MAP_PAIRLIST(VAL_MAP(v))), 0, flags);
+        Protect_Series(MAP_PAIRLIST(VAL_MAP(v)), 0, flags);
     else if (ANY_CONTEXT(v))
         Protect_Context(VAL_CONTEXT(v), flags);
 }
@@ -178,8 +178,10 @@ void Protect_Value(unstable const RELVAL *v, REBFLGS flags)
 //
 // Anything that calls this must call Uncolor() when done.
 //
-void Protect_Series(const REBSER *s, REBLEN index, REBFLGS flags)
+void Protect_Series(const REBSER *s_const, REBLEN index, REBFLGS flags)
 {
+    REBSER *s = m_cast(REBSER*, s_const);  // mutate flags only
+
     if (Is_Series_Black(s))
         return; // avoid loop
 
@@ -215,27 +217,29 @@ void Protect_Series(const REBSER *s, REBLEN index, REBFLGS flags)
 //
 void Protect_Context(REBCTX *c, REBFLGS flags)
 {
-    if (Is_Series_Black(SER(c)))
+    REBARR *varlist = m_cast(REBARR*, CTX_VARLIST(c));  // mutate flags only
+
+    if (Is_Series_Black(varlist))
         return; // avoid loop
 
     if (flags & PROT_SET) {
         if (flags & PROT_FREEZE) {
             if (flags & PROT_DEEP)
-                SET_SERIES_INFO(c, FROZEN_DEEP);
-            SET_SERIES_INFO(c, FROZEN_SHALLOW);
+                SET_SERIES_INFO(varlist, FROZEN_DEEP);
+            SET_SERIES_INFO(varlist, FROZEN_SHALLOW);
         }
         else
-            SET_SERIES_INFO(c, PROTECTED);
+            SET_SERIES_INFO(varlist, PROTECTED);
     }
     else {
         assert(not (flags & PROT_FREEZE));
-        CLEAR_SERIES_INFO(CTX_VARLIST(c), PROTECTED);
+        CLEAR_SERIES_INFO(varlist, PROTECTED);
     }
 
     if (not (flags & PROT_DEEP))
         return;
 
-    Flip_Series_To_Black(SER(CTX_VARLIST(c))); // for recursion
+    Flip_Series_To_Black(varlist); // for recursion
 
     REBVAL *var = CTX_VARS_HEAD(c);
     for (; NOT_END(var); ++var)
@@ -505,26 +509,29 @@ void Force_Value_Frozen_Core(
     enum Reb_Kind kind = CELL_KIND(cell);
 
     if (ANY_ARRAY_KIND(kind)) {
+        REBARR *a = m_cast(REBARR*, VAL_ARRAY(cell));  // mutate flags only
         if (deep)
-            Freeze_Array_Deep(m_cast(REBARR*, VAL_ARRAY(cell)));
+            Freeze_Array_Deep(a);
         else
-            Freeze_Array_Shallow(m_cast(REBARR*, VAL_ARRAY(cell)));
+            Freeze_Array_Shallow(a);
         if (locker)
-            SET_SERIES_INFO(VAL_ARRAY(cell), AUTO_LOCKED);
+            SET_SERIES_INFO(a, AUTO_LOCKED);
     }
     else if (ANY_CONTEXT_KIND(kind)) {
+        REBCTX *c = VAL_CONTEXT(cell);
         if (deep)
-            Deep_Freeze_Context(VAL_CONTEXT(cell));
+            Deep_Freeze_Context(c);
         else
             fail ("What does a shallow freeze of a context mean?");
         if (locker)
-            SET_SERIES_INFO(VAL_CONTEXT(cell), AUTO_LOCKED);
+            SET_SERIES_INFO(m_cast(REBARR*, CTX_VARLIST(c)), AUTO_LOCKED);
     }
     else if (ANY_SERIES_KIND(kind)) {
-        Freeze_Series(VAL_SERIES(cell));
+        REBSER *s = m_cast(REBSER*, VAL_SERIES(cell));  // mutate flags only
+        Freeze_Series(s);
         UNUSED(deep);
         if (locker)
-            SET_SERIES_INFO(VAL_SERIES(cell), AUTO_LOCKED);
+            SET_SERIES_INFO(s, AUTO_LOCKED);
     } else
         fail (Error_Invalid_Type(kind)); // not yet implemented
 }

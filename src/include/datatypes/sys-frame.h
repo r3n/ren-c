@@ -132,7 +132,7 @@ inline static int FRM_LINE(REBFRM *f) {
         return 0;
     if (NOT_ARRAY_FLAG(FRM_ARRAY(f), HAS_FILE_LINE_UNMASKED))
         return 0;
-    return MISC(SER(FRM_ARRAY(f))).line;
+    return MISC(FRM_ARRAY(f)).line;
 }
 
 #define FRM_OUT(f) \
@@ -280,8 +280,8 @@ inline static bool Did_Reuse_Varlist_Of_Unknown_Size(
         return false;
 
     f->varlist = TG_Reuse;
-    TG_Reuse = LINK(TG_Reuse).reuse;
-    f->rootvar = cast(REBVAL*, SER(f->varlist)->content.dynamic.data);
+    TG_Reuse = ARR(LINK(TG_Reuse).reuse);
+    f->rootvar = cast(REBVAL*, f->varlist->content.dynamic.data);
     LINK_KEYSOURCE(f->varlist) = NOD(f);
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
     return true;
@@ -450,9 +450,9 @@ inline static void Abort_Frame(REBFRM *f) {
     REBNOD *n = f->alloc_value_list;
     while (n != NOD(f)) {
         REBARR *a = ARR(n);
-        n = LINK(n).custom.node;
+        n = LINK(a).custom.node;
         TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
-        GC_Kill_Series(SER(a));
+        GC_Kill_Series(a);
     }
     TRASH_POINTER_IF_DEBUG(f->alloc_value_list);
 
@@ -633,7 +633,8 @@ inline static void Push_Action(
     assert(NOT_EVAL_FLAG(f, RUNNING_ENFIX));
 
     STATIC_ASSERT(EVAL_FLAG_FULFILLING_ARG == DETAILS_FLAG_IS_BARRIER);
-    if (f->flags.bits & SER(act)->header.bits & DETAILS_FLAG_IS_BARRIER)
+    REBARR *details = ACT_DETAILS(act);
+    if (f->flags.bits & details->header.bits & DETAILS_FLAG_IS_BARRIER)
         fail (Error_Expression_Barrier_Raw());
 
     f->param = ACT_PARAMS_HEAD(act);
@@ -644,7 +645,7 @@ inline static void Push_Action(
         f->varlist  // !!! May be going to point of assuming nullptr
         or Did_Reuse_Varlist_Of_Unknown_Size(f, num_args)  // want `num_args`
     ){
-        s = SER(f->varlist);
+        s = f->varlist;
         if (s->content.dynamic.rest >= num_args + 1 + 1) // +roovar, +end
             goto sufficient_allocation;
             
@@ -829,10 +830,10 @@ inline static void Drop_Action(REBFRM *f) {
         //
         CLEAR_SERIES_INFO(f->varlist, HOLD);
 
-        assert(0 == (SER(f->varlist)->info.bits & ~( // <- note bitwise not
-            SERIES_INFO_0_IS_TRUE // parallels NODE_FLAG_NODE
-            | FLAG_WIDE_BYTE_OR_0(0) // don't mask out wide (0 for arrays))
-            | FLAG_LEN_BYTE_OR_255(255) // mask out non-dynamic-len (dynamic)
+        assert(0 == (f->varlist->info.bits & ~(  // <- note bitwise not
+            SERIES_INFO_0_IS_TRUE  // parallels NODE_FLAG_NODE
+            | FLAG_WIDE_BYTE_OR_0(0)  // don't mask out wide (0 for arrays))
+            | FLAG_LEN_BYTE_OR_255(255)  // mask out non-dynamic-len (dynamic)
         )));
     }
 

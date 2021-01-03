@@ -56,7 +56,7 @@ inline static bool Is_Array_Frozen_Deep(const REBARR *a) {
 
 inline static REBARR *Freeze_Array_Deep(REBARR *a) {
     Protect_Series(
-        SER(a),
+        a,
         0, // start protection at index 0
         PROT_DEEP | PROT_SET | PROT_FREEZE
     );
@@ -73,11 +73,11 @@ inline static REBARR *Freeze_Array_Shallow(REBARR *a) {
     Is_Series_Read_Only(SER(a))
 
 #define Force_Value_Frozen_Deep(v) \
-    Force_Value_Frozen_Core((v), true, SER(EMPTY_ARRAY))  // auto-locked
+    Force_Value_Frozen_Core((v), true, EMPTY_ARRAY)  // auto-locked
 
 #define Force_Value_Frozen_Deep_Blame(v,blame) \
-    Force_Value_Frozen_Core((v), true, SER(blame))
+    Force_Value_Frozen_Core((v), true, blame)
 
 #define Force_Value_Frozen_Shallow(v) \
-    Force_Value_Frozen_Core((v), false, SER(EMPTY_ARRAY))  // auto-locked
+    Force_Value_Frozen_Core((v), false, EMPTY_ARRAY)  // auto-locked
 

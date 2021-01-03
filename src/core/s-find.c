@@ -419,7 +419,7 @@ REBLEN Find_Bitset_In_Binstr(
     REBCEL(const*) binstr,
     REBLEN end_unsigned,
     REBINT skip,
-    const REBSER *bset,
+    const REBBIN *bset,
     REBFLGS flags
 ){
   #if !defined(NDEBUG)
@@ -550,7 +550,7 @@ REBLEN Find_Value_In_Binstr(
         );
 
         if (formed)
-            Free_Unmanaged_Series(SER(formed));
+            Free_Unmanaged_Series(formed);
 
         return result;
     }

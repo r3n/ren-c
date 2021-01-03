@@ -169,18 +169,17 @@ static void Read_File_Port(
 
     struct rebol_devreq *req = Req(file);
 
-    REBSER *ser = Make_Binary(len); // read result buffer
-    TERM_BIN_LEN(ser, len);
-    Init_Binary(out, ser);
+    REBBIN *bin = Make_Binary(len); // read result buffer
+    TERM_BIN_LEN(bin, len);
+    Init_Binary(out, bin);
 
     // Do the read, check for errors:
-    req->common.data = BIN_HEAD(ser);
+    req->common.data = BIN_HEAD(bin);
     req->length = len;
 
     OS_DO_DEVICE_SYNC(file, RDC_READ);
 
-    SET_SERIES_LEN(ser, req->actual);
-    TERM_SEQUENCE(ser);
+    TERM_BIN_LEN(bin, req->actual);
 }
 
 

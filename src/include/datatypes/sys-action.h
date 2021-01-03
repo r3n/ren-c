@@ -155,7 +155,7 @@
 
 
 inline static REBARR *ACT_DETAILS(REBACT *a) {
-    assert(GET_ARRAY_FLAG(&a->details, IS_DETAILS));
+    assert(GET_ARRAY_FLAG(&(a->details), IS_DETAILS));
     return &a->details;
 }
 
@@ -215,11 +215,11 @@ inline static REBARR *ACT_PARAMLIST(REBACT *a) {
 
 inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {
     assert(n != 0 and n < ARR_LEN(ACT_PARAMLIST(a)));
-    return SER_AT(REBVAL, SER(ACT_PARAMLIST(a)), n);
+    return SER_AT(REBVAL, ACT_PARAMLIST(a), n);
 }
 
 #define ACT_NUM_PARAMS(a) \
-    (cast(REBSER*, ACT_PARAMLIST(a))->content.dynamic.used - 1) // dynamic
+    (ACT_PARAMLIST(a)->content.dynamic.used - 1)  // guaranteed dynamic
 
 
 //=//// META OBJECT ///////////////////////////////////////////////////////=//
@@ -245,7 +245,7 @@ inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
 }
 
 inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
-    REBSER *s = SER(ACT_SPECIALTY(a));
+    REBSER *s = ACT_SPECIALTY(a);
     return cast(REBVAL*, s->content.dynamic.data) + 1; // skip archetype/root
 }
 
@@ -254,7 +254,7 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 // REBVAL should be okay.
 //
 #define ACT_PARAMS_HEAD(a) \
-    (cast(REBVAL*, SER(ACT_PARAMLIST(a))->content.dynamic.data) + 1)
+    (cast(REBVAL*, ACT_PARAMLIST(a)->content.dynamic.data) + 1)
 
 inline static REBACT *VAL_ACTION(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION); // so it works on literals
@@ -391,7 +391,7 @@ inline static REBVAL *Voidify_Rootparam(REBARR *paramlist) {
 // more design work on this is needed.
 
 #define ACT_HAS_RETURN(a) \
-    (did (SER(ACT_PARAMLIST(a))->header.bits & PARAMLIST_FLAG_HAS_RETURN))
+    (did (ACT_PARAMLIST(a)->header.bits & PARAMLIST_FLAG_HAS_RETURN))
 
 
 //=//// NATIVE ACTION ACCESS //////////////////////////////////////////////=//

@@ -53,16 +53,15 @@ REBSTR *Make_String_Core(REBSIZ encoded_capacity, REBFLGS flags)
 // Create a string series from the given bytes.
 // Source is always latin-1 valid. Result is always 8bit.
 //
-REBSER *Copy_Bytes(const REBYTE *src, REBINT len)
+REBBIN *Copy_Bytes(const REBYTE *src, REBINT len)
 {
     if (len < 0)
         len = strsize(src);
 
-    REBSER *dst = Make_Binary(len);
-    memcpy(BIN_HEAD(dst), src, len);
-    TERM_SEQUENCE_LEN(dst, len);
-
-    return dst;
+    REBBIN *bin = Make_Binary(len);
+    memcpy(BIN_HEAD(bin), src, len);
+    TERM_BIN_LEN(bin, len);
+    return bin;
 }
 
 
@@ -116,8 +115,8 @@ REBSTR *Append_Codepoint(REBSTR *dst, REBUNI c)
 
     REBSIZ tail = STR_SIZE(dst);
     REBSIZ encoded_size = Encoded_Size_For_Codepoint(c);
-    EXPAND_SERIES_TAIL(SER(dst), encoded_size);
-    Encode_UTF8_Char(BIN_AT(SER(dst), tail), c, encoded_size);
+    EXPAND_SERIES_TAIL(dst, encoded_size);
+    Encode_UTF8_Char(BIN_AT(dst, tail), c, encoded_size);
 
     // "length" grew by 1 codepoint, but "size" grew by 1 to UNI_MAX_ENCODED
     //
@@ -170,10 +169,10 @@ REBSTR *Append_Ascii_Len(REBSTR *dst, const char *ascii, REBLEN len)
     else {
         old_size = STR_SIZE(dst);
         old_len = STR_LEN(dst);
-        EXPAND_SERIES_TAIL(SER(dst), len);
+        EXPAND_SERIES_TAIL(dst, len);
     }
 
-    memcpy(BIN_AT(SER(dst), old_size), ascii, len);
+    memcpy(BIN_AT(dst, old_size), ascii, len);
 
     TERM_STR_LEN_SIZE(dst, old_len + len, old_size + len);
     return dst;
@@ -234,9 +233,9 @@ void Append_String_Limit(REBSTR *dst, REBCEL(const*) src, REBLEN limit)
     REBSIZ old_used = STR_SIZE(dst);
 
     REBLEN tail = STR_SIZE(dst);
-    Expand_Series(SER(dst), tail, size);  // series USED changes too
+    Expand_Series(dst, tail, size);  // series USED changes too
 
-    memcpy(BIN_AT(SER(dst), tail), utf8, size);
+    memcpy(BIN_AT(dst, tail), utf8, size);
     TERM_STR_LEN_SIZE(dst, old_len + len, old_used + size);
 }
 
@@ -341,10 +340,10 @@ REBSTR *Append_UTF8_May_Fail(
     REBLEN old_len = STR_LEN(dst);
     REBSIZ old_size = STR_SIZE(dst);
 
-    EXPAND_SERIES_TAIL(SER(dst), size);
+    EXPAND_SERIES_TAIL(dst, size);
     memcpy(
-        BIN_AT(SER(dst), old_size),
-        BIN_AT(SER(mo->series), mo->offset),
+        BIN_AT(dst, old_size),
+        BIN_AT(mo->series, mo->offset),
         STR_SIZE(mo->series) - mo->offset
     );
 
@@ -374,7 +373,7 @@ REBSTR *Append_UTF8_May_Fail(
 //
 void Join_Binary_In_Byte_Buf(const REBVAL *blk, REBINT limit)
 {
-    REBSER *buf = BYTE_BUF;
+    REBBIN *buf = BYTE_BUF;
 
     REBLEN tail = 0;
 

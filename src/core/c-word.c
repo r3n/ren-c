@@ -262,11 +262,11 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
 
   new_interning: {
 
-    REBSER *s = Make_Series_Core(
+    REBBIN *s = BIN(Make_Series_Core(
         size + 1,  // if small, fits in a REBSER node (w/no data allocation)
         sizeof(REBYTE),
         SERIES_FLAG_IS_STRING | STRING_FLAG_IS_SYMBOL | SERIES_FLAG_FIXED_SIZE
-    );
+    ));
 
     // The incoming string isn't always null terminated, e.g. if you are
     // interning `foo` in `foo: bar + 1` it would be colon-terminated.
@@ -584,8 +584,8 @@ void Startup_Symbols(REBARR *words)
             // Could probably use less than 16 bits, but 8 is insufficient.
             // (length %words.r > 256)
             //
-            assert(SECOND_UINT16(SER(name)->header) == 0);
-            SET_SECOND_UINT16(SER(name)->header, sym);
+            assert(SECOND_UINT16(name->header) == 0);
+            SET_SECOND_UINT16(name->header, sym);
             assert(SAME_SYM_NONZERO(STR_SYMBOL(name), sym));
 
             name = LINK_SYNONYM(name);

@@ -37,10 +37,10 @@ void MF_Comma(REB_MOLD *mo, REBCEL(const*) v, bool form)
     REBSIZ size = STR_SIZE(mo->series);
     if (
         size > mo->offset + 1
-        and *BIN_AT(SER(mo->series), size - 1) == ' '  // not multibyte char
-        and *BIN_AT(SER(mo->series), size - 2) != ','  // also safe compare
+        and *BIN_AT(mo->series, size - 1) == ' '  // not multibyte char
+        and *BIN_AT(mo->series, size - 2) != ','  // also safe compare
     ){
-        *BIN_AT(SER(mo->series), size - 1) = ',';
+        *BIN_AT(mo->series, size - 1) = ',';
     }
     else
         Append_Codepoint(mo->series, ',');

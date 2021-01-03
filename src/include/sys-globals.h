@@ -192,7 +192,7 @@ TVAR REBSER **Prior_Expand; // Track prior series expansions (acceleration)
 TVAR REBSER *TG_Mold_Stack; // Used to prevent infinite loop in cyclical molds
 
 TVAR REBARR *TG_Buf_Collect; // for collecting object keys or words
-TVAR REBSER *TG_Byte_Buf; // temporary byte buffer used mainly by raw print
+TVAR REBBIN *TG_Byte_Buf; // temporary byte buffer used mainly by raw print
 TVAR REBSTR *TG_Mold_Buf; // temporary UTF8 buffer - used mainly by mold
 
 TVAR REBSER *GC_Manuals;    // Manually memory managed (not by GC)

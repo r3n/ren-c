@@ -458,8 +458,8 @@ REBNATIVE(do)
         // Its data stolen, the context's node should now be GC'd when
         // references in other FRAME! value cells have all gone away.
         //
-        assert(GET_SERIES_FLAG(c, MANAGED));
-        assert(GET_SERIES_INFO(c, INACCESSIBLE));
+        assert(GET_SERIES_FLAG(CTX_VARLIST(c), MANAGED));
+        assert(GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE));
 
         Push_Frame(D_OUT, f);
         f->varlist = CTX_VARLIST(stolen);

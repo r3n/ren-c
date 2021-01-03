@@ -178,7 +178,7 @@ static void Queue_Mark_Node_Deep(void *p)
         return;  // it's 2 cells, sizeof(REBSER), but no room for REBSER data
     }
 
-    REBSER *s = SER(p);
+    REBSER *s = SER(cast(REBNOD*, p));
     if (GET_SERIES_INFO(s, INACCESSIBLE)) {
         //
         // !!! All inaccessible nodes should be collapsed and canonized into
@@ -311,7 +311,7 @@ static void Propagate_All_GC_Marks(void)
         // We should have marked this series at queueing time to keep it from
         // being doubly added before the queue had a chance to be processed
          //
-        assert(SER(a)->header.bits & NODE_FLAG_MARKED);
+        assert(a->header.bits & NODE_FLAG_MARKED);
 
         unstable RELVAL *v = ARR_HEAD(a);
         for (; NOT_END(v); ++v) {
@@ -415,7 +415,7 @@ void Reify_Va_To_Array_In_Frame(
         assert(FEED_PENDING(f->feed) == nullptr);
     else {
         assert(NOT_FEED_FLAG(f->feed, TOOK_HOLD));
-        SET_SERIES_INFO(f_array, HOLD);
+        SET_SERIES_INFO(m_cast(REBARR*, f_array), HOLD);
         SET_FEED_FLAG(f->feed, TOOK_HOLD);
     }
 }
@@ -486,7 +486,7 @@ static void Mark_Root_Series(void)
                 if (s->header.bits & NODE_FLAG_MANAGED)
                     continue; // BLOCK! should mark it
 
-                if (GET_ARRAY_FLAG(s, IS_VARLIST))
+                if (GET_ARRAY_FLAG(ARR(s), IS_VARLIST))
                     if (CTX_TYPE(CTX(s)) == REB_FRAME)
                         continue;  // Mark_Frame_Stack_Deep() etc. mark it
 
@@ -500,9 +500,9 @@ static void Mark_Root_Series(void)
                 // Manage and use PUSH_GC_GUARD and DROP_GC_GUARD on them.
                 //
                 assert(
-                    NOT_ARRAY_FLAG(s, IS_VARLIST)
-                    and NOT_ARRAY_FLAG(s, IS_DETAILS)
-                    and NOT_ARRAY_FLAG(s, IS_PAIRLIST)
+                    NOT_ARRAY_FLAG(ARR(s), IS_VARLIST)
+                    and NOT_ARRAY_FLAG(ARR(s), IS_DETAILS)
+                    and NOT_ARRAY_FLAG(ARR(s), IS_PAIRLIST)
                 );
 
                 if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK))
@@ -567,7 +567,7 @@ static void Mark_Symbol_Series(void)
     assert(IS_POINTER_TRASH_DEBUG(*canon)); // SYM_0 for all non-builtin words
     ++canon;
     for (; *canon != nullptr; ++canon)
-        SER(*canon)->header.bits |= NODE_FLAG_MARKED;
+        (*canon)->header.bits |= NODE_FLAG_MARKED;
 
     ASSERT_NO_GC_MARKS_PENDING(); // doesn't ues any queueing
 }
@@ -1038,8 +1038,8 @@ REBLEN Recycle_Core(bool shutdown, REBSER *sweeplist)
     //
     while (TG_Reuse) {
         REBARR *varlist = TG_Reuse;
-        TG_Reuse = LINK(TG_Reuse).reuse;
-        GC_Kill_Series(SER(varlist)); // no track for Free_Unmanaged_Series()
+        TG_Reuse = ARR(LINK(TG_Reuse).reuse);
+        GC_Kill_Series(varlist); // no track for Free_Unmanaged_Series()
     }
 
     // MARKING PHASE: the "root set" from which we determine the liveness
@@ -1248,7 +1248,7 @@ static void Mark_Devices_Deep(void)
         if (not dev->pending)
             continue;
 
-        REBSER *req = SER(dev->pending);
+        REBSER *req = dev->pending;
 
         // This used to walk the ->next field of the REBREQ explicitly, and
         // mark the port pointers internal to the REBREQ.  Following the

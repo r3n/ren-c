@@ -38,6 +38,16 @@
 //   like `as text! as binary! make bitset! [...]`)
 
 
+#ifdef __cplusplus  // !!! Make fancier checks, as with SER() and ARR()
+    inline static REBBIN *BIN(void *p)
+        { return reinterpret_cast<REBBIN*>(p); }
+    inline static const REBBIN *BIN(const void *p)
+        { return reinterpret_cast<const REBBIN*>(p); }
+#else
+    #define BIN(p) cast(REBBIN*, (p))
+#endif
+
+
 //=//// BINARY! SERIES ////////////////////////////////////////////////////=//
 
 inline static REBYTE *BIN_AT(const_if_c REBBIN *bin, REBLEN n)
@@ -71,12 +81,12 @@ inline static REBLEN BIN_LEN(const REBBIN *s) {
     return SER_USED(s);
 }
 
-inline static void TERM_BIN(REBSER *s) {
+inline static void TERM_BIN(REBBIN *s) {
     assert(SER_WIDE(s) == 1);
     BIN_HEAD(s)[SER_USED(s)] = 0;
 }
 
-inline static void TERM_BIN_LEN(REBSER *s, REBLEN len) {
+inline static void TERM_BIN_LEN(REBBIN *s, REBLEN len) {
     assert(SER_WIDE(s) == 1);
     SET_SERIES_USED(s, len);
     BIN_HEAD(s)[len] = 0;
@@ -88,11 +98,11 @@ inline static void TERM_BIN_LEN(REBSER *s, REBLEN len) {
 // as UTF-8 data later, e.g. `as word! binary`, since it would be too late
 // to give them that capacity after-the-fact to enable this.
 //
-inline static REBSER *Make_Binary_Core(REBLEN capacity, REBFLGS flags)
+inline static REBBIN *Make_Binary_Core(REBLEN capacity, REBFLGS flags)
 {
     REBSER *bin = Make_Series_Core(capacity + 1, sizeof(REBYTE), flags);
     TERM_SEQUENCE(bin);
-    return bin;
+    return BIN(bin);
 }
 
 #define Make_Binary(capacity) \
@@ -103,7 +113,7 @@ inline static REBSER *Make_Binary_Core(REBLEN capacity, REBFLGS flags)
 
 inline static const REBBIN *VAL_BINARY(unstable REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_BINARY);
-    return VAL_SERIES(v);
+    return BIN(VAL_SERIES(v));
 }
 
 #define VAL_BINARY_ENSURE_MUTABLE(v) \

@@ -109,7 +109,7 @@ REB_R MAKE_Word(
     }
 
     if (ANY_STRING(arg)) {
-        if (Is_Series_Frozen(SER(VAL_STRING(arg))))
+        if (Is_Series_Frozen(VAL_STRING(arg)))
             goto as_word;  // just reuse AS mechanics on frozen strings
 
         // Otherwise, we'll have to copy the data for a TO conversion

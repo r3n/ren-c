@@ -536,12 +536,12 @@ void Mold_Uni_Char(REB_MOLD *mo, REBUNI c, bool parened)
         if (parened or c == 0x1E or c == 0xFEFF) {
             REBLEN len_old = STR_LEN(buf);
             REBSIZ size_old = STR_SIZE(buf);
-            EXPAND_SERIES_TAIL(SER(buf), 7);  // worst case: ^(1234)
+            EXPAND_SERIES_TAIL(buf, 7);  // worst case: ^(1234)
             TERM_STR_LEN_SIZE(buf, len_old, size_old);
 
             Append_Ascii(buf, "^(");
 
-            REBYTE *bp = BIN_TAIL(SER(buf));
+            REBYTE *bp = BIN_TAIL(buf);
             REBYTE *ep = Form_Uni_Hex(bp, c); // !!! Make a mold...
             TERM_STR_LEN_SIZE(
                 buf,
@@ -849,7 +849,7 @@ REBTYPE(String)
         REBSIZ offset = VAL_OFFSET_FOR_INDEX(v, index);
         REBSIZ size_old = STR_SIZE(s);
 
-        Remove_Series_Units(SER(s), offset, size);  // should keep terminator
+        Remove_Series_Units(s, offset, size);  // should keep terminator
         Free_Bookmarks_Maybe_Null(s);
         SET_STR_LEN_SIZE(s, tail - len, size_old - size);  // no term needed
 
@@ -1012,7 +1012,7 @@ REBTYPE(String)
         // the head of the series).  One of many behaviors worth reviewing.
         //
         if (index == 0 and IS_SER_DYNAMIC(s))
-            Unbias_Series(SER(s), false);
+            Unbias_Series(s, false);
 
         Free_Bookmarks_Maybe_Null(s);  // review!
         REBSIZ offset = VAL_OFFSET_FOR_INDEX(v, index);

@@ -457,7 +457,7 @@ bool Make_Vector_Spec(
         fail ("Too many arguments in MAKE VECTOR! block");
 
     REBLEN num_bytes = len * (bitsize / 8);
-    REBSER *bin = Make_Binary(num_bytes);
+    REBBIN *bin = Make_Binary(num_bytes);
     CLEAR(BIN_HEAD(bin), num_bytes);  // !!! 0 bytes -> 0 int/float?
     SET_SERIES_LEN(bin, num_bytes);
     TERM_SERIES(bin);
@@ -504,10 +504,9 @@ REB_R MAKE_Vector(
 
         REBYTE bitsize = 32;
         REBLEN num_bytes = (len * bitsize) / 8;
-        REBSER *bin = Make_Binary(num_bytes);
+        REBBIN *bin = Make_Binary(num_bytes);
         CLEAR(BIN_HEAD(bin), num_bytes);
-        SET_SERIES_LEN(bin, num_bytes);
-        TERM_SERIES(bin);
+        TERM_BIN_LEN(bin, num_bytes);
 
         const bool sign = true;
         const bool integral = true;
@@ -648,10 +647,10 @@ REBTYPE(Vector)
         if (REF(part) or REF(deep) or REF(types))
             fail (Error_Bad_Refines_Raw());
 
-        REBBIN *bin = Copy_Series_Core(
+        REBBIN *bin = BIN(Copy_Series_Core(
             VAL_BINARY(VAL_VECTOR_BINARY(v)),
             NODE_FLAG_MANAGED
-        );
+        ));
 
         return Init_Vector(
             D_OUT,

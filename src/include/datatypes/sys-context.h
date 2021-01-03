@@ -135,7 +135,7 @@
 //
 
 inline static const REBVAL *CTX_ARCHETYPE(const REBCTX *c) {  // read-only
-    const REBSER *varlist = SER(CTX_VARLIST(c));
+    const REBSER *varlist = CTX_VARLIST(c);
     if (not IS_SER_DYNAMIC(varlist)) {  // a freed stub, variables are gone
         assert(GET_SERIES_INFO(varlist, INACCESSIBLE));
         return cast(const REBVAL*, &varlist->content.fixed);
@@ -215,9 +215,13 @@ inline static void INIT_VAL_CONTEXT_VARLIST(RELVAL *v, REBARR *varlist)
 //
 
 inline static REBARR *CTX_KEYLIST(REBCTX *c) {
-    if (Is_Node_Cell(LINK_KEYSOURCE(c)))  // running frame, source is REBFRM*
-        return ACT_PARAMLIST(CTX_FRAME_ACTION(c));  // use action's paramlist
-    return ARR(LINK_KEYSOURCE(c)); // not a REBFRM, so use keylist
+    if (Is_Node_Cell(LINK_KEYSOURCE(CTX_VARLIST(c)))) {
+        //
+        // running frame, source is REBFRM*, so use action's paramlist.
+        //
+        return ACT_PARAMLIST(CTX_FRAME_ACTION(c));
+    }
+    return ARR(LINK_KEYSOURCE(CTX_VARLIST(c)));  // not a REBFRM, use keylist
 }
 
 static inline void INIT_CTX_KEYLIST_SHARED(REBCTX *c, REBARR *keylist) {
@@ -247,20 +251,20 @@ static inline void INIT_CTX_KEYLIST_UNIQUE(REBCTX *c, REBARR *keylist) {
 //
 
 inline static REBLEN CTX_LEN(REBCTX *c) {
-    return cast(REBSER*, (c))->content.dynamic.used - 1;  // -1 for archetype
+    return CTX_VARLIST(c)->content.dynamic.used - 1;  // -1 for archetype
 }
 
 #define CTX_ROOTKEY(c) \
-    cast(REBVAL*, SER(CTX_KEYLIST(c))->content.dynamic.data)  // never fixed
+    cast(REBVAL*, CTX_KEYLIST(c)->content.dynamic.data)  // never fixed
 
 #define CTX_TYPE(c) \
     VAL_TYPE(CTX_ARCHETYPE(c))
 
 #define CTX_KEYS_HEAD(c) \
-    SER_AT(REBVAL, SER(CTX_KEYLIST(c)), 1)  // 1-based, no RELVAL*
+    SER_AT(REBVAL, CTX_KEYLIST(c), 1)  // 1-based, no RELVAL*
 
 #define CTX_VARS_HEAD(c) \
-    SER_AT(REBVAL, SER(CTX_VARLIST(c)), 1)
+    SER_AT(REBVAL, CTX_VARLIST(c), 1)
 
 inline static REBVAL *CTX_KEY(REBCTX *c, REBLEN n) {
     //
@@ -271,11 +275,11 @@ inline static REBVAL *CTX_KEY(REBCTX *c, REBLEN n) {
     /* assert(NOT_SERIES_INFO(c, INACCESSIBLE)); */
 
     assert(n != 0 and n <= CTX_LEN(c));
-    return cast(REBVAL*, SER(CTX_KEYLIST(c))->content.dynamic.data) + n;
+    return cast(REBVAL*, CTX_KEYLIST(c)->content.dynamic.data) + n;
 }
 
 inline static REBVAL *CTX_VAR(REBCTX *c, REBLEN n) {  // 1-based, no RELVAL*
-    assert(NOT_SERIES_INFO(c, INACCESSIBLE));
+    assert(NOT_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE));
     assert(n != 0 and n <= CTX_LEN(c));
     return cast(REBVAL*, cast(REBSER*, c)->content.dynamic.data) + n;
 }
@@ -295,11 +299,11 @@ inline static REBVAL *CTX_VAR(REBCTX *c, REBLEN n) {  // 1-based, no RELVAL*
 
 inline static bool Is_Frame_On_Stack(REBCTX *c) {
     assert(IS_FRAME(CTX_ARCHETYPE(c)));
-    return Is_Node_Cell(LINK_KEYSOURCE(c));
+    return Is_Node_Cell(LINK_KEYSOURCE(CTX_VARLIST(c)));
 }
 
 inline static REBFRM *CTX_FRAME_IF_ON_STACK(REBCTX *c) {
-    REBNOD *keysource = LINK_KEYSOURCE(c);
+    REBNOD *keysource = LINK_KEYSOURCE(CTX_VARLIST(c));
     if (not Is_Node_Cell(keysource))
         return nullptr; // e.g. came from MAKE FRAME! or Encloser_Dispatcher
 
@@ -319,7 +323,7 @@ inline static REBFRM *CTX_FRAME_MAY_FAIL(REBCTX *c) {
 }
 
 inline static void FAIL_IF_INACCESSIBLE_CTX(REBCTX *c) {
-    if (GET_SERIES_INFO(c, INACCESSIBLE)) {
+    if (GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE)) {
         if (CTX_TYPE(c) == REB_FRAME)
             fail (Error_Expired_Frame_Raw()); // !!! different error?
         fail (Error_Series_Data_Freed_Raw());
@@ -609,7 +613,7 @@ inline static bool Is_Native_Port_Actor(const REBVAL *actor) {
 // instead of needing to push a redundant run of stack-based memory cells.
 //
 inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
-    REBSER *stub = SER(c);
+    REBSER *stub = CTX_VARLIST(c);
 
     // Rather than memcpy() and touch up the header and info to remove
     // SERIES_INFO_HOLD from DETAILS_FLAG_IS_NATIVE, or NODE_FLAG_MANAGED,

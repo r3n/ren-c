@@ -366,7 +366,7 @@ void Mold_File_To_Local(REB_MOLD *mo, const RELVAL *file, REBFLGS flags) {
             REBLEN n = STR_SIZE(mo->series);
             if (
                 n > mo->offset
-                and *BIN_AT(SER(mo->series), n - 1) == OS_DIR_SEP
+                and *BIN_AT(mo->series, n - 1) == OS_DIR_SEP
             ){
                 // Collapse multiple sequential slashes into just one, by
                 // skipping to the next character without adding to mold.
@@ -402,7 +402,7 @@ void Mold_File_To_Local(REB_MOLD *mo, const RELVAL *file, REBFLGS flags) {
     //
     if (flags & REB_FILETOLOCAL_NO_TAIL_SLASH) {
         REBSIZ n = STR_SIZE(mo->series);
-        if (n > mo->offset and *BIN_AT(SER(mo->series), n - 1) == OS_DIR_SEP)
+        if (n > mo->offset and *BIN_AT(mo->series, n - 1) == OS_DIR_SEP)
             TERM_STR_LEN_SIZE(mo->series, STR_LEN(mo->series) - 1, n - 1);
     }
 

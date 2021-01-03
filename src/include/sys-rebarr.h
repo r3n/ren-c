@@ -35,9 +35,12 @@
 //   number uses that bit.
 //
 
-struct Reb_Array {
-    struct Reb_Series series;  // http://stackoverflow.com/a/9747062
-};
+#if defined(DEBUG_CHECK_CASTS)
+    inline static REBARR *ensure_array(REBARR *a) { return a; }
+    inline static const REBARR *ensure_array(const REBARR *a) { return a; }
+#else
+    #define ensure_array(a) (a)
+#endif
 
 
 // If a series is an array, then there are 16 free bits available for use
@@ -157,17 +160,17 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 // These token-pasting based macros allow the callsites to be shorter, since
 // they don't have to say ARRAY and FLAG twice.
 
-#define SET_ARRAY_FLAG(s,name) \
-    (cast(REBSER*, ARR(s))->header.bits |= ARRAY_FLAG_##name)
+#define SET_ARRAY_FLAG(a,name) \
+    (ensure_array(a)->header.bits |= ARRAY_FLAG_##name)
 
-#define GET_ARRAY_FLAG(s,name) \
-    ((cast(const REBSER*, ARR(s))->header.bits & ARRAY_FLAG_##name) != 0)
+#define GET_ARRAY_FLAG(a,name) \
+    ((ensure_array(a)->header.bits & ARRAY_FLAG_##name) != 0)
 
-#define CLEAR_ARRAY_FLAG(s,name) \
-    (cast(REBSER*, ARR(s))->header.bits &= ~ARRAY_FLAG_##name)
+#define CLEAR_ARRAY_FLAG(a,name) \
+    (ensure_array(a)->header.bits &= ~ARRAY_FLAG_##name)
 
-#define NOT_ARRAY_FLAG(s,name) \
-    ((cast(const REBSER*, ARR(s))->header.bits & ARRAY_FLAG_##name) == 0)
+#define NOT_ARRAY_FLAG(a,name) \
+    ((ensure_array(a)->header.bits & ARRAY_FLAG_##name) == 0)
 
 
 // Ordinary source arrays use their ->link field to point to an interned file
@@ -196,16 +199,11 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
         >::type
     >
     inline A *ARR(T *p) {
-        constexpr bool derived = std::is_same<T0, REBARR>::value;
-
         constexpr bool base = std::is_same<T0, void>::value
             or std::is_same<T0, REBNOD>::value
             or std::is_same<T0, REBSER>::value;
 
-        static_assert(
-            derived or base,
-            "ARR works on void/REBNOD/REBSER/REBARR"
-        );
+        static_assert(base, "ARR works on void/REBNOD/REBSER");
 
         bool b = base;  // needed to avoid compiler constexpr warning
         if (b and p and (reinterpret_cast<const REBSER*>(p)->header.bits & (

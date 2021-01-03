@@ -244,10 +244,10 @@ REBNATIVE(hijack)
         // would need to restore the *exact* capacity.  Review.
 
         REBLEN details_len = ARR_LEN(hijacker_details);
-        if (SER_REST(SER(victim_details)) < details_len + 1)
+        if (SER_REST(victim_details) < details_len + 1)
             EXPAND_SERIES_TAIL(
-                SER(victim_details),
-                details_len + 1 - SER_REST(SER(victim_details))
+                victim_details,
+                details_len + 1 - SER_REST(victim_details)
             );
 
         unstable RELVAL *src = ARR_HEAD(hijacker_details) + 1;

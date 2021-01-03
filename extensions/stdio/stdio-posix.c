@@ -202,7 +202,7 @@ DEVICE_CMD Read_IO(REBREQ *io)
     assert(VAL_INDEX(req->common.binary) == 0);
     assert(VAL_LEN_AT(req->common.binary) == 0);
 
-    REBSER *bin = VAL_BINARY_ENSURE_MUTABLE(req->common.binary);
+    REBBIN *bin = VAL_BINARY_ENSURE_MUTABLE(req->common.binary);
     assert(SER_AVAIL(bin) >= req->length);
 
     // Null redirection (should be handled at PORT! level to not ask for read)

@@ -149,14 +149,14 @@ void *RL_rebMalloc(size_t size)
 {
     ENTER_API;
 
-    REBSER *s = Make_Series_Core(
+    REBBIN *s = BIN(Make_Series_Core(
         ALIGN_SIZE  // stores REBSER* (must be at least big enough for void*)
             + size  // for the actual data capacity (may be 0, see notes)
             + 1,  // for termination (AS TEXT! of rebRepossess(), see notes)
         sizeof(REBYTE),  // rebRepossess() only creates binary series ATM
         SERIES_FLAG_DONT_RELOCATE  // direct data pointer is being handed back
             | SERIES_FLAG_ALWAYS_DYNAMIC  // rebRepossess() needs bias field
-    );
+    ));
 
     REBYTE *ptr = BIN_HEAD(s) + ALIGN_SIZE;
 
@@ -208,10 +208,10 @@ void *RL_rebRealloc(void *ptr, size_t new_size)
     if (not ptr)  // C realloc() accepts null
         return rebMalloc(new_size);
 
-    REBSER **ps = cast(REBSER**, ptr) - 1;
-    UNPOISON_MEMORY(ps, sizeof(REBSER*));  // need to underrun to fetch `s`
+    REBBIN **ps = cast(REBBIN**, ptr) - 1;
+    UNPOISON_MEMORY(ps, sizeof(REBBIN*));  // need to underrun to fetch `s`
 
-    REBSER *s = *ps;
+    REBBIN *s = *ps;
 
     REBLEN old_size = BIN_LEN(s) - ALIGN_SIZE;
 
@@ -239,10 +239,10 @@ void RL_rebFree(void *ptr)
     if (not ptr)
         return;
 
-    REBSER **ps = cast(REBSER**, ptr) - 1;
-    UNPOISON_MEMORY(ps, sizeof(REBSER*));  // need to underrun to fetch `s`
+    REBBIN **ps = cast(REBBIN**, ptr) - 1;
+    UNPOISON_MEMORY(ps, sizeof(REBBIN*));  // need to underrun to fetch `s`
 
-    REBSER *s = *ps;
+    REBBIN *s = *ps;
     if (s->header.bits & NODE_FLAG_CELL) {
         rebJumps(
             "PANIC [",
@@ -287,10 +287,10 @@ REBVAL *RL_rebRepossess(void *ptr, size_t size)
 {
     ENTER_API;
 
-    REBSER **ps = cast(REBSER**, ptr) - 1;
-    UNPOISON_MEMORY(ps, sizeof(REBSER*));  // need to underrun to fetch `s`
+    REBBIN **ps = cast(REBBIN**, ptr) - 1;
+    UNPOISON_MEMORY(ps, sizeof(REBBIN*));  // need to underrun to fetch `s`
 
-    REBSER *s = *ps;
+    REBBIN *s = *ps;
     assert(NOT_SERIES_FLAG(s, MANAGED));
 
     if (size > BIN_LEN(s) - ALIGN_SIZE)
@@ -545,7 +545,7 @@ REBVAL *RL_rebSizedBinary(const void *bytes, size_t size)
 {
     ENTER_API;
 
-    REBSER *bin = Make_Binary(size);
+    REBBIN *bin = Make_Binary(size);
     memcpy(BIN_HEAD(bin), bytes, size);
     TERM_BIN_LEN(bin, size);
 
@@ -576,7 +576,7 @@ REBVAL *RL_rebUninitializedBinary_internal(size_t size)
 {
     ENTER_API;
 
-    REBSER *bin = Make_Binary(size);
+    REBBIN *bin = Make_Binary(size);
 
     // !!! Caution, unfilled bytes, access or molding may be *worse* than
     // random by the rules of C if they don't get written!  Must be filled

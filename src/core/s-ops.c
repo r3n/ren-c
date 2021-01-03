@@ -128,7 +128,7 @@ void Trim_Tail(REB_MOLD *mo, REBYTE ascii)
     REBSIZ size = STR_SIZE(mo->series);
 
     for (; size > 0; --size, --len) {
-        REBYTE b = *BIN_AT(SER(mo->series), size - 1);
+        REBYTE b = *BIN_AT(mo->series, size - 1);
         if (b != ascii)
             break;
     }

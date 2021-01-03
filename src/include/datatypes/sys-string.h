@@ -358,9 +358,6 @@
 
 //=//// REBSTR SERIES FOR UTF8 STRINGS ////////////////////////////////////=//
 
-struct Reb_String {
-    struct Reb_Series series;  // http://stackoverflow.com/a/9747062
-};
 
 #if !defined(DEBUG_CHECK_CASTS)
 
@@ -370,10 +367,10 @@ struct Reb_String {
 #else  // !!! Enhance with more checks, like SER() does.
 
     inline static REBSTR *STR(void *p)
-      { return cast(REBSTR*, SER(p)); }
+      { return cast(REBSTR*, p); }
 
     inline static const REBSTR *STR(const void *p)
-      { return cast(const REBSTR*, SER(p)); }
+      { return cast(const REBSTR*, p); }
 
 #endif
 
@@ -393,7 +390,7 @@ inline static bool IS_SER_STRING(const REBSER *s) {
 // canon spelling form...as well as hold binding information.
 //
 #define IS_STR_SYMBOL(s) \
-    (SER(s)->header.bits & STRING_FLAG_IS_SYMBOL)
+    ((s)->header.bits & STRING_FLAG_IS_SYMBOL)
 
 
 //=//// STRING ALL-ASCII FLAG /////////////////////////////////////////////=//
@@ -420,17 +417,17 @@ inline static bool Is_String_Definitely_ASCII(const REBSTR *str) {
 }
 
 inline static const char *STR_UTF8(const REBSTR *s)
-  { return cast(const char*, BIN_HEAD(SER(s))); }
+  { return cast(const char*, BIN_HEAD(s)); }
 
 inline static size_t STR_SIZE(const REBSTR *s)  // e.g. encoded UTF-8 size
-  { return SER_USED(SER(s)); }
+  { return SER_USED(s); }
 
 
 inline static REBCHR(*) STR_HEAD(const_if_c REBSTR *s)
-  { return cast(REBCHR(*), SER_HEAD(REBYTE, SER(s))); }
+  { return cast(REBCHR(*), SER_HEAD(REBYTE, s)); }
 
 inline static REBCHR(*) STR_TAIL(const_if_c REBSTR *s)
-  { return cast(REBCHR(*), SER_TAIL(REBYTE, SER(s))); }
+  { return cast(REBCHR(*), SER_TAIL(REBYTE, s)); }
 
 #ifdef __cplusplus
     inline static REBCHR(const*) STR_HEAD(const REBSTR *s)
@@ -472,7 +469,7 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
 
     // The position `offset` describes must be a codepoint boundary.
     //
-    assert(not Is_Continuation_Byte_If_Utf8(*BIN_AT(SER(s), offset)));
+    assert(not Is_Continuation_Byte_If_Utf8(*BIN_AT(s, offset)));
 
     if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
       #if defined(DEBUG_UTF8_EVERYWHERE)
@@ -488,7 +485,7 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
     // they're not too long (since spaces and newlines are illegal.)
     //
     REBLEN index = 0;
-    REBCHR(const*) ep = cast(REBCHR(const*), BIN_AT(SER(s), offset));
+    REBCHR(const*) ep = cast(REBCHR(const*), BIN_AT(s, offset));
     REBCHR(const*) cp = STR_HEAD(s);
     while (cp != ep) {
         cp = NEXT_STR(cp);
@@ -500,13 +497,13 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
 inline static void SET_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
     assert(not IS_STR_SYMBOL(s));
 
-    SET_SERIES_USED(SER(s), used);
+    SET_SERIES_USED(s, used);
     MISC(s).length = len;
 }
 
 inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
     SET_STR_LEN_SIZE(s, len, used);
-    TERM_SEQUENCE(SER(s));
+    TERM_SEQUENCE(s);
 }
 
 
@@ -548,7 +545,7 @@ inline static REBBMK* Alloc_Bookmark(void) {
 inline static void Free_Bookmarks_Maybe_Null(REBSTR *str) {
     assert(not IS_STR_SYMBOL(str));  // call on string
     if (LINK(str).bookmarks) {
-        GC_Kill_Series(SER(LINK(str).bookmarks));
+        GC_Kill_Series(LINK(str).bookmarks);
         LINK(str).bookmarks = nullptr;
     }
 }
@@ -567,7 +564,7 @@ inline static void Free_Bookmarks_Maybe_Null(REBSTR *str) {
         for (i = 0; i != index; ++i)
             cp = NEXT_STR(cp);
 
-        REBSIZ actual = cast(REBYTE*, cp) - SER_DATA(SER(s));
+        REBSIZ actual = cast(REBYTE*, cp) - SER_DATA(s);
         assert(actual == offset);
     }
 #endif
@@ -629,7 +626,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
             goto scan_from_head;  // good locality, avoid bookmark logic
         }
         if (not bookmark and not IS_STR_SYMBOL(s)) {
-            LINK(s).bookmarks = bookmark = Alloc_Bookmark();
+            LINK(m_cast(REBSTR*, s)).bookmarks = bookmark = Alloc_Bookmark();
             goto scan_from_head;  // will fill in bookmark
         }
     }
@@ -643,7 +640,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
             goto scan_from_tail;  // good locality, avoid bookmark logic
         }
         if (not bookmark and not IS_STR_SYMBOL(s)) {
-            LINK(s).bookmarks = bookmark = Alloc_Bookmark();
+            LINK(m_cast(REBSTR*, s)).bookmarks = bookmark = Alloc_Bookmark();
             goto scan_from_tail;  // will fill in bookmark
         }
     }
@@ -678,7 +675,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     }
 
     index = booked;
-    cp = cast(REBCHR(*), SER_DATA(SER(s)) + BMK_OFFSET(bookmark)); }
+    cp = cast(REBCHR(*), SER_DATA(s) + BMK_OFFSET(bookmark)); }
 
     if (index > at) {
       #ifdef DEBUG_TRACE_BOOKMARKS
@@ -930,10 +927,10 @@ inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
                 STR_TAIL(s) - old_next_cp
             );
 
-            SET_SERIES_USED(SER(s), SER_USED(SER(s)) + delta);
+            SET_SERIES_USED(s, SER_USED(s) + delta);
         }
         else {
-            EXPAND_SERIES_TAIL(SER(s), delta);  // this adds to SERIES_USED
+            EXPAND_SERIES_TAIL(s, delta);  // this adds to SERIES_USED
             cp = cast(REBCHR(*),  // refresh `cp` (may've reallocated!)
                 cast(REBYTE*, STR_HEAD(s)) + cp_offset
             );
@@ -957,11 +954,11 @@ inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
     }
 
   #ifdef DEBUG_UTF8_EVERYWHERE  // see note on `len` at start of function
-    MISC(SER(s)).length = len;
+    MISC(s).length = len;
   #endif
 
     Encode_UTF8_Char(cp, c, size);
-    ASSERT_SERIES_TERM(SER(s));
+    ASSERT_SERIES_TERM(s);
 }
 
 inline static REBLEN Num_Codepoints_For_Bytes(
@@ -1004,7 +1001,7 @@ inline static REBVAL *Init_Any_String_At(
         const REBSTR *str,
         REBLEN index
     ){
-        return Init_Any_Series_At_Core(out, kind, SER(str), index, UNBOUND);
+        return Init_Any_Series_At_Core(out, kind, str, index, UNBOUND);
     }
 
   #ifdef DEBUG_UNSTABLE_CELLS

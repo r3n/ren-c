@@ -166,7 +166,7 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         if (!IS_BINARY(data))
             Init_Binary(data, Make_Binary(32000));
 
-        REBSER *ser = VAL_SERIES_KNOWN_MUTABLE(data);
+        REBBIN *ser = VAL_BINARY_KNOWN_MUTABLE(data);
         req->length = SER_AVAIL(ser); // space available
         if (req->length < 32000 / 2)
             Extend_Series(ser, 32000);

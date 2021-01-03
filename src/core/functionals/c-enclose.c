@@ -108,7 +108,7 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     // allocated through the usual mechanisms, so if unmanaged it's not in
     // the tracking list Init_Any_Context() expects.  Just fiddle the bit.
     //
-    SET_SERIES_FLAG(c, MANAGED);
+    SET_SERIES_FLAG(CTX_VARLIST(c), MANAGED);
 
     // When the DO of the FRAME! executes, we don't want it to run the
     // encloser again (infinite loop).

@@ -68,11 +68,10 @@ REBINT CT_Binary(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 ***********************************************************************/
 
 
-static REBSER *Make_Binary_BE64(const REBVAL *arg)
+static REBBIN *Make_Binary_BE64(const REBVAL *arg)
 {
-    REBSER *ser = Make_Binary(8);
-
-    REBYTE *bp = BIN_HEAD(ser);
+    REBBIN *bin = Make_Binary(8);
+    REBYTE *bp = BIN_HEAD(bin);
 
     REBI64 i;
     REBDEC d;
@@ -88,20 +87,24 @@ static REBSER *Make_Binary_BE64(const REBVAL *arg)
         cp = cast(const REBYTE*, &d);
     }
 
-#ifdef ENDIAN_LITTLE
+  #ifdef ENDIAN_LITTLE
+  blockscope {
     REBLEN n;
     for (n = 0; n < 8; ++n)
         bp[n] = cp[7 - n];
-#elif defined(ENDIAN_BIG)
+  }
+  #elif defined(ENDIAN_BIG)
+  blockscope {
     REBLEN n;
     for (n = 0; n < 8; ++n)
         bp[n] = cp[n];
-#else
+  }
+  #else
     #error "Unsupported CPU endian"
-#endif
+  #endif
 
-    TERM_BIN_LEN(ser, 8);
-    return ser;
+    TERM_BIN_LEN(bin, 8);
+    return bin;
 }
 
 
@@ -118,7 +121,7 @@ static REBSER *Make_Binary_BE64(const REBVAL *arg)
 // Note also the existence of AS and storing strings as UTF-8 should reduce
 // copying, e.g. `as binary! some-string` will be cheaper than TO or MAKE.
 //
-static REBSER *MAKE_TO_Binary_Common(const REBVAL *arg)
+static REBBIN *MAKE_TO_Binary_Common(const REBVAL *arg)
 {
     switch (VAL_TYPE(arg)) {
     case REB_BINARY: {
@@ -135,14 +138,14 @@ static REBSER *MAKE_TO_Binary_Common(const REBVAL *arg)
         REBSIZ utf8_size;
         REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, arg);
 
-        REBSER *bin = Make_Binary(utf8_size);
+        REBBIN *bin = Make_Binary(utf8_size);
         memcpy(BIN_HEAD(bin), utf8, utf8_size);
         TERM_BIN_LEN(bin, utf8_size);
         return bin; }
 
     case REB_BLOCK:
         Join_Binary_In_Byte_Buf(arg, -1);
-        return Copy_Series_Core(BYTE_BUF, SERIES_FLAGS_NONE);
+        return BIN(Copy_Series_Core(BYTE_BUF, SERIES_FLAGS_NONE));
 
     case REB_TUPLE: {
         REBLEN len = VAL_SEQUENCE_LEN(arg);
@@ -157,7 +160,7 @@ static REBSER *MAKE_TO_Binary_Common(const REBVAL *arg)
         return Copy_Bytes(BIN_HEAD(VAL_BINARY(arg)), VAL_LEN_HEAD(arg));
 
     case REB_MONEY: {
-        REBSER *bin = Make_Binary(12);
+        REBBIN *bin = Make_Binary(12);
         deci_to_binary(BIN_HEAD(bin), VAL_MONEY_AMOUNT(arg));
         TERM_SEQUENCE_LEN(bin, 12);
         return bin; }
@@ -487,14 +490,14 @@ REBTYPE(Binary)
         if (sym == SYM_FIND) {
             if (REF(tail) or REF(match))
                 ret += size;
-            return Init_Any_Series_At(D_OUT, REB_BINARY, VAL_SERIES(v), ret);
+            return Init_Any_Series_At(D_OUT, REB_BINARY, VAL_BINARY(v), ret);
         }
 
         ret++;
         if (ret >= cast(REBLEN, tail))
             return nullptr;
 
-        return Init_Integer(D_OUT, *BIN_AT(VAL_SERIES(v), ret)); }
+        return Init_Integer(D_OUT, *BIN_AT(VAL_BINARY(v), ret)); }
 
       case SYM_TAKE: {
         INCLUDE_PARAMS_OF_TAKE;
@@ -601,8 +604,8 @@ REBTYPE(Binary)
         REBSIZ smaller = MIN(t0, t1);  // smaller array size
         REBSIZ larger = MAX(t0, t1);
 
-        REBSER *series = Make_Binary(larger);
-        TERM_SEQUENCE_LEN(series, larger);
+        REBBIN *series = Make_Binary(larger);
+        TERM_BIN_LEN(series, larger);
 
         REBYTE *dest = BIN_HEAD(series);
 

@@ -65,11 +65,11 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
         IS_BINDABLE_KIND(heart)
         and (binding = EXTRA(Binding, v).node)
         and not (binding->header.bits & SERIES_FLAG_IS_STRING)
-        and NOT_SERIES_INFO(binding, INACCESSIBLE)
+        and NOT_SERIES_INFO(SER(binding), INACCESSIBLE)
     ){
-        assert(IS_SER_ARRAY(binding));
+        assert(IS_SER_ARRAY(SER(binding)));
         if (
-            GET_ARRAY_FLAG(binding, IS_VARLIST)
+            GET_ARRAY_FLAG(ARR(binding), IS_VARLIST)
             and (CTX_TYPE(CTX(binding)) == REB_FRAME)
         ){
             if (
@@ -78,10 +78,10 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
             ){
                 panic (binding);
             }
-            REBNOD *keysource = LINK_KEYSOURCE(binding);
+            REBNOD *keysource = LINK_KEYSOURCE(ARR(binding));
             if (
                 not Is_Node_Cell(keysource)
-                and GET_ARRAY_FLAG(keysource, IS_DETAILS)
+                and GET_ARRAY_FLAG(ARR(keysource), IS_DETAILS)
             ){
                 if (
                     (keysource->header.bits & SERIES_MASK_PARAMLIST)
@@ -89,7 +89,7 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
                 ){
                     panic (binding);
                 }
-                if (NOT_SERIES_FLAG(keysource, MANAGED))
+                if (NOT_SERIES_FLAG(SER(keysource), MANAGED))
                     panic (keysource);
             }
         }
@@ -156,7 +156,7 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         const REBMAP* map = VAL_MAP(v);
         assert(Is_Marked(map));
-        assert(IS_SER_ARRAY(map));
+        assert(IS_SER_ARRAY(MAP_PAIRLIST(map)));
         break; }
 
       case REB_HANDLE: { // See %sys-handle.h
@@ -200,7 +200,7 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
 
       case REB_BINARY: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBBIN *s = SER(PAYLOAD(Any, v).first.node);
+        REBBIN *s = BIN(PAYLOAD(Any, v).first.node);
         if (GET_SERIES_INFO(s, INACCESSIBLE))
             break;
 
@@ -215,7 +215,7 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
       case REB_URL:
       case REB_TAG: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        if (GET_SERIES_INFO(PAYLOAD(Any, v).first.node, INACCESSIBLE))
+        if (GET_SERIES_INFO(STR(PAYLOAD(Any, v).first.node), INACCESSIBLE))
             break;
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
@@ -247,7 +247,7 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
       case REB_ERROR:
       case REB_FRAME:
       case REB_PORT: {
-        if (GET_SERIES_INFO(PAYLOAD(Any, v).first.node, INACCESSIBLE))
+        if (GET_SERIES_INFO(SER(PAYLOAD(Any, v).first.node), INACCESSIBLE))
             break;
 
         assert((v->header.bits & CELL_MASK_CONTEXT) == CELL_MASK_CONTEXT);
@@ -279,7 +279,7 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
             assert(Is_Marked(PAYLOAD(Any, v).second.node));  // phase or label
         }
 
-        if (GET_SERIES_INFO(context, INACCESSIBLE))
+        if (GET_SERIES_INFO(CTX_VARLIST(context), INACCESSIBLE))
             break;
 
         const REBVAL *archetype = CTX_ARCHETYPE(context);
@@ -307,7 +307,7 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
       case REB_SET_GROUP:
       case REB_GET_GROUP:
       case REB_SYM_GROUP: {
-        if (GET_SERIES_INFO(PAYLOAD(Any, v).first.node, INACCESSIBLE))
+        if (GET_SERIES_INFO(ARR(PAYLOAD(Any, v).first.node), INACCESSIBLE))
             break;
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
@@ -361,13 +361,13 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
                 (cache->header.bits & ARRAY_FLAG_IS_PATCH)
                 or (
                     (cache->header.bits & ARRAY_FLAG_IS_VARLIST)
-                    and (SER(Singular_From_Cell(v))->header.bits & ARRAY_FLAG_IS_PATCH)
+                    and (Singular_From_Cell(v)->header.bits & ARRAY_FLAG_IS_PATCH)
                 )
             );
         }
 
         const REBSTR *spelling = VAL_WORD_SPELLING(v);
-        assert(Is_Series_Frozen(SER(spelling)));
+        assert(Is_Series_Frozen(spelling));
 
         // !!! Whether you can count at this point on a spelling being GC
         // marked depends on whether it's the binding or not; this is a
@@ -467,7 +467,7 @@ void Assert_Cell_Marked_Correctly(unstable const RELVAL *v)
 
       case REB_ISSUE: {
         if (heart == REB_TEXT) {
-            const REBSER *s = SER(VAL_STRING(v));
+            const REBSER *s = VAL_STRING(v);
             assert(Is_Series_Frozen(s));
 
             // We do not want ISSUE!s to use series if the payload fits in

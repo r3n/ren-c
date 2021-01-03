@@ -1278,10 +1278,9 @@ REBNATIVE(scan_net_header)
     REBARR *result = Make_Array(10); // Just a guess at size (use STD_BUF?)
 
     REBVAL *header = ARG(header);
-    REBLEN index = VAL_INDEX(header);
-    const REBSER *utf8 = VAL_SERIES(header);
-
-    const REBYTE *cp = BIN_HEAD(utf8) + index;
+    REBSIZ size;
+    const REBYTE *cp = VAL_BYTES_AT(&size, header);
+    UNUSED(size);  // !!! Review semantics
 
     while (IS_LEX_ANY_SPACE(*cp)) cp++; // skip white space
 

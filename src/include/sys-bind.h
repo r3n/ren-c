@@ -134,8 +134,8 @@
 //
 inline static bool Is_Overriding_Context(REBCTX *stored, REBCTX *override)
 {
-    REBNOD *stored_source = LINK_KEYSOURCE(stored);
-    REBNOD *temp = LINK_KEYSOURCE(override);
+    REBNOD *stored_source = LINK_KEYSOURCE(CTX_VARLIST(stored));
+    REBNOD *temp = LINK_KEYSOURCE(CTX_VARLIST(override));
 
     // FRAME! "keylists" are actually paramlists, and the LINK.underlying
     // field is used in paramlists (precluding a LINK.ancestor).  Plus, since
@@ -157,10 +157,10 @@ inline static bool Is_Overriding_Context(REBCTX *stored, REBCTX *override)
         if (temp == stored_source)
             return true;
 
-        if (LINK_ANCESTOR_NODE(temp) == temp)
+        if (LINK_ANCESTOR_NODE(SER(temp)) == temp)
             break;
 
-        temp = LINK_ANCESTOR_NODE(temp);
+        temp = LINK_ANCESTOR_NODE(SER(temp));
     }
 
     return false;
@@ -223,9 +223,10 @@ inline static void SHUTDOWN_BINDER(struct Reb_Binder *binder) {
 //
 inline static bool Try_Add_Binder_Index(
     struct Reb_Binder *binder,
-    const REBSTR *s,
+    const REBSTR *str,
     REBINT index
 ){
+    REBSTR *s = m_cast(REBSTR*, str);
     assert(index != 0);
     if (binder->high) {
         if (MISC(s).bind_index.high != 0)
@@ -269,8 +270,9 @@ inline static REBINT Get_Binder_Index_Else_0( // 0 if not present
 
 inline static REBINT Remove_Binder_Index_Else_0( // return old value if there
     struct Reb_Binder *binder,
-    const REBSTR *s
+    const REBSTR *str
 ){
+    REBSTR *s = m_cast(REBSTR*, str);
     REBINT old_index;
     if (binder->high) {
         old_index = MISC(s).bind_index.high;
@@ -354,10 +356,10 @@ inline static void INIT_BINDING_MAY_MANAGE(
 ){
     EXTRA(Binding, out).node = binding;
 
-    if (not binding or GET_SERIES_FLAG(binding, MANAGED))
+    if (not binding or GET_SERIES_FLAG(SER(binding), MANAGED))
         return;  // unbound or managed already (frame OR object context)
 
-    REBFRM *f = FRM(LINK_KEYSOURCE(binding));  // unmanaged can only be frame
+    REBFRM *f = FRM(LINK_KEYSOURCE(SER(binding)));  // unmanaged can only be frame
     assert(IS_END(f->param));  // cannot manage frame varlist in mid fulfill!
     UNUSED(f);
 
@@ -401,8 +403,8 @@ inline static REBCTX *VAL_WORD_CONTEXT(unstable const REBVAL *v) {
     assert(IS_WORD_BOUND(v));
     REBNOD *binding = VAL_WORD_BINDING(v);
     assert(
-        GET_SERIES_FLAG(binding, MANAGED)
-        or IS_END(FRM(LINK_KEYSOURCE(binding))->param)  // not "fulfilling"
+        GET_SERIES_FLAG(SER(binding), MANAGED)
+        or IS_END(FRM(LINK_KEYSOURCE(SER(binding)))->param)  // not fulfilling
     );
     binding->header.bits |= NODE_FLAG_MANAGED;  // !!! review managing needs
     REBCTX *c = CTX(binding);
@@ -551,7 +553,7 @@ inline static option(REBCTX*) Get_Word_Context(
           }
 
           skip_hit_patch:
-            specifier = LINK_PATCH_NEXT_NODE(specifier);
+            specifier = LINK_PATCH_NEXT_NODE(SER(specifier));
         } while (
             specifier and not (specifier->header.bits & ARRAY_FLAG_IS_VARLIST)
         );
@@ -562,7 +564,7 @@ inline static option(REBCTX*) Get_Word_Context(
 
   virtual_miss:
 
-    if (GET_ARRAY_FLAG(specifier, IS_PATCH)) {
+    if (GET_ARRAY_FLAG(ARR(specifier), IS_PATCH)) {
         //
         // Bad news: We have a virtual bind in effect, but not the virtual
         // bind that is cached in the word.  We have no way of knowing if
@@ -619,7 +621,7 @@ inline static option(REBCTX*) Get_Word_Context(
             }
           }
           skip_miss_patch:
-            specifier = LINK_PATCH_NEXT_NODE(specifier);
+            specifier = LINK_PATCH_NEXT_NODE(ARR(specifier));
         } while (
             specifier and not (specifier->header.bits & ARRAY_FLAG_IS_VARLIST)
         );
@@ -633,7 +635,7 @@ inline static option(REBCTX*) Get_Word_Context(
         // `specifier` should be set now.
     }
 
-    assert(specifier == SPECIFIED or GET_ARRAY_FLAG(specifier, IS_VARLIST));
+    assert(specifier == SPECIFIED or GET_ARRAY_FLAG(ARR(specifier), IS_VARLIST));
 
     REBCTX *c;
 
@@ -714,7 +716,7 @@ static inline const REBVAL *Lookup_Word_May_Fail(
     REBCTX *c = try_unwrap(Get_Word_Context(&index, any_word, specifier));
     if (not c)
         fail (Error_Not_Bound_Raw(SPECIFIC(any_word)));
-    if (GET_SERIES_INFO(c, INACCESSIBLE))
+    if (GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE))
         fail (Error_No_Relative_Core(any_word));
 
     return CTX_VAR(c, index);
@@ -728,7 +730,7 @@ static inline option(const REBVAL*) Lookup_Word(
     REBCTX *c = try_unwrap(Get_Word_Context(&index, any_word, specifier));
     if (not c)
         return nullptr;
-    if (GET_SERIES_INFO(c, INACCESSIBLE))
+    if (GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE))
         return nullptr;
 
     return CTX_VAR(c, index);
@@ -765,7 +767,7 @@ static inline REBVAL *Lookup_Mutable_Word_May_Fail(
     //
     // Lock bits are all in SER->info and checked in the same instruction.
     //
-    FAIL_IF_READ_ONLY_SER(SER(CTX_VARLIST(c)));
+    FAIL_IF_READ_ONLY_SER(CTX_VARLIST(c));
 
     REBVAL *var = CTX_VAR(c, index);
 
@@ -952,12 +954,12 @@ inline static REBNOD** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
 {
     assert(specifier->header.bits & ARRAY_FLAG_IS_PATCH);
     while (
-        (LINK_PATCH_NEXT_NODE(specifier) != nullptr) and not
-        (LINK_PATCH_NEXT_NODE(specifier)->header.bits & ARRAY_FLAG_IS_VARLIST)
+        (LINK_PATCH_NEXT_NODE(ARR(specifier)) != nullptr) and not
+        (SER(LINK_PATCH_NEXT_NODE(ARR(specifier)))->header.bits & ARRAY_FLAG_IS_VARLIST)
     ){
-        specifier = LINK_PATCH_NEXT_NODE(specifier);
+        specifier = LINK_PATCH_NEXT_NODE(SER(specifier));
     }
-    return &LINK_PATCH_NEXT_NODE(specifier);
+    return &LINK_PATCH_NEXT_NODE(SER(specifier));
 }
 
 inline static option(REBCTX*) SPC_FRAME_CTX(REBSPC *specifier)
@@ -1008,7 +1010,7 @@ inline static bool Merge_Patches_Reused(
         // If we reused an existing patch, there's a possibility we can find
         // it in the list of synonyms for the parent patch.
         //
-        REBARR *temp = MISC(parent).variant;
+        REBARR *temp = ARR(MISC(parent).variant);
         while (temp != parent) {
             if (LINK_PATCH_NEXT_NODE(temp) == NOD(next)) {
                 *merged = temp;
@@ -1111,7 +1113,7 @@ inline static REBSPC *Derive_Specifier_Core(
         if (
             frame_ctx == nullptr
             or (
-                NOT_SERIES_INFO(frame_ctx, INACCESSIBLE) and
+                NOT_SERIES_INFO(CTX_VARLIST(frame_ctx), INACCESSIBLE) and
                 not Action_Is_Base_Of(
                     ACT(binding),
                     CTX_FRAME_ACTION(frame_ctx)

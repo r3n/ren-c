@@ -91,7 +91,7 @@ inline static REBVAL *Init_Issue_Utf8(
     else {
         REBSTR *str = Make_Sized_String_UTF8(cs_cast(utf8), size);
         assert(STR_LEN(str) == len);  // ^-- revalidates :-/ should match
-        Freeze_Series(SER(str));
+        Freeze_Series(str);
         Init_Text(out, str);
     }
     mutable_KIND3Q_BYTE(out) = REB_ISSUE;

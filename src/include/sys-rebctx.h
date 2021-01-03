@@ -59,7 +59,7 @@
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* ancestor */ )
 
 struct Reb_Context {
-    struct Reb_Array varlist;  // keylist is held in ->link.keysource
+    REBARR varlist;  // keylist is held in ->link.keysource
 };
 
 
@@ -80,16 +80,14 @@ struct Reb_Context {
         >::type
     >
     inline static C *CTX(T *p) {
-        constexpr bool derived = std::is_same<T0, REBCTX>::value;
-
         constexpr bool base = std::is_same<T0, void>::value
             or std::is_same<T0, REBNOD>::value
             or std::is_same<T0, REBSER>::value
             or std::is_same<T0, REBARR>::value;
 
         static_assert(
-            derived or base,
-            "CTX() works on REBNOD/REBSER/REBARR/REBCTX"
+            base,
+            "CTX() works on REBNOD/REBSER/REBARR"
         );
 
         bool b = base;  // needed to avoid compiler constexpr warning

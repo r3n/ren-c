@@ -270,7 +270,7 @@ static REBVAL *Get_Event_Var(
         if (not req or not ReqPortCtx(req))
             return nullptr;
 
-        return Init_Port(out, CTX(ReqPortCtx(req))); }
+        return Init_Port(out, ReqPortCtx(req)); }
 
       case SYM_WINDOW:
       case SYM_GOB: {

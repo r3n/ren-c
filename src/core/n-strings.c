@@ -563,7 +563,7 @@ REBNATIVE(enline)
         RETURN (ARG(string)); // nothing to do
 
     REBLEN old_len = MISC(s).length;
-    EXPAND_SERIES_TAIL(SER(s), delta);  // corrupts MISC(str).length
+    EXPAND_SERIES_TAIL(s, delta);  // corrupts MISC(str).length
     MISC(s).length = old_len + delta;  // just adding CR's
 
     // One feature of using UTF-8 for strings is that CR/LF substitution can
@@ -825,7 +825,7 @@ REBNATIVE(to_hex)
     // UTF-8 Everywhere unification of ANY-WORD! and ANY-STRING! is done.
     //
     assert(len == STR_SIZE(mo->series) - mo->offset);
-    if (NULL == Scan_Issue(D_OUT, BIN_AT(SER(mo->series), mo->offset), len))
+    if (NULL == Scan_Issue(D_OUT, BIN_AT(mo->series, mo->offset), len))
         fail (PAR(value));
 
     Drop_Mold(mo);

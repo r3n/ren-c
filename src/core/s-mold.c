@@ -94,8 +94,8 @@
 REBYTE *Prep_Mold_Overestimated(REB_MOLD *mo, REBLEN num_bytes)
 {
     REBLEN tail = STR_LEN(mo->series);
-    EXPAND_SERIES_TAIL(SER(mo->series), num_bytes);  // terminates at guess
-    return BIN_AT(SER(mo->series), tail);
+    EXPAND_SERIES_TAIL(mo->series, num_bytes);  // terminates at guess
+    return BIN_AT(mo->series, tail);
 }
 
 
@@ -166,7 +166,7 @@ void New_Indented_Line(REB_MOLD *mo)
     if (STR_LEN(mo->series) == 0)
         bp = nullptr;
     else {
-        bp = BIN_LAST(SER(mo->series));  // legal way to check UTF-8
+        bp = BIN_LAST(mo->series);  // legal way to check UTF-8
         if (*bp == ' ' or *bp == '\t')
             *bp = '\n';
         else
@@ -342,7 +342,7 @@ void Form_Array_At(
             if (
                 n < len
                 and STR_LEN(mo->series) != 0
-                and *BIN_LAST(SER(mo->series)) != LF
+                and *BIN_LAST(mo->series) != LF
                 and NOT_MOLD_FLAG(mo, MOLD_FLAG_TIGHT)
             ){
                 Append_Codepoint(mo->series, ' ');
@@ -404,7 +404,7 @@ void Mold_Or_Form_Cell(
     bool form
 ){
     REBSTR *s = mo->series;
-    ASSERT_SERIES_TERM(SER(s));
+    ASSERT_SERIES_TERM(s);
 
     if (C_STACK_OVERFLOWING(&s))
         Fail_Stack_Overflow();
@@ -427,7 +427,7 @@ void Mold_Or_Form_Cell(
     MOLD_HOOK *hook = Mold_Or_Form_Hook_For_Type_Of(cell);
     hook(mo, STABLE_HACK(cell), form);
 
-    ASSERT_SERIES_TERM(SER(s));
+    ASSERT_SERIES_TERM(s);
 }
 
 
@@ -607,12 +607,12 @@ void Push_Mold(REB_MOLD *mo)
 
     assert(mo->series == nullptr);  // Indicates not pushed, see DECLARE_MOLD
 
-    REBSER *s = SER(MOLD_BUF);
+    REBSTR *s = MOLD_BUF;
     ASSERT_SERIES_TERM(s);
 
-    mo->series = STR(s);
-    mo->offset = STR_SIZE(mo->series);
-    mo->index = STR_LEN(mo->series);
+    mo->series = s;
+    mo->offset = STR_SIZE(s);
+    mo->index = STR_LEN(s);
 
     if (GET_MOLD_FLAG(mo, MOLD_FLAG_LIMIT))
         assert(mo->limit != 0);  // !!! Should a limit of 0 be allowed?
@@ -723,7 +723,7 @@ void Throttle_Mold(REB_MOLD *mo) {
 REBSTR *Pop_Molded_String(REB_MOLD *mo)
 {
     assert(mo->series != nullptr);  // if null, there was no Push_Mold()
-    ASSERT_SERIES_TERM(SER(mo->series));
+    ASSERT_SERIES_TERM(mo->series);
 
     // Limit string output to a specified size to prevent long console
     // garbage output if MOLD_FLAG_LIMIT was set in Push_Mold().
@@ -734,7 +734,7 @@ REBSTR *Pop_Molded_String(REB_MOLD *mo)
     REBLEN len = STR_LEN(mo->series) - mo->index;
 
     REBSTR *popped = Make_String(size);
-    memcpy(BIN_HEAD(SER(popped)), BIN_AT(SER(mo->series), mo->offset), size);
+    memcpy(BIN_HEAD(popped), BIN_AT(mo->series, mo->offset), size);
     TERM_STR_LEN_SIZE(popped, len, size);
 
     // Though the protocol of Mold_Value does terminate, it only does so if
@@ -756,16 +756,16 @@ REBSTR *Pop_Molded_String(REB_MOLD *mo)
 // !!! This particular use of the mold buffer might undermine tricks which
 // could be used with invalid UTF-8 bytes--for instance.  Review.
 //
-REBSER *Pop_Molded_Binary(REB_MOLD *mo)
+REBBIN *Pop_Molded_Binary(REB_MOLD *mo)
 {
     assert(STR_LEN(mo->series) >= mo->offset);
 
-    ASSERT_SERIES_TERM(SER(mo->series));
+    ASSERT_SERIES_TERM(mo->series);
     Throttle_Mold(mo);
 
     REBSIZ size = STR_SIZE(mo->series) - mo->offset;
-    REBSER *bin = Make_Binary(size);
-    memcpy(BIN_HEAD(bin), BIN_AT(SER(mo->series), mo->offset), size);
+    REBBIN *bin = Make_Binary(size);
+    memcpy(BIN_HEAD(bin), BIN_AT(mo->series, mo->offset), size);
     TERM_BIN_LEN(bin, size);
 
     // Though the protocol of Mold_Value does terminate, it only does so if
@@ -839,7 +839,7 @@ void Startup_Mold(REBLEN size)
 //
 void Shutdown_Mold(void)
 {
-    Free_Unmanaged_Series(SER(TG_Mold_Buf));
+    Free_Unmanaged_Series(TG_Mold_Buf);
     TG_Mold_Buf = nullptr;
 
     Free_Unmanaged_Series(TG_Mold_Stack);

@@ -179,20 +179,18 @@ void Clonify(
                 v,
                 CTX_VARLIST(Copy_Context_Shallow_Managed(VAL_CONTEXT(v)))
             );
-            series = SER(CTX_VARLIST(VAL_CONTEXT(v)));
+            series = CTX_VARLIST(VAL_CONTEXT(v));
             would_need_deep = true;
         }
         else if (ANY_ARRAY_KIND(heart)) {
             REBNOD *n = VAL_NODE(v);
             assert(not (FIRST_BYTE(n->header.bits) & NODE_BYTEMASK_0x01_CELL));
-            series = SER(
-                Copy_Array_At_Extra_Shallow(
-                    ARR(n),
-                    0,  // index
-                    VAL_SPECIFIER(v),
-                    0,  // extra
-                    NODE_FLAG_MANAGED
-                )
+            series = Copy_Array_At_Extra_Shallow(
+                ARR(n),
+                0,  // index
+                VAL_SPECIFIER(v),
+                0,  // extra
+                NODE_FLAG_MANAGED
             );
 
             // Despite their immutability, new instances of PATH! need to be
@@ -371,7 +369,7 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
 //
 unstable RELVAL *Alloc_Tail_Array(REBARR *a)
 {
-    EXPAND_SERIES_TAIL(SER(a), 1);
+    EXPAND_SERIES_TAIL(a, 1);
     TERM_ARRAY_LEN(a, ARR_LEN(a));
     unstable RELVAL *last = ARR_LAST(a);
     TRASH_CELL_IF_DEBUG(last); // !!! was an END marker, good enough?
@@ -384,10 +382,10 @@ unstable RELVAL *Alloc_Tail_Array(REBARR *a)
 //
 void Uncolor_Array(const REBARR *a)
 {
-    if (Is_Series_White(SER(a)))
+    if (Is_Series_White(a))
         return; // avoid loop
 
-    Flip_Series_To_White(SER(a));
+    Flip_Series_To_White(a);
 
     unstable const RELVAL *v;
     for (v = ARR_HEAD(a); NOT_END(v); ++v) {

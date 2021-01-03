@@ -217,7 +217,20 @@ typedef struct Reb_Node REBNOD;
 
 
 
-//=//// SERIES SUBCLASSES /////////////////////////////////////////////////=//
+//=//// SERIES AND NON-INHERITED SUBCLASS DEFINITIONS /////////////////////=//
+//
+// The C++ build defines Reb_Array, Reb_Binary, and Reb_String as being
+// derived from Reb_Series.  This affords convenience by having it possible
+// to pass the derived class to something taking a base class, but not vice
+// versa.  However, you cannot forward-declare inheritance:
+//
+// https://stackoverflow.com/q/2159390/
+//
+// Hence, those derived definitions have to be in %sys-rebser.h.
+//
+// Aggregate types that are logically collections of multiple series do not
+// inherit.  You have to specify which series you want to extract, e.g.
+// GET_ARRAY_FLAG(CTX_VARLIST(context)), not just GET_ARRAY_FLAG(context).
 //
 // Note that because the Reb_Series structure includes a Reb_Value by value,
 // the %sys-rebser.h must be included *after* %sys-rebval.h; however the
@@ -227,14 +240,6 @@ typedef struct Reb_Node REBNOD;
 struct Reb_Series;
 typedef struct Reb_Series REBSER;
 
-typedef REBSER REBBIN;  // generic binary series, e.g. for BINARY! (byte-size)
-
-struct Reb_String;
-typedef struct Reb_String REBSTR;  // see %sys-string.h
-
-struct Reb_Array;
-typedef struct Reb_Array REBARR;  // array of value cells
-
 struct Reb_Context;
 typedef struct Reb_Context REBCTX;
 
@@ -243,10 +248,6 @@ typedef struct Reb_Action REBACT;
 
 struct Reb_Map;
 typedef struct Reb_Map REBMAP;
-
-typedef REBSER REBBMK;  // "bookmark" (list of UTF-8 index=>offsets)
-
-typedef REBSER REBTYP;  // Rebol Type (list of hook function pointers)
 
 
 //=//// BINDING ///////////////////////////////////////////////////////////=//
@@ -450,16 +451,6 @@ enum Reb_Vararg_Op {
 };
 
 
-// REBCHR(*) is defined in %sys-scan.h, along with SCAN_STATE, and both are
-// referenced by internal API functions.
-//
-// (Note: %sys-do.h needs to call into the scanner if Fetch_Next_In_Frame() is
-// to be inlined at all--at its many time-critical callsites--so the scanner
-// has to be in the internal API)
-//
-#include "sys-scan.h"
-
-
 //=//// API OPCODES ///////////////////////////////////////////////////////=//
 //
 // The libRebol API can take REBVAL*, or UTF-8 strings of raw textual material
@@ -500,15 +491,6 @@ typedef struct rebol_time_fields {
 
 
 
-// To help document places in the core that are complicit in the "extension
-// hack", alias arrays being used for the FFI and GOB to another name.
-//
-typedef REBARR REBGOB;
-
-typedef REBARR REBSTU;
-typedef REBARR REBFLD;
-
-
 //=//// R3-ALPHA DEVICE / DEVICE REQUEST //////////////////////////////////=//
 //
 // In order to decouple the interpreter from R3-Alpha's device model (and
@@ -518,6 +500,6 @@ typedef REBARR REBFLD;
 // array, or using LINK()/MISC() with SERIES_INFO_XXX_IS_CUSTOM_NODE.
 //
 struct Reb_Request;
-#define REBREQ struct Reb_Series
+#define REBREQ REBBIN
 struct rebol_device;
 #define REBDEV struct rebol_device

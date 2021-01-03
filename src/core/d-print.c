@@ -109,9 +109,9 @@ void Form_RGBA(REB_MOLD *mo, const REBYTE *dp)
     REBLEN len_old = STR_LEN(mo->series);
     REBSIZ used_old = STR_SIZE(mo->series);
 
-    EXPAND_SERIES_TAIL(SER(mo->series), 8);  // grow by 8 bytes, may realloc
+    EXPAND_SERIES_TAIL(mo->series, 8);  // grow by 8 bytes, may realloc
 
-    REBYTE *bp = BIN_AT(SER(mo->series), used_old);  // potentially new buffer
+    REBYTE *bp = BIN_AT(mo->series, used_old);  // potentially new buffer
 
     bp[0] = Hex_Digits[(dp[0] >> 4) & 0xf];
     bp[1] = Hex_Digits[dp[0] & 0xf];

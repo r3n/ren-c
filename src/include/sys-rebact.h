@@ -27,7 +27,7 @@
 
 
 struct Reb_Action {
-    struct Reb_Array details;
+    REBARR details;
 };
 
 
@@ -164,16 +164,16 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
 
 #define SET_ACTION_FLAG(s,name) \
-    (cast(REBSER*, ACT(s))->header.bits |= DETAILS_FLAG_##name)
+    (ACT_DETAILS(s)->header.bits |= DETAILS_FLAG_##name)
 
 #define GET_ACTION_FLAG(s,name) \
-    ((cast(REBSER*, ACT(s))->header.bits & DETAILS_FLAG_##name) != 0)
+    ((ACT_DETAILS(s)->header.bits & DETAILS_FLAG_##name) != 0)
 
 #define CLEAR_ACTION_FLAG(s,name) \
-    (cast(REBSER*, ACT(s))->header.bits &= ~DETAILS_FLAG_##name)
+    (ACT_DETAILS(s)->header.bits &= ~DETAILS_FLAG_##name)
 
 #define NOT_ACTION_FLAG(s,name) \
-    ((cast(REBSER*, ACT(s))->header.bits & DETAILS_FLAG_##name) == 0)
+    ((ACT_DETAILS(s)->header.bits & DETAILS_FLAG_##name) == 0)
 
 
 
@@ -205,10 +205,6 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
     template <typename P>
     inline REBACT *ACT(P p) {
-        constexpr bool derived =
-            std::is_same<P, nullptr_t>::value  // here to avoid check below
-            or std::is_same<P, REBACT*>::value;
-
         constexpr bool base =
             std::is_same<P, void*>::value
             or std::is_same<P, REBNOD*>::value
@@ -216,8 +212,8 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
             or std::is_same<P, REBARR*>::value;
 
         static_assert(
-            derived or base,
-            "ACT() works on void/REBNOD/REBSER/REBARR/REBACT/nullptr"
+            base,
+            "ACT() works on void/REBNOD/REBSER/REBARR"
         );
 
         bool b = base;  // needed to avoid compiler constexpr warning

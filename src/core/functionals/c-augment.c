@@ -176,9 +176,9 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
             0,  // index
             SPECIFIED,
             delta,  // extra cells
-            SER(old_varlist)->header.bits
+            old_varlist->header.bits
         );
-        SER(varlist)->info.bits = SER(old_varlist)->info.bits;
+        varlist->info.bits = old_varlist->info.bits;
         INIT_VAL_CONTEXT_VARLIST(ARR_HEAD(varlist), varlist);
 
         // We fill in the added parameters in the specialization as undefined

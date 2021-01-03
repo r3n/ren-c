@@ -268,7 +268,7 @@ static bool Subparse_Throws(
     // ensures that usermode accesses to the frame won't be able to fiddle
     // the frame values to bit patterns the native might crash on.
     //
-    SET_SERIES_INFO(SER(f->varlist), HOLD);
+    SET_SERIES_INFO(f->varlist, HOLD);
 
     REBFRM *frame_ = f;
     INCLUDE_PARAMS_OF_SUBPARSE;
@@ -704,7 +704,7 @@ static REB_R Parse_One_Rule(
             bool uncased;
             REBUNI uni;
             if (P_TYPE == REB_BINARY) {
-                uni = *BIN_AT(P_INPUT, P_POS);
+                uni = *BIN_AT(BIN(P_INPUT), P_POS);
                 uncased = false;
             }
             else {
@@ -2614,7 +2614,7 @@ REBNATIVE(subparse)
                             fail ("SET for datatype only allows 1 value");
                     }
                     else if (P_TYPE == REB_BINARY)
-                        Init_Integer(var, *BIN_AT(P_INPUT, begin));
+                        Init_Integer(var, *BIN_AT(BIN(P_INPUT), begin));
                     else
                         Init_Char_Unchecked(
                             var,

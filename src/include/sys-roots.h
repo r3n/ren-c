@@ -95,7 +95,7 @@ inline static void Link_Api_Handle_To_Frame(REBARR *a, REBFRM *f)
 
     if (not empty_list) {  // head of list exists, take its spot at the head
         assert(Is_Api_Value(ARR_SINGLE(ARR(f->alloc_value_list))));
-        MISC(f->alloc_value_list).custom.node = NOD(a);  // link back to us
+        MISC(SER(f->alloc_value_list)).custom.node = NOD(a);  // link back to us
     }
 
     LINK(a).custom.node = f->alloc_value_list;  // forward pointer
@@ -117,17 +117,17 @@ inline static void Unlink_Api_Handle_From_Frame(REBARR *a)
 
         if (not at_tail) {  // only set next item's backlink if it exists
             assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(a).custom.node))));
-            MISC(LINK(a).custom.node).custom.node = NOD(f);
+            MISC(SER(LINK(a).custom.node)).custom.node = NOD(f);
         }
     }
     else {
         // we're not at the head, so there is a node before us, set its "next"
         assert(Is_Api_Value(ARR_SINGLE(ARR(MISC(a).custom.node))));
-        LINK(MISC(a).custom.node).custom.node = LINK(a).custom.node;
+        LINK(SER(MISC(a).custom.node)).custom.node = LINK(a).custom.node;
 
         if (not at_tail) {  // only set next item's backlink if it exists
             assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(a).custom.node))));
-            MISC(LINK(a).custom.node).custom.node = MISC(a).custom.node;
+            MISC(SER(LINK(a).custom.node)).custom.node = MISC(a).custom.node;
         }
     }
 }
@@ -178,7 +178,7 @@ inline static void Free_Value(REBVAL *v)
     if (GET_SERIES_FLAG(a, MANAGED))
         Unlink_Api_Handle_From_Frame(a);
 
-    GC_Kill_Series(SER(a));
+    GC_Kill_Series(a);
 }
 
 
@@ -209,7 +209,6 @@ inline static REBARR *Alloc_Instruction(enum Reb_Api_Opcode opcode) {
 }
 
 inline static void Free_Instruction(REBARR *a) {
-    assert(IS_SER_ARRAY(SER(a)));
     TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
     Free_Node(SER_POOL, NOD(a));
 }

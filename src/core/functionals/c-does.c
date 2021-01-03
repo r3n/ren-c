@@ -215,7 +215,7 @@ REBNATIVE(does)
             DSP,  // lower dsp would be if we wanted to add refinements
             nullptr  // don't set up a binder; just poke specializee in frame
         );
-        assert(GET_SERIES_FLAG(exemplar, MANAGED));
+        assert(GET_SERIES_FLAG(CTX_VARLIST(exemplar), MANAGED));
 
         // Put argument into DO's *second* frame slot (first is RETURN)
         //

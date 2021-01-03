@@ -118,7 +118,7 @@ REBSER *Copy_Series_Core(const REBSER *s, REBFLGS flags)
     //
     if (GET_SERIES_FLAG(s, IS_STRING)) {
         assert(not IS_STR_SYMBOL(s));
-        copy = SER(Make_String_Core(used, flags));
+        copy = Make_String_Core(used, flags);
         SET_SERIES_USED(copy, used);
         TERM_SERIES(copy);
         LINK(copy).bookmarks = nullptr;  // !!! Review: copy these?
@@ -326,7 +326,7 @@ void Unbias_Series(REBSER *s, bool keep)
 void Reset_Array(REBARR *a)
 {
     if (IS_SER_DYNAMIC(a))
-        Unbias_Series(SER(a), false);
+        Unbias_Series(a, false);
     TERM_ARRAY_LEN(a, 0);
 }
 

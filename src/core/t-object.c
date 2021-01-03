@@ -87,7 +87,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
             //
             // Wasn't already collected...so we added it...
             //
-            EXPAND_SERIES_TAIL(SER(BUF_COLLECT), 1);
+            EXPAND_SERIES_TAIL(BUF_COLLECT, 1);
             Init_Context_Key(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(word));
         }
         if (IS_END(word + 1))
@@ -524,7 +524,7 @@ REBCTX *Copy_Context_Extra_Managed(
 ){
     assert(GET_ARRAY_FLAG(CTX_VARLIST(original), IS_VARLIST));
     ASSERT_ARRAY_MANAGED(CTX_KEYLIST(original));
-    assert(NOT_SERIES_INFO(original, INACCESSIBLE));
+    assert(NOT_SERIES_INFO(CTX_VARLIST(original), INACCESSIBLE));
 
     REBARR *varlist = Make_Array_For_Copy(
         CTX_LEN(original) + extra + 1,
@@ -554,7 +554,7 @@ REBCTX *Copy_Context_Extra_Managed(
     }
 
     TERM_ARRAY_LEN(varlist, CTX_LEN(original) + 1);
-    SER(varlist)->header.bits |= SERIES_MASK_VARLIST;
+    varlist->header.bits |= SERIES_MASK_VARLIST;
 
     REBCTX *copy = CTX(varlist); // now a well-formed context
 

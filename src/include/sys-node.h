@@ -55,6 +55,7 @@
             or std::is_same<T0, REBVAL>::value
             or std::is_same<T0, RELVAL>::value
             or std::is_same<T0, REBSER>::value
+            or std::is_same<T0, REBBIN>::value
             or std::is_same<T0, REBSTR>::value
             or std::is_same<T0, REBARR>::value
             or std::is_same<T0, REBCTX>::value
@@ -181,7 +182,7 @@ inline static void Free_Node(REBLEN pool_id, void *p)
     if (
         pool_id == SER_POOL
         and not (node->header.bits & NODE_FLAG_CELL)
-        and GET_SERIES_INFO(SER(node), MONITOR_DEBUG)
+        and (cast(REBSER*, node)->info.bits & SERIES_INFO_MONITOR_DEBUG)
     ){
         printf(
             "Freeing series %p on tick #%d\n",

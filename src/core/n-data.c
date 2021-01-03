@@ -1070,7 +1070,7 @@ REBNATIVE(free_q)
     if (n == nullptr or Is_Node_Cell(n))  // VAL_WORD_CACHE() can be null
         return Init_False(D_OUT);
 
-    return Init_Logic(D_OUT, GET_SERIES_INFO(n, INACCESSIBLE));
+    return Init_Logic(D_OUT, GET_SERIES_INFO(SER(n), INACCESSIBLE));
 }
 
 
@@ -1151,7 +1151,7 @@ bool Try_As_String(
 
                 ++num_codepoints;
             }
-            SET_SERIES_FLAG(m_cast(REBSER*, bin), IS_STRING);
+            SET_SERIES_FLAG(m_cast(REBBIN*, bin), IS_STRING);
             str = STR(bin);
 
             SET_STR_LEN_SIZE(
@@ -1159,7 +1159,7 @@ bool Try_As_String(
                 num_codepoints,
                 BIN_LEN(bin)
             );
-            LINK(bin).bookmarks = nullptr;
+            LINK(m_cast(REBBIN*, bin)).bookmarks = nullptr;
 
             // !!! TBD: cache index/offset
 
@@ -1186,7 +1186,7 @@ bool Try_As_String(
     }
     else if (IS_ISSUE(v)) {
         if (CELL_HEART(cast(REBCEL(const*), v)) != REB_BYTES) {
-            assert(Is_Series_Frozen(SER(VAL_STRING(v))));
+            assert(Is_Series_Frozen(VAL_STRING(v)));
             goto any_string;  // ISSUE! series must be immutable
         }
 
@@ -1201,9 +1201,9 @@ bool Try_As_String(
         assert(size + 1 < sizeof(PAYLOAD(Bytes, v).at_least_8));  // must fit
 
         REBSTR *str = Make_String_Core(size, SERIES_FLAGS_NONE);
-        memcpy(SER_DATA(SER(str)), utf8, size + 1);  // +1 to include '\0'
+        memcpy(SER_DATA(str), utf8, size + 1);  // +1 to include '\0'
         SET_STR_LEN_SIZE(str, len, size);
-        Freeze_Series(SER(str));
+        Freeze_Series(str);
         Init_Any_String(out, new_kind, str);
     }
     else if (ANY_STRING(v)) {
@@ -1433,7 +1433,7 @@ REBNATIVE(as)
           any_string: {
             const REBSTR *s = VAL_STRING(v);
 
-            if (not Is_Series_Frozen(SER(s))) {
+            if (not Is_Series_Frozen(s)) {
                 //
                 // We always force strings used with AS to frozen, so that the
                 // effect of freezing doesn't appear to mystically happen just
@@ -1499,7 +1499,7 @@ REBNATIVE(as)
                 // Constrain the input in the way it would be if we were doing
                 // the more efficient reuse.
                 //
-                SET_SERIES_FLAG(m_cast(REBSER*, bin), IS_STRING);
+                SET_SERIES_FLAG(m_cast(REBBIN*, bin), IS_STRING);
                 Freeze_Series(bin);
             }
 
@@ -1531,7 +1531,7 @@ REBNATIVE(as)
           any_string_as_binary:
             Init_Binary_At(
                 D_OUT,
-                SER(VAL_STRING(v)),
+                VAL_STRING(v),
                 ANY_WORD(v) ? 0 : VAL_OFFSET(v)
             );
             return Inherit_Const(D_OUT, v);

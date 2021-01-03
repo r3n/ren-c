@@ -39,7 +39,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
 ){
     assert(ANY_SEQUENCE_KIND(kind));
     assert(GET_SERIES_FLAG(a, MANAGED));
-    ASSERT_SERIES_TERM(SER(a));
+    ASSERT_SERIES_TERM(a);
     assert(index == 0);  // !!! current rule
     assert(Is_Array_Frozen_Shallow(a));  // must be immutable (may be aliased)
 
@@ -100,7 +100,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
     // do it is that leaving it as an index allows for aliasing BLOCK! as
     // PATH! from non-head positions.
 
-    Init_Any_Series_At_Core(out, REB_BLOCK, SER(a), index, specifier);
+    Init_Any_Series_At_Core(out, REB_BLOCK, a, index, specifier);
     mutable_KIND3Q_BYTE(out) = kind;
     assert(HEART_BYTE(out) == REB_BLOCK);
 

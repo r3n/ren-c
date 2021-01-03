@@ -378,7 +378,7 @@ REBNATIVE(reskinned)
     }
 
     if (ACT_HAS_RETURN(original))
-        SER(paramlist)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
+        paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
 
     // !!! This does not make a unique copy of the meta information context.
     // Hence updates to the title/parameter-descriptions/etc. of the tightened
@@ -405,8 +405,8 @@ REBNATIVE(reskinned)
     );
 
     if (not need_skin_phase)  // inherit the native flag if no phase change
-        SER(defers)->header.bits
-            |= SER(original)->header.bits & DETAILS_FLAG_IS_NATIVE;
+        ACT_DETAILS(defers)->header.bits
+            |= ACT_DETAILS(original)->header.bits & DETAILS_FLAG_IS_NATIVE;
 
     if (need_skin_phase)
         Move_Value(
@@ -483,9 +483,9 @@ REBNATIVE(tweak)
     }
 
     if (VAL_LOGIC(ARG(enable)))
-        SER(act)->header.bits |= flag;
+        ACT_DETAILS(act)->header.bits |= flag;
     else
-        SER(act)->header.bits &= ~flag;
+        ACT_DETAILS(act)->header.bits &= ~flag;
 
     RETURN (ARG(action));
 }

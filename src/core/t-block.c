@@ -189,7 +189,7 @@ REB_R MAKE_Array(
         return Init_Any_Series_At_Core(
             out,
             kind,
-            SER(VAL_ARRAY(any_array)),
+            VAL_ARRAY(any_array),
             index,
             derived
         );
@@ -269,7 +269,7 @@ REB_R MAKE_Array(
             // so no typeset or quoting settings available.  Can't produce
             // any voids, because the data source is a block.
             //
-            assert(NOT_ARRAY_FLAG(VAL_VARARGS_BINDING_NODE(arg), IS_VARLIST));
+            assert(NOT_ARRAY_FLAG(ARR(VAL_VARARGS_BINDING_NODE(arg)), IS_VARLIST));
         }
         else {
             REBCTX *context = CTX(VAL_VARARGS_BINDING(arg));
@@ -860,7 +860,7 @@ REBTYPE(Array)
         else
             Derelativize(D_OUT, &ARR_HEAD(arr)[index], specifier);
 
-        Remove_Series_Units(SER(arr), index, len);
+        Remove_Series_Units(arr, index, len);
         return D_OUT; }
 
     //-- Search:
@@ -981,7 +981,7 @@ REBTYPE(Array)
             if (index == 0) Reset_Array(arr);
             else {
                 SET_END(STABLE_HACK(ARR_AT(arr, index)));
-                SET_SERIES_LEN(SER(arr), cast(REBLEN, index));
+                SET_SERIES_LEN(arr, cast(REBLEN, index));
             }
         }
         RETURN (array);
@@ -1352,7 +1352,7 @@ void Assert_Array_Core(const REBARR *a)
     // we don't use ASSERT_SERIES the macro here, because that checks to
     // see if the series is an array...and if so, would call this routine
     //
-    Assert_Series_Core(SER(a));
+    Assert_Series_Core(a);
 
     if (not IS_SER_ARRAY(a))
         panic (a);
@@ -1377,7 +1377,7 @@ void Assert_Array_Core(const REBARR *a)
         panic (item);
 
     if (IS_SER_DYNAMIC(a)) {
-        REBLEN rest = SER_REST(SER(a));
+        REBLEN rest = SER_REST(a);
         assert(rest > 0 and rest > i);
 
         for (; i < rest - 1; ++i, ++item) {

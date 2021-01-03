@@ -49,7 +49,7 @@ inline static void INIT_BITS_NOT(REBSER *s, bool negated)
 
 inline static REBBIN *VAL_BITSET(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_BITSET);
-    return SER(VAL_NODE(v));
+    return BIN(VAL_NODE(v));
 }
 
 #define VAL_BITSET_ENSURE_MUTABLE(v) \

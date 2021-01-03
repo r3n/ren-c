@@ -94,7 +94,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
             const REBSER *s = VAL_SERIES(v);
             if (not IS_SER_ARRAY(s))
                 return nullptr;
-            if (NOT_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED))
+            if (NOT_ARRAY_FLAG(ARR(s), HAS_FILE_LINE_UNMASKED))
                 return nullptr;
             return Init_File(D_OUT, LINK_FILE(s)); }
 
@@ -102,7 +102,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
             const REBSER *s = VAL_SERIES(v);
             if (not IS_SER_ARRAY(s))
                 return nullptr;
-            if (NOT_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED))
+            if (NOT_ARRAY_FLAG(ARR(s), HAS_FILE_LINE_UNMASKED))
                 return nullptr;
             return Init_Integer(D_OUT, MISC(s).line); }
 

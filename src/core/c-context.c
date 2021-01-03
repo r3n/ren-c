@@ -112,7 +112,7 @@ bool Expand_Context_Keylist_Core(REBCTX *context, REBLEN delta)
     // context, and no INIT_CTX_KEYLIST_SHARED was used by another context
     // to mark the flag indicating it's shared.  Extend it directly.
 
-    Extend_Series(SER(keylist), delta);
+    Extend_Series(keylist, delta);
     TERM_ARRAY_LEN(keylist, ARR_LEN(keylist));
 
     return false;
@@ -128,7 +128,7 @@ void Expand_Context(REBCTX *context, REBLEN delta)
 {
     // varlist is unique to each object--expand without making a copy.
     //
-    Extend_Series(SER(CTX_VARLIST(context)), delta);
+    Extend_Series(CTX_VARLIST(context), delta);
     TERM_ARRAY_LEN(CTX_VARLIST(context), ARR_LEN(CTX_VARLIST(context)));
 
     Expand_Context_Keylist_Core(context, delta);
@@ -166,7 +166,7 @@ REBVAL *Append_Context(
     // Review why this is expanding when the callers are expanding.  Should
     // also check that redundant keys aren't getting added here.
     //
-    EXPAND_SERIES_TAIL(SER(keylist), 1);
+    EXPAND_SERIES_TAIL(keylist, 1);
     Init_Context_Key(
         ARR_LAST(keylist),
         spelling
@@ -177,7 +177,7 @@ REBVAL *Append_Context(
 
     // Add a slot to the var list
     //
-    EXPAND_SERIES_TAIL(SER(CTX_VARLIST(context)), 1);
+    EXPAND_SERIES_TAIL(CTX_VARLIST(context), 1);
 
     REBVAL *value = Init_Void(ARR_LAST(CTX_VARLIST(context)), SYM_UNSET);
     TERM_ARRAY_LEN(CTX_VARLIST(context), ARR_LEN(CTX_VARLIST(context)));
@@ -288,8 +288,9 @@ void Collect_End(struct Reb_Collector *cl)
             MISC(canon).bind_index.high != 0
             or MISC(canon).bind_index.low != 0
         );
-        MISC(canon).bind_index.high = 0;
-        MISC(canon).bind_index.low = 0;
+        REBSTR *s = m_cast(REBSTR*, canon);
+        MISC(s).bind_index.high = 0;
+        MISC(s).bind_index.low = 0;
     }
 
     SET_ARRAY_LEN_NOTERM(BUF_COLLECT, 0);
@@ -320,7 +321,7 @@ void Collect_Context_Keys(
     // necessary if duplicates are found, but the actual buffer length will be
     // set correctly by the end.)
     //
-    EXPAND_SERIES_TAIL(SER(BUF_COLLECT), CTX_LEN(context));
+    EXPAND_SERIES_TAIL(BUF_COLLECT, CTX_LEN(context));
     SET_ARRAY_LEN_NOTERM(BUF_COLLECT, cl->index);
 
     unstable RELVAL *collect = ARR_TAIL(BUF_COLLECT);  // *after* expansion
@@ -391,7 +392,7 @@ static void Collect_Inner_Loop(
 
             ++cl->index;
 
-            EXPAND_SERIES_TAIL(SER(BUF_COLLECT), 1);
+            EXPAND_SERIES_TAIL(BUF_COLLECT, 1);
             if (cl->flags & COLLECT_AS_TYPESET)
                 Init_Context_Key(
                     ARR_LAST(BUF_COLLECT),
@@ -963,7 +964,7 @@ void Resolve_Context(
     bool all,
     bool expand
 ) {
-    FAIL_IF_READ_ONLY_SER(SER(CTX_VARLIST(target))); // !!! should heed CONST
+    FAIL_IF_READ_ONLY_SER(CTX_VARLIST(target));  // !!! should heed CONST
 
     REBLEN i;
     if (IS_INTEGER(only_words)) { // Must be: 0 < i <= tail
@@ -1226,8 +1227,7 @@ void Assert_Context_Core(REBCTX *c)
     REBARR *varlist = CTX_VARLIST(c);
 
     if (
-        (SER(varlist)->header.bits & SERIES_MASK_VARLIST)
-        != SERIES_MASK_VARLIST
+        (varlist->header.bits & SERIES_MASK_VARLIST) != SERIES_MASK_VARLIST
     ){
         panic (varlist);
     }
@@ -1252,7 +1252,7 @@ void Assert_Context_Core(REBCTX *c)
     if (VAL_CONTEXT(rootvar) != c)
         panic (rootvar);
 
-    if (GET_SERIES_INFO(c, INACCESSIBLE)) {
+    if (GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE)) {
         //
         // !!! For the moment, don't check inaccessible stack frames any
         // further.  This includes varless reified frames and those reified

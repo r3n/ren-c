@@ -522,12 +522,13 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
 
                 break; }
 
-              case REB_BINARY:
+              case REB_BINARY: {
+                const REBBIN *bin = BIN(les->data_ser);
                 if (var)
-                    Init_Integer(var, BIN_HEAD(les->data_ser)[les->data_idx]);
+                    Init_Integer(var, BIN_HEAD(bin)[les->data_idx]);
                 if (++les->data_idx == les->data_len)
                     more_data = false;
-                break;
+                break; }
 
               case REB_TEXT:
               case REB_TAG:
@@ -687,12 +688,12 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
             les.data_len = VAL_LEN_HEAD(les.data);  // has HOLD, won't change
         }
         else if (ANY_CONTEXT(les.data)) {
-            les.data_ser = SER(CTX_VARLIST(VAL_CONTEXT(les.data)));
+            les.data_ser = CTX_VARLIST(VAL_CONTEXT(les.data));
             les.data_idx = 1;
             les.data_len = SER_USED(les.data_ser);  // has HOLD, won't change
         }
         else if (IS_MAP(les.data)) {
-            les.data_ser = SER(MAP_PAIRLIST(VAL_MAP(les.data)));
+            les.data_ser = MAP_PAIRLIST(VAL_MAP(les.data));
             les.data_idx = 0;
             les.data_len = SER_USED(les.data_ser);  // has HOLD, won't change
         }
@@ -703,7 +704,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
 
         took_hold = NOT_SERIES_INFO(les.data_ser, HOLD);
         if (took_hold)
-            SET_SERIES_INFO(les.data_ser, HOLD);
+            SET_SERIES_INFO(m_cast(REBSER*, les.data_ser), HOLD);
 
         if (les.data_idx >= les.data_len) {
             assert(Is_Heavy_Nulled(D_OUT));  // result if loop body never runs
@@ -722,7 +723,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
   cleanup:;
 
     if (took_hold)  // release read-only lock
-        CLEAR_SERIES_INFO(les.data_ser, HOLD);
+        CLEAR_SERIES_INFO(m_cast(REBSER*, les.data_ser), HOLD);
 
     if (IS_DATATYPE(les.data))  // must free temp array of instances
         Free_Unmanaged_Array(m_cast(REBARR*, ARR(les.data_ser)));
@@ -1170,13 +1171,15 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
             return 0;
         }
 
+        REBBIN *bin = BIN(res->series);
+
         // If there was a THROW, or fail() we need the remaining data
         //
         REBLEN orig_len = VAL_LEN_HEAD(res->data);
         assert(res->start <= orig_len);
         Append_Ascii_Len(
             res->mo->series,
-            cs_cast(BIN_AT(res->series, res->start)),
+            cs_cast(BIN_AT(bin, res->start)),
             orig_len - res->start
         );
 
@@ -1184,7 +1187,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
         // into it.  Revisit if this inhibits cool UTF-8 based tricks the
         // mold buffer might do otherwise.
         //
-        REBSER *popped = Pop_Molded_Binary(res->mo);
+        REBBIN *popped = Pop_Molded_Binary(res->mo);
 
         assert(BIN_LEN(popped) <= VAL_LEN_HEAD(res->data));
         count = VAL_LEN_HEAD(res->data) - BIN_LEN(popped);
@@ -1225,9 +1228,9 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
         // identity of the incoming series is kept but now with different
         // underlying data.
         //
-        Swap_Series_Content(SER(popped), res->series);
+        Swap_Series_Content(popped, res->series);
 
-        Free_Unmanaged_Series(SER(popped));  // frees incoming series's data
+        Free_Unmanaged_Series(popped);  // frees incoming series's data
     }
 
     return count;
@@ -1270,8 +1273,10 @@ static REB_R Remove_Each_Core(struct Remove_Each_State *res)
                     VAL_ARRAY_AT_HEAD(res->data, index),
                     VAL_SPECIFIER(res->data)
                 );
-            else if (IS_BINARY(res->data))
-                Init_Integer(var, cast(REBI64, BIN_HEAD(res->series)[index]));
+            else if (IS_BINARY(res->data)) {
+                REBBIN *bin = BIN(res->series);
+                Init_Integer(var, cast(REBI64, BIN_HEAD(bin)[index]));
+            }
             else {
                 assert(ANY_STRING(res->data));
                 Init_Char_Unchecked(
@@ -1333,9 +1338,10 @@ static REB_R Remove_Each_Core(struct Remove_Each_State *res)
             do {
                 assert(res->start <= len);
                 if (IS_BINARY(res->data)) {
+                    REBBIN *bin = BIN(res->series);
                     Append_Ascii_Len(
                         res->mo->series,
-                        cs_cast(BIN_AT(res->series, res->start)),
+                        cs_cast(BIN_AT(bin, res->start)),
                         1
                     );
                 }

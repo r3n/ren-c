@@ -141,15 +141,15 @@ REBLEN Modify_Array(
 
     if (sym != SYM_CHANGE) {
         // Always expand dst_arr for INSERT and APPEND actions:
-        Expand_Series(SER(dst_arr), dst_idx, size);
+        Expand_Series(dst_arr, dst_idx, size);
     }
     else {
         if (size > part)
-            Expand_Series(SER(dst_arr), dst_idx, size - part);
+            Expand_Series(dst_arr, dst_idx, size - part);
         else if (size < part and (flags & AM_PART))
-            Remove_Series_Units(SER(dst_arr), dst_idx, part - size);
+            Remove_Series_Units(dst_arr, dst_idx, part - size);
         else if (size + dst_idx > tail) {
-            EXPAND_SERIES_TAIL(SER(dst_arr), size - (tail - dst_idx));
+            EXPAND_SERIES_TAIL(dst_arr, size - (tail - dst_idx));
         }
     }
 
@@ -236,7 +236,7 @@ REBLEN Modify_String_Or_Binary(
 
     ENSURE_MUTABLE(dst);  // note this also rules out ANY-WORD!s
 
-    REBSER *dst_ser = VAL_SERIES_ENSURE_MUTABLE(dst);
+    REBBIN *dst_ser = BIN(VAL_SERIES_ENSURE_MUTABLE(dst));
     REBLEN dst_idx = VAL_INDEX(dst);
     REBSIZ dst_used = SER_USED(dst_ser);
 
@@ -482,7 +482,7 @@ REBLEN Modify_String_Or_Binary(
 
       use_mold_buffer:
 
-        src_ptr = BIN_AT(SER(mo->series), mo->offset);
+        src_ptr = BIN_AT(mo->series, mo->offset);
         src_size_raw = STR_SIZE(mo->series) - mo->offset;
         if (not IS_SER_STRING(dst_ser))
             src_len_raw = src_size_raw;

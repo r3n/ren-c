@@ -68,6 +68,159 @@
 //   position by the physical length, but VAL_ARRAY_AT() doesn't check.
 //
 
+#if !defined(DEBUG_CHECK_CASTS)
+
+    #define ensure_series(s) (s)
+
+    #define SER(p) \
+        m_cast(REBSER*, (const REBSER*)(p))  // don't check const in C or C++
+
+#else
+
+    inline static REBSER *ensure_series(REBSER *s) { return s; }
+    inline static const REBSER *ensure_series(const REBSER *s) { return s; }
+
+    inline const REBSER *SER(const REBNOD *n) {
+        const REBSER *s = reinterpret_cast<const REBSER*>(n);
+
+        if (s and (s->header.bits & (
+            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
+        )) != (
+            NODE_FLAG_NODE
+        )){
+            panic (n);
+        }
+
+        return s;
+    }
+
+    inline REBSER *SER(REBNOD *n)
+      { return const_cast<REBSER*>(SER(const_cast<const REBNOD*>(n))); }
+#endif
+
+
+#define LINK(s) \
+    ensure_series(s)->link_private
+
+#define MISC(s) \
+    ensure_series(s)->misc_private
+
+
+
+//
+// Series header FLAGs (distinct from INFO bits)
+//
+
+#define SET_SERIES_FLAG(s,name) \
+    (ensure_series(s)->header.bits |= SERIES_FLAG_##name)
+
+#define GET_SERIES_FLAG(s,name) \
+    ((ensure_series(s)->header.bits & SERIES_FLAG_##name) != 0)
+
+#define CLEAR_SERIES_FLAG(s,name) \
+    (ensure_series(s)->header.bits &= ~SERIES_FLAG_##name)
+
+#define NOT_SERIES_FLAG(s,name) \
+    ((ensure_series(s)->header.bits & SERIES_FLAG_##name) == 0)
+
+
+//
+// Series INFO bits (distinct from header FLAGs)
+//
+
+#define SET_SERIES_INFO(s,name) \
+    (ensure_series(s)->info.bits |= SERIES_INFO_##name)
+
+#define GET_SERIES_INFO(s,name) \
+    ((ensure_series(s)->info.bits & SERIES_INFO_##name) != 0)
+
+#define CLEAR_SERIES_INFO(s,name) \
+    (ensure_series(s)->info.bits &= ~SERIES_INFO_##name)
+
+#define NOT_SERIES_INFO(s,name) \
+    ((ensure_series(s)->info.bits & SERIES_INFO_##name) == 0)
+
+
+
+#define IS_SER_ARRAY(s) \
+    (WIDE_BYTE_OR_0(ensure_series(s)) == 0)
+
+#define IS_SER_DYNAMIC(s) \
+    (LEN_BYTE_OR_255(ensure_series(s)) == 255)
+
+// These are series implementation details that should not be used by most
+// code.  But in order to get good inlining, they have to be in the header
+// files (of the *internal* API, not of libRebol).  Generally avoid it.
+//
+// !!! Can't `assert((w) < MAX_SERIES_WIDE)` without triggering "range of
+// type makes this always false" warning; C++ build could sense if it's a
+// REBYTE and dodge the comparison if so.
+//
+
+#define MAX_SERIES_WIDE 0x100
+
+inline static REBYTE SER_WIDE(const REBSER *s) {
+    //
+    // Arrays use 0 width as a strategic choice, so that the second byte of
+    // the ->info flags is 0.  See Endlike_Header() for why.
+    //
+    REBYTE wide = WIDE_BYTE_OR_0(s);
+    if (wide == 0) {
+        assert(IS_SER_ARRAY(s));
+        return sizeof(REBVAL);
+    }
+    return wide;
+}
+
+
+//
+// Bias is empty space in front of head:
+//
+
+inline static REBLEN SER_BIAS(const REBSER *s) {
+    assert(IS_SER_DYNAMIC(s));
+    return cast(REBLEN, ((s)->content.dynamic.bias >> 16) & 0xffff);
+}
+
+inline static REBLEN SER_REST(const REBSER *s) {
+    if (LEN_BYTE_OR_255(s) == 255)
+        return s->content.dynamic.rest;
+
+    if (IS_SER_ARRAY(s))
+        return 2; // includes info bits acting as trick "terminator"
+
+    assert(sizeof(s->content) % SER_WIDE(s) == 0);
+    return sizeof(s->content) / SER_WIDE(s);
+}
+
+#define MAX_SERIES_BIAS 0x1000
+
+inline static void SER_SET_BIAS(REBSER *s, REBLEN bias) {
+    assert(IS_SER_DYNAMIC(s));
+    s->content.dynamic.bias =
+        (s->content.dynamic.bias & 0xffff) | (bias << 16);
+}
+
+inline static void SER_ADD_BIAS(REBSER *s, REBLEN b) {
+    assert(IS_SER_DYNAMIC(s));
+    s->content.dynamic.bias += b << 16;
+}
+
+inline static void SER_SUB_BIAS(REBSER *s, REBLEN b) {
+    assert(IS_SER_DYNAMIC(s));
+    s->content.dynamic.bias -= b << 16;
+}
+
+inline static size_t SER_TOTAL(const REBSER *s) {
+    return (SER_REST(s) + SER_BIAS(s)) * SER_WIDE(s);
+}
+
+inline static size_t SER_TOTAL_IF_DYNAMIC(const REBSER *s) {
+    if (not IS_SER_DYNAMIC(s))
+        return 0;
+    return SER_TOTAL(s);
+}
+
 
 //
 // For debugging purposes, it's nice to be able to crash on some kind of guard
@@ -81,7 +234,7 @@
 //
 #if defined(DEBUG_SERIES_ORIGINS) || defined(DEBUG_COUNT_TICKS)
     inline static void Touch_Series_Debug(void *p) {
-        REBSER *s = SER(p);  // allow REBARR, REBCTX, REBACT...
+        REBSER *s = SER(cast(REBNOD*, p));  // allow REBARR, REBCTX, REBACT...
 
         // NOTE: When series are allocated, the only thing valid here is the
         // header.  Hence you can't tell (for instance) if it's an array or
@@ -124,7 +277,7 @@
     inline static void MONITOR_SERIES(void *p) {
         printf("Adding monitor to %p on tick #%d\n", p, cast(int, TG_Tick));
         fflush(stdout);
-        SET_SERIES_INFO(p, MONITOR_DEBUG);
+        SET_SERIES_INFO(SER(cast(REBNOD*, p)), MONITOR_DEBUG);
     }
 #endif
 
@@ -349,7 +502,7 @@ inline static void TERM_SEQUENCE_LEN(REBSER *s, REBLEN len) {
             or (
                 SER_WIDE(s) == 1
                 and s != TG_Byte_Buf
-                and s != SER(TG_Mold_Buf)
+                and s != TG_Mold_Buf
             )
         ){
             Assert_Series_Term_Core(s);
@@ -428,27 +581,25 @@ inline static REBSER *Manage_Series(REBSER *s)  // give manual series to GC
 #ifdef NDEBUG
     #define ASSERT_SERIES_MANAGED(s)
 #else
-    inline static void ASSERT_SERIES_MANAGED(const void *s) {
+    inline static void ASSERT_SERIES_MANAGED(const REBSER *s) {
         if (NOT_SERIES_FLAG(s, MANAGED))
             panic (s);
     }
 #endif
 
-inline static REBSER *Force_Series_Managed(const_if_c void *p) {
-    REBSER *s = m_cast(REBSER*, SER(p));
+inline static REBSER *Force_Series_Managed(const_if_c REBSER *s) {
     if (NOT_SERIES_FLAG(s, MANAGED))
-        Manage_Series(s);
-    return s;
+        Manage_Series(m_cast(REBSER*, s));
+    return m_cast(REBSER*, s);
 }
 
 #if !defined(__cplusplus)
     #define Force_Series_Managed_Core Force_Series_Managed
 #else
-    inline static REBSER *Force_Series_Managed_Core(void *p)
-      { return Force_Series_Managed(p); }  // mutable series may be unmanaged
+    inline static REBSER *Force_Series_Managed_Core(REBSER *s)
+      { return Force_Series_Managed(s); }  // mutable series may be unmanaged
 
-    inline static REBSER *Force_Series_Managed_Core(const void *p) {
-        const REBSER *s = SER(p);
+    inline static REBSER *Force_Series_Managed_Core(const REBSER *s) {
         ASSERT_SERIES_MANAGED(s);  // const series should already be managed
         return m_cast(REBSER*, s);
     }
@@ -491,7 +642,7 @@ static inline bool Is_Series_White(const REBSER *s) {
 
 static inline void Flip_Series_To_Black(const REBSER *s) {
     assert(NOT_SERIES_INFO(s, BLACK));
-    SET_SERIES_INFO(s, BLACK);
+    SET_SERIES_INFO(m_cast(REBSER*, s), BLACK);
 #if !defined(NDEBUG)
     ++TG_Num_Black_Series;
 #endif
@@ -499,7 +650,7 @@ static inline void Flip_Series_To_Black(const REBSER *s) {
 
 static inline void Flip_Series_To_White(const REBSER *s) {
     assert(GET_SERIES_INFO(s, BLACK));
-    CLEAR_SERIES_INFO(s, BLACK);
+    CLEAR_SERIES_INFO(m_cast(REBSER*, s), BLACK);
 #if !defined(NDEBUG)
     --TG_Num_Black_Series;
 #endif
@@ -512,8 +663,13 @@ static inline void Flip_Series_To_White(const REBSER *s) {
 
 inline static void Freeze_Series(const REBSER *s) {  // there is no unfreeze
     assert(not IS_SER_ARRAY(s)); // use Deep_Freeze_Array
-    SET_SERIES_INFO(s, FROZEN_SHALLOW);
-    SET_SERIES_INFO(s, FROZEN_DEEP);  // so generic deep frozen checks faster
+
+    // Mutable cast is all right for this bit.  We set the FROZEN_DEEP flag
+    // even though there is no structural depth here, so that the generic
+    // test for deep-frozenness can be faster.
+    //
+    SET_SERIES_INFO(m_cast(REBSER*, s), FROZEN_SHALLOW);
+    SET_SERIES_INFO(m_cast(REBSER*, s), FROZEN_DEEP);
 }
 
 inline static bool Is_Series_Frozen(const REBSER *s) {
@@ -748,6 +904,39 @@ inline static REBLEN VAL_INDEX(unstable REBCEL(const*) v) {
 
 inline static const REBYTE *VAL_DATA_AT(unstable REBCEL(const*) v) {
     return SER_DATA_AT(SER_WIDE(VAL_SERIES(v)), VAL_SERIES(v), VAL_INDEX(v));
+}
+
+
+inline static void INIT_SPECIFIER(unstable RELVAL *v, const void *p) {
+    //
+    // can be called on non-bindable series, but p must be nullptr
+
+    const REBNOD *binding = cast(const REBNOD*, p);
+    EXTRA(Binding, v).node = m_cast(REBNOD*, binding);
+
+  #if !defined(NDEBUG)
+    if (not binding or (binding->header.bits & SERIES_FLAG_IS_STRING))
+        return;  // e.g. UNBOUND (words use strings to indicate unbounds)
+
+    assert(Is_Bindable(v));  // works on partially formed values
+
+    assert(not (binding->header.bits & NODE_FLAG_CELL));  // not currently used
+
+    if (binding->header.bits & NODE_FLAG_MANAGED) {
+        assert(
+            binding->header.bits & ARRAY_FLAG_IS_DETAILS  // relative
+            or binding->header.bits & ARRAY_FLAG_IS_VARLIST  // specific
+            or (
+                ANY_ARRAY(v)
+                and (binding->header.bits & ARRAY_FLAG_IS_PATCH)  // virtual
+            ) or (
+                IS_VARARGS(v) and not IS_SER_DYNAMIC(SER(binding))
+            )  // varargs from MAKE VARARGS! [...], else is a varlist
+        );
+    }
+    else
+        assert(binding->header.bits & ARRAY_FLAG_IS_VARLIST);
+  #endif
 }
 
 

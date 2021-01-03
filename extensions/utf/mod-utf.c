@@ -222,7 +222,7 @@ static REBSER *Encode_Utf16(
 ){
     REBCHR(const*) cp = data;
 
-    REBSER *bin = Make_Binary(sizeof(uint16_t) * len);
+    REBBIN *bin = Make_Binary(sizeof(uint16_t) * len);
     uint16_t* up = cast(uint16_t*, BIN_HEAD(bin));
 
     REBLEN i = 0;

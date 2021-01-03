@@ -115,7 +115,7 @@ REBNATIVE(generic)
     // and list the appropriate types from HELP.
     //
     RELVAL *param = STABLE_HACK(ARR_AT(paramlist, 1));
-    if (SER(paramlist)->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
+    if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
         assert(VAL_PARAM_SYM(param) == SYM_RETURN);
         TYPE_SET(param, REB_CUSTOM);
         ++param;
