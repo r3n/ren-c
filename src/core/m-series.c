@@ -92,31 +92,6 @@ void Append_Series(REBSER *s, const void *data, REBLEN len)
 
 
 //
-//  Append_Values_Len: C
-//
-// Append value(s) onto the tail of an array.  The len is
-// the number of units and does not include the terminator
-// (which will be added).
-//
-void Append_Values_Len(REBARR *a, const REBVAL *head, REBLEN len)
-{
-    REBLEN old_len = ARR_LEN(a);
-
-    // updates tail, which could move data storage.
-    //
-    EXPAND_SERIES_TAIL(SER(a), len);
-
-    memcpy(    // https://stackoverflow.com/q/57721104/
-        cast(char*, ARR_AT(a, old_len)),
-        cast(const char*, head),
-        sizeof(REBVAL) * len
-    );
-
-    TERM_ARRAY_LEN(a, ARR_LEN(a));
-}
-
-
-//
 //  Copy_Series_Core: C
 //
 // Copy underlying series that *isn't* an "array" (such as STRING!, BINARY!,
