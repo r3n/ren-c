@@ -340,6 +340,20 @@ Special internal defines used by RT, not Host-Kit developers:
     #endif
 
     #define DEBUG_ENABLE_ALWAYS_MALLOC
+
+    // System V ABI for X86 says alignment can be 4 bytes for double.  But
+    // you can change this in the compiler settings.  We should either sync
+    // with that setting or just skip it, and assume that we do enough
+    // checking on the 64-bit builds.
+    // 
+    // https://stackoverflow.com/q/14893802/
+    //
+    // !!! We are overpaying for the ALIGN_SIZE if it's not needed for double,
+    // so perhaps ALIGN_SIZE should be configured in build settings...
+    //
+    #if !defined(TO_WINDOWS_X86) && !defined(TO_LINUX_X86)
+        #define DEBUG_DONT_CHECK_ALIGN
+    #endif
 #else
     // We may want to test the valgrind build even if it's release so that
     // it checks the R3_ALWAYS_MALLOC environment variable
@@ -347,20 +361,6 @@ Special internal defines used by RT, not Host-Kit developers:
     #if defined(INCLUDE_CALLGRIND_NATIVE)
         #define DEBUG_ENABLE_ALWAYS_MALLOC
     #endif
-#endif
-
-// System V ABI for X86 says alignment can be 4 bytes for double.  However,
-// you can change this in the compiler settings.  We should either sync with
-// that setting or just skip it, and assume that we do enough checking on the
-// 64-bit builds.
-// 
-// https://stackoverflow.com/q/14893802/
-//
-// !!! We are overpaying for the ALIGN_SIZE if it's not needed for double,
-// so perhaps it is that which should be configurable in the build settings...
-//
-#if defined(TO_WINDOWS_X86) || defined(TO_LINUX_X86)
-    #define DEBUG_DONT_CHECK_ALIGN
 #endif
 
 

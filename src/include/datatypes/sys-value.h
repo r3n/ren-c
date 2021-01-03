@@ -448,7 +448,7 @@ inline static REBVAL *RESET_CUSTOM_CELL(
 // This is another case where the debug build doesn't inline functions.
 // Run the risk of repeating macro args to speed up this critical check.
 //
-#ifdef DEBUG_DONT_CHECK_ALIGN
+#if !defined(DEBUG_CHECK_ALIGN)
     #define ALIGN_CHECK_CELL_EVIL_MACRO(c)    NOOP
 #else
     #define ALIGN_CHECK_CELL_EVIL_MACRO(c) \
