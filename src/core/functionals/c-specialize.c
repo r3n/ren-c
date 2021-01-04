@@ -222,7 +222,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         //
         REBDSP dsp = highest_ordered_dsp;
         for (; dsp != lowest_ordered_dsp; --dsp) {
-            REBVAL *ordered = DS_AT(dsp);
+            STKVAL(*) ordered = DS_AT(dsp);
             if (VAL_WORD_SPELLING(ordered) != symbol)
                 continue;  // just continuing this loop
 
@@ -392,7 +392,7 @@ bool Specialize_Action_Throws(
                 //
                 while (ordered_dsp != DSP) {
                     ++ordered_dsp;
-                    REBVAL *ordered = DS_AT(ordered_dsp);
+                    STKVAL(*) ordered = DS_AT(ordered_dsp);
 
                     if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
                         fail (Error_Bad_Refine_Raw(ordered));
@@ -474,7 +474,7 @@ bool Specialize_Action_Throws(
     //
     while (ordered_dsp != DSP) {
         ++ordered_dsp;
-        REBVAL *ordered = DS_AT(ordered_dsp);
+        STKVAL(*) ordered = DS_AT(ordered_dsp);
         if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
             fail (Error_Bad_Refine_Raw(ordered));
 

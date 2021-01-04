@@ -391,7 +391,7 @@ requote: reframer func* [
     :left "Enforces nothing to the left of the pointfree expression"
         [<end>]
     :expression "POINTFREE expression, BLANK!s are unspecialized arg slots"
-        [any-value! <...>]
+        [any-value! <variadic>]
 ][
     pointfree make block! expression  ; !!! Allow Vararg param for efficiency?
 ]

@@ -249,7 +249,7 @@ REBCTX *Get_Context_From_Stack(void)
 // which could do a push or pop.  (Currently stable w.r.t. pop but there may
 // be compaction at some point.)
 //
-REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
+void Expand_Data_Stack_May_Fail(REBLEN amount)
 {
     REBLEN len_old = ARR_LEN(DS_Array);
 
@@ -299,7 +299,6 @@ REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
     assert(cell == ARR_TAIL(DS_Array));
 
     ASSERT_ARRAY(DS_Array);
-    return DS_TOP;
 }
 
 
@@ -310,6 +309,10 @@ REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
 //
 REBARR *Pop_Stack_Values_Core(REBDSP dsp_start, REBFLGS flags)
 {
+  #ifdef DEBUG_EXTANT_STACK_POINTERS
+    assert(TG_Stack_Outstanding == 0);  // in the future, pop may disrupt
+  #endif
+
     REBARR *array = Copy_Values_Len_Shallow_Core(
         DS_AT(dsp_start + 1), // start somewhere in the stack, end at DS_TOP
         SPECIFIED, // data stack should be fully specified--no relative values

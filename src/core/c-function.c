@@ -293,7 +293,7 @@ void Push_Paramlist_Triads_May_Fail(
 
             // Save the block for parameter types.
             //
-            REBVAL* param;
+            STKVAL(*) param;
             if (IS_PARAM(DS_TOP)) {
                 REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
                 Init_Block(
@@ -608,7 +608,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             Move_Value(DS_PUSH(), EMPTY_TEXT);
         }
         else {
-            REBVAL *param = DS_AT(definitional_return_dsp);
+            STKVAL(*) param = DS_AT(definitional_return_dsp);
             assert(
                 VAL_PARAM_CLASS(param) == REB_P_LOCAL
                 or VAL_PARAM_CLASS(param) == REB_P_SEALED  // !!! review reuse
@@ -630,7 +630,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     // There should be no more pushes past this point, so a stable pointer
     // into the stack for the definitional return can be found.
     //
-    REBVAL *definitional_return =
+    STKVAL(*) definitional_return =
         definitional_return_dsp == 0
             ? nullptr
             : DS_AT(definitional_return_dsp);
@@ -669,7 +669,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     const REBSTR *duplicate = nullptr;
 
-    REBVAL *src = DS_AT(dsp_orig + 1) + 3;
+    STKVAL(*) src = DS_AT(dsp_orig + 1) + 3;
 
     if (definitional_return) {
         assert(flags & MKF_RETURN);
@@ -761,7 +761,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         REBVAL *dest = SPECIFIC(rootvar) + 1;
         const RELVAL *param = ARR_AT(paramlist, 1);
 
-        REBVAL *src = DS_AT(dsp_orig + 2);
+        STKVAL(*) src = DS_AT(dsp_orig + 2);
         src += 3;
 
         if (definitional_return) {
@@ -827,7 +827,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         const RELVAL *param = ARR_AT(paramlist, 1);
         REBVAL *dest = SPECIFIC(rootvar) + 1;
 
-        REBVAL *src = DS_AT(dsp_orig + 3);
+        STKVAL(*) src = DS_AT(dsp_orig + 3);
         src += 3;
 
         if (definitional_return) {
@@ -875,6 +875,10 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             CTX(notes_varlist)
         );
     }
+
+  #ifdef DEBUG_EXTANT_STACK_POINTERS
+    definitional_return = nullptr;  // holds a count otherwise
+  #endif
 
     // With all the values extracted from stack to array, restore stack pointer
     //

@@ -206,6 +206,10 @@ TVAR uintptr_t TG_Stack_Limit;    // Limit address for CPU stack.
     TVAR intptr_t TG_Num_Black_Series;
 #endif
 
+#ifdef DEBUG_EXTANT_STACK_POINTERS
+    TVAR REBLEN TG_Stack_Outstanding;  // how many DS_AT()/DS_TOP refs extant
+#endif
+
 // Each time Eval_Core is called a Reb_Frame* is pushed to the "frame stack".
 // Some pushed entries will represent groups or paths being executed, and
 // some will represent functions that are gathering arguments...hence they

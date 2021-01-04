@@ -328,6 +328,19 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     if (TG_Jump_List == nullptr)
         panic (error);
 
+  #ifdef DEBUG_EXTANT_STACK_POINTERS
+    //
+    // We trust that the stack levels were checked on each evaluator step as
+    // 0, so that when levels are unwound we should be back to 0 again.  The
+    // longjmp will cross the C++ destructors, which is technically undefined
+    // but for this debug setting we can hope it will just not run them.
+    //
+    // Set_Location_Of_Error() uses stack, so this has to be done first, else
+    // the DS_PUSH() will warn that there is stack outstanding.
+    //
+    TG_Stack_Outstanding = 0;
+  #endif
+
     // If the error doesn't have a where/near set, set it from stack
     //
     // !!! Do not do this for out off memory errors, as it allocates memory.

@@ -546,7 +546,7 @@ static void Mark_Data_Stack(void)
     REBVAL *head = SPECIFIC(ARR_HEAD(DS_Array));
     ASSERT_UNREADABLE_IF_DEBUG(head);  // DS_AT(0) is deliberately invalid
 
-    REBVAL *stackval = DS_TOP;
+    REBVAL *stackval = DS_Movable_Top;
     for (; stackval != head; --stackval)  // stop before DS_AT(0)
         Queue_Mark_Value_Deep(stackval);
 

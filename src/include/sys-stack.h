@@ -50,6 +50,10 @@
 //
 //=// NOTES ///////////////////////////////////////////////////////////////=//
 //
+// * Do not store the result of a DS_PUSH() directly into a REBVAL* variable.
+//   Instead, use the STKVAL(*) type, which makes sure that you don't try
+//   to hold a parameter across another push or an evaluation.
+//
 // * The data stack is limited in size, and this means code that uses it may
 //   break down when working on larger cases:
 //
@@ -58,10 +62,96 @@
 // * Although R3-Alpha used the data stack for pushing function arguments,
 //   the arguments were frequently passed around by pointer (vs. using an
 //   indexed "DSP" position).  This was bad since the data stack could
-//   relocate its contents due to growth.  For this and oher reasons,
+//   relocate its contents due to growth.  For this and other reasons,
 //   the Rebol call stack is built out of linked REBARR allocations which
 //   can be used to back FRAME! contexts.
 //
+
+// The result of DS_PUSH() and DS_TOP is not REBVAL*, but STKVAL(*).  In an
+// unchecked build this is just a REBVAL*, but with DEBUG_EXTANT_STACK_POINTERS
+// it becomes a checked C++ wrapper class...which keeps track of how many
+// such stack values are extant.  If the number is not zero, then you will
+// get an assert if you try to DS_PUSH() or DS_DROP(), as well as if you
+// try to run any evaluations.
+//
+// NOTE: Due to the interactions of longjmp() with crossing C++ destructors,
+// using this debug setting is technically undefined behavior if a fail()
+// occurs while a stack value is outstanding.  However, we just assume the
+// destructor is not called in this case...and the fail mechanism sets the
+// outstanding count to zero.
+//
+#if !defined(DEBUG_EXTANT_STACK_POINTERS)
+    #define STKVAL(p) REBVAL*
+#else
+    struct Reb_Stack_Value_Ptr {
+        REBVAL *v;
+
+      public:
+        Reb_Stack_Value_Ptr () : v (nullptr) {}
+        Reb_Stack_Value_Ptr (REBVAL *v) : v (v) {
+            if (v != nullptr)
+                ++TG_Stack_Outstanding;
+        }
+        Reb_Stack_Value_Ptr (const Reb_Stack_Value_Ptr &stk) : v (stk.v) {
+            if (v != nullptr)
+                ++TG_Stack_Outstanding;
+        }
+        ~Reb_Stack_Value_Ptr() {
+            if (v != nullptr)
+                --TG_Stack_Outstanding;
+        }
+
+        Reb_Stack_Value_Ptr& operator=(const Reb_Stack_Value_Ptr& other) {
+            if (v != nullptr)
+                --TG_Stack_Outstanding;
+            v = other.v;
+            if (v != nullptr)
+                ++TG_Stack_Outstanding;
+            return *this;
+        }
+
+        operator REBVAL* () { return v; }
+        REBVAL* operator->() { return v; }
+
+        bool operator==(const Reb_Stack_Value_Ptr &other)
+            { return this->v == other.v; }
+        bool operator!=(const Reb_Stack_Value_Ptr &other)
+            { return this->v != other.v; }
+        bool operator<=(const Reb_Stack_Value_Ptr &other)
+            { return this->v <= other.v; }
+        bool operator>=(const Reb_Stack_Value_Ptr &other)
+            { return this->v >= other.v; }
+
+        Reb_Stack_Value_Ptr operator+(ptrdiff_t diff)
+            { return this->v + diff; }
+        Reb_Stack_Value_Ptr& operator+=(ptrdiff_t diff)
+            { this->v += diff; return *this; }
+        Reb_Stack_Value_Ptr operator-(ptrdiff_t diff)
+            { return this->v - diff; }
+        Reb_Stack_Value_Ptr& operator-=(ptrdiff_t diff)
+            { this->v -= diff; return *this; }
+
+        Reb_Stack_Value_Ptr& operator--()  // prefix decrement
+            { --this->v; return *this; }
+        Reb_Stack_Value_Ptr operator--(int)  // postfix decrement
+        {
+           Reb_Stack_Value_Ptr temp = *this;
+           --*this;
+           return temp;
+        }
+
+        Reb_Stack_Value_Ptr& operator++()  // prefix increment
+            { ++this->v; return *this; }
+        Reb_Stack_Value_Ptr operator++(int)  // postfix increment
+        {
+           Reb_Stack_Value_Ptr temp = *this;
+           ++*this;
+           return temp;
+        }
+    };
+
+    #define STKVAL(p) Reb_Stack_Value_Ptr
+#endif
 
 
 // DSP stands for "(D)ata (S)tack "(P)osition", and is the index of the top
@@ -73,13 +163,13 @@
 // DS_TOP is the most recently pushed item.
 //
 #define DS_TOP \
-    cast(REBVAL*, DS_Movable_Top) // cast helps stop ++DS_TOP, etc.
+    cast(STKVAL(*), DS_Movable_Top) // cast helps stop ++DS_TOP, etc.
 
 // DS_AT accesses value at given stack location.  It is allowed to point at
 // a stack location that is an end, e.g. DS_AT(dsp + 1), because that location
 // may be used as the start of a copy which is ultimately of length 0.
 //
-inline static REBVAL *DS_AT(REBDSP d) {
+inline static STKVAL(*) DS_AT(REBDSP d) {
     REBVAL *at = SPECIFIC(ARR_HEAD(DS_Array) + d);
     assert(
         ((at->header.bits & NODE_FLAG_CELL) and d <= (DSP + 1))
@@ -108,12 +198,20 @@ inline static REBVAL *DS_AT(REBDSP d) {
 
 #define STACK_EXPAND_BASIS 128
 
-// Note: DS_Movable_Top is DS_TOP, but it asserts on ENDs...
+// Note: DS_Movable_Top is just DS_TOP, but accessing DS_TOP asserts on ENDs
 //
-#define DS_PUSH() \
-    (++DS_Index, ++DS_Movable_Top, IS_END(DS_Movable_Top) \
-        ? Expand_Data_Stack_May_Fail(STACK_EXPAND_BASIS) \
-        : TRASH_CELL_IF_DEBUG(DS_Movable_Top)) \
+inline static STKVAL(*) DS_PUSH() {
+  #ifdef DEBUG_EXTANT_STACK_POINTERS
+    assert(TG_Stack_Outstanding == 0);  // push may disrupt any extant values
+  #endif
+    ++DS_Index;
+    ++DS_Movable_Top;
+    if (IS_END(DS_Movable_Top))
+        Expand_Data_Stack_May_Fail(STACK_EXPAND_BASIS);
+    else
+        TRASH_CELL_IF_DEBUG(DS_Movable_Top);
+    return DS_Movable_Top;
+}
 
 
 //
@@ -132,12 +230,18 @@ inline static REBVAL *DS_AT(REBDSP d) {
         (DS_Movable_Top -= (DS_Index - (dsp)), DS_Index = (dsp))
 #else
     inline static void DS_DROP(void) {
+      #ifdef DEBUG_EXTANT_STACK_POINTERS
+        assert(TG_Stack_Outstanding == 0);  // in the future, pop may disrupt
+      #endif
         Init_Unreadable_Void(DS_TOP); // mostly trashy but safe for NOT_END()
         --DS_Index;
         --DS_Movable_Top;
     }
 
     inline static void DS_DROP_TO(REBDSP dsp) {
+      #ifdef DEBUG_EXTANT_STACK_POINTERS
+        assert(TG_Stack_Outstanding == 0);  // in the future, pop may disrupt
+      #endif
         assert(DSP >= dsp);
         while (DSP != dsp)
             DS_DROP();

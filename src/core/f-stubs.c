@@ -489,7 +489,7 @@ int64_t Mul_Max(enum Reb_Kind type, int64_t n, int64_t m, int64_t maxi)
 // "be smart" so even a TEXT! can be turned into a SET-WORD! (just an
 // unbound one).
 //
-REBVAL *Setify(REBVAL *out) {
+REBVAL *Setify(REBVAL *out) {  // called on stack values; can't call evaluator
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);
@@ -508,18 +508,8 @@ REBVAL *Setify(REBVAL *out) {
     else if (ANY_GROUP_KIND(kind)) {
         mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SET_GROUP;
     }
-    else if (kind == REB_NULL) {
+    else
         fail ("Cannot SETIFY a NULL");
-    }
-    else {
-        // !!! For everything else, as en experiment see if there's some
-        // kind of logic to turn into a SET-WORD!  Calling through the
-        // API is slow, but easy to do for a test.
-        //
-        REBVAL *set = rebValueQ("to set-word!", out, rebEND);
-        Move_Value(out, set);
-        rebRelease(set);
-    }
 
     return Quotify(out, quotes);
 }
@@ -547,7 +537,7 @@ REBNATIVE(setify)
 //
 // Like Setify() but Makes GET-XXX! instead of SET-XXX!.
 //
-REBVAL *Getify(REBVAL *out) {
+REBVAL *Getify(REBVAL *out) {  // called on stack values; can't call evaluator
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);
@@ -566,16 +556,8 @@ REBVAL *Getify(REBVAL *out) {
     else if (ANY_WORD_KIND(kind)) {
         mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_GET_WORD;
     }
-    else if (kind == REB_NULL) {
-        fail ("Cannot GETIFY a NULL");
-    }
-    else {
-        // !!! Experiment...see what happens if we fall back on GET-WORD!
-        //
-        REBVAL *get = rebValueQ("to get-word!", out, rebEND);
-        Move_Value(out, get);
-        rebRelease(get);
-    }
+    else
+        fail ("Cannot GETIFY");
 
     return Quotify(out, quotes);
 }
@@ -605,7 +587,7 @@ REBNATIVE(getify)
 // "be smart" so even a TEXT! can be turned into a SYM-WORD! (just an
 // unbound one).
 //
-REBVAL *Symify(REBVAL *out) {
+REBVAL *Symify(REBVAL *out) {  // called on stack values; can't call evaluator
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);
@@ -624,18 +606,8 @@ REBVAL *Symify(REBVAL *out) {
     else if (ANY_GROUP_KIND(kind)) {
         mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_GROUP;
     }
-    else if (kind == REB_NULL) {
-        fail ("Cannot SYMIFY a NULL");
-    }
-    else {
-        // !!! For everything else, as en experiment see if there's some
-        // kind of logic to turn into a SET-WORD!  Calling through the
-        // API is slow, but easy to do for a test.
-        //
-        REBVAL *set = rebValueQ("to sym-word!", out, rebEND);
-        Move_Value(out, set);
-        rebRelease(set);
-    }
+    else
+        fail ("Cannot SYMIFY");
 
     return Quotify(out, quotes);
 }

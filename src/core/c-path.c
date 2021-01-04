@@ -641,9 +641,10 @@ bool Eval_Path_Throws_Core(
         // pushed as ISSUE!s (we needed to evaluate them in forward order).
         // This way we can just pop them as we go, and know if they weren't
         // all consumed if not back to `dsp_orig` by the end.
-
-        REBVAL *bottom = DS_AT(dsp_orig + 1);
-        REBVAL *top = DS_TOP;
+        //
+      blockscope {
+        STKVAL(*) bottom = DS_AT(dsp_orig + 1);
+        STKVAL(*) top = DS_TOP;
 
         DECLARE_LOCAL (temp);
         while (top > bottom) {
@@ -660,6 +661,7 @@ bool Eval_Path_Throws_Core(
             top--;
             bottom++;
         }
+      }
 
         assert(IS_ACTION(pvs->out));
 

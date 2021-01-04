@@ -120,6 +120,10 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
     // on the data stack or mold stack/etc.  See Drop_Frame() for the actual
     // balance check.
 
+  #ifdef DEBUG_EXTANT_STACK_POINTERS
+    assert(TG_Stack_Outstanding == 0);
+  #endif
+
     // See notes on f->feed->gotten about the coherence issues in the face
     // of arbitrary function execution.
     //
@@ -228,6 +232,10 @@ void Do_Process_Action_Checks_Debug(REBFRM *f) {
 
     assert(IS_FRAME(f->rootvar));
     assert(f->arg == f->rootvar + 1);
+
+  #ifdef DEBUG_EXTANT_STACK_POINTERS
+    assert(TG_Stack_Outstanding == 0);
+  #endif
 
     REBACT *phase = VAL_FRAME_PHASE(f->rootvar);
 

@@ -2510,8 +2510,8 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         // mutating it into a single element GROUP!.
         //
       blockscope {
-        REBVAL *head = DS_AT(dsp_path_head);
-        REBVAL *cleanup = head + 1;
+        STKVAL(*) head = DS_AT(dsp_path_head);
+        STKVAL(*) cleanup = head + 1;
         for (; cleanup <= DS_TOP; ++cleanup) {
             if (IS_GET_WORD(cleanup)) {
                 REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);

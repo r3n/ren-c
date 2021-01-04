@@ -480,13 +480,13 @@ inline static RELVAL *Prep_Cell_Core(RELVAL *c) {
     #define TRASH_VALUE \
         cast(const REBVAL*, &PG_Trash_Value_Debug)
 
-    inline static RELVAL *Init_Trash_Debug(RELVAL *v) {
+    inline static REBVAL *Init_Trash_Debug(RELVAL *v) {
         ASSERT_CELL_WRITABLE_EVIL_MACRO(v);
         v->header.bits &= CELL_MASK_PERSIST;
         v->header.bits |=
             FLAG_KIND3Q_BYTE(REB_T_TRASH)
                 | FLAG_HEART_BYTE(REB_T_TRASH);
-        return v;
+        return cast(REBVAL*, v);
     }
 
     #define TRASH_CELL_IF_DEBUG(v) \

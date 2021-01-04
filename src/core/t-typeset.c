@@ -143,19 +143,12 @@ bool Add_Typeset_Bits_Core(
             item = maybe_word;  // wasn't variable
 
         if (IS_TUPLE(item)) {
-            DECLARE_LOCAL (specific);
-            Derelativize(specific, item, VAL_SEQUENCE_SPECIFIER(item));
-            if (rebDidQ("equal?", specific, "'<...>", rebEND)) {
-                //
-                // !!! The actual final notation for variadics is not decided
-                // on, so there is compatibility for now with the <...> form
-                // from when that was a TAG! vs. a 5-element TUPLE!  While
-                // core sources were changed to `<variadic>`, asking users
-                // to shuffle should only be done once (when final is known).
-                //
-                TYPE_SET(typeset, REB_TS_VARIADIC);
-                continue;
-            }
+            //
+            // !!! This previously called rebDidQ() with "equal?" to check for
+            // the <...> signal for variadics, which is now an odd tuple.
+            // The problem is that you can't call the evaluator while pushing
+            // parameters and typesets to the stack, since the typeset is
+            // in a stack variable.  Review.
         }
 
         if (IS_TAG(item)) {

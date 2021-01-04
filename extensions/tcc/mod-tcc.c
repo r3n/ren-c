@@ -655,10 +655,10 @@ REBNATIVE(compile_p)
     // their function pointers to substitute in for the dispatcher.
     //
     while (DSP != dsp_orig) {
-        REBVAL *native = DS_TOP;
-        assert(IS_ACTION(native) and Is_User_Native(VAL_ACTION(native)));
+        REBACT *action = VAL_ACTION(DS_TOP);  // stack will hold action live
+        assert(Is_User_Native(action));  // can't cache stack pointer, extract
 
-        REBARR *details = ACT_DETAILS(VAL_ACTION(native));
+        REBARR *details = ACT_DETAILS(action);
         REBVAL *linkname = SPECIFIC(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME));
 
         char *name_utf8 = rebSpell("ensure text!", linkname, rebEND);
@@ -676,7 +676,7 @@ REBNATIVE(compile_p)
         assert(sizeof(c_func) == sizeof(void*));
         memcpy(&c_func, &sym, sizeof(c_func));
 
-        ACT_DISPATCHER(VAL_ACTION(native)) = c_func;
+        ACT_DISPATCHER(action) = c_func;
         Move_Value(ARR_AT(details, IDX_TCC_NATIVE_STATE), handle);
 
         DS_DROP();
