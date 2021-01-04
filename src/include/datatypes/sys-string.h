@@ -382,6 +382,20 @@ inline static bool IS_SER_STRING(const REBSER *s) {
     return true;
 }
 
+
+//=//// STRING_FLAG_IS_SYMBOL /////////////////////////////////////////////=//
+//
+// If a string is a symbol, then that means it is legal to use in ANY-WORD!.
+// If it is aliased in an ANY-STRING! or BINARY!, it will be read-only.
+//
+// See notes on SERIES_FLAG_IS_KEYLIKE for why this same bit is used for
+// arrays when they are keylists.
+//
+// !!! It is possible for non-symbols to be interned and hashed as well, with
+// filenames.  What removes those interning table entries?
+//
+#define STRING_FLAG_IS_SYMBOL SERIES_FLAG_IS_KEYLIKE
+
 // While the content format is UTF-8 for both ANY-STRING! and ANY-WORD!, the
 // MISC() and LINK() fields are used differently.  A string caches its length
 // in codepoints so that doesn't have to be recalculated, and it also has

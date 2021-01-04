@@ -205,20 +205,6 @@
     FLAG_LEFT_BIT(12)
 
 
-//=//// STRING_FLAG_IS_SYMBOL /////////////////////////////////////////////=//
-//
-// If a string is a symbol, then that means it is legal to use in ANY-WORD!.
-// If it is aliased in an ANY-STRING! or BINARY!, it will be read-only.
-//
-// !!! It is possible for non-symbols to be interned and hashed as well, with
-// filenames.  What removes those interning table entries?
-//
-#define SERIES_FLAG_13 \
-    FLAG_LEFT_BIT(13)
-
-#define STRING_FLAG_IS_SYMBOL SERIES_FLAG_13
-
-
 //=//// SERIES_FLAG_LINK_NODE_NEEDS_MARK //////////////////////////////////=//
 //
 // This indicates that a series's LINK() field is the `custom` node element,
@@ -228,7 +214,7 @@
 // just not one that should be marked.
 //
 #define SERIES_FLAG_LINK_NODE_NEEDS_MARK \
-    FLAG_LEFT_BIT(14)
+    FLAG_LEFT_BIT(13)
 
 
 //=//// SERIES_FLAG_MISC_NODE_NEEDS_MARK //////////////////////////////////=//
@@ -240,8 +226,18 @@
 // just not one that should be marked.
 //
 #define SERIES_FLAG_MISC_NODE_NEEDS_MARK \
-    FLAG_LEFT_BIT(15)
+    FLAG_LEFT_BIT(14)
 
+
+//=//// SERIES_FLAG_IS_KEYLIKE ////////////////////////////////////////////=//
+//
+// This flag is used to have a shareable bit between arrays and non-arrays,
+// specifically so that the same bit can indicate ARRAY_FLAG_IS_KEYLIST and
+// STRING_FLAG_IS_SYMBOL.  This is to anticipate a future where single-length
+// keylists can be represented compactly as just a pointer to the symbol.
+//
+#define SERIES_FLAG_IS_KEYLIKE \
+    FLAG_LEFT_BIT(15)
 
 
 //=/////// ^-- STOP GENERIC SERIES FLAGS AT FLAG_LEFT_BIT(15) --^ /////////=//

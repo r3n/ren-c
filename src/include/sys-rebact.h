@@ -40,6 +40,17 @@ struct Reb_Action {
 // Note: LINK on details is the DISPATCHER, on varlists it's KEYSOURCE
 
 
+//=//// ARRAY_FLAG_IS_KEYLIST /////////////////////////////////////////////=//
+//
+// Context keylist arrays and Action paramlist arrays are converging, and
+// this flag is used to mark them.  It's the same bit as used to mark a
+// string as being a symbol, which is a forward-thinking move to aim for a
+// time when single-length keylists can be represented by just a pointer to
+// a symbol.
+//
+#define ARRAY_FLAG_IS_KEYLIST SERIES_FLAG_IS_KEYLIKE
+
+
 //=//// PARAMLIST_FLAG_HAS_RETURN /////////////////////////////////////////=//
 //
 // See ACT_HAS_RETURN() for remarks.  Note: This is a flag on PARAMLIST, not
@@ -181,17 +192,15 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 // allocated dynamically, in order to make access to the archetype and the
 // parameters faster than ARR_AT().  See code for ACT_PARAM(), etc.
 //
-// Includes SERIES_FLAG_FIXED_SIZE because for now, the user can't expand
-// them (e.g. by APPENDing to a FRAME! value).  Also, no internal tricks
-// for function composition expand them either at this time.
+// !!! This used to include SERIES_FLAG_FIXED_SIZE for both.  However, that
+// meant the mask was different for paramlists and context keylists (which
+// are nearing full convergence).  And on the details array, it got in the
+// way of HIJACK, which may perform expansion.  So that was removed.
 //
-#define SERIES_MASK_PARAMLIST \
-    (NODE_FLAG_NODE | SERIES_FLAG_ALWAYS_DYNAMIC | SERIES_FLAG_FIXED_SIZE \
-        | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* ancestor */ \
-        /* misc is not currently used */ )
+#define SERIES_MASK_PARAMLIST SERIES_MASK_KEYLIST
 
 #define SERIES_MASK_DETAILS \
-    (NODE_FLAG_NODE  /* not fixed size, may expand via HIJACK etc.*/ \
+    (NODE_FLAG_NODE \
         | SERIES_FLAG_MISC_NODE_NEEDS_MARK  /* meta */ \
         | ARRAY_FLAG_IS_DETAILS \
         /* LINK is dispatcher, a c function pointer, should not mark */ )
