@@ -66,7 +66,7 @@ inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
     if (k != REB_CUSTOM)
         return SYM_FROM_KIND(k);
 
-    unstable RELVAL *ext = ARR_HEAD(PG_Extension_Types);
+    RELVAL *ext = ARR_HEAD(PG_Extension_Types);
     REBTYP *t = VAL_TYPE_CUSTOM(v);
     if (t == VAL_TYPE_CUSTOM(ext + 0))
         return SYM_LIBRARY_X;
@@ -98,7 +98,7 @@ inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
 #define VAL_TYPESET_HIGH_BITS(v) \
     EXTRA(Typeset, (v)).high_bits
 
-inline static bool TYPE_CHECK(unstable REBCEL(const*) v, REBYTE n) {
+inline static bool TYPE_CHECK(REBCEL(const*) v, REBYTE n) {
     assert(HEART_BYTE(v) == REB_TYPESET);
 
     if (n < 32)
@@ -108,7 +108,7 @@ inline static bool TYPE_CHECK(unstable REBCEL(const*) v, REBYTE n) {
     return did (VAL_TYPESET_HIGH_BITS(v) & FLAGIT_KIND(n - 32));
 }
 
-inline static bool TYPE_CHECK_BITS(unstable REBCEL(const*) v, REBU64 bits) {
+inline static bool TYPE_CHECK_BITS(REBCEL(const*) v, REBU64 bits) {
     assert(HEART_BYTE(v) == REB_TYPESET);
 
     uint_fast32_t low = bits & cast(uint32_t, 0xFFFFFFFF);
@@ -123,7 +123,7 @@ inline static bool TYPE_CHECK_BITS(unstable REBCEL(const*) v, REBU64 bits) {
 }
 
 inline static bool TYPE_CHECK_EXACT_BITS(
-    unstable REBCEL(const*) v,
+    REBCEL(const*) v,
     REBU64 bits
 ){
     assert(HEART_BYTE(v) == REB_TYPESET);
@@ -139,7 +139,7 @@ inline static bool TYPE_CHECK_EXACT_BITS(
     return true;
 }
 
-inline static void TYPE_SET(unstable RELVAL *v, REBYTE n) {
+inline static void TYPE_SET(RELVAL *v, REBYTE n) {
     assert(HEART_BYTE(v) == REB_TYPESET);
 
     if (n < 32) {
@@ -150,7 +150,7 @@ inline static void TYPE_SET(unstable RELVAL *v, REBYTE n) {
     VAL_TYPESET_HIGH_BITS(v) |= FLAGIT_KIND(n - 32);
 }
 
-inline static void TYPE_CLEAR(unstable RELVAL *v, REBYTE n) {
+inline static void TYPE_CLEAR(RELVAL *v, REBYTE n) {
     assert(HEART_BYTE(v) == REB_TYPESET);
 
     if (n < 32) {
@@ -162,8 +162,8 @@ inline static void TYPE_CLEAR(unstable RELVAL *v, REBYTE n) {
 }
 
 inline static bool EQUAL_TYPESET(
-    unstable REBCEL(const*) v1,
-    unstable REBCEL(const*) v2
+    REBCEL(const*) v1,
+    REBCEL(const*) v2
 ){
     assert(HEART_BYTE(v1) == REB_TYPESET);
     assert(HEART_BYTE(v2) == REB_TYPESET);
@@ -175,7 +175,7 @@ inline static bool EQUAL_TYPESET(
     return true;
 }
 
-inline static void CLEAR_ALL_TYPESET_BITS(unstable RELVAL *v) {
+inline static void CLEAR_ALL_TYPESET_BITS(RELVAL *v) {
     assert(HEART_BYTE(v) == REB_TYPESET);
 
     VAL_TYPESET_HIGH_BITS(v) = 0;
@@ -273,7 +273,7 @@ typedef enum Reb_Kind Reb_Param_Class;
     // when they do have to worry about it, it 
 
 
-inline static Reb_Param_Class VAL_PARAM_CLASS(unstable const RELVAL *v) {
+inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
     assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
     return cast(Reb_Param_Class, KIND3Q_BYTE_UNCHECKED(v));
 }
@@ -346,7 +346,7 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(unstable const RELVAL *v) {
 // so the "special" (see ACT_SPECIALTY()) is allowed to be the same as param.
 //
 inline static bool Is_Param_Hidden(
-    unstable const RELVAL *param,
+    const RELVAL *param,
     const RELVAL *special  // should be param -or- the context value
 ){
     // Once a parameter is hidden, it is either visible in the frame or part
@@ -368,12 +368,12 @@ inline static bool Is_Param_Hidden(
     return GET_CELL_FLAG(special, ARG_MARKED_CHECKED);
 }
 
-inline static void Hide_Param(unstable RELVAL *param) {
+inline static void Hide_Param(RELVAL *param) {
     assert(VAL_PARAM_CLASS(param) != REB_P_SEALED);
     mutable_KIND3Q_BYTE(param) = REB_P_LOCAL;
 }
 
-inline static void Seal_Param(unstable RELVAL *param) {
+inline static void Seal_Param(RELVAL *param) {
     mutable_KIND3Q_BYTE(param) = REB_P_SEALED;
 }
 
@@ -412,12 +412,12 @@ inline static void Seal_Param(unstable RELVAL *param) {
 //
 // Name should be NULL unless typeset in object keylist or func paramlist
 
-inline static const REBSTR *VAL_KEY_SPELLING(unstable const RELVAL *v) {
+inline static const REBSTR *VAL_KEY_SPELLING(const RELVAL *v) {
     assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
     return VAL_TYPESET_STRING(v);
 }
 
-inline static OPT_REBSYM VAL_KEY_SYM(unstable const RELVAL *v) {
+inline static OPT_REBSYM VAL_KEY_SYM(const RELVAL *v) {
     assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
     return STR_SYMBOL(VAL_KEY_SPELLING(v)); // mirrors canon's symbol
 }
@@ -425,22 +425,13 @@ inline static OPT_REBSYM VAL_KEY_SYM(unstable const RELVAL *v) {
 #define VAL_PARAM_SPELLING(p) VAL_KEY_SPELLING(p)
 #define VAL_PARAM_SYM(p) VAL_KEY_SYM(p)
 
-inline static REBVAL *Init_Typeset(unstable_ok RELVAL *out, REBU64 bits)
+inline static REBVAL *Init_Typeset(RELVAL *out, REBU64 bits)
 {
     RESET_CELL(out, REB_TYPESET, CELL_MASK_NONE);
     VAL_TYPESET_LOW_BITS(out) = bits & cast(uint32_t, 0xFFFFFFFF);
     VAL_TYPESET_HIGH_BITS(out) = bits >> 32;
     return cast(REBVAL*, out);
 }
-
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Init_Typeset(
-        unstable RELVAL *out,
-        REBU64 bits
-    ){
-        return Init_Typeset(STABLE(out), bits);
-    }
-#endif
 
 
 // For the moment, a param has a cell kind that is a REB_TYPESET, but then
@@ -450,7 +441,7 @@ inline static REBVAL *Init_Typeset(unstable_ok RELVAL *out, REBU64 bits)
 // for a generalized typeset!)
 //
 inline static REBVAL *Init_Param_Core(
-    unstable RELVAL *out,
+    RELVAL *out,
     Reb_Param_Class pclass,
     const REBSTR *spelling,
     REBU64 bits
@@ -486,8 +477,8 @@ inline static REBVAL *Init_Param_Core(
 
 
 inline static REBVAL *Refinify(REBVAL *v);  // forward declaration
-inline static bool IS_REFINEMENT(const RELVAL *v);  // forward declaration
-inline static bool IS_PREDICATE(const RELVAL *v);  // forward declaration
+inline static bool IS_REFINEMENT(const RELVAL *v);  // forward decl
+inline static bool IS_PREDICATE(const RELVAL *v);  // forward decl
 
 
 // This is an interim workaround for the need to be able check constrained
@@ -543,7 +534,7 @@ inline static bool Is_Typeset_Empty(const RELVAL *param) {
 
 // Forward definition needed...
 //
-inline static bool Is_Blackhole(unstable const RELVAL *v);
+inline static bool Is_Blackhole(const RELVAL *v);
 
 
 // During the process of specialization, a NULL refinement means that it has
@@ -557,7 +548,10 @@ inline static bool Is_Blackhole(unstable const RELVAL *v);
 // dequoting and requoting, etc.  Those are evaluator mechanics for filling
 // the slot--this happens after that.
 //
-inline static void Typecheck_Refinement(const RELVAL *param, REBVAL *arg) {
+inline static void Typecheck_Refinement(
+    const RELVAL *param,
+    REBVAL *arg
+){
     assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
     assert(TYPE_CHECK(param, REB_TS_REFINEMENT));
 

@@ -219,7 +219,7 @@ REB_R MAKE_String(
         // to produce #{abcd2}.  That behavior is not available in Ren-C.
 
         REBLEN len;
-        unstable const RELVAL *first = VAL_ARRAY_LEN_AT(&len, def);
+        const RELVAL *first = VAL_ARRAY_LEN_AT(&len, def);
 
         if (len != 2)
             goto bad_make;
@@ -227,7 +227,7 @@ REB_R MAKE_String(
         if (not ANY_STRING(first))
             goto bad_make;
 
-        unstable const RELVAL *index = first + 1;
+        const RELVAL *index = first + 1;
         if (!IS_INTEGER(index))
             goto bad_make;
 

@@ -190,7 +190,7 @@ REBNATIVE(bind)
         fail (Error_Invalid_Arg(frame_, PAR(value)));
     }
 
-    unstable RELVAL *at;
+    RELVAL *at;
     if (REF(copy)) {
         REBARR *copy = Copy_Array_Core_Managed(
             VAL_ARRAY(v),
@@ -563,7 +563,7 @@ REBNATIVE(collect_words)
     if (REF(deep))
         flags |= COLLECT_DEEP;
 
-    unstable const RELVAL *head = VAL_ARRAY_AT(ARG(block));
+    const RELVAL *head = VAL_ARRAY_AT(ARG(block));
     return Init_Block(
         D_OUT,
         Collect_Unique_Words_Managed(head, flags, ARG(ignore))
@@ -573,7 +573,7 @@ REBNATIVE(collect_words)
 
 inline static void Get_Var_May_Fail(
     REBVAL *out,
-    unstable const RELVAL *source,  // ANY-WORD! or ANY-PATH! (maybe quoted)
+    const RELVAL *source,  // ANY-WORD! or ANY-PATH! (maybe quoted)
     REBSPC *specifier,
     bool any,  // should a VOID! value be gotten normally vs. error
     bool hard  // should GROUP!s in paths not be evaluated
@@ -591,7 +591,7 @@ inline static void Get_Var_May_Fail(
         //
         if (Eval_Path_Throws_Core(
             out,
-            STABLE_HACK(source),  // !!! Review
+            source,  // !!! Review
             specifier,
             nullptr,  // not requesting value to set means it's a get
             EVAL_MASK_DEFAULT
@@ -641,8 +641,8 @@ REBNATIVE(get)
     }
 
     REBARR *results = Make_Array(VAL_LEN_AT(source));
-    RELVAL *dest = STABLE(ARR_HEAD(results));
-    unstable const RELVAL *item = VAL_ARRAY_AT(source);
+    RELVAL *dest = ARR_HEAD(results);
+    const RELVAL *item = VAL_ARRAY_AT(source);
 
     for (; NOT_END(item); ++item, ++dest) {
         DECLARE_LOCAL (temp);
@@ -800,9 +800,9 @@ REBNATIVE(set)
         RETURN (value);
     }
 
-    unstable const RELVAL *item = VAL_ARRAY_AT(target);
+    const RELVAL *item = VAL_ARRAY_AT(target);
 
-    unstable const RELVAL *v;
+    const RELVAL *v;
     if (IS_BLOCK(value) and not REF(single))
         v = VAL_ARRAY_AT(value);
     else {
@@ -823,11 +823,11 @@ REBNATIVE(set)
         }
 
         Set_Var_May_Fail(
-            STABLE_HACK(item),
+            item,
             VAL_SPECIFIER(target),
             IS_END(v)  // R3-Alpha/Red blank after END
                 ? BLANK_VALUE
-                : STABLE_HACK(v), 
+                : v, 
             (IS_BLOCK(value) and not REF(single))
                 ? VAL_SPECIFIER(value)
                 : SPECIFIED,

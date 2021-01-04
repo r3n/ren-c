@@ -195,9 +195,12 @@ inline static void INIT_VAL_FRAME_ROOTVAR(
   #endif
 }
 
-inline static void INIT_VAL_CONTEXT_VARLIST(RELVAL *v, REBARR *varlist)
-  { VAL_CONTEXT_VARLIST_NODE(v) = NOD(varlist); }  // type checks REBARR
-
+inline static void INIT_VAL_CONTEXT_VARLIST(
+    RELVAL *v,
+    REBARR *varlist  // type checks REBARR
+){
+    VAL_CONTEXT_VARLIST_NODE(v) = NOD(varlist);
+}
 
 //=//// CONTEXT KEYLISTS //////////////////////////////////////////////////=//
 //
@@ -340,7 +343,7 @@ inline static void FAIL_IF_INACCESSIBLE_CTX(REBCTX *c) {
 // be checked elsewhere...or also check it before use.
 //
 
-inline static REBCTX *VAL_CONTEXT(unstable REBCEL(const*) v) {
+inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
     assert(ANY_CONTEXT_KIND(CELL_HEART(v)));
     REBCTX *c = CTX(PAYLOAD(Any, v).first.node);
     FAIL_IF_INACCESSIBLE_CTX(c);
@@ -365,7 +368,7 @@ inline static void INIT_VAL_FRAME_BINDING(RELVAL *v, REBCTX *binding) {
     VAL_FRAME_BINDING_NODE(v) = NOD(binding);
 }
 
-inline static REBCTX *VAL_FRAME_BINDING(unstable REBCEL(const*) v) {
+inline static REBCTX *VAL_FRAME_BINDING(REBCEL(const*) v) {
     assert(REB_FRAME == CELL_HEART(v));
     return CTX(VAL_FRAME_BINDING_NODE(v));
 }
@@ -393,20 +396,20 @@ inline static void INIT_VAL_FRAME_PHASE(RELVAL *v, REBACT *phase) {
     VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(phase);
 }
 
-inline static REBACT *VAL_FRAME_PHASE(unstable REBCEL(const*) v) {
+inline static REBACT *VAL_FRAME_PHASE(REBCEL(const*) v) {
     REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
     if (IS_SER_STRING(s))  // holds label, not a phase
         return CTX_FRAME_ACTION(VAL_CONTEXT(v));  // so use archetype
     return ACT(s);  // cell has its own phase, return it
 }
 
-inline static bool IS_FRAME_PHASED(unstable REBCEL(const*) v) {
+inline static bool IS_FRAME_PHASED(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_FRAME);
     REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
     return not IS_SER_STRING(s);
 }
 
-inline static option(const REBSTR*) VAL_FRAME_LABEL(unstable const RELVAL *v) {
+inline static option(const REBSTR*) VAL_FRAME_LABEL(const RELVAL *v) {
     REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
     if (IS_SER_STRING(s))  // label in value
         return STR(s);
@@ -414,7 +417,7 @@ inline static option(const REBSTR*) VAL_FRAME_LABEL(unstable const RELVAL *v) {
 }
 
 inline static void INIT_VAL_FRAME_LABEL(
-    unstable RELVAL *v,
+    RELVAL *v,
     option(const REBSTR*) label
 ){
     assert(IS_FRAME(v));
@@ -442,7 +445,7 @@ inline static void INIT_VAL_FRAME_LABEL(
 // visible for that phase of execution and which aren't.
 //
 
-inline static REBVAL *VAL_CONTEXT_KEYS_HEAD(unstable REBCEL(const*) context)
+inline static REBVAL *VAL_CONTEXT_KEYS_HEAD(REBCEL(const*) context)
 {
     if (CELL_KIND(context) != REB_FRAME)
         return CTX_KEYS_HEAD(VAL_CONTEXT(context));
@@ -462,7 +465,7 @@ inline static REBVAL *VAL_CONTEXT_KEYS_HEAD(unstable REBCEL(const*) context)
 // the 0 slot of the context's varlist.
 //
 static inline REBVAL *Init_Any_Context(
-    unstable RELVAL *out,
+    RELVAL *out,
     enum Reb_Kind kind,
     REBCTX *c
 ){
@@ -482,7 +485,7 @@ static inline REBVAL *Init_Any_Context(
     Init_Any_Context((out), REB_PORT, (c))
 
 inline static REBVAL *Init_Frame(
-    unstable RELVAL *out,
+    RELVAL *out,
     REBCTX *c,
     option(const REBSTR*) label  // nullptr (ANONYMOUS) is okay
 ){

@@ -180,9 +180,9 @@ REBINT Hash_UTF8(const REBYTE *utf8, REBSIZ size)
 // Fails if datatype cannot be hashed.  Note that the specifier is not used
 // in hashing, because it is not used in comparisons either.
 //
-uint32_t Hash_Value(unstable const RELVAL *v)
+uint32_t Hash_Value(const RELVAL *v)
 {
-    unstable REBCEL(const*) cell = VAL_UNESCAPED(v);  // hash dequoted cell
+    REBCEL(const*) cell = VAL_UNESCAPED(v);  // hash dequoted cell
     enum Reb_Kind kind = CELL_KIND(cell);
 
     uint32_t hash;
@@ -278,7 +278,7 @@ uint32_t Hash_Value(unstable const RELVAL *v)
         switch (heart) {
           case REB_BYTES:
             hash = Hash_Bytes(
-                PAYLOAD(Bytes, STABLE(cell)).at_least_8,
+                PAYLOAD(Bytes, cell).at_least_8,
                 EXTRA(Bytes, cell).exactly_4[IDX_EXTRA_USED]
             );
             break;
@@ -465,7 +465,7 @@ REBSER *Hash_Block(const REBVAL *block, REBLEN skip, bool cased)
     // Create the hash array (integer indexes):
     REBSER *hashlist = Make_Hash_Series(VAL_LEN_AT(block));
 
-    unstable const RELVAL *value = VAL_ARRAY_AT(block);
+    const RELVAL *value = VAL_ARRAY_AT(block);
     if (IS_END(value))
         return hashlist;
 

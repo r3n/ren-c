@@ -42,7 +42,7 @@
 #define IS_NULLED(v) \
     (VAL_TYPE(v) == REB_NULL)
 
-inline static REBVAL *Init_Nulled_Core(unstable RELVAL *out) {
+inline static REBVAL *Init_Nulled_Core(RELVAL *out) {
     RESET_VAL_HEADER(out, REB_NULL, CELL_MASK_NONE);
   #ifdef ZERO_UNUSED_CELL_FIELDS
     EXTRA(Any, out).trash = nullptr;

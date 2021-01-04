@@ -149,7 +149,7 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
     //
     REBARR *details = ACT_DETAILS(adaptation);
     Init_Relative_Block(
-        STABLE(ARR_AT(details, IDX_ADAPTER_PRELUDE)),
+        ARR_AT(details, IDX_ADAPTER_PRELUDE),
         adaptation,
         prelude
     );

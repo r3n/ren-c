@@ -192,7 +192,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
         //
         Manage_Series(reified);
 
-        feed->value = STABLE(ARR_HEAD(reified));
+        feed->value = ARR_HEAD(reified);
         Init_Any_Array_At(FEED_SINGLE(feed), REB_BLOCK, reified, 1);
         break; }
 
@@ -225,7 +225,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             if (ARR_LEN(inst1) > 1)
                 panic ("rebU() of more than one value splice not written");
 
-            REBVAL *single = SPECIFIC(STABLE(ARR_SINGLE(inst1)));
+            REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
             Move_Value(&feed->fetched, single);
             Quotify(
                 &feed->fetched,
@@ -236,7 +236,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             GC_Kill_Series(inst1);  // not manuals-tracked
         }
         else if (GET_ARRAY_FLAG(inst1, INSTRUCTION_SPLICE)) {
-            REBVAL *single = SPECIFIC(STABLE(ARR_SINGLE(inst1)));
+            REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
             if (IS_BLOCK(single)) {
                 feed->value = nullptr;  // will become FEED_PENDING(), ignored
                 Splice_Block_Into_Feed(feed, single);
@@ -260,7 +260,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             // vs. putting it in fetched/MARKED_TEMPORARY...but that makes
             // this more convoluted.  Review.
 
-            REBVAL *single = SPECIFIC(STABLE(ARR_SINGLE(inst1)));
+            REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
             Move_Value(&feed->fetched, single);
             Quotify(&feed->fetched, QUOTING_BYTE(feed));
             feed->value = &feed->fetched;
@@ -574,7 +574,7 @@ inline static void Prep_Array_Feed(
             // ^-- faster than NOT_END()
     }
     else {
-        feed->value = STABLE(ARR_AT(array, index));
+        feed->value = ARR_AT(array, index);
         Init_Any_Array_At_Core(
             FEED_SINGLE(feed), REB_BLOCK, array, index + 1, specifier
         );
@@ -643,7 +643,7 @@ inline static void Prep_Va_Feed(
 
 inline static void Prep_Any_Array_Feed(
     REBFED *feed,
-    unstable const RELVAL *any_array,  // array is extracted and HOLD put on
+    const RELVAL *any_array,  // array is extracted and HOLD put on
     REBSPC *specifier,
     REBFLGS parent_flags  // only reads FEED_FLAG_CONST out of this
 ){

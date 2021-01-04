@@ -68,141 +68,13 @@ inline static void INIT_LINK_KEYSOURCE(REBARR *varlist, REBNOD *keysource) {
     LINK_KEYSOURCE(varlist) = keysource;
 }
 
-// For a *read-only* REBSTR, circularly linked list of othEr-CaSed string
-// forms.  It should be relatively quick to find the canon form on
-// average, since many-cased forms are somewhat rare.
-//
-// Note: String series using this don't have SERIES_FLAG_LINK_NODE_NEEDS_MARK.
-// One synonym need not keep another alive, because the process of freeing
-// string nodes unlinks them from the list.  (Hence the canon can change!)
-//
-#define LINK_SYNONYM_NODE(s)    LINK(s).custom.node
-#define LINK_SYNONYM(s)         STR(LINK_SYNONYM_NODE(s))
 
-
-//=//// SAFE COMPARISONS WITH BUILT-IN SYMBOLS ////////////////////////////=//
-//
-// A SYM refers to one of the built-in words and can be used in C switch
-// statements.  A canon STR is used to identify everything else.
-// 
-// R3-Alpha's concept was that all words got persistent integer values, which
-// prevented garbage collection.  Ren-C only gives built-in words integer
-// values--or SYMs--while others must be compared by pointers to their
-// name or canon-name pointers.  A non-built-in symbol will return SYM_0 as
-// its symbol, allowing it to fall through to defaults in case statements.
-//
-// Though it works fine for switch statements, it creates a problem if someone
-// writes `VAL_WORD_SYM(a) == VAL_WORD_SYM(b)`, because all non-built-ins
-// will appear to be equal.  It's a tricky enough bug to catch to warrant an
-// extra check in C++ that disallows comparing SYMs with ==
-
-#if defined(NDEBUG) || !defined(CPLUSPLUS_11)
-    //
-    // Trivial definition for C build or release builds: symbols are just a C
-    // enum value and an OPT_REBSYM acts just like a REBSYM.
-    //
-    typedef enum Reb_Symbol REBSYM;
-    typedef enum Reb_Symbol OPT_REBSYM;
-#else
-    struct REBSYM;
-
-    struct OPT_REBSYM {  // may only be converted to REBSYM, no comparisons
-        enum Reb_Symbol n;
-        OPT_REBSYM (const REBSYM& sym);
-        bool operator==(enum Reb_Symbol other) const
-          { return n == other; }
-        bool operator!=(enum Reb_Symbol other) const
-          { return n != other; }
-
-        bool operator==(OPT_REBSYM &&other) const = delete;
-        bool operator!=(OPT_REBSYM &&other) const = delete;
-
-        operator unsigned int() const  // so it works in switch() statements
-          { return cast(unsigned int, n); }
-
-        explicit operator enum Reb_Symbol()  // must be an *explicit* cast
-          { return n; }
-    };
-
-    struct REBSYM {  // acts like a REBOL_Symbol with no OPT_REBSYM compares
-        enum Reb_Symbol n;
-        REBSYM () {}
-        REBSYM (int n) : n (cast(enum Reb_Symbol, n)) {}
-        REBSYM (OPT_REBSYM opt_sym) : n (opt_sym.n) {}
-
-        operator unsigned int() const  // so it works in switch() statements
-          { return cast(unsigned int, n); }
-
-        explicit operator enum Reb_Symbol() {  // must be an *explicit* cast
-            assert(n != SYM_0);
-            return n;
-        }
-
-        bool operator>=(enum Reb_Symbol other) const {
-            assert(other != SYM_0);
-            return n >= other;
-        }
-        bool operator<=(enum Reb_Symbol other) const {
-            assert(other != SYM_0);
-            return n <= other;
-        }
-        bool operator>(enum Reb_Symbol other) const {
-            assert(other != SYM_0);
-            return n > other;
-        }
-        bool operator<(enum Reb_Symbol other) const {
-            assert(other != SYM_0);
-            return n < other;
-        }
-        bool operator==(enum Reb_Symbol other) const
-          { return n == other; }
-        bool operator!=(enum Reb_Symbol other) const
-          { return n != other; }
-
-        bool operator==(REBSYM &other) const = delete;  // may be SYM_0
-        void operator!=(REBSYM &other) const = delete;  // ...same
-        bool operator==(const OPT_REBSYM &other) const = delete;  // ...same
-        void operator!=(const OPT_REBSYM &other) const = delete;  // ...same
-    };
-
-    inline OPT_REBSYM::OPT_REBSYM(const REBSYM &sym) : n (sym.n) {}
-#endif
-
-inline static bool SAME_SYM_NONZERO(REBSYM a, REBSYM b) {
-    assert(a != SYM_0 and b != SYM_0);
-    return cast(REBLEN, a) == cast(REBLEN, b);
-}
-
-inline static OPT_REBSYM STR_SYMBOL(const REBSTR *s) {
-    assert(IS_STR_SYMBOL(s));
-    return cast(REBSYM, SECOND_UINT16(s->header));
-}
-
-inline static const REBSTR *Canon(REBSYM sym) {
-    assert(cast(REBLEN, sym) != 0);
-    assert(cast(REBLEN, sym) < SER_USED(PG_Symbol_Canons));  // null if boot!
-    return *SER_AT(const REBSTR*, PG_Symbol_Canons, cast(REBLEN, sym));
-}
-
-inline static bool SAME_STR(const REBSTR *s1, const REBSTR *s2) {
-    assert(IS_STR_SYMBOL(s1));
-    assert(IS_STR_SYMBOL(s2));
-
-    const REBSTR *temp = s1;
-    do {
-        if (temp == s2)
-            return true;
-    } while ((temp = LINK_SYNONYM(temp)) != s1);
-
-    return false;  // stopped when circularly linked list loops back to self
-}
-
-inline static OPT_REBSYM VAL_WORD_SYM(unstable REBCEL(const*) v) {
+inline static OPT_REBSYM VAL_WORD_SYM(REBCEL(const*) v) {
     assert(PG_Symbol_Canons);  // all syms are 0 prior to Init_Symbols()
     return STR_SYMBOL(VAL_WORD_SPELLING(v));
 }
 
-inline static void INIT_VAL_WORD_PRIMARY_INDEX(unstable RELVAL *v, REBLEN i) {
+inline static void INIT_VAL_WORD_PRIMARY_INDEX(RELVAL *v, REBLEN i) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
     assert(i < 1048576);  // 20 bit number for physical indices
     VAL_WORD_INDEXES_U32(v) &= 0xFFF00000;
@@ -210,7 +82,7 @@ inline static void INIT_VAL_WORD_PRIMARY_INDEX(unstable RELVAL *v, REBLEN i) {
 }
 
 inline static void INIT_VAL_WORD_VIRTUAL_MONDEX(
-    unstable const RELVAL *v,  // mutation allowed on cached property
+    const RELVAL *v,  // mutation allowed on cached property
     REBLEN mondex  // index mod 4095 (hence invented name "mondex")
 ){
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
@@ -220,7 +92,7 @@ inline static void INIT_VAL_WORD_VIRTUAL_MONDEX(
 }
 
 inline static REBVAL *Init_Any_Word_Core(
-    unstable RELVAL *out,
+    RELVAL *out,
     enum Reb_Kind kind,
     const REBSTR *spelling
 ){
@@ -241,7 +113,7 @@ inline static REBVAL *Init_Any_Word_Core(
 #define Init_Sym_Word(out,str)      Init_Any_Word((out), REB_SYM_WORD, (str))
 
 inline static REBVAL *Init_Any_Word_Bound_Core(
-    unstable RELVAL *out,
+    RELVAL *out,
     enum Reb_Kind type,
     REBCTX *context,  // spelling determined by context and index
     REBLEN index
@@ -264,18 +136,3 @@ inline static REBVAL *Init_Any_Word_Bound_Core(
 //
 inline static const REBSTR *Intern_Unsized_Managed(const char *utf8)
   { return Intern_UTF8_Managed(cb_cast(utf8), strsize(utf8)); }
-
-
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Plainify(unstable REBVAL *out)
-      { return Plainify(STABLE(out)); }
-
-    inline static unstable REBVAL *Getify(unstable REBVAL *out)
-      { return Getify(STABLE(out)); }
-
-    inline static unstable REBVAL *Setify(unstable REBVAL *out)
-      { return Setify(STABLE(out)); }
-
-    inline static unstable REBVAL *Symify(unstable REBVAL *out)
-      { return Symify(STABLE(out)); }
-#endif

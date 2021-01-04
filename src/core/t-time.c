@@ -69,7 +69,7 @@ REBI64 Join_Time(REB_TIMEF *tf, bool neg)
 //
 // Scan string and convert to time.  Return zero if error.
 //
-const REBYTE *Scan_Time(unstable RELVAL *out, const REBYTE *cp, REBLEN len)
+const REBYTE *Scan_Time(RELVAL *out, const REBYTE *cp, REBLEN len)
 {
     cast(void, len); // !!! should len be paid attention to?
 
@@ -273,7 +273,7 @@ REB_R MAKE_Time(
 
     case REB_BLOCK: { // [hh mm ss]
         REBLEN len;
-        unstable const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
+        const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
 
         if (len > 3)
             goto no_time;

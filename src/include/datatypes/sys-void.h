@@ -44,7 +44,7 @@
 //
 
 inline static REBVAL *Init_Void_Core(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBSTR *label
 ){
     RESET_VAL_HEADER(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
@@ -60,14 +60,14 @@ inline static REBVAL *Init_Void_Core(
     Init_Void_Core(TRACK_CELL_IF_DEBUG(out), Canon(sym))
 
 inline static const REBSTR* VAL_VOID_LABEL(
-    unstable REBCEL(const*) v
+    REBCEL(const*) v
 ){
     assert(CELL_KIND(v) == REB_VOID);
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
     return cast(const REBSTR*, VAL_NODE(v));
 }
 
-inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
+inline static bool Is_Void_With_Sym(const RELVAL *v, REBSYM sym) {
     assert(sym != SYM_0);
     if (not IS_VOID(v))
         return false;
@@ -88,7 +88,7 @@ inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
     #define ASSERT_READABLE_IF_DEBUG(v) \
         NOOP
 #else
-    inline static REBVAL *Init_Unreadable_Void_Debug(unstable RELVAL *out) {
+    inline static REBVAL *Init_Unreadable_Void_Debug(RELVAL *out) {
         RESET_VAL_HEADER(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
 
         // While SYM_UNREADABLE might be nice here, that prevents usage at
@@ -106,7 +106,7 @@ inline static bool Is_Void_With_Sym(unstable const RELVAL *v, REBSYM sym) {
     #define IS_VOID_RAW(v) \
         (KIND3Q_BYTE_UNCHECKED(v) == REB_VOID)
 
-    inline static bool IS_UNREADABLE_DEBUG(unstable const RELVAL *v) {
+    inline static bool IS_UNREADABLE_DEBUG(const RELVAL *v) {
         if (KIND3Q_BYTE_UNCHECKED(v) != REB_VOID)
             return false;
         return VAL_NODE(v) == nullptr;

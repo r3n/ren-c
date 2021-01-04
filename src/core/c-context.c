@@ -53,7 +53,7 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
     MISC_META_NODE(varlist) = nullptr;  // GC sees meta object, must init
     INIT_CTX_KEYLIST_UNIQUE(CTX(varlist), keylist);  // starts out unique
 
-    RELVAL *rootvar = STABLE(Alloc_Tail_Array(varlist));
+    RELVAL *rootvar = Alloc_Tail_Array(varlist);
     INIT_VAL_CONTEXT_ROOTVAR(rootvar, kind, varlist);
 
     return CTX(varlist);  // varlist pointer is context handle
@@ -154,7 +154,7 @@ void Expand_Context(REBCTX *context, REBLEN delta)
 //
 REBVAL *Append_Context(
     REBCTX *context,
-    option(unstable RELVAL*) any_word,  // allowed to be quoted as well
+    option(RELVAL*) any_word,  // allowed to be quoted as well
     option(const REBSTR*) spelling
 ) {
     REBARR *keylist = CTX_KEYLIST(context);
@@ -263,7 +263,7 @@ void Collect_End(struct Reb_Collector *cl)
 
     // Reset binding table (note BUF_COLLECT may have expanded)
     //
-    unstable RELVAL *v =
+    RELVAL *v =
         (cl == NULL or (cl->flags & COLLECT_AS_TYPESET))
             ? ARR_HEAD(BUF_COLLECT) + 1
             : ARR_HEAD(BUF_COLLECT);
@@ -324,7 +324,7 @@ void Collect_Context_Keys(
     EXPAND_SERIES_TAIL(BUF_COLLECT, CTX_LEN(context));
     SET_ARRAY_LEN_NOTERM(BUF_COLLECT, cl->index);
 
-    unstable RELVAL *collect = ARR_TAIL(BUF_COLLECT);  // *after* expansion
+    RELVAL *collect = ARR_TAIL(BUF_COLLECT);  // *after* expansion
 
     if (check_dups) {
         for (; NOT_END(key); key++) {
@@ -370,10 +370,10 @@ void Collect_Context_Keys(
 //
 static void Collect_Inner_Loop(
     struct Reb_Collector *cl,
-    unstable const RELVAL *head
+    const RELVAL *head
 ){
     for (; NOT_END(head); ++head) {
-        unstable REBCEL(const*) cell = VAL_UNESCAPED(head);  // X from ''''X
+        REBCEL(const*) cell = VAL_UNESCAPED(head);  // X from ''''X
         enum Reb_Kind kind = CELL_KIND(cell);
 
         if (ANY_WORD_KIND(kind)) {
@@ -440,7 +440,7 @@ static void Collect_Inner_Loop(
 // the complexity to move handling for that case in this routine.
 //
 REBARR *Collect_Keylist_Managed(
-    unstable const RELVAL *head,
+    const RELVAL *head,
     option(REBCTX*) prior,
     REBFLGS flags // see %sys-core.h for COLLECT_ANY_WORD, etc.
 ) {
@@ -491,7 +491,7 @@ REBARR *Collect_Keylist_Managed(
 // Collect unique words from a block, possibly deeply...maybe just SET-WORD!s.
 //
 REBARR *Collect_Unique_Words_Managed(
-    unstable const RELVAL *head,
+    const RELVAL *head,
     REBFLGS flags,  // See COLLECT_XXX
     const REBVAL *ignore  // BLOCK!, ANY-CONTEXT!, or BLANK! for none
 ){
@@ -502,7 +502,7 @@ REBARR *Collect_Unique_Words_Managed(
     // any non-words in a block the user passed in.
     //
     if (not IS_NULLED(ignore)) {
-        unstable const RELVAL *check = VAL_ARRAY_AT(ignore);
+        const RELVAL *check = VAL_ARRAY_AT(ignore);
         for (; NOT_END(check); ++check) {
             if (not ANY_WORD_KIND(CELL_KIND(VAL_UNESCAPED(check))))
                 fail (Error_Bad_Value_Core(check, VAL_SPECIFIER(ignore)));
@@ -523,9 +523,9 @@ REBARR *Collect_Unique_Words_Managed(
     // an error...so they will just be skipped when encountered.
     //
     if (IS_BLOCK(ignore)) {
-        unstable const RELVAL *item = VAL_ARRAY_AT(ignore);
+        const RELVAL *item = VAL_ARRAY_AT(ignore);
         for (; NOT_END(item); ++item) {
-            unstable REBCEL(const*) cell = VAL_UNESCAPED(item);
+            REBCEL(const*) cell = VAL_UNESCAPED(item);
             const REBSTR *symbol = VAL_WORD_SPELLING(cell);
 
             // A block may have duplicate words in it (this situation could
@@ -561,9 +561,9 @@ REBARR *Collect_Unique_Words_Managed(
     REBARR *array = Grab_Collected_Array_Managed(cl, SERIES_FLAGS_NONE);
 
     if (IS_BLOCK(ignore)) {
-        unstable const RELVAL *item = VAL_ARRAY_AT(ignore);
+        const RELVAL *item = VAL_ARRAY_AT(ignore);
         for (; NOT_END(item); ++item) {
-            unstable REBCEL(const*) cell = VAL_UNESCAPED(item);
+            REBCEL(const*) cell = VAL_UNESCAPED(item);
             const REBSTR *symbol = VAL_WORD_SPELLING(cell);
 
           #if !defined(NDEBUG)
@@ -619,7 +619,7 @@ void Rebind_Context_Deep(
 //
 REBCTX *Make_Context_Detect_Managed(
     enum Reb_Kind kind,
-    unstable const RELVAL *head,
+    const RELVAL *head,
     option(REBCTX*) parent
 ) {
     REBARR *keylist = Collect_Keylist_Managed(
@@ -663,7 +663,7 @@ REBCTX *Make_Context_Detect_Managed(
         }
     }
 
-    RELVAL *var = STABLE(ARR_HEAD(varlist));
+    RELVAL *var = ARR_HEAD(varlist);
     INIT_VAL_CONTEXT_ROOTVAR(var, kind, varlist);
 
     ++var;
@@ -724,7 +724,7 @@ REBCTX *Make_Context_Detect_Managed(
 //
 REBCTX *Construct_Context_Managed(
     enum Reb_Kind kind,
-    unstable RELVAL *head,  // !!! Warning: modified binding
+    RELVAL *head,  // !!! Warning: modified binding
     REBSPC *specifier,
     option(REBCTX*) parent
 ){
@@ -739,7 +739,7 @@ REBCTX *Construct_Context_Managed(
 
     Bind_Values_Shallow(head, CTX_ARCHETYPE(context));
 
-    unstable const RELVAL *value = head;
+    const RELVAL *value = head;
     for (; NOT_END(value); value += 2) {
         if (not IS_SET_WORD(value))
             fail (Error_Invalid_Type(VAL_TYPE(value)));
@@ -901,7 +901,7 @@ REBCTX *Merge_Contexts_Managed(REBCTX *parent1, REBCTX *parent2)
     // the parent was an ERROR! so will the child be.  This is a new idea,
     // so review consequences.
     //
-    RELVAL *rootvar = STABLE(ARR_HEAD(varlist));
+    RELVAL *rootvar = ARR_HEAD(varlist);
     INIT_VAL_CONTEXT_ROOTVAR(rootvar, CTX_TYPE(parent1), varlist);
 
     // Copy parent1 values.  (Can't use memcpy() because it would copy things
@@ -993,7 +993,7 @@ void Resolve_Context(
     }
     else if (IS_BLOCK(only_words)) {
         // Limit exports to only these words:
-        unstable const RELVAL *word = VAL_ARRAY_AT(only_words);
+        const RELVAL *word = VAL_ARRAY_AT(only_words);
         for (; NOT_END(word); word++) {
             if (IS_WORD(word) or IS_SET_WORD(word)) {
                 Add_Binder_Index(&binder, VAL_WORD_SPELLING(word), -1);
@@ -1088,7 +1088,7 @@ void Resolve_Context(
                 Remove_Binder_Index_Else_0(&binder, VAL_KEY_SPELLING(key));
         }
         else if (IS_BLOCK(only_words)) {
-            unstable const RELVAL *word = VAL_ARRAY_AT(only_words);
+            const RELVAL *word = VAL_ARRAY_AT(only_words);
             for (; NOT_END(word); word++) {
                 if (IS_WORD(word) or IS_SET_WORD(word))
                     Remove_Binder_Index_Else_0(&binder, VAL_WORD_SPELLING(word));

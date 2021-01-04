@@ -232,13 +232,13 @@ static void Set_Vector_At(REBCEL(const*) vec, REBLEN n, const RELVAL *set) {
 
 void Set_Vector_Row(
     REBCEL(const*) vec,
-    unstable const REBVAL *blk   // !!! "can not be BLOCK!?"
+    const REBVAL *blk   // !!! "can not be BLOCK!?"
 ){
     REBLEN idx = VAL_INDEX(blk);
 
     if (IS_BLOCK(blk)) {
         REBLEN len;
-        const RELVAL *val = STABLE_HACK(VAL_ARRAY_LEN_AT(&len, blk));
+        const RELVAL *val = VAL_ARRAY_LEN_AT(&len, blk);
 
         REBLEN n = 0;
         for (; NOT_END(val); val++) {
@@ -274,7 +274,7 @@ REBARR *Vector_To_Array(const REBVAL *vect)
         fail (vect);
 
     REBARR *arr = Make_Array(len);
-    RELVAL *dest = STABLE_HACK(ARR_HEAD(arr));
+    RELVAL *dest = ARR_HEAD(arr);
     REBLEN n;
     for (n = VAL_INDEX(vect); n < VAL_LEN_HEAD(vect); ++n, ++dest)
         Get_Vector_At(dest, vect, n);
@@ -370,10 +370,10 @@ void Shuffle_Vector(REBVAL *vect, bool secure)
 //
 bool Make_Vector_Spec(
     REBVAL *out,
-    unstable const RELVAL *head,
+    const RELVAL *head,
     REBSPC *specifier
 ){
-    unstable const RELVAL *item = head;
+    const RELVAL *item = head;
 
     // The specifier would be needed if variables were going to be looked
     // up, but isn't required for just symbol comparisons or extracting
@@ -429,7 +429,7 @@ bool Make_Vector_Spec(
     else
         len = 1;
 
-    unstable const REBVAL *iblk;
+    const REBVAL *iblk;
     if (NOT_END(item) and (IS_BLOCK(item) or IS_BINARY(item))) {
         REBLEN init_len = VAL_LEN_AT(item);
         if (IS_BINARY(item) and integral)  // !!! What was this about?

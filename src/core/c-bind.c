@@ -37,7 +37,7 @@
 //
 void Bind_Values_Inner_Loop(
     struct Reb_Binder *binder,
-    unstable RELVAL *head,
+    RELVAL *head,
     REBCTX *context,
     REBU64 bind_types, // !!! REVIEW: force word types low enough for 32-bit?
     REBU64 add_midstream_types,
@@ -105,7 +105,7 @@ void Bind_Values_Inner_Loop(
 // bindings that come after the added value is seen will be bound.
 //
 void Bind_Values_Core(
-    unstable RELVAL *head,
+    RELVAL *head,
     const RELVAL *context,
     REBU64 bind_types,
     REBU64 add_midstream_types,
@@ -234,7 +234,7 @@ REBNATIVE(let)
 //
 static void Clonify_And_Bind_Relative(
     REBVAL *v,  // Note: incoming value is not relative
-    unstable const RELVAL *src,
+    const RELVAL *src,
     REBFLGS flags,
     REBU64 deep_types,
     struct Reb_Binder *binder,
@@ -289,7 +289,7 @@ static void Clonify_And_Bind_Relative(
         // Objects and series get shallow copied at minimum
         //
         REBSER *series;
-        unstable const RELVAL *sub_src;
+        const RELVAL *sub_src;
 
         bool would_need_deep;
 
@@ -345,7 +345,7 @@ static void Clonify_And_Bind_Relative(
         // copied series and "clonify" the values in it.
         //
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
-            REBVAL *sub = SPECIFIC(STABLE(ARR_HEAD(ARR(series))));
+            REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
             for (; NOT_END(sub); ++sub, ++sub_src)
                 Clonify_And_Bind_Relative(
                     sub,
@@ -446,8 +446,8 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
     REBARR *copy = Make_Array_For_Copy(len, flags, original);
 
-    unstable const RELVAL *src = ARR_AT(original, index);
-    RELVAL *dest = STABLE(ARR_HEAD(copy));
+    const RELVAL *src = ARR_AT(original, index);
+    RELVAL *dest = ARR_HEAD(copy);
     REBLEN count = 0;
     for (; count < len; ++count, ++dest, ++src) {
         Clonify_And_Bind_Relative(
@@ -485,7 +485,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
             REBLEN old_paramlist_len = ARR_LEN(paramlist);
             EXPAND_SERIES_TAIL(paramlist, num_lets);
-            RELVAL *param = STABLE(ARR_AT(paramlist, old_paramlist_len));
+            RELVAL *param = ARR_AT(paramlist, old_paramlist_len);
 
             REBDSP dsp = dsp_orig;
             while (dsp != DSP) {
@@ -627,15 +627,15 @@ void Rebind_Values_Deep(
 void Virtual_Bind_Deep_To_New_Context(
     REBVAL *body_in_out, // input *and* output parameter
     REBCTX **context_out,
-    unstable const REBVAL *spec
+    const REBVAL *spec
 ){
     assert(IS_BLOCK(body_in_out) or IS_SYM_BLOCK(body_in_out));
 
     REBLEN num_vars = IS_BLOCK(spec) ? VAL_LEN_AT(spec) : 1;
     if (num_vars == 0)
-        fail (STABLE_HACK(spec));  // !!! should fail() take unstable?
+        fail (spec);  // !!! should fail() take unstable?
 
-    unstable const RELVAL *item;
+    const RELVAL *item;
     REBSPC *specifier;
     bool rebinding;
     if (IS_BLOCK(spec)) {

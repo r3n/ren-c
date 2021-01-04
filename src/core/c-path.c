@@ -82,7 +82,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
         return cast(REBVAL*, out);
     }
 
-    unstable const RELVAL *v = ARR_HEAD(a);
+    const RELVAL *v = ARR_HEAD(a);
     for (; NOT_END(v); ++v) {
         if (not Is_Valid_Sequence_Element(kind, v)) {
             Derelativize(out, v, specifier);
@@ -642,8 +642,8 @@ bool Eval_Path_Throws_Core(
         // This way we can just pop them as we go, and know if they weren't
         // all consumed if not back to `dsp_orig` by the end.
 
-        unstable REBVAL *bottom = DS_AT(dsp_orig + 1);
-        unstable REBVAL *top = DS_TOP;
+        REBVAL *bottom = DS_AT(dsp_orig + 1);
+        REBVAL *top = DS_TOP;
 
         DECLARE_LOCAL (temp);
         while (top > bottom) {
@@ -714,7 +714,7 @@ bool Eval_Path_Throws_Core(
 //
 void Get_Simple_Value_Into(
     REBVAL *out,
-    unstable const RELVAL *val,
+    const RELVAL *val,
     REBSPC *specifier
 ){
     if (IS_WORD(val) or IS_GET_WORD(val))
@@ -724,7 +724,7 @@ void Get_Simple_Value_Into(
         // !!! This is an example case where the pointer being passed in
         // may move.  Review.
         //
-        Get_Path_Core(out, STABLE_HACK(val), specifier);
+        Get_Path_Core(out, val, specifier);
     }
     else
         Derelativize(out, val, specifier);
@@ -997,7 +997,7 @@ REB_R MAKE_Path(
         }
         else { // Splice any generated paths, so there are no paths-in-paths.
 
-            const RELVAL *item = STABLE_HACK(VAL_ARRAY_AT(out));  // safe?
+            const RELVAL *item = VAL_ARRAY_AT(out);  // safe?
             if (IS_BLANK(item) and DSP != dsp_orig) {
                 if (IS_BLANK(DS_TOP)) // make path! ['a/b/ `/c`]
                     fail ("Cannot merge slashes in MAKE PATH!");

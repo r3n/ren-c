@@ -111,7 +111,7 @@ inline static REBBIN *Make_Binary_Core(REBLEN capacity, REBFLGS flags)
 
 //=//// BINARY! VALUES ////////////////////////////////////////////////////=//
 
-inline static const REBBIN *VAL_BINARY(unstable REBCEL(const*) v) {
+inline static const REBBIN *VAL_BINARY(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_BINARY);
     return BIN(VAL_SERIES(v));
 }
@@ -125,7 +125,7 @@ inline static const REBBIN *VAL_BINARY(unstable REBCEL(const*) v) {
 
 inline static const REBYTE *VAL_BINARY_SIZE_AT(
     REBSIZ *size_at_out,
-    unstable REBCEL(const*) v
+    REBCEL(const*) v
 ){
     const REBBIN *bin = VAL_BINARY(v);
     REBIDX i = VAL_INDEX_RAW(v);

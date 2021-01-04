@@ -176,7 +176,11 @@ inline static void Probe_Molded_Value(const REBVAL *v)
 //
 //  Probe_Core_Debug: C
 //
-// Use PROBE() to invoke, see notes there.
+// Use PROBE() to invoke from code; this gives more information like line
+// numbers, and in the C++ build will return the input (like the PROBE native
+// function does).
+//
+// Use Probe() to invoke from the C debugger (non-macro, single-arity form).
 //
 void* Probe_Core_Debug(
     const void *p,

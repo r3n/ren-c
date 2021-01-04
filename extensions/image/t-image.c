@@ -36,13 +36,13 @@
 void Tuples_To_RGBA(
     REBYTE *rgba,
     REBLEN size,
-    unstable const RELVAL *head,
+    const RELVAL *head,
     REBLEN len
 ){
     if (len > size)
         len = size;  // avoid over-run
 
-    unstable const RELVAL *item = head;
+    const RELVAL *item = head;
     for (; len > 0; len--, rgba += 4, ++head)
         Get_Tuple_Bytes(rgba, item, 4);
 }
@@ -261,7 +261,7 @@ REB_R MAKE_Image(
         Init_Image_Black_Opaque(out, w, h);
     }
     else if (IS_BLOCK(arg)) {  // make image! [size rgba index]
-        const RELVAL *item = STABLE_HACK(VAL_ARRAY_AT(arg));
+        const RELVAL *item = VAL_ARRAY_AT(arg);
         if (not IS_PAIR(item))
             goto bad_make;
 

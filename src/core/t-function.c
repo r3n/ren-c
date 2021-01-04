@@ -235,8 +235,8 @@ REBTYPE(Action)
         // where we can bit-copy a possibly-relative value.
         //
       blockscope {
-        unstable RELVAL *src = ARR_HEAD(ACT_DETAILS(act)) + 1;
-        unstable RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy)) + 1;
+        RELVAL *src = ARR_HEAD(ACT_DETAILS(act)) + 1;
+        RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy)) + 1;
         for (; NOT_END(src); ++src, ++dest)
             Blit_Relative(dest, src);
         TERM_ARRAY_LEN(ACT_DETAILS(proxy), details_len);
@@ -294,7 +294,7 @@ REBTYPE(Action)
             // that symbol out before giving it back.
             //
             REBVAL *param = ACT_PARAMS_HEAD(act);
-            unstable REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
+            REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
             for (; NOT_END(param); ++param, ++typeset) {
                 assert(IS_PARAM(param));
                 RESET_CELL(typeset, REB_TYPESET, CELL_MASK_NONE);

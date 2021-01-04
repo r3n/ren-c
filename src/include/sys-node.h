@@ -275,7 +275,7 @@ enum Reb_Pointer_Detect {
 // already be on its first step of a UTF-8 decode otherwise.
 //
 inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(
-    unstable const void *p
+    const void *p
 ){
     const REBYTE* bp = cast(const REBYTE*, p);
 
@@ -343,7 +343,7 @@ inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(
     ((n)->header.bits |= (f))
 
 #define SET_NOD_FLAG(n,f) \
-    SET_CELL_FLAGS((n), (f))
+    SET_NOD_FLAGS((n), (f))
 
 #define GET_NOD_FLAG(n, f) \
     (did ((n)->header.bits & (f)))

@@ -93,7 +93,7 @@
         return cast(REBSPC*, c);
     }
 
-    inline static REBSPC *VAL_SPECIFIER(unstable REBCEL(const*) v) {
+    inline static REBSPC *VAL_SPECIFIER(REBCEL(const*) v) {
         assert(ANY_ARRAY_KIND(CELL_HEART(v)));
 
         REBNOD *n = EXTRA(Binding, v).node;
@@ -351,7 +351,7 @@ inline static REBNOD *SPC_BINDING(REBSPC *specifier)
 // Payload and header should be valid prior to making this call.
 //
 inline static void INIT_BINDING_MAY_MANAGE(
-    unstable RELVAL *out,
+    RELVAL *out,
     REBNOD* binding
 ){
     EXTRA(Binding, out).node = binding;
@@ -389,9 +389,68 @@ inline static REBLEN VAL_WORD_INDEX(const RELVAL *v) {
 }
 
 #ifdef CPLUSPLUS_11
-    inline static bool IS_WORD_UNBOUND(unstable REBCEL(const*) v) = delete;
-    inline static REBLEN VAL_WORD_INDEX(unstable REBCEL(const*) v) = delete;
+    inline static bool IS_WORD_UNBOUND(REBCEL(const*) v) = delete;
+    inline static REBLEN VAL_WORD_INDEX(REBCEL(const*) v) = delete;
 #endif
+
+inline static REBNOD *VAL_WORD_BINDING(const RELVAL *v) {
+    assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
+    REBNOD *binding = VAL_WORD_BINDING_NODE(v);
+    if (binding->header.bits & SERIES_FLAG_IS_STRING)
+        return UNBOUND;
+    return VAL_WORD_BINDING_NODE(v);
+}
+
+inline static void INIT_VAL_WORD_BINDING(RELVAL *v, const void *p) {
+    assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
+
+    const REBNOD *binding = cast(const REBNOD*, p);
+    assert(binding);  // can't set word bindings to nullptr
+    VAL_WORD_BINDING_NODE(v) = m_cast(REBNOD*, binding);
+
+  #if !defined(NDEBUG)
+    if (binding->header.bits & SERIES_FLAG_IS_STRING)
+        return;  // e.g. UNBOUND (words use strings to indicate unbounds)
+
+    assert(not (binding->header.bits & NODE_FLAG_CELL));  // not currently used
+
+    if (binding->header.bits & NODE_FLAG_MANAGED) {
+        assert(
+            binding->header.bits & ARRAY_FLAG_IS_DETAILS  // relative
+            or binding->header.bits & ARRAY_FLAG_IS_VARLIST  // specific
+        );
+    }
+    else
+        assert(binding->header.bits & ARRAY_FLAG_IS_VARLIST);
+  #endif
+}
+
+
+// While ideally error messages would give back data that is bound exactly to
+// the context that was applicable, threading the specifier into many cases
+// can overcomplicate code.  We'd break too many invariants to just say a
+// relativized value is "unbound", so make an expired frame if necessary.
+//
+inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
+    if (not Is_Bindable(v) or IS_SPECIFIC(v))
+        Move_Value(out, SPECIFIC(v));
+    else {  // must be bound to a function
+        REBACT *binding = ACT(VAL_WORD_BINDING(v));
+        REBCTX *expired = Make_Expired_Frame_Ctx_Managed(binding);
+
+        Move_Value_Header(out, v);
+        out->payload = v->payload;
+        EXTRA(Binding, out).node = NOD(expired);
+    }
+    return cast(REBVAL*, out);
+}
+
+// This is a super lazy version of unrelativization, which can be used to
+// hand a relative value to something like fail(), since fail will clean up
+// the stray alloc.
+//
+#define rebUnrelativize(v) \
+    Unrelativize(Alloc_Value(), (v))
 
 inline static void Unbind_Any_Word(RELVAL *v) {
     const REBSTR *spelling = VAL_WORD_SPELLING(VAL_UNESCAPED(v));
@@ -399,7 +458,7 @@ inline static void Unbind_Any_Word(RELVAL *v) {
     INIT_VAL_WORD_PRIMARY_INDEX(v, 0);
 }
 
-inline static REBCTX *VAL_WORD_CONTEXT(unstable const REBVAL *v) {
+inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
     assert(IS_WORD_BOUND(v));
     REBNOD *binding = VAL_WORD_BINDING(v);
     assert(
@@ -417,7 +476,7 @@ inline static REBCTX *VAL_WORD_CONTEXT(unstable const REBVAL *v) {
 // up space in word cell for other features.  Note that this means if a
 // context is freed, its keylist must be retained to provide the words.
 //
-inline static const REBSTR *VAL_WORD_SPELLING(unstable REBCEL(const*) cell) {
+inline static const REBSTR *VAL_WORD_SPELLING(REBCEL(const*) cell) {
     assert(ANY_WORD_KIND(CELL_HEART(cell)));
     REBNOD *binding = VAL_WORD_BINDING_NODE(cell);
 
@@ -484,7 +543,7 @@ inline static const REBSTR *VAL_WORD_SPELLING(unstable REBCEL(const*) cell) {
 //
 inline static option(REBCTX*) Get_Word_Context(
     REBLEN *index_out,
-    unstable const RELVAL* any_word,
+    const RELVAL* any_word,
     REBSPC *specifier
 ){
     REBNOD *binding = VAL_WORD_BINDING(any_word);
@@ -709,7 +768,7 @@ inline static option(REBCTX*) Get_Word_Context(
 }
 
 static inline const REBVAL *Lookup_Word_May_Fail(
-    unstable const RELVAL *any_word,
+    const RELVAL *any_word,
     REBSPC *specifier
 ){
     REBLEN index;
@@ -723,7 +782,7 @@ static inline const REBVAL *Lookup_Word_May_Fail(
 }
 
 static inline option(const REBVAL*) Lookup_Word(
-    unstable const RELVAL *any_word,
+    const RELVAL *any_word,
     REBSPC *specifier
 ){
     REBLEN index;
@@ -738,7 +797,7 @@ static inline option(const REBVAL*) Lookup_Word(
 
 static inline const REBVAL *Get_Word_May_Fail(
     RELVAL *out,
-    unstable const RELVAL* any_word,
+    const RELVAL* any_word,
     REBSPC *specifier
 ){
     const REBVAL *var = Lookup_Word_May_Fail(any_word, specifier);
@@ -752,7 +811,7 @@ static inline const REBVAL *Get_Word_May_Fail(
 }
 
 static inline REBVAL *Lookup_Mutable_Word_May_Fail(
-    unstable const RELVAL* any_word,
+    const RELVAL* any_word,
     REBSPC *specifier
 ){
     REBLEN index;
@@ -784,7 +843,7 @@ static inline REBVAL *Lookup_Mutable_Word_May_Fail(
 }
 
 inline static REBVAL *Sink_Word_May_Fail(
-    unstable const RELVAL* any_word,
+    const RELVAL* any_word,
     REBSPC *specifier
 ){
     REBVAL *var = Lookup_Mutable_Word_May_Fail(any_word, specifier);
@@ -820,25 +879,25 @@ inline static REBVAL *Sink_Word_May_Fail(
 
 inline static REBSPC *Derive_Specifier(
     REBSPC *parent,
-    unstable const RELVAL* any_array
+    const RELVAL* any_array
 );
 
 #ifdef CPLUSPLUS_11
     inline static REBSPC *Derive_Specifier(
         REBSPC *parent,
-        unstable const REBVAL* any_array
+        const REBVAL* any_array
     ) = delete;
 #endif
 
 inline static REBVAL *Derelativize(
-    unstable_ok RELVAL *out,  // relative dest overwritten w/specific value
-    unstable const RELVAL *v,
+    RELVAL *out,  // relative dest overwritten w/specific value
+    const RELVAL *v,
     REBSPC *specifier
 ){
     Move_Value_Header(out, v);
-    out->payload = STABLE(v)->payload;
+    out->payload = v->payload;
     if (not Is_Bindable(v)) {
-        out->extra = STABLE(v)->extra;
+        out->extra = v->extra;
         return cast(REBVAL*, out);
     }
 
@@ -854,11 +913,11 @@ inline static REBVAL *Derelativize(
         REBCTX *c = try_unwrap(Get_Word_Context(&index, v, specifier));
         if (not c) {
             assert(VAL_WORD_BINDING(v) == UNBOUND);
-            out->extra = STABLE(v)->extra;
+            out->extra = v->extra;
             Unbind_Any_Word(out);  // !!! do this more efficiently
         }
         else {
-            out->extra = STABLE(v)->extra;  // !!! for knowing spelling in binding, temp...
+            out->extra = v->extra;  // !!! to know spelling in binding, temp
             INIT_BINDING_MAY_MANAGE(out, NOD(c));
             INIT_VAL_WORD_PRIMARY_INDEX(out, index);
         }
@@ -894,21 +953,11 @@ inline static REBVAL *Derelativize(
         // Things like contexts and varargs are not affected by specifiers,
         // at least not currently.
         //
-        out->extra = STABLE(v)->extra;
+        out->extra = v->extra;
     }
 
     return cast(REBVAL*, out);
 }
-
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static REBVAL *Derelativize(
-        unstable RELVAL *out,
-        unstable const RELVAL *v,
-        REBSPC *specifier
-    ){
-        return Derelativize(STABLE(out), v, specifier);
-    }
-#endif
 
 
 // In the C++ build, defining this overload that takes a REBVAL* instead of
@@ -1056,7 +1105,7 @@ inline static bool Merge_Patches_Reused(
 //
 inline static REBSPC *Derive_Specifier_Core(
     REBSPC *specifier,  // merge this specifier...
-    unstable const RELVAL* any_array  // ...onto the binding in this array
+    const RELVAL* any_array  // ...onto the binding in this array
 ){
     REBNOD *binding = EXTRA(Binding, any_array).node;
 
@@ -1198,14 +1247,14 @@ inline static REBSPC *Derive_Specifier_Core(
 #if !defined(DEBUG_VIRTUAL_BINDING)
     inline static REBSPC *Derive_Specifier(
         REBSPC *specifier,
-        unstable const RELVAL* any_array
+        const RELVAL* any_array
     ){
         return Derive_Specifier_Core(specifier, any_array);
     }
 #else
     inline static REBSPC *Derive_Specifier(
         REBSPC *specifier,
-        unstable const RELVAL* any_array
+        const RELVAL* any_array
     ){
         REBSPC *derived = Derive_Specifier_Core(specifier, any_array);
         REBNOD *binding = EXTRA(Binding, any_array).node;

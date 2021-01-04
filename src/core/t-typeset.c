@@ -128,19 +128,19 @@ void Shutdown_Typesets(void)
 // reviewed to see if anything actually used it.
 //
 bool Add_Typeset_Bits_Core(
-    unstable RELVAL *typeset,
-    unstable const RELVAL *head,
+    RELVAL *typeset,
+    const RELVAL *head,
     REBSPC *specifier
 ) {
     assert(IS_TYPESET(typeset) or IS_PARAM(typeset));
 
-    unstable const RELVAL *maybe_word = head;
+    const RELVAL *maybe_word = head;
     for (; NOT_END(maybe_word); ++maybe_word) {
         const RELVAL *item;
         if (IS_WORD(maybe_word))
             item = Lookup_Word_May_Fail(maybe_word, specifier);
         else
-            item = STABLE_HACK(maybe_word); // wasn't variable
+            item = maybe_word;  // wasn't variable
 
         if (IS_TUPLE(item)) {
             DECLARE_LOCAL (specific);

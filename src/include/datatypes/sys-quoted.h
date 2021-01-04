@@ -55,6 +55,16 @@
 // location of the word.
 //
 
+
+//=//// WORD DEFINITION CODE //////////////////////////////////////////////=//
+//
+// !!! The code should get reorganized to not have these definitions in the
+// quoting header.  But for the moment this untangles the dependencies so
+// that it will compile.
+//
+
+inline static void Unbind_Any_Word(RELVAL *v);  // forward define
+
 #define VAL_WORD_PRIMARY_INDEX_UNCHECKED(v) \
     (VAL_WORD_INDEXES_U32(v) & 0x000FFFFF)
 
@@ -62,31 +72,31 @@
     ((VAL_WORD_INDEXES_U32(v) & 0xFFF00000) >> 20)
 
 
-inline static REBLEN VAL_QUOTED_PAYLOAD_DEPTH(unstable const RELVAL *v) {
+
+inline static REBLEN VAL_QUOTED_PAYLOAD_DEPTH(const RELVAL *v) {
     assert(IS_QUOTED(v));
     REBLEN depth = VAL_WORD_VIRTUAL_MONDEX_UNCHECKED(v);
     assert(depth > 3);  // else quote fits entirely in cell
     return depth;
 }
 
-inline static REBVAL* VAL_QUOTED_PAYLOAD_CELL(unstable const RELVAL *v) {
+inline static REBVAL* VAL_QUOTED_PAYLOAD_CELL(const RELVAL *v) {
     assert(VAL_QUOTED_PAYLOAD_DEPTH(v) > 3);  // else quote fits in one cell
     return VAL(VAL_NODE(v));
 }
 
-inline static REBLEN VAL_QUOTED_DEPTH(unstable const RELVAL *v) {
+inline static REBLEN VAL_QUOTED_DEPTH(const RELVAL *v) {
     if (KIND3Q_BYTE(v) >= REB_64)  // shallow enough to use type byte trick...
         return KIND3Q_BYTE(v) / REB_64;  // ...see explanation above
     return VAL_QUOTED_PAYLOAD_DEPTH(v);
 }
 
-inline static REBLEN VAL_NUM_QUOTES(unstable const RELVAL *v) {
+inline static REBLEN VAL_NUM_QUOTES(const RELVAL *v) {
     if (not IS_QUOTED(v))
         return 0;
     return VAL_QUOTED_DEPTH(v);
 }
 
-inline static void Unbind_Any_Word(unstable RELVAL *v);  // forward define
 
 // It is necessary to be able to store relative values in escaped cells.
 //
@@ -180,14 +190,6 @@ inline static RELVAL *Quotify_Core(
 
     inline static RELVAL *Quotify(RELVAL *v, REBLEN depth)
         { return Quotify_Core(v, depth); }
-
-  #ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Quotify(unstable REBVAL *v, REBLEN depth)
-        { return cast(REBVAL*, Quotify_Core(STABLE(v), depth)); }
-
-    inline static unstable RELVAL *Quotify(unstable RELVAL *v, REBLEN depth)
-        { return Quotify_Core(STABLE(v), depth); }
-  #endif
 #endif
 
 
@@ -267,18 +269,10 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
 
     inline static RELVAL *Unquotify(RELVAL *v, REBLEN depth)
         { return Unquotify_Core(v, depth); }
-
-  #ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Unquotify(unstable REBVAL *v, REBLEN depth)
-        { return cast(REBVAL*, Unquotify_Core(STABLE(v), depth)); }
-
-    inline static unstable RELVAL *Unquotify(unstable RELVAL *v, REBLEN depth)
-        { return Unquotify_Core(STABLE(v), depth); }
-  #endif
 #endif
 
 
-inline static REBCEL(const*) VAL_UNESCAPED(unstable_ok const RELVAL *v) {
+inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v) {
     if (KIND3Q_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable voids
         return v;  // Note: kind byte may be > 64
 
@@ -290,16 +284,8 @@ inline static REBCEL(const*) VAL_UNESCAPED(unstable_ok const RELVAL *v) {
     return VAL_QUOTED_PAYLOAD_CELL(v);
 }
 
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBCEL(const*) VAL_UNESCAPED(
-        unstable const RELVAL *v
-    ){
-        return VAL_UNESCAPED(STABLE(v));
-    }
-#endif
 
-
-inline static REBLEN Dequotify(unstable RELVAL *v) {
+inline static REBLEN Dequotify(RELVAL *v) {
     if (KIND3Q_BYTE(v) != REB_QUOTED) {
         REBLEN depth = KIND3Q_BYTE(v) / REB_64;
         mutable_KIND3Q_BYTE(v) %= REB_64;
@@ -314,7 +300,7 @@ inline static REBLEN Dequotify(unstable RELVAL *v) {
 
 // !!! Temporary workaround for what was IS_LIT_WORD() (now not its own type)
 //
-inline static bool IS_QUOTED_WORD(unstable const RELVAL *v) {
+inline static bool IS_QUOTED_WORD(const RELVAL *v) {
     return IS_QUOTED(v)
         and VAL_QUOTED_DEPTH(v) == 1
         and CELL_KIND(VAL_UNESCAPED(v)) == REB_WORD;
@@ -322,7 +308,7 @@ inline static bool IS_QUOTED_WORD(unstable const RELVAL *v) {
 
 // !!! Temporary workaround for what was IS_LIT_PATH() (now not its own type)
 //
-inline static bool IS_QUOTED_PATH(unstable const RELVAL *v) {
+inline static bool IS_QUOTED_PATH(const RELVAL *v) {
     return IS_QUOTED(v)
         and VAL_QUOTED_DEPTH(v) == 1
         and CELL_KIND(VAL_UNESCAPED(v)) == REB_PATH;

@@ -32,7 +32,7 @@
 // Scan and convert money.  Return zero if error.
 //
 const REBYTE *Scan_Money(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ){

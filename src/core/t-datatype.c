@@ -130,7 +130,7 @@ REBTYPE(Datatype)
             REBVAL *var = CTX_VARS_HEAD(context);
             REBVAL *key = CTX_KEYS_HEAD(context);
 
-            unstable RELVAL *item = ARR_HEAD(VAL_TYPE_SPEC(type));
+            RELVAL *item = ARR_HEAD(VAL_TYPE_SPEC(type));
 
             for (; NOT_END(var); ++var, ++key) {
                 if (IS_END(item))
@@ -253,7 +253,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
     if (ARR_LEN(boot_types) != REB_MAX - 1)  // exclude REB_0_END
         panic (boot_types);  // other types/internals should have a WORD!
 
-    unstable RELVAL *word = ARR_HEAD(boot_types);
+    RELVAL *word = ARR_HEAD(boot_types);
 
     if (VAL_WORD_SYM(word) != SYM_NULL)
         panic (word);  // First internal byte type is NULL at 1

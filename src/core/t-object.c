@@ -49,7 +49,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
 
     // Process word/value argument block:
 
-    unstable const RELVAL *item = VAL_ARRAY_AT(arg);
+    const RELVAL *item = VAL_ARRAY_AT(arg);
 
     // Can't actually fail() during a collect, so make sure any errors are
     // set and then jump to a Collect_End()
@@ -72,7 +72,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
 
     // Examine word/value argument block
 
-    unstable const RELVAL *word;
+    const RELVAL *word;
     for (word = item; NOT_END(word); word += 2) {
         if (!IS_WORD(word) && !IS_SET_WORD(word)) {
             error = Error_Bad_Value_Core(word, VAL_SPECIFIER(arg));
@@ -100,7 +100,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
     REBLEN len = CTX_LEN(c) + 1;
     Expand_Context(c, ARR_LEN(BUF_COLLECT) - len);
 
-    unstable RELVAL *collect_key = ARR_AT(BUF_COLLECT, len);
+    RELVAL *collect_key = ARR_AT(BUF_COLLECT, len);
     for (; NOT_END(collect_key); ++collect_key)
         Append_Context(c, nullptr, VAL_KEY_SPELLING(collect_key));
   }
@@ -531,7 +531,7 @@ REBCTX *Copy_Context_Extra_Managed(
         SERIES_MASK_VARLIST | NODE_FLAG_MANAGED,
         nullptr // original_array, N/A because LINK()/MISC() used otherwise
     );
-    REBVAL *dest = SPECIFIC(STABLE(ARR_HEAD(varlist)));
+    REBVAL *dest = SPECIFIC(ARR_HEAD(varlist));
 
     // The type information and fields in the rootvar (at head of the varlist)
     // get filled in with a copy, but the varlist needs to be updated in the

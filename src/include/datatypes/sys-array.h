@@ -53,37 +53,37 @@
 // marker in its tail slot, which is one past the last position that is
 // valid for writing a full REBVAL.
 
-inline static unstable RELVAL *ARR_AT(const_if_c REBARR *a, REBLEN n)
+inline static RELVAL *ARR_AT(const_if_c REBARR *a, REBLEN n)
   { return SER_AT(RELVAL, a, n); }
 
-inline static unstable RELVAL *ARR_HEAD(const_if_c REBARR *a)
+inline static RELVAL *ARR_HEAD(const_if_c REBARR *a)
   { return SER_HEAD(RELVAL, a); }
 
-inline static unstable RELVAL *ARR_TAIL(const_if_c REBARR *a)
+inline static RELVAL *ARR_TAIL(const_if_c REBARR *a)
   { return SER_TAIL(RELVAL, a); }
 
-inline static unstable RELVAL *ARR_LAST(const_if_c REBARR *a)
+inline static RELVAL *ARR_LAST(const_if_c REBARR *a)
   { return SER_LAST(RELVAL, a); }
 
-inline static unstable RELVAL *ARR_SINGLE(const_if_c REBARR *a) {
+inline static RELVAL *ARR_SINGLE(const_if_c REBARR *a) {
     assert(not IS_SER_DYNAMIC(a));
     return cast(RELVAL*, &a->content.fixed);
 }
 
 #ifdef __cplusplus
-    inline static unstable const RELVAL *ARR_AT(const REBARR *a, REBLEN n)
+    inline static const RELVAL *ARR_AT(const REBARR *a, REBLEN n)
         { return SER_AT(const RELVAL, a, n); }
 
-    inline static unstable const RELVAL *ARR_HEAD(const REBARR *a)
+    inline static const RELVAL *ARR_HEAD(const REBARR *a)
         { return SER_HEAD(const RELVAL, a); }
 
-    inline static unstable const RELVAL *ARR_TAIL(const REBARR *a)
+    inline static const RELVAL *ARR_TAIL(const REBARR *a)
         { return SER_TAIL(const RELVAL, a); }
 
-    inline static unstable const RELVAL *ARR_LAST(const REBARR *a)
+    inline static const RELVAL *ARR_LAST(const REBARR *a)
         { return SER_LAST(const RELVAL, a); }
 
-    inline static unstable const RELVAL *ARR_SINGLE(const REBARR *a) {
+    inline static const RELVAL *ARR_SINGLE(const REBARR *a) {
         assert(not IS_SER_DYNAMIC(a));
         return cast(const RELVAL*, &a->content.fixed);
     }
@@ -169,7 +169,7 @@ inline static void Prep_Array(
 ){
     assert(IS_SER_DYNAMIC(a));
 
-    unstable RELVAL *prep = ARR_HEAD(a);
+    RELVAL *prep = ARR_HEAD(a);
 
     if (NOT_SERIES_FLAG(a, FIXED_SIZE)) {
         //
@@ -208,7 +208,7 @@ inline static void Prep_Array(
         // It may not be necessary, but doing it for now to have an easier
         // invariant to work with.  Review.
         //
-        prep = STABLE(ARR_AT(a, a->content.dynamic.rest - 1));
+        prep = ARR_AT(a, a->content.dynamic.rest - 1);
         // fallthrough
     }
 
@@ -248,7 +248,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
         }
 
         Prep_Array(ARR(s), capacity);
-        SET_END(STABLE(ARR_HEAD(ARR(s))));
+        SET_END(ARR_HEAD(ARR(s)));
 
       #if !defined(NDEBUG)
         PG_Reb_Stats->Series_Memory += capacity * wide;
@@ -459,7 +459,7 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
 // These operations do not need to take the value's index position into
 // account; they strictly operate on the array series
 //
-inline static const REBARR *VAL_ARRAY(unstable REBCEL(const*) v) {
+inline static const REBARR *VAL_ARRAY(REBCEL(const*) v) {
     assert(ANY_ARRAY_KIND(CELL_HEART(v)));
 
     const REBARR *a = ARR(PAYLOAD(Any, v).first.node);
@@ -483,9 +483,9 @@ inline static const REBARR *VAL_ARRAY(unstable REBCEL(const*) v) {
 // of bounds of the data.  If a function can deal with such out of bounds
 // arrays meaningfully, it should work with VAL_INDEX_UNBOUNDED().
 //
-inline static unstable const RELVAL *VAL_ARRAY_LEN_AT(
+inline static const RELVAL *VAL_ARRAY_LEN_AT(
     REBLEN *len_at_out,
-    unstable REBCEL(const*) v
+    REBCEL(const*) v
 ){
     const REBARR *arr = VAL_ARRAY(v);
     REBIDX i = VAL_INDEX_RAW(v);  // VAL_ARRAY() already checks it's series
@@ -521,7 +521,7 @@ inline static unstable const RELVAL *VAL_ARRAY_LEN_AT(
 #define VAL_ARRAY_AT_MUTABLE_HACK(v) \
     m_cast(RELVAL*, VAL_ARRAY_AT(v))
 
-inline static const unstable RELVAL *VAL_ARRAY_TAIL(unstable const RELVAL *v)
+inline static const RELVAL *VAL_ARRAY_TAIL(const RELVAL *v)
   { return ARR_TAIL(VAL_ARRAY(v)); }
 
 
@@ -536,7 +536,7 @@ inline static const unstable RELVAL *VAL_ARRAY_TAIL(unstable const RELVAL *v)
 // head because it's taking an index.  So  it looks weird enough to suggest
 // looking here for what the story is.
 //
-inline static unstable const RELVAL *VAL_ARRAY_AT_HEAD(
+inline static const RELVAL *VAL_ARRAY_AT_HEAD(
     const RELVAL *v,
     REBLEN n
 ){
@@ -552,7 +552,7 @@ inline static unstable const RELVAL *VAL_ARRAY_AT_HEAD(
 // initialize, and the C++ build can also validate managed consistent w/const.
 
 inline static REBVAL *Init_Any_Array_At_Core(
-    unstable_ok RELVAL *out,
+    RELVAL *out,
     enum Reb_Kind kind,
     const_if_c REBARR *array,
     REBLEN index,
@@ -577,36 +577,6 @@ inline static REBVAL *Init_Any_Array_At_Core(
     ){
         return Init_Any_Series_At_Core(out, kind, array, index, binding);
     }
-
-  #ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Init_Any_Array_At_Core(
-        unstable RELVAL *out,
-        enum Reb_Kind kind,
-        REBARR *array,
-        REBLEN index,
-        REBNOD *binding
-    ){
-        return Init_Any_Series_At_Core(
-            STABLE(out),
-            kind,
-            Force_Series_Managed_Core(array),
-            index,
-            binding
-        );
-    }
-
-    inline static unstable REBVAL *Init_Any_Array_At_Core(
-        unstable RELVAL *out,
-        enum Reb_Kind kind,
-        const REBARR *array,  // all const arrays should be already managed
-        REBLEN index,
-        REBNOD *binding
-    ){
-        return Init_Any_Series_At_Core(
-            STABLE(out), kind, SER(array), index, binding
-        );
-    }
-  #endif
 #endif
 
 #define Init_Any_Array_At(v,t,a,i) \
@@ -648,9 +618,9 @@ inline static RELVAL *Init_Relative_Block_At(
 
 // Checks if ANY-GROUP! is like ((...)) or (...), used by COMPOSE & PARSE
 //
-inline static bool Is_Any_Doubled_Group(unstable REBCEL(const*) group) {
+inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {
     assert(ANY_GROUP_KIND(CELL_HEART(group)));
-    unstable const RELVAL *inner = VAL_ARRAY_AT(group);
+    const RELVAL *inner = VAL_ARRAY_AT(group);
     if (KIND3Q_BYTE(inner) != REB_GROUP or NOT_END(inner + 1))
         return false; // plain (...) GROUP!
     return true; // a ((...)) GROUP!, inject as rule

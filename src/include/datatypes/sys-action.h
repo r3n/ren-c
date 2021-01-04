@@ -159,7 +159,7 @@ inline static REBARR *ACT_DETAILS(REBACT *a) {
     return &a->details;
 }
 
-inline static REBCTX *VAL_ACTION_BINDING(unstable REBCEL(const*) v) {
+inline static REBCTX *VAL_ACTION_BINDING(REBCEL(const*) v) {
     assert(CELL_HEART(v) == REB_ACTION);
     REBNOD *binding = VAL_ACTION_BINDING_NODE(v);
     assert(
@@ -170,7 +170,7 @@ inline static REBCTX *VAL_ACTION_BINDING(unstable REBCEL(const*) v) {
 }
 
 inline static void INIT_VAL_ACTION_BINDING(
-    unstable RELVAL *v,
+    RELVAL *v,
     REBCTX *binding
 ){
     assert(IS_ACTION(v));
@@ -185,7 +185,7 @@ inline static void INIT_VAL_ACTION_BINDING(
 // archetype is updated to match its container.
 
 #define ACT_ARCHETYPE(a) \
-    SPECIFIC(ARR_AT(ACT_DETAILS(a), 0))
+    SER_AT(REBVAL, ACT_DETAILS(a), 0)
 
 
 #define ACT_SPECIALTY(a) \
@@ -202,7 +202,7 @@ inline static REBARR *ACT_PARAMLIST(REBACT *a) {
     (LINK(ACT_DETAILS(a)).dispatcher)
 
 #define DETAILS_AT(a,n) \
-    SPECIFIC(STABLE(ARR_AT((a), (n))))
+    SPECIFIC(ARR_AT((a), (n)))
 
 #define IDX_DETAILS_1 1  // Common index used for code body location
 
@@ -256,7 +256,7 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 #define ACT_PARAMS_HEAD(a) \
     (cast(REBVAL*, ACT_PARAMLIST(a)->content.dynamic.data) + 1)
 
-inline static REBACT *VAL_ACTION(unstable REBCEL(const*) v) {
+inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION); // so it works on literals
     REBSER *s = SER(VAL_ACTION_DETAILS_NODE(v));
     if (GET_SERIES_INFO(s, INACCESSIBLE))
@@ -279,7 +279,7 @@ inline static REBACT *VAL_ACTION(unstable REBCEL(const*) v) {
 // the words, you get the currently executing label instead...which may
 // actually make more sense.
 
-inline static const REBSTR *VAL_ACTION_LABEL(unstable const RELVAL *v) {
+inline static const REBSTR *VAL_ACTION_LABEL(const RELVAL *v) {
     assert(IS_ACTION(v));
     REBSER *s = SER(VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v));
     if (IS_SER_ARRAY(s))
@@ -288,7 +288,7 @@ inline static const REBSTR *VAL_ACTION_LABEL(unstable const RELVAL *v) {
 }
 
 inline static void INIT_VAL_ACTION_LABEL(
-    unstable RELVAL *v,
+    RELVAL *v,
     option(const REBSTR*) label
 ){
     ASSERT_CELL_WRITABLE_EVIL_MACRO(v);  // archetype R/O
@@ -413,7 +413,7 @@ inline static REBVAL *Voidify_Rootparam(REBARR *paramlist) {
 // no label.
 //
 static inline REBVAL *Init_Action(
-    unstable RELVAL *out,
+    RELVAL *out,
     REBACT *a,
     option(const REBSTR*) label,  // allowed to be ANONYMOUS
     REBCTX *binding  // allowed to be UNBOUND

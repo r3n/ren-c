@@ -715,54 +715,23 @@ inline static void FAIL_IF_READ_ONLY_SER(REBSER *s) {
     fail (Error_Series_Protected_Raw());
 }
 
-// While ideally error messages would give back data that is bound exactly to
-// the context that was applicable, threading the specifier into many cases
-// can overcomplicate code.  We'd break too many invariants to just say a
-// relativized value is "unbound", so make an expired frame if necessary.
-//
-inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
-    if (not Is_Bindable(v) or IS_SPECIFIC(v))
-        Move_Value(out, SPECIFIC(v));
-    else {  // must be bound to a function
-        REBACT *binding = ACT(VAL_WORD_BINDING(v));
-        REBCTX *expired = Make_Expired_Frame_Ctx_Managed(binding);
-
-        Move_Value_Header(out, v);
-        out->payload = v->payload;
-        EXTRA(Binding, out).node = NOD(expired);
-    }
-    return cast(REBVAL*, out);
-}
-
-// This is a super lazy version of unrelativization, which can be used to
-// hand a relative value to something like fail(), since fail will clean up
-// the stray alloc.
-//
-#define rebUnrelativize(v) \
-    Unrelativize(Alloc_Value(), (v))
-
 
 #if defined(NDEBUG)
     #define KNOWN_MUTABLE(v) v
 #else
-    inline static const RELVAL* KNOWN_MUTABLE(unstable_ok const RELVAL* v) {
+    inline static const RELVAL* KNOWN_MUTABLE(const RELVAL* v) {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
         assert(not Is_Series_Read_Only(s));
         assert(NOT_CELL_FLAG(v, CONST));
         return v;
     }
-
-  #ifdef DEBUG_UNSTABLE_CELLS
-    inline static const unstable RELVAL *KNOWN_MUTABLE(
-        unstable const RELVAL *v
-    ){
-        return KNOWN_MUTABLE(STABLE(v));
-    }
-  #endif
 #endif
 
-inline static const RELVAL *ENSURE_MUTABLE(unstable_ok const RELVAL *v) {
+// Forward declaration needed
+inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v);
+
+inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
     REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
 
@@ -775,14 +744,6 @@ inline static const RELVAL *ENSURE_MUTABLE(unstable_ok const RELVAL *v) {
     Unrelativize(specific, v);  // relative values lose binding in error object
     fail (Error_Const_Value_Raw(specific));
 }
-
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static const unstable RELVAL *ENSURE_MUTABLE(
-        unstable const RELVAL *v
-    ){
-        return ENSURE_MUTABLE(STABLE(v));
-    }
-#endif
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -836,7 +797,7 @@ inline static void DROP_GC_GUARD(const void *p) {
 // Uses "evil macro" variations because it is called so frequently, that in
 // the debug build (which doesn't inline functions) there's a notable cost.
 //
-inline static const REBSER *VAL_SERIES(unstable REBCEL(const*) v) {
+inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
   #if !defined(NDEBUG)
     enum Reb_Kind k = CELL_HEART(v);
     assert(ANY_SERIES_KIND_EVIL_MACRO);
@@ -869,7 +830,7 @@ inline static const REBSER *VAL_SERIES(unstable REBCEL(const*) v) {
     // becomes prohibitive when the functions aren't inlined and checks wind
     // up getting done 
     //
-    inline static REBIDX VAL_INDEX_UNBOUNDED(unstable REBCEL(const*) v) {
+    inline static REBIDX VAL_INDEX_UNBOUNDED(REBCEL(const*) v) {
         enum Reb_Kind k = CELL_HEART(v);  // only const access if heart!
         assert(ANY_SERIES_KIND_EVIL_MACRO);
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
@@ -884,13 +845,13 @@ inline static const REBSER *VAL_SERIES(unstable REBCEL(const*) v) {
 #endif
 
 
-inline static REBLEN VAL_LEN_HEAD(unstable REBCEL(const*) v);  // forward decl
+inline static REBLEN VAL_LEN_HEAD(REBCEL(const*) v);  // forward decl
 
 // Unlike VAL_INDEX_UNBOUNDED() that may give a negative number or past the
 // end of series, VAL_INDEX() does bounds checking and always returns an
 // unsigned REBLEN.
 //
-inline static REBLEN VAL_INDEX(unstable REBCEL(const*) v) {
+inline static REBLEN VAL_INDEX(REBCEL(const*) v) {
     enum Reb_Kind k = CELL_HEART(v);  // only const access if heart!
     assert(ANY_SERIES_KIND_EVIL_MACRO);
     UNUSED(k);
@@ -902,12 +863,12 @@ inline static REBLEN VAL_INDEX(unstable REBCEL(const*) v) {
 }
 
 
-inline static const REBYTE *VAL_DATA_AT(unstable REBCEL(const*) v) {
+inline static const REBYTE *VAL_DATA_AT(REBCEL(const*) v) {
     return SER_DATA_AT(SER_WIDE(VAL_SERIES(v)), VAL_SERIES(v), VAL_INDEX(v));
 }
 
 
-inline static void INIT_SPECIFIER(unstable RELVAL *v, const void *p) {
+inline static void INIT_SPECIFIER(RELVAL *v, const void *p) {
     //
     // can be called on non-bindable series, but p must be nullptr
 
@@ -941,7 +902,7 @@ inline static void INIT_SPECIFIER(unstable RELVAL *v, const void *p) {
 
 
 inline static REBVAL *Init_Any_Series_At_Core(
-    unstable_ok RELVAL *out,
+    RELVAL *out,
     enum Reb_Kind type,
     const REBSER *s,  // ensured managed by calling macro
     REBLEN index,
@@ -977,18 +938,6 @@ inline static REBVAL *Init_Any_Series_At_Core(
     INIT_SPECIFIER(out, specifier);  // asserts if unbindable type tries to bind
     return cast(REBVAL*, out);
 }
-
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Init_Any_Series_At_Core(
-        unstable RELVAL *out,
-        enum Reb_Kind type,
-        const REBSER *s,  // ensured managed by calling macro
-        REBLEN index,
-        REBNOD *binding
-    ){
-        return Init_Any_Series_At_Core(STABLE(out), type, s, index, binding);
-    }
-#endif
 
 #define Init_Any_Series_At(v,t,s,i) \
     Init_Any_Series_At_Core((v), (t), \

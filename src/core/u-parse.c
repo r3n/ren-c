@@ -617,7 +617,7 @@ static REB_R Parse_One_Rule(
 
     if (IS_SER_ARRAY(P_INPUT)) {
         const REBARR *arr = ARR(P_INPUT);
-        const RELVAL *item = STABLE_HACK(ARR_AT(arr, pos));
+        const RELVAL *item = ARR_AT(arr, pos);
 
         switch (VAL_TYPE(rule)) {
           case REB_QUOTED:
@@ -809,7 +809,7 @@ static REBIXO To_Thru_Block_Rule(
         VAL_INDEX_RAW(iter) <= cast(REBIDX, P_INPUT_LEN);
         ++VAL_INDEX_RAW(iter)
     ){  // see note
-        const RELVAL *blk = STABLE_HACK(ARR_HEAD(VAL_ARRAY(rule_block)));
+        const RELVAL *blk = ARR_HEAD(VAL_ARRAY(rule_block));
         for (; NOT_END(blk); blk++) {
             if (IS_BAR(blk))
                 fail (Error_Parse_Rule());  // !!! Shouldn't `TO [|]` succeed?
@@ -2186,7 +2186,7 @@ REBNATIVE(subparse)
                 if (not subrule)  // capture only on iteration #1
                     FETCH_NEXT_RULE_KEEP_LAST(&subrule, f);
 
-                const RELVAL *cmp = STABLE_HACK(ARR_AT(ARR(P_INPUT), P_POS));
+                const RELVAL *cmp = ARR_AT(ARR(P_INPUT), P_POS);
 
                 if (IS_END(cmp))
                     i = END_FLAG;
@@ -2237,7 +2237,7 @@ REBNATIVE(subparse)
                 if (not subrule)  // capture only on iteration #1
                     FETCH_NEXT_RULE_KEEP_LAST(&subrule, f);
 
-                const RELVAL *cmp = STABLE_HACK(ARR_AT(ARR(P_INPUT), P_POS));
+                const RELVAL *cmp = ARR_AT(ARR(P_INPUT), P_POS);
 
                 if (IS_END(cmp))
                     i = END_FLAG;
@@ -2277,7 +2277,7 @@ REBNATIVE(subparse)
                 if (not IS_SER_ARRAY(P_INPUT))
                     fail (Error_Parse_Rule());
 
-                const RELVAL *into = STABLE_HACK(ARR_AT(ARR(P_INPUT), P_POS));
+                const RELVAL *into = ARR_AT(ARR(P_INPUT), P_POS);
                 if (IS_END(into)) {
                     i = END_FLAG;  // `parse [] [into [...]]`, rejects
                     break;

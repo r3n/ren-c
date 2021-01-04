@@ -100,11 +100,11 @@ static REBGOB *Map_Gob_Inner(REBGOB *gob, REBD32 *xo, REBD32 *yo)
     while (GOB_PANE(gob) && (max_depth-- > 0)) {
         REBINT len = GOB_LEN(gob);
 
-        unstable REBVAL *item = GOB_HEAD(gob) + len - 1;
+        REBVAL *item = GOB_HEAD(gob) + len - 1;
 
         REBINT n;
         for (n = 0; n < len; ++n, --item) {
-            REBGOB *child = VAL_GOB(STABLE_HACK(item));
+            REBGOB *child = VAL_GOB(item);
             if (
                 (*xo >= x + GOB_X(child)) &&
                 (*xo <  x + GOB_X(child) + GOB_W(child)) &&

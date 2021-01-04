@@ -73,14 +73,14 @@
 // DS_TOP is the most recently pushed item.
 //
 #define DS_TOP \
-    cast(unstable REBVAL*, DS_Movable_Top) // cast helps stop ++DS_TOP, etc.
+    cast(REBVAL*, DS_Movable_Top) // cast helps stop ++DS_TOP, etc.
 
 // DS_AT accesses value at given stack location.  It is allowed to point at
 // a stack location that is an end, e.g. DS_AT(dsp + 1), because that location
 // may be used as the start of a copy which is ultimately of length 0.
 //
-inline static unstable REBVAL *DS_AT(REBDSP d) {
-    unstable REBVAL *at = SPECIFIC(ARR_HEAD(DS_Array) + d);
+inline static REBVAL *DS_AT(REBDSP d) {
+    REBVAL *at = SPECIFIC(ARR_HEAD(DS_Array) + d);
     assert(
         ((at->header.bits & NODE_FLAG_CELL) and d <= (DSP + 1))
         or (not (SECOND_BYTE(at->header) != REB_0 and d == (DSP + 1)))

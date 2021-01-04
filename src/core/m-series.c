@@ -384,7 +384,7 @@ void Assert_Series_Term_Core(const REBSER *s)
         //
         // END values aren't canonized to zero bytes, check IS_END explicitly
         //
-        unstable const RELVAL *tail = ARR_TAIL(ARR(s));
+        const RELVAL *tail = ARR_TAIL(ARR(s));
         if (NOT_END(tail))
             panic (tail);
     }

@@ -114,7 +114,7 @@ REBNATIVE(generic)
     // be able to inventory which types had registered generic dispatchers
     // and list the appropriate types from HELP.
     //
-    RELVAL *param = STABLE_HACK(ARR_AT(paramlist, 1));
+    RELVAL *param = ARR_AT(paramlist, 1);
     if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
         assert(VAL_PARAM_SYM(param) == SYM_RETURN);
         TYPE_SET(param, REB_CUSTOM);

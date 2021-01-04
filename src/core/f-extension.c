@@ -220,7 +220,7 @@ REBNATIVE(load_extension)
 
     REBDSP dsp_orig = DSP; // for accumulating exports
 
-    RELVAL *item = STABLE_HACK(ARR_HEAD(specs));
+    RELVAL *item = ARR_HEAD(specs);
     REBLEN i;
     for (i = 0; i < num_natives; ++i) {
         //

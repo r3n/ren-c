@@ -328,7 +328,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
           unspecialized_refinement: {
 
-            unstable REBVAL *ordered = DS_TOP;  // v-- #2258
+            REBVAL *ordered = DS_TOP;  // v-- #2258
             const REBSTR *param_symbol = VAL_PARAM_SPELLING(f->param);
 
             for (; ordered != DS_AT(f->dsp_orig); --ordered) {

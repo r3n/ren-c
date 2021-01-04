@@ -36,7 +36,7 @@
 // polymorphically access const data across ANY-STRING!, ANY-WORD!, and ISSUE!
 //
 
-inline static bool IS_CHAR_CELL(unstable REBCEL(const*) v) {
+inline static bool IS_CHAR_CELL(REBCEL(const*) v) {
     if (CELL_KIND(v) != REB_ISSUE)
         return false;
 
@@ -48,7 +48,7 @@ inline static bool IS_CHAR_CELL(unstable REBCEL(const*) v) {
 
 #define IS_CHAR IS_CHAR_CELL  // could be faster if used VAL_TYPE()
 
-inline static REBUNI VAL_CHAR(unstable REBCEL(const*) v) {
+inline static REBUNI VAL_CHAR(REBCEL(const*) v) {
     assert(CELL_HEART(v) == REB_BYTES);
 
     if (EXTRA(Bytes, v).exactly_4[IDX_EXTRA_LEN] == 0)
@@ -57,7 +57,7 @@ inline static REBUNI VAL_CHAR(unstable REBCEL(const*) v) {
     assert(EXTRA(Bytes, v).exactly_4[IDX_EXTRA_LEN] == 1);  // e.g. codepoint
 
     REBUNI c;
-    Back_Scan_UTF8_Char_Unchecked(&c, PAYLOAD(Bytes, STABLE(v)).at_least_8);
+    Back_Scan_UTF8_Char_Unchecked(&c, PAYLOAD(Bytes, v).at_least_8);
     return c;
 }
 
@@ -76,7 +76,7 @@ inline static const REBYTE *VAL_CHAR_ENCODED(REBCEL(const*) v) {
 }
 
 inline static REBVAL *Init_Issue_Utf8(
-    unstable_ok RELVAL *out,
+    RELVAL *out,
     REBCHR(const*) utf8,  // previously validated UTF-8 (maybe not null term?)
     REBSIZ size,
     REBLEN len  // while validating, you should have counted the codepoints
@@ -98,22 +98,11 @@ inline static REBVAL *Init_Issue_Utf8(
     return cast(REBVAL*, out);
 }
 
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Init_Issue_Utf8(
-        unstable RELVAL *out,
-        REBCHR(const*) utf8,
-        REBSIZ size,
-        REBLEN len
-    ){
-        return Init_Issue_Utf8(STABLE(out), utf8, size, len);
-    }
-#endif
-
 
 // If you know that a codepoint is good (e.g. it came from an ANY-STRING!)
 // this routine can be used.
 //
-inline static REBVAL *Init_Char_Unchecked(unstable_ok RELVAL *out, REBUNI c) {
+inline static REBVAL *Init_Char_Unchecked(RELVAL *out, REBUNI c) {
     RESET_CELL(out, REB_BYTES, CELL_MASK_NONE);
 
     if (c == 0) {
@@ -141,15 +130,6 @@ inline static REBVAL *Init_Char_Unchecked(unstable_ok RELVAL *out, REBUNI c) {
     return cast(REBVAL*, out);
 }
 
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Init_Char_Unchecked(
-        unstable RELVAL *out,
-        REBUNI c
-    ){
-        return Init_Char_Unchecked(STABLE(out), c);
-    }
-#endif
-
 inline static REBVAL *Init_Char_May_Fail(RELVAL *out, REBUNI c) {
     if (c > MAX_UNI) {
         DECLARE_LOCAL (temp);
@@ -162,15 +142,6 @@ inline static REBVAL *Init_Char_May_Fail(RELVAL *out, REBUNI c) {
 
     return Init_Char_Unchecked(out, c);
 }
-
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Init_Char_May_Fail(
-        unstable RELVAL *out,
-        REBUNI c
-    ){
-        return Init_Char_May_Fail(STABLE(out), c);
-    }
-#endif
 
 
 //=//// "BLACKHOLE" (Empty ISSUE!, a.k.a. CODEPOINT 0) ////////////////////=//
@@ -221,7 +192,7 @@ inline static REBVAL *Init_Char_May_Fail(RELVAL *out, REBUNI c) {
 #define Init_Blackhole(out) \
     Init_Char_Unchecked(out, 0)
 
-inline static bool Is_Blackhole(unstable const RELVAL *v) {
+inline static bool Is_Blackhole(const RELVAL *v) {
     if (not IS_CHAR(v))
         return false;
 
@@ -284,7 +255,7 @@ inline static const REBYTE *VAL_BYTES_LIMIT_AT(
 inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
     REBLEN *length_out,
     REBSIZ *size_out,
-    unstable REBCEL(const*) v,
+    REBCEL(const*) v,
     REBLEN limit
 ){
   #if !defined(NDEBUG)

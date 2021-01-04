@@ -39,7 +39,7 @@
 
 // !!! Find a better place for this!
 //
-inline static bool ANY_ESCAPABLE_GET(unstable const RELVAL *v) {
+inline static bool ANY_ESCAPABLE_GET(const RELVAL *v) {
     if (IS_GET_BLOCK(v))
         fail ("GET-BLOCK! in escapable parameter slots currently reserved");
     return IS_GET_GROUP(v) or IS_GET_WORD(v) or IS_GET_PATH(v);
@@ -234,7 +234,7 @@ inline static REBCTX *Context_For_Frame_May_Manage(REBFRM *f) {
 
 //=//// FRAME LABELING ////////////////////////////////////////////////////=//
 
-inline static void Get_Frame_Label_Or_Blank(unstable RELVAL *out, REBFRM *f) {
+inline static void Get_Frame_Label_Or_Blank(RELVAL *out, REBFRM *f) {
     assert(Is_Action_Frame(f));
     if (f->label)
         Init_Word(out, unwrap(f->label));  // WORD!, PATH!, or stored invoke
@@ -293,7 +293,7 @@ inline static void Conserve_Varlist(REBARR *varlist)
     assert(NOT_SERIES_INFO(varlist, INACCESSIBLE));
     assert(NOT_SERIES_FLAG(varlist, MANAGED));
 
-    RELVAL *rootvar = STABLE(ARR_HEAD(varlist));
+    RELVAL *rootvar = ARR_HEAD(varlist);
     assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == varlist);
     TRASH_POINTER_IF_DEBUG(VAL_FRAME_PHASE_OR_LABEL_NODE(rootvar));
     TRASH_POINTER_IF_DEBUG(VAL_FRAME_BINDING_NODE(rootvar));
@@ -696,18 +696,18 @@ inline static void Push_Action(
     INIT_VAL_FRAME_BINDING(f->rootvar, binding);  // FRM_BINDING()
 
     s->content.dynamic.used = num_args + 1;
-    unstable RELVAL *tail = TRACK_CELL_IF_DEBUG(ARR_TAIL(f->varlist));
+    RELVAL *tail = TRACK_CELL_IF_DEBUG(ARR_TAIL(f->varlist));
     tail->header.bits = FLAG_KIND3Q_BYTE(REB_0);  // no NODE_FLAG_CELL
 
     // Current invariant for all arrays (including fixed size), last cell in
     // the allocation is an end.
-    unstable RELVAL *ultimate = TRACK_CELL_IF_DEBUG(
+    RELVAL *ultimate = TRACK_CELL_IF_DEBUG(
         ARR_AT(f->varlist, s->content.dynamic.rest - 1)
     );
     ultimate->header.bits = Endlike_Header(0); // unreadable
 
   #if !defined(NDEBUG)
-    unstable RELVAL *prep = ultimate - 1;
+    RELVAL *prep = ultimate - 1;
     for (; prep > tail; --prep) {
         USED(TRACK_CELL_IF_DEBUG(prep));
         prep->header.bits =
@@ -842,7 +842,7 @@ inline static void Drop_Action(REBFRM *f) {
         assert(NOT_SERIES_INFO(f->varlist, INACCESSIBLE));
         assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
 
-        RELVAL *rootvar = STABLE(ARR_HEAD(f->varlist));
+        RELVAL *rootvar = ARR_HEAD(f->varlist);
         assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == f->varlist);
         TRASH_POINTER_IF_DEBUG(VAL_FRAME_PHASE_OR_LABEL_NODE(rootvar));
         TRASH_POINTER_IF_DEBUG(VAL_FRAME_BINDING_NODE(rootvar));

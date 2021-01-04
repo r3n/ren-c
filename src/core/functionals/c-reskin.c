@@ -214,8 +214,8 @@ REBNATIVE(reskinned)
 
     bool need_skin_phase = false;  // only needed if types were broadened
 
-    unstable RELVAL *param = ARR_AT(paramlist, 1);  // 0 is ACT_ARCHETYPE
-    unstable const RELVAL *item = VAL_ARRAY_AT(ARG(skin));
+    RELVAL *param = ARR_AT(paramlist, 1);  // 0 is ACT_ARCHETYPE
+    const RELVAL *item = VAL_ARRAY_AT(ARG(skin));
     Reb_Param_Class pclass;
     while (NOT_END(item)) {
         bool change;
@@ -419,8 +419,8 @@ REBNATIVE(reskinned)
         // on the source and target are the same, and it preserves relative
         // value information (rarely what you meant, but it's meant here).
         //
-        unstable RELVAL *src = ARR_HEAD(ACT_DETAILS(original)) + 1;
-        unstable RELVAL *dest = ARR_HEAD(ACT_DETAILS(defers)) + 1;
+        RELVAL *src = ARR_HEAD(ACT_DETAILS(original)) + 1;
+        RELVAL *dest = ARR_HEAD(ACT_DETAILS(defers)) + 1;
         for (; NOT_END(src); ++src, ++dest)
             Blit_Relative(dest, src);
     }

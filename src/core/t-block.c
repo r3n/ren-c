@@ -167,12 +167,12 @@ REB_R MAKE_Array(
         // instead of just [a b c] as the construction spec.
         //
         REBLEN len;
-        unstable const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
 
         if (len != 2 or not ANY_ARRAY(at) or not IS_INTEGER(at + 1))
             goto bad_make;
 
-        unstable const RELVAL *any_array = at;
+        const RELVAL *any_array = at;
         REBINT index = VAL_INDEX(any_array) + Int32(at + 1) - 1;
 
         if (index < 0 or index > cast(REBINT, VAL_LEN_HEAD(any_array)))
@@ -208,7 +208,7 @@ REB_R MAKE_Array(
         // data, but aliases it under a new kind.)
         //
         REBLEN len;
-        unstable const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
         return Init_Any_Array(
             out,
             kind,
@@ -275,9 +275,9 @@ REB_R MAKE_Array(
             REBCTX *context = CTX(VAL_VARARGS_BINDING(arg));
             REBFRM *param_frame = CTX_FRAME_MAY_FAIL(context);
 
-            REBVAL *param = SPECIFIC(STABLE(ARR_HEAD(
+            REBVAL *param = SPECIFIC(ARR_HEAD(
                 ACT_PARAMLIST(FRM_PHASE(param_frame))
-            )));
+            ));
             if (VAL_VARARGS_SIGNED_PARAM_INDEX(arg) < 0)
                 param += - VAL_VARARGS_SIGNED_PARAM_INDEX(arg);
             else
@@ -346,7 +346,7 @@ REB_R TO_Array(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
     }
     else if (ANY_ARRAY(arg)) {
         REBLEN len;
-        unstable const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
         return Init_Any_Array(
             out,
             kind,
@@ -393,7 +393,7 @@ REBLEN Find_In_Array(
     //
     if (ANY_WORD(target)) {
         for (; index >= start and index < end; index += skip) {
-            unstable const RELVAL *item = ARR_AT(array, index);
+            const RELVAL *item = ARR_AT(array, index);
             const REBSTR *target_symbol = VAL_WORD_SPELLING(target);
             if (ANY_WORD(item)) {
                 if (flags & AM_FIND_CASE) { // Must be same type and spelling
@@ -419,16 +419,16 @@ REBLEN Find_In_Array(
     //
     if (ANY_ARRAY(target) and not (flags & AM_FIND_ONLY)) {
         for (; index >= start and index < end; index += skip) {
-            unstable const RELVAL *item = ARR_AT(array, index);
+            const RELVAL *item = ARR_AT(array, index);
 
             REBLEN count = 0;
-            unstable const RELVAL *other = VAL_ARRAY_AT(target);
+            const RELVAL *other = VAL_ARRAY_AT(target);
             for (; NOT_END(other); ++other, ++item) {
                 if (
                     IS_END(item) or
                     0 != Cmp_Value(
-                        STABLE_HACK(item),
-                        STABLE_HACK(other),
+                        item,
+                        other,
                         did (flags & AM_FIND_CASE)
                     )
                 ){
@@ -447,7 +447,7 @@ REBLEN Find_In_Array(
     //
     if (IS_DATATYPE(target) or IS_TYPESET(target)) {
         for (; index >= start and index < end; index += skip) {
-            unstable const RELVAL *item = ARR_AT(array, index);
+            const RELVAL *item = ARR_AT(array, index);
 
             if (IS_DATATYPE(target)) {
                 if (VAL_TYPE(item) == VAL_TYPE_KIND(target))
@@ -480,9 +480,9 @@ REBLEN Find_In_Array(
     // All other cases
 
     for (; index >= start and index < end; index += skip) {
-        unstable const RELVAL *item = ARR_AT(array, index);
+        const RELVAL *item = ARR_AT(array, index);
         if (0 == Cmp_Value(
-            STABLE_HACK(item),
+            item,
             target,
             did (flags & AM_FIND_CASE))
         ){
@@ -582,7 +582,7 @@ void Shuffle_Array(REBARR *arr, REBLEN idx, bool secure)
 {
     REBLEN n;
     REBLEN k;
-    unstable RELVAL *data = ARR_HEAD(arr);
+    RELVAL *data = ARR_HEAD(arr);
 
     // Rare case where RELVAL bit copying is okay...between spots in the
     // same array.
@@ -598,9 +598,9 @@ void Shuffle_Array(REBARR *arr, REBLEN idx, bool secure)
         // value to itself.
         //
         if (k != (n + idx)) {
-            swap.header = STABLE(&data[k])->header;
-            swap.payload = STABLE(&data[k])->payload;
-            swap.extra = STABLE(&data[k])->extra;
+            swap.header = data[k].header;
+            swap.payload = data[k].payload;
+            swap.extra = data[k].extra;
             Blit_Relative(&data[k], &data[n + idx]);
             Blit_Relative(&data[n + idx], &swap);
         }
@@ -639,7 +639,7 @@ REB_R PD_Array(
         n = -1;
 
         const REBSTR *symbol = VAL_WORD_SPELLING(picker);
-        unstable const RELVAL *item = VAL_ARRAY_AT(pvs->out);
+        const RELVAL *item = VAL_ARRAY_AT(pvs->out);
         REBLEN index = VAL_INDEX(pvs->out);
         for (; NOT_END(item); ++item, ++index) {
             if (ANY_WORD(item) and symbol == VAL_WORD_SPELLING(item)) {
@@ -704,7 +704,7 @@ RELVAL *Pick_Block(REBVAL *out, const REBVAL *block, const RELVAL *picker)
         return NULL;
     }
 
-    unstable const RELVAL *slot = VAL_ARRAY_AT_HEAD(block, n);
+    const RELVAL *slot = VAL_ARRAY_AT_HEAD(block, n);
     Derelativize(out, slot, VAL_SPECIFIER(block));
     return out;
 }
@@ -980,7 +980,7 @@ REBTYPE(Array)
         if (index < VAL_LEN_HEAD(array)) {
             if (index == 0) Reset_Array(arr);
             else {
-                SET_END(STABLE_HACK(ARR_AT(arr, index)));
+                SET_END(ARR_AT(arr, index));
                 SET_SERIES_LEN(arr, cast(REBLEN, index));
             }
         }
@@ -1069,8 +1069,8 @@ REBTYPE(Array)
         if (len == 0)
             RETURN (array); // !!! do 1-element reversals update newlines?
 
-        unstable RELVAL *front = ARR_AT(arr, index);
-        unstable RELVAL *back = front + len - 1;
+        RELVAL *front = ARR_AT(arr, index);
+        RELVAL *back = front + len - 1;
 
         // We must reverse the sense of the newline markers as well, #2326
         // Elements that used to be the *end* of lines now *start* lines.
@@ -1087,9 +1087,9 @@ REBTYPE(Array)
             bool line_front = GET_CELL_FLAG(front + 1, NEWLINE_BEFORE);
 
             RELVAL temp;
-            temp.header = STABLE(front)->header;
-            temp.extra = STABLE(front)->extra;
-            temp.payload = STABLE(front)->payload;
+            temp.header = front->header;
+            temp.extra = front->extra;
+            temp.payload = front->payload;
 
             // When we move the back cell to the front position, it gets the
             // newline flag based on the flag state that was *after* it.
@@ -1156,7 +1156,7 @@ REBTYPE(Array)
         }
 
         reb_qsort_r(
-            STABLE_HACK(ARR_AT(arr, index)),
+            ARR_AT(arr, index),
             len / skip,
             sizeof(REBVAL) * skip,
             &flags,
@@ -1357,7 +1357,7 @@ void Assert_Array_Core(const REBARR *a)
     if (not IS_SER_ARRAY(a))
         panic (a);
 
-    unstable const RELVAL *item = ARR_HEAD(a);
+    const RELVAL *item = ARR_HEAD(a);
     REBLEN i;
     REBLEN len = ARR_LEN(a);
     for (i = 0; i < len; ++i, ++item) {
@@ -1399,7 +1399,7 @@ void Assert_Array_Core(const REBARR *a)
         }
         assert(item == ARR_AT(a, rest - 1));
 
-        unstable const RELVAL *ultimate = ARR_AT(a, rest - 1);
+        const RELVAL *ultimate = ARR_AT(a, rest - 1);
         if (NOT_END(ultimate) or (ultimate->header.bits & NODE_FLAG_CELL)) {
             printf("Implicit termination/unwritable END missing from array\n");
             panic (a);

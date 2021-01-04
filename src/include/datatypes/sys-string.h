@@ -444,7 +444,7 @@ inline static REBLEN STR_LEN(const REBSTR *s) {
 
     if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
       #if defined(DEBUG_UTF8_EVERYWHERE)
-        if (MISC(s).length > SER_USED(SER(s))) // includes 0xDECAFBAD
+        if (MISC(s).length > SER_USED(s))  // includes 0xDECAFBAD
             panic(s);
       #endif
         return MISC(s).length;
@@ -473,7 +473,7 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
 
     if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
       #if defined(DEBUG_UTF8_EVERYWHERE)
-        if (MISC(s).length > SER_USED(SER(s))) // includes 0xDECAFBAD
+        if (MISC(s).length > SER_USED(s))  // includes 0xDECAFBAD
             panic(s);
       #endif
 
@@ -748,9 +748,9 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
       { return STR_AT(m_cast(REBSTR*, s), at); }
 #endif
 
-inline static const REBSTR* VAL_WORD_SPELLING(unstable REBCEL(const*) v);
+inline static const REBSTR* VAL_WORD_SPELLING(REBCEL(const*) v);
 
-inline static const REBSTR *VAL_STRING(unstable REBCEL(const*) v) {
+inline static const REBSTR *VAL_STRING(REBCEL(const*) v) {
     if (ANY_STRING_KIND(CELL_HEART(v)))
         return STR(VAL_NODE(v));  // VAL_SERIES() would assert
 
@@ -766,17 +766,17 @@ inline static const REBSTR *VAL_STRING(unstable REBCEL(const*) v) {
 // that type.  So if the series is a string and not a binary, the special
 // cache of the length in the series node for strings must be used.
 //
-inline static REBLEN VAL_LEN_HEAD(unstable REBCEL(const*) v) {
+inline static REBLEN VAL_LEN_HEAD(REBCEL(const*) v) {
     const REBSER *s = VAL_SERIES(v);
     if (GET_SERIES_FLAG(s, IS_STRING) and CELL_KIND(v) != REB_BINARY)
         return STR_LEN(STR(s));
     return SER_USED(s);
 }
 
-inline static bool VAL_PAST_END(unstable REBCEL(const*) v)
+inline static bool VAL_PAST_END(REBCEL(const*) v)
    { return VAL_INDEX(v) > VAL_LEN_HEAD(v); }
 
-inline static REBLEN VAL_LEN_AT(unstable REBCEL(const*) v) {
+inline static REBLEN VAL_LEN_AT(REBCEL(const*) v) {
     //
     // !!! At present, it is considered "less of a lie" to tell people the
     // length of a series is 0 if its index is actually past the end, than
@@ -794,7 +794,7 @@ inline static REBLEN VAL_LEN_AT(unstable REBCEL(const*) v) {
     return VAL_LEN_HEAD(v) - i;  // take current index into account
 }
 
-inline static REBCHR(const*) VAL_STRING_AT(unstable REBCEL(const*) v) {
+inline static REBCHR(const*) VAL_STRING_AT(REBCEL(const*) v) {
     const REBSTR *str = VAL_STRING(v);  // checks that it's ANY-STRING!
     REBIDX i = VAL_INDEX_RAW(v);
     REBLEN len = STR_LEN(str);
@@ -804,7 +804,7 @@ inline static REBCHR(const*) VAL_STRING_AT(unstable REBCEL(const*) v) {
 }
 
 
-inline static REBCHR(const*) VAL_STRING_TAIL(unstable REBCEL(const*) v) {
+inline static REBCHR(const*) VAL_STRING_TAIL(REBCEL(const*) v) {
     const REBSTR *s = VAL_STRING(v);  // debug build checks it's ANY-STRING!
     return STR_TAIL(s);
 }
@@ -820,7 +820,7 @@ inline static REBCHR(const*) VAL_STRING_TAIL(unstable REBCEL(const*) v) {
 
 inline static REBSIZ VAL_SIZE_LIMIT_AT(
     REBLEN *length, // length in chars to end (including limit)
-    unstable REBCEL(const*) v,
+    REBCEL(const*) v,
     REBLEN limit  // UNLIMITED (e.g. a very large number) for no limit
 ){
     assert(ANY_STRING_KIND(CELL_HEART(v)));
@@ -980,7 +980,7 @@ inline static REBLEN Num_Codepoints_For_Bytes(
 // initialize, and the C++ build can also validate managed consistent w/const.
 
 inline static REBVAL *Init_Any_String_At(
-    unstable_ok RELVAL *out,
+    RELVAL *out,
     enum Reb_Kind kind,
     const_if_c REBSTR *str,
     REBLEN index
@@ -1003,32 +1003,6 @@ inline static REBVAL *Init_Any_String_At(
     ){
         return Init_Any_Series_At_Core(out, kind, str, index, UNBOUND);
     }
-
-  #ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Init_Any_String_At(
-        unstable RELVAL *out,
-        enum Reb_Kind kind,
-        REBSTR *str,
-        REBLEN index
-    ){
-        return Init_Any_Series_At_Core(
-            out,
-            kind,
-            Force_Series_Managed_Core(str),
-            index,
-            UNBOUND
-        );
-    }
-
-    inline static unstable REBVAL *Init_Any_String_At(
-        unstable RELVAL *out,
-        enum Reb_Kind kind,
-        const REBSTR *str,
-        REBLEN index
-    ){
-        return Init_Any_Series_At_Core(out, kind, SER(str), index, UNBOUND);
-    }
-  #endif
 #endif
 
 #define Init_Any_String(v,t,s) \

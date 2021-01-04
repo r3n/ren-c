@@ -766,7 +766,7 @@ void Startup_Task(void)
 //
 static void Startup_Base(REBARR *boot_base)
 {
-    unstable RELVAL *head = ARR_HEAD(boot_base);
+    RELVAL *head = ARR_HEAD(boot_base);
 
     // By this point, the Lib_Context contains basic definitions for things
     // like true, false, the natives, and the generics.  But before deeply
@@ -810,7 +810,7 @@ static void Startup_Base(REBARR *boot_base)
 // done by delegating it to Rebol can use a function in sys as a service.
 //
 static void Startup_Sys(REBARR *boot_sys) {
-    unstable RELVAL *head = ARR_HEAD(boot_sys);
+    RELVAL *head = ARR_HEAD(boot_sys);
 
     // Add all new top-level SET-WORD! found in the sys boot-block to Lib,
     // and then bind deeply all words to Lib and Sys.  See Startup_Base() notes
@@ -819,7 +819,6 @@ static void Startup_Sys(REBARR *boot_sys) {
     Bind_Values_Set_Midstream_Shallow(head, Sys_Context);
     Bind_Values_Deep(head, Lib_Context);
     Bind_Values_Deep(head, Sys_Context);
-    FORGET(head);
 
     DECLARE_LOCAL (result);
     if (Do_At_Mutable_Throws(result, boot_sys, 0, SPECIFIED))

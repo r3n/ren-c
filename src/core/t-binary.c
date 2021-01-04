@@ -207,15 +207,15 @@ REB_R MAKE_Binary(
         // to produce #{000102}.  That behavior is not available in Ren-C.
 
         REBLEN len;
-        unstable const RELVAL *at = VAL_ARRAY_LEN_AT(&len, def);
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, def);
         if (len != 2)
             goto bad_make;
 
-        unstable const RELVAL *first = at;
+        const RELVAL *first = at;
         if (not IS_BINARY(first))
             goto bad_make;
 
-        unstable const RELVAL *index = at + 1;
+        const RELVAL *index = at + 1;
         if (not IS_INTEGER(index))
             goto bad_make;
 
@@ -902,7 +902,7 @@ REBNATIVE(enbin)
             "fail {Second element of ENBIN settings must be + or +/-}",
         "]",
         rebEND);
-    unstable const RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
+    const RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
     if (not IS_INTEGER(third))
         fail ("Third element of ENBIN settings must be an integer}");
     REBINT num_bytes = VAL_INT32(third);
@@ -1010,7 +1010,7 @@ REBNATIVE(debin)
         "]",
         rebEND);
     REBLEN num_bytes;
-    unstable const RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
+    const RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
     if (IS_END(third))
         num_bytes = bin_size;
     else {

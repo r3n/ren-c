@@ -762,11 +762,11 @@ REBCTX *Make_Error_Managed_Core(
 
     DECLARE_LOCAL (id);
     DECLARE_LOCAL (type);
-    unstable const REBVAL *message;  // Stack values ("movable") are allowed
+    const REBVAL *message;  // Stack values ("movable") are allowed
     if (cat_sym == SYM_0 and id_sym == SYM_0) {
         Init_Blank(id);
         Init_Blank(type);
-        message = va_arg(*vaptr, unstable const REBVAL*);
+        message = va_arg(*vaptr, const REBVAL*);
     }
     else {
         assert(cat_sym != SYM_0 and id_sym != SYM_0);
@@ -784,7 +784,7 @@ REBCTX *Make_Error_Managed_Core(
 
     REBLEN expected_args = 0;
     if (IS_BLOCK(message)) { // GET-WORD!s in template should match va_list
-        unstable const RELVAL *temp = ARR_HEAD(VAL_ARRAY(message));
+        const RELVAL *temp = ARR_HEAD(VAL_ARRAY(message));
         for (; NOT_END(temp); ++temp) {
             if (IS_GET_WORD(temp))
                 ++expected_args;
@@ -817,7 +817,7 @@ REBCTX *Make_Error_Managed_Core(
     REBVAL *key = CTX_KEY(error, root_len) + 1;  // 1-based indexing
     REBVAL *var = CTX_VAR(error, root_len) + 1;
 
-    unstable const RELVAL *msg_item =
+    const RELVAL *msg_item =
         IS_TEXT(message)
             ? cast(const RELVAL*, END_NODE)  // gcc/g++ 2.95 needs (bug)
             : ARR_HEAD(VAL_ARRAY(message));
@@ -937,7 +937,7 @@ REBCTX *Error_User(const char *utf8) {
 //  Error_Need_Non_End_Core: C
 //
 REBCTX *Error_Need_Non_End_Core(
-    unstable const RELVAL *target,
+    const RELVAL *target,
     REBSPC *specifier
 ){
     assert(IS_SET_WORD(target) or IS_SET_PATH(target));
@@ -952,9 +952,9 @@ REBCTX *Error_Need_Non_End_Core(
 //  Error_Need_Non_Void_Core: C
 //
 REBCTX *Error_Need_Non_Void_Core(
-    unstable const RELVAL *target,
+    const RELVAL *target,
     REBSPC *specifier,
-    unstable const RELVAL *voided
+    const RELVAL *voided
 ){
     // SET calls this, and doesn't work on just SET-WORD! and SET-PATH!
     //
@@ -1054,7 +1054,7 @@ REBCTX *Error_No_Memory(REBLEN bytes)
 //
 //  Error_No_Relative_Core: C
 //
-REBCTX *Error_No_Relative_Core(unstable REBCEL(const*) any_word)
+REBCTX *Error_No_Relative_Core(REBCEL(const*) any_word)
 {
     DECLARE_LOCAL (unbound);
     Init_Any_Word(
@@ -1113,7 +1113,7 @@ REBCTX *Error_Invalid_Arg(REBFRM *f, const RELVAL *param)
 {
     assert(IS_PARAM(param));
 
-    RELVAL *rootparam = STABLE(ARR_HEAD(ACT_PARAMLIST(FRM_PHASE(f))));
+    RELVAL *rootparam = ARR_HEAD(ACT_PARAMLIST(FRM_PHASE(f)));
     assert(IS_UNREADABLE_DEBUG(rootparam));
     assert(param > rootparam);
     assert(param <= rootparam + 1 + FRM_NUM_ARGS(f));
@@ -1140,7 +1140,7 @@ REBCTX *Error_Invalid_Arg(REBFRM *f, const RELVAL *param)
 //
 // Will turn into an unknown error if a nulled cell is passed in.
 //
-REBCTX *Error_Bad_Value_Core(unstable const RELVAL *value, REBSPC *specifier)
+REBCTX *Error_Bad_Value_Core(const RELVAL *value, REBSPC *specifier)
 {
     if (IS_NULLED(value))
         fail (Error_Unknown_Error_Raw());
@@ -1226,7 +1226,7 @@ REBCTX *Error_Invalid_Type(enum Reb_Kind kind)
 //
 // value out of range: <value>
 //
-REBCTX *Error_Out_Of_Range(unstable const REBVAL *arg)
+REBCTX *Error_Out_Of_Range(const REBVAL *arg)
 {
     return Error_Out_Of_Range_Raw(arg);
 }

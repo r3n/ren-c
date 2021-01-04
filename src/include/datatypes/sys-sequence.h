@@ -92,7 +92,7 @@
 
 inline static bool Is_Valid_Sequence_Element(
     enum Reb_Kind sequence_kind,
-    unstable const RELVAL *v
+    const RELVAL *v
 ){
     assert(ANY_SEQUENCE_KIND(sequence_kind));
 
@@ -120,7 +120,7 @@ inline static bool Is_Valid_Sequence_Element(
 // the output cell passed in will be either a REB_NULL (if the data was
 // too short) or it will be the first badly-typed value that was problematic.
 //
-inline static REBCTX *Error_Bad_Sequence_Init(unstable const REBVAL *v) {
+inline static REBCTX *Error_Bad_Sequence_Init(const REBVAL *v) {
     if (IS_NULLED(v))
         return Error_Sequence_Too_Short_Raw();
     fail (Error_Bad_Sequence_Item_Raw(v));
@@ -219,7 +219,7 @@ inline static REBVAL *Try_Leading_Blank_Pathify(
 // revisit this low-priority idea at that time.
 
 inline static REBVAL *Init_Any_Sequence_Bytes(
-    unstable_ok RELVAL *out,
+    RELVAL *out,
     enum Reb_Kind kind,
     const REBYTE *data,
     REBSIZ size
@@ -249,7 +249,7 @@ inline static REBVAL *Init_Any_Sequence_Bytes(
 inline static REBVAL *Try_Init_Any_Sequence_All_Integers(
     RELVAL *out,
     enum Reb_Kind kind,
-    unstable const RELVAL *head,  // NOTE: Can't use DS_PUSH() or evaluation
+    const RELVAL *head,  // NOTE: Can't use DS_PUSH() or evaluation
     REBLEN len
 ){
   #if !defined(NDEBUG)
@@ -268,7 +268,7 @@ inline static REBVAL *Try_Init_Any_Sequence_All_Integers(
 
     REBYTE *bp = PAYLOAD(Bytes, out).at_least_8;
 
-    unstable const RELVAL *item = head;
+    const RELVAL *item = head;
     REBLEN n;
     for (n = 0; n < len; ++n, ++item, ++bp) {
         if (not IS_INTEGER(item))
@@ -293,10 +293,10 @@ inline static REBVAL *Try_Init_Any_Sequence_All_Integers(
 // REB_PAIR type, making PAIR! just a type constraint on TUPLE!s.
 
 inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
-    unstable RELVAL *out,
+    RELVAL *out,
     enum Reb_Kind kind,
-    unstable const RELVAL *v1,
-    unstable const RELVAL *v2,
+    const RELVAL *v1,
+    const RELVAL *v2,
     REBSPC *specifier  // assumed to apply to both v1 and v2
 ){
     if (IS_BLANK(v1))
@@ -331,7 +331,7 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
         if (i1 >= 0 and i2 >= 0 and i1 <= 255 and i2 <= 255) {
             buf[0] = cast(REBYTE, i1);
             buf[1] = cast(REBYTE, i2);
-            return Init_Any_Sequence_Bytes(STABLE(out), kind, buf, 2);
+            return Init_Any_Sequence_Bytes(out, kind, buf, 2);
         }
 
         // fall through
@@ -458,7 +458,7 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
 // take as immutable...or you can create a `/foo`-style path in a more
 // optimized fashion using Refinify()
 
-inline static REBLEN VAL_SEQUENCE_LEN(unstable REBCEL(const*) sequence) {
+inline static REBLEN VAL_SEQUENCE_LEN(REBCEL(const*) sequence) {
     assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));
 
     switch (HEART_BYTE(sequence)) {
@@ -499,7 +499,7 @@ inline static REBLEN VAL_SEQUENCE_LEN(unstable REBCEL(const*) sequence) {
 //
 inline static const RELVAL *VAL_SEQUENCE_AT(
     RELVAL *store,  // return may not point at this cell, ^-- SEE WHY!
-    unstable REBCEL(const*) sequence,  // allowed to be the same as sequence
+    REBCEL(const*) sequence,  // allowed to be the same as sequence
     REBLEN n
 ){
   #if !defined(NDEBUG)
@@ -559,7 +559,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         const REBARR *a = ARR(VAL_NODE(sequence));
         assert(ARR_LEN(a) >= 2);
         assert(Is_Array_Frozen_Shallow(a));
-        return STABLE(ARR_AT(a, n)); }  // array is read only
+        return ARR_AT(a, n); }  // array is read only
 
       default:
         assert(false);
@@ -568,7 +568,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
 }
 
 inline static REBYTE VAL_SEQUENCE_BYTE_AT(
-    unstable REBCEL(const*) sequence,
+    REBCEL(const*) sequence,
     REBLEN n
 ){
     DECLARE_LOCAL (temp);
@@ -579,7 +579,7 @@ inline static REBYTE VAL_SEQUENCE_BYTE_AT(
 }
 
 inline static REBSPC *VAL_SEQUENCE_SPECIFIER(
-    unstable REBCEL(const*) sequence
+    REBCEL(const*) sequence
 ){
     assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));
 
@@ -617,7 +617,7 @@ inline static REBSPC *VAL_SEQUENCE_SPECIFIER(
 //
 inline static bool Did_Get_Sequence_Bytes(
     void *buf,
-    unstable const RELVAL *sequence,
+    const RELVAL *sequence,
     REBSIZ buf_size
 ){
     REBLEN len = VAL_SEQUENCE_LEN(sequence);
@@ -644,7 +644,7 @@ inline static bool Did_Get_Sequence_Bytes(
 
 inline static void Get_Tuple_Bytes(
     void *buf,
-    unstable const RELVAL *tuple,
+    const RELVAL *tuple,
     REBSIZ buf_size
 ){
     assert(IS_TUPLE(tuple));
@@ -679,7 +679,9 @@ inline static bool IS_REFINEMENT(const RELVAL *v) {
 inline static bool IS_PREDICATE1_CELL(REBCEL(const*) cell)
   { return CELL_KIND(cell) == REB_TUPLE and CELL_HEART(cell) == REB_GET_WORD; }
 
-inline static const REBSTR *VAL_PREDICATE1_SPELLING(REBCEL(const*) cell) {
+inline static const REBSTR *VAL_PREDICATE1_SPELLING(
+    REBCEL(const*) cell
+){
     assert(IS_PREDICATE1_CELL(cell));
     return VAL_WORD_SPELLING(cell);
 }
@@ -692,7 +694,9 @@ inline static bool IS_PREDICATE(const RELVAL *v) {
     return IS_BLANK(VAL_SEQUENCE_AT(temp, v, 0));
 }
 
-inline static const REBSTR *VAL_REFINEMENT_SPELLING(REBCEL(const*) v) {
+inline static const REBSTR *VAL_REFINEMENT_SPELLING(
+    REBCEL(const*) v
+){
     assert(IS_REFINEMENT_CELL(v));
     return VAL_WORD_SPELLING(v);
 }

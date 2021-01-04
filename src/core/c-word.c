@@ -559,7 +559,7 @@ void Startup_Symbols(REBARR *words)
         *SER_AT(REBSTR*, PG_Symbol_Canons, cast(REBLEN, sym))
     );
 
-    unstable RELVAL *word = ARR_HEAD(words);
+    RELVAL *word = ARR_HEAD(words);
     for (; NOT_END(word); ++word) {
         assert(IS_WORD(word));  // real word, not fake (e.g. `/` as -slash-0-)
         REBSTR *canon = m_cast(REBSTR*, VAL_WORD_SPELLING(word));

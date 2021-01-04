@@ -382,7 +382,7 @@ void Join_Binary_In_Byte_Buf(const REBVAL *blk, REBINT limit)
 
     SET_SERIES_LEN(buf, 0);
 
-    unstable const RELVAL *val;
+    const RELVAL *val;
     for (val = VAL_ARRAY_AT(blk); limit > 0; val++, limit--) {
         switch (VAL_TYPE(val)) {
         case REB_INTEGER:

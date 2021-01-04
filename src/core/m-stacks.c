@@ -249,7 +249,7 @@ REBCTX *Get_Context_From_Stack(void)
 // which could do a push or pop.  (Currently stable w.r.t. pop but there may
 // be compaction at some point.)
 //
-unstable REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
+REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
 {
     REBLEN len_old = ARR_LEN(DS_Array);
 
@@ -285,7 +285,7 @@ unstable REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
     // the debug build).  In order to serve as a marker for the stack slot
     // being available, it merely must not be IS_END()...
 
-    unstable REBVAL *cell = DS_Movable_Top;
+    REBVAL *cell = DS_Movable_Top;
 
     REBLEN len_new = len_old + amount;
     REBLEN n;
@@ -330,7 +330,7 @@ REBARR *Pop_Stack_Values_Core(REBDSP dsp_start, REBFLGS flags)
 //
 void Pop_Stack_Values_Into(REBVAL *into, REBDSP dsp_start) {
     REBLEN len = DSP - dsp_start;
-    unstable REBVAL *values = SPECIFIC(ARR_AT(DS_Array, dsp_start + 1));
+    REBVAL *values = SPECIFIC(ARR_AT(DS_Array, dsp_start + 1));
 
     VAL_INDEX_RAW(into) = Insert_Series(
         VAL_SERIES_ENSURE_MUTABLE(into),

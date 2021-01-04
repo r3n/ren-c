@@ -86,7 +86,7 @@ enum {
 bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
 {
     REBARR *code_arr = Make_Array(FRM_NUM_ARGS(f)); // max, e.g. no refines
-    RELVAL *code = STABLE(ARR_HEAD(code_arr));
+    RELVAL *code = ARR_HEAD(code_arr);
 
     // !!! For the moment, if refinements are needed we generate a PATH! with
     // the ACTION! at the head, and have the evaluator rediscover the stack
@@ -250,8 +250,8 @@ REBNATIVE(hijack)
                 details_len + 1 - SER_REST(victim_details)
             );
 
-        unstable RELVAL *src = ARR_HEAD(hijacker_details) + 1;
-        unstable RELVAL *dest = ARR_HEAD(victim_details) + 1;
+        RELVAL *src = ARR_HEAD(hijacker_details) + 1;
+        RELVAL *dest = ARR_HEAD(victim_details) + 1;
         for (; NOT_END(src); ++src, ++dest)
             Blit_Relative(dest, src);  // details may contain relative values
         TERM_ARRAY_LEN(victim_details, details_len);

@@ -48,8 +48,8 @@ REBARR *Copy_Array_At_Extra_Shallow(
 
     REBARR *copy = Make_Array_For_Copy(len + extra, flags, original);
 
-    unstable const RELVAL *src = ARR_AT(original, index);
-    RELVAL *dest = STABLE(ARR_HEAD(copy));
+    const RELVAL *src = ARR_AT(original, index);
+    RELVAL *dest = ARR_HEAD(copy);
     REBLEN count = 0;
     for (; count < len; ++count, ++dest, ++src)
         Derelativize(dest, src, specifier);
@@ -83,8 +83,8 @@ REBARR *Copy_Array_At_Max_Shallow(
     REBARR *copy = Make_Array_For_Copy(max, flags, original);
 
     REBLEN count = 0;
-    unstable const RELVAL *src = ARR_AT(original, index);
-    RELVAL *dest = STABLE(ARR_HEAD(copy));
+    const RELVAL *src = ARR_AT(original, index);
+    RELVAL *dest = ARR_HEAD(copy);
     for (; count < max; ++count, ++src, ++dest)
         Derelativize(dest, src, specifier);
 
@@ -101,7 +101,7 @@ REBARR *Copy_Array_At_Max_Shallow(
 // hold that many entries, with an optional bit of extra space at the end.
 //
 REBARR *Copy_Values_Len_Extra_Shallow_Core(
-    unstable const RELVAL *head,
+    const RELVAL *head,
     REBSPC *specifier,
     REBLEN len,
     REBLEN extra,
@@ -110,8 +110,8 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
     REBARR *a = Make_Array_Core(len + extra, flags);
 
     REBLEN count = 0;
-    unstable const RELVAL *src = head;
-    RELVAL *dest = STABLE(ARR_HEAD(a));
+    const RELVAL *src = head;
+    RELVAL *dest = ARR_HEAD(a);
     for (; count < len; ++count, ++src, ++dest) {
         if (KIND3Q_BYTE_UNCHECKED(src) == REB_NULL)  // allow unreadable void
             assert(flags & ARRAY_FLAG_IS_VARLIST);  // usually not legal
@@ -222,7 +222,7 @@ void Clonify(
         // copied series and "clonify" the values in it.
         //
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
-            REBVAL *sub = SPECIFIC(STABLE(ARR_HEAD(ARR(series))));
+            REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
             for (; NOT_END(sub); ++sub)
                 Clonify(sub, flags, deep_types);
         }
@@ -275,8 +275,8 @@ REBARR *Copy_Array_Core_Managed(
         original
     );
 
-    unstable const RELVAL *src = ARR_AT(original, index);
-    RELVAL *dest = STABLE(ARR_HEAD(copy));
+    const RELVAL *src = ARR_AT(original, index);
+    RELVAL *dest = ARR_HEAD(copy);
     REBLEN count = 0;
     for (; count < len; ++count, ++dest, ++src) {
         Clonify(
@@ -317,8 +317,8 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
     const REBFLGS flags = NODE_FLAG_MANAGED;
 
     REBARR *copy = Make_Array_For_Copy(ARR_LEN(original), flags, original);
-    unstable const RELVAL *src = ARR_HEAD(original);
-    RELVAL *dest = STABLE(ARR_HEAD(copy));
+    const RELVAL *src = ARR_HEAD(original);
+    RELVAL *dest = ARR_HEAD(copy);
 
     for (; NOT_END(src); ++src, ++dest) {
         if (not IS_RELATIVE(src)) {
@@ -340,12 +340,12 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
                     VAL_ARRAY(src), before, after
                 )
             );
-            PAYLOAD(Any, dest).second = PAYLOAD(Any, STABLE(src)).second;
+            PAYLOAD(Any, dest).second = PAYLOAD(Any, src).second;
             INIT_SPECIFIER(dest, after); // relative binding
         }
         else {
             assert(ANY_WORD(src));
-            PAYLOAD(Any, dest) = PAYLOAD(Any, STABLE(src));
+            PAYLOAD(Any, dest) = PAYLOAD(Any, src);
             INIT_SPECIFIER(dest, after);
         }
 
@@ -367,11 +367,11 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
 //
 // Note: Updates the termination and tail.
 //
-unstable RELVAL *Alloc_Tail_Array(REBARR *a)
+RELVAL *Alloc_Tail_Array(REBARR *a)
 {
     EXPAND_SERIES_TAIL(a, 1);
     TERM_ARRAY_LEN(a, ARR_LEN(a));
-    unstable RELVAL *last = ARR_LAST(a);
+    RELVAL *last = ARR_LAST(a);
     TRASH_CELL_IF_DEBUG(last); // !!! was an END marker, good enough?
     return last;
 }
@@ -387,7 +387,7 @@ void Uncolor_Array(const REBARR *a)
 
     Flip_Series_To_White(a);
 
-    unstable const RELVAL *v;
+    const RELVAL *v;
     for (v = ARR_HEAD(a); NOT_END(v); ++v) {
         if (ANY_PATH(v) or ANY_ARRAY(v) or IS_MAP(v) or ANY_CONTEXT(v))
             Uncolor(v);
@@ -400,7 +400,7 @@ void Uncolor_Array(const REBARR *a)
 //
 // Clear the recusion markers for series and object trees.
 //
-void Uncolor(unstable const RELVAL *v)
+void Uncolor(const RELVAL *v)
 {
     if (ANY_ARRAY(v))
         Uncolor_Array(VAL_ARRAY(v));

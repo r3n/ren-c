@@ -67,14 +67,14 @@
 #define VAL_VARARGS_BINDING_NODE(v) \
     EXTRA(Binding, (v)).node
 
-inline static REBARR *VAL_VARARGS_BINDING(unstable REBCEL(const*) v) {
+inline static REBARR *VAL_VARARGS_BINDING(REBCEL(const*) v) {
     assert(CELL_HEART(v) == REB_VARARGS);
     REBNOD *binding = VAL_VARARGS_BINDING_NODE(v);
     return ARR(binding);  // may be varlist or array
 }
 
 inline static void INIT_VAL_VARARGS_BINDING(
-    unstable RELVAL *v,
+    RELVAL *v,
     REBARR *binding  // either an array or a frame varlist
 ){
     assert(IS_VARARGS(v));
@@ -130,7 +130,7 @@ inline static bool Is_Block_Style_Varargs(
     // array with one BLOCK!, that is the actual array and index to advance.
     //
     REBARR *array1 = ARR(binding);
-    *shared_out = SPECIFIC(STABLE(ARR_HEAD(array1)));
+    *shared_out = SPECIFIC(ARR_HEAD(array1));
     assert(
         IS_END(*shared_out)
         or (IS_BLOCK(*shared_out) and ARR_LEN(array1) == 1)

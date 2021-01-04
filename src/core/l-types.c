@@ -578,7 +578,7 @@ const REBYTE *Scan_Dec_Buf(
 // Scan and convert a decimal value.  Return zero if error.
 //
 const REBYTE *Scan_Decimal(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len,
     bool dec_only
@@ -670,7 +670,7 @@ const REBYTE *Scan_Decimal(
 // Allow preceding + - and any combination of ' marks.
 //
 const REBYTE *Scan_Integer(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ){
@@ -763,7 +763,7 @@ const REBYTE *Scan_Integer(
 // Scan and convert a date. Also can include a time and zone.
 //
 const REBYTE *Scan_Date(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
@@ -1002,7 +1002,7 @@ const REBYTE *Scan_Date(
 // Scan and convert a file name.
 //
 const REBYTE *Scan_File(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
@@ -1045,7 +1045,7 @@ const REBYTE *Scan_File(
 // Scan and convert email.
 //
 const REBYTE *Scan_Email(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ){
@@ -1115,7 +1115,7 @@ const REBYTE *Scan_Email(
 // on Windows, are expressed as TEXT!.)
 //
 const REBYTE *Scan_URL(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ){
@@ -1129,7 +1129,7 @@ const REBYTE *Scan_URL(
 // Scan and convert a pair
 //
 const REBYTE *Scan_Pair(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
@@ -1183,7 +1183,7 @@ const REBYTE *Scan_Pair(
 // Scan and convert binary strings.
 //
 const REBYTE *Scan_Binary(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
@@ -1221,7 +1221,7 @@ const REBYTE *Scan_Binary(
 // Scan any string that does not require special decoding.
 //
 const REBYTE *Scan_Any(
-    unstable RELVAL *out,
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN num_bytes,
     enum Reb_Kind type,
@@ -1308,7 +1308,7 @@ REBNATIVE(scan_net_header)
         REBVAL *val = NULL; // rigorous checks worry it could be uninitialized
 
         const REBSTR *name = Intern_UTF8_Managed(start, cp - start);
-        unstable RELVAL *item;
+        RELVAL *item;
 
         cp++;
         // Search if word already present:

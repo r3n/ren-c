@@ -145,7 +145,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     REBARR *varlist = Make_Array_Core(num_slots, SERIES_MASK_VARLIST);
     INIT_CTX_KEYLIST_SHARED(CTX(varlist), ACT_PARAMLIST(act));
 
-    RELVAL *rootvar = STABLE(ARR_HEAD(varlist));
+    RELVAL *rootvar = ARR_HEAD(varlist);
     INIT_VAL_FRAME_ROOTVAR(
         rootvar,
         varlist,
@@ -222,7 +222,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         //
         REBDSP dsp = highest_ordered_dsp;
         for (; dsp != lowest_ordered_dsp; --dsp) {
-            unstable REBVAL *ordered = DS_AT(dsp);
+            REBVAL *ordered = DS_AT(dsp);
             if (VAL_WORD_SPELLING(ordered) != symbol)
                 continue;  // just continuing this loop
 
@@ -392,7 +392,7 @@ bool Specialize_Action_Throws(
                 //
                 while (ordered_dsp != DSP) {
                     ++ordered_dsp;
-                    unstable REBVAL *ordered = DS_AT(ordered_dsp);
+                    REBVAL *ordered = DS_AT(ordered_dsp);
 
                     if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
                         fail (Error_Bad_Refine_Raw(ordered));
@@ -474,7 +474,7 @@ bool Specialize_Action_Throws(
     //
     while (ordered_dsp != DSP) {
         ++ordered_dsp;
-        unstable REBVAL *ordered = DS_AT(ordered_dsp);
+        REBVAL *ordered = DS_AT(ordered_dsp);
         if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
             fail (Error_Bad_Refine_Raw(ordered));
 

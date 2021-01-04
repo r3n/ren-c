@@ -2284,7 +2284,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 cell,
                 kind,
                 nullptr,
-                SPECIFIC(STABLE(ARR_AT(array, 1)))
+                SPECIFIC(ARR_AT(array, 1))
             );
             if (r == R_THROWN) {  // !!! good argument for not using MAKE
                 assert(false);
@@ -2510,8 +2510,8 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         // mutating it into a single element GROUP!.
         //
       blockscope {
-        unstable REBVAL *head = DS_AT(dsp_path_head);
-        unstable REBVAL *cleanup = head + 1;
+        REBVAL *head = DS_AT(dsp_path_head);
+        REBVAL *cleanup = head + 1;
         for (; cleanup <= DS_TOP; ++cleanup) {
             if (IS_GET_WORD(cleanup)) {
                 REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);
@@ -3109,7 +3109,7 @@ const REBYTE *Scan_Any_Word(
 // !!! Since this follows the same rules as FILE!, the code should merge,
 // though FILE! will make mutable strings and not have in-cell optimization.
 //
-const REBYTE *Scan_Issue(unstable RELVAL *out, const REBYTE *cp, REBSIZ size)
+const REBYTE *Scan_Issue(RELVAL *out, const REBYTE *cp, REBSIZ size)
 {
     const REBYTE *bp = cp;
 

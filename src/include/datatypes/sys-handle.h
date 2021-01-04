@@ -65,12 +65,12 @@
     EXTRA(Any, (v)).cfunc
 
 
-inline static bool Is_Handle_Cfunc(unstable REBCEL(const*) v) {
+inline static bool Is_Handle_Cfunc(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_HANDLE);
     return VAL_HANDLE_LENGTH_U(v) == 0;
 }
 
-inline static uintptr_t VAL_HANDLE_LEN(unstable REBCEL(const*) v) {
+inline static uintptr_t VAL_HANDLE_LEN(REBCEL(const*) v) {
     assert(not Is_Handle_Cfunc(v));
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a)
@@ -79,7 +79,7 @@ inline static uintptr_t VAL_HANDLE_LEN(unstable REBCEL(const*) v) {
         return VAL_HANDLE_LENGTH_U(v);
 }
 
-inline static void *VAL_HANDLE_VOID_POINTER(unstable REBCEL(const*) v) {
+inline static void *VAL_HANDLE_VOID_POINTER(REBCEL(const*) v) {
     assert(not Is_Handle_Cfunc(v));
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a)
@@ -91,7 +91,7 @@ inline static void *VAL_HANDLE_VOID_POINTER(unstable REBCEL(const*) v) {
 #define VAL_HANDLE_POINTER(t, v) \
     cast(t *, VAL_HANDLE_VOID_POINTER(v))
 
-inline static CFUNC *VAL_HANDLE_CFUNC(unstable REBCEL(const*) v) {
+inline static CFUNC *VAL_HANDLE_CFUNC(REBCEL(const*) v) {
     assert(Is_Handle_Cfunc(v));
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a)
@@ -100,7 +100,7 @@ inline static CFUNC *VAL_HANDLE_CFUNC(unstable REBCEL(const*) v) {
         return VAL_HANDLE_CFUNC_P(v);
 }
 
-inline static CLEANUP_CFUNC *VAL_HANDLE_CLEANER(unstable REBCEL(const*) v) {
+inline static CLEANUP_CFUNC *VAL_HANDLE_CLEANER(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_HANDLE);
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (not a)
@@ -108,7 +108,7 @@ inline static CLEANUP_CFUNC *VAL_HANDLE_CLEANER(unstable REBCEL(const*) v) {
     return MISC(a).cleaner;
 }
 
-inline static void SET_HANDLE_LEN(unstable RELVAL *v, uintptr_t length) {
+inline static void SET_HANDLE_LEN(RELVAL *v, uintptr_t length) {
     assert(VAL_TYPE(v) == REB_HANDLE);
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a)
@@ -117,7 +117,7 @@ inline static void SET_HANDLE_LEN(unstable RELVAL *v, uintptr_t length) {
         VAL_HANDLE_LENGTH_U(v) = length;
 }
 
-inline static void SET_HANDLE_CDATA(unstable RELVAL *v, void *cdata) {
+inline static void SET_HANDLE_CDATA(RELVAL *v, void *cdata) {
     assert(VAL_TYPE(v) == REB_HANDLE);
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a) {
@@ -130,7 +130,7 @@ inline static void SET_HANDLE_CDATA(unstable RELVAL *v, void *cdata) {
     }
 }
 
-inline static void SET_HANDLE_CFUNC(unstable RELVAL *v, CFUNC *cfunc) {
+inline static void SET_HANDLE_CFUNC(RELVAL *v, CFUNC *cfunc) {
     assert(Is_Handle_Cfunc(v));
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (a) {
@@ -144,7 +144,7 @@ inline static void SET_HANDLE_CFUNC(unstable RELVAL *v, CFUNC *cfunc) {
 }
 
 inline static REBVAL *Init_Handle_Cdata(
-    unstable_ok RELVAL *out,
+    RELVAL *out,
     void *cdata,
     uintptr_t length
 ){
@@ -157,7 +157,7 @@ inline static REBVAL *Init_Handle_Cdata(
 }
 
 inline static REBVAL *Init_Handle_Cfunc(
-    unstable_ok RELVAL *out,
+    RELVAL *out,
     CFUNC *cfunc
 ){
     RESET_CELL(out, REB_HANDLE, CELL_MASK_NONE);  // payload first is not node
@@ -167,24 +167,6 @@ inline static REBVAL *Init_Handle_Cfunc(
     return cast(REBVAL*, out);
 }
 
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Init_Handle_Cdata(
-        unstable RELVAL *out,
-        void *cdata,
-        uintptr_t length
-    ){
-        return Init_Handle_Cdata(STABLE(out), cdata, length);
-    }
-
-    inline static unstable REBVAL *Init_Handle_Cfunc(
-        unstable RELVAL *out,
-        CFUNC *cfunc
-    ){
-        return Init_Handle_Cfunc(STABLE(out), cfunc);
-    }
-#endif
-
-
 inline static void Init_Handle_Cdata_Managed_Common(
     RELVAL *out,
     uintptr_t length,
@@ -193,7 +175,7 @@ inline static void Init_Handle_Cdata_Managed_Common(
     REBARR *singular = Alloc_Singular(NODE_FLAG_MANAGED);
     MISC(singular).cleaner = cleaner;
 
-    unstable RELVAL *single = ARR_SINGLE(singular);
+    RELVAL *single = ARR_SINGLE(singular);
     RESET_VAL_HEADER(single, REB_HANDLE, CELL_FLAG_FIRST_IS_NODE);
     VAL_HANDLE_SINGULAR_NODE(single) = NOD(singular); 
     VAL_HANDLE_LENGTH_U(single) = length;
@@ -211,7 +193,7 @@ inline static void Init_Handle_Cdata_Managed_Common(
 }
 
 inline static REBVAL *Init_Handle_Cdata_Managed(
-    unstable_ok RELVAL *out,
+    RELVAL *out,
     void *cdata,
     uintptr_t length,
     CLEANUP_CFUNC *cleaner
@@ -226,7 +208,7 @@ inline static REBVAL *Init_Handle_Cdata_Managed(
 }
 
 inline static REBVAL *Init_Handle_Cdata_Managed_Cfunc(
-    unstable_ok RELVAL *out,
+    RELVAL *out,
     CFUNC *cfunc,
     CLEANUP_CFUNC *cleaner
 ){
@@ -238,22 +220,3 @@ inline static REBVAL *Init_Handle_Cdata_Managed_Cfunc(
     VAL_HANDLE_CFUNC_P(ARR_SINGLE(a)) = cfunc;
     return cast(REBVAL*, out);
 }
-
-#ifdef DEBUG_UNSTABLE_CELLS
-    inline static unstable REBVAL *Init_Handle_Cdata_Managed(
-        unstable RELVAL *out,
-        void *cdata,
-        uintptr_t length,
-        CLEANUP_CFUNC *cleaner
-    ){
-        return Init_Handle_Cdata_Managed(STABLE(out), cdata, length, cleaner);
-    }
-
-    inline static unstable REBVAL *Init_Handle_Cdata_Managed_Cfunc(
-        unstable RELVAL *out,
-        CFUNC *cfunc,
-        CLEANUP_CFUNC *cleaner
-    ){
-        return Init_Handle_Cdata_Managed_Cfunc(STABLE(out), cfunc, cleaner);
-    }
-#endif

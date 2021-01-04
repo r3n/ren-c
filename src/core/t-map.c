@@ -58,7 +58,7 @@ REBMAP *Make_Map(REBLEN capacity)
 
 
 static REBCTX *Error_Conflicting_Key(
-    unstable const RELVAL *key,
+    const RELVAL *key,
     REBSPC *specifier
 ){
     DECLARE_LOCAL (specific);
@@ -83,7 +83,7 @@ static REBCTX *Error_Conflicting_Key(
 REBINT Find_Key_Hashed(
     REBARR *array,
     REBSER *hashlist,
-    unstable const RELVAL *key,  // !!! assumes ++key finds the values
+    const RELVAL *key,  // !!! assumes ++key finds the values
     REBSPC *specifier,
     REBLEN wide,
     bool strict,
@@ -121,15 +121,15 @@ REBINT Find_Key_Hashed(
 
     REBLEN n;
     while ((n = indexes[slot]) != 0) {
-        unstable RELVAL *k = ARR_AT(array, (n - 1) * wide); // stored key
-        if (0 == Cmp_Value(STABLE_HACK(k), STABLE_HACK(key), true)) {
+        RELVAL *k = ARR_AT(array, (n - 1) * wide); // stored key
+        if (0 == Cmp_Value(k, key, true)) {
             if (strict)
                 return slot; // don't need to check synonyms, stop looking
             goto found_synonym; // confirm exact match is the only match
         }
 
         if (not strict) {  // now do the non strict match (false)
-            if (0 == Cmp_Value(STABLE_HACK(k), STABLE_HACK(key), false)) {
+            if (0 == Cmp_Value(k, key, false)) {
 
               found_synonym:;
 
@@ -163,7 +163,7 @@ REBINT Find_Key_Hashed(
     }
 
     if (mode > 1) { // append new value to the target series
-        unstable const RELVAL *src = key;
+        const RELVAL *src = key;
         indexes[slot] = (ARR_LEN(array) / wide) + 1;
 
         REBLEN index;
@@ -189,7 +189,7 @@ static void Rehash_Map(REBMAP *map)
     REBLEN *hashes = SER_HEAD(REBLEN, hashlist);
     REBARR *pairlist = MAP_PAIRLIST(map);
 
-    unstable REBVAL *key = SPECIFIC(ARR_HEAD(pairlist));
+    REBVAL *key = SPECIFIC(ARR_HEAD(pairlist));
     REBLEN n;
 
     for (n = 0; n < ARR_LEN(pairlist); n += 2, key += 2) {
@@ -254,9 +254,9 @@ void Expand_Hash(REBSER *ser)
 //
 REBLEN Find_Map_Entry(
     REBMAP *map,
-    unstable const RELVAL *key,
+    const RELVAL *key,
     REBSPC *key_specifier,
-    unstable const RELVAL *val,
+    const RELVAL *val,
     REBSPC *val_specifier,
     bool strict
 ) {
@@ -369,7 +369,7 @@ REB_R PD_Map(
     if (n == 0)
         return nullptr;
 
-    unstable const REBVAL *val = SPECIFIC(
+    const REBVAL *val = SPECIFIC(
         ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1)
     );
     if (IS_NULLED(val))  // zombie entry, means unused
@@ -384,11 +384,11 @@ REB_R PD_Map(
 //
 static void Append_Map(
     REBMAP *map,
-    unstable const RELVAL *head,
+    const RELVAL *head,
     REBSPC *specifier,
     REBLEN len
 ){
-    unstable const RELVAL *item = head;
+    const RELVAL *item = head;
     REBLEN n = 0;
 
     while (n < len && NOT_END(item)) {
@@ -464,16 +464,16 @@ inline static REBMAP *Copy_Map(const REBMAP *map, REBU64 types) {
     //
     assert(ARR_LEN(copy) % 2 == 0); // should be [key value key value]...
 
-    unstable REBVAL *key = SPECIFIC(ARR_HEAD(copy));  // keys/vals specified
+    REBVAL *key = SPECIFIC(ARR_HEAD(copy));  // keys/vals specified
     for (; NOT_END(key); key += 2) {
         assert(Is_Value_Frozen_Deep(key));  // immutable key
 
-        unstable REBVAL *v = key + 1;
+        REBVAL *v = key + 1;
         if (IS_NULLED(v))
             continue; // "zombie" map element (not present)
 
         REBFLGS flags = NODE_FLAG_MANAGED;  // !!! Review
-        Clonify(STABLE_HACK(v), flags, types);
+        Clonify(v, flags, types);
     }
 
     return MAP(copy);
@@ -493,7 +493,7 @@ REB_R TO_Map(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
         // make map! [word val word val]
         //
         REBLEN len;
-        unstable const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
+        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
         REBSPC *specifier = VAL_SPECIFIER(arg);
 
         REBMAP *map = Make_Map(len / 2); // [key value key value...] + END
@@ -527,8 +527,8 @@ REBARR *Map_To_Array(const REBMAP *map, REBINT what)
     REBLEN count = Length_Map(map);
     REBARR *a = Make_Array(count * ((what == 0) ? 2 : 1));
 
-    RELVAL *dest = STABLE(ARR_HEAD(a));
-    unstable const REBVAL *val = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    RELVAL *dest = ARR_HEAD(a);
+    const REBVAL *val = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     for (; NOT_END(val); val += 2) {
         if (not IS_NULLED(val + 1)) {  // can't be END
             if (what <= 0) {
@@ -559,7 +559,7 @@ REBCTX *Alloc_Context_From_Map(const REBMAP *map)
     // a bit haphazard to have `make object! make map! [x 10 <y> 20]` and
     // just throw out the <y> 20 case...
 
-    unstable const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     REBLEN count = 0;
 
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
@@ -618,7 +618,7 @@ void MF_Map(REB_MOLD *mo, REBCEL(const*) v, bool form)
     //
     mo->indent++;
 
-    unstable const RELVAL *key = ARR_HEAD(MAP_PAIRLIST(m));
+    const RELVAL *key = ARR_HEAD(MAP_PAIRLIST(m));
     for (; NOT_END(key); key += 2) {  // note value slot must not be END
         if (IS_NULLED(key + 1))
             continue; // if value for this key is void, key has been removed
@@ -749,7 +749,7 @@ REBTYPE(Map)
             fail (PAR(value));
 
         REBLEN len = Part_Len_May_Modify_Index(value, ARG(part));
-        unstable const RELVAL *at = VAL_ARRAY_AT(value);  // w/modified index
+        const RELVAL *at = VAL_ARRAY_AT(value);  // w/modified index
 
         Append_Map(m, at, VAL_SPECIFIER(value), len);
 

@@ -49,8 +49,8 @@
     #define TOUCH_CELL(c) \
         ((c)->touch = TG_Tick)
 
-    inline static unstable RELVAL *Track_Cell_If_Debug(
-        unstable RELVAL *v,
+    inline static RELVAL *Track_Cell_If_Debug(
+        RELVAL *v,
         const char *file,
         int line
     ){
@@ -68,8 +68,8 @@
 
   #elif defined(DEBUG_COUNT_TICKS)
 
-    inline static unstable RELVAL *Track_Cell_If_Debug(
-        unstable RELVAL *v,
+    inline static RELVAL *Track_Cell_If_Debug(
+        RELVAL *v,
         const char *file,
         int line
     ){
@@ -86,8 +86,8 @@
 
   #else  // not counting ticks, and not using extended cell format
 
-    inline static unstable RELVAL *Track_Cell_If_Debug(
-        unstable RELVAL *v,
+    inline static RELVAL *Track_Cell_If_Debug(
+        RELVAL *v,
         const char *file,
         int line
     ){

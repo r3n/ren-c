@@ -103,7 +103,7 @@ REB_R MAKE_Sequence(
         REBLEN len = 0;
         REBINT n;
 
-        unstable const RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *item = VAL_ARRAY_AT(arg);
 
         REBYTE buf[MAX_TUPLE];
         REBYTE *vp = buf;
