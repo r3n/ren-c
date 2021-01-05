@@ -67,7 +67,7 @@ void Shutdown_Data_Stack(void)
     assert(DSP == 0);
     ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(DS_Array));
 
-    Free_Unmanaged_Array(DS_Array);
+    Free_Unmanaged_Series(DS_Array);
 }
 
 

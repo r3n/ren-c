@@ -828,7 +828,7 @@ REBNATIVE(applique)
         // ^-- changes CTX_KEYS_HEAD result
 
     if (def_threw) {
-        Free_Unmanaged_Array(CTX_VARLIST(stolen)); // could TG_Reuse it
+        Free_Unmanaged_Series(CTX_VARLIST(stolen));  // could TG_Reuse it
         RETURN (temp);
     }
 

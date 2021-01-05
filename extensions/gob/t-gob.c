@@ -861,7 +861,7 @@ void MF_Gob(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     REBARR *array = Gob_To_Array(VAL_GOB(v));
     Mold_Array_At(mo, array, 0, "[]");
-    Free_Unmanaged_Array(array);
+    Free_Unmanaged_Series(array);
 
     End_Mold(mo);
 }

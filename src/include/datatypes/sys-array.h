@@ -435,10 +435,6 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
     );
 }
 
-#define Free_Unmanaged_Array(a) \
-    Free_Unmanaged_Series(a)
-
-
 
 //=////////////////////////////////////////////////////////////////////////=//
 //

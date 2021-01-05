@@ -170,7 +170,7 @@ void MF_Action(REB_MOLD *mo, REBCEL(const*) v, bool form)
     const bool just_words = false;
     REBARR *parameters = Make_Action_Parameters_Arr(VAL_ACTION(v), just_words);
     Mold_Array_At(mo, parameters, 0, "[]");
-    Free_Unmanaged_Array(parameters);
+    Free_Unmanaged_Series(parameters);
 
     // !!! Previously, ACTION! would mold the body out.  This created a large
     // amount of output, and also many function variations do not have

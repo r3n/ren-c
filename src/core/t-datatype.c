@@ -428,6 +428,6 @@ void Unhook_Datatype(REBTYP *type)
 //
 void Shutdown_Datatypes(void)
 {
-    Free_Unmanaged_Array(PG_Extension_Types);
+    Free_Unmanaged_Series(PG_Extension_Types);
     PG_Extension_Types = nullptr;
 }

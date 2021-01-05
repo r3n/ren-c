@@ -726,7 +726,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         CLEAR_SERIES_INFO(m_cast(REBSER*, les.data_ser), HOLD);
 
     if (IS_DATATYPE(les.data))  // must free temp array of instances
-        Free_Unmanaged_Array(m_cast(REBARR*, ARR(les.data_ser)));
+        Free_Unmanaged_Series(m_cast(REBARR*, ARR(les.data_ser)));
 
     //=//// NOW FINISH UP /////////////////////////////////////////////////=//
 

@@ -194,7 +194,7 @@ REBSER *Make_Set_Operation_Series(
         // used capacity size
         //
         out_ser = Copy_Array_Shallow(ARR(buffer), SPECIFIED);
-        Free_Unmanaged_Array(ARR(buffer));
+        Free_Unmanaged_Series(ARR(buffer));
     }
     else if (ANY_STRING(val1)) {
         DECLARE_MOLD (mo);

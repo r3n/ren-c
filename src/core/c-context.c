@@ -1212,8 +1212,8 @@ void Startup_Collector(void)
 //
 void Shutdown_Collector(void)
 {
-    Free_Unmanaged_Array(TG_Buf_Collect);
-    TG_Buf_Collect = NULL;
+    Free_Unmanaged_Series(TG_Buf_Collect);
+    TG_Buf_Collect = nullptr;
 }
 
 
