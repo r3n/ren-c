@@ -644,6 +644,9 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     // Instead, add it onto a series allocated as resizable.  This is likely
     // temporary--as LET mechanics should use some form of "virtual binding".
     //
+    // !!! Note this means that Assert_Array_Core() has to have an exemption
+    // for ARRAY_FLAG_IS_PARAMLIST...review that.
+    //
     REBARR *paramlist = Make_Array_Core(
         num_slots,
         SERIES_MASK_PARAMLIST & ~(SERIES_FLAG_FIXED_SIZE)
