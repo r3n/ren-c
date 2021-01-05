@@ -2128,7 +2128,12 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
         if (bp[len - 1] == '%') {
             RESET_VAL_HEADER(DS_TOP, REB_PERCENT, CELL_MASK_NONE);
-            VAL_DECIMAL(DS_TOP) /= 100.0;
+
+            // !!! DEBUG_EXTANT_STACK_POINTERS can't resolve if this is
+            // a REBCEL(const*) or REBVAL* overload with DEBUG_CHECK_CASTS.
+            // Have to cast explicitly, use VAL()
+            //
+            VAL_DECIMAL(VAL(DS_TOP)) /= 100.0;
         }
         break;
 

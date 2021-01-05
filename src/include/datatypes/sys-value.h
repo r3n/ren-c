@@ -195,7 +195,7 @@
     #define KIND3Q_BYTE KIND3Q_BYTE_UNCHECKED
 #else
     inline static REBYTE KIND3Q_BYTE_Debug(
-        const RELVAL *v,
+        const RELVAL *v,  // can't be used on REBCEL(const*)
         const char *file,
         int line
     ){
@@ -241,20 +241,6 @@
         }
         return KIND3Q_BYTE_UNCHECKED(v);
     }
-
-  #ifdef CPLUSPLUS_11
-    //
-    // Since KIND3Q_BYTE() is used by checks like IS_WORD() for efficiency, we
-    // don't want that to contaminate the use with cells, because if you
-    // bothered to change the type view to a cell you did so because you
-    // were interested in its unquoted kind.
-    //
-    inline static REBYTE KIND3Q_BYTE_Debug(
-        REBCEL(const*) v,
-        const char *file,
-        int line
-    ) = delete;
-  #endif
 
     #define KIND3Q_BYTE(v) \
         KIND3Q_BYTE_Debug((v), __FILE__, __LINE__)

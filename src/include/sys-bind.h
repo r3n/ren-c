@@ -388,11 +388,6 @@ inline static REBLEN VAL_WORD_INDEX(const RELVAL *v) {
     return cast(REBLEN, i);
 }
 
-#ifdef CPLUSPLUS_11
-    inline static bool IS_WORD_UNBOUND(REBCEL(const*) v) = delete;
-    inline static REBLEN VAL_WORD_INDEX(REBCEL(const*) v) = delete;
-#endif
-
 inline static REBNOD *VAL_WORD_BINDING(const RELVAL *v) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
     REBNOD *binding = VAL_WORD_BINDING_NODE(v);

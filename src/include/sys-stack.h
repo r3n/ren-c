@@ -80,9 +80,7 @@
 // destructor is not called in this case...and the fail mechanism sets the
 // outstanding count to zero.
 //
-#if !defined(DEBUG_EXTANT_STACK_POINTERS)
-    #define STKVAL(p) REBVAL*
-#else
+#if defined(DEBUG_EXTANT_STACK_POINTERS)
     struct Reb_Stack_Value_Ptr {
         REBVAL *v;
 
@@ -149,8 +147,6 @@
            return temp;
         }
     };
-
-    #define STKVAL(p) Reb_Stack_Value_Ptr
 #endif
 
 

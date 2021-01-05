@@ -142,6 +142,28 @@ typedef struct Reb_Node REBNOD;
 #endif
 
 
+//=//// EXTANT STACK POINTERS /////////////////////////////////////////////=//
+//
+// See %sys-stack.h for a deeper explanation.  This has to be declared in
+// order to put in one of REBCEL(const*)'s implicit constructors.  Because
+// having the STKVAL(*) have a user-defined conversion to REBVAL* won't
+// get that...and you can't convert to both REBVAL* and REBCEL(const*) as
+// that would be ambiguous.
+//
+// Even with this definition, the intersecting needs of DEBUG_CHECK_CASTS and
+// DEBUG_EXTANT_STACK_POINTERS means there will be some cases where distinct
+// overloads of REBVAL* vs. REBCEL(const*) will wind up being ambiguous.
+// For instance, VAL_DECIMAL(STKVAL(*)) can't tell which checked overload
+// to use.  In such cases, you have to cast, e.g. VAL_DECIMAL(VAL(stackval)).
+//
+#if !defined(DEBUG_EXTANT_STACK_POINTERS)
+    #define STKVAL(p) REBVAL*
+#else
+    struct Reb_Stack_Value_Ptr;
+    #define STKVAL(p) Reb_Stack_Value_Ptr
+#endif
+
+
 //=//// ESCAPE-ALIASABLE CELLS ////////////////////////////////////////////=//
 //
 // The system uses a trick in which the type byte is bumped by multiples of
@@ -198,6 +220,7 @@ typedef struct Reb_Node REBNOD;
 
         RebcellPtr () { }
         RebcellPtr (const Reb_Cell *p) : p (p) {}
+        RebcellPtr (STKVAL(*) p) : p (p) {}
 
         const Reb_Cell **operator&() { return &p; }
         const Reb_Cell *operator->() { return p; }
