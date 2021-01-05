@@ -53,7 +53,7 @@
 // contention for bits may become an issue in the future.
 //
 #define ARRAY_FLAG_SINGULAR_API_RELEASE \
-    ARRAY_FLAG_23
+    ARRAY_FLAG_24
 
 
 //=//// ARRAY_FLAG_INSTRUCTION_ADJUST_QUOTING /////////////////////////////=//
@@ -63,7 +63,7 @@
 // one value, but in the future they might contain more.
 //
 #define ARRAY_FLAG_INSTRUCTION_ADJUST_QUOTING \
-    ARRAY_FLAG_24
+    ARRAY_FLAG_25
 
 
 //=//// ARRAY_FLAG_INSTRUCTION_SPLICE /////////////////////////////////////=//
@@ -72,7 +72,7 @@
 // to execute.
 //
 #define ARRAY_FLAG_INSTRUCTION_SPLICE \
-    ARRAY_FLAG_25
+    ARRAY_FLAG_26
 
 
 // What distinguishes an API value is that it has both the NODE_FLAG_CELL and

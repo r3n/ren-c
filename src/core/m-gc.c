@@ -712,7 +712,7 @@ static void Mark_Frame_Stack_Deep(void)
             // partial parameter traversal.
             //
             assert(IS_END(f->param)); // done walking
-            Queue_Mark_Node_Deep(CTX(f->varlist));
+            Queue_Mark_Node_Deep(f->varlist);  // may not pass CTX() test
             goto propagate_and_continue;
         }
 

@@ -107,16 +107,9 @@
     FLAG_LEFT_BIT(20)
 
 
-//=//// ARRAY_FLAG_NEWLINE_AT_TAIL ////////////////////////////////////////=//
+//=//// ARRAY_FLAG_21 /////////////////////////////////////////////////////=//
 //
-// The mechanics of how Rebol tracks newlines is that there is only one bit
-// per value to track the property.  Yet since newlines are conceptually
-// "between" values, that's one bit too few to represent all possibilities.
-//
-// Ren-C carries a bit for indicating when there's a newline intended at the
-// tail of an array.
-//
-#define ARRAY_FLAG_NEWLINE_AT_TAIL \
+#define ARRAY_FLAG_21 \
     FLAG_LEFT_BIT(21)
 
 
@@ -135,10 +128,22 @@
 STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 
 
+//=//// ARRAY_FLAG_NEWLINE_AT_TAIL ////////////////////////////////////////=//
+//
+// The mechanics of how Rebol tracks newlines is that there is only one bit
+// per value to track the property.  Yet since newlines are conceptually
+// "between" values, that's one bit too few to represent all possibilities.
+//
+// Ren-C carries a bit for indicating when there's a newline intended at the
+// tail of an array.
+//
+#define ARRAY_FLAG_NEWLINE_AT_TAIL \
+    FLAG_LEFT_BIT(23)
+
+
 // These flags are available for use by specific array subclasses (e.g. a
 // PARAMLIST might use it for different things from a VARLIST)
 
-#define ARRAY_FLAG_23 FLAG_LEFT_BIT(23)
 #define ARRAY_FLAG_24 FLAG_LEFT_BIT(24)
 #define ARRAY_FLAG_25 FLAG_LEFT_BIT(25)
 #define ARRAY_FLAG_26 FLAG_LEFT_BIT(26)
@@ -199,14 +204,16 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
         >::type
     >
     inline A *ARR(T *p) {
-        constexpr bool base = std::is_same<T0, void>::value
-            or std::is_same<T0, REBNOD>::value
-            or std::is_same<T0, REBSER>::value;
+        static_assert(
+            std::is_same<T0, void>::value
+                or std::is_same<T0, REBNOD>::value
+                or std::is_same<T0, REBSER>::value,
+            "ARR() works on [void* REBNOD* REBSER*]"
+        );
+        if (not p)
+            return nullptr;
 
-        static_assert(base, "ARR works on void/REBNOD/REBSER");
-
-        bool b = base;  // needed to avoid compiler constexpr warning
-        if (b and p and (reinterpret_cast<const REBSER*>(p)->header.bits & (
+        if ((reinterpret_cast<const REBSER*>(p)->header.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
         )) != (
             NODE_FLAG_NODE
@@ -214,8 +221,7 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
             panic (p);
         }
 
-        if (p)
-            assert(WIDE_BYTE_OR_0(reinterpret_cast<const REBSER*>(p)) == 0);
+        assert(WIDE_BYTE_OR_0(reinterpret_cast<const REBSER*>(p)) == 0);
 
         return reinterpret_cast<A*>(p);
     }

@@ -30,12 +30,12 @@
         | CELL_FLAG_SECOND_IS_NODE  /* phase (for FRAME!) */)
 
 
-//=//// SERIES_FLAG_VARLIST_23 ////////////////////////////////////////////=//
+//=//// SERIES_FLAG_VARLIST_24 ////////////////////////////////////////////=//
 //
 // (Note: This is where varlist-specific flags could start being defined.)
 //
-#define SERIES_FLAG_VARLIST_23 \
-    ARRAY_FLAG_23
+#define SERIES_FLAG_VARLIST_24 \
+    ARRAY_FLAG_24
 
 
 #define BUF_COLLECT TG_Buf_Collect
@@ -81,26 +81,27 @@ struct Reb_Context {
         >::type
     >
     inline static C *CTX(T *p) {
-        constexpr bool base = std::is_same<T0, void>::value
-            or std::is_same<T0, REBNOD>::value
-            or std::is_same<T0, REBSER>::value
-            or std::is_same<T0, REBARR>::value;
-
         static_assert(
-            base,
-            "CTX() works on REBNOD/REBSER/REBARR"
+            std::is_same<T0, void>::value
+                or std::is_same<T0, REBNOD>::value
+                or std::is_same<T0, REBSER>::value
+                or std::is_same<T0, REBARR>::value,
+            "CTX() works on [void* REBNOD* REBSER* REBARR*]"
         );
+        if (not p)
+            return nullptr;
 
-        bool b = base;  // needed to avoid compiler constexpr warning
-        if (b and p and (reinterpret_cast<const REBNOD*>(p)->header.bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
-                | ARRAY_FLAG_IS_VARLIST
+        if ((reinterpret_cast<const REBSER*>(p)->header.bits & (
+            SERIES_MASK_VARLIST
+                | NODE_FLAG_FREE
+                | NODE_FLAG_CELL
                 | ARRAY_FLAG_IS_DETAILS
+                | ARRAY_FLAG_IS_PARTIALS
                 | ARRAY_FLAG_IS_PAIRLIST
                 | ARRAY_FLAG_HAS_FILE_LINE_UNMASKED
-        )) != (
-            NODE_FLAG_NODE | ARRAY_FLAG_IS_VARLIST
-        )){
+        )) !=
+            SERIES_MASK_VARLIST
+        ){
             panic (p);
         }
 

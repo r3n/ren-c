@@ -80,22 +80,34 @@
     inline static REBSER *ensure_series(REBSER *s) { return s; }
     inline static const REBSER *ensure_series(const REBSER *s) { return s; }
 
-    inline const REBSER *SER(const REBNOD *n) {
-        const REBSER *s = reinterpret_cast<const REBSER*>(n);
+    template <
+        typename T,
+        typename T0 = typename std::remove_const<T>::type,
+        typename S = typename std::conditional<
+            std::is_const<T>::value,  // boolean
+            const REBSER,  // true branch
+            REBSER  // false branch
+        >::type
+    >
+    inline S *SER(T *p) {
+        static_assert(
+            std::is_same<T0, void>::value
+                or std::is_same<T0, REBNOD>::value,
+            "SER() works on [void* REBNOD*]"
+        );
+        if (not p)
+            return nullptr;
 
-        if (s and (s->header.bits & (
+        if ((reinterpret_cast<const REBSER*>(p)->header.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
         )) != (
             NODE_FLAG_NODE
         )){
-            panic (n);
+            panic (p);
         }
 
-        return s;
+        return reinterpret_cast<S*>(p);
     }
-
-    inline REBSER *SER(REBNOD *n)
-      { return const_cast<REBSER*>(SER(const_cast<const REBNOD*>(n))); }
 #endif
 
 
