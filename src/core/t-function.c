@@ -207,9 +207,7 @@ REBTYPE(Action)
 
         // Copying functions creates another handle which executes the same
         // code, yet has a distinct identity.  This means it would not be
-        // HIJACK'd if the function that it was copied from was.
-
-        REBARR *paramlist = ACT_PARAMLIST(act);
+        // HIJACK'd if the function that it was copied from was hijacked.
 
         REBCTX *meta = ACT_META(act);  // !!! Note: not a copy of meta
 
@@ -221,10 +219,9 @@ REBTYPE(Action)
 
         REBLEN details_len = ARR_LEN(ACT_DETAILS(act));
         REBACT *proxy = Make_Action(
-            paramlist,
+            ACT_SPECIALTY(act),  // not changing the interface
             meta,
             ACT_DISPATCHER(act),
-            ACT_EXEMPLAR(act),  // not changing the specialization
             details_len  // details array capacity
         );
 

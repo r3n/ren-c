@@ -303,21 +303,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED)  // args from callsite
                 goto unspecialized_refinement;  // most common case (?)
 
-            // A non-checked SYM-WORD! with binding indicates a partial
-            // refinement with parameter index that needs to be pushed
-            // to top of stack, hence HIGHER priority for fulfilling
-            // @ the callsite than any refinements added by a PATH!.
-            //
-            if (IS_SYM_WORD(f->special)) {
-                REBLEN partial_index = VAL_WORD_INDEX(f->special);
-                const REBSTR *partial_symbol = VAL_WORD_SPELLING(f->special);
-
-                Init_Sym_Word(DS_PUSH(), partial_symbol);
-                INIT_VAL_WORD_BINDING(DS_TOP, f->varlist);
-                INIT_VAL_WORD_PRIMARY_INDEX(DS_TOP, partial_index);
-            }
-            else
-                assert(Is_Void_With_Sym(f->special, SYM_UNSET));
+            assert(Is_Void_With_Sym(f->special, SYM_UNSET));
 
   //=//// UNSPECIALIZED REFINEMENT SLOT ///////////////////////////////////=//
 
@@ -345,23 +331,15 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     // for this one.  But we did need to set its index
                     // so we knew it was valid (errors later if not set).
                     //
-                    goto used_refinement;
+                    Init_Blackhole(f->arg);  // # means refinement used
+                    goto continue_fulfilling;
                 }
 
                 goto skip_fulfilling_arg_for_now;
             }
 
-            goto unused_refinement; }  // not in path, not specialized yet
-
-          unused_refinement:  // Note: might get pushed by a later slot
-
             Init_Nulled(f->arg);  // null means refinement not used
-            goto continue_fulfilling;
-
-          used_refinement:  // can hit this on redo, copy its argument
-
-            Init_Blackhole(f->arg);  // # means refinement used
-            goto continue_fulfilling;
+            goto continue_fulfilling; }
         }
 
   //=//// ARGUMENT FULFILLMENT ////////////////////////////////////////////=//

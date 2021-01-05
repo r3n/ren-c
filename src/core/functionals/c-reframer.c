@@ -184,13 +184,10 @@ REBNATIVE(reframer_p)
     // store the implementation phase and which parameter to fill with the
     // frame.
     //
-    REBARR *paramlist = VAL_ACTION_PARAMLIST(shim);
-
     REBACT *reframer = Make_Action(
-        paramlist,
+        ACT_SPECIALTY(VAL_ACTION(shim)),  // same interface as shim
         nullptr,  // meta inherited by REFRAMER helper to REFRAMER*
         &Reframer_Dispatcher,
-        ACT_EXEMPLAR(VAL_ACTION(shim)),  // same exemplar as shim
         IDX_REFRAMER_MAX  // details array capacity => [shim, param_index]
     );
 

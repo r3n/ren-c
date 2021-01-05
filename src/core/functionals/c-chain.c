@@ -216,15 +216,14 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
     // The chained function has the same interface as head of the chain.
     //
     // !!! Output (RETURN) should match the *tail* of the chain.  Is this
-    // worth a new paramlist?  Should this be reviewed?
+    // worth a new paramlist?  Should return mechanics be just reviewed in
+    // general, possibly that all actions put the return slot in a separate
+    // sliver that includes the partials?
     //
-    REBARR *paramlist = VAL_ACTION_PARAMLIST(first);
-
     REBACT *chain = Make_Action(
-        paramlist,
+        ACT_SPECIALTY(VAL_ACTION(first)),  // same interface as first action
         nullptr,  // meta inherited by CHAIN helper to CHAIN*
         &Chainer_Dispatcher,
-        ACT_EXEMPLAR(VAL_ACTION(first)),  // same exemplar as first action
         IDX_CHAINER_MAX  // details array capacity
     );
     Force_Value_Frozen_Deep(pipeline);

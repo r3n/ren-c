@@ -176,7 +176,6 @@ REBNATIVE(does)
             paramlist,
             nullptr,  // no meta (REDESCRIBE can add help)
             &Block_Dispatcher,  // **SEE COMMENTS**, not quite like plain DO!
-            nullptr,  // no specialization exemplar (or inherited exemplar)
             IDX_DOES_MAX  // details array capacity
         );
 

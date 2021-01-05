@@ -139,7 +139,6 @@ REBVAL *Make_Native(
         paramlist,
         meta,
         dispatcher, // "dispatcher" is unique to this "native"
-        nullptr, // no specialization exemplar (or inherited exemplar)
         IDX_NATIVE_MAX // details array capacity
     );
 

@@ -714,7 +714,6 @@ REBNATIVE(js_native)
         paramlist,
         meta,
         &JavaScript_Dispatcher,
-        nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_JS_NATIVE_MAX  // details len [source module handle]
     );
 

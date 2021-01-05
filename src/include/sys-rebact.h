@@ -207,9 +207,9 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
 #define SERIES_MASK_PARTIALS \
     (NODE_FLAG_NODE \
-        | SERIES_FLAG_MISC_NODE_NEEDS_MARK  /* details */ \
+        | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* details */ \
         | ARRAY_FLAG_IS_PARTIALS \
-        /* LINK is unused at this time (linked partials vs full copies?) */ )
+        /* MISC is unused at this time (could be paramlist cache?) */ )
 
 
 #if !defined(DEBUG_CHECK_CASTS)

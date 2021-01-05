@@ -166,13 +166,10 @@ REBNATIVE(enclose_p)  // see extended definition ENCLOSE in %base-defs.r
     //
     // !!! Return result may differ; similar issue comes up with CHAIN
     //
-    REBARR *paramlist = VAL_ACTION_PARAMLIST(inner);
-
     REBACT *enclosure = Make_Action(
-        paramlist,
+        ACT_SPECIALTY(VAL_ACTION(inner)),  // same interface as inner
         nullptr,  // meta inherited by ENCLOSE helper to ENCLOSE*
         &Encloser_Dispatcher,
-        ACT_EXEMPLAR(VAL_ACTION(inner)),  // same exemplar as inner
         IDX_ENCLOSER_MAX  // details array capacity => [inner, outer]
     );
 

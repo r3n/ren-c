@@ -117,23 +117,21 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
 
     REBVAL *adaptee = ARG(adaptee);
 
-    REBARR *paramlist = VAL_ACTION_PARAMLIST(adaptee);
-
     // !!! There was code here which would hide it so adapted code had no
     // access to the locals.  That requires creating a new paramlist.  Is
     // there a better way to do that with phasing?
 
     REBACT *adaptation = Make_Action(
-        paramlist,
+        ACT_SPECIALTY(VAL_ACTION(adaptee)),  // reuse partials/exemplar/etc.
         nullptr,  // meta inherited by ADAPT helper to ADAPT*
         &Adapter_Dispatcher,
-        ACT_EXEMPLAR(VAL_ACTION(adaptee)),  // same exemplar as adaptee
         IDX_ADAPTER_MAX  // details array capacity => [prelude, adaptee]
     );
 
-    // !!! In a future branch it may be possible that specific binding allows
-    // a read-only input to be "viewed" with a relative binding, and no copy
-    // would need be made if input was R/O.  For now, we copy to relativize.
+    // !!! As with FUNC, we copy and bind the block the user gives us.  This
+    // means we will not see updates to it.  So long as we are copying it,
+    // we might as well mutably bind it--there's no incentive to virtual
+    // bind things that are copied.
     //
     REBARR *prelude = Copy_And_Bind_Relative_Deep_Managed(
         ARG(prelude),

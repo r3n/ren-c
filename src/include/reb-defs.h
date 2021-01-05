@@ -410,9 +410,8 @@ typedef void (MOLD_HOOK)(REB_MOLD *mo, REBCEL(const*) v, bool form);
 // for %tmp-internals.h, it has to be a typedef.
 //
 typedef enum {
-    PHF_SORTED_PASS = 1 << 0,
-    PHF_UNREFINED = 1 << 1,  // a /refinement that takes an arg, made "normal"
-    PHF_DEMODALIZED = 1 << 2  // an @param with its refinement specialized out
+    PHF_UNREFINED = 1 << 0,  // a /refinement that takes an arg, made "normal"
+    PHF_DEMODALIZED = 1 << 1  // an @param with its refinement specialized out
 } Reb_Param_Hook_Flags;
 #define PHF_MASK_NONE 0
 typedef bool (PARAM_HOOK)(REBVAL *v, REBFLGS flags, void *opaque);

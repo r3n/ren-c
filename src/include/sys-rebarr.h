@@ -107,9 +107,13 @@
     FLAG_LEFT_BIT(20)
 
 
-//=//// ARRAY_FLAG_21 /////////////////////////////////////////////////////=//
+//=//// ARRAY_FLAG_IS_PARTIALS ////////////////////////////////////////////=//
 //
-#define ARRAY_FLAG_21 \
+// In order to make it possible to reuse exemplars and paramlists in action
+// variations that have different partial specializations, a splice of
+// partial refinements can sit between the action cell and its "speciality".
+//
+#define ARRAY_FLAG_IS_PARTIALS \
     FLAG_LEFT_BIT(21)
 
 

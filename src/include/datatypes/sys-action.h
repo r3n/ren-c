@@ -188,15 +188,62 @@ inline static void INIT_VAL_ACTION_BINDING(
     SER_AT(REBVAL, ACT_DETAILS(a), 0)
 
 
+//=//// PARAMLIST, EXEMPLAR, AND PARTIALS /////////////////////////////////=//
+//
+// Space in action arrays is fairly tight--considering the number of parts
+// that are packed in.  Since partial specialization is somewhat rare, it
+// is an optional splice before the place where the paramlist or the
+// exemplar is to be found.
+//
+// !!! Once the partial specialization information is pulled out of the
+// exemplar frame, the likely plan is to merge type information into full
+// cells in the exemplar; based on the idea that it's not needed if the
+// cell has been specialized.  This means specialization would have to
+// count as type checking.
+//
+
 #define ACT_SPECIALTY(a) \
     ARR(VAL_ACTION_SPECIALTY_OR_LABEL_NODE(ACT_ARCHETYPE(a)))
 
-inline static REBARR *ACT_PARAMLIST(REBACT *a) {
-    REBARR *specialty = ACT_SPECIALTY(a);
-    if (GET_ARRAY_FLAG(specialty, IS_VARLIST))
-        return ARR(LINK_KEYSOURCE(specialty));
-    return specialty;
+#define LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(a) \
+    LINK(a).custom.node
+
+inline static option(REBARR*) ACT_PARTIALS(REBACT *a) {
+    REBARR *list = ACT_SPECIALTY(a);
+    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+        return list;
+    return nullptr;
 }
+
+inline static REBARR *ACT_PARAMLIST(REBACT *a) {
+    REBARR *list = ACT_SPECIALTY(a);
+    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+        list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
+    if (GET_ARRAY_FLAG(list, IS_VARLIST))
+        return ARR(LINK_KEYSOURCE(list));
+    return list;
+}
+
+inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
+    REBARR *list = ACT_SPECIALTY(a);
+    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+        list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
+    if (GET_ARRAY_FLAG(list, IS_VARLIST))
+        return CTX(list);
+    return nullptr;
+}
+
+inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
+    REBARR *list = ACT_SPECIALTY(a);
+    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+        list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
+    return cast(REBVAL*, list->content.dynamic.data) + 1;  // skip archetype
+}
+
+#define ACT_PARAMS_HEAD(a) \
+    (cast(REBVAL*, ACT_PARAMLIST(a)->content.dynamic.data) + 1)
+
+
 
 #define ACT_DISPATCHER(a) \
     (LINK(ACT_DETAILS(a)).dispatcher)
@@ -232,29 +279,6 @@ inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {
     CTX(MISC_META_NODE(ACT_DETAILS(a)))
 
 
-// An efficiency trick makes functions that do not have exemplars NOT store
-// nullptr in the LINK_SPECIALTY(info) node in that case--instead the params.
-// This makes Push_Action() slightly faster in assigning f->special.
-//
-inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
-    REBARR *specialty = ACT_SPECIALTY(a);
-    if (GET_ARRAY_FLAG(specialty, IS_VARLIST))
-        return CTX(specialty);
-
-    return nullptr;
-}
-
-inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
-    REBSER *s = ACT_SPECIALTY(a);
-    return cast(REBVAL*, s->content.dynamic.data) + 1; // skip archetype/root
-}
-
-
-// There is no binding information in a function parameter (typeset) so a
-// REBVAL should be okay.
-//
-#define ACT_PARAMS_HEAD(a) \
-    (cast(REBVAL*, ACT_PARAMLIST(a)->content.dynamic.data) + 1)
 
 inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION); // so it works on literals

@@ -348,7 +348,6 @@ REBACT *Make_Interpreted_Action_May_Fail(
         paramlist,
         meta,
         &Empty_Dispatcher,  // will be overwritten if non-[] body
-        nullptr,  // no specialization exemplar (or inherited exemplar)
         details_capacity  // we fill in details[0], caller fills any extra
     );
 

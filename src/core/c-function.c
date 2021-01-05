@@ -26,9 +26,6 @@
 
 
 struct Params_Of_State {
-    REBARR *arr;
-    REBLEN num_visible;
-    RELVAL *dest;
     bool just_words;
 };
 
@@ -44,24 +41,14 @@ static bool Params_Of_Hook(
 ){
     struct Params_Of_State *s = cast(struct Params_Of_State*, opaque);
 
-    if (not (flags & PHF_SORTED_PASS)) {
-        ++s->num_visible;  // first pass we just count unspecialized params
-        return true;
-    }
-
-    if (not s->arr) {  // if first step on second pass, make the array
-        s->arr = Make_Array(s->num_visible);
-        s->dest = ARR_HEAD(s->arr);
-    }
-
-    Init_Any_Word(s->dest, REB_WORD, VAL_PARAM_SPELLING(param));
+    Init_Any_Word(DS_PUSH(), REB_WORD, VAL_PARAM_SPELLING(param));
 
     if (not s->just_words) {
         if (
             not (flags & PHF_UNREFINED)
             and TYPE_CHECK(param, REB_TS_REFINEMENT)
         ){
-            Refinify(SPECIFIC(s->dest));
+            Refinify(DS_TOP);
         }
 
         switch (VAL_PARAM_CLASS(param)) {
@@ -74,19 +61,19 @@ static bool Params_Of_Hook(
                 // associated refinement specialized out
             }
             else
-                Symify(SPECIFIC(s->dest));
+                Symify(DS_TOP);
             break;
 
           case REB_P_SOFT:
-            Getify(SPECIFIC(s->dest));
+            Getify(DS_TOP);
             break;
 
           case REB_P_MEDIUM:
-            Quotify(Getify(SPECIFIC(s->dest)), 1);
+            Quotify(Getify(DS_TOP), 1);
             break;
 
           case REB_P_HARD:
-            Quotify(SPECIFIC(s->dest), 1);
+            Quotify(DS_TOP, 1);
             break;
 
           default:
@@ -95,7 +82,6 @@ static bool Params_Of_Hook(
         }
     }
 
-    ++s->dest;
     return true;
 }
 
@@ -107,18 +93,11 @@ static bool Params_Of_Hook(
 REBARR *Make_Action_Parameters_Arr(REBACT *act, bool just_words)
 {
     struct Params_Of_State s;
-    s.arr = nullptr;
-    s.num_visible = 0;
     s.just_words = just_words;
 
+    REBDSP dsp_orig = DSP;
     For_Each_Unspecialized_Param(act, &Params_Of_Hook, &s);
-
-    if (not s.arr)
-        return Make_Array(1); // no unspecialized parameters, empty array
-
-    TERM_ARRAY_LEN(s.arr, s.num_visible);
-    ASSERT_ARRAY(s.arr);
-    return s.arr;
+    return Pop_Stack_Values(dsp_orig);
 }
 
 
@@ -127,27 +106,17 @@ static bool Typesets_Of_Hook(
     REBFLGS flags,
     void *opaque
 ){
-    struct Params_Of_State *s = cast(struct Params_Of_State*, opaque);
-
-    if (not (flags & PHF_SORTED_PASS)) {
-        ++s->num_visible;  // first pass we just count unspecialized params
-        return true;
-    }
-
-    if (not s->arr) {  // if first step on second pass, make the array
-        s->arr = Make_Array(s->num_visible);
-        s->dest = ARR_HEAD(s->arr);
-    }
+    UNUSED(opaque);
+    UNUSED(flags);
 
     // It's already a typeset, but remove the parameter spelling.
     //
     // !!! Typesets must be revisited in a world with user-defined types, as
     // well as to accomodate multiple quoting levels.
     //
-    Move_Value(s->dest, param);
-    assert(IS_TYPESET(s->dest));
-    VAL_TYPESET_STRING_NODE(s->dest) = nullptr;
-    ++s->dest;
+    Move_Value(DS_PUSH(), param);
+    assert(IS_TYPESET(DS_TOP));
+    VAL_TYPESET_STRING_NODE(DS_TOP) = nullptr;
 
     return true;
 }
@@ -160,19 +129,11 @@ static bool Typesets_Of_Hook(
 //
 REBARR *Make_Action_Typesets_Arr(REBACT *act)
 {
-    struct Params_Of_State s;
-    s.arr = nullptr;
-    s.num_visible = 0;
-    s.just_words = false;  // (ignored)
+    void *opaque = nullptr;  // could be any void* to pass thru to hook
 
-    For_Each_Unspecialized_Param(act, &Typesets_Of_Hook, &s);
-
-    if (not s.arr)
-        return Make_Array(1); // no unspecialized parameters, empty array
-
-    TERM_ARRAY_LEN(s.arr, s.num_visible);
-    ASSERT_ARRAY(s.arr);
-    return s.arr;
+    REBDSP dsp_orig = DSP;
+    For_Each_Unspecialized_Param(act, &Typesets_Of_Hook, opaque);
+    return Pop_Stack_Values(dsp_orig);
 }
 
 
@@ -1016,14 +977,43 @@ REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
 // This is where they can store information that will be available when the
 // dispatcher is called.
 //
+// The `specialty` argument is an interface structure that holds information
+// that can be shared between function instances.  It encodes information
+// about the parameter names and types, specialization data, as well as any
+// partial specialization or parameter reordering instructions.  This can
+// take several forms depending on how much detail there is.  See the
+// ACT_SPECIALTY() definition for more information on how this is laid out.
+//
 REBACT *Make_Action(
-    REBARR *paramlist,
+    REBARR *specialty,  // paramlist, exemplar, partials -> exemplar/paramlist
     REBCTX *meta,
     REBNAT dispatcher, // native C function called by Eval_Core
-    option(REBCTX*) exemplar, // if provided, make consistent w/next level
     REBLEN details_capacity // capacity of ACT_DETAILS (including archetype)
 ){
     assert(details_capacity >= 1);  // must have room for archetype
+
+    // !!! There used to be more validation code needed here when it was
+    // possible to pass a specialization frame separately from a paramlist.
+    // But once paramlists were separated out from the function's identity
+    // array (using ACT_DETAILS() as the identity instead of ACT_PARAMLIST())
+    // then all the "shareable" information was glommed up minus redundancy
+    // into the ACT_SPECIALTY().  Here's some of the residual checking, as
+    // a placeholder for more useful consistency checking which might be done.
+    //
+  blockscope {
+    option(REBCTX*) exemplar = nullptr;
+    REBARR *paramlist;
+
+    REBARR *list = specialty;
+    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+        list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
+    if (GET_SERIES_FLAG(list, IS_KEYLIKE))
+        paramlist = list;
+    else {
+        assert(GET_ARRAY_FLAG(list, IS_VARLIST));
+        exemplar = CTX(list);
+        paramlist = CTX_KEYLIST(exemplar);
+    }
 
     ASSERT_SERIES_MANAGED(paramlist);  // paramlists/keylists, can be shared
     ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(paramlist));  // unused at this time
@@ -1033,6 +1023,12 @@ REBACT *Make_Action(
         assert(VAL_PARAM_SYM(param) == SYM_RETURN);
         UNUSED(param);
     }
+
+    if (exemplar) {
+        assert(GET_SERIES_FLAG(CTX_VARLIST(unwrap(exemplar)), MANAGED));
+        assert(CTX_TYPE(unwrap(exemplar)) == REB_FRAME);
+    }
+  }
 
     // "details" for an action is an array of cells which can be anything
     // the dispatcher understands it to be, by contract.  Terminate it
@@ -1058,25 +1054,7 @@ REBACT *Make_Action(
     LINK(details).dispatcher = dispatcher; // level of indirection, hijackable
     MISC_META_NODE(details) = NOD(meta);
 
-    if (not exemplar) {
-        //
-        // No exemplar is used as a cue to set the "specialty" to paramlist,
-        // so that Push_Action() can assign f->special directly from it in
-        // dispatch, and be equal to f->param.
-        //
-        VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype) = NOD(paramlist);
-    }
-    else {
-        // The parameters of the paramlist should line up with the slots of
-        // the exemplar (though some of these parameters may be hidden due to
-        // specialization, see REB_TS_HIDDEN).
-        //
-        assert(GET_SERIES_FLAG(CTX_VARLIST(unwrap(exemplar)), MANAGED));
-        assert(CTX_LEN(unwrap(exemplar)) == ARR_LEN(paramlist) - 1);
-
-        VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype)
-            = NOD(CTX_VARLIST(unwrap(exemplar)));
-    }
+    VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype) = NOD(specialty);
 
     assert(NOT_ARRAY_FLAG(details, HAS_FILE_LINE_UNMASKED));
 
@@ -1110,7 +1088,6 @@ REBACT *Make_Action(
             SET_ACTION_FLAG(act, SKIPPABLE_FIRST);
     }
 
-    assert(ACT_PARAMLIST(act) == paramlist);  // via specialty
     return act;
 }
 

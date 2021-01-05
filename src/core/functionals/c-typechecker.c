@@ -127,7 +127,6 @@ REBNATIVE(typechecker)
         IS_DATATYPE(type)
             ? &Datatype_Checker_Dispatcher
             : &Typeset_Checker_Dispatcher,
-        nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_TYPECHECKER_MAX  // details array capacity
     );
     Move_Value(ARR_AT(ACT_DETAILS(typechecker), IDX_TYPECHECKER_TYPE), type);

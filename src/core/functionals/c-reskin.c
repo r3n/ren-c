@@ -396,11 +396,18 @@ REBNATIVE(reskinned)
         ? cast(REBLEN, IDX_SKINNER_MAX)
         : ARR_LEN(ACT_DETAILS(original));
 
+    // !!! This has become broken, because paramlists can't be changed
+    // independently of the exemplar.  The upcoming way to address this is
+    // to put the parameter type and kind information in the exemplar,
+    // leaving the named keys as a separate thing.  TBD, but this broken code
+    // should be able to be fixed relatively soon.
+    //
+    UNUSED(paramlist);
+
     REBACT *defers = Make_Action(
-        paramlist,
+        ACT_SPECIALTY(original),  // see note, paramlist lost...
         meta,
         need_skin_phase ? &Skinner_Dispatcher : ACT_DISPATCHER(original),
-        ACT_EXEMPLAR(original),  // don't add to the original's specialization
         details_len  // details array capacity
     );
 

@@ -162,13 +162,9 @@
 
 //=//// CELL_FLAG_20 //////////////////////////////////////////////////////=//
 //
-// Reserved for future use... however for the moment it is used to mark
-// partial refinements, see usage in %c-special.c.  (This could probably
-// multplex with some other bit.)
+// Reserved for future use... with only 8 cell flags, this is a scarce item.
 //
 #define CELL_FLAG_20 \
-    FLAG_LEFT_BIT(20)
-#define CELL_FLAG_PUSH_PARTIAL \
     FLAG_LEFT_BIT(20)
 
 

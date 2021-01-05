@@ -324,7 +324,6 @@ REBNATIVE(make_native)
         paramlist,
         meta,
         &Pending_Native_Dispatcher, // will be replaced e.g. by COMPILE
-        nullptr, // no specialization exemplar (or inherited exemplar)
         IDX_TCC_NATIVE_MAX // details len [source module linkname tcc_state]
     );
 

@@ -725,11 +725,24 @@ inline static void Push_Action(
     // is needed to fill the specialized slots contributed by later phases.
     //
     // f->special here will either equal f->param (to indicate normal argument
-    // fulfillment) or the head of the "exemplar".  To speed this up, the
-    // absence of a cached exemplar just means that the "specialty" holds the
-    // paramlist... this means no conditional code is needed here.
+    // fulfillment) or the head of the "exemplar".
     //
-    f->special = ACT_SPECIALTY_HEAD(act);
+    // !!! It is planned that exemplars will be unified with paramlist, making
+    // the context keys something different entirely.  
+    //
+    REBARR *list = ACT_SPECIALTY(act);
+    if (GET_ARRAY_FLAG(list, IS_PARTIALS)) {
+        const REBVAL *word = SPECIFIC(ARR_HEAD(list));
+        for (; NOT_END(word); ++word)
+            Move_Value(DS_PUSH(), word);
+        list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
+    }
+    if (GET_ARRAY_FLAG(list, IS_VARLIST))
+        f->special = CTX_VARS_HEAD(CTX(list));
+    else {
+        assert(GET_SERIES_FLAG(list, IS_KEYLIKE));
+        f->special = SER_AT(REBVAL, list, 1);
+    }
 
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
     assert(NOT_SERIES_INFO(f->varlist, INACCESSIBLE));

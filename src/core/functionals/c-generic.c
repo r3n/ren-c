@@ -128,7 +128,6 @@ REBNATIVE(generic)
         paramlist,
         meta,
         &Generic_Dispatcher,  // return type is only checked in debug build
-        nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_NATIVE_MAX  // details array capacity
     );
 

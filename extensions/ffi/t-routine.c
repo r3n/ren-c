@@ -1163,7 +1163,6 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
         paramlist,
         nullptr,  // no meta
         &Routine_Dispatcher,
-        nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_ROUTINE_MAX  // details array len
     );
 

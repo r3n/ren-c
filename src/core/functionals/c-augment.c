@@ -160,7 +160,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     // than one AUGMENT might happen to the same function).  :-/
 
     REBCTX *old_exemplar = ACT_EXEMPLAR(augmentee);
-    REBCTX *exemplar;
+    option(REBCTX*) exemplar;
     if (not old_exemplar)
         exemplar = nullptr;
     else {
@@ -215,10 +215,9 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     }
 
     REBACT* augmentated = Make_Action(
-        paramlist,
+        exemplar ? CTX_VARLIST(exemplar) : paramlist,
         meta,
         &Augmenter_Dispatcher,
-        exemplar,
         IDX_AUGMENTER_MAX  // size of the ACT_DETAILS array
     );
 

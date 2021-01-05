@@ -26,49 +26,16 @@
 // as it will always be appending 10.
 //
 // The method used is to store a FRAME! in the specialization's ACT_DETAILS().
-// Parameters in that frame that are REB_P_LOCAL are considered to be
-// specialized out, and frame holds its specialized value.  For unspecialized
-// parameters, the value slots in the frame are available to serve as
-// instructions on how those parameters should be fulfilled.  %c-action.c
-// heeds this when walking parameters (see `f->special`).
+// Frame cells which carry the ARG_MARKED_CHECKED bit are considered to be
+// specialized out.
 //
-// Code is shared between the SPECIALIZE native and specialization of a
-// GET-PATH! via refinements, such as `adp: :append/dup/part`.  However,
-// specifying a refinement that takes an argument *without* that argument is
-// a "partial refinement specialization", made complicated by ordering:
+// !!! Future directions would make use of unused frame cells to store the
+// information for gathering the argument, e.g. its parameter modality and
+// its type..
 //
-//     foo: func [/A [integer!] /B [integer!] /C [integer!]] [...]
-//
-//     fooBC: :foo/B/C
-//     fooCB: :foo/C/B
-//
-//     fooBC 1 2  ; /B = 1, /C = 2
-//     fooCB 1 2  ; /B = 2, /C = 1
-//
-// Also, a call to `fooBC/A 1 2 3` does not want /A = 1, because it should act
-// like `foo/B/C/A 1 2 3`.  Since the ordering matters, information encoding
-// that order must be stored *somewhere*.  This has a greater cost than a
-// single bit on a parameter can encode.
-//
-// It's solved with a simple mechanical trick--that may look counterintuitive
-// at first.  Since unspecialized slots would usually be `~unset~`, we sneak
-// information into them.  This disrupts the default ordering by pushing
-// refinements that have higher priority than fulfilling the unspecialized
-// slot they are in.
-//
-// So when looking at `fooBC: :foo/B/C`
-//
-// * /A's slot would contain an instruction for /C.  As the evaluator visits
-//   arguments in order it pushes /C as the current first-in-line to take
-//   an argument at the callsite.  Yet /A has not been "specialized out", so
-//   a call like `fooBC/A` is legal...it's just that pushing /C from the
-//   /A slot means /A must wait to gather an argument at the callsite.
-//
-// * /B's slot would contain an instruction for /B.  This will push /B to now
-//   be first in line in fulfillment.
-//
-// * /C's slot would hold the labeled VOID! `~unset~`, having the typical
-//   appearance of not being specialized.
+// The code for partial specialization is unified with the code for full
+// specialization, because while `:append/part` doesn't fulfill a frame slot,
+// `:append/only` does.  The code for this is still being designed.
 //
 
 #include "sys-core.h"
@@ -99,7 +66,7 @@ REB_R Specializer_Dispatcher(REBFRM *f)
     assert(ARR_LEN(details) == IDX_SPECIALIZER_MAX);  // just archetype!
     UNUSED(details);
 
-    REBCTX *exemplar = CTX(ACT_SPECIALTY(FRM_PHASE(f)));
+    REBCTX *exemplar = ACT_EXEMPLAR(FRM_PHASE(f));
 
     INIT_FRM_PHASE(f, CTX_FRAME_ACTION(exemplar));
     INIT_FRM_BINDING(f, CTX_FRAME_BINDING(exemplar));
@@ -155,6 +122,16 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
     const REBVAL *param = ACT_PARAMS_HEAD(act);
     REBVAL *arg = SPECIFIC(rootvar) + 1;
+
+    // If there is a PARTIALS list, then push its refinements.
+    //
+    REBARR *specialty = ACT_SPECIALTY(act);
+    if (GET_ARRAY_FLAG(specialty, IS_PARTIALS)) {
+        const REBVAL *word = SPECIFIC(ARR_HEAD(specialty));
+        for (; NOT_END(word); ++word)
+            Move_Value(DS_PUSH(), word);
+    }
+
     const REBVAL *special = ACT_SPECIALTY_HEAD(act);  // of exemplar/paramlist
 
     REBLEN index = 1; // used to bind REFINEMENT! values to parameter slots
@@ -195,30 +172,21 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             continue;
         }
 
-        // Unspecialized refinement slots may have an SYM-WORD! in them that
-        // reflects a partial that needs to be pushed to the stack.  (They
-        // are in *reverse* order of use.)
+        // Unspecialized refinement slot.  It may be partially specialized,
+        // e.g. we may have pushed to the stack from the PARTIALS for it.
+        //
+        // !!! If partials were allowed to encompass things like /ONLY then
+        // we would have to use that to fill the slot here.  For the moment,
+        // a full new exemplar is generated for parameterless refinements
+        // which seems expensive for the likes of :append/only, when we
+        // can make :append/dup more compactly.  Rethink.
 
         assert(
             (special == param and IS_PARAM(special))
-            or (
-                IS_SYM_WORD(special)
-                or Is_Void_With_Sym(special, SYM_UNSET)
-            )
+            or Is_Void_With_Sym(special, SYM_UNSET)
         );
 
-        if (IS_SYM_WORD(special)) {
-            REBLEN partial_index = VAL_WORD_INDEX(special);
-            Init_Any_Word_Bound( // push a SYM-WORD! to data stack
-                DS_PUSH(),
-                REB_SYM_WORD,
-                exemplar,
-                partial_index
-            );
-        }
-
-        // Unspecialized or partially specialized refinement.  Check the
-        // passed-in refinements on the stack for usage.
+        // Check the passed-in refinements on the stack for usage.
         //
         REBDSP dsp = highest_ordered_dsp;
         for (; dsp != lowest_ordered_dsp; --dsp) {
@@ -384,37 +352,7 @@ bool Specialize_Action_Throws(
                 and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
             ){
                 // Undefined refinements not explicitly marked hidden are
-                // still candidates for usage at the callsite.  Hence it must
-                // be pre-empted by our ordered overrides.  BUT the overrides
-                // only apply if their slot wasn't filled by the user code.
-                // Yet these values we are putting in disrupt that detection,
-                // so use another flag (PUSH_PARTIAL) to reflect this state.
-                //
-                while (ordered_dsp != DSP) {
-                    ++ordered_dsp;
-                    STKVAL(*) ordered = DS_AT(ordered_dsp);
-
-                    if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
-                        fail (Error_Bad_Refine_Raw(ordered));
-
-                    REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
-                    if (
-                        Is_Void_With_Sym(slot, SYM_UNSET)
-                        or GET_CELL_FLAG(slot, PUSH_PARTIAL)
-                    ){
-                        // It's still partial, so set up the pre-empt.
-                        //
-                        Init_Any_Word_Bound(
-                            arg,
-                            REB_SYM_WORD,
-                            exemplar,
-                            VAL_WORD_INDEX(ordered)
-                        );
-                        SET_CELL_FLAG(arg, PUSH_PARTIAL);
-                        goto unspecialized_arg;
-                    }
-                    // Otherwise the user filled it in, so skip to next...
-                }
+                // still candidates for usage at the callsite.
 
                 goto unspecialized_arg;  // ran out...no pre-empt needed
             }
@@ -441,10 +379,7 @@ bool Specialize_Action_Throws(
       unspecialized_arg:
 
         assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
-        assert(
-            Is_Void_With_Sym(arg, SYM_UNSET)
-            or (IS_SYM_WORD(arg) and TYPE_CHECK(param, REB_TS_REFINEMENT))
-        );
+        assert(Is_Void_With_Sym(arg, SYM_UNSET));
         continue;
 
       specialized_arg_with_check:
@@ -470,30 +405,71 @@ bool Specialize_Action_Throws(
         continue;
     }
 
-    // Everything should have balanced out for a valid specialization
+    // Everything should have balanced out for a valid specialization.
+    // Turn partial refinements into an array of things to push.
     //
-    while (ordered_dsp != DSP) {
-        ++ordered_dsp;
-        STKVAL(*) ordered = DS_AT(ordered_dsp);
-        if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
-            fail (Error_Bad_Refine_Raw(ordered));
+    REBARR *partials;
+    if (ordered_dsp == DSP)
+        partials = nullptr;
+    else {
+        // The list of ordered refinements may contain some cases like /ONLY
+        // which aren't considered partial because they have no argument.
+        // If that's the only kind of partial we hvae, we'll free this array.
+        //
+        // !!! This array will be allocated too big in cases like /dup/only,
+        // review how to pick the exact size efficiently.  There's also the
+        // case that duplicate refinements or non-existent ones create waste,
+        // but since we error and throw those arrays away it doesn't matter.
+        //
+        partials = Make_Array_Core(
+            DSP - ordered_dsp,  // maximum partial count possible
+            SERIES_MASK_PARTIALS  // don't manage, yet... may free
+        );
 
-        REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
-        assert(not IS_NULLED(slot) and NOT_CELL_FLAG(slot, PUSH_PARTIAL));
-        UNUSED(slot);
+        while (ordered_dsp != DSP) {
+            ++ordered_dsp;
+            STKVAL(*) ordered = DS_AT(ordered_dsp);
+            if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
+                fail (Error_Bad_Refine_Raw(ordered));
+
+            REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
+            if (NOT_CELL_FLAG(slot, ARG_MARKED_CHECKED)) {
+                assert(Is_Void_With_Sym(slot, SYM_UNSET));
+
+                // It's still partial...
+                //
+                Init_Any_Word_Bound(
+                    Alloc_Tail_Array(partials),
+                    REB_SYM_WORD,
+                    exemplar,
+                    VAL_WORD_INDEX(ordered)
+                );
+            }
+            assert(not IS_NULLED(slot));
+        }
+        DS_DROP_TO(lowest_ordered_dsp);
+
+        if (ARR_LEN(partials) == 0) {
+            Free_Unmanaged_Series(partials);
+            partials = nullptr;
+        }
+        else {
+            LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(partials) = NOD(exemplar);
+            Manage_Series(partials);
+        }
     }
-    DS_DROP_TO(lowest_ordered_dsp);
 
     REBACT *specialized = Make_Action(
-        paramlist,
+        partials != nullptr ? partials : CTX_VARLIST(exemplar),
         nullptr,  // meta inherited by SPECIALIZE helper to SPECIALIZE*
         &Specializer_Dispatcher,
-        exemplar,  // also provide a context of specialization values
         IDX_SPECIALIZER_MAX  // details array capacity
     );
     assert(CTX_KEYLIST(exemplar) == ACT_PARAMLIST(unspecialized));
 
+
     Init_Action(out, specialized, VAL_ACTION_LABEL(specializee), UNBOUND);
+
     return false;  // code block did not throw
 }
 
@@ -555,8 +531,7 @@ REBNATIVE(specialize_p)  // see extended definition SPECIALIZE in %base-defs.r
 //     [a [integer!] c [integer!] b [integer!]]
 //
 // But the frame order doesn't change; the information for knowing the order
-// is encoded with instructions occupying the non-fully-specialized slots.
-// (See %c-specialize.c for a description of the mechanic.)
+// is encoded in a "partials" array.  See remarks on ACT_PARTIALS().
 //
 // The true order could be cached when the function is generated, but to keep
 // things "simple" we capture the behavior in this routine.
@@ -568,44 +543,19 @@ void For_Each_Unspecialized_Param(
     PARAM_HOOK hook,
     void *opaque
 ){
-    REBDSP dsp_orig = DSP;
+    option(REBARR*) partials = ACT_PARTIALS(act);
 
-    // Do an initial scan to push the partial refinements in the reverse
-    // order that they apply.  While walking the parameters in a potentially
-    // "unsorted" fashion, offer them to the passed-in hook in case it has a
-    // use for this first pass (e.g. just counting, to make an array big
-    // enough to hold what's going to be given to it in the second pass.
-
+    // Walking the parameters in a potentially "unsorted" fashion.  Offer them
+    // to the passed-in hook in case it has a use for this first pass (e.g.
+    // just counting, to make an array big enough to hold what's going to be
+    // given to it in the second pass.
+    //
+  blockscope {
     REBVAL *param = ACT_PARAMS_HEAD(act);
     REBVAL *special = ACT_SPECIALTY_HEAD(act);
 
-    REBLEN index = 1;
-    for (; NOT_END(param); ++param, ++special, ++index) {
-        if (Is_Param_Hidden(param, special))
-            continue;  // specialized out, not in interface
-
-        Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
-        if (pclass == REB_P_LOCAL)
-            continue;  // locals not in interface
-
-        if (not hook(param, PHF_MASK_NONE, opaque)) {  // unsorted pass
-            DS_DROP_TO(dsp_orig);
-            return;
-        }
-
-        if (IS_SYM_WORD(special)) {
-            assert(TYPE_CHECK(param, REB_TS_REFINEMENT));
-            Move_Value(DS_PUSH(), special);
-        }
-    }
-
-    // Refinements are now on stack such that topmost is first in-use
-    // specialized refinement.
-
-    // Now second loop, where we print out just the normal args.
+    // Loop through and pass just the normal args.
     //
-    param = ACT_PARAMS_HEAD(act);
-    special = ACT_SPECIALTY_HEAD(act);
     for (; NOT_END(param); ++param, ++special) {
         if (Is_Param_Hidden(param, special))
             continue;
@@ -620,7 +570,7 @@ void For_Each_Unspecialized_Param(
         // If the modal parameter has had its refinement specialized out, it
         // is no longer modal.
         //
-        REBFLGS flags = PHF_SORTED_PASS;
+        REBFLGS flags = 0;
         if (pclass == REB_P_MODAL) {
             if (NOT_END(param + 1)) {  // !!! Ideally checked at creation
                 if (GET_CELL_FLAG(special + 1, ARG_MARKED_CHECKED)) {
@@ -630,35 +580,36 @@ void For_Each_Unspecialized_Param(
             }
         }
 
-        if (not hook(param, flags, opaque)) {
-            DS_DROP_TO(dsp_orig);
+        bool cancel = not hook(param, flags, opaque);
+        if (cancel)
             return;
-        }
     }
+  }
 
     // Now jump around and take care of the partial refinements.
 
-    REBDSP dsp = DSP;  // highest priority are at *top* of stack, go downward
-    while (dsp != dsp_orig) {
-        param = ACT_PARAM(act, VAL_WORD_INDEX(DS_AT(dsp)));
-        --dsp;
+    if (partials) {
+        assert(ARR_LEN(unwrap(partials)) > 0);  // no partials means no array
+ 
+        // the highest priority are at *top* of stack, so we have to go
+        // "downward" in the push order...e.g. the reverse of the array.
 
-        bool cancel = not hook(
-            param,
-            PHF_SORTED_PASS | PHF_UNREFINED,
-            opaque
-        );
+        REBVAL *partial = SPECIFIC(ARR_TAIL(unwrap(partials)));
+        REBVAL *head = SPECIFIC(ARR_HEAD(unwrap(partials)));
+        for (; partial-- != head; ) {
+            REBVAL *param = ACT_PARAM(act, VAL_WORD_INDEX(partial));
 
-        if (cancel) {
-            DS_DROP_TO(dsp_orig);
-            return;
+            bool cancel = not hook(param, PHF_UNREFINED, opaque);
+            if (cancel)
+                return;
         }
     }
 
     // Finally, output any fully unspecialized refinements
 
-    param = ACT_PARAMS_HEAD(act);
-    special = ACT_SPECIALTY_HEAD(act);
+  blockscope {
+    REBVAL *param = ACT_PARAMS_HEAD(act);
+    REBVAL *special = ACT_SPECIALTY_HEAD(act);
 
     for (; NOT_END(param); ++param, ++special) {
         if (Is_Param_Hidden(param, special))
@@ -667,32 +618,30 @@ void For_Each_Unspecialized_Param(
         if (not TYPE_CHECK(param, REB_TS_REFINEMENT))
             continue;
 
-        dsp = dsp_orig;
-        while (dsp != DSP) {
-            ++dsp;
-            if (SAME_STR(
-                VAL_WORD_SPELLING(DS_AT(dsp)),
-                VAL_PARAM_SPELLING(param)
-            )){
-                goto continue_unspecialized_loop;
+        if (partials) {
+            REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
+            for (; NOT_END(partial); ++partial) {
+                if (SAME_STR(
+                    VAL_WORD_SPELLING(partial),
+                    VAL_PARAM_SPELLING(param)
+                )){
+                    goto continue_unspecialized_loop;
+                }
             }
         }
 
-        if (not hook(param, PHF_SORTED_PASS, opaque)) {
-            DS_DROP_TO(dsp_orig);
-            return; // stack should be balanced here
-        }
+        bool cancel = not hook(param, 0, opaque);
+        if (cancel)
+            return;
 
       continue_unspecialized_loop:
         NOOP;
     }
-
-    DS_DROP_TO(dsp_orig);
+  }
 }
 
 
 struct Find_Param_State {
-    REBACT *act;
     REBVAL *param;
 };
 
@@ -700,9 +649,6 @@ static bool First_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
 {
     struct Find_Param_State *s = cast(struct Find_Param_State*, opaque);
     assert(not s->param);  // should stop enumerating if found
-
-    if (not (flags & PHF_SORTED_PASS))
-        return true;  // can't learn anything until second pass
 
     if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
         return false;  // we know WORD!-based invocations will be 0 arity
@@ -714,9 +660,6 @@ static bool First_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
 static bool Last_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
 {
     struct Find_Param_State *s = cast(struct Find_Param_State*, opaque);
-
-    if (not (flags & PHF_SORTED_PASS))
-        return true;  // can't learn anything until second pass
 
     if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
         return false;  // we know WORD!-based invocations will be 0 arity
@@ -738,7 +681,6 @@ static bool Last_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
 REBVAL *First_Unspecialized_Param(REBACT *act)
 {
     struct Find_Param_State s;
-    s.act = act;
     s.param = nullptr;
 
     For_Each_Unspecialized_Param(act, &First_Param_Hook, &s);
@@ -755,7 +697,6 @@ REBVAL *First_Unspecialized_Param(REBACT *act)
 REBVAL *Last_Unspecialized_Param(REBACT *act)
 {
     struct Find_Param_State s;
-    s.act = act;
     s.param = nullptr;
 
     For_Each_Unspecialized_Param(act, &Last_Param_Hook, &s);
@@ -990,8 +931,6 @@ REBACT *Alloc_Action_From_Exemplar(
 ){
     REBACT *unspecialized = CTX_FRAME_ACTION(exemplar);
 
-    REBARR *paramlist = ACT_PARAMLIST(unspecialized);
-
     REBVAL *param = ACT_PARAMS_HEAD(unspecialized);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
     for (; NOT_END(param); ++param, ++arg) {
@@ -1020,10 +959,9 @@ REBACT *Alloc_Action_From_Exemplar(
     // This code parallels Specialize_Action_Throws(), see comments there
 
     REBACT *action = Make_Action(
-        paramlist,
+        CTX_VARLIST(exemplar),  // note: no partials
         nullptr,  // no meta, REDESCRIBE can add help
         dispatcher,
-        exemplar,  // also provide a context of specialization values
         details_capacity
     );
 
@@ -1044,4 +982,79 @@ REBACT *Make_Action_From_Exemplar(REBCTX *exemplar)
         IDX_SPECIALIZER_MAX  // details capacity
     );
     return action;
+}
+
+
+//
+//  partialize: native [
+//
+//  {Test new concept for partial refinements and parameter reordering}
+//
+//      return: [action!]
+//      action [action!]
+//      partials [block!]
+//  ]
+//
+REBNATIVE(partialize)
+{
+    INCLUDE_PARAMS_OF_PARTIALIZE;
+
+    REBVAL *copy = rebValue("copy", rebQ(ARG(action)), rebEND);
+    REBACT *reordered = VAL_ACTION(copy);
+    rebRelease(copy);
+
+    REBCTX *exemplar = ACT_EXEMPLAR(reordered);
+    if (not exemplar)
+        fail ("PARTIALIZE experiment requires exemplar at the moment");
+
+    REBDSP dsp_orig = DSP;
+
+    REBARR *specialty = ACT_SPECIALTY(reordered);
+    if (GET_ARRAY_FLAG(specialty, IS_PARTIALS)) {
+        const REBVAL *word = SPECIFIC(ARR_HEAD(specialty));
+        for (; NOT_END(word); ++word) {
+            assert(IS_WORD_BOUND(word));
+            Move_Value(DS_PUSH(), word);
+        }
+        specialty = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(specialty));
+    }
+
+    // We need to bind the incoming words to what's visible, as hidden words
+    // may exist in internal compositions.
+    //
+    const RELVAL *item = VAL_ARRAY_AT(ARG(partials));
+    for (; NOT_END(item); ++item) {
+        REBVAL *param = ACT_PARAMS_HEAD(reordered);
+        REBVAL *special = ACT_SPECIALTY_HEAD(reordered);
+        REBLEN index = 1;
+        const REBSTR *spelling = VAL_WORD_SPELLING(item);
+        for (; NOT_END(param); ++param, ++special, ++index) {
+            if (Is_Param_Hidden(param, special))
+                continue;
+
+            if (VAL_PARAM_SPELLING(param) == spelling) {
+                Init_Any_Word_Bound(DS_PUSH(), REB_SYM_WORD, exemplar, index);
+                goto next_item;
+            }
+        }
+
+        fail (rebUnrelativize(item));
+
+      next_item: {}
+    }
+
+    REBARR *partials = Pop_Stack_Values_Core(
+        dsp_orig,
+        SERIES_FLAG_MANAGED | SERIES_MASK_PARTIALS
+    );
+    LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(partials) = NOD(specialty);
+    REBVAL *archetype = ACT_ARCHETYPE(reordered);
+    VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype) = NOD(partials);
+
+    return Init_Action(
+        D_OUT,
+        reordered,
+        VAL_ACTION_LABEL(ARG(action)),
+        VAL_ACTION_BINDING(ARG(action))
+    );
 }

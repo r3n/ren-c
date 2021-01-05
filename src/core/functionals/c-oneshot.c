@@ -122,7 +122,6 @@ REBNATIVE(n_shot)
         paramlist,
         nullptr,  // !!! no meta, should this auto-generate info for HELP?
         n >= 0 ? &Downshot_Dispatcher : &Upshot_Dispatcher,
-        nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_ONESHOT_MAX  // details array capacity
     );
     Init_Integer(ARR_AT(ACT_DETAILS(n_shot), IDX_ONESHOT_COUNTER), n);
