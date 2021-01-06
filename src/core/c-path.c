@@ -646,17 +646,16 @@ bool Eval_Path_Throws_Core(
         STKVAL(*) bottom = DS_AT(dsp_orig + 1);
         STKVAL(*) top = DS_TOP;
 
-        DECLARE_LOCAL (temp);
         while (top > bottom) {
-            assert(IS_SYM_WORD(bottom) and not IS_WORD_BOUND(bottom));
-            assert(IS_SYM_WORD(top) and not IS_WORD_BOUND(top));
+            assert(IS_WORD(bottom) and not IS_WORD_BOUND(bottom));
+            assert(IS_WORD(top) and not IS_WORD_BOUND(top));
 
-            // We used to be able to just swap the spellings here, but now
-            // the spellings tie into the binding so we have to swap cells.
+            // Optimize the swap here so that it just swaps the spellings of
+            // the words (unbound words keep their spelling in the binding).
             //
-            Blit_Specific(temp, bottom);
-            Blit_Specific(bottom, top);
-            Blit_Specific(top, temp);
+            const REBSTR *spelling = STR(EXTRA(Binding, bottom).node);
+            EXTRA(Binding, bottom).node = EXTRA(Binding, top).node;
+            EXTRA(Binding, top).node = NOD(spelling);
 
             top--;
             bottom++;

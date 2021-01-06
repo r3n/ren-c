@@ -86,7 +86,7 @@ REB_R Augmenter_Dispatcher(REBFRM *f)
 //  {Create an ACTION! variant that acts the same, but has added parameters}
 //
 //      return: [action!]
-//      augmentee "Function whose implementation is to be augmented"
+//      action "Function whose implementation is to be augmented"
 //          [action!]
 //      spec "Spec dialect for words to add to the derived function"
 //          [block!]
@@ -96,7 +96,8 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
 {
     INCLUDE_PARAMS_OF_AUGMENT_P;
 
-    REBACT *augmentee = VAL_ACTION(ARG(augmentee));
+    REBACT *augmentee = VAL_ACTION(ARG(action));
+    option(const REBSTR*) label = VAL_ACTION_LABEL(ARG(action));
 
     // We reuse the process from Make_Paramlist_Managed_May_Fail(), which
     // pushes parameters to the stack in groups of three items per parameter.
@@ -223,13 +224,8 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
 
     Move_Value(
         ARR_AT(ACT_DETAILS(augmentated), IDX_AUGMENTER_AUGMENTEE),
-        ARG(augmentee)
+        ARG(action)
     );
 
-    return Init_Action(
-        D_OUT,
-        augmentated,
-        VAL_ACTION_LABEL(ARG(augmentee)),
-        UNBOUND
-    );
+    return Init_Action(D_OUT, augmentated, label, UNBOUND);
 }

@@ -77,12 +77,12 @@
     ([a x] = parameters of :fooy)
     ([10 20 #] = fooy 10 20)
     (
-        'bad-refine = (trap [
+        'bad-parameter = (trap [
             fooy/y 10 20
         ])/id
     )
     (
-        'bad-refine = (trap [
+        'bad-parmeter = (trap [
             fooy 10 @(20)
         ])/id
     )

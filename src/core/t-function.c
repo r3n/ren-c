@@ -386,9 +386,9 @@ REB_R PD_Action(
     else if (IS_PATH(picker) and IS_REFINEMENT(picker))
         spelling = VAL_REFINEMENT_SPELLING(picker);
     else
-        fail (Error_Bad_Refine_Raw(rebUnrelativize(picker)));
+        return R_UNHANDLED;
 
-    Init_Sym_Word(DS_PUSH(), spelling);
+    Init_Word(DS_PUSH(), spelling);
 
     return pvs->out; // leave ACTION! value in pvs->out, as-is
 }

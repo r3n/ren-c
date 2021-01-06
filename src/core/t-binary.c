@@ -777,14 +777,14 @@ REBTYPE(Binary)
         UNUSED(PAR(series));
 
         if (REF(all))
-            fail (Error_Bad_Refine_Raw(ARG(all)));
+            fail (Error_Bad_Refines_Raw());
 
         if (REF(case)) {
             // Ignored...all BINARY! sorts are case-sensitive.
         }
 
         if (REF(compare))
-            fail (Error_Bad_Refine_Raw(ARG(compare)));  // !!! not in R3-Alpha
+            fail (Error_Bad_Refines_Raw());  // !!! not in R3-Alpha
 
         REBFLGS thunk = 0;
 

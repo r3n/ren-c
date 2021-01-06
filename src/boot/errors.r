@@ -170,8 +170,7 @@ Script: [
 
     no-refine:          [:arg1 {has no refinement called} :arg2]
     bad-refines:        {incompatible or invalid refinements}
-    bad-refine:         [{incompatible or duplicate refinement:} :arg1]
-    non-logic-refine:   [:arg1 {refinement must be LOGIC!, not} :arg2]
+    bad-parameter:      [{incompatible or duplicate parameter:} :arg1]
 
     legacy-refinement:  [
                             {Refinements now act as their own args.  See}

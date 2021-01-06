@@ -173,7 +173,7 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
 
     // Signal refinement as being in use.
     //
-    Init_Sym_Word(DS_PUSH(), VAL_PARAM_SPELLING(enable));
+    Init_Word(DS_PUSH(), VAL_PARAM_SPELLING(enable));
   }
 
   skip_enable_modal:
@@ -276,8 +276,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             goto continue_fulfilling;
         }
 
-  //=//// A /REFINEMENT ARG ///////////////////////////////////////////////=//
+  //=//// CHECK FOR ORDER OVERRIDE ////////////////////////////////////////=//
 
+        // Parameters are fulfilled in either 1 or 2 passes, depending on
+        // whether the path uses any "refinements".
+        //
         // Refinements can be tricky because the "visitation order" of the
         // parameters while walking across the parameter array might not
         // match the "consumption order" of the expressions that need to
@@ -291,33 +294,17 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // The first PATH! pushes /B to the top of stack, with /C below.
         // The second PATH! pushes /C to the top of stack, with /B below
         //
-        // If the refinements can be popped off the stack in the order
-        // that they are encountered, then this can be done in one pass.
-        // Otherwise a second pass is needed.  But it is accelerated by
-        // storing the parameter indices to revisit in the binding of the
-        // words (e.g. /B and /C above) on the data stack.
+        // While historically Rebol paths for invoking functions could only
+        // use refinements for optional parameters, Ren-C leverages the same
+        // two-pass mechanism to implement the reordering of non-optional
+        // parameters at the callsite.
 
-        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
-            assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));  // jump lower
-
-            if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED)  // args from callsite
-                goto unspecialized_refinement;  // most common case (?)
-
-            assert(Is_Void_With_Sym(f->special, SYM_UNSET));
-
-  //=//// UNSPECIALIZED REFINEMENT SLOT ///////////////////////////////////=//
-
-    // We want to fulfill all normal parameters before any refinements
-    // that take arguments.  Ren-C allows normal parameters *after* any
-    // refinement, that are not "refinement arguments".  So a refinement
-    // that takes an argument must always fulfill using "pickups".
-
-          unspecialized_refinement: {
-
-            STKVAL(*) ordered = DS_TOP;  // v-- #2258
+        if (DSP != f->dsp_orig) {  // reorderings or refinements pushed
+            STKVAL(*) ordered = DS_TOP;
+            STKVAL(*) lowest_ordered = DS_AT(f->dsp_orig);
             const REBSTR *param_symbol = VAL_PARAM_SPELLING(f->param);
 
-            for (; ordered != DS_AT(f->dsp_orig); --ordered) {
+            for (; ordered != lowest_ordered; --ordered) {
                 if (VAL_WORD_SPELLING(ordered) != param_symbol)
                     continue;
 
@@ -337,9 +324,18 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
                 goto skip_fulfilling_arg_for_now;
             }
+        }
+
+  //=//// A /REFINEMENT ARG ///////////////////////////////////////////////=//
+
+        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
+            assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));  // jump lower
+
+            if (SPECIAL_IS_ARBITRARY_SO_SPECIALIZED)  // args from callsite
+                assert(Is_Void_With_Sym(f->special, SYM_UNSET));
 
             Init_Nulled(f->arg);  // null means refinement not used
-            goto continue_fulfilling; }
+            goto continue_fulfilling;
         }
 
   //=//// ARGUMENT FULFILLMENT ////////////////////////////////////////////=//
@@ -762,16 +758,15 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // second time through, and we were just jumping up to check the
     // parameters in response to a R_REDO_CHECKED; if so, skip this.
     //
-    if (DSP != f->dsp_orig and IS_SYM_WORD(DS_TOP)) {
+    if (DSP != f->dsp_orig and IS_WORD(DS_TOP)) {
 
       next_pickup:
 
-        assert(IS_SYM_WORD(DS_TOP));
+        assert(IS_WORD(DS_TOP));
 
         if (not IS_WORD_BOUND(DS_TOP)) {  // the loop didn't index it
-            mutable_KIND3Q_BYTE(DS_TOP) = REB_WORD;
-            mutable_HEART_BYTE(DS_TOP) = REB_WORD;
-            fail (Error_Bad_Refine_Raw(DS_TOP));  // so duplicate or junk
+            Refinify(DS_TOP);  // used as refinement, so report that way
+            fail (Error_Bad_Parameter_Raw(DS_TOP));  // so duplicate or junk
         }
 
         // FRM_ARGS_HEAD offsets are 0-based, while index is 1-based.
@@ -784,7 +779,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         f->special += offset;
 
         assert(VAL_WORD_SPELLING(DS_TOP) == VAL_PARAM_SPELLING(f->param));
-        assert(TYPE_CHECK(f->param, REB_TS_REFINEMENT));
         DS_DROP();
 
         if (Is_Typeset_Empty(f->param)) {  // no callsite arg, just drop

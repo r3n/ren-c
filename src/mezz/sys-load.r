@@ -547,7 +547,7 @@ load-module: func [
     switch type of source [
         word! [ ; loading the preloaded
             if name [
-                cause-error 'script 'bad-refine /as  ; no renaming
+                cause-error 'script 'bad-parameter /as  ; no renaming
             ]
 
             ; Return blank if no module of that name found
@@ -600,7 +600,7 @@ load-module: func [
             if let tmp: find/skip next system/modules mod: source 2 [
                 if name [
                     ; already imported
-                    cause-error 'script 'bad-refine /as
+                    cause-error 'script 'bad-parameter /as
                 ]
 
                 all [
@@ -617,7 +617,7 @@ load-module: func [
 
         block! [
             if any [version name] [
-                cause-error 'script 'bad-refines blank
+                cause-error 'script 'bad-parameter blank
             ]
 
             data: make block! length of source

@@ -996,26 +996,6 @@ REBCTX *Error_Need_Non_Null_Core(const RELVAL *target, REBSPC *specifier) {
 
 
 //
-//  Error_Non_Logic_Refinement: C
-//
-// !!! This error is a placeholder for addressing the issue of using a value
-// to set a refinement that's not a good fit for the refinement type, e.g.
-//
-//     specialize :append [only: 10]
-//
-// It seems that LOGIC! should be usable, and for purposes of chaining a
-// refinement-style PATH! should be usable too (for using one refinement to
-// trigger another--whether the name is the same or not).  BLANK! has to be
-// legal as well.  But arbitrary values probably should not be.
-//
-REBCTX *Error_Non_Logic_Refinement(const RELVAL *param, const REBVAL *arg) {
-    DECLARE_LOCAL (word);
-    Init_Word(word, VAL_PARAM_SPELLING(param));
-    return Error_Non_Logic_Refine_Raw(word, Type_Of(arg));
-}
-
-
-//
 //  Error_Bad_Func_Def: C
 //
 REBCTX *Error_Bad_Func_Def(const REBVAL *spec, const REBVAL *body)

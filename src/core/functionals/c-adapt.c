@@ -105,7 +105,7 @@ REB_R Adapter_Dispatcher(REBFRM *f)
 //  {Create a variant of an ACTION! that preprocesses its arguments}
 //
 //      return: [action!]
-//      adaptee "Function to be run after the prelude is complete"
+//      action "Function to be run after the prelude is complete"
 //          [action!]
 //      prelude "Code to run in constructed frame before adaptee runs"
 //          [block!]
@@ -115,7 +115,7 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
 {
     INCLUDE_PARAMS_OF_ADAPT_P;
 
-    REBVAL *adaptee = ARG(adaptee);
+    REBVAL *adaptee = ARG(action);
 
     // !!! There was code here which would hide it so adapted code had no
     // access to the locals.  That requires creating a new paramlist.  Is

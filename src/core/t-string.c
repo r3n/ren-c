@@ -1079,7 +1079,7 @@ REBTYPE(String)
         UNUSED(PAR(series));
 
         if (REF(all))
-            fail (Error_Bad_Refine_Raw(ARG(all)));
+            fail (Error_Bad_Refines_Raw());
 
         if (not Is_String_Definitely_ASCII(VAL_STRING(v)))
             fail ("UTF-8 Everywhere: String sorting temporarily unavailable");
@@ -1090,7 +1090,7 @@ REBTYPE(String)
         // interest, maybe common case.
 
         if (REF(compare))
-            fail (Error_Bad_Refine_Raw(PAR(compare))); // !!! not in R3-Alpha
+            fail (Error_Bad_Refines_Raw());  // !!! not in R3-Alpha
 
         Move_Value(D_OUT, v);  // before index modification
         REBLEN len = Part_Len_May_Modify_Index(v, ARG(part));

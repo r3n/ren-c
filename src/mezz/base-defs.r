@@ -255,11 +255,13 @@ inherit-meta: func* [
     return: "Same as derived (assists in efficient chaining)"
         [action!]
     derived [action!]
-    original [action! word! path!]
+    original "Passed as WORD! to use GET to avoid tainting cached label"
+        [word!]
     /augment "Additional spec information to scan"
         [block!]
 ][
-    if action! <> reflect :original 'type [original: get original]
+    original: get original  ; GET so `specialize :foo [...]` keeps label foo
+
     if let m1: meta-of :original [
         set-meta :derived let m2: copy :m1  ; shallow copy
         if in m1 'parameter-notes [  ; shallow copy, but make frame match
@@ -283,19 +285,19 @@ inherit-meta: func* [
 ]
 
 enclose: enclose* :enclose* func* [f] [  ; uses low-level ENCLOSE* to make
-    let inner: f/inner: compose :f/inner
-    inherit-meta do f get 'inner  ; no :inner name cache
+    let inner: get 'f/inner
+    inherit-meta do f 'inner
 ]
-inherit-meta :enclose :enclose*  ; needed since we used ENCLOSE*
+inherit-meta :enclose 'enclose*  ; needed since we used ENCLOSE*
 
 specialize: enclose :specialize* func* [f] [  ; now we have high-level ENCLOSE
-    let specializee: f/specializee: compose :f/specializee
-    inherit-meta do f get 'specializee  ; no :specializee name cache
+    let action: get 'f/action
+    inherit-meta do f 'action
 ]
 
 adapt: enclose :adapt* func* [f] [
-    let adaptee: f/adaptee: compose :f/adaptee
-    inherit-meta do f get 'adaptee  ; no :adaptee name cache
+    let action: get 'f/action
+    inherit-meta do f 'action
 ]
 
 chain: enclose :chain* func* [f] [
@@ -312,19 +314,24 @@ chain: enclose :chain* func* [f] [
         ]
     ]
 
-    let pipeline: f/pipeline: reduce :f/pipeline
-    inherit-meta do f pick pipeline 1
+    let pipeline1: pick (f/pipeline: reduce :f/pipeline) 1
+    inherit-meta do f 'pipeline1
 ]
 
 augment: enclose :augment* func* [f] [
-    let augmentee: f/augmentee: compose :f/augmentee
+    let action: get 'f/action
     let spec: :f/spec
-    inherit-meta/augment do f get 'augmentee spec  ; no :augmentee name cache
+    inherit-meta/augment do f 'action spec
 ]
 
 reframer: enclose :reframer* func* [f] [
-    let shim: f/shim: compose :f/shim
-    inherit-meta do f get 'shim
+    let shim: get 'f/shim
+    inherit-meta do f 'shim
+]
+
+reorder: enclose :reorder* func* [f] [
+    let action: get 'f/action
+    inherit-meta do f 'action  
 ]
 
 ; The lower-level pointfree function separates out the action it takes, but
@@ -344,7 +351,7 @@ pointfree: enclose (specialize* :pointfree* [
     ; rest of block is invocation by example
     f/block: skip f/block 1  ; Note: NEXT not defined yet
 
-    inherit-meta do f get 'action  ; no :action name cache
+    inherit-meta do f 'action  ; no :action name cache
 ]
 
 

@@ -429,8 +429,10 @@ bool Specialize_Action_Throws(
         while (ordered_dsp != DSP) {
             ++ordered_dsp;
             STKVAL(*) ordered = DS_AT(ordered_dsp);
-            if (not IS_WORD_BOUND(ordered))  // specialize :print/asdf
-                fail (Error_Bad_Refine_Raw(ordered));
+            if (not IS_WORD_BOUND(ordered)) {  // specialize :print/asdf
+                Refinify(ordered);  // used as refinement, report as such
+                fail (Error_Bad_Parameter_Raw(ordered));
+            }
 
             REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
             if (NOT_CELL_FLAG(slot, ARG_MARKED_CHECKED)) {
@@ -440,7 +442,7 @@ bool Specialize_Action_Throws(
                 //
                 Init_Any_Word_Bound(
                     Alloc_Tail_Array(partials),
-                    REB_SYM_WORD,
+                    REB_WORD,
                     exemplar,
                     VAL_WORD_INDEX(ordered)
                 );
@@ -467,7 +469,6 @@ bool Specialize_Action_Throws(
     );
     assert(CTX_KEYLIST(exemplar) == ACT_PARAMLIST(unspecialized));
 
-
     Init_Action(out, specialized, VAL_ACTION_LABEL(specializee), UNBOUND);
 
     return false;  // code block did not throw
@@ -480,7 +481,7 @@ bool Specialize_Action_Throws(
 //  {Create a new action through partial or full specialization of another}
 //
 //      return: [action!]
-//      specializee "Function whose parameters will be set to fixed values"
+//      action "Function whose parameters will be set to fixed values"
 //          [action!]
 //      def "Definition for FRAME! fields for args and refinements"
 //          [block!]
@@ -490,7 +491,7 @@ REBNATIVE(specialize_p)  // see extended definition SPECIALIZE in %base-defs.r
 {
     INCLUDE_PARAMS_OF_SPECIALIZE_P;
 
-    REBVAL *specializee = ARG(specializee);
+    REBVAL *specializee = ARG(action);
 
     // Refinement specializations via path are pushed to the stack, giving
     // order information that can't be meaningfully gleaned from an arbitrary
@@ -567,6 +568,18 @@ void For_Each_Unspecialized_Param(
         if (pclass == REB_P_LOCAL)
             continue;
 
+        if (partials) {  // even normal parameters can appear in partials
+            REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
+            for (; NOT_END(partial); ++partial) {
+                if (SAME_STR(
+                    VAL_WORD_SPELLING(partial),
+                    VAL_PARAM_SPELLING(param)
+                )){
+                    goto skip_in_first_pass;
+                }
+            }
+        }
+
         // If the modal parameter has had its refinement specialized out, it
         // is no longer modal.
         //
@@ -583,6 +596,8 @@ void For_Each_Unspecialized_Param(
         bool cancel = not hook(param, flags, opaque);
         if (cancel)
             return;
+
+      skip_in_first_pass: {}
     }
   }
 
@@ -982,79 +997,4 @@ REBACT *Make_Action_From_Exemplar(REBCTX *exemplar)
         IDX_SPECIALIZER_MAX  // details capacity
     );
     return action;
-}
-
-
-//
-//  partialize: native [
-//
-//  {Test new concept for partial refinements and parameter reordering}
-//
-//      return: [action!]
-//      action [action!]
-//      partials [block!]
-//  ]
-//
-REBNATIVE(partialize)
-{
-    INCLUDE_PARAMS_OF_PARTIALIZE;
-
-    REBVAL *copy = rebValue("copy", rebQ(ARG(action)), rebEND);
-    REBACT *reordered = VAL_ACTION(copy);
-    rebRelease(copy);
-
-    REBCTX *exemplar = ACT_EXEMPLAR(reordered);
-    if (not exemplar)
-        fail ("PARTIALIZE experiment requires exemplar at the moment");
-
-    REBDSP dsp_orig = DSP;
-
-    REBARR *specialty = ACT_SPECIALTY(reordered);
-    if (GET_ARRAY_FLAG(specialty, IS_PARTIALS)) {
-        const REBVAL *word = SPECIFIC(ARR_HEAD(specialty));
-        for (; NOT_END(word); ++word) {
-            assert(IS_WORD_BOUND(word));
-            Move_Value(DS_PUSH(), word);
-        }
-        specialty = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(specialty));
-    }
-
-    // We need to bind the incoming words to what's visible, as hidden words
-    // may exist in internal compositions.
-    //
-    const RELVAL *item = VAL_ARRAY_AT(ARG(partials));
-    for (; NOT_END(item); ++item) {
-        REBVAL *param = ACT_PARAMS_HEAD(reordered);
-        REBVAL *special = ACT_SPECIALTY_HEAD(reordered);
-        REBLEN index = 1;
-        const REBSTR *spelling = VAL_WORD_SPELLING(item);
-        for (; NOT_END(param); ++param, ++special, ++index) {
-            if (Is_Param_Hidden(param, special))
-                continue;
-
-            if (VAL_PARAM_SPELLING(param) == spelling) {
-                Init_Any_Word_Bound(DS_PUSH(), REB_SYM_WORD, exemplar, index);
-                goto next_item;
-            }
-        }
-
-        fail (rebUnrelativize(item));
-
-      next_item: {}
-    }
-
-    REBARR *partials = Pop_Stack_Values_Core(
-        dsp_orig,
-        SERIES_FLAG_MANAGED | SERIES_MASK_PARTIALS
-    );
-    LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(partials) = NOD(specialty);
-    REBVAL *archetype = ACT_ARCHETYPE(reordered);
-    VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype) = NOD(partials);
-
-    return Init_Action(
-        D_OUT,
-        reordered,
-        VAL_ACTION_LABEL(ARG(action)),
-        VAL_ACTION_BINDING(ARG(action))
-    );
 }

@@ -196,7 +196,7 @@ inline static STKVAL(*) DS_AT(REBDSP d) {
 
 // Note: DS_Movable_Top is just DS_TOP, but accessing DS_TOP asserts on ENDs
 //
-inline static STKVAL(*) DS_PUSH() {
+inline static STKVAL(*) DS_PUSH(void) {
   #ifdef DEBUG_EXTANT_STACK_POINTERS
     assert(TG_Stack_Outstanding == 0);  // push may disrupt any extant values
   #endif
