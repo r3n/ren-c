@@ -1017,15 +1017,18 @@ REBCTX *Error_Bad_Func_Def(const REBVAL *spec, const REBVAL *body)
 //
 //  Error_No_Arg: C
 //
-REBCTX *Error_No_Arg(REBFRM *f, const RELVAL *param)
+REBCTX *Error_No_Arg(option(const REBSTR*) label, const REBSTR *spelling)
 {
     DECLARE_LOCAL (param_word);
-    Init_Word(param_word, VAL_PARAM_SPELLING(param));
+    Init_Word(param_word, spelling);
 
-    DECLARE_LOCAL (label);
-    Get_Frame_Label_Or_Blank(label, f);
+    DECLARE_LOCAL (label_word);
+    if (label)
+        Init_Word(label_word, label);
+    else
+        Init_Blank(label_word);
 
-    return Error_No_Arg_Raw(label, param_word);
+    return Error_No_Arg_Raw(label_word, param_word);
 }
 
 

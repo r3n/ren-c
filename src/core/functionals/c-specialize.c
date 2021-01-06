@@ -136,11 +136,8 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
     REBLEN index = 1; // used to bind REFINEMENT! values to parameter slots
 
-    REBCTX *exemplar = ACT_EXEMPLAR(act); // may be null
-    if (exemplar)
-        assert(special == CTX_VARS_HEAD(exemplar));
-    else
-        assert(special == ACT_PARAMS_HEAD(act));
+    REBCTX *exemplar = ACT_EXEMPLAR(act);
+    assert(special == CTX_VARS_HEAD(exemplar));
 
     for (; NOT_END(param); ++param, ++arg, ++special, ++index) {
         Prep_Cell(arg);
@@ -456,7 +453,7 @@ bool Specialize_Action_Throws(
             partials = nullptr;
         }
         else {
-            LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(partials) = NOD(exemplar);
+            LINK_PARTIALS_EXEMPLAR_NODE(partials) = NOD(exemplar);
             Manage_Series(partials);
         }
     }

@@ -992,6 +992,50 @@ REBACT *Make_Action(
 ){
     assert(details_capacity >= 1);  // must have room for archetype
 
+    REBARR *list = specialty;
+    if (GET_ARRAY_FLAG(list, IS_PARTIALS)) {
+        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
+    }
+    else if (GET_SERIES_FLAG(list, IS_KEYLIKE)) {
+        // As a step toward usermode parameter definitions, move the typesets
+        // into an exemplar...so all actions will have exemplars.
+        //
+        REBARR *paramlist = list;
+        REBARR *varlist = Make_Array_Core(
+            ARR_LEN(paramlist),  // paramlist
+            NODE_FLAG_MANAGED | SERIES_MASK_VARLIST
+        );
+        REBVAL *src = SER_AT(REBVAL, paramlist, 1);
+        REBVAL *dest = SER_AT(REBVAL, varlist, 1);
+        for (; NOT_END(src); ++src, ++dest) {
+            assert(HEART_BYTE(src) == REB_TYPESET);
+           /* Move_Value(dest, src);
+            VAL_TYPESET_STRING_NODE(dest) = nullptr; */
+            Init_Void(dest, SYM_UNSET);  // !!! starting out...
+            if (Is_Param_Hidden(src, src))
+                SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
+        }
+        TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));
+        INIT_LINK_KEYSOURCE(varlist, NOD(paramlist));
+        MISC_META_NODE(varlist) = nullptr;
+
+        // !!! Can't make this a frame yet, need an action to pick it up.
+        //
+        Init_Unreadable_Void(ARR_HEAD(varlist));
+        list = varlist;
+        specialty = varlist;
+    }
+    else
+        assert(GET_ARRAY_FLAG(list, IS_VARLIST));
+
+    REBARR *varlist = list;
+
+    assert(GET_SERIES_FLAG(varlist, MANAGED));
+    assert(
+        IS_UNREADABLE_DEBUG(ARR_HEAD(varlist))  // must fill in
+        or CTX_TYPE(CTX(varlist)) == REB_FRAME
+    );
+
     // !!! There used to be more validation code needed here when it was
     // possible to pass a specialization frame separately from a paramlist.
     // But once paramlists were separated out from the function's identity
@@ -1001,19 +1045,7 @@ REBACT *Make_Action(
     // a placeholder for more useful consistency checking which might be done.
     //
   blockscope {
-    option(REBCTX*) exemplar = nullptr;
-    REBARR *paramlist;
-
-    REBARR *list = specialty;
-    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
-    if (GET_SERIES_FLAG(list, IS_KEYLIKE))
-        paramlist = list;
-    else {
-        assert(GET_ARRAY_FLAG(list, IS_VARLIST));
-        exemplar = CTX(list);
-        paramlist = CTX_KEYLIST(exemplar);
-    }
+    REBARR *paramlist = ARR(LINK_KEYSOURCE(varlist));
 
     ASSERT_SERIES_MANAGED(paramlist);  // paramlists/keylists, can be shared
     ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(paramlist));  // unused at this time
@@ -1022,11 +1054,6 @@ REBACT *Make_Action(
         RELVAL *param = ARR_AT(paramlist, 1);
         assert(VAL_PARAM_SYM(param) == SYM_RETURN);
         UNUSED(param);
-    }
-
-    if (exemplar) {
-        assert(GET_SERIES_FLAG(CTX_VARLIST(unwrap(exemplar)), MANAGED));
-        assert(CTX_TYPE(unwrap(exemplar)) == REB_FRAME);
     }
   }
 
@@ -1059,6 +1086,13 @@ REBACT *Make_Action(
     assert(NOT_ARRAY_FLAG(details, HAS_FILE_LINE_UNMASKED));
 
     REBACT *act = ACT(details); // now it's a legitimate REBACT
+
+    // !!! We may have to initialize the exemplar rootvar.
+    //
+    REBVAL *rootvar = SER_HEAD(REBVAL, varlist);
+    if (IS_UNREADABLE_DEBUG(rootvar)) {
+        INIT_VAL_FRAME_ROOTVAR(rootvar, varlist, act, UNBOUND);
+    }
 
     // Precalculate cached function flags.  This involves finding the first
     // unspecialized argument which would be taken at a callsite, which can

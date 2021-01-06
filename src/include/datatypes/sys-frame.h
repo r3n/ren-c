@@ -735,7 +735,7 @@ inline static void Push_Action(
         const REBVAL *word = SPECIFIC(ARR_HEAD(list));
         for (; NOT_END(word); ++word)
             Move_Value(DS_PUSH(), word);
-        list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
+        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
     }
     if (GET_ARRAY_FLAG(list, IS_VARLIST))
         f->special = CTX_VARS_HEAD(CTX(list));

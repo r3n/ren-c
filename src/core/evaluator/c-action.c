@@ -58,35 +58,6 @@
 #define kind_current KIND_BYTE_UNCHECKED(v)
 
 
-//=//// ARGUMENT LOOP MODES ///////////////////////////////////////////////=//
-//
-// f->special is kept in sync with either:
-//
-// * f->param to indicate ordinary argument fulfillment for all the relevant
-//   args, refinements, and refinement args of the function.
-//
-// * some other pointer to an array of REBVAL which is the same length as the
-//   argument list.  Any non-null values in that array should be used in lieu
-//   of an ordinary argument...e.g. that argument has been "specialized".
-//
-// All the states can be incremented across the length of the frame.  This
-// means `++f->special` can be done without checking for null values.
-//
-// Additionally, in the f->param state, f->special will never register as
-// anything other than a parameter.  This can speed up some checks, such as
-// where `IS_NULLED(f->special)` can only match the other cases.
-//
-// Done with macros for speed in the debug build (which does not inline).
-// The name of the trigger condition is included since reinforcing what's true
-// at the callsite is good to help understand the state.
-
-#define SPECIAL_IS_PARAM_SO_UNSPECIALIZED \
-    (f->special == f->param)
-
-#define SPECIAL_IS_ARBITRARY_SO_SPECIALIZED \
-    (f->special != f->param and f->special != f->arg)
-
-
 #ifdef DEBUG_EXPIRED_LOOKBACK
     #define CURRENT_CHANGES_IF_FETCH_NEXT \
         (f->feed->stress != nullptr)
@@ -259,20 +230,16 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // come from argument fulfillment.  If there is an exemplar, they are
         // set from that, otherwise they are undefined.
         //
-        if (Is_Param_Hidden(f->param, f->special)) {
-            if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED) {  // no exemplar
-                Init_Void(f->arg, SYM_UNSET);
-                SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-            }
-            else {
-                // For specialized cases, we assume type checking was done
-                // when the parameter is hidden.  It cannot be manipulated
-                // from the outside (e.g. by REFRAMER) so there is no benefit
-                // to deferring the check, only extra cost on each invocation.
-                //
-                Blit_Specific(f->arg, f->special);  // keep ARG_MARKED_CHECKED
-                assert(GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED));
-            }
+        if (Is_Param_Hidden(f->param, f->special)) {  // hidden includes local
+            //
+            // For specialized cases, we assume type checking was done
+            // when the parameter is hidden.  It cannot be manipulated
+            // from the outside (e.g. by REFRAMER) so there is no benefit
+            // to deferring the check, only extra cost on each invocation.
+            //
+            Blit_Specific(f->arg, f->special);  // keep ARG_MARKED_CHECKED
+            assert(GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED));
+
             goto continue_fulfilling;
         }
 
@@ -331,8 +298,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
             assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));  // jump lower
 
-            if (SPECIAL_IS_ARBITRARY_SO_SPECIALIZED)  // args from callsite
-                assert(Is_Void_With_Sym(f->special, SYM_UNSET));
+            assert(Is_Void_With_Sym(f->special, SYM_UNSET));
 
             Init_Nulled(f->arg);  // null means refinement not used
             goto continue_fulfilling;
@@ -912,7 +878,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // Note: `1 + comment "foo"` => `1 +`, arg is END
             //
             if (not Is_Param_Endable(f->param))
-                fail (Error_No_Arg(f, f->param));
+                fail (Error_No_Arg(f->label, VAL_PARAM_SPELLING(f->param)));
 
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             continue;

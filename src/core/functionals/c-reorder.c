@@ -101,51 +101,39 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
 {
     INCLUDE_PARAMS_OF_REORDER_P;
 
-    REBDSP dsp_orig = DSP;
-
     REBACT *reorderee = VAL_ACTION(ARG(action));
     option(const REBSTR*) label  = VAL_ACTION_LABEL(ARG(action));
+
+    // Working with just the exemplar means we will lose the partials ordering
+    // information from the interface.  But that's what we want, as the
+    // caller is to specify a complete ordering.
+    //
+    REBCTX *exemplar = ACT_EXEMPLAR(reorderee);
+
+    // We need a binder to efficiently map arguments to their position in
+    // the parameters array, and track which parameters are mentioned.
+
+    struct Reb_Binder binder;
+    INIT_BINDER(&binder);
+
+  blockscope {
+    REBVAL *param = ACT_PARAMS_HEAD(reorderee);
+    REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
+    REBLEN index = 1;
+    for (; NOT_END(param); ++param, ++special, ++index) {
+        if (Is_Param_Hidden(param, special))
+            continue;
+        Add_Binder_Index(&binder, VAL_PARAM_SPELLING(param), index);
+    }
+  }
 
     // IMPORTANT: Binders use global state and code is not allowed to fail()
     // without cleaning the binder up first, balancing it all out to zeros.
     // Errors must be stored and reported after the cleanup.
     //
-    struct Reb_Binder binder;
-    INIT_BINDER(&binder);
-
     option(REBCTX*) error = nullptr;
 
-    // !!! The goal of this routine is to not need to allocate any new
-    // interface beyond the reorder array.  However, we need an exemplar in
-    // order to set the bindings of the words that we push in the partials.
-    // It's planned that all actions will have exemplars (and the type
-    // information and parameter type will live in that slot).  Since some
-    // functions don't have it yet, force it.
-    //
-    REBCTX *exemplar = ACT_EXEMPLAR(reorderee);
-    if (exemplar) {  // need binder to efficiently know argument positions
-        REBVAL *param = ACT_PARAMS_HEAD(reorderee);
-        REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
-        REBLEN index = 1;
-        for (; NOT_END(param); ++param, ++special, ++index) {
-            if (Is_Param_Hidden(param, special))
-                continue;
-            Add_Binder_Index(&binder, VAL_PARAM_SPELLING(param), index);
-        }
-    }
-    else {
-        exemplar = Make_Context_For_Action_Push_Partials(
-            ARG(action),
-            dsp_orig,  // lowest_ordered_dsp
-            &binder
-        );
-        Manage_Series(CTX_VARLIST(exemplar));
-        assert(dsp_orig == DSP);  // didn't have exemplar, no partials ATM
-    }
-
-    // Working with just the exemplar means we've lost the partials ordering
-    // information from the interface.  But that's what we want, as this
-    // function is supposed to generate a complete answer.
+    REBDSP dsp_orig = DSP;
 
     // We proceed through the array, and remove the binder indices as we go.
     // This lets us check for double uses or use of words that aren't in the
@@ -227,16 +215,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
             and not mentioned
             and not TYPE_CHECK(param, REB_TS_REFINEMENT)  // okay to leave out
         ){
-            DECLARE_LOCAL (param_word);
-            Init_Word(param_word, VAL_PARAM_SPELLING(param));
-
-            DECLARE_LOCAL (label_value);
-            if (label)
-                Init_Word(label_value, unwrap(label));
-            else
-                Init_Blank(label_value);
-
-            error = Error_No_Arg_Raw(label_value, param_word);
+            error = Error_No_Arg(label, VAL_PARAM_SPELLING(param));
         }
     }
   }
@@ -250,7 +229,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
         dsp_orig,
         SERIES_FLAG_MANAGED | SERIES_MASK_PARTIALS
     );
-    LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(partials) = NOD(exemplar);
+    LINK_PARTIALS_EXEMPLAR_NODE(partials) = NOD(exemplar);
 
     REBACT *reordered = Make_Action(
         partials,

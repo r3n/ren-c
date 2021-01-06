@@ -152,7 +152,7 @@ REB_R Reframer_Dispatcher(REBFRM *f)
     //
     SET_SERIES_FLAG(CTX_VARLIST(stolen), MANAGED); // can't use Manage_Series
 
-    REBVAL *arg = FRM_ARGS_HEAD(f) + VAL_INT32(param_index);
+    REBVAL *arg = FRM_ARG(f, VAL_INT32(param_index));
     Init_Frame(arg, stolen, label);
 
     INIT_FRM_PHASE(f, VAL_ACTION(shim));
@@ -178,50 +178,113 @@ REBNATIVE(reframer_p)
 {
     INCLUDE_PARAMS_OF_REFRAMER_P;
 
-    REBVAL *shim = ARG(shim);
+    REBACT *shim = VAL_ACTION(ARG(shim));
+    option(const REBSTR*) label = VAL_ACTION_LABEL(ARG(shim));
 
-    // Make action as a copy of the input function, with enough space to
-    // store the implementation phase and which parameter to fill with the
-    // frame.
+    REBDSP dsp_orig = DSP;
+
+    struct Reb_Binder binder;
+    INIT_BINDER(&binder);
+    REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
+        ARG(shim),
+        dsp_orig,
+        &binder
+    );
+
+    option(REBCTX*) error = nullptr;  // can't fail() with binder in effect
+
+    REBLEN param_index = 0;
+
+    if (DSP != dsp_orig) {
+        error = Error_User("REFRAMER can't use partial specializions ATM");
+        goto cleanup_binder;
+    }
+
+  blockscope {
+    REBVAL *param;
+    
+    if (REF(parameter)) {
+        const REBSTR *spelling = VAL_WORD_SPELLING(ARG(parameter));
+        param_index = Get_Binder_Index_Else_0(&binder, spelling);
+        if (param_index == 0) {
+            error = Error_No_Arg(label, spelling);
+            goto cleanup_binder;
+        }
+        param = CTX_KEY(exemplar, param_index);
+        PROBE(param);
+    }
+    else {
+        param = Last_Unspecialized_Param(shim);
+        param_index = param - ACT_PARAMS_HEAD(shim) + 1;
+    }
+
+    // Make sure the parameter is able to accept FRAME! arguments (the type
+    // checking will ultimately use hte same slot we overwrite here!)
     //
+    if (not TYPE_CHECK(param, REB_FRAME)) {
+        DECLARE_LOCAL (label_word);
+        if (label)
+            Init_Word(label_word, label);
+        else
+            Init_Blank(label_word);
+
+        DECLARE_LOCAL (param_word);
+        Init_Word(param_word, VAL_PARAM_SPELLING(param));
+
+        error = Error_Expect_Arg_Raw(
+            label_word,
+            Datatype_From_Kind(REB_FRAME),
+            param_word
+        );
+        goto cleanup_binder;
+    }
+  }
+
+  cleanup_binder: {
+    REBVAL *param = ACT_PARAMS_HEAD(shim);
+    REBVAL *special = ACT_SPECIALTY_HEAD(shim);
+    for (; NOT_END(param); ++param, ++special) {
+        if (Is_Param_Hidden(param, special))
+            continue;
+
+        const REBSTR *spelling = VAL_PARAM_SPELLING(param);
+        REBLEN index = Remove_Binder_Index_Else_0(&binder, spelling);
+        assert(index != 0);
+        UNUSED(index);
+    }
+
+    SHUTDOWN_BINDER(&binder);
+
+    if (error)  // once binder is cleaned up, safe to raise errors
+        fail (unwrap(error));
+  }
+
+    // We need the dispatcher to be willing to start the reframing step even
+    // though the frame to be processed isn't ready yet.  So we have to
+    // specialize the argument with something that type checks.  It wants a
+    // FRAME!, so temporarily fill it with the exemplar frame itself.
+    //
+    // !!! An expired frame would be better, or tweaking the argument so it
+    // takes a void and giving it ~pending~; would make bugs more obvious.
+    //
+    REBVAL *var = CTX_VAR(exemplar, param_index);
+    Move_Value(var, CTX_ARCHETYPE(exemplar));
+    SET_CELL_FLAG(var, ARG_MARKED_CHECKED);
+
+    // Make action with enough space to store the implementation phase and
+    // which parameter to fill with the *real* frame instance.
+    //
+    Manage_Series(CTX_VARLIST(exemplar));
     REBACT *reframer = Make_Action(
-        ACT_SPECIALTY(VAL_ACTION(shim)),  // same interface as shim
+        CTX_VARLIST(exemplar),  // shim minus the frame argument
         nullptr,  // meta inherited by REFRAMER helper to REFRAMER*
         &Reframer_Dispatcher,
         IDX_REFRAMER_MAX  // details array capacity => [shim, param_index]
     );
 
-    // Find the parameter they want to overwrite with the frame, or default
-    // to the last unspecialized parameter.
-    //
-    REBVAL *param = nullptr;
-    if (REF(parameter)) {
-        const REBSTR *canon = VAL_WORD_SPELLING(REF(parameter));
-        REBVAL *temp = ACT_PARAMS_HEAD(reframer);
-        for (; NOT_END(temp); ++temp) {
-            if (VAL_PARAM_SPELLING(temp) == canon) {
-                param = temp;
-                break;
-            }
-        }
-    }
-    else {  // default parameter to the last unspecialized one
-        param = Last_Unspecialized_Param(reframer);
-    }
-
-    // Set the type bits so that we can get the dispatcher to the point of
-    // running even though we haven't filled in a frame yet.
-    //
-    if (not param)
-        fail ("Could not find parameter for REFRAMER");
-    TYPE_SET(param, REB_VOID);
-    Hide_Param(param);
-
-    REBLEN param_index = param - ACT_PARAMS_HEAD(reframer);
-
     REBARR *details = ACT_DETAILS(reframer);
-    Move_Value(ARR_AT(details, IDX_REFRAMER_SHIM), shim);
+    Move_Value(ARR_AT(details, IDX_REFRAMER_SHIM), ARG(shim));
     Init_Integer(ARR_AT(details, IDX_REFRAMER_PARAM_INDEX), param_index);
 
-    return Init_Action(D_OUT, reframer, VAL_ACTION_LABEL(shim), UNBOUND);
+    return Init_Action(D_OUT, reframer, label, UNBOUND);
 }

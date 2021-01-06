@@ -82,7 +82,7 @@
         ])/id
     )
     (
-        'bad-parmeter = (trap [
+        'bad-parameter = (trap [
             fooy 10 @(20)
         ])/id
     )

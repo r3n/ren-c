@@ -205,7 +205,7 @@ inline static void INIT_VAL_ACTION_BINDING(
 #define ACT_SPECIALTY(a) \
     ARR(VAL_ACTION_SPECIALTY_OR_LABEL_NODE(ACT_ARCHETYPE(a)))
 
-#define LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(a) \
+#define LINK_PARTIALS_EXEMPLAR_NODE(a) \
     LINK(a).custom.node
 
 inline static option(REBARR*) ACT_PARTIALS(REBACT *a) {
@@ -218,25 +218,23 @@ inline static option(REBARR*) ACT_PARTIALS(REBACT *a) {
 inline static REBARR *ACT_PARAMLIST(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
-    if (GET_ARRAY_FLAG(list, IS_VARLIST))
-        return ARR(LINK_KEYSOURCE(list));
-    return list;
+        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
+    assert(GET_ARRAY_FLAG(list, IS_VARLIST));
+    return ARR(LINK_KEYSOURCE(list));
 }
 
 inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
-    if (GET_ARRAY_FLAG(list, IS_VARLIST))
-        return CTX(list);
-    return nullptr;
+        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
+    assert(GET_ARRAY_FLAG(list, IS_VARLIST));
+    return CTX(list);
 }
 
 inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
+        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
     return cast(REBVAL*, list->content.dynamic.data) + 1;  // skip archetype
 }
 

@@ -535,13 +535,8 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
 
         REBARR *list = ACT_SPECIALTY(VAL_ACTION(archetype));
         if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-            list = ARR(LINK_PARTIALS_VARLIST_OR_PARAMLIST_NODE(list));
-        if (GET_ARRAY_FLAG(list, IS_VARLIST)) {
-            REBCTX *exemplar = CTX(list);
-            UNUSED(exemplar);
-        }
-        else
-            assert(list == ACT_PARAMLIST(ACT(m_cast(REBARR*, a))));
+            list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
+        assert(GET_ARRAY_FLAG(list, IS_VARLIST));
     }
     else if (GET_ARRAY_FLAG(a, IS_VARLIST)) {
         const REBVAL *archetype = CTX_ARCHETYPE(CTX(a));

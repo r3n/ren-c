@@ -480,12 +480,15 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             // be taken off.
             //
             REBARR *paramlist = ACT_PARAMLIST(relative);
+            REBARR *varlist = CTX_VARLIST(ACT_EXEMPLAR(relative));
             assert(GET_SERIES_FLAG(paramlist, FIXED_SIZE));
             CLEAR_SERIES_FLAG(paramlist, FIXED_SIZE);
 
             REBLEN old_paramlist_len = ARR_LEN(paramlist);
             EXPAND_SERIES_TAIL(paramlist, num_lets);
+            EXPAND_SERIES_TAIL(varlist, num_lets);
             RELVAL *param = ARR_AT(paramlist, old_paramlist_len);
+            RELVAL *special = ARR_AT(varlist, old_paramlist_len);
 
             REBDSP dsp = dsp_orig;
             while (dsp != DSP) {
@@ -499,12 +502,18 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
                 ++dsp;
                 ++param;
 
+                Init_Void(special, SYM_UNSET);
+                SET_CELL_FLAG(special, ARG_MARKED_CHECKED);
+                ++special;
+
                 // Will be removed from binder below
             }
             DS_DROP_TO(dsp_orig);
 
             TERM_ARRAY_LEN(paramlist, old_paramlist_len + num_lets);
             SET_SERIES_FLAG(paramlist, FIXED_SIZE);
+
+            TERM_ARRAY_LEN(varlist, old_paramlist_len + num_lets);
         }
     }
 
