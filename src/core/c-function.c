@@ -1009,11 +1009,12 @@ REBACT *Make_Action(
         REBVAL *dest = SER_AT(REBVAL, varlist, 1);
         for (; NOT_END(src); ++src, ++dest) {
             assert(HEART_BYTE(src) == REB_TYPESET);
-           /* Move_Value(dest, src);
-            VAL_TYPESET_STRING_NODE(dest) = nullptr; */
-            Init_Void(dest, SYM_UNSET);  // !!! starting out...
-            if (Is_Param_Hidden(src, src))
+            if (Is_Param_Hidden(src, src)) {
+                Init_Void(dest, SYM_UNSET);
                 SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
+            }
+            else
+                Move_Value(dest, src);
         }
         TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));
         INIT_LINK_KEYSOURCE(varlist, NOD(paramlist));

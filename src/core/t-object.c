@@ -679,7 +679,11 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
         Append_Ascii(s, ": ");
 
-        if (IS_NULLED(var))
+        if (IS_PARAM(var)) {  // !!! Review how to handle molding exemplars
+            assert(CELL_KIND(v) == REB_FRAME);
+            Append_Ascii(s, "'~unset~");  // !!! Review: mold an UNSET_VALUE?
+        }
+        else if (IS_NULLED(var))
             Append_Ascii(s, "'");  // `field: '` would evaluate to null
         else {
             if (IS_VOID(var) or not ANY_INERT(var))  // needs quoting

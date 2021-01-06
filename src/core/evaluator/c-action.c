@@ -243,6 +243,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             goto continue_fulfilling;
         }
 
+        assert(IS_PARAM(f->special));
+
   //=//// CHECK FOR ORDER OVERRIDE ////////////////////////////////////////=//
 
         // Parameters are fulfilled in either 1 or 2 passes, depending on
@@ -295,11 +297,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// A /REFINEMENT ARG ///////////////////////////////////////////////=//
 
-        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
+        if (TYPE_CHECK(f->special, REB_TS_REFINEMENT)) {
             assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));  // jump lower
-
-            assert(Is_Void_With_Sym(f->special, SYM_UNSET));
-
             Init_Nulled(f->arg);  // null means refinement not used
             goto continue_fulfilling;
         }

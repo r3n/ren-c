@@ -120,9 +120,6 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         VAL_ACTION_BINDING(action)
     );
 
-    const REBVAL *param = ACT_PARAMS_HEAD(act);
-    REBVAL *arg = SPECIFIC(rootvar) + 1;
-
     // If there is a PARTIALS list, then push its refinements.
     //
     REBARR *specialty = ACT_SPECIALTY(act);
@@ -132,23 +129,20 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             Move_Value(DS_PUSH(), word);
     }
 
-    const REBVAL *special = ACT_SPECIALTY_HEAD(act);  // of exemplar/paramlist
-
-    REBLEN index = 1; // used to bind REFINEMENT! values to parameter slots
-
     REBCTX *exemplar = ACT_EXEMPLAR(act);
-    assert(special == CTX_VARS_HEAD(exemplar));
+
+    const REBVAL *param = CTX_KEYS_HEAD(exemplar);
+    const REBVAL *special = CTX_VARS_HEAD(exemplar);
+
+    REBVAL *arg = SPECIFIC(rootvar) + 1;
+
+    REBLEN index = 1;  // used to bind REFINEMENT! values to parameter slots
 
     for (; NOT_END(param); ++param, ++arg, ++special, ++index) {
         Prep_Cell(arg);
 
         if (Is_Param_Hidden(param, special)) {  // local or specialized
-            if (param == special) {  // no prior exemplar
-                Init_Void(arg, SYM_UNSET);
-                SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
-            }
-            else
-                Blit_Specific(arg, special);  // preserve ARG_MARKED_CHECKED
+            Blit_Specific(arg, special);  // preserve ARG_MARKED_CHECKED
 
           continue_specialized:
 
@@ -177,11 +171,6 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         // a full new exemplar is generated for parameterless refinements
         // which seems expensive for the likes of :append/only, when we
         // can make :append/dup more compactly.  Rethink.
-
-        assert(
-            (special == param and IS_PARAM(special))
-            or Is_Void_With_Sym(special, SYM_UNSET)
-        );
 
         // Check the passed-in refinements on the stack for usage.
         //
@@ -327,20 +316,19 @@ bool Specialize_Action_Throws(
     REBARR *paramlist = ACT_PARAMLIST(unspecialized);
 
     const RELVAL *param = ARR_AT(paramlist, 1);
+    const REBVAL *special = ACT_SPECIALTY_HEAD(unspecialized);
+
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
 
     REBDSP ordered_dsp = lowest_ordered_dsp;
 
-    for (; NOT_END(param); ++param, ++arg) {
+    for (; NOT_END(param); ++param, ++arg, ++special) {
         //
-        // Note: We don't want to immediately accept the ARG_MARKED_CHECKED as
-        // hidden and done, because if the parameter wasn't hidden at the
-        // outset it hasn't been typechecked yet.
-        //
-        // !!! Should PROTECT/HIDE do the type checking at the PROTECT if it
-        // detects the field is in a FRAME!?
+        // Note: We check ARG_MARKED_CHECKED on `special` from the *original*
+        // varlist...as the user may have used PROTECT/HIDE to force `arg`
+        // to be hidden and still needs a typecheck here.
 
-        if (Is_Param_Hidden(param, param))  // ^-- note why special = param
+        if (Is_Param_Hidden(param, special))
             continue;
 
         if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
@@ -377,6 +365,8 @@ bool Specialize_Action_Throws(
 
         assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
         assert(Is_Void_With_Sym(arg, SYM_UNSET));
+        assert(IS_PARAM(special));
+        Move_Value(arg, special);
         continue;
 
       specialized_arg_with_check:
@@ -433,7 +423,7 @@ bool Specialize_Action_Throws(
 
             REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
             if (NOT_CELL_FLAG(slot, ARG_MARKED_CHECKED)) {
-                assert(Is_Void_With_Sym(slot, SYM_UNSET));
+                assert(IS_PARAM(slot));
 
                 // It's still partial...
                 //
@@ -444,7 +434,6 @@ bool Specialize_Action_Throws(
                     VAL_WORD_INDEX(ordered)
                 );
             }
-            assert(not IS_NULLED(slot));
         }
         DS_DROP_TO(lowest_ordered_dsp);
 
@@ -944,21 +933,27 @@ REBACT *Alloc_Action_From_Exemplar(
     REBACT *unspecialized = CTX_FRAME_ACTION(exemplar);
 
     REBVAL *param = ACT_PARAMS_HEAD(unspecialized);
+    const REBVAL *special = ACT_SPECIALTY_HEAD(unspecialized);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
-    for (; NOT_END(param); ++param, ++arg) {
-        if (GET_CELL_FLAG(arg, ARG_MARKED_CHECKED))
+    for (; NOT_END(param); ++param, ++arg, ++special) {
+        if (Is_Param_Hidden(param, special))
             continue;
 
-        assert(not Is_Param_Hidden(param, param));  // param = special
-
-        // We leave non-hidden ~unset~ as-is to be handled by the evaluator
-        // as unspecialized:
+        // We leave non-hidden ~unset~ to be handled by the evaluator as
+        // unspecialized (which means putting it back to the parameter
+        // description info, e.g. the typeset for now):
         //
         // https://forum.rebol.info/t/default-values-and-make-frame/1412
         // https://forum.rebol.info/t/1413
         //
-        if (Is_Void_With_Sym(arg, SYM_UNSET))
+        if (
+            Is_Void_With_Sym(arg, SYM_UNSET)
+            and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
+        ){
+            assert(IS_PARAM(special));
+            Move_Value(arg, special);
             continue;
+        }
 
         if (TYPE_CHECK(param, REB_TS_REFINEMENT))
             Typecheck_Refinement(param, arg);

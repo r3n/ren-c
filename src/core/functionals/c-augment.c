@@ -123,6 +123,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     // For each parameter in the original function, we push a corresponding
     // "triad".
     //
+  blockscope {
     REBVAL *param = ACT_PARAMS_HEAD(augmentee);
     for (; NOT_END(param); ++param) {
         Move_Value(DS_PUSH(), param);
@@ -131,6 +132,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         Move_Value(DS_PUSH(), EMPTY_BLOCK);
         Move_Value(DS_PUSH(), EMPTY_TEXT);
     }
+  }
 
     // Now we reuse the spec analysis logic, which pushes more parameters to
     // the stack.  This may add duplicates--which will be detected when we
@@ -182,14 +184,15 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     varlist->info.bits = old_varlist->info.bits;
     INIT_VAL_CONTEXT_VARLIST(ARR_HEAD(varlist), varlist);
 
-    // We fill in the added parameters in the specialization as undefined
-    // starters.  This is considered to be "unspecialized".
+    // We fill in the added parameters in the specialization as the params
+    // for starters.  This is considered to be "unspecialized".
     //
     blockscope {
+        REBVAL *param = SER_AT(REBVAL, paramlist, old_len);
         RELVAL *temp = ARR_AT(varlist, old_len);
         REBLEN i;
         for (i = 0; i < delta; ++i) {
-            Init_Void(temp, SYM_UNSET);
+            Move_Value(temp, param);
             temp = temp + 1;
         }
         TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));

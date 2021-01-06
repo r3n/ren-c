@@ -275,9 +275,8 @@ REBNATIVE(reframer_p)
     // which parameter to fill with the *real* frame instance.
     //
     Manage_Series(CTX_VARLIST(exemplar));
-    REBACT *reframer = Make_Action(
-        CTX_VARLIST(exemplar),  // shim minus the frame argument
-        nullptr,  // meta inherited by REFRAMER helper to REFRAMER*
+    REBACT *reframer = Alloc_Action_From_Exemplar(
+        exemplar,  // shim minus the frame argument
         &Reframer_Dispatcher,
         IDX_REFRAMER_MAX  // details array capacity => [shim, param_index]
     );
