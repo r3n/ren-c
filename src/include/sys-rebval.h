@@ -662,3 +662,8 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     inline static const REBVAL* VAL(const void *p)
       { return cast(const REBVAL*, p); }
 #endif
+
+
+//=//// KEYS AND VARS /////////////////////////////////////////////////////=//
+
+struct REBKEY : public REBVAL {};  // !!! TBD: REBSYM(*)

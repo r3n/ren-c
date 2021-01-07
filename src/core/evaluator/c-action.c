@@ -212,7 +212,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
-            f->param = END_NODE;  // don't need f->param in paramlist
+            f->param = cast(const REBKEY*, END_NODE);  // don't need f->param
             goto fulfill_and_any_pickups_done;
         }
         continue;
@@ -752,7 +752,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
-            f->param = END_NODE;  // don't need f->param in paramlist
+            f->param = cast(const REBKEY*, END_NODE);  // don't need f->param
             goto fulfill_and_any_pickups_done;
         }
 

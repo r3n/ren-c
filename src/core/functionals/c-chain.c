@@ -77,7 +77,7 @@ REBFRM *Push_Downshifted_Frame(REBVAL *out, REBFRM *f) {
     SET_SERIES_INFO(f->varlist, INACCESSIBLE);
     f->rootvar = nullptr;
 
-    sub->param = END_NODE;
+    sub->param = cast(const REBKEY*, END_NODE);
     sub->arg = sub->rootvar + 1;  // !!! enforced by entering Process_Action()
     sub->special = END_NODE;
 

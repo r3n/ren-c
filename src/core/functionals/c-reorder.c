@@ -117,13 +117,13 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     INIT_BINDER(&binder);
 
   blockscope {
-    const REBVAL *param = ACT_PARAMS_HEAD(reorderee);
+    const REBKEY *key = ACT_PARAMS_HEAD(reorderee);
     REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
     REBLEN index = 1;
-    for (; NOT_END(param); ++param, ++special, ++index) {
+    for (; NOT_END(key); ++key, ++special, ++index) {
         if (Is_Param_Hidden(special))
             continue;
-        Add_Binder_Index(&binder, VAL_KEY_SPELLING(param), index);
+        Add_Binder_Index(&binder, VAL_KEY_SPELLING(key), index);
     }
   }
 
@@ -197,14 +197,14 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     // ordering list.
 
   cleanup_binder: {
-    const REBVAL *param = ACT_PARAMS_HEAD(reorderee);
+    const REBKEY *key = ACT_PARAMS_HEAD(reorderee);
     REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
     REBLEN index = 1;
-    for (; NOT_END(param); ++param, ++special, ++index) {
+    for (; NOT_END(key); ++key, ++special, ++index) {
         if (Is_Param_Hidden(special))
             continue;
 
-        const REBSTR *spelling = VAL_KEY_SPELLING(param);
+        const REBSTR *spelling = VAL_KEY_SPELLING(key);
 
         // If we saw the parameter, we removed its index from the binder.
         //
@@ -213,9 +213,9 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
         if (
             error == nullptr  // don't report an error here if one is pending
             and not mentioned
-            and not TYPE_CHECK(param, REB_TS_REFINEMENT)  // okay to leave out
+            and not TYPE_CHECK(special, REB_TS_REFINEMENT)  // okay to leave out
         ){
-            error = Error_No_Arg(label, VAL_KEY_SPELLING(param));
+            error = Error_No_Arg(label, VAL_KEY_SPELLING(key));
         }
     }
   }

@@ -214,7 +214,7 @@ REBNATIVE(reskinned)
 
     bool need_skin_phase = false;  // only needed if types were broadened
 
-    const REBVAL *key = nullptr;  // !!! TBD, rethink all of this
+    const REBKEY *key = nullptr;  // !!! TBD, rethink all of this
     REBVAL *param = SER_AT(REBVAL, paramlist, 1);
     const RELVAL *item = VAL_ARRAY_AT(ARG(skin));
     Reb_Param_Class pclass;

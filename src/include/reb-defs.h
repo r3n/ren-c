@@ -399,29 +399,6 @@ typedef struct rebol_mold REB_MOLD;
 typedef void (MOLD_HOOK)(REB_MOLD *mo, REBCEL(const*) v, bool form);
 
 
-//=//// PARAMETER ENUMERATION /////////////////////////////////////////////=//
-//
-// Parameter lists of composed/derived functions still must have compatible
-// frames with their underlying C code.  This makes parameter enumeration of
-// a derived function a 2-pass process that is a bit tricky.
-//
-// !!! Due to a current limitation of the prototype scanner, a function type
-// can't be used directly in a function definition and have it be picked up
-// for %tmp-internals.h, it has to be a typedef.
-//
-typedef enum {
-    PHF_UNREFINED = 1 << 0,  // a /refinement that takes an arg, made "normal"
-    PHF_DEMODALIZED = 1 << 1  // an @param with its refinement specialized out
-} Reb_Param_Hook_Flags;
-#define PHF_MASK_NONE 0
-typedef bool (PARAM_HOOK)(
-    const REBVAL *param,
-    REBVAL *special,
-    REBFLGS flags,
-    void *opaque
-);
-
-
 // These definitions are needed in %sys-rebval.h, and can't be put in
 // %sys-rebact.h because that depends on Reb_Array, which depends on
 // Reb_Series, which depends on values... :-/

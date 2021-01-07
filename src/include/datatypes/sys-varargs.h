@@ -193,7 +193,7 @@ inline static bool Is_Frame_Style_Varargs_May_Fail(
 
 
 inline static const REBVAL *Param_For_Varargs_Maybe_Null(
-    const REBVAL **key,
+    const REBKEY **key,
     REBCEL(const*) v
 ){
     assert(CELL_KIND(v) == REB_VARARGS);

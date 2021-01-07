@@ -1056,7 +1056,7 @@ REBCTX *Error_No_Relative_Core(REBCEL(const*) any_word)
 //
 REBCTX *Error_Not_Varargs(
     REBFRM *f,
-    const REBVAL *key,
+    const REBKEY *key,
     const REBVAL *param,
     enum Reb_Kind kind
 ){
@@ -1074,8 +1074,9 @@ REBCTX *Error_Not_Varargs(
         VAL_KEY_SPELLING(key),
         FLAGIT_KIND(REB_VARARGS) // actually expected
     );
+    UNUSED(honest_param);  // !!! pass to Error_Arg_Type(?)
 
-    return Error_Arg_Type(f, honest_param, kind);
+    return Error_Arg_Type(f, key, kind);
 }
 
 
@@ -1221,7 +1222,7 @@ REBCTX *Error_Out_Of_Range(const REBVAL *arg)
 //
 //  Error_Protected_Key: C
 //
-REBCTX *Error_Protected_Key(const REBVAL *key)
+REBCTX *Error_Protected_Key(const REBKEY *key)
 {
     DECLARE_LOCAL (key_name);
     Init_Word(key_name, VAL_KEY_SPELLING(key));
@@ -1263,7 +1264,7 @@ REBCTX *Error_Unexpected_Type(enum Reb_Kind expected, enum Reb_Kind actual)
 //
 REBCTX *Error_Arg_Type(
     REBFRM *f,
-    const REBVAL *key,
+    const REBKEY *key,
     enum Reb_Kind actual
 ){
     DECLARE_LOCAL (param_word);

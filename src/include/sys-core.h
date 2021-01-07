@@ -199,6 +199,30 @@
 //
 #include "sys-scan.h"
 
+// !!! There should probably be "sys-hooks.h" or something like that
+//
+//=//// PARAMETER ENUMERATION /////////////////////////////////////////////=//
+//
+// Parameter lists of composed/derived functions still must have compatible
+// frames with their underlying C code.  This makes parameter enumeration of
+// a derived function a 2-pass process that is a bit tricky.
+//
+// !!! Due to a current limitation of the prototype scanner, a function type
+// can't be used directly in a function definition and have it be picked up
+// for %tmp-internals.h, it has to be a typedef.
+//
+typedef enum {
+    PHF_UNREFINED = 1 << 0,  // a /refinement that takes an arg, made "normal"
+    PHF_DEMODALIZED = 1 << 1  // an @param with its refinement specialized out
+} Reb_Param_Hook_Flags;
+#define PHF_MASK_NONE 0
+typedef bool (PARAM_HOOK)(
+    const REBKEY *key,
+    REBVAL *special,
+    REBFLGS flags,
+    void *opaque
+);
+
 
 //=////////////////////////////////////////////////////////////////////////=//
 //

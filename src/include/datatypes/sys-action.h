@@ -239,7 +239,7 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 }
 
 #define ACT_PARAMS_HEAD(a) \
-    (cast(const REBVAL*, ACT_PARAMLIST(a)->content.dynamic.data) + 1)
+    (cast(const REBKEY*, ACT_PARAMLIST(a)->content.dynamic.data) + 1)
 
 
 
@@ -267,14 +267,13 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 //
 // https://forum.rebol.info/t/1002
 //
-struct REBKEY : public REBVAL {};  // !!! TBD: REBSYM(*)
 #define IS_KEY IS_WORD
 
-inline static const REBSTR *VAL_KEY_SPELLING(const REBVAL *key) {
+inline static const REBSTR *VAL_KEY_SPELLING(const REBKEY *key) {
     return VAL_WORD_SPELLING(key);
 }
 
-inline static const REBSTR *VAL_KEY_SPELLING(REBVAL *key) = delete;
+inline static const REBSTR *VAL_KEY_SPELLING(REBKEY *key) = delete;
 
 #define VAL_KEY_SYM VAL_WORD_SYM
 #define Init_Key Init_Word

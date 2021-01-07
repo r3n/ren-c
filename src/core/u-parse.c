@@ -260,7 +260,7 @@ static bool Subparse_Throws(
 
     Begin_Prefix_Action(f, Canon(SYM_SUBPARSE));
 
-    f->param = END_NODE;  // informs infix lookahead
+    f->param = cast(const REBKEY*, END_NODE);  // informs infix lookahead
     f->arg = m_cast(REBVAL*, END_NODE);
     f->special = END_NODE;
 

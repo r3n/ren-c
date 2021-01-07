@@ -100,7 +100,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
     REBLEN len = CTX_LEN(c) + 1;
     Expand_Context(c, ARR_LEN(BUF_COLLECT) - len);
 
-    const REBVAL *collect_key = SER_AT(const REBVAL, BUF_COLLECT, len);
+    const REBKEY *collect_key = SER_AT(const REBKEY, BUF_COLLECT, len);
     for (; NOT_END(collect_key); ++collect_key)
         Append_Context(c, nullptr, VAL_KEY_SPELLING(collect_key));
   }
@@ -112,7 +112,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
         );
         assert(i != 0);
 
-        const REBVAL *key = CTX_KEY(c, i);
+        const REBKEY *key = CTX_KEY(c, i);
         REBVAL *var = CTX_VAR(c, i);
 
         if (GET_CELL_FLAG(var, PROTECTED)) {
@@ -161,8 +161,8 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // fields of objects do not figure into the `equal?` of their public
     // portions.
 
-    const REBVAL *key1 = CTX_KEYS_HEAD(c1);
-    const REBVAL *key2 = CTX_KEYS_HEAD(c2);
+    const REBKEY *key1 = CTX_KEYS_HEAD(c1);
+    const REBKEY *key2 = CTX_KEYS_HEAD(c2);
     const REBVAL *var1 = CTX_VARS_HEAD(c1);
     const REBVAL *var2 = CTX_VARS_HEAD(c2);
 
@@ -630,7 +630,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         //
         // Mold all words and their values ("key: <molded value>")
         //
-        const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(v);
+        const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(v);
         REBVAL *var = CTX_VARS_HEAD(c);
         bool had_output = false;
         for (; NOT_END(key); key++, var++) {
@@ -663,7 +663,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     mo->indent++;
 
-    const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(v);
+    const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(v);
     REBVAL *var = CTX_VARS_HEAD(VAL_CONTEXT(v));
 
     for (; NOT_END(key); ++key, ++var) {

@@ -795,7 +795,7 @@ REBNATIVE(applique)
 
     // Reset all the binder indices to zero, balancing out what was added.
     //
-    const REBVAL *key = CTX_KEYS_HEAD(exemplar);
+    const REBKEY *key = CTX_KEYS_HEAD(exemplar);
     REBVAL *var = CTX_VARS_HEAD(exemplar);
     for (; NOT_END(key); key++, ++var) {
         if (Is_Param_Hidden(var))

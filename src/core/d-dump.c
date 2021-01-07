@@ -131,18 +131,18 @@ void Dump_Stack(REBFRM *f, REBLEN level)
 
     REBINT n = 1;
     REBVAL *arg = FRM_ARG(f, 1);
-    const REBVAL *param = ACT_PARAMS_HEAD(FRM_PHASE(f));
+    const REBKEY *key = ACT_PARAMS_HEAD(FRM_PHASE(f));
 
-    for (; NOT_END(param); ++param, ++arg, ++n) {
+    for (; NOT_END(key); ++key, ++arg, ++n) {
         if (IS_NULLED(arg))
             printf(
                 "    %s:\n",
-                STR_UTF8(VAL_KEY_SPELLING(param))
+                STR_UTF8(VAL_KEY_SPELLING(key))
             );
         else
             printf(
                 "    %s: %p\n",
-                STR_UTF8(VAL_KEY_SPELLING(param)),
+                STR_UTF8(VAL_KEY_SPELLING(key)),
                 cast(void*, arg)
             );
     }

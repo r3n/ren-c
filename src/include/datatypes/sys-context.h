@@ -264,7 +264,7 @@ inline static REBLEN CTX_LEN(REBCTX *c) {
     VAL_TYPE(CTX_ARCHETYPE(c))
 
 #define CTX_KEYS_HEAD(c) \
-    SER_AT(REBVAL, CTX_KEYLIST(c), 1)  // 1-based, no RELVAL*
+    SER_AT(REBKEY, CTX_KEYLIST(c), 1)  // 1-based, no RELVAL*
 
 #define CTX_VARS_HEAD(c) \
     SER_AT(REBVAL, CTX_VARLIST(c), 1)
@@ -445,7 +445,7 @@ inline static void INIT_VAL_FRAME_LABEL(
 // visible for that phase of execution and which aren't.
 //
 
-inline static const REBVAL *VAL_CONTEXT_KEYS_HEAD(REBCEL(const*) context)
+inline static const REBKEY *VAL_CONTEXT_KEYS_HEAD(REBCEL(const*) context)
 {
     if (CELL_KIND(context) != REB_FRAME)
         return CTX_KEYS_HEAD(VAL_CONTEXT(context));

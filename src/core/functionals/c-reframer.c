@@ -201,7 +201,7 @@ REBNATIVE(reframer_p)
     }
 
   blockscope {
-    const REBVAL *key;
+    const REBKEY *key;
     REBVAL *param;
     
     if (REF(parameter)) {
@@ -242,13 +242,13 @@ REBNATIVE(reframer_p)
   }
 
   cleanup_binder: {
-    const REBVAL *param = ACT_PARAMS_HEAD(shim);
+    const REBKEY *key = ACT_PARAMS_HEAD(shim);
     REBVAL *special = ACT_SPECIALTY_HEAD(shim);
-    for (; NOT_END(param); ++param, ++special) {
+    for (; NOT_END(key); ++key, ++special) {
         if (Is_Param_Hidden(special))
             continue;
 
-        const REBSTR *spelling = VAL_KEY_SPELLING(param);
+        const REBSTR *spelling = VAL_KEY_SPELLING(key);
         REBLEN index = Remove_Binder_Index_Else_0(&binder, spelling);
         assert(index != 0);
         UNUSED(index);

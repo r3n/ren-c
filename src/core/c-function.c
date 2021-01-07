@@ -35,14 +35,14 @@ struct Params_Of_State {
 // !!! See notes on Is_Param_Hidden() for why caller isn't filtering locals.
 //
 static bool Params_Of_Hook(
-    const REBVAL *param,
+    const REBKEY *key,
     REBVAL *special,
     REBFLGS flags,
     void *opaque
 ){
     struct Params_Of_State *s = cast(struct Params_Of_State*, opaque);
 
-    Init_Word(DS_PUSH(), VAL_KEY_SPELLING(param));
+    Init_Word(DS_PUSH(), VAL_KEY_SPELLING(key));
 
     if (not s->just_words) {
         if (
@@ -103,12 +103,12 @@ REBARR *Make_Action_Parameters_Arr(REBACT *act, bool just_words)
 
 
 static bool Typesets_Of_Hook(
-    const REBVAL *param,
+    const REBKEY *key,
     REBVAL *special,
     REBFLGS flags,
     void *opaque
 ){
-    UNUSED(param);
+    UNUSED(key);
     UNUSED(opaque);
     UNUSED(flags);
 
@@ -951,12 +951,12 @@ REBARR *Make_Paramlist_Managed_May_Fail(
 //
 REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
 {
-    const REBVAL *param = SER_AT(const REBVAL, paramlist, 1);
+    const REBKEY *key = SER_AT(const REBKEY, paramlist, 1);
     REBLEN len = ARR_LEN(paramlist);
 
     REBLEN n;
-    for (n = 1; n < len; ++n, ++param) {
-        if (spelling == VAL_KEY_SPELLING(param))
+    for (n = 1; n < len; ++n, ++key) {
+        if (spelling == VAL_KEY_SPELLING(key))
             return n;
     }
 
