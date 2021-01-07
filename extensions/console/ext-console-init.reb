@@ -154,7 +154,7 @@ console!: make object! [
         else [
             ; print the first 20 lines of the first 2048 characters of mold
             ;
-            pos: molded: mold/limit :v 2048
+            pos: molded: mold/limit get 'v 2048
             loop 20 [
                 pos: next (find pos newline else [break])
             ] then [  ; e.g. didn't break

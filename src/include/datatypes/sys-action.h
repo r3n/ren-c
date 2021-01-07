@@ -303,8 +303,8 @@ inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
 // the words, you get the currently executing label instead...which may
 // actually make more sense.
 
-inline static const REBSTR *VAL_ACTION_LABEL(const RELVAL *v) {
-    assert(IS_ACTION(v));
+inline static const REBSTR *VAL_ACTION_LABEL(REBCEL(const *) v) {
+    assert(CELL_HEART(v) == REB_ACTION);
     REBSER *s = SER(VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v));
     if (IS_SER_ARRAY(s))
         return ANONYMOUS;  // archetype (e.g. may live in paramlist[0] itself)

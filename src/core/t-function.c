@@ -158,9 +158,14 @@ void MF_Action(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
-    Pre_Mold(mo, v);
+    Append_Ascii(mo->series, "#[action! ");
 
-    Append_Codepoint(mo->series, '[');
+    option(const REBSTR*) label = VAL_ACTION_LABEL(v);
+    if (label) {
+        Append_Codepoint(mo->series, '{');
+        Append_Spelling(mo->series, unwrap(label));
+        Append_Ascii(mo->series, "} ");
+    }
 
     // !!! The system is no longer keeping the spec of functions, in order
     // to focus on a generalized "meta info object" service.  MOLD of
@@ -174,10 +179,9 @@ void MF_Action(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     // !!! Previously, ACTION! would mold the body out.  This created a large
     // amount of output, and also many function variations do not have
-    // ordinary "bodies".  Review if Get_Maybe_Fake_Action_Body() should be
-    // used for this case.
-    //
-    Append_Ascii(mo->series, " [...]");
+    // ordinary "bodies".  It's more useful to show the cached name, and maybe
+    // some base64 encoding of a UUID (?)  In the meantime, having the label
+    // of the last word used is actually a lot more useful than most things.
 
     Append_Codepoint(mo->series, ']');
     End_Mold(mo);
