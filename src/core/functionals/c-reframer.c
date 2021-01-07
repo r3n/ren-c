@@ -201,7 +201,7 @@ REBNATIVE(reframer_p)
     }
 
   blockscope {
-    REBVAL *key;
+    const REBVAL *key;
     REBVAL *param;
     
     if (REF(parameter)) {
@@ -230,7 +230,7 @@ REBNATIVE(reframer_p)
             Init_Blank(label_word);
 
         DECLARE_LOCAL (param_word);
-        Init_Word(param_word, VAL_KEY_SPELLING(param));
+        Init_Word(param_word, VAL_KEY_SPELLING(key));
 
         error = Error_Expect_Arg_Raw(
             label_word,
@@ -242,7 +242,7 @@ REBNATIVE(reframer_p)
   }
 
   cleanup_binder: {
-    REBVAL *param = ACT_PARAMS_HEAD(shim);
+    const REBVAL *param = ACT_PARAMS_HEAD(shim);
     REBVAL *special = ACT_SPECIALTY_HEAD(shim);
     for (; NOT_END(param); ++param, ++special) {
         if (Is_Param_Hidden(special))

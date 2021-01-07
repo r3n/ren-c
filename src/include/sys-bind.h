@@ -651,7 +651,7 @@ inline static option(REBCTX*) Get_Word_Context(
             REBLEN cached_len = VAL_WORD_INDEX(ARR_SINGLE(ARR(specifier)));
 
             REBLEN index = 1;
-            REBVAL *key = CTX_KEYS_HEAD(overload);
+            const REBVAL *key = CTX_KEYS_HEAD(overload);
             for (; index <= cached_len; ++key, ++index) {
                 if (VAL_KEY_SPELLING(key) != spelling)
                     continue;

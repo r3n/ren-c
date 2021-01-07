@@ -142,7 +142,8 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
 ){
     TRASH_CELL_IF_DEBUG(out);
 
-    const RELVAL *param = Param_For_Varargs_Maybe_Null(vararg);
+    const REBVAL *key;
+    const RELVAL *param = Param_For_Varargs_Maybe_Null(&key, vararg);
     if (pclass == REB_P_DETECT)
         pclass = VAL_PARAM_CLASS(param);
 
@@ -339,7 +340,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         if (not vararg_frame)
             fail (out);
 
-        fail (Error_Arg_Type(unwrap(vararg_frame), param, VAL_TYPE(out)));
+        fail (Error_Arg_Type(unwrap(vararg_frame), key, VAL_TYPE(out)));
     }
 
     if (arg) {
@@ -582,7 +583,8 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     Append_Codepoint(mo->series, '[');
 
     Reb_Param_Class pclass;
-    const RELVAL *param = Param_For_Varargs_Maybe_Null(v);
+    const REBVAL *key;
+    const RELVAL *param = Param_For_Varargs_Maybe_Null(&key, v);
     if (param == NULL) {
         pclass = REB_P_HARD;
         Append_Ascii(mo->series, "???"); // never bound to an argument
@@ -614,7 +616,7 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
         };
 
         DECLARE_LOCAL (param_word);
-        Init_Any_Word(param_word, kind, VAL_KEY_SPELLING(param));
+        Init_Any_Word(param_word, kind, VAL_KEY_SPELLING(key));
         if (quoted)
             Quotify(param_word, 1);
         Mold_Value(mo, param_word);
@@ -671,7 +673,7 @@ REBNATIVE(variadic_q)
 {
     INCLUDE_PARAMS_OF_VARIADIC_Q;
 
-    REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(ARG(action)));
+    REBVAL *param = ACT_SPECIALTY_HEAD(VAL_ACTION(ARG(action)));
     for (; NOT_END(param); ++param) {
         if (Is_Param_Variadic(param))
             return Init_True(D_OUT);

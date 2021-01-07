@@ -263,27 +263,13 @@ inline static REBLEN CTX_LEN(REBCTX *c) {
 #define CTX_TYPE(c) \
     VAL_TYPE(CTX_ARCHETYPE(c))
 
-// Context keys and action parameters use a compatible representation (this
-// enables using action paramlists as FRAME! context keylists).
-//
-// !!! An API for hinting types in FRAME! contexts could be useful, if that
-// was then used to make an ACTION! out of it...which is a conceptual idea
-// for the "real way to make actions":
-//
-// https://forum.rebol.info/t/1002
-//
-#define IS_KEY IS_WORD
-#define VAL_KEY_SPELLING VAL_WORD_SPELLING
-#define VAL_KEY_SYM VAL_WORD_SYM
-#define Init_Key Init_Word
-
 #define CTX_KEYS_HEAD(c) \
     SER_AT(REBVAL, CTX_KEYLIST(c), 1)  // 1-based, no RELVAL*
 
 #define CTX_VARS_HEAD(c) \
     SER_AT(REBVAL, CTX_VARLIST(c), 1)
 
-inline static REBVAL *CTX_KEY(REBCTX *c, REBLEN n) {
+inline static const REBKEY *CTX_KEY(REBCTX *c, REBLEN n) {
     //
     // !!! Inaccessible contexts have to retain their keylists, at least
     // until all words bound to them have been adjusted somehow, because the
@@ -292,7 +278,7 @@ inline static REBVAL *CTX_KEY(REBCTX *c, REBLEN n) {
     /* assert(NOT_SERIES_INFO(c, INACCESSIBLE)); */
 
     assert(n != 0 and n <= CTX_LEN(c));
-    return cast(REBVAL*, CTX_KEYLIST(c)->content.dynamic.data) + n;
+    return cast(const REBKEY*, CTX_KEYLIST(c)->content.dynamic.data) + n;
 }
 
 inline static REBVAL *CTX_VAR(REBCTX *c, REBLEN n) {  // 1-based, no RELVAL*
@@ -459,7 +445,7 @@ inline static void INIT_VAL_FRAME_LABEL(
 // visible for that phase of execution and which aren't.
 //
 
-inline static REBVAL *VAL_CONTEXT_KEYS_HEAD(REBCEL(const*) context)
+inline static const REBVAL *VAL_CONTEXT_KEYS_HEAD(REBCEL(const*) context)
 {
     if (CELL_KIND(context) != REB_FRAME)
         return CTX_KEYS_HEAD(VAL_CONTEXT(context));

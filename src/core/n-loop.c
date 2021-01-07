@@ -445,7 +445,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
               case REB_FRAME: {
                 REBCTX *c = VAL_CONTEXT(les->data);
 
-                REBVAL *key;
+                const REBVAL *key;
                 REBVAL *val;
                 REBLEN bind_index;
                 while (true) {  // find next non-hidden key (if any)

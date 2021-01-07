@@ -907,7 +907,7 @@ inline static void Drop_Action(REBFRM *f) {
     FRM_ARG(frame_, (p_##name##_))
 
 #define PAR(name) \
-    ACT_PARAM(FRM_PHASE(frame_), (p_##name##_))  // a REB_P_XXX pseudovalue
+    ACT_SPECIAL(FRM_PHASE(frame_), (p_##name##_))  // a REB_P_XXX pseudovalue
 
 #define REF(name) \
     NULLIFY_NULLED(ARG(name))
@@ -950,8 +950,8 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
 //
 inline static void FAIL_IF_BAD_RETURN_TYPE(REBFRM *f) {
     REBACT *phase = FRM_PHASE(f);
-    REBVAL *typeset = ACT_PARAMS_HEAD(phase);
-    assert(VAL_KEY_SYM(typeset) == SYM_RETURN);
+    REBVAL *typeset = ACT_SPECIALTY_HEAD(phase);
+    assert(VAL_KEY_SYM(ACT_PARAMS_HEAD(phase)) == SYM_RETURN);
 
     // Typeset bits for locals in frames are usually ignored, but the RETURN:
     // local uses them for the return types of a function.
@@ -962,8 +962,8 @@ inline static void FAIL_IF_BAD_RETURN_TYPE(REBFRM *f) {
 
 inline static void FAIL_IF_NO_INVISIBLE_RETURN(REBFRM *f) {
     REBACT *phase = FRM_PHASE(f);
-    REBVAL *typeset = ACT_PARAMS_HEAD(phase);
-    assert(VAL_KEY_SYM(typeset) == SYM_RETURN);
+    REBVAL *typeset = ACT_SPECIALTY_HEAD(phase);
+    assert(VAL_KEY_SYM(ACT_PARAMS_HEAD(phase)) == SYM_RETURN);
 
     if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE))
         fail (Error_Bad_Invisible(f));

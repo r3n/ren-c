@@ -822,7 +822,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // Actual argument must be a VARARGS!
             //
             if (not IS_VARARGS(f->arg))
-                fail (Error_Not_Varargs(f, f->param, VAL_TYPE(f->arg)));
+                fail (Error_Not_Varargs(f, f->param, f->special, VAL_TYPE(f->arg)));
 
             VAL_VARARGS_PHASE_NODE(f->arg) = NOD(FRM_PHASE(f));
 

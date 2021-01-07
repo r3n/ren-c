@@ -100,7 +100,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
     REBLEN len = CTX_LEN(c) + 1;
     Expand_Context(c, ARR_LEN(BUF_COLLECT) - len);
 
-    RELVAL *collect_key = ARR_AT(BUF_COLLECT, len);
+    const REBVAL *collect_key = SER_AT(const REBVAL, BUF_COLLECT, len);
     for (; NOT_END(collect_key); ++collect_key)
         Append_Context(c, nullptr, VAL_KEY_SPELLING(collect_key));
   }
@@ -112,7 +112,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
         );
         assert(i != 0);
 
-        REBVAL *key = CTX_KEY(c, i);
+        const REBVAL *key = CTX_KEY(c, i);
         REBVAL *var = CTX_VAR(c, i);
 
         if (GET_CELL_FLAG(var, PROTECTED)) {
@@ -630,11 +630,11 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         //
         // Mold all words and their values ("key: <molded value>")
         //
-        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(v);
+        const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(v);
         REBVAL *var = CTX_VARS_HEAD(c);
         bool had_output = false;
         for (; NOT_END(key); key++, var++) {
-            if (Is_Param_Sealed(key))
+            if (Is_Param_Sealed(var))
                 continue;
             if (honor_hidden and Is_Param_Hidden(var))
                 continue;
@@ -663,11 +663,11 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     mo->indent++;
 
-    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(v);
+    const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(v);
     REBVAL *var = CTX_VARS_HEAD(VAL_CONTEXT(v));
 
     for (; NOT_END(key); ++key, ++var) {
-        if (Is_Param_Sealed(key))
+        if (Is_Param_Sealed(var))
             continue;
         if (honor_hidden and Is_Param_Hidden(var))
             continue;

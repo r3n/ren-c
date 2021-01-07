@@ -762,7 +762,7 @@ const void *RL_rebArgR(unsigned char quotes, const void *p, va_list *vaptr)
 
     const REBSTR *spelling = Intern_UTF8_Managed(cb_cast(name), strsize(name));
 
-    REBVAL *param = ACT_PARAMS_HEAD(act);
+    const REBVAL *param = ACT_PARAMS_HEAD(act);
     REBVAL *arg = FRM_ARGS_HEAD(f);
     for (; NOT_END(param); ++param, ++arg) {
         if (SAME_STR(VAL_KEY_SPELLING(param), spelling))

@@ -239,7 +239,7 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 }
 
 #define ACT_PARAMS_HEAD(a) \
-    (cast(REBVAL*, ACT_PARAMLIST(a)->content.dynamic.data) + 1)
+    (cast(const REBVAL*, ACT_PARAMLIST(a)->content.dynamic.data) + 1)
 
 
 
@@ -258,9 +258,30 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 #define IDX_NATIVE_CONTEXT 2 // libRebol binds strings here (and lib)
 #define IDX_NATIVE_MAX (IDX_NATIVE_CONTEXT + 1)
 
-inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {
+// Context keys and action parameters use a compatible representation (this
+// enables using action paramlists as FRAME! context keylists).
+//
+// !!! An API for hinting types in FRAME! contexts could be useful, if that
+// was then used to make an ACTION! out of it...which is a conceptual idea
+// for the "real way to make actions":
+//
+// https://forum.rebol.info/t/1002
+//
+struct REBKEY : public REBVAL {};  // !!! TBD: REBSYM(*)
+#define IS_KEY IS_WORD
+
+inline static const REBSTR *VAL_KEY_SPELLING(const REBVAL *key) {
+    return VAL_WORD_SPELLING(key);
+}
+
+inline static const REBSTR *VAL_KEY_SPELLING(REBVAL *key) = delete;
+
+#define VAL_KEY_SYM VAL_WORD_SYM
+#define Init_Key Init_Word
+
+inline static const REBKEY *ACT_PARAM(REBACT *a, REBLEN n) {
     assert(n != 0 and n < ARR_LEN(ACT_PARAMLIST(a)));
-    return SER_AT(REBVAL, ACT_PARAMLIST(a), n);
+    return SER_AT(const REBKEY, ACT_PARAMLIST(a), n);
 }
 
 inline static REBVAL *ACT_SPECIAL(REBACT *a, REBLEN n) {

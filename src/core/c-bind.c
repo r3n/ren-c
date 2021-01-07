@@ -120,7 +120,7 @@ void Bind_Values_Core(
     //
   blockscope {
     REBLEN index = 1;
-    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
     REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
     for (; NOT_END(key); key++, var++, index++)
         if (not Is_Param_Sealed(var))
@@ -137,9 +137,10 @@ void Bind_Values_Core(
     );
 
   blockscope {  // Reset all the binder indices to zero
-    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
-    for (; NOT_END(key); key++)
-        if (not Is_Param_Sealed(key))
+    const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
+    for (; NOT_END(key); ++key, ++var)
+        if (not Is_Param_Sealed(var))
             Remove_Binder_Index(&binder, VAL_KEY_SPELLING(key));
   }
 
@@ -419,9 +420,10 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     REBLEN param_num = 1;
 
   blockscope {  // Setup binding table from the argument word list
-    REBVAL *param = ACT_PARAMS_HEAD(relative);
-    for (; NOT_END(param); ++param, ++param_num) {
-        if (Is_Param_Sealed(param))
+    const REBVAL *param = ACT_PARAMS_HEAD(relative);
+    REBVAL *special = ACT_SPECIALTY_HEAD(relative);
+    for (; NOT_END(param); ++param, ++special, ++param_num) {
+        if (Is_Param_Sealed(special))
             continue;
         Add_Binder_Index(&binder, VAL_KEY_SPELLING(param), param_num);
     }
@@ -514,9 +516,10 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     }
 
   blockscope {  // Reset binding table
-    REBVAL *param = ACT_PARAMS_HEAD(relative);
-    for (; NOT_END(param); param++) {
-        if (Is_Param_Sealed(param))
+    const REBVAL *param = ACT_PARAMS_HEAD(relative);
+    REBVAL *special = ACT_SPECIALTY_HEAD(relative);
+    for (; NOT_END(param); ++param, ++special) {
+        if (Is_Param_Sealed(special))
             continue;
 
         Remove_Binder_Index(&binder, VAL_KEY_SPELLING(param));
@@ -692,28 +695,30 @@ void Virtual_Bind_Deep_To_New_Context(
 
     const REBSTR *duplicate = nullptr;
 
-    REBVAL *key = CTX_KEYS_HEAD(c);
-    REBVAL *var = CTX_VARS_HEAD(c);
-
     REBSYM dummy_sym = SYM_DUMMY1;
 
     REBLEN index = 1;
     while (index <= num_vars) {
+        const REBSTR *spelling;
+
         if (IS_BLANK(item)) {
             if (dummy_sym == SYM_DUMMY9)
                 fail ("Current limitation: only up to 9 BLANK! keys");
-            Init_Key(key, Canon(dummy_sym));
-            Hide_Param(key);
+
+            spelling = Canon(dummy_sym);
             dummy_sym = cast(REBSYM, cast(int, dummy_sym) + 1);
 
+            REBVAL *var = Append_Context(c, nullptr, spelling);
             Init_Blank(var);
+            Hide_Param(var);
             SET_CELL_FLAG(var, BIND_MARKED_REUSE);
             SET_CELL_FLAG(var, PROTECTED);
 
             goto add_binding_for_check;
         }
         else if (IS_WORD(item)) {
-            Init_Key(key, VAL_WORD_SPELLING(item));
+            spelling = VAL_WORD_SPELLING(item);
+            REBVAL *var = Append_Context(c, nullptr, spelling);
 
             // !!! For loops, nothing should be able to be aware of this
             // synthesized variable until the loop code has initialized it
@@ -726,17 +731,16 @@ void Virtual_Bind_Deep_To_New_Context(
 
             assert(rebinding); // shouldn't get here unless we're rebinding
 
-            if (not Try_Add_Binder_Index(
-                &binder, VAL_KEY_SPELLING(key), index
-            )){
+            if (not Try_Add_Binder_Index(&binder, spelling, index)) {
+                //
                 // We just remember the first duplicate, but we go ahead
                 // and fill in all the keylist slots to make a valid array
                 // even though we plan on failing.  Duplicates count as a
                 // problem even if they are LIT-WORD! (negative index) as
                 // `for-each [x 'x] ...` is paradoxical.
                 //
-                if (duplicate == NULL)
-                    duplicate = VAL_KEY_SPELLING(key);
+                if (duplicate == nullptr)
+                    duplicate = spelling;
             }
         }
         else {
@@ -753,8 +757,10 @@ void Virtual_Bind_Deep_To_New_Context(
             // itself into the slot, and give it NODE_FLAG_MARKED...then
             // hide it from the context and binding.
             //
-            Init_Key(key, VAL_WORD_SPELLING(VAL_UNESCAPED(item)));
-            Hide_Param(key);
+            spelling = VAL_WORD_SPELLING(VAL_UNESCAPED(item));
+            REBVAL *var = Append_Context(c, nullptr, spelling);
+
+            Hide_Param(var);
             Derelativize(var, item, specifier);
             SET_CELL_FLAG(var, BIND_MARKED_REUSE);
             SET_CELL_FLAG(var, PROTECTED);
@@ -775,24 +781,19 @@ void Virtual_Bind_Deep_To_New_Context(
             // process will ignore.
             //
             if (rebinding) {
-                REBINT stored = Get_Binder_Index_Else_0(
-                    &binder, VAL_KEY_SPELLING(key)
-                );
+                REBINT stored = Get_Binder_Index_Else_0(&binder, spelling);
                 if (stored > 0) {
-                    if (duplicate == NULL)
-                        duplicate = VAL_KEY_SPELLING(key);
+                    if (duplicate == nullptr)
+                        duplicate = spelling;
                 }
                 else if (stored == 0) {
-                    Add_Binder_Index(&binder, VAL_KEY_SPELLING(key), -1);
+                    Add_Binder_Index(&binder, spelling, -1);
                 }
                 else {
                     assert(stored == -1);
                 }
             }
         }
-
-        key++;
-        var++;
 
         ++item;
         ++index;
@@ -838,8 +839,8 @@ void Virtual_Bind_Deep_To_New_Context(
 
     // Must remove binder indexes for all words, even if about to fail
     //
-    key = CTX_KEYS_HEAD(c);
-    var = CTX_VARS_HEAD(c); // only needed for debug, optimized out
+    const REBVAL *key = CTX_KEYS_HEAD(c);
+    REBVAL *var = CTX_VARS_HEAD(c); // only needed for debug, optimized out
     for (; NOT_END(key); ++key, ++var) {
         REBINT stored = Remove_Binder_Index_Else_0(
             &binder, VAL_KEY_SPELLING(key)
@@ -918,7 +919,7 @@ void Init_Interning_Binder(
     // Use positive numbers for all the keys in the context.
     //
   blockscope {
-    REBVAL *key = CTX_KEYS_HEAD(ctx);
+    const REBVAL *key = CTX_KEYS_HEAD(ctx);
     REBINT index = 1;
     for (; NOT_END(key); ++key, ++index)
         Add_Binder_Index(binder, VAL_KEY_SPELLING(key), index);  // positives
@@ -930,7 +931,7 @@ void Init_Interning_Binder(
     // new positive index.
     //
     if (ctx != VAL_CONTEXT(Lib_Context)) {
-        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
+        const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
         REBINT index = 1;
         for (; NOT_END(key); ++key, ++index) {
             const REBSTR *canon = VAL_KEY_SPELLING(key);
@@ -953,7 +954,7 @@ void Shutdown_Interning_Binder(struct Reb_Binder *binder, REBCTX *ctx)
     // All of the user context keys should be positive, and removable
     //
   blockscope {
-    REBVAL *key = CTX_KEYS_HEAD(ctx);
+    const REBVAL *key = CTX_KEYS_HEAD(ctx);
     REBINT index = 1;
     for (; NOT_END(key); ++key, ++index) {
         REBINT n = Remove_Binder_Index_Else_0(binder, VAL_KEY_SPELLING(key));
@@ -966,7 +967,7 @@ void Shutdown_Interning_Binder(struct Reb_Binder *binder, REBCTX *ctx)
     // find them in the list any more.
     //
     if (ctx != VAL_CONTEXT(Lib_Context)) {
-        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
+        const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
         REBINT index = 1;
         for (; NOT_END(key); ++key, ++index) {
             REBINT n = Remove_Binder_Index_Else_0(binder, VAL_KEY_SPELLING(key));

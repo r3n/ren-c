@@ -294,7 +294,7 @@ REBTYPE(Action)
             // special feature for object keys and paramlists!  So clear
             // that symbol out before giving it back.
             //
-            REBVAL *param = ACT_PARAMS_HEAD(act);
+            const REBVAL *param = ACT_PARAMS_HEAD(act);
             REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
             for (; NOT_END(param); ++param, ++typeset) {
                 assert(IS_PARAM(param));

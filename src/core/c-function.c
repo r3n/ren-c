@@ -35,7 +35,7 @@ struct Params_Of_State {
 // !!! See notes on Is_Param_Hidden() for why caller isn't filtering locals.
 //
 static bool Params_Of_Hook(
-    REBVAL *param,
+    const REBVAL *param,
     REBVAL *special,
     REBFLGS flags,
     void *opaque
@@ -103,7 +103,7 @@ REBARR *Make_Action_Parameters_Arr(REBACT *act, bool just_words)
 
 
 static bool Typesets_Of_Hook(
-    REBVAL *param,
+    const REBVAL *param,
     REBVAL *special,
     REBFLGS flags,
     void *opaque
@@ -951,7 +951,7 @@ REBARR *Make_Paramlist_Managed_May_Fail(
 //
 REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
 {
-    RELVAL *param = ARR_AT(paramlist, 1);
+    const REBVAL *param = SER_AT(const REBVAL, paramlist, 1);
     REBLEN len = ARR_LEN(paramlist);
 
     REBLEN n;

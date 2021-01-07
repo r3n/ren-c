@@ -370,8 +370,8 @@ REBACT *Make_Interpreted_Action_May_Fail(
             ACT_DISPATCHER(a) = &Voider_Dispatcher;  // !!! ^-- see info note
         }
         else if (ACT_HAS_RETURN(a)) {
-            REBVAL *typeset = ACT_PARAMS_HEAD(a);
-            assert(VAL_KEY_SYM(typeset) == SYM_RETURN);
+            REBVAL *typeset = ACT_SPECIALTY_HEAD(a);
+            assert(VAL_KEY_SYM(ACT_PARAMS_HEAD(a)) == SYM_RETURN);
             if (not TYPE_CHECK(typeset, REB_VOID))  // `do []` returns
                 ACT_DISPATCHER(a) = &Returner_Dispatcher;  // error when run
         }
@@ -637,12 +637,13 @@ REBNATIVE(return)
     // Defininitional returns are "locals"--there's no argument type check.
     // So TYPESET! bits in the RETURN param are used for legal return types.
     //
-    REBVAL *typeset = ACT_PARAMS_HEAD(target_fun);
+    REBVAL *typeset = ACT_SPECIALTY_HEAD(target_fun);
     //
     // !!! LOCALNESS NOT KNOWN NOW
     //
+    UNUSED(typeset);
 /*    assert(VAL_PARAM_CLASS(typeset) == REB_P_LOCAL); */
-    assert(VAL_KEY_SYM(typeset) == SYM_RETURN);
+    assert(VAL_KEY_SYM(ACT_PARAMS_HEAD(target_fun)) == SYM_RETURN);
 
     // There are two ways you can get an "endish nulled".  One is a plain
     // `RETURN` with nothing following it (which is interpreted as returning

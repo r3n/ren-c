@@ -509,9 +509,7 @@ struct Reb_Frame {
     // advanced but we'd like to hold the old one...this makes it important
     // to protect it from GC if we have advanced beyond as well!)
     //
-    // Made relative just to have another RELVAL on hand.
-    //
-    const RELVAL *param;
+    const REBVAL *param;
 
     // `arg is the "actual argument"...which holds the pointer to the
     // REBVAL slot in the `arglist` for that corresponding `param`.  These
@@ -553,6 +551,8 @@ struct Reb_Frame {
     struct {
         RELVAL *cell;
         REBSPC *specifier;
+
+        const RELVAL *picker;
     } ref;
 
     // Used to slip cell to re-evaluate into Eval_Core()

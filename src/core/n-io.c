@@ -49,11 +49,8 @@ REBNATIVE(form)
     INCLUDE_PARAMS_OF_FORM;
 
     REBVAL *v = ARG(value);
-    if (IS_VOID(v)) {
-        DECLARE_LOCAL (word);
-        Init_Word(word, VAL_KEY_SPELLING(PAR(value)));
-        fail (Error_Need_Non_Void_Core(word, SPECIFIED, v));
-    }
+    if (IS_VOID(v))
+        fail (ARG(value));
 
     return Init_Text(D_OUT, Copy_Form_Value(v, 0));
 }

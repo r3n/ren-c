@@ -820,16 +820,6 @@ REBCTX *Make_Error_Managed_Core(
         types
     );
 
-    // Copying with extra reserved the capacity, but didn't bump the length.
-    // Do it now so CTX_KEY/CTX_VAR don't assert on out of bounds access.
-    //
-    REBLEN root_len = CTX_LEN(root_error);
-    TERM_ARRAY_LEN(CTX_VARLIST(error), root_len + expected_args + 1);
-    TERM_ARRAY_LEN(CTX_KEYLIST(error), root_len + expected_args + 1);
-
-    REBVAL *key = CTX_KEY(error, root_len) + 1;  // 1-based indexing
-    REBVAL *var = CTX_VAR(error, root_len) + 1;
-
     const RELVAL *msg_item =
         IS_TEXT(message)
             ? cast(const RELVAL*, END_NODE)  // gcc/g++ 2.95 needs (bug)
@@ -840,7 +830,8 @@ REBCTX *Make_Error_Managed_Core(
     //
     for (; NOT_END(msg_item); ++msg_item) {
         if (IS_GET_WORD(msg_item)) {
-            Init_Key(key, VAL_WORD_SPELLING(msg_item));
+            const REBSTR *spelling = VAL_WORD_SPELLING(msg_item);
+            REBVAL *var = Append_Context(error, nullptr, spelling);
 
             const void *p = va_arg(*vaptr, const void*);
 
@@ -865,13 +856,10 @@ REBCTX *Make_Error_Managed_Core(
                 const REBVAL *arg = cast(const REBVAL*, p);
                 Move_Value(var, arg);
             }
-
-            ++key;
-            ++var;
         }
     }
-    assert(IS_END(key));
-    assert(IS_END(var));
+
+    assert(CTX_LEN(error) == CTX_LEN(root_error) + expected_args);
 
     mutable_KIND3Q_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
     mutable_HEART_BYTE(CTX_ROOTVAR(error)) = REB_ERROR;
@@ -1068,7 +1056,8 @@ REBCTX *Error_No_Relative_Core(REBCEL(const*) any_word)
 //
 REBCTX *Error_Not_Varargs(
     REBFRM *f,
-    const RELVAL *param,
+    const REBVAL *key,
+    const REBVAL *param,
     enum Reb_Kind kind
 ){
     assert(Is_Param_Variadic(param));
@@ -1082,7 +1071,7 @@ REBCTX *Error_Not_Varargs(
     Init_Param(
         honest_param,
         REB_P_NORMAL,
-        VAL_KEY_SPELLING(param),
+        VAL_KEY_SPELLING(key),
         FLAGIT_KIND(REB_VARARGS) // actually expected
     );
 
@@ -1109,10 +1098,11 @@ REBCTX *Error_Invalid_Arg(REBFRM *f, const RELVAL *param)
 {
     assert(IS_PARAM(param));
 
-    RELVAL *rootparam = ARR_HEAD(ACT_PARAMLIST(FRM_PHASE(f)));
-    assert(IS_UNREADABLE_DEBUG(rootparam));
-    assert(param > rootparam);
-    assert(param <= rootparam + 1 + FRM_NUM_ARGS(f));
+    RELVAL *headparam = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
+    assert(param >= headparam);
+    assert(param <= headparam + FRM_NUM_ARGS(f));
+
+    REBLEN index = 1 + (param - headparam);
 
     DECLARE_LOCAL (label);
     if (not f->label)
@@ -1121,9 +1111,9 @@ REBCTX *Error_Invalid_Arg(REBFRM *f, const RELVAL *param)
         Init_Word(label, unwrap(f->label));
 
     DECLARE_LOCAL (param_name);
-    Init_Word(param_name, VAL_KEY_SPELLING(param));
+    Init_Word(param_name, VAL_KEY_SPELLING(ACT_PARAM(FRM_PHASE(f), index)));
 
-    REBVAL *arg = FRM_ARG(f, param - rootparam);
+    REBVAL *arg = FRM_ARG(f, index);
     if (IS_NULLED(arg))
         return Error_Arg_Required_Raw(label, param_name);
 
@@ -1231,10 +1221,8 @@ REBCTX *Error_Out_Of_Range(const REBVAL *arg)
 //
 //  Error_Protected_Key: C
 //
-REBCTX *Error_Protected_Key(REBVAL *key)
+REBCTX *Error_Protected_Key(const REBVAL *key)
 {
-    assert(IS_TYPESET(key));
-
     DECLARE_LOCAL (key_name);
     Init_Word(key_name, VAL_KEY_SPELLING(key));
 
@@ -1275,11 +1263,11 @@ REBCTX *Error_Unexpected_Type(enum Reb_Kind expected, enum Reb_Kind actual)
 //
 REBCTX *Error_Arg_Type(
     REBFRM *f,
-    const RELVAL *param,
+    const REBVAL *key,
     enum Reb_Kind actual
 ){
     DECLARE_LOCAL (param_word);
-    Init_Word(param_word, VAL_KEY_SPELLING(param));
+    Init_Word(param_word, VAL_KEY_SPELLING(key));
 
     DECLARE_LOCAL (label);
     Get_Frame_Label_Or_Blank(label, f);

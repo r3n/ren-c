@@ -90,7 +90,7 @@ REB_R Skinner_Dispatcher(REBFRM *f)
 
     REBVAL *skinned = DETAILS_AT(details, IDX_SKINNER_SKINNED);
 
-    REBVAL *param = ACT_PARAMS_HEAD(phase);
+    const REBVAL *param = ACT_PARAMS_HEAD(phase);
     REBVAL *arg = FRM_ARGS_HEAD(f);
     for (; NOT_END(param); ++param, ++arg) {
         if (Is_Param_Skin_Expanded(param))  // !!! always says true (for now)
@@ -214,7 +214,8 @@ REBNATIVE(reskinned)
 
     bool need_skin_phase = false;  // only needed if types were broadened
 
-    RELVAL *param = ARR_AT(paramlist, 1);  // 0 is ACT_ARCHETYPE
+    const REBVAL *key = nullptr;  // !!! TBD, rethink all of this
+    REBVAL *param = SER_AT(REBVAL, paramlist, 1);
     const RELVAL *item = VAL_ARRAY_AT(ARG(skin));
     Reb_Param_Class pclass;
     while (NOT_END(item)) {
@@ -263,11 +264,11 @@ REBNATIVE(reskinned)
                     fail (word);
                 }
 
-                param = ARR_AT(paramlist, 1);
+                param = SER_AT(REBVAL, paramlist, 1);
                 wrapped_around = true;
             }
 
-            if (VAL_KEY_SPELLING(param) == symbol)
+            if (VAL_KEY_SPELLING(key) == symbol)
                 break;
             ++param;
         }

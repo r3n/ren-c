@@ -263,10 +263,10 @@ void Collect_End(struct Reb_Collector *cl)
 
     // Reset binding table (note BUF_COLLECT may have expanded)
     //
-    RELVAL *v =
+    const REBVAL *v =
         (cl == NULL or (cl->flags & COLLECT_AS_TYPESET))
-            ? ARR_HEAD(BUF_COLLECT) + 1
-            : ARR_HEAD(BUF_COLLECT);
+            ? SER_HEAD(REBVAL, BUF_COLLECT) + 1
+            : SER_HEAD(REBVAL, BUF_COLLECT);
     for (; NOT_END(v); ++v) {
         const REBSTR *canon =
             (cl == NULL or (cl->flags & COLLECT_AS_TYPESET))
@@ -312,7 +312,7 @@ void Collect_Context_Keys(
 ){
     assert(cl->flags & COLLECT_AS_TYPESET);
 
-    REBVAL *key = CTX_KEYS_HEAD(context);
+    const REBVAL *key = CTX_KEYS_HEAD(context);
 
     assert(cl->index >= 1); // 0 in bind table means "not present"
 
@@ -544,7 +544,7 @@ REBARR *Collect_Unique_Words_Managed(
         }
     }
     else if (ANY_CONTEXT(ignore)) {
-        REBVAL *key = CTX_KEYS_HEAD(VAL_CONTEXT(ignore));
+        const REBVAL *key = CTX_KEYS_HEAD(VAL_CONTEXT(ignore));
         for (; NOT_END(key); ++key) {
             //
             // Shouldn't be possible to have an object with duplicate keys,
@@ -580,7 +580,7 @@ REBARR *Collect_Unique_Words_Managed(
         }
     }
     else if (ANY_CONTEXT(ignore)) {
-        REBVAL *key = CTX_KEYS_HEAD(VAL_CONTEXT(ignore));
+        const REBVAL *key = CTX_KEYS_HEAD(VAL_CONTEXT(ignore));
         for (; NOT_END(key); ++key)
             Remove_Binder_Index(&cl->binder, VAL_KEY_SPELLING(key));
     }
@@ -778,14 +778,14 @@ REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
     if (IS_FRAME(context))
         always = IS_FRAME_PHASED(context);
 
-    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
     REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
 
     assert(!(mode & 4));
 
     REBLEN n = 1;
     for (; NOT_END(key); n++, key++, var++) {
-        if (Is_Param_Sealed(key))
+        if (Is_Param_Sealed(var))
             continue;
 
         if (not always and Is_Param_Hidden(var))
@@ -918,7 +918,7 @@ REBCTX *Merge_Contexts_Managed(REBCTX *parent1, REBCTX *parent2)
     TERM_ARRAY_LEN(varlist, ARR_LEN(keylist));
 
     // Copy parent2 values:
-    REBVAL *key = CTX_KEYS_HEAD(parent2);
+    const REBVAL *key = CTX_KEYS_HEAD(parent2);
     REBVAL *value = CTX_VARS_HEAD(parent2);
     for (; NOT_END(key); key++, value++) {
         // no need to search when the binding table is available
@@ -986,7 +986,7 @@ void Resolve_Context(
     // If limited resolve, tag the word ids that need to be copied:
     if (i != 0) {
         // Only the new words of the target:
-        REBVAL *key = CTX_KEY(target, i);
+        const REBVAL *key = CTX_KEY(target, i);
         for (; NOT_END(key); key++)
             Add_Binder_Index(&binder, VAL_KEY_SPELLING(key), -1);
         n = CTX_LEN(target);
@@ -1008,7 +1008,7 @@ void Resolve_Context(
     // Expand target as needed:
     if (expand and n > 0) {
         // Determine how many new words to add:
-        REBVAL *key = CTX_KEYS_HEAD(target);
+        const REBVAL *key = CTX_KEYS_HEAD(target);
         for (; NOT_END(key); key++)
             if (Get_Binder_Index_Else_0(&binder, VAL_KEY_SPELLING(key)) != 0)
                 --n;
@@ -1025,7 +1025,7 @@ void Resolve_Context(
     // Done by marking all source words (in bind table):
     //
   blockscope {
-    REBVAL *key = CTX_KEYS_HEAD(source);
+    const REBVAL *key = CTX_KEYS_HEAD(source);
     REBINT n = 1;
     for (; NOT_END(key); n++, key++) {
         const REBSTR *symbol = VAL_KEY_SPELLING(key);
@@ -1043,8 +1043,8 @@ void Resolve_Context(
     // Foreach word in target, copy the correct value from source:
     //
   blockscope {
+    const REBVAL *key = i != 0 ? CTX_KEY(target, i) : CTX_KEYS_HEAD(target);
     REBVAL *var = i != 0 ? CTX_VAR(target, i) : CTX_VARS_HEAD(target);
-    REBVAL *key = i != 0 ? CTX_KEY(target, i) : CTX_KEYS_HEAD(target);
     for (; NOT_END(key); key++, var++) {
         REBINT m = Remove_Binder_Index_Else_0(&binder, VAL_KEY_SPELLING(key));
         if (m != 0) {
@@ -1062,7 +1062,7 @@ void Resolve_Context(
 
     // Add any new words and values:
     if (expand) {
-        REBVAL *key = CTX_KEYS_HEAD(source);
+        const REBVAL *key = CTX_KEYS_HEAD(source);
         REBINT n = 1;
         for (; NOT_END(key); n++, key++) {
             const REBSTR *canon = VAL_KEY_SPELLING(key);
@@ -1083,7 +1083,7 @@ void Resolve_Context(
         // but the fault-tolerant Remove_Binder_Index_Else_0()
         //
         if (i != 0) {
-            REBVAL *key = CTX_KEY(target, i);
+            const REBVAL *key = CTX_KEY(target, i);
             for (; NOT_END(key); key++)
                 Remove_Binder_Index_Else_0(&binder, VAL_KEY_SPELLING(key));
         }
@@ -1095,7 +1095,7 @@ void Resolve_Context(
             }
         }
         else {
-            REBVAL *key = CTX_KEYS_HEAD(source);
+            const REBVAL *key = CTX_KEYS_HEAD(source);
             for (; NOT_END(key); key++)
                 Remove_Binder_Index_Else_0(&binder, VAL_KEY_SPELLING(key));
         }
@@ -1130,7 +1130,7 @@ REBLEN Find_Symbol_In_Context(
         // that are hidden with PROTECT/HIDE.  SELF needs a lot of review.
     }
 
-    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
     REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
 
     REBLEN n;
@@ -1144,7 +1144,7 @@ REBLEN Find_Symbol_In_Context(
                 continue;
         }
 
-        if (Is_Param_Sealed(key))
+        if (Is_Param_Sealed(var))
             continue;  // pretend this parameter is not there
 
         if (not always and Is_Param_Hidden(var))

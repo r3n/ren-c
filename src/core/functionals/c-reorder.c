@@ -117,7 +117,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     INIT_BINDER(&binder);
 
   blockscope {
-    REBVAL *param = ACT_PARAMS_HEAD(reorderee);
+    const REBVAL *param = ACT_PARAMS_HEAD(reorderee);
     REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
     REBLEN index = 1;
     for (; NOT_END(param); ++param, ++special, ++index) {
@@ -184,7 +184,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
         if (ignore)
             continue;
 
-        REBVAL *param = ACT_PARAM(reorderee, index);
+        const REBVAL *param = ACT_PARAM(reorderee, index);
         if (TYPE_CHECK(param, REB_TS_REFINEMENT) and Is_Typeset_Empty(param)) {
             error = Error_User("Can't reorder refinements with no argument");
             goto cleanup_binder;
@@ -197,7 +197,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     // ordering list.
 
   cleanup_binder: {
-    REBVAL *param = ACT_PARAMS_HEAD(reorderee);
+    const REBVAL *param = ACT_PARAMS_HEAD(reorderee);
     REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
     REBLEN index = 1;
     for (; NOT_END(param); ++param, ++special, ++index) {

@@ -446,12 +446,6 @@ void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
         Append_Ascii(mo->series, "~unreadable~");
         return;
     }
-    if (IS_PARAM(v)) {  // > REB_MAX, has no molding dispatch
-        Append_Ascii(mo->series, "<<");
-        Append_Spelling(mo->series, VAL_KEY_SPELLING(v));
-        Append_Ascii(mo->series, ">>");
-        return;
-    }
   #endif
 
     REBLEN depth = VAL_NUM_QUOTES(v);

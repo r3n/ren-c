@@ -75,7 +75,7 @@
     (PVS_OPT_SETVAL(pvs) != nullptr)
 
 #define PVS_PICKER(pvs) \
-    pvs->param
+    pvs->u.ref.picker
 
 inline static bool Get_Path_Throws_Core(
     REBVAL *out,

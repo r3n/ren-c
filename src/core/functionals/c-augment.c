@@ -124,7 +124,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     // "triad".
     //
   blockscope {
-    REBVAL *param = ACT_PARAMS_HEAD(augmentee);
+    const REBVAL *param = ACT_PARAMS_HEAD(augmentee);
     REBVAL *special = ACT_SPECIALTY_HEAD(augmentee);
     for (; NOT_END(param); ++param) {
         Move_Value(DS_PUSH(), param);

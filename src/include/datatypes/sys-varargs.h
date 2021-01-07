@@ -192,22 +192,39 @@ inline static bool Is_Frame_Style_Varargs_May_Fail(
     (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0)
 
 
-inline static const REBVAL *Param_For_Varargs_Maybe_Null(REBCEL(const*) v) {
+inline static const REBVAL *Param_For_Varargs_Maybe_Null(
+    const REBVAL **key,
+    REBCEL(const*) v
+){
     assert(CELL_KIND(v) == REB_VARARGS);
 
     REBACT *phase = VAL_VARARGS_PHASE(v);
     if (phase) {
         REBARR *paramlist = CTX_VARLIST(ACT_EXEMPLAR(phase));
-        if (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0) // e.g. enfix
+        if (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0) {  // e.g. enfix
+            if (key)
+                *key = ACT_PARAM(
+                    phase,
+                    (- VAL_VARARGS_SIGNED_PARAM_INDEX(v)) - 1
+                );
             return cast(REBVAL*, ARR_AT(
                 paramlist,
                 - VAL_VARARGS_SIGNED_PARAM_INDEX(v)
             ));
+        }
+
+        *key = ACT_PARAM(
+            phase,
+            VAL_VARARGS_SIGNED_PARAM_INDEX(v) - 1
+        );
         return cast(REBVAL*, ARR_AT(
             paramlist,
             VAL_VARARGS_SIGNED_PARAM_INDEX(v)
         ));
     }
+
+    if (key)
+        *key = nullptr;
 
     // A vararg created from a block AND never passed as an argument so no
     // typeset or quoting settings available.  Treat as "normal" parameter.

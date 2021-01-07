@@ -291,7 +291,7 @@ bool Specialize_Action_Throws(
         // !!! Only one binder can be in effect, and we're calling arbitrary
         // code.  Must clean up now vs. in loop we do at the end.  :-(
         //
-        RELVAL *key = CTX_KEYS_HEAD(exemplar);
+        const REBVAL *key = CTX_KEYS_HEAD(exemplar);
         REBVAL *var = CTX_VARS_HEAD(exemplar);
         for (; NOT_END(key); ++key, ++var) {
             if (Is_Param_Hidden(var))
@@ -538,7 +538,7 @@ void For_Each_Unspecialized_Param(
     // given to it in the second pass.
     //
   blockscope {
-    REBVAL *param = ACT_PARAMS_HEAD(act);
+    const REBVAL *param = ACT_PARAMS_HEAD(act);
     REBVAL *special = ACT_SPECIALTY_HEAD(act);
 
     // Loop through and pass just the normal args.
@@ -598,7 +598,7 @@ void For_Each_Unspecialized_Param(
         REBVAL *partial = SPECIFIC(ARR_TAIL(unwrap(partials)));
         REBVAL *head = SPECIFIC(ARR_HEAD(unwrap(partials)));
         for (; partial-- != head; ) {
-            REBVAL *param = ACT_PARAM(act, VAL_WORD_INDEX(partial));
+            const REBVAL *param = ACT_PARAM(act, VAL_WORD_INDEX(partial));
             REBVAL *special = ACT_SPECIAL(act, VAL_WORD_INDEX(partial));
 
             bool cancel = not hook(param, special, PHF_UNREFINED, opaque);
@@ -610,7 +610,7 @@ void For_Each_Unspecialized_Param(
     // Finally, output any fully unspecialized refinements
 
   blockscope {
-    REBVAL *param = ACT_PARAMS_HEAD(act);
+    const REBVAL *param = ACT_PARAMS_HEAD(act);
     REBVAL *special = ACT_SPECIALTY_HEAD(act);
 
     for (; NOT_END(param); ++param, ++special) {
@@ -644,12 +644,12 @@ void For_Each_Unspecialized_Param(
 
 
 struct Find_Param_State {
-    REBVAL *param;
+    const REBVAL *param;
     REBVAL *special;
 };
 
 static bool First_Param_Hook(
-    REBVAL *param,
+    const REBVAL *param,
     REBVAL *special,
     REBFLGS flags,
     void *opaque
@@ -666,7 +666,7 @@ static bool First_Param_Hook(
 }
 
 static bool Last_Param_Hook(
-    REBVAL *param,
+    const REBVAL *param,
     REBVAL *special,
     REBFLGS flags,
     void *opaque
@@ -691,7 +691,7 @@ static bool Last_Param_Hook(
 //
 // This means that the last parameter (D) is actually the first of FOO-D.
 //
-REBVAL *First_Unspecialized_Param(REBVAL **key, REBACT *act)
+REBVAL *First_Unspecialized_Param(const REBVAL ** key, REBACT *act)
 {
     struct Find_Param_State s;
     s.param = nullptr;
@@ -710,7 +710,7 @@ REBVAL *First_Unspecialized_Param(REBVAL **key, REBACT *act)
 //
 // See notes on First_Unspecialized_Param() regarding complexity
 //
-REBVAL *Last_Unspecialized_Param(REBVAL **key, REBACT *act)
+REBVAL *Last_Unspecialized_Param(const REBVAL ** key, REBACT *act)
 {
     struct Find_Param_State s;
     s.param = nullptr;
@@ -949,7 +949,7 @@ REBACT *Alloc_Action_From_Exemplar(
 ){
     REBACT *unspecialized = CTX_FRAME_ACTION(exemplar);
 
-    REBVAL *param = ACT_PARAMS_HEAD(unspecialized);
+    const REBVAL *param = ACT_PARAMS_HEAD(unspecialized);
     const REBVAL *special = ACT_SPECIALTY_HEAD(unspecialized);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
     for (; NOT_END(param); ++param, ++arg, ++special) {
