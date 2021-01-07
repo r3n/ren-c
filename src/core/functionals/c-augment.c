@@ -125,9 +125,10 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     //
   blockscope {
     REBVAL *param = ACT_PARAMS_HEAD(augmentee);
+    REBVAL *special = ACT_SPECIALTY_HEAD(augmentee);
     for (; NOT_END(param); ++param) {
         Move_Value(DS_PUSH(), param);
-        if (Is_Param_Hidden(param, param))  // special = param
+        if (Is_Param_Hidden(special))
             Seal_Param(DS_TOP);
         Move_Value(DS_PUSH(), EMPTY_BLOCK);
         Move_Value(DS_PUSH(), EMPTY_TEXT);

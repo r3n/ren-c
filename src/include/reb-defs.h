@@ -414,7 +414,7 @@ typedef enum {
     PHF_DEMODALIZED = 1 << 1  // an @param with its refinement specialized out
 } Reb_Param_Hook_Flags;
 #define PHF_MASK_NONE 0
-typedef bool (PARAM_HOOK)(REBVAL *v, REBFLGS flags, void *opaque);
+typedef bool (PARAM_HOOK)(REBVAL *key, REBVAL *special, REBFLGS flags, void *opaque);
 
 
 // These definitions are needed in %sys-rebval.h, and can't be put in

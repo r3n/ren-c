@@ -121,8 +121,9 @@ void Bind_Values_Core(
   blockscope {
     REBLEN index = 1;
     REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
-    for (; NOT_END(key); key++, index++)
-        if (not Is_Param_Sealed(key))
+    REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
+    for (; NOT_END(key); key++, var++, index++)
+        if (not Is_Param_Sealed(var))
             Add_Binder_Index(&binder, VAL_KEY_SPELLING(key), index);
   }
 
@@ -136,7 +137,7 @@ void Bind_Values_Core(
     );
 
   blockscope {  // Reset all the binder indices to zero
-    RELVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
     for (; NOT_END(key); key++)
         if (not Is_Param_Sealed(key))
             Remove_Binder_Index(&binder, VAL_KEY_SPELLING(key));
@@ -418,7 +419,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     REBLEN param_num = 1;
 
   blockscope {  // Setup binding table from the argument word list
-    RELVAL *param = ACT_PARAMS_HEAD(relative);
+    REBVAL *param = ACT_PARAMS_HEAD(relative);
     for (; NOT_END(param); ++param, ++param_num) {
         if (Is_Param_Sealed(param))
             continue;
@@ -493,12 +494,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             REBDSP dsp = dsp_orig;
             while (dsp != DSP) {
                 const REBSTR *spelling = VAL_WORD_SPELLING(DS_AT(dsp + 1));
-                Init_Param(
-                    param,
-                    REB_P_LOCAL,
-                    spelling,
-                    FLAGIT_KIND(REB_VOID)
-                );
+                Init_Word(param, spelling);
                 ++dsp;
                 ++param;
 
@@ -518,10 +514,11 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     }
 
   blockscope {  // Reset binding table
-    RELVAL *param = ACT_PARAMS_HEAD(relative);
+    REBVAL *param = ACT_PARAMS_HEAD(relative);
     for (; NOT_END(param); param++) {
         if (Is_Param_Sealed(param))
             continue;
+
         Remove_Binder_Index(&binder, VAL_KEY_SPELLING(param));
     }
   }
@@ -705,7 +702,7 @@ void Virtual_Bind_Deep_To_New_Context(
         if (IS_BLANK(item)) {
             if (dummy_sym == SYM_DUMMY9)
                 fail ("Current limitation: only up to 9 BLANK! keys");
-            Init_Context_Key(key, Canon(dummy_sym));
+            Init_Key(key, Canon(dummy_sym));
             Hide_Param(key);
             dummy_sym = cast(REBSYM, cast(int, dummy_sym) + 1);
 
@@ -716,7 +713,7 @@ void Virtual_Bind_Deep_To_New_Context(
             goto add_binding_for_check;
         }
         else if (IS_WORD(item)) {
-            Init_Context_Key(key, VAL_WORD_SPELLING(item));
+            Init_Key(key, VAL_WORD_SPELLING(item));
 
             // !!! For loops, nothing should be able to be aware of this
             // synthesized variable until the loop code has initialized it
@@ -730,7 +727,7 @@ void Virtual_Bind_Deep_To_New_Context(
             assert(rebinding); // shouldn't get here unless we're rebinding
 
             if (not Try_Add_Binder_Index(
-                &binder, VAL_PARAM_SPELLING(key), index
+                &binder, VAL_KEY_SPELLING(key), index
             )){
                 // We just remember the first duplicate, but we go ahead
                 // and fill in all the keylist slots to make a valid array
@@ -739,7 +736,7 @@ void Virtual_Bind_Deep_To_New_Context(
                 // `for-each [x 'x] ...` is paradoxical.
                 //
                 if (duplicate == NULL)
-                    duplicate = VAL_PARAM_SPELLING(key);
+                    duplicate = VAL_KEY_SPELLING(key);
             }
         }
         else {
@@ -756,7 +753,7 @@ void Virtual_Bind_Deep_To_New_Context(
             // itself into the slot, and give it NODE_FLAG_MARKED...then
             // hide it from the context and binding.
             //
-            Init_Context_Key(key, VAL_WORD_SPELLING(VAL_UNESCAPED(item)));
+            Init_Key(key, VAL_WORD_SPELLING(VAL_UNESCAPED(item)));
             Hide_Param(key);
             Derelativize(var, item, specifier);
             SET_CELL_FLAG(var, BIND_MARKED_REUSE);
@@ -779,14 +776,14 @@ void Virtual_Bind_Deep_To_New_Context(
             //
             if (rebinding) {
                 REBINT stored = Get_Binder_Index_Else_0(
-                    &binder, VAL_PARAM_SPELLING(key)
+                    &binder, VAL_KEY_SPELLING(key)
                 );
                 if (stored > 0) {
                     if (duplicate == NULL)
-                        duplicate = VAL_PARAM_SPELLING(key);
+                        duplicate = VAL_KEY_SPELLING(key);
                 }
                 else if (stored == 0) {
-                    Add_Binder_Index(&binder, VAL_PARAM_SPELLING(key), -1);
+                    Add_Binder_Index(&binder, VAL_KEY_SPELLING(key), -1);
                 }
                 else {
                     assert(stored == -1);
@@ -845,7 +842,7 @@ void Virtual_Bind_Deep_To_New_Context(
     var = CTX_VARS_HEAD(c); // only needed for debug, optimized out
     for (; NOT_END(key); ++key, ++var) {
         REBINT stored = Remove_Binder_Index_Else_0(
-            &binder, VAL_PARAM_SPELLING(key)
+            &binder, VAL_KEY_SPELLING(key)
         );
         if (stored == 0)
             assert(duplicate);

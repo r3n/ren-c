@@ -36,22 +36,23 @@ struct Params_Of_State {
 //
 static bool Params_Of_Hook(
     REBVAL *param,
+    REBVAL *special,
     REBFLGS flags,
     void *opaque
 ){
     struct Params_Of_State *s = cast(struct Params_Of_State*, opaque);
 
-    Init_Any_Word(DS_PUSH(), REB_WORD, VAL_PARAM_SPELLING(param));
+    Init_Word(DS_PUSH(), VAL_KEY_SPELLING(param));
 
     if (not s->just_words) {
         if (
             not (flags & PHF_UNREFINED)
-            and TYPE_CHECK(param, REB_TS_REFINEMENT)
+            and TYPE_CHECK(special, REB_TS_REFINEMENT)
         ){
             Refinify(DS_TOP);
         }
 
-        switch (VAL_PARAM_CLASS(param)) {
+        switch (VAL_PARAM_CLASS(special)) {
           case REB_P_OUTPUT:
           case REB_P_NORMAL:
             break;
@@ -103,9 +104,11 @@ REBARR *Make_Action_Parameters_Arr(REBACT *act, bool just_words)
 
 static bool Typesets_Of_Hook(
     REBVAL *param,
+    REBVAL *special,
     REBFLGS flags,
     void *opaque
 ){
+    UNUSED(param);
     UNUSED(opaque);
     UNUSED(flags);
 
@@ -114,7 +117,7 @@ static bool Typesets_Of_Hook(
     // !!! Typesets must be revisited in a world with user-defined types, as
     // well as to accomodate multiple quoting levels.
     //
-    Move_Value(DS_PUSH(), param);
+    Move_Value(DS_PUSH(), special);
     assert(IS_TYPESET(DS_TOP));
     VAL_TYPESET_STRING_NODE(DS_TOP) = nullptr;
 
@@ -570,10 +573,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         }
         else {
             STKVAL(*) param = DS_AT(definitional_return_dsp);
-            assert(
-                VAL_PARAM_CLASS(param) == REB_P_LOCAL
-                or VAL_PARAM_CLASS(param) == REB_P_SEALED  // !!! review reuse
-            );
+            assert(VAL_PARAM_CLASS(param) == REB_P_LOCAL);
             assert(HEART_BYTE(param) == REB_TYPESET);
             UNUSED(param);
         }
@@ -614,8 +614,12 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     );
     SET_SERIES_FLAG(paramlist, FIXED_SIZE);
 
-    if (flags & MKF_HAS_RETURN)
-        paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
+    // !!!
+    // !!! TEMPORARY -- TURNING OFF RETURN CHECKS
+    // !!!
+
+/*    if (flags & MKF_HAS_RETURN)
+        paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN; */
 
   blockscope {
     REBVAL *dest = Voidify_Rootparam(paramlist) + 1;
@@ -645,8 +649,8 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     //
     for (; src != DS_TOP + 1; src += 3) {
         if (not Is_Param_Sealed(src)) {  // allow reuse of sealed names
-            if (not Try_Add_Binder_Index(&binder, VAL_PARAM_SPELLING(src), 1020))
-                duplicate = VAL_PARAM_SPELLING(src);
+            if (not Try_Add_Binder_Index(&binder, VAL_TYPESET_STRING(src), 1020))
+                duplicate = VAL_TYPESET_STRING(src);
         }
 
         if (definitional_return and src == definitional_return)
@@ -666,7 +670,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         if (Is_Param_Sealed(src))
             continue;
         if (
-            Remove_Binder_Index_Else_0(&binder, VAL_PARAM_SPELLING(src))
+            Remove_Binder_Index_Else_0(&binder, VAL_TYPESET_STRING(src))
             == 0
         ){
             assert(duplicate);
@@ -760,7 +764,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             else
                 Move_Value(dest, src);
 
-            if (Is_Param_Hidden(param, param))  // special = param
+            if (VAL_PARAM_CLASS(param) == REB_P_LOCAL)
                 SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
             ++dest;
             ++param;
@@ -825,7 +829,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             else
                 Move_Value(dest, src);
 
-            if (Is_Param_Hidden(param, param))  // param = special
+            if (VAL_PARAM_CLASS(param) == REB_P_LOCAL)
                 SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
             ++dest;
             ++param;
@@ -952,7 +956,7 @@ REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
 
     REBLEN n;
     for (n = 1; n < len; ++n, ++param) {
-        if (spelling == VAL_PARAM_SPELLING(param))
+        if (spelling == VAL_KEY_SPELLING(param))
             return n;
     }
 
@@ -1009,12 +1013,18 @@ REBACT *Make_Action(
         REBVAL *dest = SER_AT(REBVAL, varlist, 1);
         for (; NOT_END(src); ++src, ++dest) {
             assert(HEART_BYTE(src) == REB_TYPESET);
-            if (Is_Param_Hidden(src, src)) {
+            if (VAL_PARAM_CLASS(src) == REB_P_LOCAL) {
                 Init_Void(dest, SYM_UNSET);
                 SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
             }
             else
                 Move_Value(dest, src);
+
+            // Now change the actual "param" to be more like a key, to only
+            // contain the spelling (as an unbound word, that could be reduced
+            // to the spelling itself)
+            //
+            Init_Key(src, VAL_TYPESET_STRING(src));
         }
         TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));
         INIT_LINK_KEYSOURCE(varlist, NOD(paramlist));
@@ -1053,7 +1063,7 @@ REBACT *Make_Action(
     assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
     if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
         RELVAL *param = ARR_AT(paramlist, 1);
-        assert(VAL_PARAM_SYM(param) == SYM_RETURN);
+        assert(VAL_KEY_SYM(param) == SYM_RETURN);
         UNUSED(param);
     }
   }
@@ -1101,7 +1111,7 @@ REBACT *Make_Action(
     // the work of doing that is factored into a routine (`PARAMETERS OF`
     // uses it as well).
 
-    REBVAL *first_unspecialized = First_Unspecialized_Param(act);
+    REBVAL *first_unspecialized = First_Unspecialized_Param(nullptr, act);
     if (first_unspecialized) {
         switch (VAL_PARAM_CLASS(first_unspecialized)) {
           case REB_P_OUTPUT:

@@ -765,7 +765,7 @@ const void *RL_rebArgR(unsigned char quotes, const void *p, va_list *vaptr)
     REBVAL *param = ACT_PARAMS_HEAD(act);
     REBVAL *arg = FRM_ARGS_HEAD(f);
     for (; NOT_END(param); ++param, ++arg) {
-        if (SAME_STR(VAL_PARAM_SPELLING(param), spelling))
+        if (SAME_STR(VAL_KEY_SPELLING(param), spelling))
             return arg;
     }
 

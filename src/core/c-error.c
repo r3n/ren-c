@@ -840,7 +840,7 @@ REBCTX *Make_Error_Managed_Core(
     //
     for (; NOT_END(msg_item); ++msg_item) {
         if (IS_GET_WORD(msg_item)) {
-            Init_Context_Key(key, VAL_WORD_SPELLING(msg_item));
+            Init_Key(key, VAL_WORD_SPELLING(msg_item));
 
             const void *p = va_arg(*vaptr, const void*);
 
@@ -1082,7 +1082,7 @@ REBCTX *Error_Not_Varargs(
     Init_Param(
         honest_param,
         REB_P_NORMAL,
-        VAL_PARAM_SPELLING(param),
+        VAL_KEY_SPELLING(param),
         FLAGIT_KIND(REB_VARARGS) // actually expected
     );
 
@@ -1121,7 +1121,7 @@ REBCTX *Error_Invalid_Arg(REBFRM *f, const RELVAL *param)
         Init_Word(label, unwrap(f->label));
 
     DECLARE_LOCAL (param_name);
-    Init_Word(param_name, VAL_PARAM_SPELLING(param));
+    Init_Word(param_name, VAL_KEY_SPELLING(param));
 
     REBVAL *arg = FRM_ARG(f, param - rootparam);
     if (IS_NULLED(arg))
@@ -1279,7 +1279,7 @@ REBCTX *Error_Arg_Type(
     enum Reb_Kind actual
 ){
     DECLARE_LOCAL (param_word);
-    Init_Word(param_word, VAL_PARAM_SPELLING(param));
+    Init_Word(param_word, VAL_KEY_SPELLING(param));
 
     DECLARE_LOCAL (label);
     Get_Frame_Label_Or_Blank(label, f);

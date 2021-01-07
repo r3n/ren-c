@@ -121,9 +121,9 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
     REBLEN index = 1;
     for (; NOT_END(param); ++param, ++special, ++index) {
-        if (Is_Param_Hidden(param, special))
+        if (Is_Param_Hidden(special))
             continue;
-        Add_Binder_Index(&binder, VAL_PARAM_SPELLING(param), index);
+        Add_Binder_Index(&binder, VAL_KEY_SPELLING(param), index);
     }
   }
 
@@ -201,10 +201,10 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
     REBLEN index = 1;
     for (; NOT_END(param); ++param, ++special, ++index) {
-        if (Is_Param_Hidden(param, special))
+        if (Is_Param_Hidden(special))
             continue;
 
-        const REBSTR *spelling = VAL_PARAM_SPELLING(param);
+        const REBSTR *spelling = VAL_KEY_SPELLING(param);
 
         // If we saw the parameter, we removed its index from the binder.
         //
@@ -215,7 +215,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
             and not mentioned
             and not TYPE_CHECK(param, REB_TS_REFINEMENT)  // okay to leave out
         ){
-            error = Error_No_Arg(label, VAL_PARAM_SPELLING(param));
+            error = Error_No_Arg(label, VAL_KEY_SPELLING(param));
         }
     }
   }

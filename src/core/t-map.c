@@ -577,7 +577,7 @@ REBCTX *Alloc_Context_From_Map(const REBMAP *map)
 
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1)) {
-            Init_Context_Key(key, VAL_WORD_SPELLING(mval));
+            Init_Key(key, VAL_WORD_SPELLING(mval));
             ++key;
             Move_Value(var, &mval[1]);
             ++var;

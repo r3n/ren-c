@@ -401,7 +401,7 @@ inline static enum Reb_Kind BLOCKIFY_KIND(REBYTE k) {
 // of parameter flags is something planned for the near future.
 
 inline static bool IS_PARAM_KIND(REBYTE k)
-    { return k >= REB_P_OUTPUT and k <= REB_P_SEALED; }
+    { return k >= REB_P_OUTPUT and k <= REB_P_LOCAL; }
 
 #define IS_PARAM(v) \
     IS_PARAM_KIND(KIND3Q_BYTE(v))

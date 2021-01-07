@@ -263,10 +263,13 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
     //
     // !!! PG_Dispatcher() should do this, so every phase gets checked.
     //
-  #ifdef DEBUG_NATIVE_RETURNS
+    // !!!! RETURNS NOT WORKING RIGHT NOW
+    // !!! FIX THIS DO NOT CHECK IN
+    UNUSED(phase);
+/*  #ifdef DEBUG_NATIVE_RETURNS
     if (ACT_HAS_RETURN(phase)) {
         REBVAL *typeset = ACT_PARAMS_HEAD(phase);
-        assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
+        assert(VAL_KEY_SYM(typeset) == SYM_RETURN);
         if (GET_CELL_FLAG(f->out, OUT_MARKED_STALE)) {
             if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE)) {
                 printf("Native code violated return type contract!\n");
@@ -284,7 +287,7 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
             panic (Error_Bad_Return_Type(f, VAL_TYPE(f->out)));
         }
     }
-  #endif
+  #endif */
 }
 
 

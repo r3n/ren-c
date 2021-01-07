@@ -383,7 +383,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     ){
         // !!! cache this test?
         //
-        REBVAL *first = First_Unspecialized_Param(enfixed);
+        REBVAL *first = First_Unspecialized_Param(nullptr, enfixed);
         if (
             VAL_PARAM_CLASS(first) == REB_P_SOFT
             or VAL_PARAM_CLASS(first) == REB_P_MODAL
@@ -398,7 +398,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // with the BLOCK! on the left, but `x: default [...]` gets the SET-WORD!
     //
     if (GET_ACTION_FLAG(enfixed, SKIPPABLE_FIRST)) {
-        REBVAL *first = First_Unspecialized_Param(enfixed);
+        REBVAL *first = First_Unspecialized_Param(nullptr, enfixed);
         if (not TYPE_CHECK(first, kind_current))  // left's kind
             goto give_up_backward_quote_priority;
     }
@@ -1103,12 +1103,18 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             fail ("SET-BLOCK! is only allowed to have ACTION! on right ATM.");
 
         REBDSP dsp_outputs = DSP;
-        REBVAL *temp = ACT_PARAMS_HEAD(VAL_ACTION(f_spare));
-        for (; NOT_END(temp); ++temp) {
-            if (VAL_PARAM_CLASS(temp) != REB_P_OUTPUT)
+
+      blockscope {
+        REBVAL *key = ACT_PARAMS_HEAD(VAL_ACTION(f_spare));
+        REBVAL *special = ACT_SPECIALTY_HEAD(VAL_ACTION(f_spare));
+        for (; NOT_END(key); ++key, ++special) {
+            if (Is_Param_Hidden(special))
                 continue;
-            Init_Word(DS_PUSH(), VAL_TYPESET_STRING(temp));
+            if (VAL_PARAM_CLASS(special) != REB_P_OUTPUT)
+                continue;
+            Init_Word(DS_PUSH(), VAL_KEY_SPELLING(key));
         }
+      }
 
         DECLARE_LOCAL(outputs);
         Init_Block(outputs, Pop_Stack_Values(dsp_outputs));
@@ -1434,7 +1440,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))
             fail (Error_Literal_Left_Path_Raw());
 
-        REBVAL *first = First_Unspecialized_Param(enfixed);
+        REBVAL *first = First_Unspecialized_Param(nullptr, enfixed);
         if (VAL_PARAM_CLASS(first) == REB_P_SOFT) {
             if (GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)) {
                 CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);

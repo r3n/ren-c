@@ -263,6 +263,20 @@ inline static REBLEN CTX_LEN(REBCTX *c) {
 #define CTX_TYPE(c) \
     VAL_TYPE(CTX_ARCHETYPE(c))
 
+// Context keys and action parameters use a compatible representation (this
+// enables using action paramlists as FRAME! context keylists).
+//
+// !!! An API for hinting types in FRAME! contexts could be useful, if that
+// was then used to make an ACTION! out of it...which is a conceptual idea
+// for the "real way to make actions":
+//
+// https://forum.rebol.info/t/1002
+//
+#define IS_KEY IS_WORD
+#define VAL_KEY_SPELLING VAL_WORD_SPELLING
+#define VAL_KEY_SYM VAL_WORD_SYM
+#define Init_Key Init_Word
+
 #define CTX_KEYS_HEAD(c) \
     SER_AT(REBVAL, CTX_KEYLIST(c), 1)  // 1-based, no RELVAL*
 
@@ -287,8 +301,8 @@ inline static REBVAL *CTX_VAR(REBCTX *c, REBLEN n) {  // 1-based, no RELVAL*
     return cast(REBVAL*, cast(REBSER*, c)->content.dynamic.data) + n;
 }
 
-#define CTX_KEY_SPELLING(c,n)       VAL_TYPESET_STRING(CTX_KEY((c), (n)))
-#define CTX_KEY_SYM(c,n)            STR_SYMBOL(CTX_KEY_SPELLING((c), (n)))
+#define CTX_KEY_SPELLING(c,n)       VAL_KEY_SPELLING(CTX_KEY((c), (n)))
+#define CTX_KEY_SYM(c,n)            VAL_KEY_SYM(CTX_KEY((c), (n)))
 
 
 //=//// FRAME! REBCTX* <-> REBFRM* STRUCTURE //////////////////////////////=//

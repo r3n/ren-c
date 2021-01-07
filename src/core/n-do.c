@@ -424,7 +424,7 @@ REBNATIVE(do)
         // Ren-C will only run arity 0 functions from DO, otherwise REEVAL
         // must be used.  Look for the first non-local parameter to tell.
         //
-        if (First_Unspecialized_Param(VAL_ACTION(source)))
+        if (First_Unspecialized_Param(nullptr, VAL_ACTION(source)))
             fail (Error_Do_Arity_Non_Zero_Raw());
 
         if (Eval_Value_Throws(D_OUT, source, SPECIFIED))
@@ -466,7 +466,7 @@ REBNATIVE(do)
         f->rootvar = CTX_ROOTVAR(stolen);
         f->arg = f->rootvar + 1;
         // f->param set above
-        f->special = f->arg;
+        f->special = ACT_SPECIALTY_HEAD(phase);
 
         assert(FRM_PHASE(f) == phase);  // !!! v-- should archetype match?
         INIT_FRM_BINDING(f, VAL_FRAME_BINDING(source));
@@ -798,7 +798,7 @@ REBNATIVE(applique)
     REBVAL *key = CTX_KEYS_HEAD(exemplar);
     REBVAL *var = CTX_VARS_HEAD(exemplar);
     for (; NOT_END(key); key++, ++var) {
-        if (Is_Param_Hidden(key, var))
+        if (Is_Param_Hidden(var))
             continue; // was part of a specialization internal to the action
 
         // !!! This is another case where if you want to literaly apply

@@ -167,7 +167,7 @@ REBVAL *Append_Context(
     // also check that redundant keys aren't getting added here.
     //
     EXPAND_SERIES_TAIL(keylist, 1);
-    Init_Context_Key(
+    Init_Key(
         ARR_LAST(keylist),
         spelling
             ? unwrap(spelling)
@@ -394,7 +394,7 @@ static void Collect_Inner_Loop(
 
             EXPAND_SERIES_TAIL(BUF_COLLECT, 1);
             if (cl->flags & COLLECT_AS_TYPESET)
-                Init_Context_Key(
+                Init_Key(
                     ARR_LAST(BUF_COLLECT),
                     VAL_WORD_SPELLING(cell)
                 );
@@ -788,7 +788,7 @@ REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
         if (Is_Param_Sealed(key))
             continue;
 
-        if (not always and Is_Param_Hidden(key, var))
+        if (not always and Is_Param_Hidden(var))
             continue;
 
         if (mode & 1) {
@@ -1147,7 +1147,7 @@ REBLEN Find_Symbol_In_Context(
         if (Is_Param_Sealed(key))
             continue;  // pretend this parameter is not there
 
-        if (not always and Is_Param_Hidden(key, var))
+        if (not always and Is_Param_Hidden(var))
             return 0;
 
         return n;
@@ -1277,7 +1277,7 @@ void Assert_Context_Core(REBCTX *c)
             panic (c);
         }
 
-        if (not IS_PARAM(key))
+        if (not IS_WORD(key))
             panic (key);
 
         if (IS_END(var)) {

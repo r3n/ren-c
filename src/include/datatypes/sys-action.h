@@ -263,6 +263,11 @@ inline static REBVAL *ACT_PARAM(REBACT *a, REBLEN n) {
     return SER_AT(REBVAL, ACT_PARAMLIST(a), n);
 }
 
+inline static REBVAL *ACT_SPECIAL(REBACT *a, REBLEN n) {
+    assert(n != 0 and n < ARR_LEN(ACT_PARAMLIST(a)));
+    return ACT_SPECIALTY_HEAD(a) + n - 1;
+}
+
 #define ACT_NUM_PARAMS(a) \
     (ACT_PARAMLIST(a)->content.dynamic.used - 1)  // guaranteed dynamic
 
@@ -411,9 +416,21 @@ inline static REBVAL *Voidify_Rootparam(REBARR *paramlist) {
 // The only bright idea in practice right now is that parameter lists which
 // have a definitional return in the first slot have a flag saying so.  Much
 // more design work on this is needed.
+//
+
+// !!! THE ACTION RETURN MECHANISM IS NOT WORKING AT THE MOMENT SO WE
+// GO BY THE WORD, THIS IS NOT GOOD, ALL NEEDS RETHINKING...
+// SKIP RETURN JUST TO GET IT WORKING.  IT IS LIKELY THAT THE GENERIC
+// SHOULD ENCODE THE INDEX IN THE DETAILS INSTEAD OF MAKING THIS ROUTINE
+// GUESS, BECAUSE THE FUNCTION SPECIFICATION CEASES TO OFFER TYPE
+// INFORMATION ONCE THINGS ARE SPECIALIZED.
+
+/*#define ACT_HAS_RETURN(a) \
+    (did (ACT_PARAMLIST(a)->header.bits & PARAMLIST_FLAG_HAS_RETURN))
+*/
 
 #define ACT_HAS_RETURN(a) \
-    (did (ACT_PARAMLIST(a)->header.bits & PARAMLIST_FLAG_HAS_RETURN))
+    (SYM_RETURN == VAL_KEY_SYM(ACT_PARAMS_HEAD(a)))
 
 
 //=//// NATIVE ACTION ACCESS //////////////////////////////////////////////=//
@@ -434,7 +451,7 @@ inline static REBVAL *Voidify_Rootparam(REBARR *paramlist) {
 // the 0 slot of the action's details.  That action has no binding and
 // no label.
 //
-static inline REBVAL *Init_Action(
+static inline REBVAL *Init_Action_Core(
     RELVAL *out,
     REBACT *a,
     option(const REBSTR*) label,  // allowed to be ANONYMOUS
@@ -445,7 +462,7 @@ static inline REBVAL *Init_Action(
   #endif
     Force_Series_Managed(ACT_DETAILS(a));
 
-    RESET_CELL(out, REB_ACTION, CELL_MASK_ACTION);
+    RESET_VAL_HEADER(out, REB_ACTION, CELL_MASK_ACTION);
     VAL_ACTION_DETAILS_NODE(out) = NOD(ACT_DETAILS(a));
     INIT_VAL_ACTION_LABEL(out, label);
     INIT_VAL_ACTION_BINDING(out, binding);
@@ -453,6 +470,8 @@ static inline REBVAL *Init_Action(
     return cast(REBVAL*, out);
 }
 
+#define Init_Action(out,a,label,binding) \
+    Init_Action_Core(TRACK_CELL_IF_DEBUG(out), (a), (label), (binding))
 
 inline static REB_R Run_Generic_Dispatch(
     const REBVAL *first_arg,  // !!! Is this always same as FRM_ARG(f, 1)?

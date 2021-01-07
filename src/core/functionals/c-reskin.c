@@ -105,7 +105,7 @@ REB_R Skinner_Dispatcher(REBFRM *f)
     // against the returned type.
 
     param = ACT_PARAMS_HEAD(phase);
-    assert(VAL_PARAM_SYM(param) == SYM_RETURN);
+    assert(VAL_KEY_SYM(param) == SYM_RETURN);
 
     if (not Is_Param_Skin_Expanded(param)) {  // don't need to retain control
         //
@@ -267,7 +267,7 @@ REBNATIVE(reskinned)
                 wrapped_around = true;
             }
 
-            if (VAL_PARAM_SPELLING(param) == symbol)
+            if (VAL_KEY_SPELLING(param) == symbol)
                 break;
             ++param;
         }
@@ -306,7 +306,7 @@ REBNATIVE(reskinned)
         }
 
         REBSPC *specifier = VAL_SPECIFIER(item);
-        bool hidden = Is_Param_Hidden(param, param);  // special = param
+        bool hidden = Is_Param_Hidden(param);
 
         switch (sym) {
           case SYM_0:  // completely override type bits
@@ -337,7 +337,7 @@ REBNATIVE(reskinned)
             // types is no big deal...any type that passed the narrower check
             // will pass the broader one.
             //
-            if (VAL_PARAM_SYM(param) == SYM_RETURN)
+            if (VAL_KEY_SYM(param) == SYM_RETURN)
                 need_skin_phase = true;
             break; }
 
@@ -377,8 +377,12 @@ REBNATIVE(reskinned)
         fail ("Type-expanding RESKIN only works on ADAPT/ENCLOSE actions");
     }
 
+    // !!!
+    // !!! TEMPORARY -- TURNING OFF RETURN CHECKS
+    // !!!
+/*
     if (ACT_HAS_RETURN(original))
-        paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
+        paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN; */
 
     // !!! This does not make a unique copy of the meta information context.
     // Hence updates to the title/parameter-descriptions/etc. of the tightened
@@ -460,7 +464,7 @@ REBNATIVE(tweak)
     INCLUDE_PARAMS_OF_TWEAK;
 
     REBACT *act = VAL_ACTION(ARG(action));
-    REBVAL *first = First_Unspecialized_Param(act);
+    REBVAL *first = First_Unspecialized_Param(nullptr, act);
 
     Reb_Param_Class pclass = first
         ? VAL_PARAM_CLASS(first)

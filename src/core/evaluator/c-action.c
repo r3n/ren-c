@@ -132,7 +132,7 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     // not followed by a refinement.  That would cost
     // extra, but avoid the test on every call.
     //
-    const RELVAL *enable = f->param + 1;
+    const RELVAL *enable = f->special + 1;
     if (
         IS_END(enable)
         or not TYPE_CHECK(enable, REB_TS_REFINEMENT)
@@ -144,7 +144,7 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
 
     // Signal refinement as being in use.
     //
-    Init_Word(DS_PUSH(), VAL_PARAM_SPELLING(enable));
+    Init_Word(DS_PUSH(), VAL_KEY_SPELLING(f->param + 1));
   }
 
   skip_enable_modal:
@@ -199,6 +199,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
     for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
 
+        assert(IS_KEY(f->param));  // new rule (will become f->key)
+
   //=//// CONTINUES (AT TOP SO GOTOS DO NOT CROSS INITIALIZATIONS /////////=//
 
         Prep_Cell(f->arg);
@@ -230,7 +232,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // come from argument fulfillment.  If there is an exemplar, they are
         // set from that, otherwise they are undefined.
         //
-        if (Is_Param_Hidden(f->param, f->special)) {  // hidden includes local
+        if (Is_Param_Hidden(f->special)) {  // hidden includes local
             //
             // For specialized cases, we assume type checking was done
             // when the parameter is hidden.  It cannot be manipulated
@@ -271,7 +273,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (DSP != f->dsp_orig) {  // reorderings or refinements pushed
             STKVAL(*) ordered = DS_TOP;
             STKVAL(*) lowest_ordered = DS_AT(f->dsp_orig);
-            const REBSTR *param_symbol = VAL_PARAM_SPELLING(f->param);
+            const REBSTR *param_symbol = VAL_KEY_SPELLING(f->param);
 
             for (; ordered != lowest_ordered; --ordered) {
                 if (VAL_WORD_SPELLING(ordered) != param_symbol)
@@ -281,7 +283,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 INIT_VAL_WORD_BINDING(ordered, f->varlist);
                 INIT_VAL_WORD_PRIMARY_INDEX(ordered, offset + 1);
 
-                if (Is_Typeset_Empty(f->param)) {
+                if (Is_Typeset_Empty(f->special)) {
                     //
                     // There's no argument, so we won't need to come back
                     // for this one.  But we did need to set its index
@@ -307,7 +309,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
       fulfill_arg: ;  // semicolon needed--next statement is declaration
 
-        Reb_Param_Class pclass = VAL_PARAM_CLASS(f->param);
+        Reb_Param_Class pclass = VAL_PARAM_CLASS(f->special);
         assert(pclass != REB_P_LOCAL);  // should have been handled by hidden
 
   //=//// HANDLE IF NEXT ARG IS IN OUT SLOT (e.g. ENFIX, CHAIN) ///////////=//
@@ -340,7 +342,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // slot which will react with TRUE to TAIL?, so feed it
                 // from the global empty array.
                 //
-                if (Is_Param_Variadic(f->param)) {
+                if (Is_Param_Variadic(f->special)) {
                     Init_Varargs_Untyped_Enfix(f->arg, END_NODE);
                     goto continue_fulfilling;
                 }
@@ -354,7 +356,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 goto continue_fulfilling;
             }
 
-            if (Is_Param_Variadic(f->param)) {
+            if (Is_Param_Variadic(f->special)) {
                 //
                 // Stow unevaluated cell into an array-form variadic, so
                 // the user can do 0 or 1 TAKEs of it.
@@ -475,7 +477,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // back to this call through a reified FRAME!, and are able to
         // consume additional arguments during the function run.
         //
-        if (Is_Param_Variadic(f->param)) {
+        if (Is_Param_Variadic(f->special)) {
             Init_Varargs_Untyped_Normal(f->arg, f);
             goto continue_fulfilling;
         }
@@ -564,11 +566,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   //=//// HARD QUOTED ARG-OR-REFINEMENT-ARG ///////////////////////////////=//
 
           case REB_P_HARD:
-            if (not Is_Param_Skippable(f->param))
+            if (not Is_Param_Skippable(f->special))
                 Literal_Next_In_Frame(f->arg, f);  // CELL_FLAG_UNEVALUATED
             else {
-                if (not Typecheck_Including_Constraints(f->param, f_next)) {
-                    assert(Is_Param_Endable(f->param));
+                if (not Typecheck_Including_Constraints(f->special, f_next)) {
+                    assert(Is_Param_Endable(f->special));
                     Init_Endish_Nulled(f->arg);  // not EVAL_FLAG_BARRIER_HIT
                     SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
                     goto continue_fulfilling;
@@ -743,10 +745,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         f->arg += offset;
         f->special += offset;
 
-        assert(VAL_WORD_SPELLING(DS_TOP) == VAL_PARAM_SPELLING(f->param));
+        assert(VAL_WORD_SPELLING(DS_TOP) == VAL_KEY_SPELLING(f->param));
         DS_DROP();
 
-        if (Is_Typeset_Empty(f->param)) {  // no callsite arg, just drop
+        if (Is_Typeset_Empty(f->special)) {  // no callsite arg, just drop
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
@@ -786,8 +788,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
     f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
     f->arg = FRM_ARGS_HEAD(f);
+    f->special = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
 
-    for (; NOT_END(f->param); ++f->param, ++f->arg) {
+    for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
         assert(NOT_END(f->arg));  // all END fulfilled as Init_Endish_Nulled()
 
         // Note that if you have a redo situation as with an ENCLOSE, a
@@ -795,10 +798,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // modified.  Even though it's hidden, it may need to be typechecked
         // again, unless it was fully hidden.
         //
-        if (GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
+        if (GET_CELL_FLAG(f->special, ARG_MARKED_CHECKED))
             continue;
-
-        assert(VAL_PARAM_CLASS(f->param) != REB_P_SEALED);
 
 /*        if (VAL_PARAM_CLASS(f->param) == REB_P_LOCAL) {
             if (not IS_VOID(f->arg) and not IS_ACTION(f->arg))  // !!! TEMP TO TRY BOOT
@@ -815,7 +816,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // The data feed is unchanged (can come from this frame, or another,
         // or just an array from MAKE VARARGS! of a BLOCK!)
         //
-        if (Is_Param_Variadic(f->param)) {
+        if (Is_Param_Variadic(f->special)) {
             //
             // The types on the parameter are for the values fetched later.
             // Actual argument must be a VARARGS!
@@ -842,7 +843,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // Refinements have a special rule beyond plain type checking, in that
         // they don't just want an ISSUE! or NULL, they want # or NULL.
         //
-        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
+        if (TYPE_CHECK(f->special, REB_TS_REFINEMENT)) {
             if (
                 GET_EVAL_FLAG(f, FULLY_SPECIALIZED)
                 and Is_Void_With_Sym(f->arg, SYM_UNSET)
@@ -851,7 +852,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             }
             else if (NOT_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
-                Typecheck_Refinement(f->param, f->arg);
+                Typecheck_Refinement(f->special, f->arg);
             continue;
         }
 
@@ -876,8 +877,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             //
             // Note: `1 + comment "foo"` => `1 +`, arg is END
             //
-            if (not Is_Param_Endable(f->param))
-                fail (Error_No_Arg(f->label, VAL_PARAM_SPELLING(f->param)));
+            if (not Is_Param_Endable(f->special))
+                fail (Error_No_Arg(f->label, VAL_KEY_SPELLING(f->param)));
 
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             continue;
@@ -887,7 +888,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
         if (
             kind_byte == REB_BLANK  // v-- e.g. <blank> param
-            and TYPE_CHECK(f->param, REB_TS_NOOP_IF_BLANK)
+            and TYPE_CHECK(f->special, REB_TS_NOOP_IF_BLANK)
         ){
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             SET_EVAL_FLAG(f, TYPECHECK_ONLY);
@@ -900,19 +901,19 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // like `foo: func [...] mutable [...]` ?  This seems bad, because the
         // contract of the function hasn't been "tweaked" with reskinning.
         //
-        if (TYPE_CHECK(f->param, REB_TS_CONST))
+        if (TYPE_CHECK(f->special, REB_TS_CONST))
             SET_CELL_FLAG(f->arg, CONST);
 
         // !!! Review when # is used here
-        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
-            Typecheck_Refinement(f->param, f->arg);
+        if (TYPE_CHECK(f->special, REB_TS_REFINEMENT)) {
+            Typecheck_Refinement(f->special, f->arg);
             continue;
         }
 
-        if (VAL_PARAM_SYM(f->param) == SYM_RETURN)
+        if (VAL_KEY_SYM(f->param) == SYM_RETURN)
             continue;  // !!! let whatever go for now
 
-        if (not Typecheck_Including_Constraints(f->param, f->arg))
+        if (not Typecheck_Including_Constraints(f->special, f->arg))
             fail (Error_Arg_Type(f, f->param, VAL_TYPE(f->arg)));
 
         SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
@@ -1054,7 +1055,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 f->special = ACT_SPECIALTY_HEAD(redo_phase);
                 f->arg = FRM_ARGS_HEAD(f);
                 for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
-                    if (Is_Param_Hidden(f->param, f->special)) {
+                    if (Is_Param_Hidden(f->special)) {
                         if (f->param == f->special) {
                             Init_Void(f->arg, SYM_UNSET);
                             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);

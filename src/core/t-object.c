@@ -88,7 +88,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
             // Wasn't already collected...so we added it...
             //
             EXPAND_SERIES_TAIL(BUF_COLLECT, 1);
-            Init_Context_Key(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(word));
+            Init_Key(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(word));
         }
         if (IS_END(word + 1))
             break; // fix bug#708
@@ -120,7 +120,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
             goto collect_end;
         }
 
-        if (Is_Param_Hidden(key, var)) {
+        if (Is_Param_Hidden(var)) {
             error = Error_Hidden_Raw();
             goto collect_end;
         }
@@ -174,14 +174,14 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     //
     for (; NOT_END(key1) && NOT_END(key2); key1++, key2++, var1++, var2++) {
       no_advance:
-        if (Is_Param_Hidden(key1, var1)) {
+        if (Is_Param_Hidden(var1)) {
             ++key1;
             ++var1;
             if (IS_END(key1))
                 break;
             goto no_advance;
         }
-        if (Is_Param_Hidden(key2, var2)) {
+        if (Is_Param_Hidden(var2)) {
             ++key2;
             ++var2;
             if (IS_END(key2))
@@ -205,11 +205,11 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // they don't line up.
     //
     for (; NOT_END(key1); key1++, var1++) {
-        if (not Is_Param_Hidden(key1, var1))
+        if (not Is_Param_Hidden(var1))
             return 1;
     }
     for (; NOT_END(key2); key2++, var2++) {
-        if (not Is_Param_Hidden(key2, var2))
+        if (not Is_Param_Hidden(var2))
             return -1;
     }
 
@@ -636,7 +636,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         for (; NOT_END(key); key++, var++) {
             if (Is_Param_Sealed(key))
                 continue;
-            if (honor_hidden and Is_Param_Hidden(key, var))
+            if (honor_hidden and Is_Param_Hidden(var))
                 continue;
 
             Append_Spelling(mo->series, VAL_KEY_SPELLING(key));
@@ -669,7 +669,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
     for (; NOT_END(key); ++key, ++var) {
         if (Is_Param_Sealed(key))
             continue;
-        if (honor_hidden and Is_Param_Hidden(key, var))
+        if (honor_hidden and Is_Param_Hidden(var))
             continue;
 
         New_Indented_Line(mo);

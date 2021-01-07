@@ -485,7 +485,7 @@ inline static const REBSTR *VAL_WORD_SPELLING(REBCEL(const*) cell) {
     const RELVAL *v = CELL_TO_VAL(cell);
 
     if (binding->header.bits & ARRAY_FLAG_IS_DETAILS)  // relative
-        return VAL_PARAM_SPELLING(ACT_PARAM(ACT(binding), VAL_WORD_INDEX(v)));
+        return VAL_KEY_SPELLING(ACT_PARAM(ACT(binding), VAL_WORD_INDEX(v)));
 
     assert(binding->header.bits & ARRAY_FLAG_IS_VARLIST);  // specific
     return CTX_KEY_SPELLING(CTX(binding), VAL_WORD_INDEX(v));

@@ -136,7 +136,7 @@ bool Interpreted_Dispatch_Details_1_Throws(
     assert(IS_BLOCK(body) and IS_RELATIVE(body) and VAL_INDEX(body) == 0);
 
     if (ACT_HAS_RETURN(phase)) {
-        assert(VAL_PARAM_SYM(ACT_PARAMS_HEAD(phase)) == SYM_RETURN);
+        assert(VAL_KEY_SYM(ACT_PARAMS_HEAD(phase)) == SYM_RETURN);
         REBVAL *cell = FRM_ARG(f, 1);
         Move_Value(cell, NATIVE_VAL(return));
         INIT_VAL_ACTION_BINDING(cell, CTX(f->varlist));
@@ -245,7 +245,12 @@ REB_R Returner_Dispatcher(REBFRM *f)
     }
 
     Blit_Specific(f->out, spare);
+
+    // !!! TYPECHECKING RETURN IS BROKEN 
+    /*
     FAIL_IF_BAD_RETURN_TYPE(f);
+    */
+
     return f->out;
 }
 
@@ -366,7 +371,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
         }
         else if (ACT_HAS_RETURN(a)) {
             REBVAL *typeset = ACT_PARAMS_HEAD(a);
-            assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
+            assert(VAL_KEY_SYM(typeset) == SYM_RETURN);
             if (not TYPE_CHECK(typeset, REB_VOID))  // `do []` returns
                 ACT_DISPATCHER(a) = &Returner_Dispatcher;  // error when run
         }
@@ -633,11 +638,11 @@ REBNATIVE(return)
     // So TYPESET! bits in the RETURN param are used for legal return types.
     //
     REBVAL *typeset = ACT_PARAMS_HEAD(target_fun);
-    assert(
-        VAL_PARAM_CLASS(typeset) == REB_P_LOCAL
-        or VAL_PARAM_CLASS(typeset) == REB_P_SEALED  // !!! review reuse
-    );
-    assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
+    //
+    // !!! LOCALNESS NOT KNOWN NOW
+    //
+/*    assert(VAL_PARAM_CLASS(typeset) == REB_P_LOCAL); */
+    assert(VAL_KEY_SYM(typeset) == SYM_RETURN);
 
     // There are two ways you can get an "endish nulled".  One is a plain
     // `RETURN` with nothing following it (which is interpreted as returning
@@ -670,9 +675,14 @@ REBNATIVE(return)
     // take [<opt> any-value!] as its argument, and then report the error
     // itself...implicating the frame (in a way parallel to this native).
     //
+
+
+    // !!!! RETURN TYPE CHECKING BROKEN
+    // NEW STRATEGY NEEDED
+    /*
     if (not TYPE_CHECK(typeset, VAL_TYPE(v)))
         fail (Error_Bad_Return_Type(target_frame, VAL_TYPE(v)));
-
+        */
   skip_type_check: {
     Move_Value(D_OUT, NATIVE_VAL(unwind)); // see also Make_Thrown_Unwind_Value
     INIT_VAL_ACTION_BINDING(D_OUT, f_binding);

@@ -109,19 +109,19 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     f->special = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
 
     for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
-        if (Is_Param_Hidden(f->param, f->special))  // specialized or local
+        if (Is_Param_Hidden(f->special))  // specialized or local
             continue;
 
-        if (TYPE_CHECK(f->param, REB_TS_SKIPPABLE) and IS_NULLED(f->arg))
+        if (TYPE_CHECK(f->special, REB_TS_SKIPPABLE) and IS_NULLED(f->arg))
             continue;  // don't throw in skippable args that are nulled out
 
-        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
+        if (TYPE_CHECK(f->special, REB_TS_REFINEMENT)) {
             if (IS_NULLED(f->arg))  // don't add to PATH!
                 continue;
 
-            Init_Word(DS_PUSH(), VAL_PARAM_SPELLING(f->param));
+            Init_Word(DS_PUSH(), VAL_KEY_SPELLING(f->param));
 
-            if (Is_Typeset_Empty(f->param)) {
+            if (Is_Typeset_Empty(f->special)) {
                 assert(Is_Blackhole(f->arg));  // used but argless refinement
                 continue;
             }

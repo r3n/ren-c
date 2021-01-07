@@ -106,6 +106,13 @@ REBNATIVE(generic)
     assert(not (flags & MKF_IS_VOIDER));
     assert(not (flags & MKF_IS_ELIDER));
 
+    REBACT *generic = Make_Action(
+        paramlist,
+        meta,
+        &Generic_Dispatcher,  // return type is only checked in debug build
+        IDX_NATIVE_MAX  // details array capacity
+    );
+
     // !!! There is no system yet for extension types to register which of
     // the generic actions they can handle.  So for the moment, we just say
     // that any custom type will have its action dispatcher run--and it's
@@ -114,22 +121,23 @@ REBNATIVE(generic)
     // be able to inventory which types had registered generic dispatchers
     // and list the appropriate types from HELP.
     //
-    RELVAL *param = ARR_AT(paramlist, 1);
-    if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
-        assert(VAL_PARAM_SYM(param) == SYM_RETURN);
-        TYPE_SET(param, REB_CUSTOM);
-        ++param;
-    }
-    while (VAL_PARAM_CLASS(param) != REB_P_NORMAL)
-        ++param;
-    TYPE_SET(param, REB_CUSTOM);
 
-    REBACT *generic = Make_Action(
-        paramlist,
-        meta,
-        &Generic_Dispatcher,  // return type is only checked in debug build
-        IDX_NATIVE_MAX  // details array capacity
-    );
+
+    // !!!
+    // !!! TEMPORARY - DISABLING RETURN CHECKS
+    // !!!
+    /*
+    RELVAL *param = ARR_AT(paramlist, 1);
+    REBVAL *special = ACT_SPECIALTY_HEAD(generic);
+    if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
+        assert(VAL_KEY_SYM(param) == SYM_RETURN);
+        TYPE_SET(special, REB_CUSTOM);
+        ++special;
+    }
+    while (VAL_PARAM_CLASS(special) != REB_P_NORMAL)
+        ++special;
+    TYPE_SET(special, REB_CUSTOM);
+    */
 
     SET_ACTION_FLAG(generic, IS_NATIVE);
 

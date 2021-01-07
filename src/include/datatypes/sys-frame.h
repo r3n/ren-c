@@ -951,7 +951,7 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
 inline static void FAIL_IF_BAD_RETURN_TYPE(REBFRM *f) {
     REBACT *phase = FRM_PHASE(f);
     REBVAL *typeset = ACT_PARAMS_HEAD(phase);
-    assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
+    assert(VAL_KEY_SYM(typeset) == SYM_RETURN);
 
     // Typeset bits for locals in frames are usually ignored, but the RETURN:
     // local uses them for the return types of a function.
@@ -963,7 +963,7 @@ inline static void FAIL_IF_BAD_RETURN_TYPE(REBFRM *f) {
 inline static void FAIL_IF_NO_INVISIBLE_RETURN(REBFRM *f) {
     REBACT *phase = FRM_PHASE(f);
     REBVAL *typeset = ACT_PARAMS_HEAD(phase);
-    assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
+    assert(VAL_KEY_SYM(typeset) == SYM_RETURN);
 
     if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE))
         fail (Error_Bad_Invisible(f));

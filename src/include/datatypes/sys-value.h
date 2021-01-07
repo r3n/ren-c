@@ -744,7 +744,7 @@ inline static void Move_Value_Header(
 //
 // Interface designed to line up with Derelativize()
 //
-inline static REBVAL *Move_Value(RELVAL *out, const REBVAL *v) {
+inline static REBVAL *Move_Value_Core(RELVAL *out, const REBVAL *v) {
     Move_Value_Header(out, v);
 
     // Payloads cannot hold references to stackvars, raw bit transfer ok.
@@ -762,6 +762,11 @@ inline static REBVAL *Move_Value(RELVAL *out, const REBVAL *v) {
     return cast(REBVAL*, out);
 }
 
+// This macro is a good place to add TRACK_CELL_IF_DEBUG() if you want to
+// know when things were last moved to a place, vs. what created them.
+//
+#define Move_Value(out,v) \
+    Move_Value_Core(TRACK_CELL_IF_DEBUG(out), (v))
 
 // When doing something like a COPY of an OBJECT!, the var cells have to be
 // handled specially, e.g. by preserving CELL_FLAG_ARG_MARKED_CHECKED.

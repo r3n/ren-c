@@ -154,7 +154,7 @@ static void Schema_From_Block_May_Fail(
     if (sym == SYM_VOID) {
         assert(
             not param_out
-            or VAL_PARAM_SYM(unwrap(param_out)) == SYM_RETURN
+            or VAL_KEY_SYM(unwrap(param_out)) == SYM_RETURN
         );  // can only do void for return types
         Init_Blank(schema_out);
     }

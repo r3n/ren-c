@@ -345,36 +345,28 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
 // However, not all calls have an associated value cell to test for hiddenness
 // so the "special" (see ACT_SPECIALTY()) is allowed to be the same as param.
 //
-inline static bool Is_Param_Hidden(
-    const RELVAL *param,
-    const RELVAL *special  // should be param -or- the context value
-){
-    // Once a parameter is hidden, it is either visible in the frame or part
-    // of an embedded frame's internal state.  Anything invisible to the
-    // outside world from one layer will also be invisible to layers of
-    // functionals above it.
-    //
-    Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
-    if (special == param)
-        return IS_HIDDEN_PARAM_KIND(pclass);
+inline static bool Is_Param_Hidden(const RELVAL *special)
+{
+    if (GET_CELL_FLAG(special, ARG_MARKED_CHECKED)) {
+        assert(not IS_PARAM(special));
+        return true;
+    }
 
-  /*  if (IS_HIDDEN_PARAM_KIND(pclass))
-        assert(GET_CELL_FLAG(special, ARG_MARKED_CHECKED)); */
-
-    // In order for MAKE FRAME! to be able to hide arguments, it can't muck
-    // with any paramlists...the bit has to be set on the values.  It hides
-    // the argument with a flag on the cell.
+    // unchecked parameters in an exemplar frame may be PARAM!, but if they
+    // are an ordinary FRAME! they will not be.  Review if better asserts are
+    // needed here that make it worth passing in the context being checked.
     //
-    return GET_CELL_FLAG(special, ARG_MARKED_CHECKED);
+    return false;
 }
 
 inline static void Hide_Param(RELVAL *param) {
-    assert(VAL_PARAM_CLASS(param) != REB_P_SEALED);
-    mutable_KIND3Q_BYTE(param) = REB_P_LOCAL;
+    UNUSED(param);
+    /*mutable_KIND3Q_BYTE(param) = REB_P_LOCAL;*/
 }
 
 inline static void Seal_Param(RELVAL *param) {
-    mutable_KIND3Q_BYTE(param) = REB_P_SEALED;
+    UNUSED(param);
+    /*mutable_KIND3Q_BYTE(param) = REB_P_LOCAL;*/
 }
 
 
@@ -390,8 +382,10 @@ inline static void Seal_Param(RELVAL *param) {
 // solution to separate the property of bindability from visibility, as
 // the SELF solution shakes out--so that SELF may be hidden but bind.
 //
-#define Is_Param_Sealed(v) \
-    (VAL_PARAM_CLASS(v) == REB_P_SEALED)
+inline static bool Is_Param_Sealed(REBVAL *special) {
+    UNUSED(special);
+    return false;  // !!! temporary, needs to use cell flag
+}
 
 // Parameters can be marked such that if they are blank, the action will not
 // be run at all.  This is done via the `<blank>` annotation, which indicates
@@ -411,19 +405,6 @@ inline static void Seal_Param(RELVAL *param) {
 //=//// PARAMETER SYMBOL //////////////////////////////////////////////////=//
 //
 // Name should be NULL unless typeset in object keylist or func paramlist
-
-inline static const REBSTR *VAL_KEY_SPELLING(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
-    return VAL_TYPESET_STRING(v);
-}
-
-inline static OPT_REBSYM VAL_KEY_SYM(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
-    return STR_SYMBOL(VAL_KEY_SPELLING(v)); // mirrors canon's symbol
-}
-
-#define VAL_PARAM_SPELLING(p) VAL_KEY_SPELLING(p)
-#define VAL_PARAM_SYM(p) VAL_KEY_SYM(p)
 
 inline static REBVAL *Init_Typeset(RELVAL *out, REBU64 bits)
 {
@@ -459,21 +440,6 @@ inline static REBVAL *Init_Param_Core(
 #define Init_Param(out,pclass,spelling,bits) \
     Init_Param_Core( \
         TRACK_CELL_IF_EXTENDED_DEBUG(out), (pclass), (spelling), (bits))
-
-
-// Context keys and action parameters use a compatible representation (this
-// enables using action paramlists as FRAME! context keylists).  However,
-// Rebol objects historically don't do any typechecking, so this just says
-// any value is legal.
-//
-// !!! An API for hinting types in FRAME! contexts could be useful, if that
-// was then used to make an ACTION! out of it...which is a conceptual idea
-// for the "real way to make actions":
-//
-// https://forum.rebol.info/t/1002
-//
-#define Init_Context_Key(out,spelling) \
-    Init_Param((out), REB_P_NORMAL, (spelling), TS_VALUE)
 
 
 inline static REBVAL *Refinify(REBVAL *v);  // forward declaration
@@ -526,7 +492,8 @@ inline static bool Typecheck_Including_Constraints(
 }
 
 
-inline static bool Is_Typeset_Empty(const RELVAL *param) {
+inline static bool Is_Typeset_Empty(REBCEL(const*) param) {
+    assert(CELL_HEART(param) == REB_TYPESET);
     REBU64 bits = VAL_TYPESET_LOW_BITS(param);
     bits |= cast(REBU64, VAL_TYPESET_HIGH_BITS(param)) << 32;
     return (bits & TS_OPT_VALUE) == 0;  // e.g. `[/refine]`

@@ -141,7 +141,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     for (; NOT_END(param); ++param, ++arg, ++special, ++index) {
         Prep_Cell(arg);
 
-        if (Is_Param_Hidden(param, special)) {  // local or specialized
+        if (Is_Param_Hidden(special)) {  // local or specialized
             Blit_Specific(arg, special);  // preserve ARG_MARKED_CHECKED
 
           continue_specialized:
@@ -151,8 +151,8 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
         assert(NOT_CELL_FLAG(special, ARG_MARKED_CHECKED));
 
-        const REBSTR *symbol = VAL_PARAM_SPELLING(param);  // added to binding
-        if (not TYPE_CHECK(param, REB_TS_REFINEMENT)) {  // nothing to push
+        const REBSTR *symbol = VAL_KEY_SPELLING(param);  // added to binding
+        if (not TYPE_CHECK(special, REB_TS_REFINEMENT)) {  // nothing to push
 
           continue_unspecialized:
 
@@ -184,7 +184,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             INIT_VAL_WORD_BINDING(ordered, varlist);
             INIT_VAL_WORD_PRIMARY_INDEX(ordered, index);
 
-            if (not Is_Typeset_Empty(param))  // needs argument
+            if (not Is_Typeset_Empty(special))  // needs argument
                 goto continue_unspecialized;
 
             // If refinement named on stack takes no arguments, then it can't
@@ -294,7 +294,7 @@ bool Specialize_Action_Throws(
         RELVAL *key = CTX_KEYS_HEAD(exemplar);
         REBVAL *var = CTX_VARS_HEAD(exemplar);
         for (; NOT_END(key); ++key, ++var) {
-            if (Is_Param_Hidden(key, var))
+            if (Is_Param_Hidden(var))
                 continue;  // maybe refinement from stack, now specialized out
 
             Remove_Binder_Index(&binder, VAL_KEY_SPELLING(key));
@@ -328,10 +328,10 @@ bool Specialize_Action_Throws(
         // varlist...as the user may have used PROTECT/HIDE to force `arg`
         // to be hidden and still needs a typecheck here.
 
-        if (Is_Param_Hidden(param, special))
+        if (Is_Param_Hidden(special))
             continue;
 
-        if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
+        if (TYPE_CHECK(special, REB_TS_REFINEMENT)) {
             if (
                 Is_Void_With_Sym(arg, SYM_UNSET)
                 and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
@@ -345,7 +345,7 @@ bool Specialize_Action_Throws(
             if (GET_CELL_FLAG(arg, ARG_MARKED_CHECKED))
                 assert(IS_NULLED(arg) or Is_Blackhole(arg));
             else
-                Typecheck_Refinement(param, arg);
+                Typecheck_Refinement(special, arg);
 
             goto specialized_arg_no_typecheck;
         }
@@ -374,10 +374,10 @@ bool Specialize_Action_Throws(
         // !!! If argument was previously specialized, should have been type
         // checked already... don't type check again (?)
         //
-        if (Is_Param_Variadic(param))
+        if (Is_Param_Variadic(special))
             fail ("Cannot currently SPECIALIZE variadic arguments.");
 
-        if (not TYPE_CHECK(param, VAL_TYPE(arg)))
+        if (not TYPE_CHECK(special, VAL_TYPE(arg)))
             fail (arg);  // !!! merge w/Error_Invalid_Arg()
 
        SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
@@ -544,13 +544,13 @@ void For_Each_Unspecialized_Param(
     // Loop through and pass just the normal args.
     //
     for (; NOT_END(param); ++param, ++special) {
-        if (Is_Param_Hidden(param, special))
+        if (Is_Param_Hidden(special))
             continue;
 
-        if (TYPE_CHECK(param, REB_TS_REFINEMENT))
+        if (TYPE_CHECK(special, REB_TS_REFINEMENT))
             continue;
 
-        Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
+        Reb_Param_Class pclass = VAL_PARAM_CLASS(special);
         if (pclass == REB_P_LOCAL)
             continue;
 
@@ -559,7 +559,7 @@ void For_Each_Unspecialized_Param(
             for (; NOT_END(partial); ++partial) {
                 if (SAME_STR(
                     VAL_WORD_SPELLING(partial),
-                    VAL_PARAM_SPELLING(param)
+                    VAL_KEY_SPELLING(param)
                 )){
                     goto skip_in_first_pass;
                 }
@@ -573,13 +573,13 @@ void For_Each_Unspecialized_Param(
         if (pclass == REB_P_MODAL) {
             if (NOT_END(param + 1)) {  // !!! Ideally checked at creation
                 if (GET_CELL_FLAG(special + 1, ARG_MARKED_CHECKED)) {
-                    if (TYPE_CHECK(param + 1, REB_TS_REFINEMENT))  // required
+                    if (TYPE_CHECK(special + 1, REB_TS_REFINEMENT))  // required
                         flags |= PHF_DEMODALIZED;  // !!! ^-- check at create!
                 }
             }
         }
 
-        bool cancel = not hook(param, flags, opaque);
+        bool cancel = not hook(param, special, flags, opaque);
         if (cancel)
             return;
 
@@ -599,8 +599,9 @@ void For_Each_Unspecialized_Param(
         REBVAL *head = SPECIFIC(ARR_HEAD(unwrap(partials)));
         for (; partial-- != head; ) {
             REBVAL *param = ACT_PARAM(act, VAL_WORD_INDEX(partial));
+            REBVAL *special = ACT_SPECIAL(act, VAL_WORD_INDEX(partial));
 
-            bool cancel = not hook(param, PHF_UNREFINED, opaque);
+            bool cancel = not hook(param, special, PHF_UNREFINED, opaque);
             if (cancel)
                 return;
         }
@@ -613,10 +614,10 @@ void For_Each_Unspecialized_Param(
     REBVAL *special = ACT_SPECIALTY_HEAD(act);
 
     for (; NOT_END(param); ++param, ++special) {
-        if (Is_Param_Hidden(param, special))
+        if (Is_Param_Hidden(special))
             continue;
 
-        if (not TYPE_CHECK(param, REB_TS_REFINEMENT))
+        if (not TYPE_CHECK(special, REB_TS_REFINEMENT))
             continue;
 
         if (partials) {
@@ -624,14 +625,14 @@ void For_Each_Unspecialized_Param(
             for (; NOT_END(partial); ++partial) {
                 if (SAME_STR(
                     VAL_WORD_SPELLING(partial),
-                    VAL_PARAM_SPELLING(param)
+                    VAL_KEY_SPELLING(param)
                 )){
                     goto continue_unspecialized_loop;
                 }
             }
         }
 
-        bool cancel = not hook(param, 0, opaque);
+        bool cancel = not hook(param, special, 0, opaque);
         if (cancel)
             return;
 
@@ -644,28 +645,39 @@ void For_Each_Unspecialized_Param(
 
 struct Find_Param_State {
     REBVAL *param;
+    REBVAL *special;
 };
 
-static bool First_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
-{
+static bool First_Param_Hook(
+    REBVAL *param,
+    REBVAL *special,
+    REBFLGS flags,
+    void *opaque
+){
     struct Find_Param_State *s = cast(struct Find_Param_State*, opaque);
     assert(not s->param);  // should stop enumerating if found
 
-    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
+    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(special, REB_TS_REFINEMENT))
         return false;  // we know WORD!-based invocations will be 0 arity
 
     s->param = param;
+    s->special = special;
     return false;  // found first unspecialized, no need to look more
 }
 
-static bool Last_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
-{
+static bool Last_Param_Hook(
+    REBVAL *param,
+    REBVAL *special,
+    REBFLGS flags,
+    void *opaque
+){
     struct Find_Param_State *s = cast(struct Find_Param_State*, opaque);
 
-    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
+    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(special, REB_TS_REFINEMENT))
         return false;  // we know WORD!-based invocations will be 0 arity
 
     s->param = param;
+    s->special = special;
     return true;  // keep looking and be left with the last
 }
 
@@ -679,14 +691,17 @@ static bool Last_Param_Hook(REBVAL *param, REBFLGS flags, void *opaque)
 //
 // This means that the last parameter (D) is actually the first of FOO-D.
 //
-REBVAL *First_Unspecialized_Param(REBACT *act)
+REBVAL *First_Unspecialized_Param(REBVAL **key, REBACT *act)
 {
     struct Find_Param_State s;
     s.param = nullptr;
+    s.special = nullptr;
 
     For_Each_Unspecialized_Param(act, &First_Param_Hook, &s);
 
-    return s.param;  // may be nullptr
+    if (key)
+        *key = s.param; 
+    return s.special;  // may be nullptr
 }
 
 
@@ -695,14 +710,17 @@ REBVAL *First_Unspecialized_Param(REBACT *act)
 //
 // See notes on First_Unspecialized_Param() regarding complexity
 //
-REBVAL *Last_Unspecialized_Param(REBACT *act)
+REBVAL *Last_Unspecialized_Param(REBVAL **key, REBACT *act)
 {
     struct Find_Param_State s;
     s.param = nullptr;
+    s.special = nullptr;
 
     For_Each_Unspecialized_Param(act, &Last_Param_Hook, &s);
 
-    return s.param;  // may be nullptr
+    if (key)
+        *key = s.param;
+    return s.special;  // may be nullptr
 }
 
 //
@@ -713,7 +731,7 @@ REBVAL *Last_Unspecialized_Param(REBACT *act)
 REBVAL *First_Unspecialized_Arg(option(REBVAL **) param_out, REBFRM *f)
 {
     REBACT *phase = FRM_PHASE(f);
-    REBVAL *param = First_Unspecialized_Param(phase);
+    REBVAL *param = First_Unspecialized_Param(nullptr, phase);
     if (param_out)
         *unwrap(param_out) = param;
 
@@ -801,7 +819,6 @@ bool Make_Invocation_Frame_Throws(
             goto found_first_arg_ptr;
 
           case REB_P_LOCAL:
-          case REB_P_SEALED:
             break;
 
           case REB_P_OUTPUT:  // should always have REB_TS_REFINEMENT
@@ -936,7 +953,7 @@ REBACT *Alloc_Action_From_Exemplar(
     const REBVAL *special = ACT_SPECIALTY_HEAD(unspecialized);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
     for (; NOT_END(param); ++param, ++arg, ++special) {
-        if (Is_Param_Hidden(param, special))
+        if (Is_Param_Hidden(special))
             continue;
 
         // We leave non-hidden ~unset~ to be handled by the evaluator as
@@ -955,10 +972,10 @@ REBACT *Alloc_Action_From_Exemplar(
             continue;
         }
 
-        if (TYPE_CHECK(param, REB_TS_REFINEMENT))
-            Typecheck_Refinement(param, arg);
+        if (TYPE_CHECK(special, REB_TS_REFINEMENT))
+            Typecheck_Refinement(special, arg);
         else
-            Typecheck_Including_Constraints(param, arg);
+            Typecheck_Including_Constraints(special, arg);
 
         SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
     }

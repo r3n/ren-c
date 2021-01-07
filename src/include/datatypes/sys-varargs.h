@@ -197,7 +197,7 @@ inline static const REBVAL *Param_For_Varargs_Maybe_Null(REBCEL(const*) v) {
 
     REBACT *phase = VAL_VARARGS_PHASE(v);
     if (phase) {
-        REBARR *paramlist = ACT_PARAMLIST(phase);
+        REBARR *paramlist = CTX_VARLIST(ACT_EXEMPLAR(phase));
         if (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0) // e.g. enfix
             return cast(REBVAL*, ARR_AT(
                 paramlist,
