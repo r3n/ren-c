@@ -124,7 +124,7 @@ void Bind_Values_Core(
     REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
     for (; NOT_END(key); key++, var++, index++)
         if (not Is_Param_Sealed(var))
-            Add_Binder_Index(&binder, VAL_KEY_SPELLING(key), index);
+            Add_Binder_Index(&binder, KEY_SPELLING(key), index);
   }
 
     Bind_Values_Inner_Loop(
@@ -141,7 +141,7 @@ void Bind_Values_Core(
     REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
     for (; NOT_END(key); ++key, ++var)
         if (not Is_Param_Sealed(var))
-            Remove_Binder_Index(&binder, VAL_KEY_SPELLING(key));
+            Remove_Binder_Index(&binder, KEY_SPELLING(key));
   }
 
     SHUTDOWN_BINDER(&binder);
@@ -420,12 +420,12 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     REBLEN param_num = 1;
 
   blockscope {  // Setup binding table from the argument word list
-    const REBKEY *key = ACT_PARAMS_HEAD(relative);
+    const REBKEY *key = ACT_KEYS_HEAD(relative);
     REBVAL *special = ACT_SPECIALTY_HEAD(relative);
     for (; NOT_END(key); ++key, ++special, ++param_num) {
         if (Is_Param_Sealed(special))
             continue;
-        Add_Binder_Index(&binder, VAL_KEY_SPELLING(key), param_num);
+        Add_Binder_Index(&binder, KEY_SPELLING(key), param_num);
     }
   }
 
@@ -482,7 +482,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             // flag, then the cells will be formatted such that the flag cannot
             // be taken off.
             //
-            REBARR *paramlist = ACT_PARAMLIST(relative);
+            REBARR *paramlist = ACT_KEYLIST(relative);
             REBARR *varlist = CTX_VARLIST(ACT_EXEMPLAR(relative));
             assert(GET_SERIES_FLAG(paramlist, FIXED_SIZE));
             CLEAR_SERIES_FLAG(paramlist, FIXED_SIZE);
@@ -516,13 +516,13 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     }
 
   blockscope {  // Reset binding table
-    const REBKEY *key = ACT_PARAMS_HEAD(relative);
+    const REBKEY *key = ACT_KEYS_HEAD(relative);
     REBVAL *special = ACT_SPECIALTY_HEAD(relative);
     for (; NOT_END(key); ++key, ++special) {
         if (Is_Param_Sealed(special))
             continue;
 
-        Remove_Binder_Index(&binder, VAL_KEY_SPELLING(key));
+        Remove_Binder_Index(&binder, KEY_SPELLING(key));
     }
   }
 
@@ -843,7 +843,7 @@ void Virtual_Bind_Deep_To_New_Context(
     REBVAL *var = CTX_VARS_HEAD(c); // only needed for debug, optimized out
     for (; NOT_END(key); ++key, ++var) {
         REBINT stored = Remove_Binder_Index_Else_0(
-            &binder, VAL_KEY_SPELLING(key)
+            &binder, KEY_SPELLING(key)
         );
         if (stored == 0)
             assert(duplicate);
@@ -922,7 +922,7 @@ void Init_Interning_Binder(
     const REBKEY *key = CTX_KEYS_HEAD(ctx);
     REBINT index = 1;
     for (; NOT_END(key); ++key, ++index)
-        Add_Binder_Index(binder, VAL_KEY_SPELLING(key), index);  // positives
+        Add_Binder_Index(binder, KEY_SPELLING(key), index);  // positives
   }
 
     // For all the keys that aren't in the supplied context but *are* in lib,
@@ -934,7 +934,7 @@ void Init_Interning_Binder(
         const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
         REBINT index = 1;
         for (; NOT_END(key); ++key, ++index) {
-            const REBSTR *canon = VAL_KEY_SPELLING(key);
+            const REBSTR *canon = KEY_SPELLING(key);
             REBINT n = Get_Binder_Index_Else_0(binder, canon);
             if (n == 0)
                 Add_Binder_Index(binder, canon, - index);
@@ -957,7 +957,7 @@ void Shutdown_Interning_Binder(struct Reb_Binder *binder, REBCTX *ctx)
     const REBKEY *key = CTX_KEYS_HEAD(ctx);
     REBINT index = 1;
     for (; NOT_END(key); ++key, ++index) {
-        REBINT n = Remove_Binder_Index_Else_0(binder, VAL_KEY_SPELLING(key));
+        REBINT n = Remove_Binder_Index_Else_0(binder, KEY_SPELLING(key));
         assert(n == index);
         UNUSED(n);
     }
@@ -970,7 +970,7 @@ void Shutdown_Interning_Binder(struct Reb_Binder *binder, REBCTX *ctx)
         const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
         REBINT index = 1;
         for (; NOT_END(key); ++key, ++index) {
-            REBINT n = Remove_Binder_Index_Else_0(binder, VAL_KEY_SPELLING(key));
+            REBINT n = Remove_Binder_Index_Else_0(binder, KEY_SPELLING(key));
             assert(n == 0 or n == -index);
             UNUSED(n);
         }

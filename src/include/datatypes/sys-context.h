@@ -222,7 +222,7 @@ inline static REBARR *CTX_KEYLIST(REBCTX *c) {
         //
         // running frame, source is REBFRM*, so use action's paramlist.
         //
-        return ACT_PARAMLIST(CTX_FRAME_ACTION(c));
+        return ACT_KEYLIST(CTX_FRAME_ACTION(c));
     }
     return ARR(LINK_KEYSOURCE(CTX_VARLIST(c)));  // not a REBFRM, use keylist
 }
@@ -286,9 +286,6 @@ inline static REBVAL *CTX_VAR(REBCTX *c, REBLEN n) {  // 1-based, no RELVAL*
     assert(n != 0 and n <= CTX_LEN(c));
     return cast(REBVAL*, cast(REBSER*, c)->content.dynamic.data) + n;
 }
-
-#define CTX_KEY_SPELLING(c,n)       VAL_KEY_SPELLING(CTX_KEY((c), (n)))
-#define CTX_KEY_SYM(c,n)            VAL_KEY_SYM(CTX_KEY((c), (n)))
 
 
 //=//// FRAME! REBCTX* <-> REBFRM* STRUCTURE //////////////////////////////=//
@@ -451,7 +448,7 @@ inline static const REBKEY *VAL_CONTEXT_KEYS_HEAD(REBCEL(const*) context)
         return CTX_KEYS_HEAD(VAL_CONTEXT(context));
 
     REBACT *phase = VAL_FRAME_PHASE(context);
-    return ACT_PARAMS_HEAD(phase);
+    return ACT_KEYS_HEAD(phase);
 }
 
 #define VAL_CONTEXT_VARS_HEAD(context) \

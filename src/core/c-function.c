@@ -42,7 +42,7 @@ static bool Params_Of_Hook(
 ){
     struct Params_Of_State *s = cast(struct Params_Of_State*, opaque);
 
-    Init_Word(DS_PUSH(), VAL_KEY_SPELLING(key));
+    Init_Word(DS_PUSH(), KEY_SPELLING(key));
 
     if (not s->just_words) {
         if (
@@ -956,7 +956,7 @@ REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
 
     REBLEN n;
     for (n = 1; n < len; ++n, ++key) {
-        if (spelling == VAL_KEY_SPELLING(key))
+        if (spelling == KEY_SPELLING(key))
             return n;
     }
 
@@ -1050,7 +1050,7 @@ REBACT *Make_Action(
     // !!! There used to be more validation code needed here when it was
     // possible to pass a specialization frame separately from a paramlist.
     // But once paramlists were separated out from the function's identity
-    // array (using ACT_DETAILS() as the identity instead of ACT_PARAMLIST())
+    // array (using ACT_DETAILS() as the identity instead of ACT_KEYLIST())
     // then all the "shareable" information was glommed up minus redundancy
     // into the ACT_SPECIALTY().  Here's some of the residual checking, as
     // a placeholder for more useful consistency checking which might be done.
@@ -1062,9 +1062,9 @@ REBACT *Make_Action(
     ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(paramlist));  // unused at this time
     assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
     if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
-        RELVAL *param = ARR_AT(paramlist, 1);
-        assert(VAL_KEY_SYM(param) == SYM_RETURN);
-        UNUSED(param);
+        const REBKEY *key = SER_AT(const REBKEY, paramlist, 1);
+        assert(KEY_SYM(key) == SYM_RETURN);
+        UNUSED(key);
     }
   }
 
@@ -1167,7 +1167,7 @@ REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
     INIT_VAL_FRAME_ROOTVAR(rootvar, varlist, a, UNBOUND);  // !!! binding?
 
     REBCTX *expired = CTX(varlist);
-    INIT_CTX_KEYLIST_SHARED(expired, ACT_PARAMLIST(a));
+    INIT_CTX_KEYLIST_SHARED(expired, ACT_KEYLIST(a));
 
     return expired;
 }

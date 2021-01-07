@@ -28,7 +28,7 @@ static bool Same_Action(REBCEL(const*) a, REBCEL(const*) b)
 {
     assert(CELL_KIND(a) == REB_ACTION and CELL_KIND(b) == REB_ACTION);
 
-    if (VAL_ACTION_PARAMLIST(a) == VAL_ACTION_PARAMLIST(b)) {
+    if (VAL_ACTION_KEYLIST(a) == VAL_ACTION_KEYLIST(b)) {
         //
         // All actions that have the same paramlist are not necessarily the
         // "same action".  For instance, every RETURN shares a common
@@ -294,7 +294,7 @@ REBTYPE(Action)
             // special feature for object keys and paramlists!  So clear
             // that symbol out before giving it back.
             //
-            const REBVAL *param = ACT_PARAMS_HEAD(act);
+            const REBVAL *param = ACT_KEYS_HEAD(act);
             REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
             for (; NOT_END(param); ++param, ++typeset) {
                 assert(IS_PARAM(param));

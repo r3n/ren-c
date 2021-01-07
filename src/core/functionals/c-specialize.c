@@ -110,7 +110,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
     REBLEN num_slots = ACT_NUM_PARAMS(act) + 1;  // +1 is for CTX_ARCHETYPE()
     REBARR *varlist = Make_Array_Core(num_slots, SERIES_MASK_VARLIST);
-    INIT_CTX_KEYLIST_SHARED(CTX(varlist), ACT_PARAMLIST(act));
+    INIT_CTX_KEYLIST_SHARED(CTX(varlist), ACT_KEYLIST(act));
 
     RELVAL *rootvar = ARR_HEAD(varlist);
     INIT_VAL_FRAME_ROOTVAR(
@@ -151,7 +151,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
         assert(NOT_CELL_FLAG(special, ARG_MARKED_CHECKED));
 
-        const REBSTR *symbol = VAL_KEY_SPELLING(param);  // added to binding
+        const REBSTR *symbol = KEY_SPELLING(param);  // added to binding
         if (not TYPE_CHECK(special, REB_TS_REFINEMENT)) {  // nothing to push
 
           continue_unspecialized:
@@ -297,7 +297,7 @@ bool Specialize_Action_Throws(
             if (Is_Param_Hidden(var))
                 continue;  // maybe refinement from stack, now specialized out
 
-            Remove_Binder_Index(&binder, VAL_KEY_SPELLING(key));
+            Remove_Binder_Index(&binder, KEY_SPELLING(key));
         }
         SHUTDOWN_BINDER(&binder);
 
@@ -313,7 +313,7 @@ bool Specialize_Action_Throws(
         }
     }
 
-    REBARR *paramlist = ACT_PARAMLIST(unspecialized);
+    REBARR *paramlist = ACT_KEYLIST(unspecialized);
 
     const RELVAL *param = ARR_AT(paramlist, 1);
     const REBVAL *special = ACT_SPECIALTY_HEAD(unspecialized);
@@ -453,7 +453,7 @@ bool Specialize_Action_Throws(
         &Specializer_Dispatcher,
         IDX_SPECIALIZER_MAX  // details array capacity
     );
-    assert(CTX_KEYLIST(exemplar) == ACT_PARAMLIST(unspecialized));
+    assert(CTX_KEYLIST(exemplar) == ACT_KEYLIST(unspecialized));
 
     Init_Action(out, specialized, VAL_ACTION_LABEL(specializee), UNBOUND);
 
@@ -538,7 +538,7 @@ void For_Each_Unspecialized_Param(
     // given to it in the second pass.
     //
   blockscope {
-    const REBKEY *key = ACT_PARAMS_HEAD(act);
+    const REBKEY *key = ACT_KEYS_HEAD(act);
     REBVAL *special = ACT_SPECIALTY_HEAD(act);
 
     // Loop through and pass just the normal args.
@@ -559,7 +559,7 @@ void For_Each_Unspecialized_Param(
             for (; NOT_END(partial); ++partial) {
                 if (SAME_STR(
                     VAL_WORD_SPELLING(partial),
-                    VAL_KEY_SPELLING(key)
+                    KEY_SPELLING(key)
                 )){
                     goto skip_in_first_pass;
                 }
@@ -598,7 +598,7 @@ void For_Each_Unspecialized_Param(
         REBVAL *partial = SPECIFIC(ARR_TAIL(unwrap(partials)));
         REBVAL *head = SPECIFIC(ARR_HEAD(unwrap(partials)));
         for (; partial-- != head; ) {
-            const REBKEY *key = ACT_PARAM(act, VAL_WORD_INDEX(partial));
+            const REBKEY *key = ACT_KEY(act, VAL_WORD_INDEX(partial));
             REBVAL *special = ACT_SPECIAL(act, VAL_WORD_INDEX(partial));
 
             bool cancel = not hook(key, special, PHF_UNREFINED, opaque);
@@ -610,7 +610,7 @@ void For_Each_Unspecialized_Param(
     // Finally, output any fully unspecialized refinements
 
   blockscope {
-    const REBKEY *key = ACT_PARAMS_HEAD(act);
+    const REBKEY *key = ACT_KEYS_HEAD(act);
     REBVAL *special = ACT_SPECIALTY_HEAD(act);
 
     for (; NOT_END(key); ++key, ++special) {
@@ -625,7 +625,7 @@ void For_Each_Unspecialized_Param(
             for (; NOT_END(partial); ++partial) {
                 if (SAME_STR(
                     VAL_WORD_SPELLING(partial),
-                    VAL_KEY_SPELLING(key)
+                    KEY_SPELLING(key)
                 )){
                     goto continue_unspecialized_loop;
                 }
@@ -912,11 +912,11 @@ bool Make_Frame_From_Varargs_Throws(
 
     REBCTX *exemplar = Steal_Context_Vars(
         CTX(f->varlist),
-        NOD(ACT_PARAMLIST(act))
+        NOD(ACT_KEYLIST(act))
     );
     assert(ACT_NUM_PARAMS(act) == CTX_LEN(exemplar));
 
-    INIT_LINK_KEYSOURCE(CTX_VARLIST(exemplar), NOD(ACT_PARAMLIST(act)));
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(exemplar), NOD(ACT_KEYLIST(act)));
 
     SET_SERIES_FLAG(f->varlist, MANAGED); // is inaccessible
     f->varlist = nullptr; // just let it GC, for now
@@ -949,7 +949,7 @@ REBACT *Alloc_Action_From_Exemplar(
 ){
     REBACT *unspecialized = CTX_FRAME_ACTION(exemplar);
 
-    const REBVAL *param = ACT_PARAMS_HEAD(unspecialized);
+    const REBVAL *param = ACT_KEYS_HEAD(unspecialized);
     const REBVAL *special = ACT_SPECIALTY_HEAD(unspecialized);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
     for (; NOT_END(param); ++param, ++arg, ++special) {

@@ -144,7 +144,7 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
 
     // Signal refinement as being in use.
     //
-    Init_Word(DS_PUSH(), VAL_KEY_SPELLING(f->param + 1));
+    Init_Word(DS_PUSH(), KEY_SPELLING(f->param + 1));
   }
 
   skip_enable_modal:
@@ -198,8 +198,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));
 
     for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
-
-        assert(IS_KEY(f->param));  // new rule (will become f->key)
 
   //=//// CONTINUES (AT TOP SO GOTOS DO NOT CROSS INITIALIZATIONS /////////=//
 
@@ -273,7 +271,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (DSP != f->dsp_orig) {  // reorderings or refinements pushed
             STKVAL(*) ordered = DS_TOP;
             STKVAL(*) lowest_ordered = DS_AT(f->dsp_orig);
-            const REBSTR *param_symbol = VAL_KEY_SPELLING(f->param);
+            const REBSTR *param_symbol = KEY_SPELLING(f->param);
 
             for (; ordered != lowest_ordered; --ordered) {
                 if (VAL_WORD_SPELLING(ordered) != param_symbol)
@@ -745,7 +743,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         f->arg += offset;
         f->special += offset;
 
-        assert(VAL_WORD_SPELLING(DS_TOP) == VAL_KEY_SPELLING(f->param));
+        assert(VAL_WORD_SPELLING(DS_TOP) == KEY_SPELLING(f->param));
         DS_DROP();
 
         if (Is_Typeset_Empty(f->special)) {  // no callsite arg, just drop
@@ -786,7 +784,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   typecheck_then_dispatch:
     Expire_Out_Cell_Unless_Invisible(f);
 
-    f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
+    f->param = ACT_KEYS_HEAD(FRM_PHASE(f));
     f->arg = FRM_ARGS_HEAD(f);
     f->special = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
 
@@ -878,7 +876,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // Note: `1 + comment "foo"` => `1 +`, arg is END
             //
             if (not Is_Param_Endable(f->special))
-                fail (Error_No_Arg(f->label, VAL_KEY_SPELLING(f->param)));
+                fail (Error_No_Arg(f->label, KEY_SPELLING(f->param)));
 
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             continue;
@@ -910,7 +908,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             continue;
         }
 
-        if (VAL_KEY_SYM(f->param) == SYM_RETURN)
+        if (KEY_SYM(f->param) == SYM_RETURN)
             continue;  // !!! let whatever go for now
 
         if (not Typecheck_Including_Constraints(f->special, f->arg))
@@ -1051,7 +1049,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // typechecking loop itself.
                 //
                 REBACT *redo_phase = VAL_FRAME_PHASE(f->out);
-                f->param = ACT_PARAMS_HEAD(redo_phase);
+                f->param = ACT_KEYS_HEAD(redo_phase);
                 f->special = ACT_SPECIALTY_HEAD(redo_phase);
                 f->arg = FRM_ARGS_HEAD(f);
                 for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {

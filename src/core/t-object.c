@@ -102,7 +102,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
 
     const REBKEY *collect_key = SER_AT(const REBKEY, BUF_COLLECT, len);
     for (; NOT_END(collect_key); ++collect_key)
-        Append_Context(c, nullptr, VAL_KEY_SPELLING(collect_key));
+        Append_Context(c, nullptr, KEY_SPELLING(collect_key));
   }
 
     // Set new values to obj words
@@ -189,8 +189,8 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
             goto no_advance;
         }
 
-        const REBSTR *symbol1 = VAL_KEY_SPELLING(key1);
-        const REBSTR *symbol2 = VAL_KEY_SPELLING(key2);
+        const REBSTR *symbol1 = KEY_SPELLING(key1);
+        const REBSTR *symbol2 = KEY_SPELLING(key2);
         REBINT spell_diff = Compare_Spellings(symbol1, symbol2, strict);
         if (spell_diff != 0)
             return spell_diff;
@@ -639,7 +639,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
             if (honor_hidden and Is_Param_Hidden(var))
                 continue;
 
-            Append_Spelling(mo->series, VAL_KEY_SPELLING(key));
+            Append_Spelling(mo->series, KEY_SPELLING(key));
             Append_Ascii(mo->series, ": ");
             Mold_Value(mo, var);
             Append_Codepoint(mo->series, LF);
@@ -674,7 +674,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
         New_Indented_Line(mo);
 
-        const REBSTR *spelling = VAL_KEY_SPELLING(key);
+        const REBSTR *spelling = KEY_SPELLING(key);
         Append_Utf8(s, STR_UTF8(spelling), STR_SIZE(spelling));
 
         Append_Ascii(s, ": ");

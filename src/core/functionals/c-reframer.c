@@ -132,11 +132,11 @@ REB_R Reframer_Dispatcher(REBFRM *f)
 
     REBCTX *stolen = Steal_Context_Vars(
         CTX(sub->varlist),
-        NOD(ACT_PARAMLIST(act))
+        NOD(ACT_KEYLIST(act))
     );
     assert(ACT_NUM_PARAMS(act) == CTX_LEN(stolen));
 
-    INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(ACT_PARAMLIST(act)));
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(ACT_KEYLIST(act)));
 
     SET_SERIES_FLAG(sub->varlist, MANAGED); // is inaccessible
     sub->varlist = nullptr; // just let it GC, for now
@@ -230,7 +230,7 @@ REBNATIVE(reframer_p)
             Init_Blank(label_word);
 
         DECLARE_LOCAL (param_word);
-        Init_Word(param_word, VAL_KEY_SPELLING(key));
+        Init_Word(param_word, KEY_SPELLING(key));
 
         error = Error_Expect_Arg_Raw(
             label_word,
@@ -242,13 +242,13 @@ REBNATIVE(reframer_p)
   }
 
   cleanup_binder: {
-    const REBKEY *key = ACT_PARAMS_HEAD(shim);
+    const REBKEY *key = ACT_KEYS_HEAD(shim);
     REBVAL *special = ACT_SPECIALTY_HEAD(shim);
     for (; NOT_END(key); ++key, ++special) {
         if (Is_Param_Hidden(special))
             continue;
 
-        const REBSTR *spelling = VAL_KEY_SPELLING(key);
+        const REBSTR *spelling = KEY_SPELLING(key);
         REBLEN index = Remove_Binder_Index_Else_0(&binder, spelling);
         assert(index != 0);
         UNUSED(index);

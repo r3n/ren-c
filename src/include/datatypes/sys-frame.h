@@ -637,7 +637,7 @@ inline static void Push_Action(
     if (f->flags.bits & details->header.bits & DETAILS_FLAG_IS_BARRIER)
         fail (Error_Expression_Barrier_Raw());
 
-    f->param = ACT_PARAMS_HEAD(act);
+    f->param = ACT_KEYS_HEAD(act);
     REBLEN num_args = ACT_NUM_PARAMS(act);  // includes specialized + locals
 
     REBSER *s;
@@ -831,7 +831,7 @@ inline static void Drop_Action(REBFRM *f) {
         INIT_LINK_KEYSOURCE(f->varlist, NOD(f));
       #endif
 
-        INIT_LINK_KEYSOURCE(f->varlist, NOD(ACT_PARAMLIST(f->original)));
+        INIT_LINK_KEYSOURCE(f->varlist, NOD(ACT_KEYLIST(f->original)));
         f->varlist = nullptr;
     }
     else {
@@ -951,7 +951,7 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
 inline static void FAIL_IF_BAD_RETURN_TYPE(REBFRM *f) {
     REBACT *phase = FRM_PHASE(f);
     REBVAL *typeset = ACT_SPECIALTY_HEAD(phase);
-    assert(VAL_KEY_SYM(ACT_PARAMS_HEAD(phase)) == SYM_RETURN);
+    assert(KEY_SYM(ACT_KEYS_HEAD(phase)) == SYM_RETURN);
 
     // Typeset bits for locals in frames are usually ignored, but the RETURN:
     // local uses them for the return types of a function.
@@ -963,7 +963,7 @@ inline static void FAIL_IF_BAD_RETURN_TYPE(REBFRM *f) {
 inline static void FAIL_IF_NO_INVISIBLE_RETURN(REBFRM *f) {
     REBACT *phase = FRM_PHASE(f);
     REBVAL *typeset = ACT_SPECIALTY_HEAD(phase);
-    assert(VAL_KEY_SYM(ACT_PARAMS_HEAD(phase)) == SYM_RETURN);
+    assert(KEY_SYM(ACT_KEYS_HEAD(phase)) == SYM_RETURN);
 
     if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE))
         fail (Error_Bad_Invisible(f));

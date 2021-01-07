@@ -104,7 +104,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     Init_Group(DS_PUSH(), group);
 
     assert(IS_END(f->param)); // okay to reuse, if it gets put back...
-    f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
+    f->param = ACT_KEYS_HEAD(FRM_PHASE(f));
     f->arg = FRM_ARGS_HEAD(f);
     f->special = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
 
@@ -119,7 +119,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
             if (IS_NULLED(f->arg))  // don't add to PATH!
                 continue;
 
-            Init_Word(DS_PUSH(), VAL_KEY_SPELLING(f->param));
+            Init_Word(DS_PUSH(), KEY_SPELLING(f->param));
 
             if (Is_Typeset_Empty(f->special)) {
                 assert(Is_Blackhole(f->arg));  // used but argless refinement

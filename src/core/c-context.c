@@ -270,7 +270,7 @@ void Collect_End(struct Reb_Collector *cl)
     for (; NOT_END(v); ++v) {
         const REBSTR *canon =
             (cl == NULL or (cl->flags & COLLECT_AS_TYPESET))
-                ? VAL_KEY_SPELLING(v)
+                ? KEY_SPELLING(v)
                 : VAL_WORD_SPELLING(v);
 
         if (cl != NULL) {
@@ -328,7 +328,7 @@ void Collect_Context_Keys(
 
     if (check_dups) {
         for (; NOT_END(key); key++) {
-            const REBSTR *symbol = VAL_KEY_SPELLING(key);
+            const REBSTR *symbol = KEY_SPELLING(key);
             if (not Try_Add_Binder_Index(&cl->binder, symbol, cl->index))
                 continue; // don't collect if already in bind table
 
@@ -351,7 +351,7 @@ void Collect_Context_Keys(
         //
         for (; NOT_END(key); ++key, ++collect, ++cl->index) {
             Blit_Relative(collect, key);
-            Add_Binder_Index(&cl->binder, VAL_KEY_SPELLING(key), cl->index);
+            Add_Binder_Index(&cl->binder, KEY_SPELLING(key), cl->index);
         }
         SET_ARRAY_LEN_NOTERM(
             BUF_COLLECT, ARR_LEN(BUF_COLLECT) + CTX_LEN(context)
@@ -550,7 +550,7 @@ REBARR *Collect_Unique_Words_Managed(
             // Shouldn't be possible to have an object with duplicate keys,
             // use plain Add_Binder_Index.
             //
-            Add_Binder_Index(&cl->binder, VAL_KEY_SPELLING(key), -1);
+            Add_Binder_Index(&cl->binder, KEY_SPELLING(key), -1);
         }
     }
     else
@@ -582,7 +582,7 @@ REBARR *Collect_Unique_Words_Managed(
     else if (ANY_CONTEXT(ignore)) {
         const REBKEY *key = CTX_KEYS_HEAD(VAL_CONTEXT(ignore));
         for (; NOT_END(key); ++key)
-            Remove_Binder_Index(&cl->binder, VAL_KEY_SPELLING(key));
+            Remove_Binder_Index(&cl->binder, KEY_SPELLING(key));
     }
     else
         assert(IS_NULLED(ignore));
@@ -923,7 +923,7 @@ REBCTX *Merge_Contexts_Managed(REBCTX *parent1, REBCTX *parent2)
     for (; NOT_END(key); key++, value++) {
         // no need to search when the binding table is available
         REBINT n = Get_Binder_Index_Else_0(
-            &collector.binder, VAL_KEY_SPELLING(key)
+            &collector.binder, KEY_SPELLING(key)
         );
         assert(n != 0);
 
@@ -988,7 +988,7 @@ void Resolve_Context(
         // Only the new words of the target:
         const REBKEY *key = CTX_KEY(target, i);
         for (; NOT_END(key); key++)
-            Add_Binder_Index(&binder, VAL_KEY_SPELLING(key), -1);
+            Add_Binder_Index(&binder, KEY_SPELLING(key), -1);
         n = CTX_LEN(target);
     }
     else if (IS_BLOCK(only_words)) {
@@ -1010,7 +1010,7 @@ void Resolve_Context(
         // Determine how many new words to add:
         const REBKEY *key = CTX_KEYS_HEAD(target);
         for (; NOT_END(key); key++)
-            if (Get_Binder_Index_Else_0(&binder, VAL_KEY_SPELLING(key)) != 0)
+            if (Get_Binder_Index_Else_0(&binder, KEY_SPELLING(key)) != 0)
                 --n;
 
         // Expand context by the amount required:
@@ -1028,7 +1028,7 @@ void Resolve_Context(
     const REBKEY *key = CTX_KEYS_HEAD(source);
     REBINT n = 1;
     for (; NOT_END(key); n++, key++) {
-        const REBSTR *symbol = VAL_KEY_SPELLING(key);
+        const REBSTR *symbol = KEY_SPELLING(key);
         if (IS_NULLED(only_words))
             Add_Binder_Index(&binder, symbol, n);
         else {
@@ -1046,7 +1046,7 @@ void Resolve_Context(
     const REBKEY *key = i != 0 ? CTX_KEY(target, i) : CTX_KEYS_HEAD(target);
     REBVAL *var = i != 0 ? CTX_VAR(target, i) : CTX_VARS_HEAD(target);
     for (; NOT_END(key); key++, var++) {
-        REBINT m = Remove_Binder_Index_Else_0(&binder, VAL_KEY_SPELLING(key));
+        REBINT m = Remove_Binder_Index_Else_0(&binder, KEY_SPELLING(key));
         if (m != 0) {
             // "the remove succeeded, so it's marked as set now" (old comment)
 
@@ -1065,7 +1065,7 @@ void Resolve_Context(
         const REBKEY *key = CTX_KEYS_HEAD(source);
         REBINT n = 1;
         for (; NOT_END(key); n++, key++) {
-            const REBSTR *canon = VAL_KEY_SPELLING(key);
+            const REBSTR *canon = KEY_SPELLING(key);
             if (Remove_Binder_Index_Else_0(&binder, canon) != 0) {
                 //
                 // Note: no protect check is needed here
@@ -1085,7 +1085,7 @@ void Resolve_Context(
         if (i != 0) {
             const REBKEY *key = CTX_KEY(target, i);
             for (; NOT_END(key); key++)
-                Remove_Binder_Index_Else_0(&binder, VAL_KEY_SPELLING(key));
+                Remove_Binder_Index_Else_0(&binder, KEY_SPELLING(key));
         }
         else if (IS_BLOCK(only_words)) {
             const RELVAL *word = VAL_ARRAY_AT(only_words);
@@ -1097,7 +1097,7 @@ void Resolve_Context(
         else {
             const REBKEY *key = CTX_KEYS_HEAD(source);
             for (; NOT_END(key); key++)
-                Remove_Binder_Index_Else_0(&binder, VAL_KEY_SPELLING(key));
+                Remove_Binder_Index_Else_0(&binder, KEY_SPELLING(key));
         }
     }
 
@@ -1136,11 +1136,11 @@ REBLEN Find_Symbol_In_Context(
     REBLEN n;
     for (n = 1; NOT_END(key); ++n, ++key, ++var) {
         if (strict) {
-            if (symbol != VAL_KEY_SPELLING(key))
+            if (symbol != KEY_SPELLING(key))
                 continue;
         }
         else {
-            if (not SAME_STR(symbol, VAL_KEY_SPELLING(key)))
+            if (not SAME_STR(symbol, KEY_SPELLING(key)))
                 continue;
         }
 

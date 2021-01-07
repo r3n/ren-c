@@ -449,9 +449,9 @@ REBNATIVE(do)
 
         DECLARE_END_FRAME (f, flags);
 
-        assert(CTX_KEYS_HEAD(c) == ACT_PARAMS_HEAD(phase));
+        assert(CTX_KEYS_HEAD(c) == ACT_KEYS_HEAD(phase));
         f->param = CTX_KEYS_HEAD(c);
-        REBCTX *stolen = Steal_Context_Vars(c, NOD(ACT_PARAMLIST(phase)));
+        REBCTX *stolen = Steal_Context_Vars(c, NOD(ACT_KEYLIST(phase)));
         INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(f));
             // ^-- changes CTX_KEYS_HEAD()
 
@@ -720,7 +720,7 @@ REBNATIVE(redo)
     //
     if (REF(other)) {
         REBVAL *sibling = ARG(other);
-        if (ACT_PARAMLIST(f->original) != ACT_PARAMLIST(VAL_ACTION(sibling)))
+        if (ACT_KEYLIST(f->original) != ACT_KEYLIST(VAL_ACTION(sibling)))
             fail ("/OTHER function passed to REDO has incompatible FRAME!");
 
         INIT_VAL_FRAME_PHASE(restartee, VAL_ACTION(sibling));
@@ -807,7 +807,7 @@ REBNATIVE(applique)
         if (Is_Void_With_Sym(var, SYM_UNSET))
             Init_Nulled(var);
 
-        Remove_Binder_Index(&binder, VAL_KEY_SPELLING(key));
+        Remove_Binder_Index(&binder, KEY_SPELLING(key));
     }
     SHUTDOWN_BINDER(&binder); // must do before running code that might BIND
 
@@ -818,11 +818,11 @@ REBNATIVE(applique)
     bool def_threw = Do_Any_Array_At_Throws(temp, ARG(def), SPECIFIED);
     DROP_GC_GUARD(exemplar);
 
-    assert(CTX_KEYS_HEAD(exemplar) == ACT_PARAMS_HEAD(VAL_ACTION(applicand)));
+    assert(CTX_KEYS_HEAD(exemplar) == ACT_KEYS_HEAD(VAL_ACTION(applicand)));
     f->param = CTX_KEYS_HEAD(exemplar);
     REBCTX *stolen = Steal_Context_Vars(
         exemplar,
-        NOD(ACT_PARAMLIST(VAL_ACTION(applicand)))
+        NOD(ACT_KEYLIST(VAL_ACTION(applicand)))
     );
     INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(f));
         // ^-- changes CTX_KEYS_HEAD result

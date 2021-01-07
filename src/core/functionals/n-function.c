@@ -136,7 +136,7 @@ bool Interpreted_Dispatch_Details_1_Throws(
     assert(IS_BLOCK(body) and IS_RELATIVE(body) and VAL_INDEX(body) == 0);
 
     if (ACT_HAS_RETURN(phase)) {
-        assert(VAL_KEY_SYM(ACT_PARAMS_HEAD(phase)) == SYM_RETURN);
+        assert(KEY_SYM(ACT_KEYS_HEAD(phase)) == SYM_RETURN);
         REBVAL *cell = FRM_ARG(f, 1);
         Move_Value(cell, NATIVE_VAL(return));
         INIT_VAL_ACTION_BINDING(cell, CTX(f->varlist));
@@ -371,7 +371,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
         }
         else if (ACT_HAS_RETURN(a)) {
             REBVAL *typeset = ACT_SPECIALTY_HEAD(a);
-            assert(VAL_KEY_SYM(ACT_PARAMS_HEAD(a)) == SYM_RETURN);
+            assert(KEY_SYM(ACT_KEYS_HEAD(a)) == SYM_RETURN);
             if (not TYPE_CHECK(typeset, REB_VOID))  // `do []` returns
                 ACT_DISPATCHER(a) = &Returner_Dispatcher;  // error when run
         }
@@ -643,7 +643,7 @@ REBNATIVE(return)
     //
     UNUSED(typeset);
 /*    assert(VAL_PARAM_CLASS(typeset) == REB_P_LOCAL); */
-    assert(VAL_KEY_SYM(ACT_PARAMS_HEAD(target_fun)) == SYM_RETURN);
+    assert(KEY_SYM(ACT_KEYS_HEAD(target_fun)) == SYM_RETURN);
 
     // There are two ways you can get an "endish nulled".  One is a plain
     // `RETURN` with nothing following it (which is interpreted as returning

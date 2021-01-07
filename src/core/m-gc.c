@@ -737,7 +737,7 @@ static void Mark_Frame_Stack_Deep(void)
         REBACT *phase; // goto would cross initialization
         phase = FRM_PHASE(f);
         const REBVAL *param;
-        param = ACT_PARAMS_HEAD(phase);
+        param = ACT_KEYS_HEAD(phase);
 
         REBVAL *arg;
         for (arg = FRM_ARGS_HEAD(f); NOT_END(param); ++param, ++arg) {

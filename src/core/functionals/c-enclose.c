@@ -98,9 +98,9 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     //
     REBCTX *c = Steal_Context_Vars(
         CTX(f->varlist),
-        NOD(ACT_PARAMLIST(FRM_PHASE(f)))
+        NOD(ACT_KEYLIST(FRM_PHASE(f)))
     );
-    INIT_LINK_KEYSOURCE(CTX_VARLIST(c), NOD(ACT_PARAMLIST(VAL_ACTION(inner))));
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(c), NOD(ACT_KEYLIST(VAL_ACTION(inner))));
 
     assert(GET_SERIES_INFO(f->varlist, INACCESSIBLE));  // look dead
 

@@ -323,7 +323,7 @@ void Extra_Init_Action_Checks_Debug(REBACT *a) {
     REBVAL *archetype = ACT_ARCHETYPE(a);
     assert(VAL_ACTION(archetype) == a);
 
-    REBARR *paramlist = ACT_PARAMLIST(a);
+    REBARR *paramlist = ACT_KEYLIST(a);
     assert(
         (paramlist->header.bits & SERIES_MASK_PARAMLIST)
         == SERIES_MASK_PARAMLIST

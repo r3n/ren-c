@@ -660,7 +660,7 @@ REBNATIVE(match)
         f->out = SET_END(temp);
 
         f->rootvar = CTX_ROOTVAR(CTX(f->varlist));
-        f->param = ACT_PARAMS_HEAD(VAL_ACTION(test));
+        f->param = ACT_KEYS_HEAD(VAL_ACTION(test));
         f->arg = f->rootvar + 1;
         f->special = f->arg;
 

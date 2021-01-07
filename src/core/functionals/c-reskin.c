@@ -90,10 +90,11 @@ REB_R Skinner_Dispatcher(REBFRM *f)
 
     REBVAL *skinned = DETAILS_AT(details, IDX_SKINNER_SKINNED);
 
-    const REBVAL *param = ACT_PARAMS_HEAD(phase);
+    const REBKEY *key = ACT_KEYS_HEAD(phase);
     REBVAL *arg = FRM_ARGS_HEAD(f);
-    for (; NOT_END(param); ++param, ++arg) {
-        if (Is_Param_Skin_Expanded(param))  // !!! always says true (for now)
+    REBVAL *param = ACT_SPECIALTY_HEAD(phase);
+    for (; NOT_END(key); ++key, ++param) {
+        if (Is_Param_Skin_Expanded(param))  // !!! always true (for now)
             CLEAR_CELL_FLAG(arg, ARG_MARKED_CHECKED);
     }
 
@@ -104,8 +105,9 @@ REB_R Skinner_Dispatcher(REBFRM *f)
     // If the return type has been altered, then we need to check the value
     // against the returned type.
 
-    param = ACT_PARAMS_HEAD(phase);
-    assert(VAL_KEY_SYM(param) == SYM_RETURN);
+    key = ACT_KEYS_HEAD(phase);
+    param = ACT_SPECIALTY_HEAD(phase);
+    assert(KEY_SYM(key) == SYM_RETURN);
 
     if (not Is_Param_Skin_Expanded(param)) {  // don't need to retain control
         //
@@ -202,7 +204,7 @@ REBNATIVE(reskinned)
     // if it has to search hierarchies or lists of quoted forms/etc.
     //
     REBARR *paramlist = Copy_Array_Shallow_Flags(
-        ACT_PARAMLIST(original),
+        ACT_KEYLIST(original),
         SPECIFIED,  // no relative values in parameter lists
         SERIES_MASK_PARAMLIST
     );
@@ -210,7 +212,7 @@ REBNATIVE(reskinned)
     // Indicate "safe" relationship for frames; e.g. that a frame built for
     // the reskinned function is safe to use with the original function.
     //
-    LINK_ANCESTOR_NODE(paramlist) = NOD(ACT_PARAMLIST(original));
+    LINK_ANCESTOR_NODE(paramlist) = NOD(ACT_KEYLIST(original));
 
     bool need_skin_phase = false;  // only needed if types were broadened
 
@@ -268,7 +270,7 @@ REBNATIVE(reskinned)
                 wrapped_around = true;
             }
 
-            if (VAL_KEY_SPELLING(key) == symbol)
+            if (KEY_SPELLING(key) == symbol)
                 break;
             ++param;
         }
@@ -338,7 +340,7 @@ REBNATIVE(reskinned)
             // types is no big deal...any type that passed the narrower check
             // will pass the broader one.
             //
-            if (VAL_KEY_SYM(param) == SYM_RETURN)
+            if (KEY_SYM(key) == SYM_RETURN)
                 need_skin_phase = true;
             break; }
 

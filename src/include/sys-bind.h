@@ -485,10 +485,10 @@ inline static const REBSTR *VAL_WORD_SPELLING(REBCEL(const*) cell) {
     const RELVAL *v = CELL_TO_VAL(cell);
 
     if (binding->header.bits & ARRAY_FLAG_IS_DETAILS)  // relative
-        return VAL_KEY_SPELLING(ACT_PARAM(ACT(binding), VAL_WORD_INDEX(v)));
+        return KEY_SPELLING(ACT_KEY(ACT(binding), VAL_WORD_INDEX(v)));
 
     assert(binding->header.bits & ARRAY_FLAG_IS_VARLIST);  // specific
-    return CTX_KEY_SPELLING(CTX(binding), VAL_WORD_INDEX(v));
+    return KEY_SPELLING(CTX_KEY(CTX(binding), VAL_WORD_INDEX(v)));
 }
 
 
@@ -598,7 +598,7 @@ inline static option(REBCTX*) Get_Word_Context(
 
             REBLEN index = mondex;
             for (; index <= cached_len; index += MONDEX_MOD) {
-                if (spelling != CTX_KEY_SPELLING(overload, mondex))
+                if (spelling != KEY_SPELLING(CTX_KEY(overload, mondex)))
                     continue;
 
                 *index_out = mondex;
@@ -653,7 +653,7 @@ inline static option(REBCTX*) Get_Word_Context(
             REBLEN index = 1;
             const REBKEY *key = CTX_KEYS_HEAD(overload);
             for (; index <= cached_len; ++key, ++index) {
-                if (VAL_KEY_SPELLING(key) != spelling)
+                if (KEY_SPELLING(key) != spelling)
                     continue;
 
                 // !!! FOR-EACH uses the slots in an object to count how

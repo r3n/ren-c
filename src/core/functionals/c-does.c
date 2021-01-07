@@ -218,7 +218,7 @@ REBNATIVE(does)
 
         // Put argument into DO's *second* frame slot (first is RETURN)
         //
-        assert(VAL_KEY_SYM(CTX_KEY(exemplar, 1)) == SYM_RETURN);
+        assert(KEY_SYM(CTX_KEY(exemplar, 1)) == SYM_RETURN);
         Move_Value(CTX_VAR(exemplar, 2), specializee);
         Move_Value(specializee, NATIVE_VAL(do));
         label = ANONYMOUS;

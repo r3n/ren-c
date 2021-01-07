@@ -268,8 +268,8 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
     UNUSED(phase);
 /*  #ifdef DEBUG_NATIVE_RETURNS
     if (ACT_HAS_RETURN(phase)) {
-        REBVAL *typeset = ACT_PARAMS_HEAD(phase);
-        assert(VAL_KEY_SYM(typeset) == SYM_RETURN);
+        REBVAL *typeset = ACT_KEYS_HEAD(phase);
+        assert(KEY_SYM(typeset) == SYM_RETURN);
         if (GET_CELL_FLAG(f->out, OUT_MARKED_STALE)) {
             if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE)) {
                 printf("Native code violated return type contract!\n");

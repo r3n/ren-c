@@ -293,7 +293,7 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
                 if (f_seek == FS_BOTTOM)
                     panic ("fail (PAR(name)); issued for param not on stack");
 
-                const REBVAL *v_seek = ACT_PARAMS_HEAD(FRM_PHASE(f_seek));
+                const REBVAL *v_seek = ACT_KEYS_HEAD(FRM_PHASE(f_seek));
                 for (; NOT_END(v_seek); ++v_seek) {
                     if (v_seek == v)
                         goto found_param;
@@ -438,7 +438,7 @@ const REBVAL *Find_Error_For_Sym(enum Reb_Symbol id_sym)
 
         REBLEN n = 1;
         for (; n != CTX_LEN(category) + 1; ++n) {
-            if (SAME_STR(CTX_KEY_SPELLING(category, n), id_canon)) {
+            if (SAME_STR(KEY_SPELLING(CTX_KEY(category, n)), id_canon)) {
                 REBVAL *message = CTX_VAR(category, n);
                 assert(IS_BLOCK(message) or IS_TEXT(message));
                 return message;
@@ -1071,7 +1071,7 @@ REBCTX *Error_Not_Varargs(
     Init_Param(
         honest_param,
         REB_P_NORMAL,
-        VAL_KEY_SPELLING(key),
+        KEY_SPELLING(key),
         FLAGIT_KIND(REB_VARARGS) // actually expected
     );
     UNUSED(honest_param);  // !!! pass to Error_Arg_Type(?)
@@ -1112,7 +1112,7 @@ REBCTX *Error_Invalid_Arg(REBFRM *f, const RELVAL *param)
         Init_Word(label, unwrap(f->label));
 
     DECLARE_LOCAL (param_name);
-    Init_Word(param_name, VAL_KEY_SPELLING(ACT_PARAM(FRM_PHASE(f), index)));
+    Init_Word(param_name, KEY_SPELLING(ACT_KEY(FRM_PHASE(f), index)));
 
     REBVAL *arg = FRM_ARG(f, index);
     if (IS_NULLED(arg))
@@ -1225,7 +1225,7 @@ REBCTX *Error_Out_Of_Range(const REBVAL *arg)
 REBCTX *Error_Protected_Key(const REBKEY *key)
 {
     DECLARE_LOCAL (key_name);
-    Init_Word(key_name, VAL_KEY_SPELLING(key));
+    Init_Word(key_name, KEY_SPELLING(key));
 
     return Error_Protected_Word_Raw(key_name);
 }
@@ -1268,7 +1268,7 @@ REBCTX *Error_Arg_Type(
     enum Reb_Kind actual
 ){
     DECLARE_LOCAL (param_word);
-    Init_Word(param_word, VAL_KEY_SPELLING(key));
+    Init_Word(param_word, KEY_SPELLING(key));
 
     DECLARE_LOCAL (label);
     Get_Frame_Label_Or_Blank(label, f);

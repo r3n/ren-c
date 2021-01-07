@@ -124,7 +124,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     // "triad".
     //
   blockscope {
-    const REBVAL *param = ACT_PARAMS_HEAD(augmentee);
+    const REBVAL *param = ACT_KEYS_HEAD(augmentee);
     REBVAL *special = ACT_SPECIALTY_HEAD(augmentee);
     for (; NOT_END(param); ++param) {
         Move_Value(DS_PUSH(), param);
@@ -168,7 +168,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
 
     REBCTX *old_exemplar = ACT_EXEMPLAR(augmentee);
 
-    REBLEN old_len = ARR_LEN(ACT_PARAMLIST(augmentee));
+    REBLEN old_len = ARR_LEN(ACT_KEYLIST(augmentee));
     REBLEN delta = ARR_LEN(paramlist) - old_len;
     assert(delta > 0);
 

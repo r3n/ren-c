@@ -215,7 +215,7 @@ inline static option(REBARR*) ACT_PARTIALS(REBACT *a) {
     return nullptr;
 }
 
-inline static REBARR *ACT_PARAMLIST(REBACT *a) {
+inline static REBARR *ACT_KEYLIST(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
         list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
@@ -238,9 +238,8 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
     return cast(REBVAL*, list->content.dynamic.data) + 1;  // skip archetype
 }
 
-#define ACT_PARAMS_HEAD(a) \
-    (cast(const REBKEY*, ACT_PARAMLIST(a)->content.dynamic.data) + 1)
-
+#define ACT_KEYS_HEAD(a) \
+    (cast(const REBKEY*, ACT_KEYLIST(a)->content.dynamic.data) + 1)
 
 
 #define ACT_DISPATCHER(a) \
@@ -261,35 +260,27 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 // Context keys and action parameters use a compatible representation (this
 // enables using action paramlists as FRAME! context keylists).
 //
-// !!! An API for hinting types in FRAME! contexts could be useful, if that
-// was then used to make an ACTION! out of it...which is a conceptual idea
-// for the "real way to make actions":
-//
-// https://forum.rebol.info/t/1002
-//
-#define IS_KEY IS_WORD
-
-inline static const REBSTR *VAL_KEY_SPELLING(const REBKEY *key) {
+inline static const REBSTR *KEY_SPELLING(const REBKEY *key) {
     return VAL_WORD_SPELLING(key);
 }
 
-inline static const REBSTR *VAL_KEY_SPELLING(REBKEY *key) = delete;
+#define KEY_SYM(key) \
+    STR_SYMBOL(KEY_SPELLING(key))
 
-#define VAL_KEY_SYM VAL_WORD_SYM
 #define Init_Key Init_Word
 
-inline static const REBKEY *ACT_PARAM(REBACT *a, REBLEN n) {
-    assert(n != 0 and n < ARR_LEN(ACT_PARAMLIST(a)));
-    return SER_AT(const REBKEY, ACT_PARAMLIST(a), n);
+inline static const REBKEY *ACT_KEY(REBACT *a, REBLEN n) {
+    assert(n != 0 and n < ARR_LEN(ACT_KEYLIST(a)));
+    return SER_AT(const REBKEY, ACT_KEYLIST(a), n);
 }
 
 inline static REBVAL *ACT_SPECIAL(REBACT *a, REBLEN n) {
-    assert(n != 0 and n < ARR_LEN(ACT_PARAMLIST(a)));
+    assert(n != 0 and n < ARR_LEN(ACT_KEYLIST(a)));
     return ACT_SPECIALTY_HEAD(a) + n - 1;
 }
 
 #define ACT_NUM_PARAMS(a) \
-    (ACT_PARAMLIST(a)->content.dynamic.used - 1)  // guaranteed dynamic
+    (ACT_KEYLIST(a)->content.dynamic.used - 1)  // guaranteed dynamic
 
 
 //=//// META OBJECT ///////////////////////////////////////////////////////=//
@@ -311,8 +302,8 @@ inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
     return ACT(s);
 }
 
-#define VAL_ACTION_PARAMLIST(v) \
-    ACT_PARAMLIST(VAL_ACTION(v))
+#define VAL_ACTION_KEYLIST(v) \
+    ACT_KEYLIST(VAL_ACTION(v))
 
 
 //=//// ACTION LABELING ///////////////////////////////////////////////////=//
@@ -378,8 +369,8 @@ inline static bool Action_Is_Base_Of(REBACT *base, REBACT *derived) {
     if (derived == base)
         return true;  // fast common case (review how common)
 
-    REBARR *paramlist_test = ACT_PARAMLIST(derived);
-    REBARR *paramlist_base = ACT_PARAMLIST(base);
+    REBARR *paramlist_test = ACT_KEYLIST(derived);
+    REBARR *paramlist_base = ACT_KEYLIST(base);
     while (true) {
         if (paramlist_test == paramlist_base)
             return true;
@@ -446,11 +437,11 @@ inline static REBVAL *Voidify_Rootparam(REBARR *paramlist) {
 // INFORMATION ONCE THINGS ARE SPECIALIZED.
 
 /*#define ACT_HAS_RETURN(a) \
-    (did (ACT_PARAMLIST(a)->header.bits & PARAMLIST_FLAG_HAS_RETURN))
+    (did (ACT_KEYLIST(a)->header.bits & PARAMLIST_FLAG_HAS_RETURN))
 */
 
 #define ACT_HAS_RETURN(a) \
-    (SYM_RETURN == VAL_KEY_SYM(ACT_PARAMS_HEAD(a)))
+    (SYM_RETURN == KEY_SYM(ACT_KEYS_HEAD(a)))
 
 
 //=//// NATIVE ACTION ACCESS //////////////////////////////////////////////=//

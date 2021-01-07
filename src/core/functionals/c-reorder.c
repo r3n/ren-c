@@ -117,13 +117,13 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     INIT_BINDER(&binder);
 
   blockscope {
-    const REBKEY *key = ACT_PARAMS_HEAD(reorderee);
+    const REBKEY *key = ACT_KEYS_HEAD(reorderee);
     REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
     REBLEN index = 1;
     for (; NOT_END(key); ++key, ++special, ++index) {
         if (Is_Param_Hidden(special))
             continue;
-        Add_Binder_Index(&binder, VAL_KEY_SPELLING(key), index);
+        Add_Binder_Index(&binder, KEY_SPELLING(key), index);
     }
   }
 
@@ -184,7 +184,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
         if (ignore)
             continue;
 
-        const REBVAL *param = ACT_PARAM(reorderee, index);
+        const REBVAL *param = ACT_KEY(reorderee, index);
         if (TYPE_CHECK(param, REB_TS_REFINEMENT) and Is_Typeset_Empty(param)) {
             error = Error_User("Can't reorder refinements with no argument");
             goto cleanup_binder;
@@ -197,14 +197,14 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     // ordering list.
 
   cleanup_binder: {
-    const REBKEY *key = ACT_PARAMS_HEAD(reorderee);
+    const REBKEY *key = ACT_KEYS_HEAD(reorderee);
     REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
     REBLEN index = 1;
     for (; NOT_END(key); ++key, ++special, ++index) {
         if (Is_Param_Hidden(special))
             continue;
 
-        const REBSTR *spelling = VAL_KEY_SPELLING(key);
+        const REBSTR *spelling = KEY_SPELLING(key);
 
         // If we saw the parameter, we removed its index from the binder.
         //
@@ -215,7 +215,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
             and not mentioned
             and not TYPE_CHECK(special, REB_TS_REFINEMENT)  // okay to leave out
         ){
-            error = Error_No_Arg(label, VAL_KEY_SPELLING(key));
+            error = Error_No_Arg(label, KEY_SPELLING(key));
         }
     }
   }
