@@ -138,7 +138,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
     REBLEN index = 1;  // used to bind REFINEMENT! values to parameter slots
 
-    for (; NOT_END(param); ++param, ++arg, ++special, ++index) {
+    for (; NOT_END_KEY(param); ++param, ++arg, ++special, ++index) {
         Prep_Cell(arg);
 
         if (Is_Param_Hidden(special)) {  // local or specialized
@@ -293,7 +293,7 @@ bool Specialize_Action_Throws(
         //
         const REBKEY *key = CTX_KEYS_HEAD(exemplar);
         REBVAL *var = CTX_VARS_HEAD(exemplar);
-        for (; NOT_END(key); ++key, ++var) {
+        for (; NOT_END_KEY(key); ++key, ++var) {
             if (Is_Param_Hidden(var))
                 continue;  // maybe refinement from stack, now specialized out
 
@@ -543,7 +543,7 @@ void For_Each_Unspecialized_Param(
 
     // Loop through and pass just the normal args.
     //
-    for (; NOT_END(key); ++key, ++special) {
+    for (; NOT_END_KEY(key); ++key, ++special) {
         if (Is_Param_Hidden(special))
             continue;
 
@@ -571,7 +571,7 @@ void For_Each_Unspecialized_Param(
         //
         REBFLGS flags = 0;
         if (pclass == REB_P_MODAL) {
-            if (NOT_END(key + 1)) {  // !!! Ideally checked at creation
+            if (NOT_END_KEY(key + 1)) {  // !!! Ideally checked at creation
                 if (GET_CELL_FLAG(special + 1, ARG_MARKED_CHECKED)) {
                     if (TYPE_CHECK(special + 1, REB_TS_REFINEMENT))  // required
                         flags |= PHF_DEMODALIZED;  // !!! ^-- check at create!
@@ -613,7 +613,7 @@ void For_Each_Unspecialized_Param(
     const REBKEY *key = ACT_KEYS_HEAD(act);
     REBVAL *special = ACT_SPECIALTY_HEAD(act);
 
-    for (; NOT_END(key); ++key, ++special) {
+    for (; NOT_END_KEY(key); ++key, ++special) {
         if (Is_Param_Hidden(special))
             continue;
 

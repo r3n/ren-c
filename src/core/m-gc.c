@@ -711,7 +711,7 @@ static void Mark_Frame_Stack_Deep(void)
             // then it can just be marked normally...no need to do custom
             // partial parameter traversal.
             //
-            assert(IS_END(f->param)); // done walking
+            assert(IS_END_KEY(f->key)); // done walking
             Queue_Mark_Node_Deep(f->varlist);  // may not pass CTX() test
             goto propagate_and_continue;
         }
@@ -741,9 +741,9 @@ static void Mark_Frame_Stack_Deep(void)
 
         REBVAL *arg;
         for (arg = FRM_ARGS_HEAD(f); NOT_END(param); ++param, ++arg) {
-            if (param == f->param) {
+            if (param == f->key) {
                 //
-                // When param and f->param match, that means that arg is the
+                // When param and f->key match, that means that arg is the
                 // output slot for some other frame's f->out.  Let that frame
                 // do the marking (which tolerates END, an illegal state for
                 // prior arg slots we've visited...unless deferred!)

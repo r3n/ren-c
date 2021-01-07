@@ -133,7 +133,7 @@ void Dump_Stack(REBFRM *f, REBLEN level)
     REBVAL *arg = FRM_ARG(f, 1);
     const REBKEY *key = ACT_KEYS_HEAD(FRM_PHASE(f));
 
-    for (; NOT_END(key); ++key, ++arg, ++n) {
+    for (; NOT_END_KEY(key); ++key, ++arg, ++n) {
         if (IS_NULLED(arg))
             printf(
                 "    %s:\n",

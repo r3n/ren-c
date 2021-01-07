@@ -209,7 +209,7 @@ void Eval_Core_Expression_Checks_Debug(REBFRM *f)
 
     // Trash fields that GC won't be seeing unless Is_Action_Frame()
     //
-    TRASH_POINTER_IF_DEBUG(f->param);
+    TRASH_POINTER_IF_DEBUG(f->key);
     TRASH_POINTER_IF_DEBUG(f->arg);
     TRASH_POINTER_IF_DEBUG(f->special);
 

@@ -101,7 +101,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
     Expand_Context(c, ARR_LEN(BUF_COLLECT) - len);
 
     const REBKEY *collect_key = SER_AT(const REBKEY, BUF_COLLECT, len);
-    for (; NOT_END(collect_key); ++collect_key)
+    for (; NOT_END_KEY(collect_key); ++collect_key)
         Append_Context(c, nullptr, KEY_SPELLING(collect_key));
   }
 
@@ -172,19 +172,23 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // !!! The order dependence suggests that `make object! [a: 1 b: 2]` will
     // not be equal to `make object! [b: 1 a: 2]`.  See #2341
     //
-    for (; NOT_END(key1) && NOT_END(key2); key1++, key2++, var1++, var2++) {
+    for (
+        ;
+        NOT_END_KEY(key1) and NOT_END_KEY(key2);
+        ++key1, ++key2, ++var1, ++var2
+    ){
       no_advance:
         if (Is_Param_Hidden(var1)) {
             ++key1;
             ++var1;
-            if (IS_END(key1))
+            if (IS_END_KEY(key1))
                 break;
             goto no_advance;
         }
         if (Is_Param_Hidden(var2)) {
             ++key2;
             ++var2;
-            if (IS_END(key2))
+            if (IS_END_KEY(key2))
                 break;
             goto no_advance;
         }
@@ -204,11 +208,11 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // all hidden values.  Which is okay.  But if a value isn't hidden,
     // they don't line up.
     //
-    for (; NOT_END(key1); key1++, var1++) {
+    for (; NOT_END_KEY(key1); key1++, var1++) {
         if (not Is_Param_Hidden(var1))
             return 1;
     }
-    for (; NOT_END(key2); key2++, var2++) {
+    for (; NOT_END_KEY(key2); key2++, var2++) {
         if (not Is_Param_Hidden(var2))
             return -1;
     }
@@ -633,7 +637,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(v);
         REBVAL *var = CTX_VARS_HEAD(c);
         bool had_output = false;
-        for (; NOT_END(key); key++, var++) {
+        for (; NOT_END_KEY(key); key++, var++) {
             if (Is_Param_Sealed(var))
                 continue;
             if (honor_hidden and Is_Param_Hidden(var))
@@ -666,7 +670,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
     const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(v);
     REBVAL *var = CTX_VARS_HEAD(VAL_CONTEXT(v));
 
-    for (; NOT_END(key); ++key, ++var) {
+    for (; NOT_END_KEY(key); ++key, ++var) {
         if (Is_Param_Sealed(var))
             continue;
         if (honor_hidden and Is_Param_Hidden(var))

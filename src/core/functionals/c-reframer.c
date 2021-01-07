@@ -244,7 +244,7 @@ REBNATIVE(reframer_p)
   cleanup_binder: {
     const REBKEY *key = ACT_KEYS_HEAD(shim);
     REBVAL *special = ACT_SPECIALTY_HEAD(shim);
-    for (; NOT_END(key); ++key, ++special) {
+    for (; NOT_END_KEY(key); ++key, ++special) {
         if (Is_Param_Hidden(special))
             continue;
 

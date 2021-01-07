@@ -301,7 +301,7 @@ STATIC_ASSERT(DETAILS_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
 // arguments at the callsite can't be gathered in sequence.  Revisiting them
 // will be necessary.  This flag is set while they are revisited, which is
 // important not only for Eval_Core() to know, but also the GC...since it
-// means it must protect *all* of the arguments--not just up thru f->param.
+// means it must protect *all* of the arguments--not just up thru f->key.
 //
 #define EVAL_FLAG_DOING_PICKUPS \
     FLAG_LEFT_BIT(27)
@@ -490,7 +490,7 @@ struct Reb_Frame {
     // ultimately usable as an ordinary CTX_VARLIST() for a FRAME! value, it
     // is different because it is built progressively, with random bits in
     // its pending capacity that are specifically accounted for by the GC...
-    // which limits its marking up to the progress point of `f->param`.
+    // which limits its marking up to the progress point of `f->key`.
     //
     // It starts out unmanaged, so that if no usages by the user specifically
     // ask for a FRAME! value, and the REBCTX* isn't needed to store in a
@@ -509,7 +509,7 @@ struct Reb_Frame {
     // advanced but we'd like to hold the old one...this makes it important
     // to protect it from GC if we have advanced beyond as well!)
     //
-    const REBKEY *param;
+    const REBKEY *key;
 
     // `arg is the "actual argument"...which holds the pointer to the
     // REBVAL slot in the `arglist` for that corresponding `param`.  These

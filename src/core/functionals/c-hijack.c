@@ -103,12 +103,12 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     Quotify(ARR_SINGLE(group), 1);  // suppress evaluation until pathing
     Init_Group(DS_PUSH(), group);
 
-    assert(IS_END(f->param)); // okay to reuse, if it gets put back...
-    f->param = ACT_KEYS_HEAD(FRM_PHASE(f));
+    assert(IS_END_KEY(f->key));  // okay to reuse, if it gets put back...
+    f->key = ACT_KEYS_HEAD(FRM_PHASE(f));
     f->arg = FRM_ARGS_HEAD(f);
     f->special = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
 
-    for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
+    for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->special) {
         if (Is_Param_Hidden(f->special))  // specialized or local
             continue;
 
@@ -119,7 +119,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
             if (IS_NULLED(f->arg))  // don't add to PATH!
                 continue;
 
-            Init_Word(DS_PUSH(), KEY_SPELLING(f->param));
+            Init_Word(DS_PUSH(), KEY_SPELLING(f->key));
 
             if (Is_Typeset_Empty(f->special)) {
                 assert(Is_Blackhole(f->arg));  // used but argless refinement

@@ -61,16 +61,16 @@ inline static bool ANY_ESCAPABLE_GET(const RELVAL *v) {
     ((f)->original != nullptr)
 
 
-// While a function frame is fulfilling its arguments, the `f->param` will
+// While a function frame is fulfilling its arguments, the `f->key` will
 // be pointing to a typeset.  The invariant that is maintained is that
-// `f->param` will *not* be a typeset when the function is actually in the
+// `f->key` will *not* be a typeset when the function is actually in the
 // process of running.  (So no need to set/clear/test another "mode".)
 //
 // Some cases in debug code call this all the way up the call stack, and when
 // the debug build doesn't inline functions it's best to use as a macro.
 
 #define Is_Action_Frame_Fulfilling_Unchecked(f) \
-    NOT_END((f)->param)
+    NOT_END_KEY((f)->key)
 
 inline static bool Is_Action_Frame_Fulfilling(REBFRM *f) {
     assert(Is_Action_Frame(f));
@@ -609,7 +609,7 @@ inline static void Begin_Action_Core(
 // values behind ARG(name), REF(name), D_ARG(3),  etc.)
 //
 // This only allocates space for the arguments, it does not initialize.
-// Eval_Core initializes as it goes, and updates f->param so the GC knows how
+// Eval_Core initializes as it goes, and updates f->key so the GC knows how
 // far it has gotten so as not to see garbage.  APPLY has different handling
 // when it has to build the frame for the user to write to before running;
 // so Eval_Core only checks the arguments, and does not fulfill them.
@@ -637,7 +637,7 @@ inline static void Push_Action(
     if (f->flags.bits & details->header.bits & DETAILS_FLAG_IS_BARRIER)
         fail (Error_Expression_Barrier_Raw());
 
-    f->param = ACT_KEYS_HEAD(act);
+    f->key = ACT_KEYS_HEAD(act);
     REBLEN num_args = ACT_NUM_PARAMS(act);  // includes specialized + locals
 
     REBSER *s;
@@ -724,7 +724,7 @@ inline static void Push_Action(
     // specialization together.  This means only the outermost specialization
     // is needed to fill the specialized slots contributed by later phases.
     //
-    // f->special here will either equal f->param (to indicate normal argument
+    // f->special here will either equal f->key (to indicate normal argument
     // fulfillment) or the head of the "exemplar".
     //
     // !!! It is planned that exemplars will be unified with paramlist, making

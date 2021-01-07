@@ -450,7 +450,7 @@ REBNATIVE(do)
         DECLARE_END_FRAME (f, flags);
 
         assert(CTX_KEYS_HEAD(c) == ACT_KEYS_HEAD(phase));
-        f->param = CTX_KEYS_HEAD(c);
+        f->key = CTX_KEYS_HEAD(c);
         REBCTX *stolen = Steal_Context_Vars(c, NOD(ACT_KEYLIST(phase)));
         INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(f));
             // ^-- changes CTX_KEYS_HEAD()
@@ -465,7 +465,7 @@ REBNATIVE(do)
         f->varlist = CTX_VARLIST(stolen);
         f->rootvar = CTX_ROOTVAR(stolen);
         f->arg = f->rootvar + 1;
-        // f->param set above
+        // f->key set above
         f->special = ACT_SPECIALTY_HEAD(phase);
 
         assert(FRM_PHASE(f) == phase);  // !!! v-- should archetype match?
@@ -797,7 +797,7 @@ REBNATIVE(applique)
     //
     const REBKEY *key = CTX_KEYS_HEAD(exemplar);
     REBVAL *var = CTX_VARS_HEAD(exemplar);
-    for (; NOT_END(key); key++, ++var) {
+    for (; NOT_END_KEY(key); key++, ++var) {
         if (Is_Param_Hidden(var))
             continue; // was part of a specialization internal to the action
 
@@ -819,7 +819,7 @@ REBNATIVE(applique)
     DROP_GC_GUARD(exemplar);
 
     assert(CTX_KEYS_HEAD(exemplar) == ACT_KEYS_HEAD(VAL_ACTION(applicand)));
-    f->param = CTX_KEYS_HEAD(exemplar);
+    f->key = CTX_KEYS_HEAD(exemplar);
     REBCTX *stolen = Steal_Context_Vars(
         exemplar,
         NOD(ACT_KEYLIST(VAL_ACTION(applicand)))
@@ -847,7 +847,7 @@ REBNATIVE(applique)
     f->varlist = CTX_VARLIST(stolen);
     f->rootvar = CTX_ROOTVAR(stolen);
     f->arg = f->rootvar + 1;
-    // f->param assigned above
+    // f->key assigned above
     f->special = f->arg; // signal only type-check the existing data
     INIT_FRM_PHASE(f, VAL_ACTION(applicand));
     INIT_FRM_BINDING(f, VAL_ACTION_BINDING(applicand));

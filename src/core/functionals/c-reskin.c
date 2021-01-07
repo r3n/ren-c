@@ -93,7 +93,7 @@ REB_R Skinner_Dispatcher(REBFRM *f)
     const REBKEY *key = ACT_KEYS_HEAD(phase);
     REBVAL *arg = FRM_ARGS_HEAD(f);
     REBVAL *param = ACT_SPECIALTY_HEAD(phase);
-    for (; NOT_END(key); ++key, ++param) {
+    for (; NOT_END_KEY(key); ++key, ++param) {
         if (Is_Param_Skin_Expanded(param))  // !!! always true (for now)
             CLEAR_CELL_FLAG(arg, ARG_MARKED_CHECKED);
     }

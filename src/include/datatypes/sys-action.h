@@ -264,6 +264,16 @@ inline static const REBSTR *KEY_SPELLING(const REBKEY *key) {
     return VAL_WORD_SPELLING(key);
 }
 
+#define END_KEY cast(const REBKEY*, END_NODE)
+
+inline static bool IS_END(const REBKEY *key) = delete;
+
+inline static bool IS_END_KEY(const REBKEY *key)
+  { return IS_END(static_cast<const REBVAL*>(key)); }
+
+#define NOT_END_KEY(key) \
+    (not IS_END_KEY(key))
+
 #define KEY_SYM(key) \
     STR_SYMBOL(KEY_SPELLING(key))
 
@@ -516,7 +526,7 @@ inline static REB_R Run_Generic_Dispatch(
 // of the frame for their own use.  But before then, the state byte is used
 // by action dispatch itself.
 //
-// So if f->param is END, then this state is not meaningful.
+// So if f->key is END, then this state is not meaningful.
 //
 enum {
     ST_ACTION_INITIAL_ENTRY = 0,  // is separate "fulfilling" state needed?

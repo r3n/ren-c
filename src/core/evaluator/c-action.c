@@ -144,7 +144,7 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
 
     // Signal refinement as being in use.
     //
-    Init_Word(DS_PUSH(), KEY_SPELLING(f->param + 1));
+    Init_Word(DS_PUSH(), KEY_SPELLING(f->key + 1));
   }
 
   skip_enable_modal:
@@ -177,7 +177,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     Do_Process_Action_Checks_Debug(f);
   #endif
 
-    if (IS_END(f->param))  // STATE_BYTE() belongs to the dispatcher if END
+    if (IS_END_KEY(f->key))  // STATE_BYTE() belongs to the dispatcher if END
         goto dispatch;
 
     switch (STATE_BYTE(f)) {
@@ -197,7 +197,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
     assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));
 
-    for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
+    for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->special) {
 
   //=//// CONTINUES (AT TOP SO GOTOS DO NOT CROSS INITIALIZATIONS /////////=//
 
@@ -210,7 +210,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
-            f->param = cast(const REBKEY*, END_NODE);  // don't need f->param
+            f->key = END_KEY;  // don't need f->key
             goto fulfill_and_any_pickups_done;
         }
         continue;
@@ -271,7 +271,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (DSP != f->dsp_orig) {  // reorderings or refinements pushed
             STKVAL(*) ordered = DS_TOP;
             STKVAL(*) lowest_ordered = DS_AT(f->dsp_orig);
-            const REBSTR *param_symbol = KEY_SPELLING(f->param);
+            const REBSTR *param_symbol = KEY_SPELLING(f->key);
 
             for (; ordered != lowest_ordered; --ordered) {
                 if (VAL_WORD_SPELLING(ordered) != param_symbol)
@@ -739,18 +739,18 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         //
         REBINT offset =
             VAL_WORD_INDEX(DS_TOP) - (f->arg - FRM_ARGS_HEAD(f)) - 1;
-        f->param += offset;
+        f->key += offset;
         f->arg += offset;
         f->special += offset;
 
-        assert(VAL_WORD_SPELLING(DS_TOP) == KEY_SPELLING(f->param));
+        assert(VAL_WORD_SPELLING(DS_TOP) == KEY_SPELLING(f->key));
         DS_DROP();
 
         if (Is_Typeset_Empty(f->special)) {  // no callsite arg, just drop
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
-            f->param = cast(const REBKEY*, END_NODE);  // don't need f->param
+            f->key = END_KEY;  // don't need f->key
             goto fulfill_and_any_pickups_done;
         }
 
@@ -762,7 +762,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   fulfill_and_any_pickups_done:
 
     CLEAR_EVAL_FLAG(f, DOING_PICKUPS);  // reevaluate may set flag again
-    assert(IS_END(f->param));  // signals !Is_Action_Frame_Fulfilling()
+    assert(IS_END_KEY(f->key));  // signals !Is_Action_Frame_Fulfilling()
 
     if (GET_EVAL_FLAG(f, FULFILL_ONLY)) {  // only fulfillment, no typecheck
         assert(GET_CELL_FLAG(f->out, OUT_MARKED_STALE));  // didn't touch out
@@ -784,11 +784,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   typecheck_then_dispatch:
     Expire_Out_Cell_Unless_Invisible(f);
 
-    f->param = ACT_KEYS_HEAD(FRM_PHASE(f));
+    f->key = ACT_KEYS_HEAD(FRM_PHASE(f));
     f->arg = FRM_ARGS_HEAD(f);
     f->special = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
 
-    for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
+    for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->special) {
         assert(NOT_END(f->arg));  // all END fulfilled as Init_Endish_Nulled()
 
         // Note that if you have a redo situation as with an ENCLOSE, a
@@ -799,7 +799,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (GET_CELL_FLAG(f->special, ARG_MARKED_CHECKED))
             continue;
 
-/*        if (VAL_PARAM_CLASS(f->param) == REB_P_LOCAL) {
+/*        if (VAL_PARAM_CLASS(f->key) == REB_P_LOCAL) {
             if (not IS_VOID(f->arg) and not IS_ACTION(f->arg))  // !!! TEMP TO TRY BOOT
                 fail ("locals must be void");
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
@@ -820,7 +820,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // Actual argument must be a VARARGS!
             //
             if (not IS_VARARGS(f->arg))
-                fail (Error_Not_Varargs(f, f->param, f->special, VAL_TYPE(f->arg)));
+                fail (Error_Not_Varargs(f, f->key, f->special, VAL_TYPE(f->arg)));
 
             VAL_VARARGS_PHASE_NODE(f->arg) = NOD(FRM_PHASE(f));
 
@@ -876,7 +876,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // Note: `1 + comment "foo"` => `1 +`, arg is END
             //
             if (not Is_Param_Endable(f->special))
-                fail (Error_No_Arg(f->label, KEY_SPELLING(f->param)));
+                fail (Error_No_Arg(f->label, KEY_SPELLING(f->key)));
 
             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             continue;
@@ -908,11 +908,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             continue;
         }
 
-        if (KEY_SYM(f->param) == SYM_RETURN)
+        if (KEY_SYM(f->key) == SYM_RETURN)
             continue;  // !!! let whatever go for now
 
         if (not Typecheck_Including_Constraints(f->special, f->arg))
-            fail (Error_Arg_Type(f, f->param, VAL_TYPE(f->arg)));
+            fail (Error_Arg_Type(f, f->key, VAL_TYPE(f->arg)));
 
         SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
     }
@@ -942,7 +942,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     else if (GET_EVAL_FLAG(f, RUNNING_ENFIX) and NOT_END(f->out))
         SET_EVAL_FLAG(f, UNDO_MARKED_STALE);
 
-    assert(IS_END(f->param));
+    assert(IS_END_KEY(f->key));
     assert(
         IS_END(f_next)
         or FRM_IS_VARIADIC(f)
@@ -1049,12 +1049,12 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // typechecking loop itself.
                 //
                 REBACT *redo_phase = VAL_FRAME_PHASE(f->out);
-                f->param = ACT_KEYS_HEAD(redo_phase);
+                f->key = ACT_KEYS_HEAD(redo_phase);
                 f->special = ACT_SPECIALTY_HEAD(redo_phase);
                 f->arg = FRM_ARGS_HEAD(f);
-                for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
+                for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->special) {
                     if (Is_Param_Hidden(f->special)) {
-                        if (f->param == f->special) {
+                        if (f->key == f->special) {
                             Init_Void(f->arg, SYM_UNSET);
                             SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
                         }
