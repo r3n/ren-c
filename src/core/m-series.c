@@ -117,7 +117,10 @@ REBSER *Copy_Series_Core(const REBSER *s, REBFLGS flags)
     // to be copied, for sure.
     //
     if (GET_SERIES_FLAG(s, IS_STRING)) {
-        assert(not IS_STR_SYMBOL(s));
+        //
+        // Note: If the string was a symbol (aliased via AS) it will lose
+        // that information.
+        //
         copy = Make_String_Core(used, flags);
         SET_SERIES_USED(copy, used);
         TERM_SERIES(copy);
