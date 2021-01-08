@@ -69,9 +69,11 @@ REB_R Datatype_Checker_Dispatcher(REBFRM *f)
         );
     }
 
+    assert(KEY_SYM(ACT_KEY(FRM_PHASE(f), 1)) == SYM_RETURN);  // skip arg 1
+
     return Init_Logic(  // otherwise won't be equal to any custom type
         f->out,
-        VAL_TYPE(FRM_ARG(f, 1)) == VAL_TYPE_KIND_OR_CUSTOM(datatype)
+        VAL_TYPE(FRM_ARG(f, 2)) == VAL_TYPE_KIND_OR_CUSTOM(datatype)
     );
 }
 
@@ -89,7 +91,9 @@ REB_R Typeset_Checker_Dispatcher(REBFRM *f)
     REBVAL *typeset = DETAILS_AT(details, IDX_TYPECHECKER_TYPE);
     assert(IS_TYPESET(typeset));
 
-    return Init_Logic(f->out, TYPE_CHECK(typeset, VAL_TYPE(FRM_ARG(f, 1))));
+    assert(KEY_SYM(ACT_KEY(FRM_PHASE(f), 1)) == SYM_RETURN);  // skip arg 1
+
+    return Init_Logic(f->out, TYPE_CHECK(typeset, VAL_TYPE(FRM_ARG(f, 2))));
 }
 
 
@@ -108,21 +112,8 @@ REBNATIVE(typechecker)
 
     REBVAL *type = ARG(type);
 
-    REBARR *paramlist = Make_Array_Core(
-        2,
-        SERIES_MASK_PARAMLIST | NODE_FLAG_MANAGED
-    );
-    REBVAL *rootparam = Voidify_Rootparam(paramlist);
-    Init_Param(
-        rootparam + 1,
-        REB_P_NORMAL,
-        Canon(SYM_VALUE),
-        TS_OPT_VALUE  // Allow null (e.g. <opt>), returns false
-    );
-    TERM_ARRAY_LEN(paramlist, 2);
-
     REBACT *typechecker = Make_Action(
-        paramlist,
+        CTX_VARLIST(ACT_EXEMPLAR(NATIVE_ACT(null_q))),  // same frame as NULL?
         nullptr,  // no meta !!! auto-generate info for HELP?
         IS_DATATYPE(type)
             ? &Datatype_Checker_Dispatcher
