@@ -203,11 +203,11 @@ REBNATIVE(reskinned)
     // of a system in which the checks are more expensive...which it will be
     // if it has to search hierarchies or lists of quoted forms/etc.
     //
-    REBARR *paramlist = Copy_Array_Shallow_Flags(
+    REBARR *paramlist = nullptr; /*Copy_Array_Shallow_Flags(
         ACT_KEYLIST(original),
         SPECIFIED,  // no relative values in parameter lists
         SERIES_MASK_PARAMLIST
-    );
+    );*/
 
     // Indicate "safe" relationship for frames; e.g. that a frame built for
     // the reskinned function is safe to use with the original function.

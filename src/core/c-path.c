@@ -655,7 +655,7 @@ bool Eval_Path_Throws_Core(
             //
             const REBSTR *spelling = STR(EXTRA(Binding, bottom).node);
             EXTRA(Binding, bottom).node = EXTRA(Binding, top).node;
-            EXTRA(Binding, top).node = NOD(spelling);
+            EXTRA(Binding, top).node = m_cast(REBNOD*, NOD(spelling));
 
             top--;
             bottom++;

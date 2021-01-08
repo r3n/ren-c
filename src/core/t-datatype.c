@@ -127,8 +127,8 @@ REBTYPE(Datatype)
 
             assert(CTX_TYPE(context) == REB_OBJECT);
 
+            REBKEY *key = CTX_KEYS_HEAD(context);
             REBVAL *var = CTX_VARS_HEAD(context);
-            REBVAL *key = CTX_KEYS_HEAD(context);
 
             RELVAL *item = ARR_HEAD(VAL_TYPE_SPEC(type));
 

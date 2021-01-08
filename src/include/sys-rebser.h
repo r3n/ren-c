@@ -853,6 +853,13 @@ struct Reb_Series {
 #endif
 
 
+// We want to be able to enumerate keys by incrementing across them.  The
+// things we increment across aren't REBSER nodes, but pointers to REBSER
+// nodes for the strings... so a "key" is a pointer.
+//
+typedef const REBSTR *REBKEY;
+
+
 // To help document places in the core that are complicit in the "extension
 // hack", alias arrays being used for the FFI and GOB to another name.
 //

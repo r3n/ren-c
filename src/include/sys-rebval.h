@@ -666,4 +666,4 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 
 //=//// KEYS AND VARS /////////////////////////////////////////////////////=//
 
-struct REBKEY : public REBVAL {};  // !!! TBD: REBSYM(*)
+struct REBVAR : public REBVAL {};

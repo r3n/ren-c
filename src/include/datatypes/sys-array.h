@@ -108,8 +108,8 @@ inline static REBARR *Singular_From_Cell(const RELVAL *v) {
 // and its terminator.  Many routines seek to choose the precise moment to
 // sync these independently for performance reasons (for better or worse).
 //
-#define ARR_LEN(a) \
-    SER_USED(a)
+inline static REBLEN ARR_LEN(const REBARR *a)
+  { return SER_USED(a); }
 
 
 // Set length and also terminate.  This routine avoids conditionality in the
@@ -142,7 +142,7 @@ inline static void RESET_ARRAY(REBARR *a) {
 
 inline static void TERM_SERIES(REBSER *s) {
     if (IS_SER_ARRAY(s))
-        TERM_ARRAY_LEN(ARR(s), ARR_LEN(s));
+        TERM_ARRAY_LEN(ARR(s), SER_USED(s));
     else
         TERM_SEQUENCE(s);
 }

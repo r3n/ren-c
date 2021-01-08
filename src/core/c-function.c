@@ -614,6 +614,13 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     );
     SET_SERIES_FLAG(paramlist, FIXED_SIZE);
 
+    REBSER *keylist = Make_Series_Core(
+        (num_slots - 1) + 1,  // - 1 archetype, + 1 terminator
+        sizeof(REBKEY),
+        NODE_FLAG_MANAGED | SERIES_MASK_KEYLIST
+    );
+    LINK_ANCESTOR_NODE(keylist) = NOD(keylist);  // chain ends with self
+
     // !!!
     // !!! TEMPORARY -- TURNING OFF RETURN CHECKS
     // !!!
@@ -622,7 +629,8 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN; */
 
   blockscope {
-    REBVAL *dest = Voidify_Rootparam(paramlist) + 1;
+    REBVAL *param = Voidify_Rootparam(paramlist) + 1;
+    REBKEY *key = SER_HEAD(REBKEY, keylist);
 
     // We want to check for duplicates and a Binder can be used for that
     // purpose--but note that a fail () cannot happen while binders are
@@ -641,8 +649,12 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     if (definitional_return) {
         assert(flags & MKF_RETURN);
-        Move_Value(dest, definitional_return);
-        ++dest;
+        Init_Key(key, VAL_TYPESET_STRING(definitional_return));
+        ++key;
+
+        Init_Void(param, SYM_UNSET);  // acts as a local !!! being revisited
+        SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
+        ++param;
     }
 
     // Weird due to Spectre/MSVC: https://stackoverflow.com/q/50399940
@@ -656,8 +668,18 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         if (definitional_return and src == definitional_return)
             continue;
 
-        Move_Value(dest, src);
-        ++dest;
+        Init_Key(key, VAL_TYPESET_STRING(src));
+        ++key;
+
+        if (VAL_PARAM_CLASS(src) == REB_P_LOCAL) {
+            Init_Void(param, SYM_UNSET);
+            SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
+        }
+        else {
+            Move_Value(param, src);
+            VAL_TYPESET_STRING_NODE(param) = nullptr;
+        }
+        ++param;
     }
 
     // Must remove binder indexes for all words, even if about to fail
@@ -666,7 +688,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     // Weird due to Spectre/MSVC: https://stackoverflow.com/q/50399940
     //
-    for (; src != DS_TOP + 1; src += 3, ++dest) {
+    for (; src != DS_TOP + 1; src += 3, ++param) {
         if (Is_Param_Sealed(src))
             continue;
         if (
@@ -687,6 +709,10 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     TERM_ARRAY_LEN(paramlist, num_slots);
     Manage_Series(paramlist);
+
+    TERM_SEQUENCE_LEN(keylist, ARR_LEN(paramlist) - 1);
+    INIT_LINK_KEYSOURCE(paramlist, NOD(keylist));
+    MISC_META_NODE(paramlist) = nullptr;
   }
 
     //=///////////////////////////////////////////////////////////////////=//
@@ -721,7 +747,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             SERIES_MASK_VARLIST | NODE_FLAG_MANAGED
         );
         MISC_META_NODE(types_varlist) = nullptr;  // GC sees, must initialize
-        INIT_CTX_KEYLIST_SHARED(CTX(types_varlist), paramlist);
+        INIT_CTX_KEYLIST_SHARED(CTX(types_varlist), keylist);
 
         RELVAL *rootvar = ARR_HEAD(types_varlist);
         INIT_VAL_CONTEXT_ROOTVAR(rootvar, REB_OBJECT, types_varlist);
@@ -764,7 +790,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             else
                 Move_Value(dest, src);
 
-            if (VAL_PARAM_CLASS(param) == REB_P_LOCAL)
+            if (GET_CELL_FLAG(param, ARG_MARKED_CHECKED))
                 SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
             ++dest;
             ++param;
@@ -787,7 +813,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             SERIES_MASK_VARLIST | NODE_FLAG_MANAGED
         );
         MISC_META_NODE(notes_varlist) = nullptr;  // GC sees, must initialize
-        INIT_CTX_KEYLIST_SHARED(CTX(notes_varlist), paramlist);
+        INIT_CTX_KEYLIST_SHARED(CTX(notes_varlist), keylist);
 
         RELVAL *rootvar = ARR_HEAD(notes_varlist);
         INIT_VAL_CONTEXT_ROOTVAR(rootvar, REB_OBJECT, notes_varlist); 
@@ -829,7 +855,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             else
                 Move_Value(dest, src);
 
-            if (VAL_PARAM_CLASS(param) == REB_P_LOCAL)
+            if (GET_CELL_FLAG(param, ARG_MARKED_CHECKED))
                 SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
             ++dest;
             ++param;
@@ -932,10 +958,6 @@ REBARR *Make_Paramlist_Managed_May_Fail(
         definitional_return_dsp
     );
 
-    // By default, all paramlists point to themselves as the termination of
-    // the ancestor chain.
-    //
-    LINK_ANCESTOR_NODE(paramlist) = NOD(paramlist);
     return paramlist;
 }
 
@@ -996,56 +1018,19 @@ REBACT *Make_Action(
 ){
     assert(details_capacity >= 1);  // must have room for archetype
 
-    REBARR *list = specialty;
-    if (GET_ARRAY_FLAG(list, IS_PARTIALS)) {
-        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
+    REBARR *paramlist;
+    if (GET_ARRAY_FLAG(specialty, IS_PARTIALS)) {
+        paramlist = ARR(LINK_PARTIALS_EXEMPLAR_NODE(specialty));
     }
-    else if (GET_SERIES_FLAG(list, IS_KEYLIKE)) {
-        // As a step toward usermode parameter definitions, move the typesets
-        // into an exemplar...so all actions will have exemplars.
-        //
-        REBARR *paramlist = list;
-        REBARR *varlist = Make_Array_Core(
-            ARR_LEN(paramlist),  // paramlist
-            NODE_FLAG_MANAGED | SERIES_MASK_VARLIST
-        );
-        REBVAL *src = SER_AT(REBVAL, paramlist, 1);
-        REBVAL *dest = SER_AT(REBVAL, varlist, 1);
-        for (; NOT_END(src); ++src, ++dest) {
-            assert(HEART_BYTE(src) == REB_TYPESET);
-            if (VAL_PARAM_CLASS(src) == REB_P_LOCAL) {
-                Init_Void(dest, SYM_UNSET);
-                SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
-            }
-            else
-                Move_Value(dest, src);
-
-            // Now change the actual "param" to be more like a key, to only
-            // contain the spelling (as an unbound word, that could be reduced
-            // to the spelling itself)
-            //
-            Init_Key(src - 1, VAL_TYPESET_STRING(src));
-        }
-        TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));
-        TERM_ARRAY_LEN(paramlist, ARR_LEN(paramlist) - 1);
-        INIT_LINK_KEYSOURCE(varlist, NOD(paramlist));
-        MISC_META_NODE(varlist) = nullptr;
-
-        // !!! Can't make this a frame yet, need an action to pick it up.
-        //
-        Init_Unreadable_Void(ARR_HEAD(varlist));
-        list = varlist;
-        specialty = varlist;
+    else {
+        assert(GET_ARRAY_FLAG(specialty, IS_VARLIST));
+        paramlist = specialty;
     }
-    else
-        assert(GET_ARRAY_FLAG(list, IS_VARLIST));
 
-    REBARR *varlist = list;
-
-    assert(GET_SERIES_FLAG(varlist, MANAGED));
+    assert(GET_SERIES_FLAG(paramlist, MANAGED));
     assert(
-        IS_UNREADABLE_DEBUG(ARR_HEAD(varlist))  // must fill in
-        or CTX_TYPE(CTX(varlist)) == REB_FRAME
+        IS_UNREADABLE_DEBUG(ARR_HEAD(paramlist))  // must fill in
+        or CTX_TYPE(CTX(paramlist)) == REB_FRAME
     );
 
     // !!! There used to be more validation code needed here when it was
@@ -1057,11 +1042,10 @@ REBACT *Make_Action(
     // a placeholder for more useful consistency checking which might be done.
     //
   blockscope {
-    REBARR *paramlist = ARR(LINK_KEYSOURCE(varlist));
+    REBSER *keylist = SER(LINK_KEYSOURCE(paramlist));
 
-    ASSERT_SERIES_MANAGED(paramlist);  // paramlists/keylists, can be shared
-    assert(ARR_LEN(paramlist) + 1 == ARR_LEN(varlist));
-    assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
+    ASSERT_SERIES_MANAGED(keylist);  // paramlists/keylists, can be shared
+    assert(SER_USED(keylist) + 1 == ARR_LEN(paramlist));
     if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
         const REBKEY *key = SER_AT(const REBKEY, paramlist, 0);
         assert(KEY_SYM(key) == SYM_RETURN);
@@ -1101,9 +1085,9 @@ REBACT *Make_Action(
 
     // !!! We may have to initialize the exemplar rootvar.
     //
-    REBVAL *rootvar = SER_HEAD(REBVAL, varlist);
+    REBVAL *rootvar = SER_HEAD(REBVAL, paramlist);
     if (IS_UNREADABLE_DEBUG(rootvar)) {
-        INIT_VAL_FRAME_ROOTVAR(rootvar, varlist, act, UNBOUND);
+        INIT_VAL_FRAME_ROOTVAR(rootvar, paramlist, act, UNBOUND);
     }
 
     // Precalculate cached function flags.  This involves finding the first

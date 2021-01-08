@@ -197,7 +197,7 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 // are nearing full convergence).  And on the details array, it got in the
 // way of HIJACK, which may perform expansion.  So that was removed.
 //
-#define SERIES_MASK_PARAMLIST SERIES_MASK_KEYLIST
+#define SERIES_MASK_PARAMLIST SERIES_MASK_VARLIST
 
 #define SERIES_MASK_DETAILS \
     (NODE_FLAG_NODE \

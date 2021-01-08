@@ -37,11 +37,13 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
 {
     assert(not (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED));  // LINK is taken
 
-    REBARR *keylist = Make_Array_Core(
-        capacity,  // uses all cells (no "rootkey")
+    REBSER *keylist = Make_Series_Core(
+        capacity + 1,  // size + terminator
+        sizeof(REBKEY),
         SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED  // always shareable
     );
     LINK_ANCESTOR_NODE(keylist) = NOD(keylist);  // default to keylist itself
+    TERM_SEQUENCE_LEN(keylist, 0);  // need terminating END_KEY
 
     REBARR *varlist = Make_Array_Core(
         capacity + 1,  // size + room for rootvar
@@ -65,9 +67,8 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
 //
 bool Expand_Context_Keylist_Core(REBCTX *context, REBLEN delta)
 {
-    REBARR *keylist = CTX_KEYLIST(context);
-
-    assert(NOT_ARRAY_FLAG(keylist, IS_DETAILS)); // can't expand FRAME! list
+    REBSER *keylist = CTX_KEYLIST(context);
+    assert(GET_SERIES_FLAG(keylist, IS_KEYLIKE));
 
     if (GET_SERIES_INFO(keylist, KEYLIST_SHARED)) {
         //
@@ -78,10 +79,14 @@ bool Expand_Context_Keylist_Core(REBCTX *context, REBLEN delta)
         //
         // (If all shared copies break away in this fashion, then the last
         // copy of the dangling keylist will be GC'd.)
-        //
-        // Keylists are only typesets, so no need for a specifier.
 
-        REBARR *copy = Copy_Array_Extra_Shallow(keylist, SPECIFIED, delta);
+        REBSER *copy = Copy_Series_At_Len_Extra(
+            keylist,
+            0,
+            SER_USED(keylist),
+            delta,
+            SERIES_MASK_KEYLIST
+        );
 
         // Preserve link to ancestor keylist.  Note that if it pointed to
         // itself, we update this keylist to point to itself.
@@ -111,7 +116,7 @@ bool Expand_Context_Keylist_Core(REBCTX *context, REBLEN delta)
     // to mark the flag indicating it's shared.  Extend it directly.
 
     Extend_Series(keylist, delta);
-    TERM_ARRAY_LEN(keylist, ARR_LEN(keylist));
+    TERM_SEQUENCE_LEN(keylist, SER_USED(keylist));
 
     return false;
 }
@@ -155,7 +160,7 @@ REBVAL *Append_Context(
     option(RELVAL*) any_word,  // allowed to be quoted as well
     option(const REBSTR*) spelling
 ) {
-    REBARR *keylist = CTX_KEYLIST(context);
+    REBSER *keylist = CTX_KEYLIST(context);
 
     // Add the key to key list
     //
@@ -166,12 +171,12 @@ REBVAL *Append_Context(
     //
     EXPAND_SERIES_TAIL(keylist, 1);
     Init_Key(
-        ARR_LAST(keylist),
+        SER_LAST(REBKEY, keylist),
         spelling
             ? unwrap(spelling)
             : VAL_WORD_SPELLING(VAL_UNESCAPED(unwrap(any_word)))
     );
-    TERM_ARRAY_LEN(keylist, ARR_LEN(keylist));
+    TERM_SEQUENCE_LEN(keylist, SER_USED(keylist));
 
     // Add a slot to the var list
     //
@@ -218,33 +223,6 @@ void Collect_Start(struct Reb_Collector* collector, REBFLGS flags)
 
     assert(ARR_LEN(BUF_COLLECT) == 1); // should be empty (just 0 placeholder)
     assert(IS_UNREADABLE_DEBUG(ARR_HEAD(BUF_COLLECT)));  // bind "index" [0]
-}
-
-
-//
-//  Grab_Collected_Array_Managed: C
-//
-REBARR *Grab_Collected_Array_Managed(
-    struct Reb_Collector *collector,
-    REBFLGS flags
-){
-    UNUSED(collector); // not needed at the moment
-
-    // We didn't terminate as we were collecting, so terminate now.
-    //
-    TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));
-
-    // If no new words, prior context.
-    //
-    // All collected values should be unbound (so "SPECIFIED").
-    //
-    return Copy_Array_At_Extra_Shallow(
-        BUF_COLLECT,
-        1,  // skip unreadable void
-        SPECIFIED,
-        0,  // extra
-        flags | NODE_FLAG_MANAGED
-    );
 }
 
 
@@ -424,7 +402,7 @@ static void Collect_Inner_Loop(
 // key collection in the case where head[] was empty.  Revisit if it is worth
 // the complexity to move handling for that case in this routine.
 //
-REBARR *Collect_Keylist_Managed(
+REBSER *Collect_Keylist_Managed(
     const RELVAL *head,
     option(REBCTX*) prior,
     REBFLGS flags // see %sys-core.h for COLLECT_ANY_WORD, etc.
@@ -446,11 +424,27 @@ REBARR *Collect_Keylist_Managed(
     // collect buffer than the original keylist) then make a new keylist
     // array, otherwise reuse the original
     //
-    REBARR *keylist;
-    if (prior and ARR_LEN(CTX_KEYLIST(unwrap(prior))) == ARR_LEN(BUF_COLLECT))
+    REBSER *keylist;
+    if (prior and ARR_LEN(CTX_VARLIST(unwrap(prior))) == ARR_LEN(BUF_COLLECT))
         keylist = CTX_KEYLIST(unwrap(prior));
-    else
-        keylist = Grab_Collected_Array_Managed(cl, SERIES_MASK_KEYLIST);
+    else {
+        TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));  // delayed term
+
+        REBLEN len = ARR_LEN(BUF_COLLECT) - 1;  // don't count unreadable [0]
+        keylist = Make_Series_Core(
+            len + 1,  // - 1 unreadable void, + 1 terminator
+            sizeof(REBKEY),
+            SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
+        );
+        
+        const RELVAL *word = ARR_AT(BUF_COLLECT, 1);
+        REBKEY* key = SER_HEAD(REBKEY, keylist);
+        for (; NOT_END(word); ++word, ++key)
+            Init_Key(key, VAL_WORD_SPELLING(word));
+
+        TERM_SEQUENCE_LEN(keylist, len);
+        assert(IS_END_KEY(SER_TAIL(const REBKEY, keylist)));
+    }
 
     Collect_End(cl);
     return keylist;
@@ -529,7 +523,21 @@ REBARR *Collect_Unique_Words_Managed(
 
     Collect_Inner_Loop(cl, head);
 
-    REBARR *array = Grab_Collected_Array_Managed(cl, SERIES_FLAGS_NONE);
+    UNUSED(collector); // not needed at the moment
+
+    // We didn't terminate as we were collecting, so terminate now.
+    //
+    TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));
+
+    // All collected values should be unbound (so "SPECIFIED").
+    //
+    REBARR *array = Copy_Array_At_Extra_Shallow(
+        BUF_COLLECT,
+        1,  // skip unreadable void
+        SPECIFIED,
+        0,  // extra
+        NODE_FLAG_MANAGED
+    );
 
     if (IS_BLOCK(ignore)) {
         const RELVAL *item = VAL_ARRAY_AT(ignore);
@@ -593,13 +601,13 @@ REBCTX *Make_Context_Detect_Managed(
     const RELVAL *head,
     option(REBCTX*) parent
 ) {
-    REBARR *keylist = Collect_Keylist_Managed(
+    REBSER *keylist = Collect_Keylist_Managed(
         head,
         parent,
         COLLECT_ONLY_SET_WORDS
     );
 
-    REBLEN len = ARR_LEN(keylist);
+    REBLEN len = SER_USED(keylist);
     REBARR *varlist = Make_Array_Core(
         1 + len,  // needs room for rootvar
         SERIES_MASK_VARLIST
@@ -749,13 +757,13 @@ REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
     if (IS_FRAME(context))
         always = IS_FRAME_PHASED(context);
 
-    const REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
+    const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(context);
     REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
 
     assert(!(mode & 4));
 
     REBLEN n = 1;
-    for (; NOT_END(key); n++, key++, var++) {
+    for (; NOT_END_KEY(key); n++, key++, var++) {
         if (Is_Param_Sealed(var))
             continue;
 
@@ -1193,15 +1201,13 @@ void Assert_Context_Core(REBCTX *c)
         panic (varlist);
     }
 
-    REBARR *keylist = CTX_KEYLIST(c);
-    if (keylist == NULL)
-        panic (c);
-
     REBVAL *rootvar = CTX_ROOTVAR(c);
-    if (not ANY_CONTEXT(rootvar))
+    if (not ANY_CONTEXT(rootvar) or VAL_CONTEXT(rootvar) != c)
         panic (rootvar);
 
-    REBLEN keys_len = ARR_LEN(keylist);
+    REBSER *keylist = CTX_KEYLIST(c);
+
+    REBLEN keys_len = SER_USED(keylist);
     REBLEN vars_len = ARR_LEN(varlist);
 
     if (vars_len < 1)
@@ -1209,9 +1215,6 @@ void Assert_Context_Core(REBCTX *c)
 
     if (keys_len + 1 != vars_len)
         panic (c);
-
-    if (VAL_CONTEXT(rootvar) != c)
-        panic (rootvar);
 
     if (GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE)) {
         //
@@ -1222,18 +1225,18 @@ void Assert_Context_Core(REBCTX *c)
         return;
     }
 
-    REBVAL *key = CTX_KEYS_HEAD(c);
+    const REBKEY *key = CTX_KEYS_HEAD(c);
     REBVAL *var = CTX_VARS_HEAD(c);
 
     REBLEN n;
     for (n = 1; n < vars_len; n++, var++, key++) {
-        if (IS_END(key)) {
+        if (IS_END_KEY(key)) {
             printf("** Early key end at index: %d\n", cast(int, n));
             panic (c);
         }
 
-        if (not IS_WORD(key))
-            panic (key);
+        if (not IS_SER_STRING(*key) and IS_STR_SYMBOL(STR(*key)))
+            panic (*key);
 
         if (IS_END(var)) {
             printf("** Early var end at index: %d\n", cast(int, n));
@@ -1241,7 +1244,7 @@ void Assert_Context_Core(REBCTX *c)
         }
     }
 
-    if (NOT_END(key)) {
+    if (NOT_END_KEY(key)) {
         printf("** Missing key end at index: %d\n", cast(int, n));
         panic (key);
     }

@@ -1080,7 +1080,7 @@ inline static REBSER *Copy_Series_At_Len(
     REBLEN index,
     REBLEN len
 ){
-    return Copy_Series_At_Len_Extra(s, index, len, 0);
+    return Copy_Series_At_Len_Extra(s, index, len, 0, SERIES_FLAGS_NONE);
 }
 
 

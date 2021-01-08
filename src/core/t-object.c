@@ -94,9 +94,9 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
     REBLEN len = CTX_LEN(c) + 1;
     Expand_Context(c, ARR_LEN(BUF_COLLECT) - len);
 
-    const REBKEY *collect_key = SER_AT(const REBKEY, BUF_COLLECT, len);
-    for (; NOT_END_KEY(collect_key); ++collect_key)
-        Append_Context(c, nullptr, KEY_SPELLING(collect_key));
+    const REBVAL *new_word = SER_AT(REBVAL, BUF_COLLECT, len);
+    for (; NOT_END(new_word); ++new_word)
+        Append_Context(c, nullptr, VAL_WORD_SPELLING(new_word));
   }
 
     // Set new values to obj words
@@ -561,10 +561,10 @@ REBCTX *Copy_Context_Extra_Managed(
     else {
         assert(CTX_TYPE(original) != REB_FRAME);  // can't expand FRAME!s
 
-        REBARR *keylist = Copy_Array_At_Extra_Shallow(
+        REBSER *keylist = Copy_Series_At_Len_Extra(
             CTX_KEYLIST(original),
             0,
-            SPECIFIED,
+            CTX_LEN(original),
             extra,
             SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
         );

@@ -57,7 +57,7 @@
 #define SERIES_MASK_KEYLIST \
     (NODE_FLAG_NODE  /* NOT always dynamic */ \
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* ancestor */ \
-        | ARRAY_FLAG_IS_KEYLIST)
+        | SERIES_FLAG_IS_KEYLIKE)
 
 struct Reb_Context {
     REBARR varlist;  // keylist is held in ->link.keysource

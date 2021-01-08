@@ -224,8 +224,8 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
         )){
             panic (p);
         }
-
-        assert(WIDE_BYTE_OR_0(reinterpret_cast<const REBSER*>(p)) == 0);
+        if (WIDE_BYTE_OR_0(reinterpret_cast<const REBSER*>(p)) != 0)
+            panic (p);
 
         return reinterpret_cast<A*>(p);
     }

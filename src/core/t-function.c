@@ -286,26 +286,8 @@ REBTYPE(Action)
             Get_Maybe_Fake_Action_Body(D_OUT, action);
             return D_OUT;
 
-          case SYM_TYPES: {
-            REBARR *copy = Make_Array(ACT_NUM_PARAMS(act));
-
-            // The typesets have a symbol in them for the parameters, and
-            // ordinary typesets aren't supposed to have it--that's a
-            // special feature for object keys and paramlists!  So clear
-            // that symbol out before giving it back.
-            //
-            const REBVAL *param = ACT_KEYS_HEAD(act);
-            REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
-            for (; NOT_END(param); ++param, ++typeset) {
-                assert(IS_PARAM(param));
-                RESET_CELL(typeset, REB_TYPESET, CELL_MASK_NONE);
-                VAL_TYPESET_LOW_BITS(typeset) = VAL_TYPESET_LOW_BITS(param);
-                VAL_TYPESET_HIGH_BITS(typeset) = VAL_TYPESET_HIGH_BITS(param);
-            }
-            TERM_ARRAY_LEN(copy, ACT_NUM_PARAMS(act));
-            assert(IS_END(typeset));
-
-            return Init_Block(D_OUT, copy); }
+          case SYM_TYPES:
+            return Move_Value(D_OUT, CTX_ARCHETYPE(ACT_EXEMPLAR(act)));
 
           case SYM_FILE:
           case SYM_LINE: {

@@ -84,8 +84,8 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
                 and GET_ARRAY_FLAG(ARR(keysource), IS_DETAILS)
             ){
                 if (
-                    (keysource->header.bits & SERIES_MASK_PARAMLIST)
-                    != SERIES_MASK_PARAMLIST
+                    (keysource->header.bits & SERIES_MASK_KEYLIST)
+                    != SERIES_MASK_KEYLIST
                 ){
                     panic (binding);
                 }
@@ -566,14 +566,18 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
             assert(IS_FRAME(archetype));
         }
         else {
-            REBARR *keylist = ARR(keysource);
+            REBSER *keylist = SER(keysource);
+            if (IS_SER_ARRAY(keylist))
+                panic (a);
+
+            assert(GET_SERIES_FLAG(keylist, IS_KEYLIKE));
 
             if (IS_FRAME(archetype)) {
                 // Frames use paramlists as their "keylist", there is no
                 // place to put an ancestor link.
             }
             else {
-                REBARR *ancestor = LINK_ANCESTOR(keylist);
+                REBSER *ancestor = LINK_ANCESTOR(keylist);
                 UNUSED(ancestor);  // maybe keylist
             }
         }

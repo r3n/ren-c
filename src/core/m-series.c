@@ -155,11 +155,12 @@ REBSER *Copy_Series_At_Len_Extra(
     const REBSER *s,
     REBLEN index,
     REBLEN len,
-    REBLEN extra
+    REBLEN extra,
+    REBFLGS flags
 ){
     assert(not IS_SER_ARRAY(s));
 
-    REBSER *copy = Make_Series(len + 1 + extra, SER_WIDE(s));
+    REBSER *copy = Make_Series_Core(len + 1 + extra, SER_WIDE(s), flags);
     memcpy(
         SER_DATA(copy),
         SER_DATA(s) + index * SER_WIDE(s),

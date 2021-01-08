@@ -242,6 +242,17 @@ void* Probe_Core_Debug(
                 Mold_Array_At(mo, ARR(s), 0, "[]"); // not necessarily BLOCK!
             }
         }
+        else if (GET_SERIES_FLAG(s, IS_KEYLIKE)) {
+            assert(SER_WIDE(s) == sizeof(REBKEY));  // ^-- or is byte size
+            Probe_Print_Helper(p, expr, "Keylist Series", file, line);
+            const REBKEY *key = SER_HEAD(REBKEY, s);
+            Append_Codepoint(mo->series, '[');
+            for (; NOT_END_KEY(key); ++key) {
+                Mold_Text_Series_At(mo, KEY_SPELLING(key), 0);
+                Append_Codepoint(mo->series, ' ');
+            }
+            Append_Codepoint(mo->series, ']');
+        }
         else if (s == PG_Symbols_By_Hash) {
             printf("can't probe PG_Symbols_By_Hash (TBD: add probing)\n");
         }

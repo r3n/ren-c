@@ -254,6 +254,8 @@ static void Startup_End_Node(void)
     PG_End_Node.header.bits = Endlike_Header(0);  // no NODE_FLAG_CELL, R/O
     USED(TRACK_CELL_IF_DEBUG(&PG_End_Node));
     assert(IS_END(END_NODE));  // sanity check
+
+    PG_End_Key = nullptr;  // REBSTR* of null, that can be pointed to
 }
 
 

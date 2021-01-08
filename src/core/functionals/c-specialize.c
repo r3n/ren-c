@@ -552,6 +552,8 @@ void For_Each_Unspecialized_Param(
         if (pclass == REB_P_LOCAL)
             continue;
 
+        REBFLGS flags = 0;
+
         if (partials) {  // even normal parameters can appear in partials
             REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
             for (; NOT_END(partial); ++partial) {
@@ -567,7 +569,6 @@ void For_Each_Unspecialized_Param(
         // If the modal parameter has had its refinement specialized out, it
         // is no longer modal.
         //
-        REBFLGS flags = 0;
         if (pclass == REB_P_MODAL) {
             if (NOT_END_KEY(key + 1)) {  // !!! Ideally checked at creation
                 if (GET_CELL_FLAG(special + 1, ARG_MARKED_CHECKED)) {
@@ -577,8 +578,7 @@ void For_Each_Unspecialized_Param(
             }
         }
 
-        bool cancel = not hook(key, special, flags, opaque);
-        if (cancel)
+        if (not hook(key, special, flags, opaque))
             return;
 
       skip_in_first_pass: {}
@@ -599,8 +599,7 @@ void For_Each_Unspecialized_Param(
             const REBKEY *key = ACT_KEY(act, VAL_WORD_INDEX(partial));
             REBVAL *special = ACT_SPECIAL(act, VAL_WORD_INDEX(partial));
 
-            bool cancel = not hook(key, special, PHF_UNREFINED, opaque);
-            if (cancel)
+            if (not hook(key, special, PHF_UNREFINED, opaque))
                 return;
         }
     }
@@ -630,8 +629,7 @@ void For_Each_Unspecialized_Param(
             }
         }
 
-        bool cancel = not hook(key, special, 0, opaque);
-        if (cancel)
+        if (not hook(key, special, 0, opaque))
             return;
 
       continue_unspecialized_loop:
@@ -800,9 +798,10 @@ bool Make_Invocation_Frame_Throws(
 
     *first_arg_ptr = nullptr;
 
-    REBVAL *param = CTX_KEYS_HEAD(CTX(f->varlist));
-    REBVAL *arg = CTX_VARS_HEAD(CTX(f->varlist));
-    for (; NOT_END(param); ++param, ++arg) {
+    const REBKEY *key = ACT_KEYS_HEAD(FRM_PHASE(f));
+    REBVAL *param = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
+    REBVAL *arg = FRM_ARGS_HEAD(f);
+    for (; NOT_END_KEY(key); ++key, ++param, ++arg) {
         Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
         if (TYPE_CHECK(param, REB_TS_REFINEMENT))
             continue;  // optional so doesn't count
@@ -947,10 +946,10 @@ REBACT *Alloc_Action_From_Exemplar(
 ){
     REBACT *unspecialized = CTX_FRAME_ACTION(exemplar);
 
-    const REBVAL *param = ACT_KEYS_HEAD(unspecialized);
+    const REBKEY *key = ACT_KEYS_HEAD(unspecialized);
     const REBVAL *special = ACT_SPECIALTY_HEAD(unspecialized);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
-    for (; NOT_END(param); ++param, ++arg, ++special) {
+    for (; NOT_END_KEY(key); ++key, ++arg, ++special) {
         if (Is_Param_Hidden(special))
             continue;
 

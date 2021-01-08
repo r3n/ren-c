@@ -184,7 +184,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
         if (ignore)
             continue;
 
-        const REBVAL *param = ACT_KEY(reorderee, index);
+        const REBVAL *param = ACT_SPECIAL(reorderee, index);
         if (TYPE_CHECK(param, REB_TS_REFINEMENT) and Is_Typeset_Empty(param)) {
             error = Error_User("Can't reorder refinements with no argument");
             goto cleanup_binder;

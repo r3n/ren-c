@@ -288,8 +288,11 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
         or CTX_TYPE(c) == REB_FRAME
     );
 
-    REBARR *keylist = CTX_KEYLIST(c);
-    assert(NOT_ARRAY_FLAG(keylist, HAS_FILE_LINE_UNMASKED));
+    // Keylists are uniformly managed, or certain routines would return
+    // "sometimes managed, sometimes not" keylists...a bad invariant.
+    //
+    REBSER *keylist = CTX_KEYLIST(c);
+    ASSERT_SERIES_MANAGED(keylist);
 
     assert(not CTX_META(c) or ANY_CONTEXT_KIND(CTX_TYPE(CTX_META(c))));
 
@@ -302,11 +305,6 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
         assert(GET_ARRAY_FLAG(ARR(archetype_phase), IS_DETAILS));
     else
         assert(archetype_phase == nullptr);
-
-    // Keylists are uniformly managed, or certain routines would return
-    // "sometimes managed, sometimes not" keylists...a bad invariant.
-    //
-    ASSERT_SERIES_MANAGED(CTX_KEYLIST(c));
 }
 
 
@@ -319,12 +317,11 @@ void Extra_Init_Action_Checks_Debug(REBACT *a) {
     REBVAL *archetype = ACT_ARCHETYPE(a);
     assert(VAL_ACTION(archetype) == a);
 
-    REBARR *paramlist = ACT_KEYLIST(a);
+    REBSER *keylist = ACT_KEYLIST(a);
     assert(
-        (paramlist->header.bits & SERIES_MASK_PARAMLIST)
-        == SERIES_MASK_PARAMLIST
+        (keylist->header.bits & SERIES_MASK_KEYLIST)
+        == SERIES_MASK_KEYLIST
     );
-    assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
 
     // !!! Currently only a context can serve as the "meta" information,
     // though the interface may expand.

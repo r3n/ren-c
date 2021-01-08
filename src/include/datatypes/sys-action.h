@@ -215,14 +215,6 @@ inline static option(REBARR*) ACT_PARTIALS(REBACT *a) {
     return nullptr;
 }
 
-inline static REBARR *ACT_KEYLIST(REBACT *a) {
-    REBARR *list = ACT_SPECIALTY(a);
-    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
-    assert(GET_ARRAY_FLAG(list, IS_VARLIST));
-    return ARR(LINK_KEYSOURCE(list));
-}
-
 inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
@@ -231,15 +223,28 @@ inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
     return CTX(list);
 }
 
+// Note: This is a more optimized version of CTX_KEYLIST(ACT_EXEMPLAR(a)),
+// and also forward declared.
+//
+inline static REBSER *ACT_KEYLIST(REBACT *a) {
+    REBARR *list = ACT_SPECIALTY(a);
+    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
+    assert(GET_ARRAY_FLAG(list, IS_VARLIST));
+    return SER(LINK_KEYSOURCE(list));
+}
+
+#define ACT_KEYS_HEAD(a) \
+    SER_HEAD(const REBKEY, ACT_KEYLIST(a))
+
+#define ACT_PARAMLIST(a)            CTX_VARLIST(ACT_EXEMPLAR(a))
+
 inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
         list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
     return cast(REBVAL*, list->content.dynamic.data) + 1;  // skip archetype
 }
-
-#define ACT_KEYS_HEAD(a) \
-    CTX_KEYS_HEAD(ACT_EXEMPLAR(a))
 
 
 #define ACT_DISPATCHER(a) \
@@ -257,27 +262,23 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 #define IDX_NATIVE_CONTEXT 2 // libRebol binds strings here (and lib)
 #define IDX_NATIVE_MAX (IDX_NATIVE_CONTEXT + 1)
 
-// Context keys and action parameters use a compatible representation (this
-// enables using action paramlists as FRAME! context keylists).
-//
-inline static const REBSTR *KEY_SPELLING(const REBKEY *key) {
-    return VAL_WORD_SPELLING(key);
-}
 
-#define END_KEY cast(const REBKEY*, END_NODE)
+inline static const REBSTR *KEY_SPELLING(const REBKEY *key)
+  { return *key; }
 
-inline static bool IS_END(const REBKEY *key) = delete;
+#define END_KEY &PG_End_Key
 
-inline static bool IS_END_KEY(const REBKEY *key)
-  { return IS_END(static_cast<const REBVAL*>(key)); }
+
+inline static void Init_Key(REBKEY *dest, const REBSTR *spelling)
+  { *dest = spelling; }
+
+#define IS_END_KEY(key) (*(key) == nullptr)
 
 #define NOT_END_KEY(key) \
     (not IS_END_KEY(key))
 
 #define KEY_SYM(key) \
     STR_SYMBOL(KEY_SPELLING(key))
-
-#define Init_Key Init_Word
 
 #define ACT_KEY(a,n)            CTX_KEY(ACT_EXEMPLAR(a), (n))
 #define ACT_SPECIAL(a,n)        CTX_VAR(ACT_EXEMPLAR(a), (n))
@@ -366,23 +367,23 @@ inline static void INIT_VAL_ACTION_LABEL(
 // The code for processing derivation is slightly different; it should be
 // unified more if possible.
 
-#define LINK_ANCESTOR(s)            ARR(LINK_ANCESTOR_NODE(s))
+#define LINK_ANCESTOR(s)            SER(LINK_ANCESTOR_NODE(s))
 
 inline static bool Action_Is_Base_Of(REBACT *base, REBACT *derived) {
     if (derived == base)
         return true;  // fast common case (review how common)
 
-    REBARR *paramlist_test = ACT_KEYLIST(derived);
-    REBARR *paramlist_base = ACT_KEYLIST(base);
+    REBSER *keylist_test = ACT_KEYLIST(derived);
+    REBSER *keylist_base = ACT_KEYLIST(base);
     while (true) {
-        if (paramlist_test == paramlist_base)
+        if (keylist_test == keylist_base)
             return true;
 
-        REBARR *ancestor = LINK_ANCESTOR(paramlist_test);
-        if (ancestor == paramlist_test)
+        REBSER *ancestor = LINK_ANCESTOR(keylist_test);
+        if (ancestor == keylist_test)
             return false;  // signals end of the chain, no match found
 
-        paramlist_test = ancestor;
+        keylist_test = ancestor;
     }
 }
 

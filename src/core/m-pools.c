@@ -1067,7 +1067,7 @@ void Remake_Series(REBSER *s, REBLEN units, REBYTE wide, REBFLGS flags)
         s->content.dynamic.used = 0;
 
     if (IS_SER_ARRAY(s))
-        TERM_ARRAY_LEN(ARR(s), ARR_LEN(s));
+        TERM_ARRAY_LEN(ARR(s), SER_USED(s));
     else
         TERM_SEQUENCE(s);
 

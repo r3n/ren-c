@@ -482,23 +482,24 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             // flag, then the cells will be formatted such that the flag cannot
             // be taken off.
             //
-            REBARR *paramlist = ACT_KEYLIST(relative);
-            REBARR *varlist = CTX_VARLIST(ACT_EXEMPLAR(relative));
+            REBSER *keylist = ACT_KEYLIST(relative);
+
+            REBARR *paramlist = ACT_PARAMLIST(relative);
             assert(GET_SERIES_FLAG(paramlist, FIXED_SIZE));
             CLEAR_SERIES_FLAG(paramlist, FIXED_SIZE);
 
-            REBLEN old_paramlist_len = ARR_LEN(paramlist);
+            REBLEN old_keylist_len = SER_USED(keylist);
+            EXPAND_SERIES_TAIL(keylist, num_lets);
             EXPAND_SERIES_TAIL(paramlist, num_lets);
-            EXPAND_SERIES_TAIL(varlist, num_lets);
-            RELVAL *param = ARR_AT(paramlist, old_paramlist_len);
-            RELVAL *special = ARR_AT(varlist, old_paramlist_len + 1);
+            REBKEY *key = SER_AT(REBKEY, keylist, old_keylist_len);
+            RELVAL *special = ARR_AT(paramlist, old_keylist_len + 1);
 
             REBDSP dsp = dsp_orig;
             while (dsp != DSP) {
                 const REBSTR *spelling = VAL_WORD_SPELLING(DS_AT(dsp + 1));
-                Init_Word(param, spelling);
+                Init_Key(key, spelling);
                 ++dsp;
-                ++param;
+                ++key;
 
                 Init_Void(special, SYM_UNSET);
                 SET_CELL_FLAG(special, ARG_MARKED_CHECKED);
@@ -508,10 +509,10 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             }
             DS_DROP_TO(dsp_orig);
 
-            TERM_ARRAY_LEN(paramlist, old_paramlist_len + num_lets);
-            SET_SERIES_FLAG(paramlist, FIXED_SIZE);
+            TERM_SEQUENCE_LEN(keylist, old_keylist_len + num_lets);
 
-            TERM_ARRAY_LEN(varlist, old_paramlist_len + num_lets + 1);
+            TERM_ARRAY_LEN(paramlist, old_keylist_len + num_lets + 1);
+            SET_SERIES_FLAG(paramlist, FIXED_SIZE);
         }
     }
 
@@ -758,12 +759,14 @@ void Virtual_Bind_Deep_To_New_Context(
             // hide it from the context and binding.
             //
             spelling = VAL_WORD_SPELLING(VAL_UNESCAPED(item));
-            REBVAL *var = Append_Context(c, nullptr, spelling);
 
+          blockscope {
+            REBVAL *var = Append_Context(c, nullptr, spelling);
             Hide_Param(var);
             Derelativize(var, item, specifier);
             SET_CELL_FLAG(var, BIND_MARKED_REUSE);
             SET_CELL_FLAG(var, PROTECTED);
+          }
 
           add_binding_for_check:
 

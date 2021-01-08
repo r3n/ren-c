@@ -92,6 +92,8 @@ PVAR REB_OPTS *Reb_Opts;
 PVAR RELVAL PG_End_Node;
 PVAR REBVAL PG_Nulled_Cell;
 
+PVAR REBKEY PG_End_Key;
+
 PVAR REBVAL PG_Blank_Value;
 PVAR REBVAL PG_False_Value;
 PVAR REBVAL PG_True_Value;

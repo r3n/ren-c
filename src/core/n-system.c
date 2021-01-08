@@ -252,7 +252,7 @@ REBNATIVE(check)
         ASSERT_CONTEXT(VAL_CONTEXT(value));
     }
     else if (IS_ACTION(value)) {
-        ASSERT_ARRAY(VAL_ACTION_KEYLIST(value));
+        ASSERT_SERIES(VAL_ACTION_KEYLIST(value));
         ASSERT_ARRAY(ACT_DETAILS(VAL_ACTION(value)));
     }
 

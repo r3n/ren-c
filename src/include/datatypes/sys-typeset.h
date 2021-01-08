@@ -427,7 +427,7 @@ inline static REBVAL *Init_Param_Core(
     const REBSTR *spelling,
     REBU64 bits
 ){
-    RESET_CELL(out, REB_TYPESET, CELL_FLAG_FIRST_IS_NODE);
+    RESET_VAL_HEADER(out, REB_TYPESET, CELL_FLAG_FIRST_IS_NODE);
     mutable_KIND3Q_BYTE(out) = pclass;
 
     VAL_TYPESET_STRING_NODE(out) = NOD(m_cast(REBSTR*, spelling));

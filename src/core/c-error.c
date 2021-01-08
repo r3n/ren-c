@@ -51,7 +51,7 @@ void Snap_State_Core(struct Reb_State *s)
     s->manuals_len = SER_USED(GC_Manuals);
     s->mold_buf_len = STR_LEN(STR(MOLD_BUF));
     s->mold_buf_size = STR_SIZE(STR(MOLD_BUF));
-    s->mold_loop_tail = ARR_LEN(TG_Mold_Stack);
+    s->mold_loop_tail = SER_USED(TG_Mold_Stack);
 
     s->saved_sigmask = Eval_Sigmask;
 
@@ -130,7 +130,7 @@ void Assert_State_Balanced_Debug(
 
     assert(s->mold_buf_len == STR_LEN(STR(MOLD_BUF)));
     assert(s->mold_buf_size == STR_SIZE(STR(MOLD_BUF)));
-    assert(s->mold_loop_tail == ARR_LEN(TG_Mold_Stack));
+    assert(s->mold_loop_tail == SER_USED(TG_Mold_Stack));
 
     assert(s->saved_sigmask == Eval_Sigmask);  // !!! is this always true?
 
@@ -295,7 +295,7 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
                 if (f_seek == FS_BOTTOM)
                     panic ("fail (PAR(name)); issued for param not on stack");
 
-                const REBVAL *v_seek = ACT_KEYS_HEAD(FRM_PHASE(f_seek));
+                const REBVAL *v_seek = ACT_SPECIALTY_HEAD(FRM_PHASE(f_seek));
                 for (; NOT_END(v_seek); ++v_seek) {
                     if (v_seek == v)
                         goto found_param;

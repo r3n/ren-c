@@ -159,7 +159,7 @@ inline static REBCTX *CTX_FRAME_BINDING(REBCTX *c) {
     return CTX(VAL_FRAME_BINDING_NODE(archetype));
 }
 
-inline static void INIT_VAL_CONTEXT_ROOTVAR(
+inline static void INIT_VAL_CONTEXT_ROOTVAR_Core(
     RELVAL *out,
     enum Reb_Kind kind,
     REBARR *varlist
@@ -175,7 +175,11 @@ inline static void INIT_VAL_CONTEXT_ROOTVAR(
   #endif
 }
 
-inline static void INIT_VAL_FRAME_ROOTVAR(
+#define INIT_VAL_CONTEXT_ROOTVAR(out,kind,varlist) \
+    INIT_VAL_CONTEXT_ROOTVAR_Core( \
+        TRACK_CELL_IF_DEBUG(out), (kind), (varlist))
+
+inline static void INIT_VAL_FRAME_ROOTVAR_Core(
     RELVAL *out,
     REBARR *varlist,
     REBACT *phase,
@@ -186,7 +190,7 @@ inline static void INIT_VAL_FRAME_ROOTVAR(
         or out == ARR_HEAD(varlist)
     );
     assert(phase != nullptr);
-    RESET_CELL(out, REB_FRAME, CELL_MASK_CONTEXT);
+    RESET_VAL_HEADER(out, REB_FRAME, CELL_MASK_CONTEXT);
     VAL_CONTEXT_VARLIST_NODE(out) = NOD(varlist);
     VAL_FRAME_BINDING_NODE(out) = NOD(binding);
     VAL_FRAME_PHASE_OR_LABEL_NODE(out) = NOD(phase);
@@ -194,6 +198,10 @@ inline static void INIT_VAL_FRAME_ROOTVAR(
     out->header.bits |= CELL_FLAG_PROTECTED;
   #endif
 }
+
+#define INIT_VAL_FRAME_ROOTVAR(out,varlist,phase,binding) \
+    INIT_VAL_FRAME_ROOTVAR_Core( \
+        TRACK_CELL_IF_EXTENDED_DEBUG(out), (varlist), (phase), (binding))
 
 inline static void INIT_VAL_CONTEXT_VARLIST(
     RELVAL *v,
@@ -217,22 +225,22 @@ inline static void INIT_VAL_CONTEXT_VARLIST(
 // is moved (see CELL_MASK_COPIED regarding this mechanic)
 //
 
-inline static REBARR *CTX_KEYLIST(REBCTX *c) {
+inline static REBSER *CTX_KEYLIST(REBCTX *c) {
     if (Is_Node_Cell(LINK_KEYSOURCE(CTX_VARLIST(c)))) {
         //
         // running frame, source is REBFRM*, so use action's paramlist.
         //
         return ACT_KEYLIST(CTX_FRAME_ACTION(c));
     }
-    return ARR(LINK_KEYSOURCE(CTX_VARLIST(c)));  // not a REBFRM, use keylist
+    return SER(LINK_KEYSOURCE(CTX_VARLIST(c)));  // not a REBFRM, use keylist
 }
 
-static inline void INIT_CTX_KEYLIST_SHARED(REBCTX *c, REBARR *keylist) {
+static inline void INIT_CTX_KEYLIST_SHARED(REBCTX *c, REBSER *keylist) {
     SET_SERIES_INFO(keylist, KEYLIST_SHARED);
     INIT_LINK_KEYSOURCE(CTX_VARLIST(c), NOD(keylist));
 }
 
-static inline void INIT_CTX_KEYLIST_UNIQUE(REBCTX *c, REBARR *keylist) {
+static inline void INIT_CTX_KEYLIST_UNIQUE(REBCTX *c, REBSER *keylist) {
     assert(NOT_SERIES_INFO(keylist, KEYLIST_SHARED));
     INIT_LINK_KEYSOURCE(CTX_VARLIST(c), NOD(keylist));
 }

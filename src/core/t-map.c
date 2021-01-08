@@ -559,37 +559,30 @@ REBCTX *Alloc_Context_From_Map(const REBMAP *map)
     // a bit haphazard to have `make object! make map! [x 10 <y> 20]` and
     // just throw out the <y> 20 case...
 
-    const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     REBLEN count = 0;
 
+  blockscope {
+    const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1))
             ++count;
     }
+  }
 
     // See Alloc_Context() - cannot use it directly because no Collect_Words
 
-    REBCTX *context = Alloc_Context(REB_OBJECT, count);
-    REBVAL *key = CTX_KEYS_HEAD(context);
-    REBVAL *var = CTX_VARS_HEAD(context);
+    REBCTX *c = Alloc_Context(REB_OBJECT, count);
 
-    mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
 
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1)) {
-            Init_Key(key, VAL_WORD_SPELLING(mval));
-            ++key;
+            REBVAL *var = Append_Context(c, nullptr, VAL_WORD_SPELLING(mval));
             Move_Value(var, &mval[1]);
-            ++var;
         }
     }
 
-    TERM_ARRAY_LEN(CTX_VARLIST(context), count + 1);
-    TERM_ARRAY_LEN(CTX_KEYLIST(context), count + 1);
-    assert(IS_END(key));
-    assert(IS_END(var));
-
-    return context;
+    return c;
 }
 
 

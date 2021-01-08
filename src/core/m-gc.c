@@ -212,8 +212,25 @@ static void Queue_Mark_Node_Deep(void *p)
 
     s->header.bits |= NODE_FLAG_MARKED; // may be already set
 
-    if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and LINK(s).custom.node)
-        Queue_Mark_Node_Deep(LINK(s).custom.node);
+    if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and LINK(s).custom.node) {
+        REBSER *link = SER(LINK(s).custom.node);
+        Queue_Mark_Node_Deep(link);
+
+        // Keylist series need to be marked.
+        //
+        // !!! Review efficiency, this may need a separate flag for "has
+        // pointers that need marking", such lists are used elsewhere.
+        //
+        if (
+            GET_SERIES_FLAG(link, IS_KEYLIKE)
+            and SER_WIDE(link) == sizeof(REBKEY)
+        ){
+            REBKEY *key = SER_HEAD(REBKEY, link);
+            for (; not IS_END_KEY(key); ++key)
+                m_cast(REBSTR*, KEY_SPELLING(key))->header.bits
+                    |= NODE_FLAG_MARKED;
+        }
+    }
 
     if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and MISC(s).custom.node)
         Queue_Mark_Node_Deep(MISC(s).custom.node);
@@ -585,8 +602,10 @@ static void Mark_Symbol_Series(void)
 static void Mark_Natives(void)
 {
     REBLEN n;
-    for (n = 0; n < Num_Natives; ++n)
-        Queue_Mark_Node_Deep(Natives[n]);
+    for (n = 0; n < Num_Natives; ++n) {
+        if (Natives[n])  // checking allows recycle during Startup_Natives()
+            Queue_Mark_Node_Deep(Natives[n]);
+    }
 
     Propagate_All_GC_Marks();
 }
@@ -736,12 +755,12 @@ static void Mark_Frame_Stack_Deep(void)
         //
         REBACT *phase; // goto would cross initialization
         phase = FRM_PHASE(f);
-        const REBVAL *param;
-        param = ACT_KEYS_HEAD(phase);
+        const REBKEY *key;
+        key = ACT_KEYS_HEAD(phase);
 
         REBVAL *arg;
-        for (arg = FRM_ARGS_HEAD(f); NOT_END(param); ++param, ++arg) {
-            if (param == f->key) {
+        for (arg = FRM_ARGS_HEAD(f); NOT_END_KEY(key); ++key, ++arg) {
+            if (key == f->key) {
                 //
                 // When param and f->key match, that means that arg is the
                 // output slot for some other frame's f->out.  Let that frame
