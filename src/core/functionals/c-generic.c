@@ -150,3 +150,54 @@ REBNATIVE(generic)
 
     return Init_Void(D_OUT, SYM_VOID);
 }
+
+
+//
+//  Startup_Generics: C
+//
+// Returns an array of words bound to generics for SYSTEM/CATALOG/ACTIONS
+//
+REBARR *Startup_Generics(const REBVAL *boot_generics)
+{
+    assert(VAL_INDEX(boot_generics) == 0); // should be at head, sanity check
+    RELVAL *head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_generics);
+    REBSPC *specifier = VAL_SPECIFIER(boot_generics);
+
+    // Add SET-WORD!s that are top-level in the generics block to the lib
+    // context, so there is a variable for each action.  This means that the
+    // assignments can execute.
+    //
+    Bind_Values_Set_Midstream_Shallow(head, Lib_Context);
+
+    // The above actually does bind the GENERIC word to the GENERIC native,
+    // since the GENERIC word is found in the top-level of the block.  But as
+    // with the natives, in order to process `foo: generic [x [integer!]]` the
+    // INTEGER! word must be bound to its datatype.  Deep bind the code in
+    // order to bind the words for these datatypes.
+    //
+    Bind_Values_Deep(head, Lib_Context);
+
+    DECLARE_LOCAL (result);
+    if (Do_Any_Array_At_Throws(result, boot_generics, SPECIFIED))
+        panic (result);
+
+    if (not IS_BLANK(result))
+        panic (result);
+
+    // Sanity check the symbol transformation
+    //
+    if (0 != strcmp("open", STR_UTF8(Canon(SYM_OPEN))))
+        panic (Canon(SYM_OPEN));
+
+    REBDSP dsp_orig = DSP;
+
+    RELVAL *item = head;
+    for (; NOT_END(item); ++item)
+        if (IS_SET_WORD(item)) {
+            Derelativize(DS_PUSH(), item, specifier);
+            mutable_KIND3Q_BYTE(DS_TOP) = REB_WORD; // change pushed to WORD!
+            mutable_HEART_BYTE(DS_TOP) = REB_WORD;
+        }
+
+    return Pop_Stack_Values(dsp_orig); // catalog of generics
+}

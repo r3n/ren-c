@@ -174,3 +174,129 @@ REBVAL *Make_Native(
 
     return var;
 }
+
+
+//
+//  Init_Action_Meta_Shim: C
+//
+// Make_Paramlist_Managed_May_Fail() needs the object archetype ACTION-META
+// from %sysobj.r, to have the keylist to use in generating the info used
+// by HELP for the natives.  However, natives themselves are used in order
+// to run the object construction in %sysobj.r
+//
+// To break this Catch-22, this code builds a field-compatible version of
+// ACTION-META.  After %sysobj.r is loaded, an assert checks to make sure
+// that this manual construction actually matches the definition in the file.
+//
+static void Init_Action_Meta_Shim(void) {
+    REBSYM field_syms[5] = {
+        SYM_DESCRIPTION, SYM_RETURN_TYPE, SYM_RETURN_NOTE,
+        SYM_PARAMETER_TYPES, SYM_PARAMETER_NOTES
+    };
+    REBCTX *meta = Alloc_Context_Core(REB_OBJECT, 6, NODE_FLAG_MANAGED);
+    REBLEN i = 1;
+    for (; i != 6; ++i)  // !!! Should these be BLANK! or NULL ?
+        Init_Blank(Append_Context(meta, nullptr, Canon(field_syms[i - 1])));
+
+    Root_Action_Meta = Init_Object(Alloc_Value(), meta);
+    Force_Value_Frozen_Deep(Root_Action_Meta);
+}
+
+static void Shutdown_Action_Meta_Shim(void) {
+    rebRelease(Root_Action_Meta);
+}
+
+
+//
+//  Startup_Natives: C
+//
+// Create native functions.  In R3-Alpha this would go as far as actually
+// creating a NATIVE native by hand, and then run code that would call that
+// native for each function.  Ren-C depends on having the native table
+// initialized to run the evaluator (for instance to test functions against
+// the UNWIND native's FUNC signature in definitional returns).  So it
+// "fakes it" just by calling a C function for each item...and there is no
+// actual "native native".
+//
+// Returns an array of words bound to natives for SYSTEM/CATALOG/NATIVES
+//
+REBARR *Startup_Natives(const REBVAL *boot_natives)
+{
+    // Must be called before first use of Make_Paramlist_Managed_May_Fail()
+    //
+    Init_Action_Meta_Shim();
+
+    assert(VAL_INDEX(boot_natives) == 0); // should be at head, sanity check
+    RELVAL *item = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_natives);
+    REBSPC *specifier = VAL_SPECIFIER(boot_natives);
+
+    // Although the natives are not being "executed", there are typesets
+    // being built from the specs.  So to process `foo: native [x [integer!]]`
+    // the INTEGER! word must be bound to its datatype.  Deep walk the
+    // natives in order to bind these datatypes.
+    //
+    Bind_Values_Deep(item, Lib_Context);
+
+    REBARR *catalog = Make_Array(Num_Natives);
+
+    REBLEN n = 0;
+    REBVAL *generic_word = nullptr; // gives clear error if GENERIC not found
+
+    while (NOT_END(item)) {
+        if (n >= Num_Natives)
+            panic (item);
+
+        REBVAL *name = SPECIFIC(item);
+        assert(IS_SET_WORD(name));
+
+        REBVAL *native = Make_Native(
+            &item,
+            specifier,
+            Native_C_Funcs[n],
+            Lib_Context
+        );
+
+        // While the lib context natives can be overwritten, the system
+        // currently depends on having a permanent list of the natives that
+        // does not change, see uses via NATIVE_VAL() and NAT_ACT().
+        //
+        Natives[n] = VAL_ACTION(native);  // Note: Loses enfixedness (!)
+
+        REBVAL *catalog_item = Move_Value(Alloc_Tail_Array(catalog), name);
+        mutable_KIND3Q_BYTE(catalog_item) = REB_WORD;
+        mutable_HEART_BYTE(catalog_item) = REB_WORD;
+
+        if (VAL_WORD_SYM(name) == SYM_GENERIC)
+            generic_word = name;
+
+        Recycle();
+
+        ++n;
+    }
+
+    if (n != Num_Natives)
+        panic ("Incorrect number of natives found during processing");
+
+    if (not generic_word)
+        panic ("GENERIC native not found during boot block processing");
+
+    return catalog;
+}
+
+
+//
+//  Shutdown_Natives: C
+//
+// Being able to run Recycle() during the native startup process means being
+// able to holistically check the system state.  This relies on initialized
+// data in the natives table.  Since the interpreter can be shutdown and
+// started back up in the same session, we can't rely on zero initialization
+// for startups after the first, unless we manually null them out.
+//
+void Shutdown_Natives(void) {
+    REBLEN n;
+    for (n = 0; n < Num_Natives; ++n)
+        Natives[n] = nullptr;
+
+    Shutdown_Action_Meta_Shim();
+}
