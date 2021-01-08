@@ -57,13 +57,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
     REBCTX *error = NULL;
 
     struct Reb_Collector collector;
-    Collect_Start(&collector, COLLECT_ANY_WORD | COLLECT_AS_TYPESET);
-
-    // Leave the [0] slot blank while collecting (ROOTKEY/ROOTPARAM), but
-    // valid (but "unreadable") bits so that the copy will still work.
-    //
-    Init_Unreadable_Void(ARR_HEAD(BUF_COLLECT));
-    SET_ARRAY_LEN_NOTERM(BUF_COLLECT, 1);
+    Collect_Start(&collector, COLLECT_ANY_WORD);
 
     // Setup binding table with obj words.  Binding table is empty so don't
     // bother checking for duplicates.
@@ -88,7 +82,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
             // Wasn't already collected...so we added it...
             //
             EXPAND_SERIES_TAIL(BUF_COLLECT, 1);
-            Init_Key(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(word));
+            Init_Word(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(word));
         }
         if (IS_END(word + 1))
             break; // fix bug#708

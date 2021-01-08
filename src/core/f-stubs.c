@@ -303,10 +303,6 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     else
         assert(archetype_phase == nullptr);
 
-  #ifdef DEBUG_UNREADABLE_VOIDS
-    assert(IS_UNREADABLE_DEBUG(CTX_ROOTKEY(c)));  // unused at this time
-  #endif
-
     // Keylists are uniformly managed, or certain routines would return
     // "sometimes managed, sometimes not" keylists...a bad invariant.
     //

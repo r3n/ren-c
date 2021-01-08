@@ -310,9 +310,7 @@ enum {
     COLLECT_ONLY_SET_WORDS = 0,
     COLLECT_ANY_WORD = 1 << 1,
     COLLECT_DEEP = 1 << 2,
-    COLLECT_NO_DUP = 1 << 3, // Do not allow dups during collection (for specs)
-    COLLECT_4 = 1 << 4,  // was COLLECT_ENSURE_SELF
-    COLLECT_AS_TYPESET = 1 << 5
+    COLLECT_NO_DUP = 1 << 3  // Do not allow dups during collection (for specs)
 };
 
 struct Reb_Collector {

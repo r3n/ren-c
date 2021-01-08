@@ -154,7 +154,7 @@ static void Schema_From_Block_May_Fail(
     if (sym == SYM_VOID) {
         assert(
             not param_out
-            or VAL_KEY_SYM(unwrap(param_out)) == SYM_RETURN
+            or KEY_SYM(unwrap(param_out)) == SYM_RETURN
         );  // can only do void for return types
         Init_Blank(schema_out);
     }
@@ -752,7 +752,7 @@ REB_R Routine_Dispatcher(REBFRM *f)
             nullptr,  // dest pointer must be nullptr if store is non-null
             FRM_ARG(f, i + 1),  // 1-based
             RIN_ARG_SCHEMA(rin, i),  // 0-based
-            ACT_PARAM(FRM_PHASE(f), i + 1)  // 1-based
+            ACT_KEY(FRM_PHASE(f), i + 1)  // 1-based
         );
 
         // We will convert the offset to a pointer later

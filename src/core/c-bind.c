@@ -491,7 +491,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             EXPAND_SERIES_TAIL(paramlist, num_lets);
             EXPAND_SERIES_TAIL(varlist, num_lets);
             RELVAL *param = ARR_AT(paramlist, old_paramlist_len);
-            RELVAL *special = ARR_AT(varlist, old_paramlist_len);
+            RELVAL *special = ARR_AT(varlist, old_paramlist_len + 1);
 
             REBDSP dsp = dsp_orig;
             while (dsp != DSP) {
@@ -511,7 +511,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             TERM_ARRAY_LEN(paramlist, old_paramlist_len + num_lets);
             SET_SERIES_FLAG(paramlist, FIXED_SIZE);
 
-            TERM_ARRAY_LEN(varlist, old_paramlist_len + num_lets);
+            TERM_ARRAY_LEN(varlist, old_paramlist_len + num_lets + 1);
         }
     }
 
@@ -798,9 +798,6 @@ void Virtual_Bind_Deep_To_New_Context(
         ++item;
         ++index;
     }
-
-    TERM_ARRAY_LEN(CTX_VARLIST(c), num_vars + 1);
-    TERM_ARRAY_LEN(CTX_KEYLIST(c), num_vars + 1);
 
     // As currently written, the loop constructs which use these contexts
     // will hold pointers into the arrays across arbitrary user code running.

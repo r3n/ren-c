@@ -239,7 +239,7 @@ inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
 }
 
 #define ACT_KEYS_HEAD(a) \
-    (cast(const REBKEY*, ACT_KEYLIST(a)->content.dynamic.data) + 1)
+    CTX_KEYS_HEAD(ACT_EXEMPLAR(a))
 
 
 #define ACT_DISPATCHER(a) \
@@ -279,18 +279,11 @@ inline static bool IS_END_KEY(const REBKEY *key)
 
 #define Init_Key Init_Word
 
-inline static const REBKEY *ACT_KEY(REBACT *a, REBLEN n) {
-    assert(n != 0 and n < ARR_LEN(ACT_KEYLIST(a)));
-    return SER_AT(const REBKEY, ACT_KEYLIST(a), n);
-}
-
-inline static REBVAL *ACT_SPECIAL(REBACT *a, REBLEN n) {
-    assert(n != 0 and n < ARR_LEN(ACT_KEYLIST(a)));
-    return ACT_SPECIALTY_HEAD(a) + n - 1;
-}
+#define ACT_KEY(a,n)            CTX_KEY(ACT_EXEMPLAR(a), (n))
+#define ACT_SPECIAL(a,n)        CTX_VAR(ACT_EXEMPLAR(a), (n))
 
 #define ACT_NUM_PARAMS(a) \
-    (ACT_KEYLIST(a)->content.dynamic.used - 1)  // guaranteed dynamic
+    CTX_LEN(ACT_EXEMPLAR(a))
 
 
 //=//// META OBJECT ///////////////////////////////////////////////////////=//

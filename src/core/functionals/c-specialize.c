@@ -313,16 +313,14 @@ bool Specialize_Action_Throws(
         }
     }
 
-    REBARR *paramlist = ACT_KEYLIST(unspecialized);
-
-    const RELVAL *param = ARR_AT(paramlist, 1);
+    const REBKEY *key = ACT_KEYS_HEAD(unspecialized);
     const REBVAL *special = ACT_SPECIALTY_HEAD(unspecialized);
 
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
 
     REBDSP ordered_dsp = lowest_ordered_dsp;
 
-    for (; NOT_END(param); ++param, ++arg, ++special) {
+    for (; NOT_END_KEY(key); ++key, ++arg, ++special) {
         //
         // Note: We check ARG_MARKED_CHECKED on `special` from the *original*
         // varlist...as the user may have used PROTECT/HIDE to force `arg`

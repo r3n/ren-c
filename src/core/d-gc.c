@@ -567,7 +567,6 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         }
         else {
             REBARR *keylist = ARR(keysource);
-            ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(keylist));  // reserved
 
             if (IS_FRAME(archetype)) {
                 // Frames use paramlists as their "keylist", there is no

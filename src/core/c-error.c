@@ -42,7 +42,8 @@ void Snap_State_Core(struct Reb_State *s)
     // length of the collect buffer to tell if a later fail() happens in
     // the middle of a Collect_Keys.)
     //
-    assert(ARR_LEN(BUF_COLLECT) == 0);
+    assert(ARR_LEN(BUF_COLLECT) == 1);
+    assert(IS_UNREADABLE_DEBUG(ARR_HEAD(BUF_COLLECT)));
 
     s->guarded_len = SER_USED(GC_Guarded);
     s->frame = FS_TOP;
@@ -82,7 +83,8 @@ void Assert_State_Balanced_Debug(
 
     assert(s->frame == FS_TOP);
 
-    assert(ARR_LEN(BUF_COLLECT) == 0);
+    assert(ARR_LEN(BUF_COLLECT) == 1);
+    assert(IS_UNREADABLE_DEBUG(ARR_HEAD(BUF_COLLECT)));
 
     if (s->guarded_len != SER_USED(GC_Guarded)) {
         printf(

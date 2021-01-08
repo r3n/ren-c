@@ -55,7 +55,7 @@
         | ARRAY_FLAG_IS_VARLIST)
 
 #define SERIES_MASK_KEYLIST \
-    (NODE_FLAG_NODE | SERIES_FLAG_ALWAYS_DYNAMIC \
+    (NODE_FLAG_NODE  /* NOT always dynamic */ \
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* ancestor */ \
         | ARRAY_FLAG_IS_KEYLIST)
 

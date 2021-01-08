@@ -1054,14 +1054,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 f->arg = FRM_ARGS_HEAD(f);
                 for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->special) {
                     if (Is_Param_Hidden(f->special)) {
-                        if (f->key == f->special) {
-                            Init_Void(f->arg, SYM_UNSET);
-                            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-                        }
-                        else {
-                            Blit_Specific(f->arg, f->special);
-                            assert(GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED));
-                        }
+                        Blit_Specific(f->arg, f->special);
+                        assert(GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED));
                     }
                 }
 

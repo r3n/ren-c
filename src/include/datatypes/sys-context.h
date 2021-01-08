@@ -257,17 +257,14 @@ inline static REBLEN CTX_LEN(REBCTX *c) {
     return CTX_VARLIST(c)->content.dynamic.used - 1;  // -1 for archetype
 }
 
-#define CTX_ROOTKEY(c) \
-    cast(REBVAL*, CTX_KEYLIST(c)->content.dynamic.data)  // never fixed
-
 #define CTX_TYPE(c) \
     VAL_TYPE(CTX_ARCHETYPE(c))
 
 #define CTX_KEYS_HEAD(c) \
-    SER_AT(REBKEY, CTX_KEYLIST(c), 1)  // 1-based, no RELVAL*
+    SER_AT(REBKEY, CTX_KEYLIST(c), 0)  // 0-based
 
 #define CTX_VARS_HEAD(c) \
-    SER_AT(REBVAL, CTX_VARLIST(c), 1)
+    SER_AT(REBVAL, CTX_VARLIST(c), 1)  // 1-based (must skip archetype
 
 inline static const REBKEY *CTX_KEY(REBCTX *c, REBLEN n) {
     //
@@ -278,7 +275,7 @@ inline static const REBKEY *CTX_KEY(REBCTX *c, REBLEN n) {
     /* assert(NOT_SERIES_INFO(c, INACCESSIBLE)); */
 
     assert(n != 0 and n <= CTX_LEN(c));
-    return cast(const REBKEY*, CTX_KEYLIST(c)->content.dynamic.data) + n;
+    return SER_AT(const REBKEY, CTX_KEYLIST(c), n - 1);
 }
 
 inline static REBVAL *CTX_VAR(REBCTX *c, REBLEN n) {  // 1-based, no RELVAL*

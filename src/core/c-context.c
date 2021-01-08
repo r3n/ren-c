@@ -38,11 +38,9 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
     assert(not (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED));  // LINK is taken
 
     REBARR *keylist = Make_Array_Core(
-        capacity + 1,  // size + room for rootkey
+        capacity,  // uses all cells (no "rootkey")
         SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED  // always shareable
     );
-    RELVAL *rootkey = Alloc_Tail_Array(keylist);
-    Init_Unreadable_Void(rootkey);  // reserved for future use
     LINK_ANCESTOR_NODE(keylist) = NOD(keylist);  // default to keylist itself
 
     REBARR *varlist = Make_Array_Core(
@@ -218,7 +216,8 @@ void Collect_Start(struct Reb_Collector* collector, REBFLGS flags)
     collector->index = 1;
     INIT_BINDER(&collector->binder);
 
-    assert(ARR_LEN(BUF_COLLECT) == 0); // should be empty
+    assert(ARR_LEN(BUF_COLLECT) == 1); // should be empty (just 0 placeholder)
+    assert(IS_UNREADABLE_DEBUG(ARR_HEAD(BUF_COLLECT)));  // bind "index" [0]
 }
 
 
@@ -235,15 +234,15 @@ REBARR *Grab_Collected_Array_Managed(
     //
     TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));
 
-    // If no new words, prior context.  Note length must include the slot
-    // for the rootkey...and note also this means the rootkey cell *may*
-    // be shared between all keylists when you pass in a prior.
+    // If no new words, prior context.
     //
-    // All collected values should have been fully specified.
+    // All collected values should be unbound (so "SPECIFIED").
     //
-    return Copy_Array_Shallow_Flags(
+    return Copy_Array_At_Extra_Shallow(
         BUF_COLLECT,
+        1,  // skip unreadable void
         SPECIFIED,
+        0,  // extra
         flags | NODE_FLAG_MANAGED
     );
 }
@@ -263,15 +262,9 @@ void Collect_End(struct Reb_Collector *cl)
 
     // Reset binding table (note BUF_COLLECT may have expanded)
     //
-    const REBKEY *v =
-        (cl == NULL or (cl->flags & COLLECT_AS_TYPESET))
-            ? SER_HEAD(REBKEY, BUF_COLLECT) + 1
-            : SER_HEAD(REBKEY, BUF_COLLECT);
-    for (; NOT_END_KEY(v); ++v) {
-        const REBSTR *canon =
-            (cl == NULL or (cl->flags & COLLECT_AS_TYPESET))
-                ? KEY_SPELLING(v)
-                : VAL_WORD_SPELLING(v);
+    const REBVAL *v = SPECIFIC(ARR_AT(BUF_COLLECT, 1));
+    for (; NOT_END(v); ++v) {
+        const REBSTR *canon = VAL_WORD_SPELLING(v);
 
         if (cl != NULL) {
             Remove_Binder_Index(&cl->binder, canon);
@@ -293,7 +286,7 @@ void Collect_End(struct Reb_Collector *cl)
         MISC(s).bind_index.low = 0;
     }
 
-    SET_ARRAY_LEN_NOTERM(BUF_COLLECT, 0);
+    TERM_ARRAY_LEN(BUF_COLLECT, 1);
 
     if (cl != NULL)
         SHUTDOWN_BINDER(&cl->binder);
@@ -310,8 +303,6 @@ void Collect_Context_Keys(
     REBCTX *context,
     bool check_dups // check for duplicates (otherwise assume unique)
 ){
-    assert(cl->flags & COLLECT_AS_TYPESET);
-
     const REBKEY *key = CTX_KEYS_HEAD(context);
 
     assert(cl->index >= 1); // 0 in bind table means "not present"
@@ -334,7 +325,7 @@ void Collect_Context_Keys(
 
             ++cl->index;
 
-            Blit_Relative(collect, key); // fast copy, matching cell formats
+            Init_Word(collect, symbol);
             ++collect;
         }
 
@@ -350,7 +341,7 @@ void Collect_Context_Keys(
         // Optimized add of all keys to bind table and collect buffer.
         //
         for (; NOT_END_KEY(key); ++key, ++collect, ++cl->index) {
-            Blit_Relative(collect, key);
+            Init_Word(collect, KEY_SPELLING(key));
             Add_Binder_Index(&cl->binder, KEY_SPELLING(key), cl->index);
         }
         SET_ARRAY_LEN_NOTERM(
@@ -393,13 +384,7 @@ static void Collect_Inner_Loop(
             ++cl->index;
 
             EXPAND_SERIES_TAIL(BUF_COLLECT, 1);
-            if (cl->flags & COLLECT_AS_TYPESET)
-                Init_Key(
-                    ARR_LAST(BUF_COLLECT),
-                    VAL_WORD_SPELLING(cell)
-                );
-            else
-                Init_Word(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(cell));
+            Init_Word(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(cell));
 
             continue;
         }
@@ -447,14 +432,7 @@ REBARR *Collect_Keylist_Managed(
     struct Reb_Collector collector;
     struct Reb_Collector *cl = &collector;
 
-    assert(not (flags & COLLECT_AS_TYPESET)); // not optional, we add it
-    Collect_Start(cl, flags | COLLECT_AS_TYPESET);
-
-    // Leave the [0] slot blank while collecting (ROOTKEY/ROOTPARAM), but
-    // valid (but "unreadable") bits so that the copy will still work.
-    //
-    Init_Unreadable_Void(ARR_HEAD(BUF_COLLECT));
-    SET_ARRAY_LEN_NOTERM(BUF_COLLECT, 1);
+    Collect_Start(cl, flags);
 
     // Setup binding table with existing words, no need to check duplicates
     //
@@ -473,12 +451,6 @@ REBARR *Collect_Keylist_Managed(
         keylist = CTX_KEYLIST(unwrap(prior));
     else
         keylist = Grab_Collected_Array_Managed(cl, SERIES_MASK_KEYLIST);
-
-    // !!! Usages of the rootkey for non-FRAME! contexts is open for future,
-    // but it's set to an unreadable void at the moment just to make sure it
-    // doesn't get used on accident.
-    //
-    ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(keylist));
 
     Collect_End(cl);
     return keylist;
@@ -512,10 +484,9 @@ REBARR *Collect_Unique_Words_Managed(
     struct Reb_Collector collector;
     struct Reb_Collector *cl = &collector;
 
-    assert(not (flags & COLLECT_AS_TYPESET)); // only used for making keylists
     Collect_Start(cl, flags);
 
-    assert(ARR_LEN(BUF_COLLECT) == 0); // should be empty
+    assert(ARR_LEN(BUF_COLLECT) == 1);  // index starts at 1 (empty state)
 
     // The way words get "ignored" in the collecting process is to give them
     // dummy bindings so it appears they've "already been collected", but
@@ -630,11 +601,11 @@ REBCTX *Make_Context_Detect_Managed(
 
     REBLEN len = ARR_LEN(keylist);
     REBARR *varlist = Make_Array_Core(
-        len,
+        1 + len,  // needs room for rootvar
         SERIES_MASK_VARLIST
             | NODE_FLAG_MANAGED // Note: Rebind below requires managed context
     );
-    TERM_ARRAY_LEN(varlist, len);
+    TERM_ARRAY_LEN(varlist, 1 + len);
     MISC_META_NODE(varlist) = nullptr;  // clear meta object (GC sees this)
 
     REBCTX *context = CTX(varlist);
@@ -668,7 +639,7 @@ REBCTX *Make_Context_Detect_Managed(
 
     ++var;
 
-    for (; len > 1; --len, ++var) // [0] is rootvar (context), already done
+    for (; len > 0; --len, ++var)  // [0] is rootvar (context), already done
         Init_Nulled(var);
 
     if (parent) {
@@ -842,16 +813,7 @@ REBCTX *Merge_Contexts_Managed(REBCTX *parent1, REBCTX *parent2)
     // Keep the binding table.
 
     struct Reb_Collector collector;
-    Collect_Start(
-        &collector,
-        COLLECT_ANY_WORD | COLLECT_AS_TYPESET
-    );
-
-    // Leave the [0] slot blank while collecting (ROOTKEY/ROOTPARAM), but
-    // valid (but "unreadable") bits so that the copy will still work.
-    //
-    Init_Unreadable_Void(ARR_HEAD(BUF_COLLECT));
-    SET_ARRAY_LEN_NOTERM(BUF_COLLECT, 1);
+    Collect_Start(&collector, COLLECT_ANY_WORD);
 
     // Setup binding table and BUF_COLLECT with parent1 words.  Don't bother
     // checking for duplicates, buffer is empty.
@@ -879,7 +841,6 @@ REBCTX *Merge_Contexts_Managed(REBCTX *parent1, REBCTX *parent2)
         SPECIFIED,
         NODE_FLAG_MANAGED
     );
-    Init_Unreadable_Void(ARR_HEAD(keylist)); // Currently no rootkey usage
 
     if (parent1 == NULL)
         LINK_ANCESTOR_NODE(keylist) = NOD(keylist);
@@ -1200,10 +1161,10 @@ void Startup_Collector(void)
 {
     // Temporary block used while scanning for words.
     //
-    // Note that the logic inside Collect_Keylist managed assumes it's at
-    // least long enough to hold the rootkey (SYM_0).
+    // !!! Review why this can't use the data stack, like everything else.
     //
-    TG_Buf_Collect = Make_Array_Core(1 + 99, SERIES_FLAGS_NONE);
+    TG_Buf_Collect = Make_Array_Core(100, SERIES_FLAGS_NONE);
+    Init_Unreadable_Void(Alloc_Tail_Array(BUF_COLLECT));
 }
 
 
@@ -1243,10 +1204,10 @@ void Assert_Context_Core(REBCTX *c)
     REBLEN keys_len = ARR_LEN(keylist);
     REBLEN vars_len = ARR_LEN(varlist);
 
-    if (keys_len < 1)
-        panic (keylist);
+    if (vars_len < 1)
+        panic (varlist);
 
-    if (keys_len != vars_len)
+    if (keys_len + 1 != vars_len)
         panic (c);
 
     if (VAL_CONTEXT(rootvar) != c)
@@ -1261,17 +1222,11 @@ void Assert_Context_Core(REBCTX *c)
         return;
     }
 
-    // Note that in the future the rootkey for OBJECT!/ERROR!/FRAME!/PORT!
-    // may be more used.  Reserved as unreadable for now.
-    //
-    REBVAL *rootkey = CTX_ROOTKEY(c);
-    assert(IS_UNREADABLE_DEBUG(rootkey));
-
     REBVAL *key = CTX_KEYS_HEAD(c);
     REBVAL *var = CTX_VARS_HEAD(c);
 
     REBLEN n;
-    for (n = 1; n < keys_len; n++, var++, key++) {
+    for (n = 1; n < vars_len; n++, var++, key++) {
         if (IS_END(key)) {
             printf("** Early key end at index: %d\n", cast(int, n));
             panic (c);

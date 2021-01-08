@@ -237,7 +237,7 @@ inline static heapaddr_t Frame_Id_For_Frame_May_Outlive_Call(REBFRM* f) {
 //
 
 inline static heapaddr_t Native_Id_For_Action(REBACT *act)
-  { return Heapaddr_From_Pointer(ACT_PARAMLIST(act)); }
+  { return Heapaddr_From_Pointer(ACT_KEYLIST(act)); }
 
 #define IDX_JS_NATIVE_OBJECT \
     IDX_NATIVE_MAX  // handle gives hookpoint for GC of table entry
@@ -843,7 +843,7 @@ REBNATIVE(js_native)
 
     Init_Handle_Cdata_Managed(
         ARR_AT(details, IDX_JS_NATIVE_OBJECT),
-        ACT_PARAMLIST(native),
+        ACT_KEYLIST(native),
         0,
         &cleanup_js_object
     );

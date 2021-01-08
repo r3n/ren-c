@@ -1024,9 +1024,10 @@ REBACT *Make_Action(
             // contain the spelling (as an unbound word, that could be reduced
             // to the spelling itself)
             //
-            Init_Key(src, VAL_TYPESET_STRING(src));
+            Init_Key(src - 1, VAL_TYPESET_STRING(src));
         }
         TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));
+        TERM_ARRAY_LEN(paramlist, ARR_LEN(paramlist) - 1);
         INIT_LINK_KEYSOURCE(varlist, NOD(paramlist));
         MISC_META_NODE(varlist) = nullptr;
 
@@ -1059,10 +1060,10 @@ REBACT *Make_Action(
     REBARR *paramlist = ARR(LINK_KEYSOURCE(varlist));
 
     ASSERT_SERIES_MANAGED(paramlist);  // paramlists/keylists, can be shared
-    ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(paramlist));  // unused at this time
+    assert(ARR_LEN(paramlist) + 1 == ARR_LEN(varlist));
     assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
     if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
-        const REBKEY *key = SER_AT(const REBKEY, paramlist, 1);
+        const REBKEY *key = SER_AT(const REBKEY, paramlist, 0);
         assert(KEY_SYM(key) == SYM_RETURN);
         UNUSED(key);
     }
