@@ -561,6 +561,14 @@ static void Init_System_Object(
         nullptr  // parent
     );
 
+    // Create a global value for it in the Lib context, so we can say things
+    // like `system/contexts` (also protects newly made context from GC).
+    //
+    Init_Object(
+        Append_Context(VAL_CONTEXT(Lib_Context), nullptr, Canon(SYM_SYSTEM)),
+        system
+    );
+
     Bind_Values_Deep(spec_head, Lib_Context);
 
     // Bind it so CONTEXT native will work (only used at topmost depth)
@@ -574,14 +582,6 @@ static void Init_System_Object(
         panic (result);
     if (not IS_BLANK(result))
         panic (result);
-
-    // Create a global value for it.  (This is why we are able to say `system`
-    // and have it bound in lines like `sys: system/contexts/sys`)
-    //
-    Init_Object(
-        Append_Context(VAL_CONTEXT(Lib_Context), nullptr, Canon(SYM_SYSTEM)),
-        system
-    );
 
     // Make the system object a root value, to protect it from GC.  (Someone
     // could say `system: blank` in the Lib_Context, otherwise!)
