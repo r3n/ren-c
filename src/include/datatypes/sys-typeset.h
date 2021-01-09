@@ -385,12 +385,6 @@ inline static bool Is_Param_Sealed(REBVAL *special) {
 #define Is_Param_Noop_If_Blank(v) \
     TYPE_CHECK((v), REB_TS_NOOP_IF_BLANK
 
-// !!! TBD: find a bit to store this in (param is full at the moment, so we
-// force all parameters to be rechecked in a skin.
-//
-#define Set_Param_Skin_Expanded(v) NOOP
-#define Is_Param_Skin_Expanded(v) true
-
 
 //=//// PARAMETER SYMBOL //////////////////////////////////////////////////=//
 //

@@ -38,7 +38,6 @@ core: [
     functionals/c-native.c
     functionals/c-oneshot.c
     functionals/c-reframer.c
-    functionals/c-reskin.c
     functionals/c-reorder.c
     functionals/c-specialize.c
     functionals/c-typechecker.c
