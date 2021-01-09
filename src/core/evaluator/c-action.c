@@ -308,7 +308,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
       fulfill_arg: ;  // semicolon needed--next statement is declaration
 
         Reb_Param_Class pclass = VAL_PARAM_CLASS(f->special);
-        assert(pclass != REB_P_LOCAL);  // should have been handled by hidden
 
   //=//// HANDLE IF NEXT ARG IS IN OUT SLOT (e.g. ENFIX, CHAIN) ///////////=//
 
@@ -706,7 +705,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         //
         assert(NOT_FEED_FLAG(f->feed, NO_LOOKAHEAD));
 
-        assert(pclass != REB_P_LOCAL);
         assert(NOT_EVAL_FLAG(f, FULLY_SPECIALIZED));
 
         goto continue_fulfilling;
@@ -798,13 +796,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         //
         if (GET_CELL_FLAG(f->special, ARG_MARKED_CHECKED))
             continue;
-
-/*        if (VAL_PARAM_CLASS(f->key) == REB_P_LOCAL) {
-            if (not IS_VOID(f->arg) and not IS_ACTION(f->arg))  // !!! TEMP TO TRY BOOT
-                fail ("locals must be void");
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-            continue;
-        } */
 
         // We can't a-priori typecheck the variadic argument, since the values
         // aren't calculated until the function starts running.  Instead we

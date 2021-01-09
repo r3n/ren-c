@@ -363,8 +363,7 @@ REBNATIVE(make_native)
         // Auto-generate a linker name based on the numeric value of the
         // paramlist pointer.  Just "N_" followed by the hexadecimal value.
 
-        REBARR *paramlist = ACT_KEYLIST(native);  // unique for this action!
-        intptr_t heapaddr = cast(intptr_t, paramlist);
+        intptr_t heapaddr = cast(intptr_t, details);
         REBVAL *linkname = rebValue(
             "unspaced [{N_} as text! to-hex", rebI(heapaddr), "]",
         rebEND);

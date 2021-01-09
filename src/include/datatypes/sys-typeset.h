@@ -198,12 +198,6 @@ inline static void CLEAR_ALL_TYPESET_BITS(RELVAL *v) {
 
 typedef enum Reb_Kind Reb_Param_Class;
 
-    //
-    // `REB_P_LOCAL` is a "pure" local, which will be set to null by
-    // argument fulfillment.  It is indicated by a SET-WORD! in the function
-    // spec, or by coming after a <local> tag in the function generators.
-    //
-
     // `REB_P_NORMAL` is cued by an ordinary WORD! in the function spec
     // to indicate that you would like that argument to be evaluated normally.
     //
@@ -230,9 +224,6 @@ typedef enum Reb_Kind Reb_Param_Class;
     //
     //     >> foo :(1 + 2)
     //     a is :(1 + 2)
-    //
-
-    // `REB_P_REFINEMENT`
     //
 
     // `REB_P_MEDIUM` is cued by a QUOTED GET-WORD! in the function spec
@@ -269,8 +260,9 @@ typedef enum Reb_Kind Reb_Param_Class;
     // left.  Contrast this with how THEN wants the enfix on the right to
     // win out ahead of its quoting.
     //
-    // This is a subtlety that most functions don't have to worry about.  But
-    // when they do have to worry about it, it 
+    // This is a subtlety that most functions don't have to worry about, so
+    // using soft quoting is favored to medium quoting for being one less
+    // character to type.
 
 
 inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
@@ -361,12 +353,10 @@ inline static bool Is_Param_Hidden(const RELVAL *special)
 
 inline static void Hide_Param(RELVAL *param) {
     UNUSED(param);
-    /*mutable_KIND3Q_BYTE(param) = REB_P_LOCAL;*/
 }
 
 inline static void Seal_Param(RELVAL *param) {
     UNUSED(param);
-    /*mutable_KIND3Q_BYTE(param) = REB_P_LOCAL;*/
 }
 
 

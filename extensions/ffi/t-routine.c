@@ -154,7 +154,7 @@ static void Schema_From_Block_May_Fail(
     if (sym == SYM_VOID) {
         assert(
             not param_out
-            or KEY_SYM(unwrap(param_out)) == SYM_RETURN
+            or STR_SYMBOL(VAL_TYPESET_STRING(unwrap(param_out))) == SYM_RETURN
         );  // can only do void for return types
         Init_Blank(schema_out);
     }
@@ -224,7 +224,7 @@ static uintptr_t arg_to_ffi(
     void *dest,
     const REBVAL *arg,
     const REBVAL *schema,
-    const REBVAL *param
+    const REBKEY *key
 ){
     // Only one of dest or store should be non-nullptr.  This allows to write
     // either to a known pointer of sufficient size (dest) or to a series
@@ -241,8 +241,8 @@ static uintptr_t arg_to_ffi(
     // !!! Shouldn't the argument have already had its type checked by the
     // calling process?
     //
-    if (param)
-        assert(arg != nullptr and IS_PARAM(param));
+    if (key)
+        assert(arg != nullptr and IS_STR_SYMBOL(*key));
     else
         assert(arg == nullptr);  // return value, just make space (no arg)
   #endif
@@ -291,10 +291,10 @@ static uintptr_t arg_to_ffi(
         // because it couldn't do so in the return case where arg was null)
 
         if (not IS_STRUCT(arg))
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         if (STU_SIZE(VAL_STRUCT(arg)) != FLD_WIDE(top))
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         memcpy(dest, VAL_STRUCT_DATA_AT(arg), STU_SIZE(VAL_STRUCT(arg)));
 
@@ -329,7 +329,7 @@ static uintptr_t arg_to_ffi(
         else if (IS_INTEGER(arg))
             buffer.u8 = cast(uint8_t, VAL_INT64(arg));
         else
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         data = cast(char*, &buffer.u8);
         size = sizeof(buffer.u8);
@@ -341,7 +341,7 @@ static uintptr_t arg_to_ffi(
         else if (IS_INTEGER(arg))
             buffer.i8 = cast(int8_t, VAL_INT64(arg));
         else
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         data = cast(char*, &buffer.i8);
         size = sizeof(buffer.i8);
@@ -353,7 +353,7 @@ static uintptr_t arg_to_ffi(
         else if (IS_INTEGER(arg))
             buffer.u16 = cast(uint16_t, VAL_INT64(arg));
         else
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         data = cast(char*, &buffer.u16);
         size = sizeof(buffer.u16);
@@ -365,7 +365,7 @@ static uintptr_t arg_to_ffi(
         else if (IS_INTEGER(arg))
             buffer.i16 = cast(int16_t, VAL_INT64(arg));
         else
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         data = cast(char*, &buffer.i16);
         size = sizeof(buffer.i16);
@@ -377,7 +377,7 @@ static uintptr_t arg_to_ffi(
         else if (IS_INTEGER(arg))
             buffer.u32 = cast(int32_t, VAL_INT64(arg));
         else
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         data = cast(char*, &buffer.u32);
         size = sizeof(buffer.u32);
@@ -389,7 +389,7 @@ static uintptr_t arg_to_ffi(
         else if (IS_INTEGER(arg))
             buffer.i32 = cast(int32_t, VAL_INT64(arg));
         else
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         data = cast(char*, &buffer.i32);
         size = sizeof(buffer.i32);
@@ -402,7 +402,7 @@ static uintptr_t arg_to_ffi(
         else if (IS_INTEGER(arg))
             buffer.i64 = VAL_INT64(arg);
         else
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         data = cast(char*, &buffer.i64);
         size = sizeof(buffer.i64);
@@ -454,7 +454,7 @@ static uintptr_t arg_to_ffi(
             break; }
 
           default:
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
         }
 
         data = cast(char*, &buffer.ipt);
@@ -477,7 +477,7 @@ static uintptr_t arg_to_ffi(
         else if (IS_DECIMAL(arg))
             buffer.f = cast(float, VAL_DECIMAL(arg));
         else
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         data = cast(char*, &buffer.f);
         size = sizeof(buffer.f);
@@ -489,7 +489,7 @@ static uintptr_t arg_to_ffi(
         else if (IS_DECIMAL(arg))
             buffer.d = VAL_DECIMAL(arg);
         else
-            fail (Error_Arg_Type(D_FRAME, param, VAL_TYPE(arg)));
+            fail (Error_Arg_Type(D_FRAME, key, VAL_TYPE(arg)));
 
         data = cast(char*, &buffer.d);
         size = sizeof(buffer.d);
@@ -813,7 +813,7 @@ REB_R Routine_Dispatcher(REBFRM *f)
                 nullptr,  // dest pointer must be null if store is non-null
                 DS_AT(dsp),  // arg
                 schema,
-                param  // used for typecheck, VAL_TYPESET_SYM for error msgs
+                nullptr  // REVIEW: need key for error messages
             ));
         }
 
@@ -949,19 +949,13 @@ static REBVAL *callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
     if (inv->cif->rtype->type == FFI_TYPE_VOID)
         assert(IS_BLANK(RIN_RET_SCHEMA(inv->rin)));
     else {
-        DECLARE_LOCAL (param);
-        Init_Param(
-            param,
-            REB_P_LOCAL,
-            Canon(SYM_RETURN),
-            TS_OPT_VALUE  // *returned* types, not the return ACTION!
-        );
+        const REBSTR *spelling = Canon(SYM_RETURN);
         arg_to_ffi(
             nullptr,  // store must be null if dest is non-null,
             inv->ret,  // destination pointer
             result,
             RIN_RET_SCHEMA(inv->rin),
-            param  // parameter used for symbol in error only
+            &spelling  // parameter used for symbol in error only
         );
     }
 

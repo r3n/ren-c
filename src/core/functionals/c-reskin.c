@@ -236,7 +236,7 @@ REBNATIVE(reskinned)
         if (IS_WORD(item))
             pclass = REB_P_NORMAL;
         else if (IS_SET_WORD(item))
-            pclass = REB_P_LOCAL;
+            pclass = REB_VOID;
         else if (IS_GET_WORD(item))
             pclass = REB_P_SOFT;
         else if (IS_SYM_WORD(item))

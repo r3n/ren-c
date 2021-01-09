@@ -642,7 +642,6 @@ REBNATIVE(return)
     // !!! LOCALNESS NOT KNOWN NOW
     //
     UNUSED(typeset);
-/*    assert(VAL_PARAM_CLASS(typeset) == REB_P_LOCAL); */
     assert(KEY_SYM(ACT_KEYS_HEAD(target_fun)) == SYM_RETURN);
 
     // There are two ways you can get an "endish nulled".  One is a plain

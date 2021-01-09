@@ -549,8 +549,6 @@ void For_Each_Unspecialized_Param(
             continue;
 
         Reb_Param_Class pclass = VAL_PARAM_CLASS(special);
-        if (pclass == REB_P_LOCAL)
-            continue;
 
         REBFLGS flags = 0;
 
@@ -814,9 +812,6 @@ bool Make_Invocation_Frame_Throws(
           case REB_P_SOFT:
             *first_arg_ptr = arg;
             goto found_first_arg_ptr;
-
-          case REB_P_LOCAL:
-            break;
 
           case REB_P_OUTPUT:  // should always have REB_TS_REFINEMENT
           default:

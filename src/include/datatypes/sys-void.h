@@ -82,6 +82,8 @@ inline static bool Is_Void_With_Sym(const RELVAL *v, REBSYM sym) {
     #define IS_VOID_RAW(v) \
         IS_VOID(v)
 
+    #define IS_UNREADABLE_DEBUG(v) false
+
     #define ASSERT_UNREADABLE_IF_DEBUG(v) \
         assert(IS_VOID(v))  // would have to be a void even if not unreadable
 

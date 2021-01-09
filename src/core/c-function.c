@@ -184,7 +184,7 @@ void Push_Paramlist_Triads_May_Fail(
             if (mode == SPEC_MODE_WITH)
                 continue;
 
-            if (IS_PARAM(DS_TOP))
+            if (IS_PARAM(DS_TOP) or IS_WORD(DS_TOP))  // word for locals
                 Move_Value(DS_PUSH(), EMPTY_BLOCK);  // need block in position
 
             if (IS_BLOCK(DS_TOP)) {  // in right spot to push notes/title
@@ -258,7 +258,7 @@ void Push_Paramlist_Triads_May_Fail(
             // Save the block for parameter types.
             //
             STKVAL(*) param;
-            if (IS_PARAM(DS_TOP)) {
+            if (IS_PARAM(DS_TOP) or IS_WORD(DS_TOP)) {
                 REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
                 Init_Block(
                     DS_PUSH(),
@@ -281,7 +281,7 @@ void Push_Paramlist_Triads_May_Fail(
                     fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
                 }
 
-                assert(IS_PARAM(DS_TOP - 2));
+                assert(IS_PARAM(DS_TOP - 2) or IS_WORD(DS_TOP - 2));
                 param = DS_TOP - 2;
 
                 assert(IS_BLOCK(DS_TOP - 1));
@@ -302,19 +302,21 @@ void Push_Paramlist_Triads_May_Fail(
             // Turn block into typeset for parameter at current index.
             // Leaves VAL_TYPESET_SYM as-is.
             //
-            bool was_refinement = TYPE_CHECK(param, REB_TS_REFINEMENT);
-            REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
-            VAL_TYPESET_LOW_BITS(param) = 0;
-            VAL_TYPESET_HIGH_BITS(param) = 0;
-            Add_Typeset_Bits_Core(
-                param,
-                ARR_HEAD(VAL_ARRAY(item)),
-                derived
-            );
-            if (was_refinement)
-                TYPE_SET(param, REB_TS_REFINEMENT);
+            if (not IS_WORD(param)) {
+                bool was_refinement =  TYPE_CHECK(param, REB_TS_REFINEMENT);
+                REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
+                VAL_TYPESET_LOW_BITS(param) = 0;
+                VAL_TYPESET_HIGH_BITS(param) = 0;
+                Add_Typeset_Bits_Core(
+                    param,
+                    ARR_HEAD(VAL_ARRAY(item)),
+                    derived
+                );
+                if (was_refinement)
+                    TYPE_SET(param, REB_TS_REFINEMENT);
 
-            *flags |= MKF_HAS_TYPES;
+                *flags |= MKF_HAS_TYPES;
+            }
             continue;
         }
 
@@ -375,7 +377,7 @@ void Push_Paramlist_Triads_May_Fail(
             // but it's now another way to name locals.
             //
             if (IS_PREDICATE1_CELL(cell) and not quoted) {
-                pclass = REB_P_LOCAL;
+                pclass = REB_VOID;
                 spelling = VAL_PREDICATE1_SPELLING(cell);
             }
         }
@@ -384,7 +386,7 @@ void Push_Paramlist_Triads_May_Fail(
 
             if (kind == REB_SET_WORD) {
                 if (VAL_WORD_SYM(cell) == SYM_RETURN and not quoted) {
-                    pclass = REB_P_LOCAL;
+                    pclass = REB_VOID;
                 }
                 else if (not quoted) {
                     refinement = true;  // sets REB_TS_REFINEMENT (optional)
@@ -424,14 +426,14 @@ void Push_Paramlist_Triads_May_Fail(
             fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
 
         if (mode != SPEC_MODE_NORMAL) {
-            if (pclass != REB_P_NORMAL and pclass != REB_P_LOCAL)
+            if (pclass != REB_P_NORMAL and pclass != REB_VOID)
                 fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
 
             if (mode == SPEC_MODE_LOCAL)
-                pclass = REB_P_LOCAL;
+                pclass = REB_VOID;
         }
 
-        if (STR_SYMBOL(spelling) == SYM_RETURN and pclass != REB_P_LOCAL) {
+        if (STR_SYMBOL(spelling) == SYM_RETURN and pclass != REB_VOID) {
             //
             // Cancel definitional return if any non-SET-WORD! uses the name
             // RETURN when defining a FUNC.
@@ -453,7 +455,7 @@ void Push_Paramlist_Triads_May_Fail(
         // In rhythm of TYPESET! BLOCK! TEXT! we want to be on a string spot
         // at the time of the push of each new typeset.
         //
-        if (IS_PARAM(DS_TOP))
+        if (IS_PARAM(DS_TOP) or IS_WORD(DS_TOP))
             Move_Value(DS_PUSH(), EMPTY_BLOCK);
         if (IS_BLOCK(DS_TOP))
             Move_Value(DS_PUSH(), EMPTY_TEXT);
@@ -470,13 +472,8 @@ void Push_Paramlist_Triads_May_Fail(
         // If the typeset bits contain REB_NULL, that indicates <opt>.
         // But Is_Param_Endable() indicates <end>.
 
-        if (pclass == REB_P_LOCAL) {
-            Init_Param(
-                DS_PUSH(),
-                REB_P_LOCAL,
-                spelling,  // don't canonize, see #2258
-                TS_OPT_VALUE
-            );
+        if (pclass == REB_VOID) {
+            Init_Word(DS_PUSH(), spelling);
         }
         else if (refinement) {
             Init_Param(
@@ -510,7 +507,7 @@ void Push_Paramlist_Triads_May_Fail(
                 Init_Word(word, spelling);
                 fail (Error_Dup_Vars_Raw(word));  // most dup checks are later
             }
-            if (pclass == REB_P_LOCAL)
+            if (pclass == REB_VOID)
                 *definitional_return_dsp = DSP;  // RETURN: explicit, tolerate
             else
                 *flags &= ~MKF_RETURN;
@@ -536,7 +533,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 ){
     // Go ahead and flesh out the TYPESET! BLOCK! TEXT! triples.
     //
-    if (IS_PARAM(DS_TOP))
+    if (IS_PARAM(DS_TOP) or IS_WORD(DS_TOP))
         Move_Value(DS_PUSH(), EMPTY_BLOCK);
     if (IS_BLOCK(DS_TOP))
         Move_Value(DS_PUSH(), EMPTY_TEXT);
@@ -559,13 +556,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             // they are allowed to return anything.  Generally speaking, the
             // checks are on the input side, not the output.
             //
-            Init_Param(
-                DS_PUSH(),
-                REB_P_LOCAL,
-                Canon(SYM_RETURN),
-                TS_OPT_VALUE
-                    | FLAGIT_KIND(REB_TS_INVISIBLE)  // return @() intentional
-            );
+            Init_Word(DS_PUSH(), Canon(SYM_RETURN));
             definitional_return_dsp = DSP;
 
             Move_Value(DS_PUSH(), EMPTY_BLOCK);
@@ -573,8 +564,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         }
         else {
             STKVAL(*) param = DS_AT(definitional_return_dsp);
-            assert(VAL_PARAM_CLASS(param) == REB_P_LOCAL);
-            assert(HEART_BYTE(param) == REB_TYPESET);
+            assert(VAL_WORD_SYM(param) == SYM_RETURN);
             UNUSED(param);
         }
 
@@ -628,10 +618,6 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 /*    if (flags & MKF_HAS_RETURN)
         paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN; */
 
-  blockscope {
-    REBVAL *param = Voidify_Rootparam(paramlist) + 1;
-    REBKEY *key = SER_HEAD(REBKEY, keylist);
-
     // We want to check for duplicates and a Binder can be used for that
     // purpose--but note that a fail () cannot happen while binders are
     // in effect UNLESS the BUF_COLLECT contains information to undo it!
@@ -645,11 +631,15 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     const REBSTR *duplicate = nullptr;
 
+  blockscope {
+    REBVAL *param = Voidify_Rootparam(paramlist) + 1;
+    REBKEY *key = SER_HEAD(REBKEY, keylist);
+
     STKVAL(*) src = DS_AT(dsp_orig + 1) + 3;
 
     if (definitional_return) {
         assert(flags & MKF_RETURN);
-        Init_Key(key, VAL_TYPESET_STRING(definitional_return));
+        Init_Key(key, VAL_WORD_SPELLING(definitional_return));
         ++key;
 
         Init_Void(param, SYM_UNSET);  // acts as a local !!! being revisited
@@ -660,43 +650,54 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     // Weird due to Spectre/MSVC: https://stackoverflow.com/q/50399940
     //
     for (; src != DS_TOP + 1; src += 3) {
+        const REBSTR *spelling;
+        if (IS_WORD(src))
+            spelling = VAL_WORD_SPELLING(src);
+        else
+            spelling = VAL_TYPESET_STRING(src);
+
         if (not Is_Param_Sealed(src)) {  // allow reuse of sealed names
-            if (not Try_Add_Binder_Index(&binder, VAL_TYPESET_STRING(src), 1020))
-                duplicate = VAL_TYPESET_STRING(src);
+            if (not Try_Add_Binder_Index(&binder, spelling, 1020))
+                duplicate = spelling;
         }
 
         if (definitional_return and src == definitional_return)
             continue;
 
-        Init_Key(key, VAL_TYPESET_STRING(src));
-        ++key;
+        if (IS_WORD(src)) {  // e.g. a local
+            Init_Key(key, VAL_WORD_SPELLING(src));
 
-        if (VAL_PARAM_CLASS(src) == REB_P_LOCAL) {
             Init_Void(param, SYM_UNSET);
             SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
         }
         else {
+            Init_Key(key, VAL_TYPESET_STRING(src));
+
             Move_Value(param, src);
             VAL_TYPESET_STRING_NODE(param) = nullptr;
         }
+        ++key;
         ++param;
     }
 
+    TERM_ARRAY_LEN(paramlist, num_slots);
+    Manage_Series(paramlist);
+
+    TERM_SEQUENCE_LEN(keylist, ARR_LEN(paramlist) - 1);
+    INIT_LINK_KEYSOURCE(paramlist, NOD(keylist));
+    MISC_META_NODE(paramlist) = nullptr;
+  }
+
     // Must remove binder indexes for all words, even if about to fail
     //
-    src = DS_AT(dsp_orig + 1) + 3;
-
-    // Weird due to Spectre/MSVC: https://stackoverflow.com/q/50399940
-    //
-    for (; src != DS_TOP + 1; src += 3, ++param) {
-        if (Is_Param_Sealed(src))
+  blockscope {
+    const REBKEY *key = SER_AT(REBKEY, keylist, 0);
+    REBVAL *param = SER_AT(REBVAL, paramlist, 1);
+    for (; NOT_END_KEY(key); ++key, ++param) {
+        if (Is_Param_Sealed(param))
             continue;
-        if (
-            Remove_Binder_Index_Else_0(&binder, VAL_TYPESET_STRING(src))
-            == 0
-        ){
-            assert(duplicate);
-        }
+        if (Remove_Binder_Index_Else_0(&binder, KEY_SPELLING(key)) == 0)
+            assert(duplicate);  // erroring on this is pending
     }
 
     SHUTDOWN_BINDER(&binder);
@@ -706,13 +707,6 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         Init_Word(word, duplicate);
         fail (Error_Dup_Vars_Raw(word));
     }
-
-    TERM_ARRAY_LEN(paramlist, num_slots);
-    Manage_Series(paramlist);
-
-    TERM_SEQUENCE_LEN(keylist, ARR_LEN(paramlist) - 1);
-    INIT_LINK_KEYSOURCE(paramlist, NOD(keylist));
-    MISC_META_NODE(paramlist) = nullptr;
   }
 
     //=///////////////////////////////////////////////////////////////////=//
