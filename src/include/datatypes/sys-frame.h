@@ -724,25 +724,19 @@ inline static void Push_Action(
     // specialization together.  This means only the outermost specialization
     // is needed to fill the specialized slots contributed by later phases.
     //
-    // f->special here will either equal f->key (to indicate normal argument
+    // f->param here will either equal f->key (to indicate normal argument
     // fulfillment) or the head of the "exemplar".
     //
     // !!! It is planned that exemplars will be unified with paramlist, making
     // the context keys something different entirely.  
     //
-    REBARR *list = ACT_SPECIALTY(act);
-    if (GET_ARRAY_FLAG(list, IS_PARTIALS)) {
-        const REBVAL *word = SPECIFIC(ARR_HEAD(list));
+    REBARR *partials = try_unwrap(ACT_PARTIALS(act));
+    if (partials) {
+        const REBVAL *word = SPECIFIC(ARR_HEAD(partials));
         for (; NOT_END(word); ++word)
             Move_Value(DS_PUSH(), word);
-        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
     }
-    if (GET_ARRAY_FLAG(list, IS_VARLIST))
-        f->special = CTX_VARS_HEAD(CTX(list));
-    else {
-        assert(GET_SERIES_FLAG(list, IS_KEYLIKE));
-        f->special = SER_AT(REBVAL, list, 1);
-    }
+    f->param = ACT_PARAMS_HEAD(act);
 
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
     assert(NOT_SERIES_INFO(f->varlist, INACCESSIBLE));
@@ -907,7 +901,7 @@ inline static void Drop_Action(REBFRM *f) {
     FRM_ARG(frame_, (p_##name##_))
 
 #define PAR(name) \
-    ACT_SPECIAL(FRM_PHASE(frame_), (p_##name##_))  // a REB_P_XXX pseudovalue
+    ACT_PARAM(FRM_PHASE(frame_), (p_##name##_))  // a REB_P_XXX pseudovalue
 
 #define REF(name) \
     NULLIFY_NULLED(ARG(name))
@@ -950,21 +944,21 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
 //
 inline static void FAIL_IF_BAD_RETURN_TYPE(REBFRM *f) {
     REBACT *phase = FRM_PHASE(f);
-    REBVAL *typeset = ACT_SPECIALTY_HEAD(phase);
+    const REBPAR *param = ACT_PARAMS_HEAD(phase);
     assert(KEY_SYM(ACT_KEYS_HEAD(phase)) == SYM_RETURN);
 
     // Typeset bits for locals in frames are usually ignored, but the RETURN:
     // local uses them for the return types of a function.
     //
-    if (not Typecheck_Including_Constraints(typeset, f->out))
+    if (not Typecheck_Including_Constraints(param, f->out))
         fail (Error_Bad_Return_Type(f, VAL_TYPE(f->out)));
 }
 
 inline static void FAIL_IF_NO_INVISIBLE_RETURN(REBFRM *f) {
     REBACT *phase = FRM_PHASE(f);
-    REBVAL *typeset = ACT_SPECIALTY_HEAD(phase);
+    const REBPAR *param = ACT_PARAMS_HEAD(phase);
     assert(KEY_SYM(ACT_KEYS_HEAD(phase)) == SYM_RETURN);
 
-    if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE))
+    if (not TYPE_CHECK(param, REB_TS_INVISIBLE))
         fail (Error_Bad_Invisible(f));
 }

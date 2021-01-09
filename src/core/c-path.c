@@ -297,7 +297,7 @@ bool Next_Path_Throws(REBPVS *pvs)
             //
             fail ("Path evaluation produced temporary value, can't POKE it");
         }
-        TRASH_POINTER_IF_DEBUG(pvs->special);
+        TRASH_POINTER_IF_DEBUG(pvs->param);
     }
     else {
         pvs->u.ref.cell = nullptr; // clear status of the reference
@@ -526,7 +526,8 @@ bool Eval_Path_Throws_Core(
 
     assert(out != setval and out != FRM_SPARE(pvs));
 
-    pvs->special = setval ? unwrap(setval) : nullptr; // a.k.a. PVS_OPT_SETVAL()
+    // a.k.a. PVS_OPT_SETVAL()
+    pvs->param = cast_PAR(setval ? unwrap(setval) : nullptr);
     assert(PVS_OPT_SETVAL(pvs) == setval);
 
     pvs->label = nullptr;
@@ -831,7 +832,7 @@ REBNATIVE(pick)
     PVS_PICKER(pvs) = ARG(picker);
 
     pvs->label = nullptr; // applies to e.g. :append/only returning APPEND
-    pvs->special = nullptr;
+    pvs->param = nullptr;
 
   redo: ;  // semicolon is intentional, next line is declaration
 
@@ -927,7 +928,7 @@ REBNATIVE(poke)
     PVS_PICKER(pvs) = ARG(picker);
 
     pvs->label = nullptr;  // e.g. :append/only returning APPEND
-    pvs->special = ARG(value);
+    pvs->param = cast_PAR(ARG(value));
 
     PATH_HOOK *hook = Path_Hook_For_Type_Of(location);
 

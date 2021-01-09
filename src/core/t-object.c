@@ -107,14 +107,14 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
         assert(i != 0);
 
         const REBKEY *key = CTX_KEY(c, i);
-        REBVAL *var = CTX_VAR(c, i);
+        REBVAR *var = CTX_VAR(c, i);
 
         if (GET_CELL_FLAG(var, PROTECTED)) {
             error = Error_Protected_Key(key);
             goto collect_end;
         }
 
-        if (Is_Param_Hidden(var)) {
+        if (Is_Var_Hidden(var)) {
             error = Error_Hidden_Raw();
             goto collect_end;
         }
@@ -157,8 +157,8 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 
     const REBKEY *key1 = CTX_KEYS_HEAD(c1);
     const REBKEY *key2 = CTX_KEYS_HEAD(c2);
-    const REBVAL *var1 = CTX_VARS_HEAD(c1);
-    const REBVAL *var2 = CTX_VARS_HEAD(c2);
+    const REBVAR *var1 = CTX_VARS_HEAD(c1);
+    const REBVAR *var2 = CTX_VARS_HEAD(c2);
 
     // Compare each entry, in order.  Skip any hidden fields, field names are
     // compared case-insensitively.
@@ -172,14 +172,14 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
         ++key1, ++key2, ++var1, ++var2
     ){
       no_advance:
-        if (Is_Param_Hidden(var1)) {
+        if (Is_Var_Hidden(var1)) {
             ++key1;
             ++var1;
             if (IS_END_KEY(key1))
                 break;
             goto no_advance;
         }
-        if (Is_Param_Hidden(var2)) {
+        if (Is_Var_Hidden(var2)) {
             ++key2;
             ++var2;
             if (IS_END_KEY(key2))
@@ -203,11 +203,11 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // they don't line up.
     //
     for (; NOT_END_KEY(key1); key1++, var1++) {
-        if (not Is_Param_Hidden(var1))
+        if (not Is_Var_Hidden(var1))
             return 1;
     }
     for (; NOT_END_KEY(key2); key2++, var2++) {
-        if (not Is_Param_Hidden(var2))
+        if (not Is_Var_Hidden(var2))
             return -1;
     }
 
@@ -629,12 +629,12 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         // Mold all words and their values ("key: <molded value>")
         //
         const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(v);
-        REBVAL *var = CTX_VARS_HEAD(c);
+        REBVAR *var = CTX_VARS_HEAD(c);
         bool had_output = false;
         for (; NOT_END_KEY(key); key++, var++) {
-            if (Is_Param_Sealed(var))
+            if (CELL_KIND(v) == REB_FRAME and Is_Param_Sealed(cast_PAR(var)))
                 continue;
-            if (honor_hidden and Is_Param_Hidden(var))
+            if (honor_hidden and Is_Var_Hidden(var))
                 continue;
 
             Append_Spelling(mo->series, KEY_SPELLING(key));
@@ -662,12 +662,12 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
     mo->indent++;
 
     const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(v);
-    REBVAL *var = CTX_VARS_HEAD(VAL_CONTEXT(v));
+    REBVAR *var = CTX_VARS_HEAD(VAL_CONTEXT(v));
 
     for (; NOT_END_KEY(key); ++key, ++var) {
-        if (Is_Param_Sealed(var))
+        if (CELL_KIND(v) == REB_FRAME and Is_Param_Sealed(cast_PAR(var)))
             continue;
-        if (honor_hidden and Is_Param_Hidden(var))
+        if (honor_hidden and Is_Var_Hidden(var))
             continue;
 
         New_Indented_Line(mo);

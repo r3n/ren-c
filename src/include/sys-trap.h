@@ -262,8 +262,8 @@ inline static void DROP_TRAP_SAME_STACKLEVEL_AS_PUSH(struct Reb_State *j) {
             static_assert(
                 std::is_same<T, REBCTX>::value
                 or std::is_same<T, const char>::value
-                or std::is_same<T, const REBVAL>::value
-                or std::is_same<T, REBVAL>::value,
+                or std::is_base_of<const REBVAL, T>::value
+                or std::is_base_of<REBVAL, T>::value,
                 "fail() works on: REBCTX*, REBVAL*, const char*"
             );
             Fail_Core(p);

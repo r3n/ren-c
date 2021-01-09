@@ -664,6 +664,22 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 #endif
 
 
-//=//// KEYS AND VARS /////////////////////////////////////////////////////=//
+//=//// VARS and PARAMs ///////////////////////////////////////////////////=//
+//
+// These are lightweight classes on top of cells that help catch cases of
+// testing for flags that only apply if you're sure something is a parameter
+// cell or variable cell.
+//
 
-struct REBVAR : public REBVAL {};
+#ifdef CPLUSPLUS_11
+    struct REBVAR : public REBVAL {};
+    struct REBPAR : public REBVAR {};
+
+    inline static const REBPAR* cast_PAR(const REBVAL *v)
+        { return cast(const REBPAR*, v); }
+#else
+    #define REBVAR REBVAL
+    #define REBPAR REBVAL
+
+    #define cast_PAR(v) (v)
+#endif

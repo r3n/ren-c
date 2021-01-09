@@ -239,11 +239,11 @@ inline static REBSER *ACT_KEYLIST(REBACT *a) {
 
 #define ACT_PARAMLIST(a)            CTX_VARLIST(ACT_EXEMPLAR(a))
 
-inline static REBVAL *ACT_SPECIALTY_HEAD(REBACT *a) {
+inline static REBPAR *ACT_PARAMS_HEAD(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
         list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
-    return cast(REBVAL*, list->content.dynamic.data) + 1;  // skip archetype
+    return cast(REBPAR*, list->content.dynamic.data) + 1;  // skip archetype
 }
 
 
@@ -281,7 +281,7 @@ inline static void Init_Key(REBKEY *dest, const REBSTR *spelling)
     STR_SYMBOL(KEY_SPELLING(key))
 
 #define ACT_KEY(a,n)            CTX_KEY(ACT_EXEMPLAR(a), (n))
-#define ACT_SPECIAL(a,n)        CTX_VAR(ACT_EXEMPLAR(a), (n))
+#define ACT_PARAM(a,n)          cast_PAR(CTX_VAR(ACT_EXEMPLAR(a), (n)))
 
 #define ACT_NUM_PARAMS(a) \
     CTX_LEN(ACT_EXEMPLAR(a))

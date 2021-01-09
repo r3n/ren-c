@@ -445,14 +445,14 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
               case REB_FRAME: {
                 REBCTX *c = VAL_CONTEXT(les->data);
 
-                REBVAL *val;
+                REBVAR *val;
                 REBLEN bind_index;
                 while (true) {  // find next non-hidden key (if any)
                     val = CTX_VAR(c, les->data_idx);
                     bind_index = les->data_idx;
                     if (++les->data_idx == les->data_len)
                         more_data = false;
-                    if (not Is_Param_Hidden(val))
+                    if (not Is_Var_Hidden(val))
                         break;
                     if (not more_data)
                         goto finished;

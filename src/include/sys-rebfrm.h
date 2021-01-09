@@ -100,7 +100,7 @@ STATIC_ASSERT(EVAL_FLAG_CACHE_NO_LOOKAHEAD == FEED_FLAG_NO_LOOKAHEAD);
 
 //=//// EVAL_FLAG_FULLY_SPECIALIZED ///////////////////////////////////////=//
 //
-// When a null is seen in f->special, the question is whether that is an
+// When a null is seen in f->param, the question is whether that is an
 // intentional "null specialization" or if it means the argument should be
 // gathered normally (if applicable), as it would in a typical invocation.
 // If the frame is considered fully specialized (as with DO F) then there
@@ -542,7 +542,7 @@ struct Reb_Frame {
     // item being dispatched (which would be cleaner, but some cases must
     // look ahead with alternate handling).
     //
-    const REBVAL *special;
+    const REBPAR *param;
 
   union {
     //

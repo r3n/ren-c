@@ -36,7 +36,7 @@ struct Params_Of_State {
 //
 static bool Params_Of_Hook(
     const REBKEY *key,
-    REBVAL *special,
+    const REBPAR *param,
     REBFLGS flags,
     void *opaque
 ){
@@ -47,12 +47,12 @@ static bool Params_Of_Hook(
     if (not s->just_words) {
         if (
             not (flags & PHF_UNREFINED)
-            and TYPE_CHECK(special, REB_TS_REFINEMENT)
+            and TYPE_CHECK(param, REB_TS_REFINEMENT)
         ){
             Refinify(DS_TOP);
         }
 
-        switch (VAL_PARAM_CLASS(special)) {
+        switch (VAL_PARAM_CLASS(param)) {
           case REB_P_OUTPUT:
           case REB_P_NORMAL:
             break;
@@ -104,7 +104,7 @@ REBARR *Make_Action_Parameters_Arr(REBACT *act, bool just_words)
 
 static bool Typesets_Of_Hook(
     const REBKEY *key,
-    REBVAL *special,
+    const REBPAR *param,
     REBFLGS flags,
     void *opaque
 ){
@@ -112,14 +112,12 @@ static bool Typesets_Of_Hook(
     UNUSED(opaque);
     UNUSED(flags);
 
-    // It's already a typeset, but remove the parameter spelling.
-    //
     // !!! Typesets must be revisited in a world with user-defined types, as
     // well as to accomodate multiple quoting levels.
     //
-    Move_Value(DS_PUSH(), special);
+    Move_Value(DS_PUSH(), param);
     assert(IS_TYPESET(DS_TOP));
-    VAL_TYPESET_STRING_NODE(DS_TOP) = nullptr;
+    assert(VAL_TYPESET_STRING_NODE(DS_TOP) == nullptr);
 
     return true;
 }
@@ -656,7 +654,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         else
             spelling = VAL_TYPESET_STRING(src);
 
-        if (not Is_Param_Sealed(src)) {  // allow reuse of sealed names
+        if (not Is_Param_Sealed(cast_PAR(src))) {  // sealed names reusable
             if (not Try_Add_Binder_Index(&binder, spelling, 1020))
                 duplicate = spelling;
         }
@@ -692,7 +690,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     //
   blockscope {
     const REBKEY *key = SER_AT(REBKEY, keylist, 0);
-    REBVAL *param = SER_AT(REBVAL, paramlist, 1);
+    const REBPAR *param = SER_AT(REBPAR, paramlist, 1);
     for (; NOT_END_KEY(key); ++key, ++param) {
         if (Is_Param_Sealed(param))
             continue;
@@ -1090,9 +1088,9 @@ REBACT *Make_Action(
     // the work of doing that is factored into a routine (`PARAMETERS OF`
     // uses it as well).
 
-    REBVAL *first_unspecialized = First_Unspecialized_Param(nullptr, act);
-    if (first_unspecialized) {
-        switch (VAL_PARAM_CLASS(first_unspecialized)) {
+    const REBPAR *first = First_Unspecialized_Param(nullptr, act);
+    if (first) {
+        switch (VAL_PARAM_CLASS(first)) {
           case REB_P_OUTPUT:
           case REB_P_NORMAL:
             break;
@@ -1108,7 +1106,7 @@ REBACT *Make_Action(
             assert(false);
         }
 
-        if (TYPE_CHECK(first_unspecialized, REB_TS_SKIPPABLE))
+        if (TYPE_CHECK(first, REB_TS_SKIPPABLE))
             SET_ACTION_FLAG(act, SKIPPABLE_FIRST);
     }
 
@@ -1354,4 +1352,61 @@ bool Get_If_Word_Or_Path_Throws(
         Derelativize(out, v, specifier);
 
     return false;
+}
+
+
+//
+//  tweak: native [
+//
+//  {Modify a special property (currently only for ACTION!)}
+//
+//      return: "Same action identity as input"
+//          [action!]
+//      action "(modified) Action to modify property of"
+//          [action!]
+//      property "Currently must be [defer postpone]"
+//          [word!]
+//      enable [logic!]
+//  ]
+//
+REBNATIVE(tweak)
+{
+    INCLUDE_PARAMS_OF_TWEAK;
+
+    REBACT *act = VAL_ACTION(ARG(action));
+    const REBPAR *first = First_Unspecialized_Param(nullptr, act);
+
+    Reb_Param_Class pclass = first
+        ? VAL_PARAM_CLASS(first)
+        : REB_P_NORMAL;  // imagine it as <end>able
+
+    REBFLGS flag;
+
+    switch (VAL_WORD_SYM(ARG(property))) {
+      case SYM_BARRIER:   // don't allow being taken as an argument, e.g. |
+        flag = DETAILS_FLAG_IS_BARRIER;
+        break;
+
+      case SYM_DEFER:  // Special enfix behavior used by THEN, ELSE, ALSO...
+        if (pclass != REB_P_NORMAL)
+            fail ("TWEAK defer only actions with evaluative 1st params");
+        flag = DETAILS_FLAG_DEFERS_LOOKBACK;
+        break;
+
+      case SYM_POSTPONE:  // Wait as long as it can to run w/o changing order
+        if (pclass != REB_P_NORMAL and pclass != REB_P_SOFT)
+            fail ("TWEAK postpone only actions with evaluative 1st params");
+        flag = DETAILS_FLAG_POSTPONES_ENTIRELY;
+        break;
+
+      default:
+        fail ("TWEAK currently only supports [barrier defer postpone]");
+    }
+
+    if (VAL_LOGIC(ARG(enable)))
+        ACT_DETAILS(act)->header.bits |= flag;
+    else
+        ACT_DETAILS(act)->header.bits &= ~flag;
+
+    RETURN (ARG(action));
 }

@@ -202,7 +202,7 @@ REBNATIVE(reframer_p)
 
   blockscope {
     const REBKEY *key;
-    REBVAL *param;
+    const REBPAR *param;
     
     if (REF(parameter)) {
         const REBSTR *spelling = VAL_WORD_SPELLING(ARG(parameter));
@@ -212,11 +212,11 @@ REBNATIVE(reframer_p)
             goto cleanup_binder;
         }
         key = CTX_KEY(exemplar, param_index);
-        param = CTX_VAR(exemplar, param_index);
+        param = cast_PAR(CTX_VAR(exemplar, param_index));
     }
     else {
         param = Last_Unspecialized_Param(&key, shim);
-        param_index = param - ACT_SPECIALTY_HEAD(shim) + 1;
+        param_index = param - ACT_PARAMS_HEAD(shim) + 1;
     }
 
     // Make sure the parameter is able to accept FRAME! arguments (the type
@@ -243,9 +243,9 @@ REBNATIVE(reframer_p)
 
   cleanup_binder: {
     const REBKEY *key = ACT_KEYS_HEAD(shim);
-    REBVAL *special = ACT_SPECIALTY_HEAD(shim);
-    for (; NOT_END_KEY(key); ++key, ++special) {
-        if (Is_Param_Hidden(special))
+    const REBPAR *param = ACT_PARAMS_HEAD(shim);
+    for (; NOT_END_KEY(key); ++key, ++param) {
+        if (Is_Param_Hidden(param))
             continue;
 
         const REBSTR *spelling = KEY_SPELLING(key);

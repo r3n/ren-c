@@ -180,7 +180,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
 
             // !!! Cache this test?
             //
-            REBVAL *first = First_Unspecialized_Param(nullptr, action);
+            const REBPAR *first = First_Unspecialized_Param(nullptr, action);
             if (VAL_PARAM_CLASS(first) == REB_P_SOFT)
                 return true;  // don't look back, yield the lookahead
 
@@ -200,7 +200,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
         // So we have to do that check here.
         //
         if (GET_ACTION_FLAG(action, SKIPPABLE_FIRST)) {
-            REBVAL *first = First_Unspecialized_Param(nullptr, action);
+            const REBPAR *first = First_Unspecialized_Param(nullptr, action);
             if (not TYPE_CHECK(first, KIND3Q_BYTE(out)))
                 return true;  // didn't actually want this parameter type
         }

@@ -106,22 +106,22 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     assert(IS_END_KEY(f->key));  // okay to reuse, if it gets put back...
     f->key = ACT_KEYS_HEAD(FRM_PHASE(f));
     f->arg = FRM_ARGS_HEAD(f);
-    f->special = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
+    f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
 
-    for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->special) {
-        if (Is_Param_Hidden(f->special))  // specialized or local
+    for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->param) {
+        if (Is_Param_Hidden(f->param))  // specialized or local
             continue;
 
-        if (TYPE_CHECK(f->special, REB_TS_SKIPPABLE) and IS_NULLED(f->arg))
+        if (TYPE_CHECK(f->param, REB_TS_SKIPPABLE) and IS_NULLED(f->arg))
             continue;  // don't throw in skippable args that are nulled out
 
-        if (TYPE_CHECK(f->special, REB_TS_REFINEMENT)) {
+        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
             if (IS_NULLED(f->arg))  // don't add to PATH!
                 continue;
 
             Init_Word(DS_PUSH(), KEY_SPELLING(f->key));
 
-            if (Is_Typeset_Empty(f->special)) {
+            if (Is_Typeset_Empty(f->param)) {
                 assert(Is_Blackhole(f->arg));  // used but argless refinement
                 continue;
             }

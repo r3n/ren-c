@@ -673,7 +673,7 @@ REBNATIVE(variadic_q)
 {
     INCLUDE_PARAMS_OF_VARIADIC_Q;
 
-    REBVAL *param = ACT_SPECIALTY_HEAD(VAL_ACTION(ARG(action)));
+    const REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(ARG(action)));
     for (; NOT_END(param); ++param) {
         if (Is_Param_Variadic(param))
             return Init_True(D_OUT);

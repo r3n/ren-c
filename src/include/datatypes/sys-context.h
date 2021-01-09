@@ -268,12 +268,6 @@ inline static REBLEN CTX_LEN(REBCTX *c) {
 #define CTX_TYPE(c) \
     VAL_TYPE(CTX_ARCHETYPE(c))
 
-#define CTX_KEYS_HEAD(c) \
-    SER_AT(REBKEY, CTX_KEYLIST(c), 0)  // 0-based
-
-#define CTX_VARS_HEAD(c) \
-    SER_AT(REBVAL, CTX_VARLIST(c), 1)  // 1-based (must skip archetype
-
 inline static const REBKEY *CTX_KEY(REBCTX *c, REBLEN n) {
     //
     // !!! Inaccessible contexts have to retain their keylists, at least
@@ -286,11 +280,21 @@ inline static const REBKEY *CTX_KEY(REBCTX *c, REBLEN n) {
     return SER_AT(const REBKEY, CTX_KEYLIST(c), n - 1);
 }
 
-inline static REBVAL *CTX_VAR(REBCTX *c, REBLEN n) {  // 1-based, no RELVAL*
+inline static REBVAR *CTX_VAR(REBCTX *c, REBLEN n) {  // 1-based, no RELVAL*
     assert(NOT_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE));
     assert(n != 0 and n <= CTX_LEN(c));
-    return cast(REBVAL*, cast(REBSER*, c)->content.dynamic.data) + n;
+    return cast(REBVAR*, cast(REBSER*, c)->content.dynamic.data) + n;
 }
+
+// CTX_VARS_HEAD() and CTX_KEYS_HEAD() allow CTX_LEN() to be 0, while
+// CTX_VAR() does not.  Also, CTX_KEYS_HEAD() gives back a mutable slot.
+
+#define CTX_KEYS_HEAD(c) \
+    SER_AT(REBKEY, CTX_KEYLIST(c), 0)  // 0-based
+
+#define CTX_VARS_HEAD(c) \
+    (cast(REBVAR*, cast(REBSER*, (c))->content.dynamic.data) + 1)
+
 
 
 //=//// FRAME! REBCTX* <-> REBFRM* STRUCTURE //////////////////////////////=//

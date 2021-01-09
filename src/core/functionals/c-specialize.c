@@ -56,7 +56,7 @@ enum {
 //
 // The evaluator does not do any special "running" of a specialized frame.
 // All of the contribution that the specialization had to make was taken care
-// of when Eval_Core() used f->special to fill from the exemplar.  So all this
+// of when Eval_Core() used f->param to fill from the exemplar.  So all this
 // does is change the phase and binding to match the function this layer was
 // specializing.
 //
@@ -129,30 +129,28 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             Move_Value(DS_PUSH(), word);
     }
 
-    REBCTX *exemplar = ACT_EXEMPLAR(act);
-
-    const REBKEY *param = CTX_KEYS_HEAD(exemplar);
-    const REBVAL *special = CTX_VARS_HEAD(exemplar);
+    const REBKEY *key = ACT_KEYS_HEAD(act);
+    const REBPAR *param = ACT_PARAMS_HEAD(act);
 
     REBVAL *arg = SPECIFIC(rootvar) + 1;
 
     REBLEN index = 1;  // used to bind REFINEMENT! values to parameter slots
 
-    for (; NOT_END_KEY(param); ++param, ++arg, ++special, ++index) {
+    for (; NOT_END_KEY(key); ++key, ++param, ++arg, ++index) {
         Prep_Cell(arg);
 
-        if (Is_Param_Hidden(special)) {  // local or specialized
-            Blit_Specific(arg, special);  // preserve ARG_MARKED_CHECKED
+        if (Is_Param_Hidden(param)) {  // local or specialized
+            Blit_Specific(arg, param);  // preserve ARG_MARKED_CHECKED
 
           continue_specialized:
 
             continue;
         }
 
-        assert(NOT_CELL_FLAG(special, ARG_MARKED_CHECKED));
+        assert(NOT_CELL_FLAG(param, ARG_MARKED_CHECKED));
 
-        const REBSTR *symbol = KEY_SPELLING(param);  // added to binding
-        if (not TYPE_CHECK(special, REB_TS_REFINEMENT)) {  // nothing to push
+        const REBSTR *symbol = KEY_SPELLING(key);  // added to binding
+        if (not TYPE_CHECK(param, REB_TS_REFINEMENT)) {  // nothing to push
 
           continue_unspecialized:
 
@@ -184,7 +182,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             INIT_VAL_WORD_BINDING(ordered, varlist);
             INIT_VAL_WORD_PRIMARY_INDEX(ordered, index);
 
-            if (not Is_Typeset_Empty(special))  // needs argument
+            if (not Is_Typeset_Empty(param))  // needs argument
                 goto continue_unspecialized;
 
             // If refinement named on stack takes no arguments, then it can't
@@ -291,10 +289,10 @@ bool Specialize_Action_Throws(
         // !!! Only one binder can be in effect, and we're calling arbitrary
         // code.  Must clean up now vs. in loop we do at the end.  :-(
         //
-        const REBKEY *key = CTX_KEYS_HEAD(exemplar);
-        REBVAL *var = CTX_VARS_HEAD(exemplar);
-        for (; NOT_END_KEY(key); ++key, ++var) {
-            if (Is_Param_Hidden(var))
+        const REBKEY *key = ACT_KEYS_HEAD(unspecialized);
+        const REBPAR *param = ACT_PARAMS_HEAD(unspecialized);
+        for (; NOT_END_KEY(key); ++key, ++param) {
+            if (Is_Param_Hidden(param))
                 continue;  // maybe refinement from stack, now specialized out
 
             Remove_Binder_Index(&binder, KEY_SPELLING(key));
@@ -314,22 +312,22 @@ bool Specialize_Action_Throws(
     }
 
     const REBKEY *key = ACT_KEYS_HEAD(unspecialized);
-    const REBVAL *special = ACT_SPECIALTY_HEAD(unspecialized);
+    const REBPAR *param = ACT_PARAMS_HEAD(unspecialized);
 
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
 
     REBDSP ordered_dsp = lowest_ordered_dsp;
 
-    for (; NOT_END_KEY(key); ++key, ++arg, ++special) {
+    for (; NOT_END_KEY(key); ++key, ++param, ++arg) {
         //
         // Note: We check ARG_MARKED_CHECKED on `special` from the *original*
         // varlist...as the user may have used PROTECT/HIDE to force `arg`
         // to be hidden and still needs a typecheck here.
 
-        if (Is_Param_Hidden(special))
+        if (Is_Param_Hidden(param))
             continue;
 
-        if (TYPE_CHECK(special, REB_TS_REFINEMENT)) {
+        if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
             if (
                 Is_Void_With_Sym(arg, SYM_UNSET)
                 and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
@@ -343,7 +341,7 @@ bool Specialize_Action_Throws(
             if (GET_CELL_FLAG(arg, ARG_MARKED_CHECKED))
                 assert(IS_NULLED(arg) or Is_Blackhole(arg));
             else
-                Typecheck_Refinement(special, arg);
+                Typecheck_Refinement(param, arg);
 
             goto specialized_arg_no_typecheck;
         }
@@ -363,8 +361,8 @@ bool Specialize_Action_Throws(
 
         assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
         assert(Is_Void_With_Sym(arg, SYM_UNSET));
-        assert(IS_PARAM(special));
-        Move_Value(arg, special);
+        assert(IS_PARAM(param));
+        Move_Value(arg, param);
         continue;
 
       specialized_arg_with_check:
@@ -372,10 +370,10 @@ bool Specialize_Action_Throws(
         // !!! If argument was previously specialized, should have been type
         // checked already... don't type check again (?)
         //
-        if (Is_Param_Variadic(special))
+        if (Is_Param_Variadic(param))
             fail ("Cannot currently SPECIALIZE variadic arguments.");
 
-        if (not TYPE_CHECK(special, VAL_TYPE(arg)))
+        if (not TYPE_CHECK(param, VAL_TYPE(arg)))
             fail (arg);  // !!! merge w/Error_Invalid_Arg()
 
        SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
@@ -537,18 +535,18 @@ void For_Each_Unspecialized_Param(
     //
   blockscope {
     const REBKEY *key = ACT_KEYS_HEAD(act);
-    REBVAL *special = ACT_SPECIALTY_HEAD(act);
+    const REBPAR *param = ACT_PARAMS_HEAD(act);
 
     // Loop through and pass just the normal args.
     //
-    for (; NOT_END_KEY(key); ++key, ++special) {
-        if (Is_Param_Hidden(special))
+    for (; NOT_END_KEY(key); ++key, ++param) {
+        if (Is_Param_Hidden(param))
             continue;
 
-        if (TYPE_CHECK(special, REB_TS_REFINEMENT))
+        if (TYPE_CHECK(param, REB_TS_REFINEMENT))
             continue;
 
-        Reb_Param_Class pclass = VAL_PARAM_CLASS(special);
+        Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
 
         REBFLGS flags = 0;
 
@@ -569,14 +567,14 @@ void For_Each_Unspecialized_Param(
         //
         if (pclass == REB_P_MODAL) {
             if (NOT_END_KEY(key + 1)) {  // !!! Ideally checked at creation
-                if (GET_CELL_FLAG(special + 1, ARG_MARKED_CHECKED)) {
-                    if (TYPE_CHECK(special + 1, REB_TS_REFINEMENT))  // required
+                if (GET_CELL_FLAG(param + 1, ARG_MARKED_CHECKED)) {
+                    if (TYPE_CHECK(param + 1, REB_TS_REFINEMENT))  // required
                         flags |= PHF_DEMODALIZED;  // !!! ^-- check at create!
                 }
             }
         }
 
-        if (not hook(key, special, flags, opaque))
+        if (not hook(key, param, flags, opaque))
             return;
 
       skip_in_first_pass: {}
@@ -595,9 +593,9 @@ void For_Each_Unspecialized_Param(
         REBVAL *head = SPECIFIC(ARR_HEAD(unwrap(partials)));
         for (; partial-- != head; ) {
             const REBKEY *key = ACT_KEY(act, VAL_WORD_INDEX(partial));
-            REBVAL *special = ACT_SPECIAL(act, VAL_WORD_INDEX(partial));
+            const REBPAR *param = ACT_PARAM(act, VAL_WORD_INDEX(partial));
 
-            if (not hook(key, special, PHF_UNREFINED, opaque))
+            if (not hook(key, param, PHF_UNREFINED, opaque))
                 return;
         }
     }
@@ -606,13 +604,13 @@ void For_Each_Unspecialized_Param(
 
   blockscope {
     const REBKEY *key = ACT_KEYS_HEAD(act);
-    REBVAL *special = ACT_SPECIALTY_HEAD(act);
+    const REBPAR *param = ACT_PARAMS_HEAD(act);
 
-    for (; NOT_END_KEY(key); ++key, ++special) {
-        if (Is_Param_Hidden(special))
+    for (; NOT_END_KEY(key); ++key, ++param) {
+        if (Is_Param_Hidden(param))
             continue;
 
-        if (not TYPE_CHECK(special, REB_TS_REFINEMENT))
+        if (not TYPE_CHECK(param, REB_TS_REFINEMENT))
             continue;
 
         if (partials) {
@@ -627,7 +625,7 @@ void For_Each_Unspecialized_Param(
             }
         }
 
-        if (not hook(key, special, 0, opaque))
+        if (not hook(key, param, 0, opaque))
             return;
 
       continue_unspecialized_loop:
@@ -639,39 +637,39 @@ void For_Each_Unspecialized_Param(
 
 struct Find_Param_State {
     const REBKEY *key;
-    REBVAL *special;
+    const REBPAR *param;
 };
 
 static bool First_Param_Hook(
     const REBKEY *key,
-    REBVAL *special,
+    const REBPAR *param,
     REBFLGS flags,
     void *opaque
 ){
     struct Find_Param_State *s = cast(struct Find_Param_State*, opaque);
     assert(not s->key);  // should stop enumerating if found
 
-    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(special, REB_TS_REFINEMENT))
+    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
         return false;  // we know WORD!-based invocations will be 0 arity
 
     s->key = key;
-    s->special = special;
+    s->param = param;
     return false;  // found first unspecialized, no need to look more
 }
 
 static bool Last_Param_Hook(
     const REBKEY *key,
-    REBVAL *special,
+    const REBPAR *param,
     REBFLGS flags,
     void *opaque
 ){
     struct Find_Param_State *s = cast(struct Find_Param_State*, opaque);
 
-    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(special, REB_TS_REFINEMENT))
+    if (not (flags & PHF_UNREFINED) and TYPE_CHECK(param, REB_TS_REFINEMENT))
         return false;  // we know WORD!-based invocations will be 0 arity
 
     s->key = key;
-    s->special = special;
+    s->param = param;
     return true;  // keep looking and be left with the last
 }
 
@@ -685,17 +683,17 @@ static bool Last_Param_Hook(
 //
 // This means that the last parameter (D) is actually the first of FOO-D.
 //
-REBVAL *First_Unspecialized_Param(const REBKEY ** key, REBACT *act)
+const REBPAR *First_Unspecialized_Param(const REBKEY ** key, REBACT *act)
 {
     struct Find_Param_State s;
     s.key = nullptr;
-    s.special = nullptr;
+    s.param = nullptr;
 
     For_Each_Unspecialized_Param(act, &First_Param_Hook, &s);
 
     if (key)
         *key = s.key; 
-    return s.special;  // may be nullptr
+    return s.param;  // may be nullptr
 }
 
 
@@ -704,17 +702,17 @@ REBVAL *First_Unspecialized_Param(const REBKEY ** key, REBACT *act)
 //
 // See notes on First_Unspecialized_Param() regarding complexity
 //
-REBVAL *Last_Unspecialized_Param(const REBKEY ** key, REBACT *act)
+const REBPAR *Last_Unspecialized_Param(const REBKEY ** key, REBACT *act)
 {
     struct Find_Param_State s;
     s.key = nullptr;
-    s.special = nullptr;
+    s.param = nullptr;
 
     For_Each_Unspecialized_Param(act, &Last_Param_Hook, &s);
 
     if (key)
         *key = s.key;
-    return s.special;  // may be nullptr
+    return s.param;  // may be nullptr
 }
 
 //
@@ -722,17 +720,17 @@ REBVAL *Last_Unspecialized_Param(const REBKEY ** key, REBACT *act)
 //
 // Helper built on First_Unspecialized_Param(), can also give you the param.
 //
-REBVAL *First_Unspecialized_Arg(option(REBVAL **) param_out, REBFRM *f)
+REBVAL *First_Unspecialized_Arg(option(const REBPAR **) param_out, REBFRM *f)
 {
     REBACT *phase = FRM_PHASE(f);
-    REBVAL *param = First_Unspecialized_Param(nullptr, phase);
+    const REBPAR *param = First_Unspecialized_Param(nullptr, phase);
     if (param_out)
         *unwrap(param_out) = param;
 
     if (param == nullptr)
         return nullptr;
 
-    REBLEN index = param - ACT_SPECIALTY_HEAD(phase);
+    REBLEN index = param - ACT_PARAMS_HEAD(phase);
     return FRM_ARGS_HEAD(f) + index;
 }
 
@@ -797,7 +795,7 @@ bool Make_Invocation_Frame_Throws(
     *first_arg_ptr = nullptr;
 
     const REBKEY *key = ACT_KEYS_HEAD(FRM_PHASE(f));
-    REBVAL *param = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
+    const REBPAR *param = ACT_PARAMS_HEAD(FRM_PHASE(f));
     REBVAL *arg = FRM_ARGS_HEAD(f);
     for (; NOT_END_KEY(key); ++key, ++param, ++arg) {
         Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
@@ -942,10 +940,10 @@ REBACT *Alloc_Action_From_Exemplar(
     REBACT *unspecialized = CTX_FRAME_ACTION(exemplar);
 
     const REBKEY *key = ACT_KEYS_HEAD(unspecialized);
-    const REBVAL *special = ACT_SPECIALTY_HEAD(unspecialized);
+    const REBPAR *param = ACT_PARAMS_HEAD(unspecialized);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
-    for (; NOT_END_KEY(key); ++key, ++arg, ++special) {
-        if (Is_Param_Hidden(special))
+    for (; NOT_END_KEY(key); ++key, ++arg, ++param) {
+        if (Is_Param_Hidden(param))
             continue;
 
         // We leave non-hidden ~unset~ to be handled by the evaluator as
@@ -959,15 +957,15 @@ REBACT *Alloc_Action_From_Exemplar(
             Is_Void_With_Sym(arg, SYM_UNSET)
             and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
         ){
-            assert(IS_PARAM(special));
-            Move_Value(arg, special);
+            assert(IS_PARAM(param));
+            Move_Value(arg, param);
             continue;
         }
 
-        if (TYPE_CHECK(special, REB_TS_REFINEMENT))
-            Typecheck_Refinement(special, arg);
+        if (TYPE_CHECK(param, REB_TS_REFINEMENT))
+            Typecheck_Refinement(param, arg);
         else
-            Typecheck_Including_Constraints(special, arg);
+            Typecheck_Including_Constraints(param, arg);
 
         SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
     }

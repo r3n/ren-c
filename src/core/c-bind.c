@@ -121,9 +121,9 @@ void Bind_Values_Core(
   blockscope {
     REBLEN index = 1;
     const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(context);
-    REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
+    const REBVAR *var = VAL_CONTEXT_VARS_HEAD(context);
     for (; NOT_END_KEY(key); key++, var++, index++)
-        if (not Is_Param_Sealed(var))
+        if (not Is_Var_Hidden(var))
             Add_Binder_Index(&binder, KEY_SPELLING(key), index);
   }
 
@@ -138,9 +138,9 @@ void Bind_Values_Core(
 
   blockscope {  // Reset all the binder indices to zero
     const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(context);
-    REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
+    const REBVAR *var = VAL_CONTEXT_VARS_HEAD(context);
     for (; NOT_END_KEY(key); ++key, ++var)
-        if (not Is_Param_Sealed(var))
+        if (not Is_Var_Hidden(var))
             Remove_Binder_Index(&binder, KEY_SPELLING(key));
   }
 
@@ -421,9 +421,9 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
   blockscope {  // Setup binding table from the argument word list
     const REBKEY *key = ACT_KEYS_HEAD(relative);
-    REBVAL *special = ACT_SPECIALTY_HEAD(relative);
-    for (; NOT_END_KEY(key); ++key, ++special, ++param_num) {
-        if (Is_Param_Sealed(special))
+    const REBPAR *param = ACT_PARAMS_HEAD(relative);
+    for (; NOT_END_KEY(key); ++key, ++param, ++param_num) {
+        if (Is_Param_Sealed(param))
             continue;
         Add_Binder_Index(&binder, KEY_SPELLING(key), param_num);
     }
@@ -518,9 +518,9 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
   blockscope {  // Reset binding table
     const REBKEY *key = ACT_KEYS_HEAD(relative);
-    REBVAL *special = ACT_SPECIALTY_HEAD(relative);
-    for (; NOT_END_KEY(key); ++key, ++special) {
-        if (Is_Param_Sealed(special))
+    const REBPAR *param = ACT_PARAMS_HEAD(relative);
+    for (; NOT_END_KEY(key); ++key, ++param) {
+        if (Is_Param_Sealed(param))
             continue;
 
         Remove_Binder_Index(&binder, KEY_SPELLING(key));

@@ -337,10 +337,24 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
 // However, not all calls have an associated value cell to test for hiddenness
 // so the "special" (see ACT_SPECIALTY()) is allowed to be the same as param.
 //
-inline static bool Is_Param_Hidden(const RELVAL *special)
+inline static bool Is_Param_Hidden(const REBPAR *param)
 {
-    if (GET_CELL_FLAG(special, ARG_MARKED_CHECKED)) {
-        assert(not IS_PARAM(special));
+    if (GET_CELL_FLAG(param, ARG_MARKED_CHECKED)) {
+        assert(not IS_PARAM(param));
+        return true;
+    }
+
+    // unchecked parameters in an exemplar frame may be PARAM!, but if they
+    // are an ordinary FRAME! they will not be.  Review if better asserts are
+    // needed here that make it worth passing in the context being checked.
+    //
+    return false;
+}
+
+inline static bool Is_Var_Hidden(const REBVAR *var)
+{
+    if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED)) {
+        assert(not IS_PARAM(var));
         return true;
     }
 
@@ -372,8 +386,8 @@ inline static void Seal_Param(RELVAL *param) {
 // solution to separate the property of bindability from visibility, as
 // the SELF solution shakes out--so that SELF may be hidden but bind.
 //
-inline static bool Is_Param_Sealed(REBVAL *special) {
-    UNUSED(special);
+inline static bool Is_Param_Sealed(const REBPAR *param) {
+    UNUSED(param);
     return false;  // !!! temporary, needs to use cell flag
 }
 

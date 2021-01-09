@@ -383,7 +383,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     ){
         // !!! cache this test?
         //
-        REBVAL *first = First_Unspecialized_Param(nullptr, enfixed);
+        const REBPAR *first = First_Unspecialized_Param(nullptr, enfixed);
         if (
             VAL_PARAM_CLASS(first) == REB_P_SOFT
             or VAL_PARAM_CLASS(first) == REB_P_MODAL
@@ -398,7 +398,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // with the BLOCK! on the left, but `x: default [...]` gets the SET-WORD!
     //
     if (GET_ACTION_FLAG(enfixed, SKIPPABLE_FIRST)) {
-        REBVAL *first = First_Unspecialized_Param(nullptr, enfixed);
+        const REBPAR *first = First_Unspecialized_Param(nullptr, enfixed);
         if (not TYPE_CHECK(first, kind_current))  // left's kind
             goto give_up_backward_quote_priority;
     }
@@ -1106,11 +1106,11 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
       blockscope {
         const REBKEY *key = ACT_KEYS_HEAD(VAL_ACTION(f_spare));
-        REBVAL *special = ACT_SPECIALTY_HEAD(VAL_ACTION(f_spare));
-        for (; NOT_END_KEY(key); ++key, ++special) {
-            if (Is_Param_Hidden(special))
+        const REBPAR *param = ACT_PARAMS_HEAD(VAL_ACTION(f_spare));
+        for (; NOT_END_KEY(key); ++key, ++param) {
+            if (Is_Param_Hidden(param))
                 continue;
-            if (VAL_PARAM_CLASS(special) != REB_P_OUTPUT)
+            if (VAL_PARAM_CLASS(param) != REB_P_OUTPUT)
                 continue;
             Init_Word(DS_PUSH(), KEY_SPELLING(key));
         }
@@ -1440,7 +1440,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))
             fail (Error_Literal_Left_Path_Raw());
 
-        REBVAL *first = First_Unspecialized_Param(nullptr, enfixed);
+        const REBPAR *first = First_Unspecialized_Param(nullptr, enfixed);
         if (VAL_PARAM_CLASS(first) == REB_P_SOFT) {
             if (GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)) {
                 CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);

@@ -211,7 +211,7 @@ void Eval_Core_Expression_Checks_Debug(REBFRM *f)
     //
     TRASH_POINTER_IF_DEBUG(f->key);
     TRASH_POINTER_IF_DEBUG(f->arg);
-    TRASH_POINTER_IF_DEBUG(f->special);
+    TRASH_POINTER_IF_DEBUG(f->param);
 
     assert(not f->varlist or NOT_SERIES_INFO(f->varlist, INACCESSIBLE));
 

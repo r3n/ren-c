@@ -118,10 +118,10 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
 
   blockscope {
     const REBKEY *key = ACT_KEYS_HEAD(reorderee);
-    REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
+    const REBPAR *param = ACT_PARAMS_HEAD(reorderee);
     REBLEN index = 1;
-    for (; NOT_END_KEY(key); ++key, ++special, ++index) {
-        if (Is_Param_Hidden(special))
+    for (; NOT_END_KEY(key); ++key, ++param, ++index) {
+        if (Is_Param_Hidden(param))
             continue;
         Add_Binder_Index(&binder, KEY_SPELLING(key), index);
     }
@@ -184,7 +184,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
         if (ignore)
             continue;
 
-        const REBVAL *param = ACT_SPECIAL(reorderee, index);
+        const REBVAL *param = ACT_PARAM(reorderee, index);
         if (TYPE_CHECK(param, REB_TS_REFINEMENT) and Is_Typeset_Empty(param)) {
             error = Error_User("Can't reorder refinements with no argument");
             goto cleanup_binder;
@@ -198,10 +198,10 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
 
   cleanup_binder: {
     const REBKEY *key = ACT_KEYS_HEAD(reorderee);
-    REBVAL *special = ACT_SPECIALTY_HEAD(reorderee);
+    const REBPAR *param = ACT_PARAMS_HEAD(reorderee);
     REBLEN index = 1;
-    for (; NOT_END_KEY(key); ++key, ++special, ++index) {
-        if (Is_Param_Hidden(special))
+    for (; NOT_END_KEY(key); ++key, ++param, ++index) {
+        if (Is_Param_Hidden(param))
             continue;
 
         const REBSTR *spelling = KEY_SPELLING(key);
@@ -213,7 +213,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
         if (
             error == nullptr  // don't report an error here if one is pending
             and not mentioned
-            and not TYPE_CHECK(special, REB_TS_REFINEMENT)  // okay to leave out
+            and not TYPE_CHECK(param, REB_TS_REFINEMENT)  // okay to leave out
         ){
             error = Error_No_Arg(label, KEY_SPELLING(key));
         }

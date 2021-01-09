@@ -79,7 +79,7 @@ REBFRM *Push_Downshifted_Frame(REBVAL *out, REBFRM *f) {
 
     sub->key = END_KEY;
     sub->arg = sub->rootvar + 1;  // !!! enforced by entering Process_Action()
-    sub->special = END_NODE;
+    sub->param = cast_PAR(END_NODE);
 
     return sub;
 }

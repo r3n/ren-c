@@ -69,7 +69,7 @@
 
 
 #define PVS_OPT_SETVAL(pvs) \
-    pvs->special
+    pvs->param
 
 #define PVS_IS_SET_PATH(pvs) \
     (PVS_OPT_SETVAL(pvs) != nullptr)

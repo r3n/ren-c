@@ -662,7 +662,7 @@ REBNATIVE(match)
         f->rootvar = CTX_ROOTVAR(CTX(f->varlist));
         f->key = ACT_KEYS_HEAD(VAL_ACTION(test));
         f->arg = f->rootvar + 1;
-        f->special = f->arg;
+        f->param = ACT_PARAMS_HEAD(VAL_ACTION(test));
 
         f->flags.bits = EVAL_MASK_DEFAULT
             | EVAL_FLAG_FULLY_SPECIALIZED

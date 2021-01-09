@@ -125,14 +125,14 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     //
   blockscope {
     const REBKEY *key = ACT_KEYS_HEAD(augmentee);
-    REBVAL *special = ACT_SPECIALTY_HEAD(augmentee);
+    const REBPAR *param = ACT_PARAMS_HEAD(augmentee);
     for (; NOT_END_KEY(key); ++key) {
-        Move_Value(DS_PUSH(), special);
+        Move_Value(DS_PUSH(), param);
 
         VAL_TYPESET_STRING_NODE(DS_TOP)
             = m_cast(REBNOD*, NOD(KEY_SPELLING(key)));  // !!! temp
 
-        if (Is_Param_Hidden(special))
+        if (Is_Param_Hidden(param))
             Seal_Param(DS_TOP);
         Move_Value(DS_PUSH(), EMPTY_BLOCK);
         Move_Value(DS_PUSH(), EMPTY_TEXT);

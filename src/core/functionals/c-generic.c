@@ -128,7 +128,7 @@ REBNATIVE(generic)
     // !!!
     /*
     RELVAL *param = ARR_AT(paramlist, 1);
-    REBVAL *special = ACT_SPECIALTY_HEAD(generic);
+    const REBPAR *param = ACT_PARAMS_HEAD(generic);
     if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
         assert(KEY_SYM(param) == SYM_RETURN);
         TYPE_SET(special, REB_CUSTOM);

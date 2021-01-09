@@ -721,8 +721,8 @@ static void Mark_Frame_Stack_Deep(void)
         // function is running, currently.  nullptr is permitted as well
         // (e.g. path frames use nullptr to indicate no set value on a path)
         //
-        if (f->special)
-            Queue_Mark_Opt_End_Cell_Deep(f->special);
+        if (f->param)
+            Queue_Mark_Opt_End_Cell_Deep(f->param);
 
         if (f->varlist and GET_SERIES_FLAG(f->varlist, MANAGED)) {
             //

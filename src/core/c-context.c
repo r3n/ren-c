@@ -758,16 +758,16 @@ REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
         always = IS_FRAME_PHASED(context);
 
     const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(context);
-    REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
+    const REBVAR *var = VAL_CONTEXT_VARS_HEAD(context);
 
     assert(!(mode & 4));
 
     REBLEN n = 1;
     for (; NOT_END_KEY(key); n++, key++, var++) {
-        if (Is_Param_Sealed(var))
+        if (IS_FRAME(context) and Is_Param_Sealed(cast_PAR(var)))
             continue;
 
-        if (not always and Is_Param_Hidden(var))
+        if (not always and Is_Var_Hidden(var))
             continue;
 
         if (mode & 1) {
@@ -1100,7 +1100,7 @@ REBLEN Find_Symbol_In_Context(
     }
 
     const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(context);
-    REBVAL *var = VAL_CONTEXT_VARS_HEAD(context);
+    const REBVAR *var = VAL_CONTEXT_VARS_HEAD(context);
 
     REBLEN n;
     for (n = 1; NOT_END_KEY(key); ++n, ++key, ++var) {
@@ -1113,10 +1113,10 @@ REBLEN Find_Symbol_In_Context(
                 continue;
         }
 
-        if (Is_Param_Sealed(var))
+        if (IS_FRAME(context) and Is_Param_Sealed(cast_PAR(var)))
             continue;  // pretend this parameter is not there
 
-        if (not always and Is_Param_Hidden(var))
+        if (not always and Is_Var_Hidden(var))
             return 0;
 
         return n;

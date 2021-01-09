@@ -222,10 +222,10 @@ void Trapped_Helper(struct Reb_State *s)
 // REBCTX* or a UTF-8 char *.  If it's UTF-8, an error will be created from
 // it automatically (but with no ID...the string becomes the "ID")
 //
-// If the pointer is to a function parameter (e.g. what you get for PAR(name)
-// inside a native), then it will figure out what parameter that function is
-// for, find the most recent call on the stack, and report both the parameter
-// name and value as being implicated as a problem).
+// If the pointer is to a function parameter of the current native (e.g. what
+// you get for PAR(name) inside a native), then it will report both the
+// parameter name and value as being implicated as a problem.  This only
+// works for the current topmost stack level.
 //
 // Passing an arbitrary REBVAL* will give a generic "Invalid Arg" error.
 //
@@ -285,27 +285,16 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
 
       case DETECTED_AS_CELL: {
         const REBVAL *v = cast(const REBVAL*, p);
-        if (IS_PARAM(v)) {
-            //
-            // If the PAR() style parameter is used, that parameter must be
-            // for a function running on the stack.
-            //
-            REBFRM *f_seek = FS_TOP;
-            while (true) {
-                if (f_seek == FS_BOTTOM)
-                    panic ("fail (PAR(name)); issued for param not on stack");
 
-                const REBVAL *v_seek = ACT_SPECIALTY_HEAD(FRM_PHASE(f_seek));
-                for (; NOT_END(v_seek); ++v_seek) {
-                    if (v_seek == v)
-                        goto found_param;
-                }
-                f_seek = f_seek->prior;
-            }
+        // Check to see if the REBVAL* cell is in the paramlist of the current
+        // running native.  (We could theoretically do this with ARG(), or
+        // have a nuance of behavior with ARG()...or even for the REBKEY*.)
+        //
+        const REBPAR *head = ACT_PARAMS_HEAD(FRM_PHASE(FS_TOP));
+        REBLEN num_params = ACT_NUM_PARAMS(FRM_PHASE(FS_TOP));
 
-          found_param:
-            error = Error_Invalid_Arg(f_seek, v);
-        }
+        if (v >= head and v < head + num_params)
+            error = Error_Invalid_Arg(FS_TOP, cast_PAR(v));
         else
             error = Error_Bad_Value(v);
         break; }
@@ -1097,11 +1086,11 @@ REBCTX *Error_Not_Varargs(
 // incompatibility with rebFail(), where the non-exposure of raw context
 // pointers meant passing REBVAL* was literally failing on an error value.
 //
-REBCTX *Error_Invalid_Arg(REBFRM *f, const RELVAL *param)
+REBCTX *Error_Invalid_Arg(REBFRM *f, const REBPAR *param)
 {
     assert(IS_PARAM(param));
 
-    RELVAL *headparam = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
+    const REBPAR *headparam = ACT_PARAMS_HEAD(FRM_PHASE(f));
     assert(param >= headparam);
     assert(param <= headparam + FRM_NUM_ARGS(f));
 

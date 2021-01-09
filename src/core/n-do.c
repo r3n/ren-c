@@ -466,7 +466,7 @@ REBNATIVE(do)
         f->rootvar = CTX_ROOTVAR(stolen);
         f->arg = f->rootvar + 1;
         // f->key set above
-        f->special = ACT_SPECIALTY_HEAD(phase);
+        f->param = ACT_PARAMS_HEAD(phase);
 
         assert(FRM_PHASE(f) == phase);  // !!! v-- should archetype match?
         INIT_FRM_BINDING(f, VAL_FRAME_BINDING(source));
@@ -796,9 +796,9 @@ REBNATIVE(applique)
     // Reset all the binder indices to zero, balancing out what was added.
     //
     const REBKEY *key = CTX_KEYS_HEAD(exemplar);
-    REBVAL *var = CTX_VARS_HEAD(exemplar);
+    REBVAR *var = CTX_VARS_HEAD(exemplar);
     for (; NOT_END_KEY(key); key++, ++var) {
-        if (Is_Param_Hidden(var))
+        if (Is_Var_Hidden(var))
             continue; // was part of a specialization internal to the action
 
         // !!! This is another case where if you want to literaly apply
@@ -848,7 +848,7 @@ REBNATIVE(applique)
     f->rootvar = CTX_ROOTVAR(stolen);
     f->arg = f->rootvar + 1;
     // f->key assigned above
-    f->special = f->arg; // signal only type-check the existing data
+    f->param = ACT_PARAMS_HEAD(VAL_ACTION(applicand));
     INIT_FRM_PHASE(f, VAL_ACTION(applicand));
     INIT_FRM_BINDING(f, VAL_ACTION_BINDING(applicand));
 
