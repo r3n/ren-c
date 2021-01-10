@@ -276,12 +276,6 @@ REBTYPE(Action)
                 Make_Action_Parameters_Arr(act, just_words)
             ); }
 
-          case SYM_TYPESETS:
-            return Init_Block(
-                D_OUT,
-                Make_Action_Typesets_Arr(act)
-            );
-
           case SYM_BODY:
             Get_Maybe_Fake_Action_Body(D_OUT, action);
             return D_OUT;

@@ -281,15 +281,7 @@ void* Probe_Core_Debug(
         if (IS_PARAM(v)) {
             Probe_Print_Helper(p, expr, "Param Cell", file, line);
 
-            const REBSTR *spelling = KEY_SPELLING(cast(const REBKEY*, v));
-            Append_Ascii(mo->series, "(");
-            Append_Utf8(
-                mo->series,
-                STR_UTF8(spelling),
-                STR_SIZE(spelling)
-            );
-            Append_Ascii(mo->series, ") ");
-            Append_Ascii(mo->series, "..."); // probe types?
+            Append_Ascii(mo->series, "(...)");
         }
         else {
             Probe_Print_Helper(p, expr, "Value", file, line);

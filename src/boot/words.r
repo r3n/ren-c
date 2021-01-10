@@ -110,7 +110,6 @@ spec
 body
 words
 parameters
-typesets
 values
 types
 title

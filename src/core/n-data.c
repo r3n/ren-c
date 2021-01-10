@@ -1226,11 +1226,14 @@ bool Try_As_String(
 //
 //  {Aliases underlying data of one value to act as another of same class}
 //
-//      return: [<opt> integer! issue! any-sequence! any-series! any-word!]
+//      return: [
+//          <opt> integer! issue! any-sequence! any-series! any-word!
+//          frame! action!
+//      ]
 //      type [datatype!]
 //      value [
 //          <blank>
-//          integer! issue! any-sequence! any-series! any-word!
+//          integer! issue! any-sequence! any-series! any-word! frame! action!
 //      ]
 //  ]
 //
@@ -1538,6 +1541,50 @@ REBNATIVE(as)
         }
 
         fail (v); }
+
+      case REB_FRAME: {
+        if (IS_ACTION(v)) {
+            //
+            // We give back the exemplar of the frame, which contains the
+            // parameter descriptions.  Since exemplars are reused, this is
+            // not enough to make the right action out of...so the phase has
+            // to be set to the action that we are returning.
+            //
+            // !!! This loses the label information.  Technically the space
+            // for the varlist could be reclaimed in this case and a label
+            // used, as the read-only frame is archetypal.
+            //
+            RESET_VAL_HEADER(D_OUT, REB_FRAME, CELL_MASK_CONTEXT);
+            VAL_CONTEXT_VARLIST_NODE(D_OUT) = NOD(ACT_EXEMPLAR(VAL_ACTION(v)));
+            VAL_FRAME_BINDING_NODE(D_OUT) = NOD(VAL_ACTION_BINDING(v));
+            VAL_FRAME_PHASE_OR_LABEL_NODE(D_OUT) = NOD(VAL_ACTION(v));
+            return D_OUT;
+        }
+
+        fail (v);
+      }
+
+    case REB_ACTION: {
+      if (IS_FRAME(v)) {
+        //
+        // We want AS ACTION! AS FRAME! of an action to be basically a no-op.
+        // So that means that it uses the dispatcher and details it encoded
+        // in the phase.  This means COPY of a FRAME! needs to create a new
+        // action identity at that moment.  There is no Make_Action() here,
+        // because all frame references to this frame are the same action.
+        //
+        assert(ACT_EXEMPLAR(VAL_FRAME_PHASE(v)) == VAL_CONTEXT(v));
+        Deep_Freeze_Context(VAL_CONTEXT(v));
+        return Init_Action(
+            D_OUT,
+            VAL_FRAME_PHASE(v),
+            ANONYMOUS,  // see note, we might have stored this in varlist slot
+            VAL_FRAME_BINDING(v)
+        );
+      }
+
+      fail (v);
+    }
 
       bad_cast:;
       default:

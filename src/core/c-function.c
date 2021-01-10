@@ -102,41 +102,6 @@ REBARR *Make_Action_Parameters_Arr(REBACT *act, bool just_words)
 }
 
 
-static bool Typesets_Of_Hook(
-    const REBKEY *key,
-    const REBPAR *param,
-    REBFLGS flags,
-    void *opaque
-){
-    UNUSED(key);
-    UNUSED(opaque);
-    UNUSED(flags);
-
-    // !!! Typesets must be revisited in a world with user-defined types, as
-    // well as to accomodate multiple quoting levels.
-    //
-    Move_Value(DS_PUSH(), param);
-    assert(IS_TYPESET(DS_TOP));
-    assert(VAL_TYPESET_STRING_NODE(DS_TOP) == nullptr);
-
-    return true;
-}
-
-//
-//  Make_Action_Typesets_Arr: C
-//
-// Return a block of function arg typesets.
-// Note: skips 0th entry.
-//
-REBARR *Make_Action_Typesets_Arr(REBACT *act)
-{
-    void *opaque = nullptr;  // could be any void* to pass thru to hook
-
-    REBDSP dsp_orig = DSP;
-    For_Each_Unspecialized_Param(act, &Typesets_Of_Hook, opaque);
-    return Pop_Stack_Values(dsp_orig);
-}
-
 
 enum Reb_Spec_Mode {
     SPEC_MODE_NORMAL, // words are arguments
@@ -954,30 +919,6 @@ REBARR *Make_Paramlist_Managed_May_Fail(
 }
 
 
-
-//
-//  Find_Param_Index: C
-//
-// Find function param word in function "frame".
-//
-// !!! This is semi-redundant with similar functions for Find_Word_In_Array
-// and key finding for objects, review...
-//
-REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
-{
-    const REBKEY *key = SER_AT(const REBKEY, paramlist, 1);
-    REBLEN len = ARR_LEN(paramlist);
-
-    REBLEN n;
-    for (n = 1; n < len; ++n, ++key) {
-        if (spelling == KEY_SPELLING(key))
-            return n;
-    }
-
-    return 0;
-}
-
-
 //
 //  Make_Action: C
 //
@@ -1081,6 +1022,13 @@ REBACT *Make_Action(
     if (IS_UNREADABLE_DEBUG(rootvar)) {
         INIT_VAL_FRAME_ROOTVAR(rootvar, paramlist, act, UNBOUND);
     }
+
+    // The exemplar needs to be frozen, it can't change after this point.
+    // You can't change the types or parameter conventions of an existing
+    // action...you have to make a new variation.  Note that the exemplar
+    // can be exposed by AS FRAME! of this action...
+    //
+    Deep_Freeze_Context(CTX(paramlist));
 
     // Precalculate cached function flags.  This involves finding the first
     // unspecialized argument which would be taken at a callsite, which can
