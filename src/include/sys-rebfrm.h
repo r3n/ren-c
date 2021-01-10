@@ -52,15 +52,13 @@ STATIC_ASSERT(EVAL_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(2)
 
 
-//=//// EVAL_FLAG_UNDO_MARKED_STALE ///////////////////////////////////////=//
+//=//// EVAL_FLAG_PATH_MODE ///////////////////////////////////////////////=//
 //
-// Note: This bit is the same as NODE_FLAG_MARKED, so it lines up directly
-// with CELL_FLAG_OUT_MARKED_STALE.
+// The frame is for a PATH! dispatch.  Many of the Eval_Core() flags are not
+// applicable in this case.
 //
-#define EVAL_FLAG_UNDO_MARKED_STALE \
+#define EVAL_FLAG_PATH_MODE \
     FLAG_LEFT_BIT(3)
-
-STATIC_ASSERT(EVAL_FLAG_UNDO_MARKED_STALE == CELL_FLAG_OUT_MARKED_STALE);
 
 
 //=//// EVAL_FLAG_CACHE_NO_LOOKAHEAD //////////////////////////////////////=//
@@ -192,13 +190,15 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(19)
 
 
-//=//// EVAL_FLAG_PATH_MODE ///////////////////////////////////////////////=//
+//=//// EVAL_FLAG_UNDO_NOTE_STALE /////////////////////////////////////////=//
 //
-// The frame is for a PATH! dispatch.  Many of the Eval_Core() flags are not
-// applicable in this case.
+// Note: This bit is the same as CELL_FLAG_NOTE, so it lines up directly
+// with CELL_FLAG_OUT_NOTE_STALE.
 //
-#define EVAL_FLAG_PATH_MODE \
+#define EVAL_FLAG_UNDO_NOTE_STALE \
     FLAG_LEFT_BIT(20)
+
+STATIC_ASSERT(EVAL_FLAG_UNDO_NOTE_STALE == CELL_FLAG_OUT_NOTE_STALE);
 
 
 //=//// EVAL_FLAG_PATH_HARD_QUOTE /////////////////////////////////////////=//

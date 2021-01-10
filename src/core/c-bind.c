@@ -492,7 +492,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             EXPAND_SERIES_TAIL(keylist, num_lets);
             EXPAND_SERIES_TAIL(paramlist, num_lets);
             REBKEY *key = SER_AT(REBKEY, keylist, old_keylist_len);
-            RELVAL *special = ARR_AT(paramlist, old_keylist_len + 1);
+            RELVAL *param = ARR_AT(paramlist, old_keylist_len + 1);
 
             REBDSP dsp = dsp_orig;
             while (dsp != DSP) {
@@ -501,9 +501,9 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
                 ++dsp;
                 ++key;
 
-                Init_Void(special, SYM_UNSET);
-                SET_CELL_FLAG(special, ARG_MARKED_CHECKED);
-                ++special;
+                Init_Void(param, SYM_UNSET);
+                SET_CELL_FLAG(param, VAR_MARKED_HIDDEN);
+                ++param;
 
                 // Will be removed from binder below
             }
@@ -712,7 +712,7 @@ void Virtual_Bind_Deep_To_New_Context(
             REBVAL *var = Append_Context(c, nullptr, spelling);
             Init_Blank(var);
             Hide_Param(var);
-            SET_CELL_FLAG(var, BIND_MARKED_REUSE);
+            SET_CELL_FLAG(var, BIND_NOTE_REUSE);
             SET_CELL_FLAG(var, PROTECTED);
 
             goto add_binding_for_check;
@@ -764,7 +764,7 @@ void Virtual_Bind_Deep_To_New_Context(
             REBVAL *var = Append_Context(c, nullptr, spelling);
             Hide_Param(var);
             Derelativize(var, item, specifier);
-            SET_CELL_FLAG(var, BIND_MARKED_REUSE);
+            SET_CELL_FLAG(var, BIND_NOTE_REUSE);
             SET_CELL_FLAG(var, PROTECTED);
           }
 
@@ -848,9 +848,9 @@ void Virtual_Bind_Deep_To_New_Context(
         if (stored == 0)
             assert(duplicate);
         else if (stored > 0)
-            assert(NOT_CELL_FLAG(var, BIND_MARKED_REUSE));
+            assert(NOT_CELL_FLAG(var, BIND_NOTE_REUSE));
         else
-            assert(GET_CELL_FLAG(var, BIND_MARKED_REUSE));
+            assert(GET_CELL_FLAG(var, BIND_NOTE_REUSE));
     }
 
     SHUTDOWN_BINDER(&binder);

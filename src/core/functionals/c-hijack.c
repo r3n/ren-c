@@ -190,7 +190,7 @@ REB_R Hijacker_Dispatcher(REBFRM *f)
     if (Redo_Action_Throws_Maybe_Stale(f->out, f, VAL_ACTION(hijacker)))
         return R_THROWN;
 
-    return f->out;  // Note: may have OUT_MARKED_STALE, hence invisible
+    return f->out;  // Note: may have OUT_NOTE_STALE, hence invisible
 }
 
 

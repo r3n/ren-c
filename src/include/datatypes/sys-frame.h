@@ -752,7 +752,7 @@ inline static void Drop_Action(REBFRM *f) {
     if (NOT_EVAL_FLAG(f, FULFILLING_ARG))
         CLEAR_FEED_FLAG(f->feed, BARRIER_HIT);
 
-    if (f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE) {
+    if (f->out->header.bits & CELL_FLAG_OUT_NOTE_STALE) {
         //
         // If the whole evaluation of the action turned out to be invisible,
         // then refresh the feed's NO_LOOKAHEAD state to whatever it was
@@ -935,7 +935,7 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
     return Move_Value(D_OUT, (v))
 
 #define RETURN_INVISIBLE \
-    assert(D_OUT->header.bits & CELL_FLAG_OUT_MARKED_STALE); \
+    assert(D_OUT->header.bits & CELL_FLAG_OUT_NOTE_STALE); \
     return D_OUT
 
 

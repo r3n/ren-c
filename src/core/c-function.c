@@ -237,7 +237,7 @@ void Push_Paramlist_Triads_May_Fail(
             STKVAL(*) param = PARAM_SLOT(DSP);
 
             if (
-                GET_CELL_FLAG(param, ARG_MARKED_CHECKED)
+                GET_CELL_FLAG(param, STACK_NOTE_LOCAL)
                 and VAL_WORD_SYM(KEY_SLOT(DSP)) == SYM_RETURN
             ){
                 continue;  // !!! allow because of RETURN, still figuring... 
@@ -426,7 +426,7 @@ void Push_Paramlist_Triads_May_Fail(
 
         if (pclass == REB_P_LOCAL) {
             Init_Void(param, SYM_UNSET);
-            SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
+            SET_CELL_FLAG(param, STACK_NOTE_LOCAL);
         }
         else if (refinement) {
             Init_Param(
@@ -506,7 +506,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
             STKVAL(*) param = PARAM_SLOT(DSP);
             Init_Void(param, SYM_VOID);
-            SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
+            SET_CELL_FLAG(param, VAR_MARKED_HIDDEN);
 
             Init_Nulled(TYPES_SLOT(DSP));
             Init_Nulled(NOTES_SLOT(DSP));
@@ -583,7 +583,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         ++key;
 
         Init_Void(param, SYM_UNSET);  // acts as a local !!! being revisited
-        SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
+        SET_CELL_FLAG(param, VAR_MARKED_HIDDEN);
         ++param;
     }
 
@@ -603,8 +603,8 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         Init_Key(key, spelling);
 
         Move_Value(param, slot);
-        if (GET_CELL_FLAG(slot, ARG_MARKED_CHECKED))
-            SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
+        if (GET_CELL_FLAG(slot, STACK_NOTE_LOCAL))
+            SET_CELL_FLAG(param, VAR_MARKED_HIDDEN);
 
       #if !defined(NDEBUG)
         SET_CELL_FLAG(param, PROTECTED);
@@ -699,7 +699,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             );
 
             Init_Nulled(dest);  // clear the local RETURN: var's description
-            SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
+            SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
             ++dest;
             ++param;
         }
@@ -713,8 +713,8 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
                 continue;
 
             Move_Value(dest, types);
-            if (GET_CELL_FLAG(param, ARG_MARKED_CHECKED))
-                SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
+            if (GET_CELL_FLAG(param, VAR_MARKED_HIDDEN))
+                SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
 
             ++dest;
             ++param;
@@ -757,7 +757,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             );
 
             Init_Nulled(dest);
-            SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
+            SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
             ++dest;
             ++param;
         }
@@ -772,8 +772,8 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
             Move_Value(dest, notes);
 
-            if (GET_CELL_FLAG(param, ARG_MARKED_CHECKED))
-                SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
+            if (GET_CELL_FLAG(param, VAR_MARKED_HIDDEN))
+                SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
             ++dest;
             ++param;
         }

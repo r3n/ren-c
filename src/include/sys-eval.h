@@ -43,9 +43,9 @@
 // * The usermode EVALUATE action is able to avoid overwriting the previous
 //   value if the final evaluation step has nothing in it.  That's based on
 //   the ability exposed here through the "Maybe_Stale" variations of the
-//   Eval_XXX() routines.  Care should be taken not to allow OUT_MARKED_STALE
+//   Eval_XXX() routines.  Care should be taken not to allow OUT_NOTE_STALE
 //   to leak and clear it on the cell (it is NODE_FLAG_MARKED and could be
-//   misinterpreted--very easily so as ARG_MARKED_CHECKED!)
+//   misinterpreted--very easily so as VAR_MARKED_HIDDEN!)
 //
 // * The usermode REEVAL function chooses to make `reeval comment "hi"` VOID!
 //   rather than to raise an error.  However, the non-"Maybe_Stale" versions
@@ -108,7 +108,7 @@ enum {
 };
 
 
-// Simple helper for Eval_Maybe_Stale_Throws() that clears OUT_MARKED_STALE
+// Simple helper for Eval_Maybe_Stale_Throws() that clears OUT_NOTE_STALE
 // (an alias for NODE_FLAG_MARKED that is used for generic purposes and may be
 // misinterpreted if it leaked.)
 //
@@ -118,7 +118,7 @@ enum {
 inline static bool Eval_Throws(REBFRM *f) {
     if (Eval_Maybe_Stale_Throws(f))
         return true;
-    CLEAR_CELL_FLAG(f->out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(f->out, OUT_NOTE_STALE);
     return false;
 }
 
@@ -251,7 +251,7 @@ inline static bool Eval_Step_Maybe_Stale_Throws(
 inline static bool Eval_Step_Throws(REBVAL *out, REBFRM *f) {
     SET_END(out);
     bool threw = Eval_Step_Maybe_Stale_Throws(out, f);
-    CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
     return threw;
 }
 

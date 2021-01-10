@@ -81,7 +81,7 @@ inline static bool Do_Any_Array_At_Throws(
         feed,
         EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
     );
-    CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
     return threw;
 }
 
@@ -133,7 +133,7 @@ inline static bool Do_At_Mutable_Throws(
         index,
         specifier
     );
-    CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
     return threw;
 }
 

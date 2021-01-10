@@ -68,7 +68,7 @@
 
 
 inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
-    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
+    SET_CELL_FLAG(f->out, OUT_NOTE_STALE);
 }
 
 
@@ -237,8 +237,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // from the outside (e.g. by REFRAMER) so there is no benefit
             // to deferring the check, only extra cost on each invocation.
             //
-            Blit_Specific(f->arg, f->param);  // keep ARG_MARKED_CHECKED
-            assert(GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED));
+            Blit_Specific(f->arg, f->param);  // keep VAR_MARKED_HIDDEN
+            assert(GET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN));
 
             goto continue_fulfilling;
         }
@@ -314,7 +314,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
             CLEAR_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
 
-            if (GET_CELL_FLAG(f->out, OUT_MARKED_STALE)) {
+            if (GET_CELL_FLAG(f->out, OUT_NOTE_STALE)) {
                 //
                 // Something like `lib/help left-lit` is allowed to work,
                 // but if it were just `obj/int-value left-lit` then the
@@ -344,7 +344,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     goto continue_fulfilling;
                 }
 
-                // The OUT_MARKED_STALE flag is also used by BAR! to keep
+                // The OUT_NOTE_STALE flag is also used by BAR! to keep
                 // a result in f->out, so that the barrier doesn't destroy
                 // data in cases like `(1 + 2 | comment "hi")` => 3, but
                 // left enfix should treat that just like an end.
@@ -569,11 +569,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 if (not Typecheck_Including_Constraints(f->param, f_next)) {
                     assert(Is_Param_Endable(f->param));
                     Init_Endish_Nulled(f->arg);  // not EVAL_FLAG_BARRIER_HIT
-                    SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+                    SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
                     goto continue_fulfilling;
                 }
                 Literal_Next_In_Frame(f->arg, f);
-                SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+                SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
             }
 
@@ -583,7 +583,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             //
             Lookahead_To_Sync_Enfix_Defer_Flag(f->feed);
 
-            if (GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
+            if (GET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN))
                 goto continue_fulfilling;
 
             break;
@@ -763,7 +763,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     assert(IS_END_KEY(f->key));  // signals !Is_Action_Frame_Fulfilling()
 
     if (GET_EVAL_FLAG(f, FULFILL_ONLY)) {  // only fulfillment, no typecheck
-        assert(GET_CELL_FLAG(f->out, OUT_MARKED_STALE));  // didn't touch out
+        assert(GET_CELL_FLAG(f->out, OUT_NOTE_STALE));  // didn't touch out
         goto skip_output_check;
     }
 
@@ -794,7 +794,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // modified.  Even though it's hidden, it may need to be typechecked
         // again, unless it was fully hidden.
         //
-        if (GET_CELL_FLAG(f->param, ARG_MARKED_CHECKED))
+        if (GET_CELL_FLAG(f->param, VAR_MARKED_HIDDEN))
             continue;
 
         // We can't a-priori typecheck the variadic argument, since the values
@@ -825,7 +825,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     ? -(f->arg - FRM_ARGS_HEAD(f) + 1)
                     : f->arg - FRM_ARGS_HEAD(f) + 1;
 
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+            SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
             continue;
         }
 
@@ -838,9 +838,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 and Is_Void_With_Sym(f->arg, SYM_UNSET)
             ){
                 Init_Nulled(f->arg);
-                SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+                SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
             }
-            else if (NOT_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
+            else if (NOT_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN))
                 Typecheck_Refinement(f->param, f->arg);
             continue;
         }
@@ -869,7 +869,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (not Is_Param_Endable(f->param))
                 fail (Error_No_Arg(f->label, KEY_SPELLING(f->key)));
 
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+            SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
             continue;
         }
 
@@ -879,7 +879,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             kind_byte == REB_BLANK  // v-- e.g. <blank> param
             and TYPE_CHECK(f->param, REB_TS_NOOP_IF_BLANK)
         ){
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+            SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
             SET_EVAL_FLAG(f, TYPECHECK_ONLY);
             continue;
         }
@@ -905,7 +905,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (not Typecheck_Including_Constraints(f->param, f->arg))
             fail (Error_Arg_Type(f, f->key, VAL_TYPE(f->arg)));
 
-        SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+        SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
     }
 
 
@@ -924,14 +924,14 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // a 0-arity function to run in the same evaluation step as the left
     // hand side.  This is how expression work (see `|:`)
     //
-    assert(NOT_EVAL_FLAG(f, UNDO_MARKED_STALE));
+    assert(NOT_EVAL_FLAG(f, UNDO_NOTE_STALE));
     if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
         assert(GET_EVAL_FLAG(f, RUNNING_ENFIX));
         CLEAR_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
-        f->out->header.bits |= CELL_FLAG_OUT_MARKED_STALE;  // won't undo this
+        f->out->header.bits |= CELL_FLAG_OUT_NOTE_STALE;  // won't undo this
     }
     else if (GET_EVAL_FLAG(f, RUNNING_ENFIX) and NOT_END(f->out))
-        SET_EVAL_FLAG(f, UNDO_MARKED_STALE);
+        SET_EVAL_FLAG(f, UNDO_NOTE_STALE);
 
     assert(IS_END_KEY(f->key));
     assert(
@@ -1046,13 +1046,13 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->param) {
                     if (Is_Param_Hidden(f->param)) {
                         Blit_Specific(f->arg, f->param);
-                        assert(GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED));
+                        assert(GET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN));
                     }
                 }
 
                 INIT_FRM_PHASE(f, redo_phase);
                 INIT_FRM_BINDING(f, VAL_FRAME_BINDING(f->out));
-                CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
+                CLEAR_EVAL_FLAG(f, UNDO_NOTE_STALE);
                 goto typecheck_then_dispatch;
             }
         }
@@ -1067,7 +1067,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // run the f->phase again.  The dispatcher may have changed the
         // value of what f->phase is, for instance.
 
-        CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
+        CLEAR_EVAL_FLAG(f, UNDO_NOTE_STALE);
 
         if (not EXTRA(Any, r).flag)  // R_REDO_UNCHECKED
             goto dispatch;
@@ -1081,7 +1081,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// CHECK FOR INVISIBILITY (STALE OUTPUT) ///////////////////////////=//
 
-    if (not (f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE))
+    if (not (f->out->header.bits & CELL_FLAG_OUT_NOTE_STALE))
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);
     else {
         // We didn't know before we ran the enfix function if it was going
@@ -1089,15 +1089,15 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // are supposed to do so.
         //
         STATIC_ASSERT(
-            EVAL_FLAG_UNDO_MARKED_STALE == CELL_FLAG_OUT_MARKED_STALE
+            EVAL_FLAG_UNDO_NOTE_STALE == CELL_FLAG_OUT_NOTE_STALE
         );
-        f->out->header.bits ^= (f->flags.bits & EVAL_FLAG_UNDO_MARKED_STALE);
+        f->out->header.bits ^= (f->flags.bits & EVAL_FLAG_UNDO_NOTE_STALE);
 
         // If a "good" output is in `f->out`, the invisible should have
         // had no effect on it.  So jump to the position after output
         // would be checked by a normal function.
         //
-        if (NOT_CELL_FLAG(f->out, OUT_MARKED_STALE) or IS_END(f_next)) {
+        if (NOT_CELL_FLAG(f->out, OUT_NOTE_STALE) or IS_END(f_next)) {
             //
             // Note: could be an END that is not "stale", example:
             //
@@ -1149,7 +1149,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   skip_output_check:
 
-    CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
+    CLEAR_EVAL_FLAG(f, UNDO_NOTE_STALE);
 
     Drop_Action(f);
 

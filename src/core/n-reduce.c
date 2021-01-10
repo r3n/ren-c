@@ -263,7 +263,7 @@ REB_R Compose_To_Stack_Core(
                 Abort_Frame(f);
                 return R_THROWN;
             }
-            CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
+            CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
 
             REBVAL *insert;
             if (

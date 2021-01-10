@@ -270,7 +270,7 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
     if (ACT_HAS_RETURN(phase)) {
         REBVAL *typeset = ACT_KEYS_HEAD(phase);
         assert(KEY_SYM(typeset) == SYM_RETURN);
-        if (GET_CELL_FLAG(f->out, OUT_MARKED_STALE)) {
+        if (GET_CELL_FLAG(f->out, OUT_NOTE_STALE)) {
             if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE)) {
                 printf("Native code violated return type contract!\n");
                 panic (Error_Bad_Invisible(f));

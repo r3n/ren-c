@@ -26,7 +26,7 @@
 // as it will always be appending 10.
 //
 // The method used is to store a FRAME! in the specialization's ACT_DETAILS().
-// Frame cells which carry the ARG_MARKED_CHECKED bit are considered to be
+// Frame cells which carry the VAR_MARKED_HIDDEN bit are considered to be
 // specialized out.
 //
 // !!! Future directions would make use of unused frame cells to store the
@@ -140,21 +140,21 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         Prep_Cell(arg);
 
         if (Is_Param_Hidden(param)) {  // local or specialized
-            Blit_Specific(arg, param);  // preserve ARG_MARKED_CHECKED
+            Blit_Specific(arg, param);  // preserve VAR_MARKED_HIDDEN
 
           continue_specialized:
 
             continue;
         }
 
-        assert(NOT_CELL_FLAG(param, ARG_MARKED_CHECKED));
+        assert(NOT_CELL_FLAG(param, VAR_MARKED_HIDDEN));
 
         const REBSTR *symbol = KEY_SPELLING(key);  // added to binding
         if (not TYPE_CHECK(param, REB_TS_REFINEMENT)) {  // nothing to push
 
           continue_unspecialized:
 
-            Init_Void(arg, SYM_UNSET);  // *not* ARG_MARKED_CHECKED
+            Init_Void(arg, SYM_UNSET);  // *not* VAR_MARKED_HIDDEN
             if (binder)
                 Add_Binder_Index(unwrap(binder), symbol, index);
 
@@ -191,7 +191,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             //     specialize :append/only [only: #]  ; only not bound
             //
             Init_Blackhole(arg);
-            SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+            SET_CELL_FLAG(arg, VAR_MARKED_HIDDEN);
             goto continue_specialized;
         }
 
@@ -320,7 +320,7 @@ bool Specialize_Action_Throws(
 
     for (; NOT_END_KEY(key); ++key, ++param, ++arg) {
         //
-        // Note: We check ARG_MARKED_CHECKED on `special` from the *original*
+        // Note: We check VAR_MARKED_HIDDEN on `special` from the *original*
         // varlist...as the user may have used PROTECT/HIDE to force `arg`
         // to be hidden and still needs a typecheck here.
 
@@ -330,7 +330,7 @@ bool Specialize_Action_Throws(
         if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
             if (
                 Is_Void_With_Sym(arg, SYM_UNSET)
-                and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
+                and NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN)
             ){
                 // Undefined refinements not explicitly marked hidden are
                 // still candidates for usage at the callsite.
@@ -338,7 +338,7 @@ bool Specialize_Action_Throws(
                 goto unspecialized_arg;  // ran out...no pre-empt needed
             }
 
-            if (GET_CELL_FLAG(arg, ARG_MARKED_CHECKED))
+            if (GET_CELL_FLAG(arg, VAR_MARKED_HIDDEN))
                 assert(IS_NULLED(arg) or Is_Blackhole(arg));
             else
                 Typecheck_Refinement(param, arg);
@@ -350,7 +350,7 @@ bool Specialize_Action_Throws(
 
         if (
             Is_Void_With_Sym(arg, SYM_UNSET)
-            and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
+            and NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN)
         ){
             goto unspecialized_arg;
         }
@@ -359,7 +359,7 @@ bool Specialize_Action_Throws(
 
       unspecialized_arg:
 
-        assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
+        assert(NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN));
         assert(Is_Void_With_Sym(arg, SYM_UNSET));
         assert(IS_TYPESET(param));
         Move_Value(arg, param);
@@ -376,7 +376,7 @@ bool Specialize_Action_Throws(
         if (not TYPE_CHECK(param, VAL_TYPE(arg)))
             fail (arg);  // !!! merge w/Error_Invalid_Arg()
 
-       SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+       SET_CELL_FLAG(arg, VAR_MARKED_HIDDEN);
 
       specialized_arg_no_typecheck:
 
@@ -384,7 +384,7 @@ bool Specialize_Action_Throws(
         // for enumeration in the evaluator to line up with the frame values
         // of the underlying function.
 
-        assert(GET_CELL_FLAG(arg, ARG_MARKED_CHECKED));
+        assert(GET_CELL_FLAG(arg, VAR_MARKED_HIDDEN));
         continue;
     }
 
@@ -418,7 +418,7 @@ bool Specialize_Action_Throws(
             }
 
             REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
-            if (NOT_CELL_FLAG(slot, ARG_MARKED_CHECKED)) {
+            if (NOT_CELL_FLAG(slot, VAR_MARKED_HIDDEN)) {
                 assert(IS_TYPESET(slot));
 
                 // It's still partial...
@@ -567,7 +567,7 @@ void For_Each_Unspecialized_Param(
         //
         if (pclass == REB_P_MODAL) {
             if (NOT_END_KEY(key + 1)) {  // !!! Ideally checked at creation
-                if (GET_CELL_FLAG(param + 1, ARG_MARKED_CHECKED)) {
+                if (GET_CELL_FLAG(param + 1, VAR_MARKED_HIDDEN)) {
                     if (TYPE_CHECK(param + 1, REB_TS_REFINEMENT))  // required
                         flags |= PHF_DEMODALIZED;  // !!! ^-- check at create!
                 }
@@ -911,7 +911,7 @@ REBACT *Alloc_Action_From_Exemplar(
         //
         if (
             Is_Void_With_Sym(arg, SYM_UNSET)
-            and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
+            and NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN)
         ){
             assert(IS_TYPESET(param));
             Move_Value(arg, param);
@@ -923,7 +923,7 @@ REBACT *Alloc_Action_From_Exemplar(
         else
             Typecheck_Including_Constraints(param, arg);
 
-        SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+        SET_CELL_FLAG(arg, VAR_MARKED_HIDDEN);
     }
 
     // This code parallels Specialize_Action_Throws(), see comments there

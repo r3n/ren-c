@@ -140,7 +140,7 @@ bool Interpreted_Dispatch_Details_1_Throws(
         REBVAL *cell = FRM_ARG(f, 1);
         Move_Value(cell, NATIVE_VAL(return));
         INIT_VAL_ACTION_BINDING(cell, CTX(f->varlist));
-        SET_CELL_FLAG(cell, ARG_MARKED_CHECKED);  // necessary?
+        SET_CELL_FLAG(cell, VAR_MARKED_HIDDEN);  // necessary?
     }
 
     // The function body contains relativized words, that point to the
@@ -263,7 +263,7 @@ REB_R Returner_Dispatcher(REBFRM *f)
 //
 REB_R Elider_Dispatcher(REBFRM *f)
 {
-    assert(f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE);
+    assert(f->out->header.bits & CELL_FLAG_OUT_NOTE_STALE);
 
     REBVAL *discarded = FRM_SPARE(f);  // spare usable during dispatch
 
@@ -272,7 +272,7 @@ REB_R Elider_Dispatcher(REBFRM *f)
         return R_THROWN;
     UNUSED(returned);  // no additional work to bypass
 
-    assert(f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE);
+    assert(f->out->header.bits & CELL_FLAG_OUT_NOTE_STALE);
 
     return f->out;
 }
@@ -291,7 +291,7 @@ REB_R Commenter_Dispatcher(REBFRM *f)
     assert(VAL_LEN_AT(body) == 0);
     UNUSED(body);
 
-    assert(f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE);
+    assert(f->out->header.bits & CELL_FLAG_OUT_NOTE_STALE);
     return f->out;
 }
 

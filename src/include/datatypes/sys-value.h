@@ -765,7 +765,7 @@ inline static REBVAL *Move_Value_Core(RELVAL *out, const REBVAL *v) {
     Move_Value_Core(TRACK_CELL_IF_DEBUG(out), (v))
 
 // When doing something like a COPY of an OBJECT!, the var cells have to be
-// handled specially, e.g. by preserving CELL_FLAG_ARG_MARKED_CHECKED.
+// handled specially, e.g. by preserving CELL_FLAG_VAR_MARKED_HIDDEN.
 //
 // !!! What about other non-copyable properties like CELL_FLAG_PROTECTED?
 //
@@ -778,7 +778,7 @@ inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
 
     Move_Value(out, v);
     out->header.bits |= (
-        v->header.bits & (CELL_FLAG_ARG_MARKED_CHECKED)
+        v->header.bits & (CELL_FLAG_VAR_MARKED_HIDDEN)
     );
     return cast(REBVAL*, out);
 }

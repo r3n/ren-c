@@ -150,7 +150,7 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
         // in the cell of the variable; see `Is_Param_Hidden()`.
 
         if (flags & PROT_SET)
-            var->header.bits |= CELL_FLAG_ARG_MARKED_CHECKED;
+            var->header.bits |= CELL_FLAG_VAR_MARKED_HIDDEN;
         else
             fail ("Un-hiding is not supported");
     }

@@ -800,7 +800,7 @@ REBNATIVE(all)
             Abort_Frame(f);
             return R_THROWN;
         }
-        if (GET_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
+        if (GET_CELL_FLAG(D_OUT, OUT_NOTE_STALE)) {
             if (IS_END(f->feed->value))  // `all []`
                 break;
             continue;  // `all [comment "hi" 1]`, first step is stale
@@ -833,7 +833,7 @@ REBNATIVE(all)
     Drop_Frame(f);
 
     if (IS_NULLED(D_OUT)) {
-        if (NOT_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
+        if (NOT_CELL_FLAG(D_OUT, OUT_NOTE_STALE)) {
             //
             // The only way a NULL evaluation that isn't the initial loaded
             // NULL should make it to the end is if a predicate passed it,
@@ -844,7 +844,7 @@ REBNATIVE(all)
         }
     }
 
-    CLEAR_CELL_FLAG(D_OUT, OUT_MARKED_STALE);  // `all [true elide 1 + 2]`
+    CLEAR_CELL_FLAG(D_OUT, OUT_NOTE_STALE);  // `all [true elide 1 + 2]`
 
     return D_OUT;  // successful ALL when the last D_OUT assignment passed
 }
@@ -881,7 +881,7 @@ REBNATIVE(any)
             Abort_Frame(f);
             return R_THROWN;
         }
-        if (GET_CELL_FLAG(D_OUT, OUT_MARKED_STALE)) {
+        if (GET_CELL_FLAG(D_OUT, OUT_NOTE_STALE)) {
             if (IS_END(f->feed->value))  // `any []`
                 break;
             continue;  // `any [comment "hi" 1]`, first step is stale
@@ -961,11 +961,11 @@ REBNATIVE(case)
             goto threw;
 
         if (IS_END(f_value)) {
-            CLEAR_CELL_FLAG(D_OUT, OUT_MARKED_STALE);
+            CLEAR_CELL_FLAG(D_OUT, OUT_NOTE_STALE);
             goto reached_end;
         }
 
-        if (GET_CELL_FLAG(D_OUT, OUT_MARKED_STALE))
+        if (GET_CELL_FLAG(D_OUT, OUT_NOTE_STALE))
             continue;  // a COMMENT, but not at end.
 
         bool matched;

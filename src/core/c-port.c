@@ -125,7 +125,7 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     if (Redo_Action_Throws_Maybe_Stale(frame_->out, frame_, VAL_ACTION(action)))
         return R_THROWN;
 
-    CLEAR_CELL_FLAG(frame_->out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(frame_->out, OUT_NOTE_STALE);
 
     r = D_OUT; // result should be in frame_->out
   }

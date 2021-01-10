@@ -356,7 +356,7 @@ static REB_R Loop_Number_Common(
 // a flag to indicate a dereference is necessary.
 //
 REBVAL *Real_Var_From_Pseudo(REBVAL *pseudo_var) {
-    if (NOT_CELL_FLAG(pseudo_var, BIND_MARKED_REUSE))
+    if (NOT_CELL_FLAG(pseudo_var, BIND_NOTE_REUSE))
         return pseudo_var;
     if (IS_BLANK(pseudo_var))  // e.g. `for-each _ [1 2 3] [...]`
         return nullptr;  // signal to throw generated quantity away
@@ -1123,8 +1123,8 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
         if (res->broke) {  // cleanup markers, don't do removals
             RELVAL *temp = VAL_ARRAY_KNOWN_MUTABLE_AT(res->data);
             for (; NOT_END(temp); ++temp) {
-                if (GET_CELL_FLAG(temp, MARKED_REMOVE))
-                    CLEAR_CELL_FLAG(temp, MARKED_REMOVE);
+                if (GET_CELL_FLAG(temp, NOTE_REMOVE))
+                    CLEAR_CELL_FLAG(temp, NOTE_REMOVE);
             }
             return 0;
         }
@@ -1137,7 +1137,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
         // avoid blitting cells onto themselves by making the first thing we
         // do is to pass up all the unmarked (kept) cells.
         //
-        while (NOT_END(src) and NOT_CELL_FLAG(src, MARKED_REMOVE)) {
+        while (NOT_END(src) and NOT_CELL_FLAG(src, NOTE_REMOVE)) {
             ++src;
             ++dest;
         }
@@ -1146,7 +1146,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
         // on are going to be moving to somewhere besides the original spot
         //
         for (; NOT_END(dest); ++dest, ++src) {
-            while (NOT_END(src) and GET_CELL_FLAG(src, MARKED_REMOVE)) {
+            while (NOT_END(src) and GET_CELL_FLAG(src, NOTE_REMOVE)) {
                 ++src;
                 --len;
                 ++count;
@@ -1322,7 +1322,7 @@ static REB_R Remove_Each_Core(struct Remove_Each_State *res)
                 assert(res->start <= len);
                 SET_CELL_FLAG(  // v-- okay to mark despite read only
                     m_cast(RELVAL*, ARR_AT(VAL_ARRAY(res->data), res->start)),
-                    MARKED_REMOVE
+                    NOTE_REMOVE
                 );
                 ++res->start;
             } while (res->start != index);

@@ -305,16 +305,23 @@ inline static enum Reb_Param_Class VAL_PARAM_CLASS(const REBPAR *param) {
 #define Is_Param_Skippable(v) \
     TYPE_CHECK((v), REB_TS_SKIPPABLE)
 
-// Whether a parameter is considered "hidden" depends on the point of view.
-// For instance: a local is hidden to the interface outside a function, but
-// if a FRAME! holds a phase for a function then anything the body of that
-// function has available should also be shown.
+
+// All hidden parameters in the exemplar frame of an ACTION! are not shown
+// on the public interface of that function.  This means type information
+// is not relevant (though the type information for later phases of that
+// slot may be pertinent).  So instead of type information, hidden param slots
+// hold the initialization value for that position.
 //
-// Some aspects of determining hiddenness come from a parameter's properties,
-// which is common to all FRAME!s and invocations of the function which has
-// that parameter.  But it is also possible for specific instances to hide
-// parameters, which is used by specialization to allow ANY-VALUE! including
-// undefineds to be specialized:
+// In terms of whether the parameter is truly "hidden" from a view of a FRAME!
+// with MOLD or to BIND depends on the frame's phase.  For instance, while a
+// frame is running the body of an interpreted function...that phase has to
+// see the locals defined for that function.  This means you can't tell from a
+// frame context node pointer alone whether a key is visible...the full FRAME!
+// cell--phase included--must be used.
+//
+// Hiding is used to accomplish the desire of signaling that an ~unset~ be
+// removed rom the interface for a frame, so you can actualy specialize a
+// value out as ~unset~:
 //
 //     >> f: make frame! :append
 //     >> f/value: '~unset~  ; typically this would mean "unspecialized"
@@ -327,14 +334,11 @@ inline static enum Reb_Param_Class VAL_PARAM_CLASS(const REBPAR *param) {
 // visibility on a per-instance basis.  To avoid having to make a new keylist
 // each time this happens, the NODE_FLAG_MARKED bit on a context is taken
 // to mean this.  It won't be copied by Move_Value() that reads the variable,
-// and it is heeded here as ARG_MARKED_CHECKED if a value cell is given.
-//
-// However, not all calls have an associated value cell to test for hiddenness
-// so the "special" (see ACT_SPECIALTY()) is allowed to be the same as param.
+// and it is heeded here as VAR_MARKED_HIDDEN if a value cell is given.
 //
 inline static bool Is_Param_Hidden(const REBPAR *param)
 {
-    if (GET_CELL_FLAG(param, ARG_MARKED_CHECKED))
+    if (GET_CELL_FLAG(param, VAR_MARKED_HIDDEN))
         return true;
 
     // unchecked parameters in an exemplar frame may be PARAM!, but if they
@@ -346,7 +350,7 @@ inline static bool Is_Param_Hidden(const REBPAR *param)
 
 inline static bool Is_Var_Hidden(const REBVAR *var)
 {
-    if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED))
+    if (GET_CELL_FLAG(var, VAR_MARKED_HIDDEN))
         return true;
 
     // unchecked parameters in an exemplar frame may be PARAM!, but if they
@@ -506,7 +510,7 @@ inline static void Typecheck_Refinement(
     const REBPAR *param,
     REBVAL *arg
 ){
-    assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
+    assert(NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN));
     assert(TYPE_CHECK(param, REB_TS_REFINEMENT));
 
     if (IS_NULLED(arg)) {
@@ -523,5 +527,5 @@ inline static void Typecheck_Refinement(
     else if (not Typecheck_Including_Constraints(param, arg))
         fail (Error_Invalid_Type(VAL_TYPE(arg)));
 
-    SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
+    SET_CELL_FLAG(arg, VAR_MARKED_HIDDEN);
 }

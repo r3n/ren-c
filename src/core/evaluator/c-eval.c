@@ -27,7 +27,7 @@
 // * _Maybe_Stale_ => The evaluation targets an output cell which must be
 //   preloaded or set to END.  If there is no result (e.g. due to being just
 //   comments) then whatever was in that cell will still be there -but- will
-//   carry OUT_MARKED_STALE.  This is just an alias for NODE_FLAG_MARKED, and
+//   carry OUT_NOTE_STALE.  This is just an alias for NODE_FLAG_MARKED, and
 //   it must be cleared off before passing pointers to the cell to a routine
 //   which may interpret that flag differently.
 //
@@ -122,7 +122,7 @@
 
 
 inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
-    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
+    SET_CELL_FLAG(f->out, OUT_NOTE_STALE);
 }
 
 
@@ -230,7 +230,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
         if (GET_EVAL_FLAG(f, FULFILLING_ARG)) {
-            f->out->header.bits |= CELL_FLAG_OUT_MARKED_STALE;
+            f->out->header.bits |= CELL_FLAG_OUT_NOTE_STALE;
             return false;
         }
         CLEAR_FEED_FLAG(f->feed, BARRIER_HIT);  // not an argument, clear flag
@@ -276,7 +276,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         }
 
         if (NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT))
-            SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
+            SET_CELL_FLAG(f->out, OUT_NOTE_STALE);
 
         v = f->u.reval.value;
         gotten = nullptr;
@@ -308,7 +308,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     }
 
     assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
-    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);  // out won't act as enfix input
+    SET_CELL_FLAG(f->out, OUT_NOTE_STALE);  // out won't act as enfix input
 
     UPDATE_EXPRESSION_START(f);  // !!! See FRM_INDEX() for caveats
 
@@ -578,7 +578,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         if (
             GET_EVAL_FLAG(f, FULFILLING_ARG)
-            and GET_CELL_FLAG(f->out, OUT_MARKED_STALE)
+            and GET_CELL_FLAG(f->out, OUT_NOTE_STALE)
             and NOT_END(f_next)
         ){
             gotten = f_next_gotten;
@@ -739,14 +739,14 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         assert(
             IS_END(f->out)
-            or GET_CELL_FLAG(f->out, OUT_MARKED_STALE)
+            or GET_CELL_FLAG(f->out, OUT_NOTE_STALE)
             or IS_VOID(f->out)
         );
 
         DECLARE_FEED_AT_CORE (subfeed, v, f_specifier);
 
         // "Maybe_Stale" variant leaves f->out as-is if no result generated
-        // However, it sets OUT_MARKED_STALE in that case (note we may be
+        // However, it sets OUT_NOTE_STALE in that case (note we may be
         // leaving an END in f->out by doing this.)
         //
         if (Do_Feed_To_End_Maybe_Stale_Throws(

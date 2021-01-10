@@ -267,7 +267,7 @@ REBNATIVE(reframer_p)
     //
     REBVAL *var = CTX_VAR(exemplar, param_index);
     Move_Value(var, CTX_ARCHETYPE(exemplar));
-    SET_CELL_FLAG(var, ARG_MARKED_CHECKED);
+    SET_CELL_FLAG(var, VAR_MARKED_HIDDEN);
 
     // Make action with enough space to store the implementation phase and
     // which parameter to fill with the *real* frame instance.

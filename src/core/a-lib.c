@@ -868,7 +868,7 @@ static void Run_Va_May_Fail_Core(
         fail (Error_No_Catch_For_Throw(out));
     }
 
-    CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
 }
 
 #define Run_Va_May_Fail(out,quotes,p,vaptr) \

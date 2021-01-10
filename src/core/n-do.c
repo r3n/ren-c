@@ -236,7 +236,7 @@ REBNATIVE(shove)
         return R_THROWN;
     }
 
-    assert(NOT_CELL_FLAG(D_OUT, OUT_MARKED_STALE));  // !!! can this happen?
+    assert(NOT_CELL_FLAG(D_OUT, OUT_NOTE_STALE));  // !!! can this happen?
 
     if (REF(set)) {
         if (IS_SET_WORD(left)) {
@@ -379,7 +379,7 @@ REBNATIVE(do)
         if (threw)
             return R_THROWN;
 
-        CLEAR_CELL_FLAG(D_OUT, OUT_MARKED_STALE);
+        CLEAR_CELL_FLAG(D_OUT, OUT_NOTE_STALE);
         return D_OUT; }
 
       case REB_BINARY:

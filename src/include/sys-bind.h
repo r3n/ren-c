@@ -660,7 +660,7 @@ inline static option(REBCTX*) Get_Word_Context(
                 // general questions of hiding which is the same bit.  Don't
                 // count it as a hit.
                 //
-                if (GET_CELL_FLAG(CTX_VAR(overload, index), BIND_MARKED_REUSE))
+                if (GET_CELL_FLAG(CTX_VAR(overload, index), BIND_NOTE_REUSE))
                     break;
 
                 // Found a match!  Cache it to speed up next time.  Note that

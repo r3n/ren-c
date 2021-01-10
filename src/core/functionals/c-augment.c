@@ -202,7 +202,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));
     }
 
-    // !!! Inefficient, we need to keep the ARG_MARKED_CHECKED bit, but
+    // !!! Inefficient, we need to keep the VAR_MARKED_HIDDEN bit, but
     // copying won't keep it by default!  Review folding this into the
     // copy machinery as part of the stackless copy implementation.  Done
     // poorly here alongside the copy that should be parameterized.
@@ -212,8 +212,8 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         RELVAL *dest = ARR_HEAD(varlist) + 1;
         REBLEN i;
         for (i = 1; i < old_len; ++i, ++src, ++dest) {
-            if (GET_CELL_FLAG(src, ARG_MARKED_CHECKED))
-                SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
+            if (GET_CELL_FLAG(src, VAR_MARKED_HIDDEN))
+                SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
         }
     }
 

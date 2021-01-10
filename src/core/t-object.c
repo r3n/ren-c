@@ -512,7 +512,7 @@ REBNATIVE(set_meta)
 //
 // !!! Copying a context used to be more different from copying an ordinary
 // array.  But at the moment, much of the difference is that the marked bit
-// in cells gets duplicated (so new context has the same ARG_MARKED_CHECKED
+// in cells gets duplicated (so new context has the same VAR_MARKED_HIDDEN
 // settings on its variables).  Review if the copying can be cohered better.
 //
 REBCTX *Copy_Context_Extra_Managed(
@@ -545,7 +545,7 @@ REBCTX *Copy_Context_Extra_Managed(
     //
     REBVAL *src = CTX_VARS_HEAD(original);
     for (; NOT_END(src); ++src, ++dest) {
-        Move_Var(dest, src); // keep ARG_MARKED_CHECKED
+        Move_Var(dest, src); // keep VAR_MARKED_HIDDEN
 
         REBFLGS flags = NODE_FLAG_MANAGED;  // !!! Review, which flags?
         Clonify(dest, flags, types);
