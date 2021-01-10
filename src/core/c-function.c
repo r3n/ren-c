@@ -110,6 +110,14 @@ enum Reb_Spec_Mode {
 };
 
 
+#define KEY_SLOT(dsp)       DS_AT((dsp) - 3)
+#define PARAM_SLOT(dsp)     DS_AT((dsp) - 2)
+#define TYPES_SLOT(dsp)     DS_AT((dsp) - 1)
+#define NOTES_SLOT(dsp)     DS_AT(dsp)
+
+#define PUSH_SLOTS() \
+    do { DS_PUSH(); DS_PUSH(); DS_PUSH(); DS_PUSH(); } while (0)
+
 //
 //  Push_Paramlist_Triads_May_Fail: C
 //
@@ -121,7 +129,6 @@ enum Reb_Spec_Mode {
 void Push_Paramlist_Triads_May_Fail(
     const REBVAL *spec,
     REBFLGS *flags,
-    REBDSP dsp_orig,
     REBDSP *definitional_return_dsp
 ){
     assert(IS_BLOCK(spec));
@@ -147,21 +154,20 @@ void Push_Paramlist_Triads_May_Fail(
             if (mode == SPEC_MODE_WITH)
                 continue;
 
-            if (IS_PARAM(DS_TOP) or IS_WORD(DS_TOP))  // word for locals
-                Move_Value(DS_PUSH(), EMPTY_BLOCK);  // need block in position
+            STKVAL(*) notes = NOTES_SLOT(DSP);
+            assert(
+                IS_NULLED(notes)  // hasn't been written to yet
+                or IS_TEXT(notes)  // !!! we overwrite, but should we append?
+            );
 
-            if (IS_BLOCK(DS_TOP)) {  // in right spot to push notes/title
-                Init_Text(DS_PUSH(), Copy_String_At(item));
-            }
-            else {  // !!! A string was already pushed.  Should we append?
-                assert(IS_TEXT(DS_TOP));
-                Init_Text(DS_TOP, Copy_String_At(item));
-            }
-
-            if (DS_TOP == DS_AT(dsp_orig + 3))
+            if (IS_VOID(KEY_SLOT(DSP))) {  // no keys seen, act as description
+                Init_Text(notes, Copy_String_At(item));
                 *flags |= MKF_HAS_DESCRIPTION;
-            else
+            }
+            else {
+                Init_Text(notes, Copy_String_At(item));
                 *flags |= MKF_HAS_NOTES;
+            }
 
             continue;
         }
@@ -195,91 +201,73 @@ void Push_Paramlist_Triads_May_Fail(
                 goto process_typeset_block;
             }
             else
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
         }
 
     //=//// BLOCK! OF TYPES TO MAKE TYPESET FROM (PLUS PARAMETER TAGS) ////=//
 
         if (IS_BLOCK(item)) {
           process_typeset_block:
-            if (IS_BLOCK(DS_TOP)) // two blocks of types!
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+            if (IS_VOID(KEY_SLOT(DSP)))  // too early, `func [[integer!] {!}]`
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
-            // You currently can't say `<local> x [integer!]`, because they
-            // are always void when the function runs.  You can't say
-            // `<with> x [integer!]` because "externs" don't have param slots
-            // to store the type in.
-            //
-            // !!! A type constraint on a <with> parameter might be useful,
-            // though--and could be achieved by adding a type checker into
-            // the body of the function.  However, that would be more holistic
-            // than this generation of just a paramlist.  Consider for future.
-            //
-            if (mode != SPEC_MODE_NORMAL)
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+            STKVAL(*) types = TYPES_SLOT(DSP);
 
-            // Save the block for parameter types.
-            //
-            STKVAL(*) param;
-            if (IS_PARAM(DS_TOP) or IS_WORD(DS_TOP)) {
-                REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
-                Init_Block(
-                    DS_PUSH(),
-                    Copy_Array_At_Deep_Managed(
-                        VAL_ARRAY(item),
-                        VAL_INDEX(item),
-                        derived
-                    )
-                );
+            if (IS_BLOCK(types))  // too many, `func [x [void!] [blank!]]`
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
-                param = DS_TOP - 1;  // volatile if you DS_PUSH()!
+            assert(IS_NULLED(types));
+
+            // You currently can't say `<local> x [integer!]`, because locals
+            // are hidden from the interface, and hidden values (notably
+            // specialized-out values) use the `param` slot for the value,
+            // not type information.  So local has `~unset~ in that slot.
+            //
+            // Even if you could give locals a type, it could only be given
+            // a meaning if it were used to check assignments during the
+            // function.  There's currently no mechanism for doing that.
+            //
+            // You can't say `<with> y [integer!]` either...though it might
+            // be a nice feature to check the type of an imported value at
+            // the time of calling.
+            //
+            if (mode != SPEC_MODE_NORMAL)  // <local> <with>
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
+
+            STKVAL(*) param = PARAM_SLOT(DSP);
+
+            if (
+                GET_CELL_FLAG(param, ARG_MARKED_CHECKED)
+                and VAL_WORD_SYM(KEY_SLOT(DSP)) == SYM_RETURN
+            ){
+                continue;  // !!! allow because of RETURN, still figuring... 
             }
-            else {
-                assert(IS_TEXT(DS_TOP));  // !!! are blocks after notes good?
 
-                if (IS_VOID_RAW(DS_TOP - 2)) {
-                    //
-                    // No parameters pushed, e.g. func [[integer!] {<-- bad}]
-                    //
-                    fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
-                }
-
-                assert(IS_PARAM(DS_TOP - 2) or IS_WORD(DS_TOP - 2));
-                param = DS_TOP - 2;
-
-                assert(IS_BLOCK(DS_TOP - 1));
-                if (VAL_ARRAY(DS_TOP - 1) != EMPTY_ARRAY)
-                    fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
-
-                REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
-                Init_Block(
-                    DS_TOP - 1,
-                    Copy_Array_At_Deep_Managed(
-                        VAL_ARRAY(item),
-                        VAL_INDEX(item),
-                        derived
-                    )
-                );
-            }
+            REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
+            Init_Block(
+                types,
+                Copy_Array_At_Deep_Managed(
+                    VAL_ARRAY(item),
+                    VAL_INDEX(item),
+                    derived
+                )
+            );
 
             // Turn block into typeset for parameter at current index.
             // Leaves VAL_TYPESET_SYM as-is.
-            //
-            if (not IS_WORD(param)) {
-                bool was_refinement =  TYPE_CHECK(param, REB_TS_REFINEMENT);
-                REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
-                VAL_TYPESET_LOW_BITS(param) = 0;
-                VAL_TYPESET_HIGH_BITS(param) = 0;
-                Add_Typeset_Bits_Core(
-                    param,
-                    ARR_HEAD(VAL_ARRAY(item)),
-                    derived
-                );
-                if (was_refinement)
-                    TYPE_SET(param, REB_TS_REFINEMENT);
 
-                *flags |= MKF_HAS_TYPES;
-            }
+            bool was_refinement = TYPE_CHECK(param, REB_TS_REFINEMENT);
+            VAL_TYPESET_LOW_BITS(param) = 0;
+            VAL_TYPESET_HIGH_BITS(param) = 0;
+            Add_Typeset_Bits_Core(
+                param,
+                ARR_HEAD(VAL_ARRAY(item)),
+                derived
+            );
+            if (was_refinement)
+                TYPE_SET(param, REB_TS_REFINEMENT);
+
+            *flags |= MKF_HAS_TYPES;
             continue;
         }
 
@@ -288,7 +276,7 @@ void Push_Paramlist_Triads_May_Fail(
         bool quoted = false;  // single quoting level used as signal in spec
         if (VAL_NUM_QUOTES(item) > 0) {
             if (VAL_NUM_QUOTES(item) > 1)
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
             quoted = true;
         }
 
@@ -301,7 +289,7 @@ void Push_Paramlist_Triads_May_Fail(
         bool refinement = false;  // paths with blanks at head are refinements
         if (ANY_PATH_KIND(kind)) {
             if (not IS_REFINEMENT_CELL(cell))
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
             refinement = true;
             refinement_seen = true;
@@ -383,14 +371,14 @@ void Push_Paramlist_Triads_May_Fail(
             }
         }
         else
-            fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+            fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
         if (pclass == REB_P_DETECT)  // didn't match
-            fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+            fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
         if (mode != SPEC_MODE_NORMAL) {
             if (pclass != REB_P_NORMAL and pclass != REB_VOID)
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
             if (mode == SPEC_MODE_LOCAL)
                 pclass = REB_VOID;
@@ -415,14 +403,15 @@ void Push_Paramlist_Triads_May_Fail(
         if (mode == SPEC_MODE_WITH)
             continue;
 
-        // In rhythm of TYPESET! BLOCK! TEXT! we want to be on a string spot
-        // at the time of the push of each new typeset.
+        // Pushing description values for a new named element...
         //
-        if (IS_PARAM(DS_TOP) or IS_WORD(DS_TOP))
-            Move_Value(DS_PUSH(), EMPTY_BLOCK);
-        if (IS_BLOCK(DS_TOP))
-            Move_Value(DS_PUSH(), EMPTY_TEXT);
-        assert(IS_TEXT(DS_TOP));
+        PUSH_SLOTS();
+
+        Init_Word(KEY_SLOT(DSP), spelling);
+        Init_Nulled(TYPES_SLOT(DSP));  // may or may not add later
+        Init_Nulled(NOTES_SLOT(DSP));  // may or may not add later
+
+        STKVAL(*) param = PARAM_SLOT(DSP);
 
         // Non-annotated arguments disallow ACTION!, VOID! and NULL.  Not
         // having to worry about ACTION! and NULL means by default, code
@@ -436,21 +425,20 @@ void Push_Paramlist_Triads_May_Fail(
         // But Is_Param_Endable() indicates <end>.
 
         if (pclass == REB_VOID) {
-            Init_Word(DS_PUSH(), spelling);
+            Init_Void(param, SYM_UNSET);
+            SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
         }
         else if (refinement) {
             Init_Param(
-                DS_PUSH(),
+                param,
                 pclass,
-                spelling,  // don't canonize, see #2258
                 FLAGIT_KIND(REB_TS_REFINEMENT)  // must preserve if type block
             );
         }
         else
             Init_Param(
-                DS_PUSH(),
+                param,
                 pclass,
-                spelling,  // don't canonize, see #2258
                 TS_OPT_VALUE  // By default <opt> ANY-VALUE! is legal
             );
 
@@ -471,7 +459,7 @@ void Push_Paramlist_Triads_May_Fail(
                 fail (Error_Dup_Vars_Raw(word));  // most dup checks are later
             }
             if (pclass == REB_VOID)
-                *definitional_return_dsp = DSP;  // RETURN: explicit, tolerate
+                *definitional_return_dsp = DSP;  // RETURN: explicit
             else
                 *flags &= ~MKF_RETURN;
         }
@@ -494,14 +482,6 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     REBFLGS flags,
     REBDSP definitional_return_dsp
 ){
-    // Go ahead and flesh out the TYPESET! BLOCK! TEXT! triples.
-    //
-    if (IS_PARAM(DS_TOP) or IS_WORD(DS_TOP))
-        Move_Value(DS_PUSH(), EMPTY_BLOCK);
-    if (IS_BLOCK(DS_TOP))
-        Move_Value(DS_PUSH(), EMPTY_TEXT);
-    assert((DSP - dsp_orig) % 3 == 0); // must be a multiple of 3
-
     // Definitional RETURN slots must have their argument value fulfilled with
     // an ACTION! specific to the action called on *every instantiation*.
     // They are marked with special parameter classes to avoid needing to
@@ -519,16 +499,22 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             // they are allowed to return anything.  Generally speaking, the
             // checks are on the input side, not the output.
             //
-            Init_Word(DS_PUSH(), Canon(SYM_RETURN));
+            PUSH_SLOTS();
+
+            Init_Word(KEY_SLOT(DSP), Canon(SYM_RETURN));
             definitional_return_dsp = DSP;
 
-            Move_Value(DS_PUSH(), EMPTY_BLOCK);
-            Move_Value(DS_PUSH(), EMPTY_TEXT);
+            STKVAL(*) param = PARAM_SLOT(DSP);
+            Init_Void(param, SYM_VOID);
+            SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
+
+            Init_Nulled(TYPES_SLOT(DSP));
+            Init_Nulled(NOTES_SLOT(DSP));
         }
         else {
-            STKVAL(*) param = DS_AT(definitional_return_dsp);
-            assert(VAL_WORD_SYM(param) == SYM_RETURN);
-            UNUSED(param);
+            assert(
+                VAL_WORD_SYM(KEY_SLOT(definitional_return_dsp)) == SYM_RETURN
+            );
         }
 
         // definitional_return handled specially when paramlist copied
@@ -539,15 +525,8 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     // Slots, which is length +1 (includes the rootvar or rootparam)
     //
-    REBLEN num_slots = (DSP - dsp_orig) / 3;
-
-    // There should be no more pushes past this point, so a stable pointer
-    // into the stack for the definitional return can be found.
-    //
-    STKVAL(*) definitional_return =
-        definitional_return_dsp == 0
-            ? nullptr
-            : DS_AT(definitional_return_dsp);
+    assert((DSP - dsp_orig) % 4 == 0);
+    REBLEN num_slots = (DSP - dsp_orig) / 4;
 
     // Must make the function "paramlist" even if "empty", for identity.
     //
@@ -598,11 +577,9 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     REBVAL *param = Voidify_Rootparam(paramlist) + 1;
     REBKEY *key = SER_HEAD(REBKEY, keylist);
 
-    STKVAL(*) src = DS_AT(dsp_orig + 1) + 3;
-
-    if (definitional_return) {
+    if (definitional_return_dsp != 0) {
         assert(flags & MKF_RETURN);
-        Init_Key(key, VAL_WORD_SPELLING(definitional_return));
+        Init_Key(key, VAL_WORD_SPELLING(KEY_SLOT(definitional_return_dsp)));
         ++key;
 
         Init_Void(param, SYM_UNSET);  // acts as a local !!! being revisited
@@ -610,35 +587,25 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         ++param;
     }
 
-    // Weird due to Spectre/MSVC: https://stackoverflow.com/q/50399940
-    //
-    for (; src != DS_TOP + 1; src += 3) {
-        const REBSTR *spelling;
-        if (IS_WORD(src))
-            spelling = VAL_WORD_SPELLING(src);
-        else
-            spelling = VAL_TYPESET_STRING(src);
+    REBDSP dsp = dsp_orig + 8;
+    for (; dsp <= DSP; dsp += 4) {
+        const REBSTR *spelling = VAL_WORD_SPELLING(KEY_SLOT(dsp));
 
-        if (not Is_Param_Sealed(cast_PAR(src))) {  // sealed names reusable
+        STKVAL(*) slot = PARAM_SLOT(dsp);
+        if (not Is_Param_Sealed(cast_PAR(slot))) {  // sealed reusable
             if (not Try_Add_Binder_Index(&binder, spelling, 1020))
                 duplicate = spelling;
         }
 
-        if (definitional_return and src == definitional_return)
-            continue;
+        if (dsp == definitional_return_dsp)
+            continue;  // was added to the head of the list already
 
-        if (IS_WORD(src)) {  // e.g. a local
-            Init_Key(key, VAL_WORD_SPELLING(src));
+        Init_Key(key, spelling);
 
-            Init_Void(param, SYM_UNSET);
+        Move_Value(param, slot);
+        if (GET_CELL_FLAG(slot, ARG_MARKED_CHECKED))
             SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
-        }
-        else {
-            Init_Key(key, VAL_TYPESET_STRING(src));
 
-            Move_Value(param, src);
-            VAL_TYPESET_STRING_NODE(param) = nullptr;
-        }
         ++key;
         ++param;
     }
@@ -689,10 +656,11 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     // slot, the third cell we pushed onto the stack.  Extract it if so.
     //
     if (flags & MKF_HAS_DESCRIPTION) {
-        assert(IS_TEXT(DS_AT(dsp_orig + 3)));
+        STKVAL(*) description = NOTES_SLOT(dsp_orig + 4);
+        assert(IS_TEXT(description));
         Move_Value(
             CTX_VAR(*meta, STD_ACTION_META_DESCRIPTION),
-            DS_AT(dsp_orig + 3)
+            description
         );
     }
 
@@ -712,10 +680,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         REBVAL *dest = SPECIFIC(rootvar) + 1;
         const RELVAL *param = ARR_AT(paramlist, 1);
 
-        STKVAL(*) src = DS_AT(dsp_orig + 2);
-        src += 3;
-
-        if (definitional_return) {
+        if (definitional_return_dsp != 0) {
             //
             // We put the return note in the top-level meta information, not
             // on the local itself (the "return-ness" is a distinct property
@@ -724,31 +689,29 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             // argument while having nothing to do with the exit value of
             // the function.)
             //
-            if (NOT_END(VAL_ARRAY_AT(definitional_return + 1))) {
-                Move_Value(
-                    CTX_VAR(*meta, STD_ACTION_META_RETURN_TYPE),
-                    &definitional_return[1]
-                );
-            }
+            Move_Value(
+                CTX_VAR(*meta, STD_ACTION_META_RETURN_TYPE),
+                TYPES_SLOT(definitional_return_dsp)
+            );
 
-            Init_Nulled(dest); // clear the local RETURN: var's description
+            Init_Nulled(dest);  // clear the local RETURN: var's description
             SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
             ++dest;
             ++param;
         }
 
-        for (; src <= DS_TOP; src += 3) {
-            assert(IS_BLOCK(src));
-            if (definitional_return and src == definitional_return + 1)
+        REBDSP dsp = dsp_orig + 8;
+        for (; dsp <= DSP; dsp += 4) {
+            STKVAL(*) types = TYPES_SLOT(dsp);
+            assert(IS_NULLED(types) or IS_BLOCK(types));
+
+            if (dsp == definitional_return_dsp)
                 continue;
 
-            if (IS_END(VAL_ARRAY_AT(src)))
-                Init_Nulled(dest);
-            else
-                Move_Value(dest, src);
-
+            Move_Value(dest, types);
             if (GET_CELL_FLAG(param, ARG_MARKED_CHECKED))
                 SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
+
             ++dest;
             ++param;
         }
@@ -778,23 +741,16 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         const RELVAL *param = ARR_AT(paramlist, 1);
         REBVAL *dest = SPECIFIC(rootvar) + 1;
 
-        STKVAL(*) src = DS_AT(dsp_orig + 3);
-        src += 3;
-
-        if (definitional_return) {
+        if (definitional_return_dsp != 0) {
             //
             // See remarks on the return type--the RETURN is documented in
             // the top-level META-OF, not the "incidentally" named RETURN
             // parameter in the list
             //
-            if (VAL_LEN_HEAD(definitional_return + 2) == 0)
-                Init_Nulled(CTX_VAR(*meta, STD_ACTION_META_RETURN_NOTE));
-            else {
-                Move_Value(
-                    CTX_VAR(*meta, STD_ACTION_META_RETURN_NOTE),
-                    &definitional_return[2]
-                );
-            }
+            Move_Value(
+                CTX_VAR(*meta, STD_ACTION_META_RETURN_NOTE),
+                NOTES_SLOT(definitional_return_dsp)
+            );
 
             Init_Nulled(dest);
             SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
@@ -802,15 +758,15 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             ++param;
         }
 
-        for (; src <= DS_TOP; src += 3) {
-            assert(IS_TEXT(src));
-            if (definitional_return and src == definitional_return + 2)
+        REBDSP dsp = dsp_orig + 8;
+        for (; dsp <= DSP; dsp += 4) {
+            STKVAL(*) notes = NOTES_SLOT(dsp);
+            assert(IS_TEXT(notes) or IS_NULLED(notes));
+
+            if (dsp == definitional_return_dsp)
                 continue;
 
-            if (VAL_LEN_HEAD(src) == 0)
-                Init_Nulled(dest);
-            else
-                Move_Value(dest, src);
+            Move_Value(dest, notes);
 
             if (GET_CELL_FLAG(param, ARG_MARKED_CHECKED))
                 SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
@@ -826,10 +782,6 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             CTX(notes_varlist)
         );
     }
-
-  #ifdef DEBUG_EXTANT_STACK_POINTERS
-    definitional_return = nullptr;  // holds a count otherwise
-  #endif
 
     // With all the values extracted from stack to array, restore stack pointer
     //
@@ -887,6 +839,8 @@ REBARR *Make_Paramlist_Managed_May_Fail(
 
     REBDSP definitional_return_dsp = 0;
 
+    PUSH_SLOTS();
+
     // As we go through the spec block, we push TYPESET! BLOCK! TEXT! triples.
     // These will be split out into separate arrays after the process is done.
     // The first slot of the paramlist needs to be the function canon value,
@@ -895,9 +849,10 @@ REBARR *Make_Paramlist_Managed_May_Fail(
     // the function description--it will be extracted from the slot before
     // it is turned into a rootkey for param_notes.
     //
-    Init_Unreadable_Void(DS_PUSH()); // paramlist[0] becomes ACT_ARCHETYPE()
-    Move_Value(DS_PUSH(), EMPTY_BLOCK); // param_types[0] (object canon)
-    Move_Value(DS_PUSH(), EMPTY_TEXT); // param_notes[0] (desc, then canon)
+    Init_Void(KEY_SLOT(DSP), SYM_VOID);  // signal for no parameters pushed
+    Init_Unreadable_Void(PARAM_SLOT(DSP));  // not used at all
+    Init_Unreadable_Void(TYPES_SLOT(DSP));  // not used at all
+    Init_Nulled(NOTES_SLOT(DSP));  // overwritten if description
 
     // The process is broken up into phases so that the spec analysis code
     // can be reused in AUGMENT.
@@ -905,7 +860,6 @@ REBARR *Make_Paramlist_Managed_May_Fail(
     Push_Paramlist_Triads_May_Fail(
         spec,
         flags,
-        dsp_orig,
         &definitional_return_dsp
     );
     REBARR *paramlist = Pop_Paramlist_With_Meta_May_Fail(

@@ -113,7 +113,6 @@ REBNATIVE(n_shot)
     Init_Param(
         rootparam + 1,
         REB_P_NORMAL,
-        Canon(SYM_VALUE),  // !!! would SYM_CODE be better?
         FLAGIT_KIND(REB_BLOCK) | FLAGIT_KIND(REB_ACTION)
     );
     TERM_ARRAY_LEN(paramlist, 2);

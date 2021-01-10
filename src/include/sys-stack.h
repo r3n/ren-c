@@ -165,8 +165,13 @@
 // a stack location that is an end, e.g. DS_AT(dsp + 1), because that location
 // may be used as the start of a copy which is ultimately of length 0.
 //
+// We use the fact that the data stack is always dynamic to avoid having to
+// check if it is or not.  Although the stack can only hold fully specified
+// values, someone may also DS_PUSH() trash and then initialize it with
+// DS_AT(), so we don't check it with SPECIFIC() here.
+//
 inline static STKVAL(*) DS_AT(REBDSP d) {
-    REBVAL *at = SPECIFIC(ARR_HEAD(DS_Array) + d);
+    REBVAL *at = cast(REBVAL*, DS_Array->content.dynamic.data) + d;
     assert(
         ((at->header.bits & NODE_FLAG_CELL) and d <= (DSP + 1))
         or (not (SECOND_BYTE(at->header) != REB_0 and d == (DSP + 1)))

@@ -103,21 +103,22 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         fail ("AUGMENT doesn't yet work with reordered/partial functions");
 
     // We reuse the process from Make_Paramlist_Managed_May_Fail(), which
-    // pushes parameters to the stack in groups of three items per parameter.
+    // pushes descriptors to the stack in groups for each parameter.
 
     REBDSP dsp_orig = DSP;
     REBDSP definitional_return_dsp = 0;
 
-    // Start with pushing a cell for the special [0] slot
+    // Start with pushing nothings for the [0] slot
     //
-    Init_Unreadable_Void(DS_PUSH());  // paramlist[0] becomes ACT_ARCHETYPE()
-    Move_Value(DS_PUSH(), EMPTY_BLOCK);  // param_types[0] (object canon)
-    Move_Value(DS_PUSH(), EMPTY_TEXT);  // param_notes[0] (desc, then canon)
+    Init_Void(DS_PUSH(), SYM_VOID);  // key slot (signal for no pushes)
+    Init_Unreadable_Void(DS_PUSH());  // unused
+    Init_Unreadable_Void(DS_PUSH());  // unused
+    Init_Nulled(DS_PUSH());  // description slot
 
     REBFLGS flags = MKF_KEYWORDS;
     if (ACT_HAS_RETURN(augmentee)) {
         flags |= MKF_RETURN;
-        definitional_return_dsp = DSP + 1;
+        definitional_return_dsp = DSP + 4;
     }
 
     // For each parameter in the original function, we push a corresponding
@@ -127,15 +128,14 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     const REBKEY *key = ACT_KEYS_HEAD(augmentee);
     const REBPAR *param = ACT_PARAMS_HEAD(augmentee);
     for (; NOT_END_KEY(key); ++key) {
+        Init_Word(DS_PUSH(), KEY_SPELLING(key));
+
         Move_Value(DS_PUSH(), param);
-
-        VAL_TYPESET_STRING_NODE(DS_TOP)
-            = m_cast(REBNOD*, NOD(KEY_SPELLING(key)));  // !!! temp
-
         if (Is_Param_Hidden(param))
-            Seal_Param(DS_TOP);
-        Move_Value(DS_PUSH(), EMPTY_BLOCK);
-        Move_Value(DS_PUSH(), EMPTY_TEXT);
+            Seal_Param(DS_TOP);  // augment can use the same name as a local
+
+        Init_Nulled(DS_PUSH());  // types (inherits via INHERIT-META)
+        Init_Nulled(DS_PUSH());  // notes (inherits via INHERIT-META)
     }
   }
 
@@ -147,7 +147,6 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     Push_Paramlist_Triads_May_Fail(
         ARG(spec),
         &flags,
-        dsp_orig,
         &definitional_return_dsp
     );
 

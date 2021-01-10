@@ -677,6 +677,9 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 
     inline static const REBPAR* cast_PAR(const REBVAL *v)
         { return cast(const REBPAR*, v); }
+
+    inline static REBPAR* cast_PAR(REBVAL *v)
+        { return cast(REBPAR*, v); }
 #else
     #define REBVAR REBVAL
     #define REBPAR REBVAL

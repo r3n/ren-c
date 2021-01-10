@@ -1062,7 +1062,6 @@ REBCTX *Error_Not_Varargs(
     Init_Param(
         honest_param,
         REB_P_NORMAL,
-        KEY_SPELLING(key),
         FLAGIT_KIND(REB_VARARGS) // actually expected
     );
     UNUSED(honest_param);  // !!! pass to Error_Arg_Type(?)
@@ -1135,17 +1134,6 @@ REBCTX *Error_Bad_Value_Core(const RELVAL *value, REBSPC *specifier)
 REBCTX *Error_Bad_Value(const REBVAL *value)
 {
     return Error_Bad_Value_Core(value, SPECIFIED);
-}
-
-
-//
-//  Error_Bad_Func_Def_Core: C
-//
-REBCTX *Error_Bad_Func_Def_Core(const RELVAL *item, REBSPC *specifier)
-{
-    DECLARE_LOCAL (specific);
-    Derelativize(specific, item, specifier);
-    return Error_Bad_Func_Def_Raw(specific);
 }
 
 

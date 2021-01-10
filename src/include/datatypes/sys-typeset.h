@@ -85,12 +85,6 @@ inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
 //
 // Operations when typeset is done with a bitset (currently all typesets)
 
-#define VAL_TYPESET_STRING_NODE(v) \
-    PAYLOAD(Any, (v)).first.node
-
-#define VAL_TYPESET_STRING(v) \
-    STR(VAL_TYPESET_STRING_NODE(v))
-
 
 #define VAL_TYPESET_LOW_BITS(v) \
     PAYLOAD(Any, (v)).second.u32
@@ -422,22 +416,21 @@ inline static REBVAL *Init_Typeset(RELVAL *out, REBU64 bits)
 inline static REBVAL *Init_Param_Core(
     RELVAL *out,
     Reb_Param_Class pclass,
-    const REBSTR *spelling,
     REBU64 bits
 ){
     RESET_VAL_HEADER(out, REB_TYPESET, CELL_FLAG_FIRST_IS_NODE);
     mutable_KIND3Q_BYTE(out) = pclass;
 
-    VAL_TYPESET_STRING_NODE(out) = NOD(m_cast(REBSTR*, spelling));
+    PAYLOAD(Any, out).first.trash = nullptr;
     VAL_TYPESET_LOW_BITS(out) = bits & cast(uint32_t, 0xFFFFFFFF);
     VAL_TYPESET_HIGH_BITS(out) = bits >> 32;
     assert(IS_PARAM(out));
     return cast(REBVAL*, out);
 }
 
-#define Init_Param(out,pclass,spelling,bits) \
+#define Init_Param(out,pclass,bits) \
     Init_Param_Core( \
-        TRACK_CELL_IF_EXTENDED_DEBUG(out), (pclass), (spelling), (bits))
+        TRACK_CELL_IF_EXTENDED_DEBUG(out), (pclass), (bits))
 
 
 inline static REBVAL *Refinify(REBVAL *v);  // forward declaration

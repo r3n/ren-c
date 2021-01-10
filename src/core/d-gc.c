@@ -136,11 +136,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(VAL_TYPE_KIND_OR_CUSTOM(v) != REB_0);
         break;
 
-      case REB_TYPESET: {  // bitset bits don't need marking, but symbol may
-        if (GET_CELL_FLAG(v, FIRST_IS_NODE)) {
-            REBSTR *s = VAL_TYPESET_STRING(v);
-            assert(s == nullptr or Is_Marked(s));
-        }
+      case REB_TYPESET: {  // bitset bits don't need marking
         break; }
 
       case REB_BITSET: {
