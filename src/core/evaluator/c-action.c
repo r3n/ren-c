@@ -243,7 +243,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             goto continue_fulfilling;
         }
 
-        assert(IS_PARAM(f->param));
+        assert(IS_TYPESET(f->param));
 
   //=//// CHECK FOR ORDER OVERRIDE ////////////////////////////////////////=//
 
@@ -307,7 +307,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
       fulfill_arg: ;  // semicolon needed--next statement is declaration
 
-        Reb_Param_Class pclass = VAL_PARAM_CLASS(f->param);
+        enum Reb_Param_Class pclass = VAL_PARAM_CLASS(f->param);
 
   //=//// HANDLE IF NEXT ARG IS IN OUT SLOT (e.g. ENFIX, CHAIN) ///////////=//
 

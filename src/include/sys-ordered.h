@@ -391,21 +391,6 @@ inline static enum Reb_Kind BLOCKIFY_KIND(REBYTE k) {
 }
 
 
-//=//// "PARAM" CELLS /////////////////////////////////////////////////////=//
-//
-// !!! Due to the scarcity of bytes in cells, yet a desire to use them for
-// parameters, they are a kind of "container" class in the KIND3Q_BYTE() while
-// the actual CELL_KIND (via HEART_BYTE()) is a REB_TYPESET.
-//
-// Making the typeset expression more sophisticated to clearly express a list
-// of parameter flags is something planned for the near future.
-
-inline static bool IS_PARAM_KIND(REBYTE k)
-    { return k >= REB_P_OUTPUT and k <= REB_P_HARD; }
-
-#define IS_PARAM(v) \
-    IS_PARAM_KIND(KIND3Q_BYTE(v))
-
 // If a type can be used with the VAL_UTF8_XXX accessors
 
 inline static bool ANY_UTF8_KIND(REBYTE k)

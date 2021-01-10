@@ -446,13 +446,6 @@ void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
         Append_Ascii(mo->series, "~unreadable~");
         return;
     }
-    if (IS_PARAM(v)) {  // no hooks registered, set to heart byte
-        DECLARE_LOCAL (typeset);
-        Move_Value(typeset, SPECIFIC(v));
-        mutable_KIND3Q_BYTE(typeset) = REB_TYPESET;
-        Mold_Or_Form_Cell(mo, typeset, form);
-        return;
-    }
   #endif
 
     REBLEN depth = VAL_NUM_QUOTES(v);

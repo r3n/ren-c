@@ -361,7 +361,7 @@ bool Specialize_Action_Throws(
 
         assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
         assert(Is_Void_With_Sym(arg, SYM_UNSET));
-        assert(IS_PARAM(param));
+        assert(IS_TYPESET(param));
         Move_Value(arg, param);
         continue;
 
@@ -419,7 +419,7 @@ bool Specialize_Action_Throws(
 
             REBVAL *slot = CTX_VAR(exemplar, VAL_WORD_INDEX(ordered));
             if (NOT_CELL_FLAG(slot, ARG_MARKED_CHECKED)) {
-                assert(IS_PARAM(slot));
+                assert(IS_TYPESET(slot));
 
                 // It's still partial...
                 //
@@ -546,7 +546,7 @@ void For_Each_Unspecialized_Param(
         if (TYPE_CHECK(param, REB_TS_REFINEMENT))
             continue;
 
-        Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
+        enum Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
 
         REBFLGS flags = 0;
 
@@ -913,7 +913,7 @@ REBACT *Alloc_Action_From_Exemplar(
             Is_Void_With_Sym(arg, SYM_UNSET)
             and NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED)
         ){
-            assert(IS_PARAM(param));
+            assert(IS_TYPESET(param));
             Move_Value(arg, param);
             continue;
         }

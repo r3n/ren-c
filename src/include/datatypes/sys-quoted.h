@@ -111,8 +111,7 @@ inline static RELVAL *Quotify_Core(
     }
 
     REBYTE kind = KIND3Q_BYTE_UNCHECKED(v) % REB_64;  // HEART_BYTE may differ
-    if (kind >= REB_MAX)  // e.g. REB_P_XXX for params
-        assert(depth == 0);
+    assert(kind <= REB_MAX);
 
     depth += KIND3Q_BYTE_UNCHECKED(v) / REB_64;
 

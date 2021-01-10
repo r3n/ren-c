@@ -6,7 +6,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2012-2020 Ren-C Open Source Contributors
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
 // REBOL is a trademark of REBOL Technologies
 //
@@ -21,34 +21,32 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // A "context" is the abstraction behind OBJECT!, PORT!, FRAME!, ERROR!, etc.
-// It maps keys to values using two parallel arrays of equal length, whose
-// indices line up in correspondence:
+// It maps keys to values using two parallel series, whose indices line up in
+// correspondence:
 //
-//   "KEYLIST" - an array that contains IS_PARAM() cells, but which have a
-//   symbol ID encoded as an extra piece of information for that key.
+//   "KEYLIST" - a series of pointer-sized elements to REBSTR* symbols.
 //
-//   "VARLIST" - an array of equal length to the keylist, which holds an
-//   arbitrary REBVAL in each position that corresponds to its key.
+//   "VARLIST" - an array which holds an archetypal ANY-CONTEXT! value in its
+//   [0] element, and then a cell-sized slot for each variable.
 //
 // A `REBCTX*` is an alias of the varlist's `REBARR*`, and keylists are
 // reached through the `->link` of the varlist.  The reason varlists
 // are used as the identity of the context is that keylists can be shared
-// between contexts.  (If the context is for a FRAME! then the keylist is
-// actually the "paramlist" of the ACTION! it represents.)
+// between contexts.
 //
-// Indices into the arrays are 1-based for keys and values, with the [0]
-// elements of the keylist and varlist used for other purposes:
+// Indices into the arrays are 0-based for keys and 1-based for values, with
+// the [0] elements of the varlist used an archetypal value:
 //
-//    VARLIST ARRAY (aka REBCTX*)  ---Link-->         KEYLIST ARRAY
+//    VARLIST ARRAY (aka REBCTX*)  ---Link--+
+//  +------------------------------+        |
+//  +          "ROOTVAR"           |        |
+//  | Archetype ANY-CONTEXT! Value |        v         KEYLIST SERIES
 //  +------------------------------+        +-------------------------------+
-//  +          "ROOTVAR"           |        |           "ROOTKEY"           |
-//  | Archetype ANY-CONTEXT! Value |        |    Reserved for Future Use    |
+//  |      <opt> ANY-VALUE! 1      |        |     REBSTR* key symbol  1     |
 //  +------------------------------+        +-------------------------------+
-//  |      <opt> ANY-VALUE! 1      |        |     TYPESET! (w/symbol) 1     |
+//  |      <opt> ANY-VALUE! 2      |        |     REBSTR* key symbol 2      |
 //  +------------------------------+        +-------------------------------+
-//  |      <opt> ANY-VALUE! 2      |        |     TYPESET! (w/symbol) 2     |
-//  +------------------------------+        +-------------------------------+
-//  |      <opt> ANY-VALUE! ...    |        |     TYPESET! (w/symbol) ...   |
+//  |      <opt> ANY-VALUE! ...    |        |     REBSTR* key symbol ...    |
 //  +------------------------------+        +-------------------------------+
 //
 // (For executing frames, the ---Link--> is actually to the REBFRM* structure

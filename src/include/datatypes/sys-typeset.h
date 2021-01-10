@@ -86,6 +86,9 @@ inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
 // Operations when typeset is done with a bitset (currently all typesets)
 
 
+#define VAL_TYPESET_PARAM_CLASS_U32(v) \
+    PAYLOAD(Any, (v)).first.u32
+
 #define VAL_TYPESET_LOW_BITS(v) \
     PAYLOAD(Any, (v)).second.u32
 
@@ -190,8 +193,6 @@ inline static void CLEAR_ALL_TYPESET_BITS(RELVAL *v) {
 // packed in with the TYPESET_FLAG_XXX bits.
 //
 
-typedef enum Reb_Kind Reb_Param_Class;
-
     // `REB_P_NORMAL` is cued by an ordinary WORD! in the function spec
     // to indicate that you would like that argument to be evaluated normally.
     //
@@ -259,9 +260,9 @@ typedef enum Reb_Kind Reb_Param_Class;
     // character to type.
 
 
-inline static Reb_Param_Class VAL_PARAM_CLASS(const REBPAR *param) {
-    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(param)));
-    return cast(Reb_Param_Class, KIND3Q_BYTE_UNCHECKED(param));
+inline static enum Reb_Param_Class VAL_PARAM_CLASS(const REBPAR *param) {
+    assert(IS_TYPESET(param));
+    return cast(enum Reb_Param_Class, VAL_TYPESET_PARAM_CLASS_U32(param));
 }
 
 
@@ -333,10 +334,8 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(const REBPAR *param) {
 //
 inline static bool Is_Param_Hidden(const REBPAR *param)
 {
-    if (GET_CELL_FLAG(param, ARG_MARKED_CHECKED)) {
-        assert(not IS_PARAM(param));
+    if (GET_CELL_FLAG(param, ARG_MARKED_CHECKED))
         return true;
-    }
 
     // unchecked parameters in an exemplar frame may be PARAM!, but if they
     // are an ordinary FRAME! they will not be.  Review if better asserts are
@@ -347,10 +346,8 @@ inline static bool Is_Param_Hidden(const REBPAR *param)
 
 inline static bool Is_Var_Hidden(const REBVAR *var)
 {
-    if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED)) {
-        assert(not IS_PARAM(var));
+    if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED))
         return true;
-    }
 
     // unchecked parameters in an exemplar frame may be PARAM!, but if they
     // are an ordinary FRAME! they will not be.  Review if better asserts are
@@ -401,6 +398,7 @@ inline static bool Is_Param_Sealed(const REBPAR *param) {
 inline static REBVAL *Init_Typeset(RELVAL *out, REBU64 bits)
 {
     RESET_CELL(out, REB_TYPESET, CELL_MASK_NONE);
+    VAL_TYPESET_PARAM_CLASS_U32(out) = REB_P_NORMAL;
     VAL_TYPESET_LOW_BITS(out) = bits & cast(uint32_t, 0xFFFFFFFF);
     VAL_TYPESET_HIGH_BITS(out) = bits >> 32;
     return cast(REBVAL*, out);
@@ -415,16 +413,14 @@ inline static REBVAL *Init_Typeset(RELVAL *out, REBU64 bits)
 //
 inline static REBVAL *Init_Param_Core(
     RELVAL *out,
-    Reb_Param_Class pclass,
+    enum Reb_Param_Class pclass,
     REBU64 bits
 ){
-    RESET_VAL_HEADER(out, REB_TYPESET, CELL_FLAG_FIRST_IS_NODE);
-    mutable_KIND3Q_BYTE(out) = pclass;
+    RESET_VAL_HEADER(out, REB_TYPESET, CELL_MASK_NONE);
 
-    PAYLOAD(Any, out).first.trash = nullptr;
+    VAL_TYPESET_PARAM_CLASS_U32(out) = pclass;
     VAL_TYPESET_LOW_BITS(out) = bits & cast(uint32_t, 0xFFFFFFFF);
     VAL_TYPESET_HIGH_BITS(out) = bits >> 32;
-    assert(IS_PARAM(out));
     return cast(REBVAL*, out);
 }
 

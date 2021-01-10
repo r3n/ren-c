@@ -238,7 +238,6 @@ e-types/emit {
 
         REB_0 = REB_0_END,  /* REB_0 when used for signals besides ENDness */
         REB_TS_ENDABLE = REB_0,  /* bit set in typesets for endability */
-        REB_P_DETECT = REB_0,  /* detect paramclass from vararg */
 
         /*** TEMP FAKERY TO HAVE A TYPESET BIT FOR INVISIBILITY ***/
 
@@ -248,12 +247,10 @@ e-types/emit {
 
         PSEUDOTYPE_ONE = REB_MAX,
         REB_R_THROWN = PSEUDOTYPE_ONE,
-        REB_P_OUTPUT = PSEUDOTYPE_ONE,
         REB_TS_VARIADIC = PSEUDOTYPE_ONE,
 
         PSEUDOTYPE_TWO,
         REB_R_INVISIBLE = PSEUDOTYPE_TWO,
-        REB_P_NORMAL = PSEUDOTYPE_TWO,
         REB_TS_SKIPPABLE = PSEUDOTYPE_TWO,
       #if defined(DEBUG_TRASH_MEMORY)
         REB_T_TRASH = PSEUDOTYPE_TWO,  /* identify trash in debug build */
@@ -261,21 +258,17 @@ e-types/emit {
 
         PSEUDOTYPE_THREE,
         REB_R_REDO = PSEUDOTYPE_THREE,
-        REB_P_MODAL = PSEUDOTYPE_THREE,  /* can act like REB_P_HARD */
         REB_TS_3 = PSEUDOTYPE_THREE,
 
         PSEUDOTYPE_FOUR,
         REB_R_REFERENCE = PSEUDOTYPE_FOUR,
-        REB_P_SOFT = PSEUDOTYPE_FOUR,
         REB_TS_IN_OUT = PSEUDOTYPE_FOUR,
 
         PSEUDOTYPE_FIVE,
         REB_R_IMMEDIATE = PSEUDOTYPE_FIVE,
-        REB_P_MEDIUM = PSEUDOTYPE_FIVE,
         REB_TS_NOOP_IF_BLANK = PSEUDOTYPE_FIVE,
 
         PSEUDOTYPE_SIX,
-        REB_P_HARD = PSEUDOTYPE_SIX,
         REB_G_XYF = PSEUDOTYPE_SIX,  /* used by GOB, compact 2xfloat */
         REB_TS_CONST = PSEUDOTYPE_SIX,
 

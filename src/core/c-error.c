@@ -1053,6 +1053,7 @@ REBCTX *Error_Not_Varargs(
 ){
     assert(Is_Param_Variadic(param));
     assert(kind != REB_VARARGS);
+    UNUSED(param);
 
     // Since the "types accepted" are a lie (an [integer! <variadic>] takes
     // VARARGS! when fulfilled in a frame directly, not INTEGER!) then
@@ -1087,7 +1088,7 @@ REBCTX *Error_Not_Varargs(
 //
 REBCTX *Error_Invalid_Arg(REBFRM *f, const REBPAR *param)
 {
-    assert(IS_PARAM(param));
+    assert(IS_TYPESET(param));
 
     const REBPAR *headparam = ACT_PARAMS_HEAD(FRM_PHASE(f));
     assert(param >= headparam);

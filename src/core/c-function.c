@@ -284,7 +284,7 @@ void Push_Paramlist_Triads_May_Fail(
         enum Reb_Kind kind = CELL_KIND(cell);
 
         const REBSTR* spelling = nullptr;  // avoids compiler warning
-        Reb_Param_Class pclass = REB_P_DETECT;  // error if not changed below
+        enum Reb_Param_Class pclass = REB_P_DETECT;  // error if not changed
 
         bool refinement = false;  // paths with blanks at head are refinements
         if (ANY_PATH_KIND(kind)) {
@@ -328,7 +328,7 @@ void Push_Paramlist_Triads_May_Fail(
             // but it's now another way to name locals.
             //
             if (IS_PREDICATE1_CELL(cell) and not quoted) {
-                pclass = REB_VOID;
+                pclass = REB_P_LOCAL;
                 spelling = VAL_PREDICATE1_SPELLING(cell);
             }
         }
@@ -337,7 +337,7 @@ void Push_Paramlist_Triads_May_Fail(
 
             if (kind == REB_SET_WORD) {
                 if (VAL_WORD_SYM(cell) == SYM_RETURN and not quoted) {
-                    pclass = REB_VOID;
+                    pclass = REB_P_LOCAL;
                 }
                 else if (not quoted) {
                     refinement = true;  // sets REB_TS_REFINEMENT (optional)
@@ -377,14 +377,14 @@ void Push_Paramlist_Triads_May_Fail(
             fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
         if (mode != SPEC_MODE_NORMAL) {
-            if (pclass != REB_P_NORMAL and pclass != REB_VOID)
+            if (pclass != REB_P_NORMAL and pclass != REB_P_LOCAL)
                 fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
             if (mode == SPEC_MODE_LOCAL)
-                pclass = REB_VOID;
+                pclass = REB_P_LOCAL;
         }
 
-        if (STR_SYMBOL(spelling) == SYM_RETURN and pclass != REB_VOID) {
+        if (STR_SYMBOL(spelling) == SYM_RETURN and pclass != REB_P_LOCAL) {
             //
             // Cancel definitional return if any non-SET-WORD! uses the name
             // RETURN when defining a FUNC.
@@ -424,7 +424,7 @@ void Push_Paramlist_Triads_May_Fail(
         // If the typeset bits contain REB_NULL, that indicates <opt>.
         // But Is_Param_Endable() indicates <end>.
 
-        if (pclass == REB_VOID) {
+        if (pclass == REB_P_LOCAL) {
             Init_Void(param, SYM_UNSET);
             SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
         }
@@ -458,7 +458,7 @@ void Push_Paramlist_Triads_May_Fail(
                 Init_Word(word, spelling);
                 fail (Error_Dup_Vars_Raw(word));  // most dup checks are later
             }
-            if (pclass == REB_VOID)
+            if (pclass == REB_P_LOCAL)
                 *definitional_return_dsp = DSP;  // RETURN: explicit
             else
                 *flags &= ~MKF_RETURN;
@@ -605,6 +605,10 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         Move_Value(param, slot);
         if (GET_CELL_FLAG(slot, ARG_MARKED_CHECKED))
             SET_CELL_FLAG(param, ARG_MARKED_CHECKED);
+
+      #if !defined(NDEBUG)
+        SET_CELL_FLAG(param, PROTECTED);
+      #endif
 
         ++key;
         ++param;
@@ -1278,7 +1282,7 @@ REBNATIVE(tweak)
     REBACT *act = VAL_ACTION(ARG(action));
     const REBPAR *first = First_Unspecialized_Param(nullptr, act);
 
-    Reb_Param_Class pclass = first
+    enum Reb_Param_Class pclass = first
         ? VAL_PARAM_CLASS(first)
         : REB_P_NORMAL;  // imagine it as <end>able
 

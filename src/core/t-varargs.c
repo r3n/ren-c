@@ -48,7 +48,7 @@ inline static bool Vararg_Op_If_No_Advance_Handled(
     enum Reb_Vararg_Op op,
     const RELVAL *opt_look, // the first value in the varargs input
     REBSPC *specifier,
-    Reb_Param_Class pclass
+    enum Reb_Param_Class pclass
 ){
     if (IS_END(opt_look)) {
         Init_For_Vararg_End(out, op); // exhausted
@@ -138,7 +138,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
     REBVAL *out,
     enum Reb_Vararg_Op op,
     const RELVAL *vararg,
-    enum Reb_Kind pclass // use REB_P_DETECT to use what's in the vararg
+    enum Reb_Param_Class pclass  // REB_P_DETECT to use what's in the vararg
 ){
     TRASH_CELL_IF_DEBUG(out);
 
@@ -582,7 +582,7 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
 
     Append_Codepoint(mo->series, '[');
 
-    Reb_Param_Class pclass;
+    enum Reb_Param_Class pclass;
     const REBKEY *key;
     const REBPAR *param = Param_For_Varargs_Maybe_Null(&key, v);
     if (param == NULL) {

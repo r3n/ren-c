@@ -310,6 +310,21 @@ typedef uint_fast32_t REBDSP; // Note: 0 for empty stack ([0] entry is trash)
 typedef REBVAL *REB_R;
 
 
+//=//// PARAMETER CLASSES ////////////////////////////////////////////////=//
+
+enum Reb_Param_Class {
+    REB_P_NORMAL,
+    REB_P_OUTPUT,
+    REB_P_MODAL,  /* can act like REB_P_HARD */
+    REB_P_SOFT,
+    REB_P_MEDIUM,
+    REB_P_HARD,
+
+    REB_P_DETECT,
+    REB_P_LOCAL
+};
+
+
 //=//// TYPE HOOKS ///////////////////////////////////////////////////////=//
 
 

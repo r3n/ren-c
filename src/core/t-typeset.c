@@ -132,7 +132,7 @@ bool Add_Typeset_Bits_Core(
     const RELVAL *head,
     REBSPC *specifier
 ) {
-    assert(IS_TYPESET(typeset) or IS_PARAM(typeset));
+    assert(IS_TYPESET(typeset));
 
     const RELVAL *maybe_word = head;
     for (; NOT_END(maybe_word); ++maybe_word) {
@@ -204,7 +204,7 @@ bool Add_Typeset_Bits_Core(
                 // `@arg` notation is used), but the native specs are loaded
                 // by a boostrap r3 that can't read them.
                 //
-                mutable_KIND3Q_BYTE(typeset) = REB_P_MODAL;
+                VAL_TYPESET_PARAM_CLASS_U32(typeset) = REB_P_MODAL;
             }
         }
         else if (IS_DATATYPE(item)) {
