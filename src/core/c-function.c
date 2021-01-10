@@ -260,7 +260,7 @@ void Push_Paramlist_Triads_May_Fail(
             VAL_TYPESET_LOW_BITS(param) = 0;
             VAL_TYPESET_HIGH_BITS(param) = 0;
             Add_Typeset_Bits_Core(
-                param,
+                cast_PAR(param),
                 ARR_HEAD(VAL_ARRAY(item)),
                 derived
             );

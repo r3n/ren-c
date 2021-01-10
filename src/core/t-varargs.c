@@ -143,7 +143,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
     TRASH_CELL_IF_DEBUG(out);
 
     const REBKEY *key;
-    const RELVAL *param = Param_For_Varargs_Maybe_Null(&key, vararg);
+    const REBPAR *param = Param_For_Varargs_Maybe_Null(&key, vararg);
     if (pclass == REB_P_DETECT)
         pclass = VAL_PARAM_CLASS(param);
 
@@ -584,7 +584,7 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
 
     Reb_Param_Class pclass;
     const REBKEY *key;
-    const RELVAL *param = Param_For_Varargs_Maybe_Null(&key, v);
+    const REBPAR *param = Param_For_Varargs_Maybe_Null(&key, v);
     if (param == NULL) {
         pclass = REB_P_HARD;
         Append_Ascii(mo->series, "???"); // never bound to an argument

@@ -259,9 +259,9 @@ typedef enum Reb_Kind Reb_Param_Class;
     // character to type.
 
 
-inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
-    return cast(Reb_Param_Class, KIND3Q_BYTE_UNCHECKED(v));
+inline static Reb_Param_Class VAL_PARAM_CLASS(const REBPAR *param) {
+    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(param)));
+    return cast(Reb_Param_Class, KIND3Q_BYTE_UNCHECKED(param));
 }
 
 
@@ -448,7 +448,7 @@ inline static bool IS_PREDICATE(const RELVAL *v);  // forward decl
 // instead of checking typeset bit flags directly.
 //
 inline static bool Typecheck_Including_Constraints(
-    const RELVAL *param,
+    const REBPAR *param,
     const RELVAL *v
 ){
     if (VAL_PARAM_CLASS(param) == REB_P_OUTPUT) {
@@ -507,7 +507,7 @@ inline static bool Is_Blackhole(const RELVAL *v);
 // the slot--this happens after that.
 //
 inline static void Typecheck_Refinement(
-    const RELVAL *param,
+    const REBPAR *param,
     REBVAL *arg
 ){
     assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));

@@ -128,7 +128,7 @@ void Shutdown_Typesets(void)
 // reviewed to see if anything actually used it.
 //
 bool Add_Typeset_Bits_Core(
-    RELVAL *typeset,
+    REBPAR *typeset,
     const RELVAL *head,
     REBSPC *specifier
 ) {
@@ -273,7 +273,11 @@ REB_R MAKE_Typeset(
     if (!IS_BLOCK(arg)) goto bad_make;
 
     Init_Typeset(out, 0);
-    Add_Typeset_Bits_Core(out, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
+    Add_Typeset_Bits_Core(
+        cast_PAR(out),
+        VAL_ARRAY_AT(arg),
+        VAL_SPECIFIER(arg)
+    );
     return out;
 
   bad_make:

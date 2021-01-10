@@ -192,7 +192,7 @@ inline static bool Is_Frame_Style_Varargs_May_Fail(
     (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0)
 
 
-inline static const REBVAL *Param_For_Varargs_Maybe_Null(
+inline static const REBPAR *Param_For_Varargs_Maybe_Null(
     const REBKEY **key,
     REBCEL(const*) v
 ){
@@ -207,7 +207,7 @@ inline static const REBVAL *Param_For_Varargs_Maybe_Null(
                     phase,
                     (- VAL_VARARGS_SIGNED_PARAM_INDEX(v)) - 1
                 );
-            return cast(REBVAL*, ARR_AT(
+            return cast(REBPAR*, ARR_AT(
                 paramlist,
                 - VAL_VARARGS_SIGNED_PARAM_INDEX(v)
             ));
@@ -217,7 +217,7 @@ inline static const REBVAL *Param_For_Varargs_Maybe_Null(
             phase,
             VAL_VARARGS_SIGNED_PARAM_INDEX(v) - 1
         );
-        return cast(REBVAL*, ARR_AT(
+        return cast(REBPAR*, ARR_AT(
             paramlist,
             VAL_VARARGS_SIGNED_PARAM_INDEX(v)
         ));
