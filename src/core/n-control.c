@@ -645,16 +645,17 @@ REBNATIVE(match)
         // but actually captures its first argument.  That will be MATCH's
         // return value if the filter function returns a truthy result.
 
-        REBVAL *first_arg;
-        if (Make_Invocation_Frame_Throws(f, &first_arg, test)) {
+        if (Make_Invocation_Frame_Throws(f, test)) {
             Drop_Frame(f);
             return R_THROWN;
         }
 
-        if (not first_arg)
+        REBVAL *first = First_Unspecialized_Arg(nullptr, f);
+
+        if (not first)
             fail ("MATCH with a function pattern must take at least 1 arg");
 
-        Move_Value(D_OUT, first_arg); // steal first argument before call
+        Move_Value(D_OUT, first);  // steal first argument before call
 
         DECLARE_LOCAL (temp);
         f->out = SET_END(temp);

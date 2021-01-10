@@ -121,23 +121,18 @@ REBNATIVE(generic)
     // be able to inventory which types had registered generic dispatchers
     // and list the appropriate types from HELP.
     //
-
-
-    // !!!
-    // !!! TEMPORARY - DISABLING RETURN CHECKS
-    // !!!
-    /*
-    RELVAL *param = ARR_AT(paramlist, 1);
-    const REBPAR *param = ACT_PARAMS_HEAD(generic);
-    if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
-        assert(KEY_SYM(param) == SYM_RETURN);
-        TYPE_SET(special, REB_CUSTOM);
-        ++special;
+    REBPAR *param = m_cast(REBPAR*, ACT_PARAMS_HEAD(generic));
+    if (ACT_HAS_RETURN(generic)) {
+        /*TYPE_SET(param, REB_CUSTOM);*/  // !!! Temp while RETURN worked out
+        ++param;
     }
-    while (VAL_PARAM_CLASS(special) != REB_P_NORMAL)
-        ++special;
-    TYPE_SET(special, REB_CUSTOM);
-    */
+    while (
+        not Is_Param_Hidden(param)
+        and VAL_PARAM_CLASS(param) != REB_P_NORMAL
+    ){
+        ++param;
+    }
+    TYPE_SET(param, REB_CUSTOM);
 
     SET_ACTION_FLAG(generic, IS_NATIVE);
 

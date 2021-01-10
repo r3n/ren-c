@@ -117,13 +117,10 @@ REB_R Reframer_Dispatcher(REBFRM *f)
     Move_Value(action, sub->out);
     PUSH_GC_GUARD(action);
 
-    REBVAL *first_arg;
-    if (Make_Invocation_Frame_Throws(sub, &first_arg, action)) {
+    if (Make_Invocation_Frame_Throws(sub, action)) {
         DROP_GC_GUARD(action);
         return R_THROWN;
     }
-
-    UNUSED(first_arg); // MATCH uses to get its answer faster, we don't need
 
     REBACT *act = VAL_ACTION(action);
 

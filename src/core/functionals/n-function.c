@@ -372,8 +372,13 @@ REBACT *Make_Interpreted_Action_May_Fail(
         else if (ACT_HAS_RETURN(a)) {
             const REBPAR *param = ACT_PARAMS_HEAD(a);
             assert(KEY_SYM(ACT_KEYS_HEAD(a)) == SYM_RETURN);
+
+         // !!! Temporary disablement due to RETURN issue
+          /*
             if (not TYPE_CHECK(param, REB_VOID))  // `do []` returns
                 ACT_DISPATCHER(a) = &Returner_Dispatcher;  // error when run
+          */
+          UNUSED(param);
         }
         else {
             // Keep the Void_Dispatcher passed in above
