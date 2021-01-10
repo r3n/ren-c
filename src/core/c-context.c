@@ -38,15 +38,15 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
     assert(not (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED));  // LINK is taken
 
     REBSER *keylist = Make_Series_Core(
-        capacity + 1,  // size + terminator
+        capacity,  // no terminator
         sizeof(REBKEY),
         SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED  // always shareable
     );
     LINK_ANCESTOR_NODE(keylist) = NOD(keylist);  // default to keylist itself
-    TERM_SEQUENCE_LEN(keylist, 0);  // need terminating END_KEY
+    assert(SER_USED(keylist) == 0);
 
     REBARR *varlist = Make_Array_Core(
-        capacity + 1,  // size + room for rootvar
+        capacity + 1,  // size + room for rootvar (array terminator implicit)
         SERIES_MASK_VARLIST  // includes assurance of dynamic allocation
             | flags  // e.g. NODE_FLAG_MANAGED
     );
@@ -169,14 +169,13 @@ REBVAL *Append_Context(
     // Review why this is expanding when the callers are expanding.  Should
     // also check that redundant keys aren't getting added here.
     //
-    EXPAND_SERIES_TAIL(keylist, 1);
+    EXPAND_SERIES_TAIL(keylist, 1);  // updates the used count
     Init_Key(
         SER_LAST(REBKEY, keylist),
         spelling
             ? unwrap(spelling)
             : VAL_WORD_SPELLING(VAL_UNESCAPED(unwrap(any_word)))
     );
-    TERM_SEQUENCE_LEN(keylist, SER_USED(keylist));
 
     // Add a slot to the var list
     //
@@ -281,7 +280,8 @@ void Collect_Context_Keys(
     REBCTX *context,
     bool check_dups // check for duplicates (otherwise assume unique)
 ){
-    const REBKEY *key = CTX_KEYS_HEAD(context);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, context);
 
     assert(cl->index >= 1); // 0 in bind table means "not present"
 
@@ -296,7 +296,7 @@ void Collect_Context_Keys(
     RELVAL *collect = ARR_TAIL(BUF_COLLECT);  // *after* expansion
 
     if (check_dups) {
-        for (; NOT_END_KEY(key); key++) {
+        for (; key != tail; key++) {
             const REBSTR *symbol = KEY_SPELLING(key);
             if (not Try_Add_Binder_Index(&cl->binder, symbol, cl->index))
                 continue; // don't collect if already in bind table
@@ -318,7 +318,7 @@ void Collect_Context_Keys(
     else {
         // Optimized add of all keys to bind table and collect buffer.
         //
-        for (; NOT_END_KEY(key); ++key, ++collect, ++cl->index) {
+        for (; key != tail; ++key, ++collect, ++cl->index) {
             Init_Word(collect, KEY_SPELLING(key));
             Add_Binder_Index(&cl->binder, KEY_SPELLING(key), cl->index);
         }
@@ -432,7 +432,7 @@ REBSER *Collect_Keylist_Managed(
 
         REBLEN len = ARR_LEN(BUF_COLLECT) - 1;  // don't count unreadable [0]
         keylist = Make_Series_Core(
-            len + 1,  // - 1 unreadable void, + 1 terminator
+            len,  // no terminator
             sizeof(REBKEY),
             SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
         );
@@ -442,8 +442,7 @@ REBSER *Collect_Keylist_Managed(
         for (; NOT_END(word); ++word, ++key)
             Init_Key(key, VAL_WORD_SPELLING(word));
 
-        TERM_SEQUENCE_LEN(keylist, len);
-        assert(IS_END_KEY(SER_TAIL(const REBKEY, keylist)));
+        SET_SERIES_USED(keylist, len);  // no terminator
     }
 
     Collect_End(cl);
@@ -509,8 +508,9 @@ REBARR *Collect_Unique_Words_Managed(
         }
     }
     else if (ANY_CONTEXT(ignore)) {
-        const REBKEY *key = CTX_KEYS_HEAD(VAL_CONTEXT(ignore));
-        for (; NOT_END_KEY(key); ++key) {
+        const REBKEY *tail;
+        const REBKEY *key = CTX_KEYS(&tail, VAL_CONTEXT(ignore));
+        for (; key != tail; ++key) {
             //
             // Shouldn't be possible to have an object with duplicate keys,
             // use plain Add_Binder_Index.
@@ -559,8 +559,9 @@ REBARR *Collect_Unique_Words_Managed(
         }
     }
     else if (ANY_CONTEXT(ignore)) {
-        const REBKEY *key = CTX_KEYS_HEAD(VAL_CONTEXT(ignore));
-        for (; NOT_END_KEY(key); ++key)
+        const REBKEY *tail;
+        const REBKEY *key = CTX_KEYS(&tail, VAL_CONTEXT(ignore));
+        for (; key != tail; ++key)
             Remove_Binder_Index(&cl->binder, KEY_SPELLING(key));
     }
     else
@@ -751,19 +752,21 @@ REBCTX *Construct_Context_Managed(
 //
 REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
 {
+    REBCTX *c = VAL_CONTEXT(context);
     REBDSP dsp_orig = DSP;
 
     bool always = false;  // default to not always showing hidden things
     if (IS_FRAME(context))
         always = IS_FRAME_PHASED(context);
 
-    const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(context);
-    const REBVAR *var = VAL_CONTEXT_VARS_HEAD(context);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, c);
+    const REBVAR *var = CTX_VARS_HEAD(c);
 
     assert(!(mode & 4));
 
     REBLEN n = 1;
-    for (; NOT_END_KEY(key); n++, key++, var++) {
+    for (; key != tail; ++key, ++var, ++n) {
         if (IS_FRAME(context) and Is_Param_Sealed(cast_PAR(var)))
             continue;
 
@@ -887,9 +890,10 @@ REBCTX *Merge_Contexts_Managed(REBCTX *parent1, REBCTX *parent2)
     TERM_ARRAY_LEN(varlist, ARR_LEN(keylist));
 
     // Copy parent2 values:
-    const REBKEY *key = CTX_KEYS_HEAD(parent2);
-    REBVAL *value = CTX_VARS_HEAD(parent2);
-    for (; NOT_END_KEY(key); key++, value++) {
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, parent2);
+    REBVAR *var = CTX_VARS_HEAD(parent2);
+    for (; key != tail; ++key, ++var) {
         // no need to search when the binding table is available
         REBINT n = Get_Binder_Index_Else_0(
             &collector.binder, KEY_SPELLING(key)
@@ -901,7 +905,7 @@ REBCTX *Merge_Contexts_Managed(REBCTX *parent1, REBCTX *parent2)
         //
         REBFLGS flags = NODE_FLAG_MANAGED;  // !!! Review, which flags?
         Clonify(
-            Move_Value(CTX_VAR(merged, n), value),
+            Move_Value(CTX_VAR(merged, n), var),
             flags,
             TS_CLONE
         );
@@ -955,8 +959,10 @@ void Resolve_Context(
     // If limited resolve, tag the word ids that need to be copied:
     if (i != 0) {
         // Only the new words of the target:
-        const REBKEY *key = CTX_KEY(target, i);
-        for (; NOT_END_KEY(key); key++)
+        const REBKEY *tail;
+        const REBKEY *key = CTX_KEYS(&tail, target);
+        key += (i - 1);
+        for (; key != tail; key++)
             Add_Binder_Index(&binder, KEY_SPELLING(key), -1);
         n = CTX_LEN(target);
     }
@@ -977,8 +983,9 @@ void Resolve_Context(
     // Expand target as needed:
     if (expand and n > 0) {
         // Determine how many new words to add:
-        const REBKEY *key = CTX_KEYS_HEAD(target);
-        for (; NOT_END_KEY(key); key++)
+        const REBKEY *tail;
+        const REBKEY *key = CTX_KEYS(&tail, target);
+        for (; key != tail; key++)
             if (Get_Binder_Index_Else_0(&binder, KEY_SPELLING(key)) != 0)
                 --n;
 
@@ -994,9 +1001,10 @@ void Resolve_Context(
     // Done by marking all source words (in bind table):
     //
   blockscope {
-    const REBKEY *key = CTX_KEYS_HEAD(source);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, source);
     REBINT n = 1;
-    for (; NOT_END_KEY(key); n++, key++) {
+    for (; key != tail; n++, key++) {
         const REBSTR *symbol = KEY_SPELLING(key);
         if (IS_NULLED(only_words))
             Add_Binder_Index(&binder, symbol, n);
@@ -1012,9 +1020,13 @@ void Resolve_Context(
     // Foreach word in target, copy the correct value from source:
     //
   blockscope {
-    const REBKEY *key = i != 0 ? CTX_KEY(target, i) : CTX_KEYS_HEAD(target);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, target);
+    if (i != 0)
+        key += (i - 1);
+
     REBVAL *var = i != 0 ? CTX_VAR(target, i) : CTX_VARS_HEAD(target);
-    for (; NOT_END_KEY(key); key++, var++) {
+    for (; key != tail; key++, var++) {
         REBINT m = Remove_Binder_Index_Else_0(&binder, KEY_SPELLING(key));
         if (m != 0) {
             // "the remove succeeded, so it's marked as set now" (old comment)
@@ -1031,9 +1043,10 @@ void Resolve_Context(
 
     // Add any new words and values:
     if (expand) {
-        const REBKEY *key = CTX_KEYS_HEAD(source);
+        const REBKEY *tail;
+        const REBKEY *key = CTX_KEYS(&tail, source);
         REBINT n = 1;
-        for (; NOT_END_KEY(key); n++, key++) {
+        for (; key != tail; n++, key++) {
             const REBSTR *canon = KEY_SPELLING(key);
             if (Remove_Binder_Index_Else_0(&binder, canon) != 0) {
                 //
@@ -1052,8 +1065,10 @@ void Resolve_Context(
         // but the fault-tolerant Remove_Binder_Index_Else_0()
         //
         if (i != 0) {
-            const REBKEY *key = CTX_KEY(target, i);
-            for (; NOT_END_KEY(key); key++)
+            const REBKEY *tail;
+            const REBKEY *key = CTX_KEYS(&tail, target);
+            key += (i - 1);
+            for (; key != tail; key++)
                 Remove_Binder_Index_Else_0(&binder, KEY_SPELLING(key));
         }
         else if (IS_BLOCK(only_words)) {
@@ -1064,8 +1079,9 @@ void Resolve_Context(
             }
         }
         else {
-            const REBKEY *key = CTX_KEYS_HEAD(source);
-            for (; NOT_END_KEY(key); key++)
+            const REBKEY *tail;
+            const REBKEY *key = CTX_KEYS(&tail, source);
+            for (; key != tail; key++)
                 Remove_Binder_Index_Else_0(&binder, KEY_SPELLING(key));
         }
     }
@@ -1090,6 +1106,8 @@ REBLEN Find_Symbol_In_Context(
     const REBSTR *symbol,
     bool strict
 ){
+    REBCTX *c = VAL_CONTEXT(context);
+
     bool always = true;
     if (IS_FRAME(context))
         always = IS_FRAME_PHASED(context);
@@ -1099,11 +1117,12 @@ REBLEN Find_Symbol_In_Context(
         // that are hidden with PROTECT/HIDE.  SELF needs a lot of review.
     }
 
-    const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(context);
-    const REBVAR *var = VAL_CONTEXT_VARS_HEAD(context);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, c);
+    const REBVAR *var = CTX_VARS_HEAD(c);
 
     REBLEN n;
-    for (n = 1; NOT_END_KEY(key); ++n, ++key, ++var) {
+    for (n = 1; key != tail; ++n, ++key, ++var) {
         if (strict) {
             if (symbol != KEY_SPELLING(key))
                 continue;
@@ -1230,11 +1249,6 @@ void Assert_Context_Core(REBCTX *c)
 
     REBLEN n;
     for (n = 1; n < vars_len; n++, var++, key++) {
-        if (IS_END_KEY(key)) {
-            printf("** Early key end at index: %d\n", cast(int, n));
-            panic (c);
-        }
-
         if (not IS_SER_STRING(*key) and IS_STR_SYMBOL(STR(*key)))
             panic (*key);
 
@@ -1242,11 +1256,6 @@ void Assert_Context_Core(REBCTX *c)
             printf("** Early var end at index: %d\n", cast(int, n));
             panic (c);
         }
-    }
-
-    if (NOT_END_KEY(key)) {
-        printf("** Missing key end at index: %d\n", cast(int, n));
-        panic (key);
     }
 
     if (NOT_END(var)) {

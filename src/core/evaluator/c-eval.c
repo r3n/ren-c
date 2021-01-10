@@ -1105,9 +1105,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         REBDSP dsp_outputs = DSP;
 
       blockscope {
-        const REBKEY *key = ACT_KEYS_HEAD(VAL_ACTION(f_spare));
+        const REBKEY *tail;
+        const REBKEY *key = ACT_KEYS(&tail, VAL_ACTION(f_spare));
         const REBPAR *param = ACT_PARAMS_HEAD(VAL_ACTION(f_spare));
-        for (; NOT_END_KEY(key); ++key, ++param) {
+        for (; key != tail; ++key, ++param) {
             if (Is_Param_Hidden(param))
                 continue;
             if (VAL_PARAM_CLASS(param) != REB_P_OUTPUT)

@@ -547,7 +547,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     SET_SERIES_FLAG(paramlist, FIXED_SIZE);
 
     REBSER *keylist = Make_Series_Core(
-        (num_slots - 1) + 1,  // - 1 archetype, + 1 terminator
+        (num_slots - 1),  // - 1 archetype
         sizeof(REBKEY),
         NODE_FLAG_MANAGED | SERIES_MASK_KEYLIST
     );
@@ -617,7 +617,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     TERM_ARRAY_LEN(paramlist, num_slots);
     Manage_Series(paramlist);
 
-    TERM_SEQUENCE_LEN(keylist, ARR_LEN(paramlist) - 1);
+    SET_SERIES_USED(keylist, num_slots - 1);  // no terminator
     INIT_LINK_KEYSOURCE(paramlist, NOD(keylist));
     MISC_META_NODE(paramlist) = nullptr;
   }
@@ -625,9 +625,10 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     // Must remove binder indexes for all words, even if about to fail
     //
   blockscope {
-    const REBKEY *key = SER_AT(REBKEY, keylist, 0);
+    const REBKEY *tail = SER_TAIL(REBKEY, keylist);
+    const REBKEY *key = SER_HEAD(REBKEY, keylist);
     const REBPAR *param = SER_AT(REBPAR, paramlist, 1);
-    for (; NOT_END_KEY(key); ++key, ++param) {
+    for (; key != tail; ++key, ++param) {
         if (Is_Param_Sealed(param))
             continue;
         if (Remove_Binder_Index_Else_0(&binder, KEY_SPELLING(key)) == 0)

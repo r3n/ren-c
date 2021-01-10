@@ -155,8 +155,10 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // fields of objects do not figure into the `equal?` of their public
     // portions.
 
-    const REBKEY *key1 = CTX_KEYS_HEAD(c1);
-    const REBKEY *key2 = CTX_KEYS_HEAD(c2);
+    const REBKEY *tail1;
+    const REBKEY *key1 = CTX_KEYS(&tail1, c1);
+    const REBKEY *tail2;
+    const REBKEY *key2 = CTX_KEYS(&tail2, c2);
     const REBVAR *var1 = CTX_VARS_HEAD(c1);
     const REBVAR *var2 = CTX_VARS_HEAD(c2);
 
@@ -168,21 +170,21 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     //
     for (
         ;
-        NOT_END_KEY(key1) and NOT_END_KEY(key2);
+        key1 != tail1 and key2 != tail2;
         ++key1, ++key2, ++var1, ++var2
     ){
       no_advance:
         if (Is_Var_Hidden(var1)) {
             ++key1;
             ++var1;
-            if (IS_END_KEY(key1))
+            if (key1 == tail1)
                 break;
             goto no_advance;
         }
         if (Is_Var_Hidden(var2)) {
             ++key2;
             ++var2;
-            if (IS_END_KEY(key2))
+            if (key2 == tail2)
                 break;
             goto no_advance;
         }
@@ -202,11 +204,11 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // all hidden values.  Which is okay.  But if a value isn't hidden,
     // they don't line up.
     //
-    for (; NOT_END_KEY(key1); key1++, var1++) {
+    for (; key1 != tail1; key1++, var1++) {
         if (not Is_Var_Hidden(var1))
             return 1;
     }
-    for (; NOT_END_KEY(key2); key2++, var2++) {
+    for (; key2 != tail2; key2++, var2++) {
         if (not Is_Var_Hidden(var2))
             return -1;
     }
@@ -628,10 +630,11 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         //
         // Mold all words and their values ("key: <molded value>")
         //
-        const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(v);
+        const REBKEY *tail;
+        const REBKEY *key = CTX_KEYS(&tail, c);
         REBVAR *var = CTX_VARS_HEAD(c);
         bool had_output = false;
-        for (; NOT_END_KEY(key); key++, var++) {
+        for (; key != tail; key++, var++) {
             if (CELL_KIND(v) == REB_FRAME and Is_Param_Sealed(cast_PAR(var)))
                 continue;
             if (honor_hidden and Is_Var_Hidden(var))
@@ -661,10 +664,11 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     mo->indent++;
 
-    const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(v);
-    REBVAR *var = CTX_VARS_HEAD(VAL_CONTEXT(v));
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, c);
+    REBVAR *var = CTX_VARS_HEAD(c);
 
-    for (; NOT_END_KEY(key); ++key, ++var) {
+    for (; key != tail; ++key, ++var) {
         if (CELL_KIND(v) == REB_FRAME and Is_Param_Sealed(cast_PAR(var)))
             continue;
         if (honor_hidden and Is_Var_Hidden(var))

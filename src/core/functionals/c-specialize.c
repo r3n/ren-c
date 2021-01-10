@@ -129,14 +129,15 @@ REBCTX *Make_Context_For_Action_Push_Partials(
             Move_Value(DS_PUSH(), word);
     }
 
-    const REBKEY *key = ACT_KEYS_HEAD(act);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, act);
     const REBPAR *param = ACT_PARAMS_HEAD(act);
 
     REBVAL *arg = SPECIFIC(rootvar) + 1;
 
     REBLEN index = 1;  // used to bind REFINEMENT! values to parameter slots
 
-    for (; NOT_END_KEY(key); ++key, ++param, ++arg, ++index) {
+    for (; key != tail; ++key, ++param, ++arg, ++index) {
         Prep_Cell(arg);
 
         if (Is_Param_Hidden(param)) {  // local or specialized
@@ -289,9 +290,10 @@ bool Specialize_Action_Throws(
         // !!! Only one binder can be in effect, and we're calling arbitrary
         // code.  Must clean up now vs. in loop we do at the end.  :-(
         //
-        const REBKEY *key = ACT_KEYS_HEAD(unspecialized);
+        const REBKEY *tail;
+        const REBKEY *key = ACT_KEYS(&tail, unspecialized);
         const REBPAR *param = ACT_PARAMS_HEAD(unspecialized);
-        for (; NOT_END_KEY(key); ++key, ++param) {
+        for (; key != tail; ++key, ++param) {
             if (Is_Param_Hidden(param))
                 continue;  // maybe refinement from stack, now specialized out
 
@@ -311,14 +313,15 @@ bool Specialize_Action_Throws(
         }
     }
 
-    const REBKEY *key = ACT_KEYS_HEAD(unspecialized);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, unspecialized);
     const REBPAR *param = ACT_PARAMS_HEAD(unspecialized);
 
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
 
     REBDSP ordered_dsp = lowest_ordered_dsp;
 
-    for (; NOT_END_KEY(key); ++key, ++param, ++arg) {
+    for (; key != tail; ++key, ++param, ++arg) {
         //
         // Note: We check VAR_MARKED_HIDDEN on `special` from the *original*
         // varlist...as the user may have used PROTECT/HIDE to force `arg`
@@ -534,12 +537,13 @@ void For_Each_Unspecialized_Param(
     // given to it in the second pass.
     //
   blockscope {
-    const REBKEY *key = ACT_KEYS_HEAD(act);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, act);
     const REBPAR *param = ACT_PARAMS_HEAD(act);
 
     // Loop through and pass just the normal args.
     //
-    for (; NOT_END_KEY(key); ++key, ++param) {
+    for (; key != tail; ++key, ++param) {
         if (Is_Param_Hidden(param))
             continue;
 
@@ -566,7 +570,7 @@ void For_Each_Unspecialized_Param(
         // is no longer modal.
         //
         if (pclass == REB_P_MODAL) {
-            if (NOT_END_KEY(key + 1)) {  // !!! Ideally checked at creation
+            if (key + 1 != tail) {  // !!! Ideally checked at creation
                 if (GET_CELL_FLAG(param + 1, VAR_MARKED_HIDDEN)) {
                     if (TYPE_CHECK(param + 1, REB_TS_REFINEMENT))  // required
                         flags |= PHF_DEMODALIZED;  // !!! ^-- check at create!
@@ -603,10 +607,11 @@ void For_Each_Unspecialized_Param(
     // Finally, output any fully unspecialized refinements
 
   blockscope {
-    const REBKEY *key = ACT_KEYS_HEAD(act);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, act);
     const REBPAR *param = ACT_PARAMS_HEAD(act);
 
-    for (; NOT_END_KEY(key); ++key, ++param) {
+    for (; key != tail; ++key, ++param) {
         if (Is_Param_Hidden(param))
             continue;
 
@@ -895,10 +900,11 @@ REBACT *Alloc_Action_From_Exemplar(
 ){
     REBACT *unspecialized = CTX_FRAME_ACTION(exemplar);
 
-    const REBKEY *key = ACT_KEYS_HEAD(unspecialized);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, unspecialized);
     const REBPAR *param = ACT_PARAMS_HEAD(unspecialized);
     REBVAL *arg = CTX_VARS_HEAD(exemplar);
-    for (; NOT_END_KEY(key); ++key, ++arg, ++param) {
+    for (; key != tail; ++key, ++arg, ++param) {
         if (Is_Param_Hidden(param))
             continue;
 

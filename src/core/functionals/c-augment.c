@@ -125,9 +125,10 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     // "triad".
     //
   blockscope {
-    const REBKEY *key = ACT_KEYS_HEAD(augmentee);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, augmentee);
     const REBPAR *param = ACT_PARAMS_HEAD(augmentee);
-    for (; NOT_END_KEY(key); ++key) {
+    for (; key != tail; ++key) {
         Init_Word(DS_PUSH(), KEY_SPELLING(key));
 
         Move_Value(DS_PUSH(), param);

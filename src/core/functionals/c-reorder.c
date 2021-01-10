@@ -117,10 +117,11 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     INIT_BINDER(&binder);
 
   blockscope {
-    const REBKEY *key = ACT_KEYS_HEAD(reorderee);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, reorderee);
     const REBPAR *param = ACT_PARAMS_HEAD(reorderee);
     REBLEN index = 1;
-    for (; NOT_END_KEY(key); ++key, ++param, ++index) {
+    for (; key != tail; ++key, ++param, ++index) {
         if (Is_Param_Hidden(param))
             continue;
         Add_Binder_Index(&binder, KEY_SPELLING(key), index);
@@ -197,10 +198,11 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     // ordering list.
 
   cleanup_binder: {
-    const REBKEY *key = ACT_KEYS_HEAD(reorderee);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, reorderee);
     const REBPAR *param = ACT_PARAMS_HEAD(reorderee);
     REBLEN index = 1;
-    for (; NOT_END_KEY(key); ++key, ++param, ++index) {
+    for (; key != tail; ++key, ++param, ++index) {
         if (Is_Param_Hidden(param))
             continue;
 

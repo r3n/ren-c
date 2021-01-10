@@ -114,15 +114,18 @@ void Bind_Values_Core(
     struct Reb_Binder binder;
     INIT_BINDER(&binder);
 
+    REBCTX *c = VAL_CONTEXT(context);
+
     // Associate the canon of a word with an index number.  (This association
     // is done by poking the index into the REBSER of the series behind the
     // ANY-WORD!, so it must be cleaned up to not break future bindings.)
     //
   blockscope {
     REBLEN index = 1;
-    const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(context);
-    const REBVAR *var = VAL_CONTEXT_VARS_HEAD(context);
-    for (; NOT_END_KEY(key); key++, var++, index++)
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, c);
+    const REBVAR *var = CTX_VARS_HEAD(c);
+    for (; key != tail; key++, var++, index++)
         if (not Is_Var_Hidden(var))
             Add_Binder_Index(&binder, KEY_SPELLING(key), index);
   }
@@ -130,16 +133,17 @@ void Bind_Values_Core(
     Bind_Values_Inner_Loop(
         &binder,
         head,
-        VAL_CONTEXT(context),
+        c,
         bind_types,
         add_midstream_types,
         flags
     );
 
   blockscope {  // Reset all the binder indices to zero
-    const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(context);
-    const REBVAR *var = VAL_CONTEXT_VARS_HEAD(context);
-    for (; NOT_END_KEY(key); ++key, ++var)
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, c);
+    const REBVAR *var = CTX_VARS_HEAD(c);
+    for (; key != tail; ++key, ++var)
         if (not Is_Var_Hidden(var))
             Remove_Binder_Index(&binder, KEY_SPELLING(key));
   }
@@ -420,15 +424,19 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     REBLEN param_num = 1;
 
   blockscope {  // Setup binding table from the argument word list
-    const REBKEY *key = ACT_KEYS_HEAD(relative);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, relative);
     const REBPAR *param = ACT_PARAMS_HEAD(relative);
-    for (; NOT_END_KEY(key); ++key, ++param, ++param_num) {
+    for (; key != tail; ++key, ++param, ++param_num) {
         if (Is_Param_Sealed(param))
             continue;
         Add_Binder_Index(&binder, KEY_SPELLING(key), param_num);
     }
   }
 
+    REBARR *copy;
+
+  blockscope {
     const REBARR *original = VAL_ARRAY(body);
     REBLEN index = VAL_INDEX(body);
     REBSPC *specifier = VAL_SPECIFIER(body);
@@ -447,7 +455,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
     // Currently we start by making a shallow copy and then adjust it
 
-    REBARR *copy = Make_Array_For_Copy(len, flags, original);
+    copy = Make_Array_For_Copy(len, flags, original);
 
     const RELVAL *src = ARR_AT(original, index);
     RELVAL *dest = ARR_HEAD(copy);
@@ -515,11 +523,13 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             SET_SERIES_FLAG(paramlist, FIXED_SIZE);
         }
     }
+  }
 
   blockscope {  // Reset binding table
-    const REBKEY *key = ACT_KEYS_HEAD(relative);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, relative);
     const REBPAR *param = ACT_PARAMS_HEAD(relative);
-    for (; NOT_END_KEY(key); ++key, ++param) {
+    for (; key != tail; ++key, ++param) {
         if (Is_Param_Sealed(param))
             continue;
 
@@ -839,9 +849,10 @@ void Virtual_Bind_Deep_To_New_Context(
 
     // Must remove binder indexes for all words, even if about to fail
     //
-    const REBKEY *key = CTX_KEYS_HEAD(c);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, c);
     REBVAL *var = CTX_VARS_HEAD(c); // only needed for debug, optimized out
-    for (; NOT_END_KEY(key); ++key, ++var) {
+    for (; key != tail; ++key, ++var) {
         REBINT stored = Remove_Binder_Index_Else_0(
             &binder, KEY_SPELLING(key)
         );
@@ -919,9 +930,10 @@ void Init_Interning_Binder(
     // Use positive numbers for all the keys in the context.
     //
   blockscope {
-    const REBKEY *key = CTX_KEYS_HEAD(ctx);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, ctx);
     REBINT index = 1;
-    for (; NOT_END_KEY(key); ++key, ++index)
+    for (; key != tail; ++key, ++index)
         Add_Binder_Index(binder, KEY_SPELLING(key), index);  // positives
   }
 
@@ -931,9 +943,10 @@ void Init_Interning_Binder(
     // new positive index.
     //
     if (ctx != VAL_CONTEXT(Lib_Context)) {
-        const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
+        const REBKEY *tail;
+        const REBKEY *key = CTX_KEYS(&tail, VAL_CONTEXT(Lib_Context));
         REBINT index = 1;
-        for (; NOT_END_KEY(key); ++key, ++index) {
+        for (; key != tail; ++key, ++index) {
             const REBSTR *canon = KEY_SPELLING(key);
             REBINT n = Get_Binder_Index_Else_0(binder, canon);
             if (n == 0)
@@ -954,9 +967,10 @@ void Shutdown_Interning_Binder(struct Reb_Binder *binder, REBCTX *ctx)
     // All of the user context keys should be positive, and removable
     //
   blockscope {
-    const REBKEY *key = CTX_KEYS_HEAD(ctx);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, ctx);
     REBINT index = 1;
-    for (; NOT_END_KEY(key); ++key, ++index) {
+    for (; key != tail; ++key, ++index) {
         REBINT n = Remove_Binder_Index_Else_0(binder, KEY_SPELLING(key));
         assert(n == index);
         UNUSED(n);
@@ -967,9 +981,10 @@ void Shutdown_Interning_Binder(struct Reb_Binder *binder, REBCTX *ctx)
     // find them in the list any more.
     //
     if (ctx != VAL_CONTEXT(Lib_Context)) {
-        const REBKEY *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
+        const REBKEY *tail;
+        const REBKEY *key = CTX_KEYS(&tail, VAL_CONTEXT(Lib_Context));
         REBINT index = 1;
-        for (; NOT_END_KEY(key); ++key, ++index) {
+        for (; key != tail; ++key, ++index) {
             REBINT n = Remove_Binder_Index_Else_0(binder, KEY_SPELLING(key));
             assert(n == 0 or n == -index);
             UNUSED(n);

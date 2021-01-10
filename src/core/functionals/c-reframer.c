@@ -239,9 +239,10 @@ REBNATIVE(reframer_p)
   }
 
   cleanup_binder: {
-    const REBKEY *key = ACT_KEYS_HEAD(shim);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, shim);
     const REBPAR *param = ACT_PARAMS_HEAD(shim);
-    for (; NOT_END_KEY(key); ++key, ++param) {
+    for (; key != tail; ++key, ++param) {
         if (Is_Param_Hidden(param))
             continue;
 

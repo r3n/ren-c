@@ -127,12 +127,13 @@ REBTYPE(Datatype)
 
             assert(CTX_TYPE(context) == REB_OBJECT);
 
-            REBKEY *key = CTX_KEYS_HEAD(context);
-            REBVAL *var = CTX_VARS_HEAD(context);
+            const REBKEY *tail;
+            const REBKEY *key = CTX_KEYS(&tail, context);
+            REBVAR *var = CTX_VARS_HEAD(context);
 
             RELVAL *item = ARR_HEAD(VAL_TYPE_SPEC(type));
 
-            for (; NOT_END(var); ++var, ++key) {
+            for (; key != tail; ++key, ++var) {
                 if (IS_END(item))
                     Init_Blank(var);
                 else {

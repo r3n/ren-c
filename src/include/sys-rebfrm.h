@@ -510,6 +510,7 @@ struct Reb_Frame {
     // to protect it from GC if we have advanced beyond as well!)
     //
     const REBKEY *key;
+    const REBKEY *key_tail;
 
     // `arg is the "actual argument"...which holds the pointer to the
     // REBVAL slot in the `arglist` for that corresponding `param`.  These

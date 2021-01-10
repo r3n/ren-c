@@ -762,9 +762,10 @@ const void *RL_rebArgR(unsigned char quotes, const void *p, va_list *vaptr)
 
     const REBSTR *spelling = Intern_UTF8_Managed(cb_cast(name), strsize(name));
 
-    const REBKEY *key = ACT_KEYS_HEAD(act);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, act);
     REBVAL *arg = FRM_ARGS_HEAD(f);
-    for (; NOT_END_KEY(key); ++key, ++arg) {
+    for (; key != tail; ++key, ++arg) {
         if (SAME_STR(KEY_SPELLING(key), spelling))
             return arg;
     }

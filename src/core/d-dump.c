@@ -131,9 +131,10 @@ void Dump_Stack(REBFRM *f, REBLEN level)
 
     REBINT n = 1;
     REBVAL *arg = FRM_ARG(f, 1);
-    const REBKEY *key = ACT_KEYS_HEAD(FRM_PHASE(f));
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, FRM_PHASE(f));
 
-    for (; NOT_END_KEY(key); ++key, ++arg, ++n) {
+    for (; key != tail; ++key, ++arg, ++n) {
         if (IS_NULLED(arg))
             printf(
                 "    %s:\n",

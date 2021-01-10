@@ -177,8 +177,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     Do_Process_Action_Checks_Debug(f);
   #endif
 
-    if (IS_END_KEY(f->key))  // STATE_BYTE() belongs to the dispatcher if END
-        goto dispatch;
+    if (not Is_Action_Frame_Fulfilling(f))
+        goto dispatch;  // STATE_BYTE() belongs to the dispatcher if key=null
 
     switch (STATE_BYTE(f)) {
       case ST_ACTION_INITIAL_ENTRY:
@@ -197,7 +197,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
     assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));
 
-    for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->param) {
+    for (; f->key != f->key_tail; ++f->key, ++f->arg, ++f->param) {
 
   //=//// CONTINUES (AT TOP SO GOTOS DO NOT CROSS INITIALIZATIONS /////////=//
 
@@ -210,7 +210,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
-            f->key = END_KEY;  // don't need f->key
+            f->key = nullptr;  // don't need f->key
+            f->key_tail = nullptr;
             goto fulfill_and_any_pickups_done;
         }
         continue;
@@ -748,7 +749,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
-            f->key = END_KEY;  // don't need f->key
+            f->key = nullptr;  // don't need f->key
+            f->key_tail = nullptr;
             goto fulfill_and_any_pickups_done;
         }
 
@@ -760,7 +762,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   fulfill_and_any_pickups_done:
 
     CLEAR_EVAL_FLAG(f, DOING_PICKUPS);  // reevaluate may set flag again
-    assert(IS_END_KEY(f->key));  // signals !Is_Action_Frame_Fulfilling()
+    f->key = nullptr;  // signals !Is_Action_Frame_Fulfilling()
+    f->key_tail = nullptr;
 
     if (GET_EVAL_FLAG(f, FULFILL_ONLY)) {  // only fulfillment, no typecheck
         assert(GET_CELL_FLAG(f->out, OUT_NOTE_STALE));  // didn't touch out
@@ -782,11 +785,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   typecheck_then_dispatch:
     Expire_Out_Cell_Unless_Invisible(f);
 
-    f->key = ACT_KEYS_HEAD(FRM_PHASE(f));
+    f->key = ACT_KEYS(&f->key_tail, FRM_PHASE(f));
     f->arg = FRM_ARGS_HEAD(f);
     f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
 
-    for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->param) {
+    for (; f->key != f->key_tail; ++f->key, ++f->arg, ++f->param) {
         assert(NOT_END(f->arg));  // all END fulfilled as Init_Endish_Nulled()
 
         // Note that if you have a redo situation as with an ENCLOSE, a
@@ -933,7 +936,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     else if (GET_EVAL_FLAG(f, RUNNING_ENFIX) and NOT_END(f->out))
         SET_EVAL_FLAG(f, UNDO_NOTE_STALE);
 
-    assert(IS_END_KEY(f->key));
+    assert(not Is_Action_Frame_Fulfilling(f));
     assert(
         IS_END(f_next)
         or FRM_IS_VARIADIC(f)
@@ -1040,10 +1043,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // typechecking loop itself.
                 //
                 REBACT *redo_phase = VAL_FRAME_PHASE(f->out);
-                f->key = ACT_KEYS_HEAD(redo_phase);
+                f->key = ACT_KEYS(&f->key_tail, redo_phase);
                 f->param = ACT_PARAMS_HEAD(redo_phase);
                 f->arg = FRM_ARGS_HEAD(f);
-                for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->param) {
+                for (; f->key != f->key_tail; ++f->key, ++f->arg, ++f->param) {
                     if (Is_Param_Hidden(f->param)) {
                         Blit_Specific(f->arg, f->param);
                         assert(GET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN));

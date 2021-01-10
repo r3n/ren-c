@@ -103,12 +103,12 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     Quotify(ARR_SINGLE(group), 1);  // suppress evaluation until pathing
     Init_Group(DS_PUSH(), group);
 
-    assert(IS_END_KEY(f->key));  // okay to reuse, if it gets put back...
-    f->key = ACT_KEYS_HEAD(FRM_PHASE(f));
+    assert(not Is_Action_Frame_Fulfilling(f));  // okay to reuse
+    f->key = ACT_KEYS(&f->key_tail, FRM_PHASE(f));
     f->arg = FRM_ARGS_HEAD(f);
     f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
 
-    for (; NOT_END_KEY(f->key); ++f->key, ++f->arg, ++f->param) {
+    for (; f->key != f->key_tail; ++f->key, ++f->arg, ++f->param) {
         if (Is_Param_Hidden(f->param))  // specialized or local
             continue;
 

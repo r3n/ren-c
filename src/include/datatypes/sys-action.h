@@ -237,6 +237,9 @@ inline static REBSER *ACT_KEYLIST(REBACT *a) {
 #define ACT_KEYS_HEAD(a) \
     SER_HEAD(const REBKEY, ACT_KEYLIST(a))
 
+#define ACT_KEYS(tail,a) \
+    CTX_KEYS((tail), ACT_EXEMPLAR(a))
+
 #define ACT_PARAMLIST(a)            CTX_VARLIST(ACT_EXEMPLAR(a))
 
 inline static REBPAR *ACT_PARAMS_HEAD(REBACT *a) {
@@ -266,16 +269,9 @@ inline static REBPAR *ACT_PARAMS_HEAD(REBACT *a) {
 inline static const REBSTR *KEY_SPELLING(const REBKEY *key)
   { return *key; }
 
-#define END_KEY &PG_End_Key
-
 
 inline static void Init_Key(REBKEY *dest, const REBSTR *spelling)
   { *dest = spelling; }
-
-#define IS_END_KEY(key) (*(key) == nullptr)
-
-#define NOT_END_KEY(key) \
-    (not IS_END_KEY(key))
 
 #define KEY_SYM(key) \
     STR_SYMBOL(KEY_SPELLING(key))

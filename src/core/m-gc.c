@@ -225,8 +225,9 @@ static void Queue_Mark_Node_Deep(void *p)
             GET_SERIES_FLAG(link, IS_KEYLIKE)
             and SER_WIDE(link) == sizeof(REBKEY)
         ){
+            REBKEY *tail = SER_TAIL(REBKEY, link);
             REBKEY *key = SER_HEAD(REBKEY, link);
-            for (; not IS_END_KEY(key); ++key)
+            for (; key != tail; ++key)
                 m_cast(REBSTR*, KEY_SPELLING(key))->header.bits
                     |= NODE_FLAG_MARKED;
         }
@@ -730,7 +731,7 @@ static void Mark_Frame_Stack_Deep(void)
             // then it can just be marked normally...no need to do custom
             // partial parameter traversal.
             //
-            assert(IS_END_KEY(f->key)); // done walking
+            assert(not Is_Action_Frame_Fulfilling(f));
             Queue_Mark_Node_Deep(f->varlist);  // may not pass CTX() test
             goto propagate_and_continue;
         }
@@ -756,13 +757,14 @@ static void Mark_Frame_Stack_Deep(void)
         REBACT *phase; // goto would cross initialization
         phase = FRM_PHASE(f);
         const REBKEY *key;
-        key = ACT_KEYS_HEAD(phase);
+        const REBKEY *tail;
+        key = ACT_KEYS(&tail, phase);
 
         REBVAL *arg;
-        for (arg = FRM_ARGS_HEAD(f); NOT_END_KEY(key); ++key, ++arg) {
+        for (arg = FRM_ARGS_HEAD(f); key != tail; ++key, ++arg) {
             if (key == f->key) {
                 //
-                // When param and f->key match, that means that arg is the
+                // When key and f->key match, that means that arg is the
                 // output slot for some other frame's f->out.  Let that frame
                 // do the marking (which tolerates END, an illegal state for
                 // prior arg slots we've visited...unless deferred!)

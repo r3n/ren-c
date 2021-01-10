@@ -450,7 +450,7 @@ REBNATIVE(do)
         DECLARE_END_FRAME (f, flags);
 
         assert(CTX_KEYS_HEAD(c) == ACT_KEYS_HEAD(phase));
-        f->key = CTX_KEYS_HEAD(c);
+        f->key = CTX_KEYS(&f->key_tail, c);
         REBCTX *stolen = Steal_Context_Vars(c, NOD(ACT_KEYLIST(phase)));
         INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(f));
             // ^-- changes CTX_KEYS_HEAD()
@@ -795,9 +795,10 @@ REBNATIVE(applique)
 
     // Reset all the binder indices to zero, balancing out what was added.
     //
-    const REBKEY *key = CTX_KEYS_HEAD(exemplar);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, exemplar);
     REBVAR *var = CTX_VARS_HEAD(exemplar);
-    for (; NOT_END_KEY(key); key++, ++var) {
+    for (; key != tail; key++, ++var) {
         if (Is_Var_Hidden(var))
             continue; // was part of a specialization internal to the action
 
@@ -819,7 +820,7 @@ REBNATIVE(applique)
     DROP_GC_GUARD(exemplar);
 
     assert(CTX_KEYS_HEAD(exemplar) == ACT_KEYS_HEAD(VAL_ACTION(applicand)));
-    f->key = CTX_KEYS_HEAD(exemplar);
+    f->key = CTX_KEYS(&f->key_tail, exemplar);
     REBCTX *stolen = Steal_Context_Vars(
         exemplar,
         NOD(ACT_KEYLIST(VAL_ACTION(applicand)))

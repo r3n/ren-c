@@ -69,12 +69,9 @@ inline static bool ANY_ESCAPABLE_GET(const RELVAL *v) {
 // Some cases in debug code call this all the way up the call stack, and when
 // the debug build doesn't inline functions it's best to use as a macro.
 
-#define Is_Action_Frame_Fulfilling_Unchecked(f) \
-    NOT_END_KEY((f)->key)
-
 inline static bool Is_Action_Frame_Fulfilling(REBFRM *f) {
     assert(Is_Action_Frame(f));
-    return Is_Action_Frame_Fulfilling_Unchecked(f);
+    return f->key != f->key_tail;
 }
 
 
@@ -387,7 +384,7 @@ inline static void Push_Frame(
     for (; ftemp != FS_BOTTOM; ftemp = ftemp->prior) {
         if (not Is_Action_Frame(ftemp))
             continue;
-        if (Is_Action_Frame_Fulfilling_Unchecked(ftemp))
+        if (Is_Action_Frame_Fulfilling(ftemp))
             continue;
         if (GET_SERIES_INFO(ftemp->varlist, INACCESSIBLE))
             continue; // Encloser_Dispatcher() reuses args from up stack
@@ -637,7 +634,7 @@ inline static void Push_Action(
     if (f->flags.bits & details->header.bits & DETAILS_FLAG_IS_BARRIER)
         fail (Error_Expression_Barrier_Raw());
 
-    f->key = ACT_KEYS_HEAD(act);
+    f->key = ACT_KEYS(&f->key_tail, act);
     REBLEN num_args = ACT_NUM_PARAMS(act);  // includes specialized + locals
 
     REBSER *s;
