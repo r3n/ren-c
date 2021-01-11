@@ -7,7 +7,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2019-2020 Ren-C Open Source Contributors
+// Copyright 2019-2021 Ren-C Open Source Contributors
 //
 // See README.md and CREDITS.md for more information.
 //
@@ -51,33 +51,10 @@
 
 #include "sys-core.h"
 
-enum {
-    IDX_AUGMENTER_AUGMENTEE = 1,  // Function with briefer frame to dispatch
-    IDX_AUGMENTER_MAX
-};
-
-
+// See notes why the Augmenter gets away with reusing Specializer_Dispatcher
 //
-//  Augmenter_Dispatcher: C
-//
-// It might seem an augmentation can just run the underlying frame directly,
-// but it needs to switch phases in order to get the frame to report the
-// more limited set of fields that are in effect when the frame runs.  So it
-// does a cheap switch of phase, and a redo without needing new type checking.
-//
-REB_R Augmenter_Dispatcher(REBFRM *f)
-{
-    REBACT *phase = FRM_PHASE(f);
-    REBARR *details = ACT_DETAILS(phase);
-    assert(ARR_LEN(details) == IDX_AUGMENTER_MAX);
-
-    REBVAL *augmentee = DETAILS_AT(details, IDX_AUGMENTER_AUGMENTEE);
-
-    INIT_FRM_PHASE(f, VAL_ACTION(augmentee));
-    INIT_FRM_BINDING(f, VAL_ACTION_BINDING(augmentee));
-
-    return R_REDO_UNCHECKED;  // signatures should match
-}
+#define Augmenter_Dispatcher Specializer_Dispatcher
+#define IDX_AUGMENTER_MAX 1
 
 
 //
@@ -128,12 +105,12 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     const REBKEY *tail;
     const REBKEY *key = ACT_KEYS(&tail, augmentee);
     const REBPAR *param = ACT_PARAMS_HEAD(augmentee);
-    for (; key != tail; ++key) {
+    for (; key != tail; ++key, ++param) {
         Init_Word(DS_PUSH(), KEY_SPELLING(key));
 
         Move_Value(DS_PUSH(), param);
-        if (Is_Param_Hidden(param))
-            Seal_Param(DS_TOP);  // augment can use the same name as a local
+        if (Is_Param_Hidden(param))  // !!! This should hide locals
+            SET_CELL_FLAG(DS_TOP, STACK_NOTE_LOCAL);
 
         Init_Nulled(DS_PUSH());  // types (inherits via INHERIT-META)
         Init_Nulled(DS_PUSH());  // notes (inherits via INHERIT-META)
@@ -159,81 +136,34 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
         definitional_return_dsp
     );
 
-    // Keep track that this derived paramlist is related to the original, so
+    // Usually when you call Make_Action() on a freshly generated paramlist,
+    // it notices that the rootvar is void and hasn't been filled in... so it
+    // makes the frame the paramlist is the varlist of (the exemplar) have a
+    // rootvar pointing to the phase of the newly generated action.
+    //
+    // But since AUGMENT itself doesn't add any new behavior, we can get away
+    // with patching the augmentee's action information (phase and binding)
+    // into the paramlist...and reusing the Specializer_Dispatcher.
+
+    INIT_VAL_FRAME_ROOTVAR(
+        ARR_HEAD(paramlist),
+        paramlist,
+        VAL_ACTION(ARG(action)),
+        VAL_ACTION_BINDING(ARG(action))
+    );
+
+    REBACT* augmentated = Make_Action(
+        paramlist,
+        meta,
+        &Augmenter_Dispatcher,
+        IDX_AUGMENTER_MAX  // same as specialization, just 1 (for archetype)
+    );
+
+    // Keep track that the derived keylist is related to the original, so
     // that it's possible to tell a frame built for the augmented function is
     // compatible with the original function (and its ancestors, too)
     //
-    LINK_ANCESTOR_NODE(paramlist) = NOD(paramlist);
-
-    // We have to inject a simple dispatcher to flip the phase to one that has
-    // the more limited frame.  But we have to make an expanded exemplar if
-    // there is one.  (We can't expand the existing exemplar, because more
-    // than one AUGMENT might happen to the same function).  :-/
-
-    REBCTX *old_exemplar = ACT_EXEMPLAR(augmentee);
-
-    REBLEN old_len = SER_USED(ACT_KEYLIST(augmentee));
-    REBLEN delta = ARR_LEN(paramlist) - old_len;
-    assert(delta > 0);
-
-    REBARR *old_varlist = CTX_VARLIST(old_exemplar);
-    assert(ARR_LEN(old_varlist) == old_len);
-
-    REBARR *varlist = Copy_Array_At_Extra_Shallow(
-        old_varlist,
-        0,  // index
-        SPECIFIED,
-        delta,  // extra cells
-        old_varlist->header.bits
-    );
-    varlist->info.bits = old_varlist->info.bits;
-    INIT_VAL_CONTEXT_VARLIST(ARR_HEAD(varlist), varlist);
-
-    // We fill in the added parameters in the specialization as the params
-    // for starters.  This is considered to be "unspecialized".
-    //
-    blockscope {
-        REBVAL *param = SER_AT(REBVAL, paramlist, old_len);
-        RELVAL *temp = ARR_AT(varlist, old_len);
-        REBLEN i;
-        for (i = 0; i < delta; ++i) {
-            Move_Value(temp, param);
-            temp = temp + 1;
-        }
-        TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));
-    }
-
-    // !!! Inefficient, we need to keep the VAR_MARKED_HIDDEN bit, but
-    // copying won't keep it by default!  Review folding this into the
-    // copy machinery as part of the stackless copy implementation.  Done
-    // poorly here alongside the copy that should be parameterized.
-    //
-    blockscope {
-        RELVAL *src = ARR_HEAD(old_varlist) + 1;
-        RELVAL *dest = ARR_HEAD(varlist) + 1;
-        REBLEN i;
-        for (i = 1; i < old_len; ++i, ++src, ++dest) {
-            if (GET_CELL_FLAG(src, VAR_MARKED_HIDDEN))
-                SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
-        }
-    }
-
-    MISC_META_NODE(varlist) = nullptr;  // GC sees, must initialize
-
-    REBCTX* exemplar = CTX(varlist);
-    INIT_CTX_KEYLIST_SHARED(exemplar, paramlist);
-
-    REBACT* augmentated = Make_Action(
-        CTX_VARLIST(exemplar),
-        meta,
-        &Augmenter_Dispatcher,
-        IDX_AUGMENTER_MAX  // size of the ACT_DETAILS array
-    );
-
-    Move_Value(
-        ARR_AT(ACT_DETAILS(augmentated), IDX_AUGMENTER_AUGMENTEE),
-        ARG(action)
-    );
+    LINK_ANCESTOR_NODE(ACT_KEYLIST(augmentated)) = NOD(ACT_KEYLIST(augmentee));
 
     return Init_Action(D_OUT, augmentated, label, UNBOUND);
 }
