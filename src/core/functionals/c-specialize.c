@@ -448,7 +448,6 @@ bool Specialize_Action_Throws(
 
     REBACT *specialized = Make_Action(
         partials != nullptr ? partials : CTX_VARLIST(exemplar),
-        nullptr,  // meta inherited by SPECIALIZE helper to SPECIALIZE*
         &Specializer_Dispatcher,
         IDX_SPECIALIZER_MAX  // details array capacity
     );
@@ -570,11 +569,9 @@ void For_Each_Unspecialized_Param(
         // is no longer modal.
         //
         if (pclass == REB_P_MODAL) {
-            if (key + 1 != tail) {  // !!! Ideally checked at creation
-                if (GET_CELL_FLAG(param + 1, VAR_MARKED_HIDDEN)) {
-                    if (TYPE_CHECK(param + 1, REB_TS_REFINEMENT))  // required
-                        flags |= PHF_DEMODALIZED;  // !!! ^-- check at create!
-                }
+            if (key + 1 != tail) {  // !!! Ideally check, + refine, on create
+                if (GET_CELL_FLAG(param + 1, VAR_MARKED_HIDDEN))
+                    flags |= PHF_DEMODALIZED;
             }
         }
 
@@ -936,7 +933,6 @@ REBACT *Alloc_Action_From_Exemplar(
 
     REBACT *action = Make_Action(
         CTX_VARLIST(exemplar),  // note: no partials
-        nullptr,  // no meta, REDESCRIBE can add help
         dispatcher,
         details_capacity
     );

@@ -168,7 +168,6 @@ REBNATIVE(enclose_p)  // see extended definition ENCLOSE in %base-defs.r
     //
     REBACT *enclosure = Make_Action(
         ACT_SPECIALTY(VAL_ACTION(inner)),  // same interface as inner
-        nullptr,  // meta inherited by ENCLOSE helper to ENCLOSE*
         &Encloser_Dispatcher,
         IDX_ENCLOSER_MAX  // details array capacity => [inner, outer]
     );

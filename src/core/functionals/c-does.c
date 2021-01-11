@@ -193,8 +193,7 @@ REBNATIVE(does)
         //
         Manage_Series(paramlist);
         REBACT *doer = Make_Action(
-            CTX_VARLIST(ACT_EXEMPLAR(NATIVE_ACT(surprise))),  // same, no args
-            nullptr,  // no meta (REDESCRIBE can add help)
+            ACT_SPECIALTY(NATIVE_ACT(surprise)),  // same, no args
             &Block_Dispatcher,  // **SEE COMMENTS**, not quite like plain DO!
             IDX_DOES_MAX  // details array capacity
         );

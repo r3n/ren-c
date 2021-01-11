@@ -553,12 +553,8 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     );
     LINK_ANCESTOR_NODE(keylist) = NOD(keylist);  // chain ends with self
 
-    // !!!
-    // !!! TEMPORARY -- TURNING OFF RETURN CHECKS
-    // !!!
-
-/*    if (flags & MKF_HAS_RETURN)
-        paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN; */
+    if (flags & MKF_HAS_RETURN)
+        paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
 
     // We want to check for duplicates and a Binder can be used for that
     // purpose--but note that a fail () cannot happen while binders are
@@ -904,9 +900,8 @@ REBARR *Make_Paramlist_Managed_May_Fail(
 //
 REBACT *Make_Action(
     REBARR *specialty,  // paramlist, exemplar, partials -> exemplar/paramlist
-    REBCTX *meta,
-    REBNAT dispatcher, // native C function called by Eval_Core
-    REBLEN details_capacity // capacity of ACT_DETAILS (including archetype)
+    REBNAT dispatcher,  // native C function called by Eval_Core
+    REBLEN details_capacity  // capacity of ACT_DETAILS (including archetype)
 ){
     assert(details_capacity >= 1);  // must have room for archetype
 
@@ -939,7 +934,7 @@ REBACT *Make_Action(
     ASSERT_SERIES_MANAGED(keylist);  // paramlists/keylists, can be shared
     assert(SER_USED(keylist) + 1 == ARR_LEN(paramlist));
     if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
-        const REBKEY *key = SER_AT(const REBKEY, paramlist, 0);
+        const REBKEY *key = SER_AT(const REBKEY, keylist, 0);
         assert(KEY_SYM(key) == SYM_RETURN);
         UNUSED(key);
     }
@@ -967,7 +962,7 @@ REBACT *Make_Action(
     TERM_ARRAY_LEN(details, details_capacity);
 
     LINK(details).dispatcher = dispatcher; // level of indirection, hijackable
-    MISC_META_NODE(details) = NOD(meta);
+    MISC_META_NODE(details) = nullptr;  // caller can fill in
 
     VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype) = NOD(specialty);
 

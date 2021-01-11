@@ -132,15 +132,22 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     // not followed by a refinement.  That would cost
     // extra, but avoid the test on every call.
     //
-    const RELVAL *enable = f->param + 1;
-    if (
-        IS_END(enable)
-        or not TYPE_CHECK(enable, REB_TS_REFINEMENT)
-    ){
-        fail ("Refinement must follow modal parameter");
+    const REBPAR *enable = f->param + 1;
+    if (IS_END(enable))
+        fail ("Modal parameter can't be at end of parameter list");
+
+    if (Is_Param_Hidden(enable)) {
+        if (not (IS_NULLED(enable) or Is_Blackhole(enable)))
+            fail ("Specialized refinement following modal can't take args");
     }
-    if (not Is_Typeset_Empty(enable))
-        fail ("Modal refinement cannot take arguments");
+    else {
+        if (not (
+            TYPE_CHECK(enable, REB_TS_REFINEMENT)
+            and Is_Typeset_Empty(enable)
+        )){
+            fail ("Refinement must follow modal parameter");
+        }
+    }
 
     // Signal refinement as being in use.
     //

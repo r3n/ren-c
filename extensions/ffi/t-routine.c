@@ -1155,7 +1155,6 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
 
     REBACT *action = Make_Action(
         paramlist,
-        nullptr,  // no meta
         &Routine_Dispatcher,
         IDX_ROUTINE_MAX  // details array len
     );

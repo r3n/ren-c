@@ -108,10 +108,12 @@ REBNATIVE(generic)
 
     REBACT *generic = Make_Action(
         paramlist,
-        meta,
         &Generic_Dispatcher,  // return type is only checked in debug build
         IDX_NATIVE_MAX  // details array capacity
     );
+
+    assert(ACT_META(generic) == nullptr);
+    ACT_META_NODE(generic) = NOD(meta);
 
     // !!! There is no system yet for extension types to register which of
     // the generic actions they can handle.  So for the moment, we just say

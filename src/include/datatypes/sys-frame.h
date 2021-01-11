@@ -956,6 +956,10 @@ inline static void FAIL_IF_NO_INVISIBLE_RETURN(REBFRM *f) {
     const REBPAR *param = ACT_PARAMS_HEAD(phase);
     assert(KEY_SYM(ACT_KEYS_HEAD(phase)) == SYM_RETURN);
 
-    if (not TYPE_CHECK(param, REB_TS_INVISIBLE))
-        fail (Error_Bad_Invisible(f));
+    UNUSED(param);
+    // !!!
+    // !!! Returns not working right now
+    // !!!
+/*    if (not TYPE_CHECK(param, REB_TS_INVISIBLE))
+        fail (Error_Bad_Invisible(f));  */
 }

@@ -121,7 +121,6 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     // the stack.  This may add duplicates--which will be detected when we
     // try to pop the stack into a paramlist.
     //
-    assert(flags & MKF_RETURN);
     Push_Paramlist_Triads_May_Fail(
         ARG(spec),
         &flags,
@@ -154,10 +153,12 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
 
     REBACT* augmentated = Make_Action(
         paramlist,
-        meta,
         &Augmenter_Dispatcher,
         IDX_AUGMENTER_MAX  // same as specialization, just 1 (for archetype)
     );
+
+    assert(ACT_META(augmentated) == nullptr);
+    ACT_META_NODE(augmentated) = NOD(meta);
 
     // Keep track that the derived keylist is related to the original, so
     // that it's possible to tell a frame built for the augmented function is

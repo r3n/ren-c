@@ -223,7 +223,6 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
     //
     REBACT *chain = Make_Action(
         ACT_SPECIALTY(VAL_ACTION(first)),  // same interface as first action
-        nullptr,  // meta inherited by CHAIN helper to CHAIN*
         &Chainer_Dispatcher,
         IDX_CHAINER_MAX  // details array capacity
     );

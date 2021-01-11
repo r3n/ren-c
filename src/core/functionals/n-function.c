@@ -351,10 +351,12 @@ REBACT *Make_Interpreted_Action_May_Fail(
 
     REBACT *a = Make_Action(
         paramlist,
-        meta,
         &Empty_Dispatcher,  // will be overwritten if non-[] body
         details_capacity  // we fill in details[0], caller fills any extra
     );
+
+    assert(ACT_META(a) == nullptr);
+    ACT_META_NODE(a) = NOD(meta);
 
     // We look at the *actual* function flags; e.g. the person may have used
     // the FUNC generator (with MKF_RETURN) but then named a parameter RETURN

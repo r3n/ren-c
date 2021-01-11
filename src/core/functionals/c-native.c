@@ -136,18 +136,20 @@ REBVAL *Make_Native(
     assert(not (flags & MKF_IS_VOIDER));
     assert(not (flags & MKF_IS_ELIDER));
 
-    REBACT *act = Make_Action(
+    REBACT *native = Make_Action(
         paramlist,
-        meta,
         dispatcher, // "dispatcher" is unique to this "native"
         IDX_NATIVE_MAX // details array capacity
     );
 
-    SET_ACTION_FLAG(act, IS_NATIVE);
-    if (enfix)
-        SET_ACTION_FLAG(act, ENFIXED);
+    assert(ACT_META(native) == nullptr);
+    ACT_META_NODE(native) = NOD(meta);
 
-    REBARR *details = ACT_DETAILS(act);
+    SET_ACTION_FLAG(native, IS_NATIVE);
+    if (enfix)
+        SET_ACTION_FLAG(native, ENFIXED);
+
+    REBARR *details = ACT_DETAILS(native);
 
     // If a user-equivalent body was provided, we save it in the native's
     // REBVAL for later lookup.
@@ -171,7 +173,7 @@ REBVAL *Make_Native(
     // Append the native to the module under the name given.
     //
     REBVAL *var = Append_Context(VAL_CONTEXT(module), name, nullptr);
-    Init_Action(var, act, VAL_WORD_SPELLING(name), UNBOUND);
+    Init_Action(var, native, VAL_WORD_SPELLING(name), UNBOUND);
 
     return var;
 }

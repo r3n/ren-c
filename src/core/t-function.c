@@ -224,10 +224,12 @@ REBTYPE(Action)
         REBLEN details_len = ARR_LEN(ACT_DETAILS(act));
         REBACT *proxy = Make_Action(
             ACT_SPECIALTY(act),  // not changing the interface
-            meta,
             ACT_DISPATCHER(act),
             details_len  // details array capacity
         );
+
+        assert(ACT_META(proxy) == nullptr);
+        ACT_META_NODE(proxy) = NOD(meta);
 
         if (GET_ACTION_FLAG(act, IS_NATIVE))
             SET_ACTION_FLAG(proxy, IS_NATIVE);

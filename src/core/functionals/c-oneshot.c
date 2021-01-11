@@ -59,7 +59,7 @@ REB_R Downshot_Dispatcher(REBFRM *f)  // runs until count is reached
         return nullptr;  // always return null once 0 is reached
     --VAL_INT64(n);
 
-    REBVAL *code = FRM_ARG(f, 1);
+    REBVAL *code = FRM_ARG(f, 2);  // skip the RETURN
     if (Do_Branch_Throws(f->out, code))
         return R_THROWN;
 
@@ -78,11 +78,34 @@ REB_R Upshot_Dispatcher(REBFRM *f)  // won't run until count is reached
         return nullptr;  // return null until 0 is reached
     }
 
-    REBVAL *code = FRM_ARG(f, 1);
+    REBVAL *code = FRM_ARG(f, 2);  // skip the RETURN
     if (Do_Branch_Throws(f->out, code))
         return R_THROWN;
 
     return f->out;
+}
+
+
+//
+//  do-branch: native [
+//
+//  {Sample Interface for a Simplified DO that just runs a Branch}
+//
+//      return: [<opt> any-value!]
+//      branch [any-branch!]
+//  ]
+//
+REBNATIVE(do_branch)
+//
+// !!! This function only exists to serve as the interface for the generated
+// function from N-SHOT.  More thinking is necessary about how to layer DO
+// on top of a foundational DO* (instead of the current way, which has the
+// higher level DO as a native that calls out to helper code for its
+// implementation...)  Revisit.
+{
+    INCLUDE_PARAMS_OF_DO_BRANCH;
+
+    fail ("DO-BRANCH is theoretical and not part of an API yet.");
 }
 
 
@@ -101,25 +124,8 @@ REBNATIVE(n_shot)
 
     REBI64 n = VAL_INT64(ARG(n));
 
-    REBARR *paramlist = Make_Array_Core(
-        2,
-        SERIES_MASK_PARAMLIST | NODE_FLAG_MANAGED
-    );
-
-    REBVAL *rootparam = Voidify_Rootparam(paramlist);
-
-    // !!! Should anything DO would accept be legal, as DOES would run?
-    //
-    Init_Param(
-        rootparam + 1,
-        REB_P_NORMAL,
-        FLAGIT_KIND(REB_BLOCK) | FLAGIT_KIND(REB_ACTION)
-    );
-    TERM_ARRAY_LEN(paramlist, 2);
-
     REBACT *n_shot = Make_Action(
-        paramlist,
-        nullptr,  // !!! no meta, should this auto-generate info for HELP?
+        ACT_SPECIALTY(NATIVE_ACT(do_branch)),
         n >= 0 ? &Downshot_Dispatcher : &Upshot_Dispatcher,
         IDX_ONESHOT_MAX  // details array capacity
     );

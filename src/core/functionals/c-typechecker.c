@@ -59,13 +59,13 @@ REB_R Datatype_Checker_Dispatcher(REBFRM *f)
     REBVAL *datatype = DETAILS_AT(details, IDX_TYPECHECKER_TYPE);
 
     if (VAL_TYPE_KIND_OR_CUSTOM(datatype) == REB_CUSTOM) {
-        if (VAL_TYPE(FRM_ARG(f, 1)) != REB_CUSTOM)
+        if (VAL_TYPE(FRM_ARG(f, 2)) != REB_CUSTOM)
             return Init_False(f->out);
 
         REBTYP *typ = VAL_TYPE_CUSTOM(datatype);
         return Init_Logic(
             f->out,
-            CELL_CUSTOM_TYPE(FRM_ARG(f, 1)) == typ
+            CELL_CUSTOM_TYPE(FRM_ARG(f, 2)) == typ
         );
     }
 
@@ -113,8 +113,7 @@ REBNATIVE(typechecker)
     REBVAL *type = ARG(type);
 
     REBACT *typechecker = Make_Action(
-        CTX_VARLIST(ACT_EXEMPLAR(NATIVE_ACT(null_q))),  // same frame as NULL?
-        nullptr,  // no meta !!! auto-generate info for HELP?
+        ACT_SPECIALTY(NATIVE_ACT(null_q)),  // same frame as NULL?
         IS_DATATYPE(type)
             ? &Datatype_Checker_Dispatcher
             : &Typeset_Checker_Dispatcher,

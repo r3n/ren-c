@@ -235,7 +235,6 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
 
     REBACT *reordered = Make_Action(
         partials,
-        nullptr,  // no meta (REORDER provides for REORDER*)
         &Reorderer_Dispatcher,
         IDX_REORDERER_MAX
     );

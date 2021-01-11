@@ -712,10 +712,12 @@ REBNATIVE(js_native)
 
     REBACT *native = Make_Action(
         paramlist,
-        meta,
         &JavaScript_Dispatcher,
         IDX_JS_NATIVE_MAX  // details len [source module handle]
     );
+
+    assert(ACT_META(native) == nullptr);  // should default to nullptr
+    ACT_META_NODE(native) = NOD(meta);
 
     heapaddr_t native_id = Native_Id_For_Action(native);
 

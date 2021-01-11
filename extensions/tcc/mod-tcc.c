@@ -322,10 +322,12 @@ REBNATIVE(make_native)
     );
     REBACT *native = Make_Action(
         paramlist,
-        meta,
         &Pending_Native_Dispatcher, // will be replaced e.g. by COMPILE
         IDX_TCC_NATIVE_MAX // details len [source module linkname tcc_state]
     );
+
+    assert(ACT_META(native) == nullptr);
+    ACT_META_NODE(native) = NOD(meta);
 
     REBARR *details = ACT_DETAILS(native);
 

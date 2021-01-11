@@ -123,7 +123,6 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
 
     REBACT *adaptation = Make_Action(
         ACT_SPECIALTY(VAL_ACTION(adaptee)),  // reuse partials/exemplar/etc.
-        nullptr,  // meta inherited by ADAPT helper to ADAPT*
         &Adapter_Dispatcher,
         IDX_ADAPTER_MAX  // details array capacity => [prelude, adaptee]
     );

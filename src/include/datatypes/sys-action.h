@@ -289,8 +289,11 @@ inline static void Init_Key(REBKEY *dest, const REBSTR *spelling)
 // where information for HELP is saved, and it's how modules store out-of-band
 // information that doesn't appear in their body.
 
+#define ACT_META_NODE(a) \
+    MISC_META_NODE(ACT_DETAILS(a))
+
 #define ACT_META(a) \
-    CTX(MISC_META_NODE(ACT_DETAILS(a)))
+    CTX(ACT_META_NODE(a))
 
 
 
@@ -429,19 +432,8 @@ inline static REBVAL *Voidify_Rootparam(REBARR *paramlist) {
 // more design work on this is needed.
 //
 
-// !!! THE ACTION RETURN MECHANISM IS NOT WORKING AT THE MOMENT SO WE
-// GO BY THE WORD, THIS IS NOT GOOD, ALL NEEDS RETHINKING...
-// SKIP RETURN JUST TO GET IT WORKING.  IT IS LIKELY THAT THE GENERIC
-// SHOULD ENCODE THE INDEX IN THE DETAILS INSTEAD OF MAKING THIS ROUTINE
-// GUESS, BECAUSE THE FUNCTION SPECIFICATION CEASES TO OFFER TYPE
-// INFORMATION ONCE THINGS ARE SPECIALIZED.
-
-/*#define ACT_HAS_RETURN(a) \
-    (did (ACT_KEYLIST(a)->header.bits & PARAMLIST_FLAG_HAS_RETURN))
-*/
-
 #define ACT_HAS_RETURN(a) \
-    (SYM_RETURN == KEY_SYM(ACT_KEYS_HEAD(a)))
+    (did (ACT_PARAMLIST(a)->header.bits & PARAMLIST_FLAG_HAS_RETURN))
 
 
 //=//// NATIVE ACTION ACCESS //////////////////////////////////////////////=//
