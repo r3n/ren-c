@@ -79,10 +79,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
                 panic (binding);
             }
             REBNOD *keysource = LINK_KEYSOURCE(ARR(binding));
-            if (
-                not Is_Node_Cell(keysource)
-                and GET_ARRAY_FLAG(ARR(keysource), IS_DETAILS)
-            ){
+            if (not Is_Node_Cell(keysource)) {
                 if (
                     (keysource->header.bits & SERIES_MASK_KEYLIST)
                     != SERIES_MASK_KEYLIST

@@ -213,6 +213,17 @@ static void Queue_Mark_Node_Deep(void *p)
     s->header.bits |= NODE_FLAG_MARKED; // may be already set
 
     if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and LINK(s).custom.node) {
+        //
+        // !!! The keysource for varlists can be set to a REBFRM*, which acts
+        // like a cell because the flag is set to being an "endlike header".
+        // The DEBUG_CHECK_CASTS noticed that this was marking an END when
+        // casting as a SER().  It wasn't entirely obvious what was going on,
+        // but this makes it clearer so that a more elegant fix can be made.
+        //
+        if (Is_Node_Cell(LINK(s).custom.node))
+            if (IS_SER_ARRAY(s) and GET_ARRAY_FLAG(ARR(s), IS_VARLIST))
+                goto skip_mark_rebfrm_link;
+
         REBSER *link = SER(LINK(s).custom.node);
         Queue_Mark_Node_Deep(link);
 
@@ -233,6 +244,7 @@ static void Queue_Mark_Node_Deep(void *p)
         }
     }
 
+  skip_mark_rebfrm_link:
     if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and MISC(s).custom.node)
         Queue_Mark_Node_Deep(MISC(s).custom.node);
 
