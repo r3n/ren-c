@@ -125,7 +125,7 @@ REBNATIVE(generic)
     //
     REBPAR *param = m_cast(REBPAR*, ACT_PARAMS_HEAD(generic));
     if (ACT_HAS_RETURN(generic)) {
-        /*TYPE_SET(param, REB_CUSTOM);*/  // !!! Temp while RETURN worked out
+        TYPE_SET(param, REB_CUSTOM);
         ++param;
     }
     while (

@@ -239,10 +239,6 @@ e-types/emit {
         REB_0 = REB_0_END,  /* REB_0 when used for signals besides ENDness */
         REB_TS_ENDABLE = REB_0,  /* bit set in typesets for endability */
 
-        /*** TEMP FAKERY TO HAVE A TYPESET BIT FOR INVISIBILITY ***/
-
-        REB_TS_INVISIBLE = REB_BYTES,  /* can never occur in KIND3Q_BYTE */
-
         /*** PSEUDOTYPES ***/
 
         PSEUDOTYPE_ONE = REB_MAX,
@@ -258,7 +254,7 @@ e-types/emit {
 
         PSEUDOTYPE_THREE,
         REB_R_REDO = PSEUDOTYPE_THREE,
-        REB_TS_3 = PSEUDOTYPE_THREE,
+        REB_TS_INVISIBLE = PSEUDOTYPE_THREE,
 
         PSEUDOTYPE_FOUR,
         REB_R_REFERENCE = PSEUDOTYPE_FOUR,

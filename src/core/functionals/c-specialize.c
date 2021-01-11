@@ -612,8 +612,12 @@ void For_Each_Unspecialized_Param(
         if (Is_Param_Hidden(param))
             continue;
 
-        if (not TYPE_CHECK(param, REB_TS_REFINEMENT))
+        if (
+            not TYPE_CHECK(param, REB_TS_REFINEMENT)
+            or VAL_PARAM_CLASS(param) == REB_P_RETURN
+        ){
             continue;
+        }
 
         if (partials) {
             REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));

@@ -563,6 +563,7 @@ pe-format: context [
 
     gen-rule: function [
         "Collect set-words in @rule to make into an object saved in @name"
+        return: [block!]
         rule [block!]
         'name [word!]
         /skip "Do not collect these words"

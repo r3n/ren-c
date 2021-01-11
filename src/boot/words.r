@@ -122,14 +122,10 @@ label
 
 value ; used by TYPECHECKER to name the argument of the generated function
 
-; !!! See notes on FUNCTION-META and SPECIALIZER-META in %sysobj.r
+; See notes on ACTION-META in %sysobj.r
 description
-return-type
-return-note
 parameter-types
 parameter-notes
-specializee
-specializee-name
 
 x
 y

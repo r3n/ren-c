@@ -1574,7 +1574,7 @@ REBNATIVE(as)
         // because all frame references to this frame are the same action.
         //
         assert(ACT_EXEMPLAR(VAL_FRAME_PHASE(v)) == VAL_CONTEXT(v));
-        Deep_Freeze_Context(VAL_CONTEXT(v));
+        Freeze_Array_Shallow(CTX_VARLIST(VAL_CONTEXT(v)));
         return Init_Action(
             D_OUT,
             VAL_FRAME_PHASE(v),

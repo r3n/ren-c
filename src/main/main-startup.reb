@@ -207,6 +207,7 @@ change-dir: '~unset~
 main-startup: function [
     "Usermode command-line processing: handles args, security, scripts"
 
+    return: [<opt> any-value!] "!!! Narrow down return type?"
     argv {Raw command line argument block received by main() as STRING!s}
         [block!]
     <with>

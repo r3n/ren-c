@@ -264,17 +264,17 @@ inherit-meta: func* [
 
     if let m1: meta-of :original [
         set-meta :derived let m2: copy :m1  ; shallow copy
-        if in m1 'parameter-notes [  ; shallow copy, but make frame match
+        if select m1 'parameter-notes [  ; shallow copy, but make frame match
             m2/parameter-notes: make frame! :derived
-            for-each [key value] :m1/parameter-notes [
+            for-each [key value] m1/parameter-notes [
                 if in m2/parameter-notes key [
                     m2/parameter-notes/(key): get* 'value  ; !!! VOID!s
                 ]
             ]
         ]
-        if in m2 'parameter-types [  ; shallow copy, but make frame match
+        if select m1 'parameter-types [  ; shallow copy, but make frame match
             m2/parameter-types: make frame! :derived
-            for-each [key value] :m1/parameter-types [
+            for-each [key value] m1/parameter-types [
                 if in m2/parameter-types key [
                     m2/parameter-types/(key): get* 'value  ; !!! VOID!s
                 ]

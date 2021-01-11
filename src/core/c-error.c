@@ -290,13 +290,17 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
         // running native.  (We could theoretically do this with ARG(), or
         // have a nuance of behavior with ARG()...or even for the REBKEY*.)
         //
-        const REBPAR *head = ACT_PARAMS_HEAD(FRM_PHASE(FS_TOP));
-        REBLEN num_params = ACT_NUM_PARAMS(FRM_PHASE(FS_TOP));
-
-        if (v >= head and v < head + num_params)
-            error = Error_Invalid_Arg(FS_TOP, cast_PAR(v));
-        else
+        if (not Is_Action_Frame(FS_TOP))
             error = Error_Bad_Value(v);
+        else {
+            const REBPAR *head = ACT_PARAMS_HEAD(FRM_PHASE(FS_TOP));
+            REBLEN num_params = ACT_NUM_PARAMS(FRM_PHASE(FS_TOP));
+
+            if (v >= head and v < head + num_params)
+                error = Error_Invalid_Arg(FS_TOP, cast_PAR(v));
+            else
+                error = Error_Bad_Value(v);
+        }
         break; }
 
       default:

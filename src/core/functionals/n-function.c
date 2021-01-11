@@ -246,10 +246,7 @@ REB_R Returner_Dispatcher(REBFRM *f)
 
     Blit_Specific(f->out, spare);
 
-    // !!! TYPECHECKING RETURN IS BROKEN 
-    /*
     FAIL_IF_BAD_RETURN_TYPE(f);
-    */
 
     return f->out;
 }
@@ -375,12 +372,8 @@ REBACT *Make_Interpreted_Action_May_Fail(
             const REBPAR *param = ACT_PARAMS_HEAD(a);
             assert(KEY_SYM(ACT_KEYS_HEAD(a)) == SYM_RETURN);
 
-         // !!! Temporary disablement due to RETURN issue
-          /*
             if (not TYPE_CHECK(param, REB_VOID))  // `do []` returns
                 ACT_DISPATCHER(a) = &Returner_Dispatcher;  // error when run
-          */
-          UNUSED(param);
         }
         else {
             // Keep the Void_Dispatcher passed in above
@@ -645,10 +638,6 @@ REBNATIVE(return)
     // So TYPESET! bits in the RETURN param are used for legal return types.
     //
     const REBPAR *param = ACT_PARAMS_HEAD(target_fun);
-    //
-    // !!! LOCALNESS NOT KNOWN NOW
-    //
-    UNUSED(param);
     assert(KEY_SYM(ACT_KEYS_HEAD(target_fun)) == SYM_RETURN);
 
     // There are two ways you can get an "endish nulled".  One is a plain
@@ -682,14 +671,9 @@ REBNATIVE(return)
     // take [<opt> any-value!] as its argument, and then report the error
     // itself...implicating the frame (in a way parallel to this native).
     //
-
-
-    // !!!! RETURN TYPE CHECKING BROKEN
-    // NEW STRATEGY NEEDED
-    /*
-    if (not TYPE_CHECK(typeset, VAL_TYPE(v)))
+    if (not TYPE_CHECK(param, VAL_TYPE(v)))
         fail (Error_Bad_Return_Type(target_frame, VAL_TYPE(v)));
-        */
+
   skip_type_check: {
     Move_Value(D_OUT, NATIVE_VAL(unwind)); // see also Make_Thrown_Unwind_Value
     INIT_VAL_ACTION_BINDING(D_OUT, f_binding);

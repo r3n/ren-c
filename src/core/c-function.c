@@ -53,6 +53,7 @@ static bool Params_Of_Hook(
         }
 
         switch (VAL_PARAM_CLASS(param)) {
+          case REB_P_RETURN:
           case REB_P_OUTPUT:
           case REB_P_NORMAL:
             break;
@@ -336,8 +337,15 @@ void Push_Paramlist_Triads_May_Fail(
             spelling = VAL_WORD_SPELLING(cell);
 
             if (kind == REB_SET_WORD) {
+                //
+                // Outputs are set to refinements, and that includes RETURN,
+                // because if it were set to a local there would be nowhere
+                // to put its type information.  The information is resident
+                // in the unspecialized slot.  This is under review.
+                //
                 if (VAL_WORD_SYM(cell) == SYM_RETURN and not quoted) {
-                    pclass = REB_P_LOCAL;
+                    refinement = true;  // sets REB_TS_REFINEMENT (optional)
+                    pclass = REB_P_RETURN;
                 }
                 else if (not quoted) {
                     refinement = true;  // sets REB_TS_REFINEMENT (optional)
@@ -384,7 +392,7 @@ void Push_Paramlist_Triads_May_Fail(
                 pclass = REB_P_LOCAL;
         }
 
-        if (STR_SYMBOL(spelling) == SYM_RETURN and pclass != REB_P_LOCAL) {
+        if (STR_SYMBOL(spelling) == SYM_RETURN and pclass != REB_P_RETURN) {
             //
             // Cancel definitional return if any non-SET-WORD! uses the name
             // RETURN when defining a FUNC.
@@ -458,7 +466,7 @@ void Push_Paramlist_Triads_May_Fail(
                 Init_Word(word, spelling);
                 fail (Error_Dup_Vars_Raw(word));  // most dup checks are later
             }
-            if (pclass == REB_P_LOCAL)
+            if (pclass == REB_P_RETURN)
                 *definitional_return_dsp = DSP;  // RETURN: explicit
             else
                 *flags &= ~MKF_RETURN;
@@ -494,19 +502,24 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     if (flags & MKF_RETURN) {
         if (definitional_return_dsp == 0) { // no explicit RETURN: pure local
-            //
-            // While default arguments disallow ACTION!, VOID!, and NULL...
-            // they are allowed to return anything.  Generally speaking, the
-            // checks are on the input side, not the output.
-            //
             PUSH_SLOTS();
 
             Init_Word(KEY_SLOT(DSP), Canon(SYM_RETURN));
             definitional_return_dsp = DSP;
 
             STKVAL(*) param = PARAM_SLOT(DSP);
-            Init_Void(param, SYM_VOID);
-            SET_CELL_FLAG(param, VAR_MARKED_HIDDEN);
+
+            // While default arguments disallow ACTION!, VOID!, and NULL...
+            // they are allowed to return anything.  Generally speaking, the
+            // checks are on the input side, not the output.
+            //
+            Init_Param(
+                param,
+                REB_P_RETURN,
+                TS_OPT_VALUE
+                    | FLAGIT_KIND(REB_TS_INVISIBLE)  // return @() intentional
+                    | FLAGIT_KIND(REB_TS_REFINEMENT)  // need slot for types
+            );
 
             Init_Nulled(TYPES_SLOT(DSP));
             Init_Nulled(NOTES_SLOT(DSP));
@@ -578,8 +591,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         Init_Key(key, VAL_WORD_SPELLING(KEY_SLOT(definitional_return_dsp)));
         ++key;
 
-        Init_Void(param, SYM_UNSET);  // acts as a local !!! being revisited
-        SET_CELL_FLAG(param, VAR_MARKED_HIDDEN);
+        Move_Value(param, PARAM_SLOT(definitional_return_dsp));
         ++param;
     }
 
@@ -681,33 +693,10 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         REBVAL *dest = SPECIFIC(rootvar) + 1;
         const RELVAL *param = ARR_AT(paramlist, 1);
 
-        if (definitional_return_dsp != 0) {
-            //
-            // We put the return note in the top-level meta information, not
-            // on the local itself (the "return-ness" is a distinct property
-            // of the function from what word is used for RETURN:, and it
-            // is possible to use the word RETURN for a local or refinement
-            // argument while having nothing to do with the exit value of
-            // the function.)
-            //
-            Move_Value(
-                CTX_VAR(*meta, STD_ACTION_META_RETURN_TYPE),
-                TYPES_SLOT(definitional_return_dsp)
-            );
-
-            Init_Nulled(dest);  // clear the local RETURN: var's description
-            SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
-            ++dest;
-            ++param;
-        }
-
         REBDSP dsp = dsp_orig + 8;
         for (; dsp <= DSP; dsp += 4) {
             STKVAL(*) types = TYPES_SLOT(dsp);
             assert(IS_NULLED(types) or IS_BLOCK(types));
-
-            if (dsp == definitional_return_dsp)
-                continue;
 
             Move_Value(dest, types);
             if (GET_CELL_FLAG(param, VAR_MARKED_HIDDEN))
@@ -742,30 +731,10 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         const RELVAL *param = ARR_AT(paramlist, 1);
         REBVAL *dest = SPECIFIC(rootvar) + 1;
 
-        if (definitional_return_dsp != 0) {
-            //
-            // See remarks on the return type--the RETURN is documented in
-            // the top-level META-OF, not the "incidentally" named RETURN
-            // parameter in the list
-            //
-            Move_Value(
-                CTX_VAR(*meta, STD_ACTION_META_RETURN_NOTE),
-                NOTES_SLOT(definitional_return_dsp)
-            );
-
-            Init_Nulled(dest);
-            SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
-            ++dest;
-            ++param;
-        }
-
         REBDSP dsp = dsp_orig + 8;
         for (; dsp <= DSP; dsp += 4) {
             STKVAL(*) notes = NOTES_SLOT(dsp);
             assert(IS_TEXT(notes) or IS_NULLED(notes));
-
-            if (dsp == definitional_return_dsp)
-                continue;
 
             Move_Value(dest, notes);
 
@@ -982,7 +951,7 @@ REBACT *Make_Action(
     // action...you have to make a new variation.  Note that the exemplar
     // can be exposed by AS FRAME! of this action...
     //
-    Deep_Freeze_Context(CTX(paramlist));
+    Freeze_Array_Shallow(paramlist);
 
     // Precalculate cached function flags.  This involves finding the first
     // unspecialized argument which would be taken at a callsite, which can
@@ -993,6 +962,7 @@ REBACT *Make_Action(
     const REBPAR *first = First_Unspecialized_Param(nullptr, act);
     if (first) {
         switch (VAL_PARAM_CLASS(first)) {
+          case REB_P_RETURN:
           case REB_P_OUTPUT:
           case REB_P_NORMAL:
             break;

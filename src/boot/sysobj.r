@@ -194,11 +194,9 @@ standard: make object! [
     ;
     action-meta: make object! [
         description:
-        return-type:
-        return-note:
         parameter-types:
         parameter-notes:
-            _
+            null
     ]
 
     ; !!! This is the template used for all errors, to which extra fields are
