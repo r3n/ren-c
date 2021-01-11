@@ -61,12 +61,13 @@ REBNATIVE(form)
 //
 //  "Converts a value to a REBOL-readable string."
 //
-//      return: [text!]
+//      return: "NULL if input is NULL"
+//          [<opt> text!]
 //      truncated: "<output> Whether the mold was truncated"
 //          [logic!]
 //
 //      value "The value to mold"
-//          [any-value!]
+//          [<opt> any-value!]
 //      /only "For a block value, mold only its contents, no outer []"
 //      /all "Use construction syntax"
 //      /flat "No indentation"
@@ -77,6 +78,10 @@ REBNATIVE(form)
 REBNATIVE(mold)
 {
     INCLUDE_PARAMS_OF_MOLD;
+
+    REBVAL *v = ARG(value);
+    if (IS_NULLED(v))
+        return nullptr;
 
     DECLARE_MOLD (mo);
     if (REF(all))
@@ -90,10 +95,10 @@ REBNATIVE(mold)
 
     Push_Mold(mo);
 
-    if (REF(only) and IS_BLOCK(ARG(value)))
+    if (REF(only) and IS_BLOCK(v))
         SET_MOLD_FLAG(mo, MOLD_FLAG_ONLY);
 
-    Mold_Value(mo, ARG(value));
+    Mold_Value(mo, v);
 
     REBSTR *popped = Pop_Molded_String(mo);  // sets MOLD_FLAG_TRUNCATED
 

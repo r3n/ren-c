@@ -22,12 +22,14 @@
 (null? trap [a: null a])
 (not error? trap [set 'a null])
 
-; NULL has no visual representation, so MOLD and FORM errors on it
+; NULL has no visual representation, so FORM errors on it
 ; Users are expected to triage the NULL to vaporize, error, or find some
 ; way to represent it "out of band" in their target medium.
+;
+; MOLD was reviewed and deemed to be better without this protection than with.
+; (It may be reviewed an decided the same for FORM)
 (
-    e: trap [mold null]
-    'arg-required = e/id
+    null = mold null
 )
 (
     e: trap [form null]
