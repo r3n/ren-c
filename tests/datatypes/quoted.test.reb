@@ -109,7 +109,7 @@
 )
 
 (just '[a b c] = quote [a b c])
-(just '(a b c) == quote lit (a b c))
+(just '(a b c) == quote just (a b c))
 (not (just '[A B C] == quote [a b c]))
 ('''[a b c] !== '''''[a b c])
 ('''[a b c] == '''[a b c])
@@ -129,7 +129,7 @@
 ; REQUOTE is a reframing action that removes quoting levels and then puts
 ; them back on to the result.
 
-((just ''''3) == requote add lit ''''1 2)
+((just ''''3) == requote add just ''''1 2)
 
 ((just '''[b c d]) == requote find ''''[a b c d] 'b)
 
@@ -139,12 +139,12 @@
 
 ('''a/b/c/d/e/f = requote join just '''a/b/c 'd/e/f)
 
-((just '[1]) = (requote parse lit '[1] [some integer!]))
+((just '[1]) = (requote parse just '[1] [some integer!]))
 
 
 ; COPY should be implemented for all types, QUOTED! included.
 ;
-((just '''[a b c]) == copy lit '''[a b c])
+((just '''[a b c]) == copy just '''[a b c])
 
 
 ; All escaped values are truthy, regardless of what it is they are escaping

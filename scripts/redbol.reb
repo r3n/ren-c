@@ -240,14 +240,32 @@ rewrite-spec-and-body: helper [
 ; once (e.g. a loop or function body) it marks that parameter `<const>`.
 ; That prevents casual mutations.
 ;
-; !!! See notes in RESKINNED for why an ADAPT must be used (for now)
+; !!! This depended on the RESKINNED function, which was removed to make way
+; for more coherent granular parameter tweaking in the spec and function
+; creation with AS FRAME!.  In order to begin implementing that approach
+; correctly, the bad implementation of RESKINNED had to be pulled out.  For
+; the moment, the const parameter is not tweaked in Redbol...but the feature
+; is aiming to come back shortly in much better form.
+;
+
+for-each-nonconst: emulate [
+;    reskinned [
+;        body [block!]  ; no <const> annotation
+;    ] adapt :for-each []  ; see RESKINNED for why this is an ADAPT for now
+
+    :for-each
+]
 
 func-nonconst: emulate [
-    reskinned [body [block!]] adapt :func []
+;    reskinned [body [block!]] adapt :func []
+
+    :func
 ]
 
 function-nonconst: emulate [
-    reskinned [body [block!]] adapt :function []
+;     reskinned [body [block!]] adapt :function []
+
+    :function
 ]
 
 redbol-func: func: emulate [
@@ -1069,12 +1087,6 @@ switch: emulate [  ; Ren-C evaluates cases: https://trello.com/c/9ChhSWC4/
     ]
 ]
 
-
-for-each-nonconst: emulate [
-    reskinned [
-        body [block!]  ; no <const> annotation
-    ] adapt :for-each []  ; see RESKINNED for why this is an ADAPT for now
-]
 
 while: emulate [denuller :while]
 foreach: emulate [
