@@ -386,17 +386,6 @@ inline static bool Action_Is_Base_Of(REBACT *base, REBACT *derived) {
     }
 }
 
-inline static REBVAL *Voidify_Rootparam(REBARR *paramlist) {
-    //
-    // !!! Since the voidification is to comply with systemic rules, we also
-    // comply with the rule that the ancestor can't be trash here.  Review.
-    //
-    assert(IS_POINTER_SAFETRASH_DEBUG(LINK_ANCESTOR_NODE(paramlist)));
-    LINK_ANCESTOR_NODE(paramlist) = NOD(paramlist);
-
-    return Init_Unreadable_Void(ARR_HEAD(paramlist)); 
-}
-
 
 //=//// RETURN HANDLING (WIP) /////////////////////////////////////////////=//
 //

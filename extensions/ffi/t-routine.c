@@ -1149,9 +1149,16 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
         SERIES_MASK_PARAMLIST | NODE_FLAG_MANAGED
     );
 
-    // Now fill in the canon value of the paramlist so it is an actual REBACT
+    // Initializing the array head to a void signals the Make_Action() that
+    // it is supposed to touch up the paramlist to point to the action.
     //
-    Voidify_Rootparam(paramlist);
+    // !!! FFI needs update to the new keylist conventions, with a REBSER*
+    // of symbols, instead of having the symbols in the key.   Much of this
+    // frame building is likely better expressed as user code that then
+    // passes the constructed FRAME! in to be coupled with the routine
+    // dispatcher.
+    //
+    Init_Unreadable_Void(ARR_HEAD(paramlist));
 
     REBACT *action = Make_Action(
         paramlist,

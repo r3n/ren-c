@@ -176,14 +176,7 @@ REBNATIVE(does)
     REBVAL *specializee = ARG(specializee);
 
     if (IS_BLOCK(specializee)) {
-        REBARR *paramlist = Make_Array_Core(
-            1,  // archetype only...DOES always makes action with no arguments
-            SERIES_MASK_PARAMLIST
-        );
-
-        Voidify_Rootparam(paramlist);
-        TERM_ARRAY_LEN(paramlist, 1);
-
+        //
         // `does [...]` and `does do [...]` are not exactly the same.  The
         // generated ACTION! of the first form uses Block_Dispatcher() and
         // does on-demand relativization, so it's "kind of like" a `func []`
@@ -191,7 +184,6 @@ REBNATIVE(does)
         // is optimized to not run the block with the DO native...hence a
         // HIJACK of DO won't be triggered by invocations of the first form.
         //
-        Manage_Series(paramlist);
         REBACT *doer = Make_Action(
             ACT_SPECIALTY(NATIVE_ACT(surprise)),  // same, no args
             &Block_Dispatcher,  // **SEE COMMENTS**, not quite like plain DO!

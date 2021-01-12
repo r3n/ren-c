@@ -583,7 +583,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     const REBSTR *duplicate = nullptr;
 
   blockscope {
-    REBVAL *param = Voidify_Rootparam(paramlist) + 1;
+    REBVAL *param = Init_Unreadable_Void(ARR_HEAD(paramlist)) + 1;
     REBKEY *key = SER_HEAD(REBKEY, keylist);
 
     if (definitional_return_dsp != 0) {
