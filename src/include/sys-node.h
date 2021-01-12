@@ -69,11 +69,13 @@
                "/REBMAP/REBFRM or nullptr"
         );
 
-        bool b = base;  // needed to avoid compiler constexpr warning
-        if (b and p and (reinterpret_cast<const REBNOD*>(p)->header.bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE
+        if (not p)
+            return nullptr;
+
+        if ((FIRST_BYTE(reinterpret_cast<const REBNOD*>(p)->leader) & (
+            NODE_BYTEMASK_0x80_NODE | NODE_BYTEMASK_0x40_FREE
         )) != (
-            NODE_FLAG_NODE
+            NODE_BYTEMASK_0x80_NODE
         )){
             panic (p);
         }
@@ -83,16 +85,91 @@
 #endif
 
 
-#if defined(NDEBUG)
-    #define Is_Node_Cell(n) \
-        (did (FIRST_BYTE((n)->header) & NODE_BYTEMASK_0x01_CELL))
+#define NODE_BYTE(p) \
+    FIRST_BYTE(NOD(p)->leader)
+
+#ifdef NDEBUG
+    #define IS_FREE_NODE(p) \
+        (did (*cast(const REBYTE*, (p)) & NODE_BYTEMASK_0x40_FREE))
 #else
-    inline static bool Is_Node_Cell(REBNOD *n) {
-        REBYTE first = FIRST_BYTE(n->header);
-        assert(first & NODE_BYTEMASK_0x80_NODE);
-        return did (first & NODE_BYTEMASK_0x01_CELL);
+    inline static bool IS_FREE_NODE(const void *p) {
+        REBYTE first = *cast(const REBYTE*, p);  // NODE_BYTE asserts on free!
+
+        if (not (first & NODE_BYTEMASK_0x40_FREE))
+            return false;  // byte access defeats strict alias
+
+        assert(first == FREED_SERIES_BYTE or first == FREED_CELL_BYTE);
+        return true;
     }
 #endif
+
+
+//=//// MEMORY ALLOCATION AND FREEING MACROS //////////////////////////////=//
+//
+// Rebol's internal memory management is done based on a pooled model, which
+// use Try_Alloc_Mem() and Free_Mem() instead of calling malloc directly.
+// (Comments on those routines explain why this was done--even in an age of
+// modern thread-safe allocators--due to Rebol's ability to exploit extra
+// data in its pool block when a series grows.)
+//
+// Since Free_Mem() requires callers to pass in the size of the memory being
+// freed, it can be tricky.  These macros are modeled after C++'s new/delete
+// and new[]/delete[], and allocations take either a type or a type and a
+// length.  The size calculation is done automatically, and the result is cast
+// to the appropriate type.  The deallocations also take a type and do the
+// calculations.
+//
+// In a C++11 build, an extra check is done to ensure the type you pass in a
+// FREE or FREE_N lines up with the type of pointer being freed.
+//
+
+#define TRY_ALLOC(t) \
+    cast(t *, Try_Alloc_Mem(sizeof(t)))
+
+#define TRY_ALLOC_ZEROFILL(t) \
+    cast(t *, memset(ALLOC(t), '\0', sizeof(t)))
+
+#define TRY_ALLOC_N(t,n) \
+    cast(t *, Try_Alloc_Mem(sizeof(t) * (n)))
+
+#define TRY_ALLOC_N_ZEROFILL(t,n) \
+    cast(t *, memset(TRY_ALLOC_N(t, (n)), '\0', sizeof(t) * (n)))
+
+#ifdef CPLUSPLUS_11
+    #define FREE(t,p) \
+        do { \
+            static_assert( \
+                std::is_same<decltype(p), std::add_pointer<t>::type>::value, \
+                "mismatched FREE type" \
+            ); \
+            Free_Mem(p, sizeof(t)); \
+        } while (0)
+
+    #define FREE_N(t,n,p)   \
+        do { \
+            static_assert( \
+                std::is_same<decltype(p), std::add_pointer<t>::type>::value, \
+                "mismatched FREE_N type" \
+            ); \
+            Free_Mem(p, sizeof(t) * (n)); \
+        } while (0)
+#else
+    #define FREE(t,p) \
+        Free_Mem((p), sizeof(t))
+
+    #define FREE_N(t,n,p)   \
+        Free_Mem((p), sizeof(t) * (n))
+#endif
+
+#define CLEAR(m, s) \
+    memset((void*)(m), 0, s)
+
+#define CLEARS(m) \
+    memset((void*)(m), 0, sizeof(*m))
+
+
+#define Is_Node_Cell(n) \
+    (did (NODE_BYTE(n) & NODE_BYTEMASK_0x01_CELL))
 
 
 // Allocate a node from a pool.  Returned node will not be zero-filled, but
@@ -172,12 +249,12 @@ inline static void *Alloc_Node(REBLEN pool_id) {
 //
 inline static void Free_Node(REBLEN pool_id, void *p)
 {
-    REBNOD* node = cast(REBNOD*, p);
+    REBNOD* node = NOD(p);
 
   #ifdef DEBUG_MONITOR_SERIES
     if (
         pool_id == SER_POOL
-        and not (node->header.bits & NODE_FLAG_CELL)
+        and not Is_Node_Cell(node)
         and (cast(REBSER*, node)->info.bits & SERIES_INFO_MONITOR_DEBUG)
     ){
         printf(
@@ -189,7 +266,7 @@ inline static void Free_Node(REBLEN pool_id, void *p)
     }
   #endif
 
-    mutable_FIRST_BYTE(node->header) = FREED_SERIES_BYTE;
+    mutable_FIRST_BYTE(node->leader) = FREED_SERIES_BYTE;
 
     REBPOL *pool = &Mem_Pools[pool_id];
 

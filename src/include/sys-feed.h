@@ -81,7 +81,7 @@ inline static option(va_list*) FEED_VAPTR(REBFED *feed)
 // we sneak past that by accessing the node directly.
 //
 #define FEED_SPECIFIER(feed) \
-    EXTRA(Binding, FEED_SINGLE(feed)).node
+    ARR(BINDING(FEED_SINGLE(feed)))
 
 #define FEED_ARRAY(feed) \
     VAL_ARRAY(FEED_SINGLE(feed))

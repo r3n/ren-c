@@ -276,7 +276,6 @@ typedef struct Reb_Map REBMAP;
 //=//// BINDING ///////////////////////////////////////////////////////////=//
 
 struct Reb_Node;
-typedef struct Reb_Node REBSPC;
 
 struct Reb_Binder;
 struct Reb_Collector;

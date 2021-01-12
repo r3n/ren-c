@@ -403,7 +403,7 @@ REB_R PD_Context(
     // no need to go hunting).  'x
     //
     REBLEN n;
-    if (VAL_WORD_BINDING(picker) == NOD(c))
+    if (VAL_WORD_BINDING(picker) == CTX_VARLIST(c))
         n = VAL_WORD_INDEX(picker);
     else {
         const bool strict = false;
@@ -418,7 +418,7 @@ REB_R PD_Context(
         // the word is an evaluative product, as the bits live in the cell
         // and it will be discarded.
         //
-        INIT_VAL_WORD_BINDING(m_cast(RELVAL*, picker), NOD(c));
+        INIT_VAL_WORD_BINDING(m_cast(RELVAL*, picker), CTX_VARLIST(c));
         INIT_VAL_WORD_PRIMARY_INDEX(m_cast(RELVAL*, picker), n);
     }
 

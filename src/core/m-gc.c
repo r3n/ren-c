@@ -178,7 +178,7 @@ static void Queue_Mark_Node_Deep(void *p)
         return;  // it's 2 cells, sizeof(REBSER), but no room for REBSER data
     }
 
-    REBSER *s = SER(cast(REBNOD*, p));
+    REBSER *s = SER(p);
     if (GET_SERIES_INFO(s, INACCESSIBLE)) {
         //
         // !!! All inaccessible nodes should be collapsed and canonized into
@@ -291,9 +291,10 @@ static void Queue_Mark_Opt_Value_Deep(const RELVAL *v)
   #endif
 
     if (IS_BINDABLE_KIND(heart)) {
-        REBNOD *binding = EXTRA(Binding, v).node;
-        if (binding != UNBOUND and (binding->header.bits & NODE_FLAG_MANAGED))
-            Queue_Mark_Node_Deep(binding);
+        REBSER *binding = BINDING(v);
+        if (binding != UNBOUND)
+            if (NODE_BYTE(binding) & NODE_BYTEMASK_0x20_MANAGED)
+                Queue_Mark_Node_Deep(binding);
     }
 
     if (GET_CELL_FLAG(v, FIRST_IS_NODE) and PAYLOAD(Any, v).first.node)
@@ -1191,7 +1192,7 @@ REBLEN Recycle(void)
 void Push_Guard_Node(const REBNOD *node)
 {
   #if !defined(NDEBUG)
-    if (FIRST_BYTE(node->header) & NODE_BYTEMASK_0x01_CELL) {
+    if (FIRST_BYTE(node->leader) & NODE_BYTEMASK_0x01_CELL) {
         //
         // It is a value.  Cheap check: require that it already contain valid
         // data when the guard call is made (even if GC isn't necessarily

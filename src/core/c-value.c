@@ -95,7 +95,7 @@ REBNOD *Dump_Value_Debug(const RELVAL *v)
     if (not containing)
         return nullptr;
 
-    if (not (containing->header.bits & NODE_FLAG_CELL)) {
+    if (not Is_Node_Cell(containing)) {
         printf(
             "Containing series for value pointer found, %p:\n",
             cast(void*, containing)

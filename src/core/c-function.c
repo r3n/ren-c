@@ -920,7 +920,7 @@ REBACT *Make_Action(
     RELVAL *archetype = ARR_HEAD(details);
     RESET_CELL(archetype, REB_ACTION, CELL_MASK_ACTION);
     VAL_ACTION_DETAILS_NODE(archetype) = NOD(details);
-    VAL_ACTION_BINDING_NODE(archetype) = UNBOUND;
+    mutable_BINDING(archetype) = UNBOUND;
 
   #if !defined(NDEBUG)  // notice attempted mutation of the archetype cell
     SET_CELL_FLAG(archetype, PROTECTED);

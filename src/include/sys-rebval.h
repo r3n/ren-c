@@ -337,11 +337,6 @@ inline static uintptr_t Endlike_Header(uintptr_t bits) {
 
 struct Reb_Character_Extra { REBUNI codepoint; };  // see %sys-char.h
 
-struct Reb_Binding_Extra  // see %sys-bind.h
-{
-    REBNOD* node;
-};
-
 struct Reb_Datatype_Extra  // see %sys-datatype.h
 {
     enum Reb_Kind kind;
@@ -400,7 +395,7 @@ union Reb_Bytes_Extra {
 union Reb_Value_Extra { //=/////////////////// ACTUAL EXTRA DEFINITION ////=//
 
     struct Reb_Character_Extra Character;
-    struct Reb_Binding_Extra Binding;
+    const REBSER *Binding;  // see %sys-bind.h
     struct Reb_Datatype_Extra Datatype;
     struct Reb_Date_Extra Date;
     struct Reb_Typeset_Extra Typeset;
@@ -620,6 +615,12 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 
 #define EXTRA(Type, v) \
     (v)->extra.Type
+
+#define mutable_BINDING(v) \
+    *((const REBSER**)&(v)->extra.Binding)
+
+#define BINDING(v) \
+    ((REBSER*)(v)->extra.Binding)
 
 
 //=////////////////////////////////////////////////////////////////////////=//

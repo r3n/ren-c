@@ -159,7 +159,7 @@ inline static RELVAL *Quotify_Core(
             // leave `v` binding as it was
         }
         else if (Is_Bindable(unquoted)) {
-            EXTRA(Binding, unquoted).node = nullptr;  // must look unbound
+            mutable_BINDING(unquoted) = UNBOUND;  // must look unbound
             // leave `v` to hold the binding as it was
         }
         else {
@@ -170,7 +170,7 @@ inline static RELVAL *Quotify_Core(
             // we can just say yes always but have it unbound if not.
             //
             unquoted->extra = v->extra;  // save the non-binding-related data
-            EXTRA(Binding, v).node = UNBOUND;
+            mutable_BINDING(v) = UNBOUND;
         }
 
       #if !defined(NDEBUG)

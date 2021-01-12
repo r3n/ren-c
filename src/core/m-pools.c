@@ -458,7 +458,7 @@ bool Try_Fill_Pool(REBPOL *pool)
     }
 
     while (true) {
-        mutable_FIRST_BYTE(node->header) = FREED_SERIES_BYTE;
+        mutable_FIRST_BYTE(node->leader) = FREED_SERIES_BYTE;
 
         if (--units == 0) {
             node->next_if_free = nullptr;
@@ -659,7 +659,7 @@ void Free_Unbiased_Series_Data(char *unbiased, REBLEN total)
         pool->first = node;
         pool->free++;
 
-        mutable_FIRST_BYTE(node->header) = FREED_SERIES_BYTE;
+        mutable_FIRST_BYTE(node->leader) = FREED_SERIES_BYTE;
     }
     else {
         FREE_N(char, total, unbiased);

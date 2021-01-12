@@ -311,7 +311,7 @@ void Virtual_Bind_Patchify(REBVAL *any_array, REBCTX *ctx, enum Reb_Kind kind)
     // not concerned and want to try binding it through the virtualized
     // reference anyway.
     //
-    INIT_BINDING_MAY_MANAGE(any_array, NOD(patch));
+    INIT_BINDING_MAY_MANAGE(any_array, patch);
     Constify(any_array);
 }
 
@@ -1556,7 +1556,7 @@ REBNATIVE(as)
             //
             RESET_VAL_HEADER(D_OUT, REB_FRAME, CELL_MASK_CONTEXT);
             VAL_CONTEXT_VARLIST_NODE(D_OUT) = NOD(ACT_EXEMPLAR(VAL_ACTION(v)));
-            VAL_FRAME_BINDING_NODE(D_OUT) = NOD(VAL_ACTION_BINDING(v));
+            mutable_BINDING(D_OUT) = CTX_VARLIST(VAL_ACTION_BINDING(v));
             VAL_FRAME_PHASE_OR_LABEL_NODE(D_OUT) = NOD(VAL_ACTION(v));
             return D_OUT;
         }

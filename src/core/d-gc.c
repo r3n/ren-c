@@ -35,7 +35,7 @@
 #if !defined(NDEBUG)
 
 #define Is_Marked(n) \
-    (NOD(n)->header.bits & NODE_FLAG_MARKED)
+    (did (NODE_BYTE(n) & NODE_BYTEMASK_0x10_MARKED))
 
 
 //
@@ -52,22 +52,21 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(VAL_QUOTED_DEPTH(v) >= 3);
         REBCEL(const*) cell = VAL_UNESCAPED(v);
         if (ANY_WORD_KIND(CELL_KIND(cell))) {
-            assert(VAL_WORD_BINDING_NODE(cell)->header.bits
-                & SERIES_FLAG_IS_STRING);
+            assert(BINDING(cell)->header.bits & SERIES_FLAG_IS_STRING);
         }
         return;
     }
 
     enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), v));
 
-    REBNOD *binding;
+    const REBSER *binding;
     if (
         IS_BINDABLE_KIND(heart)
-        and (binding = EXTRA(Binding, v).node)
+        and (binding = BINDING(v))
         and not (binding->header.bits & SERIES_FLAG_IS_STRING)
-        and NOT_SERIES_INFO(SER(binding), INACCESSIBLE)
+        and NOT_SERIES_INFO(binding, INACCESSIBLE)
     ){
-        assert(IS_SER_ARRAY(SER(binding)));
+        assert(IS_SER_ARRAY(binding));
         if (
             GET_ARRAY_FLAG(ARR(binding), IS_VARLIST)
             and (CTX_TYPE(CTX(binding)) == REB_FRAME)
@@ -81,7 +80,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             REBNOD *keysource = LINK(KeySource, ARR(binding));
             if (not Is_Node_Cell(keysource)) {
                 if (
-                    (keysource->header.bits & SERIES_MASK_KEYLIST)
+                    (SER(keysource)->header.bits & SERIES_MASK_KEYLIST)
                     != SERIES_MASK_KEYLIST
                 ){
                     panic (binding);
@@ -187,8 +186,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_EVENT: {  // packed cell structure with one GC-able slot
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         REBNOD *n = PAYLOAD(Any, v).first.node;  // REBGOB*, REBREQ*, etc.
-        assert(n == nullptr or n->header.bits & NODE_FLAG_NODE);
-        assert(Is_Marked(PAYLOAD(Any, v).first.node));
+        assert(n == nullptr or Is_Marked(PAYLOAD(Any, v).first.node));
         break; }
 
       case REB_BINARY: {
@@ -257,7 +255,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         // could apply to any OBJECT!, but the binding cheaply makes it
         // a method for that object.)
         //
-        if (VAL_FRAME_BINDING_NODE(v) != UNBOUND) {
+        if (BINDING(v) != UNBOUND) {
             if (CTX_TYPE(context) == REB_FRAME) {
                 struct Reb_Frame *f = CTX_FRAME_IF_ON_STACK(context);
                 if (f)  // comes from execution, not MAKE FRAME!
@@ -348,7 +346,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_SYM_WORD: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
 
-        REBNOD *cache = VAL_WORD_CACHE_NODE(v);
+        REBSPC *cache = cast(REBSPC*, VAL_WORD_CACHE_NODE(v));
         if (cache) {
             assert(
                 (cache->header.bits & ARRAY_FLAG_IS_PATCH)
@@ -517,7 +515,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
     if (GET_ARRAY_FLAG(a, IS_DETAILS)) {
         const RELVAL *archetype = ARR_HEAD(a);
         assert(IS_ACTION(archetype));
-        assert(VAL_ACTION_BINDING_NODE(archetype) == UNBOUND);
+        assert(VAL_ACTION_BINDING(archetype) == UNBOUND);
 
         // These queueings cannot be done in Queue_Mark_Function_Deep
         // because of the potential for overflowing the C stack with calls
@@ -538,7 +536,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         //
         assert(ANY_CONTEXT(archetype));
         assert(
-            VAL_FRAME_BINDING_NODE(archetype) == UNBOUND
+            BINDING(archetype) == UNBOUND
             or VAL_TYPE(archetype) == REB_FRAME
         );
 

@@ -1007,7 +1007,7 @@ REBCTX *Error_No_Arg(option(const REBSTR*) label, const REBSTR *spelling)
 
     DECLARE_LOCAL (label_word);
     if (label)
-        Init_Word(label_word, label);
+        Init_Word(label_word, unwrap(label));
     else
         Init_Blank(label_word);
 

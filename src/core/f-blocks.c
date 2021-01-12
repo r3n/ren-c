@@ -184,7 +184,7 @@ void Clonify(
         }
         else if (ANY_ARRAY_KIND(heart)) {
             REBNOD *n = VAL_NODE(v);
-            assert(not (FIRST_BYTE(n->header.bits) & NODE_BYTEMASK_0x01_CELL));
+            assert(not Is_Node_Cell(n));
             series = Copy_Array_At_Extra_Shallow(
                 ARR(n),
                 0,  // index

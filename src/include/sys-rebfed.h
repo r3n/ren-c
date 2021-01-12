@@ -24,7 +24,7 @@
 //
 
 
-#define FEED_MASK_DEFAULT 0
+#define FEED_MASK_DEFAULT NODE_FLAG_NODE
 
 #define FEED_FLAG_0_IS_TRUE \
     FLAG_LEFT_BIT(0)

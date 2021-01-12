@@ -840,6 +840,16 @@ struct Reb_Series {
 typedef const REBSTR *REBKEY;
 
 
+// It may become interesting to say that a specifier can be a pairing or
+// a REBVAL* of some kind.  But for the moment, that just complicates the
+// issue of not being able to check the ->header bits safely (it would require
+// checking the NODE_BYTE() first, then casting to a VAL() or SER()).  In
+// the interests of making the code strict-aliasing-safe for starters, assume
+// all specifiers are arrays.
+//
+typedef REBARR REBSPC;
+
+
 // To help document places in the core that are complicit in the "extension
 // hack", alias arrays being used for the FFI and GOB to another name.
 //

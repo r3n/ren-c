@@ -73,8 +73,8 @@
 
 // Next node is either to another patch, a frame specifier REBCTX, or nullptr.
 //
-#define LINK_PatchNext_TYPE        REBNOD*
-#define LINK_PatchNext_CAST        NOD
+#define LINK_PatchNext_TYPE        REBARR*
+#define LINK_PatchNext_CAST        ARR
 
 // The virtual binding patches keep a circularly linked list of their variants
 // that have distinct next pointers.  This way, they can look through that
@@ -88,7 +88,7 @@
         cast(REBSPC*, (p)) // makes UNBOUND look like SPECIFIED
 
     #define VAL_SPECIFIER(v) \
-        SPC(EXTRA(Binding, (v)).node)
+        SPC(BINDING(v))
 #else
     inline static REBSPC* SPC(void *p) {
         assert(p != SPECIFIED); // use SPECIFIED, not SPC(SPECIFIED)
@@ -104,20 +104,20 @@
     inline static REBSPC *VAL_SPECIFIER(REBCEL(const*) v) {
         assert(ANY_ARRAY_KIND(CELL_HEART(v)));
 
-        REBNOD *n = EXTRA(Binding, v).node;
-        if (not n)
+        REBARR *a = ARR(BINDING(v));
+        if (not a)
             return SPECIFIED;
 
-        if (n->header.bits & ARRAY_FLAG_IS_PATCH)
-            return cast(REBSPC*, n);  // virtual bind
+        if (a->header.bits & ARRAY_FLAG_IS_PATCH)
+            return cast(REBSPC*, a);  // virtual bind
 
         // While an ANY-WORD! can be bound specifically to an arbitrary
         // object, an ANY-ARRAY! only becomes bound specifically to frames.
         // The keylist for a frame's context should come from a function's
         // paramlist, which should have an ACTION! value in keylist[0]
         //
-        assert(CTX_TYPE(CTX(n)) == REB_FRAME);  // may be inaccessible
-        return cast(REBSPC*, n);
+        assert(CTX_TYPE(CTX(a)) == REB_FRAME);  // may be inaccessible
+        return cast(REBSPC*, a);
     }
 #endif
 
@@ -156,9 +156,9 @@ inline static bool Is_Overriding_Context(REBCTX *stored, REBCTX *override)
     // !!! Note that in virtual binding, something like a FOR-EACH would
     // wind up overriding words bound to FRAME!s, even though not "derived".
     //
-    if (stored_source->header.bits & ARRAY_FLAG_IS_DETAILS)
+    if (Is_Node_Cell(stored_source))
         return false;
-    if (temp->header.bits & ARRAY_FLAG_IS_DETAILS)
+    if (Is_Node_Cell(temp))
         return false;
 
     while (true) {
@@ -341,13 +341,12 @@ struct Reb_Collector {
 // would fail later, but given that the REBFRM's captured binding can outlive
 // the frame that might lose important functionality.
 //
-inline static REBNOD *SPC_BINDING(REBSPC *specifier)
+inline static REBSER *SPC_BINDING(REBSPC *specifier)
 {
     assert(specifier != UNBOUND);
     const REBVAL *rootvar = CTX_ARCHETYPE(CTX(specifier));  // ok if Decay()'d
     assert(IS_FRAME(rootvar));
-    assert(not EXTRA(Binding, rootvar).node or ((intptr_t)EXTRA(Binding, rootvar).node > 300000));
-    return EXTRA(Binding, rootvar).node;
+    return BINDING(rootvar);
 }
 
 
@@ -358,18 +357,18 @@ inline static REBNOD *SPC_BINDING(REBSPC *specifier)
 //
 inline static void INIT_BINDING_MAY_MANAGE(
     RELVAL *out,
-    REBNOD* binding
+    const REBSER* binding
 ){
-    EXTRA(Binding, out).node = binding;
+    mutable_BINDING(out) = binding;
 
-    if (not binding or GET_SERIES_FLAG(SER(binding), MANAGED))
+    if (not binding or GET_SERIES_FLAG(binding, MANAGED))
         return;  // unbound or managed already (frame OR object context)
 
-    REBFRM *f = FRM(LINK(KeySource, SER(binding)));  // unmanaged only frame
+    REBFRM *f = FRM(LINK(KeySource, binding));  // unmanaged only frame
     assert(f->key == f->key_tail);  // cannot manage varlist in mid fulfill!
     UNUSED(f);
 
-    binding->header.bits |= NODE_FLAG_MANAGED; // burdens the GC, now...
+    m_cast(REBSER*, binding)->header.bits |= NODE_FLAG_MANAGED;  // GC sees...
 }
 
 
@@ -380,7 +379,7 @@ inline static void INIT_BINDING_MAY_MANAGE(
 //
 inline static bool IS_WORD_UNBOUND(const RELVAL *v) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
-    return VAL_WORD_BINDING_NODE(v)->header.bits & SERIES_FLAG_IS_STRING;
+    return BINDING(v)->header.bits & SERIES_FLAG_IS_STRING;
 }
 
 #define IS_WORD_BOUND(v) \
@@ -394,26 +393,23 @@ inline static REBLEN VAL_WORD_INDEX(const RELVAL *v) {
     return cast(REBLEN, i);
 }
 
-inline static REBNOD *VAL_WORD_BINDING(const RELVAL *v) {
+inline static REBARR *VAL_WORD_BINDING(const RELVAL *v) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
-    REBNOD *binding = VAL_WORD_BINDING_NODE(v);
+    const REBSER *binding = BINDING(v);
     if (binding->header.bits & SERIES_FLAG_IS_STRING)
         return UNBOUND;
-    return VAL_WORD_BINDING_NODE(v);
+    return m_cast(REBARR*, ARR(binding));
 }
 
-inline static void INIT_VAL_WORD_BINDING(RELVAL *v, const void *p) {
+inline static void INIT_VAL_WORD_BINDING(RELVAL *v, const REBSER *binding) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
 
-    const REBNOD *binding = cast(const REBNOD*, p);
     assert(binding);  // can't set word bindings to nullptr
-    VAL_WORD_BINDING_NODE(v) = m_cast(REBNOD*, binding);
+    mutable_BINDING(v) = binding;
 
   #if !defined(NDEBUG)
     if (binding->header.bits & SERIES_FLAG_IS_STRING)
         return;  // e.g. UNBOUND (words use strings to indicate unbounds)
-
-    assert(not (binding->header.bits & NODE_FLAG_CELL));  // not currently used
 
     if (binding->header.bits & NODE_FLAG_MANAGED) {
         assert(
@@ -441,7 +437,7 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
 
         Move_Value_Header(out, v);
         out->payload = v->payload;
-        EXTRA(Binding, out).node = NOD(expired);
+        mutable_BINDING(out) = CTX_VARLIST(expired);
     }
     return cast(REBVAL*, out);
 }
@@ -455,17 +451,17 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
 
 inline static void Unbind_Any_Word(RELVAL *v) {
     const REBSTR *spelling = VAL_WORD_SPELLING(VAL_UNESCAPED(v));
-    INIT_VAL_WORD_BINDING(v, NOD(spelling));
+    INIT_VAL_WORD_BINDING(v, spelling);
     INIT_VAL_WORD_PRIMARY_INDEX(v, 0);
 }
 
 inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
     assert(IS_WORD_BOUND(v));
-    REBNOD *binding = VAL_WORD_BINDING(v);
+    REBARR *binding = VAL_WORD_BINDING(v);
     assert(
-        GET_SERIES_FLAG(SER(binding), MANAGED) or
-        FRM(LINK(KeySource, SER(binding)))->key
-            == FRM(LINK(KeySource, SER(binding)))->key_tail  // not fulfilling
+        GET_SERIES_FLAG(binding, MANAGED) or
+        FRM(LINK(KeySource, binding))->key
+            == FRM(LINK(KeySource, binding))->key_tail  // not fulfilling
     );
     binding->header.bits |= NODE_FLAG_MANAGED;  // !!! review managing needs
     REBCTX *c = CTX(binding);
@@ -480,10 +476,11 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
 //
 inline static const REBSTR *VAL_WORD_SPELLING(REBCEL(const*) cell) {
     assert(ANY_WORD_KIND(CELL_HEART(cell)));
-    REBNOD *binding = VAL_WORD_BINDING_NODE(cell);
 
-    if (binding->header.bits & SERIES_FLAG_IS_STRING)
-        return STR(VAL_WORD_BINDING_NODE(cell));
+    if (BINDING(cell)->header.bits & SERIES_FLAG_IS_STRING)
+        return STR(BINDING(cell));
+
+    REBARR *binding = ARR(BINDING(cell));
 
     // Note: inside QUOTED! cells, all words should be bound to strings.  This
     // is because different bindings can be made at each reference site.
@@ -548,7 +545,7 @@ inline static option(REBCTX*) Get_Word_Context(
     const RELVAL* any_word,
     REBSPC *specifier
 ){
-    REBNOD *binding = VAL_WORD_BINDING(any_word);
+    REBARR *binding = VAL_WORD_BINDING(any_word);
 
     if (specifier == SPECIFIED) {  // Note: may become SPECIFIED again below
         if (binding == UNBOUND)
@@ -563,7 +560,7 @@ inline static option(REBCTX*) Get_Word_Context(
     // matches the cache in the word, then trust the information in it...
     // whether that's a hit or a miss.
     //
-    if (specifier == VAL_WORD_CACHE_NODE(any_word)) {
+    if (NOD(specifier) == VAL_WORD_CACHE_NODE(any_word)) {
         //
         // Since the number of bits available in a virtual bind is limited,
         // the value stored is the index modulo MONDEX_MOD.  A miss is
@@ -588,20 +585,19 @@ inline static option(REBCTX*) Get_Word_Context(
         do {
             assert(specifier->header.bits & ARRAY_FLAG_IS_PATCH);
             if (
-                IS_SET_WORD(ARR_SINGLE(ARR(specifier)))
+                IS_SET_WORD(ARR_SINGLE(specifier))
                 and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
             ){
                 goto skip_hit_patch;
             }
 
           blockscope {
-            REBCTX *overload
-                = CTX(VAL_WORD_BINDING_NODE(ARR_SINGLE(ARR(specifier))));
+            REBCTX *overload = CTX(BINDING(ARR_SINGLE(specifier)));
 
             // Length at time of virtual bind is cached by index.  This avoids
             // allowing untrustworthy cache states.
             //
-            REBLEN cached_len = VAL_WORD_INDEX(ARR_SINGLE(ARR(specifier)));
+            REBLEN cached_len = VAL_WORD_INDEX(ARR_SINGLE(specifier));
 
             REBLEN index = mondex;
             for (; index <= cached_len; index += MONDEX_MOD) {
@@ -614,9 +610,9 @@ inline static option(REBCTX*) Get_Word_Context(
           }
 
           skip_hit_patch:
-            specifier = LINK(PatchNext, SER(specifier));
+            specifier = LINK(PatchNext, specifier);
         } while (
-            specifier and not (specifier->header.bits & ARRAY_FLAG_IS_VARLIST)
+            specifier and NOT_ARRAY_FLAG(specifier, IS_VARLIST)
         );
 
         panic (any_word);  // bad cache in value
@@ -625,7 +621,7 @@ inline static option(REBCTX*) Get_Word_Context(
 
   virtual_miss:
 
-    if (GET_ARRAY_FLAG(ARR(specifier), IS_PATCH)) {
+    if (GET_ARRAY_FLAG(specifier, IS_PATCH)) {
         //
         // Bad news: We have a virtual bind in effect, but not the virtual
         // bind that is cached in the word.  We have no way of knowing if
@@ -642,20 +638,19 @@ inline static option(REBCTX*) Get_Word_Context(
         //
         do {
             if (
-                IS_SET_WORD(ARR_SINGLE(ARR(specifier)))
+                IS_SET_WORD(ARR_SINGLE(specifier))
                 and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
             ){
                 goto skip_miss_patch;
             }
 
           blockscope {
-            REBCTX *overload
-                = CTX(VAL_WORD_BINDING_NODE(ARR_SINGLE(ARR(specifier))));
+            REBCTX *overload = CTX(BINDING(ARR_SINGLE(specifier)));
 
             // Length at time of virtual bind is cached by index.  This avoids
             // allowing untrustworthy cache states.
             //
-            REBLEN cached_len = VAL_WORD_INDEX(ARR_SINGLE(ARR(specifier)));
+            REBLEN cached_len = VAL_WORD_INDEX(ARR_SINGLE(specifier));
 
             REBLEN index = 1;
             const REBKEY *key = CTX_KEYS_HEAD(overload);
@@ -682,9 +677,9 @@ inline static option(REBCTX*) Get_Word_Context(
             }
           }
           skip_miss_patch:
-            specifier = LINK(PatchNext, ARR(specifier));
+            specifier = LINK(PatchNext, specifier);
         } while (
-            specifier and not (specifier->header.bits & ARRAY_FLAG_IS_VARLIST)
+            specifier and NOT_ARRAY_FLAG(specifier, IS_VARLIST)
         );
 
         // Update the cache to say we miss on this particular specifier
@@ -696,7 +691,7 @@ inline static option(REBCTX*) Get_Word_Context(
         // `specifier` should be set now.
     }
 
-    assert(specifier == SPECIFIED or GET_ARRAY_FLAG(ARR(specifier), IS_VARLIST));
+    assert(specifier == SPECIFIED or GET_ARRAY_FLAG(specifier, IS_VARLIST));
 
     REBCTX *c;
 
@@ -725,7 +720,7 @@ inline static option(REBCTX*) Get_Word_Context(
             //
         }
         else {
-            REBNOD *f_binding = SPC_BINDING(specifier); // can't fail()
+            REBSER *f_binding = SPC_BINDING(specifier); // can't fail()
             if (f_binding and Is_Overriding_Context(c, CTX(f_binding))) {
                 //
                 // The specifier binding overrides--because what's happening 
@@ -920,7 +915,7 @@ inline static REBVAL *Derelativize(
         }
         else {
             out->extra = v->extra;  // !!! to know spelling in binding, temp
-            INIT_BINDING_MAY_MANAGE(out, NOD(c));
+            INIT_BINDING_MAY_MANAGE(out, CTX_VARLIST(c));
             INIT_VAL_WORD_PRIMARY_INDEX(out, index);
         }
 
@@ -1001,16 +996,16 @@ inline static REBVAL *Derelativize(
 // top of each other, the chain always bottoms out on the same FRAME! that
 // the original specifier was pointing to.
 //
-inline static REBNOD** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
+inline static REBARR** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
 {
     assert(specifier->header.bits & ARRAY_FLAG_IS_PATCH);
     while (
-        (LINK(PatchNext, ARR(specifier)) != nullptr) and not
-        (SER(LINK(PatchNext, ARR(specifier)))->header.bits & ARRAY_FLAG_IS_VARLIST)
+        (LINK(PatchNext, specifier) != nullptr) and not
+        (LINK(PatchNext, specifier)->header.bits & ARRAY_FLAG_IS_VARLIST)
     ){
-        specifier = LINK(PatchNext, SER(specifier));
+        specifier = LINK(PatchNext, specifier);
     }
-    return &mutable_LINK(PatchNext, SER(specifier));
+    return &mutable_LINK(PatchNext, specifier);
 }
 
 inline static option(REBCTX*) SPC_FRAME_CTX(REBSPC *specifier)
@@ -1038,7 +1033,7 @@ inline static bool Merge_Patches_Reused(
     // If we find the child already accounted for in the parent, we're done.
     // Recursions should notice this case and return up to make a no-op.
     //
-    if (LINK(PatchNext, parent) == NOD(child)) {
+    if (LINK(PatchNext, parent) == child) {
         *merged = parent;
         return true;  // reused existing
     }
@@ -1049,13 +1044,13 @@ inline static bool Merge_Patches_Reused(
     REBARR *next = nullptr;  // so no warming on the jump
     if (
         LINK(PatchNext, parent) == nullptr
-        or (SER(LINK(PatchNext, parent))->header.bits & ARRAY_FLAG_IS_VARLIST)
+        or GET_ARRAY_FLAG(LINK(PatchNext, parent), IS_VARLIST)
     ){
         next = child;
         goto reused;
     }
 
-    if (Merge_Patches_Reused(&next, ARR(LINK(PatchNext, parent)), child)) {
+    if (Merge_Patches_Reused(&next, LINK(PatchNext, parent), child)) {
       reused: {
         //
         // If we reused an existing patch, there's a possibility we can find
@@ -1063,7 +1058,7 @@ inline static bool Merge_Patches_Reused(
         //
         REBARR *temp = MISC(Variant, parent);
         while (temp != parent) {
-            if (LINK(PatchNext, temp) == NOD(next)) {
+            if (LINK(PatchNext, temp) == next) {
                 *merged = temp;
                 return true;  // reused
             }
@@ -1080,7 +1075,7 @@ inline static bool Merge_Patches_Reused(
     );
 
     Move_Value(ARR_SINGLE(patch), SPECIFIC(ARR_SINGLE(parent)));
-    mutable_LINK(PatchNext, patch) = NOD(next);
+    mutable_LINK(PatchNext, patch) = next;
 
     // Link into the circular list.
     //
@@ -1107,20 +1102,20 @@ inline static bool Merge_Patches_Reused(
 //
 inline static REBSPC *Derive_Specifier_Core(
     REBSPC *specifier,  // merge this specifier...
-    const RELVAL* any_array  // ...onto the binding in this array
+    const RELVAL* any_array  // ...onto the one in this array
 ){
-    REBNOD *binding = EXTRA(Binding, any_array).node;
+    REBARR *old = ARR(BINDING(any_array));
 
     if (specifier == SPECIFIED) {  // no override being requested
         assert(
-            binding == UNBOUND
-            or (binding->header.bits & ARRAY_FLAG_IS_VARLIST)
-            or (binding->header.bits & ARRAY_FLAG_IS_PATCH)
+            old == UNBOUND
+            or GET_ARRAY_FLAG(old, IS_VARLIST)
+            or GET_ARRAY_FLAG(old, IS_PATCH)
         );
-        return binding;  // so give back what was the array was holding
+        return old;  // so give back what was the array was holding
     }
 
-    if (binding == UNBOUND) {  // no binding information in the incoming cell
+    if (old == UNBOUND) {  // no binding information in the incoming cell
         //
         // It is legal to use a specifier with a "fully resolved" value.
         // A virtual specifier must be propagated, but it's not necessary to
@@ -1129,7 +1124,7 @@ inline static REBSPC *Derive_Specifier_Core(
         // when it wasn't actually useful...and it taxes the GC.  Drop if
         // possible.
         //
-        if (not (specifier->header.bits & ARRAY_FLAG_IS_PATCH))
+        if (NOT_ARRAY_FLAG(specifier, IS_PATCH))
             return SPECIFIED;
 
         return specifier;  // so just propagate the incoming specifier
@@ -1139,15 +1134,15 @@ inline static REBSPC *Derive_Specifier_Core(
     // clarity and assertions, but trust the optimizer to fold them together
     // in the release build.
 
-    if (specifier == binding) {  // basically a no-op as specifier in effect
+    if (specifier == old) {  // a no-op, specifier was already applied
         assert(
-            (specifier->header.bits & ARRAY_FLAG_IS_VARLIST)
-            or (specifier->header.bits & ARRAY_FLAG_IS_PATCH)
+            GET_ARRAY_FLAG(specifier, IS_VARLIST)
+            or GET_ARRAY_FLAG(specifier, IS_PATCH)
         );
         return specifier;
     }
 
-    if (binding->header.bits & ARRAY_FLAG_IS_DETAILS) {
+    if (GET_ARRAY_FLAG(old, IS_DETAILS)) {
         //
         // The stored binding is relative to a function, and so the specifier
         // we have *must* be able to give us the matching FRAME! instance.
@@ -1165,14 +1160,11 @@ inline static REBSPC *Derive_Specifier_Core(
             frame_ctx == nullptr
             or (
                 NOT_SERIES_INFO(CTX_VARLIST(frame_ctx), INACCESSIBLE) and
-                not Action_Is_Base_Of(
-                    ACT(binding),
-                    CTX_FRAME_ACTION(frame_ctx)
-                )
+                not Action_Is_Base_Of(ACT(old), CTX_FRAME_ACTION(frame_ctx))
             )
         ){
             printf("Function mismatch in specific binding, expected:\n");
-            PROBE(ACT_ARCHETYPE(ACT(binding)));
+            PROBE(ACT_ARCHETYPE(ACT(old)));
             printf("Panic on relative value\n");
             panic (any_array);
         }
@@ -1185,14 +1177,14 @@ inline static REBSPC *Derive_Specifier_Core(
     // happens, the specifier we give back has to have the frame resolution
     // compatible with what's in the value.
 
-    if (binding->header.bits & ARRAY_FLAG_IS_VARLIST) {
+    if (GET_ARRAY_FLAG(old, IS_VARLIST)) {
         //
         // If the array cell is already holding a frame, then it intends to
         // broadcast that down for resolving relative values underneath it.
         // We can only pass thru the incoming specifier if it is compatible.
         // Otherwise we need a new specifier that folds in the binding.
         //
-        assert(specifier->header.bits & ARRAY_FLAG_IS_PATCH);
+        assert(GET_ARRAY_FLAG(specifier, IS_PATCH));
 
         // !!! This case of a match could be handled by the swap below, but
         // break it out separately for now for the sake of asserts.
@@ -1201,8 +1193,8 @@ inline static REBSPC *Derive_Specifier_Core(
         // an extra check of that, review when efficiency is being revisited
         // (SPC_PATCH_CTX() as separate entry point?)
         //
-        REBNOD **specifier_frame_ctx_addr = SPC_FRAME_CTX_ADDRESS(specifier);
-        if (*specifier_frame_ctx_addr == binding)  // all clear to reuse
+        REBARR **specifier_frame_ctx_addr = SPC_FRAME_CTX_ADDRESS(specifier);
+        if (*specifier_frame_ctx_addr == old)  // all clear to reuse
             return specifier;
 
         if (*specifier_frame_ctx_addr == UNSPECIFIED) {
@@ -1210,7 +1202,7 @@ inline static REBSPC *Derive_Specifier_Core(
             // If the patch had no specifier, then it doesn't hurt to modify
             // it directly.  This will only work once for specifier's chain.
             //
-            *specifier_frame_ctx_addr = binding;
+            *specifier_frame_ctx_addr = old;
             return specifier;
         }
 
@@ -1226,21 +1218,21 @@ inline static REBSPC *Derive_Specifier_Core(
     //
     // !!! How do we make sure this doesn't make a circularly linked list?
 
-    assert(binding->header.bits & ARRAY_FLAG_IS_PATCH);
+    assert(GET_ARRAY_FLAG(old, IS_PATCH));
 
-    if (not (specifier->header.bits & ARRAY_FLAG_IS_PATCH)) {
-        assert(specifier->header.bits & ARRAY_FLAG_IS_VARLIST);
-        return binding;  // The binding can be disregarded on this value
+    if (NOT_ARRAY_FLAG(specifier, IS_PATCH)) {
+        assert(GET_ARRAY_FLAG(specifier, IS_VARLIST));
+        return old;  // The binding can be disregarded on this value
     }
 
     REBARR *merged;
-    if (Merge_Patches_Reused(&merged, ARR(specifier), ARR(binding))) {
+    if (Merge_Patches_Reused(&merged, specifier, old)) {
         //
         // The patch might be able to be reused and it might not.  Is this
         // interesting information at the end of the chain?
         //
     }
-    return NOD(merged);
+    return merged;
 }
 
 #if !defined(NDEBUG)
@@ -1259,22 +1251,22 @@ inline static REBSPC *Derive_Specifier_Core(
         const RELVAL* any_array
     ){
         REBSPC *derived = Derive_Specifier_Core(specifier, any_array);
-        REBNOD *binding = EXTRA(Binding, any_array).node;
+        REBARR *old = ARR(BINDING(any_array));
         if (
-            binding == UNSPECIFIED
-            or (binding->header.bits & ARRAY_FLAG_IS_VARLIST)
+            old == UNSPECIFIED
+            or GET_ARRAY_FLAG(old, IS_VARLIST)
         ){
             // no special invariant to check, anything goes for derived
         }
-        else if (binding->header.bits & ARRAY_FLAG_IS_DETAILS) {  // relative
+        else if (GET_ARRAY_FLAG(old, IS_DETAILS)) {  // relative
             REBCTX *derived_ctx = try_unwrap(SPC_FRAME_CTX(derived));
             REBCTX *specifier_ctx = try_unwrap(SPC_FRAME_CTX(specifier));
             assert(derived_ctx == specifier_ctx);
         }
         else {
-            assert(binding->header.bits & ARRAY_FLAG_IS_PATCH);
+            assert(GET_ARRAY_FLAG(old, IS_PATCH));
 
-            REBCTX *binding_ctx = try_unwrap(SPC_FRAME_CTX(binding));
+            REBCTX *binding_ctx = try_unwrap(SPC_FRAME_CTX(old));
             if (binding_ctx == UNSPECIFIED) {
                 // anything goes for the frame in the derived specifier
             }
@@ -1286,6 +1278,7 @@ inline static REBSPC *Derive_Specifier_Core(
         return derived;
     }
 #endif
+
 
 //
 // BINDING CONVENIENCE MACROS

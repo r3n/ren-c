@@ -604,10 +604,17 @@ inline static void INIT_VAL_NODE(RELVAL *v, const void *p) {
 // the same function if it contains any instances of such relative words.
 //
 inline static bool IS_RELATIVE(REBCEL(const*) v) {
-    if (not Is_Bindable(v) or not EXTRA(Binding, v).node)
+    if (not Is_Bindable(v))
+        return false;
+        
+    REBSER *binding = BINDING(v);
+    if (not binding)
         return false; // INTEGER! and other types are inherently "specific"
 
-    if (EXTRA(Binding, v).node->header.bits & ARRAY_FLAG_IS_DETAILS)
+    if (WIDE_BYTE_OR_0(binding) != 0)  // not IS_SER_ARRAY()
+        return false;  // !!! should have SERIES_FLAG_IS_ARRAY, union flags
+
+    if (binding->header.bits & ARRAY_FLAG_IS_DETAILS)
         return true;
 
     return false;
@@ -622,7 +629,7 @@ inline static bool IS_RELATIVE(REBCEL(const*) v) {
 
 inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
     assert(IS_RELATIVE(v));
-    return ACT(EXTRA(Binding, v).node);
+    return ACT(BINDING(v));
 }
 
 // When you have a RELVAL* (e.g. from a REBARR) that you KNOW to be specific,
@@ -702,8 +709,6 @@ inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
 #define UNSPECIFIED nullptr
 
 
-#define VAL_WORD_BINDING_NODE(v)        EXTRA(Binding, (v)).node
-
 #define VAL_WORD_CACHE_NODE(v) \
     PAYLOAD(Any, m_cast(RELVAL*, cast(const RELVAL*, (v)))).first.node
 
@@ -751,7 +756,7 @@ inline static REBVAL *Move_Value_Core(RELVAL *out, const REBVAL *v) {
     out->payload = v->payload;
 
     if (Is_Bindable(v))  // extra is either a binding or a plain C value/ptr
-        INIT_BINDING_MAY_MANAGE(out, EXTRA(Binding, v).node);
+        INIT_BINDING_MAY_MANAGE(out, BINDING(v));
     else
         out->extra = v->extra;
 

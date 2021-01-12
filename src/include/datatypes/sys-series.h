@@ -945,16 +945,14 @@ inline static void INIT_SPECIFIER(RELVAL *v, const void *p) {
     //
     // can be called on non-bindable series, but p must be nullptr
 
-    const REBNOD *binding = cast(const REBNOD*, p);
-    EXTRA(Binding, v).node = m_cast(REBNOD*, binding);
+    const REBSER *binding = SER(p);  // can't (currently) be a cell/pairing
+    mutable_BINDING(v) = binding;
 
   #if !defined(NDEBUG)
     if (not binding or (binding->header.bits & SERIES_FLAG_IS_STRING))
         return;  // e.g. UNBOUND (words use strings to indicate unbounds)
 
     assert(Is_Bindable(v));  // works on partially formed values
-
-    assert(not (binding->header.bits & NODE_FLAG_CELL));  // not currently used
 
     if (binding->header.bits & NODE_FLAG_MANAGED) {
         assert(
@@ -964,7 +962,7 @@ inline static void INIT_SPECIFIER(RELVAL *v, const void *p) {
                 ANY_ARRAY(v)
                 and (binding->header.bits & ARRAY_FLAG_IS_PATCH)  // virtual
             ) or (
-                IS_VARARGS(v) and not IS_SER_DYNAMIC(SER(binding))
+                IS_VARARGS(v) and not IS_SER_DYNAMIC(binding)
             )  // varargs from MAKE VARARGS! [...], else is a varlist
         );
     }
@@ -979,7 +977,7 @@ inline static REBVAL *Init_Any_Series_At_Core(
     enum Reb_Kind type,
     const REBSER *s,  // ensured managed by calling macro
     REBLEN index,
-    REBNOD *specifier
+    REBARR *specifier
 ){
   #if !defined(NDEBUG)
     assert(ANY_SERIES_KIND(type));

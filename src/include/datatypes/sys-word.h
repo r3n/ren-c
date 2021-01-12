@@ -98,7 +98,7 @@ inline static REBVAL *Init_Any_Word_Core(
     const REBSTR *spelling
 ){
     RESET_VAL_HEADER(out, kind, CELL_FLAG_FIRST_IS_NODE);
-    VAL_WORD_BINDING_NODE(out) = NOD(m_cast(REBSTR*, spelling));
+    mutable_BINDING(out) = spelling;
     VAL_WORD_INDEXES_U32(out) = 0;
     VAL_WORD_CACHE_NODE(out) = UNSPECIFIED;
 
@@ -120,7 +120,7 @@ inline static REBVAL *Init_Any_Word_Bound_Core(
     REBLEN index
 ){
     RESET_VAL_HEADER(out, type, CELL_FLAG_FIRST_IS_NODE);
-    VAL_WORD_BINDING_NODE(out) = NOD(context);
+    mutable_BINDING(out) = &context->varlist;
     VAL_WORD_INDEXES_U32(out) = index;
     VAL_WORD_CACHE_NODE(out) = UNSPECIFIED;
 

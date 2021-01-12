@@ -105,7 +105,6 @@
 //
 #define VAL_CONTEXT_VARLIST_NODE(v)         PAYLOAD(Any, (v)).first.node
 #define VAL_FRAME_PHASE_OR_LABEL_NODE(v)    PAYLOAD(Any, (v)).second.node
-#define VAL_FRAME_BINDING_NODE(v)           EXTRA(Binding, (v)).node
 
 
 //=//// CONTEXT ARCHETYPE VALUE CELL (ROOTVAR)  ///////////////////////////=//
@@ -154,7 +153,7 @@ inline static REBACT *CTX_FRAME_ACTION(REBCTX *c) {
 inline static REBCTX *CTX_FRAME_BINDING(REBCTX *c) {
     const REBVAL *archetype = CTX_ARCHETYPE(c);
     assert(VAL_TYPE(archetype) == REB_FRAME);
-    return CTX(VAL_FRAME_BINDING_NODE(archetype));
+    return CTX(BINDING(archetype));
 }
 
 inline static void INIT_VAL_CONTEXT_ROOTVAR_Core(
@@ -166,7 +165,7 @@ inline static void INIT_VAL_CONTEXT_ROOTVAR_Core(
     assert(out == ARR_HEAD(varlist));
     RESET_CELL(out, kind, CELL_MASK_CONTEXT);
     VAL_CONTEXT_VARLIST_NODE(out) = NOD(varlist);
-    VAL_FRAME_BINDING_NODE(out) = UNBOUND;  // not a frame
+    mutable_BINDING(out) = UNBOUND;  // not a frame
     VAL_FRAME_PHASE_OR_LABEL_NODE(out) = nullptr;  // not a frame
   #if !defined(NDEBUG)
     out->header.bits |= CELL_FLAG_PROTECTED;
@@ -190,7 +189,7 @@ inline static void INIT_VAL_FRAME_ROOTVAR_Core(
     assert(phase != nullptr);
     RESET_VAL_HEADER(out, REB_FRAME, CELL_MASK_CONTEXT);
     VAL_CONTEXT_VARLIST_NODE(out) = NOD(varlist);
-    VAL_FRAME_BINDING_NODE(out) = NOD(binding);
+    mutable_BINDING(out) = CTX_VARLIST(binding);
     VAL_FRAME_PHASE_OR_LABEL_NODE(out) = NOD(phase);
   #if !defined(NDEBUG)
     out->header.bits |= CELL_FLAG_PROTECTED;
@@ -374,12 +373,12 @@ inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
 
 inline static void INIT_VAL_FRAME_BINDING(RELVAL *v, REBCTX *binding) {
     assert(IS_FRAME(v));  // may be marked protected (e.g. archetype)
-    VAL_FRAME_BINDING_NODE(v) = NOD(binding);
+    EXTRA(Binding, v) = CTX_VARLIST(binding);
 }
 
 inline static REBCTX *VAL_FRAME_BINDING(REBCEL(const*) v) {
     assert(REB_FRAME == CELL_HEART(v));
-    return CTX(VAL_FRAME_BINDING_NODE(v));
+    return CTX(BINDING(v));
 }
 
 
@@ -670,7 +669,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
             | FLAG_HEART_BYTE(REB_FRAME)
             | CELL_MASK_CONTEXT;
     INIT_VAL_CONTEXT_VARLIST(single, ARR(stub));
-    INIT_VAL_FRAME_BINDING(single, CTX(VAL_FRAME_BINDING_NODE(rootvar)));
+    INIT_VAL_FRAME_BINDING(single, VAL_FRAME_BINDING(rootvar));
     TRASH_POINTER_IF_DEBUG(VAL_FRAME_PHASE_OR_LABEL_NODE(single));
 
     INIT_VAL_CONTEXT_VARLIST(rootvar, ARR(copy));

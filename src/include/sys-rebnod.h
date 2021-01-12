@@ -508,9 +508,17 @@ union Reb_Header {
 //
 
 struct Reb_Node {
-    union Reb_Header header; // leftmost byte FREED_SERIES_BYTE if free
+    //
+    // This is not called "header" for a reason: you should *NOT* read the
+    // bits of this header-sized slot to try and interpret bits that were
+    // assigned through a REBSER or a REBVAL.  *You have to read out the
+    // bits using the same type that initialized it.*  So only the first
+    // byte here should be consulted...accessed through an `unsigned char*`
+    // in order to defeat strict aliasing.  See NODE_BYTE()
+    //
+    union Reb_Header leader;  // leftmost byte is FREED_SERIES_BYTE if free
 
-    struct Reb_Node *next_if_free; // if not free, entire node is available
+    struct Reb_Node *next_if_free;  // if not free, entire node is available
 
     // Size of a node must be a multiple of 64-bits.  This is because there
     // must be a baseline guarantee for node allocations to be able to know
@@ -518,83 +526,3 @@ struct Reb_Node {
     //
     /* REBI64 payload[N];*/
 };
-
-#ifdef NDEBUG
-    #define IS_FREE_NODE(p) \
-        (did (FIRST_BYTE(cast(const struct Reb_Node*, (p))->header) \
-            & NODE_BYTEMASK_0x40_FREE))  // byte access defeats strict alias
-#else
-    inline static bool IS_FREE_NODE(const void *p) {
-        REBYTE first = FIRST_BYTE(cast(const struct Reb_Node*, p)->header);
-
-        if (not (first & NODE_BYTEMASK_0x40_FREE))
-            return false;  // byte access defeats strict alias
-
-        assert(first == FREED_SERIES_BYTE or first == FREED_CELL_BYTE);
-        return true;
-    }
-#endif
-
-
-//=//// MEMORY ALLOCATION AND FREEING MACROS //////////////////////////////=//
-//
-// Rebol's internal memory management is done based on a pooled model, which
-// use Try_Alloc_Mem() and Free_Mem() instead of calling malloc directly.
-// (Comments on those routines explain why this was done--even in an age of
-// modern thread-safe allocators--due to Rebol's ability to exploit extra
-// data in its pool block when a series grows.)
-//
-// Since Free_Mem() requires callers to pass in the size of the memory being
-// freed, it can be tricky.  These macros are modeled after C++'s new/delete
-// and new[]/delete[], and allocations take either a type or a type and a
-// length.  The size calculation is done automatically, and the result is cast
-// to the appropriate type.  The deallocations also take a type and do the
-// calculations.
-//
-// In a C++11 build, an extra check is done to ensure the type you pass in a
-// FREE or FREE_N lines up with the type of pointer being freed.
-//
-
-#define TRY_ALLOC(t) \
-    cast(t *, Try_Alloc_Mem(sizeof(t)))
-
-#define TRY_ALLOC_ZEROFILL(t) \
-    cast(t *, memset(ALLOC(t), '\0', sizeof(t)))
-
-#define TRY_ALLOC_N(t,n) \
-    cast(t *, Try_Alloc_Mem(sizeof(t) * (n)))
-
-#define TRY_ALLOC_N_ZEROFILL(t,n) \
-    cast(t *, memset(TRY_ALLOC_N(t, (n)), '\0', sizeof(t) * (n)))
-
-#ifdef CPLUSPLUS_11
-    #define FREE(t,p) \
-        do { \
-            static_assert( \
-                std::is_same<decltype(p), std::add_pointer<t>::type>::value, \
-                "mismatched FREE type" \
-            ); \
-            Free_Mem(p, sizeof(t)); \
-        } while (0)
-
-    #define FREE_N(t,n,p)   \
-        do { \
-            static_assert( \
-                std::is_same<decltype(p), std::add_pointer<t>::type>::value, \
-                "mismatched FREE_N type" \
-            ); \
-            Free_Mem(p, sizeof(t) * (n)); \
-        } while (0)
-#else
-    #define FREE(t,p) \
-        Free_Mem((p), sizeof(t))
-
-    #define FREE_N(t,n,p)   \
-        Free_Mem((p), sizeof(t) * (n))
-#endif
-
-#define CLEAR(m, s) \
-    memset((void*)(m), 0, s)
-
-#define CLEARS(m) \
-    memset((void*)(m), 0, sizeof(*m))

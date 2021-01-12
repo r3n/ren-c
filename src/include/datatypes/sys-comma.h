@@ -47,6 +47,6 @@ inline static REBVAL *Init_Comma(RELVAL *out) {
     // This means the binding has to be nulled out in the cell to keep the
     // GC from crashing on it.
     //
-    EXTRA(Binding, out).node = nullptr;
+    mutable_BINDING(out) = nullptr;
     return cast(REBVAL*, out);
 }

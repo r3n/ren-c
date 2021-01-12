@@ -561,7 +561,7 @@ inline static REBVAL *Init_Any_Array_At_Core(
     enum Reb_Kind kind,
     const_if_c REBARR *array,
     REBLEN index,
-    REBNOD *binding
+    REBARR *binding
 ){
     return Init_Any_Series_At_Core(
         out,
@@ -578,7 +578,7 @@ inline static REBVAL *Init_Any_Array_At_Core(
         enum Reb_Kind kind,
         const REBARR *array,  // all const arrays should be already managed
         REBLEN index,
-        REBNOD *binding
+        REBARR *binding
     ){
         return Init_Any_Series_At_Core(out, kind, array, index, binding);
     }

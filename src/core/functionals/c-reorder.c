@@ -213,7 +213,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
         bool mentioned = (0 == Remove_Binder_Index_Else_0(&binder, spelling));
 
         if (
-            error == nullptr  // don't report an error here if one is pending
+            not error  // don't report an error here if one is pending
             and not mentioned
             and not TYPE_CHECK(param, REB_TS_REFINEMENT)  // okay to leave out
         ){

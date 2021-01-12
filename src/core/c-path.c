@@ -654,9 +654,9 @@ bool Eval_Path_Throws_Core(
             // Optimize the swap here so that it just swaps the spellings of
             // the words (unbound words keep their spelling in the binding).
             //
-            const REBSTR *spelling = STR(EXTRA(Binding, bottom).node);
-            EXTRA(Binding, bottom).node = EXTRA(Binding, top).node;
-            EXTRA(Binding, top).node = m_cast(REBNOD*, NOD(spelling));
+            const REBSTR *spelling = STR(BINDING(bottom));
+            mutable_BINDING(bottom) = STR(BINDING(top));
+            mutable_BINDING(top) = spelling;
 
             top--;
             bottom++;

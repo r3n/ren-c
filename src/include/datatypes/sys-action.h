@@ -150,9 +150,6 @@
 #define VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v) \
     PAYLOAD(Any, (v)).second.node  // lvalue, but a node
 
-#define VAL_ACTION_BINDING_NODE(v) \
-    EXTRA(Any, (v)).node
-
 
 inline static REBARR *ACT_DETAILS(REBACT *a) {
     assert(GET_ARRAY_FLAG(&(a->details), IS_DETAILS));
@@ -161,12 +158,7 @@ inline static REBARR *ACT_DETAILS(REBACT *a) {
 
 inline static REBCTX *VAL_ACTION_BINDING(REBCEL(const*) v) {
     assert(CELL_HEART(v) == REB_ACTION);
-    REBNOD *binding = VAL_ACTION_BINDING_NODE(v);
-    assert(
-        binding == nullptr
-        or (binding->header.bits & ARRAY_FLAG_IS_VARLIST)
-    );
-    return CTX(binding);  // !!! should do assert above, review build flags
+    return CTX(BINDING(v));
 }
 
 inline static void INIT_VAL_ACTION_BINDING(
@@ -174,7 +166,7 @@ inline static void INIT_VAL_ACTION_BINDING(
     REBCTX *binding
 ){
     assert(IS_ACTION(v));
-    VAL_ACTION_BINDING_NODE(v) = NOD(binding);
+    mutable_BINDING(v) = &binding->varlist;
 }
 
 

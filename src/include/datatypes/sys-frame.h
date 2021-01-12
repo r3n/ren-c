@@ -163,13 +163,13 @@ inline static int FRM_LINE(REBFRM *f) {
     cast(REBACT*, VAL_FRAME_PHASE_OR_LABEL_NODE((f)->rootvar))
 
 inline static void INIT_FRM_PHASE(REBFRM *f, REBACT *phase)  // check types
-  { VAL_FRAME_PHASE_OR_LABEL_NODE((f)->rootvar) = NOD(phase); }  // ...only
+  { VAL_FRAME_PHASE_OR_LABEL_NODE(f->rootvar) = NOD(phase); }  // ...only
 
 inline static void INIT_FRM_BINDING(REBFRM *f, REBCTX *binding)
-  { VAL_FRAME_BINDING_NODE((f)->rootvar) = NOD(binding); }  // also fast
+  { mutable_BINDING(f->rootvar) = CTX_VARLIST(binding); }  // also fast
 
 #define FRM_BINDING(f) \
-    cast(REBCTX*, VAL_FRAME_BINDING_NODE((f)->rootvar))
+    cast(REBCTX*, BINDING((f)->rootvar))
 
 inline static option(const REBSTR*) FRM_LABEL(REBFRM *f) {
     assert(Is_Action_Frame(f));
@@ -293,7 +293,7 @@ inline static void Conserve_Varlist(REBARR *varlist)
     RELVAL *rootvar = ARR_HEAD(varlist);
     assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == varlist);
     TRASH_POINTER_IF_DEBUG(VAL_FRAME_PHASE_OR_LABEL_NODE(rootvar));
-    TRASH_POINTER_IF_DEBUG(VAL_FRAME_BINDING_NODE(rootvar));
+    TRASH_POINTER_IF_DEBUG(mutable_BINDING(rootvar));
   #endif
 
     mutable_LINK(ReuseNext, varlist) = TG_Reuse;
@@ -849,7 +849,7 @@ inline static void Drop_Action(REBFRM *f) {
         RELVAL *rootvar = ARR_HEAD(f->varlist);
         assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == f->varlist);
         TRASH_POINTER_IF_DEBUG(VAL_FRAME_PHASE_OR_LABEL_NODE(rootvar));
-        TRASH_POINTER_IF_DEBUG(VAL_FRAME_BINDING_NODE(rootvar));
+        TRASH_POINTER_IF_DEBUG(mutable_BINDING(rootvar));
     }
   #endif
 

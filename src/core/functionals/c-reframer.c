@@ -222,7 +222,7 @@ REBNATIVE(reframer_p)
     if (not TYPE_CHECK(param, REB_FRAME)) {
         DECLARE_LOCAL (label_word);
         if (label)
-            Init_Word(label_word, label);
+            Init_Word(label_word, unwrap(label));
         else
             Init_Blank(label_word);
 
