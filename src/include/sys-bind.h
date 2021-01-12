@@ -73,7 +73,15 @@
 
 // Next node is either to another patch, a frame specifier REBCTX, or nullptr.
 //
-#define LINK_PATCH_NEXT_NODE(patch)     LINK(patch).custom.node
+#define LINK_PatchNext_TYPE        REBNOD*
+#define LINK_PatchNext_CAST        NOD
+
+// The virtual binding patches keep a circularly linked list of their variants
+// that have distinct next pointers.  This way, they can look through that
+// list before creating an equivalent chain to one that already exists.
+//
+#define MISC_Variant_TYPE           REBARR*
+#define MISC_Variant_CAST           ARR
 
 #ifdef NDEBUG
     #define SPC(p) \
@@ -134,8 +142,8 @@
 //
 inline static bool Is_Overriding_Context(REBCTX *stored, REBCTX *override)
 {
-    REBNOD *stored_source = LINK_KEYSOURCE(CTX_VARLIST(stored));
-    REBNOD *temp = LINK_KEYSOURCE(CTX_VARLIST(override));
+    REBNOD *stored_source = LINK(KeySource, CTX_VARLIST(stored));
+    REBNOD *temp = LINK(KeySource, CTX_VARLIST(override));
 
     // FRAME! "keylists" are actually paramlists, and the LINK.underlying
     // field is used in paramlists (precluding a LINK.ancestor).  Plus, since
@@ -157,10 +165,10 @@ inline static bool Is_Overriding_Context(REBCTX *stored, REBCTX *override)
         if (temp == stored_source)
             return true;
 
-        if (LINK_ANCESTOR_NODE(SER(temp)) == temp)
+        if (NOD(LINK(Ancestor, SER(temp))) == temp)
             break;
 
-        temp = LINK_ANCESTOR_NODE(SER(temp));
+        temp = NOD(LINK(Ancestor, SER(temp)));
     }
 
     return false;
@@ -229,14 +237,14 @@ inline static bool Try_Add_Binder_Index(
     REBSTR *s = m_cast(REBSTR*, str);
     assert(index != 0);
     if (binder->high) {
-        if (MISC(s).bind_index.high != 0)
+        if (s->misc.bind_index.high != 0)
             return false;
-        MISC(s).bind_index.high = index;
+        s->misc.bind_index.high = index;
     }
     else {
-        if (MISC(s).bind_index.low != 0)
+        if (s->misc.bind_index.low != 0)
             return false;
-        MISC(s).bind_index.low = index;
+        s->misc.bind_index.low = index;
     }
 
   #if !defined(NDEBUG)
@@ -262,9 +270,9 @@ inline static REBINT Get_Binder_Index_Else_0( // 0 if not present
     const REBSTR *s
 ){
     if (binder->high)
-        return MISC(s).bind_index.high;
+        return s->misc.bind_index.high;
     else
-        return MISC(s).bind_index.low;
+        return s->misc.bind_index.low;
 }
 
 
@@ -275,16 +283,16 @@ inline static REBINT Remove_Binder_Index_Else_0( // return old value if there
     REBSTR *s = m_cast(REBSTR*, str);
     REBINT old_index;
     if (binder->high) {
-        old_index = MISC(s).bind_index.high;
+        old_index = s->misc.bind_index.high;
         if (old_index == 0)
             return 0;
-        MISC(s).bind_index.high = 0;
+        s->misc.bind_index.high = 0;
     }
     else {
-        old_index = MISC(s).bind_index.low;
+        old_index = s->misc.bind_index.low;
         if (old_index == 0)
             return 0;
-        MISC(s).bind_index.low = 0;
+        s->misc.bind_index.low = 0;
     }
 
   #if !defined(NDEBUG)
@@ -357,7 +365,7 @@ inline static void INIT_BINDING_MAY_MANAGE(
     if (not binding or GET_SERIES_FLAG(SER(binding), MANAGED))
         return;  // unbound or managed already (frame OR object context)
 
-    REBFRM *f = FRM(LINK_KEYSOURCE(SER(binding)));  // unmanaged can only be frame
+    REBFRM *f = FRM(LINK(KeySource, SER(binding)));  // unmanaged only frame
     assert(f->key == f->key_tail);  // cannot manage varlist in mid fulfill!
     UNUSED(f);
 
@@ -456,8 +464,8 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
     REBNOD *binding = VAL_WORD_BINDING(v);
     assert(
         GET_SERIES_FLAG(SER(binding), MANAGED) or
-        FRM(LINK_KEYSOURCE(SER(binding)))->key
-            == FRM(LINK_KEYSOURCE(SER(binding)))->key_tail  // not fulfilling
+        FRM(LINK(KeySource, SER(binding)))->key
+            == FRM(LINK(KeySource, SER(binding)))->key_tail  // not fulfilling
     );
     binding->header.bits |= NODE_FLAG_MANAGED;  // !!! review managing needs
     REBCTX *c = CTX(binding);
@@ -606,7 +614,7 @@ inline static option(REBCTX*) Get_Word_Context(
           }
 
           skip_hit_patch:
-            specifier = LINK_PATCH_NEXT_NODE(SER(specifier));
+            specifier = LINK(PatchNext, SER(specifier));
         } while (
             specifier and not (specifier->header.bits & ARRAY_FLAG_IS_VARLIST)
         );
@@ -674,7 +682,7 @@ inline static option(REBCTX*) Get_Word_Context(
             }
           }
           skip_miss_patch:
-            specifier = LINK_PATCH_NEXT_NODE(ARR(specifier));
+            specifier = LINK(PatchNext, ARR(specifier));
         } while (
             specifier and not (specifier->header.bits & ARRAY_FLAG_IS_VARLIST)
         );
@@ -997,12 +1005,12 @@ inline static REBNOD** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
 {
     assert(specifier->header.bits & ARRAY_FLAG_IS_PATCH);
     while (
-        (LINK_PATCH_NEXT_NODE(ARR(specifier)) != nullptr) and not
-        (SER(LINK_PATCH_NEXT_NODE(ARR(specifier)))->header.bits & ARRAY_FLAG_IS_VARLIST)
+        (LINK(PatchNext, ARR(specifier)) != nullptr) and not
+        (SER(LINK(PatchNext, ARR(specifier)))->header.bits & ARRAY_FLAG_IS_VARLIST)
     ){
-        specifier = LINK_PATCH_NEXT_NODE(SER(specifier));
+        specifier = LINK(PatchNext, SER(specifier));
     }
-    return &LINK_PATCH_NEXT_NODE(SER(specifier));
+    return &mutable_LINK(PatchNext, SER(specifier));
 }
 
 inline static option(REBCTX*) SPC_FRAME_CTX(REBSPC *specifier)
@@ -1030,7 +1038,7 @@ inline static bool Merge_Patches_Reused(
     // If we find the child already accounted for in the parent, we're done.
     // Recursions should notice this case and return up to make a no-op.
     //
-    if (LINK_PATCH_NEXT_NODE(parent) == NOD(child)) {
+    if (LINK(PatchNext, parent) == NOD(child)) {
         *merged = parent;
         return true;  // reused existing
     }
@@ -1040,22 +1048,22 @@ inline static bool Merge_Patches_Reused(
     //
     REBARR *next = nullptr;  // so no warming on the jump
     if (
-        LINK_PATCH_NEXT_NODE(parent) == nullptr
-        or (LINK_PATCH_NEXT_NODE(parent)->header.bits & ARRAY_FLAG_IS_VARLIST)
+        LINK(PatchNext, parent) == nullptr
+        or (SER(LINK(PatchNext, parent))->header.bits & ARRAY_FLAG_IS_VARLIST)
     ){
         next = child;
         goto reused;
     }
 
-    if (Merge_Patches_Reused(&next, ARR(LINK_PATCH_NEXT_NODE(parent)), child)) {
+    if (Merge_Patches_Reused(&next, ARR(LINK(PatchNext, parent)), child)) {
       reused: {
         //
         // If we reused an existing patch, there's a possibility we can find
         // it in the list of synonyms for the parent patch.
         //
-        REBARR *temp = ARR(MISC(parent).variant);
+        REBARR *temp = MISC(Variant, parent);
         while (temp != parent) {
-            if (LINK_PATCH_NEXT_NODE(temp) == NOD(next)) {
+            if (LINK(PatchNext, temp) == NOD(next)) {
                 *merged = temp;
                 return true;  // reused
             }
@@ -1072,12 +1080,12 @@ inline static bool Merge_Patches_Reused(
     );
 
     Move_Value(ARR_SINGLE(patch), SPECIFIC(ARR_SINGLE(parent)));
-    LINK_PATCH_NEXT_NODE(patch) = NOD(next);
+    mutable_LINK(PatchNext, patch) = NOD(next);
 
     // Link into the circular list.
     //
-    MISC(patch).variant = MISC(parent).variant;
-    MISC(parent).variant = patch;
+    mutable_MISC(Variant, patch) = MISC(Variant, parent);
+    mutable_MISC(Variant, parent) = patch;
 
     *merged = patch;
     return false;  // not reused, allocated

@@ -262,13 +262,13 @@ inline static bool IS_STRUCT(const RELVAL *v)  // Note: QUOTED! doesn't count
 
 typedef REBARR REBSTU;
 
-#define LINK_SCHEMA_NODE(stu)   LINK(stu).custom.node
-#define LINK_SCHEMA(s)          ARR(LINK_SCHEMA_NODE(s))
+#define LINK_Schema_TYPE        REBFLD*  // ust an alias for REBARR
+#define LINK_Schema_CAST        ARR
 
-#define MISC_STU_OFFSET(stu)    MISC(stu).custom.u32
+#define MISC_STU_OFFSET(stu)    (stu)->misc.custom.u32
 
 inline static REBFLD *STU_SCHEMA(REBSTU *stu) {
-    REBFLD *schema = cast(REBARR*, LINK(stu).custom.node);
+    REBFLD *schema = LINK(Schema, stu);
     assert(FLD_IS_STRUCT(schema));
     return schema;
 }
@@ -277,7 +277,7 @@ inline static REBFLD *STU_SCHEMA(REBSTU *stu) {
     SPECIFIC(ARR_SINGLE(stu))  // BINARY! or HANDLE!
 
 #define STU_OFFSET(stu) \
-    MISC(stu).custom.u32
+    (stu)->misc.custom.u32
 
 inline static REBARR *STU_FIELDLIST(REBSTU *stu)
   { return FLD_FIELDLIST(STU_SCHEMA(stu)); }

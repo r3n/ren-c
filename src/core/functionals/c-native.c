@@ -143,7 +143,7 @@ REBVAL *Make_Native(
     );
 
     assert(ACT_META(native) == nullptr);
-    ACT_META_NODE(native) = NOD(meta);
+    mutable_ACT_META(native) = meta;
 
     SET_ACTION_FLAG(native, IS_NATIVE);
     if (enfix)

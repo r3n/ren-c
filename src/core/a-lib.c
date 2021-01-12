@@ -1731,7 +1731,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         fail ("rebU() and rebQ() currently can't splice more than one value");
 
     SET_ARRAY_FLAG(a, INSTRUCTION_ADJUST_QUOTING);
-    MISC(a).quoting_delta = delta - 1;
+    a->misc.quoting_delta = delta - 1;
     return NOD(a);
 }
 
@@ -1895,8 +1895,8 @@ void RL_rebUnmanage(void *p)
     CLEAR_SERIES_FLAG(a, MANAGED);
     Unlink_Api_Handle_From_Frame(a);
 
-    TRASH_POINTER_IF_DEBUG(LINK(a).custom.node);
-    TRASH_POINTER_IF_DEBUG(MISC(a).custom.node);
+    TRASH_POINTER_IF_DEBUG(a->link.trash);
+    TRASH_POINTER_IF_DEBUG(a->misc.trash);
 }
 
 

@@ -42,6 +42,13 @@
 //
 
 
+#define LINK_ApiNext_TYPE       REBNOD*
+#define LINK_ApiNext_CAST       NOD
+
+#define MISC_ApiPrev_TYPE       REBNOD*
+#define MISC_ApiPrev_CAST       NOD
+
+
 //=//// ARRAY_FLAG_SINGULAR_API_RELEASE //////////////////////////////////=//
 //
 // The rebR() function can be used with an API handle to tell a variadic
@@ -89,45 +96,45 @@ inline static void Link_Api_Handle_To_Frame(REBARR *a, REBFRM *f)
     // API freeing operations can update the head of the list in the frame
     // when given only the node pointer.
 
-    MISC(a).custom.node = NOD(f);  // back pointer for doubly linked list
+    mutable_MISC(ApiPrev, a) = NOD(f);  // back pointer for doubly linked list
 
     bool empty_list = f->alloc_value_list == NOD(f);
 
     if (not empty_list) {  // head of list exists, take its spot at the head
         assert(Is_Api_Value(ARR_SINGLE(ARR(f->alloc_value_list))));
-        MISC(SER(f->alloc_value_list)).custom.node = NOD(a);  // link back to us
+        mutable_MISC(ApiPrev, SER(f->alloc_value_list)) = NOD(a);  // link back
     }
 
-    LINK(a).custom.node = f->alloc_value_list;  // forward pointer
+    mutable_LINK(ApiNext, a) = f->alloc_value_list;  // forward pointer
     f->alloc_value_list = NOD(a);
 }
 
 inline static void Unlink_Api_Handle_From_Frame(REBARR *a)
 {
     bool at_head = did (
-        *cast(REBYTE*, MISC(a).custom.node) & NODE_BYTEMASK_0x01_CELL
+        *cast(REBYTE*, MISC(ApiPrev, a)) & NODE_BYTEMASK_0x01_CELL
     );
     bool at_tail = did (
-        *cast(REBYTE*, LINK(a).custom.node) & NODE_BYTEMASK_0x01_CELL
+        *cast(REBYTE*, LINK(ApiNext, a)) & NODE_BYTEMASK_0x01_CELL
     );
 
     if (at_head) {
-        REBFRM *f = FRM(MISC(a).custom.node);
-        f->alloc_value_list = LINK(a).custom.node;
+        REBFRM *f = FRM(MISC(ApiPrev, a));
+        f->alloc_value_list = LINK(ApiNext, a);
 
         if (not at_tail) {  // only set next item's backlink if it exists
-            assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(a).custom.node))));
-            MISC(SER(LINK(a).custom.node)).custom.node = NOD(f);
+            assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(ApiNext, a)))));
+            mutable_MISC(ApiPrev, SER(LINK(ApiNext, a))) = NOD(f);
         }
     }
     else {
         // we're not at the head, so there is a node before us, set its "next"
-        assert(Is_Api_Value(ARR_SINGLE(ARR(MISC(a).custom.node))));
-        LINK(SER(MISC(a).custom.node)).custom.node = LINK(a).custom.node;
+        assert(Is_Api_Value(ARR_SINGLE(ARR(MISC(ApiPrev, a)))));
+        mutable_LINK(ApiNext, SER(MISC(ApiPrev, a))) = LINK(ApiNext, a);
 
         if (not at_tail) {  // only set next item's backlink if it exists
-            assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(a).custom.node))));
-            MISC(SER(LINK(a).custom.node)).custom.node = MISC(a).custom.node;
+            assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(ApiNext, a)))));
+            mutable_MISC(ApiPrev, SER(LINK(ApiNext, a))) = MISC(ApiPrev, a);
         }
     }
 }
@@ -201,7 +208,7 @@ inline static REBARR *Alloc_Instruction(enum Reb_Api_Opcode opcode) {
         FLAG_WIDE_BYTE_OR_0(0) // signals array, also implicit terminator
             | FLAG_LEN_BYTE_OR_255(1) // signals singular
     );
-    MISC(s).opcode = opcode;
+    s->misc.opcode = opcode;
 
     RELVAL *cell = TRACK_CELL_IF_DEBUG(SER_CELL(s));
     cell->header.bits = CELL_MASK_PREP_END | NODE_FLAG_ROOT;

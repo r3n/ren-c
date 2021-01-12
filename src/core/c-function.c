@@ -564,7 +564,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         sizeof(REBKEY),
         NODE_FLAG_MANAGED | SERIES_MASK_KEYLIST
     );
-    LINK_ANCESTOR_NODE(keylist) = NOD(keylist);  // chain ends with self
+    mutable_LINK(Ancestor, keylist) = keylist;  // chain ends with self
 
     if (flags & MKF_HAS_RETURN)
         paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
@@ -627,7 +627,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     SET_SERIES_USED(keylist, num_slots - 1);  // no terminator
     INIT_LINK_KEYSOURCE(paramlist, NOD(keylist));
-    MISC_META_NODE(paramlist) = nullptr;
+    mutable_MISC(Meta, paramlist) = nullptr;
   }
 
     // Must remove binder indexes for all words, even if about to fail
@@ -684,7 +684,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             num_slots,
             SERIES_MASK_VARLIST | NODE_FLAG_MANAGED
         );
-        MISC_META_NODE(types_varlist) = nullptr;  // GC sees, must initialize
+        mutable_MISC(Meta, types_varlist) = nullptr;  // GC sees, must init
         INIT_CTX_KEYLIST_SHARED(CTX(types_varlist), keylist);
 
         RELVAL *rootvar = ARR_HEAD(types_varlist);
@@ -722,7 +722,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             num_slots,
             SERIES_MASK_VARLIST | NODE_FLAG_MANAGED
         );
-        MISC_META_NODE(notes_varlist) = nullptr;  // GC sees, must initialize
+        mutable_MISC(Meta, notes_varlist) = nullptr;  // GC sees, must init
         INIT_CTX_KEYLIST_SHARED(CTX(notes_varlist), keylist);
 
         RELVAL *rootvar = ARR_HEAD(notes_varlist);
@@ -876,7 +876,7 @@ REBACT *Make_Action(
 
     REBARR *paramlist;
     if (GET_ARRAY_FLAG(specialty, IS_PARTIALS)) {
-        paramlist = ARR(LINK_PARTIALS_EXEMPLAR_NODE(specialty));
+        paramlist = CTX_VARLIST(LINK(PartialsExemplar, specialty));
     }
     else {
         assert(GET_ARRAY_FLAG(specialty, IS_VARLIST));
@@ -898,7 +898,7 @@ REBACT *Make_Action(
     // a placeholder for more useful consistency checking which might be done.
     //
   blockscope {
-    REBSER *keylist = SER(LINK_KEYSOURCE(paramlist));
+    REBSER *keylist = SER(LINK(KeySource, paramlist));
 
     ASSERT_SERIES_MANAGED(keylist);  // paramlists/keylists, can be shared
     assert(SER_USED(keylist) + 1 == ARR_LEN(paramlist));
@@ -930,8 +930,8 @@ REBACT *Make_Action(
     //
     TERM_ARRAY_LEN(details, details_capacity);
 
-    LINK(details).dispatcher = dispatcher; // level of indirection, hijackable
-    MISC_META_NODE(details) = nullptr;  // caller can fill in
+    details->link.dispatcher = dispatcher; // level of indirection, hijackable
+    mutable_MISC(Meta, details) = nullptr;  // caller can fill in
 
     VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype) = NOD(specialty);
 
@@ -1010,7 +1010,7 @@ REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
     REBARR *varlist = Alloc_Singular(NODE_FLAG_MANAGED);
     varlist->header.bits |= SERIES_MASK_VARLIST;
     SET_SERIES_INFO(varlist, INACCESSIBLE);
-    MISC_META_NODE(varlist) = nullptr;
+    mutable_MISC(Meta, varlist) = nullptr;
 
     RELVAL *rootvar = ARR_SINGLE(varlist);
     INIT_VAL_FRAME_ROOTVAR(rootvar, varlist, a, UNBOUND);  // !!! binding?

@@ -72,7 +72,7 @@ static void get_scalar(
         REBSTU *sub_stu = Alloc_Singular(
             NODE_FLAG_MANAGED | SERIES_FLAG_LINK_NODE_NEEDS_MARK
         );
-        LINK(sub_stu).custom.node = NOD(field);
+        mutable_LINK(Schema, sub_stu) = field;
 
         // The parent data may be a singular array for a HANDLE! or a BINARY!
         // series, depending on whether the data is owned by Rebol or not.
@@ -1319,7 +1319,7 @@ REB_R MAKE_Struct(
         NODE_FLAG_MANAGED | SERIES_FLAG_LINK_NODE_NEEDS_MARK
     );
     Manage_Series(schema);
-    LINK_SCHEMA_NODE(stu) = NOD(schema);
+    mutable_LINK(Schema, stu) = schema;
 
     if (raw_addr) {
         make_ext_storage(
@@ -1489,7 +1489,7 @@ REBSTU *Copy_Struct_Managed(REBSTU *src)
     // linked manually.
     //
     REBSTU *copy = Copy_Array_Shallow(src, SPECIFIED);
-    LINK_SCHEMA_NODE(copy) = LINK_SCHEMA_NODE(src);  // share the same schema
+    mutable_LINK(Schema, copy) = LINK(Schema, src);  // share the same schema
     MISC_STU_OFFSET(copy) = MISC_STU_OFFSET(src);  // copies offset
 
     // Update the binary data with a copy of its sequence.

@@ -280,7 +280,7 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
     Freeze_Series(s); 
 
     if (not synonym) {
-        LINK_SYNONYM_NODE(s) = NOD(s);  // 1-item in circular list
+        mutable_LINK(Synonym, s) = STR(s);  // 1-item in circular list
 
         // leave header.bits as 0 for SYM_0 as answer to VAL_WORD_SYM()
         // Startup_Symbols() tags values from %words.r after the fact.
@@ -302,8 +302,8 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
         // This is a synonym for an existing canon.  Link it into the synonyms
         // circularly linked list, and direct link the canon form.
         //
-        LINK_SYNONYM_NODE(s) = LINK_SYNONYM_NODE(synonym);
-        LINK_SYNONYM_NODE(synonym) = NOD(s);
+        mutable_LINK(Synonym, s) = LINK(Synonym, synonym);
+        mutable_LINK(Synonym, synonym) = STR(s);
 
         // If the canon form had a SYM_XXX for quick comparison of %words.r
         // words in C switch statements, the synonym inherits that number.
@@ -320,8 +320,8 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
     // there is an infrastructure in place for sharing (start with 2, grow to
     // N eventually).
     //
-    MISC(s).bind_index.high = 0;
-    MISC(s).bind_index.low = 0;
+    s->misc.bind_index.high = 0;
+    s->misc.bind_index.low = 0;
 
     if (deleted_slot) {
         *deleted_slot = STR(s);  // reuse the deleted slot
@@ -379,17 +379,17 @@ const REBSTR *Intern_Any_String_Managed(const RELVAL *v) {
 //
 void GC_Kill_Interning(REBSTR *intern)
 {
-    REBSTR *synonym = LINK_SYNONYM(intern);
+    REBSTR *synonym = LINK(Synonym, intern);
 
     // Note synonym and intern may be the same here.
     //
     REBSTR *temp = synonym;
-    while (LINK_SYNONYM(temp) != intern)
-        temp = LINK_SYNONYM(temp);
-    LINK_SYNONYM_NODE(temp) = NOD(synonym);  // cut the intern out (or no-op)
+    while (LINK(Synonym, temp) != intern)
+        temp = LINK(Synonym, temp);
+    mutable_LINK(Synonym, temp) = synonym;  // cut the intern out (or no-op)
 
-    assert(MISC(intern).bind_index.high == 0);  // shouldn't GC during binds?
-    assert(MISC(intern).bind_index.low == 0);
+    assert(intern->misc.bind_index.high == 0);  // shouldn't GC during binds?
+    assert(intern->misc.bind_index.low == 0);
 
     REBLEN num_slots = SER_USED(PG_Symbols_By_Hash);
     REBSTR* *symbols_by_hash = SER_HEAD(REBSTR*, PG_Symbols_By_Hash);
@@ -588,7 +588,7 @@ void Startup_Symbols(REBARR *words)
             SET_SECOND_UINT16(name->header, sym);
             assert(SAME_SYM_NONZERO(STR_SYMBOL(name), sym));
 
-            name = LINK_SYNONYM(name);
+            name = LINK(Synonym, name);
         } while (name != canon); // circularly linked list, stop on a cycle
     }
 

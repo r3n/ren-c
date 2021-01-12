@@ -42,7 +42,7 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
         sizeof(REBKEY),
         SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED  // always shareable
     );
-    LINK_ANCESTOR_NODE(keylist) = NOD(keylist);  // default to keylist itself
+    mutable_LINK(Ancestor, keylist) = keylist;  // default to keylist itself
     assert(SER_USED(keylist) == 0);
 
     REBARR *varlist = Make_Array_Core(
@@ -50,7 +50,7 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
         SERIES_MASK_VARLIST  // includes assurance of dynamic allocation
             | flags  // e.g. NODE_FLAG_MANAGED
     );
-    MISC_META_NODE(varlist) = nullptr;  // GC sees meta object, must init
+    mutable_MISC(Meta, varlist) = nullptr;  // GC sees meta object, must init
     INIT_CTX_KEYLIST_UNIQUE(CTX(varlist), keylist);  // starts out unique
 
     RELVAL *rootvar = Alloc_Tail_Array(varlist);
@@ -97,10 +97,10 @@ bool Expand_Context_Keylist_Core(REBCTX *context, REBLEN delta)
         // objects are essentially all new objects as far as derivation are
         // concerned, though they can still run against ancestor methods.
         //
-        if (LINK_ANCESTOR(keylist) == keylist)
-            LINK_ANCESTOR_NODE(copy) = NOD(copy);
+        if (LINK(Ancestor, keylist) == keylist)
+            mutable_LINK(Ancestor, copy) = copy;
         else
-            LINK_ANCESTOR_NODE(copy) = LINK_ANCESTOR_NODE(keylist);
+            mutable_LINK(Ancestor, copy) = LINK(Ancestor, keylist);
 
         Manage_Series(copy);
         INIT_CTX_KEYLIST_UNIQUE(context, copy);
@@ -255,12 +255,12 @@ void Collect_End(struct Reb_Collector *cl)
         // For now just zero it out based on the collect buffer.
         //
         assert(
-            MISC(canon).bind_index.high != 0
-            or MISC(canon).bind_index.low != 0
+            canon->misc.bind_index.high != 0
+            or canon->misc.bind_index.low != 0
         );
         REBSTR *s = m_cast(REBSTR*, canon);
-        MISC(s).bind_index.high = 0;
-        MISC(s).bind_index.low = 0;
+        s->misc.bind_index.high = 0;
+        s->misc.bind_index.low = 0;
     }
 
     TERM_ARRAY_LEN(BUF_COLLECT, 1);
@@ -615,7 +615,7 @@ REBCTX *Make_Context_Detect_Managed(
             | NODE_FLAG_MANAGED // Note: Rebind below requires managed context
     );
     TERM_ARRAY_LEN(varlist, 1 + len);
-    MISC_META_NODE(varlist) = nullptr;  // clear meta object (GC sees this)
+    mutable_MISC(Meta, varlist) = nullptr;  // clear meta object (GC sees)
 
     REBCTX *context = CTX(varlist);
 
@@ -626,7 +626,7 @@ REBCTX *Make_Context_Detect_Managed(
     //
     if (not parent) {
         INIT_CTX_KEYLIST_UNIQUE(context, keylist);
-        LINK_ANCESTOR_NODE(keylist) = NOD(keylist);
+        mutable_LINK(Ancestor, keylist) = keylist;
     }
     else {
         if (keylist == CTX_KEYLIST(unwrap(parent))) {
@@ -639,7 +639,7 @@ REBCTX *Make_Context_Detect_Managed(
         }
         else {
             INIT_CTX_KEYLIST_UNIQUE(context, keylist);
-            LINK_ANCESTOR_NODE(keylist) = NOD(CTX_KEYLIST(unwrap(parent)));
+            mutable_LINK(Ancestor, keylist) = CTX_KEYLIST(unwrap(parent));
         }
     }
 
@@ -854,16 +854,16 @@ REBCTX *Merge_Contexts_Managed(REBCTX *parent1, REBCTX *parent2)
     );
 
     if (parent1 == NULL)
-        LINK_ANCESTOR_NODE(keylist) = NOD(keylist);
+        mutable_LINK(Ancestor, keylist) = keylist;
     else
-        LINK_ANCESTOR_NODE(keylist) = NOD(CTX_KEYLIST(parent1));
+        mutable_LINK(Ancestor, keylist) = CTX_KEYLIST(parent1);
 
     REBARR *varlist = Make_Array_Core(
         ARR_LEN(keylist),
         SERIES_MASK_VARLIST
             | NODE_FLAG_MANAGED // rebind below requires managed context
     );
-    MISC_META_NODE(varlist) = nullptr;  // GC sees, it must be initialized
+    mutable_MISC(Meta, varlist) = nullptr;  // GC sees, it must be initialized
 
     REBCTX *merged = CTX(varlist);
     INIT_CTX_KEYLIST_UNIQUE(merged, keylist);

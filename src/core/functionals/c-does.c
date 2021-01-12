@@ -83,6 +83,8 @@ REB_R Block_Dispatcher(REBFRM *f)
         // ^-- note not a `const RELVAL *block`, may get updated!
     assert(IS_BLOCK(block) and VAL_INDEX(block) == 0);
 
+    const REBARR *body = VAL_ARRAY(block);
+
     if (IS_SPECIFIC(block)) {
         if (FRM_BINDING(f) == UNBOUND) {
             if (Do_Any_Array_At_Throws(f->out, SPECIFIC(block), SPECIFIED))
@@ -107,7 +109,7 @@ REB_R Block_Dispatcher(REBFRM *f)
         // Derelativize()'d out to make it specific, and then re-relativized
         // through a copy on behalf of o2/b.
 
-        REBARR *body_array = Copy_And_Bind_Relative_Deep_Managed(
+        REBARR *relativized = Copy_And_Bind_Relative_Deep_Managed(
             SPECIFIC(block),
             FRM_PHASE(f),
             TS_WORD,
@@ -116,16 +118,16 @@ REB_R Block_Dispatcher(REBFRM *f)
 
         // Preserve file and line information from the original, if present.
         //
-        if (GET_ARRAY_FLAG(VAL_ARRAY(block), HAS_FILE_LINE_UNMASKED)) {
-            LINK_FILE_NODE(body_array) = LINK_FILE_NODE(VAL_ARRAY(block));
-            MISC(body_array).line = MISC(VAL_ARRAY(block)).line;
-            SET_ARRAY_FLAG(body_array, HAS_FILE_LINE_UNMASKED);
+        if (GET_ARRAY_FLAG(body, HAS_FILE_LINE_UNMASKED)) {
+            mutable_LINK(Filename, relativized) = LINK(Filename, body);
+            relativized->misc.line = body->misc.line;
+            SET_ARRAY_FLAG(relativized, HAS_FILE_LINE_UNMASKED);
         }
 
         // Update block cell as a relativized copy (we won't do this again).
         //
         REBACT *phase = FRM_PHASE(f);
-        Init_Relative_Block(block, phase, body_array);
+        Init_Relative_Block(block, phase, relativized);
     }
 
     assert(IS_RELATIVE(block));

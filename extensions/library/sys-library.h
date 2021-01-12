@@ -30,6 +30,9 @@
 
 typedef REBARR REBLIB;
 
+#define LINK_Descriptor_TYPE        void*
+#define LINK_Descriptor_CAST        (void*)
+
 extern REBTYP *EG_Library_Type;
 
 inline static bool IS_LIBRARY(const RELVAL *v) {  // Note: QUOTED! doesn't count
@@ -37,10 +40,10 @@ inline static bool IS_LIBRARY(const RELVAL *v) {  // Note: QUOTED! doesn't count
 }
 
 inline static void *LIB_FD(REBLIB *l)
-  { return LINK(l).fd; }  // (F)ile (D)escriptor
+  { return LINK(Descriptor, l); }  // (F)ile (D)escriptor
 
 inline static bool IS_LIB_CLOSED(REBLIB *l)
-  { return LINK(l).fd == nullptr; }
+  { return LINK(Descriptor, l) == nullptr; }
 
 inline static REBLIB *VAL_LIBRARY(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Library_Type);
@@ -48,11 +51,11 @@ inline static REBLIB *VAL_LIBRARY(REBCEL(const*) v) {
 }
 
 #define VAL_LIBRARY_META_NODE(v) \
-    MISC_META_NODE(SER(VAL_NODE(v)))
+    MISC(Meta, SER(VAL_NODE(v)))
 
 inline static REBCTX *VAL_LIBRARY_META(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Library_Type);
-    return CTX(VAL_LIBRARY_META_NODE(v));
+    return MISC(Meta, SER(VAL_NODE(v)));
 }
 
 

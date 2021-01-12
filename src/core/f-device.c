@@ -61,15 +61,15 @@ static int Poll_Default(REBDEV *dev)
         int result = dev->commands[Req(req)->command](req);
 
         if (result == DR_DONE) { // if done, remove from pending list
-            *prior = NextReq(req);
-            NextReq(req) = nullptr;
+            *prior = LINK(ReqNext, req);
+            mutable_LINK(ReqNext, req) = nullptr;
             Req(req)->flags &= ~RRF_PENDING;
             change = true;
         }
         else {
             assert(result == DR_PEND);
 
-            prior = &NextReq(req);
+            prior = &mutable_LINK(ReqNext, req);
             if (Req(req)->flags & RRF_ACTIVE)
                 change = true;
         }
@@ -92,13 +92,13 @@ void Attach_Request(REBREQ **node, REBREQ *req)
     // See if its there, and get last req:
     for (r = *node; r; r = *node) {
         if (r == req) return; // already in list
-        node = &NextReq(r);
+        node = &mutable_LINK(ReqNext, r);
     }
 
     // Link the new request to end:
     *node = req;
     Force_Req_Managed(req);
-    NextReq(req) = nullptr;
+    mutable_LINK(ReqNext, req) = nullptr;
     Req(req)->flags |= RRF_PENDING;
 }
 
@@ -115,12 +115,12 @@ void Detach_Request(REBREQ **node, REBREQ *req)
 
     for (r = *node; r; r = *node) {
         if (r == req) {
-            *node = NextReq(req);
-            NextReq(req) = nullptr;
+            *node = LINK(ReqNext, req);
+            mutable_LINK(ReqNext, req) = nullptr;
             Req(req)->flags |= RRF_PENDING;
             return;
         }
-        node = &NextReq(r);
+        node = &mutable_LINK(ReqNext, r);
     }
 }
 
@@ -227,8 +227,8 @@ REBREQ *OS_Make_Devreq(REBDEV *dev)
     memset(BIN_HEAD(req), 0, dev->req_size);
     TERM_BIN_LEN(req, dev->req_size);
 
-    LINK(req).custom.node = nullptr;
-    MISC(req).custom.node = nullptr;
+    mutable_LINK(ReqNext, req) = nullptr;
+    mutable_MISC(ReqPortCtx, req) = nullptr;
 
     Req(req)->device = dev;
 

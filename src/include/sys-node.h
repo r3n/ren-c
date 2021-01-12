@@ -52,12 +52,8 @@
     inline static N *NOD(T *p) {
         constexpr bool derived =
             std::is_same<T0, REBNOD>::value
-            or std::is_same<T0, REBVAL>::value
-            or std::is_same<T0, RELVAL>::value
-            or std::is_same<T0, REBSER>::value
-            or std::is_same<T0, REBBIN>::value
-            or std::is_same<T0, REBSTR>::value
-            or std::is_same<T0, REBARR>::value
+            or std::is_base_of<REBRAW, T0>::value
+            or std::is_base_of<REBSER, T0>::value
             or std::is_same<T0, REBCTX>::value
             or std::is_same<T0, REBACT>::value
             or std::is_same<T0, REBMAP>::value

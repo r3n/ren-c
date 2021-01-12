@@ -124,8 +124,8 @@ REBSER *Copy_Series_Core(const REBSER *s, REBFLGS flags)
         copy = Make_String_Core(used, flags);
         SET_SERIES_USED(copy, used);
         TERM_SERIES(copy);
-        LINK(copy).bookmarks = nullptr;  // !!! Review: copy these?
-        MISC(copy).length = MISC(s).length;
+        mutable_LINK(Bookmarks, copy) = nullptr;  // !!! Review: copy these?
+        copy->misc.length = s->misc.length;
     }
     else {
         copy = Make_Series_Core(used + 1, SER_WIDE(s), flags);

@@ -499,9 +499,9 @@ REBNATIVE(set_meta)
     REBVAL *v = ARG(value);
 
     if (IS_ACTION(v))
-        MISC_META_NODE(ACT_DETAILS(VAL_ACTION(v))) = NOD(meta_ctx);
+        mutable_MISC(Meta, ACT_DETAILS(VAL_ACTION(v))) = meta_ctx;
     else
-        MISC_META_NODE(CTX_VARLIST(VAL_CONTEXT(v))) = NOD(meta_ctx);
+        mutable_MISC(Meta, CTX_VARLIST(VAL_CONTEXT(v))) = meta_ctx;
 
     RETURN (meta);
 }
@@ -571,7 +571,7 @@ REBCTX *Copy_Context_Extra_Managed(
             SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
         );
 
-        LINK_ANCESTOR_NODE(keylist) = NOD(CTX_KEYLIST(original));
+        mutable_LINK(Ancestor, keylist) = CTX_KEYLIST(original);
 
         INIT_CTX_KEYLIST_UNIQUE(copy, keylist);  // ->link field
     }
@@ -581,12 +581,12 @@ REBCTX *Copy_Context_Extra_Managed(
     // If we're copying a frame here, we know it's not running.
     //
     if (CTX_TYPE(original) == REB_FRAME)
-        MISC_META_NODE(varlist) = nullptr;
+        mutable_MISC(Meta, varlist) = nullptr;
     else {
         // !!! Should the meta object be copied for other context types?
         // Deep copy?  Shallow copy?  Just a reference to the same object?
         //
-        MISC_META_NODE(varlist) = nullptr;
+        mutable_MISC(Meta, varlist) = nullptr;
     }
 
     return copy;
@@ -812,7 +812,7 @@ REBTYPE(Context)
 
         switch (sym) {
           case SYM_FILE: {
-            REBSTR *file = FRM_FILE(f);
+            const REBSTR *file = FRM_FILE(f);
             if (not file)
                 return nullptr;
             return Init_Word(D_OUT, file); }

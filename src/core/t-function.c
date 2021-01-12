@@ -229,7 +229,7 @@ REBTYPE(Action)
         );
 
         assert(ACT_META(proxy) == nullptr);
-        ACT_META_NODE(proxy) = NOD(meta);
+        mutable_ACT_META(proxy) = meta;
 
         if (GET_ACTION_FLAG(act, IS_NATIVE))
             SET_ACTION_FLAG(proxy, IS_NATIVE);
@@ -303,9 +303,9 @@ REBTYPE(Action)
             // !!! How to tell URL! vs FILE! ?
             //
             if (VAL_WORD_SYM(property) == SYM_FILE)
-                Init_File(D_OUT, LINK_FILE(a));
+                Init_File(D_OUT, LINK(Filename, a));
             else
-                Init_Integer(D_OUT, MISC(a).line);
+                Init_Integer(D_OUT, a->misc.line);
 
             return D_OUT; }
 

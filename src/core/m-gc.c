@@ -190,8 +190,8 @@ static void Queue_Mark_Node_Deep(void *p)
         // would be more helpful to have a flag to indicate their binding
         // went stale...some other cell flag?)  For now, just leave it.
         //
-        /*TRASH_POINTER_IF_DEBUG(MISC(s).trash);
-        TRASH_POINTER_IF_DEBUG(LINK(s).trash);
+        /*TRASH_POINTER_IF_DEBUG(s->misc.trash);
+        TRASH_POINTER_IF_DEBUG(s->link.trash);
         s->header.bits &= ~(
             SERIES_FLAG_LINK_NODE_NEEDS_MARK
                 | SERIES_FLAG_MISC_NODE_NEEDS_MARK
@@ -212,7 +212,7 @@ static void Queue_Mark_Node_Deep(void *p)
 
     s->header.bits |= NODE_FLAG_MARKED; // may be already set
 
-    if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and LINK(s).custom.node) {
+    if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and s->link.custom.node) {
         //
         // !!! The keysource for varlists can be set to a REBFRM*, which acts
         // like a cell because the flag is set to being an "endlike header".
@@ -220,11 +220,11 @@ static void Queue_Mark_Node_Deep(void *p)
         // casting as a SER().  It wasn't entirely obvious what was going on,
         // but this makes it clearer so that a more elegant fix can be made.
         //
-        if (Is_Node_Cell(LINK(s).custom.node))
+        if (Is_Node_Cell(s->link.custom.node))
             if (IS_SER_ARRAY(s) and GET_ARRAY_FLAG(ARR(s), IS_VARLIST))
                 goto skip_mark_rebfrm_link;
 
-        REBSER *link = SER(LINK(s).custom.node);
+        REBSER *link = SER(s->link.custom.node);
         Queue_Mark_Node_Deep(link);
 
         // Keylist series need to be marked.
@@ -245,8 +245,8 @@ static void Queue_Mark_Node_Deep(void *p)
     }
 
   skip_mark_rebfrm_link:
-    if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and MISC(s).custom.node)
-        Queue_Mark_Node_Deep(MISC(s).custom.node);
+    if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and s->misc.custom.node)
+        Queue_Mark_Node_Deep(s->misc.custom.node);
 
     if (IS_SER_ARRAY(s)) {
         //
@@ -536,11 +536,11 @@ static void Mark_Root_Series(void)
                 );
 
                 if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK))
-                    if (LINK(s).custom.node)
-                        Queue_Mark_Node_Deep(LINK(s).custom.node);
+                    if (s->link.custom.node)
+                        Queue_Mark_Node_Deep(s->link.custom.node);
                 if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK))
-                    if (MISC(s).custom.node)
-                        Queue_Mark_Node_Deep(MISC(s).custom.node);
+                    if (s->misc.custom.node)
+                        Queue_Mark_Node_Deep(s->misc.custom.node);
 
                 RELVAL *item = ARR_HEAD(cast(REBARR*, s));
                 for (; NOT_END(item); ++item)
@@ -678,7 +678,7 @@ static void Mark_Frame_Stack_Deep(void)
         REBARR *singular = FEED_SINGULAR(f->feed);
         do {
             Queue_Mark_Value_Deep(ARR_SINGLE(singular));
-            singular = ARR(LINK_SPLICE_NODE(singular));
+            singular = LINK(Splice, singular);
         } while (singular);
 
         // END is possible, because the frame could be sitting at the end of
@@ -1071,7 +1071,7 @@ REBLEN Recycle_Core(bool shutdown, REBSER *sweeplist)
     //
     while (TG_Reuse) {
         REBARR *varlist = TG_Reuse;
-        TG_Reuse = ARR(LINK(TG_Reuse).reuse);
+        TG_Reuse = LINK(ReuseNext, TG_Reuse);
         GC_Kill_Series(varlist); // no track for Free_Unmanaged_Series()
     }
 

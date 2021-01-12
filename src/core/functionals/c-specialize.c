@@ -200,7 +200,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     }
 
     TERM_ARRAY_LEN(varlist, num_slots);
-    MISC_META_NODE(varlist) = nullptr;  // GC sees this, we must initialize
+    mutable_MISC(Meta, varlist) = nullptr;  // GC sees this, we must init
 
     return CTX(varlist);
 }
@@ -441,7 +441,7 @@ bool Specialize_Action_Throws(
             partials = nullptr;
         }
         else {
-            LINK_PARTIALS_EXEMPLAR_NODE(partials) = NOD(exemplar);
+            mutable_LINK(PartialsExemplar, partials) = exemplar;
             Manage_Series(partials);
         }
     }

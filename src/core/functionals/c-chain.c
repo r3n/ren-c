@@ -66,7 +66,7 @@ REBFRM *Push_Downshifted_Frame(REBVAL *out, REBFRM *f) {
     Push_Frame(out, sub);
     assert(sub->varlist == nullptr);
     sub->varlist = f->varlist;
-    assert(LINK_KEYSOURCE(sub->varlist) == NOD(f));
+    assert(LINK(KeySource, sub->varlist) == NOD(f));
     INIT_LINK_KEYSOURCE(sub->varlist, NOD(sub));
     sub->rootvar = SPECIFIC(ARR_HEAD(sub->varlist));
 

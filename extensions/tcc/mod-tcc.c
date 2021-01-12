@@ -327,7 +327,7 @@ REBNATIVE(make_native)
     );
 
     assert(ACT_META(native) == nullptr);
-    ACT_META_NODE(native) = NOD(meta);
+    mutable_ACT_META(native) = meta;
 
     REBARR *details = ACT_DETAILS(native);
 

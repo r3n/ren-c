@@ -717,7 +717,7 @@ REBNATIVE(js_native)
     );
 
     assert(ACT_META(native) == nullptr);  // should default to nullptr
-    ACT_META_NODE(native) = NOD(meta);
+    mutable_ACT_META(native) = meta;
 
     heapaddr_t native_id = Native_Id_For_Action(native);
 

@@ -30,12 +30,9 @@ struct Reb_Action {
     REBARR details;
 };
 
+#define MISC_Meta_TYPE      REBCTX*
+#define MISC_Meta_CAST      CTX
 
-#define LINK_ANCESTOR_NODE(keylist_or_paramlist) \
-    LINK(keylist_or_paramlist).custom.node
-
-#define MISC_META_NODE(varlist_or_details)  \
-    MISC(varlist_or_details).custom.node
 
 // Note: LINK on details is the DISPATCHER, on varlists it's KEYSOURCE
 

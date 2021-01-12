@@ -113,7 +113,7 @@ REBNATIVE(generic)
     );
 
     assert(ACT_META(generic) == nullptr);
-    ACT_META_NODE(generic) = NOD(meta);
+    mutable_ACT_META(generic) = meta;
 
     // !!! There is no system yet for extension types to register which of
     // the generic actions they can handle.  So for the moment, we just say

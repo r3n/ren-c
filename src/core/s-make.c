@@ -40,8 +40,8 @@ REBSTR *Make_String_Core(REBSIZ encoded_capacity, REBFLGS flags)
         sizeof(REBYTE),
         flags | SERIES_FLAG_IS_STRING
     );
-    MISC(s).length = 0;
-    LINK(s).bookmarks = nullptr;  // generated on demand
+    s->misc.length = 0;
+    mutable_LINK(Bookmarks, s) = nullptr;  // generated on demand
     TERM_SEQUENCE(s);
     return STR(s);
 }

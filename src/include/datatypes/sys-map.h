@@ -45,10 +45,10 @@ struct Reb_Map {
     REBARR pairlist;  // hashlist is held in ->link.hashlist
 };
 
-// The MAP! datatype uses this.
+// See LINK() macro for how this is used.
 //
-#define LINK_HASHLIST_NODE(s)       LINK(s).custom.node
-#define LINK_HASHLIST(s)            SER(LINK(s).custom.node)
+#define LINK_Hashlist_TYPE          REBSER*
+#define LINK_Hashlist_CAST          SER
 
 
 inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
@@ -62,7 +62,7 @@ inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
 #endif
 
 #define MAP_HASHLIST(m) \
-    LINK_HASHLIST(MAP_PAIRLIST(m))
+    LINK(Hashlist, MAP_PAIRLIST(m))
 
 #define MAP_HASHES(m) \
     SER_HEAD(MAP_HASHLIST(m))

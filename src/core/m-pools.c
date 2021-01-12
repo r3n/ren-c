@@ -944,13 +944,13 @@ void Swap_Series_Content(REBSER* a, REBSER* b)
     a->content = b->content;
     b->content = a_content;
 
-    union Reb_Series_Misc a_misc = MISC(a);
-    MISC(a) = MISC(b);
-    MISC(b) = a_misc;
+    union Reb_Series_Misc a_misc = a->misc;
+    a->misc = b->misc;
+    b->misc = a_misc;
 
-    union Reb_Series_Link a_link = LINK(a);
-    LINK(a) = LINK(b);
-    LINK(b) = a_link;
+    union Reb_Series_Link a_link = a->link;
+    a->link = b->link;
+    b->link = a_link;
 }
 
 
@@ -1073,7 +1073,7 @@ void Remake_Series(REBSER *s, REBLEN units, REBYTE wide, REBFLGS flags)
 
   #ifdef DEBUG_UTF8_EVERYWHERE
     if (GET_SERIES_FLAG(s, IS_STRING) and not IS_STR_SYMBOL(STR(s))) {
-        MISC(s).length = 0xDECAFBAD;
+        s->misc.length = 0xDECAFBAD;
         TOUCH_SERIES_IF_DEBUG(s);
     }
   #endif
@@ -1101,11 +1101,11 @@ void Decay_Series(REBSER *s)
         // Remove patch from circularly linked list of variants.
         // (if it's the last one, this winds up making no meaningful change)
         //
-        REBARR *temp = ARR(MISC(s).variant);
-        while (MISC(temp).variant != s) {
-            temp = ARR(MISC(temp).variant);
+        REBARR *temp = MISC(Variant, s);
+        while (MISC(Variant, temp) != s) {
+            temp = MISC(Variant, temp);
         }
-        MISC(temp).variant = MISC(s).variant;
+        mutable_MISC(Variant, temp) = MISC(Variant, s);
     }
 
     // Remove series from expansion list, if found:
@@ -1173,8 +1173,8 @@ void Decay_Series(REBSER *s)
                     //
                     // !!! Would a no-op cleaner be more efficient for those?
                     //
-                    if (MISC(s).cleaner)
-                        (MISC(s).cleaner)(SPECIFIC(v));
+                    if (s->misc.cleaner)
+                        (s->misc.cleaner)(SPECIFIC(v));
                 }
             }
         }
@@ -1212,7 +1212,7 @@ void GC_Kill_Series(REBSER *s)
   #if !defined(NDEBUG)
     s->info.bits = FLAG_WIDE_BYTE_OR_0(77);  // corrupt SER_WIDE()
     // The spot LINK occupies will be used by Free_Node() to link the freelist
-    FREETRASH_POINTER_IF_DEBUG(s->misc_private.trash);
+    FREETRASH_POINTER_IF_DEBUG(s->misc.trash);
   #endif
 
   #if defined(TO_WINDOWS) && defined(DEBUG_SERIES_ORIGINS)

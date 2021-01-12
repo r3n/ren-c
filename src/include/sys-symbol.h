@@ -44,8 +44,8 @@
 // One synonym need not keep another alive, because the process of freeing
 // string nodes unlinks them from the list.  (Hence the canon can change!)
 //
-#define LINK_SYNONYM_NODE(s)    LINK(s).custom.node
-#define LINK_SYNONYM(s)         STR(LINK_SYNONYM_NODE(s))
+#define LINK_Synonym_TYPE       const REBSTR*
+#define LINK_Synonym_CAST       STR
 
 
 #if defined(NDEBUG) || !defined(CPLUSPLUS_11)
@@ -144,7 +144,7 @@ inline static bool SAME_STR(const REBSTR *s1, const REBSTR *s2) {
     do {
         if (temp == s2)
             return true;
-    } while ((temp = LINK_SYNONYM(temp)) != s1);
+    } while ((temp = LINK(Synonym, temp)) != s1);
 
     return false;  // stopped when circularly linked list loops back to self
 }

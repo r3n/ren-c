@@ -96,7 +96,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
                 return nullptr;
             if (NOT_ARRAY_FLAG(ARR(s), HAS_FILE_LINE_UNMASKED))
                 return nullptr;
-            return Init_File(D_OUT, LINK_FILE(s)); }
+            return Init_File(D_OUT, LINK(Filename, s)); }
 
           case SYM_LINE: {
             const REBSER *s = VAL_SERIES(v);
@@ -104,7 +104,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
                 return nullptr;
             if (NOT_ARRAY_FLAG(ARR(s), HAS_FILE_LINE_UNMASKED))
                 return nullptr;
-            return Init_Integer(D_OUT, MISC(s).line); }
+            return Init_Integer(D_OUT, s->misc.line); }
 
           default:
             break;

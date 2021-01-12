@@ -105,7 +105,7 @@ inline static CLEANUP_CFUNC *VAL_HANDLE_CLEANER(REBCEL(const*) v) {
     REBARR *a = VAL_HANDLE_SINGULAR(v);
     if (not a)
         return nullptr;
-    return MISC(a).cleaner;
+    return a->misc.cleaner;
 }
 
 inline static void SET_HANDLE_LEN(RELVAL *v, uintptr_t length) {
@@ -173,7 +173,7 @@ inline static void Init_Handle_Cdata_Managed_Common(
     CLEANUP_CFUNC *cleaner
 ){
     REBARR *singular = Alloc_Singular(NODE_FLAG_MANAGED);
-    MISC(singular).cleaner = cleaner;
+    singular->misc.cleaner = cleaner;
 
     RELVAL *single = ARR_SINGLE(singular);
     RESET_VAL_HEADER(single, REB_HANDLE, CELL_FLAG_FIRST_IS_NODE);

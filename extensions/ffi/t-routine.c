@@ -540,7 +540,7 @@ static void ffi_to_rebol(
         REBSTU *stu = Alloc_Singular(
             NODE_FLAG_MANAGED | SERIES_FLAG_LINK_NODE_NEEDS_MARK
         );
-        LINK_SCHEMA_NODE(stu) = NOD(top);
+        mutable_LINK(Schema, stu) = top;
 
         REBBIN *data = BIN(Make_Series_Core(
             FLD_WIDE(top),  // !!! what about FLD_LEN_BYTES_TOTAL ?

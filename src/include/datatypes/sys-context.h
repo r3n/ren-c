@@ -98,7 +98,7 @@
 // processed header)
 //
 #define CTX_VARLIST(c)  (&(c)->varlist)
-#define CTX_META(c)     CTX(MISC_META_NODE(CTX_VARLIST(c)))
+#define CTX_META(c)     MISC(Meta, CTX_VARLIST(c))
 
 
 // ANY-CONTEXT! value cell schematic
@@ -224,13 +224,13 @@ inline static void INIT_VAL_CONTEXT_VARLIST(
 //
 
 inline static REBSER *CTX_KEYLIST(REBCTX *c) {
-    if (Is_Node_Cell(LINK_KEYSOURCE(CTX_VARLIST(c)))) {
+    if (Is_Node_Cell(LINK(KeySource, CTX_VARLIST(c)))) {
         //
         // running frame, source is REBFRM*, so use action's paramlist.
         //
         return ACT_KEYLIST(CTX_FRAME_ACTION(c));
     }
-    return SER(LINK_KEYSOURCE(CTX_VARLIST(c)));  // not a REBFRM, use keylist
+    return SER(LINK(KeySource, CTX_VARLIST(c)));  // not a REBFRM, use keylist
 }
 
 static inline void INIT_CTX_KEYLIST_SHARED(REBCTX *c, REBSER *keylist) {
@@ -311,11 +311,11 @@ inline static const REBKEY *CTX_KEYS(const REBKEY ** tail, REBCTX *c) {
 
 inline static bool Is_Frame_On_Stack(REBCTX *c) {
     assert(IS_FRAME(CTX_ARCHETYPE(c)));
-    return Is_Node_Cell(LINK_KEYSOURCE(CTX_VARLIST(c)));
+    return Is_Node_Cell(LINK(KeySource, CTX_VARLIST(c)));
 }
 
 inline static REBFRM *CTX_FRAME_IF_ON_STACK(REBCTX *c) {
-    REBNOD *keysource = LINK_KEYSOURCE(CTX_VARLIST(c));
+    REBNOD *keysource = LINK(KeySource, CTX_VARLIST(c));
     if (not Is_Node_Cell(keysource))
         return nullptr; // e.g. came from MAKE FRAME! or Encloser_Dispatcher
 
@@ -639,13 +639,13 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
         FLAG_WIDE_BYTE_OR_0(0) // implicit termination, and indicates array
             | FLAG_LEN_BYTE_OR_255(255) // indicates dynamic (varlist rule)
     );
-    TRASH_POINTER_IF_DEBUG(LINK_KEYSOURCE(copy)); // needs update
+    TRASH_POINTER_IF_DEBUG(mutable_LINK(KeySource, copy)); // needs update
     memcpy(  // https://stackoverflow.com/q/57721104/
         cast(char*, &copy->content),
         cast(char*, &stub->content),
         sizeof(union Reb_Series_Content)
     );
-    MISC_META_NODE(copy) = nullptr;  // let stub have the meta
+    mutable_MISC(Meta, copy) = nullptr;  // let stub have the meta
 
     REBVAL *rootvar = cast(REBVAL*, copy->content.dynamic.data);
 

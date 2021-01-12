@@ -45,6 +45,15 @@
 // context (which is also required to do a GET_VAR lookup).
 //
 
+// !!! We generally want to use LINK(Filename, x) but that uses the STR()
+// macro which is not defined in this file.  There's a bit of a circular
+// dependency since %sys-string.h uses arrays for bookmarks; so having a
+// special operation here is an easy workaround that still lets us make a
+// lot of this central code inlinable.
+//
+#define LINK_FILENAME_HACK(s) \
+    cast(REBSTR*, s->link.custom.node)
+
 
 // HEAD, TAIL, and LAST refer to specific value pointers in the array.  An
 // empty array should have an END marker in its head slot, and since it has
@@ -288,8 +297,8 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
             not FRM_IS_VARIADIC(FS_TOP) and
             GET_ARRAY_FLAG(FRM_ARRAY(FS_TOP), HAS_FILE_LINE_UNMASKED)
         ){
-            LINK_FILE_NODE(s) = LINK_FILE_NODE(FRM_ARRAY(FS_TOP));
-            MISC(s).line = MISC(FRM_ARRAY(FS_TOP)).line;
+            mutable_LINK(Filename, s) = LINK_FILENAME_HACK(FRM_ARRAY(FS_TOP));
+            s->misc.line = FRM_ARRAY(FS_TOP)->misc.line;
         }
         else {
             CLEAR_ARRAY_FLAG(ARR(s), HAS_FILE_LINE_UNMASKED);
@@ -336,8 +345,8 @@ inline static REBARR *Make_Array_For_Copy(
             capacity,
             flags & ~ARRAY_FLAG_HAS_FILE_LINE_UNMASKED
         );
-        LINK_FILE_NODE(a) = LINK_FILE_NODE(original);
-        MISC(a).line = MISC(original).line;
+        mutable_LINK(Filename, a) = LINK_FILENAME_HACK(original);
+        a->misc.line = original->misc.line;
         SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
         return a;
     }
@@ -640,3 +649,6 @@ inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {
     #define IS_VALUE_IN_ARRAY_DEBUG(a,v) \
         (ARR_LEN(a) != 0 and (v) >= ARR_HEAD(a) and (v) < ARR_TAIL(a))
 #endif
+
+
+#undef LINK_FILENAME_HACK  // later files shoul use LINK(Filename, x)

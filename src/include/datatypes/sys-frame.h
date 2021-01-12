@@ -108,19 +108,19 @@ inline static REBLEN FRM_EXPR_INDEX(REBFRM *f) {
     return f->expr_index - 1;
 }
 
-inline static REBSTR* FRM_FILE(REBFRM *f) { // https://trello.com/c/K3vntyPx
+inline static const REBSTR* FRM_FILE(REBFRM *f) {
     if (FRM_IS_VARIADIC(f))
         return nullptr;
     if (NOT_ARRAY_FLAG(FRM_ARRAY(f), HAS_FILE_LINE_UNMASKED))
         return nullptr;
-    return STR(LINK(FRM_ARRAY(f)).custom.node);
+    return LINK(Filename, FRM_ARRAY(f));
 }
 
 inline static const char* FRM_FILE_UTF8(REBFRM *f) {
     //
     // !!! Note: Too early in boot at the moment to use Canon(__ANONYMOUS__).
     //
-    REBSTR *str = FRM_FILE(f);
+    const REBSTR *str = FRM_FILE(f);
     return str ? STR_UTF8(str) : "(anonymous)"; 
 }
 
@@ -129,7 +129,7 @@ inline static int FRM_LINE(REBFRM *f) {
         return 0;
     if (NOT_ARRAY_FLAG(FRM_ARRAY(f), HAS_FILE_LINE_UNMASKED))
         return 0;
-    return MISC(FRM_ARRAY(f)).line;
+    return FRM_ARRAY(f)->misc.line;
 }
 
 #define FRM_OUT(f) \
@@ -277,9 +277,9 @@ inline static bool Did_Reuse_Varlist_Of_Unknown_Size(
         return false;
 
     f->varlist = TG_Reuse;
-    TG_Reuse = ARR(LINK(TG_Reuse).reuse);
+    TG_Reuse = LINK(ReuseNext, TG_Reuse);
     f->rootvar = cast(REBVAL*, f->varlist->content.dynamic.data);
-    LINK_KEYSOURCE(f->varlist) = NOD(f);
+    mutable_LINK(KeySource, f->varlist) = NOD(f);
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
     return true;
 }
@@ -296,7 +296,7 @@ inline static void Conserve_Varlist(REBARR *varlist)
     TRASH_POINTER_IF_DEBUG(VAL_FRAME_BINDING_NODE(rootvar));
   #endif
 
-    LINK(varlist).reuse = TG_Reuse;
+    mutable_LINK(ReuseNext, varlist) = TG_Reuse;
     TG_Reuse = varlist;
 }
 
@@ -447,7 +447,7 @@ inline static void Abort_Frame(REBFRM *f) {
     REBNOD *n = f->alloc_value_list;
     while (n != NOD(f)) {
         REBARR *a = ARR(n);
-        n = LINK(a).custom.node;
+        n = LINK(ApiNext, a);
         TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
         GC_Kill_Series(a);
     }
@@ -665,7 +665,7 @@ inline static void Push_Action(
                 | FLAG_LEN_BYTE_OR_255(255) // signals dynamic
         );
         INIT_LINK_KEYSOURCE(ARR(s), NOD(f)); // maps varlist back to f
-        MISC_META_NODE(s) = nullptr; // GC will sees this
+        mutable_MISC(Meta, s) = nullptr;  // GC will sees this
         f->varlist = ARR(s);
     }
 
@@ -766,7 +766,7 @@ inline static void Drop_Action(REBFRM *f) {
 
     assert(
         GET_SERIES_INFO(f->varlist, INACCESSIBLE)
-        or LINK_KEYSOURCE(f->varlist) == NOD(f)
+        or LINK(KeySource, f->varlist) == NOD(f)
     );
 
     if (GET_SERIES_INFO(f->varlist, INACCESSIBLE)) {

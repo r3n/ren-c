@@ -78,7 +78,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             ){
                 panic (binding);
             }
-            REBNOD *keysource = LINK_KEYSOURCE(ARR(binding));
+            REBNOD *keysource = LINK(KeySource, ARR(binding));
             if (not Is_Node_Cell(keysource)) {
                 if (
                     (keysource->header.bits & SERIES_MASK_KEYLIST)
@@ -218,9 +218,9 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(Is_Marked(s));
 
         if (not IS_STR_SYMBOL(STR(s))) {
-            REBBMK *bookmark = LINK(s).bookmarks;
+            REBBMK *bookmark = LINK(Bookmarks, s);
             if (bookmark) {
-                assert(not LINK(bookmark).bookmarks);  // just one for now
+                assert(not LINK(Bookmarks, bookmark));  // just one for now
                 //
                 // The intent is that bookmarks are unmanaged REBSERs, which
                 // get freed when the string GCs.  This mechanic could be a by
@@ -370,8 +370,8 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             assert(Is_Marked(spelling));
 
         assert(  // GC can't run during binding, only time bind indices != 0
-            MISC(spelling).bind_index.high == 0
-            and MISC(spelling).bind_index.low == 0
+            spelling->misc.bind_index.high == 0
+            and spelling->misc.bind_index.low == 0
         );
 
         if (IS_WORD_BOUND(v))
@@ -528,7 +528,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
 
         REBARR *list = ACT_SPECIALTY(VAL_ACTION(archetype));
         if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-            list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
+            list = CTX_VARLIST(LINK(PartialsExemplar, list));
         assert(GET_ARRAY_FLAG(list, IS_VARLIST));
     }
     else if (GET_ARRAY_FLAG(a, IS_VARLIST)) {
@@ -546,7 +546,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         // because of the potential for overflowing the C stack with calls
         // to Queue_Mark_Context_Deep.
 
-        REBNOD *keysource = LINK_KEYSOURCE(a);
+        REBNOD *keysource = LINK(KeySource, a);
         if (Is_Node_Cell(keysource)) {
             //
             // Must be a FRAME! and it must be on the stack running.  If
@@ -570,7 +570,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
                 // place to put an ancestor link.
             }
             else {
-                REBSER *ancestor = LINK_ANCESTOR(keylist);
+                REBSER *ancestor = LINK(Ancestor, keylist);
                 UNUSED(ancestor);  // maybe keylist
             }
         }
@@ -583,7 +583,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         // seemed to be a source of bugs, but it may be added again...in
         // which case the hashlist may be NULL.
         //
-        REBSER *hashlist = LINK_HASHLIST(a);
+        REBSER *hashlist = LINK(Hashlist, a);
         assert(hashlist != nullptr);
         UNUSED(hashlist);
     }

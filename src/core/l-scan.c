@@ -2575,8 +2575,8 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             and IS_SER_ARRAY(SER(VAL_NODE(DS_TOP)))
         ){
             REBARR *a = ARR(VAL_NODE(DS_TOP));
-            MISC(a).line = ss->line;
-            LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss->file));
+            a->misc.line = ss->line;
+            mutable_LINK(Filename, a) = ss->file;
             SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
             SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
@@ -2815,8 +2815,8 @@ static REBARR *Scan_Child_Array(SCAN_LEVEL *parent, REBYTE mode)
 
     // Tag array with line where the beginning bracket/group/etc. was found
     //
-    MISC(a).line = ss->line;
-    LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss->file));
+    a->misc.line = ss->line;
+    mutable_LINK(Filename, a) = ss->file;
     SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
     SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
@@ -2846,8 +2846,8 @@ REBARR *Scan_UTF8_Managed(const REBSTR *file, const REBYTE *utf8, REBSIZ size)
             | (level.newline_pending ? ARRAY_FLAG_NEWLINE_AT_TAIL : 0)
     );
 
-    MISC(a).line = ss.line;
-    LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss.file));
+    a->misc.line = ss.line;
+    mutable_LINK(Filename, a) = ss.file;
     SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
     SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
@@ -3019,8 +3019,8 @@ REBNATIVE(transcode)
             NODE_FLAG_MANAGED
                 | (level.newline_pending ? ARRAY_FLAG_NEWLINE_AT_TAIL : 0)
         );
-        MISC(a).line = ss.line;
-        LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss.file));
+        a->misc.line = ss.line;
+        mutable_LINK(Filename, a) = ss.file;
         a->header.bits |= ARRAY_MASK_HAS_FILE_LINE;
 
         Init_Block(D_OUT, a);

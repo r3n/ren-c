@@ -562,9 +562,9 @@ REBNATIVE(enline)
     if (delta == 0)
         RETURN (ARG(string)); // nothing to do
 
-    REBLEN old_len = MISC(s).length;
-    EXPAND_SERIES_TAIL(s, delta);  // corrupts MISC(str).length
-    MISC(s).length = old_len + delta;  // just adding CR's
+    REBLEN old_len = s->misc.length;
+    EXPAND_SERIES_TAIL(s, delta);  // corrupts str->misc.length
+    s->misc.length = old_len + delta;  // just adding CR's
 
     // One feature of using UTF-8 for strings is that CR/LF substitution can
     // stay a byte-oriented process..because UTF-8 doesn't reuse bytes in the

@@ -25,6 +25,15 @@
 //
 
 
+// The REBFRM's `varlist` field holds a ready-made varlist for a frame,
+// which may be reused.  However, when a stack frame is dropped it can
+// only be reused by putting it in a place that future pushes can find
+// it.  This is used to link a varlist into the reusable list.
+//
+#define LINK_ReuseNext_TYPE         REBARR*
+#define LINK_ReuseNext_CAST         ARR
+
+
 // See Endlike_Header() for why these are chosen the way they are.  This
 // means that the Reb_Frame->flags field can function as an implicit END for
 // Reb_Frame->cell, as well as be distinguished from a REBVAL*, a REBSER*, or

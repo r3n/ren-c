@@ -518,8 +518,8 @@ void Set_Location_Of_Error(
         break;
     }
     if (f != FS_BOTTOM) {
-        REBSTR *file = LINK_FILE(FRM_ARRAY(f));
-        REBLIN line = MISC(FRM_ARRAY(f)).line;
+        const REBSTR *file = LINK(Filename, FRM_ARRAY(f));
+        REBLIN line = FRM_ARRAY(f)->misc.line;
 
         REBSYM file_sym = STR_SYMBOL(file);
         if (IS_NULLED_OR_BLANK(&vars->file)) {

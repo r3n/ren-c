@@ -44,6 +44,12 @@
 //
 
 
+#define LINK_ReqNext_TYPE       REBREQ*  // alias for REBBIN
+#define LINK_ReqNext_CAST       BIN
+
+#define MISC_ReqPortCtx_TYPE    REBCTX*
+#define MISC_ReqPortCtx_CAST    CTX
+
 enum Reb_Device_Command {
     RDC_INIT,       // init device driver resources
     RDC_QUIT,       // cleanup device driver resources
@@ -192,29 +198,6 @@ inline static struct rebol_devreq *Req(REBREQ *req) {
     return cast(struct rebol_devreq*, BIN_HEAD(req));
 }
 
-
-// Get `next_req` field hidden in REBSER structure LINK().
-// Being in this spot (instead of inside the binary content of the request)
-// means the chain of requests can be followed by GC.
-//
-inline static void **AddrOfNextReq(REBREQ *req) {
-    ASSERT_REBREQ(req);
-    return cast(void**, &LINK(req).custom.node);  // NextReq() dereferences
-}
-#define NextReq(req) \
-    *cast(REBREQ**, AddrOfNextReq(req))
-
-
-// Get `port_ctx` field hidden in REBSER structure MISC().
-// Being in this spot (instead of inside the binary content of the request)
-// means the chain of requests can be followed by GC.
-//
-inline static void **AddrOfReqPortCtx(REBREQ *req) {
-    ASSERT_REBREQ(req);
-    return cast(void**, &MISC(req).custom.node);  // ReqPortCtx() dereferences
-}
-#define ReqPortCtx(req) \
-    *cast(REBCTX**, AddrOfReqPortCtx(req))  // !!! Transitional hack
 
 
 // !!! Transitional - Lifetime management of REBREQ in R3-Alpha was somewhat

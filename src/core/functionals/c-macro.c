@@ -64,19 +64,19 @@ void Splice_Block_Into_Feed(REBFED *feed, const REBVAL *splice) {
         assert(NOT_SERIES_FLAG(saved, MANAGED));
 
         // old feed data resumes after the splice
-        LINK_SPLICE_NODE(&feed->singular) = NOD(saved);
+        mutable_LINK(Splice, &feed->singular) = saved;
 
         // The feed->value which would have been seen next has to be preserved
         // as the first thing to run when the next splice happens.
         //
-        MISC_PENDING_NODE(saved) = NOD(m_cast(RELVAL*, feed->value));
+        mutable_MISC(Pending, saved) = feed->value;
     }
 
     feed->value = VAL_ARRAY_AT(splice);
     Move_Value(FEED_SINGLE(feed), splice);
     ++VAL_INDEX_UNBOUNDED(FEED_SINGLE(feed));
  
-    MISC_PENDING_NODE(&feed->singular) = nullptr;
+    mutable_MISC(Pending, &feed->singular) = nullptr;
 
     // !!! See remarks above about this per-feed hold logic that should be
     // per-splice hold logic.  Pending whole system review of iteration.

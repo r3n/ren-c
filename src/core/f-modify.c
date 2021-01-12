@@ -542,13 +542,13 @@ REBLEN Modify_String_Or_Binary(
         SET_SERIES_USED(dst_ser, dst_used + src_size_total);
 
         if (IS_SER_STRING(dst_ser)) {
-            bookmark = LINK(dst_ser).bookmarks;
+            bookmark = LINK(Bookmarks, dst_ser);
 
             if (bookmark and BMK_INDEX(bookmark) > dst_idx) {  // only INSERT
                 BMK_INDEX(bookmark) += src_len_total;
                 BMK_OFFSET(bookmark) += src_size_total;
             }
-            MISC(dst_ser).length = dst_len_old + src_len_total;
+            dst_ser->misc.length = dst_len_old + src_len_total;
         }
     }
     else {  // CHANGE only expands if more content added than overwritten
@@ -571,7 +571,7 @@ REBLEN Modify_String_Or_Binary(
 
             // Note: above functions may update the bookmarks --^
             //
-            bookmark = LINK(dst_ser).bookmarks;
+            bookmark = LINK(Bookmarks, dst_ser);
         }
         else {
             dst_len_at = VAL_LEN_AT(dst);
@@ -673,13 +673,13 @@ REBLEN Modify_String_Or_Binary(
         // good a cache as any to be relevant for the next operation.
         //
         if (IS_SER_STRING(dst_ser)) {
-            bookmark = LINK(dst_ser).bookmarks;
+            bookmark = LINK(Bookmarks, dst_ser);
 
             if (bookmark and BMK_INDEX(bookmark) > dst_idx) {
                 BMK_INDEX(bookmark) = dst_idx;
                 BMK_OFFSET(bookmark) = dst_off;
             }
-            MISC(dst_ser).length = dst_len_old + src_len_total - part;
+            dst_ser->misc.length = dst_len_old + src_len_total - part;
         }
     }
 

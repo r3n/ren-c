@@ -60,12 +60,13 @@
 // not run afoul of C's rules, by which you cannot assign one member of
 // a union and then read from another.
 //
-#define LINK_KEYSOURCE(s)       LINK(s).custom.node
+#define LINK_KeySource_TYPE         REBNOD*
+#define LINK_KeySource_CAST         NOD
 
 inline static void INIT_LINK_KEYSOURCE(REBARR *varlist, REBNOD *keysource) {
     if (not Is_Node_Cell(keysource))
         assert(GET_SERIES_FLAG(SER(keysource), IS_KEYLIKE));
-    LINK_KEYSOURCE(varlist) = keysource;
+    mutable_LINK(KeySource, varlist) = keysource;
 }
 
 

@@ -234,19 +234,23 @@ inline static REBARR *GOB_PANE(REBGOB *g) {
     return VAL_ARRAY_KNOWN_MUTABLE(v);
 }
 
-#define GOB_PARENT(g) \
-    cast(REBGOB*, LINK(g).custom.node)
+#define LINK_GobParent_TYPE         REBGOB*
+#define LINK_GobParent_CAST         (REBGOB*)ARR
 
-inline static void SET_GOB_PARENT(REBGOB *g, REBGOB *parent) {
-    LINK(g).custom.node = NOD(parent);
-}
+#define MISC_GobOwner_TYPE          REBGOB*
+#define MISC_GobOwner_CAST          (REBGOB*)ARR
+
+#define GOB_PARENT(g) \
+    LINK(GobParent, (g))
+
+inline static void SET_GOB_PARENT(REBGOB *g, REBGOB *parent)
+  { mutable_LINK(GobParent, g) = parent; }
 
 #define GOB_OWNER(g) \
-    cast(REBGOB*, MISC(g).custom.node)  // unused?
+    MISC(GobOwner, (g))
 
-inline static void SET_GOB_OWNER(REBGOB *g, REBGOB *owner) {
-    MISC(g).custom.node = NOD(owner);
-}
+inline static void SET_GOB_OWNER(REBGOB *g, REBGOB *owner)
+  { mutable_MISC(GobOwner, g) = owner; }
 
 #define GOB_STRING(g)       SER_HEAD(GOB_CONTENT(g))
 #define GOB_LEN(g)          ARR_LEN(GOB_PANE(g))

@@ -41,10 +41,10 @@
 #define MAX_BITSET 0x7fffffff
 
 inline static bool BITS_NOT(const REBSER *s)
-  { return MISC(s).negated; }
+  { return s->misc.negated; }
 
 inline static void INIT_BITS_NOT(REBSER *s, bool negated)
-  { MISC(s).negated = negated; }
+  { s->misc.negated = negated; }
 
 
 inline static REBBIN *VAL_BITSET(REBCEL(const*) v) {

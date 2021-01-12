@@ -267,10 +267,10 @@ static REBVAL *Get_Event_Var(
 
         assert(VAL_EVENT_MODEL(v) == EVM_DEVICE);  // holds IO request w/PORT!
         REBREQ *req = cast(REBREQ*, VAL_EVENT_NODE(v));
-        if (not req or not ReqPortCtx(req))
+        if (not req or not MISC(ReqPortCtx, req))
             return nullptr;
 
-        return Init_Port(out, ReqPortCtx(req)); }
+        return Init_Port(out, MISC(ReqPortCtx, req)); }
 
       case SYM_WINDOW:
       case SYM_GOB: {

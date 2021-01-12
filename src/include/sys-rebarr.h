@@ -187,8 +187,11 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 // was not created from a file, then the information from the source that was
 // running at the time is propagated into the new second-generation series.
 //
-#define LINK_FILE_NODE(s)       LINK(s).custom.node
-#define LINK_FILE(s)            STR(LINK_FILE_NODE(s))
+// !!! LINK_FILENAME_HACK is needed in %sys-array.h due to dependencies not
+// having STR() available.
+//
+#define LINK_Filename_TYPE          const REBSTR*
+#define LINK_Filename_CAST          (const REBSTR*)STR
 
 
 #if !defined(DEBUG_CHECK_CASTS)

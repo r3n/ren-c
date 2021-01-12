@@ -158,13 +158,13 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     );
 
     assert(ACT_META(augmentated) == nullptr);
-    ACT_META_NODE(augmentated) = NOD(meta);
+    mutable_ACT_META(augmentated) = meta;
 
     // Keep track that the derived keylist is related to the original, so
     // that it's possible to tell a frame built for the augmented function is
     // compatible with the original function (and its ancestors, too)
     //
-    LINK_ANCESTOR_NODE(ACT_KEYLIST(augmentated)) = NOD(ACT_KEYLIST(augmentee));
+    mutable_LINK(Ancestor, ACT_KEYLIST(augmentated)) = ACT_KEYLIST(augmentee);
 
     return Init_Action(D_OUT, augmentated, label, UNBOUND);
 }

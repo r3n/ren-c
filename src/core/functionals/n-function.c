@@ -353,7 +353,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
     );
 
     assert(ACT_META(a) == nullptr);
-    ACT_META_NODE(a) = NOD(meta);
+    mutable_ACT_META(a) = meta;
 
     // We look at the *actual* function flags; e.g. the person may have used
     // the FUNC generator (with MKF_RETURN) but then named a parameter RETURN
@@ -405,13 +405,13 @@ REBACT *Make_Interpreted_Action_May_Fail(
     // Favor the spec first, then the body, for file and line information.
     //
     if (GET_ARRAY_FLAG(VAL_ARRAY(spec), HAS_FILE_LINE_UNMASKED)) {
-        LINK_FILE_NODE(copy) = LINK_FILE_NODE(VAL_ARRAY(spec));
-        MISC(copy).line = MISC(VAL_ARRAY(spec)).line;
+        mutable_LINK(Filename, copy) = LINK(Filename, VAL_ARRAY(spec));
+        copy->misc.line = VAL_ARRAY(spec)->misc.line;
         SET_ARRAY_FLAG(copy, HAS_FILE_LINE_UNMASKED);
     }
     else if (GET_ARRAY_FLAG(VAL_ARRAY(body), HAS_FILE_LINE_UNMASKED)) {
-        LINK_FILE_NODE(copy) = LINK_FILE_NODE(VAL_ARRAY(body));
-        MISC(copy).line = MISC(VAL_ARRAY(body)).line;
+        mutable_LINK(Filename, copy) = LINK(Filename, VAL_ARRAY(body));
+        copy->misc.line = VAL_ARRAY(body)->misc.line;
         SET_ARRAY_FLAG(copy, HAS_FILE_LINE_UNMASKED);
     }
     else {

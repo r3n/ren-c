@@ -295,15 +295,15 @@ void Virtual_Bind_Patchify(REBVAL *any_array, REBCTX *ctx, enum Reb_Kind kind)
     // the chain.  So we can simply point to the existing specifier...whether
     // it is a patch, a frame context, or nullptr.
     //
-    LINK_PATCH_NEXT_NODE(patch) = VAL_SPECIFIER(any_array);
+    mutable_LINK(PatchNext, patch) = VAL_SPECIFIER(any_array);
 
     // A circularly linked list of variations of this patch with different
-    // LINK_PATCH_NEXT_NODE() is maintained, to assist in avoiding creating
+    // LINK(PatchNext) is maintained, to assist in avoiding creating
     // unnecessary duplicates.  But since this is the moment of fresh patch
     // creation, there shouldn't be any variants (yet).  Note Decay_Series()
     // will remove this patch from the list when it is being GC'd.
     //
-    MISC(patch).variant = patch;
+    mutable_MISC(Variant, patch) = patch;
 
     // Update array's binding.  Note that once virtually bound, mutating BIND
     // operations might apepar to be ignored if applied to the block.  This
@@ -1159,7 +1159,7 @@ bool Try_As_String(
                 num_codepoints,
                 BIN_LEN(bin)
             );
-            LINK(m_cast(REBBIN*, bin)).bookmarks = nullptr;
+            mutable_LINK(Bookmarks, m_cast(REBBIN*, bin)) = nullptr;
 
             // !!! TBD: cache index/offset
 

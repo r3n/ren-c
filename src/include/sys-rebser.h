@@ -605,24 +605,6 @@ union Reb_Series_Link {
     void *trash;
   #endif
 
-    // For a writable REBSTR, a list of entities that cache the mapping from
-    // index to character offset is maintained.  Without some help, it would
-    // be necessary to search from the head or tail of the string, character
-    // by character, to turn an index into an offset.  This is prohibitive.
-    //
-    // These bookmarks must be kept in sync.  How many bookmarks are kept
-    // should be reigned in proportionally to the length of the series.  As
-    // a first try of this strategy, singular arrays are being used.
-    //
-    struct Reb_Series *bookmarks;
-
-    // The REBFRM's `varlist` field holds a ready-made varlist for a frame,
-    // which may be reused.  However, when a stack frame is dropped it can
-    // only be reused by putting it in a place that future pushes can find
-    // it.  This is used to link a varlist into the reusable list.
-    //
-    struct Reb_Series *reuse;  // actually a REBARR
-
     // For LIBRARY!, the file descriptor.  This is set to NULL when the
     // library is not loaded.
     //
@@ -734,13 +716,6 @@ union Reb_Series_Misc {
     //
     int quoting_delta;
 
-    // The virtual binding patches keep a circularly linked list of all of
-    // their variations that have distinct next pointers.  This way, they
-    // can look through that list before creating an equivalent chain to one
-    // that already exists.
-    //
-    struct Reb_Series *variant;  // actually a REBARR*
-
     // If a REBSER is used by a custom cell type, it can use the MISC()
     // field how it likes.  But if it is a node and needs to be GC-marked,
     // it has to tell the system with SERIES_INFO_MISC_NODE_NEEDS_MARK.
@@ -778,7 +753,7 @@ struct Reb_Series {
     //
     // Use the LINK() macro to acquire this field...don't access directly.
     //
-    union Reb_Series_Link link_private;
+    union Reb_Series_Link link;
 
     // `content` is the sizeof(REBVAL) data for the series, which is thus
     // 4 platform pointers in size.  If the series is small enough, the header
@@ -818,7 +793,7 @@ struct Reb_Series {
     // !!! The forwarding feature is on a branch that stalled, but the notes
     // are kept here as a reminder of it--and why MISC() should be used.
     //
-    union Reb_Series_Misc misc_private;
+    union Reb_Series_Misc misc;
 
 #if defined(DEBUG_SERIES_ORIGINS) || defined(DEBUG_COUNT_TICKS)
     intptr_t *guard; // intentionally alloc'd and freed for use by Panic_Series
@@ -846,10 +821,15 @@ struct Reb_Series {
 
     struct Reb_Array : public Reb_Series {};
     typedef struct Reb_Array REBARR;
+
+    struct Reb_Bookmark_List : public Reb_Series {};
+    typedef struct Reb_Bookmark_List REBBMK;  // list of UTF-8 index=>offsets
+
 #else
     typedef struct Reb_Series REBBIN;
     typedef struct Reb_Series REBSTR;
     typedef struct Reb_Series REBARR;
+    typedef struct Reb_Series REBBMK;
 #endif
 
 
@@ -867,8 +847,6 @@ typedef REBARR REBGOB;
 
 typedef REBARR REBSTU;
 typedef REBARR REBFLD;
-
-typedef REBSER REBBMK;  // "bookmark" (list of UTF-8 index=>offsets)
 
 typedef REBBIN REBTYP;  // Rebol Type (list of hook function pointers)
 

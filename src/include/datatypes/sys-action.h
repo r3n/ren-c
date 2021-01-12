@@ -38,7 +38,7 @@
 // an archetype in the [0] position, it is different from a varlist because
 // the values have no correspondence with the keys.  Instead, this is the
 // instance data used by the C native "dispatcher" function (which lives in
-// LINK(details).dispatcher).
+// details->link.dispatcher).
 //
 // What the details array holds varies by dispatcher.  Some examples:
 //
@@ -205,8 +205,8 @@ inline static void INIT_VAL_ACTION_BINDING(
 #define ACT_SPECIALTY(a) \
     ARR(VAL_ACTION_SPECIALTY_OR_LABEL_NODE(ACT_ARCHETYPE(a)))
 
-#define LINK_PARTIALS_EXEMPLAR_NODE(a) \
-    LINK(a).custom.node
+#define LINK_PartialsExemplar_TYPE         REBCTX*
+#define LINK_PartialsExemplar_CAST         CTX
 
 inline static option(REBARR*) ACT_PARTIALS(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
@@ -218,7 +218,7 @@ inline static option(REBARR*) ACT_PARTIALS(REBACT *a) {
 inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
+        list = &LINK(PartialsExemplar, list)->varlist;  // no CTX_VARLIST yet
     assert(GET_ARRAY_FLAG(list, IS_VARLIST));
     return CTX(list);
 }
@@ -229,9 +229,9 @@ inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
 inline static REBSER *ACT_KEYLIST(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
+        list = &LINK(PartialsExemplar, list)->varlist;  // no CTX_VARLIST yet
     assert(GET_ARRAY_FLAG(list, IS_VARLIST));
-    return SER(LINK_KEYSOURCE(list));
+    return SER(LINK(KeySource, list));
 }
 
 #define ACT_KEYS_HEAD(a) \
@@ -245,13 +245,13 @@ inline static REBSER *ACT_KEYLIST(REBACT *a) {
 inline static REBPAR *ACT_PARAMS_HEAD(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = ARR(LINK_PARTIALS_EXEMPLAR_NODE(list));
+        list = &LINK(PartialsExemplar, list)->varlist;  // no CTX_VARLIST yet
     return cast(REBPAR*, list->content.dynamic.data) + 1;  // skip archetype
 }
 
 
 #define ACT_DISPATCHER(a) \
-    (LINK(ACT_DETAILS(a)).dispatcher)
+    ACT_DETAILS(a)->link.dispatcher
 
 #define DETAILS_AT(a,n) \
     SPECIFIC(ARR_AT((a), (n)))
@@ -289,12 +289,8 @@ inline static void Init_Key(REBKEY *dest, const REBSTR *spelling)
 // where information for HELP is saved, and it's how modules store out-of-band
 // information that doesn't appear in their body.
 
-#define ACT_META_NODE(a) \
-    MISC_META_NODE(ACT_DETAILS(a))
-
-#define ACT_META(a) \
-    CTX(ACT_META_NODE(a))
-
+#define mutable_ACT_META(a)     mutable_MISC(Meta, ACT_DETAILS(a))
+#define ACT_META(a)             MISC(Meta, ACT_DETAILS(a))
 
 
 inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
@@ -366,7 +362,8 @@ inline static void INIT_VAL_ACTION_LABEL(
 // The code for processing derivation is slightly different; it should be
 // unified more if possible.
 
-#define LINK_ANCESTOR(s)            SER(LINK_ANCESTOR_NODE(s))
+#define LINK_Ancestor_TYPE              REBSER*
+#define LINK_Ancestor_CAST              SER
 
 inline static bool Action_Is_Base_Of(REBACT *base, REBACT *derived) {
     if (derived == base)
@@ -378,7 +375,7 @@ inline static bool Action_Is_Base_Of(REBACT *base, REBACT *derived) {
         if (keylist_test == keylist_base)
             return true;
 
-        REBSER *ancestor = LINK_ANCESTOR(keylist_test);
+        REBSER *ancestor = LINK(Ancestor, keylist_test);
         if (ancestor == keylist_test)
             return false;  // signals end of the chain, no match found
 

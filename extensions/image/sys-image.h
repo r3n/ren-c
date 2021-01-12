@@ -33,6 +33,12 @@
 //   is made.  A `make image!` that did not use a foreign source could
 //   optimize this and consider it the binary owner, at same cost as R3-Alpha.
 
+#define LINK_Width_TYPE         intptr_t
+#define LINK_Width_CAST         (intptr_t)
+
+#define MISC_Height_TYPE        intptr_t
+#define MISC_Height_CAST        (intptr_t)
+
 extern REBTYP* EG_Image_Type;
 
 inline static REBVAL *VAL_IMAGE_BIN(REBCEL(const*) v) {
@@ -41,10 +47,10 @@ inline static REBVAL *VAL_IMAGE_BIN(REBCEL(const*) v) {
 }
 
 #define VAL_IMAGE_WIDTH(v) \
-    LINK(ARR(PAYLOAD(Any, v).first.node)).custom.i
+    mutable_LINK(Width, ARR(PAYLOAD(Any, v).first.node))
 
 #define VAL_IMAGE_HEIGHT(v) \
-    MISC(ARR(PAYLOAD(Any, v).first.node)).custom.i
+    mutable_MISC(Height, ARR(PAYLOAD(Any, v).first.node))
 
 inline static REBYTE *VAL_IMAGE_HEAD(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
@@ -98,8 +104,8 @@ inline static REBVAL *Init_Image(
 
     REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);
     Init_Binary(ARR_SINGLE(a), bin);
-    LINK(a).custom.i = width;  // see notes on why this isn't put on bin...
-    MISC(a).custom.i = height;  // (...it would corrupt shared series!)
+    mutable_LINK(Width, a) = width;  // see why this isn't put on bin...
+    mutable_MISC(Height, a) = height;  // (...it would corrupt shared series!)
 
     RESET_CUSTOM_CELL(out, EG_Image_Type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE(out, a);

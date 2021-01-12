@@ -56,6 +56,19 @@
     ((REBSTR*)nullptr)
 
 
+// For a writable REBSTR, a list of entities that cache the mapping from
+// index to character offset is maintained.  Without some help, it would
+// be necessary to search from the head or tail of the string, character
+// by character, to turn an index into an offset.  This is prohibitive.
+//
+// These bookmarks must be kept in sync.  How many bookmarks are kept
+// should be reigned in proportionally to the length of the series.  As
+// a first try of this strategy, singular arrays are being used.
+//
+#define LINK_Bookmarks_TYPE     REBBMK*  // alias for REBSER* at this time
+#define LINK_Bookmarks_CAST     (REBBMK*)SER
+
+
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // REBCHR(*) + REBCHR(const*): "ITERATOR" TYPE FOR SPECIFIC GOOD UTF-8 DATA
@@ -458,10 +471,10 @@ inline static REBLEN STR_LEN(const REBSTR *s) {
 
     if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
       #if defined(DEBUG_UTF8_EVERYWHERE)
-        if (MISC(s).length > SER_USED(s))  // includes 0xDECAFBAD
+        if (s->misc.length > SER_USED(s))  // includes 0xDECAFBAD
             panic(s);
       #endif
-        return MISC(s).length;
+        return s->misc.length;
     }
 
     // Have to do it the slow way if it's a symbol series...but hopefully
@@ -487,7 +500,7 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
 
     if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
       #if defined(DEBUG_UTF8_EVERYWHERE)
-        if (MISC(s).length > SER_USED(s))  // includes 0xDECAFBAD
+        if (s->misc.length > SER_USED(s))  // includes 0xDECAFBAD
             panic(s);
       #endif
 
@@ -512,7 +525,7 @@ inline static void SET_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
     assert(not IS_STR_SYMBOL(s));
 
     SET_SERIES_USED(s, used);
-    MISC(s).length = len;
+    s->misc.length = len;
 }
 
 inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
@@ -539,10 +552,10 @@ struct Reb_Bookmark {
 };
 
 #define BMK_INDEX(b) \
-    SER_HEAD(struct Reb_Bookmark, (b))->index
+    SER_HEAD(struct Reb_Bookmark, c_cast(REBBMK*, (b)))->index
 
 #define BMK_OFFSET(b) \
-    SER_HEAD(struct Reb_Bookmark, (b))->offset
+    SER_HEAD(struct Reb_Bookmark, c_cast(REBBMK*, (b)))->offset
 
 inline static REBBMK* Alloc_Bookmark(void) {
     REBSER *s = Make_Series_Core(
@@ -550,23 +563,23 @@ inline static REBBMK* Alloc_Bookmark(void) {
         sizeof(struct Reb_Bookmark),
         SERIES_FLAG_MANAGED  // LINK_NODE_NEEDS_MARK not neded if is bookmark
     );
-    LINK(s).bookmarks = nullptr;  // !!! efficiency by linking bookmarks?
+    mutable_LINK(Bookmarks, s) = nullptr;  // !!! efficiency by linking bookmarks?
     SET_SERIES_LEN(s, 1);
     CLEAR_SERIES_FLAG(s, MANAGED);  // manual but untracked (avoid leak error)
-    return s;
+    return cast(REBBMK*, s);
 }
 
 inline static void Free_Bookmarks_Maybe_Null(REBSTR *str) {
     assert(not IS_STR_SYMBOL(str));  // call on string
-    if (LINK(str).bookmarks) {
-        GC_Kill_Series(LINK(str).bookmarks);
-        LINK(str).bookmarks = nullptr;
+    if (LINK(Bookmarks, str)) {
+        GC_Kill_Series(LINK(Bookmarks, str));
+        mutable_LINK(Bookmarks, str) = nullptr;
     }
 }
 
 #if !defined(NDEBUG)
     inline static void Check_Bookmarks_Debug(REBSTR *s) {
-        REBBMK *bookmark = LINK(s).bookmarks;
+        REBBMK *bookmark = LINK(Bookmarks, s);
         if (not bookmark)
             return;
 
@@ -605,7 +618,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     assert(at <= STR_LEN(s));
 
     if (Is_Definitely_Ascii(s)) {  // can't have any false positives
-        assert(not LINK(s).bookmarks);  // mutations must ensure this
+        assert(not LINK(Bookmarks, s));  // mutations must ensure this
         return cast(REBCHR(*), cast(REBYTE*, STR_HEAD(s)) + at);
     }
 
@@ -614,7 +627,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
 
     REBBMK *bookmark = nullptr;  // updated at end if not nulled out
     if (not IS_STR_SYMBOL(s))
-        bookmark = LINK(s).bookmarks;
+        bookmark = LINK(Bookmarks, s);
 
   #if defined(DEBUG_SPORADICALLY_DROP_BOOKMARKS)
     if (bookmark and SPORADICALLY(100)) {
@@ -640,7 +653,8 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
             goto scan_from_head;  // good locality, avoid bookmark logic
         }
         if (not bookmark and not IS_STR_SYMBOL(s)) {
-            LINK(m_cast(REBSTR*, s)).bookmarks = bookmark = Alloc_Bookmark();
+            bookmark = Alloc_Bookmark();
+            mutable_LINK(Bookmarks, m_cast(REBSTR*, s)) = bookmark;
             goto scan_from_head;  // will fill in bookmark
         }
     }
@@ -654,7 +668,8 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
             goto scan_from_tail;  // good locality, avoid bookmark logic
         }
         if (not bookmark and not IS_STR_SYMBOL(s)) {
-            LINK(m_cast(REBSTR*, s)).bookmarks = bookmark = Alloc_Bookmark();
+            bookmark = Alloc_Bookmark();
+            mutable_LINK(Bookmarks, m_cast(REBSTR*, s)) = bookmark;
             goto scan_from_tail;  // will fill in bookmark
         }
     }
@@ -665,7 +680,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     // track the last access--which speeds up the most common case of an
     // iteration.  Improve as time permits!
     //
-    assert(not bookmark or not LINK(bookmark).bookmarks);  // only one for now
+    assert(not bookmark or not LINK(Bookmarks, bookmark));  // only one
 
   blockscope {
     REBLEN booked = BMK_INDEX(bookmark);
@@ -962,13 +977,13 @@ inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
         // dealing with.  Only update bookmark if it's an offset *after*
         // that character position...
         //
-        REBBMK *book = LINK(s).bookmarks;
+        REBBMK *book = LINK(Bookmarks, s);
         if (book and BMK_OFFSET(book) > cp_offset)
             BMK_OFFSET(book) += delta;
     }
 
   #ifdef DEBUG_UTF8_EVERYWHERE  // see note on `len` at start of function
-    MISC(s).length = len;
+    s->misc.length = len;
   #endif
 
     Encode_UTF8_Char(cp, c, size);

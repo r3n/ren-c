@@ -48,18 +48,21 @@
 #define FEED_SINGULAR(feed)     ARR(&(feed)->singular)
 #define FEED_SINGLE(feed)       SER_CELL(&(feed)->singular)
 
-#define LINK_SPLICE_NODE(s)     LINK(s).custom.node
-#define MISC_PENDING_NODE(s)    MISC(s).custom.node
+#define LINK_Splice_TYPE        REBARR*
+#define LINK_Splice_CAST        ARR
+
+#define MISC_Pending_TYPE       const RELVAL*
+#define MISC_Pending_CAST       (const RELVAL*)
 
 #define FEED_SPLICE(feed) \
-    cast(REBARR*, LINK_SPLICE_NODE(&(feed)->singular))
+    LINK(Splice, &(feed)->singular)
 
 // This contains an IS_END() marker if the next fetch should be an attempt
 // to consult the va_list (if any).  That end marker may be resident in
 // an array, or if it's a plain va_list source it may be the global END.
 //
 #define FEED_PENDING(feed) \
-    cast(const RELVAL*, MISC_PENDING_NODE(&(feed)->singular))
+    MISC(Pending, &(feed)->singular)
 
 #define FEED_IS_VARIADIC(feed)  IS_COMMA(FEED_SINGLE(feed))
 
@@ -229,7 +232,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             Move_Value(&feed->fetched, single);
             Quotify(
                 &feed->fetched,
-                QUOTING_BYTE(feed) + MISC(inst1).quoting_delta
+                QUOTING_BYTE(feed) + inst1->misc.quoting_delta
             );
             feed->value = &feed->fetched;
 
@@ -344,7 +347,7 @@ inline static void Fetch_Next_In_Feed(REBFED *feed) {
         assert(NOT_END(FEED_PENDING(feed)));
 
         feed->value = FEED_PENDING(feed);
-        MISC_PENDING_NODE(&feed->singular) = nullptr;
+        mutable_MISC(Pending, &feed->singular) = nullptr;
     }
     else if (FEED_IS_VARIADIC(feed)) {
         //
@@ -495,8 +498,8 @@ inline static REBFED* Alloc_Feed(void) {
             | FLAG_LEN_BYTE_OR_255(0)
     );
     Prep_Cell(FEED_SINGLE(feed));
-    LINK_SPLICE_NODE(&feed->singular) = nullptr;
-    MISC_PENDING_NODE(&feed->singular) = nullptr;
+    mutable_LINK(Splice, &feed->singular) = nullptr;
+    mutable_MISC(Pending, &feed->singular) = nullptr;
 
     return feed;
 }

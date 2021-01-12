@@ -111,12 +111,73 @@
 #endif
 
 
-#define LINK(s) \
-    ensure_series(s)->link_private
+//=//// LINK AND MISC HELPERS /////////////////////////////////////////////=//
+//
+// The GC has flags LINK_NEEDS_MARKED and MISC_NEEDS_MARKED which allow the
+// varied flavors of series to call out whether they need pointers inside of
+// their node to be further processed for marking.
+//
+// This generality comes at a cost in clarity for the source, because all of
+// the varied meanings which the link and misc fields might have need to be
+// assigned through the same named structure member.  (If they were given
+// different names in the union, the GC couldn't know which union field it
+// was supposed to read to mark.)
+//
+// The LINK() and MISC() macros try to mitigate this by letting callsites
+// that assign and read the link and misc fields of series nodes be different,
+// while still getting type checking.  They do this via token pasting, to
+// collaborate with definition macros.  For instance:
+//
+//      #define LINK_Bookmark_TYPE REBBMK*
+//      #define LINK_Bookmark_CAST (REBBMK*)SER
+//
+// These definitions let us build macros for doing RValue and LValue access
+// under a unique-looking reference, with type safety:
+//
+//      REBBMK *bookmark = LINK(Bookmark, series);
+//      mutable_LINK(Bookmark, series) = bookmark;
+//
+// These effectively expand to:
+//
+//      REBBMK *bookmark = (REBBMK*)SER((void*)series->link.custom.node);
+//      *((**REBBMK)series->link.custom.node) = bookmark;
+//
+// You get the desired properties of being easy to find cases of a particular
+// interpretation of the field, along with type checking on the assignment,
+// and a cast operation that does potentially heavy debug checks on the
+// extractionheavy-checking cast operation on the extraction.  (See
+// DEBUG_CHECK_CASTS for the C++ versions of SER(), ARR(), CTX()...)
+//
+// Note: C casts are used here to gloss the `const` status of the node.  The
+// caller is responsible for storing reads in the right constness for what
+// they know to be stored in the node.
+//
 
-#define MISC(s) \
-    ensure_series(s)->misc_private
+#define LINK(Field, s) \
+    LINK_##Field##_CAST((void*)(s)->link.custom.node)
 
+#define MISC(Field, s) \
+    MISC_##Field##_CAST((void*)(s)->misc.custom.node)
+
+#if defined(NDEBUG)
+    //
+    // Technically speaking, the debug versions below may risk causing
+    // problems in strict aliasing.  Haven't seen any cases of it...but just
+    // to be safe, the release build skips the cast and just assigns to the
+    // REBNOD* directly.
+
+    #define mutable_LINK(Field, s) \
+        (s)->link.custom.node
+
+    #define mutable_MISC(Field, s) \
+        (s)->misc.custom.node
+#else
+    #define mutable_LINK(Field, s) \
+        *(LINK_##Field##_TYPE*)(&(s)->link.custom.node)
+
+    #define mutable_MISC(Field, s) \
+        *(MISC_##Field##_TYPE*)(&(s)->misc.custom.node)
+#endif
 
 
 //
@@ -325,7 +386,7 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
     // strings.
     //
     if (GET_SERIES_FLAG(s, IS_STRING)) {
-        MISC(s).length = 0xDECAFBAD;
+        s->misc.length = 0xDECAFBAD;
         TOUCH_SERIES_IF_DEBUG(s);
     }
   #endif
@@ -982,14 +1043,14 @@ inline static REBSER *Alloc_Series_Node(REBFLGS flags) {
     s->header.bits = NODE_FLAG_NODE | flags | SERIES_FLAG_8_IS_TRUE;  // #1
 
   #if !defined(NDEBUG)
-    SAFETRASH_POINTER_IF_DEBUG(s->link_private.trash);  // #2
+    SAFETRASH_POINTER_IF_DEBUG(s->link.trash);  // #2
     memset(  // https://stackoverflow.com/q/57721104/
         cast(char*, &s->content.fixed),
         0xBD,
         sizeof(s->content)
     );  // #3 - #6
     memset(&s->info, 0xAE, sizeof(s->info));  // #7, caller sets SER_WIDE()
-    SAFETRASH_POINTER_IF_DEBUG(s->link_private.trash);  // #8
+    SAFETRASH_POINTER_IF_DEBUG(s->link.trash);  // #8
 
     TOUCH_SERIES_IF_DEBUG(s);  // tag current C stack as series origin in ASAN
     PG_Reb_Stats->Series_Made++;
