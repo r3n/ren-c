@@ -28,7 +28,7 @@
 // In Ren-C, there is an implicit END marker just past the last cell in the
 // capacity.  Allowing a SET_END() on this position could corrupt the END
 // signaling slot, which only uses a bit out of a Reb_Header sized item to
-// signal.  Use TERM_ARRAY_LEN() to safely terminate arrays and respect not
+// signal.  Use SET_SERIES_LEN() to safely terminate arrays and respect not
 // writing if it's past capacity.
 //
 // While many operations are shared in common with REBSER, there is a
@@ -121,39 +121,8 @@ inline static REBLEN ARR_LEN(const REBARR *a)
   { return SER_USED(a); }
 
 
-// Set length and also terminate.  This routine avoids conditionality in the
-// release build, which means it may overwrite a signal byte in a "read-only"
-// end (such as an Endlike_Header).  Not branching is presumed to perform
-// better, but cells that weren't ends already are writability checked.
-//
-// !!! Review if SERIES_FLAG_FIXED_SIZE should be calling this routine.  At
-// the moment, fixed size series merely can't expand, but it might be more
-// efficient if they didn't use any "appending" operators to get built.
-//
-inline static void TERM_ARRAY_LEN(REBARR *a, REBLEN len) {
-    assert(len < SER_REST(a));
-    SET_SERIES_LEN(a, len);
-
-  #if !defined(NDEBUG)
-    if (NOT_END(ARR_AT(a, len)))
-        ASSERT_CELL_WRITABLE_EVIL_MACRO(ARR_AT(a, len));
-  #endif
-    mutable_SECOND_BYTE(ARR_AT(a, len)->header.bits) = REB_0_END;
-}
-
-inline static void SET_ARRAY_LEN_NOTERM(REBARR *a, REBLEN len) {
-    SET_SERIES_LEN(a, len);  // call out non-terminating usages
-}
-
 inline static void RESET_ARRAY(REBARR *a) {
-    TERM_ARRAY_LEN(a, 0);
-}
-
-inline static void TERM_SERIES(REBSER *s) {
-    if (IS_SER_ARRAY(s))
-        TERM_ARRAY_LEN(ARR(s), SER_USED(s));
-    else
-        TERM_SEQUENCE(s);
+    SET_SERIES_LEN(a, 0);
 }
 
 

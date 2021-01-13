@@ -254,7 +254,7 @@ inline static void SET_GOB_OWNER(REBGOB *g, REBGOB *owner)
 
 #define GOB_STRING(g)       SER_HEAD(GOB_CONTENT(g))
 #define GOB_LEN(g)          ARR_LEN(GOB_PANE(g))
-#define SET_GOB_LEN(g,l)    TERM_ARRAY_LEN(GOB_PANE(g), (l))
+#define SET_GOB_LEN(g,l)    SET_SERIES_LEN(GOB_PANE(g), (l))
 #define GOB_HEAD(g)         SPECIFIC(ARR_HEAD(GOB_PANE(g)))
 
 #define GOB_BITMAP(g)   GOB_STRING(g)

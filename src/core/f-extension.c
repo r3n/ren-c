@@ -455,7 +455,7 @@ REBVAL *rebCollateExtension_internal(
         dispatchers,
         dispatchers_len
     );
-    TERM_ARRAY_LEN(a, IDX_COLLATOR_MAX);
+    SET_SERIES_LEN(a, IDX_COLLATOR_MAX);
 
     return Init_Block(Alloc_Value(), a);
 }

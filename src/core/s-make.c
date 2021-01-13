@@ -35,15 +35,14 @@
 //
 REBSTR *Make_String_Core(REBSIZ encoded_capacity, REBFLGS flags)
 {
-    REBSER *s = Make_Series_Core(
-        encoded_capacity + 1,  // +1 is for NUL terminator
-        sizeof(REBYTE),
+    REBBIN *bin = Make_Binary_Core(
+        encoded_capacity,  // binary includes room for '\0' terminator
         flags | SERIES_FLAG_IS_STRING
     );
-    s->misc.length = 0;
-    mutable_LINK(Bookmarks, s) = nullptr;  // generated on demand
-    TERM_SEQUENCE(s);
-    return STR(s);
+    bin->misc.length = 0;
+    mutable_LINK(Bookmarks, bin) = nullptr;  // generated on demand
+    *BIN_HEAD(bin) = '\0';  // zero length, so head = tail
+    return STR(bin);
 }
 
 

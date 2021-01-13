@@ -162,7 +162,7 @@ static REBBIN *MAKE_TO_Binary_Common(const REBVAL *arg)
     case REB_MONEY: {
         REBBIN *bin = Make_Binary(12);
         deci_to_binary(BIN_HEAD(bin), VAL_MONEY_AMOUNT(arg));
-        TERM_SEQUENCE_LEN(bin, 12);
+        TERM_BIN_LEN(bin, 12);
         return bin; }
 
     default:
@@ -564,7 +564,7 @@ REBTYPE(Binary)
         if (index == 0 and IS_SER_DYNAMIC(bin))
             Unbias_Series(bin, false);
 
-        TERM_SEQUENCE_LEN(bin, cast(REBLEN, index));
+        TERM_BIN_LEN(bin, cast(REBLEN, index));  // may have string alias
         RETURN (v); }
 
     //-- Creation:
@@ -650,11 +650,12 @@ REBTYPE(Binary)
         const REBYTE *bp = VAL_BINARY_SIZE_AT(&size, v);
 
         REBBIN *bin = Make_Binary(size);
-        TERM_SEQUENCE_LEN(bin, size);
 
         REBYTE *dp = BIN_HEAD(bin);
         for (; size > 0; --size, ++bp, ++dp)
             *dp = ~(*bp);
+
+        TERM_BIN_LEN(bin, size);
 
         return Init_Any_Series(D_OUT, REB_BINARY, bin); }
 

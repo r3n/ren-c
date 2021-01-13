@@ -1289,7 +1289,7 @@ REBNATIVE(default)
                     Move_Value(dest, D_OUT);
                 }
             }
-            TERM_ARRAY_LEN(composed, len);
+            SET_SERIES_LEN(composed, len);
             Freeze_Array_Shallow(composed);
             Force_Series_Managed(composed);
 
@@ -1467,9 +1467,9 @@ REBNATIVE(catch)
         Move_Value(ARR_AT(a, 0), label); // throw name
         CATCH_THROWN(ARR_AT(a, 1), D_OUT); // thrown value--may be null!
         if (IS_NULLED(ARR_AT(a, 1)))
-            TERM_ARRAY_LEN(a, 1); // trim out null value (illegal in block)
+            SET_SERIES_LEN(a, 1); // trim out null value (illegal in block)
         else
-            TERM_ARRAY_LEN(a, 2);
+            SET_SERIES_LEN(a, 2);
         return Init_Block(D_OUT, a);
     }
 

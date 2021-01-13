@@ -721,7 +721,11 @@ REBLEN Modify_String_Or_Binary(
         }
     }
 
-    ASSERT_SERIES_TERM(dst_ser);
+    // !!! SET_SERIES_USED() now corrupts the terminating byte, which notices
+    // problems when it's not synchronized.  Review why the above code does
+    // not always produce a legitimate termination.
+    //
+    TERM_SERIES_IF_NECESSARY(dst_ser);
 
     if (sym == SYM_APPEND)
         return 0;

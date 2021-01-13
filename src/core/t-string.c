@@ -849,9 +849,9 @@ REBTYPE(String)
         REBSIZ offset = VAL_OFFSET_FOR_INDEX(v, index);
         REBSIZ size_old = STR_SIZE(s);
 
-        Remove_Series_Units(s, offset, size);  // should keep terminator
+        Remove_Series_Units(s, offset, size);  // !!! at one time, kept term
         Free_Bookmarks_Maybe_Null(s);
-        SET_STR_LEN_SIZE(s, tail - len, size_old - size);  // no term needed
+        TERM_STR_LEN_SIZE(s, tail - len, size_old - size);
 
         RETURN (v); }
 

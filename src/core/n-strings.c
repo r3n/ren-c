@@ -848,6 +848,13 @@ REBNATIVE(find_script)
 
     REBVAL *arg = ARG(script);
 
+    // !!! The scanner requires binaries to end with '\0' at this time.  It
+    // should be able to take a length limit.  Hack around the problem by
+    // forcing termination on the binary.
+    //
+    if (IS_BINARY(arg))  // see BINARY_BAD_UTF8_TAIL_BYTE
+        TERM_BIN(m_cast(REBBIN*, VAL_BINARY(arg)));
+
     REBSIZ size;
     const REBYTE *bp = VAL_BYTES_AT(&size, arg);
 

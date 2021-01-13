@@ -227,10 +227,10 @@
 
 
 #define IS_SER_ARRAY(s) \
-    (WIDE_BYTE_OR_0(ensure_series(s)) == 0)
+    (WIDE_BYTE_OR_0(s) == 0)
 
 #define IS_SER_DYNAMIC(s) \
-    (LEN_BYTE_OR_255(ensure_series(s)) == 255)
+    (LEN_BYTE_OR_255(s) == 255)
 
 // These are series implementation details that should not be used by most
 // code.  But in order to get good inlining, they have to be in the header
@@ -382,32 +382,6 @@ inline static REBLEN SER_USED(const REBSER *s) {
     return len_byte == 255 ? s->content.dynamic.used : len_byte;
 }
 
-inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
-    if (LEN_BYTE_OR_255(s) == 255)
-        s->content.dynamic.used = used;
-    else {
-        assert(used < sizeof(s->content));
-        mutable_LEN_BYTE_OR_255(s) = used;
-    }
-
-  #if defined(DEBUG_UTF8_EVERYWHERE)
-    //
-    // Low-level series mechanics will manipulate the used field, but that's
-    // at the byte level.  The higher level string mechanics must be used on
-    // strings.
-    //
-    if (GET_SERIES_FLAG(s, IS_STRING)) {
-        s->misc.length = 0xDECAFBAD;
-        TOUCH_SERIES_IF_DEBUG(s);
-    }
-  #endif
-}
-
-inline static void SET_SERIES_LEN(REBSER *s, REBLEN len) {
-    assert(NOT_SERIES_FLAG(s, IS_STRING));  // use _LEN_SIZE
-    SET_SERIES_USED(s, len);
-}
-
 
 // Raw access does not demand that the caller know the contained type.  So
 // for instance a generic debugging routine might just want a byte pointer
@@ -479,6 +453,85 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
 #define SER_HEAD(t,s) \
     SER_AT(t, (s), 0)  // using SER_DATA_AT() vs. just SER_DATA() checks width
 
+
+// If a binary series is a string (or aliased as a string), it must have all
+// modifications keep it with valid UTF-8 content.  That includes having a
+// terminal `\0` byte.  Since there is a special code path for setting the
+// length in the case of aliased binaries, that's what enforces the 0 byte
+// rule...but if a binary is never aliased as a string it may not be
+// terminated.  It's always long enough to carry a terminator...and the
+// debug build sets binary-sized series tails to this byte to make sure that
+// they are formally terminated if they need to be.
+//
+#if !defined(NDEBUG)
+    #define BINARY_BAD_UTF8_TAIL_BYTE 0xFE
+#endif
+
+// !!! Review if SERIES_FLAG_FIXED_SIZE should be calling this routine.  At
+// the moment, fixed size series merely can't expand, but it might be more
+// efficient if they didn't use any "appending" operators to get built.
+//
+inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
+    if (LEN_BYTE_OR_255(s) == 255) {
+        s->content.dynamic.used = used;
+
+        // !!! See notes on TERM_SERIES_IF_NEEDED() for how array termination
+        // is slated to be a debug feature only.
+        //
+        if (IS_SER_ARRAY(s))
+            SET_END(SER_AT(RELVAL, s, used));
+    }
+    else {
+        assert(used < sizeof(s->content));
+        mutable_LEN_BYTE_OR_255(s) = used;
+
+        // !!! See notes on TERM_SERIES_IF_NEEDED() for how array termination
+        // is slated to be a debug feature only.
+        //
+        if (IS_SER_ARRAY(s)) {
+            if (used == 0)
+                SET_END(SER_HEAD(RELVAL, s));
+            else {
+                assert(used == 1);
+                assert(IS_END(SER_AT(RELVAL, s, 1)));
+            }
+        }
+    }
+
+  #if !defined(NDEBUG)
+    if (SER_WIDE(s) == 1) {  // presume BINARY! or ANY-STRING! (?)
+        REBYTE *tail = SER_AT(REBYTE, s, used);
+        *tail = BINARY_BAD_UTF8_TAIL_BYTE;  // make missing terminator obvious
+    }
+  #endif
+
+  #if defined(DEBUG_UTF8_EVERYWHERE)
+    //
+    // Low-level series mechanics will manipulate the used field, but that's
+    // at the byte level.  The higher level string mechanics must be used on
+    // strings.
+    //
+    if (GET_SERIES_FLAG(s, IS_STRING)) {
+        s->misc.length = 0xDECAFBAD;
+        TOUCH_SERIES_IF_DEBUG(s);
+    }
+  #endif
+}
+
+// See TERM_STRING_LEN_SIZE() for the code that maintains string invariants,
+// including the '\0' termination (this routine will corrupt the tail byte
+// in the debug build to catch violators.)
+//
+inline static void SET_SERIES_LEN(REBSER *s, REBLEN len) {
+    assert(NOT_SERIES_FLAG(s, IS_STRING));  // use _LEN_SIZE
+    SET_SERIES_USED(s, len);
+}
+
+#ifdef CPLUSPLUS_11  // catch cases when calling on REBSTR* directly
+    inline static void SET_SERIES_LEN(REBSTR *s, REBLEN len) = delete;
+#endif
+
+
 inline static REBYTE *SER_DATA_TAIL(size_t w, const_if_c REBSER *s)
   { return SER_DATA_AT(w, s, SER_USED(s)); }
 
@@ -525,62 +578,46 @@ inline static void EXPAND_SERIES_TAIL(REBSER *s, REBLEN delta) {
         SET_SERIES_USED(s, SER_USED(s) + delta);  // no termination implied
     else
         Expand_Series(s, SER_USED(s), delta);  // currently terminates
+}
 
-    // !!! R3-Alpha had a premise of not terminating arrays when it did not
-    // have to, but the invariants of when termination happened was unclear.
-    // Ren-C has tried to ferret out the places where termination was and
-    // wasn't happening via asserts and address sanitizer; while not "over
-    // terminating" redundantly.  To try and make it clear this does not
-    // terminate, we poison even if it calls into Expand_Series, which
-    // *does* terminate.
-    //
-  #if !defined(NDEBUG)
-    if (IS_SER_ARRAY(s)) {  // trash to ensure termination (if not implicit)
-        RELVAL *tail = SER_TAIL(RELVAL, s);
-        if (
-            IS_SER_DYNAMIC(s)  // don't overwrite INFO bits
-            and not (
-                IS_END(tail)
-                and (tail->header.bits & CELL_FLAG_PROTECTED)
-            )
-        ){
-            mutable_SECOND_BYTE(tail->header.bits) = REB_T_TRASH;
+
+//=//// SERIES TERMINATION ////////////////////////////////////////////////=//
+//
+// R3-Alpha had a concept of termination which was that all series had one
+// full-sized unit at their tail which was set to zero bytes.  Ren-C moves
+// away from this concept...it only has terminating '\0' on UTF-8 strings,
+// a reserved terminating *position* on binaries (in case they become
+// aliased as UTF-8 strings), and the debug build terminates arrays in order
+// to catch out-of-bounds accesses more easily:
+//
+// https://forum.rebol.info/t/1445
+//
+// Under this strategy, most of the termination is handled by the functions
+// that deal with their specific subclass (e.g. Make_String()).  But some
+// generic routines that memcpy() data behind the scenes needs to be sure it
+// maintains the invariant that the higher level routines want.
+//
+
+inline static void TERM_SERIES_IF_NECESSARY(REBSER *s)
+{
+    if (SER_WIDE(s) == 1) {
+        if (GET_SERIES_FLAG(s, IS_STRING))
+            *SER_TAIL(REBYTE, s) = '\0';
+        else {
+          #if !defined(NDEBUG)
+            *SER_TAIL(REBYTE, s) = BINARY_BAD_UTF8_TAIL_BYTE;
+          #endif
         }
     }
-    else if (SER_WIDE(s) == 1)  // presume BINARY! or ANY-STRING! (?)
-        *SER_DATA_TAIL(1, s) = 0xFE;  // invalid UTF-8 byte, e.g. poisonous
-    else {
-        // Assume other series (like GC_Mark_Stack) don't necessarily
-        // terminate.
-    }
-  #endif
-}
-
-//
-// Termination
-//
-
-inline static void TERM_SEQUENCE(REBSER *s) {
-    assert(not IS_SER_ARRAY(s));
-    memset(SER_DATA_AT(SER_WIDE(s), s, SER_USED(s)), 0, SER_WIDE(s));
-}
-
-inline static void TERM_SEQUENCE_LEN(REBSER *s, REBLEN len) {
-    SET_SERIES_LEN(s, len);
-    TERM_SEQUENCE(s);
+    else if (IS_SER_DYNAMIC(s) and IS_SER_ARRAY(s))
+        SET_END(SER_TAIL(RELVAL, s));
 }
 
 #ifdef NDEBUG
-    #define ASSERT_SERIES_TERM(s) \
-        NOOP
-
     #define ASSERT_SERIES_TERM_IF_NEEDED(s) \
         NOOP
 #else
-    #define ASSERT_SERIES_TERM(s) \
-        Assert_Series_Term_Core(s)
-
-    inline static void ASSERT_SERIES_TERM_IF_NEEDED(REBSER *s) {
+    inline static void ASSERT_SERIES_TERM_IF_NEEDED(const REBSER *s) {
         if (
             IS_SER_ARRAY(s)
             or (
@@ -1003,7 +1040,7 @@ inline static REBVAL *Init_Any_Series_At_Core(
     // that if they were valid UTF-8, they could be aliased as Rebol strings,
     // which are zero terminated.  So it's the rule.
     //
-    ASSERT_SERIES_TERM(s);
+    ASSERT_SERIES_TERM_IF_NEEDED(s);
 
     if (ANY_ARRAY_KIND(type))
         assert(IS_SER_ARRAY(s));

@@ -345,7 +345,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
         Manage_Series(type);
         Init_Custom_Datatype(Alloc_Tail_Array(a), type);
     }
-    TERM_ARRAY_LEN(a, 5);
+    SET_SERIES_LEN(a, 5);
 
     PG_Extension_Types = a;
 

@@ -802,7 +802,6 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
             }
         }
       #endif
-        TERM_SERIES(s);
         return;
     }
 
@@ -908,7 +907,6 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
   #endif
 
     assert(NOT_SERIES_FLAG(s, MARKED));
-    TERM_SERIES(s);
 }
 
 
@@ -1067,10 +1065,7 @@ void Remake_Series(REBSER *s, REBLEN units, REBYTE wide, REBFLGS flags)
     } else
         s->content.dynamic.used = 0;
 
-    if (IS_SER_ARRAY(s))
-        TERM_ARRAY_LEN(ARR(s), SER_USED(s));
-    else
-        TERM_SEQUENCE(s);
+    SET_SERIES_LEN(s, SER_USED(s));
 
   #ifdef DEBUG_UTF8_EVERYWHERE
     if (GET_SERIES_FLAG(s, IS_STRING) and not IS_STR_SYMBOL(STR(s))) {

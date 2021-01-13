@@ -45,7 +45,7 @@ void Startup_Data_Stack(REBLEN capacity)
     // The END marker will signal DS_PUSH() that it has run out of space,
     // and it will perform the allocation at that time.
     //
-    TERM_ARRAY_LEN(DS_Array, 1);
+    SET_SERIES_LEN(DS_Array, 1);
     ASSERT_ARRAY(DS_Array);
 
     // Reuse the expansion logic that happens on a DS_PUSH() to get the
@@ -295,7 +295,7 @@ void Expand_Data_Stack_May_Fail(REBLEN amount)
     // Update the end marker to serve as the indicator for when the next
     // stack push would need to expand.
     //
-    TERM_ARRAY_LEN(DS_Array, len_new);
+    SET_SERIES_LEN(DS_Array, len_new);
     assert(cell == ARR_TAIL(DS_Array));
 
     ASSERT_ARRAY(DS_Array);
@@ -322,25 +322,4 @@ REBARR *Pop_Stack_Values_Core(REBDSP dsp_start, REBFLGS flags)
 
     DS_DROP_TO(dsp_start);
     return array;
-}
-
-
-//
-//  Pop_Stack_Values_Into: C
-//
-// Pops computed values from the stack into an existing ANY-ARRAY.  The
-// index of that array will be updated to the insertion tail (/INTO protocol)
-//
-void Pop_Stack_Values_Into(REBVAL *into, REBDSP dsp_start) {
-    REBLEN len = DSP - dsp_start;
-    REBVAL *values = SPECIFIC(ARR_AT(DS_Array, dsp_start + 1));
-
-    VAL_INDEX_RAW(into) = Insert_Series(
-        VAL_SERIES_ENSURE_MUTABLE(into),
-        VAL_INDEX(into),
-        cast(REBYTE*, values), // stack only holds fully specified REBVALs
-        len // multiplied by width (sizeof(REBVAL)) in Insert_Series
-    );
-
-    DS_DROP_TO(dsp_start);
 }

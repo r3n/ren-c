@@ -310,7 +310,7 @@ static bool Subparse_Throws(
     Drop_Frame(f);
 
     if ((r == R_THROWN or IS_NULLED(out)) and collection)
-        TERM_ARRAY_LEN(unwrap(collection), collect_tail);  // abort rollback
+        SET_SERIES_LEN(unwrap(collection), collect_tail);  // abort rollback
 
     if (r == R_THROWN) {
         //
@@ -2752,7 +2752,7 @@ REBNATIVE(subparse)
             goto return_null;
 
         if (P_COLLECTION)
-            TERM_ARRAY_LEN(P_COLLECTION, collection_tail);
+            SET_SERIES_LEN(P_COLLECTION, collection_tail);
 
         FETCH_TO_BAR_OR_END(f);
         if (IS_END(P_RULE))  // no alternate rule
@@ -2779,14 +2779,14 @@ REBNATIVE(subparse)
 
   return_null:
     if (not IS_NULLED(ARG(collection)))  // fail -> drop COLLECT additions
-      TERM_ARRAY_LEN(P_COLLECTION, collection_tail);
+      SET_SERIES_LEN(P_COLLECTION, collection_tail);
 
     return Init_Nulled(D_OUT);
 
   return_thrown:
     if (not IS_NULLED(ARG(collection)))  // throw -> drop COLLECT additions
         if (VAL_THROWN_LABEL(D_OUT) != NATIVE_VAL(parse_accept))  // ...unless
-            TERM_ARRAY_LEN(P_COLLECTION, collection_tail);
+            SET_SERIES_LEN(P_COLLECTION, collection_tail);
 
     return R_THROWN;
 }

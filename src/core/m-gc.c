@@ -1068,12 +1068,6 @@ REBLEN Recycle_Core(bool shutdown, REBSER *sweeplist)
     PG_Reb_Stats->Mark_Count = 0;
   #endif
 
-    // WARNING: This terminates an existing open block.  This could be a
-    // problem if code is building a new value at the tail, but has not yet
-    // updated the TAIL marker.
-    //
-    TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));
-
     // The TG_Reuse list consists of entries which could grow to arbitrary
     // length, and which aren't being tracked anywhere.  Cull them during GC
     // in case the stack at one point got very deep and isn't going to use
@@ -1261,7 +1255,6 @@ void Startup_GC(void)
     // nested structures don't cause the C stack to overflow.
     //
     GC_Mark_Stack = Make_Series(100, sizeof(const REBNOD*));
-    TERM_SEQUENCE(GC_Mark_Stack);
 }
 
 

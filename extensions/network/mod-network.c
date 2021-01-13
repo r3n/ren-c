@@ -260,7 +260,7 @@ static REB_R Transport_Actor(
             // and could not keep the BINARY! up to date).  Ren-C tries to
             // operate with the binary in a valid state after every change.
             //
-            ASSERT_SERIES_TERM(VAL_BINARY(port_data));
+            ASSERT_SERIES_TERM_IF_NEEDED(VAL_BINARY(port_data));
         }
         else if (req->command == RDC_WRITE) {
             //

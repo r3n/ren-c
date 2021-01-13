@@ -199,7 +199,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         goto continue_unspecialized;
     }
 
-    TERM_ARRAY_LEN(varlist, num_slots);
+    SET_SERIES_LEN(varlist, num_slots);
     mutable_MISC(Meta, varlist) = nullptr;  // GC sees this, we must init
 
     return CTX(varlist);

@@ -180,7 +180,7 @@ static bool Get_Struct_Var(REBVAL *out, REBSTU *stu, const RELVAL *word)
             REBLEN n;
             for (n = 0; n < dimension; ++n)
                 get_scalar(ARR_AT(arr, n), stu, field, n);
-            TERM_ARRAY_LEN(arr, dimension);
+            SET_SERIES_LEN(arr, dimension);
             Init_Block(out, arr);
         }
         else
@@ -256,7 +256,7 @@ REBARR *Struct_To_Array(REBSTU *stu)
             REBLEN n;
             for (n = 0; n < dimension; n ++)
                 get_scalar(ARR_AT(init, n), stu, field, n);
-            TERM_ARRAY_LEN(init, dimension);
+            SET_SERIES_LEN(init, dimension);
             Init_Block(Alloc_Tail_Array(typespec), init);
         }
         else
@@ -1100,7 +1100,7 @@ REB_R MAKE_Struct(
     Init_Blank(FLD_AT(schema, IDX_FIELD_NAME));  // no symbol for structs
     Init_Blank(FLD_AT(schema, IDX_FIELD_OFFSET));  // the offset is not used
     Init_Unreadable_Void(FLD_AT(schema, IDX_FIELD_WIDE));  // will fill in
-    TERM_ARRAY_LEN(schema, IDX_FIELD_MAX);
+    SET_SERIES_LEN(schema, IDX_FIELD_MAX);
 
 //
 // PROCESS FIELDS
@@ -1151,7 +1151,7 @@ REB_R MAKE_Struct(
         Init_Unreadable_Void(FLD_AT(field, IDX_FIELD_NAME));
         Init_Integer(FLD_AT(field, IDX_FIELD_OFFSET), offset);
         Init_Unreadable_Void(FLD_AT(field, IDX_FIELD_WIDE));
-        TERM_ARRAY_LEN(field, IDX_FIELD_MAX);
+        SET_SERIES_LEN(field, IDX_FIELD_MAX);
 
         // Must be a word or a set-word, with set-words initializing
 

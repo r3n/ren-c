@@ -1152,7 +1152,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
                 ++count;
             }
             if (IS_END(src)) {
-                TERM_ARRAY_LEN(VAL_ARRAY_KNOWN_MUTABLE(res->data), len);
+                SET_SERIES_LEN(VAL_ARRAY_KNOWN_MUTABLE(res->data), len);
                 return count;
             }
             Blit_Relative(dest, src);  // same array--rare place we can do this

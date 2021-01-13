@@ -125,7 +125,7 @@ REBVAL *Make_Native(
         spec,
         &flags  // return type checked only in debug build
     );
-    ASSERT_SERIES_TERM(paramlist);
+    ASSERT_SERIES_TERM_IF_NEEDED(paramlist);
 
     // Natives are their own dispatchers; there is no point of interjection
     // to force their outputs to anything but what they return.  Instead of

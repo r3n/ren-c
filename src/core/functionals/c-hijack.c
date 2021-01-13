@@ -138,7 +138,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
         ++code;
     }
 
-    TERM_ARRAY_LEN(code_arr, code - ARR_HEAD(code_arr));
+    SET_SERIES_LEN(code_arr, code - ARR_HEAD(code_arr));
     Manage_Series(code_arr);
 
     DECLARE_LOCAL (first);
@@ -256,7 +256,7 @@ REBNATIVE(hijack)
         RELVAL *dest = ARR_HEAD(victim_details) + 1;
         for (; NOT_END(src); ++src, ++dest)
             Blit_Relative(dest, src);  // details may contain relative values
-        TERM_ARRAY_LEN(victim_details, details_len);
+        SET_SERIES_LEN(victim_details, details_len);
     }
     else {
         // A mismatch means there could be someone out there pointing at this
@@ -277,7 +277,7 @@ REBNATIVE(hijack)
             ARR_AT(victim_details, IDX_HIJACKER_HIJACKER),
             ARG(hijacker)
         );
-        TERM_ARRAY_LEN(victim_details, 2);
+        SET_SERIES_LEN(victim_details, 2);
     }
 
     // !!! What should be done about MISC(victim_paramlist).meta?  Leave it

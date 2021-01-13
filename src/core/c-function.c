@@ -622,7 +622,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         ++param;
     }
 
-    TERM_ARRAY_LEN(paramlist, num_slots);
+    SET_SERIES_LEN(paramlist, num_slots);
     Manage_Series(paramlist);
 
     SET_SERIES_USED(keylist, num_slots - 1);  // no terminator
@@ -707,7 +707,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         }
         assert(IS_END(param));
 
-        TERM_ARRAY_LEN(types_varlist, num_slots);
+        SET_SERIES_LEN(types_varlist, num_slots);
 
         Init_Object(
             CTX_VAR(*meta, STD_ACTION_META_PARAMETER_TYPES),
@@ -745,7 +745,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         }
         assert(IS_END(param));
 
-        TERM_ARRAY_LEN(notes_varlist, num_slots);
+        SET_SERIES_LEN(notes_varlist, num_slots);
 
         Init_Object(
             CTX_VAR(*meta, STD_ACTION_META_PARAMETER_NOTES),
@@ -928,7 +928,7 @@ REBACT *Make_Action(
 
     // Leave rest of the cells in the capacity uninitialized (caller fills in)
     //
-    TERM_ARRAY_LEN(details, details_capacity);
+    SET_SERIES_LEN(details, details_capacity);
 
     details->link.dispatcher = dispatcher; // level of indirection, hijackable
     mutable_MISC(Meta, details) = nullptr;  // caller can fill in

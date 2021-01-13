@@ -279,7 +279,7 @@ REBARR *Vector_To_Array(const REBVAL *vect)
     for (n = VAL_INDEX(vect); n < VAL_LEN_HEAD(vect); ++n, ++dest)
         Get_Vector_At(dest, vect, n);
 
-    TERM_ARRAY_LEN(arr, len);
+    SET_SERIES_LEN(arr, len);
     assert(IS_END(dest));
 
     return arr;

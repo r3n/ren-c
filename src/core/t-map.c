@@ -205,7 +205,7 @@ static void Rehash_Map(REBMAP *map)
             Move_Value(
                 &key[1], SPECIFIC(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))
             );
-            SET_ARRAY_LEN_NOTERM(pairlist, ARR_LEN(pairlist) - 2);
+            SET_SERIES_LEN(pairlist, ARR_LEN(pairlist) - 2);
         }
 
         REBLEN hash = Find_Key_Hashed(
@@ -216,7 +216,7 @@ static void Rehash_Map(REBMAP *map)
         // discard zombies at end of pairlist
         //
         while (IS_NULLED(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))) {
-            SET_ARRAY_LEN_NOTERM(pairlist, ARR_LEN(pairlist) - 2);
+            SET_SERIES_LEN(pairlist, ARR_LEN(pairlist) - 2);
         }
     }
 }
@@ -542,7 +542,7 @@ REBARR *Map_To_Array(const REBMAP *map, REBINT what)
         }
     }
 
-    TERM_ARRAY_LEN(a, dest - ARR_HEAD(a));
+    SET_SERIES_LEN(a, dest - ARR_HEAD(a));
     assert(IS_END(dest));
     return a;
 }

@@ -279,7 +279,7 @@ static void Startup_Empty_Array(void)
     REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
     Init_Blank(ARR_AT(a, 0));
     Init_Blank(ARR_AT(a, 1));
-    TERM_ARRAY_LEN(a, 2);
+    SET_SERIES_LEN(a, 2);
     Freeze_Array_Deep(a);
     PG_2_Blanks_Array = a;
   }

@@ -478,7 +478,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
         );
     }
 
-    TERM_ARRAY_LEN(copy, len);
+    SET_SERIES_LEN(copy, len);
 
     if (gather_lets) {
         //
@@ -520,9 +520,9 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
             }
             DS_DROP_TO(dsp_orig);
 
-            TERM_SEQUENCE_LEN(keylist, old_keylist_len + num_lets);
+            SET_SERIES_LEN(keylist, old_keylist_len + num_lets);
 
-            TERM_ARRAY_LEN(paramlist, old_keylist_len + num_lets + 1);
+            SET_SERIES_LEN(paramlist, old_keylist_len + num_lets + 1);
             SET_SERIES_FLAG(paramlist, FIXED_SIZE);
         }
     }

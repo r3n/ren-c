@@ -200,9 +200,7 @@ static REBBIN *Decode_Base2(const REBYTE **src, REBLEN len, REBYTE delim)
     }
     if (count) goto err; // improper modulus
 
-    *bp = 0;
-    SET_SERIES_LEN(bin, bp - BIN_HEAD(bin));
-    ASSERT_SERIES_TERM(bin);
+    TERM_BIN_LEN(bin, bp - BIN_HEAD(bin));
     return bin;
 
 err:
@@ -240,9 +238,7 @@ static REBBIN *Decode_Base16(const REBYTE **src, REBLEN len, REBYTE delim)
     }
     if (count & 1) goto err; // improper modulus
 
-    *bp = 0;
-    SET_SERIES_LEN(bin, bp - BIN_HEAD(bin));
-    ASSERT_SERIES_TERM(bin);
+    TERM_BIN_LEN(bin, bp - BIN_HEAD(bin));
     return bin;
 
 err:
@@ -315,9 +311,7 @@ static REBBIN *Decode_Base64(const REBYTE **src, REBLEN len, REBYTE delim)
 
     if (flip) goto err;
 
-    *bp = 0;
-    SET_SERIES_LEN(bin, bp - BIN_HEAD(bin));
-    ASSERT_SERIES_TERM(bin);
+    TERM_BIN_LEN(bin, bp - BIN_HEAD(bin));
     return bin;
 
 err:

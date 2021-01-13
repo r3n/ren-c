@@ -939,7 +939,7 @@ static REBVAL *callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
     for (i = 0; i != inv->cif->nargs; ++i, ++elem)
         ffi_to_rebol(elem, RIN_ARG_SCHEMA(inv->rin, i), inv->args[i]);
 
-    TERM_ARRAY_LEN(code, 1 + inv->cif->nargs);
+    SET_SERIES_LEN(code, 1 + inv->cif->nargs);
     Manage_Series(code);  // DO requires managed arrays (guarded while running)
 
     DECLARE_LOCAL (result);
@@ -1242,7 +1242,7 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
             );  // lifetime must match cif lifetime
     }
 
-    TERM_ARRAY_LEN(r, IDX_ROUTINE_MAX);
+    SET_SERIES_LEN(r, IDX_ROUTINE_MAX);
 
     return action;
 }

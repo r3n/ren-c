@@ -84,7 +84,7 @@ REBVAL *Append_Event(void)
     }
 
     REBARR *state_array = VAL_ARRAY_KNOWN_MUTABLE(state);
-    TERM_ARRAY_LEN(state_array, VAL_LEN_HEAD(state) + 1);
+    SET_SERIES_LEN(state_array, VAL_LEN_HEAD(state) + 1);
     return Init_Blank(ARR_LAST(state_array));
 }
 
@@ -199,7 +199,7 @@ REB_R Event_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         return r; }
 
     case SYM_CLEAR:
-        TERM_ARRAY_LEN(VAL_ARRAY_KNOWN_MUTABLE(state), 0);
+        SET_SERIES_LEN(VAL_ARRAY_KNOWN_MUTABLE(state), 0);
         CLR_SIGNAL(SIG_EVENT_PORT);
         RETURN (port);
 

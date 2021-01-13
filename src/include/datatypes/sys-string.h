@@ -523,14 +523,16 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
 
 inline static void SET_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
     assert(not IS_STR_SYMBOL(s));
-
-    SET_SERIES_USED(s, used);
+    assert(used == SER_USED(s));
     s->misc.length = len;
+    assert(*BIN_AT(s, used) == '\0');
 }
 
 inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
-    SET_STR_LEN_SIZE(s, len, used);
-    TERM_SEQUENCE(s);
+    assert(not IS_STR_SYMBOL(s));
+    SET_SERIES_USED(s, used);
+    s->misc.length = len;
+    *BIN_AT(s, used) = '\0';
 }
 
 
@@ -987,7 +989,7 @@ inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
   #endif
 
     Encode_UTF8_Char(cp, c, size);
-    ASSERT_SERIES_TERM(s);
+    ASSERT_SERIES_TERM_IF_NEEDED(s);
 }
 
 inline static REBLEN Num_Codepoints_For_Bytes(

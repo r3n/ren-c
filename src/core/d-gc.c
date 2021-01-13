@@ -196,7 +196,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             break;
 
         assert(SER_WIDE(s) == sizeof(REBYTE));
-        ASSERT_SERIES_TERM(s);
+        ASSERT_SERIES_TERM_IF_NEEDED(s);
         assert(Is_Marked(s));
         break; }
 
@@ -211,6 +211,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         const REBSER *s = VAL_SERIES(v);
+        ASSERT_SERIES_TERM_IF_NEEDED(s);
 
         assert(SER_WIDE(s) == sizeof(REBYTE));
         assert(Is_Marked(s));
@@ -298,11 +299,13 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_SET_GROUP:
       case REB_GET_GROUP:
       case REB_SYM_GROUP: {
-        if (GET_SERIES_INFO(ARR(VAL_NODE1(v)), INACCESSIBLE))
+        REBARR *a = ARR(VAL_NODE1(v));
+        if (GET_SERIES_INFO(a, INACCESSIBLE))
             break;
 
+        ASSERT_SERIES_TERM_IF_NEEDED(a);
+
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        const REBARR *a = VAL_ARRAY(v);
         assert(Is_Marked(a));
         break; }
 

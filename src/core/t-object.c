@@ -78,18 +78,12 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
         if (Try_Add_Binder_Index(
             &collector.binder, symbol, ARR_LEN(BUF_COLLECT))
         ){
-            //
-            // Wasn't already collected...so we added it...
-            //
-            TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));  // must term
             EXPAND_SERIES_TAIL(BUF_COLLECT, 1);
             Init_Word(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(word));
         }
         if (IS_END(word + 1))
             break; // fix bug#708
     }
-
-    TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));
 
   blockscope {  // Append new words to obj
     REBLEN len = CTX_LEN(c) + 1;
@@ -554,7 +548,7 @@ REBCTX *Copy_Context_Extra_Managed(
         Clonify(dest, flags, types);
     }
 
-    TERM_ARRAY_LEN(varlist, CTX_LEN(original) + 1);
+    SET_SERIES_LEN(varlist, CTX_LEN(original) + 1);
     varlist->leader.bits |= SERIES_MASK_VARLIST;
 
     REBCTX *copy = CTX(varlist); // now a well-formed context

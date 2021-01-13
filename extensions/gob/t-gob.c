@@ -91,7 +91,7 @@ REBGOB *Make_Gob(void)
     Init_XYF(ARR_AT(a, IDX_GOB_TYPE_AND_OLD_SIZE), 0, 0);
     GOB_TYPE(a) = GOBT_NONE;
 
-    TERM_ARRAY_LEN(a, IDX_GOB_MAX);
+    SET_SERIES_LEN(a, IDX_GOB_MAX);
     return a;  // REBGOB is-a REBARR
 }
 
@@ -237,7 +237,7 @@ static void Insert_Gobs(
 
     if (not pane) {
         pane = Make_Array_Core(count + 1, NODE_FLAG_MANAGED);
-        TERM_ARRAY_LEN(pane, count);
+        SET_SERIES_LEN(pane, count);
         index = 0;
     }
     else {

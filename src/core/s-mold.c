@@ -404,7 +404,7 @@ void Mold_Or_Form_Cell(
     bool form
 ){
     REBSTR *s = mo->series;
-    ASSERT_SERIES_TERM(s);
+    ASSERT_SERIES_TERM_IF_NEEDED(s);
 
     if (C_STACK_OVERFLOWING(&s))
         Fail_Stack_Overflow();
@@ -427,7 +427,7 @@ void Mold_Or_Form_Cell(
     MOLD_HOOK *hook = Mold_Or_Form_Hook_For_Type_Of(cell);
     hook(mo, cell, form);
 
-    ASSERT_SERIES_TERM(s);
+    ASSERT_SERIES_TERM_IF_NEEDED(s);
 }
 
 
@@ -602,7 +602,7 @@ void Push_Mold(REB_MOLD *mo)
     assert(mo->series == nullptr);  // Indicates not pushed, see DECLARE_MOLD
 
     REBSTR *s = MOLD_BUF;
-    ASSERT_SERIES_TERM(s);
+    ASSERT_SERIES_TERM_IF_NEEDED(s);
 
     mo->series = s;
     mo->offset = STR_SIZE(s);
@@ -693,7 +693,7 @@ void Throttle_Mold(REB_MOLD *mo) {
         REBUNI dummy;
         REBCHR(*) cp = SKIP_CHR(&dummy, tail, -(overage));
 
-        SET_STR_LEN_SIZE(
+        TERM_STR_LEN_SIZE(
             mo->series,
             STR_LEN(mo->series) - overage,
             STR_SIZE(mo->series) - (tail - cp)
@@ -717,7 +717,7 @@ void Throttle_Mold(REB_MOLD *mo) {
 REBSTR *Pop_Molded_String(REB_MOLD *mo)
 {
     assert(mo->series != nullptr);  // if null, there was no Push_Mold()
-    ASSERT_SERIES_TERM(mo->series);
+    ASSERT_SERIES_TERM_IF_NEEDED(mo->series);
 
     // Limit string output to a specified size to prevent long console
     // garbage output if MOLD_FLAG_LIMIT was set in Push_Mold().
@@ -754,7 +754,7 @@ REBBIN *Pop_Molded_Binary(REB_MOLD *mo)
 {
     assert(STR_LEN(mo->series) >= mo->offset);
 
-    ASSERT_SERIES_TERM(mo->series);
+    ASSERT_SERIES_TERM_IF_NEEDED(mo->series);
     Throttle_Mold(mo);
 
     REBSIZ size = STR_SIZE(mo->series) - mo->offset;

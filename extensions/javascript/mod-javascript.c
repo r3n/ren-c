@@ -715,6 +715,7 @@ REBNATIVE(js_native)
         &JavaScript_Dispatcher,
         IDX_JS_NATIVE_MAX  // details len [source module handle]
     );
+    SET_ACTION_FLAG(native, IS_NATIVE);
 
     assert(ACT_META(native) == nullptr);  // should default to nullptr
     mutable_ACT_META(native) = meta;
@@ -849,9 +850,6 @@ REBNATIVE(js_native)
         0,
         &cleanup_js_object
     );
-
-    TERM_ARRAY_LEN(details, IDX_JS_NATIVE_MAX);
-    SET_ACTION_FLAG(native, IS_NATIVE);
 
     return Init_Action(D_OUT, native, ANONYMOUS, UNBOUND);
 }

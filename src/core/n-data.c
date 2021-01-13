@@ -659,7 +659,7 @@ REBNATIVE(get)
             Move_Value(dest, temp);
     }
 
-    TERM_ARRAY_LEN(results, VAL_LEN_AT(source));
+    SET_SERIES_LEN(results, VAL_LEN_AT(source));
     return Init_Block(D_OUT, results);
 }
 
@@ -1154,7 +1154,7 @@ bool Try_As_String(
             SET_SERIES_FLAG(m_cast(REBBIN*, bin), IS_STRING);
             str = STR(bin);
 
-            SET_STR_LEN_SIZE(
+            TERM_STR_LEN_SIZE(
                 m_cast(REBSTR*, str),  // legal for tweaking cached data
                 num_codepoints,
                 BIN_LEN(bin)
@@ -1202,7 +1202,7 @@ bool Try_As_String(
 
         REBSTR *str = Make_String_Core(size, SERIES_FLAGS_NONE);
         memcpy(SER_DATA(str), utf8, size + 1);  // +1 to include '\0'
-        SET_STR_LEN_SIZE(str, len, size);
+        TERM_STR_LEN_SIZE(str, len, size);  // !!! SET_STR asserts size, review
         Freeze_Series(str);
         Init_Any_String(out, new_kind, str);
     }
@@ -1275,7 +1275,7 @@ REBNATIVE(as)
                 Blit_Relative(ARR_AT(a, 1), v);
                 mutable_KIND3Q_BYTE(ARR_AT(a, 1)) = REB_WORD;
                 mutable_HEART_BYTE(ARR_AT(a, 1)) = REB_WORD;
-                TERM_ARRAY_LEN(a, 2);
+                SET_SERIES_LEN(a, 2);
                 Init_Block(v, a);
                 break; }
 
@@ -1285,7 +1285,7 @@ REBNATIVE(as)
                 mutable_KIND3Q_BYTE(ARR_HEAD(a)) = REB_WORD;
                 mutable_HEART_BYTE(ARR_HEAD(a)) = REB_WORD;
                 Init_Blank(ARR_AT(a, 1));
-                TERM_ARRAY_LEN(a, 2);
+                SET_SERIES_LEN(a, 2);
                 Init_Block(v, a);
                 break; }
 

@@ -54,7 +54,7 @@ REBARR *Copy_Array_At_Extra_Shallow(
     for (; count < len; ++count, ++dest, ++src)
         Derelativize(dest, src, specifier);
 
-    TERM_ARRAY_LEN(copy, len);
+    SET_SERIES_LEN(copy, len);
 
     return copy;
 }
@@ -88,7 +88,7 @@ REBARR *Copy_Array_At_Max_Shallow(
     for (; count < max; ++count, ++src, ++dest)
         Derelativize(dest, src, specifier);
 
-    TERM_ARRAY_LEN(copy, max);
+    SET_SERIES_LEN(copy, max);
 
     return copy;
 }
@@ -119,7 +119,7 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
         Derelativize(dest, src, specifier);
     }
 
-    TERM_ARRAY_LEN(a, len);
+    SET_SERIES_LEN(a, len);
     return a;
 }
 
@@ -286,7 +286,7 @@ REBARR *Copy_Array_Core_Managed(
         );
     }
 
-    TERM_ARRAY_LEN(copy, len);
+    SET_SERIES_LEN(copy, len);
 
     return copy;
 }
@@ -351,7 +351,7 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
 
     }
 
-    TERM_ARRAY_LEN(copy, ARR_LEN(original));
+    SET_SERIES_LEN(copy, ARR_LEN(original));
 
     return copy;
 }
@@ -370,7 +370,7 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
 RELVAL *Alloc_Tail_Array(REBARR *a)
 {
     EXPAND_SERIES_TAIL(a, 1);
-    TERM_ARRAY_LEN(a, ARR_LEN(a));
+    SET_SERIES_LEN(a, ARR_LEN(a));
     RELVAL *last = ARR_LAST(a);
     TRASH_CELL_IF_DEBUG(last); // !!! was an END marker, good enough?
     return last;
