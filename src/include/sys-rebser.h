@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
@@ -210,7 +210,7 @@
 // This indicates that a series's LINK() field is the `custom` node element,
 // and should be marked (if not null).
 //
-// Note: Even if this flag is not set, *link.custom might still be a node*...
+// Note: Even if this flag is not set, *link.any might still be a node*...
 // just not one that should be marked.
 //
 #define SERIES_FLAG_LINK_NODE_NEEDS_MARK \
@@ -222,7 +222,7 @@
 // This indicates that a series's MISC() field is the `custom` node element,
 // and should be marked (if not null).
 //
-// Note: Even if this flag is not set, *misc.custom might still be a node*...
+// Note: Even if this flag is not set, *misc.any might still be a node*...
 // just not one that should be marked.
 //
 #define SERIES_FLAG_MISC_NODE_NEEDS_MARK \
@@ -491,10 +491,12 @@ STATIC_ASSERT(31 < 32);
 // REBSER to be distinguished from a REBVAL or a UTF-8 string and not run
 // afoul of strict aliasing requirements.
 //
-// There are 3 basic layouts which can be overlaid inside the union:
+// There are 3 basic layouts which can be overlaid inside the union (the
+// "leader" is the "header" with a different name to avoid uses which might
+// alias with bits initialized through REBVAL->header):
 //
-//      Dynamic: [header link [allocation tracking] info misc]
-//     Singular: [header link [REBVAL cell] info misc]
+//      Dynamic: [leader link [allocation tracking] info misc]
+//     Singular: [leader link [REBVAL cell] info misc]
 //      Pairing: [[REBVAL cell] [REBVAL cell]]
 //
 // The singular form has space the *size* of a cell, but can be addressed as
@@ -617,15 +619,12 @@ union Reb_Series_Link {
     //
     REBNAT dispatcher;
 
-    // If a REBSER is used by a custom cell type, it can use the LINK()
-    // field how it likes.  But if it is a node and needs to be GC-marked,
-    // it has to tell the system with SERIES_INFO_LINK_NODE_NEEDS_MARK.
+    // If a REBNOD* is stored in the link field, it has to use this union
+    // member for SERIES_INFO_LINK_NODE_NEEDS_MARK to see it.  To help make
+    // the reference sites be unique for each purpose and still be type safe,
+    // see the LINK() macro helpers.
     //
-    // Notable uses by extensions:
-    // 1. `parent` GOB of GOB! details
-    // 2. `next_req` REBREQ* of a REBREQ
-    //
-    union Reb_Any custom;
+    union Reb_Any any;
 };
 
 
@@ -677,24 +676,6 @@ union Reb_Series_Misc {
         int low:16;
     } bind_index;
 
-    // When copying arrays, it's necessary to keep a map from source series
-    // to their corresponding new copied series.  This allows multiple
-    // appearances of the same identities in the source to give corresponding
-    // appearances of the same *copied* identity in the target, and also is
-    // integral to avoiding problems with cyclic structures.
-    //
-    // As with the `bind_index` above, the cheapest way to build such a map is
-    // to put the forward into the series node itself.  However, when copying
-    // a generic series the bits are all used up.  So the ->misc field is
-    // temporarily "co-opted"...its content taken out of the node and put into
-    // the forwarding entry.  Then the index of the forwarding entry is put
-    // here.  At the end of the copy, all the ->misc fields are restored.
-    //
-    // !!! This feature was in a development branch that has stalled, but the
-    // field is kept here to keep track of the idea.
-    //
-    REBDSP forwarding;
-
     // Used on arrays for special instructions to Fetch_Next_In_Frame().
     //
     enum Reb_Api_Opcode opcode;
@@ -708,23 +689,18 @@ union Reb_Series_Misc {
     // to affect all values, it has to be stored somewhere that all
     // REBVALs would see a change--hence the field is in the series.
     //
-    // !!! This could be a SERIES_FLAG, e.g. BITSET_FLAG_IS_NEGATED
-    //
     bool negated;
 
     // rebQ() and rebU() use this with ARRAY_FLAG_INSTRUCTION_ADJUST_QUOTING.
     //
     int quoting_delta;
 
-    // If a REBSER is used by a custom cell type, it can use the MISC()
-    // field how it likes.  But if it is a node and needs to be GC-marked,
-    // it has to tell the system with SERIES_INFO_MISC_NODE_NEEDS_MARK.
+    // If a REBNOD* is stored in the misc field, it has to use this union
+    // member for SERIES_INFO_MISC_NODE_NEEDS_MARK to see it.  To help make
+    // the reference sites be unique for each purpose and still be type safe,
+    // see the MISC() macro helpers.
     //
-    // Notable uses by extensions:
-    // 1. `owner` of GOB! node
-    // 2. `port_ctx` of REBREQ ("link back to REBOL PORT! object")
-    //
-    union Reb_Any custom;
+    union Reb_Any any;
 };
 
 
@@ -788,17 +764,7 @@ union Reb_Series_Misc {
     union Reb_Header info;
 
     // This is the second pointer-sized piece of series data that is used
-    // for various purposes.  It is similar to ->link, however at some points
-    // it can be temporarily "corrupted", since copying extracts it into a
-    // forwarding entry and co-opts `misc.forwarding` to point to that entry.
-    // It can be recovered...but one must know one is copying and go through
-    // the forwarding.
-    //
-    // Currently it is assumed no one needs the ->misc while forwarding is in
-    // effect...but the MISC() macro checks that.  Don't access this directly.
-    //
-    // !!! The forwarding feature is on a branch that stalled, but the notes
-    // are kept here as a reminder of it--and why MISC() should be used.
+    // for various purposes, similar to link.
     //
     union Reb_Series_Misc misc;
 

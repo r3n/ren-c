@@ -52,7 +52,7 @@
 // lot of this central code inlinable.
 //
 #define LINK_FILENAME_HACK(s) \
-    cast(const REBSTR*, s->link.custom.node)
+    cast(const REBSTR*, s->link.any.node)
 
 
 // HEAD, TAIL, and LAST refer to specific value pointers in the array.  An

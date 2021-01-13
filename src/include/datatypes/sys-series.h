@@ -139,8 +139,8 @@
 //
 // These effectively expand to:
 //
-//      REBBMK *bookmark = (REBBMK*)SER((void*)series->link.custom.node);
-//      *((**REBBMK)series->link.custom.node) = bookmark;
+//      REBBMK *bookmark = (REBBMK*)SER((void*)series->link.any.node);
+//      *((**REBBMK)series->link.any.node) = bookmark;
 //
 // You get the desired properties of being easy to find cases of a particular
 // interpretation of the field, along with type checking on the assignment,
@@ -154,10 +154,10 @@
 //
 
 #define LINK(Field, s) \
-    LINK_##Field##_CAST(x_cast(REBNOD*, (s)->link.custom.node))
+    LINK_##Field##_CAST(x_cast(REBNOD*, (s)->link.any.node))
 
 #define MISC(Field, s) \
-    MISC_##Field##_CAST(x_cast(REBNOD*, (s)->misc.custom.node))
+    MISC_##Field##_CAST(x_cast(REBNOD*, (s)->misc.any.node))
 
 #if !defined(CPLUSPLUS_11)
     //
@@ -167,16 +167,16 @@
     // REBNOD* directly.
 
     #define mutable_LINK(Field, s) \
-        (s)->link.custom.node
+        (s)->link.any.node
 
     #define mutable_MISC(Field, s) \
-        (s)->misc.custom.node
+        (s)->misc.any.node
 #else
     #define mutable_LINK(Field, s) \
-        *(LINK_##Field##_TYPE*)(&(s)->link.custom.node)
+        *(LINK_##Field##_TYPE*)(&(s)->link.any.node)
 
     #define mutable_MISC(Field, s) \
-        *(MISC_##Field##_TYPE*)(&(s)->misc.custom.node)
+        *(MISC_##Field##_TYPE*)(&(s)->misc.any.node)
 #endif
 
 

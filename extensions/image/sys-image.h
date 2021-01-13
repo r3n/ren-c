@@ -47,10 +47,10 @@ inline static REBVAL *VAL_IMAGE_BIN(REBCEL(const*) v) {
 }
 
 #define VAL_IMAGE_WIDTH(v) \
-    ARR(VAL_NODE1(v))->link.custom.i
+    ARR(VAL_NODE1(v))->link.any.i
 
 #define VAL_IMAGE_HEIGHT(v) \
-    ARR(VAL_NODE1(v))->misc.custom.i
+    ARR(VAL_NODE1(v))->misc.any.i
 
 inline static REBYTE *VAL_IMAGE_HEAD(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
