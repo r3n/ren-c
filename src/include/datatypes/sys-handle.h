@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -20,33 +20,25 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// In Rebol terminology, a HANDLE! is a pointer to a function or data that
-// represents an arbitrary external resource.  While such data could also
-// be encoded as a BINARY! "blob" (as it might be in XML), the HANDLE! type
-// is intentionally "opaque" to user code so that it is a black box.
+// In R3-Alpha, a HANDLE! was just a cell that would hold an arbitrary C
+// data pointer.  The pointer was not shared as the cell was copied around...
+// so it could not be changed and reflected in other instances.
 //
-// Additionally, Ren-C added the idea of a garbage collector callback for
-// "Managed" handles.  This is implemented by means of making the handle cost
-// a single REBSER node shared among its instances, which is a "singular"
-// Array containing a canon value of the handle itself.  When there are no
-// references left to the handle and the GC runs, it will run a hook stored
-// in the ->misc field of the singular array.
+// Ren-C kept that "cheap" form, but also added a variant "managed" form of
+// HANDLE that keeps its data inside of a shared tracking node.  This means
+// that operations can change the data and have the change reflected in other
+// references to that handle.
 //
-// As an added benefit of the Managed form, the code and data pointers in the
-// value itself are not used; instead preferring the data held in the REBARR.
-// This allows one instance of a managed handle to have its code or data
-// pointer changed and be reflected in all instances.  The simple form of
-// handle however is such that each REBVAL copied instance is independent,
-// and changing one won't change the others.
+// Another feature of the managed form is that the node can hold a hook for
+// a "cleanup" function.  The GC will call this when there are no references
+// left to the handle.
 //
 ////=// NOTES /////////////////////////////////////////////////////////////=//
 //
-// * The ->extra field of the REBVAL may contain a singular REBARR that is
-//   leveraged for its GC-awareness.  This leverages the GC-aware ability of a
-//   REBSER to know when no references to the handle exist and call a cleanup
-//   function.  The GC-aware variant allocates a "singular" array, which is
-//   the exact size of a REBSER and carries the canon data.  If the cheaper
-//   kind that's just raw data and no callback, ->extra is null.
+// * The C language spec says that data pointers and function pointers on a
+//   platform may not be the same size.  Many codebases ignore this and
+//   assume that they are, but HANDLE! tries to stay on the right side of
+//   the spec and has different forms for functions and data.
 //
 
 #define INIT_VAL_HANDLE_SINGULAR        INIT_VAL_NODE1
@@ -63,31 +55,36 @@ inline static bool Is_Handle_Cfunc(REBCEL(const*) v) {
     return VAL_HANDLE_LENGTH_U(v) == 0;
 }
 
+inline static REBCEL(const*) VAL_HANDLE_CANON(REBCEL(const*) v) {
+    assert(CELL_KIND(v) == REB_HANDLE);
+    if (NOT_CELL_FLAG(v, FIRST_IS_NODE))
+        return v;  // changing handle instance won't be seen by copies
+    return ARR_SINGLE(VAL_HANDLE_SINGULAR(v));  // has shared node
+}
+
+inline static RELVAL *mutable_VAL_HANDLE_CANON(RELVAL *v) {
+    assert(IS_HANDLE(v));
+    if (NOT_CELL_FLAG(v, FIRST_IS_NODE))
+        return v;  // changing handle instance won't be seen by copies
+    return ARR_SINGLE(VAL_HANDLE_SINGULAR(v));  // has shared node
+}
+
 inline static uintptr_t VAL_HANDLE_LEN(REBCEL(const*) v) {
     assert(not Is_Handle_Cfunc(v));
-    if (GET_CELL_FLAG(v, FIRST_IS_NODE))
-        return VAL_HANDLE_LENGTH_U(ARR_SINGLE(VAL_HANDLE_SINGULAR(v)));
-    else
-        return VAL_HANDLE_LENGTH_U(v);
+    return VAL_HANDLE_LENGTH_U(VAL_HANDLE_CANON(v));
 }
 
 inline static void *VAL_HANDLE_VOID_POINTER(REBCEL(const*) v) {
     assert(not Is_Handle_Cfunc(v));
-    if (GET_CELL_FLAG(v, FIRST_IS_NODE))
-        return VAL_HANDLE_CDATA_P(ARR_SINGLE(VAL_HANDLE_SINGULAR(v)));
-    else
-        return VAL_HANDLE_CDATA_P(v);
+    return VAL_HANDLE_CDATA_P(VAL_HANDLE_CANON(v));
 }
 
-#define VAL_HANDLE_POINTER(t, v) \
-    cast(t *, VAL_HANDLE_VOID_POINTER(v))
+#define VAL_HANDLE_POINTER(T, v) \
+    cast(T*, VAL_HANDLE_VOID_POINTER(v))
 
 inline static CFUNC *VAL_HANDLE_CFUNC(REBCEL(const*) v) {
     assert(Is_Handle_Cfunc(v));
-    if (GET_CELL_FLAG(v, FIRST_IS_NODE))
-        return VAL_HANDLE_CFUNC_P(ARR_SINGLE(VAL_HANDLE_SINGULAR(v)));
-    else
-        return VAL_HANDLE_CFUNC_P(v);
+    return VAL_HANDLE_CFUNC_P(VAL_HANDLE_CANON(v));
 }
 
 inline static CLEANUP_CFUNC *VAL_HANDLE_CLEANER(REBCEL(const*) v) {
@@ -97,38 +94,20 @@ inline static CLEANUP_CFUNC *VAL_HANDLE_CLEANER(REBCEL(const*) v) {
     return VAL_HANDLE_SINGULAR(v)->misc.cleaner;
 }
 
-inline static void SET_HANDLE_LEN(RELVAL *v, uintptr_t length) {
-    assert(VAL_TYPE(v) == REB_HANDLE);
-    if (GET_CELL_FLAG(v, FIRST_IS_NODE))
-        VAL_HANDLE_LENGTH_U(ARR_SINGLE(VAL_HANDLE_SINGULAR(v))) = length;
-    else
-        VAL_HANDLE_LENGTH_U(v) = length;
-}
+inline static void SET_HANDLE_LEN(RELVAL *v, uintptr_t length)
+  { VAL_HANDLE_LENGTH_U(mutable_VAL_HANDLE_CANON(v)) = length; }
 
 inline static void SET_HANDLE_CDATA(RELVAL *v, void *cdata) {
-    assert(VAL_TYPE(v) == REB_HANDLE);
-    if (GET_CELL_FLAG(v, FIRST_IS_NODE)) {
-        REBARR *a = VAL_HANDLE_SINGULAR(v);
-        assert(VAL_HANDLE_LENGTH_U(ARR_SINGLE(a)) != 0);
-        VAL_HANDLE_CDATA_P(ARR_SINGLE(a)) = cdata;
-    }
-    else {
-        assert(VAL_HANDLE_LENGTH_U(v) != 0);
-        VAL_HANDLE_CDATA_P(v) = cdata;
-    }
+    RELVAL *canon = mutable_VAL_HANDLE_CANON(v);
+    assert(VAL_HANDLE_LENGTH_U(canon) != 0);
+    VAL_HANDLE_CDATA_P(canon) = cdata;
 }
 
 inline static void SET_HANDLE_CFUNC(RELVAL *v, CFUNC *cfunc) {
     assert(Is_Handle_Cfunc(v));
-    if (GET_CELL_FLAG(v, FIRST_IS_NODE)) {
-        REBARR *a = VAL_HANDLE_SINGULAR(v);
-        assert(VAL_HANDLE_LENGTH_U(ARR_SINGLE(a)) == 0);
-        VAL_HANDLE_CFUNC_P(ARR_SINGLE(a)) = cfunc;
-    }
-    else {
-        assert(VAL_HANDLE_LENGTH_U(v) == 0);
-        VAL_HANDLE_CFUNC_P(v) = cfunc;
-    }
+    RELVAL *canon = mutable_VAL_HANDLE_CANON(v);
+    assert(VAL_HANDLE_LENGTH_U(canon) == 0);
+    VAL_HANDLE_CFUNC_P(canon) = cfunc;
 }
 
 inline static REBVAL *Init_Handle_Cdata(
@@ -155,7 +134,7 @@ inline static REBVAL *Init_Handle_Cfunc(
     return cast(REBVAL*, out);
 }
 
-inline static void Init_Handle_Cdata_Managed_Common(
+inline static void Init_Handle_Managed_Common(
     RELVAL *out,
     uintptr_t length,
     CLEANUP_CFUNC *cleaner
@@ -186,7 +165,7 @@ inline static REBVAL *Init_Handle_Cdata_Managed(
     uintptr_t length,
     CLEANUP_CFUNC *cleaner
 ){
-    Init_Handle_Cdata_Managed_Common(out, length, cleaner);
+    Init_Handle_Managed_Common(out, length, cleaner);
 
     // Leave the non-singular cfunc as trash; clients should not be using
 
@@ -200,7 +179,7 @@ inline static REBVAL *Init_Handle_Cdata_Managed_Cfunc(
     CFUNC *cfunc,
     CLEANUP_CFUNC *cleaner
 ){
-    Init_Handle_Cdata_Managed_Common(out, 0, cleaner);
+    Init_Handle_Managed_Common(out, 0, cleaner);
 
     // Leave the non-singular cfunc as trash; clients should not be using
     
