@@ -416,9 +416,9 @@ void Assert_Series_Core(const REBSER *s)
         panic (s);
 
     assert(
-        GET_SERIES_INFO(s, 0_IS_TRUE) // @ NODE_FLAG_NODE
-        and NOT_SERIES_INFO(s, 1_IS_FALSE) // @ NOT(NODE_FLAG_FREE)
-        and NOT_SERIES_INFO(s, 7_IS_FALSE) // @ NODE_FLAG_CELL
+        GET_SERIES_INFO(s, 0_IS_TRUE)  // NODE_FLAG_NODE
+        and NOT_SERIES_INFO(s, 1_IS_FALSE)  // NOT(NODE_FLAG_FREE)
+        and GET_SERIES_INFO(s, 7_IS_TRUE)  // NODE_FLAG_CELL
     );
 
     assert(SER_USED(s) < SER_REST(s));

@@ -313,19 +313,15 @@ inline static void Free_Node(REBLEN pool_id, void *p)
 }
 
 
-//=////////////////////////////////////////////////////////////////////////=//
+//=//// POINTER DETECTION (UTF-8, SERIES, FREED SERIES, END) //////////////=//
 //
-// POINTER DETECTION (UTF-8, SERIES, FREED SERIES, END...)
-//
-//=////////////////////////////////////////////////////////////////////////=//
-//
-// Rebol's "nodes" all have a platform-pointer-sized header of bits, which
-// is constructed using byte-order-sensitive bit flags (see FLAG_LEFT_BIT and
-// related definitions).
+// Ren-C's "nodes" (REBVAL and REBSER derivatives) all have a platform-pointer
+// sized header of bits, which is constructed using byte-order-sensitive bit
+// flags (see FLAG_LEFT_BIT and related definitions for how those work).
 //
 // The values for the bits were chosen carefully, so that the leading byte of
-// Rebol structures could be distinguished from the leading byte of a UTF-8
-// string.  This is taken advantage of in the API.
+// REBVAL and REBSER could be distinguished from the leading byte of a UTF-8
+// string, as well as from each other.  This is taken advantage of in the API.
 //
 // During startup, Assert_Pointer_Detection_Working() checks invariants that
 // make this routine able to work.
@@ -343,18 +339,11 @@ enum Reb_Pointer_Detect {
     DETECTED_AS_END = 5 // may be a cell, or made with Endlike_Header()
 };
 
-// !!! Given how often this is called, would a 256 byte table mapping bytes
-// to types be worth it?  The function call could be avoided entirely.
-// Alternately, it could be folded into the UTF-8 detection so that the
-// invalid Rebol-oriented cases gave illegal codepoints...that way, it could
-// already be on its first step of a UTF-8 decode otherwise.
-//
-inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(
-    const void *p
-){
+inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(const void *p)
+{
     const REBYTE* bp = cast(const REBYTE*, p);
 
-    switch (bp[0] >> 4) {  // switch on the left 4 bits of the byte
+    switch (bp[0] >> 4) {  // 4 left bits: 0xbNFGK -> Node Free manaGed marKed
       case 0:
       case 1:
       case 2:
@@ -369,25 +358,29 @@ inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(
     // valid starting points for a UTF-8 string)
 
       case 8:  // 0xb1000
-        if (bp[1] == REB_0)
-            return DETECTED_AS_END;  // may be end cell or "endlike" header
-        if (bp[0] & 0x1)
+        if (bp[1] == REB_0) {
+            if (bp[0] & NODE_BYTEMASK_0x01_CELL)  // may be series info flags
+                return DETECTED_AS_END;
+            return DETECTED_AS_SERIES;
+        }
+        if (bp[0] & NODE_BYTEMASK_0x01_CELL)
             return DETECTED_AS_CELL;  // unmanaged
         return DETECTED_AS_SERIES;  // unmanaged
 
-      case 9:  // 0xb1001
+      case 9:  // 0xb1001 - marked bit set, should not see series in mid-GC
+        assert(bp[0] & NODE_BYTEMASK_0x01_CELL);  // must be cell / end header
         if (bp[1] == REB_0)
-            return DETECTED_AS_END;  // has to be an "endlike" header
-        assert(bp[0] & 0x1);  // marked and unmanaged, must be a cell
+            return DETECTED_AS_END;
         return DETECTED_AS_CELL;
 
       case 10:  // 0b1010
       case 11:  // 0b1011
-        if (bp[1] == REB_0)
-            return DETECTED_AS_END;
-        if (bp[0] & 0x1)
-            return DETECTED_AS_CELL; // managed, marked if `case 11`
-        return DETECTED_AS_SERIES; // managed, marked if `case 11`
+        if (bp[1] == REB_0) {
+            if (bp[0] & NODE_BYTEMASK_0x01_CELL)  // may be series info flags
+                return DETECTED_AS_END;  // managed, marked if `case 11`
+            return DETECTED_AS_SERIES;  // series that just has no [1] flags
+        }
+        return DETECTED_AS_SERIES;  // managed, marked if `case 11`
 
     // v-- bit sequences starting with `11` are *usually* legal multi-byte
     // valid starting points for UTF-8, with only the exceptions made for

@@ -81,6 +81,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
             //
             // Wasn't already collected...so we added it...
             //
+            TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));  // must term
             EXPAND_SERIES_TAIL(BUF_COLLECT, 1);
             Init_Word(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(word));
         }

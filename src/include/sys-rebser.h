@@ -117,11 +117,10 @@
     0 // helps locate places that want to say "no flags"
 
 
-// Detect_Rebol_Pointer() uses the fact that this bit is 0 for series headers
-// to discern between REBSER, REBVAL, and END.  If push comes to shove that
-// could be done differently, and this bit retaken.
+//=//// SERIES_FLAG_8 /////////////////////////////////////////////////////=//
 //
-#define SERIES_FLAG_8_IS_TRUE FLAG_LEFT_BIT(8) // CELL_FLAG_NOT_END
+#define SERIES_FLAG_8 \
+    FLAG_LEFT_BIT(8)
 
 
 //=//// SERIES_FLAG_FIXED_SIZE ////////////////////////////////////////////=//
@@ -331,8 +330,11 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
     FLAG_LEFT_BIT(6)
 
 
-#define SERIES_INFO_7_IS_FALSE FLAG_LEFT_BIT(7) // is NOT a cell
-STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
+// !!! Currently we lie here and act like a cell, because it allows the
+// END marker trick to work without sacrificing a SERIES_FLAG.
+//
+#define SERIES_INFO_7_IS_TRUE FLAG_LEFT_BIT(7)
+STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
 
 
 //=//// BITS 8-15 ARE FOR SER_WIDE() //////////////////////////////////////=//

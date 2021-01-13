@@ -551,15 +551,16 @@ e-lib/emit {
     /*
      * Since a C nullptr (pointer cast of 0) is used to represent the Rebol
      * `null` in the API, something different must be used to indicate the
-     * end of variadic input.  So a pointer to data is used where the first
-     * byte is illegal for starting UTF-8 (a continuation byte, first bit 1,
-     * second bit 0) and the second byte is 0.
+     * end of variadic input.  So a *pointer to data* is used where the first
+     * byte of that data is illegal for starting UTF-8 (a continuation byte,
+     * first bit 1, second bit 0).  The second byte is 0, coming from the
+     * '\0' implicit terminator of the C string literal.
      *
      * To Rebol, the first bit being 1 means it's a Rebol node, the second
      * that it is not in the "free" state.  The lowest bit in the first byte
-     * clear indicates it doesn't point to a "cell".  The SECOND_BYTE() is
-     * where the VAL_TYPE() of a cell is usually stored, and this being 0
-     * indicates an END marker.
+     * set suggests it points to a "cell"...though it doesn't.  But the
+     * SECOND_BYTE() is where the VAL_TYPE() of a cell is usually stored, and
+     * this being 0 indicates an END marker.
      *
      * Note: We use a `void*` for this because it needs to be suitable for
      * the same alignment as character.  The C++ build checks that void*
@@ -568,7 +569,7 @@ e-lib/emit {
      * something with another alignment).
      */
     #define rebEND \
-        ((const void*)"\x80")
+        ((const void*)"\x81")
 
     /*
      * SHORTHAND MACROS

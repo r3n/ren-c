@@ -256,7 +256,13 @@
 
 // Endlike headers have the second byte clear (to pass the IS_END() test).
 // But they also have leading bits `10` so they don't look like a UTF-8
-// string, and don't have NODE_FLAG_CELL set to prevents writing to them.
+// string.  They once did not have NODE_FLAG_CELL in order to prevent
+// being written to by cell routines...but the idea of endlike headers is
+// about to be phased out because arrays walks will terminate by reaching
+// the tail, not END.  So now they carry NODE_FLAG_CELL in order to make
+// Detect_Rebol_Pointer() able to distinguish from ordinary series that have
+// zero flags in their second byte...rather than sacrificing a bit in the
+// SERIES_FLAG set to avoid that situation.
 //
 // !!! One must be careful in reading and writing bits initialized via
 // different structure types.  As it is, setting and testing for ends is done
@@ -268,11 +274,11 @@
 inline static uintptr_t Endlike_Header(uintptr_t bits) {
     assert(
         0 == (bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
+            NODE_FLAG_NODE | NODE_FLAG_FREE
             | FLAG_SECOND_BYTE(255)
         ))
     );
-    return bits | NODE_FLAG_NODE;
+    return bits | NODE_FLAG_NODE | NODE_FLAG_CELL;
 }
 
 

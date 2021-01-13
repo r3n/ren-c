@@ -538,7 +538,7 @@ inline static void EXPAND_SERIES_TAIL(REBSER *s, REBLEN delta) {
     if (IS_SER_ARRAY(s)) {  // trash to ensure termination (if not implicit)
         RELVAL *tail = SER_TAIL(RELVAL, s);
         if (
-            (tail->header.bits & NODE_FLAG_CELL)
+            IS_SER_DYNAMIC(s)  // don't overwrite INFO bits
             and not (
                 IS_END(tail)
                 and (tail->header.bits & CELL_FLAG_PROTECTED)
@@ -1049,7 +1049,7 @@ inline static REBSER *Alloc_Series_Node(REBFLGS flags) {
     // or array of length 0!  Only one is set here.  The info should be
     // set by the caller, as should a terminator in the internal payload
 
-    s->leader.bits = NODE_FLAG_NODE | flags | SERIES_FLAG_8_IS_TRUE;  // #1
+    s->leader.bits = NODE_FLAG_NODE | flags;  // #1
 
   #if !defined(NDEBUG)
     SAFETRASH_POINTER_IF_DEBUG(s->link.trash);  // #2
@@ -1203,7 +1203,7 @@ inline static REBSER *Make_Series_Core(
     s->info.bits =
         SERIES_INFO_0_IS_TRUE
         // not SERIES_INFO_1_IS_FALSE
-        // not SERIES_INFO_7_IS_FALSE
+        | SERIES_INFO_7_IS_TRUE
         | FLAG_WIDE_BYTE_OR_0(wide);
 
     if (

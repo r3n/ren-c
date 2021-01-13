@@ -1401,12 +1401,6 @@ void Assert_Array_Core(const REBARR *a)
             }
         }
         assert(item == ARR_AT(a, rest - 1));
-
-        const RELVAL *ultimate = ARR_AT(a, rest - 1);
-        if (NOT_END(ultimate) or (ultimate->header.bits & NODE_FLAG_CELL)) {
-            printf("Implicit termination/unwritable END missing from array\n");
-            panic (a);
-        }
     }
 
 }

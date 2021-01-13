@@ -836,6 +836,7 @@ inline static void Drop_Action(REBFRM *f) {
 
         assert(0 == (f->varlist->info.bits & ~(  // <- note bitwise not
             SERIES_INFO_0_IS_TRUE  // parallels NODE_FLAG_NODE
+            | SERIES_INFO_7_IS_TRUE
             | FLAG_WIDE_BYTE_OR_0(0)  // don't mask out wide (0 for arrays))
             | FLAG_LEN_BYTE_OR_255(255)  // mask out non-dynamic-len (dynamic)
         )));
