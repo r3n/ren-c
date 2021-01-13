@@ -781,7 +781,7 @@ inline static const REBSTR* VAL_WORD_SPELLING(REBCEL(const*) v);
 
 inline static const REBSTR *VAL_STRING(REBCEL(const*) v) {
     if (ANY_STRING_KIND(CELL_HEART(v)))
-        return STR(VAL_NODE(v));  // VAL_SERIES() would assert
+        return STR(VAL_NODE1(v));  // VAL_SERIES() would assert
 
     return VAL_WORD_SPELLING(v);  // asserts ANY_WORD_KIND() for heart
 }

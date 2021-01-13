@@ -35,10 +35,10 @@
 extern REBTYP *EG_Vector_Type;
 
 #define VAL_VECTOR_BINARY(v) \
-    VAL(PAYLOAD(Any, (v)).first.node)  // pairing[0]
+    VAL(VAL_NODE1(v))  // pairing[0]
 
 #define VAL_VECTOR_SIGN_INTEGRAL_WIDE(v) \
-    PAIRING_KEY(VAL(PAYLOAD(Any, (v)).first.node))  // pairing[1]
+    PAIRING_KEY(VAL(VAL_NODE1(v)))  // pairing[1]
 
 #define VAL_VECTOR_SIGN(v) \
     PAYLOAD(Any, VAL_VECTOR_SIGN_INTEGRAL_WIDE(v)).first.flag
@@ -64,7 +64,7 @@ inline static REBYTE VAL_VECTOR_WIDE(REBCEL(const*) v) {  // "wide" REBSER term
 
 inline static REBYTE *VAL_VECTOR_HEAD(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Vector_Type);
-    REBVAL *binary = VAL(PAYLOAD(Any, v).first.node);
+    REBVAL *binary = VAL(VAL_NODE1(v));
     return BIN_HEAD(VAL_BINARY_ENSURE_MUTABLE(binary));
 }
 
@@ -102,7 +102,7 @@ inline static REBVAL *Init_Vector(
     EXTRA(Any, siw).i32 = bitsize / 8;  // e.g. VAL_VECTOR_WIDE()
 
     Manage_Pairing(paired);
-    INIT_VAL_NODE(out, paired);
+    INIT_VAL_NODE1(out, paired);
     return cast(REBVAL*, out);
 }
 

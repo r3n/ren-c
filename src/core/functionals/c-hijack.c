@@ -236,8 +236,10 @@ REBNATIVE(hijack)
         // exemplar.  Update the specialty regardless of whether the paramlist
         // matched *exactly* (Note: paramlist determined from the specialty)
         //
-        VAL_ACTION_SPECIALTY_OR_LABEL_NODE(victim_archetype)
-            = NOD(ACT_SPECIALTY(hijacker));
+        INIT_VAL_ACTION_SPECIALTY_OR_LABEL(
+            victim_archetype,
+            ACT_SPECIALTY(hijacker)
+        );
 
         // !!! It may be worth it to optimize some dispatchers to depend on
         // ARR_SINGLE(info) being correct.  That would mean hijack reversals

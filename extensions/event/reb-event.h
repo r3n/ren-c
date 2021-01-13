@@ -99,10 +99,10 @@ enum {
     mutable_FOURTH_BYTE(EXTRA(Any, (v)).u)
 
 #define VAL_EVENT_NODE(v) \
-    VAL_NODE(v)
+    VAL_NODE1(v)
 
 #define SET_VAL_EVENT_NODE(v,p) \
-    INIT_VAL_NODE((v), (p))
+    INIT_VAL_NODE1((v), (p))
 
 #define VAL_EVENT_DATA(v) \
     PAYLOAD(Any, (v)).second.u

@@ -388,7 +388,7 @@ REB_R MAKE_Varargs(
             Move_Value(ARR_SINGLE(array1), arg);
 
         RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
-        VAL_VARARGS_PHASE_NODE(out) = nullptr;
+        INIT_VAL_VARARGS_PHASE(out, nullptr);
         UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));  // trashes in C++11
         INIT_VAL_VARARGS_BINDING(out, array1);
 

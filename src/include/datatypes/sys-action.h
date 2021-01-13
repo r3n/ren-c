@@ -144,11 +144,9 @@
 #define CELL_MASK_ACTION \
     (CELL_FLAG_FIRST_IS_NODE | CELL_FLAG_SECOND_IS_NODE)
 
-#define VAL_ACTION_DETAILS_NODE(v) \
-    PAYLOAD(Any, (v)).first.node  // lvalue, but a node
-
-#define VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v) \
-    PAYLOAD(Any, (v)).second.node  // lvalue, but a node
+#define INIT_VAL_ACTION_DETAILS                         INIT_VAL_NODE1
+#define VAL_ACTION_SPECIALTY_OR_LABEL(v)                SER(VAL_NODE2(v))
+#define INIT_VAL_ACTION_SPECIALTY_OR_LABEL              INIT_VAL_NODE2
 
 
 inline static REBARR *ACT_DETAILS(REBACT *a) {
@@ -195,7 +193,7 @@ inline static void INIT_VAL_ACTION_BINDING(
 //
 
 #define ACT_SPECIALTY(a) \
-    ARR(VAL_ACTION_SPECIALTY_OR_LABEL_NODE(ACT_ARCHETYPE(a)))
+    ARR(VAL_NODE2(ACT_ARCHETYPE(a)))
 
 #define LINK_PartialsExemplar_TYPE         REBCTX*
 #define LINK_PartialsExemplar_CAST         CTX
@@ -287,7 +285,7 @@ inline static void Init_Key(REBKEY *dest, const REBSTR *spelling)
 
 inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION); // so it works on literals
-    REBSER *s = SER(VAL_ACTION_DETAILS_NODE(v));
+    REBSER *s = SER(VAL_NODE1(v));
     if (GET_SERIES_INFO(s, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return ACT(s);
@@ -310,7 +308,7 @@ inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
 
 inline static const REBSTR *VAL_ACTION_LABEL(REBCEL(const *) v) {
     assert(CELL_HEART(v) == REB_ACTION);
-    REBSER *s = SER(VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v));
+    REBSER *s = VAL_ACTION_SPECIALTY_OR_LABEL(v);
     if (IS_SER_ARRAY(s))
         return ANONYMOUS;  // archetype (e.g. may live in paramlist[0] itself)
     return STR(s);
@@ -322,11 +320,9 @@ inline static void INIT_VAL_ACTION_LABEL(
 ){
     ASSERT_CELL_WRITABLE_EVIL_MACRO(v);  // archetype R/O
     if (label)
-        VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v)
-            = NOD(m_cast(REBSTR*, unwrap(label)));
+        INIT_VAL_ACTION_SPECIALTY_OR_LABEL(v, unwrap(label));
     else
-        VAL_ACTION_SPECIALTY_OR_LABEL_NODE(v)
-            = NOD(ACT_SPECIALTY(VAL_ACTION(v)));
+        INIT_VAL_ACTION_SPECIALTY_OR_LABEL(v, ACT_SPECIALTY(VAL_ACTION(v)));
 }
 
 
@@ -444,7 +440,7 @@ static inline REBVAL *Init_Action_Core(
     Force_Series_Managed(ACT_DETAILS(a));
 
     RESET_VAL_HEADER(out, REB_ACTION, CELL_MASK_ACTION);
-    VAL_ACTION_DETAILS_NODE(out) = NOD(ACT_DETAILS(a));
+    INIT_VAL_ACTION_DETAILS(out, ACT_DETAILS(a));
     INIT_VAL_ACTION_LABEL(out, label);
     INIT_VAL_ACTION_BINDING(out, binding);
 

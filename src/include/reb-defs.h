@@ -109,7 +109,15 @@ typedef uint_fast32_t REBUNI;
 //=//// MEMORY POOLS //////////////////////////////////////////////////////=//
 //
 typedef struct rebol_mem_pool REBPOL;
-typedef struct Reb_Node REBNOD;
+
+#ifdef CPLUSPLUS_11
+    typedef struct Reb_Node REBNOD;
+#else
+    typedef void REBNOD;
+#endif
+
+struct Reb_Pool_Unit;
+typedef struct Reb_Pool_Unit REBPIT;
 
 
 //=//// "RAW" CELLS ///////////////////////////////////////////////////////=//
@@ -275,7 +283,11 @@ typedef struct Reb_Map REBMAP;
 
 //=//// BINDING ///////////////////////////////////////////////////////////=//
 
-struct Reb_Node;
+#ifdef CPLUSPLUS_11
+    struct Reb_Node {};  // used as empty base class for REBSER + REBVAL
+#else
+    struct Reb_Node { REBYTE first; };  // REBNOD is void*, but define struct
+#endif
 
 struct Reb_Binder;
 struct Reb_Collector;

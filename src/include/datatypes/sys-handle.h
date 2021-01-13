@@ -49,20 +49,13 @@
 //   kind that's just raw data and no callback, ->extra is null.
 //
 
-#define VAL_HANDLE_SINGULAR_NODE(v) \
-    PAYLOAD(Any, (v)).first.node
+#define INIT_VAL_HANDLE_SINGULAR        INIT_VAL_NODE1
+#define VAL_HANDLE_SINGULAR(v)          ARR(VAL_NODE1(v))
 
-#define VAL_HANDLE_SINGULAR(v) \
-    ARR(PAYLOAD(Any, (v)).first.node)
+#define VAL_HANDLE_LENGTH_U(v)          PAYLOAD(Any, (v)).second.u
 
-#define VAL_HANDLE_LENGTH_U(v) \
-    PAYLOAD(Any, (v)).second.u
-
-#define VAL_HANDLE_CDATA_P(v) \
-    EXTRA(Any, (v)).p
-
-#define VAL_HANDLE_CFUNC_P(v) \
-    EXTRA(Any, (v)).cfunc
+#define VAL_HANDLE_CDATA_P(v)           EXTRA(Any, (v)).p
+#define VAL_HANDLE_CFUNC_P(v)           EXTRA(Any, (v)).cfunc
 
 
 inline static bool Is_Handle_Cfunc(REBCEL(const*) v) {
@@ -72,18 +65,16 @@ inline static bool Is_Handle_Cfunc(REBCEL(const*) v) {
 
 inline static uintptr_t VAL_HANDLE_LEN(REBCEL(const*) v) {
     assert(not Is_Handle_Cfunc(v));
-    REBARR *a = VAL_HANDLE_SINGULAR(v);
-    if (a)
-        return VAL_HANDLE_LENGTH_U(ARR_SINGLE(a));
+    if (GET_CELL_FLAG(v, FIRST_IS_NODE))
+        return VAL_HANDLE_LENGTH_U(ARR_SINGLE(VAL_HANDLE_SINGULAR(v)));
     else
         return VAL_HANDLE_LENGTH_U(v);
 }
 
 inline static void *VAL_HANDLE_VOID_POINTER(REBCEL(const*) v) {
     assert(not Is_Handle_Cfunc(v));
-    REBARR *a = VAL_HANDLE_SINGULAR(v);
-    if (a)
-        return VAL_HANDLE_CDATA_P(ARR_SINGLE(a));
+    if (GET_CELL_FLAG(v, FIRST_IS_NODE))
+        return VAL_HANDLE_CDATA_P(ARR_SINGLE(VAL_HANDLE_SINGULAR(v)));
     else
         return VAL_HANDLE_CDATA_P(v);
 }
@@ -93,34 +84,31 @@ inline static void *VAL_HANDLE_VOID_POINTER(REBCEL(const*) v) {
 
 inline static CFUNC *VAL_HANDLE_CFUNC(REBCEL(const*) v) {
     assert(Is_Handle_Cfunc(v));
-    REBARR *a = VAL_HANDLE_SINGULAR(v);
-    if (a)
-        return VAL_HANDLE_CFUNC_P(ARR_SINGLE(a));
+    if (GET_CELL_FLAG(v, FIRST_IS_NODE))
+        return VAL_HANDLE_CFUNC_P(ARR_SINGLE(VAL_HANDLE_SINGULAR(v)));
     else
         return VAL_HANDLE_CFUNC_P(v);
 }
 
 inline static CLEANUP_CFUNC *VAL_HANDLE_CLEANER(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_HANDLE);
-    REBARR *a = VAL_HANDLE_SINGULAR(v);
-    if (not a)
+    if (NOT_CELL_FLAG(v, FIRST_IS_NODE))
         return nullptr;
-    return a->misc.cleaner;
+    return VAL_HANDLE_SINGULAR(v)->misc.cleaner;
 }
 
 inline static void SET_HANDLE_LEN(RELVAL *v, uintptr_t length) {
     assert(VAL_TYPE(v) == REB_HANDLE);
-    REBARR *a = VAL_HANDLE_SINGULAR(v);
-    if (a)
-        VAL_HANDLE_LENGTH_U(ARR_SINGLE(a)) = length;
+    if (GET_CELL_FLAG(v, FIRST_IS_NODE))
+        VAL_HANDLE_LENGTH_U(ARR_SINGLE(VAL_HANDLE_SINGULAR(v))) = length;
     else
         VAL_HANDLE_LENGTH_U(v) = length;
 }
 
 inline static void SET_HANDLE_CDATA(RELVAL *v, void *cdata) {
     assert(VAL_TYPE(v) == REB_HANDLE);
-    REBARR *a = VAL_HANDLE_SINGULAR(v);
-    if (a) {
+    if (GET_CELL_FLAG(v, FIRST_IS_NODE)) {
+        REBARR *a = VAL_HANDLE_SINGULAR(v);
         assert(VAL_HANDLE_LENGTH_U(ARR_SINGLE(a)) != 0);
         VAL_HANDLE_CDATA_P(ARR_SINGLE(a)) = cdata;
     }
@@ -132,8 +120,8 @@ inline static void SET_HANDLE_CDATA(RELVAL *v, void *cdata) {
 
 inline static void SET_HANDLE_CFUNC(RELVAL *v, CFUNC *cfunc) {
     assert(Is_Handle_Cfunc(v));
-    REBARR *a = VAL_HANDLE_SINGULAR(v);
-    if (a) {
+    if (GET_CELL_FLAG(v, FIRST_IS_NODE)) {
+        REBARR *a = VAL_HANDLE_SINGULAR(v);
         assert(VAL_HANDLE_LENGTH_U(ARR_SINGLE(a)) == 0);
         VAL_HANDLE_CFUNC_P(ARR_SINGLE(a)) = cfunc;
     }
@@ -150,7 +138,7 @@ inline static REBVAL *Init_Handle_Cdata(
 ){
     assert(length != 0);  // can't be 0 unless cfunc (see also malloc(0))
     RESET_CELL(out, REB_HANDLE, CELL_MASK_NONE);  // payload first is not node
-    VAL_HANDLE_SINGULAR_NODE(out) = nullptr;
+    PAYLOAD(Any, out).first.trash = out;  // must initialize field
     VAL_HANDLE_CDATA_P(out) = cdata;
     VAL_HANDLE_LENGTH_U(out) = length;  // non-zero signals cdata
     return cast(REBVAL*, out);
@@ -161,7 +149,7 @@ inline static REBVAL *Init_Handle_Cfunc(
     CFUNC *cfunc
 ){
     RESET_CELL(out, REB_HANDLE, CELL_MASK_NONE);  // payload first is not node
-    VAL_HANDLE_SINGULAR_NODE(out) = nullptr;
+    PAYLOAD(Any, out).first.trash = out;  // must initialize field
     VAL_HANDLE_CFUNC_P(out) = cfunc;
     VAL_HANDLE_LENGTH_U(out) = 0;  // signals cfunc
     return cast(REBVAL*, out);
@@ -177,7 +165,7 @@ inline static void Init_Handle_Cdata_Managed_Common(
 
     RELVAL *single = ARR_SINGLE(singular);
     RESET_VAL_HEADER(single, REB_HANDLE, CELL_FLAG_FIRST_IS_NODE);
-    VAL_HANDLE_SINGULAR_NODE(single) = NOD(singular); 
+    INIT_VAL_HANDLE_SINGULAR(single, singular);
     VAL_HANDLE_LENGTH_U(single) = length;
     // caller fills in VAL_HANDLE_CDATA_P or VAL_HANDLE_CFUNC_P
 
@@ -187,7 +175,7 @@ inline static void Init_Handle_Cdata_Managed_Common(
     // series component.
     //
     RESET_CELL(out, REB_HANDLE, CELL_FLAG_FIRST_IS_NODE);
-    VAL_HANDLE_SINGULAR_NODE(out) = NOD(singular);
+    INIT_VAL_HANDLE_SINGULAR(out, singular);
     VAL_HANDLE_LENGTH_U(out) = 0xDECAFBAD;  // trash to avoid compiler warning
     VAL_HANDLE_CDATA_P(out) = nullptr;  // or complains about not initializing
 }

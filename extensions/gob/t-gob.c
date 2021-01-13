@@ -1071,7 +1071,7 @@ REBTYPE(Gob)
   set_index:
 
     RESET_CUSTOM_CELL(D_OUT, EG_Gob_Type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(D_OUT, gob);
+    INIT_VAL_NODE1(D_OUT, gob);
     VAL_GOB_INDEX(D_OUT) = index;
     return D_OUT;
 }

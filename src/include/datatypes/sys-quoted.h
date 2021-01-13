@@ -82,7 +82,7 @@ inline static REBLEN VAL_QUOTED_PAYLOAD_DEPTH(const RELVAL *v) {
 
 inline static REBVAL* VAL_QUOTED_PAYLOAD_CELL(const RELVAL *v) {
     assert(VAL_QUOTED_PAYLOAD_DEPTH(v) > 3);  // else quote fits in one cell
-    return VAL(VAL_NODE(v));
+    return VAL(VAL_NODE1(v));
 }
 
 inline static REBLEN VAL_QUOTED_DEPTH(const RELVAL *v) {
@@ -141,7 +141,7 @@ inline static RELVAL *Quotify_Core(
         Manage_Pairing(unquoted);
 
         RESET_VAL_HEADER(v, REB_QUOTED, CELL_FLAG_FIRST_IS_NODE);
-        PAYLOAD(Any, v).first.node = NOD(unquoted);
+        INIT_VAL_NODE1(v, unquoted);
         VAL_WORD_INDEXES_U32(v) = depth << 20;  // see VAL_QUOTED_DEPTH()
 
         if (ANY_WORD_KIND(CELL_HEART(cast(REBCEL(const*), unquoted)))) {
@@ -225,7 +225,7 @@ inline static void Collapse_Quoted_Internal(RELVAL *v)
         VAL_WORD_INDEXES_U32(v) &= 0x000FFFFF;  // wipe out quote depth
         VAL_WORD_INDEXES_U32(v) |=
             (VAL_WORD_INDEXES_U32(unquoted) & 0xFFF00000);
-        VAL_WORD_CACHE_NODE(v) = VAL_WORD_CACHE_NODE(unquoted);
+        INIT_VAL_WORD_CACHE(v, VAL_WORD_CACHE(unquoted));
     }
     else {
         v->payload = unquoted->payload;

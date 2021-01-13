@@ -370,7 +370,12 @@ union Reb_Any {  // needed to beat strict aliasing, used in payload
     // (and perhaps in the future, the payload second slot).  If you do use
     // a node in the cell, be sure to set CELL_FLAG_FIRST_IS_NODE!
     //
-    REBNOD *node;
+    // No REBNODs (REBSER or REBVAL) are ever actually declared const, but
+    // care should be taken on extraction to give back a `const` reference
+    // if the intent is immutability, or a conservative state of possible
+    // immutability (e.g. the CONST usermode status hasn't been checked)
+    //
+    const REBNOD *node;
 
     // The GC is only marking one field in the union...the node.  So that is
     // the only field that should be assigned and read.  These "type puns"
@@ -569,7 +574,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 //
 
 #if defined(CPLUSPLUS_11)
-    struct alignas(ALIGN_SIZE) Reb_Cell
+    struct alignas(ALIGN_SIZE) Reb_Cell : public Reb_Node
 #elif defined(C_11)
     struct alignas(ALIGN_SIZE) Reb_Value
 #else

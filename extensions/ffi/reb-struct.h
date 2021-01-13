@@ -325,7 +325,7 @@ inline static bool STU_INACCESSIBLE(REBSTU *stu) {
 // may be a handle instead of a BINARY!.
 
 #define VAL_STRUCT(v) \
-    cast(REBSTU*, VAL_NODE(v))
+    cast(REBSTU*, VAL_NODE1(v))
 
 #define VAL_STRUCT_DATA(v) \
     STU_DATA(VAL_STRUCT(v))
@@ -364,7 +364,7 @@ inline static REBVAL *Init_Struct(RELVAL *out, REBSTU *stu) {
     assert(GET_SERIES_FLAG(stu, MANAGED));
 
     RESET_CUSTOM_CELL(out, EG_Struct_Type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, stu);
+    INIT_VAL_NODE1(out, stu);
     VAL_STRUCT_OFFSET(out) = 0;
     return SPECIFIC(out);
 }

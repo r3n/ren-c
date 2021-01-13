@@ -728,8 +728,12 @@ union Reb_Series_Misc {
 };
 
 
-struct Reb_Series {
-    //
+#if defined(CPLUSPLUS_11)
+    struct Reb_Series : public Reb_Node
+#else
+    struct Reb_Series
+#endif
+{
     // See the description of SERIES_FLAG_XXX for the bits in this header.
     // It is designed in such a way as to have compatibility with REBVAL's
     // header, but be wary of "Strict Aliasing" when making use of that:

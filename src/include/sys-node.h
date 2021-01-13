@@ -31,7 +31,7 @@
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define NOD(p) \
-        m_cast(REBNOD*, (const REBNOD*)(p))  // don't check const in C or C++
+        ((REBNOD*)(p))  // don't check const, even in C++, if checks disabled
 
 #else
 
@@ -72,7 +72,7 @@
         if (not p)
             return nullptr;
 
-        if ((FIRST_BYTE(reinterpret_cast<const REBNOD*>(p)->leader) & (
+        if ((*reinterpret_cast<const REBYTE*>(p) & (
             NODE_BYTEMASK_0x80_NODE | NODE_BYTEMASK_0x40_FREE
         )) != (
             NODE_BYTEMASK_0x80_NODE
@@ -86,7 +86,7 @@
 
 
 #define NODE_BYTE(p) \
-    FIRST_BYTE(NOD(p)->leader)
+    *cast(const REBYTE*, NOD(p))
 
 #ifdef NDEBUG
     #define IS_FREE_NODE(p) \
@@ -206,31 +206,31 @@ inline static void *Try_Alloc_Node(REBLEN pool_id)
 
     assert(pool->first);
 
-    REBNOD *node = pool->first;
+    REBPIT *unit = pool->first;
 
-    pool->first = node->next_if_free;
-    if (node == pool->last)
+    pool->first = unit->next_if_free;
+    if (unit == pool->last)
         pool->last = nullptr;
 
     pool->free--;
 
   #ifdef DEBUG_MEMORY_ALIGN
-    if (cast(uintptr_t, node) % sizeof(REBI64) != 0) {
+    if (cast(uintptr_t, unit) % sizeof(REBI64) != 0) {
         printf(
-            "Node address %p not aligned to %d bytes\n",
-            cast(void*, node),
+            "Pool Unit address %p not aligned to %d bytes\n",
+            cast(void*, unit),
             cast(int, sizeof(REBI64))
         );
-        printf("Pool address is %p and pool-first is %p\n",
+        printf("Pool Unit address is %p and pool-first is %p\n",
             cast(void*, pool),
             cast(void*, pool->first)
         );
-        panic (node);
+        panic (unit);
     }
   #endif
 
-    assert(IS_FREE_NODE(node)); // client needs to change to non-free
-    return cast(void*, node);
+    assert(IS_FREE_NODE(cast(REBNOD*, unit)));  // client must make non-free
+    return cast(void*, unit);
 }
 
 
@@ -266,13 +266,15 @@ inline static void Free_Node(REBLEN pool_id, void *p)
     }
   #endif
 
-    mutable_FIRST_BYTE(node->leader) = FREED_SERIES_BYTE;
+    REBPIT* unit = cast(REBPIT*, node);
+
+    mutable_FIRST_BYTE(unit->leader) = FREED_SERIES_BYTE;
 
     REBPOL *pool = &Mem_Pools[pool_id];
 
   #ifdef NDEBUG
-    node->next_if_free = pool->first;
-    pool->first = node;
+    unit->next_if_free = pool->first;
+    pool->first = unit;
   #else
     // !!! In R3-Alpha, the most recently freed node would become the first
     // node to hand out.  This is a simple and likely good strategy for
@@ -295,15 +297,15 @@ inline static void Free_Node(REBLEN pool_id, void *p)
         // We don't want Free_Node to fail with an "out of memory" error, so
         // just fall back to the release build behavior in this case.
         //
-        node->next_if_free = pool->first;
-        pool->first = node;
+        unit->next_if_free = pool->first;
+        pool->first = unit;
     }
     else {
         assert(pool->last);
 
-        pool->last->next_if_free = node;
-        pool->last = node;
-        node->next_if_free = nullptr;
+        pool->last->next_if_free = unit;
+        pool->last = unit;
+        unit->next_if_free = nullptr;
     }
   #endif
 

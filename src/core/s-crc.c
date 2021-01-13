@@ -445,7 +445,7 @@ REBVAL *Init_Map(RELVAL *out, REBMAP *map)
     Force_Series_Managed(MAP_PAIRLIST(map));
 
     RESET_CELL(out, REB_MAP, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, MAP_PAIRLIST(map));
+    INIT_VAL_NODE1(out, MAP_PAIRLIST(map));
     // second payload pointer not used
 
     return cast(REBVAL*, out);

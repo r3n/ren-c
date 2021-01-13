@@ -159,7 +159,7 @@
 #define MISC(Field, s) \
     MISC_##Field##_CAST((void*)(s)->misc.custom.node)
 
-#if defined(NDEBUG)
+#if !defined(CPLUSPLUS_11)
     //
     // Technically speaking, the debug versions below may risk causing
     // problems in strict aliasing.  Haven't seen any cases of it...but just
@@ -178,6 +178,17 @@
     #define mutable_MISC(Field, s) \
         *(MISC_##Field##_TYPE*)(&(s)->misc.custom.node)
 #endif
+
+
+// The GC wants to read the node generically, but doesn't want to have to
+// deal with the node being const (which makes assignments possible when it's
+// a `const void*`, since (*(void*)&voidptr) won't work).
+//
+#define LINK_Node_TYPE      NODE
+#define LINK_Node_CAST      (REBNOD*)  // remove const
+
+#define MISC_Node_TYPE      NODE
+#define MISC_Node_CAST      (REBNOD*)  // remove const
 
 
 //
@@ -794,7 +805,7 @@ inline static void FAIL_IF_READ_ONLY_SER(REBSER *s) {
 #else
     inline static const RELVAL* KNOWN_MUTABLE(const RELVAL* v) {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
+        REBSER *s = SER(VAL_NODE1(v));  // can be pairlist, varlist, etc.
         assert(not Is_Series_Read_Only(s));
         assert(NOT_CELL_FLAG(v, CONST));
         return v;
@@ -806,7 +817,7 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v);
 
 inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
+    REBSER *s = SER(VAL_NODE1(v));  // can be pairlist, varlist, etc.
 
     FAIL_IF_READ_ONLY_SER(s);
 
@@ -875,7 +886,7 @@ inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
     enum Reb_Kind k = CELL_HEART(v);
     assert(ANY_SERIES_KIND_EVIL_MACRO);
   #endif
-    const REBSER *s = SER(PAYLOAD(Any, v).first.node);
+    const REBSER *s = SER(VAL_NODE1(v));
     if (GET_SERIES_INFO(s, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return s;
@@ -1004,7 +1015,7 @@ inline static REBVAL *Init_Any_Series_At_Core(
   #endif
 
     RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, s);
+    INIT_VAL_NODE1(out, s);
     VAL_INDEX_RAW(out) = index;
     INIT_SPECIFIER(out, specifier);  // asserts if unbindable type tries to bind
     return cast(REBVAL*, out);

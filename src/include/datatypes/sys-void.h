@@ -48,7 +48,7 @@ inline static REBVAL *Init_Void_Core(
     const REBSTR *label
 ){
     RESET_VAL_HEADER(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
-    VAL_NODE(out) = NOD(m_cast(REBSTR*, label));
+    INIT_VAL_NODE1(out, label);
   #ifdef ZERO_UNUSED_CELL_FIELDS
     EXTRA(Any, out).trash = nullptr;
     PAYLOAD(Any, out).second.trash = nullptr;
@@ -64,7 +64,7 @@ inline static const REBSTR* VAL_VOID_LABEL(
 ){
     assert(CELL_KIND(v) == REB_VOID);
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    return cast(const REBSTR*, VAL_NODE(v));
+    return cast(const REBSTR*, VAL_NODE1(v));
 }
 
 inline static bool Is_Void_With_Sym(const RELVAL *v, REBSYM sym) {
@@ -98,7 +98,7 @@ inline static bool Is_Void_With_Sym(const RELVAL *v, REBSYM sym) {
         // to crash sites that expect normal voids.  It's usually clear
         // from the assert that the void is unreadable, anyway.
         //
-        VAL_NODE(out) = nullptr;  // needs flag for VAL_NODE() to not assert
+        INIT_VAL_NODE1(out, nullptr);  // FIRST_IS_NODE needed to do this
         return cast(REBVAL*, out);
     }
 
@@ -111,7 +111,7 @@ inline static bool Is_Void_With_Sym(const RELVAL *v, REBSYM sym) {
     inline static bool IS_UNREADABLE_DEBUG(const RELVAL *v) {
         if (KIND3Q_BYTE_UNCHECKED(v) != REB_VOID)
             return false;
-        return VAL_NODE(v) == nullptr;
+        return VAL_NODE1(v) == nullptr;
     }
 
     #define ASSERT_UNREADABLE_IF_DEBUG(v) \

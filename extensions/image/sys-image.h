@@ -43,14 +43,14 @@ extern REBTYP* EG_Image_Type;
 
 inline static REBVAL *VAL_IMAGE_BIN(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
-    return cast(REBVAL*, ARR_SINGLE(ARR(PAYLOAD(Any, v).first.node)));
+    return cast(REBVAL*, ARR_SINGLE(ARR(VAL_NODE1(v))));
 }
 
 #define VAL_IMAGE_WIDTH(v) \
-    mutable_LINK(Width, ARR(PAYLOAD(Any, v).first.node))
+    ARR(VAL_NODE1(v))->link.custom.i
 
 #define VAL_IMAGE_HEIGHT(v) \
-    mutable_MISC(Height, ARR(PAYLOAD(Any, v).first.node))
+    ARR(VAL_NODE1(v))->misc.custom.i
 
 inline static REBYTE *VAL_IMAGE_HEAD(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
@@ -104,11 +104,12 @@ inline static REBVAL *Init_Image(
 
     REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);
     Init_Binary(ARR_SINGLE(a), bin);
-    mutable_LINK(Width, a) = width;  // see why this isn't put on bin...
-    mutable_MISC(Height, a) = height;  // (...it would corrupt shared series!)
 
     RESET_CUSTOM_CELL(out, EG_Image_Type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, a);
+    INIT_VAL_NODE1(out, a);
+
+    VAL_IMAGE_WIDTH(out) = width;  // see why this isn't put on bin...
+    VAL_IMAGE_HEIGHT(out) = height;  // (...it would corrupt shared series!)
 
     assert(VAL_IMAGE_POS(out) == 0);  // !!! sketchy concept, is in BINARY!
 

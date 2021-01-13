@@ -47,15 +47,15 @@ inline static bool IS_LIB_CLOSED(REBLIB *l)
 
 inline static REBLIB *VAL_LIBRARY(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Library_Type);
-    return ARR(VAL_NODE(v));
+    return ARR(VAL_NODE1(v));
 }
 
 #define VAL_LIBRARY_META_NODE(v) \
-    MISC(Meta, SER(VAL_NODE(v)))
+    MISC(Meta, SER(VAL_NODE1(v)))
 
 inline static REBCTX *VAL_LIBRARY_META(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Library_Type);
-    return MISC(Meta, SER(VAL_NODE(v)));
+    return MISC(Meta, SER(VAL_NODE1(v)));
 }
 
 

@@ -278,14 +278,14 @@ inline static bool IS_GOB(const RELVAL *v)  // Note: QUOTED! does not count
 
 #if defined(NDEBUG) || !defined(CPLUSPLUS_11)
     #define VAL_GOB(v) \
-        cast(REBGOB*, VAL_NODE(v))  // use w/const REBVAL*
+        cast(REBGOB*, VAL_NODE1(v))  // use w/const REBVAL*
 
     #define VAL_GOB_INDEX(v) \
         PAYLOAD(Any, v).second.u
 #else
     inline static REBGOB* VAL_GOB(REBCEL(const*) v) {
         assert(CELL_CUSTOM_TYPE(v) == EG_Gob_Type);
-        return cast(REBGOB*, VAL_NODE(v));
+        return cast(REBGOB*, VAL_NODE1(v));
     }
 
     inline static uintptr_t VAL_GOB_INDEX(REBCEL(const*) v) {
@@ -303,7 +303,7 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
     assert(GET_SERIES_FLAG(g, MANAGED));
 
     RESET_CUSTOM_CELL(out, EG_Gob_Type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, g);
+    INIT_VAL_NODE1(out, g);
     VAL_GOB_INDEX(out) = 0;
     return cast(REBVAL*, out);
 }

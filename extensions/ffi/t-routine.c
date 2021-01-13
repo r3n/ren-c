@@ -550,7 +550,7 @@ static void ffi_to_rebol(
         memcpy(BIN_HEAD(data), ffi_rvalue, FLD_WIDE(top));
 
         RESET_CUSTOM_CELL(out, EG_Struct_Type, CELL_FLAG_FIRST_IS_NODE);
-        INIT_VAL_NODE(out, stu);
+        INIT_VAL_NODE1(out, stu);
         VAL_STRUCT_OFFSET(out) = 0;
 
         Init_Binary(ARR_SINGLE(stu), data);

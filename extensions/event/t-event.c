@@ -374,7 +374,7 @@ REB_R MAKE_Event(
         fail (Error_Unexpected_Type(REB_EVENT, VAL_TYPE(arg)));
 
     RESET_CELL(out, REB_EVENT, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, nullptr);
+    INIT_VAL_NODE1(out, nullptr);
     SET_VAL_EVENT_TYPE(out, SYM_NONE);  // SYM_0 shouldn't be used
     mutable_VAL_EVENT_FLAGS(out) = EVF_MASK_NONE;
     mutable_VAL_EVENT_MODEL(out) = EVM_PORT;  // ?

@@ -166,6 +166,27 @@
 #endif
 
 
+// Note: If incoming p is mutable, we currently assume that's allowed by the
+// flag bits of the node.  This could have a runtime check in debug build
+// with a C++ variation that only takes mutable pointers.
+//
+inline static void INIT_VAL_NODE1(RELVAL *v, const REBNOD *node) {
+    assert(v->header.bits & CELL_FLAG_FIRST_IS_NODE);
+    PAYLOAD(Any, v).first.node = node;
+}
+
+inline static void INIT_VAL_NODE2(RELVAL *v, const REBNOD *node) {
+    assert(v->header.bits & CELL_FLAG_SECOND_IS_NODE);
+    PAYLOAD(Any, v).second.node = node;
+}
+
+#define VAL_NODE1(v) \
+    m_cast(REBNOD*, PAYLOAD(Any, (v)).first.node)
+
+#define VAL_NODE2(v) \
+    m_cast(REBNOD*, PAYLOAD(Any, (v)).second.node)
+
+
 //=//// "KIND3Q" HEADER BYTE [REB_XXX + (n * REB_64)] /////////////////////=//
 //
 // The "kind" of fundamental datatype a cell is lives in the second byte for
@@ -209,7 +230,7 @@
             // Unreadable void is signified in the Extra by a negative tick
             //
             if (KIND3Q_BYTE_UNCHECKED(v) == REB_VOID) {
-                if (v->payload.Any.first.node == nullptr) {
+                if (VAL_NODE1(v) == nullptr) {
                     printf("KIND3Q_BYTE() called on unreadable VOID!\n");
                   #ifdef DEBUG_COUNT_TICKS
                     printf("Made on tick: %d\n", cast(int, v->extra.tick));
@@ -278,9 +299,9 @@
     inline static enum Reb_Kind CELL_HEART(const RELVAL *v) = delete;
 #endif
 
-inline static REBTYP *CELL_CUSTOM_TYPE(REBCEL(const*) v) {
+inline static const REBTYP *CELL_CUSTOM_TYPE(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_CUSTOM);
-    return cast(REBBIN*, EXTRA(Any, v).node);
+    return cast(const REBBIN*, EXTRA(Any, v).node);
 }
 
 // Sometimes you have a REBCEL* and need to pass a REBVAL* to something.  It
@@ -584,18 +605,6 @@ inline static RELVAL *Prep_Cell_Core(RELVAL *c) {
 //
 
 
-// Note: If incoming p is mutable, we currently assume that's allowed by the
-// flag bits of the node.  This could have a runtime check in debug build
-// with a C++ variation that only takes mutable pointers.
-//
-inline static void INIT_VAL_NODE(RELVAL *v, const void *p) {
-    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    PAYLOAD(Any, v).first.node = NOD(m_cast(void*, p));
-}
-
-#define VAL_NODE(v) \
-    PAYLOAD(Any, (v)).first.node
-
 
 // An ANY-WORD! is relative if it refers to a local or argument of a function,
 // and has its bits resident in the deep copy of that function's body.
@@ -709,8 +718,11 @@ inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
 #define UNSPECIFIED nullptr
 
 
-#define VAL_WORD_CACHE_NODE(v) \
-    PAYLOAD(Any, m_cast(RELVAL*, cast(const RELVAL*, (v)))).first.node
+#define VAL_WORD_CACHE(v) \
+    cast(REBSPC*, VAL_NODE1(v))
+
+inline static void INIT_VAL_WORD_CACHE(const RELVAL *v, REBSPC *specifier)
+  { INIT_VAL_NODE1(m_cast(RELVAL*, v), specifier); }
 
 #define MONDEX_MOD 4095  // modulus for the cached index modulus ("mondex")
 #define VAL_WORD_INDEXES_U32(v)         PAYLOAD(Any, (v)).second.u32

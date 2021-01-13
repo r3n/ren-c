@@ -660,11 +660,14 @@ inline static bool FRM_IS_VARIADIC(REBFRM *f);
 
         static_assert(base, "FRM() works on void/REBNOD/REBFRM");
 
-        bool b = base;  // needed to avoid compiler constexpr warning
-        if (b and p and (reinterpret_cast<REBNOD*>(p)->leader.bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
+        if (not p)
+            return nullptr;
+
+        if ((*reinterpret_cast<REBYTE*>(p) & (
+            NODE_BYTEMASK_0x80_NODE | NODE_BYTEMASK_0x40_FREE
+                | NODE_BYTEMASK_0x01_CELL
         )) != (
-            NODE_FLAG_NODE | NODE_FLAG_CELL
+            NODE_BYTEMASK_0x80_NODE | NODE_BYTEMASK_0x01_CELL
         )){
             panic (p);
         }

@@ -212,7 +212,7 @@ static void Queue_Mark_Node_Deep(void *p)
 
     s->header.bits |= NODE_FLAG_MARKED; // may be already set
 
-    if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and s->link.custom.node) {
+    if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and LINK(Node, s)) {
         //
         // !!! The keysource for varlists can be set to a REBFRM*, which acts
         // like a cell because the flag is set to being an "endlike header".
@@ -220,11 +220,11 @@ static void Queue_Mark_Node_Deep(void *p)
         // casting as a SER().  It wasn't entirely obvious what was going on,
         // but this makes it clearer so that a more elegant fix can be made.
         //
-        if (Is_Node_Cell(s->link.custom.node))
+        if (Is_Node_Cell(LINK(Node, s)))
             if (IS_SER_ARRAY(s) and GET_ARRAY_FLAG(ARR(s), IS_VARLIST))
                 goto skip_mark_rebfrm_link;
 
-        REBSER *link = SER(s->link.custom.node);
+        REBSER *link = SER(LINK(Node, s));
         Queue_Mark_Node_Deep(link);
 
         // Keylist series need to be marked.
@@ -245,8 +245,8 @@ static void Queue_Mark_Node_Deep(void *p)
     }
 
   skip_mark_rebfrm_link:
-    if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and s->misc.custom.node)
-        Queue_Mark_Node_Deep(s->misc.custom.node);
+    if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and MISC(Node, s))
+        Queue_Mark_Node_Deep(MISC(Node, s));
 
     if (IS_SER_ARRAY(s)) {
         //
@@ -297,11 +297,11 @@ static void Queue_Mark_Opt_Value_Deep(const RELVAL *v)
                 Queue_Mark_Node_Deep(binding);
     }
 
-    if (GET_CELL_FLAG(v, FIRST_IS_NODE) and PAYLOAD(Any, v).first.node)
-        Queue_Mark_Node_Deep(PAYLOAD(Any, v).first.node);
+    if (GET_CELL_FLAG(v, FIRST_IS_NODE) and VAL_NODE1(v))
+        Queue_Mark_Node_Deep(VAL_NODE1(v));
 
-    if (GET_CELL_FLAG(v, SECOND_IS_NODE) and PAYLOAD(Any, v).second.node)
-        Queue_Mark_Node_Deep(PAYLOAD(Any, v).second.node);
+    if (GET_CELL_FLAG(v, SECOND_IS_NODE) and VAL_NODE2(v))
+        Queue_Mark_Node_Deep(VAL_NODE2(v));
 
   #if !defined(NDEBUG)
     in_mark = false;
@@ -537,13 +537,13 @@ static void Mark_Root_Series(void)
                 );
 
                 if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK))
-                    if (s->link.custom.node)
-                        Queue_Mark_Node_Deep(s->link.custom.node);
+                    if (LINK(Node, s))
+                        Queue_Mark_Node_Deep(LINK(Node, s));
                 if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK))
-                    if (s->misc.custom.node)
-                        Queue_Mark_Node_Deep(s->misc.custom.node);
+                    if (MISC(Node, s))
+                        Queue_Mark_Node_Deep(MISC(Node, s));
 
-                RELVAL *item = ARR_HEAD(cast(REBARR*, s));
+                RELVAL *item = SER_HEAD(RELVAL, m_cast(REBSER*, s));
                 for (; NOT_END(item); ++item)
                     Queue_Mark_Value_Deep(item);
             }
@@ -1192,7 +1192,7 @@ REBLEN Recycle(void)
 void Push_Guard_Node(const REBNOD *node)
 {
   #if !defined(NDEBUG)
-    if (FIRST_BYTE(node->leader) & NODE_BYTEMASK_0x01_CELL) {
+    if (NODE_BYTE(node) & NODE_BYTEMASK_0x01_CELL) {
         //
         // It is a value.  Cheap check: require that it already contain valid
         // data when the guard call is made (even if GC isn't necessarily
@@ -1282,7 +1282,7 @@ static void Mark_Devices_Deep(void)
         if (not dev->pending)
             continue;
 
-        REBSER *req = dev->pending;
+        REBNOD *req = m_cast(REBNOD*, dev->pending);
 
         // This used to walk the ->next field of the REBREQ explicitly, and
         // mark the port pointers internal to the REBREQ.  Following the

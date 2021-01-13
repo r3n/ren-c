@@ -51,13 +51,13 @@ typedef struct rebol_mem_spec {
 // Pools manage fixed sized blocks of memory
 //
 struct rebol_mem_pool {
-    REBSEG *segs; // first memory segment
-    REBNOD *first; // first free node in pool
-    REBNOD *last; // last free node in pool
-    REBLEN wide; // size of allocation unit
-    REBLEN units; // units per segment allocation
-    REBLEN free; // number of units remaining
-    REBLEN  has; // total number of units
+    REBSEG *segs;  // first memory segment
+    REBPIT *first;  // first free item in pool
+    REBPIT *last;  // last free item in pool
+    REBLEN wide;  // size of allocation unit
+    REBLEN units;  // units per segment allocation
+    REBLEN free;  // number of units remaining
+    REBLEN has;  // total number of units
 };
 
 #define DEF_POOL(size, count) {size, count}

@@ -85,12 +85,9 @@ REBNOD *Dump_Value_Debug(const RELVAL *v)
     fflush(stdout);
 
     if (GET_CELL_FLAG(v, FIRST_IS_NODE))
-        printf("has first node: %p\n", cast(void*, VAL_NODE(v)));
+        printf("has first node: %p\n", cast(void*, VAL_NODE1(v)));
     if (GET_CELL_FLAG(v, SECOND_IS_NODE))
-        printf(
-            "has second node: %p\n",
-            cast(void*, PAYLOAD(Any, (v)).second.node)
-        );
+        printf("has second node: %p\n", cast(void*, VAL_NODE2(v)));
 
     if (not containing)
         return nullptr;

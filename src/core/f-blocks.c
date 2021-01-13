@@ -183,7 +183,7 @@ void Clonify(
             would_need_deep = true;
         }
         else if (ANY_ARRAY_KIND(heart)) {
-            REBNOD *n = VAL_NODE(v);
+            REBNOD *n = VAL_NODE1(v);
             assert(not Is_Node_Cell(n));
             series = Copy_Array_At_Extra_Shallow(
                 ARR(n),
@@ -201,7 +201,7 @@ void Clonify(
             if (ANY_PATH_KIND(kind))
                 Freeze_Array_Shallow(ARR(series));
 
-            INIT_VAL_NODE(v, series);
+            INIT_VAL_NODE1(v, series);
             INIT_SPECIFIER(v, UNBOUND);  // copying w/specifier makes specific
             would_need_deep = true;
         }
@@ -210,7 +210,7 @@ void Clonify(
                 VAL_SERIES(v),
                 NODE_FLAG_MANAGED
             );
-            INIT_VAL_NODE(v, series);
+            INIT_VAL_NODE1(v, series);
             would_need_deep = false;
         }
         else {
@@ -334,7 +334,7 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
         Move_Value_Header(dest, src);
 
         if (ANY_ARRAY_OR_PATH(src)) {
-            INIT_VAL_NODE(
+            INIT_VAL_NODE1(
                 dest,
                 Copy_Rerelativized_Array_Deep_Managed(
                     VAL_ARRAY(src), before, after

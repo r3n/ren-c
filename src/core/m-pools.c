@@ -444,34 +444,30 @@ bool Try_Fill_Pool(REBPOL *pool)
 
     // Add new nodes to the end of free list:
 
-    // Can't use NOD() here because it tests for NOT(NODE_FLAG_FREE)
-    //
-    REBNOD *node = cast(REBNOD*, seg + 1);
+    REBPIT *unit = cast(REBPIT*, seg + 1);
 
     if (not pool->first) {
         assert(not pool->last);
-        pool->first = node;
+        pool->first = unit;
     }
     else {
         assert(pool->last);
-        pool->last->next_if_free = node;
+        pool->last->next_if_free = unit;
     }
 
     while (true) {
-        mutable_FIRST_BYTE(node->leader) = FREED_SERIES_BYTE;
+        mutable_FIRST_BYTE(unit->leader) = FREED_SERIES_BYTE;
 
         if (--units == 0) {
-            node->next_if_free = nullptr;
+            unit->next_if_free = nullptr;
             break;
         }
 
-        // Can't use NOD() here because it tests for NODE_FLAG_FREE
-        //
-        node->next_if_free = cast(REBNOD*, cast(REBYTE*, node) + pool->wide);
-        node = node->next_if_free;
+        unit->next_if_free = cast(REBPIT*, cast(REBYTE*, unit) + pool->wide);
+        unit = unit->next_if_free;
     }
 
-    pool->last = node;
+    pool->last = unit;
     return true;
 }
 
@@ -650,16 +646,16 @@ void Free_Unbiased_Series_Data(char *unbiased, REBLEN total)
         // free nodes have significance to their headers.  Use a cast and not
         // NOD() because that assumes not (NODE_FLAG_FREE)
         //
-        REBNOD *node = cast(REBNOD*, unbiased);
+        REBPIT *unit = cast(REBPIT*, unbiased);
 
         assert(Mem_Pools[pool_num].wide >= total);
 
         pool = &Mem_Pools[pool_num];
-        node->next_if_free = pool->first;
-        pool->first = node;
+        unit->next_if_free = pool->first;
+        pool->first = unit;
         pool->free++;
 
-        mutable_FIRST_BYTE(node->leader) = FREED_SERIES_BYTE;
+        mutable_FIRST_BYTE(unit->leader) = FREED_SERIES_BYTE;
     }
     else {
         FREE_N(char, total, unbiased);
@@ -1358,9 +1354,9 @@ REBLEN Check_Memory_Debug(void)
     for (pool_num = 0; pool_num != SYSTEM_POOL; pool_num++) {
         REBLEN pool_free_nodes = 0;
 
-        REBNOD *node = Mem_Pools[pool_num].first;
-        for (; node != NULL; node = node->next_if_free) {
-            assert(IS_FREE_NODE(node));
+        REBPIT *unit = Mem_Pools[pool_num].first;
+        for (; unit != nullptr; unit = unit->next_if_free) {
+            assert(*cast(const REBYTE*, unit) & NODE_BYTEMASK_0x40_FREE);
 
             ++pool_free_nodes;
 
@@ -1368,15 +1364,15 @@ REBLEN Check_Memory_Debug(void)
             seg = Mem_Pools[pool_num].segs;
             for (; seg != NULL; seg = seg->next) {
                 if (
-                    cast(uintptr_t, node) > cast(uintptr_t, seg)
+                    cast(uintptr_t, unit) > cast(uintptr_t, seg)
                     and (
-                        cast(uintptr_t, node)
+                        cast(uintptr_t, unit)
                         < cast(uintptr_t, seg) + cast(uintptr_t, seg->size)
                     )
                 ){
                     if (found) {
-                        printf("node belongs to more than one segment\n");
-                        panic (node);
+                        printf("unit belongs to more than one segment\n");
+                        panic (unit);
                     }
 
                     found = true;
@@ -1384,13 +1380,13 @@ REBLEN Check_Memory_Debug(void)
             }
 
             if (not found) {
-                printf("node does not belong to one of the pool's segments\n");
-                panic (node);
+                printf("unit does not belong to one of the pool's segments\n");
+                panic (unit);
             }
         }
 
         if (Mem_Pools[pool_num].free != pool_free_nodes)
-            panic ("actual free node count does not agree with pool header");
+            panic ("actual free unit count does not agree with pool header");
 
         total_free_nodes += pool_free_nodes;
     }

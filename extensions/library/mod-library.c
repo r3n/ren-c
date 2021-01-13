@@ -71,7 +71,7 @@ REB_R MAKE_Library(
     mutable_MISC(Meta, lib) = nullptr;  // !!! build from spec, e.g. arg?
 
     RESET_CUSTOM_CELL(out, EG_Library_Type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, lib);
+    INIT_VAL_NODE1(out, lib);
 
     return out;
 }

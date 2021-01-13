@@ -476,7 +476,7 @@ inline static REBLEN VAL_SEQUENCE_LEN(REBCEL(const*) sequence) {
         return 2;
 
       case REB_BLOCK: {
-        REBARR *a = ARR(VAL_NODE(sequence));
+        REBARR *a = ARR(VAL_NODE1(sequence));
         assert(ARR_LEN(a) >= 2);
         assert(Is_Array_Frozen_Shallow(a));
         return ARR_LEN(a); }
@@ -556,7 +556,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         return store; }
 
       case REB_BLOCK: {
-        const REBARR *a = ARR(VAL_NODE(sequence));
+        const REBARR *a = ARR(VAL_NODE1(sequence));
         assert(ARR_LEN(a) >= 2);
         assert(Is_Array_Frozen_Shallow(a));
         return ARR_AT(a, n); }  // array is read only

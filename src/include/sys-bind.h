@@ -73,6 +73,7 @@
 
 // Next node is either to another patch, a frame specifier REBCTX, or nullptr.
 //
+#define LINK_PatchNextNode_TYPE    const REBNOD*  // to set via indirection
 #define LINK_PatchNext_TYPE        REBARR*
 #define LINK_PatchNext_CAST        ARR
 
@@ -560,7 +561,7 @@ inline static option(REBCTX*) Get_Word_Context(
     // matches the cache in the word, then trust the information in it...
     // whether that's a hit or a miss.
     //
-    if (NOD(specifier) == VAL_WORD_CACHE_NODE(any_word)) {
+    if (specifier == VAL_WORD_CACHE(any_word)) {
         //
         // Since the number of bits available in a virtual bind is limited,
         // the value stored is the index modulo MONDEX_MOD.  A miss is
@@ -628,7 +629,7 @@ inline static option(REBCTX*) Get_Word_Context(
         // this word is overridden without doing a linear search.  Do it
         // and then save the hit or miss information in the word for next use.
         //
-        VAL_WORD_CACHE_NODE(any_word) = NOD(specifier);  // we're updating it
+        INIT_VAL_WORD_CACHE(any_word, specifier);  // we're updating it
 
         const REBSTR *spelling = VAL_WORD_SPELLING(VAL_UNESCAPED(any_word));
 
@@ -926,7 +927,7 @@ inline static REBVAL *Derelativize(
         // We don't want to do this with REB_QUOTED since the cache is shared.
         //
         if (KIND3Q_BYTE_UNCHECKED(v) != REB_QUOTED) {
-            VAL_WORD_CACHE_NODE(out) = UNSPECIFIED;
+            INIT_VAL_WORD_CACHE(out, UNSPECIFIED);
             INIT_VAL_WORD_VIRTUAL_MONDEX(out, MONDEX_MOD);  // necessary?
         }
         return cast(REBVAL*, out);
@@ -996,23 +997,23 @@ inline static REBVAL *Derelativize(
 // top of each other, the chain always bottoms out on the same FRAME! that
 // the original specifier was pointing to.
 //
-inline static REBARR** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
+inline static const REBNOD** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
 {
-    assert(specifier->header.bits & ARRAY_FLAG_IS_PATCH);
+    assert(GET_ARRAY_FLAG(specifier, IS_PATCH));
     while (
-        (LINK(PatchNext, specifier) != nullptr) and not
-        (LINK(PatchNext, specifier)->header.bits & ARRAY_FLAG_IS_VARLIST)
+        LINK(PatchNext, specifier) != nullptr
+        and NOT_ARRAY_FLAG(LINK(PatchNext, specifier), IS_VARLIST)
     ){
         specifier = LINK(PatchNext, specifier);
     }
-    return &mutable_LINK(PatchNext, specifier);
+    return &mutable_LINK(PatchNextNode, specifier);
 }
 
 inline static option(REBCTX*) SPC_FRAME_CTX(REBSPC *specifier)
 {
     if (specifier == UNBOUND)  // !!! have caller check?
         return nullptr;
-    if (specifier->header.bits & ARRAY_FLAG_IS_VARLIST)
+    if (GET_ARRAY_FLAG(specifier, IS_VARLIST))
         return CTX(specifier);
     return CTX(*SPC_FRAME_CTX_ADDRESS(specifier));
 }
@@ -1193,7 +1194,8 @@ inline static REBSPC *Derive_Specifier_Core(
         // an extra check of that, review when efficiency is being revisited
         // (SPC_PATCH_CTX() as separate entry point?)
         //
-        REBARR **specifier_frame_ctx_addr = SPC_FRAME_CTX_ADDRESS(specifier);
+        const REBNOD **specifier_frame_ctx_addr
+            = SPC_FRAME_CTX_ADDRESS(specifier);
         if (*specifier_frame_ctx_addr == old)  // all clear to reuse
             return specifier;
 

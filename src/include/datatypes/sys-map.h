@@ -77,7 +77,7 @@ inline static REBMAP *MAP(void *p) {
 inline static const REBMAP *VAL_MAP(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_MAP);
 
-    REBARR *a = ARR(PAYLOAD(Any, v).first.node);
+    REBARR *a = ARR(VAL_NODE1(v));
     if (GET_SERIES_INFO(a, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
 

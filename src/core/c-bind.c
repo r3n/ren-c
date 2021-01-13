@@ -321,7 +321,7 @@ static void Clonify_And_Bind_Relative(
                 NODE_FLAG_MANAGED
             );
 
-            INIT_VAL_NODE(v, series);  // copies args
+            INIT_VAL_NODE1(v, series);  // copies args
             INIT_SPECIFIER(v, UNBOUND);  // copied w/specifier--not relative
 
             sub_src = VAL_ARRAY_AT(v);  // look for LETs
@@ -339,7 +339,7 @@ static void Clonify_And_Bind_Relative(
                 VAL_SERIES(v),
                 NODE_FLAG_MANAGED
             );
-            INIT_VAL_NODE(v, series);
+            INIT_VAL_NODE1(v, series);
             sub_src = BLANK_VALUE;  // don't try to look for LETs
 
             would_need_deep = false;

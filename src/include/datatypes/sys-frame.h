@@ -163,7 +163,7 @@ inline static int FRM_LINE(REBFRM *f) {
     cast(REBACT*, VAL_FRAME_PHASE_OR_LABEL_NODE((f)->rootvar))
 
 inline static void INIT_FRM_PHASE(REBFRM *f, REBACT *phase)  // check types
-  { VAL_FRAME_PHASE_OR_LABEL_NODE(f->rootvar) = NOD(phase); }  // ...only
+  { INIT_VAL_FRAME_PHASE_OR_LABEL(f->rootvar, NOD(phase)); }  // ...only
 
 inline static void INIT_FRM_BINDING(REBFRM *f, REBCTX *binding)
   { mutable_BINDING(f->rootvar) = CTX_VARLIST(binding); }  // also fast
@@ -292,7 +292,7 @@ inline static void Conserve_Varlist(REBARR *varlist)
 
     RELVAL *rootvar = ARR_HEAD(varlist);
     assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == varlist);
-    TRASH_POINTER_IF_DEBUG(VAL_FRAME_PHASE_OR_LABEL_NODE(rootvar));
+    INIT_VAL_FRAME_PHASE_OR_LABEL(rootvar, nullptr);  // can't trash
     TRASH_POINTER_IF_DEBUG(mutable_BINDING(rootvar));
   #endif
 
@@ -848,7 +848,7 @@ inline static void Drop_Action(REBFRM *f) {
 
         RELVAL *rootvar = ARR_HEAD(f->varlist);
         assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == f->varlist);
-        TRASH_POINTER_IF_DEBUG(VAL_FRAME_PHASE_OR_LABEL_NODE(rootvar));
+        INIT_VAL_FRAME_PHASE_OR_LABEL(rootvar, nullptr);  // can't trash ptr
         TRASH_POINTER_IF_DEBUG(mutable_BINDING(rootvar));
     }
   #endif

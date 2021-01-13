@@ -507,7 +507,7 @@ union Reb_Header {
 // pointer slot right after the header for its linked list of free nodes.
 //
 
-struct Reb_Node {
+struct Reb_Pool_Unit {
     //
     // This is not called "header" for a reason: you should *NOT* read the
     // bits of this header-sized slot to try and interpret bits that were
@@ -518,7 +518,7 @@ struct Reb_Node {
     //
     union Reb_Header leader;  // leftmost byte is FREED_SERIES_BYTE if free
 
-    struct Reb_Node *next_if_free;  // if not free, entire node is available
+    struct Reb_Pool_Unit *next_if_free;  // if not free, full item available
 
     // Size of a node must be a multiple of 64-bits.  This is because there
     // must be a baseline guarantee for node allocations to be able to know

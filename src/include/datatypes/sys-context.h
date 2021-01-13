@@ -103,8 +103,11 @@
 
 // ANY-CONTEXT! value cell schematic
 //
-#define VAL_CONTEXT_VARLIST_NODE(v)         PAYLOAD(Any, (v)).first.node
-#define VAL_FRAME_PHASE_OR_LABEL_NODE(v)    PAYLOAD(Any, (v)).second.node
+#define VAL_CONTEXT_VARLIST(v)                  ARR(VAL_NODE1(v))
+#define INIT_VAL_CONTEXT_VARLIST                INIT_VAL_NODE1
+#define VAL_FRAME_PHASE_OR_LABEL_NODE           VAL_NODE2  // faster in debug
+#define VAL_FRAME_PHASE_OR_LABEL(v)             SER(VAL_NODE2(v))
+#define INIT_VAL_FRAME_PHASE_OR_LABEL           INIT_VAL_NODE2
 
 
 //=//// CONTEXT ARCHETYPE VALUE CELL (ROOTVAR)  ///////////////////////////=//
@@ -164,9 +167,9 @@ inline static void INIT_VAL_CONTEXT_ROOTVAR_Core(
     assert(kind != REB_FRAME);  // use INIT_VAL_FRAME_ROOTVAR() instead
     assert(out == ARR_HEAD(varlist));
     RESET_CELL(out, kind, CELL_MASK_CONTEXT);
-    VAL_CONTEXT_VARLIST_NODE(out) = NOD(varlist);
+    INIT_VAL_CONTEXT_VARLIST(out, varlist);
     mutable_BINDING(out) = UNBOUND;  // not a frame
-    VAL_FRAME_PHASE_OR_LABEL_NODE(out) = nullptr;  // not a frame
+    INIT_VAL_FRAME_PHASE_OR_LABEL(out, nullptr);  // not a frame
   #if !defined(NDEBUG)
     out->header.bits |= CELL_FLAG_PROTECTED;
   #endif
@@ -188,9 +191,9 @@ inline static void INIT_VAL_FRAME_ROOTVAR_Core(
     );
     assert(phase != nullptr);
     RESET_VAL_HEADER(out, REB_FRAME, CELL_MASK_CONTEXT);
-    VAL_CONTEXT_VARLIST_NODE(out) = NOD(varlist);
+    INIT_VAL_CONTEXT_VARLIST(out, varlist);
     mutable_BINDING(out) = CTX_VARLIST(binding);
-    VAL_FRAME_PHASE_OR_LABEL_NODE(out) = NOD(phase);
+    INIT_VAL_FRAME_PHASE_OR_LABEL(out, NOD(phase));
   #if !defined(NDEBUG)
     out->header.bits |= CELL_FLAG_PROTECTED;
   #endif
@@ -200,12 +203,6 @@ inline static void INIT_VAL_FRAME_ROOTVAR_Core(
     INIT_VAL_FRAME_ROOTVAR_Core( \
         TRACK_CELL_IF_EXTENDED_DEBUG(out), (varlist), (phase), (binding))
 
-inline static void INIT_VAL_CONTEXT_VARLIST(
-    RELVAL *v,
-    REBARR *varlist  // type checks REBARR
-){
-    VAL_CONTEXT_VARLIST_NODE(v) = NOD(varlist);
-}
 
 //=//// CONTEXT KEYLISTS //////////////////////////////////////////////////=//
 //
@@ -353,7 +350,7 @@ inline static void FAIL_IF_INACCESSIBLE_CTX(REBCTX *c) {
 
 inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
     assert(ANY_CONTEXT_KIND(CELL_HEART(v)));
-    REBCTX *c = CTX(PAYLOAD(Any, v).first.node);
+    REBCTX *c = CTX(VAL_NODE1(v));
     FAIL_IF_INACCESSIBLE_CTX(c);
     return c;
 }
@@ -401,11 +398,11 @@ inline static REBCTX *VAL_FRAME_BINDING(REBCEL(const*) v) {
 
 inline static void INIT_VAL_FRAME_PHASE(RELVAL *v, REBACT *phase) {
     assert(IS_FRAME(v));  // may be marked protected (e.g. archetype)
-    VAL_FRAME_PHASE_OR_LABEL_NODE(v) = NOD(phase);
+    INIT_VAL_FRAME_PHASE_OR_LABEL(v, NOD(phase));
 }
 
 inline static REBACT *VAL_FRAME_PHASE(REBCEL(const*) v) {
-    REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
+    REBSER *s = VAL_FRAME_PHASE_OR_LABEL(v);
     if (IS_SER_STRING(s))  // holds label, not a phase
         return CTX_FRAME_ACTION(VAL_CONTEXT(v));  // so use archetype
     return ACT(s);  // cell has its own phase, return it
@@ -413,12 +410,12 @@ inline static REBACT *VAL_FRAME_PHASE(REBCEL(const*) v) {
 
 inline static bool IS_FRAME_PHASED(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_FRAME);
-    REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
+    REBSER *s = VAL_FRAME_PHASE_OR_LABEL(v);
     return not IS_SER_STRING(s);
 }
 
 inline static option(const REBSTR*) VAL_FRAME_LABEL(const RELVAL *v) {
-    REBSER *s = SER(VAL_FRAME_PHASE_OR_LABEL_NODE(v));
+    REBSER *s = VAL_FRAME_PHASE_OR_LABEL(v);
     if (IS_SER_STRING(s))  // label in value
         return STR(s);
     return ANONYMOUS;  // has a phase, so no label (maybe findable if running)
@@ -431,11 +428,12 @@ inline static void INIT_VAL_FRAME_LABEL(
     assert(IS_FRAME(v));
     ASSERT_CELL_WRITABLE_EVIL_MACRO(v);
     if (label)
-        VAL_FRAME_PHASE_OR_LABEL_NODE(v)
-            = NOD(m_cast(REBSTR*, unwrap(label)));
+        INIT_VAL_FRAME_PHASE_OR_LABEL(v, unwrap(label));
     else
-        VAL_FRAME_PHASE_OR_LABEL_NODE(v)  // for no label, match the archetype
-            = NOD(CTX_FRAME_ACTION(VAL_CONTEXT(v)));
+        INIT_VAL_FRAME_PHASE_OR_LABEL(
+            v,  // v-- for no label, match the archetype
+            NOD(CTX_FRAME_ACTION(VAL_CONTEXT(v)))
+        );
 }
 
 
@@ -670,7 +668,10 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
             | CELL_MASK_CONTEXT;
     INIT_VAL_CONTEXT_VARLIST(single, ARR(stub));
     INIT_VAL_FRAME_BINDING(single, VAL_FRAME_BINDING(rootvar));
-    TRASH_POINTER_IF_DEBUG(VAL_FRAME_PHASE_OR_LABEL_NODE(single));
+
+  #if !defined(DEBUG)
+    INIT_VAL_FRAME_PHASE_OR_LABEL(single, nullptr);  // can't trash
+  #endif
 
     INIT_VAL_CONTEXT_VARLIST(rootvar, ARR(copy));
 

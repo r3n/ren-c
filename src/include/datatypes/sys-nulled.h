@@ -46,8 +46,8 @@ inline static REBVAL *Init_Nulled_Core(RELVAL *out) {
     RESET_VAL_HEADER(out, REB_NULL, CELL_MASK_NONE);
   #ifdef ZERO_UNUSED_CELL_FIELDS
     EXTRA(Any, out).trash = nullptr;
-    PAYLOAD(Any, out).first.node = nullptr;
-    PAYLOAD(Any, out).second.node = nullptr;
+    PAYLOAD(Any, out).first.trash = nullptr;
+    PAYLOAD(Any, out).second.trash = nullptr;
   #endif
     return cast(REBVAL*, out);
 }

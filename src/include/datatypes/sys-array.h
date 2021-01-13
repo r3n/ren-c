@@ -52,7 +52,7 @@
 // lot of this central code inlinable.
 //
 #define LINK_FILENAME_HACK(s) \
-    cast(REBSTR*, s->link.custom.node)
+    cast(const REBSTR*, s->link.custom.node)
 
 
 // HEAD, TAIL, and LAST refer to specific value pointers in the array.  An
@@ -467,7 +467,7 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
 inline static const REBARR *VAL_ARRAY(REBCEL(const*) v) {
     assert(ANY_ARRAY_KIND(CELL_HEART(v)));
 
-    const REBARR *a = ARR(PAYLOAD(Any, v).first.node);
+    const REBARR *a = ARR(VAL_NODE1(v));
     if (GET_SERIES_INFO(a, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return a;
@@ -601,7 +601,7 @@ inline static RELVAL *Init_Relative_Block_At(
     REBLEN index
 ){
     RELVAL *block = RESET_CELL(out, REB_BLOCK, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(block, array);
+    INIT_VAL_NODE1(block, array);
     VAL_INDEX_RAW(block) = index;
     INIT_SPECIFIER(block, action);
     return out;

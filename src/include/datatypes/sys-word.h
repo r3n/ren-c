@@ -100,7 +100,7 @@ inline static REBVAL *Init_Any_Word_Core(
     RESET_VAL_HEADER(out, kind, CELL_FLAG_FIRST_IS_NODE);
     mutable_BINDING(out) = spelling;
     VAL_WORD_INDEXES_U32(out) = 0;
-    VAL_WORD_CACHE_NODE(out) = UNSPECIFIED;
+    INIT_VAL_WORD_CACHE(out, SPECIFIED);
 
     return cast(REBVAL*, out);
 }
@@ -122,7 +122,7 @@ inline static REBVAL *Init_Any_Word_Bound_Core(
     RESET_VAL_HEADER(out, type, CELL_FLAG_FIRST_IS_NODE);
     mutable_BINDING(out) = &context->varlist;
     VAL_WORD_INDEXES_U32(out) = index;
-    VAL_WORD_CACHE_NODE(out) = UNSPECIFIED;
+    INIT_VAL_WORD_CACHE(out, SPECIFIED);
 
     return cast(REBVAL*, out);
 }

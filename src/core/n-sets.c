@@ -240,7 +240,7 @@ REBSER *Make_Set_Operation_Series(
 
                 DECLARE_LOCAL (mo_value);
                 RESET_CELL(mo_value, REB_TEXT, CELL_FLAG_FIRST_IS_NODE);
-                VAL_NODE(mo_value) = NOD(mo->series);
+                INIT_VAL_NODE1(mo_value, mo->series);
                 VAL_INDEX_RAW(mo_value) = mo->index;
 
                 if (
@@ -315,7 +315,7 @@ REBSER *Make_Set_Operation_Series(
 
                 DECLARE_LOCAL (buf_value);
                 RESET_CELL(buf_value, REB_BINARY, CELL_FLAG_FIRST_IS_NODE);
-                VAL_NODE(buf_value) = NOD(buf);
+                INIT_VAL_NODE1(buf_value, NOD(buf));
                 VAL_INDEX_RAW(buf_value) = buf_start_len;
 
                 if (

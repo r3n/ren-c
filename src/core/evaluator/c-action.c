@@ -823,7 +823,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (not IS_VARARGS(f->arg))
                 fail (Error_Not_Varargs(f, f->key, f->param, VAL_TYPE(f->arg)));
 
-            VAL_VARARGS_PHASE_NODE(f->arg) = NOD(FRM_PHASE(f));
+            INIT_VAL_VARARGS_PHASE(f->arg, NOD(FRM_PHASE(f)));
 
             // Store the offset so that both the arg and param locations can
             // quickly be recovered, while using only a single slot in the

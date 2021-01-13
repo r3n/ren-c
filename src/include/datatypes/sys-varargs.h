@@ -58,11 +58,8 @@
 #define VAL_VARARGS_SIGNED_PARAM_INDEX(v) \
     PAYLOAD(Any, (v)).first.i
 
-#define VAL_VARARGS_PHASE_NODE(v) \
-    PAYLOAD(Any, (v)).second.node
-
-#define VAL_VARARGS_PHASE(v) \
-    ACT(VAL_VARARGS_PHASE_NODE(v))
+#define INIT_VAL_VARARGS_PHASE          INIT_VAL_NODE2
+#define VAL_VARARGS_PHASE(v)            ACT(VAL_NODE2(v))
 
 inline static REBARR *VAL_VARARGS_BINDING(REBCEL(const*) v) {
     assert(CELL_HEART(v) == REB_VARARGS);
@@ -82,7 +79,7 @@ inline static REBVAL *Init_Varargs_Untyped_Normal(RELVAL *out, REBFRM *f) {
     RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
     mutable_BINDING(out) = f->varlist;  // frame-based VARARGS!
     UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));
-    VAL_VARARGS_PHASE_NODE(out) = nullptr;  // set in typecheck
+    INIT_VAL_VARARGS_PHASE(out, nullptr);  // set in typecheck
     return cast(REBVAL*, out);
 }
 
@@ -104,7 +101,7 @@ inline static REBVAL *Init_Varargs_Untyped_Enfix(
     RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
     INIT_VAL_VARARGS_BINDING(out, array1);
     UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));
-    VAL_VARARGS_PHASE_NODE(out) = nullptr;  // set in typecheck
+    INIT_VAL_VARARGS_PHASE(out, nullptr);  // set in typecheck
     return cast(REBVAL*, out);
 }
 

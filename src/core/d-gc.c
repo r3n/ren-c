@@ -48,7 +48,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
     if (KIND3Q_BYTE_UNCHECKED(v) == REB_QUOTED) {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         assert(HEART_BYTE(v) == REB_QUOTED);
-        assert(Is_Marked(PAYLOAD(Any, v).first.node));
+        assert(Is_Marked(VAL_NODE1(v)));
         assert(VAL_QUOTED_DEPTH(v) >= 3);
         REBCEL(const*) cell = VAL_UNESCAPED(v);
         if (ANY_WORD_KIND(CELL_KIND(cell))) {
@@ -118,7 +118,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         break;
 
       case REB_PAIR: {
-        REBVAL *paired = VAL(VAL_NODE(v));
+        REBVAL *paired = VAL(VAL_NODE1(v));
         assert(Is_Marked(paired));
         break; }
 
@@ -137,7 +137,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
       case REB_BITSET: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBSER *s = SER(PAYLOAD(Any, v).first.node);
+        REBSER *s = SER(VAL_NODE1(v));
         if (GET_SERIES_INFO(s, INACCESSIBLE))
             assert(Is_Marked(s));  // TBD: clear out reference and GC `s`?
         else
@@ -152,11 +152,12 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         break; }
 
       case REB_HANDLE: { // See %sys-handle.h
-        REBARR *a = VAL_HANDLE_SINGULAR(v);
-        if (not a) {  // simple handle, no GC interaction
-            assert(not (v->header.bits & CELL_FLAG_FIRST_IS_NODE));
+        if (NOT_CELL_FLAG(v, FIRST_IS_NODE)) {
+            // simple handle, no GC interaction
         }
         else {
+            REBARR *a = VAL_HANDLE_SINGULAR(v);
+
             // Handle was created with Init_Handle_XXX_Managed.  It holds a
             // REBSER node that contains exactly one handle, and the actual
             // data for the handle lives in that shared location.  There is
@@ -185,13 +186,13 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
       case REB_EVENT: {  // packed cell structure with one GC-able slot
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBNOD *n = PAYLOAD(Any, v).first.node;  // REBGOB*, REBREQ*, etc.
-        assert(n == nullptr or Is_Marked(PAYLOAD(Any, v).first.node));
+        REBNOD *n = VAL_NODE1(v);  // REBGOB*, REBREQ*, etc.
+        assert(n == nullptr or Is_Marked(n));
         break; }
 
       case REB_BINARY: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBBIN *s = BIN(PAYLOAD(Any, v).first.node);
+        REBBIN *s = BIN(VAL_NODE1(v));
         if (GET_SERIES_INFO(s, INACCESSIBLE))
             break;
 
@@ -206,7 +207,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_URL:
       case REB_TAG: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        if (GET_SERIES_INFO(STR(PAYLOAD(Any, v).first.node), INACCESSIBLE))
+        if (GET_SERIES_INFO(STR(VAL_NODE1(v)), INACCESSIBLE))
             break;
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
@@ -238,7 +239,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_ERROR:
       case REB_FRAME:
       case REB_PORT: {
-        if (GET_SERIES_INFO(SER(PAYLOAD(Any, v).first.node), INACCESSIBLE))
+        if (GET_SERIES_INFO(SER(VAL_NODE1(v)), INACCESSIBLE))
             break;
 
         assert((v->header.bits & CELL_MASK_CONTEXT) == CELL_MASK_CONTEXT);
@@ -298,7 +299,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_SET_GROUP:
       case REB_GET_GROUP:
       case REB_SYM_GROUP: {
-        if (GET_SERIES_INFO(ARR(PAYLOAD(Any, v).first.node), INACCESSIBLE))
+        if (GET_SERIES_INFO(ARR(VAL_NODE1(v)), INACCESSIBLE))
             break;
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
@@ -320,7 +321,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
       any_sequence: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBARR *a = ARR(PAYLOAD(Any, v).first.node);
+        REBARR *a = ARR(VAL_NODE1(v));
         assert(NOT_SERIES_INFO(a, INACCESSIBLE));
 
         // With most arrays we may risk direct recursion, hence we have to
@@ -346,13 +347,13 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_SYM_WORD: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
 
-        REBSPC *cache = cast(REBSPC*, VAL_WORD_CACHE_NODE(v));
+        REBSPC *cache = VAL_WORD_CACHE(v);
         if (cache) {
             assert(
-                (cache->header.bits & ARRAY_FLAG_IS_PATCH)
+                GET_ARRAY_FLAG(cache, IS_PATCH)
                 or (
-                    (cache->header.bits & ARRAY_FLAG_IS_VARLIST)
-                    and (Singular_From_Cell(v)->header.bits & ARRAY_FLAG_IS_PATCH)
+                    GET_ARRAY_FLAG(cache, IS_VARLIST)
+                    and GET_ARRAY_FLAG(Singular_From_Cell(v), IS_PATCH)
                 )
             );
         }
@@ -382,9 +383,8 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert((v->header.bits & CELL_MASK_ACTION) == CELL_MASK_ACTION);
 
         REBACT *a = VAL_ACTION(v);
-        assert(Is_Marked(PAYLOAD(Any, v).first.node));
-        if (PAYLOAD(Any, v).second.node)
-            assert(Is_Marked(PAYLOAD(Any, v).second.node));
+        assert(Is_Marked(a));
+        assert(Is_Marked(VAL_ACTION_SPECIALTY_OR_LABEL(v)));
 
         // Make sure the [0] slot of the paramlist holds an archetype that is
         // consistent with the paramlist itself.

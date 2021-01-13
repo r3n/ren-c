@@ -44,6 +44,7 @@
 //
 
 
+#define LINK_ReqNextNode_TYPE   const REBNOD*  // for setting via indirection
 #define LINK_ReqNext_TYPE       REBREQ*  // alias for REBBIN
 #define LINK_ReqNext_CAST       BIN
 
@@ -140,7 +141,7 @@ struct rebol_device {
     DEVICE_CMD_CFUNC *commands; // command dispatch table
     uint32_t max_command;   // keep commands in bounds
     uint32_t req_size;      // size of the request state
-    REBREQ *pending;        // pending requests
+    const REBNOD *pending;  // pending requests (actually a REBREQ*)
     uint32_t flags;         // state: open, signal
 
     REBDEV *next;  // next in linked list of registered devices

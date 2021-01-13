@@ -455,7 +455,7 @@ bool Is_Value_Frozen_Deep(const RELVAL *v) {
     if (NOT_CELL_FLAG(cell, FIRST_IS_NODE))
         return true;  // payloads that live in cell are immutable
 
-    REBNOD *node = VAL_NODE(cell);
+    REBNOD *node = VAL_NODE1(cell);
     if (node == nullptr or Is_Node_Cell(node))
         return true;  // !!! Will all non-quoted Pairings be frozen?
 

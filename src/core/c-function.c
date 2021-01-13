@@ -919,7 +919,7 @@ REBACT *Make_Action(
     );
     RELVAL *archetype = ARR_HEAD(details);
     RESET_CELL(archetype, REB_ACTION, CELL_MASK_ACTION);
-    VAL_ACTION_DETAILS_NODE(archetype) = NOD(details);
+    INIT_VAL_ACTION_DETAILS(archetype, details);
     mutable_BINDING(archetype) = UNBOUND;
 
   #if !defined(NDEBUG)  // notice attempted mutation of the archetype cell
@@ -933,7 +933,7 @@ REBACT *Make_Action(
     details->link.dispatcher = dispatcher; // level of indirection, hijackable
     mutable_MISC(Meta, details) = nullptr;  // caller can fill in
 
-    VAL_ACTION_SPECIALTY_OR_LABEL_NODE(archetype) = NOD(specialty);
+    INIT_VAL_ACTION_SPECIALTY_OR_LABEL(archetype, specialty);
 
     assert(NOT_ARRAY_FLAG(details, HAS_FILE_LINE_UNMASKED));
 
@@ -1111,7 +1111,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
             // Note: clears VAL_FLAG_LINE
             //
             RESET_VAL_HEADER(slot, REB_GROUP, CELL_FLAG_FIRST_IS_NODE);
-            INIT_VAL_NODE(slot, VAL_ARRAY(body));
+            INIT_VAL_NODE1(slot, VAL_ARRAY(body));
             VAL_INDEX_RAW(slot) = 0;
             INIT_SPECIFIER(slot, a);  // relative binding
 
@@ -1122,7 +1122,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // body specific to a fabricated expired frame.  See #2221
 
         RESET_VAL_HEADER(out, REB_BLOCK, CELL_FLAG_FIRST_IS_NODE);
-        INIT_VAL_NODE(out, maybe_fake_body);
+        INIT_VAL_NODE1(out, maybe_fake_body);
         VAL_INDEX_RAW(out) = 0;
         INIT_SPECIFIER(out, Make_Expired_Frame_Ctx_Managed(a));
         return;

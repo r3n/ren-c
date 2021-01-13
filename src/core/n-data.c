@@ -1059,7 +1059,7 @@ REBNATIVE(free_q)
     if (NOT_CELL_FLAG(v, FIRST_IS_NODE))
         return Init_False(D_OUT);
 
-    REBNOD *n = PAYLOAD(Any, v).first.node;
+    REBNOD *n = VAL_NODE1(v);
 
     // If the node is not a series (e.g. a pairing), it cannot be freed (as
     // a freed version of a pairing is the same size as the pairing).
@@ -1555,9 +1555,9 @@ REBNATIVE(as)
             // used, as the read-only frame is archetypal.
             //
             RESET_VAL_HEADER(D_OUT, REB_FRAME, CELL_MASK_CONTEXT);
-            VAL_CONTEXT_VARLIST_NODE(D_OUT) = NOD(ACT_EXEMPLAR(VAL_ACTION(v)));
+            INIT_VAL_CONTEXT_VARLIST(D_OUT, ACT_PARAMLIST(VAL_ACTION(v)));
             mutable_BINDING(D_OUT) = CTX_VARLIST(VAL_ACTION_BINDING(v));
-            VAL_FRAME_PHASE_OR_LABEL_NODE(D_OUT) = NOD(VAL_ACTION(v));
+            INIT_VAL_FRAME_PHASE_OR_LABEL(D_OUT, NOD(VAL_ACTION(v)));
             return D_OUT;
         }
 
