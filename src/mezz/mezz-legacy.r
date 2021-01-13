@@ -17,6 +17,14 @@ REBOL [
 ]
 
 
+; We are in the evaluation period of deciding if JUST is a more literate short
+; term than LIT for getting values literally.  But LIT is used some places
+; (like <json>) so keep it for compatibility until a decision is reached.
+; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
+;
+lit: :just
+
+
 REBOL: function [] [
     fail @return [
         "The REBOL [] header of a script must be interpreted by LOAD (and"
