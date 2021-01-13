@@ -140,7 +140,7 @@ inline static bool Is_Frame_Style_Varargs_Maybe_Null(
     assert(CELL_KIND(vararg) == REB_VARARGS);
 
     REBARR *binding = ARR(BINDING(vararg));
-    if (binding->header.bits & ARRAY_FLAG_IS_VARLIST) {
+    if (GET_ARRAY_FLAG(binding, IS_VARLIST)) {
         // "Ordinary" case... use the original frame implied by the VARARGS!
         // (so long as it is still live on the stack)
 
@@ -222,9 +222,7 @@ inline static const REBPAR *Param_For_Varargs_Maybe_Null(
     // A vararg created from a block AND never passed as an argument so no
     // typeset or quoting settings available.  Treat as "normal" parameter.
     //
-    assert(
-        not (ARR(BINDING(v))->header.bits & ARRAY_FLAG_IS_VARLIST)
-    );
+    assert(NOT_ARRAY_FLAG(ARR(BINDING(v)), IS_VARLIST));
     return nullptr;
 }
 

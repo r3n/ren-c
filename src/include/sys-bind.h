@@ -109,7 +109,7 @@
         if (not a)
             return SPECIFIED;
 
-        if (a->header.bits & ARRAY_FLAG_IS_PATCH)
+        if (GET_ARRAY_FLAG(a, IS_PATCH))
             return cast(REBSPC*, a);  // virtual bind
 
         // While an ANY-WORD! can be bound specifically to an arbitrary
@@ -369,7 +369,7 @@ inline static void INIT_BINDING_MAY_MANAGE(
     assert(f->key == f->key_tail);  // cannot manage varlist in mid fulfill!
     UNUSED(f);
 
-    m_cast(REBSER*, binding)->header.bits |= NODE_FLAG_MANAGED;  // GC sees...
+    m_cast(REBSER*, binding)->leader.bits |= NODE_FLAG_MANAGED;  // GC sees...
 }
 
 
@@ -380,7 +380,7 @@ inline static void INIT_BINDING_MAY_MANAGE(
 //
 inline static bool IS_WORD_UNBOUND(const RELVAL *v) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
-    return BINDING(v)->header.bits & SERIES_FLAG_IS_STRING;
+    return GET_SERIES_FLAG(BINDING(v), IS_STRING);
 }
 
 #define IS_WORD_BOUND(v) \
@@ -396,10 +396,10 @@ inline static REBLEN VAL_WORD_INDEX(const RELVAL *v) {
 
 inline static REBARR *VAL_WORD_BINDING(const RELVAL *v) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
-    const REBSER *binding = BINDING(v);
-    if (binding->header.bits & SERIES_FLAG_IS_STRING)
+    REBSER *binding = BINDING(v);  // Note: is const if REBSTR...
+    if (GET_SERIES_FLAG(binding, IS_STRING))
         return UNBOUND;
-    return m_cast(REBARR*, ARR(binding));
+    return ARR(binding);
 }
 
 inline static void INIT_VAL_WORD_BINDING(RELVAL *v, const REBSER *binding) {
@@ -409,17 +409,17 @@ inline static void INIT_VAL_WORD_BINDING(RELVAL *v, const REBSER *binding) {
     mutable_BINDING(v) = binding;
 
   #if !defined(NDEBUG)
-    if (binding->header.bits & SERIES_FLAG_IS_STRING)
+    if (GET_SERIES_FLAG(binding, IS_STRING))
         return;  // e.g. UNBOUND (words use strings to indicate unbounds)
 
-    if (binding->header.bits & NODE_FLAG_MANAGED) {
+    if (binding->leader.bits & NODE_FLAG_MANAGED) {
         assert(
-            binding->header.bits & ARRAY_FLAG_IS_DETAILS  // relative
-            or binding->header.bits & ARRAY_FLAG_IS_VARLIST  // specific
+            binding->leader.bits & ARRAY_FLAG_IS_DETAILS  // relative
+            or binding->leader.bits & ARRAY_FLAG_IS_VARLIST  // specific
         );
     }
     else
-        assert(binding->header.bits & ARRAY_FLAG_IS_VARLIST);
+        assert(binding->leader.bits & ARRAY_FLAG_IS_VARLIST);
   #endif
 }
 
@@ -464,7 +464,7 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
         FRM(LINK(KeySource, binding))->key
             == FRM(LINK(KeySource, binding))->key_tail  // not fulfilling
     );
-    binding->header.bits |= NODE_FLAG_MANAGED;  // !!! review managing needs
+    binding->leader.bits |= NODE_FLAG_MANAGED;  // !!! review managing needs
     REBCTX *c = CTX(binding);
     FAIL_IF_INACCESSIBLE_CTX(c);
     return c;
@@ -478,7 +478,7 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
 inline static const REBSTR *VAL_WORD_SPELLING(REBCEL(const*) cell) {
     assert(ANY_WORD_KIND(CELL_HEART(cell)));
 
-    if (BINDING(cell)->header.bits & SERIES_FLAG_IS_STRING)
+    if (GET_SERIES_FLAG(BINDING(cell), IS_STRING))
         return STR(BINDING(cell));
 
     REBARR *binding = ARR(BINDING(cell));
@@ -489,10 +489,10 @@ inline static const REBSTR *VAL_WORD_SPELLING(REBCEL(const*) cell) {
 
     const RELVAL *v = CELL_TO_VAL(cell);
 
-    if (binding->header.bits & ARRAY_FLAG_IS_DETAILS)  // relative
+    if (GET_ARRAY_FLAG(binding, IS_DETAILS))  // relative
         return KEY_SPELLING(ACT_KEY(ACT(binding), VAL_WORD_INDEX(v)));
 
-    assert(binding->header.bits & ARRAY_FLAG_IS_VARLIST);  // specific
+    assert(GET_ARRAY_FLAG(binding, IS_VARLIST));  // specific
     return KEY_SPELLING(CTX_KEY(CTX(binding), VAL_WORD_INDEX(v)));
 }
 
@@ -552,7 +552,7 @@ inline static option(REBCTX*) Get_Word_Context(
         if (binding == UNBOUND)
             return nullptr;
 
-        assert(binding->header.bits & ARRAY_FLAG_IS_VARLIST);  // not relative
+        assert(GET_ARRAY_FLAG(binding, IS_VARLIST));  // not relative
         *index_out = VAL_WORD_INDEX(any_word);
         return CTX(binding);
     }
@@ -584,7 +584,7 @@ inline static option(REBCTX*) Get_Word_Context(
         // mondex bits to use as the mod of the chain length.
         //
         do {
-            assert(specifier->header.bits & ARRAY_FLAG_IS_PATCH);
+            assert(GET_ARRAY_FLAG(specifier, IS_PATCH));
             if (
                 IS_SET_WORD(ARR_SINGLE(specifier))
                 and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
@@ -699,7 +699,7 @@ inline static option(REBCTX*) Get_Word_Context(
     if (binding == UNBOUND)
         return nullptr;  // once no virtual bind found, no binding is unbound
 
-    if (binding->header.bits & ARRAY_FLAG_IS_VARLIST) {
+    if (GET_ARRAY_FLAG(binding, IS_VARLIST)) {
 
         // SPECIFIC BINDING: The context the word is bound to is explicitly
         // contained in the `any_word` REBVAL payload.  Extract it, but check
@@ -735,7 +735,7 @@ inline static option(REBCTX*) Get_Word_Context(
         }
     }
     else {
-        assert(binding->header.bits & ARRAY_FLAG_IS_DETAILS);
+        assert(GET_ARRAY_FLAG(binding, IS_DETAILS));
 
         // RELATIVE BINDING: The word was made during a deep copy of the block
         // that was given as a function's body, and stored a reference to that
@@ -1015,7 +1015,7 @@ inline static option(REBCTX*) SPC_FRAME_CTX(REBSPC *specifier)
         return nullptr;
     if (GET_ARRAY_FLAG(specifier, IS_VARLIST))
         return CTX(specifier);
-    return CTX(*SPC_FRAME_CTX_ADDRESS(specifier));
+    return CTX(m_cast(REBNOD*, *SPC_FRAME_CTX_ADDRESS(specifier)));
 }
 
 

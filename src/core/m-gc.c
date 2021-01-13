@@ -196,7 +196,7 @@ static void Queue_Mark_Node_Deep(void *p)
             SERIES_FLAG_LINK_NODE_NEEDS_MARK
                 | SERIES_FLAG_MISC_NODE_NEEDS_MARK
         );*/
-        s->header.bits |= NODE_FLAG_MARKED;
+        s->leader.bits |= NODE_FLAG_MARKED;
         return;
     }
 
@@ -210,7 +210,7 @@ static void Queue_Mark_Node_Deep(void *p)
     }
   #endif
 
-    s->header.bits |= NODE_FLAG_MARKED; // may be already set
+    s->leader.bits |= NODE_FLAG_MARKED;  // may be already set
 
     if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and LINK(Node, s)) {
         //
@@ -239,7 +239,7 @@ static void Queue_Mark_Node_Deep(void *p)
             REBKEY *tail = SER_TAIL(REBKEY, link);
             REBKEY *key = SER_HEAD(REBKEY, link);
             for (; key != tail; ++key)
-                m_cast(REBSTR*, KEY_SPELLING(key))->header.bits
+                m_cast(REBSTR*, KEY_SPELLING(key))->leader.bits
                     |= NODE_FLAG_MARKED;
         }
     }
@@ -342,7 +342,7 @@ static void Propagate_All_GC_Marks(void)
         // We should have marked this series at queueing time to keep it from
         // being doubly added before the queue had a chance to be processed
          //
-        assert(a->header.bits & NODE_FLAG_MARKED);
+        assert(a->leader.bits & NODE_FLAG_MARKED);
 
         RELVAL *v = ARR_HEAD(a);
         for (; NOT_END(v); ++v) {
@@ -473,52 +473,59 @@ static void Mark_Root_Series(void)
 {
     REBSEG *seg;
     for (seg = Mem_Pools[SER_POOL].segs; seg; seg = seg->next) {
-        REBSER *s = cast(REBSER *, seg + 1);
-        REBLEN n;
-        for (n = Mem_Pools[SER_POOL].units; n > 0; --n, ++s) {
+        REBYTE *unit = cast(REBYTE*, seg + 1);
+        REBLEN n = Mem_Pools[SER_POOL].num_units;
+        for (; n > 0; --n, unit += sizeof(REBSER)) {
             //
             // !!! A smarter switch statement here could do this more
             // optimally...see the sweep code for an example.
             //
-            if (IS_FREE_NODE(s))
+            REBYTE nodebyte = *unit;
+            if (nodebyte & NODE_BYTEMASK_0x40_FREE)
                 continue;
 
-            if (s->header.bits & NODE_FLAG_ROOT) {
+            assert(nodebyte & NODE_BYTEMASK_0x80_NODE);
+
+            if (nodebyte & NODE_BYTEMASK_0x04_ROOT) {
                 //
                 // This came from Alloc_Value(); all references should be
                 // from the C stack, only this visit should be marking it.
                 //
-                assert(not (s->header.bits & NODE_FLAG_MARKED));
-                assert(not IS_SER_DYNAMIC(s));
+                REBARR *a = ARR(cast(void*, unit));
 
-                if (not (s->header.bits & NODE_FLAG_MANAGED)) {
+                assert(not (a->leader.bits & NODE_FLAG_MARKED));
+
+                if (not (a->leader.bits & NODE_FLAG_MANAGED)) {
                     // if it's not managed, don't mark it (don't have to?)
                 }
                 else  // Note that Mark_Frame_Stack_Deep() will mark the owner
-                    s->header.bits |= NODE_FLAG_MARKED;
+                    a->leader.bits |= NODE_FLAG_MARKED;
 
                 // Note: Eval_Core() might target API cells, uses END
                 //
-                Queue_Mark_Opt_End_Cell_Deep(ARR_SINGLE(ARR(s)));
+                Queue_Mark_Opt_End_Cell_Deep(ARR_SINGLE(a));
                 continue;
             }
 
-            if (s->header.bits & NODE_FLAG_CELL) { // a pairing
-                if (s->header.bits & NODE_FLAG_MANAGED)
+            if (nodebyte & NODE_BYTEMASK_0x01_CELL) {  // a pairing
+                REBVAL *paired = VAL(cast(void*, unit));
+                if (paired->header.bits & NODE_FLAG_MANAGED)
                     continue; // PAIR! or other value will mark it
 
                 assert(!"unmanaged pairings not believed to exist yet");
-                REBVAL *paired = cast(REBVAL*, s);
                 Queue_Mark_Opt_Value_Deep(paired);
                 Queue_Mark_Opt_Value_Deep(PAIRING_KEY(paired));
             }
 
+            REBSER *s = SER(cast(void*, unit));
             if (IS_SER_ARRAY(s)) {
-                if (s->header.bits & NODE_FLAG_MANAGED)
+                if (s->leader.bits & NODE_FLAG_MANAGED)
                     continue; // BLOCK! should mark it
 
-                if (GET_ARRAY_FLAG(ARR(s), IS_VARLIST))
-                    if (CTX_TYPE(CTX(s)) == REB_FRAME)
+                REBARR *a = ARR(s);
+
+                if (GET_ARRAY_FLAG(a, IS_VARLIST))
+                    if (CTX_TYPE(CTX(a)) == REB_FRAME)
                         continue;  // Mark_Frame_Stack_Deep() etc. mark it
 
                 // This means someone did something like Make_Array() and then
@@ -531,19 +538,19 @@ static void Mark_Root_Series(void)
                 // Manage and use PUSH_GC_GUARD and DROP_GC_GUARD on them.
                 //
                 assert(
-                    NOT_ARRAY_FLAG(ARR(s), IS_VARLIST)
-                    and NOT_ARRAY_FLAG(ARR(s), IS_DETAILS)
-                    and NOT_ARRAY_FLAG(ARR(s), IS_PAIRLIST)
+                    NOT_ARRAY_FLAG(a, IS_VARLIST)
+                    and NOT_ARRAY_FLAG(a, IS_DETAILS)
+                    and NOT_ARRAY_FLAG(a, IS_PAIRLIST)
                 );
 
-                if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK))
-                    if (LINK(Node, s))
-                        Queue_Mark_Node_Deep(LINK(Node, s));
-                if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK))
-                    if (MISC(Node, s))
-                        Queue_Mark_Node_Deep(MISC(Node, s));
+                if (GET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK))
+                    if (LINK(Node, a))
+                        Queue_Mark_Node_Deep(LINK(Node, a));
+                if (GET_SERIES_FLAG(a, MISC_NODE_NEEDS_MARK))
+                    if (MISC(Node, a))
+                        Queue_Mark_Node_Deep(MISC(Node, a));
 
-                RELVAL *item = SER_HEAD(RELVAL, m_cast(REBSER*, s));
+                RELVAL *item = SER_HEAD(RELVAL, a);
                 for (; NOT_END(item); ++item)
                     Queue_Mark_Value_Deep(item);
             }
@@ -598,7 +605,7 @@ static void Mark_Symbol_Series(void)
     assert(IS_POINTER_TRASH_DEBUG(*canon)); // SYM_0 for all non-builtin words
     ++canon;
     for (; *canon != nullptr; ++canon)
-        (*canon)->header.bits |= NODE_FLAG_MARKED;
+        (*canon)->leader.bits |= NODE_FLAG_MARKED;
 
     ASSERT_NO_GC_MARKS_PENDING(); // doesn't ues any queueing
 }
@@ -699,7 +706,7 @@ static void Mark_Frame_Stack_Deep(void)
 
         if (
             f_specifier != SPECIFIED
-            and (f_specifier->header.bits & NODE_FLAG_MANAGED)
+            and (f_specifier->leader.bits & NODE_FLAG_MANAGED)
         ){
             Queue_Mark_Node_Deep(f_specifier);
         }
@@ -823,7 +830,7 @@ static REBLEN Sweep_Series(void)
 
     REBSEG *seg = Mem_Pools[SER_POOL].segs;
     for (; seg != nullptr; seg = seg->next) {
-        REBLEN n = Mem_Pools[SER_POOL].units;
+        REBLEN n = Mem_Pools[SER_POOL].num_units;
 
         // We use a generic byte pointer (unsigned char*) to dodge the rules
         // for strict aliasing, as the pool may contain pairs of REBVAL from
@@ -834,10 +841,10 @@ static REBLEN Sweep_Series(void)
         // DEBUG_TRACK_EXTEND_CELLS, then this will be processing the REBSER
         // nodes only--see loop lower down for the pairing pool enumeration.
 
-        REBYTE *bp = cast(REBYTE*, seg + 1);
+        REBYTE *unit = cast(REBYTE*, seg + 1);
 
-        for (; n > 0; --n, bp += sizeof(REBSER)) {
-            switch (*bp >> 4) {
+        for (; n > 0; --n, unit += sizeof(REBSER)) {
+            switch (*unit >> 4) {
               case 0:
               case 1:  // 0x1
               case 2:  // 0x2
@@ -851,7 +858,7 @@ static REBLEN Sweep_Series(void)
                 // reserved for UTF-8 strings (corresponding to valid ASCII
                 // values in the first byte).
                 //
-                panic (bp);
+                panic (unit);
 
             // v-- Everything below here has NODE_FLAG_NODE set (0x8)
 
@@ -872,7 +879,7 @@ static REBLEN Sweep_Series(void)
                 // 0x8 + 0x1: marked but not managed, this can't happen,
                 // because the marking itself asserts nodes are managed.
                 //
-                panic (bp);
+                panic (unit);
 
               case 10:
                 // 0x8 + 0x2: managed but didn't get marked, should be GC'd
@@ -881,12 +888,12 @@ static REBLEN Sweep_Series(void)
                 // as part of the switch, but see its definition for why it
                 // is at position 8 from left and not an earlier bit.
                 //
-                if (*bp & NODE_BYTEMASK_0x01_CELL) {
-                    assert(not (*bp & NODE_BYTEMASK_0x04_ROOT));
-                    Free_Node(SER_POOL, NOD(bp));  // Free_Pairing for manuals
+                if (*unit & NODE_BYTEMASK_0x01_CELL) {
+                    assert(not (*unit & NODE_BYTEMASK_0x04_ROOT));
+                    Free_Node(SER_POOL, NOD(unit));  // Free_Pairing manual
                 }
                 else {
-                    REBSER *s = cast(REBSER*, bp);
+                    REBSER *s = cast(REBSER*, unit);
                     GC_Kill_Series(s);
                 }
                 ++count;
@@ -896,7 +903,7 @@ static REBLEN Sweep_Series(void)
                 // 0x8 + 0x2 + 0x1: managed and marked, so it's still live.
                 // Don't GC it, just clear the mark.
                 //
-                *bp &= ~NODE_BYTEMASK_0x10_MARKED;
+                *unit &= ~NODE_BYTEMASK_0x10_MARKED;
                 break;
 
             // v-- Everything below this line has the two leftmost bits set
@@ -907,13 +914,13 @@ static REBLEN Sweep_Series(void)
               case 12:
                 // 0x8 + 0x4: free node, uses special illegal UTF-8 byte
                 //
-                assert(*bp == FREED_SERIES_BYTE);
+                assert(*unit == FREED_SERIES_BYTE);
                 break;
 
               case 13:
               case 14:
               case 15:
-                panic (bp);  // 0x8 + 0x4 + ... reserved for UTF-8
+                panic (unit);  // 0x8 + 0x4 + ... reserved for UTF-8
             }
         }
     }
@@ -926,7 +933,7 @@ static REBLEN Sweep_Series(void)
   #ifdef UNUSUAL_REBVAL_SIZE
     for (seg = Mem_Pools[PAR_POOL].segs; seg != NULL; seg = seg->next) {
         REBVAL *v = cast(REBVAL*, seg + 1);
-        REBLEN n = Mem_Pools[PAR_POOL].units;
+        REBLEN n = Mem_Pools[PAR_POOL].num_units;
         for (; n > 0; --n, v += 2) {
             if (v->header.bits & NODE_FLAG_FREE) {
                 assert(FIRST_BYTE(v->header) == FREED_SERIES_BYTE);
@@ -966,37 +973,39 @@ REBLEN Fill_Sweeplist(REBSER *sweeplist)
 
     REBSEG *seg;
     for (seg = Mem_Pools[SER_POOL].segs; seg != NULL; seg = seg->next) {
-        REBSER *s = cast(REBSER*, seg + 1);
-        REBLEN n;
-        for (n = Mem_Pools[SER_POOL].units; n > 0; --n, ++s) {
-            switch (FIRST_BYTE(s->header) >> 4) {
-            case 9: // 0x8 + 0x1
+        REBYTE *unit = cast(REBYTE*, seg + 1);
+        REBLEN n = Mem_Pools[SER_POOL].num_units;
+        for (; n > 0; --n, unit += sizeof(REBSER)) {
+            switch (*unit >> 4) {
+              case 9: {  // 0x8 + 0x1
+                REBSER *s = SER(cast(void*, unit));
                 ASSERT_SERIES_MANAGED(s);
-                if (s->header.bits & NODE_FLAG_MARKED)
-                    s->header.bits &= ~NODE_FLAG_MARKED;
+                if (s->leader.bits & NODE_FLAG_MARKED)
+                    s->leader.bits &= ~NODE_FLAG_MARKED;
                 else {
                     EXPAND_SERIES_TAIL(sweeplist, 1);
                     *SER_AT(REBNOD*, sweeplist, count) = NOD(s);
                     ++count;
                 }
-                break;
+                break; }
 
-            case 11: // 0x8 + 0x2 + 0x1
+              case 11: {  // 0x8 + 0x2 + 0x1
                 //
                 // It's a cell which is managed where the value is not an END.
                 // This is a managed pairing, so mark bit should be heeded.
                 //
                 // !!! It is a REBNOD, but *not* a "series".
                 //
-                ASSERT_SERIES_MANAGED(s);
-                if (s->header.bits & NODE_FLAG_MARKED)
-                    s->header.bits &= ~NODE_FLAG_MARKED;
+                REBVAL *pairing = VAL(cast(void*, unit));
+                assert(pairing->header.bits & NODE_FLAG_MANAGED);
+                if (pairing->header.bits & NODE_FLAG_MARKED)
+                    pairing->header.bits &= ~NODE_FLAG_MARKED;
                 else {
                     EXPAND_SERIES_TAIL(sweeplist, 1);
-                    *SER_AT(REBNOD*, sweeplist, count) = NOD(s);
+                    *SER_AT(REBNOD*, sweeplist, count) = NOD(pairing);
                     ++count;
                 }
-                break;
+                break; }
             }
         }
     }

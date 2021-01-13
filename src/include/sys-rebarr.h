@@ -170,16 +170,16 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 // they don't have to say ARRAY and FLAG twice.
 
 #define SET_ARRAY_FLAG(a,name) \
-    (ensure_array(a)->header.bits |= ARRAY_FLAG_##name)
+    (ensure_array(a)->leader.bits |= ARRAY_FLAG_##name)
 
 #define GET_ARRAY_FLAG(a,name) \
-    ((ensure_array(a)->header.bits & ARRAY_FLAG_##name) != 0)
+    ((ensure_array(a)->leader.bits & ARRAY_FLAG_##name) != 0)
 
 #define CLEAR_ARRAY_FLAG(a,name) \
-    (ensure_array(a)->header.bits &= ~ARRAY_FLAG_##name)
+    (ensure_array(a)->leader.bits &= ~ARRAY_FLAG_##name)
 
 #define NOT_ARRAY_FLAG(a,name) \
-    ((ensure_array(a)->header.bits & ARRAY_FLAG_##name) == 0)
+    ((ensure_array(a)->leader.bits & ARRAY_FLAG_##name) == 0)
 
 
 // Ordinary source arrays use their ->link field to point to an interned file
@@ -197,7 +197,7 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define ARR(p) \
-        m_cast(REBARR*, (const REBARR*)(p))  // don't check const in C or C++
+        x_cast(REBARR*, (p))  // don't check const in C or C++
 
 #else
 
@@ -220,7 +220,7 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
         if (not p)
             return nullptr;
 
-        if ((reinterpret_cast<const REBSER*>(p)->header.bits & (
+        if ((FIRST_BYTE(reinterpret_cast<const REBSER*>(p)->leader) & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
         )) != (
             NODE_FLAG_NODE

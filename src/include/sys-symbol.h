@@ -127,7 +127,7 @@ inline static bool SAME_SYM_NONZERO(REBSYM a, REBSYM b) {
 
 inline static OPT_REBSYM STR_SYMBOL(const REBSTR *s) {
     assert(IS_STR_SYMBOL(s));
-    return cast(REBSYM, SECOND_UINT16(s->header));
+    return cast(REBSYM, SECOND_UINT16(s->leader));
 }
 
 inline static const REBSTR *Canon(REBSYM sym) {

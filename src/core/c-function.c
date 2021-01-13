@@ -567,7 +567,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     mutable_LINK(Ancestor, keylist) = keylist;  // chain ends with self
 
     if (flags & MKF_HAS_RETURN)
-        paramlist->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
+        paramlist->leader.bits |= PARAMLIST_FLAG_HAS_RETURN;
 
     // We want to check for duplicates and a Binder can be used for that
     // purpose--but note that a fail () cannot happen while binders are
@@ -902,7 +902,7 @@ REBACT *Make_Action(
 
     ASSERT_SERIES_MANAGED(keylist);  // paramlists/keylists, can be shared
     assert(SER_USED(keylist) + 1 == ARR_LEN(paramlist));
-    if (paramlist->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
+    if (paramlist->leader.bits & PARAMLIST_FLAG_HAS_RETURN) {
         const REBKEY *key = SER_AT(const REBKEY, keylist, 0);
         assert(KEY_SYM(key) == SYM_RETURN);
         UNUSED(key);
@@ -1008,7 +1008,7 @@ REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
     // overridden by SERIES_INFO_INACCESSIBLE.
     //
     REBARR *varlist = Alloc_Singular(NODE_FLAG_MANAGED);
-    varlist->header.bits |= SERIES_MASK_VARLIST;
+    varlist->leader.bits |= SERIES_MASK_VARLIST;
     SET_SERIES_INFO(varlist, INACCESSIBLE);
     mutable_MISC(Meta, varlist) = nullptr;
 
@@ -1276,9 +1276,9 @@ REBNATIVE(tweak)
     }
 
     if (VAL_LOGIC(ARG(enable)))
-        ACT_DETAILS(act)->header.bits |= flag;
+        ACT_DETAILS(act)->leader.bits |= flag;
     else
-        ACT_DETAILS(act)->header.bits &= ~flag;
+        ACT_DETAILS(act)->leader.bits &= ~flag;
 
     RETURN (ARG(action));
 }

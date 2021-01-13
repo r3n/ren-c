@@ -66,7 +66,7 @@ void Dump_Series(REBSER *s, const char *memo)
     printf(" rest: %d\n", cast(int, SER_REST(s)));
 
     // flags includes len if non-dynamic
-    printf(" flags: %lx\n", cast(unsigned long, s->header.bits));
+    printf(" flags: %lx\n", cast(unsigned long, s->leader.bits));
 
     // info includes width
     printf(" info: %lx\n", cast(unsigned long, s->info.bits));

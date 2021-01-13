@@ -554,7 +554,7 @@ REBCTX *Copy_Context_Extra_Managed(
     }
 
     TERM_ARRAY_LEN(varlist, CTX_LEN(original) + 1);
-    varlist->header.bits |= SERIES_MASK_VARLIST;
+    varlist->leader.bits |= SERIES_MASK_VARLIST;
 
     REBCTX *copy = CTX(varlist); // now a well-formed context
 

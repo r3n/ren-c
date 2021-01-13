@@ -31,7 +31,7 @@
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define NOD(p) \
-        ((REBNOD*)(p))  // don't check const, even in C++, if checks disabled
+        x_cast(REBNOD*, (p))  // don't check const when checks disabled
 
 #else
 
@@ -206,7 +206,7 @@ inline static void *Try_Alloc_Node(REBLEN pool_id)
 
     assert(pool->first);
 
-    REBPIT *unit = pool->first;
+    REBPLU *unit = pool->first;
 
     pool->first = unit->next_if_free;
     if (unit == pool->last)
@@ -240,7 +240,7 @@ inline static void *Alloc_Node(REBLEN pool_id) {
         return node;
 
     REBPOL *pool = &Mem_Pools[pool_id];
-    fail (Error_No_Memory(pool->wide * pool->units));
+    fail (Error_No_Memory(pool->wide * pool->num_units));
 }
 
 // Free a node, returning it to its pool.  Once it is freed, its header will
@@ -266,9 +266,9 @@ inline static void Free_Node(REBLEN pool_id, void *p)
     }
   #endif
 
-    REBPIT* unit = cast(REBPIT*, node);
+    REBPLU* unit = cast(REBPLU*, node);
 
-    mutable_FIRST_BYTE(unit->leader) = FREED_SERIES_BYTE;
+    mutable_FIRST_BYTE(unit->headspot) = FREED_SERIES_BYTE;
 
     REBPOL *pool = &Mem_Pools[pool_id];
 
@@ -408,32 +408,3 @@ inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(
 
     DEAD_END;
 }
-
-
-// Unlike with GET_CELL_FLAG() etc, there's not really anything to be checked
-// on generic nodes (other than having NODE_FLAG_NODE?)  But these macros
-// help make the source a little more readable.
-
-#define SET_NOD_FLAGS(n,f) \
-    ((n)->header.bits |= (f))
-
-#define SET_NOD_FLAG(n,f) \
-    SET_NOD_FLAGS((n), (f))
-
-#define GET_NOD_FLAG(n, f) \
-    (did ((n)->header.bits & (f)))
-
-#define ANY_NOD_FLAGS(n,f) \
-    (((n)->header.bits & (f)) != 0)
-
-#define ALL_NOD_FLAGS(n,f) \
-    (((n)->header.bits & (f)) == (f))
-
-#define CLEAR_NOD_FLAGS(v,f) \
-    ((n)->header.bits &= ~(f))
-
-#define CLEAR_NOD_FLAG(n,f) \
-    CLEAR_NOD_FLAGS((n), (f))
-
-#define NOT_NOD_FLAG(n,f) \
-    (not GET_NOD_FLAG((n), (f)))

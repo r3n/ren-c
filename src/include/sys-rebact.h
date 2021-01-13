@@ -172,16 +172,16 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
 
 #define SET_ACTION_FLAG(s,name) \
-    (ACT_DETAILS(s)->header.bits |= DETAILS_FLAG_##name)
+    (ACT_DETAILS(s)->leader.bits |= DETAILS_FLAG_##name)
 
 #define GET_ACTION_FLAG(s,name) \
-    ((ACT_DETAILS(s)->header.bits & DETAILS_FLAG_##name) != 0)
+    ((ACT_DETAILS(s)->leader.bits & DETAILS_FLAG_##name) != 0)
 
 #define CLEAR_ACTION_FLAG(s,name) \
-    (ACT_DETAILS(s)->header.bits &= ~DETAILS_FLAG_##name)
+    (ACT_DETAILS(s)->leader.bits &= ~DETAILS_FLAG_##name)
 
 #define NOT_ACTION_FLAG(s,name) \
-    ((ACT_DETAILS(s)->header.bits & DETAILS_FLAG_##name) == 0)
+    ((ACT_DETAILS(s)->leader.bits & DETAILS_FLAG_##name) == 0)
 
 
 
@@ -229,7 +229,7 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
         if (not p)
             return nullptr;
 
-        if ((reinterpret_cast<const REBSER*>(p)->header.bits & (
+        if ((reinterpret_cast<const REBSER*>(p)->leader.bits & (
             SERIES_MASK_DETAILS
                 | NODE_FLAG_FREE
                 | NODE_FLAG_CELL

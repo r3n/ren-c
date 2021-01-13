@@ -1408,7 +1408,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     if (
         not f_next_gotten
         or not IS_ACTION(unwrap(f_next_gotten))
-        or not GET_ACTION_FLAG(VAL_ACTION(unwrap(f_next_gotten)), ENFIXED)
+        or NOT_ACTION_FLAG(VAL_ACTION(unwrap(f_next_gotten)), ENFIXED)
     ){
       lookback_quote_too_late: // run as if starting new expression
 

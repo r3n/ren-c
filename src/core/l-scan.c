@@ -3021,7 +3021,7 @@ REBNATIVE(transcode)
         );
         a->misc.line = ss.line;
         mutable_LINK(Filename, a) = ss.file;
-        a->header.bits |= ARRAY_MASK_HAS_FILE_LINE;
+        a->leader.bits |= ARRAY_MASK_HAS_FILE_LINE;
 
         Init_Block(D_OUT, a);
     }

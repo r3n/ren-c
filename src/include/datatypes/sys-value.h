@@ -623,7 +623,7 @@ inline static bool IS_RELATIVE(REBCEL(const*) v) {
     if (WIDE_BYTE_OR_0(binding) != 0)  // not IS_SER_ARRAY()
         return false;  // !!! should have SERIES_FLAG_IS_ARRAY, union flags
 
-    if (binding->header.bits & ARRAY_FLAG_IS_DETAILS)
+    if (binding->leader.bits & ARRAY_FLAG_IS_DETAILS)
         return true;
 
     return false;

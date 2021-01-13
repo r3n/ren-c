@@ -407,7 +407,7 @@ inline static bool Action_Is_Base_Of(REBACT *base, REBACT *derived) {
 //
 
 #define ACT_HAS_RETURN(a) \
-    (did (ACT_PARAMLIST(a)->header.bits & PARAMLIST_FLAG_HAS_RETURN))
+    (did (ACT_PARAMLIST(a)->leader.bits & PARAMLIST_FLAG_HAS_RETURN))
 
 
 //=//// NATIVE ACTION ACCESS //////////////////////////////////////////////=//

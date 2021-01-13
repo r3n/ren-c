@@ -249,7 +249,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
         s->info.bits = Endlike_Header(FLAG_LEN_BYTE_OR_255(255));  // dynamic
 
         if (not Did_Series_Data_Alloc(s, capacity)) {  // expects LEN_BYTE=255
-            s->header.bits &= ~NODE_FLAG_MANAGED;  // can't kill if managed
+            s->leader.bits &= ~NODE_FLAG_MANAGED;  // can't kill if managed
             s->info.bits |= SERIES_INFO_INACCESSIBLE;
             GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
 

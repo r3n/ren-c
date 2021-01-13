@@ -631,7 +631,7 @@ inline static void Push_Action(
 
     STATIC_ASSERT(EVAL_FLAG_FULFILLING_ARG == DETAILS_FLAG_IS_BARRIER);
     REBARR *details = ACT_DETAILS(act);
-    if (f->flags.bits & details->header.bits & DETAILS_FLAG_IS_BARRIER)
+    if (f->flags.bits & details->leader.bits & DETAILS_FLAG_IS_BARRIER)
         fail (Error_Expression_Barrier_Raw());
 
     f->key = ACT_KEYS(&f->key_tail, act);

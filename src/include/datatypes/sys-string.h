@@ -417,7 +417,7 @@ inline static bool IS_SER_STRING(const REBSER *s) {
 // canon spelling form...as well as hold binding information.
 //
 #define IS_STR_SYMBOL(s) \
-    ((s)->header.bits & STRING_FLAG_IS_SYMBOL)
+    ((s)->leader.bits & STRING_FLAG_IS_SYMBOL)
 
 
 //=//// STRING ALL-ASCII FLAG /////////////////////////////////////////////=//

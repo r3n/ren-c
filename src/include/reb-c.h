@@ -405,6 +405,8 @@
 // a CFUNC*, and non-C++14 builds are allowing cast of `const void*` to
 // non-const `char` with plain `cast()`.  Investigate as time allows.
 
+#define x_cast(t,v)    ((t)(v))  // arbitary, casts away const, use sparingly
+
 #if !defined(__cplusplus)
     /* These macros are easier-to-spot variants of the parentheses cast.
      * The 'm_cast' is when getting [M]utablity on a const is okay (RARELY!)

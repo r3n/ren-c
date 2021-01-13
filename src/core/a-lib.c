@@ -243,7 +243,7 @@ void RL_rebFree(void *ptr)
     UNPOISON_MEMORY(ps, sizeof(REBBIN*));  // need to underrun to fetch `s`
 
     REBBIN *s = *ps;
-    if (s->header.bits & NODE_FLAG_CELL) {
+    if (Is_Node_Cell(s)) {
         rebJumps(
             "PANIC [",
                 "{rebFree() mismatched with allocator!}"

@@ -735,14 +735,17 @@ union Reb_Series_Misc {
 #endif
 {
     // See the description of SERIES_FLAG_XXX for the bits in this header.
-    // It is designed in such a way as to have compatibility with REBVAL's
-    // header, but be wary of "Strict Aliasing" when making use of that:
-    // If a type is a REBSER* it cannot be safely read from a REBVAL*.
-    // Tricks have to be used:
+    // It is in the same position as a REBVAL* header, and the first byte
+    // can be read via NODE_BYTE() to determine which it is.  However, it is
+    // not called `header` because that would suggest you could have a pointer
+    // and not know if it was a REBVAL* or REBSER* and read/write it safely...
+    // you cannot do that because of "strict aliasing":
     //
     // https://stackoverflow.com/q/51846048/
     //
-    union Reb_Header header;
+    // So the series header is called "leader" to make accidents less likely.
+    //
+    union Reb_Header leader;
 
     // The `link` field is generally used for pointers to something that
     // when updated, all references to this series would want to be able

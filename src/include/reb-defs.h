@@ -117,7 +117,7 @@ typedef struct rebol_mem_pool REBPOL;
 #endif
 
 struct Reb_Pool_Unit;
-typedef struct Reb_Pool_Unit REBPIT;
+typedef struct Reb_Pool_Unit REBPLU;
 
 
 //=//// "RAW" CELLS ///////////////////////////////////////////////////////=//

@@ -385,7 +385,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 break;
 
               case REB_P_HARD:
-                if (not GET_CELL_FLAG(f->out, UNEVALUATED)) {
+                if (NOT_CELL_FLAG(f->out, UNEVALUATED)) {
                     //
                     // This can happen e.g. with `x: 10 | x >- lit`.  We
                     // raise an error in this case, while still allowing
@@ -403,7 +403,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 break;
 
               case REB_P_MODAL: {
-                if (not GET_CELL_FLAG(f->out, UNEVALUATED))
+                if (NOT_CELL_FLAG(f->out, UNEVALUATED))
                     goto enfix_normal_handling;
 
                 if (Handle_Modal_In_Out_Throws(f))
@@ -973,7 +973,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     //
     STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
     f->varlist->info.bits |=
-        (ACT_DETAILS(phase)->header.bits & SERIES_INFO_HOLD);
+        (ACT_DETAILS(phase)->leader.bits & SERIES_INFO_HOLD);
 
     REBNAT dispatcher = ACT_DISPATCHER(phase);
 

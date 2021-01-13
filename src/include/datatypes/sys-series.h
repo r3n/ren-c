@@ -73,7 +73,7 @@
     #define ensure_series(s) (s)
 
     #define SER(p) \
-        m_cast(REBSER*, (const REBSER*)(p))  // don't check const in C or C++
+        x_cast(REBSER*, (p))  // don't check const in C or C++
 
 #else
 
@@ -98,7 +98,7 @@
         if (not p)
             return nullptr;
 
-        if ((reinterpret_cast<const REBSER*>(p)->header.bits & (
+        if ((FIRST_BYTE(reinterpret_cast<const REBSER*>(p)->leader) & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
         )) != (
             NODE_FLAG_NODE
@@ -154,10 +154,10 @@
 //
 
 #define LINK(Field, s) \
-    LINK_##Field##_CAST((void*)(s)->link.custom.node)
+    LINK_##Field##_CAST(x_cast(REBNOD*, (s)->link.custom.node))
 
 #define MISC(Field, s) \
-    MISC_##Field##_CAST((void*)(s)->misc.custom.node)
+    MISC_##Field##_CAST(x_cast(REBNOD*, (s)->misc.custom.node))
 
 #if !defined(CPLUSPLUS_11)
     //
@@ -184,11 +184,11 @@
 // deal with the node being const (which makes assignments possible when it's
 // a `const void*`, since (*(void*)&voidptr) won't work).
 //
-#define LINK_Node_TYPE      NODE
-#define LINK_Node_CAST      (REBNOD*)  // remove const
+#define LINK_Node_TYPE      REBNOD
+#define LINK_Node_CAST(n)   x_cast(REBNOD*, (n))  // remove const
 
-#define MISC_Node_TYPE      NODE
-#define MISC_Node_CAST      (REBNOD*)  // remove const
+#define MISC_Node_TYPE      REBNOD
+#define MISC_Node_CAST(n)   x_cast(REBNOD*, (n))  // remove const
 
 
 //
@@ -196,16 +196,16 @@
 //
 
 #define SET_SERIES_FLAG(s,name) \
-    (ensure_series(s)->header.bits |= SERIES_FLAG_##name)
+    ((s)->leader.bits |= SERIES_FLAG_##name)
 
 #define GET_SERIES_FLAG(s,name) \
-    ((ensure_series(s)->header.bits & SERIES_FLAG_##name) != 0)
+    (((s)->leader.bits & SERIES_FLAG_##name) != 0)
 
 #define CLEAR_SERIES_FLAG(s,name) \
-    (ensure_series(s)->header.bits &= ~SERIES_FLAG_##name)
+    ((s)->leader.bits &= ~SERIES_FLAG_##name)
 
 #define NOT_SERIES_FLAG(s,name) \
-    ((ensure_series(s)->header.bits & SERIES_FLAG_##name) == 0)
+    (((s)->leader.bits & SERIES_FLAG_##name) == 0)
 
 
 //
@@ -213,16 +213,16 @@
 //
 
 #define SET_SERIES_INFO(s,name) \
-    (ensure_series(s)->info.bits |= SERIES_INFO_##name)
+    ((s)->info.bits |= SERIES_INFO_##name)
 
 #define GET_SERIES_INFO(s,name) \
-    ((ensure_series(s)->info.bits & SERIES_INFO_##name) != 0)
+    (((s)->info.bits & SERIES_INFO_##name) != 0)
 
 #define CLEAR_SERIES_INFO(s,name) \
-    (ensure_series(s)->info.bits &= ~SERIES_INFO_##name)
+    ((s)->info.bits &= ~SERIES_INFO_##name)
 
 #define NOT_SERIES_INFO(s,name) \
-    ((ensure_series(s)->info.bits & SERIES_INFO_##name) == 0)
+    (((s)->info.bits & SERIES_INFO_##name) == 0)
 
 
 
@@ -657,7 +657,7 @@ inline static REBSER *Manage_Series(REBSER *s)  // give manual series to GC
         panic (s);  // shouldn't manage an already managed series
   #endif
 
-    s->header.bits |= NODE_FLAG_MANAGED;
+    s->leader.bits |= NODE_FLAG_MANAGED;
     Untrack_Manual_Series(s);
     return s;
 }
@@ -960,25 +960,25 @@ inline static void INIT_SPECIFIER(RELVAL *v, const void *p) {
     mutable_BINDING(v) = binding;
 
   #if !defined(NDEBUG)
-    if (not binding or (binding->header.bits & SERIES_FLAG_IS_STRING))
+    if (not binding or GET_SERIES_FLAG(binding, IS_STRING))
         return;  // e.g. UNBOUND (words use strings to indicate unbounds)
 
     assert(Is_Bindable(v));  // works on partially formed values
 
-    if (binding->header.bits & NODE_FLAG_MANAGED) {
+    if (GET_SERIES_FLAG(binding, MANAGED)) {
         assert(
-            binding->header.bits & ARRAY_FLAG_IS_DETAILS  // relative
-            or binding->header.bits & ARRAY_FLAG_IS_VARLIST  // specific
+            binding->leader.bits & ARRAY_FLAG_IS_DETAILS  // relative
+            or binding->leader.bits & ARRAY_FLAG_IS_VARLIST  // specific
             or (
                 ANY_ARRAY(v)
-                and (binding->header.bits & ARRAY_FLAG_IS_PATCH)  // virtual
+                and (binding->leader.bits & ARRAY_FLAG_IS_PATCH)  // virtual
             ) or (
                 IS_VARARGS(v) and not IS_SER_DYNAMIC(binding)
             )  // varargs from MAKE VARARGS! [...], else is a varlist
         );
     }
     else
-        assert(binding->header.bits & ARRAY_FLAG_IS_VARLIST);
+        assert(binding->leader.bits & ARRAY_FLAG_IS_VARLIST);
   #endif
 }
 
@@ -1049,7 +1049,7 @@ inline static REBSER *Alloc_Series_Node(REBFLGS flags) {
     // or array of length 0!  Only one is set here.  The info should be
     // set by the caller, as should a terminator in the internal payload
 
-    s->header.bits = NODE_FLAG_NODE | flags | SERIES_FLAG_8_IS_TRUE;  // #1
+    s->leader.bits = NODE_FLAG_NODE | flags | SERIES_FLAG_8_IS_TRUE;  // #1
 
   #if !defined(NDEBUG)
     SAFETRASH_POINTER_IF_DEBUG(s->link.trash);  // #2
@@ -1217,7 +1217,7 @@ inline static REBSER *Make_Series_Core(
         mutable_LEN_BYTE_OR_255(s) = 255;  // dynamic
 
         if (not Did_Series_Data_Alloc(s, capacity)) {
-            s->header.bits &= ~NODE_FLAG_MANAGED;
+            s->leader.bits &= ~NODE_FLAG_MANAGED;
             s->info.bits |= SERIES_INFO_INACCESSIBLE;
             GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
 

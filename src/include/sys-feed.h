@@ -471,7 +471,7 @@ inline static void Inertly_Derelativize_Inheriting_Const(
 ){
     Derelativize(out, v, FEED_SPECIFIER(feed));
     SET_CELL_FLAG(out, UNEVALUATED);
-    if (not GET_CELL_FLAG(v, EXPLICITLY_MUTABLE))
+    if (NOT_CELL_FLAG(v, EXPLICITLY_MUTABLE))
         out->header.bits |= (feed->flags.bits & FEED_FLAG_CONST);
 }
 
@@ -491,7 +491,7 @@ inline static REBFED* Alloc_Feed(void) {
     Init_Unreadable_Void(Prep_Cell(&feed->lookback));
 
     REBSER *s = &feed->singular;  // SER() not yet valid
-    s->header.bits = NODE_FLAG_NODE
+    s->leader.bits = NODE_FLAG_NODE
                         | SERIES_FLAG_8_IS_TRUE;
     s->info.bits = Endlike_Header(
         FLAG_WIDE_BYTE_OR_0(0)  // implicit termination

@@ -51,9 +51,8 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(Is_Marked(VAL_NODE1(v)));
         assert(VAL_QUOTED_DEPTH(v) >= 3);
         REBCEL(const*) cell = VAL_UNESCAPED(v);
-        if (ANY_WORD_KIND(CELL_KIND(cell))) {
-            assert(BINDING(cell)->header.bits & SERIES_FLAG_IS_STRING);
-        }
+        if (ANY_WORD_KIND(CELL_KIND(cell)))
+            assert(GET_SERIES_FLAG(BINDING(cell), IS_STRING));  // unbound
         return;
     }
 
@@ -63,7 +62,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
     if (
         IS_BINDABLE_KIND(heart)
         and (binding = BINDING(v))
-        and not (binding->header.bits & SERIES_FLAG_IS_STRING)
+        and NOT_SERIES_FLAG(binding, IS_STRING)
         and NOT_SERIES_INFO(binding, INACCESSIBLE)
     ){
         assert(IS_SER_ARRAY(binding));
@@ -72,7 +71,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             and (CTX_TYPE(CTX(binding)) == REB_FRAME)
         ){
             if (
-                (binding->header.bits & SERIES_MASK_VARLIST)
+                (binding->leader.bits & SERIES_MASK_VARLIST)
                 != SERIES_MASK_VARLIST
             ){
                 panic (binding);
@@ -80,7 +79,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             REBNOD *keysource = LINK(KeySource, ARR(binding));
             if (not Is_Node_Cell(keysource)) {
                 if (
-                    (SER(keysource)->header.bits & SERIES_MASK_KEYLIST)
+                    (SER(keysource)->leader.bits & SERIES_MASK_KEYLIST)
                     != SERIES_MASK_KEYLIST
                 ){
                     panic (binding);

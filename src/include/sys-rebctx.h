@@ -91,7 +91,7 @@ struct Reb_Context {
         if (not p)
             return nullptr;
 
-        if ((reinterpret_cast<const REBSER*>(p)->header.bits & (
+        if ((reinterpret_cast<const REBSER*>(p)->leader.bits & (
             SERIES_MASK_VARLIST
                 | NODE_FLAG_FREE
                 | NODE_FLAG_CELL

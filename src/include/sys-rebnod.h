@@ -516,7 +516,9 @@ struct Reb_Pool_Unit {
     // byte here should be consulted...accessed through an `unsigned char*`
     // in order to defeat strict aliasing.  See NODE_BYTE()
     //
-    union Reb_Header leader;  // leftmost byte is FREED_SERIES_BYTE if free
+    // The first byte should *only* be read through a char*!
+    //
+    union Reb_Header headspot;  // leftmost byte is FREED_SERIES_BYTE if free
 
     struct Reb_Pool_Unit *next_if_free;  // if not free, full item available
 

@@ -145,10 +145,10 @@ void Shutdown_Frame_Stack(void)
   blockscope {
     REBSEG *seg = Mem_Pools[FRM_POOL].segs;
     for (; seg != nullptr; seg = seg->next) {
-        REBLEN n = Mem_Pools[FRM_POOL].units;
-        REBYTE *bp = cast(REBYTE*, seg + 1);
-        for (; n > 0; --n, bp += Mem_Pools[FRM_POOL].wide) {
-            REBFRM *f = cast(REBFRM*, bp);  // ^-- pool size may be rounded up
+        REBLEN n = Mem_Pools[FRM_POOL].num_units;
+        REBYTE *unit = cast(REBYTE*, seg + 1);
+        for (; n > 0; --n, unit += Mem_Pools[FRM_POOL].wide) {
+            REBFRM *f = cast(REBFRM*, unit);  // ^-- pool size may round up
             if (IS_FREE_NODE(f))
                 continue;
           #ifdef DEBUG_COUNT_TICKS
@@ -168,10 +168,10 @@ void Shutdown_Frame_Stack(void)
   blockscope {
     REBSEG *seg = Mem_Pools[FED_POOL].segs;
     for (; seg != nullptr; seg = seg->next) {
-        REBLEN n = Mem_Pools[FED_POOL].units;
-        REBYTE *bp = cast(REBYTE*, seg + 1);
-        for (; n > 0; --n, bp += Mem_Pools[FED_POOL].wide) {
-            REBFED *feed = cast(REBFED*, bp);
+        REBLEN n = Mem_Pools[FED_POOL].num_units;
+        REBYTE *unit = cast(REBYTE*, seg + 1);
+        for (; n > 0; --n, unit += Mem_Pools[FED_POOL].wide) {
+            REBFED *feed = cast(REBFED*, unit);
             if (IS_FREE_NODE(feed))
                 continue;
           #ifdef DEBUG_COUNT_TICKS

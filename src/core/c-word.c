@@ -296,7 +296,7 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
         // didn't follow the published list could cause an error.  This would
         // give more integer values without more strings in the core.
         //
-        assert(SECOND_UINT16(s->header) == 0);
+        assert(SECOND_UINT16(s->leader) == 0);
     }
     else {
         // This is a synonym for an existing canon.  Link it into the synonyms
@@ -308,8 +308,8 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
         // If the canon form had a SYM_XXX for quick comparison of %words.r
         // words in C switch statements, the synonym inherits that number.
         //
-        assert(SECOND_UINT16(s->header) == 0);
-        SET_SECOND_UINT16(s->header, STR_SYMBOL(synonym));
+        assert(SECOND_UINT16(s->leader) == 0);
+        SET_SECOND_UINT16(s->leader, STR_SYMBOL(synonym));
     }
 
     // Symbols use their MISC() to hold binding information.  Long term, it
@@ -584,8 +584,8 @@ void Startup_Symbols(REBARR *words)
             // Could probably use less than 16 bits, but 8 is insufficient.
             // (length %words.r > 256)
             //
-            assert(SECOND_UINT16(name->header) == 0);
-            SET_SECOND_UINT16(name->header, sym);
+            assert(SECOND_UINT16(name->leader) == 0);
+            SET_SECOND_UINT16(name->leader, sym);
             assert(SAME_SYM_NONZERO(STR_SYMBOL(name), sym));
 
             name = LINK(Synonym, name);
