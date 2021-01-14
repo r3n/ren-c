@@ -47,12 +47,12 @@ static REB_R Clipboard_Actor(
     REBVAL *port,
     const REBVAL *verb
 ){
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // implied by `port`
 
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != 0);
 
         switch (property) {

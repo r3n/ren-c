@@ -33,7 +33,7 @@
 
 
 static struct {
-    REBSYM sym;
+    SYMID sym;
     uintptr_t bits;
 } syms_to_typesets[] = {
     {SYM_VOID, FLAGIT_KIND(REB_VOID)},
@@ -88,7 +88,7 @@ static void Schema_From_Block_May_Fail(
     DECLARE_LOCAL (def);
     DECLARE_LOCAL (temp);
 
-    if (IS_WORD(item) and VAL_WORD_SYM(item) == SYM_STRUCT_X) {
+    if (IS_WORD(item) and VAL_WORD_ID(item) == SYM_STRUCT_X) {
         //
         // [struct! [...struct definition...]]
 
@@ -148,13 +148,13 @@ static void Schema_From_Block_May_Fail(
     if (not IS_WORD(item))
         fail (blk);
 
-    Init_Word(schema_out, VAL_WORD_SPELLING(item));
+    Init_Word(schema_out, VAL_WORD_SYMBOL(item));
 
-    REBSYM sym = VAL_WORD_SYM(item);
+    SYMID sym = VAL_WORD_ID(item);
     if (sym == SYM_VOID) {
         assert(
             not param_out
-            or STR_SYMBOL(VAL_TYPESET_STRING(unwrap(param_out))) == SYM_RETURN
+            or ID_OF_SYMBOL(VAL_TYPESET_STRING(unwrap(param_out))) == SYM_RETURN
         );  // can only do void for return types
         Init_Blank(schema_out);
     }
@@ -165,7 +165,7 @@ static void Schema_From_Block_May_Fail(
             if (syms_to_typesets[index].sym == REB_0)
                 fail ("Invalid FFI type indicator");
 
-            if (SAME_SYM_NONZERO(syms_to_typesets[index].sym, sym)) {
+            if (Same_Nonzero_Symid(syms_to_typesets[index].sym, sym)) {
                 Init_Param(
                     unwrap(param_out),
                     REB_P_NORMAL,
@@ -322,7 +322,7 @@ static uintptr_t arg_to_ffi(
     char *data;
     REBSIZ size;
 
-    switch (VAL_WORD_SYM(schema)) {
+    switch (VAL_WORD_ID(schema)) {
       case SYM_UINT8: {
         if (not arg)
             buffer.u8 = 0;  // return value, make space (but initialize)
@@ -561,7 +561,7 @@ static void ffi_to_rebol(
 
     assert(IS_WORD(schema));
 
-    switch (VAL_WORD_SYM(schema)) {
+    switch (VAL_WORD_ID(schema)) {
       case SYM_UINT8:
         Init_Integer(out, *cast(uint8_t*, ffi_rvalue));
         break;
@@ -1071,9 +1071,9 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
 
         switch (VAL_TYPE(item)) {
           case REB_WORD: {
-            const REBSTR *name = VAL_WORD_SPELLING(item);
+            const REBSTR *name = VAL_WORD_SYMBOL(item);
 
-            if (SAME_STR(name, Canon(SYM_ELLIPSIS))) {  // variadic
+            if (Are_Synonyms(name, Canon(SYM_ELLIPSIS))) {  // variadic
                 if (is_variadic)
                     fail ("FFI: Duplicate ... indicating variadic");
 
@@ -1116,7 +1116,7 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
             break; }
 
           case REB_SET_WORD:
-            switch (VAL_WORD_SYM(item)) {
+            switch (VAL_WORD_ID(item)) {
               case SYM_RETURN:{
                 if (not IS_BLANK(ret_schema))
                     fail ("FFI: Return already specified");

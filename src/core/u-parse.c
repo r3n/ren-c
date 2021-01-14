@@ -151,7 +151,7 @@
     Fetch_Next_Forget_Lookback(f)
 
 // It's fundamental to PARSE to recognize `|` and skip ahead to it to the end.
-// The debug build has enough checks on things like VAL_WORD_SPELLING() that
+// The debug build has enough checks on things like VAL_WORD_SYMBOL() that
 // it adds up when you already tested someting IS_WORD().  This reaches a
 // bit lower level to try and still have protections but speed up some--and
 // since there's no inlining in the debug build, FETCH_TO_BAR_OR_END=>macro
@@ -161,13 +161,13 @@
 //
 inline static bool IS_BAR(const RELVAL *v) {
     return KIND3Q_BYTE_UNCHECKED(v) == REB_WORD
-        and VAL_WORD_SPELLING(v) == PG_Bar_Canon;  // caseless | always canon
+        and VAL_WORD_SYMBOL(v) == PG_Bar_Canon;  // caseless | always canon
 }
 
 #define FETCH_TO_BAR_OR_END(f) \
     while (NOT_END(P_RULE) and not ( \
         KIND3Q_BYTE_UNCHECKED(P_RULE) == REB_WORD \
-        and VAL_WORD_SPELLING(P_RULE) == PG_Bar_Canon \
+        and VAL_WORD_SYMBOL(P_RULE) == PG_Bar_Canon \
     )){ \
         FETCH_NEXT_RULE(f); \
     }
@@ -223,8 +223,8 @@ STATIC_ASSERT((int)AM_FIND_MATCH == (int)PF_FIND_MATCH);
 // !!! This and other efficiency tricks from R3-Alpha should be reviewed to
 // see if they're really the best option.
 //
-inline static REBSYM VAL_CMD(const RELVAL *v) {
-    REBSYM sym = VAL_WORD_SYM(v);
+inline static SYMID VAL_CMD(const RELVAL *v) {
+    SYMID sym = VAL_WORD_ID(v);
     if (sym >= SYM_SET and sym <= SYM_END)
         return sym;
     return SYM_0;
@@ -639,7 +639,7 @@ static REB_R Parse_One_Rule(
           case REB_WORD: {  // !!! Small set of simulated type constraints
             if (Matches_Fake_Type_Constraint(
                 item,
-                cast(enum Reb_Symbol, VAL_WORD_SYM(rule))
+                cast(enum Reb_Symbol_Id, VAL_WORD_ID(rule))
             )){
                 return Init_Integer(D_OUT, pos + 1);
             }
@@ -829,7 +829,7 @@ static REBIXO To_Thru_Block_Rule(
             }
 
             if (IS_WORD(rule)) {
-                REBSYM cmd = VAL_CMD(rule);
+                SYMID cmd = VAL_CMD(rule);
 
                 if (cmd != SYM_0) {
                     if (cmd == SYM_END) {
@@ -1042,7 +1042,7 @@ static REBIXO To_Thru_Non_Block_Rule(
     if (kind == REB_LOGIC)  // no-op if true, match failure if false
         return VAL_LOGIC(rule) ? cast(REBLEN, P_POS) : END_FLAG;
 
-    if (kind == REB_WORD and VAL_WORD_SYM(rule) == SYM_END) {
+    if (kind == REB_WORD and VAL_WORD_ID(rule) == SYM_END) {
         //
         // `TO/THRU END` JUMPS TO END INPUT SERIES (ANY SERIES TYPE)
         //
@@ -1618,7 +1618,7 @@ REBNATIVE(subparse)
         //
         // This handles making a literal blank act like the word! SKIP
         //
-        REBSYM cmd = VAL_CMD(rule);
+        SYMID cmd = VAL_CMD(rule);
         if (cmd != SYM_0) {
             if (not IS_WORD(rule) and not IS_BLANK(rule)) {
                 //
@@ -1734,7 +1734,7 @@ REBNATIVE(subparse)
                 // `keep/only`.  But is that any good?  Review.
                 //
                 bool only;
-                if (IS_WORD(P_RULE) and VAL_WORD_SYM(P_RULE) == SYM_ONLY) {
+                if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_ONLY) {
                     only = true;
                     FETCH_NEXT_RULE(f);
                 }
@@ -2141,7 +2141,7 @@ REBNATIVE(subparse)
         REBIXO i;  // temp index point
 
         if (IS_WORD(rule)) {  // could be literal BLANK!, now SYM_SKIP
-            REBSYM cmd = VAL_CMD(rule);
+            SYMID cmd = VAL_CMD(rule);
 
             switch (cmd) {
               case SYM_SKIP:
@@ -2638,7 +2638,7 @@ REBNATIVE(subparse)
                     fail (Error_Parse_End());
 
                 if (IS_WORD(P_RULE)) {  // check for ONLY flag
-                    REBSYM cmd = VAL_CMD(P_RULE);
+                    SYMID cmd = VAL_CMD(P_RULE);
                     switch (cmd) {
                       case SYM_ONLY:
                         only = true;

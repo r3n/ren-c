@@ -46,13 +46,13 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
     REBFLGS sop_flags;  // "SOP_XXX" Set Operation Flags
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
     switch (sym) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(PAR(value));  // covered by `value`
 
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {

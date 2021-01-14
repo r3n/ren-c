@@ -232,10 +232,10 @@ inline static void SHUTDOWN_BINDER(struct Reb_Binder *binder) {
 //
 inline static bool Try_Add_Binder_Index(
     struct Reb_Binder *binder,
-    const REBSTR *str,
+    const REBSYM *sym,
     REBINT index
 ){
-    REBSTR *s = m_cast(REBSTR*, str);
+    REBSTR *s = m_cast(REBSYM*, sym);
     assert(index != 0);
     if (binder->high) {
         if (s->misc.bind_index.high != 0)
@@ -257,7 +257,7 @@ inline static bool Try_Add_Binder_Index(
 
 inline static void Add_Binder_Index(
     struct Reb_Binder *binder,
-    const REBSTR *s,
+    const REBSYM *s,
     REBINT index
 ){
     bool success = Try_Add_Binder_Index(binder, s, index);
@@ -268,7 +268,7 @@ inline static void Add_Binder_Index(
 
 inline static REBINT Get_Binder_Index_Else_0( // 0 if not present
     struct Reb_Binder *binder,
-    const REBSTR *s
+    const REBSYM *s
 ){
     if (binder->high)
         return s->misc.bind_index.high;
@@ -279,9 +279,9 @@ inline static REBINT Get_Binder_Index_Else_0( // 0 if not present
 
 inline static REBINT Remove_Binder_Index_Else_0( // return old value if there
     struct Reb_Binder *binder,
-    const REBSTR *str
+    const REBSYM *str
 ){
-    REBSTR *s = m_cast(REBSTR*, str);
+    REBSTR *s = m_cast(REBSYM*, str);
     REBINT old_index;
     if (binder->high) {
         old_index = s->misc.bind_index.high;
@@ -306,9 +306,9 @@ inline static REBINT Remove_Binder_Index_Else_0( // return old value if there
 
 inline static void Remove_Binder_Index(
     struct Reb_Binder *binder,
-    const REBSTR *canon
+    const REBSYM *s
 ){
-    REBINT old_index = Remove_Binder_Index_Else_0(binder, canon);
+    REBINT old_index = Remove_Binder_Index_Else_0(binder, s);
     assert(old_index != 0);
     UNUSED(old_index);
 }
@@ -453,7 +453,7 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
     Unrelativize(Alloc_Value(), (v))
 
 inline static void Unbind_Any_Word(RELVAL *v) {
-    const REBSTR *spelling = VAL_WORD_SPELLING(VAL_UNESCAPED(v));
+    const REBSTR *spelling = VAL_WORD_SYMBOL(VAL_UNESCAPED(v));
     INIT_VAL_WORD_BINDING(v, spelling);
     INIT_VAL_WORD_PRIMARY_INDEX(v, 0);
 }
@@ -477,11 +477,11 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
 // up space in word cell for other features.  Note that this means if a
 // context is freed, its keylist must be retained to provide the words.
 //
-inline static const REBSTR *VAL_WORD_SPELLING(REBCEL(const*) cell) {
+inline static const REBSYM *VAL_WORD_SYMBOL(REBCEL(const*) cell) {
     assert(ANY_WORD_KIND(CELL_HEART(cell)));
 
     if (GET_SERIES_FLAG(BINDING(cell), IS_STRING))
-        return STR(BINDING(cell));
+        return SYM(BINDING(cell));
 
     REBARR *binding = ARR(BINDING(cell));
 
@@ -492,10 +492,10 @@ inline static const REBSTR *VAL_WORD_SPELLING(REBCEL(const*) cell) {
     const RELVAL *v = CELL_TO_VAL(cell);
 
     if (GET_ARRAY_FLAG(binding, IS_DETAILS))  // relative
-        return KEY_SPELLING(ACT_KEY(ACT(binding), VAL_WORD_INDEX(v)));
+        return KEY_SYMBOL(ACT_KEY(ACT(binding), VAL_WORD_INDEX(v)));
 
     assert(GET_ARRAY_FLAG(binding, IS_VARLIST));  // specific
-    return KEY_SPELLING(CTX_KEY(CTX(binding), VAL_WORD_INDEX(v)));
+    return KEY_SYMBOL(CTX_KEY(CTX(binding), VAL_WORD_INDEX(v)));
 }
 
 
@@ -575,7 +575,7 @@ inline static option(REBCTX*) Get_Word_Context(
             goto virtual_miss;
 
       blockscope {
-        const REBSTR *spelling = VAL_WORD_SPELLING(VAL_UNESCAPED(any_word));
+        const REBSTR *spelling = VAL_WORD_SYMBOL(VAL_UNESCAPED(any_word));
 
         // We have the primary binding's spelling to check against, so we
         // can recognize when the lossy index matches up.  It needs to match
@@ -604,7 +604,7 @@ inline static option(REBCTX*) Get_Word_Context(
 
             REBLEN index = mondex;
             for (; index <= cached_len; index += MONDEX_MOD) {
-                if (spelling != KEY_SPELLING(CTX_KEY(overload, mondex)))
+                if (spelling != KEY_SYMBOL(CTX_KEY(overload, mondex)))
                     continue;
 
                 *index_out = mondex;
@@ -633,7 +633,7 @@ inline static option(REBCTX*) Get_Word_Context(
         //
         INIT_VAL_WORD_CACHE(any_word, specifier);  // we're updating it
 
-        const REBSTR *spelling = VAL_WORD_SPELLING(VAL_UNESCAPED(any_word));
+        const REBSTR *spelling = VAL_WORD_SYMBOL(VAL_UNESCAPED(any_word));
 
         // !!! Virtual binding could use the bind table as a kind of next
         // level cache if it encounters a large enough object to make it
@@ -658,7 +658,7 @@ inline static option(REBCTX*) Get_Word_Context(
             REBLEN index = 1;
             const REBKEY *key = CTX_KEYS_HEAD(overload);
             for (; index <= cached_len; ++key, ++index) {
-                if (KEY_SPELLING(key) != spelling)
+                if (KEY_SYMBOL(key) != spelling)
                     continue;
 
                 // !!! FOR-EACH uses the slots in an object to count how
@@ -835,7 +835,7 @@ static inline REBVAL *Lookup_Mutable_Word_May_Fail(
     //
     if (GET_CELL_FLAG(var, PROTECTED)) {
         DECLARE_LOCAL (unwritable);
-        Init_Word(unwritable, VAL_WORD_SPELLING(any_word));
+        Init_Word(unwritable, VAL_WORD_SYMBOL(any_word));
         fail (Error_Protected_Word_Raw(unwritable));
     }
 

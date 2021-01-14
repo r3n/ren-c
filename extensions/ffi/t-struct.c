@@ -162,7 +162,7 @@ static bool Get_Struct_Var(REBVAL *out, REBSTU *stu, const RELVAL *word)
     RELVAL *item = ARR_HEAD(fieldlist);
     for (; NOT_END(item); ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
-        if (FLD_NAME(field) != VAL_WORD_SPELLING(word))
+        if (FLD_NAME(field) != VAL_WORD_SYMBOL(word))
             continue;
 
         if (FLD_IS_ARRAY(field)) {
@@ -303,7 +303,7 @@ static bool same_fields(REBARR *tgt_fieldlist, REBARR *src_fieldlist)
                 return false;
             }
 
-        if (not SAME_SYM_NONZERO(
+        if (not Same_Nonzero_Symid(
             FLD_TYPE_SYM(tgt_field),
             FLD_TYPE_SYM(src_field)
         )){
@@ -496,7 +496,7 @@ static bool Set_Struct_Var(
     for (; NOT_END(item); ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
-        if (VAL_WORD_SPELLING(word) != FLD_NAME(field))
+        if (VAL_WORD_SYMBOL(word) != FLD_NAME(field))
             continue;
 
         if (FLD_IS_ARRAY(field)) {
@@ -548,7 +548,7 @@ static void parse_attr(
         if (not IS_SET_WORD(attr))
             fail (attr);
 
-        switch (VAL_WORD_SYM(attr)) {
+        switch (VAL_WORD_ID(attr)) {
           case SYM_RAW_SIZE:
             ++ attr;
             if (IS_END(attr) or not IS_INTEGER(attr))
@@ -781,7 +781,7 @@ static void Parse_Field_Type_May_Fail(
         fail ("Empty field type in FFI");
 
     if (IS_WORD(val)) {
-        REBSYM sym = VAL_WORD_SYM(val);
+        SYMID sym = VAL_WORD_ID(val);
 
         // Initialize the type symbol with the unbound word by default (will
         // be overwritten in the struct cases).
@@ -993,7 +993,7 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
         for (; NOT_END(item); ++item) {
             REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
-            if (FLD_NAME(field) != VAL_WORD_SPELLING(word))
+            if (FLD_NAME(field) != VAL_WORD_SYMBOL(word))
                 continue;
 
             if (FLD_IS_ARRAY(field)) {
@@ -1168,7 +1168,7 @@ REB_R MAKE_Struct(
         else
             fail (Error_Invalid_Type(VAL_TYPE(f_value)));
 
-        Init_Word(FLD_AT(field, IDX_FIELD_NAME), VAL_WORD_SPELLING(f_value));
+        Init_Word(FLD_AT(field, IDX_FIELD_NAME), VAL_WORD_SYMBOL(f_value));
 
         Fetch_Next_Forget_Lookback(f);
         if (IS_END(f_value) or not IS_BLOCK(f_value))
@@ -1516,7 +1516,7 @@ REBTYPE(Struct)
     REBVAL *arg;
 
     // unary actions
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_CHANGE: {
         arg = D_ARG(2);
         if (not IS_BINARY(arg))
@@ -1537,7 +1537,7 @@ REBTYPE(Struct)
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value));
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {

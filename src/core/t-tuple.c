@@ -191,7 +191,7 @@ REBTYPE(Sequence)
     UNUSED(all_byte_sized_ints);
     REBYTE *vp = buf;
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     // !!! This used to depend on "IS_BINARY_ACT", a concept that does not
     // exist any longer with symbol-based action dispatch.  Patch with more
@@ -246,7 +246,7 @@ REBTYPE(Sequence)
             if (ap)
                 a = (REBINT) *ap++;
 
-            switch (VAL_WORD_SYM(verb)) {
+            switch (VAL_WORD_ID(verb)) {
             case SYM_ADD: v += a; break;
 
             case SYM_SUBTRACT: v -= a; break;
@@ -350,7 +350,7 @@ REBTYPE(Sequence)
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));
 
-        switch (VAL_WORD_SYM(ARG(property))) {
+        switch (VAL_WORD_ID(ARG(property))) {
           case SYM_LENGTH:
             return Init_Integer(D_OUT, VAL_SEQUENCE_LEN(sequence));
 
@@ -369,7 +369,7 @@ REBTYPE(Sequence)
             HEART_BYTE(sequence) == REB_WORD
             or HEART_BYTE(sequence) == REB_ISSUE
         ){
-            assert(VAL_WORD_SYM(sequence) == SYM__SLASH_1_);
+            assert(VAL_WORD_ID(sequence) == SYM__SLASH_1_);
             return Move_Value(frame_->out, sequence);
         }
 

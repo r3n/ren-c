@@ -71,7 +71,7 @@ static void update(REBREQ *signal, REBINT len, REBVAL *arg)
 
 static int sig_word_num(const REBSTR *canon)
 {
-    switch (STR_SYMBOL(canon)) {
+    switch (ID_OF_SYMBOL(canon)) {
         case SYM_SIGALRM:
             return SIGALRM;
         case SYM_SIGABRT:
@@ -153,12 +153,12 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     REBVAL *spec = CTX_VAR(ctx, STD_PORT_SPEC);
 
     if (not (req->flags & RRF_OPEN)) {
-        switch (VAL_WORD_SYM(verb)) {
+        switch (VAL_WORD_ID(verb)) {
         case SYM_REFLECT: {
             INCLUDE_PARAMS_OF_REFLECT;
 
             UNUSED(ARG(value));
-            REBSYM property = VAL_WORD_SYM(ARG(property));
+            SYMID property = VAL_WORD_ID(ARG(property));
 
             switch (property) {
             case SYM_OPEN_Q:
@@ -186,7 +186,7 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
                 if (not IS_WORD(sig))
                     fail (Error_Invalid_Spec_Raw(sig));
 
-                if (VAL_WORD_SYM(sig) == SYM_ALL) {
+                if (VAL_WORD_ID(sig) == SYM_ALL) {
                     if (sigfillset(&ReqPosixSignal(signal)->mask) < 0)
                         fail (Error_Invalid_Spec_Raw(sig));
                     break;
@@ -195,7 +195,7 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
                 if (
                     sigaddset(
                         &ReqPosixSignal(signal)->mask,
-                        sig_word_num(VAL_WORD_SPELLING(sig))
+                        sig_word_num(VAL_WORD_SYMBOL(sig))
                     ) < 0
                 ){
                     fail (Error_Invalid_Spec_Raw(sig));
@@ -204,10 +204,10 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
             OS_DO_DEVICE_SYNC(signal, RDC_OPEN);
 
-            if (VAL_WORD_SYM(verb) == SYM_OPEN)
+            if (VAL_WORD_ID(verb) == SYM_OPEN)
                 RETURN (port);
 
-            assert((req->flags & RRF_OPEN) and VAL_WORD_SYM(verb) == SYM_READ);
+            assert((req->flags & RRF_OPEN) and VAL_WORD_ID(verb) == SYM_READ);
             break; } // fallthrough
 
         case SYM_CLOSE:
@@ -221,12 +221,12 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         }
     }
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
     case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value));
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
 
         switch (property) {
         case SYM_OPEN_Q:

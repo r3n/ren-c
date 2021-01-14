@@ -403,9 +403,9 @@ REBLEN Stack_Depth(void)
 //
 // If the message is not found, return nullptr.
 //
-const REBVAL *Find_Error_For_Sym(enum Reb_Symbol id_sym)
+const REBVAL *Find_Error_For_Sym(enum Reb_Symbol_Id id_sym)
 {
-    const REBSTR *id_canon = Canon(id_sym);
+    const REBSYM *id_canon = Canon(id_sym);
 
     REBCTX *categories = VAL_CONTEXT(Get_System(SYS_CATALOG, CAT_ERRORS));
 
@@ -415,7 +415,7 @@ const REBVAL *Find_Error_For_Sym(enum Reb_Symbol id_sym)
 
         REBLEN n = 1;
         for (; n != CTX_LEN(category) + 1; ++n) {
-            if (SAME_STR(KEY_SPELLING(CTX_KEY(category, n)), id_canon)) {
+            if (Are_Synonyms(KEY_SYMBOL(CTX_KEY(category, n)), id_canon)) {
                 REBVAL *message = CTX_VAR(category, n);
                 assert(IS_BLOCK(message) or IS_TEXT(message));
                 return message;
@@ -503,13 +503,10 @@ void Set_Location_Of_Error(
         const REBSTR *file = LINK(Filename, FRM_ARRAY(f));
         REBLIN line = FRM_ARRAY(f)->misc.line;
 
-        REBSYM file_sym = STR_SYMBOL(file);
-        if (IS_NULLED_OR_BLANK(&vars->file)) {
-            if (file_sym != SYM___ANONYMOUS__)
-                Init_Word(&vars->file, file);
-            if (line != 0)
-                Init_Integer(&vars->line, line);
-        }
+        if (file)
+            Init_File(&vars->file, file);
+        if (line != 0)
+            Init_Integer(&vars->line, line);
     }
 }
 
@@ -625,7 +622,7 @@ REB_R MAKE_Error(
         // Find correct category for TYPE: (if any)
         REBVAL *category = Select_Symbol_In_Context(
             CTX_ARCHETYPE(categories),
-            VAL_WORD_SPELLING(&vars->type)
+            VAL_WORD_SYMBOL(&vars->type)
         );
 
         if (category) {
@@ -635,7 +632,7 @@ REB_R MAKE_Error(
 
             REBVAL *message = Select_Symbol_In_Context(
                 category,
-                VAL_WORD_SPELLING(&vars->id)
+                VAL_WORD_SYMBOL(&vars->id)
             );
 
             if (message) {
@@ -720,8 +717,8 @@ REB_R TO_Error(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 // regain control to properly call va_end with no longjmp to skip it.
 //
 REBCTX *Make_Error_Managed_Core(
-    enum Reb_Symbol cat_sym,
-    enum Reb_Symbol id_sym,
+    enum Reb_Symbol_Id cat_sym,
+    enum Reb_Symbol_Id id_sym,
     va_list *vaptr
 ){
     if (PG_Boot_Phase < BOOT_ERRORS) { // no STD_ERROR or template table yet
@@ -797,8 +794,8 @@ REBCTX *Make_Error_Managed_Core(
     //
     for (; NOT_END(msg_item); ++msg_item) {
         if (IS_GET_WORD(msg_item)) {
-            const REBSTR *spelling = VAL_WORD_SPELLING(msg_item);
-            REBVAL *var = Append_Context(error, nullptr, spelling);
+            const REBSYM *symbol = VAL_WORD_SYMBOL(msg_item);
+            REBVAL *var = Append_Context(error, nullptr, symbol);
 
             const void *p = va_arg(*vaptr, const void*);
 
@@ -866,7 +863,7 @@ REBCTX *Make_Error_Managed_Core(
 //
 REBCTX *Error(
     int cat_sym,
-    int id_sym, // can't be enum Reb_Symbol, see note below
+    int id_sym, // can't be enum Reb_Symbol_Id, see note below
     ... /* REBVAL *arg1, REBVAL *arg2, ... */
 ){
     va_list va;
@@ -877,8 +874,8 @@ REBCTX *Error(
     va_start(va, id_sym);
 
     REBCTX *error = Make_Error_Managed_Core(
-        cast(enum Reb_Symbol, cat_sym),
-        cast(enum Reb_Symbol, id_sym),
+        cast(enum Reb_Symbol_Id, cat_sym),
+        cast(enum Reb_Symbol_Id, id_sym),
         &va
     );
 
@@ -972,10 +969,10 @@ REBCTX *Error_Bad_Func_Def(const REBVAL *spec, const REBVAL *body)
 //
 //  Error_No_Arg: C
 //
-REBCTX *Error_No_Arg(option(const REBSTR*) label, const REBSTR *spelling)
+REBCTX *Error_No_Arg(option(const REBSYM*) label, const REBSYM *symbol)
 {
     DECLARE_LOCAL (param_word);
-    Init_Word(param_word, spelling);
+    Init_Word(param_word, symbol);
 
     DECLARE_LOCAL (label_word);
     if (label)
@@ -1011,7 +1008,7 @@ REBCTX *Error_No_Relative_Core(REBCEL(const*) any_word)
     Init_Any_Word(
         unbound,
         CELL_KIND(any_word),
-        VAL_WORD_SPELLING(any_word)
+        VAL_WORD_SYMBOL(any_word)
     );
 
     return Error_No_Relative_Raw(unbound);
@@ -1079,7 +1076,7 @@ REBCTX *Error_Invalid_Arg(REBFRM *f, const REBPAR *param)
         Init_Word(label, unwrap(f->label));
 
     DECLARE_LOCAL (param_name);
-    Init_Word(param_name, KEY_SPELLING(ACT_KEY(FRM_PHASE(f), index)));
+    Init_Word(param_name, KEY_SYMBOL(ACT_KEY(FRM_PHASE(f), index)));
 
     REBVAL *arg = FRM_ARG(f, index);
     if (IS_NULLED(arg))
@@ -1181,7 +1178,7 @@ REBCTX *Error_Out_Of_Range(const REBVAL *arg)
 REBCTX *Error_Protected_Key(const REBKEY *key)
 {
     DECLARE_LOCAL (key_name);
-    Init_Word(key_name, KEY_SPELLING(key));
+    Init_Word(key_name, KEY_SYMBOL(key));
 
     return Error_Protected_Word_Raw(key_name);
 }
@@ -1224,7 +1221,7 @@ REBCTX *Error_Arg_Type(
     enum Reb_Kind actual
 ){
     DECLARE_LOCAL (param_word);
-    Init_Word(param_word, KEY_SPELLING(key));
+    Init_Word(param_word, KEY_SYMBOL(key));
 
     DECLARE_LOCAL (label);
     Get_Frame_Label_Or_Blank(label, f);
@@ -1316,7 +1313,7 @@ REBCTX *Error_Cannot_Reflect(enum Reb_Kind type, const REBVAL *arg)
 //
 //  Error_On_Port: C
 //
-REBCTX *Error_On_Port(enum Reb_Symbol id_sym, REBVAL *port, REBINT err_code)
+REBCTX *Error_On_Port(enum Reb_Symbol_Id id_sym, REBVAL *port, REBINT err_code)
 {
     FAIL_IF_BAD_PORT(port);
 
@@ -1471,7 +1468,7 @@ void MF_Error(REB_MOLD *mo, REBCEL(const*) v, bool form)
     //
     Append_Ascii(mo->series, "** ");
     if (IS_WORD(&vars->type)) {  // has a <type>
-        Append_Spelling(mo->series, VAL_WORD_SPELLING(&vars->type));
+        Append_Spelling(mo->series, VAL_WORD_SYMBOL(&vars->type));
         Append_Codepoint(mo->series, ' ');
     }
     else

@@ -151,9 +151,9 @@ REB_R PD_Pair(
     REBINT n = 0;
 
     if (IS_WORD(picker)) {
-        if (VAL_WORD_SYM(picker) == SYM_X)
+        if (VAL_WORD_ID(picker) == SYM_X)
             n = 1;
-        else if (VAL_WORD_SYM(picker) == SYM_Y)
+        else if (VAL_WORD_ID(picker) == SYM_Y)
             n = 2;
         else
             return R_UNHANDLED;
@@ -240,7 +240,7 @@ REBTYPE(Pair)
     REBVAL *x2 = nullptr;
     REBVAL *y2 = nullptr;
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REVERSE:
         return Init_Pair(D_OUT, VAL_PAIR_Y(v), VAL_PAIR_X(v));
 

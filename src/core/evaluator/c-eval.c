@@ -458,7 +458,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         VAL_ACTION(unwrap(gotten)),
         VAL_ACTION_BINDING(unwrap(gotten))
     );
-    Begin_Enfix_Action(subframe, VAL_WORD_SPELLING(v));
+    Begin_Enfix_Action(subframe, VAL_WORD_SYMBOL(v));
 
     goto process_action; }
 
@@ -627,7 +627,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             Push_Action(subframe, act, VAL_ACTION_BINDING(unwrap(gotten)));
             Begin_Action_Core(
                 subframe,
-                VAL_WORD_SPELLING(v),  // use word as label
+                VAL_WORD_SYMBOL(v),  // use word as label
                 GET_ACTION_FLAG(act, ENFIXED)
             );
             goto process_action;
@@ -682,7 +682,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         Decay_If_Nulled(f->out);
 
         if (IS_ACTION(unwrap(gotten)))  // cache the word's label in the cell
-            INIT_VAL_ACTION_LABEL(f->out, VAL_WORD_SPELLING(v));
+            INIT_VAL_ACTION_LABEL(f->out, VAL_WORD_SYMBOL(v));
         break;
 
 
@@ -896,7 +896,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
       case REB_SET_PATH:
       case REB_SET_TUPLE: {
         if (HEART_BYTE(v) == REB_WORD) {
-            assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+            assert(VAL_WORD_ID(v) == SYM__SLASH_1_);
             goto process_set_word;
         }
 
@@ -937,7 +937,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
       case REB_GET_PATH:
       case REB_GET_TUPLE:
         if (HEART_BYTE(v) == REB_WORD) {
-            assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+            assert(VAL_WORD_ID(v) == SYM__SLASH_1_);
             goto process_get_word;
         }
 
@@ -1113,7 +1113,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
                 continue;
             if (VAL_PARAM_CLASS(param) != REB_P_OUTPUT)
                 continue;
-            Init_Word(DS_PUSH(), KEY_SPELLING(key));
+            Init_Word(DS_PUSH(), KEY_SYMBOL(key));
         }
       }
 
@@ -1379,7 +1379,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // words.)  Operations based on VAL_TYPE() or CELL_TYPE() will see it
         // as PATH!, but CELL_KIND() will interpret the cell bits as a word.
         //
-        if (VAL_WORD_SPELLING(f_next) != PG_Slash_1_Canon)
+        if (VAL_WORD_SYMBOL(f_next) != PG_Slash_1_Canon)
             goto finished;  // optimized refinement (see IS_REFINEMENT())
         break; }
 
@@ -1540,7 +1540,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     DECLARE_ACTION_SUBFRAME (subframe, f);
     Push_Frame(f->out, subframe);
     Push_Action(subframe, enfixed, VAL_ACTION_BINDING(unwrap(f_next_gotten)));
-    Begin_Enfix_Action(subframe, VAL_WORD_SPELLING(f_next));
+    Begin_Enfix_Action(subframe, VAL_WORD_SYMBOL(f_next));
 
     Fetch_Next_Forget_Lookback(f);  // advances next
     goto process_action; }

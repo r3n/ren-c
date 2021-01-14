@@ -88,7 +88,7 @@
 // void parameters being legal.  The VOID! return type is handled exclusively
 // by the return value, to prevent potential mixups.
 //
-inline static ffi_type *Get_FFType_For_Sym(REBSYM sym) {
+inline static ffi_type *Get_FFType_For_Sym(SYMID sym) {
     switch (sym) {
       case SYM_UINT8: return &ffi_type_uint8;
       case SYM_INT8: return &ffi_type_sint8;
@@ -177,7 +177,7 @@ enum {
 inline static const REBSTR *FLD_NAME(REBFLD *f) {
     if (IS_BLANK(FLD_AT(f, IDX_FIELD_NAME)))
         return nullptr;
-    return VAL_WORD_SPELLING(FLD_AT(f, IDX_FIELD_NAME));
+    return VAL_WORD_SYMBOL(FLD_AT(f, IDX_FIELD_NAME));
 }
 
 inline static bool FLD_IS_STRUCT(REBFLD *f) {
@@ -187,7 +187,7 @@ inline static bool FLD_IS_STRUCT(REBFLD *f) {
     return false;
 }
 
-inline static REBSYM FLD_TYPE_SYM(REBFLD *f) {
+inline static SYMID FLD_TYPE_SYM(REBFLD *f) {
     if (FLD_IS_STRUCT(f)) {
         //
         // We could return SYM_STRUCT_X for structs, but it's probably better
@@ -197,7 +197,7 @@ inline static REBSYM FLD_TYPE_SYM(REBFLD *f) {
         return SYM_STRUCT_X;
     }
     assert(IS_WORD(FLD_AT(f, IDX_FIELD_TYPE)));
-    return VAL_WORD_SYM(FLD_AT(f, IDX_FIELD_TYPE));
+    return VAL_WORD_ID(FLD_AT(f, IDX_FIELD_TYPE));
 }
 
 inline static REBARR *FLD_FIELDLIST(REBFLD *f) {
@@ -237,7 +237,7 @@ inline static ffi_type* SCHEMA_FFTYPE(const RELVAL *schema) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(schema);
         return FLD_FFTYPE(field);
     }
-    return Get_FFType_For_Sym(VAL_WORD_SYM(schema));
+    return Get_FFType_For_Sym(VAL_WORD_ID(schema));
 }
 
 

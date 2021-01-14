@@ -239,7 +239,7 @@ static void Queue_Mark_Node_Deep(void *p)
             REBKEY *tail = SER_TAIL(REBKEY, link);
             REBKEY *key = SER_HEAD(REBKEY, link);
             for (; key != tail; ++key)
-                m_cast(REBSTR*, KEY_SPELLING(key))->leader.bits
+                m_cast(REBSYM*, KEY_SYMBOL(key))->leader.bits
                     |= NODE_FLAG_MARKED;
         }
     }
@@ -736,7 +736,7 @@ static void Mark_Frame_Stack_Deep(void)
         Queue_Mark_Node_Deep(f->original);  // never nullptr
 
         if (f->label)  // nullptr if anonymous
-            Queue_Mark_Node_Deep(m_cast(REBSTR*, unwrap(f->label)));
+            Queue_Mark_Node_Deep(m_cast(REBSYM*, unwrap(f->label)));
 
         // special can be used to GC protect an arbitrary value while a
         // function is running, currently.  nullptr is permitted as well

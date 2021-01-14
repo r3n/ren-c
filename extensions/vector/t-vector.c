@@ -382,7 +382,7 @@ bool Make_Vector_Spec(
     UNUSED(specifier);
 
     bool sign = true;  // default to signed, not unsigned
-    if (IS_WORD(item) and VAL_WORD_SYM(item) == SYM_UNSIGNED) {
+    if (IS_WORD(item) and VAL_WORD_ID(item) == SYM_UNSIGNED) {
         sign = false;
         ++item;
     }
@@ -391,9 +391,9 @@ bool Make_Vector_Spec(
     if (not IS_WORD(item))
         return false;
     else {
-        if (VAL_WORD_SYM(item) == SYM_INTEGER_X)  // e_X_clamation (INTEGER!)
+        if (VAL_WORD_ID(item) == SYM_INTEGER_X)  // e_X_clamation (INTEGER!)
             integral = true;
-        else if (VAL_WORD_SYM(item) == SYM_DECIMAL_X) {  // (DECIMAL!)
+        else if (VAL_WORD_ID(item) == SYM_DECIMAL_X) {  // (DECIMAL!)
             integral = false;
             if (not sign)
                 return false;  // C doesn't have unsigned floating points
@@ -623,12 +623,12 @@ REBTYPE(Vector)
 {
     REBVAL *v = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // same as `v`
 
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         switch (property) {
           case SYM_LENGTH:
             return Init_Integer(D_OUT, VAL_VECTOR_LEN_AT(v));

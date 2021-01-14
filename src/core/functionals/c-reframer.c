@@ -111,7 +111,7 @@ REB_R Reframer_Dispatcher(REBFRM *f)
 
     Fetch_Next_Forget_Lookback(sub);  // now, onto the arguments...
 
-    const REBSTR *label = VAL_ACTION_LABEL(sub->out);
+    option(const REBSTR*) label = VAL_ACTION_LABEL(sub->out);
 
     DECLARE_LOCAL (action);
     Move_Value(action, sub->out);
@@ -176,7 +176,7 @@ REBNATIVE(reframer_p)
     INCLUDE_PARAMS_OF_REFRAMER_P;
 
     REBACT *shim = VAL_ACTION(ARG(shim));
-    option(const REBSTR*) label = VAL_ACTION_LABEL(ARG(shim));
+    option(const REBSYM*) label = VAL_ACTION_LABEL(ARG(shim));
 
     REBDSP dsp_orig = DSP;
 
@@ -202,10 +202,10 @@ REBNATIVE(reframer_p)
     const REBPAR *param;
     
     if (REF(parameter)) {
-        const REBSTR *spelling = VAL_WORD_SPELLING(ARG(parameter));
-        param_index = Get_Binder_Index_Else_0(&binder, spelling);
+        const REBSYM *symbol = VAL_WORD_SYMBOL(ARG(parameter));
+        param_index = Get_Binder_Index_Else_0(&binder, symbol);
         if (param_index == 0) {
-            error = Error_No_Arg(label, spelling);
+            error = Error_No_Arg(label, symbol);
             goto cleanup_binder;
         }
         key = CTX_KEY(exemplar, param_index);
@@ -227,7 +227,7 @@ REBNATIVE(reframer_p)
             Init_Blank(label_word);
 
         DECLARE_LOCAL (param_word);
-        Init_Word(param_word, KEY_SPELLING(key));
+        Init_Word(param_word, KEY_SYMBOL(key));
 
         error = Error_Expect_Arg_Raw(
             label_word,
@@ -246,8 +246,8 @@ REBNATIVE(reframer_p)
         if (Is_Param_Hidden(param))
             continue;
 
-        const REBSTR *spelling = KEY_SPELLING(key);
-        REBLEN index = Remove_Binder_Index_Else_0(&binder, spelling);
+        const REBSYM *symbol = KEY_SYMBOL(key);
+        REBLEN index = Remove_Binder_Index_Else_0(&binder, symbol);
         assert(index != 0);
         UNUSED(index);
     }

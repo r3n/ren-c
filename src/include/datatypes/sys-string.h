@@ -53,7 +53,7 @@
 // intent clearer for passing in a null REBSTR*, use ANONYMOUS instead.
 //
 #define ANONYMOUS \
-    ((REBSTR*)nullptr)
+    x_cast(const REBSYM*, nullptr)
 
 
 // For a writable REBSTR, a list of entities that cache the mapping from
@@ -419,6 +419,8 @@ inline static bool IS_SER_STRING(const REBSER *s) {
 #define IS_STR_SYMBOL(s) \
     ((s)->leader.bits & STRING_FLAG_IS_SYMBOL)
 
+#define SYM(s) x_cast(REBSYM*, s)
+
 
 //=//// STRING ALL-ASCII FLAG /////////////////////////////////////////////=//
 //
@@ -779,13 +781,13 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
       { return STR_AT(m_cast(REBSTR*, s), at); }
 #endif
 
-inline static const REBSTR* VAL_WORD_SPELLING(REBCEL(const*) v);
+inline static const REBSYM *VAL_WORD_SYMBOL(REBCEL(const*) v);
 
 inline static const REBSTR *VAL_STRING(REBCEL(const*) v) {
     if (ANY_STRING_KIND(CELL_HEART(v)))
         return STR(VAL_NODE1(v));  // VAL_SERIES() would assert
 
-    return VAL_WORD_SPELLING(v);  // asserts ANY_WORD_KIND() for heart
+    return VAL_WORD_SYMBOL(v);  // asserts ANY_WORD_KIND() for heart
 }
 
 #define VAL_STRING_ENSURE_MUTABLE(v) \

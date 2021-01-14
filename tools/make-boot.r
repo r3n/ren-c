@@ -954,11 +954,11 @@ e-symbols/emit {
      *
      * Note: SYM_0 is not a symbol of the string "0".  It's the "SYM" constant
      * that is returned for any interning that *does not have* a compile-time
-     * constant assigned to it.  Since VAL_WORD_SYM() will return SYM_0 for
+     * constant assigned to it.  Since VAL_WORD_ID() will return SYM_0 for
      * all user (and extension) defined words, don't try to check equality
-     * with `VAL_WORD_SYM(word1) == VAL_WORD_SYM(word2)`.
+     * with `VAL_WORD_ID(word1) == VAL_WORD_ID(word2)`.
      */
-    enum Reb_Symbol {
+    enum Reb_Symbol_Id {
         SYM_0 = 0,
         $(Syms),
     };

@@ -59,19 +59,19 @@ inline static REBVAL *Init_Void_Core(
 #define Init_Void(out,sym) \
     Init_Void_Core(TRACK_CELL_IF_DEBUG(out), Canon(sym))
 
-inline static const REBSTR* VAL_VOID_LABEL(
+inline static const REBSYM* VAL_VOID_LABEL(
     REBCEL(const*) v
 ){
     assert(CELL_KIND(v) == REB_VOID);
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    return cast(const REBSTR*, VAL_NODE1(v));
+    return cast(const REBSYM*, VAL_NODE1(v));
 }
 
-inline static bool Is_Void_With_Sym(const RELVAL *v, REBSYM sym) {
+inline static bool Is_Void_With_Sym(const RELVAL *v, SYMID sym) {
     assert(sym != SYM_0);
     if (not IS_VOID(v))
         return false;
-    return cast(REBLEN, sym) == cast(REBLEN, STR_SYMBOL(VAL_VOID_LABEL(v)));
+    return cast(REBLEN, sym) == cast(REBLEN, ID_OF_SYMBOL(VAL_VOID_LABEL(v)));
 }
 
 

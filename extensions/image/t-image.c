@@ -592,7 +592,7 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
     if (w == 0)
         RETURN (value);
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
     if (sym == SYM_APPEND) {
         index = tail;
         sym = SYM_INSERT;
@@ -953,14 +953,14 @@ REBTYPE(Image)
     if (index > tail)
         index = tail;
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
     switch (sym) {
 
     case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // accounted for by value above
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -1211,7 +1211,7 @@ void Pick_Image(REBVAL *out, const REBVAL *value, const RELVAL *picker)
     REBYTE *src = VAL_IMAGE_AT(value);
 
     if (IS_WORD(picker)) {
-        switch (VAL_WORD_SYM(picker)) {
+        switch (VAL_WORD_ID(picker)) {
         case SYM_SIZE:
             Init_Pair_Int(
                 out,
@@ -1266,7 +1266,7 @@ void Poke_Image_Fail_If_Read_Only(
     REBYTE *src = VAL_IMAGE_AT(value);
 
     if (IS_WORD(picker)) {
-        switch (VAL_WORD_SYM(picker)) {
+        switch (VAL_WORD_ID(picker)) {
         case SYM_SIZE:
             if (!IS_PAIR(poke) || !VAL_PAIR_X_DEC(poke))
                 fail (poke);

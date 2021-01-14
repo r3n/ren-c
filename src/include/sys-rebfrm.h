@@ -493,7 +493,7 @@ struct Reb_Frame {
     // The evaluator only enforces that the symbol be set during function
     // calls--in the release build, it is allowed to be garbage otherwise.
     //
-    option(const REBSTR*) label;
+    option(const REBSYM*) label;
 
     // The varlist is where arguments for the frame are kept.  Though it is
     // ultimately usable as an ordinary CTX_VARLIST() for a FRAME! value, it

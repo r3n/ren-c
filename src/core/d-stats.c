@@ -155,7 +155,7 @@ REBNATIVE(callgrind)
     INCLUDE_PARAMS_OF_CALLGRIND;
 
   #if defined(INCLUDE_CALLGRIND_NATIVE)
-    switch (VAL_WORD_SYM(ARG(instruction))) {
+    switch (VAL_WORD_ID(ARG(instruction))) {
       case SYM_ON:
         PG_Callgrind_On = true;
         CALLGRIND_START_INSTRUMENTATION;

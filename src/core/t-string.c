@@ -801,7 +801,7 @@ REBTYPE(String)
     REBVAL *v = D_ARG(1);
     assert(ANY_STRING(v));
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     REBLEN index = VAL_INDEX(v);
     REBLEN tail = VAL_LEN_HEAD(v);
@@ -811,7 +811,7 @@ REBTYPE(String)
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // accounted for by `v`
 
-        if (VAL_WORD_SYM(ARG(property)) == SYM_SIZE) {
+        if (VAL_WORD_ID(ARG(property)) == SYM_SIZE) {
             REBSIZ size;
             VAL_UTF8_SIZE_AT(&size, v);
             return Init_Integer(D_OUT, size);
@@ -867,7 +867,7 @@ REBTYPE(String)
         UNUSED(REF(only)); // all strings appends are /ONLY...currently unused
 
         REBLEN len; // length of target
-        if (VAL_WORD_SYM(verb) == SYM_CHANGE)
+        if (VAL_WORD_ID(verb) == SYM_CHANGE)
             len = Part_Len_May_Modify_Index(v, ARG(part));
         else
             len = Part_Limit_Append_Insert(ARG(part));
@@ -889,7 +889,7 @@ REBTYPE(String)
 
         VAL_INDEX_RAW(v) = Modify_String_Or_Binary(  // does read-only check
             v,
-            cast(enum Reb_Symbol, sym),
+            cast(enum Reb_Symbol_Id, sym),
             ARG(value),
             flags,
             len,

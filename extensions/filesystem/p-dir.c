@@ -84,7 +84,7 @@ static REBARR *Read_Dir_May_Fail(REBREQ *dir)
 static void Init_Dir_Path(
     REBREQ *dir,
     const REBVAL *path,
-    REBSYM policy
+    SYMID policy
 ){
     UNUSED(policy);
 
@@ -123,13 +123,13 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     //const REBYTE *flags = Security_Policy(SYM_FILE, path);
 
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
 
     case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // implicitly supplied as `port`
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
 
         switch (property) {
         case SYM_LENGTH: {
@@ -212,7 +212,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         rebRelease(result); // ignore result
 
-        if (VAL_WORD_SYM(verb) != SYM_CREATE)
+        if (VAL_WORD_ID(verb) != SYM_CREATE)
             Init_Blank(state);
 
         RETURN (port); }

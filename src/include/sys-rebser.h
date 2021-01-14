@@ -243,7 +243,7 @@
 
 // If a series is not an array, then the rightmost 16 bits of the series flags
 // are used to store an arbitrary per-series-type 16 bit number.  Right now,
-// that's used by the string series to save their REBSYM id integer (if they
+// that's used by the string series to save their SYMID id integer (if they
 // have one).
 
 //=/////// SEE %sys-rebarr.h for the ARRAY_FLAG_XXX definitions here //////=//
@@ -794,6 +794,9 @@ union Reb_Series_Misc {
     struct Reb_String : public Reb_Binary {};  // strings can act as binaries
     typedef struct Reb_String REBSTR;
 
+    struct Reb_Symbol : public Reb_String {};  // word-constrained strings
+    typedef struct Reb_Symbol REBSYM;
+
     struct Reb_Array : public Reb_Series {};
     typedef struct Reb_Array REBARR;
 
@@ -803,6 +806,7 @@ union Reb_Series_Misc {
 #else
     typedef struct Reb_Series REBBIN;
     typedef struct Reb_Series REBSTR;
+    typedef struct Reb_Series REBSYM;
     typedef struct Reb_Series REBARR;
     typedef struct Reb_Series REBBMK;
 #endif
@@ -812,7 +816,7 @@ union Reb_Series_Misc {
 // things we increment across aren't REBSER nodes, but pointers to REBSER
 // nodes for the strings... so a "key" is a pointer.
 //
-typedef const REBSTR *REBKEY;
+typedef const REBSYM *REBKEY;
 
 
 // It may become interesting to say that a specifier can be a pairing or

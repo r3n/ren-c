@@ -577,7 +577,7 @@ REBCTX *Alloc_Context_From_Map(const REBMAP *map)
 
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1)) {
-            REBVAL *var = Append_Context(c, nullptr, VAL_WORD_SPELLING(mval));
+            REBVAL *var = Append_Context(c, nullptr, VAL_WORD_SYMBOL(mval));
             Move_Value(var, &mval[1]);
         }
     }
@@ -644,7 +644,7 @@ REBTYPE(Map)
 {
     REBVAL *map = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // covered by `v`
@@ -652,7 +652,7 @@ REBTYPE(Map)
         const REBMAP *m = VAL_MAP(map);
 
         REBVAL *property = ARG(property);
-        switch (VAL_WORD_SYM(property)) {
+        switch (VAL_WORD_ID(property)) {
           case SYM_LENGTH:
             return Init_Integer(D_OUT, Length_Map(m));
 
@@ -703,7 +703,7 @@ REBTYPE(Map)
             SPECIFIC(ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1))
         );
 
-        if (VAL_WORD_SYM(verb) == SYM_FIND)
+        if (VAL_WORD_ID(verb) == SYM_FIND)
             return IS_NULLED(D_OUT) ? nullptr : Init_True(D_OUT);
 
         return D_OUT; }

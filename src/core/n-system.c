@@ -193,7 +193,7 @@ REBNATIVE(limit_usage)
 {
     INCLUDE_PARAMS_OF_LIMIT_USAGE;
 
-    REBSYM sym = VAL_WORD_SYM(ARG(field));
+    SYMID sym = VAL_WORD_ID(ARG(field));
 
     // !!! comment said "Only gets set once"...why?
     //

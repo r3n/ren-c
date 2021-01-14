@@ -566,9 +566,9 @@ void Pick_Or_Poke_Date(
     const RELVAL *picker,
     option(const REBVAL*) opt_poke
 ){
-    REBSYM sym;
+    SYMID sym;
     if (IS_WORD(picker)) {
-        sym = VAL_WORD_SYM(picker); // error later if SYM_0 or not a match
+        sym = VAL_WORD_ID(picker); // error later if SYM_0 or not a match
     }
     else if (IS_INTEGER(picker)) {
         switch (Int32(picker)) {
@@ -880,7 +880,7 @@ REBTYPE(Date)
     REBVAL *v = D_ARG(1);
     assert(IS_DATE(v));
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     REBYMD date = VAL_DATE(v);
     REBLEN day = VAL_DAY(v) - 1;

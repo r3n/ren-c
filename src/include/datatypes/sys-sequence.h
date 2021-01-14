@@ -679,11 +679,11 @@ inline static bool IS_REFINEMENT(const RELVAL *v) {
 inline static bool IS_PREDICATE1_CELL(REBCEL(const*) cell)
   { return CELL_KIND(cell) == REB_TUPLE and CELL_HEART(cell) == REB_GET_WORD; }
 
-inline static const REBSTR *VAL_PREDICATE1_SPELLING(
+inline static const REBSYM *VAL_PREDICATE1_SYMBOL(
     REBCEL(const*) cell
 ){
     assert(IS_PREDICATE1_CELL(cell));
-    return VAL_WORD_SPELLING(cell);
+    return VAL_WORD_SYMBOL(cell);
 }
 
 inline static bool IS_PREDICATE(const RELVAL *v) {
@@ -694,9 +694,9 @@ inline static bool IS_PREDICATE(const RELVAL *v) {
     return IS_BLANK(VAL_SEQUENCE_AT(temp, v, 0));
 }
 
-inline static const REBSTR *VAL_REFINEMENT_SPELLING(
+inline static const REBSYM *VAL_REFINEMENT_SYMBOL(
     REBCEL(const*) v
 ){
     assert(IS_REFINEMENT_CELL(v));
-    return VAL_WORD_SPELLING(v);
+    return VAL_WORD_SYMBOL(v);
 }

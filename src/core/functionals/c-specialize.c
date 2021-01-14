@@ -150,7 +150,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
         assert(NOT_CELL_FLAG(param, VAR_MARKED_HIDDEN));
 
-        const REBSTR *symbol = KEY_SPELLING(key);  // added to binding
+        const REBSYM *symbol = KEY_SYMBOL(key);  // added to binding
         if (not TYPE_CHECK(param, REB_TS_REFINEMENT)) {  // nothing to push
 
           continue_unspecialized:
@@ -176,7 +176,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         REBDSP dsp = highest_ordered_dsp;
         for (; dsp != lowest_ordered_dsp; --dsp) {
             STKVAL(*) ordered = DS_AT(dsp);
-            if (VAL_WORD_SPELLING(ordered) != symbol)
+            if (VAL_WORD_SYMBOL(ordered) != symbol)
                 continue;  // just continuing this loop
 
             assert(not IS_WORD_BOUND(ordered));  // we bind only one
@@ -297,7 +297,7 @@ bool Specialize_Action_Throws(
             if (Is_Param_Hidden(param))
                 continue;  // maybe refinement from stack, now specialized out
 
-            Remove_Binder_Index(&binder, KEY_SPELLING(key));
+            Remove_Binder_Index(&binder, KEY_SYMBOL(key));
         }
         SHUTDOWN_BINDER(&binder);
 
@@ -556,9 +556,9 @@ void For_Each_Unspecialized_Param(
         if (partials) {  // even normal parameters can appear in partials
             REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
             for (; NOT_END(partial); ++partial) {
-                if (SAME_STR(
-                    VAL_WORD_SPELLING(partial),
-                    KEY_SPELLING(key)
+                if (Are_Synonyms(
+                    VAL_WORD_SYMBOL(partial),
+                    KEY_SYMBOL(key)
                 )){
                     goto skip_in_first_pass;
                 }
@@ -622,9 +622,9 @@ void For_Each_Unspecialized_Param(
         if (partials) {
             REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
             for (; NOT_END(partial); ++partial) {
-                if (SAME_STR(
-                    VAL_WORD_SPELLING(partial),
-                    KEY_SPELLING(key)
+                if (Are_Synonyms(
+                    VAL_WORD_SYMBOL(partial),
+                    KEY_SYMBOL(key)
                 )){
                     goto continue_unspecialized_loop;
                 }
@@ -759,7 +759,7 @@ bool Make_Invocation_Frame_Throws(REBFRM *f, const REBVAL *action)
     f->flags.bits |=
         EVAL_FLAG_ERROR_ON_DEFERRED_ENFIX;  // can't deal with ELSE/THEN/etc.
 
-    option(const REBSTR*) label = nullptr;  // !!! for now
+    option(const REBSYM*) label = nullptr;  // !!! for now
     Push_Action(f, VAL_ACTION(action), VAL_ACTION_BINDING(action));
     Begin_Prefix_Action(f, label);
 
@@ -839,7 +839,7 @@ bool Make_Frame_From_Varargs_Throws(
     if (not IS_ACTION(out))
         fail (specializee);
 
-    const REBSTR *label = VAL_ACTION_LABEL(out);
+    option(const REBSTR*) label = VAL_ACTION_LABEL(out);
 
     DECLARE_LOCAL (action);
     Move_Value(action, out);

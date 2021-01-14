@@ -414,10 +414,10 @@ inline static bool IS_FRAME_PHASED(REBCEL(const*) v) {
     return not IS_SER_STRING(s);
 }
 
-inline static option(const REBSTR*) VAL_FRAME_LABEL(const RELVAL *v) {
+inline static option(const REBSYM*) VAL_FRAME_LABEL(const RELVAL *v) {
     REBSER *s = VAL_FRAME_PHASE_OR_LABEL(v);
     if (IS_SER_STRING(s))  // label in value
-        return STR(s);
+        return SYM(s);
     return ANONYMOUS;  // has a phase, so no label (maybe findable if running)
 }
 

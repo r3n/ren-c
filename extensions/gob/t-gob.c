@@ -27,7 +27,7 @@
 #include "reb-gob.h"
 
 const struct {
-    REBSYM sym;
+    SYMID sym;
     uintptr_t flags;
 } Gob_Flag_Words[] = {
     {SYM_RESIZE,      GOBF_RESIZE},
@@ -313,14 +313,14 @@ static REBARR *Gob_Flags_To_Array(REBGOB *gob)
 //
 //  Set_Gob_Flag: C
 //
-static void Set_Gob_Flag(REBGOB *gob, const REBSTR *name)
+static void Set_Gob_Flag(REBGOB *gob, const REBSYM *name)
 {
-    REBSYM sym = STR_SYMBOL(name);
+    SYMID sym = ID_OF_SYMBOL(name);
     if (sym == SYM_0) return; // !!! fail?
 
     REBINT i;
     for (i = 0; Gob_Flag_Words[i].sym != SYM_0; ++i) {
-        if (SAME_SYM_NONZERO(sym, Gob_Flag_Words[i].sym)) {
+        if (Same_Nonzero_Symid(sym, Gob_Flag_Words[i].sym)) {
             REBLEN flag = Gob_Flag_Words[i].flags;
             SET_GOB_FLAG(gob, flag);
             //handle mutual exclusive states
@@ -358,7 +358,7 @@ static void Set_Gob_Flag(REBGOB *gob, const REBSTR *name)
 //
 static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
 {
-    switch (VAL_WORD_SYM(word)) {
+    switch (VAL_WORD_ID(word)) {
       case SYM_OFFSET:
         return Did_Set_XYF(ARR_AT(gob, IDX_GOB_OFFSET_AND_FLAGS), val);
 
@@ -486,7 +486,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
 
       case SYM_FLAGS:
         if (IS_WORD(val))
-            Set_Gob_Flag(gob, VAL_WORD_SPELLING(val));
+            Set_Gob_Flag(gob, VAL_WORD_SYMBOL(val));
         else if (IS_BLOCK(val)) {
             //clear only flags defined by words
             REBINT i;
@@ -495,7 +495,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
 
             const RELVAL* item;
             for (item = ARR_HEAD(VAL_ARRAY(val)); NOT_END(item); item++)
-                if (IS_WORD(item)) Set_Gob_Flag(gob, VAL_WORD_SPELLING(item));
+                if (IS_WORD(item)) Set_Gob_Flag(gob, VAL_WORD_SYMBOL(item));
         }
         break;
 
@@ -524,7 +524,7 @@ static REBVAL *Get_GOB_Var(
     REBGOB *gob,
     const RELVAL *word
 ){
-    switch (VAL_WORD_SYM(word)) {
+    switch (VAL_WORD_ID(word)) {
       case SYM_OFFSET:
         return Init_Pair_Dec(out, GOB_X(gob), GOB_Y(gob));
 
@@ -648,7 +648,7 @@ static void Set_GOB_Vars(
 static REBARR *Gob_To_Array(REBGOB *gob)
 {
     REBARR *arr = Make_Array(10);
-    REBSYM words[] = {SYM_OFFSET, SYM_SIZE, SYM_ALPHA, SYM_0};
+    SYMID words[] = {SYM_OFFSET, SYM_SIZE, SYM_ALPHA, SYM_0};
     REBVAL *vals[6];
 
     REBINT n;
@@ -664,7 +664,7 @@ static REBARR *Gob_To_Array(REBGOB *gob)
     if (!GOB_TYPE(gob)) return arr;
 
     if (GOB_CONTENT(gob)) {
-        REBSYM sym;
+        SYMID sym;
         switch (GOB_TYPE(gob)) {
         case GOBT_COLOR:
             sym = SYM_COLOR;
@@ -879,12 +879,12 @@ REBTYPE(Gob)
     REBLEN tail = GOB_PANE(gob) ? GOB_LEN(gob) : 0;
 
     // unary actions
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
     case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // covered by `val`
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -956,14 +956,14 @@ REBTYPE(Gob)
         if (!GOB_PANE(gob) || index >= tail)
             fail (Error_Index_Out_Of_Range_Raw());
         if (
-            VAL_WORD_SYM(verb) == SYM_CHANGE
+            VAL_WORD_ID(verb) == SYM_CHANGE
             && (REF(part) || REF(only) || REF(dup))
         ){
             fail (Error_Not_Done_Raw());
         }
 
         Insert_Gobs(gob, value, index, 1, false);
-        if (VAL_WORD_SYM(verb) == SYM_POKE) {
+        if (VAL_WORD_ID(verb) == SYM_POKE) {
             Move_Value(D_OUT, value);
             return D_OUT;
         }

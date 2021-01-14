@@ -560,7 +560,7 @@ inline static void Prep_Frame_Core(
 
 inline static void Begin_Action_Core(
     REBFRM *f,
-    option(const REBSTR*) label,
+    option(const REBSYM*) label,
     bool enfix
 ){
     assert(NOT_EVAL_FLAG(f, RUNNING_ENFIX));

@@ -101,7 +101,7 @@ REBNATIVE(make)
     REBVAL *arg = ARG(def);
 
     if (IS_SYM_WORD(type)) {  // hack for MAKE CHAR! 0
-        switch (VAL_WORD_SYM(type)) {
+        switch (VAL_WORD_ID(type)) {
           case SYM_CHAR_X:
             Move_Value(type, Datatype_From_Kind(REB_ISSUE));
             break;
@@ -197,7 +197,7 @@ REBNATIVE(to)
     REBVAL *type = ARG(type);
 
     if (IS_SYM_WORD(type)) {  // hack for TO CHAR! XXX
-        switch (VAL_WORD_SYM(type)) {
+        switch (VAL_WORD_ID(type)) {
           case SYM_CHAR_X:
             fail ("Convert INTEGER! to codepoint with MAKE ISSUE!, not TO");
 
@@ -266,7 +266,7 @@ REB_R Reflect_Core(REBFRM *frame_)
     REBCEL(const*) cell = VAL_UNESCAPED(v);
     enum Reb_Kind kind = CELL_KIND(cell);
 
-    switch (VAL_WORD_SYM(ARG(property))) {
+    switch (VAL_WORD_ID(ARG(property))) {
       case SYM_0:
         //
         // If a word wasn't in %words.r, it has no integer SYM.  There is
@@ -1307,14 +1307,14 @@ REBNATIVE(scan_net_header)
 
         REBVAL *val = NULL; // rigorous checks worry it could be uninitialized
 
-        const REBSTR *name = Intern_UTF8_Managed(start, cp - start);
+        const REBSYM *name = Intern_UTF8_Managed(start, cp - start);
         RELVAL *item;
 
         cp++;
         // Search if word already present:
         for (item = ARR_HEAD(result); NOT_END(item); item += 2) {
             assert(IS_TEXT(item + 1) || IS_BLOCK(item + 1));
-            if (SAME_STR(VAL_WORD_SPELLING(item), name)) {
+            if (Are_Synonyms(VAL_WORD_SYMBOL(item), name)) {
                 // Does it already use a block?
                 if (IS_BLOCK(item + 1)) {
                     // Block of values already exists:

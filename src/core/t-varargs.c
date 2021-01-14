@@ -462,12 +462,12 @@ REBTYPE(Varargs)
 {
     REBVAL *value = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
     case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // already have `value`
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -616,7 +616,7 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
         };
 
         DECLARE_LOCAL (param_word);
-        Init_Any_Word(param_word, kind, KEY_SPELLING(key));
+        Init_Any_Word(param_word, kind, KEY_SYMBOL(key));
         if (quoted)
             Quotify(param_word, 1);
         Mold_Value(mo, param_word);

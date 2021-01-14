@@ -147,7 +147,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
         Init_Va_Scan_Level_Core(
             &level,
             &ss,
-            Intern_Unsized_Managed("sys-do.h"),
+            Intern_Unsized_Managed("-variadic-"),
             start_line,
             cast(const REBYTE*, p),
             feed

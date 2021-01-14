@@ -41,7 +41,7 @@
 // their own reduce before trying to make a typeset out of a block?
 //
 const struct {
-    REBSYM sym;
+    SYMID sym;
     REBU64 bits;
 } Typesets[] = {
     {SYM_ANY_VALUE_X, TS_VALUE},
@@ -220,7 +220,7 @@ bool Add_Typeset_Bits_Core(
             VAL_TYPESET_HIGH_BITS(typeset) |= VAL_TYPESET_HIGH_BITS(item);
         }
         else if (IS_SYM_WORD(item)) {  // see Startup_Fake_Type_Constraint()
-            switch (VAL_WORD_SYM(item)) {
+            switch (VAL_WORD_ID(item)) {
               case SYM_CHAR_X:
               case SYM_BLACKHOLE_X:
                 TYPE_SET(typeset, REB_ISSUE);
@@ -395,7 +395,7 @@ REBTYPE(Typeset)
 {
     REBVAL *v = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_FIND: {
         INCLUDE_PARAMS_OF_FIND;
         UNUSED(ARG(series));  // covered by `v`
@@ -433,7 +433,7 @@ REBTYPE(Typeset)
         else if (not IS_TYPESET(arg))
             fail (arg);
 
-        switch (VAL_WORD_SYM(verb)) {
+        switch (VAL_WORD_ID(verb)) {
           case SYM_UNION:
             VAL_TYPESET_LOW_BITS(v) |= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) |= VAL_TYPESET_HIGH_BITS(arg);

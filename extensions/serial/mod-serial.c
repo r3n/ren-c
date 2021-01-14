@@ -48,12 +48,12 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
     // Actions for an unopened serial port:
     if (not (req->flags & RRF_OPEN)) {
-        switch (VAL_WORD_SYM(verb)) {
+        switch (VAL_WORD_ID(verb)) {
           case SYM_REFLECT: {
             INCLUDE_PARAMS_OF_REFLECT;
 
             UNUSED(ARG(value));
-            REBSYM property = VAL_WORD_SYM(ARG(property));
+            SYMID property = VAL_WORD_ID(ARG(property));
             assert(property != SYM_0);
 
             switch (property) {
@@ -132,12 +132,12 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
     // Actions for an open socket:
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value));
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {

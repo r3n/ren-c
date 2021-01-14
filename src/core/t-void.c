@@ -59,7 +59,7 @@ REB_R MAKE_Void(
     UNUSED(parent);
 
     if (IS_WORD(arg))
-        return Init_Void_Core(out, VAL_WORD_SPELLING(arg));
+        return Init_Void_Core(out, VAL_WORD_SYMBOL(arg));
 
     fail (Error_Bad_Make(kind, arg));
 }
@@ -85,8 +85,8 @@ REB_R TO_Void(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
 //
 REBINT CT_Void(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    const REBSTR* label_a = VAL_VOID_LABEL(a);
-    const REBSTR* label_b = VAL_VOID_LABEL(b);
+    const REBSYM* label_a = VAL_VOID_LABEL(a);
+    const REBSYM* label_b = VAL_VOID_LABEL(b);
 
     return Compare_Spellings(label_a, label_b, strict);
 }
@@ -99,12 +99,12 @@ REBTYPE(Void)
 {
     REBVAL *voided = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value)); // taken care of by `voided` above.
 
-        switch (VAL_WORD_SYM(ARG(property))) {
+        switch (VAL_WORD_ID(ARG(property))) {
           case SYM_LABEL:
             return Init_Word(D_OUT, VAL_VOID_LABEL(voided));
 

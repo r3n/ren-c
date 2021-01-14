@@ -300,14 +300,14 @@ REBTYPE(Issue)
 {
     REBVAL *issue = D_ARG(1);
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     switch (sym) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // same as `v`
 
-        switch (VAL_WORD_SYM(ARG(property))) {
+        switch (VAL_WORD_ID(ARG(property))) {
           case SYM_CODEPOINT:
             if (not IS_CHAR(issue))
                 break;  // must be a single codepoint to use this reflector

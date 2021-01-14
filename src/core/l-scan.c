@@ -659,7 +659,7 @@ static void Update_Error_Near_For_Line(
     ERROR_VARS *vars = ERR_VARS(error);
     Init_Text(&vars->nearest, Pop_Molded_String(mo));
 
-    Init_Word(&vars->file, ss->file);
+    Init_File(&vars->file, ss->file);
     Init_Integer(&vars->line, ss->line);
 }
 
@@ -2244,7 +2244,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             fail (Error_Malconstruct_Raw(temp));
         }
 
-        REBSYM sym = VAL_WORD_SYM(ARR_HEAD(array));
+        SYMID sym = VAL_WORD_ID(ARR_HEAD(array));
         if (
             IS_KIND_SYM(sym)
             or sym == SYM_IMAGE_X
@@ -2372,7 +2372,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         REBCTX *context = unwrap(ss->feed->context);
         REBCTX *lib = try_unwrap(ss->feed->lib);
 
-        const REBSTR *symbol = VAL_WORD_SPELLING(DS_TOP);
+        const REBSYM *symbol = VAL_WORD_SYMBOL(DS_TOP);
         REBINT n = Get_Binder_Index_Else_0(binder, symbol);
         if (n > 0) {
             //
@@ -2947,11 +2947,24 @@ REBNATIVE(transcode)
 
     REBVAL *source = ARG(source);
 
-    // !!! Should the base name and extension be stored, or whole path?
-    //
-    const REBSTR *file = REF(file)
-        ? Intern_Any_String_Managed(ARG(file))
-        : Canon(SYM___ANONYMOUS__);
+    const REBSTR *file;
+    if (REF(file)) {
+        //
+        // Originally, interning was used on the file to avoid redundancy.
+        // However, that meant the interning mechanic was being given strings
+        // that were not necessarily valid WORD! symbols.  There's probably
+        // not *that* much redundancy of files being scanned, and plain old
+        // freezing can keep the user from changing the passed in filename
+        // after-the-fact (making a copy would likely be wasteful, so let
+        // them copy if they care to change the string later).
+        //
+        // !!! Should the base name and extension be stored, or whole path?
+        //
+        file = VAL_STRING(ARG(file));
+        Freeze_Series(file);
+    }
+    else
+        file = Canon(SYM___ANONYMOUS__);
 
     const REBVAL *line_number;
     if (ANY_WORD(ARG(line)))

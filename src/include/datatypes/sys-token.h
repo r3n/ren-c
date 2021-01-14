@@ -239,7 +239,7 @@ inline static const REBYTE *VAL_BYTES_LIMIT_AT(
     assert(ANY_WORD(v));
     assert(limit == VAL_LEN_AT(v)); // !!! TBD: string unification
 
-    const REBSTR *spelling = VAL_WORD_SPELLING(v);
+    const REBSTR *spelling = VAL_WORD_SYMBOL(v);
     *size_out = STR_SIZE(spelling);
     return STR_HEAD(spelling); 
 }
@@ -313,7 +313,7 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
     else {
         assert(ANY_WORD_KIND(CELL_HEART(v)));
 
-        const REBSTR *spelling = VAL_WORD_SPELLING(v);
+        const REBSTR *spelling = VAL_WORD_SYMBOL(v);
         utf8 = STR_HEAD(spelling);
 
         if (size_out or length_out) {

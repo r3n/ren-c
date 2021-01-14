@@ -70,9 +70,9 @@ inline static void INIT_LINK_KEYSOURCE(REBARR *varlist, REBNOD *keysource) {
 }
 
 
-inline static OPT_REBSYM VAL_WORD_SYM(REBCEL(const*) v) {
+inline static OPT_SYMID VAL_WORD_ID(REBCEL(const*) v) {
     assert(PG_Symbol_Canons);  // all syms are 0 prior to Init_Symbols()
-    return STR_SYMBOL(VAL_WORD_SPELLING(v));
+    return ID_OF_SYMBOL(VAL_WORD_SYMBOL(v));
 }
 
 inline static void INIT_VAL_WORD_PRIMARY_INDEX(RELVAL *v, REBLEN i) {
@@ -95,10 +95,10 @@ inline static void INIT_VAL_WORD_VIRTUAL_MONDEX(
 inline static REBVAL *Init_Any_Word_Core(
     RELVAL *out,
     enum Reb_Kind kind,
-    const REBSTR *spelling
+    const REBSYM *sym
 ){
     RESET_VAL_HEADER(out, kind, CELL_FLAG_FIRST_IS_NODE);
-    mutable_BINDING(out) = spelling;
+    mutable_BINDING(out) = sym;
     VAL_WORD_INDEXES_U32(out) = 0;
     INIT_VAL_WORD_CACHE(out, SPECIFIED);
 

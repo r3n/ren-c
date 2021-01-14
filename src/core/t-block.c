@@ -394,18 +394,18 @@ REBLEN Find_In_Array(
     if (ANY_WORD(target)) {
         for (; index >= start and index < end; index += skip) {
             const RELVAL *item = ARR_AT(array, index);
-            const REBSTR *target_symbol = VAL_WORD_SPELLING(target);
+            const REBSYM *target_symbol = VAL_WORD_SYMBOL(target);
             if (ANY_WORD(item)) {
                 if (flags & AM_FIND_CASE) { // Must be same type and spelling
                     if (
-                        VAL_WORD_SPELLING(item) == target_symbol
+                        VAL_WORD_SYMBOL(item) == target_symbol
                         and VAL_TYPE(item) == VAL_TYPE(target)
                     ){
                         return index;
                     }
                 }
                 else { // Can be different type or differently cased spelling
-                    if (SAME_STR(VAL_WORD_SPELLING(item), target_symbol))
+                    if (Are_Synonyms(VAL_WORD_SYMBOL(item), target_symbol))
                         return index;
                 }
             }
@@ -638,11 +638,11 @@ REB_R PD_Array(
         //
         n = -1;
 
-        const REBSTR *symbol = VAL_WORD_SPELLING(picker);
+        const REBSTR *symbol = VAL_WORD_SYMBOL(picker);
         const RELVAL *item = VAL_ARRAY_AT(pvs->out);
         REBLEN index = VAL_INDEX(pvs->out);
         for (; NOT_END(item); ++item, ++index) {
-            if (ANY_WORD(item) and symbol == VAL_WORD_SPELLING(item)) {
+            if (ANY_WORD(item) and symbol == VAL_WORD_SYMBOL(item)) {
                 n = index + 1;
                 break;
             }
@@ -809,7 +809,7 @@ REBTYPE(Array)
 
     REBSPC *specifier = VAL_SPECIFIER(array);
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
     switch (sym) {
       case SYM_UNIQUE:
       case SYM_INTERSECT:
@@ -913,7 +913,7 @@ REBTYPE(Array)
         if (REF(only))
             len = 1;
 
-        if (VAL_WORD_SYM(verb) == SYM_FIND) {
+        if (VAL_WORD_ID(verb) == SYM_FIND) {
             if (REF(tail) or REF(match))
                 ret += len;
             VAL_INDEX_RAW(array) = ret;
@@ -936,7 +936,7 @@ REBTYPE(Array)
         UNUSED(PAR(series));
 
         REBLEN len; // length of target
-        if (VAL_WORD_SYM(verb) == SYM_CHANGE)
+        if (VAL_WORD_ID(verb) == SYM_CHANGE)
             len = Part_Len_May_Modify_Index(array, ARG(part));
         else
             len = Part_Limit_Append_Insert(ARG(part));
@@ -965,7 +965,7 @@ REBTYPE(Array)
         VAL_INDEX_RAW(D_OUT) = Modify_Array(
             arr,
             index,
-            cast(enum Reb_Symbol, sym),
+            cast(enum Reb_Symbol_Id, sym),
             ARG(value),
             flags,
             len,

@@ -298,12 +298,12 @@ REB_R Console_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
     REBREQ *req = Force_Get_Port_State(port, &Dev_StdIO);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value)); // implied by `port`
 
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         switch (property) {
           case SYM_OPEN_Q:
             return Init_Logic(D_OUT, did (Req(req)->flags & RRF_OPEN));

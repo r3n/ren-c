@@ -473,10 +473,10 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #include "datatypes/sys-datatype.h"  // uses BIN()
 
 #include "datatypes/sys-char.h"  // use Init_Integer() for bad codepoint error
-#include "datatypes/sys-string.h"  // REBSYM needed for typesets
+#include "datatypes/sys-string.h"  // SYMID needed for typesets
 
 #include "sys-symbol.h"
-#include "datatypes/sys-void.h"  // REBSYM needed
+#include "datatypes/sys-void.h"  // SYMID needed
 
 #include "datatypes/sys-pair.h"
 #include "datatypes/sys-quoted.h"  // pairings for storage, void used as well
@@ -522,7 +522,7 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 //
 inline static void Check_Security_Placeholder(
     const REBSTR *subsystem,
-    enum Reb_Symbol policy,
+    enum Reb_Symbol_Id policy,
     const REBVAL *value
 ){
     /* see Check_Security() in the SECURE Extension */

@@ -683,7 +683,7 @@ REBVAL *Get_Sys_Function_Debug(REBLEN index, const char *name)
 {
     REBCTX *sys = VAL_CONTEXT(Sys_Context);
     const REBKEY *key = CTX_KEY(sys, index);
-    const char *key_utf8 = STR_UTF8(KEY_SPELLING(key));
+    const char *key_utf8 = STR_UTF8(KEY_SYMBOL(key));
     assert(strcmp(key_utf8, name) == 0);
     return CTX_VAR(sys, index);
 }
@@ -869,7 +869,7 @@ void Startup_Core(void)
     );
 
     REBARR *boot_array = Scan_UTF8_Managed(
-        Intern_Unsized_Managed("tmp-boot.r"),
+        Intern_Unsized_Managed("-tmp-boot-"),
         utf8,
         utf8_size
     );
@@ -882,7 +882,7 @@ void Startup_Core(void)
 
     Startup_Symbols(VAL_ARRAY_KNOWN_MUTABLE(&boot->words));
 
-    // STR_SYMBOL(), VAL_WORD_SYM() and Canon(SYM_XXX) now available
+    // ID_OF_SYMBOL(), VAL_WORD_ID() and Canon(SYM_XXX) now available
 
     PG_Boot_Phase = BOOT_LOADED;
 

@@ -33,11 +33,11 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
         const bool strict = true;
         if (0 == Find_Symbol_In_Context(
             context,
-            VAL_WORD_SPELLING(arg),
+            VAL_WORD_SYMBOL(arg),
             strict
         )){
             Expand_Context(c, 1);
-            Append_Context(c, nullptr, VAL_WORD_SPELLING(arg));
+            Append_Context(c, nullptr, VAL_WORD_SYMBOL(arg));
         }
         return;
     }
@@ -78,14 +78,14 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
             goto collect_end;
         }
 
-        const REBSTR *symbol = VAL_WORD_SPELLING(word);
+        const REBSYM *symbol = VAL_WORD_SYMBOL(word);
 
         if (Try_Add_Binder_Index(
             &collector.binder,
             symbol,
             Collector_Index_If_Pushed(&collector)
         )){
-            Init_Word(DS_PUSH(), VAL_WORD_SPELLING(word));
+            Init_Word(DS_PUSH(), VAL_WORD_SYMBOL(word));
         }
         if (IS_END(word + 1))  // catch malformed case with no value (#708)
             break;
@@ -98,14 +98,14 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
 
     STKVAL(*) new_word = DS_AT(collector.dsp_orig) + first_new_index;
     for (; new_word != DS_TOP + 1; ++new_word)
-        Append_Context(c, nullptr, VAL_WORD_SPELLING(new_word));
+        Append_Context(c, nullptr, VAL_WORD_SYMBOL(new_word));
   }
 
   blockscope {  // Set new values to obj words
     const RELVAL *word = item;
     for (; NOT_END(word); word += 2) {
         REBLEN i = Get_Binder_Index_Else_0(
-            &collector.binder, VAL_WORD_SPELLING(word)
+            &collector.binder, VAL_WORD_SYMBOL(word)
         );
         assert(i != 0);
 
@@ -193,8 +193,8 @@ REBINT CT_Context(REBCEL(const*) a, REBCEL(const*) b, bool strict)
             goto no_advance;
         }
 
-        const REBSTR *symbol1 = KEY_SPELLING(key1);
-        const REBSTR *symbol2 = KEY_SPELLING(key2);
+        const REBSYM *symbol1 = KEY_SYMBOL(key1);
+        const REBSYM *symbol2 = KEY_SYMBOL(key2);
         REBINT spell_diff = Compare_Spellings(symbol1, symbol2, strict);
         if (spell_diff != 0)
             return spell_diff;
@@ -411,7 +411,7 @@ REB_R PD_Context(
         n = VAL_WORD_INDEX(picker);
     else {
         const bool strict = false;
-        n = Find_Symbol_In_Context(pvs->out, VAL_WORD_SPELLING(picker), strict);
+        n = Find_Symbol_In_Context(pvs->out, VAL_WORD_SYMBOL(picker), strict);
 
         if (n == 0)
             return R_UNHANDLED;
@@ -644,7 +644,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
             if (honor_hidden and Is_Var_Hidden(var))
                 continue;
 
-            Append_Spelling(mo->series, KEY_SPELLING(key));
+            Append_Spelling(mo->series, KEY_SYMBOL(key));
             Append_Ascii(mo->series, ": ");
             Mold_Value(mo, var);
             Append_Codepoint(mo->series, LF);
@@ -680,7 +680,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
         New_Indented_Line(mo);
 
-        const REBSTR *spelling = KEY_SPELLING(key);
+        const REBSTR *spelling = KEY_SYMBOL(key);
         Append_Utf8(s, STR_UTF8(spelling), STR_SIZE(spelling));
 
         Append_Ascii(s, ": ");
@@ -718,13 +718,13 @@ REB_R Context_Common_Action_Maybe_Unhandled(
     REBVAL *v = D_ARG(1);
     REBCTX *c = VAL_CONTEXT(v);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // covered by `v`
 
         REBVAL *property = ARG(property);
-        switch (VAL_WORD_SYM(property)) {
+        switch (VAL_WORD_ID(property)) {
           case SYM_LENGTH: // !!! Should this be legal?
             return Init_Integer(D_OUT, CTX_LEN(c));
 
@@ -770,7 +770,7 @@ REBTYPE(Context)
     REBVAL *context = D_ARG(1);
     REBCTX *c = VAL_CONTEXT(context);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // covered by `v`
@@ -779,14 +779,14 @@ REBTYPE(Context)
             break;
 
         REBVAL *property = ARG(property);
-        REBSYM sym = VAL_WORD_SYM(property);
+        SYMID sym = VAL_WORD_ID(property);
 
         if (sym == SYM_LABEL) {
             //
             // Can be answered for frames that have no execution phase, if
             // they were initialized with a label.
             //
-            option(const REBSTR*) label = VAL_FRAME_LABEL(context);
+            option(const REBSYM*) label = VAL_FRAME_LABEL(context);
             if (label)
                 return Init_Word(D_OUT, unwrap(label));
 
@@ -819,7 +819,7 @@ REBTYPE(Context)
             const REBSTR *file = FRM_FILE(f);
             if (not file)
                 return nullptr;
-            return Init_Word(D_OUT, file); }
+            return Init_File(D_OUT, file); }
 
           case SYM_LINE: {
             REBLIN line = FRM_LINE(f);
@@ -909,13 +909,13 @@ REBTYPE(Context)
 
         REBLEN n = Find_Symbol_In_Context(
             context,
-            VAL_WORD_SPELLING(pattern),
+            VAL_WORD_SYMBOL(pattern),
             did REF(case)
         );
         if (n == 0)
             return nullptr;
 
-        if (VAL_WORD_SYM(verb) == SYM_FIND)
+        if (VAL_WORD_ID(verb) == SYM_FIND)
             return Init_True(D_OUT); // !!! obscures non-LOGIC! result?
 
         RETURN (CTX_VAR(c, n)); }

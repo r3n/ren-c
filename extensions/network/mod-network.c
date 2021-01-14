@@ -114,12 +114,12 @@ static REB_R Transport_Actor(
         //
         // Actions for an unopened socket
         //
-        switch (VAL_WORD_SYM(verb)) {
+        switch (VAL_WORD_ID(verb)) {
           case SYM_REFLECT: {
             INCLUDE_PARAMS_OF_REFLECT;
 
             UNUSED(ARG(value));  // covered by `port`
-            REBSYM property = VAL_WORD_SYM(ARG(property));
+            SYMID property = VAL_WORD_ID(ARG(property));
             assert(property != SYM_0);
 
             switch (property) {
@@ -216,12 +216,12 @@ static REB_R Transport_Actor(
 
   open_socket_actions:
 
-    switch (VAL_WORD_SYM(verb)) { // Ordered by frequency
+    switch (VAL_WORD_ID(verb)) { // Ordered by frequency
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // covered by `port`
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {

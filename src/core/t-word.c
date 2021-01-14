@@ -30,7 +30,7 @@
 //
 // Used in CT_Word() and CT_Void()
 //
-REBINT Compare_Spellings(const REBSTR *a, const REBSTR *b, bool strict)
+REBINT Compare_Spellings(const REBSYM *a, const REBSYM *b, bool strict)
 {
     if (strict) {
         if (a == b)
@@ -51,7 +51,7 @@ REBINT Compare_Spellings(const REBSTR *a, const REBSTR *b, bool strict)
     else {
         // Different cases acceptable, only check for a canon match
         //
-        if (SAME_STR(a, b))
+        if (Are_Synonyms(a, b))
             return 0;
 
         // !!! "They must differ by case...."  This needs to account for
@@ -77,8 +77,8 @@ REBINT Compare_Spellings(const REBSTR *a, const REBSTR *b, bool strict)
 REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     return Compare_Spellings(
-        VAL_WORD_SPELLING(a),
-        VAL_WORD_SPELLING(b),
+        VAL_WORD_SYMBOL(a),
+        VAL_WORD_SYMBOL(b),
         strict
     );
 }
@@ -196,7 +196,7 @@ REB_R TO_Word(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 
 inline static void Mold_Word(REB_MOLD *mo, REBCEL(const*) v)
 {
-    const REBSTR *spelling = VAL_WORD_SPELLING(v);
+    const REBSTR *spelling = VAL_WORD_SYMBOL(v);
     Append_Utf8(mo->series, STR_UTF8(spelling), STR_SIZE(spelling));
 }
 
@@ -254,17 +254,17 @@ REBTYPE(Word)
     REBVAL *v = D_ARG(1);
     assert(ANY_WORD(v));
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value));
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
         case SYM_LENGTH: {
-            const REBSTR *spelling = VAL_WORD_SPELLING(v);
+            const REBSTR *spelling = VAL_WORD_SYMBOL(v);
             const REBYTE *bp = STR_HEAD(spelling);
             REBSIZ size = STR_SIZE(spelling);
             REBLEN len = 0;

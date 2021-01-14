@@ -65,7 +65,7 @@ REB_R MAKE_Datatype(
             return Move_Value(out, custom);
     }
     if (IS_WORD(arg)) {
-        REBSYM sym = VAL_WORD_SYM(arg);
+        SYMID sym = VAL_WORD_ID(arg);
         if (sym == SYM_0 or sym >= SYM_FROM_KIND(REB_MAX))
             goto bad_make;
 
@@ -111,10 +111,10 @@ REBTYPE(Datatype)
 
     REBVAL *arg = D_ARG(2);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
 
     case SYM_REFLECT: {
-        REBSYM sym = VAL_WORD_SYM(arg);
+        SYMID sym = VAL_WORD_ID(arg);
         if (sym == SYM_SPEC) {
             //
             // The "type specs" were loaded as an array, but this reflector
@@ -203,9 +203,9 @@ REBVAL *Datatype_From_Url(const REBVAL *url) {
 // unconstrained form of the type matches), PARSE recognizes the symbol and
 // enforces it.
 //
-static void Startup_Fake_Type_Constraint(REBSYM sym)
+static void Startup_Fake_Type_Constraint(SYMID sym)
 {
-    const REBSTR *canon = Canon(sym);
+    const REBSYM *canon = Canon(sym);
     REBVAL *char_x = Append_Context(VAL_CONTEXT(Lib_Context), nullptr, canon);
     Init_Sym_Word(char_x, canon);
 }
@@ -216,7 +216,7 @@ static void Startup_Fake_Type_Constraint(REBSYM sym)
 //
 // Called on SYM-WORD!s by PARSE and MATCH.
 //
-bool Matches_Fake_Type_Constraint(const RELVAL *v, enum Reb_Symbol sym) {
+bool Matches_Fake_Type_Constraint(const RELVAL *v, enum Reb_Symbol_Id sym) {
     switch (sym) {
       case SYM_CHAR_X:
         return IS_CHAR(v);
@@ -256,7 +256,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
 
     RELVAL *word = ARR_HEAD(boot_types);
 
-    if (VAL_WORD_SYM(word) != SYM_NULL)
+    if (VAL_WORD_ID(word) != SYM_NULL)
         panic (word);  // First internal byte type is NULL at 1
 
     REBARR *catalog = Make_Array(REB_MAX - 1);

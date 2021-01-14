@@ -404,7 +404,7 @@ REBTYPE(Binary)
     REBINT index = cast(REBINT, VAL_INDEX(v));
     REBINT tail = cast(REBINT, VAL_LEN_HEAD(v));
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
     switch (sym) {
       case SYM_UNIQUE:
       case SYM_INTERSECT:
@@ -430,7 +430,7 @@ REBTYPE(Binary)
         }
 
         REBLEN len; // length of target
-        if (VAL_WORD_SYM(verb) == SYM_CHANGE)
+        if (VAL_WORD_ID(verb) == SYM_CHANGE)
             len = Part_Len_May_Modify_Index(v, ARG(part));
         else
             len = Part_Limit_Append_Insert(ARG(part));
@@ -443,7 +443,7 @@ REBTYPE(Binary)
 
         VAL_INDEX_RAW(v) = Modify_String_Or_Binary(
             v,
-            cast(enum Reb_Symbol, sym),
+            cast(enum Reb_Symbol_Id, sym),
             ARG(value),
             flags,
             len,
@@ -609,7 +609,7 @@ REBTYPE(Binary)
 
         REBYTE *dest = BIN_HEAD(series);
 
-        switch (VAL_WORD_SYM(verb)) {
+        switch (VAL_WORD_ID(verb)) {
           case SYM_BITWISE_AND: {
             REBLEN i;
             for (i = 0; i < smaller; i++)

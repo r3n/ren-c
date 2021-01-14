@@ -138,7 +138,7 @@ static void Expand_Word_Table(void)
     assert(SER_WIDE(PG_Symbols_By_Hash) == sizeof(REBSTR*));
 
     REBSER *ser = Make_Series_Core(
-        num_slots, sizeof(REBSTR*), SERIES_FLAG_POWER_OF_2
+        num_slots, sizeof(REBSYM*), SERIES_FLAG_POWER_OF_2
     );
     Clear_Series(ser);
     SET_SERIES_LEN(ser, num_slots);
@@ -196,7 +196,7 @@ static void Expand_Word_Table(void)
 // one "canon" interning to use for fast case-insensitive compares.  If that
 // canon form is GC'd, the agreed upon canon for the group will change.
 //
-const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
+const REBSYM *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
 {
     // The hashing technique used is called "linear probing":
     //
@@ -213,7 +213,7 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
         num_slots = SER_USED(PG_Symbols_By_Hash);  // got larger
     }
 
-    REBSTR* *symbols_by_hash = SER_HEAD(REBSTR*, PG_Symbols_By_Hash);
+    REBSYM* *symbols_by_hash = SER_HEAD(REBSYM*, PG_Symbols_By_Hash);
 
     REBLEN skip; // how many slots to skip when occupied candidates found
     REBLEN slot = First_Hash_Candidate_Slot(
@@ -227,9 +227,9 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
     // be skipped to try again) the search uses a comparison that is
     // case-insensitive...but reports if synonyms via > 0 results.
     //
-    REBSTR *synonym = nullptr;
-    REBSTR **deleted_slot = nullptr;
-    REBSTR* symbol;
+    REBSYM *synonym = nullptr;
+    REBSYM **deleted_slot = nullptr;
+    REBSYM* symbol;
     while ((symbol = symbols_by_hash[slot])) {
         if (symbol == DELETED_SYMBOL) {
             deleted_slot = &symbols_by_hash[slot];
@@ -280,9 +280,9 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
     Freeze_Series(s); 
 
     if (not synonym) {
-        mutable_LINK(Synonym, s) = STR(s);  // 1-item in circular list
+        mutable_LINK(Synonym, s) = SYM(s);  // 1-item in circular list
 
-        // leave header.bits as 0 for SYM_0 as answer to VAL_WORD_SYM()
+        // leave header.bits as 0 for SYM_0 as answer to VAL_WORD_ID()
         // Startup_Symbols() tags values from %words.r after the fact.
         //
         // Words that aren't in the bootup %words.r list don't have integer
@@ -303,13 +303,13 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
         // circularly linked list, and direct link the canon form.
         //
         mutable_LINK(Synonym, s) = LINK(Synonym, synonym);
-        mutable_LINK(Synonym, synonym) = STR(s);
+        mutable_LINK(Synonym, synonym) = SYM(s);
 
         // If the canon form had a SYM_XXX for quick comparison of %words.r
         // words in C switch statements, the synonym inherits that number.
         //
         assert(SECOND_UINT16(s->leader) == 0);
-        SET_SECOND_UINT16(s->leader, STR_SYMBOL(synonym));
+        SET_SECOND_UINT16(s->leader, ID_OF_SYMBOL(synonym));
     }
 
     // Symbols use their MISC() to hold binding information.  Long term, it
@@ -324,13 +324,13 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
     s->misc.bind_index.low = 0;
 
     if (deleted_slot) {
-        *deleted_slot = STR(s);  // reuse the deleted slot
+        *deleted_slot = SYM(s);  // reuse the deleted slot
       #if !defined(NDEBUG)
         --PG_Num_Symbol_Deleteds;  // note slot usage count stays constant
       #endif
     }
     else {
-        symbols_by_hash[slot] = STR(s);
+        symbols_by_hash[slot] = SYM(s);
         ++PG_Num_Symbol_Slots_In_Use;
     }
 
@@ -338,7 +338,7 @@ const REBSTR *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
     // be no clear contract on the return result--as it wouldn't be possible
     // to know if a shared instance had been managed by someone else or not.
     //
-    return STR(Manage_Series(s));
+    return SYM(Manage_Series(s));
   }
 }
 
@@ -379,11 +379,11 @@ const REBSTR *Intern_Any_String_Managed(const RELVAL *v) {
 //
 void GC_Kill_Interning(REBSTR *intern)
 {
-    REBSTR *synonym = LINK(Synonym, intern);
+    REBSYM *synonym = LINK(Synonym, intern);
 
     // Note synonym and intern may be the same here.
     //
-    REBSTR *temp = synonym;
+    REBSYM *temp = synonym;
     while (LINK(Synonym, temp) != intern)
         temp = LINK(Synonym, temp);
     mutable_LINK(Synonym, temp) = synonym;  // cut the intern out (or no-op)
@@ -533,7 +533,7 @@ void Startup_Early_Symbols(void)
 //
 // This goes through the name series for %words.r words and tags them with
 // SYM_XXX constants.  This allows the small number to be quickly extracted to
-// use with VAL_WORD_SYM() in C switch statements.  These are the only words
+// use with VAL_WORD_ID() in C switch statements.  These are the only words
 // that have fixed symbol numbers--others are only managed and compared
 // through their pointers.
 //
@@ -549,12 +549,12 @@ void Startup_Symbols(REBARR *words)
         SERIES_FLAG_FIXED_SIZE // can't ever add more SYM_XXX lookups
     );
 
-    // All words that not in %words.r will get back VAL_WORD_SYM(w) == SYM_0
+    // All words that not in %words.r will get back VAL_WORD_ID(w) == SYM_0
     // Hence, SYM_0 cannot be canonized.  Allowing Canon(SYM_0) to return NULL
     // and try and use that meaningfully is too risky, so it is simply
     // prohibited to canonize SYM_0, and trash the REBSTR* in the [0] slot.
     //
-    REBSYM sym = SYM_0;
+    SYMID sym = SYM_0;
     TRASH_POINTER_IF_DEBUG(
         *SER_AT(REBSTR*, PG_Symbol_Canons, cast(REBLEN, sym))
     );
@@ -562,9 +562,9 @@ void Startup_Symbols(REBARR *words)
     RELVAL *word = ARR_HEAD(words);
     for (; NOT_END(word); ++word) {
         assert(IS_WORD(word));  // real word, not fake (e.g. `/` as -slash-0-)
-        REBSTR *canon = m_cast(REBSTR*, VAL_WORD_SPELLING(word));
+        REBSYM *canon = m_cast(REBSYM*, VAL_WORD_SYMBOL(word));
 
-        sym = cast(REBSYM, cast(REBLEN, sym) + 1);
+        sym = cast(SYMID, cast(REBLEN, sym) + 1);
         *SER_AT(REBSTR*, PG_Symbol_Canons, cast(REBLEN, sym)) = canon;
 
         if (sym == SYM__SLASH_1_)
@@ -578,7 +578,7 @@ void Startup_Symbols(REBARR *words)
         // included alternate-case forms of the %words.r words.  Walk any
         // aliases and make sure they have the header bits too.
 
-        REBSTR *name = canon;
+        REBSYM *name = canon;
         do {
             // Symbol series store symbol number in the header's 2nd uint16_t.
             // Could probably use less than 16 bits, but 8 is insufficient.
@@ -586,7 +586,7 @@ void Startup_Symbols(REBARR *words)
             //
             assert(SECOND_UINT16(name->leader) == 0);
             SET_SECOND_UINT16(name->leader, sym);
-            assert(SAME_SYM_NONZERO(STR_SYMBOL(name), sym));
+            assert(Same_Nonzero_Symid(ID_OF_SYMBOL(name), sym));
 
             name = LINK(Synonym, name);
         } while (name != canon); // circularly linked list, stop on a cycle

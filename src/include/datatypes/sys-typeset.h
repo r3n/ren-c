@@ -45,18 +45,18 @@
 //      make typeset! [<hide> <quote> <protect> text! integer!]
 //
 
-inline static bool IS_KIND_SYM(REBSYM s)
-  { return s != SYM_0 and s < cast(REBSYM, REB_MAX); }
+inline static bool IS_KIND_SYM(SYMID s)
+  { return s != SYM_0 and s < cast(SYMID, REB_MAX); }
 
-inline static enum Reb_Kind KIND_FROM_SYM(REBSYM s) {
+inline static enum Reb_Kind KIND_FROM_SYM(SYMID s) {
     assert(IS_KIND_SYM(s));
     return cast(enum Reb_Kind, cast(int, (s)));
 }
 
 #define SYM_FROM_KIND(k) \
-    cast(REBSYM, cast(enum Reb_Kind, (k)))
+    cast(SYMID, cast(enum Reb_Kind, (k)))
 
-inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
+inline static SYMID VAL_TYPE_SYM(REBCEL(const*) v) {
     //
     // !!! The extension type list is limited to a finite set as a first step
     // of generalizing the approach.  Bridge compatibility for things like

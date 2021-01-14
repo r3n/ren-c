@@ -196,7 +196,7 @@ REBTYPE(Action)
     REBVAL *action = D_ARG(1);
     REBACT *act = VAL_ACTION(action);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_COPY: {
         INCLUDE_PARAMS_OF_COPY;
 
@@ -257,7 +257,7 @@ REBTYPE(Action)
         UNUSED(ARG(value));
 
         REBVAL *property = ARG(property);
-        REBSYM sym = VAL_WORD_SYM(property);
+        SYMID sym = VAL_WORD_ID(property);
         switch (sym) {
           case SYM_BINDING: {
             if (Did_Get_Binding_Of(D_OUT, action))
@@ -265,10 +265,10 @@ REBTYPE(Action)
             return nullptr; }
 
           case SYM_LABEL: {
-            const REBSTR *label = VAL_ACTION_LABEL(action);
+            option(const REBSYM*) label = VAL_ACTION_LABEL(action);
             if (not label)
                 return nullptr;
-            return Init_Word(D_OUT, label); }
+            return Init_Word(D_OUT, unwrap(label)); }
 
           case SYM_WORDS:
           case SYM_PARAMETERS: {
@@ -302,7 +302,7 @@ REBTYPE(Action)
 
             // !!! How to tell URL! vs FILE! ?
             //
-            if (VAL_WORD_SYM(property) == SYM_FILE)
+            if (VAL_WORD_ID(property) == SYM_FILE)
                 Init_File(D_OUT, LINK(Filename, a));
             else
                 Init_Integer(D_OUT, a->misc.line);
@@ -362,15 +362,15 @@ REB_R PD_Action(
     // general path mechanic before reaching this dispatch.  So if it's not
     // a word/refinement or or one of those that evaluated it, then error.
     //
-    const REBSTR *spelling;
+    const REBSYM *symbol;
     if (IS_WORD(picker))
-        spelling = VAL_WORD_SPELLING(picker);
+        symbol = VAL_WORD_SYMBOL(picker);
     else if (IS_PATH(picker) and IS_REFINEMENT(picker))
-        spelling = VAL_REFINEMENT_SPELLING(picker);
+        symbol = VAL_REFINEMENT_SYMBOL(picker);
     else
         return R_UNHANDLED;
 
-    Init_Word(DS_PUSH(), spelling);
+    Init_Word(DS_PUSH(), symbol);
 
     return pvs->out; // leave ACTION! value in pvs->out, as-is
 }

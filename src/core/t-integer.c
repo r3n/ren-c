@@ -259,7 +259,7 @@ REBTYPE(Integer)
 
     REBI64 arg;
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     // !!! This used to rely on IS_BINARY_ACT, which is no longer available
     // in the symbol based dispatch.  Consider doing another way.
@@ -285,7 +285,7 @@ REBTYPE(Integer)
         else {
             // Decimal or other numeric second argument:
             REBLEN n = 0; // use to flag special case
-            switch (VAL_WORD_SYM(verb)) {
+            switch (VAL_WORD_ID(verb)) {
             // Anything added to an integer is same as adding the integer:
             case SYM_ADD:
             case SYM_MULTIPLY: {

@@ -301,7 +301,7 @@ bool Set_Bits(REBBIN *bset, const RELVAL *val, bool set)
     if (
         NOT_END(item)
         && IS_WORD(item)
-        && VAL_WORD_SYM(item) == SYM__NOT_  // see TO-C-NAME
+        && VAL_WORD_ID(item) == SYM__NOT_  // see TO-C-NAME
     ){
         INIT_BITS_NOT(bset, true);
         item++;
@@ -321,7 +321,7 @@ bool Set_Bits(REBBIN *bset, const RELVAL *val, bool set)
             if (
                 NOT_END(item + 1)
                 && IS_WORD(item + 1)
-                && VAL_WORD_SYM(item + 1) == SYM_HYPHEN
+                && VAL_WORD_ID(item + 1) == SYM_HYPHEN
             ){
                 item += 2;
                 if (IS_CHAR(item)) {
@@ -346,7 +346,7 @@ bool Set_Bits(REBBIN *bset, const RELVAL *val, bool set)
             if (
                 NOT_END(item + 1)
                 && IS_WORD(item + 1)
-                && VAL_WORD_SYM(item + 1) == SYM_HYPHEN
+                && VAL_WORD_ID(item + 1) == SYM_HYPHEN
             ){
                 REBUNI c = n;
                 item += 2;
@@ -375,7 +375,7 @@ bool Set_Bits(REBBIN *bset, const RELVAL *val, bool set)
 
         case REB_WORD: {
             // Special: BITS #{000...}
-            if (not IS_WORD(item) or VAL_WORD_SYM(item) != SYM_BITS)
+            if (not IS_WORD(item) or VAL_WORD_ID(item) != SYM_BITS)
                 return false;
             item++;
             if (not IS_BINARY(item))
@@ -453,7 +453,7 @@ bool Check_Bits(const REBBIN *bset, const RELVAL *val, bool uncased)
                     return true;
             }
             REBUNI c = VAL_CHAR(item);
-            if (IS_WORD(item + 1) && VAL_WORD_SYM(item + 1) == SYM_HYPHEN) {
+            if (IS_WORD(item + 1) && VAL_WORD_ID(item + 1) == SYM_HYPHEN) {
                 item += 2;
                 if (IS_CHAR(item)) {
                     REBLEN n = VAL_CHAR(item);
@@ -475,7 +475,7 @@ bool Check_Bits(const REBBIN *bset, const RELVAL *val, bool uncased)
             REBLEN n = Int32s(SPECIFIC(item), 0);
             if (n > 0xffff)
                 return false;
-            if (IS_WORD(item + 1) && VAL_WORD_SYM(item + 1) == SYM_HYPHEN) {
+            if (IS_WORD(item + 1) && VAL_WORD_ID(item + 1) == SYM_HYPHEN) {
                 REBUNI c = n;
                 item += 2;
                 if (IS_INTEGER(item)) {
@@ -570,13 +570,13 @@ REBTYPE(Bitset)
 {
     REBVAL *v = D_ARG(1);
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
     switch (sym) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value)); // covered by `v`
 
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         switch (property) {
           case SYM_LENGTH:
             return Init_Integer(v, BIN_LEN(VAL_BITSET(v)) * 8);

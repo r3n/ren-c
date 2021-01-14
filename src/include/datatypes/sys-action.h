@@ -256,15 +256,15 @@ inline static REBPAR *ACT_PARAMS_HEAD(REBACT *a) {
 #define IDX_NATIVE_MAX (IDX_NATIVE_CONTEXT + 1)
 
 
-inline static const REBSTR *KEY_SPELLING(const REBKEY *key)
+inline static const REBSYM *KEY_SYMBOL(const REBKEY *key)
   { return *key; }
 
 
-inline static void Init_Key(REBKEY *dest, const REBSTR *spelling)
-  { *dest = spelling; }
+inline static void Init_Key(REBKEY *dest, const REBSYM *symbol)
+  { *dest = symbol; }
 
 #define KEY_SYM(key) \
-    STR_SYMBOL(KEY_SPELLING(key))
+    ID_OF_SYMBOL(KEY_SYMBOL(key))
 
 #define ACT_KEY(a,n)            CTX_KEY(ACT_EXEMPLAR(a), (n))
 #define ACT_PARAM(a,n)          cast_PAR(CTX_VAR(ACT_EXEMPLAR(a), (n)))
@@ -306,12 +306,12 @@ inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
 // the words, you get the currently executing label instead...which may
 // actually make more sense.
 
-inline static const REBSTR *VAL_ACTION_LABEL(REBCEL(const *) v) {
+inline static option(const REBSYM*) VAL_ACTION_LABEL(REBCEL(const *) v) {
     assert(CELL_HEART(v) == REB_ACTION);
     REBSER *s = VAL_ACTION_SPECIALTY_OR_LABEL(v);
     if (IS_SER_ARRAY(s))
         return ANONYMOUS;  // archetype (e.g. may live in paramlist[0] itself)
-    return STR(s);
+    return SYM(s);
 }
 
 inline static void INIT_VAL_ACTION_LABEL(

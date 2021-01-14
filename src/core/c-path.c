@@ -378,7 +378,7 @@ bool Next_Path_Throws(REBPVS *pvs)
 
         if (IS_WORD(PVS_PICKER(pvs))) {
             if (not pvs->label) {  // !!! only used for this "bit" signal
-                pvs->label = VAL_WORD_SPELLING(PVS_PICKER(pvs));
+                pvs->label = VAL_WORD_SYMBOL(PVS_PICKER(pvs));
                 INIT_VAL_ACTION_LABEL(pvs->out, unwrap(pvs->label));
             }
         }
@@ -436,8 +436,8 @@ bool Eval_Path_Throws_Core(
 
       case REB_WORD:  // get or set `'/` or `'.`
         assert(
-            VAL_WORD_SPELLING(sequence) == PG_Slash_1_Canon
-            or VAL_WORD_SPELLING(sequence) == PG_Dot_1_Canon
+            VAL_WORD_SYMBOL(sequence) == PG_Slash_1_Canon
+            or VAL_WORD_SYMBOL(sequence) == PG_Dot_1_Canon
         );
         goto handle_word;
 
@@ -561,7 +561,7 @@ bool Eval_Path_Throws_Core(
         );
         Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
         if (IS_ACTION(pvs->out))
-            pvs->label = VAL_WORD_SPELLING(second);
+            pvs->label = VAL_WORD_SYMBOL(second);
     }
     else if (IS_WORD(f_value)) {
         //
@@ -573,7 +573,7 @@ bool Eval_Path_Throws_Core(
         Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
 
         if (IS_ACTION(pvs->out)) {
-            pvs->label = VAL_WORD_SPELLING(f_value);
+            pvs->label = VAL_WORD_SYMBOL(f_value);
             INIT_VAL_ACTION_LABEL(pvs->out, unwrap(pvs->label));
         }
     }
@@ -771,7 +771,7 @@ REBCTX *Resolve_Path(const REBVAL *path, REBLEN *index_out)
         const bool strict = false;
         REBLEN i = Find_Symbol_In_Context(
             var,
-            VAL_WORD_SPELLING(picker),
+            VAL_WORD_SYMBOL(picker),
             strict
         );
         ++index;

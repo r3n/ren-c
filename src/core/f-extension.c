@@ -229,7 +229,7 @@ REBNATIVE(load_extension)
         // normal module export...also Make_Native() doesn't understand it
         //
         bool is_export;
-        if (IS_WORD(item) and VAL_WORD_SYM(item) == SYM_EXPORT) {
+        if (IS_WORD(item) and VAL_WORD_ID(item) == SYM_EXPORT) {
             is_export = true;
             ++item;
         }
@@ -272,7 +272,7 @@ REBNATIVE(load_extension)
             // We don't want to necessarily make binding work on stack values.
             // So get to stack by way of the spare cell.
             //
-            Init_Word(D_SPARE, VAL_WORD_SPELLING(name));
+            Init_Word(D_SPARE, VAL_WORD_SYMBOL(name));
             if (0 == Try_Bind_Word(module, D_SPARE))
                 panic ("Couldn't bind word just added -- problem");
             Move_Value(DS_PUSH(), D_SPARE);

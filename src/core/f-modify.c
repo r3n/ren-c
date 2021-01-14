@@ -33,7 +33,7 @@
 REBLEN Modify_Array(
     REBARR *dst_arr,  // target
     REBLEN dst_idx,  // position
-    enum Reb_Symbol sym,  // INSERT, APPEND, CHANGE
+    enum Reb_Symbol_Id sym,  // INSERT, APPEND, CHANGE
     const REBVAL *src_val,  // source
     REBLEN flags,  // AM_SPLICE, AM_PART, AM_LINE
     REBLEN part,  // dst to remove (CHANGE) or limit to grow (APPEND/INSERT)
@@ -226,7 +226,7 @@ REBLEN Modify_Array(
 //
 REBLEN Modify_String_Or_Binary(
     REBVAL *dst,  // ANY-STRING! or BINARY! value to modify
-    enum Reb_Symbol sym,  // SYM_APPEND @ tail, SYM_INSERT/SYM_CHANGE @ index
+    enum Reb_Symbol_Id sym,  // SYM_APPEND @ tail, SYM_INSERT/SYM_CHANGE @ index
     const REBVAL *src,  // ANY-VALUE! argument with content to inject
     REBFLGS flags,  // AM_PART, AM_LINE
     REBLEN part,  // dst to remove (CHANGE) or limit to grow (APPEND/INSERT)

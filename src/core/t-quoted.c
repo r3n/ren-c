@@ -148,7 +148,7 @@ REBTYPE(Quoted)
 {
     // Note: SYM_REFLECT is handled directly in the REFLECT native
     //
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_COPY: {  // D_ARG(1) skips RETURN in first arg slot
         REBLEN num_quotes = Dequotify(D_ARG(1));
         REB_R r = Run_Generic_Dispatch(D_ARG(1), frame_, verb);

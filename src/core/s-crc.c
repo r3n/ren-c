@@ -351,7 +351,7 @@ uint32_t Hash_Value(const RELVAL *v)
         // !!! Should this hash be cached on the words somehow, e.g. in the
         // data payload before the actual string?
         //
-        hash = Hash_String(VAL_WORD_SPELLING(cell));
+        hash = Hash_String(VAL_WORD_SYMBOL(cell));
         break; }
 
       case REB_ACTION:

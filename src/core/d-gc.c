@@ -360,7 +360,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             );
         }
 
-        const REBSTR *spelling = VAL_WORD_SPELLING(v);
+        const REBSTR *spelling = VAL_WORD_SYMBOL(v);
         assert(Is_Series_Frozen(spelling));
 
         // !!! Whether you can count at this point on a spelling being GC

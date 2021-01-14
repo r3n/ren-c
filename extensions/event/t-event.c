@@ -68,7 +68,7 @@ REBINT CT_Event(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 //
 static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
 {
-    switch (VAL_WORD_SYM(word)) {
+    switch (VAL_WORD_ID(word)) {
       case SYM_TYPE: {
         //
         // !!! Rather limiting symbol-to-integer transformation for event
@@ -77,7 +77,7 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
         if (not IS_WORD(val) and not IS_QUOTED_WORD(val))
             return false;
 
-        REBSYM type_sym = VAL_WORD_SYM(val);
+        SYMID type_sym = VAL_WORD_ID(val);
 
         RELVAL *typelist = Get_System(SYS_VIEW, VIEW_EVENT_TYPES);
         assert(IS_BLOCK(typelist));
@@ -144,7 +144,7 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
             assert(IS_BLOCK(event_keys));
             UNUSED(event_keys);  // we can use any key name, but...
 
-            REBSYM sym = VAL_WORD_SYM(val);  // ...has to be symbol (for now)
+            SYMID sym = VAL_WORD_ID(val);  // ...has to be symbol (for now)
             if (sym == SYM_0)
                 fail ("EVENT! only takes keys that are compile-time symbols");
 
@@ -176,7 +176,7 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
             if (not IS_WORD(item))
                 continue;
 
-            switch (VAL_WORD_SYM(item)) {
+            switch (VAL_WORD_ID(item)) {
             case SYM_CONTROL:
                 mutable_VAL_EVENT_FLAGS(event) |= EVF_CONTROL;
                 break;
@@ -242,14 +242,14 @@ void Set_Event_Vars(
 static REBVAL *Get_Event_Var(
     RELVAL *out,
     REBCEL(const*) v,
-    const REBSTR *canon
+    const REBSYM *symbol
 ){
-    switch (STR_SYMBOL(canon)) {
+    switch (ID_OF_SYMBOL(symbol)) {
       case SYM_TYPE: {
         if (VAL_EVENT_TYPE(v) == SYM_NONE)  // !!! Should this ever happen?
             return nullptr;
 
-        REBSYM typesym = VAL_EVENT_TYPE(v);
+        SYMID typesym = VAL_EVENT_TYPE(v);
         return Init_Word(out, Canon(typesym)); }
 
       case SYM_PORT: {
@@ -408,7 +408,7 @@ REB_R PD_Event(
     if (IS_WORD(picker)) {
         if (not setval) {
             return Get_Event_Var(
-                pvs->out, pvs->out, VAL_WORD_SPELLING(picker)
+                pvs->out, pvs->out, VAL_WORD_SYMBOL(picker)
             );
         }
         else {
@@ -443,7 +443,7 @@ void MF_Event(REB_MOLD *mo, REBCEL(const*) v, bool form)
     UNUSED(form);
 
     REBLEN field;
-    REBSYM fields[] = {
+    SYMID fields[] = {
         SYM_TYPE, SYM_PORT, SYM_GOB, SYM_OFFSET, SYM_KEY,
         SYM_FLAGS, SYM_CODE, SYM_DATA, SYM_0
     };

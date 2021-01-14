@@ -246,7 +246,7 @@ void* Probe_Core_Debug(
             const REBKEY *key = SER_HEAD(REBKEY, s);
             Append_Ascii(mo->series, "<< ");
             for (; key != tail; ++key) {
-                Mold_Text_Series_At(mo, KEY_SPELLING(key), 0);
+                Mold_Text_Series_At(mo, KEY_SYMBOL(key), 0);
                 Append_Codepoint(mo->series, ' ');
             }
             Append_Ascii(mo->series, ">>");

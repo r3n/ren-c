@@ -329,7 +329,7 @@ inline static bool Single_Test_Throws(
       case REB_SYM_WORD: {
         if (Matches_Fake_Type_Constraint(
             arg,
-            cast(enum Reb_Symbol, VAL_WORD_SYM(test_cell))
+            cast(enum Reb_Symbol_Id, VAL_WORD_ID(test_cell))
         )){
             Init_True(out);
             return false;

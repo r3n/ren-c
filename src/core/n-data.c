@@ -339,9 +339,9 @@ REBNATIVE(in)
     // here in IN, but BIND's behavior on words may need revisiting.
     //
     if (ANY_WORD(v)) {
-        const REBSTR *spelling = VAL_WORD_SPELLING(v);
+        const REBSYM *symbol = VAL_WORD_SYMBOL(v);
         const bool strict = true;
-        REBLEN index = Find_Symbol_In_Context(ARG(context), spelling, strict);
+        REBLEN index = Find_Symbol_In_Context(ARG(context), symbol, strict);
         if (index == 0)
             return nullptr;
         return Init_Any_Word_Bound(D_OUT, VAL_TYPE(v), ctx, index);
@@ -377,9 +377,9 @@ REBNATIVE(without)
     // here in IN, but BIND's behavior on words may need revisiting.
     //
     if (ANY_WORD(v)) {
-        const REBSTR *spelling = VAL_WORD_SPELLING(v);
+        const REBSYM *symbol = VAL_WORD_SYMBOL(v);
         const bool strict = true;
-        REBLEN index = Find_Symbol_In_Context(ARG(context), spelling, strict);
+        REBLEN index = Find_Symbol_In_Context(ARG(context), symbol, strict);
         if (index == 0)
             return nullptr;
         return Init_Any_Word_Bound(D_OUT, VAL_TYPE(v), ctx, index);
@@ -1089,7 +1089,7 @@ bool Try_As_String(
     assert(strmode == STRMODE_ALL_CODEPOINTS or strmode == STRMODE_NO_CR);
 
     if (ANY_WORD(v)) {  // ANY-WORD! can alias as a read only ANY-STRING!
-        Init_Any_String(out, new_kind, VAL_WORD_SPELLING(v));
+        Init_Any_String(out, new_kind, VAL_WORD_SYMBOL(v));
         Inherit_Const(Quotify(out, quotes), v);
     }
     else if (IS_BINARY(v)) {  // If valid UTF-8, BINARY! aliases as ANY-STRING!
@@ -1263,8 +1263,8 @@ REBNATIVE(as)
 
               case REB_WORD:
                 assert(
-                    VAL_WORD_SPELLING(v) == PG_Dot_1_Canon
-                    or VAL_WORD_SPELLING(v) == PG_Slash_1_Canon
+                    VAL_WORD_SYMBOL(v) == PG_Dot_1_Canon
+                    or VAL_WORD_SYMBOL(v) == PG_Slash_1_Canon
                 );
                 Init_Block(v, PG_2_Blanks_Array);
                 break;
@@ -1465,7 +1465,7 @@ REBNATIVE(as)
                 goto intern_utf8;
             }
 
-            Init_Any_Word(D_OUT, new_kind, s);
+            Init_Any_Word(D_OUT, new_kind, SYM(s));
             return Inherit_Const(D_OUT, v);
           }
         }
@@ -1506,7 +1506,7 @@ REBNATIVE(as)
                 Freeze_Series(bin);
             }
 
-            return Inherit_Const(Init_Any_Word(D_OUT, new_kind, str), v);
+            return Inherit_Const(Init_Any_Word(D_OUT, new_kind, SYM(str)), v);
         }
 
         if (not ANY_WORD(v))

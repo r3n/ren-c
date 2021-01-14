@@ -701,7 +701,7 @@ REBNATIVE(same_q)
     if (ANY_WORD(v1))  // !!! "same" was spelling -and- binding in R3-Alpha
         return Init_Logic(
             D_OUT,
-            VAL_WORD_SPELLING(v1) == VAL_WORD_SPELLING(v2)
+            VAL_WORD_SYMBOL(v1) == VAL_WORD_SYMBOL(v2)
                 and VAL_WORD_BINDING(v1) == VAL_WORD_BINDING(v2)
         );
 

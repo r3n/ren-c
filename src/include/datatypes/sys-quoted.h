@@ -150,7 +150,7 @@ inline static RELVAL *Quotify_Core(
             // PRIMARY_INDEX.  If a word is shared by several QUOTED!
             // then that index can be different in each one.  So the shared
             // word is put in an unbound state, which means the binding is
-            // to the spelling, which VAL_WORD_SPELLING() of REBCEL can work.
+            // to the spelling, which VAL_WORD_SYMBOL() of REBCEL can work.
             //
             VAL_WORD_INDEXES_U32(v) |=
                 VAL_WORD_PRIMARY_INDEX_UNCHECKED(unquoted);

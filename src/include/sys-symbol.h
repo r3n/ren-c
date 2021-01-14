@@ -6,7 +6,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2012-2020 Ren-C Open Source Contributors
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
 // REBOL is a trademark of REBOL Technologies
 //
@@ -25,18 +25,18 @@
 // 
 // R3-Alpha's concept was that all words got persistent integer values, which
 // prevented garbage collection.  Ren-C only gives built-in words integer
-// values--or SYMs--while others must be compared by pointers to their
+// values--or SYMIDs--while others must be compared by pointers to their
 // name or canon-name pointers.  A non-built-in symbol will return SYM_0 as
-// its symbol, allowing it to fall through to defaults in case statements.
+// its symbol ID, allowing it to fall through to defaults in case statements.
 //
 // Though it works fine for switch statements, it creates a problem if someone
-// writes `VAL_WORD_SYM(a) == VAL_WORD_SYM(b)`, because all non-built-ins
+// writes `VAL_WORD_ID(a) == VAL_WORD_ID(b)`, because all non-built-ins
 // will appear to be equal.  It's a tricky enough bug to catch to warrant an
-// extra check in C++ that disallows comparing SYMs with ==
+// extra check in C++ that disallows comparing SYMIDs with ==
 //
 
 
-// For a *read-only* REBSTR, circularly linked list of othEr-CaSed string
+// For a *read-only* REBSYM, circularly linked list of othEr-CaSed string
 // forms.  It should be relatively quick to find the canon form on
 // average, since many-cased forms are somewhat rare.
 //
@@ -44,102 +44,97 @@
 // One synonym need not keep another alive, because the process of freeing
 // string nodes unlinks them from the list.  (Hence the canon can change!)
 //
-#define LINK_Synonym_TYPE       const REBSTR*
-#define LINK_Synonym_CAST       STR
+#define LINK_Synonym_TYPE       const REBSYM*
+#define LINK_Synonym_CAST       SYM
 
 
 #if defined(NDEBUG) || !defined(CPLUSPLUS_11)
     //
     // Trivial definition for C build or release builds: symbols are just a C
-    // enum value and an OPT_REBSYM acts just like a REBSYM.
+    // enum value and an OPT_SYMID acts just like a SYMID.
     //
-    typedef enum Reb_Symbol REBSYM;
-    typedef enum Reb_Symbol OPT_REBSYM;
+    typedef enum Reb_Symbol_Id SYMID;
+    typedef enum Reb_Symbol_Id OPT_SYMID;
 #else
-    struct REBSYM;
+    struct SYMID;
 
-    struct OPT_REBSYM {  // may only be converted to REBSYM, no comparisons
-        enum Reb_Symbol n;
-        OPT_REBSYM (const REBSYM& sym);
-        bool operator==(enum Reb_Symbol other) const
+    struct OPT_SYMID {  // may only be converted to SYMID, no comparisons
+        enum Reb_Symbol_Id n;
+        OPT_SYMID (const SYMID& sym);
+        bool operator==(enum Reb_Symbol_Id other) const
           { return n == other; }
-        bool operator!=(enum Reb_Symbol other) const
+        bool operator!=(enum Reb_Symbol_Id other) const
           { return n != other; }
 
-        bool operator==(OPT_REBSYM &&other) const = delete;
-        bool operator!=(OPT_REBSYM &&other) const = delete;
+        bool operator==(OPT_SYMID &&other) const = delete;
+        bool operator!=(OPT_SYMID &&other) const = delete;
 
         operator unsigned int() const  // so it works in switch() statements
           { return cast(unsigned int, n); }
 
-        explicit operator enum Reb_Symbol()  // must be an *explicit* cast
+        explicit operator enum Reb_Symbol_Id()  // must be an *explicit* cast
           { return n; }
     };
 
-    struct REBSYM {  // acts like a REBOL_Symbol with no OPT_REBSYM compares
-        enum Reb_Symbol n;
-        REBSYM () {}
-        REBSYM (int n) : n (cast(enum Reb_Symbol, n)) {}
-        REBSYM (OPT_REBSYM opt_sym) : n (opt_sym.n) {}
+    struct SYMID {  // acts like a REBOL_Symbol with no OPT_SYMID compares
+        enum Reb_Symbol_Id n;
+        SYMID () {}
+        SYMID (int n) : n (cast(enum Reb_Symbol_Id, n)) {}
+        SYMID (OPT_SYMID opt_sym) : n (opt_sym.n) {}
 
         operator unsigned int() const  // so it works in switch() statements
           { return cast(unsigned int, n); }
 
-        explicit operator enum Reb_Symbol() {  // must be an *explicit* cast
+        explicit operator enum Reb_Symbol_Id() {  // must be an *explicit* cast
             assert(n != SYM_0);
             return n;
         }
 
-        bool operator>=(enum Reb_Symbol other) const {
+        bool operator>=(enum Reb_Symbol_Id other) const {
             assert(other != SYM_0);
             return n >= other;
         }
-        bool operator<=(enum Reb_Symbol other) const {
+        bool operator<=(enum Reb_Symbol_Id other) const {
             assert(other != SYM_0);
             return n <= other;
         }
-        bool operator>(enum Reb_Symbol other) const {
+        bool operator>(enum Reb_Symbol_Id other) const {
             assert(other != SYM_0);
             return n > other;
         }
-        bool operator<(enum Reb_Symbol other) const {
+        bool operator<(enum Reb_Symbol_Id other) const {
             assert(other != SYM_0);
             return n < other;
         }
-        bool operator==(enum Reb_Symbol other) const
+        bool operator==(enum Reb_Symbol_Id other) const
           { return n == other; }
-        bool operator!=(enum Reb_Symbol other) const
+        bool operator!=(enum Reb_Symbol_Id other) const
           { return n != other; }
 
-        bool operator==(REBSYM &other) const = delete;  // may be SYM_0
-        void operator!=(REBSYM &other) const = delete;  // ...same
-        bool operator==(const OPT_REBSYM &other) const = delete;  // ...same
-        void operator!=(const OPT_REBSYM &other) const = delete;  // ...same
+        bool operator==(SYMID &other) const = delete;  // may be SYM_0
+        void operator!=(SYMID &other) const = delete;  // ...same
+        bool operator==(const OPT_SYMID &other) const = delete;  // ...same
+        void operator!=(const OPT_SYMID &other) const = delete;  // ...same
     };
 
-    inline OPT_REBSYM::OPT_REBSYM(const REBSYM &sym) : n (sym.n) {}
+    inline OPT_SYMID::OPT_SYMID(const SYMID &sym) : n (sym.n) {}
 #endif
 
-inline static bool SAME_SYM_NONZERO(REBSYM a, REBSYM b) {
+inline static bool Same_Nonzero_Symid(SYMID a, SYMID b) {
     assert(a != SYM_0 and b != SYM_0);
     return cast(REBLEN, a) == cast(REBLEN, b);
 }
 
-inline static OPT_REBSYM STR_SYMBOL(const REBSTR *s) {
-    assert(IS_STR_SYMBOL(s));
-    return cast(REBSYM, SECOND_UINT16(s->leader));
+inline static OPT_SYMID ID_OF_SYMBOL(const REBSYM *s)
+  { return cast(SYMID, SECOND_UINT16(s->leader)); }
+
+inline static const REBSYM *Canon(SYMID symid) {
+    assert(cast(REBLEN, symid) != 0);
+    assert(cast(REBLEN, symid) < SER_USED(PG_Symbol_Canons));  // null if boot
+    return *SER_AT(const REBSYM*, PG_Symbol_Canons, cast(REBLEN, symid));
 }
 
-inline static const REBSTR *Canon(REBSYM sym) {
-    assert(cast(REBLEN, sym) != 0);
-    assert(cast(REBLEN, sym) < SER_USED(PG_Symbol_Canons));  // null if boot!
-    return *SER_AT(const REBSTR*, PG_Symbol_Canons, cast(REBLEN, sym));
-}
-
-inline static bool SAME_STR(const REBSTR *s1, const REBSTR *s2) {
-    assert(IS_STR_SYMBOL(s1));
-    assert(IS_STR_SYMBOL(s2));
-
+inline static bool Are_Synonyms(const REBSYM *s1, const REBSYM *s2) {
     const REBSTR *temp = s1;
     do {
         if (temp == s2)

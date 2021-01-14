@@ -151,7 +151,7 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
 
     // Signal refinement as being in use.
     //
-    Init_Word(DS_PUSH(), KEY_SPELLING(f->key + 1));
+    Init_Word(DS_PUSH(), KEY_SYMBOL(f->key + 1));
   }
 
   skip_enable_modal:
@@ -279,10 +279,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (DSP != f->dsp_orig) {  // reorderings or refinements pushed
             STKVAL(*) ordered = DS_TOP;
             STKVAL(*) lowest_ordered = DS_AT(f->dsp_orig);
-            const REBSTR *param_symbol = KEY_SPELLING(f->key);
+            const REBSTR *param_symbol = KEY_SYMBOL(f->key);
 
             for (; ordered != lowest_ordered; --ordered) {
-                if (VAL_WORD_SPELLING(ordered) != param_symbol)
+                if (VAL_WORD_SYMBOL(ordered) != param_symbol)
                     continue;
 
                 REBLEN offset = f->arg - FRM_ARGS_HEAD(f);
@@ -749,7 +749,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         f->arg += offset;
         f->param += offset;
 
-        assert(VAL_WORD_SPELLING(DS_TOP) == KEY_SPELLING(f->key));
+        assert(VAL_WORD_SYMBOL(DS_TOP) == KEY_SYMBOL(f->key));
         DS_DROP();
 
         if (Is_Typeset_Empty(f->param)) {  // no callsite arg, just drop
@@ -877,7 +877,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // Note: `1 + comment "foo"` => `1 +`, arg is END
             //
             if (not Is_Param_Endable(f->param))
-                fail (Error_No_Arg(f->label, KEY_SPELLING(f->key)));
+                fail (Error_No_Arg(f->label, KEY_SYMBOL(f->key)));
 
             SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
             continue;

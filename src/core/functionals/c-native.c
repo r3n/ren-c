@@ -82,7 +82,7 @@ REBVAL *Make_Native(
     ++*item;
 
     bool enfix;
-    if (IS_WORD(*item) and VAL_WORD_SYM(*item) == SYM_ENFIX) {
+    if (IS_WORD(*item) and VAL_WORD_ID(*item) == SYM_ENFIX) {
         enfix = true;
         ++*item;
     }
@@ -93,15 +93,15 @@ REBVAL *Make_Native(
     //
     bool has_body;
     if (IS_WORD(*item)) {
-        if (VAL_WORD_SYM(*item) != SYM_NATIVE)
+        if (VAL_WORD_ID(*item) != SYM_NATIVE)
             panic (*item);
         has_body = false;
     }
     else {
         DECLARE_LOCAL (temp);
         if (
-            VAL_WORD_SYM(VAL_SEQUENCE_AT(temp, *item, 0)) != SYM_NATIVE
-            or VAL_WORD_SYM(VAL_SEQUENCE_AT(temp, *item, 1)) != SYM_BODY
+            VAL_WORD_ID(VAL_SEQUENCE_AT(temp, *item, 0)) != SYM_NATIVE
+            or VAL_WORD_ID(VAL_SEQUENCE_AT(temp, *item, 1)) != SYM_BODY
         ){
             panic (*item);
         }
@@ -173,7 +173,7 @@ REBVAL *Make_Native(
     // Append the native to the module under the name given.
     //
     REBVAL *var = Append_Context(VAL_CONTEXT(module), name, nullptr);
-    Init_Action(var, native, VAL_WORD_SPELLING(name), UNBOUND);
+    Init_Action(var, native, VAL_WORD_SYMBOL(name), UNBOUND);
 
     return var;
 }
@@ -192,7 +192,7 @@ REBVAL *Make_Native(
 // that this manual construction actually matches the definition in the file.
 //
 static void Init_Action_Meta_Shim(void) {
-    REBSYM field_syms[3] = {
+    SYMID field_syms[3] = {
         SYM_DESCRIPTION, SYM_PARAMETER_TYPES, SYM_PARAMETER_NOTES
     };
     REBCTX *meta = Alloc_Context_Core(REB_OBJECT, 4, NODE_FLAG_MANAGED);
@@ -268,7 +268,7 @@ REBARR *Startup_Natives(const REBVAL *boot_natives)
         mutable_KIND3Q_BYTE(catalog_item) = REB_WORD;
         mutable_HEART_BYTE(catalog_item) = REB_WORD;
 
-        if (VAL_WORD_SYM(name) == SYM_GENERIC)
+        if (VAL_WORD_ID(name) == SYM_GENERIC)
             generic_word = name;
 
         Recycle();
