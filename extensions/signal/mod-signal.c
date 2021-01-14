@@ -69,77 +69,40 @@ static void update(REBREQ *signal, REBINT len, REBVAL *arg)
     req->actual = 0; /* avoid duplicate updates */
 }
 
-static int sig_word_num(const REBSTR *canon)
+static int sig_word_num(const REBVAL *word)
 {
-    switch (ID_OF_SYMBOL(canon)) {
-        case SYM_SIGALRM:
-            return SIGALRM;
-        case SYM_SIGABRT:
-            return SIGABRT;
-        case SYM_SIGBUS:
-            return SIGBUS;
-        case SYM_SIGCHLD:
-            return SIGCHLD;
-        case SYM_SIGCONT:
-            return SIGCONT;
-        case SYM_SIGFPE:
-            return SIGFPE;
-        case SYM_SIGHUP:
-            return SIGHUP;
-        case SYM_SIGILL:
-            return SIGILL;
-        case SYM_SIGINT:
-            return SIGINT;
-/* can't be caught
-        case SYM_SIGKILL:
-            return SIGKILL;
-*/
-        case SYM_SIGPIPE:
-            return SIGPIPE;
-        case SYM_SIGQUIT:
-            return SIGQUIT;
-        case SYM_SIGSEGV:
-            return SIGSEGV;
-/* can't be caught
-        case SYM_SIGSTOP:
-            return SIGSTOP;
-*/
-        case SYM_SIGTERM:
-            return SIGTERM;
-        case SYM_SIGTTIN:
-            return SIGTTIN;
-        case SYM_SIGTTOU:
-            return SIGTTOU;
-        case SYM_SIGUSR1:
-            return SIGUSR1;
-        case SYM_SIGUSR2:
-            return SIGUSR2;
-        case SYM_SIGTSTP:
-            return SIGTSTP;
-        case SYM_SIGPOLL:
-            return SIGPOLL;
-        case SYM_SIGPROF:
-            return SIGPROF;
-        case SYM_SIGSYS:
-            return SIGSYS;
-        case SYM_SIGTRAP:
-            return SIGTRAP;
-        case SYM_SIGURG:
-            return SIGURG;
-        case SYM_SIGVTALRM:
-            return SIGVTALRM;
-        case SYM_SIGXCPU:
-            return SIGXCPU;
-        case SYM_SIGXFSZ:
-            return SIGXFSZ;
-        default: {
-            DECLARE_LOCAL (word);
-            Init_Word(word, canon);
-
-            fail (Error_Invalid_Spec_Raw(word));
-        }
-    }
+    return rebUnboxInteger("select just", word, "[",
+        "sigalrm", rebI(SIGALRM),
+        "sigabrt", rebI(SIGABRT),
+        "sigbus", rebI(SIGBUS),
+        "sigchld", rebI(SIGCHLD),
+        "sigcont", rebI(SIGCONT),
+        "sigfpe", rebI(SIGFPE),
+        "sighup", rebI(SIGHUP),
+        "sigill", rebI(SIGILL),
+        "sigint", rebI(SIGINT),
+        // SIGKILL can't be caught
+        "sigpipe", rebI(SIGPIPE),
+        "sigquit", rebI(SIGQUIT),
+        "sigsegv", rebI(SIGSEGV),
+        // SIGSTOP can't be caught
+        "sigterm", rebI(SIGTERM),
+        "sigttin", rebI(SIGTTIN),
+        "sigttou", rebI(SIGTTOU),
+        "sigusr1", rebI(SIGUSR1),
+        "sigusr2", rebI(SIGUSR2),
+        "sigtstp", rebI(SIGTSTP),
+        "sigpoll", rebI(SIGPOLL),
+        "sigprof", rebI(SIGPROF),
+        "sigsys", rebI(SIGSYS),
+        "sigurg", rebI(SIGURG),
+        "sigvtalrm", rebI(SIGVTALRM),
+        "sigxcpu", rebI(SIGXCPU),
+        "sigxfsz", rebI(SIGXFSZ),
+        "fail [{Unknown SIG:} just", word, "]",
+    "]", rebEND);
 }
+
 
 //
 //  Signal_Actor: C
@@ -186,7 +149,7 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
                 if (not IS_WORD(sig))
                     fail (Error_Invalid_Spec_Raw(sig));
 
-                if (VAL_WORD_ID(sig) == SYM_ALL) {
+                if (rebDidQ(sig, "== 'all")) {
                     if (sigfillset(&ReqPosixSignal(signal)->mask) < 0)
                         fail (Error_Invalid_Spec_Raw(sig));
                     break;
@@ -195,7 +158,7 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
                 if (
                     sigaddset(
                         &ReqPosixSignal(signal)->mask,
-                        sig_word_num(VAL_WORD_SYMBOL(sig))
+                        sig_word_num(sig)
                     ) < 0
                 ){
                     fail (Error_Invalid_Spec_Raw(sig));
