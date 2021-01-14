@@ -1441,7 +1441,7 @@ static void Mold_Value_Limit(REB_MOLD *mo, RELVAL *v, REBLEN limit)
         for (; n < limit; ++n)
             at = NEXT_STR(at);
 
-        SET_STR_LEN_SIZE(str, start_len + limit, at - STR_HEAD(str));
+        TERM_STR_LEN_SIZE(str, start_len + limit, at - STR_HEAD(str));
         Free_Bookmarks_Maybe_Null(str);
 
         Append_Ascii(str, "...");
@@ -1527,7 +1527,7 @@ void MF_Error(REB_MOLD *mo, REBCEL(const*) v, bool form)
     if (not IS_BLANK(file)) {
         Append_Codepoint(mo->series, '\n');
         Append_Ascii(mo->series, RM_ERROR_FILE);
-        if (IS_WORD(file))
+        if (IS_FILE(file))
             Form_Value(mo, file);
         else
             Append_Ascii(mo->series, RM_BAD_ERROR_FORMAT);

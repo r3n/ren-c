@@ -1065,8 +1065,6 @@ void Remake_Series(REBSER *s, REBLEN units, REBYTE wide, REBFLGS flags)
     } else
         s->content.dynamic.used = 0;
 
-    SET_SERIES_LEN(s, SER_USED(s));
-
   #ifdef DEBUG_UTF8_EVERYWHERE
     if (GET_SERIES_FLAG(s, IS_STRING) and not IS_STR_SYMBOL(STR(s))) {
         s->misc.length = 0xDECAFBAD;
