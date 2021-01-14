@@ -1064,6 +1064,7 @@ inline static bool Merge_Patches_Reused(
                 *merged = temp;
                 return true;  // reused
             }
+            temp = MISC(Variant, temp);
         }
       }
     }

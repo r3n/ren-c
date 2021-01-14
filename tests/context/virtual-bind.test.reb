@@ -147,3 +147,40 @@
         e/id = 'const-value
     )
 ]
+
+; Test virtual binding chain reuse scenario.
+;
+; !!! Right now the only way to make sure it's actually reusing the same
+; chain is to set a breakpoint in the debugger.  There should probably be
+; some way to reflect this--at least in debug builds--so you can analyze
+; the virtual bind patch information.
+(
+    x: 100
+    y: 200
+    plus-global: [x + y]
+    minus-global: [x - y]
+    alpha: make object! compose/only [  ; virtual binds body to obj
+        x: 10
+        y: 20
+        plus: (plus-global)
+        minus: (minus-global)
+    ]
+    beta: make object! compose/only [  ; virtual binds body to obj
+        x: 1000
+        y: 2000
+        plus: (plus-global)
+        minus: (minus-global)
+    ]
+    [11 1001 999 9 30 -10 300 -100] = collect [
+        for-each y [1] compose/only [
+            keep do (alpha/plus)  ; needs chain y -> alpha
+            keep do (beta/plus)  ; needs chain y -> beta
+            keep do (beta/minus)  ; also needs chain y -> beta
+            keep do (alpha/minus)  ; back to needing chain y -> alpha
+            keep do obj/plus
+            keep do obj/minus
+            keep do plus-global
+            keep do minus-global
+        ]
+    ]
+)
