@@ -202,23 +202,14 @@ REBVAL *Append_Context(
 //  Collect_Start: C
 //
 // Begin using a "binder" to start mapping canon symbol names to integer
-// indices.  Use Collect_End() to free the map.
-//
-// WARNING: This routine uses the shared BUF_COLLECT rather than
-// targeting a new series directly.  This way a context can be
-// allocated at exactly the right length when contents are copied.
-// Therefore do not call code that might call BIND or otherwise
-// make use of the Bind_Table or BUF_COLLECT.
+// indices.  The symbols are collected on the stack.  Use Collect_End() to
+// free the map.
 //
 void Collect_Start(struct Reb_Collector* collector, REBFLGS flags)
 {
     collector->flags = flags;
     collector->dsp_orig = DSP;
-    collector->index = 1;
     INIT_BINDER(&collector->binder);
-
-    assert(ARR_LEN(BUF_COLLECT) == 1); // should be empty (just 0 placeholder)
-    assert(IS_UNREADABLE_DEBUG(ARR_HEAD(BUF_COLLECT)));  // bind "index" [0]
 }
 
 
@@ -226,95 +217,52 @@ void Collect_Start(struct Reb_Collector* collector, REBFLGS flags)
 //  Collect_End: C
 //
 // Reset the bind markers in the canon series nodes so they can be reused,
-// and empty the BUF_COLLECT.
+// and drop the collected words from the stack.
 //
 void Collect_End(struct Reb_Collector *cl)
 {
-    // Reset binding table (note BUF_COLLECT may have expanded)
-    //
-    const REBVAL *v = SPECIFIC(ARR_AT(BUF_COLLECT, 1));
-    for (; NOT_END(v); ++v) {
-        const REBSTR *canon = VAL_WORD_SPELLING(v);
-
-        if (cl != NULL) {
-            Remove_Binder_Index(&cl->binder, canon);
-            continue;
-        }
-
-        // !!! This doesn't have a "binder" available to clear out the
-        // keys with.  The nature of handling error states means that if
-        // a thread-safe binding system was implemented, we'd have to know
-        // which thread had the error to roll back any binding structures.
-        // For now just zero it out based on the collect buffer.
-        //
-        assert(
-            canon->misc.bind_index.high != 0
-            or canon->misc.bind_index.low != 0
-        );
-        REBSTR *s = m_cast(REBSTR*, canon);
-        s->misc.bind_index.high = 0;
-        s->misc.bind_index.low = 0;
+    REBDSP dsp = DSP;
+    for (; dsp != cl->dsp_orig; --dsp) {
+        const REBSTR *canon = VAL_WORD_SPELLING(DS_TOP);
+        Remove_Binder_Index(&cl->binder, canon);
+        DS_DROP();
     }
 
-    SET_SERIES_LEN(BUF_COLLECT, 1);
-
-    if (cl != NULL)
-        SHUTDOWN_BINDER(&cl->binder);
+    SHUTDOWN_BINDER(&cl->binder);
 }
 
 
 //
 //  Collect_Context_Keys: C
 //
-// Collect keys from a prior context into BUF_COLLECT for a new context.
+// Collect keys from a context to the data stack, indexing them in a binder.
+// If requested, it will return the first duplicate found (or null).
 //
 void Collect_Context_Keys(
+    option(const REBSTR**) duplicate,
     struct Reb_Collector *cl,
-    REBCTX *context,
-    bool check_dups // check for duplicates (otherwise assume unique)
+    REBCTX *context
 ){
     const REBKEY *tail;
     const REBKEY *key = CTX_KEYS(&tail, context);
 
-    assert(cl->index >= 1); // 0 in bind table means "not present"
+    if (duplicate)
+        *unwrap(duplicate) = nullptr;
 
-    // This is necessary so Blit_Relative() below isn't overwriting memory that
-    // BUF_COLLECT does not own.  (It may make the buffer capacity bigger than
-    // necessary if duplicates are found, but the actual buffer length will be
-    // set correctly by the end.)
-    //
-    EXPAND_SERIES_TAIL(BUF_COLLECT, CTX_LEN(context));
+    for (; key != tail; ++key) {
+        const REBSTR *spelling = KEY_SPELLING(key);
+        if (not Try_Add_Binder_Index(
+            &cl->binder,
+            spelling,
+            Collector_Index_If_Pushed(cl)
+        )){
+            if (duplicate and not *unwrap(duplicate))  // returns first dup
+                *unwrap(duplicate) = spelling;
 
-    RELVAL *collect = ARR_AT(BUF_COLLECT, cl->index);  // *after* expansion
-
-    if (check_dups) {
-        for (; key != tail; key++) {
-            const REBSTR *symbol = KEY_SPELLING(key);
-            if (not Try_Add_Binder_Index(&cl->binder, symbol, cl->index))
-                continue; // don't collect if already in bind table
-
-            ++cl->index;
-
-            Init_Word(collect, symbol);
-            ++collect;
+            continue;  // don't collect if already in bind table
         }
+        Init_Word(DS_PUSH(), spelling);
     }
-    else {
-        // Optimized add of all keys to bind table and collect buffer.
-        //
-        for (; key != tail; ++key, ++collect, ++cl->index) {
-            Init_Word(collect, KEY_SPELLING(key));
-            Add_Binder_Index(&cl->binder, KEY_SPELLING(key), cl->index);
-        }
-    }
-
-    // Mark length of BUF_COLLECT by how far `collect` advanced
-    // (would be 0 if all the keys were duplicates...)
-    //
-    SET_SERIES_LEN(
-        BUF_COLLECT,
-        ARR_LEN(BUF_COLLECT) + (collect - ARR_TAIL(BUF_COLLECT))
-    );
 }
 
 
@@ -333,22 +281,25 @@ static void Collect_Inner_Loop(
 
         if (ANY_WORD_KIND(kind)) {
             if (kind != REB_SET_WORD and not (cl->flags & COLLECT_ANY_WORD))
-                continue; // kind of word we're not interested in collecting
+                continue;  // kind of word we're not interested in collecting
 
             const REBSTR *symbol = VAL_WORD_SPELLING(cell);
-            if (not Try_Add_Binder_Index(&cl->binder, symbol, cl->index)) {
+            if (not Try_Add_Binder_Index(
+                &cl->binder,
+                symbol,
+                Collector_Index_If_Pushed(cl)
+            )){
                 if (cl->flags & COLLECT_NO_DUP) {
+                    Collect_End(cl);  // IMPORTANT: Can't fail with binder
+
                     DECLARE_LOCAL (duplicate);
                     Init_Word(duplicate, VAL_WORD_SPELLING(cell));
-                    fail (Error_Dup_Vars_Raw(duplicate)); // cleans bindings
+                    fail (Error_Dup_Vars_Raw(duplicate));  // cleans bindings
                 }
-                continue; // tolerate duplicate
+                continue;  // tolerate duplicate
             }
 
-            ++cl->index;
-
-            EXPAND_SERIES_TAIL(BUF_COLLECT, 1);
-            Init_Word(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(cell));
+            Init_Word(DS_PUSH(), VAL_WORD_SPELLING(cell));
 
             continue;
         }
@@ -370,7 +321,7 @@ static void Collect_Inner_Loop(
 //
 //  Collect_Keylist_Managed: C
 //
-// Scans a block for words to extract and make into typeset keys to go in
+// Scans a block for words to extract and make into symbol keys to use for
 // a context.  The Bind_Table is used to quickly determine duplicate entries.
 //
 // A `prior` context can be provided to serve as a basis; all the keys in
@@ -380,53 +331,46 @@ static void Collect_Inner_Loop(
 // in prior) then then `prior`'s keylist may be returned.  The result is
 // always pre-managed, because it may not be legal to free prior's keylist.
 //
-// Returns:
-//     A block of typesets that can be used for a context keylist.
-//     If no new words, the prior list is returned.
-//
-// !!! There was previously an optimization in object creation which bypassed
-// key collection in the case where head[] was empty.  Revisit if it is worth
-// the complexity to move handling for that case in this routine.
-//
 REBSER *Collect_Keylist_Managed(
     const RELVAL *head,
     option(REBCTX*) prior,
-    REBFLGS flags // see %sys-core.h for COLLECT_ANY_WORD, etc.
+    REBFLGS flags  // see %sys-core.h for COLLECT_ANY_WORD, etc.
 ) {
     struct Reb_Collector collector;
     struct Reb_Collector *cl = &collector;
 
     Collect_Start(cl, flags);
 
-    // Setup binding table with existing words, no need to check duplicates
-    //
-    if (prior)
-        Collect_Context_Keys(cl, unwrap(prior), false);
+    if (prior) {
+        const REBSTR *duplicate;
+        Collect_Context_Keys(&duplicate, cl, unwrap(prior));
+        assert(not duplicate);  // context should have had all unique keys
+    }
 
-    // Scan for words, adding them to BUF_COLLECT and bind table:
     Collect_Inner_Loop(cl, head);
+
+    REBLEN num_collected = DSP - cl->dsp_orig;
 
     // If new keys were added to the collect buffer (as evidenced by a longer
     // collect buffer than the original keylist) then make a new keylist
     // array, otherwise reuse the original
     //
     REBSER *keylist;
-    if (prior and ARR_LEN(CTX_VARLIST(unwrap(prior))) == ARR_LEN(BUF_COLLECT))
+    if (prior and CTX_LEN(unwrap(prior)) == num_collected)
         keylist = CTX_KEYLIST(unwrap(prior));
     else {
-        REBLEN len = ARR_LEN(BUF_COLLECT) - 1;  // don't count unreadable [0]
         keylist = Make_Series_Core(
-            len,  // no terminator
+            num_collected,  // no terminator
             sizeof(REBKEY),
             SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
         );
         
-        const RELVAL *word = ARR_AT(BUF_COLLECT, 1);
+        STKVAL(*) word = DS_AT(cl->dsp_orig) + 1;
         REBKEY* key = SER_HEAD(REBKEY, keylist);
-        for (; NOT_END(word); ++word, ++key)
+        for (; word != DS_TOP + 1; ++word, ++key)
             Init_Key(key, VAL_WORD_SPELLING(word));
 
-        SET_SERIES_USED(keylist, len);  // no terminator
+        SET_SERIES_USED(keylist, num_collected);  // no terminator
     }
 
     Collect_End(cl);
@@ -462,8 +406,6 @@ REBARR *Collect_Unique_Words_Managed(
     struct Reb_Collector *cl = &collector;
 
     Collect_Start(cl, flags);
-
-    assert(ARR_LEN(BUF_COLLECT) == 1);  // index starts at 1 (empty state)
 
     // The way words get "ignored" in the collecting process is to give them
     // dummy bindings so it appears they've "already been collected", but
@@ -507,15 +449,13 @@ REBARR *Collect_Unique_Words_Managed(
 
     Collect_Inner_Loop(cl, head);
 
-    UNUSED(collector); // not needed at the moment
-
-    // All collected values should be unbound (so "SPECIFIED").
+    // We don't use Pop_Stack_Values_Core() because we want to keep the values
+    // on the stack so that Collect_End() can remove them from the binder.
     //
-    REBARR *array = Copy_Array_At_Extra_Shallow(
-        BUF_COLLECT,
-        1,  // skip unreadable void
+    REBARR *array = Copy_Values_Len_Shallow_Core(
+        DS_AT(cl->dsp_orig + 1),
         SPECIFIED,
-        0,  // extra
+        DSP - cl->dsp_orig,
         NODE_FLAG_MANAGED
     );
 
@@ -786,118 +726,6 @@ REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
 
 
 //
-//  Merge_Contexts_Managed: C
-//
-// Create a child context from two parent contexts. Merge common fields.
-// Values from the second parent take precedence.
-//
-// Deep copy and rebind the child.
-//
-REBCTX *Merge_Contexts_Managed(REBCTX *parent1, REBCTX *parent2)
-{
-    if (parent2 != NULL) {
-        assert(CTX_TYPE(parent1) == CTX_TYPE(parent2));
-        fail ("Multiple inheritance of object support removed from Ren-C");
-    }
-
-    // Merge parent1 and parent2 words.
-    // Keep the binding table.
-
-    struct Reb_Collector collector;
-    Collect_Start(&collector, COLLECT_ANY_WORD);
-
-    // Setup binding table and BUF_COLLECT with parent1 words.  Don't bother
-    // checking for duplicates, buffer is empty.
-    //
-    Collect_Context_Keys(&collector, parent1, false);
-
-    // Add parent2 words to binding table and BUF_COLLECT, and since we know
-    // BUF_COLLECT isn't empty then *do* check for duplicates.
-    //
-    Collect_Context_Keys(&collector, parent2, true);
-
-    // Allocate child (now that we know the correct size).  Obey invariant
-    // that keylists are always managed.  The BUF_COLLECT contains only
-    // typesets, so no need for a specifier in the copy.
-    //
-    // !!! Review: should child start fresh with no meta information, or get
-    // the meta information held by parents?
-    //
-    REBARR *keylist = Copy_Array_Shallow_Flags(
-        BUF_COLLECT,
-        SPECIFIED,
-        NODE_FLAG_MANAGED
-    );
-
-    if (parent1 == NULL)
-        mutable_LINK(Ancestor, keylist) = keylist;
-    else
-        mutable_LINK(Ancestor, keylist) = CTX_KEYLIST(parent1);
-
-    REBARR *varlist = Make_Array_Core(
-        ARR_LEN(keylist),
-        SERIES_MASK_VARLIST
-            | NODE_FLAG_MANAGED // rebind below requires managed context
-    );
-    mutable_MISC(Meta, varlist) = nullptr;  // GC sees, it must be initialized
-
-    REBCTX *merged = CTX(varlist);
-    INIT_CTX_KEYLIST_UNIQUE(merged, keylist);
-
-    // !!! Currently we assume the child will be of the same type as the
-    // parent...so if the parent was an OBJECT! so will the child be, if
-    // the parent was an ERROR! so will the child be.  This is a new idea,
-    // so review consequences.
-    //
-    RELVAL *rootvar = ARR_HEAD(varlist);
-    INIT_VAL_CONTEXT_ROOTVAR(rootvar, CTX_TYPE(parent1), varlist);
-
-    // Copy parent1 values.  (Can't use memcpy() because it would copy things
-    // like protected bits...)
-    //
-    REBVAL *copy_dest = CTX_VARS_HEAD(merged);
-    const REBVAL *copy_src = CTX_VARS_HEAD(parent1);
-    for (; NOT_END(copy_src); ++copy_src, ++copy_dest)
-        Move_Var(copy_dest, copy_src);
-
-    // Copy parent2 values:
-    const REBKEY *tail;
-    const REBKEY *key = CTX_KEYS(&tail, parent2);
-    REBVAR *var = CTX_VARS_HEAD(parent2);
-    for (; key != tail; ++key, ++var) {
-        // no need to search when the binding table is available
-        REBINT n = Get_Binder_Index_Else_0(
-            &collector.binder, KEY_SPELLING(key)
-        );
-        assert(n != 0);
-
-        // Deep copy the child.
-        // Context vars are REBVALs, already fully specified
-        //
-        REBFLGS flags = NODE_FLAG_MANAGED;  // !!! Review, which flags?
-        Clonify(
-            Move_Value(CTX_VAR(merged, n), var),
-            flags,
-            TS_CLONE
-        );
-    }
-
-    SET_SERIES_LEN(varlist, ARR_LEN(keylist));
-
-    // Rebind the child
-    //
-    Rebind_Context_Deep(parent1, merged, nullptr);
-    Rebind_Context_Deep(parent2, merged, &collector.binder);
-
-    // release the bind table
-    //
-    Collect_End(&collector);
-
-    return merged;
-}
-
-
-//
 //  Resolve_Context: C
 //
 // Only_words can be a block of words or an index in the target
@@ -1159,12 +987,6 @@ REBVAL *Obj_Value(REBVAL *value, REBLEN index)
 //
 void Startup_Collector(void)
 {
-    // Temporary block used while scanning for words.
-    //
-    // !!! Review why this can't use the data stack, like everything else.
-    //
-    TG_Buf_Collect = Make_Array_Core(100, SERIES_FLAGS_NONE);
-    Init_Unreadable_Void(Alloc_Tail_Array(BUF_COLLECT));
 }
 
 
@@ -1173,8 +995,6 @@ void Startup_Collector(void)
 //
 void Shutdown_Collector(void)
 {
-    Free_Unmanaged_Series(TG_Buf_Collect);
-    TG_Buf_Collect = nullptr;
 }
 
 

@@ -326,8 +326,10 @@ struct Reb_Collector {
     REBFLGS flags;
     REBDSP dsp_orig;
     struct Reb_Binder binder;
-    REBLEN index;
 };
+
+#define Collector_Index_If_Pushed(collector) \
+    ((DSP - (collector)->dsp_orig) + 1)  // index of *next* item to add
 
 
 // The process of derelativization will resolve a relative value with a

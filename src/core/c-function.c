@@ -570,9 +570,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         paramlist->leader.bits |= PARAMLIST_FLAG_HAS_RETURN;
 
     // We want to check for duplicates and a Binder can be used for that
-    // purpose--but note that a fail () cannot happen while binders are
-    // in effect UNLESS the BUF_COLLECT contains information to undo it!
-    // There's no BUF_COLLECT here, so don't fail while binder in effect.
+    // purpose--but fail() isn't allowed while binders are in effect.
     //
     // (This is why we wait until the parameter list gathering process
     // is over to do the duplicate checks--it can fail.)

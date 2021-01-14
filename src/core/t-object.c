@@ -29,17 +29,15 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
 {
     REBCTX *c = VAL_CONTEXT(context);
 
-    // Can be a word:
-    if (ANY_WORD(arg)) {
+    if (ANY_WORD(arg)) {  // Add an unset word: `append context 'some-word`
         const bool strict = true;
         if (0 == Find_Symbol_In_Context(
             context,
             VAL_WORD_SPELLING(arg),
             strict
         )){
-            Expand_Context(c, 1); // copy word table also
+            Expand_Context(c, 1);
             Append_Context(c, nullptr, VAL_WORD_SPELLING(arg));
-            // default of Append_Context is that arg's value is void
         }
         return;
     }
@@ -47,28 +45,35 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
     if (not IS_BLOCK(arg))
         fail (arg);
 
-    // Process word/value argument block:
-
     const RELVAL *item = VAL_ARRAY_AT(arg);
 
     // Can't actually fail() during a collect, so make sure any errors are
     // set and then jump to a Collect_End()
     //
-    REBCTX *error = NULL;
+    REBCTX *error = nullptr;
 
     struct Reb_Collector collector;
     Collect_Start(&collector, COLLECT_ANY_WORD);
 
-    // Setup binding table with obj words.  Binding table is empty so don't
-    // bother checking for duplicates.
+  blockscope {  // Start out binding table with words already in context
+    const REBSTR *duplicate;
+    Collect_Context_Keys(&duplicate, &collector, c);
+    assert(not duplicate);  // context should have all unique keys
+  }
+
+    REBLEN first_new_index = Collector_Index_If_Pushed(&collector);
+
+    // Do a pass to collect the [set-word: <value>] keys and add them to the
+    // binder.  But don't modify the object yet, in case the block turns out
+    // to be malformed (we don't want partial expansions applied).
     //
-    Collect_Context_Keys(&collector, c, false);
-
-    // Examine word/value argument block
-
+    // !!! This allows plain WORD! in the key spot, in addition to SET-WORD!.
+    // Should it allow ANY-WORD!?  Restrict to just SET-WORD!?
+    //
+  blockscope {
     const RELVAL *word;
     for (word = item; NOT_END(word); word += 2) {
-        if (!IS_WORD(word) && !IS_SET_WORD(word)) {
+        if (not IS_WORD(word) and not IS_SET_WORD(word)) {
             error = Error_Bad_Value_Core(word, VAL_SPECIFIER(arg));
             goto collect_end;
         }
@@ -76,26 +81,29 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
         const REBSTR *symbol = VAL_WORD_SPELLING(word);
 
         if (Try_Add_Binder_Index(
-            &collector.binder, symbol, ARR_LEN(BUF_COLLECT))
-        ){
-            EXPAND_SERIES_TAIL(BUF_COLLECT, 1);
-            Init_Word(ARR_LAST(BUF_COLLECT), VAL_WORD_SPELLING(word));
+            &collector.binder,
+            symbol,
+            Collector_Index_If_Pushed(&collector)
+        )){
+            Init_Word(DS_PUSH(), VAL_WORD_SPELLING(word));
         }
-        if (IS_END(word + 1))
-            break; // fix bug#708
+        if (IS_END(word + 1))  // catch malformed case with no value (#708)
+            break;
     }
+  }
 
   blockscope {  // Append new words to obj
-    REBLEN len = CTX_LEN(c) + 1;
-    Expand_Context(c, ARR_LEN(BUF_COLLECT) - len);
+    REBLEN num_added = Collector_Index_If_Pushed(&collector) - first_new_index;
+    Expand_Context(c, num_added);
 
-    const REBVAL *new_word = SER_AT(REBVAL, BUF_COLLECT, len);
-    for (; NOT_END(new_word); ++new_word)
+    STKVAL(*) new_word = DS_AT(collector.dsp_orig) + first_new_index;
+    for (; new_word != DS_TOP + 1; ++new_word)
         Append_Context(c, nullptr, VAL_WORD_SPELLING(new_word));
   }
 
-    // Set new values to obj words
-    for (word = item; NOT_END(word); word += 2) {
+  blockscope {  // Set new values to obj words
+    const RELVAL *word = item;
+    for (; NOT_END(word); word += 2) {
         REBLEN i = Get_Binder_Index_Else_0(
             &collector.binder, VAL_WORD_SPELLING(word)
         );
@@ -115,17 +123,18 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
         }
 
         if (IS_END(word + 1)) {
-            Init_Blank(var);
-            break; // fix bug#708
+            Init_Void(var, SYM_VOID);
+            break;  // fix bug#708
         }
         else
             Derelativize(var, &word[1], VAL_SPECIFIER(arg));
     }
+  }
 
-collect_end:
+  collect_end:
     Collect_End(&collector);
 
-    if (error != NULL)
+    if (error)
         fail (error);
 }
 

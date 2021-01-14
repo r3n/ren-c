@@ -38,13 +38,6 @@ void Snap_State_Core(struct Reb_State *s)
 {
     s->dsp = DSP;
 
-    // There should not be a Collect_Keys in progress.  (We use a non-zero
-    // length of the collect buffer to tell if a later fail() happens in
-    // the middle of a Collect_Keys.)
-    //
-    assert(ARR_LEN(BUF_COLLECT) == 1);
-    assert(IS_UNREADABLE_DEBUG(ARR_HEAD(BUF_COLLECT)));
-
     s->guarded_len = SER_USED(GC_Guarded);
     s->frame = FS_TOP;
 
@@ -82,9 +75,6 @@ void Assert_State_Balanced_Debug(
     }
 
     assert(s->frame == FS_TOP);
-
-    assert(ARR_LEN(BUF_COLLECT) == 1);
-    assert(IS_UNREADABLE_DEBUG(ARR_HEAD(BUF_COLLECT)));
 
     if (s->guarded_len != SER_USED(GC_Guarded)) {
         printf(
@@ -164,14 +154,6 @@ void Trapped_Helper(struct Reb_State *s)
     // Restore Rebol data stack pointer at time of Push_Trap
     //
     DS_DROP_TO(s->dsp);
-
-    // If we were in the middle of a Collect_Keys and an error occurs, then
-    // the binding lookup table has entries in it that need to be zeroed out.
-    // We can tell if that's necessary by whether there is anything
-    // accumulated in the collect buffer.
-    //
-    if (ARR_LEN(BUF_COLLECT) != 0)
-        Collect_End(NULL); // !!! No binder, review implications
 
     // Free any manual series that were extant at the time of the error
     // (that were created since this PUSH_TRAP started).  This includes
@@ -565,17 +547,7 @@ REB_R MAKE_Error(
     REBCTX *e;
     ERROR_VARS *vars; // C struct mirroring fixed portion of error fields
 
-    if (IS_ERROR(arg) or IS_OBJECT(arg)) {
-        // Create a new error object from another object, including any
-        // non-standard fields.  WHERE: and NEAR: will be overridden if
-        // used.  If ID:, TYPE:, or CODE: were used in a way that would
-        // be inconsistent with a Rebol system error, an error will be
-        // raised later in the routine.
-
-        e = Merge_Contexts_Managed(root_error, VAL_CONTEXT(arg));
-        vars = ERR_VARS(e);
-    }
-    else if (IS_BLOCK(arg)) {
+    if (IS_BLOCK(arg)) {
         // If a block, then effectively MAKE OBJECT! on it.  Afterward,
         // apply the same logic as if an OBJECT! had been passed in above.
 
