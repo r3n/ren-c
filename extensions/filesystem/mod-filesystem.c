@@ -276,10 +276,14 @@ void Mold_File_To_Local(REB_MOLD *mo, const RELVAL *file, REBFLGS flags) {
             if (c == '.') {
                 up = NEXT_CHR(&c, up);
                 ++i;
-                assert(c != '\0' || i == len);
 
-                if (c == '\0' || c == '/')
-                    continue; // . or ./ mean stay in same directory
+                if (c == '\0') {
+                    assert(i == len);
+                    break;  // %xxx/. means stay in the same directory
+                }
+
+                if (c == '/')
+                    continue; // %xxx/./yyy has ./ mean stay in same directory
 
                 if (c != '.') {
                     //

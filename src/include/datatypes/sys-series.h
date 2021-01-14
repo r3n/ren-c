@@ -605,16 +605,7 @@ inline static void TERM_SERIES_IF_NECESSARY(REBSER *s)
         NOOP
 #else
     inline static void ASSERT_SERIES_TERM_IF_NEEDED(const REBSER *s) {
-        if (
-            IS_SER_ARRAY(s)
-            or (
-                SER_WIDE(s) == 1
-                and s != TG_Byte_Buf
-                and s != TG_Mold_Buf
-            )
-        ){
-            Assert_Series_Term_Core(s);
-        }
+        Assert_Series_Term_Core(s);
     }
 #endif
 
