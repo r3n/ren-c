@@ -129,11 +129,11 @@ REB_R Reframer_Dispatcher(REBFRM *f)
 
     REBCTX *stolen = Steal_Context_Vars(
         CTX(sub->varlist),
-        NOD(ACT_KEYLIST(act))
+        ACT_KEYLIST(act)
     );
     assert(ACT_NUM_PARAMS(act) == CTX_LEN(stolen));
 
-    INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(ACT_KEYLIST(act)));
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), ACT_KEYLIST(act));
 
     SET_SERIES_FLAG(sub->varlist, MANAGED); // is inaccessible
     sub->varlist = nullptr; // just let it GC, for now

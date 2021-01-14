@@ -528,6 +528,7 @@ inline static void SET_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
     assert(used == SER_USED(s));
     s->misc.length = len;
     assert(*BIN_AT(s, used) == '\0');
+    UNUSED(used);
 }
 
 inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {

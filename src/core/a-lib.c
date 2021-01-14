@@ -1732,7 +1732,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
 
     SET_ARRAY_FLAG(a, INSTRUCTION_ADJUST_QUOTING);
     a->misc.quoting_delta = delta - 1;
-    return NOD(a);
+    return a;
 }
 
 //
@@ -1786,7 +1786,7 @@ const REBINS *RL_rebRELEASING(REBVAL *v)
         fail ("Cannot apply rebR() more than once to the same API value");
 
     SET_ARRAY_FLAG(a, SINGULAR_API_RELEASE);
-    return NOD(a);
+    return a;
 }
 
 

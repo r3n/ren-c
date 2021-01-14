@@ -984,7 +984,7 @@ REBLEN Fill_Sweeplist(REBSER *sweeplist)
                     s->leader.bits &= ~NODE_FLAG_MARKED;
                 else {
                     EXPAND_SERIES_TAIL(sweeplist, 1);
-                    *SER_AT(REBNOD*, sweeplist, count) = NOD(s);
+                    *SER_AT(REBNOD*, sweeplist, count) = s;
                     ++count;
                 }
                 break; }

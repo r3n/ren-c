@@ -508,7 +508,7 @@ REBNOD *Try_Find_Containing_Node_Debug(const void *p)
                     p >= cast(void*, &s->content)
                     && p < cast(void*, &s->content + 1)
                 ){
-                    return NOD(s);
+                    return s;
                 }
                 continue;
             }
@@ -539,7 +539,7 @@ REBNOD *Try_Find_Containing_Node_Debug(const void *p)
             if (p < cast(void*, s->content.dynamic.data)) {
                 printf("Pointer found in freed head capacity of series\n");
                 fflush(stdout);
-                return NOD(s);
+                return s;
             }
 
             if (p >= cast(void*,
@@ -548,10 +548,10 @@ REBNOD *Try_Find_Containing_Node_Debug(const void *p)
             )) {
                 printf("Pointer found in freed tail capacity of series\n");
                 fflush(stdout);
-                return NOD(s);
+                return s;
             }
 
-            return NOD(s);
+            return s;
         }
     }
 
@@ -1215,7 +1215,7 @@ void GC_Kill_Series(REBSER *s)
     Free_Winstack_Debug(s->guard);
   #endif
 
-    Free_Node(SER_POOL, NOD(s));
+    Free_Node(SER_POOL, s);
 
     if (GC_Ballast > 0)
         CLR_SIGNAL(SIG_RECYCLE);  // Enough space that requested GC can cancel

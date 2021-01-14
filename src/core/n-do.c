@@ -451,7 +451,7 @@ REBNATIVE(do)
 
         assert(CTX_KEYS_HEAD(c) == ACT_KEYS_HEAD(phase));
         f->key = CTX_KEYS(&f->key_tail, c);
-        REBCTX *stolen = Steal_Context_Vars(c, NOD(ACT_KEYLIST(phase)));
+        REBCTX *stolen = Steal_Context_Vars(c, ACT_KEYLIST(phase));
         INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(f));
             // ^-- changes CTX_KEYS_HEAD()
 
@@ -823,7 +823,7 @@ REBNATIVE(applique)
     f->key = CTX_KEYS(&f->key_tail, exemplar);
     REBCTX *stolen = Steal_Context_Vars(
         exemplar,
-        NOD(ACT_KEYLIST(VAL_ACTION(applicand)))
+        ACT_KEYLIST(VAL_ACTION(applicand))
     );
     INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(f));
         // ^-- changes CTX_KEYS_HEAD result

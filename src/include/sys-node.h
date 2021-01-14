@@ -53,10 +53,6 @@
         constexpr bool derived =
             std::is_same<T0, REBNOD>::value
             or std::is_base_of<REBRAW, T0>::value
-            or std::is_base_of<REBSER, T0>::value
-            or std::is_same<T0, REBCTX>::value
-            or std::is_same<T0, REBACT>::value
-            or std::is_same<T0, REBMAP>::value
             or std::is_same<T0, REBFRM>::value;
 
         constexpr bool base =
@@ -65,8 +61,7 @@
 
         static_assert(
             derived or base,
-            "NOD() works on void/REBVAL/REBSER/REBSTR/REBARR/REBCTX/REBACT" \
-               "/REBMAP/REBFRM or nullptr"
+            "NOD() works on void* or REBFRM*"
         );
 
         if (not p)
@@ -86,7 +81,7 @@
 
 
 #define NODE_BYTE(p) \
-    *cast(const REBYTE*, NOD(p))
+    *cast(const REBYTE*, ensure(const REBNOD*, p))
 
 #ifdef NDEBUG
     #define IS_FREE_NODE(p) \

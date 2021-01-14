@@ -57,9 +57,19 @@
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* ancestor */ \
         | SERIES_FLAG_IS_KEYLIKE)
 
-struct Reb_Context {
-    REBARR varlist;  // keylist is held in ->link.keysource
-};
+
+#ifdef CPLUSPLUS_11
+    struct Reb_Context : public Reb_Node {
+        struct Reb_Series_Base varlist;  // keylist in ->link.keysource
+    };
+#else
+    struct Reb_Context {
+        struct Reb_Series varlist;
+    };
+#endif
+
+#define CTX_VARLIST(c) \
+    x_cast(REBARR*, &(c)->varlist)
 
 
 #if !defined(DEBUG_CHECK_CASTS)

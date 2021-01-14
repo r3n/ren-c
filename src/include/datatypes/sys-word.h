@@ -120,7 +120,7 @@ inline static REBVAL *Init_Any_Word_Bound_Core(
     REBLEN index
 ){
     RESET_VAL_HEADER(out, type, CELL_FLAG_FIRST_IS_NODE);
-    mutable_BINDING(out) = &context->varlist;
+    mutable_BINDING(out) = CTX_VARLIST(context);
     VAL_WORD_INDEXES_U32(out) = index;
     INIT_VAL_WORD_CACHE(out, SPECIFIED);
 

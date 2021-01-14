@@ -50,7 +50,7 @@ static int Poll_Default(REBDEV *dev)
 
     bool change = false;
 
-    const REBNOD **prior = &dev->pending;
+    REBNOD **prior = &dev->pending;
     REBREQ *req = BIN(m_cast(REBNOD*, *prior));
     for (; req != nullptr; req = BIN(m_cast(REBNOD*, *prior))) {
         assert(Req(req)->command < RDC_MAX);
@@ -69,7 +69,7 @@ static int Poll_Default(REBDEV *dev)
         else {
             assert(result == DR_PEND);
 
-            prior = &mutable_LINK(ReqNextNode, req);
+            prior = &node_LINK(ReqNext, req);
             if (Req(req)->flags & RRF_ACTIVE)
                 change = true;
         }
@@ -85,14 +85,14 @@ static int Poll_Default(REBDEV *dev)
 // Attach a request to a device's pending or accept list.
 // Node is a pointer to the head pointer of the req list.
 //
-void Attach_Request(const REBNOD **node, REBREQ *req)
+void Attach_Request(REBNOD **node, REBREQ *req)
 {
-    const REBNOD *r;
+    REBNOD *r;
 
     // See if its there, and get last req:
     for (r = *node; r; r = *node) {
         if (r == req) return; // already in list
-        node = &mutable_LINK(ReqNextNode, BIN(r));
+        node = &node_LINK(ReqNext, BIN(r));
     }
 
     // Link the new request to end:
@@ -109,9 +109,9 @@ void Attach_Request(const REBNOD **node, REBREQ *req)
 // Detach a request to a device's pending or accept list.
 // If it is not in list, then no harm done.
 //
-void Detach_Request(const REBNOD **node, REBREQ *req)
+void Detach_Request(REBNOD **node, REBREQ *req)
 {
-    const REBNOD *r;
+    REBNOD *r;
 
     for (r = *node; r; r = *node) {
         if (r == req) {
@@ -120,7 +120,7 @@ void Detach_Request(const REBNOD **node, REBREQ *req)
             Req(req)->flags |= RRF_PENDING;
             return;
         }
-        node = &mutable_LINK(ReqNextNode, BIN(r));
+        node = &node_LINK(ReqNext, BIN(r));
     }
 }
 

@@ -26,9 +26,19 @@
 //
 
 
-struct Reb_Action {
-    REBARR details;
-};
+#ifdef CPLUSPLUS_11
+    struct Reb_Action : public Reb_Node {
+        struct Reb_Series_Base details;
+    };
+#else
+    struct Reb_Action {
+        struct Reb_Series details;
+    };
+#endif
+
+#define ACT_DETAILS(a) \
+    cast(REBARR*, &(a)->details)
+
 
 #define MISC_Meta_TYPE      REBCTX*
 #define MISC_Meta_CAST      CTX

@@ -35,13 +35,6 @@
 //   number uses that bit.
 //
 
-#if defined(DEBUG_CHECK_CASTS)
-    inline static REBARR *ensure_array(REBARR *a) { return a; }
-    inline static const REBARR *ensure_array(const REBARR *a) { return a; }
-#else
-    #define ensure_array(a) (a)
-#endif
-
 
 // If a series is an array, then there are 16 free bits available for use
 // in the SERIES_FLAG_XXX section.
@@ -169,17 +162,17 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 // These token-pasting based macros allow the callsites to be shorter, since
 // they don't have to say ARRAY and FLAG twice.
 
-#define SET_ARRAY_FLAG(a,name) \
-    (ensure_array(a)->leader.bits |= ARRAY_FLAG_##name)
-
 #define GET_ARRAY_FLAG(a,name) \
-    ((ensure_array(a)->leader.bits & ARRAY_FLAG_##name) != 0)
-
-#define CLEAR_ARRAY_FLAG(a,name) \
-    (ensure_array(a)->leader.bits &= ~ARRAY_FLAG_##name)
+    ((ensure(const REBARR*, a)->leader.bits & ARRAY_FLAG_##name) != 0)
 
 #define NOT_ARRAY_FLAG(a,name) \
-    ((ensure_array(a)->leader.bits & ARRAY_FLAG_##name) == 0)
+    ((ensure(const REBARR*, a)->leader.bits & ARRAY_FLAG_##name) == 0)
+
+#define SET_ARRAY_FLAG(a,name) \
+    (ensure(REBARR*, a)->leader.bits |= ARRAY_FLAG_##name)
+
+#define CLEAR_ARRAY_FLAG(a,name) \
+    (ensure(REBARR*, a)->leader.bits &= ~ARRAY_FLAG_##name)
 
 
 // Ordinary source arrays use their ->link field to point to an interned file

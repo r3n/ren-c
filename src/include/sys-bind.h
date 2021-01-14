@@ -73,7 +73,6 @@
 
 // Next node is either to another patch, a frame specifier REBCTX, or nullptr.
 //
-#define LINK_PatchNextNode_TYPE    const REBNOD*  // to set via indirection
 #define LINK_PatchNext_TYPE        REBARR*
 #define LINK_PatchNext_CAST        ARR
 
@@ -166,10 +165,10 @@ inline static bool Is_Overriding_Context(REBCTX *stored, REBCTX *override)
         if (temp == stored_source)
             return true;
 
-        if (NOD(LINK(Ancestor, SER(temp))) == temp)
+        if (LINK(Ancestor, SER(temp)) == temp)
             break;
 
-        temp = NOD(LINK(Ancestor, SER(temp)));
+        temp = LINK(Ancestor, SER(temp));
     }
 
     return false;
@@ -999,7 +998,7 @@ inline static REBVAL *Derelativize(
 // top of each other, the chain always bottoms out on the same FRAME! that
 // the original specifier was pointing to.
 //
-inline static const REBNOD** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
+inline static REBNOD** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
 {
     assert(GET_ARRAY_FLAG(specifier, IS_PATCH));
     while (
@@ -1008,7 +1007,7 @@ inline static const REBNOD** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
     ){
         specifier = LINK(PatchNext, specifier);
     }
-    return &mutable_LINK(PatchNextNode, specifier);
+    return &node_LINK(PatchNextNode, specifier);
 }
 
 inline static option(REBCTX*) SPC_FRAME_CTX(REBSPC *specifier)
@@ -1017,7 +1016,7 @@ inline static option(REBCTX*) SPC_FRAME_CTX(REBSPC *specifier)
         return nullptr;
     if (GET_ARRAY_FLAG(specifier, IS_VARLIST))
         return CTX(specifier);
-    return CTX(m_cast(REBNOD*, *SPC_FRAME_CTX_ADDRESS(specifier)));
+    return CTX(*SPC_FRAME_CTX_ADDRESS(specifier));
 }
 
 
@@ -1196,8 +1195,7 @@ inline static REBSPC *Derive_Specifier_Core(
         // an extra check of that, review when efficiency is being revisited
         // (SPC_PATCH_CTX() as separate entry point?)
         //
-        const REBNOD **specifier_frame_ctx_addr
-            = SPC_FRAME_CTX_ADDRESS(specifier);
+        REBNOD **specifier_frame_ctx_addr = SPC_FRAME_CTX_ADDRESS(specifier);
         if (*specifier_frame_ctx_addr == old)  // all clear to reuse
             return specifier;
 

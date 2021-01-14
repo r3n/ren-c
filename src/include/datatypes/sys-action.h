@@ -149,11 +149,6 @@
 #define INIT_VAL_ACTION_SPECIALTY_OR_LABEL              INIT_VAL_NODE2
 
 
-inline static REBARR *ACT_DETAILS(REBACT *a) {
-    assert(GET_ARRAY_FLAG(&(a->details), IS_DETAILS));
-    return &a->details;
-}
-
 inline static REBCTX *VAL_ACTION_BINDING(REBCEL(const*) v) {
     assert(CELL_HEART(v) == REB_ACTION);
     return CTX(BINDING(v));
@@ -164,7 +159,7 @@ inline static void INIT_VAL_ACTION_BINDING(
     REBCTX *binding
 ){
     assert(IS_ACTION(v));
-    mutable_BINDING(v) = &binding->varlist;
+    mutable_BINDING(v) = CTX_VARLIST(binding);
 }
 
 
@@ -208,7 +203,7 @@ inline static option(REBARR*) ACT_PARTIALS(REBACT *a) {
 inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = &LINK(PartialsExemplar, list)->varlist;  // no CTX_VARLIST yet
+        list = CTX_VARLIST(LINK(PartialsExemplar, list));
     assert(GET_ARRAY_FLAG(list, IS_VARLIST));
     return CTX(list);
 }
@@ -219,7 +214,7 @@ inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
 inline static REBSER *ACT_KEYLIST(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = &LINK(PartialsExemplar, list)->varlist;  // no CTX_VARLIST yet
+        list = CTX_VARLIST(LINK(PartialsExemplar, list));
     assert(GET_ARRAY_FLAG(list, IS_VARLIST));
     return SER(LINK(KeySource, list));
 }
@@ -235,7 +230,7 @@ inline static REBSER *ACT_KEYLIST(REBACT *a) {
 inline static REBPAR *ACT_PARAMS_HEAD(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
     if (GET_ARRAY_FLAG(list, IS_PARTIALS))
-        list = &LINK(PartialsExemplar, list)->varlist;  // no CTX_VARLIST yet
+        list = CTX_VARLIST(LINK(PartialsExemplar, list));
     return cast(REBPAR*, list->content.dynamic.data) + 1;  // skip archetype
 }
 

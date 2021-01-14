@@ -163,7 +163,7 @@ inline static int FRM_LINE(REBFRM *f) {
     cast(REBACT*, VAL_FRAME_PHASE_OR_LABEL_NODE((f)->rootvar))
 
 inline static void INIT_FRM_PHASE(REBFRM *f, REBACT *phase)  // check types
-  { INIT_VAL_FRAME_PHASE_OR_LABEL(f->rootvar, NOD(phase)); }  // ...only
+  { INIT_VAL_FRAME_PHASE_OR_LABEL(f->rootvar, phase); }  // ...only
 
 inline static void INIT_FRM_BINDING(REBFRM *f, REBCTX *binding)
   { mutable_BINDING(f->rootvar) = CTX_VARLIST(binding); }  // also fast
@@ -783,7 +783,7 @@ inline static void Drop_Action(REBFRM *f) {
             // This node could be reused vs. calling Alloc_Node() on the next
             // action invocation...but easier for the moment to let it go.
             //
-            Free_Node(SER_POOL, NOD(f->varlist));
+            Free_Node(SER_POOL, f->varlist);
             f->varlist = nullptr;
         }
     }
@@ -822,7 +822,7 @@ inline static void Drop_Action(REBFRM *f) {
         INIT_LINK_KEYSOURCE(f->varlist, NOD(f));
       #endif
 
-        INIT_LINK_KEYSOURCE(f->varlist, NOD(ACT_KEYLIST(f->original)));
+        INIT_LINK_KEYSOURCE(f->varlist, ACT_KEYLIST(f->original));
         f->varlist = nullptr;
     }
     else {

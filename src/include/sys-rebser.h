@@ -706,8 +706,8 @@ union Reb_Series_Misc {
 };
 
 
-#if defined(CPLUSPLUS_11)
-    struct Reb_Series : public Reb_Node
+#ifdef CPLUSPLUS_11
+    struct Reb_Series_Base
 #else
     struct Reb_Series
 #endif
@@ -788,6 +788,8 @@ union Reb_Series_Misc {
 // https://stackoverflow.com/q/2159390/
 //
 #ifdef __cplusplus
+    struct Reb_Series : public Reb_Node, public Reb_Series_Base {};
+
     struct Reb_Binary : public Reb_Series {};
     typedef struct Reb_Binary REBBIN;
 

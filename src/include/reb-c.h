@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -337,30 +337,6 @@
     // require manual labeling of `extern` on any exported variables.
     //
     #define EXTERN_C extern
-#endif
-
-
-//=//// C-ONLY CONSTNESS //////////////////////////////////////////////////=//
-//
-// C lacks overloading, which means that having one version of code for const
-// input and another for non-const input requires two entirely different names
-// for the function variations.  That can wind up seeming noisier than is
-// worth it for a compile-time check.  This makes it easier to declare the C++
-// variation for the const case:
-//
-//    // C build mutable result even if const input (mutable case in C++)
-//    Member* Get_Member(const_if_c Object* o) {...}
-//
-//    #ifdef __cplusplus
-//        // C++ build adds protection to the const input case
-//        const Member* Get_Member(const Object *o) {...}
-//    #endif
-//
-
-#ifdef __cplusplus
-    #define const_if_c
-#else
-    #define const_if_c const
 #endif
 
 
@@ -942,6 +918,66 @@
 
     #define IS_CFUNC_TRASH_DEBUG(T,p) \
         ((p) == cast(T, cast(uintptr_t, 0xDECAFBAD)))
+#endif
+
+
+//=//// TYPE ENSURING HELPERS /////////////////////////////////////////////=//
+//
+// It's useful when building macros to make inline functions that just check
+// a type, for example:
+//
+//      inline static Foo* ensure_foo(Foo* f) { return f; }
+//
+// This has the annoying property that you have to write that function and
+// put it somewhere.  But also, there's a problem with constness... if you
+// want to retain it, you will need two overloads in C++ (and C does not
+// have overloading).
+//
+// This introduces some tools that are no-ops in C.  One is a simple type
+// `ensure` construct:
+//
+//      void *p = ensure(REBSER*, s);
+//
+// Another called `ensurer` lets you put it in the stream of execution without
+// being inside parentheses (it does this with operator `<<` magic):
+//
+//      int x = ensurer(int) "this would fail in a C++ build, for instance";
+//
+// And yet another called `ensured` lets you check an assignment.  This is
+// helpful when you need to do something like assign to a void* and can't
+// do weird cast dereferencing or you'll violate strict aliasing.
+//
+#if !defined(CPLUSPLUS_11) or !defined(DEBUG_CHECK_CASTS)
+    #define ensure(T,v) (v)
+    #define ensurer(T)
+    #define ensured(T,L,left) (left)
+#else
+    template<typename T>
+    struct ensure_reader {
+        template<typename U>
+        T operator<< (U u) { return u; }
+
+        template<typename U>
+        static T check(U u) { return u; }
+    };
+    #define ensure(T,v) ensure_reader<T>::check(v)
+    #define ensurer(T) ensure_reader<T>() <<
+
+    template<typename T, typename L>
+    struct ensure_writer {
+        L &left;
+        ensure_writer(L &left) : left (left) {}
+        void operator=(const T &right) {
+            left = right;
+        }
+    };
+    #define ensured(T,L,left) (ensure_writer<T,L>{(left)})
+        //
+        // ^-- Note: C++17 should be able to infer template arguments from
+        // constructors, so this could just be `ensurer(T,left)`.  There
+        // aren't enough of these to worry about it, yet.
+        //
+        // https://stackoverflow.com/a/984597/
 #endif
 
 

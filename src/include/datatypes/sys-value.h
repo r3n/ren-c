@@ -429,7 +429,7 @@ inline static REBVAL *RESET_CUSTOM_CELL(
     REBFLGS flags
 ){
     RESET_CELL(out, REB_CUSTOM, flags);
-    EXTRA(Any, out).node = NOD(type);
+    EXTRA(Any, out).node = type;
     return cast(REBVAL*, out);
 }
 
@@ -734,8 +734,6 @@ inline static void Move_Value_Header(
 ){
     assert(out != v);  // usually a sign of a mistake; not worth supporting
     assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
-
-    // Note: Pseudotypes are legal to move, but none of them are bindable
 
     ASSERT_CELL_WRITABLE_EVIL_MACRO(out);
 

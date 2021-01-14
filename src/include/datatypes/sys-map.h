@@ -41,9 +41,17 @@
     (ARRAY_FLAG_IS_PAIRLIST \
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* hashlist */)
 
-struct Reb_Map {
-    REBARR pairlist;  // hashlist is held in ->link.hashlist
-};
+
+#ifdef CPLUSPLUS_11
+    struct Reb_Map : public Reb_Node {
+        struct Reb_Series_Base pairlist;  // hashlist in LINK(Hashlist)
+    };
+#else
+    struct Reb_Map {
+        struct Reb_Series pairlist;
+    };
+#endif
+
 
 // See LINK() macro for how this is used.
 //
@@ -52,8 +60,7 @@ struct Reb_Map {
 
 
 inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
-    assert(GET_ARRAY_FLAG(&(m->pairlist), IS_PAIRLIST));
-    return (&m_cast(REBMAP*, m)->pairlist);
+    return cast(REBARR*, (&m_cast(REBMAP*, m)->pairlist));
 }
 
 #ifdef __cplusplus

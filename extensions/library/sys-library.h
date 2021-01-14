@@ -30,20 +30,17 @@
 
 typedef REBARR REBLIB;
 
-#define LINK_Descriptor_TYPE        void*
-#define LINK_Descriptor_CAST        (void*)
-
 extern REBTYP *EG_Library_Type;
 
 inline static bool IS_LIBRARY(const RELVAL *v) {  // Note: QUOTED! doesn't count
     return IS_CUSTOM(v) and CELL_CUSTOM_TYPE(v) == EG_Library_Type;
 }
 
-inline static void *LIB_FD(REBLIB *l)
-  { return LINK(Descriptor, l); }  // (F)ile (D)escriptor
+inline static void *LIB_FD(REBLIB *lib)
+  { return lib->link.fd; }  // (F)ile (D)escriptor
 
-inline static bool IS_LIB_CLOSED(REBLIB *l)
-  { return LINK(Descriptor, l) == nullptr; }
+inline static bool IS_LIB_CLOSED(REBLIB *lib)
+  { return lib->link.fd == nullptr; }
 
 inline static REBLIB *VAL_LIBRARY(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Library_Type);

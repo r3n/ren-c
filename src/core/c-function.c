@@ -624,7 +624,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     Manage_Series(paramlist);
 
     SET_SERIES_USED(keylist, num_slots - 1);  // no terminator
-    INIT_LINK_KEYSOURCE(paramlist, NOD(keylist));
+    INIT_LINK_KEYSOURCE(paramlist, keylist);
     mutable_MISC(Meta, paramlist) = nullptr;
   }
 

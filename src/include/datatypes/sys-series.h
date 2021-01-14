@@ -70,15 +70,10 @@
 
 #if !defined(DEBUG_CHECK_CASTS)
 
-    #define ensure_series(s) (s)
-
     #define SER(p) \
         x_cast(REBSER*, (p))  // don't check const in C or C++
 
 #else
-
-    inline static REBSER *ensure_series(REBSER *s) { return s; }
-    inline static const REBSER *ensure_series(const REBSER *s) { return s; }
 
     template <
         typename T,
@@ -124,23 +119,23 @@
 // was supposed to read to mark.)
 //
 // The LINK() and MISC() macros try to mitigate this by letting callsites
-// that assign and read the link and misc fields of series nodes be different,
-// while still getting type checking.  They do this via token pasting, to
-// collaborate with definition macros.  For instance:
+// that assign and read the link and misc fields of series nodes be different.
+// e.g. the following assigns and reads the same REBNOD* that everything else
+// using the link field does, but documents it is for "bookmark":
+//
+//      REBBMK *bookmark = LINK(Bookmark, series);
+//      mutable_LINK(Bookmark, series) = bookmark;
+//
+// To do this, you must define two macros:
 //
 //      #define LINK_Bookmark_TYPE REBBMK*
 //      #define LINK_Bookmark_CAST (REBBMK*)SER
 //
 // These definitions let us build macros for doing RValue and LValue access
-// under a unique-looking reference, with type safety:
-//
-//      REBBMK *bookmark = LINK(Bookmark, series);
-//      mutable_LINK(Bookmark, series) = bookmark;
-//
-// These effectively expand to:
+// under a unique-looking reference, with type safety, expanding to:
 //
 //      REBBMK *bookmark = (REBBMK*)SER((void*)series->link.any.node);
-//      *((**REBBMK)series->link.any.node) = bookmark;
+//      series->link.any.node = ensure(REBBMK*) bookmark;
 //
 // You get the desired properties of being easy to find cases of a particular
 // interpretation of the field, along with type checking on the assignment,
@@ -159,25 +154,17 @@
 #define MISC(Field, s) \
     MISC_##Field##_CAST(x_cast(REBNOD*, (s)->misc.any.node))
 
-#if !defined(CPLUSPLUS_11)
-    //
-    // Technically speaking, the debug versions below may risk causing
-    // problems in strict aliasing.  Haven't seen any cases of it...but just
-    // to be safe, the release build skips the cast and just assigns to the
-    // REBNOD* directly.
+#define mutable_LINK(Field, s) \
+    ensured(LINK_##Field##_TYPE, const REBNOD*, (s)->link.any.node)
 
-    #define mutable_LINK(Field, s) \
-        (s)->link.any.node
+#define mutable_MISC(Field, s) \
+    ensured(MISC_##Field##_TYPE, const REBNOD*, (s)->misc.any.node)
 
-    #define mutable_MISC(Field, s) \
-        (s)->misc.any.node
-#else
-    #define mutable_LINK(Field, s) \
-        *(LINK_##Field##_TYPE*)(&(s)->link.any.node)
+#define node_LINK(Field, s) \
+    *x_cast(REBNOD**, &(s)->link.any.node)  // const ok for strict alias
 
-    #define mutable_MISC(Field, s) \
-        *(MISC_##Field##_TYPE*)(&(s)->misc.any.node)
-#endif
+#define node_MISC(Field, s) \
+    *x_cast(REBNOD**, &(s)->misc.any.node)  // const ok for strict alias
 
 
 // The GC wants to read the node generically, but doesn't want to have to
@@ -892,8 +879,8 @@ inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
 // before a command ends.
 //
 
-#define PUSH_GC_GUARD(p) \
-    Push_Guard_Node(NOD(p))
+#define PUSH_GC_GUARD(node) \
+    Push_Guard_Node(node)
 
 inline static void DROP_GC_GUARD(const void *p) {
   #if defined(NDEBUG)

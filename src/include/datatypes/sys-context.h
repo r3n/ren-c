@@ -97,7 +97,6 @@
 // is another object's-worth of data *about* the module's contents (e.g. the
 // processed header)
 //
-#define CTX_VARLIST(c)  (&(c)->varlist)
 #define CTX_META(c)     MISC(Meta, CTX_VARLIST(c))
 
 
@@ -193,7 +192,7 @@ inline static void INIT_VAL_FRAME_ROOTVAR_Core(
     RESET_VAL_HEADER(out, REB_FRAME, CELL_MASK_CONTEXT);
     INIT_VAL_CONTEXT_VARLIST(out, varlist);
     mutable_BINDING(out) = CTX_VARLIST(binding);
-    INIT_VAL_FRAME_PHASE_OR_LABEL(out, NOD(phase));
+    INIT_VAL_FRAME_PHASE_OR_LABEL(out, phase);
   #if !defined(NDEBUG)
     out->header.bits |= CELL_FLAG_PROTECTED;
   #endif
@@ -231,12 +230,12 @@ inline static REBSER *CTX_KEYLIST(REBCTX *c) {
 
 static inline void INIT_CTX_KEYLIST_SHARED(REBCTX *c, REBSER *keylist) {
     SET_SERIES_INFO(keylist, KEYLIST_SHARED);
-    INIT_LINK_KEYSOURCE(CTX_VARLIST(c), NOD(keylist));
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(c), keylist);
 }
 
 static inline void INIT_CTX_KEYLIST_UNIQUE(REBCTX *c, REBSER *keylist) {
     assert(NOT_SERIES_INFO(keylist, KEYLIST_SHARED));
-    INIT_LINK_KEYSOURCE(CTX_VARLIST(c), NOD(keylist));
+    INIT_LINK_KEYSOURCE(CTX_VARLIST(c), keylist);
 }
 
 
@@ -398,7 +397,7 @@ inline static REBCTX *VAL_FRAME_BINDING(REBCEL(const*) v) {
 
 inline static void INIT_VAL_FRAME_PHASE(RELVAL *v, REBACT *phase) {
     assert(IS_FRAME(v));  // may be marked protected (e.g. archetype)
-    INIT_VAL_FRAME_PHASE_OR_LABEL(v, NOD(phase));
+    INIT_VAL_FRAME_PHASE_OR_LABEL(v, phase);
 }
 
 inline static REBACT *VAL_FRAME_PHASE(REBCEL(const*) v) {
@@ -432,7 +431,7 @@ inline static void INIT_VAL_FRAME_LABEL(
     else
         INIT_VAL_FRAME_PHASE_OR_LABEL(
             v,  // v-- for no label, match the archetype
-            NOD(CTX_FRAME_ACTION(VAL_CONTEXT(v)))
+            CTX_FRAME_ACTION(VAL_CONTEXT(v))
         );
 }
 
@@ -636,7 +635,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
         FLAG_WIDE_BYTE_OR_0(0) // implicit termination, and indicates array
             | FLAG_LEN_BYTE_OR_255(255) // indicates dynamic (varlist rule)
     );
-    TRASH_POINTER_IF_DEBUG(mutable_LINK(KeySource, copy)); // needs update
+    TRASH_POINTER_IF_DEBUG(node_LINK(KeySource, copy)); // needs update
     memcpy(  // https://stackoverflow.com/q/57721104/
         cast(char*, &copy->content),
         cast(char*, &stub->content),

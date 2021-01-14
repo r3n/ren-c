@@ -67,7 +67,7 @@ REB_R MAKE_Library(
     REBLIB *lib = Alloc_Singular(NODE_FLAG_MANAGED);
     Init_Unreadable_Void(ARR_SINGLE(lib));  // !!! save name? other data?
 
-    mutable_LINK(Descriptor, lib) = fd;  // seen as shared by all instances
+    lib->link.fd = fd;  // seen as shared by all instances
     mutable_MISC(Meta, lib) = nullptr;  // !!! build from spec, e.g. arg?
 
     RESET_CUSTOM_CELL(out, EG_Library_Type, CELL_FLAG_FIRST_IS_NODE);
@@ -119,7 +119,7 @@ REBTYPE(Library)
         }
         else {
             Close_Library(VAL_LIBRARY_FD(lib));
-            mutable_LINK(Descriptor, VAL_LIBRARY(lib)) = nullptr;
+            VAL_LIBRARY(lib)->link.fd = nullptr;
         }
         return nullptr; }
 

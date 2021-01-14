@@ -102,11 +102,11 @@ inline static void Link_Api_Handle_To_Frame(REBARR *a, REBFRM *f)
 
     if (not empty_list) {  // head of list exists, take its spot at the head
         assert(Is_Api_Value(ARR_SINGLE(ARR(f->alloc_value_list))));
-        mutable_MISC(ApiPrev, SER(f->alloc_value_list)) = NOD(a);  // link back
+        mutable_MISC(ApiPrev, SER(f->alloc_value_list)) = a;  // link back
     }
 
     mutable_LINK(ApiNext, a) = f->alloc_value_list;  // forward pointer
-    f->alloc_value_list = NOD(a);
+    f->alloc_value_list = a;
 }
 
 inline static void Unlink_Api_Handle_From_Frame(REBARR *a)
@@ -217,7 +217,7 @@ inline static REBARR *Alloc_Instruction(enum Reb_Api_Opcode opcode) {
 
 inline static void Free_Instruction(REBARR *a) {
     TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
-    Free_Node(SER_POOL, NOD(a));
+    Free_Node(SER_POOL, a);
 }
 
 
