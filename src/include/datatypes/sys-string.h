@@ -445,12 +445,11 @@ inline static bool Is_String_Definitely_ASCII(const REBSTR *str) {
     return false;
 }
 
-inline static const char *STR_UTF8(const REBSTR *s)
-  { return cast(const char*, BIN_HEAD(s)); }
+#define STR_UTF8(s) \
+    SER_HEAD(const char, ensure(const REBSTR*, s))
 
-inline static size_t STR_SIZE(const REBSTR *s)  // e.g. encoded UTF-8 size
-  { return SER_USED(s); }
-
+#define STR_SIZE(s) \
+    SER_USED(ensure(const REBSTR*, s))  // UTF-8 byte count (not codepoints)
 
 inline static REBCHR(*) STR_HEAD(const_if_c REBSTR *s)
   { return cast(REBCHR(*), SER_HEAD(REBYTE, s)); }
@@ -853,7 +852,7 @@ inline static REBCHR(const*) VAL_STRING_TAIL(REBCEL(const*) v) {
 
 
 inline static REBSIZ VAL_SIZE_LIMIT_AT(
-    REBLEN *length, // length in chars to end (including limit)
+    option(REBLEN*) length_out,  // length in chars to end (including limit)
     REBCEL(const*) v,
     REBLEN limit  // UNLIMITED (e.g. a very large number) for no limit
 ){
@@ -864,13 +863,13 @@ inline static REBSIZ VAL_SIZE_LIMIT_AT(
 
     REBLEN len_at = VAL_LEN_AT(v);
     if (limit >= len_at) {
-        if (length != nullptr)
-            *length = len_at;
+        if (length_out)
+            *unwrap(length_out) = len_at;
         tail = VAL_STRING_TAIL(v);  // byte count known (fast)
     }
     else {
-        if (length != nullptr)
-            *length = limit;
+        if (length_out)
+            *unwrap(length_out) = limit;
         tail = at;
         for (; limit > 0; --limit)
             tail = NEXT_STR(tail);
@@ -880,7 +879,7 @@ inline static REBSIZ VAL_SIZE_LIMIT_AT(
 }
 
 #define VAL_SIZE_AT(v) \
-    VAL_SIZE_LIMIT_AT(NULL, v, UNLIMITED)
+    VAL_SIZE_LIMIT_AT(nullptr, v, UNLIMITED)
 
 inline static REBSIZ VAL_OFFSET(const RELVAL *v) {
     return VAL_STRING_AT(v) - STR_HEAD(VAL_STRING(v));

@@ -232,7 +232,7 @@ inline static const REBYTE *VAL_BYTES_LIMIT_AT(
     }
 
     if (ANY_STRING(v)) {
-        *size_out = VAL_SIZE_LIMIT_AT(NULL, v, limit);
+        *size_out = VAL_SIZE_LIMIT_AT(nullptr, v, limit);
         return VAL_STRING_AT(v);
     }
 
@@ -253,8 +253,8 @@ inline static const REBYTE *VAL_BYTES_LIMIT_AT(
 // routine for handling that.
 //
 inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
-    REBLEN *length_out,
-    REBSIZ *size_out,
+    option(REBLEN*) length_out,
+    option(REBSIZ*) size_out,
     REBCEL(const*) v,
     REBLEN limit
 ){
@@ -283,9 +283,9 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
         }
 
         if (length_out)
-            *length_out = len;
+            *unwrap(length_out) = len;
         if (size_out)
-            *size_out = size;
+            *unwrap(size_out) = size;
         return cast(REBCHR(const*), PAYLOAD(Bytes, v).at_least_8);
     }
 
@@ -295,18 +295,8 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
 
         if (size_out or length_out) {
             REBSIZ utf8_size = VAL_SIZE_LIMIT_AT(length_out, v, limit);
-
-            // Protect against embedded '\0' in debug build, which are illegal
-            // in ANY-STRING!, and mess up clients who go by NUL terminators.
-            //
-          #if !defined(NDEBUG)
-            REBLEN n;
-            for (n = 0; n < utf8_size; ++n)
-                assert(cast(const REBYTE*, utf8)[n] != '\0');
-          #endif
-
             if (size_out)
-                *size_out = utf8_size;
+                *unwrap(size_out) = utf8_size;
             // length_out handled by VAL_SIZE_LIMIT_AT, even if nullptr
         }
     }
@@ -318,7 +308,7 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
 
         if (size_out or length_out) {
             if (limit == UNLIMITED and not length_out)
-                *size_out = STR_SIZE(spelling);
+                *unwrap(size_out) = STR_SIZE(spelling);
             else {
                 // WORD!s don't cache their codepoint length, must calculate
                 //
@@ -329,9 +319,9 @@ inline static REBCHR(const*) VAL_UTF8_LEN_SIZE_AT_LIMIT(
                         break;
                 }
                 if (size_out)
-                    *size_out = cp - utf8;
+                    *unwrap(size_out) = cp - utf8;
                 if (length_out)
-                    *length_out = index;
+                    *unwrap(length_out) = index;
             }
         }
     }
