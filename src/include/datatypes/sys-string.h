@@ -84,7 +84,7 @@
 // So for instance: instead of simply saying:
 //
 //     REBUNI *ptr = STR_HEAD(string_series);
-//     REBUNI c = *ptr++;
+//     REBUNI c = *ptr++;  // !!! invalid, treating UTF-8 like it's ASCII!
 //
 // ...one must instead write:
 //
@@ -95,9 +95,9 @@
 // The code that runs behind the scenes is typical UTF-8 forward and backward
 // scanning code, minus any need for error handling.
 //
-#if !defined(CPLUSPLUS_11) or !defined(DEBUG_UTF8_EVERYWHERE)
+#if !defined(DEBUG_UTF8_EVERYWHERE)
     //
-    // Plain C build uses trivial expansion of REBCHR(*) and REBCHR(const*)
+    // Plain build uses trivial expansion of REBCHR(*) and REBCHR(const*)
     //
     //          REBCHR(*) cp; => REBYTE * cp;
     //     REBCHR(const*) cp; => REBYTE const* cp;  // same as `const REBYTE*`
@@ -105,77 +105,13 @@
     #define REBCHR(star_or_const_star) \
         REBYTE star_or_const_star
 
-    inline static REBYTE* NEXT_CHR(
-        REBUNI *codepoint_out,
-        const REBYTE *bp
-    ){
-        if (*bp < 0x80)
-            *codepoint_out = *bp;
-        else
-            bp = Back_Scan_UTF8_Char_Unchecked(codepoint_out, bp);
-        return m_cast(REBYTE*, bp + 1);
-    }
-
-    inline static REBYTE* BACK_CHR(
-        REBUNI *codepoint_out,
-        const REBYTE *bp
-    ){
-        const REBYTE *t = bp;
-        --t;
-        while (Is_Continuation_Byte_If_Utf8(*t))
-            --t;
-        NEXT_CHR(codepoint_out, t);  // Review: optimize backward scans?
-        return m_cast(REBYTE*, t);
-    }
-
-    inline static REBYTE* NEXT_STR(const REBYTE *bp) {
-        do {
-            ++bp;
-        } while (Is_Continuation_Byte_If_Utf8(*bp));
-        return m_cast(REBYTE*, bp);
-    }
-
-    inline static REBYTE* BACK_STR(const REBYTE *bp) {
-        do {
-            --bp;
-        } while (Is_Continuation_Byte_If_Utf8(*bp));
-        return m_cast(REBYTE*, bp);
-    }
-
-    inline static REBUNI CHR_CODE(const REBYTE *bp) {
-        REBUNI codepoint;
-        NEXT_CHR(&codepoint, bp);
-        return codepoint;
-    }
-
-    inline static REBYTE* SKIP_CHR(
-        REBUNI *codepoint_out,
-        const REBYTE *bp,
-        REBINT delta
-    ){
-        if (delta > 0) {
-            while (delta != 0) {
-                bp = NEXT_STR(bp);
-                --delta;
-            }
-        }
-        else {
-            while (delta != 0) {
-                bp = BACK_STR(bp);
-                ++delta;
-            }
-        }
-        *codepoint_out = CHR_CODE(bp);
-        return m_cast(REBYTE*, bp);
-    }
-
-    inline static REBYTE* WRITE_CHR(REBYTE* bp, REBUNI c) {
-        REBSIZ size = Encoded_Size_For_Codepoint(c);
-        Encode_UTF8_Char(bp, c, size);
-        return bp + size;
-    }
+    #define const_if_unchecked_utf8 const
 #else
-    // C++ build uses templates to expand REBCHR(*) and REBCHR(const*) into
+    #if !defined(CPLUSPLUS_11)
+        #error "DEBUG_UTF8_EVERYWHERE requires C++11 or higher"
+    #endif
+
+    // Debug mode uses templates to expand REBCHR(*) and REBCHR(const*) into
     // pointer classes.  This technique allows the simple C compilation too:
     //
     // http://blog.hostilefork.com/kinda-smart-pointers-in-c/
@@ -185,7 +121,7 @@
     // incompatible runtime interface between C and C++ builds of cores and
     // extensions using the internal API--which we want to avoid!
     //
-    // NOTE: THE NON-INLINED OVERHEAD IS EXTREME IN UNOPTIMIZED BUILDS!  A
+    // NOTE: THE NON-INLINED OVERHEAD IS RATHER HIGH IN UNOPTIMIZED BUILDS!
     // debug build does not inline these classes and functions.  So traversing
     // strings involves a lot of constructing objects and calling methods that
     // call methods.  Hence these classes are used only in non-debug (and
@@ -197,9 +133,12 @@
     #define REBCHR(star_or_const_star) \
         RebchrPtr<REBYTE star_or_const_star>
 
+    #define const_if_unchecked_utf8
+
     // Primary purpose of the classes is to disable the ability to directly
     // increment or decrement pointers to REBYTE* without going through helper
-    // routines that do decoding.
+    // routines that do decoding.  But we still want to do pointer comparison,
+    // and C++ sadly makes us write this all out.
 
     template<>
     struct RebchrPtr<const REBYTE*> {
@@ -210,64 +149,6 @@
         explicit RebchrPtr (const REBYTE *bp) : bp (bp) {}
         explicit RebchrPtr (const char *cstr)
             : bp (reinterpret_cast<const REBYTE*>(cstr)) {}
-
-        RebchrPtr next(REBUNI *out) {
-            const REBYTE *t = bp;
-            if (*t < 0x80)
-                *out = *t;
-            else
-                t = Back_Scan_UTF8_Char_Unchecked(out, t);
-            return RebchrPtr {t + 1};
-        }
-
-        RebchrPtr back(REBUNI *out) {
-            const REBYTE *t = bp;
-            --t;
-            while (Is_Continuation_Byte_If_Utf8(*t))
-                --t;
-            Back_Scan_UTF8_Char_Unchecked(out, t);
-            return RebchrPtr {t};
-        }
-
-        RebchrPtr next_only() {
-            const REBYTE *t = bp;
-            do {
-                ++t;
-            } while (Is_Continuation_Byte_If_Utf8(*t));
-            return RebchrPtr {t};
-        }
-
-        RebchrPtr back_only() {
-            const REBYTE *t = bp;
-            do {
-                --t;
-            } while (Is_Continuation_Byte_If_Utf8(*t));
-            return RebchrPtr {t};
-        }
-
-        REBUNI code() {
-            REBUNI c;
-            next(&c);
-            return c;
-        }
-
-        RebchrPtr skip(REBUNI *out, REBINT delta) {
-            RebchrPtr t = *this;
-            if (delta > 0) {
-                while (delta != 0) {
-                    t = t.next_only();
-                    --delta;
-                }
-            }
-            else {
-                while (delta != 0) {
-                    t = t.back_only();
-                    ++delta;
-                }
-            }
-            *out = t.code();
-            return RebchrPtr {t.bp};
-        }
 
         REBSIZ operator-(const REBYTE *rhs)
           { return bp - rhs; }
@@ -318,40 +199,11 @@
         static REBCHR(*) nonconst(REBCHR(const*) cp)
           { return RebchrPtr {const_cast<REBYTE*>(cp.bp)}; }
 
-        RebchrPtr back(REBUNI *out)
-          { return nonconst(REBCHR(const*)::back(out)); }
-
-        RebchrPtr next(REBUNI *out)
-          { return nonconst(REBCHR(const*)::next(out)); }
-
-        RebchrPtr back_only()
-          { return nonconst(REBCHR(const*)::back_only()); }
-
-        RebchrPtr next_only()
-          { return nonconst(REBCHR(const*)::next_only()); }
-
-        RebchrPtr skip(REBUNI *out, REBINT delta)
-          { return nonconst(REBCHR(const*)::skip(out, delta)); }
-
-        RebchrPtr write(REBUNI c) {
-            REBSIZ size = Encoded_Size_For_Codepoint(c);
-            Encode_UTF8_Char(const_cast<REBYTE*>(bp), c, size);
-            return RebchrPtr {const_cast<REBYTE*>(bp) + size};
-        }
-
         operator void*() { return const_cast<REBYTE*>(bp); }  // implicit
         operator REBYTE*() { return const_cast<REBYTE*>(bp); }  // implicit
         explicit operator char*()
             { return const_cast<char*>(reinterpret_cast<const char*>(bp)); }
     };
-
-    #define NEXT_CHR(out, cp)               (cp).next(out)
-    #define BACK_CHR(out, cp)               (cp).back(out)
-    #define NEXT_STR(cp)                    (cp).next_only()
-    #define BACK_STR(cp)                    (cp).back_only()
-    #define CHR_CODE(cp)                    (cp).code()
-    #define SKIP_CHR(out,cp,delta)          (cp).skip((out), (delta))
-    #define WRITE_CHR(cp, c)                (cp).write(c)
 
   #if defined(DEBUG_CHECK_CASTS)
     //
@@ -365,8 +217,114 @@
   #else
     #error "DEBUG_UTF8_EVERYWHERE currently requires DEBUG_CHECK_CASTS"
   #endif
-
 #endif
+
+inline static REBCHR(*) NEXT_CHR(
+    REBUNI *codepoint_out,
+    REBCHR(const_if_unchecked_utf8*) cp
+){
+    const REBYTE *t = cp;
+    if (*t < 0x80)
+        *codepoint_out = *t;
+    else
+        t = Back_Scan_UTF8_Char_Unchecked(codepoint_out, t);
+    return cast(REBCHR(*), m_cast(REBYTE*, t + 1));
+}
+
+inline static REBCHR(*) BACK_CHR(
+    REBUNI *codepoint_out,
+    REBCHR(const_if_unchecked_utf8*) cp
+){
+    const_if_unchecked_utf8 REBYTE *t = cp;
+    --t;
+    while (Is_Continuation_Byte_If_Utf8(*t))
+        --t;
+    NEXT_CHR(codepoint_out, cast(REBCHR(const_if_unchecked_utf8*), t));
+    return cast(REBCHR(*), m_cast(REBYTE*, t));
+}
+
+inline static REBCHR(*) NEXT_STR(REBCHR(const_if_unchecked_utf8*) cp) {
+    const_if_unchecked_utf8 REBYTE *t = cp;
+    do {
+        ++t;
+    } while (Is_Continuation_Byte_If_Utf8(*t));
+    return cast(REBCHR(*), m_cast(REBYTE*, t));
+}
+
+inline static REBCHR(*) BACK_STR(REBCHR(const_if_unchecked_utf8*) cp) {
+    const_if_unchecked_utf8 REBYTE *t = cp;
+    do {
+        --t;
+    } while (Is_Continuation_Byte_If_Utf8(*t));
+    return cast(REBCHR(*), m_cast(REBYTE*, t));
+}
+
+inline static REBCHR(*) SKIP_CHR(
+    REBUNI *codepoint_out,
+    REBCHR(const_if_unchecked_utf8*) cp,
+    REBINT delta
+){
+    if (delta > 0) {
+        while (delta != 0) {
+            cp = NEXT_STR(cp);
+            --delta;
+        }
+    }
+    else {
+        while (delta != 0) {
+            cp = BACK_STR(cp);
+            ++delta;
+        }
+    }
+    NEXT_CHR(codepoint_out, cp);
+    return cast(REBCHR(*), cp);
+}
+
+#if defined(DEBUG_UTF8_EVERYWHERE)
+    //
+    // See the definition of `const_if_c` for the explanation of why this
+    // overloading technique is needed to make output constness match input.
+    //
+    inline static REBCHR(const*) NEXT_CHR(
+        REBUNI *codepoint_out,
+        REBCHR(const*) cp
+    ){
+        return NEXT_CHR(codepoint_out, m_cast(REBCHR(*), cp));
+    }
+
+    inline static REBCHR(const*) BACK_CHR(
+        REBUNI *codepoint_out,
+        REBCHR(const*) cp
+    ){
+        return BACK_CHR(codepoint_out, m_cast(REBCHR(*), cp));
+    }
+
+    inline static REBCHR(const*) NEXT_STR(REBCHR(const*) cp)
+      { return NEXT_STR(m_cast(REBCHR(*), cp)); }
+
+    inline static REBCHR(const*) BACK_STR(REBCHR(const*) cp)
+      { return BACK_STR(m_cast(REBCHR(*), cp)); }
+
+    inline static REBCHR(const*) SKIP_CHR(
+        REBUNI *codepoint_out,
+        REBCHR(const*) cp,
+        REBINT delta
+    ){
+        return SKIP_CHR(codepoint_out, m_cast(REBCHR(*), cp), delta);
+    }
+#endif
+
+inline static REBUNI CHR_CODE(REBCHR(const*) cp) {
+    REBUNI codepoint;
+    NEXT_CHR(&codepoint, cp);
+    return codepoint;
+}
+
+inline static REBCHR(*) WRITE_CHR(REBCHR(*) cp, REBUNI c) {
+    REBSIZ size = Encoded_Size_For_Codepoint(c);
+    Encode_UTF8_Char(cp, c, size);
+    return cast(REBCHR(*), cast(REBYTE*, cp) + size);
+}
 
 
 //=//// REBSTR SERIES FOR UTF8 STRINGS ////////////////////////////////////=//
