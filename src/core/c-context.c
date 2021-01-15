@@ -273,10 +273,12 @@ void Collect_Context_Keys(
 //
 static void Collect_Inner_Loop(
     struct Reb_Collector *cl,
-    const RELVAL *head
+    const RELVAL *head,
+    const RELVAL *tail
 ){
-    for (; NOT_END(head); ++head) {
-        REBCEL(const*) cell = VAL_UNESCAPED(head);  // X from ''''X
+    const RELVAL *v = head;
+    for (; v != tail; ++v) {
+        REBCEL(const*) cell = VAL_UNESCAPED(v);  // X from ''''X
         enum Reb_Kind kind = CELL_KIND(cell);
 
         if (ANY_WORD_KIND(kind)) {
@@ -312,8 +314,11 @@ static void Collect_Inner_Loop(
         // given stepping away from SET-WORD! gathering as locals.
         // https://github.com/rebol/rebol-issues/issues/2276
         //
-        if (ANY_ARRAY_KIND(kind))
-            Collect_Inner_Loop(cl, VAL_ARRAY_AT(cell));
+        if (ANY_ARRAY_KIND(kind)) {
+            const RELVAL *sub_tail;
+            const RELVAL *sub_at = VAL_ARRAY_AT_T(&sub_tail, cell);
+            Collect_Inner_Loop(cl, sub_at, sub_tail);
+        }
     }
 }
 
@@ -333,6 +338,7 @@ static void Collect_Inner_Loop(
 //
 REBSER *Collect_Keylist_Managed(
     const RELVAL *head,
+    const RELVAL *tail,
     option(REBCTX*) prior,
     REBFLGS flags  // see %sys-core.h for COLLECT_ANY_WORD, etc.
 ) {
@@ -347,7 +353,7 @@ REBSER *Collect_Keylist_Managed(
         assert(not duplicate);  // context should have had all unique keys
     }
 
-    Collect_Inner_Loop(cl, head);
+    Collect_Inner_Loop(cl, head, tail);
 
     REBLEN num_collected = DSP - cl->dsp_orig;
 
@@ -385,6 +391,7 @@ REBSER *Collect_Keylist_Managed(
 //
 REBARR *Collect_Unique_Words_Managed(
     const RELVAL *head,
+    const RELVAL *tail,
     REBFLGS flags,  // See COLLECT_XXX
     const REBVAL *ignore  // BLOCK!, ANY-CONTEXT!, or BLANK! for none
 ){
@@ -395,8 +402,9 @@ REBARR *Collect_Unique_Words_Managed(
     // any non-words in a block the user passed in.
     //
     if (not IS_NULLED(ignore)) {
-        const RELVAL *check = VAL_ARRAY_AT(ignore);
-        for (; NOT_END(check); ++check) {
+        const RELVAL *check_tail;
+        const RELVAL *check = VAL_ARRAY_AT_T(&check_tail, ignore);
+        for (; check != check_tail; ++check) {
             if (not ANY_WORD_KIND(CELL_KIND(VAL_UNESCAPED(check))))
                 fail (Error_Bad_Value_Core(check, VAL_SPECIFIER(ignore)));
         }
@@ -434,9 +442,9 @@ REBARR *Collect_Unique_Words_Managed(
         }
     }
     else if (ANY_CONTEXT(ignore)) {
-        const REBKEY *tail;
-        const REBKEY *key = CTX_KEYS(&tail, VAL_CONTEXT(ignore));
-        for (; key != tail; ++key) {
+        const REBKEY *key_tail;
+        const REBKEY *key = CTX_KEYS(&key_tail, VAL_CONTEXT(ignore));
+        for (; key != key_tail; ++key) {
             //
             // Shouldn't be possible to have an object with duplicate keys,
             // use plain Add_Binder_Index.
@@ -447,7 +455,7 @@ REBARR *Collect_Unique_Words_Managed(
     else
         assert(IS_NULLED(ignore));
 
-    Collect_Inner_Loop(cl, head);
+    Collect_Inner_Loop(cl, head, tail);
 
     // We don't use Pop_Stack_Values_Core() because we want to keep the values
     // on the stack so that Collect_End() can remove them from the binder.
@@ -479,9 +487,9 @@ REBARR *Collect_Unique_Words_Managed(
         }
     }
     else if (ANY_CONTEXT(ignore)) {
-        const REBKEY *tail;
-        const REBKEY *key = CTX_KEYS(&tail, VAL_CONTEXT(ignore));
-        for (; key != tail; ++key)
+        const REBKEY *key_tail;
+        const REBKEY *key = CTX_KEYS(&key_tail, VAL_CONTEXT(ignore));
+        for (; key != key_tail; ++key)
             Remove_Binder_Index(&cl->binder, KEY_SYMBOL(key));
     }
     else
@@ -503,7 +511,9 @@ void Rebind_Context_Deep(
     REBCTX *dest,
     option(struct Reb_Binder*) binder
 ){
-    Rebind_Values_Deep(CTX_VARS_HEAD(dest), source, dest, binder);
+    const RELVAL *tail = ARR_TAIL(CTX_VARLIST(dest));
+    RELVAL *head = ARR_HEAD(CTX_VARLIST(dest));
+    Rebind_Values_Deep(head, tail, source, dest, binder);
 }
 
 
@@ -520,10 +530,12 @@ void Rebind_Context_Deep(
 REBCTX *Make_Context_Detect_Managed(
     enum Reb_Kind kind,
     const RELVAL *head,
+    const RELVAL *tail,
     option(REBCTX*) parent
 ) {
     REBSER *keylist = Collect_Keylist_Managed(
         head,
+        tail,
         parent,
         COLLECT_ONLY_SET_WORDS
     );
@@ -625,26 +637,28 @@ REBCTX *Make_Context_Detect_Managed(
 REBCTX *Construct_Context_Managed(
     enum Reb_Kind kind,
     RELVAL *head,  // !!! Warning: modified binding
+    const RELVAL *tail,
     REBSPC *specifier,
     option(REBCTX*) parent
 ){
     REBCTX *context = Make_Context_Detect_Managed(
         kind, // type
         head, // values to scan for toplevel set-words
+        tail,
         parent // parent
     );
 
     if (not head)
         return context;
 
-    Bind_Values_Shallow(head, CTX_ARCHETYPE(context));
+    Bind_Values_Shallow(head, tail, CTX_ARCHETYPE(context));
 
     const RELVAL *value = head;
     for (; NOT_END(value); value += 2) {
         if (not IS_SET_WORD(value))
             fail (Error_Invalid_Type(VAL_TYPE(value)));
 
-        if (IS_END(value + 1))
+        if (value + 1 == tail)
             fail ("Unexpected end in context spec block.");
 
         if (IS_SET_WORD(value + 1))

@@ -141,8 +141,9 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
             sigemptyset(&ReqPosixSignal(signal)->mask);
 
-            const RELVAL *item;
-            for (item = VAL_ARRAY_AT_HEAD(val, 0); NOT_END(item); ++item) {
+            const RELVAL *tail;
+            const RELVAL *item = VAL_ARRAY_AT_T(&tail, val);
+            for (; item != tail; ++item) {
                 DECLARE_LOCAL (sig);
                 Derelativize(sig, item, VAL_SPECIFIER(val));
 

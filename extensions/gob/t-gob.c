@@ -493,9 +493,11 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
             for (i = 0; Gob_Flag_Words[i].sym != 0; ++i)
                 CLR_GOB_FLAG(gob, Gob_Flag_Words[i].flags);
 
-            const RELVAL* item;
-            for (item = ARR_HEAD(VAL_ARRAY(val)); NOT_END(item); item++)
-                if (IS_WORD(item)) Set_Gob_Flag(gob, VAL_WORD_SYMBOL(item));
+            const RELVAL *item = ARR_HEAD(VAL_ARRAY(val));
+            const RELVAL *tail = ARR_TAIL(VAL_ARRAY(val));
+            for (; item != tail; ++item)
+                if (IS_WORD(item))
+                    Set_Gob_Flag(gob, VAL_WORD_SYMBOL(item));
         }
         break;
 
@@ -613,26 +615,26 @@ static REBVAL *Get_GOB_Var(
 //
 static void Set_GOB_Vars(
     REBGOB *gob,
-    const RELVAL *blk,
+    const RELVAL *block,
     REBSPC *specifier
 ){
     DECLARE_LOCAL (var);
     DECLARE_LOCAL (val);
 
-    while (NOT_END(blk)) {
-        assert(not IS_NULLED(blk));
-
-        Derelativize(var, blk, specifier);
-        ++blk;
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT_T(&tail, block);
+    while (item != tail) {
+        Derelativize(var, item, specifier);
+        ++item;
 
         if (!IS_SET_WORD(var))
             fail (Error_Unexpected_Type(REB_SET_WORD, VAL_TYPE(var)));
 
-        if (IS_END(blk))
+        if (item == tail)
             fail (Error_Need_Non_End_Raw(var));
 
-        Derelativize(val, blk, specifier);
-        ++blk;
+        Derelativize(val, item, specifier);
+        ++item;
 
         if (IS_SET_WORD(val))
             fail (Error_Need_Non_End_Raw(var));
@@ -712,7 +714,7 @@ void Extend_Gob_Core(REBGOB *gob, const REBVAL *arg) {
     // were the only ones "merging".
 
     if (IS_BLOCK(arg)) {
-        Set_GOB_Vars(gob, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
+        Set_GOB_Vars(gob, arg, VAL_SPECIFIER(arg));
     }
     else if (IS_PAIR(arg)) {
         GOB_X(gob) = VAL_PAIR_X_DEC(arg);

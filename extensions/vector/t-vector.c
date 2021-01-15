@@ -237,13 +237,11 @@ void Set_Vector_Row(
     REBLEN idx = VAL_INDEX(blk);
 
     if (IS_BLOCK(blk)) {
-        REBLEN len;
-        const RELVAL *val = VAL_ARRAY_LEN_AT(&len, blk);
+        const RELVAL *tail;
+        const RELVAL *val = VAL_ARRAY_AT_T(&tail, blk);
 
         REBLEN n = 0;
-        for (; NOT_END(val); val++) {
-            //if (n >= ser->tail) Expand_Vector(ser);
-
+        for (; val != tail; ++val) {
             Set_Vector_At(vec, n++, val);
         }
     }
@@ -370,10 +368,11 @@ void Shuffle_Vector(REBVAL *vect, bool secure)
 //
 bool Make_Vector_Spec(
     REBVAL *out,
-    const RELVAL *head,
+    const RELVAL *block,
     REBSPC *specifier
 ){
-    const RELVAL *item = head;
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT_T(&tail, block);
 
     // The specifier would be needed if variables were going to be looked
     // up, but isn't required for just symbol comparisons or extracting
@@ -382,13 +381,13 @@ bool Make_Vector_Spec(
     UNUSED(specifier);
 
     bool sign = true;  // default to signed, not unsigned
-    if (IS_WORD(item) and VAL_WORD_ID(item) == SYM_UNSIGNED) {
+    if (item != tail and IS_WORD(item) and VAL_WORD_ID(item) == SYM_UNSIGNED) {
         sign = false;
         ++item;
     }
 
     bool integral = false;  // default to integer, not floating point
-    if (not IS_WORD(item))
+    if (item == tail or not IS_WORD(item))
         return false;
     else {
         if (VAL_WORD_ID(item) == SYM_INTEGER_X)  // e_X_clamation (INTEGER!)
@@ -404,7 +403,7 @@ bool Make_Vector_Spec(
     }
 
     REBYTE bitsize;
-    if (not IS_INTEGER(item))
+    if (item == tail or not IS_INTEGER(item))
         return false;  // bit size required, no defaulting
     else {
         REBLEN i = Int32(item);
@@ -420,7 +419,7 @@ bool Make_Vector_Spec(
     }
 
     REBYTE len = 1;  // !!! default len to 1...why?
-    if (NOT_END(item) && IS_INTEGER(item)) {
+    if (item != tail and IS_INTEGER(item)) {
         if (Int32(item) < 0)
             return false;
         len = Int32(item);
@@ -430,7 +429,7 @@ bool Make_Vector_Spec(
         len = 1;
 
     const REBVAL *iblk;
-    if (NOT_END(item) and (IS_BLOCK(item) or IS_BINARY(item))) {
+    if (item != tail and (IS_BLOCK(item) or IS_BINARY(item))) {
         REBLEN init_len = VAL_LEN_AT(item);
         if (IS_BINARY(item) and integral)  // !!! What was this about?
             return false;
@@ -448,12 +447,12 @@ bool Make_Vector_Spec(
     // like vectors will be positional.  VAL_VECTOR_INDEX() always 0 for now.
     //
     REBLEN index = 0;  // default index offset inside returned REBVAL to 0
-    if (NOT_END(item) and IS_INTEGER(item)) {
+    if (item != tail and IS_INTEGER(item)) {
         index = (Int32s(item, 1) - 1);
         ++item;
     }
 
-    if (NOT_END(item))
+    if (item != tail)
         fail ("Too many arguments in MAKE VECTOR! block");
 
     REBLEN num_bytes = len * (bitsize / 8);
@@ -477,7 +476,7 @@ bool Make_Vector_Spec(
 REB_R TO_Vector(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
     if (IS_BLOCK(arg)) {
-        if (Make_Vector_Spec(out, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg)))
+        if (Make_Vector_Spec(out, arg, VAL_SPECIFIER(arg)))
             return out;
     }
     fail (Error_Bad_Make(kind, arg));

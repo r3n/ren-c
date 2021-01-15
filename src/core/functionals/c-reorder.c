@@ -144,7 +144,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     // We iterate backwards, because that's the stack order that needs to
     // be pushed.
     //
-    const RELVAL *item = ARR_TAIL(VAL_ARRAY(ARG(ordering)));
+    const RELVAL *item = VAL_ARRAY_TAIL(ARG(ordering));
     const RELVAL *at = VAL_ARRAY_AT(ARG(ordering));
     for (; at != item--; ) {
         const REBSYM *symbol = VAL_WORD_SYMBOL(item);

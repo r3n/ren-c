@@ -318,9 +318,13 @@ REB_R MAKE_Context(
         : nullptr;
 
     if (IS_BLOCK(arg)) {
+        const RELVAL *tail;
+        const RELVAL *at = VAL_ARRAY_AT_T(&tail, arg);
+
         REBCTX *ctx = Make_Context_Detect_Managed(
             REB_OBJECT,
-            VAL_ARRAY_AT(arg),
+            at,
+            tail,
             parent_ctx
         );
         Init_Any_Context(out, kind, ctx); // GC guards it
@@ -350,6 +354,7 @@ REB_R MAKE_Context(
         REBCTX *context = Make_Context_Detect_Managed(
             kind,
             END_NODE,  // values to scan for toplevel set-words (empty)
+            END_NODE,
             parent_ctx
         );
 
@@ -960,25 +965,34 @@ REBNATIVE(construct)
     // This parallels the code originally in CONSTRUCT.  Run it if the /ONLY
     // refinement was passed in.
     //
+  blockscope {
+    const RELVAL *tail = VAL_ARRAY_TAIL(spec);
+    RELVAL *at = VAL_ARRAY_AT_MUTABLE_HACK(spec);
     if (REF(only)) {
         Init_Object(
             D_OUT,
             Construct_Context_Managed(
                 REB_OBJECT,
-                VAL_ARRAY_AT_MUTABLE_HACK(spec),  // warning: modifies binding!
+                at,  // warning: modifies binding!
+                tail,
                 VAL_SPECIFIER(spec),
                 parent
             )
         );
         return D_OUT;
     }
+  }
 
     // Scan the object for top-level set words in order to make an
     // appropriately sized context.
     //
+    const RELVAL *tail = VAL_ARRAY_TAIL(spec);
+    RELVAL *at = VAL_ARRAY_AT_ENSURE_MUTABLE(spec);
+
     REBCTX *ctx = Make_Context_Detect_Managed(
         parent ? CTX_TYPE(parent) : REB_OBJECT,  // !!! Presume object?
-        VAL_ARRAY_AT(spec),
+        at,
+        tail,
         parent
     );
     Init_Object(D_OUT, ctx);  // GC protects context
@@ -986,7 +1000,7 @@ REBNATIVE(construct)
     // !!! This binds the actual body data, not a copy of it.  See
     // Virtual_Bind_Deep_To_New_Context() for future directions.
     //
-    Bind_Values_Deep(VAL_ARRAY_AT_ENSURE_MUTABLE(spec), CTX_ARCHETYPE(ctx));
+    Bind_Values_Deep(at, tail, CTX_ARCHETYPE(ctx));
 
     DECLARE_LOCAL (dummy);
     if (Do_Any_Array_At_Throws(dummy, spec, SPECIFIED)) {

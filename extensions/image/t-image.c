@@ -261,8 +261,9 @@ REB_R MAKE_Image(
         Init_Image_Black_Opaque(out, w, h);
     }
     else if (IS_BLOCK(arg)) {  // make image! [size rgba index]
-        const RELVAL *item = VAL_ARRAY_AT(arg);
-        if (not IS_PAIR(item))
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT_T(&tail, arg);
+        if (item == tail or not IS_PAIR(item))
             goto bad_make;
 
         REBINT w = VAL_PAIR_X_INT(item);
@@ -272,7 +273,7 @@ REB_R MAKE_Image(
 
         ++item;
 
-        if (IS_END(item)) {  // was just `make image! [10x20]`, allow it
+        if (item == tail) {  // just `make image! [10x20]`, allow it
             Init_Image_Black_Opaque(out, w, h);
             ++item;
         }
@@ -298,7 +299,7 @@ REB_R MAKE_Image(
             // !!! Sketchy R3-Alpha concept: "image position".  The block
             // MAKE IMAGE! format allowed you to specify it.
 
-            if (NOT_END(item) and IS_INTEGER(item)) {
+            if (item != tail and IS_INTEGER(item)) {
                 VAL_IMAGE_POS(out) = (Int32s(SPECIFIC(item), 1) - 1);
                 ++item;
             }
@@ -331,14 +332,15 @@ REB_R MAKE_Image(
             }
 
             REBYTE *ip = VAL_IMAGE_HEAD(out);  // image pointer
+
             Tuples_To_RGBA(
-                ip, w * h, VAL_ARRAY_AT(item), VAL_LEN_AT(item)
+                ip, w * h, VAL_ARRAY_AT_T(nullptr, item), VAL_LEN_AT(item)
             );
         }
         else
             goto bad_make;
 
-        if (NOT_END(item))
+        if (item != tail)
             fail ("Too many elements in BLOCK! for MAKE IMAGE!");
     }
     else
@@ -763,7 +765,7 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
         if (index + part > tail) part = tail - index;  // clip it
         ip += index * 4;
         for (; dup > 0; dup--, ip += part * 4)
-            Tuples_To_RGBA(ip, part, SPECIFIC(VAL_ARRAY_AT(arg)), part);
+            Tuples_To_RGBA(ip, part, VAL_ARRAY_AT_T(nullptr, arg), part);
     }
     else
         fail (Error_Invalid_Type(VAL_TYPE(arg)));

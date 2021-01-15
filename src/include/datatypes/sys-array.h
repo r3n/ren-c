@@ -458,7 +458,7 @@ inline static const REBARR *VAL_ARRAY(REBCEL(const*) v) {
 // arrays meaningfully, it should work with VAL_INDEX_UNBOUNDED().
 //
 inline static const RELVAL *VAL_ARRAY_LEN_AT(
-    REBLEN *len_at_out,
+    option(REBLEN*) len_at_out,
     REBCEL(const*) v
 ){
     const REBARR *arr = VAL_ARRAY(v);
@@ -467,12 +467,42 @@ inline static const RELVAL *VAL_ARRAY_LEN_AT(
     if (i < 0 or i > cast(REBIDX, len))
         fail (Error_Index_Out_Of_Range_Raw());
     if (len_at_out)  // inlining should remove this if() for VAL_ARRAY_AT()
-        *len_at_out = len - i;
+        *unwrap(len_at_out) = len - i;
     return ARR_AT(arr, i);
 }
 
 #define VAL_ARRAY_AT(v) \
     VAL_ARRAY_LEN_AT(nullptr, (v))
+
+inline static const RELVAL *VAL_ARRAY_AT_T(
+    option(const RELVAL**) tail_out,
+    REBCEL(const*) v
+){
+    const REBARR *arr = VAL_ARRAY(v);
+    REBIDX i = VAL_INDEX_RAW(v);  // VAL_ARRAY() already checks it's series
+    REBLEN len = ARR_LEN(arr);
+    if (i < 0 or i > cast(REBIDX, len))
+        fail (Error_Index_Out_Of_Range_Raw());
+    const RELVAL *at = ARR_AT(arr, i);
+    if (tail_out)  // inlining should remove this if() for no tail
+        *unwrap(tail_out) = at + (len - i);
+    return at;
+}
+
+inline static const RELVAL *VAL_ARRAY_AT_HEAD_T(
+    option(const RELVAL**) tail_out,
+    REBCEL(const*) v
+){
+    const REBARR *arr = VAL_ARRAY(v);
+    REBIDX i = VAL_INDEX_RAW(v);  // VAL_ARRAY() already checks it's series
+    const RELVAL *at = ARR_AT(arr, i);
+    if (tail_out) {  // inlining should remove this if() for no tail
+        REBLEN len = ARR_LEN(arr);
+        *unwrap(tail_out) = at + len;
+    }
+    return at;
+}
+
 
 #define VAL_ARRAY_AT_ENSURE_MUTABLE(v) \
     m_cast(RELVAL*, VAL_ARRAY_AT(ENSURE_MUTABLE(v)))
@@ -495,8 +525,8 @@ inline static const RELVAL *VAL_ARRAY_LEN_AT(
 #define VAL_ARRAY_AT_MUTABLE_HACK(v) \
     m_cast(RELVAL*, VAL_ARRAY_AT(v))
 
-inline static const RELVAL *VAL_ARRAY_TAIL(const RELVAL *v)
-  { return ARR_TAIL(VAL_ARRAY(v)); }
+#define VAL_ARRAY_TAIL(v) \
+  ARR_TAIL(VAL_ARRAY(v))
 
 
 // !!! VAL_ARRAY_AT_HEAD() is a leftover from the old definition of

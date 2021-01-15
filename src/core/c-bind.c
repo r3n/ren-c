@@ -38,13 +38,15 @@
 void Bind_Values_Inner_Loop(
     struct Reb_Binder *binder,
     RELVAL *head,
+    const RELVAL *tail,
     REBCTX *context,
     REBU64 bind_types, // !!! REVIEW: force word types low enough for 32-bit?
     REBU64 add_midstream_types,
     REBFLGS flags
 ){
-    for (; NOT_END(head); ++head) {
-        REBCEL(const*) cell = VAL_UNESCAPED(head);
+    RELVAL *v = head;
+    for (; v != tail; ++v) {
+        REBCEL(const*) cell = VAL_UNESCAPED(v);
         enum Reb_Kind heart = CELL_HEART(cell);
 
         // !!! Review use of `heart` bit here, e.g. when a REB_PATH has an
@@ -68,27 +70,31 @@ void Bind_Values_Inner_Loop(
                 // We're overwriting any previous binding, which may have
                 // been relative.
 
-                INIT_VAL_WORD_BINDING(head, CTX_VARLIST(context));
-                INIT_VAL_WORD_PRIMARY_INDEX(head, n);
+                INIT_VAL_WORD_BINDING(v, CTX_VARLIST(context));
+                INIT_VAL_WORD_PRIMARY_INDEX(v, n);
             }
             else if (type_bit & add_midstream_types) {
                 //
                 // Word is not in context, so add it if option is specified
                 //
-                Append_Context(context, head, nullptr);
-                Add_Binder_Index(binder, symbol, VAL_WORD_INDEX(head));
+                Append_Context(context, v, nullptr);
+                Add_Binder_Index(binder, symbol, VAL_WORD_INDEX(v));
             }
         }
         else if (flags & BIND_DEEP) {
-            if (ANY_ARRAY_KIND(heart))
+            if (ANY_ARRAY_KIND(heart)) {
+                const RELVAL *sub_tail = VAL_ARRAY_TAIL(VAL_UNESCAPED(v));
+                RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(VAL_UNESCAPED(v));
                 Bind_Values_Inner_Loop(
                     binder,
-                    VAL_ARRAY_AT_MUTABLE_HACK(VAL_UNESCAPED(head)),
+                    sub_at,
+                    sub_tail,
                     context,
                     bind_types,
                     add_midstream_types,
                     flags
                 );
+            }
         }
     }
 }
@@ -106,6 +112,7 @@ void Bind_Values_Inner_Loop(
 //
 void Bind_Values_Core(
     RELVAL *head,
+    const RELVAL *tail,
     const RELVAL *context,
     REBU64 bind_types,
     REBU64 add_midstream_types,
@@ -122,10 +129,10 @@ void Bind_Values_Core(
     //
   blockscope {
     REBLEN index = 1;
-    const REBKEY *tail;
-    const REBKEY *key = CTX_KEYS(&tail, c);
+    const REBKEY *key_tail;
+    const REBKEY *key = CTX_KEYS(&key_tail, c);
     const REBVAR *var = CTX_VARS_HEAD(c);
-    for (; key != tail; key++, var++, index++)
+    for (; key != key_tail; key++, var++, index++)
         if (not Is_Var_Hidden(var))
             Add_Binder_Index(&binder, KEY_SYMBOL(key), index);
   }
@@ -133,6 +140,7 @@ void Bind_Values_Core(
     Bind_Values_Inner_Loop(
         &binder,
         head,
+        tail,
         c,
         bind_types,
         add_midstream_types,
@@ -140,10 +148,10 @@ void Bind_Values_Core(
     );
 
   blockscope {  // Reset all the binder indices to zero
-    const REBKEY *tail;
-    const REBKEY *key = CTX_KEYS(&tail, c);
+    const REBKEY *key_tail;
+    const REBKEY *key = CTX_KEYS(&key_tail, c);
     const REBVAR *var = CTX_VARS_HEAD(c);
-    for (; key != tail; ++key, ++var)
+    for (; key != key_tail; ++key, ++var)
         if (not Is_Var_Hidden(var))
             Remove_Binder_Index(&binder, KEY_SYMBOL(key));
   }
@@ -159,10 +167,14 @@ void Bind_Values_Core(
 // bound to a particular target (if target is NULL, then all
 // words will be unbound regardless of their VAL_WORD_CONTEXT).
 //
-void Unbind_Values_Core(RELVAL *head, option(REBCTX*) context, bool deep)
-{
+void Unbind_Values_Core(
+    RELVAL *head,
+    const RELVAL *tail,
+    option(REBCTX*) context,
+    bool deep
+){
     RELVAL *v = head;
-    for (; NOT_END(v); ++v) {
+    for (; v != tail; ++v) {
         //
         // !!! We inefficiently dequote all values just to make sure we don't
         // damage shared bindings; review more efficient means of doing this.
@@ -178,8 +190,11 @@ void Unbind_Values_Core(RELVAL *head, option(REBCTX*) context, bool deep)
         ){
             Unbind_Any_Word(v);
         }
-        else if (ANY_ARRAY_KIND(heart) and deep)
-            Unbind_Values_Core(VAL_ARRAY_AT_MUTABLE_HACK(v), context, true);
+        else if (ANY_ARRAY_KIND(heart) and deep) {
+            const RELVAL *sub_tail = VAL_ARRAY_TAIL(v);
+            RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(v);
+            Unbind_Values_Core(sub_at, sub_tail, context, true);
+        }
     }
 }
 
@@ -355,7 +370,8 @@ static void Clonify_And_Bind_Relative(
         //
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
             REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
-            for (; NOT_END(sub); ++sub, ++sub_src)
+            RELVAL *sub_tail = ARR_TAIL(ARR(series));
+            for (; sub != sub_tail; ++sub, ++sub_src)
                 Clonify_And_Bind_Relative(
                     sub,
                     sub_src,
@@ -553,22 +569,20 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 //
 void Rebind_Values_Deep(
     RELVAL *head,
-    REBCTX *src,
-    REBCTX *dst,
+    const RELVAL *tail,
+    REBCTX *from,
+    REBCTX *to,
     option(struct Reb_Binder*) binder
 ) {
     RELVAL *v = head;
-    for (; NOT_END(v); ++v) {
+    for (; v != tail; ++v) {
         if (ANY_ARRAY_OR_PATH(v)) {
-            Rebind_Values_Deep(
-                VAL_ARRAY_AT_MUTABLE_HACK(v),
-                src,
-                dst,
-                binder
-            );
+            const RELVAL *sub_tail = VAL_ARRAY_TAIL(v);
+            RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(v);
+            Rebind_Values_Deep(sub_at, sub_tail, from, to, binder);
         }
-        else if (ANY_WORD(v) and VAL_WORD_BINDING(v) == CTX_VARLIST(src)) {
-            INIT_VAL_WORD_BINDING(v, CTX_VARLIST(dst));
+        else if (ANY_WORD(v) and VAL_WORD_BINDING(v) == CTX_VARLIST(from)) {
+            INIT_VAL_WORD_BINDING(v, CTX_VARLIST(to));
 
             if (binder) {
                 INIT_VAL_WORD_PRIMARY_INDEX(
@@ -605,8 +619,8 @@ void Rebind_Values_Deep(
                 // frames" (would that ever make sense?)
             }
             else {
-                if (Is_Overriding_Context(stored, dst))
-                    INIT_VAL_ACTION_BINDING(v, dst);
+                if (Is_Overriding_Context(stored, to))
+                    INIT_VAL_ACTION_BINDING(v, to);
                 else {
                     // Could be bound to a reified frame context, or just
                     // to some other object not related to this derivation.
@@ -659,31 +673,33 @@ void Virtual_Bind_Deep_To_New_Context(
         fail (spec);  // !!! should fail() take unstable?
 
     const RELVAL *item;
+
     REBSPC *specifier;
     bool rebinding;
-    if (IS_BLOCK(spec)) {
-        item = VAL_ARRAY_AT(spec);
+    if (IS_BLOCK(spec)) {  // walk the block for errors BEFORE making binder
         specifier = VAL_SPECIFIER(spec);
+        item = VAL_ARRAY_AT(spec);
+
+        const RELVAL *tail;
+        const RELVAL *check = VAL_ARRAY_AT_T(&tail, spec);
 
         rebinding = false;
-        for (; NOT_END(item); ++item) {
-            if (IS_BLANK(item)) {
+        for (; check != tail; ++check) {
+            if (IS_BLANK(check)) {
                 // Will be transformed into dummy item, no rebinding needed
             }
-            else if (IS_WORD(item))
+            else if (IS_WORD(check))
                 rebinding = true;
-            else if (not IS_QUOTED_WORD(item)) {
+            else if (not IS_QUOTED_WORD(check)) {
                 //
                 // Better to fail here, because if we wait until we're in
                 // the middle of building the context, the managed portion
                 // (keylist) would be incomplete and tripped on by the GC if
                 // we didn't do some kind of workaround.
                 //
-                fail (Error_Bad_Value_Core(item, specifier));
+                fail (Error_Bad_Value_Core(check, specifier));
             }
         }
-
-        item = VAL_ARRAY_AT(spec);
     }
     else {
         item = spec;
@@ -852,6 +868,7 @@ void Virtual_Bind_Deep_To_New_Context(
 
     // Must remove binder indexes for all words, even if about to fail
     //
+  blockscope {
     const REBKEY *tail;
     const REBKEY *key = CTX_KEYS(&tail, c);
     REBVAL *var = CTX_VARS_HEAD(c); // only needed for debug, optimized out
@@ -866,6 +883,7 @@ void Virtual_Bind_Deep_To_New_Context(
         else
             assert(GET_CELL_FLAG(var, BIND_NOTE_REUSE));
     }
+  }
 
     SHUTDOWN_BINDER(&binder);
 

@@ -1310,22 +1310,22 @@ inline static REBSPC *Derive_Specifier_Core(
 // it starts, it will keep binding until it hits an end marker.
 //
 
-#define Bind_Values_Deep(values,context) \
-    Bind_Values_Core((values), (context), TS_WORD, 0, BIND_DEEP)
+#define Bind_Values_Deep(at,tail,context) \
+    Bind_Values_Core((at), (tail), (context), TS_WORD, 0, BIND_DEEP)
 
-#define Bind_Values_All_Deep(values,context) \
-    Bind_Values_Core((values), (context), TS_WORD, TS_WORD, BIND_DEEP)
+#define Bind_Values_All_Deep(at,tail,context) \
+    Bind_Values_Core((at), (tail), (context), TS_WORD, TS_WORD, BIND_DEEP)
 
-#define Bind_Values_Shallow(values, context) \
-    Bind_Values_Core((values), (context), TS_WORD, 0, BIND_0)
+#define Bind_Values_Shallow(at,tail,context) \
+    Bind_Values_Core((at), (tail), (context), TS_WORD, 0, BIND_0)
 
 // Gave this a complex name to warn of its peculiarities.  Calling with
 // just BIND_SET is shallow and tricky because the set words must occur
 // before the uses (to be applied to bindings of those uses)!
 //
-#define Bind_Values_Set_Midstream_Shallow(values, context) \
+#define Bind_Values_Set_Midstream_Shallow(at,tail,context) \
     Bind_Values_Core( \
-        (values), (context), TS_WORD, FLAGIT_KIND(REB_SET_WORD), BIND_0)
+        (at), (tail), (context), TS_WORD, FLAGIT_KIND(REB_SET_WORD), BIND_0)
 
-#define Unbind_Values_Deep(values) \
-    Unbind_Values_Core((values), nullptr, true)
+#define Unbind_Values_Deep(at,tail) \
+    Unbind_Values_Core((at), (tail), nullptr, true)

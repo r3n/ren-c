@@ -229,6 +229,7 @@ REBARR *Startup_Natives(const REBVAL *boot_natives)
     Init_Action_Meta_Shim();
 
     assert(VAL_INDEX(boot_natives) == 0); // should be at head, sanity check
+    const RELVAL *tail = VAL_ARRAY_TAIL(boot_natives);
     RELVAL *item = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_natives);
     REBSPC *specifier = VAL_SPECIFIER(boot_natives);
 
@@ -237,7 +238,7 @@ REBARR *Startup_Natives(const REBVAL *boot_natives)
     // the INTEGER! word must be bound to its datatype.  Deep walk the
     // natives in order to bind these datatypes.
     //
-    Bind_Values_Deep(item, Lib_Context);
+    Bind_Values_Deep(item, tail, Lib_Context);
 
     REBARR *catalog = Make_Array(Num_Natives);
 

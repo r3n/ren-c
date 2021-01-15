@@ -551,9 +551,13 @@ REB_R MAKE_Error(
         // Bind and do an evaluation step (as with MAKE OBJECT! with A_MAKE
         // code in REBTYPE(Context) and code in REBNATIVE(construct))
 
+        const RELVAL *tail;
+        const RELVAL *head = VAL_ARRAY_AT_T(&tail, arg);
+
         e = Make_Context_Detect_Managed(
             REB_ERROR, // type
-            VAL_ARRAY_AT(arg), // values to scan for toplevel set-words
+            head, // values to scan for toplevel set-words
+            tail,
             root_error // parent
         );
 
@@ -1352,26 +1356,32 @@ REBCTX *Startup_Errors(const REBVAL *boot_errors)
     }
   #endif
 
+    const RELVAL *errors_tail = VAL_ARRAY_TAIL(boot_errors);
+    RELVAL *errors_head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_errors);
     assert(VAL_INDEX(boot_errors) == 0);
     REBCTX *catalog = Construct_Context_Managed(
         REB_OBJECT,
-        VAL_ARRAY_KNOWN_MUTABLE_AT(boot_errors),  // modifies bindings
+        errors_head,  // modifies bindings
+        errors_tail,
         VAL_SPECIFIER(boot_errors),
         nullptr
     );
 
-    // Create objects for all error types (CAT_ERRORS is "selfish", currently
-    // so self is in slot 1 and the actual errors start at context slot 2)
+    // Morph blocks into objects for all error categories.
     //
-    REBVAL *val = CTX_VARS_HEAD(catalog);
-    for (; NOT_END(val); val++) {
+    const RELVAL *category_tail = ARR_TAIL(CTX_VARLIST(catalog));
+    REBVAL *category = CTX_VARS_HEAD(catalog);
+    for (; category != category_tail; ++category) {
+        const RELVAL *tail = VAL_ARRAY_TAIL(category);
+        RELVAL *head = ARR_HEAD(VAL_ARRAY_KNOWN_MUTABLE(category));
         REBCTX *error = Construct_Context_Managed(
             REB_OBJECT,
-            ARR_HEAD(VAL_ARRAY_KNOWN_MUTABLE(val)),  // modifies bindings
+            head,  // modifies bindings
+            tail,
             SPECIFIED, // source array not in a function body
             nullptr
         );
-        Init_Object(val, error);
+        Init_Object(category, error);
     }
 
     return catalog;

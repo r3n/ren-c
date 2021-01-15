@@ -394,13 +394,15 @@ static void Init_System_Object(
     REBCTX *errors_catalog
 ) {
     assert(VAL_INDEX(boot_sysobj_spec) == 0);
+    const RELVAL *spec_tail = VAL_ARRAY_TAIL(boot_sysobj_spec);
     RELVAL *spec_head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_sysobj_spec);
 
     // Create the system object from the sysobj block (defined in %sysobj.r)
     //
     REBCTX *system = Make_Context_Detect_Managed(
         REB_OBJECT, // type
-        VAL_ARRAY_AT(boot_sysobj_spec), // scan for toplevel set-words
+        spec_head, // scan for toplevel set-words
+        spec_tail,
         nullptr  // parent
     );
 
@@ -412,11 +414,11 @@ static void Init_System_Object(
         system
     );
 
-    Bind_Values_Deep(spec_head, Lib_Context);
+    Bind_Values_Deep(spec_head, spec_tail, Lib_Context);
 
     // Bind it so CONTEXT native will work (only used at topmost depth)
     //
-    Bind_Values_Shallow(spec_head, CTX_ARCHETYPE(system));
+    Bind_Values_Shallow(spec_head, spec_tail, CTX_ARCHETYPE(system));
 
     // Evaluate the block (will eval CONTEXTs within).  Expects void result.
     //
@@ -610,6 +612,7 @@ void Startup_Task(void)
 static void Startup_Base(REBARR *boot_base)
 {
     RELVAL *head = ARR_HEAD(boot_base);
+    const RELVAL *tail = ARR_TAIL(boot_base);
 
     // By this point, the Lib_Context contains basic definitions for things
     // like true, false, the natives, and the generics.  But before deeply
@@ -621,12 +624,12 @@ static void Startup_Base(REBARR *boot_base)
     // for FOO to bind to.  So FOO: would be an unbound SET-WORD!,
     // and give an error on the assignment.
     //
-    Bind_Values_Set_Midstream_Shallow(head, Lib_Context);
+    Bind_Values_Set_Midstream_Shallow(head, tail, Lib_Context);
 
     // With the base block's definitions added to the mix, deep bind the code
     // and execute it.
 
-    Bind_Values_Deep(head, Lib_Context);
+    Bind_Values_Deep(head, tail, Lib_Context);
 
     DECLARE_LOCAL (result);
     if (Do_At_Mutable_Throws(result, boot_base, 0, SPECIFIED))
@@ -654,14 +657,15 @@ static void Startup_Base(REBARR *boot_base)
 //
 static void Startup_Sys(REBARR *boot_sys) {
     RELVAL *head = ARR_HEAD(boot_sys);
+    const RELVAL *tail = ARR_TAIL(boot_sys);
 
     // Add all new top-level SET-WORD! found in the sys boot-block to Lib,
     // and then bind deeply all words to Lib and Sys.  See Startup_Base() notes
     // for why the top-level walk is needed first.
     //
-    Bind_Values_Set_Midstream_Shallow(head, Sys_Context);
-    Bind_Values_Deep(head, Lib_Context);
-    Bind_Values_Deep(head, Sys_Context);
+    Bind_Values_Set_Midstream_Shallow(head, tail, Sys_Context);
+    Bind_Values_Deep(head, tail, Lib_Context);
+    Bind_Values_Deep(head, tail, Sys_Context);
 
     DECLARE_LOCAL (result);
     if (Do_At_Mutable_Throws(result, boot_sys, 0, SPECIFIED))

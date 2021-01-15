@@ -83,7 +83,8 @@ static void Schema_From_Block_May_Fail(
     if (VAL_LEN_AT(blk) == 0)
         fail (blk);
 
-    const RELVAL *item = VAL_ARRAY_AT(blk);
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT_T(&tail, blk);
 
     DECLARE_LOCAL (def);
     DECLARE_LOCAL (temp);
@@ -93,7 +94,7 @@ static void Schema_From_Block_May_Fail(
         // [struct! [...struct definition...]]
 
         ++item;
-        if (IS_END(item) or not IS_BLOCK(item))
+        if (item == tail or not IS_BLOCK(item))
             fail (blk);
 
         // Use the block spec to build a temporary structure through the same
@@ -1064,8 +1065,9 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
     REBLEN num_fixed = 0;  // number of fixed (non-variadic) arguments
     bool is_variadic = false;  // default to not being variadic
 
-    const RELVAL *item = VAL_ARRAY_AT(ffi_spec);
-    for (; NOT_END(item); ++item) {
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT_T(&tail, ffi_spec);
+    for (; item != tail; ++item) {
         if (IS_TEXT(item))
             continue;  // !!! TBD: extract ACT_META info from spec notes
 

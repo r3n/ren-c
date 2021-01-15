@@ -157,6 +157,7 @@ REBNATIVE(generic)
 REBARR *Startup_Generics(const REBVAL *boot_generics)
 {
     assert(VAL_INDEX(boot_generics) == 0); // should be at head, sanity check
+    const RELVAL *tail = ARR_TAIL(VAL_ARRAY(boot_generics));
     RELVAL *head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_generics);
     REBSPC *specifier = VAL_SPECIFIER(boot_generics);
 
@@ -164,7 +165,7 @@ REBARR *Startup_Generics(const REBVAL *boot_generics)
     // context, so there is a variable for each action.  This means that the
     // assignments can execute.
     //
-    Bind_Values_Set_Midstream_Shallow(head, Lib_Context);
+    Bind_Values_Set_Midstream_Shallow(head, tail, Lib_Context);
 
     // The above actually does bind the GENERIC word to the GENERIC native,
     // since the GENERIC word is found in the top-level of the block.  But as
@@ -172,7 +173,7 @@ REBARR *Startup_Generics(const REBVAL *boot_generics)
     // INTEGER! word must be bound to its datatype.  Deep bind the code in
     // order to bind the words for these datatypes.
     //
-    Bind_Values_Deep(head, Lib_Context);
+    Bind_Values_Deep(head, tail, Lib_Context);
 
     DECLARE_LOCAL (result);
     if (Do_Any_Array_At_Throws(result, boot_generics, SPECIFIED))

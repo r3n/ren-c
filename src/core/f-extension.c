@@ -201,7 +201,7 @@ REBNATIVE(load_extension)
     // This is something that raises questions, but go ahead and bind them
     // into lib for the time being (don't add any new words).
     //
-    Bind_Values_Deep(ARR_HEAD(specs), Lib_Context);
+    Bind_Values_Deep(ARR_HEAD(specs), ARR_TAIL(specs), Lib_Context);
 
     // Some of the things being tacked on here (like the DLL info etc.) should
     // reside in the META OF portion, vs. being in-band in the module itself.

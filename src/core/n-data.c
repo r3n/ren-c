@@ -191,6 +191,7 @@ REBNATIVE(bind)
     }
 
     RELVAL *at;
+    const RELVAL *tail;
     if (REF(copy)) {
         REBARR *copy = Copy_Array_Core_Managed(
             VAL_ARRAY(v),
@@ -202,16 +203,19 @@ REBNATIVE(bind)
             TS_ARRAY // types to copy deeply
         );
         at = ARR_HEAD(copy);
+        tail = ARR_TAIL(copy);
         Init_Any_Array(D_OUT, VAL_TYPE(v), copy);
     }
     else {
         ENSURE_MUTABLE(v);  // use IN for virtual binding
+        tail = VAL_ARRAY_TAIL(v);
         at = VAL_ARRAY_AT_MUTABLE_HACK(v);  // !!! only binds *after* index!
         Move_Value(D_OUT, v);
     }
 
     Bind_Values_Core(
         at,
+        tail,
         context,
         bind_types,
         add_midstream_types,
@@ -526,12 +530,12 @@ REBNATIVE(unbind)
     if (ANY_WORD(word))
         Unbind_Any_Word(word);
     else {
+        assert(IS_BLOCK(word));
+
+        const RELVAL *tail = VAL_ARRAY_TAIL(word);
+        RELVAL *at = VAL_ARRAY_AT_ENSURE_MUTABLE(word);
         option(REBCTX*) context = nullptr;
-        Unbind_Values_Core(
-            VAL_ARRAY_AT_ENSURE_MUTABLE(word),
-            context,
-            did REF(deep)
-        );
+        Unbind_Values_Core(at, tail, context, did REF(deep));
     }
 
     RETURN (word);
@@ -563,10 +567,11 @@ REBNATIVE(collect_words)
     if (REF(deep))
         flags |= COLLECT_DEEP;
 
-    const RELVAL *head = VAL_ARRAY_AT(ARG(block));
+    const RELVAL *tail;
+    const RELVAL *at = VAL_ARRAY_AT_T(&tail, ARG(block));
     return Init_Block(
         D_OUT,
-        Collect_Unique_Words_Managed(head, flags, ARG(ignore))
+        Collect_Unique_Words_Managed(at, tail, flags, ARG(ignore))
     );
 }
 

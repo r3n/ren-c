@@ -171,8 +171,9 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
         mutable_VAL_EVENT_FLAGS(event)
             &= ~(EVF_DOUBLE | EVF_CONTROL | EVF_SHIFT);
 
-        const RELVAL *item;
-        for (item = ARR_HEAD(VAL_ARRAY(val)); NOT_END(item); ++item) {
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT_T(&tail, val);
+        for (; item != tail; ++item) {
             if (not IS_WORD(item))
                 continue;
 
@@ -208,25 +209,27 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
 //
 void Set_Event_Vars(
     REBVAL *evt,
-    const RELVAL *head,
+    const RELVAL *block,
     REBSPC *specifier
 ){
     DECLARE_LOCAL (var);
     DECLARE_LOCAL (val);
 
-    while (NOT_END(head)) {
-        Derelativize(var, head, specifier);
-        ++head;
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT_T(&tail, block);
+    while (item != tail) {
+        Derelativize(var, item, specifier);
+        ++item;
 
         if (not IS_SET_WORD(var))
             fail (var);
 
-        if (IS_END(head))
+        if (item == tail)
             Init_Blank(val);
         else
-            Get_Simple_Value_Into(val, head, specifier);
+            Get_Simple_Value_Into(val, item, specifier);
 
-        ++head;
+        ++item;
 
         if (!Set_Event_Var(evt, var, val))
             fail (Error_Bad_Field_Set_Raw(var, Type_Of(val)));
@@ -366,7 +369,7 @@ REB_R MAKE_Event(
             fail (Error_Bad_Make(REB_EVENT, arg));
 
         Move_Value(out, unwrap(parent));  // !!! "shallow" event clone
-        Set_Event_Vars(out, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
+        Set_Event_Vars(out, arg, VAL_SPECIFIER(arg));
         return out;
     }
 
@@ -379,7 +382,7 @@ REB_R MAKE_Event(
     mutable_VAL_EVENT_FLAGS(out) = EVF_MASK_NONE;
     mutable_VAL_EVENT_MODEL(out) = EVM_PORT;  // ?
 
-    Set_Event_Vars(out, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
+    Set_Event_Vars(out, arg, VAL_SPECIFIER(arg));
     return out;
 }
 

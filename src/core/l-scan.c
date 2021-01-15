@@ -2236,7 +2236,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         // just Lib_Context?  Not binding would break functions entirely,
         // but they can't round-trip anyway.  See #2262.
         //
-        Bind_Values_All_Deep(ARR_HEAD(array), Lib_Context);
+        Bind_Values_All_Deep(ARR_HEAD(array), ARR_TAIL(array), Lib_Context);
 
         if (ARR_LEN(array) == 0 or not IS_WORD(ARR_HEAD(array))) {
             DECLARE_LOCAL (temp);

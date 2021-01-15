@@ -159,8 +159,9 @@ static bool Get_Struct_Var(REBVAL *out, REBSTU *stu, const RELVAL *word)
 {
     REBARR *fieldlist = STU_FIELDLIST(stu);
 
+    RELVAL *tail = ARR_TAIL(fieldlist);
     RELVAL *item = ARR_HEAD(fieldlist);
-    for (; NOT_END(item); ++item) {
+    for (; item != tail; ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
         if (FLD_NAME(field) != VAL_WORD_SYMBOL(word))
             continue;
@@ -205,12 +206,13 @@ REBARR *Struct_To_Array(REBSTU *stu)
 {
     REBARR *fieldlist = STU_FIELDLIST(stu);
     RELVAL *item = ARR_HEAD(fieldlist);
+    RELVAL *tail = ARR_TAIL(fieldlist);
 
     REBDSP dsp_orig = DSP;
 
     // fail_if_non_accessible(STU_TO_VAL(stu));
 
-    for(; NOT_END(item); ++item) {
+    for(; item != tail; ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         Init_Set_Word(DS_PUSH(), FLD_NAME(field)); // required name
@@ -289,9 +291,11 @@ static bool same_fields(REBARR *tgt_fieldlist, REBARR *src_fieldlist)
         return false;
 
     RELVAL *tgt_item = ARR_HEAD(tgt_fieldlist);
+    RELVAL *tgt_tail = ARR_TAIL(tgt_fieldlist);
     RELVAL *src_item = ARR_HEAD(src_fieldlist);
+    RELVAL *src_tial = ARR_TAIL(src_fieldlist);
 
-    for (; NOT_END(src_item); ++src_item, ++tgt_item) {
+    for (; src_item != tail; ++src_item, ++tgt_item) {
         REBFLD *src_field = VAL_ARRAY_KNOWN_MUTABLE(src_item);
         REBFLD *tgt_field = VAL_ARRAY_KNOWN_MUTABLE(tgt_item);
 
@@ -492,8 +496,9 @@ static bool Set_Struct_Var(
 ){
     REBARR *fieldlist = STU_FIELDLIST(stu);
     RELVAL *item = ARR_HEAD(fieldlist);
+    RELVAL *tail = ARR_TAIL(fieldlist);
 
-    for (; NOT_END(item); ++item) {
+    for (; item != tail; ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         if (VAL_WORD_SYMBOL(word) != FLD_NAME(field))
@@ -539,19 +544,20 @@ static void parse_attr(
     REBINT *raw_size,
     uintptr_t *raw_addr
 ){
-    const REBVAL *attr = SPECIFIC(VAL_ARRAY_AT(blk));
+    const RELVAL *tail;
+    const REBVAL *attr = SPECIFIC(VAL_ARRAY_AT_T(&tail, blk));
 
     *raw_size = -1;
     *raw_addr = 0;
 
-    while (NOT_END(attr)) {
+    while (attr != tail) {
         if (not IS_SET_WORD(attr))
             fail (attr);
 
         switch (VAL_WORD_ID(attr)) {
           case SYM_RAW_SIZE:
             ++ attr;
-            if (IS_END(attr) or not IS_INTEGER(attr))
+            if (attr == tail or not IS_INTEGER(attr))
                 fail (attr);
             if (*raw_size > 0)
                 fail ("FFI: duplicate raw size");
@@ -562,7 +568,7 @@ static void parse_attr(
 
           case SYM_RAW_MEMORY:
             ++ attr;
-            if (IS_END(attr) or not IS_INTEGER(attr))
+            if (attr == tail or not IS_INTEGER(attr))
                 fail (attr);
             if (*raw_addr != 0)
                 fail ("FFI: duplicate raw memory");
@@ -577,7 +583,7 @@ static void parse_attr(
             if (*raw_addr != 0)
                 fail ("FFI: raw memory is exclusive with extern");
 
-            if (IS_END(attr) or not IS_BLOCK(attr) or VAL_LEN_AT(attr) != 2)
+            if (attr == tail or not IS_BLOCK(attr) or VAL_LEN_AT(attr) != 2)
                 fail (attr);
 
             const RELVAL *lib = VAL_ARRAY_AT_HEAD(attr, 0);
@@ -675,7 +681,8 @@ static REBLEN Total_Struct_Dimensionality(REBARR *fields)
     REBLEN n_fields = 0;
 
     RELVAL *item = ARR_HEAD(fields);
-    for (; NOT_END(item); ++item) {
+    RELVAL *tail = ARR_TAIL(fields);
+    for (; item != tail; ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         if (FLD_IS_STRUCT(field))
@@ -737,9 +744,10 @@ static void Prepare_Field_For_FFI(REBFLD *schema)
     );
 
     RELVAL *item = ARR_HEAD(fieldlist);
+    RELVAL *tail = ARR_TAIL(fieldlist);
 
     REBLEN j = 0;
-    for (; NOT_END(item); ++item) {
+    for (; item != tail; ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
         REBLEN dimension = FLD_IS_ARRAY(field) ? FLD_DIMENSION(field) : 1;
 
@@ -775,9 +783,10 @@ static void Parse_Field_Type_May_Fail(
 ){
     TRASH_CELL_IF_DEBUG(inner);
 
-    const RELVAL *val = VAL_ARRAY_AT(spec);
+    const RELVAL *tail;
+    const RELVAL *val = VAL_ARRAY_AT_T(&tail, spec);
 
-    if (IS_END(val))
+    if (val == tail)
         fail ("Empty field type in FFI");
 
     if (IS_WORD(val)) {
@@ -925,7 +934,7 @@ static void Parse_Field_Type_May_Fail(
 
     // Find out the array dimension (if there is one)
     //
-    if (IS_END(val)) {
+    if (val == tail) {
         Init_Blank(FLD_AT(field, IDX_FIELD_DIMENSION)); // scalar
     }
     else if (IS_BLOCK(val)) {
@@ -956,9 +965,10 @@ static void Parse_Field_Type_May_Fail(
 //
 void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
 {
-    const RELVAL *spec_item = VAL_ARRAY_AT(spec);
+    const RELVAL *spec_tail;
+    const RELVAL *spec_item = VAL_ARRAY_AT_T(&spec_tail, spec);
 
-    while (NOT_END(spec_item)) {
+    while (spec_item != spec_tail) {
         const RELVAL *word;
         if (IS_BLOCK(spec_item)) { // options: raw-memory, etc
             REBINT raw_size = -1;
@@ -984,14 +994,15 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
         }
 
         const RELVAL *fld_val = spec_item + 1;
-        if (IS_END(fld_val))
+        if (fld_val == spec_tail)
             fail (Error_Need_Non_End_Raw(rebUnrelativize(fld_val)));
 
         REBARR *fieldlist = VAL_STRUCT_FIELDLIST(ret);
-        RELVAL *item = ARR_HEAD(fieldlist);
+        RELVAL *field_item = ARR_HEAD(fieldlist);
+        RELVAL *fields_tail = ARR_TAIL(fieldlist);
 
-        for (; NOT_END(item); ++item) {
-            REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
+        for (; field_item != fields_tail; ++field_item) {
+            REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(field_item);
 
             if (FLD_NAME(field) != VAL_WORD_SYMBOL(word))
                 continue;
