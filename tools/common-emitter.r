@@ -220,6 +220,7 @@ boot-version: load-value %../src/boot/version.r
 make-emitter: function [
     {Create a buffered output text file emitter}
 
+    return: [object!]
     title "Title for the comment header (header matches file type)"
         [text!]
     file "Filename to be emitted... .r/.reb/.c/.h/.inc files supported"
