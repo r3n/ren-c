@@ -1126,7 +1126,16 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // been preloaded with the words or paths from the left block.
         //
         REBVAL *specialized = rebValue(
-            "enclose specialize", rebQ(f_spare), "collect [ use [block] [",
+            "specialize enclose", rebQ(f_spare), "func [f] [",
+                "for-each output", outputs, "[",
+                    "if f/(output) [",  // void in case func doesn't (null?)
+                        "set f/(output) '~unset~",
+                    "]",
+                "]",
+                "either first", f->out, "@[",
+                    "set first", f->out, "do f",
+                "] @[do f]",
+            "] collect [ use [block] [",
                 "block: next", f->out,
                 "for-each output", outputs, "["
                     "if tail? block [break]",  // no more outputs wanted
@@ -1137,16 +1146,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
                     "block: next block",
                 "]",
                 "if not tail? block [fail {Too many multi-returns}]",
-            "] ] func [f] [",
-                "for-each output", outputs, "[",
-                    "if f/(output) [",  // void in case func doesn't (null?)
-                        "set f/(output) '~unset~",
-                    "]",
-                "]",
-                "either first", f->out, "@[",
-                    "set first", f->out, "do f",
-                "] @[do f]",
-            "]",
+            "] ]",
         rebEND);
 
         DROP_GC_GUARD(outputs);

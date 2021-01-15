@@ -338,9 +338,7 @@ reorder: enclose :reorder* func* [f] [
 ; the higher level one uses a block.  Specialize out the action, and then
 ; overwrite it in the enclosure with an action taken out of the block.
 ;
-pointfree: enclose (specialize* :pointfree* [
-    action: :panic-value  ; gets overwritten, best to make it something mean
-]) func* [f] [
+pointfree: specialize* (enclose :pointfree* func* [f] [
     let action: f/action: (match action! any [
         if match [word! path!] :f/block/1 [get compose f/block/1]
         :f/block/1
@@ -352,6 +350,8 @@ pointfree: enclose (specialize* :pointfree* [
     f/block: skip f/block 1  ; Note: NEXT not defined yet
 
     inherit-meta do f 'action  ; no :action name cache
+])[
+    action: :panic-value  ; gets overwritten, best to make it something mean
 ]
 
 
