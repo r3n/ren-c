@@ -173,38 +173,3 @@
 
     vblock == nblock
 )
-
-
-; Test MAKE FRAME! from a VARARGS! with a test userspace implementation of the
-; MATCH operation...
-[
-    (userspace-match: function [
-        {Check value using tests (match types, TRUE or FALSE, or filter)}
-
-        return: "Input if it matched, otherwise null (void if falsey match)"
-            [<opt> any-value!]
-        'args [<opt> any-value! <variadic>]
-        'args-normal [<opt> any-value! <variadic>]
-        <local> first-arg
-    ][
-        test: first args
-        switch type of :test [
-            word! path! [
-                if action? get test [
-                    f: make frame! args
-                    first-arg: get in f first parameters of action of f
-                    either-match false do f [return first-arg]
-                    return null
-                ]
-            ]
-        ]
-
-        either-match :(take args) (take args-normal) @null
-    ]
-    true)
-
-    (userspace-match integer! 10 then [true])
-    (userspace-match integer! <tag> else [true])
-    (10 = userspace-match even? 10)
-    (null = userspace-match even? 7)
-]

@@ -93,8 +93,14 @@ REB_R Encloser_Dispatcher(REBFRM *f)
 
     // We want to call OUTER with a FRAME! value that will dispatch to INNER
     // when (and if) it runs DO on it.  That frame is the one built for this
-    // call to the encloser.  If it isn't managed, there's no worries about
-    // user handles on it...so just take it.  Otherwise, "steal" its vars.
+    // call to the encloser.  We "steal" its vars but leave a node stub
+    // in the f->varlist slot.
+    //
+    // !!! Could we do better... e.g. if the varlist is unmanaged, and hence
+    // hasn't been handed out to reflect a debug level or anything like that?
+    // (Consider it might have--an ADAPT might have run above this frame and
+    // have pointers to it.)  Paying for a node here is the "safest bet" but
+    // performance should be investigated over the long run.
     //
     REBCTX *c = Steal_Context_Vars(
         CTX(f->varlist),

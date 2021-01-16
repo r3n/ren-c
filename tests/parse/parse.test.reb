@@ -294,12 +294,6 @@
     i == 2
 )
 
-; Use experimental MATCH to get input on success, see #2165
-; !!! This is a speculative feature, and is not confirmed for Beta/One
-
-("abc" = match parse "abc" ["a" "b" "c"])
-(null? match parse "abc" ["a" "b" "d"])
-
 
 ; GET-GROUP!
 ; These evaluate and inject their material into the PARSE, if it is not null.

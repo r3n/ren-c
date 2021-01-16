@@ -560,10 +560,9 @@ REBNATIVE(either_match)
 //
 //      return: "Input if it matched, otherwise null (void if falsey match)"
 //          [<opt> any-value!]
-//      'test "Typeset membership, LOGIC! to test for truth, filter function"
-//          [
-//              word!  ; GET to find actual test
-//              action! get-word! get-path!  ; arity-1 filter function
+//      test "Typeset membership, LOGIC! to test for truth, filter function"
+//          [<opt>
+//              action!  ; arity-1 filter function
 //              path!  ; AND'd tests
 //              block!  ; OR'd tests
 //              datatype! typeset!  ; literals accepted
@@ -572,160 +571,28 @@ REBNATIVE(either_match)
 //              integer!  ; matches length of series
 //              quoted!  ; same test, but make quote level part of the test
 //          ]
-//      :args [<opt> any-value! <variadic>]
+//      value [<opt> any-value!]
 //  ]
 //
 REBNATIVE(match)
-//
-// MATCH implements a special frame making behavior, to accomplish:
-//
-//     >> match parse "aaa" [some "a"]
-//     == "AAA"
-//
-// To do this, it builds a frame for the function, steals its argument, and
-// returns it.  Hence it has to be variadic.  EITHER-MATCH provides a more
-// easily reusable variant of the MATCH logic (e.g. specialized by ENSURE)
-//
 {
     INCLUDE_PARAMS_OF_MATCH;
 
-    // !!! The vararg's frame is not really a parent, but try to stay
-    // consistent with the naming in subframe code copy/pasted for now...
-    //
-    REBFRM *parent;
-    if (not Is_Frame_Style_Varargs_May_Fail(&parent, ARG(args)))
-        fail (
-            "Currently MATCH on a VARARGS! only works with a varargs"
-            " which is tied to an existing, running frame--not one that is"
-            " being simulated from a BLOCK! (e.g. MAKE VARARGS! [...])"
-        );
-
-    assert(Is_Action_Frame(parent));
-
     REBVAL *test = ARG(test);
-
-    switch (KIND3Q_BYTE(test)) {
-      case REB_WORD:
-      case REB_PATH: {
-        if (NOT_CELL_FLAG(test, UNEVALUATED)) // soft quote eval'd
-            goto either_match; // allow `MATCH ('NULL?) ...`
-
-        // REBFRM whose built FRAME! context we will steal
-        //
-        DECLARE_FRAME (f, parent->feed, EVAL_MASK_DEFAULT);  // capture DSP
-        Push_Frame(D_OUT, f);
-
-        if (Get_If_Word_Or_Path_Throws(
-            D_OUT,
-            test,
-            SPECIFIED,
-            true  // push_refinements, DECLARE_FRAME() captured original DSP
-        )){
-            Drop_Frame(f);
-            return R_THROWN;
-        }
-
-        Move_Value(test, D_OUT);
-
-        if (not IS_ACTION(test)) {
-            Drop_Frame(f);
-            if (
-                IS_WORD(test) or IS_GET_WORD(test) or IS_SET_WORD(test)
-                or ANY_PATH(test)  // ^-- we allow ISSUE!
-            ){
-                fail (PAR(test)); // disallow `X: 'Y | MATCH X ...`
-            }
-            goto either_match; // will typecheck the result
-        }
-
-        // It was a non-soft quote eval'd word, the kind we want to give the
-        // "magical" functionality to.
-        //
-        // We run the testing function in place in a way that appears "normal"
-        // but actually captures its first argument.  That will be MATCH's
-        // return value if the filter function returns a truthy result.
-
-        if (Make_Invocation_Frame_Throws(f, test)) {
-            Drop_Frame(f);
-            return R_THROWN;
-        }
-
-        REBVAL *first = First_Unspecialized_Arg(nullptr, f);
-
-        if (not first)
-            fail ("MATCH with a function pattern must take at least 1 arg");
-
-        Move_Value(D_OUT, first);  // steal first argument before call
-
-        DECLARE_LOCAL (temp);
-        f->out = SET_END(temp);
-
-        f->rootvar = CTX_ROOTVAR(CTX(f->varlist));
-
-        f->flags.bits = EVAL_MASK_DEFAULT
-            | EVAL_FLAG_FULLY_SPECIALIZED
-            | FLAG_STATE_BYTE(ST_ACTION_TYPECHECKING);
-
-        Begin_Prefix_Action(f, VAL_ACTION_LABEL(test));
-
-        bool threw = Process_Action_Throws(f);
-
-        Drop_Frame(f);
-
-        if (threw)
-            return R_THROWN;
-
-        if (IS_VOID(temp))
-            fail (Error_Void_Conditional_Raw());
-
-        // We still have the first argument from the filter call in D_OUT.
-
-        // MATCH *wants* to pass through the argument on a match, but
-        // won't do so if the argument was falsey, as that is misleading.
-        // Instead it passes a VOID! back (test with `value?` or `null?`)
-
-        if (IS_TRUTHY(temp)) {
-            if (IS_VOID(D_OUT))
-                return D_OUT;  // don't corrupt, so you can MATCH exact voids
-            if (IS_FALSEY(D_OUT))
-                return Init_Void(D_OUT, SYM_MATCHED);
-            return D_OUT;
-        }
-
-        return nullptr; }
-
-      default:
-        break;
-    }
-
-  either_match:;
-
-    // For the "non-magic" cases that are handled by plain EITHER-TEST, call
-    // through with the transformed test.  Just take one normal arg via
-    // variadic.
-
-    if (Do_Vararg_Op_Maybe_End_Throws_Core(
-        D_OUT,
-        VARARG_OP_TAKE,
-        ARG(args),
-        REB_P_NORMAL
-    )){
-        return R_THROWN;
-    }
-
-    if (IS_END(D_OUT))
-        fail ("Frame hack is written to need argument!");
+    REBVAL *v = ARG(value);
 
     DECLARE_LOCAL (temp);
-    if (Match_Core_Throws(temp, test, SPECIFIED, D_OUT, SPECIFIED))
+    if (Match_Core_Throws(temp, test, SPECIFIED, v, SPECIFIED))
         return R_THROWN;
 
     if (VAL_LOGIC(temp)) {
-        if (IS_VOID(D_OUT))
-            return D_OUT;  // don't corrupt, so you can MATCH exact voids
-        if (IS_FALSEY(D_OUT)) // see above for why false match not passed thru
-            return Init_Void(D_OUT, SYM_MATCHED);
-        return D_OUT;
+        if (IS_VOID(v) or IS_TRUTHY(v))
+            RETURN (v);
+
+        // Falsey matched values return a VOID! to show they did match, but
+        // to avoid misleading falseness of the result.
+        //
+        return Init_Void(D_OUT, SYM_MATCHED);
     }
 
     return nullptr;
