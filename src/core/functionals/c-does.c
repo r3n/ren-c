@@ -37,17 +37,13 @@
 // (Those who prefer getting RETURNs can just do `FUNC [] [...]`, this offers
 // a unique alternative to that.)
 //
-// Further, it tries to allow you to specialize all of a function's arguments
-// at once inline:
+//=//// NOTES ////////////////////////////////////////////////////////////=//
 //
-//     >> c: does catch [throw <like-this>]
-//
-//     >> c
-//     == <like-this>
-//
-// !!! The fast specialization behavior of DOES is semi-related to POINTFREE,
-// and was initially introduced for its potential usage in code golf.  This
-// feature has not been extensively used or tested.  Review.
+// * One experimental feature was removed, to allow specialization by example.
+//   For instance `c: does catch [throw <like-this>]`.  This was inspired by
+//   code golf.  However, it altered the interface (to quote its argument and
+//   be variadic) and it also brought in distracting complexity that is better
+//   kept in the implementations of REFRAMER and POINTFREE.
 //
 
 #include "sys-core.h"
@@ -162,30 +158,34 @@ REBNATIVE(surprise)
 //
 //  does: native [
 //
-//  {Specializes DO for a value (or for args of another named function)}
+//  {Make action that will DO a value (more optimized than SPECIALIZE :DO)}
 //
 //      return: [action!]
-//      :specializee [any-value!]
-//          {WORD! or PATH! names function to specialize, else arg to DO}
-//      'args [any-value! <variadic>]
-//          {arguments which will be consumed to fulfill a named function}
+//      source "Note: Will LOCK source if a BLOCK! (review behavior)"
+//          [any-value!]
 //  ]
 //
 REBNATIVE(does)
+//
+// !!! Note: `does [...]` and `does [do [...]]` are not exactly the same.  The
+// generated ACTION! of the first form uses Block_Dispatcher() and does
+// on-demand relativization, so it's "kind of like" a `func []` in forwarding
+// references to members of derived objects.  Also, it is optimized to not run
+// the block with the DO native...hence a HIJACK of DO won't be triggered by
+// invocations of the first form.
+//
+// !!! There were more experimental behaviors that were culled, like quoting
+// the first argument and acting on it to get `foo: does append block <foo>`
+// notation without a block.  This concept from code golf was thought to
+// possibly be useful and "natural" for other cases.  However, that idea
+// has been generalized through REFRAMER, so those who wish to experiemnt
+// with it can do it that way.
 {
     INCLUDE_PARAMS_OF_DOES;
 
-    REBVAL *specializee = ARG(specializee);
+    REBVAL *source = ARG(source);
 
-    if (IS_BLOCK(specializee)) {
-        //
-        // `does [...]` and `does do [...]` are not exactly the same.  The
-        // generated ACTION! of the first form uses Block_Dispatcher() and
-        // does on-demand relativization, so it's "kind of like" a `func []`
-        // in forwarding references to members of derived objects.  Also, it
-        // is optimized to not run the block with the DO native...hence a
-        // HIJACK of DO won't be triggered by invocations of the first form.
-        //
+    if (IS_BLOCK(source)) {
         REBACT *doer = Make_Action(
             ACT_SPECIALTY(NATIVE_ACT(surprise)),  // same, no args
             &Block_Dispatcher,  // **SEE COMMENTS**, not quite like plain DO!
@@ -196,46 +196,28 @@ REBNATIVE(does)
         // things invariant we have to lock it.
         //
         RELVAL *body = ARR_AT(ACT_DETAILS(doer), IDX_DOES_BLOCK);
-        Force_Value_Frozen_Deep(specializee);
-        Move_Value(body, specializee);
+        Force_Value_Frozen_Deep(source);
+        Move_Value(body, source);
 
         return Init_Action(D_OUT, doer, ANONYMOUS, UNBOUND);
     }
 
-    REBCTX *exemplar;
-    option(const REBSTR*) label;
-    if (
-        GET_CELL_FLAG(specializee, UNEVALUATED)
-        and (IS_WORD(specializee) or IS_PATH(specializee))
-    ){
-        if (Make_Frame_From_Varargs_Throws(
-            D_OUT,
-            specializee,
-            ARG(args)
-        )){
-            return R_THROWN;
-        }
-        exemplar = VAL_CONTEXT(D_OUT);
-        label = VAL_FRAME_LABEL(D_OUT);
-    }
-    else {
-        // On all other types, we just make it act like a specialized call to
-        // DO for that value.
+    // On all other types, we just make it act like a specialized call to
+    // DO for that value.
 
-        exemplar = Make_Context_For_Action(
-            NATIVE_VAL(do),
-            DSP,  // lower dsp would be if we wanted to add refinements
-            nullptr  // don't set up a binder; just poke specializee in frame
-        );
-        assert(GET_SERIES_FLAG(CTX_VARLIST(exemplar), MANAGED));
+    REBCTX *exemplar = Make_Context_For_Action(
+        NATIVE_VAL(do),
+        DSP,  // lower dsp would be if we wanted to add refinements
+        nullptr  // don't set up a binder; just poke specializee in frame
+    );
+    assert(GET_SERIES_FLAG(CTX_VARLIST(exemplar), MANAGED));
 
-        // Put argument into DO's *second* frame slot (first is RETURN)
-        //
-        assert(KEY_SYM(CTX_KEY(exemplar, 1)) == SYM_RETURN);
-        Move_Value(CTX_VAR(exemplar, 2), specializee);
-        Move_Value(specializee, NATIVE_VAL(do));
-        label = ANONYMOUS;
-    }
+    // Put argument into DO's *second* frame slot (first is RETURN)
+    //
+    assert(KEY_SYM(CTX_KEY(exemplar, 1)) == SYM_RETURN);
+    Move_Value(CTX_VAR(exemplar, 2), source);
+
+    const REBSTR *label = ANONYMOUS;  // !!! Better answer?
 
     REBACT *doer = Make_Action_From_Exemplar(exemplar);
     return Init_Action(D_OUT, doer, label, UNBOUND);
