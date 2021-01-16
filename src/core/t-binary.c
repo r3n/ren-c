@@ -650,12 +650,11 @@ REBTYPE(Binary)
         const REBYTE *bp = VAL_BINARY_SIZE_AT(&size, v);
 
         REBBIN *bin = Make_Binary(size);
+        TERM_BIN_LEN(bin, size);  // !!! size is decremented, must set now
 
         REBYTE *dp = BIN_HEAD(bin);
         for (; size > 0; --size, ++bp, ++dp)
             *dp = ~(*bp);
-
-        TERM_BIN_LEN(bin, size);
 
         return Init_Any_Series(D_OUT, REB_BINARY, bin); }
 

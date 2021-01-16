@@ -148,7 +148,7 @@
 
 ; HIDDEN VARIABLES SHOULD STAY HIDDEN
 ;
-: The bit indicating hiddenness lives on the variable slot of the context.
+; The bit indicating hiddenness lives on the variable slot of the context.
 ; This puts it at risk of being overwritten by other values...though it is
 ; supposed to be protected by masking operations.  Make sure changing the
 ; value doesn't un-hide it...

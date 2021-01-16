@@ -280,6 +280,7 @@ REBNATIVE(shove)
 //          action!  ; will only run arity 0 actions (avoids DO variadic)
 //          frame!  ; acts like APPLY (voids are optionals, not unspecialized)
 //          varargs!  ; simulates as if frame! or block! is being executed
+//          quoted!  ; removes quote level
 //      ]
 //      /args "Sets system/script/args if doing a script (usually a TEXT!)"
 //          [any-value!]
@@ -470,6 +471,10 @@ REBNATIVE(do)
             return R_THROWN; // prohibits recovery from exits
 
         return D_OUT; }
+
+      case REB_QUOTED:
+        Move_Value(D_OUT, ARG(source));
+        return Unquotify(D_OUT, 1);
 
       default:
         break;
