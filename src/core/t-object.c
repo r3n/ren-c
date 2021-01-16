@@ -238,33 +238,26 @@ REB_R MAKE_Frame(
     if (parent)
         fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
-    // MAKE FRAME! on a VARARGS! supports the userspace authoring of ACTION!s
-    // like MATCH.  However, MATCH is kept as a native for performance--as
-    // many usages will not be variadic, and the ones that are do not need
-    // to create GC-managed FRAME! objects.
+    // MAKE FRAME! on a VARARGS! was an experiment designed before REFRAMER
+    // existed, to allow writing things like REQUOTE.  It's still experimental
+    // but has had its functionality unified with reframer, so that it doesn't
+    // really cost that much to keep around.  Use it sparingly (if at all).
     //
     if (IS_VARARGS(arg)) {
-        DECLARE_LOCAL (temp);
-        SET_END(temp);
-        PUSH_GC_GUARD(temp);
+        REBFRM *f_varargs;
+        if (not Is_Frame_Style_Varargs_May_Fail(&f_varargs, arg))
+            fail (
+                "Currently MAKE FRAME! on a VARARGS! only works with a varargs"
+                " which is tied to an existing, running frame--not one that is"
+                " being simulated from a BLOCK! (e.g. MAKE VARARGS! [...])"
+            );
 
-        if (Do_Vararg_Op_Maybe_End_Throws_Core(
-            temp,
-            VARARG_OP_TAKE,
-            arg,
-            REB_P_HARD
-        )){
-            assert(!"Hard quoted vararg ops should not throw");
-        }
+        assert(Is_Action_Frame(f_varargs));
 
-        if (IS_END(temp))
-            fail ("Cannot MAKE FRAME! on an empty VARARGS!");
+        if (Make_Frame_From_Feed_Throws(out, f_varargs->feed))
+            return R_THROWN;
 
-        bool threw = Make_Frame_From_Varargs_Throws(out, temp, arg);
-
-        DROP_GC_GUARD(temp);
-
-        return threw ? R_THROWN : out;
+        return out;
     }
 
     REBDSP lowest_ordered_dsp = DSP;  // Data stack gathers any refinements

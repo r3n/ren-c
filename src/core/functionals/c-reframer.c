@@ -29,7 +29,7 @@
 // parameter to a function, and adds them back for the result:
 //
 //     requote: reframer func [f [frame!]] [
-//         p: first words of f
+//         p: first parameters of f
 //         num-quotes: quotes of f/(p)
 //
 //         f/(p): dequote f/(p)
@@ -37,21 +37,25 @@
 //         return quote/depth do f num-quotes
 //     ]
 //
-//     >> item: first ['''[a b c]]
+//     >> item: just '''[a b c]
+//     == '''[a b c]
 //
 //     >> requote append item <d>  ; append doesn't accept QUOTED! items
 //     == '''[a b c <d>]   ; munging frame and result makes it seem to
 //
-// !!! Due to the way that REFRAMER works today, it cannot support a chain
-// of reframers.  e.g. with MY implemented as a reframer, you couldn't say:
+//=//// NOTES /////////////////////////////////////////////////////////////=//
 //
-//     >> item: my requote append <d>
+// * Enfix handling is not yet implemented, e.g. `requote '''1 + 2`
 //
-// Being able to do so would require some kind of "compound frame" that could
-// allow MY to push through REQUOTE to see APPEND's arguments.  This sounds
-// technically difficult, though perhaps pared down versions could be made
-// in the near term (e.g. in cases like this, where the reframer takes no
-// arguments of its own)
+// * Because reframers need to know the function they are operating on, they
+//   are unable to "see through" a GROUP! to get it, as a group could contain
+//   multiple expressions.  So `requote (append item <d>)` cannot work.
+//
+// * If you "reframe a reframer" at the moment, you will not likely get what
+//   you want...as the arguments you want to inspect will be compacted into
+//   a frame argument.  It may be possible to make a "compound frame" that
+//   captures the user-perceived combination of a reframer and what it's
+//   reframing, but that would be technically difficult.
 //
 
 #include "sys-core.h"
@@ -64,16 +68,59 @@ enum {
 
 
 //
-//  Make_Invocation_Frame_Throws: C
+//  Make_Invokable_From_Feed_Throws: C
 //
 // This builds a frame from a feed *as if* it were going to be used to call
 // an action, but doesn't actually make the call.  Instead it leaves the
 // varlist available for other purposes.
 //
-bool Make_Invocation_Frame_Throws(REBFRM *f, const REBVAL *action)
+// If the next item in the feed is not a WORD! or PATH! that look up to an
+// action (nor an ACTION! literally) then the output will be set to a QUOTED!
+// version of what would be evaluated to.  So in the case of NULL, it will be
+// a single quote of nothing.
+//
+bool Make_Invokable_From_Feed_Throws(REBVAL *out, REBFED *feed)
 {
-    assert(IS_ACTION(action));
-    assert(f == FS_TOP);
+    if (IS_END(feed->value)) {
+        Quotify(Init_Endish_Nulled(out), 1);
+        return false;
+    }
+
+    if (IS_GROUP(feed->value))  // `requote (append [a b c] #d, <can't-work>)`
+        fail ("Actions made with REFRAMER cannot work with GROUP!s");
+
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+    Push_Frame(out, f);
+
+    if (Get_If_Word_Or_Path_Throws(
+        f->out,  // e.g. parent's spare
+        feed->value,
+        FEED_SPECIFIER(feed),
+        true  // push_refinements = true (DECLARE_FRAME captured original DSP)
+    )){
+        Drop_Frame(f);
+        return true;
+    }
+
+    if (not IS_ACTION(f->out)) {
+        Derelativize(f->out, f_value, f_specifier);
+        Quotify(f->out, 1);
+        Fetch_Next_Forget_Lookback(f);  // we've seen it now
+        Drop_Frame(f);
+        return false;
+    }
+
+    Fetch_Next_Forget_Lookback(f);  // now, onto the arguments...
+
+    option(const REBSTR*) label = VAL_ACTION_LABEL(f->out);
+
+    // !!! Process_Action_Throws() calls Drop_Action() and loses the phase.
+    // It probably shouldn't, but since it does we need the action afterward
+    // to put the phase back.
+    //
+    DECLARE_LOCAL (action);
+    Move_Value(action, out);
+    PUSH_GC_GUARD(action);
 
     // It is desired that any nulls encountered be processed as if they are
     // not specialized...and gather at the callsite if necessary.
@@ -81,9 +128,8 @@ bool Make_Invocation_Frame_Throws(REBFRM *f, const REBVAL *action)
     f->flags.bits |=
         EVAL_FLAG_ERROR_ON_DEFERRED_ENFIX;  // can't deal with ELSE/THEN/etc.
 
-    option(const REBSYM*) label = nullptr;  // !!! for now
-    Push_Action(f, VAL_ACTION(action), VAL_ACTION_BINDING(action));
-    Begin_Prefix_Action(f, label);
+    Push_Action(f, VAL_ACTION(f->out), VAL_ACTION_BINDING(f->out));
+    Begin_Prefix_Action(f, VAL_ACTION_LABEL(f->out));
 
     // Use this special mode where we ask the dispatcher not to run, just to
     // gather the args.  Push_Action() checks that it's not set, so we don't
@@ -93,7 +139,19 @@ bool Make_Invocation_Frame_Throws(REBFRM *f, const REBVAL *action)
 
     assert(FRM_BINDING(f) == VAL_ACTION_BINDING(action));  // no invocation
 
-    bool threw = Process_Action_Throws(f);
+    if (Process_Action_Throws(f)) {
+        DROP_GC_GUARD(action);
+        return true;
+    }
+
+    // At the moment, Begin_Prefix_Action() marks the frame as having been
+    // invoked...but since it didn't get managed it drops the flag in
+    // Drop_Action().
+    //
+    // !!! The flag is new, as a gambit to try and avoid copying frames for
+    // DO-ing just in order to expire the old identity.  Under development.
+    //
+    assert(NOT_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED));
 
     assert(NOT_EVAL_FLAG(f, FULFILL_ONLY));  // cleared by the evaluator
 
@@ -108,103 +166,16 @@ bool Make_Invocation_Frame_Throws(REBFRM *f, const REBVAL *action)
     // can theoretically just be put back into the reuse list, or managed
     // and handed out for other purposes by the caller.
     //
-    assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
-
-    // At the moment, Begin_Prefix_Action() marks the frame as having been
-    // invoked...but since it didn't get managed it drops the flag in
-    // Drop_Action().
-    //
-    // !!! The flag is new, as a gambit to try and avoid copying frames for
-    // DO-ing just in order to expire the old identity.  Under development.
-    //
-    assert(NOT_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED));
-
-    return threw;
-}
-
-
-//
-//  Make_Frame_From_Varargs_Throws: C
-//
-// Routines like MATCH or DOES are willing to do impromptu specializations
-// from a feed of instructions, so that a frame for an ACTION! can be made
-// without actually running it yet.  This is also exposed by MAKE ACTION!.
-//
-// This pre-manages the exemplar, because it has to be done specially (it gets
-// "stolen" out from under an evaluator's REBFRM*, and was manually tracked
-// but never in the manual series list.)
-//
-bool Make_Frame_From_Varargs_Throws(
-    REBVAL *out,
-    const REBVAL *specializee,
-    const REBVAL *varargs
-){
-    // !!! The vararg's frame is not really a parent, but try to stay
-    // consistent with the naming in subframe code copy/pasted for now...
-    //
-    REBFRM *parent;
-    if (not Is_Frame_Style_Varargs_May_Fail(&parent, varargs))
-        fail (
-            "Currently MAKE FRAME! on a VARARGS! only works with a varargs"
-            " which is tied to an existing, running frame--not one that is"
-            " being simulated from a BLOCK! (e.g. MAKE VARARGS! [...])"
-        );
-
-    assert(Is_Action_Frame(parent));
-
-    // REBFRM whose built FRAME! context we will steal
-
-    DECLARE_FRAME (f, parent->feed, EVAL_MASK_DEFAULT);
-    Push_Frame(out, f);
-
-    if (Get_If_Word_Or_Path_Throws(
-        out,
-        specializee,
-        SPECIFIED,
-        true  // push_refinements = true (DECLARE_FRAME captured original DSP)
-    )){
-        Drop_Frame(f);
-        return true;
-    }
-
-    if (not IS_ACTION(out))
-        fail (specializee);
-
-    option(const REBSTR*) label = VAL_ACTION_LABEL(out);
-
-    DECLARE_LOCAL (action);
-    Move_Value(action, out);
-    PUSH_GC_GUARD(action);
-
-    // We interpret phrasings like `x: does all [...]` to mean something
-    // like `x: specialize :all [block: [...]]`.  While this originated
-    // from the Rebmu code golfing language to eliminate a pair of bracket
-    // characters from `x: does [all [...]]`, it actually has different
-    // semantics...which can be useful in their own right, plus the
-    // resulting function will run faster.
-
-    if (Make_Invocation_Frame_Throws(f, action)) {
-        DROP_GC_GUARD(action);
-        return true;
-    }
+    REBARR *varlist = f->varlist;
+    assert(NOT_SERIES_FLAG(varlist, MANAGED));  // not invoked yet
+    f->varlist = nullptr;  // just let it GC, for now
 
     REBACT *act = VAL_ACTION(action);
-
-    assert(NOT_SERIES_FLAG(f->varlist, MANAGED)); // not invoked yet
     assert(FRM_BINDING(f) == VAL_ACTION_BINDING(action));
 
-    REBCTX *exemplar = Steal_Context_Vars(
-        CTX(f->varlist),
-        ACT_KEYLIST(act)
-    );
-    assert(ACT_NUM_PARAMS(act) == CTX_LEN(exemplar));
+    INIT_LINK_KEYSOURCE(varlist, ACT_KEYLIST(act));
 
-    INIT_LINK_KEYSOURCE(CTX_VARLIST(exemplar), ACT_KEYLIST(act));
-
-    SET_SERIES_FLAG(f->varlist, MANAGED); // is inaccessible
-    f->varlist = nullptr; // just let it GC, for now
-
-    // May not be at end or thrown, e.g. (x: does just y x = 'y)
+    // May not be at end or thrown, e.g. (x: does+ just y x = 'y)
     //
     DROP_GC_GUARD(action);  // before drop to balance at right time
     Drop_Frame(f);
@@ -213,8 +184,43 @@ bool Make_Frame_From_Varargs_Throws(
     // managed, but Push_Action() does not use ordinary series creation to
     // make its nodes, so manual ones don't wind up in the tracking list.
     //
-    SET_SERIES_FLAG(CTX_VARLIST(exemplar), MANAGED);  // can't Manage_Series()
+    SET_SERIES_FLAG(varlist, MANAGED); // can't use Manage_Series
 
+    Init_Frame(out, CTX(varlist), label);
+    return false;
+}
+
+
+//
+//  Make_Frame_From_Feed_Throws: C
+//
+// Making an invokable from a feed might return a QUOTED!, because that is
+// more efficient (and truthful) than creating a FRAME! for the identity
+// function.  However, MAKE FRAME! of a VARARGS! was an experimental feature
+// that has to follow the rules of MAKE FRAME!...e.g. returning a frame.
+// This converts QUOTED!s into frames for the identity function.
+//
+bool Make_Frame_From_Feed_Throws(REBVAL *out, REBFED *feed)
+{
+    if (Make_Invokable_From_Feed_Throws(out, feed))
+        return true;
+
+    if (IS_FRAME(out))
+        return false;
+
+    assert(IS_QUOTED(out));
+    REBCTX *exemplar = Make_Context_For_Action(
+        NATIVE_VAL(identity),
+        DSP,
+        nullptr
+    );
+
+    Unquotify(Move_Value(CTX_VAR(exemplar, 2), out), 1);
+
+    // Should we save the WORD! from a variable access to use as the name of
+    // the identity alias?
+    //
+    option(const REBSYM*) label = nullptr;
     Init_Frame(out, exemplar, label);
     return false;
 }
@@ -241,66 +247,20 @@ REB_R Reframer_Dispatcher(REBFRM *f)
     REBVAL* param_index = DETAILS_AT(details, IDX_REFRAMER_PARAM_INDEX);
     assert(IS_INTEGER(param_index));
 
-    if (IS_END(f_value) or not (IS_WORD(f_value) or IS_PATH(f_value)))
-        fail ("REFRAMER can only currently run on subsequent WORD!/PATH!");
-
-    // First run ahead and make the frame we want from the feed.  We push
-    // the frame so that we can fold the refinements used into it, without
-    // needing to create an intermediate specialized function in the process.
+    // First run ahead and make the frame we want from the feed.
     //
-    // Note: We do not overwrite f->out in case of invisibility.
-
-    DECLARE_FRAME (sub, f->feed, EVAL_MASK_DEFAULT);
-    Push_Frame(f_spare, sub);
-
-    if (Get_If_Word_Or_Path_Throws(
-        sub->out,  // e.g. f_spare
-        f_value,
-        f_specifier,
-        true  // push_refinements = true (DECLARE_FRAME captured original DSP)
-    )){
-        Drop_Frame(sub);
+    // Note: We can't write the value directly into the arg (as this frame
+    // may have been built by a higher level ADAPT or other function that
+    // still holds references, and those references could be reachable by
+    // code that runs to fulfill parameters...which could see partially
+    // filled values).  And we don't want to overwrite f->out in case of
+    // invisibility.  So the frame's spare cell is used.
+    //
+    if (Make_Invokable_From_Feed_Throws(f_spare, f->feed))
         return R_THROWN;
-    }
-
-    if (not IS_ACTION(sub->out))
-        fail (rebUnrelativize(f_value));
-
-    Fetch_Next_Forget_Lookback(sub);  // now, onto the arguments...
-
-    option(const REBSTR*) label = VAL_ACTION_LABEL(sub->out);
-
-    DECLARE_LOCAL (action);
-    Move_Value(action, sub->out);
-    PUSH_GC_GUARD(action);
-
-    if (Make_Invocation_Frame_Throws(sub, action)) {
-        DROP_GC_GUARD(action);
-        return R_THROWN;
-    }
-
-    REBARR *varlist = sub->varlist;
-    assert(NOT_SERIES_FLAG(varlist, MANAGED));  // not invoked yet
-    sub->varlist = nullptr;  // just let it GC, for now
-
-    REBACT *act = VAL_ACTION(action);
-    assert(FRM_BINDING(sub) == VAL_ACTION_BINDING(action));
-
-    INIT_LINK_KEYSOURCE(varlist, ACT_KEYLIST(act));
-
-    // May not be at end or thrown, e.g. (x: does just y x = 'y)
-    //
-    DROP_GC_GUARD(action);  // before drop to balance at right time
-    Drop_Frame(sub);
-
-    // The exemplar may or may not be managed as of yet.  We want it
-    // managed, but Push_Action() does not use ordinary series creation to
-    // make its nodes, so manual ones don't wind up in the tracking list.
-    //
-    SET_SERIES_FLAG(varlist, MANAGED); // can't use Manage_Series
 
     REBVAL *arg = FRM_ARG(f, VAL_INT32(param_index));
-    Init_Frame(arg, CTX(varlist), label);
+    Move_Value(arg, f_spare);
 
     INIT_FRM_PHASE(f, VAL_ACTION(shim));
     INIT_FRM_BINDING(f, VAL_ACTION_BINDING(shim));
@@ -312,12 +272,12 @@ REB_R Reframer_Dispatcher(REBFRM *f)
 //
 //  reframer*: native [
 //
-//  {Make a function that manipulate other actions at the callsite}
+//  {Make a function that manipulates an invocation at the callsite}
 //
 //      return: [action!]
-//      shim "The action that has a FRAME! argument to supply"
+//      shim "The action that has a FRAME! (or QUOTED!) argument to supply"
 //          [action!]
-//      /parameter "Which parameter of the shim gets given the FRAME!"
+//      /parameter "Shim parameter receiving the frame--defaults to last"
 //          [word!]
 //  ]
 //
@@ -367,7 +327,7 @@ REBNATIVE(reframer_p)
     }
 
     // Make sure the parameter is able to accept FRAME! arguments (the type
-    // checking will ultimately use hte same slot we overwrite here!)
+    // checking will ultimately use the same slot we overwrite here!)
     //
     if (not TYPE_CHECK(param, REB_FRAME)) {
         DECLARE_LOCAL (label_word);

@@ -1193,15 +1193,15 @@ bool Get_If_Word_Or_Path_Throws(
     REBSPC *specifier,
     bool push_refinements
 ) {
-    if (IS_WORD(v) or IS_GET_WORD(v) or IS_SYM_WORD(v)) {
+    if (IS_WORD(v) or IS_GET_WORD(v)) {
       get_as_word:
         Get_Word_May_Fail(out, v, specifier);
         if (IS_ACTION(out))
             INIT_VAL_ACTION_LABEL(out, VAL_WORD_SYMBOL(v));
     }
     else if (
-        IS_PATH(v) or IS_GET_PATH(v) or IS_SYM_PATH(v)
-        or IS_TUPLE(v) or IS_GET_TUPLE(v) or IS_SYM_TUPLE(v)
+        IS_PATH(v) or IS_GET_PATH(v)
+        or IS_TUPLE(v) or IS_GET_TUPLE(v)
     ){
         if (ANY_WORD_KIND(HEART_BYTE(v)))  // e.g. `/`
             goto get_as_word;  // faster than calling Eval_Path_Throws_Core?

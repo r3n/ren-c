@@ -219,6 +219,7 @@ struct Reb_Feed {
     // the initial value in order to display full error messages.
     //
     const RELVAL *value;  // is never nullptr (ends w/END cells or rebEND)
+    // Note: The specifier comes from FEED_SPECIFIER()
 
     //=//// ^-- be sure above fields align cells below to 64-bits --v /////=//
     // (two intptr_t sized things should take care of it on both 32/64-bit) //
