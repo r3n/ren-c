@@ -93,6 +93,29 @@
 #define SERIES_FLAG_ROOT NODE_FLAG_ROOT
 #define SERIES_FLAG_MARKED NODE_FLAG_MARKED
 
+//=//// SERIES_FLAG_LINK_NODE_NEEDS_MARK //////////////////////////////////=//
+//
+// This indicates that a series's LINK() field is the `custom` node element,
+// and should be marked (if not null).
+//
+// Note: Even if this flag is not set, *link.any might still be a node*...
+// just not one that should be marked.
+//
+#define SERIES_FLAG_LINK_NODE_NEEDS_MARK \
+    NODE_FLAG_GC_ONE
+
+
+//=//// SERIES_FLAG_MISC_NODE_NEEDS_MARK //////////////////////////////////=//
+//
+// This indicates that a series's MISC() field is the `custom` node element,
+// and should be marked (if not null).
+//
+// Note: Even if this flag is not set, *misc.any might still be a node*...
+// just not one that should be marked.
+//
+#define SERIES_FLAG_MISC_NODE_NEEDS_MARK \
+    NODE_FLAG_GC_TWO
+
 
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -204,27 +227,15 @@
     FLAG_LEFT_BIT(12)
 
 
-//=//// SERIES_FLAG_LINK_NODE_NEEDS_MARK //////////////////////////////////=//
+//=//// SERIES_FLAG_13 ////////////////////////////////////////////////////=//
 //
-// This indicates that a series's LINK() field is the `custom` node element,
-// and should be marked (if not null).
-//
-// Note: Even if this flag is not set, *link.any might still be a node*...
-// just not one that should be marked.
-//
-#define SERIES_FLAG_LINK_NODE_NEEDS_MARK \
+#define SERIES_FLAG_13 \
     FLAG_LEFT_BIT(13)
 
 
-//=//// SERIES_FLAG_MISC_NODE_NEEDS_MARK //////////////////////////////////=//
+//=//// SERIES_FLAG_14 ////////////////////////////////////////////////////=//
 //
-// This indicates that a series's MISC() field is the `custom` node element,
-// and should be marked (if not null).
-//
-// Note: Even if this flag is not set, *misc.any might still be a node*...
-// just not one that should be marked.
-//
-#define SERIES_FLAG_MISC_NODE_NEEDS_MARK \
+#define SERIES_FLAG_14 \
     FLAG_LEFT_BIT(14)
 
 

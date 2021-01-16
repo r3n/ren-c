@@ -98,6 +98,24 @@
 #define CELL_FLAG_VAR_MARKED_HIDDEN NODE_FLAG_MARKED
 
 
+//=//// CELL_FLAG_FIRST_IS_NODE ///////////////////////////////////////////=//
+//
+// This flag is used on cells to indicate that they use the "Any" Payload,
+// and `PAYLOAD(Any, v).first.node` should be marked as a node by the GC.
+//
+#define CELL_FLAG_FIRST_IS_NODE \
+    NODE_FLAG_GC_ONE
+
+
+//=//// CELL_FLAG_SECOND_IS_NODE //////////////////////////////////////////=//
+//
+// This flag is used on cells to indicate that they use the "Any" Payload,
+// and `PAYLOAD(Any, v).second.node` should be marked as a node by the GC.
+//
+#define CELL_FLAG_SECOND_IS_NODE \
+    NODE_FLAG_GC_TWO
+
+
 // v-- BEGIN GENERAL CELL BITS HERE, third byte in the header
 
 
@@ -115,21 +133,15 @@
     FLAG_LEFT_BIT(16)
 
 
-//=//// CELL_FLAG_FIRST_IS_NODE ///////////////////////////////////////////=//
+//=//// CELL_FLAG_17 //////////////////////////////////////////////////////=//
 //
-// This flag is used on cells to indicate that they use the "Any" Payload,
-// and `PAYLOAD(Any, v).first.node` should be marked as a node by the GC.
-//
-#define CELL_FLAG_FIRST_IS_NODE \
+#define CELL_FLAG_17 \
     FLAG_LEFT_BIT(17)
 
 
-//=//// CELL_FLAG_SECOND_IS_NODE //////////////////////////////////////////=//
+//=//// CELL_FLAG_18 //////////////////////////////////////////////////////=//
 //
-// This flag is used on cells to indicate that they use the "Any" Payload,
-// and `PAYLOAD(Any, v).second.node` should be marked as a node by the GC.
-//
-#define CELL_FLAG_SECOND_IS_NODE \
+#define CELL_FLAG_18 \
     FLAG_LEFT_BIT(18)
 
 

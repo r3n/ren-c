@@ -486,7 +486,7 @@ static void Mark_Root_Series(void)
 
             assert(nodebyte & NODE_BYTEMASK_0x80_NODE);
 
-            if (nodebyte & NODE_BYTEMASK_0x04_ROOT) {
+            if (nodebyte & NODE_BYTEMASK_0x02_ROOT) {
                 //
                 // This came from Alloc_Value(); all references should be
                 // from the C stack, only this visit should be marking it.
@@ -889,7 +889,7 @@ static REBLEN Sweep_Series(void)
                 // is at position 8 from left and not an earlier bit.
                 //
                 if (*unit & NODE_BYTEMASK_0x01_CELL) {
-                    assert(not (*unit & NODE_BYTEMASK_0x04_ROOT));
+                    assert(not (*unit & NODE_BYTEMASK_0x02_ROOT));
                     Free_Node(SER_POOL, NOD(unit));  // Free_Pairing manual
                 }
                 else {

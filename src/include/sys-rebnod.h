@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
@@ -425,44 +425,38 @@ union Reb_Header {
 #define NODE_BYTEMASK_0x10_MARKED 0x10
 
 
-//=//// NODE_FLAG_4 (fifth-leftmost bit) //////////////////////////////////=//
+//=//// NODE_FLAG_GC_ONE / NODE_FLAG_GC_TWO (fifth/sixth-leftmost bit) ////=//
 //
-// !!! This bit is reclaimed from a scrapped idea of distinguishing cells on
-// the data stack in particular, as not requiring persistent reification of
-// frames.  Besides adding complexity, the idea is incompatible with a
-// stackless model...which rearranges the data stack as will when suspending
-// or resuming stacks.
+// Both REBVAL* and REBSER* nodes have two slots in them which can be called
+// out for attention from the GC.  Though these bits are scarce, sacrificing
+// them means not needing to do a switch() on the REB_TYPE of the cell to
+// know how to mark them.
 //
-#define NODE_FLAG_4 \
+// The third potentially-node-holding slot in a cell ("Extra") is deemed
+// whether to be marked or not by the ordering in the %types.r file.  So no
+// bit is needed for that.
+//
+#define NODE_FLAG_GC_ONE \
     FLAG_LEFT_BIT(4)
-#define NODE_BYTEMASK_0x08_FOUR 0x08
+#define NODE_BYTEMASK_0x08_GC_ONE 0x08
+
+#define NODE_FLAG_GC_TWO \
+    FLAG_LEFT_BIT(5)
+#define NODE_BYTEMASK_0x04_GC_TWO 0x04
 
 
-//=//// NODE_FLAG_ROOT (sixth-leftmost bit) ///////////////////////////////=//
+//=//// NODE_FLAG_ROOT (seventh-leftmost bit) /////////////////////////////=//
 //
 // Means the node should be treated as a root for GC purposes.  If the node
 // also has NODE_FLAG_CELL, that means the cell must live in a "pairing"
-// REBSER-sized structure for two cells.  This indicates it is an API handle.
+// REBSER-sized structure for two cells.
 //
 // This flag is masked out by CELL_MASK_COPIED, so that when values are moved
 // into or out of API handle cells the flag is left untouched.
 //
 #define NODE_FLAG_ROOT \
-    FLAG_LEFT_BIT(5)
-#define NODE_BYTEMASK_0x04_ROOT 0x04
-
-
-//=//// NODE_FLAG_6 (seventh-leftmost bit) ////////////////////////////////=//
-//
-// !!! This bit was recovered from a scrapped concept of marking cells based
-// on their projected lifetimes, to limit the amount of REBFRM* reification
-// as REBARR* varlists that needed to be monitored by GC.  It was a complex
-// idea for an optimization to start with, but a "stackless" model undermines
-// the notion of such lifetimes.
-//
-#define NODE_FLAG_6 \
     FLAG_LEFT_BIT(6)
-#define NODE_BYTEMASK_0x02_SIX 0x02
+#define NODE_BYTEMASK_0x02_ROOT 0x02
 
 
 //=//// NODE_FLAG_CELL (eighth-leftmost bit) //////////////////////////////=//
