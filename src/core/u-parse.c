@@ -720,7 +720,7 @@ static REB_R Parse_One_Rule(
 
           case REB_TYPESET:
           case REB_DATATYPE: {
-            const REBSTR *file = Canon(SYM___ANONYMOUS__);
+            const REBSTR *file = ANONYMOUS;
 
             REBLIN start_line = 1;
 

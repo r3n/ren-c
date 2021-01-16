@@ -127,7 +127,7 @@ REB_R MAKE_Array(
         REBSIZ size;
         REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&size, arg);
 
-        const REBSTR *file = Canon(SYM___ANONYMOUS__);
+        const REBSTR *file = ANONYMOUS;
         Init_Any_Array(
             out,
             kind,
@@ -222,7 +222,7 @@ REB_R MAKE_Array(
         //
         REBSIZ utf8_size;
         REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, arg);
-        const REBSTR *file = Canon(SYM___ANONYMOUS__);
+        const REBSTR *file = ANONYMOUS;
         return Init_Any_Array(
             out,
             kind,
@@ -234,7 +234,7 @@ REB_R MAKE_Array(
         // `to block! #{00BDAE....}` assumes the binary data is UTF8, and
         // goes directly to the scanner to make an unbound code array.
         //
-        const REBSTR *file = Canon(SYM___ANONYMOUS__);
+        const REBSTR *file = ANONYMOUS;
 
         REBSIZ size;
         const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);

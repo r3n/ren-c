@@ -176,11 +176,11 @@
     ]
 )
 
-; Smoke test for literalizing items of every type
+; Smoke test for quoting items of every type
 
 (
     for-each item compose [
-        (quote :+)
+        (:+)
         word
         set-word:
         :get-word
@@ -234,6 +234,8 @@
         (e2: trap [equal2: :lit-item = :lit-item]) also [
             e2/where: e2/near: _
         ]
+        if e1 [e1/line: null]  ; ignore line difference (file should be same)
+        if e2 [e2/line: null]
         if :e1 != :e2 [
             print mold type of get/any 'item
             print mold e1

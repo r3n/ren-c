@@ -659,7 +659,11 @@ static void Update_Error_Near_For_Line(
     ERROR_VARS *vars = ERR_VARS(error);
     Init_Text(&vars->nearest, Pop_Molded_String(mo));
 
-    Init_File(&vars->file, ss->file);
+    if (ss->file)
+        Init_File(&vars->file, ss->file);
+    else
+        Init_Nulled(&vars->file);
+
     Init_Integer(&vars->line, ss->line);
 }
 
@@ -2864,7 +2868,7 @@ REBINT Scan_Header(const REBYTE *utf8, REBLEN len)
 {
     SCAN_LEVEL level;
     SCAN_STATE ss;
-    const REBSTR *file= Canon(SYM___ANONYMOUS__);
+    const REBSTR *file = ANONYMOUS;
     const REBLIN start_line = 1;
     Init_Scan_Level(&level, &ss, file, start_line, utf8, len);
 
@@ -2964,7 +2968,7 @@ REBNATIVE(transcode)
         Freeze_Series(file);
     }
     else
-        file = Canon(SYM___ANONYMOUS__);
+        file = ANONYMOUS;
 
     const REBVAL *line_number;
     if (ANY_WORD(ARG(line)))
@@ -3090,7 +3094,7 @@ const REBYTE *Scan_Any_Word(
 ) {
     SCAN_LEVEL level;
     SCAN_STATE ss;
-    const REBSTR *file = Canon(SYM___ANONYMOUS__);
+    const REBSTR *file = ANONYMOUS;
     const REBLIN start_line = 1;
 
     // !!! We use UNLIMITED here instead of `size` because the R3-Alpha

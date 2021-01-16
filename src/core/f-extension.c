@@ -190,7 +190,7 @@ REBNATIVE(load_extension)
     );
 
     REBARR *specs = Scan_UTF8_Managed(
-        Canon(SYM___ANONYMOUS__), // !!! Name of DLL if available?
+        ANONYMOUS,  // !!! Name of DLL if available?
         specs_utf8,
         specs_size
     );

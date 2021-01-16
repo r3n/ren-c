@@ -363,10 +363,6 @@ pid
 id
 exit-code
 
-; used when a function is executed but not looked up through a word binding
-; (product of literal or evaluation) so no name is known for it
---anonymous--
-
 ; used to signal situations where information that would be available in
 ; a debug build has been elided
 ;
