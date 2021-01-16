@@ -858,10 +858,13 @@ REBNATIVE(maximum)
         Move_Value(coerced2, value2);
 
         bool strict = false;
-        if (-1 == Compare_Modify_Values(coerced1, coerced2, strict))
+        REBINT diff = Compare_Modify_Values(coerced1, coerced2, strict);
+        if (diff == 1)
             Move_Value(D_OUT, value1);
-        else
+        else {
+            assert(diff == 0 or diff == -1);
             Move_Value(D_OUT, value2);
+        }
     }
     return D_OUT;
 }
@@ -893,10 +896,13 @@ REBNATIVE(minimum)
         Move_Value(coerced2, value2);
 
         bool strict = false;
-        if (1 == Compare_Modify_Values(coerced1, coerced2, strict))
+        REBINT diff = Compare_Modify_Values(coerced1, coerced2, strict);
+        if (diff == -1)
             Move_Value(D_OUT, value1);
-        else
+        else {
+            assert(diff == 0 or diff == 1);
             Move_Value(D_OUT, value2);
+        }
     }
     return D_OUT;
 }
