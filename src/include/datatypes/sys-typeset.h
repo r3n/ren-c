@@ -510,7 +510,6 @@ inline static void Typecheck_Refinement(
     const REBPAR *param,
     REBVAL *arg
 ){
-    assert(NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN));
     assert(TYPE_CHECK(param, REB_TS_REFINEMENT));
 
     if (IS_NULLED(arg)) {
@@ -526,6 +525,4 @@ inline static void Typecheck_Refinement(
     }
     else if (not Typecheck_Including_Constraints(param, arg))
         fail (Error_Invalid_Type(VAL_TYPE(arg)));
-
-    SET_CELL_FLAG(arg, VAR_MARKED_HIDDEN);
 }

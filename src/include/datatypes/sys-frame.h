@@ -289,6 +289,7 @@ inline static void Conserve_Varlist(REBARR *varlist)
   #if !defined(NDEBUG)
     assert(NOT_SERIES_INFO(varlist, INACCESSIBLE));
     assert(NOT_SERIES_FLAG(varlist, MANAGED));
+    assert(NOT_ARRAY_FLAG(varlist, FRAME_HAS_BEEN_INVOKED));
 
     RELVAL *rootvar = ARR_HEAD(varlist);
     assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == varlist);
@@ -566,8 +567,16 @@ inline static void Begin_Action_Core(
     assert(NOT_EVAL_FLAG(f, RUNNING_ENFIX));
     assert(NOT_FEED_FLAG(f->feed, DEFERRING_ENFIX));
 
+    assert(NOT_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED));
+    SET_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED);
+
     assert(not f->original);
     f->original = FRM_PHASE(f);
+
+    // f->key_tail = v-- set here
+    f->key = ACT_KEYS(&f->key_tail, f->original);
+    f->param = ACT_PARAMS_HEAD(f->original);
+    f->arg = f->rootvar + 1;
 
     assert(IS_OPTION_TRASH_DEBUG(f->label));  // ACTION! makes valid
     assert(not label or GET_SERIES_FLAG(unwrap(label), IS_STRING));
@@ -634,7 +643,6 @@ inline static void Push_Action(
     if (f->flags.bits & details->leader.bits & DETAILS_FLAG_IS_BARRIER)
         fail (Error_Expression_Barrier_Raw());
 
-    f->key = ACT_KEYS(&f->key_tail, act);
     REBLEN num_args = ACT_NUM_PARAMS(act);  // includes specialized + locals
 
     REBSER *s;
@@ -713,8 +721,6 @@ inline static void Push_Action(
     }
   #endif
 
-    f->arg = f->rootvar + 1;
-
     // Each layer of specialization of a function can only add specializations
     // of arguments which have not been specialized already.  For efficiency,
     // the act of specialization merges all the underlying layers of
@@ -733,7 +739,6 @@ inline static void Push_Action(
         for (; NOT_END(word); ++word)
             Move_Value(DS_PUSH(), word);
     }
-    f->param = ACT_PARAMS_HEAD(act);
 
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
     assert(NOT_SERIES_INFO(f->varlist, INACCESSIBLE));
@@ -833,6 +838,7 @@ inline static void Drop_Action(REBFRM *f) {
         // only DETAILS_FLAG_IS_NATIVE sets HOLD.  Clear that.
         //
         CLEAR_SERIES_INFO(f->varlist, HOLD);
+        CLEAR_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED);
 
         assert(0 == (f->varlist->info.bits & ~(  // <- note bitwise not
             SERIES_INFO_0_IS_TRUE  // parallels NODE_FLAG_NODE

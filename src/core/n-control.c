@@ -661,9 +661,6 @@ REBNATIVE(match)
         f->out = SET_END(temp);
 
         f->rootvar = CTX_ROOTVAR(CTX(f->varlist));
-        f->key = ACT_KEYS(&f->key_tail, VAL_ACTION(test));
-        f->arg = f->rootvar + 1;
-        f->param = ACT_PARAMS_HEAD(VAL_ACTION(test));
 
         f->flags.bits = EVAL_MASK_DEFAULT
             | EVAL_FLAG_FULLY_SPECIALIZED

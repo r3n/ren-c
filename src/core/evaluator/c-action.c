@@ -245,8 +245,13 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // from the outside (e.g. by REFRAMER) so there is no benefit
             // to deferring the check, only extra cost on each invocation.
             //
-            Blit_Specific(f->arg, f->param);  // keep VAR_MARKED_HIDDEN
-            assert(GET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN));
+            // !!! At one point, this would copy the hidden bit, so that the
+            // local itself carried the flag.  However, using the local bit
+            // for values actually in the frame creates an issue that the
+            // higher level phases were hiding parameters from specialization
+            // that lower levels should see.  Review.
+            //
+            Move_Value(f->arg, f->param);
 
             goto continue_fulfilling;
         }
@@ -577,11 +582,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 if (not Typecheck_Including_Constraints(f->param, f_next)) {
                     assert(Is_Param_Endable(f->param));
                     Init_Endish_Nulled(f->arg);  // not EVAL_FLAG_BARRIER_HIT
-                    SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
                     goto continue_fulfilling;
                 }
                 Literal_Next_In_Frame(f->arg, f);
-                SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
             }
 
@@ -591,10 +594,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             //
             Lookahead_To_Sync_Enfix_Defer_Flag(f->feed);
 
-            if (GET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN))
-                goto continue_fulfilling;
-
-            break;
+            goto continue_fulfilling;
 
   //=//// MODAL ARG  //////////////////////////////////////////////////////=//
 
@@ -835,9 +835,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     ? -(f->arg - FRM_ARGS_HEAD(f) + 1)
                     : f->arg - FRM_ARGS_HEAD(f) + 1;
 
-            SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
             continue;
         }
+
+        if (VAL_PARAM_CLASS(f->param) == REB_P_RETURN)
+            continue;  // !!! hack
 
         // Refinements have a special rule beyond plain type checking, in that
         // they don't just want an ISSUE! or NULL, they want # or NULL.
@@ -848,9 +850,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 and Is_Void_With_Sym(f->arg, SYM_UNSET)
             ){
                 Init_Nulled(f->arg);
-                SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
             }
-            else if (NOT_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN))
+            else
                 Typecheck_Refinement(f->param, f->arg);
             continue;
         }
@@ -879,7 +880,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (not Is_Param_Endable(f->param))
                 fail (Error_No_Arg(f->label, KEY_SYMBOL(f->key)));
 
-            SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
             continue;
         }
 
@@ -889,7 +889,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             kind_byte == REB_BLANK  // v-- e.g. <blank> param
             and TYPE_CHECK(f->param, REB_TS_NOOP_IF_BLANK)
         ){
-            SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
             SET_EVAL_FLAG(f, TYPECHECK_ONLY);
             continue;
         }
@@ -914,8 +913,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
         if (not Typecheck_Including_Constraints(f->param, f->arg))
             fail (Error_Arg_Type(f, f->key, VAL_TYPE(f->arg)));
-
-        SET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN);
     }
 
 

@@ -122,21 +122,14 @@ REB_R Reframer_Dispatcher(REBFRM *f)
         return R_THROWN;
     }
 
-    REBACT *act = VAL_ACTION(action);
+    REBARR *varlist = sub->varlist;
+    assert(NOT_SERIES_FLAG(varlist, MANAGED));  // not invoked yet
+    sub->varlist = nullptr;  // just let it GC, for now
 
-    assert(NOT_SERIES_FLAG(sub->varlist, MANAGED)); // not invoked yet
+    REBACT *act = VAL_ACTION(action);
     assert(FRM_BINDING(sub) == VAL_ACTION_BINDING(action));
 
-    REBCTX *stolen = Steal_Context_Vars(
-        CTX(sub->varlist),
-        ACT_KEYLIST(act)
-    );
-    assert(ACT_NUM_PARAMS(act) == CTX_LEN(stolen));
-
-    INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), ACT_KEYLIST(act));
-
-    SET_SERIES_FLAG(sub->varlist, MANAGED); // is inaccessible
-    sub->varlist = nullptr; // just let it GC, for now
+    INIT_LINK_KEYSOURCE(varlist, ACT_KEYLIST(act));
 
     // May not be at end or thrown, e.g. (x: does just y x = 'y)
     //
@@ -147,10 +140,10 @@ REB_R Reframer_Dispatcher(REBFRM *f)
     // managed, but Push_Action() does not use ordinary series creation to
     // make its nodes, so manual ones don't wind up in the tracking list.
     //
-    SET_SERIES_FLAG(CTX_VARLIST(stolen), MANAGED); // can't use Manage_Series
+    SET_SERIES_FLAG(varlist, MANAGED); // can't use Manage_Series
 
     REBVAL *arg = FRM_ARG(f, VAL_INT32(param_index));
-    Init_Frame(arg, stolen, label);
+    Init_Frame(arg, CTX(varlist), label);
 
     INIT_FRM_PHASE(f, VAL_ACTION(shim));
     INIT_FRM_BINDING(f, VAL_ACTION_BINDING(shim));

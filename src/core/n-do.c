@@ -432,43 +432,31 @@ REBNATIVE(do)
         return D_OUT; }
 
       case REB_FRAME: {
-        REBCTX *c = VAL_CONTEXT(source); // checks for INACCESSIBLE
-        REBACT *phase = VAL_FRAME_PHASE(source);
-
-        if (CTX_FRAME_IF_ON_STACK(c)) // see REDO for tail-call recursion
+        if (IS_FRAME_PHASED(source))  // see REDO for tail-call recursion
             fail ("Use REDO to restart a running FRAME! (not DO)");
 
-        // To DO a FRAME! will "steal" its data.  If a user wishes to use a
-        // frame multiple times, they must say DO COPY FRAME, so that the
-        // data is stolen from the copy.  This allows for efficient reuse of
-        // the context's memory in the cases where a copy isn't needed.
+        REBCTX *c = VAL_CONTEXT(source); // checks for INACCESSIBLE
+
+        REBARR *varlist = CTX_VARLIST(c);
+        if (GET_ARRAY_FLAG(varlist, FRAME_HAS_BEEN_INVOKED))
+            fail ("Can't DO FRAME! invoked prior, consider DO COPY FRAME!");
 
         REBFLGS flags = EVAL_MASK_DEFAULT
             | EVAL_FLAG_FULLY_SPECIALIZED
             | FLAG_STATE_BYTE(ST_ACTION_TYPECHECKING);
 
         DECLARE_END_FRAME (f, flags);
-
-        assert(CTX_KEYS_HEAD(c) == ACT_KEYS_HEAD(phase));
-        f->key = CTX_KEYS(&f->key_tail, c);
-        REBCTX *stolen = Steal_Context_Vars(c, ACT_KEYLIST(phase));
-        INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(f));
-            // ^-- changes CTX_KEYS_HEAD()
-
-        // Its data stolen, the context's node should now be GC'd when
-        // references in other FRAME! value cells have all gone away.
-        //
-        assert(GET_SERIES_FLAG(CTX_VARLIST(c), MANAGED));
-        assert(GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE));
-
         Push_Frame(D_OUT, f);
-        f->varlist = CTX_VARLIST(stolen);
-        f->rootvar = CTX_ROOTVAR(stolen);
-        f->arg = f->rootvar + 1;
-        // f->key set above
-        f->param = ACT_PARAMS_HEAD(phase);
 
-        assert(FRM_PHASE(f) == phase);  // !!! v-- should archetype match?
+        f->varlist = varlist;
+        f->rootvar = CTX_ROOTVAR(c);
+        INIT_LINK_KEYSOURCE(varlist, NOD(f));
+
+        REBACT *action = CTX_FRAME_ACTION(c);
+
+        assert(CTX_KEYS_HEAD(c) == ACT_KEYS_HEAD(action));
+
+        assert(FRM_PHASE(f) == action);  // !!! v-- should archetype match?
         INIT_FRM_BINDING(f, VAL_FRAME_BINDING(source));
 
         Begin_Prefix_Action(f, VAL_FRAME_LABEL(source));
@@ -784,7 +772,8 @@ REBNATIVE(applique)
         f->dsp_orig, // lowest_ordered_dsp of refinements to weave in
         &binder
     );
-    Manage_Series(CTX_VARLIST(exemplar)); // binding code into it
+    REBARR *varlist = CTX_VARLIST(exemplar);
+    Manage_Series(varlist); // binding code into it
 
     Virtual_Bind_Deep_To_Existing_Context(
         ARG(def),
@@ -819,19 +808,8 @@ REBNATIVE(applique)
     bool def_threw = Do_Any_Array_At_Throws(temp, ARG(def), SPECIFIED);
     DROP_GC_GUARD(exemplar);
 
-    assert(CTX_KEYS_HEAD(exemplar) == ACT_KEYS_HEAD(VAL_ACTION(applicand)));
-    f->key = CTX_KEYS(&f->key_tail, exemplar);
-    REBCTX *stolen = Steal_Context_Vars(
-        exemplar,
-        ACT_KEYLIST(VAL_ACTION(applicand))
-    );
-    INIT_LINK_KEYSOURCE(CTX_VARLIST(stolen), NOD(f));
-        // ^-- changes CTX_KEYS_HEAD result
-
-    if (def_threw) {
-        Free_Unmanaged_Series(CTX_VARLIST(stolen));  // could TG_Reuse it
+    if (def_threw)
         RETURN (temp);
-    }
 
     if (not REF(opt)) {
         //
@@ -845,11 +823,11 @@ REBNATIVE(applique)
     }
 
     Push_Frame(D_OUT, f);
-    f->varlist = CTX_VARLIST(stolen);
-    f->rootvar = CTX_ROOTVAR(stolen);
-    f->arg = f->rootvar + 1;
-    // f->key assigned above
-    f->param = ACT_PARAMS_HEAD(VAL_ACTION(applicand));
+
+    f->varlist = varlist;
+    f->rootvar = CTX_ROOTVAR(exemplar);
+    INIT_LINK_KEYSOURCE(varlist, NOD(f));
+
     INIT_FRM_PHASE(f, VAL_ACTION(applicand));
     INIT_FRM_BINDING(f, VAL_ACTION_BINDING(applicand));
 

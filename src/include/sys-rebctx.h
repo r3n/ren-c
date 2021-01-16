@@ -30,11 +30,27 @@
         | CELL_FLAG_SECOND_IS_NODE  /* phase (for FRAME!) */)
 
 
-//=//// SERIES_FLAG_VARLIST_24 ////////////////////////////////////////////=//
+//=//// ARRAY_FLAG_FRAME_HAS_BEEN_INVOKED /////////////////////////////////=//
 //
-// (Note: This is where varlist-specific flags could start being defined.)
+// It is intrinsic to the design of Redbols that they are allowed to mutate
+// their argument cells.  Hence if you build a frame and then DO it, the
+// arguments will very likely be changed.  Being able to see these changes
+// from the outside in non-debugging cases is dangerous, since it's part of
+// the implementation detail of the function (like how it handles locals)
+// and is not part of the calling contract.
 //
-#define SERIES_FLAG_VARLIST_24 \
+// This is why you can't say things like `loop 2 [do frame]`...the first time
+// you do the frame it could be arbitrarily corrupted.  Instead you must copy
+// the frame on all but the last time (e.g. `do copy frame, do frame`)
+//
+// The initial implementation of DO of FRAME! would actually create a new
+// varlist node and move the data to id--expiring the old node.  That is
+// expensive, so the cheaper way to do it is to set a flag on the frame.
+// Then, if a frame is archetypal (no phase) it can check this flag before
+// a DO and say the frame can't be run again...nor can fields be assigned
+// or read any longer.
+//
+#define ARRAY_FLAG_FRAME_HAS_BEEN_INVOKED \
     ARRAY_FLAG_24
 
 

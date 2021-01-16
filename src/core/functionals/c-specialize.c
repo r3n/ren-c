@@ -346,6 +346,7 @@ bool Specialize_Action_Throws(
             else
                 Typecheck_Refinement(param, arg);
 
+            SET_CELL_FLAG(arg, VAR_MARKED_HIDDEN);
             goto specialized_arg_no_typecheck;
         }
 
@@ -787,6 +788,15 @@ bool Make_Invocation_Frame_Throws(REBFRM *f, const REBVAL *action)
     // and handed out for other purposes by the caller.
     //
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
+
+    // At the moment, Begin_Prefix_Action() marks the frame as having been
+    // invoked...but since it didn't get managed it drops the flag in
+    // Drop_Action().
+    //
+    // !!! The flag is new, as a gambit to try and avoid copying frames for
+    // DO-ing just in order to expire the old identity.  Under development.
+    //
+    assert(NOT_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED));
 
     return threw;
 }

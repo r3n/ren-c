@@ -642,11 +642,13 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         const REBKEY *tail;
         const REBKEY *key = CTX_KEYS(&tail, c);
         REBVAR *var = CTX_VARS_HEAD(c);
+        REBPAR *param = (CELL_KIND(v) == REB_FRAME)
+            ? ACT_PARAMS_HEAD(VAL_FRAME_PHASE(v))
+            : cast_PAR(var);
+
         bool had_output = false;
-        for (; key != tail; key++, var++) {
-            if (CELL_KIND(v) == REB_FRAME and Is_Param_Sealed(cast_PAR(var)))
-                continue;
-            if (honor_hidden and Is_Var_Hidden(var))
+        for (; key != tail; ++key, ++var, ++param) {
+            if (honor_hidden and Is_Param_Hidden(param))
                 continue;
 
             Append_Spelling(mo->series, KEY_SYMBOL(key));
@@ -676,11 +678,12 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
     const REBKEY *tail;
     const REBKEY *key = CTX_KEYS(&tail, c);
     REBVAR *var = CTX_VARS_HEAD(c);
+    REBPAR *param = (CELL_KIND(v) == REB_FRAME)
+        ? ACT_PARAMS_HEAD(VAL_FRAME_PHASE(v))
+        : cast_PAR(var);
 
-    for (; key != tail; ++key, ++var) {
-        if (CELL_KIND(v) == REB_FRAME and Is_Param_Sealed(cast_PAR(var)))
-            continue;
-        if (honor_hidden and Is_Var_Hidden(var))
+    for (; key != tail; ++key, ++var, ++param) {
+        if (honor_hidden and Is_Param_Hidden(param))
             continue;
 
         New_Indented_Line(mo);
@@ -889,6 +892,20 @@ REBTYPE(Context)
         }
         else if (REF(deep))
             types = TS_STD_SERIES;
+
+        // !!! Special attention on copying frames is going to be needed,
+        // because copying a frame will be expected to create a new identity
+        // for an ACTION! if that frame is aliased AS ACTION!.  The design
+        // of this is still evolving, but we don't want archetypal values
+        // otherwise we could not `do copy f`, so initialize with label.
+        //
+        if (IS_FRAME(context)) {
+            return Init_Frame(
+                D_OUT,
+                Copy_Context_Extra_Managed(c, 0, types),
+                VAL_FRAME_LABEL(context)
+            ); 
+        }
 
         return Init_Any_Context(
             D_OUT,

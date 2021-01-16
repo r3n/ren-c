@@ -110,12 +110,19 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     //
     SET_SERIES_FLAG(CTX_VARLIST(c), MANAGED);
 
-    // When the DO of the FRAME! executes, we don't want it to run the
-    // encloser again (infinite loop).
+    // We're passing the built context to the `outer` function as a FRAME!,
+    // which that function can DO (or not).  But when the DO runs, we don't
+    // want it to run the encloser again--that would be an infinite loop.
+    // Update CTX_FRAME_ACTION() to point to the `inner` that was enclosed.
     //
     REBVAL *rootvar = CTX_ROOTVAR(c);
     INIT_VAL_FRAME_PHASE(rootvar, VAL_ACTION(inner));
     INIT_VAL_FRAME_BINDING(rootvar, VAL_ACTION_BINDING(inner));
+
+    // We want people to be able to DO the FRAME! being given back.  
+    //
+    assert(GET_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED));
+    CLEAR_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED);
 
     // We don't actually know how long the frame we give back is going to
     // live, or who it might be given to.  And it may contain things like
@@ -130,10 +137,19 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     //
     SET_SERIES_FLAG(f->varlist, MANAGED);
 
-    // !!! A bug here was fixed in the stackless build more elegantly.  Just
-    // make a copy for old mainline.
+    // Because the built context is intended to be used with DO, it must be
+    // "phaseless".  The property of phaselessness allows detection of when
+    // the frame should heed FRAME_HAS_BEEN_INVOKED (phased frames internal
+    // to the implementation must have full visibility of locals/etc.)
+    //
+    // !!! A bug was observed here in the stackless build that required a
+    // copy instead of using the archetype.  However, the "phaseless"
+    // requirement for DO was introduced since...suggesting the copy would
+    // be needed regardless.  Be attentive should this ever be switched to
+    // try and use CTX_ARCHETYPE() directly to GC issues.
     //
     REBVAL *rootcopy = Move_Value(FRM_SPARE(f), rootvar);
+    INIT_VAL_FRAME_PHASE_OR_LABEL(FRM_SPARE(f), VAL_ACTION_LABEL(inner));
 
     const bool fully = true;
     if (RunQ_Throws(f->out, fully, rebU(outer), rootcopy, rebEND))

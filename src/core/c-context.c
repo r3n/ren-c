@@ -689,22 +689,23 @@ REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
     REBCTX *c = VAL_CONTEXT(context);
     REBDSP dsp_orig = DSP;
 
-    bool always = false;  // default to not always showing hidden things
+    bool honor_hidden = true;  // default to not  showing hidden things
     if (IS_FRAME(context))
-        always = IS_FRAME_PHASED(context);
+        honor_hidden = not IS_FRAME_PHASED(context);
 
     const REBKEY *tail;
     const REBKEY *key = CTX_KEYS(&tail, c);
     const REBVAR *var = CTX_VARS_HEAD(c);
 
+    const REBPAR *param = IS_FRAME(context)
+        ? ACT_PARAMS_HEAD(VAL_FRAME_PHASE(context))
+        : cast_PAR(var);
+
     assert(!(mode & 4));
 
     REBLEN n = 1;
-    for (; key != tail; ++key, ++var, ++n) {
-        if (IS_FRAME(context) and Is_Param_Sealed(cast_PAR(var)))
-            continue;
-
-        if (not always and Is_Var_Hidden(var))
+    for (; key != tail; ++key, ++var, ++param, ++n) {
+        if (honor_hidden and Is_Param_Hidden(param))
             continue;
 
         if (mode & 1) {
@@ -921,21 +922,20 @@ REBLEN Find_Symbol_In_Context(
 ){
     REBCTX *c = VAL_CONTEXT(context);
 
-    bool always = true;
+    bool honor_hidden = true;
     if (IS_FRAME(context))
-        always = IS_FRAME_PHASED(context);
-    else {
-        // !!! Defaulting to TRUE means that you can find things like SELF
-        // even though they are not displayed.  But you can also find things
-        // that are hidden with PROTECT/HIDE.  SELF needs a lot of review.
-    }
+        honor_hidden = not IS_FRAME_PHASED(context);
 
     const REBKEY *tail;
     const REBKEY *key = CTX_KEYS(&tail, c);
     const REBVAR *var = CTX_VARS_HEAD(c);
 
+    const REBPAR *param = IS_FRAME(context)
+        ? ACT_PARAMS_HEAD(VAL_FRAME_PHASE(context))
+        : cast_PAR(var);
+
     REBLEN n;
-    for (n = 1; key != tail; ++n, ++key, ++var) {
+    for (n = 1; key != tail; ++n, ++key, ++var, ++param) {
         if (strict) {
             if (symbol != KEY_SYMBOL(key))
                 continue;
@@ -945,10 +945,7 @@ REBLEN Find_Symbol_In_Context(
                 continue;
         }
 
-        if (IS_FRAME(context) and Is_Param_Sealed(cast_PAR(var)))
-            continue;  // pretend this parameter is not there
-
-        if (not always and Is_Var_Hidden(var))
+        if (honor_hidden and Is_Param_Hidden(param))
             return 0;
 
         return n;
