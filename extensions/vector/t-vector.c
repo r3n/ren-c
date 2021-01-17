@@ -457,7 +457,7 @@ bool Make_Vector_Spec(
 
     REBLEN num_bytes = len * (bitsize / 8);
     REBBIN *bin = Make_Binary(num_bytes);
-    CLEAR(BIN_HEAD(bin), num_bytes);  // !!! 0 bytes -> 0 int/float?
+    memset(BIN_HEAD(bin), 0, num_bytes);  // !!! 0 bytes -> 0 int/float?
     TERM_BIN_LEN(bin, num_bytes);
 
     Init_Vector(out, bin, sign, integral, bitsize);
@@ -503,7 +503,7 @@ REB_R MAKE_Vector(
         REBYTE bitsize = 32;
         REBLEN num_bytes = (len * bitsize) / 8;
         REBBIN *bin = Make_Binary(num_bytes);
-        CLEAR(BIN_HEAD(bin), num_bytes);
+        memset(BIN_HEAD(bin), 0, num_bytes);
         TERM_BIN_LEN(bin, num_bytes);
 
         const bool sign = true;

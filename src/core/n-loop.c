@@ -1458,7 +1458,7 @@ REBNATIVE(remove_each)
         // stacks already exists and the mold buffer is "hot", so it's not
         // necessarily *that* wasteful in the scheme of things.
         //
-        CLEARS(&mold_struct);
+        memset(&mold_struct, 0, sizeof(mold_struct));
         res.mo = &mold_struct;
         Push_Mold(res.mo);
     }

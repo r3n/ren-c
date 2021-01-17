@@ -919,8 +919,8 @@ inline static REBVAL *Init_Zeroed_Hack(RELVAL *out, enum Reb_Kind kind) {
     }
     else {
         RESET_CELL(out, kind, CELL_MASK_NONE);
-        CLEAR(&out->extra, sizeof(union Reb_Value_Extra));
-        CLEAR(&out->payload, sizeof(union Reb_Value_Payload));
+        memset(&out->extra, 0, sizeof(union Reb_Value_Extra));
+        memset(&out->payload, 0, sizeof(union Reb_Value_Payload));
     }
     return cast(REBVAL*, out);
 }

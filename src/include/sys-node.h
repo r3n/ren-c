@@ -156,12 +156,6 @@
         Free_Mem((p), sizeof(t) * (n))
 #endif
 
-#define CLEAR(m, s) \
-    memset((void*)(m), 0, s)
-
-#define CLEARS(m) \
-    memset((void*)(m), 0, sizeof(*m))
-
 
 #define Is_Node_Cell(n) \
     (did (NODE_BYTE(n) & NODE_BYTEMASK_0x01_CELL))

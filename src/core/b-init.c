@@ -806,7 +806,7 @@ void Startup_Core(void)
     PG_Mem_Usage = 0;
     PG_Mem_Limit = 0;
     Reb_Opts = TRY_ALLOC(REB_OPTS);
-    CLEAR(Reb_Opts, sizeof(REB_OPTS));
+    memset(Reb_Opts, 0, sizeof(REB_OPTS));
     TG_Jump_List = nullptr;
 
     Check_Basics();

@@ -614,7 +614,7 @@ REBTYPE(Binary)
             REBLEN i;
             for (i = 0; i < smaller; i++)
                 *dest++ = *p0++ & *p1++;
-            CLEAR(dest, larger - smaller);
+            memset(dest, 0, larger - smaller);
             break; }
 
           case SYM_BITWISE_OR: {

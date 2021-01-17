@@ -307,6 +307,7 @@ void Startup_Pools(REBINT scale)
 
   #if !defined(NDEBUG)
     PG_Reb_Stats = TRY_ALLOC(REB_STATS);
+    memset(PG_Reb_Stats, 0, sizeof(REB_STATS));
   #endif
 
     // Manually allocated series that GC is not responsible for (unless a
@@ -319,7 +320,7 @@ void Startup_Pools(REBINT scale)
     CLEAR_SERIES_FLAG(GC_Manuals, MANAGED);
 
     Prior_Expand = TRY_ALLOC_N(REBSER*, MAX_EXPAND_LIST);
-    CLEAR(Prior_Expand, sizeof(REBSER*) * MAX_EXPAND_LIST);
+    memset(Prior_Expand, 0, sizeof(REBSER*) * MAX_EXPAND_LIST);
     Prior_Expand[0] = (REBSER*)1;
 }
 

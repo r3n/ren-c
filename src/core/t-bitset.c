@@ -245,7 +245,7 @@ void Set_Bit(REBBIN *bset, REBLEN n, bool set)
     if (i >= tail) {
         if (!set) return; // no need to expand
         Expand_Series(bset, tail, (i - tail) + 1);
-        CLEAR(BIN_AT(bset, tail), (i - tail) + 1);
+        memset(BIN_AT(bset, tail), 0, (i - tail) + 1);
     }
 
     bit = 1 << (7 - ((n) & 7));
@@ -387,7 +387,7 @@ bool Set_Bits(REBBIN *bset, const RELVAL *val, bool set)
             REBUNI c = BIN_LEN(bset);
             if (n >= c) {
                 Expand_Series(bset, c, (n - c));
-                CLEAR(BIN_AT(bset, c), (n - c));
+                memset(BIN_AT(bset, c), 0, (n - c));
             }
             memcpy(BIN_HEAD(bset), at, n);
             break; }

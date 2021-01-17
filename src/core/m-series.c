@@ -302,10 +302,10 @@ void Clear_Series(REBSER *s)
 
     if (IS_SER_DYNAMIC(s)) {
         Unbias_Series(s, false);
-        CLEAR(s->content.dynamic.data, SER_REST(s) * SER_WIDE(s));
+        memset(s->content.dynamic.data, 0, SER_REST(s) * SER_WIDE(s));
     }
     else
-        CLEAR(cast(REBYTE*, &s->content), sizeof(s->content));
+        memset(cast(REBYTE*, &s->content), 0, sizeof(s->content));
 
     TERM_SERIES_IF_NECESSARY(s);
 }

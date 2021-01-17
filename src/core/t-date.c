@@ -259,7 +259,7 @@ REBINT Diff_Date(REBYMD d1, REBYMD d2)
 REBLEN Week_Day(REBYMD date)
 {
     REBYMD year1;
-    CLEARS(&year1);
+    memset(&year1, 0, sizeof(REBYMD));
     year1.day = 1;
     year1.month = 1;
 
