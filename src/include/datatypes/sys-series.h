@@ -1066,6 +1066,9 @@ inline static REBSER *Alloc_Series_Node(REBFLGS flags) {
     SAFETRASH_POINTER_IF_DEBUG(s->link.trash);  // #8
 
     TOUCH_SERIES_IF_DEBUG(s);  // tag current C stack as series origin in ASAN
+  #endif
+
+  #if defined(DEBUG_COLLECT_STATS)
     PG_Reb_Stats->Series_Made++;
   #endif
 
@@ -1228,7 +1231,7 @@ inline static REBSER *Make_Series_Core(
             fail (Error_No_Memory(capacity * wide));
         }
 
-      #if !defined(NDEBUG)
+      #if defined(DEBUG_COLLECT_STATS)
         PG_Reb_Stats->Series_Memory += capacity * wide;
       #endif
     }

@@ -228,7 +228,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
         Prep_Array(ARR(s), capacity);
         SET_END(ARR_HEAD(ARR(s)));
 
-      #if !defined(NDEBUG)
+      #if defined(DEBUG_COLLECT_STATS)
         PG_Reb_Stats->Series_Memory += capacity * wide;
       #endif
     }
@@ -275,7 +275,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
         }
     }
 
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     PG_Reb_Stats->Blocks++;
   #endif
 

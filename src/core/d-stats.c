@@ -51,14 +51,8 @@ REBNATIVE(stats)
     if (REF(evals))
         return Init_Integer(D_OUT, num_evals);
 
-#ifdef NDEBUG
-    UNUSED(REF(show));
-    UNUSED(REF(profile));
-    UNUSED(ARG(pool));
-
-    fail (Error_Debug_Only_Raw());
-#else
     if (REF(profile)) {
+      #if defined(DEBUG_COLLECT_STATS)
         return rebValue("make object! [",
             "evals:", rebI(num_evals),
             "series-made:", rebI(PG_Reb_Stats->Series_Made),
@@ -70,8 +64,12 @@ REBNATIVE(stats)
             "made-objects:", rebI(PG_Reb_Stats->Objects),
             "recycles:", rebI(PG_Reb_Stats->Recycle_Counter),
         "]", rebEND);
+      #else
+        fail (Error_Debug_Only_Raw());
+      #endif
     }
 
+  #if !defined(NDEBUG)
     if (REF(pool)) {
         REBVAL *pool_id = ARG(pool);
         Dump_Series_In_Pool(VAL_INT32(pool_id));
@@ -82,7 +80,12 @@ REBNATIVE(stats)
         Dump_Pools();
 
     return Init_Integer(D_OUT, Inspect_Series(did REF(show)));
-#endif
+  #else
+    UNUSED(REF(show));
+    UNUSED(ARG(pool));
+
+    fail (Error_Debug_Only_Raw());
+  #endif
 }
 
 

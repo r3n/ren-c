@@ -110,6 +110,8 @@ cflags: compose [
         {-DDEBUG_HAS_PROBE}
         {-DDEBUG_COUNT_TICKS}
         {-DDEBUG_PRINTF_FAIL_LOCATIONS}
+
+        {-DDEBUG_COLLECT_STATS}  ; !!! maybe temporary, has cost but good info
     ]]))
 
     ((if use-asyncify [[

@@ -1076,7 +1076,7 @@ REBLEN Recycle_Core(bool shutdown, REBSER *sweeplist)
 
     ASSERT_NO_GC_MARKS_PENDING();
 
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     PG_Reb_Stats->Recycle_Counter++;
     PG_Reb_Stats->Recycle_Series = Mem_Pools[SER_POOL].free;
     PG_Reb_Stats->Mark_Count = 0;
@@ -1132,13 +1132,13 @@ REBLEN Recycle_Core(bool shutdown, REBSER *sweeplist)
     else
         count += Sweep_Series();
 
-#if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     // Compute new stats:
     PG_Reb_Stats->Recycle_Series
         = Mem_Pools[SER_POOL].free - PG_Reb_Stats->Recycle_Series;
     PG_Reb_Stats->Recycle_Series_Total += PG_Reb_Stats->Recycle_Series;
     PG_Reb_Stats->Recycle_Prior_Eval = Eval_Cycles;
-#endif
+  #endif
 
     // !!! This reset of the "ballast" is the original code from R3-Alpha:
     //

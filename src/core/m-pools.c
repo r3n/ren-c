@@ -305,7 +305,7 @@ void Startup_Pools(REBINT scale)
     // !!! Revisit where series init/shutdown goes when the code is more
     // organized to have some of the logic not in the pools file
 
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     PG_Reb_Stats = TRY_ALLOC(REB_STATS);
     memset(PG_Reb_Stats, 0, sizeof(REB_STATS));
   #endif
@@ -394,7 +394,7 @@ void Shutdown_Pools(void)
     // !!! Revisit location (just has to be after all series are freed)
     FREE_N(REBSER*, MAX_EXPAND_LIST, Prior_Expand);
 
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     FREE(REB_STATS, PG_Reb_Stats);
   #endif
 
@@ -903,7 +903,7 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
         Free_Unbiased_Series_Data(data_old - (wide * bias_old), size_old);
     }
 
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     PG_Reb_Stats->Series_Expanded++;
   #endif
 
@@ -1219,7 +1219,7 @@ void GC_Kill_Series(REBSER *s)
     if (GC_Ballast > 0)
         CLR_SIGNAL(SIG_RECYCLE);  // Enough space that requested GC can cancel
 
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     PG_Reb_Stats->Series_Freed++;
   #endif
 }

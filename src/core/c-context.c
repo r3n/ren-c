@@ -602,9 +602,9 @@ REBCTX *Make_Context_Detect_Managed(
 
     ASSERT_CONTEXT(context);
 
-#if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     PG_Reb_Stats->Objects++;
-#endif
+  #endif
 
     return context;
 }

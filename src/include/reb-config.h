@@ -366,6 +366,17 @@ Special internal defines used by RT, not Host-Kit developers:
         //
         #define DEBUG_EXTANT_STACK_POINTERS
     #endif
+
+    // The PG_Reb_Stats structure is only tracked in the debug build, as this
+    // data gathering is a sort of constant "tax" on the system.  While it
+    // might arguably be interesting to non-debug build users who are trying
+    // to optimize their code, the compromise of having to maintain the
+    // numbers suggests those users should be empowered with a debug build if
+    // they are doing such work (they should probably have one for other
+    // reasons; note this has been true of things like Windows NT where there
+    // were indeed "checked" builds given to those who had such interest.)
+    //
+    #define DEBUG_COLLECT_STATS
 #else
     // We may want to test the valgrind build even if it's release so that
     // it checks the R3_ALWAYS_MALLOC environment variable
