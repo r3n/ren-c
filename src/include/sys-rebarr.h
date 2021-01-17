@@ -190,7 +190,7 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define ARR(p) \
-        x_cast(REBARR*, (p))  // don't check const in C or C++
+        m_cast(REBARR*, x_cast(const REBARR*, (p)))  // subvert const warnings
 
 #else
 

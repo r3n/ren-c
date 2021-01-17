@@ -71,7 +71,7 @@
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define SER(p) \
-        x_cast(REBSER*, (p))  // don't check const in C or C++
+        m_cast(REBSER*, x_cast(const REBSER*, (p)))  // subvert const warnings
 
 #else
 
@@ -149,10 +149,10 @@
 //
 
 #define LINK(Field, s) \
-    LINK_##Field##_CAST(x_cast(REBNOD*, (s)->link.any.node))
+    LINK_##Field##_CAST(m_cast(REBNOD*, (s)->link.any.node))
 
 #define MISC(Field, s) \
-    MISC_##Field##_CAST(x_cast(REBNOD*, (s)->misc.any.node))
+    MISC_##Field##_CAST(m_cast(REBNOD*, (s)->misc.any.node))
 
 #define mutable_LINK(Field, s) \
     ensured(LINK_##Field##_TYPE, const REBNOD*, (s)->link.any.node)
@@ -161,10 +161,10 @@
     ensured(MISC_##Field##_TYPE, const REBNOD*, (s)->misc.any.node)
 
 #define node_LINK(Field, s) \
-    *x_cast(REBNOD**, &(s)->link.any.node)  // const ok for strict alias
+    *m_cast(REBNOD**, &(s)->link.any.node)  // const ok for strict alias
 
 #define node_MISC(Field, s) \
-    *x_cast(REBNOD**, &(s)->misc.any.node)  // const ok for strict alias
+    *m_cast(REBNOD**, &(s)->misc.any.node)  // const ok for strict alias
 
 
 //

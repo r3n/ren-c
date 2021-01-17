@@ -31,7 +31,7 @@
 #if !defined(DEBUG_CHECK_CASTS)
 
     #define NOD(p) \
-        x_cast(REBNOD*, (p))  // don't check const when checks disabled
+        m_cast(REBNOD*, x_cast(const REBNOD*, (p)))  // subvert const warnings
 
 #else
 

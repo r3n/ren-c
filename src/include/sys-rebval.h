@@ -640,10 +640,10 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     (v)->extra.Type
 
 #define mutable_BINDING(v) \
-    *((const REBSER**)&(v)->extra.Binding)
+    *x_cast(const REBSER**, &(v)->extra.Binding)
 
 #define BINDING(v) \
-    ((REBSER*)(v)->extra.Binding)
+    m_cast(REBSER*, (v)->extra.Binding)
 
 
 //=////////////////////////////////////////////////////////////////////////=//

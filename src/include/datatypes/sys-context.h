@@ -133,7 +133,7 @@
 // For the moment that is done with the CTX_META() field instead.
 //
 
-inline static const REBVAL *CTX_ARCHETYPE(const REBCTX *c) {  // read-only
+inline static const REBVAL *CTX_ARCHETYPE(REBCTX *c) {  // read-only form
     const REBSER *varlist = CTX_VARLIST(c);
     if (not IS_SER_DYNAMIC(varlist)) {  // a freed stub, variables are gone
         assert(GET_SERIES_INFO(varlist, INACCESSIBLE));

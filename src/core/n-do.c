@@ -453,11 +453,7 @@ REBNATIVE(do)
         f->rootvar = CTX_ROOTVAR(c);
         INIT_LINK_KEYSOURCE(varlist, NOD(f));
 
-        REBACT *action = CTX_FRAME_ACTION(c);
-
-        assert(CTX_KEYS_HEAD(c) == ACT_KEYS_HEAD(action));
-
-        assert(FRM_PHASE(f) == action);  // !!! v-- should archetype match?
+        assert(FRM_PHASE(f) == CTX_FRAME_ACTION(c));
         INIT_FRM_BINDING(f, VAL_FRAME_BINDING(source));
 
         Begin_Prefix_Action(f, VAL_FRAME_LABEL(source));

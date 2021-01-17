@@ -85,7 +85,7 @@
 #endif
 
 #define CTX_VARLIST(c) \
-    x_cast(REBARR*, &(c)->varlist)
+    cast(REBARR*, &(c)->varlist)
 
 
 #if !defined(DEBUG_CHECK_CASTS)

@@ -53,7 +53,7 @@
 // intent clearer for passing in a null REBSTR*, use ANONYMOUS instead.
 //
 #define ANONYMOUS \
-    x_cast(const REBSYM*, nullptr)
+    cast(const REBSYM*, nullptr)
 
 
 // For a writable REBSTR, a list of entities that cache the mapping from
@@ -377,7 +377,8 @@ inline static bool IS_SER_STRING(const REBSER *s) {
 #define IS_STR_SYMBOL(s) \
     ((s)->leader.bits & STRING_FLAG_IS_SYMBOL)
 
-#define SYM(s) x_cast(REBSYM*, s)
+#define SYM(s) \
+    m_cast(REBSYM*, x_cast(const REBSYM*, (s)))
 
 
 //=//// STRING ALL-ASCII FLAG /////////////////////////////////////////////=//
