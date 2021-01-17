@@ -376,20 +376,7 @@ requote: reframer func* [
 ]
 
 
-->: enfixed lambda: func* [
-    {Convenience wrapper for MAKE ACTION! (Note: does not provide RETURN)}
-
-    return: [action!]
-    'args "Block of argument words, or a single word (if one argument)"
-        [<end> word! block!]
-    body "Block that serves as the body"
-        [block!]
-][
-    make action! reduce [  ; use MAKE ACTION! for no RETURN handling
-        blockify dequote args  ; note NULL for <end> produces `[]`
-        body
-    ]
-]
+->: enfixed :lambda
 
 <-: enfixed func* [
     {Declare action by example instantiation, missing args left unspecialized}

@@ -227,25 +227,13 @@ REBNATIVE(bind)
 
 
 //
-//  Virtual_Bind_Patchify: C
+//  Specifier_Chained_With_Context: C
 //
-// Update the binding in an array so that it adds the given context as
-// overriding the bindings.  This is done without actually mutating the
-// structural content of the array...but means words in the array will need
-// additional calculations that take the virtual binding chain into account
-// as part of Get_Word_Context().
-//
-// !!! There is a performance tradeoff we could tinker with here, where we
-// could build a binder which hashed words to object indices, and then walk
-// the block with that binding information to cache in words the virtual
-// binding "hits" and "misses".  With small objects this is likely a poor
-// tradeoff, as searching them is cheap.  Also it preemptively presumes all
-// words would be looked up (many might not be, or might not be intended to
-// be looked up with this specifier).  But if the binding chain contains very
-// large objects the linear searches might be expensive enough to be worth it.
-//
-void Virtual_Bind_Patchify(REBVAL *any_array, REBCTX *ctx, enum Reb_Kind kind)
-{
+REBSPC *Specifier_Chained_With_Context(
+    REBSPC *specifier,
+    REBCTX *ctx,
+    enum Reb_Kind kind
+){
     assert(kind == REB_WORD or kind == REB_SET_WORD);
 
     // The way virtual binding works, it remembers the length of the context
@@ -259,7 +247,7 @@ void Virtual_Bind_Patchify(REBVAL *any_array, REBCTX *ctx, enum Reb_Kind kind)
     // it is chosen to match the "at that moment" behavior of mutable BIND.)
     //
     if (CTX_LEN(ctx) == 0)
-        return;
+        return specifier;
 
     REBARR *patch = Alloc_Singular(
         NODE_FLAG_MANAGED
@@ -299,7 +287,7 @@ void Virtual_Bind_Patchify(REBVAL *any_array, REBCTX *ctx, enum Reb_Kind kind)
     // the chain.  So we can simply point to the existing specifier...whether
     // it is a patch, a frame context, or nullptr.
     //
-    mutable_LINK(PatchNext, patch) = VAL_SPECIFIER(any_array);
+    mutable_LINK(PatchNext, patch) = specifier;
 
     // A circularly linked list of variations of this patch with different
     // LINK(PatchNext) is maintained, to assist in avoiding creating
@@ -309,13 +297,40 @@ void Virtual_Bind_Patchify(REBVAL *any_array, REBCTX *ctx, enum Reb_Kind kind)
     //
     mutable_MISC(Variant, patch) = patch;
 
+    return patch;
+}
+
+
+//
+//  Virtual_Bind_Patchify: C
+//
+// Update the binding in an array so that it adds the given context as
+// overriding the bindings.  This is done without actually mutating the
+// structural content of the array...but means words in the array will need
+// additional calculations that take the virtual binding chain into account
+// as part of Get_Word_Context().
+//
+// !!! There is a performance tradeoff we could tinker with here, where we
+// could build a binder which hashed words to object indices, and then walk
+// the block with that binding information to cache in words the virtual
+// binding "hits" and "misses".  With small objects this is likely a poor
+// tradeoff, as searching them is cheap.  Also it preemptively presumes all
+// words would be looked up (many might not be, or might not be intended to
+// be looked up with this specifier).  But if the binding chain contains very
+// large objects the linear searches might be expensive enough to be worth it.
+//
+void Virtual_Bind_Patchify(REBVAL *any_array, REBCTX *ctx, enum Reb_Kind kind)
+{
     // Update array's binding.  Note that once virtually bound, mutating BIND
     // operations might apepar to be ignored if applied to the block.  This
     // makes CONST a good default...and MUTABLE can be used if people are
     // not concerned and want to try binding it through the virtualized
     // reference anyway.
     //
-    INIT_BINDING_MAY_MANAGE(any_array, patch);
+    INIT_BINDING_MAY_MANAGE(
+        any_array,
+        Specifier_Chained_With_Context(VAL_SPECIFIER(any_array), ctx, kind)
+    );
     Constify(any_array);
 }
 
