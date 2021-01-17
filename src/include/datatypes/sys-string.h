@@ -277,7 +277,7 @@ inline static REBCHR(*) SKIP_CHR(
         }
     }
     NEXT_CHR(codepoint_out, cp);
-    return cast(REBCHR(*), cp);
+    return m_cast(REBCHR(*), cp);
 }
 
 #if defined(DEBUG_UTF8_EVERYWHERE)

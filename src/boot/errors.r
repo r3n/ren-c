@@ -232,6 +232,7 @@ Script: [
 
     frame-already-used: [{Frame currently in use by a function call} :arg1]
     frame-not-on-stack: {Frame is no longer running on the stack}
+    stale-frame:        {Original FRAME! can't be reused/viewed after invoking}
 
     varargs-no-stack:   {Call originating VARARGS! has finished running}
     varargs-make-only:  {MAKE *shared* BLOCK! supported on VARARGS! (not TO)}

@@ -440,7 +440,7 @@ REBNATIVE(do)
 
         REBARR *varlist = CTX_VARLIST(c);
         if (GET_ARRAY_FLAG(varlist, FRAME_HAS_BEEN_INVOKED))
-            fail ("Can't DO FRAME! invoked prior, consider DO COPY FRAME!");
+            fail (Error_Stale_Frame_Raw());
 
         REBFLGS flags = EVAL_MASK_DEFAULT
             | EVAL_FLAG_FULLY_SPECIALIZED

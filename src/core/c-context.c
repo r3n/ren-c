@@ -923,8 +923,14 @@ REBLEN Find_Symbol_In_Context(
     REBCTX *c = VAL_CONTEXT(context);
 
     bool honor_hidden = true;
-    if (IS_FRAME(context))
-        honor_hidden = not IS_FRAME_PHASED(context);
+    if (IS_FRAME(context)) {
+        if (IS_FRAME_PHASED(context))
+            honor_hidden = false;
+        else {
+            if (GET_ARRAY_FLAG(CTX_VARLIST(c), FRAME_HAS_BEEN_INVOKED))
+                fail (Error_Stale_Frame_Raw());
+        }
+    }
 
     const REBKEY *tail;
     const REBKEY *key = CTX_KEYS(&tail, c);
