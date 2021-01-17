@@ -65,7 +65,21 @@
 #include "sys-int-funcs.h"
 
 
+// The reason the LINK() and MISC() macros are so weird is because regardless
+// of who assigns the fields, the GC wants to be able to mark them.  So the
+// same generic field must be used for all cases...which those macros help
+// to keep distinct for comprehensibility purposes.
 //
+// But access via the GC just sees the fields as their generic nodes (though
+// through a non-const point of view, to mark them).
+
+#define LINK_Node_TYPE      REBNOD*
+#define LINK_Node_CAST
+
+#define MISC_Node_TYPE      REBNOD*
+#define MISC_Node_CAST
+
+
 // !!! In R3-Alpha, the core included specialized structures which required
 // their own GC participation.  This is because rather than store their
 // properties in conventional Rebol types (like an OBJECT!) they wanted to

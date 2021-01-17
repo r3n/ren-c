@@ -167,17 +167,6 @@
     *x_cast(REBNOD**, &(s)->misc.any.node)  // const ok for strict alias
 
 
-// The GC wants to read the node generically, but doesn't want to have to
-// deal with the node being const (which makes assignments possible when it's
-// a `const void*`, since (*(void*)&voidptr) won't work).
-//
-#define LINK_Node_TYPE      REBNOD
-#define LINK_Node_CAST(n)   x_cast(REBNOD*, (n))  // remove const
-
-#define MISC_Node_TYPE      REBNOD
-#define MISC_Node_CAST(n)   x_cast(REBNOD*, (n))  // remove const
-
-
 //
 // Series header FLAGs (distinct from INFO bits)
 //
