@@ -42,15 +42,13 @@
 //=//// QUOTED ////////////////////////////////////////////////////////////=//
 //
 // Testing for QUOTED! is special, as it isn't just the REB_QUOTED type, but
-// also multiplexed as values > REB_64.  See %sys-quoted.h
+// also multiplexed as values > REB_QUOTED.  See %sys-quoted.h
 //
-// !!! Review making this test faster as just `k >= REB_QUOTED` by positioning
-// the QUOTED! datatype past all the pseudotypes (e.g. at 63).  This would
-// raise REB_MAX, and inflate all the tables for dispatch to 64 items, which
-// is not really a big deal...but there are likely other consequences.
+// !!! Currently this would register REB_T_UNSAFE as quoted, but it will cause
+// other problems quickly enough that it's not worth asserting here.
 
-inline static bool IS_QUOTED_KIND(REBYTE k)
-  { return k == REB_QUOTED or k >= REB_64; }
+#define IS_QUOTED_KIND(k) \
+  ((k) >= REB_QUOTED)
 
 #define IS_QUOTED(v) \
     IS_QUOTED_KIND(KIND3Q_BYTE(v))
