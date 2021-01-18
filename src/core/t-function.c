@@ -59,15 +59,17 @@ REBINT CT_Action(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 //
 //  MAKE_Action: C
 //
-// For REB_ACTION and "make spec", there is a function spec block and then
-// a block of Rebol code implementing that function.  In that case we expect
-// that `def` should be:
+// Ren-C provides the ability to MAKE ACTION! from a FRAME!.  Any values on
+// the public interface which are ~unset~ will be assumed to be unspecialized.
 //
-//     [[spec] [body]]
+// https://forum.rebol.info/t/default-values-and-make-frame/1412
 //
-// !!! This has a potential to redesign as a single block, see concept:
-//
-// https://forum.rebol.info/t/1002
+// It however does not carry forward R3-Alpha's concept of MAKE ACTION! from
+// a BLOCK!, e.g. `make function! copy/deep reduce [spec body]`.  This is
+// because there is no particular advantage to folding the two parameters to
+// FUNC into one block...and it makes spec analysis seem more "cooked in"
+// than being an epicycle of the design of FUNC (which is just an optimized
+// version of something that could be written in usermode).
 //
 REB_R MAKE_Action(
     REBVAL *out,
@@ -79,15 +81,12 @@ REB_R MAKE_Action(
     if (parent)
         fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
-    // MAKE ACTION! on a FRAME! will create an action where the NULLs are
-    // assumed to be unspecialized.
-    // !!! Techniques for passing NULL literally should be examined.
-    //
-    if (IS_FRAME(arg)) {
+    if (IS_FRAME(arg)) {  // will assume ~unset~ fields are unspecialized
         //
-        // Use a copy of the frame's values so original frame is left as is.
-        // !!! Could also expire original frame and steal variables, and ask
-        // user to copy if they care, for efficiency?
+        // !!! This makes a copy of the incoming context.  AS FRAME! does not,
+        // but it expects any specialized frame fields to be hidden, and non
+        // hidden fields are parameter specifications.  Review if there is
+        // some middle ground.
         //
         REBVAL *frame_copy = rebValue("copy", arg, rebEND);
         REBCTX *exemplar = VAL_CONTEXT(frame_copy);
@@ -101,35 +100,10 @@ REB_R MAKE_Action(
         );
     }
 
-    if (
-        not IS_BLOCK(arg)
-        or VAL_LEN_AT(arg) != 2
-        or not IS_BLOCK(VAL_ARRAY_AT(arg))
-        or not IS_BLOCK(VAL_ARRAY_AT(arg) + 1)
-    ){
+    if (not IS_BLOCK(arg))
         fail (Error_Bad_Make(REB_ACTION, arg));
-    }
 
-    DECLARE_LOCAL (spec);
-    Derelativize(spec, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
-
-    DECLARE_LOCAL (body);
-    Derelativize(body, VAL_ARRAY_AT(arg) + 1, VAL_SPECIFIER(arg));
-
-    // Spec-constructed functions do *not* have definitional returns
-    // added automatically.  They are part of the generators.  So the
-    // behavior comes--as with any other generator--from the projected
-    // code (though round-tripping it via text is not possible in
-    // general in any case due to loss of bindings.)
-    //
-    REBACT *act = Make_Interpreted_Action_May_Fail(
-        spec,
-        body,
-        MKF_MASK_NONE,
-        1 + IDX_DETAILS_1  // details, archetype plus relativized body
-    );
-
-    return Init_Action(out, act, ANONYMOUS, UNBOUND);
+    fail ("Ren-C does not support MAKE ACTION! on BLOCK! (see FUNC*/FUNC)");
 }
 
 

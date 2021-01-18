@@ -393,7 +393,7 @@ REBARR *Collect_Unique_Words_Managed(
     const RELVAL *head,
     const RELVAL *tail,
     REBFLGS flags,  // See COLLECT_XXX
-    const REBVAL *ignore  // BLOCK!, ANY-CONTEXT!, or BLANK! for none
+    const REBVAL *ignorables  // BLOCK!, ANY-CONTEXT!, or BLANK! for none
 ){
     // We do not want to fail() during the bind at this point in time (the
     // system doesn't know how to clean up, and the only cleanup it does
@@ -401,12 +401,12 @@ REBARR *Collect_Unique_Words_Managed(
     // the "ignore" bindings.)  Do a pre-pass to fail first, if there are
     // any non-words in a block the user passed in.
     //
-    if (not IS_NULLED(ignore)) {
+    if (not IS_NULLED(ignorables)) {
         const RELVAL *check_tail;
-        const RELVAL *check = VAL_ARRAY_AT_T(&check_tail, ignore);
+        const RELVAL *check = VAL_ARRAY_AT_T(&check_tail, ignorables);
         for (; check != check_tail; ++check) {
             if (not ANY_WORD_KIND(CELL_KIND(VAL_UNESCAPED(check))))
-                fail (Error_Bad_Value_Core(check, VAL_SPECIFIER(ignore)));
+                fail (Error_Bad_Value_Core(check, VAL_SPECIFIER(ignorables)));
         }
     }
 
@@ -420,10 +420,11 @@ REBARR *Collect_Unique_Words_Managed(
     // not actually add them to the collection.  Then, duplicates don't cause
     // an error...so they will just be skipped when encountered.
     //
-    if (IS_BLOCK(ignore)) {
-        const RELVAL *item = VAL_ARRAY_AT(ignore);
-        for (; NOT_END(item); ++item) {
-            REBCEL(const*) cell = VAL_UNESCAPED(item);
+    if (IS_BLOCK(ignorables)) {
+        const RELVAL *ignore_tail;
+        const RELVAL *ignore = VAL_ARRAY_AT_T(&ignore_tail, ignorables);
+        for (; ignore != ignore_tail; ++ignore) {
+            REBCEL(const*) cell = VAL_UNESCAPED(ignore);
             const REBSYM *symbol = VAL_WORD_SYMBOL(cell);
 
             // A block may have duplicate words in it (this situation could
@@ -441,9 +442,9 @@ REBARR *Collect_Unique_Words_Managed(
             }
         }
     }
-    else if (ANY_CONTEXT(ignore)) {
+    else if (ANY_CONTEXT(ignorables)) {
         const REBKEY *key_tail;
-        const REBKEY *key = CTX_KEYS(&key_tail, VAL_CONTEXT(ignore));
+        const REBKEY *key = CTX_KEYS(&key_tail, VAL_CONTEXT(ignorables));
         for (; key != key_tail; ++key) {
             //
             // Shouldn't be possible to have an object with duplicate keys,
@@ -453,7 +454,7 @@ REBARR *Collect_Unique_Words_Managed(
         }
     }
     else
-        assert(IS_NULLED(ignore));
+        assert(IS_NULLED(ignorables));
 
     Collect_Inner_Loop(cl, head, tail);
 
@@ -467,10 +468,11 @@ REBARR *Collect_Unique_Words_Managed(
         NODE_FLAG_MANAGED
     );
 
-    if (IS_BLOCK(ignore)) {
-        const RELVAL *item = VAL_ARRAY_AT(ignore);
-        for (; NOT_END(item); ++item) {
-            REBCEL(const*) cell = VAL_UNESCAPED(item);
+    if (IS_BLOCK(ignorables)) {
+        const RELVAL *ignore_tail;
+        const RELVAL *ignore = VAL_ARRAY_AT_T(&ignore_tail, ignorables);
+        for (; ignore != ignore_tail; ++ignore) {
+            REBCEL(const*) cell = VAL_UNESCAPED(ignore);
             const REBSYM *symbol = VAL_WORD_SYMBOL(cell);
 
           #if !defined(NDEBUG)
@@ -486,14 +488,14 @@ REBARR *Collect_Unique_Words_Managed(
             Remove_Binder_Index(&cl->binder, symbol);
         }
     }
-    else if (ANY_CONTEXT(ignore)) {
+    else if (ANY_CONTEXT(ignorables)) {
         const REBKEY *key_tail;
-        const REBKEY *key = CTX_KEYS(&key_tail, VAL_CONTEXT(ignore));
+        const REBKEY *key = CTX_KEYS(&key_tail, VAL_CONTEXT(ignorables));
         for (; key != key_tail; ++key)
             Remove_Binder_Index(&cl->binder, KEY_SYMBOL(key));
     }
     else
-        assert(IS_NULLED(ignore));
+        assert(IS_NULLED(ignorables));
 
     Collect_End(cl);
     return array;
@@ -654,7 +656,7 @@ REBCTX *Construct_Context_Managed(
     Bind_Values_Shallow(head, tail, CTX_ARCHETYPE(context));
 
     const RELVAL *value = head;
-    for (; NOT_END(value); value += 2) {
+    for (; value != tail; value += 2) {
         if (not IS_SET_WORD(value))
             fail (Error_Invalid_Type(VAL_TYPE(value)));
 
@@ -784,8 +786,9 @@ void Resolve_Context(
     }
     else if (IS_BLOCK(only_words)) {
         // Limit exports to only these words:
-        const RELVAL *word = VAL_ARRAY_AT(only_words);
-        for (; NOT_END(word); word++) {
+        const RELVAL *tail;
+        const RELVAL *word = VAL_ARRAY_AT_T(&tail, only_words);
+        for (; word != tail; word++) {
             if (IS_WORD(word) or IS_SET_WORD(word)) {
                 Add_Binder_Index(&binder, VAL_WORD_SYMBOL(word), -1);
                 n++;
@@ -888,8 +891,9 @@ void Resolve_Context(
                 Remove_Binder_Index_Else_0(&binder, KEY_SYMBOL(key));
         }
         else if (IS_BLOCK(only_words)) {
-            const RELVAL *word = VAL_ARRAY_AT(only_words);
-            for (; NOT_END(word); word++) {
+            const RELVAL *tail;
+            const RELVAL *word = VAL_ARRAY_AT_T(&tail, only_words);
+            for (; word != tail; word++) {
                 if (IS_WORD(word) or IS_SET_WORD(word))
                     Remove_Binder_Index_Else_0(&binder, VAL_WORD_SYMBOL(word));
             }

@@ -765,8 +765,9 @@ REBCTX *Make_Error_Managed_Core(
 
     REBLEN expected_args = 0;
     if (IS_BLOCK(message)) { // GET-WORD!s in template should match va_list
-        const RELVAL *temp = ARR_HEAD(VAL_ARRAY(message));
-        for (; NOT_END(temp); ++temp) {
+        const RELVAL *tail;
+        const RELVAL *temp = VAL_ARRAY_AT_T(&tail, message);
+        for (; temp != tail; ++temp) {
             if (IS_GET_WORD(temp))
                 ++expected_args;
             else

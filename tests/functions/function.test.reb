@@ -4,8 +4,10 @@
 (action! = type of does ["OK"])
 ; minimum
 (action? does [])
-; literal form
-(action? first [#[action! [[] []]]])
+
+; !!! literal form no longer supported
+(error? trap [load "#[action! [[] []]]"])
+
 ; return-less return value tests
 (
     f: does []
@@ -411,8 +413,8 @@
     unset 'y
 
     body: [x + y]
-    f: make action! reduce [[x] body]
-    g: make action! reduce [[y] body]
+    f: func reduce [x] body
+    g: func reduce [y] body
     error? trap [f 1]
 )]
 [#2044 (

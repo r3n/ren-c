@@ -7,8 +7,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2020 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -21,9 +21,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// FUNC is the basic means for creating a usermode function, implemented by
-// a BLOCK! of code, with another block serving as the "spec" for parameters
-// and HELP information:
+// FUNC is a common means for creating an action from a BLOCK! of code, with
+// another block serving as the "spec" for parameters and HELP:
 //
 //     >> print-sum-twice: func [
 //            {Prints the sum of two integers, and return the sum}
@@ -41,7 +40,7 @@
 //     The sum is 30
 //     The sum is 30
 //
-// Ren-C brings many new abilities not present in historical Rebol:
+// Ren-C brings new abilities not present in historical Rebol:
 //
 // * Return-type checking via `return: [...]` in the spec
 //
@@ -57,17 +56,22 @@
 //   leaving whatever result was in the evaluation previous to the function
 //   call as-is.
 //
-// * A FRAME! object type that bundles together a function instance and its
-//   parameters, which can be invoked or turned into a specialized ACTION!.
-//
 // * Refinements-as-their-own-arguments--which streamlines the evaluator,
 //   saves memory, simplifies naming, and simplifies the FRAME! mechanics.
 //
-// * Many mechanisms for adjusting the behavior or parameterization of
-//   functions without rewriting them, e.g. SPECIALIZE, ADAPT, ENCLOSE,
-//   AUGMENT, CHAIN, and HIJACK.  These derived function generators can be
-//   applied equally well to natives as well as user functions...or to other
-//   derivations.
+//=//// NOTES /////////////////////////////////////////////////////////////=//
+//
+// * R3-Alpha defined FUNC in terms of MAKE ACTION! on a block.  There was
+//   no particular advantage to having an entry point to making functions
+//   from a spec and body that put them both in the same block, so FUNC
+//   serves as a more logical native entry point for that functionality.
+//
+// * While FUNC is intended to be an optimized native due to its commonality,
+//   the belief is still that it should be possible to build an equivalent
+//   (albeit slower) version in usermode out of other primitives.  The current
+//   plan is that those primitives would be MAKE ACTION! from a FRAME!, and
+//   being able to ADAPT a block of code into that frame.  This makes ADAPT
+//   the more foundational operation for fusing interfaces with block bodies.
 //
 
 #include "sys-core.h"
@@ -296,16 +300,23 @@ REB_R Commenter_Dispatcher(REBFRM *f)
 //
 //  Make_Interpreted_Action_May_Fail: C
 //
-// This is the support routine behind both `MAKE ACTION!` and FUNC.
+// This digests the spec block into a `paramlist` for parameter descriptions,
+// along with an associated `keylist` of the names of the parameters and
+// various locals.  A separate object that uses the same keylist is made
+// which maps the parameters to any descriptions that were in the spec.
 //
-// Ren-C's schematic is *very* different from R3-Alpha, whose definition of
-// FUNC was simply:
+// Due to the fact that the typesets in paramlists are "lossy" of information
+// in the source, another object is currently created as well that maps the
+// parameters to the BLOCK! of type information as it appears in the source.
+// Attempts are being made to close the gap between that and the paramlist, so
+// that separate arrays aren't needed for this closely related information:
 //
-//     make function! copy/deep reduce [spec body]
+// https://forum.rebol.info/t/1459
 //
-// Ren-C's `make action!` doesn't need to copy the spec (it does not save
-// it--parameter descriptions are in a meta object).  The body is copied
-// implicitly (as it must be in order to relativize it).
+// The C function dispatcher that is used for the resulting ACTION! varies.
+// For instance, if the body is empty then it picks a dispatcher that does
+// not bother running the code.  And if there's no return type specified,
+// a dispatcher that doesn't check the type is used.
 //
 // There is also a "definitional return" MKF_RETURN option used by FUNC, so
 // the body will introduce a RETURN specific to each action invocation, thus
