@@ -87,8 +87,7 @@ console!: make object! [
 {Welcome to Rebol.  For more information please type in the commands below:
 
   HELP    - For starting information
-  ABOUT   - Information about your Rebol
-  CHANGES - What's different about this version}
+  ABOUT   - Information about your Rebol}
 
     print-greeting: method [
         return: <void>
