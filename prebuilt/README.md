@@ -28,7 +28,10 @@ WINDOWS:
 https://s3.amazonaws.com/r3bootstraps/r3-windows-x86-8994d23.exe
 
 OS X:
-https://s3.amazonaws.com/r3bootstraps/r3-osx-x64-8994d23
+https://s3.amazonaws.com/r3bootstraps/r3-osx-x64-8994d23-debug
+*(Note: There was some reason the release build that had been generated for
+OS X wasn't used--it was compiled with unwanted dependencies, or somesuch.
+So the bootstrap build that was picked has debug instrumentation in it.)*
 
 ANDROID:
 https://s3.amazonaws.com/r3bootstraps/r3-android-arm-8994d23
