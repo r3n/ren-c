@@ -429,8 +429,7 @@ inline static REBVAL *Init_Param_Core(
 }
 
 #define Init_Param(out,pclass,bits) \
-    Init_Param_Core( \
-        TRACK_CELL_IF_EXTENDED_DEBUG(out), (pclass), (bits))
+    Init_Param_Core(TRACK_CELL_IF_DEBUG(out), (pclass), (bits))
 
 
 inline static REBVAL *Refinify(REBVAL *v);  // forward declaration

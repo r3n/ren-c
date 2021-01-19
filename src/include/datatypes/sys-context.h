@@ -200,7 +200,7 @@ inline static void INIT_VAL_FRAME_ROOTVAR_Core(
 
 #define INIT_VAL_FRAME_ROOTVAR(out,varlist,phase,binding) \
     INIT_VAL_FRAME_ROOTVAR_Core( \
-        TRACK_CELL_IF_EXTENDED_DEBUG(out), (varlist), (phase), (binding))
+        TRACK_CELL_IF_DEBUG(out), (varlist), (phase), (binding))
 
 
 //=//// CONTEXT KEYLISTS //////////////////////////////////////////////////=//

@@ -227,13 +227,11 @@ inline static void INIT_VAL_NODE2(RELVAL *v, const REBNOD *node) {
                 | NODE_FLAG_FREE
             )) == (NODE_FLAG_CELL | NODE_FLAG_NODE)
         ){
-            // Unreadable void is signified in the Extra by a negative tick
-            //
             if (KIND3Q_BYTE_UNCHECKED(v) == REB_VOID) {
                 if (VAL_NODE1(v) == nullptr) {
                     printf("KIND3Q_BYTE() called on unreadable VOID!\n");
-                  #ifdef DEBUG_COUNT_TICKS
-                    printf("Made on tick: %d\n", cast(int, v->extra.tick));
+                  #ifdef DEBUG_TRACK_EXTEND_CELLS
+                    printf("Made on tick: %d\n", cast(int, v->tick));
                   #endif
                     panic_at (v, file, line);
                 }
@@ -528,7 +526,7 @@ inline static RELVAL *Prep_Cell_Core(RELVAL *c) {
 #define END_NODE \
     cast(const REBVAL*, &PG_End_Node) // rebEND is char*, not REBVAL* aligned!
 
-#if defined(DEBUG_TRACK_CELLS) || defined(DEBUG_CELL_WRITABILITY)
+#if defined(DEBUG_TRACK_EXTEND_CELLS) || defined(DEBUG_CELL_WRITABILITY)
     inline static REBVAL *SET_END_Debug(RELVAL *v) {
         ASSERT_CELL_WRITABLE_EVIL_MACRO(v);
 
@@ -741,7 +739,8 @@ inline static void Move_Value_Header(
     out->header.bits |= v->header.bits & CELL_MASK_COPY;
 
   #ifdef DEBUG_TRACK_EXTEND_CELLS
-    out->track = v->track;
+    out->file = v->file;
+    out->line = v->line;
     out->tick = TG_Tick;  // initialization tick
     out->touch = v->touch;  // arbitrary debugging use via TOUCH_CELL
   #endif

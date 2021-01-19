@@ -1133,7 +1133,7 @@ switch user-config/debug [
             "NDEBUG"  ; disable assert(), and many other general debug checks
 
             ; Include debugging features which do not in-and-of-themselves
-            ; affect runtime performance (DEBUG_TRACK_CELLS would be an
+            ; affect runtime performance (DEBUG_TRACK_EXTEND_CELLS would be an
             ; example of something that significantly affects runtime, and
             ; even things like DEBUG_FRAME_LABELS adds a tiny bit!)
             ;

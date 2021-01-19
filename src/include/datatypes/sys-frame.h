@@ -685,7 +685,7 @@ inline static void Push_Action(
     }
 
     f->rootvar = cast(REBVAL*, s->content.dynamic.data);
-    USED(TRACK_CELL_IF_EXTENDED_DEBUG(f->rootvar));
+    USED(TRACK_CELL_IF_DEBUG(f->rootvar));
     f->rootvar->header.bits =
         NODE_FLAG_NODE
             | NODE_FLAG_CELL

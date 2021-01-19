@@ -47,28 +47,16 @@ REBNOD *Dump_Value_Debug(const RELVAL *v)
       case REB_NULL:
       case REB_VOID:
       case REB_BLANK:
-      #if defined(DEBUG_TRACK_CELLS)
+      #if defined(DEBUG_TRACK_EXTEND_CELLS)
         printf("REBVAL init");
 
-        #if defined(DEBUG_TRACK_EXTEND_CELLS)
-            #if defined(DEBUG_COUNT_TICKS)
-                printf(" @ tick #%d", cast(unsigned int, v->tick));
-                if (v->touch != 0)
-                    printf(" @ touch #%d", cast(unsigned int, v->touch));
-            #endif
+        printf(" @ tick #%d", cast(unsigned int, v->tick));
+        if (v->touch != 0)
+            printf(" @ touch #%d", cast(unsigned int, v->touch));
 
-            printf(" @ %s:%d\n", v->track.file, v->track.line);
-        #else
-            #if defined(DEBUG_COUNT_TICKS)
-                printf(" @ tick #%d", cast(unsigned int, v->extra.tick));
-            #endif
-
-            printf(
-                " @ %s:%d\n", PAYLOAD(Track, v).file, PAYLOAD(Track, v).line
-            );
-        #endif
+        printf(" @ %s:%ld\n", v->file, cast(unsigned long, v->line));
       #else
-        printf("- no track info (see DEBUG_TRACK_CELLS/DEBUG_COUNT_TICKS)\n");
+        printf("- no track info (see DEBUG_TRACK_EXTEND_CELLS)\n");
       #endif
         fflush(stdout);
         break;

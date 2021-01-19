@@ -425,10 +425,6 @@ union Reb_Value_Extra { //=/////////////////// ACTUAL EXTRA DEFINITION ////=//
 
     union Reb_Any Any;
     union Reb_Bytes_Extra Bytes;
-
-  #if defined(DEBUG_COUNT_TICKS)
-    uintptr_t tick;  // cells that don't use their bindings can show this
-  #endif
 };
 
 
@@ -496,14 +492,6 @@ struct Reb_Comma_Payload {
     const void* const* packed;
 };
 
-#if defined(DEBUG_TRACK_CELLS)
-    struct Reb_Track_Payload  // see %sys-track.h
-    {
-        const char *file;  // is REBYTE (UTF-8), but char* for debug watch
-        int line;
-    };
-#endif
-
 union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 
     // Due to strict aliasing, if a routine is going to generically access a
@@ -548,17 +536,6 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 
     union Reb_Bytes_Payload Bytes;
     struct Reb_Comma_Payload Comma;
-
-  #if defined(DEBUG_TRACK_CELLS) && !defined(DEBUG_TRACK_EXTEND_CELLS)
-    //
-    // Debug builds put the file and line number of initialization for a cell
-    // into the payload.  It will remain there after initialization for types
-    // that do not need a payload (NULL, VOID!, BLANK!, LOGIC!).  See the
-    // DEBUG_TRACK_EXTEND_CELLS option for tracking even types with payloads,
-    // and also see TOUCH_CELL() for how to update tracking at runtime.
-    //
-    struct Reb_Track_Payload Track;
-  #endif
 
   #if !defined(NDEBUG) // unsafe "puns" for easy debug viewing in C watchlist
     int64_t int64_pun;
@@ -605,12 +582,13 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 
       #if defined(DEBUG_TRACK_EXTEND_CELLS)
         //
-        // Lets you preserve the tracking info even if the cell has a payload.
-        // This doubles the cell size, but can be a very helpful debug option.
+        // This doubles the cell size, but is a *very* helpful debug option.
+        // See %sys-track.h for explanation.
         //
-        struct Reb_Track_Payload track;
-        uintptr_t tick; // stored in the Reb_Value_Extra for basic tracking
-        uintptr_t touch; // see TOUCH_CELL(), pads out to 4 * sizeof(void*)
+        const char *file;  // is REBYTE (UTF-8), but char* for debug watch
+        uintptr_t line;
+        uintptr_t tick;  // stored in the Reb_Value_Extra for basic tracking
+        uintptr_t touch;  // see TOUCH_CELL(), pads out to 4 * sizeof(void*)
       #endif
     };
 

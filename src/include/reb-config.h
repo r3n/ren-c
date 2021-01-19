@@ -257,12 +257,6 @@ Special internal defines used by RT, not Host-Kit developers:
     #define DEBUG_TRASH_MEMORY
     #define DEBUG_BALANCE_STATE
 
-    // There is a mode where the track payload exists in all cells, making
-    // them grow by 2 * sizeof(void*): DEBUG_TRACK_EXTEND_CELLS.  This can
-    // tell you about a cell's initialization even if it carries a payload.
-    //
-    #define DEBUG_TRACK_CELLS
-
     // See debugbreak.h and REBNATIVE(c_debug_break)...useful!
     //
     #define INCLUDE_C_DEBUG_BREAK_NATIVE
@@ -432,7 +426,6 @@ Special internal defines used by RT, not Host-Kit developers:
 
 
 #ifdef DEBUG_TRACK_EXTEND_CELLS
-    #define DEBUG_TRACK_CELLS
     #define UNUSUAL_REBVAL_SIZE // sizeof(REBVAL)*2 may be > sizeof(REBSER)
 #endif
 
@@ -448,3 +441,26 @@ Special internal defines used by RT, not Host-Kit developers:
         #error "DEBUG_PRINTF_FAIL_LOCATIONS requires DEBUG_STDIO_OK"
     #endif
 #endif
+
+// It would seem that cells like REB_BLANK which don't use their payloads
+// could just leave them uninitialized...saving time on the assignments.
+//
+// Unfortunately, this is a technically gray area in C.  If you try to
+// copy the memory of that cell (as cells are often copied), it might be a
+// "trap representation".  Reading such representations to copy them...
+// even if not interpreted... is undefined behavior:
+//
+// https://stackoverflow.com/q/60112841
+// https://stackoverflow.com/q/33393569/
+//
+// Odds are it would still work fine if you didn't zero them.  However,
+// compilers will warn you--especially at higher optimization levels--if
+// they notice uninitialized values being used in copies.  This is a bad
+// warning to turn off, because it often points out defective code.
+//
+// So to play it safe and be able to keep warnings on, fields are zeroed out.
+// But it's set up as its own independent flag, so that someone looking
+// to squeak out a tiny bit more optimization could turn this off in a
+// release build.  It would save on a few null assignments.
+//
+#define ZERO_UNUSED_CELL_FIELDS
