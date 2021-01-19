@@ -159,7 +159,7 @@ inline static void INIT_VAL_ACTION_BINDING(
     REBCTX *binding
 ){
     assert(IS_ACTION(v));
-    mutable_BINDING(v) = CTX_VARLIST(binding);
+    mutable_BINDING(v) = binding;
 }
 
 

@@ -439,7 +439,7 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
 
         Move_Value_Header(out, v);
         out->payload = v->payload;
-        mutable_BINDING(out) = CTX_VARLIST(expired);
+        mutable_BINDING(out) = expired;
     }
     return cast(REBVAL*, out);
 }

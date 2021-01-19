@@ -418,7 +418,7 @@ union Reb_Bytes_Extra {
 union Reb_Value_Extra { //=/////////////////// ACTUAL EXTRA DEFINITION ////=//
 
     struct Reb_Character_Extra Character;
-    const REBSER *Binding;  // see %sys-bind.h
+    const REBNOD *Binding;  // see %sys-bind.h
     struct Reb_Datatype_Extra Datatype;
     struct Reb_Date_Extra Date;
     struct Reb_Typeset_Extra Typeset;
@@ -640,10 +640,10 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     (v)->extra.Type
 
 #define mutable_BINDING(v) \
-    *x_cast(const REBSER**, &(v)->extra.Binding)
+    (v)->extra.Binding
 
 #define BINDING(v) \
-    m_cast(REBSER*, (v)->extra.Binding)
+    x_cast(REBSER*, m_cast(REBNOD*, (v)->extra.Binding))
 
 
 //=////////////////////////////////////////////////////////////////////////=//

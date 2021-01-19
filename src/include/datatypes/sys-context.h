@@ -191,7 +191,7 @@ inline static void INIT_VAL_FRAME_ROOTVAR_Core(
     assert(phase != nullptr);
     RESET_VAL_HEADER(out, REB_FRAME, CELL_MASK_CONTEXT);
     INIT_VAL_CONTEXT_VARLIST(out, varlist);
-    mutable_BINDING(out) = CTX_VARLIST(binding);
+    mutable_BINDING(out) = binding;
     INIT_VAL_FRAME_PHASE_OR_LABEL(out, phase);
   #if !defined(NDEBUG)
     out->header.bits |= CELL_FLAG_PROTECTED;
@@ -369,7 +369,7 @@ inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
 
 inline static void INIT_VAL_FRAME_BINDING(RELVAL *v, REBCTX *binding) {
     assert(IS_FRAME(v));  // may be marked protected (e.g. archetype)
-    EXTRA(Binding, v) = CTX_VARLIST(binding);
+    EXTRA(Binding, v) = binding;
 }
 
 inline static REBCTX *VAL_FRAME_BINDING(REBCEL(const*) v) {

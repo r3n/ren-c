@@ -166,7 +166,7 @@ inline static void INIT_FRM_PHASE(REBFRM *f, REBACT *phase)  // check types
   { INIT_VAL_FRAME_PHASE_OR_LABEL(f->rootvar, phase); }  // ...only
 
 inline static void INIT_FRM_BINDING(REBFRM *f, REBCTX *binding)
-  { mutable_BINDING(f->rootvar) = CTX_VARLIST(binding); }  // also fast
+  { mutable_BINDING(f->rootvar) = binding; }  // also fast
 
 #define FRM_BINDING(f) \
     cast(REBCTX*, BINDING((f)->rootvar))
