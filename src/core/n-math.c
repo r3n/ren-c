@@ -984,10 +984,7 @@ REBNATIVE(zero_q)
     enum Reb_Kind type = VAL_TYPE(v);
 
     if (type == REB_ISSUE)  // special case, `#` represents the '\0' codepoint
-        return Init_Logic(
-            D_OUT,
-            IS_CHAR(cast(REBCEL(const*), v)) and VAL_CHAR(v) == 0
-        );
+        return Init_Logic(D_OUT, IS_CHAR(v) and VAL_CHAR(v) == 0);
 
     if (not ANY_SCALAR_KIND(type))
         return Init_False(D_OUT);

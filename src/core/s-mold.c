@@ -116,7 +116,7 @@ void Pre_Mold_Core(REB_MOLD *mo, REBCEL(const*) v, bool all)
     // comes back as the answer.
     //
     const REBSTR *type_name = Canon(
-        SYM_FROM_KIND(cast(enum Reb_Kind, HEART_BYTE(v)))
+        SYM_FROM_KIND(cast(enum Reb_Kind, CELL_HEART(v)))
     );
     Append_Spelling(mo->series, type_name);
 

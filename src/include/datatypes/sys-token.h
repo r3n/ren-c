@@ -46,7 +46,11 @@ inline static bool IS_CHAR_CELL(REBCEL(const*) v) {
     return EXTRA(Bytes, v).exactly_4[IDX_EXTRA_LEN] <= 1;  // codepoint
 }
 
-#define IS_CHAR IS_CHAR_CELL  // could be faster if used VAL_TYPE()
+inline static bool IS_CHAR(const RELVAL *v) {
+    if (not IS_ISSUE(v))
+        return false;
+    return IS_CHAR_CELL(v);
+}
 
 inline static REBUNI VAL_CHAR(REBCEL(const*) v) {
     assert(CELL_HEART(v) == REB_BYTES);

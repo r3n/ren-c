@@ -284,11 +284,15 @@ inline static void INIT_VAL_NODE2(RELVAL *v, const REBNOD *node) {
     #define CELL_KIND CELL_KIND_UNCHECKED
     #define CELL_HEART CELL_HEART_UNCHECKED
 #else
-    inline static enum Reb_Kind CELL_KIND(REBCEL(const*) cell)
-        { return CELL_KIND_UNCHECKED(cell); }
+    inline static enum Reb_Kind CELL_KIND(REBCEL(const*) cell) {
+        assert(HEART_BYTE(cell) != REB_QUOTED);
+        return CELL_KIND_UNCHECKED(cell);
+    }
 
-    inline static enum Reb_Kind CELL_HEART(REBCEL(const*) cell)
-      { return CELL_HEART_UNCHECKED(cell); }
+    inline static enum Reb_Kind CELL_HEART(REBCEL(const*) cell) {
+        assert(HEART_BYTE(cell) != REB_QUOTED);
+        return CELL_HEART_UNCHECKED(cell);
+    }
 
     // We want to disable asking for low level implementation details on a
     // cell that may be a REB_QUOTED; you have to call VAL_UNESCAPED() first.
@@ -610,7 +614,7 @@ inline static RELVAL *Prep_Cell_Core(RELVAL *c) {
 // An ANY-ARRAY! in the deep copy of a function body must be relative also to
 // the same function if it contains any instances of such relative words.
 //
-inline static bool IS_RELATIVE(REBCEL(const*) v) {
+inline static bool IS_RELATIVE(const RELVAL *v) {
     if (not Is_Bindable(v))
         return false;
         

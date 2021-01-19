@@ -1162,11 +1162,11 @@ REBINT CT_Sequence(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // internal representations like [1 2] the array and #{0102} the bytes.
     // See the Try_Init_Sequence() pecking order for how this is guaranteed.
     //
-    int heart_diff = cast(int, HEART_BYTE(a)) - HEART_BYTE(b);
+    int heart_diff = cast(int, CELL_HEART(a)) - CELL_HEART(b);
     if (heart_diff != 0)
         return heart_diff > 0 ? 1 : -1;
 
-    switch (HEART_BYTE(a)) {  // now known to be same as HEART_BYTE(b)
+    switch (CELL_HEART(a)) {  // now known to be same as CELL_HEART(b)
       case REB_BYTES: {  // packed bytes
         REBLEN a_len = VAL_SEQUENCE_LEN(a);
         int diff = cast(int, a_len) - VAL_SEQUENCE_LEN(b);

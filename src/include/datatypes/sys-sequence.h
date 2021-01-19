@@ -461,7 +461,7 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
 inline static REBLEN VAL_SEQUENCE_LEN(REBCEL(const*) sequence) {
     assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));
 
-    switch (HEART_BYTE(sequence)) {
+    switch (CELL_HEART(sequence)) {
       case REB_BYTES:  // packed sequence of bytes directly in cell
         assert(NOT_CELL_FLAG(sequence, FIRST_IS_NODE));  // TBD: series form
         return EXTRA(Bytes, sequence).exactly_4[IDX_EXTRA_USED];
