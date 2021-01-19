@@ -82,8 +82,8 @@ boot-banner: [
     "REBOL 3.0 (Ren-C branch)"
     -
     = Copyright: "2012 REBOL Technologies"
-    = Copyright: "2012-2017 Ren-C Open Source Contributors"
-    = "" "Apache 2.0 License, see LICENSE."
+    = Copyright: "2012-2021 Ren-C Open Source Contributors"
+    = "" "Licensed Under LGPL 3.0, see LICENSE."
     = Website:  "http://github.com/metaeducation/ren-c"
     -
     = Version:   system/version
