@@ -101,7 +101,7 @@ REBNATIVE(either)
 
 
 inline static bool Single_Test_Throws(
-    REBVAL *out, // GC-safe output cell
+    REBVAL *out,  // GC-safe output cell
     const RELVAL *test,
     REBSPC *test_specifier,
     const RELVAL *arg,
@@ -113,6 +113,25 @@ inline static bool Single_Test_Throws(
     //
     if (C_STACK_OVERFLOWING(&sum_quotes))
         Fail_Stack_Overflow();
+
+    // !!! The MATCH dialect concept calls functions and needs GC safe space
+    // to process the test into.  Although the `out` cell is presumed safe,
+    // putting a processed test into out means running into problems with
+    // trying to use the test and the output in the same expression:
+    //
+    //     Get_If_Word_Or_Path_Throws(out, ...);
+    //     test = out;
+    //     ...
+    //     Init_Logic(out, Some_Comparison(test, ...));  // test aliases out
+    //
+    // This aliasing leads to working in some compilations but fail in others.
+    // Make a GC guarded cell to keep this from happening, which requires
+    // some awkward `goto`-ing to make sure it drops (if only it were C++ !)
+    // Optimize when this experimental dialect gets a more serious treatment.
+    //
+    DECLARE_LOCAL (fetched_test);
+    SET_END(fetched_test);
+    PUSH_GC_GUARD(fetched_test);
 
     // We may need to add in the quotes of the dereference.  e.g.
     //
@@ -141,75 +160,60 @@ inline static bool Single_Test_Throws(
     ){
         const bool push_refinements = false;
 
-        DECLARE_LOCAL (dequoted_test); // wouldn't need if Get took any escape
+        DECLARE_LOCAL (dequoted_test);  // wouldn't need if Get took quoted
         Dequotify(Derelativize(dequoted_test, test, test_specifier));
 
         REBDSP lowest_ordered_dsp = DSP;
-        if (Get_If_Word_Or_Path_Throws( // !!! take any escape level?
-            out,
+        if (Get_If_Word_Or_Path_Throws(  // !!! take any escape level?
+            fetched_test,
             dequoted_test,
             SPECIFIED,
-            push_refinements // !!! Look into pushing e.g. `match :foo?/bar x`
+            push_refinements  // !!! Look into pushing e.g. `match :foo?/bar x`
         )){
-            return true;
+            Move_Value(out, fetched_test);
+            goto return_thrown;
         }
 
         assert(lowest_ordered_dsp == DSP); // would have made specialization
         UNUSED(lowest_ordered_dsp);
 
-        if (IS_ACTION(out)) {
+        if (IS_ACTION(fetched_test)) {
             if (IS_GET_WORD(dequoted_test) or IS_GET_PATH(dequoted_test)) {
                 // ok
             } else
                 fail ("ACTION! match rule must be GET-WORD!/GET-PATH!");
         }
         else {
-            sum_quotes += VAL_NUM_QUOTES(out);
-            Dequotify(out); // we want to use the dequoted version for test
+            sum_quotes += VAL_NUM_QUOTES(fetched_test);
+            Dequotify(fetched_test);  // use the dequoted version for test
         }
 
-        test = out;
-        test_cell = VAL_UNESCAPED(test);
+        test = fetched_test;
+        test_cell = VAL_UNESCAPED(fetched_test);
         test_kind = CELL_KIND(test_cell);
         test_specifier = SPECIFIED;
     }
 
+  blockscope {
+    bool matched;  // compiler will catch paths that don't initialize this
+
     switch (test_kind) {
       case REB_NULL:  // more useful for NON NULL XXX than MATCH NULL XXX
-        Init_Logic(
-            out,
-            CELL_KIND(arg_cell) == REB_NULL
-                and VAL_NUM_QUOTES(arg) == sum_quotes
-        );
-        return false;
+        matched = (CELL_KIND(arg_cell) == REB_NULL)
+                and (VAL_NUM_QUOTES(arg) == sum_quotes);
+        goto return_matched;
 
-      case REB_VOID:
-        //
-        // Was considered because NON VOID XXX is shorter than NON VOID! XXX.
-        // However, that encourages a habit of passing void values where they
-        // probably are better caught as errors.
-        //
-        break;
-
-      case REB_PATH: { // AND the tests together
+      case REB_PATH: {  // AND the tests together
         REBSPC *specifier = Derive_Specifier(test_specifier, test);
-
-        // !!! The array case can extract VAL_ARRAY() from the test and
-        // reuse `out`, but paths may not have series to extract... have to
-        // cache the test in a GC-safe slot
-        //
-        DECLARE_LOCAL (test_cache);  // have to keep `out` alive
-        Move_Value(test_cache, SPECIFIC(CELL_TO_VAL(test_cell)));
-        PUSH_GC_GUARD(test_cache);
 
         DECLARE_LOCAL (temp);  // path element extraction buffer (if needed)
         SET_END(temp);
-        PUSH_GC_GUARD(temp);
+        PUSH_GC_GUARD(temp);  // !!! doesn't technically need a guard?
 
-        REBLEN len = VAL_SEQUENCE_LEN(test_cache);
+        REBLEN len = VAL_SEQUENCE_LEN(test);
         REBLEN i;
         for (i = 0; i < len; ++i) {
-            const RELVAL *item = VAL_SEQUENCE_AT(temp, test_cache, i);
+            const RELVAL *item = VAL_SEQUENCE_AT(temp, test, i);
 
             if (Single_Test_Throws(
                 out,
@@ -220,22 +224,19 @@ inline static bool Single_Test_Throws(
                 sum_quotes
             )){
                 DROP_GC_GUARD(temp);
-                DROP_GC_GUARD(test_cache);
-                return true;
+                goto return_thrown;
             }
 
             if (not VAL_LOGIC(out))  {  // any ANDing failing skips block
                 DROP_GC_GUARD(temp);
-                DROP_GC_GUARD(test_cache);
-                return false;  // false=no throw
+                goto return_out;
             }
         }
         DROP_GC_GUARD(temp);
-        DROP_GC_GUARD(test_cache);
-        assert(VAL_LOGIC(out)); // if all tests succeeded in block
-        return false; } // return the LOGIC! truth, false=no throw
+        assert(VAL_LOGIC(out) == true);  // if all tests succeeded in block
+        goto return_out; }  // return the LOGIC! truth, false=no throw
 
-      case REB_BLOCK: { // OR the tests together
+      case REB_BLOCK: {  // OR the tests together
         const RELVAL *item = VAL_ARRAY_AT(test_cell);
         REBSPC *specifier = Derive_Specifier(test_specifier, test);
         for (; NOT_END(item); ++item) {
@@ -247,25 +248,23 @@ inline static bool Single_Test_Throws(
                 arg_specifier,
                 sum_quotes
             )){
-                return true;
+                goto return_thrown;
             }
-            if (VAL_LOGIC(out)) // test succeeded
-                return false; // return the LOGIC! truth, false=no throw
+            if (VAL_LOGIC(out) == true)  // test succeeded
+                goto return_out;  // return the LOGIC! true
         }
         assert(not VAL_LOGIC(out));
-        return false; }
+        goto return_out; }
 
-      case REB_LOGIC: // test for "truthy" or "falsey"
+      case REB_LOGIC:  // test for "truthy" or "falsey"
         //
         // Note: testing a literal block for truth or falsehood could make
         // sense if the *test* varies (e.g. true or false from variable).
+        // So IS_TRUTHY() is used here instead of IS_CONDITIONAL_TRUE()
         //
-        Init_Logic(
-            out,
-            VAL_LOGIC(test_cell) == IS_TRUTHY(arg) // vs IS_CONDITIONAL_TRUE()
-                and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg)
-        );
-        return false;
+        matched = VAL_LOGIC(test_cell) == IS_TRUTHY(arg)
+                and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg);
+        goto return_matched;
 
       case REB_ACTION: {
         DECLARE_LOCAL (arg_specified);
@@ -285,63 +284,63 @@ inline static bool Single_Test_Throws(
         DROP_GC_GUARD(arg_specified);
         if (threw) {
             Move_Value(out, temp);
-            return true;
+            goto return_thrown;
         }
 
-        Init_Logic(out, IS_TRUTHY(temp));  // errors on VOID!
-        return false; }
+        matched = IS_TRUTHY(temp);  // errors on VOID!
+        goto return_matched; }
 
       case REB_DATATYPE:
-        Init_Logic(
-            out,
-            VAL_TYPE_KIND(test_cell) == CELL_KIND(arg_cell)
-                and VAL_NUM_QUOTES(arg) == sum_quotes
-        );
-        return false;
+        matched = VAL_TYPE_KIND(test_cell) == CELL_KIND(arg_cell)
+                and VAL_NUM_QUOTES(arg) == sum_quotes;
+        goto return_matched;
 
       case REB_TYPESET:
-        Init_Logic(
-            out,
-            TYPE_CHECK(test_cell, CELL_KIND(arg_cell))
-                and VAL_NUM_QUOTES(arg) == sum_quotes
-        );
-        return false;
+        matched = TYPE_CHECK(test_cell, CELL_KIND(arg_cell))
+                and VAL_NUM_QUOTES(arg) == sum_quotes;
+        break;
 
      case REB_TAG: {  // just support <opt> for now
         bool strict = false;
-        Init_Logic(
-            out,
-            CELL_KIND(arg_cell) == REB_NULL
-            and 0 == CT_String(test_cell, Root_Opt_Tag, strict)
-            and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg)
-        );
-        return false; }
+        matched = CELL_KIND(arg_cell) == REB_NULL
+                and 0 == CT_String(test_cell, Root_Opt_Tag, strict)
+                and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg);
+        goto return_matched; }
 
-      case REB_INTEGER: // interpret as length
-        Init_Logic(
-            out,
-            ANY_SERIES_KIND(CELL_KIND(arg_cell))
+      case REB_INTEGER:  // interpret as length
+        matched = ANY_SERIES_KIND(CELL_KIND(arg_cell))
                 and VAL_LEN_AT(arg_cell) == VAL_UINT32(test_cell)
-                and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg)
-        );
-        return false;
+                and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg);
+        goto return_matched;
 
       case REB_SYM_WORD: {
-        if (Matches_Fake_Type_Constraint(
+        matched = Matches_Fake_Type_Constraint(
             arg,
             cast(enum Reb_Symbol_Id, VAL_WORD_ID(test_cell))
-        )){
-            Init_True(out);
-            return false;
-        }
-        Init_False(out);
-        return false; }
+        );
+        goto return_matched; }
 
+      case REB_VOID:
+        //
+        // Was considered because NON VOID XXX is shorter than NON VOID! XXX.
+        // However, that encourages a habit of passing void values where they
+        // probably are better caught as errors.
+        //
       default:
-        break;
+        fail (Error_Invalid_Type(test_kind));
     }
 
-    fail (Error_Invalid_Type(test_kind));
+  return_matched:
+    Init_Logic(out, matched);
+
+  return_out:
+    DROP_GC_GUARD(fetched_test);
+    return false;
+  }
+
+  return_thrown:
+    DROP_GC_GUARD(fetched_test);
+    return true;
 }
 
 
