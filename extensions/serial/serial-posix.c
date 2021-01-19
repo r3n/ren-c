@@ -87,7 +87,7 @@ static REBINT Set_Serial_Settings(int ttyfd, REBREQ *req)
     struct termios attr;
     struct devreq_serial *serial = ReqSerial(req);
     REBINT speed = serial->baud;
-    CLEARS(&attr);
+    memset(&attr, 0, sizeof(attr));
 #ifdef DEBUG_SERIAL
     printf("setting attributes: speed %d\n", speed);
 #endif
