@@ -58,7 +58,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
     enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), v));
 
-    const REBSER *binding;
+    REBSER *binding;
     if (
         IS_BINDABLE_KIND(heart)
         and (binding = BINDING(v))
@@ -532,7 +532,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         assert(GET_ARRAY_FLAG(list, IS_VARLIST));
     }
     else if (GET_ARRAY_FLAG(a, IS_VARLIST)) {
-        const REBVAL *archetype = CTX_ARCHETYPE(CTX(a));
+        const REBVAL *archetype = CTX_ARCHETYPE(CTX(m_cast(REBARR*, a)));
 
         // Currently only FRAME! archetypes use binding
         //
