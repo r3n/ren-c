@@ -53,6 +53,42 @@
 //
 
 
+#if !defined(CPLUSPLUS_11)
+    //
+    // In plain C builds, there's no such thing as "base classes".  So the
+    // only way to make a function that can accept either a REBSER* or a
+    // REBVAL* without knowing which is to use a `void*`.  So the REBNOD is
+    // defined as `void`, and the C++ build is trusted to do the more strict
+    // type checking.
+    //
+    struct Reb_Node { REBYTE first; };  // REBNOD is void*, but define struct
+    typedef void REBNOD;
+#else
+    // If we were willing to commit to building with a C++ compiler, we'd
+    // want to make the Reb_Node contain the common `header` bits that REBSER
+    // and REBVAL would share.  But since we're not, we instead make a less
+    // invasive empty base class, that doesn't disrupt the memory layout of
+    // derived classes due to the "Empty Base Class Optimization":
+    //
+    // https://en.cppreference.com/w/cpp/language/ebo
+    //
+    // The optimization hits a tricky case with REBCTX (or REBACT/REBMAP).
+    // e.g. in order to not be able to mistakenly pass a REBCTX* to a routine
+    // that is expecting a REBARR*, REBCTX is not derived from REBARR...rather
+    // it is declared as a structure containing a single REBARR.  But if we
+    // add REBNOD as a base class of REBCTX, then it will contain a member
+    // derived from REBNOD as well.
+    //
+    // Avoiding this means having a more fundamental form of REBSER that does
+    // not derive from REBNOD, which REBCTX then contains.  After that it can
+    // safely derive from REBNOD...while still being unwilling to directly
+    // coerce itself to a REBARR.
+    //
+    struct Reb_Node {};  // used as empty base class for REBSER + REBVAL
+    typedef struct Reb_Node REBNOD;
+#endif
+
+
 //=////////////////////////////////////////////////////////////////////=///=//
 //
 // BYTE-ORDER SENSITIVE BIT FLAGS & MASKING
@@ -91,6 +127,15 @@
 
 #define PLATFORM_BITS \
     (sizeof(uintptr_t) * 8)
+
+// !!! Originally the REBFLGS type was a `uint_fast32_t`.  However, there were
+// several cases of the type being used with these macros...which only work
+// with platform sized ints.  If the callsites that use REBFLGS are all
+// changed to not hold things like NODE_FLAG_XXX then this could be changed
+// back, but until then it has to be uintptr_t (which is likely defined to be
+// the same as uint_fast32_t on most platforms anyway).
+//
+typedef uintptr_t REBFLGS;
 
 #if defined(ENDIAN_BIG) // Byte w/most significant bit first
 
@@ -315,13 +360,6 @@ inline static uintptr_t FLAG_SECOND_UINT16(uint16_t u)
 // able to signal the IS_END() test for REBVAL.  See Endlike_Header()
 //
 
-// If this turns out not to be true on some weird platform (e.g. you have an
-// integer type faster than an integer the size of a pointer that is *bigger*
-// than a pointer) then there needs to be a #define to disable uint_fast32_t
-// for the `bits` field of the header below.
-//
-STATIC_ASSERT(sizeof(uint_fast32_t) <= sizeof(uintptr_t));
-
 union Reb_Header {
     //
     // unsigned integer that's the size of a platform pointer (e.g. 32-bits on
@@ -331,13 +369,11 @@ union Reb_Header {
     // !!! Future application of the 32 unused header bits on 64-bit machines
     // might add some kind of optimization or instrumentation.
     //
-    uintptr_t capacity;  // how big we want this union to be for cell rules
-
-    // uintptr_t may not be the fastest type for operating on 32 bits.  So
-    // we do our accesses through whatever is, while making sure the header
-    // itself is the right size.
-
-    uint_fast32_t bits;
+    // !!! uintptr_t may not be the fastest type for operating on 32-bits.
+    // But using a `uint_fast32_t` would prohibit 64-bit platforms from
+    // exploiting the additional bit space (due to strict aliasing).
+    //
+    uintptr_t bits;
 
     // !!! For some reason, at least on 64-bit Ubuntu, TCC will bloat the
     // header structure to be 16 bytes instead of 8 if you put a 4 byte char
@@ -490,35 +526,3 @@ union Reb_Header {
 //
 #define FREED_SERIES_BYTE 192
 #define FREED_CELL_BYTE 193
-
-
-//=//// NODE STRUCTURE ////////////////////////////////////////////////////=//
-//
-// Though the name Node is used for a superclass that can be "in use" or
-// "free", this is the definition of the structure for its layout when it
-// has NODE_FLAG_FREE set.  In that case, the memory manager will set the
-// header bits to have the leftmost byte as FREED_SERIES_BYTE, and use the
-// pointer slot right after the header for its linked list of free nodes.
-//
-
-struct Reb_Pool_Unit {
-    //
-    // This is not called "header" for a reason: you should *NOT* read the
-    // bits of this header-sized slot to try and interpret bits that were
-    // assigned through a REBSER or a REBVAL.  *You have to read out the
-    // bits using the same type that initialized it.*  So only the first
-    // byte here should be consulted...accessed through an `unsigned char*`
-    // in order to defeat strict aliasing.  See NODE_BYTE()
-    //
-    // The first byte should *only* be read through a char*!
-    //
-    union Reb_Header headspot;  // leftmost byte is FREED_SERIES_BYTE if free
-
-    struct Reb_Pool_Unit *next_if_free;  // if not free, full item available
-
-    // Size of a node must be a multiple of 64-bits.  This is because there
-    // must be a baseline guarantee for node allocations to be able to know
-    // where 64-bit alignment boundaries are.
-    //
-    /* REBI64 payload[N];*/
-};

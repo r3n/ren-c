@@ -74,7 +74,6 @@ typedef int64_t REBI64; // 64 bit integer
 typedef uint64_t REBU64; // 64 bit unsigned integer
 typedef float REBD32; // 32 bit decimal
 typedef double REBDEC; // 64 bit decimal
-typedef uint_fast32_t REBFLGS; // unsigned used for working with bit flags
 typedef uintptr_t REBLIN; // type used to store line numbers in Rebol files
 typedef uintptr_t REBTCK; // type the debug build uses for evaluator "ticks"
 
@@ -109,12 +108,6 @@ typedef uint_fast32_t REBUNI;
 //=//// MEMORY POOLS //////////////////////////////////////////////////////=//
 //
 typedef struct rebol_mem_pool REBPOL;
-
-#ifdef CPLUSPLUS_11
-    typedef struct Reb_Node REBNOD;
-#else
-    typedef void REBNOD;
-#endif
 
 struct Reb_Pool_Unit;
 typedef struct Reb_Pool_Unit REBPLU;
@@ -282,12 +275,6 @@ typedef struct Reb_Map REBMAP;
 
 
 //=//// BINDING ///////////////////////////////////////////////////////////=//
-
-#ifdef CPLUSPLUS_11
-    struct Reb_Node {};  // used as empty base class for REBSER + REBVAL
-#else
-    struct Reb_Node { REBYTE first; };  // REBNOD is void*, but define struct
-#endif
 
 struct Reb_Binder;
 struct Reb_Collector;

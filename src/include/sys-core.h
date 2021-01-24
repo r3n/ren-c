@@ -182,9 +182,8 @@
 
 #include "sys-panic.h"  // "blue screen of death"-style termination
 
-#include "mem-pools.h"
-
 #include "sys-rebnod.h"
+#include "mem-pools.h"
 
 #include "sys-rebval.h"  // low level Rebol cell structure definition
 #include "sys-rebser.h"  // series structure definition (embeds REBVAL)

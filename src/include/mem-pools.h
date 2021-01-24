@@ -84,3 +84,42 @@ enum Mem_Pool_Specs {
     SYSTEM_POOL,
     MAX_POOLS
 };
+
+
+//=//// MEMORY POOL UNIT //////////////////////////////////////////////////=//
+//
+// When enumerating over the units in a memory pool, it's important to know
+// how that unit was initialized in order to validly read its data.  If the
+// unit was initialized through a REBSER pointer, then you don't want to
+// dereference it as if it had been initialized through a REBVAL.
+//
+// Similarly, you need to know when you are looking at it through the lens
+// of a "freed pool unit" (which then means you can read the data linking it
+// to the next free unit).
+//
+// Using byte-level access on the first byte to detect the initialization
+// breaks the Catch-22, since access through `char*` and `unsigned char*` are
+// not subject to "strict aliasing" rules.
+//
+
+struct Reb_Pool_Unit {
+    //
+    // This is not called "header" for a reason: you should *NOT* read the
+    // bits of this header-sized slot to try and interpret bits that were
+    // assigned through a REBSER or a REBVAL.  *You have to read out the
+    // bits using the same type that initialized it.*  So only the first
+    // byte here should be consulted...accessed through an `unsigned char*`
+    // in order to defeat strict aliasing.  See NODE_BYTE()
+    //
+    // The first byte should *only* be read through a char*!
+    //
+    union Reb_Header headspot;  // leftmost byte is FREED_SERIES_BYTE if free
+
+    struct Reb_Pool_Unit *next_if_free;  // if not free, full item available
+
+    // Size of a node must be a multiple of 64-bits.  This is because there
+    // must be a baseline guarantee for node allocations to be able to know
+    // where 64-bit alignment boundaries are.
+    //
+    /* REBI64 payload[N];*/
+};

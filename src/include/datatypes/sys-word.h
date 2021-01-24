@@ -20,18 +20,15 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// The ANY-WORD! is the fundamental symbolic concept of Rebol.  It is
-// implemented as a REBSTR UTF-8 string (see %sys-string.h), but rather than
-// hold "bookmark" caches of indexing positions into its data (which is
-// generally quite short and not iterated), it stores links to "synonyms"
-// of alternate spellings which share the same symbol ID.
+// ANY-WORD! is the fundamental symbolic concept of Rebol.  Rather than
+// storing a pointer to a mutable string, it stores a pointer to a read-only
+// symbol (see %sys-symbol.h) that can be quickly looked up and compared.
 //
-// ANY-WORD! can act as a variable when bound specifically to a context
+// Words can act as a variable when bound specifically to a context
 // (see %sys-context.h) or bound relatively to an action (see %sys-action.h).
 //
 // For routines that manage binding, see %sys-bind.h.
 //
-
 
 
 // REBCTX types use this field of their varlist (which is the identity of
