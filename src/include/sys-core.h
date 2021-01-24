@@ -30,7 +30,7 @@
 // * With those types defined, it includes %tmp-internals.h - which is all
 //   all the non-inline "internal API" functions.  This list of function
 //   prototypes is generated automatically by a Rebol script that scans the
-//   %.c files during the build process. 
+//   %.c files during the build process.
 //
 // * Next it starts including various headers in a specific order.  These
 //   build on the data definitions and call into the internal API.  Since they
@@ -513,21 +513,3 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #include "sys-do.h"  // higher-level evaluate-until-end API
 
 #include "sys-pick.h"
-
-
-// !!! The SECURE dialect and subsystem is now in an extension.  But
-// because SECURE was never fully implemented, it is really just a stub
-// implementation.  The `_Placeholder` name helps keep every callsite
-// from having to be documented that it's effectively a no-op.
-//
-inline static void Check_Security_Placeholder(
-    const REBSTR *subsystem,
-    enum Reb_Symbol_Id policy,
-    const REBVAL *value
-){
-    /* see Check_Security() in the SECURE Extension */
-
-    UNUSED(subsystem);
-    UNUSED(policy);
-    UNUSED(value);
-}

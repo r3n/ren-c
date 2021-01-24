@@ -96,7 +96,6 @@ void *Try_Alloc_Mem(size_t size)
     PG_Mem_Usage += size;
     if (PG_Mem_Limit != 0 and PG_Mem_Usage > PG_Mem_Limit) {
         PG_Mem_Usage -= size;
-        Check_Security_Placeholder(Canon(SYM_MEMORY), SYM_EXEC, 0);
     }
 
   #if !defined(NDEBUG)

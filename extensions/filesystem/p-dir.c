@@ -91,8 +91,6 @@ static void Init_Dir_Path(
     struct rebol_devreq *req = Req(dir);
     req->modes |= RFM_DIR;
 
-    Secure_Port(Canon(SYM_FILE), dir, path /* , dir->path */);
-
     ReqFile(dir)->path = path;
 }
 
@@ -119,9 +117,6 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         fail (Error_Invalid_Spec_Raw(path));
 
     REBVAL *state = CTX_VAR(ctx, STD_PORT_STATE); // BLOCK! means port open
-
-    //const REBYTE *flags = Security_Policy(SYM_FILE, path);
-
 
     switch (VAL_WORD_ID(verb)) {
 

@@ -575,8 +575,6 @@ REBNATIVE(change_dir)
     else {
         assert(IS_FILE(arg));
 
-        Check_Security_Placeholder(Canon(SYM_FILE), SYM_EXEC, arg);
-
         bool success = Set_Current_Dir_Value(arg);
 
         if (not success)

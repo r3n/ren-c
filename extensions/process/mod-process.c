@@ -333,8 +333,6 @@ REBNATIVE(get_env)
 
     REBVAL *variable = ARG(variable);
 
-    Check_Security_Placeholder(Canon(SYM_ENVR), SYM_READ, variable);
-
     REBCTX *error = NULL;
 
   #ifdef TO_WINDOWS
@@ -411,8 +409,6 @@ REBNATIVE(set_env)
 
     REBVAL *variable = ARG(variable);
     REBVAL *value = ARG(value);
-
-    Check_Security_Placeholder(Canon(SYM_ENVR), SYM_WRITE, variable);
 
   #ifdef TO_WINDOWS
     WCHAR *key_wide = rebSpellWide(variable, rebEND);
