@@ -384,14 +384,15 @@ REB_R PD_Map(
 static void Append_Map(
     REBMAP *map,
     const RELVAL *head,
+    const RELVAL *tail,
     REBSPC *specifier,
     REBLEN len
 ){
     const RELVAL *item = head;
     REBLEN n = 0;
 
-    while (n < len && NOT_END(item)) {
-        if (IS_END(item + 1)) {
+    while (n < len and item != tail) {
+        if (item + 1 == tail) {
             //
             // Keys with no value not allowed, e.g. `make map! [1 "foo" 2]`
             //
@@ -493,12 +494,13 @@ REB_R TO_Map(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
         //
         // make map! [word val word val]
         //
-        REBLEN len;
-        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
+        REBLEN len = VAL_LEN_AT(arg);
+        const RELVAL *tail;
+        const RELVAL *at = VAL_ARRAY_AT(&tail, arg);
         REBSPC *specifier = VAL_SPECIFIER(arg);
 
         REBMAP *map = Make_Map(len / 2); // [key value key value...] + END
-        Append_Map(map, at, specifier, len);
+        Append_Map(map, at, tail, specifier, len);
         Rehash_Map(map);
         return Init_Map(out, map);
     }
@@ -743,9 +745,10 @@ REBTYPE(Map)
             fail (PAR(value));
 
         REBLEN len = Part_Len_May_Modify_Index(value, ARG(part));
-        const RELVAL *at = VAL_ARRAY_AT(value);  // w/modified index
+        const RELVAL *tail;
+        const RELVAL *at = VAL_ARRAY_AT(&tail, value);  // w/modified index
 
-        Append_Map(m, at, VAL_SPECIFIER(value), len);
+        Append_Map(m, at, tail, VAL_SPECIFIER(value), len);
 
         return Init_Map(D_OUT, m); }
 

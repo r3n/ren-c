@@ -83,8 +83,11 @@ void Bind_Values_Inner_Loop(
         }
         else if (flags & BIND_DEEP) {
             if (ANY_ARRAY_KIND(heart)) {
-                const RELVAL *sub_tail = VAL_ARRAY_TAIL(VAL_UNESCAPED(v));
-                RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(VAL_UNESCAPED(v));
+                const RELVAL *sub_tail;
+                RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(
+                    &sub_tail,
+                    VAL_UNESCAPED(v)
+                );
                 Bind_Values_Inner_Loop(
                     binder,
                     sub_at,
@@ -191,8 +194,8 @@ void Unbind_Values_Core(
             Unbind_Any_Word(v);
         }
         else if (ANY_ARRAY_KIND(heart) and deep) {
-            const RELVAL *sub_tail = VAL_ARRAY_TAIL(v);
-            RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(v);
+            const RELVAL *sub_tail;
+            RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(&sub_tail, v);
             Unbind_Values_Core(sub_at, sub_tail, context, true);
         }
     }
@@ -339,7 +342,7 @@ static void Clonify_And_Bind_Relative(
             INIT_VAL_NODE1(v, series);  // copies args
             INIT_SPECIFIER(v, UNBOUND);  // copied w/specifier--not relative
 
-            sub_src = VAL_ARRAY_AT(v);  // look for LETs
+            sub_src = VAL_ARRAY_AT(nullptr, v);  // look for LETs, may be tail
 
             // See notes in Clonify()...need to copy immutable paths so that
             // binding pointers can be changed in the "immutable" copy.
@@ -577,8 +580,8 @@ void Rebind_Values_Deep(
     RELVAL *v = head;
     for (; v != tail; ++v) {
         if (ANY_ARRAY_OR_PATH(v)) {
-            const RELVAL *sub_tail = VAL_ARRAY_TAIL(v);
-            RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(v);
+            const RELVAL *sub_tail;
+            RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(&sub_tail, v);
             Rebind_Values_Deep(sub_at, sub_tail, from, to, binder);
         }
         else if (ANY_WORD(v) and VAL_WORD_BINDING(v) == CTX_VARLIST(from)) {
@@ -672,16 +675,16 @@ void Virtual_Bind_Deep_To_New_Context(
     if (num_vars == 0)
         fail (spec);  // !!! should fail() take unstable?
 
+    const RELVAL *tail;
     const RELVAL *item;
 
     REBSPC *specifier;
     bool rebinding;
     if (IS_BLOCK(spec)) {  // walk the block for errors BEFORE making binder
         specifier = VAL_SPECIFIER(spec);
-        item = VAL_ARRAY_AT(spec);
+        item = VAL_ARRAY_AT(&tail, spec);
 
-        const RELVAL *tail;
-        const RELVAL *check = VAL_ARRAY_AT_T(&tail, spec);
+        const RELVAL *check = item;
 
         rebinding = false;
         for (; check != tail; ++check) {
@@ -703,6 +706,7 @@ void Virtual_Bind_Deep_To_New_Context(
     }
     else {
         item = spec;
+        tail = spec;
         specifier = SPECIFIED;
         rebinding = IS_WORD(item);
     }
@@ -869,10 +873,10 @@ void Virtual_Bind_Deep_To_New_Context(
     // Must remove binder indexes for all words, even if about to fail
     //
   blockscope {
-    const REBKEY *tail;
-    const REBKEY *key = CTX_KEYS(&tail, c);
+    const REBKEY *key_tail;
+    const REBKEY *key = CTX_KEYS(&key_tail, c);
     REBVAL *var = CTX_VARS_HEAD(c); // only needed for debug, optimized out
-    for (; key != tail; ++key, ++var) {
+    for (; key != key_tail; ++key, ++var) {
         REBINT stored = Remove_Binder_Index_Else_0(
             &binder, KEY_SYMBOL(key)
         );

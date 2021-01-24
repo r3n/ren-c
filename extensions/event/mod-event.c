@@ -264,7 +264,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
 
         REBLEN num_pending = 0;
         const RELVAL *tail;
-        val = VAL_ARRAY_AT_T(&tail, ports);
+        val = VAL_ARRAY_AT(&tail, ports);
         for (; val != tail; ++val) {  // find timeout
             if (Pending_Port(val))
                 ++num_pending;
@@ -458,7 +458,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     if (REF(all))
         return D_OUT;  // caller wants all the ports that waked us
 
-    const RELVAL *first = VAL_ARRAY_AT_T(nullptr, D_OUT);
+    const RELVAL *first = VAL_ARRAY_ITEM_AT(D_OUT);
     if (not IS_PORT(first)) {
         assert(!"First element of intersection not port, does this happen?");
         return nullptr;

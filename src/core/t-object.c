@@ -45,7 +45,8 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
     if (not IS_BLOCK(arg))
         fail (arg);
 
-    const RELVAL *item = VAL_ARRAY_AT(arg);
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT(&tail, arg);
 
     // Can't actually fail() during a collect, so make sure any errors are
     // set and then jump to a Collect_End()
@@ -72,7 +73,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
     //
   blockscope {
     const RELVAL *word;
-    for (word = item; NOT_END(word); word += 2) {
+    for (word = item; word != tail; word += 2) {
         if (not IS_WORD(word) and not IS_SET_WORD(word)) {
             error = Error_Bad_Value_Core(word, VAL_SPECIFIER(arg));
             goto collect_end;
@@ -87,7 +88,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
         )){
             Init_Word(DS_PUSH(), VAL_WORD_SYMBOL(word));
         }
-        if (IS_END(word + 1))  // catch malformed case with no value (#708)
+        if (word + 1 == tail)  // catch malformed case with no value (#708)
             break;
     }
   }
@@ -103,7 +104,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
 
   blockscope {  // Set new values to obj words
     const RELVAL *word = item;
-    for (; NOT_END(word); word += 2) {
+    for (; word != tail; word += 2) {
         REBLEN i = Get_Binder_Index_Else_0(
             &collector.binder, VAL_WORD_SYMBOL(word)
         );
@@ -122,7 +123,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
             goto collect_end;
         }
 
-        if (IS_END(word + 1)) {
+        if (word + 1 == tail) {
             Init_Void(var, SYM_VOID);
             break;  // fix bug#708
         }
@@ -312,7 +313,7 @@ REB_R MAKE_Context(
 
     if (IS_BLOCK(arg)) {
         const RELVAL *tail;
-        const RELVAL *at = VAL_ARRAY_AT_T(&tail, arg);
+        const RELVAL *at = VAL_ARRAY_AT(&tail, arg);
 
         REBCTX *ctx = Make_Context_Detect_Managed(
             REB_OBJECT,
@@ -977,8 +978,8 @@ REBNATIVE(construct)
     // refinement was passed in.
     //
   blockscope {
-    const RELVAL *tail = VAL_ARRAY_TAIL(spec);
-    RELVAL *at = VAL_ARRAY_AT_MUTABLE_HACK(spec);
+    const RELVAL *tail;
+    RELVAL *at = VAL_ARRAY_AT_MUTABLE_HACK(&tail, spec);
     if (REF(only)) {
         Init_Object(
             D_OUT,
@@ -997,8 +998,8 @@ REBNATIVE(construct)
     // Scan the object for top-level set words in order to make an
     // appropriately sized context.
     //
-    const RELVAL *tail = VAL_ARRAY_TAIL(spec);
-    RELVAL *at = VAL_ARRAY_AT_ENSURE_MUTABLE(spec);
+    const RELVAL *tail;
+    RELVAL *at = VAL_ARRAY_AT_ENSURE_MUTABLE(&tail, spec);
 
     REBCTX *ctx = Make_Context_Detect_Managed(
         parent ? CTX_TYPE(parent) : REB_OBJECT,  // !!! Presume object?

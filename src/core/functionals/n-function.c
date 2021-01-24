@@ -371,7 +371,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
     // which overrides it, so the value won't have PARAMLIST_HAS_RETURN.
 
     REBARR *copy;
-    if (IS_END(VAL_ARRAY_AT(body))) {  // optimize empty body case
+    if (VAL_LEN_AT(body) == 0) {  // optimize empty body case
 
         if (mkf_flags & MKF_IS_ELIDER) {
             INIT_ACT_DISPATCHER(a, &Commenter_Dispatcher);

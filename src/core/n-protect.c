@@ -312,21 +312,23 @@ static REB_R Protect_Unprotect_Core(REBFRM *frame_, REBFLGS flags)
 
     if (IS_BLOCK(value)) {
         if (REF(words)) {
-            const RELVAL *val;
-            for (val = VAL_ARRAY_AT(value); NOT_END(val); val++) {
+            const RELVAL *tail;
+            const RELVAL *item = VAL_ARRAY_AT(&tail, value);
+            for (; item != tail; ++item) {
                 DECLARE_LOCAL (word); // need binding, can't pass RELVAL
-                Derelativize(word, val, VAL_SPECIFIER(value));
+                Derelativize(word, item, VAL_SPECIFIER(value));
                 Protect_Word_Value(word, flags);  // will unmark if deep
             }
             RETURN (ARG(value));
         }
         if (REF(values)) {
             REBVAL *var;
-            const RELVAL *item;
+            const RELVAL *tail;
+            const RELVAL *item = VAL_ARRAY_AT(&tail, value);
 
             DECLARE_LOCAL (safe);
 
-            for (item = VAL_ARRAY_AT(value); NOT_END(item); ++item) {
+            for (; item != tail; ++item) {
                 if (IS_WORD(item)) {
                     //
                     // Since we *are* PROTECT we allow ourselves to get mutable

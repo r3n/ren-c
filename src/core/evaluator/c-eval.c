@@ -1073,8 +1073,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (VAL_LEN_AT(v) == 0)
             fail ("SET-BLOCK! must not be empty for now.");
 
-        const RELVAL *check = VAL_ARRAY_AT(v);
-        for (; NOT_END(check); ++check) {
+        const RELVAL *tail;
+        const RELVAL *check = VAL_ARRAY_AT(&tail, v);
+        for (; tail != check; ++check) {
             if (IS_BLANK(check) or IS_WORD(check) or IS_PATH(check))
                 continue;
             if (Is_Blackhole(check))
@@ -1110,10 +1111,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         REBDSP dsp_outputs = DSP;
 
       blockscope {
-        const REBKEY *tail;
-        const REBKEY *key = ACT_KEYS(&tail, VAL_ACTION(f_spare));
+        const REBKEY *key_tail;
+        const REBKEY *key = ACT_KEYS(&key_tail, VAL_ACTION(f_spare));
         const REBPAR *param = ACT_PARAMS_HEAD(VAL_ACTION(f_spare));
-        for (; key != tail; ++key, ++param) {
+        for (; key != key_tail; ++key, ++param) {
             if (Is_Param_Hidden(param))
                 continue;
             if (VAL_PARAM_CLASS(param) != REB_P_OUTPUT)

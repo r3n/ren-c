@@ -552,7 +552,7 @@ REB_R MAKE_Error(
         // code in REBTYPE(Context) and code in REBNATIVE(construct))
 
         const RELVAL *tail;
-        const RELVAL *head = VAL_ARRAY_AT_T(&tail, arg);
+        const RELVAL *head = VAL_ARRAY_AT(&tail, arg);
 
         e = Make_Context_Detect_Managed(
             REB_ERROR, // type
@@ -766,7 +766,7 @@ REBCTX *Make_Error_Managed_Core(
     REBLEN expected_args = 0;
     if (IS_BLOCK(message)) { // GET-WORD!s in template should match va_list
         const RELVAL *tail;
-        const RELVAL *temp = VAL_ARRAY_AT_T(&tail, message);
+        const RELVAL *temp = VAL_ARRAY_AT(&tail, message);
         for (; temp != tail; ++temp) {
             if (IS_GET_WORD(temp))
                 ++expected_args;
@@ -1357,8 +1357,10 @@ REBCTX *Startup_Errors(const REBVAL *boot_errors)
     }
   #endif
 
-    const RELVAL *errors_tail = VAL_ARRAY_TAIL(boot_errors);
-    RELVAL *errors_head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_errors);
+    const RELVAL *errors_tail;
+    RELVAL *errors_head
+        = VAL_ARRAY_KNOWN_MUTABLE_AT(&errors_tail, boot_errors);
+
     assert(VAL_INDEX(boot_errors) == 0);
     REBCTX *catalog = Construct_Context_Managed(
         REB_OBJECT,

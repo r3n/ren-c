@@ -84,7 +84,7 @@ static void Schema_From_Block_May_Fail(
         fail (blk);
 
     const RELVAL *tail;
-    const RELVAL *item = VAL_ARRAY_AT_T(&tail, blk);
+    const RELVAL *item = VAL_ARRAY_AT(&tail, blk);
 
     DECLARE_LOCAL (def);
     DECLARE_LOCAL (temp);
@@ -1066,7 +1066,7 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
     bool is_variadic = false;  // default to not being variadic
 
     const RELVAL *tail;
-    const RELVAL *item = VAL_ARRAY_AT_T(&tail, ffi_spec);
+    const RELVAL *item = VAL_ARRAY_AT(&tail, ffi_spec);
     for (; item != tail; ++item) {
         if (IS_TEXT(item))
             continue;  // !!! TBD: extract ACT_META info from spec notes

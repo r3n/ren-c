@@ -594,8 +594,9 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 les->mode == LOOP_MAP_EACH_SPLICED
                 and IS_BLOCK(les->out)
             ){
-                const RELVAL *v = VAL_ARRAY_AT(les->out);
-                for (; NOT_END(v); ++v)
+                const RELVAL *tail;
+                const RELVAL *v = VAL_ARRAY_AT(&tail, les->out);
+                for (; v != tail; ++v)
                     Derelativize(DS_PUSH(), v, VAL_SPECIFIER(les->out));
             }
             else
@@ -1121,8 +1122,9 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
     REBLEN count = 0;
     if (ANY_ARRAY(res->data)) {
         if (res->broke) {  // cleanup markers, don't do removals
-            RELVAL *temp = VAL_ARRAY_KNOWN_MUTABLE_AT(res->data);
-            for (; NOT_END(temp); ++temp) {
+            const RELVAL *tail;
+            RELVAL *temp = VAL_ARRAY_KNOWN_MUTABLE_AT(&tail, res->data);
+            for (; temp != tail; ++temp) {
                 if (GET_CELL_FLAG(temp, NOTE_REMOVE))
                     CLEAR_CELL_FLAG(temp, NOTE_REMOVE);
             }
@@ -1131,13 +1133,14 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
 
         REBLEN len = VAL_LEN_HEAD(res->data);
 
-        RELVAL *dest = VAL_ARRAY_KNOWN_MUTABLE_AT(res->data);
+        const RELVAL *tail;
+        RELVAL *dest = VAL_ARRAY_KNOWN_MUTABLE_AT(&tail, res->data);
         RELVAL *src = dest;
 
         // avoid blitting cells onto themselves by making the first thing we
         // do is to pass up all the unmarked (kept) cells.
         //
-        while (NOT_END(src) and NOT_CELL_FLAG(src, NOTE_REMOVE)) {
+        while (src != tail and NOT_CELL_FLAG(src, NOTE_REMOVE)) {
             ++src;
             ++dest;
         }
@@ -1145,8 +1148,8 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
         // If we get here, we're either at the end, or all the cells from here
         // on are going to be moving to somewhere besides the original spot
         //
-        for (; NOT_END(dest); ++dest, ++src) {
-            while (NOT_END(src) and GET_CELL_FLAG(src, NOTE_REMOVE)) {
+        for (; dest != tail; ++dest, ++src) {
+            while (src != tail and GET_CELL_FLAG(src, NOTE_REMOVE)) {
                 ++src;
                 --len;
                 ++count;

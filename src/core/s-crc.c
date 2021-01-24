@@ -473,8 +473,9 @@ REBSER *Hash_Block(const REBVAL *block, REBLEN skip, bool cased)
     // Create the hash array (integer indexes):
     REBSER *hashlist = Make_Hash_Series(VAL_LEN_AT(block));
 
-    const RELVAL *value = VAL_ARRAY_AT(block);
-    if (IS_END(value))
+    const RELVAL *tail;
+    const RELVAL *value = VAL_ARRAY_AT(&tail, block);
+    if (value == tail)
         return hashlist;
 
     REBLEN *hashes = SER_HEAD(REBLEN, hashlist);
@@ -501,7 +502,7 @@ REBSER *Hash_Block(const REBVAL *block, REBLEN skip, bool cased)
             n++;
             skip_index--;
 
-            if (IS_END(value)) {
+            if (value == tail) {
                 if (skip_index != 0) {
                     //
                     // !!! It's not clear what to do when hashing something

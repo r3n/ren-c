@@ -166,7 +166,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         if (Vararg_Op_If_No_Advance_Handled(
             out,
             op,
-            IS_END(shared) ? END_NODE : VAL_ARRAY_AT(shared),
+            IS_END(shared) ? END_NODE : VAL_ARRAY_ITEM_AT(shared),
             IS_END(shared) ? SPECIFIED : VAL_SPECIFIER(shared),
             pclass
         )){
@@ -215,7 +215,11 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
             break; }
 
         case REB_P_HARD:
-            Derelativize(out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared));
+            Derelativize(
+                out,
+                VAL_ARRAY_ITEM_AT(shared),
+                VAL_SPECIFIER(shared)
+            );
             SET_CELL_FLAG(out, UNEVALUATED);
             VAL_INDEX_UNBOUNDED(shared) += 1;
             break;
@@ -227,15 +231,19 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
             fail ("Variadic medium parameters not yet implemented");
 
         case REB_P_SOFT:
-            if (ANY_ESCAPABLE_GET(VAL_ARRAY_AT(shared))) {
+            if (ANY_ESCAPABLE_GET(VAL_ARRAY_ITEM_AT(shared))) {
                 if (Eval_Value_Throws(
-                    out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared)
+                    out, VAL_ARRAY_ITEM_AT(shared), VAL_SPECIFIER(shared)
                 )){
                     return true;
                 }
             }
             else { // not a soft-"exception" case, quote ordinarily
-                Derelativize(out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared));
+                Derelativize(
+                    out,
+                    VAL_ARRAY_ITEM_AT(shared),
+                    VAL_SPECIFIER(shared)
+                );
                 SET_CELL_FLAG(out, UNEVALUATED);
             }
             VAL_INDEX_UNBOUNDED(shared) += 1;
@@ -382,7 +390,7 @@ REB_R MAKE_Varargs(
         // should be an END marker (not an array at its end)
         //
         REBARR *array1 = Alloc_Singular(NODE_FLAG_MANAGED);
-        if (IS_END(VAL_ARRAY_AT(arg)))
+        if (VAL_LEN_AT(arg) == 0)
             SET_END(ARR_SINGLE(array1));
         else
             Move_Value(ARR_SINGLE(array1), arg);

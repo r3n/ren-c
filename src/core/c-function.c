@@ -138,9 +138,10 @@ void Push_Paramlist_Triads_May_Fail(
 
     bool refinement_seen = false;
 
-    const RELVAL* value = VAL_ARRAY_AT(spec);
+    const RELVAL *tail;
+    const RELVAL *value = VAL_ARRAY_AT(&tail, spec);
 
-    while (NOT_END(value)) {
+    while (value != tail) {
         const RELVAL* item = value;  // "faked"
         ++value;  // go ahead and consume next
 
@@ -260,9 +261,13 @@ void Push_Paramlist_Triads_May_Fail(
             bool was_refinement = TYPE_CHECK(param, REB_TS_REFINEMENT);
             VAL_TYPESET_LOW_BITS(param) = 0;
             VAL_TYPESET_HIGH_BITS(param) = 0;
+            
+            const RELVAL *types_tail;
+            const RELVAL *types_at = VAL_ARRAY_AT(&types_tail, item);
             Add_Typeset_Bits_Core(
                 cast_PAR(param),
-                ARR_HEAD(VAL_ARRAY(item)),
+                types_at,
+                types_tail,
                 derived
             );
             if (was_refinement)

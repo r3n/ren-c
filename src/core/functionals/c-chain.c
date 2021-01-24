@@ -201,14 +201,15 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
     REBVAL *out = D_OUT;  // plan ahead for factoring into Chain_Action(out..
 
     REBVAL *pipeline = ARG(pipeline);
-    const RELVAL *first = VAL_ARRAY_AT(pipeline);
+    const RELVAL *tail;
+    const RELVAL *first = VAL_ARRAY_AT(&tail, pipeline);
 
     // !!! Current validation is that all are actions.  Should there be other
     // checks?  (That inputs match outputs in the chain?)  Should it be
     // a dialect and allow things other than functions?
     //
     const RELVAL *check = first;
-    for (; NOT_END(check); ++check) {
+    for (; check != tail; ++check) {
         if (not IS_ACTION(check)) {
             DECLARE_LOCAL (specific);
             Derelativize(specific, check, VAL_SPECIFIER(pipeline));

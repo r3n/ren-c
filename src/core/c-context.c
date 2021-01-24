@@ -316,7 +316,7 @@ static void Collect_Inner_Loop(
         //
         if (ANY_ARRAY_KIND(kind)) {
             const RELVAL *sub_tail;
-            const RELVAL *sub_at = VAL_ARRAY_AT_T(&sub_tail, cell);
+            const RELVAL *sub_at = VAL_ARRAY_AT(&sub_tail, cell);
             Collect_Inner_Loop(cl, sub_at, sub_tail);
         }
     }
@@ -402,7 +402,7 @@ REBARR *Collect_Unique_Words_Managed(
     //
     if (not IS_NULLED(ignorables)) {
         const RELVAL *check_tail;
-        const RELVAL *check = VAL_ARRAY_AT_T(&check_tail, ignorables);
+        const RELVAL *check = VAL_ARRAY_AT(&check_tail, ignorables);
         for (; check != check_tail; ++check) {
             if (not ANY_WORD_KIND(CELL_KIND(VAL_UNESCAPED(check))))
                 fail (Error_Bad_Value_Core(check, VAL_SPECIFIER(ignorables)));
@@ -421,7 +421,7 @@ REBARR *Collect_Unique_Words_Managed(
     //
     if (IS_BLOCK(ignorables)) {
         const RELVAL *ignore_tail;
-        const RELVAL *ignore = VAL_ARRAY_AT_T(&ignore_tail, ignorables);
+        const RELVAL *ignore = VAL_ARRAY_AT(&ignore_tail, ignorables);
         for (; ignore != ignore_tail; ++ignore) {
             REBCEL(const*) cell = VAL_UNESCAPED(ignore);
             const REBSYM *symbol = VAL_WORD_SYMBOL(cell);
@@ -469,7 +469,7 @@ REBARR *Collect_Unique_Words_Managed(
 
     if (IS_BLOCK(ignorables)) {
         const RELVAL *ignore_tail;
-        const RELVAL *ignore = VAL_ARRAY_AT_T(&ignore_tail, ignorables);
+        const RELVAL *ignore = VAL_ARRAY_AT(&ignore_tail, ignorables);
         for (; ignore != ignore_tail; ++ignore) {
             REBCEL(const*) cell = VAL_UNESCAPED(ignore);
             const REBSYM *symbol = VAL_WORD_SYMBOL(cell);
@@ -787,7 +787,7 @@ void Resolve_Context(
     else if (IS_BLOCK(only_words)) {
         // Limit exports to only these words:
         const RELVAL *tail;
-        const RELVAL *word = VAL_ARRAY_AT_T(&tail, only_words);
+        const RELVAL *word = VAL_ARRAY_AT(&tail, only_words);
         for (; word != tail; word++) {
             if (IS_WORD(word) or IS_SET_WORD(word)) {
                 Add_Binder_Index(&binder, VAL_WORD_SYMBOL(word), -1);
@@ -892,7 +892,7 @@ void Resolve_Context(
         }
         else if (IS_BLOCK(only_words)) {
             const RELVAL *tail;
-            const RELVAL *word = VAL_ARRAY_AT_T(&tail, only_words);
+            const RELVAL *word = VAL_ARRAY_AT(&tail, only_words);
             for (; word != tail; word++) {
                 if (IS_WORD(word) or IS_SET_WORD(word))
                     Remove_Binder_Index_Else_0(&binder, VAL_WORD_SYMBOL(word));

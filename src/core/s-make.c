@@ -383,8 +383,8 @@ void Join_Binary_In_Byte_Buf(const REBVAL *blk, REBINT limit)
 
     SET_SERIES_LEN(buf, 0);
 
-    const RELVAL *val;
-    for (val = VAL_ARRAY_AT(blk); limit > 0; val++, limit--) {
+    const RELVAL *val = VAL_ARRAY_ITEM_AT(blk);
+    for (; limit > 0; val++, limit--) {
         switch (VAL_TYPE(val)) {
         case REB_INTEGER:
             EXPAND_SERIES_TAIL(buf, 1);

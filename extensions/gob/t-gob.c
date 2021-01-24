@@ -626,7 +626,7 @@ static void Set_GOB_Vars(
     DECLARE_LOCAL (val);
 
     const RELVAL *tail;
-    const RELVAL *item = VAL_ARRAY_AT_T(&tail, block);
+    const RELVAL *item = VAL_ARRAY_AT(&tail, block);
     while (item != tail) {
         Derelativize(var, item, specifier);
         ++item;
@@ -999,7 +999,9 @@ REBTYPE(Gob)
             len = 1;
         }
         else if (IS_BLOCK(value)) {
-            value = VAL_ARRAY_KNOWN_MUTABLE_LEN_AT(&len, value);  // !!!
+            value = m_cast(RELVAL*,
+                VAL_ARRAY_LEN_AT(&len, KNOWN_MUTABLE(value))
+            );  // !!!
         }
         else
             fail (PAR(value));

@@ -157,8 +157,8 @@ REBNATIVE(generic)
 REBARR *Startup_Generics(const REBVAL *boot_generics)
 {
     assert(VAL_INDEX(boot_generics) == 0); // should be at head, sanity check
-    const RELVAL *tail = ARR_TAIL(VAL_ARRAY(boot_generics));
-    RELVAL *head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_generics);
+    const RELVAL *tail;
+    RELVAL *head = VAL_ARRAY_KNOWN_MUTABLE_AT(&tail, boot_generics);
     REBSPC *specifier = VAL_SPECIFIER(boot_generics);
 
     // Add SET-WORD!s that are top-level in the generics block to the lib

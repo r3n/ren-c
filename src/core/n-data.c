@@ -208,8 +208,7 @@ REBNATIVE(bind)
     }
     else {
         ENSURE_MUTABLE(v);  // use IN for virtual binding
-        tail = VAL_ARRAY_TAIL(v);
-        at = VAL_ARRAY_AT_MUTABLE_HACK(v);  // !!! only binds *after* index!
+        at = VAL_ARRAY_AT_MUTABLE_HACK(&tail, v);  // !!! only *after* index!
         Move_Value(D_OUT, v);
     }
 
@@ -438,8 +437,8 @@ REBNATIVE(unbind)
     else {
         assert(IS_BLOCK(word));
 
-        const RELVAL *tail = VAL_ARRAY_TAIL(word);
-        RELVAL *at = VAL_ARRAY_AT_ENSURE_MUTABLE(word);
+        const RELVAL *tail;
+        RELVAL *at = VAL_ARRAY_AT_ENSURE_MUTABLE(&tail, word);
         option(REBCTX*) context = nullptr;
         Unbind_Values_Core(at, tail, context, did REF(deep));
     }
@@ -474,7 +473,7 @@ REBNATIVE(collect_words)
         flags |= COLLECT_DEEP;
 
     const RELVAL *tail;
-    const RELVAL *at = VAL_ARRAY_AT_T(&tail, ARG(block));
+    const RELVAL *at = VAL_ARRAY_AT(&tail, ARG(block));
     return Init_Block(
         D_OUT,
         Collect_Unique_Words_Managed(at, tail, flags, ARG(ignore))
@@ -553,9 +552,10 @@ REBNATIVE(get)
 
     REBARR *results = Make_Array(VAL_LEN_AT(source));
     RELVAL *dest = ARR_HEAD(results);
-    const RELVAL *item = VAL_ARRAY_AT(source);
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT(&tail, source);
 
-    for (; NOT_END(item); ++item, ++dest) {
+    for (; item != tail; ++item, ++dest) {
         DECLARE_LOCAL (temp);
         Get_Var_May_Fail(
             temp,  // don't want to write directly into movable memory
@@ -711,23 +711,26 @@ REBNATIVE(set)
         RETURN (value);
     }
 
-    const RELVAL *item = VAL_ARRAY_AT(target);
+    const RELVAL *item_tail;
+    const RELVAL *item = VAL_ARRAY_AT(&item_tail, target);
 
+    const RELVAL *v_tail;
     const RELVAL *v;
     if (IS_BLOCK(value) and not REF(single))
-        v = VAL_ARRAY_AT(value);
+        v = VAL_ARRAY_AT(&v_tail, value);
     else {
         Init_True(ARG(single));
         v = value;
+        v_tail = value + 1;
     }
 
     for (
         ;
-        NOT_END(item);
+        item != item_tail;
         ++item, (REF(single) or IS_END(v)) ? NOOP : (++v, NOOP)
      ){
         if (REF(some)) {
-            if (IS_END(v))
+            if (v == v_tail)
                 break; // won't be setting any further values
             if (IS_BLANK(v))
                 continue; // /SOME means treat blanks as no-ops
@@ -736,7 +739,7 @@ REBNATIVE(set)
         Set_Var_May_Fail(
             item,
             VAL_SPECIFIER(target),
-            IS_END(v)  // R3-Alpha/Red blank after END
+            v == v_tail  // R3-Alpha/Red blank after END
                 ? BLANK_VALUE
                 : v, 
             (IS_BLOCK(value) and not REF(single))

@@ -74,7 +74,7 @@ void Splice_Block_Into_Feed(REBFED *feed, const REBVAL *splice) {
         mutable_MISC(Pending, saved) = feed->value;
     }
 
-    feed->value = VAL_ARRAY_AT(splice);
+    feed->value = VAL_ARRAY_ITEM_AT(splice);
     Move_Value(FEED_SINGLE(feed), splice);
     ++VAL_INDEX_UNBOUNDED(FEED_SINGLE(feed));
  

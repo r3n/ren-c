@@ -130,12 +130,13 @@ void Shutdown_Typesets(void)
 bool Add_Typeset_Bits_Core(
     REBPAR *typeset,
     const RELVAL *head,
+    const RELVAL *tail,
     REBSPC *specifier
 ) {
     assert(IS_TYPESET(typeset));
 
     const RELVAL *maybe_word = head;
-    for (; NOT_END(maybe_word); ++maybe_word) {
+    for (; maybe_word != tail; ++maybe_word) {
         const RELVAL *item;
         if (IS_WORD(maybe_word))
             item = Lookup_Word_May_Fail(maybe_word, specifier);
@@ -272,13 +273,18 @@ REB_R MAKE_Typeset(
 
     if (!IS_BLOCK(arg)) goto bad_make;
 
+  blockscope {
+    const RELVAL *tail;
+    const RELVAL *at = VAL_ARRAY_AT(&tail, arg);
     Init_Typeset(out, 0);
     Add_Typeset_Bits_Core(
         cast_PAR(out),
-        VAL_ARRAY_AT(arg),
+        at,
+        tail,
         VAL_SPECIFIER(arg)
     );
     return out;
+  }
 
   bad_make:
     fail (Error_Bad_Make(REB_TYPESET, arg));

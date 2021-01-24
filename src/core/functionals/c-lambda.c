@@ -125,7 +125,7 @@ REBNATIVE(lambda)
     const RELVAL *word_tail;
     const RELVAL *word;
     if (IS_BLOCK(wordlist))
-        word = VAL_ARRAY_AT_T(&word_tail, wordlist);
+        word = VAL_ARRAY_AT(&word_tail, wordlist);
     else if (IS_WORD(wordlist)) {
         word = ARG(words);
         word_tail = word + 1;

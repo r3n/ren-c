@@ -545,7 +545,7 @@ static void parse_attr(
     uintptr_t *raw_addr
 ){
     const RELVAL *tail;
-    const REBVAL *attr = SPECIFIC(VAL_ARRAY_AT_T(&tail, blk));
+    const REBVAL *attr = SPECIFIC(VAL_ARRAY_AT(&tail, blk));
 
     *raw_size = -1;
     *raw_addr = 0;
@@ -784,7 +784,7 @@ static void Parse_Field_Type_May_Fail(
     TRASH_CELL_IF_DEBUG(inner);
 
     const RELVAL *tail;
-    const RELVAL *val = VAL_ARRAY_AT_T(&tail, spec);
+    const RELVAL *val = VAL_ARRAY_AT(&tail, spec);
 
     if (val == tail)
         fail ("Empty field type in FFI");
@@ -966,7 +966,7 @@ static void Parse_Field_Type_May_Fail(
 void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
 {
     const RELVAL *spec_tail;
-    const RELVAL *spec_item = VAL_ARRAY_AT_T(&spec_tail, spec);
+    const RELVAL *spec_item = VAL_ARRAY_AT(&spec_tail, spec);
 
     while (spec_item != spec_tail) {
         const RELVAL *word;

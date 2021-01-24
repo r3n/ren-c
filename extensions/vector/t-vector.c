@@ -238,7 +238,7 @@ void Set_Vector_Row(
 
     if (IS_BLOCK(blk)) {
         const RELVAL *tail;
-        const RELVAL *val = VAL_ARRAY_AT_T(&tail, blk);
+        const RELVAL *val = VAL_ARRAY_AT(&tail, blk);
 
         REBLEN n = 0;
         for (; val != tail; ++val) {
@@ -372,7 +372,7 @@ bool Make_Vector_Spec(
     REBSPC *specifier
 ){
     const RELVAL *tail;
-    const RELVAL *item = VAL_ARRAY_AT_T(&tail, block);
+    const RELVAL *item = VAL_ARRAY_AT(&tail, block);
 
     // The specifier would be needed if variables were going to be looked
     // up, but isn't required for just symbol comparisons or extracting

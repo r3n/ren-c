@@ -262,7 +262,7 @@ REB_R MAKE_Image(
     }
     else if (IS_BLOCK(arg)) {  // make image! [size rgba index]
         const RELVAL *tail;
-        const RELVAL *item = VAL_ARRAY_AT_T(&tail, arg);
+        const RELVAL *item = VAL_ARRAY_AT(&tail, arg);
         if (item == tail or not IS_PAIR(item))
             goto bad_make;
 
@@ -334,7 +334,7 @@ REB_R MAKE_Image(
             REBYTE *ip = VAL_IMAGE_HEAD(out);  // image pointer
 
             Tuples_To_RGBA(
-                ip, w * h, VAL_ARRAY_AT_T(nullptr, item), VAL_LEN_AT(item)
+                ip, w * h, VAL_ARRAY_ITEM_AT(item), VAL_LEN_AT(item)
             );
         }
         else
@@ -765,7 +765,7 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
         if (index + part > tail) part = tail - index;  // clip it
         ip += index * 4;
         for (; dup > 0; dup--, ip += part * 4)
-            Tuples_To_RGBA(ip, part, VAL_ARRAY_AT_T(nullptr, arg), part);
+            Tuples_To_RGBA(ip, part, VAL_ARRAY_ITEM_AT(arg), part);
     }
     else
         fail (Error_Invalid_Type(VAL_TYPE(arg)));

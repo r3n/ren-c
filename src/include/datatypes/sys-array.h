@@ -490,10 +490,7 @@ inline static const RELVAL *VAL_ARRAY_LEN_AT(
     return ARR_AT(arr, i);
 }
 
-#define VAL_ARRAY_AT(v) \
-    VAL_ARRAY_LEN_AT(nullptr, (v))
-
-inline static const RELVAL *VAL_ARRAY_AT_T(
+inline static const RELVAL *VAL_ARRAY_AT(
     option(const RELVAL**) tail_out,
     REBCEL(const*) v
 ){
@@ -522,15 +519,20 @@ inline static const RELVAL *VAL_ARRAY_AT_HEAD_T(
     return at;
 }
 
+inline static const RELVAL *VAL_ARRAY_ITEM_AT(REBCEL(const*) v) {
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT(&tail, v);
+    assert(item != tail);  // should be a valid value
+    return item;
+}
 
-#define VAL_ARRAY_AT_ENSURE_MUTABLE(v) \
-    m_cast(RELVAL*, VAL_ARRAY_AT(ENSURE_MUTABLE(v)))
 
-#define VAL_ARRAY_KNOWN_MUTABLE_AT(v) \
-    m_cast(RELVAL*, VAL_ARRAY_AT(KNOWN_MUTABLE(v)))
+#define VAL_ARRAY_AT_ENSURE_MUTABLE(tail_out,v) \
+    m_cast(RELVAL*, VAL_ARRAY_AT((tail_out), ENSURE_MUTABLE(v)))
 
-#define VAL_ARRAY_KNOWN_MUTABLE_LEN_AT(len_out,v) \
-    m_cast(RELVAL*, VAL_ARRAY_LEN_AT((len_out), KNOWN_MUTABLE(v)))
+#define VAL_ARRAY_KNOWN_MUTABLE_AT(tail_out,v) \
+    m_cast(RELVAL*, VAL_ARRAY_AT((tail_out), KNOWN_MUTABLE(v)))
+
 
 // !!! R3-Alpha introduced concepts of immutable series with PROTECT, but
 // did not consider the protected status to apply to binding.  Ren-C added
@@ -541,8 +543,8 @@ inline static const RELVAL *VAL_ARRAY_AT_HEAD_T(
 // some of the thinking on this topic.  Until it's solved, binding-related
 // calls to this function get mutable access on non-mutable series.  :-/
 //
-#define VAL_ARRAY_AT_MUTABLE_HACK(v) \
-    m_cast(RELVAL*, VAL_ARRAY_AT(v))
+#define VAL_ARRAY_AT_MUTABLE_HACK(tail_out,v) \
+    m_cast(RELVAL*, VAL_ARRAY_AT((tail_out), (v)))
 
 #define VAL_ARRAY_TAIL(v) \
   ARR_TAIL(VAL_ARRAY(v))
@@ -643,10 +645,11 @@ inline static RELVAL *Init_Relative_Block_At(
 //
 inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {
     assert(ANY_GROUP_KIND(CELL_HEART(group)));
-    const RELVAL *inner = VAL_ARRAY_AT(group);
-    if (KIND3Q_BYTE(inner) != REB_GROUP or NOT_END(inner + 1))
-        return false; // plain (...) GROUP!
-    return true; // a ((...)) GROUP!, inject as rule
+    const RELVAL *tail;
+    const RELVAL *inner = VAL_ARRAY_AT(&tail, group);
+    if (inner + 1 != tail)  // should be exactly one item
+        return false;
+    return IS_GROUP(inner);  // if true, it's a ((...)) GROUP!
 }
 
 

@@ -394,8 +394,9 @@ static void Init_System_Object(
     REBCTX *errors_catalog
 ) {
     assert(VAL_INDEX(boot_sysobj_spec) == 0);
-    const RELVAL *spec_tail = VAL_ARRAY_TAIL(boot_sysobj_spec);
-    RELVAL *spec_head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_sysobj_spec);
+    const RELVAL *spec_tail;
+    RELVAL *spec_head
+        = VAL_ARRAY_KNOWN_MUTABLE_AT(&spec_tail, boot_sysobj_spec);
 
     // Create the system object from the sysobj block (defined in %sysobj.r)
     //

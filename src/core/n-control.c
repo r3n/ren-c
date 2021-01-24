@@ -237,9 +237,10 @@ inline static bool Single_Test_Throws(
         goto return_out; }  // return the LOGIC! truth, false=no throw
 
       case REB_BLOCK: {  // OR the tests together
-        const RELVAL *item = VAL_ARRAY_AT(test_cell);
+        const RELVAL *item_tail;
+        const RELVAL *item = VAL_ARRAY_AT(&item_tail, test_cell);
         REBSPC *specifier = Derive_Specifier(test_specifier, test);
-        for (; NOT_END(item); ++item) {
+        for (; item != item_tail; ++item) {
             if (Single_Test_Throws(
                 out,
                 item,
@@ -1284,8 +1285,9 @@ REBNATIVE(catch)
             //
             // Test all the words in the block for a match to catch
 
-            const RELVAL *candidate = VAL_ARRAY_AT(ARG(name));
-            for (; NOT_END(candidate); candidate++) {
+            const RELVAL *tail;
+            const RELVAL *candidate = VAL_ARRAY_AT(&tail, ARG(name));
+            for (; candidate != tail; candidate++) {
                 //
                 // !!! Should we test a typeset for illegal name types?
                 //

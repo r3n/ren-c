@@ -172,7 +172,7 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
             &= ~(EVF_DOUBLE | EVF_CONTROL | EVF_SHIFT);
 
         const RELVAL *tail;
-        const RELVAL *item = VAL_ARRAY_AT_T(&tail, val);
+        const RELVAL *item = VAL_ARRAY_AT(&tail, val);
         for (; item != tail; ++item) {
             if (not IS_WORD(item))
                 continue;
@@ -216,7 +216,7 @@ void Set_Event_Vars(
     DECLARE_LOCAL (val);
 
     const RELVAL *tail;
-    const RELVAL *item = VAL_ARRAY_AT_T(&tail, block);
+    const RELVAL *item = VAL_ARRAY_AT(&tail, block);
     while (item != tail) {
         Derelativize(var, item, specifier);
         ++item;

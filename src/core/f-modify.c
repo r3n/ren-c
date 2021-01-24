@@ -41,12 +41,12 @@ REBLEN Modify_Array(
 ){
     assert(sym == SYM_INSERT or sym == SYM_CHANGE or sym == SYM_APPEND);
 
-    REBLEN tail = ARR_LEN(dst_arr);
+    REBLEN tail_idx = ARR_LEN(dst_arr);
 
     const RELVAL *src_rel;
     REBSPC *specifier;
 
-    if (IS_NULLED(src_val) and sym == SYM_CHANGE) {
+    if (sym == SYM_CHANGE and IS_NULLED(src_val)) {
         //
         // Tweak requests to CHANGE to a null to be a deletion; basically
         // what happens with an empty block.
@@ -54,17 +54,17 @@ REBLEN Modify_Array(
         flags |= AM_SPLICE;
         src_val = EMPTY_BLOCK;
     }
-
-    if (IS_NULLED(src_val) or dups <= 0) {
+    else if (IS_NULLED(src_val) or dups <= 0) {
+        //
         // If they are effectively asking for "no action" then all we have
         // to do is return the natural index result for the operation.
-        // (APPEND will return 0, insert the tail of the insertion...so index)
-
+        // (APPEND will return 0, INSERT the tail of the insertion...)
+        //
         return (sym == SYM_APPEND) ? 0 : dst_idx;
     }
 
-    if (sym == SYM_APPEND or dst_idx > tail)
-        dst_idx = tail;
+    if (sym == SYM_APPEND or dst_idx > tail_idx)
+        dst_idx = tail_idx;
 
     // Each dup being inserted need a newline signal after it if:
     //
@@ -83,7 +83,8 @@ REBLEN Modify_Array(
         REBCEL(const*) unescaped = VAL_UNESCAPED(src_val);
         assert(ANY_ARRAY_KIND(CELL_KIND(unescaped)));
 
-        ilen = VAL_LEN_AT(unescaped);
+        REBLEN len_at = VAL_LEN_AT(unescaped);
+        ilen = len_at;
 
         // Adjust length of insertion if changing /PART:
         if (sym != SYM_CHANGE and (flags & AM_PART)) {
@@ -92,8 +93,7 @@ REBLEN Modify_Array(
         }
 
         if (not tail_newline) {
-            const RELVAL *tail_cell = VAL_ARRAY_AT(unescaped) + ilen;
-            if (IS_END(tail_cell)) {
+            if (ilen == len_at) {
                 tail_newline = GET_SUBCLASS_FLAG(
                     ARRAY,
                     VAL_ARRAY(src_val),
@@ -102,8 +102,11 @@ REBLEN Modify_Array(
             }
             else if (ilen == 0)
                 tail_newline = false;
-            else
+            else {
+                const RELVAL *tail_cell
+                    = VAL_ARRAY_ITEM_AT(unescaped) + ilen;
                 tail_newline = GET_CELL_FLAG(tail_cell, NEWLINE_BEFORE);
+            }
         }
 
         // Are we modifying ourselves? If so, copy src_val block first:
@@ -119,7 +122,7 @@ REBLEN Modify_Array(
             specifier = SPECIFIED; // copy already specified it
         }
         else {
-            src_rel = VAL_ARRAY_AT(unescaped); // skips by VAL_INDEX values
+            src_rel = VAL_ARRAY_AT(nullptr, unescaped);  // may be tail
             specifier = VAL_SPECIFIER(unescaped);
         }
     }
@@ -149,12 +152,12 @@ REBLEN Modify_Array(
             Expand_Series(dst_arr, dst_idx, size - part);
         else if (size < part and (flags & AM_PART))
             Remove_Series_Units(dst_arr, dst_idx, part - size);
-        else if (size + dst_idx > tail) {
-            EXPAND_SERIES_TAIL(dst_arr, size - (tail - dst_idx));
+        else if (size + dst_idx > tail_idx) {
+            EXPAND_SERIES_TAIL(dst_arr, size - (tail_idx - dst_idx));
         }
     }
 
-    tail = (sym == SYM_APPEND) ? 0 : size + dst_idx;
+    tail_idx = (sym == SYM_APPEND) ? 0 : size + dst_idx;
 
     REBLEN dup_index = 0;
     for (; dup_index < cast(REBLEN, dups); ++dup_index) {  // dups checked > 0
@@ -204,7 +207,7 @@ REBLEN Modify_Array(
 
     ASSERT_ARRAY(dst_arr);
 
-    return tail;
+    return tail_idx;
 }
 
 
@@ -469,8 +472,9 @@ REBLEN Modify_String_Or_Binary(
             // between.  There is some rationale to this, though implications
             // for operations like TO TEXT! of a BLOCK! are unclear...
             //
-            const RELVAL *item;
-            for (item = VAL_ARRAY_AT(src); NOT_END(item); ++item)
+            const RELVAL *item_tail;
+            const RELVAL *item = VAL_ARRAY_AT(&item_tail, src);
+            for (; item != item_tail; ++item)
                 Form_Value(mo, item);
             goto use_mold_buffer;
         }

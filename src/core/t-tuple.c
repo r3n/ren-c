@@ -103,12 +103,13 @@ REB_R MAKE_Sequence(
         REBLEN len = 0;
         REBINT n;
 
-        const RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, arg);
 
         REBYTE buf[MAX_TUPLE];
         REBYTE *vp = buf;
 
-        for (; NOT_END(item); ++item, ++vp, ++len) {
+        for (; item != tail; ++item, ++vp, ++len) {
             if (len >= MAX_TUPLE)
                 goto bad_make;
             if (IS_INTEGER(item)) {

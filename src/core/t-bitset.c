@@ -170,14 +170,16 @@ REBLEN Find_Max_Bit(const RELVAL *val)
             maxi = VAL_LEN_AT(val) * 8 - 1;
         break;
 
-    case REB_BLOCK:
-        for (val = VAL_ARRAY_AT(val); NOT_END(val); val++) {
-            REBLEN n = Find_Max_Bit(val);
+    case REB_BLOCK: {
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, val);
+        for (; item != tail; ++item) {
+            REBLEN n = Find_Max_Bit(item);
             if (n != NOT_FOUND and n > maxi)
                 maxi = n;
         }
         //maxi++;
-        break;
+        break; }
 
     case REB_BLANK:
         maxi = 0;
@@ -296,10 +298,11 @@ bool Set_Bits(REBBIN *bset, const RELVAL *val, bool set)
     if (!ANY_ARRAY(val))
         fail (Error_Invalid_Type(VAL_TYPE(val)));
 
-    const RELVAL *item = VAL_ARRAY_AT(val);
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT(&tail, val);
 
     if (
-        NOT_END(item)
+        item != tail
         && IS_WORD(item)
         && VAL_WORD_ID(item) == SYM__NOT_  // see TO-C-NAME
     ){
@@ -309,7 +312,7 @@ bool Set_Bits(REBBIN *bset, const RELVAL *val, bool set)
 
     // Loop through block of bit specs:
 
-    for (; NOT_END(item); item++) {
+    for (; item != tail; item++) {
 
         switch (VAL_TYPE(item)) {
         case REB_ISSUE: {
@@ -319,7 +322,7 @@ bool Set_Bits(REBBIN *bset, const RELVAL *val, bool set)
             }
             REBUNI c = VAL_CHAR(item);
             if (
-                NOT_END(item + 1)
+                item + 1 != tail
                 && IS_WORD(item + 1)
                 && VAL_WORD_ID(item + 1) == SYM_HYPHEN
             ){
@@ -344,7 +347,7 @@ bool Set_Bits(REBBIN *bset, const RELVAL *val, bool set)
             if (n > MAX_BITSET)
                 return false;
             if (
-                NOT_END(item + 1)
+                item + 1 != tail
                 && IS_WORD(item + 1)
                 && VAL_WORD_ID(item + 1) == SYM_HYPHEN
             ){
@@ -442,8 +445,9 @@ bool Check_Bits(const REBBIN *bset, const RELVAL *val, bool uncased)
 
     // Loop through block of bit specs
 
-    const RELVAL *item;
-    for (item = VAL_ARRAY_AT(val); NOT_END(item); item++) {
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT(&tail, val);
+    for (; item != tail; item++) {
 
         switch (VAL_TYPE(item)) {
 

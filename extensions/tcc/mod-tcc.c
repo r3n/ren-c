@@ -208,7 +208,7 @@ static void Process_Block_Helper(
     rebEND);
 
     const RELVAL *tail;
-    const RELVAL *text = VAL_ARRAY_AT_T(&tail, block);
+    const RELVAL *text = VAL_ARRAY_AT(&tail, block);
     for (; text != tail; ++text)
         Process_Text_Helper_Core(some_tcc_api, state, SPECIFIC(text), label);
 
@@ -497,7 +497,7 @@ REBNATIVE(compile_p)
 
     if (REF(files)) {
         const RELVAL *tail;
-        const RELVAL *item = VAL_ARRAY_AT_T(&tail, compilables);
+        const RELVAL *item = VAL_ARRAY_AT(&tail, compilables);
         for (; item != tail; ++item) {
             if (not IS_TEXT(item))
                 fail ("If COMPILE*/FILES, compilables must be TEXT! paths");
@@ -525,7 +525,7 @@ REBNATIVE(compile_p)
         Push_Mold(mo);
 
         const RELVAL *tail;
-        const RELVAL *item = VAL_ARRAY_AT_T(&tail, compilables);
+        const RELVAL *item = VAL_ARRAY_AT(&tail, compilables);
         for (; item != tail; ++item) {
             if (IS_ACTION(item)) {
                 assert(Is_User_Native(VAL_ACTION(item)));

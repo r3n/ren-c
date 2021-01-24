@@ -998,8 +998,8 @@ REB_R MAKE_Path(
             Move_Value(DS_PUSH(), out);
         }
         else { // Splice any generated paths, so there are no paths-in-paths.
-
-            const RELVAL *item = VAL_ARRAY_AT(out);  // safe?
+            const RELVAL *tail;
+            const RELVAL *item = VAL_ARRAY_AT(&tail, out);  // safe?
             if (IS_BLANK(item) and DSP != dsp_orig) {
                 if (IS_BLANK(DS_TOP)) // make path! ['a/b/ `/c`]
                     fail ("Cannot merge slashes in MAKE PATH!");
@@ -1008,7 +1008,7 @@ REB_R MAKE_Path(
             else if (DSP != dsp_orig and IS_BLANK(DS_TOP))
                 DS_DROP(); // make path! ['a/ 'b/c] => a/b/c, not a//b/c
 
-            for (; NOT_END(item); ++item)
+            for (; item != tail; ++item)
                 Derelativize(DS_PUSH(), item, VAL_SPECIFIER(out));
         }
     }
@@ -1112,11 +1112,12 @@ REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         fail (Error_Sequence_Too_Short_Raw());
 
     if (len == 2) {
+        const RELVAL *at = VAL_ARRAY_ITEM_AT(arg);
         if (not Try_Init_Any_Sequence_Pairlike_Core(
             out,
             kind,
-            VAL_ARRAY_AT(arg),
-            VAL_ARRAY_AT(arg) + 1,
+            at,
+            at + 1,
             VAL_SPECIFIER(arg)
         )){
             fail (Error_Bad_Sequence_Init(out));

@@ -78,14 +78,16 @@ REB_R MAKE_Pair(
         y = arg;
     }
     else if (IS_BLOCK(arg)) {
-        const RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, arg);
 
         if (ANY_NUMBER(item))
             x = item;
         else
             goto bad_make;
 
-        if (IS_END(++item))
+        ++item;
+        if (item == tail)
             goto bad_make;
 
         if (ANY_NUMBER(item))
@@ -93,7 +95,8 @@ REB_R MAKE_Pair(
         else
             goto bad_make;
 
-        if (not IS_END(++item))
+        ++item;
+        if (item != tail)
             goto bad_make;
     }
     else

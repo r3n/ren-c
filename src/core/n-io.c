@@ -179,8 +179,9 @@ REBNATIVE(new_line)
     bool mark = VAL_LOGIC(ARG(mark));
 
     REBVAL *pos = ARG(position);
-    RELVAL *item = VAL_ARRAY_AT_ENSURE_MUTABLE(pos);
-    REBARR *a = VAL_ARRAY_KNOWN_MUTABLE(pos);  // for setting at tail
+    const RELVAL *tail;
+    RELVAL *item = VAL_ARRAY_AT_ENSURE_MUTABLE(&tail, pos);
+    REBARR *a = VAL_ARRAY_KNOWN_MUTABLE(pos);  // need if setting flag at tail
 
     REBINT skip;
     if (REF(all))
@@ -195,16 +196,16 @@ REBNATIVE(new_line)
 
     REBLEN n;
     for (n = 0; true; ++n, ++item) {
-        if (skip != 0 and (n % skip != 0))
-            continue;
-
-        if (IS_END(item)) {  // no cell at tail; use flag on array
+        if (item == tail) {  // no cell at tail; use flag on array
             if (mark)
                 SET_SUBCLASS_FLAG(ARRAY, a, NEWLINE_AT_TAIL);
             else
                 CLEAR_SUBCLASS_FLAG(ARRAY, a, NEWLINE_AT_TAIL);
             break;
         }
+
+        if (skip != 0 and (n % skip != 0))
+            continue;
 
         if (mark)
             SET_CELL_FLAG(item, NEWLINE_BEFORE);
@@ -235,6 +236,7 @@ REBNATIVE(new_line_q)
 
     const REBARR *arr;
     const RELVAL *item;
+    const RELVAL *tail;
 
     if (IS_VARARGS(pos)) {
         REBFRM *f;
@@ -255,10 +257,11 @@ REBNATIVE(new_line_q)
 
             arr = f_array;
             item = f->feed->value;
+            tail = f->feed->value + 1;  // !!! Review
         }
         else if (Is_Block_Style_Varargs(&shared, pos)) {
             arr = VAL_ARRAY(shared);
-            item = VAL_ARRAY_AT(shared);
+            item = VAL_ARRAY_AT(&tail, shared);
         }
         else
             panic ("Bad VARARGS!");
@@ -266,10 +269,10 @@ REBNATIVE(new_line_q)
     else {
         assert(IS_GROUP(pos) or IS_BLOCK(pos));
         arr = VAL_ARRAY(pos);
-        item = VAL_ARRAY_AT(pos);
+        item = VAL_ARRAY_AT(&tail, pos);
     }
 
-    if (NOT_END(item))
+    if (item != tail)
         return Init_Logic(D_OUT, GET_CELL_FLAG(item, NEWLINE_BEFORE));
 
     return Init_Logic(D_OUT, GET_SUBCLASS_FLAG(ARRAY, arr, NEWLINE_AT_TAIL));

@@ -419,13 +419,15 @@ REBLEN Find_In_Array(
     //
     if (ANY_ARRAY(target) and not (flags & AM_FIND_ONLY)) {
         for (; index >= start and index < end; index += skip) {
+            const RELVAL *item_tail = ARR_TAIL(array);
             const RELVAL *item = ARR_AT(array, index);
 
             REBLEN count = 0;
-            const RELVAL *other = VAL_ARRAY_AT(target);
-            for (; NOT_END(other); ++other, ++item) {
+            const RELVAL *other_tail;
+            const RELVAL *other = VAL_ARRAY_AT(&other_tail, target);
+            for (; other != other_tail; ++other, ++item) {
                 if (
-                    IS_END(item) or
+                    item == item_tail or
                     0 != Cmp_Value(
                         item,
                         other,
@@ -639,9 +641,10 @@ REB_R PD_Array(
         n = -1;
 
         const REBSTR *symbol = VAL_WORD_SYMBOL(picker);
-        const RELVAL *item = VAL_ARRAY_AT(pvs->out);
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, pvs->out);
         REBLEN index = VAL_INDEX(pvs->out);
-        for (; NOT_END(item); ++item, ++index) {
+        for (; item != tail; ++item, ++index) {
             if (ANY_WORD(item) and symbol == VAL_WORD_SYMBOL(item)) {
                 n = index + 1;
                 break;
@@ -1047,8 +1050,8 @@ REBTYPE(Array)
         ){
             // RELVAL bits can be copied within the same array
             //
-            RELVAL *a = VAL_ARRAY_AT_ENSURE_MUTABLE(array);
-            RELVAL *b = VAL_ARRAY_AT_ENSURE_MUTABLE(arg);
+            RELVAL *a = VAL_ARRAY_AT_ENSURE_MUTABLE(nullptr, array);
+            RELVAL *b = VAL_ARRAY_AT_ENSURE_MUTABLE(nullptr, arg);
             RELVAL temp;
             temp.header = a->header;
             temp.payload = a->payload;
