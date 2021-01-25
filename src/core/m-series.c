@@ -122,7 +122,7 @@ REBSER *Copy_Series_At_Len_Extra(
     memcpy(
         SER_DATA(copy),
         SER_DATA(s) + index * SER_WIDE(s),
-        capacity * SER_WIDE(s)  // will include terminator if SER_WIDE() == 1
+        len * SER_WIDE(s)  // will include terminator if SER_WIDE() == 1
     );
     SET_SERIES_USED(copy, len);
     return copy;
@@ -374,7 +374,7 @@ void Assert_Series_Core(const REBSER *s)
         and GET_SERIES_INFO(s, 7_IS_TRUE)  // NODE_FLAG_CELL
     );
 
-    assert(SER_USED(s) < SER_REST(s));
+    assert(SER_USED(s) <= SER_REST(s));
 
     Assert_Series_Term_Core(s);
 }
