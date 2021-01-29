@@ -101,7 +101,7 @@ for-each [name value] options [
             ]
         ]
         'EXTENSIONS [
-            ; [+|-|*] [NAME {+|-|*|[modules]}]... 
+            ; [+|-|*] [NAME {+|-|*|[modules]}]...
             use [ext-file user-ext][
                 user-ext: load value
                 if not block? user-ext [
@@ -283,7 +283,7 @@ gen-obj: func [
                 ; builds use unsigned chars.
                 ;
                 <gnu:-funsigned-char>
- 
+
                 ; MSVC never bumped the __cplusplus version past 1997, even if
                 ; you compile with C++17.  Hence CPLUSPLUS_11 is used by Rebol
                 ; code as the switch for most C++ behaviors, and we have to
@@ -911,7 +911,7 @@ EXAMPLES:
     extensions: +
     => enable all extensions as builtin
     extensions: "- gif + jpg * png [lodepng]"
-    => disable all extensions but gif (builtin),jpg and png (dynamic)^/ 
+    => disable all extensions but gif (builtin),jpg and png (dynamic)^/
 CURRENT VALUE:
     }
     indent mold user-config/extensions
