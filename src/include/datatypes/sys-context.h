@@ -91,13 +91,17 @@
 #endif
 
 
-// REBCTX* properties (note: shares LINK_KEYSOURCE() with REBACT*)
+// Due to limitations on the number of available pointers in a REBSER--and a
+// desire to avoid making a global mapping table from contexts to the virtual
+// bind patch list that uses them--the list is multiplexed with the meta
+// information for an object.  See %sys-patch.h for more information.
 //
 // Note: MODULE! contexts depend on a property stored in the META field, which
 // is another object's-worth of data *about* the module's contents (e.g. the
 // processed header)
 //
-#define CTX_META(c)     MISC(Meta, CTX_VARLIST(c))
+#define MISC_MetaOrPatches_TYPE      REBARR*
+#define MISC_MetaOrPatches_CAST      ARR
 
 
 // ANY-CONTEXT! value cell schematic

@@ -1095,11 +1095,11 @@ void Decay_Series(REBSER *s)
         // Remove patch from circularly linked list of variants.
         // (if it's the last one, this winds up making no meaningful change)
         //
-        REBARR *temp = MISC(Variant, s);
-        while (MISC(Variant, temp) != s) {
-            temp = MISC(Variant, temp);
+        REBARR *temp = LINK(Variant, s);
+        while (LINK(Variant, temp) != s) {
+            temp = LINK(Variant, temp);
         }
-        mutable_MISC(Variant, temp) = MISC(Variant, s);
+        mutable_LINK(Variant, temp) = LINK(Variant, s);
     }
 
     // Remove series from expansion list, if found:

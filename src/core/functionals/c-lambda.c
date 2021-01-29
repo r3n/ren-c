@@ -69,9 +69,13 @@ REB_R Lambda_Dispatcher(REBFRM *f)
 
     SET_SERIES_FLAG(f->varlist, MANAGED);  // not manually tracked...
 
-    REBSPC *specifier = Specifier_Chained_With_Context(
-        VAL_SPECIFIER(block),
+    // We have to use Make_Or_Reuse_Patch() here, because it could be the
+    // case that a higher level wrapper used the frame and virtually bound it.
+    //
+    REBSPC *specifier = Make_Or_Reuse_Patch(
         CTX(f->varlist),
+        CTX_LEN(CTX(f->varlist)),
+        VAL_SPECIFIER(block),
         REB_WORD
     );
 

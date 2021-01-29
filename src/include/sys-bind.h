@@ -71,55 +71,6 @@
 // so that locations using them may avoid overhead in invocation.
 
 
-// Next node is either to another patch, a frame specifier REBCTX, or nullptr.
-//
-#define LINK_PatchNext_TYPE        REBARR*
-#define LINK_PatchNext_CAST        ARR
-
-// The virtual binding patches keep a circularly linked list of their variants
-// that have distinct next pointers.  This way, they can look through that
-// list before creating an equivalent chain to one that already exists.
-//
-#define MISC_Variant_TYPE           REBARR*
-#define MISC_Variant_CAST           ARR
-
-#ifdef NDEBUG
-    #define SPC(p) \
-        cast(REBSPC*, (p)) // makes UNBOUND look like SPECIFIED
-
-    #define VAL_SPECIFIER(v) \
-        SPC(BINDING(v))
-#else
-    inline static REBSPC* SPC(void *p) {
-        assert(p != SPECIFIED); // use SPECIFIED, not SPC(SPECIFIED)
-
-        REBCTX *c = CTX(p);
-        assert(CTX_TYPE(c) == REB_FRAME);
-
-        // Note: May be managed or unamanged.
-
-        return cast(REBSPC*, c);
-    }
-
-    inline static REBSPC *VAL_SPECIFIER(REBCEL(const*) v) {
-        assert(ANY_ARRAY_KIND(CELL_HEART(v)));
-
-        REBARR *a = ARR(BINDING(v));
-        if (not a)
-            return SPECIFIED;
-
-        if (GET_ARRAY_FLAG(a, IS_PATCH))
-            return cast(REBSPC*, a);  // virtual bind
-
-        // While an ANY-WORD! can be bound specifically to an arbitrary
-        // object, an ANY-ARRAY! only becomes bound specifically to frames.
-        // The keylist for a frame's context should come from a function's
-        // paramlist, which should have an ACTION! value in keylist[0]
-        //
-        assert(CTX_TYPE(CTX(a)) == REB_FRAME);  // may be inaccessible
-        return cast(REBSPC*, a);
-    }
-#endif
 
 
 // Tells whether when an ACTION! has a binding to a context, if that binding
@@ -612,7 +563,7 @@ inline static option(REBCTX*) Get_Word_Context(
           }
 
           skip_hit_patch:
-            specifier = LINK(PatchNext, specifier);
+            specifier = NextPatch(specifier);
         } while (
             specifier and NOT_ARRAY_FLAG(specifier, IS_VARLIST)
         );
@@ -679,7 +630,7 @@ inline static option(REBCTX*) Get_Word_Context(
             }
           }
           skip_miss_patch:
-            specifier = LINK(PatchNext, specifier);
+            specifier = NextPatch(specifier);
         } while (
             specifier and NOT_ARRAY_FLAG(specifier, IS_VARLIST)
         );
@@ -1002,12 +953,12 @@ inline static REBNOD** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
 {
     assert(GET_ARRAY_FLAG(specifier, IS_PATCH));
     while (
-        LINK(PatchNext, specifier) != nullptr
-        and NOT_ARRAY_FLAG(LINK(PatchNext, specifier), IS_VARLIST)
+        NextPatch(specifier) != nullptr
+        and NOT_ARRAY_FLAG(NextPatch(specifier), IS_VARLIST)
     ){
-        specifier = LINK(PatchNext, specifier);
+        specifier = NextPatch(specifier);
     }
-    return &node_LINK(PatchNextNode, specifier);
+    return &NextPatchNode(specifier);
 }
 
 inline static option(REBCTX*) SPC_FRAME_CTX(REBSPC *specifier)
@@ -1024,8 +975,12 @@ inline static option(REBCTX*) SPC_FRAME_CTX(REBSPC *specifier)
 // child is at the beginning of the chain.  This will preserve the child's
 // frame resolving context (if any) that terminates it.
 //
-inline static bool Merge_Patches_Reused(
-    REBARR **merged,
+// If the returned chain manages to reuse an existing case, then the result
+// will have ARRAY_FLAG_PATCH_REUSED set.  This can inform higher levels of
+// whether it's worth searching their patchlist or not...as newly created
+// patches can't appear in their prior create list.
+//
+inline static REBARR *Merge_Patches_May_Reuse(
     REBARR *parent,
     REBARR *child
 ){
@@ -1035,58 +990,32 @@ inline static bool Merge_Patches_Reused(
     // If we find the child already accounted for in the parent, we're done.
     // Recursions should notice this case and return up to make a no-op.
     //
-    if (LINK(PatchNext, parent) == child) {
-        *merged = parent;
-        return true;  // reused existing
+    if (NextPatch(parent) == child) {
+        SET_ARRAY_FLAG(parent, PATCH_REUSED);
+        return parent;  // reused existing
     }
 
     // If we get to the end of the merge chain and don't find the child, then
     // we're going to need a patch that incorporates it.
     //
-    REBARR *next = nullptr;  // so no warming on the jump
+    REBARR *next;
     if (
-        LINK(PatchNext, parent) == nullptr
-        or GET_ARRAY_FLAG(LINK(PatchNext, parent), IS_VARLIST)
+        NextPatch(parent) == nullptr
+        or GET_ARRAY_FLAG(NextPatch(parent), IS_VARLIST)
     ){
         next = child;
-        goto reused;
+        SET_ARRAY_FLAG(next, PATCH_REUSED);
     }
+    else
+        next = Merge_Patches_May_Reuse(NextPatch(parent), child);
 
-    if (Merge_Patches_Reused(&next, LINK(PatchNext, parent), child)) {
-      reused: {
-        //
-        // If we reused an existing patch, there's a possibility we can find
-        // it in the list of synonyms for the parent patch.
-        //
-        REBARR *temp = MISC(Variant, parent);
-        while (temp != parent) {
-            if (LINK(PatchNext, temp) == next) {
-                *merged = temp;
-                return true;  // reused
-            }
-            temp = MISC(Variant, temp);
-        }
-      }
-    }
-
-    // Nope.  Have to allocate a new variation.
-    //
-    REBARR *patch = Alloc_Singular(
-        NODE_FLAG_MANAGED
-        | SERIES_FLAG_LINK_NODE_NEEDS_MARK
-        | ARRAY_FLAG_IS_PATCH
+    return Make_Patch_Core(
+        CTX(BINDING(ARR_SINGLE(parent))),
+        VAL_WORD_INDEX(ARR_SINGLE(parent)),
+        next,
+        VAL_TYPE(ARR_SINGLE(parent)),
+        GET_ARRAY_FLAG(next, PATCH_REUSED)
     );
-
-    Move_Value(ARR_SINGLE(patch), SPECIFIC(ARR_SINGLE(parent)));
-    mutable_LINK(PatchNext, patch) = next;
-
-    // Link into the circular list.
-    //
-    mutable_MISC(Variant, patch) = MISC(Variant, parent);
-    mutable_MISC(Variant, parent) = patch;
-
-    *merged = patch;
-    return false;  // not reused, allocated
 }
 
 
@@ -1228,14 +1157,10 @@ inline static REBSPC *Derive_Specifier_Core(
         return old;  // The binding can be disregarded on this value
     }
 
-    REBARR *merged;
-    if (Merge_Patches_Reused(&merged, specifier, old)) {
-        //
-        // The patch might be able to be reused and it might not.  Is this
-        // interesting information at the end of the chain?
-        //
-    }
-    return merged;
+    // The patch might be able to be reused and it might not, so it may carry
+    // the PATCH_REUSED array flag.  Is that interesting information here?
+    //
+    return Merge_Patches_May_Reuse(specifier, old);
 }
 
 #if !defined(NDEBUG)

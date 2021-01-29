@@ -491,6 +491,7 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 
 #include "sys-stack.h"
 
+#include "sys-patch.h"
 #include "sys-bind.h" // needs DS_PUSH() and DS_TOP from %sys-stack.h
 #include "datatypes/sys-token.h"
 #include "datatypes/sys-sequence.h"  // also needs DS_PUSH()
