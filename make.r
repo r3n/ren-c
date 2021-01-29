@@ -190,6 +190,13 @@ gen-obj: func [
     ;
     append flags <msc:/wd4574>
 
+    ; Building as C++ using nmake seems to trigger this warning to say there
+    ; is no exception handling policy in place.  We don't use C++ exceptions
+    ; in the C++ build, so we ignore the warning...but if exceptions were used
+    ; there'd have to be an implementation choice made there.
+    ;
+    append flags <msc:/wd4577>
+
     ; There's a warning on reinterpret_cast between related classes, trying to
     ; suggest you use static_cast instead.  This complicates the `cast` macro
     ; tricks, which just use reinterpret_cast.
@@ -1556,7 +1563,7 @@ sort/compare builtin-extensions func [a b] [a/sequence < b/sequence]
 vars: reduce [
     reb-tool: make rebmake/var-class [
         name: {REBOL_TOOL}
-        if not any [
+        any [
             'file = exists? value: system/options/boot
             all [
                 user-config/rebol-tool
@@ -1566,7 +1573,15 @@ vars: reduce [
                 {r3-make}
                 rebmake/target-platform/exe-suffix
             ]
-        ] [fail "^/^/!! Cannot find a valid REBOL_TOOL !!^/"]
+        ] else [
+            fail "^/^/!! Cannot find a valid REBOL_TOOL !!^/"
+        ]
+
+        ; Originally this didn't transform to a local file path (e.g. with
+        ; backslashes instead of slashes on Windows).  There was some reason it
+        ; worked in visual studio, but not with nmake.
+        ;
+        value: file-to-local value
     ]
     make rebmake/var-class [
         name: {REBOL}
