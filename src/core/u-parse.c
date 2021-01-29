@@ -94,6 +94,7 @@
     USED(ARG(input)); \
     USED(ARG(flags)); \
     USED(ARG(collection)); \
+    USED(ARG(inside)); \
     USED(ARG(num_quotes)); \
     USED(ARG(position)); \
     USED(ARG(save))
@@ -115,6 +116,12 @@
         : VAL_ARRAY_KNOWN_MUTABLE(ARG(collection)) \
     )
 
+#define P_INSIDE \
+    (IS_NULLED(ARG(inside)) \
+        ? nullptr \
+        : VAL_CONTEXT(ARG(inside)) \
+    )
+
 #define P_NUM_QUOTES        VAL_INT32(ARG(num_quotes))
 
 #define P_POS               VAL_INDEX_UNBOUNDED(ARG(position))
@@ -129,8 +136,41 @@
 // is only used when the rule *isn't* in that cell.
 //
 #define P_SAVE              ARG(save)
-#define rule_specifier() \
+
+#define Quote_Rule_Specifier(rule) \
     (rule == ARG(save) ? SPECIFIED : P_RULE_SPECIFIER)
+
+inline static REBSPC *Array_Rule_Specifier(
+    REBFRM *frame_,
+    const RELVAL *rule
+){
+    USE_PARAMS_OF_SUBPARSE;
+
+    // We want to add the virtual binding on, if it's not already being
+    // accounted for.  The way we tell whether it's accounted for is
+    // if it's in the ARG(save) slot.  If it's not, it should be already
+    // in the specifier.
+    //
+    // But we also want to avoid creating a new specifier if possible.
+    // Do this by examining the specifier in the block and seeing if
+    // it's reusable.
+
+    REBSPC *specifier;
+    if (rule != ARG(save))  // lives in the array being processed
+        specifier = Derive_Specifier(P_RULE_SPECIFIER, rule);  // already in
+    else if (P_INSIDE) {
+        specifier = Make_Or_Reuse_Patch(
+            P_INSIDE,
+            CTX_LEN(P_INSIDE),
+            VAL_SPECIFIER(rule),
+            REB_WORD
+        );
+    }
+    else
+        specifier = SPECIFIED;
+
+    return specifier;
+}
 
 
 // !!! R3-Alpha's PARSE code long predated frames, and was retrofitted to use
@@ -251,6 +291,7 @@ static bool Subparse_Throws(
     REBSPC *input_specifier,
     REBFRM *f,
     option(REBARR*) collection,
+    option(REBCTX*) inside,
     REBFLGS flags
 ){
     assert(ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(input))));
@@ -293,6 +334,11 @@ static bool Subparse_Throws(
         Init_Nulled(Prep_Cell(ARG(collection)));
         collect_tail = 0;
     }
+
+    if (inside)
+        Move_Value(Prep_Cell(ARG(inside)), CTX_ARCHETYPE(inside));
+    else
+        Init_Nulled(Prep_Cell(ARG(inside)));
 
     // Locals in frame would be void on entry if called by action dispatch.
     //
@@ -483,11 +529,9 @@ REB_R Process_Group_For_Parse(
     bool inject = IS_GET_GROUP(group);  // plain groups always discard
 
     assert(IS_GROUP(group) or IS_GET_GROUP(group));
-    REBSPC *derived = (group == P_SAVE)
-        ? SPECIFIED
-        : Derive_Specifier(P_RULE_SPECIFIER, group);
+    REBSPC *specifier = Array_Rule_Specifier(frame_, group);
 
-    if (Do_Any_Array_At_Throws(cell, group, derived))
+    if (Do_Any_Array_At_Throws(cell, group, specifier))
         return R_THROWN;
 
     // !!! The input is not locked from modification by agents other than the
@@ -582,7 +626,7 @@ static REB_R Parse_One_Rule(
 
         DECLARE_FRAME_AT_CORE (
             subframe,
-            rule, rule_specifier(),
+            rule, Array_Rule_Specifier(frame_, rule),
             EVAL_MASK_DEFAULT
         );
 
@@ -595,6 +639,7 @@ static REB_R Parse_One_Rule(
             SPECIFIED,
             subframe,
             P_COLLECTION,
+            P_INSIDE,
             (P_FLAGS & PF_FIND_MASK)
         )){
             Move_Value(D_OUT, subresult);
@@ -622,7 +667,7 @@ static REB_R Parse_One_Rule(
 
         switch (VAL_TYPE(rule)) {
           case REB_QUOTED:
-            Derelativize(D_SPARE, rule, rule_specifier());
+            Derelativize(D_SPARE, rule, Quote_Rule_Specifier(rule));
             rule = Unquotify(D_SPARE, 1);
             break;  // fall through to direct match
 
@@ -1211,6 +1256,8 @@ static REB_R Handle_Seek_Rule_Dont_Update_Begin(
 //      flags [integer!]
 //      /collection "Array into which any KEEP values are collected"
 //          [any-series!]
+//      /inside "Context added to rules (and subrules)"
+//          [any-context!]
 //      <local> position num-quotes save
 //  ]
 //
@@ -1549,6 +1596,7 @@ REBNATIVE(subparse)
                     SPECIFIED,
                     subframe,
                     collection,
+                    P_INSIDE,
                     (P_FLAGS & PF_FIND_MASK) | PF_ONE_RULE
                 );
 
@@ -1603,7 +1651,7 @@ REBNATIVE(subparse)
                     if (Do_Any_Array_At_Throws(
                         D_OUT,
                         rule,
-                        rule_specifier()
+                        Array_Rule_Specifier(f, rule)
                     )){
                         goto return_thrown;
                     }
@@ -1642,6 +1690,7 @@ REBNATIVE(subparse)
                         SPECIFIED,
                         subframe,
                         P_COLLECTION,
+                        P_INSIDE,
                         (P_FLAGS & PF_FIND_MASK) | PF_ONE_RULE
                     );
 
@@ -2163,6 +2212,7 @@ REBNATIVE(subparse)
                     P_INPUT_SPECIFIER,  // harmless if specified API value
                     subframe,
                     P_COLLECTION,
+                    P_INSIDE,
                     (P_FLAGS & PF_FIND_MASK)  // PF_ONE_RULE?
                 )){
                     goto return_thrown;
@@ -2194,7 +2244,7 @@ REBNATIVE(subparse)
 
             DECLARE_FRAME_AT_CORE (
                 subframe,
-                rule, rule_specifier(),
+                rule, Array_Rule_Specifier(f, rule),
                 EVAL_MASK_DEFAULT
             );
 
@@ -2206,6 +2256,7 @@ REBNATIVE(subparse)
                 SPECIFIED,
                 subframe,
                 P_COLLECTION,
+                P_INSIDE,
                 (P_FLAGS & PF_FIND_MASK)  // no PF_ONE_RULE
             )) {
                 Move_Value(D_OUT, D_SPARE);
@@ -2635,6 +2686,8 @@ REBNATIVE(subparse)
 //      rules "Rules to parse by"
 //          [<blank> block!]
 //      /case "Uses case-sensitive comparison"
+//      /inside "Context to add to rules (and subrules)"
+//          [any-context!]
 //  ]
 //
 REBNATIVE(parse)
@@ -2648,6 +2701,13 @@ REBNATIVE(parse)
     if (not ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(input))))
         fail ("PARSE input must be an ANY-SERIES! (use AS BLOCK! for PATH!)");
 
+    // We kick off the virtual bind here, to apply to the rules feed.  But
+    // that won't follow through subrule links on its own.  SUBPARSE has to
+    // explicitly add the rule on when it follows such links.
+    //
+    if (REF(inside))
+        Virtual_Bind_Patchify(ARG(rules), VAL_CONTEXT(ARG(inside)), REB_WORD);
+
     DECLARE_FRAME_AT (subframe, ARG(rules), EVAL_MASK_DEFAULT);
 
     bool interrupted;
@@ -2657,6 +2717,7 @@ REBNATIVE(parse)
         input, SPECIFIED,
         subframe,
         nullptr,  // start out with no COLLECT in effect, so no P_COLLECTION
+        REF(inside) ? VAL_CONTEXT(ARG(inside)) : nullptr,
         REF(case) ? AM_FIND_CASE : 0
         //
         // We always want "case-sensitivity" on binary bytes, vs. treating
