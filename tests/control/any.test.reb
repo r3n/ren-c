@@ -358,3 +358,5 @@
 (_ = any .not [1 _ 2])
 (null-2? any .not [1 null 2])
 ("this is why" = any .not [1 null 2] then ["this is why"])
+
+(10 = any [(10 elide "stale")])

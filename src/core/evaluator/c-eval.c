@@ -749,6 +749,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // However, it sets OUT_NOTE_STALE in that case (note we may be
         // leaving an END in f->out by doing this.)
         //
+        // !!! Review why the stale bit was left here.  It must be cleared
+        // if the group evaluation finished, otherwise `any [(10 elide "hi")]`
+        // would result in NULL instead of 10.
+        //
         if (Do_Feed_To_End_Maybe_Stale_Throws(
             f->out,
             subfeed,
@@ -771,6 +775,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         }
 
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // `(1)` considered evaluative
+        CLEAR_CELL_FLAG(f->out, OUT_NOTE_STALE);  // any [(10 elide "hi")]
         break; }
 
 
