@@ -147,6 +147,7 @@ REB_R Chainer_Dispatcher(REBFRM *f)
     while (true) {
         if (Process_Action_Maybe_Stale_Throws(sub)) {
             Abort_Frame(sub);
+            Move_Value(f->out, sub->out);  // move from spare
             return R_THROWN;
         }
 
