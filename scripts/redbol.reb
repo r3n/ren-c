@@ -75,6 +75,20 @@ string!: emulate [text!]
 string?: emulate [:text?]
 to-string: emulate [specialize :to [type: text!]]
 
+; There is no CHAR! "datatype" in Ren-C (ISSUE! and CHAR! are unified)
+; The belief is that TO a char-like thing of 1 should be #"1"
+; Currently AS is serving as the numeric converter.
+;
+to-char: emulate [
+    func [value] [
+        either integer? value [
+            as issue! value
+        ][
+            to issue! value
+        ]
+    ]
+]
+
 paren!: emulate [group!]
 paren?: emulate [:group?]
 to-paren: emulate [specialize :to [type: group!]]
@@ -669,14 +683,11 @@ parse: emulate [
         comment [all_PARSE: all]  ; Not used
         all: :lib/all
 
-        switch type of rules [
+        return switch type of rules [
             blank! [split input charset reduce [tab space CR LF]]
             text! [split input to-bitset rules]
         ] else [
-            if not pos: parse/(case_PARSE) input rules [
-                return false
-            ]
-            return tail? pos
+            did parse/(case_PARSE) input rules
         ]
     ]
 ]
@@ -1003,7 +1014,7 @@ compress: emulate [
         /gzip
         /only
     ][
-        if not any [gzip only] [  ; assume caller wants "Rebol compression"
+        any [gzip, only] else [  ; assume caller wants "Rebol compression"
             data: to-binary copy/part data part
             zlib: zdeflate data
 
@@ -1033,7 +1044,7 @@ decompress: emulate [
         /zlib [integer!] "Red refinement (RFC 1951), uncompressed size"
         /deflate [integer!] "Red refinement (RFC 1950), uncompressed size"
     ][
-        if not any [gzip zlib deflate] [
+        any [gzip, zlib, deflate] else [
             ;
             ; Assume data is "Rebol compressed".  Could get more compatibility
             ; by testing for gzip header or otherwise having a fallback, as
@@ -1054,6 +1065,8 @@ decompress: emulate [
 and: emulate [enfixed :intersect]
 or: emulate [enfixed :union]
 xor: emulate [enfixed :difference]
+
+mod: emulate [:modulo]  ; MOD is enfix in Ren-C, MODULO still prefix
 
 ; Ren-C NULL means no branch ran, Rebol2 this is communicated by #[none]
 ; Ren-C ~branched~ when branch ran w/null result, Rebol2 calls that #[unset]

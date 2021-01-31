@@ -11,3 +11,4 @@
 #
 *.r linguist-language=text
 *.reb linguist-language=text
+*.test.reb linguist-language=text
