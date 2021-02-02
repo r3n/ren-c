@@ -18,7 +18,7 @@ dump: function [
     return: <elide>
         "Doesn't return anything, not even void (so like a COMMENT)"
     :value [any-value!]
-    :extra "Optional variadic data for SET-WORD!, e.g. `dump x: 1 + 2`"
+    'extra "Optional variadic data for SET-WORD!, e.g. `dump x: 1 + 2`"
         [any-value! <variadic>]
     /prefix "Put a custom marker at the beginning of each output line"
         [text!]
