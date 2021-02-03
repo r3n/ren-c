@@ -668,7 +668,7 @@ inline static void Push_Action(
             SERIES_MASK_VARLIST
                 | SERIES_FLAG_FIXED_SIZE // FRAME!s don't expand ATM
         );
-        s->info.bits = Endlike_Header(
+        SER_INFO(s) = Endlike_Header(
             FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
                 | FLAG_USED_BYTE_ARRAY()  // also reserved
         );
@@ -840,7 +840,7 @@ inline static void Drop_Action(REBFRM *f) {
         CLEAR_SERIES_INFO(f->varlist, HOLD);
         CLEAR_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED);
 
-        assert(0 == (f->varlist->info.bits & ~(  // <- note bitwise not
+        assert(0 == (SER_INFO(f->varlist) & ~(  // <- note bitwise not
             SERIES_INFO_0_IS_TRUE  // parallels NODE_FLAG_NODE
             | SERIES_INFO_7_IS_TRUE
             | FLAG_WIDE_BYTE_OR_0(0)  // don't mask out wide (0 for arrays))

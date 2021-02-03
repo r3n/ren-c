@@ -204,7 +204,7 @@ inline static REBARR *Alloc_Instruction(enum Reb_Api_Opcode opcode) {
         SERIES_FLAG_FIXED_SIZE // not tracked as stray manual, but unmanaged
         /* ... */
     );
-    s->info.bits = Endlike_Header(
+    SER_INFO(s) = Endlike_Header(
         FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
             | FLAG_USED_BYTE_ARRAY()  // also reserved
     );

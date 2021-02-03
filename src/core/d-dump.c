@@ -69,7 +69,7 @@ void Dump_Series(REBSER *s, const char *memo)
     printf(" flags: %lx\n", cast(unsigned long, s->leader.bits));
 
     // info includes width
-    printf(" info: %lx\n", cast(unsigned long, s->info.bits));
+    printf(" info: %lx\n", cast(unsigned long, SER_INFO(s)));
 
     fflush(stdout);
 }

@@ -244,7 +244,7 @@ inline static void Free_Node(REBLEN pool_id, void *p)
     if (
         pool_id == SER_POOL
         and not Is_Node_Cell(node)
-        and (cast(REBSER*, node)->info.bits & SERIES_INFO_MONITOR_DEBUG)
+        and (cast(REBSER*, node)->info.flags.bits & SERIES_INFO_MONITOR_DEBUG)
     ){
         printf(
             "Freeing series %p on tick #%d\n",

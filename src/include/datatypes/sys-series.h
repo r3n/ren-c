@@ -154,17 +154,26 @@
 #define MISC(Field, s) \
     MISC_##Field##_CAST(m_cast(REBNOD*, (s)->misc.any.node))
 
+#define INODE(Field, s) \
+    INODE_##Field##_CAST(m_cast(REBNOD*, (s)->info.node))
+
 #define mutable_LINK(Field, s) \
     ensured(LINK_##Field##_TYPE, const REBNOD*, (s)->link.any.node)
 
 #define mutable_MISC(Field, s) \
     ensured(MISC_##Field##_TYPE, const REBNOD*, (s)->misc.any.node)
 
+#define mutable_INODE(Field, s) \
+    ensured(INODE_##Field##_TYPE, const REBNOD*, (s)->info.node)
+
 #define node_LINK(Field, s) \
     *m_cast(REBNOD**, &(s)->link.any.node)  // const ok for strict alias
 
 #define node_MISC(Field, s) \
     *m_cast(REBNOD**, &(s)->misc.any.node)  // const ok for strict alias
+
+#define node_INODE(Field, s) \
+    *m_cast(REBNOD**, &(s)->info.node)  // const ok for strict alias
 
 
 //
@@ -187,18 +196,32 @@
 //
 // Series INFO bits (distinct from header FLAGs)
 //
+// Only valid for some forms of series (space is used for other purposes in
+// places like action details lists, etc.)
+//
+
+#if !defined(__cplusplus)
+    #define SER_INFO(s) \
+        (s)->info.flags.bits
+#else
+    inline static const uintptr_t &SER_INFO(const REBSER *s)
+      { return s->info.flags.bits; }
+
+    inline static uintptr_t &SER_INFO(REBSER *s)
+      { return s->info.flags.bits; }
+#endif
 
 #define SET_SERIES_INFO(s,name) \
-    ((s)->info.bits |= SERIES_INFO_##name)
+    (SER_INFO(s) |= SERIES_INFO_##name)
 
 #define GET_SERIES_INFO(s,name) \
-    (((s)->info.bits & SERIES_INFO_##name) != 0)
+    ((SER_INFO(s) & SERIES_INFO_##name) != 0)
 
 #define CLEAR_SERIES_INFO(s,name) \
-    ((s)->info.bits &= ~SERIES_INFO_##name)
+    (SER_INFO(s) &= ~SERIES_INFO_##name)
 
 #define NOT_SERIES_INFO(s,name) \
-    (((s)->info.bits & SERIES_INFO_##name) == 0)
+    ((SER_INFO(s) & SERIES_INFO_##name) == 0)
 
 
 
@@ -788,7 +811,7 @@ inline static bool Is_Series_Frozen(const REBSER *s) {
 }
 
 inline static bool Is_Series_Read_Only(const REBSER *s) {  // may be temporary
-    return 0 != (s->info.bits &
+    return 0 != (SER_INFO(s) &
         (SERIES_INFO_HOLD | SERIES_INFO_PROTECTED
         | SERIES_INFO_FROZEN_SHALLOW | SERIES_INFO_FROZEN_DEEP)
     );
@@ -1081,7 +1104,7 @@ inline static REBSER *Alloc_Series_Node(REBFLGS flags) {
         0xBD,
         sizeof(s->content)
     );  // #3 - #6
-    memset(&s->info, 0xAE, sizeof(s->info));  // #7, caller sets SER_WIDE()
+    memset(&s->info, 0xAE, sizeof(s->info));  // #7
     SAFETRASH_POINTER_IF_DEBUG(s->link.trash);  // #8
 
     TOUCH_SERIES_IF_DEBUG(s);  // tag current C stack as series origin in ASAN
@@ -1226,7 +1249,7 @@ inline static REBSER *Make_Series_Core(
     // (It technically doesn't need to.)
     //
     REBSER *s = Alloc_Series_Node(flags);
-    s->info.bits =
+    SER_INFO(s) =
         SERIES_INFO_0_IS_TRUE
         // not SERIES_INFO_1_IS_FALSE
         | SERIES_INFO_7_IS_TRUE

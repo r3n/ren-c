@@ -629,7 +629,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
         SERIES_MASK_VARLIST
             | SERIES_FLAG_FIXED_SIZE
     );
-    copy->info.bits = Endlike_Header(
+    SER_INFO(copy) = Endlike_Header(
         FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
             | FLAG_USED_BYTE_ARRAY()  // also reserved
     );

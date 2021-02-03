@@ -1204,7 +1204,7 @@ void GC_Kill_Series(REBSER *s)
         Decay_Series(s);
 
   #if !defined(NDEBUG)
-    s->info.bits = FLAG_WIDE_BYTE_OR_0(77);  // corrupt SER_WIDE()
+    SER_INFO(s) = FLAG_WIDE_BYTE_OR_0(77);  // corrupt SER_WIDE()
     // The spot LINK occupies will be used by Free_Node() to link the freelist
     FREETRASH_POINTER_IF_DEBUG(s->misc.trash);
   #endif

@@ -969,7 +969,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // marked protected if it's a native...without needing an if() branch.
     //
     STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
-    f->varlist->info.bits |=
+    SER_INFO(f->varlist) |=
         (ACT_DETAILS(phase)->leader.bits & SERIES_INFO_HOLD);
 
     REBNAT dispatcher = ACT_DISPATCHER(phase);

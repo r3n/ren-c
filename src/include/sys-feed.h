@@ -492,7 +492,7 @@ inline static REBFED* Alloc_Feed(void) {
 
     REBSER *s = &feed->singular;  // SER() not yet valid
     s->leader.bits = NODE_FLAG_NODE | SERIES_FLAG_IS_ARRAY;
-    s->info.bits = Endlike_Header(
+    SER_INFO(s) = Endlike_Header(
         FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
             | FLAG_USED_BYTE_ARRAY()  // also reserved
     );

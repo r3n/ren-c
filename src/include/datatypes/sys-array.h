@@ -237,7 +237,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
         cell->header.bits = CELL_MASK_PREP_END;
     }
 
-    s->info.bits = Endlike_Header(
+    SER_INFO(s) = Endlike_Header(
         FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
             | FLAG_USED_BYTE_ARRAY()  // also reserved
     );

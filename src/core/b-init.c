@@ -87,7 +87,7 @@ static void Check_Basics(void)
     // double-duty as terminator for that REBVAL when enumerated as an ARRAY.
 
   blockscope {
-    size_t offset = offsetof(REBSER, info);  // in variable avoids warning
+    size_t offset = offsetof(REBSER, info.flags);  // variable avoids warning
     if (offset - offsetof(REBSER, content) != sizeof(REBVAL))
         panic ("bad structure alignment for internal array termination"); }
 

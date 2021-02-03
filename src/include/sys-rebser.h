@@ -385,10 +385,10 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
     FLAG_SECOND_BYTE(0xBD)  // Reserved for future use (arbitrary byte)
 
 #define WIDE_BYTE_OR_0(s) \
-    SECOND_BYTE((s)->info.bits)
+    SECOND_BYTE(SER_INFO(s))
 
 #define mutable_WIDE_BYTE_OR_0(s) \
-    mutable_SECOND_BYTE((s)->info.bits)
+    mutable_SECOND_BYTE(SER_INFO(s))
 
 
 //=//// BITS 16-23 ARE SER_USED() FOR NON-DYNAMIC NON-ARRAYS //////////////=//
@@ -413,10 +413,10 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
     FLAG_THIRD_BYTE(255)  // reserved for future use, single array len in cell
 
 #define USED_BYTE(s) \
-    THIRD_BYTE((s)->info)
+    THIRD_BYTE(SER_INFO(s))
 
 #define mutable_USED_BYTE(s) \
-    mutable_THIRD_BYTE((s)->info)
+    mutable_THIRD_BYTE(SER_INFO(s))
 
 
 //=//// SERIES_INFO_AUTO_LOCKED ///////////////////////////////////////////=//
@@ -744,6 +744,22 @@ union Reb_Series_Misc {
 };
 
 
+// Some series flags imply the INFO is used not for flags, but for another
+// markable pointer.  This is not legal for any series that needs to encode
+// its SER_WIDE(), so only strings and arrays can pull this trick...when
+// they are used to implement internal structures.
+//
+union Reb_Series_Info {
+    //
+    // Using a union lets us see the underlying `uintptr_t` type-punned in
+    // debug builds as bytes/bits.
+    //
+    union Reb_Header flags;
+
+    const REBNOD *node;
+};
+
+
 #ifdef CPLUSPLUS_11
     struct Reb_Series_Base
 #else
@@ -801,7 +817,7 @@ union Reb_Series_Misc {
     // interesting added caching feature or otherwise that would use
     // it, while not making any feature specifically require a 64-bit CPU.
     //
-    union Reb_Header info;
+    union Reb_Series_Info info;
 
     // This is the second pointer-sized piece of series data that is used
     // for various purposes, similar to link.
