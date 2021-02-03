@@ -272,8 +272,6 @@ REBARR *Startup_Natives(const REBVAL *boot_natives)
         if (VAL_WORD_ID(name) == SYM_GENERIC)
             generic_word = name;
 
-        Recycle();
-
         ++n;
     }
 
