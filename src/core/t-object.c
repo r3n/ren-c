@@ -517,7 +517,7 @@ REBNATIVE(set_meta)
         if (misc and GET_ARRAY_FLAG(misc, IS_PATCH))
             mutable_MISC(MetaProxy, misc) = meta_ctx;
         else
-            mutable_MISC(MetaOrPatches, varlist) = meta_ctx;
+            mutable_MISC(MetaOrPatches, varlist) = CTX_VARLIST(meta_ctx);
     }
 
     RETURN (meta);

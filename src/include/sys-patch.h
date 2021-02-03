@@ -166,7 +166,7 @@ inline static REBARR *Make_Patch_Core(
     // Over the long run, this needs to be legal, though.
     //
     if (next and GET_ARRAY_FLAG(next, IS_PATCH)) {
-        assert(BINDING(ARR_SINGLE(next)) != NOD(ctx));
+        assert(BINDING(ARR_SINGLE(next)) != CTX_VARLIST(ctx));
     }
 
     REBARR *misc = MISC(MetaOrPatches, CTX_VARLIST(ctx));
@@ -184,7 +184,7 @@ inline static REBARR *Make_Patch_Core(
         do {
             if (
                 NextPatch(variant) == next
-                and BINDING(ARR_SINGLE(variant)) == NOD(ctx) and
+                and BINDING(ARR_SINGLE(variant)) == CTX_VARLIST(ctx) and
                 VAL_WORD_PRIMARY_INDEX_UNCHECKED(ARR_SINGLE(variant)) == limit
             ){
                 // The reused flag isn't initially set, but becomes set on
@@ -204,7 +204,7 @@ inline static REBARR *Make_Patch_Core(
         // there'd be no way to mark the misc proxy).  Make sure the one
         // we keep alive is the last one requested.
         //
-        misc = ARR(MISC(MetaProxy, variant));
+        misc = CTX_VARLIST(MISC(MetaProxy, variant));
         mutable_MISC(MetaProxy, variant) = nullptr;
     }
 
@@ -263,8 +263,7 @@ inline static REBARR *Make_Patch_Core(
 
     // Pushing the newest patch to the GC-marked link.
     //
-    assert(not misc or GET_ARRAY_FLAG(misc, IS_VARLIST));
-    mutable_MISC(MetaProxy, patch) = misc;
+    mutable_MISC(MetaProxy, patch) = CTX(misc);
 
     mutable_MISC(MetaOrPatches, CTX_VARLIST(ctx)) = patch;
 
