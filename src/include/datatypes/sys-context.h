@@ -630,8 +630,8 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
             | SERIES_FLAG_FIXED_SIZE
     );
     copy->info.bits = Endlike_Header(
-        FLAG_WIDE_BYTE_OR_0(0) // implicit termination, and indicates array
-            | FLAG_LEN_BYTE_OR_255(255) // indicates dynamic (varlist rule)
+        FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
+            | FLAG_USED_BYTE_ARRAY()  // also reserved
     );
     TRASH_POINTER_IF_DEBUG(node_LINK(KeySource, copy)); // needs update
     memcpy(  // https://stackoverflow.com/q/57721104/

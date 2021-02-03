@@ -205,8 +205,8 @@ inline static REBARR *Alloc_Instruction(enum Reb_Api_Opcode opcode) {
         /* ... */
     );
     s->info.bits = Endlike_Header(
-        FLAG_WIDE_BYTE_OR_0(0) // signals array, also implicit terminator
-            | FLAG_LEN_BYTE_OR_255(1) // signals singular
+        FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
+            | FLAG_USED_BYTE_ARRAY()  // also reserved
     );
     s->misc.opcode = opcode;
 

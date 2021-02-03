@@ -669,8 +669,8 @@ inline static void Push_Action(
                 | SERIES_FLAG_FIXED_SIZE // FRAME!s don't expand ATM
         );
         s->info.bits = Endlike_Header(
-            FLAG_WIDE_BYTE_OR_0(0) // signals array, also implicit terminator
-                | FLAG_LEN_BYTE_OR_255(255) // signals dynamic
+            FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
+                | FLAG_USED_BYTE_ARRAY()  // also reserved
         );
         INIT_LINK_KEYSOURCE(ARR(s), NOD(f)); // maps varlist back to f
         mutable_MISC(Meta, s) = nullptr;  // GC will sees this
@@ -844,7 +844,7 @@ inline static void Drop_Action(REBFRM *f) {
             SERIES_INFO_0_IS_TRUE  // parallels NODE_FLAG_NODE
             | SERIES_INFO_7_IS_TRUE
             | FLAG_WIDE_BYTE_OR_0(0)  // don't mask out wide (0 for arrays))
-            | FLAG_LEN_BYTE_OR_255(255)  // mask out non-dynamic-len (dynamic)
+            | FLAG_USED_BYTE(255)  // mask out non-dynamic-len (dynamic)
         )));
     }
 

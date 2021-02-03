@@ -217,7 +217,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
 
         SET_SERIES_FLAG(s, DYNAMIC);
 
-        if (not Did_Series_Data_Alloc(s, capacity)) {  // expects LEN_BYTE=255
+        if (not Did_Series_Data_Alloc(s, capacity)) {  // expects USED_BYTE=255
             s->leader.bits &= ~NODE_FLAG_MANAGED;  // can't kill if managed
             SET_SERIES_FLAG(s, INACCESSIBLE);
             GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
@@ -238,8 +238,8 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
     }
 
     s->info.bits = Endlike_Header(
-        FLAG_WIDE_BYTE_OR_0(0)  // implicit termination
-            | FLAG_LEN_BYTE_OR_255(0)  // !!! byte should be free for use
+        FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
+            | FLAG_USED_BYTE_ARRAY()  // also reserved
     );
 
     // It is more efficient if you know a series is going to become managed to

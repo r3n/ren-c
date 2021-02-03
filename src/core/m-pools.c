@@ -935,9 +935,9 @@ void Swap_Series_Content(REBSER* a, REBSER* b)
     // which includes whether the series is dynamic or if the data lives in
     // the node itself, the width (right 8 bits), etc.
 
-    REBYTE a_len = LEN_BYTE_OR_255(a); // indicates dynamic if 255
-    mutable_LEN_BYTE_OR_255(a) = LEN_BYTE_OR_255(b);
-    mutable_LEN_BYTE_OR_255(b) = a_len;
+    REBYTE a_len = USED_BYTE(a); // indicates dynamic if 255
+    mutable_USED_BYTE(a) = USED_BYTE(b);
+    mutable_USED_BYTE(b) = a_len;
 
     union Reb_Series_Content a_content = a->content;
     a->content = b->content;
@@ -1142,7 +1142,7 @@ void Decay_Series(REBSER *s)
             ? INT32_MAX
             : tmp;
 
-        mutable_LEN_BYTE_OR_255(s) = 1; // !!! is this right?
+        mutable_USED_BYTE(s) = 1;  // !!! is this right?
     }
     else {
         // Special GC processing for HANDLE! when the handle is implemented as

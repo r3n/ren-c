@@ -230,6 +230,18 @@ inline static REBYTE SER_WIDE(const REBSER *s) {
     //
     if (GET_SERIES_FLAG(s, IS_ARRAY))
         return sizeof(REBVAL);
+
+    // Strings use 1 as their width.  Most accessors that know they are
+    // dealing with strings use accessors that are hardcoded to know that
+    // they're in byte units (though codepoints can use multiple bytes).  It
+    // frees up a byte worth of INFO bits in string nodes to hardcode this
+    // here, and most accesses don't need SER_WIDE() so it won't slow much.
+    //
+    // (no special IS_BINARY, so it sacrifices WIDE_BYTE)
+    //
+    if (GET_SERIES_FLAG(s, IS_STRING))
+        return 1;
+
     return WIDE_BYTE_OR_0(s);
 }
 
@@ -359,7 +371,7 @@ inline static REBLEN SER_USED(const REBSER *s) {
         return s->content.dynamic.used;
     if (GET_SERIES_FLAG(s, IS_ARRAY))
         return IS_END(&s->content.fixed.cells[0]) ? 0 : 1;
-    return LEN_BYTE_OR_255(s);
+    return USED_BYTE(s);
 }
 
 
@@ -478,7 +490,7 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
             }
         }
         else
-            mutable_LEN_BYTE_OR_255(s) = used;
+            mutable_USED_BYTE(s) = used;
     }
 
   #if !defined(NDEBUG)

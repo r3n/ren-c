@@ -378,6 +378,12 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
 #define FLAG_WIDE_BYTE_OR_0(wide) \
     FLAG_SECOND_BYTE(wide)
 
+#define FLAG_WIDE_BYTE_ARRAY() \
+    FLAG_SECOND_BYTE(0)  // needed for termination signal, being phased out
+
+#define FLAG_WIDE_BYTE_STRING() \
+    FLAG_SECOND_BYTE(0xBD)  // Reserved for future use (arbitrary byte)
+
 #define WIDE_BYTE_OR_0(s) \
     SECOND_BYTE((s)->info.bits)
 
@@ -385,22 +391,31 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
     mutable_SECOND_BYTE((s)->info.bits)
 
 
-//=//// BITS 16-23 ARE SER_USED() FOR NON-DYNAMIC SERIES //////////////////=//
+//=//// BITS 16-23 ARE SER_USED() FOR NON-DYNAMIC NON-ARRAYS //////////////=//
 
-// 255 indicates that this series has a dynamically allocated portion.  If it
-// is another value, then it's the length of content which is found directly
-// in the series node's embedded Reb_Series_Content.
+// SERIES_FLAG_DYNAMIC indicates that a series has a dynamically allocated
+// portion, and it has a whole uintptr_t to use for the length.  However, if
+// that flag is not set the payload is small, fitting in Reb_Series_Content
+// where the allocation tracking information would be.
 //
-// (See also: SERIES_FLAG_ALWAYS_DYNAMIC to prevent creating embedded data.)
+// If the data is an array, then the length can only be 0 or 1, since the
+// tracking information is the same size as a cell.  This can be encoded by
+// having the cell be END or non-END to know the length.
+//
+// For binaries and other non-arrays the length has to be stored somewhere.
+// The third byte of the INFO is set aside for the purpose.
 //
 
-#define FLAG_LEN_BYTE_OR_255(len) \
+#define FLAG_USED_BYTE(len) \
     FLAG_THIRD_BYTE(len)
 
-#define LEN_BYTE_OR_255(s) \
+#define FLAG_USED_BYTE_ARRAY() \
+    FLAG_THIRD_BYTE(255)  // reserved for future use, single array len in cell
+
+#define USED_BYTE(s) \
     THIRD_BYTE((s)->info)
 
-#define mutable_LEN_BYTE_OR_255(s) \
+#define mutable_USED_BYTE(s) \
     mutable_THIRD_BYTE((s)->info)
 
 
@@ -593,10 +608,14 @@ union Reb_Series_Content {
     //
     struct Reb_Series_Dynamic dynamic;
 
-    // If LEN_BYTE_OR_255() != 255, 0 or 1 length arrays can be held in
-    // the series node.  This trick is accomplished via "implicit termination"
-    // in the ->info bits that come directly after ->content.  For how this is
-    // done, see Endlike_Header()
+    // If not(SERIES_FLAG_DYNAMIC), then 0 or 1 length arrays can be held in
+    // the series node.  If the single cell holds an END, it's 0 length...
+    // otherwise it's length 1.
+    //
+    // !!! At time of writing this trick requires "implicit termination" in
+    // the ->info bits that come directly after ->content.  For how this is
+    // done, see Endlike_Header().  This is being phased out, enumerating
+    // based on a tail pointer from the stored length.
     //
     union {
         // Due to strict aliasing requirements, this has to be initialized

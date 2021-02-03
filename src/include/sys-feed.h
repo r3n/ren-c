@@ -493,8 +493,8 @@ inline static REBFED* Alloc_Feed(void) {
     REBSER *s = &feed->singular;  // SER() not yet valid
     s->leader.bits = NODE_FLAG_NODE | SERIES_FLAG_IS_ARRAY;
     s->info.bits = Endlike_Header(
-        FLAG_WIDE_BYTE_OR_0(0)  // implicit termination
-            | FLAG_LEN_BYTE_OR_255(0)
+        FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
+            | FLAG_USED_BYTE_ARRAY()  // also reserved
     );
     Prep_Cell(FEED_SINGLE(feed));
     mutable_LINK(Splice, &feed->singular) = nullptr;

@@ -56,7 +56,7 @@
 
 
 // A context's varlist is always allocated dynamically, in order to speed
-// up variable access--no need to test LEN_BYTE_OR_255 for 255.
+// up variable access--no need to test USED_BYTE_OR_255 for 255.
 //
 // !!! Ideally this would carry a flag to tell a GC "shrinking" process not
 // to reclaim the dynamic memory to make a singular cell...but that flag
