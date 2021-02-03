@@ -213,15 +213,14 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
         if (not p)
             return nullptr;
 
-        if ((FIRST_BYTE(reinterpret_cast<const REBSER*>(p)->leader) & (
+        if ((reinterpret_cast<const REBSER*>(p)->leader.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
+            | SERIES_FLAG_IS_ARRAY
         )) != (
-            NODE_FLAG_NODE
+            NODE_FLAG_NODE | SERIES_FLAG_IS_ARRAY
         )){
             panic (p);
         }
-        if (WIDE_BYTE_OR_0(reinterpret_cast<const REBSER*>(p)) != 0)
-            panic (p);
 
         return reinterpret_cast<A*>(p);
     }

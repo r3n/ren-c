@@ -616,19 +616,16 @@ inline static RELVAL *Prep_Cell_Core(RELVAL *c) {
 //
 inline static bool IS_RELATIVE(const RELVAL *v) {
     if (not Is_Bindable(v))
-        return false;
+        return false;  // may use extra for non-GC-marked uintptr_t-size data
         
     REBSER *binding = BINDING(v);
     if (not binding)
-        return false; // INTEGER! and other types are inherently "specific"
+        return false;  // INTEGER! and other types are inherently "specific"
 
-    if (WIDE_BYTE_OR_0(binding) != 0)  // not IS_SER_ARRAY()
-        return false;  // !!! should have SERIES_FLAG_IS_ARRAY, union flags
+    if (not (binding->leader.bits & SERIES_FLAG_IS_ARRAY))
+        return false;
 
-    if (binding->leader.bits & ARRAY_FLAG_IS_DETAILS)
-        return true;
-
-    return false;
+    return did (binding->leader.bits & ARRAY_FLAG_IS_DETAILS);  // action
 }
 
 #ifdef CPLUSPLUS_11

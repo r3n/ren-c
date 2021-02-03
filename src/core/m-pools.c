@@ -867,7 +867,7 @@ void Expand_Series(REBSER *s, REBLEN index, REBLEN delta)
     // The new series will *always* be dynamic, because it would not be
     // expanding if a fixed size allocation was sufficient.
 
-    mutable_LEN_BYTE_OR_255(s) = 255; // series alloc caller sets
+    SET_SERIES_FLAG(s, DYNAMIC);
     SET_SERIES_FLAG(s, POWER_OF_2);
     if (not Did_Series_Data_Alloc(s, used_old + delta + x))
         fail (Error_No_Memory((used_old + delta + x) * wide));
@@ -1040,7 +1040,7 @@ void Remake_Series(REBSER *s, REBLEN units, REBYTE wide, REBFLGS flags)
     // a REBSER.  All series code needs a general audit, so that should be one
     // of the things considered.
 
-    mutable_LEN_BYTE_OR_255(s) = 255; // series alloc caller sets
+    SET_SERIES_FLAG(s, DYNAMIC);
     if (not Did_Series_Data_Alloc(s, units + 1)) {
         // Put series back how it was (there may be extant references)
         s->content.dynamic.data = cast(char*, data_old);

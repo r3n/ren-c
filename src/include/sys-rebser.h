@@ -192,21 +192,23 @@
     FLAG_LEFT_BIT(10)
 
 
-//=//// SERIES_FLAG_ALWAYS_DYNAMIC ////////////////////////////////////////=//
+//=//// SERIES_FLAG_DYNAMIC ///////////////////////////////////////////////=//
 //
 // The optimization which uses small series will fit the data into the series
-// node if it is small enough.  But doing this requires a test on SER_USED()
-// and SER_DATA() to see if the small optimization is in effect.  Some
-// code is more interested in the performance gained by being able to assume
-// where to look for the data pointer and the length (e.g. paramlists and
-// context varlists/keylists).  Passing this flag into series creation
-// routines will avoid creating the shortened form.
+// node if it is small enough.  This flag is set when a series uses its
+// `content` for tracking information instead of the actual data itself.
+//
+// It can also be passed in at series creation time to force an allocation to
+// be dynamic.  This is because some code is more interested in performance
+// gained by being able to assume where to look for the data pointer and the
+// length (e.g. paramlists and context varlists/keylists).  So passing this
+// flag into series creation routines avoids creating the shortened form.
 //
 // Note: Currently SERIES_INFO_INACCESSIBLE overrides this, but does not
 // remove the flag...e.g. there can be inaccessible contexts that carry the
 // SERIES_FLAG_ALWAYS_DYNAMIC bit but no longer have an allocation.
 //
-#define SERIES_FLAG_ALWAYS_DYNAMIC \
+#define SERIES_FLAG_DYNAMIC \
     FLAG_LEFT_BIT(11)
 
 
@@ -227,9 +229,17 @@
     FLAG_LEFT_BIT(12)
 
 
-//=//// SERIES_FLAG_13 ////////////////////////////////////////////////////=//
+//=//// SERIES_FLAG_IS_ARRAY //////////////////////////////////////////////=//
 //
-#define SERIES_FLAG_13 \
+// Indicates that the series is an array.
+//
+// Note: Previously the SER_WIDE() byte of 0 was used for this test.  This
+// made it do double-duty as an END marker for singular arrays.  However,
+// END markers are being phased out for their wastefulness...meaning a flag
+// is going to be needed.  This also lets array variants that do not have
+// INFO bits can be possible...repurposing that pointer for something else.
+//
+#define SERIES_FLAG_IS_ARRAY \
     FLAG_LEFT_BIT(13)
 
 

@@ -77,7 +77,7 @@
 //   to change as TYPESET! is slated to be replaced with "type predicates".
 //
 // * Since varlists and keylists always have more than one element, they are
-//   allocated with SERIES_FLAG_ALWAYS_DYNAMIC and do not need to check for
+//   allocated with SERIES_FLAG_DYNAMIC and do not need to check for whether
 //   the singular optimization when being used.  This does not apply when a
 //   varlist becomes invalid (e.g. via FREE), when its data allocation is
 //   released and it is decayed to a singular.
@@ -254,8 +254,8 @@ static inline void INIT_CTX_KEYLIST_UNIQUE(REBCTX *c, REBSER *keylist) {
 //
 // Context's "length" does not count the [0] cell of either the varlist or
 // the keylist arrays.  Hence it must subtract 1.  SERIES_MASK_VARLIST
-// includes SERIES_FLAG_ALWAYS_DYNAMIC, so a dyamic series can be assumed
-// so long as it is valid.
+// includes SERIES_FLAG_DYNAMIC, so a dyamic series can be assumed so long
+// as it is valid.
 //
 
 inline static REBLEN CTX_LEN(REBCTX *c) {
@@ -676,6 +676,8 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
     // to a keylist.  !!! Review why this was needed, vs just nullptr
     //
     INIT_LINK_KEYSOURCE(ARR(stub), keysource);
+
+    CLEAR_SERIES_FLAG(stub, DYNAMIC);  // mark stub as no longer dynamic
 
     return CTX(copy);
 }

@@ -207,15 +207,15 @@ inline static void Prep_Array(
 inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
     const REBLEN wide = sizeof(REBVAL);
 
-    REBSER *s = Alloc_Series_Node(flags);
+    REBSER *s = Alloc_Series_Node(flags | SERIES_FLAG_IS_ARRAY);
 
     if (
-        (flags & SERIES_FLAG_ALWAYS_DYNAMIC)  // inlining will constant fold
+        (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold
         or capacity > 1
     ){
         capacity += 1;  // account for cell needed for terminator (END)
 
-        s->info.bits = Endlike_Header(FLAG_LEN_BYTE_OR_255(255));  // dynamic
+        SET_SERIES_FLAG(s, DYNAMIC);
 
         if (not Did_Series_Data_Alloc(s, capacity)) {  // expects LEN_BYTE=255
             s->leader.bits &= ~NODE_FLAG_MANAGED;  // can't kill if managed
@@ -235,12 +235,12 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
     else {
         RELVAL *cell = TRACK_CELL_IF_DEBUG(SER_CELL(s));
         cell->header.bits = CELL_MASK_PREP_END;
-
-        s->info.bits = Endlike_Header(
-            FLAG_WIDE_BYTE_OR_0(0)  // implicit termination
-                | FLAG_LEN_BYTE_OR_255(0)
-        );
     }
+
+    s->info.bits = Endlike_Header(
+        FLAG_WIDE_BYTE_OR_0(0)  // implicit termination
+            | FLAG_LEN_BYTE_OR_255(0)  // !!! byte should be free for use
+    );
 
     // It is more efficient if you know a series is going to become managed to
     // create it in the managed state.  But be sure no evaluations are called
@@ -333,10 +333,8 @@ inline static REBARR *Make_Array_For_Copy(
 // For `flags`, be sure to consider if you need ARRAY_FLAG_HAS_FILE_LINE.
 //
 inline static REBARR *Alloc_Singular(REBFLGS flags) {
-    assert(not (flags & SERIES_FLAG_ALWAYS_DYNAMIC));
-    REBARR *a = Make_Array_Core(1, flags | SERIES_FLAG_FIXED_SIZE);
-    mutable_LEN_BYTE_OR_255(a) = 1;  // non-dynamic length (default was 0)
-    return a;
+    assert(not (flags & SERIES_FLAG_DYNAMIC));
+    return Make_Array_Core(1, flags | SERIES_FLAG_FIXED_SIZE);
 }
 
 #define Append_Value(a,v) \

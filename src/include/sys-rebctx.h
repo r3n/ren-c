@@ -63,7 +63,8 @@
 // can't be SERIES_FLAG_FIXED_SIZE, because most varlists can expand.
 //
 #define SERIES_MASK_VARLIST \
-    (NODE_FLAG_NODE | SERIES_FLAG_ALWAYS_DYNAMIC \
+    (NODE_FLAG_NODE | SERIES_FLAG_DYNAMIC \
+        | SERIES_FLAG_IS_ARRAY \
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* keysource */ \
         | SERIES_FLAG_MISC_NODE_NEEDS_MARK  /* meta */ \
         | ARRAY_FLAG_IS_VARLIST)
@@ -119,6 +120,7 @@
             SERIES_MASK_VARLIST
                 | NODE_FLAG_FREE
                 | NODE_FLAG_CELL
+                | SERIES_FLAG_IS_ARRAY
                 | ARRAY_FLAG_IS_DETAILS
                 | ARRAY_FLAG_IS_PARTIALS
                 | ARRAY_FLAG_IS_PAIRLIST

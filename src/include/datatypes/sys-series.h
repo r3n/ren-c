@@ -93,7 +93,7 @@
         if (not p)
             return nullptr;
 
-        if ((FIRST_BYTE(reinterpret_cast<const REBSER*>(p)->leader) & (
+        if ((reinterpret_cast<const REBSER*>(p)->leader.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
         )) != (
             NODE_FLAG_NODE
@@ -203,10 +203,10 @@
 
 
 #define IS_SER_ARRAY(s) \
-    (WIDE_BYTE_OR_0(s) == 0)
+    GET_SERIES_FLAG((s), IS_ARRAY)
 
 #define IS_SER_DYNAMIC(s) \
-    (LEN_BYTE_OR_255(s) == 255)
+    GET_SERIES_FLAG((s), DYNAMIC)
 
 // These are series implementation details that should not be used by most
 // code.  But in order to get good inlining, they have to be in the header
@@ -224,12 +224,13 @@ inline static REBYTE SER_WIDE(const REBSER *s) {
     // Arrays use 0 width as a strategic choice, so that the second byte of
     // the ->info flags is 0.  See Endlike_Header() for why.
     //
-    REBYTE wide = WIDE_BYTE_OR_0(s);
-    if (wide == 0) {
-        assert(IS_SER_ARRAY(s));
+    // !!! This is being changed...however, some array forms might use their
+    // INFO bits for other things.  Hence the SER_WIDE() bit is likely not
+    // going to be used.
+    //
+    if (GET_SERIES_FLAG(s, IS_ARRAY))
         return sizeof(REBVAL);
-    }
-    return wide;
+    return WIDE_BYTE_OR_0(s);
 }
 
 
@@ -243,7 +244,7 @@ inline static REBLEN SER_BIAS(const REBSER *s) {
 }
 
 inline static REBLEN SER_REST(const REBSER *s) {
-    if (LEN_BYTE_OR_255(s) == 255)
+    if (IS_SER_DYNAMIC(s))
         return s->content.dynamic.rest;
 
     if (IS_SER_ARRAY(s))
@@ -354,8 +355,11 @@ inline static size_t SER_TOTAL_IF_DYNAMIC(const REBSER *s) {
 //
 
 inline static REBLEN SER_USED(const REBSER *s) {
-    REBYTE len_byte = LEN_BYTE_OR_255(s);
-    return len_byte == 255 ? s->content.dynamic.used : len_byte;
+    if (GET_SERIES_FLAG(s, DYNAMIC))
+        return s->content.dynamic.used;
+    if (GET_SERIES_FLAG(s, IS_ARRAY))
+        return IS_END(&s->content.fixed.cells[0]) ? 0 : 1;
+    return LEN_BYTE_OR_255(s);
 }
 
 
@@ -371,7 +375,7 @@ inline static REBYTE *SER_DATA(const_if_c REBSER *s) {
     //
     assert(NOT_SERIES_INFO(s, INACCESSIBLE));
 
-    return LEN_BYTE_OR_255(s) == 255
+    return IS_SER_DYNAMIC(s)
         ? cast(REBYTE*, s->content.dynamic.data)
         : cast(REBYTE*, &s->content);
 }
@@ -448,7 +452,7 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
 // efficient if they didn't use any "appending" operators to get built.
 //
 inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
-    if (LEN_BYTE_OR_255(s) == 255) {
+    if (IS_SER_DYNAMIC(s)) {
         s->content.dynamic.used = used;
 
         // !!! See notes on TERM_SERIES_IF_NEEDED() for how array termination
@@ -459,7 +463,6 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
     }
     else {
         assert(used < sizeof(s->content));
-        mutable_LEN_BYTE_OR_255(s) = used;
 
         // !!! See notes on TERM_SERIES_IF_NEEDED() for how array termination
         // is slated to be a debug feature only.
@@ -469,9 +472,13 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
                 SET_END(SER_HEAD(RELVAL, s));
             else {
                 assert(used == 1);
+                if (IS_END(SER_HEAD(RELVAL, s)))
+                    Init_Nulled(SER_HEAD(RELVAL, s));  // !!! Unreadable void?
                 assert(IS_END(SER_AT(RELVAL, s, 1)));
             }
         }
+        else
+            mutable_LEN_BYTE_OR_255(s) = used;
     }
 
   #if !defined(NDEBUG)
@@ -1214,14 +1221,14 @@ inline static REBSER *Make_Series_Core(
         | FLAG_WIDE_BYTE_OR_0(wide);
 
     if (
-        (flags & SERIES_FLAG_ALWAYS_DYNAMIC)  // inlining will constant fold
+        (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold
         or (capacity * wide > sizeof(s->content))
     ){
         // Data won't fit in a REBSER node, needs a dynamic allocation.  The
         // capacity given back as the ->rest may be larger than the requested
         // size, because the memory pool reports the full rounded allocation.
 
-        mutable_LEN_BYTE_OR_255(s) = 255;  // dynamic
+        SET_SERIES_FLAG(s, DYNAMIC);
 
         if (not Did_Series_Data_Alloc(s, capacity)) {
             s->leader.bits &= ~NODE_FLAG_MANAGED;

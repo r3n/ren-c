@@ -1001,12 +1001,13 @@ REBACT *Make_Action(
 //
 REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
 {
-    // Since passing SERIES_MASK_VARLIST includes SERIES_FLAG_ALWAYS_DYNAMIC,
+    // Since passing SERIES_MASK_VARLIST includes SERIES_FLAG_DYNAMIC,
     // don't pass it in to the allocation...it needs to be set, but will be
     // overridden by SERIES_INFO_INACCESSIBLE.
     //
-    REBARR *varlist = Alloc_Singular(NODE_FLAG_MANAGED);
-    varlist->leader.bits |= SERIES_MASK_VARLIST;
+    REBARR *varlist = Alloc_Singular(NODE_FLAG_MANAGED);  // !!! not dynamic
+    varlist->leader.bits |= SERIES_MASK_VARLIST;  // !!! adds dynamic
+    CLEAR_SERIES_FLAG(varlist, DYNAMIC);  // !!! removes (review cleaner way)
     SET_SERIES_INFO(varlist, INACCESSIBLE);
     mutable_MISC(Meta, varlist) = nullptr;
 

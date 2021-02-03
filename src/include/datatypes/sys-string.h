@@ -610,7 +610,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
         if (len < sizeof(REBVAL)) {
             if (not IS_STR_SYMBOL(s))
                 assert(
-                    GET_SERIES_FLAG(s, ALWAYS_DYNAMIC)  // e.g. mold buffer
+                    GET_SERIES_FLAG(s, DYNAMIC)  // e.g. mold buffer
                     or not bookmark  // mutations must ensure this
                 );
             goto scan_from_head;  // good locality, avoid bookmark logic
@@ -626,7 +626,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
             if (not IS_STR_SYMBOL(s))
                 assert(
                     not bookmark  // mutations must ensure this usually but...
-                    or GET_SERIES_FLAG(s, ALWAYS_DYNAMIC)  // !!! mold buffer?
+                    or GET_SERIES_FLAG(s, DYNAMIC)  // !!! mold buffer?
                 );
             goto scan_from_tail;  // good locality, avoid bookmark logic
         }

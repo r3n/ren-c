@@ -824,7 +824,7 @@ void Startup_Mold(REBLEN size)
     //
     // !!! Review, seems like the mold buffer logic is broken.  :-/
     //
-    TG_Mold_Buf = Make_String_Core(size, SERIES_FLAG_ALWAYS_DYNAMIC);
+    TG_Mold_Buf = Make_String_Core(size, SERIES_FLAG_DYNAMIC);
 }
 
 

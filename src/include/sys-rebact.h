@@ -195,7 +195,7 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
 
 
-// Includes SERIES_FLAG_ALWAYS_DYNAMIC because an action's paramlist is always
+// Includes SERIES_FLAG_DYNAMIC because an action's paramlist is always
 // allocated dynamically, in order to make access to the archetype and the
 // parameters faster than ARR_AT().  See code for ACT_KEY(), etc.
 //
@@ -208,6 +208,7 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
 #define SERIES_MASK_DETAILS \
     (NODE_FLAG_NODE \
+        | SERIES_FLAG_IS_ARRAY \
         | SERIES_FLAG_MISC_NODE_NEEDS_MARK  /* meta */ \
         | ARRAY_FLAG_IS_DETAILS \
         /* LINK is dispatcher, a c function pointer, should not mark */ )
@@ -243,6 +244,7 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
             SERIES_MASK_DETAILS
                 | NODE_FLAG_FREE
                 | NODE_FLAG_CELL
+                | SERIES_FLAG_IS_ARRAY
                 | ARRAY_FLAG_IS_VARLIST
                 | ARRAY_FLAG_IS_PAIRLIST
                 | ARRAY_FLAG_HAS_FILE_LINE_UNMASKED
