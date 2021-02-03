@@ -108,7 +108,7 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     );
     INIT_LINK_KEYSOURCE(CTX_VARLIST(c), ACT_KEYLIST(VAL_ACTION(inner)));
 
-    assert(GET_SERIES_INFO(f->varlist, INACCESSIBLE));  // look dead
+    assert(GET_SERIES_FLAG(f->varlist, INACCESSIBLE));  // look dead
 
     // f->varlist may or may not have wound up being managed.  It was not
     // allocated through the usual mechanisms, so if unmanaged it's not in

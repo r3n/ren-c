@@ -1047,7 +1047,7 @@ void Assert_Context_Core(REBCTX *c)
     if (keys_len + 1 != vars_len)
         panic (c);
 
-    if (GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE)) {
+    if (GET_SERIES_FLAG(CTX_VARLIST(c), INACCESSIBLE)) {
         //
         // !!! For the moment, don't check inaccessible stack frames any
         // further.  This includes varless reified frames and those reified

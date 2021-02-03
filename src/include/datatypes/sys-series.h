@@ -373,7 +373,7 @@ inline static REBYTE *SER_DATA(const_if_c REBSER *s) {
     // The VAL_CONTEXT(), VAL_SERIES(), VAL_ARRAY() extractors do the failing
     // upon extraction--that's meant to catch it before it gets this far.
     //
-    assert(NOT_SERIES_INFO(s, INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(s, INACCESSIBLE));
 
     return IS_SER_DYNAMIC(s)
         ? cast(REBYTE*, s->content.dynamic.data)
@@ -394,7 +394,7 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
     // The VAL_CONTEXT(), VAL_SERIES(), VAL_ARRAY() extractors do the failing
     // upon extraction--that's meant to catch it before it gets this far.
     //
-    assert(not (s->info.bits & SERIES_INFO_INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(s, INACCESSIBLE));
 
     return ((w) * (i)) + ( // v-- inlining of SER_DATA
         IS_SER_DYNAMIC(s)
@@ -898,7 +898,7 @@ inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
     assert(ANY_SERIES_KIND_EVIL_MACRO);
   #endif
     const REBSER *s = SER(VAL_NODE1(v));
-    if (GET_SERIES_INFO(s, INACCESSIBLE))
+    if (GET_SERIES_FLAG(s, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return s;
 }
@@ -1231,8 +1231,8 @@ inline static REBSER *Make_Series_Core(
         SET_SERIES_FLAG(s, DYNAMIC);
 
         if (not Did_Series_Data_Alloc(s, capacity)) {
-            s->leader.bits &= ~NODE_FLAG_MANAGED;
-            s->info.bits |= SERIES_INFO_INACCESSIBLE;
+            CLEAR_SERIES_FLAG(s, MANAGED);
+            SET_SERIES_FLAG(s, INACCESSIBLE);
             GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
 
             fail (Error_No_Memory(capacity * wide));

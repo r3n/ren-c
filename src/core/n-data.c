@@ -941,7 +941,7 @@ REBNATIVE(free)
         fail ("FREE only implemented for ANY-SERIES! at the moment");
 
     REBSER *s = VAL_SERIES_ENSURE_MUTABLE(v);
-    if (GET_SERIES_INFO(s, INACCESSIBLE))
+    if (GET_SERIES_FLAG(s, INACCESSIBLE))
         fail ("Cannot FREE already freed series");
 
     Decay_Series(s);
@@ -981,7 +981,7 @@ REBNATIVE(free_q)
     if (n == nullptr or Is_Node_Cell(n))  // VAL_WORD_CACHE() can be null
         return Init_False(D_OUT);
 
-    return Init_Logic(D_OUT, GET_SERIES_INFO(SER(n), INACCESSIBLE));
+    return Init_Logic(D_OUT, GET_SERIES_FLAG(SER(n), INACCESSIBLE));
 }
 
 

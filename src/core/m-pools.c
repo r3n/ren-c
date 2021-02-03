@@ -1082,7 +1082,7 @@ void Remake_Series(REBSER *s, REBLEN units, REBYTE wide, REBFLGS flags)
 //
 void Decay_Series(REBSER *s)
 {
-    assert(NOT_SERIES_INFO(s, INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(s, INACCESSIBLE));
 
     if (GET_SERIES_FLAG(s, IS_STRING)) {
         if (IS_STR_SYMBOL(STR(s)))
@@ -1174,7 +1174,7 @@ void Decay_Series(REBSER *s)
         }
     }
 
-    SET_SERIES_INFO(s, INACCESSIBLE);
+    SET_SERIES_FLAG(s, INACCESSIBLE);
 }
 
 
@@ -1200,7 +1200,7 @@ void GC_Kill_Series(REBSER *s)
     //
     TOUCH_SERIES_IF_DEBUG(s);
 
-    if (NOT_SERIES_INFO(s, INACCESSIBLE))
+    if (NOT_SERIES_FLAG(s, INACCESSIBLE))
         Decay_Series(s);
 
   #if !defined(NDEBUG)

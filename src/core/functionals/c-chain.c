@@ -73,8 +73,9 @@ REBFRM *Push_Downshifted_Frame(REBVAL *out, REBFRM *f) {
     // !!! This leaks a dummy varlist, could just reuse a global one that
     // shows as INACCESSIBLE.
     //
-    f->varlist = Alloc_Singular(SERIES_FLAG_MANAGED | ARRAY_FLAG_IS_VARLIST);
-    SET_SERIES_INFO(f->varlist, INACCESSIBLE);
+    f->varlist = Alloc_Singular(
+        SERIES_FLAG_MANAGED | SERIES_FLAG_INACCESSIBLE | ARRAY_FLAG_IS_VARLIST
+    );
     f->rootvar = nullptr;
 
     sub->key = nullptr;

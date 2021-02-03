@@ -140,9 +140,19 @@
     0 // helps locate places that want to say "no flags"
 
 
-//=//// SERIES_FLAG_8 /////////////////////////////////////////////////////=//
+//=//// SERIES_FLAG_INACCESSIBLE //////////////////////////////////////////=//
 //
-#define SERIES_FLAG_8 \
+// An inaccessible series is one which may still have extant references, but
+// the data is no longer available.  That can happen implicitly or because
+// of a manual use of the FREE operation.
+//
+// It would be costly if all series access operations had to check the
+// accessibility bit.  Instead, the general pattern is that code that extracts
+// series from values, e.g. VAL_ARRAY(), performs a check to make sure that
+// the series is accessible at the time of extraction.  Subsequent access of
+// the extracted series is then unchecked.
+//
+#define SERIES_FLAG_INACCESSIBLE \
     FLAG_LEFT_BIT(8)
 
 
@@ -204,7 +214,7 @@
 // length (e.g. paramlists and context varlists/keylists).  So passing this
 // flag into series creation routines avoids creating the shortened form.
 //
-// Note: Currently SERIES_INFO_INACCESSIBLE overrides this, but does not
+// Note: Currently SERIES_FLAG_INACCESSIBLE overrides this, but does not
 // remove the flag...e.g. there can be inaccessible contexts that carry the
 // SERIES_FLAG_ALWAYS_DYNAMIC bit but no longer have an allocation.
 //
@@ -409,21 +419,9 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(24)
 
 
-//=//// SERIES_INFO_INACCESSIBLE //////////////////////////////////////////=//
+//=//// SERIES_INFO_25 ////////////////////////////////////////////////////=//
 //
-// Currently this used to note when a CONTEXT_INFO_STACK series has had its
-// stack level popped (there's no data to lookup for words bound to it).
-//
-// !!! This is currently redundant with checking if a CONTEXT_INFO_STACK
-// series has its `misc.f` (REBFRM) nulled out, but it means both can be
-// tested at the same time with a single bit.
-//
-// !!! It is conceivable that there would be other cases besides frames that
-// would want to expire their contents, and it's also conceivable that frames
-// might want to *half* expire their contents (e.g. have a hybrid of both
-// stack and dynamic values+locals).  These are potential things to look at.
-//
-#define SERIES_INFO_INACCESSIBLE \
+#define SERIES_INFO_25 \
     FLAG_LEFT_BIT(25)
 
 

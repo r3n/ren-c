@@ -541,7 +541,7 @@ REBCTX *Copy_Context_Extra_Managed(
 ){
     assert(GET_ARRAY_FLAG(CTX_VARLIST(original), IS_VARLIST));
     ASSERT_SERIES_MANAGED(CTX_KEYLIST(original));
-    assert(NOT_SERIES_INFO(CTX_VARLIST(original), INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(CTX_VARLIST(original), INACCESSIBLE));
 
     REBARR *varlist = Make_Array_For_Copy(
         CTX_LEN(original) + extra + 1,

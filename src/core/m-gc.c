@@ -193,7 +193,7 @@ static void Queue_Mark_Node_Deep(void *p)
     }
 
     REBSER *s = SER(p);
-    if (GET_SERIES_INFO(s, INACCESSIBLE)) {
+    if (GET_SERIES_FLAG(s, INACCESSIBLE)) {
         //
         // !!! All inaccessible nodes should be collapsed and canonized into
         // a universal inaccessible node so the stub can be freed.  But since
@@ -770,7 +770,7 @@ static void Mark_Frame_Stack_Deep(void)
             goto propagate_and_continue;
         }
 
-        if (f->varlist and GET_SERIES_INFO(f->varlist, INACCESSIBLE)) {
+        if (f->varlist and GET_SERIES_FLAG(f->varlist, INACCESSIBLE)) {
             //
             // This happens in Encloser_Dispatcher(), where it can capture a
             // varlist that may not be managed (e.g. if there were no ADAPTs

@@ -219,7 +219,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
 
         if (not Did_Series_Data_Alloc(s, capacity)) {  // expects LEN_BYTE=255
             s->leader.bits &= ~NODE_FLAG_MANAGED;  // can't kill if managed
-            s->info.bits |= SERIES_INFO_INACCESSIBLE;
+            SET_SERIES_FLAG(s, INACCESSIBLE);
             GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
 
             fail (Error_No_Memory(capacity * wide));
@@ -435,7 +435,7 @@ inline static const REBARR *VAL_ARRAY(REBCEL(const*) v) {
     assert(ANY_ARRAY_KIND(CELL_HEART(v)));
 
     const REBARR *a = ARR(VAL_NODE1(v));
-    if (GET_SERIES_INFO(a, INACCESSIBLE))
+    if (GET_SERIES_FLAG(a, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return a;
 }

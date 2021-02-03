@@ -63,7 +63,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         IS_BINDABLE_KIND(heart)
         and (binding = BINDING(v))
         and NOT_SERIES_FLAG(binding, IS_STRING)
-        and NOT_SERIES_INFO(binding, INACCESSIBLE)
+        and NOT_SERIES_FLAG(binding, INACCESSIBLE)
     ){
         assert(IS_SER_ARRAY(binding));
         if (
@@ -137,7 +137,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_BITSET: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         REBSER *s = SER(VAL_NODE1(v));
-        if (GET_SERIES_INFO(s, INACCESSIBLE))
+        if (GET_SERIES_FLAG(s, INACCESSIBLE))
             assert(Is_Marked(s));  // TBD: clear out reference and GC `s`?
         else
             assert(Is_Marked(s));
@@ -192,7 +192,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_BINARY: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         REBBIN *s = BIN(VAL_NODE1(v));
-        if (GET_SERIES_INFO(s, INACCESSIBLE))
+        if (GET_SERIES_FLAG(s, INACCESSIBLE))
             break;
 
         assert(SER_WIDE(s) == sizeof(REBYTE));
@@ -206,7 +206,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_URL:
       case REB_TAG: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        if (GET_SERIES_INFO(STR(VAL_NODE1(v)), INACCESSIBLE))
+        if (GET_SERIES_FLAG(STR(VAL_NODE1(v)), INACCESSIBLE))
             break;
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
@@ -239,7 +239,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_ERROR:
       case REB_FRAME:
       case REB_PORT: {
-        if (GET_SERIES_INFO(SER(VAL_NODE1(v)), INACCESSIBLE))
+        if (GET_SERIES_FLAG(SER(VAL_NODE1(v)), INACCESSIBLE))
             break;
 
         assert((v->header.bits & CELL_MASK_CONTEXT) == CELL_MASK_CONTEXT);
@@ -271,7 +271,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             assert(Is_Marked(PAYLOAD(Any, v).second.node));  // phase or label
         }
 
-        if (GET_SERIES_INFO(CTX_VARLIST(context), INACCESSIBLE))
+        if (GET_SERIES_FLAG(CTX_VARLIST(context), INACCESSIBLE))
             break;
 
         const REBVAL *archetype = CTX_ARCHETYPE(context);
@@ -300,7 +300,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_GET_GROUP:
       case REB_SYM_GROUP: {
         REBARR *a = ARR(VAL_NODE1(v));
-        if (GET_SERIES_INFO(a, INACCESSIBLE))
+        if (GET_SERIES_FLAG(a, INACCESSIBLE))
             break;
 
         ASSERT_SERIES_TERM_IF_NEEDED(a);
@@ -324,7 +324,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       any_sequence: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         REBARR *a = ARR(VAL_NODE1(v));
-        assert(NOT_SERIES_INFO(a, INACCESSIBLE));
+        assert(NOT_SERIES_FLAG(a, INACCESSIBLE));
 
         // With most arrays we may risk direct recursion, hence we have to
         // use Queue_Mark_Array_Deep().  But paths are guaranteed to not have

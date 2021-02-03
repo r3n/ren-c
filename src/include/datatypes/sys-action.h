@@ -281,7 +281,7 @@ inline static void Init_Key(REBKEY *dest, const REBSYM *symbol)
 inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_ACTION); // so it works on literals
     REBSER *s = SER(VAL_NODE1(v));
-    if (GET_SERIES_INFO(s, INACCESSIBLE))
+    if (GET_SERIES_FLAG(s, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return ACT(s);
 }

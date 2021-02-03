@@ -725,7 +725,7 @@ static inline const REBVAL *Lookup_Word_May_Fail(
     REBCTX *c = try_unwrap(Get_Word_Context(&index, any_word, specifier));
     if (not c)
         fail (Error_Not_Bound_Raw(SPECIFIC(any_word)));
-    if (GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE))
+    if (GET_SERIES_FLAG(CTX_VARLIST(c), INACCESSIBLE))
         fail (Error_No_Relative_Core(any_word));
 
     return CTX_VAR(c, index);
@@ -739,7 +739,7 @@ static inline option(const REBVAL*) Lookup_Word(
     REBCTX *c = try_unwrap(Get_Word_Context(&index, any_word, specifier));
     if (not c)
         return nullptr;
-    if (GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE))
+    if (GET_SERIES_FLAG(CTX_VARLIST(c), INACCESSIBLE))
         return nullptr;
 
     return CTX_VAR(c, index);
@@ -1091,7 +1091,7 @@ inline static REBSPC *Derive_Specifier_Core(
         if (
             frame_ctx == nullptr
             or (
-                NOT_SERIES_INFO(CTX_VARLIST(frame_ctx), INACCESSIBLE) and
+                NOT_SERIES_FLAG(CTX_VARLIST(frame_ctx), INACCESSIBLE) and
                 not Action_Is_Base_Of(ACT(old), CTX_FRAME_ACTION(frame_ctx))
             )
         ){

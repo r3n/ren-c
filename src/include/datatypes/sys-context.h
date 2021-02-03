@@ -140,10 +140,10 @@
 inline static const REBVAL *CTX_ARCHETYPE(REBCTX *c) {  // read-only form
     const REBSER *varlist = CTX_VARLIST(c);
     if (not IS_SER_DYNAMIC(varlist)) {  // a freed stub, variables are gone
-        assert(GET_SERIES_INFO(varlist, INACCESSIBLE));
+        assert(GET_SERIES_FLAG(varlist, INACCESSIBLE));
         return cast(const REBVAL*, &varlist->content.fixed);
     }
-    assert(NOT_SERIES_INFO(varlist, INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(varlist, INACCESSIBLE));
     return cast(const REBVAL*, varlist->content.dynamic.data);
 }
 
@@ -189,7 +189,7 @@ inline static void INIT_VAL_FRAME_ROOTVAR_Core(
     REBCTX *binding  // allowed to be UNBOUND
 ){
     assert(
-        (GET_SERIES_INFO(varlist, INACCESSIBLE) and out == ARR_SINGLE(varlist))
+        (GET_SERIES_FLAG(varlist, INACCESSIBLE) and out == ARR_SINGLE(varlist))
         or out == ARR_HEAD(varlist)
     );
     assert(phase != nullptr);
@@ -271,14 +271,14 @@ inline static const REBKEY *CTX_KEY(REBCTX *c, REBLEN n) {
     // until all words bound to them have been adjusted somehow, because the
     // words depend on those keys for their spellings (once bound)
     //
-    /* assert(NOT_SERIES_INFO(c, INACCESSIBLE)); */
+    /* assert(NOT_SERIES_FLAG(c, INACCESSIBLE)); */
 
     assert(n != 0 and n <= CTX_LEN(c));
     return SER_AT(const REBKEY, CTX_KEYLIST(c), n - 1);
 }
 
 inline static REBVAR *CTX_VAR(REBCTX *c, REBLEN n) {  // 1-based, no RELVAL*
-    assert(NOT_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(CTX_VARLIST(c), INACCESSIBLE));
     assert(n != 0 and n <= CTX_LEN(c));
     return cast(REBVAR*, cast(REBSER*, c)->content.dynamic.data) + n;
 }
@@ -318,7 +318,7 @@ inline static REBFRM *CTX_FRAME_IF_ON_STACK(REBCTX *c) {
     if (not Is_Node_Cell(keysource))
         return nullptr; // e.g. came from MAKE FRAME! or Encloser_Dispatcher
 
-    assert(NOT_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(CTX_VARLIST(c), INACCESSIBLE));
     assert(IS_FRAME(CTX_ARCHETYPE(c)));
 
     REBFRM *f = FRM(keysource);
@@ -334,7 +334,7 @@ inline static REBFRM *CTX_FRAME_MAY_FAIL(REBCTX *c) {
 }
 
 inline static void FAIL_IF_INACCESSIBLE_CTX(REBCTX *c) {
-    if (GET_SERIES_INFO(CTX_VARLIST(c), INACCESSIBLE)) {
+    if (GET_SERIES_FLAG(CTX_VARLIST(c), INACCESSIBLE)) {
         if (CTX_TYPE(c) == REB_FRAME)
             fail (Error_Expired_Frame_Raw()); // !!! different error?
         fail (Error_Series_Data_Freed_Raw());
@@ -651,11 +651,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
     // now those marking failure are asked to do so manually to the stub
     // after this returns (hence they need to cache the varlist first).
     //
-    stub->info.bits = Endlike_Header(
-        SERIES_INFO_INACCESSIBLE // args memory now "stolen" by copy
-            | FLAG_WIDE_BYTE_OR_0(0) // width byte is 0 for array series
-            | FLAG_LEN_BYTE_OR_255(1) // not dynamic any more, new len is 1
-    );
+    SET_SERIES_FLAG(stub, INACCESSIBLE);
 
     REBVAL *single = cast(REBVAL*, &stub->content.fixed);
     single->header.bits =

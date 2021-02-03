@@ -287,7 +287,7 @@ inline static bool Did_Reuse_Varlist_Of_Unknown_Size(
 inline static void Conserve_Varlist(REBARR *varlist)
 {
   #if !defined(NDEBUG)
-    assert(NOT_SERIES_INFO(varlist, INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(varlist, INACCESSIBLE));
     assert(NOT_SERIES_FLAG(varlist, MANAGED));
     assert(NOT_ARRAY_FLAG(varlist, FRAME_HAS_BEEN_INVOKED));
 
@@ -387,7 +387,7 @@ inline static void Push_Frame(
             continue;
         if (Is_Action_Frame_Fulfilling(ftemp))
             continue;
-        if (GET_SERIES_INFO(ftemp->varlist, INACCESSIBLE))
+        if (GET_SERIES_FLAG(ftemp->varlist, INACCESSIBLE))
             continue; // Encloser_Dispatcher() reuses args from up stack
         assert(
             f->out < FRM_ARGS_HEAD(ftemp)
@@ -678,7 +678,7 @@ inline static void Push_Action(
     }
 
     if (not Did_Series_Data_Alloc(s, num_args + 1 + 1)) {  // +rootvar, +end
-        s->info.bits |= SERIES_INFO_INACCESSIBLE;
+        SET_SERIES_FLAG(s, INACCESSIBLE);
         GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
         f->varlist = nullptr;
         fail (Error_No_Memory(sizeof(REBVAL) * (num_args + 1 + 1)));
@@ -741,7 +741,7 @@ inline static void Push_Action(
     }
 
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
-    assert(NOT_SERIES_INFO(f->varlist, INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(f->varlist, INACCESSIBLE));
 }
 
 
@@ -770,11 +770,11 @@ inline static void Drop_Action(REBFRM *f) {
     CLEAR_EVAL_FLAG(f, FULFILL_ONLY);
 
     assert(
-        GET_SERIES_INFO(f->varlist, INACCESSIBLE)
+        GET_SERIES_FLAG(f->varlist, INACCESSIBLE)
         or LINK(KeySource, f->varlist) == NOD(f)
     );
 
-    if (GET_SERIES_INFO(f->varlist, INACCESSIBLE)) {
+    if (GET_SERIES_FLAG(f->varlist, INACCESSIBLE)) {
         //
         // If something like Encloser_Dispatcher() runs, it might steal the
         // variables from a context to give them to the user, leaving behind
@@ -850,7 +850,7 @@ inline static void Drop_Action(REBFRM *f) {
 
   #if !defined(NDEBUG)
     if (f->varlist) {
-        assert(NOT_SERIES_INFO(f->varlist, INACCESSIBLE));
+        assert(NOT_SERIES_FLAG(f->varlist, INACCESSIBLE));
         assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
 
         RELVAL *rootvar = ARR_HEAD(f->varlist);
