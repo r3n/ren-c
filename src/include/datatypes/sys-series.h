@@ -269,13 +269,46 @@ inline static REBYTE SER_WIDE(const REBSER *s) {
 }
 
 
+#if !defined(__cplusplus)
+    #define SER_BONUS(s) \
+        (s)->content.dynamic.bonus.node
+#else
+    inline static const struct Reb_Node * const &SER_BONUS(const REBSER *s) {
+        assert(s->leader.bits & SERIES_FLAG_DYNAMIC);
+        return s->content.dynamic.bonus.node;
+    }
+
+    inline static const struct Reb_Node * &SER_BONUS(REBSER *s) {
+        assert(s->leader.bits & SERIES_FLAG_DYNAMIC);
+        return s->content.dynamic.bonus.node;
+    }
+#endif
+
+#define BONUS(Field, s) \
+    BONUS_##Field##_CAST(m_cast(REBNOD*, SER_BONUS(s)))
+
+#define mutable_BONUS(Field, s) \
+    ensured(BONUS_##Field##_TYPE, const REBNOD*, SER_BONUS(s))
+
+#define node_BONUS(Field, s) \
+    *m_cast(REBNOD**, &SER_BONUS(s))  // const ok for strict alias
+
+
 //
 // Bias is empty space in front of head:
 //
 
-inline static REBLEN SER_BIAS(const REBSER *s) {
+inline static bool IS_SER_BIASED(const REBSER *s) {
     assert(IS_SER_DYNAMIC(s));
-    return cast(REBLEN, ((s)->content.dynamic.bias >> 16) & 0xffff);
+    if (not IS_SER_ARRAY(s))
+        return true;
+    return true;
+}
+
+inline static REBLEN SER_BIAS(const REBSER *s) {
+    if (not IS_SER_BIASED(s))
+        return 0;
+    return cast(REBLEN, ((s)->content.dynamic.bonus.bias >> 16) & 0xffff);
 }
 
 inline static REBLEN SER_REST(const REBSER *s) {
@@ -292,19 +325,19 @@ inline static REBLEN SER_REST(const REBSER *s) {
 #define MAX_SERIES_BIAS 0x1000
 
 inline static void SER_SET_BIAS(REBSER *s, REBLEN bias) {
-    assert(IS_SER_DYNAMIC(s));
-    s->content.dynamic.bias =
-        (s->content.dynamic.bias & 0xffff) | (bias << 16);
+    assert(IS_SER_BIASED(s));
+    s->content.dynamic.bonus.bias =
+        (s->content.dynamic.bonus.bias & 0xffff) | (bias << 16);
 }
 
 inline static void SER_ADD_BIAS(REBSER *s, REBLEN b) {
-    assert(IS_SER_DYNAMIC(s));
-    s->content.dynamic.bias += b << 16;
+    assert(IS_SER_BIASED(s));
+    s->content.dynamic.bonus.bias += b << 16;
 }
 
 inline static void SER_SUB_BIAS(REBSER *s, REBLEN b) {
-    assert(IS_SER_DYNAMIC(s));
-    s->content.dynamic.bias -= b << 16;
+    assert(IS_SER_BIASED(s));
+    s->content.dynamic.bonus.bias -= b << 16;
 }
 
 inline static size_t SER_TOTAL(const REBSER *s) {
@@ -1206,7 +1239,11 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN capacity) {
     // SER_SET_BIAS() uses bit masking on an existing value, we are sure
     // here to clear out the whole value for starters.
     //
-    s->content.dynamic.bias = 0;
+    if (IS_SER_BIASED(s))
+        s->content.dynamic.bonus.bias = 0;
+    else {
+        // Leave as trash, or as existing bonus (if called in Expand_Series())
+    }
 
     // The allocation may have returned more than we requested, so we note
     // that in 'rest' so that the series can expand in and use the space.

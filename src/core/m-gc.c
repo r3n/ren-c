@@ -263,7 +263,26 @@ static void Queue_Mark_Node_Deep(void *p)
         Queue_Mark_Node_Deep(MISC(Node, s));
 
     if (IS_SER_ARRAY(s)) {
+        REBARR *a = ARR(s);
+
+    //=//// MARK BONUS (if not using slot for `bias`) /////////////////////=//
+
+        // Whether the bonus slot needs to be marked is dictated by internal
+        // series type, not an extension-usable flag (due to flag scarcity).
         //
+        if (IS_SER_DYNAMIC(a) and not IS_SER_BIASED(a)) {
+            REBNOD *bonus = node_BONUS(Node, a);
+            if (bonus) {
+              #if !defined(NDEBUG)
+                if (IS_POINTER_TRASH_DEBUG(bonus))
+                    panic (a);
+              #endif
+                Queue_Mark_Node_Deep(bonus);
+            }
+        }
+
+    //=//// MARK ARRAY ELEMENT CELLS (if array) ///////////////////////////=//
+
         // Submits the array into the deferred stack to be processed later
         // with Propagate_All_GC_Marks().  If it were not queued and just used
         // recursion (as R3-Alpha did) then deeply nested arrays could

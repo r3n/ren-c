@@ -567,6 +567,25 @@ STATIC_ASSERT(31 < 32);
 // and sweeping.
 //
 
+
+union Reb_Series_Bonus {
+    //
+    // In R3-Alpha, the bias was not a full REBLEN but was limited in range to
+    // 16 bits or so.  This means 16 info bits are likely available if needed
+    // for dynamic series...though it would complicate the logic for biasing
+    // to have to notice when you TAKE 65535 units from the head of a larger
+    // series and need to allocate a new pointer (though this needs to be
+    // done anyway, otherwise memory is wasted).
+    //
+    REBLEN bias;
+
+    // Series nodes that do not use bias (e.g. context varlists) can use the
+    // bonus slot for other information.
+    //
+    const REBNOD *node;
+};
+
+
 struct Reb_Series_Dynamic {
     //
     // `data` is the "head" of the series data.  It might not point directly
@@ -592,11 +611,9 @@ struct Reb_Series_Dynamic {
     REBLEN rest;
 
     // This is the 4th pointer on 32-bit platforms which could be used for
-    // something when a series is dynamic.  Previously the bias was not
-    // a full REBLEN but was limited in range to 16 bits or so.  This means
-    // 16 info bits are likely available if needed for dynamic series.
+    // something when a series is dynamic.
     //
-    REBLEN bias;
+    union Reb_Series_Bonus bonus;
 };
 
 
@@ -824,10 +841,10 @@ union Reb_Series_Info {
     //
     union Reb_Series_Misc misc;
 
-#if defined(DEBUG_SERIES_ORIGINS) || defined(DEBUG_COUNT_TICKS)
-    intptr_t *guard; // intentionally alloc'd and freed for use by Panic_Series
-    uintptr_t tick; // also maintains sizeof(REBSER) % sizeof(REBI64) == 0
-#endif
+  #if defined(DEBUG_SERIES_ORIGINS) || defined(DEBUG_COUNT_TICKS)
+    intptr_t *guard;  // intentionally alloc'd and freed for use by panic()
+    uintptr_t tick;  // also maintains sizeof(REBSER) % sizeof(REBI64) == 0
+  #endif
 };
 
 
