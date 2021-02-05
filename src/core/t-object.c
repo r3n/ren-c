@@ -458,11 +458,7 @@ REBNATIVE(meta_of)  // see notes on MISC_META()
         meta = ACT_META(VAL_ACTION(v));
     else {
         assert(ANY_CONTEXT(v));
-        REBARR *misc = MISC(MetaOrPatches, CTX_VARLIST(VAL_CONTEXT(v)));
-        if (misc and GET_ARRAY_FLAG(misc, IS_PATCH))
-            meta = MISC(MetaProxy, misc);
-        else
-            meta = CTX(misc);
+        meta = CTX_META(VAL_CONTEXT(v));
     }
 
     if (not meta)
@@ -506,19 +502,8 @@ REBNATIVE(set_meta)
 
     if (IS_ACTION(v))
         mutable_MISC(Meta, ACT_DETAILS(VAL_ACTION(v))) = meta_ctx;
-    else {
-        assert(ANY_CONTEXT(v));
-
-        // The slot where the meta is stored in a context is overloaded with
-        // storing a patches list.  See %sys-patch for details.
-        //
-        REBARR *varlist = CTX_VARLIST(VAL_CONTEXT(v));
-        REBARR *misc = MISC(MetaOrPatches, varlist);
-        if (misc and GET_ARRAY_FLAG(misc, IS_PATCH))
-            mutable_MISC(MetaProxy, misc) = meta_ctx;
-        else
-            mutable_MISC(MetaOrPatches, varlist) = CTX_VARLIST(meta_ctx);
-    }
+    else
+        mutable_MISC(Meta, CTX_VARLIST(VAL_CONTEXT(v))) = meta_ctx;
 
     RETURN (meta);
 }
@@ -605,6 +590,8 @@ REBCTX *Copy_Context_Extra_Managed(
         //
         mutable_MISC(Meta, varlist) = nullptr;
     }
+
+    mutable_BONUS(Patches, varlist) = nullptr;  // no virtual bind patches yet
 
     return copy;
 }

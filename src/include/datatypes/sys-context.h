@@ -91,18 +91,16 @@
 #endif
 
 
-// Due to limitations on the number of available pointers in a REBSER--and a
-// desire to avoid making a global mapping table from contexts to the virtual
-// bind patch list that uses them--the list is multiplexed with the meta
-// information for an object.  See %sys-patch.h for more information.
+// REBCTX* properties (note: shares LINK_KEYSOURCE() with REBACT*)
 //
 // Note: MODULE! contexts depend on a property stored in the META field, which
 // is another object's-worth of data *about* the module's contents (e.g. the
 // processed header)
 //
-#define MISC_MetaOrPatches_TYPE      REBARR*
-#define MISC_MetaOrPatches_CAST      ARR
+#define CTX_META(c)     MISC(Meta, CTX_VARLIST(c))
 
+#define BONUS_Patches_TYPE      REBARR*
+#define BONUS_Patches_CAST      ARR
 
 // ANY-CONTEXT! value cell schematic
 //
@@ -640,6 +638,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
         sizeof(union Reb_Series_Content)
     );
     mutable_MISC(Meta, copy) = nullptr;  // let stub have the meta
+    mutable_BONUS(Patches, copy) = nullptr;  // don't carry forward patches
 
     REBVAL *rootvar = cast(REBVAL*, copy->content.dynamic.data);
 

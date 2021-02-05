@@ -294,14 +294,7 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     REBSER *keylist = CTX_KEYLIST(c);
     ASSERT_SERIES_MANAGED(keylist);
 
-    // Light check of misc, mostly to see that it's not garbage.
-    //
-    REBARR *misc = MISC(MetaOrPatches, CTX_VARLIST(c));
-    assert(
-        not misc
-        or GET_ARRAY_FLAG(misc, IS_PATCH)
-        or GET_ARRAY_FLAG(misc, IS_VARLIST)
-    );
+    assert(not CTX_META(c) or ANY_CONTEXT_KIND(CTX_TYPE(CTX_META(c))));
 
     // FRAME!s must always fill in the phase slot, but that piece of the
     // REBVAL is reserved for future use in other context types...so make

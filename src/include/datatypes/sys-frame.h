@@ -674,6 +674,7 @@ inline static void Push_Action(
         );
         INIT_LINK_KEYSOURCE(ARR(s), NOD(f)); // maps varlist back to f
         mutable_MISC(Meta, s) = nullptr;  // GC will sees this
+        mutable_BONUS(Patches, s) = nullptr;
         f->varlist = ARR(s);
     }
 

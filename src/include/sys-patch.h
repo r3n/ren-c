@@ -66,8 +66,8 @@
 // that have distinct next pointers.  This way, they can look through that
 // list before creating an equivalent chain to one that already exists.
 //
-#define LINK_Variant_TYPE        REBARR*
-#define LINK_Variant_CAST        ARR
+#define MISC_Variant_TYPE        REBARR*
+#define MISC_Variant_CAST        ARR
 
 
 // Next node is either to another patch, a frame specifier REBCTX, or nullptr.
@@ -81,16 +81,10 @@
 #define INIT_NEXT_PATCH(patch, specifier) \
     INIT_VAL_WORD_CACHE(ARR_SINGLE(patch), (specifier))
 
-// One element in the circularly-linked list of variants is pointed to by
-// the object being virtually bound.  This uses one of the very scarce
-// per pointer objects.  But since the virtually bound patch is only for
-// one object, it can sacrifice one of its fields to hold information.
+// The link slot for patches is available for use...
 //
-// !!! This is somewhat lame, as it means all virtual bind patches give up
-// their misc() slot.
-//
-#define MISC_MetaProxy_TYPE           REBCTX*
-#define MISC_MetaProxy_CAST           CTX
+#define LINK_PatchUnused_TYPE           REBNOD*
+#define LINK_PatchUnused_CAST(p)        (p)
 
 
 #ifdef NDEBUG
@@ -169,18 +163,16 @@ inline static REBARR *Make_Patch_Core(
         assert(BINDING(ARR_SINGLE(next)) != CTX_VARLIST(ctx));
     }
 
-    REBARR *misc = MISC(MetaOrPatches, CTX_VARLIST(ctx));
-    REBARR *variant;
-    if (not misc or NOT_ARRAY_FLAG(misc, IS_PATCH))
-        variant = nullptr;
-    else {
+    REBARR *patches = BONUS(Patches, CTX_VARLIST(ctx));
+    if (patches) {
+        //
         // There's a list of variants in place.  Search it to see if any of
         // them are a match for the given limit and next specifier.
         //
         // !!! Long term this should not search if not reuse.  For now we
         // search just to make sure that you're not putting in a duplicate.
         //
-        variant = misc;
+        REBARR *variant = patches;
         do {
             if (
                 NextPatch(variant) == next
@@ -193,19 +185,14 @@ inline static REBARR *Make_Patch_Core(
                 // bother searching or not.
                 //
                 assert(reuse);
+                USED(reuse);
                 SET_ARRAY_FLAG(variant, PATCH_REUSED);
                 return variant;
             }
-            variant = LINK(Variant, variant);
-        } while (variant != misc);
+            variant = MISC(Variant, variant);
+        } while (variant != patches);
 
-        // We're going to need to make a patch.  Due to the awkward design,
-        // we'll always be leaving one patch alive for the GC (otherwise
-        // there'd be no way to mark the misc proxy).  Make sure the one
-        // we keep alive is the last one requested.
-        //
-        misc = CTX_VARLIST(MISC(MetaProxy, variant));
-        mutable_MISC(MetaProxy, variant) = nullptr;
+        // We're going to need to make a patch.
     }
 
     // A virtual bind patch array is a singular node holding an ANY-WORD!
@@ -230,9 +217,11 @@ inline static REBARR *Make_Patch_Core(
     //
     REBARR *patch = Alloc_Singular(
         NODE_FLAG_MANAGED
-        | SERIES_FLAG_MISC_NODE_NEEDS_MARK
         //
-        // LINK is a node, but it's used for linking patches to variants
+        // LINK is not used yet (likely application: symbol for patches that
+        // represent lets).  Consider uses in patches that represent objects.
+        //
+        // MISC is a node, but it's used for linking patches to variants
         // with different chains underneath them...and shouldn't keep that
         // alternate version alive.  So no SERIES_FLAG_MISC_NODE_NEEDS_MARK.
         //
@@ -249,23 +238,25 @@ inline static REBARR *Make_Patch_Core(
     INIT_NEXT_PATCH(patch, next);
 
     // A circularly linked list of variations of this patch with different
-    // MISC(MetaProxy) is maintained, to assist in avoiding creating
-    // unnecessary duplicates.  But since this is the moment of fresh patch
-    // creation, there shouldn't be any variants (yet).  Note Decay_Series()
-    // will remove this patch from the list when it is being GC'd.
+    // NextPatch() dta is maintained, to assist in avoiding creating
+    // unnecessary duplicates.  Decay_Series() will remove this patch from the
+    // list when it is being GC'd.
     //
-    if (not variant)
-        mutable_LINK(Variant, patch) = patch;
+    if (not patches)
+        mutable_MISC(Variant, patch) = patch;
     else {
-        mutable_LINK(Variant, patch) = LINK(Variant, variant);
-        mutable_LINK(Variant, variant) = patch;
+        mutable_MISC(Variant, patch) = MISC(Variant, patches);
+        mutable_MISC(Variant, patches) = patch;
     }
 
-    // Pushing the newest patch to the GC-marked link.
+    // Make the last looked for patch the first one that would be found if
+    // the same search is used again (assume that's a good strategy)
     //
-    mutable_MISC(MetaProxy, patch) = CTX(misc);
+    mutable_BONUS(Patches, CTX_VARLIST(ctx)) = patch;
 
-    mutable_MISC(MetaOrPatches, CTX_VARLIST(ctx)) = patch;
+    // The LINK field is still available.
+    //
+    mutable_LINK(PatchUnused, patch) = nullptr;
 
     return patch;
 }

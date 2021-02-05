@@ -302,7 +302,9 @@ inline static bool IS_SER_BIASED(const REBSER *s) {
     assert(IS_SER_DYNAMIC(s));
     if (not IS_SER_ARRAY(s))
         return true;
-    return true;
+    return not (s->leader.bits & (
+        ARRAY_FLAG_IS_VARLIST
+    ));
 }
 
 inline static REBLEN SER_BIAS(const REBSER *s) {

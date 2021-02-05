@@ -1095,11 +1095,11 @@ void Decay_Series(REBSER *s)
         // Remove patch from circularly linked list of variants.
         // (if it's the last one, this winds up making no meaningful change)
         //
-        REBARR *temp = LINK(Variant, s);
-        while (LINK(Variant, temp) != s) {
-            temp = LINK(Variant, temp);
+        REBARR *temp = MISC(Variant, s);
+        while (MISC(Variant, temp) != s) {
+            temp = MISC(Variant, temp);
         }
-        mutable_LINK(Variant, temp) = LINK(Variant, s);
+        mutable_MISC(Variant, temp) = MISC(Variant, s);
     }
 
     // Remove series from expansion list, if found:
@@ -1141,8 +1141,6 @@ void Decay_Series(REBSER *s)
         GC_Ballast = REB_I32_ADD_OF(GC_Ballast, total, &tmp)
             ? INT32_MAX
             : tmp;
-
-        mutable_USED_BYTE(s) = 1;  // !!! is this right?
     }
     else {
         // Special GC processing for HANDLE! when the handle is implemented as

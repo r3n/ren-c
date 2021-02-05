@@ -51,6 +51,7 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
             | flags  // e.g. NODE_FLAG_MANAGED
     );
     mutable_MISC(Meta, varlist) = nullptr;  // GC sees meta object, must init
+    mutable_BONUS(Patches, varlist) = nullptr;
     INIT_CTX_KEYLIST_UNIQUE(CTX(varlist), keylist);  // starts out unique
 
     RELVAL *rootvar = Alloc_Tail_Array(varlist);
@@ -550,6 +551,7 @@ REBCTX *Make_Context_Detect_Managed(
     );
     SET_SERIES_LEN(varlist, 1 + len);
     mutable_MISC(Meta, varlist) = nullptr;  // clear meta object (GC sees)
+    mutable_BONUS(Patches, varlist) = nullptr;  // clear virtual patch list
 
     REBCTX *context = CTX(varlist);
 

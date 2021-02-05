@@ -201,6 +201,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
     SET_SERIES_LEN(varlist, num_slots);
     mutable_MISC(Meta, varlist) = nullptr;  // GC sees this, we must init
+    mutable_BONUS(Patches, varlist) = nullptr;
 
     return CTX(varlist);
 }

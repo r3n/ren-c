@@ -626,6 +626,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     SET_SERIES_USED(keylist, num_slots - 1);  // no terminator
     INIT_LINK_KEYSOURCE(paramlist, keylist);
     mutable_MISC(Meta, paramlist) = nullptr;
+    mutable_BONUS(Patches, paramlist) = nullptr;
   }
 
     // Must remove binder indexes for all words, even if about to fail
@@ -683,6 +684,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             SERIES_MASK_VARLIST | NODE_FLAG_MANAGED
         );
         mutable_MISC(Meta, types_varlist) = nullptr;  // GC sees, must init
+        mutable_BONUS(Patches, types_varlist) = nullptr;
         INIT_CTX_KEYLIST_SHARED(CTX(types_varlist), keylist);
 
         RELVAL *rootvar = ARR_HEAD(types_varlist);
@@ -721,6 +723,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             SERIES_MASK_VARLIST | NODE_FLAG_MANAGED
         );
         mutable_MISC(Meta, notes_varlist) = nullptr;  // GC sees, must init
+        mutable_BONUS(Patches, notes_varlist) = nullptr;
         INIT_CTX_KEYLIST_SHARED(CTX(notes_varlist), keylist);
 
         RELVAL *rootvar = ARR_HEAD(notes_varlist);
@@ -1010,6 +1013,7 @@ REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
     CLEAR_SERIES_FLAG(varlist, DYNAMIC);  // !!! removes (review cleaner way)
     SET_SERIES_FLAG(varlist, INACCESSIBLE);
     mutable_MISC(Meta, varlist) = nullptr;
+    mutable_BONUS(Patches, varlist) = nullptr;
 
     RELVAL *rootvar = ARR_SINGLE(varlist);
     INIT_VAL_FRAME_ROOTVAR(rootvar, varlist, a, UNBOUND);  // !!! binding?

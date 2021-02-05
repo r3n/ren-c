@@ -296,7 +296,7 @@ static void Queue_Mark_Node_Deep(void *p)
         //
         if (SER_FULL(GC_Mark_Stack))
             Extend_Series(GC_Mark_Stack, 8);
-        *SER_AT(REBARR*, GC_Mark_Stack, SER_USED(GC_Mark_Stack)) = ARR(s);
+        *SER_AT(REBARR*, GC_Mark_Stack, SER_USED(GC_Mark_Stack)) = a;
         SET_SERIES_USED(GC_Mark_Stack, SER_USED(GC_Mark_Stack) + 1);  // !term
     }
 }
