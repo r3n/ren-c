@@ -126,13 +126,15 @@
         if (not p)
             return nullptr;
 
-        if ((reinterpret_cast<const REBSER*>(p)->leader.bits & (
+        if (((reinterpret_cast<const REBSER*>(p)->leader.bits & (
             SERIES_MASK_VARLIST
                 | NODE_FLAG_FREE
                 | NODE_FLAG_CELL
                 | FLAG_FLAVOR_BYTE(255)
                 | ARRAY_FLAG_HAS_FILE_LINE_UNMASKED
-        )) !=
+        ))
+            | SERIES_FLAG_DYNAMIC  // permit non-dynamic (e.g. inaccessible
+        ) !=
             SERIES_MASK_VARLIST
         ){
             panic (p);
