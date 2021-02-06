@@ -254,7 +254,7 @@ typedef struct Reb_Pool_Unit REBPLU;
 //
 // Aggregate types that are logically collections of multiple series do not
 // inherit.  You have to specify which series you want to extract, e.g.
-// GET_ARRAY_FLAG(CTX_VARLIST(context)), not just GET_ARRAY_FLAG(context).
+// GET_SERIES_FLAG(CTX_VARLIST(context)), not just GET_SERIES_FLAG(context).
 //
 // Note that because the Reb_Series structure includes a Reb_Value by value,
 // the %sys-rebser.h must be included *after* %sys-rebval.h; however the

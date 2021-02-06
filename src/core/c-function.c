@@ -559,14 +559,14 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     );
     SET_SERIES_FLAG(paramlist, FIXED_SIZE);
 
-    REBSER *keylist = Make_Series_Core(
+    REBSER *keylist = Make_Series(
         (num_slots - 1),  // - 1 archetype
         SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
     );
     mutable_LINK(Ancestor, keylist) = keylist;  // chain ends with self
 
     if (flags & MKF_HAS_RETURN)
-        paramlist->leader.bits |= PARAMLIST_FLAG_HAS_RETURN;
+        paramlist->leader.bits |= VARLIST_FLAG_PARAMLIST_HAS_RETURN;
 
     // We want to check for duplicates and a Binder can be used for that
     // purpose--but fail() isn't allowed while binders are in effect.
@@ -902,7 +902,7 @@ REBACT *Make_Action(
 
     ASSERT_SERIES_MANAGED(keylist);  // paramlists/keylists, can be shared
     assert(SER_USED(keylist) + 1 == ARR_LEN(paramlist));
-    if (paramlist->leader.bits & PARAMLIST_FLAG_HAS_RETURN) {
+    if (GET_SUBCLASS_FLAG(VARLIST, paramlist, PARAMLIST_HAS_RETURN)) {
         const REBKEY *key = SER_AT(const REBKEY, keylist, 0);
         assert(KEY_SYM(key) == SYM_RETURN);
         UNUSED(key);
@@ -934,8 +934,6 @@ REBACT *Make_Action(
     mutable_MISC(Meta, details) = nullptr;  // caller can fill in
 
     INIT_VAL_ACTION_SPECIALTY_OR_LABEL(archetype, specialty);
-
-    assert(NOT_ARRAY_FLAG(details, HAS_FILE_LINE_UNMASKED));
 
     REBACT *act = ACT(details); // now it's a legitimate REBACT
 

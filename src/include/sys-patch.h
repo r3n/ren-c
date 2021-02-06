@@ -63,6 +63,19 @@
 #define MISC_Variant_CAST        ARR
 
 
+//=//// PATCH_FLAG_REUSED /////////////////////////////////////////////////=//
+//
+// It's convenient to be able to know when a patch returned from a make call
+// is reused or not.  But adding that parameter to the interface complicates
+// it.  There's plenty of bits free on patch array flags, so just use one.
+//
+// !!! This could use a cell marking flag on the patch's cell, but putting
+// it here as a temporary measure.
+//
+#define PATCH_FLAG_REUSED \
+    SERIES_FLAG_24
+
+
 // Next node is either to another patch, a frame specifier REBCTX, or nullptr.
 //
 #define NextPatchNode(patch) \
@@ -179,7 +192,7 @@ inline static REBARR *Make_Patch_Core(
                 //
                 assert(reuse);
                 USED(reuse);
-                SET_ARRAY_FLAG(variant, PATCH_REUSED);
+                SET_SUBCLASS_FLAG(PATCH, variant, REUSED);
                 return variant;
             }
             variant = MISC(Variant, variant);

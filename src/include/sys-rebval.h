@@ -116,8 +116,23 @@
     NODE_FLAG_GC_TWO
 
 
-// v-- BEGIN GENERAL CELL BITS HERE, third byte in the header
+//=//// BITS 16-23: CELL LAYOUT BYTE ("HEART") ////////////////////////////=//
+//
+// The heart byte corresponds to the actual bit layout of the cell; it's what
+// the GC marks a cell as.  The CELL_HEART() will often match the CELL_KIND(),
+// but won't in cases where the KIND is REB_PATH but the HEART is REB_BLOCK...
+// indicating that the path is using the underlying implementation of a block.
+//
 
+#define FLAG_HEART_BYTE(b)         FLAG_THIRD_BYTE(b)
+#define HEART_BYTE(v)              THIRD_BYTE((v)->header)
+#define mutable_HEART_BYTE(v)      mutable_THIRD_BYTE((v)->header)
+
+
+//=//// BITS 24-31: CELL FLAGS ////////////////////////////////////////////=//
+//
+// (description here)
+//
 
 //=//// CELL_FLAG_PROTECTED ///////////////////////////////////////////////=//
 //
@@ -130,19 +145,19 @@
 // be checked at once...hence there's not "NODE_FLAG_PROTECTED" in common.)
 //
 #define CELL_FLAG_PROTECTED \
-    FLAG_LEFT_BIT(16)
+    FLAG_LEFT_BIT(24)
 
 
-//=//// CELL_FLAG_17 //////////////////////////////////////////////////////=//
+//=//// CELL_FLAG_25 //////////////////////////////////////////////////////=//
 //
-#define CELL_FLAG_17 \
-    FLAG_LEFT_BIT(17)
+#define CELL_FLAG_25 \
+    FLAG_LEFT_BIT(25)
 
 
-//=//// CELL_FLAG_18 //////////////////////////////////////////////////////=//
+//=//// CELL_FLAG_26 //////////////////////////////////////////////////////=//
 //
-#define CELL_FLAG_18 \
-    FLAG_LEFT_BIT(18)
+#define CELL_FLAG_26 \
+    FLAG_LEFT_BIT(26)
 
 
 //=//// CELL_FLAG_UNEVALUATED /////////////////////////////////////////////=//
@@ -164,7 +179,7 @@
 // That has a lot of impact for the new user experience.
 //
 #define CELL_FLAG_UNEVALUATED \
-    FLAG_LEFT_BIT(19)
+    FLAG_LEFT_BIT(27)
 
 
 //=//// CELL_FLAG_NOTE ////////////////////////////////////////////////////=//
@@ -193,7 +208,7 @@
 //
 
 #define CELL_FLAG_NOTE \
-    FLAG_LEFT_BIT(20)
+    FLAG_LEFT_BIT(28)
 
 #define CELL_FLAG_OUT_NOTE_STALE CELL_FLAG_NOTE
 #define CELL_FLAG_NOTE_REMOVE CELL_FLAG_NOTE
@@ -218,7 +233,7 @@
 // representing paths with newlines in them may be needed.
 //
 #define CELL_FLAG_NEWLINE_BEFORE \
-    FLAG_LEFT_BIT(21)
+    FLAG_LEFT_BIT(29)
 
 
 //=//// CELL_FLAG_CONST ///////////////////////////////////////////////////=//
@@ -229,7 +244,7 @@
 // const view on a mutable value with CONST.
 //
 #define CELL_FLAG_CONST \
-    FLAG_LEFT_BIT(22)  // NOTE: Must be SAME BIT as FEED_FLAG_CONST
+    FLAG_LEFT_BIT(30)  // NOTE: Must be SAME BIT as FEED_FLAG_CONST
 
 
 //=//// CELL_FLAG_EXPLICITLY_MUTABLE //////////////////////////////////////=//
@@ -249,21 +264,7 @@
 // the MUTABLE flag should only be added by running MUTABLE.
 //
 #define CELL_FLAG_EXPLICITLY_MUTABLE \
-    FLAG_LEFT_BIT(23)
-
-
-// After 8 bits for node flags, 8 bits for the datatype, and 8 generic value
-// bits...there's only 8 more bits left on 32-bit platforms in the header.
-//
-// This is used for the `HEART` byte.  The heart byte corresponds to the
-// actual bit layout of the cell; it's what the GC marks a cell as.  The
-// CELL_HEART() will often match the CELL_KIND(), but won't in cases where
-// the KIND is REB_PATH but the HEART is REB_BLOCK...indicating that the
-// path is using the underlying implementation of a block.
-
-#define FLAG_HEART_BYTE(b)         FLAG_FOURTH_BYTE(b)
-#define HEART_BYTE(v)              FOURTH_BYTE((v)->header)
-#define mutable_HEART_BYTE(v)      mutable_FOURTH_BYTE((v)->header)
+    FLAG_LEFT_BIT(31)
 
 
 // Endlike headers have the second byte clear (to pass the IS_END() test).

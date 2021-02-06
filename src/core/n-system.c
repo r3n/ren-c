@@ -142,7 +142,7 @@ REBNATIVE(recycle)
       #if defined(NDEBUG)
         fail (Error_Debug_Only_Raw());
       #else
-        REBSER *sweeplist = Make_Series(100, FLAVOR_NODELIST);
+        REBSER *sweeplist = Make_Series(100, FLAG_FLAVOR(NODELIST));
         count = Recycle_Core(false, sweeplist);
         assert(count == SER_USED(sweeplist));
 

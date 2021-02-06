@@ -37,7 +37,7 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
 {
     assert(not (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED));  // LINK is taken
 
-    REBSER *keylist = Make_Series_Core(
+    REBSER *keylist = Make_Series(
         capacity,  // no terminator
         SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED  // always shareable
     );
@@ -70,7 +70,7 @@ bool Expand_Context_Keylist_Core(REBCTX *context, REBLEN delta)
     REBSER *keylist = CTX_KEYLIST(context);
     assert(IS_KEYLIST(keylist));
 
-    if (GET_SERIES_FLAG(keylist, KEYLIST_SHARED)) {
+    if (GET_SUBCLASS_FLAG(KEYLIST, keylist, SHARED)) {
         //
         // INIT_CTX_KEYLIST_SHARED was used to set the flag that indicates
         // this keylist is shared with one or more other contexts.  Can't
@@ -365,7 +365,7 @@ REBSER *Collect_Keylist_Managed(
     if (prior and CTX_LEN(unwrap(prior)) == num_collected)
         keylist = CTX_KEYLIST(unwrap(prior));
     else {
-        keylist = Make_Series_Core(
+        keylist = Make_Series(
             num_collected,  // no terminator
             SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
         );
@@ -931,7 +931,8 @@ REBLEN Find_Symbol_In_Context(
         if (IS_FRAME_PHASED(context))
             honor_hidden = false;
         else {
-            if (GET_ARRAY_FLAG(CTX_VARLIST(c), FRAME_HAS_BEEN_INVOKED))
+            REBARR *varlist = CTX_VARLIST(c);
+            if (GET_SUBCLASS_FLAG(VARLIST, varlist, FRAME_HAS_BEEN_INVOKED))
                 fail (Error_Stale_Frame_Raw());
         }
     }

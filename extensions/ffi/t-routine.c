@@ -543,7 +543,7 @@ static void ffi_to_rebol(
         );
         mutable_LINK(Schema, stu) = top;
 
-        REBBIN *data = BIN(Make_Series_Core(
+        REBBIN *data = BIN(Make_Series(
             FLD_WIDE(top),  // !!! what about FLD_LEN_BYTES_TOTAL ?
             FLAVOR_BINARY,
             NODE_FLAG_MANAGED

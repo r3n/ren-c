@@ -170,7 +170,7 @@ STATIC_ASSERT(FEED_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
 // (This behavior is designed to permit switching into a "mode" that is
 //
 #define FEED_FLAG_CONST \
-    FLAG_LEFT_BIT(22)
+    FLAG_LEFT_BIT(30)
 STATIC_ASSERT(FEED_FLAG_CONST == CELL_FLAG_CONST);
 
 

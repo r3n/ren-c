@@ -199,15 +199,13 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(19)
 
 
-//=//// EVAL_FLAG_UNDO_NOTE_STALE /////////////////////////////////////////=//
+//=//// EVAL_FLAG_TYPECHECK_ONLY //////////////////////////////////////////=//
 //
-// Note: This bit is the same as CELL_FLAG_NOTE, so it lines up directly
-// with CELL_FLAG_OUT_NOTE_STALE.
+// This is used by <blank> to indicate that once the frame is fulfilled, the
+// only thing that should be done is typechecking...don't run the action.
 //
-#define EVAL_FLAG_UNDO_NOTE_STALE \
+#define EVAL_FLAG_TYPECHECK_ONLY \
     FLAG_LEFT_BIT(20)
-
-STATIC_ASSERT(EVAL_FLAG_UNDO_NOTE_STALE == CELL_FLAG_OUT_NOTE_STALE);
 
 
 //=//// EVAL_FLAG_PATH_HARD_QUOTE /////////////////////////////////////////=//
@@ -316,13 +314,15 @@ STATIC_ASSERT(DETAILS_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
     FLAG_LEFT_BIT(27)
 
 
-//=//// EVAL_FLAG_TYPECHECK_ONLY //////////////////////////////////////////=//
+//=//// EVAL_FLAG_UNDO_NOTE_STALE /////////////////////////////////////////=//
 //
-// This is used by <blank> to indicate that once the frame is fulfilled, the
-// only thing that should be done is typechecking...don't run the action.
+// Note: This bit is the same as CELL_FLAG_NOTE, so it lines up directly
+// with CELL_FLAG_OUT_NOTE_STALE.
 //
-#define EVAL_FLAG_TYPECHECK_ONLY \
+#define EVAL_FLAG_UNDO_NOTE_STALE \
     FLAG_LEFT_BIT(28)
+
+STATIC_ASSERT(EVAL_FLAG_UNDO_NOTE_STALE == CELL_FLAG_OUT_NOTE_STALE);
 
 
 //=//// EVAL_FLAG_PUSH_PATH_REFINES + EVAL_FLAG_BLAME_PARENT //////////////=//

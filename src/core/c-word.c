@@ -137,7 +137,7 @@ static void Expand_Word_Table(void)
     REBLEN num_slots = Get_Hash_Prime_May_Fail(old_num_slots + 1);
     assert(SER_WIDE(PG_Symbols_By_Hash) == sizeof(REBSTR*));
 
-    REBSER *ser = Make_Series_Core(
+    REBSER *ser = Make_Series(
         num_slots, FLAG_FLAVOR(CANONTABLE) | SERIES_FLAG_POWER_OF_2
     );
     Clear_Series(ser);
@@ -262,7 +262,7 @@ const REBSYM *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
 
   new_interning: {
 
-    REBBIN *s = BIN(Make_Series_Core(
+    REBBIN *s = BIN(Make_Series(
         size + 1,  // if small, fits in a REBSER node (w/no data allocation)
         FLAG_FLAVOR(SYMBOL) | SERIES_FLAG_FIXED_SIZE
     ));
@@ -468,7 +468,7 @@ void Startup_Interning(void)
     n = 1; // forces exercise of rehashing logic in debug build
   #endif
 
-    PG_Symbols_By_Hash = Make_Series_Core(
+    PG_Symbols_By_Hash = Make_Series(
         n, FLAG_FLAVOR(CANONTABLE) | SERIES_FLAG_POWER_OF_2
     );
     Clear_Series(PG_Symbols_By_Hash);  // all slots start as nullptr
@@ -542,7 +542,7 @@ void Startup_Early_Symbols(void)
 void Startup_Symbols(REBARR *words)
 {
     assert(PG_Symbol_Canons == nullptr);
-    PG_Symbol_Canons = Make_Series_Core(
+    PG_Symbol_Canons = Make_Series(
         1 + ARR_LEN(words),  // 1 + => extra trash at head for SYM_0
         FLAG_FLAVOR(COMMONWORDS)
             | SERIES_FLAG_FIXED_SIZE  // can't ever add more SYM_XXX lookups

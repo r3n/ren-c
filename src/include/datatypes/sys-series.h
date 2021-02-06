@@ -253,12 +253,26 @@ inline static REBSER *ensure_flavor(
 #endif
 
 
+#define GET_SUBCLASS_FLAG(subclass,s,name) \
+    ((ensure_flavor(FLAVOR_##subclass, (s))->leader.bits \
+        & subclass##_FLAG_##name) != 0)
+
+#define NOT_SUBCLASS_FLAG(subclass,s,name) \
+    ((ensure_flavor(FLAVOR_##subclass, (s))->leader.bits \
+        & subclass##_FLAG_##name) == 0)
+
+#define SET_SUBCLASS_FLAG(subclass,s,name) \
+    (ensure_flavor(FLAVOR_##subclass, (s))->leader.bits \
+        |= subclass##_FLAG_##name)
+
+#define CLEAR_SUBCLASS_FLAG(subclass,s,name) \
+    (ensure_flavor(FLAVOR_##subclass, (s))->leader.bits \
+        &= ~subclass##_FLAG_##name)
+
+
 #define IS_SER_DYNAMIC(s) \
     GET_SERIES_FLAG((s), DYNAMIC)
 
-// These are series implementation details that should not be used by most
-// code.  But in order to get good inlining, they have to be in the header
-// files (of the *internal* API, not of libRebol).  Generally avoid it.
 
 #define SER_WIDE(s) \
     Wide_For_Flavor(SER_FLAVOR(s))
@@ -1112,7 +1126,7 @@ inline static REBVAL *Init_Any_Series_At_Core(
 // allocation into a separate routine is not a huge cost.
 //
 // Note: This series will not participate in management tracking!
-// See NODE_FLAG_MANAGED handling in Make_Array_Core() and Make_Series_Core().
+// See NODE_FLAG_MANAGED handling in Make_Array_Core() and Make_Series().
 //
 inline static REBSER *Alloc_Series_Node(REBFLGS flags) {
     assert(not (flags & NODE_FLAG_CELL));
@@ -1268,12 +1282,12 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN capacity) {
 // Small series will be allocated from a memory pool.
 // Large series will be allocated from system memory.
 //
-inline static REBSER *Make_Series_Core(REBLEN capacity, REBFLGS flags)
+inline static REBSER *Make_Series(REBLEN capacity, REBFLGS flags)
 {
     assert(not (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED));
 
     size_t wide = Wide_For_Flavor(
-        cast(enum Reb_Series_Flavor, FOURTH_BYTE(flags))
+        cast(enum Reb_Series_Flavor, FLAVOR_BYTE(flags))
     );
     if (cast(REBU64, capacity) * wide > INT32_MAX)
         fail (Error_No_Memory(cast(REBU64, capacity) * wide));
@@ -1329,15 +1343,6 @@ inline static REBSER *Make_Series_Core(REBLEN capacity, REBFLGS flags)
 
     return s;
 }
-
-// !!! When series are made they are not terminated, which means that though
-// they are empty they may not be "valid".  Should this be called Alloc_Ser()?
-// Is Make_Series() needed or are there few enough calls it should always take
-// the flags and not have a _Core() variant?
-//
-#define Make_Series(capacity, flavor) \
-    Make_Series_Core((capacity), FLAG_FLAVOR_BYTE(flavor) | SERIES_FLAGS_NONE)
-
 
 enum act_modify_mask {
     AM_PART = 1 << 0,

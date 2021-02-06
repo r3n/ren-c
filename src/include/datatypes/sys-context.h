@@ -91,6 +91,22 @@
 #endif
 
 
+//=//// KEYLIST_FLAG_SHARED ///////////////////////////////////////////////=//
+//
+// This is indicated on the keylist array of a context when that same array
+// is the keylist for another object.  If this flag is set, then modifying an
+// object using that keylist (such as by adding a key/value pair) will require
+// that object to make its own copy.
+//
+// Note: This flag did not exist in R3-Alpha, so all expansions would copy--
+// even if expanding the same object by 1 item 100 times with no sharing of
+// the keylist.  That would make 100 copies of an arbitrary long keylist that
+// the GC would have to clean up.
+//
+#define KEYLIST_FLAG_SHARED \
+    SERIES_FLAG_24
+
+
 // REBCTX* properties (note: shares LINK_KEYSOURCE() with REBACT*)
 //
 // Note: MODULE! contexts depend on a property stored in the META field, which
@@ -231,12 +247,12 @@ inline static REBSER *CTX_KEYLIST(REBCTX *c) {
 }
 
 static inline void INIT_CTX_KEYLIST_SHARED(REBCTX *c, REBSER *keylist) {
-    SET_SERIES_FLAG(keylist, KEYLIST_SHARED);
+    SET_SUBCLASS_FLAG(KEYLIST, keylist, SHARED);
     INIT_LINK_KEYSOURCE(CTX_VARLIST(c), keylist);
 }
 
 static inline void INIT_CTX_KEYLIST_UNIQUE(REBCTX *c, REBSER *keylist) {
-    assert(NOT_SERIES_FLAG(keylist, KEYLIST_SHARED));
+    assert(NOT_SUBCLASS_FLAG(KEYLIST, keylist, SHARED));
     INIT_LINK_KEYSOURCE(CTX_VARLIST(c), keylist);
 }
 

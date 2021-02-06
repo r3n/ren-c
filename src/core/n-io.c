@@ -200,9 +200,9 @@ REBNATIVE(new_line)
 
         if (IS_END(item)) {  // no cell at tail; use flag on array
             if (mark)
-                SET_ARRAY_FLAG(a, NEWLINE_AT_TAIL);
+                SET_SUBCLASS_FLAG(ARRAY, a, NEWLINE_AT_TAIL);
             else
-                CLEAR_ARRAY_FLAG(a, NEWLINE_AT_TAIL);
+                CLEAR_SUBCLASS_FLAG(ARRAY, a, NEWLINE_AT_TAIL);
             break;
         }
 
@@ -272,7 +272,7 @@ REBNATIVE(new_line_q)
     if (NOT_END(item))
         return Init_Logic(D_OUT, GET_CELL_FLAG(item, NEWLINE_BEFORE));
 
-    return Init_Logic(D_OUT, GET_ARRAY_FLAG(arr, NEWLINE_AT_TAIL));
+    return Init_Logic(D_OUT, GET_SUBCLASS_FLAG(ARRAY, arr, NEWLINE_AT_TAIL));
 }
 
 

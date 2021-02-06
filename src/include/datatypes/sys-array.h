@@ -55,6 +55,25 @@
     cast(const REBSTR*, s->link.any.node)
 
 
+inline static bool Has_Newline_At_Tail(const REBARR *a) {
+    if (SER_FLAVOR(a) != FLAVOR_ARRAY)
+        return false;  // only plain arrays can have newlines
+
+    // Using GET_SUBCLASS_FLAG() would redundantly check it's a plain array.
+    //
+    return did (a->leader.bits & ARRAY_FLAG_NEWLINE_AT_TAIL);
+}
+
+inline static bool Has_File_Line(const REBARR *a) {
+    if (SER_FLAVOR(a) != FLAVOR_ARRAY)
+        return false;  // only plain arrays can have newlines
+
+    // Using GET_SUBCLASS_FLAG() would redundantly check it's a plain array.
+    //
+    return did (a->leader.bits & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED);
+}
+
+
 // HEAD, TAIL, and LAST refer to specific value pointers in the array.  An
 // empty array should have an END marker in its head slot, and since it has
 // no last value then ARR_LAST should not be called (this is checked in
@@ -265,13 +284,13 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
         assert(flags & SERIES_FLAG_LINK_NODE_NEEDS_MARK);
         if (
             not FRM_IS_VARIADIC(FS_TOP) and
-            GET_ARRAY_FLAG(FRM_ARRAY(FS_TOP), HAS_FILE_LINE_UNMASKED)
+            GET_SUBCLASS_FLAG(ARRAY, FRM_ARRAY(FS_TOP), HAS_FILE_LINE_UNMASKED)
         ){
             mutable_LINK(Filename, s) = LINK_FILENAME_HACK(FRM_ARRAY(FS_TOP));
             s->misc.line = FRM_ARRAY(FS_TOP)->misc.line;
         }
         else {
-            CLEAR_ARRAY_FLAG(ARR(s), HAS_FILE_LINE_UNMASKED);
+            CLEAR_SUBCLASS_FLAG(ARRAY, s, HAS_FILE_LINE_UNMASKED);
             CLEAR_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK);
         }
     }
@@ -299,7 +318,7 @@ inline static REBARR *Make_Array_For_Copy(
     REBFLGS flags,
     const REBARR *original
 ){
-    if (original and GET_ARRAY_FLAG(original, NEWLINE_AT_TAIL)) {
+    if (original and Has_Newline_At_Tail(original)) {
         //
         // All of the newline bits for cells get copied, so it only makes
         // sense that the bit for newline on the tail would be copied too.
@@ -309,7 +328,7 @@ inline static REBARR *Make_Array_For_Copy(
 
     if (
         (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED)
-        and (original and GET_ARRAY_FLAG(original, HAS_FILE_LINE_UNMASKED))
+        and (original and Has_File_Line(original))
     ){
         REBARR *a = Make_Array_Core(
             capacity,
@@ -317,7 +336,7 @@ inline static REBARR *Make_Array_For_Copy(
         );
         mutable_LINK(Filename, a) = LINK_FILENAME_HACK(original);
         a->misc.line = original->misc.line;
-        SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
+        SET_SUBCLASS_FLAG(ARRAY, a, HAS_FILE_LINE_UNMASKED);
         return a;
     }
 

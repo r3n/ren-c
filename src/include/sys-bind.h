@@ -990,7 +990,7 @@ inline static REBARR *Merge_Patches_May_Reuse(
     // Recursions should notice this case and return up to make a no-op.
     //
     if (NextPatch(parent) == child) {
-        SET_ARRAY_FLAG(parent, PATCH_REUSED);
+        SET_SUBCLASS_FLAG(PATCH, parent, REUSED);
         return parent;  // reused existing
     }
 
@@ -1000,7 +1000,7 @@ inline static REBARR *Merge_Patches_May_Reuse(
     REBARR *next;
     if (NextPatch(parent) == nullptr or IS_VARLIST(NextPatch(parent))) {
         next = child;
-        SET_ARRAY_FLAG(next, PATCH_REUSED);
+        SET_SUBCLASS_FLAG(PATCH, next, REUSED);
     }
     else
         next = Merge_Patches_May_Reuse(NextPatch(parent), child);
@@ -1010,7 +1010,7 @@ inline static REBARR *Merge_Patches_May_Reuse(
         VAL_WORD_INDEX(ARR_SINGLE(parent)),
         next,
         VAL_TYPE(ARR_SINGLE(parent)),
-        GET_ARRAY_FLAG(next, PATCH_REUSED)
+        GET_SUBCLASS_FLAG(PATCH, next, REUSED)
     );
 }
 

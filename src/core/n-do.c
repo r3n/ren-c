@@ -439,7 +439,7 @@ REBNATIVE(do)
         REBCTX *c = VAL_CONTEXT(source); // checks for INACCESSIBLE
 
         REBARR *varlist = CTX_VARLIST(c);
-        if (GET_ARRAY_FLAG(varlist, FRAME_HAS_BEEN_INVOKED))
+        if (GET_SUBCLASS_FLAG(VARLIST, varlist, FRAME_HAS_BEEN_INVOKED))
             fail (Error_Stale_Frame_Raw());
 
         REBFLGS flags = EVAL_MASK_DEFAULT

@@ -151,7 +151,7 @@ bool Make_Invokable_From_Feed_Throws(REBVAL *out, REBFED *feed)
     // !!! The flag is new, as a gambit to try and avoid copying frames for
     // DO-ing just in order to expire the old identity.  Under development.
     //
-    assert(NOT_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED));
+    assert(NOT_SUBCLASS_FLAG(VARLIST, f->varlist, FRAME_HAS_BEEN_INVOKED));
 
     assert(NOT_EVAL_FLAG(f, FULFILL_ONLY));  // cleared by the evaluator
 

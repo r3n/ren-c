@@ -48,73 +48,12 @@
 // ->misc and ->link fields for caching purposes in strings.
 //
 #define ARRAY_FLAG_HAS_FILE_LINE_UNMASKED \
-    FLAG_LEFT_BIT(16)
+    SERIES_FLAG_29
 
 #define ARRAY_MASK_HAS_FILE_LINE \
     (ARRAY_FLAG_HAS_FILE_LINE_UNMASKED | SERIES_FLAG_LINK_NODE_NEEDS_MARK)
 
 
-//=//// ARRAY_FLAG_FRAME_HAS_BEEN_INVOKED /////////////////////////////////=//
-//
-// It is intrinsic to the design of Redbols that they are allowed to mutate
-// their argument cells.  Hence if you build a frame and then DO it, the
-// arguments will very likely be changed.  Being able to see these changes
-// from the outside in non-debugging cases is dangerous, since it's part of
-// the implementation detail of the function (like how it handles locals)
-// and is not part of the calling contract.
-//
-// This is why you can't say things like `loop 2 [do frame]`...the first time
-// you do the frame it could be arbitrarily corrupted.  Instead you must copy
-// the frame on all but the last time (e.g. `do copy frame, do frame`)
-//
-// The initial implementation of DO of FRAME! would actually create a new
-// varlist node and move the data to id--expiring the old node.  That is
-// expensive, so the cheaper way to do it is to set a flag on the frame.
-// Then, if a frame is archetypal (no phase) it can check this flag before
-// a DO and say the frame can't be run again...nor can fields be assigned
-// or read any longer.
-//
-// !!! This may not be the best place to put this flag, review.
-//
-#define ARRAY_FLAG_FRAME_HAS_BEEN_INVOKED \
-    FLAG_LEFT_BIT(17)
-
-
-//=//// PARAMLIST_FLAG_HAS_RETURN /////////////////////////////////////////=//
-//
-// See ACT_HAS_RETURN() for remarks.  Note: This is a flag on PARAMLIST, not
-// on DETAILS.
-//
-// !!! Doesn't belong here, but as with many bits it's being pushed around
-// as part of the "flavor" conversion.
-//
-#define PARAMLIST_FLAG_HAS_RETURN \
-    FLAG_LEFT_BIT(18)
-
-
-//=//// ARRAY_FLAG_19 /////////////////////////////////////////////////////=//
-//
-#define ARRAY_FLAG_19 \
-    FLAG_LEFT_BIT(19)
-
-
-//=//// ARRAY_FLAG_PATCH_REUSED ///////////////////////////////////////////=//
-//
-// It's convenient to be able to know when a patch returned from a make call
-// is reused or not.  But adding that parameter to the interface complicates
-// it.  There's plenty of bits free on patch array flags, so just use one.
-//
-// !!! This could use a cell marking flag on the patch's cell, but putting
-// it here as a temporary measure.
-//
-#define ARRAY_FLAG_PATCH_REUSED \
-    FLAG_LEFT_BIT(20)
-
-
-//=//// ARRAY_FLAG_21 /////////////////////////////////////////////////////=//
-//
-#define ARRAY_FLAG_21 \
-    FLAG_LEFT_BIT(21)
 
 
 //=//// ARRAY_FLAG_CONST_SHALLOW //////////////////////////////////////////=//
@@ -128,7 +67,7 @@
 // it is the same bit as the const flag one would find in the value.
 //
 #define ARRAY_FLAG_CONST_SHALLOW \
-    FLAG_LEFT_BIT(22)
+    SERIES_FLAG_30
 STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 
 
@@ -142,7 +81,7 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 // tail of an array.
 //
 #define ARRAY_FLAG_NEWLINE_AT_TAIL \
-    FLAG_LEFT_BIT(23)
+    SERIES_FLAG_31
 
 
 // These flags are available for use by specific array subclasses (e.g. a
@@ -164,22 +103,6 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 // they're not using the arbitrary 16-bit number the way that a REBSTR is for
 // storing the symbol).  64-bit machines have more space, but it shouldn't
 // be used for anything but optimizations.
-
-
-// These token-pasting based macros allow the callsites to be shorter, since
-// they don't have to say ARRAY and FLAG twice.
-
-#define GET_ARRAY_FLAG(a,name) \
-    ((ensure(const REBARR*, a)->leader.bits & ARRAY_FLAG_##name) != 0)
-
-#define NOT_ARRAY_FLAG(a,name) \
-    ((ensure(const REBARR*, a)->leader.bits & ARRAY_FLAG_##name) == 0)
-
-#define SET_ARRAY_FLAG(a,name) \
-    (ensure(REBARR*, a)->leader.bits |= ARRAY_FLAG_##name)
-
-#define CLEAR_ARRAY_FLAG(a,name) \
-    (ensure(REBARR*, a)->leader.bits &= ~ARRAY_FLAG_##name)
 
 
 // Ordinary source arrays use their ->link field to point to an interned file

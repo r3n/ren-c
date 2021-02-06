@@ -315,7 +315,7 @@ void Startup_Pools(REBINT scale)
     // As a trick to keep this series from trying to track itself, say it's
     // managed, then sneak the flag off.
     //
-    GC_Manuals = Make_Series_Core(
+    GC_Manuals = Make_Series(
         15,
         FLAG_FLAVOR(SERIESLIST) | NODE_FLAG_MANAGED
     );
@@ -1242,7 +1242,7 @@ void Assert_Pointer_Detection_Working(void)
     uintptr_t cell_flag = NODE_FLAG_CELL;
     assert(FIRST_BYTE(cell_flag) == 0x1);
     uintptr_t protected_flag = CELL_FLAG_PROTECTED;
-    assert(THIRD_BYTE(protected_flag) == 0x80);
+    assert(FOURTH_BYTE(protected_flag) == 0x80);
 
     assert(Detect_Rebol_Pointer("") == DETECTED_AS_UTF8);
     assert(Detect_Rebol_Pointer("asdf") == DETECTED_AS_UTF8);
@@ -1278,7 +1278,7 @@ void Assert_Pointer_Detection_Working(void)
     //
     assert(not (END_NODE->header.bits & NODE_FLAG_MANAGED));
 
-    REBSER *ser = Make_Series(1, FLAVOR_BINARY);
+    REBSER *ser = Make_Series(1, FLAG_FLAVOR(BINARY));
     assert(Detect_Rebol_Pointer(ser) == DETECTED_AS_SERIES);
     Free_Unmanaged_Series(ser);
     assert(Detect_Rebol_Pointer(ser) == DETECTED_AS_FREED_SERIES);

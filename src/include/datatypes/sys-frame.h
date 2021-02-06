@@ -111,7 +111,7 @@ inline static REBLEN FRM_EXPR_INDEX(REBFRM *f) {
 inline static const REBSTR* FRM_FILE(REBFRM *f) {
     if (FRM_IS_VARIADIC(f))
         return nullptr;
-    if (NOT_ARRAY_FLAG(FRM_ARRAY(f), HAS_FILE_LINE_UNMASKED))
+    if (NOT_SUBCLASS_FLAG(ARRAY, FRM_ARRAY(f), HAS_FILE_LINE_UNMASKED))
         return nullptr;
     return LINK(Filename, FRM_ARRAY(f));
 }
@@ -127,7 +127,7 @@ inline static const char* FRM_FILE_UTF8(REBFRM *f) {
 inline static int FRM_LINE(REBFRM *f) {
     if (FRM_IS_VARIADIC(f))
         return 0;
-    if (NOT_ARRAY_FLAG(FRM_ARRAY(f), HAS_FILE_LINE_UNMASKED))
+    if (NOT_SUBCLASS_FLAG(ARRAY, FRM_ARRAY(f), HAS_FILE_LINE_UNMASKED))
         return 0;
     return FRM_ARRAY(f)->misc.line;
 }
@@ -290,7 +290,7 @@ inline static void Conserve_Varlist(REBARR *varlist)
   #if !defined(NDEBUG)
     assert(NOT_SERIES_FLAG(varlist, INACCESSIBLE));
     assert(NOT_SERIES_FLAG(varlist, MANAGED));
-    assert(NOT_ARRAY_FLAG(varlist, FRAME_HAS_BEEN_INVOKED));
+    assert(NOT_SUBCLASS_FLAG(VARLIST, varlist, FRAME_HAS_BEEN_INVOKED));
 
     RELVAL *rootvar = ARR_HEAD(varlist);
     assert(CTX_VARLIST(VAL_CONTEXT(rootvar)) == varlist);
@@ -568,8 +568,8 @@ inline static void Begin_Action_Core(
     assert(NOT_EVAL_FLAG(f, RUNNING_ENFIX));
     assert(NOT_FEED_FLAG(f->feed, DEFERRING_ENFIX));
 
-    assert(NOT_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED));
-    SET_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED);
+    assert(NOT_SUBCLASS_FLAG(VARLIST, f->varlist, FRAME_HAS_BEEN_INVOKED));
+    SET_SUBCLASS_FLAG(VARLIST, f->varlist, FRAME_HAS_BEEN_INVOKED);
 
     assert(not f->original);
     f->original = FRM_PHASE(f);
@@ -836,7 +836,7 @@ inline static void Drop_Action(REBFRM *f) {
         // only DETAILS_FLAG_IS_NATIVE sets HOLD.  Clear that.
         //
         CLEAR_SERIES_INFO(f->varlist, HOLD);
-        CLEAR_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED);
+        CLEAR_SUBCLASS_FLAG(VARLIST, f->varlist, FRAME_HAS_BEEN_INVOKED);
 
         assert(
             0 == (SER_INFO(f->varlist) & ~(  // <- note bitwise not

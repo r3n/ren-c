@@ -98,9 +98,9 @@ inline static void TERM_BIN_LEN(REBBIN *s, REBLEN len) {
 //
 inline static REBBIN *Make_Binary_Core(REBLEN capacity, REBFLGS flags)
 {
-    assert(FOURTH_BYTE(flags) == 0);  // shouldn't pass in a flavor
+    assert(FLAVOR_BYTE(flags) == 0);  // shouldn't pass in a flavor
 
-    REBSER *s = Make_Series_Core(capacity + 1, FLAG_FLAVOR(BINARY) | flags);
+    REBSER *s = Make_Series(capacity + 1, FLAG_FLAVOR(BINARY) | flags);
   #if !defined(NDEBUG)
     *SER_HEAD(REBYTE, s) = BINARY_BAD_UTF8_TAIL_BYTE;  // reserve for '\0'
   #endif

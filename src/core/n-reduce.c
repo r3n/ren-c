@@ -119,7 +119,7 @@ REBNATIVE(reduce)
     Drop_Frame_Unbalanced(f);  // Drop_Frame() asserts on accumulation
 
     REBFLGS pop_flags = NODE_FLAG_MANAGED | ARRAY_MASK_HAS_FILE_LINE;
-    if (GET_ARRAY_FLAG(VAL_ARRAY(v), NEWLINE_AT_TAIL))
+    if (GET_SUBCLASS_FLAG(ARRAY, VAL_ARRAY(v), NEWLINE_AT_TAIL))
         pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
 
     return Init_Any_Array(
@@ -407,7 +407,7 @@ REB_R Compose_To_Stack_Core(
                     = NODE_FLAG_MANAGED
                     | ARRAY_MASK_HAS_FILE_LINE;
 
-                if (GET_ARRAY_FLAG(VAL_ARRAY(cell), NEWLINE_AT_TAIL))
+                if (GET_SUBCLASS_FLAG(ARRAY, VAL_ARRAY(cell), NEWLINE_AT_TAIL))
                     pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
 
                 REBARR *popped = Pop_Stack_Values_Core(dsp_deep, pop_flags);
@@ -516,7 +516,7 @@ REBNATIVE(compose)
     // flags.  Borrow the one for the tail directly from the input REBARR.
     //
     REBFLGS flags = NODE_FLAG_MANAGED | ARRAY_MASK_HAS_FILE_LINE;
-    if (GET_ARRAY_FLAG(VAL_ARRAY(ARG(value)), NEWLINE_AT_TAIL))
+    if (GET_SUBCLASS_FLAG(ARRAY, VAL_ARRAY(ARG(value)), NEWLINE_AT_TAIL))
         flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
 
     REBARR *popped = Pop_Stack_Values_Core(dsp_orig, flags);

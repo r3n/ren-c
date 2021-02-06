@@ -77,14 +77,14 @@ REBSER *Copy_Series_Core(const REBSER *s, REBFLGS flags)
         copy->misc.length = s->misc.length;
     }
     else if (SER_WIDE(s) == 1) {  // non-string BINARY!
-        copy = Make_Series_Core(
+        copy = Make_Series(
             used + 1,  // term space
             FLAG_FLAVOR_BYTE(SER_FLAVOR(s)) | flags
         );
         SET_SERIES_USED(copy, used);
     }
     else {
-        copy = Make_Series_Core(used, FLAG_FLAVOR_BYTE(SER_FLAVOR(s)) | flags);
+        copy = Make_Series(used, FLAG_FLAVOR_BYTE(SER_FLAVOR(s)) | flags);
         SET_SERIES_USED(copy, used);
     }
 
@@ -121,7 +121,7 @@ REBSER *Copy_Series_At_Len_Extra(
     REBLEN capacity = len + extra;
     if (SER_WIDE(s) == 1)
         ++capacity;
-    REBSER *copy = Make_Series_Core(capacity, flags);
+    REBSER *copy = Make_Series(capacity, flags);
     assert(SER_WIDE(s) == SER_WIDE(copy));
     memcpy(
         SER_DATA(copy),

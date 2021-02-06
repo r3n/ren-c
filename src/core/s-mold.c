@@ -298,7 +298,7 @@ void Mold_Array_At(
         --mo->indent;
 
     if (sep[1] != '\0') {
-        if (GET_ARRAY_FLAG(a, NEWLINE_AT_TAIL))
+        if (Has_Newline_At_Tail(a))  // accommodates varlists, etc. for PROBE
             New_Indented_Line(mo); // but not any indentation from *this* mold
         Append_Codepoint(mo->series, sep[1]);
     }
@@ -814,7 +814,7 @@ void Drop_Mold_Core(
 //
 void Startup_Mold(REBLEN size)
 {
-    TG_Mold_Stack = Make_Series(10, FLAVOR_MOLDSTACK);
+    TG_Mold_Stack = Make_Series(10, FLAG_FLAVOR(MOLDSTACK));
 
     // Most string code tries to optimize "bookmarks" that help map indices
     // to encoded codepoint positions in such a way that when the string

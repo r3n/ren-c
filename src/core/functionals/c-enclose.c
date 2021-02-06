@@ -127,8 +127,8 @@ REB_R Encloser_Dispatcher(REBFRM *f)
 
     // We want people to be able to DO the FRAME! being given back.  
     //
-    assert(GET_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED));
-    CLEAR_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED);
+    assert(GET_SUBCLASS_FLAG(VARLIST, f->varlist, FRAME_HAS_BEEN_INVOKED));
+    CLEAR_SUBCLASS_FLAG(VARLIST, f->varlist, FRAME_HAS_BEEN_INVOKED);
 
     // We don't actually know how long the frame we give back is going to
     // live, or who it might be given to.  And it may contain things like

@@ -572,7 +572,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         // which case the hashlist may be NULL.
         //
         REBSER *hashlist = LINK(Hashlist, a);
-        assert(hashlist != nullptr);
+        assert(SER_FLAVOR(hashlist) == FLAVOR_HASHLIST);
         UNUSED(hashlist);
     }
 }

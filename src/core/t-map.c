@@ -442,18 +442,19 @@ inline static REBMAP *Copy_Map(const REBMAP *map, REBU64 types) {
     REBARR *copy = Copy_Array_Shallow_Flags(
         MAP_PAIRLIST(map),
         SPECIFIED,
-        SERIES_FLAGS_NONE | FLAG_FLAVOR(PAIRLIST)
+        SERIES_MASK_PAIRLIST
     );
 
     // So long as the copied pairlist is the same array size as the original,
     // a literal copy of the hashlist can still be used, as a start (needs
     // its own copy so new map's hashes will reflect its own mutations)
     //
-    mutable_LINK(Hashlist, copy) = Copy_Series_Core(
+    REBSER *hashlist = Copy_Series_Core(
         MAP_HASHLIST(map),
         SERIES_FLAGS_NONE | FLAG_FLAVOR(HASHLIST)
             // ^-- !!! No NODE_FLAG_MANAGED?
     );
+    mutable_LINK(Hashlist, copy) = hashlist;
 
     if (types == 0)
         return MAP(copy); // no types have deep copy requested, shallow is OK

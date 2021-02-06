@@ -149,7 +149,7 @@ void *RL_rebMalloc(size_t size)
 {
     ENTER_API;
 
-    REBBIN *s = BIN(Make_Series_Core(
+    REBBIN *s = BIN(Make_Series(
         ALIGN_SIZE  // stores REBSER* (must be at least big enough for void*)
             + size  // for the actual data capacity (may be 0, see notes)
             + 1,  // for termination (AS TEXT! of rebRepossess(), see notes)
@@ -1790,7 +1790,7 @@ const REBINS *RL_rebRELEASING(REBVAL *v)
     if (SER_FLAVOR(a) == FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE)
         fail ("Cannot apply rebR() more than once to the same API value");
 
-    mutable_FLAVOR_BYTE(a) = FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE;
+    mutable_SER_FLAVOR(a) = FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE;
     return cast(REBINS*, a);
 }
 
@@ -2161,7 +2161,7 @@ REBNATIVE(api_transient)
     REBVAL *v = Move_Value(Alloc_Value(), ARG(value));
     rebUnmanage(v);  // has to survive the API-TRANSIENT's frame
     REBARR *a = Singular_From_Cell(v);
-    mutable_FLAVOR_BYTE(a) = FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE;
+    mutable_SER_FLAVOR(a) = FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE;
 
     // Regarding adddresses in WASM:
     //

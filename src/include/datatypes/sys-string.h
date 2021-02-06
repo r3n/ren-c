@@ -486,7 +486,7 @@ inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
     SER_HEAD(struct Reb_Bookmark, c_cast(REBBMK*, (b)))->offset
 
 inline static REBBMK* Alloc_Bookmark(void) {
-    REBSER *s = Make_Series_Core(
+    REBSER *s = Make_Series(
         1,
         FLAG_FLAVOR(BOOKMARKLIST) | SERIES_FLAG_MANAGED
             // LINK_NODE_NEEDS_MARK not needed if is bookmark

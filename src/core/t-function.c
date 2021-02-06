@@ -271,7 +271,7 @@ REBTYPE(Action)
                 return nullptr;
 
             const REBARR *a = VAL_ARRAY(ARR_HEAD(details));
-            if (NOT_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED))
+            if (NOT_SUBCLASS_FLAG(ARRAY, a, HAS_FILE_LINE_UNMASKED))
                 return nullptr;
 
             // !!! How to tell URL! vs FILE! ?

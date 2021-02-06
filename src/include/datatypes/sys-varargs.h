@@ -85,21 +85,21 @@ inline static REBVAL *Init_Varargs_Untyped_Normal(RELVAL *out, REBFRM *f) {
 
 inline static REBVAL *Init_Varargs_Untyped_Enfix(
     RELVAL *out,
-    const REBVAL *single
+    const REBVAL *left
 ){
-    REBARR *array1;
-    if (IS_END(single))
-        array1 = EMPTY_ARRAY;
+    REBARR *feed;
+    if (IS_END(left))
+        feed = EMPTY_ARRAY;
     else {
-        REBARR *feed = Alloc_Singular(FLAG_FLAVOR(FEED) | NODE_FLAG_MANAGED);
-        Move_Value(ARR_SINGLE(feed), single);
+        REBARR *singular = Alloc_Singular(NODE_FLAG_MANAGED);
+        Move_Value(ARR_SINGLE(singular), left);
 
-        array1 = Alloc_Singular(FLAG_FLAVOR(ARRAY1) | NODE_FLAG_MANAGED);
-        Init_Block(ARR_SINGLE(array1), feed);  // index 0
+        feed = Alloc_Singular(FLAG_FLAVOR(FEED) | NODE_FLAG_MANAGED);
+        Init_Block(ARR_SINGLE(feed), singular);  // index 0
     }
 
     RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
-    INIT_VAL_VARARGS_BINDING(out, array1);
+    INIT_VAL_VARARGS_BINDING(out, feed);
     UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));
     INIT_VAL_VARARGS_PHASE(out, nullptr);  // set in typecheck
     return cast(REBVAL*, out);

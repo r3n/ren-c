@@ -419,10 +419,18 @@ uint32_t Hash_Value(const RELVAL *v)
 //
 //  Make_Hash_Series: C
 //
+// Hashlists are added to the manuals list normally.  They don't participate
+// in GC initially, and hence may be freed if used in some kind of set union
+// or intersection operation.  However, if Init_Map() is used they will be
+// forced managed along with the pairlist they are attached to.
+//
+// (Review making them non-managed, and freed in Decay_Series(), since they
+// are not shared in maps.  Consider impacts on the set operations.)
+//
 REBSER *Make_Hash_Series(REBLEN len)
 {
     REBLEN n = Get_Hash_Prime_May_Fail(len * 2);  // best when 2X # of keys
-    REBSER *ser = Make_Series(n + 1, FLAVOR_HASHLIST);
+    REBSER *ser = Make_Series(n + 1, FLAG_FLAVOR(HASHLIST));
     Clear_Series(ser);
     SET_SERIES_LEN(ser, n);
 

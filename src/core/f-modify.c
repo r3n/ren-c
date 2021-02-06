@@ -94,7 +94,8 @@ REBLEN Modify_Array(
         if (not tail_newline) {
             const RELVAL *tail_cell = VAL_ARRAY_AT(unescaped) + ilen;
             if (IS_END(tail_cell)) {
-                tail_newline = GET_ARRAY_FLAG(
+                tail_newline = GET_SUBCLASS_FLAG(
+                    ARRAY,
                     VAL_ARRAY(src_val),
                     NEWLINE_AT_TAIL
                 );
@@ -137,7 +138,7 @@ REBLEN Modify_Array(
     //
     bool head_newline =
         (dst_idx == ARR_LEN(dst_arr))
-        and GET_ARRAY_FLAG(dst_arr, NEWLINE_AT_TAIL);
+        and GET_SUBCLASS_FLAG(ARRAY, dst_arr, NEWLINE_AT_TAIL);
 
     if (sym != SYM_CHANGE) {
         // Always expand dst_arr for INSERT and APPEND actions:
@@ -171,7 +172,7 @@ REBLEN Modify_Array(
                 // The array flag is not cleared until the loop actually
                 // makes a value that will carry on the bit.
                 //
-                CLEAR_ARRAY_FLAG(dst_arr, NEWLINE_AT_TAIL);
+                CLEAR_SUBCLASS_FLAG(ARRAY, dst_arr, NEWLINE_AT_TAIL);
                 continue;
             }
 
@@ -186,7 +187,7 @@ REBLEN Modify_Array(
     //
     if (tail_newline) {
         if (dst_idx == ARR_LEN(dst_arr))
-            SET_ARRAY_FLAG(dst_arr, NEWLINE_AT_TAIL);
+            SET_SUBCLASS_FLAG(ARRAY, dst_arr, NEWLINE_AT_TAIL);
         else
             SET_CELL_FLAG(ARR_AT(dst_arr, dst_idx), NEWLINE_BEFORE);
     }

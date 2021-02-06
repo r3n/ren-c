@@ -228,22 +228,9 @@
     FLAG_LEFT_BIT(12)
 
 
-//=//// SERIES_FLAG_KEYLIST_SHARED ////////////////////////////////////////=//
+//=//// SERIES_FLAG_13 ////////////////////////////////////////////////////=//
 //
-// This is indicated on the keylist array of a context when that same array
-// is the keylist for another object.  If this flag is set, then modifying an
-// object using that keylist (such as by adding a key/value pair) will require
-// that object to make its own copy.
-//
-// Note: This flag did not exist in R3-Alpha, so all expansions would copy--
-// even if expanding the same object by 1 item 100 times with no sharing of
-// the keylist.  That would make 100 copies of an arbitrary long keylist that
-// the GC would have to clean up.
-//
-// !!! Does not belong here, but to try and make progress on the flavor bytes
-// it was moved since it was not a hold/locking related bit.
-//
-#define SERIES_FLAG_KEYLIST_SHARED \
+#define SERIES_FLAG_13 \
     FLAG_LEFT_BIT(13)
 
 
@@ -268,7 +255,29 @@
     FLAG_LEFT_BIT(15)
 
 
-//=//// BITS 16-23: ARRAY FLAGS ///////////////////////////////////////////=//
+//=//// BITS 16-23: SERIES SUBCLASS ("FLAVOR") ////////////////////////////=//
+//
+// Series subclasses keep a byte to tell which kind they are.  The byte is an
+// enum which is ordered in a way that offers information (e.g. all the
+// arrays are in a range, all the series with wide size of 1 are together...)
+//
+
+#define FLAG_FLAVOR_BYTE(flavor)        FLAG_THIRD_BYTE(flavor)
+#define FLAG_FLAVOR(name)               FLAG_FLAVOR_BYTE(FLAVOR_##name)
+
+inline static REBYTE FLAVOR_BYTE(uintptr_t flags)
+  { return THIRD_BYTE(flags); }
+
+#define SER_FLAVOR(s) \
+    x_cast(enum Reb_Series_Flavor, THIRD_BYTE((s)->leader))
+
+#define mutable_SER_FLAVOR(s) \
+    mutable_THIRD_BYTE((s)->leader)
+
+
+//=//// BITS 24-31: SUBCLASS FLAGS ////////////////////////////////////////=//
+//
+// These flags are those that differ based on which series subclass is used.
 //
 // This space is used currently for array flags to store things like whether
 // the array ends in a newline.  It's a hodepodge of other bits which were
@@ -276,22 +285,14 @@
 // ability to be more thought out after the basics of flavors are solved.
 //
 
-
-//=//// BITS 24-31: SERIES SUBCLASS ("FLAVOR") ////////////////////////////=//
-//
-// Series subclasses keep a byte to tell which kind they are.  The byte is an
-// enum which is ordered in a way that offers information (e.g. all the
-// arrays are in a range, all the series with wide size of 1 are together...)
-//
-
-#define FLAG_FLAVOR_BYTE(flavor)        FLAG_FOURTH_BYTE(flavor)
-#define FLAG_FLAVOR(name)               FLAG_FLAVOR_BYTE(FLAVOR_##name)
-
-#define FLAVOR_BYTE(s)                  FOURTH_BYTE((s)->leader)
-#define mutable_FLAVOR_BYTE(s)          mutable_FOURTH_BYTE((s)->leader)
-
-#define SER_FLAVOR(s) \
-    x_cast(enum Reb_Series_Flavor, FLAVOR_BYTE(s))
+#define SERIES_FLAG_24 FLAG_LEFT_BIT(24)
+#define SERIES_FLAG_25 FLAG_LEFT_BIT(25)
+#define SERIES_FLAG_26 FLAG_LEFT_BIT(26)
+#define SERIES_FLAG_27 FLAG_LEFT_BIT(27)
+#define SERIES_FLAG_28 FLAG_LEFT_BIT(28)
+#define SERIES_FLAG_29 FLAG_LEFT_BIT(29)
+#define SERIES_FLAG_30 FLAG_LEFT_BIT(30)
+#define SERIES_FLAG_31 FLAG_LEFT_BIT(31)
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -761,7 +762,7 @@ union Reb_Series_Info {
     union Reb_Series_Content content;
 
     // `info` consists of bits that could apply equally to any series, and
-    // that may need to be tested together as a group.  Make_Series_Core()
+    // that may need to be tested together as a group.  Make_Series()
     // calls presume all the info bits are initialized to zero, so any flag
     // that controls the allocation should be a SERIES_FLAG_XXX instead.
     //

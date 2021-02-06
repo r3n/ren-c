@@ -45,7 +45,7 @@ enum Reb_Series_Flavor {
     // !!! Should this flavor automatically imply file and line numbering
     // should be captured?
     //
-    FLAVOR_0_ARRAY,
+    FLAVOR_ARRAY,
 
     // This indicates this series represents the "varlist" of a context (which
     // is interchangeable with the identity of the varlist itself).  A second
@@ -85,7 +85,6 @@ enum Reb_Series_Flavor {
 
     FLAVOR_DATASTACK,
     FLAVOR_FEED,
-    FLAVOR_ARRAY1,
     FLAVOR_API,
 
     // The rebR() function can be used with an API handle to tell a variadic

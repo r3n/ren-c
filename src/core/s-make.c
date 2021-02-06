@@ -35,9 +35,9 @@
 //
 REBSTR *Make_String_Core(REBSIZ encoded_capacity, REBFLGS flags)
 {
-    assert(FOURTH_BYTE(flags) == 0);  // shouldn't have a flavor
+    assert(FLAVOR_BYTE(flags) == 0);  // shouldn't have a flavor
 
-    REBBIN *bin = BIN(Make_Series_Core(
+    REBBIN *bin = BIN(Make_Series(
         encoded_capacity + 1,  // binary includes room for '\0' terminator
         FLAG_FLAVOR(STRING) | flags
     ));
