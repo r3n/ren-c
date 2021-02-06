@@ -84,19 +84,6 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
     SERIES_FLAG_31
 
 
-// These flags are available for use by specific array subclasses (e.g. a
-// PARAMLIST might use it for different things from a VARLIST)
-
-#define ARRAY_INFO_24 FLAG_LEFT_BIT(24)
-#define ARRAY_INFO_25 FLAG_LEFT_BIT(25)
-#define ARRAY_INFO_26 FLAG_LEFT_BIT(26)
-#define ARRAY_INFO_27 FLAG_LEFT_BIT(27)
-#define ARRAY_INFO_28 FLAG_LEFT_BIT(28)
-#define ARRAY_INFO_29 FLAG_LEFT_BIT(29)
-#define ARRAY_INFO_30 FLAG_LEFT_BIT(30)
-#define ARRAY_INFO_31 FLAG_LEFT_BIT(31)
-
-
 //=//////////// ^-- STOP ARRAY FLAGS AT FLAG_LEFT_BIT(31) --^ /////////////=//
 
 // Arrays can use all the way up to the 32-bit limit on the flags (since

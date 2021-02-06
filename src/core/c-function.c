@@ -1278,9 +1278,9 @@ REBNATIVE(tweak)
     }
 
     if (VAL_LOGIC(ARG(enable)))
-        ACT_DETAILS(act)->info.flags.bits |= flag;
+        ACT_DETAILS(act)->leader.bits |= flag;
     else
-        ACT_DETAILS(act)->info.flags.bits &= ~flag;
+        ACT_DETAILS(act)->leader.bits &= ~flag;
 
     RETURN (ARG(action));
 }

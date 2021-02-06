@@ -66,7 +66,7 @@
 // the stack vs. just one.
 //
 #define DETAILS_FLAG_POSTPONES_ENTIRELY \
-    ARRAY_INFO_24
+    SERIES_FLAG_24
 
 
 //=//// DETAILS_FLAG_IS_BARRIER ///////////////////////////////////////////=//
@@ -83,7 +83,7 @@
 // was added to the TWEAK list pending a notation in function specs.
 //
 #define DETAILS_FLAG_IS_BARRIER \
-    ARRAY_INFO_25
+    SERIES_FLAG_25
 
 
 //=//// DETAILS_FLAG_DEFERS_LOOKBACK //////////////////////////////////////=//
@@ -95,7 +95,7 @@
 // is always the same for invocation via a plain word.
 //
 #define DETAILS_FLAG_DEFERS_LOOKBACK \
-    ARRAY_INFO_26
+    SERIES_FLAG_26
 
 
 //=//// DETAILS_FLAG_QUOTES_FIRST /////////////////////////////////////////=//
@@ -107,7 +107,7 @@
 // walk the parameter list every time that function is called.
 //
 #define DETAILS_FLAG_QUOTES_FIRST \
-    ARRAY_INFO_27
+    SERIES_FLAG_27
 
 
 //=//// DETAILS_FLAG_SKIPPABLE_FIRST //////////////////////////////////////=//
@@ -121,7 +121,7 @@
 // work too when it doesn't see a SET-WORD! or SET-PATH! to the left.)
 //
 #define DETAILS_FLAG_SKIPPABLE_FIRST \
-    ARRAY_INFO_28
+    SERIES_FLAG_28
 
 
 //=//// DETAILS_FLAG_IS_NATIVE ////////////////////////////////////////////=//
@@ -139,7 +139,7 @@
 // longer possible, so that was dropped...but it could be brought back.
 //
 #define DETAILS_FLAG_IS_NATIVE \
-    ARRAY_INFO_29
+    SERIES_FLAG_29
 
 
 //=//// DETAILS_FLAG_ENFIXED //////////////////////////////////////////////=//
@@ -149,13 +149,13 @@
 // attempt at simplification which caused more problems than it solved.
 //
 #define DETAILS_FLAG_ENFIXED \
-    ARRAY_INFO_30
+    SERIES_FLAG_30
 
 
 //=//// DETAILS_FLAG_31 ///////////////////////////////////////////////////=//
 //
 #define DETAILS_FLAG_31 \
-    ARRAY_INFO_31
+    SERIES_FLAG_31
 
 
 // These are the flags which are scanned for and set during Make_Action
@@ -171,18 +171,17 @@
     (DETAILS_FLAG_DEFERS_LOOKBACK | DETAILS_FLAG_POSTPONES_ENTIRELY)
 
 
-#define SET_ACTION_FLAG(s,name) \
-    (ACT_DETAILS(s)->info.flags.bits |= DETAILS_FLAG_##name)
+#define SET_ACTION_FLAG(act,name) \
+    SET_SUBCLASS_FLAG(DETAILS, ACT_DETAILS(act), name)
 
-#define GET_ACTION_FLAG(s,name) \
-    ((ACT_DETAILS(s)->info.flags.bits & DETAILS_FLAG_##name) != 0)
+#define GET_ACTION_FLAG(act,name) \
+    GET_SUBCLASS_FLAG(DETAILS, ACT_DETAILS(act), name)
 
-#define CLEAR_ACTION_FLAG(s,name) \
-    (ACT_DETAILS(s)->info.flags.bits &= ~DETAILS_FLAG_##name)
+#define CLEAR_ACTION_FLAG(act,name) \
+    CLEAR_SUBCLASS_FLAG(DETAILS, ACT_DETAILS(act), name)
 
-#define NOT_ACTION_FLAG(s,name) \
-    ((ACT_DETAILS(s)->info.flags.bits & DETAILS_FLAG_##name) == 0)
-
+#define NOT_ACTION_FLAG(act,name) \
+    NOT_SUBCLASS_FLAG(DETAILS, ACT_DETAILS(act), name)
 
 
 // Includes SERIES_FLAG_DYNAMIC because an action's paramlist is always
