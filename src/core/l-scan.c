@@ -311,6 +311,8 @@ static const REBYTE *Scan_UTF8_Char_Escapable(REBUNI *out, const REBYTE *bp)
     REBYTE lex;
 
     REBYTE c = *bp;
+    if (c == '\0')
+        return nullptr;  // signal error if end of string
 
     if (c >= 0x80) {  // multibyte sequence
         if (not (bp = Back_Scan_UTF8_Char(out, bp, nullptr)))
