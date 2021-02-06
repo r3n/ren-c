@@ -38,7 +38,7 @@ void Startup_Data_Stack(REBLEN capacity)
     // that indices into the data stack can be unsigned (no need for -1 to
     // mean empty, because 0 can)
     //
-    DS_Array = Make_Array_Core(1, SERIES_FLAGS_NONE);
+    DS_Array = Make_Array_Core(1, FLAG_FLAVOR(DATASTACK) | SERIES_FLAGS_NONE);
     Init_Unreadable_Void(ARR_HEAD(DS_Array));
     SET_CELL_FLAG(ARR_HEAD(DS_Array), PROTECTED);
 

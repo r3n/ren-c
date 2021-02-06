@@ -622,10 +622,10 @@ inline static bool IS_RELATIVE(const RELVAL *v) {
     if (not binding)
         return false;  // INTEGER! and other types are inherently "specific"
 
-    if (not (binding->leader.bits & SERIES_FLAG_IS_ARRAY))
+    if (not IS_SER_ARRAY(binding))
         return false;
 
-    return did (binding->leader.bits & ARRAY_FLAG_IS_DETAILS);  // action
+    return IS_DETAILS(binding);  // action
 }
 
 #ifdef CPLUSPLUS_11

@@ -58,7 +58,7 @@ void Dump_Series(REBSER *s, const char *memo)
     if (s == NULL)
         return;
 
-    printf(" wide: %d\n", SER_WIDE(s));
+    printf(" wide: %d\n", cast(int, SER_WIDE(s)));
     printf(" size: %ld\n", cast(unsigned long, SER_TOTAL_IF_DYNAMIC(s)));
     if (IS_SER_DYNAMIC(s))
         printf(" bias: %d\n", cast(int, SER_BIAS(s)));

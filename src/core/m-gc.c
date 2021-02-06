@@ -235,7 +235,7 @@ static void Queue_Mark_Node_Deep(void *p)
         // but this makes it clearer so that a more elegant fix can be made.
         //
         if (Is_Node_Cell(LINK(Node, s)))
-            if (IS_SER_ARRAY(s) and GET_ARRAY_FLAG(ARR(s), IS_VARLIST))
+            if (IS_VARLIST(s))
                 goto skip_mark_rebfrm_link;
 
         REBSER *link = SER(LINK(Node, s));
@@ -246,10 +246,7 @@ static void Queue_Mark_Node_Deep(void *p)
         // !!! Review efficiency, this may need a separate flag for "has
         // pointers that need marking", such lists are used elsewhere.
         //
-        if (
-            GET_SERIES_FLAG(link, IS_KEYLIKE)
-            and SER_WIDE(link) == sizeof(REBKEY)
-        ){
+        if (IS_KEYLIST(link)) {
             REBKEY *tail = SER_TAIL(REBKEY, link);
             REBKEY *key = SER_HEAD(REBKEY, link);
             for (; key != tail; ++key)
@@ -388,7 +385,7 @@ static void Propagate_All_GC_Marks(void)
             //
             if (
                 KIND3Q_BYTE_UNCHECKED(v) == REB_NULL
-                and NOT_ARRAY_FLAG(a, IS_VARLIST)
+                and not IS_VARLIST(a)
             ){
                 panic(a);
             }
@@ -557,7 +554,7 @@ static void Mark_Root_Series(void)
 
                 REBARR *a = ARR(s);
 
-                if (GET_ARRAY_FLAG(a, IS_VARLIST))
+                if (IS_VARLIST(a))
                     if (CTX_TYPE(CTX(a)) == REB_FRAME)
                         continue;  // Mark_Frame_Stack_Deep() etc. mark it
 
@@ -571,9 +568,9 @@ static void Mark_Root_Series(void)
                 // Manage and use PUSH_GC_GUARD and DROP_GC_GUARD on them.
                 //
                 assert(
-                    NOT_ARRAY_FLAG(a, IS_VARLIST)
-                    and NOT_ARRAY_FLAG(a, IS_DETAILS)
-                    and NOT_ARRAY_FLAG(a, IS_PAIRLIST)
+                    not IS_VARLIST(a)
+                    and not IS_DETAILS(a)
+                    and not IS_PAIRLIST(a)
                 );
 
                 if (GET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK))
@@ -1282,12 +1279,12 @@ void Startup_GC(void)
 
     // Temporary series and values protected from GC. Holds node pointers.
     //
-    GC_Guarded = Make_Series(15, sizeof(REBNOD*));
+    GC_Guarded = Make_Series(15, FLAVOR_NODELIST);
 
     // The marking queue used in lieu of recursion to ensure that deeply
     // nested structures don't cause the C stack to overflow.
     //
-    GC_Mark_Stack = Make_Series(100, sizeof(const REBNOD*));
+    GC_Mark_Stack = Make_Series(100, FLAVOR_NODELIST);
 }
 
 

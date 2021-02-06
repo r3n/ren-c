@@ -91,10 +91,10 @@ inline static REBVAL *Init_Varargs_Untyped_Enfix(
     if (IS_END(single))
         array1 = EMPTY_ARRAY;
     else {
-        REBARR *feed = Alloc_Singular(NODE_FLAG_MANAGED);
+        REBARR *feed = Alloc_Singular(FLAG_FLAVOR(FEED) | NODE_FLAG_MANAGED);
         Move_Value(ARR_SINGLE(feed), single);
 
-        array1 = Alloc_Singular(NODE_FLAG_MANAGED);
+        array1 = Alloc_Singular(FLAG_FLAVOR(ARRAY1) | NODE_FLAG_MANAGED);
         Init_Block(ARR_SINGLE(array1), feed);  // index 0
     }
 
@@ -113,7 +113,7 @@ inline static bool Is_Block_Style_Varargs(
     assert(CELL_KIND(vararg) == REB_VARARGS);
 
     REBARR *binding = ARR(BINDING(vararg));
-    if (GET_ARRAY_FLAG(binding, IS_VARLIST)) {
+    if (IS_VARLIST(binding)) {
         *shared_out = nullptr;  // avoid compiler warning in -Og build
         return false;  // it's an ordinary vararg, representing a FRAME!
     }
@@ -140,7 +140,7 @@ inline static bool Is_Frame_Style_Varargs_Maybe_Null(
     assert(CELL_KIND(vararg) == REB_VARARGS);
 
     REBARR *binding = ARR(BINDING(vararg));
-    if (GET_ARRAY_FLAG(binding, IS_VARLIST)) {
+    if (IS_VARLIST(binding)) {
         // "Ordinary" case... use the original frame implied by the VARARGS!
         // (so long as it is still live on the stack)
 
@@ -222,7 +222,7 @@ inline static const REBPAR *Param_For_Varargs_Maybe_Null(
     // A vararg created from a block AND never passed as an argument so no
     // typeset or quoting settings available.  Treat as "normal" parameter.
     //
-    assert(NOT_ARRAY_FLAG(ARR(BINDING(v)), IS_VARLIST));
+    assert(not IS_VARLIST(BINDING(v)));
     return nullptr;
 }
 

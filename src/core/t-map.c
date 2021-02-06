@@ -235,7 +235,6 @@ void Expand_Hash(REBSER *ser)
     Remake_Series(
         ser,
         prime + 1,
-        SER_WIDE(ser),
         SERIES_FLAG_POWER_OF_2  // not(NODE_FLAG_NODE) => don't keep data
     );
 
@@ -443,7 +442,7 @@ inline static REBMAP *Copy_Map(const REBMAP *map, REBU64 types) {
     REBARR *copy = Copy_Array_Shallow_Flags(
         MAP_PAIRLIST(map),
         SPECIFIED,
-        SERIES_MASK_PAIRLIST
+        SERIES_FLAGS_NONE | FLAG_FLAVOR(PAIRLIST)
     );
 
     // So long as the copied pairlist is the same array size as the original,
@@ -452,7 +451,8 @@ inline static REBMAP *Copy_Map(const REBMAP *map, REBU64 types) {
     //
     mutable_LINK(Hashlist, copy) = Copy_Series_Core(
         MAP_HASHLIST(map),
-        SERIES_FLAGS_NONE // !!! No NODE_FLAG_MANAGED?
+        SERIES_FLAGS_NONE | FLAG_FLAVOR(HASHLIST)
+            // ^-- !!! No NODE_FLAG_MANAGED?
     );
 
     if (types == 0)

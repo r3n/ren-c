@@ -260,8 +260,8 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
 
       case DETECTED_AS_SERIES: {
         REBSER *s = m_cast(REBSER*, cast(const REBSER*, p));  // don't mutate
-        if (not IS_SER_ARRAY(s) or NOT_ARRAY_FLAG(ARR(s), IS_VARLIST))
-            panic (s);
+        if (not IS_VARLIST(s))
+            panic (s);  // only kind of series allowed are contxts of ERROR!
         error = CTX(s);
         break; }
 

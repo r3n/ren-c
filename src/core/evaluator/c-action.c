@@ -964,13 +964,14 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // in its argument slots that the C won't recognize.  Usermode code that
     // gets its hands on a native's FRAME! (e.g. for debug viewing) can't be
     // allowed to change the frame values to other bit patterns out from
-    // under the C or it could result in a crash.  By making the IS_NATIVE
-    // flag the same as the HOLD info bit, we can make sure the frame gets
-    // marked protected if it's a native...without needing an if() branch.
+    // under the C or it could result in a crash.
     //
-    STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
-    SER_INFO(f->varlist) |=
-        (ACT_DETAILS(phase)->leader.bits & SERIES_INFO_HOLD);
+    // !!! Once the IS_NATIVE flag was the same as the HOLD info bit, but that
+    // trick got shaken up with flag reordering.  Review.
+    //
+    /*STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);*/
+    if (GET_ACTION_FLAG(phase, IS_NATIVE))
+        SER_INFO(f->varlist) |= SERIES_INFO_HOLD;
 
     REBNAT dispatcher = ACT_DISPATCHER(phase);
 

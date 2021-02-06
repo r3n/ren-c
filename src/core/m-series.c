@@ -65,7 +65,7 @@ REBSER *Copy_Series_Core(const REBSER *s, REBFLGS flags)
     // propagated.  This includes locks, etc.  But the string flag needs
     // to be copied, for sure.
     //
-    if (GET_SERIES_FLAG(s, IS_STRING)) {
+    if (IS_SER_UTF8(s)) {
         //
         // Note: If the string was a symbol (aliased via AS) it will lose
         // that information.
@@ -77,11 +77,14 @@ REBSER *Copy_Series_Core(const REBSER *s, REBFLGS flags)
         copy->misc.length = s->misc.length;
     }
     else if (SER_WIDE(s) == 1) {  // non-string BINARY!
-        copy = Make_Series_Core(used + 1, SER_WIDE(s), flags);  // term space
+        copy = Make_Series_Core(
+            used + 1,  // term space
+            FLAG_FLAVOR_BYTE(SER_FLAVOR(s)) | flags
+        );
         SET_SERIES_USED(copy, used);
     }
     else {
-        copy = Make_Series_Core(used, SER_WIDE(s), flags);
+        copy = Make_Series_Core(used, FLAG_FLAVOR_BYTE(SER_FLAVOR(s)) | flags);
         SET_SERIES_USED(copy, used);
     }
 
@@ -118,7 +121,8 @@ REBSER *Copy_Series_At_Len_Extra(
     REBLEN capacity = len + extra;
     if (SER_WIDE(s) == 1)
         ++capacity;
-    REBSER *copy = Make_Series_Core(capacity, SER_WIDE(s), flags);
+    REBSER *copy = Make_Series_Core(capacity, flags);
+    assert(SER_WIDE(s) == SER_WIDE(copy));
     memcpy(
         SER_DATA(copy),
         SER_DATA(s) + index * SER_WIDE(s),
@@ -346,7 +350,7 @@ void Assert_Series_Term_Core(const REBSER *s)
     }
     else if (SER_WIDE(s) == 1) {
         const REBYTE *tail = BIN_TAIL(BIN(s));
-        if (GET_SERIES_FLAG(s, IS_STRING)) {
+        if (IS_SER_UTF8(s)) {
             if (*tail != '\0')
                 panic (s);
         }
@@ -374,6 +378,7 @@ void Assert_Series_Core(const REBSER *s)
         and GET_SERIES_INFO(s, 7_IS_TRUE)  // NODE_FLAG_CELL
     );
 
+    assert(SER_FLAVOR(s) != FLAVOR_TRASH);
     assert(SER_USED(s) <= SER_REST(s));
 
     Assert_Series_Term_Core(s);

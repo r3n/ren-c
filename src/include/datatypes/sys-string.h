@@ -48,6 +48,11 @@
 //   See the distinction between SER_USED() and STR_LEN().
 //
 
+
+#define SYM(s) \
+    m_cast(REBSYM*, x_cast(const REBSYM*, (s)))
+
+
 // Some places permit an optional label (such as the names of function
 // invocations, which may not have an associated name).  To make the callsite
 // intent clearer for passing in a null REBSTR*, use ANONYMOUS instead.
@@ -346,41 +351,6 @@ inline static REBCHR(*) WRITE_CHR(REBCHR(*) cp, REBUNI c) {
 #endif
 
 
-inline static bool IS_SER_STRING(const REBSER *s) {
-    if (NOT_SERIES_FLAG((s), IS_STRING))
-        return false;
-    assert(SER_WIDE(s) == 1);
-    return true;
-}
-
-
-//=//// STRING_FLAG_IS_SYMBOL /////////////////////////////////////////////=//
-//
-// If a string is a symbol, then that means it is legal to use in ANY-WORD!.
-// If it is aliased in an ANY-STRING! or BINARY!, it will be read-only.
-//
-// See notes on SERIES_FLAG_IS_KEYLIKE for why this same bit is used for
-// arrays when they are keylists.
-//
-// !!! It is possible for non-symbols to be interned and hashed as well, with
-// filenames.  What removes those interning table entries?
-//
-#define STRING_FLAG_IS_SYMBOL SERIES_FLAG_IS_KEYLIKE
-
-// While the content format is UTF-8 for both ANY-STRING! and ANY-WORD!, the
-// MISC() and LINK() fields are used differently.  A string caches its length
-// in codepoints so that doesn't have to be recalculated, and it also has
-// caches of "bookmarks" mapping codepoint indexes to byte offsets.  Words
-// store a pointer that is used in a circularly linked list to find their
-// canon spelling form...as well as hold binding information.
-//
-#define IS_STR_SYMBOL(s) \
-    ((s)->leader.bits & STRING_FLAG_IS_SYMBOL)
-
-#define SYM(s) \
-    m_cast(REBSYM*, x_cast(const REBSYM*, (s)))
-
-
 //=//// STRING ALL-ASCII FLAG /////////////////////////////////////////////=//
 //
 // One of the best optimizations that can be done on strings is to keep track
@@ -429,7 +399,7 @@ inline static REBLEN STR_LEN(const REBSTR *s) {
     if (Is_Definitely_Ascii(s))
         return STR_SIZE(s);
 
-    if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
+    if (IS_NONSYMBOL_STRING(s)) {  // length is cached for non-ANY-WORD!
       #if defined(DEBUG_UTF8_EVERYWHERE)
         if (s->misc.length > SER_USED(s))  // includes 0xDECAFBAD
             panic(s);
@@ -458,7 +428,7 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
     //
     assert(not Is_Continuation_Byte_If_Utf8(*BIN_AT(s, offset)));
 
-    if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
+    if (IS_NONSYMBOL_STRING(s)) {  // length is cached for non-ANY-WORD!
       #if defined(DEBUG_UTF8_EVERYWHERE)
         if (s->misc.length > SER_USED(s))  // includes 0xDECAFBAD
             panic(s);
@@ -482,7 +452,7 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
 }
 
 inline static void SET_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
-    assert(not IS_STR_SYMBOL(s));
+    assert(IS_NONSYMBOL_STRING(s));
     assert(used == SER_USED(s));
     s->misc.length = len;
     assert(*BIN_AT(s, used) == '\0');
@@ -490,7 +460,7 @@ inline static void SET_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
 }
 
 inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
-    assert(not IS_STR_SYMBOL(s));
+    assert(IS_NONSYMBOL_STRING(s));
     SET_SERIES_USED(s, used);
     s->misc.length = len;
     *BIN_AT(s, used) = '\0';
@@ -509,11 +479,6 @@ inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
 // series node otherwise.  Bookmarks aren't generated for strings that are
 // very short, or that are never enumerated.
 
-struct Reb_Bookmark {
-    REBLEN index;
-    REBSIZ offset;
-};
-
 #define BMK_INDEX(b) \
     SER_HEAD(struct Reb_Bookmark, c_cast(REBBMK*, (b)))->index
 
@@ -523,8 +488,8 @@ struct Reb_Bookmark {
 inline static REBBMK* Alloc_Bookmark(void) {
     REBSER *s = Make_Series_Core(
         1,
-        sizeof(struct Reb_Bookmark),
-        SERIES_FLAG_MANAGED  // LINK_NODE_NEEDS_MARK not neded if is bookmark
+        FLAG_FLAVOR(BOOKMARKLIST) | SERIES_FLAG_MANAGED
+            // LINK_NODE_NEEDS_MARK not needed if is bookmark
     );
     mutable_LINK(Bookmarks, s) = nullptr;  // !!! efficiency by linking bookmarks?
     SET_SERIES_LEN(s, 1);
@@ -533,7 +498,7 @@ inline static REBBMK* Alloc_Bookmark(void) {
 }
 
 inline static void Free_Bookmarks_Maybe_Null(REBSTR *str) {
-    assert(not IS_STR_SYMBOL(str));  // call on string
+    assert(IS_NONSYMBOL_STRING(str));
     if (LINK(Bookmarks, str)) {
         GC_Kill_Series(LINK(Bookmarks, str));
         mutable_LINK(Bookmarks, str) = nullptr;
@@ -589,7 +554,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     REBLEN index;
 
     REBBMK *bookmark = nullptr;  // updated at end if not nulled out
-    if (not IS_STR_SYMBOL(s))
+    if (IS_NONSYMBOL_STRING(s))
         bookmark = LINK(Bookmarks, s);
 
   #if defined(DEBUG_SPORADICALLY_DROP_BOOKMARKS)
@@ -608,14 +573,14 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
 
     if (at < len / 2) {
         if (len < sizeof(REBVAL)) {
-            if (not IS_STR_SYMBOL(s))
+            if (IS_NONSYMBOL_STRING(s))
                 assert(
                     GET_SERIES_FLAG(s, DYNAMIC)  // e.g. mold buffer
                     or not bookmark  // mutations must ensure this
                 );
             goto scan_from_head;  // good locality, avoid bookmark logic
         }
-        if (not bookmark and not IS_STR_SYMBOL(s)) {
+        if (not bookmark and IS_NONSYMBOL_STRING(s)) {
             bookmark = Alloc_Bookmark();
             mutable_LINK(Bookmarks, m_cast(REBSTR*, s)) = bookmark;
             goto scan_from_head;  // will fill in bookmark
@@ -623,14 +588,14 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     }
     else {
         if (len < sizeof(REBVAL)) {
-            if (not IS_STR_SYMBOL(s))
+            if (IS_NONSYMBOL_STRING(s))
                 assert(
                     not bookmark  // mutations must ensure this usually but...
                     or GET_SERIES_FLAG(s, DYNAMIC)  // !!! mold buffer?
                 );
             goto scan_from_tail;  // good locality, avoid bookmark logic
         }
-        if (not bookmark and not IS_STR_SYMBOL(s)) {
+        if (not bookmark and IS_NONSYMBOL_STRING(s)) {
             bookmark = Alloc_Bookmark();
             mutable_LINK(Bookmarks, m_cast(REBSTR*, s)) = bookmark;
             goto scan_from_tail;  // will fill in bookmark
@@ -760,7 +725,7 @@ inline static const REBSTR *VAL_STRING(REBCEL(const*) v) {
 //
 inline static REBLEN VAL_LEN_HEAD(REBCEL(const*) v) {
     const REBSER *s = VAL_SERIES(v);
-    if (GET_SERIES_FLAG(s, IS_STRING) and CELL_KIND(v) != REB_BINARY)
+    if (IS_SER_UTF8(s) and CELL_KIND(v) != REB_BINARY)
         return STR_LEN(STR(s));
     return SER_USED(s);
 }
@@ -896,7 +861,7 @@ inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
     REBLEN len = STR_LEN(s);
   #endif
 
-    assert(not IS_STR_SYMBOL(s));
+    assert(IS_NONSYMBOL_STRING(s));
     assert(n < STR_LEN(s));
 
     REBCHR(*) cp = STR_AT(s, n);
@@ -1058,7 +1023,13 @@ inline static REBSER *Copy_Series_At_Len(
     REBLEN index,
     REBLEN len
 ){
-    return Copy_Series_At_Len_Extra(s, index, len, 0, SERIES_FLAGS_NONE);
+    return Copy_Series_At_Len_Extra(
+        s,
+        index,
+        len,
+        0,
+        FLAG_FLAVOR_BYTE(SER_FLAVOR(s)) | SERIES_FLAGS_NONE
+    );
 }
 
 

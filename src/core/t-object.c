@@ -524,7 +524,6 @@ REBCTX *Copy_Context_Extra_Managed(
     REBLEN extra,
     REBU64 types
 ){
-    assert(GET_ARRAY_FLAG(CTX_VARLIST(original), IS_VARLIST));
     ASSERT_SERIES_MANAGED(CTX_KEYLIST(original));
     assert(NOT_SERIES_FLAG(CTX_VARLIST(original), INACCESSIBLE));
 

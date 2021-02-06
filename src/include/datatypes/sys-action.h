@@ -195,16 +195,16 @@ inline static void INIT_VAL_ACTION_BINDING(
 
 inline static option(REBARR*) ACT_PARTIALS(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
-    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+    if (IS_PARTIALS(list))
         return list;
     return nullptr;
 }
 
 inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
-    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+    if (IS_PARTIALS(list))
         list = CTX_VARLIST(LINK(PartialsExemplar, list));
-    assert(GET_ARRAY_FLAG(list, IS_VARLIST));
+    assert(IS_VARLIST(list));
     return CTX(list);
 }
 
@@ -213,9 +213,9 @@ inline static REBCTX *ACT_EXEMPLAR(REBACT *a) {
 //
 inline static REBSER *ACT_KEYLIST(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
-    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+    if (IS_PARTIALS(list))
         list = CTX_VARLIST(LINK(PartialsExemplar, list));
-    assert(GET_ARRAY_FLAG(list, IS_VARLIST));
+    assert(IS_VARLIST(list));
     return SER(LINK(KeySource, list));
 }
 
@@ -229,7 +229,7 @@ inline static REBSER *ACT_KEYLIST(REBACT *a) {
 
 inline static REBPAR *ACT_PARAMS_HEAD(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
-    if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+    if (IS_PARTIALS(list))
         list = CTX_VARLIST(LINK(PartialsExemplar, list));
     return cast(REBPAR*, list->content.dynamic.data) + 1;  // skip archetype
 }

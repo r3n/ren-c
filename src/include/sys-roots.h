@@ -49,41 +49,11 @@
 #define MISC_ApiPrev_CAST       NOD
 
 
-//=//// ARRAY_FLAG_SINGULAR_API_RELEASE //////////////////////////////////=//
-//
-// The rebR() function can be used with an API handle to tell a variadic
-// function to release that handle after encountering it.
-//
-// !!! API handles are singular arrays, because there is already a stake in
-// making them efficient.  However it means they have to share header and
-// info bits, when most are not applicable to them.  This is a tradeoff, and
-// contention for bits may become an issue in the future.
-//
-#define ARRAY_FLAG_SINGULAR_API_RELEASE \
-    ARRAY_FLAG_24
-
-
-//=//// ARRAY_FLAG_INSTRUCTION_ADJUST_QUOTING /////////////////////////////=//
-//
-// This is used by rebQ() and rebU() to either add a quoting level of splices
-// or to remove one.  Today these arrays are always singular and contain
-// one value, but in the future they might contain more.
-//
-#define ARRAY_FLAG_INSTRUCTION_ADJUST_QUOTING \
-    ARRAY_FLAG_25
-
-
-//=//// ARRAY_FLAG_INSTRUCTION_SPLICE /////////////////////////////////////=//
-//
-// This is used by rebINLINE() to place an array of content as raw material
-// to execute.
-//
-#define ARRAY_FLAG_INSTRUCTION_SPLICE \
-    ARRAY_FLAG_26
-
-
 // What distinguishes an API value is that it has both the NODE_FLAG_CELL and
 // NODE_FLAG_ROOT bits set.
+//
+// !!! Note: The FLAVOR_API state can be converted to an instruction for
+// releasing the handle...so beware using FLAVOR_API for detection.
 //
 inline static bool Is_Api_Value(const RELVAL *v) {
     assert(v->header.bits & NODE_FLAG_CELL);
@@ -149,7 +119,9 @@ inline static void Unlink_Api_Handle_From_Frame(REBARR *a)
 //
 inline static REBVAL *Alloc_Value(void)
 {
-    REBARR *a = Alloc_Singular(NODE_FLAG_ROOT | NODE_FLAG_MANAGED);
+    REBARR *a = Alloc_Singular(
+        FLAG_FLAVOR(API) |  NODE_FLAG_ROOT | NODE_FLAG_MANAGED
+    );
 
     // Giving the cell itself NODE_FLAG_ROOT lets a REBVAL* be discerned as
     // either an API handle or not.  The flag is not copied by Move_Value().
@@ -186,38 +158,6 @@ inline static void Free_Value(REBVAL *v)
         Unlink_Api_Handle_From_Frame(a);
 
     GC_Kill_Series(a);
-}
-
-
-// "Instructions" are singular arrays; they are intended to be used directly
-// with a variadic API call, and will be freed automatically by an enumeration
-// to the va_end() point--whether there is an error, throw, or completion.
-//
-// They are not GC managed, in order to avoid taxing the garbage collector
-// (and tripping assert mechanisms).  So they can leak if used incorrectly.
-//
-// Instructions should be returned as a const void *, in order to discourage
-// using these anywhere besides as arguments to a variadic API like rebValue().
-//
-inline static REBARR *Alloc_Instruction(enum Reb_Api_Opcode opcode) {
-    REBSER *s = Alloc_Series_Node(
-        SERIES_FLAG_FIXED_SIZE // not tracked as stray manual, but unmanaged
-        /* ... */
-    );
-    SER_INFO(s) = Endlike_Header(
-        FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
-            | FLAG_USED_BYTE_ARRAY()  // also reserved
-    );
-    s->misc.opcode = opcode;
-
-    RELVAL *cell = TRACK_CELL_IF_DEBUG(SER_CELL(s));
-    cell->header.bits = CELL_MASK_PREP_END | NODE_FLAG_ROOT;
-    return ARR(s);
-}
-
-inline static void Free_Instruction(REBARR *a) {
-    TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
-    Free_Node(SER_POOL, a);
 }
 
 

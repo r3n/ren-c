@@ -138,7 +138,7 @@ static void Expand_Word_Table(void)
     assert(SER_WIDE(PG_Symbols_By_Hash) == sizeof(REBSTR*));
 
     REBSER *ser = Make_Series_Core(
-        num_slots, sizeof(REBSYM*), SERIES_FLAG_POWER_OF_2
+        num_slots, FLAG_FLAVOR(CANONTABLE) | SERIES_FLAG_POWER_OF_2
     );
     Clear_Series(ser);
     SET_SERIES_LEN(ser, num_slots);
@@ -264,8 +264,7 @@ const REBSYM *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
 
     REBBIN *s = BIN(Make_Series_Core(
         size + 1,  // if small, fits in a REBSER node (w/no data allocation)
-        sizeof(REBYTE),
-        SERIES_FLAG_IS_STRING | STRING_FLAG_IS_SYMBOL | SERIES_FLAG_FIXED_SIZE
+        FLAG_FLAVOR(SYMBOL) | SERIES_FLAG_FIXED_SIZE
     ));
 
     // The incoming string isn't always null terminated, e.g. if you are
@@ -296,7 +295,7 @@ const REBSYM *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
         // didn't follow the published list could cause an error.  This would
         // give more integer values without more strings in the core.
         //
-        assert(SECOND_UINT16(s->leader) == 0);
+        assert(SECOND_UINT16(s->info) == 0);
     }
     else {
         // This is a synonym for an existing canon.  Link it into the synonyms
@@ -308,8 +307,8 @@ const REBSYM *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
         // If the canon form had a SYM_XXX for quick comparison of %words.r
         // words in C switch statements, the synonym inherits that number.
         //
-        assert(SECOND_UINT16(s->leader) == 0);
-        SET_SECOND_UINT16(s->leader, ID_OF_SYMBOL(synonym));
+        assert(SECOND_UINT16(s->info) == 0);
+        SET_SECOND_UINT16(s->info, ID_OF_SYMBOL(synonym));
     }
 
     // Symbols use their MISC() to hold binding information.  Long term, it
@@ -470,7 +469,7 @@ void Startup_Interning(void)
   #endif
 
     PG_Symbols_By_Hash = Make_Series_Core(
-        n, sizeof(REBSTR*), SERIES_FLAG_POWER_OF_2
+        n, FLAG_FLAVOR(CANONTABLE) | SERIES_FLAG_POWER_OF_2
     );
     Clear_Series(PG_Symbols_By_Hash);  // all slots start as nullptr
     SET_SERIES_LEN(PG_Symbols_By_Hash, n);
@@ -544,9 +543,9 @@ void Startup_Symbols(REBARR *words)
 {
     assert(PG_Symbol_Canons == nullptr);
     PG_Symbol_Canons = Make_Series_Core(
-        1 + ARR_LEN(words), // 1 + => extra trash at head for SYM_0
-        sizeof(REBSTR*),
-        SERIES_FLAG_FIXED_SIZE // can't ever add more SYM_XXX lookups
+        1 + ARR_LEN(words),  // 1 + => extra trash at head for SYM_0
+        FLAG_FLAVOR(COMMONWORDS)
+            | SERIES_FLAG_FIXED_SIZE  // can't ever add more SYM_XXX lookups
     );
 
     // All words that not in %words.r will get back VAL_WORD_ID(w) == SYM_0
@@ -584,8 +583,8 @@ void Startup_Symbols(REBARR *words)
             // Could probably use less than 16 bits, but 8 is insufficient.
             // (length %words.r > 256)
             //
-            assert(SECOND_UINT16(name->leader) == 0);
-            SET_SECOND_UINT16(name->leader, sym);
+            assert(SECOND_UINT16(name->info) == 0);
+            SET_SECOND_UINT16(name->info, sym);
             assert(Same_Nonzero_Symid(ID_OF_SYMBOL(name), sym));
 
             name = LINK(Synonym, name);

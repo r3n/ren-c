@@ -281,6 +281,7 @@ inline static bool Did_Reuse_Varlist_Of_Unknown_Size(
     f->rootvar = cast(REBVAL*, f->varlist->content.dynamic.data);
     mutable_LINK(KeySource, f->varlist) = NOD(f);
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
+    assert(SER_FLAVOR(f->varlist) == FLAVOR_VARLIST);
     return true;
 }
 
@@ -579,7 +580,7 @@ inline static void Begin_Action_Core(
     f->arg = f->rootvar + 1;
 
     assert(IS_OPTION_TRASH_DEBUG(f->label));  // ACTION! makes valid
-    assert(not label or GET_SERIES_FLAG(unwrap(label), IS_STRING));
+    assert(not label or IS_SYMBOL(unwrap(label)));
     f->label = label;
   #if defined(DEBUG_FRAME_LABELS) // helpful for looking in the debugger
     f->label_utf8 = cast(const char*, Frame_Label_Or_Anonymous_UTF8(f));
@@ -669,8 +670,7 @@ inline static void Push_Action(
                 | SERIES_FLAG_FIXED_SIZE // FRAME!s don't expand ATM
         );
         SER_INFO(s) = Endlike_Header(
-            FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
-                | FLAG_USED_BYTE_ARRAY()  // also reserved
+            FLAG_USED_BYTE_ARRAY()  // reserved for future use
         );
         INIT_LINK_KEYSOURCE(ARR(s), NOD(f)); // maps varlist back to f
         mutable_MISC(Meta, s) = nullptr;  // GC will sees this
@@ -747,10 +747,7 @@ inline static void Push_Action(
 
 
 inline static void Drop_Action(REBFRM *f) {
-    assert(
-        not f->label
-        or GET_SERIES_FLAG(unwrap(f->label), IS_STRING)
-    );
+    assert(not f->label or IS_SYMBOL(unwrap(f->label)));
 
     if (NOT_EVAL_FLAG(f, FULFILLING_ARG))
         CLEAR_FEED_FLAG(f->feed, BARRIER_HIT);
@@ -841,11 +838,11 @@ inline static void Drop_Action(REBFRM *f) {
         CLEAR_SERIES_INFO(f->varlist, HOLD);
         CLEAR_ARRAY_FLAG(f->varlist, FRAME_HAS_BEEN_INVOKED);
 
-        assert(0 == (SER_INFO(f->varlist) & ~(  // <- note bitwise not
-            SERIES_INFO_0_IS_TRUE  // parallels NODE_FLAG_NODE
-            | SERIES_INFO_7_IS_TRUE
-            | FLAG_WIDE_BYTE_OR_0(0)  // don't mask out wide (0 for arrays))
-            | FLAG_USED_BYTE(255)  // mask out non-dynamic-len (dynamic)
+        assert(
+            0 == (SER_INFO(f->varlist) & ~(  // <- note bitwise not
+                SERIES_INFO_0_IS_TRUE  // parallels NODE_FLAG_NODE
+                    | SERIES_INFO_7_IS_TRUE
+                    | FLAG_USED_BYTE(255)  // mask out non-dynamic-len
         )));
     }
 

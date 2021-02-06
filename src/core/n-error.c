@@ -90,9 +90,7 @@ static REBVAL *Entrap_Dangerous(REBFRM *frame_) {
     if (IS_NULLED(D_OUT))
         return nullptr; // don't box it up
 
-    REBARR *a = Alloc_Singular(
-        ARRAY_MASK_HAS_FILE_LINE | NODE_FLAG_MANAGED
-    );
+    REBARR *a = Alloc_Singular(ARRAY_MASK_HAS_FILE_LINE | NODE_FLAG_MANAGED);
     Move_Value(ARR_SINGLE(a), D_OUT);
     Init_Block(D_OUT, a);
     return nullptr;

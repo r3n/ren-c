@@ -315,7 +315,10 @@ void Startup_Pools(REBINT scale)
     // As a trick to keep this series from trying to track itself, say it's
     // managed, then sneak the flag off.
     //
-    GC_Manuals = Make_Series_Core(15, sizeof(REBSER *), NODE_FLAG_MANAGED);
+    GC_Manuals = Make_Series_Core(
+        15,
+        FLAG_FLAVOR(SERIESLIST) | NODE_FLAG_MANAGED
+    );
     CLEAR_SERIES_FLAG(GC_Manuals, MANAGED);
 
     Prior_Expand = TRY_ALLOC_N(REBSER*, MAX_EXPAND_LIST);
@@ -992,7 +995,7 @@ REBNATIVE(swap_contents)
 // Reallocate a series as a given maximum size.  Content in the retained
 // portion of the length will be preserved if NODE_FLAG_NODE is passed in.
 //
-void Remake_Series(REBSER *s, REBLEN units, REBYTE wide, REBFLGS flags)
+void Remake_Series(REBSER *s, REBLEN units, REBFLGS flags)
 {
     // !!! This routine is being scaled back in terms of what it's allowed to
     // do for the moment; so the method of passing in flags is a bit strange.
@@ -1002,12 +1005,7 @@ void Remake_Series(REBSER *s, REBLEN units, REBYTE wide, REBFLGS flags)
     bool preserve = did (flags & NODE_FLAG_NODE);
 
     REBLEN used_old = SER_USED(s);
-    REBYTE wide_old = SER_WIDE(s);
-
-  #if !defined(NDEBUG)
-    if (preserve)
-        assert(wide == wide_old); // can't change width if preserving
-  #endif
+    REBYTE wide = SER_WIDE(s);
 
     assert(NOT_SERIES_FLAG(s, FIXED_SIZE));
 
@@ -1033,7 +1031,6 @@ void Remake_Series(REBSER *s, REBLEN units, REBYTE wide, REBFLGS flags)
         data_old = cast(char*, &content_old);
     }
 
-    mutable_WIDE_BYTE_OR_0(s) = wide;
     s->leader.bits |= flags;
 
     // !!! Currently the remake won't make a series that fits in the size of
@@ -1066,14 +1063,14 @@ void Remake_Series(REBSER *s, REBLEN units, REBYTE wide, REBFLGS flags)
         s->content.dynamic.used = 0;
 
   #ifdef DEBUG_UTF8_EVERYWHERE
-    if (GET_SERIES_FLAG(s, IS_STRING) and not IS_STR_SYMBOL(STR(s))) {
+    if (IS_NONSYMBOL_STRING(s)) {
         s->misc.length = 0xDECAFBAD;
         TOUCH_SERIES_IF_DEBUG(s);
     }
   #endif
 
     if (was_dynamic)
-        Free_Unbiased_Series_Data(data_old - (wide_old * bias_old), size_old);
+        Free_Unbiased_Series_Data(data_old - (wide * bias_old), size_old);
 }
 
 
@@ -1084,13 +1081,16 @@ void Decay_Series(REBSER *s)
 {
     assert(NOT_SERIES_FLAG(s, INACCESSIBLE));
 
-    if (GET_SERIES_FLAG(s, IS_STRING)) {
-        if (IS_STR_SYMBOL(STR(s)))
-            GC_Kill_Interning(STR(s));  // special handling can adjust canons
-        else
-            Free_Bookmarks_Maybe_Null(STR(s));
-    }
-    else if (IS_SER_ARRAY(s) and GET_ARRAY_FLAG(ARR(s), IS_PATCH)) {
+    switch (SER_FLAVOR(s)) {
+      case FLAVOR_STRING:
+        Free_Bookmarks_Maybe_Null(STR(s));
+        break;
+
+      case FLAVOR_SYMBOL:
+        GC_Kill_Interning(STR(s));  // special handling can adjust canons
+        break;
+
+      case FLAVOR_PATCH: {
         //
         // Remove patch from circularly linked list of variants.
         // (if it's the last one, this winds up making no meaningful change)
@@ -1100,6 +1100,22 @@ void Decay_Series(REBSER *s)
             temp = MISC(Variant, temp);
         }
         mutable_MISC(Variant, temp) = MISC(Variant, s);
+        break; }
+
+      case FLAVOR_HANDLE: {
+        RELVAL *v = ARR_SINGLE(ARR(s));
+        assert(CELL_KIND_UNCHECKED(v) == REB_HANDLE);
+
+        // Some handles use the managed form just because they want changes to
+        // the pointer in one instance to be seen by other instances...there
+        // may be no cleaner function.
+        //
+        if (s->misc.cleaner)
+            (s->misc.cleaner)(SPECIFIC(v));
+        break; }
+
+      default:
+        break;
     }
 
     // Remove series from expansion list, if found:
@@ -1120,13 +1136,8 @@ void Decay_Series(REBSER *s)
         // Preserving ACTION!'s archetype is speculative--to point out the
         // possibility exists for the other array with a "canon" [0]
         //
-        if (IS_SER_ARRAY(s))
-            if (
-                GET_ARRAY_FLAG(ARR(s), IS_VARLIST)
-                or GET_ARRAY_FLAG(ARR(s), IS_DETAILS)
-            ){
-                s->content.fixed.cells[0] = *ARR_HEAD(ARR(s));
-            }
+        if (IS_VARLIST(s) or IS_DETAILS(s))
+            s->content.fixed.cells[0] = *ARR_HEAD(ARR(s));
 
         Free_Unbiased_Series_Data(unbiased, total);
 
@@ -1141,35 +1152,6 @@ void Decay_Series(REBSER *s)
         GC_Ballast = REB_I32_ADD_OF(GC_Ballast, total, &tmp)
             ? INT32_MAX
             : tmp;
-    }
-    else {
-        // Special GC processing for HANDLE! when the handle is implemented as
-        // a singular array, so that if the handle represents a resource, it
-        // may be freed.
-        //
-        // Note that not all singular arrays containing a HANDLE! should be
-        // interpreted that when the array is freed the handle is freed (!)
-        // Only when the handle array pointer in the freed singular
-        // handle matches the REBARR being freed.  (It may have been just a
-        // singular array that happened to contain a handle, otherwise, as
-        // opposed to the specific singular made for the handle's GC awareness)
-
-        if (IS_SER_ARRAY(s)) {
-            RELVAL *v = ARR_HEAD(ARR(s));
-            if (CELL_KIND_UNCHECKED(v) == REB_HANDLE) {
-                if (VAL_HANDLE_SINGULAR(v) == ARR(s)) {
-                    //
-                    // Some handles use the managed form just because they
-                    // want changes to the pointer in one instance to be seen
-                    // by other instances...there may be no cleaner function.
-                    //
-                    // !!! Would a no-op cleaner be more efficient for those?
-                    //
-                    if (s->misc.cleaner)
-                        (s->misc.cleaner)(SPECIFIC(v));
-                }
-            }
-        }
     }
 
     SET_SERIES_FLAG(s, INACCESSIBLE);
@@ -1202,7 +1184,7 @@ void GC_Kill_Series(REBSER *s)
         Decay_Series(s);
 
   #if !defined(NDEBUG)
-    SER_INFO(s) = FLAG_WIDE_BYTE_OR_0(77);  // corrupt SER_WIDE()
+    FREETRASH_POINTER_IF_DEBUG(s->info.node);
     // The spot LINK occupies will be used by Free_Node() to link the freelist
     FREETRASH_POINTER_IF_DEBUG(s->misc.trash);
   #endif
@@ -1296,7 +1278,7 @@ void Assert_Pointer_Detection_Working(void)
     //
     assert(not (END_NODE->header.bits & NODE_FLAG_MANAGED));
 
-    REBSER *ser = Make_Series(1, sizeof(char));
+    REBSER *ser = Make_Series(1, FLAVOR_BINARY);
     assert(Detect_Rebol_Pointer(ser) == DETECTED_AS_SERIES);
     Free_Unmanaged_Series(ser);
     assert(Detect_Rebol_Pointer(ser) == DETECTED_AS_FREED_SERIES);

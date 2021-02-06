@@ -58,15 +58,6 @@
 #define ARRAY_FLAG_IS_KEYLIST SERIES_FLAG_IS_KEYLIKE
 
 
-//=//// PARAMLIST_FLAG_HAS_RETURN /////////////////////////////////////////=//
-//
-// See ACT_HAS_RETURN() for remarks.  Note: This is a flag on PARAMLIST, not
-// on DETAILS.
-//
-#define PARAMLIST_FLAG_HAS_RETURN \
-    ARRAY_FLAG_24
-
-
 //=//// DETAILS_FLAG_POSTPONES_ENTIRELY ///////////////////////////////////=//
 //
 // A postponing operator causes everything on its left to run before it will.
@@ -75,7 +66,7 @@
 // the stack vs. just one.
 //
 #define DETAILS_FLAG_POSTPONES_ENTIRELY \
-    ARRAY_FLAG_24
+    ARRAY_INFO_24
 
 
 //=//// DETAILS_FLAG_IS_BARRIER ///////////////////////////////////////////=//
@@ -92,7 +83,7 @@
 // was added to the TWEAK list pending a notation in function specs.
 //
 #define DETAILS_FLAG_IS_BARRIER \
-    ARRAY_FLAG_25
+    ARRAY_INFO_25
 
 
 //=//// DETAILS_FLAG_DEFERS_LOOKBACK //////////////////////////////////////=//
@@ -104,7 +95,7 @@
 // is always the same for invocation via a plain word.
 //
 #define DETAILS_FLAG_DEFERS_LOOKBACK \
-    ARRAY_FLAG_26
+    ARRAY_INFO_26
 
 
 //=//// DETAILS_FLAG_QUOTES_FIRST /////////////////////////////////////////=//
@@ -116,7 +107,7 @@
 // walk the parameter list every time that function is called.
 //
 #define DETAILS_FLAG_QUOTES_FIRST \
-    ARRAY_FLAG_27
+    ARRAY_INFO_27
 
 
 //=//// DETAILS_FLAG_SKIPPABLE_FIRST //////////////////////////////////////=//
@@ -130,7 +121,7 @@
 // work too when it doesn't see a SET-WORD! or SET-PATH! to the left.)
 //
 #define DETAILS_FLAG_SKIPPABLE_FIRST \
-    ARRAY_FLAG_28
+    ARRAY_INFO_28
 
 
 //=//// DETAILS_FLAG_IS_NATIVE ////////////////////////////////////////////=//
@@ -142,14 +133,13 @@
 // rebValue() etc. should consider for binding, in addition to lib.  A BLANK!
 // in the 1 slot means no additional consideration...bind to lib only.
 //
-// Note: This is tactially set to be the same as SERIES_INFO_HOLD to make it
+// Note: This was tactially set to be the same as SERIES_INFO_HOLD to make it
 // possible to branchlessly mask in the bit to stop frames from being mutable
-// by user code once native code starts running.
+// by user code once native code starts running.  Shuffling made this no
+// longer possible, so that was dropped...but it could be brought back.
 //
 #define DETAILS_FLAG_IS_NATIVE \
-    ARRAY_FLAG_29
-
-STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
+    ARRAY_INFO_29
 
 
 //=//// DETAILS_FLAG_ENFIXED //////////////////////////////////////////////=//
@@ -159,13 +149,13 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 // attempt at simplification which caused more problems than it solved.
 //
 #define DETAILS_FLAG_ENFIXED \
-    ARRAY_FLAG_30
+    ARRAY_INFO_30
 
 
 //=//// DETAILS_FLAG_31 ///////////////////////////////////////////////////=//
 //
 #define DETAILS_FLAG_31 \
-    ARRAY_FLAG_31
+    ARRAY_INFO_31
 
 
 // These are the flags which are scanned for and set during Make_Action
@@ -182,16 +172,16 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
 
 #define SET_ACTION_FLAG(s,name) \
-    (ACT_DETAILS(s)->leader.bits |= DETAILS_FLAG_##name)
+    (ACT_DETAILS(s)->info.flags.bits |= DETAILS_FLAG_##name)
 
 #define GET_ACTION_FLAG(s,name) \
-    ((ACT_DETAILS(s)->leader.bits & DETAILS_FLAG_##name) != 0)
+    ((ACT_DETAILS(s)->info.flags.bits & DETAILS_FLAG_##name) != 0)
 
 #define CLEAR_ACTION_FLAG(s,name) \
-    (ACT_DETAILS(s)->leader.bits &= ~DETAILS_FLAG_##name)
+    (ACT_DETAILS(s)->info.flags.bits &= ~DETAILS_FLAG_##name)
 
 #define NOT_ACTION_FLAG(s,name) \
-    ((ACT_DETAILS(s)->leader.bits & DETAILS_FLAG_##name) == 0)
+    ((ACT_DETAILS(s)->info.flags.bits & DETAILS_FLAG_##name) == 0)
 
 
 
@@ -208,15 +198,14 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
 
 #define SERIES_MASK_DETAILS \
     (NODE_FLAG_NODE \
-        | SERIES_FLAG_IS_ARRAY \
         | SERIES_FLAG_MISC_NODE_NEEDS_MARK  /* meta */ \
-        | ARRAY_FLAG_IS_DETAILS \
+        | FLAG_FLAVOR(DETAILS) \
         /* LINK is dispatcher, a c function pointer, should not mark */ )
 
 #define SERIES_MASK_PARTIALS \
     (NODE_FLAG_NODE \
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* details */ \
-        | ARRAY_FLAG_IS_PARTIALS \
+        | FLAG_FLAVOR(PARTIALS) \
         /* MISC is unused at this time (could be paramlist cache?) */ )
 
 
@@ -244,9 +233,7 @@ STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
             SERIES_MASK_DETAILS
                 | NODE_FLAG_FREE
                 | NODE_FLAG_CELL
-                | SERIES_FLAG_IS_ARRAY
-                | ARRAY_FLAG_IS_VARLIST
-                | ARRAY_FLAG_IS_PAIRLIST
+                | FLAG_FLAVOR_BYTE(255)
                 | ARRAY_FLAG_HAS_FILE_LINE_UNMASKED
         )) !=
             SERIES_MASK_DETAILS

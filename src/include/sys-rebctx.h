@@ -30,30 +30,6 @@
         | CELL_FLAG_SECOND_IS_NODE  /* phase (for FRAME!) */)
 
 
-//=//// ARRAY_FLAG_FRAME_HAS_BEEN_INVOKED /////////////////////////////////=//
-//
-// It is intrinsic to the design of Redbols that they are allowed to mutate
-// their argument cells.  Hence if you build a frame and then DO it, the
-// arguments will very likely be changed.  Being able to see these changes
-// from the outside in non-debugging cases is dangerous, since it's part of
-// the implementation detail of the function (like how it handles locals)
-// and is not part of the calling contract.
-//
-// This is why you can't say things like `loop 2 [do frame]`...the first time
-// you do the frame it could be arbitrarily corrupted.  Instead you must copy
-// the frame on all but the last time (e.g. `do copy frame, do frame`)
-//
-// The initial implementation of DO of FRAME! would actually create a new
-// varlist node and move the data to id--expiring the old node.  That is
-// expensive, so the cheaper way to do it is to set a flag on the frame.
-// Then, if a frame is archetypal (no phase) it can check this flag before
-// a DO and say the frame can't be run again...nor can fields be assigned
-// or read any longer.
-//
-#define ARRAY_FLAG_FRAME_HAS_BEEN_INVOKED \
-    ARRAY_FLAG_24
-
-
 
 // A context's varlist is always allocated dynamically, in order to speed
 // up variable access--no need to test USED_BYTE_OR_255 for 255.
@@ -64,15 +40,14 @@
 //
 #define SERIES_MASK_VARLIST \
     (NODE_FLAG_NODE | SERIES_FLAG_DYNAMIC \
-        | SERIES_FLAG_IS_ARRAY \
+        | FLAG_FLAVOR(VARLIST) \
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* keysource */ \
-        | SERIES_FLAG_MISC_NODE_NEEDS_MARK  /* meta */ \
-        | ARRAY_FLAG_IS_VARLIST)
+        | SERIES_FLAG_MISC_NODE_NEEDS_MARK  /* meta */)
 
 #define SERIES_MASK_KEYLIST \
     (NODE_FLAG_NODE  /* NOT always dynamic */ \
-        | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* ancestor */ \
-        | SERIES_FLAG_IS_KEYLIKE)
+        | FLAG_FLAVOR(KEYLIST) \
+        | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* ancestor */ )
 
 
 #ifdef CPLUSPLUS_11
@@ -120,10 +95,7 @@
             SERIES_MASK_VARLIST
                 | NODE_FLAG_FREE
                 | NODE_FLAG_CELL
-                | SERIES_FLAG_IS_ARRAY
-                | ARRAY_FLAG_IS_DETAILS
-                | ARRAY_FLAG_IS_PARTIALS
-                | ARRAY_FLAG_IS_PAIRLIST
+                | FLAG_FLAVOR_BYTE(255)
                 | ARRAY_FLAG_HAS_FILE_LINE_UNMASKED
         )) !=
             SERIES_MASK_VARLIST

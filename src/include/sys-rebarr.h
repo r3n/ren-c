@@ -20,11 +20,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// REBARR is an opaque type alias for REBSER.  The distinction of when a
-// series node is specially chosen by having the SECOND_BYTE in the info bits
-// (a.k.a. the WIDE_BYTE()) equal to zero.  This allows the info bits to
-// serve as an implicit terminator if the array payload fits into the series
-// node (a "singular array").
+// REBARR is an opaque type alias for REBSER.
 //
 //=//// NOTES /////////////////////////////////////////////////////////////=//
 //
@@ -58,55 +54,66 @@
     (ARRAY_FLAG_HAS_FILE_LINE_UNMASKED | SERIES_FLAG_LINK_NODE_NEEDS_MARK)
 
 
-//=//// ARRAY_FLAG_IS_PATCH ///////////////////////////////////////////////=//
+//=//// ARRAY_FLAG_FRAME_HAS_BEEN_INVOKED /////////////////////////////////=//
 //
-// The concept of "Virtual Binding" is that instances of ANY-ARRAY! values can
-// carry along a collection of contexts that override the bindings of words
-// that are encountered.  This collection is done by means of "patches" that
-// make a linked list of overrides.
+// It is intrinsic to the design of Redbols that they are allowed to mutate
+// their argument cells.  Hence if you build a frame and then DO it, the
+// arguments will very likely be changed.  Being able to see these changes
+// from the outside in non-debugging cases is dangerous, since it's part of
+// the implementation detail of the function (like how it handles locals)
+// and is not part of the calling contract.
 //
-#define ARRAY_FLAG_IS_PATCH \
+// This is why you can't say things like `loop 2 [do frame]`...the first time
+// you do the frame it could be arbitrarily corrupted.  Instead you must copy
+// the frame on all but the last time (e.g. `do copy frame, do frame`)
+//
+// The initial implementation of DO of FRAME! would actually create a new
+// varlist node and move the data to id--expiring the old node.  That is
+// expensive, so the cheaper way to do it is to set a flag on the frame.
+// Then, if a frame is archetypal (no phase) it can check this flag before
+// a DO and say the frame can't be run again...nor can fields be assigned
+// or read any longer.
+//
+// !!! This may not be the best place to put this flag, review.
+//
+#define ARRAY_FLAG_FRAME_HAS_BEEN_INVOKED \
     FLAG_LEFT_BIT(17)
 
 
-//=//// ARRAY_FLAG_IS_DETAILS /////////////////////////////////////////////=//
+//=//// PARAMLIST_FLAG_HAS_RETURN /////////////////////////////////////////=//
 //
-// ARRAY_FLAG_IS_DETAILS indicates the array is the details list of an ACTION!
-// (The first element will be a canon value for the ACTION!)
+// See ACT_HAS_RETURN() for remarks.  Note: This is a flag on PARAMLIST, not
+// on DETAILS.
 //
-#define ARRAY_FLAG_IS_DETAILS \
+// !!! Doesn't belong here, but as with many bits it's being pushed around
+// as part of the "flavor" conversion.
+//
+#define PARAMLIST_FLAG_HAS_RETURN \
     FLAG_LEFT_BIT(18)
 
 
-//=//// ARRAY_FLAG_IS_VARLIST /////////////////////////////////////////////=//
+//=//// ARRAY_FLAG_19 /////////////////////////////////////////////////////=//
 //
-// This indicates this series represents the "varlist" of a context (which is
-// interchangeable with the identity of the varlist itself).  A second series
-// can be reached from it via the `->misc` field in the series node, which is
-// a second array known as a "keylist".
-//
-// See notes on REBCTX for further details about what a context is.
-//
-#define ARRAY_FLAG_IS_VARLIST \
+#define ARRAY_FLAG_19 \
     FLAG_LEFT_BIT(19)
 
 
-//=//// ARRAY_FLAG_IS_PAIRLIST ////////////////////////////////////////////=//
+//=//// ARRAY_FLAG_PATCH_REUSED ///////////////////////////////////////////=//
 //
-// Indicates that this series represents the "pairlist" of a map, so the
-// series also has a hashlist linked to in the series node.
+// It's convenient to be able to know when a patch returned from a make call
+// is reused or not.  But adding that parameter to the interface complicates
+// it.  There's plenty of bits free on patch array flags, so just use one.
 //
-#define ARRAY_FLAG_IS_PAIRLIST \
+// !!! This could use a cell marking flag on the patch's cell, but putting
+// it here as a temporary measure.
+//
+#define ARRAY_FLAG_PATCH_REUSED \
     FLAG_LEFT_BIT(20)
 
 
-//=//// ARRAY_FLAG_IS_PARTIALS ////////////////////////////////////////////=//
+//=//// ARRAY_FLAG_21 /////////////////////////////////////////////////////=//
 //
-// In order to make it possible to reuse exemplars and paramlists in action
-// variations that have different partial specializations, a splice of
-// partial refinements can sit between the action cell and its "speciality".
-//
-#define ARRAY_FLAG_IS_PARTIALS \
+#define ARRAY_FLAG_21 \
     FLAG_LEFT_BIT(21)
 
 
@@ -141,14 +148,14 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 // These flags are available for use by specific array subclasses (e.g. a
 // PARAMLIST might use it for different things from a VARLIST)
 
-#define ARRAY_FLAG_24 FLAG_LEFT_BIT(24)
-#define ARRAY_FLAG_25 FLAG_LEFT_BIT(25)
-#define ARRAY_FLAG_26 FLAG_LEFT_BIT(26)
-#define ARRAY_FLAG_27 FLAG_LEFT_BIT(27)
-#define ARRAY_FLAG_28 FLAG_LEFT_BIT(28)
-#define ARRAY_FLAG_29 FLAG_LEFT_BIT(29)
-#define ARRAY_FLAG_30 FLAG_LEFT_BIT(30)
-#define ARRAY_FLAG_31 FLAG_LEFT_BIT(31)
+#define ARRAY_INFO_24 FLAG_LEFT_BIT(24)
+#define ARRAY_INFO_25 FLAG_LEFT_BIT(25)
+#define ARRAY_INFO_26 FLAG_LEFT_BIT(26)
+#define ARRAY_INFO_27 FLAG_LEFT_BIT(27)
+#define ARRAY_INFO_28 FLAG_LEFT_BIT(28)
+#define ARRAY_INFO_29 FLAG_LEFT_BIT(29)
+#define ARRAY_INFO_30 FLAG_LEFT_BIT(30)
+#define ARRAY_INFO_31 FLAG_LEFT_BIT(31)
 
 
 //=//////////// ^-- STOP ARRAY FLAGS AT FLAG_LEFT_BIT(31) --^ /////////////=//
@@ -215,9 +222,8 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 
         if ((reinterpret_cast<const REBSER*>(p)->leader.bits & (
             NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
-            | SERIES_FLAG_IS_ARRAY
         )) != (
-            NODE_FLAG_NODE | SERIES_FLAG_IS_ARRAY
+            NODE_FLAG_NODE
         )){
             panic (p);
         }

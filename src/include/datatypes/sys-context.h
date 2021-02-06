@@ -231,12 +231,12 @@ inline static REBSER *CTX_KEYLIST(REBCTX *c) {
 }
 
 static inline void INIT_CTX_KEYLIST_SHARED(REBCTX *c, REBSER *keylist) {
-    SET_SERIES_INFO(keylist, KEYLIST_SHARED);
+    SET_SERIES_FLAG(keylist, KEYLIST_SHARED);
     INIT_LINK_KEYSOURCE(CTX_VARLIST(c), keylist);
 }
 
 static inline void INIT_CTX_KEYLIST_UNIQUE(REBCTX *c, REBSER *keylist) {
-    assert(NOT_SERIES_INFO(keylist, KEYLIST_SHARED));
+    assert(NOT_SERIES_FLAG(keylist, KEYLIST_SHARED));
     INIT_LINK_KEYSOURCE(CTX_VARLIST(c), keylist);
 }
 
@@ -404,7 +404,7 @@ inline static void INIT_VAL_FRAME_PHASE(RELVAL *v, REBACT *phase) {
 
 inline static REBACT *VAL_FRAME_PHASE(REBCEL(const*) v) {
     REBSER *s = VAL_FRAME_PHASE_OR_LABEL(v);
-    if (not s or IS_SER_STRING(s))  // ANONYMOUS or label, not a phase
+    if (not s or IS_SYMBOL(s))  // ANONYMOUS or label, not a phase
         return CTX_FRAME_ACTION(VAL_CONTEXT(v));  // so use archetype
     return ACT(s);  // cell has its own phase, return it
 }
@@ -412,12 +412,12 @@ inline static REBACT *VAL_FRAME_PHASE(REBCEL(const*) v) {
 inline static bool IS_FRAME_PHASED(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_FRAME);
     REBSER *s = VAL_FRAME_PHASE_OR_LABEL(v);
-    return s and not IS_SER_STRING(s);
+    return s and not IS_SYMBOL(s);
 }
 
 inline static option(const REBSYM*) VAL_FRAME_LABEL(const RELVAL *v) {
     REBSER *s = VAL_FRAME_PHASE_OR_LABEL(v);
-    if (s and IS_SER_STRING(s))  // label in value
+    if (s and IS_SYMBOL(s))  // label in value
         return SYM(s);
     return ANONYMOUS;  // has a phase, so no label (maybe findable if running)
 }
@@ -628,8 +628,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
             | SERIES_FLAG_FIXED_SIZE
     );
     SER_INFO(copy) = Endlike_Header(
-        FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
-            | FLAG_USED_BYTE_ARRAY()  // also reserved
+        FLAG_USED_BYTE_ARRAY()  // reserved for future use
     );
     TRASH_POINTER_IF_DEBUG(node_LINK(KeySource, copy)); // needs update
     memcpy(  // https://stackoverflow.com/q/57721104/

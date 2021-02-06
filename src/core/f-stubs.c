@@ -302,7 +302,7 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     //
     REBNOD *archetype_phase = VAL_FRAME_PHASE_OR_LABEL_NODE(archetype);
     if (CTX_TYPE(c) == REB_FRAME)
-        assert(GET_ARRAY_FLAG(ARR(archetype_phase), IS_DETAILS));
+        assert(IS_DETAILS(ARR(archetype_phase)));
     else
         assert(archetype_phase == nullptr);
 }

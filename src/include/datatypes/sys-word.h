@@ -62,7 +62,7 @@
 
 inline static void INIT_LINK_KEYSOURCE(REBARR *varlist, REBNOD *keysource) {
     if (not Is_Node_Cell(keysource))
-        assert(GET_SERIES_FLAG(SER(keysource), IS_KEYLIKE));
+        assert(IS_KEYLIST(SER(keysource)));
     mutable_LINK(KeySource, varlist) = keysource;
 }
 

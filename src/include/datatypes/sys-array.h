@@ -204,10 +204,12 @@ inline static void Prep_Array(
 // Make a series that is the right size to store REBVALs (and marked for the
 // garbage collector to look into recursively).  ARR_LEN() will be 0.
 //
-inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
+inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
+{
     const REBLEN wide = sizeof(REBVAL);
 
-    REBSER *s = Alloc_Series_Node(flags | SERIES_FLAG_IS_ARRAY);
+    REBSER *s = Alloc_Series_Node(flags);
+    assert(IS_SER_ARRAY(s));  // flavor should have been an array flavor
 
     if (
         (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold
@@ -238,8 +240,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
     }
 
     SER_INFO(s) = Endlike_Header(
-        FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
-            | FLAG_USED_BYTE_ARRAY()  // also reserved
+        FLAG_USED_BYTE_ARRAY()  // reserved for future use
     );
 
     // It is more efficient if you know a series is going to become managed to

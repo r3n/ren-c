@@ -153,8 +153,8 @@ void *RL_rebMalloc(size_t size)
         ALIGN_SIZE  // stores REBSER* (must be at least big enough for void*)
             + size  // for the actual data capacity (may be 0, see notes)
             + 1,  // for termination (AS TEXT! of rebRepossess(), see notes)
-        sizeof(REBYTE),  // rebRepossess() only creates binary series ATM
-        SERIES_FLAG_DONT_RELOCATE  // direct data pointer is being handed back
+        FLAG_FLAVOR(BINARY)  // rebRepossess() only creates binary series ATM
+            | SERIES_FLAG_DONT_RELOCATE  // direct data pointer handed back
             | SERIES_FLAG_DYNAMIC  // rebRepossess() needs bias field
     ));
 
@@ -1695,7 +1695,9 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         else
             p = *packed++;
         if (p and Detect_Rebol_Pointer(p) == DETECTED_AS_END) {
-            a = Alloc_Singular(NODE_FLAG_MANAGED);
+            a = Alloc_Singular(
+                FLAG_FLAVOR(INSTRUCTION_ADJUST_QUOTING) | NODE_FLAG_MANAGED
+            );
             CLEAR_SERIES_FLAG(a, MANAGED);  // see notes above on why we lied
             Quotify(Move_Value(ARR_SINGLE(a), first), 1);
         }
@@ -1715,7 +1717,11 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
             Fetch_Next_In_Feed(feed);
         }
 
-        a = Pop_Stack_Values_Core(dsp_orig, NODE_FLAG_MANAGED);
+        a = Pop_Stack_Values_Core(
+            dsp_orig,
+            NODE_FLAG_MANAGED
+                | FLAG_FLAVOR(INSTRUCTION_ADJUST_QUOTING)
+        );
         CLEAR_SERIES_FLAG(a, MANAGED);  // see notes above on why we lied
 
         Free_Feed(feed);
@@ -1730,7 +1736,6 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
     if (ARR_LEN(a) > 1)
         fail ("rebU() and rebQ() currently can't splice more than one value");
 
-    SET_ARRAY_FLAG(a, INSTRUCTION_ADJUST_QUOTING);
     a->misc.quoting_delta = delta - 1;
     return cast(REBINS*, a);
 }
@@ -1782,10 +1787,10 @@ const REBINS *RL_rebRELEASING(REBVAL *v)
         fail ("Cannot apply rebR() to non-API value");
 
     REBARR *a = Singular_From_Cell(v);
-    if (GET_ARRAY_FLAG(a, SINGULAR_API_RELEASE))
+    if (SER_FLAVOR(a) == FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE)
         fail ("Cannot apply rebR() more than once to the same API value");
 
-    SET_ARRAY_FLAG(a, SINGULAR_API_RELEASE);
+    mutable_FLAVOR_BYTE(a) = FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE;
     return cast(REBINS*, a);
 }
 
@@ -1805,8 +1810,9 @@ const void *RL_rebINLINE(const REBVAL *v)
     if (IS_ACTION(v))
         return v;  // just let actions through as-is (helpful for predicates)
 
-    REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED
-                                    | ARRAY_FLAG_INSTRUCTION_SPLICE);
+    REBARR *a = Alloc_Singular(
+        FLAG_FLAVOR(INSTRUCTION_SPLICE) | NODE_FLAG_MANAGED
+    );
     CLEAR_SERIES_FLAG(a, MANAGED);  // lying avoided manuals tracking
 
     if (IS_BLOCK(v)) {  // splice entire block contents
@@ -2155,7 +2161,7 @@ REBNATIVE(api_transient)
     REBVAL *v = Move_Value(Alloc_Value(), ARG(value));
     rebUnmanage(v);  // has to survive the API-TRANSIENT's frame
     REBARR *a = Singular_From_Cell(v);
-    SET_ARRAY_FLAG(a, SINGULAR_API_RELEASE);
+    mutable_FLAVOR_BYTE(a) = FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE;
 
     // Regarding adddresses in WASM:
     //

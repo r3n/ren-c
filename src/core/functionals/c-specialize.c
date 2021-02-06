@@ -123,7 +123,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     // If there is a PARTIALS list, then push its refinements.
     //
     REBARR *specialty = ACT_SPECIALTY(act);
-    if (GET_ARRAY_FLAG(specialty, IS_PARTIALS)) {
+    if (IS_PARTIALS(specialty)) {
         const REBVAL *word = SPECIFIC(ARR_HEAD(specialty));
         for (; NOT_END(word); ++word)
             Move_Value(DS_PUSH(), word);

@@ -64,7 +64,7 @@ REB_R MAKE_Library(
     if (fd == NULL)
         fail (arg);
 
-    REBLIB *lib = Alloc_Singular(NODE_FLAG_MANAGED);
+    REBLIB *lib = Alloc_Singular(FLAG_FLAVOR(LIBRARY) | NODE_FLAG_MANAGED);
     Init_Unreadable_Void(ARR_SINGLE(lib));  // !!! save name? other data?
 
     lib->link.fd = fd;  // seen as shared by all instances

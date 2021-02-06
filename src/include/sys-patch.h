@@ -55,13 +55,6 @@
 //
 
 
-// It's convenient to be able to know when a patch returned from a make call
-// is reused or not.  But adding that parameter to the interface complicates
-// it.  There's plenty of bits free on patch array flags, so just use one.
-//
-#define ARRAY_FLAG_PATCH_REUSED ARRAY_FLAG_24
-
-
 // The virtual binding patches keep a circularly linked list of their variants
 // that have distinct next pointers.  This way, they can look through that
 // list before creating an equivalent chain to one that already exists.
@@ -112,7 +105,7 @@
         if (not a)
             return SPECIFIED;
 
-        if (GET_ARRAY_FLAG(a, IS_PATCH))
+        if (IS_PATCH(a))
             return cast(REBSPC*, a);  // virtual bind
 
         // While an ANY-WORD! can be bound specifically to an arbitrary
@@ -159,7 +152,7 @@ inline static REBARR *Make_Patch_Core(
     // for the moment assume it only happens on accident and alert us to it.
     // Over the long run, this needs to be legal, though.
     //
-    if (next and GET_ARRAY_FLAG(next, IS_PATCH)) {
+    if (next and IS_PATCH(next)) {
         assert(BINDING(ARR_SINGLE(next)) != CTX_VARLIST(ctx));
     }
 
@@ -216,16 +209,17 @@ inline static REBARR *Make_Patch_Core(
     //   mechanism needs revisiting, but it's just another reason.)
     //
     REBARR *patch = Alloc_Singular(
-        NODE_FLAG_MANAGED
         //
         // LINK is not used yet (likely application: symbol for patches that
         // represent lets).  Consider uses in patches that represent objects.
+        // So no SERIES_FLAG_LINK_NODE_NEEDS_MARK yet.
         //
         // MISC is a node, but it's used for linking patches to variants
         // with different chains underneath them...and shouldn't keep that
         // alternate version alive.  So no SERIES_FLAG_MISC_NODE_NEEDS_MARK.
         //
-        | ARRAY_FLAG_IS_PATCH
+        FLAG_FLAVOR(PATCH)
+            | NODE_FLAG_MANAGED
     );
 
     Init_Any_Word_Bound(ARR_SINGLE(patch), kind, ctx, limit);

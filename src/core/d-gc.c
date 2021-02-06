@@ -52,7 +52,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(VAL_QUOTED_DEPTH(v) >= 3);
         REBCEL(const*) cell = VAL_UNESCAPED(v);
         if (ANY_WORD_KIND(CELL_KIND(cell)))
-            assert(GET_SERIES_FLAG(BINDING(cell), IS_STRING));  // unbound
+            assert(IS_SYMBOL(BINDING(cell)));  // unbound
         return;
     }
 
@@ -62,20 +62,14 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
     if (
         IS_BINDABLE_KIND(heart)
         and (binding = BINDING(v))
-        and NOT_SERIES_FLAG(binding, IS_STRING)
+        and not IS_SYMBOL(binding)
         and NOT_SERIES_FLAG(binding, INACCESSIBLE)
     ){
+        if (not IS_SER_ARRAY(binding))
+            panic(binding);
+
         assert(IS_SER_ARRAY(binding));
-        if (
-            GET_ARRAY_FLAG(ARR(binding), IS_VARLIST)
-            and (CTX_TYPE(CTX(binding)) == REB_FRAME)
-        ){
-            if (
-                (binding->leader.bits & SERIES_MASK_VARLIST)
-                != SERIES_MASK_VARLIST
-            ){
-                panic (binding);
-            }
+        if (IS_VARLIST(binding) and CTX_TYPE(CTX(binding)) == REB_FRAME) {
             REBNOD *keysource = LINK(KeySource, ARR(binding));
             if (not Is_Node_Cell(keysource)) {
                 if (
@@ -216,7 +210,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(SER_WIDE(s) == sizeof(REBYTE));
         assert(Is_Marked(s));
 
-        if (not IS_STR_SYMBOL(STR(s))) {
+        if (IS_NONSYMBOL_STRING(s)) {
             REBBMK *bookmark = LINK(Bookmarks, s);
             if (bookmark) {
                 assert(not LINK(Bookmarks, bookmark));  // just one for now
@@ -263,7 +257,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
                     assert(VAL_FRAME_BINDING(v) == FRM_BINDING(f));
             }
             else
-                assert(GET_ARRAY_FLAG(Singular_From_Cell(v), IS_PATCH));
+                assert(IS_PATCH(Singular_From_Cell(v)));
         }
 
         if (PAYLOAD(Any, v).second.node) {
@@ -352,11 +346,8 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         REBSPC *cache = VAL_WORD_CACHE(v);
         if (cache) {
             assert(
-                GET_ARRAY_FLAG(cache, IS_PATCH)
-                or (
-                    GET_ARRAY_FLAG(cache, IS_VARLIST)
-                    and GET_ARRAY_FLAG(Singular_From_Cell(v), IS_PATCH)
-                )
+                IS_PATCH(cache)
+                or (IS_VARLIST(cache) and IS_PATCH(Singular_From_Cell(v)))
             );
         }
 
@@ -514,7 +505,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         assert(IS_SER_ARRAY(a));
     #endif
 
-    if (GET_ARRAY_FLAG(a, IS_DETAILS)) {
+    if (IS_DETAILS(a)) {
         const RELVAL *archetype = ARR_HEAD(a);
         assert(IS_ACTION(archetype));
         assert(VAL_ACTION_BINDING(archetype) == UNBOUND);
@@ -527,11 +518,11 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         assert(Is_Marked(details));
 
         REBARR *list = ACT_SPECIALTY(VAL_ACTION(archetype));
-        if (GET_ARRAY_FLAG(list, IS_PARTIALS))
+        if (IS_PARTIALS(list))
             list = CTX_VARLIST(LINK(PartialsExemplar, list));
-        assert(GET_ARRAY_FLAG(list, IS_VARLIST));
+        assert(IS_VARLIST(list));
     }
-    else if (GET_ARRAY_FLAG(a, IS_VARLIST)) {
+    else if (IS_VARLIST(a)) {
         const REBVAL *archetype = CTX_ARCHETYPE(CTX(m_cast(REBARR*, a)));
 
         // Currently only FRAME! archetypes use binding
@@ -560,10 +551,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         }
         else {
             REBSER *keylist = SER(keysource);
-            if (IS_SER_ARRAY(keylist))
-                panic (a);
-
-            assert(GET_SERIES_FLAG(keylist, IS_KEYLIKE));
+            assert(IS_KEYLIST(keylist));
 
             if (IS_FRAME(archetype)) {
                 // Frames use paramlists as their "keylist", there is no
@@ -575,7 +563,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
             }
         }
     }
-    else if (GET_ARRAY_FLAG(a, IS_PAIRLIST)) {
+    else if (IS_PAIRLIST(a)) {
         //
         // There was once a "small map" optimization that wouldn't
         // produce a hashlist for small maps and just did linear search.

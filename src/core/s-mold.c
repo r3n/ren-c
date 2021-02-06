@@ -636,7 +636,6 @@ void Push_Mold(REB_MOLD *mo)
         Remake_Series(
             s,
             SER_USED(s) + MIN_COMMON,
-            SER_WIDE(s),
             NODE_FLAG_NODE // NODE_FLAG_NODE means preserve the data
         );
         TERM_STR_LEN_SIZE(mo->series, len, SER_USED(s));
@@ -815,7 +814,7 @@ void Drop_Mold_Core(
 //
 void Startup_Mold(REBLEN size)
 {
-    TG_Mold_Stack = Make_Series(10, sizeof(const void*));
+    TG_Mold_Stack = Make_Series(10, FLAVOR_MOLDSTACK);
 
     // Most string code tries to optimize "bookmarks" that help map indices
     // to encoded codepoint positions in such a way that when the string

@@ -39,7 +39,6 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
 
     REBSER *keylist = Make_Series_Core(
         capacity,  // no terminator
-        sizeof(REBKEY),
         SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED  // always shareable
     );
     mutable_LINK(Ancestor, keylist) = keylist;  // default to keylist itself
@@ -69,9 +68,9 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
 bool Expand_Context_Keylist_Core(REBCTX *context, REBLEN delta)
 {
     REBSER *keylist = CTX_KEYLIST(context);
-    assert(GET_SERIES_FLAG(keylist, IS_KEYLIKE));
+    assert(IS_KEYLIST(keylist));
 
-    if (GET_SERIES_INFO(keylist, KEYLIST_SHARED)) {
+    if (GET_SERIES_FLAG(keylist, KEYLIST_SHARED)) {
         //
         // INIT_CTX_KEYLIST_SHARED was used to set the flag that indicates
         // this keylist is shared with one or more other contexts.  Can't
@@ -368,7 +367,6 @@ REBSER *Collect_Keylist_Managed(
     else {
         keylist = Make_Series_Core(
             num_collected,  // no terminator
-            sizeof(REBKEY),
             SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
         );
         
@@ -1063,7 +1061,7 @@ void Assert_Context_Core(REBCTX *c)
 
     REBLEN n;
     for (n = 1; n < vars_len; n++, var++, key++) {
-        if (not IS_SER_STRING(*key) and IS_STR_SYMBOL(STR(*key)))
+        if (not IS_SYMBOL(*key))
             panic (*key);
 
         if (IS_END(var)) {

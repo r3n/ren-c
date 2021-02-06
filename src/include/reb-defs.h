@@ -273,6 +273,10 @@ typedef struct Reb_Action REBACT;
 struct Reb_Map;
 typedef struct Reb_Map REBMAP;
 
+struct Reb_Bookmark {
+    REBLEN index;
+    REBSIZ offset;
+};
 
 //=//// BINDING ///////////////////////////////////////////////////////////=//
 
@@ -466,20 +470,6 @@ enum Reb_Vararg_Op {
     VARARG_OP_TAIL_Q, // tail?
     VARARG_OP_FIRST, // "lookahead"
     VARARG_OP_TAKE // doesn't modify underlying data stream--advances index
-};
-
-
-//=//// API OPCODES ///////////////////////////////////////////////////////=//
-//
-// The libRebol API can take REBVAL*, or UTF-8 strings of raw textual material
-// to scan and bind, or it can take a REBARR* of an "API instruction".
-//
-// These opcodes must be visible to the REBSER definition, as they live in
-// the `MISC()` section.
-//
-
-enum Reb_Api_Opcode {
-    API_OPCODE_UNUSED  // !!! Not currently used, review
 };
 
 

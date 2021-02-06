@@ -210,7 +210,8 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
         // !!! Actually, THIS CODE CAN'T FAIL.  :-/  It is part of the
         // implementation of fail's cleanup itself.
         //
-        if (GET_ARRAY_FLAG(inst1, INSTRUCTION_ADJUST_QUOTING)) {
+        switch (SER_FLAVOR(inst1)) {
+          case FLAVOR_INSTRUCTION_ADJUST_QUOTING: {
             assert(NOT_SERIES_FLAG(inst1, MANAGED));
 
             // !!! Previously this didn't allow the case of:
@@ -237,8 +238,9 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             feed->value = &feed->fetched;
 
             GC_Kill_Series(inst1);  // not manuals-tracked
-        }
-        else if (GET_ARRAY_FLAG(inst1, INSTRUCTION_SPLICE)) {
+            break; }
+
+          case FLAVOR_INSTRUCTION_SPLICE: {
             REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
             if (IS_BLOCK(single)) {
                 feed->value = nullptr;  // will become FEED_PENDING(), ignored
@@ -249,8 +251,9 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
                 feed->value = &feed->fetched;
             }
             GC_Kill_Series(inst1);
-        }
-        else if (GET_ARRAY_FLAG(inst1, SINGULAR_API_RELEASE)) {
+            break; }
+
+          case FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE: {
             //
             // !!! Originally this asserted it was a managed handle, but the
             // needs of API-TRANSIENT are such that a handle which outlives
@@ -268,10 +271,20 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             Quotify(&feed->fetched, QUOTING_BYTE(feed));
             feed->value = &feed->fetched;
             rebRelease(single);  // *is* the instruction
-        }
-        else
+            break; }
+        
+          default:
+            //
+            // Besides instructions, other series types aren't currenlty
+            // supported...though it was considered that you could use
+            // REBCTX* or REBACT* directly instead of their archtypes.  This
+            // was considered when thinking about ditching value archetypes
+            // altogether (e.g. no usable cell pattern guaranteed at the head)
+            // but it's important in several APIs to emphasize a value gives
+            // phase information, while archetypes do not.
+            // 
             panic (inst1);
-
+        }
         break; }
 
       case DETECTED_AS_CELL: {
@@ -491,10 +504,9 @@ inline static REBFED* Alloc_Feed(void) {
     Init_Unreadable_Void(Prep_Cell(&feed->lookback));
 
     REBSER *s = &feed->singular;  // SER() not yet valid
-    s->leader.bits = NODE_FLAG_NODE | SERIES_FLAG_IS_ARRAY;
+    s->leader.bits = NODE_FLAG_NODE | FLAG_FLAVOR(FEED);
     SER_INFO(s) = Endlike_Header(
-        FLAG_WIDE_BYTE_ARRAY()  // reserved for future use
-            | FLAG_USED_BYTE_ARRAY()  // also reserved
+        FLAG_USED_BYTE_ARRAY()  // reserved for future use
     );
     Prep_Cell(FEED_SINGLE(feed));
     mutable_LINK(Splice, &feed->singular) = nullptr;

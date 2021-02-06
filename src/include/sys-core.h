@@ -186,6 +186,7 @@
 #include "mem-pools.h"
 
 #include "sys-rebval.h"  // low level Rebol cell structure definition
+#include "sys-flavor.h"  // series subclass marking byte definitions
 #include "sys-rebser.h"  // series structure definition (embeds REBVAL)
 
 

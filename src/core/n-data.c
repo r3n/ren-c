@@ -1022,7 +1022,7 @@ bool Try_As_String(
         const REBSTR *str;
         REBLEN index;
         if (
-            NOT_SERIES_FLAG(bin, IS_STRING)
+            not IS_SER_UTF8(bin)
             or strmode != STRMODE_ALL_CODEPOINTS
         ){
             // If the binary wasn't created as a view on string data to
@@ -1062,7 +1062,7 @@ bool Try_As_String(
 
                 ++num_codepoints;
             }
-            SET_SERIES_FLAG(m_cast(REBBIN*, bin), IS_STRING);
+            mutable_FLAVOR_BYTE(bin) = FLAVOR_STRING;
             str = STR(bin);
 
             TERM_STR_LEN_SIZE(
@@ -1362,7 +1362,7 @@ REBNATIVE(as)
             if (VAL_INDEX(v) != 0)  // can't reuse non-head series AS WORD!
                 goto intern_utf8;
 
-            if (IS_STR_SYMBOL(s)) {
+            if (IS_SYMBOL(s)) {
                 //
                 // This string's content was already frozen and checked, e.g.
                 // the string came from something like `as text! 'some-word`
@@ -1394,7 +1394,7 @@ REBNATIVE(as)
                     fail (Error_Alias_Constrains_Raw());
 
             const REBSTR *str;
-            if (IS_SER_STRING(bin) and IS_STR_SYMBOL(STR(bin)))
+            if (IS_SYMBOL(bin))
                 str = STR(bin);
             else {
                 // !!! There isn't yet a mechanic for interning an existing
@@ -1413,7 +1413,7 @@ REBNATIVE(as)
                 // Constrain the input in the way it would be if we were doing
                 // the more efficient reuse.
                 //
-                SET_SERIES_FLAG(m_cast(REBBIN*, bin), IS_STRING);
+                mutable_FLAVOR_BYTE(bin) = FLAVOR_STRING;
                 Freeze_Series(bin);
             }
 

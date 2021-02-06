@@ -59,7 +59,9 @@ void Splice_Block_Into_Feed(REBFED *feed, const REBVAL *splice) {
     // be used once the splice runs out.
     //
     if (FEED_IS_VARIADIC(feed) or NOT_END(feed->value)) {
-        REBARR *saved = Alloc_Singular(SERIES_FLAG_MANAGED);  // no tracking
+        REBARR *saved = Alloc_Singular(
+            FLAG_FLAVOR(FEED) | SERIES_FLAG_MANAGED  // no tracking
+        );
         memcpy(saved, FEED_SINGULAR(feed), sizeof(REBARR));
         assert(NOT_SERIES_FLAG(saved, MANAGED));
 

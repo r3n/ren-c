@@ -197,13 +197,12 @@ void* Probe_Core_Debug(
         // types in terms of sizing, just to know what they are.
 
         if (SER_WIDE(s) == sizeof(REBYTE)) {
-            if (GET_SERIES_FLAG(s, IS_STRING)) {
-                REBSTR *str = STR(s);
-                if (IS_STR_SYMBOL(str))
+            if (IS_SER_UTF8(s)) {
+                if (IS_SYMBOL(s))
                     Probe_Print_Helper(p, expr, "WORD! series", file, line);
                 else
                     Probe_Print_Helper(p, expr, "STRING! series", file, line);
-                Mold_Text_Series_At(mo, str, 0);  // or could be TAG!, etc.
+                Mold_Text_Series_At(mo, STR(s), 0);  // or could be TAG!, etc.
             }
             else {
                 REBBIN *bin = BIN(s);
@@ -218,7 +217,7 @@ void* Probe_Core_Debug(
             }
         }
         else if (IS_SER_ARRAY(s)) {
-            if (GET_ARRAY_FLAG(ARR(s), IS_VARLIST)) {
+            if (IS_VARLIST(s)) {
                 Probe_Print_Helper(p, expr, "Context Varlist", file, line);
                 Probe_Molded_Value(CTX_ARCHETYPE(CTX(s)));
             }
@@ -227,7 +226,7 @@ void* Probe_Core_Debug(
                 Mold_Array_At(mo, ARR(s), 0, "[]"); // not necessarily BLOCK!
             }
         }
-        else if (GET_SERIES_FLAG(s, IS_KEYLIKE)) {
+        else if (IS_KEYLIST(s)) {
             assert(SER_WIDE(s) == sizeof(REBKEY));  // ^-- or is byte size
             Probe_Print_Helper(p, expr, "Keylist Series", file, line);
             const REBKEY *tail = SER_TAIL(REBKEY, s);

@@ -222,62 +222,76 @@
     FLAG_LEFT_BIT(11)
 
 
-//=//// SERIES_FLAG_IS_STRING /////////////////////////////////////////////=//
+//=//// SERIES_FLAG_12 ////////////////////////////////////////////////////=//
 //
-// Indicates the series holds a UTF-8 encoded string.  Ren-C strings follow
-// the "UTF-8 Everywhere" manifesto, where they are not decoded into a fixed
-// number of bytes per character array, but remain in UTF8 at all times:
-//
-// http://utf8everywhere.org/
-//
-// There are two varieties of string series, those used by ANY-STRING! and
-// those used by ANY-WORD!, tested with IS_STR_SYMBOL().  While they store
-// their content the same, they use the MISC() and LINK() fields of the series
-// node differently.
-//
-#define SERIES_FLAG_IS_STRING \
+#define SERIES_FLAG_12 \
     FLAG_LEFT_BIT(12)
 
 
-//=//// SERIES_FLAG_IS_ARRAY //////////////////////////////////////////////=//
+//=//// SERIES_FLAG_KEYLIST_SHARED ////////////////////////////////////////=//
 //
-// Indicates that the series is an array.
+// This is indicated on the keylist array of a context when that same array
+// is the keylist for another object.  If this flag is set, then modifying an
+// object using that keylist (such as by adding a key/value pair) will require
+// that object to make its own copy.
 //
-// Note: Previously the SER_WIDE() byte of 0 was used for this test.  This
-// made it do double-duty as an END marker for singular arrays.  However,
-// END markers are being phased out for their wastefulness...meaning a flag
-// is going to be needed.  This also lets array variants that do not have
-// INFO bits can be possible...repurposing that pointer for something else.
+// Note: This flag did not exist in R3-Alpha, so all expansions would copy--
+// even if expanding the same object by 1 item 100 times with no sharing of
+// the keylist.  That would make 100 copies of an arbitrary long keylist that
+// the GC would have to clean up.
 //
-#define SERIES_FLAG_IS_ARRAY \
+// !!! Does not belong here, but to try and make progress on the flavor bytes
+// it was moved since it was not a hold/locking related bit.
+//
+#define SERIES_FLAG_KEYLIST_SHARED \
     FLAG_LEFT_BIT(13)
 
 
-//=//// SERIES_FLAG_14 ////////////////////////////////////////////////////=//
+//=//// SERIES_FLAG_BLACK /////////////////////////////////////////////////=//
 //
-#define SERIES_FLAG_14 \
+// This is a generic bit for the "coloring API", e.g. Is_Series_Black(),
+// Flip_Series_White(), etc.  These let native routines engage in marking
+// and unmarking nodes without potentially wrecking the garbage collector by
+// reusing NODE_FLAG_MARKED.  Purposes could be for recursion protection or
+// other features, to avoid having to make a map from REBSER to bool.
+//
+// !!! Not clear if this belongs in the SERIES_FLAG_XXX or not, but moving
+// it here for now.
+//
+#define SERIES_FLAG_BLACK \
     FLAG_LEFT_BIT(14)
 
 
-//=//// SERIES_FLAG_IS_KEYLIKE ////////////////////////////////////////////=//
+//=//// SERIES_FLAG_15 ////////////////////////////////////////////////////=//
 //
-// This flag is used to have a shareable bit between arrays and non-arrays,
-// specifically so that the same bit can indicate ARRAY_FLAG_IS_KEYLIST and
-// STRING_FLAG_IS_SYMBOL.  This is to anticipate a future where single-length
-// keylists can be represented compactly as just a pointer to the symbol.
-//
-#define SERIES_FLAG_IS_KEYLIKE \
+#define SERIES_FLAG_15 \
     FLAG_LEFT_BIT(15)
 
 
-//=/////// ^-- STOP GENERIC SERIES FLAGS AT FLAG_LEFT_BIT(15) --^ /////////=//
+//=//// BITS 16-23: ARRAY FLAGS ///////////////////////////////////////////=//
+//
+// This space is used currently for array flags to store things like whether
+// the array ends in a newline.  It's a hodepodge of other bits which were
+// rehomed while organizing the flavor bits.  These positions now have the
+// ability to be more thought out after the basics of flavors are solved.
+//
 
-// If a series is not an array, then the rightmost 16 bits of the series flags
-// are used to store an arbitrary per-series-type 16 bit number.  Right now,
-// that's used by the string series to save their SYMID id integer (if they
-// have one).
 
-//=/////// SEE %sys-rebarr.h for the ARRAY_FLAG_XXX definitions here //////=//
+//=//// BITS 24-31: SERIES SUBCLASS ("FLAVOR") ////////////////////////////=//
+//
+// Series subclasses keep a byte to tell which kind they are.  The byte is an
+// enum which is ordered in a way that offers information (e.g. all the
+// arrays are in a range, all the series with wide size of 1 are together...)
+//
+
+#define FLAG_FLAVOR_BYTE(flavor)        FLAG_FOURTH_BYTE(flavor)
+#define FLAG_FLAVOR(name)               FLAG_FLAVOR_BYTE(FLAVOR_##name)
+
+#define FLAVOR_BYTE(s)                  FOURTH_BYTE((s)->leader)
+#define mutable_FLAVOR_BYTE(s)          mutable_FOURTH_BYTE((s)->leader)
+
+#define SER_FLAVOR(s) \
+    x_cast(enum Reb_Series_Flavor, FLAVOR_BYTE(s))
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -300,26 +314,19 @@ STATIC_ASSERT(SERIES_INFO_0_IS_TRUE == NODE_FLAG_NODE);
 STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
 
 
-//=//// SERIES_INFO_2 /////////////////////////////////////////////////////=//
+//=//// SERIES_INFO_AUTO_LOCKED ///////////////////////////////////////////=//
 //
-// Note: Same bit position as NODE_FLAG_MANAGED in flags, if that is relevant.
+// Some operations lock series automatically, e.g. to use a piece of data as
+// map keys.  This approach was chosen after realizing that a lot of times,
+// users don't care if something they use as a key gets locked.  So instead
+// of erroring by telling them they can't use an unlocked series as a map key,
+// this locks it but changes the SERIES_FLAG_HAS_FILE_LINE to implicate the
+// point where the locking occurs.
 //
-#define SERIES_INFO_MISC_BIT \
+// !!! The file-line feature is pending.
+//
+#define SERIES_INFO_AUTO_LOCKED \
     FLAG_LEFT_BIT(2)
-
-
-//=//// SERIES_INFO_BLACK /////////////////////////////////////////////////=//
-//
-// This is a generic bit for the "coloring API", e.g. Is_Series_Black(),
-// Flip_Series_White(), etc.  These let native routines engage in marking
-// and unmarking nodes without potentially wrecking the garbage collector by
-// reusing NODE_FLAG_MARKED.  Purposes could be for recursion protection or
-// other features, to avoid having to make a map from REBSER to bool.
-//
-// Note: Same bit as NODE_FLAG_MARKED, interesting but irrelevant.
-//
-#define SERIES_INFO_BLACK \
-    FLAG_LEFT_BIT(3)
 
 
 //=//// SERIES_INFO_PROTECTED /////////////////////////////////////////////=//
@@ -334,13 +341,7 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
 // ends up affecting all values with that series in the payload.
 //
 #define SERIES_INFO_PROTECTED \
-    FLAG_LEFT_BIT(4)
-
-
-//=//// SERIES_INFO_5 /////////////////////////////////////////////////////=//
-//
-#define SERIES_INFO_5 \
-    FLAG_LEFT_BIT(5)
+    FLAG_LEFT_BIT(3)
 
 
 //=//// SERIES_INFO_FROZEN_DEEP ///////////////////////////////////////////=//
@@ -358,114 +359,7 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
 // value in the series data...then by that point it cannot be enforced.
 //
 #define SERIES_INFO_FROZEN_DEEP \
-    FLAG_LEFT_BIT(6)
-
-
-// !!! Currently we lie here and act like a cell, because it allows the
-// END marker trick to work without sacrificing a SERIES_FLAG.
-//
-#define SERIES_INFO_7_IS_TRUE FLAG_LEFT_BIT(7)
-STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
-
-
-//=//// BITS 8-15 ARE FOR SER_WIDE() //////////////////////////////////////=//
-
-// The "width" is the size of the individual elements in the series.  For an
-// ANY-ARRAY this is always 0, to indicate IS_END() for arrays of length 0-1
-// (singulars) which can be held completely in the content bits before the
-// ->info field.  Hence this is also used for IS_SER_ARRAY()
-
-#define FLAG_WIDE_BYTE_OR_0(wide) \
-    FLAG_SECOND_BYTE(wide)
-
-#define FLAG_WIDE_BYTE_ARRAY() \
-    FLAG_SECOND_BYTE(0)  // needed for termination signal, being phased out
-
-#define FLAG_WIDE_BYTE_STRING() \
-    FLAG_SECOND_BYTE(0xBD)  // Reserved for future use (arbitrary byte)
-
-#define WIDE_BYTE_OR_0(s) \
-    SECOND_BYTE(SER_INFO(s))
-
-#define mutable_WIDE_BYTE_OR_0(s) \
-    mutable_SECOND_BYTE(SER_INFO(s))
-
-
-//=//// BITS 16-23 ARE SER_USED() FOR NON-DYNAMIC NON-ARRAYS //////////////=//
-
-// SERIES_FLAG_DYNAMIC indicates that a series has a dynamically allocated
-// portion, and it has a whole uintptr_t to use for the length.  However, if
-// that flag is not set the payload is small, fitting in Reb_Series_Content
-// where the allocation tracking information would be.
-//
-// If the data is an array, then the length can only be 0 or 1, since the
-// tracking information is the same size as a cell.  This can be encoded by
-// having the cell be END or non-END to know the length.
-//
-// For binaries and other non-arrays the length has to be stored somewhere.
-// The third byte of the INFO is set aside for the purpose.
-//
-
-#define FLAG_USED_BYTE(len) \
-    FLAG_THIRD_BYTE(len)
-
-#define FLAG_USED_BYTE_ARRAY() \
-    FLAG_THIRD_BYTE(255)  // reserved for future use, single array len in cell
-
-#define USED_BYTE(s) \
-    THIRD_BYTE(SER_INFO(s))
-
-#define mutable_USED_BYTE(s) \
-    mutable_THIRD_BYTE(SER_INFO(s))
-
-
-//=//// SERIES_INFO_AUTO_LOCKED ///////////////////////////////////////////=//
-//
-// Some operations lock series automatically, e.g. to use a piece of data as
-// map keys.  This approach was chosen after realizing that a lot of times,
-// users don't care if something they use as a key gets locked.  So instead
-// of erroring by telling them they can't use an unlocked series as a map key,
-// this locks it but changes the SERIES_FLAG_HAS_FILE_LINE to implicate the
-// point where the locking occurs.
-//
-// !!! The file-line feature is pending.
-//
-#define SERIES_INFO_AUTO_LOCKED \
-    FLAG_LEFT_BIT(24)
-
-
-//=//// SERIES_INFO_25 ////////////////////////////////////////////////////=//
-//
-#define SERIES_INFO_25 \
-    FLAG_LEFT_BIT(25)
-
-
-//=//// SERIES_INFO_26 ////////////////////////////////////////////////////=//
-//
-#define SERIES_INFO_26 \
-    FLAG_LEFT_BIT(26)
-
-
-//=//// SERIES_INFO_27 ////////////////////////////////////////////////////=//
-//
-#define SERIES_INFO_27 \
-    FLAG_LEFT_BIT(27)
-
-
-//=//// SERIES_INFO_KEYLIST_SHARED ////////////////////////////////////////=//
-//
-// This is indicated on the keylist array of a context when that same array
-// is the keylist for another object.  If this flag is set, then modifying an
-// object using that keylist (such as by adding a key/value pair) will require
-// that object to make its own copy.
-//
-// Note: This flag did not exist in R3-Alpha, so all expansions would copy--
-// even if expanding the same object by 1 item 100 times with no sharing of
-// the keylist.  That would make 100 copies of an arbitrary long keylist that
-// the GC would have to clean up.
-//
-#define SERIES_INFO_KEYLIST_SHARED \
-    FLAG_LEFT_BIT(28)
+    FLAG_LEFT_BIT(4)
 
 
 //=//// SERIES_INFO_HOLD //////////////////////////////////////////////////=//
@@ -484,7 +378,7 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
 // as far as usermode operations are concerned.
 //
 #define SERIES_INFO_HOLD \
-    FLAG_LEFT_BIT(29)
+    FLAG_LEFT_BIT(5)
 
 
 //=//// SERIES_INFO_FROZEN_SHALLOW ////////////////////////////////////////=//
@@ -492,7 +386,7 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
 // A series can be locked permanently, but only at its own top level.
 //
 #define SERIES_INFO_FROZEN_SHALLOW \
-    FLAG_LEFT_BIT(30)
+    FLAG_LEFT_BIT(6)
 
 
 #ifdef DEBUG_MONITOR_SERIES
@@ -503,8 +397,59 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
     // messed with.  Setting this bit on it asks for a notice.
     //
     #define SERIES_INFO_MONITOR_DEBUG \
-        FLAG_LEFT_BIT(31)
+        FLAG_LEFT_BIT(7)  // !!! Overlap because not currently used, review
 #endif
+
+// !!! Currently we lie here and act like a cell, because it allows the
+// END marker trick to work without sacrificing a SERIES_FLAG.
+//
+#define SERIES_INFO_7_IS_TRUE FLAG_LEFT_BIT(7)
+STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
+
+
+//=//// BITS 8-15 ARE SER_USED() FOR NON-DYNAMIC NON-ARRAYS ///////////////=//
+
+// SERIES_FLAG_DYNAMIC indicates that a series has a dynamically allocated
+// portion, and it has a whole uintptr_t to use for the length.  However, if
+// that flag is not set the payload is small, fitting in Reb_Series_Content
+// where the allocation tracking information would be.
+//
+// If the data is an array, then the length can only be 0 or 1, since the
+// tracking information is the same size as a cell.  This can be encoded by
+// having the cell be END or non-END to know the length.
+//
+// For binaries and other non-arrays the length has to be stored somewhere.
+// The third byte of the INFO is set aside for the purpose.
+//
+// !!! Currently arrays leverage this as 0 for a terminator of the singular
+// array case.  However, long term zero termination of arrays is not being
+// kept as a redundancy with the length.  It is costly to update and takes
+// additional space from rounding up.
+//
+
+#define FLAG_USED_BYTE(len) \
+    FLAG_SECOND_BYTE(len)
+
+#define FLAG_USED_BYTE_ARRAY() \
+    FLAG_SECOND_BYTE(0)  // must be zero
+
+#define USED_BYTE(s) \
+    SECOND_BYTE(SER_INFO(s))
+
+#define mutable_USED_BYTE(s) \
+    mutable_SECOND_BYTE(SER_INFO(s))
+
+
+//=//// BITS 16-31 ARE SYMID FOR SYMBOLS //////////////////////////////////=//
+
+
+//=//// BITS 24-31: CUSTOM INFO FLAGS /////////////////////////////////////=//
+//
+// Right now these flags are being used for properties specific to array
+// types.  Strings leave it open in case they are interned and need to store
+// the SYMID (along with the previous byte)
+
+
 
 
 // ^-- STOP AT FLAG_LEFT_BIT(31) --^
@@ -732,10 +677,6 @@ union Reb_Series_Misc {
         int high:16;
         int low:16;
     } bind_index;
-
-    // Used on arrays for special instructions to Fetch_Next_In_Frame().
-    //
-    enum Reb_Api_Opcode opcode;
 
     // some HANDLE!s use this for GC finalization
     //

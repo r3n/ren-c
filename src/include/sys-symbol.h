@@ -126,7 +126,7 @@ inline static bool Same_Nonzero_Symid(SYMID a, SYMID b) {
 }
 
 inline static OPT_SYMID ID_OF_SYMBOL(const REBSYM *s)
-  { return cast(SYMID, SECOND_UINT16(s->leader)); }
+  { return cast(SYMID, SECOND_UINT16(s->info)); }
 
 inline static const REBSYM *Canon(SYMID symid) {
     assert(cast(REBLEN, symid) != 0);

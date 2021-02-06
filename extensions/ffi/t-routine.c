@@ -243,7 +243,7 @@ static uintptr_t arg_to_ffi(
     // calling process?
     //
     if (key)
-        assert(arg != nullptr and IS_STR_SYMBOL(*key));
+        assert(arg != nullptr and IS_SYMBOL(*key));
     else
         assert(arg == nullptr);  // return value, just make space (no arg)
   #endif
@@ -545,7 +545,7 @@ static void ffi_to_rebol(
 
         REBBIN *data = BIN(Make_Series_Core(
             FLD_WIDE(top),  // !!! what about FLD_LEN_BYTES_TOTAL ?
-            sizeof(REBYTE),
+            FLAVOR_BINARY,
             NODE_FLAG_MANAGED
         ));
         memcpy(BIN_HEAD(data), ffi_rvalue, FLD_WIDE(top));
@@ -737,7 +737,7 @@ REB_R Routine_Dispatcher(REBFRM *f)
     if (num_args == 0)
         arg_offsets = nullptr;  // don't waste time with the alloc + free
     else
-        arg_offsets = Make_Series(num_args, sizeof(void*));
+        arg_offsets = Make_Series(num_args, FLAVOR_POINTER);
 
     // First gather the fixed parameters from the frame.  They are known to
     // be of correct general types (they were checked by Eval_Core for the call)

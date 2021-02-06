@@ -38,7 +38,7 @@
 //
 
 #define SERIES_MASK_PAIRLIST \
-    (ARRAY_FLAG_IS_PAIRLIST \
+    (FLAG_FLAVOR(PAIRLIST) \
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* hashlist */)
 
 
@@ -76,7 +76,7 @@ inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
 
 inline static REBMAP *MAP(void *p) {
     REBARR *a = ARR(p);
-    assert(GET_ARRAY_FLAG(a, IS_PAIRLIST));
+    assert(IS_PAIRLIST(a));
     return cast(REBMAP*, a);
 }
 

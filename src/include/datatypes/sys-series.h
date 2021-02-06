@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
@@ -224,9 +224,34 @@
     ((SER_INFO(s) & SERIES_INFO_##name) == 0)
 
 
+inline static REBSER *ensure_flavor(
+    enum Reb_Series_Flavor flavor,
+    const_if_c REBSER *s
+){
+    if (SER_FLAVOR(s) != flavor) {
+        enum Reb_Series_Flavor actual = SER_FLAVOR(s);
+        USED(actual);
+        panic (s);
+    }
+    assert(SER_FLAVOR(s) == flavor);
+    return m_cast(REBSER*, s);
+}
 
-#define IS_SER_ARRAY(s) \
-    GET_SERIES_FLAG((s), IS_ARRAY)
+#ifdef __cplusplus
+    inline static const REBSER *ensure_flavor(
+        enum Reb_Series_Flavor flavor,
+        const REBSER *s
+    ){
+        if (SER_FLAVOR(s) != flavor) {
+            enum Reb_Series_Flavor actual = SER_FLAVOR(s);
+            USED(actual);
+            panic (s);
+        }
+        assert(SER_FLAVOR(s) == flavor);
+        return s;
+    }
+#endif
+
 
 #define IS_SER_DYNAMIC(s) \
     GET_SERIES_FLAG((s), DYNAMIC)
@@ -234,39 +259,9 @@
 // These are series implementation details that should not be used by most
 // code.  But in order to get good inlining, they have to be in the header
 // files (of the *internal* API, not of libRebol).  Generally avoid it.
-//
-// !!! Can't `assert((w) < MAX_SERIES_WIDE)` without triggering "range of
-// type makes this always false" warning; C++ build could sense if it's a
-// REBYTE and dodge the comparison if so.
-//
 
-#define MAX_SERIES_WIDE 0x100
-
-inline static REBYTE SER_WIDE(const REBSER *s) {
-    //
-    // Arrays use 0 width as a strategic choice, so that the second byte of
-    // the ->info flags is 0.  See Endlike_Header() for why.
-    //
-    // !!! This is being changed...however, some array forms might use their
-    // INFO bits for other things.  Hence the SER_WIDE() bit is likely not
-    // going to be used.
-    //
-    if (GET_SERIES_FLAG(s, IS_ARRAY))
-        return sizeof(REBVAL);
-
-    // Strings use 1 as their width.  Most accessors that know they are
-    // dealing with strings use accessors that are hardcoded to know that
-    // they're in byte units (though codepoints can use multiple bytes).  It
-    // frees up a byte worth of INFO bits in string nodes to hardcode this
-    // here, and most accesses don't need SER_WIDE() so it won't slow much.
-    //
-    // (no special IS_BINARY, so it sacrifices WIDE_BYTE)
-    //
-    if (GET_SERIES_FLAG(s, IS_STRING))
-        return 1;
-
-    return WIDE_BYTE_OR_0(s);
-}
+#define SER_WIDE(s) \
+    Wide_For_Flavor(SER_FLAVOR(s))
 
 
 #if !defined(__cplusplus)
@@ -302,9 +297,7 @@ inline static bool IS_SER_BIASED(const REBSER *s) {
     assert(IS_SER_DYNAMIC(s));
     if (not IS_SER_ARRAY(s))
         return true;
-    return not (s->leader.bits & (
-        ARRAY_FLAG_IS_VARLIST
-    ));
+    return not IS_VARLIST(s);
 }
 
 inline static REBLEN SER_BIAS(const REBSER *s) {
@@ -425,9 +418,9 @@ inline static size_t SER_TOTAL_IF_DYNAMIC(const REBSER *s) {
 //
 
 inline static REBLEN SER_USED(const REBSER *s) {
-    if (GET_SERIES_FLAG(s, DYNAMIC))
+    if (IS_SER_DYNAMIC(s))
         return s->content.dynamic.used;
-    if (GET_SERIES_FLAG(s, IS_ARRAY))
+    if (IS_SER_ARRAY(s))
         return IS_END(&s->content.fixed.cells[0]) ? 0 : 1;
     return USED_BYTE(s);
 }
@@ -456,7 +449,11 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
         if (IS_FREE_NODE(s))
             printf("SER_DATA_AT asked on freed series\n");
         else
-            printf("SER_DATA_AT asked %d on width=%d\n", w, SER_WIDE(s));
+            printf(
+                "SER_DATA_AT asked %d on width=%d\n",
+                w,
+                cast(int, SER_WIDE(s))
+            );
         panic (s);
     }
   #endif
@@ -576,7 +573,7 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
 // in the debug build to catch violators.)
 //
 inline static void SET_SERIES_LEN(REBSER *s, REBLEN len) {
-    assert(NOT_SERIES_FLAG(s, IS_STRING));  // use _LEN_SIZE
+    assert(not IS_SER_UTF8(s));  // use _LEN_SIZE
     SET_SERIES_USED(s, len);
 }
 
@@ -654,7 +651,7 @@ inline static void EXPAND_SERIES_TAIL(REBSER *s, REBLEN delta) {
 inline static void TERM_SERIES_IF_NECESSARY(REBSER *s)
 {
     if (SER_WIDE(s) == 1) {
-        if (GET_SERIES_FLAG(s, IS_STRING))
+        if (IS_SER_UTF8(s))
             *SER_TAIL(REBYTE, s) = '\0';
         else {
           #if !defined(NDEBUG)
@@ -798,27 +795,27 @@ inline static REBSER *Force_Series_Managed(const_if_c REBSER *s) {
 //
 
 static inline bool Is_Series_Black(const REBSER *s) {
-    return GET_SERIES_INFO(s, BLACK);
+    return GET_SERIES_FLAG(s, BLACK);
 }
 
 static inline bool Is_Series_White(const REBSER *s) {
-    return NOT_SERIES_INFO(s, BLACK);
+    return NOT_SERIES_FLAG(s, BLACK);
 }
 
 static inline void Flip_Series_To_Black(const REBSER *s) {
-    assert(NOT_SERIES_INFO(s, BLACK));
-    SET_SERIES_INFO(m_cast(REBSER*, s), BLACK);
-#if !defined(NDEBUG)
+    assert(NOT_SERIES_FLAG(s, BLACK));
+    SET_SERIES_FLAG(m_cast(REBSER*, s), BLACK);
+  #if !defined(NDEBUG)
     ++TG_Num_Black_Series;
-#endif
+  #endif
 }
 
 static inline void Flip_Series_To_White(const REBSER *s) {
-    assert(GET_SERIES_INFO(s, BLACK));
-    CLEAR_SERIES_INFO(m_cast(REBSER*, s), BLACK);
-#if !defined(NDEBUG)
+    assert(GET_SERIES_FLAG(s, BLACK));
+    CLEAR_SERIES_FLAG(m_cast(REBSER*, s), BLACK);
+  #if !defined(NDEBUG)
     --TG_Num_Black_Series;
-#endif
+  #endif
 }
 
 
@@ -1041,25 +1038,24 @@ inline static void INIT_SPECIFIER(RELVAL *v, const void *p) {
     mutable_BINDING(v) = binding;
 
   #if !defined(NDEBUG)
-    if (not binding or GET_SERIES_FLAG(binding, IS_STRING))
+    if (not binding or IS_SYMBOL(binding))
         return;  // e.g. UNBOUND (words use strings to indicate unbounds)
 
     assert(Is_Bindable(v));  // works on partially formed values
 
     if (GET_SERIES_FLAG(binding, MANAGED)) {
         assert(
-            binding->leader.bits & ARRAY_FLAG_IS_DETAILS  // relative
-            or binding->leader.bits & ARRAY_FLAG_IS_VARLIST  // specific
+            IS_DETAILS(binding)  // relative
+            or IS_VARLIST(binding)  // specific
             or (
-                ANY_ARRAY(v)
-                and (binding->leader.bits & ARRAY_FLAG_IS_PATCH)  // virtual
+                ANY_ARRAY(v) and IS_PATCH(binding)  // virtual
             ) or (
                 IS_VARARGS(v) and not IS_SER_DYNAMIC(binding)
             )  // varargs from MAKE VARARGS! [...], else is a varlist
         );
     }
     else
-        assert(binding->leader.bits & ARRAY_FLAG_IS_VARLIST);
+        assert(IS_VARLIST(binding));
   #endif
 }
 
@@ -1089,7 +1085,7 @@ inline static REBVAL *Init_Any_Series_At_Core(
     if (ANY_ARRAY_KIND(type))
         assert(IS_SER_ARRAY(s));
     else if (ANY_STRING_KIND(type))
-        assert(GET_SERIES_FLAG(s, IS_STRING));
+        assert(IS_SER_UTF8(s));
     else {
         // Note: Binaries are allowed to alias strings
     }
@@ -1272,13 +1268,13 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN capacity) {
 // Small series will be allocated from a memory pool.
 // Large series will be allocated from system memory.
 //
-inline static REBSER *Make_Series_Core(
-    REBLEN capacity,
-    REBYTE wide,
-    REBFLGS flags
-){
+inline static REBSER *Make_Series_Core(REBLEN capacity, REBFLGS flags)
+{
     assert(not (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED));
 
+    size_t wide = Wide_For_Flavor(
+        cast(enum Reb_Series_Flavor, FOURTH_BYTE(flags))
+    );
     if (cast(REBU64, capacity) * wide > INT32_MAX)
         fail (Error_No_Memory(cast(REBU64, capacity) * wide));
 
@@ -1291,8 +1287,7 @@ inline static REBSER *Make_Series_Core(
     SER_INFO(s) =
         SERIES_INFO_0_IS_TRUE
         // not SERIES_INFO_1_IS_FALSE
-        | SERIES_INFO_7_IS_TRUE
-        | FLAG_WIDE_BYTE_OR_0(wide);
+        | SERIES_INFO_7_IS_TRUE;
 
     if (
         (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold
@@ -1340,8 +1335,8 @@ inline static REBSER *Make_Series_Core(
 // Is Make_Series() needed or are there few enough calls it should always take
 // the flags and not have a _Core() variant?
 //
-#define Make_Series(capacity, wide) \
-    Make_Series_Core((capacity), (wide), SERIES_FLAGS_NONE)
+#define Make_Series(capacity, flavor) \
+    Make_Series_Core((capacity), FLAG_FLAVOR_BYTE(flavor) | SERIES_FLAGS_NONE)
 
 
 enum act_modify_mask {

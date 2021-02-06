@@ -561,8 +561,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     REBSER *keylist = Make_Series_Core(
         (num_slots - 1),  // - 1 archetype
-        sizeof(REBKEY),
-        NODE_FLAG_MANAGED | SERIES_MASK_KEYLIST
+        SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
     );
     mutable_LINK(Ancestor, keylist) = keylist;  // chain ends with self
 
@@ -876,11 +875,11 @@ REBACT *Make_Action(
     assert(details_capacity >= 1);  // must have room for archetype
 
     REBARR *paramlist;
-    if (GET_ARRAY_FLAG(specialty, IS_PARTIALS)) {
+    if (IS_PARTIALS(specialty)) {
         paramlist = CTX_VARLIST(LINK(PartialsExemplar, specialty));
     }
     else {
-        assert(GET_ARRAY_FLAG(specialty, IS_VARLIST));
+        assert(IS_VARLIST(specialty));
         paramlist = specialty;
     }
 
@@ -1008,12 +1007,14 @@ REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
     // don't pass it in to the allocation...it needs to be set, but will be
     // overridden by SERIES_FLAG_INACCESSIBLE.
     //
-    REBARR *varlist = Alloc_Singular(NODE_FLAG_MANAGED);  // !!! not dynamic
+    REBARR *varlist = Alloc_Singular(
+        FLAG_FLAVOR(VARLIST) | NODE_FLAG_MANAGED  // !!! not dynamic
+    );
     varlist->leader.bits |= SERIES_MASK_VARLIST;  // !!! adds dynamic
     CLEAR_SERIES_FLAG(varlist, DYNAMIC);  // !!! removes (review cleaner way)
     SET_SERIES_FLAG(varlist, INACCESSIBLE);
     mutable_MISC(Meta, varlist) = nullptr;
-    mutable_BONUS(Patches, varlist) = nullptr;
+    // no BONUS (it's INACCESSIBLE, so non-dynamic)
 
     RELVAL *rootvar = ARR_SINGLE(varlist);
     INIT_VAL_FRAME_ROOTVAR(rootvar, varlist, a, UNBOUND);  // !!! binding?
@@ -1279,9 +1280,9 @@ REBNATIVE(tweak)
     }
 
     if (VAL_LOGIC(ARG(enable)))
-        ACT_DETAILS(act)->leader.bits |= flag;
+        ACT_DETAILS(act)->info.flags.bits |= flag;
     else
-        ACT_DETAILS(act)->leader.bits &= ~flag;
+        ACT_DETAILS(act)->info.flags.bits &= ~flag;
 
     RETURN (ARG(action));
 }

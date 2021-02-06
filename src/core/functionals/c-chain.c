@@ -74,7 +74,7 @@ REBFRM *Push_Downshifted_Frame(REBVAL *out, REBFRM *f) {
     // shows as INACCESSIBLE.
     //
     f->varlist = Alloc_Singular(
-        SERIES_FLAG_MANAGED | SERIES_FLAG_INACCESSIBLE | ARRAY_FLAG_IS_VARLIST
+        FLAG_FLAVOR(VARLIST) | SERIES_FLAG_MANAGED | SERIES_FLAG_INACCESSIBLE
     );
     f->rootvar = nullptr;
 

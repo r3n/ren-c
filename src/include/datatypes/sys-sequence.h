@@ -190,7 +190,10 @@ inline static REBVAL *Try_Leading_Blank_Pathify(
         return v;
     }
 
-    REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);  // optimize "pairlike"
+    REBARR *a = Make_Array_Core(
+        2,  // optimize "pairlike"
+        NODE_FLAG_MANAGED
+    );
     Init_Blank(Alloc_Tail_Array(a));
     Move_Value(Alloc_Tail_Array(a), v);
     Freeze_Array_Shallow(a);
@@ -342,7 +345,10 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
         return nullptr;
     }
 
-    REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);  // optimize "pairlike"
+    REBARR *a = Make_Array_Core(
+        2,
+        NODE_FLAG_MANAGED  // optimize "pairlike"
+    );
     Derelativize(ARR_AT(a, 0), v1, specifier);
     Derelativize(ARR_AT(a, 1), v2, specifier);
     SET_SERIES_LEN(a, 2);

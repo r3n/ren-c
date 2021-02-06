@@ -237,13 +237,15 @@ REBLEN Modify_String_Or_Binary(
     ENSURE_MUTABLE(dst);  // note this also rules out ANY-WORD!s
 
     REBBIN *dst_ser = BIN(VAL_SERIES_ENSURE_MUTABLE(dst));
+    assert(not IS_SYMBOL(dst_ser));  // would be immutable
+
     REBLEN dst_idx = VAL_INDEX(dst);
     REBSIZ dst_used = SER_USED(dst_ser);
 
     REBLEN dst_len_old = 0xDECAFBAD;  // only if IS_SER_STRING(dst_ser)
     REBSIZ dst_off;
     if (IS_BINARY(dst)) {  // check invariants up front even if NULL / no-op
-        if (IS_SER_STRING(dst_ser)) {
+        if (IS_NONSYMBOL_STRING(dst_ser)) {
             REBYTE at = *BIN_AT(dst_ser, dst_idx);
             if (Is_Continuation_Byte_If_Utf8(at))
                 fail (Error_Bad_Utf8_Bin_Edit_Raw());
@@ -253,8 +255,7 @@ REBLEN Modify_String_Or_Binary(
     }
     else {
         assert(ANY_STRING(dst));
-        assert(IS_SER_STRING(dst_ser));
-        assert(not IS_STR_SYMBOL(STR(dst_ser)));  // would have been read-only
+        assert(IS_NONSYMBOL_STRING(dst_ser));
 
         dst_off = VAL_OFFSET_FOR_INDEX(dst, dst_idx);  // !!! review for speed
         dst_len_old = STR_LEN(STR(dst_ser));
@@ -289,7 +290,7 @@ REBLEN Modify_String_Or_Binary(
         dst_off = SER_USED(dst_ser);
         dst_idx = dst_len_old;
     }
-    else if (IS_BINARY(dst) and IS_SER_STRING(dst_ser)) {
+    else if (IS_BINARY(dst) and IS_NONSYMBOL_STRING(dst_ser)) {
         dst_idx = STR_INDEX_AT(STR(dst_ser), dst_off);
     }
 
@@ -318,7 +319,7 @@ REBLEN Modify_String_Or_Binary(
             UNLIMITED
         );
 
-        if (IS_SER_STRING(dst_ser)) {
+        if (IS_NONSYMBOL_STRING(dst_ser)) {
             if (src_len_raw == 0)
                 fail (Error_Illegal_Zero_Byte_Raw());  // no '\0' in strings
         }
@@ -351,7 +352,7 @@ REBLEN Modify_String_Or_Binary(
         // be cropping the /PART of the input via passing a parameter here.
         //
         src_size_raw = VAL_SIZE_LIMIT_AT(&src_len_raw, src, UNLIMITED);
-        if (not IS_SER_STRING(dst_ser))
+        if (not IS_NONSYMBOL_STRING(dst_ser))
             src_len_raw = src_size_raw;
     }
     else if (IS_INTEGER(src)) {
@@ -361,7 +362,7 @@ REBLEN Modify_String_Or_Binary(
         // otherwise `append #{123456} 10` is #{1234560A}, just the byte
 
         src_byte = VAL_UINT8(src);  // fails if out of range
-        if (IS_SER_STRING(dst_ser) and src_byte >= 0x80)
+        if (IS_NONSYMBOL_STRING(dst_ser) and src_byte >= 0x80)
             fail (Error_Bad_Utf8_Bin_Edit_Raw());
 
         src_ptr = &src_byte;
@@ -374,13 +375,13 @@ REBLEN Modify_String_Or_Binary(
         src_ptr = BIN_AT(bin, offset);
         src_size_raw = BIN_LEN(bin) - offset;
 
-        if (not IS_SER_STRING(dst_ser)) {
+        if (not IS_NONSYMBOL_STRING(dst_ser)) {
             if (limit > 0 and limit < src_size_raw)
                 src_size_raw = limit;  // /PART is in bytes for binary! dest
             src_len_raw = src_size_raw;
         }
         else {
-            if (IS_SER_STRING(bin)) {  // guaranteed valid UTF-8
+            if (IS_NONSYMBOL_STRING(bin)) {  // guaranteed valid UTF-8
                 const REBSTR *str = STR(bin);
                 if (Is_Continuation_Byte_If_Utf8(*src_ptr))
                     fail (Error_Bad_Utf8_Bin_Edit_Raw());
@@ -484,7 +485,7 @@ REBLEN Modify_String_Or_Binary(
 
         src_ptr = BIN_AT(mo->series, mo->offset);
         src_size_raw = STR_SIZE(mo->series) - mo->offset;
-        if (not IS_SER_STRING(dst_ser))
+        if (not IS_NONSYMBOL_STRING(dst_ser))
             src_len_raw = src_size_raw;
         else
             src_len_raw = STR_LEN(mo->series) - mo->index;
@@ -496,7 +497,7 @@ REBLEN Modify_String_Or_Binary(
     //
     // !!! Bad first implementation; improve.
     //
-    if (IS_SER_STRING(dst_ser)) {
+    if (IS_NONSYMBOL_STRING(dst_ser)) {
         REBCHR(const*) t = cast(REBCHR(const*), src_ptr + src_size_raw);
         while (src_len_raw > limit) {
             t = BACK_STR(t);
@@ -541,7 +542,7 @@ REBLEN Modify_String_Or_Binary(
         Expand_Series(dst_ser, dst_off, src_size_total);
         SET_SERIES_USED(dst_ser, dst_used + src_size_total);
 
-        if (IS_SER_STRING(dst_ser)) {
+        if (IS_NONSYMBOL_STRING(dst_ser)) {
             bookmark = LINK(Bookmarks, dst_ser);
 
             if (bookmark and BMK_INDEX(bookmark) > dst_idx) {  // only INSERT
@@ -561,7 +562,7 @@ REBLEN Modify_String_Or_Binary(
 
         REBLEN dst_len_at;
         REBSIZ dst_size_at;
-        if (IS_SER_STRING(dst_ser)) {
+        if (IS_NONSYMBOL_STRING(dst_ser)) {
             if (IS_BINARY(dst)) {
                 dst_size_at = VAL_LEN_AT(dst);  // byte count
                 dst_len_at = STR_INDEX_AT(STR(dst_ser), dst_size_at);
@@ -593,7 +594,7 @@ REBLEN Modify_String_Or_Binary(
         // have to be moved safely out of the way before being overwritten.
 
         REBSIZ part_size;
-        if (IS_SER_STRING(dst_ser)) {
+        if (IS_NONSYMBOL_STRING(dst_ser)) {
             if (IS_BINARY(dst)) {
                 //
                 // The calculations on the new length depend on `part` being
@@ -672,7 +673,7 @@ REBLEN Modify_String_Or_Binary(
         // complicated--but just assume that the start of the change is as
         // good a cache as any to be relevant for the next operation.
         //
-        if (IS_SER_STRING(dst_ser)) {
+        if (IS_NONSYMBOL_STRING(dst_ser)) {
             bookmark = LINK(Bookmarks, dst_ser);
 
             if (bookmark and BMK_INDEX(bookmark) > dst_idx) {

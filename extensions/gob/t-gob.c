@@ -68,7 +68,8 @@ REBGOB *Make_Gob(void)
 {
     REBGOB *a = Make_Array_Core(
         IDX_GOB_MAX,
-        SERIES_FLAG_FIXED_SIZE
+        FLAG_FLAVOR(GOBLIST)
+            | SERIES_FLAG_FIXED_SIZE
             | SERIES_FLAG_LINK_NODE_NEEDS_MARK
             | SERIES_FLAG_MISC_NODE_NEEDS_MARK
     );
@@ -236,7 +237,10 @@ static void Insert_Gobs(
     REBARR *pane = GOB_PANE(gob);
 
     if (not pane) {
-        pane = Make_Array_Core(count + 1, NODE_FLAG_MANAGED);
+        pane = Make_Array_Core(
+            count + 1,
+            FLAG_FLAVOR(GOBLIST) | NODE_FLAG_MANAGED
+        );
         SET_SERIES_LEN(pane, count);
         index = 0;
     }

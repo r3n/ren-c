@@ -139,7 +139,7 @@ inline static void Init_Handle_Managed_Common(
     uintptr_t length,
     CLEANUP_CFUNC *cleaner
 ){
-    REBARR *singular = Alloc_Singular(NODE_FLAG_MANAGED);
+    REBARR *singular = Alloc_Singular(FLAG_FLAVOR(HANDLE) | NODE_FLAG_MANAGED);
     singular->misc.cleaner = cleaner;
 
     RELVAL *single = ARR_SINGLE(singular);

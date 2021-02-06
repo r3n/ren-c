@@ -35,10 +35,12 @@
 //
 REBSTR *Make_String_Core(REBSIZ encoded_capacity, REBFLGS flags)
 {
-    REBBIN *bin = Make_Binary_Core(
-        encoded_capacity,  // binary includes room for '\0' terminator
-        flags | SERIES_FLAG_IS_STRING
-    );
+    assert(FOURTH_BYTE(flags) == 0);  // shouldn't have a flavor
+
+    REBBIN *bin = BIN(Make_Series_Core(
+        encoded_capacity + 1,  // binary includes room for '\0' terminator
+        FLAG_FLAVOR(STRING) | flags
+    ));
     bin->misc.length = 0;
     mutable_LINK(Bookmarks, bin) = nullptr;  // generated on demand
     *BIN_HEAD(bin) = '\0';  // zero length, so head = tail
@@ -108,7 +110,7 @@ REBSTR *Append_Codepoint(REBSTR *dst, REBUNI c)
     }
 
     assert(c <= MAX_UNI);
-    assert(not IS_STR_SYMBOL(dst));
+    assert(not IS_SYMBOL(dst));
 
     REBLEN old_len = STR_LEN(dst);
 
@@ -221,7 +223,7 @@ void Append_Spelling(REBSTR *dst, const REBSTR *spelling)
 //
 void Append_String_Limit(REBSTR *dst, REBCEL(const*) src, REBLEN limit)
 {
-    assert(not IS_STR_SYMBOL(dst));
+    assert(not IS_SYMBOL(dst));
     assert(ANY_UTF8_KIND(CELL_KIND(src)));
 
     REBLEN len;

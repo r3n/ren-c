@@ -269,7 +269,7 @@ REB_R MAKE_Array(
             // so no typeset or quoting settings available.  Can't produce
             // any voids, because the data source is a block.
             //
-            assert(NOT_ARRAY_FLAG(VAL_VARARGS_BINDING(arg), IS_VARLIST));
+            assert(not IS_VARLIST(VAL_VARARGS_BINDING(arg)));
         }
         else {
             REBCTX *context = CTX(VAL_VARARGS_BINDING(arg));
@@ -1383,8 +1383,7 @@ void Assert_Array_Core(const REBARR *a)
         for (; i < rest - 1; ++i, ++item) {
             const bool unwritable = not (item->header.bits & NODE_FLAG_CELL);
             if (
-                GET_SERIES_FLAG(a, FIXED_SIZE)
-                and NOT_SERIES_FLAG(a, IS_KEYLIKE)  // !!! LETs mess this up
+                GET_SERIES_FLAG(a, FIXED_SIZE)  // !!! LETs mess this up
             ){
               #if !defined(NDEBUG)
                 if (not unwritable) {
