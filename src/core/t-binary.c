@@ -545,7 +545,7 @@ REBTYPE(Binary)
         else {
             Init_Binary(
                 D_OUT,
-                Copy_Series_At_Len(bin, VAL_INDEX(v), len)
+                Copy_Binary_At_Len(bin, VAL_INDEX(v), len)
             );
         }
         Remove_Any_Series_Len(v, VAL_INDEX(v), len);  // bad UTF-8 alias fails
@@ -582,7 +582,7 @@ REBTYPE(Binary)
         return Init_Any_Series(
             D_OUT,
             REB_BINARY,
-            Copy_Series_At_Len(VAL_SERIES(v), VAL_INDEX(v), len)
+            Copy_Binary_At_Len(VAL_SERIES(v), VAL_INDEX(v), len)
         ); }
 
     //-- Bitwise:

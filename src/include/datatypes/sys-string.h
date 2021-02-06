@@ -1018,7 +1018,7 @@ inline static REBINT First_Hash_Candidate_Slot(
 #define Copy_String_At(v) \
     Copy_String_At_Limit((v), -1)
 
-inline static REBSER *Copy_Series_At_Len(
+inline static REBSER *Copy_Binary_At_Len(
     const REBSER *s,
     REBLEN index,
     REBLEN len
@@ -1028,7 +1028,7 @@ inline static REBSER *Copy_Series_At_Len(
         index,
         len,
         0,
-        FLAG_FLAVOR_BYTE(SER_FLAVOR(s)) | SERIES_FLAGS_NONE
+        FLAG_FLAVOR(BINARY) | SERIES_FLAGS_NONE
     );
 }
 

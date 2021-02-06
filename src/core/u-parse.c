@@ -1728,7 +1728,7 @@ REBNATIVE(subparse)
                         Init_Any_Series(
                             Alloc_Tail_Array(P_COLLECTION),
                             P_TYPE,
-                            Copy_Series_At_Len(
+                            Copy_Binary_At_Len(
                                 P_INPUT,
                                 pos_before,
                                 pos_after - pos_before
@@ -2408,7 +2408,7 @@ REBNATIVE(subparse)
                 else if (P_TYPE == REB_BINARY) {
                     Init_Binary(  // R3-Alpha behavior (e.g. not AS TEXT!)
                         sink,
-                        Copy_Series_At_Len(P_INPUT, begin, count)
+                        Copy_Binary_At_Len(P_INPUT, begin, count)
                     );
                 }
                 else {

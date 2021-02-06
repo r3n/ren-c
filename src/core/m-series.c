@@ -126,9 +126,10 @@ REBSER *Copy_Series_At_Len_Extra(
     memcpy(
         SER_DATA(copy),
         SER_DATA(s) + index * SER_WIDE(s),
-        len * SER_WIDE(s)  // will include terminator if SER_WIDE() == 1
+        len * SER_WIDE(s)  // !!! Review if +1 copying terminator is worth it
     );
     SET_SERIES_USED(copy, len);
+    TERM_SERIES_IF_NECESSARY(copy);
     return copy;
 }
 
