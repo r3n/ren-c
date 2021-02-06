@@ -84,6 +84,44 @@
 //
 
 
+#if !defined(DEBUG_CHECK_CASTS)
+
+    #define SER(p) \
+        m_cast(REBSER*, x_cast(const REBSER*, (p)))  // subvert const warnings
+
+#else
+
+    template <
+        typename T,
+        typename T0 = typename std::remove_const<T>::type,
+        typename S = typename std::conditional<
+            std::is_const<T>::value,  // boolean
+            const REBSER,  // true branch
+            REBSER  // false branch
+        >::type
+    >
+    inline S *SER(T *p) {
+        static_assert(
+            std::is_same<T0, void>::value
+                or std::is_same<T0, REBNOD>::value,
+            "SER() works on [void* REBNOD*]"
+        );
+        if (not p)
+            return nullptr;
+
+        if ((reinterpret_cast<const REBSER*>(p)->leader.bits & (
+            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
+        )) != (
+            NODE_FLAG_NODE
+        )){
+            panic (p);
+        }
+
+        return reinterpret_cast<S*>(p);
+    }
+#endif
+
+
 #ifdef NDEBUG
     #define ASSERT_CONTEXT(c) cast(void, 0)
 #else

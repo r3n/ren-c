@@ -189,6 +189,10 @@
 #include "sys-flavor.h"  // series subclass marking byte definitions
 #include "sys-rebser.h"  // series structure definition (embeds REBVAL)
 
+#include "sys-rebarr.h"  // array structure definition (subclass of REBSER)
+#include "sys-rebact.h"  // action structure definition (subclass of REBSER)
+#include "sys-rebctx.h"  // context structure definition (subclass of REBSER)
+
 
 // REBCHR(*) is defined in %sys-scan.h, along with SCAN_STATE, and both are
 // referenced by internal API functions.
@@ -239,10 +243,6 @@ typedef bool (PARAM_HOOK)(
 // See %make/make-headers.r for the generation of this list.
 //
 #include "tmp-internals.h"
-
-#include "sys-rebarr.h"  // array structure definition (subclass of REBSER)
-#include "sys-rebact.h"  // action structure definition (subclass of REBSER)
-#include "sys-rebctx.h"  // context structure definition (subclass of REBSER)
 
 #include "sys-state.h"
 #include "sys-rebfed.h"  // REBFED (feed) definitio, used by REBFRM

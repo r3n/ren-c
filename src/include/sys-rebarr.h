@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
@@ -20,20 +20,45 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// REBARR is an opaque type alias for REBSER.
+// In the C build, a REBARR* and REBSER* are the same type.  The C++ build
+// derives REBARR from REBSER...meaning you can pass an array to a function
+// that expects a series, but not vice-versa.
 //
-//=//// NOTES /////////////////////////////////////////////////////////////=//
-//
-// * When checking for an ARRAY_FLAG_XXX on a series, you must be certain
-//   that it is an array REBSER node...because non-arrays use the 16 bits for
-//   array flags for other purposes.  An arbitrary REBSER tested for
-//   ARRAY_FLAG_IS_VARLIST might alias with a UTF-8 symbol string whose symbol
-//   number uses that bit.
+// There are several subclasses (FLAVOR_XXX) whose elements are value cells,
+// and hence are arrays.  However the "plain" array, e.g. the kind used in
+// BLOCK!s and GROUP!s, is its own subclass...which interprets the subclass
+// bits in particular ways not relevant to other arrays (e.g. object variable
+// lists do not need a flag tracking if there's a newline that needs to be
+// output at the end of the varlist).
 //
 
+#ifdef __cplusplus
+    struct Reb_Array : public Reb_Series {};
+    typedef struct Reb_Array REBARR;
+#else
+    typedef struct Reb_Series REBARR;
+#endif
 
-// If a series is an array, then there are 16 free bits available for use
-// in the SERIES_FLAG_XXX section.
+
+// It may become interesting to say that a specifier can be a pairing or
+// a REBVAL* of some kind.  But for the moment, that just complicates the
+// issue of not being able to check the ->header bits safely (it would require
+// checking the NODE_BYTE() first, then casting to a VAL() or SER()).  In
+// the interests of making the code strict-aliasing-safe for starters, assume
+// all specifiers are arrays.
+//
+typedef REBARR REBSPC;
+
+
+// To help document places in the core that are complicit in the "extension
+// hack", alias arrays being used for the FFI and GOB to another name.
+//
+typedef REBARR REBGOB;
+
+typedef REBARR REBSTU;
+typedef REBARR REBFLD;
+
+typedef REBBIN REBTYP;  // Rebol Type (list of hook function pointers)
 
 
 //=//// ARRAY_FLAG_HAS_FILE_LINE_UNMASKED /////////////////////////////////=//
@@ -48,12 +73,34 @@
 // ->misc and ->link fields for caching purposes in strings.
 //
 #define ARRAY_FLAG_HAS_FILE_LINE_UNMASKED \
-    SERIES_FLAG_29
+    SERIES_FLAG_24
 
 #define ARRAY_MASK_HAS_FILE_LINE \
     (ARRAY_FLAG_HAS_FILE_LINE_UNMASKED | SERIES_FLAG_LINK_NODE_NEEDS_MARK)
 
 
+//=//// ARRAY_FLAG_25 /////////////////////////////////////////////////////=//
+//
+#define ARRAY_FLAG_25 \
+    SERIES_FLAG_25
+
+
+//=//// ARRAY_FLAG_26 /////////////////////////////////////////////////////=//
+//
+#define ARRAY_FLAG_26 \
+    SERIES_FLAG_26
+
+
+//=//// ARRAY_FLAG_27 /////////////////////////////////////////////////////=//
+//
+#define ARRAY_FLAG_27 \
+    SERIES_FLAG_27
+
+
+//=//// ARRAY_FLAG_28 /////////////////////////////////////////////////////=//
+//
+#define ARRAY_FLAG_28 \
+    SERIES_FLAG_28
 
 
 //=//// ARRAY_FLAG_CONST_SHALLOW //////////////////////////////////////////=//
@@ -84,14 +131,6 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
     SERIES_FLAG_31
 
 
-//=//////////// ^-- STOP ARRAY FLAGS AT FLAG_LEFT_BIT(31) --^ /////////////=//
-
-// Arrays can use all the way up to the 32-bit limit on the flags (since
-// they're not using the arbitrary 16-bit number the way that a REBSTR is for
-// storing the symbol).  64-bit machines have more space, but it shouldn't
-// be used for anything but optimizations.
-
-
 // Ordinary source arrays use their ->link field to point to an interned file
 // name string (or URL string) from which the code was loaded.  If a series
 // was not created from a file, then the information from the source that was
@@ -102,43 +141,3 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 //
 #define LINK_Filename_TYPE          const REBSTR*
 #define LINK_Filename_CAST          (const REBSTR*)STR
-
-
-#if !defined(DEBUG_CHECK_CASTS)
-
-    #define ARR(p) \
-        m_cast(REBARR*, x_cast(const REBARR*, (p)))  // subvert const warnings
-
-#else
-
-    template <
-        typename T,
-        typename T0 = typename std::remove_const<T>::type,
-        typename A = typename std::conditional<
-            std::is_const<T>::value,  // boolean
-            const REBARR,  // true branch
-            REBARR  // false branch
-        >::type
-    >
-    inline A *ARR(T *p) {
-        static_assert(
-            std::is_same<T0, void>::value
-                or std::is_same<T0, REBNOD>::value
-                or std::is_same<T0, REBSER>::value,
-            "ARR() works on [void* REBNOD* REBSER*]"
-        );
-        if (not p)
-            return nullptr;
-
-        if ((reinterpret_cast<const REBSER*>(p)->leader.bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
-        )) != (
-            NODE_FLAG_NODE
-        )){
-            panic (p);
-        }
-
-        return reinterpret_cast<A*>(p);
-    }
-
-#endif

@@ -635,10 +635,6 @@ inline static bool IS_RELATIVE(const RELVAL *v) {
 #define IS_SPECIFIC(v) \
     (not IS_RELATIVE(v))
 
-inline static REBACT *VAL_RELATIVE(const RELVAL *v) {
-    assert(IS_RELATIVE(v));
-    return ACT(BINDING(v));
-}
 
 // When you have a RELVAL* (e.g. from a REBARR) that you KNOW to be specific,
 // you might be bothered by an error like:

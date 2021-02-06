@@ -329,7 +329,7 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
         // All relative values under a sub-block must be relative to the
         // same function.
         //
-        assert(VAL_RELATIVE(src) == before);
+        assert(ACT(BINDING(src)) == before);
 
         Move_Value_Header(dest, src);
 

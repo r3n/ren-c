@@ -832,9 +832,6 @@ union Reb_Series_Info {
     struct Reb_Symbol : public Reb_String {};  // word-constrained strings
     typedef struct Reb_Symbol REBSYM;
 
-    struct Reb_Array : public Reb_Series {};
-    typedef struct Reb_Array REBARR;
-
     struct Reb_Bookmark_List : public Reb_Series {};
     typedef struct Reb_Bookmark_List REBBMK;  // list of UTF-8 index=>offsets
 
@@ -842,7 +839,6 @@ union Reb_Series_Info {
     typedef struct Reb_Series REBBIN;
     typedef struct Reb_Series REBSTR;
     typedef struct Reb_Series REBSYM;
-    typedef struct Reb_Series REBARR;
     typedef struct Reb_Series REBBMK;
 #endif
 
@@ -852,27 +848,6 @@ union Reb_Series_Info {
 // nodes for the strings... so a "key" is a pointer.
 //
 typedef const REBSYM *REBKEY;
-
-
-// It may become interesting to say that a specifier can be a pairing or
-// a REBVAL* of some kind.  But for the moment, that just complicates the
-// issue of not being able to check the ->header bits safely (it would require
-// checking the NODE_BYTE() first, then casting to a VAL() or SER()).  In
-// the interests of making the code strict-aliasing-safe for starters, assume
-// all specifiers are arrays.
-//
-typedef REBARR REBSPC;
-
-
-// To help document places in the core that are complicit in the "extension
-// hack", alias arrays being used for the FFI and GOB to another name.
-//
-typedef REBARR REBGOB;
-
-typedef REBARR REBSTU;
-typedef REBARR REBFLD;
-
-typedef REBBIN REBTYP;  // Rebol Type (list of hook function pointers)
 
 
 //=//// DON'T PUT ANY CODE (OR MACROS THAT MAY NEED CODE) IN THIS FILE! ///=//
