@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -57,6 +57,7 @@
 // Addressing that is an ongoing process.
 //
 
+#include "tmp-version.h"  // historical 5 numbers in a TUPLE! (see %systems.r)
 #include "reb-config.h"
 
 
@@ -164,68 +165,43 @@
 #define MAX_EXPAND_LIST 5       // number of series-1 in Prior_Expand list
 
 
+//=//// FORWARD-DECLARE TYPES USED IN %tmp-internals.h ////////////////////=//
+//
 // This does all the forward definitions that are necessary for the compiler
 // to be willing to build %tmp-internals.h.  Some structures are fully defined
-// and some are only forward declared.
+// and some are only forward declared.  See notes in %structs/README.md
 //
-#include "reb-defs.h"
 
+#include "reb-defs.h"  // basic typedefs like REBYTE
 
-// Small integer symbol IDs, e.g. SYM_THRU or SYM_ON, for built-in words so
-// that they can be used in C switch() statements.
-//
-#include "tmp-symbols.h"
-
-
-
-#include "tmp-version.h"  // historical 5 numbers in a TUPLE! (see %systems.r)
-
-#include "sys-panic.h"  // "blue screen of death"-style termination
-
-#include "sys-rebnod.h"
+#include "structs/sys-rebnod.h"
 #include "mem-pools.h"
 
-#include "sys-rebval.h"  // low level Rebol cell structure definition
-#include "sys-flavor.h"  // series subclass marking byte definitions
-#include "sys-rebser.h"  // series structure definition (embeds REBVAL)
+#include "tmp-kinds.h"  // Defines `enum Reb_Kind` (REB_BLOCK, REB_TEXT, etc)
+#include "sys-ordered.h"  // changing the type enum *must* update these macros
 
-#include "sys-rebarr.h"  // array structure definition (subclass of REBSER)
-#include "sys-rebact.h"  // action structure definition (subclass of REBSER)
-#include "sys-rebctx.h"  // context structure definition (subclass of REBSER)
+#include "structs/sys-rebcel.h"
+#include "structs/sys-rebval.h"  // low level Rebol cell structure definition
 
+#include "sys-flavor.h"  // series subclass byte (uses sizeof(REBVAL))
 
-// REBCHR(*) is defined in %sys-scan.h, along with SCAN_STATE, and both are
-// referenced by internal API functions.
-//
+#include "tmp-symid.h"  // small integer IDs for words (e.g. SYM_THRU, SYM_ON)
+
+#include "structs/sys-rebser.h"  // series structure definition, embeds REBVAL
+
+#include "structs/sys-rebarr.h"  // array structure (REBSER subclass)
+#include "structs/sys-rebact.h"  // action structure
+#include "structs/sys-rebctx.h"  // context structure
+
+#include "structs/sys-rebchr.h"  // REBCHR(*) is REBYTE* in validated UTF8
+
 // (Note: %sys-do.h needs to call into the scanner if Fetch_Next_In_Frame() is
 // to be inlined at all--at its many time-critical callsites--so the scanner
 // has to be in the internal API)
 //
 #include "sys-scan.h"
 
-// !!! There should probably be "sys-hooks.h" or something like that
-//
-//=//// PARAMETER ENUMERATION /////////////////////////////////////////////=//
-//
-// Parameter lists of composed/derived functions still must have compatible
-// frames with their underlying C code.  This makes parameter enumeration of
-// a derived function a 2-pass process that is a bit tricky.
-//
-// !!! Due to a current limitation of the prototype scanner, a function type
-// can't be used directly in a function definition and have it be picked up
-// for %tmp-internals.h, it has to be a typedef.
-//
-typedef enum {
-    PHF_UNREFINED = 1 << 0,  // a /refinement that takes an arg, made "normal"
-    PHF_DEMODALIZED = 1 << 1  // an @param with its refinement specialized out
-} Reb_Param_Hook_Flags;
-#define PHF_MASK_NONE 0
-typedef bool (PARAM_HOOK)(
-    const REBKEY *key,
-    const REBPAR *param,
-    REBFLGS flags,
-    void *opaque
-);
+#include "sys-hooks.h"  // function pointer definitions
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -243,6 +219,9 @@ typedef bool (PARAM_HOOK)(
 // See %make/make-headers.r for the generation of this list.
 //
 #include "tmp-internals.h"
+
+#include "sys-panic.h"  // "blue screen of death"-style termination
+#include "sys-casts.h"  // coercion macros like SER(), uses panic() to alert
 
 #include "sys-state.h"
 #include "sys-rebfed.h"  // REBFED (feed) definitio, used by REBFRM

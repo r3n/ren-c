@@ -673,20 +673,6 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 #endif
 
 
-// !!! Consider a more sophisticated macro/template, like in DEBUG_CHECK_CASTS
-// though this is good enough for many usages for now.
-
-#if !defined(CPLUSPLUS_11)
-    #define VAL(p) \
-        cast(RELVAL*, (p))
-#else
-    inline static REBVAL* VAL(void *p)
-      { return cast(REBVAL*, p); }
-
-    inline static const REBVAL* VAL(const void *p)
-      { return cast(const REBVAL*, p); }
-#endif
-
 
 //=//// VARS and PARAMs ///////////////////////////////////////////////////=//
 //

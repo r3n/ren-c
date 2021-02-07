@@ -74,12 +74,6 @@ inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
 #define MAP_HASHES(m) \
     SER_HEAD(MAP_HASHLIST(m))
 
-inline static REBMAP *MAP(void *p) {
-    REBARR *a = ARR(p);
-    assert(IS_PAIRLIST(a));
-    return cast(REBMAP*, a);
-}
-
 
 inline static const REBMAP *VAL_MAP(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_MAP);

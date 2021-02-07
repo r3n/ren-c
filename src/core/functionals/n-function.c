@@ -374,17 +374,17 @@ REBACT *Make_Interpreted_Action_May_Fail(
     if (IS_END(VAL_ARRAY_AT(body))) {  // optimize empty body case
 
         if (mkf_flags & MKF_IS_ELIDER) {
-            ACT_DISPATCHER(a) = &Commenter_Dispatcher;
+            INIT_ACT_DISPATCHER(a, &Commenter_Dispatcher);
         }
         else if (mkf_flags & MKF_IS_VOIDER) {
-            ACT_DISPATCHER(a) = &Voider_Dispatcher;  // !!! ^-- see info note
+            INIT_ACT_DISPATCHER(a, &Voider_Dispatcher);  // !!! ^-- see note
         }
         else if (ACT_HAS_RETURN(a)) {
             const REBPAR *param = ACT_PARAMS_HEAD(a);
             assert(KEY_SYM(ACT_KEYS_HEAD(a)) == SYM_RETURN);
 
             if (not TYPE_CHECK(param, REB_VOID))  // `do []` returns
-                ACT_DISPATCHER(a) = &Returner_Dispatcher;  // error when run
+                INIT_ACT_DISPATCHER(a, &Returner_Dispatcher);  // error later
         }
         else {
             // Keep the Void_Dispatcher passed in above
@@ -397,13 +397,13 @@ REBACT *Make_Interpreted_Action_May_Fail(
     else {  // body not empty, pick dispatcher based on output disposition
 
         if (mkf_flags & MKF_IS_ELIDER)
-            ACT_DISPATCHER(a) = &Elider_Dispatcher; // no f->out mutation
+            INIT_ACT_DISPATCHER(a, &Elider_Dispatcher);  // no f->out mutation
         else if (mkf_flags & MKF_IS_VOIDER) // !!! see note
-            ACT_DISPATCHER(a) = &Voider_Dispatcher; // forces f->out void
+            INIT_ACT_DISPATCHER(a, &Voider_Dispatcher);  // forces f->out void
         else if (ACT_HAS_RETURN(a))
-            ACT_DISPATCHER(a) = &Returner_Dispatcher; // type checks f->out
+            INIT_ACT_DISPATCHER(a, &Returner_Dispatcher);  // typecheck f->out
         else
-            ACT_DISPATCHER(a) = &Unchecked_Dispatcher; // unchecked f->out
+            INIT_ACT_DISPATCHER(a, &Unchecked_Dispatcher); // unchecked f->out
 
         copy = Copy_And_Bind_Relative_Deep_Managed(
             body,  // new copy has locals bound relatively to the new action

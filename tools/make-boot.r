@@ -146,8 +146,8 @@ e-version/write-emitted
 ; recompiled with changes to the core.  These symbols aren't in libRebol,
 ; however, so it only affects clients of the core API for now.
 
-(e-symbols: make-emitter "Symbol Numbers"
-    make-file [(prep-dir) include/tmp-symbols.h])
+(e-symbols: make-emitter "Symbol ID (SYMID) Enumeration Type and Values"
+    make-file [(prep-dir) include/tmp-symid.h])
 
 syms: copy []
 

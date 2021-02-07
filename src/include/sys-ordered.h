@@ -20,6 +20,12 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// The ordering of types in %types.r encodes properties of the types for
+// efficiency.  So adding or removing a type generally means shuffling their
+// values.  Hence their numbering is subject to change as an implementation
+// detail--and the specific integer values of things like REB_BLOCK should
+// never be exposed through the API.
+//
 // These macros embed specific knowledge of the type ordering.  Basically any
 // changes to %types.r mean having to take into account fixups here.
 //

@@ -930,7 +930,7 @@ REBACT *Make_Action(
     //
     SET_SERIES_LEN(details, details_capacity);
 
-    details->link.dispatcher = dispatcher; // level of indirection, hijackable
+    mutable_LINK_DISPATCHER(details) = cast(CFUNC*, dispatcher);
     mutable_MISC(Meta, details) = nullptr;  // caller can fill in
 
     INIT_VAL_ACTION_SPECIALTY_OR_LABEL(archetype, specialty);

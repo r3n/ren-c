@@ -230,7 +230,8 @@ REBNATIVE(hijack)
         // reasonably common case, and especially common when putting the
         // originally hijacked function back.
 
-        victim_details->link.dispatcher = hijacker_details->link.dispatcher;
+        mutable_LINK_DISPATCHER(victim_details)
+            = cast(CFUNC*, LINK_DISPATCHER(hijacker_details));
 
         // For the victim to act like the hijacker, it must use the same
         // exemplar.  Update the specialty regardless of whether the paramlist
@@ -269,7 +270,8 @@ REBNATIVE(hijack)
         // process of building a new frame.  But in general one basically
         // needs to do a new function call.
         //
-        victim_details->link.dispatcher = &Hijacker_Dispatcher;
+        mutable_LINK_DISPATCHER(victim_details)
+            = cast(CFUNC*, &Hijacker_Dispatcher);
 
         if (ARR_LEN(victim_details) < 2)
             Alloc_Tail_Array(victim_details);

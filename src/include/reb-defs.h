@@ -41,17 +41,6 @@
 typedef unsigned char REBYTE; // don't change to uint8_t, see note
 
 
-// Defines `enum Reb_Kind`, which is the enumeration of low-level cell types
-// in Rebol (e.g. REB_BLOCK, REB_TEXT, etc.)
-//
-// The ordering encodes properties of the types for efficiency, so adding or
-// removing a type generally means shuffling their values.  They are generated
-// from a table and the numbers should not be exported to clients.
-//
-#include "tmp-kinds.h"
-#include "sys-ordered.h"  // shuffling types *must* consider these macros!
-
-
 //=//// REBOL NUMERIC TYPES ("REBXXX") ////////////////////////////////////=//
 //
 // The 64-bit build modifications to R3-Alpha after its open sourcing changed
@@ -111,133 +100,6 @@ typedef struct rebol_mem_pool REBPOL;
 
 struct Reb_Pool_Unit;
 typedef struct Reb_Pool_Unit REBPLU;
-
-
-//=//// "RAW" CELLS ///////////////////////////////////////////////////////=//
-//
-// A raw cell is just the structure, with no additional protections.  This
-// makes it useful for embedding in REBSER, because if it had disablement of
-// things like assignment then it would also carry disablement of memcpy()
-// of containing structures...which would limit that definition.  These
-// cells should not be used for any other purposes.
-//
-#if !defined(CPLUSPLUS_11)
-    #define REBRAW struct Reb_Value
-#else
-    #define REBRAW struct Reb_Cell  // usually only const, see REBCEL(const*)
-#endif
-
-
-//=//// RELATIVE VALUES ///////////////////////////////////////////////////=//
-//
-// Note that in the C build, %rebol.h forward-declares `struct Reb_Value` and
-// then #defines REBVAL to that.
-//
-#if !defined(CPLUSPLUS_11)
-    #define RELVAL \
-        struct Reb_Value // same as REBVAL, no checking in C build
-#else
-    struct Reb_Relative_Value; // won't implicitly downcast to REBVAL
-    #define RELVAL \
-        struct Reb_Relative_Value // *might* be IS_RELATIVE()
-#endif
-
-
-//=//// EXTANT STACK POINTERS /////////////////////////////////////////////=//
-//
-// See %sys-stack.h for a deeper explanation.  This has to be declared in
-// order to put in one of REBCEL(const*)'s implicit constructors.  Because
-// having the STKVAL(*) have a user-defined conversion to REBVAL* won't
-// get that...and you can't convert to both REBVAL* and REBCEL(const*) as
-// that would be ambiguous.
-//
-// Even with this definition, the intersecting needs of DEBUG_CHECK_CASTS and
-// DEBUG_EXTANT_STACK_POINTERS means there will be some cases where distinct
-// overloads of REBVAL* vs. REBCEL(const*) will wind up being ambiguous.
-// For instance, VAL_DECIMAL(STKVAL(*)) can't tell which checked overload
-// to use.  In such cases, you have to cast, e.g. VAL_DECIMAL(VAL(stackval)).
-//
-#if !defined(DEBUG_EXTANT_STACK_POINTERS)
-    #define STKVAL(p) REBVAL*
-#else
-    struct Reb_Stack_Value_Ptr;
-    #define STKVAL(p) Reb_Stack_Value_Ptr
-#endif
-
-
-//=//// ESCAPE-ALIASABLE CELLS ////////////////////////////////////////////=//
-//
-// The system uses a trick in which the type byte is bumped by multiples of
-// 64 to indicate up to 3 levels of escaping.  VAL_TYPE() will report these
-// as being REB_QUOTED, but the entire payload for them is in the cell.
-//
-// Most of the time, routines want to see these as being QUOTED!.  But some
-// lower-level routines (like molding or comparison) want to be able to act
-// on them in-place witout making a copy.  To ensure they see the value for
-// the "type that it is" and use CELL_KIND() and not VAL_TYPE(), this alias
-// for RELVAL prevents VAL_TYPE() operations.
-//
-// Because a REBCEL can be linked to by a QUOTED!, it's important not to
-// modify the potentially-shared escaped data.  So all REBCEL* should be
-// const.  That's enforced in the C++ debug build, and a wrapping class is
-// used for the pointer to make sure one doesn't assume it lives in an array
-// and try to do pointer math on it...since it may be a singular allocation.
-//
-// Note: This needs special handling in %make-headers.r to recognize the
-// format.  See the `typemacro_parentheses` rule.
-//
-#if !defined(CPLUSPLUS_11)
-
-    #define REBCEL(const_star) \
-        const struct Reb_Value *  // same as RELVAL, no checking in C build
-
-#elif !defined(DEBUG_CHECK_CASTS)
-    //
-    // The %sys-internals.h API is used by core extensions, and we may want
-    // to build the executable with C++ but an extension with C.  If there
-    // are "trick" pointer types that are classes with methods passed in
-    // the API, that would inhibit such an implementation.
-    //
-    // Making it easy to configure such a mixture isn't a priority at this
-    // time.  But just make sure some C++ builds are possible without
-    // using the active pointer class.  Choose debug builds for now.
-    //
-    struct Reb_Cell;  // won't implicitly downcast to RELVAL
-    #define REBCEL(const_star) \
-        const struct Reb_Cell *  // not a class instance in %sys-internals.h
-#else
-    // This heavier wrapper form of Reb_Cell() can be costly...empirically
-    // up to 10% of the runtime, since it's called so often.  But it protects
-    // against pointer arithmetic on REBCEL().
-    //
-    struct Reb_Cell;  // won't implicitly downcast to RELVAL
-    template<typename T>
-    struct RebcellPtr {
-        T p;
-        static_assert(
-            std::is_same<const Reb_Cell*, T>::value,
-            "Instantiations of REBCEL only work as REBCEL(const*)"
-        );
-
-        RebcellPtr () { }
-        RebcellPtr (const Reb_Cell *p) : p (p) {}
-        RebcellPtr (STKVAL(*) p) : p (p) {}
-
-        const Reb_Cell **operator&() { return &p; }
-        const Reb_Cell *operator->() { return p; }
-        const Reb_Cell &operator*() { return *p; }
-
-        operator const Reb_Cell* () { return p; }
-
-        explicit operator const Reb_Value* ()
-          { return reinterpret_cast<const Reb_Value*>(p); }
-
-        explicit operator const Reb_Relative_Value* ()
-          { return reinterpret_cast<const Reb_Relative_Value*>(p); }
-    };
-    #define REBCEL(const_star) \
-        struct RebcellPtr<Reb_Cell const_star>
-#endif
 
 
 
@@ -306,12 +168,6 @@ struct Reb_State;
 typedef uint_fast32_t REBDSP; // Note: 0 for empty stack ([0] entry is trash)
 
 
-// The REB_R type is a REBVAL* but with the idea that it is legal to hold
-// types like REB_R_THROWN, etc.  This helps document interface contract.
-//
-typedef REBVAL *REB_R;
-
-
 //=//// PARAMETER CLASSES ////////////////////////////////////////////////=//
 
 enum Reb_Param_Class {
@@ -327,49 +183,6 @@ enum Reb_Param_Class {
     REB_P_LOCAL
 };
 
-
-//=//// TYPE HOOKS ///////////////////////////////////////////////////////=//
-
-
-
-// PER-TYPE COMPARE HOOKS, to support GREATER?, EQUAL?, LESSER?...
-//
-// Every datatype should have a comparison function, because otherwise a
-// block containing an instance of that type cannot SORT.  Like the
-// generic dispatchers, compare hooks are done on a per-class basis, with
-// no overrides for individual types (only if they are the only type in
-// their class).
-//
-typedef REBINT (COMPARE_HOOK)(REBCEL(const*) a, REBCEL(const*) b, bool strict);
-
-
-// PER-TYPE MAKE HOOKS: for `make datatype def`
-//
-// These functions must return a REBVAL* to the type they are making
-// (either in the output cell given or an API cell)...or they can return
-// R_THROWN if they throw.  (e.g. `make object! [return]` can throw)
-//
-typedef REB_R (MAKE_HOOK)(
-    REBVAL *out,
-    enum Reb_Kind kind,
-    option(const REBVAL*) opt_parent,
-    const REBVAL *def
-);
-
-
-// PER-TYPE TO HOOKS: for `to datatype value`
-//
-// These functions must return a REBVAL* to the type they are making
-// (either in the output cell or an API cell).  They are NOT allowed to
-// throw, and are not supposed to make use of any binding information in
-// blocks they are passed...so no evaluations should be performed.
-//
-// !!! Note: It is believed in the future that MAKE would be constructor
-// like and decided by the destination type, while TO would be "cast"-like
-// and decided by the source type.  For now, the destination decides both,
-// which means TO-ness and MAKE-ness are a bit too similar.
-//
-typedef REB_R (TO_HOOK)(REBVAL*, enum Reb_Kind, const REBVAL*);
 
 
 //=//// STRING MODES //////////////////////////////////////////////////////=//
@@ -405,55 +218,6 @@ enum Reb_Strmode {
 //
 struct rebol_mold;
 typedef struct rebol_mold REB_MOLD;
-
-
-// PER-TYPE MOLD HOOKS: for `mold value` and `form value`
-//
-// Note: ERROR! may be a context, but it has its own special FORM-ing
-// beyond the class (falls through to ANY-CONTEXT! for mold), and BINARY!
-// has a different handler than strings.  So not all molds are driven by
-// their class entirely.
-//
-typedef void (MOLD_HOOK)(REB_MOLD *mo, REBCEL(const*) v, bool form);
-
-
-// These definitions are needed in %sys-rebval.h, and can't be put in
-// %sys-rebact.h because that depends on Reb_Array, which depends on
-// Reb_Series, which depends on values... :-/
-
-// C function implementing a native ACTION!
-//
-typedef REB_R (*REBNAT)(REBFRM *frame_);
-#define REBNATIVE(n) \
-    REB_R N_##n(REBFRM *frame_)
-
-//
-// PER-TYPE GENERIC HOOKS: e.g. for `append value x` or `select value y`
-//
-// This is using the term in the sense of "generic functions":
-// https://en.wikipedia.org/wiki/Generic_function
-//
-// The current assumption (rightly or wrongly) is that the handler for
-// a generic action (e.g. APPEND) doesn't need a special hook for a
-// specific datatype, but that the class has a common function.  But note
-// any behavior for a specific type can still be accomplished by testing
-// the type passed into that common hook!
-//
-typedef REB_R (GENERIC_HOOK)(REBFRM *frame_, const REBVAL *verb);
-#define REBTYPE(n) \
-    REB_R T_##n(REBFRM *frame_, const REBVAL *verb)
-
-
-// PER-TYPE PATH HOOKS: for `a/b`, `:a/b`, `a/b:`, `pick a b`, `poke a b`
-//
-typedef REB_R (PATH_HOOK)(
-    REBPVS *pvs, const RELVAL *picker, option(const REBVAL*) setval
-);
-
-
-// Port hook: for implementing generic ACTION!s on a PORT! class
-//
-typedef REB_R (PORT_HOOK)(REBFRM *frame_, REBVAL *port, const REBVAL *verb);
 
 
 //=//// VARIADIC OPERATIONS ///////////////////////////////////////////////=//

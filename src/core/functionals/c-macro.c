@@ -135,7 +135,7 @@ REBNATIVE(macro)
         IDX_DETAILS_1 + 1  // details capacity, just body slot (and archetype)
     );
 
-    ACT_DISPATCHER(macro) = &Macro_Dispatcher;
+    INIT_ACT_DISPATCHER(macro, &Macro_Dispatcher);
 
     return Init_Action(D_OUT, macro, ANONYMOUS, UNBOUND);
 }

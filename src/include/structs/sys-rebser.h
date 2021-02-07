@@ -638,10 +638,6 @@ union Reb_Series_Link {
     //
     void *fd;
 
-    // native dispatcher code, the LINK() on ACT_DETAILS() for actions
-    //
-    REBNAT dispatcher;
-
     // If a REBNOD* is stored in the link field, it has to use this union
     // member for SERIES_INFO_LINK_NODE_NEEDS_MARK to see it.  To help make
     // the reference sites be unique for each purpose and still be type safe,

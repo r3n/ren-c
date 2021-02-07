@@ -38,7 +38,7 @@
 // an archetype in the [0] position, it is different from a varlist because
 // the values have no correspondence with the keys.  Instead, this is the
 // instance data used by the C native "dispatcher" function (which lives in
-// details->link.dispatcher).
+// details's LINK field).
 //
 // What the details array holds varies by dispatcher.  Some examples:
 //
@@ -72,43 +72,6 @@
 //   HIJACKed--or otherwise hooked to affect all instances of a function.
 //
 
-
-#if !defined(DEBUG_CHECK_CASTS)
-
-    #define ACT(p) \
-        cast(REBACT*, (p))
-
-#else
-
-    template <typename P>
-    inline REBACT *ACT(P p) {
-        static_assert(
-            std::is_same<P, void*>::value
-                or std::is_same<P, REBNOD*>::value
-                or std::is_same<P, REBSER*>::value
-                or std::is_same<P, REBARR*>::value,
-            "ACT() works on [void* REBNOD* REBSER* REBARR*]"
-        );
-
-        if (not p)
-            return nullptr;
-
-        if ((reinterpret_cast<const REBSER*>(p)->leader.bits & (
-            SERIES_MASK_DETAILS
-                | NODE_FLAG_FREE
-                | NODE_FLAG_CELL
-                | FLAG_FLAVOR_BYTE(255)
-                | ARRAY_FLAG_HAS_FILE_LINE_UNMASKED
-        )) !=
-            SERIES_MASK_DETAILS
-        ){
-            panic (p);
-        }
-
-        return reinterpret_cast<REBACT*>(p);
-    }
-
-#endif
 
 
 // The method for generating system indices isn't based on LOAD of an object,
@@ -287,9 +250,15 @@ inline static REBPAR *ACT_PARAMS_HEAD(REBACT *a) {
     return cast(REBPAR*, list->content.dynamic.data) + 1;  // skip archetype
 }
 
+#define LINK_DISPATCHER(a)              cast(REBNAT, (a)->link.any.cfunc)
+#define mutable_LINK_DISPATCHER(a)      (a)->link.any.cfunc
 
 #define ACT_DISPATCHER(a) \
-    ACT_DETAILS(a)->link.dispatcher
+    LINK_DISPATCHER(ACT_DETAILS(a))
+
+#define INIT_ACT_DISPATCHER(a,cfunc) \
+    mutable_LINK_DISPATCHER(ACT_DETAILS(a)) = cast(CFUNC*, (cfunc))
+
 
 #define DETAILS_AT(a,n) \
     SPECIFIC(ARR_AT((a), (n)))

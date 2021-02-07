@@ -49,10 +49,6 @@
 //
 
 
-#define SYM(s) \
-    m_cast(REBSYM*, x_cast(const REBSYM*, (s)))
-
-
 // Some places permit an optional label (such as the names of function
 // invocations, which may not have an associated name).  To make the callsite
 // intent clearer for passing in a null REBSTR*, use ANONYMOUS instead.
@@ -73,156 +69,6 @@
 #define LINK_Bookmarks_TYPE     REBBMK*  // alias for REBSER* at this time
 #define LINK_Bookmarks_CAST     (REBBMK*)SER
 
-
-//=////////////////////////////////////////////////////////////////////////=//
-//
-// REBCHR(*) + REBCHR(const*): "ITERATOR" TYPE FOR SPECIFIC GOOD UTF-8 DATA
-//
-//=////////////////////////////////////////////////////////////////////////=//
-//
-// Rebol exchanges UTF-8 data with the outside world via "char*".  But inside
-// the code, REBYTE* is used for not-yet-validated bytes that are to be
-// scanned as UTF-8.  When accessing an already-checked string, however,
-// the REBCHR(*) type is used...signaling no error checking should need to be
-// done while walking through the UTF-8 sequence.
-//
-// So for instance: instead of simply saying:
-//
-//     REBUNI *ptr = STR_HEAD(string_series);
-//     REBUNI c = *ptr++;  // !!! invalid, treating UTF-8 like it's ASCII!
-//
-// ...one must instead write:
-//
-//     REBCHR(*) ptr = STR_HEAD(string_series);
-//     REBUNI c;
-//     ptr = NEXT_CHR(&c, ptr);  // ++ptr or ptr[n] will error in C++ build
-//
-// The code that runs behind the scenes is typical UTF-8 forward and backward
-// scanning code, minus any need for error handling.
-//
-#if !defined(DEBUG_UTF8_EVERYWHERE)
-    //
-    // Plain build uses trivial expansion of REBCHR(*) and REBCHR(const*)
-    //
-    //          REBCHR(*) cp; => REBYTE * cp;
-    //     REBCHR(const*) cp; => REBYTE const* cp;  // same as `const REBYTE*`
-    //
-    #define REBCHR(star_or_const_star) \
-        REBYTE star_or_const_star
-
-    #define const_if_unchecked_utf8 const
-#else
-    #if !defined(CPLUSPLUS_11)
-        #error "DEBUG_UTF8_EVERYWHERE requires C++11 or higher"
-    #endif
-
-    // Debug mode uses templates to expand REBCHR(*) and REBCHR(const*) into
-    // pointer classes.  This technique allows the simple C compilation too:
-    //
-    // http://blog.hostilefork.com/kinda-smart-pointers-in-c/
-    //
-    // NOTE: Don't put this in %reb-defs.h and try to pass REBCHR(*) as args
-    // to routines as part of the %sys-core.h API.  This would lead to an
-    // incompatible runtime interface between C and C++ builds of cores and
-    // extensions using the internal API--which we want to avoid!
-    //
-    // NOTE: THE NON-INLINED OVERHEAD IS RATHER HIGH IN UNOPTIMIZED BUILDS!
-    // debug build does not inline these classes and functions.  So traversing
-    // strings involves a lot of constructing objects and calling methods that
-    // call methods.  Hence these classes are used only in non-debug (and
-    // hopefully) optimized builds, where the inlining makes it equivalent to
-    // the C version.  That allows for the compile-time type checking but no
-    // added runtime overhead.
-    //
-    template<typename T> struct RebchrPtr;
-    #define REBCHR(star_or_const_star) \
-        RebchrPtr<REBYTE star_or_const_star>
-
-    #define const_if_unchecked_utf8
-
-    // Primary purpose of the classes is to disable the ability to directly
-    // increment or decrement pointers to REBYTE* without going through helper
-    // routines that do decoding.  But we still want to do pointer comparison,
-    // and C++ sadly makes us write this all out.
-
-    template<>
-    struct RebchrPtr<const REBYTE*> {
-        const REBYTE *bp;  // will actually be mutable if constructed mutable
-
-        RebchrPtr () {}
-        RebchrPtr (nullptr_t n) : bp (n) {}
-        explicit RebchrPtr (const REBYTE *bp) : bp (bp) {}
-        explicit RebchrPtr (const char *cstr)
-            : bp (reinterpret_cast<const REBYTE*>(cstr)) {}
-
-        REBSIZ operator-(const REBYTE *rhs)
-          { return bp - rhs; }
-
-        REBSIZ operator-(RebchrPtr rhs)
-          { return bp - rhs.bp; }
-
-        bool operator==(const RebchrPtr<const REBYTE*> &other)
-          { return bp == other.bp; }
-
-        bool operator==(const REBYTE *other)
-          { return bp == other; }
-
-        bool operator!=(const RebchrPtr<const REBYTE*> &other)
-          { return bp != other.bp; }
-
-        bool operator!=(const REBYTE *other)
-          { return bp != other; }
-
-        bool operator>(const RebchrPtr<const REBYTE*> &other)
-          { return bp > other.bp; }
-
-        bool operator<(const REBYTE *other)
-          { return bp < other; }
-
-        bool operator<=(const RebchrPtr<const REBYTE*> &other)
-          { return bp <= other.bp; }
-
-        bool operator>=(const REBYTE *other)
-          { return bp >= other; }
-
-        operator bool() { return bp != nullptr; }  // implicit
-        operator const void*() { return bp; }  // implicit
-        operator const REBYTE*() { return bp; }  // implicit
-        operator const char*()
-          { return reinterpret_cast<const char*>(bp); }  // implicit
-    };
-
-    template<>
-    struct RebchrPtr<REBYTE*> : public RebchrPtr<const REBYTE*> {
-        RebchrPtr () : RebchrPtr<const REBYTE*>() {}
-        RebchrPtr (nullptr_t n) : RebchrPtr<const REBYTE*>(n) {}
-        explicit RebchrPtr (REBYTE *bp)
-            : RebchrPtr<const REBYTE*> (bp) {}
-        explicit RebchrPtr (char *cstr)
-            : RebchrPtr<const REBYTE*> (reinterpret_cast<REBYTE*>(cstr)) {}
-
-        static REBCHR(*) nonconst(REBCHR(const*) cp)
-          { return RebchrPtr {const_cast<REBYTE*>(cp.bp)}; }
-
-        operator void*() { return const_cast<REBYTE*>(bp); }  // implicit
-        operator REBYTE*() { return const_cast<REBYTE*>(bp); }  // implicit
-        explicit operator char*()
-            { return const_cast<char*>(reinterpret_cast<const char*>(bp)); }
-    };
-
-  #if defined(DEBUG_CHECK_CASTS)
-    //
-    // const_cast<> and reinterpret_cast<> don't work with user-defined
-    // conversion operators.  But since this codebase uses m_cast, we can
-    // cheat when the class is being used with the helpers.
-    //
-    template <>
-    inline REBCHR(*) m_cast_helper(REBCHR(const*) v)
-      { return RebchrPtr<REBYTE*> {const_cast<REBYTE*>(v.bp)}; }
-  #else
-    #error "DEBUG_UTF8_EVERYWHERE currently requires DEBUG_CHECK_CASTS"
-  #endif
-#endif
 
 inline static REBCHR(*) NEXT_CHR(
     REBUNI *codepoint_out,
@@ -330,25 +176,6 @@ inline static REBCHR(*) WRITE_CHR(REBCHR(*) cp, REBUNI c) {
     Encode_UTF8_Char(cp, c, size);
     return cast(REBCHR(*), cast(REBYTE*, cp) + size);
 }
-
-
-//=//// REBSTR SERIES FOR UTF8 STRINGS ////////////////////////////////////=//
-
-
-#if !defined(DEBUG_CHECK_CASTS)
-
-    #define STR(p) \
-        m_cast(REBSTR*, (const REBSTR*)(p))  // don't check const in C or C++
-
-#else  // !!! Enhance with more checks, like SER() does.
-
-    inline static REBSTR *STR(void *p)
-      { return cast(REBSTR*, p); }
-
-    inline static const REBSTR *STR(const void *p)
-      { return cast(const REBSTR*, p); }
-
-#endif
 
 
 //=//// STRING ALL-ASCII FLAG /////////////////////////////////////////////=//

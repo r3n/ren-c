@@ -28,58 +28,6 @@
 //
 
 
-#if !defined(DEBUG_CHECK_CASTS)
-
-    #define NOD(p) \
-        m_cast(REBNOD*, x_cast(const REBNOD*, (p)))  // subvert const warnings
-
-#else
-
-    inline static REBNOD *NOD(nullptr_t p) {
-        UNUSED(p);
-        return nullptr;
-    }
-
-    template <
-        typename T,
-        typename T0 = typename std::remove_const<T>::type,
-        typename N = typename std::conditional<
-            std::is_const<T>::value,  // boolean
-            const REBNOD,  // true branch
-            REBNOD  // false branch
-        >::type
-    >
-    inline static N *NOD(T *p) {
-        constexpr bool derived =
-            std::is_same<T0, REBNOD>::value
-            or std::is_base_of<REBRAW, T0>::value
-            or std::is_same<T0, REBFRM>::value;
-
-        constexpr bool base =
-            std::is_same<T0, void>::value
-            or std::is_same<T0, REBYTE>::value;
-
-        static_assert(
-            derived or base,
-            "NOD() works on void* or REBFRM*"
-        );
-
-        if (not p)
-            return nullptr;
-
-        if ((*reinterpret_cast<const REBYTE*>(p) & (
-            NODE_BYTEMASK_0x80_NODE | NODE_BYTEMASK_0x40_FREE
-        )) != (
-            NODE_BYTEMASK_0x80_NODE
-        )){
-            panic (p);
-        }
-
-        return reinterpret_cast<N*>(p);
-    }
-#endif
-
-
 #define NODE_BYTE(p) \
     *cast(const REBYTE*, ensure(const REBNOD*, p))
 

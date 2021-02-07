@@ -45,44 +45,6 @@
 // context (which is also required to do a GET_VAR lookup).
 //
 
-#if !defined(DEBUG_CHECK_CASTS)
-
-    #define ARR(p) \
-        m_cast(REBARR*, x_cast(const REBARR*, (p)))  // subvert const warnings
-
-#else
-
-    template <
-        typename T,
-        typename T0 = typename std::remove_const<T>::type,
-        typename A = typename std::conditional<
-            std::is_const<T>::value,  // boolean
-            const REBARR,  // true branch
-            REBARR  // false branch
-        >::type
-    >
-    inline A *ARR(T *p) {
-        static_assert(
-            std::is_same<T0, void>::value
-                or std::is_same<T0, REBNOD>::value
-                or std::is_same<T0, REBSER>::value,
-            "ARR() works on [void* REBNOD* REBSER*]"
-        );
-        if (not p)
-            return nullptr;
-
-        if ((reinterpret_cast<const REBSER*>(p)->leader.bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
-        )) != (
-            NODE_FLAG_NODE
-        )){
-            panic (p);
-        }
-
-        return reinterpret_cast<A*>(p);
-    }
-
-#endif
 
 // !!! We generally want to use LINK(Filename, x) but that uses the STR()
 // macro which is not defined in this file.  There's a bit of a circular
