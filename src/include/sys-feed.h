@@ -50,9 +50,12 @@
 
 #define LINK_Splice_TYPE        REBARR*
 #define LINK_Splice_CAST        ARR
+#define HAS_LINK_Splice         FLAVOR_FEED
 
 #define MISC_Pending_TYPE       const RELVAL*
 #define MISC_Pending_CAST       (const RELVAL*)
+#define HAS_MISC_Pending        FLAVOR_FEED
+
 
 #define FEED_SPLICE(feed) \
     LINK(Splice, &(feed)->singular)
@@ -253,8 +256,15 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             GC_Kill_Series(inst1);
             break; }
 
-          case FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE: {
+          case FLAVOR_API: {
             //
+            // We usually get the API *cells* passed to us, not the singular
+            // array holding them.  But the rebR() function will actually
+            // flip the "release" flag and then return the existing API handle
+            // back, now behaving as an instruction.
+            //
+            assert(GET_SUBCLASS_FLAG(API, inst1, RELEASE));
+
             // !!! Originally this asserted it was a managed handle, but the
             // needs of API-TRANSIENT are such that a handle which outlives
             // the frame is returned as a SINGULAR_API_RELEASE.  Review.

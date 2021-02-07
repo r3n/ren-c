@@ -113,22 +113,28 @@
 //
 
 #define LINK(Field, s) \
-    LINK_##Field##_CAST(m_cast(REBNOD*, (s)->link.any.node))
+    LINK_##Field##_CAST(m_cast(REBNOD*, \
+        ensure_flavor(HAS_LINK_##Field, (s))->link.any.node))
 
 #define MISC(Field, s) \
-    MISC_##Field##_CAST(m_cast(REBNOD*, (s)->misc.any.node))
+    MISC_##Field##_CAST(m_cast(REBNOD*, \
+        ensure_flavor(HAS_MISC_##Field, (s))->misc.any.node))
 
 #define INODE(Field, s) \
-    INODE_##Field##_CAST(m_cast(REBNOD*, (s)->info.node))
+    INODE_##Field##_CAST(m_cast(REBNOD*, \
+        ensure_flavor(HAS_INODE_##Field, (s))->info.node))
 
 #define mutable_LINK(Field, s) \
-    ensured(LINK_##Field##_TYPE, const REBNOD*, (s)->link.any.node)
+    ensured(LINK_##Field##_TYPE, const REBNOD*, \
+        ensure_flavor(HAS_LINK_##Field, (s))->link.any.node)
 
 #define mutable_MISC(Field, s) \
-    ensured(MISC_##Field##_TYPE, const REBNOD*, (s)->misc.any.node)
+    ensured(MISC_##Field##_TYPE, const REBNOD*, \
+        ensure_flavor(HAS_MISC_##Field, (s))->misc.any.node)
 
 #define mutable_INODE(Field, s) \
-    ensured(INODE_##Field##_TYPE, const REBNOD*, (s)->info.node)
+    ensured(INODE_##Field##_TYPE, const REBNOD*, \
+        ensure_flavor(HAS_INODE_##Field, (s))->info.node)
 
 #define node_LINK(Field, s) \
     *m_cast(REBNOD**, &(s)->link.any.node)  // const ok for strict alias
@@ -258,10 +264,12 @@ inline static REBSER *ensure_flavor(
 #endif
 
 #define BONUS(Field, s) \
-    BONUS_##Field##_CAST(m_cast(REBNOD*, SER_BONUS(s)))
+    BONUS_##Field##_CAST(m_cast(REBNOD*, \
+        SER_BONUS(ensure_flavor(HAS_BONUS_##Field, (s)))))
 
 #define mutable_BONUS(Field, s) \
-    ensured(BONUS_##Field##_TYPE, const REBNOD*, SER_BONUS(s))
+    ensured(BONUS_##Field##_TYPE, const REBNOD*, \
+        SER_BONUS(ensure_flavor(HAS_BONUS_##Field, (s))))
 
 #define node_BONUS(Field, s) \
     *m_cast(REBNOD**, &SER_BONUS(s))  // const ok for strict alias

@@ -87,16 +87,6 @@ enum Reb_Series_Flavor {
     FLAVOR_FEED,
     FLAVOR_API,
 
-    // The rebR() function can be used with an API handle to tell a variadic
-    // function to release that handle after encountering it.
-    //
-    // !!! API handles are singular arrays, because there is already a stake in
-    // making them efficient.  However it means they have to share header and
-    // info bits, when most are not applicable to them.  This is a tradeoff, and
-    // contention for bits may become an issue in the future.
-    //
-    FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE,
-
     // This is used by rebQ() and rebU() to either add a quoting level of
     // splices or to remove one.  Today these arrays are always singular and
     // contain one value, but in the future they might contain more.
@@ -109,7 +99,7 @@ enum Reb_Series_Flavor {
     FLAVOR_INSTRUCTION_SPLICE,
 
     FLAVOR_MAX_ARRAY = FLAVOR_INSTRUCTION_SPLICE,
-    // ^-- everything below this line has width=sizeof(REBVAL)
+    // ^-- everything above this line has width=sizeof(REBVAL)
 
     // For the moment all series that aren't a REBVAL or a binary store items
     // of size pointer.
@@ -125,15 +115,15 @@ enum Reb_Series_Flavor {
     FLAVOR_HASHLIST,  // outlier, sizeof(REBLEN)...
     FLAVOR_BOOKMARKLIST,  // also outlier, sizeof(struct Reb_Bookmark)
 
-    // v-- everything below this line has width=sizeof(REBVAL)
+    // v-- everything below this line has width=1
 
-    FLAVOR_MIN_BYTESIZE,
+    FLAVOR_BINARY,
+    FLAVOR_MIN_BYTESIZE = FLAVOR_BINARY,
 
-    FLAVOR_BINARY = FLAVOR_MIN_BYTESIZE,
+    // v-- everything below this line is UTF-8 (or trash)
 
-    FLAVOR_MIN_UTF8,
-
-    FLAVOR_STRING = FLAVOR_MIN_UTF8,
+    FLAVOR_STRING,
+    FLAVOR_MIN_UTF8 = FLAVOR_STRING,
 
     // While the content format is UTF-8 for both ANY-STRING! and ANY-WORD!,
     // MISC() and LINK() fields are used differently.  String caches its length

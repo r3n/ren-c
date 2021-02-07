@@ -624,7 +624,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     SET_SERIES_USED(keylist, num_slots - 1);  // no terminator
     INIT_LINK_KEYSOURCE(paramlist, keylist);
-    mutable_MISC(Meta, paramlist) = nullptr;
+    mutable_MISC(VarlistMeta, paramlist) = nullptr;
     mutable_BONUS(Patches, paramlist) = nullptr;
   }
 
@@ -682,7 +682,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             num_slots,
             SERIES_MASK_VARLIST | NODE_FLAG_MANAGED
         );
-        mutable_MISC(Meta, types_varlist) = nullptr;  // GC sees, must init
+        mutable_MISC(VarlistMeta, types_varlist) = nullptr;
         mutable_BONUS(Patches, types_varlist) = nullptr;
         INIT_CTX_KEYLIST_SHARED(CTX(types_varlist), keylist);
 
@@ -721,7 +721,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             num_slots,
             SERIES_MASK_VARLIST | NODE_FLAG_MANAGED
         );
-        mutable_MISC(Meta, notes_varlist) = nullptr;  // GC sees, must init
+        mutable_MISC(VarlistMeta, notes_varlist) = nullptr;
         mutable_BONUS(Patches, notes_varlist) = nullptr;
         INIT_CTX_KEYLIST_SHARED(CTX(notes_varlist), keylist);
 
@@ -931,7 +931,7 @@ REBACT *Make_Action(
     SET_SERIES_LEN(details, details_capacity);
 
     mutable_LINK_DISPATCHER(details) = cast(CFUNC*, dispatcher);
-    mutable_MISC(Meta, details) = nullptr;  // caller can fill in
+    mutable_MISC(DetailsMeta, details) = nullptr;  // caller can fill in
 
     INIT_VAL_ACTION_SPECIALTY_OR_LABEL(archetype, specialty);
 
@@ -1011,7 +1011,7 @@ REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
     varlist->leader.bits |= SERIES_MASK_VARLIST;  // !!! adds dynamic
     CLEAR_SERIES_FLAG(varlist, DYNAMIC);  // !!! removes (review cleaner way)
     SET_SERIES_FLAG(varlist, INACCESSIBLE);
-    mutable_MISC(Meta, varlist) = nullptr;
+    mutable_MISC(VarlistMeta, varlist) = nullptr;
     // no BONUS (it's INACCESSIBLE, so non-dynamic)
 
     RELVAL *rootvar = ARR_SINGLE(varlist);

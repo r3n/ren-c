@@ -49,7 +49,7 @@ REBCTX *Alloc_Context_Core(enum Reb_Kind kind, REBLEN capacity, REBFLGS flags)
         SERIES_MASK_VARLIST  // includes assurance of dynamic allocation
             | flags  // e.g. NODE_FLAG_MANAGED
     );
-    mutable_MISC(Meta, varlist) = nullptr;  // GC sees meta object, must init
+    mutable_MISC(VarlistMeta, varlist) = nullptr;
     mutable_BONUS(Patches, varlist) = nullptr;
     INIT_CTX_KEYLIST_UNIQUE(CTX(varlist), keylist);  // starts out unique
 
@@ -548,8 +548,8 @@ REBCTX *Make_Context_Detect_Managed(
             | NODE_FLAG_MANAGED // Note: Rebind below requires managed context
     );
     SET_SERIES_LEN(varlist, 1 + len);
-    mutable_MISC(Meta, varlist) = nullptr;  // clear meta object (GC sees)
-    mutable_BONUS(Patches, varlist) = nullptr;  // clear virtual patch list
+    mutable_MISC(VarlistMeta, varlist) = nullptr;
+    mutable_BONUS(Patches, varlist) = nullptr;  // start w/no virtual binds
 
     REBCTX *context = CTX(varlist);
 

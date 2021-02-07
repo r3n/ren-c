@@ -61,6 +61,7 @@
 //
 #define MISC_Variant_TYPE        REBARR*
 #define MISC_Variant_CAST        ARR
+#define HAS_MISC_Variant         FLAVOR_PATCH
 
 
 //=//// PATCH_FLAG_REUSED /////////////////////////////////////////////////=//
@@ -91,6 +92,7 @@
 //
 #define LINK_PatchUnused_TYPE           REBNOD*
 #define LINK_PatchUnused_CAST(p)        (p)
+#define HAS_LINK_PatchUnused            FLAVOR_PATCH
 
 
 #ifdef NDEBUG

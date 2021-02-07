@@ -501,9 +501,9 @@ REBNATIVE(set_meta)
     REBVAL *v = ARG(value);
 
     if (IS_ACTION(v))
-        mutable_MISC(Meta, ACT_DETAILS(VAL_ACTION(v))) = meta_ctx;
+        mutable_MISC(DetailsMeta, ACT_DETAILS(VAL_ACTION(v))) = meta_ctx;
     else
-        mutable_MISC(Meta, CTX_VARLIST(VAL_CONTEXT(v))) = meta_ctx;
+        mutable_MISC(VarlistMeta, CTX_VARLIST(VAL_CONTEXT(v))) = meta_ctx;
 
     RETURN (meta);
 }
@@ -582,12 +582,12 @@ REBCTX *Copy_Context_Extra_Managed(
     // If we're copying a frame here, we know it's not running.
     //
     if (CTX_TYPE(original) == REB_FRAME)
-        mutable_MISC(Meta, varlist) = nullptr;
+        mutable_MISC(VarlistMeta, varlist) = nullptr;
     else {
         // !!! Should the meta object be copied for other context types?
         // Deep copy?  Shallow copy?  Just a reference to the same object?
         //
-        mutable_MISC(Meta, varlist) = nullptr;
+        mutable_MISC(VarlistMeta, varlist) = nullptr;
     }
 
     mutable_BONUS(Patches, varlist) = nullptr;  // no virtual bind patches yet

@@ -673,7 +673,7 @@ inline static void Push_Action(
             FLAG_USED_BYTE_ARRAY()  // reserved for future use
         );
         INIT_LINK_KEYSOURCE(ARR(s), NOD(f)); // maps varlist back to f
-        mutable_MISC(Meta, s) = nullptr;  // GC will sees this
+        mutable_MISC(VarlistMeta, s) = nullptr;
         mutable_BONUS(Patches, s) = nullptr;
         f->varlist = ARR(s);
     }

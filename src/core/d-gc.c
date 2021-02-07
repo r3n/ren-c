@@ -213,7 +213,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         if (IS_NONSYMBOL_STRING(s)) {
             REBBMK *bookmark = LINK(Bookmarks, s);
             if (bookmark) {
-                assert(not LINK(Bookmarks, bookmark));  // just one for now
+                assert(SER_USED(bookmark) == 1);  // just one for now
                 //
                 // The intent is that bookmarks are unmanaged REBSERs, which
                 // get freed when the string GCs.  This mechanic could be a by

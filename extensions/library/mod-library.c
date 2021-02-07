@@ -68,7 +68,7 @@ REB_R MAKE_Library(
     Init_Unreadable_Void(ARR_SINGLE(lib));  // !!! save name? other data?
 
     lib->link.fd = fd;  // seen as shared by all instances
-    mutable_MISC(Meta, lib) = nullptr;  // !!! build from spec, e.g. arg?
+    node_MISC(Meta, lib) = nullptr;  // !!! build from spec, e.g. arg?
 
     RESET_CUSTOM_CELL(out, EG_Library_Type, CELL_FLAG_FIRST_IS_NODE);
     INIT_VAL_NODE1(out, lib);
@@ -94,10 +94,6 @@ void MF_Library(REB_MOLD *mo, REBCEL(const*) v, bool form)
     UNUSED(form);
 
     Pre_Mold(mo, v);
-
-    REBCTX *meta = VAL_LIBRARY_META(v);
-    if (meta)
-        MF_Context(mo, CTX_ARCHETYPE(meta), form);
 
     End_Mold(mo);
 }

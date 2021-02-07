@@ -264,6 +264,7 @@ typedef REBARR REBSTU;
 
 #define LINK_Schema_TYPE        REBFLD*  // ust an alias for REBARR
 #define LINK_Schema_CAST        ARR
+#define HAS_LINK_Scheme         FLAVOR_ARRAY
 
 #define MISC_STU_OFFSET(stu)    (stu)->misc.custom.u32
 

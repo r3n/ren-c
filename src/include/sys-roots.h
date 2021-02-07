@@ -44,9 +44,18 @@
 
 #define LINK_ApiNext_TYPE       REBNOD*
 #define LINK_ApiNext_CAST       NOD
+#define HAS_LINK_ApiNext       FLAVOR_API
 
 #define MISC_ApiPrev_TYPE       REBNOD*
 #define MISC_ApiPrev_CAST       NOD
+#define HAS_MISC_ApiPrev        FLAVOR_API
+
+
+// The rebR() function can be used with an API handle to tell a variadic
+// function to release that handle after encountering it.
+//
+#define API_FLAG_RELEASE \
+    SERIES_FLAG_24
 
 
 // What distinguishes an API value is that it has both the NODE_FLAG_CELL and

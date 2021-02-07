@@ -35,9 +35,11 @@
 
 #define LINK_Width_TYPE         intptr_t
 #define LINK_Width_CAST         (intptr_t)
+#define HAS_LINK_Width          FLAVOR_ARRAY
 
 #define MISC_Height_TYPE        intptr_t
 #define MISC_Height_CAST        (intptr_t)
+#define HAS_MISC_Height         FLAVOR_ARRAY
 
 extern REBTYP* EG_Image_Type;
 

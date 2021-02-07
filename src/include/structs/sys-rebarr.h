@@ -141,3 +141,4 @@ STATIC_ASSERT(ARRAY_FLAG_CONST_SHALLOW == CELL_FLAG_CONST);
 //
 #define LINK_Filename_TYPE          const REBSTR*
 #define LINK_Filename_CAST          (const REBSTR*)STR
+#define HAS_LINK_Filename           FLAVOR_ARRAY

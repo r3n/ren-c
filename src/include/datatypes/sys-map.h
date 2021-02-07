@@ -57,7 +57,7 @@
 //
 #define LINK_Hashlist_TYPE          REBSER*
 #define LINK_Hashlist_CAST          SER
-
+#define HAS_LINK_Hashlist           FLAVOR_PAIRLIST
 
 inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
     return cast(REBARR*, (&m_cast(REBMAP*, m)->pairlist));

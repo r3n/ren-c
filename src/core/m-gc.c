@@ -226,7 +226,7 @@ static void Queue_Mark_Node_Deep(void *p)
 
     s->leader.bits |= NODE_FLAG_MARKED;  // may be already set
 
-    if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and LINK(Node, s)) {
+    if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and node_LINK(Node, s)) {
         //
         // !!! The keysource for varlists can be set to a REBFRM*, which acts
         // like a cell because the flag is set to being an "endlike header".
@@ -234,11 +234,11 @@ static void Queue_Mark_Node_Deep(void *p)
         // casting as a SER().  It wasn't entirely obvious what was going on,
         // but this makes it clearer so that a more elegant fix can be made.
         //
-        if (Is_Node_Cell(LINK(Node, s)))
+        if (Is_Node_Cell(node_LINK(Node, s)))
             if (IS_VARLIST(s))
                 goto skip_mark_rebfrm_link;
 
-        REBSER *link = SER(LINK(Node, s));
+        REBSER *link = SER(node_LINK(Node, s));
         Queue_Mark_Node_Deep(link);
 
         // Keylist series need to be marked.
@@ -256,8 +256,8 @@ static void Queue_Mark_Node_Deep(void *p)
     }
 
   skip_mark_rebfrm_link:
-    if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and MISC(Node, s))
-        Queue_Mark_Node_Deep(MISC(Node, s));
+    if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and node_MISC(Node, s))
+        Queue_Mark_Node_Deep(node_MISC(Node, s));
 
     if (IS_SER_ARRAY(s)) {
         REBARR *a = ARR(s);
@@ -574,11 +574,11 @@ static void Mark_Root_Series(void)
                 );
 
                 if (GET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK))
-                    if (LINK(Node, a))
-                        Queue_Mark_Node_Deep(LINK(Node, a));
+                    if (node_LINK(Node, a))
+                        Queue_Mark_Node_Deep(node_LINK(Node, a));
                 if (GET_SERIES_FLAG(a, MISC_NODE_NEEDS_MARK))
-                    if (MISC(Node, a))
-                        Queue_Mark_Node_Deep(MISC(Node, a));
+                    if (node_MISC(Node, a))
+                        Queue_Mark_Node_Deep(node_MISC(Node, a));
 
                 RELVAL *item = SER_HEAD(RELVAL, a);
                 for (; NOT_END(item); ++item)

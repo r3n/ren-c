@@ -59,6 +59,7 @@
 //
 #define LINK_KeySource_TYPE         REBNOD*
 #define LINK_KeySource_CAST         NOD
+#define HAS_LINK_KeySource          FLAVOR_VARLIST
 
 inline static void INIT_LINK_KEYSOURCE(REBARR *varlist, REBNOD *keysource) {
     if (not Is_Node_Cell(keysource))

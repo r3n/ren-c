@@ -40,9 +40,9 @@
     cast(REBARR*, &(a)->details)
 
 
-#define MISC_Meta_TYPE      REBCTX*
-#define MISC_Meta_CAST      CTX
-
+#define MISC_DetailsMeta_TYPE      REBCTX*
+#define MISC_DetailsMeta_CAST      CTX
+#define HAS_MISC_DetailsMeta       FLAVOR_DETAILS
 
 // Note: LINK on details is the DISPATCHER, on varlists it's KEYSOURCE
 

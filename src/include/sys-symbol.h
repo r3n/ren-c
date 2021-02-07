@@ -46,7 +46,7 @@
 //
 #define LINK_Synonym_TYPE       const REBSYM*
 #define LINK_Synonym_CAST       SYM
-
+#define HAS_LINK_Synonym        FLAVOR_SYMBOL
 
 #if defined(NDEBUG) || !defined(CPLUSPLUS_11)
     //

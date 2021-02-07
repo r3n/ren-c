@@ -1787,10 +1787,10 @@ const REBINS *RL_rebRELEASING(REBVAL *v)
         fail ("Cannot apply rebR() to non-API value");
 
     REBARR *a = Singular_From_Cell(v);
-    if (SER_FLAVOR(a) == FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE)
+    if (GET_SUBCLASS_FLAG(API, a, RELEASE))
         fail ("Cannot apply rebR() more than once to the same API value");
 
-    mutable_SER_FLAVOR(a) = FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE;
+    SET_SUBCLASS_FLAG(API, a, RELEASE);
     return cast(REBINS*, a);
 }
 
@@ -2161,7 +2161,7 @@ REBNATIVE(api_transient)
     REBVAL *v = Move_Value(Alloc_Value(), ARG(value));
     rebUnmanage(v);  // has to survive the API-TRANSIENT's frame
     REBARR *a = Singular_From_Cell(v);
-    mutable_SER_FLAVOR(a) = FLAVOR_INSTRUCTION_SINGULAR_API_RELEASE;
+    SET_SUBCLASS_FLAG(API, a, RELEASE);
 
     // Regarding adddresses in WASM:
     //

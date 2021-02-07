@@ -113,10 +113,12 @@
 // is another object's-worth of data *about* the module's contents (e.g. the
 // processed header)
 //
-#define CTX_META(c)     MISC(Meta, CTX_VARLIST(c))
+#define CTX_META(c)     MISC(VarlistMeta, CTX_VARLIST(c))
 
 #define BONUS_Patches_TYPE      REBARR*
 #define BONUS_Patches_CAST      ARR
+#define HAS_BONUS_Patches       FLAVOR_VARLIST
+
 
 // ANY-CONTEXT! value cell schematic
 //
@@ -652,7 +654,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
         cast(char*, &stub->content),
         sizeof(union Reb_Series_Content)
     );
-    mutable_MISC(Meta, copy) = nullptr;  // let stub have the meta
+    mutable_MISC(VarlistMeta, copy) = nullptr;  // let stub have the meta
     mutable_BONUS(Patches, copy) = nullptr;  // don't carry forward patches
 
     REBVAL *rootvar = cast(REBVAL*, copy->content.dynamic.data);

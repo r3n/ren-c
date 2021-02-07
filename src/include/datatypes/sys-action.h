@@ -208,6 +208,7 @@ inline static void INIT_VAL_ACTION_BINDING(
 
 #define LINK_PartialsExemplar_TYPE         REBCTX*
 #define LINK_PartialsExemplar_CAST         CTX
+#define HAS_LINK_PartialsExemplar          FLAVOR_PARTIALS
 
 inline static option(REBARR*) ACT_PARTIALS(REBACT *a) {
     REBARR *list = ACT_SPECIALTY(a);
@@ -296,8 +297,8 @@ inline static void Init_Key(REBKEY *dest, const REBSYM *symbol)
 // where information for HELP is saved, and it's how modules store out-of-band
 // information that doesn't appear in their body.
 
-#define mutable_ACT_META(a)     mutable_MISC(Meta, ACT_DETAILS(a))
-#define ACT_META(a)             MISC(Meta, ACT_DETAILS(a))
+#define mutable_ACT_META(a)     mutable_MISC(DetailsMeta, ACT_DETAILS(a))
+#define ACT_META(a)             MISC(DetailsMeta, ACT_DETAILS(a))
 
 
 inline static REBACT *VAL_ACTION(REBCEL(const*) v) {
@@ -369,6 +370,7 @@ inline static void INIT_VAL_ACTION_LABEL(
 
 #define LINK_Ancestor_TYPE              REBSER*
 #define LINK_Ancestor_CAST              SER
+#define HAS_LINK_Ancestor               FLAVOR_KEYLIST
 
 inline static bool Action_Is_Base_Of(REBACT *base, REBACT *derived) {
     if (derived == base)

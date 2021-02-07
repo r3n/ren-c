@@ -46,9 +46,11 @@
 
 #define LINK_ReqNext_TYPE       REBREQ*  // alias for REBBIN
 #define LINK_ReqNext_CAST       BIN
+#define HAS_LINK_ReqNext        FLAVOR_BINARY
 
 #define MISC_ReqPortCtx_TYPE    REBCTX*
 #define MISC_ReqPortCtx_CAST    CTX
+#define HAS_MISC_ReqPortCtx     FLAVOR_BINARY
 
 enum Reb_Device_Command {
     RDC_INIT,       // init device driver resources

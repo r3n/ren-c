@@ -236,9 +236,11 @@ inline static REBARR *GOB_PANE(REBGOB *g) {
 
 #define LINK_GobParent_TYPE         REBGOB*
 #define LINK_GobParent_CAST         (REBGOB*)ARR
+#define HAS_LINK_GobParent          FLAVOR_GOBLIST
 
 #define MISC_GobOwner_TYPE          REBGOB*
 #define MISC_GobOwner_CAST          (REBGOB*)ARR
+#define HAS_MISC_GobOwner           FLAVOR_GOBLIST
 
 #define GOB_PARENT(g) \
     LINK(GobParent, (g))

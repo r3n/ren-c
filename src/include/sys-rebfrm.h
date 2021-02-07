@@ -32,6 +32,7 @@
 //
 #define LINK_ReuseNext_TYPE         REBARR*
 #define LINK_ReuseNext_CAST         ARR
+#define HAS_LINK_ReuseNext          FLAVOR_VARLIST
 
 
 // See Endlike_Header() for why these are chosen the way they are.  This

@@ -68,6 +68,7 @@
 //
 #define LINK_Bookmarks_TYPE     REBBMK*  // alias for REBSER* at this time
 #define LINK_Bookmarks_CAST     (REBBMK*)SER
+#define HAS_LINK_Bookmarks      FLAVOR_STRING
 
 
 inline static REBCHR(*) NEXT_CHR(
@@ -316,9 +317,7 @@ inline static REBBMK* Alloc_Bookmark(void) {
     REBSER *s = Make_Series(
         1,
         FLAG_FLAVOR(BOOKMARKLIST) | SERIES_FLAG_MANAGED
-            // LINK_NODE_NEEDS_MARK not needed if is bookmark
     );
-    mutable_LINK(Bookmarks, s) = nullptr;  // !!! efficiency by linking bookmarks?
     SET_SERIES_LEN(s, 1);
     CLEAR_SERIES_FLAG(s, MANAGED);  // manual but untracked (avoid leak error)
     return cast(REBBMK*, s);
@@ -435,7 +434,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     // track the last access--which speeds up the most common case of an
     // iteration.  Improve as time permits!
     //
-    assert(not bookmark or not LINK(Bookmarks, bookmark));  // only one
+    assert(not bookmark or SER_USED(bookmark) == 1);  // only one
 
   blockscope {
     REBLEN booked = BMK_INDEX(bookmark);
