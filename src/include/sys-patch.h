@@ -77,22 +77,32 @@
     SERIES_FLAG_24
 
 
-// Next node is either to another patch, a frame specifier REBCTX, or nullptr.
+//=//// PATCH_FLAG_LET ////////////////////////////////////////////////////=//
 //
-#define NextPatchNode(patch) \
-    *m_cast(REBNOD**, &PAYLOAD(Any, ARR_SINGLE(patch)).first.node)
+// This signifies that a patch was made using LET, and hence it doesn't point
+// to an object...rather the contents are the variable itself.  The LINK()
+// holds the symbol.
+//
+#define PATCH_FLAG_LET \
+    SERIES_FLAG_25
 
-#define NextPatch(patch) \
-    VAL_WORD_CACHE(ARR_SINGLE(patch))
 
-#define INIT_NEXT_PATCH(patch, specifier) \
-    INIT_VAL_WORD_CACHE(ARR_SINGLE(patch), (specifier))
 
 // The link slot for patches is available for use...
 //
-#define LINK_PatchUnused_TYPE           REBNOD*
-#define LINK_PatchUnused_CAST(p)        (p)
-#define HAS_LINK_PatchUnused            FLAVOR_PATCH
+#define LINK_PatchSymbol_TYPE           const REBSYM*
+#define LINK_PatchSymbol_CAST           SYM
+#define HAS_LINK_PatchSymbol            FLAVOR_PATCH
+
+#define INODE_NextPatch_TYPE            REBARR*
+#define INODE_NextPatch_CAST            ARR
+#define HAS_INODE_NextPatch             FLAVOR_PATCH
+
+// Next node is either to another patch, a frame specifier REBCTX, or nullptr.
+//
+
+#define NextPatch(patch) \
+    INODE(NextPatch, patch)
 
 
 #ifdef NDEBUG
@@ -235,6 +245,7 @@ inline static REBARR *Make_Patch_Core(
         //
         FLAG_FLAVOR(PATCH)
             | NODE_FLAG_MANAGED
+            | SERIES_FLAG_INFO_NODE_NEEDS_MARK
     );
 
     Init_Any_Word_Bound(ARR_SINGLE(patch), kind, ctx, limit);
@@ -244,7 +255,7 @@ inline static REBARR *Make_Patch_Core(
     // the chain.  So we can simply point to the existing specifier...whether
     // it is a patch, a frame context, or nullptr.
     //
-    INIT_NEXT_PATCH(patch, next);
+    mutable_INODE(NextPatch, patch) = next;
 
     // A circularly linked list of variations of this patch with different
     // NextPatch() dta is maintained, to assist in avoiding creating
@@ -265,7 +276,7 @@ inline static REBARR *Make_Patch_Core(
 
     // The LINK field is still available.
     //
-    mutable_LINK(PatchUnused, patch) = nullptr;
+    mutable_LINK(PatchSymbol, patch) = nullptr;
 
     return patch;
 }

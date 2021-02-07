@@ -548,21 +548,13 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     // Must make the function "paramlist" even if "empty", for identity.
     //
-    // !!! In order to facilitate adding to the frame in the copy and
-    // relativize step to add LET variables, don't pass SERIES_FLAG_FIXED_SIZE
-    // in the creation step.  This formats cells in such a way that the
-    // series mechanically cannot be expanded even if the flag is removed.
-    // Instead, add it onto a series allocated as resizable.  This is likely
-    // temporary--as LET mechanics should use some form of "virtual binding".
-    //
-    // !!! Note this means that Assert_Array_Core() has to have an exemption
-    // for ARRAY_FLAG_IS_PARAMLIST...review that.
+    // !!! This is no longer true, since details is the identity.  Review
+    // optimization potential.
     //
     REBARR *paramlist = Make_Array_Core(
         num_slots,
-        SERIES_MASK_PARAMLIST & ~(SERIES_FLAG_FIXED_SIZE)
+        SERIES_MASK_PARAMLIST
     );
-    SET_SERIES_FLAG(paramlist, FIXED_SIZE);
 
     REBSER *keylist = Make_Series(
         (num_slots - 1),  // - 1 archetype
@@ -797,12 +789,6 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 // generator will be "initializing it with a definitional return" for you.
 // You don't have to use it if you don't want to...and may overwrite the
 // variable.  But it won't be a void at the start.
-//
-// Note: While paramlists should ultimately carry SERIES_FLAG_FIXED_SIZE,
-// the product of this routine might need to be added to.  And series that
-// are created fixed size have special preparation such that they will trip
-// more asserts.  So the fixed size flag is *not* added here, but ensured
-// in the Make_Action() step.
 //
 REBARR *Make_Paramlist_Managed_May_Fail(
     REBCTX **meta,

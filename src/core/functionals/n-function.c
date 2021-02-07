@@ -408,8 +408,7 @@ REBACT *Make_Interpreted_Action_May_Fail(
         copy = Copy_And_Bind_Relative_Deep_Managed(
             body,  // new copy has locals bound relatively to the new action
             a,
-            TS_WORD,
-            did (mkf_flags & MKF_GATHER_LETS) // transitional LET technique
+            TS_WORD
         );
     }
 
@@ -493,7 +492,7 @@ REBNATIVE(func_p)
     REBACT *func = Make_Interpreted_Action_May_Fail(
         ARG(spec),
         ARG(body),
-        MKF_RETURN | MKF_KEYWORDS | MKF_GATHER_LETS,
+        MKF_RETURN | MKF_KEYWORDS,
         1 + IDX_DETAILS_1  // archetype and one array slot (will be filled)
     );
 

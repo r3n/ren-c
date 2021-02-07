@@ -239,7 +239,6 @@
                 | NODE_FLAG_FREE
                 | NODE_FLAG_CELL
                 | FLAG_FLAVOR_BYTE(255)
-                | ARRAY_FLAG_HAS_FILE_LINE_UNMASKED
         )) !=
             SERIES_MASK_DETAILS
         ){

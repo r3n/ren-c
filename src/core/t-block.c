@@ -1385,9 +1385,7 @@ void Assert_Array_Core(const REBARR *a)
 
         for (; i < rest - 1; ++i, ++item) {
             const bool unwritable = not (item->header.bits & NODE_FLAG_CELL);
-            if (
-                GET_SERIES_FLAG(a, FIXED_SIZE)  // !!! LETs mess this up
-            ){
+            if (GET_SERIES_FLAG(a, FIXED_SIZE)) {
               #if !defined(NDEBUG)
                 if (not unwritable) {
                     printf("Writable cell found in fixed-size array rest\n");

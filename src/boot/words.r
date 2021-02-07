@@ -248,16 +248,6 @@ dummy7
 dummy8
 dummy9
 
-; !!! The best implementation concept for LET would be a runtime concept
-; where only those instances of LET in an evaluation stream could somehow add
-; dynamically to a running context, while inert ones would not.  e.g.
-; code like `data: [let x:]` would not create memory for an x variable unless
-; you actually `do data`.  But as an interim step before the "virtual binding"
-; needed for that exists, LET is searched for as a keyword by FUNC at
-; function creation time, much like SET-WORD!s were looked for before.
-;
-let
-
 ; !!! Legacy: Used to report an error on usage of /LOCAL when <local> was
 ; intended.  Should be removed from code when the majority of such uses have
 ; been found, as the responsibility for that comes from %r2-warn.reb

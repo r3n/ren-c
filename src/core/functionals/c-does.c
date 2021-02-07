@@ -108,8 +108,7 @@ REB_R Block_Dispatcher(REBFRM *f)
         REBARR *relativized = Copy_And_Bind_Relative_Deep_Managed(
             SPECIFIC(block),
             FRM_PHASE(f),
-            TS_WORD,
-            false  // do not gather LETs
+            TS_WORD
         );
 
         // Preserve file and line information from the original, if present.

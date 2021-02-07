@@ -91,7 +91,7 @@ func: func* [
     /gather "Gather SET-WORD! as local variables (preferably, please use LET)"
     <local>
         new-spec var other
-        new-body exclusions locals defaulters statics
+        new-body exclusions locals defaulters statics with-return
 ][
     ; R3-Alpha offered features on FUNCTION (a complex usermode construct)
     ; that the simpler/faster FUNC did not have.  Ren-C seeks to make FUNC and
@@ -115,7 +115,7 @@ func: func* [
         return func* spec body
     ]
 
-    let exclusions: copy []
+    exclusions: copy []
 
     ; Rather than MAKE BLOCK! LENGTH OF SPEC here, we copy the spec and clear
     ; it.  This costs slightly more, but it means we inherit the file and line
@@ -125,19 +125,14 @@ func: func* [
     ; !!! General API control to set the file and line on blocks is another
     ; possibility, but since it's so new, we'd rather get experience first.
     ;
-    let new-spec: clear copy spec
+    new-spec: clear copy spec
 
-    let new-body: _
-    let statics: _
-    let defaulters: _
-    let var: <dummy>  ; enter PARSE with truthy state (gets overwritten)
-    let with-return: _
+    new-body: _
+    statics: _
+    defaulters: _
+    var: <dummy>  ; enter PARSE with truthy state (gets overwritten)
+    with-return: _
 
-    ; Gather the SET-WORD!s in the body, excluding the collected ANY-WORD!s
-    ; that should not be considered.  Note that COLLECT is not defined by
-    ; this point in the bootstrap.
-    ;
-    let other
     parse spec [any [
         <void> (append new-spec <void>)
     |
@@ -268,6 +263,10 @@ func: func* [
         )
     ] end]
 
+    ; Gather the SET-WORD!s in the body, excluding the collected ANY-WORD!s
+    ; that should not be considered.  Note that COLLECT is not defined by
+    ; this point in the bootstrap.
+    ;
     locals: try if gather [collect-words/deep/set/ignore body exclusions]
 
     if statics [
@@ -292,8 +291,7 @@ func: func* [
     ;
     if const? body [new-body: const new-body]
 
-    let thing
-    func* new-spec thing: either defaulters [
+    func* new-spec either defaulters [
         append/only defaulters as group! any [new-body body]
     ][
         any [new-body body]

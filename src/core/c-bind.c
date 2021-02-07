@@ -224,25 +224,81 @@ REBLEN Try_Bind_Word(const RELVAL *context, REBVAL *word)
 }
 
 
+
 //
 //  let: native [
 //
-//  {LET is noticed by FUNC to mean "create a local binding"}
+//  {Dynamically add a new binding into the stream of evaluation}
 //
-//      return: [<invisible>]
-//      'word [<skip> word!]
+//      return: [<invisible> word!]
+//      :word [<variadic> word! set-word!]
 //  ]
 //
 REBNATIVE(let)
-//
-// !!! Currently LET is a no-op, but in the future should be able to inject
-// new bindings into a code stream as it goes.  The mechanisms for that are
-// not yet designed, hence the means for creating new variables is actually
-// parallel to how SET-WORD!s were scanned for in R3-Alpha's FUNCTION.
 {
     INCLUDE_PARAMS_OF_LET;
-    UNUSED(ARG(word));  // just skip over WORD!s (vs. look them up)
 
+    REBFRM *f = frame_;
+    UNUSED(ARG(word));  // native, so has direct frame access.
+
+    if (IS_END(f_value) or not (IS_WORD(f_value) or IS_SET_WORD(f_value)))
+        fail ("LET needs to be followed by WORD! or SET-WORD!");
+
+    const REBSYM *symbol = VAL_WORD_SYMBOL(f_value);
+
+    // We create a virtual binding patch to link into the binding.  The
+    // difference with this patch is that its singular value is the value
+    // of a new variable.
+
+    REBARR *patch = Alloc_Singular(
+        //
+        // LINK is the symbol that the virtual binding matches.
+        //
+        // MISC is a node, but it's used for linking patches to variants
+        // with different chains underneath them...and shouldn't keep that
+        // alternate version alive.  So no SERIES_FLAG_MISC_NODE_NEEDS_MARK.
+        //
+        FLAG_FLAVOR(PATCH)
+            | PATCH_FLAG_LET
+            | NODE_FLAG_MANAGED
+            | SERIES_FLAG_LINK_NODE_NEEDS_MARK
+            | SERIES_FLAG_INFO_NODE_NEEDS_MARK
+    );
+
+    Init_Void(ARR_SINGLE(patch), SYM_UNSET);  // start variable off as unset
+
+    // The way it is designed, the list of patches terminates in either a
+    // nullptr or a context pointer that represents the specifying frame for
+    // the chain.  So we can simply point to the existing specifier...whether
+    // it is a patch, a frame context, or nullptr.
+    //
+    REBSPC *specifier = f_specifier;
+    if (NOT_SERIES_FLAG(specifier, MANAGED))
+        SET_SERIES_FLAG(specifier, MANAGED);  // natives don't manage
+    mutable_INODE(NextPatch, patch) = specifier;
+
+    // A circularly linked list of variations of this patch with different
+    // NextPatch() data is maintained, to assist in avoiding creating
+    // unnecessary duplicates.  But since this is an absolutely new instance
+    // (from a LET) we won't find any existing chains for this.
+    //
+    mutable_MISC(Variant, patch) = patch;
+
+    // Store the symbol so the patch knows it.
+    //
+    mutable_LINK(PatchSymbol, patch) = symbol;
+
+    mutable_BINDING(FEED_SINGLE(f->feed)) = patch;
+
+    if (IS_WORD(f_value)) {
+        Derelativize(D_OUT, f_value, f_specifier);
+        Fetch_Next_In_Feed(f->feed);  // skip over the word
+        return D_OUT;  // return the word
+    }
+
+    // If the expression is a SET-WORD!, e.g. `let x: 1 + 2`, then the LET
+    // vanishes and leaves behind the `x: 1 + 2` for the ensuing evaluation.
+    //
     RETURN_INVISIBLE;
 }
 
@@ -261,35 +317,14 @@ REBNATIVE(let)
 //
 static void Clonify_And_Bind_Relative(
     REBVAL *v,  // Note: incoming value is not relative
-    const RELVAL *src,
     REBFLGS flags,
     REBU64 deep_types,
     struct Reb_Binder *binder,
     REBACT *relative,
-    REBU64 bind_types,
-    REBLEN *param_num  // if not null, gathering LETs (next index for LET)
+    REBU64 bind_types
 ){
     if (C_STACK_OVERFLOWING(&bind_types))
         Fail_Stack_Overflow();
-
-    if (param_num and IS_WORD(src) and VAL_WORD_ID(src) == SYM_LET) {
-        if (IS_WORD(src + 1) or IS_SET_WORD(src + 1)) {
-            const REBSYM *symbol = VAL_WORD_SYMBOL(src + 1);
-            if (Try_Add_Binder_Index(binder, symbol, *param_num)) {
-                Init_Word(DS_PUSH(), symbol);
-                ++(*param_num);
-            }
-            else {
-                // !!! Should double LETs be an error?  With virtual binding
-                // it would override, but we can't do that now...so it may
-                // be better to just prohibit it.
-            }
-        }
-
-        // !!! We don't actually add the new words as we go, but rather all at
-        // once from the stack.  This may be superfluous, and we could use
-        // regular appends and trust the expansion logic.
-    }
 
     assert(flags & NODE_FLAG_MANAGED);
 
@@ -316,8 +351,6 @@ static void Clonify_And_Bind_Relative(
         // Objects and series get shallow copied at minimum
         //
         REBSER *series;
-        const RELVAL *sub_src;
-
         bool would_need_deep;
 
         if (ANY_CONTEXT_KIND(heart)) {
@@ -326,7 +359,6 @@ static void Clonify_And_Bind_Relative(
                 CTX_VARLIST(Copy_Context_Shallow_Managed(VAL_CONTEXT(v)))
             );
             series = CTX_VARLIST(VAL_CONTEXT(v));
-            sub_src = BLANK_VALUE;  // don't try to look for LETs
 
             would_need_deep = true;
         }
@@ -342,8 +374,6 @@ static void Clonify_And_Bind_Relative(
             INIT_VAL_NODE1(v, series);  // copies args
             INIT_SPECIFIER(v, UNBOUND);  // copied w/specifier--not relative
 
-            sub_src = VAL_ARRAY_AT(nullptr, v);  // look for LETs, may be tail
-
             // See notes in Clonify()...need to copy immutable paths so that
             // binding pointers can be changed in the "immutable" copy.
             //
@@ -358,13 +388,11 @@ static void Clonify_And_Bind_Relative(
                 NODE_FLAG_MANAGED
             );
             INIT_VAL_NODE1(v, series);
-            sub_src = BLANK_VALUE;  // don't try to look for LETs
 
             would_need_deep = false;
         }
         else {
             would_need_deep = false;
-            sub_src = nullptr;
             series = nullptr;
         }
 
@@ -374,16 +402,14 @@ static void Clonify_And_Bind_Relative(
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
             REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
             RELVAL *sub_tail = ARR_TAIL(ARR(series));
-            for (; sub != sub_tail; ++sub, ++sub_src)
+            for (; sub != sub_tail; ++sub)
                 Clonify_And_Bind_Relative(
                     sub,
-                    sub_src,
                     flags,
                     deep_types,
                     binder,
                     relative,
-                    bind_types,
-                    param_num
+                    bind_types
                 );
         }
     }
@@ -437,8 +463,7 @@ static void Clonify_And_Bind_Relative(
 REBARR *Copy_And_Bind_Relative_Deep_Managed(
     const REBVAL *body,
     REBACT *relative,
-    REBU64 bind_types,
-    bool gather_lets
+    REBU64 bind_types
 ){
     struct Reb_Binder binder;
     INIT_BINDER(&binder);
@@ -473,8 +498,6 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
     REBLEN len = tail - index;
 
-    REBDSP dsp_orig = DSP;
-
     // Currently we start by making a shallow copy and then adjust it
 
     copy = Make_Array_For_Copy(len, flags, original);
@@ -485,66 +508,15 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     for (; count < len; ++count, ++dest, ++src) {
         Clonify_And_Bind_Relative(
             Derelativize(dest, src, specifier),
-            src,
             flags | NODE_FLAG_MANAGED,
             deep_types,
             &binder,
             relative,
-            bind_types,
-            gather_lets
-                ? &param_num  // next bind index for a LET to use
-                : nullptr
+            bind_types
         );
     }
 
     SET_SERIES_LEN(copy, len);
-
-    if (gather_lets) {
-        //
-        // Extend the paramlist with any LET variables we gathered...
-        //
-        REBLEN num_lets = DSP - dsp_orig;
-        if (num_lets != 0) {
-            //
-            // !!! We can only clear this flag because Make_Paramlist_Managed()
-            // created the array *without* SERIES_FLAG_FIXED_SIZE, but then
-            // added it after the fact.  If at Make_Array() time you pass in the
-            // flag, then the cells will be formatted such that the flag cannot
-            // be taken off.
-            //
-            REBSER *keylist = ACT_KEYLIST(relative);
-
-            REBARR *paramlist = ACT_PARAMLIST(relative);
-            assert(GET_SERIES_FLAG(paramlist, FIXED_SIZE));
-            CLEAR_SERIES_FLAG(paramlist, FIXED_SIZE);
-
-            REBLEN old_keylist_len = SER_USED(keylist);
-            EXPAND_SERIES_TAIL(keylist, num_lets);
-            EXPAND_SERIES_TAIL(paramlist, num_lets);
-            REBKEY *key = SER_AT(REBKEY, keylist, old_keylist_len);
-            RELVAL *param = ARR_AT(paramlist, old_keylist_len + 1);
-
-            REBDSP dsp = dsp_orig;
-            while (dsp != DSP) {
-                const REBSYM *symbol = VAL_WORD_SYMBOL(DS_AT(dsp + 1));
-                Init_Key(key, symbol);
-                ++dsp;
-                ++key;
-
-                Init_Void(param, SYM_UNSET);
-                SET_CELL_FLAG(param, VAR_MARKED_HIDDEN);
-                ++param;
-
-                // Will be removed from binder below
-            }
-            DS_DROP_TO(dsp_orig);
-
-            SET_SERIES_LEN(keylist, old_keylist_len + num_lets);
-
-            SET_SERIES_LEN(paramlist, old_keylist_len + num_lets + 1);
-            SET_SERIES_FLAG(paramlist, FIXED_SIZE);
-        }
-    }
   }
 
   blockscope {  // Reset binding table

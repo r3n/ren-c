@@ -131,7 +131,7 @@ REBNATIVE(macro)
     REBACT *macro = Make_Interpreted_Action_May_Fail(
         ARG(spec),
         ARG(body),
-        MKF_RETURN | MKF_KEYWORDS | MKF_GATHER_LETS,
+        MKF_RETURN | MKF_KEYWORDS,
         IDX_DETAILS_1 + 1  // details capacity, just body slot (and archetype)
     );
 

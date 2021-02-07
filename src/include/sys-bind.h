@@ -443,6 +443,9 @@ inline static const REBSYM *VAL_WORD_SYMBOL(REBCEL(const*) cell) {
     if (IS_DETAILS(binding))  // relative
         return KEY_SYMBOL(ACT_KEY(ACT(binding), VAL_WORD_INDEX(v)));
 
+    if (IS_PATCH(binding))  // let
+        return LINK(PatchSymbol, binding);
+
     assert(IS_VARLIST(binding));  // specific
     return KEY_SYMBOL(CTX_KEY(CTX(binding), VAL_WORD_INDEX(v)));
 }
@@ -492,20 +495,24 @@ inline static const REBSYM *VAL_WORD_SYMBOL(REBCEL(const*) cell) {
 // failure mode while it's running...even if the context is inaccessible or
 // the word is unbound.  Errors should be raised by callers if applicable.
 //
-inline static option(REBCTX*) Get_Word_Context(
+inline static option(REBARR*) Get_Word_Container(
     REBLEN *index_out,
     const RELVAL* any_word,
     REBSPC *specifier
 ){
+  #if !defined(NDEBUG)
+    *index_out = 0xDECAFBAD;  // trash index to make sure it gets set
+  #endif
+
     REBARR *binding = VAL_WORD_BINDING(any_word);
 
     if (specifier == SPECIFIED) {  // Note: may become SPECIFIED again below
         if (binding == UNBOUND)
             return nullptr;
 
-        assert(IS_VARLIST(binding));  // not relative
+        assert(IS_VARLIST(binding) or IS_PATCH(binding));  // not relative
         *index_out = VAL_WORD_INDEX(any_word);
-        return CTX(binding);
+        return binding;
     }
 
     // Virtual binding shortcut; if a virtual binding is in effect and it
@@ -536,6 +543,15 @@ inline static option(REBCTX*) Get_Word_Context(
         //
         do {
             assert(IS_PATCH(specifier));
+
+            if (GET_SUBCLASS_FLAG(PATCH, specifier, LET)) {
+                if (LINK(PatchSymbol, specifier) == spelling) {
+                    *index_out = 1;  // !!! lie, review
+                    return specifier;
+                }
+                goto skip_hit_patch;
+            }
+
             if (
                 IS_SET_WORD(ARR_SINGLE(specifier))
                 and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
@@ -557,7 +573,7 @@ inline static option(REBCTX*) Get_Word_Context(
                     continue;
 
                 *index_out = mondex;
-                return overload;
+                return CTX_VARLIST(overload);
             }
           }
 
@@ -589,6 +605,14 @@ inline static option(REBCTX*) Get_Word_Context(
         // wortwhile?
         //
         do {
+            if (GET_SUBCLASS_FLAG(PATCH, specifier, LET)) {
+                if (LINK(PatchSymbol, specifier) == spelling) {
+                    *index_out = 1;  // !!! lie, review
+                    return specifier;
+                }
+                goto skip_miss_patch;
+            }
+
             if (
                 IS_SET_WORD(ARR_SINGLE(specifier))
                 and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
@@ -625,7 +649,7 @@ inline static option(REBCTX*) Get_Word_Context(
                 //
                 INIT_VAL_WORD_VIRTUAL_MONDEX(any_word, index % MONDEX_MOD);
                 *index_out = index;
-                return overload;
+                return CTX_VARLIST(overload);
             }
           }
           skip_miss_patch:
@@ -649,6 +673,16 @@ inline static option(REBCTX*) Get_Word_Context(
 
     if (binding == UNBOUND)
         return nullptr;  // once no virtual bind found, no binding is unbound
+
+    if (IS_PATCH(binding)) {
+        //
+        // LET BINDING: Directly bound to a LET variable.  This happens when
+        // a word that is bound to a LET gets copied so it's not virtual.
+        //
+        assert(GET_SUBCLASS_FLAG(PATCH, binding, LET));
+        *index_out = 1;  // !!! lie, review
+        return binding;
+    }
 
     if (IS_VARLIST(binding)) {
 
@@ -713,7 +747,7 @@ inline static option(REBCTX*) Get_Word_Context(
     }
 
     *index_out = VAL_WORD_INDEX(any_word);
-    return c;
+    return CTX_VARLIST(c);
 }
 
 static inline const REBVAL *Lookup_Word_May_Fail(
@@ -721,9 +755,12 @@ static inline const REBVAL *Lookup_Word_May_Fail(
     REBSPC *specifier
 ){
     REBLEN index;
-    REBCTX *c = try_unwrap(Get_Word_Context(&index, any_word, specifier));
-    if (not c)
+    REBARR *a = try_unwrap(Get_Word_Container(&index, any_word, specifier));
+    if (not a)
         fail (Error_Not_Bound_Raw(SPECIFIC(any_word)));
+    if (IS_PATCH(a))
+        return SPECIFIC(ARR_SINGLE(a));
+    REBCTX *c = CTX(a);
     if (GET_SERIES_FLAG(CTX_VARLIST(c), INACCESSIBLE))
         fail (Error_No_Relative_Core(any_word));
 
@@ -735,9 +772,12 @@ static inline option(const REBVAL*) Lookup_Word(
     REBSPC *specifier
 ){
     REBLEN index;
-    REBCTX *c = try_unwrap(Get_Word_Context(&index, any_word, specifier));
-    if (not c)
+    REBARR *a = try_unwrap(Get_Word_Container(&index, any_word, specifier));
+    if (not a)
         return nullptr;
+    if (IS_PATCH(a))
+        return SPECIFIC(ARR_SINGLE(a));
+    REBCTX *c = CTX(a);
     if (GET_SERIES_FLAG(CTX_VARLIST(c), INACCESSIBLE))
         return nullptr;
 
@@ -764,20 +804,27 @@ static inline REBVAL *Lookup_Mutable_Word_May_Fail(
     REBSPC *specifier
 ){
     REBLEN index;
-    REBCTX *c = try_unwrap(Get_Word_Context(&index, any_word, specifier));
-    if (not c)
+    REBARR *a = try_unwrap(Get_Word_Container(&index, any_word, specifier));
+    if (not a)
         fail (Error_Not_Bound_Raw(SPECIFIC(any_word)));
 
-    // A context can be permanently frozen (`lock obj`) or temporarily
-    // protected, e.g. `protect obj | unprotect obj`.  A native will
-    // use SERIES_FLAG_HOLD on a FRAME! context in order to prevent
-    // setting values to types with bit patterns the C might crash on.
-    //
-    // Lock bits are all in SER->info and checked in the same instruction.
-    //
-    FAIL_IF_READ_ONLY_SER(CTX_VARLIST(c));
+    REBVAL *var;
+    if (IS_PATCH(a))
+        var = SPECIFIC(ARR_SINGLE(a));
+    else {
+        REBCTX *c = CTX(a);
 
-    REBVAL *var = CTX_VAR(c, index);
+        // A context can be permanently frozen (`lock obj`) or temporarily
+        // protected, e.g. `protect obj | unprotect obj`.  A native will
+        // use SERIES_FLAG_HOLD on a FRAME! context in order to prevent
+        // setting values to types with bit patterns the C might crash on.
+        //
+        // Lock bits are all in SER->info and checked in the same instruction.
+        //
+        FAIL_IF_READ_ONLY_SER(CTX_VARLIST(c));
+
+        var = CTX_VAR(c, index);
+    }
 
     // The PROTECT command has a finer-grained granularity for marking
     // not just contexts, but individual fields as protected.
@@ -859,15 +906,15 @@ inline static REBVAL *Derelativize(
     //
     if (ANY_WORD_KIND(heart)) {
         REBLEN index;
-        REBCTX *c = try_unwrap(Get_Word_Context(&index, v, specifier));
-        if (not c) {
+        REBARR *a = try_unwrap(Get_Word_Container(&index, v, specifier));
+        if (not a) {
             assert(VAL_WORD_BINDING(v) == UNBOUND);
             out->extra = v->extra;
             Unbind_Any_Word(out);  // !!! do this more efficiently
         }
         else {
             out->extra = v->extra;  // !!! to know spelling in binding, temp
-            INIT_BINDING_MAY_MANAGE(out, CTX_VARLIST(c));
+            INIT_BINDING_MAY_MANAGE(out, a);
             INIT_VAL_WORD_PRIMARY_INDEX(out, index);
         }
 
@@ -957,7 +1004,7 @@ inline static REBNOD** SPC_FRAME_CTX_ADDRESS(REBSPC *specifier)
     ){
         specifier = NextPatch(specifier);
     }
-    return &NextPatchNode(specifier);
+    return &node_INODE(NextPatch, specifier);
 }
 
 inline static option(REBCTX*) SPC_FRAME_CTX(REBSPC *specifier)
