@@ -222,9 +222,20 @@
     FLAG_LEFT_BIT(11)
 
 
-//=//// SERIES_FLAG_12 ////////////////////////////////////////////////////=//
+//=//// SERIES_FLAG_INFO_NODE_NEEDS_MARK //////////////////////////////////=//
 //
-#define SERIES_FLAG_12 \
+// Bits are hard to come by in a REBSER, especially a singular REBSER which
+// uses the cell content for an arbitrary value (e.g. API handles).  The
+// space for the INFO bits is thus sometimes claimed for a node, which may
+// need marking.
+//
+// !!! Future plans involve being able to dynamically switch out the info
+// bits for a node, e.g. to hold a lock.  Then the info bits would be moved
+// to the lock--which might itself be a feed or frame (to avoid making a new
+// identity).  Those features are just ideas for the moment, but if they came
+// to pass this bit would also be synonymous with SERIES_FLAG_HOLD.
+//
+#define SERIES_FLAG_INFO_NODE_NEEDS_MARK \
     FLAG_LEFT_BIT(12)
 
 

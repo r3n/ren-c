@@ -259,9 +259,12 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
         cell->header.bits = CELL_MASK_PREP_END;
     }
 
-    SER_INFO(s) = Endlike_Header(
-        FLAG_USED_BYTE_ARRAY()  // reserved for future use
-    );
+    if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK))
+        TRASH_POINTER_IF_DEBUG(s->info.node);
+    else 
+        SER_INFO(s) = Endlike_Header(
+            FLAG_USED_BYTE_ARRAY()  // reserved for future use
+        );
 
     // It is more efficient if you know a series is going to become managed to
     // create it in the managed state.  But be sure no evaluations are called
@@ -281,7 +284,10 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
     // Arrays created at runtime default to inheriting the file and line
     // number from the array executing in the current frame.
     //
-    if (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED) { // most callsites fold
+    if (
+        FLAVOR_BYTE(flags) == FLAVOR_ARRAY
+        and (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED)  // hope callsites fold
+    ){
         assert(flags & SERIES_FLAG_LINK_NODE_NEEDS_MARK);
         if (
             not FRM_IS_VARIADIC(FS_TOP) and
@@ -328,7 +334,8 @@ inline static REBARR *Make_Array_For_Copy(
     }
 
     if (
-        (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED)
+        FLAVOR_BYTE(flags) == FLAVOR_ARRAY
+        and (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED)
         and (original and Has_File_Line(original))
     ){
         REBARR *a = Make_Array_Core(

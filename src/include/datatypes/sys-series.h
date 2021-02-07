@@ -174,11 +174,15 @@
     #define SER_INFO(s) \
         (s)->info.flags.bits
 #else
-    inline static const uintptr_t &SER_INFO(const REBSER *s)
-      { return s->info.flags.bits; }
+    inline static const uintptr_t &SER_INFO(const REBSER *s) {
+        assert(NOT_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK));
+        return s->info.flags.bits;
+    }
 
-    inline static uintptr_t &SER_INFO(REBSER *s)
-      { return s->info.flags.bits; }
+    inline static uintptr_t &SER_INFO(REBSER *s) {
+        assert(NOT_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK));
+        return s->info.flags.bits;
+    }
 #endif
 
 #define SET_SERIES_INFO(s,name) \
@@ -1256,8 +1260,6 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN capacity) {
 //
 inline static REBSER *Make_Series(REBLEN capacity, REBFLGS flags)
 {
-    assert(not (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED));
-
     size_t wide = Wide_For_Flavor(
         cast(enum Reb_Series_Flavor, FLAVOR_BYTE(flags))
     );
@@ -1270,10 +1272,12 @@ inline static REBSER *Make_Series(REBLEN capacity, REBFLGS flags)
     // (It technically doesn't need to.)
     //
     REBSER *s = Alloc_Series_Node(flags);
-    SER_INFO(s) =
-        SERIES_INFO_0_IS_TRUE
-        // not SERIES_INFO_1_IS_FALSE
-        | SERIES_INFO_7_IS_TRUE;
+    assert(not IS_SER_ARRAY(s));
+
+    if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK))
+        TRASH_POINTER_IF_DEBUG(s->info.node);
+    else
+        SER_INFO(s) = Endlike_Header(0);
 
     if (
         (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold

@@ -259,6 +259,19 @@ static void Queue_Mark_Node_Deep(void *p)
     if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and node_MISC(Node, s))
         Queue_Mark_Node_Deep(node_MISC(Node, s));
 
+  //=//// MARK INODE (if not using slot for `info`) ///////////////////////=//
+
+    if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK)) {
+        REBNOD *inode = node_INODE(Node, s);
+        if (inode) {
+          #if !defined(NDEBUG)
+            if (IS_POINTER_TRASH_DEBUG(inode))
+                panic (s);
+          #endif
+            Queue_Mark_Node_Deep(inode);
+        }
+    }
+
     if (IS_SER_ARRAY(s)) {
         REBARR *a = ARR(s);
 
@@ -375,7 +388,8 @@ static void Propagate_All_GC_Marks(void)
         assert(a->leader.bits & NODE_FLAG_MARKED);
 
         RELVAL *v = ARR_HEAD(a);
-        for (; NOT_END(v); ++v) {
+        const RELVAL *tail = ARR_TAIL(a);
+        for (; v != tail; ++v) {
             Queue_Mark_Opt_Value_Deep(v);
 
           #if !defined(NDEBUG)
