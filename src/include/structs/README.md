@@ -17,3 +17,9 @@ Being before %tmp-internals.h limits the list of what can be done in an inline
 function, so that discourages writing a lot of inline functions in the files.
 This offers guidance on helping to organize the source, which otherwise would
 have no natural cue on when to break things into separate include files.
+
+It may be interesting to have some of the information in these files be
+generated from tables.  If the flags were generated in this way, then it would
+mean features could be developed like automatically generating bitfield
+"pun" structures to mirror the bit layout (that currently has to be done by
+hand, so it tends to get outdated).

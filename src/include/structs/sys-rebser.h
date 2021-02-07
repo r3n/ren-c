@@ -462,14 +462,11 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
 
 
 //=//// BITS 16-31 ARE SYMID FOR SYMBOLS //////////////////////////////////=//
-
-
-//=//// BITS 24-31: CUSTOM INFO FLAGS /////////////////////////////////////=//
 //
-// Right now these flags are being used for properties specific to array
-// types.  Strings leave it open in case they are interned and need to store
-// the SYMID (along with the previous byte)
-
+// These bits are currently unused by other types.  One reason to avoid using
+// them is the concept that the INFO slot will be used to hold locking info
+// for series, which would require a full pointer.
+//
 
 
 
@@ -477,8 +474,7 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
 //
 // While 64-bit systems have another 32-bits available in the header, core
 // functionality shouldn't require using them...only optimization features.
-//
-STATIC_ASSERT(31 < 32);
+
 
 
 //=////////////////////////////////////////////////////////////////////////=//

@@ -260,79 +260,72 @@ inline static uintptr_t FLAG_SECOND_UINT16(uint16_t u)
 #ifdef DEBUG_USE_BITFIELD_HEADER_PUNS
     struct Reb_Series_Header_Pun {
         int _07_cell_always_false:1;
-        int _06_stack:1;
-        int _05_root:1;
-        int _04_transient:1;
+        int _06_root:1;
+        int _05_misc_needs_mark:1;
+        int _04_link_needs_mark:1;
         int _03_marked:1;
         int _02_managed:1;
         int _01_free:1;
         int _00_node_always_true:1;
 
-        int _15_unused:1;
-        int _14_unused:1;
-        int _13_has_dynamic:1;
-        int _12_is_array:1;
-        int _11_power_of_two:1;
-        int _10_utf8_string:1;
+        int _15_flag_15:1;
+        int _14_black:1;
+        int _13_flag_13:1;
+        int _12_flag_12:1;
+        int _11_dynamic:1;
+        int _10_power_of_two:1;
         int _09_fixed_size:1;
-        int _08_not_end_always_true:1;
+        int _08_inaccessible:1;
 
-        int _23_array_unused:1;
-        int _22_array_tail_newline;
-        int _21_array_unused:1;
-        int _20_array_pairlist:1;
-        int _19_array_varlist:1;
-        int _18_array_paramlist:1;
-        int _17_array_nulleds_legal:1;
-        int _16_array_file_line:1;
+        unsigned int _16to23_flavor:8;
+
+        int _31_subclass:1;
+        int _30_subclass:1;
+        int _29_subclass:1;
+        int _28_subclass:1;
+        int _27_subclass:1;
+        int _26_subclass:1;
+        int _25_subclass:1;
+        int _24_subclass:1;
     }__attribute__((packed));
 
     struct Reb_Info_Header_Pun {
         int _07_cell_always_false:1;
-        int _06_frozen:1;
+        int _06_frozen_shallow:1;
         int _05_hold:1;
-        int _04_protected:1;
-        int _03_black:1;
-        int _02_unused:1;
+        int _04_frozen_deep:1;
+        int _03_protected:1;
+        int _02_auto_locked:1;
         int _01_free_always_false:1;
         int _00_node_always_true:1;
 
-        unsigned int _08to15_wide:8;
+        unsigned int _08to15_used:8;
 
-        unsigned int _16to23_len_if_non_dynamic:8;
-
-        int _31_unused:1;
-        int _30_unused:1;
-        int _29_api_release:1;
-        int _28_shared_keylist:1;
-        int _27_string_canon:1;
-        int _26_frame_failed:1;
-        int _25_inaccessible:1;
-        int _24_auto_locked:1;
+        unsigned int _16to31_symid_if_sym:8;
     }__attribute__((packed));
 
     struct Reb_Value_Header_Pun {
         int _07_cell_always_true:1;
-        int _06_stack:1;
-        int _05_root:1;
-        int _04_transient:1;
+        int _06_root:1;
+        int _05_second_needs_mark:1;
+        int _04_first_needs_mark:1;
         int _03_marked:1;
         int _02_managed:1;
         int _01_free:1;
         int _00_node_always_true:1;
 
-        unsigned int _08to15_kind:8;
+        unsigned int _08to15_kind3q:8;
 
-        int _23_unused:1;
-        int _22_eval_flip:1;
-        int _21_enfixed:1;
-        int _20_unevaluated:1;
-        int _19_newline_before:1;
-        int _18_falsey:1;
-        int _17_thrown:1;
-        int _16_protected:1;
+        unsigned int _16to23_heart:8;
 
-        unsigned int _24to31_type_specific_bits:8;
+        int _31_explicitly_mutable:1;
+        int _30_const:1;
+        int _29_newline_before:1;
+        int _28_note:1;
+        int _27_unevaluated:1;
+        int _26_cell:1;
+        int _25_cell:1;
+        int _24_protected:1;
     }__attribute__((packed));
 #endif
 
