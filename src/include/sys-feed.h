@@ -233,7 +233,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
                 panic ("rebU() of more than one value splice not written");
 
             REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
-            Move_Value(&feed->fetched, single);
+            Copy_Cell(&feed->fetched, single);
             Quotify(
                 &feed->fetched,
                 QUOTING_BYTE(feed) + inst1->misc.quoting_delta
@@ -250,7 +250,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
                 Splice_Block_Into_Feed(feed, single);
             }
             else {
-                Move_Value(&feed->fetched, single);
+                Copy_Cell(&feed->fetched, single);
                 feed->value = &feed->fetched;
             }
             GC_Kill_Series(inst1);
@@ -277,7 +277,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             // this more convoluted.  Review.
 
             REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
-            Move_Value(&feed->fetched, single);
+            Copy_Cell(&feed->fetched, single);
             Quotify(&feed->fetched, QUOTING_BYTE(feed));
             feed->value = &feed->fetched;
             rebRelease(single);  // *is* the instruction
@@ -313,7 +313,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             // We don't want to corrupt the value itself.  We have to move
             // it into the fetched cell and quote it.
             //
-            Quotify(Move_Value(&feed->fetched, cell), QUOTING_BYTE(feed));
+            Quotify(Copy_Cell(&feed->fetched, cell), QUOTING_BYTE(feed));
             feed->value = &feed->fetched;  // note END is detected separately
         }
         break; }
@@ -452,13 +452,12 @@ inline static const RELVAL *Lookback_While_Fetching_Next(REBFRM *f) {
     //
     const RELVAL *lookback;
     if (f->feed->value == &f->feed->fetched) {
-        Move_Value_Core(
+        Move_Cell_Core(
             &f->feed->lookback,
             SPECIFIC(&f->feed->fetched),
             CELL_MASK_ALL
         );
         lookback = &f->feed->lookback;
-        Init_Unreadable_Void(&f->feed->fetched);
     }
     else
         lookback = f->feed->value;

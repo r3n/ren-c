@@ -789,7 +789,7 @@ REBVAL *RL_rebArg(unsigned char quotes, const void *p, va_list *vaptr)
         return nullptr;
 
     REBVAL *arg = cast(REBVAL*, c_cast(void*, argR));  // sneaky, but we know!
-    return Move_Value(Alloc_Value(), arg);  // don't give REBVAL* arg directly
+    return Copy_Cell(Alloc_Value(), arg);  // don't give REBVAL* arg directly
 }
 
 
@@ -1699,10 +1699,10 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
                 FLAG_FLAVOR(INSTRUCTION_ADJUST_QUOTING) | NODE_FLAG_MANAGED
             );
             CLEAR_SERIES_FLAG(a, MANAGED);  // see notes above on why we lied
-            Quotify(Move_Value(ARR_SINGLE(a), first), 1);
+            Quotify(Copy_Cell(ARR_SINGLE(a), first), 1);
         }
         else {  // no shortcut, push and keep going
-            Quotify(Move_Value(DS_PUSH(), first), 1);
+            Quotify(Copy_Cell(DS_PUSH(), first), 1);
             goto no_shortcut;
         }
     }
@@ -1713,7 +1713,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         DECLARE_VA_FEED (feed, p, vaptr, feed_flags);
 
         while (NOT_END(feed->value)) {
-            Quotify(Move_Value(DS_PUSH(), SPECIFIC(feed->value)), 1);
+            Quotify(Copy_Cell(DS_PUSH(), SPECIFIC(feed->value)), 1);
             Fetch_Next_In_Feed(feed);
         }
 
@@ -1816,7 +1816,7 @@ const void *RL_rebINLINE(const REBVAL *v)
     CLEAR_SERIES_FLAG(a, MANAGED);  // lying avoided manuals tracking
 
     if (IS_BLOCK(v)) {  // splice entire block contents
-        Move_Value(ARR_SINGLE(a), v);
+        Copy_Cell(ARR_SINGLE(a), v);
     }
     else if (IS_TUPLE(v)) {
         DECLARE_LOCAL (store);
@@ -1830,7 +1830,7 @@ const void *RL_rebINLINE(const REBVAL *v)
         }
         else {  // has array, reuse it (but bump it forward to skip blank)
             assert(CELL_HEART(cast(REBCEL(const*), v)) == REB_BLOCK);
-            Move_Value(ARR_SINGLE(a), v);
+            Copy_Cell(ARR_SINGLE(a), v);
             mutable_KIND3Q_BYTE(ARR_SINGLE(a)) = REB_BLOCK;
             ++VAL_INDEX_UNBOUNDED(ARR_SINGLE(a));  // skip blank
         }
@@ -2158,7 +2158,7 @@ REBNATIVE(api_transient)
 {
     INCLUDE_PARAMS_OF_API_TRANSIENT;
 
-    REBVAL *v = Move_Value(Alloc_Value(), ARG(value));
+    REBVAL *v = Copy_Cell(Alloc_Value(), ARG(value));
     rebUnmanage(v);  // has to survive the API-TRANSIENT's frame
     REBARR *a = Singular_From_Cell(v);
     SET_SUBCLASS_FLAG(API, a, RELEASE);

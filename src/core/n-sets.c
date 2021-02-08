@@ -211,7 +211,7 @@ REBSER *Make_Set_Operation_Series(
             const REBSTR *str = VAL_STRING(val1);
 
             DECLARE_LOCAL (iter);
-            Move_Value(iter, val1);
+            Copy_Cell(iter, val1);
 
             // Iterate over first series
             //
@@ -288,7 +288,7 @@ REBSER *Make_Set_Operation_Series(
             // Iterate over first series
             //
             DECLARE_LOCAL (iter);
-            Move_Value(iter, val1);
+            Copy_Cell(iter, val1);
 
             for (
                 ;

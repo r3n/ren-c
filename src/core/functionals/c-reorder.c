@@ -240,7 +240,7 @@ REBNATIVE(reorder_p)  // see REORDER in %base-defs.r, for inheriting meta
     );
 
     REBARR *details = ACT_DETAILS(reordered);
-    Move_Value(DETAILS_AT(details, IDX_REORDERER_REORDEREE), ARG(action));
+    Copy_Cell(DETAILS_AT(details, IDX_REORDERER_REORDEREE), ARG(action));
 
     return Init_Action(D_OUT, reordered, label, UNBOUND);
 }

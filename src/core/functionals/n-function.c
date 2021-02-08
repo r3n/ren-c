@@ -142,7 +142,7 @@ bool Interpreted_Dispatch_Details_1_Throws(
     if (ACT_HAS_RETURN(phase)) {
         assert(KEY_SYM(ACT_KEYS_HEAD(phase)) == SYM_RETURN);
         REBVAL *cell = FRM_ARG(f, 1);
-        Move_Value(cell, NATIVE_VAL(return));
+        Copy_Cell(cell, NATIVE_VAL(return));
         INIT_VAL_ACTION_BINDING(cell, CTX(f->varlist));
         SET_CELL_FLAG(cell, VAR_MARKED_HIDDEN);  // necessary?
     }
@@ -194,7 +194,7 @@ REB_R Unchecked_Dispatcher(REBFRM *f)
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
     bool returned;
     if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
-        Move_Value(f->out, spare);
+        Move_Cell(f->out, spare);
         return R_THROWN;
     }
     if (not returned)  // assume if it was returned, it was decayed if needed
@@ -203,7 +203,7 @@ REB_R Unchecked_Dispatcher(REBFRM *f)
     if (IS_ENDISH_NULLED(spare))
         return f->out;  // was invisible
 
-    return Move_Value_Core(
+    return Move_Cell_Core(
         f->out,
         spare,
         CELL_MASK_COPY | CELL_FLAG_UNEVALUATED  // keep unevaluated status
@@ -221,7 +221,7 @@ REB_R Voider_Dispatcher(REBFRM *f)
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
     bool returned;
     if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
-        Move_Value(f->out, spare);
+        Move_Cell(f->out, spare);
         return R_THROWN;
     }
     UNUSED(returned);  // no additional work to bypass
@@ -242,7 +242,7 @@ REB_R Returner_Dispatcher(REBFRM *f)
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
     bool returned;
     if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
-        Move_Value(f->out, spare);
+        Move_Cell(f->out, spare);
         return R_THROWN;
     }
     if (not returned)  // assume if it was returned, it was decayed if needed
@@ -253,7 +253,7 @@ REB_R Returner_Dispatcher(REBFRM *f)
         return f->out;  // was invisible
     }
 
-    Move_Value_Core(
+    Move_Cell_Core(
         f->out,
         spare,
         CELL_MASK_COPY | CELL_FLAG_UNEVALUATED
@@ -524,7 +524,7 @@ REB_R Init_Thrown_Unwind_Value(
     const REBVAL *value,
     REBFRM *frame // required if level is INTEGER! or ACTION!
 ) {
-    Move_Value(out, NATIVE_VAL(unwind));
+    Copy_Cell(out, NATIVE_VAL(unwind));
 
     if (IS_FRAME(level)) {
         INIT_VAL_FRAME_BINDING(out, VAL_CONTEXT(level));
@@ -696,7 +696,7 @@ REBNATIVE(return)
         fail (Error_Bad_Return_Type(target_frame, VAL_TYPE(v)));
 
   skip_type_check: {
-    Move_Value(D_OUT, NATIVE_VAL(unwind)); // see also Make_Thrown_Unwind_Value
+    Copy_Cell(D_OUT, NATIVE_VAL(unwind)); // see also Make_Thrown_Unwind_Value
     INIT_VAL_ACTION_BINDING(D_OUT, f_binding);
 
     return Init_Thrown_With_Label(D_OUT, v, D_OUT);  // preserves UNEVALUATED

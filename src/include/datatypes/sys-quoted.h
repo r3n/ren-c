@@ -133,7 +133,7 @@ inline static RELVAL *Quotify_Core(
         REBVAL *unquoted = Alloc_Pairing();
         Init_Unreadable_Void(PAIRING_KEY(unquoted));  // Key not used ATM
 
-        Move_Value_Header(unquoted, v);
+        Copy_Cell_Header(unquoted, v);
         mutable_KIND3Q_BYTE(unquoted) = kind;  // escaping only in literal
 
         unquoted->payload = v->payload;
@@ -215,7 +215,7 @@ inline static void Collapse_Quoted_Internal(RELVAL *v)
         and KIND3Q_BYTE(unquoted) != REB_QUOTED
         and KIND3Q_BYTE(unquoted) < REB_MAX
     );
-    Move_Value_Header(v, unquoted);
+    Copy_Cell_Header(v, unquoted);
     if (ANY_WORD_KIND(CELL_HEART(cast(REBCEL(const*), unquoted)))) {
         //
         // `v` needs to retain the primary binding index (which was

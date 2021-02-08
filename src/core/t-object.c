@@ -324,7 +324,7 @@ REB_R MAKE_Context(
         Init_Any_Context(out, kind, ctx); // GC guards it
 
         DECLARE_LOCAL (virtual_arg);
-        Move_Value(virtual_arg, arg);
+        Copy_Cell(virtual_arg, arg);
 
         Virtual_Bind_Deep_To_Existing_Context(
             virtual_arg,
@@ -335,7 +335,7 @@ REB_R MAKE_Context(
 
         DECLARE_LOCAL (dummy);
         if (Do_Any_Array_At_Throws(dummy, virtual_arg, SPECIFIED)) {
-            Move_Value(out, dummy);
+            Move_Cell(out, dummy);
             return R_THROWN;
         }
 
@@ -539,7 +539,7 @@ REBCTX *Copy_Context_Extra_Managed(
     // get filled in with a copy, but the varlist needs to be updated in the
     // copied rootvar to the one just created.
     //
-    Move_Value(dest, CTX_ARCHETYPE(original));
+    Copy_Cell(dest, CTX_ARCHETYPE(original));
     INIT_VAL_CONTEXT_VARLIST(dest, varlist);
 
     ++dest;
@@ -549,7 +549,7 @@ REBCTX *Copy_Context_Extra_Managed(
     //
     REBVAL *src = CTX_VARS_HEAD(original);
     for (; NOT_END(src); ++src, ++dest) {
-        Move_Value_Core(  // trying to duplicate slot precisely
+        Copy_Cell_Core(  // trying to duplicate slot precisely
             dest,
             src,
             CELL_MASK_COPY | CELL_FLAG_VAR_MARKED_HIDDEN
@@ -1020,7 +1020,7 @@ REBNATIVE(construct)
 
     DECLARE_LOCAL (dummy);
     if (Do_Any_Array_At_Throws(dummy, spec, SPECIFIED)) {
-        Move_Value(D_OUT, dummy);
+        Move_Cell(D_OUT, dummy);
         return R_THROWN;  // evaluation result ignored unless thrown
     }
 

@@ -148,7 +148,7 @@ REB_R Chainer_Dispatcher(REBFRM *f)
     while (true) {
         if (Process_Action_Maybe_Stale_Throws(sub)) {
             Abort_Frame(sub);
-            Move_Value(f->out, sub->out);  // move from spare
+            Move_Cell(f->out, sub->out);  // move from spare
             return R_THROWN;
         }
 
@@ -179,7 +179,7 @@ REB_R Chainer_Dispatcher(REBFRM *f)
 
     Drop_Frame(sub);
 
-    Move_Value(f->out, FRM_SPARE(f));
+    Copy_Cell(f->out, FRM_SPARE(f));
     return f->out;
 }
 
@@ -230,7 +230,7 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
         IDX_CHAINER_MAX  // details array capacity
     );
     Force_Value_Frozen_Deep(pipeline);
-    Move_Value(ARR_AT(ACT_DETAILS(chain), IDX_CHAINER_PIPELINE), pipeline);
+    Copy_Cell(ARR_AT(ACT_DETAILS(chain), IDX_CHAINER_PIPELINE), pipeline);
 
     return Init_Action(out, chain, VAL_ACTION_LABEL(first), UNBOUND);
 }

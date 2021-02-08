@@ -68,7 +68,7 @@ REB_R MAKE_Quoted(
     if (parent)
         fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
-    return Quotify(Move_Value(out, arg), 1);
+    return Quotify(Copy_Cell(out, arg), 1);
 }
 
 
@@ -108,7 +108,7 @@ REB_R PD_Quoted(
     UNUSED(setval);
 
     if (KIND3Q_BYTE(pvs->out) == REB_QUOTED)
-        Move_Value(pvs->out, VAL_QUOTED_PAYLOAD_CELL(pvs->out));
+        Copy_Cell(pvs->out, VAL_QUOTED_PAYLOAD_CELL(pvs->out));
     else {
         assert(KIND3Q_BYTE(pvs->out) >= REB_MAX);
         mutable_KIND3Q_BYTE(pvs->out) %= REB_64;
@@ -194,7 +194,7 @@ REBNATIVE(just)
         return D_OUT;  // Don't set UNEVALUATED flag
     }
 
-    Move_Value(D_OUT, v);
+    Copy_Cell(D_OUT, v);
     SET_CELL_FLAG(D_OUT, UNEVALUATED);
     return D_OUT;
 }
@@ -220,7 +220,7 @@ REBNATIVE(quote)
     if (depth < 0)
         fail (PAR(depth));
 
-    return Quotify(Move_Value(D_OUT, ARG(optional)), depth);
+    return Quotify(Copy_Cell(D_OUT, ARG(optional)), depth);
 }
 
 
@@ -251,7 +251,7 @@ REBNATIVE(unquote)
     if (cast(REBLEN, depth) > VAL_NUM_QUOTES(v))
         fail ("Value not quoted enough for unquote depth requested");
 
-    return Unquotify(Move_Value(D_OUT, v), depth);
+    return Unquotify(Copy_Cell(D_OUT, v), depth);
 }
 
 

@@ -333,7 +333,7 @@ REBNATIVE(make_native)
     REBARR *details = ACT_DETAILS(native);
 
     if (Is_Series_Frozen(VAL_SERIES(source)))
-        Move_Value(ARR_AT(details, IDX_NATIVE_BODY), source); // no copy
+        Copy_Cell(ARR_AT(details, IDX_NATIVE_BODY), source); // no copy
     else {
         Init_Text(
             ARR_AT(details, IDX_NATIVE_BODY),
@@ -345,7 +345,7 @@ REBNATIVE(make_native)
     // look for bindings.  For the moment, set user natives to use the user
     // context...it could be a parameter of some kind (?)
     //
-    Move_Value(
+    Copy_Cell(
         ARR_AT(details, IDX_NATIVE_CONTEXT),
         Get_System(SYS_CONTEXTS, CTX_USER)
     );
@@ -354,7 +354,7 @@ REBNATIVE(make_native)
         REBVAL *linkname = ARG(linkname);
 
         if (Is_Series_Frozen(VAL_SERIES(linkname)))
-            Move_Value(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
+            Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
         else {
             Init_Text(
                 ARR_AT(details, IDX_TCC_NATIVE_LINKNAME),
@@ -371,7 +371,7 @@ REBNATIVE(make_native)
             "unspaced [{N_} as text! to-hex", rebI(heapaddr), "]",
         rebEND);
 
-        Move_Value(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
+        Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
         rebRelease(linkname);
     }
 
@@ -534,7 +534,7 @@ REBNATIVE(compile_p)
                 // back and fill in its dispatcher and TCC_State after the
                 // compilation...
                 //
-                Move_Value(DS_PUSH(), SPECIFIC(item));
+                Copy_Cell(DS_PUSH(), SPECIFIC(item));
 
                 REBARR *details = ACT_DETAILS(VAL_ACTION(item));
                 RELVAL *source = ARR_AT(details, IDX_NATIVE_BODY);
@@ -680,7 +680,7 @@ REBNATIVE(compile_p)
         memcpy(&c_func, &sym, sizeof(c_func));
 
         ACT_DISPATCHER(action) = c_func;
-        Move_Value(ARR_AT(details, IDX_TCC_NATIVE_STATE), handle);
+        Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_STATE), handle);
 
         DS_DROP();
     }

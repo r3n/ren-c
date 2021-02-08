@@ -201,7 +201,7 @@ REB_R Call_Core(REBFRM *frame_) {
             REBVAL *block = rebValue(
                 "parse-command-to-argv*", ARG(command), rebEND
             );
-            Move_Value(ARG(command), block);
+            Copy_Cell(ARG(command), block);
             rebRelease(block);
             goto block_command;
         }

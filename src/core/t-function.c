@@ -215,7 +215,7 @@ REBTYPE(Action)
         RELVAL *src = ARR_HEAD(ACT_DETAILS(act)) + 1;
         RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy)) + 1;
         for (; NOT_END(src); ++src, ++dest)
-            Move_Value(dest, src);
+            Copy_Cell(dest, src);
         SET_SERIES_LEN(ACT_DETAILS(proxy), details_len);
       }
 
@@ -257,7 +257,7 @@ REBTYPE(Action)
             return D_OUT;
 
           case SYM_TYPES:
-            return Move_Value(D_OUT, CTX_ARCHETYPE(ACT_EXEMPLAR(act)));
+            return Copy_Cell(D_OUT, CTX_ARCHETYPE(ACT_EXEMPLAR(act)));
 
           case SYM_FILE:
           case SYM_LINE: {

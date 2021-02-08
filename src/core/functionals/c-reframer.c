@@ -119,7 +119,7 @@ bool Make_Invokable_From_Feed_Throws(REBVAL *out, REBFED *feed)
     // to put the phase back.
     //
     DECLARE_LOCAL (action);
-    Move_Value(action, out);
+    Copy_Cell(action, out);
     PUSH_GC_GUARD(action);
 
     // It is desired that any nulls encountered be processed as if they are
@@ -215,7 +215,7 @@ bool Make_Frame_From_Feed_Throws(REBVAL *out, REBFED *feed)
         nullptr
     );
 
-    Unquotify(Move_Value(CTX_VAR(exemplar, 2), out), 1);
+    Unquotify(Copy_Cell(CTX_VAR(exemplar, 2), out), 1);
 
     // Should we save the WORD! from a variable access to use as the name of
     // the identity alias?
@@ -260,7 +260,7 @@ REB_R Reframer_Dispatcher(REBFRM *f)
         return R_THROWN;
 
     REBVAL *arg = FRM_ARG(f, VAL_INT32(param_index));
-    Move_Value(arg, f_spare);
+    Copy_Cell(arg, f_spare);
 
     INIT_FRM_PHASE(f, VAL_ACTION(shim));
     INIT_FRM_BINDING(f, VAL_ACTION_BINDING(shim));
@@ -377,7 +377,7 @@ REBNATIVE(reframer_p)
     // takes a void and giving it ~pending~; would make bugs more obvious.
     //
     REBVAL *var = CTX_VAR(exemplar, param_index);
-    Move_Value(var, CTX_ARCHETYPE(exemplar));
+    Copy_Cell(var, CTX_ARCHETYPE(exemplar));
     SET_CELL_FLAG(var, VAR_MARKED_HIDDEN);
 
     // Make action with enough space to store the implementation phase and
@@ -391,7 +391,7 @@ REBNATIVE(reframer_p)
     );
 
     REBARR *details = ACT_DETAILS(reframer);
-    Move_Value(ARR_AT(details, IDX_REFRAMER_SHIM), ARG(shim));
+    Copy_Cell(ARR_AT(details, IDX_REFRAMER_SHIM), ARG(shim));
     Init_Integer(ARR_AT(details, IDX_REFRAMER_PARAM_INDEX), param_index);
 
     return Init_Action(D_OUT, reframer, label, UNBOUND);

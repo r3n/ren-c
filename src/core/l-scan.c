@@ -2307,7 +2307,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             }
             DROP_GC_GUARD(array);
 
-            Move_Value(DS_PUSH(), cell);
+            Copy_Cell(DS_PUSH(), cell);
             DROP_GC_GUARD(cell);
         }
         else {
@@ -2393,7 +2393,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             // A proxy needs to be imported from lib to context.
             //
             Expand_Context(context, 1);
-            Move_Value(
+            Copy_Cell(
                 Append_Context(context, DS_TOP, nullptr),
                 CTX_VAR(lib, -n)  // -n is positive
             );
@@ -2530,7 +2530,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     = mutable_HEART_BYTE(cleanup)
                     = REB_GET_WORD;
 
-                Move_Value(ARR_SINGLE(a), cleanup);
+                Copy_Cell(ARR_SINGLE(a), cleanup);
                 Init_Group(cleanup, a);
             }
         }
@@ -2550,7 +2550,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
         assert(ANY_SEQUENCE(temp));  // Should be >= 2 elements, no decaying
 
-        Move_Value(DS_PUSH(), temp);
+        Copy_Cell(DS_PUSH(), temp);
 
         // !!! Temporarily raise attention to usage like `.5` or `5.` to guide
         // people that these are contentious with tuples.  There is no way
@@ -2776,7 +2776,7 @@ bool Scan_To_Stack_Relaxed_Failed(SCAN_LEVEL *level) {
 
     ss->begin = ss->end;  // skip malformed token
 
-    Move_Value(DS_PUSH(), error);
+    Copy_Cell(DS_PUSH(), error);
     rebRelease(error);
     return true;
 }
@@ -3012,7 +3012,7 @@ REBNATIVE(transcode)
         if (not Is_Blackhole(REF(relax))) {
             REBVAL *var = Lookup_Mutable_Word_May_Fail(ARG(relax), SPECIFIED);
             if (failed)
-                Move_Value(var, DS_TOP);
+                Copy_Cell(var, DS_TOP);
             else
                 Init_Nulled(var);
         }
@@ -3027,7 +3027,7 @@ REBNATIVE(transcode)
         if (DSP == dsp_orig)
             Init_Nulled(D_OUT);
         else {
-            Move_Value(D_OUT, DS_TOP);
+            Copy_Cell(D_OUT, DS_TOP);
             DS_DROP();
         }
         assert(DSP == dsp_orig);
@@ -3053,7 +3053,7 @@ REBNATIVE(transcode)
     //
     if (REF(next) and not Is_Blackhole(ARG(next))) {
         REBVAL *var = Sink_Word_May_Fail(ARG(next), SPECIFIED);
-        Move_Value(var, source);
+        Copy_Cell(var, source);
 
         if (IS_BINARY(var)) {
             if (ss.begin)

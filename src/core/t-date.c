@@ -55,8 +55,8 @@ REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     if (VAL_DATE(a).zone != VAL_DATE(b).zone) {
         tiebreaker = VAL_DATE(a).zone > VAL_DATE(b).zone ? 1 : -1;
 
-        Dequotify(Move_Value(adjusted_a, SPECIFIC(CELL_TO_VAL(a))));
-        Dequotify(Move_Value(adjusted_b, SPECIFIC(CELL_TO_VAL(b))));
+        Dequotify(Copy_Cell(adjusted_a, SPECIFIC(CELL_TO_VAL(a))));
+        Dequotify(Copy_Cell(adjusted_b, SPECIFIC(CELL_TO_VAL(b))));
 
         const bool to_utc = true;
         Adjust_Date_Zone(adjusted_a, to_utc);
@@ -96,7 +96,7 @@ void MF_Date(REB_MOLD *mo, REBCEL(const*) v_orig, bool form)
     // make a copy that we can tweak during the emit process
 
     DECLARE_LOCAL (v);
-    Move_Value(v, SPECIFIC(CELL_TO_VAL(v_orig)));
+    Copy_Cell(v, SPECIFIC(CELL_TO_VAL(v_orig)));
 
     if (
         VAL_MONTH(v) == 0
@@ -431,7 +431,7 @@ REB_R MAKE_Date(
         fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_DATE(arg))
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
     if (IS_TEXT(arg)) {
         REBSIZ size;
@@ -613,7 +613,7 @@ void Pick_Or_Poke_Date(
             if (not Does_Date_Have_Time(v))
                 Init_Nulled(out);
             else {
-                Move_Value(out, v); // want v's adjusted VAL_NANO()
+                Copy_Cell(out, v); // want v's adjusted VAL_NANO()
                 Adjust_Date_Zone(out, false);
                 RESET_VAL_HEADER(out, REB_TIME, CELL_MASK_NONE);
             }
@@ -634,7 +634,7 @@ void Pick_Or_Poke_Date(
             break;
 
         case SYM_DATE: {
-            Move_Value(out, v);
+            Copy_Cell(out, v);
 
             const bool to_utc = false;
             Adjust_Date_Zone(out, to_utc); // !!! necessary?
@@ -653,7 +653,7 @@ void Pick_Or_Poke_Date(
             break;
 
         case SYM_UTC: {
-            Move_Value(out, v);
+            Copy_Cell(out, v);
             VAL_DATE(out).zone = 0;
             const bool to_utc = true;
             Adjust_Date_Zone(out, to_utc);
@@ -866,7 +866,7 @@ REB_R PD_Date(
     // !!! The date picking as written can't both read and write the out cell.
     //
     DECLARE_LOCAL (temp);
-    Move_Value(temp, pvs->out);
+    Copy_Cell(temp, pvs->out);
     Pick_Or_Poke_Date(pvs->out, temp, picker, nullptr);
     return pvs->out;
 }

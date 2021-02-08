@@ -226,7 +226,7 @@ bool Next_Path_Throws(REBPVS *pvs)
 
         REBSPC *derived = Derive_Specifier(f_specifier, f_value);
         if (Do_Any_Array_At_Throws(f_spare, f_value, derived)) {
-            Move_Value(pvs->out, f_spare);
+            Move_Cell(pvs->out, f_spare);
             return true; // thrown
         }
         PVS_PICKER(pvs) = f_spare;
@@ -261,7 +261,7 @@ bool Next_Path_Throws(REBPVS *pvs)
             break; // nothing left to do, have to take the dispatcher's word
 
           case REB_R_REFERENCE: { // dispatcher wants a set *if* at end of path
-            Move_Value(pvs->u.ref.cell, PVS_OPT_SETVAL(pvs));
+            Copy_Cell(pvs->u.ref.cell, PVS_OPT_SETVAL(pvs));
             break; }
 
           case REB_R_IMMEDIATE: {
@@ -283,7 +283,7 @@ bool Next_Path_Throws(REBPVS *pvs)
             if (not pvs->u.ref.cell)
                 fail ("Can't update temporary immediate value via SET-PATH!");
 
-            Move_Value(pvs->u.ref.cell, pvs->out);
+            Copy_Cell(pvs->u.ref.cell, pvs->out);
             break; }
 
           case REB_R_REDO: // e.g. used by REB_QUOTED to retrigger, sometimes
@@ -468,7 +468,7 @@ bool Eval_Path_Throws_Core(
                 }
             }
 
-            Move_Value(
+            Copy_Cell(
                 Lookup_Mutable_Word_May_Fail(sequence, sequence_specifier),
                 unwrap(setval)
             );
@@ -559,7 +559,7 @@ bool Eval_Path_Throws_Core(
             second,
             VAL_SEQUENCE_SPECIFIER(f_value)
         );
-        Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
+        Copy_Cell(pvs->out, SPECIFIC(pvs->u.ref.cell));
         if (IS_ACTION(pvs->out))
             pvs->label = VAL_WORD_SYMBOL(second);
     }
@@ -570,7 +570,7 @@ bool Eval_Path_Throws_Core(
         //
         pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(f_value, specifier);
 
-        Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
+        Copy_Cell(pvs->out, SPECIFIC(pvs->u.ref.cell));
 
         if (IS_ACTION(pvs->out)) {
             pvs->label = VAL_WORD_SYMBOL(f_value);
@@ -616,7 +616,7 @@ bool Eval_Path_Throws_Core(
             // Prioritize rethinking this when the feature gets used more.
             //
             assert(NOT_CELL_FLAG(pvs->u.ref.cell, PROTECTED));
-            Move_Value(pvs->u.ref.cell, PVS_OPT_SETVAL(pvs));
+            Copy_Cell(pvs->u.ref.cell, PVS_OPT_SETVAL(pvs));
         }
     }
     else {
@@ -689,7 +689,7 @@ bool Eval_Path_Throws_Core(
                 panic ("REFINE-only specializations should not THROW");
             }
 
-            Move_Value(pvs->out, FRM_SPARE(pvs));
+            Copy_Cell(pvs->out, FRM_SPARE(pvs));
         }
     }
 
@@ -827,7 +827,7 @@ REBNATIVE(pick)
     DECLARE_END_FRAME (pvs, EVAL_MASK_DEFAULT);
 
     Push_Frame(D_OUT, pvs);
-    Move_Value(D_OUT, location);
+    Copy_Cell(D_OUT, location);
 
     PVS_PICKER(pvs) = ARG(picker);
 
@@ -851,7 +851,7 @@ REBNATIVE(pick)
         //
         // It was parented to the PVS frame, we have to read it out.
         //
-        Move_Value(D_OUT, r);
+        Copy_Cell(D_OUT, r);
         rebRelease(r);
         r = D_OUT;
     }
@@ -923,7 +923,7 @@ REBNATIVE(poke)
     DECLARE_END_FRAME (pvs, EVAL_MASK_DEFAULT);
 
     Push_Frame(D_OUT, pvs);
-    Move_Value(D_OUT, location);
+    Copy_Cell(D_OUT, location);
 
     PVS_PICKER(pvs) = ARG(picker);
 
@@ -942,7 +942,7 @@ REBNATIVE(poke)
         break;
 
       case REB_R_REFERENCE:  // wants us to write it
-        Move_Value(pvs->u.ref.cell, ARG(value));
+        Copy_Cell(pvs->u.ref.cell, ARG(value));
         break;
 
       default:
@@ -995,7 +995,7 @@ REB_R MAKE_Path(
         if (not ANY_PATH(out)) {
             if (DSP != dsp_orig and IS_BLANK(DS_TOP))
                 DS_DROP(); // make path! ['a/ 'b] => a/b, not a//b
-            Move_Value(DS_PUSH(), out);
+            Copy_Cell(DS_PUSH(), out);
         }
         else { // Splice any generated paths, so there are no paths-in-paths.
             const RELVAL *tail;
@@ -1088,13 +1088,13 @@ REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         // !!! If we don't copy an array, we don't get a new form to use for
         // new bindings in lookups.  Review!
         //
-        Move_Value(out, arg);
+        Copy_Cell(out, arg);
         mutable_KIND3Q_BYTE(out) = arg_kind;
         return out;
     }
 
     if (arg_kind != REB_BLOCK) {
-        Move_Value(out, arg);  // move value so we can modify it
+        Copy_Cell(out, arg);  // move value so we can modify it
         Dequotify(out);  // remove quotes (should TO take a REBCEL()?)
         Plainify(out);  // remove any decorations like @ or :
         if (not Try_Leading_Blank_Pathify(out, kind))

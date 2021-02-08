@@ -329,7 +329,7 @@ REBTYPE(Issue)
         return R_UNHANDLED; }
 
       case SYM_COPY:  // since copy result is also immutable, Move() suffices
-        return Move_Value(D_OUT, issue);
+        return Copy_Cell(D_OUT, issue);
 
       default:
         break;

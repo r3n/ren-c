@@ -70,7 +70,7 @@ static void Query_Net(REBVAL *out, REBVAL *port, struct devreq_net *sock)
         sock->remote_port
     );
 
-    Move_Value(out, info);
+    Copy_Cell(out, info);
     rebRelease(info);
 }
 

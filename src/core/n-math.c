@@ -853,17 +853,17 @@ REBNATIVE(maximum)
     }
     else {
         DECLARE_LOCAL (coerced1);
-        Move_Value(coerced1, value1);
+        Copy_Cell(coerced1, value1);
         DECLARE_LOCAL (coerced2);
-        Move_Value(coerced2, value2);
+        Copy_Cell(coerced2, value2);
 
         bool strict = false;
         REBINT diff = Compare_Modify_Values(coerced1, coerced2, strict);
         if (diff == 1)
-            Move_Value(D_OUT, value1);
+            Copy_Cell(D_OUT, value1);
         else {
             assert(diff == 0 or diff == -1);
-            Move_Value(D_OUT, value2);
+            Copy_Cell(D_OUT, value2);
         }
     }
     return D_OUT;
@@ -891,17 +891,17 @@ REBNATIVE(minimum)
     }
     else {
         DECLARE_LOCAL (coerced1);
-        Move_Value(coerced1, value1);
+        Copy_Cell(coerced1, value1);
         DECLARE_LOCAL (coerced2);
-        Move_Value(coerced2, value2);
+        Copy_Cell(coerced2, value2);
 
         bool strict = false;
         REBINT diff = Compare_Modify_Values(coerced1, coerced2, strict);
         if (diff == -1)
-            Move_Value(D_OUT, value1);
+            Copy_Cell(D_OUT, value1);
         else {
             assert(diff == 0 or diff == 1);
-            Move_Value(D_OUT, value2);
+            Copy_Cell(D_OUT, value2);
         }
     }
     return D_OUT;

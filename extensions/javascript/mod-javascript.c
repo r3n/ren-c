@@ -660,7 +660,7 @@ REB_R JavaScript_Dispatcher(REBFRM *f)
         Init_Nulled(f->out);
     else {
         assert(not IS_NULLED(native_result));  // API uses nullptr only
-        Move_Value(f->out, native_result);
+        Copy_Cell(f->out, native_result);
         rebRelease(native_result);
     }
 
@@ -725,7 +725,7 @@ REBNATIVE(js_native)
     REBARR *details = ACT_DETAILS(native);
 
     if (Is_Series_Frozen(VAL_SERIES(source)))
-        Move_Value(ARR_AT(details, IDX_NATIVE_BODY), source);  // no copy
+        Copy_Cell(ARR_AT(details, IDX_NATIVE_BODY), source);  // no copy
     else {
         Init_Text(
             ARR_AT(details, IDX_NATIVE_BODY),
@@ -839,7 +839,7 @@ REBNATIVE(js_native)
     // look for bindings.  For the moment, set user natives to use the user
     // context...it could be a parameter of some kind (?)
     //
-    Move_Value(
+    Copy_Cell(
         ARR_AT(details, IDX_NATIVE_CONTEXT),
         Get_System(SYS_CONTEXTS, CTX_USER)
     );

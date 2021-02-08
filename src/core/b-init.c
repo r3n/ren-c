@@ -508,10 +508,10 @@ void Shutdown_System_Object(void)
 //
 static void Init_Contexts_Object(void)
 {
-    Move_Value(Get_System(SYS_CONTEXTS, CTX_SYS), Sys_Context);
+    Copy_Cell(Get_System(SYS_CONTEXTS, CTX_SYS), Sys_Context);
 
-    Move_Value(Get_System(SYS_CONTEXTS, CTX_LIB), Lib_Context);
-    Move_Value(Get_System(SYS_CONTEXTS, CTX_USER), Lib_Context);
+    Copy_Cell(Get_System(SYS_CONTEXTS, CTX_LIB), Lib_Context);
+    Copy_Cell(Get_System(SYS_CONTEXTS, CTX_USER), Lib_Context);
 }
 
 

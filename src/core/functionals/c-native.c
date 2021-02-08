@@ -168,7 +168,7 @@ REBVAL *Make_Native(
     // stack and looks to see where the native function that is running
     // says its "module" is.  Core natives default to Lib_Context.
     //
-    Move_Value(ARR_AT(details, IDX_NATIVE_CONTEXT), module);
+    Copy_Cell(ARR_AT(details, IDX_NATIVE_CONTEXT), module);
 
     // Append the native to the module under the name given.
     //
@@ -265,7 +265,7 @@ REBARR *Startup_Natives(const REBVAL *boot_natives)
         //
         Natives[n] = VAL_ACTION(native);  // Note: Loses enfixedness (!)
 
-        REBVAL *catalog_item = Move_Value(Alloc_Tail_Array(catalog), name);
+        REBVAL *catalog_item = Copy_Cell(Alloc_Tail_Array(catalog), name);
         mutable_KIND3Q_BYTE(catalog_item) = REB_WORD;
         mutable_HEART_BYTE(catalog_item) = REB_WORD;
 

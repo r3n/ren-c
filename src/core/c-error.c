@@ -569,7 +569,7 @@ REB_R MAKE_Error(
         Rebind_Context_Deep(root_error, e, nullptr);  // NULL=>no more binds
 
         DECLARE_LOCAL (virtual_arg);
-        Move_Value(virtual_arg, arg);
+        Copy_Cell(virtual_arg, arg);
         Virtual_Bind_Deep_To_Existing_Context(
             virtual_arg,
             e,
@@ -579,7 +579,7 @@ REB_R MAKE_Error(
 
         DECLARE_LOCAL (evaluated);
         if (Do_Any_Array_At_Throws(evaluated, virtual_arg, SPECIFIED)) {
-            Move_Value(out, evaluated);
+            Move_Cell(out, evaluated);
             return R_THROWN;
         }
 
@@ -645,7 +645,7 @@ REB_R MAKE_Error(
                 if (not IS_BLANK(&vars->message))
                     fail (Error_Invalid_Error_Raw(arg));
 
-                Move_Value(&vars->message, message);
+                Copy_Cell(&vars->message, message);
             }
             else {
                 // At the moment, we don't let the user make a user-ID'd
@@ -823,7 +823,7 @@ REBCTX *Make_Error_Managed_Core(
             }
             else {
                 const REBVAL *arg = cast(const REBVAL*, p);
-                Move_Value(var, arg);
+                Copy_Cell(var, arg);
             }
         }
     }
@@ -837,9 +837,9 @@ REBCTX *Make_Error_Managed_Core(
     //
     ERROR_VARS *vars = ERR_VARS(error);
 
-    Move_Value(&vars->message, message);
-    Move_Value(&vars->id, id);
-    Move_Value(&vars->type, type);
+    Copy_Cell(&vars->message, message);
+    Copy_Cell(&vars->id, id);
+    Copy_Cell(&vars->type, type);
 
     return error;
 }
@@ -1141,7 +1141,7 @@ REBCTX *Error_No_Value(const REBVAL *target) {
 REBCTX *Error_No_Catch_For_Throw(REBVAL *thrown)
 {
     DECLARE_LOCAL (label);
-    Move_Value(label, VAL_THROWN_LABEL(thrown));
+    Copy_Cell(label, VAL_THROWN_LABEL(thrown));
 
     DECLARE_LOCAL (arg);
     CATCH_THROWN(arg, thrown);

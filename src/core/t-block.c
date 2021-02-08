@@ -63,7 +63,7 @@ REBNATIVE(only)  // https://forum.rebol.info/t/1182/11
     // only work for limited levels of such boxing--likely just one level.
     //
     REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);
-    Move_Value(ARR_SINGLE(a), ARG(value));
+    Copy_Cell(ARR_SINGLE(a), ARG(value));
     Freeze_Array_Shallow(a);  // immutable (to permit future optimized case)
     return Init_Block(D_OUT, a);
 }
@@ -302,7 +302,7 @@ REB_R MAKE_Array(
             if (IS_END(out))
                 break;
 
-            Move_Value(DS_PUSH(), out);
+            Copy_Cell(DS_PUSH(), out);
         } while (true);
 
         return Init_Any_Array(out, kind, Pop_Stack_Values(dsp_orig));
@@ -317,7 +317,7 @@ REB_R MAKE_Array(
             REBVAL *generated = rebValue(arg, rebEND);
             if (not generated)
                 break;
-            Move_Value(DS_PUSH(), generated);
+            Copy_Cell(DS_PUSH(), generated);
             rebRelease(generated);
         }
         return Init_Any_Array(out, kind, Pop_Stack_Values(dsp_orig));
@@ -357,7 +357,7 @@ REB_R TO_Array(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         // !!! Review handling of making a 1-element PATH!, e.g. TO PATH! 10
         //
         REBARR *single = Alloc_Singular(NODE_FLAG_MANAGED);
-        Move_Value(ARR_SINGLE(single), arg);
+        Copy_Cell(ARR_SINGLE(single), arg);
         return Init_Any_Array(out, kind, single);
     }
 }
@@ -596,15 +596,15 @@ void Shuffle_Array(REBARR *arr, REBLEN idx, bool secure)
         n--;
 
         // Only do the following block when an actual swap occurs.
-        // Otherwise an assertion will fail when trying to Move_Value() a
+        // Otherwise an assertion will fail when trying to Copy_Cell() a
         // value to itself.
         //
         if (k != (n + idx)) {
             swap.header = data[k].header;
             swap.payload = data[k].payload;
             swap.extra = data[k].extra;
-            Move_Value(&data[k], &data[n + idx]);
-            Move_Value(&data[n + idx], &swap);
+            Copy_Cell(&data[k], &data[n + idx]);
+            Copy_Cell(&data[n + idx], &swap);
         }
     }
 }
@@ -920,7 +920,7 @@ REBTYPE(Array)
             if (REF(tail) or REF(match))
                 ret += len;
             VAL_INDEX_RAW(array) = ret;
-            Move_Value(D_OUT, array);
+            Copy_Cell(D_OUT, array);
         }
         else {
             ret += len;
@@ -964,7 +964,7 @@ REBTYPE(Array)
         if (REF(line))
             flags |= AM_LINE;
 
-        Move_Value(D_OUT, array);
+        Copy_Cell(D_OUT, array);
         VAL_INDEX_RAW(D_OUT) = Modify_Array(
             arr,
             index,
@@ -1056,8 +1056,8 @@ REBTYPE(Array)
             temp.header = a->header;
             temp.payload = a->payload;
             temp.extra = a->extra;
-            Move_Value(a, b);
-            Move_Value(b, &temp);
+            Copy_Cell(a, b);
+            Copy_Cell(b, &temp);
         }
         RETURN (array); }
 
@@ -1097,7 +1097,7 @@ REBTYPE(Array)
             // When we move the back cell to the front position, it gets the
             // newline flag based on the flag state that was *after* it.
             //
-            Move_Value(front, back);
+            Copy_Cell(front, back);
             if (line_back)
                 SET_CELL_FLAG(front, NEWLINE_BEFORE);
             else
@@ -1107,7 +1107,7 @@ REBTYPE(Array)
             // that was on the back will be the after for the next blit.
             //
             line_back = GET_CELL_FLAG(back, NEWLINE_BEFORE);
-            Move_Value(back, &temp);
+            Copy_Cell(back, &temp);
             if (line_front)
                 SET_CELL_FLAG(back, NEWLINE_BEFORE);
             else
@@ -1141,7 +1141,7 @@ REBTYPE(Array)
             flags.offset = 0;
         }
 
-        Move_Value(D_OUT, array);  // save array before messing with index
+        Copy_Cell(D_OUT, array);  // save array before messing with index
 
         REBLEN len = Part_Len_May_Modify_Index(array, ARG(part));
         if (len <= 1)
@@ -1242,7 +1242,7 @@ REBNATIVE(blockify)
     if (IS_NULLED(v)) {
         // leave empty
     } else {
-        Move_Value(ARR_HEAD(a), v);
+        Copy_Cell(ARR_HEAD(a), v);
         SET_SERIES_LEN(a, 1);
     }
     return Init_Block(D_OUT, Freeze_Array_Shallow(a));
@@ -1275,7 +1275,7 @@ REBNATIVE(groupify)
     if (IS_NULLED(v)) {
         // leave empty
     } else {
-        Move_Value(ARR_HEAD(a), v);
+        Copy_Cell(ARR_HEAD(a), v);
         SET_SERIES_LEN(a, 1);
     }
     return Init_Group(D_OUT, Freeze_Array_Shallow(a));
@@ -1306,7 +1306,7 @@ REBNATIVE(enblock)
     if (IS_NULLED(v)) {
         // leave empty
     } else {
-        Move_Value(ARR_HEAD(a), v);
+        Copy_Cell(ARR_HEAD(a), v);
         SET_SERIES_LEN(a, 1);
     }
     return Init_Block(D_OUT, Freeze_Array_Shallow(a));
@@ -1337,7 +1337,7 @@ REBNATIVE(engroup)
     if (IS_NULLED(v)) {
         // leave empty
     } else {
-        Move_Value(ARR_HEAD(a), v);
+        Copy_Cell(ARR_HEAD(a), v);
         SET_SERIES_LEN(a, 1);
     }
     return Init_Group(D_OUT, Freeze_Array_Shallow(a));

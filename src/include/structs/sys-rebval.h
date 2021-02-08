@@ -137,7 +137,7 @@
 //=//// CELL_FLAG_PROTECTED ///////////////////////////////////////////////=//
 //
 // Values can carry a user-level protection bit.  The bit is not copied by
-// Move_Value(), and hence reading a protected value and writing it to
+// Copy_Cell(), and hence reading a protected value and writing it to
 // another location will not propagate the protectedness from the original
 // value to the copy.
 //
@@ -562,7 +562,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 //
 // Goal is that the mechanics are managed with low-level C, so the C++ build
 // is just there to notice when you try to use a raw byte copy.  Use functions
-// instead.  (See: Move_Value(), Derelativize())
+// instead.  (See: Copy_Cell(), Derelativize())
 //
 // Note: It is annoying that this means any structure that embeds a value cell
 // cannot be assigned.  However, `struct Reb_Value` must be the type exported

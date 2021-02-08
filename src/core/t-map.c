@@ -199,10 +199,10 @@ static void Rehash_Map(REBMAP *map)
             //
             // It's a "zombie", move last key to overwrite it
             //
-            Move_Value(
+            Copy_Cell(
                 key, SPECIFIC(ARR_AT(pairlist, ARR_LEN(pairlist) - 2))
             );
-            Move_Value(
+            Copy_Cell(
                 &key[1], SPECIFIC(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))
             );
             SET_SERIES_LEN(pairlist, ARR_LEN(pairlist) - 2);
@@ -374,7 +374,7 @@ REB_R PD_Map(
     if (IS_NULLED(val))  // zombie entry, means unused
         return nullptr;
 
-    return Move_Value(pvs->out, val); // RETURN (...) uses `frame_`, not `pvs`
+    return Copy_Cell(pvs->out, val); // RETURN (...) uses `frame_`, not `pvs`
 }
 
 
@@ -535,11 +535,11 @@ REBARR *Map_To_Array(const REBMAP *map, REBINT what)
     for (; NOT_END(val); val += 2) {
         if (not IS_NULLED(val + 1)) {  // can't be END
             if (what <= 0) {
-                Move_Value(dest, &val[0]);
+                Copy_Cell(dest, &val[0]);
                 ++dest;
             }
             if (what >= 0) {
-                Move_Value(dest, &val[1]);
+                Copy_Cell(dest, &val[1]);
                 ++dest;
             }
         }
@@ -581,7 +581,7 @@ REBCTX *Alloc_Context_From_Map(const REBMAP *map)
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1)) {
             REBVAL *var = Append_Context(c, nullptr, VAL_WORD_SYMBOL(mval));
-            Move_Value(var, &mval[1]);
+            Copy_Cell(var, &mval[1]);
         }
     }
 
@@ -701,7 +701,7 @@ REBTYPE(Map)
         if (n == 0)
             return nullptr;
 
-        Move_Value(
+        Copy_Cell(
             D_OUT,
             SPECIFIC(ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1))
         );

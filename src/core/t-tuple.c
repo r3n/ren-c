@@ -46,7 +46,7 @@ REB_R MAKE_Sequence(
         fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_TUPLE(arg))
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
     // !!! Net lookup parses IP addresses out of `tcp://93.184.216.34` or
     // similar URL!s.  In Rebol3 these captures come back the same type
@@ -371,7 +371,7 @@ REBTYPE(Sequence)
             or HEART_BYTE(sequence) == REB_ISSUE
         ){
             assert(VAL_WORD_ID(sequence) == SYM__SLASH_1_);
-            return Move_Value(frame_->out, sequence);
+            return Copy_Cell(frame_->out, sequence);
         }
 
         assert(HEART_BYTE(sequence) == REB_BLOCK);

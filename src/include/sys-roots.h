@@ -133,7 +133,7 @@ inline static REBVAL *Alloc_Value(void)
     );
 
     // Giving the cell itself NODE_FLAG_ROOT lets a REBVAL* be discerned as
-    // either an API handle or not.  The flag is not copied by Move_Value().
+    // either an API handle or not.  The flag is not copied by Copy_Cell().
     //
     REBVAL *v = SPECIFIC(ARR_SINGLE(a));
 
@@ -214,7 +214,7 @@ inline static void Handle_Api_Dispatcher_Result(REBFRM *f, const REBVAL* r) {
     if (IS_NULLED(r))
         assert(!"Dispatcher returned nulled cell, not C nullptr for API use");
 
-    Move_Value(f->out, r);
+    Copy_Cell(f->out, r);
     if (NOT_CELL_FLAG(r, MANAGED))
         rebRelease(r);
 }

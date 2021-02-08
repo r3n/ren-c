@@ -336,7 +336,7 @@ static bool Subparse_Throws(
     }
 
     if (inside)
-        Move_Value(Prep_Cell(ARG(inside)), CTX_ARCHETYPE(inside));
+        Copy_Cell(Prep_Cell(ARG(inside)), CTX_ARCHETYPE(inside));
     else
         Init_Nulled(Prep_Cell(ARG(inside)));
 
@@ -575,7 +575,7 @@ static REB_R Parse_One_Rule(
     if (IS_GROUP(rule) or IS_GET_GROUP(rule)) {
         rule = Process_Group_For_Parse(frame_, D_SPARE, rule);
         if (rule == R_THROWN) {
-            Move_Value(D_OUT, D_SPARE);
+            Move_Cell(D_OUT, D_SPARE);
             return R_THROWN;
         }
         if (rule == R_INVISIBLE) {  // !!! Should this be legal?
@@ -642,7 +642,7 @@ static REB_R Parse_One_Rule(
             P_INSIDE,
             (P_FLAGS & PF_FIND_MASK)
         )){
-            Move_Value(D_OUT, subresult);
+            Move_Cell(D_OUT, subresult);
             return R_THROWN;
         }
 
@@ -849,7 +849,7 @@ static REBIXO To_Thru_Block_Rule(
     // positioned on the end cell or null terminator of a string may match.
     //
     DECLARE_LOCAL (iter);
-    Move_Value(iter, ARG(position));  // need to slide pos
+    Copy_Cell(iter, ARG(position));  // need to slide pos
     for (
         ;
         VAL_INDEX_RAW(iter) <= cast(REBIDX, P_INPUT_LEN);
@@ -866,7 +866,7 @@ static REBIXO To_Thru_Block_Rule(
             else {
                 rule = Process_Group_For_Parse(frame_, cell, blk);
                 if (rule == R_THROWN) {
-                    Move_Value(D_OUT, cell);
+                    Move_Cell(D_OUT, cell);
                     return THROWN_FLAG;
                 }
                 if (rule == R_INVISIBLE)
@@ -1169,7 +1169,7 @@ static void Handle_Mark_Rule(
 
     REBYTE k = KIND3Q_BYTE(rule);  // REB_0_END ok
     if (k == REB_WORD or k == REB_SET_WORD) {
-        Move_Value(Sink_Word_May_Fail(rule, specifier), ARG(position));
+        Copy_Cell(Sink_Word_May_Fail(rule, specifier), ARG(position));
     }
     else if (
         k == REB_PATH or k == REB_SET_PATH
@@ -1317,7 +1317,7 @@ REBNATIVE(subparse)
         VAL_INDEX_RAW(ARG(input)) = VAL_LEN_HEAD(ARG(input));
     }
 
-    Move_Value(ARG(position), ARG(input));
+    Copy_Cell(ARG(position), ARG(input));
 
     // Every time we hit an alternate rule match (with |), we have to reset
     // any of the collected values.  Remember the tail when we started.
@@ -1455,7 +1455,7 @@ REBNATIVE(subparse)
 
         rule = Process_Group_For_Parse(f, D_SPARE, rule);
         if (rule == R_THROWN) {
-            Move_Value(D_OUT, D_SPARE);
+            Move_Cell(D_OUT, D_SPARE);
             return R_THROWN;
         }
         if (rule == R_INVISIBLE) {  // was a (...), or null-bearing :(...)
@@ -1463,7 +1463,7 @@ REBNATIVE(subparse)
             goto pre_rule;
         }
         assert(rule == D_SPARE);
-        rule = Move_Value(P_SAVE, D_SPARE);
+        rule = Move_Cell(P_SAVE, D_SPARE);
 
         // was a GET-GROUP!, e.g. :(...), fall through so its result will
         // act as a rule in its own right.
@@ -1482,7 +1482,7 @@ REBNATIVE(subparse)
             SET_END(D_SPARE);
 
             if (Do_Signals_Throws(D_SPARE)) {
-                Move_Value(D_OUT, D_SPARE);
+                Move_Cell(D_OUT, D_SPARE);
                 return R_THROWN;
             }
 
@@ -1660,7 +1660,7 @@ REBNATIVE(subparse)
                         // Nothing to add
                     }
                     else if (only) {
-                        Move_Value(
+                        Copy_Cell(
                             Alloc_Tail_Array(P_COLLECTION),
                             D_OUT
                         );
@@ -1816,7 +1816,7 @@ REBNATIVE(subparse)
                     P_RULE,
                     P_RULE_SPECIFIER
                 )) {
-                    Move_Value(D_OUT, condition);
+                    Copy_Cell(D_OUT, condition);
                     goto return_thrown;
                 }
 
@@ -1930,10 +1930,10 @@ REBNATIVE(subparse)
     else if (ANY_SEQUENCE(rule)) {
         if (IS_PATH(rule) or IS_TUPLE(rule)) {
             if (Get_Path_Throws_Core(D_SPARE, rule, P_RULE_SPECIFIER)) {
-                Move_Value(D_OUT, D_SPARE);
+                Copy_Cell(D_OUT, D_SPARE);
                 goto return_thrown;
             }
-            rule = Move_Value(P_SAVE, D_SPARE);
+            rule = Copy_Cell(P_SAVE, D_SPARE);
         }
         else if (IS_SET_PATH(rule) or IS_SET_TUPLE(rule)) {
             Handle_Mark_Rule(f, rule, P_RULE_SPECIFIER);
@@ -2146,7 +2146,7 @@ REBNATIVE(subparse)
                         subrule, P_RULE_SPECIFIER,
                         cmp, P_INPUT_SPECIFIER
                     )){
-                        Move_Value(D_OUT, temp);
+                        Move_Cell(D_OUT, temp);
                         return R_THROWN;
                     }
 
@@ -2258,8 +2258,8 @@ REBNATIVE(subparse)
                 P_COLLECTION,
                 P_INSIDE,
                 (P_FLAGS & PF_FIND_MASK)  // no PF_ONE_RULE
-            )) {
-                Move_Value(D_OUT, D_SPARE);
+            )){
+                Move_Cell(D_OUT, D_SPARE);
                 return R_THROWN;
             }
 
@@ -2366,7 +2366,7 @@ REBNATIVE(subparse)
             if ((P_FLAGS & PF_NOT2) and not IS_NULLED(ARG(position)))
                 Init_Nulled(ARG(position));  // not found
             else {
-                Move_Value(ARG(position), ARG(input));
+                Copy_Cell(ARG(position), ARG(input));
                 P_POS = begin;
             }
         }
@@ -2445,7 +2445,7 @@ REBNATIVE(subparse)
                         set_or_copy_word,
                         P_RULE_SPECIFIER
                     )){
-                        Move_Value(D_OUT, D_SPARE);
+                        Move_Cell(D_OUT, D_SPARE);
                         return R_THROWN;
                     }
 
@@ -2488,7 +2488,7 @@ REBNATIVE(subparse)
                     */
 
                     if (DSP > f->dsp_orig) {
-                        Move_Value(var, DS_TOP);
+                        Copy_Cell(var, DS_TOP);
                         DS_DROP();
                         if (DSP != f->dsp_orig)
                             fail ("SET for datatype only allows 1 value");
@@ -2551,7 +2551,7 @@ REBNATIVE(subparse)
                         rule,
                         derived
                     )){
-                        Move_Value(D_OUT, evaluated);
+                        Copy_Cell(D_OUT, evaluated);
                         goto return_thrown;
                     }
 
@@ -2640,7 +2640,7 @@ REBNATIVE(subparse)
         // Jump to the alternate rule and reset input
         //
         FETCH_NEXT_RULE(f);
-        Move_Value(ARG(position), ARG(input));  // P_POS may be null
+        Copy_Cell(ARG(position), ARG(input));  // P_POS may be null
         begin = P_INPUT_IDX;
     }
 
@@ -2768,7 +2768,7 @@ REBNATIVE(parse)
     // the writes must be done to a RELVAL.  We must dequote/requote to
     // make sure we don't write to a REB_QUOTED or shared contained cell.
     //
-    Move_Value(D_SPARE, ARG(input));
+    Copy_Cell(D_SPARE, ARG(input));
     REBLEN num_quotes = Dequotify(D_SPARE);  // take quotes out
     VAL_INDEX_UNBOUNDED(D_SPARE) = index;  // cell guaranteed not REB_QUOTED
     Quotify(D_SPARE, num_quotes);  // put quotes back

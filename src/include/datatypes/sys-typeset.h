@@ -333,7 +333,7 @@ inline static enum Reb_Param_Class VAL_PARAM_CLASS(const REBPAR *param) {
 // For this mechanic to work, there has to be a bit on frames that tracks
 // visibility on a per-instance basis.  To avoid having to make a new keylist
 // each time this happens, the NODE_FLAG_MARKED bit on a context is taken
-// to mean this.  It won't be copied by Move_Value() that reads the variable,
+// to mean this.  It won't be copied by Copy_Cell() that reads the variable,
 // and it is heeded here as VAR_MARKED_HIDDEN if a value cell is given.
 //
 inline static bool Is_Param_Hidden(const REBPAR *param)

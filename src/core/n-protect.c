@@ -130,7 +130,7 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
     REBVAL *var = CTX_VAR(context, index);
 
     // Due to the fact that not all the bits in a value header are copied when
-    // Move_Value is done, it's possible to set the protection status of a
+    // Copy_Cell is done, it's possible to set the protection status of a
     // variable on the value vs. the key.  This means the keylist does not
     // have to be modified, and hence it doesn't have to be made unique
     // from any objects that were sharing it.
@@ -344,7 +344,7 @@ static REB_R Protect_Unprotect_Core(REBFRM *frame_, REBFLGS flags)
                     var = safe;
                 }
                 else {
-                    Move_Value(safe, value);
+                    Copy_Cell(safe, value);
                     var = safe;
                 }
 

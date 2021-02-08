@@ -120,3 +120,28 @@ inline static bool Is_Void_With_Sym(const RELVAL *v, SYMID sym) {
     #define ASSERT_READABLE_IF_DEBUG(v) \
         assert(not IS_UNREADABLE_DEBUG(v))
 #endif
+
+
+// Moving a cell invalidates the old location.  This idea is a potential
+// prelude to being able to do some sort of reference counting on series based
+// on the cells that refer to them tracking when they are overwritten.  In
+// the meantime, setting to unreadable void helps see when a value that isn't
+// thought to be used any more is still being used.
+//
+inline static REBVAL *Move_Cell_Untracked(
+    RELVAL *out,
+    REBVAL *v,
+    REBFLGS copy_mask
+){
+    Copy_Cell_Core(out, v, copy_mask);
+  #if defined(NDEBUG)
+    Init_Unreadable_Void(v);  // no advantage in release build (yet!)
+  #endif
+    return cast(REBVAL*, out);
+}
+
+#define Move_Cell(out,v) \
+    Move_Cell_Untracked(TRACK_CELL_IF_DEBUG(out), (v), CELL_MASK_COPY)
+
+#define Move_Cell_Core(out,v,cell_mask) \
+    Move_Cell_Untracked(TRACK_CELL_IF_DEBUG(out), (v), (cell_mask))

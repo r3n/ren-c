@@ -108,7 +108,7 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
     for (; key != tail; ++key, ++param) {
         Init_Word(DS_PUSH(), KEY_SYMBOL(key));
 
-        Move_Value(DS_PUSH(), param);
+        Copy_Cell(DS_PUSH(), param);
         if (Is_Param_Hidden(param))  // !!! This should hide locals
             SET_CELL_FLAG(DS_TOP, STACK_NOTE_LOCAL);
 

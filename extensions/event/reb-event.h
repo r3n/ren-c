@@ -190,7 +190,7 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
     // !!! HACK... way of getting EG_Gob_Type.
     //
     REBVAL *hack = rebValue("make gob! []", rebEND);
-    Move_Value(out, hack);
+    Copy_Cell(out, hack);
     rebRelease(hack);
 
     mutable_VAL_GOB(out) = g;

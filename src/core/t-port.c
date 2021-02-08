@@ -169,7 +169,7 @@ REBTYPE(Port)
             //
             const REBVAL *made = rebValueQ("make port!", D_ARG(1), rebEND);
             assert(IS_PORT(made));
-            Move_Value(D_ARG(1), made);
+            Copy_Cell(D_ARG(1), made);
             rebRelease(made);
             break; }
 

@@ -329,7 +329,7 @@ REB_R PD_Binary(
         Init_Integer(pvs->out, VAL_CHAR(unwrap(setval)));
     }
     else if (IS_INTEGER(unwrap(setval))) {
-        Move_Value(pvs->out, unwrap(setval));
+        Copy_Cell(pvs->out, unwrap(setval));
     }
     else {
         // !!! See notes in the REBTYPE(String) about alternate cases
@@ -788,7 +788,7 @@ REBTYPE(Binary)
 
         REBFLGS thunk = 0;
 
-        Move_Value(D_OUT, v);  // copy to output before index adjustment
+        Copy_Cell(D_OUT, v);  // copy to output before index adjustment
 
         REBLEN len = Part_Len_May_Modify_Index(v, ARG(part));
         REBYTE *data_at = VAL_BINARY_AT_ENSURE_MUTABLE(v);  // ^ index changes

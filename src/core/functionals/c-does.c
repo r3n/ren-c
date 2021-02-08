@@ -196,7 +196,7 @@ REBNATIVE(does)
         //
         RELVAL *body = ARR_AT(ACT_DETAILS(doer), IDX_DOES_BLOCK);
         Force_Value_Frozen_Deep(source);
-        Move_Value(body, source);
+        Copy_Cell(body, source);
 
         return Init_Action(D_OUT, doer, ANONYMOUS, UNBOUND);
     }
@@ -214,7 +214,7 @@ REBNATIVE(does)
     // Put argument into DO's *second* frame slot (first is RETURN)
     //
     assert(KEY_SYM(CTX_KEY(exemplar, 1)) == SYM_RETURN);
-    Move_Value(CTX_VAR(exemplar, 2), source);
+    Copy_Cell(CTX_VAR(exemplar, 2), source);
 
     const REBSTR *label = ANONYMOUS;  // !!! Better answer?
 

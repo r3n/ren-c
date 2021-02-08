@@ -64,7 +64,7 @@ inline static REBVAL *Init_Builtin_Datatype(
     enum Reb_Kind kind
 ){
     assert(kind > REB_0 and kind < REB_MAX);
-    Move_Value(out, Datatype_From_Kind(kind));
+    Copy_Cell(out, Datatype_From_Kind(kind));
     assert(VAL_TYPE_KIND(out) == kind);
     assert(GET_CELL_FLAG(out, FIRST_IS_NODE));
     assert(NOT_CELL_FLAG(out, SECOND_IS_NODE));  // only custom types have

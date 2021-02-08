@@ -90,7 +90,7 @@ void Startup_Typesets(void)
     for (n = 0; Typesets[n].sym != 0; n++) {
         Init_Typeset(DS_PUSH(), Typesets[n].bits);
 
-        Move_Value(
+        Copy_Cell(
             Append_Context(lib, nullptr, Canon(Typesets[n].sym)),
             DS_TOP
         );
@@ -269,7 +269,7 @@ REB_R MAKE_Typeset(
         fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_TYPESET(arg))
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
     if (!IS_BLOCK(arg)) goto bad_make;
 
@@ -323,7 +323,7 @@ REBARR *Typeset_To_Array(const REBVAL *tset)
                 // that they can take optional values.  Hence this can occur
                 // in typesets coming from ACTION!
                 //
-                Move_Value(DS_PUSH(), Root_Opt_Tag);
+                Copy_Cell(DS_PUSH(), Root_Opt_Tag);
             }
             else if (n == REB_CUSTOM) {
                 //

@@ -160,7 +160,7 @@ void Change_Case(
     // the same index.  However, R3-Alpha code would use Partial() and may
     // change val's index.  Capture it before potential change, review.
     //
-    Move_Value(out, val);
+    Copy_Cell(out, val);
 
     REBLEN len = Part_Len_May_Modify_Index(val, part);
 

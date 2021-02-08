@@ -119,7 +119,7 @@ REBNATIVE(typechecker)
             : &Typeset_Checker_Dispatcher,
         IDX_TYPECHECKER_MAX  // details array capacity
     );
-    Move_Value(ARR_AT(ACT_DETAILS(typechecker), IDX_TYPECHECKER_TYPE), type);
+    Copy_Cell(ARR_AT(ACT_DETAILS(typechecker), IDX_TYPECHECKER_TYPE), type);
 
     return Init_Action(D_OUT, typechecker, ANONYMOUS, UNBOUND);
 }

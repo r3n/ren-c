@@ -160,7 +160,7 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     // value existed, the parameter had to act quoted.  Eval.
     //
     if (Eval_Value_Maybe_End_Throws(f->arg, f->out, SPECIFIED)) {
-        Move_Value(f->out, f->arg);
+        Copy_Cell(f->out, f->arg);
         return true;
     }
 
@@ -251,7 +251,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // higher level phases were hiding parameters from specialization
             // that lower levels should see.  Review.
             //
-            Move_Value(f->arg, f->param);
+            Copy_Cell(f->arg, f->param);
 
             goto continue_fulfilling;
         }
@@ -384,7 +384,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
               case REB_P_OUTPUT:
                 enfix_normal_handling:
 
-                Move_Value(f->arg, f->out);
+                Copy_Cell(f->arg, f->out);
                 if (GET_CELL_FLAG(f->out, UNEVALUATED))
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
                 break;
@@ -403,7 +403,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
                 // Is_Param_Skippable() accounted for in pre-lookback
 
-                Move_Value(f->arg, f->out);
+                Copy_Cell(f->arg, f->out);
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
                 break;
 
@@ -438,12 +438,12 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
               escapable:
                 if (ANY_ESCAPABLE_GET(f->out)) {
                     if (Eval_Value_Throws(f->arg, f->out, SPECIFIED)) {
-                        Move_Value(f->out, f->arg);
+                        Copy_Cell(f->out, f->arg);
                         goto abort_action;
                     }
                 }
                 else {
-                    Move_Value(f->arg, f->out);
+                    Copy_Cell(f->arg, f->out);
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
                 }
                 break;
@@ -565,7 +565,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 fail (Error_Void_Evaluation_Raw());  // must be quoted
 
             if (Eval_Step_In_Subframe_Throws(f->arg, f, flags)) {
-                Move_Value(f->out, f->arg);
+                Copy_Cell(f->out, f->arg);
                 goto abort_action;
             }
 
@@ -682,7 +682,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 Drop_Frame(subframe);
 
                 if (threw) {
-                    Move_Value(f->out, f->arg);
+                    Copy_Cell(f->out, f->arg);
                     goto abort_action;
                 }
             }
@@ -692,9 +692,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // is something like a GROUP!, GET-WORD!, or GET-PATH!...
                 // it has to be evaluated.
                 //
-                Move_Value(f_spare, f->arg);
+                Copy_Cell(f_spare, f->arg);
                 if (Eval_Value_Throws(f->arg, f_spare, f_specifier)) {
-                    Move_Value(f->out, f->arg);
+                    Copy_Cell(f->out, f->arg);
                     goto abort_action;
                 }
             }
@@ -980,7 +980,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     if (r == f->out) {
         //
         // common case; we'll want to clear the UNEVALUATED flag if it's
-        // not an invisible return result (other cases Move_Value())
+        // not an invisible return result (other cases Copy_Cell())
         //
     }
     else if (not r) {  // API and internal code can both return `nullptr`
@@ -1055,7 +1055,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 f->arg = FRM_ARGS_HEAD(f);
                 for (; f->key != f->key_tail; ++f->key, ++f->arg, ++f->param) {
                     if (Is_Param_Hidden(f->param)) {
-                        Move_Value_Core(
+                        Copy_Cell_Core(
                             f->arg,
                             f->param,
                             CELL_MASK_COPY | CELL_FLAG_VAR_MARKED_HIDDEN

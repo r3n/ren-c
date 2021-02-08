@@ -268,7 +268,7 @@ static void Insert_Gobs(
         if (IS_GOB(val)) {
             if (GOB_PARENT(VAL_GOB(val)) != NULL)
                 fail ("GOB! not expected to have parent");
-            Move_Value(item, SPECIFIC(val));
+            Copy_Cell(item, SPECIFIC(val));
             ++item;
 
             SET_GOB_PARENT(VAL_GOB(val), gob);
@@ -386,7 +386,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
         else
             return false;
 
-        Move_Value(GOB_CONTENT(gob), val);
+        Copy_Cell(GOB_CONTENT(gob), val);
         break;
 
       case SYM_DRAW:
@@ -398,7 +398,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
         else
             return false;
 
-        Move_Value(GOB_CONTENT(gob), val);
+        Copy_Cell(GOB_CONTENT(gob), val);
         break;
 
       case SYM_TEXT:
@@ -412,7 +412,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
         else
             return false;
 
-        Move_Value(GOB_CONTENT(gob), val);
+        Copy_Cell(GOB_CONTENT(gob), val);
         break;
 
       case SYM_EFFECT:
@@ -424,7 +424,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
         else
             return false;
 
-        Move_Value(GOB_CONTENT(gob), val);
+        Copy_Cell(GOB_CONTENT(gob), val);
         break;
 
       case SYM_COLOR:
@@ -443,7 +443,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
         else
             return false;
 
-        Move_Value(GOB_CONTENT(gob), val);
+        Copy_Cell(GOB_CONTENT(gob), val);
         break;
 
       case SYM_PANE:
@@ -485,7 +485,7 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
         else
             return false;
 
-        Move_Value(GOB_DATA(gob), val);
+        Copy_Cell(GOB_DATA(gob), val);
         break;
 
       case SYM_FLAGS:
@@ -540,39 +540,39 @@ static REBVAL *Get_GOB_Var(
       case SYM_IMAGE:
         if (GOB_TYPE(gob) == GOBT_IMAGE) {
             assert(rebDid("image?", GOB_CONTENT(gob), rebEND));
-            return Move_Value(out, GOB_CONTENT(gob));
+            return Copy_Cell(out, GOB_CONTENT(gob));
         }
         return Init_Blank(out);
 
       case SYM_DRAW:
         if (GOB_TYPE(gob) == GOBT_DRAW) {
             assert(IS_BLOCK(GOB_CONTENT(gob)));
-            return Move_Value(out, GOB_CONTENT(gob));
+            return Copy_Cell(out, GOB_CONTENT(gob));
         }
         return Init_Blank(out);
 
       case SYM_TEXT:
         if (GOB_TYPE(gob) == GOBT_TEXT) {
             assert(IS_BLOCK(GOB_CONTENT(gob)));
-            return Move_Value(out, GOB_CONTENT(gob));
+            return Copy_Cell(out, GOB_CONTENT(gob));
         }
         if (GOB_TYPE(gob) == GOBT_STRING) {
             assert(IS_TEXT(GOB_CONTENT(gob)));
-            return Move_Value(out, GOB_CONTENT(gob));
+            return Copy_Cell(out, GOB_CONTENT(gob));
         }
         return Init_Blank(out);
 
       case SYM_EFFECT:
         if (GOB_TYPE(gob) == GOBT_EFFECT) {
             assert(IS_BLOCK(GOB_CONTENT(gob)));
-            return Move_Value(out, GOB_CONTENT(gob));
+            return Copy_Cell(out, GOB_CONTENT(gob));
         }
         return Init_Blank(out);
 
       case SYM_COLOR:
         if (GOB_TYPE(gob) == GOBT_COLOR) {
             assert(IS_TUPLE(GOB_CONTENT(gob)));
-            return Move_Value(out, GOB_CONTENT(gob));
+            return Copy_Cell(out, GOB_CONTENT(gob));
         }
         return Init_Blank(out);
 
@@ -600,7 +600,7 @@ static REBVAL *Get_GOB_Var(
             or kind == REB_BINARY
             or kind == REB_INTEGER
         ){
-            return Move_Value(out, GOB_DATA(gob));
+            return Copy_Cell(out, GOB_DATA(gob));
         }
         assert(kind == REB_BLANK);
         return Init_Blank(out); }
@@ -823,7 +823,7 @@ REB_R PD_Gob(
                 // Have to copy -and- protect.
                 //
                 DECLARE_LOCAL (orig_picker);
-                Move_Value(cast(RELVAL*, orig_picker), picker);
+                Copy_Cell(cast(RELVAL*, orig_picker), picker);
                 PUSH_GC_GUARD(orig_picker);
 
                 if (Next_Path_Throws(pvs)) // sets value in pvs->store
@@ -970,7 +970,7 @@ REBTYPE(Gob)
 
         Insert_Gobs(gob, value, index, 1, false);
         if (VAL_WORD_ID(verb) == SYM_POKE) {
-            Move_Value(D_OUT, value);
+            Copy_Cell(D_OUT, value);
             return D_OUT;
         }
         index++;

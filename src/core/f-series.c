@@ -66,12 +66,12 @@ REB_R Series_Common_Action_Maybe_Unhandled(
             return Init_Integer(D_OUT, len_head - VAL_INDEX_RAW(v)); }
 
           case SYM_HEAD:
-            Move_Value(D_OUT, v);
+            Copy_Cell(D_OUT, v);
             VAL_INDEX_RAW(D_OUT) = 0;
             return Trust_Const(D_OUT);
 
           case SYM_TAIL:
-            Move_Value(D_OUT, v);
+            Copy_Cell(D_OUT, v);
             VAL_INDEX_RAW(D_OUT) = VAL_LEN_HEAD(v);
             return Trust_Const(D_OUT);
 

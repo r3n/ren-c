@@ -154,7 +154,7 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     // be needed regardless.  Be attentive should this ever be switched to
     // try and use CTX_ARCHETYPE() directly to GC issues.
     //
-    REBVAL *rootcopy = Move_Value(FRM_SPARE(f), rootvar);
+    REBVAL *rootcopy = Copy_Cell(FRM_SPARE(f), rootvar);
     INIT_VAL_FRAME_PHASE_OR_LABEL(FRM_SPARE(f), VAL_ACTION_LABEL(inner));
 
     const bool fully = true;
@@ -195,8 +195,8 @@ REBNATIVE(enclose_p)  // see extended definition ENCLOSE in %base-defs.r
     );
 
     REBARR *details = ACT_DETAILS(enclosure);
-    Move_Value(ARR_AT(details, IDX_ENCLOSER_INNER), inner);
-    Move_Value(ARR_AT(details, IDX_ENCLOSER_OUTER), outer);
+    Copy_Cell(ARR_AT(details, IDX_ENCLOSER_INNER), inner);
+    Copy_Cell(ARR_AT(details, IDX_ENCLOSER_OUTER), outer);
 
     return Init_Action(D_OUT, enclosure, VAL_ACTION_LABEL(inner), UNBOUND);
 }

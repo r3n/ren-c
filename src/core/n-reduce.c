@@ -91,7 +91,7 @@ REBNATIVE(reduce)
                 rebINLINE(predicate), rebQ(D_OUT),
             rebEND);
             if (processed)
-                Move_Value(D_OUT, processed);
+                Copy_Cell(D_OUT, processed);
             else
                 Init_Nulled(D_OUT);
             rebRelease(processed);
@@ -110,7 +110,7 @@ REBNATIVE(reduce)
         // https://forum.rebol.info/t/what-should-do-do/1426
         //
         if (not IS_NULLED(D_OUT)) {
-            Move_Value(DS_PUSH(), D_OUT);
+            Copy_Cell(DS_PUSH(), D_OUT);
             if (line)
                 SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
         }
@@ -323,7 +323,7 @@ REB_R Compose_To_Stack_Core(
                 if (insert == nullptr)
                     Init_Nulled(DS_PUSH());
                 else
-                    Move_Value(DS_PUSH(), insert);  // can't stack eval direct
+                    Copy_Cell(DS_PUSH(), insert);  // can't stack eval direct
 
                 if (heart == REB_SET_GROUP)
                     Setify(DS_TOP);
@@ -401,7 +401,7 @@ REB_R Compose_To_Stack_Core(
 
                     fail (Error_Bad_Sequence_Init(DS_TOP));
                 }
-                Move_Value(DS_PUSH(), temp);
+                Copy_Cell(DS_PUSH(), temp);
             }
             else {
                 REBFLGS pop_flags

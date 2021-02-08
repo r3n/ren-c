@@ -180,7 +180,7 @@ REBNATIVE(bind)
     // FRAME! that they intend to return from.)
     //
     if (IS_ACTION(v)) {
-        Move_Value(D_OUT, v);
+        Copy_Cell(D_OUT, v);
         INIT_VAL_ACTION_BINDING(D_OUT, VAL_CONTEXT(context));
         return Quotify(D_OUT, num_quotes);
     }
@@ -209,7 +209,7 @@ REBNATIVE(bind)
     else {
         ENSURE_MUTABLE(v);  // use IN for virtual binding
         at = VAL_ARRAY_AT_MUTABLE_HACK(&tail, v);  // !!! only *after* index!
-        Move_Value(D_OUT, v);
+        Copy_Cell(D_OUT, v);
     }
 
     Bind_Values_Core(
@@ -360,7 +360,7 @@ bool Did_Get_Binding_Of(REBVAL *out, const REBVAL *v)
         // have a longer lifetime than the REBFRM* or other node)
         //
         REBCTX *c = VAL_WORD_CONTEXT(v);
-        Move_Value(out, CTX_ARCHETYPE(c));
+        Copy_Cell(out, CTX_ARCHETYPE(c));
         break; }
 
     default:
@@ -491,7 +491,7 @@ inline static void Get_Var_May_Fail(
     enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(source));
 
     if (ANY_WORD_KIND(kind)) {
-        Move_Value(out, Lookup_Word_May_Fail(source, specifier));
+        Copy_Cell(out, Lookup_Word_May_Fail(source, specifier));
     }
     else if (ANY_SEQUENCE_KIND(kind)) {
         //
@@ -567,7 +567,7 @@ REBNATIVE(get)
         if (IS_NULLED(temp))
             Init_Void(dest, SYM_NULLED);  // blocks can't contain nulls
         else
-            Move_Value(dest, temp);
+            Copy_Cell(dest, temp);
     }
 
     SET_SERIES_LEN(results, VAL_LEN_AT(source));
@@ -1122,7 +1122,7 @@ bool Try_As_String(
     }
     else if (ANY_STRING(v)) {
       any_string:
-        Move_Value(out, v);
+        Copy_Cell(out, v);
         mutable_KIND3Q_BYTE(out)
             = mutable_HEART_BYTE(out)
             = new_kind;
@@ -1186,7 +1186,7 @@ REBNATIVE(as)
               case REB_GET_WORD: {
                 REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
                 Init_Blank(ARR_HEAD(a));
-                Move_Value(ARR_AT(a, 1), v);
+                Copy_Cell(ARR_AT(a, 1), v);
                 mutable_KIND3Q_BYTE(ARR_AT(a, 1)) = REB_WORD;
                 mutable_HEART_BYTE(ARR_AT(a, 1)) = REB_WORD;
                 SET_SERIES_LEN(a, 2);
@@ -1195,7 +1195,7 @@ REBNATIVE(as)
 
               case REB_SYM_WORD: {
                 REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
-                Move_Value(ARR_HEAD(a), v);
+                Copy_Cell(ARR_HEAD(a), v);
                 mutable_KIND3Q_BYTE(ARR_HEAD(a)) = REB_WORD;
                 mutable_HEART_BYTE(ARR_HEAD(a)) = REB_WORD;
                 Init_Blank(ARR_AT(a, 1));
@@ -1249,7 +1249,7 @@ REBNATIVE(as)
         }
 
         if (ANY_PATH(v)) {
-            Move_Value(D_OUT, v);
+            Copy_Cell(D_OUT, v);
             mutable_KIND3Q_BYTE(D_OUT)
                 = new_kind;
             return Trust_Const(D_OUT);
@@ -1509,7 +1509,7 @@ REBNATIVE(as)
     // Fallthrough for cases where changing the type byte and potentially
     // updating the quotes is enough.
     //
-    Move_Value(D_OUT, v);
+    Copy_Cell(D_OUT, v);
     mutable_KIND3Q_BYTE(D_OUT)
         = mutable_HEART_BYTE(D_OUT)
         = new_kind;

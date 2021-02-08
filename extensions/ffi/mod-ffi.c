@@ -198,7 +198,7 @@ REBNATIVE(make_routine)
 
     Init_Handle_Cfunc(RIN_AT(r, IDX_ROUTINE_CFUNC), cfunc);
     Init_Blank(RIN_AT(r, IDX_ROUTINE_CLOSURE));
-    Move_Value(RIN_AT(r, IDX_ROUTINE_ORIGIN), ARG(lib));
+    Copy_Cell(RIN_AT(r, IDX_ROUTINE_ORIGIN), ARG(lib));
 
     return Init_Action(D_OUT, routine, ANONYMOUS, UNBOUND);
 }
@@ -305,7 +305,7 @@ REBNATIVE(wrap_callback)
         sizeof(&closure),
         &cleanup_ffi_closure
     );
-    Move_Value(RIN_AT(r, IDX_ROUTINE_ORIGIN), ARG(action));
+    Copy_Cell(RIN_AT(r, IDX_ROUTINE_ORIGIN), ARG(action));
 
     return Init_Action(D_OUT, callback, ANONYMOUS, UNBOUND);
 }
@@ -443,7 +443,7 @@ REBNATIVE(alloc_value_pointer)
 {
     FFI_INCLUDE_PARAMS_OF_ALLOC_VALUE_POINTER;
 
-    REBVAL *allocated = Move_Value(Alloc_Value(), ARG(value));
+    REBVAL *allocated = Copy_Cell(Alloc_Value(), ARG(value));
     rebUnmanage(allocated);
 
     return Init_Integer(D_OUT, cast(intptr_t, allocated));
@@ -504,7 +504,7 @@ REBNATIVE(get_at_pointer)
 
     REBVAL *cell = cast(REBVAL*, cast(intptr_t, VAL_INT64(ARG(source))));
 
-    Move_Value(D_OUT, cell);
+    Copy_Cell(D_OUT, cell);
     return D_OUT;  // don't return `cell` (would do a rebRelease())
 }
 
@@ -536,7 +536,7 @@ REBNATIVE(set_at_pointer)
         fail (Error_No_Value(v));
 
     REBVAL *cell = cast(REBVAL*, cast(intptr_t, VAL_INT64(ARG(target))));
-    Move_Value(cell, v);
+    Copy_Cell(cell, v);
 
     RETURN (ARG(value));  // Returning cell would rebRelease()
 }

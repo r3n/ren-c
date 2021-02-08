@@ -198,7 +198,7 @@ inline static bool Do_Branch_Core_Throws(
         break;
 
       case REB_QUOTED:
-        Unquotify(Move_Value(out, branch), 1);
+        Unquotify(Copy_Cell(out, branch), 1);
         break;
 
       case REB_BLOCK:
@@ -223,7 +223,7 @@ inline static bool Do_Branch_Core_Throws(
 
       case REB_SYM_WORD:
       case REB_SYM_PATH:
-        Plainify(Move_Value(cell, branch));
+        Plainify(Copy_Cell(cell, branch));
         if (Eval_Value_Throws(out, cell, SPECIFIED))
             return true;
         break;

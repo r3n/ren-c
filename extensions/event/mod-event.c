@@ -450,7 +450,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     // had custom code here but this just uses the API.
 
     REBVAL *sieved = rebValue("intersect", ports, waked, rebEND);
-    Move_Value(D_OUT, sieved);
+    Copy_Cell(D_OUT, sieved);
     rebRelease(sieved);
 
     RESET_ARRAY(VAL_ARRAY_KNOWN_MUTABLE(waked));  // clear waked list

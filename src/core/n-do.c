@@ -65,9 +65,9 @@ REBNATIVE(reeval)
         ARG(value),
         flags,
         enfix
-    ))
+    )){
         return R_THROWN;
-
+    }
     return D_OUT;  // don't clear stale flag...act invisibly
 }
 
@@ -145,7 +145,7 @@ REBNATIVE(shove)
             return R_THROWN;
         }
 
-        Move_Value(shovee, D_OUT);
+        Copy_Cell(shovee, D_OUT);
     }
     else if (IS_GROUP(f_value)) {
         if (Do_Any_Array_At_Throws(D_OUT, f_value, f_specifier))
@@ -153,10 +153,10 @@ REBNATIVE(shove)
         if (IS_END(D_OUT))  // !!! need SHOVE frame for type error
             fail ("GROUP! passed to SHOVE did not evaluate to content");
 
-        Move_Value(shovee, D_OUT);  // Note: can't eval directly into arg slot
+        Copy_Cell(shovee, D_OUT);  // Note: can't eval directly into arg slot
     }
     else
-        Move_Value(shovee, SPECIFIC(f_value));
+        Copy_Cell(shovee, SPECIFIC(f_value));
 
     if (not IS_ACTION(shovee) and not ANY_SET_KIND(VAL_TYPE(shovee)))
         fail ("SHOVE's immediate right must be ACTION! or SET-XXX! type");
@@ -194,13 +194,13 @@ REBNATIVE(shove)
 
     if (REF(set)) {
         if (IS_SET_WORD(left)) {
-            Move_Value(D_OUT, Lookup_Word_May_Fail(left, SPECIFIED));
+            Copy_Cell(D_OUT, Lookup_Word_May_Fail(left, SPECIFIED));
         }
         else if (IS_SET_PATH(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
             composed_set_path = rebValueQ("compose", left, rebEND);
             REBVAL *temp = rebValueQ("get/hard", composed_set_path, rebEND);
-            Move_Value(D_OUT, temp);
+            Copy_Cell(D_OUT, temp);
             rebRelease(temp);
         }
         else
@@ -217,7 +217,7 @@ REBNATIVE(shove)
             return R_THROWN;
     }
     else {
-        Move_Value(D_OUT, left);
+        Copy_Cell(D_OUT, left);
         if (GET_CELL_FLAG(left, UNEVALUATED))
             SET_CELL_FLAG(D_OUT, UNEVALUATED);
     }
@@ -240,7 +240,7 @@ REBNATIVE(shove)
 
     if (REF(set)) {
         if (IS_SET_WORD(left)) {
-            Move_Value(Sink_Word_May_Fail(left, SPECIFIED), D_OUT);
+            Copy_Cell(Sink_Word_May_Fail(left, SPECIFIED), D_OUT);
         }
         else if (IS_SET_PATH(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
@@ -469,7 +469,7 @@ REBNATIVE(do)
         return D_OUT; }
 
       case REB_QUOTED:
-        Move_Value(D_OUT, ARG(source));
+        Copy_Cell(D_OUT, ARG(source));
         return Unquotify(D_OUT, 1);
 
       default:
@@ -528,11 +528,11 @@ REBNATIVE(evaluate)
                 SPECIFIED,
                 EVAL_MASK_DEFAULT
             )){
-                Move_Value(D_OUT, D_SPARE);
+                Move_Cell(D_OUT, D_SPARE);
                 return R_THROWN;
             }
 
-            Move_Value(D_OUT, source);
+            Copy_Cell(D_OUT, source);
             VAL_INDEX_UNBOUNDED(D_OUT) = index;
 
             if (IS_END(D_SPARE)) {
@@ -551,7 +551,7 @@ REBNATIVE(evaluate)
                 Quotify(D_OUT, 1);  // void-is-invisible signal on array
             }
             else {
-                Move_Value(D_OUT, source);
+                Copy_Cell(D_OUT, source);
                 VAL_INDEX_UNBOUNDED(D_OUT) = index;
             }
         }
@@ -582,7 +582,7 @@ REBNATIVE(evaluate)
                 // having BLANK! mean "thrown" may evolve into a convention.
                 //
                 Init_Unreadable_Void(position);
-                Move_Value(D_OUT, D_SPARE);
+                Move_Cell(D_OUT, D_SPARE);
                 return R_THROWN;
             }
 
@@ -607,7 +607,7 @@ REBNATIVE(evaluate)
 
             REBFLGS flags = EVAL_MASK_DEFAULT;
             if (Eval_Step_In_Subframe_Throws(D_SPARE, f, flags)) {
-                Move_Value(D_OUT, D_SPARE);
+                Move_Cell(D_OUT, D_SPARE);
                 return R_THROWN;
             }
 
@@ -615,7 +615,7 @@ REBNATIVE(evaluate)
                 return nullptr;
         }
 
-        Move_Value(D_OUT, source);  // VARARGS! will have updated position
+        Copy_Cell(D_OUT, source);  // VARARGS! will have updated position
         break; }  // update variable
 
       default:
@@ -687,7 +687,7 @@ REBNATIVE(redo)
         if (not IS_FRAME(D_OUT))
             fail ("Context of restartee in REDO is not a FRAME!");
 
-        Move_Value(restartee, D_OUT);
+        Copy_Cell(restartee, D_OUT);
     }
 
     REBCTX *c = VAL_CONTEXT(restartee);
@@ -720,7 +720,7 @@ REBNATIVE(redo)
     // of the frame.  Use REDO as the throw label that Eval_Core() will
     // identify for that behavior.
     //
-    Move_Value(D_OUT, NATIVE_VAL(redo));
+    Copy_Cell(D_OUT, NATIVE_VAL(redo));
     INIT_VAL_ACTION_BINDING(D_OUT, c);
 
     // The FRAME! contains its ->phase and ->binding, which should be enough

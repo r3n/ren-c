@@ -77,14 +77,14 @@ REB_R Adapter_Dispatcher(REBFRM *f)
 
     bool returned;
     if (Interpreted_Dispatch_Details_1_Throws(&returned, discarded, f)) {
-        Move_Value(f->out, discarded);
+        Move_Cell(f->out, discarded);
         return R_THROWN;
     }
 
     if (returned) {
         if (IS_ENDISH_NULLED(discarded))
             return f->out;
-        return Move_Value(f->out, discarded);
+        return Move_Cell(f->out, discarded);
     }
 
     // The second thing to do is update the phase and binding to run the
@@ -149,7 +149,7 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
         adaptation,
         prelude
     );
-    Move_Value(ARR_AT(details, IDX_ADAPTER_ADAPTEE), adaptee);
+    Copy_Cell(ARR_AT(details, IDX_ADAPTER_ADAPTEE), adaptee);
 
     return Init_Action(D_OUT, adaptation, VAL_ACTION_LABEL(adaptee), UNBOUND);
 }

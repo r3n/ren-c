@@ -93,7 +93,7 @@ REB_R MAKE_Money(
         return Init_Money(out, decimal_to_deci(VAL_DECIMAL(arg)));
 
       case REB_MONEY:
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
       case REB_TEXT: {
         const REBYTE *bp = Analyze_String_For_Scan(
@@ -260,7 +260,7 @@ REBTYPE(Money)
             else if (IS_DECIMAL(to) or IS_PERCENT(to))
                 Init_Money(temp, decimal_to_deci(VAL_DECIMAL(to)));
             else if (IS_MONEY(to))
-                Move_Value(temp, to);
+                Copy_Cell(temp, to);
             else
                 fail (PAR(to));
         }

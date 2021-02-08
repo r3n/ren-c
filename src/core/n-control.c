@@ -170,7 +170,7 @@ inline static bool Single_Test_Throws(
             SPECIFIED,
             push_refinements  // !!! Look into pushing e.g. `match :foo?/bar x`
         )){
-            Move_Value(out, fetched_test);
+            Copy_Cell(out, fetched_test);
             goto return_thrown;
         }
 
@@ -284,7 +284,7 @@ inline static bool Single_Test_Throws(
 
         DROP_GC_GUARD(arg_specified);
         if (threw) {
-            Move_Value(out, temp);
+            Copy_Cell(out, temp);
             goto return_thrown;
         }
 
@@ -858,10 +858,10 @@ REBNATIVE(case)
             // Note: Can't evaluate directly into ARG(branch)...frame cell.
             //
             if (Eval_Value_Throws(D_SPARE, f_value, f_specifier)) {
-                Move_Value(D_OUT, D_SPARE);
+                Copy_Cell(D_OUT, D_SPARE);
                 goto threw;
             }
-            Move_Value(ARG(branch), D_SPARE);
+            Copy_Cell(ARG(branch), D_SPARE);
         }
         else
             Derelativize(ARG(branch), f_value, f_specifier);
@@ -882,18 +882,17 @@ REBNATIVE(case)
             continue;
         }
 
-        if (Do_Branch_With_Throws(D_SPARE, ARG(branch), D_OUT)) {
-            Move_Value(D_OUT, D_SPARE);
+        bool threw = Do_Branch_With_Throws(D_SPARE, ARG(branch), D_OUT);
+        Move_Cell(D_OUT, D_SPARE);
+        if (threw)
             goto threw;
-        }
-        Move_Value(D_OUT, D_SPARE);
 
         if (not REF(all)) {
             Drop_Frame(f);
             return D_OUT;
         }
 
-        Move_Value(ARG(last), D_OUT);
+        Move_Cell(ARG(last), D_OUT);
     }
 
   reached_end:;
@@ -1057,10 +1056,10 @@ REBNATIVE(switch)
                     D_OUT,
                     rebEND
                 )){
-                    Move_Value(D_OUT, temp);
+                    Move_Cell(D_OUT, temp);
                     goto threw;
                 }
-                Move_Value(D_OUT, temp);
+                Move_Cell(D_OUT, temp);
                 break;
             }
 
@@ -1072,7 +1071,7 @@ REBNATIVE(switch)
             return D_OUT;
         }
 
-        Move_Value(ARG(last), D_OUT);  // save in case no fallout
+        Copy_Cell(ARG(last), D_OUT);  // save in case no fallout
         Init_Nulled(D_OUT);  // switch back to using for fallout
         Fetch_Next_Forget_Lookback(f);  // keep matching if /ALL
     }
@@ -1120,7 +1119,7 @@ REBNATIVE(default)
         return R_THROWN;
 
     if (IS_SET_WORD(target))
-        Move_Value(D_OUT, Lookup_Word_May_Fail(target, SPECIFIED));
+        Copy_Cell(D_OUT, Lookup_Word_May_Fail(target, SPECIFIED));
     else {
         assert(IS_SET_PATH(target));
 
@@ -1150,7 +1149,7 @@ REBNATIVE(default)
                 else {
                     if (Do_Any_Array_At_Throws(D_OUT, item, specifier))
                         return R_THROWN;
-                    Move_Value(dest, D_OUT);
+                    Copy_Cell(dest, D_OUT);
                 }
             }
             SET_SERIES_LEN(composed, len);
@@ -1198,7 +1197,7 @@ REBNATIVE(default)
         return R_THROWN;
 
     if (IS_SET_WORD(target))
-        Move_Value(Sink_Word_May_Fail(target, SPECIFIED), D_OUT);
+        Copy_Cell(Sink_Word_May_Fail(target, SPECIFIED), D_OUT);
     else {
         assert(IS_SET_PATH(target));
         DECLARE_LOCAL (dummy);
@@ -1295,7 +1294,7 @@ REBNATIVE(catch)
                     fail (PAR(name));
 
                 Derelativize(temp1, candidate, VAL_SPECIFIER(ARG(name)));
-                Move_Value(temp2, label);
+                Copy_Cell(temp2, label);
 
                 // Return the THROW/NAME's arg if the names match
                 //
@@ -1305,8 +1304,8 @@ REBNATIVE(catch)
             }
         }
         else {
-            Move_Value(temp1, ARG(name));
-            Move_Value(temp2, label);
+            Copy_Cell(temp1, ARG(name));
+            Copy_Cell(temp2, label);
 
             // Return the THROW/NAME's arg if the names match
             //
@@ -1329,7 +1328,7 @@ REBNATIVE(catch)
     if (REF(name) or REF(any)) {
         REBARR *a = Make_Array(2);
 
-        Move_Value(ARR_AT(a, 0), label); // throw name
+        Copy_Cell(ARR_AT(a, 0), label); // throw name
         CATCH_THROWN(ARR_AT(a, 1), D_OUT); // thrown value--may be null!
         if (IS_NULLED(ARR_AT(a, 1)))
             SET_SERIES_LEN(a, 1); // trim out null value (illegal in block)

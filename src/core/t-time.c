@@ -245,7 +245,7 @@ REB_R MAKE_Time(
 
     switch (VAL_TYPE(arg)) {
     case REB_TIME: // just copy it (?)
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
     case REB_TEXT: { // scan using same decoding as LOAD would
         REBSIZ size;
@@ -619,9 +619,9 @@ REBTYPE(Time)
             // date dispatcher already.  Instead of repeating the code here in
             // the time dispatcher, swap the arguments and call DATE's version.
             //
-            Move_Value(D_SPARE, v);
-            Move_Value(D_ARG(1), arg);
-            Move_Value(D_ARG(2), D_SPARE);
+            Copy_Cell(D_SPARE, v);
+            Copy_Cell(D_ARG(1), arg);
+            Copy_Cell(D_ARG(2), D_SPARE);
             return T_Date(frame_, verb);
         }
         fail (Error_Math_Args(REB_TIME, verb));

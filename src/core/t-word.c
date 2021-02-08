@@ -103,7 +103,7 @@ REB_R MAKE_Word(
         // true since EXTRA(Binding, ...) conveys the entire bind state.
         // Rethink what it means to preserve the bits vs. not.
         //
-        Move_Value(out, arg);
+        Copy_Cell(out, arg);
         mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = kind;
         return out;
     }
@@ -131,7 +131,7 @@ REB_R MAKE_Word(
         //
       as_word: {
         REBVAL *as = rebValue("as", Datatype_From_Kind(kind), arg, rebEND);
-        Move_Value(out, as);
+        Copy_Cell(out, as);
         rebRelease(as);
 
         return out;

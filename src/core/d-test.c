@@ -73,14 +73,14 @@ REBNATIVE(test_librebol)
     SET_CELL_FLAG(Init_Integer(DS_PUSH(), 3), NEWLINE_BEFORE);
     REBVAL *macro = rebValue("macro [x] [[append x first]]", rebEND);
     REBVAL *mtest1 = rebValue(macro, "[1 2 3]", "[d e f]", rebEND);
-    Move_Value(DS_PUSH(), mtest1);
+    Copy_Cell(DS_PUSH(), mtest1);
     rebRelease(mtest1);
 
     SET_CELL_FLAG(Init_Integer(DS_PUSH(), 4), NEWLINE_BEFORE);
     REBVAL *numbers = rebValue("[1 2 3]", rebEND);
     REBVAL *letters = rebValue("[d e f]", rebEND);
     REBVAL *mtest2 = rebValue(macro, rebR(numbers), rebR(letters), rebEND);
-    Move_Value(DS_PUSH(), mtest2);
+    Copy_Cell(DS_PUSH(), mtest2);
     rebRelease(mtest2);
 
     rebRelease(macro);

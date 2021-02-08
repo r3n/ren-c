@@ -52,7 +52,7 @@ static REBARR *Read_Dir_May_Fail(REBREQ *dir)
         if (req->flags & RRF_DONE)
             break;
 
-        Move_Value(DS_PUSH(), ReqFile(file)->path);
+        Copy_Cell(DS_PUSH(), ReqFile(file)->path);
 
         // Assume the file.devreq gets blown away on each loop, so there's
         // nowhere to free the file->path unless we do it here.

@@ -99,7 +99,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     // !!! Is_Valid_Sequence_Element() requires action to be in a GROUP!
     //
     REBARR *group = Alloc_Singular(NODE_FLAG_MANAGED);
-    Move_Value(ARR_SINGLE(group), ACT_ARCHETYPE(run));  // Review: binding?
+    Copy_Cell(ARR_SINGLE(group), ACT_ARCHETYPE(run));  // Review: binding?
     Quotify(ARR_SINGLE(group), 1);  // suppress evaluation until pathing
     Init_Group(DS_PUSH(), group);
 
@@ -134,7 +134,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
         // another good reason this should probably be done another way.  It
         // also loses information about the const bit.
         //
-        Quotify(Move_Value(code, f->arg), 1);
+        Quotify(Copy_Cell(code, f->arg), 1);
         ++code;
     }
 
@@ -144,7 +144,7 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     DECLARE_LOCAL (first);
     if (DSP == dsp_orig + 1) {  // no refinements, just use ACTION!
         DS_DROP_TO(dsp_orig);
-        Move_Value(first, ACT_ARCHETYPE(run));
+        Copy_Cell(first, ACT_ARCHETYPE(run));
     }
     else {
         REBARR *a = Freeze_Array_Shallow(Pop_Stack_Values(dsp_orig));
@@ -256,7 +256,7 @@ REBNATIVE(hijack)
         RELVAL *src = ARR_HEAD(hijacker_details) + 1;
         RELVAL *dest = ARR_HEAD(victim_details) + 1;
         for (; NOT_END(src); ++src, ++dest)
-            Move_Value_Core(dest, src, CELL_MASK_ALL);
+            Copy_Cell_Core(dest, src, CELL_MASK_ALL);
         SET_SERIES_LEN(victim_details, details_len);
     }
     else {
@@ -275,7 +275,7 @@ REBNATIVE(hijack)
 
         if (ARR_LEN(victim_details) < 2)
             Alloc_Tail_Array(victim_details);
-        Move_Value(
+        Copy_Cell(
             ARR_AT(victim_details, IDX_HIJACKER_HIJACKER),
             ARG(hijacker)
         );

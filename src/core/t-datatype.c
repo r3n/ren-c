@@ -62,7 +62,7 @@ REB_R MAKE_Datatype(
     if (IS_URL(arg)) {
         REBVAL *custom = Datatype_From_Url(arg);
         if (custom != nullptr)
-            return Move_Value(out, custom);
+            return Copy_Cell(out, custom);
     }
     if (IS_WORD(arg)) {
         SYMID sym = VAL_WORD_ID(arg);

@@ -354,7 +354,7 @@ REBNATIVE(get_env)
             error = Error_User("Unknown error fetching variable to buffer");
         else {
             REBVAL *temp = rebLengthedTextWide(val, val_len_plus_one - 1);
-            Move_Value(D_OUT, temp);
+            Copy_Cell(D_OUT, temp);
             rebRelease(temp);
         }
         rebFree(val);

@@ -738,7 +738,7 @@ inline static void Push_Action(
     if (partials) {
         const REBVAL *word = SPECIFIC(ARR_HEAD(partials));
         for (; NOT_END(word); ++word)
-            Move_Value(DS_PUSH(), word);
+            Copy_Cell(DS_PUSH(), word);
     }
 
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
@@ -934,7 +934,7 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
 // then return the D_OUT pointer...this is the fastest form of returning.)
 //
 #define RETURN(v) \
-    return Move_Value(D_OUT, (v))
+    return Copy_Cell(D_OUT, (v))
 
 #define RETURN_INVISIBLE \
     assert(D_OUT->header.bits & CELL_FLAG_OUT_NOTE_STALE); \

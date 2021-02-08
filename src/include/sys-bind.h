@@ -382,12 +382,12 @@ inline static void INIT_VAL_WORD_BINDING(RELVAL *v, const REBSER *binding) {
 //
 inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
     if (not Is_Bindable(v) or IS_SPECIFIC(v))
-        Move_Value(out, SPECIFIC(v));
+        Copy_Cell(out, SPECIFIC(v));
     else {  // must be bound to a function
         REBACT *binding = ACT(VAL_WORD_BINDING(v));
         REBCTX *expired = Make_Expired_Frame_Ctx_Managed(binding);
 
-        Move_Value_Header(out, v);
+        Copy_Cell_Header(out, v);
         out->payload = v->payload;
         mutable_BINDING(out) = expired;
     }
@@ -796,7 +796,7 @@ static inline const REBVAL *Get_Word_May_Fail(
             var
         ));
 
-    return Move_Value(out, var);
+    return Copy_Cell(out, var);
 }
 
 static inline REBVAL *Lookup_Mutable_Word_May_Fail(
@@ -864,7 +864,7 @@ inline static REBVAL *Sink_Word_May_Fail(
 // in an array may only be relative to the function that deep copied them, and
 // that is the only kind of specifier you can use with them).
 //
-// Interface designed to line up with Move_Value()
+// Interface designed to line up with Copy_Cell()
 //
 // !!! At the moment, there is a fair amount of overlap in this code with
 // Get_Context_Core().  One of them resolves a value's real binding and then
@@ -890,7 +890,7 @@ inline static REBVAL *Derelativize(
     const RELVAL *v,
     REBSPC *specifier
 ){
-    Move_Value_Header(out, v);
+    Copy_Cell_Header(out, v);
     out->payload = v->payload;
     if (not Is_Bindable(v)) {
         out->extra = v->extra;
@@ -958,7 +958,7 @@ inline static REBVAL *Derelativize(
 
 // In the C++ build, defining this overload that takes a REBVAL* instead of
 // a RELVAL*, and then not defining it...will tell you that you do not need
-// to use Derelativize.  Juse Move_Value() if your source is a REBVAL!
+// to use Derelativize.  Juse Copy_Cell() if your source is a REBVAL!
 //
 #ifdef CPLUSPLUS_11
     REBVAL *Derelativize(RELVAL *dest, const REBVAL *v, REBSPC *specifier);

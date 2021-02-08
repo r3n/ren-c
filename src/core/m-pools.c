@@ -1253,7 +1253,7 @@ void Assert_Pointer_Detection_Working(void)
     // The system does not really intentionally "free" any cells, but they
     // can happen in bad memory locations.  Along with CELL_FLAG_PROTECED and
     // the potential absence of NODE_FLAG_CELL or NODE_FLAG_NODE, they make
-    // four good ways that a random Move_Value() might fail in the debug
+    // four good ways that a random Copy_Cell() might fail in the debug
     // build.  It could also become useful if one wanted a more "serious"
     // form of trashing than TRASH_CELL_IF_DEBUG().
     //

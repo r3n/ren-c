@@ -145,7 +145,7 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
     // Use SWITCH instead of IF chain? (was written w/ANY_STR test)
 
     if (IS_INTEGER(value)) {
-        Move_Value(out, value);
+        Copy_Cell(out, value);
         goto check_sign;
     }
     if (IS_DECIMAL(value) || IS_PERCENT(value)) {
@@ -184,7 +184,7 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
         REBVAL *result = rebValue(
             "debin [be", rebR(sign), "]", value,
             rebEND);
-        Move_Value(out, result);
+        Copy_Cell(out, result);
         rebRelease(result);
         return;
     }
@@ -290,9 +290,9 @@ REBTYPE(Integer)
             case SYM_ADD:
             case SYM_MULTIPLY: {
                 // Swap parameter order:
-                Move_Value(D_OUT, val2);  // Use as temp workspace
-                Move_Value(val2, val);
-                Move_Value(val, D_OUT);
+                Copy_Cell(D_OUT, val2);  // Use as temp workspace
+                Copy_Cell(val2, val);
+                Copy_Cell(val, D_OUT);
                 return Run_Generic_Dispatch(val, frame_, verb); }
 
             // Only type valid to subtract from, divide into, is decimal/money:
@@ -331,7 +331,7 @@ REBTYPE(Integer)
     switch (sym) {
 
     case SYM_COPY:
-        Move_Value(D_OUT, val);
+        Copy_Cell(D_OUT, val);
         return D_OUT;
 
     case SYM_ADD: {

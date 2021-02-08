@@ -126,7 +126,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     if (IS_PARTIALS(specialty)) {
         const REBVAL *word = SPECIFIC(ARR_HEAD(specialty));
         for (; NOT_END(word); ++word)
-            Move_Value(DS_PUSH(), word);
+            Copy_Cell(DS_PUSH(), word);
     }
 
     const REBKEY *tail;
@@ -141,7 +141,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         Prep_Cell(arg);
 
         if (Is_Param_Hidden(param)) {  // local or specialized
-            Move_Value_Core(
+            Copy_Cell_Core(
                 arg,
                 param,
                 CELL_MASK_COPY | CELL_FLAG_VAR_MARKED_HIDDEN
@@ -371,7 +371,7 @@ bool Specialize_Action_Throws(
         assert(NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN));
         assert(Is_Void_With_Sym(arg, SYM_UNSET));
         assert(IS_TYPESET(param));
-        Move_Value(arg, param);
+        Copy_Cell(arg, param);
         continue;
 
       specialized_arg_with_check:
@@ -779,7 +779,7 @@ REBACT *Alloc_Action_From_Exemplar(
             and NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN)
         ){
             assert(IS_TYPESET(param));
-            Move_Value(arg, param);
+            Copy_Cell(arg, param);
             continue;
         }
 

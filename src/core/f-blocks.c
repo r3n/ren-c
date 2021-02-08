@@ -322,7 +322,7 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
 
     for (; NOT_END(src); ++src, ++dest) {
         if (not IS_RELATIVE(src)) {
-            Move_Value(dest, SPECIFIC(src));
+            Copy_Cell(dest, SPECIFIC(src));
             continue;
         }
 
@@ -331,7 +331,7 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
         //
         assert(ACT(BINDING(src)) == before);
 
-        Move_Value_Header(dest, src);
+        Copy_Cell_Header(dest, src);
 
         if (ANY_ARRAY_OR_PATH(src)) {
             INIT_VAL_NODE1(

@@ -608,7 +608,7 @@ static void ffi_to_rebol(
         break;
 
       case SYM_REBVAL:
-        Move_Value(out, *cast(const REBVAL**, ffi_rvalue));
+        Copy_Cell(out, *cast(const REBVAL**, ffi_rvalue));
         break;
 
       case SYM_VOID:
@@ -672,7 +672,7 @@ REB_R Routine_Dispatcher(REBFRM *f)
             if (IS_END(f->out))
                 break;
 
-            Move_Value(DS_PUSH(), f->out);
+            Copy_Cell(DS_PUSH(), f->out);
             SET_END(f->out); // expected by Do_Vararg_Op
         } while (true);
 
@@ -933,7 +933,7 @@ static REBVAL *callback_dispatcher_core(struct Reb_Callback_Invocation *inv)
     //
     REBARR *code = Make_Array(1 + inv->cif->nargs);
     RELVAL *elem = ARR_HEAD(code);
-    Move_Value(elem, RIN_CALLBACK_ACTION(inv->rin));
+    Copy_Cell(elem, RIN_CALLBACK_ACTION(inv->rin));
     ++elem;
 
     REBLEN i;
@@ -1178,7 +1178,7 @@ REBACT *Alloc_Ffi_Action_For_Spec(REBVAL *ffi_spec, ffi_abi abi) {
     TRASH_CELL_IF_DEBUG(RIN_AT(r, IDX_ROUTINE_CLOSURE));
     TRASH_CELL_IF_DEBUG(RIN_AT(r, IDX_ROUTINE_ORIGIN));  // LIBRARY!/ACTION!
 
-    Move_Value(RIN_AT(r, IDX_ROUTINE_RET_SCHEMA), ret_schema);
+    Copy_Cell(RIN_AT(r, IDX_ROUTINE_RET_SCHEMA), ret_schema);
     DROP_GC_GUARD(ret_schema);
 
     Init_Logic(RIN_AT(r, IDX_ROUTINE_IS_VARIADIC), is_variadic);

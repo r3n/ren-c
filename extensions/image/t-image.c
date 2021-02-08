@@ -856,7 +856,7 @@ void Find_Image(REBFRM *frame_)
 
     // Post process the search (failure or apply /match and /tail):
 
-    Move_Value(D_OUT, value);
+    Copy_Cell(D_OUT, value);
     assert((p - VAL_IMAGE_HEAD(value)) % 4 == 0);
 
     REBINT n = cast(REBLEN, (p - VAL_IMAGE_HEAD(value)) / 4);
@@ -924,7 +924,7 @@ void MF_Image(REB_MOLD *mo, REBCEL(const*) v, bool form)
     Pre_Mold(mo, v);
     if (GET_MOLD_FLAG(mo, MOLD_FLAG_ALL)) {
         DECLARE_LOCAL (head);
-        Move_Value(head, SPECIFIC(CELL_TO_VAL(v)));
+        Copy_Cell(head, SPECIFIC(CELL_TO_VAL(v)));
         VAL_IMAGE_POS(head) = 0; // mold all of it
         Mold_Image_Data(mo, head);
         Post_Mold(mo, v);

@@ -143,7 +143,7 @@ static REB_R Loop_Series_Common(
     // if they change `var` during the loop, it affects the iteration.  Hence
     // it must be checked for changing to another series, or non-series.
     //
-    Move_Value(var, start);
+    Copy_Cell(var, start);
     REBIDX *state = &VAL_INDEX_UNBOUNDED(var);
 
     // Run only once if start is equal to end...edge case.
@@ -476,7 +476,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                     //
                     ++pseudo_var;
                     var = Real_Var_From_Pseudo(pseudo_var);
-                    Move_Value(var, val);
+                    Copy_Cell(var, val);
                 }
                 else
                     fail ("Loop enumeration of contexts must be 1 or 2 vars");
@@ -501,7 +501,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 } while (IS_NULLED(val));
 
                 if (var)
-                    Move_Value(var, key);
+                    Copy_Cell(var, key);
 
                 if (CTX_LEN(les->pseudo_vars_ctx) == 1) {
                     //
@@ -513,7 +513,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                     //
                     ++pseudo_var;
                     var = Real_Var_From_Pseudo(pseudo_var);
-                    Move_Value(var, val);
+                    Copy_Cell(var, val);
                 }
                 else
                     fail ("Loop enumeration of contexts must be 1 or 2 vars");
@@ -546,7 +546,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 REBVAL *generated = rebValue(les->data, rebEND);
                 if (generated) {
                     if (var)
-                        Move_Value(var, generated);
+                        Copy_Cell(var, generated);
                     rebRelease(generated);
                 }
                 else {
@@ -600,7 +600,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                     Derelativize(DS_PUSH(), v, VAL_SPECIFIER(les->out));
             }
             else
-                Move_Value(DS_PUSH(), les->out);  // non nulls added to result
+                Copy_Cell(DS_PUSH(), les->out);  // non nulls added to result
             break;
         }
     } while (more_data and not broke);
@@ -641,7 +641,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         // is a poor substitute for).
         //
         REBVAL *block = rebValueQ("as block!", ARG(data), rebEND);
-        Move_Value(ARG(data), block);
+        Copy_Cell(ARG(data), block);
         rebRelease(block);
     }
 
@@ -904,7 +904,7 @@ REBNATIVE(for_skip)
 
     REBVAL *pseudo_var = CTX_VAR(context, 1); // not movable, see #2274
     REBVAL *var = Real_Var_From_Pseudo(pseudo_var);
-    Move_Value(var, series);
+    Copy_Cell(var, series);
 
     // Starting location when past end with negative skip:
     //
@@ -1158,7 +1158,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
                 SET_SERIES_LEN(VAL_ARRAY_KNOWN_MUTABLE(res->data), len);
                 return count;
             }
-            Move_Value(dest, src);  // same array--rare place we can do this
+            Copy_Cell(dest, src);  // same array--rare place we can do this
         }
 
         // If we get here, there were no removals, and length is unchanged.
@@ -1704,7 +1704,7 @@ REBNATIVE(while)
 
     do {
         if (Do_Branch_Throws(D_SPARE, ARG(condition))) {
-            Move_Value(D_OUT, D_SPARE);
+            Move_Cell(D_OUT, D_SPARE);
             return R_THROWN;  // don't see BREAK/CONTINUE in the *condition*
         }
 

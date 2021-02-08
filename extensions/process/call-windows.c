@@ -248,7 +248,7 @@ REB_R Call_Core(REBFRM *frame_) {
         REBVAL *text = rebValue(
             "argv-block-to-command*", ARG(command),
         rebEND);
-        Move_Value(ARG(command), text);
+        Copy_Cell(ARG(command), text);
         rebRelease(text);
         goto text_command;
     }

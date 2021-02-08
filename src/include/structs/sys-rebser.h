@@ -611,7 +611,7 @@ union Reb_Series_Content {
         // Due to strict aliasing requirements, this has to be initialized
         // as a value to read cell data.  It is a Reb_Cell in order to let
         // series nodes be memcpy()'d as part of their mechanics, but this
-        // should not be used to actually "move" cells!  Use Move_Value()
+        // should not be used to actually "move" cells!  Use Copy_Cell()
         //
         REBRAW cells[1];
 

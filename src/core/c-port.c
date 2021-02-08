@@ -172,7 +172,7 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             assert(IS_TEXT(D_OUT));
 
             DECLARE_LOCAL (temp);
-            Move_Value(temp, D_OUT);
+            Copy_Cell(temp, D_OUT);
             Init_Block(D_OUT, Split_Lines(temp));
         }
     }

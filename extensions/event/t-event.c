@@ -257,7 +257,7 @@ static REBVAL *Get_Event_Var(
 
       case SYM_PORT: {
         if (VAL_EVENT_MODEL(v) == EVM_GUI)  // "most events are for the GUI"
-            return Move_Value(out, Get_System(SYS_VIEW, VIEW_EVENT_PORT));
+            return Copy_Cell(out, Get_System(SYS_VIEW, VIEW_EVENT_PORT));
 
         if (VAL_EVENT_MODEL(v) == EVM_PORT)
             return Init_Port(out, CTX(VAL_EVENT_NODE(v)));
@@ -266,7 +266,7 @@ static REBVAL *Get_Event_Var(
             return Init_Object(out, CTX(VAL_EVENT_NODE(v)));
 
         if (VAL_EVENT_MODEL(v) == EVM_CALLBACK)
-            return Move_Value(out, Get_System(SYS_PORTS, PORTS_CALLBACK));
+            return Copy_Cell(out, Get_System(SYS_PORTS, PORTS_CALLBACK));
 
         assert(VAL_EVENT_MODEL(v) == EVM_DEVICE);  // holds IO request w/PORT!
         REBREQ *req = cast(REBREQ*, VAL_EVENT_NODE(v));
@@ -368,7 +368,7 @@ REB_R MAKE_Event(
         if (not IS_BLOCK(arg))
             fail (Error_Bad_Make(REB_EVENT, arg));
 
-        Move_Value(out, unwrap(parent));  // !!! "shallow" event clone
+        Copy_Cell(out, unwrap(parent));  // !!! "shallow" event clone
         Set_Event_Vars(out, arg, VAL_SPECIFIER(arg));
         return out;
     }

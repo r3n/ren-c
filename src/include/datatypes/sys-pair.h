@@ -85,8 +85,8 @@ inline static REBVAL *Init_Pair(
 
     RESET_CELL(out, REB_PAIR, CELL_FLAG_FIRST_IS_NODE);
     REBVAL *p = Alloc_Pairing();
-    Move_Value(PAIRING_KEY(p), cast(const REBVAL*, x));
-    Move_Value(p, cast(const REBVAL*, y));
+    Copy_Cell(PAIRING_KEY(p), cast(const REBVAL*, x));
+    Copy_Cell(p, cast(const REBVAL*, y));
     Manage_Pairing(p);
     INIT_VAL_PAIR(out, p);
     return cast(REBVAL*, out);

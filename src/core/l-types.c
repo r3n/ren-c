@@ -103,7 +103,7 @@ REBNATIVE(make)
     if (IS_SYM_WORD(type)) {  // hack for MAKE CHAR! 0
         switch (VAL_WORD_ID(type)) {
           case SYM_CHAR_X:
-            Move_Value(type, Datatype_From_Kind(REB_ISSUE));
+            Copy_Cell(type, Datatype_From_Kind(REB_ISSUE));
             break;
 
           default:
@@ -381,12 +381,12 @@ REBNATIVE(of)
         if (Eval_Value_Throws(D_SPARE, prop, SPECIFIED))
             return R_THROWN;
         if (not IS_WORD(D_SPARE)) {
-            Move_Value(prop, D_SPARE);
+            Move_Cell(prop, D_SPARE);
             fail (Error_Invalid_Arg(frame_, PAR(property)));
         }
     }
     else
-        Move_Value(D_SPARE, prop);
+        Copy_Cell(D_SPARE, prop);
 
     // !!! Ugly hack to make OF frame-compatible with REFLECT.  If there was
     // a separate dispatcher for REFLECT it could be called with proper
@@ -394,8 +394,8 @@ REBNATIVE(of)
     // fit the type action dispatcher rule... dispatch item in first arg,
     // property in the second.
     //
-    Move_Value(ARG(property), ARG(value));
-    Move_Value(ARG(value), D_SPARE);
+    Copy_Cell(ARG(property), ARG(value));
+    Copy_Cell(ARG(value), D_SPARE);
 
     return Reflect_Core(frame_);
 }

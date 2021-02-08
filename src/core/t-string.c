@@ -448,7 +448,7 @@ REB_R PD_String(
 
 
     if (IS_CHAR(unwrap(setval))) {
-        Move_Value(pvs->out, unwrap(setval));
+        Copy_Cell(pvs->out, unwrap(setval));
     }
     else if (IS_INTEGER(unwrap(setval))) {
         Init_Char_May_Fail(pvs->out, Int32(unwrap(setval)));
@@ -1065,7 +1065,7 @@ REBTYPE(String)
 
         REBSTR *str = VAL_STRING_ENSURE_MUTABLE(v);
 
-        Move_Value(D_OUT, v);  // save before index adjustment
+        Copy_Cell(D_OUT, v);  // save before index adjustment
         REBINT len = Part_Len_May_Modify_Index(v, ARG(part));
         if (len > 0)
             reverse_string(str, VAL_INDEX(v), len);
@@ -1092,7 +1092,7 @@ REBTYPE(String)
         if (REF(compare))
             fail (Error_Bad_Refines_Raw());  // !!! not in R3-Alpha
 
-        Move_Value(D_OUT, v);  // before index modification
+        Copy_Cell(D_OUT, v);  // before index modification
         REBLEN len = Part_Len_May_Modify_Index(v, ARG(part));
         if (len <= 1)
             return D_OUT;

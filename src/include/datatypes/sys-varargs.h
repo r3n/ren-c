@@ -92,7 +92,7 @@ inline static REBVAL *Init_Varargs_Untyped_Enfix(
         feed = EMPTY_ARRAY;
     else {
         REBARR *singular = Alloc_Singular(NODE_FLAG_MANAGED);
-        Move_Value(ARR_SINGLE(singular), left);
+        Copy_Cell(ARR_SINGLE(singular), left);
 
         feed = Alloc_Singular(FLAG_FLAVOR(FEED) | NODE_FLAG_MANAGED);
         Init_Block(ARR_SINGLE(feed), singular);  // index 0

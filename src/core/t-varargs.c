@@ -393,7 +393,7 @@ REB_R MAKE_Varargs(
         if (VAL_LEN_AT(arg) == 0)
             SET_END(ARR_SINGLE(array1));
         else
-            Move_Value(ARR_SINGLE(array1), arg);
+            Copy_Cell(ARR_SINGLE(array1), arg);
 
         RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
         INIT_VAL_VARARGS_PHASE(out, nullptr);
@@ -442,7 +442,7 @@ REB_R PD_Varargs(
         fail (Error_Varargs_No_Look_Raw());
 
     DECLARE_LOCAL (location);
-    Move_Value(location, pvs->out);
+    Copy_Cell(location, pvs->out);
 
     if (Do_Vararg_Op_Maybe_End_Throws(
         pvs->out,
@@ -538,7 +538,7 @@ REBTYPE(Varargs)
             }
             if (IS_END(D_OUT))
                 break;
-            Move_Value(DS_PUSH(), D_OUT);
+            Move_Cell(DS_PUSH(), D_OUT);
         }
 
         // !!! What if caller wanted a REB_GROUP, REB_PATH, or an /INTO?

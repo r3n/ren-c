@@ -862,7 +862,7 @@ REBNATIVE(find_script)
     if (offset == -1)
         return nullptr;
 
-    Move_Value(D_OUT, arg);
+    Copy_Cell(D_OUT, arg);
 
     if (IS_BINARY(arg)) {  // may not all be valid UTF-8
         VAL_INDEX_RAW(D_OUT) += offset;
@@ -923,7 +923,7 @@ REBNATIVE(invalid_utf8_q)
     for (; utf8 != end; utf8 += trail) {
         trail = trailingBytesForUTF8[*utf8] + 1;
         if (utf8 + trail > end or not isLegalUTF8(utf8, trail)) {
-            Move_Value(D_OUT, arg);
+            Copy_Cell(D_OUT, arg);
             VAL_INDEX_RAW(D_OUT) = utf8 - BIN_HEAD(VAL_BINARY(arg));
             return D_OUT;
         }

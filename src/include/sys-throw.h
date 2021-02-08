@@ -86,7 +86,7 @@ inline static REB_R Init_Thrown_With_Label(
 ){
   #if defined(NDEBUG)
     if (out != label)
-        Move_Value(out, label);
+        Copy_Cell(out, label);
   #else
     assert(IS_END(&TG_Thrown_Arg));
     assert(IS_END(&TG_Thrown_Label_Debug));
@@ -97,16 +97,16 @@ inline static REB_R Init_Thrown_With_Label(
     // reifications, but outside performance should still work the same.)
     //
     if (SPORADICALLY(2)) {
-        Move_Value(&TG_Thrown_Label_Debug, label);
+        Copy_Cell(&TG_Thrown_Label_Debug, label);
         Init_Unreadable_Void(out);
     }
     else {
         if (out != label)
-            Move_Value(out, label);
+            Copy_Cell(out, label);
     }
   #endif
 
-    Move_Value(&TG_Thrown_Arg, arg);
+    Copy_Cell(&TG_Thrown_Arg, arg);
     if (GET_CELL_FLAG(arg, UNEVALUATED))
         SET_CELL_FLAG(&TG_Thrown_Arg, UNEVALUATED);  // for invisible RETURN
 
@@ -120,7 +120,7 @@ static inline void CATCH_THROWN(
     assert(NOT_END(&TG_Thrown_Arg));
 
     UNUSED(thrown);
-    Move_Value(arg_out, &TG_Thrown_Arg);
+    Copy_Cell(arg_out, &TG_Thrown_Arg);
     if (GET_CELL_FLAG(&TG_Thrown_Arg, UNEVALUATED))
         SET_CELL_FLAG(arg_out, UNEVALUATED);  // indicates invisible RETURN
 

@@ -493,9 +493,9 @@ REBTYPE(Decimal)
             sym == SYM_ADD ||
             sym == SYM_MULTIPLY
         )){
-            Move_Value(D_OUT, D_ARG(2));
-            Move_Value(D_ARG(2), D_ARG(1));
-            Move_Value(D_ARG(1), D_OUT);
+            Copy_Cell(D_OUT, D_ARG(2));
+            Copy_Cell(D_ARG(2), D_ARG(1));
+            Copy_Cell(D_ARG(1), D_OUT);
             return Run_Generic_Dispatch(D_ARG(1), frame_, verb);
         }
 
@@ -582,7 +582,7 @@ REBTYPE(Decimal)
     switch (sym) {
 
     case SYM_COPY:
-        return Move_Value(D_OUT, val);
+        return Copy_Cell(D_OUT, val);
 
     case SYM_NEGATE:
         d1 = -d1;

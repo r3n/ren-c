@@ -54,7 +54,7 @@ REB_R MAKE_Pair(
         fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_PAIR(arg))
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
     if (IS_TEXT(arg)) {
         //
@@ -171,9 +171,9 @@ REB_R PD_Pair(
 
     if (not setval) {
         if (n == 1)
-            Move_Value(pvs->out, VAL_PAIR_X(pvs->out));
+            Copy_Cell(pvs->out, VAL_PAIR_X(pvs->out));
         else
-            Move_Value(pvs->out, VAL_PAIR_Y(pvs->out));
+            Copy_Cell(pvs->out, VAL_PAIR_Y(pvs->out));
         return pvs->out;
     }
 
@@ -188,9 +188,9 @@ REB_R PD_Pair(
         return R_UNHANDLED;
 
     if (n == 1)
-        Move_Value(VAL_PAIR_X(pvs->out), unwrap(setval));
+        Copy_Cell(VAL_PAIR_X(pvs->out), unwrap(setval));
     else
-        Move_Value(VAL_PAIR_Y(pvs->out), unwrap(setval));
+        Copy_Cell(VAL_PAIR_Y(pvs->out), unwrap(setval));
 
     // Using R_IMMEDIATE means that although we've updated pvs->out, we'll
     // leave it to the path dispatch to figure out if that can be written back
@@ -274,14 +274,14 @@ REBTYPE(Pair)
         FRM_LABEL(frame_)
     );
 
-    Move_Value(D_ARG(1), x1);
+    Copy_Cell(D_ARG(1), x1);
     if (x2)
-        Move_Value(D_ARG(2), x2);  // use extracted arg x instead of pair arg
+        Copy_Cell(D_ARG(2), x2);  // use extracted arg x instead of pair arg
     REBVAL *x_frame = rebValueQ("copy", frame, rebEND);
 
-    Move_Value(D_ARG(1), y1);
+    Copy_Cell(D_ARG(1), y1);
     if (y2)
-        Move_Value(D_ARG(2), y2);  // use extracted arg y instead of pair arg
+        Copy_Cell(D_ARG(2), y2);  // use extracted arg y instead of pair arg
     REBVAL *y_frame = rebValueQ("copy", frame, rebEND);
 
     return rebValue(

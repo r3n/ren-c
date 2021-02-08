@@ -75,7 +75,7 @@ void Splice_Block_Into_Feed(REBFED *feed, const REBVAL *splice) {
     }
 
     feed->value = VAL_ARRAY_ITEM_AT(splice);
-    Move_Value(FEED_SINGLE(feed), splice);
+    Copy_Cell(FEED_SINGLE(feed), splice);
     ++VAL_INDEX_UNBOUNDED(FEED_SINGLE(feed));
  
     mutable_MISC(Pending, &feed->singular) = nullptr;
@@ -98,7 +98,7 @@ REB_R Macro_Dispatcher(REBFRM *f)
     REBVAL *spare = FRM_SPARE(f);  // write to spare, return will be invisible
     bool returned;
     if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
-        Move_Value(f->out, spare);
+        Move_Cell(f->out, spare);
         return R_THROWN;
     }
     UNUSED(returned);  // no additional work to bypass
@@ -220,8 +220,7 @@ bool Cache_Predicate_Throws(
     if (Eval_Value_Throws(out, predicate, VAL_SPECIFIER(predicate)))
         return true;
 
-    Move_Value(predicate, out);
+    Move_Cell(predicate, out);
 
-    TRASH_CELL_IF_DEBUG(out);
     return false;
 }

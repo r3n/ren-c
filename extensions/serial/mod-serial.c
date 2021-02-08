@@ -211,7 +211,7 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
                 len = n;
         }
 
-        Move_Value(CTX_VAR(ctx, STD_PORT_DATA), data); // keep it GC safe
+        Copy_Cell(CTX_VAR(ctx, STD_PORT_DATA), data); // keep it GC safe
         req->length = len;
         req->common.data = VAL_BINARY_AT_KNOWN_MUTABLE(data);
         req->actual = 0;

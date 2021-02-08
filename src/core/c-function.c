@@ -585,7 +585,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         Init_Key(key, VAL_WORD_SYMBOL(KEY_SLOT(definitional_return_dsp)));
         ++key;
 
-        Move_Value(param, PARAM_SLOT(definitional_return_dsp));
+        Copy_Cell(param, PARAM_SLOT(definitional_return_dsp));
         ++param;
     }
 
@@ -604,7 +604,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
         Init_Key(key, symbol);
 
-        Move_Value(param, slot);
+        Copy_Cell(param, slot);
         if (GET_CELL_FLAG(slot, STACK_NOTE_LOCAL))
             SET_CELL_FLAG(param, VAR_MARKED_HIDDEN);
 
@@ -666,7 +666,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     if (flags & MKF_HAS_DESCRIPTION) {
         STKVAL(*) description = NOTES_SLOT(dsp_orig + 4);
         assert(IS_TEXT(description));
-        Move_Value(
+        Copy_Cell(
             CTX_VAR(*meta, STD_ACTION_META_DESCRIPTION),
             description
         );
@@ -694,7 +694,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             STKVAL(*) types = TYPES_SLOT(dsp);
             assert(IS_NULLED(types) or IS_BLOCK(types));
 
-            Move_Value(dest, types);
+            Copy_Cell(dest, types);
             if (GET_CELL_FLAG(param, VAR_MARKED_HIDDEN))
                 SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
 
@@ -733,7 +733,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             STKVAL(*) notes = NOTES_SLOT(dsp);
             assert(IS_TEXT(notes) or IS_NULLED(notes));
 
-            Move_Value(dest, notes);
+            Copy_Cell(dest, notes);
 
             if (GET_CELL_FLAG(param, VAR_MARKED_HIDDEN))
                 SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
@@ -1128,14 +1128,14 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         //
         const REBVAL *frame = CTX_ARCHETYPE(ACT_EXEMPLAR(a));
         assert(IS_FRAME(frame));
-        Move_Value(out, frame);
+        Copy_Cell(out, frame);
         return;
     }
 
     if (ACT_DISPATCHER(a) == &Generic_Dispatcher) {
         REBVAL *verb = DETAILS_AT(details, 1);
         assert(IS_WORD(verb));
-        Move_Value(out, verb);
+        Copy_Cell(out, verb);
         return;
     }
 

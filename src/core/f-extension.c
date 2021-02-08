@@ -92,7 +92,7 @@ REBNATIVE(builtin_extensions)
         COLLATE_CFUNC *collator = Builtin_Extension_Collators[i];
         REBVAL *details = (*collator)();
         assert(IS_BLOCK(details) and VAL_LEN_AT(details) == IDX_COLLATOR_MAX);
-        Move_Value(Alloc_Tail_Array(list), details);
+        Copy_Cell(Alloc_Tail_Array(list), details);
         rebRelease(details);
     }
     return Init_Block(Alloc_Value(), list);
@@ -153,7 +153,7 @@ REBNATIVE(load_extension)
         details = VAL_ARRAY(details_block);
         rebRelease(details_block);
 
-        Move_Value(lib, lib_api);
+        Copy_Cell(lib, lib_api);
         rebRelease(lib_api);
     }
 
@@ -275,7 +275,7 @@ REBNATIVE(load_extension)
             Init_Word(D_SPARE, VAL_WORD_SYMBOL(name));
             if (0 == Try_Bind_Word(module, D_SPARE))
                 panic ("Couldn't bind word just added -- problem");
-            Move_Value(DS_PUSH(), D_SPARE);
+            Copy_Cell(DS_PUSH(), D_SPARE);
         }
     }
 

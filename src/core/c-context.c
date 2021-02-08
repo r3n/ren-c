@@ -592,7 +592,7 @@ REBCTX *Make_Context_Detect_Managed(
         REBVAL *src = CTX_VARS_HEAD(unwrap(parent));
         for (; NOT_END(src); ++dest, ++src) {
             REBFLGS flags = NODE_FLAG_MANAGED;  // !!! Review, what flags?
-            Move_Value(dest, src);
+            Copy_Cell(dest, src);
             Clonify(dest, flags, TS_CLONE);
         }
     }
@@ -729,7 +729,7 @@ REBARR *Context_To_Array(const RELVAL *context, REBINT mode)
             if (IS_NULLED(var))
                 fail (Error_Null_Object_Block_Raw());
 
-            Move_Value(DS_PUSH(), var);
+            Copy_Cell(DS_PUSH(), var);
         }
     }
 
@@ -852,7 +852,7 @@ void Resolve_Context(
                 if (m < 0)
                     Init_Void(var, SYM_UNSET);  // not in source context
                 else
-                    Move_Value_Core(  // Need to preserve context flags
+                    Copy_Cell_Core(  // Need to preserve context flags
                         var,
                         CTX_VAR(source, m),
                         CELL_MASK_COPY | CELL_FLAG_VAR_MARKED_HIDDEN
@@ -874,7 +874,7 @@ void Resolve_Context(
                 // Note: no protect check is needed here
                 //
                 REBVAL *var = Append_Context(target, nullptr, canon);
-                Move_Value_Core(  // need to preserve slot's flags
+                Copy_Cell_Core(  // need to preserve slot's flags
                     var,
                     CTX_VAR(source, n),
                     CELL_MASK_COPY | CELL_FLAG_VAR_MARKED_HIDDEN

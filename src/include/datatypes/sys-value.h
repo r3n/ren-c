@@ -647,7 +647,7 @@ inline static bool IS_RELATIVE(const RELVAL *v) {
 //
 // Because SPECIFIC has cost in the debug build, there may be situations where
 // one is sure that the value is specific, and `cast(REBVAL*, v`) is a better
-// choice for efficiency.  This applies to things like `Move_Value()`, which
+// choice for efficiency.  This applies to things like `Copy_Cell()`, which
 // is called often and already knew its input was a REBVAL* to start with.
 
 inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
@@ -723,7 +723,7 @@ inline static void INIT_VAL_WORD_CACHE(const RELVAL *v, REBSPC *specifier)
 #define VAL_WORD_INDEXES_U32(v)         PAYLOAD(Any, (v)).second.u32
 
 
-inline static void Move_Value_Header(
+inline static void Copy_Cell_Header(
     RELVAL *out,
     const RELVAL *v
 ){
@@ -751,7 +751,7 @@ inline static void Move_Value_Header(
 //
 // Interface designed to line up with Derelativize()
 //
-inline static RELVAL *Move_Value_Untracked(
+inline static RELVAL *Copy_Cell_Untracked(
     RELVAL *out,
     const RELVAL *v,
     REBFLGS copy_mask  // typically you don't copy UNEVALUATED, PROTECTED, etc
@@ -794,43 +794,42 @@ inline static RELVAL *Move_Value_Untracked(
 }
 
 #if defined(__cplusplus)  // REBVAL and RELVAL are checked distinctly
-    inline static REBVAL *Move_Value_Untracked(
+    inline static REBVAL *Copy_Cell_Untracked(
         RELVAL *out,
         const REBVAL *v,
         REBFLGS copy_mask
     ){
-        return cast(REBVAL*, Move_Value_Untracked(
+        return cast(REBVAL*, Copy_Cell_Untracked(
             out,
             cast(const RELVAL*, v),
             copy_mask
         ));
     }
 
-    inline static REBVAL *Move_Value_Untracked(
+    inline static REBVAL *Copy_Cell_Untracked(
         REBVAL *out,
         const REBVAL *v,
         REBFLGS copy_mask
     ){
-        return cast(REBVAL*, Move_Value_Untracked(
+        return cast(REBVAL*, Copy_Cell_Untracked(
             cast(RELVAL*, out),
             cast(const RELVAL*, v),
             copy_mask
         ));
     }
 
-    inline static RELVAL *Move_Value_Untracked(
+    inline static RELVAL *Copy_Cell_Untracked(
         REBVAL *out,
         const RELVAL *v,
         REBFLGS copy_mask
     ) = delete;
 #endif
 
-#define Move_Value(out,v) \
-    Move_Value_Untracked(TRACK_CELL_IF_DEBUG(out), (v), CELL_MASK_COPY)
+#define Copy_Cell(out,v) \
+    Copy_Cell_Untracked(TRACK_CELL_IF_DEBUG(out), (v), CELL_MASK_COPY)
 
-#define Move_Value_Core(out,v,copy_mask) \
-    Move_Value_Untracked(TRACK_CELL_IF_DEBUG(out), (v), (copy_mask))
-
+#define Copy_Cell_Core(out,v,copy_mask) \
+    Copy_Cell_Untracked(TRACK_CELL_IF_DEBUG(out), (v), (copy_mask))
 
 
 // !!! Super primordial experimental `const` feature.  Concept is that various

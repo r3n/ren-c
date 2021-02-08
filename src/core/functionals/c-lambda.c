@@ -82,12 +82,16 @@ REB_R Lambda_Dispatcher(REBFRM *f)
     SET_END(f_spare);  // detect `x -> [elide x]` case.
 
     if (Do_Any_Array_At_Throws(f_spare, block, specifier)) {
-        Move_Value(f->out, f_spare);
+        Move_Cell(f->out, f_spare);
         return R_THROWN;
     }
 
     if (NOT_END(f_spare))
-        Move_Value(f->out, f_spare);
+        Move_Cell_Core(
+            f->out,
+            f_spare,
+            CELL_MASK_COPY | CELL_FLAG_UNEVALUATED
+        );
 
     return f->out;
 }
@@ -179,7 +183,7 @@ REBNATIVE(lambda)
     assert(ACT_META(lambda) == nullptr);
 
     REBARR *details = ACT_DETAILS(lambda);
-    Move_Value(ARR_AT(details, IDX_LAMBDA_BLOCK), body);
+    Copy_Cell(ARR_AT(details, IDX_LAMBDA_BLOCK), body);
 
     return Init_Action(D_OUT, lambda, ANONYMOUS, UNBOUND);
 }

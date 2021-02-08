@@ -433,7 +433,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // what was current into f->out so it can be consumed as the first
         // parameter of whatever that was.
 
-        Move_Value(&f->feed->lookback, f->out);
+        Copy_Cell(&f->feed->lookback, f->out);
         Derelativize(f->out, v, f_specifier);
         SET_CELL_FLAG(f->out, UNEVALUATED);
 
@@ -636,7 +636,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (IS_VOID(unwrap(gotten)))  // need GET/ANY if it's void ("undefined")
             fail (Error_Need_Non_Void_Core(v, f_specifier, unwrap(gotten)));
 
-        Move_Value(f->out, unwrap(gotten));  // no copy CELL_FLAG_UNEVALUATED
+        Copy_Cell(f->out, unwrap(gotten));  // no copy CELL_FLAG_UNEVALUATED
         Decay_If_Nulled(f->out);
         break;
 
@@ -654,7 +654,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
       set_word_with_out:
 
-        Move_Value(Sink_Word_May_Fail(v, f_specifier), f->out);
+        Copy_Cell(Sink_Word_May_Fail(v, f_specifier), f->out);
         break; }
 
 
@@ -678,7 +678,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (IS_VOID(unwrap(gotten)))
             fail (Error_Need_Non_Void_Core(v, f_specifier, unwrap(gotten)));
 
-        Move_Value(f->out, unwrap(gotten));
+        Copy_Cell(f->out, unwrap(gotten));
         Decay_If_Nulled(f->out);
 
         if (IS_ACTION(unwrap(gotten)))  // cache the word's label in the cell
@@ -835,7 +835,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             EVAL_MASK_DEFAULT | EVAL_FLAG_PUSH_PATH_REFINES
         )){
             if (where != f->out)
-                Move_Value(f->out, where);
+                Copy_Cell(f->out, where);
             goto return_thrown;
         }
 
@@ -871,7 +871,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             fail (Error_Need_Non_Void_Core(v, f_specifier, where));
 
         if (where != f->out)
-            Move_Value(f->out, where);  // won't move CELL_FLAG_UNEVALUATED
+            Copy_Cell(f->out, where);  // won't move CELL_FLAG_UNEVALUATED
         else
             CLEAR_CELL_FLAG(f->out, UNEVALUATED);
         Decay_If_Nulled(f->out);
@@ -917,7 +917,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             f->out,
             EVAL_MASK_DEFAULT  // evaluating GROUP!s ok
         )){
-            Move_Value(f->out, f_spare);
+            Copy_Cell(f->out, f_spare);
             goto return_thrown;
         }
 
@@ -992,7 +992,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         f_next_gotten = nullptr;  // arbitrary code changes fetched variables
 
         if (Do_Any_Array_At_Throws(f_spare, v, f_specifier)) {
-            Move_Value(f->out, f_spare);
+            Copy_Cell(f->out, f_spare);
             goto return_thrown;
         }
 
@@ -1157,7 +1157,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         DROP_GC_GUARD(outputs);
 
-        Move_Value(f_spare, specialized);
+        Copy_Cell(f_spare, specialized);
         rebRelease(specialized);
 
         // Toss away the pending WORD!/PATH!/ACTION! that was in the execution
@@ -1287,7 +1287,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
   //=//// END MAIN SWITCH STATEMENT ///////////////////////////////////////=//
 
     // The UNEVALUATED flag is one of the bits that doesn't get copied by
-    // Move_Value() or Derelativize().  Hence it can be overkill to clear it
+    // Copy_Cell() or Derelativize().  Hence it can be overkill to clear it
     // off if one knows a value came from doing those things.  This test at
     // the end checks to make sure that the right thing happened.
     //

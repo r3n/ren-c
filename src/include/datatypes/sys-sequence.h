@@ -195,7 +195,7 @@ inline static REBVAL *Try_Leading_Blank_Pathify(
         NODE_FLAG_MANAGED
     );
     Init_Blank(Alloc_Tail_Array(a));
-    Move_Value(Alloc_Tail_Array(a), v);
+    Copy_Cell(Alloc_Tail_Array(a), v);
     Freeze_Array_Shallow(a);
 
     Init_Block(v, a);
@@ -393,7 +393,7 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
         if (not Is_Valid_Sequence_Element(kind, DS_TOP))
             return nullptr;
 
-        Move_Value(out, DS_TOP);
+        Copy_Cell(out, DS_TOP);
         DS_DROP();
 
         if (kind != REB_PATH) {  // carry over : or @ decoration (if possible)
@@ -540,7 +540,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         // a WORD! also unless we fiddle the bits at a new location.
         //
         if (sequence != store)
-            Move_Value(store, CELL_TO_VAL(sequence));
+            Copy_Cell(store, CELL_TO_VAL(sequence));
         mutable_KIND3Q_BYTE(store)
             = mutable_HEART_BYTE(store) = PLAINIFY_ANY_GET_KIND(heart);
         return store; }
@@ -556,7 +556,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         // a WORD! also unless we fiddle the bits at a new location.
         //
         if (sequence != store)
-            Move_Value(store, CELL_TO_VAL(sequence));
+            Copy_Cell(store, CELL_TO_VAL(sequence));
         mutable_KIND3Q_BYTE(store)
             = mutable_HEART_BYTE(store) = PLAINIFY_ANY_SYM_KIND(heart);
         return store; }

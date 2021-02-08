@@ -494,7 +494,7 @@ static inline REBVAL *Init_Any_Context(
     UNUSED(kind);
     ASSERT_SERIES_MANAGED(CTX_VARLIST(c));
     ASSERT_SERIES_MANAGED(CTX_KEYLIST(c));
-    return Move_Value(out, CTX_ARCHETYPE(c));
+    return Copy_Cell(out, CTX_ARCHETYPE(c));
 }
 
 #define Init_Object(out,c) \

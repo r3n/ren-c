@@ -78,7 +78,7 @@ static void get_scalar(
         // series, depending on whether the data is owned by Rebol or not.
         // That series pointer is being referenced again here.
         //
-        Move_Value(ARR_SINGLE(sub_stu), STU_DATA(stu));
+        Copy_Cell(ARR_SINGLE(sub_stu), STU_DATA(stu));
         STU_OFFSET(sub_stu) = offset;
         assert(STU_SIZE(sub_stu) == FLD_WIDE(field));
         Init_Struct(out, sub_stu);
@@ -142,7 +142,7 @@ static void get_scalar(
         break;
 
       case SYM_REBVAL:
-        Move_Value(out, cast(const REBVAL*, p));
+        Copy_Cell(out, cast(const REBVAL*, p));
         break;
 
       default:
@@ -875,7 +875,7 @@ static void Parse_Field_Type_May_Fail(
             // (What about just storing the STRUCT! value itself in the type
             // field, instead of the array of fields?)
             //
-            Move_Value(
+            Copy_Cell(
                 FLD_AT(field, IDX_FIELD_FFTYPE),
                 FLD_AT(VAL_STRUCT_SCHEMA(inner), IDX_FIELD_FFTYPE)
             );
@@ -921,7 +921,7 @@ static void Parse_Field_Type_May_Fail(
         // Borrow the same ffi_type* that the struct uses, see above note
         // regarding alternative ideas.
         //
-        Move_Value(
+        Copy_Cell(
             FLD_AT(field, IDX_FIELD_FFTYPE),
             FLD_AT(VAL_STRUCT_SCHEMA(val), IDX_FIELD_FFTYPE)
         );
@@ -1222,7 +1222,7 @@ REB_R MAKE_Struct(
                 REBVAL *reduced = rebValue("reduce", specific, rebEND);
                 DROP_GC_GUARD(specific);
 
-                Move_Value(init, reduced);
+                Copy_Cell(init, reduced);
                 rebRelease(reduced);
 
                 Fetch_Next_Forget_Lookback(f);
@@ -1407,7 +1407,7 @@ REB_R PD_Struct(
             // evaluation may not protect the result...)
             //
             DECLARE_LOCAL (sel_orig);
-            Move_Value(cast(RELVAL*, sel_orig), picker);
+            Copy_Cell(cast(RELVAL*, sel_orig), picker);
             PUSH_GC_GUARD(sel_orig);
 
             if (Next_Path_Throws(pvs)) { // updates pvs->out, PVS_PICKER()
@@ -1423,7 +1423,7 @@ REB_R PD_Struct(
                     pvs->u.ref.specifier
                 );
             else
-                Move_Value(specific, pvs->out);
+                Copy_Cell(specific, pvs->out);
 
             if (not Set_Struct_Var(stu, sel_orig, nullptr, specific))
                 return R_UNHANDLED;
@@ -1541,7 +1541,7 @@ REBTYPE(Struct)
             BIN_HEAD(VAL_BINARY(arg)),
             VAL_STRUCT_DATA_LEN(val)
         );
-        Move_Value(D_OUT, val);
+        Copy_Cell(D_OUT, val);
         return D_OUT; }
 
       case SYM_REFLECT: {
