@@ -224,28 +224,18 @@ REBLEN Try_Bind_Word(const RELVAL *context, REBVAL *word)
 }
 
 
-
 //
-//  let: native [
+//  Make_Let_Patch: C
 //
-//  {Dynamically add a new binding into the stream of evaluation}
+// Efficient form of "mini-object" allocation that can hold exactly one
+// variable.  Unlike a context, it does not have the ability to hold an
+// archetypal form of that context...because the only value cell in the
+// singular array is taken for the variable content itself.
 //
-//      return: [<invisible> word!]
-//      :word [<variadic> word! set-word!]
-//  ]
-//
-REBNATIVE(let)
-{
-    INCLUDE_PARAMS_OF_LET;
-
-    REBFRM *f = frame_;
-    UNUSED(ARG(word));  // native, so has direct frame access.
-
-    if (IS_END(f_value) or not (IS_WORD(f_value) or IS_SET_WORD(f_value)))
-        fail ("LET needs to be followed by WORD! or SET-WORD!");
-
-    const REBSYM *symbol = VAL_WORD_SYMBOL(f_value);
-
+REBARR *Make_Let_Patch(
+    const REBSYM *symbol,
+    REBSPC *specifier
+){
     // We create a virtual binding patch to link into the binding.  The
     // difference with this patch is that its singular value is the value
     // of a new variable.
@@ -272,9 +262,7 @@ REBNATIVE(let)
     // the chain.  So we can simply point to the existing specifier...whether
     // it is a patch, a frame context, or nullptr.
     //
-    REBSPC *specifier = f_specifier;
-    if (NOT_SERIES_FLAG(specifier, MANAGED))
-        SET_SERIES_FLAG(specifier, MANAGED);  // natives don't manage
+    assert(GET_SERIES_FLAG(specifier, MANAGED));
     mutable_INODE(NextPatch, patch) = specifier;
 
     // A circularly linked list of variations of this patch with different
@@ -288,7 +276,36 @@ REBNATIVE(let)
     //
     mutable_LINK(PatchSymbol, patch) = symbol;
 
-    mutable_BINDING(FEED_SINGLE(f->feed)) = patch;
+    return patch;
+}
+
+
+//
+//  let: native [
+//
+//  {Dynamically add a new binding into the stream of evaluation}
+//
+//      return: [<invisible> word!]
+//      :word [<variadic> word! set-word!]
+//  ]
+//
+REBNATIVE(let)
+{
+    INCLUDE_PARAMS_OF_LET;
+
+    REBFRM *f = frame_;
+    UNUSED(ARG(word));  // native, so has direct frame access.
+
+    if (IS_END(f_value) or not (IS_WORD(f_value) or IS_SET_WORD(f_value)))
+        fail ("LET needs to be followed by WORD! or SET-WORD!");
+
+    const REBSYM *symbol = VAL_WORD_SYMBOL(f_value);
+
+    REBSPC *specifier = f_specifier;
+    if (specifier and NOT_SERIES_FLAG(specifier, MANAGED))
+        SET_SERIES_FLAG(specifier, MANAGED);  // natives don't manage
+
+    mutable_BINDING(FEED_SINGLE(f->feed)) = Make_Let_Patch(symbol, specifier);
 
     if (IS_WORD(f_value)) {
         Derelativize(D_OUT, f_value, f_specifier);
