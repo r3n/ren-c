@@ -130,3 +130,8 @@
     (null = [# # #]: transcode "3o4")
     ('scan-invalid = pick trap [[# # _]: transcode "3o4"] 'id)
 ]
+
+(
+    [v p]: transcode to binary! "7-Feb-2021/23:00"
+    [7-Feb-2021/23:00 #{}] = reduce [v p]
+)

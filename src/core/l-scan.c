@@ -3055,8 +3055,12 @@ REBNATIVE(transcode)
         REBVAL *var = Sink_Word_May_Fail(ARG(next), SPECIFIED);
         Move_Value(var, source);
 
-        if (IS_BINARY(var))
-            VAL_INDEX_UNBOUNDED(var) = ss.end - BIN_HEAD(VAL_BINARY(var));
+        if (IS_BINARY(var)) {
+            if (ss.begin)
+                VAL_INDEX_UNBOUNDED(var) = ss.begin - BIN_HEAD(VAL_BINARY(var));
+            else
+                VAL_INDEX_UNBOUNDED(var) = BIN_LEN(VAL_BINARY(var));
+        }
         else {
             assert(IS_TEXT(var));
 
@@ -3070,7 +3074,7 @@ REBNATIVE(transcode)
             // (It would probably be better if the scanner kept count, though
             // maybe that would make it slower when this isn't needed?)
             //
-            if (ss.begin != 0)
+            if (ss.begin)
                 VAL_INDEX_RAW(var) += Num_Codepoints_For_Bytes(bp, ss.begin);
             else
                 VAL_INDEX_RAW(var) += BIN_TAIL(VAL_STRING(var)) - bp;
