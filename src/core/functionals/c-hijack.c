@@ -256,7 +256,7 @@ REBNATIVE(hijack)
         RELVAL *src = ARR_HEAD(hijacker_details) + 1;
         RELVAL *dest = ARR_HEAD(victim_details) + 1;
         for (; NOT_END(src); ++src, ++dest)
-            Blit_Relative(dest, src);  // details may contain relative values
+            Move_Value_Core(dest, src, CELL_MASK_ALL);
         SET_SERIES_LEN(victim_details, details_len);
     }
     else {

@@ -540,7 +540,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         // a WORD! also unless we fiddle the bits at a new location.
         //
         if (sequence != store)
-            Blit_Relative(store, CELL_TO_VAL(sequence));
+            Move_Value(store, CELL_TO_VAL(sequence));
         mutable_KIND3Q_BYTE(store)
             = mutable_HEART_BYTE(store) = PLAINIFY_ANY_GET_KIND(heart);
         return store; }
@@ -556,7 +556,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         // a WORD! also unless we fiddle the bits at a new location.
         //
         if (sequence != store)
-            Blit_Relative(store, CELL_TO_VAL(sequence));
+            Move_Value(store, CELL_TO_VAL(sequence));
         mutable_KIND3Q_BYTE(store)
             = mutable_HEART_BYTE(store) = PLAINIFY_ANY_SYM_KIND(heart);
         return store; }

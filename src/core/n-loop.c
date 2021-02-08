@@ -1158,7 +1158,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
                 SET_SERIES_LEN(VAL_ARRAY_KNOWN_MUTABLE(res->data), len);
                 return count;
             }
-            Blit_Relative(dest, src);  // same array--rare place we can do this
+            Move_Value(dest, src);  // same array--rare place we can do this
         }
 
         // If we get here, there were no removals, and length is unchanged.

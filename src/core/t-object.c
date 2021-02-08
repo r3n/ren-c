@@ -549,7 +549,11 @@ REBCTX *Copy_Context_Extra_Managed(
     //
     REBVAL *src = CTX_VARS_HEAD(original);
     for (; NOT_END(src); ++src, ++dest) {
-        Move_Var(dest, src); // keep VAR_MARKED_HIDDEN
+        Move_Value_Core(  // trying to duplicate slot precisely
+            dest,
+            src,
+            CELL_MASK_COPY | CELL_FLAG_VAR_MARKED_HIDDEN
+        );
 
         REBFLGS flags = NODE_FLAG_MANAGED;  // !!! Review, which flags?
         Clonify(dest, flags, types);

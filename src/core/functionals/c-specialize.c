@@ -141,7 +141,11 @@ REBCTX *Make_Context_For_Action_Push_Partials(
         Prep_Cell(arg);
 
         if (Is_Param_Hidden(param)) {  // local or specialized
-            Blit_Specific(arg, param);  // preserve VAR_MARKED_HIDDEN
+            Move_Value_Core(
+                arg,
+                param,
+                CELL_MASK_COPY | CELL_FLAG_VAR_MARKED_HIDDEN
+            );
 
           continue_specialized:
 

@@ -2393,7 +2393,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             // A proxy needs to be imported from lib to context.
             //
             Expand_Context(context, 1);
-            Move_Var(  // preserve enfix state
+            Move_Value(
                 Append_Context(context, DS_TOP, nullptr),
                 CTX_VAR(lib, -n)  // -n is positive
             );

@@ -751,11 +751,22 @@ inline static void Move_Value_Header(
 //
 // Interface designed to line up with Derelativize()
 //
-inline static REBVAL *Move_Value_Core(RELVAL *out, const REBVAL *v) {
-    Move_Value_Header(out, v);
+inline static RELVAL *Move_Value_Untracked(
+    RELVAL *out,
+    const RELVAL *v,
+    REBFLGS copy_mask  // typically you don't copy UNEVALUATED, PROTECTED, etc
+){
+    assert(out != v);  // usually a sign of a mistake; not worth supporting
+    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
 
-    // Payloads cannot hold references to stackvars, raw bit transfer ok.
+    ASSERT_CELL_WRITABLE_EVIL_MACRO(out);
+
+    // Q: Will optimizer notice if copy mask is CELL_MASK_ALL, and not bother
+    // with masking out CELL_MASK_PERSIST since all bits are overwritten?
     //
+    out->header.bits &= CELL_MASK_PERSIST;
+    out->header.bits |= v->header.bits & copy_mask;
+
     // Note: must be copied over *before* INIT_BINDING_MAY_MANAGE is called,
     // so that if it's a REB_QUOTED it can find the literal->cell.
     //
@@ -764,78 +775,62 @@ inline static REBVAL *Move_Value_Core(RELVAL *out, const REBVAL *v) {
     if (Is_Bindable(v))  // extra is either a binding or a plain C value/ptr
         INIT_BINDING_MAY_MANAGE(out, BINDING(v));
     else
-        out->extra = v->extra;
+        out->extra = v->extra;  // extra inert bits
 
-    return cast(REBVAL*, out);
+    if (IS_RELATIVE(v)) {
+        //
+        // You shouldn't be getting relative values out of cells that are
+        // actually API handles.
+        //
+        assert(not (v->header.bits & NODE_FLAG_ROOT));
+
+        // However, you should not write relative bits into API destinations,
+        // not even hypothetically.  The target should not be an API cell.
+        //
+        assert(not (out->header.bits & (NODE_FLAG_ROOT | NODE_FLAG_MANAGED)));
+    }
+
+    return out;
 }
 
-// This macro is a good place to add TRACK_CELL_IF_DEBUG() if you want to
-// know when things were last moved to a place, vs. what created them.
-//
-#define Move_Value(out,v) \
-    Move_Value_Core(TRACK_CELL_IF_DEBUG(out), (v))
+#if defined(__cplusplus)  // REBVAL and RELVAL are checked distinctly
+    inline static REBVAL *Move_Value_Untracked(
+        RELVAL *out,
+        const REBVAL *v,
+        REBFLGS copy_mask
+    ){
+        return cast(REBVAL*, Move_Value_Untracked(
+            out,
+            cast(const RELVAL*, v),
+            copy_mask
+        ));
+    }
 
-// When doing something like a COPY of an OBJECT!, the var cells have to be
-// handled specially, e.g. by preserving CELL_FLAG_VAR_MARKED_HIDDEN.
-//
-// !!! What about other non-copyable properties like CELL_FLAG_PROTECTED?
-//
-inline static REBVAL *Move_Var(RELVAL *out, const REBVAL *v)
-{
-    // This special kind of copy can only be done into another object's
-    // variable slot. (Since the source may be a FRAME!, v *might* be stack
-    // but it should never be relative.  If it's stack, we have to go through
-    // the whole potential reification process...double-set header for now.)
+    inline static REBVAL *Move_Value_Untracked(
+        REBVAL *out,
+        const REBVAL *v,
+        REBFLGS copy_mask
+    ){
+        return cast(REBVAL*, Move_Value_Untracked(
+            cast(RELVAL*, out),
+            cast(const RELVAL*, v),
+            copy_mask
+        ));
+    }
 
-    Move_Value(out, v);
-    out->header.bits |= (
-        v->header.bits & (CELL_FLAG_VAR_MARKED_HIDDEN)
-    );
-    return cast(REBVAL*, out);
-}
-
-
-// Generally speaking, you cannot take a RELVAL from one cell and copy it
-// blindly into another...it needs to be Derelativize()'d.  This routine is
-// for the rare cases where it's legal, e.g. shuffling a cell from one place
-// in an array to another cell in the same array.
-//
-inline static RELVAL *Blit_Relative(RELVAL *out, const RELVAL *v)
-{
-    // It's imaginable that you might try to blit a cell from a source that
-    // could be an API node.  But it should never be *actually* relative
-    // (just tunneled down through some chain of RELVAL*-accepting functions).
-    //
-    assert(not ((v->header.bits & NODE_FLAG_ROOT) and IS_RELATIVE(v)));
-
-    // However, you should not write relative bits into API destinations,
-    // not even hypothetically.  The target should not be an API cell.
-    //
-    assert(not (out->header.bits & (NODE_FLAG_ROOT | NODE_FLAG_MANAGED)));
-
-    Move_Value_Header(out, v);
-
-    out->payload = v->payload;
-    out->extra = v->extra;
-
-    return out;  // still (potentially) relative!
-}
-
-#ifdef __cplusplus  // avoid blitting into REBVAL*, and use without specifier
-    inline static RELVAL *Blit_Relative(REBVAL *out, const RELVAL *v) = delete;
+    inline static RELVAL *Move_Value_Untracked(
+        REBVAL *out,
+        const RELVAL *v,
+        REBFLGS copy_mask
+    ) = delete;
 #endif
 
+#define Move_Value(out,v) \
+    Move_Value_Untracked(TRACK_CELL_IF_DEBUG(out), (v), CELL_MASK_COPY)
 
-// !!! Should this replace Move_Var() ?
-//
-inline static REBVAL *Blit_Specific(RELVAL *out, const REBVAL *v)
-{
-    Move_Value_Header(out, v);
-    out->header.bits |= (v->header.bits & NODE_FLAG_MARKED);
-    out->payload = v->payload;
-    out->extra = v->extra;
-    return cast(REBVAL*, out);
-}
+#define Move_Value_Core(out,v,copy_mask) \
+    Move_Value_Untracked(TRACK_CELL_IF_DEBUG(out), (v), (copy_mask))
+
 
 
 // !!! Super primordial experimental `const` feature.  Concept is that various

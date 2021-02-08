@@ -328,6 +328,9 @@ inline static uintptr_t Endlike_Header(uintptr_t bits) {
 #define CELL_MASK_COPY \
     ~(CELL_MASK_PERSIST | CELL_FLAG_NOTE | CELL_FLAG_UNEVALUATED)
 
+#define CELL_MASK_ALL \
+    ~cast(REBFLGS, 0)
+
 
 //=//// CELL's `EXTRA` FIELD DEFINITION ///////////////////////////////////=//
 //
@@ -559,7 +562,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 //
 // Goal is that the mechanics are managed with low-level C, so the C++ build
 // is just there to notice when you try to use a raw byte copy.  Use functions
-// instead.  (See: Move_Value(), Blit_Relative(), Derelativize())
+// instead.  (See: Move_Value(), Derelativize())
 //
 // Note: It is annoying that this means any structure that embeds a value cell
 // cannot be assigned.  However, `struct Reb_Value` must be the type exported

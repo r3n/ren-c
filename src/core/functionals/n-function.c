@@ -202,7 +202,12 @@ REB_R Unchecked_Dispatcher(REBFRM *f)
 
     if (IS_ENDISH_NULLED(spare))
         return f->out;  // was invisible
-    return Blit_Specific(f->out, spare);  // keep CELL_FLAG_UNEVALUATED
+
+    return Move_Value_Core(
+        f->out,
+        spare,
+        CELL_MASK_COPY | CELL_FLAG_UNEVALUATED  // keep unevaluated status
+    );
 }
 
 
@@ -248,7 +253,11 @@ REB_R Returner_Dispatcher(REBFRM *f)
         return f->out;  // was invisible
     }
 
-    Blit_Specific(f->out, spare);
+    Move_Value_Core(
+        f->out,
+        spare,
+        CELL_MASK_COPY | CELL_FLAG_UNEVALUATED
+    );
 
     FAIL_IF_BAD_RETURN_TYPE(f);
 

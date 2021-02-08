@@ -215,7 +215,7 @@ REBTYPE(Action)
         RELVAL *src = ARR_HEAD(ACT_DETAILS(act)) + 1;
         RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy)) + 1;
         for (; NOT_END(src); ++src, ++dest)
-            Blit_Relative(dest, src);
+            Move_Value(dest, src);
         SET_SERIES_LEN(ACT_DETAILS(proxy), details_len);
       }
 

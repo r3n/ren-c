@@ -452,7 +452,11 @@ inline static const RELVAL *Lookback_While_Fetching_Next(REBFRM *f) {
     //
     const RELVAL *lookback;
     if (f->feed->value == &f->feed->fetched) {
-        Blit_Specific(&f->feed->lookback, SPECIFIC(&f->feed->fetched));
+        Move_Value_Core(
+            &f->feed->lookback,
+            SPECIFIC(&f->feed->fetched),
+            CELL_MASK_ALL
+        );
         lookback = &f->feed->lookback;
         Init_Unreadable_Void(&f->feed->fetched);
     }

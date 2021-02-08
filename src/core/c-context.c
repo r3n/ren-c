@@ -852,7 +852,11 @@ void Resolve_Context(
                 if (m < 0)
                     Init_Void(var, SYM_UNSET);  // not in source context
                 else
-                    Move_Var(var, CTX_VAR(source, m));  // preserves flags
+                    Move_Value_Core(  // Need to preserve context flags
+                        var,
+                        CTX_VAR(source, m),
+                        CELL_MASK_COPY | CELL_FLAG_VAR_MARKED_HIDDEN
+                    );
             }
         }
     }
@@ -870,7 +874,11 @@ void Resolve_Context(
                 // Note: no protect check is needed here
                 //
                 REBVAL *var = Append_Context(target, nullptr, canon);
-                Move_Var(var, CTX_VAR(source, n));  // preserves flags
+                Move_Value_Core(  // need to preserve slot's flags
+                    var,
+                    CTX_VAR(source, n),
+                    CELL_MASK_COPY | CELL_FLAG_VAR_MARKED_HIDDEN
+                );
             }
         }
     }
