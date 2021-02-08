@@ -185,8 +185,6 @@
 
 #include "sys-flavor.h"  // series subclass byte (uses sizeof(REBVAL))
 
-#include "tmp-symid.h"  // small integer IDs for words (e.g. SYM_THRU, SYM_ON)
-
 #include "structs/sys-rebser.h"  // series structure definition, embeds REBVAL
 
 #include "structs/sys-rebarr.h"  // array structure (REBSER subclass)
@@ -194,6 +192,11 @@
 #include "structs/sys-rebctx.h"  // context structure
 
 #include "structs/sys-rebchr.h"  // REBCHR(*) is REBYTE* in validated UTF8
+
+#include "structs/sys-rebfed.h"  // REBFED (feed) definition
+#include "structs/sys-rebjmp.h"  // Jump state (for TRAP)
+#include "structs/sys-rebfrm.h"  // C struct for running frame, uses REBFED
+
 
 // (Note: %sys-do.h needs to call into the scanner if Fetch_Next_In_Frame() is
 // to be inlined at all--at its many time-critical callsites--so the scanner
@@ -218,14 +221,11 @@
 //
 // See %make/make-headers.r for the generation of this list.
 //
+#include "tmp-symid.h"  // small integer IDs for words (e.g. SYM_THRU, SYM_ON)
 #include "tmp-internals.h"
 
 #include "sys-panic.h"  // "blue screen of death"-style termination
 #include "sys-casts.h"  // coercion macros like SER(), uses panic() to alert
-
-#include "sys-state.h"
-#include "sys-rebfed.h"  // REBFED (feed) definitio, used by REBFRM
-#include "sys-rebfrm.h"  // REBFRM (frame) definition, also used by value
 
 #include "sys-mold.h"
 

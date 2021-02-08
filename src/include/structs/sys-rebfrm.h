@@ -644,36 +644,3 @@ inline static bool FRM_IS_VARIADIC(REBFRM *f);
 
 #define FS_TOP (TG_Top_Frame + 0) // avoid assign to FS_TOP via + 0
 #define FS_BOTTOM (TG_Bottom_Frame + 0) // avoid assign to FS_BOTTOM via + 0
-
-
-#if !defined(DEBUG_CHECK_CASTS)
-
-    #define FRM(p) \
-        cast(REBFRM*, (p)) // FRM() just does a cast (maybe with added checks)
-
-#else
-
-    template <class T>
-    inline REBFRM *FRM(T *p) {
-        constexpr bool base = std::is_same<T, void>::value
-            or std::is_same<T, REBNOD>::value
-            or std::is_same<T, REBFRM>::value;
-
-        static_assert(base, "FRM() works on void/REBNOD/REBFRM");
-
-        if (not p)
-            return nullptr;
-
-        if ((*reinterpret_cast<REBYTE*>(p) & (
-            NODE_BYTEMASK_0x80_NODE | NODE_BYTEMASK_0x40_FREE
-                | NODE_BYTEMASK_0x01_CELL
-        )) != (
-            NODE_BYTEMASK_0x80_NODE | NODE_BYTEMASK_0x01_CELL
-        )){
-            panic (p);
-        }
-
-        return reinterpret_cast<REBFRM*>(p);
-    }
-
-#endif

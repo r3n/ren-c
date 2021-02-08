@@ -75,6 +75,8 @@
 
     #define VAL(p)          x_cast(REBVAL*, (p))
 
+    #define FRM(p)          x_cast(REBFRM*, (p))
+
 #else
 
     // The C++ variants are more heavyweight, and beyond the scope of writing
@@ -275,6 +277,28 @@
     inline static const REBVAL* VAL(const void *p)
       { return cast(const REBVAL*, p); }
 
+    template <class T>
+    inline REBFRM *FRM(T *p) {
+        constexpr bool base = std::is_same<T, void>::value
+            or std::is_same<T, REBNOD>::value
+            or std::is_same<T, REBFRM>::value;
+
+        static_assert(base, "FRM() works on void/REBNOD/REBFRM");
+
+        if (not p)
+            return nullptr;
+
+        if ((*reinterpret_cast<REBYTE*>(p) & (
+            NODE_BYTEMASK_0x80_NODE | NODE_BYTEMASK_0x40_FREE
+                | NODE_BYTEMASK_0x01_CELL
+        )) != (
+            NODE_BYTEMASK_0x80_NODE | NODE_BYTEMASK_0x01_CELL
+        )){
+            panic (p);
+        }
+
+        return reinterpret_cast<REBFRM*>(p);
+    }
 #endif
 
 
