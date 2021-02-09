@@ -656,30 +656,6 @@ REBNATIVE(evaluate)
 
 
 //
-//  sync-invisibles: native [
-//
-//  {If an evaluatable source has pending invisibles, execute and advance}
-//
-//      return: [<opt> block! group! varargs!]
-//      source [block! group!]
-//  ]
-//
-REBNATIVE(sync_invisibles)
-{
-    INCLUDE_PARAMS_OF_SYNC_INVISIBLES;
-
-    // !!! This hasn't been implemented yet.  It is probably best done as
-    // an adaptation of Eval_Core() with some kind of mode flag, and
-    // would take some redesign to do efficiently.
-
-    if (VAL_LEN_AT(ARG(source)) == 0)
-        return nullptr;
-
-    RETURN (ARG(source));
-}
-
-
-//
 //  redo: native [
 //
 //  {Restart a frame's action from the top with its current state}
