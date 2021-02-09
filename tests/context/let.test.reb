@@ -87,3 +87,23 @@
         value = <value>
     ]
 )
+
+; Evaluation steps need to be able to carry forward the aggregate specifier
+; on their return results, otherwise the LET would be forgotten each time
+; you make a step.
+;
+; !!! This leads to some bad properties if you try to seek around in the
+; block you get back, e.g. if you run it again or try to do lookups of the
+; words, you'll get out of sync stuff:
+;
+; https://forum.rebol.info/t/1496
+(
+    x: <user>
+    output: '~unset~
+    block: evaluate evaluate evaluate [let x: 10 output: x]
+    did all [
+        block = []
+        output = 10
+        x = <user>
+    ]
+)

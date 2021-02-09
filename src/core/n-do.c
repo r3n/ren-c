@@ -515,25 +515,51 @@ REBNATIVE(evaluate)
     switch (VAL_TYPE(source)) {
       case REB_BLOCK:
       case REB_GROUP: {
-        REBLEN index;
         if (VAL_LEN_AT(source) == 0) {  // `evaluate []` should return null
             Init_Nulled(D_OUT);
             Init_Empty_Nulled(D_SPARE);
         }
         else {
-            if (Eval_Step_In_Any_Array_At_Throws(
-                D_SPARE,
-                &index,
-                source,
-                SPECIFIED,
-                EVAL_MASK_DEFAULT
-            )){
+            DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
+            assert(NOT_END(feed->value));  // checked for VAL_LEN_AT() == 0
+
+            DECLARE_FRAME (
+                f,
+                feed,
+                EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+            );
+
+            SET_END(D_SPARE);
+            Push_Frame(D_SPARE, f);
+            bool threw = Eval_Throws(f);  // only one step of evaluation
+
+            if (not threw) {
+                Copy_Cell(D_OUT, source);
+
+                VAL_INDEX_UNBOUNDED(D_OUT) = FRM_INDEX(f);  // new index
+
+                // There may have been a LET statement in the code.  If there
+                // was, then we have to incorporate the binding it added into
+                // the reported state *somehow*.  Right now we add it to the
+                // block we give back...though this gives rise to questionable
+                // properties, such as if the user goes backward in the block
+                // and were to evaluate it again:
+                //
+                // https://forum.rebol.info/t/1496
+                //
+                // Right now we can politely ask "don't do that", but better
+                // would probably be to make EVALUATE return something with
+                // more limited privileges... more like a FRAME!/VARARGS!.
+                //
+                INIT_BINDING_MAY_MANAGE(D_OUT, f_specifier);
+            }
+
+            Drop_Frame(f);
+
+            if (threw) {
                 Move_Cell(D_OUT, D_SPARE);
                 return R_THROWN;
             }
-
-            Copy_Cell(D_OUT, source);
-            VAL_INDEX_UNBOUNDED(D_OUT) = index;
 
             if (IS_END(D_SPARE)) {
                 //
@@ -549,10 +575,6 @@ REBNATIVE(evaluate)
                 //
                 Init_Empty_Nulled(D_SPARE);
                 Quotify(D_OUT, 1);  // void-is-invisible signal on array
-            }
-            else {
-                Copy_Cell(D_OUT, source);
-                VAL_INDEX_UNBOUNDED(D_OUT) = index;
             }
         }
         break; }  // update variable
