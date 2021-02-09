@@ -367,6 +367,7 @@ inline static void INIT_VAL_WORD_BINDING(RELVAL *v, const REBSER *binding) {
         assert(
             IS_DETAILS(binding)  // relative
             or IS_VARLIST(binding)  // specific
+            or IS_PATCH(binding)  // let
         );
     }
     else

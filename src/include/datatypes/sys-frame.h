@@ -937,9 +937,10 @@ inline static REBVAL *D_ARG_Core(REBFRM *f, REBLEN n) {  // 1 for first arg
     return Copy_Cell(D_OUT, (v))
 
 #define RETURN_INVISIBLE \
-    assert(D_OUT->header.bits & CELL_FLAG_OUT_NOTE_STALE); \
-    return D_OUT
-
+    do { \
+        assert(D_OUT->header.bits & CELL_FLAG_OUT_NOTE_STALE); \
+        return D_OUT; \
+    } while (0)
 
 // Shared code for type checking the return result.  It's used by the
 // Returner_Dispatcher(), but custom dispatchers use it to (e.g. JS-NATIVE)

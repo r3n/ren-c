@@ -163,15 +163,11 @@ load-header: function [
 
     ; get 'rebol keyword
 
-    let key
-    let rest
-    [key rest]: transcode/file/line data file 'line
+    let [key rest]: transcode/file/line data file 'line
 
     ; get header block
 
-    let hdr
-    let error
-    [hdr rest error]: transcode/file/line rest file 'line
+    let [hdr 'rest error]: transcode/file/line rest file 'line
 
     if error [fail error]
 
@@ -237,7 +233,6 @@ load-header: function [
     ] else [
         ; block-embedded script, only script compression
 
-        let data
         data: transcode data  ; decode embedded script
         rest: skip data 2  ; !!! what is this skipping ("hdr/length" ??)
 
@@ -733,7 +728,7 @@ load-module: func [
     let pos
     all [
         override?: not no-lib  ; set to false later if existing module is used
-        set [name0: mod0:] pos: try find/skip system/modules name 2
+        set [name0 mod0] pos: try find/skip system/modules name 2
     ]
     then [  ; Get existing module's info
 

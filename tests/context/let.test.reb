@@ -39,3 +39,51 @@
         x: <in-user-context>
         [<in-user-context> x 10 10] = reduce [x, let x, x: 10, get 'x]
 )]
+
+; If a LET receives a BLOCK!, then anything that is quoted will be dequoted
+; and slipped into the stream to be handled normally.
+[(
+    saved: _
+    leftq: enfixed func ['x] [saved: x]
+    let [a 'b ''(c)]: leftq
+    saved = just [a b '(c)]:
+)(
+    leftq: enfixed func ['x] [saved: x]
+    saved: let [a 'b ''(c)]
+    saved = [a b '(c)]
+)]
+
+; The quoting property of LET is used to subvert a LET binding during a
+; multiple-return value scenario, allowing you to mix and match variables
+; which are getting new bindings with existing bindings.
+(
+    value: <value>
+    pos: <pos>
+    result: do [
+        let [value 'pos]: transcode "[first item] #residue"
+        reduce [value pos]
+    ]
+    did all [
+        result = [[first item] " #residue"]
+        pos = " #residue"
+        value = <value>
+    ]
+)
+
+; GROUP!s can either be evaluated on behalf of the LET, or if escaped they
+; will be evaluated on behalf of the multi-return.  (At the moment, multi
+; return does not support GROUP!s)
+(
+    value: <value>
+    pos: <pos>
+    word: 'value
+    result: do [
+        let [(word) 'pos]: transcode "[first item] #residue"
+        reduce [value pos]
+    ]
+    did all [
+        result = [[first item] " #residue"]
+        pos = " #residue"
+        value = <value>
+    ]
+)
