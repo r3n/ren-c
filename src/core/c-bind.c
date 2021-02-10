@@ -517,6 +517,35 @@ REBNATIVE(let)
 
 
 //
+//  add-let-binding: native [
+//
+//  {Experimental function for adding a new variable binding to a frame}
+//
+//      return: [any-word!]
+//      frame [frame!]
+//      word [any-word!]
+//  ]
+//
+REBNATIVE(add_let_binding) {
+    INCLUDE_PARAMS_OF_ADD_LET_BINDING;
+
+    REBFRM *f = CTX_FRAME_IF_ON_STACK(VAL_CONTEXT(ARG(frame)));
+
+    if (f_specifier)
+        SET_SERIES_FLAG(f_specifier, MANAGED);
+    REBSPC *patch = Make_Let_Patch(VAL_WORD_SYMBOL(ARG(word)), f_specifier);
+
+    mutable_BINDING(FEED_SINGLE(f->feed)) = patch;
+
+    Move_Cell(D_OUT, ARG(word));
+    INIT_VAL_WORD_BINDING(D_OUT, patch);
+    INIT_VAL_WORD_PRIMARY_INDEX(D_OUT, 1);
+
+    return D_OUT;
+}
+
+
+//
 //  Clonify_And_Bind_Relative: C
 //
 // Recursive function for relative function word binding.  The code for
