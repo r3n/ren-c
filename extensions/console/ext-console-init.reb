@@ -89,7 +89,7 @@ console!: make object! [
   HELP    - For starting information
   ABOUT   - Information about your Rebol}
 
-    print-greeting: method [
+    print-greeting: meth [
         return: <void>
         {Adds live elements to static greeting content (build #, version)}
     ][
@@ -102,7 +102,7 @@ console!: make object! [
         boot-print greeting
     ]
 
-    print-prompt: method [return: <void>] [
+    print-prompt: meth [return: <void>] [
         ;
         ; Note: See example override in skin in the Debugger extension, which
         ; adds the stack "level" number and "current" function name.
@@ -114,7 +114,7 @@ console!: make object! [
         write-stdout space
     ]
 
-    print-result: method [return: <void> v [<opt> any-value!]] [
+    print-result: meth [return: <void> v [<opt> any-value!]] [
         switch match void! last-result: get/any 'v [
             null [
                 ; not a void, fall through to other printing
@@ -153,7 +153,7 @@ console!: make object! [
         else [
             ; print the first 20 lines of the first 2048 characters of mold
             ;
-            pos: molded: mold/limit get 'v 2048
+            let pos: let molded: mold/limit get 'v 2048
             loop 20 [
                 pos: next (find pos newline else [break])
             ] then [  ; e.g. didn't break
@@ -163,26 +163,26 @@ console!: make object! [
         ]
     ]
 
-    print-warning: method [s] [print [warning reduce s]]
+    print-warning: meth [s] [print [warning reduce s]]
 
-    print-error: method [e [error!]] [
+    print-error: meth [e [error!]] [
         if :e/file = 'tmp-boot.r [
             e/file: e/line: _  ; errors in console showed this, junk
         ]
         print [e]
     ]
 
-    print-halted: method [] [
+    print-halted: meth [] [
         print "[interrupted by Ctrl-C or HALT instruction]"
     ]
 
-    print-info: method [s] [print [info reduce s]]
+    print-info: meth [s] [print [info reduce s]]
 
-    print-gap: method [] [print newline]
+    print-gap: meth [] [print newline]
 
     === BEHAVIOR (can be overridden) ===
 
-    input-hook: method [
+    input-hook: meth [
         {Receives line input, parse/transform, send back to CONSOLE eval}
 
         return: "null if canceled, otherwise processed text line input"
@@ -191,7 +191,7 @@ console!: make object! [
         ask text!
     ]
 
-    dialect-hook: method [
+    dialect-hook: meth [
         {Receives code block, parse/transform, send back to CONSOLE eval}
         b [block!]
     ][
@@ -225,7 +225,7 @@ console!: make object! [
 
     === HELPERS (could be overridden!) ===
 
-    add-shortcut: method [
+    add-shortcut: meth [
         {Add/Change console shortcut}
         return: <void>
         name [any-word!] "Shortcut name"

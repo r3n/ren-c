@@ -133,7 +133,7 @@
 
     o2/b = 10
 )(
-    o1: make object! [a: 10 b: method [] [f: func [] [a] f]]
+    o1: make object! [a: 10 b: meth [] [f: func [] [a] f]]
     o2: make o1 [a: 20]
 
     o2/b = 20
@@ -154,13 +154,13 @@
         ]
         repeat n 256 [
             ;
-            ; fun-1: method [] [var-1]
-            ; fun-2: method [] [var-1 + var-2]
+            ; fun-1: meth [] [var-1]
+            ; fun-2: meth [] [var-1 + var-2]
             ; ...
-            ; fun-256: method [] [var-1 + var-2 ... + var-256]
+            ; fun-256: meth [] [var-1 + var-2 ... + var-256]
             ;
             keep compose [
-                (as word! unspaced ["meth-" n]): method [] (collect [
+                (as word! unspaced ["meth-" n]): meth [] (collect [
                     repeat i n [
                         keep compose [
                             (as word! unspaced ["var-" i]) (if i <> n ['+])

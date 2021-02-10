@@ -46,7 +46,7 @@ Expect crashes and mayhem.  But see BACKTRACE, RESUME, and STEP.}
     focus-frame: _
     focus-index: _
 
-    print-greeting: method [return: <void>] [
+    print-greeting: meth [return: <void>] [
         ;
         ; We override in order to avoid printing out the redundant Rebol
         ; version information (and to print the greeting only once, which
@@ -83,7 +83,7 @@ Expect crashes and mayhem.  But see BACKTRACE, RESUME, and STEP.}
         write-stdout space
     ]
 
-    dialect-hook: method [
+    dialect-hook: meth [
         {Receives code block, parse/transform, send back to CONSOLE eval}
         b [block!]
     ][

@@ -691,7 +691,7 @@ inline static option(REBARR*) Get_Word_Container(
         // contained in the `any_word` REBVAL payload.  Extract it, but check
         // to see if there is an override via "DERIVED BINDING", e.g.:
         //
-        //    o1: make object [a: 10 f: method [] [print a]]
+        //    o1: make object [a: 10 f: meth [] [print a]]
         //    o2: make o1 [a: 20]
         //
         // O2 doesn't copy F's body, but its copy of the ACTION! cell in o2/f

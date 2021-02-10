@@ -132,6 +132,30 @@ undefined?: :unset?
 collect*: :collect
 collect: :collect-block
 
+collect-lets: func [
+    return: [block!]
+    array [block! group!]
+    <local> lets
+][
+    lets: copy []
+    for-next item array [
+        case [
+            item/1 = 'let [
+                item: next item
+                if match [set-word! word! block!] item/1 [
+                    append lets item/1
+                ]
+            ]
+            value? match [block! group!] item/1 [
+                append lets collect-lets item/1
+            ]
+        ]
+    ]
+    return lets
+]
+
+let: :nihil
+
 modernize-action: function [
     "Account for <blank> annotation, refinements as own arguments"
     return: [block!]
@@ -234,6 +258,14 @@ modernize-action: function [
             spec: my next
         ]
     ]
+
+    ; The bootstrap executable does not have support for true dynamic LET.
+    ; We approximate it by searching the body for LET followed by SET-WORD!
+    ; or WORD! and add that to locals.
+    ;
+    append spec <local>
+    append spec collect-lets body
+
     body: compose [
         ((blankers))
         ((proxiers))
@@ -246,7 +278,9 @@ func: adapt :func [set [spec body] modernize-action spec body]
 function: adapt :function [set [spec body] modernize-action spec body]
 
 meth: enfixed adapt :meth [set [spec body] modernize-action spec body]
-method: enfixed adapt :method [set [spec body] modernize-action spec body]
+method: func [/dummy] [
+    fail 'dummy "METHOD deprecated temporarily, use METH"
+]
 
 trim: adapt :trim [  ; there's a bug in TRIM/AUTO in 8994d23
     if auto [

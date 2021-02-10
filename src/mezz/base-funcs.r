@@ -813,13 +813,6 @@ meth: enfixed func [
     ) context
 ]
 
-; See notes on the future where FUNC and FUNCTION are synonyms (same will be
-; true of METH and METHOD:
-;
-; https://forum.rebol.info/t/rethinking-auto-gathered-set-word-locals/1150
-;
-method: enfixed :meth/gather
-
 
 module: func [
     {Creates a new module}

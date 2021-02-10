@@ -104,7 +104,7 @@
 )(
     o1: make object! [
         a: 10
-        b: method [] [f: does [a] f]
+        b: meth [] [f: does [a] f]
     ]
     o2: make o1 [a: 20]
 

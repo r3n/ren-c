@@ -107,17 +107,17 @@ elf-format: context [
     ; explicit at the callsites.
     ;
     mode: _
-    handler: function [name [word!] num-bytes [integer!]] [
+    handler: func [name [word!] num-bytes [integer!]] [
         assert [
             binary? begin, num-bytes <= length of begin,
             find [read write] mode
         ]
 
         either mode = 'read [
-            bin: copy/part begin num-bytes
+            let bin: copy/part begin num-bytes
             set name debin [(either endian = 'little ['le] ['be]) +] bin
         ][
-            val: ensure integer! get name
+            let val: ensure integer! get name
             change begin enbin [
                 (either endian = 'little ['le] ['be]) + (num-bytes)
             ] val
@@ -228,22 +228,22 @@ elf-format: context [
         (mode: _)
     ]
 
-    find-section: method [
+    find-section: meth [
         return: [<opt> integer!]
             {The index of the section header with encap (sh_xxx vars set)}
         name [text!]
         section-headers [binary!]
         string-section [binary!]
     ][
-        index: 0
+        let index: 0
         parse section-headers [
             (assert [integer? e_shnum])
             e_shnum [ ; the number of times to apply the rule
                 (mode: 'read) section-header-rule
                 (
-                    name-start: skip string-section sh_name
-                    name-end: ensure binary! find name-start #{00}
-                    section-name: to-text copy/part name-start name-end
+                    let name-start: skip string-section sh_name
+                    let name-end: ensure binary! find name-start #{00}
+                    let section-name: to-text copy/part name-start name-end
                     if name = section-name [
                         return index  ; sh_offset, sh_size, etc. are set
                     ]
@@ -255,7 +255,7 @@ elf-format: context [
         return null
     ]
 
-    update-offsets: method [
+    update-offsets: meth [
         {Adjust headers to account for insertion or removal of data @ offset}
 
         return: <void>
@@ -278,6 +278,7 @@ elf-format: context [
 
         assert [e_shoff >= offset]  ; section headers are after any changes
 
+        let pos
         parse skip executable e_shoff [
             e_shnum [
                 (mode: 'read) pos: section-header-rule
@@ -290,7 +291,7 @@ elf-format: context [
         ]
     ]
 
-    update-embedding: method [
+    update-embedding: meth [
         return: <void>
         executable [binary!]
             {Executable to be mutated to either add or update an embedding}
@@ -300,7 +301,7 @@ elf-format: context [
         ; tail or not--which indicates some other app added data using the
         ; simple concatenation method of "poor man's encap"
         ;
-        section-header-tail: e_shoff + (e_shnum * e_shentsize)
+        let section-header-tail: e_shoff + (e_shnum * e_shentsize)
         case [
             section-header-tail = length of executable [
                 print "Executable has no appended data past ELF image size"
@@ -319,7 +320,7 @@ elf-format: context [
         ; The string names of the sections are themselves stored in a section,
         ; (at index `e_shstrndx`)
         ;
-        string-header-offset: e_shoff + (e_shstrndx * e_shentsize)
+        let string-header-offset: e_shoff + (e_shstrndx * e_shentsize)
 
         parse skip executable string-header-offset [
             (mode: 'read) section-header-rule to end
@@ -327,8 +328,8 @@ elf-format: context [
             fail "Error finding string section in ELF binary"
         ]
 
-        string-section-offset: sh_offset
-        string-section-size: sh_size
+        let string-section-offset: sh_offset
+        let string-section-size: sh_size
 
         ; Now that we have the string section, we can go through the
         ; section names and see if there's any match for an existing encap
@@ -355,8 +356,8 @@ elf-format: context [
                 "]"
             ]
 
-            old-size: sh_size
-            new-size: length of embedding
+            let old-size: sh_size
+            let new-size: length of embedding
 
             ; Update the size of the embedded section in it's section header
             ;
@@ -369,7 +370,7 @@ elf-format: context [
             ; Adjust all the program and section header offsets that are
             ; affected by this movement
             ;
-            delta: new-size - old-size
+            let delta: new-size - old-size
             print ["Updating embedding by delta of" delta "bytes."]
             (update-offsets
                 executable
@@ -422,7 +423,7 @@ elf-format: context [
             ; Start by cloning the string table section, and assume that its
             ; fields will be mostly okay for the platform.
             ;
-            (new-section-header: copy/part
+            let new-section-header: (copy/part
                 (skip executable string-header-offset) e_shentsize)
 
             ; Tweak the fields of the copy to be SHT_NOTE, which is used for
@@ -486,17 +487,17 @@ elf-format: context [
         ]
     ]
 
-    get-embedding: method [
+    get-embedding: meth [
         return: [<opt> binary!]
         file [file!]
     ][
-        header-data: read/part file 64 ; 64-bit size, 32-bit is smaller
+        let header-data: read/part file 64 ; 64-bit size, 32-bit is smaller
 
         parse header-data [(mode: 'read) header-rule to end] else [
             return null
         ]
 
-        section-headers-data:
+        let section-headers-data:
             read/seek/part file e_shoff (e_shnum * e_shentsize)
 
         ; The string names of the sections are themselves stored in a section,
@@ -508,12 +509,12 @@ elf-format: context [
             fail "Error finding string section in ELF binary"
         ]
 
-        string-section-data: read/seek/part file sh_offset sh_size
+        let string-section-data: read/seek/part file sh_offset sh_size
 
         ; Now that we have the string section, we can go through the
         ; section names and see if there's any match for an existing encap
         ;
-        section-index: (
+        let section-index: (
             find-section
                 encap-section-name
                 section-headers-data
@@ -561,23 +562,19 @@ pe-format: context [
 
     uintptr-le: uintptr-32-le  ; assume 32-bit unless discovered otherwise
 
-    gen-rule: function [
+    gen-rule: func [
         "Collect set-words in @rule to make into an object saved in @name"
         return: [block!]
         rule [block!]
         'name [word!]
         /skip "Do not collect these words"
             [word! block!]
-        <local>
-        word
-        skips
-        def
-        find-a-word
     ][
-        words: skip
+        let words: skip
         skip: :lib/skip
 
-        find-a-word: func [
+        let def: make block! 1
+        let find-a-word: func [
             return: <void>
             word [any-word!]
         ][
@@ -600,8 +597,9 @@ pe-format: context [
             words: [err]
         ]
 
-        def: make block! 1
-        group-rule: [
+        let word
+        let block-rule
+        let group-rule: [
             set word set-word!
             (find-a-word word)
             | and block! into block-rule ;recursively look into the array
@@ -788,11 +786,11 @@ pe-format: context [
         reverse skip (to binary! i) 6
     ]
 
-    align-to: function [
+    align-to: func [
         offset [integer!]
         align [integer!]
     ][
-        if zero? rem: remainder offset align [
+        if zero? let rem: remainder offset align [
             offset
         ] else [
             offset + align - rem
@@ -812,7 +810,7 @@ pe-format: context [
         clear data-directories
     ]
 
-    parse-exe: function [
+    parse-exe: func [
         exe-data [binary!]
     ][
         reset
@@ -823,12 +821,12 @@ pe-format: context [
         true
     ]
 
-    update-section-header: function [
+    update-section-header: func [
         return: <void>
         pos [binary!]
         section [object!]
     ][
-        change pos new-section: join-all [
+        change pos let new-section: join-all [
             copy/part (head of insert/dup
                 tail of to binary! copy section/name
                 #{00}
@@ -857,7 +855,7 @@ pe-format: context [
         assert [size-of-section-header = length of new-section]
     ]
 
-    add-section: function [
+    add-section: func [
         "Add a new section to the exe, modify in place"
         exe-data [binary!]
         section-name [text!]
@@ -910,18 +908,19 @@ pe-format: context [
 
         sort/compare sections func [a b][a/virtual-offset < b/virtual-offset]
 
-        last-section-by-virt-offset: sections/(COFF-header/number-of-sections)
+        let last-section-by-virt-offset:
+            sections/(COFF-header/number-of-sections)
 
-        last-virt-offset: align-to
+        let last-virt-offset: align-to
             (last-section-by-virt-offset/virtual-offset
                 + last-section-by-virt-offset/virtual-size)
             4096
 
-        new-section-size: align-to
+        let new-section-size: align-to
             (length of section-data)
             PE-optional-header/file-alignment ; physical size
 
-        new-section-offset:
+        let new-section-offset:
             last-section-by-phy-offset/physical-offset
             + last-section-by-phy-offset/physical-size
 
@@ -936,7 +935,7 @@ pe-format: context [
 
         ; add a new section header
         ;
-        new-section-header: make section [
+        let new-section-header: make section [
             name: section-name
             virtual-size: length of section-data
             virtual-offset: last-virt-offset
@@ -985,7 +984,7 @@ pe-format: context [
         head of exe-data
     ]
 
-    find-section: function [
+    find-section: func [
         "Find a section to the exe"
         return: [<opt> binary!]
         exe-data [binary!]
@@ -1002,7 +1001,7 @@ pe-format: context [
 
         ;check if there's section name conflicts
 
-        target-sec: try catch [
+        let target-sec: try catch [
             for-each sec sections [
                 if section-name = to text! trim/with sec/name #{00} [
                     throw sec
@@ -1028,7 +1027,7 @@ pe-format: context [
         ]
     ]
 
-    update-section: function [
+    update-section: func [
         return: [binary!]
         exe-data [binary!]
         section-name [text!]
@@ -1036,15 +1035,15 @@ pe-format: context [
     ][
         ; FIND-SECTION will parse exe-data
         ;
-        target-sec: find-section/header exe-data section-name else [
+        let target-sec: find-section/header exe-data section-name else [
             return add-section exe-data section-name section-data
         ]
 
-        new-section-size: align-to
+        let new-section-size: align-to
             (length of section-data)
             PE-optional-header/file-alignment
 
-        section-size-diff: new-section-size - target-sec/physical-size
+        let section-size-diff: new-section-size - target-sec/physical-size
         if not zero? section-size-diff [
             new-image-size: to-u32-le align-to
                 (PE-optional-header/image-size + section-size-diff)
@@ -1055,7 +1054,7 @@ pe-format: context [
             ]
         ]
 
-        pos: start-of-section-header
+        let pos: start-of-section-header
         for-each sec sections [
             if sec/physical-offset > target-sec/physical-size [
                 ;update the offset affected sections
@@ -1077,13 +1076,13 @@ pe-format: context [
         return (head of exe-data, elide reset)
     ]
 
-    remove-section: function [
+    remove-section: func [
         exe-data [binary!]
         section-name [text!]
     ][
         ; FIND-SECTION will parse exe-data
         ;
-        target-sec: find-section/header exe-data section-name
+        let target-sec: find-section/header exe-data section-name
         ;dump target-sec
 
         ;dump COFF-header
@@ -1098,7 +1097,7 @@ pe-format: context [
                 to-u32-le (PE-optional-header/image-size - image-size-diff)
         ]
 
-        pos: start-of-section-header
+        let pos: start-of-section-header
         for-each sec sections [
             print to text! sec/name
             ;dump sec
@@ -1140,12 +1139,12 @@ pe-format: context [
         section-name: encap-section-name
     ]
 
-    get-embedding: function [
+    get-embedding: func [
         return: [<opt> binary!]
         file [file!]
     ][
         ;print ["Geting embedded from" mold file]
-        exe-data: read file
+        let exe-data: read file
 
         return (find-section/data exe-data encap-section-name, elide reset)
     ]
@@ -1155,7 +1154,7 @@ generic-format: context [
     signature: to-binary "ENCAP000"
     sig-length: length of signature
 
-    update-embedding: method [
+    update-embedding: meth [
         return: <void>
         executable [binary!]
             {Executable to be mutated to either add or update an embedding}
@@ -1171,8 +1170,8 @@ generic-format: context [
             sig-location = signature [
                 print "Binary contains encap version 0 data block."
 
-                size-location: skip sig-location -8
-                embed-size: debin [be +] copy/part size-location 8
+                let size-location: skip sig-location -8
+                let embed-size: debin [be +] copy/part size-location 8
                 print ["Existing embedded data is" embed-size "bytes long."]
 
                 print ["Trimming out existing embedded data."]
@@ -1197,27 +1196,26 @@ generic-format: context [
 
         append executable embedding
 
-        size-as-binary: enbin [be + 8] length of embedding
-        append executable size-as-binary
+        append executable enbin [be + 8] length of embedding  ; size as binary
 
         append executable signature
     ]
 
-    get-embedding: method [
+    get-embedding: meth [
         return: [<opt> binary!]
         file [file!]
     ][
-        info: query file
+        let info: query file
 
-        test-sig: read/seek/part file (info/size - sig-length) sig-length
+        let test-sig: read/seek/part file (info/size - sig-length) sig-length
 
         if test-sig != signature [return null]
 
-        embed-size: debin [be +] (
+        let embed-size: debin [be +] (
             read/seek/part file (info/size - sig-length - 8) 8
         )
 
-        embed: read/seek/part file (
+        let embed: read/seek/part file (
             info/size - sig-length - 8 - embed-size
         ) embed-size
 
@@ -1226,7 +1224,7 @@ generic-format: context [
 ]
 
 
-encap: function [
+encap: func [
     return: "Path location of the resulting output"
         [file!]
     spec "Single script to embed, directory to zip with main.reb, or dialect"
@@ -1239,24 +1237,23 @@ encap: function [
     ]
 
     rebol: default [system/options/boot]
-    either ".exe" = base-name: skip tail of rebol -4 [
-        out-rebol-path: join
-            copy/part rebol (index of base-name) - 1
-            "-encap.exe"
+    let out-rebol-path: either ".exe" = base-name: skip tail of rebol -4 [
+        join (copy/part rebol (index of base-name) - 1) "-encap.exe"
     ][
-        out-rebol-path: join rebol "-encap"
+        join rebol "-encap"
     ]
 
     print ["Encapping from original executable:" rebol]
 
-    executable: read in-rebol-path
+    let executable: read in-rebol-path
 
     print ["Original executable is" length of executable "bytes long."]
 
-    single-script: not dir? spec
+    let single-script: not dir? spec
 
+    let compressed
     either single-script [
-        embed: read spec
+        let embed: read spec
         print ["New embedded resource size is" length of embed "bytes long."]
 
         compressed: gzip embed
@@ -1304,7 +1301,10 @@ encap: function [
 
     ; !!! Currently only test the extraction for single-file, easier.
     ;
-    all [single-script, embed != extracted: get-encap out-rebol-path] then [
+    all [
+        single-script
+        embed != let extracted: get-encap out-rebol-path
+    ] then [
         print ["Test extraction size:" length of extracted]
         print ["Embedded bytes" mold embed]
         print ["Extracted bytes" mold extracted]
@@ -1316,7 +1316,7 @@ encap: function [
 ]
 
 
-get-encap: function [
+get-encap: func [
     return: [blank! binary! block!]
         {Blank if no encapping found, binary if single file, block if archive}
     rebol-path [file!]
@@ -1331,7 +1331,7 @@ get-encap: function [
     ]
 
     compressed-data: any [
-        , elf-format/get-embedding rebol-path
+        , elf-format/get-embedding rebol-path,
         , pe-format/get-embedding rebol-path
         , generic-format/get-embedding rebol-path
     ] else [
@@ -1343,7 +1343,7 @@ get-encap: function [
             return gunzip next compressed-data
         ]
         1 [
-            block: copy []
+            let block: copy []
             unzip/quiet block next compressed-data
             return block
         ]

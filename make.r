@@ -694,7 +694,7 @@ extension-class: make object! [
     sequence: _ ; the sequence in which the extension should be loaded
     visited: false
 
-    directory: method [
+    directory: meth [
         return: [text!]  ; Should this be [file!]?
     ][
         lowercase to text! name  ; !!! Should remember where it was found
