@@ -31,6 +31,8 @@
 #include "sys-core.h"
 #include "sys-int-funcs.h"
 
+#include "sys-zlib.h"  // for crc32_z()
+
 #include "datatypes/sys-money.h"
 
 
@@ -831,7 +833,7 @@ REBTYPE(Binary)
         if (REF(seed)) { // binary contents are the seed
             REBSIZ size;
             const REBYTE *data = VAL_BINARY_SIZE_AT(&size, v);
-            Set_Random(Compute_CRC24(data, size));
+            Set_Random(crc32_z(0L, data, size));
             return Init_Void(D_OUT, SYM_VOID);
         }
 

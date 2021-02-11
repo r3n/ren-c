@@ -157,6 +157,10 @@
     template <>
     inline REBCHR(*) m_cast_helper(REBCHR(const*) v)
       { return RebchrPtr<REBYTE*> {const_cast<REBYTE*>(v.bp)}; }
+
+    template <>
+    inline REBCHR(*) m_cast_helper(REBCHR(*) v)
+      { return v; }  // m_cast() is supposed to be able to be a no-op
   #else
     #error "DEBUG_UTF8_EVERYWHERE currently requires DEBUG_CHECK_CASTS"
   #endif

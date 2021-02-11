@@ -410,6 +410,11 @@
      * actual power.  cast becomes a reinterpret_cast for pointers and a
      * static_cast otherwise.  We ensure c_cast added a const and m_cast
      * removed one, and that neither affected volatility.
+     *
+     * NOTE: m_cast_helper() may seem like overkill, but it's actually needed
+     * as a hook point to overload casting with smart pointer types, e.g.
+     * `m_cast(REBCHR(*), some_const_rebchr)`.  Search for overloads of the
+     * m_cast_helper() in certain builds before deciding to simplify this.
      */
     template<typename T, typename V>
     T m_cast_helper(V v) {

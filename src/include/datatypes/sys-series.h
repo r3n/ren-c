@@ -551,7 +551,7 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
     // at the byte level.  The higher level string mechanics must be used on
     // strings.
     //
-    if (GET_SERIES_FLAG(s, IS_STRING)) {
+    if (IS_NONSYMBOL_STRING(s)) {
         s->misc.length = 0xDECAFBAD;
         TOUCH_SERIES_IF_DEBUG(s);
     }

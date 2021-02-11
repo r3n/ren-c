@@ -24,6 +24,8 @@
 
 #include "sys-core.h"
 
+#include "sys-zlib.h"  // for crc32_z()
+
 #include "sys-int-funcs.h"
 
 #include "datatypes/sys-money.h"
@@ -1138,7 +1140,7 @@ REBTYPE(String)
 
             REBSIZ utf8_size;
             REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
-            Set_Random(Compute_CRC24(utf8, utf8_size));
+            Set_Random(crc32_z(0L, utf8, utf8_size));
             return Init_Void(D_OUT, SYM_VOID);
         }
 

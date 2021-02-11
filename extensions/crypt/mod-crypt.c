@@ -65,7 +65,6 @@
 #include "tmp-mod-crypt.h"
 
 
-
 // Most routines in mbedTLS return either `void` or an `int` code which is
 // 0 on success and negative numbers on error.  This macro helps generalize
 // the pattern of trying to build a result and having a cleanup (similar
@@ -229,9 +228,15 @@ REBNATIVE(checksum)
     // Look up some internally available methods.
     //
     if (0 == strcmp(method_name, "CRC24")) {
+        //
+        // See %crc24-unused.c for explanation; all internal fast hashes now
+        // use zlib's crc32_z(), since it is a sunk cost.
+        //
+        fail ("CRC24 is currently disabled, speak up if you actually use it");
+        /*
         rebFree(method_name);
         Init_Integer(D_SPARE, Compute_CRC24(data, size));
-        return rebValue("enbin [le + 3]", D_SPARE, rebEND);
+        return rebValue("enbin [le + 3]", D_SPARE, rebEND); */
     }
     if (0 == strcmp(method_name, "CRC32")) {
         //

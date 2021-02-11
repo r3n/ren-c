@@ -29,147 +29,76 @@
 #include "sys-zlib.h" // re-use CRC code from zlib
 const z_crc_t *crc32_table; // pointer to the zlib CRC32 table
 
-#define CRCBITS 24 // may be 16, 24, or 32
-
-#define MASK_CRC(crc) \
-    ((crc) & INT32_C(0x00ffffff)) // if CRCBITS is 24
-
-#define CRCHIBIT \
-    cast(REBLEN, INT32_C(1) << (CRCBITS - 1)) // 0x8000 if CRCBITS is 16
-
-#define CRCSHIFTS (CRCBITS-8)
-#define CCITTCRC 0x1021     /* CCITT's 16-bit CRC generator polynomial */
-#define PRZCRC   0x864cfb   /* PRZ's 24-bit CRC generator polynomial */
-#define CRCINIT  0xB704CE   /* Init value for CRC accumulator */
-
-static REBLEN *crc24_table;
-
-//
-//  Generate_CRC24: C
-//
-// Simulates CRC hardware circuit.  Generates true CRC
-// directly, without requiring extra NULL bytes to be appended
-// to the message. Returns new updated CRC accumulator.
-//
-// These CRC functions are derived from code in chapter 19 of the book
-// "C Programmer's Guide to Serial Communications", by Joe Campbell.
-// Generalized to any CRC width by Philip Zimmermann.
-//
-//     CRC-16        X^16 + X^15 + X^2 + 1
-//     CRC-CCITT    X^16 + X^12 + X^2 + 1
-//
-// Notes on making a good 24-bit CRC:
-// The primitive irreducible polynomial of degree 23 over GF(2),
-// 040435651 (octal), comes from Appendix C of "Error Correcting Codes,
-// 2nd edition" by Peterson and Weldon, page 490.  This polynomial was
-// chosen for its uniform density of ones and zeros, which has better
-// error detection properties than polynomials with a minimal number of
-// nonzero terms.    Multiplying this primitive degree-23 polynomial by
-// the polynomial x+1 yields the additional property of detecting any
-// odd number of bits in error, which means it adds parity.  This
-// approach was recommended by Neal Glover.
-//
-// To multiply the polynomial 040435651 by x+1, shift it left 1 bit and
-// bitwise add (xor) the unshifted version back in.  Dropping the unused
-// upper bit (bit 24) produces a CRC-24 generator bitmask of 041446373
-// octal, or 0x864cfb hex.
-//
-// You can detect spurious leading zeros or framing errors in the
-// message by initializing the CRC accumulator to some agreed-upon
-// nonzero "random-like" value, but this is a bit nonstandard.
-//
-static REBLEN Generate_CRC24(REBYTE ch, REBLEN poly, REBLEN accum)
-{
-    REBINT i;
-    REBLEN data;
-
-    data = ch;
-    data <<= CRCSHIFTS;     /* shift data to line up with MSB of accum */
-    i = 8;                  /* counts 8 bits of data */
-    do {    /* if MSB of (data XOR accum) is TRUE, shift and subtract poly */
-        if ((data ^ accum) & CRCHIBIT) accum = (accum<<1) ^ poly;
-        else accum <<= 1;
-        data <<= 1;
-    } while (--i);  /* counts 8 bits of data */
-    return (MASK_CRC(accum));
-}
-
-
-//
-//  Make_CRC24_Table: C
-//
-// Derives a CRC lookup table from the CRC polynomial.
-// The table is used later by crcupdate function given below.
-// Only needs to be called once at the dawn of time.
-//
-static void Make_CRC24_Table(REBLEN poly)
-{
-    REBINT i;
-
-    for (i = 0; i < 256; i++)
-        crc24_table[i] = Generate_CRC24(cast(REBYTE, i), poly, 0);
-}
-
-
-//
-//  Compute_CRC24: C
-//
-// Rebol had canonized signed numbers for CRCs, and the signed logic
-// actually does turn high bytes into negative numbers so they
-// subtract instead of add *during* the calculation.  Hence the casts
-// are necessary so long as compatibility with the historical results
-// of the CHECKSUM native is needed.
-//
-REBINT Compute_CRC24(const REBYTE *str, REBLEN len)
-{
-    REBINT crc = cast(REBINT, len) + cast(REBINT, cast(REBYTE, *str));
-
-    for (; len > 0; len--) {
-        REBYTE n = cast(REBYTE, (crc >> CRCSHIFTS) ^ cast(REBYTE, *str++));
-
-        // Left shift math must use unsigned to avoid undefined behavior
-        // http://stackoverflow.com/q/3784996/211160
-        crc = cast(REBINT, MASK_CRC(cast(REBLEN, crc) << 8) ^ crc24_table[n]);
-    }
-
-    return crc;
-}
-
 
 //
 //  Hash_UTF8: C
 //
-// Return a case insensitive hash value for the string.
+// Return a case-insensitive hash value for UTF-8 data that has not previously
+// been validated, with the size in bytes.
 //
-REBINT Hash_UTF8(const REBYTE *utf8, REBSIZ size)
+// See also: Hash_UTF8_Caseless(), which works with already validated UTF-8
+// bytes and takes a length in codepoints instead of a byte size.
+//
+uint32_t Hash_Scan_UTF8_Caseless_May_Fail(const REBYTE *utf8, REBSIZ size)
 {
-    REBINT hash =
-        cast(REBINT, size) + cast(REBINT, cast(REBYTE, LO_CASE(*utf8)));
+    uint32_t crc = 0x00000000;
 
     for (; size != 0; ++utf8, --size) {
-        REBUNI n = *utf8;
+        REBUNI c = *utf8;
 
-        if (n >= 0x80) {
-            utf8 = Back_Scan_UTF8_Char(&n, utf8, &size);
-            assert(utf8 != NULL); // should have already been verified good
+        if (c >= 0x80) {
+            utf8 = Back_Scan_UTF8_Char(&c, utf8, &size);
+            if (utf8 == nullptr)
+                fail (Error_Bad_Utf8_Raw());
         }
 
-        // Optimize `n = cast(REBYTE, LO_CASE(n))` (drop upper 8 bits)
-        // !!! Is this actually faster?
-        //
-        n = cast(REBYTE, LO_CASE(n));
+        c = LO_CASE(c);
 
-        n = cast(REBYTE, (hash >> CRCSHIFTS) ^ n);
-
-        // Left shift math must use unsigned to avoid undefined behavior
-        // http://stackoverflow.com/q/3784996/211160
+        // !!! This takes into account all 4 bytes of the lowercase codepoint
+        // for the CRC calculation.  In ASCII strings this will involve a lot
+        // of zeros.  Review if there's a better way.
         //
-        hash = cast(REBINT, MASK_CRC(cast(REBLEN, hash) << 8) ^ crc24_table[n]);
+        crc = (crc >> 8) ^ crc32_table[(crc ^ c) & 0xff];
+        crc = (crc >> 8) ^ crc32_table[(crc ^ (c >> 8)) & 0xff];
+        crc = (crc >> 8) ^ crc32_table[(crc ^ (c >> 16)) & 0xff];
+        crc = (crc >> 8) ^ crc32_table[(crc ^ (c >> 24)) & 0xff];
     }
 
-    return hash;
+    return ~crc;
 }
 
+
+//
+//  Hash_UTF8_Caseless: C
+//
+// Return a 32-bit case insensitive hash value for known valid UTF-8 data.
+// Length is in characters, not bytes.
+//
+// See also: Hash_Scan_UTF8_Caseless_May_Fail(), which takes unverified
+// UTF8 and a byte count instead.
+//
+uint32_t Hash_UTF8_Caseless(REBCHR(const*) cp, REBLEN len) {
+    uint32_t crc = 0x00000000;
+
+    REBLEN n;
+    for (n = 0; n < len; n++) {
+        REBUNI c;
+        cp = NEXT_CHR(&c, cp);
+
+        c = LO_CASE(c);
+
+        // !!! This takes into account all 4 bytes of the lowercase codepoint
+        // for the CRC calculation.  In ASCII strings this will involve a lot
+        // of zeros.  Review if there's a better way.
+        //
+        crc = (crc >> 8) ^ crc32_table[(crc ^ c) & 0xff];
+        crc = (crc >> 8) ^ crc32_table[(crc ^ (c >> 8)) & 0xff];
+        crc = (crc >> 8) ^ crc32_table[(crc ^ (c >> 16)) & 0xff];
+        crc = (crc >> 8) ^ crc32_table[(crc ^ (c >> 24)) & 0xff];
+    }
+
+    return ~crc;
+}
 
 
 //
@@ -576,51 +505,10 @@ REBINT Hash_Bytes(const REBYTE *data, REBLEN len) {
 
 
 //
-//  Hash_UTF8_Caseless: C
-//
-// Return a 32-bit case insensitive hash value for UTF-8 data.  Length is in
-// characters, not bytes.
-//
-// !!! See redundant code in Hash_UTF8 which takes a size, not a length
-//
-REBINT Hash_UTF8_Caseless(const REBYTE *utf8, REBLEN len) {
-    //
-    // Note: can't make the argument a REBCHR() because the C++ build and C
-    // build can't have different ABIs for %sys-core.h
-    //
-    REBCHR(const*) cp = cast(REBCHR(const*), utf8);
-
-    uint32_t crc = 0x00000000;
-
-    REBLEN n;
-    for (n = 0; n < len; n++) {
-        REBUNI c;
-        cp = NEXT_CHR(&c, cp);
-
-        c = LO_CASE(c);
-
-        // !!! This takes into account all 4 bytes of the lowercase codepoint
-        // for the CRC calculation.  In ASCII strings this will involve a lot
-        // of zeros.  Review if there's a better way.
-        //
-        crc = (crc >> 8) ^ crc32_table[(crc ^ c) & 0xff];
-        crc = (crc >> 8) ^ crc32_table[(crc ^ (c >> 8)) & 0xff];
-        crc = (crc >> 8) ^ crc32_table[(crc ^ (c >> 16)) & 0xff];
-        crc = (crc >> 8) ^ crc32_table[(crc ^ (c >> 24)) & 0xff];
-    }
-
-    return cast(REBINT, ~crc);
-}
-
-
-//
 //  Startup_CRC: C
 //
 void Startup_CRC(void)
 {
-    crc24_table = TRY_ALLOC_N(REBLEN, 256);
-    Make_CRC24_Table(PRZCRC);
-
     // If Zlib is built with DYNAMIC_CRC_TABLE, then the first call to
     // get_crc_table() will initialize crc_table (for CRC32).  Otherwise the
     // table is precompiled-in.
@@ -636,6 +524,4 @@ void Shutdown_CRC(void)
 {
     // Zlib's DYNAMIC_CRC_TABLE uses a global array, that is not malloc()'d,
     // so nothing to free.
-
-    FREE_N(REBLEN, 256, crc24_table);
 }

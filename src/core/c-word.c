@@ -218,7 +218,7 @@ const REBSYM *Intern_UTF8_Managed(const REBYTE *utf8, size_t size)
     REBLEN skip; // how many slots to skip when occupied candidates found
     REBLEN slot = First_Hash_Candidate_Slot(
         &skip,
-        Hash_UTF8(utf8, size),
+        Hash_Scan_UTF8_Caseless_May_Fail(utf8, size),
         num_slots
     );
 
