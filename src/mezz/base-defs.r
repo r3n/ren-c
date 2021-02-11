@@ -87,8 +87,23 @@ and-not+: enfixed :bitwise-and-not
 <: enfixed :lesser?
 >: enfixed :greater?
 
+; "Official" forms of the comparison operators.  This is what we would use
+; if starting from scratch, and didn't have to deal with expectations people
+; have coming from other languages: https://forum.rebol.info/t/349/
+;
 >=: enfixed :greater-or-equal?
-=<: <=: enfixed :equal-or-lesser?  ; https://forum.rebol.info/t/349/11
+=<: enfixed :equal-or-lesser?
+
+; Compatibility Compromise: sacrifice what looks like left and right arrows
+; for usage as comparison, even though the perfectly good `=<` winds up
+; being unused as a result.  Compromise `=>` just to reinforce what is lost
+; by not retraining: https://forum.rebol.info/t/349/11
+;
+equal-or-greater?: :greater-or-equal?
+lesser-or-equal?: :equal-or-lesser?
+=>: enfixed :equal-or-greater?
+<=: enfixed :lesser-or-equal?
+
 !=: enfixed :not-equal?  ; http://www.rebol.net/r3blogs/0017.html
 ==: enfixed :strict-equal?  ; !!! https://forum.rebol.info/t/349
 !==: enfixed :strict-not-equal?  ; !!! bad pairing, most would think !=
