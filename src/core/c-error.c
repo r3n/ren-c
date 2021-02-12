@@ -229,26 +229,6 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     printf("%ld\n", cast(long, TG_Tick));  /* tick count prefix */
   #endif
 
-  #ifdef DEBUG_HAS_PROBE
-    if (PG_Probe_Failures) {  // see R3_PROBE_FAILURES environment variable
-        static bool probing = false;
-
-        if (p == cast(void*, VAL_CONTEXT(Root_Stackoverflow_Error))) {
-            printf("PROBE(Stack Overflow): mold in PROBE would recurse\n");
-            fflush(stdout);
-        }
-        else if (probing) {
-            printf("PROBE(Recursing): recursing for unknown reason\n");
-            panic (p);
-        }
-        else {
-            probing = true;
-            PROBE(p);
-            probing = false;
-        }
-    }
-  #endif
-
     REBCTX *error;
     if (p == nullptr) {
         error = Error_Unknown_Error_Raw();
@@ -292,19 +272,6 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     ASSERT_CONTEXT(error);
     assert(CTX_TYPE(error) == REB_ERROR);
 
-    // If we raise the error we'll lose the stack, and if it's an early
-    // error we always want to see it (do not use ATTEMPT or TRY on
-    // purpose in Startup_Core()...)
-    //
-    if (PG_Boot_Phase < BOOT_DONE)
-        panic (error);
-
-    // There should be a PUSH_TRAP of some kind in effect if a `fail` can
-    // ever be run.
-    //
-    if (TG_Jump_List == nullptr)
-        panic (error);
-
   #ifdef DEBUG_EXTANT_STACK_POINTERS
     //
     // We trust that the stack levels were checked on each evaluator step as
@@ -318,7 +285,8 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
     TG_Stack_Outstanding = 0;
   #endif
 
-    // If the error doesn't have a where/near set, set it from stack
+    // If the error doesn't have a where/near set, set it from stack.  Do
+    // this before the PROBE() of the error, so the information is useful.
     //
     // !!! Do not do this for out off memory errors, as it allocates memory.
     // If this were to be done there would have to be a preallocated array
@@ -329,6 +297,39 @@ ATTRIBUTE_NO_RETURN void Fail_Core(const void *p)
         if (IS_NULLED_OR_BLANK(&vars->where))
             Set_Location_Of_Error(error, FS_TOP);
     }
+
+  #ifdef DEBUG_HAS_PROBE
+    if (PG_Probe_Failures) {  // see R3_PROBE_FAILURES environment variable
+        static bool probing = false;
+
+        if (p == cast(void*, VAL_CONTEXT(Root_Stackoverflow_Error))) {
+            printf("PROBE(Stack Overflow): mold in PROBE would recurse\n");
+            fflush(stdout);
+        }
+        else if (probing) {
+            printf("PROBE(Recursing): recursing for unknown reason\n");
+            panic (p);
+        }
+        else {
+            probing = true;
+            PROBE(p);
+            probing = false;
+        }
+    }
+  #endif
+
+    // If we raise the error we'll lose the stack, and if it's an early
+    // error we always want to see it (do not use ATTEMPT or TRY on
+    // purpose in Startup_Core()...)
+    //
+    if (PG_Boot_Phase < BOOT_DONE)
+        panic (error);
+
+    // There should be a PUSH_TRAP of some kind in effect if a `fail` can
+    // ever be run.
+    //
+    if (TG_Jump_List == nullptr)
+        panic (error);
 
     // The information for the Rebol call frames generally is held in stack
     // variables, so the data will go bad in the longjmp.  We have to free
@@ -499,14 +500,20 @@ void Set_Location_Of_Error(
             continue;
         break;
     }
-    if (f != FS_BOTTOM) {
+
+    // Look for nearest frame above that has file and line information.
+    //
+    while (f != FS_BOTTOM) {
         const REBSTR *file = LINK(Filename, FRM_ARRAY(f));
         REBLIN line = FRM_ARRAY(f)->misc.line;
 
-        if (file)
+        if (file) {
             Init_File(&vars->file, file);
-        if (line != 0)
-            Init_Integer(&vars->line, line);
+            if (line != 0)
+                Init_Integer(&vars->line, line);
+            break;
+        }
+        f = f->prior;
     }
 }
 
