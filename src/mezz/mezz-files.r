@@ -11,6 +11,8 @@ REBOL [
     }
 ]
 
+decode-url: :sys/decode-url
+
 
 clean-path: func [
     {Returns new directory path with `.` and `..` processed.}

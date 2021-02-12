@@ -66,5 +66,5 @@ finish-init-core: func [
     ;
     do bind-lib boot-mezz
 
-    finish-init-core: 'done
+    finish-init-core: '~finish-init-core-done~  ; free function for GC
 ]

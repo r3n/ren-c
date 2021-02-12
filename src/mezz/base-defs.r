@@ -615,12 +615,6 @@ print: func* [
 ]
 
 
-decode-url: _ ; set in sys init
-
-; used only by Ren-C++ as a test of how to patch the lib context prior to
-; boot at the higher levels.
-test-rencpp-low-level-hook: _
-
 internal!: make typeset! [
     handle!
 ]
