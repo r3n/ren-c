@@ -37,7 +37,7 @@ extensions: make map! [
     Locale +
     MySQL +
     Network +
-    ODBC -
+    ODBC +
     PNG +
     Process +
     Secure +
