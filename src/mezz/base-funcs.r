@@ -68,7 +68,7 @@ steal: func* [
         {Value of the following SET-WORD! or SET-PATH! before assignment}
     evaluation [<opt> any-value! <variadic>]
         {Used to take the assigned value}
-    :look [set-word! set-path! <variadic>]
+    'look [set-word! set-path! <variadic>]
 ][
     get first look  ; returned value
 
@@ -91,7 +91,7 @@ func: func* [
     /gather "Gather SET-WORD! as local variables (preferably, please use LET)"
     <local>
         new-spec var other
-        new-body exclusions locals defaulters statics
+        new-body exclusions locals defaulters statics with-return
 ][
     ; R3-Alpha offered features on FUNCTION (a complex usermode construct)
     ; that the simpler/faster FUNC did not have.  Ren-C seeks to make FUNC and
@@ -115,7 +115,7 @@ func: func* [
         return func* spec body
     ]
 
-    let exclusions: copy []
+    exclusions: copy []
 
     ; Rather than MAKE BLOCK! LENGTH OF SPEC here, we copy the spec and clear
     ; it.  This costs slightly more, but it means we inherit the file and line
@@ -125,32 +125,40 @@ func: func* [
     ; !!! General API control to set the file and line on blocks is another
     ; possibility, but since it's so new, we'd rather get experience first.
     ;
-    let new-spec: clear copy spec
+    new-spec: clear copy spec
 
-    let new-body: _
-    let statics: _
-    let defaulters: _
-    let var: <dummy>  ; enter PARSE with truthy state (gets overwritten)
-    let with-return: _
+    new-body: _
+    statics: _
+    defaulters: _
+    var: <dummy>  ; enter PARSE with truthy state (gets overwritten)
+    with-return: _
 
-    ; Gather the SET-WORD!s in the body, excluding the collected ANY-WORD!s
-    ; that should not be considered.  Note that COLLECT is not defined by
-    ; this point in the bootstrap.
-    ;
-    ; !!! REVIEW: ignore self too if binding object?
-    ;
-    let other
     parse spec [any [
         <void> (append new-spec <void>)
     |
         <elide> (append new-spec <elide>)
     |
         :(either var '[
-            set var: [any-word! | lit-word! | refinement!] (
-                append new-spec var
+            set var: [any-word! | any-path! | quoted!] (
+                append new-spec var  ; need quote level as-is in new spec
 
-                ; exclude args/refines
-                append exclusions either any-path? var [var/2] [var]
+                var: dequote var
+                case [
+                    match [get-path! path!] var [
+                        if (length of var != 2) or (_ <> first var) [
+                            fail ["Bad path in spec:" var]
+                        ]
+                        append exclusions var/2  ; exclude args/refines
+                    ]
+
+                    any-word? var [
+                        append exclusions var  ; exclude args/refines
+                    ]
+
+                    true [  ; QUOTED! could have been anything
+                        fail ["Bad spec item" var]
+                    ]
+                ]
             )
             |
             set other: block! (
@@ -161,7 +169,7 @@ func: func* [
                 append/only new-spec spaced other  ; spec notes
             )
         ] '[
-            set var: set-word! (  ; locals legal anywhere
+            set var: tuple! (  ; locals legal anywhere
                 append exclusions var
                 append new-spec var
                 var: _
@@ -188,7 +196,7 @@ func: func* [
     |
         <local>
         any [set var: word! (other: _) opt set other: group! (
-            append new-spec as set-word! var
+            append new-spec to tuple! var
             append exclusions var
             if other [
                 defaulters: default [copy []]
@@ -201,7 +209,6 @@ func: func* [
     |
         <in> (
             new-body: default [
-                append exclusions 'self
                 copy/deep body
             ]
         )
@@ -231,7 +238,6 @@ func: func* [
         <static> (
             statics: default [copy []]
             new-body: default [
-                append exclusions 'self
                 copy/deep body
             ]
         )
@@ -257,6 +263,10 @@ func: func* [
         )
     ] end]
 
+    ; Gather the SET-WORD!s in the body, excluding the collected ANY-WORD!s
+    ; that should not be considered.  Note that COLLECT is not defined by
+    ; this point in the bootstrap.
+    ;
     locals: try if gather [collect-words/deep/set/ignore body exclusions]
 
     if statics [
@@ -265,12 +275,11 @@ func: func* [
     ]
 
     ; !!! The words that come back from COLLECT-WORDS are all WORD!, but we
-    ; need SET-WORD! to specify pure locals to the generators.  Review the
-    ; COLLECT-WORDS interface to efficiently give this result, as well as
-    ; a possible COLLECT-WORDS/INTO
+    ; need blank-headed-TUPLE! for pure locals to the generators.  Review the
+    ; COLLECT-WORDS interface to efficiently give this result.
     ;
     for-each loc locals [
-        append new-spec to set-word! loc
+        append new-spec to tuple! loc
     ]
 
     append new-spec opt with-return  ; if FUNC* suppresses return generation
@@ -282,8 +291,7 @@ func: func* [
     ;
     if const? body [new-body: const new-body]
 
-    let thing
-    func* new-spec thing: either defaulters [
+    func* new-spec either defaulters [
         append/only defaulters as group! any [new-body body]
     ][
         any [new-body body]
@@ -343,11 +351,11 @@ redescribe: func [
         ]
 
         if notes: try select meta 'parameter-notes [
-            if not frame? notes [
+            if not any-context? notes [  ; !!! Sometimes OBJECT!, else FRAME!
                 fail [{PARAMETER-NOTES in META-OF is not a FRAME!} notes]
             ]
 
-            if :value <> (action of notes) [
+            all [frame? notes, :value <> (action of notes)] then [
                 fail [{PARAMETER-NOTES in META-OF frame mismatch} notes]
             ]
         ]
@@ -628,7 +636,7 @@ non: redescribe [
             ;
             fail [
                 "NON failed with argument of type"
-                    type of get* 'arg else ["NULL"]
+                    (type of get* 'arg) else ["NULL"]
             ]
         ]
     ]
@@ -682,14 +690,14 @@ find-last: redescribe [
 attempt: func [
     {Tries to evaluate a block and returns result or NULL on error.}
 
-    return: "null on error, if code runs and produces null it becomes void"
+    return: "NULL on error"
         [<opt> any-value!]
     code [block! action!]
 ][
     trap [
-        return do code  ; VOIDIFY of null avoids conflation, but is overkill
+        return @(do code else [null])  ; want NULL-2 if was NULL
     ]
-    null  ; don't look at trapped error value, just return null
+    return null
 ]
 
 for-next: redescribe [
@@ -804,13 +812,6 @@ meth: enfixed func [
         func/(if gather '/gather) compose [((spec)) <in> (context)] body
     ) context
 ]
-
-; See notes on the future where FUNC and FUNCTION are synonyms (same will be
-; true of METH and METHOD:
-;
-; https://forum.rebol.info/t/rethinking-auto-gathered-set-word-locals/1150
-;
-method: enfixed :meth/gather
 
 
 module: func [
@@ -1006,7 +1007,7 @@ cause-error: func [
 fail: func [
     {Interrupts execution by reporting an error (a TRAP can intercept it).}
 
-    :blame "Point to variable or parameter to blame"
+    'blame "Point to variable or parameter to blame"
         [<skip> sym-word! sym-path!]
     reason "ERROR! value, ID, URL, message text, or failure spec"
         [<end> error! word! path! url! text! block!]

@@ -134,8 +134,8 @@ unless: checked [
 
         return: [<opt> any-value!]
         left [<end> any-value!]
-        :right [any-value! <variadic>]
-        :look [any-value! <variadic>]
+        'right [any-value! <variadic>]
+        'look [any-value! <variadic>]
     ][
         right: take right
         any [
@@ -202,7 +202,7 @@ bind?: deprecated [
 
 selfless?: deprecated [
     {SELFLESS? no longer has meaning (all frames are "selfless"), though a}
-    {generator like CONSTRUCT may choose to establish a SELF member}
+    {generator may choose to establish a SELF member}
 ]
 
 unset!: deprecated [

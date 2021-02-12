@@ -1,7 +1,7 @@
 ## NOTES ON CREATING THE PREBUILT LIBRARIES ##
 
 Start with a fresh older image of the linux you want to use.  These were made
-with Ubuntu 14.04.1, because that's what the Travis build uses that runs the
+with Ubuntu 14.04.1, because that's what the build was being used to run the
 old MinGW cross-compiler.
 
 First, install the cross-compiler.  It can live on the same system that has
@@ -126,10 +126,10 @@ MinGW, which had to be patched around.  See SET_JUMP and LONG_JUMP macros.
 ## NEXT STEP: CONTINUOUS INTEGRATION ##
 
 This was a nuisance, but the next step after this ad-hoc build is to use the
-prebuilt libs to get a continuously-integrated ZeroMQ cross-compiled on Travis
-linux servers to Windows.  That would be a good time to review lots of issues,
-like what kind of overhaul of the build system is needed to support this kind
-of complexity for an extension.
+prebuilt libs to get a continuously-integrated ZeroMQ cross-compiled on Linux
+servers to Windows.  That would be a good time to review lots of issues, like
+what kind of overhaul of the build system is needed to support this kind of
+complexity for an extension.
 
 For now, the one-off build is a proof of concept that Visual Studio is not
 necessary to make a Windows executable including ZeroMQ.

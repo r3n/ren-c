@@ -18,11 +18,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// The nature of WebAssembly and worker threads is such that the build
-// products of emscripten produce more than one file.  The details of doing
-// a load of those emscripten products can be somewhat daunting...so this file
-// makes it possible to get everything taken care of by including only a
-// single `<script>` tag on a page.
+// This file makes it possible to get everything taken care of for running
+// a Ren-C interpreter using only a single `<script>` tag on a page.
 //
 //=//// EXAMPLE ///////////////////////////////////////////////////////////=//
 //
@@ -56,13 +53,21 @@
 //
 //   https://metaeducation.s3.amazonaws.com/travis-builds/load-r3.js
 //
-// * As noted in the comment in the example, the URL for %load-r3.js currently
-//   must contain a `/`.  So use './load-r3.js' INSTEAD OF 'load-r3.js'"
+// * As noted in the example above, the URL for %load-r3.js currently
+//   must contain a `/`.  So if loading locally, use './load-r3.js' INSTEAD
+//   OF 'load-r3.js'"
 //
 // * This file is supposed to be able to load multiple versions of the
 //   evaluator.  While it is still early at time of writing to say that
 //   "it shouldn't have breaking protocol changes", over the long run it
 //   really shouldn't...so try to keep its dependencies simple as possible.
+//
+// * At one time, this supported the ability to load web workers as well...
+//   in order to use Emscripten's "Pthreads" emulation.  The code in the
+//   JavaScript extension for using pthreads was scrapped in favor of other
+//   means of suspending and resuming the interpreter.  But pthreads may
+//   be interesting for use in other C librareis in the future...so just the
+//   loading-oriented support is kept alive here in the loader.
 //
 // * Loading "modules" in JavaScript is an inexact science to begin with, and
 //   it goes without saying that working with WebAssembly and Emscripten makes
@@ -265,7 +270,13 @@ if (hasShared) {
 }
 config.info("Has Threads => " + hasThreads)
 
-let use_asyncify = ! hasThreads
+// Pthreads support was retired as an implementation point in the API.  But
+// pthreads may be needed for other uses, so the code is kept here in the
+// loader for now.
+//
+// https://forum.rebol.info/t/pros-and-cons-of-the-pthread-web-build/1425
+//
+let use_asyncify = true  /* ! hasThreads */
 let os_id = use_asyncify ? "0.16.1" : "0.16.2"
 
 config.info("Use Asyncify => " + use_asyncify)
@@ -339,7 +350,7 @@ if (is_debug) {
 if (!base_dir) {
     //
     // Default to using the base directory as wherever the %load-r3.js was
-    // fetched from.  Today, that is typically on Travis.
+    // fetched from.  Today, that is typically on AWS.
     //
     // The directory should have subdirectories %0.16.2/ (for WASM threading)
     // and %0.16.1/ (for emterpreter files).
@@ -367,6 +378,31 @@ let load_js_promiser = (url) => new Promise(function(resolve, reject) {
     script.src = url
     script.onload = () => { resolve(url) }
     script.onerror = () => { reject(url) }
+
+    if (!use_asyncify) {  // !!! use_asyncify is always true ATM, see note
+        //
+        // SharedArrayBuffer is needed to implement a threading model in
+        // Emscripten, but issues with the Spectre vulnerability and other
+        // problems means the feature is disabled unless you jump through
+        // a number of hoops.  The main page must be `https` and served with
+        // special HTTP headers (set in the server's .htaccess or elsewhere).
+        // And each foreign resource has to be served with those headers -or-
+        // carry this marking on the tag:
+        //
+        // https://web.dev/coop-coep/
+        //
+        // At the time of writing, amazon S3 doesn't provide the ability to
+        // add the label...and it might be hard to add in other deployments.
+        // So we have to put the label on here.
+        //
+        // Note: `crossorigin` is the name on the HTML tag, but `crossOrigin`
+        // is the name of the attribute on dynamically created elements.
+        //
+        // https://stackoverflow.com/a/28907499/
+        //
+        script.crossOrigin = "anonymous"
+    }
+
     if (document.body)
         document.body.appendChild(script)
     else {
@@ -411,7 +447,7 @@ let assign_git_commit_promiser = (os_id) => {  // assigns, but no return value
 let lib_suffixes = [
     ".js", ".wasm",  // all builds
     ".wast", ".temp.asm.js",  // debug only
-    ".js.mem", ".worker.js"  // non-emterpreter builds only
+    ".worker.js"  // pthreads builds only
 ]
 
 
@@ -431,7 +467,7 @@ function libRebolComponentURL(suffix) {  // suffix includes the dot
         throw Error("Unknown libRebol component extension: " + suffix)
 
     if (use_asyncify) {
-        if (suffix == ".worker.js" || suffix == ".js.mem")
+        if (suffix == ".worker.js")
             throw Error(
                 "Asking for " + suffix + " file "
                 + " in an emterpreter build (should only be for pthreads)"
@@ -473,6 +509,28 @@ function libRebolComponentURL(suffix) {  // suffix includes the dot
 // synchronous way:
 //
 // https://github.com/emscripten-core/emscripten/issues/8338
+//
+// !!! With COOP/COEP this gets worse if you don't have access to set these
+// headers where the libr3.js file is hosted (e.g. S3 doesn't allow it, while
+// CloudFront may)
+//
+//     Cross-Origin-Embedder-Policy: require-corp
+//     Cross-Origin-Opener-Policy: same-origin
+//
+// Usually, as long as you can set these on your main page you can just load
+// resources using a tag, like <script src="..." crossorigin="anonymous" />
+// and that counts.  But web workers don't have access to the DOM, and can
+// only load scripts via a special importScripts() command which does not
+// have a crossOrigin setting.  You *have* to be able to set the headers.
+//
+// This would require yet another layer of workaround, to either rig the
+// main thread to postMessage with the fetched source to the cwraps so the
+// worker could eval() it...or the worker would have to embed the cwrap
+// source somehow (being polymorphic as worker-or-plain-cwrap).  This was
+// the straw that broke the camel's back in dropping pthread support and
+// committing to asyncify...but the code is still here for now:
+//
+// https://forum.rebol.info/t/pros-and-cons-of-the-pthread-web-build/1425
 //
 let workerJsBlob = null
 let prefetch_worker_js_promiser = () => new Promise(
@@ -590,8 +648,6 @@ return assign_git_commit_promiser(os_id)  // sets git_commit
   }).then(() => {  // we now know r3_module_promiser is available
 
     config.info('Loading/Running ' + libRebolComponentURL(".js") + '...')
-    if (use_asyncify)
-        config.warn("The Asyncify build is bigger/slower, be patient...")
 
     return r3_module_promiser(reb.m)  // at first, `reb.m` is defaults...
 

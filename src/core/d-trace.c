@@ -107,8 +107,6 @@ REBNATIVE(trace)
 
     REBVAL *mode = ARG(mode);
 
-    Check_Security_Placeholder(Canon(SYM_DEBUG), SYM_READ, 0);
-
     // Set the trace level:
     if (IS_LOGIC(mode))
         Trace_Level = VAL_LOGIC(mode) ? 100000 : 0;

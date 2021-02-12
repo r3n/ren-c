@@ -47,12 +47,12 @@ REBINT CT_Integer(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Integer(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_INTEGER);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_LOGIC(arg)) {
         //
@@ -145,7 +145,7 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
     // Use SWITCH instead of IF chain? (was written w/ANY_STR test)
 
     if (IS_INTEGER(value)) {
-        Move_Value(out, value);
+        Copy_Cell(out, value);
         goto check_sign;
     }
     if (IS_DECIMAL(value) || IS_PERCENT(value)) {
@@ -184,7 +184,7 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
         REBVAL *result = rebValue(
             "debin [be", rebR(sign), "]", value,
             rebEND);
-        Move_Value(out, result);
+        Copy_Cell(out, result);
         rebRelease(result);
         return;
     }
@@ -259,7 +259,7 @@ REBTYPE(Integer)
 
     REBI64 arg;
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     // !!! This used to rely on IS_BINARY_ACT, which is no longer available
     // in the symbol based dispatch.  Consider doing another way.
@@ -285,14 +285,14 @@ REBTYPE(Integer)
         else {
             // Decimal or other numeric second argument:
             REBLEN n = 0; // use to flag special case
-            switch (VAL_WORD_SYM(verb)) {
+            switch (VAL_WORD_ID(verb)) {
             // Anything added to an integer is same as adding the integer:
             case SYM_ADD:
             case SYM_MULTIPLY: {
                 // Swap parameter order:
-                Move_Value(D_OUT, val2);  // Use as temp workspace
-                Move_Value(val2, val);
-                Move_Value(val, D_OUT);
+                Copy_Cell(D_OUT, val2);  // Use as temp workspace
+                Copy_Cell(val2, val);
+                Copy_Cell(val, D_OUT);
                 return Run_Generic_Dispatch(val, frame_, verb); }
 
             // Only type valid to subtract from, divide into, is decimal/money:
@@ -331,7 +331,7 @@ REBTYPE(Integer)
     switch (sym) {
 
     case SYM_COPY:
-        Move_Value(D_OUT, val);
+        Copy_Cell(D_OUT, val);
         return D_OUT;
 
     case SYM_ADD: {

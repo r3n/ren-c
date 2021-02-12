@@ -105,7 +105,16 @@ cscape: function [
             any-lower: did find/case expr charset [#"a" - #"z"]
             keep pattern
 
-            code: load/all expr
+            ; With binding being case-sensitive, we lowercase the expression.
+            ; Since we do the lowercasing before the load, embedded string
+            ; literals will also wind up being lowercase.  It would be more
+            ; inconvenient to deep traverse the splice after loading to only
+            ; lowercase ANY-WORD!s, so this is considered fine
+            ;
+            ; !!! Needs LOAD-ALL shim hack for bootstrap since /ALL deprecated
+            ;
+            code: load-all lowercase expr
+
             if with [
                 if lit-word? with [with: dequote with]
 
@@ -206,11 +215,12 @@ cscape: function [
 ]
 
 
-boot-version: load %../src/boot/version.r
+boot-version: load-value %../src/boot/version.r
 
 make-emitter: function [
     {Create a buffered output text file emitter}
 
+    return: [object!]
     title "Title for the comment header (header matches file type)"
         [text!]
     file "Filename to be emitted... .r/.reb/.c/.h/.inc files supported"
@@ -256,7 +266,7 @@ make-emitter: function [
             {Write data to the emitter using CSCAPE templating (see HELP)}
 
             return: <void>
-            :look [any-value! <variadic>]
+            'look [any-value! <variadic>]
             data [text! char! <variadic>]
             <with> buf-emit
         ][

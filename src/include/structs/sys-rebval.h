@@ -70,22 +70,21 @@
 
 // The GET_CELL_FLAG()/etc. macros splice together CELL_FLAG_ with the text
 // you pass in (token pasting).  Since it does this, alias NODE_FLAG_XXX to
-// CELL_FLAG_XXX so they can be used with those macros.
+// CELL_FLAG_XXX so they can be used with those macros.  MARKED is kept in
+// the name to stress you can't have more than one use in effect at a time...
+// so you must know what kind of cell you are dealing with and that it won't
+// conflict with other uses.
 //
-// * ARG_MARKED_CHECKED -- This uses the NODE_FLAG_MARKED bit on args in
+// IMPORTANT: The marked flag is a property of the cell location and not of
+// the value...so writing a new value into the cell will not update the
+// status of its mark.  It must be manually turned off once turned on, or
+// the cell must be reformatted entirely with Prep_Cell().
+//
+// * VAR_MARKED_HIDDEN -- This uses the NODE_FLAG_MARKED bit on args in
 //   action frames, and in particular specialization uses it to denote which
 //   arguments in a frame are actually specialized.  This helps notice the
 //   difference during an APPLY of encoded partial refinement specialization
 //   encoding from just a user putting random values in a refinement slot.
-//
-// * OUT_MARKED_STALE -- This application of NODE_FLAG_MARKED helps show
-//   when an evaluation step didn't add any new output, but it does not
-//   overwrite the contents of the out cell.  This allows the evaluator to
-//   leave a value in the output slot even if there is trailing invisible
-//   evaluation to be done, such as in `[1 + 2 elide (print "Hi")]`, where
-//   something like ALL would want to hold onto the 3 without needing to
-//   cache it in some other location.  Stale out cells cannot be used as
-//   left side input for enfix.
 //
 // **IMPORTANT**: This means that a routine being passed an arbitrary value
 //   should not make assumptions about the marked bit.  It should only be
@@ -96,29 +95,7 @@
 #define CELL_FLAG_MANAGED NODE_FLAG_MANAGED
 #define CELL_FLAG_ROOT NODE_FLAG_ROOT
 
-#define CELL_FLAG_ARG_MARKED_CHECKED NODE_FLAG_MARKED
-#define CELL_FLAG_OUT_MARKED_STALE NODE_FLAG_MARKED
-#define CELL_FLAG_VAR_MARKED_REUSE NODE_FLAG_MARKED
-#define CELL_FLAG_MARKED_REMOVE NODE_FLAG_MARKED
-#define CELL_FLAG_BIND_MARKED_REUSE NODE_FLAG_MARKED
-#define CELL_FLAG_FETCHED_MARKED_TEMPORARY NODE_FLAG_MARKED
-
-
-// v-- BEGIN GENERAL CELL BITS HERE, third byte in the header
-
-
-//=//// CELL_FLAG_PROTECTED ///////////////////////////////////////////////=//
-//
-// Values can carry a user-level protection bit.  The bit is not copied by
-// Move_Value(), and hence reading a protected value and writing it to
-// another location will not propagate the protectedness from the original
-// value to the copy.
-//
-// (Series have more than one kind of protection in "info" bits that can all
-// be checked at once...hence there's not "NODE_FLAG_PROTECTED" in common.)
-//
-#define CELL_FLAG_PROTECTED \
-    FLAG_LEFT_BIT(16)
+#define CELL_FLAG_VAR_MARKED_HIDDEN NODE_FLAG_MARKED
 
 
 //=//// CELL_FLAG_FIRST_IS_NODE ///////////////////////////////////////////=//
@@ -127,7 +104,7 @@
 // and `PAYLOAD(Any, v).first.node` should be marked as a node by the GC.
 //
 #define CELL_FLAG_FIRST_IS_NODE \
-    FLAG_LEFT_BIT(17)
+    NODE_FLAG_GC_ONE
 
 
 //=//// CELL_FLAG_SECOND_IS_NODE //////////////////////////////////////////=//
@@ -136,7 +113,51 @@
 // and `PAYLOAD(Any, v).second.node` should be marked as a node by the GC.
 //
 #define CELL_FLAG_SECOND_IS_NODE \
-    FLAG_LEFT_BIT(18)
+    NODE_FLAG_GC_TWO
+
+
+//=//// BITS 16-23: CELL LAYOUT BYTE ("HEART") ////////////////////////////=//
+//
+// The heart byte corresponds to the actual bit layout of the cell; it's what
+// the GC marks a cell as.  The CELL_HEART() will often match the CELL_KIND(),
+// but won't in cases where the KIND is REB_PATH but the HEART is REB_BLOCK...
+// indicating that the path is using the underlying implementation of a block.
+//
+
+#define FLAG_HEART_BYTE(b)         FLAG_THIRD_BYTE(b)
+#define HEART_BYTE(v)              THIRD_BYTE((v)->header)
+#define mutable_HEART_BYTE(v)      mutable_THIRD_BYTE((v)->header)
+
+
+//=//// BITS 24-31: CELL FLAGS ////////////////////////////////////////////=//
+//
+// (description here)
+//
+
+//=//// CELL_FLAG_PROTECTED ///////////////////////////////////////////////=//
+//
+// Values can carry a user-level protection bit.  The bit is not copied by
+// Copy_Cell(), and hence reading a protected value and writing it to
+// another location will not propagate the protectedness from the original
+// value to the copy.
+//
+// (Series have more than one kind of protection in "info" bits that can all
+// be checked at once...hence there's not "NODE_FLAG_PROTECTED" in common.)
+//
+#define CELL_FLAG_PROTECTED \
+    FLAG_LEFT_BIT(24)
+
+
+//=//// CELL_FLAG_25 //////////////////////////////////////////////////////=//
+//
+#define CELL_FLAG_25 \
+    FLAG_LEFT_BIT(25)
+
+
+//=//// CELL_FLAG_26 //////////////////////////////////////////////////////=//
+//
+#define CELL_FLAG_26 \
+    FLAG_LEFT_BIT(26)
 
 
 //=//// CELL_FLAG_UNEVALUATED /////////////////////////////////////////////=//
@@ -158,19 +179,41 @@
 // That has a lot of impact for the new user experience.
 //
 #define CELL_FLAG_UNEVALUATED \
-    FLAG_LEFT_BIT(19)
+    FLAG_LEFT_BIT(27)
 
 
-//=//// CELL_FLAG_20 //////////////////////////////////////////////////////=//
+//=//// CELL_FLAG_NOTE ////////////////////////////////////////////////////=//
 //
-// Reserved for future use... however for the moment it is used to mark
-// partial refinements, see usage in %c-special.c.  (This could probably
-// multplex with some other bit.)
+// Using the MARKED flag makes a permant marker on the cell, which will be
+// there however you assign it.  That's not always desirable for a generic
+// flag.  So the CELL_FLAG_NOTE is another general tool that can be used on
+// a cell-by-cell basis and not be copied from the location where it is
+// applied... but it will be overwritten if you put another value in that
+// particular location.
 //
-#define CELL_FLAG_20 \
-    FLAG_LEFT_BIT(20)
-#define CELL_FLAG_PUSH_PARTIAL \
-    FLAG_LEFT_BIT(20)
+// * OUT_NOTE_STALE -- This application of CELL_FLAG_NOTE helps show
+//   when an evaluation step didn't add any new output, but it does not
+//   overwrite the contents of the out cell.  This allows the evaluator to
+//   leave a value in the output slot even if there is trailing invisible
+//   evaluation to be done, such as in `[1 + 2 elide (print "Hi")]`, where
+//   something like ALL would want to hold onto the 3 without needing to
+//   cache it in some other location.  Stale out cells cannot be used as
+//   left side input for enfix.
+//
+// * STACK_NOTE_LOCAL -- When building exemplar frames on the stack, you want
+//   to observe when a value should be marked as VAR_MARKED_HIDDEN.  But you
+//   aren't allowed to write "sticky" cell format bits on stack elements.  So
+//   the more ephemeral "note" is used on the stack element and then changed
+//   to the sticky flag on the paramlist when popping.
+//
+
+#define CELL_FLAG_NOTE \
+    FLAG_LEFT_BIT(28)
+
+#define CELL_FLAG_OUT_NOTE_STALE CELL_FLAG_NOTE
+#define CELL_FLAG_NOTE_REMOVE CELL_FLAG_NOTE
+#define CELL_FLAG_BIND_NOTE_REUSE CELL_FLAG_NOTE
+#define CELL_FLAG_STACK_NOTE_LOCAL CELL_FLAG_NOTE
 
 
 //=//// CELL_FLAG_NEWLINE_BEFORE //////////////////////////////////////////=//
@@ -190,7 +233,7 @@
 // representing paths with newlines in them may be needed.
 //
 #define CELL_FLAG_NEWLINE_BEFORE \
-    FLAG_LEFT_BIT(21)
+    FLAG_LEFT_BIT(29)
 
 
 //=//// CELL_FLAG_CONST ///////////////////////////////////////////////////=//
@@ -201,7 +244,7 @@
 // const view on a mutable value with CONST.
 //
 #define CELL_FLAG_CONST \
-    FLAG_LEFT_BIT(22)  // NOTE: Must be SAME BIT as FEED_FLAG_CONST
+    FLAG_LEFT_BIT(30)  // NOTE: Must be SAME BIT as FEED_FLAG_CONST
 
 
 //=//// CELL_FLAG_EXPLICITLY_MUTABLE //////////////////////////////////////=//
@@ -221,26 +264,18 @@
 // the MUTABLE flag should only be added by running MUTABLE.
 //
 #define CELL_FLAG_EXPLICITLY_MUTABLE \
-    FLAG_LEFT_BIT(23)
-
-
-// After 8 bits for node flags, 8 bits for the datatype, and 8 generic value
-// bits...there's only 8 more bits left on 32-bit platforms in the header.
-//
-// This is used for the `HEART` byte.  The heart byte corresponds to the
-// actual bit layout of the cell; it's what the GC marks a cell as.  The
-// CELL_HEART() will often match the CELL_KIND(), but won't in cases where
-// the KIND is REB_PATH but the HEART is REB_BLOCK...indicating that the
-// path is using the underlying implementation of a block.
-
-#define FLAG_HEART_BYTE(b)         FLAG_FOURTH_BYTE(b)
-#define HEART_BYTE(v)              FOURTH_BYTE((v)->header)
-#define mutable_HEART_BYTE(v)      mutable_FOURTH_BYTE((v)->header)
+    FLAG_LEFT_BIT(31)
 
 
 // Endlike headers have the second byte clear (to pass the IS_END() test).
 // But they also have leading bits `10` so they don't look like a UTF-8
-// string, and don't have NODE_FLAG_CELL set to prevents writing to them.
+// string.  They once did not have NODE_FLAG_CELL in order to prevent
+// being written to by cell routines...but the idea of endlike headers is
+// about to be phased out because arrays walks will terminate by reaching
+// the tail, not END.  So now they carry NODE_FLAG_CELL in order to make
+// Detect_Rebol_Pointer() able to distinguish from ordinary series that have
+// zero flags in their second byte...rather than sacrificing a bit in the
+// SERIES_FLAG set to avoid that situation.
 //
 // !!! One must be careful in reading and writing bits initialized via
 // different structure types.  As it is, setting and testing for ends is done
@@ -249,16 +284,14 @@
 //
 // https://stackoverflow.com/q/51846048
 //
-inline static union Reb_Header Endlike_Header(uintptr_t bits) {
+inline static uintptr_t Endlike_Header(uintptr_t bits) {
     assert(
         0 == (bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
+            NODE_FLAG_NODE | NODE_FLAG_FREE
             | FLAG_SECOND_BYTE(255)
         ))
     );
-    union Reb_Header h;
-    h.bits = bits | NODE_FLAG_NODE;
-    return h;
+    return bits | NODE_FLAG_NODE | NODE_FLAG_CELL;
 }
 
 
@@ -270,30 +303,33 @@ inline static union Reb_Header Endlike_Header(uintptr_t bits) {
 // being copied from one cell to another, those header bits must be masked
 // out to avoid corrupting the information in the target cell.
 //
-// !!! In the future, the 64-bit build may put the integer stack level of a
-// cell in the header--which would be part of the cell's masked out format.
+// (!!! In the future, the 64-bit build may use more flags for optimization
+// purposes, though not hinge core functionality on those extra 32 bits.)
 //
 // Additionally, operations that copy need to not copy any of those bits that
 // are owned by the cell, plus additional bits that would be reset in the
-// cell if overwritten but not copied.  For now, this is why `foo: :+` does
-// not make foo an enfixed operation.
+// cell if overwritten but not copied.
 //
 // Note that this will clear NODE_FLAG_FREE, so it should be checked by the
 // debug build before resetting.
 //
-// Note also that NODE_FLAG_MARKED usage is a relatively new concept, e.g.
-// to allow REMOVE-EACH to mark values in a locked series as to which should
-// be removed when the enumeration is finished.  This *should* not be able
-// to interfere with the GC, since userspace arrays don't use that flag with
-// that meaning, but time will tell if it's a good idea to reuse the bit.
+// Notice that NODE_FLAG_MARKED is "sticky"; the mark persists with the cell.
+// That makes it good for annotating when a frame field is hidden, such as
+// when it is local...because you don't want a function assigning a local to
+// make it suddenly visible in views of that frame that shouldn't have
+// access to the implementation detail phase.  CELL_FLAG_NOTE is a generic
+// and more transient flag.
 //
 
 #define CELL_MASK_PERSIST \
-    (NODE_FLAG_NODE | NODE_FLAG_CELL | NODE_FLAG_MANAGED | NODE_FLAG_ROOT)
+    (NODE_FLAG_NODE | NODE_FLAG_CELL | NODE_FLAG_MANAGED | NODE_FLAG_ROOT \
+        | NODE_FLAG_MARKED | CELL_FLAG_PROTECTED)
 
 #define CELL_MASK_COPY \
-    ~(CELL_MASK_PERSIST | NODE_FLAG_MARKED | CELL_FLAG_PROTECTED \
-        | CELL_FLAG_UNEVALUATED)
+    ~(CELL_MASK_PERSIST | CELL_FLAG_NOTE | CELL_FLAG_UNEVALUATED)
+
+#define CELL_MASK_ALL \
+    ~cast(REBFLGS, 0)
 
 
 //=//// CELL's `EXTRA` FIELD DEFINITION ///////////////////////////////////=//
@@ -322,11 +358,6 @@ inline static union Reb_Header Endlike_Header(uintptr_t bits) {
 //
 
 struct Reb_Character_Extra { REBUNI codepoint; };  // see %sys-char.h
-
-struct Reb_Binding_Extra  // see %sys-bind.h
-{
-    REBNOD* node;
-};
 
 struct Reb_Datatype_Extra  // see %sys-datatype.h
 {
@@ -361,7 +392,12 @@ union Reb_Any {  // needed to beat strict aliasing, used in payload
     // (and perhaps in the future, the payload second slot).  If you do use
     // a node in the cell, be sure to set CELL_FLAG_FIRST_IS_NODE!
     //
-    REBNOD *node;
+    // No REBNODs (REBSER or REBVAL) are ever actually declared const, but
+    // care should be taken on extraction to give back a `const` reference
+    // if the intent is immutability, or a conservative state of possible
+    // immutability (e.g. the CONST usermode status hasn't been checked)
+    //
+    const REBNOD *node;
 
     // The GC is only marking one field in the union...the node.  So that is
     // the only field that should be assigned and read.  These "type puns"
@@ -371,6 +407,8 @@ union Reb_Any {  // needed to beat strict aliasing, used in payload
     REBSER *rebser_pun;
     REBVAL *rebval_pun;
   #endif
+
+    void *trash;  // see remarks in ZERO_UNUSED_CELL_FIELDS regarding this
 };
 
 union Reb_Bytes_Extra {
@@ -384,32 +422,13 @@ union Reb_Bytes_Extra {
 union Reb_Value_Extra { //=/////////////////// ACTUAL EXTRA DEFINITION ////=//
 
     struct Reb_Character_Extra Character;
-    struct Reb_Binding_Extra Binding;
+    const REBNOD *Binding;  // see %sys-bind.h
     struct Reb_Datatype_Extra Datatype;
     struct Reb_Date_Extra Date;
     struct Reb_Typeset_Extra Typeset;
 
     union Reb_Any Any;
     union Reb_Bytes_Extra Bytes;
-
-  #if defined(DEBUG_COUNT_TICKS)
-    //
-    // A tick field is included in all debug builds, not just those which
-    // DEBUG_TRACK_CELLS...because negative signs are used to give a distinct
-    // state to unreadable voids.  See %sys-track.h and %sys-void.h
-    //
-    intptr_t tick;  // Note: will be negative for unreadable voids
-  #endif
-
-    // The release build doesn't put anything in the ->extra field by default,
-    // so sensitive compilers notice when cells are moved without that
-    // initialization.  Rather than disable the warning, this can be used to
-    // put some junk into it, but TRASH_POINTER_IF_DEBUG() won't subvert the
-    // warning.  So just poke whatever pointer is at hand that is likely to
-    // already be in a register and not meaningful (e.g. nullptr is a poor
-    // choice, because that could look like a valid non-binding)
-    //
-    void *trash;
 };
 
 
@@ -458,13 +477,24 @@ union Reb_Bytes_Payload  // IMPORTANT: Do not cast, use `Pointers` instead
     REBYTE at_least_8[sizeof(void*) * 2];  // size depends on platform
 };
 
-#if defined(DEBUG_TRACK_CELLS)
-    struct Reb_Track_Payload  // see %sys-track.h
-    {
-        const char *file;  // is REBYTE (UTF-8), but char* for debug watch
-        int line;
-    };
-#endif
+// COMMA! is evaluative, but you wouldn't usually think of it as being
+// bindable because of its "inert-seeming" content.  To make the ANY_INERT()
+// test fast, REB_COMMA is pushed to a high value, making it bindable.  That
+// is exploited by feeds, which use it to store va_list information along
+// with a specifier in a value cell slot.  (Most commas don't have this.)
+//
+struct Reb_Comma_Payload {
+    // A frame may be sourced from a va_list of pointers, or not.  If this is
+    // NULL it is assumed that the values are sourced from a simple array.
+    //
+    va_list* vaptr;  // may be nullptr
+
+    // The feed could also be coming from a packed array of pointers...this
+    // is used by the C++ interface, which creates a `std::array` on the
+    // C stack of the processed variadic arguments it enumerated.
+    //
+    const void* const* packed;
+};
 
 union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 
@@ -509,17 +539,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     struct Reb_Time_Payload Time;
 
     union Reb_Bytes_Payload Bytes;
-
-  #if defined(DEBUG_TRACK_CELLS) && !defined(DEBUG_TRACK_EXTEND_CELLS)
-    //
-    // Debug builds put the file and line number of initialization for a cell
-    // into the payload.  It will remain there after initialization for types
-    // that do not need a payload (NULL, VOID!, BLANK!, LOGIC!).  See the
-    // DEBUG_TRACK_EXTEND_CELLS option for tracking even types with payloads,
-    // and also see TOUCH_CELL() for how to update tracking at runtime.
-    //
-    struct Reb_Track_Payload Track;
-  #endif
+    struct Reb_Comma_Payload Comma;
 
   #if !defined(NDEBUG) // unsafe "puns" for easy debug viewing in C watchlist
     int64_t int64_pun;
@@ -542,7 +562,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 //
 // Goal is that the mechanics are managed with low-level C, so the C++ build
 // is just there to notice when you try to use a raw byte copy.  Use functions
-// instead.  (See: Move_Value(), Blit_Relative(), Derelativize())
+// instead.  (See: Copy_Cell(), Derelativize())
 //
 // Note: It is annoying that this means any structure that embeds a value cell
 // cannot be assigned.  However, `struct Reb_Value` must be the type exported
@@ -553,7 +573,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 //
 
 #if defined(CPLUSPLUS_11)
-    struct alignas(ALIGN_SIZE) Reb_Cell
+    struct alignas(ALIGN_SIZE) Reb_Cell : public Reb_Node
 #elif defined(C_11)
     struct alignas(ALIGN_SIZE) Reb_Value
 #else
@@ -566,20 +586,13 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 
       #if defined(DEBUG_TRACK_EXTEND_CELLS)
         //
-        // Lets you preserve the tracking info even if the cell has a payload.
-        // This doubles the cell size, but can be a very helpful debug option.
+        // This doubles the cell size, but is a *very* helpful debug option.
+        // See %sys-track.h for explanation.
         //
-        struct Reb_Track_Payload track;
-        uintptr_t tick; // stored in the Reb_Value_Extra for basic tracking
-        uintptr_t touch; // see TOUCH_CELL(), pads out to 4 * sizeof(void*)
-      #endif
-
-      #ifdef CPLUSPLUS_11
-      public:
-        Reb_Cell () = default;
-      private:
-        Reb_Cell (Reb_Cell const & other) = delete;
-        void operator= (Reb_Cell const &rhs) = delete;
+        const char *file;  // is REBYTE (UTF-8), but char* for debug watch
+        uintptr_t line;
+        uintptr_t tick;  // stored in the Reb_Value_Extra for basic tracking
+        uintptr_t touch;  // see TOUCH_CELL(), pads out to 4 * sizeof(void*)
       #endif
     };
 
@@ -590,7 +603,15 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     // KIND3Q_BYTE() > REB_64 are considered to be REB_QUOTED variants of the
     // byte modulo 64.
     //
-    struct Reb_Relative_Value : public Reb_Cell {};
+    struct Reb_Relative_Value : public Reb_Cell {
+      #ifdef CPLUSPLUS_11
+      public:
+        Reb_Relative_Value () = default;
+      private:
+        Reb_Relative_Value (Reb_Relative_Value const & other) = delete;
+        void operator= (Reb_Relative_Value const &rhs) = delete;
+      #endif
+    };
 #endif
 
 
@@ -599,6 +620,12 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 
 #define EXTRA(Type, v) \
     (v)->extra.Type
+
+#define mutable_BINDING(v) \
+    (v)->extra.Binding
+
+#define BINDING(v) \
+    x_cast(REBSER*, m_cast(REBNOD*, (v)->extra.Binding))
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -649,16 +676,26 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
 #endif
 
 
-// !!! Consider a more sophisticated macro/template, like in DEBUG_CHECK_CASTS
-// though this is good enough for many usages for now.
 
-#if !defined(CPLUSPLUS_11)
-    #define VAL(p) \
-        cast(RELVAL*, (p))
+//=//// VARS and PARAMs ///////////////////////////////////////////////////=//
+//
+// These are lightweight classes on top of cells that help catch cases of
+// testing for flags that only apply if you're sure something is a parameter
+// cell or variable cell.
+//
+
+#ifdef CPLUSPLUS_11
+    struct REBVAR : public REBVAL {};
+    struct REBPAR : public REBVAR {};
+
+    inline static const REBPAR* cast_PAR(const REBVAL *v)
+        { return cast(const REBPAR*, v); }
+
+    inline static REBPAR* cast_PAR(REBVAL *v)
+        { return cast(REBPAR*, v); }
 #else
-    inline static REBVAL* VAL(void *p)
-      { return cast(REBVAL*, p); }
+    #define REBVAR REBVAL
+    #define REBPAR REBVAL
 
-    inline static const REBVAL* VAL(const void *p)
-      { return cast(const REBVAL*, p); }
+    #define cast_PAR(v) (v)
 #endif

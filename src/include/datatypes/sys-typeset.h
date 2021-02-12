@@ -45,18 +45,18 @@
 //      make typeset! [<hide> <quote> <protect> text! integer!]
 //
 
-inline static bool IS_KIND_SYM(REBSYM s)
-  { return s != SYM_0 and s < cast(REBSYM, REB_MAX); }
+inline static bool IS_KIND_SYM(SYMID s)
+  { return s != SYM_0 and s < cast(SYMID, REB_MAX); }
 
-inline static enum Reb_Kind KIND_FROM_SYM(REBSYM s) {
+inline static enum Reb_Kind KIND_FROM_SYM(SYMID s) {
     assert(IS_KIND_SYM(s));
     return cast(enum Reb_Kind, cast(int, (s)));
 }
 
 #define SYM_FROM_KIND(k) \
-    cast(REBSYM, cast(enum Reb_Kind, (k)))
+    cast(SYMID, cast(enum Reb_Kind, (k)))
 
-inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
+inline static SYMID VAL_TYPE_SYM(REBCEL(const*) v) {
     //
     // !!! The extension type list is limited to a finite set as a first step
     // of generalizing the approach.  Bridge compatibility for things like
@@ -85,12 +85,9 @@ inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
 //
 // Operations when typeset is done with a bitset (currently all typesets)
 
-#define VAL_TYPESET_STRING_NODE(v) \
-    PAYLOAD(Any, (v)).first.node
 
-#define VAL_TYPESET_STRING(v) \
-    STR(VAL_TYPESET_STRING_NODE(v))
-
+#define VAL_TYPESET_PARAM_CLASS_U32(v) \
+    PAYLOAD(Any, (v)).first.u32
 
 #define VAL_TYPESET_LOW_BITS(v) \
     PAYLOAD(Any, (v)).second.u32
@@ -99,7 +96,7 @@ inline static REBSYM VAL_TYPE_SYM(REBCEL(const*) v) {
     EXTRA(Typeset, (v)).high_bits
 
 inline static bool TYPE_CHECK(REBCEL(const*) v, REBYTE n) {
-    assert(HEART_BYTE(v) == REB_TYPESET);
+    assert(CELL_HEART(v) == REB_TYPESET);
 
     if (n < 32)
         return did (VAL_TYPESET_LOW_BITS(v) & FLAGIT_KIND(n));
@@ -109,7 +106,7 @@ inline static bool TYPE_CHECK(REBCEL(const*) v, REBYTE n) {
 }
 
 inline static bool TYPE_CHECK_BITS(REBCEL(const*) v, REBU64 bits) {
-    assert(HEART_BYTE(v) == REB_TYPESET);
+    assert(CELL_HEART(v) == REB_TYPESET);
 
     uint_fast32_t low = bits & cast(uint32_t, 0xFFFFFFFF);
     if (low & VAL_TYPESET_LOW_BITS(v))
@@ -122,8 +119,11 @@ inline static bool TYPE_CHECK_BITS(REBCEL(const*) v, REBU64 bits) {
     return false;
 }
 
-inline static bool TYPE_CHECK_EXACT_BITS(REBCEL(const*) v, REBU64 bits) {
-    assert(HEART_BYTE(v) == REB_TYPESET);
+inline static bool TYPE_CHECK_EXACT_BITS(
+    REBCEL(const*) v,
+    REBU64 bits
+){
+    assert(CELL_HEART(v) == REB_TYPESET);
 
     uint_fast32_t low = bits & cast(uint32_t, 0xFFFFFFFF);
     if (low != VAL_TYPESET_LOW_BITS(v))
@@ -137,7 +137,7 @@ inline static bool TYPE_CHECK_EXACT_BITS(REBCEL(const*) v, REBU64 bits) {
 }
 
 inline static void TYPE_SET(RELVAL *v, REBYTE n) {
-    assert(HEART_BYTE(v) == REB_TYPESET);
+    assert(IS_TYPESET(v));
 
     if (n < 32) {
         VAL_TYPESET_LOW_BITS(v) |= FLAGIT_KIND(n);
@@ -148,7 +148,7 @@ inline static void TYPE_SET(RELVAL *v, REBYTE n) {
 }
 
 inline static void TYPE_CLEAR(RELVAL *v, REBYTE n) {
-    assert(HEART_BYTE(v) == REB_TYPESET);
+    assert(IS_TYPESET(v));
 
     if (n < 32) {
         VAL_TYPESET_HIGH_BITS(v) &= ~FLAGIT_KIND(n);
@@ -158,9 +158,12 @@ inline static void TYPE_CLEAR(RELVAL *v, REBYTE n) {
     VAL_TYPESET_HIGH_BITS(v) &= ~FLAGIT_KIND(n - 32);
 }
 
-inline static bool EQUAL_TYPESET(REBCEL(const*) v1, REBCEL(const*) v2) {
-    assert(HEART_BYTE(v1) == REB_TYPESET);
-    assert(HEART_BYTE(v2) == REB_TYPESET);
+inline static bool EQUAL_TYPESET(
+    REBCEL(const*) v1,
+    REBCEL(const*) v2
+){
+    assert(CELL_HEART(v1) == REB_TYPESET);
+    assert(CELL_HEART(v2) == REB_TYPESET);
 
     if (VAL_TYPESET_LOW_BITS(v1) != VAL_TYPESET_LOW_BITS(v2))
         return false;
@@ -170,7 +173,7 @@ inline static bool EQUAL_TYPESET(REBCEL(const*) v1, REBCEL(const*) v2) {
 }
 
 inline static void CLEAR_ALL_TYPESET_BITS(RELVAL *v) {
-    assert(HEART_BYTE(v) == REB_TYPESET);
+    assert(VAL_TYPE(v) == REB_TYPESET);
 
     VAL_TYPESET_HIGH_BITS(v) = 0;
     VAL_TYPESET_LOW_BITS(v) = 0;
@@ -190,14 +193,6 @@ inline static void CLEAR_ALL_TYPESET_BITS(RELVAL *v) {
 // packed in with the TYPESET_FLAG_XXX bits.
 //
 
-typedef enum Reb_Kind Reb_Param_Class;
-
-    //
-    // `REB_P_LOCAL` is a "pure" local, which will be set to null by
-    // argument fulfillment.  It is indicated by a SET-WORD! in the function
-    // spec, or by coming after a <local> tag in the function generators.
-    //
-
     // `REB_P_NORMAL` is cued by an ordinary WORD! in the function spec
     // to indicate that you would like that argument to be evaluated normally.
     //
@@ -213,43 +208,61 @@ typedef enum Reb_Kind Reb_Param_Class;
     //     ** Script error: + does not allow void! for its value1 argument
     //
 
-    // `REB_P_HARD_QUOTE` is cued by a GET-WORD! in the function spec
+    // `REB_P_HARD` is cued by a quoted WORD! in the function spec
     // dialect.  It indicates that a single value of content at the callsite
     // should be passed through *literally*, without any evaluation:
     //
-    //     >> foo: function [:a] [print [{a is} a]]
-    //
-    //     >> foo 1 + 2
-    //     a is 1
+    //     >> foo: function ['a] [print [{a is} a]]
     //
     //     >> foo (1 + 2)
     //     a is (1 + 2)
     //
-
-    // `REB_P_REFINEMENT`
+    //     >> foo :(1 + 2)
+    //     a is :(1 + 2)
     //
 
-    // `REB_P_SOFT_QUOTE` is cued by a LIT-WORD! in the function spec
-    // dialect.  It quotes with the exception of GROUP!, GET-WORD!, and
+    // `REB_P_MEDIUM` is cued by a QUOTED GET-WORD! in the function spec
+    // dialect.  It quotes with the exception of GET-GROUP!, GET-WORD!, and
     // GET-PATH!...which will be evaluated:
     //
-    //     >> foo: function ['a] [print [{a is} a]
-    //
-    //     >> foo 1 + 2
-    //     a is 1
+    //     >> foo: function [':a] [print [{a is} a]
     //
     //     >> foo (1 + 2)
+    //     a is (1 + 2)
+    //
+    //     >> foo :(1 + 2)
     //     a is 3
     //
     // Although possible to implement soft quoting with hard quoting, it is
     // a convenient way to allow callers to "escape" a quoted context when
     // they need to.
+
+    // `REB_P_SOFT` is cued by a PLAIN GET-WORD!.  It acts as a more nuanced
+    // version of REB_P_MEDIUM which is escapable but will defer to enfix.
+    // This covers cases like:
     //
+    //     if true [...] then :(func [...] [...])  ; want escapability
+    //     if true [...] then x -> [...]  ; but want enfix -> lookback to win
+    //
+    // Hence it is the main mode of quoting for branches.  It would be
+    // unsuitable for cases like OF, however, due to this problem:
+    //
+    //     integer! = type of 1  ; want left quoting semantics on `type` WORD!
+    //     integer! = :(first [type length]) of 1  ; want escapability
+    //
+    // OF wants its left hand side to be escapable, however it wants the
+    // quoting behavior to out-prioritize the completion of enfix on the
+    // left.  Contrast this with how THEN wants the enfix on the right to
+    // win out ahead of its quoting.
+    //
+    // This is a subtlety that most functions don't have to worry about, so
+    // using soft quoting is favored to medium quoting for being one less
+    // character to type.
 
 
-inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
-    return cast(Reb_Param_Class, KIND3Q_BYTE_UNCHECKED(v));
+inline static enum Reb_Param_Class VAL_PARAM_CLASS(const REBPAR *param) {
+    assert(IS_TYPESET(param));
+    return cast(enum Reb_Param_Class, VAL_TYPESET_PARAM_CLASS_U32(param));
 }
 
 
@@ -292,39 +305,67 @@ inline static Reb_Param_Class VAL_PARAM_CLASS(const RELVAL *v) {
 #define Is_Param_Skippable(v) \
     TYPE_CHECK((v), REB_TS_SKIPPABLE)
 
-// Can't be reflected (set with PROTECT/HIDE) or specialized out, because it
-// is local or specialized out.
+
+// All hidden parameters in the exemplar frame of an ACTION! are not shown
+// on the public interface of that function.  This means type information
+// is not relevant (though the type information for later phases of that
+// slot may be pertinent).  So instead of type information, hidden param slots
+// hold the initialization value for that position.
 //
-// !!! Note: Currently, the semantics of Is_Param_Hidden() are rather sketchy.
-// It hasn't been figured out how such a flag would be managed on a per object
-// or frame instance while sharing the same paramlist/keylist (a method like
-// CELL_FLAG_PROTECTED would be needed if that feature were interesting).
+// In terms of whether the parameter is truly "hidden" from a view of a FRAME!
+// with MOLD or to BIND depends on the frame's phase.  For instance, while a
+// frame is running the body of an interpreted function...that phase has to
+// see the locals defined for that function.  This means you can't tell from a
+// frame context node pointer alone whether a key is visible...the full FRAME!
+// cell--phase included--must be used.
 //
-inline static bool Is_Param_Hidden(const RELVAL *v) {
-    // Once a parameter is hidden, it is either visible in the frame or part
-    // of an embedded frame's internal state.  Anything invisible to the
-    // outside world from one layer will also be invisible to layers of
-    // functionals above it.
+// Hiding is used to accomplish the desire of signaling that an ~unset~ be
+// removed rom the interface for a frame, so you can actualy specialize a
+// value out as ~unset~:
+//
+//     >> f: make frame! :append
+//     >> f/value: '~unset~  ; typically this would mean "unspecialized"
+//     >> protect/hide 'f/value  ; hiding it means "no, it's the final value"
+//     >> apu: make action! f
+//     >> apu [a b c]
+//     == [a b c ~unset~]
+//
+// For this mechanic to work, there has to be a bit on frames that tracks
+// visibility on a per-instance basis.  To avoid having to make a new keylist
+// each time this happens, the NODE_FLAG_MARKED bit on a context is taken
+// to mean this.  It won't be copied by Copy_Cell() that reads the variable,
+// and it is heeded here as VAR_MARKED_HIDDEN if a value cell is given.
+//
+inline static bool Is_Param_Hidden(const REBPAR *param)
+{
+    if (GET_CELL_FLAG(param, VAR_MARKED_HIDDEN))
+        return true;
+
+    // unchecked parameters in an exemplar frame may be PARAM!, but if they
+    // are an ordinary FRAME! they will not be.  Review if better asserts are
+    // needed here that make it worth passing in the context being checked.
     //
-    Reb_Param_Class pclass = VAL_PARAM_CLASS(v);
-    return IS_HIDDEN_PARAM_KIND(pclass);
+    return false;
+}
+
+inline static bool Is_Var_Hidden(const REBVAR *var)
+{
+    if (GET_CELL_FLAG(var, VAR_MARKED_HIDDEN))
+        return true;
+
+    // unchecked parameters in an exemplar frame may be PARAM!, but if they
+    // are an ordinary FRAME! they will not be.  Review if better asserts are
+    // needed here that make it worth passing in the context being checked.
+    //
+    return false;
 }
 
 inline static void Hide_Param(RELVAL *param) {
-    assert(VAL_PARAM_CLASS(param) != REB_P_SEALED);
-    mutable_KIND3Q_BYTE(param) = REB_P_LOCAL;
+    UNUSED(param);
 }
 
 inline static void Seal_Param(RELVAL *param) {
-    mutable_KIND3Q_BYTE(param) = REB_P_SEALED;
-}
-
-inline static void Specialize_Param(RELVAL *param) {
-    assert(
-        VAL_PARAM_CLASS(param) != REB_P_SEALED
-        and VAL_PARAM_CLASS(param) != REB_P_LOCAL
-    );
-    mutable_KIND3Q_BYTE(param) = REB_P_SPECIALIZED;
+    UNUSED(param);
 }
 
 
@@ -340,8 +381,10 @@ inline static void Specialize_Param(RELVAL *param) {
 // solution to separate the property of bindability from visibility, as
 // the SELF solution shakes out--so that SELF may be hidden but bind.
 //
-#define Is_Param_Sealed(v) \
-    (VAL_PARAM_CLASS(v) == REB_P_SEALED)
+inline static bool Is_Param_Sealed(const REBPAR *param) {
+    UNUSED(param);
+    return false;  // !!! temporary, needs to use cell flag
+}
 
 // Parameters can be marked such that if they are blank, the action will not
 // be run at all.  This is done via the `<blank>` annotation, which indicates
@@ -351,39 +394,15 @@ inline static void Specialize_Param(RELVAL *param) {
 #define Is_Param_Noop_If_Blank(v) \
     TYPE_CHECK((v), REB_TS_NOOP_IF_BLANK
 
-// !!! TBD: find a bit to store this in (param is full at the moment, so we
-// force all parameters to be rechecked in a skin.
-//
-#define Set_Param_Skin_Expanded(v) NOOP
-#define Is_Param_Skin_Expanded(v) true
-
 
 //=//// PARAMETER SYMBOL //////////////////////////////////////////////////=//
 //
 // Name should be NULL unless typeset in object keylist or func paramlist
 
-inline static const REBSTR *VAL_KEY_SPELLING(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
-    return VAL_TYPESET_STRING(v);
-}
-
-inline static const REBSTR *VAL_KEY_CANON(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
-    return STR_CANON(VAL_KEY_SPELLING(v));
-}
-
-inline static OPT_REBSYM VAL_KEY_SYM(const RELVAL *v) {
-    assert(IS_PARAM_KIND(KIND3Q_BYTE_UNCHECKED(v)));
-    return STR_SYMBOL(VAL_KEY_SPELLING(v)); // mirrors canon's symbol
-}
-
-#define VAL_PARAM_SPELLING(p) VAL_KEY_SPELLING(p)
-#define VAL_PARAM_CANON(p) VAL_KEY_CANON(p)
-#define VAL_PARAM_SYM(p) VAL_KEY_SYM(p)
-
 inline static REBVAL *Init_Typeset(RELVAL *out, REBU64 bits)
 {
     RESET_CELL(out, REB_TYPESET, CELL_MASK_NONE);
+    VAL_TYPESET_PARAM_CLASS_U32(out) = REB_P_NORMAL;
     VAL_TYPESET_LOW_BITS(out) = bits & cast(uint32_t, 0xFFFFFFFF);
     VAL_TYPESET_HIGH_BITS(out) = bits >> 32;
     return cast(REBVAL*, out);
@@ -396,40 +415,26 @@ inline static REBVAL *Init_Typeset(RELVAL *out, REBU64 bits)
 // typesets more complex (the original "64 bit flags" design is insufficient
 // for a generalized typeset!)
 //
-inline static REBVAL *Init_Param(
+inline static REBVAL *Init_Param_Core(
     RELVAL *out,
-    Reb_Param_Class pclass,
-    const REBSTR *spelling,
+    enum Reb_Param_Class pclass,
     REBU64 bits
 ){
-    RESET_CELL(out, REB_TYPESET, CELL_FLAG_FIRST_IS_NODE);
-    mutable_KIND3Q_BYTE(out) = pclass;
+    RESET_VAL_HEADER(out, REB_TYPESET, CELL_MASK_NONE);
 
-    VAL_TYPESET_STRING_NODE(out) = NOD(m_cast(REBSTR*, spelling));
+    VAL_TYPESET_PARAM_CLASS_U32(out) = pclass;
     VAL_TYPESET_LOW_BITS(out) = bits & cast(uint32_t, 0xFFFFFFFF);
     VAL_TYPESET_HIGH_BITS(out) = bits >> 32;
-    assert(IS_PARAM(out));
     return cast(REBVAL*, out);
 }
 
-// Context keys and action parameters use a compatible representation (this
-// enables using action paramlists as FRAME! context keylists).  However,
-// Rebol objects historically don't do any typechecking, so this just says
-// any value is legal.
-//
-// !!! An API for hinting types in FRAME! contexts could be useful, if that
-// was then used to make an ACTION! out of it...which is a conceptual idea
-// for the "real way to make actions":
-//
-// https://forum.rebol.info/t/1002
-//
-#define Init_Context_Key(out,spelling) \
-    Init_Param((out), REB_P_NORMAL, (spelling), TS_VALUE)
+#define Init_Param(out,pclass,bits) \
+    Init_Param_Core(TRACK_CELL_IF_DEBUG(out), (pclass), (bits))
 
 
 inline static REBVAL *Refinify(REBVAL *v);  // forward declaration
-inline static bool IS_REFINEMENT(const RELVAL *v);  // forward declaration
-inline static bool IS_PREDICATE(const RELVAL *v);  // forward declaration
+inline static bool IS_REFINEMENT(const RELVAL *v);  // forward decl
+inline static bool IS_PREDICATE(const RELVAL *v);  // forward decl
 
 
 // This is an interim workaround for the need to be able check constrained
@@ -442,14 +447,33 @@ inline static bool IS_PREDICATE(const RELVAL *v);  // forward declaration
 // instead of checking typeset bit flags directly.
 //
 inline static bool Typecheck_Including_Constraints(
-    const RELVAL *param,
+    const REBPAR *param,
     const RELVAL *v
 ){
+    if (VAL_PARAM_CLASS(param) == REB_P_OUTPUT) {
+        //
+        // !!! For the moment, output parameters don't actually check the
+        // typeset for the value being written... they just check that you've
+        // given a location to write.
+        //
+        const REBU64 ts_out = FLAGIT_KIND(REB_TS_REFINEMENT)
+            | FLAGIT_KIND(REB_NULL)
+            | FLAGIT_KIND(REB_ISSUE)  // for Is_Blackhole() use with SET
+            | FLAGIT_KIND(REB_WORD)
+            | FLAGIT_KIND(REB_PATH);
+        return (ts_out & FLAGIT_KIND(VAL_TYPE(v))) != 0;
+    }
+
     if (TYPE_CHECK(param, VAL_TYPE(v)))
         return true;
 
-    if (TYPE_CHECK(param, REB_TS_REFINEMENT) and IS_REFINEMENT(v))
+    if (
+        TYPE_CHECK(param, REB_TS_REFINEMENT)
+        and IS_PATH(v)
+        and IS_REFINEMENT(v)
+    ){
         return true;
+    }
 
     if (TYPE_CHECK(param, REB_TS_PREDICATE) and IS_PREDICATE(v))
         return true;
@@ -458,11 +482,16 @@ inline static bool Typecheck_Including_Constraints(
 }
 
 
-inline static bool Is_Typeset_Empty(const RELVAL *param) {
+inline static bool Is_Typeset_Empty(REBCEL(const*) param) {
+    assert(CELL_HEART(param) == REB_TYPESET);
     REBU64 bits = VAL_TYPESET_LOW_BITS(param);
     bits |= cast(REBU64, VAL_TYPESET_HIGH_BITS(param)) << 32;
     return (bits & TS_OPT_VALUE) == 0;  // e.g. `[/refine]`
 }
+
+// Forward definition needed...
+//
+inline static bool Is_Blackhole(const RELVAL *v);
 
 
 // During the process of specialization, a NULL refinement means that it has
@@ -476,20 +505,23 @@ inline static bool Is_Typeset_Empty(const RELVAL *param) {
 // dequoting and requoting, etc.  Those are evaluator mechanics for filling
 // the slot--this happens after that.
 //
-inline static void Typecheck_Refinement(const RELVAL *param, REBVAL *arg) {
-    assert(NOT_CELL_FLAG(arg, ARG_MARKED_CHECKED));
+inline static void Typecheck_Refinement(
+    const REBPAR *param,
+    REBVAL *arg
+){
     assert(TYPE_CHECK(param, REB_TS_REFINEMENT));
 
     if (IS_NULLED(arg)) {
         //
         // Not in use
     }
-    else if (Is_Typeset_Empty(param)) {
+    else if (
+        Is_Typeset_Empty(param)
+        and VAL_PARAM_CLASS(param) != REB_P_OUTPUT
+    ){
         if (not Is_Blackhole(arg))
             fail ("Parameterless Refinements Must be either # or NULL");
     }
     else if (not Typecheck_Including_Constraints(param, arg))
         fail (Error_Invalid_Type(VAL_TYPE(arg)));
-
-    SET_CELL_FLAG(arg, ARG_MARKED_CHECKED);
 }

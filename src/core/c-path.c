@@ -39,7 +39,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
 ){
     assert(ANY_SEQUENCE_KIND(kind));
     assert(GET_SERIES_FLAG(a, MANAGED));
-    ASSERT_SERIES_TERM(SER(a));
+    ASSERT_SERIES_TERM_IF_NEEDED(a);
     assert(index == 0);  // !!! current rule
     assert(Is_Array_Frozen_Shallow(a));  // must be immutable (may be aliased)
 
@@ -100,7 +100,7 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
     // do it is that leaving it as an index allows for aliasing BLOCK! as
     // PATH! from non-head positions.
 
-    Init_Any_Series_At_Core(out, REB_BLOCK, SER(a), index, specifier);
+    Init_Any_Series_At_Core(out, REB_BLOCK, a, index, specifier);
     mutable_KIND3Q_BYTE(out) = kind;
     assert(HEART_BYTE(out) == REB_BLOCK);
 
@@ -117,10 +117,10 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
 REB_R PD_Fail(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     UNUSED(picker);
-    UNUSED(opt_setval);
+    UNUSED(setval);
 
     fail (pvs->out);
 }
@@ -135,10 +135,10 @@ REB_R PD_Fail(
 REB_R PD_Unhooked(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     UNUSED(picker);
-    UNUSED(opt_setval);
+    UNUSED(setval);
 
     const REBVAL *type = Datatype_From_Kind(VAL_TYPE(pvs->out));
     UNUSED(type); // !!! put in error message?
@@ -226,7 +226,7 @@ bool Next_Path_Throws(REBPVS *pvs)
 
         REBSPC *derived = Derive_Specifier(f_specifier, f_value);
         if (Do_Any_Array_At_Throws(f_spare, f_value, derived)) {
-            Move_Value(pvs->out, f_spare);
+            Move_Cell(pvs->out, f_spare);
             return true; // thrown
         }
         PVS_PICKER(pvs) = f_spare;
@@ -257,11 +257,11 @@ bool Next_Path_Throws(REBPVS *pvs)
           case REB_R_THROWN:
             panic ("Path dispatch isn't allowed to throw, only GROUP!s");
 
-          case REB_R_INVISIBLE: // dispatcher assigned target with opt_setval
+          case REB_R_INVISIBLE: // dispatcher assigned target with setval
             break; // nothing left to do, have to take the dispatcher's word
 
           case REB_R_REFERENCE: { // dispatcher wants a set *if* at end of path
-            Move_Value(pvs->u.ref.cell, PVS_OPT_SETVAL(pvs));
+            Copy_Cell(pvs->u.ref.cell, PVS_OPT_SETVAL(pvs));
             break; }
 
           case REB_R_IMMEDIATE: {
@@ -283,7 +283,7 @@ bool Next_Path_Throws(REBPVS *pvs)
             if (not pvs->u.ref.cell)
                 fail ("Can't update temporary immediate value via SET-PATH!");
 
-            Move_Value(pvs->u.ref.cell, pvs->out);
+            Copy_Cell(pvs->u.ref.cell, pvs->out);
             break; }
 
           case REB_R_REDO: // e.g. used by REB_QUOTED to retrigger, sometimes
@@ -297,7 +297,7 @@ bool Next_Path_Throws(REBPVS *pvs)
             //
             fail ("Path evaluation produced temporary value, can't POKE it");
         }
-        TRASH_POINTER_IF_DEBUG(pvs->special);
+        TRASH_POINTER_IF_DEBUG(pvs->param);
     }
     else {
         pvs->u.ref.cell = nullptr; // clear status of the reference
@@ -377,9 +377,9 @@ bool Next_Path_Throws(REBPVS *pvs)
             fail (Error_Action_With_Dotted_Raw());
 
         if (IS_WORD(PVS_PICKER(pvs))) {
-            if (not pvs->opt_label) {  // !!! only used for this "bit" signal
-                pvs->opt_label = VAL_WORD_SPELLING(PVS_PICKER(pvs));
-                INIT_ACTION_LABEL(pvs->out, pvs->opt_label);
+            if (not pvs->label) {  // !!! only used for this "bit" signal
+                pvs->label = VAL_WORD_SYMBOL(PVS_PICKER(pvs));
+                INIT_VAL_ACTION_LABEL(pvs->out, unwrap(pvs->label));
             }
         }
     }
@@ -406,7 +406,7 @@ bool Next_Path_Throws(REBPVS *pvs)
 // will be allocated, in the style of the REFINE native, which will have the
 // behavior of refinement partial specialization.
 //
-// If `opt_setval` is given, the path operation will be done as a "SET-PATH!"
+// If `setval` is given, the path operation will be done as a "SET-PATH!"
 // if the path evaluation did not throw or error.  HOWEVER the set value
 // is NOT put into `out`.  This provides more flexibility on performance in
 // the evaluator, which may already have the `val` where it wants it, and
@@ -416,10 +416,10 @@ bool Next_Path_Throws(REBPVS *pvs)
 // vetted very heavily by Ren-C, and needs a review and overhaul.
 //
 bool Eval_Path_Throws_Core(
-    REBVAL *out, // if opt_setval, this is only used to return a thrown value
+    REBVAL *out, // if setval, this is only used to return a thrown value
     const RELVAL *sequence,
     REBSPC *sequence_specifier,
-    const REBVAL *opt_setval, // Note: may be the same as out!
+    option(const REBVAL*) setval, // Note: may be the same as out!
     REBFLGS flags
 ){
     REBLEN index = 0;
@@ -436,8 +436,8 @@ bool Eval_Path_Throws_Core(
 
       case REB_WORD:  // get or set `'/` or `'.`
         assert(
-            VAL_WORD_SPELLING(sequence) == PG_Slash_1_Canon
-            or VAL_WORD_SPELLING(sequence) == PG_Dot_1_Canon
+            VAL_WORD_SYMBOL(sequence) == PG_Slash_1_Canon
+            or VAL_WORD_SYMBOL(sequence) == PG_Dot_1_Canon
         );
         goto handle_word;
 
@@ -452,25 +452,25 @@ bool Eval_Path_Throws_Core(
 
       case REB_SYM_WORD:  // get or set `foo/` or `foo.`
       handle_word: {
-        if (opt_setval) {  // nullptr is GET (note IS_NULLED() to set NULLED)
+        if (setval) {  // nullptr is GET (note IS_NULLED() to set NULLED)
             //
             // This is the SET case, which means the `foo.:` and `foo/:`
             // forms pre-check the action status of the value being assigned.
             //
             if (heart == REB_SYM_WORD) {
                 if (ANY_TUPLE_KIND(VAL_TYPE(sequence))) {
-                    if (IS_ACTION(opt_setval))
+                    if (IS_ACTION(unwrap(setval)))
                         fail (Error_Action_With_Dotted_Raw());
                 }
                 else {
-                    if (not IS_ACTION(opt_setval))
+                    if (not IS_ACTION(unwrap(setval)))
                         fail (Error_Inert_With_Slashed_Raw());
                 }
             }
 
-            Move_Value(
+            Copy_Cell(
                 Lookup_Mutable_Word_May_Fail(sequence, sequence_specifier),
-                opt_setval
+                unwrap(setval)
             );
         }
         else {
@@ -510,7 +510,11 @@ bool Eval_Path_Throws_Core(
     assert(NOT_END(ARR_AT(array, index)));
 
     DECLARE_ARRAY_FEED (feed, array, index, specifier);
-    DECLARE_FRAME (pvs, feed, flags | EVAL_FLAG_PATH_MODE);
+    DECLARE_FRAME (
+        pvs,
+        feed,
+        flags | EVAL_FLAG_PATH_MODE | EVAL_FLAG_ALLOCATED_FEED
+    );
     REBFRM * const f = pvs;  // to use the f_xxx macros
 
     assert(NOT_END(f_value));  // tested 0-length path previously
@@ -520,16 +524,13 @@ bool Eval_Path_Throws_Core(
 
     REBDSP dsp_orig = DSP;
 
-    assert(
-        not opt_setval
-        or not IN_DATA_STACK_DEBUG(opt_setval) // evaluation might relocate it
-    );
-    assert(out != opt_setval and out != FRM_SPARE(pvs));
+    assert(out != setval and out != FRM_SPARE(pvs));
 
-    pvs->special = opt_setval; // a.k.a. PVS_OPT_SETVAL()
-    assert(PVS_OPT_SETVAL(pvs) == opt_setval);
+    // a.k.a. PVS_OPT_SETVAL()
+    pvs->param = cast_PAR(setval ? unwrap(setval) : nullptr);
+    assert(PVS_OPT_SETVAL(pvs) == setval);
 
-    pvs->opt_label = NULL;
+    pvs->label = nullptr;
 
     // Seed the path evaluation process by looking up the first item (to
     // get a datatype to dispatch on for the later path items)
@@ -558,9 +559,9 @@ bool Eval_Path_Throws_Core(
             second,
             VAL_SEQUENCE_SPECIFIER(f_value)
         );
-        Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
+        Copy_Cell(pvs->out, SPECIFIC(pvs->u.ref.cell));
         if (IS_ACTION(pvs->out))
-            pvs->opt_label = VAL_WORD_SPELLING(second);
+            pvs->label = VAL_WORD_SYMBOL(second);
     }
     else if (IS_WORD(f_value)) {
         //
@@ -569,11 +570,11 @@ bool Eval_Path_Throws_Core(
         //
         pvs->u.ref.cell = Lookup_Mutable_Word_May_Fail(f_value, specifier);
 
-        Move_Value(pvs->out, SPECIFIC(pvs->u.ref.cell));
+        Copy_Cell(pvs->out, SPECIFIC(pvs->u.ref.cell));
 
         if (IS_ACTION(pvs->out)) {
-            pvs->opt_label = VAL_WORD_SPELLING(f_value);
-            INIT_ACTION_LABEL(pvs->out, pvs->opt_label);
+            pvs->label = VAL_WORD_SYMBOL(f_value);
+            INIT_VAL_ACTION_LABEL(pvs->out, unwrap(pvs->label));
         }
     }
     else if (
@@ -615,7 +616,7 @@ bool Eval_Path_Throws_Core(
             // Prioritize rethinking this when the feature gets used more.
             //
             assert(NOT_CELL_FLAG(pvs->u.ref.cell, PROTECTED));
-            Move_Value(pvs->u.ref.cell, PVS_OPT_SETVAL(pvs));
+            Copy_Cell(pvs->u.ref.cell, PVS_OPT_SETVAL(pvs));
         }
     }
     else {
@@ -630,7 +631,7 @@ bool Eval_Path_Throws_Core(
 
     TRASH_POINTER_IF_DEBUG(lookback);  // goto crosses it, don't use below
 
-    if (opt_setval) {
+    if (setval) {
         // If SET then we don't return anything
         goto return_not_thrown;
     }
@@ -641,24 +642,26 @@ bool Eval_Path_Throws_Core(
         // pushed as ISSUE!s (we needed to evaluate them in forward order).
         // This way we can just pop them as we go, and know if they weren't
         // all consumed if not back to `dsp_orig` by the end.
-
-        REBVAL *bottom = DS_AT(dsp_orig + 1);
-        REBVAL *top = DS_TOP;
+        //
+      blockscope {
+        STKVAL(*) bottom = DS_AT(dsp_orig + 1);
+        STKVAL(*) top = DS_TOP;
 
         while (top > bottom) {
-            assert(IS_SYM_WORD(bottom) and not IS_WORD_BOUND(bottom));
-            assert(IS_SYM_WORD(top) and not IS_WORD_BOUND(top));
+            assert(IS_WORD(bottom) and not IS_WORD_BOUND(bottom));
+            assert(IS_WORD(top) and not IS_WORD_BOUND(top));
 
-            // It's faster to just swap the spellings.  (If binding
-            // mattered, we'd need to swap the whole cells).
+            // Optimize the swap here so that it just swaps the spellings of
+            // the words (unbound words keep their spelling in the binding).
             //
-            const REBSTR *temp = VAL_WORD_SPELLING(bottom);
-            INIT_VAL_NODE(bottom, VAL_WORD_SPELLING(top));
-            INIT_VAL_NODE(top, temp);
+            const REBSTR *spelling = STR(BINDING(bottom));
+            mutable_BINDING(bottom) = STR(BINDING(top));
+            mutable_BINDING(top) = spelling;
 
             top--;
             bottom++;
         }
+      }
 
         assert(IS_ACTION(pvs->out));
 
@@ -680,13 +683,13 @@ bool Eval_Path_Throws_Core(
             if (Specialize_Action_Throws(
                 FRM_SPARE(pvs),
                 pvs->out,
-                nullptr, // opt_def
+                nullptr, // optional def
                 dsp_orig // first_refine_dsp
             )){
                 panic ("REFINE-only specializations should not THROW");
             }
 
-            Move_Value(pvs->out, FRM_SPARE(pvs));
+            Copy_Cell(pvs->out, FRM_SPARE(pvs));
         }
     }
 
@@ -711,12 +714,20 @@ bool Eval_Path_Throws_Core(
 // were `get x` would look up a variable but `get 3` would give you 3.
 // At time of writing it seems to appear in only two places.
 //
-void Get_Simple_Value_Into(REBVAL *out, const RELVAL *val, REBSPC *specifier)
-{
+void Get_Simple_Value_Into(
+    REBVAL *out,
+    const RELVAL *val,
+    REBSPC *specifier
+){
     if (IS_WORD(val) or IS_GET_WORD(val))
         Get_Word_May_Fail(out, val, specifier);
-    else if (IS_PATH(val) or IS_GET_PATH(val))
+    else if (IS_PATH(val) or IS_GET_PATH(val)) {
+        //
+        // !!! This is an example case where the pointer being passed in
+        // may move.  Review.
+        //
         Get_Path_Core(out, val, specifier);
+    }
     else
         Derelativize(out, val, specifier);
 }
@@ -757,7 +768,12 @@ REBCTX *Resolve_Path(const REBVAL *path, REBLEN *index_out)
     picker = VAL_SEQUENCE_AT(temp, path, index);
 
     while (ANY_CONTEXT(var) and IS_WORD(picker)) {
-        REBLEN i = Find_Canon_In_Context(var, VAL_WORD_CANON(picker));
+        const bool strict = false;
+        REBLEN i = Find_Symbol_In_Context(
+            var,
+            VAL_WORD_SYMBOL(picker),
+            strict
+        );
         ++index;
         if (index == len) {
             *index_out = i;
@@ -811,18 +827,18 @@ REBNATIVE(pick)
     DECLARE_END_FRAME (pvs, EVAL_MASK_DEFAULT);
 
     Push_Frame(D_OUT, pvs);
-    Move_Value(D_OUT, location);
+    Copy_Cell(D_OUT, location);
 
     PVS_PICKER(pvs) = ARG(picker);
 
-    pvs->opt_label = NULL; // applies to e.g. :append/only returning APPEND
-    pvs->special = NULL;
+    pvs->label = nullptr; // applies to e.g. :append/only returning APPEND
+    pvs->param = nullptr;
 
   redo: ;  // semicolon is intentional, next line is declaration
 
     PATH_HOOK *hook = Path_Hook_For_Type_Of(D_OUT);
 
-    REB_R r = hook(pvs, PVS_PICKER(pvs), NULL);
+    REB_R r = hook(pvs, PVS_PICKER(pvs), nullptr);
 
     if (not r or r == pvs->out) {
         // Do nothing, let caller handle
@@ -835,7 +851,7 @@ REBNATIVE(pick)
         //
         // It was parented to the PVS frame, we have to read it out.
         //
-        Move_Value(D_OUT, r);
+        Copy_Cell(D_OUT, r);
         rebRelease(r);
         r = D_OUT;
     }
@@ -907,12 +923,12 @@ REBNATIVE(poke)
     DECLARE_END_FRAME (pvs, EVAL_MASK_DEFAULT);
 
     Push_Frame(D_OUT, pvs);
-    Move_Value(D_OUT, location);
+    Copy_Cell(D_OUT, location);
 
     PVS_PICKER(pvs) = ARG(picker);
 
-    pvs->opt_label = nullptr;  // e.g. :append/only returning APPEND
-    pvs->special = ARG(value);
+    pvs->label = nullptr;  // e.g. :append/only returning APPEND
+    pvs->param = cast_PAR(ARG(value));
 
     PATH_HOOK *hook = Path_Hook_For_Type_Of(location);
 
@@ -926,7 +942,7 @@ REBNATIVE(poke)
         break;
 
       case REB_R_REFERENCE:  // wants us to write it
-        Move_Value(pvs->u.ref.cell, ARG(value));
+        Copy_Cell(pvs->u.ref.cell, ARG(value));
         break;
 
       default:
@@ -950,11 +966,11 @@ REBNATIVE(poke)
 REB_R MAKE_Path(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (not IS_BLOCK(arg))
         fail (Error_Bad_Make(kind, arg)); // "make path! 0" has no meaning
@@ -979,11 +995,11 @@ REB_R MAKE_Path(
         if (not ANY_PATH(out)) {
             if (DSP != dsp_orig and IS_BLANK(DS_TOP))
                 DS_DROP(); // make path! ['a/ 'b] => a/b, not a//b
-            Move_Value(DS_PUSH(), out);
+            Copy_Cell(DS_PUSH(), out);
         }
         else { // Splice any generated paths, so there are no paths-in-paths.
-
-            const RELVAL *item = VAL_ARRAY_AT(out);
+            const RELVAL *tail;
+            const RELVAL *item = VAL_ARRAY_AT(&tail, out);  // safe?
             if (IS_BLANK(item) and DSP != dsp_orig) {
                 if (IS_BLANK(DS_TOP)) // make path! ['a/b/ `/c`]
                     fail ("Cannot merge slashes in MAKE PATH!");
@@ -992,7 +1008,7 @@ REB_R MAKE_Path(
             else if (DSP != dsp_orig and IS_BLANK(DS_TOP))
                 DS_DROP(); // make path! ['a/ 'b/c] => a/b/c, not a//b/c
 
-            for (; NOT_END(item); ++item)
+            for (; item != tail; ++item)
                 Derelativize(DS_PUSH(), item, VAL_SPECIFIER(out));
         }
     }
@@ -1062,7 +1078,7 @@ REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         // (Inefficient!  But just see how it feels before optimizing.)
         //
         return rebValue(
-            "as", Datatype_From_Kind(kind), "load", arg,
+            "as", Datatype_From_Kind(kind), "load-value", arg,
         rebEND);
     }
 
@@ -1072,13 +1088,13 @@ REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         // !!! If we don't copy an array, we don't get a new form to use for
         // new bindings in lookups.  Review!
         //
-        Move_Value(out, arg);
+        Copy_Cell(out, arg);
         mutable_KIND3Q_BYTE(out) = arg_kind;
         return out;
     }
 
     if (arg_kind != REB_BLOCK) {
-        Move_Value(out, arg);  // move value so we can modify it
+        Copy_Cell(out, arg);  // move value so we can modify it
         Dequotify(out);  // remove quotes (should TO take a REBCEL()?)
         Plainify(out);  // remove any decorations like @ or :
         if (not Try_Leading_Blank_Pathify(out, kind))
@@ -1096,11 +1112,12 @@ REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         fail (Error_Sequence_Too_Short_Raw());
 
     if (len == 2) {
+        const RELVAL *at = VAL_ARRAY_ITEM_AT(arg);
         if (not Try_Init_Any_Sequence_Pairlike_Core(
             out,
             kind,
-            VAL_ARRAY_AT(arg),
-            VAL_ARRAY_AT(arg) + 1,
+            at,
+            at + 1,
             VAL_SPECIFIER(arg)
         )){
             fail (Error_Bad_Sequence_Init(out));
@@ -1146,11 +1163,11 @@ REBINT CT_Sequence(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // internal representations like [1 2] the array and #{0102} the bytes.
     // See the Try_Init_Sequence() pecking order for how this is guaranteed.
     //
-    int heart_diff = cast(int, HEART_BYTE(a)) - HEART_BYTE(b);
+    int heart_diff = cast(int, CELL_HEART(a)) - CELL_HEART(b);
     if (heart_diff != 0)
         return heart_diff > 0 ? 1 : -1;
 
-    switch (HEART_BYTE(a)) {  // now known to be same as HEART_BYTE(b)
+    switch (CELL_HEART(a)) {  // now known to be same as CELL_HEART(b)
       case REB_BYTES: {  // packed bytes
         REBLEN a_len = VAL_SEQUENCE_LEN(a);
         int diff = cast(int, a_len) - VAL_SEQUENCE_LEN(b);

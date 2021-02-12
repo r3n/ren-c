@@ -142,7 +142,7 @@ REBNATIVE(recycle)
       #if defined(NDEBUG)
         fail (Error_Debug_Only_Raw());
       #else
-        REBSER *sweeplist = Make_Series(100, sizeof(REBNOD*));
+        REBSER *sweeplist = Make_Series(100, FLAG_FLAVOR(NODELIST));
         count = Recycle_Core(false, sweeplist);
         assert(count == SER_USED(sweeplist));
 
@@ -193,7 +193,7 @@ REBNATIVE(limit_usage)
 {
     INCLUDE_PARAMS_OF_LIMIT_USAGE;
 
-    REBSYM sym = VAL_WORD_SYM(ARG(field));
+    SYMID sym = VAL_WORD_ID(ARG(field));
 
     // !!! comment said "Only gets set once"...why?
     //
@@ -252,7 +252,7 @@ REBNATIVE(check)
         ASSERT_CONTEXT(VAL_CONTEXT(value));
     }
     else if (IS_ACTION(value)) {
-        ASSERT_ARRAY(VAL_ACT_PARAMLIST(value));
+        ASSERT_SERIES(VAL_ACTION_KEYLIST(value));
         ASSERT_ARRAY(ACT_DETAILS(VAL_ACTION(value)));
     }
 

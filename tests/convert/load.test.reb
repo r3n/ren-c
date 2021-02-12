@@ -1,16 +1,16 @@
 ; functions/convert/load.r
 [#20
-    (block? load/all "1")
+    ([1] = load "1")
 ]
 [#22 ; a
-    ((quote lit :a) = load "':a")
+    ((quote just :a) = load-value "':a")
 ]
 [#22 ; b
-    (error? trap [load "':a:"])
+    (error? trap [load-value "':a:"])
 ]
 [#858 (
     a: [ < ]
-    a = load mold a
+    a = load-value mold a
 )]
 (error? trap [load "1xyz#"])
 
@@ -22,7 +22,7 @@
 [#1122 (
     any [
         error? trap [load "9999999999999999999"]
-        greater? load "9999999999999999999" load "9223372036854775807"
+        greater? load-value "9999999999999999999" load-value "9223372036854775807"
     ]
 )]
 ; R2 bug

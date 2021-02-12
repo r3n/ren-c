@@ -8,7 +8,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -149,14 +149,14 @@ void *RL_rebMalloc(size_t size)
 {
     ENTER_API;
 
-    REBSER *s = Make_Series_Core(
+    REBBIN *s = BIN(Make_Series(
         ALIGN_SIZE  // stores REBSER* (must be at least big enough for void*)
             + size  // for the actual data capacity (may be 0, see notes)
             + 1,  // for termination (AS TEXT! of rebRepossess(), see notes)
-        sizeof(REBYTE),  // rebRepossess() only creates binary series ATM
-        SERIES_FLAG_DONT_RELOCATE  // direct data pointer is being handed back
-            | SERIES_FLAG_ALWAYS_DYNAMIC  // rebRepossess() needs bias field
-    );
+        FLAG_FLAVOR(BINARY)  // rebRepossess() only creates binary series ATM
+            | SERIES_FLAG_DONT_RELOCATE  // direct data pointer handed back
+            | SERIES_FLAG_DYNAMIC  // rebRepossess() needs bias field
+    ));
 
     REBYTE *ptr = BIN_HEAD(s) + ALIGN_SIZE;
 
@@ -208,10 +208,10 @@ void *RL_rebRealloc(void *ptr, size_t new_size)
     if (not ptr)  // C realloc() accepts null
         return rebMalloc(new_size);
 
-    REBSER **ps = cast(REBSER**, ptr) - 1;
-    UNPOISON_MEMORY(ps, sizeof(REBSER*));  // need to underrun to fetch `s`
+    REBBIN **ps = cast(REBBIN**, ptr) - 1;
+    UNPOISON_MEMORY(ps, sizeof(REBBIN*));  // need to underrun to fetch `s`
 
-    REBSER *s = *ps;
+    REBBIN *s = *ps;
 
     REBLEN old_size = BIN_LEN(s) - ALIGN_SIZE;
 
@@ -239,11 +239,11 @@ void RL_rebFree(void *ptr)
     if (not ptr)
         return;
 
-    REBSER **ps = cast(REBSER**, ptr) - 1;
-    UNPOISON_MEMORY(ps, sizeof(REBSER*));  // need to underrun to fetch `s`
+    REBBIN **ps = cast(REBBIN**, ptr) - 1;
+    UNPOISON_MEMORY(ps, sizeof(REBBIN*));  // need to underrun to fetch `s`
 
-    REBSER *s = *ps;
-    if (s->header.bits & NODE_FLAG_CELL) {
+    REBBIN *s = *ps;
+    if (Is_Node_Cell(s)) {
         rebJumps(
             "PANIC [",
                 "{rebFree() mismatched with allocator!}"
@@ -287,10 +287,10 @@ REBVAL *RL_rebRepossess(void *ptr, size_t size)
 {
     ENTER_API;
 
-    REBSER **ps = cast(REBSER**, ptr) - 1;
-    UNPOISON_MEMORY(ps, sizeof(REBSER*));  // need to underrun to fetch `s`
+    REBBIN **ps = cast(REBBIN**, ptr) - 1;
+    UNPOISON_MEMORY(ps, sizeof(REBBIN*));  // need to underrun to fetch `s`
 
-    REBSER *s = *ps;
+    REBBIN *s = *ps;
     assert(NOT_SERIES_FLAG(s, MANAGED));
 
     if (size > BIN_LEN(s) - ALIGN_SIZE)
@@ -545,7 +545,7 @@ REBVAL *RL_rebSizedBinary(const void *bytes, size_t size)
 {
     ENTER_API;
 
-    REBSER *bin = Make_Binary(size);
+    REBBIN *bin = Make_Binary(size);
     memcpy(BIN_HEAD(bin), bytes, size);
     TERM_BIN_LEN(bin, size);
 
@@ -576,7 +576,7 @@ REBVAL *RL_rebUninitializedBinary_internal(size_t size)
 {
     ENTER_API;
 
-    REBSER *bin = Make_Binary(size);
+    REBBIN *bin = Make_Binary(size);
 
     // !!! Caution, unfilled bytes, access or molding may be *worse* than
     // random by the rules of C if they don't get written!  Must be filled
@@ -760,12 +760,13 @@ const void *RL_rebArgR(unsigned char quotes, const void *p, va_list *vaptr)
     if (Detect_Rebol_Pointer(p2) != DETECTED_AS_END)
         fail ("rebArg() isn't actually variadic, it's arity-1");
 
-    const REBSTR *spelling = Intern_UTF8_Managed(cb_cast(name), strsize(name));
+    const REBSYM *symbol = Intern_UTF8_Managed(cb_cast(name), strsize(name));
 
-    REBVAL *param = ACT_PARAMS_HEAD(act);
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, act);
     REBVAL *arg = FRM_ARGS_HEAD(f);
-    for (; NOT_END(param); ++param, ++arg) {
-        if (SAME_STR(VAL_PARAM_SPELLING(param), spelling))
+    for (; key != tail; ++key, ++arg) {
+        if (Are_Synonyms(KEY_SYMBOL(key), symbol))
             return arg;
     }
 
@@ -788,7 +789,7 @@ REBVAL *RL_rebArg(unsigned char quotes, const void *p, va_list *vaptr)
         return nullptr;
 
     REBVAL *arg = cast(REBVAL*, c_cast(void*, argR));  // sneaky, but we know!
-    return Move_Value(Alloc_Value(), arg);  // don't give REBVAL* arg directly
+    return Copy_Cell(Alloc_Value(), arg);  // don't give REBVAL* arg directly
 }
 
 
@@ -830,7 +831,7 @@ static void Run_Va_May_Fail_Core(
     const void *p,  // first pointer (may be END, nullptr means NULLED)
     va_list *vaptr  // va_end() handled by feed for all cases (throws, fails)
 ){
-    Init_Unlabeled_Void(out);
+    Init_Empty_Nulled(out);
 
     REBFLGS flags = EVAL_MASK_DEFAULT | FLAG_QUOTING_BYTE(quotes);
 
@@ -849,7 +850,11 @@ static void Run_Va_May_Fail_Core(
         Eval_Sigmask &= ~SIG_HALT;  // disable
 
     DECLARE_VA_FEED (feed, p, vaptr, flags);
-    bool threw = Do_Feed_To_End_Maybe_Stale_Throws(out, feed);
+    bool threw = Do_Feed_To_End_Maybe_Stale_Throws(
+        out,
+        feed,
+        EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+    );
 
     // (see also Reb_State->saved_sigmask RE: if a longjmp happens)
     Eval_Sigmask = saved_sigmask;
@@ -864,7 +869,7 @@ static void Run_Va_May_Fail_Core(
         fail (Error_No_Catch_For_Throw(out));
     }
 
-    CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
 }
 
 #define Run_Va_May_Fail(out,quotes,p,vaptr) \
@@ -955,7 +960,7 @@ void RL_rebElide(unsigned char quotes, const void *p, va_list *vaptr)
 //
 // rebJumps() is like rebElide, but has the noreturn attribute.  This helps
 // inform the compiler that the routine is not expected to return.  Use it
-// with things like `rebJumps("FAIL", ...)` or `rebJumps("THROW", ...)`.  If
+// with things like `rebJumps("fail", ...)` or `rebJumps("THROW", ...)`.  If
 // by some chance the code passed to it does not jump and finishes normally,
 // then an error will be raised.
 //
@@ -1672,6 +1677,10 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
     // just calling rebQ(value) to get a quote on a single value.  Sense
     // that situation and make it faster.
     //
+    // !!! In order to avoid putting `null` in arrays here and needing to
+    // make exceptions for that in the instruction arrays, we quote everything
+    // by 1 and then decrement the delta by 1.
+    //
     const void* const *packed;
     if (vaptr)
         packed = nullptr;
@@ -1686,12 +1695,14 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         else
             p = *packed++;
         if (p and Detect_Rebol_Pointer(p) == DETECTED_AS_END) {
-            a = Alloc_Singular(NODE_FLAG_MANAGED);
+            a = Alloc_Singular(
+                FLAG_FLAVOR(INSTRUCTION_ADJUST_QUOTING) | NODE_FLAG_MANAGED
+            );
             CLEAR_SERIES_FLAG(a, MANAGED);  // see notes above on why we lied
-            Move_Value(ARR_SINGLE(a), first);
+            Quotify(Copy_Cell(ARR_SINGLE(a), first), 1);
         }
-        else {
-            Move_Value(DS_PUSH(), first);  // no shortcut, push and keep going
+        else {  // no shortcut, push and keep going
+            Quotify(Copy_Cell(DS_PUSH(), first), 1);
             goto no_shortcut;
         }
     }
@@ -1702,12 +1713,18 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         DECLARE_VA_FEED (feed, p, vaptr, feed_flags);
 
         while (NOT_END(feed->value)) {
-            Move_Value(DS_PUSH(), SPECIFIC(feed->value));
-            Fetch_Next_In_Feed(feed, false);
+            Quotify(Copy_Cell(DS_PUSH(), SPECIFIC(feed->value)), 1);
+            Fetch_Next_In_Feed(feed);
         }
 
-        a = Pop_Stack_Values_Core(dsp_orig, NODE_FLAG_MANAGED);
+        a = Pop_Stack_Values_Core(
+            dsp_orig,
+            NODE_FLAG_MANAGED
+                | FLAG_FLAVOR(INSTRUCTION_ADJUST_QUOTING)
+        );
         CLEAR_SERIES_FLAG(a, MANAGED);  // see notes above on why we lied
+
+        Free_Feed(feed);
     }
 
     // !!! Although you can do `rebU("[", a, b, "]"), you cannot do
@@ -1719,9 +1736,8 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
     if (ARR_LEN(a) > 1)
         fail ("rebU() and rebQ() currently can't splice more than one value");
 
-    SET_ARRAY_FLAG(a, INSTRUCTION_ADJUST_QUOTING);
-    MISC(a).quoting_delta = delta;
-    return NOD(a);
+    a->misc.quoting_delta = delta - 1;
+    return cast(REBINS*, a);
 }
 
 //
@@ -1771,11 +1787,58 @@ const REBINS *RL_rebRELEASING(REBVAL *v)
         fail ("Cannot apply rebR() to non-API value");
 
     REBARR *a = Singular_From_Cell(v);
-    if (GET_ARRAY_FLAG(a, SINGULAR_API_RELEASE))
+    if (GET_SUBCLASS_FLAG(API, a, RELEASE))
         fail ("Cannot apply rebR() more than once to the same API value");
 
-    SET_ARRAY_FLAG(a, SINGULAR_API_RELEASE);
-    return NOD(a);
+    SET_SUBCLASS_FLAG(API, a, RELEASE);
+    return cast(REBINS*, a);
+}
+
+
+//
+//  rebINLINE: RL_API
+//
+// This will splice an array into the execution feed.  If it is a TUPLE!, then
+// it needs to begin with a BLANK! (a predicate).
+//
+// May return an instruction, and may return just a value.
+//
+const void *RL_rebINLINE(const REBVAL *v)
+{
+    ENTER_API;
+
+    if (IS_ACTION(v))
+        return v;  // just let actions through as-is (helpful for predicates)
+
+    REBARR *a = Alloc_Singular(
+        FLAG_FLAVOR(INSTRUCTION_SPLICE) | NODE_FLAG_MANAGED
+    );
+    CLEAR_SERIES_FLAG(a, MANAGED);  // lying avoided manuals tracking
+
+    if (IS_BLOCK(v)) {  // splice entire block contents
+        Copy_Cell(ARR_SINGLE(a), v);
+    }
+    else if (IS_TUPLE(v)) {
+        DECLARE_LOCAL (store);
+        const RELVAL *first = VAL_SEQUENCE_AT(store, v, 0);
+        if (not IS_BLANK(first))
+            fail ("rebINLINE() requires TUPLE! to start with BLANK!");
+
+        if (VAL_SEQUENCE_LEN(v) == 2) {  // compact form, no array
+            const RELVAL *second = VAL_SEQUENCE_AT(store, v, 1);
+            Derelativize(ARR_SINGLE(a), second, VAL_SEQUENCE_SPECIFIER(v));
+        }
+        else {  // has array, reuse it (but bump it forward to skip blank)
+            assert(CELL_HEART(cast(REBCEL(const*), v)) == REB_BLOCK);
+            Copy_Cell(ARR_SINGLE(a), v);
+            mutable_KIND3Q_BYTE(ARR_SINGLE(a)) = REB_BLOCK;
+            ++VAL_INDEX_UNBOUNDED(ARR_SINGLE(a));  // skip blank
+        }
+    }
+    else
+        fail ("rebINLINE() expects BLOCK!, blank-headed TUPLE!, or ACTION!");
+
+    return cast(REBINS*, a);
 }
 
 
@@ -1838,8 +1901,8 @@ void RL_rebUnmanage(void *p)
     CLEAR_SERIES_FLAG(a, MANAGED);
     Unlink_Api_Handle_From_Frame(a);
 
-    TRASH_POINTER_IF_DEBUG(LINK(a).custom.node);
-    TRASH_POINTER_IF_DEBUG(MISC(a).custom.node);
+    TRASH_POINTER_IF_DEBUG(a->link.trash);
+    TRASH_POINTER_IF_DEBUG(a->misc.trash);
 }
 
 
@@ -2095,10 +2158,10 @@ REBNATIVE(api_transient)
 {
     INCLUDE_PARAMS_OF_API_TRANSIENT;
 
-    REBVAL *v = Move_Value(Alloc_Value(), ARG(value));
+    REBVAL *v = Copy_Cell(Alloc_Value(), ARG(value));
     rebUnmanage(v);  // has to survive the API-TRANSIENT's frame
     REBARR *a = Singular_From_Cell(v);
-    SET_ARRAY_FLAG(a, SINGULAR_API_RELEASE);
+    SET_SUBCLASS_FLAG(API, a, RELEASE);
 
     // Regarding adddresses in WASM:
     //

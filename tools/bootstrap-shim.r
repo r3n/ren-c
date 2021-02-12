@@ -53,8 +53,30 @@ trap [
         return :v
     ]
 
-    QUIT
+    ; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
+    ; bootstrap executable on github actions doesn't have this change
+    ;
+    if undefined? 'just [
+        just: :literal
+    ]
+
+    ; LOAD changed to have no /ALL so enforcing getting a block is weird
+    ;
+    if find parameters of :load /all [
+        load-all: :load/all
+        load-value: :load  ; imperfect...works for rebmake
+    ] else [
+        load-all: :load
+    ]
+
+    quit
 ]
+
+; !!! This isn't perfect, but it should work for the cases in rebmake
+;
+load-value: :load
+load-all: :load/all
+
 
 ; Lambda was redefined to `->` to match Haskell/Elm vs. `=>` for JavaScript.
 ; It is lighter to look at, but also if the symbol `<=` is deemed to be
@@ -110,6 +132,30 @@ undefined?: :unset?
 collect*: :collect
 collect: :collect-block
 
+collect-lets: func [
+    return: [block!]
+    array [block! group!]
+    <local> lets
+][
+    lets: copy []
+    for-next item array [
+        case [
+            item/1 = 'let [
+                item: next item
+                if match [set-word! word! block!] item/1 [
+                    append lets item/1
+                ]
+            ]
+            value? match [block! group!] item/1 [
+                append lets collect-lets item/1
+            ]
+        ]
+    ]
+    return lets
+]
+
+let: :nihil
+
 modernize-action: function [
     "Account for <blank> annotation, refinements as own arguments"
     return: [block!]
@@ -161,7 +207,18 @@ modernize-action: function [
 
             ; Find ANY-WORD!s (args/locals)
             ;
-            if keep w: match any-word! spec/1 [
+            if w: match any-word! spec/1 [
+                ;
+                ; Transform the escapable argument convention, to line up
+                ; GET-WORD! with things that are escaped by GET-WORD!s
+                ; https://forum.rebol.info/t/1433
+                ;
+                keep case [
+                    lit-word? w [to get-word! w]
+                    get-word? w [to lit-word! w]
+                    true [w]
+                ]
+
                 if last-refine-word [
                     fail [
                         "Refinements now *are* the arguments:" mold head spec
@@ -201,6 +258,14 @@ modernize-action: function [
             spec: my next
         ]
     ]
+
+    ; The bootstrap executable does not have support for true dynamic LET.
+    ; We approximate it by searching the body for LET followed by SET-WORD!
+    ; or WORD! and add that to locals.
+    ;
+    append spec <local>
+    append spec collect-lets body
+
     body: compose [
         ((blankers))
         ((proxiers))
@@ -213,11 +278,13 @@ func: adapt :func [set [spec body] modernize-action spec body]
 function: adapt :function [set [spec body] modernize-action spec body]
 
 meth: enfixed adapt :meth [set [spec body] modernize-action spec body]
-method: enfixed adapt :method [set [spec body] modernize-action spec body]
+method: func [/dummy] [
+    fail 'dummy "METHOD deprecated temporarily, use METH"
+]
 
 trim: adapt :trim [  ; there's a bug in TRIM/AUTO in 8994d23
     if auto [
-        while [(not tail? series) and [series/1 = LF]] [
+        while [(not tail? series) and (series/1 = LF)] [
             take series
         ]
     ]
@@ -233,10 +300,10 @@ mutable: func [x [any-value!]] [
     :x
 ]
 
-lit: :quote  ; Renamed due to the QUOTED! datatype
+just: :quote  ; Renamed due to the QUOTED! datatype
 quote: func [x [<opt> any-value!]] [
     switch type of x [
-        null [lit ()]
+        null [just ()]
         word! [to lit-word! x]
         path! [to lit-path! x]
 
@@ -259,7 +326,7 @@ has: null
 ; it could dump those remarks out...perhaps based on how many == there are.
 ; (This is a good reason for retaking ==, as that looks like a divider.)
 ;
-===: func [:remarks [any-value! <...>]] [  ; note: <...> is now a TUPLE!
+===: func ['remarks [any-value! <...>]] [  ; note: <...> is now a TUPLE!
     until [
         equal? '=== take remarks
     ]
@@ -443,6 +510,7 @@ delimit: func [
 
 unspaced: specialize :delimit [delimiter: _]
 spaced: specialize :delimit [delimiter: space]
+
 
 dequote: func [x] [
     switch type of x [

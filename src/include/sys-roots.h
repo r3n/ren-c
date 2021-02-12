@@ -42,32 +42,27 @@
 //
 
 
-//=//// ARRAY_FLAG_SINGULAR_API_RELEASE //////////////////////////////////=//
-//
+#define LINK_ApiNext_TYPE       REBNOD*
+#define LINK_ApiNext_CAST       NOD
+#define HAS_LINK_ApiNext       FLAVOR_API
+
+#define MISC_ApiPrev_TYPE       REBNOD*
+#define MISC_ApiPrev_CAST       NOD
+#define HAS_MISC_ApiPrev        FLAVOR_API
+
+
 // The rebR() function can be used with an API handle to tell a variadic
 // function to release that handle after encountering it.
 //
-// !!! API handles are singular arrays, because there is already a stake in
-// making them efficient.  However it means they have to share header and
-// info bits, when most are not applicable to them.  This is a tradeoff, and
-// contention for bits may become an issue in the future.
-//
-#define ARRAY_FLAG_SINGULAR_API_RELEASE \
-    ARRAY_FLAG_23
-
-
-//=//// ARRAY_FLAG_INSTRUCTION_ADJUST_QUOTING /////////////////////////////=//
-//
-// This is used by rebQ() and rebU() to either add a quoting level of splices
-// or to remove one.  Today these arrays are always singular and contain
-// one value, but in the future they might contain more.
-//
-#define ARRAY_FLAG_INSTRUCTION_ADJUST_QUOTING \
-    ARRAY_FLAG_24
+#define API_FLAG_RELEASE \
+    SERIES_FLAG_24
 
 
 // What distinguishes an API value is that it has both the NODE_FLAG_CELL and
 // NODE_FLAG_ROOT bits set.
+//
+// !!! Note: The FLAVOR_API state can be converted to an instruction for
+// releasing the handle...so beware using FLAVOR_API for detection.
 //
 inline static bool Is_Api_Value(const RELVAL *v) {
     assert(v->header.bits & NODE_FLAG_CELL);
@@ -80,45 +75,45 @@ inline static void Link_Api_Handle_To_Frame(REBARR *a, REBFRM *f)
     // API freeing operations can update the head of the list in the frame
     // when given only the node pointer.
 
-    MISC(a).custom.node = NOD(f);  // back pointer for doubly linked list
+    mutable_MISC(ApiPrev, a) = NOD(f);  // back pointer for doubly linked list
 
     bool empty_list = f->alloc_value_list == NOD(f);
 
     if (not empty_list) {  // head of list exists, take its spot at the head
         assert(Is_Api_Value(ARR_SINGLE(ARR(f->alloc_value_list))));
-        MISC(f->alloc_value_list).custom.node = NOD(a);  // link back to us
+        mutable_MISC(ApiPrev, SER(f->alloc_value_list)) = a;  // link back
     }
 
-    LINK(a).custom.node = f->alloc_value_list;  // forward pointer
-    f->alloc_value_list = NOD(a);
+    mutable_LINK(ApiNext, a) = f->alloc_value_list;  // forward pointer
+    f->alloc_value_list = a;
 }
 
 inline static void Unlink_Api_Handle_From_Frame(REBARR *a)
 {
     bool at_head = did (
-        *cast(REBYTE*, MISC(a).custom.node) & NODE_BYTEMASK_0x01_CELL
+        *cast(REBYTE*, MISC(ApiPrev, a)) & NODE_BYTEMASK_0x01_CELL
     );
     bool at_tail = did (
-        *cast(REBYTE*, LINK(a).custom.node) & NODE_BYTEMASK_0x01_CELL
+        *cast(REBYTE*, LINK(ApiNext, a)) & NODE_BYTEMASK_0x01_CELL
     );
 
     if (at_head) {
-        REBFRM *f = FRM(MISC(a).custom.node);
-        f->alloc_value_list = LINK(a).custom.node;
+        REBFRM *f = FRM(MISC(ApiPrev, a));
+        f->alloc_value_list = LINK(ApiNext, a);
 
         if (not at_tail) {  // only set next item's backlink if it exists
-            assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(a).custom.node))));
-            MISC(LINK(a).custom.node).custom.node = NOD(f);
+            assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(ApiNext, a)))));
+            mutable_MISC(ApiPrev, SER(LINK(ApiNext, a))) = NOD(f);
         }
     }
     else {
         // we're not at the head, so there is a node before us, set its "next"
-        assert(Is_Api_Value(ARR_SINGLE(ARR(MISC(a).custom.node))));
-        LINK(MISC(a).custom.node).custom.node = LINK(a).custom.node;
+        assert(Is_Api_Value(ARR_SINGLE(ARR(MISC(ApiPrev, a)))));
+        mutable_LINK(ApiNext, SER(MISC(ApiPrev, a))) = LINK(ApiNext, a);
 
         if (not at_tail) {  // only set next item's backlink if it exists
-            assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(a).custom.node))));
-            MISC(LINK(a).custom.node).custom.node = MISC(a).custom.node;
+            assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(ApiNext, a)))));
+            mutable_MISC(ApiPrev, SER(LINK(ApiNext, a))) = MISC(ApiPrev, a);
         }
     }
 }
@@ -133,10 +128,12 @@ inline static void Unlink_Api_Handle_From_Frame(REBARR *a)
 //
 inline static REBVAL *Alloc_Value(void)
 {
-    REBARR *a = Alloc_Singular(NODE_FLAG_ROOT | NODE_FLAG_MANAGED);
+    REBARR *a = Alloc_Singular(
+        FLAG_FLAVOR(API) |  NODE_FLAG_ROOT | NODE_FLAG_MANAGED
+    );
 
     // Giving the cell itself NODE_FLAG_ROOT lets a REBVAL* be discerned as
-    // either an API handle or not.  The flag is not copied by Move_Value().
+    // either an API handle or not.  The flag is not copied by Copy_Cell().
     //
     REBVAL *v = SPECIFIC(ARR_SINGLE(a));
 
@@ -169,41 +166,7 @@ inline static void Free_Value(REBVAL *v)
     if (GET_SERIES_FLAG(a, MANAGED))
         Unlink_Api_Handle_From_Frame(a);
 
-    GC_Kill_Series(SER(a));
-}
-
-
-// "Instructions" are singular arrays; they are intended to be used directly
-// with a variadic API call, and will be freed automatically by an enumeration
-// to the va_end() point--whether there is an error, throw, or completion.
-//
-// They are not GC managed, in order to avoid taxing the garbage collector
-// (and tripping assert mechanisms).  So they can leak if used incorrectly.
-//
-// Instructions should be returned as a const void *, in order to discourage
-// using these anywhere besides as arguments to a variadic API like rebValue().
-//
-inline static REBARR *Alloc_Instruction(enum Reb_Api_Opcode opcode) {
-    REBSER *s = Alloc_Series_Node(
-        SERIES_FLAG_FIXED_SIZE // not tracked as stray manual, but unmanaged
-        /* ... */
-    );
-    s->info = Endlike_Header(
-        FLAG_WIDE_BYTE_OR_0(0) // signals array, also implicit terminator
-            | FLAG_LEN_BYTE_OR_255(1) // signals singular
-    );
-    MISC(s).opcode = opcode;
-
-    RELVAL *cell = SER_CELL(s);
-    cell->header.bits = CELL_MASK_PREP_END | NODE_FLAG_ROOT;
-    TRACK_CELL_IF_DEBUG_EVIL_MACRO(cell, "<<instruction>>", 0);
-    return ARR(s);
-}
-
-inline static void Free_Instruction(REBARR *a) {
-    assert(IS_SER_ARRAY(SER(a)));
-    TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
-    Free_Node(SER_POOL, NOD(a));
+    GC_Kill_Series(a);
 }
 
 
@@ -251,7 +214,7 @@ inline static void Handle_Api_Dispatcher_Result(REBFRM *f, const REBVAL* r) {
     if (IS_NULLED(r))
         assert(!"Dispatcher returned nulled cell, not C nullptr for API use");
 
-    Move_Value(f->out, r);
+    Copy_Cell(f->out, r);
     if (NOT_CELL_FLAG(r, MANAGED))
         rebRelease(r);
 }

@@ -139,7 +139,7 @@ rebsource: context [
                 filetype: select extensions extension-of file
                 type: in source filetype
                 (reeval (ensure action! get type) file
-                    (read %% (repo-dir)/src/(file))
+                    (read %% (repo-dir)/(file)))
             ]
         ]
 
@@ -287,7 +287,7 @@ rebsource: context [
             analysis: copy []
             emit: specialize :log-emit [log: analysis]
 
-            data: read %% (repo-dir)/src/(file)
+            data: read %% (repo-dir)/(file)
 
             bol: _
             line: _
@@ -413,7 +413,7 @@ rebsource: context [
             item: ensure file! take queue
 
             if equal? #"/" last item [
-                contents: read %% (repo-dir)/src/(item)
+                contents: read %% (repo-dir)/(item)
                 insert queue map-each x contents [join item x]
                 item: _
             ] else [
@@ -450,7 +450,7 @@ rebsource: context [
             any [nl | eol | wsp]
         ]
 
-        append/only grammar/other-segment lit (
+        append/only grammar/other-segment just (
             last-func-end: _
         )
 

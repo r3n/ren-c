@@ -33,12 +33,16 @@
 //
 // Read BLOCK! of TUPLE! into sequential RGBA memory runs.
 //
-void Tuples_To_RGBA(REBYTE *rgba, REBLEN size, const REBVAL *head, REBLEN len)
-{
+void Tuples_To_RGBA(
+    REBYTE *rgba,
+    REBLEN size,
+    const RELVAL *head,
+    REBLEN len
+){
     if (len > size)
         len = size;  // avoid over-run
 
-    const REBVAL *item = head;
+    const RELVAL *item = head;
     for (; len > 0; len--, rgba += 4, ++head)
         Get_Tuple_Bytes(rgba, item, 4);
 }
@@ -231,11 +235,11 @@ void Copy_Image_Value(REBVAL *out, const REBVAL *arg, REBINT len)
 REB_R MAKE_Image(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_IMAGE(arg)) {
         //
@@ -257,8 +261,9 @@ REB_R MAKE_Image(
         Init_Image_Black_Opaque(out, w, h);
     }
     else if (IS_BLOCK(arg)) {  // make image! [size rgba index]
-        const RELVAL *item = VAL_ARRAY_AT(arg);
-        if (not IS_PAIR(item))
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, arg);
+        if (item == tail or not IS_PAIR(item))
             goto bad_make;
 
         REBINT w = VAL_PAIR_X_INT(item);
@@ -268,7 +273,7 @@ REB_R MAKE_Image(
 
         ++item;
 
-        if (IS_END(item)) {  // was just `make image! [10x20]`, allow it
+        if (item == tail) {  // just `make image! [10x20]`, allow it
             Init_Image_Black_Opaque(out, w, h);
             ++item;
         }
@@ -294,7 +299,7 @@ REB_R MAKE_Image(
             // !!! Sketchy R3-Alpha concept: "image position".  The block
             // MAKE IMAGE! format allowed you to specify it.
 
-            if (NOT_END(item) and IS_INTEGER(item)) {
+            if (item != tail and IS_INTEGER(item)) {
                 VAL_IMAGE_POS(out) = (Int32s(SPECIFIC(item), 1) - 1);
                 ++item;
             }
@@ -327,14 +332,15 @@ REB_R MAKE_Image(
             }
 
             REBYTE *ip = VAL_IMAGE_HEAD(out);  // image pointer
+
             Tuples_To_RGBA(
-                ip, w * h, SPECIFIC(VAL_ARRAY_AT(item)), VAL_LEN_AT(item)
+                ip, w * h, VAL_ARRAY_ITEM_AT(item), VAL_LEN_AT(item)
             );
         }
         else
             goto bad_make;
 
-        if (NOT_END(item))
+        if (item != tail)
             fail ("Too many elements in BLOCK! for MAKE IMAGE!");
     }
     else
@@ -577,7 +583,7 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
     REBVAL *value = ARG(series);  // !!! confusing name
     REBVAL *arg = ARG(value);
 
-    REBSER *bin = VAL_BINARY_ENSURE_MUTABLE(VAL_IMAGE_BIN(value));
+    REBBIN *bin = VAL_BINARY_ENSURE_MUTABLE(VAL_IMAGE_BIN(value));
 
     REBLEN index = VAL_IMAGE_POS(value);
     REBLEN tail = VAL_IMAGE_LEN_HEAD(value);
@@ -588,7 +594,7 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
     if (w == 0)
         RETURN (value);
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
     if (sym == SYM_APPEND) {
         index = tail;
         sym = SYM_INSERT;
@@ -759,7 +765,7 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
         if (index + part > tail) part = tail - index;  // clip it
         ip += index * 4;
         for (; dup > 0; dup--, ip += part * 4)
-            Tuples_To_RGBA(ip, part, SPECIFIC(VAL_ARRAY_AT(arg)), part);
+            Tuples_To_RGBA(ip, part, VAL_ARRAY_ITEM_AT(arg), part);
     }
     else
         fail (Error_Invalid_Type(VAL_TYPE(arg)));
@@ -850,7 +856,7 @@ void Find_Image(REBFRM *frame_)
 
     // Post process the search (failure or apply /match and /tail):
 
-    Move_Value(D_OUT, value);
+    Copy_Cell(D_OUT, value);
     assert((p - VAL_IMAGE_HEAD(value)) % 4 == 0);
 
     REBINT n = cast(REBLEN, (p - VAL_IMAGE_HEAD(value)) / 4);
@@ -918,7 +924,7 @@ void MF_Image(REB_MOLD *mo, REBCEL(const*) v, bool form)
     Pre_Mold(mo, v);
     if (GET_MOLD_FLAG(mo, MOLD_FLAG_ALL)) {
         DECLARE_LOCAL (head);
-        Move_Value(head, SPECIFIC(CELL_TO_VAL(v)));
+        Copy_Cell(head, SPECIFIC(CELL_TO_VAL(v)));
         VAL_IMAGE_POS(head) = 0; // mold all of it
         Mold_Image_Data(mo, head);
         Post_Mold(mo, v);
@@ -949,14 +955,14 @@ REBTYPE(Image)
     if (index > tail)
         index = tail;
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
     switch (sym) {
 
     case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // accounted for by value above
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -1207,7 +1213,7 @@ void Pick_Image(REBVAL *out, const REBVAL *value, const RELVAL *picker)
     REBYTE *src = VAL_IMAGE_AT(value);
 
     if (IS_WORD(picker)) {
-        switch (VAL_WORD_SYM(picker)) {
+        switch (VAL_WORD_ID(picker)) {
         case SYM_SIZE:
             Init_Pair_Int(
                 out,
@@ -1217,18 +1223,18 @@ void Pick_Image(REBVAL *out, const REBVAL *value, const RELVAL *picker)
             break;
 
         case SYM_RGB: {
-            REBSER *nser = Make_Binary(len * 3);
+            REBBIN *nser = Make_Binary(len * 3);
             SET_SERIES_LEN(nser, len * 3);
             RGB_To_Bin(BIN_HEAD(nser), src, len, false);
-            TERM_SERIES(nser);
+            TERM_BIN(nser);
             Init_Binary(out, nser);
             break; }
 
         case SYM_ALPHA: {
-            REBSER *nser = Make_Binary(len);
+            REBBIN *nser = Make_Binary(len);
             SET_SERIES_LEN(nser, len);
             Alpha_To_Bin(BIN_HEAD(nser), src, len);
-            TERM_SERIES(nser);
+            TERM_BIN(nser);
             Init_Binary(out, nser);
             break; }
 
@@ -1262,7 +1268,7 @@ void Poke_Image_Fail_If_Read_Only(
     REBYTE *src = VAL_IMAGE_AT(value);
 
     if (IS_WORD(picker)) {
-        switch (VAL_WORD_SYM(picker)) {
+        switch (VAL_WORD_ID(picker)) {
         case SYM_SIZE:
             if (!IS_PAIR(poke) || !VAL_PAIR_X_DEC(poke))
                 fail (poke);
@@ -1363,10 +1369,10 @@ void Poke_Image_Fail_If_Read_Only(
 REB_R PD_Image(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval != NULL) {
-        Poke_Image_Fail_If_Read_Only(pvs->out, picker, opt_setval);
+    if (setval) {
+        Poke_Image_Fail_If_Read_Only(pvs->out, picker, unwrap(setval));
         return R_INVISIBLE;
     }
 

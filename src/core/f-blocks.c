@@ -54,7 +54,7 @@ REBARR *Copy_Array_At_Extra_Shallow(
     for (; count < len; ++count, ++dest, ++src)
         Derelativize(dest, src, specifier);
 
-    TERM_ARRAY_LEN(copy, len);
+    SET_SERIES_LEN(copy, len);
 
     return copy;
 }
@@ -88,7 +88,7 @@ REBARR *Copy_Array_At_Max_Shallow(
     for (; count < max; ++count, ++src, ++dest)
         Derelativize(dest, src, specifier);
 
-    TERM_ARRAY_LEN(copy, max);
+    SET_SERIES_LEN(copy, max);
 
     return copy;
 }
@@ -114,12 +114,12 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
     RELVAL *dest = ARR_HEAD(a);
     for (; count < len; ++count, ++src, ++dest) {
         if (KIND3Q_BYTE_UNCHECKED(src) == REB_NULL)  // allow unreadable void
-            assert(flags & ARRAY_FLAG_NULLEDS_LEGAL);
+            assert(IS_VARLIST(a));  // usually not legal
 
         Derelativize(dest, src, specifier);
     }
 
-    TERM_ARRAY_LEN(a, len);
+    SET_SERIES_LEN(a, len);
     return a;
 }
 
@@ -149,6 +149,11 @@ void Clonify(
     //
     assert(not (deep_types & FLAGIT_KIND(REB_ACTION)));
 
+  #if !defined(NDEBUG)
+    if (IS_UNREADABLE_DEBUG(v))
+        return;
+  #endif
+
     // !!! It may be possible to do this faster/better, the impacts on higher
     // quoting levels could be incurring more cost than necessary...but for
     // now err on the side of correctness.  Unescape the value while cloning
@@ -174,20 +179,18 @@ void Clonify(
                 v,
                 CTX_VARLIST(Copy_Context_Shallow_Managed(VAL_CONTEXT(v)))
             );
-            series = SER(CTX_VARLIST(VAL_CONTEXT(v)));
+            series = CTX_VARLIST(VAL_CONTEXT(v));
             would_need_deep = true;
         }
         else if (ANY_ARRAY_KIND(heart)) {
-            REBNOD *n = VAL_NODE(v);
-            assert(not (FIRST_BYTE(n->header.bits) & NODE_BYTEMASK_0x01_CELL));
-            series = SER(
-                Copy_Array_At_Extra_Shallow(
-                    ARR(n),
-                    0,  // index
-                    VAL_SPECIFIER(v),
-                    0,  // extra
-                    NODE_FLAG_MANAGED
-                )
+            REBNOD *n = VAL_NODE1(v);
+            assert(not Is_Node_Cell(n));
+            series = Copy_Array_At_Extra_Shallow(
+                ARR(n),
+                0,  // index
+                VAL_SPECIFIER(v),
+                0,  // extra
+                NODE_FLAG_MANAGED
             );
 
             // Despite their immutability, new instances of PATH! need to be
@@ -198,8 +201,8 @@ void Clonify(
             if (ANY_PATH_KIND(kind))
                 Freeze_Array_Shallow(ARR(series));
 
-            INIT_VAL_NODE(v, series);
-            INIT_BINDING(v, UNBOUND);  // copying w/specifier makes specific
+            INIT_VAL_NODE1(v, series);
+            INIT_SPECIFIER(v, UNBOUND);  // copying w/specifier makes specific
             would_need_deep = true;
         }
         else if (ANY_SERIES_KIND(heart)) {
@@ -207,7 +210,7 @@ void Clonify(
                 VAL_SERIES(v),
                 NODE_FLAG_MANAGED
             );
-            INIT_VAL_NODE(v, series);
+            INIT_VAL_NODE1(v, series);
             would_need_deep = false;
         }
         else {
@@ -283,7 +286,7 @@ REBARR *Copy_Array_Core_Managed(
         );
     }
 
-    TERM_ARRAY_LEN(copy, len);
+    SET_SERIES_LEN(copy, len);
 
     return copy;
 }
@@ -319,36 +322,36 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
 
     for (; NOT_END(src); ++src, ++dest) {
         if (not IS_RELATIVE(src)) {
-            Move_Value(dest, SPECIFIC(src));
+            Copy_Cell(dest, SPECIFIC(src));
             continue;
         }
 
         // All relative values under a sub-block must be relative to the
         // same function.
         //
-        assert(VAL_RELATIVE(src) == before);
+        assert(ACT(BINDING(src)) == before);
 
-        Move_Value_Header(dest, src);
+        Copy_Cell_Header(dest, src);
 
         if (ANY_ARRAY_OR_PATH(src)) {
-            INIT_VAL_NODE(
+            INIT_VAL_NODE1(
                 dest,
                 Copy_Rerelativized_Array_Deep_Managed(
                     VAL_ARRAY(src), before, after
                 )
             );
             PAYLOAD(Any, dest).second = PAYLOAD(Any, src).second;
-            INIT_BINDING(dest, after); // relative binding
+            INIT_SPECIFIER(dest, after); // relative binding
         }
         else {
             assert(ANY_WORD(src));
             PAYLOAD(Any, dest) = PAYLOAD(Any, src);
-            INIT_BINDING(dest, after);
+            INIT_SPECIFIER(dest, after);
         }
 
     }
 
-    TERM_ARRAY_LEN(copy, ARR_LEN(original));
+    SET_SERIES_LEN(copy, ARR_LEN(original));
 
     return copy;
 }
@@ -366,8 +369,8 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
 //
 RELVAL *Alloc_Tail_Array(REBARR *a)
 {
-    EXPAND_SERIES_TAIL(SER(a), 1);
-    TERM_ARRAY_LEN(a, ARR_LEN(a));
+    EXPAND_SERIES_TAIL(a, 1);
+    SET_SERIES_LEN(a, ARR_LEN(a));
     RELVAL *last = ARR_LAST(a);
     TRASH_CELL_IF_DEBUG(last); // !!! was an END marker, good enough?
     return last;
@@ -379,10 +382,10 @@ RELVAL *Alloc_Tail_Array(REBARR *a)
 //
 void Uncolor_Array(const REBARR *a)
 {
-    if (Is_Series_White(SER(a)))
+    if (Is_Series_White(a))
         return; // avoid loop
 
-    Flip_Series_To_White(SER(a));
+    Flip_Series_To_White(a);
 
     const RELVAL *v;
     for (v = ARR_HEAD(a); NOT_END(v); ++v) {

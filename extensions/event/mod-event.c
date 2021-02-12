@@ -255,25 +255,28 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
 
     REBLEN timeout = 0;  // in milliseconds
     REBVAL *ports = nullptr;
-    REBINT n = 0;
 
     const RELVAL *val;
     if (not IS_BLOCK(ARG(value)))
         val = ARG(value);
     else {
         ports = ARG(value);
-        val = VAL_ARRAY_AT(ports);
-        for (; NOT_END(val); val++) {  // find timeout
+
+        REBLEN num_pending = 0;
+        const RELVAL *tail;
+        val = VAL_ARRAY_AT(&tail, ports);
+        for (; val != tail; ++val) {  // find timeout
             if (Pending_Port(val))
-                ++n;
+                ++num_pending;
 
             if (IS_INTEGER(val) or IS_DECIMAL(val) or IS_TIME(val))
                 break;
         }
-        if (IS_END(val)) {
-            if (n == 0)
+        if (val == tail) {
+            if (num_pending == 0)
                 return nullptr; // has no pending ports!
             timeout = ALL_BITS; // no timeout provided
+            val = END_NODE;
         }
     }
 
@@ -319,15 +322,17 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     if (not IS_PORT(system_port))
         fail ("System Port is not a PORT! object");
 
-    REBVAL *waiters = VAL_CONTEXT_VAR(system_port, STD_PORT_STATE);
+    REBCTX *sys = VAL_CONTEXT(system_port);
+
+    REBVAL *waiters = CTX_VAR(sys, STD_PORT_STATE);
     if (not IS_BLOCK(waiters))
         fail ("Wait queue block in System Port is not a BLOCK!");
 
-    REBVAL *waked = VAL_CONTEXT_VAR(system_port, STD_PORT_DATA);
+    REBVAL *waked = CTX_VAR(sys, STD_PORT_DATA);
     if (not IS_BLOCK(waked))
         fail ("Waked queue block in System Port is not a BLOCK!");
 
-    REBVAL *awake = VAL_CONTEXT_VAR(system_port, STD_PORT_AWAKE);
+    REBVAL *awake = CTX_VAR(sys, STD_PORT_AWAKE);
     if (not IS_ACTION(awake))
         fail ("System Port AWAKE field is not an ACTION!");
 
@@ -445,7 +450,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     // had custom code here but this just uses the API.
 
     REBVAL *sieved = rebValue("intersect", ports, waked, rebEND);
-    Move_Value(D_OUT, sieved);
+    Copy_Cell(D_OUT, sieved);
     rebRelease(sieved);
 
     RESET_ARRAY(VAL_ARRAY_KNOWN_MUTABLE(waked));  // clear waked list
@@ -453,7 +458,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     if (REF(all))
         return D_OUT;  // caller wants all the ports that waked us
 
-    const RELVAL *first = VAL_ARRAY_AT(D_OUT);
+    const RELVAL *first = VAL_ARRAY_ITEM_AT(D_OUT);
     if (not IS_PORT(first)) {
         assert(!"First element of intersection not port, does this happen?");
         return nullptr;

@@ -35,7 +35,7 @@
 #if !defined(NDEBUG)
 
 #define Is_Marked(n) \
-    (NOD(n)->header.bits & NODE_FLAG_MARKED)
+    (did (NODE_BYTE(n) & NODE_BYTEMASK_0x10_MARKED))
 
 
 //
@@ -48,44 +48,38 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
     if (KIND3Q_BYTE_UNCHECKED(v) == REB_QUOTED) {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         assert(HEART_BYTE(v) == REB_QUOTED);
-        assert(Is_Marked(PAYLOAD(Any, v).first.node));
+        assert(Is_Marked(VAL_NODE1(v)));
+        assert(VAL_QUOTED_DEPTH(v) >= 3);
+        REBCEL(const*) cell = VAL_UNESCAPED(v);
+        if (ANY_WORD_KIND(CELL_KIND(cell)))
+            assert(IS_SYMBOL(BINDING(cell)));  // unbound
         return;
     }
 
     enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), v));
 
-    REBNOD *binding;
+    REBSER *binding;
     if (
         IS_BINDABLE_KIND(heart)
-        and (binding = VAL_BINDING(v))
-        and NOT_SERIES_INFO(binding, INACCESSIBLE)
+        and (binding = BINDING(v))
+        and not IS_SYMBOL(binding)
+        and NOT_SERIES_FLAG(binding, INACCESSIBLE)
     ){
-        if (not Is_Node_Cell(binding)) {
-            assert(IS_SER_ARRAY(binding));
-            if (
-                GET_ARRAY_FLAG(binding, IS_VARLIST)
-                and (CTX_TYPE(CTX(binding)) == REB_FRAME)
-            ){
+        if (not IS_SER_ARRAY(binding))
+            panic(binding);
+
+        assert(IS_SER_ARRAY(binding));
+        if (IS_VARLIST(binding) and CTX_TYPE(CTX(binding)) == REB_FRAME) {
+            REBNOD *keysource = LINK(KeySource, ARR(binding));
+            if (not Is_Node_Cell(keysource)) {
                 if (
-                    (binding->header.bits & SERIES_MASK_VARLIST)
-                    != SERIES_MASK_VARLIST
+                    (SER(keysource)->leader.bits & SERIES_MASK_KEYLIST)
+                    != SERIES_MASK_KEYLIST
                 ){
                     panic (binding);
                 }
-                REBNOD *keysource = LINK_KEYSOURCE(binding);
-                if (
-                    not Is_Node_Cell(keysource)
-                    and GET_ARRAY_FLAG(keysource, IS_PARAMLIST)
-                ){
-                    if (
-                        (keysource->header.bits & SERIES_MASK_PARAMLIST)
-                        != SERIES_MASK_PARAMLIST
-                    ){
-                        panic (binding);
-                    }
-                    if (NOT_SERIES_FLAG(keysource, MANAGED))
-                        panic (keysource);
-                }
+                if (NOT_SERIES_FLAG(SER(keysource), MANAGED))
+                    panic (keysource);
             }
         }
     }
@@ -117,7 +111,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         break;
 
       case REB_PAIR: {
-        REBVAL *paired = VAL(VAL_NODE(v));
+        REBVAL *paired = VAL(VAL_NODE1(v));
         assert(Is_Marked(paired));
         break; }
 
@@ -131,13 +125,13 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(VAL_TYPE_KIND_OR_CUSTOM(v) != REB_0);
         break;
 
-      case REB_TYPESET: // !!! Currently just 64-bits of bitset
-        break;
+      case REB_TYPESET: {  // bitset bits don't need marking
+        break; }
 
       case REB_BITSET: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBSER *s = SER(PAYLOAD(Any, v).first.node);
-        if (GET_SERIES_INFO(s, INACCESSIBLE))
+        REBSER *s = SER(VAL_NODE1(v));
+        if (GET_SERIES_FLAG(s, INACCESSIBLE))
             assert(Is_Marked(s));  // TBD: clear out reference and GC `s`?
         else
             assert(Is_Marked(s));
@@ -147,15 +141,16 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         const REBMAP* map = VAL_MAP(v);
         assert(Is_Marked(map));
-        assert(IS_SER_ARRAY(map));
+        assert(IS_SER_ARRAY(MAP_PAIRLIST(map)));
         break; }
 
       case REB_HANDLE: { // See %sys-handle.h
-        REBARR *a = VAL_HANDLE_SINGULAR(v);
-        if (not a) {  // simple handle, no GC interaction
-            assert(not (v->header.bits & CELL_FLAG_FIRST_IS_NODE));
+        if (NOT_CELL_FLAG(v, FIRST_IS_NODE)) {
+            // simple handle, no GC interaction
         }
         else {
+            REBARR *a = VAL_HANDLE_SINGULAR(v);
+
             // Handle was created with Init_Handle_XXX_Managed.  It holds a
             // REBSER node that contains exactly one handle, and the actual
             // data for the handle lives in that shared location.  There is
@@ -184,19 +179,18 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
       case REB_EVENT: {  // packed cell structure with one GC-able slot
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBNOD *n = PAYLOAD(Any, v).first.node;  // REBGOB*, REBREQ*, etc.
-        assert(n == nullptr or n->header.bits & NODE_FLAG_NODE);
-        assert(Is_Marked(PAYLOAD(Any, v).first.node));
+        REBNOD *n = VAL_NODE1(v);  // REBGOB*, REBREQ*, etc.
+        assert(n == nullptr or Is_Marked(n));
         break; }
 
       case REB_BINARY: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBBIN *s = SER(PAYLOAD(Any, v).first.node);
-        if (GET_SERIES_INFO(s, INACCESSIBLE))
+        REBBIN *s = BIN(VAL_NODE1(v));
+        if (GET_SERIES_FLAG(s, INACCESSIBLE))
             break;
 
         assert(SER_WIDE(s) == sizeof(REBYTE));
-        ASSERT_SERIES_TERM(s);
+        ASSERT_SERIES_TERM_IF_NEEDED(s);
         assert(Is_Marked(s));
         break; }
 
@@ -206,19 +200,20 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_URL:
       case REB_TAG: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        if (GET_SERIES_INFO(PAYLOAD(Any, v).first.node, INACCESSIBLE))
+        if (GET_SERIES_FLAG(STR(VAL_NODE1(v)), INACCESSIBLE))
             break;
 
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         const REBSER *s = VAL_SERIES(v);
+        ASSERT_SERIES_TERM_IF_NEEDED(s);
 
         assert(SER_WIDE(s) == sizeof(REBYTE));
         assert(Is_Marked(s));
 
-        if (not IS_STR_SYMBOL(STR(s))) {
-            REBBMK *bookmark = LINK(s).bookmarks;
+        if (IS_NONSYMBOL_STRING(s)) {
+            REBBMK *bookmark = LINK(Bookmarks, s);
             if (bookmark) {
-                assert(not LINK(bookmark).bookmarks);  // just one for now
+                assert(SER_USED(bookmark) == 1);  // just one for now
                 //
                 // The intent is that bookmarks are unmanaged REBSERs, which
                 // get freed when the string GCs.  This mechanic could be a by
@@ -238,7 +233,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_ERROR:
       case REB_FRAME:
       case REB_PORT: {
-        if (GET_SERIES_INFO(PAYLOAD(Any, v).first.node, INACCESSIBLE))
+        if (GET_SERIES_FLAG(SER(VAL_NODE1(v)), INACCESSIBLE))
             break;
 
         assert((v->header.bits & CELL_MASK_CONTEXT) == CELL_MASK_CONTEXT);
@@ -255,11 +250,14 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         // could apply to any OBJECT!, but the binding cheaply makes it
         // a method for that object.)
         //
-        if (EXTRA(Binding, v).node != UNBOUND) {
-            assert(CTX_TYPE(context) == REB_FRAME);
-            struct Reb_Frame *f = CTX_FRAME_IF_ON_STACK(context);
-            if (f)  // comes from execution, not MAKE FRAME!
-                assert(VAL_BINDING(v) == FRM_BINDING(f));
+        if (BINDING(v) != UNBOUND) {
+            if (CTX_TYPE(context) == REB_FRAME) {
+                struct Reb_Frame *f = CTX_FRAME_IF_ON_STACK(context);
+                if (f)  // comes from execution, not MAKE FRAME!
+                    assert(VAL_FRAME_BINDING(v) == FRM_BINDING(f));
+            }
+            else
+                assert(IS_PATCH(Singular_From_Cell(v)));
         }
 
         if (PAYLOAD(Any, v).second.node) {
@@ -267,7 +265,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             assert(Is_Marked(PAYLOAD(Any, v).second.node));  // phase or label
         }
 
-        if (GET_SERIES_INFO(context, INACCESSIBLE))
+        if (GET_SERIES_FLAG(CTX_VARLIST(context), INACCESSIBLE))
             break;
 
         const REBVAL *archetype = CTX_ARCHETYPE(context);
@@ -295,11 +293,13 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_SET_GROUP:
       case REB_GET_GROUP:
       case REB_SYM_GROUP: {
-        if (GET_SERIES_INFO(PAYLOAD(Any, v).first.node, INACCESSIBLE))
+        REBARR *a = ARR(VAL_NODE1(v));
+        if (GET_SERIES_FLAG(a, INACCESSIBLE))
             break;
 
+        ASSERT_SERIES_TERM_IF_NEEDED(a);
+
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        const REBARR *a = VAL_ARRAY(v);
         assert(Is_Marked(a));
         break; }
 
@@ -317,8 +317,8 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
       any_sequence: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBARR *a = ARR(PAYLOAD(Any, v).first.node);
-        assert(NOT_SERIES_INFO(a, INACCESSIBLE));
+        REBARR *a = ARR(VAL_NODE1(v));
+        assert(NOT_SERIES_FLAG(a, INACCESSIBLE));
 
         // With most arrays we may risk direct recursion, hence we have to
         // use Queue_Mark_Array_Deep().  But paths are guaranteed to not have
@@ -343,48 +343,47 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_SYM_WORD: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
 
-        const REBSTR *spelling = STR(PAYLOAD(Any, v).first.node);
-        assert(Is_Series_Frozen(SER(spelling)));
+        REBSPC *cache = VAL_WORD_CACHE(v);
+        if (cache) {
+            assert(
+                IS_PATCH(cache)
+                or (IS_VARLIST(cache) and IS_PATCH(Singular_From_Cell(v)))
+            );
+        }
 
-        // A word marks the specific spelling it uses, but not the canon
-        // value.  That's because if the canon value gets GC'd, then
-        // another value might become the new canon during that sweep.
+        const REBSTR *spelling = VAL_WORD_SYMBOL(v);
+        assert(Is_Series_Frozen(spelling));
+
+        // !!! Whether you can count at this point on a spelling being GC
+        // marked depends on whether it's the binding or not; this is a
+        // change from when spellings were always pointed to by the cell.
         //
-        assert(Is_Marked(spelling));
+        if (IS_WORD_UNBOUND(v))
+            assert(Is_Marked(spelling));
 
         assert(  // GC can't run during binding, only time bind indices != 0
-            NOT_SERIES_INFO(spelling, STRING_CANON)
-            or (
-                MISC(spelling).bind_index.high == 0
-                and MISC(spelling).bind_index.low == 0
-            )
+            spelling->misc.bind_index.high == 0
+            and spelling->misc.bind_index.low == 0
         );
 
-        if (IS_WORD_BOUND(v)) {
-            assert(PAYLOAD(Any, v).second.i32 > 0);
-        }
-        else {
-            // The word is unbound...make sure index is 0 in debug build.
-            // (it can be left uninitialized in release builds, for now)
-            //
-            assert(PAYLOAD(Any, v).second.i32 == -1);
-        }
+        if (IS_WORD_BOUND(v))
+            assert(VAL_WORD_PRIMARY_INDEX_UNCHECKED(v) != 0);
+        else
+            assert(VAL_WORD_PRIMARY_INDEX_UNCHECKED(v) == 0);
         break; }
 
       case REB_ACTION: {
         assert((v->header.bits & CELL_MASK_ACTION) == CELL_MASK_ACTION);
 
         REBACT *a = VAL_ACTION(v);
-        REBARR *paramlist = ACT_PARAMLIST(a);
-        assert(Is_Marked(paramlist));
-
-        assert(Is_Marked(PAYLOAD(Any, v).second.node));
+        assert(Is_Marked(a));
+        assert(Is_Marked(VAL_ACTION_SPECIALTY_OR_LABEL(v)));
 
         // Make sure the [0] slot of the paramlist holds an archetype that is
         // consistent with the paramlist itself.
         //
         REBVAL *archetype = ACT_ARCHETYPE(a);
-        assert(paramlist == VAL_ACT_PARAMLIST(archetype));
+        assert(a == VAL_ACTION(archetype));
         break; }
 
       case REB_QUOTED:
@@ -395,16 +394,6 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         panic ("REB_QUOTED with (KIND3Q_BYTE() % REB_64) > 0");
 
     //=//// BEGIN INTERNAL TYPES ////////////////////////////////////////=//
-
-      case REB_P_NORMAL:
-      case REB_P_HARD_QUOTE:
-      case REB_P_MODAL:
-      case REB_P_SOFT_QUOTE:
-      case REB_P_LOCAL: {
-        REBSTR *s = VAL_TYPESET_STRING(v);
-        assert(Is_Marked(s));
-        assert(HEART_BYTE(v) == REB_TYPESET);
-        break; }
 
       case REB_G_XYF:
         //
@@ -435,6 +424,10 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
 
     enum Reb_Kind kind = CELL_KIND(cast(REBCEL(const*), v));
     switch (kind) {
+      case REB_NULL:
+        assert(heart == REB_NULL or heart == REB_BLANK);  // may be "isotope"
+        break;
+
       case REB_TUPLE:
       case REB_SET_TUPLE:
       case REB_GET_TUPLE:
@@ -447,14 +440,18 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
             heart == REB_BYTES
             or heart == REB_WORD
             or heart == REB_GET_WORD
+            or heart == REB_GET_GROUP
+            or heart == REB_GET_BLOCK
             or heart == REB_SYM_WORD
+            or heart == REB_SYM_GROUP
+            or heart == REB_SYM_BLOCK
             or heart == REB_BLOCK
          );
          break;
 
       case REB_ISSUE: {
         if (heart == REB_TEXT) {
-            const REBSER *s = SER(VAL_STRING(v));
+            const REBSER *s = VAL_STRING(v);
             assert(Is_Series_Frozen(s));
 
             // We do not want ISSUE!s to use series if the payload fits in
@@ -508,10 +505,10 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         assert(IS_SER_ARRAY(a));
     #endif
 
-    if (GET_ARRAY_FLAG(a, IS_PARAMLIST)) {
+    if (IS_DETAILS(a)) {
         const RELVAL *archetype = ARR_HEAD(a);
         assert(IS_ACTION(archetype));
-        assert(not EXTRA(Binding, archetype).node);
+        assert(VAL_ACTION_BINDING(archetype) == UNBOUND);
 
         // These queueings cannot be done in Queue_Mark_Function_Deep
         // because of the potential for overflowing the C stack with calls
@@ -520,22 +517,19 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         REBARR *details = ACT_DETAILS(VAL_ACTION(archetype));
         assert(Is_Marked(details));
 
-        REBARR *specialty = LINK_SPECIALTY(details);
-        if (GET_ARRAY_FLAG(specialty, IS_VARLIST)) {
-            REBCTX *ctx_specialty = CTX(specialty);
-            UNUSED(ctx_specialty);
-        }
-        else
-            assert(specialty == a);
+        REBARR *list = ACT_SPECIALTY(VAL_ACTION(archetype));
+        if (IS_PARTIALS(list))
+            list = CTX_VARLIST(LINK(PartialsExemplar, list));
+        assert(IS_VARLIST(list));
     }
-    else if (GET_ARRAY_FLAG(a, IS_VARLIST)) {
-        const REBVAL *archetype = CTX_ARCHETYPE(CTX(a));
+    else if (IS_VARLIST(a)) {
+        const REBVAL *archetype = CTX_ARCHETYPE(CTX(m_cast(REBARR*, a)));
 
         // Currently only FRAME! archetypes use binding
         //
         assert(ANY_CONTEXT(archetype));
         assert(
-            not EXTRA(Binding, archetype).node
+            BINDING(archetype) == UNBOUND
             or VAL_TYPE(archetype) == REB_FRAME
         );
 
@@ -543,7 +537,7 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         // because of the potential for overflowing the C stack with calls
         // to Queue_Mark_Context_Deep.
 
-        REBNOD *keysource = LINK_KEYSOURCE(a);
+        REBNOD *keysource = LINK(KeySource, a);
         if (Is_Node_Cell(keysource)) {
             //
             // Must be a FRAME! and it must be on the stack running.  If
@@ -556,23 +550,20 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
             assert(IS_FRAME(archetype));
         }
         else {
-            REBARR *keylist = ARR(keysource);
-            if (IS_FRAME(archetype)) {
-                assert(GET_ARRAY_FLAG(keylist, IS_PARAMLIST));
+            REBSER *keylist = SER(keysource);
+            assert(IS_KEYLIST(keylist));
 
+            if (IS_FRAME(archetype)) {
                 // Frames use paramlists as their "keylist", there is no
                 // place to put an ancestor link.
             }
             else {
-                assert(NOT_ARRAY_FLAG(keylist, IS_PARAMLIST));
-                ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(keylist));
-
-                REBARR *ancestor = LINK_ANCESTOR(keylist);
+                REBSER *ancestor = LINK(Ancestor, keylist);
                 UNUSED(ancestor);  // maybe keylist
             }
         }
     }
-    else if (GET_ARRAY_FLAG(a, IS_PAIRLIST)) {
+    else if (IS_PAIRLIST(a)) {
         //
         // There was once a "small map" optimization that wouldn't
         // produce a hashlist for small maps and just did linear search.
@@ -580,8 +571,8 @@ void Assert_Array_Marked_Correctly(const REBARR *a) {
         // seemed to be a source of bugs, but it may be added again...in
         // which case the hashlist may be NULL.
         //
-        REBSER *hashlist = LINK_HASHLIST(a);
-        assert(hashlist != nullptr);
+        REBSER *hashlist = LINK(Hashlist, a);
+        assert(SER_FLAVOR(hashlist) == FLAVOR_HASHLIST);
         UNUSED(hashlist);
     }
 }

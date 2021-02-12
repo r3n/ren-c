@@ -127,8 +127,6 @@ REB_R Call_Core(REBFRM *frame_) {
 
     UNUSED(REF(console));  // !!! actually not paid attention to, why?
 
-    Check_Security_Placeholder(Canon(SYM_CALL), SYM_EXEC, ARG(command));
-
     // Make sure that if the output or error series are STRING! or BINARY!,
     // they are not read-only, before we try appending to them.
     //
@@ -203,7 +201,7 @@ REB_R Call_Core(REBFRM *frame_) {
             REBVAL *block = rebValue(
                 "parse-command-to-argv*", ARG(command), rebEND
             );
-            Move_Value(ARG(command), block);
+            Copy_Cell(ARG(command), block);
             rebRelease(block);
             goto block_command;
         }

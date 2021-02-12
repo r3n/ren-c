@@ -6,9 +6,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
-// REBOL is a trademark of REBOL Technologies
+// Copyright 2012-2021 Ren-C Open Source Contributors
 //
 // See README.md and CREDITS.md for more information.
 //
@@ -20,75 +18,51 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// `Reb_Track_Payload` is the value payload in debug builds for any REBVAL
-// whose VAL_TYPE() doesn't need any information beyond the header.  This
-// offers a chance to inject some information into the payload to help
-// know where the value originated.  It is used by NULL cells, VOID!, BLANK!,
-// LOGIC!, and BAR!.
+// Using the build setting DEBUG_TRACK_EXTEND_CELLS, cells are doubled in
+// size...and carry the file, line, and tick where they were initialized.
 //
-// In addition to the file and line number where the assignment was made,
-// the "tick count" of the DO loop is also saved.  This means that it can
-// be possible in a repro case to find out which evaluation step produced
-// the value--and at what place in the source.  Repro cases can be set to
-// break on that tick count, if it is deterministic.
+// The information should be viewable in the C/C++ debug inspector when
+// looking at the cell in a watchlist.  It is also reported by panic().
 //
-// If tracking information is desired for all cell types, that means the cell
-// size has to be increased.  See DEBUG_TRACK_EXTEND_CELLS for this setting,
-// which can be useful in extreme debugging cases.
-//
-// In the debug build, "Trash" cells (NODE_FLAG_FREE) can use their payload to
-// store where and when they were initialized.  This also applies to some
-// datatypes like BLANK!, BAR!, LOGIC!, or VOID!--since they only use their
-// header bits, they can also use the payload for this in the debug build.
-//
-// (Note: The release build does not canonize unused bits of payloads, so
-// they are left as random data in that case.)
-//
-// View this information in the debugging watchlist under the `track` union
-// member of a value's payload.  It is also reported by panic().
-//
-// Note: Due to the lack of inlining in the debug build, the EVIL_MACRO form
-// of this is used.  It actually makes a significant difference, vs. using
-// a function...for this important debugging tool that's used very often.
-// (It's actually also a bit easier to read what's going on this way.)
 
-#if defined(DEBUG_TRACK_CELLS)
-
-  #if defined(DEBUG_TRACK_EXTEND_CELLS)  // assume DEBUG_COUNT_TICKS
+#if defined(DEBUG_TRACK_EXTEND_CELLS)  // assume DEBUG_COUNT_TICKS
 
     #define TOUCH_CELL(c) \
         ((c)->touch = TG_Tick)
 
-    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
-        (c)->track.file = _file; \
-        (c)->track.line = _line; \
-        (c)->extra.tick = (c)->tick = TG_Tick; \
-        (c)->touch = 0;
+    inline static RELVAL *Track_Cell_If_Debug(
+        RELVAL *v,
+        const char *file,
+        int line
+    ){
+        v->file = file;
+        v->line = line;
+        v->tick = TG_Tick;
+        v->touch = 0;
+        return v;
+    }
 
-  #elif defined(DEBUG_COUNT_TICKS)
-
-    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
-        (c)->extra.tick = TG_Tick; \
-        PAYLOAD(Track, (c)).file = _file; \
-        PAYLOAD(Track, (c)).line = _line;
-
-  #else  // not counting ticks, and not using extended cell format
-
-    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
-        (c)->extra.tick = 1; \
-        PAYLOAD(Track, (c)).file = _file; \
-        PAYLOAD(Track, (c)).line = _line;
-
-  #endif
-
-#elif !defined(NDEBUG)
-
-    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
-        ((c)->extra.tick = 1)  // unreadable void needs for debug payload
+    // NOTE: There is no guarantee of evaluation order of function arguments
+    // in C.  So if there's code like:
+    //
+    //    #define Init_Logic(out,flag) /* [backslash in comment => warning] */
+    //        Init_Logic_Core(TRACK_CELL_IF_DEBUG(out), (flag))
+    //
+    // The tracking information may be put in the cell *before* or *after*
+    // the right hand side is evaluated.  So imagine something like:
+    //
+    //     Init_Logic(D_OUT, not VAL_LOGIC(D_OUT));
+    //
+    // So TRACK_CELL_IF_DEBUG() can't do anything that would corrupt the
+    // release-build-bits of `out`, since it might run first.  This is why
+    // the tracking information is fully separate, and doesn't try to exploit
+    // that not all cell types use all bits to hide more information.
+    //
+    #define TRACK_CELL_IF_DEBUG(v) \
+        Track_Cell_If_Debug((v), __FILE__, __LINE__)
 
 #else
 
-    #define TRACK_CELL_IF_DEBUG_EVIL_MACRO(c,_file,_line) \
-        NOOP
+    #define TRACK_CELL_IF_DEBUG(v) (v)
 
 #endif

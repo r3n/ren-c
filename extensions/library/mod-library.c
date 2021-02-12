@@ -48,13 +48,13 @@ REBINT CT_Library(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Library(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_CUSTOM);
 
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (not IS_FILE(arg))
         fail (Error_Unexpected_Type(REB_FILE, VAL_TYPE(arg)));
@@ -64,14 +64,14 @@ REB_R MAKE_Library(
     if (fd == NULL)
         fail (arg);
 
-    REBLIB *lib = Alloc_Singular(NODE_FLAG_MANAGED);
+    REBLIB *lib = Alloc_Singular(FLAG_FLAVOR(LIBRARY) | NODE_FLAG_MANAGED);
     Init_Unreadable_Void(ARR_SINGLE(lib));  // !!! save name? other data?
 
-    LINK(lib).fd = fd;  // seen as shared by all instances
-    MISC_META_NODE(lib) = nullptr;  // !!! build from spec, e.g. arg?
+    lib->link.fd = fd;  // seen as shared by all instances
+    node_MISC(Meta, lib) = nullptr;  // !!! build from spec, e.g. arg?
 
     RESET_CUSTOM_CELL(out, EG_Library_Type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, lib);
+    INIT_VAL_NODE1(out, lib);
 
     return out;
 }
@@ -95,10 +95,6 @@ void MF_Library(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     Pre_Mold(mo, v);
 
-    REBCTX *meta = VAL_LIBRARY_META(v);
-    if (meta)
-        MF_Context(mo, CTX_ARCHETYPE(meta), form);
-
     End_Mold(mo);
 }
 
@@ -108,7 +104,7 @@ void MF_Library(REB_MOLD *mo, REBCEL(const*) v, bool form)
 //
 REBTYPE(Library)
 {
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
     case SYM_CLOSE: {
         INCLUDE_PARAMS_OF_CLOSE;
 
@@ -119,7 +115,7 @@ REBTYPE(Library)
         }
         else {
             Close_Library(VAL_LIBRARY_FD(lib));
-            LINK(VAL_LIBRARY(lib)).fd = NULL;
+            VAL_LIBRARY(lib)->link.fd = nullptr;
         }
         return nullptr; }
 

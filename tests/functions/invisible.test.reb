@@ -9,7 +9,7 @@
     1 = do [1 comment "a"]
 )
 (
-    ~ = do [comment "a"]
+    null? do [comment "a"]
 )
 
 (
@@ -55,7 +55,7 @@
     1 = do [1 elide "a"]
 )
 (
-    ~ = do [elide "a"]
+    null? do [elide "a"]
 )
 
 (
@@ -66,7 +66,7 @@
 )
 (
     pos: evaluate evaluate [1 elide "a" elide "b" + 2 * 3 fail "too far"]
-    pos = lit '[elide "b" + 2 * 3 fail "too far"]
+    pos = just '[elide "b" + 2 * 3 fail "too far"]
 )
 (
     pos: evaluate [
@@ -123,7 +123,7 @@
 
         return: [<opt> any-value!]
         right [<opt> <end> any-value! <variadic>]
-        :lookahead [any-value! <variadic>]
+        'lookahead [any-value! <variadic>]
         look:
     ][
         take right  ; returned value
@@ -144,7 +144,7 @@
 ]
 
 (
-    ~ = do [|||]
+    null? do [|||]
 )
 (
     3 = do [1 + 2 ||| 10 + 20, 100 + 200]
@@ -323,8 +323,8 @@
     ]
 )
 
-(void? (if true [] else [<else>]))
-(void? (if true [comment <true-branch>] else [<else>]))
+(null-2? (if true [] else [<else>]))
+(null-2? (if true [comment <true-branch>] else [<else>]))
 
 (1 = all [1 elide <vaporize>])
 (1 = any [1 elide <vaporize>])
@@ -339,7 +339,7 @@
 ; REEVAL has been tuned to be able to act invisibly if the thing being
 ; reevaluated turns out to be invisible.
 ;
-(integer? reeval lit (comment "this group vaporizes") 1020)
+(integer? reeval just (comment "this group vaporizes") 1020)
 (<before> = (<before> reeval :comment "erase me"))
 (
     x: <before>

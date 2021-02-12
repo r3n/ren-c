@@ -213,7 +213,7 @@ REBI64 Int64s(const REBVAL *val, REBINT sign)
 const REBVAL *Datatype_From_Kind(enum Reb_Kind kind)
 {
     assert(kind > REB_0 and kind < REB_MAX);
-    REBVAL *type = VAL_CONTEXT_VAR(Lib_Context, SYM_FROM_KIND(kind));
+    REBVAL *type = CTX_VAR(VAL_CONTEXT(Lib_Context), SYM_FROM_KIND(kind));
     assert(IS_DATATYPE(type));
     return type;
 }
@@ -227,7 +227,7 @@ const REBVAL *Datatype_From_Kind(enum Reb_Kind kind)
 //
 REBVAL *Type_Of(const RELVAL *value)
 {
-    return VAL_CONTEXT_VAR(Lib_Context, SYM_FROM_KIND(VAL_TYPE(value)));
+    return CTX_VAR(VAL_CONTEXT(Lib_Context), SYM_FROM_KIND(VAL_TYPE(value)));
 }
 
 
@@ -240,6 +240,9 @@ REBVAL *Get_System(REBLEN i1, REBLEN i2)
 {
     REBVAL *obj;
 
+    // Note: At present, one common way to crash here is if you use special
+    // tags in the return spec like <elide> or <void> for a native.
+    //
     obj = CTX_VAR(VAL_CONTEXT(Root_System), i1);
     if (i2 == 0) return obj;
     assert(IS_OBJECT(obj));
@@ -269,7 +272,8 @@ REBINT Get_System_Int(REBLEN i1, REBLEN i2, REBINT default_int)
 //
 void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     assert(
-        (SER(c)->header.bits & SERIES_MASK_VARLIST) == SERIES_MASK_VARLIST
+        (CTX_VARLIST(c)->leader.bits & SERIES_MASK_VARLIST)
+        == SERIES_MASK_VARLIST
     );
 
     const REBVAL *archetype = CTX_ARCHETYPE(c);
@@ -279,36 +283,28 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
     // Currently only FRAME! uses the ->binding field, in order to capture the
     // ->binding of the function value it links to (which is in ->phase)
     //
-    assert(VAL_BINDING(archetype) == UNBOUND or CTX_TYPE(c) == REB_FRAME);
-
-    REBARR *varlist = CTX_VARLIST(c);
-    REBARR *keylist = CTX_KEYLIST(c);
-    assert(NOT_ARRAY_FLAG(keylist, HAS_FILE_LINE_UNMASKED));
-
     assert(
-        not MISC_META(varlist)
-        or ANY_CONTEXT(CTX_ARCHETYPE(MISC_META(varlist)))  // current rule
+        BINDING(archetype) == UNBOUND
+        or CTX_TYPE(c) == REB_FRAME
     );
+
+    // Keylists are uniformly managed, or certain routines would return
+    // "sometimes managed, sometimes not" keylists...a bad invariant.
+    //
+    REBSER *keylist = CTX_KEYLIST(c);
+    ASSERT_SERIES_MANAGED(keylist);
+
+    assert(not CTX_META(c) or ANY_CONTEXT_KIND(CTX_TYPE(CTX_META(c))));
 
     // FRAME!s must always fill in the phase slot, but that piece of the
     // REBVAL is reserved for future use in other context types...so make
     // sure it's null at this point in time.
     //
-    if (CTX_TYPE(c) == REB_FRAME) {
-        assert(IS_ACTION(CTX_ROOTKEY(c)));
-        assert(VAL_PHASE_ELSE_ARCHETYPE(archetype) != nullptr);
-    }
-    else {
-      #ifdef DEBUG_UNREADABLE_VOIDS
-        assert(IS_UNREADABLE_DEBUG(CTX_ROOTKEY(c)));
-      #endif
-        assert(PAYLOAD(Any, archetype).second.node == nullptr);
-    }
-
-    // Keylists are uniformly managed, or certain routines would return
-    // "sometimes managed, sometimes not" keylists...a bad invariant.
-    //
-    ASSERT_ARRAY_MANAGED(CTX_KEYLIST(c));
+    REBNOD *archetype_phase = VAL_FRAME_PHASE_OR_LABEL_NODE(archetype);
+    if (CTX_TYPE(c) == REB_FRAME)
+        assert(IS_DETAILS(ARR(archetype_phase)));
+    else
+        assert(archetype_phase == nullptr);
 }
 
 
@@ -318,21 +314,19 @@ void Extra_Init_Any_Context_Checks_Debug(enum Reb_Kind kind, REBCTX *c) {
 // !!! Overlaps with ASSERT_ACTION, review folding them together.
 //
 void Extra_Init_Action_Checks_Debug(REBACT *a) {
-    assert((SER(a)->header.bits & SERIES_MASK_PARAMLIST) == SERIES_MASK_PARAMLIST);
-
     REBVAL *archetype = ACT_ARCHETYPE(a);
     assert(VAL_ACTION(archetype) == a);
 
-    REBARR *paramlist = ACT_PARAMLIST(a);
-    assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
+    REBSER *keylist = ACT_KEYLIST(a);
+    assert(
+        (keylist->leader.bits & SERIES_MASK_KEYLIST)
+        == SERIES_MASK_KEYLIST
+    );
 
     // !!! Currently only a context can serve as the "meta" information,
     // though the interface may expand.
     //
-    assert(
-        not MISC_META(paramlist)
-        or ANY_CONTEXT(CTX_ARCHETYPE(MISC_META(paramlist)))
-    );
+    assert(not ACT_META(a) or ANY_CONTEXT_KIND(CTX_TYPE(ACT_META(a))));
 }
 
 #endif
@@ -488,7 +482,7 @@ int64_t Mul_Max(enum Reb_Kind type, int64_t n, int64_t m, int64_t maxi)
 // "be smart" so even a TEXT! can be turned into a SET-WORD! (just an
 // unbound one).
 //
-REBVAL *Setify(REBVAL *out) {
+REBVAL *Setify(REBVAL *out) {  // called on stack values; can't call evaluator
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);
@@ -507,18 +501,8 @@ REBVAL *Setify(REBVAL *out) {
     else if (ANY_GROUP_KIND(kind)) {
         mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SET_GROUP;
     }
-    else if (kind == REB_NULL) {
+    else
         fail ("Cannot SETIFY a NULL");
-    }
-    else {
-        // !!! For everything else, as en experiment see if there's some
-        // kind of logic to turn into a SET-WORD!  Calling through the
-        // API is slow, but easy to do for a test.
-        //
-        REBVAL *set = rebValueQ("to set-word!", out, rebEND);
-        Move_Value(out, set);
-        rebRelease(set);
-    }
 
     return Quotify(out, quotes);
 }
@@ -546,7 +530,7 @@ REBNATIVE(setify)
 //
 // Like Setify() but Makes GET-XXX! instead of SET-XXX!.
 //
-REBVAL *Getify(REBVAL *out) {
+REBVAL *Getify(REBVAL *out) {  // called on stack values; can't call evaluator
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);
@@ -565,16 +549,8 @@ REBVAL *Getify(REBVAL *out) {
     else if (ANY_WORD_KIND(kind)) {
         mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_GET_WORD;
     }
-    else if (kind == REB_NULL) {
-        fail ("Cannot GETIFY a NULL");
-    }
-    else {
-        // !!! Experiment...see what happens if we fall back on GET-WORD!
-        //
-        REBVAL *get = rebValueQ("to get-word!", out, rebEND);
-        Move_Value(out, get);
-        rebRelease(get);
-    }
+    else
+        fail ("Cannot GETIFY");
 
     return Quotify(out, quotes);
 }
@@ -604,7 +580,7 @@ REBNATIVE(getify)
 // "be smart" so even a TEXT! can be turned into a SYM-WORD! (just an
 // unbound one).
 //
-REBVAL *Symify(REBVAL *out) {
+REBVAL *Symify(REBVAL *out) {  // called on stack values; can't call evaluator
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);
@@ -623,18 +599,8 @@ REBVAL *Symify(REBVAL *out) {
     else if (ANY_GROUP_KIND(kind)) {
         mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_GROUP;
     }
-    else if (kind == REB_NULL) {
-        fail ("Cannot SYMIFY a NULL");
-    }
-    else {
-        // !!! For everything else, as en experiment see if there's some
-        // kind of logic to turn into a SET-WORD!  Calling through the
-        // API is slow, but easy to do for a test.
-        //
-        REBVAL *set = rebValueQ("to sym-word!", out, rebEND);
-        Move_Value(out, set);
-        rebRelease(set);
-    }
+    else
+        fail ("Cannot SYMIFY");
 
     return Quotify(out, quotes);
 }

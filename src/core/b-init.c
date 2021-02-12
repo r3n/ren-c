@@ -87,7 +87,7 @@ static void Check_Basics(void)
     // double-duty as terminator for that REBVAL when enumerated as an ARRAY.
 
   blockscope {
-    size_t offset = offsetof(REBSER, info);  // in variable avoids warning
+    size_t offset = offsetof(REBSER, info.flags);  // variable avoids warning
     if (offset - offsetof(REBSER, content) != sizeof(REBVAL))
         panic ("bad structure alignment for internal array termination"); }
 
@@ -177,79 +177,13 @@ static void Startup_True_And_False(void)
 {
     REBCTX *lib = VAL_CONTEXT(Lib_Context);
 
-    REBVAL *true_value = Append_Context(lib, 0, Canon(SYM_TRUE));
+    REBVAL *true_value = Append_Context(lib, nullptr, Canon(SYM_TRUE));
     Init_True(true_value);
     assert(IS_TRUTHY(true_value) and VAL_LOGIC(true_value) == true);
 
-    REBVAL *false_value = Append_Context(lib, 0, Canon(SYM_FALSE));
+    REBVAL *false_value = Append_Context(lib, nullptr, Canon(SYM_FALSE));
     Init_False(false_value);
     assert(IS_FALSEY(false_value) and VAL_LOGIC(false_value) == false);
-}
-
-
-//
-//  generic: enfix native [
-//
-//  {Creates datatype action (currently for internal use only)}
-//
-//      return: [void!]
-//      :verb [set-word!]
-//      spec [block!]
-//  ]
-//
-REBNATIVE(generic)
-//
-// The `generic` native is searched for explicitly by %make-natives.r and put
-// in second place for initialization (after the `native` native).
-//
-// It is designed to be an enfix function that quotes its first argument,
-// so when you write FOO: ACTION [...], the FOO: gets quoted to be the verb.
-{
-    INCLUDE_PARAMS_OF_GENERIC;
-
-    REBVAL *spec = ARG(spec);
-
-    REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
-        spec,
-        MKF_KEYWORDS | MKF_RETURN  // return type checked only in debug build
-    );
-
-    // !!! There is no system yet for extension types to register which of
-    // the generic actions they can handle.  So for the moment, we just say
-    // that any custom type will have its action dispatcher run--and it's
-    // up to the handler to give an error if there's a problem.  This works,
-    // but it limits discoverability of types in HELP.  A better answeer would
-    // be able to inventory which types had registered generic dispatchers
-    // and list the appropriate types from HELP.
-    //
-    RELVAL *param = ARR_AT(paramlist, 1);
-    if (SER(paramlist)->header.bits & PARAMLIST_FLAG_HAS_RETURN) {
-        assert(VAL_PARAM_SYM(param) == SYM_RETURN);
-        TYPE_SET(param, REB_CUSTOM);
-        ++param;
-    }
-    while (VAL_PARAM_CLASS(param) != REB_P_NORMAL)
-        ++param;
-    TYPE_SET(param, REB_CUSTOM);
-
-    REBACT *generic = Make_Action(
-        paramlist,
-        &Generic_Dispatcher,  // return type is only checked in debug build
-        nullptr,  // no underlying action (use paramlist)
-        nullptr,  // no specialization exemplar (or inherited exemplar)
-        IDX_NATIVE_MAX  // details array capacity
-    );
-
-    SET_ACTION_FLAG(generic, IS_NATIVE);
-
-    REBARR *details = ACT_DETAILS(generic);
-    Init_Word(ARR_AT(details, IDX_NATIVE_BODY), VAL_WORD_CANON(ARG(verb)));
-    Move_Value(ARR_AT(details, IDX_NATIVE_CONTEXT), Lib_Context);
-
-    REBVAL *verb_var = Sink_Word_May_Fail(ARG(verb), SPECIFIED);
-    Init_Action(verb_var, generic, VAL_WORD_SPELLING(ARG(verb)), UNBOUND);
-
-    return Init_Void(D_OUT, SYM_VOID);
 }
 
 
@@ -280,7 +214,7 @@ static void Init_Action_Spec_Tags(void)
     Root_Local_Tag = Make_Locked_Tag("local");
     Root_Skip_Tag = Make_Locked_Tag("skip");
     Root_Const_Tag = Make_Locked_Tag("const");
-    Root_Output_Tag = Make_Locked_Tag("output");
+    Root_In_Out_Tag = Make_Locked_Tag("in-out");
     Root_Invisible_Tag = Make_Locked_Tag("invisible");
     Root_Elide_Tag = Make_Locked_Tag("elide");
 
@@ -300,304 +234,11 @@ static void Shutdown_Action_Spec_Tags(void)
     rebRelease(Root_Local_Tag);
     rebRelease(Root_Skip_Tag);
     rebRelease(Root_Const_Tag);
-    rebRelease(Root_Output_Tag);
+    rebRelease(Root_In_Out_Tag);
     rebRelease(Root_Invisible_Tag);
     rebRelease(Root_Elide_Tag);
 
     rebRelease(Root_Modal_Tag);  // !!! only needed for bootstrap with old r3
-}
-
-
-//
-//  Init_Action_Meta_Shim: C
-//
-// Make_Paramlist_Managed_May_Fail() needs the object archetype ACTION-META
-// from %sysobj.r, to have the keylist to use in generating the info used
-// by HELP for the natives.  However, natives themselves are used in order
-// to run the object construction in %sysobj.r
-//
-// To break this Catch-22, this code builds a field-compatible version of
-// ACTION-META.  After %sysobj.r is loaded, an assert checks to make sure
-// that this manual construction actually matches the definition in the file.
-//
-static void Init_Action_Meta_Shim(void) {
-    REBSYM field_syms[6] = {
-        SYM_SELF, SYM_DESCRIPTION, SYM_RETURN_TYPE, SYM_RETURN_NOTE,
-        SYM_PARAMETER_TYPES, SYM_PARAMETER_NOTES
-    };
-    REBCTX *meta = Alloc_Context_Core(REB_OBJECT, 6, NODE_FLAG_MANAGED);
-    REBLEN i = 1;
-    for (; i != 7; ++i) // BLANK!, as `make object! [x: ()]` is illegal
-        Init_Blank(Append_Context(meta, nullptr, Canon(field_syms[i - 1])));
-
-    Init_Object(CTX_VAR(meta, 1), meta); // it's "selfish"
-    Hide_Param(CTX_KEY(meta, 1));  // hide self
-
-    Root_Action_Meta = Init_Object(Alloc_Value(), meta);
-    Force_Value_Frozen_Deep(Root_Action_Meta);
-
-}
-
-static void Shutdown_Action_Meta_Shim(void) {
-    rebRelease(Root_Action_Meta);
-}
-
-
-//
-//  Make_Native: C
-//
-// Reused function in Startup_Natives() as well as extensions loading natives,
-// which can be parameterized with a different context in which to look up
-// bindings by deafault in the API when that native is on the stack.
-//
-// Each entry should be one of these forms:
-//
-//    some-name: native [spec content]
-//
-//    some-name: native/body [spec content] [equivalent user code]
-//
-// It is optional to put ENFIX between the SET-WORD! and the spec.
-//
-// If more refinements are added, this will have to get more sophisticated.
-//
-// Though the manual building of this table is not as "nice" as running the
-// evaluator, the evaluator makes comparisons against native values.  Having
-// all natives loaded fully before ever running Eval_Core() helps with
-// stability and invariants...also there's "state" in keeping track of which
-// native index is being loaded, which is non-obvious.  But these issues
-// could be addressed (e.g. by passing the native index number / DLL in).
-//
-REBVAL *Make_Native(
-    RELVAL **item, // the item will be advanced as necessary
-    REBSPC *specifier,
-    REBNAT dispatcher,
-    const REBVAL *module
-){
-    assert(specifier == SPECIFIED); // currently a requirement
-
-    // Get the name the native will be started at with in Lib_Context
-    //
-    if (not IS_SET_WORD(*item))
-        panic (*item);
-
-    REBVAL *name = SPECIFIC(*item);
-    ++*item;
-
-    bool enfix;
-    if (IS_WORD(*item) and VAL_WORD_SYM(*item) == SYM_ENFIX) {
-        enfix = true;
-        ++*item;
-    }
-    else
-        enfix = false;
-
-    // See if it's being invoked with NATIVE or NATIVE/BODY
-    //
-    bool has_body;
-    if (IS_WORD(*item)) {
-        if (VAL_WORD_SYM(*item) != SYM_NATIVE)
-            panic (*item);
-        has_body = false;
-    }
-    else {
-        DECLARE_LOCAL (temp);
-        if (
-            VAL_WORD_SYM(VAL_SEQUENCE_AT(temp, *item, 0)) != SYM_NATIVE
-            or VAL_WORD_SYM(VAL_SEQUENCE_AT(temp, *item, 1)) != SYM_BODY
-        ){
-            panic (*item);
-        }
-        has_body = true;
-    }
-    ++*item;
-
-    const REBVAL *spec = SPECIFIC(*item);
-    ++*item;
-    if (not IS_BLOCK(spec))
-        panic (spec);
-
-    // With the components extracted, generate the native and add it to
-    // the Natives table.  The associated C function is provided by a
-    // table built in the bootstrap scripts, `Native_C_Funcs`.
-
-    REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
-        spec,
-        MKF_KEYWORDS | MKF_RETURN  // return type checked only in debug build
-    );
-
-    REBACT *act = Make_Action(
-        paramlist,
-        dispatcher, // "dispatcher" is unique to this "native"
-        nullptr, // no underlying action (use paramlist)
-        nullptr, // no specialization exemplar (or inherited exemplar)
-        IDX_NATIVE_MAX // details array capacity
-    );
-
-    SET_ACTION_FLAG(act, IS_NATIVE);
-    if (enfix)
-        SET_ACTION_FLAG(act, ENFIXED);
-
-    REBARR *details = ACT_DETAILS(act);
-
-    // If a user-equivalent body was provided, we save it in the native's
-    // REBVAL for later lookup.
-    //
-    if (has_body) {
-        if (not IS_BLOCK(*item))
-            panic (*item);
-
-        Derelativize(ARR_AT(details, IDX_NATIVE_BODY), *item, specifier);
-        ++*item;
-    }
-    else
-        Init_Blank(ARR_AT(details, IDX_NATIVE_BODY));
-
-    // When code in the core calls APIs like `rebValue()`, it consults the
-    // stack and looks to see where the native function that is running
-    // says its "module" is.  For natives, we default to Lib_Context.
-    //
-    Move_Value(ARR_AT(details, IDX_NATIVE_CONTEXT), module);
-
-    // Append the native to the module under the name given.
-    //
-    REBVAL *var = Append_Context(VAL_CONTEXT(module), name, 0);
-    Init_Action(var, act, VAL_WORD_SPELLING(name), UNBOUND);
-
-    return var;
-}
-
-
-//
-//  Startup_Natives: C
-//
-// Create native functions.  In R3-Alpha this would go as far as actually
-// creating a NATIVE native by hand, and then run code that would call that
-// native for each function.  Ren-C depends on having the native table
-// initialized to run the evaluator (for instance to test functions against
-// the UNWIND native's FUNC signature in definitional returns).  So it
-// "fakes it" just by calling a C function for each item...and there is no
-// actual "native native".
-//
-// If there *were* a REBNATIVE(native) this would be its spec:
-//
-//  native: native [
-//      spec [block!]
-//      /body "Body of equivalent usermode code (for documentation)}
-//          [block!]
-//  ]
-//
-// Returns an array of words bound to natives for SYSTEM/CATALOG/NATIVES
-//
-static REBARR *Startup_Natives(const REBVAL *boot_natives)
-{
-    // Must be called before first use of Make_Paramlist_Managed_May_Fail()
-    //
-    Init_Action_Meta_Shim();
-
-    assert(VAL_INDEX(boot_natives) == 0); // should be at head, sanity check
-    RELVAL *item = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_natives);
-    REBSPC *specifier = VAL_SPECIFIER(boot_natives);
-
-    // Although the natives are not being "executed", there are typesets
-    // being built from the specs.  So to process `foo: native [x [integer!]]`
-    // the INTEGER! word must be bound to its datatype.  Deep walk the
-    // natives in order to bind these datatypes.
-    //
-    Bind_Values_Deep(item, Lib_Context);
-
-    REBARR *catalog = Make_Array(Num_Natives);
-
-    REBLEN n = 0;
-    REBVAL *generic_word = nullptr; // gives clear error if GENERIC not found
-
-    while (NOT_END(item)) {
-        if (n >= Num_Natives)
-            panic (item);
-
-        REBVAL *name = SPECIFIC(item);
-        assert(IS_SET_WORD(name));
-
-        REBVAL *native = Make_Native(
-            &item,
-            specifier,
-            Native_C_Funcs[n],
-            Lib_Context
-        );
-
-        // While the lib context natives can be overwritten, the system
-        // currently depends on having a permanent list of the natives that
-        // does not change, see uses via NATIVE_VAL() and NAT_ACT().
-        //
-        Natives[n] = VAL_ACTION(native);  // Note: Loses enfixedness (!)
-
-        REBVAL *catalog_item = Move_Value(Alloc_Tail_Array(catalog), name);
-        mutable_KIND3Q_BYTE(catalog_item) = REB_WORD;
-        mutable_HEART_BYTE(catalog_item) = REB_WORD;
-
-        if (VAL_WORD_SYM(name) == SYM_GENERIC)
-            generic_word = name;
-
-        ++n;
-    }
-
-    if (n != Num_Natives)
-        panic ("Incorrect number of natives found during processing");
-
-    if (not generic_word)
-        panic ("GENERIC native not found during boot block processing");
-
-    return catalog;
-}
-
-
-//
-//  Startup_Generics: C
-//
-// Returns an array of words bound to generics for SYSTEM/CATALOG/ACTIONS
-//
-static REBARR *Startup_Generics(const REBVAL *boot_generics)
-{
-    assert(VAL_INDEX(boot_generics) == 0); // should be at head, sanity check
-    RELVAL *head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_generics);
-    REBSPC *specifier = VAL_SPECIFIER(boot_generics);
-
-    // Add SET-WORD!s that are top-level in the generics block to the lib
-    // context, so there is a variable for each action.  This means that the
-    // assignments can execute.
-    //
-    Bind_Values_Set_Midstream_Shallow(head, Lib_Context);
-
-    // The above actually does bind the GENERIC word to the GENERIC native,
-    // since the GENERIC word is found in the top-level of the block.  But as
-    // with the natives, in order to process `foo: generic [x [integer!]]` the
-    // INTEGER! word must be bound to its datatype.  Deep bind the code in
-    // order to bind the words for these datatypes.
-    //
-    Bind_Values_Deep(head, Lib_Context);
-
-    DECLARE_LOCAL (result);
-    if (Do_Any_Array_At_Throws(result, boot_generics, SPECIFIED))
-        panic (result);
-
-    if (not IS_BLANK(result))
-        panic (result);
-
-    // Sanity check the symbol transformation
-    //
-    if (0 != strcmp("open", STR_UTF8(Canon(SYM_OPEN))))
-        panic (Canon(SYM_OPEN));
-
-    REBDSP dsp_orig = DSP;
-
-    RELVAL *item = head;
-    for (; NOT_END(item); ++item)
-        if (IS_SET_WORD(item)) {
-            Derelativize(DS_PUSH(), item, specifier);
-            mutable_KIND3Q_BYTE(DS_TOP) = REB_WORD; // change pushed to WORD!
-            mutable_HEART_BYTE(DS_TOP) = REB_WORD;
-        }
-
-    return Pop_Stack_Values(dsp_orig); // catalog of generics
 }
 
 
@@ -610,9 +251,9 @@ static REBARR *Startup_Generics(const REBVAL *boot_generics)
 //
 static void Startup_End_Node(void)
 {
-    PG_End_Node.header = Endlike_Header(0); // no NODE_FLAG_CELL, R/O
-    TRACK_CELL_IF_DEBUG_EVIL_MACRO(&PG_End_Node, __FILE__, __LINE__);
-    assert(IS_END(END_NODE)); // sanity check that it took
+    PG_End_Node.header.bits = Endlike_Header(0);  // no NODE_FLAG_CELL, R/O
+    USED(TRACK_CELL_IF_DEBUG(&PG_End_Node));
+    assert(IS_END(END_NODE));  // sanity check
 }
 
 
@@ -638,7 +279,7 @@ static void Startup_Empty_Array(void)
     REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
     Init_Blank(ARR_AT(a, 0));
     Init_Blank(ARR_AT(a, 1));
-    TERM_ARRAY_LEN(a, 2);
+    SET_SERIES_LEN(a, 2);
     Freeze_Array_Deep(a);
     PG_2_Blanks_Array = a;
   }
@@ -753,21 +394,32 @@ static void Init_System_Object(
     REBCTX *errors_catalog
 ) {
     assert(VAL_INDEX(boot_sysobj_spec) == 0);
-    RELVAL *spec_head = VAL_ARRAY_KNOWN_MUTABLE_AT(boot_sysobj_spec);
+    const RELVAL *spec_tail;
+    RELVAL *spec_head
+        = VAL_ARRAY_KNOWN_MUTABLE_AT(&spec_tail, boot_sysobj_spec);
 
     // Create the system object from the sysobj block (defined in %sysobj.r)
     //
-    REBCTX *system = Make_Selfish_Context_Detect_Managed(
+    REBCTX *system = Make_Context_Detect_Managed(
         REB_OBJECT, // type
-        VAL_ARRAY_AT(boot_sysobj_spec), // scan for toplevel set-words
-        NULL // parent
+        spec_head, // scan for toplevel set-words
+        spec_tail,
+        nullptr  // parent
     );
 
-    Bind_Values_Deep(spec_head, Lib_Context);
+    // Create a global value for it in the Lib context, so we can say things
+    // like `system/contexts` (also protects newly made context from GC).
+    //
+    Init_Object(
+        Append_Context(VAL_CONTEXT(Lib_Context), nullptr, Canon(SYM_SYSTEM)),
+        system
+    );
+
+    Bind_Values_Deep(spec_head, spec_tail, Lib_Context);
 
     // Bind it so CONTEXT native will work (only used at topmost depth)
     //
-    Bind_Values_Shallow(spec_head, CTX_ARCHETYPE(system));
+    Bind_Values_Shallow(spec_head, spec_tail, CTX_ARCHETYPE(system));
 
     // Evaluate the block (will eval CONTEXTs within).  Expects void result.
     //
@@ -776,14 +428,6 @@ static void Init_System_Object(
         panic (result);
     if (not IS_BLANK(result))
         panic (result);
-
-    // Create a global value for it.  (This is why we are able to say `system`
-    // and have it bound in lines like `sys: system/contexts/sys`)
-    //
-    Init_Object(
-        Append_Context(VAL_CONTEXT(Lib_Context), NULL, Canon(SYM_SYSTEM)),
-        system
-    );
 
     // Make the system object a root value, to protect it from GC.  (Someone
     // could say `system: blank` in the Lib_Context, otherwise!)
@@ -821,15 +465,23 @@ static void Init_System_Object(
     // `make error!` functionality is not ready when %sysobj.r runs.  Fix
     // up its archetype so that it is an actual ERROR!.
     //
+  blockscope {
     REBVAL *std_error = Get_System(SYS_STANDARD, STD_ERROR);
-    assert(IS_OBJECT(std_error));
+    REBCTX *c = VAL_CONTEXT(std_error);
     mutable_KIND3Q_BYTE(std_error) = REB_ERROR;
     mutable_HEART_BYTE(std_error) = REB_ERROR;
-    mutable_KIND3Q_BYTE(CTX_ROOTVAR(VAL_CONTEXT(std_error))) = REB_ERROR;
-    mutable_HEART_BYTE(CTX_ROOTVAR(VAL_CONTEXT(std_error))) = REB_ERROR;
-    assert(CTX_KEY_SYM(VAL_CONTEXT(std_error), 1) == SYM_SELF);
-    mutable_KIND3Q_BYTE(VAL_CONTEXT_VAR(std_error, 1)) = REB_ERROR;
-    mutable_HEART_BYTE(VAL_CONTEXT_VAR(std_error, 1)) = REB_ERROR;
+
+    REBVAL *rootvar = CTX_ROOTVAR(c);
+  #if !defined(NDEBUG)
+    assert(rootvar->header.bits & CELL_FLAG_PROTECTED);
+    rootvar->header.bits &= ~CELL_FLAG_PROTECTED;
+  #endif
+    mutable_KIND3Q_BYTE(rootvar) = REB_ERROR;
+    mutable_HEART_BYTE(rootvar) = REB_ERROR;
+  #if !defined(NDEBUG)
+    rootvar->header.bits |= CELL_FLAG_PROTECTED;
+  #endif
+  }
 }
 
 void Shutdown_System_Object(void)
@@ -856,10 +508,10 @@ void Shutdown_System_Object(void)
 //
 static void Init_Contexts_Object(void)
 {
-    Move_Value(Get_System(SYS_CONTEXTS, CTX_SYS), Sys_Context);
+    Copy_Cell(Get_System(SYS_CONTEXTS, CTX_SYS), Sys_Context);
 
-    Move_Value(Get_System(SYS_CONTEXTS, CTX_LIB), Lib_Context);
-    Move_Value(Get_System(SYS_CONTEXTS, CTX_USER), Lib_Context);
+    Copy_Cell(Get_System(SYS_CONTEXTS, CTX_LIB), Lib_Context);
+    Copy_Cell(Get_System(SYS_CONTEXTS, CTX_USER), Lib_Context);
 }
 
 
@@ -961,6 +613,7 @@ void Startup_Task(void)
 static void Startup_Base(REBARR *boot_base)
 {
     RELVAL *head = ARR_HEAD(boot_base);
+    const RELVAL *tail = ARR_TAIL(boot_base);
 
     // By this point, the Lib_Context contains basic definitions for things
     // like true, false, the natives, and the generics.  But before deeply
@@ -972,12 +625,12 @@ static void Startup_Base(REBARR *boot_base)
     // for FOO to bind to.  So FOO: would be an unbound SET-WORD!,
     // and give an error on the assignment.
     //
-    Bind_Values_Set_Midstream_Shallow(head, Lib_Context);
+    Bind_Values_Set_Midstream_Shallow(head, tail, Lib_Context);
 
     // With the base block's definitions added to the mix, deep bind the code
     // and execute it.
 
-    Bind_Values_Deep(head, Lib_Context);
+    Bind_Values_Deep(head, tail, Lib_Context);
 
     DECLARE_LOCAL (result);
     if (Do_At_Mutable_Throws(result, boot_base, 0, SPECIFIED))
@@ -1005,14 +658,15 @@ static void Startup_Base(REBARR *boot_base)
 //
 static void Startup_Sys(REBARR *boot_sys) {
     RELVAL *head = ARR_HEAD(boot_sys);
+    const RELVAL *tail = ARR_TAIL(boot_sys);
 
     // Add all new top-level SET-WORD! found in the sys boot-block to Lib,
     // and then bind deeply all words to Lib and Sys.  See Startup_Base() notes
     // for why the top-level walk is needed first.
     //
-    Bind_Values_Set_Midstream_Shallow(head, Sys_Context);
-    Bind_Values_Deep(head, Lib_Context);
-    Bind_Values_Deep(head, Sys_Context);
+    Bind_Values_Set_Midstream_Shallow(head, tail, Sys_Context);
+    Bind_Values_Deep(head, tail, Lib_Context);
+    Bind_Values_Deep(head, tail, Sys_Context);
 
     DECLARE_LOCAL (result);
     if (Do_At_Mutable_Throws(result, boot_sys, 0, SPECIFIED))
@@ -1032,10 +686,11 @@ static void Startup_Sys(REBARR *boot_sys) {
 //
 REBVAL *Get_Sys_Function_Debug(REBLEN index, const char *name)
 {
-    const REBVAL *key = VAL_CONTEXT_KEY(Sys_Context, index);
-    const char *key_utf8 = STR_UTF8(VAL_KEY_SPELLING(key));
+    REBCTX *sys = VAL_CONTEXT(Sys_Context);
+    const REBKEY *key = CTX_KEY(sys, index);
+    const char *key_utf8 = STR_UTF8(KEY_SYMBOL(key));
     assert(strcmp(key_utf8, name) == 0);
-    return VAL_CONTEXT_VAR(Sys_Context, index);
+    return CTX_VAR(sys, index);
 }
 #endif
 
@@ -1152,7 +807,7 @@ void Startup_Core(void)
     PG_Mem_Usage = 0;
     PG_Mem_Limit = 0;
     Reb_Opts = TRY_ALLOC(REB_OPTS);
-    CLEAR(Reb_Opts, sizeof(REB_OPTS));
+    memset(Reb_Opts, 0, sizeof(REB_OPTS));
     TG_Jump_List = nullptr;
 
     Check_Basics();
@@ -1173,6 +828,7 @@ void Startup_Core(void)
     Startup_CRC();             // For word hashing
     Set_Random(0);
     Startup_Interning();
+    Startup_Early_Symbols();  // see notes--need before data stack or scan
 
     Startup_End_Node();
     Startup_Empty_Array();
@@ -1217,10 +873,8 @@ void Startup_Core(void)
         SYM_GZIP
     );
 
-    Startup_Sequence_1_Symbol();  // see notes--needed before scanning
-
     REBARR *boot_array = Scan_UTF8_Managed(
-        Intern_Unsized_Managed("tmp-boot.r"),
+        Intern_Unsized_Managed("-tmp-boot-"),
         utf8,
         utf8_size
     );
@@ -1233,7 +887,7 @@ void Startup_Core(void)
 
     Startup_Symbols(VAL_ARRAY_KNOWN_MUTABLE(&boot->words));
 
-    // STR_SYMBOL(), VAL_WORD_SYM() and Canon(SYM_XXX) now available
+    // ID_OF_SYMBOL(), VAL_WORD_ID() and Canon(SYM_XXX) now available
 
     PG_Boot_Phase = BOOT_LOADED;
 
@@ -1260,7 +914,7 @@ void Startup_Core(void)
         VAL_ARRAY_KNOWN_MUTABLE(&boot->types),
         VAL_ARRAY_KNOWN_MUTABLE(&boot->typespecs)
     );
-    Manage_Array(datatypes_catalog);
+    Manage_Series(datatypes_catalog);
     PUSH_GC_GUARD(datatypes_catalog);
 
     // !!! REVIEW: Startup_Typesets() uses symbols, data stack, and
@@ -1276,13 +930,13 @@ void Startup_Core(void)
     // by scanning comments in the C sources for `native: ...` declarations.
     //
     REBARR *natives_catalog = Startup_Natives(SPECIFIC(&boot->natives));
-    Manage_Array(natives_catalog);
+    Manage_Series(natives_catalog);
     PUSH_GC_GUARD(natives_catalog);
 
     // boot->generics is the list in %generics.r
     //
     REBARR *generics_catalog = Startup_Generics(SPECIFIC(&boot->generics));
-    Manage_Array(generics_catalog);
+    Manage_Series(generics_catalog);
     PUSH_GC_GUARD(generics_catalog);
 
     // boot->errors is the error definition list from %errors.r
@@ -1400,7 +1054,7 @@ void Shutdown_Core(void)
     Shutdown_System_Object();
     Shutdown_Typesets();
 
-    Shutdown_Action_Meta_Shim();
+    Shutdown_Natives();
     Shutdown_Action_Spec_Tags();
     Shutdown_Root_Vars();
 

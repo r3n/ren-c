@@ -312,7 +312,7 @@ action      "an invokable Rebol subroutine"
             action      +       +       +       [branch]
 
 ; ============================================================================
-; BEGIN QUOTED RANGE (> 64) AND PSEUDOTYPES (REB_QUOTED < type < 64)
+; BEGIN QUOTED RANGE
 ; ============================================================================
 ;
 ; QUOTED! claims "bindable", but null binding if containing an unbindable type
@@ -321,3 +321,15 @@ action      "an invokable Rebol subroutine"
 
 quoted     "container for arbitrary levels of quoting"
             quoted       +       +       -      [branch]
+
+
+; This is the end of the value cell enumerations (after REB_QUOTED is REB_MAX)
+; and no valid cell should have bits in this range.
+;
+; However, higher values are currently in use in places like typesets, 
+; where bits that flag types are merged with bits that flag other things.
+; These end at the 64th bit.
+;
+; The long term hope is that those flags move out of the way, permitting more
+; growth in this fundamental set of types to use all 64 cases...while keeping
+; the three levels of quote optimization that fits the cell kind in a byte.

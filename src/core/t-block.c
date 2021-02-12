@@ -26,6 +26,50 @@
 
 
 //
+//  only: native [
+//
+//  {Optimized native for creating a single-element wrapper block}
+//
+//     return: "Top-level immutable block, containing value"
+//          [block!]
+//     value "If NULL, the resulting block will be empty"
+//          [<opt> any-value!]
+//  ]
+//
+REBNATIVE(only)  // https://forum.rebol.info/t/1182/11
+//
+// Conceived as the replacement tool for the likes of APPEND/ONLY, e.g.
+//
+//     >> only [d]
+//     == [[d]]
+//
+//     >> append [a b c] only [d]
+//     == [a b c [d]]
+{
+    INCLUDE_PARAMS_OF_ONLY;
+
+    if (IS_NULLED(ARG(value)))
+        return Init_Block(D_OUT, EMPTY_ARRAY);  // global immutable array
+
+    // This uses a "singular" array which is the size of a node (8 platform
+    // pointers).  The cell is put in the portion of the node where tracking
+    // information for a dynamically allocated series would ordinarily be.
+    //
+    // !!! This is more optimized than most array the user might create.  But
+    // an even more aggressive optimization is being planned.  The idea is
+    // to let a cell be annotated to say it's actually a block containing its
+    // payload.  Much like generic quoting, this would exploit bit(s) in the
+    // cell that aren't used otherwise to express this state...and it would
+    // only work for limited levels of such boxing--likely just one level.
+    //
+    REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);
+    Copy_Cell(ARR_SINGLE(a), ARG(value));
+    Freeze_Array_Shallow(a);  // immutable (to permit future optimized case)
+    return Init_Block(D_OUT, a);
+}
+
+
+//
 //  CT_Array: C
 //
 // "Compare Type" dispatcher for arrays.
@@ -64,11 +108,11 @@ REBINT CT_Array(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Array(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_INTEGER(arg) or IS_DECIMAL(arg)) {
         //
@@ -83,7 +127,7 @@ REB_R MAKE_Array(
         REBSIZ size;
         REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&size, arg);
 
-        const REBSTR *file = Canon(SYM___ANONYMOUS__);
+        const REBSTR *file = ANONYMOUS;
         Init_Any_Array(
             out,
             kind,
@@ -145,7 +189,7 @@ REB_R MAKE_Array(
         return Init_Any_Series_At_Core(
             out,
             kind,
-            SER(VAL_ARRAY(any_array)),
+            VAL_ARRAY(any_array),
             index,
             derived
         );
@@ -178,7 +222,7 @@ REB_R MAKE_Array(
         //
         REBSIZ utf8_size;
         REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, arg);
-        const REBSTR *file = Canon(SYM___ANONYMOUS__);
+        const REBSTR *file = ANONYMOUS;
         return Init_Any_Array(
             out,
             kind,
@@ -190,7 +234,7 @@ REB_R MAKE_Array(
         // `to block! #{00BDAE....}` assumes the binary data is UTF8, and
         // goes directly to the scanner to make an unbound code array.
         //
-        const REBSTR *file = Canon(SYM___ANONYMOUS__);
+        const REBSTR *file = ANONYMOUS;
 
         REBSIZ size;
         const REBYTE *at = VAL_BINARY_SIZE_AT(&size, arg);
@@ -225,15 +269,15 @@ REB_R MAKE_Array(
             // so no typeset or quoting settings available.  Can't produce
             // any voids, because the data source is a block.
             //
-            assert(NOT_ARRAY_FLAG(EXTRA(Binding, arg).node, IS_VARLIST));
+            assert(not IS_VARLIST(VAL_VARARGS_BINDING(arg)));
         }
         else {
-            REBCTX *context = CTX(EXTRA(Binding, arg).node);
+            REBCTX *context = CTX(VAL_VARARGS_BINDING(arg));
             REBFRM *param_frame = CTX_FRAME_MAY_FAIL(context);
 
-            REBVAL *param = SPECIFIC(
-                ARR_HEAD(ACT_PARAMLIST(FRM_PHASE(param_frame)))
-            );
+            REBVAL *param = SPECIFIC(ARR_HEAD(
+                CTX_VARLIST(ACT_EXEMPLAR(FRM_PHASE(param_frame)))
+            ));
             if (VAL_VARARGS_SIGNED_PARAM_INDEX(arg) < 0)
                 param += - VAL_VARARGS_SIGNED_PARAM_INDEX(arg);
             else
@@ -258,7 +302,7 @@ REB_R MAKE_Array(
             if (IS_END(out))
                 break;
 
-            Move_Value(DS_PUSH(), out);
+            Copy_Cell(DS_PUSH(), out);
         } while (true);
 
         return Init_Any_Array(out, kind, Pop_Stack_Values(dsp_orig));
@@ -273,7 +317,7 @@ REB_R MAKE_Array(
             REBVAL *generated = rebValue(arg, rebEND);
             if (not generated)
                 break;
-            Move_Value(DS_PUSH(), generated);
+            Copy_Cell(DS_PUSH(), generated);
             rebRelease(generated);
         }
         return Init_Any_Array(out, kind, Pop_Stack_Values(dsp_orig));
@@ -313,7 +357,7 @@ REB_R TO_Array(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         // !!! Review handling of making a 1-element PATH!, e.g. TO PATH! 10
         //
         REBARR *single = Alloc_Singular(NODE_FLAG_MANAGED);
-        Move_Value(ARR_SINGLE(single), arg);
+        Copy_Cell(ARR_SINGLE(single), arg);
         return Init_Any_Array(out, kind, single);
     }
 }
@@ -350,18 +394,18 @@ REBLEN Find_In_Array(
     if (ANY_WORD(target)) {
         for (; index >= start and index < end; index += skip) {
             const RELVAL *item = ARR_AT(array, index);
-            const REBSTR *target_canon = VAL_WORD_CANON(target);
+            const REBSYM *target_symbol = VAL_WORD_SYMBOL(target);
             if (ANY_WORD(item)) {
                 if (flags & AM_FIND_CASE) { // Must be same type and spelling
                     if (
-                        VAL_WORD_SPELLING(item) == VAL_WORD_SPELLING(target)
+                        VAL_WORD_SYMBOL(item) == target_symbol
                         and VAL_TYPE(item) == VAL_TYPE(target)
                     ){
                         return index;
                     }
                 }
                 else { // Can be different type or differently cased spelling
-                    if (VAL_WORD_CANON(item) == target_canon)
+                    if (Are_Synonyms(VAL_WORD_SYMBOL(item), target_symbol))
                         return index;
                 }
             }
@@ -375,14 +419,20 @@ REBLEN Find_In_Array(
     //
     if (ANY_ARRAY(target) and not (flags & AM_FIND_ONLY)) {
         for (; index >= start and index < end; index += skip) {
+            const RELVAL *item_tail = ARR_TAIL(array);
             const RELVAL *item = ARR_AT(array, index);
 
             REBLEN count = 0;
-            const RELVAL *other = VAL_ARRAY_AT(target);
-            for (; NOT_END(other); ++other, ++item) {
+            const RELVAL *other_tail;
+            const RELVAL *other = VAL_ARRAY_AT(&other_tail, target);
+            for (; other != other_tail; ++other, ++item) {
                 if (
-                    IS_END(item) or
-                    0 != Cmp_Value(item, other, did (flags & AM_FIND_CASE))
+                    item == item_tail or
+                    0 != Cmp_Value(
+                        item,
+                        other,
+                        did (flags & AM_FIND_CASE)
+                    )
                 ){
                     break;
                 }
@@ -433,9 +483,13 @@ REBLEN Find_In_Array(
 
     for (; index >= start and index < end; index += skip) {
         const RELVAL *item = ARR_AT(array, index);
-        if (0 == Cmp_Value(item, target, did (flags & AM_FIND_CASE)))
+        if (0 == Cmp_Value(
+            item,
+            target,
+            did (flags & AM_FIND_CASE))
+        ){
             return index;
-
+        }
         if (flags & AM_FIND_MATCH)
             break;
     }
@@ -542,16 +596,16 @@ void Shuffle_Array(REBARR *arr, REBLEN idx, bool secure)
         n--;
 
         // Only do the following block when an actual swap occurs.
-        // Otherwise an assertion will fail when trying to Blit_Relative() a
+        // Otherwise an assertion will fail when trying to Copy_Cell() a
         // value to itself.
         //
         if (k != (n + idx)) {
             swap.header = data[k].header;
             swap.payload = data[k].payload;
             swap.extra = data[k].extra;
-            Blit_Relative(&data[k], &data[n + idx]);
-            Blit_Relative(&data[n + idx], &swap);
-    }
+            Copy_Cell(&data[k], &data[n + idx]);
+            Copy_Cell(&data[n + idx], &swap);
+        }
     }
 }
 
@@ -567,7 +621,7 @@ void Shuffle_Array(REBARR *arr, REBLEN idx, bool secure)
 REB_R PD_Array(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     REBINT n;
 
@@ -586,11 +640,12 @@ REB_R PD_Array(
         //
         n = -1;
 
-        const REBSTR *canon = VAL_WORD_CANON(picker);
-        const RELVAL *item = VAL_ARRAY_AT(pvs->out);
+        const REBSTR *symbol = VAL_WORD_SYMBOL(picker);
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, pvs->out);
         REBLEN index = VAL_INDEX(pvs->out);
-        for (; NOT_END(item); ++item, ++index) {
-            if (ANY_WORD(item) and canon == VAL_WORD_CANON(item)) {
+        for (; item != tail; ++item, ++index) {
+            if (ANY_WORD(item) and symbol == VAL_WORD_SYMBOL(item)) {
                 n = index + 1;
                 break;
             }
@@ -621,16 +676,16 @@ REB_R PD_Array(
     }
 
     if (n < 0 or n >= cast(REBINT, VAL_LEN_HEAD(pvs->out))) {
-        if (opt_setval)
+        if (setval)
             return R_UNHANDLED;
 
         return nullptr;
     }
 
-    if (opt_setval)
+    if (setval)
         ENSURE_MUTABLE(pvs->out);
 
-    // assume it will only write if opt_setval (mutability checked for)
+    // assume it will only write if setval (mutability checked for)
     //
     pvs->u.ref.cell = m_cast(RELVAL*, VAL_ARRAY_AT_HEAD(pvs->out, n));
     pvs->u.ref.specifier = VAL_SPECIFIER(pvs->out);
@@ -671,8 +726,8 @@ void MF_Array(REB_MOLD *mo, REBCEL(const*) v, bool form)
     enum Reb_Kind kind = CELL_KIND(v);
 
     if (form) {
-        REBCTX *opt_context = nullptr;
-        Form_Array_At(mo, VAL_ARRAY(v), VAL_INDEX(v), opt_context);
+        option(REBCTX*) context = nullptr;
+        Form_Array_At(mo, VAL_ARRAY(v), VAL_INDEX(v), context);
         return;
     }
 
@@ -757,7 +812,7 @@ REBTYPE(Array)
 
     REBSPC *specifier = VAL_SPECIFIER(array);
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
     switch (sym) {
       case SYM_UNIQUE:
       case SYM_INTERSECT:
@@ -808,7 +863,7 @@ REBTYPE(Array)
         else
             Derelativize(D_OUT, &ARR_HEAD(arr)[index], specifier);
 
-        Remove_Series_Units(SER(arr), index, len);
+        Remove_Series_Units(arr, index, len);
         return D_OUT; }
 
     //-- Search:
@@ -861,11 +916,11 @@ REBTYPE(Array)
         if (REF(only))
             len = 1;
 
-        if (VAL_WORD_SYM(verb) == SYM_FIND) {
+        if (VAL_WORD_ID(verb) == SYM_FIND) {
             if (REF(tail) or REF(match))
                 ret += len;
             VAL_INDEX_RAW(array) = ret;
-            Move_Value(D_OUT, array);
+            Copy_Cell(D_OUT, array);
         }
         else {
             ret += len;
@@ -884,7 +939,7 @@ REBTYPE(Array)
         UNUSED(PAR(series));
 
         REBLEN len; // length of target
-        if (VAL_WORD_SYM(verb) == SYM_CHANGE)
+        if (VAL_WORD_ID(verb) == SYM_CHANGE)
             len = Part_Len_May_Modify_Index(array, ARG(part));
         else
             len = Part_Limit_Append_Insert(ARG(part));
@@ -909,11 +964,11 @@ REBTYPE(Array)
         if (REF(line))
             flags |= AM_LINE;
 
-        Move_Value(D_OUT, array);
+        Copy_Cell(D_OUT, array);
         VAL_INDEX_RAW(D_OUT) = Modify_Array(
             arr,
             index,
-            cast(enum Reb_Symbol, sym),
+            cast(enum Reb_Symbol_Id, sym),
             ARG(value),
             flags,
             len,
@@ -929,7 +984,7 @@ REBTYPE(Array)
             if (index == 0) Reset_Array(arr);
             else {
                 SET_END(ARR_AT(arr, index));
-                SET_SERIES_LEN(SER(arr), cast(REBLEN, index));
+                SET_SERIES_LEN(arr, cast(REBLEN, index));
             }
         }
         RETURN (array);
@@ -995,14 +1050,14 @@ REBTYPE(Array)
         ){
             // RELVAL bits can be copied within the same array
             //
-            RELVAL *a = VAL_ARRAY_AT_ENSURE_MUTABLE(array);
-            RELVAL *b = VAL_ARRAY_AT_ENSURE_MUTABLE(arg);
+            RELVAL *a = VAL_ARRAY_AT_ENSURE_MUTABLE(nullptr, array);
+            RELVAL *b = VAL_ARRAY_AT_ENSURE_MUTABLE(nullptr, arg);
             RELVAL temp;
             temp.header = a->header;
             temp.payload = a->payload;
             temp.extra = a->extra;
-            Blit_Relative(a, b);
-            Blit_Relative(b, &temp);
+            Copy_Cell(a, b);
+            Copy_Cell(b, &temp);
         }
         RETURN (array); }
 
@@ -1027,7 +1082,7 @@ REBTYPE(Array)
 
         bool line_back;
         if (back == ARR_LAST(arr)) // !!! review tail newline handling
-            line_back = GET_ARRAY_FLAG(arr, NEWLINE_AT_TAIL);
+            line_back = GET_SUBCLASS_FLAG(ARRAY, arr, NEWLINE_AT_TAIL);
         else
             line_back = GET_CELL_FLAG(back + 1, NEWLINE_BEFORE);
 
@@ -1042,7 +1097,7 @@ REBTYPE(Array)
             // When we move the back cell to the front position, it gets the
             // newline flag based on the flag state that was *after* it.
             //
-            Blit_Relative(front, back);
+            Copy_Cell(front, back);
             if (line_back)
                 SET_CELL_FLAG(front, NEWLINE_BEFORE);
             else
@@ -1052,7 +1107,7 @@ REBTYPE(Array)
             // that was on the back will be the after for the next blit.
             //
             line_back = GET_CELL_FLAG(back, NEWLINE_BEFORE);
-            Blit_Relative(back, &temp);
+            Copy_Cell(back, &temp);
             if (line_front)
                 SET_CELL_FLAG(back, NEWLINE_BEFORE);
             else
@@ -1086,7 +1141,7 @@ REBTYPE(Array)
             flags.offset = 0;
         }
 
-        Move_Value(D_OUT, array);  // save array before messing with index
+        Copy_Cell(D_OUT, array);  // save array before messing with index
 
         REBLEN len = Part_Len_May_Modify_Index(array, ARG(part));
         if (len <= 1)
@@ -1187,8 +1242,8 @@ REBNATIVE(blockify)
     if (IS_NULLED(v)) {
         // leave empty
     } else {
-        Move_Value(ARR_HEAD(a), v);
-        TERM_ARRAY_LEN(a, 1);
+        Copy_Cell(ARR_HEAD(a), v);
+        SET_SERIES_LEN(a, 1);
     }
     return Init_Block(D_OUT, Freeze_Array_Shallow(a));
 }
@@ -1220,8 +1275,8 @@ REBNATIVE(groupify)
     if (IS_NULLED(v)) {
         // leave empty
     } else {
-        Move_Value(ARR_HEAD(a), v);
-        TERM_ARRAY_LEN(a, 1);
+        Copy_Cell(ARR_HEAD(a), v);
+        SET_SERIES_LEN(a, 1);
     }
     return Init_Group(D_OUT, Freeze_Array_Shallow(a));
 }
@@ -1251,8 +1306,8 @@ REBNATIVE(enblock)
     if (IS_NULLED(v)) {
         // leave empty
     } else {
-        Move_Value(ARR_HEAD(a), v);
-        TERM_ARRAY_LEN(a, 1);
+        Copy_Cell(ARR_HEAD(a), v);
+        SET_SERIES_LEN(a, 1);
     }
     return Init_Block(D_OUT, Freeze_Array_Shallow(a));
 }
@@ -1282,8 +1337,8 @@ REBNATIVE(engroup)
     if (IS_NULLED(v)) {
         // leave empty
     } else {
-        Move_Value(ARR_HEAD(a), v);
-        TERM_ARRAY_LEN(a, 1);
+        Copy_Cell(ARR_HEAD(a), v);
+        SET_SERIES_LEN(a, 1);
     }
     return Init_Group(D_OUT, Freeze_Array_Shallow(a));
 }
@@ -1300,7 +1355,7 @@ void Assert_Array_Core(const REBARR *a)
     // we don't use ASSERT_SERIES the macro here, because that checks to
     // see if the series is an array...and if so, would call this routine
     //
-    Assert_Series_Core(SER(a));
+    Assert_Series_Core(a);
 
     if (not IS_SER_ARRAY(a))
         panic (a);
@@ -1313,8 +1368,8 @@ void Assert_Array_Core(const REBARR *a)
             printf("Premature array end at index %d\n", cast(int, i));
             panic (a);
         }
-        if (not GET_ARRAY_FLAG(a, IS_PARAMLIST)) {  // uses > REB_MAX for PTYPE
-            if (KIND3Q_BYTE_UNCHECKED(item) % REB_64 >= REB_MAX) {
+        if (KIND3Q_BYTE_UNCHECKED(item) % REB_64 >= REB_MAX) {
+            if (HEART_BYTE(item) != REB_TYPESET) {  // allow for REB_P classes
                 printf("Invalid KIND3Q_BYTE at index %d\n", cast(int, i));
                 panic (a);
             }
@@ -1325,7 +1380,7 @@ void Assert_Array_Core(const REBARR *a)
         panic (item);
 
     if (IS_SER_DYNAMIC(a)) {
-        REBLEN rest = SER_REST(SER(a));
+        REBLEN rest = SER_REST(a);
         assert(rest > 0 and rest > i);
 
         for (; i < rest - 1; ++i, ++item) {
@@ -1346,12 +1401,6 @@ void Assert_Array_Core(const REBARR *a)
             }
         }
         assert(item == ARR_AT(a, rest - 1));
-
-        const RELVAL *ultimate = ARR_AT(a, rest - 1);
-        if (NOT_END(ultimate) or (ultimate->header.bits & NODE_FLAG_CELL)) {
-            printf("Implicit termination/unwritable END missing from array\n");
-            panic (a);
-        }
     }
 
 }

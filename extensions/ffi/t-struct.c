@@ -72,13 +72,13 @@ static void get_scalar(
         REBSTU *sub_stu = Alloc_Singular(
             NODE_FLAG_MANAGED | SERIES_FLAG_LINK_NODE_NEEDS_MARK
         );
-        LINK(sub_stu).custom.node = NOD(field);
+        mutable_LINK(Schema, sub_stu) = field;
 
         // The parent data may be a singular array for a HANDLE! or a BINARY!
         // series, depending on whether the data is owned by Rebol or not.
         // That series pointer is being referenced again here.
         //
-        Move_Value(ARR_SINGLE(sub_stu), STU_DATA(stu));
+        Copy_Cell(ARR_SINGLE(sub_stu), STU_DATA(stu));
         STU_OFFSET(sub_stu) = offset;
         assert(STU_SIZE(sub_stu) == FLD_WIDE(field));
         Init_Struct(out, sub_stu);
@@ -142,7 +142,7 @@ static void get_scalar(
         break;
 
       case SYM_REBVAL:
-        Move_Value(out, cast(const REBVAL*, p));
+        Copy_Cell(out, cast(const REBVAL*, p));
         break;
 
       default:
@@ -159,10 +159,11 @@ static bool Get_Struct_Var(REBVAL *out, REBSTU *stu, const RELVAL *word)
 {
     REBARR *fieldlist = STU_FIELDLIST(stu);
 
+    RELVAL *tail = ARR_TAIL(fieldlist);
     RELVAL *item = ARR_HEAD(fieldlist);
-    for (; NOT_END(item); ++item) {
+    for (; item != tail; ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
-        if (STR_CANON(FLD_NAME(field)) != VAL_WORD_CANON(word))
+        if (FLD_NAME(field) != VAL_WORD_SYMBOL(word))
             continue;
 
         if (FLD_IS_ARRAY(field)) {
@@ -180,7 +181,7 @@ static bool Get_Struct_Var(REBVAL *out, REBSTU *stu, const RELVAL *word)
             REBLEN n;
             for (n = 0; n < dimension; ++n)
                 get_scalar(ARR_AT(arr, n), stu, field, n);
-            TERM_ARRAY_LEN(arr, dimension);
+            SET_SERIES_LEN(arr, dimension);
             Init_Block(out, arr);
         }
         else
@@ -205,12 +206,13 @@ REBARR *Struct_To_Array(REBSTU *stu)
 {
     REBARR *fieldlist = STU_FIELDLIST(stu);
     RELVAL *item = ARR_HEAD(fieldlist);
+    RELVAL *tail = ARR_TAIL(fieldlist);
 
     REBDSP dsp_orig = DSP;
 
     // fail_if_non_accessible(STU_TO_VAL(stu));
 
-    for(; NOT_END(item); ++item) {
+    for(; item != tail; ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         Init_Set_Word(DS_PUSH(), FLD_NAME(field)); // required name
@@ -256,7 +258,7 @@ REBARR *Struct_To_Array(REBSTU *stu)
             REBLEN n;
             for (n = 0; n < dimension; n ++)
                 get_scalar(ARR_AT(init, n), stu, field, n);
-            TERM_ARRAY_LEN(init, dimension);
+            SET_SERIES_LEN(init, dimension);
             Init_Block(Alloc_Tail_Array(typespec), init);
         }
         else
@@ -277,7 +279,7 @@ void MF_Struct(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     REBARR *array = Struct_To_Array(VAL_STRUCT(v));
     Mold_Array_At(mo, array, 0, "[]");
-    Free_Unmanaged_Array(array);
+    Free_Unmanaged_Series(array);
 
     End_Mold(mo);
 }
@@ -289,9 +291,11 @@ static bool same_fields(REBARR *tgt_fieldlist, REBARR *src_fieldlist)
         return false;
 
     RELVAL *tgt_item = ARR_HEAD(tgt_fieldlist);
+    RELVAL *tgt_tail = ARR_TAIL(tgt_fieldlist);
     RELVAL *src_item = ARR_HEAD(src_fieldlist);
+    RELVAL *src_tial = ARR_TAIL(src_fieldlist);
 
-    for (; NOT_END(src_item); ++src_item, ++tgt_item) {
+    for (; src_item != tail; ++src_item, ++tgt_item) {
         REBFLD *src_field = VAL_ARRAY_KNOWN_MUTABLE(src_item);
         REBFLD *tgt_field = VAL_ARRAY_KNOWN_MUTABLE(tgt_item);
 
@@ -303,7 +307,7 @@ static bool same_fields(REBARR *tgt_fieldlist, REBARR *src_fieldlist)
                 return false;
             }
 
-        if (not SAME_SYM_NONZERO(
+        if (not Same_Nonzero_Symid(
             FLD_TYPE_SYM(tgt_field),
             FLD_TYPE_SYM(src_field)
         )){
@@ -492,11 +496,12 @@ static bool Set_Struct_Var(
 ){
     REBARR *fieldlist = STU_FIELDLIST(stu);
     RELVAL *item = ARR_HEAD(fieldlist);
+    RELVAL *tail = ARR_TAIL(fieldlist);
 
-    for (; NOT_END(item); ++item) {
+    for (; item != tail; ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
-        if (VAL_WORD_CANON(word) != STR_CANON(FLD_NAME(field)))
+        if (VAL_WORD_SYMBOL(word) != FLD_NAME(field))
             continue;
 
         if (FLD_IS_ARRAY(field)) {
@@ -539,19 +544,20 @@ static void parse_attr(
     REBINT *raw_size,
     uintptr_t *raw_addr
 ){
-    const REBVAL *attr = SPECIFIC(VAL_ARRAY_AT(blk));
+    const RELVAL *tail;
+    const REBVAL *attr = SPECIFIC(VAL_ARRAY_AT(&tail, blk));
 
     *raw_size = -1;
     *raw_addr = 0;
 
-    while (NOT_END(attr)) {
+    while (attr != tail) {
         if (not IS_SET_WORD(attr))
             fail (attr);
 
-        switch (VAL_WORD_SYM(attr)) {
+        switch (VAL_WORD_ID(attr)) {
           case SYM_RAW_SIZE:
             ++ attr;
-            if (IS_END(attr) or not IS_INTEGER(attr))
+            if (attr == tail or not IS_INTEGER(attr))
                 fail (attr);
             if (*raw_size > 0)
                 fail ("FFI: duplicate raw size");
@@ -562,7 +568,7 @@ static void parse_attr(
 
           case SYM_RAW_MEMORY:
             ++ attr;
-            if (IS_END(attr) or not IS_INTEGER(attr))
+            if (attr == tail or not IS_INTEGER(attr))
                 fail (attr);
             if (*raw_addr != 0)
                 fail ("FFI: duplicate raw memory");
@@ -577,7 +583,7 @@ static void parse_attr(
             if (*raw_addr != 0)
                 fail ("FFI: raw memory is exclusive with extern");
 
-            if (IS_END(attr) or not IS_BLOCK(attr) or VAL_LEN_AT(attr) != 2)
+            if (attr == tail or not IS_BLOCK(attr) or VAL_LEN_AT(attr) != 2)
                 fail (attr);
 
             const RELVAL *lib = VAL_ARRAY_AT_HEAD(attr, 0);
@@ -675,7 +681,8 @@ static REBLEN Total_Struct_Dimensionality(REBARR *fields)
     REBLEN n_fields = 0;
 
     RELVAL *item = ARR_HEAD(fields);
-    for (; NOT_END(item); ++item) {
+    RELVAL *tail = ARR_TAIL(fields);
+    for (; item != tail; ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
 
         if (FLD_IS_STRUCT(field))
@@ -737,9 +744,10 @@ static void Prepare_Field_For_FFI(REBFLD *schema)
     );
 
     RELVAL *item = ARR_HEAD(fieldlist);
+    RELVAL *tail = ARR_TAIL(fieldlist);
 
     REBLEN j = 0;
-    for (; NOT_END(item); ++item) {
+    for (; item != tail; ++item) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
         REBLEN dimension = FLD_IS_ARRAY(field) ? FLD_DIMENSION(field) : 1;
 
@@ -775,13 +783,14 @@ static void Parse_Field_Type_May_Fail(
 ){
     TRASH_CELL_IF_DEBUG(inner);
 
-    const RELVAL *val = VAL_ARRAY_AT(spec);
+    const RELVAL *tail;
+    const RELVAL *val = VAL_ARRAY_AT(&tail, spec);
 
-    if (IS_END(val))
+    if (val == tail)
         fail ("Empty field type in FFI");
 
     if (IS_WORD(val)) {
-        REBSYM sym = VAL_WORD_SYM(val);
+        SYMID sym = VAL_WORD_ID(val);
 
         // Initialize the type symbol with the unbound word by default (will
         // be overwritten in the struct cases).
@@ -866,7 +875,7 @@ static void Parse_Field_Type_May_Fail(
             // (What about just storing the STRUCT! value itself in the type
             // field, instead of the array of fields?)
             //
-            Move_Value(
+            Copy_Cell(
                 FLD_AT(field, IDX_FIELD_FFTYPE),
                 FLD_AT(VAL_STRUCT_SCHEMA(inner), IDX_FIELD_FFTYPE)
             );
@@ -912,7 +921,7 @@ static void Parse_Field_Type_May_Fail(
         // Borrow the same ffi_type* that the struct uses, see above note
         // regarding alternative ideas.
         //
-        Move_Value(
+        Copy_Cell(
             FLD_AT(field, IDX_FIELD_FFTYPE),
             FLD_AT(VAL_STRUCT_SCHEMA(val), IDX_FIELD_FFTYPE)
         );
@@ -925,7 +934,7 @@ static void Parse_Field_Type_May_Fail(
 
     // Find out the array dimension (if there is one)
     //
-    if (IS_END(val)) {
+    if (val == tail) {
         Init_Blank(FLD_AT(field, IDX_FIELD_DIMENSION)); // scalar
     }
     else if (IS_BLOCK(val)) {
@@ -956,9 +965,10 @@ static void Parse_Field_Type_May_Fail(
 //
 void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
 {
-    const RELVAL *spec_item = VAL_ARRAY_AT(spec);
+    const RELVAL *spec_tail;
+    const RELVAL *spec_item = VAL_ARRAY_AT(&spec_tail, spec);
 
-    while (NOT_END(spec_item)) {
+    while (spec_item != spec_tail) {
         const RELVAL *word;
         if (IS_BLOCK(spec_item)) { // options: raw-memory, etc
             REBINT raw_size = -1;
@@ -984,16 +994,17 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
         }
 
         const RELVAL *fld_val = spec_item + 1;
-        if (IS_END(fld_val))
+        if (fld_val == spec_tail)
             fail (Error_Need_Non_End_Raw(rebUnrelativize(fld_val)));
 
         REBARR *fieldlist = VAL_STRUCT_FIELDLIST(ret);
-        RELVAL *item = ARR_HEAD(fieldlist);
+        RELVAL *field_item = ARR_HEAD(fieldlist);
+        RELVAL *fields_tail = ARR_TAIL(fieldlist);
 
-        for (; NOT_END(item); ++item) {
-            REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(item);
+        for (; field_item != fields_tail; ++field_item) {
+            REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(field_item);
 
-            if (STR_CANON(FLD_NAME(field)) != VAL_WORD_CANON(word))
+            if (FLD_NAME(field) != VAL_WORD_SYMBOL(word))
                 continue;
 
             if (FLD_IS_ARRAY(field)) {
@@ -1067,12 +1078,12 @@ void Init_Struct_Fields(REBVAL *ret, REBVAL *spec)
 REB_R MAKE_Struct(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_CUSTOM);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (not IS_BLOCK(arg))
         fail (arg);
@@ -1100,7 +1111,7 @@ REB_R MAKE_Struct(
     Init_Blank(FLD_AT(schema, IDX_FIELD_NAME));  // no symbol for structs
     Init_Blank(FLD_AT(schema, IDX_FIELD_OFFSET));  // the offset is not used
     Init_Unreadable_Void(FLD_AT(schema, IDX_FIELD_WIDE));  // will fill in
-    TERM_ARRAY_LEN(schema, IDX_FIELD_MAX);
+    SET_SERIES_LEN(schema, IDX_FIELD_MAX);
 
 //
 // PROCESS FIELDS
@@ -1126,7 +1137,7 @@ REB_R MAKE_Struct(
 
     // !!! This makes binary data for each struct level? ???
     //
-    REBSER *data_bin;
+    REBBIN *data_bin;
     if (raw_addr == 0)
         data_bin = Make_Binary(max_fields << 2);
     else
@@ -1151,7 +1162,7 @@ REB_R MAKE_Struct(
         Init_Unreadable_Void(FLD_AT(field, IDX_FIELD_NAME));
         Init_Integer(FLD_AT(field, IDX_FIELD_OFFSET), offset);
         Init_Unreadable_Void(FLD_AT(field, IDX_FIELD_WIDE));
-        TERM_ARRAY_LEN(field, IDX_FIELD_MAX);
+        SET_SERIES_LEN(field, IDX_FIELD_MAX);
 
         // Must be a word or a set-word, with set-words initializing
 
@@ -1168,7 +1179,7 @@ REB_R MAKE_Struct(
         else
             fail (Error_Invalid_Type(VAL_TYPE(f_value)));
 
-        Init_Word(FLD_AT(field, IDX_FIELD_NAME), VAL_WORD_SPELLING(f_value));
+        Init_Word(FLD_AT(field, IDX_FIELD_NAME), VAL_WORD_SYMBOL(f_value));
 
         Fetch_Next_Forget_Lookback(f);
         if (IS_END(f_value) or not IS_BLOCK(f_value))
@@ -1211,7 +1222,7 @@ REB_R MAKE_Struct(
                 REBVAL *reduced = rebValue("reduce", specific, rebEND);
                 DROP_GC_GUARD(specific);
 
-                Move_Value(init, reduced);
+                Copy_Cell(init, reduced);
                 rebRelease(reduced);
 
                 Fetch_Next_Forget_Lookback(f);
@@ -1318,8 +1329,8 @@ REB_R MAKE_Struct(
     REBSTU *stu = Alloc_Singular(
         NODE_FLAG_MANAGED | SERIES_FLAG_LINK_NODE_NEEDS_MARK
     );
-    Manage_Array(schema);
-    LINK_SCHEMA_NODE(stu) = NOD(schema);
+    Manage_Series(schema);
+    mutable_LINK(Schema, stu) = schema;
 
     if (raw_addr) {
         make_ext_storage(
@@ -1356,7 +1367,7 @@ REB_R TO_Struct(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R PD_Struct(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     REBSTU *stu = VAL_STRUCT(pvs->out);
     fail_if_non_accessible(stu);
@@ -1364,7 +1375,7 @@ REB_R PD_Struct(
     if (not IS_WORD(picker))
         return R_UNHANDLED;
 
-    if (opt_setval == nullptr) {
+    if (not setval) {
         if (not Get_Struct_Var(pvs->out, stu, picker))
             return R_UNHANDLED;
 
@@ -1396,7 +1407,7 @@ REB_R PD_Struct(
             // evaluation may not protect the result...)
             //
             DECLARE_LOCAL (sel_orig);
-            Blit_Relative(cast(RELVAL*, sel_orig), picker);
+            Copy_Cell(cast(RELVAL*, sel_orig), picker);
             PUSH_GC_GUARD(sel_orig);
 
             if (Next_Path_Throws(pvs)) { // updates pvs->out, PVS_PICKER()
@@ -1412,7 +1423,7 @@ REB_R PD_Struct(
                     pvs->u.ref.specifier
                 );
             else
-                Move_Value(specific, pvs->out);
+                Copy_Cell(specific, pvs->out);
 
             if (not Set_Struct_Var(stu, sel_orig, nullptr, specific))
                 return R_UNHANDLED;
@@ -1425,7 +1436,7 @@ REB_R PD_Struct(
         return pvs->out;
     }
     else {
-        if (not Set_Struct_Var(stu, picker, nullptr, opt_setval))
+        if (not Set_Struct_Var(stu, picker, nullptr, unwrap(setval)))
             return R_UNHANDLED;
 
         return R_INVISIBLE;
@@ -1489,7 +1500,7 @@ REBSTU *Copy_Struct_Managed(REBSTU *src)
     // linked manually.
     //
     REBSTU *copy = Copy_Array_Shallow(src, SPECIFIED);
-    LINK_SCHEMA_NODE(copy) = LINK_SCHEMA_NODE(src);  // share the same schema
+    mutable_LINK(Schema, copy) = LINK(Schema, src);  // share the same schema
     MISC_STU_OFFSET(copy) = MISC_STU_OFFSET(src);  // copies offset
 
     // Update the binary data with a copy of its sequence.
@@ -1497,12 +1508,12 @@ REBSTU *Copy_Struct_Managed(REBSTU *src)
     // !!! Note that the offset is left intact, and as written will make a
     // copy as big as struct the instance is embedded into if nonzero offset.
     //
-    REBSER *bin_copy = Make_Binary(STU_DATA_LEN(src));
+    REBBIN *bin_copy = Make_Binary(STU_DATA_LEN(src));
     memcpy(BIN_HEAD(bin_copy), STU_DATA_HEAD(src), STU_DATA_LEN(src));
     TERM_BIN_LEN(bin_copy, STU_DATA_LEN(src));
     Init_Binary(ARR_SINGLE(copy), bin_copy);
 
-    Manage_Array(copy);
+    Manage_Series(copy);
     return copy;
 }
 
@@ -1516,7 +1527,7 @@ REBTYPE(Struct)
     REBVAL *arg;
 
     // unary actions
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_CHANGE: {
         arg = D_ARG(2);
         if (not IS_BINARY(arg))
@@ -1527,17 +1538,17 @@ REBTYPE(Struct)
 
         memcpy(
             VAL_STRUCT_DATA_HEAD(val),
-            BIN_HEAD(VAL_SERIES(arg)),
+            BIN_HEAD(VAL_BINARY(arg)),
             VAL_STRUCT_DATA_LEN(val)
         );
-        Move_Value(D_OUT, val);
+        Copy_Cell(D_OUT, val);
         return D_OUT; }
 
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value));
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -1546,7 +1557,7 @@ REBTYPE(Struct)
 
         case SYM_VALUES: {
             fail_if_non_accessible(VAL_STRUCT(val));
-            REBSER *bin = Make_Binary(VAL_STRUCT_SIZE(val));
+            REBBIN *bin = Make_Binary(VAL_STRUCT_SIZE(val));
             memcpy(
                 BIN_HEAD(bin),
                 VAL_STRUCT_DATA_AT(val),

@@ -61,7 +61,7 @@ bool All_Bytes_ASCII(REBYTE *bp, REBLEN len)
 // It should be reviewed.
 //
 const REBYTE *Analyze_String_For_Scan(
-    REBSIZ *opt_size_out,
+    option(REBSIZ*) size_out,
     const REBVAL *any_string,
     REBLEN max_len  // maximum length in *codepoints*
 ){
@@ -100,8 +100,8 @@ const REBYTE *Analyze_String_For_Scan(
         up = NEXT_STR(up);
     } while (len > 0 and not IS_SPACE(c = CHR_CODE(up)));
 
-    if (opt_size_out)  // give back byte size before trailing spaces
-        *opt_size_out = up - at_index;
+    if (size_out)  // give back byte size before trailing spaces
+        *unwrap(size_out) = up - at_index;
 
     // Rest better be just spaces
     //
@@ -128,7 +128,7 @@ void Trim_Tail(REB_MOLD *mo, REBYTE ascii)
     REBSIZ size = STR_SIZE(mo->series);
 
     for (; size > 0; --size, --len) {
-        REBYTE b = *BIN_AT(SER(mo->series), size - 1);
+        REBYTE b = *BIN_AT(mo->series, size - 1);
         if (b != ascii)
             break;
     }
@@ -160,7 +160,7 @@ void Change_Case(
     // the same index.  However, R3-Alpha code would use Partial() and may
     // change val's index.  Capture it before potential change, review.
     //
-    Move_Value(out, val);
+    Copy_Cell(out, val);
 
     REBLEN len = Part_Len_May_Modify_Index(val, part);
 

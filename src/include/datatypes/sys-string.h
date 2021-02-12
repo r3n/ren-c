@@ -48,352 +48,135 @@
 //   See the distinction between SER_USED() and STR_LEN().
 //
 
+
 // Some places permit an optional label (such as the names of function
 // invocations, which may not have an associated name).  To make the callsite
 // intent clearer for passing in a null REBSTR*, use ANONYMOUS instead.
 //
 #define ANONYMOUS \
-    ((REBSTR*)nullptr)
+    cast(const REBSYM*, nullptr)
 
 
-//=////////////////////////////////////////////////////////////////////////=//
+// For a writable REBSTR, a list of entities that cache the mapping from
+// index to character offset is maintained.  Without some help, it would
+// be necessary to search from the head or tail of the string, character
+// by character, to turn an index into an offset.  This is prohibitive.
 //
-// REBCHR(*) + REBCHR(const*): "ITERATOR" TYPE FOR SPECIFIC GOOD UTF-8 DATA
+// These bookmarks must be kept in sync.  How many bookmarks are kept
+// should be reigned in proportionally to the length of the series.  As
+// a first try of this strategy, singular arrays are being used.
 //
-//=////////////////////////////////////////////////////////////////////////=//
-//
-// Rebol exchanges UTF-8 data with the outside world via "char*".  But inside
-// the code, REBYTE* is used for not-yet-validated bytes that are to be
-// scanned as UTF-8.  When accessing an already-checked string, however,
-// the REBCHR(*) type is used...signaling no error checking should need to be
-// done while walking through the UTF-8 sequence.
-//
-// So for instance: instead of simply saying:
-//
-//     REBUNI *ptr = STR_HEAD(string_series);
-//     REBUNI c = *ptr++;
-//
-// ...one must instead write:
-//
-//     REBCHR(*) ptr = STR_HEAD(string_series);
-//     REBUNI c;
-//     ptr = NEXT_CHR(&c, ptr);  // ++ptr or ptr[n] will error in C++ build
-//
-// The code that runs behind the scenes is typical UTF-8 forward and backward
-// scanning code, minus any need for error handling.
-//
-#if !defined(CPLUSPLUS_11) or !defined(DEBUG_UTF8_EVERYWHERE)
-    //
-    // Plain C build uses trivial expansion of REBCHR(*) and REBCHR(const*)
-    //
-    //          REBCHR(*) cp; => REBYTE * cp;
-    //     REBCHR(const*) cp; => REBYTE const* cp;  // same as `const REBYTE*`
-    //
-    #define REBCHR(star_or_const_star) \
-        REBYTE star_or_const_star
-
-    inline static REBYTE* NEXT_CHR(
-        REBUNI *codepoint_out,
-        const REBYTE *bp
-    ){
-        if (*bp < 0x80)
-            *codepoint_out = *bp;
-        else
-            bp = Back_Scan_UTF8_Char_Unchecked(codepoint_out, bp);
-        return m_cast(REBYTE*, bp + 1);
-    }
-
-    inline static REBYTE* BACK_CHR(
-        REBUNI *codepoint_out,
-        const REBYTE *bp
-    ){
-        const REBYTE *t = bp;
-        --t;
-        while (Is_Continuation_Byte_If_Utf8(*t))
-            --t;
-        NEXT_CHR(codepoint_out, t);  // Review: optimize backward scans?
-        return m_cast(REBYTE*, t);
-    }
-
-    inline static REBYTE* NEXT_STR(const REBYTE *bp) {
-        do {
-            ++bp;
-        } while (Is_Continuation_Byte_If_Utf8(*bp));
-        return m_cast(REBYTE*, bp);
-    }
-
-    inline static REBYTE* BACK_STR(const REBYTE *bp) {
-        do {
-            --bp;
-        } while (Is_Continuation_Byte_If_Utf8(*bp));
-        return m_cast(REBYTE*, bp);
-    }
-
-    inline static REBUNI CHR_CODE(const REBYTE *bp) {
-        REBUNI codepoint;
-        NEXT_CHR(&codepoint, bp);
-        return codepoint;
-    }
-
-    inline static REBYTE* SKIP_CHR(
-        REBUNI *codepoint_out,
-        const REBYTE *bp,
-        REBINT delta
-    ){
-        if (delta > 0) {
-            while (delta != 0) {
-                bp = NEXT_STR(bp);
-                --delta;
-            }
-        }
-        else {
-            while (delta != 0) {
-                bp = BACK_STR(bp);
-                ++delta;
-            }
-        }
-        *codepoint_out = CHR_CODE(bp);
-        return m_cast(REBYTE*, bp);
-    }
-
-    inline static REBYTE* WRITE_CHR(REBYTE* bp, REBUNI c) {
-        REBSIZ size = Encoded_Size_For_Codepoint(c);
-        Encode_UTF8_Char(bp, c, size);
-        return bp + size;
-    }
-#else
-    // C++ build uses templates to expand REBCHR(*) and REBCHR(const*) into
-    // pointer classes.  This technique allows the simple C compilation too:
-    //
-    // http://blog.hostilefork.com/kinda-smart-pointers-in-c/
-    //
-    // NOTE: Don't put this in %reb-defs.h and try to pass REBCHR(*) as args
-    // to routines as part of the %sys-core.h API.  This would lead to an
-    // incompatible runtime interface between C and C++ builds of cores and
-    // extensions using the internal API--which we want to avoid!
-    //
-    // NOTE: THE NON-INLINED OVERHEAD IS EXTREME IN UNOPTIMIZED BUILDS!  A
-    // debug build does not inline these classes and functions.  So traversing
-    // strings involves a lot of constructing objects and calling methods that
-    // call methods.  Hence these classes are used only in non-debug (and
-    // hopefully) optimized builds, where the inlining makes it equivalent to
-    // the C version.  That allows for the compile-time type checking but no
-    // added runtime overhead.
-    //
-    template<typename T> struct RebchrPtr;
-    #define REBCHR(star_or_const_star) \
-        RebchrPtr<REBYTE star_or_const_star>
-
-    // Primary purpose of the classes is to disable the ability to directly
-    // increment or decrement pointers to REBYTE* without going through helper
-    // routines that do decoding.
-
-    template<>
-    struct RebchrPtr<const REBYTE*> {
-        const REBYTE *bp;  // will actually be mutable if constructed mutable
-
-        RebchrPtr () {}
-        RebchrPtr (nullptr_t n) : bp (n) {}
-        explicit RebchrPtr (const REBYTE *bp) : bp (bp) {}
-        explicit RebchrPtr (const char *cstr)
-            : bp (reinterpret_cast<const REBYTE*>(cstr)) {}
-
-        RebchrPtr next(REBUNI *out) {
-            const REBYTE *t = bp;
-            if (*t < 0x80)
-                *out = *t;
-            else
-                t = Back_Scan_UTF8_Char_Unchecked(out, t);
-            return RebchrPtr {t + 1};
-        }
-
-        RebchrPtr back(REBUNI *out) {
-            const REBYTE *t = bp;
-            --t;
-            while (Is_Continuation_Byte_If_Utf8(*t))
-                --t;
-            Back_Scan_UTF8_Char_Unchecked(out, t);
-            return RebchrPtr {t};
-        }
-
-        RebchrPtr next_only() {
-            const REBYTE *t = bp;
-            do {
-                ++t;
-            } while (Is_Continuation_Byte_If_Utf8(*t));
-            return RebchrPtr {t};
-        }
-
-        RebchrPtr back_only() {
-            const REBYTE *t = bp;
-            do {
-                --t;
-            } while (Is_Continuation_Byte_If_Utf8(*t));
-            return RebchrPtr {t};
-        }
-
-        REBUNI code() {
-            REBUNI c;
-            next(&c);
-            return c;
-        }
-
-        RebchrPtr skip(REBUNI *out, REBINT delta) {
-            RebchrPtr t = *this;
-            if (delta > 0) {
-                while (delta != 0) {
-                    t = t.next_only();
-                    --delta;
-                }
-            }
-            else {
-                while (delta != 0) {
-                    t = t.back_only();
-                    ++delta;
-                }
-            }
-            *out = t.code();
-            return RebchrPtr {t.bp};
-        }
-
-        REBSIZ operator-(const REBYTE *rhs)
-          { return bp - rhs; }
-
-        REBSIZ operator-(RebchrPtr rhs)
-          { return bp - rhs.bp; }
-
-        bool operator==(const RebchrPtr<const REBYTE*> &other)
-          { return bp == other.bp; }
-
-        bool operator==(const REBYTE *other)
-          { return bp == other; }
-
-        bool operator!=(const RebchrPtr<const REBYTE*> &other)
-          { return bp != other.bp; }
-
-        bool operator!=(const REBYTE *other)
-          { return bp != other; }
-
-        bool operator>(const RebchrPtr<const REBYTE*> &other)
-          { return bp > other.bp; }
-
-        bool operator<(const REBYTE *other)
-          { return bp < other; }
-
-        bool operator<=(const RebchrPtr<const REBYTE*> &other)
-          { return bp <= other.bp; }
-
-        bool operator>=(const REBYTE *other)
-          { return bp >= other; }
-
-        operator bool() { return bp != nullptr; }  // implicit
-        operator const void*() { return bp; }  // implicit
-        operator const REBYTE*() { return bp; }  // implicit
-        operator const char*()
-          { return reinterpret_cast<const char*>(bp); }  // implicit
-    };
-
-    template<>
-    struct RebchrPtr<REBYTE*> : public RebchrPtr<const REBYTE*> {
-        RebchrPtr () : RebchrPtr<const REBYTE*>() {}
-        RebchrPtr (nullptr_t n) : RebchrPtr<const REBYTE*>(n) {}
-        explicit RebchrPtr (REBYTE *bp)
-            : RebchrPtr<const REBYTE*> (bp) {}
-        explicit RebchrPtr (char *cstr)
-            : RebchrPtr<const REBYTE*> (reinterpret_cast<REBYTE*>(cstr)) {}
-
-        static REBCHR(*) nonconst(REBCHR(const*) cp)
-          { return RebchrPtr {const_cast<REBYTE*>(cp.bp)}; }
-
-        RebchrPtr back(REBUNI *out)
-          { return nonconst(REBCHR(const*)::back(out)); }
-
-        RebchrPtr next(REBUNI *out)
-          { return nonconst(REBCHR(const*)::next(out)); }
-
-        RebchrPtr back_only()
-          { return nonconst(REBCHR(const*)::back_only()); }
-
-        RebchrPtr next_only()
-          { return nonconst(REBCHR(const*)::next_only()); }
-
-        RebchrPtr skip(REBUNI *out, REBINT delta)
-          { return nonconst(REBCHR(const*)::skip(out, delta)); }
-
-        RebchrPtr write(REBUNI c) {
-            REBSIZ size = Encoded_Size_For_Codepoint(c);
-            Encode_UTF8_Char(const_cast<REBYTE*>(bp), c, size);
-            return RebchrPtr {const_cast<REBYTE*>(bp) + size};
-        }
-
-        operator void*() { return const_cast<REBYTE*>(bp); }  // implicit
-        operator REBYTE*() { return const_cast<REBYTE*>(bp); }  // implicit
-        explicit operator char*()
-            { return const_cast<char*>(reinterpret_cast<const char*>(bp)); }
-    };
-
-    #define NEXT_CHR(out, cp)               (cp).next(out)
-    #define BACK_CHR(out, cp)               (cp).back(out)
-    #define NEXT_STR(cp)                    (cp).next_only()
-    #define BACK_STR(cp)                    (cp).back_only()
-    #define CHR_CODE(cp)                    (cp).code()
-    #define SKIP_CHR(out,cp,delta)          (cp).skip((out), (delta))
-    #define WRITE_CHR(cp, c)                (cp).write(c)
-
-  #if defined(DEBUG_CHECK_CASTS)
-    //
-    // const_cast<> and reinterpret_cast<> don't work with user-defined
-    // conversion operators.  But since this codebase uses m_cast, we can
-    // cheat when the class is being used with the helpers.
-    //
-    template <>
-    inline REBCHR(*) m_cast_helper(REBCHR(const*) v)
-      { return RebchrPtr<REBYTE*> {const_cast<REBYTE*>(v.bp)}; }
-  #else
-    #error "DEBUG_UTF8_EVERYWHERE currently requires DEBUG_CHECK_CASTS"
-  #endif
-
-#endif
+#define LINK_Bookmarks_TYPE     REBBMK*  // alias for REBSER* at this time
+#define LINK_Bookmarks_CAST     (REBBMK*)SER
+#define HAS_LINK_Bookmarks      FLAVOR_STRING
 
 
-//=//// REBSTR SERIES FOR UTF8 STRINGS ////////////////////////////////////=//
-
-struct Reb_String {
-    struct Reb_Series series;  // http://stackoverflow.com/a/9747062
-};
-
-#if !defined(DEBUG_CHECK_CASTS)
-
-    #define STR(p) \
-        m_cast(REBSTR*, (const REBSTR*)(p))  // don't check const in C or C++
-
-#else  // !!! Enhance with more checks, like SER() does.
-
-    inline static REBSTR *STR(void *p)
-      { return cast(REBSTR*, SER(p)); }
-
-    inline static const REBSTR *STR(const void *p)
-      { return cast(const REBSTR*, SER(p)); }
-
-#endif
-
-
-inline static bool IS_SER_STRING(const REBSER *s) {
-    if (NOT_SERIES_FLAG((s), IS_STRING))
-        return false;
-    assert(SER_WIDE(s) == 1);
-    return true;
+inline static REBCHR(*) NEXT_CHR(
+    REBUNI *codepoint_out,
+    REBCHR(const_if_unchecked_utf8*) cp
+){
+    const REBYTE *t = cp;
+    if (*t < 0x80)
+        *codepoint_out = *t;
+    else
+        t = Back_Scan_UTF8_Char_Unchecked(codepoint_out, t);
+    return cast(REBCHR(*), m_cast(REBYTE*, t + 1));
 }
 
-// While the content format is UTF-8 for both ANY-STRING! and ANY-WORD!, the
-// MISC() and LINK() fields are used differently.  A string caches its length
-// in codepoints so that doesn't have to be recalculated, and it also has
-// caches of "bookmarks" mapping codepoint indexes to byte offsets.  Words
-// store a pointer that is used in a circularly linked list to find their
-// canon spelling form...as well as hold binding information.
-//
-#define IS_STR_SYMBOL(s) \
-    NOT_SERIES_FLAG((s), UTF8_NONWORD)
+inline static REBCHR(*) BACK_CHR(
+    REBUNI *codepoint_out,
+    REBCHR(const_if_unchecked_utf8*) cp
+){
+    const_if_unchecked_utf8 REBYTE *t = cp;
+    --t;
+    while (Is_Continuation_Byte_If_Utf8(*t))
+        --t;
+    NEXT_CHR(codepoint_out, cast(REBCHR(const_if_unchecked_utf8*), t));
+    return cast(REBCHR(*), m_cast(REBYTE*, t));
+}
+
+inline static REBCHR(*) NEXT_STR(REBCHR(const_if_unchecked_utf8*) cp) {
+    const_if_unchecked_utf8 REBYTE *t = cp;
+    do {
+        ++t;
+    } while (Is_Continuation_Byte_If_Utf8(*t));
+    return cast(REBCHR(*), m_cast(REBYTE*, t));
+}
+
+inline static REBCHR(*) BACK_STR(REBCHR(const_if_unchecked_utf8*) cp) {
+    const_if_unchecked_utf8 REBYTE *t = cp;
+    do {
+        --t;
+    } while (Is_Continuation_Byte_If_Utf8(*t));
+    return cast(REBCHR(*), m_cast(REBYTE*, t));
+}
+
+inline static REBCHR(*) SKIP_CHR(
+    REBUNI *codepoint_out,
+    REBCHR(const_if_unchecked_utf8*) cp,
+    REBINT delta
+){
+    if (delta > 0) {
+        while (delta != 0) {
+            cp = NEXT_STR(cp);
+            --delta;
+        }
+    }
+    else {
+        while (delta != 0) {
+            cp = BACK_STR(cp);
+            ++delta;
+        }
+    }
+    NEXT_CHR(codepoint_out, cp);
+    return m_cast(REBCHR(*), cp);
+}
+
+#if defined(DEBUG_UTF8_EVERYWHERE)
+    //
+    // See the definition of `const_if_c` for the explanation of why this
+    // overloading technique is needed to make output constness match input.
+    //
+    inline static REBCHR(const*) NEXT_CHR(
+        REBUNI *codepoint_out,
+        REBCHR(const*) cp
+    ){
+        return NEXT_CHR(codepoint_out, m_cast(REBCHR(*), cp));
+    }
+
+    inline static REBCHR(const*) BACK_CHR(
+        REBUNI *codepoint_out,
+        REBCHR(const*) cp
+    ){
+        return BACK_CHR(codepoint_out, m_cast(REBCHR(*), cp));
+    }
+
+    inline static REBCHR(const*) NEXT_STR(REBCHR(const*) cp)
+      { return NEXT_STR(m_cast(REBCHR(*), cp)); }
+
+    inline static REBCHR(const*) BACK_STR(REBCHR(const*) cp)
+      { return BACK_STR(m_cast(REBCHR(*), cp)); }
+
+    inline static REBCHR(const*) SKIP_CHR(
+        REBUNI *codepoint_out,
+        REBCHR(const*) cp,
+        REBINT delta
+    ){
+        return SKIP_CHR(codepoint_out, m_cast(REBCHR(*), cp), delta);
+    }
+#endif
+
+inline static REBUNI CHR_CODE(REBCHR(const*) cp) {
+    REBUNI codepoint;
+    NEXT_CHR(&codepoint, cp);
+    return codepoint;
+}
+
+inline static REBCHR(*) WRITE_CHR(REBCHR(*) cp, REBUNI c) {
+    REBSIZ size = Encoded_Size_For_Codepoint(c);
+    Encode_UTF8_Char(cp, c, size);
+    return cast(REBCHR(*), cast(REBYTE*, cp) + size);
+}
 
 
 //=//// STRING ALL-ASCII FLAG /////////////////////////////////////////////=//
@@ -419,18 +202,17 @@ inline static bool Is_String_Definitely_ASCII(const REBSTR *str) {
     return false;
 }
 
-inline static const char *STR_UTF8(const REBSTR *s)
-  { return cast(const char*, BIN_HEAD(SER(s))); }
+#define STR_UTF8(s) \
+    SER_HEAD(const char, ensure(const REBSTR*, s))
 
-inline static size_t STR_SIZE(const REBSTR *s)  // e.g. encoded UTF-8 size
-  { return SER_USED(SER(s)); }
-
+#define STR_SIZE(s) \
+    SER_USED(ensure(const REBSTR*, s))  // UTF-8 byte count (not codepoints)
 
 inline static REBCHR(*) STR_HEAD(const_if_c REBSTR *s)
-  { return cast(REBCHR(*), SER_HEAD(REBYTE, SER(s))); }
+  { return cast(REBCHR(*), SER_HEAD(REBYTE, s)); }
 
 inline static REBCHR(*) STR_TAIL(const_if_c REBSTR *s)
-  { return cast(REBCHR(*), SER_TAIL(REBYTE, SER(s))); }
+  { return cast(REBCHR(*), SER_TAIL(REBYTE, s)); }
 
 #ifdef __cplusplus
     inline static REBCHR(const*) STR_HEAD(const REBSTR *s)
@@ -445,12 +227,12 @@ inline static REBLEN STR_LEN(const REBSTR *s) {
     if (Is_Definitely_Ascii(s))
         return STR_SIZE(s);
 
-    if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
+    if (IS_NONSYMBOL_STRING(s)) {  // length is cached for non-ANY-WORD!
       #if defined(DEBUG_UTF8_EVERYWHERE)
-        if (MISC(s).length > SER_USED(SER(s))) // includes 0xDECAFBAD
+        if (s->misc.length > SER_USED(s))  // includes 0xDECAFBAD
             panic(s);
       #endif
-        return MISC(s).length;
+        return s->misc.length;
     }
 
     // Have to do it the slow way if it's a symbol series...but hopefully
@@ -472,11 +254,11 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
 
     // The position `offset` describes must be a codepoint boundary.
     //
-    assert(not Is_Continuation_Byte_If_Utf8(*BIN_AT(SER(s), offset)));
+    assert(not Is_Continuation_Byte_If_Utf8(*BIN_AT(s, offset)));
 
-    if (not IS_STR_SYMBOL(s)) {  // length is cached for non-ANY-WORD! strings
+    if (IS_NONSYMBOL_STRING(s)) {  // length is cached for non-ANY-WORD!
       #if defined(DEBUG_UTF8_EVERYWHERE)
-        if (MISC(s).length > SER_USED(SER(s))) // includes 0xDECAFBAD
+        if (s->misc.length > SER_USED(s))  // includes 0xDECAFBAD
             panic(s);
       #endif
 
@@ -488,7 +270,7 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
     // they're not too long (since spaces and newlines are illegal.)
     //
     REBLEN index = 0;
-    REBCHR(const*) ep = cast(REBCHR(const*), BIN_AT(SER(s), offset));
+    REBCHR(const*) ep = cast(REBCHR(const*), BIN_AT(s, offset));
     REBCHR(const*) cp = STR_HEAD(s);
     while (cp != ep) {
         cp = NEXT_STR(cp);
@@ -498,15 +280,18 @@ inline static REBLEN STR_INDEX_AT(const REBSTR *s, REBSIZ offset) {
 }
 
 inline static void SET_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
-    assert(not IS_STR_SYMBOL(s));
-
-    SET_SERIES_USED(SER(s), used);
-    MISC(s).length = len;
+    assert(IS_NONSYMBOL_STRING(s));
+    assert(used == SER_USED(s));
+    s->misc.length = len;
+    assert(*BIN_AT(s, used) == '\0');
+    UNUSED(used);
 }
 
 inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
-    SET_STR_LEN_SIZE(s, len, used);
-    TERM_SEQUENCE(SER(s));
+    assert(IS_NONSYMBOL_STRING(s));
+    SET_SERIES_USED(s, used);
+    s->misc.length = len;
+    *BIN_AT(s, used) = '\0';
 }
 
 
@@ -522,40 +307,33 @@ inline static void TERM_STR_LEN_SIZE(REBSTR *s, REBLEN len, REBSIZ used) {
 // series node otherwise.  Bookmarks aren't generated for strings that are
 // very short, or that are never enumerated.
 
-struct Reb_Bookmark {
-    REBLEN index;
-    REBSIZ offset;
-};
-
 #define BMK_INDEX(b) \
-    SER_HEAD(struct Reb_Bookmark, (b))->index
+    SER_HEAD(struct Reb_Bookmark, c_cast(REBBMK*, (b)))->index
 
 #define BMK_OFFSET(b) \
-    SER_HEAD(struct Reb_Bookmark, (b))->offset
+    SER_HEAD(struct Reb_Bookmark, c_cast(REBBMK*, (b)))->offset
 
 inline static REBBMK* Alloc_Bookmark(void) {
-    REBSER *s = Make_Series_Core(
+    REBSER *s = Make_Series(
         1,
-        sizeof(struct Reb_Bookmark),
-        SERIES_FLAG_MANAGED  // LINK_NODE_NEEDS_MARK not neded if is bookmark
+        FLAG_FLAVOR(BOOKMARKLIST) | SERIES_FLAG_MANAGED
     );
-    LINK(s).bookmarks = nullptr;  // !!! efficiency by linking bookmarks?
     SET_SERIES_LEN(s, 1);
     CLEAR_SERIES_FLAG(s, MANAGED);  // manual but untracked (avoid leak error)
-    return s;
+    return cast(REBBMK*, s);
 }
 
 inline static void Free_Bookmarks_Maybe_Null(REBSTR *str) {
-    assert(not IS_STR_SYMBOL(str));  // call on string
-    if (LINK(str).bookmarks) {
-        GC_Kill_Series(SER(LINK(str).bookmarks));
-        LINK(str).bookmarks = nullptr;
+    assert(IS_NONSYMBOL_STRING(str));
+    if (LINK(Bookmarks, str)) {
+        GC_Kill_Series(LINK(Bookmarks, str));
+        mutable_LINK(Bookmarks, str) = nullptr;
     }
 }
 
 #if !defined(NDEBUG)
     inline static void Check_Bookmarks_Debug(REBSTR *s) {
-        REBBMK *bookmark = LINK(s).bookmarks;
+        REBBMK *bookmark = LINK(Bookmarks, s);
         if (not bookmark)
             return;
 
@@ -567,7 +345,7 @@ inline static void Free_Bookmarks_Maybe_Null(REBSTR *str) {
         for (i = 0; i != index; ++i)
             cp = NEXT_STR(cp);
 
-        REBSIZ actual = cast(REBYTE*, cp) - SER_DATA(SER(s));
+        REBSIZ actual = cast(REBYTE*, cp) - SER_DATA(s);
         assert(actual == offset);
     }
 #endif
@@ -594,7 +372,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     assert(at <= STR_LEN(s));
 
     if (Is_Definitely_Ascii(s)) {  // can't have any false positives
-        assert(not LINK(s).bookmarks);  // mutations must ensure this
+        assert(not LINK(Bookmarks, s));  // mutations must ensure this
         return cast(REBCHR(*), cast(REBYTE*, STR_HEAD(s)) + at);
     }
 
@@ -602,8 +380,8 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     REBLEN index;
 
     REBBMK *bookmark = nullptr;  // updated at end if not nulled out
-    if (not IS_STR_SYMBOL(s))
-        bookmark = LINK(s).bookmarks;
+    if (IS_NONSYMBOL_STRING(s))
+        bookmark = LINK(Bookmarks, s);
 
   #if defined(DEBUG_SPORADICALLY_DROP_BOOKMARKS)
     if (bookmark and SPORADICALLY(100)) {
@@ -621,29 +399,31 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
 
     if (at < len / 2) {
         if (len < sizeof(REBVAL)) {
-            if (not IS_STR_SYMBOL(s))
+            if (IS_NONSYMBOL_STRING(s))
                 assert(
-                    GET_SERIES_FLAG(s, ALWAYS_DYNAMIC)  // e.g. mold buffer
+                    GET_SERIES_FLAG(s, DYNAMIC)  // e.g. mold buffer
                     or not bookmark  // mutations must ensure this
                 );
             goto scan_from_head;  // good locality, avoid bookmark logic
         }
-        if (not bookmark and not IS_STR_SYMBOL(s)) {
-            LINK(s).bookmarks = bookmark = Alloc_Bookmark();
+        if (not bookmark and IS_NONSYMBOL_STRING(s)) {
+            bookmark = Alloc_Bookmark();
+            mutable_LINK(Bookmarks, m_cast(REBSTR*, s)) = bookmark;
             goto scan_from_head;  // will fill in bookmark
         }
     }
     else {
         if (len < sizeof(REBVAL)) {
-            if (not IS_STR_SYMBOL(s))
+            if (IS_NONSYMBOL_STRING(s))
                 assert(
                     not bookmark  // mutations must ensure this usually but...
-                    or GET_SERIES_FLAG(s, ALWAYS_DYNAMIC)  // !!! mold buffer?
+                    or GET_SERIES_FLAG(s, DYNAMIC)  // !!! mold buffer?
                 );
             goto scan_from_tail;  // good locality, avoid bookmark logic
         }
-        if (not bookmark and not IS_STR_SYMBOL(s)) {
-            LINK(s).bookmarks = bookmark = Alloc_Bookmark();
+        if (not bookmark and IS_NONSYMBOL_STRING(s)) {
+            bookmark = Alloc_Bookmark();
+            mutable_LINK(Bookmarks, m_cast(REBSTR*, s)) = bookmark;
             goto scan_from_tail;  // will fill in bookmark
         }
     }
@@ -654,7 +434,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     // track the last access--which speeds up the most common case of an
     // iteration.  Improve as time permits!
     //
-    assert(not bookmark or not LINK(bookmark).bookmarks);  // only one for now
+    assert(not bookmark or SER_USED(bookmark) == 1);  // only one
 
   blockscope {
     REBLEN booked = BMK_INDEX(bookmark);
@@ -678,7 +458,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     }
 
     index = booked;
-    cp = cast(REBCHR(*), SER_DATA(SER(s)) + BMK_OFFSET(bookmark)); }
+    cp = cast(REBCHR(*), SER_DATA(s) + BMK_OFFSET(bookmark)); }
 
     if (index > at) {
       #ifdef DEBUG_TRACE_BOOKMARKS
@@ -751,9 +531,13 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
       { return STR_AT(m_cast(REBSTR*, s), at); }
 #endif
 
+inline static const REBSYM *VAL_WORD_SYMBOL(REBCEL(const*) v);
+
 inline static const REBSTR *VAL_STRING(REBCEL(const*) v) {
-    assert(ANY_STRING_KIND(CELL_HEART(v)) or ANY_WORD_KIND(CELL_HEART(v)));
-    return STR(VAL_NODE(v));  // VAL_SERIES() would assert
+    if (ANY_STRING_KIND(CELL_HEART(v)))
+        return STR(VAL_NODE1(v));  // VAL_SERIES() would assert
+
+    return VAL_WORD_SYMBOL(v);  // asserts ANY_WORD_KIND() for heart
 }
 
 #define VAL_STRING_ENSURE_MUTABLE(v) \
@@ -767,7 +551,7 @@ inline static const REBSTR *VAL_STRING(REBCEL(const*) v) {
 //
 inline static REBLEN VAL_LEN_HEAD(REBCEL(const*) v) {
     const REBSER *s = VAL_SERIES(v);
-    if (GET_SERIES_FLAG(s, IS_STRING) and CELL_KIND(v) != REB_BINARY)
+    if (IS_SER_UTF8(s) and CELL_KIND(v) != REB_BINARY)
         return STR_LEN(STR(s));
     return SER_USED(s);
 }
@@ -818,7 +602,7 @@ inline static REBCHR(const*) VAL_STRING_TAIL(REBCEL(const*) v) {
 
 
 inline static REBSIZ VAL_SIZE_LIMIT_AT(
-    REBLEN *length, // length in chars to end (including limit)
+    option(REBLEN*) length_out,  // length in chars to end (including limit)
     REBCEL(const*) v,
     REBLEN limit  // UNLIMITED (e.g. a very large number) for no limit
 ){
@@ -829,13 +613,13 @@ inline static REBSIZ VAL_SIZE_LIMIT_AT(
 
     REBLEN len_at = VAL_LEN_AT(v);
     if (limit >= len_at) {
-        if (length != nullptr)
-            *length = len_at;
+        if (length_out)
+            *unwrap(length_out) = len_at;
         tail = VAL_STRING_TAIL(v);  // byte count known (fast)
     }
     else {
-        if (length != nullptr)
-            *length = limit;
+        if (length_out)
+            *unwrap(length_out) = limit;
         tail = at;
         for (; limit > 0; --limit)
             tail = NEXT_STR(tail);
@@ -845,7 +629,7 @@ inline static REBSIZ VAL_SIZE_LIMIT_AT(
 }
 
 #define VAL_SIZE_AT(v) \
-    VAL_SIZE_LIMIT_AT(NULL, v, UNLIMITED)
+    VAL_SIZE_LIMIT_AT(nullptr, v, UNLIMITED)
 
 inline static REBSIZ VAL_OFFSET(const RELVAL *v) {
     return VAL_STRING_AT(v) - STR_HEAD(VAL_STRING(v));
@@ -903,7 +687,7 @@ inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
     REBLEN len = STR_LEN(s);
   #endif
 
-    assert(not IS_STR_SYMBOL(s));
+    assert(IS_NONSYMBOL_STRING(s));
     assert(n < STR_LEN(s));
 
     REBCHR(*) cp = STR_AT(s, n);
@@ -926,10 +710,10 @@ inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
                 STR_TAIL(s) - old_next_cp
             );
 
-            SET_SERIES_USED(SER(s), SER_USED(SER(s)) + delta);
+            SET_SERIES_USED(s, SER_USED(s) + delta);
         }
         else {
-            EXPAND_SERIES_TAIL(SER(s), delta);  // this adds to SERIES_USED
+            EXPAND_SERIES_TAIL(s, delta);  // this adds to SERIES_USED
             cp = cast(REBCHR(*),  // refresh `cp` (may've reallocated!)
                 cast(REBYTE*, STR_HEAD(s)) + cp_offset
             );
@@ -947,17 +731,17 @@ inline static void SET_CHAR_AT(REBSTR *s, REBLEN n, REBUNI c) {
         // dealing with.  Only update bookmark if it's an offset *after*
         // that character position...
         //
-        REBBMK *book = LINK(s).bookmarks;
+        REBBMK *book = LINK(Bookmarks, s);
         if (book and BMK_OFFSET(book) > cp_offset)
             BMK_OFFSET(book) += delta;
     }
 
   #ifdef DEBUG_UTF8_EVERYWHERE  // see note on `len` at start of function
-    MISC(SER(s)).length = len;
+    s->misc.length = len;
   #endif
 
     Encode_UTF8_Char(cp, c, size);
-    ASSERT_SERIES_TERM(SER(s));
+    ASSERT_SERIES_TERM_IF_NEEDED(s);
 }
 
 inline static REBLEN Num_Codepoints_For_Bytes(
@@ -1000,7 +784,7 @@ inline static REBVAL *Init_Any_String_At(
         const REBSTR *str,
         REBLEN index
     ){
-        return Init_Any_Series_At_Core(out, kind, SER(str), index, UNBOUND);
+        return Init_Any_Series_At_Core(out, kind, str, index, UNBOUND);
     }
 #endif
 
@@ -1032,10 +816,16 @@ inline static REBSTR *Make_Sized_String_UTF8(const char *utf8, size_t size) {
 }
 
 
+//=//// GLOBAL STRING CONSTANTS //////////////////////////////////////////=//
+
+#define EMPTY_TEXT \
+    Root_Empty_Text
+
+
 //=//// REBSTR HASHING ////////////////////////////////////////////////////=//
 
 inline static REBINT Hash_String(const REBSTR *str)
-    { return Hash_UTF8(STR_HEAD(str), STR_SIZE(str)); }
+    { return Hash_UTF8_Caseless(STR_HEAD(str), STR_LEN(str)); }
 
 inline static REBINT First_Hash_Candidate_Slot(
     REBLEN *skip_out,
@@ -1054,12 +844,18 @@ inline static REBINT First_Hash_Candidate_Slot(
 #define Copy_String_At(v) \
     Copy_String_At_Limit((v), -1)
 
-inline static REBSER *Copy_Series_At_Len(
+inline static REBSER *Copy_Binary_At_Len(
     const REBSER *s,
     REBLEN index,
     REBLEN len
 ){
-    return Copy_Series_At_Len_Extra(s, index, len, 0);
+    return Copy_Series_At_Len_Extra(
+        s,
+        index,
+        len,
+        0,
+        FLAG_FLAVOR(BINARY) | SERIES_FLAGS_NONE
+    );
 }
 
 

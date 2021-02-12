@@ -41,15 +41,15 @@
 #define MAX_BITSET 0x7fffffff
 
 inline static bool BITS_NOT(const REBSER *s)
-  { return MISC(s).negated; }
+  { return s->misc.negated; }
 
 inline static void INIT_BITS_NOT(REBSER *s, bool negated)
-  { MISC(s).negated = negated; }
+  { s->misc.negated = negated; }
 
 
 inline static REBBIN *VAL_BITSET(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_BITSET);
-    return SER(VAL_NODE(v));
+    return BIN(VAL_NODE1(v));
 }
 
 #define VAL_BITSET_ENSURE_MUTABLE(v) \
@@ -58,7 +58,7 @@ inline static REBBIN *VAL_BITSET(REBCEL(const*) v) {
 inline static REBVAL *Init_Bitset(RELVAL *out, REBBIN *bits) {
     RESET_CELL(out, REB_BITSET, CELL_FLAG_FIRST_IS_NODE);
     ASSERT_SERIES_MANAGED(bits);
-    INIT_VAL_NODE(out, bits);
+    INIT_VAL_NODE1(out, bits);
     return cast(REBVAL*, out);
 }
 

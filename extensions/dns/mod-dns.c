@@ -69,12 +69,12 @@ static REB_R DNS_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     REBCTX *ctx = VAL_CONTEXT(port);
     REBVAL *spec = CTX_VAR(ctx, STD_PORT_SPEC);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // covered by `port`
 
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -126,7 +126,7 @@ static REB_R DNS_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             rebEND);  // W3C says non-IP hosts can't end with number in tuple
             if (tuple) {
                 if (rebDidQ("integer? last", tuple, rebEND)) {
-                    Move_Value(host, tuple);
+                    Copy_Cell(host, tuple);
                     rebRelease(tuple);
                     goto reverse_lookup;
                 }
@@ -154,18 +154,18 @@ static REB_R DNS_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
           case NO_RECOVERY:
             rebJumps(
-                "FAIL {A nonrecoverable name server error occurred}",
+                "fail {A nonrecoverable name server error occurred}",
                 rebEND
             );
 
           case TRY_AGAIN:
             rebJumps(
-                "FAIL {Temporary error on authoritative name server}",
+                "fail {Temporary error on authoritative name server}",
                 rebEND
             );
 
           default:
-            rebJumps("FAIL {Unknown host error}", rebEND);
+            rebJumps("fail {Unknown host error}", rebEND);
         } }
 
       case SYM_OPEN: {

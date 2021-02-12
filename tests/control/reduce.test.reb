@@ -11,7 +11,7 @@
 [#1760 ; unwind functions should stop evaluation
     (null? loop 1 [reduce [break]])
 ]
-(void? loop 1 [reduce [continue]])
+(null-2? loop 1 [reduce [continue]])
 (1 = catch [reduce [throw 1]])
 ([a 1] = catch/name [reduce [throw/name 1 'a]] 'a)
 (1 = reeval func [] [reduce [return 1 2] 2])
@@ -45,9 +45,22 @@
 
 ; === PREDICATES ===
 ;
-; Predicates influence the handling of NULLs, which error by default.
+; Predicates influence the handling of NULLs, which vaporize by default.
 
-('need-non-null = (trap [reduce [null]])/id)
+([] = reduce [null])
+
+; There was a bug pertaining to trying to set the new line flag on the output
+; in the case of a non-existent null, test that.
+[
+    ([] = reduce [
+        null
+    ])
+    ([] = reduce .identity [
+        null
+    ])
+]
+
+(error? trap [reduce .non.null [null]])
 
 ([3 _ 300] = reduce .try [1 + 2 if false [10 + 20] 100 + 200])
 ([3 ~nulled~ 300] = reduce .voidify [1 + 2 if false [10 + 20] 100 + 200])

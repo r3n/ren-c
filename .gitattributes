@@ -1,19 +1,14 @@
-# Custom for Visual Studio
-*.cs     diff=csharp
-*.sln    merge=union
-*.csproj merge=union
-*.vbproj merge=union
-*.fsproj merge=union
-*.dbproj merge=union
-
-# Standard to msysgit
-*.doc	 diff=astextplain
-*.DOC	 diff=astextplain
-*.docx diff=astextplain
-*.DOCX diff=astextplain
-*.dot  diff=astextplain
-*.DOT  diff=astextplain
-*.pdf  diff=astextplain
-*.PDF	 diff=astextplain
-*.rtf	 diff=astextplain
-*.RTF	 diff=astextplain
+# Disable Syntax Highlighting for Rebol Files
+#
+# While some subtle highlighting schemes can be beneficial by calling attention
+# to the lexical types (e.g. making SET-WORD!  show up in bold), the highlight
+# of "keywords" in the Linguist handling of Rebol code is against the very
+# principle of the language.  It also turns refinements pink, which is very
+# jarring and impedes readability. 
+#
+# Unfortunately, color schemes can't be adjusted.  So the only viable option is
+# to disable syntax highlighting entirely.
+#
+*.r linguist-language=text
+*.reb linguist-language=text
+*.test.reb linguist-language=text

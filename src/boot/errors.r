@@ -84,6 +84,8 @@ Script: [
     no-relative:        [:arg1 {word is bound relative to context not on stack}]
     not-in-context:     [:arg1 {is not in the specified context}]
 
+    void-evaluation:    "VOID! cells cannot be evaluated (use `var: '~void~`)"
+
     assertion-failure:  [{assertion failure:} :arg1]
 
     bad-utf8:           {invalid UTF-8 byte sequence found during decoding}
@@ -168,8 +170,7 @@ Script: [
 
     no-refine:          [:arg1 {has no refinement called} :arg2]
     bad-refines:        {incompatible or invalid refinements}
-    bad-refine:         [{incompatible or duplicate refinement:} :arg1]
-    non-logic-refine:   [:arg1 {refinement must be LOGIC!, not} :arg2]
+    bad-parameter:      [{incompatible or duplicate parameter:} :arg1]
 
     legacy-refinement:  [
                             {Refinements now act as their own args.  See}
@@ -231,6 +232,7 @@ Script: [
 
     frame-already-used: [{Frame currently in use by a function call} :arg1]
     frame-not-on-stack: {Frame is no longer running on the stack}
+    stale-frame:        {Original FRAME! can't be reused/viewed after invoking}
 
     varargs-no-stack:   {Call originating VARARGS! has finished running}
     varargs-make-only:  {MAKE *shared* BLOCK! supported on VARARGS! (not TO)}

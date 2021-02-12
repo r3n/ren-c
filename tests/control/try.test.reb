@@ -37,11 +37,11 @@
 
 ; ENTRAP (similar to TRAP, but puts normal result in a block)
 
-(void? first entrap [])
-(null? entrap [null])
+(null-2? entrap [])
+(null-2? entrap [null])
 ([3] = entrap [1 + 2])
 ([[b c]] = entrap [skip [a b c] 1])
-('no-arg = (entrap [lit])/id)
+('no-arg = (entrap [just])/id)
 
 
 ; Multiple return values

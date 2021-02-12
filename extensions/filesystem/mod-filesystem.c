@@ -276,10 +276,14 @@ void Mold_File_To_Local(REB_MOLD *mo, const RELVAL *file, REBFLGS flags) {
             if (c == '.') {
                 up = NEXT_CHR(&c, up);
                 ++i;
-                assert(c != '\0' || i == len);
 
-                if (c == '\0' || c == '/')
-                    continue; // . or ./ mean stay in same directory
+                if (c == '\0') {
+                    assert(i == len);
+                    break;  // %xxx/. means stay in the same directory
+                }
+
+                if (c == '/')
+                    continue; // %xxx/./yyy has ./ mean stay in same directory
 
                 if (c != '.') {
                     //
@@ -366,7 +370,7 @@ void Mold_File_To_Local(REB_MOLD *mo, const RELVAL *file, REBFLGS flags) {
             REBLEN n = STR_SIZE(mo->series);
             if (
                 n > mo->offset
-                and *BIN_AT(SER(mo->series), n - 1) == OS_DIR_SEP
+                and *BIN_AT(mo->series, n - 1) == OS_DIR_SEP
             ){
                 // Collapse multiple sequential slashes into just one, by
                 // skipping to the next character without adding to mold.
@@ -402,7 +406,7 @@ void Mold_File_To_Local(REB_MOLD *mo, const RELVAL *file, REBFLGS flags) {
     //
     if (flags & REB_FILETOLOCAL_NO_TAIL_SLASH) {
         REBSIZ n = STR_SIZE(mo->series);
-        if (n > mo->offset and *BIN_AT(SER(mo->series), n - 1) == OS_DIR_SEP)
+        if (n > mo->offset and *BIN_AT(mo->series, n - 1) == OS_DIR_SEP)
             TERM_STR_LEN_SIZE(mo->series, STR_LEN(mo->series) - 1, n - 1);
     }
 
@@ -531,7 +535,7 @@ REBNATIVE(what_dir)
         // reconsider the duplication.
 
         REBVAL *refresh = Get_Current_Dir_Value();
-        Move_Value(current_path, refresh);
+        Copy_Cell(current_path, refresh);
         rebRelease(refresh);
     }
     else if (not IS_URL(current_path)) {
@@ -571,15 +575,13 @@ REBNATIVE(change_dir)
     else {
         assert(IS_FILE(arg));
 
-        Check_Security_Placeholder(Canon(SYM_FILE), SYM_EXEC, arg);
-
         bool success = Set_Current_Dir_Value(arg);
 
         if (not success)
             fail (PAR(path));
     }
 
-    Move_Value(current_path, arg);
+    Copy_Cell(current_path, arg);
 
     RETURN (ARG(path));
 }

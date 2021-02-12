@@ -70,7 +70,7 @@ static void Query_Net(REBVAL *out, REBVAL *port, struct devreq_net *sock)
         sock->remote_port
     );
 
-    Move_Value(out, info);
+    Copy_Cell(out, info);
     rebRelease(info);
 }
 
@@ -114,12 +114,12 @@ static REB_R Transport_Actor(
         //
         // Actions for an unopened socket
         //
-        switch (VAL_WORD_SYM(verb)) {
+        switch (VAL_WORD_ID(verb)) {
           case SYM_REFLECT: {
             INCLUDE_PARAMS_OF_REFLECT;
 
             UNUSED(ARG(value));  // covered by `port`
-            REBSYM property = VAL_WORD_SYM(ARG(property));
+            SYMID property = VAL_WORD_ID(ARG(property));
             assert(property != SYM_0);
 
             switch (property) {
@@ -174,7 +174,7 @@ static REB_R Transport_Actor(
 
                 assert(l_result != nullptr);
                 if (rebDid("error?", l_result, rebEND))
-                    rebJumps("FAIL", l_result, rebEND);
+                    rebJumps("fail", l_result, rebEND);
                 rebRelease(l_result); // ignore result
 
                 RETURN (port);
@@ -216,12 +216,12 @@ static REB_R Transport_Actor(
 
   open_socket_actions:
 
-    switch (VAL_WORD_SYM(verb)) { // Ordered by frequency
+    switch (VAL_WORD_ID(verb)) { // Ordered by frequency
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // covered by `port`
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -260,7 +260,7 @@ static REB_R Transport_Actor(
             // and could not keep the BINARY! up to date).  Ren-C tries to
             // operate with the binary in a valid state after every change.
             //
-            ASSERT_SERIES_TERM(VAL_BINARY(port_data));
+            ASSERT_SERIES_TERM_IF_NEEDED(VAL_BINARY(port_data));
         }
         else if (req->command == RDC_WRITE) {
             //
@@ -360,7 +360,7 @@ static REB_R Transport_Actor(
         }
         else {
             if (rebDid("error?", result, rebEND))
-                rebJumps("FAIL", result, rebEND);
+                rebJumps("fail", result, rebEND);
 
             // a note said "recv CAN happen immediately"
             //
@@ -429,7 +429,7 @@ static REB_R Transport_Actor(
         }
         else {
             if (rebDid("error?", result, rebEND))
-                rebJumps("FAIL", result, rebEND);
+                rebJumps("fail", result, rebEND);
 
             // Note here said "send CAN happen immediately"
             //
@@ -484,7 +484,7 @@ static REB_R Transport_Actor(
         }
         else {
             if (rebDid("error?", result, rebEND))
-                rebJumps("lib/FAIL", result, rebEND);
+                rebJumps("lib/fail", result, rebEND);
 
             // This can happen with UDP, which is connectionless so it
             // returns DR_DONE.
@@ -604,7 +604,7 @@ REBNATIVE(set_udp_multicast)
 
     struct rebol_devreq *req = Req(sock);
     if (not (req->modes & RST_UDP)) // !!! other checks?
-        rebJumps("FAIL {SET-UDP-MULTICAST used on non-UDP port}", rebEND);
+        rebJumps("fail {SET-UDP-MULTICAST used on non-UDP port}", rebEND);
 
     struct ip_mreq mreq;
     Get_Tuple_Bytes(&mreq.imr_multiaddr.s_addr, ARG(group), 4);
@@ -647,7 +647,7 @@ REBNATIVE(set_udp_ttl)
     struct rebol_devreq *req = Req(sock);
 
     if (not (req->modes & RST_UDP)) // !!! other checks?
-        rebJumps("FAIL {SET-UDP-TTL used on non-UDP port}", rebEND);
+        rebJumps("fail {SET-UDP-TTL used on non-UDP port}", rebEND);
 
     int ttl = VAL_INT32(ARG(ttl));
     int result = setsockopt(

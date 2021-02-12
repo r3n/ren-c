@@ -312,7 +312,7 @@ check-response: function [port] [
         ]
         remove/part conn/data d2
         state/mode: 'reading-data
-        if lit (txt) <> last body-of :net-log [ ; net-log is in active state
+        if '(txt) <> last body-of :net-log [ ; net-log is in active state
             print "Dumping Webserver headers and body"
             net-log/S info
             trap [
@@ -583,6 +583,13 @@ check-data: function [
                 ; forming a hex string.  DEBASE to get a BINARY! and then
                 ; DEBIN to get an integer.
                 ;
+                ; It's not guaranteed that the chunk size is an even number
+                ; of hex digits!  If it's not, insert a 0, since DEBASE 16
+                ; would reject it otherwise.
+                ;
+                if odd? length of chunk-size [
+                    insert chunk-size #0
+                ]
                 chunk-size: debin [be +] (debase/base as text! chunk-size 16)
 
                 if chunk-size = 0 [
@@ -591,8 +598,8 @@ check-data: function [
                             |
                         copy trailer to crlf2bin to end
                     ] then [
-                        trailer: construct/only trailer
-                        append headers body-of trailer
+                        trailer: scan-net-header as binary! trailer
+                        append headers trailer
                         state/mode: 'ready
                         res: state/awake make event! [
                             type: 'custom
@@ -608,7 +615,7 @@ check-data: function [
                         break
                     ]
 
-                    insert/part tail of out mk1 mk2
+                    append/part out mk1 ((index of mk2) - (index of mk1))
                     remove/part data skip mk2 2
                     empty? data
                 ]
@@ -761,7 +768,7 @@ sys/make-scheme [
             ]
             port/state/connection: conn: make port! compose [
                 scheme: (
-                    either port/spec/scheme = 'http [lit 'tcp][lit 'tls]
+                    either port/spec/scheme = 'http [just 'tcp][just 'tls]
                 )
                 host: port/spec/host
                 port-id: port/spec/port-id
@@ -806,7 +813,7 @@ sys/make-scheme [
                 port/state
             ]
             then [
-                reduce bind [name size date] port/state/info
+                reduce in port/state/info [name size date]
             ]
             else [
                 copy port/data  ; may be BLANK!, returns null

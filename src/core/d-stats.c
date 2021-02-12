@@ -34,7 +34,7 @@
 //
 //  {Provides status and statistics information about the interpreter.}
 //
-//      return: [<opt> time! integer!]
+//      return: [<opt> time! integer! object!]
 //      /show "Print formatted results to console"
 //      /profile "Returns profiler object"
 //      /evals "Number of values evaluated by interpreter"
@@ -46,66 +46,30 @@ REBNATIVE(stats)
 {
     INCLUDE_PARAMS_OF_STATS;
 
-    if (REF(evals)) {
-        REBI64 n = Eval_Cycles + Eval_Dose - Eval_Count;
-        return Init_Integer(D_OUT, n);
-    }
+    REBI64 num_evals = Eval_Cycles + Eval_Dose - Eval_Count;
 
-#ifdef NDEBUG
-    UNUSED(REF(show));
-    UNUSED(REF(profile));
-    UNUSED(ARG(pool));
+    if (REF(evals))
+        return Init_Integer(D_OUT, num_evals);
 
-    fail (Error_Debug_Only_Raw());
-#else
     if (REF(profile)) {
-        REBVAL *obj = rebValue("make object! [",
-            "evals:",
-            "eval-actions:",
-            "series-made:",
-            "series-freed:",
-            "series-expanded:",
-            "series-bytes:",
-            "series-recycled:",
-            "made-blocks:",
-            "made-objects:",
-            "recycles:",
-                "_",
+      #if defined(DEBUG_COLLECT_STATS)
+        return rebValue("make object! [",
+            "evals:", rebI(num_evals),
+            "series-made:", rebI(PG_Reb_Stats->Series_Made),
+            "series-freed:", rebI(PG_Reb_Stats->Series_Freed),
+            "series-expanded:", rebI(PG_Reb_Stats->Series_Expanded),
+            "series-bytes:", rebI(PG_Reb_Stats->Series_Memory),
+            "series-recycled:", rebI(PG_Reb_Stats->Recycle_Series_Total),
+            "made-blocks:", rebI(PG_Reb_Stats->Blocks),
+            "made-objects:", rebI(PG_Reb_Stats->Objects),
+            "recycles:", rebI(PG_Reb_Stats->Recycle_Counter),
         "]", rebEND);
-
-        Move_Value(D_OUT, obj);
-        rebRelease(obj);
-
-        if (IS_OBJECT(D_OUT)) {
-            REBVAL *stats = VAL_CONTEXT_VAR(D_OUT, 1);
-
-            Init_Integer(stats, Eval_Cycles + Eval_Dose - Eval_Count);
-            stats++;
-            Init_Integer(stats, 0); // no such thing as natives, only functions
-
-            stats++;
-            Init_Integer(stats, PG_Reb_Stats->Series_Made);
-            stats++;
-            Init_Integer(stats, PG_Reb_Stats->Series_Freed);
-            stats++;
-            Init_Integer(stats, PG_Reb_Stats->Series_Expanded);
-            stats++;
-            Init_Integer(stats, PG_Reb_Stats->Series_Memory);
-            stats++;
-            Init_Integer(stats, PG_Reb_Stats->Recycle_Series_Total);
-
-            stats++;
-            Init_Integer(stats, PG_Reb_Stats->Blocks);
-            stats++;
-            Init_Integer(stats, PG_Reb_Stats->Objects);
-
-            stats++;
-            Init_Integer(stats, PG_Reb_Stats->Recycle_Counter);
-        }
-
-        return D_OUT;
+      #else
+        fail (Error_Debug_Only_Raw());
+      #endif
     }
 
+  #if !defined(NDEBUG)
     if (REF(pool)) {
         REBVAL *pool_id = ARG(pool);
         Dump_Series_In_Pool(VAL_INT32(pool_id));
@@ -116,7 +80,12 @@ REBNATIVE(stats)
         Dump_Pools();
 
     return Init_Integer(D_OUT, Inspect_Series(did REF(show)));
-#endif
+  #else
+    UNUSED(REF(show));
+    UNUSED(ARG(pool));
+
+    fail (Error_Debug_Only_Raw());
+  #endif
 }
 
 
@@ -155,7 +124,7 @@ REBNATIVE(callgrind)
     INCLUDE_PARAMS_OF_CALLGRIND;
 
   #if defined(INCLUDE_CALLGRIND_NATIVE)
-    switch (VAL_WORD_SYM(ARG(instruction))) {
+    switch (VAL_WORD_ID(ARG(instruction))) {
       case SYM_ON:
         PG_Callgrind_On = true;
         CALLGRIND_START_INSTRUMENTATION;

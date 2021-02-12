@@ -46,8 +46,8 @@
 #include "sys-core.h"
 
 enum {
-    IDX_ADAPTER_PRELUDE = 0,  // Relativized block to run before Adaptee
-    IDX_ADAPTER_ADAPTEE = 1,  // The ACTION! being adapted
+    IDX_ADAPTER_PRELUDE = 1,  // Relativized block to run before Adaptee
+    IDX_ADAPTER_ADAPTEE,  // The ACTION! being adapted
     IDX_ADAPTER_MAX
 };
 
@@ -73,27 +73,27 @@ REB_R Adapter_Dispatcher(REBFRM *f)
 
     REBVAL *discarded = FRM_SPARE(f);
 
-    assert(IDX_ADAPTER_PRELUDE == 0);  // same location as interpreted bodies
+    assert(IDX_ADAPTER_PRELUDE == IDX_DETAILS_1);  // same as interpreted body
 
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, discarded, f)) {
-        Move_Value(f->out, discarded);
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, discarded, f)) {
+        Move_Cell(f->out, discarded);
         return R_THROWN;
     }
 
     if (returned) {
         if (IS_ENDISH_NULLED(discarded))
             return f->out;
-        return Move_Value(f->out, discarded);
+        return Move_Cell(f->out, discarded);
     }
 
     // The second thing to do is update the phase and binding to run the
     // function that is being adapted, and pass it to the evaluator to redo.
 
-    REBVAL* adaptee = SPECIFIC(ARR_AT(details, IDX_ADAPTER_ADAPTEE));
+    REBVAL* adaptee = DETAILS_AT(details, IDX_ADAPTER_ADAPTEE);
 
     INIT_FRM_PHASE(f, VAL_ACTION(adaptee));
-    FRM_BINDING(f) = VAL_BINDING(adaptee);
+    INIT_FRM_BINDING(f, VAL_ACTION_BINDING(adaptee));
 
     return R_REDO_CHECKED;  // the redo will use the updated phase & binding
 }
@@ -105,7 +105,7 @@ REB_R Adapter_Dispatcher(REBFRM *f)
 //  {Create a variant of an ACTION! that preprocesses its arguments}
 //
 //      return: [action!]
-//      adaptee "Function to be run after the prelude is complete"
+//      action "Function to be run after the prelude is complete"
 //          [action!]
 //      prelude "Code to run in constructed frame before adaptee runs"
 //          [block!]
@@ -115,44 +115,27 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
 {
     INCLUDE_PARAMS_OF_ADAPT_P;
 
-    REBVAL *adaptee = ARG(adaptee);
+    REBVAL *adaptee = ARG(action);
 
-    REBARR *paramlist = Copy_Array_Shallow_Flags(
-        VAL_ACT_PARAMLIST(adaptee),  // same interface as head of pipeline
-        SPECIFIED,
-        SERIES_MASK_PARAMLIST
-            | (SER(VAL_ACTION(adaptee))->header.bits & PARAMLIST_MASK_INHERIT)
-            | NODE_FLAG_MANAGED
-    );
-    Sync_Paramlist_Archetype(paramlist);  // [0] cell must hold copied pointer
-    MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
-
-    // Don't allow the adapted code access to the locals.
-    //
-    RELVAL *param = ARR_AT(paramlist, 1);
-    for (; NOT_END(param); ++param)
-        if (Is_Param_Hidden(param))
-            Seal_Param(param);
-
-    REBACT *underlying = ACT_UNDERLYING(VAL_ACTION(adaptee));
+    // !!! There was code here which would hide it so adapted code had no
+    // access to the locals.  That requires creating a new paramlist.  Is
+    // there a better way to do that with phasing?
 
     REBACT *adaptation = Make_Action(
-        paramlist,
+        ACT_SPECIALTY(VAL_ACTION(adaptee)),  // reuse partials/exemplar/etc.
         &Adapter_Dispatcher,
-        underlying,  // same underlying as adaptee
-        ACT_EXEMPLAR(VAL_ACTION(adaptee)),  // same exemplar as adaptee
         IDX_ADAPTER_MAX  // details array capacity => [prelude, adaptee]
     );
 
-    // !!! In a future branch it may be possible that specific binding allows
-    // a read-only input to be "viewed" with a relative binding, and no copy
-    // would need be made if input was R/O.  For now, we copy to relativize.
+    // !!! As with FUNC, we copy and bind the block the user gives us.  This
+    // means we will not see updates to it.  So long as we are copying it,
+    // we might as well mutably bind it--there's no incentive to virtual
+    // bind things that are copied.
     //
     REBARR *prelude = Copy_And_Bind_Relative_Deep_Managed(
         ARG(prelude),
-        paramlist,
-        TS_WORD,
-        false  // do not gather LETs
+        adaptation,
+        TS_WORD
     );
 
     // We can't use a simple Init_Block() here, because the prelude has been
@@ -163,10 +146,10 @@ REBNATIVE(adapt_p)  // see extended definition ADAPT in %base-defs.r
     REBARR *details = ACT_DETAILS(adaptation);
     Init_Relative_Block(
         ARR_AT(details, IDX_ADAPTER_PRELUDE),
-        underlying,
+        adaptation,
         prelude
     );
-    Move_Value(ARR_AT(details, IDX_ADAPTER_ADAPTEE), adaptee);
+    Copy_Cell(ARR_AT(details, IDX_ADAPTER_ADAPTEE), adaptee);
 
     return Init_Action(D_OUT, adaptation, VAL_ACTION_LABEL(adaptee), UNBOUND);
 }

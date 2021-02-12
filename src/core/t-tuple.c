@@ -35,18 +35,18 @@
 REB_R MAKE_Sequence(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     if (kind == REB_TEXT or ANY_PATH_KIND(kind))  // delegate for now
-        return MAKE_Path(out, kind, opt_parent, arg);
+        return MAKE_Path(out, kind, parent, arg);
 
     assert(kind == REB_TUPLE);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_TUPLE(arg))
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
     // !!! Net lookup parses IP addresses out of `tcp://93.184.216.34` or
     // similar URL!s.  In Rebol3 these captures come back the same type
@@ -103,12 +103,13 @@ REB_R MAKE_Sequence(
         REBLEN len = 0;
         REBINT n;
 
-        const RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, arg);
 
         REBYTE buf[MAX_TUPLE];
         REBYTE *vp = buf;
 
-        for (; NOT_END(item); ++item, ++vp, ++len) {
+        for (; item != tail; ++item, ++vp, ++len) {
             if (len >= MAX_TUPLE)
                 goto bad_make;
             if (IS_INTEGER(item)) {
@@ -191,7 +192,7 @@ REBTYPE(Sequence)
     UNUSED(all_byte_sized_ints);
     REBYTE *vp = buf;
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     // !!! This used to depend on "IS_BINARY_ACT", a concept that does not
     // exist any longer with symbol-based action dispatch.  Patch with more
@@ -246,7 +247,7 @@ REBTYPE(Sequence)
             if (ap)
                 a = (REBINT) *ap++;
 
-            switch (VAL_WORD_SYM(verb)) {
+            switch (VAL_WORD_ID(verb)) {
             case SYM_ADD: v += a; break;
 
             case SYM_SUBTRACT: v -= a; break;
@@ -350,7 +351,7 @@ REBTYPE(Sequence)
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));
 
-        switch (VAL_WORD_SYM(ARG(property))) {
+        switch (VAL_WORD_ID(ARG(property))) {
           case SYM_LENGTH:
             return Init_Integer(D_OUT, VAL_SEQUENCE_LEN(sequence));
 
@@ -369,8 +370,8 @@ REBTYPE(Sequence)
             HEART_BYTE(sequence) == REB_WORD
             or HEART_BYTE(sequence) == REB_ISSUE
         ){
-            assert(VAL_WORD_SYM(sequence) == SYM__SLASH_1_);
-            return Move_Value(frame_->out, sequence);
+            assert(VAL_WORD_ID(sequence) == SYM__SLASH_1_);
+            return Copy_Cell(frame_->out, sequence);
         }
 
         assert(HEART_BYTE(sequence) == REB_BLOCK);
@@ -425,9 +426,9 @@ REBTYPE(Sequence)
 REB_R PD_Sequence(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval)
+    if (setval)
         fail ("PATH!s are immutable (convert to GROUP! or BLOCK! to mutate)");
 
     REBINT n;

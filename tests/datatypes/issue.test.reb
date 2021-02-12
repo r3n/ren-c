@@ -48,7 +48,7 @@
         case [
             issue? x [
                 assert [1 = length of as text! x]
-                assert [x = as issue! load mold x]
+                assert [x = as issue! load-value mold x]
             ]
             text? x [
                 id: (match error! trap [load x])/id

@@ -1,7 +1,6 @@
 ![Ren-C Logo][100]
 
 # Ren-C
-[![Build Status][101]](https://travis-ci.com/github/metaeducation/ren-c)
 
 [**Ren-C**][1] is a *deeply* redesigned [LGPL 3.0-licensed][2] derivative of
 the [Rebol 3][3] [codebase][4].  It explores solutions to some of the Rebol
@@ -164,4 +163,3 @@ can easily help contribute to enhancing it.
 
 
 [100]: https://raw.githubusercontent.com/metaeducation/ren-c/master/docs/ren-c-logo.png
-[101]: https://travis-ci.com/metaeducation/ren-c.svg?branch=master

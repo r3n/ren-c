@@ -19,9 +19,9 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// In Ren-C, any value can be "quote" escaped, any number of times.  As there
-// is no limit to how many levels of escaping there can be, the general case
-// of the escaping cannot fit in a value cell, so a "pairing" array is used.
+// In Ren-C, any value can be "quote" escaped, any number of times.  The
+// general case for adding information that it is escaped--as well as the
+// amount it is escaped by--can't fit in a cell.  So a "pairing" array is used
 // (a compact form with only a series tracking node, sizeof(REBVAL)*2).  This
 // is the smallest size of a GC'able entity--the same size as a singular
 // array, but a pairing is used so the GC picks up from a cell pointer that
@@ -33,8 +33,8 @@
 // just has a different count.
 //
 // HOWEVER... there is an efficiency trick, which uses the KIND3Q_BYTE() div 4
-// as the "lit level" of a value.  Then the byte mod 4 becomes the actual
-// type.  So only an actual REB_QUOTED at "apparent lit-level 0" has its own
+// as the "quote level" of a value.  Then the byte mod 4 becomes the actual
+// type.  So only an actual REB_QUOTED at "apparent quote-level 0" has its own
 // payload...as a last resort if the level exceeded what the type byte can
 // encode.
 //
@@ -44,17 +44,45 @@
 // as they do not need to worry about the aliasing and can just test the byte
 // against the unquoted REB_WORD value they are interested in.
 //
+// Binding is handled specially to mix the binding information into the
+// QUOTED! cell instead of the cells that are being escaped.  This is because
+// when there is a high level of quoting and the escaped cell is shared at
+// a number of different places, those places may have different bindings.
+// To pull this off, the escaped cell stores only *cached* binding information
+// for virtual binding...leaving all primary binding in the quoted cell.
+//
+// Consequently, the quoting level is slipped into the virtual binding index
+// location of the word.
+//
 
-inline static REBVAL* VAL_QUOTED_PAYLOAD_CELL(const RELVAL *v) {
-    assert(KIND3Q_BYTE(v) == REB_QUOTED);
-    assert(PAYLOAD(Any, v).second.u > 3);  // else quote fits entirely in cell
-    return VAL(VAL_NODE(v));
-}
+
+//=//// WORD DEFINITION CODE //////////////////////////////////////////////=//
+//
+// !!! The code should get reorganized to not have these definitions in the
+// quoting header.  But for the moment this untangles the dependencies so
+// that it will compile.
+//
+
+inline static void Unbind_Any_Word(RELVAL *v);  // forward define
+
+#define VAL_WORD_PRIMARY_INDEX_UNCHECKED(v) \
+    (VAL_WORD_INDEXES_U32(v) & 0x000FFFFF)
+
+#define VAL_WORD_VIRTUAL_MONDEX_UNCHECKED(v) \
+    ((VAL_WORD_INDEXES_U32(v) & 0xFFF00000) >> 20)
+
+
 
 inline static REBLEN VAL_QUOTED_PAYLOAD_DEPTH(const RELVAL *v) {
-    assert(KIND3Q_BYTE(v) == REB_QUOTED);
-    assert(PAYLOAD(Any, v).second.u > 3);  // else quote fits entirely in cell
-    return PAYLOAD(Any, v).second.u;
+    assert(IS_QUOTED(v));
+    REBLEN depth = VAL_WORD_VIRTUAL_MONDEX_UNCHECKED(v);
+    assert(depth > 3);  // else quote fits entirely in cell
+    return depth;
+}
+
+inline static REBVAL* VAL_QUOTED_PAYLOAD_CELL(const RELVAL *v) {
+    assert(VAL_QUOTED_PAYLOAD_DEPTH(v) > 3);  // else quote fits in one cell
+    return VAL(VAL_NODE1(v));
 }
 
 inline static REBLEN VAL_QUOTED_DEPTH(const RELVAL *v) {
@@ -77,14 +105,13 @@ inline static RELVAL *Quotify_Core(
     REBLEN depth
 ){
     if (KIND3Q_BYTE_UNCHECKED(v) == REB_QUOTED) {  // reuse payload
-        assert(PAYLOAD(Any, v).second.u > 3);  // or else whould be "in-situ"
-        PAYLOAD(Any, v).second.u += depth;
+        assert(VAL_QUOTED_PAYLOAD_DEPTH(v) + depth <= MONDEX_MOD);  // limited
+        VAL_WORD_INDEXES_U32(v) += (depth << 20);
         return v;
     }
 
     REBYTE kind = KIND3Q_BYTE_UNCHECKED(v) % REB_64;  // HEART_BYTE may differ
-    if (kind >= REB_MAX)  // e.g. REB_P_XXX for params
-        assert(depth == 0);
+    assert(kind <= REB_MAX);
 
     depth += KIND3Q_BYTE_UNCHECKED(v) / REB_64;
 
@@ -103,23 +130,38 @@ inline static RELVAL *Quotify_Core(
         // about specifiers and such.  The format bits of this cell are
         // essentially noise, and only the literal's specifier should be used.
 
-        REBVAL *paired = Alloc_Pairing();
-        Move_Value_Header(paired, v);
-        mutable_KIND3Q_BYTE(paired) = kind;  // escaping only in literal
-        paired->extra = v->extra;
-        paired->payload = v->payload;
+        REBVAL *unquoted = Alloc_Pairing();
+        Init_Unreadable_Void(PAIRING_KEY(unquoted));  // Key not used ATM
+
+        Copy_Cell_Header(unquoted, v);
+        mutable_KIND3Q_BYTE(unquoted) = kind;  // escaping only in literal
+
+        unquoted->payload = v->payload;
  
-        Init_Unreadable_Void(PAIRING_KEY(paired));  // Key not used ATM
-
-        Manage_Pairing(paired);
-
-      #if !defined(NDEBUG)
-        SET_CELL_FLAG(paired, PROTECTED); // maybe shared; can't change
-      #endif
+        Manage_Pairing(unquoted);
 
         RESET_VAL_HEADER(v, REB_QUOTED, CELL_FLAG_FIRST_IS_NODE);
-        if (Is_Bindable(paired))
-            v->extra = paired->extra; // must sync with cell (if binding)
+        INIT_VAL_NODE1(v, unquoted);
+        VAL_WORD_INDEXES_U32(v) = depth << 20;  // see VAL_QUOTED_DEPTH()
+
+        if (ANY_WORD_KIND(CELL_HEART(cast(REBCEL(const*), unquoted)))) {
+            //
+            // Words that are bound find their spellings by means of their
+            // PRIMARY_INDEX.  If a word is shared by several QUOTED!
+            // then that index can be different in each one.  So the shared
+            // word is put in an unbound state, which means the binding is
+            // to the spelling, which VAL_WORD_SYMBOL() of REBCEL can work.
+            //
+            VAL_WORD_INDEXES_U32(v) |=
+                VAL_WORD_PRIMARY_INDEX_UNCHECKED(unquoted);
+            unquoted->extra = v->extra;  // !!! for easier Unbind, review
+            Unbind_Any_Word(unquoted);  // so that binding is a spelling
+            // leave `v` binding as it was
+        }
+        else if (Is_Bindable(unquoted)) {
+            mutable_BINDING(unquoted) = UNBOUND;  // must look unbound
+            // leave `v` to hold the binding as it was
+        }
         else {
             // We say all REB_QUOTED cells are bindable, so their binding gets
             // checked even if the contained cell isn't bindable.  By setting
@@ -127,10 +169,13 @@ inline static RELVAL *Quotify_Core(
             // prevents needing to make Is_Bindable() a more complex check,
             // we can just say yes always but have it unbound if not.
             //
-            EXTRA(Binding, v).node = UNBOUND;
+            unquoted->extra = v->extra;  // save the non-binding-related data
+            mutable_BINDING(v) = UNBOUND;
         }
-        PAYLOAD(Any, v).first.node = NOD(paired);
-        PAYLOAD(Any, v).second.u = depth;
+
+      #if !defined(NDEBUG)
+        SET_CELL_FLAG(unquoted, PROTECTED); // maybe shared; can't change
+      #endif
     }
 
     return v;
@@ -162,6 +207,34 @@ inline static RELVAL *Unquotify_In_Situ(RELVAL *v, REBLEN unquotes)
 }
 
 
+inline static void Collapse_Quoted_Internal(RELVAL *v)
+{
+    REBVAL *unquoted = VAL_QUOTED_PAYLOAD_CELL(v);
+    assert(
+        KIND3Q_BYTE(unquoted) != REB_0
+        and KIND3Q_BYTE(unquoted) != REB_QUOTED
+        and KIND3Q_BYTE(unquoted) < REB_MAX
+    );
+    Copy_Cell_Header(v, unquoted);
+    if (ANY_WORD_KIND(CELL_HEART(cast(REBCEL(const*), unquoted)))) {
+        //
+        // `v` needs to retain the primary binding index (which was
+        // kept in its QUOTED! form), but sync with the virtual binding
+        // information in the escaped form.
+        //
+        VAL_WORD_INDEXES_U32(v) &= 0x000FFFFF;  // wipe out quote depth
+        VAL_WORD_INDEXES_U32(v) |=
+            (VAL_WORD_INDEXES_U32(unquoted) & 0xFFF00000);
+        INIT_VAL_WORD_CACHE(v, VAL_WORD_CACHE(unquoted));
+    }
+    else {
+        v->payload = unquoted->payload;
+        if (not Is_Bindable(v))  // non-bindable types need the extra data
+            v->extra = unquoted->extra;
+    }
+}
+
+
 // Turns 'X into X, or '''''[1 + 2] into '''(1 + 2), etc.
 //
 // Works on escape levels that fit in the cell (<= 3) as well as those that
@@ -178,24 +251,11 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
     assert(depth > 3 and depth >= unquotes);
     depth -= unquotes;
 
-    REBVAL *cell = VAL_QUOTED_PAYLOAD_CELL(v);
-    assert(
-        KIND3Q_BYTE(cell) != REB_0
-        and KIND3Q_BYTE(cell) != REB_QUOTED
-        and KIND3Q_BYTE(cell) < REB_MAX
-    );
-
     if (depth > 3) // still can't do in-situ escaping within a single cell
-        PAYLOAD(Any, v).second.u = depth;
+        VAL_WORD_INDEXES_U32(v) -= (unquotes << 20);
     else {
-        Move_Value_Header(v, cell);
+        Collapse_Quoted_Internal(v);
         mutable_KIND3Q_BYTE(v) += (REB_64 * depth);
-        assert(
-            not Is_Bindable(cell) or
-            EXTRA(Binding, v).node == EXTRA(Binding, cell).node // must sync
-        );
-        EXTRA(Binding, v) = EXTRA(Binding, cell);  // in case it's unbindable
-        v->payload = cell->payload;
     }
     return v;
 }
@@ -232,18 +292,7 @@ inline static REBLEN Dequotify(RELVAL *v) {
     }
 
     REBLEN depth = VAL_QUOTED_PAYLOAD_DEPTH(v);
-    RELVAL *cell = VAL_QUOTED_PAYLOAD_CELL(v);
-    assert(KIND3Q_BYTE(cell) != REB_QUOTED and KIND3Q_BYTE(cell) < REB_64);
-
-    Move_Value_Header(v, cell);
-  #if !defined(NDEBUG)
-    if (Is_Bindable(cell))
-        assert(EXTRA(Binding, v).node == EXTRA(Binding, cell).node);
-    else
-        assert(not EXTRA(Binding, v).node);
-  #endif
-    v->extra = cell->extra;
-    v->payload = cell->payload;
+    Collapse_Quoted_Internal(v);
     return depth;
 }
 

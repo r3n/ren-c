@@ -100,8 +100,15 @@
 ([x:] = compose [('x):])
 ([x:] = compose [('x:):])
 ([x:] = compose [(':x):])
-([x:] = compose [(#x):])
-([x:] = compose [("x"):])
+
+; Running code during SETIFY/GETIFY internally was dropped, because the
+; scanner was using it...and it had DS_PUSH()es extant.  The feature is still
+; possible, but it's not clear it's a great idea.  Punt on letting you
+; getify or setify things that aren't guaranteed to succeed (e.g. a string
+; might have spaces in it, and can't be turned into a SET-WORD!)
+;
+(error? trap [[x:] = compose [(#x):]])
+(error? trap [[x:] = compose [("x"):]])
 
 ([x/y:] = compose [( 'x/y ):])
 ([x/y:] = compose [( 'x/y: ):])

@@ -8,7 +8,7 @@ getdrives: make-routine msvcrt "_getdrives" compose/deep [
 maps: getdrives
 i: 0
 while [i < 26] [
-    if not (zero? maps) and [shift 1 i] [
+    if not (zero? maps) and (shift 1 i) [
         print unspaced [to char! (to integer! #"A") + i ":"]
     ]
     i: i + 1

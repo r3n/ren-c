@@ -234,23 +234,29 @@ inline static REBARR *GOB_PANE(REBGOB *g) {
     return VAL_ARRAY_KNOWN_MUTABLE(v);
 }
 
-#define GOB_PARENT(g) \
-    cast(REBGOB*, LINK(g).custom.node)
+#define LINK_GobParent_TYPE         REBGOB*
+#define LINK_GobParent_CAST         (REBGOB*)ARR
+#define HAS_LINK_GobParent          FLAVOR_GOBLIST
 
-inline static void SET_GOB_PARENT(REBGOB *g, REBGOB *parent) {
-    LINK(g).custom.node = NOD(parent);
-}
+#define MISC_GobOwner_TYPE          REBGOB*
+#define MISC_GobOwner_CAST          (REBGOB*)ARR
+#define HAS_MISC_GobOwner           FLAVOR_GOBLIST
+
+#define GOB_PARENT(g) \
+    LINK(GobParent, (g))
+
+inline static void SET_GOB_PARENT(REBGOB *g, REBGOB *parent)
+  { mutable_LINK(GobParent, g) = parent; }
 
 #define GOB_OWNER(g) \
-    cast(REBGOB*, MISC(g).custom.node)  // unused?
+    MISC(GobOwner, (g))
 
-inline static void SET_GOB_OWNER(REBGOB *g, REBGOB *owner) {
-    MISC(g).custom.node = NOD(owner);
-}
+inline static void SET_GOB_OWNER(REBGOB *g, REBGOB *owner)
+  { mutable_MISC(GobOwner, g) = owner; }
 
 #define GOB_STRING(g)       SER_HEAD(GOB_CONTENT(g))
 #define GOB_LEN(g)          ARR_LEN(GOB_PANE(g))
-#define SET_GOB_LEN(g,l)    TERM_ARRAY_LEN(GOB_PANE(g), (l))
+#define SET_GOB_LEN(g,l)    SET_SERIES_LEN(GOB_PANE(g), (l))
 #define GOB_HEAD(g)         SPECIFIC(ARR_HEAD(GOB_PANE(g)))
 
 #define GOB_BITMAP(g)   GOB_STRING(g)
@@ -274,14 +280,14 @@ inline static bool IS_GOB(const RELVAL *v)  // Note: QUOTED! does not count
 
 #if defined(NDEBUG) || !defined(CPLUSPLUS_11)
     #define VAL_GOB(v) \
-        cast(REBGOB*, VAL_NODE(v))  // use w/const REBVAL*
+        cast(REBGOB*, VAL_NODE1(v))  // use w/const REBVAL*
 
     #define VAL_GOB_INDEX(v) \
         PAYLOAD(Any, v).second.u
 #else
     inline static REBGOB* VAL_GOB(REBCEL(const*) v) {
         assert(CELL_CUSTOM_TYPE(v) == EG_Gob_Type);
-        return cast(REBGOB*, VAL_NODE(v));
+        return cast(REBGOB*, VAL_NODE1(v));
     }
 
     inline static uintptr_t VAL_GOB_INDEX(REBCEL(const*) v) {
@@ -299,7 +305,7 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
     assert(GET_SERIES_FLAG(g, MANAGED));
 
     RESET_CUSTOM_CELL(out, EG_Gob_Type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, g);
+    INIT_VAL_NODE1(out, g);
     VAL_GOB_INDEX(out) = 0;
     return cast(REBVAL*, out);
 }
@@ -309,8 +315,8 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
 // GOB! extension if it is loaded.
 //
 extern REBINT CT_Gob(REBCEL(const*) a, REBCEL(const*) b, bool strict);
-extern REB_R MAKE_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
-extern REB_R TO_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
+extern REB_R MAKE_Gob(REBVAL *out, enum Reb_Kind kind, option(const REBVAL*) parent, const REBVAL *arg);
+extern REB_R TO_Gob(REBVAL *out, enum Reb_Kind kind, const REBVAL* arg);
 extern void MF_Gob(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Gob);
-extern REB_R PD_Gob(REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval);
+extern REB_R PD_Gob(REBPVS *pvs, const RELVAL *picker, option(const REBVAL*) setval);

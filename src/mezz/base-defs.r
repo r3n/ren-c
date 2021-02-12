@@ -27,8 +27,6 @@ REBOL [
 
 c-break-debug: :c-debug-break  ; easy to mix up
 
-lit: :literal  ; because it's shorter
-
 ??:  ; shorthand form to use in debug sessions, not intended to be committed
 probe: func* [
     {Debug print a molded value and returns that same value.}
@@ -89,8 +87,23 @@ and-not+: enfixed :bitwise-and-not
 <: enfixed :lesser?
 >: enfixed :greater?
 
+; "Official" forms of the comparison operators.  This is what we would use
+; if starting from scratch, and didn't have to deal with expectations people
+; have coming from other languages: https://forum.rebol.info/t/349/
+;
 >=: enfixed :greater-or-equal?
-=<: <=: enfixed :equal-or-lesser?  ; https://forum.rebol.info/t/349/11
+=<: enfixed :equal-or-lesser?
+
+; Compatibility Compromise: sacrifice what looks like left and right arrows
+; for usage as comparison, even though the perfectly good `=<` winds up
+; being unused as a result.  Compromise `=>` just to reinforce what is lost
+; by not retraining: https://forum.rebol.info/t/349/11
+;
+equal-or-greater?: :greater-or-equal?
+lesser-or-equal?: :equal-or-lesser?
+=>: enfixed :equal-or-greater?
+<=: enfixed :lesser-or-equal?
+
 !=: enfixed :not-equal?  ; http://www.rebol.net/r3blogs/0017.html
 ==: enfixed :strict-equal?  ; !!! https://forum.rebol.info/t/349
 !==: enfixed :strict-not-equal?  ; !!! bad pairing, most would think !=
@@ -133,7 +146,7 @@ nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
 ; it could dump those remarks out...perhaps based on how many == there are.
 ; (This is a good reason for retaking ==, as that looks like a divider.)
 ;
-===: func* [:remarks [any-value! <variadic>]] [
+===: func* ['remarks [any-value! <variadic>]] [
     until [
         equal? '=== take remarks
     ]
@@ -257,24 +270,26 @@ inherit-meta: func* [
     return: "Same as derived (assists in efficient chaining)"
         [action!]
     derived [action!]
-    original [action! word! path!]
+    original "Passed as WORD! to use GET to avoid tainting cached label"
+        [word!]
     /augment "Additional spec information to scan"
         [block!]
 ][
-    if action! <> reflect :original 'type [original: get original]
+    original: get original  ; GET so `specialize :foo [...]` keeps label foo
+
     if let m1: meta-of :original [
         set-meta :derived let m2: copy :m1  ; shallow copy
-        if in m1 'parameter-notes [  ; shallow copy, but make frame match
+        if select m1 'parameter-notes [  ; shallow copy, but make frame match
             m2/parameter-notes: make frame! :derived
-            for-each [key value] :m1/parameter-notes [
+            for-each [key value] m1/parameter-notes [
                 if in m2/parameter-notes key [
                     m2/parameter-notes/(key): get* 'value  ; !!! VOID!s
                 ]
             ]
         ]
-        if in m2 'parameter-types [  ; shallow copy, but make frame match
+        if select m1 'parameter-types [  ; shallow copy, but make frame match
             m2/parameter-types: make frame! :derived
-            for-each [key value] :m1/parameter-types [
+            for-each [key value] m1/parameter-types [
                 if in m2/parameter-types key [
                     m2/parameter-types/(key): get* 'value  ; !!! VOID!s
                 ]
@@ -285,19 +300,19 @@ inherit-meta: func* [
 ]
 
 enclose: enclose* :enclose* func* [f] [  ; uses low-level ENCLOSE* to make
-    let inner: f/inner: compose :f/inner
-    inherit-meta do f get 'inner  ; no :inner name cache
+    let inner: get 'f/inner
+    inherit-meta do f 'inner
 ]
-inherit-meta :enclose :enclose*  ; needed since we used ENCLOSE*
+inherit-meta :enclose 'enclose*  ; needed since we used ENCLOSE*
 
 specialize: enclose :specialize* func* [f] [  ; now we have high-level ENCLOSE
-    let specializee: f/specializee: compose :f/specializee
-    inherit-meta do f get 'specializee  ; no :specializee name cache
+    let action: get 'f/action
+    inherit-meta do f 'action
 ]
 
 adapt: enclose :adapt* func* [f] [
-    let adaptee: f/adaptee: compose :f/adaptee
-    inherit-meta do f get 'adaptee  ; no :adaptee name cache
+    let action: get 'f/action
+    inherit-meta do f 'action
 ]
 
 chain: enclose :chain* func* [f] [
@@ -314,28 +329,31 @@ chain: enclose :chain* func* [f] [
         ]
     ]
 
-    let pipeline: f/pipeline: reduce :f/pipeline
-    inherit-meta do f pick pipeline 1
+    let pipeline1: pick (f/pipeline: reduce :f/pipeline) 1
+    inherit-meta do f 'pipeline1
 ]
 
 augment: enclose :augment* func* [f] [
-    let augmentee: f/augmentee: compose :f/augmentee
+    let action: get 'f/action
     let spec: :f/spec
-    inherit-meta/augment do f get 'augmentee spec  ; no :augmentee name cache
+    inherit-meta/augment do f 'action spec
 ]
 
 reframer: enclose :reframer* func* [f] [
-    let shim: f/shim: compose :f/shim
-    inherit-meta do f get 'shim
+    let shim: get 'f/shim
+    inherit-meta do f 'shim
+]
+
+reorder: enclose :reorder* func* [f] [
+    let action: get 'f/action
+    inherit-meta do f 'action  
 ]
 
 ; The lower-level pointfree function separates out the action it takes, but
 ; the higher level one uses a block.  Specialize out the action, and then
 ; overwrite it in the enclosure with an action taken out of the block.
 ;
-pointfree: enclose (specialize* :pointfree* [
-    action: :panic-value  ; gets overwritten, best to make it something mean
-]) func* [f] [
+pointfree: specialize* (enclose :pointfree* func* [f] [
     let action: f/action: (match action! any [
         if match [word! path!] :f/block/1 [get compose f/block/1]
         :f/block/1
@@ -346,7 +364,9 @@ pointfree: enclose (specialize* :pointfree* [
     ; rest of block is invocation by example
     f/block: skip f/block 1  ; Note: NEXT not defined yet
 
-    inherit-meta do f get 'action  ; no :action name cache
+    inherit-meta do f 'action  ; no :action name cache
+])[
+    action: :panic-value  ; gets overwritten, best to make it something mean
 ]
 
 
@@ -357,31 +377,21 @@ requote: reframer func* [
     f [frame!]
     <local> p num-quotes result
 ][
-    p: first words of f
+    if not p: first parameters of action of f [
+        fail ["REQUOTE must have an argument to process"]
+    ]
+
     num-quotes: quotes of f/(p)
 
     f/(p): dequote f/(p)
-    
+
     if null? result: do f [return null]
 
     return quote/depth get/any 'result num-quotes
 ]
 
 
-->: enfixed lambda: func* [
-    {Convenience wrapper for MAKE ACTION! (Note: does not provide RETURN)}
-
-    return: [action!]
-    'args "Block of argument words, or a single word (if one argument)"
-        [<end> word! block!]
-    body "Block that serves as the body"
-        [block!]
-][
-    make action! reduce [  ; use MAKE ACTION! for no RETURN handling
-        blockify dequote args  ; note NULL for <end> produces `[]`
-        body
-    ]
-]
+->: enfixed :lambda
 
 <-: enfixed func* [
     {Declare action by example instantiation, missing args left unspecialized}
@@ -390,7 +400,7 @@ requote: reframer func* [
     :left "Enforces nothing to the left of the pointfree expression"
         [<end>]
     :expression "POINTFREE expression, BLANK!s are unspecialized arg slots"
-        [any-value! <...>]
+        [any-value! <variadic>]
 ][
     pointfree make block! expression  ; !!! Allow Vararg param for efficiency?
 ]
@@ -601,15 +611,9 @@ print: func* [
         return write-stdout line
     ]
 
-    (write-stdout try spaced line) then @[write-stdout newline]
+    (write-stdout try spaced line) then [write-stdout newline]
 ]
 
-
-decode-url: _ ; set in sys init
-
-; used only by Ren-C++ as a test of how to patch the lib context prior to
-; boot at the higher levels.
-test-rencpp-low-level-hook: _
 
 internal!: make typeset! [
     handle!

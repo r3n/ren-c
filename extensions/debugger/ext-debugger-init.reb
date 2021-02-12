@@ -46,7 +46,7 @@ Expect crashes and mayhem.  But see BACKTRACE, RESUME, and STEP.}
     focus-frame: _
     focus-index: _
 
-    print-greeting: method [return: <void>] [
+    print-greeting: meth [return: <void>] [
         ;
         ; We override in order to avoid printing out the redundant Rebol
         ; version information (and to print the greeting only once, which
@@ -83,7 +83,7 @@ Expect crashes and mayhem.  But see BACKTRACE, RESUME, and STEP.}
         write-stdout space
     ]
 
-    dialect-hook: method [
+    dialect-hook: meth [
         {Receives code block, parse/transform, send back to CONSOLE eval}
         b [block!]
     ][
@@ -170,11 +170,11 @@ backtrace*: function [
         ]
 
         if not pending? f [
-            if first-frame and [any [
+            if first-frame and (any [
                 true  ; !!! Now these are ADAPT, try just zeroing first frame
                 :a = :pause
                 :a = :breakpoint
-            ]][
+            ])[
                 ; Omitting breakpoints from the list entirely presents a
                 ; skewed picture of what's going on.  But giving them
                 ; "index 1" means that inspecting the frame you're actually

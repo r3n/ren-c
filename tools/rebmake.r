@@ -168,7 +168,7 @@ posix: make platform-class [
     obj-suffix: ".o"
     archive-suffix: ".a"
 
-    gen-cmd-create: method [
+    gen-cmd-create: meth [
         return: [text!]
         cmd [object!]
     ][
@@ -179,19 +179,19 @@ posix: make platform-class [
         ]
     ]
 
-    gen-cmd-delete: method [
+    gen-cmd-delete: meth [
         return: [text!]
         cmd [object!]
     ][
         spaced ["rm -fr" cmd/file]
     ]
 
-    gen-cmd-strip: method [
+    gen-cmd-strip: meth [
         return: [text!]
         cmd [object!]
     ][
-        if tool: any [:cmd/strip :default-strip] [
-            b: ensure block! tool/commands/params cmd/file opt cmd/options
+        if let tool: any [:cmd/strip :default-strip] [
+            let b: ensure block! tool/commands/params cmd/file opt cmd/options
             assert [1 = length of b]
             return b/1
         ]
@@ -225,23 +225,23 @@ windows: make platform-class [
     obj-suffix: ".obj"
     archive-suffix: ".lib"
 
-    gen-cmd-create: method [
+    gen-cmd-create: meth [
         return: [text!]
         cmd [object!]
     ][
-        d: file-to-local cmd/file
+        let d: file-to-local cmd/file
         if #"\" = last d [remove back tail-of d]
         either dir? cmd/file [
-            spaced ["mkdir" d]
+            spaced ["if not exist" d "mkdir" d]
         ][
             unspaced ["echo . 2>" d]
         ]
     ]
-    gen-cmd-delete: method [
+    gen-cmd-delete: meth [
         return: [text!]
         cmd [object!]
     ][
-        d: file-to-local cmd/file
+        let d: file-to-local cmd/file
         if #"\" = last d [remove back tail-of d]
         either dir? cmd/file [
             spaced ["rmdir /S /Q" d]
@@ -250,7 +250,7 @@ windows: make platform-class [
         ]
     ]
 
-    gen-cmd-strip: method [
+    gen-cmd-strip: meth [
         return: [text!]
         cmd [object!]
     ][
@@ -342,12 +342,12 @@ application-class: make project-class [
     searches: _
     ldflags: _
 
-    link: method [return: <void>] [
+    link: meth [return: <void>] [
         linker/link output depends ldflags
     ]
 
-    command: method [return: [text!]] [
-        ld: any [
+    command: meth [return: [text!]] [
+        let ld: any [
             linker
             default-linker
         ]
@@ -368,16 +368,16 @@ dynamic-library-class: make project-class [
 
     searches: _
     ldflags: _
-    link: method [return: <void>] [
+    link: meth [return: <void>] [
         linker/link output depends ldflags
     ]
 
-    command: method [
+    command: meth [
         return: [text!]
         <with>
         default-linker
     ][
-        l: any [
+        let l: any [
             linker
             default-linker
         ]
@@ -405,7 +405,7 @@ compiler-class: make object! [
     id: _ ;flag prefix
     version: _
     exec-file: _
-    compile: method [
+    compile: meth [
         return: <void>
         output [file!]
         source [file!]
@@ -415,7 +415,7 @@ compiler-class: make object! [
     ][
     ]
 
-    command: method [
+    command: meth [
         return: [text!]
         output
         source
@@ -425,7 +425,7 @@ compiler-class: make object! [
     ][
     ]
     ;check if the compiler is available
-    check: method [
+    check: meth [
         return: [logic!]
         path [<blank> any-string!]
     ][
@@ -435,12 +435,15 @@ compiler-class: make object! [
 gcc: make compiler-class [
     name: 'gcc
     id: "gnu"
-    check: method [
+    check: meth [
         return: [logic!]
         /exec [file!]
-        <static>
-        digit (charset "0123456789")
     ][
+        ; !!! This used to be static, but the bootstrap executable's non
+        ; gathering form could not do <static>
+        ;
+        let digit: charset "0123456789"
+
         version: copy ""
         attempt [
             exec-file: exec: default ["gcc"]
@@ -464,7 +467,7 @@ gcc: make compiler-class [
         ]
     ]
 
-    command: method [
+    command: meth [
         return: [text!]
         output [file!]
         source [file!]
@@ -502,7 +505,7 @@ gcc: make compiler-class [
                     ; This is a stopgap workaround that ultimately would
                     ; permit cross-platform {MBEDTLS_CONFIG_FILE="filename.h"}
                     ;
-                    if find [gcc g++] name [
+                    if find [gcc g++ cl] name [
                         flg: replace/all copy flg {"} {\"}
                     ]
 
@@ -571,7 +574,7 @@ clang: make gcc [
 cl: make compiler-class [
     name: 'cl
     id: "msc" ;flag id
-    command: method [
+    command: meth [
         return: [text!]
         output [file!]
         source
@@ -596,13 +599,23 @@ cl: make compiler-class [
             ]
             if D [
                 for-each flg D [
+                    ; !!! For cases like `#include MBEDTLS_CONFIG_FILE` then
+                    ; quotes are expected to work in defines...but when you
+                    ; pass quotes on the command line it's different than
+                    ; inside of a visual studio project (for instance) because
+                    ; bash strips them out unless escaped with backslash.
+                    ; This is a stopgap workaround that ultimately would
+                    ; permit cross-platform {MBEDTLS_CONFIG_FILE="filename.h"}
+                    ;
+                    flg: replace/all copy flg {"} {\"}
+
                     keep ["/D" (filter-flag flg id else [continue])]
                 ]
             ]
             if O [
                 case [
                     O = true [keep "/O2"]
-                    O and [not zero? O] [
+                    all [O (not zero? O)] [
                         keep ["/O" O]
                     ]
                 ]
@@ -616,7 +629,7 @@ cl: make compiler-class [
                         keep "/Od /Zi"
                     ]
                     debug = false []
-                    
+
                     fail ["unrecognized debug option:" g]
                 ]
             ]
@@ -649,10 +662,12 @@ linker-class: make object! [
     name: _
     id: _ ;flag prefix
     version: _
-    link: method [][
+    link: meth [
         return: <void>
+    ][
+        ...  ; overridden
     ]
-    commands: method [
+    commands: meth [
         return: [<opt> block!]
         output [file!]
         depends [block! blank!]
@@ -676,7 +691,7 @@ ld: make linker-class [
     version: _
     exec-file: _
     id: "gnu"
-    command: method [
+    command: meth [
         return: [text!]
         output [file!]
         depends [block! blank!]
@@ -684,7 +699,7 @@ ld: make linker-class [
         ldflags [block! any-string! blank!]
         /dynamic
     ][
-        suffix: either dynamic [
+        let suffix: either dynamic [
             target-platform/dll-suffix
         ][
             target-platform/exe-suffix
@@ -701,7 +716,7 @@ ld: make linker-class [
             ]
 
             keep "-o"
-            
+
             output: file-to-local output
             either ends-with? output suffix [
                 keep output
@@ -723,7 +738,7 @@ ld: make linker-class [
         ]
     ]
 
-    accept: method [
+    accept: meth [
         return: [<opt> text!]
         dep [object!]
     ][
@@ -733,7 +748,7 @@ ld: make linker-class [
             ]
             #dynamic-extension [
                 either tag? dep/output [
-                    if lib: filter-flag dep/output id [
+                    if let lib: filter-flag dep/output id [
                         unspaced ["-l" lib]
                     ]
                 ][
@@ -766,11 +781,11 @@ ld: make linker-class [
         ]
     ]
 
-    check: method [
+    check: meth [
         return: [logic!]
         /exec [file!]
     ][
-        version: copy ""
+        let version: copy ""
         ;attempt [
             exec-file: exec: default ["gcc"]
             call/output reduce [exec "--version"] version
@@ -783,7 +798,7 @@ llvm-link: make linker-class [
     version: _
     exec-file: _
     id: "llvm"
-    command: method [
+    command: meth [
         return: [text!]
         output [file!]
         depends [block! blank!]
@@ -791,7 +806,7 @@ llvm-link: make linker-class [
         ldflags [block! any-string! blank!]
         /dynamic
     ][
-        suffix: either dynamic [
+        let suffix: either dynamic [
             target-platform/dll-suffix
         ][
             target-platform/exe-suffix
@@ -826,7 +841,7 @@ llvm-link: make linker-class [
         ]
     ]
 
-    accept: method [
+    accept: meth [
         return: [<opt> text!]
         dep [object!]
     ][
@@ -866,7 +881,7 @@ link: make linker-class [
     id: "msc"
     version: _
     exec-file: _
-    command: method [
+    command: meth [
         return: [text!]
         output [file!]
         depends [block! blank!]
@@ -874,7 +889,7 @@ link: make linker-class [
         ldflags [block! any-string! blank!]
         /dynamic
     ][
-        suffix: either dynamic [
+        let suffix: either dynamic [
             target-platform/dll-suffix
         ][
             target-platform/exe-suffix
@@ -907,7 +922,7 @@ link: make linker-class [
         ]
     ]
 
-    accept: method [
+    accept: meth [
         return: [<opt> text!]
         dep [object!]
     ][
@@ -919,10 +934,10 @@ link: make linker-class [
                 comment [import file]  ; static property is ignored
 
                 either tag? dep/output [
-                    filter-flag dep/output id
+                    try filter-flag dep/output id
                 ][
                     ;dump dep/output
-                    either ends-with? dep/output ".lib" [
+                    file-to-local/pass either ends-with? dep/output ".lib" [
                         dep/output
                     ][
                         join dep/output ".lib"
@@ -958,7 +973,7 @@ strip-class: make object! [
     id: _ ;flag prefix
     exec-file: _
     options: _
-    commands: method [
+    commands: meth [
         return: [block!]
         target [file!]
         /params [block! any-string!]
@@ -1000,11 +1015,11 @@ object-file-class: make object! [
     generated?: false
     depends: _
 
-    compile: method [return: <void>] [
+    compile: meth [return: <void>] [
         compiler/compile
     ]
 
-    command: method [
+    command: meth [
         return: [text!]
         /I "extra includes" [block!]
         /D "extra definitions" [block!]
@@ -1014,7 +1029,7 @@ object-file-class: make object! [
         /PIC "https://en.wikipedia.org/wiki/Position-independent_code"
         /E "only preprocessing"
     ][
-        cc: any [compiler default-compiler]
+        let cc: any [compiler default-compiler]
 
         if optimization = #prefer-O2-optimization [
             any [
@@ -1038,7 +1053,7 @@ object-file-class: make object! [
             opt either g [g][debug]
     ]
 
-    gen-entries: method [
+    gen-entries: meth [
         return: [object!]
         parent [object!]
         /PIC "https://en.wikipedia.org/wiki/Position-independent_code"
@@ -1118,7 +1133,7 @@ generator-class: make object! [
     gen-cmd-delete: _
     gen-cmd-strip: _
 
-    gen-cmd: method [
+    gen-cmd: meth [
         return: [text!]
         cmd [object!]
     ][
@@ -1149,17 +1164,20 @@ generator-class: make object! [
         ]
     ]
 
-    reify: method [
+    reify: meth [
         {Substitute variables in the command with its value}
         {(will recursively substitute if the value has variables)}
 
         return: [<opt> object! any-string!]
         cmd [object! any-string!]
-        <static>
-        letter (charset [#"a" - #"z" #"A" - #"Z"])
-        digit (charset "0123456789")
-        localize (func [v][either file? v [file-to-local v][v]])
     ][
+        ; !!! These were previously static, but bootstrap executable's non
+        ; gathering function form could not handle statics.
+        ;
+        letter: charset [#"a" - #"z" #"A" - #"Z"]
+        digit: charset "0123456789"
+        localize: func [v][either file? v [file-to-local v][v]]
+
         if object? cmd [
             assert [
                 find [
@@ -1170,7 +1188,9 @@ generator-class: make object! [
         ]
         if not cmd [return null]
 
-        stop: false
+        let stop: false
+        let name
+        let val
         while [not stop][
             stop: true
             parse cmd [
@@ -1191,7 +1211,7 @@ generator-class: make object! [
         cmd
     ]
 
-    prepare: method [
+    prepare: meth [
         return: <void>
         solution [object!]
     ][
@@ -1215,7 +1235,7 @@ generator-class: make object! [
         ]
     ]
 
-    flip-flag: method [
+    flip-flag: meth [
         return: <void>
         project [object!]
         to [logic!]
@@ -1233,11 +1253,11 @@ generator-class: make object! [
         ]
     ]
 
-    setup-output: method [
+    setup-output: meth [
         return: <void>
         project [object!]
     ][
-        if not suffix: find reduce [
+        if not let suffix: find reduce [
             #application target-platform/exe-suffix
             #dynamic-library target-platform/dll-suffix
             #static-library target-platform/archive-suffix
@@ -1282,7 +1302,7 @@ generator-class: make object! [
         project/basename: basename
     ]
 
-    setup-outputs: method [
+    setup-outputs: meth [
         {Set the output/implib for the project tree}
         return: <void>
         project [object!]
@@ -1317,7 +1337,7 @@ makefile: make generator-class [
     gen-cmd-delete: :posix/gen-cmd-delete
     gen-cmd-strip: :posix/gen-cmd-strip
 
-    gen-rule: method [
+    gen-rule: meth [
         return: "Possibly multi-line text for rule, with extra newline @ end"
             [text!]
         entry [object!]
@@ -1379,7 +1399,7 @@ makefile: make generator-class [
                 ; may use escaped makefile variables that get substituted.
                 ;
                 for-each cmd (ensure [block! blank!] entry/commands) [
-                    c: ((match text! cmd) else [gen-cmd cmd]) else [continue]
+                    let c: ((match text! cmd) else [gen-cmd cmd]) else [continue]
                     if empty? c [continue]  ; !!! Review why this happens
                     keep [tab c]  ; makefiles demand TAB codepoint :-(
                 ]
@@ -1394,7 +1414,7 @@ makefile: make generator-class [
         ; to the caller to decide to add the spacing line or not
     ]
 
-    emit: method [
+    emit: meth [
         return: <void>
         buf [binary!]
         project [object!]
@@ -1419,7 +1439,7 @@ makefile: make generator-class [
                 #application
                 #dynamic-library
                 #static-library [
-                    objs: make block! 8
+                    let objs: make block! 8
                     ;dump dep
                     for-each obj dep/depends [
                         ;dump obj
@@ -1468,12 +1488,12 @@ makefile: make generator-class [
         ]
     ]
 
-    generate: method [
+    generate: meth [
         return: <void>
         output [file!]
         solution [object!]
     ][
-        buf: make binary! 2048
+        let buf: make binary! 2048
         assert [solution/class = #solution]
 
         prepare solution
@@ -1519,7 +1539,7 @@ Execution: make generator-class [
     gen-cmd-delete: :host/gen-cmd-delete
     gen-cmd-strip: :host/gen-cmd-strip
 
-    run-target: method [
+    run-target: meth [
         return: <void>
         target [object!]
         /cwd "change working directory"  ; !!! Not heeded (?)
@@ -1531,7 +1551,7 @@ Execution: make generator-class [
             ]
             #entry [
                 if all [
-                    not word? target/target 
+                    not word? target/target
                     ; so you can use words for "phony" targets
                     exists? to-file target/target
                 ] [return] ;TODO: Check the timestamp to see if it needs to be updated
@@ -1547,7 +1567,7 @@ Execution: make generator-class [
                         call/shell cmd
                     ]
                 ][
-                    cmd: reify target/commands
+                    let cmd: reify target/commands
                     print ["Running:" cmd]
                     call/shell cmd
                 ]
@@ -1557,7 +1577,7 @@ Execution: make generator-class [
         ]
     ]
 
-    run: method [
+    run: meth [
         return: <void>
         project [object!]
         /parent "parent project"
@@ -1577,7 +1597,7 @@ Execution: make generator-class [
             #application
             #dynamic-library
             #static-library [
-                objs: make block! 8
+                let objs: make block! 8
                 for-each obj project/depends [
                     if obj/class = #object-library [
                         append objs obj/depends
@@ -1690,13 +1710,13 @@ visual-studio: make generator-class [
         {{e20f9729-4575-459a-98be-c69167089b8c}}
     ]
 
-    emit: method [
+    emit: meth [
         return: "Dependencies?"
             [block!]
         buf
         project [object!]
     ][
-        project-name: if project/class = #entry [
+        let project-name: if project/class = #entry [
             project/target
         ] else [
             project/name
@@ -1711,7 +1731,7 @@ visual-studio: make generator-class [
 
         ;print ["emitting..."]
         ;dump project
-        depends: make block! 8
+        let depends: make block! 8
         for-each dep project/depends [
             if find [
                 #object-library
@@ -1742,12 +1762,12 @@ visual-studio: make generator-class [
         return depends
     ]
 
-    find-compile-as: method [
+    find-compile-as: meth [
         return: [<opt> text!]
         cflags [block!]
     ][
         iterate cflags [
-            i: filter-flag cflags/1 "msc" else [continue]
+            let i: filter-flag cflags/1 "msc" else [continue]
             case [
                 parse i ["/TP" to end] [
                     comment [remove cflags] ; extensions wouldn't get it
@@ -1762,14 +1782,17 @@ visual-studio: make generator-class [
         return null
     ]
 
-    find-stack-size: method [
+    find-stack-size: meth [
         return: [<opt> text!]
         ldflags [<blank> block!]
-        <static>
-        digit (charset "0123456789")
     ][
+        ; !!! This was previously static, but the bootstrap executable's non
+        ; gathering FUNC form could not do <static>
+        ;
+        let digit: charset "0123456789"
+
         iterate ldflags [
-            i: filter-flag ldflags/1 "msc" else [continue]
+            let i: filter-flag ldflags/1 "msc" else [continue]
             parse i [
                 "/stack:"
                 copy size: some digit
@@ -1782,12 +1805,12 @@ visual-studio: make generator-class [
         return null
     ]
 
-    find-subsystem: method [
+    find-subsystem: meth [
         return: [<opt> text!]
         ldflags [<blank> block!]
     ][
         iterate ldflags [
-            i: filter-flag ldflags/1 "msc" else [continue]
+            let i: filter-flag ldflags/1 "msc" else [continue]
             parse i [
                 "/subsystem:"
                 copy subsystem: to end
@@ -1799,12 +1822,12 @@ visual-studio: make generator-class [
         return null
     ]
 
-    find-optimization: method [
+    find-optimization: meth [
         return: [text!]
         project [object!]
         obj [blank! object!]
     ][
-        optimization: all [
+        let optimization: all [
             obj
             obj/optimization = #prefer-O2-optimization
             elide (obj/optimization: _)
@@ -1827,14 +1850,14 @@ visual-studio: make generator-class [
         ]
     ]
 
-    find-optimization?: method [
+    find-optimization?: meth [
         return: [logic!]
         optimization
     ][
         not find [0 _ no false off #[false]] optimization
     ]
 
-    generate-project: method [
+    generate-project: meth [
         return: <void>
         output-dir [file!] {Solution directory}
         project [object!]
@@ -2197,7 +2220,7 @@ visual-studio: make generator-class [
         ;print ["Wrote to" out-file]
     ]
 
-    generate: method [
+    generate: meth [
         return: <void>
         output-dir [file!] {Solution directory}
         solution [object!]
@@ -2206,7 +2229,7 @@ visual-studio: make generator-class [
         assert [dir? output-dir]
         assert [solution/class = #solution]
 
-        buf: make binary! 2048
+        let buf: make binary! 2048
 
         prepare solution
 
@@ -2227,7 +2250,7 @@ visual-studio: make generator-class [
         ;print ["vars:" mold vars]
 
         ; Project section
-        projects: collect [
+        let projects: collect [
             for-each dep solution/depends [
                 if find [
                     #dynamic-library

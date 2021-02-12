@@ -58,7 +58,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_HIJACKER_HIJACKER = 0,  // Relativized block to run before Adaptee
+    IDX_HIJACKER_HIJACKER = 1,  // Relativized block to run before Adaptee
     IDX_HIJACKER_MAX
 };
 
@@ -99,16 +99,16 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
     // !!! Is_Valid_Sequence_Element() requires action to be in a GROUP!
     //
     REBARR *group = Alloc_Singular(NODE_FLAG_MANAGED);
-    Move_Value(ARR_SINGLE(group), ACT_ARCHETYPE(run));  // Review: binding?
+    Copy_Cell(ARR_SINGLE(group), ACT_ARCHETYPE(run));  // Review: binding?
     Quotify(ARR_SINGLE(group), 1);  // suppress evaluation until pathing
     Init_Group(DS_PUSH(), group);
 
-    assert(IS_END(f->param)); // okay to reuse, if it gets put back...
-    f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
+    assert(not Is_Action_Frame_Fulfilling(f));  // okay to reuse
+    f->key = ACT_KEYS(&f->key_tail, FRM_PHASE(f));
     f->arg = FRM_ARGS_HEAD(f);
-    f->special = ACT_SPECIALTY_HEAD(FRM_PHASE(f));
+    f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
 
-    for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
+    for (; f->key != f->key_tail; ++f->key, ++f->arg, ++f->param) {
         if (Is_Param_Hidden(f->param))  // specialized or local
             continue;
 
@@ -119,10 +119,10 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
             if (IS_NULLED(f->arg))  // don't add to PATH!
                 continue;
 
-            Init_Word(DS_PUSH(), VAL_PARAM_SPELLING(f->param));
+            Init_Word(DS_PUSH(), KEY_SYMBOL(f->key));
 
             if (Is_Typeset_Empty(f->param)) {
-                assert(IS_REFINEMENT(f->arg));  // used but argless refinement
+                assert(Is_Blackhole(f->arg));  // used but argless refinement
                 continue;
             }
         }
@@ -134,21 +134,21 @@ bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
         // another good reason this should probably be done another way.  It
         // also loses information about the const bit.
         //
-        Quotify(Move_Value(code, f->arg), 1);
+        Quotify(Copy_Cell(code, f->arg), 1);
         ++code;
     }
 
-    TERM_ARRAY_LEN(code_arr, code - ARR_HEAD(code_arr));
-    Manage_Array(code_arr);
+    SET_SERIES_LEN(code_arr, code - ARR_HEAD(code_arr));
+    Manage_Series(code_arr);
 
     DECLARE_LOCAL (first);
     if (DSP == dsp_orig + 1) {  // no refinements, just use ACTION!
         DS_DROP_TO(dsp_orig);
-        Move_Value(first, ACT_ARCHETYPE(run));
+        Copy_Cell(first, ACT_ARCHETYPE(run));
     }
     else {
         REBARR *a = Freeze_Array_Shallow(Pop_Stack_Values(dsp_orig));
-        Force_Array_Managed(a);
+        Force_Series_Managed(a);
         REBVAL *p = Try_Init_Path_Arraylike(first, a);
         assert(p);
         UNUSED(p);
@@ -182,7 +182,7 @@ REB_R Hijacker_Dispatcher(REBFRM *f)
 {
     REBACT *phase = FRM_PHASE(f);
     REBARR *details = ACT_DETAILS(phase);
-    RELVAL *hijacker = ARR_HEAD(details);
+    REBVAL *hijacker = DETAILS_AT(details, IDX_HIJACKER_HIJACKER);
 
     // We need to build a new frame compatible with the hijacker, and
     // transform the parameters we've gathered to be compatible with it.
@@ -190,7 +190,7 @@ REB_R Hijacker_Dispatcher(REBFRM *f)
     if (Redo_Action_Throws_Maybe_Stale(f->out, f, VAL_ACTION(hijacker)))
         return R_THROWN;
 
-    return f->out;  // Note: may have OUT_MARKED_STALE, hence invisible
+    return f->out;  // Note: may have OUT_NOTE_STALE, hence invisible
 }
 
 
@@ -208,13 +208,6 @@ REB_R Hijacker_Dispatcher(REBFRM *f)
 //  ]
 //
 REBNATIVE(hijack)
-//
-// Hijacking an action does not change its interface--and cannot.  While
-// it may seem tempting to use low-level tricks to keep the same paramlist
-// but add or remove parameters, parameter lists can be referenced many
-// places in the system (frames, specializations, adaptations) and can't
-// be corrupted...or the places that rely on their properties (number and
-// types of parameters) would get out of sync.
 {
     INCLUDE_PARAMS_OF_HIJACK;
 
@@ -224,50 +217,47 @@ REBNATIVE(hijack)
     if (victim == hijacker)
         return nullptr;  // permitting no-op hijack has some practical uses
 
-    REBARR *victim_paramlist = ACT_PARAMLIST(victim);
     REBARR *victim_details = ACT_DETAILS(victim);
-    REBARR *hijacker_paramlist = ACT_PARAMLIST(hijacker);
     REBARR *hijacker_details = ACT_DETAILS(hijacker);
 
-    if (
-        ACT_UNDERLYING(hijacker) == ACT_UNDERLYING(victim)
-        and (ACT_NUM_PARAMS(hijacker) == ACT_NUM_PARAMS(victim))
-    ){
-        // Should the underliers of the hijacker and victim match, that means
+    REBVAL *victim_archetype = ACT_ARCHETYPE(victim);
+
+    if (Action_Is_Base_Of(victim, hijacker)) {
+        //
+        // Should the paramlists of the hijacker and victim match, that means
         // any ADAPT or CHAIN or SPECIALIZE of the victim can work equally
         // well if we just use the hijacker's dispatcher directly.  This is a
         // reasonably common case, and especially common when putting the
         // originally hijacked function back.
 
-        LINK_UNDERLYING_NODE(victim_paramlist)
-            = LINK_UNDERLYING_NODE(hijacker_paramlist);
-        if (LINK_SPECIALTY(hijacker_details) == hijacker_paramlist)
-            LINK_SPECIALTY_NODE(victim_details) = NOD(victim_paramlist);
-        else
-            LINK_SPECIALTY_NODE(victim_details)
-                = LINK_SPECIALTY_NODE(hijacker_details);
+        mutable_LINK_DISPATCHER(victim_details)
+            = cast(CFUNC*, LINK_DISPATCHER(hijacker_details));
 
-        MISC(victim_details).dispatcher = MISC(hijacker_details).dispatcher;
-
-        // All function info arrays should live in cells with the same
-        // underlying formatting.  Blit_Relative ensures that's the case.
+        // For the victim to act like the hijacker, it must use the same
+        // exemplar.  Update the specialty regardless of whether the paramlist
+        // matched *exactly* (Note: paramlist determined from the specialty)
         //
+        INIT_VAL_ACTION_SPECIALTY_OR_LABEL(
+            victim_archetype,
+            ACT_SPECIALTY(hijacker)
+        );
+
         // !!! It may be worth it to optimize some dispatchers to depend on
         // ARR_SINGLE(info) being correct.  That would mean hijack reversals
         // would need to restore the *exact* capacity.  Review.
 
         REBLEN details_len = ARR_LEN(hijacker_details);
-        if (SER_REST(SER(victim_details)) < details_len + 1)
+        if (SER_REST(victim_details) < details_len + 1)
             EXPAND_SERIES_TAIL(
-                SER(victim_details),
-                details_len + 1 - SER_REST(SER(victim_details))
+                victim_details,
+                details_len + 1 - SER_REST(victim_details)
             );
 
-        RELVAL *src = ARR_HEAD(hijacker_details);
-        RELVAL *dest = ARR_HEAD(victim_details);
+        RELVAL *src = ARR_HEAD(hijacker_details) + 1;
+        RELVAL *dest = ARR_HEAD(victim_details) + 1;
         for (; NOT_END(src); ++src, ++dest)
-            Blit_Relative(dest, src);
-        TERM_ARRAY_LEN(victim_details, details_len);
+            Copy_Cell_Core(dest, src, CELL_MASK_ALL);
+        SET_SERIES_LEN(victim_details, details_len);
     }
     else {
         // A mismatch means there could be someone out there pointing at this
@@ -280,25 +270,37 @@ REBNATIVE(hijack)
         // process of building a new frame.  But in general one basically
         // needs to do a new function call.
         //
-        MISC(victim_details).dispatcher = &Hijacker_Dispatcher;
+        mutable_LINK_DISPATCHER(victim_details)
+            = cast(CFUNC*, &Hijacker_Dispatcher);
 
-        if (ARR_LEN(victim_details) < 1)
+        if (ARR_LEN(victim_details) < 2)
             Alloc_Tail_Array(victim_details);
-        Move_Value(
+        Copy_Cell(
             ARR_AT(victim_details, IDX_HIJACKER_HIJACKER),
             ARG(hijacker)
         );
-        TERM_ARRAY_LEN(victim_details, 1);
+        SET_SERIES_LEN(victim_details, 2);
     }
 
     // !!! What should be done about MISC(victim_paramlist).meta?  Leave it
     // alone?  Add a note about the hijacking?  Also: how should binding and
     // hijacking interact?
 
+    // We do not return a copy of the original function that can be used to
+    // restore the behavior.  Because you can make such a copy yourself if
+    // you intend to put the behavior back:
+    //
+    //     foo-saved: copy :foo
+    //     hijack :foo :bar
+    //     ...
+    //     hijack :foo :foo-saved
+    //
+    // Making such a copy in this routine would be wasteful if it wasn't used.
+    //
     return Init_Action(
         D_OUT,
         victim,
-        VAL_ACTION_LABEL(ARG(hijacker)),
-        VAL_BINDING(ARG(hijacker))
+        VAL_ACTION_LABEL(ARG(victim)),
+        VAL_ACTION_BINDING(ARG(hijacker))
     );
 }

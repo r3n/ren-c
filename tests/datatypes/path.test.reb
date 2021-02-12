@@ -5,13 +5,13 @@
 (path! = type of 'a/b)
 ; the minimum
 [#1947
-    (path? load "#[path! [[a] 1]]")
+    (path? load-value "#[path! [[a] 1]]")
 ]
 
 ; ANY-PATH! are no longer positional
 ;(
 ;    all [
-;        path? a: load "#[path! [[a b c] 2]]"
+;        path? a: load-value "#[path! [[a b c] 2]]"
 ;        2 == index? a
 ;    ]
 ;)
@@ -156,7 +156,7 @@
     )
 ]
 [#1977
-    (f: func [/r] [1] error? trap [do load "f/r/%"])
+    (f: func [/r] [1] error? trap [do load-value "f/r/%"])
 ]
 
 ; path evaluation order
@@ -185,7 +185,7 @@
 
 ; ISSUE! has internal slashes (like FILE!), and does not load as a path
 [
-    ("iss/ue/path" = as text! ensure issue! load "#iss/ue/path")
+    ("iss/ue/path" = as text! ensure issue! load-value "#iss/ue/path")
 ]
 
 ; https://gitter.im/red/red?at=5b23be5d1ee2d149ecc4c3fd
@@ -201,15 +201,15 @@
 )
 
 ; / is a length 2 PATH! in Ren-C
-(path! = type of lit /)
-(2 = length of lit /)
-(lit / = to path! [_ _])
+(path! = type of just /)
+(2 = length of just /)
+(just / = to path! [_ _])
 
 ; foo/ is also a length 2 PATH! in Ren-C
-(path! = type of lit foo/ )
-(2 = length of lit foo/ )
-(lit foo/ = to path! [foo _])
+(path! = type of just foo/ )
+(2 = length of just foo/ )
+(just foo/ = to path! [foo _])
 
 ; Not currently true, TO BLOCK! is acting like BLOCKIFY, review
-; ([_ _] = to block! lit /)
-; ([foo _] = to block! lit foo/ )  ; !!! low priority scanner bug on /)
+; ([_ _] = to block! just /)
+; ([foo _] = to block! just foo/ )  ; !!! low priority scanner bug on /)

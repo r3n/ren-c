@@ -12,7 +12,7 @@
 (1 = if true [1])
 
 (null? if false [])
-(void? if true [])
+(null-2? if true [])
 
 (error? if true [trap [1 / 0]])
 ; RETURN stops the evaluation
@@ -80,7 +80,7 @@
 
 ; recursive behaviour
 
-(void? if true [if false [1]])
+(null-2? if true [if false [1]])
 (1 = if true [if true [1]])
 
 ; infinite recursion
@@ -102,7 +102,7 @@
 (1 = if not false [1])
 
 (null? if not true [1])
-(void? if not false [])
+(null-2? if not false [])
 
 (error? if not false [trap [1 / 0]])
 

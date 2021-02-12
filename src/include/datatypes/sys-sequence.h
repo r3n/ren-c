@@ -79,6 +79,15 @@
 //        (REB_SET_WORD is currently avoided due to complications if binding
 //        were to see this "gimmick" as if it were a real SET-WORD! and
 //        treat this binding unusually...review)
+//   - REB_GET_BLOCK and REB_SYM_BLOCK for /[a] .[a] and [a]/ [a].
+//   - REB_GET_GROUP and REB_SYM_GROUP for /(a) .(a) and (a)/ (a).
+//
+// Beyond that, how creative one gets to using the HEART_BYTE() depends on
+// how much complication you want to bear in code like binding.
+//
+// !!! This should probably use a plain form for the `/x` so that `/1` and
+// `/<foo>` are at least able to be covered by the same technique, although
+// there is something consistent about treating `/` as the plain WORD! case.
 //
 
 inline static bool Is_Valid_Sequence_Element(
@@ -95,7 +104,6 @@ inline static bool Is_Valid_Sequence_Element(
         or k == REB_BLOCK
         or k == REB_TEXT
         or k == REB_TAG
-        or k == REB_VOID  // legal because of UNIX home dir, e.g. `~/projects`
     ){
         return true;
     }
@@ -171,21 +179,23 @@ inline static REBVAL *Try_Leading_Blank_Pathify(
     if (not Is_Valid_Sequence_Element(kind, v))
         return nullptr;  // leave element in v to indicate "the bad element"
 
-    // The current optimization only covers WORD!s, to get parity with
-    // R3-Alpha on REFINEMENT! fitting in a cell (plus `a/`, `.a`, `a.`) 
-    // How creative one gets to using the HEART_BYTE() depends on how much
-    // complication you want to bear in code like binding.
+    // See notes at top of file regarding optimizing `/a`, `(a).`, `/[a]`,
+    // into a single cell by using special values for the HEART_BYTE().
     //
-    if (VAL_TYPE(v) == REB_WORD) {
-        assert(HEART_BYTE(v) == REB_WORD);
-        mutable_HEART_BYTE(v) = REB_GET_WORD;  // "refinement-style" signal
-        mutable_KIND3Q_BYTE(v) = kind;
+    enum Reb_Kind inner = VAL_TYPE(v);
+    if (inner == REB_WORD or inner == REB_GROUP or inner == REB_BLOCK) {
+        assert(HEART_BYTE(v) == inner);
+        mutable_HEART_BYTE(v) = GETIFY_ANY_PLAIN_KIND(inner);  // "refinement"
+        mutable_KIND3Q_BYTE(v) = kind;  // give it the veneer of a sequence
         return v;
     }
 
-    REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);  // optimize "pairlike"
+    REBARR *a = Make_Array_Core(
+        2,  // optimize "pairlike"
+        NODE_FLAG_MANAGED
+    );
     Init_Blank(Alloc_Tail_Array(a));
-    Move_Value(Alloc_Tail_Array(a), v);
+    Copy_Cell(Alloc_Tail_Array(a), v);
     Freeze_Array_Shallow(a);
 
     Init_Block(v, a);
@@ -242,7 +252,7 @@ inline static REBVAL *Init_Any_Sequence_Bytes(
 inline static REBVAL *Try_Init_Any_Sequence_All_Integers(
     RELVAL *out,
     enum Reb_Kind kind,
-    const RELVAL *head,
+    const RELVAL *head,  // NOTE: Can't use DS_PUSH() or evaluation
     REBLEN len
 ){
   #if !defined(NDEBUG)
@@ -303,10 +313,17 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
         return nullptr;
     }
 
-    if (IS_WORD(v1) and IS_BLANK(v2)) {  // `foo.` and `foo/` cases
+    // See notes at top of file regarding optimizing `/a`, `(a).`, `/[a]`,
+    // into a single cell by using special values for the HEART_BYTE().
+    //
+    enum Reb_Kind inner = VAL_TYPE(v1);
+    if (
+        IS_BLANK(v2)
+        and (inner == REB_WORD or inner == REB_BLOCK or inner == REB_GROUP)
+    ){
         Derelativize(out, v1, specifier);
         mutable_KIND3Q_BYTE(out) = kind;
-        mutable_HEART_BYTE(out) = REB_SYM_WORD;  // signal trailing
+        mutable_HEART_BYTE(out) = SYMIFY_ANY_PLAIN_KIND(inner);
         return cast(REBVAL*, out);
     }
 
@@ -328,10 +345,13 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
         return nullptr;
     }
 
-    REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);  // optimize "pairlike"
+    REBARR *a = Make_Array_Core(
+        2,
+        NODE_FLAG_MANAGED  // optimize "pairlike"
+    );
     Derelativize(ARR_AT(a, 0), v1, specifier);
     Derelativize(ARR_AT(a, 1), v2, specifier);
-    TERM_ARRAY_LEN(a, 2);
+    SET_SERIES_LEN(a, 2);
     Freeze_Array_Shallow(a);
 
     Init_Block(out, a);
@@ -366,8 +386,6 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
     enum Reb_Kind kind,
     REBDSP dsp_orig
 ){
-    assert(not IN_DATA_STACK_DEBUG(out));
-
     if (DSP == dsp_orig)
         return Init_Nulled(out);
 
@@ -375,7 +393,7 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
         if (not Is_Valid_Sequence_Element(kind, DS_TOP))
             return nullptr;
 
-        Move_Value(out, DS_TOP);
+        Copy_Cell(out, DS_TOP);
         DS_DROP();
 
         if (kind != REB_PATH) {  // carry over : or @ decoration (if possible)
@@ -449,18 +467,22 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
 inline static REBLEN VAL_SEQUENCE_LEN(REBCEL(const*) sequence) {
     assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));
 
-    switch (HEART_BYTE(sequence)) {
+    switch (CELL_HEART(sequence)) {
       case REB_BYTES:  // packed sequence of bytes directly in cell
         assert(NOT_CELL_FLAG(sequence, FIRST_IS_NODE));  // TBD: series form
         return EXTRA(Bytes, sequence).exactly_4[IDX_EXTRA_USED];
 
       case REB_WORD:  // simulated [_ _] sequence (`/`, `.`)
       case REB_GET_WORD:  // compressed [_ word] sequence (`.foo`, `/foo`)
+      case REB_GET_GROUP:
+      case REB_GET_BLOCK:
       case REB_SYM_WORD:  // compressed [word _] sequence (`foo.`, `foo.`)
+      case REB_SYM_GROUP:
+      case REB_SYM_BLOCK:
         return 2;
 
       case REB_BLOCK: {
-        REBARR *a = ARR(VAL_NODE(sequence));
+        REBARR *a = ARR(VAL_NODE1(sequence));
         assert(ARR_LEN(a) >= 2);
         assert(Is_Array_Frozen_Shallow(a));
         return ARR_LEN(a); }
@@ -507,28 +529,43 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         );
         return BLANK_VALUE; }
 
-      case REB_GET_WORD:
-      case REB_SYM_WORD: {
+      case REB_GET_WORD:  // `/a` or `.a`
+      case REB_GET_GROUP:  // `/(a)` or `.(a)`
+      case REB_GET_BLOCK: {  // `/[a]` or `.[a]`
         assert(n < 2);
-        if (heart == REB_SYM_WORD and n == 1)
-            return BLANK_VALUE;
-        if (heart == REB_GET_WORD and n == 0)
+        if (n == 0)
             return BLANK_VALUE;
 
         // Because the cell is being viewed as a PATH!, we cannot view it as
         // a WORD! also unless we fiddle the bits at a new location.
         //
         if (sequence != store)
-            Blit_Relative(store, CELL_TO_VAL(sequence));
-        mutable_KIND3Q_BYTE(store) = REB_WORD;  // not ANY-SEQUENCE!
-        mutable_HEART_BYTE(store) = REB_WORD;  // not the fake REB_GET_WORD
+            Copy_Cell(store, CELL_TO_VAL(sequence));
+        mutable_KIND3Q_BYTE(store)
+            = mutable_HEART_BYTE(store) = PLAINIFY_ANY_GET_KIND(heart);
+        return store; }
+
+      case REB_SYM_WORD:  // `a/` or `a.`
+      case REB_SYM_GROUP:  // `(a)/` or `(a).`
+      case REB_SYM_BLOCK: {  // `[a]/` or `[a].`
+        assert(n < 2);
+        if (n == 1)
+            return BLANK_VALUE;
+ 
+        // Because the cell is being viewed as a PATH!, we cannot view it as
+        // a WORD! also unless we fiddle the bits at a new location.
+        //
+        if (sequence != store)
+            Copy_Cell(store, CELL_TO_VAL(sequence));
+        mutable_KIND3Q_BYTE(store)
+            = mutable_HEART_BYTE(store) = PLAINIFY_ANY_SYM_KIND(heart);
         return store; }
 
       case REB_BLOCK: {
-        REBARR *a = ARR(VAL_NODE(sequence));
+        const REBARR *a = ARR(VAL_NODE1(sequence));
         assert(ARR_LEN(a) >= 2);
         assert(Is_Array_Frozen_Shallow(a));
-        return ARR_AT(a, n); }
+        return ARR_AT(a, n); }  // array is read only
 
       default:
         assert(false);
@@ -536,24 +573,37 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
     }
 }
 
-inline static REBYTE VAL_SEQUENCE_BYTE_AT(REBCEL(const*) path, REBLEN n)
-{
+inline static REBYTE VAL_SEQUENCE_BYTE_AT(
+    REBCEL(const*) sequence,
+    REBLEN n
+){
     DECLARE_LOCAL (temp);
-    const RELVAL *at = VAL_SEQUENCE_AT(temp, path, n);
+    const RELVAL *at = VAL_SEQUENCE_AT(temp, sequence, n);
     if (not IS_INTEGER(at))
         fail ("VAL_SEQUENCE_BYTE_AT() used on non-byte ANY-SEQUENCE!");
     return VAL_UINT8(at);  // !!! All callers of this routine need vetting
 }
 
-inline static REBSPC *VAL_SEQUENCE_SPECIFIER(REBCEL(const*) sequence)
-{
+inline static REBSPC *VAL_SEQUENCE_SPECIFIER(
+    REBCEL(const*) sequence
+){
     assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));
 
     switch (CELL_HEART(sequence)) {
+        //
+        // Getting the specifier for any of the optimized types means getting
+        // the specifier for *that item in the sequence*; the sequence itself
+        // does not provide a layer of communication connecting the insides
+        // to a frame instance (because there is no actual layer).
+        //
       case REB_BYTES:
       case REB_WORD:
       case REB_GET_WORD:
+      case REB_GET_GROUP:
+      case REB_GET_BLOCK:
       case REB_SYM_WORD:
+      case REB_SYM_GROUP:
+      case REB_SYM_BLOCK:
         return SPECIFIED;
 
       case REB_BLOCK:
@@ -622,11 +672,25 @@ inline static REBVAL *Refinify(REBVAL *v) {
     return v;
 }
 
-inline static bool IS_REFINEMENT_CELL(REBCEL(const*) v)
-  { return CELL_KIND(v) == REB_PATH and CELL_HEART(v) == REB_GET_WORD; }
+inline static bool IS_REFINEMENT_CELL(REBCEL(const*) v) {
+    assert(ANY_PATH_KIND(CELL_KIND(v)));
+    return CELL_HEART(v) == REB_GET_WORD;
+}
 
-inline static bool IS_REFINEMENT(const RELVAL *v)
-  { return IS_PATH(v) and HEART_BYTE(v) == REB_GET_WORD; }
+inline static bool IS_REFINEMENT(const RELVAL *v) {
+    assert(ANY_PATH(v));
+    return HEART_BYTE(v) == REB_GET_WORD;
+}
+
+inline static bool IS_PREDICATE1_CELL(REBCEL(const*) cell)
+  { return CELL_KIND(cell) == REB_TUPLE and CELL_HEART(cell) == REB_GET_WORD; }
+
+inline static const REBSYM *VAL_PREDICATE1_SYMBOL(
+    REBCEL(const*) cell
+){
+    assert(IS_PREDICATE1_CELL(cell));
+    return VAL_WORD_SYMBOL(cell);
+}
 
 inline static bool IS_PREDICATE(const RELVAL *v) {
     if (not IS_TUPLE(v))
@@ -636,7 +700,9 @@ inline static bool IS_PREDICATE(const RELVAL *v) {
     return IS_BLANK(VAL_SEQUENCE_AT(temp, v, 0));
 }
 
-inline static const REBSTR *VAL_REFINEMENT_SPELLING(REBCEL(const*) v) {
+inline static const REBSYM *VAL_REFINEMENT_SYMBOL(
+    REBCEL(const*) v
+){
     assert(IS_REFINEMENT_CELL(v));
-    return VAL_WORD_SPELLING(v);
+    return VAL_WORD_SYMBOL(v);
 }

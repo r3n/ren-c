@@ -74,7 +74,7 @@ console!: make object! [
     repl: true  ; used to identify this as a console! object
     is-loaded: false  ; if true then this is a loaded (external) skin
     was-updated: false  ; if true then console! object found in loaded skin
-    last-result: ~startup~  ; last evaluated result (sent by HOST-CONSOLE)
+    last-result: '~startup~  ; last evaluated result (sent by HOST-CONSOLE)
 
     === APPEARANCE (can be overridden) ===
 
@@ -87,10 +87,9 @@ console!: make object! [
 {Welcome to Rebol.  For more information please type in the commands below:
 
   HELP    - For starting information
-  ABOUT   - Information about your Rebol
-  CHANGES - What's different about this version}
+  ABOUT   - Information about your Rebol}
 
-    print-greeting: method [
+    print-greeting: meth [
         return: <void>
         {Adds live elements to static greeting content (build #, version)}
     ][
@@ -103,7 +102,7 @@ console!: make object! [
         boot-print greeting
     ]
 
-    print-prompt: method [return: <void>] [
+    print-prompt: meth [return: <void>] [
         ;
         ; Note: See example override in skin in the Debugger extension, which
         ; adds the stack "level" number and "current" function name.
@@ -115,13 +114,13 @@ console!: make object! [
         write-stdout space
     ]
 
-    print-result: method [return: <void> v [<opt> any-value!]] [
+    print-result: meth [return: <void> v [<opt> any-value!]] [
         switch match void! last-result: get/any 'v [
             null [
                 ; not a void, fall through to other printing
             ]
-            ~ [
-                return  ; e.g. result of HELP, understood as output *nothing*
+            '~void~ [
+                return  ; understood this *specific* void as output *nothing*
             ]
         ] else [  ; any other labeled VOID!
             print [result mold get/any 'v]
@@ -129,8 +128,8 @@ console!: make object! [
         ]
 
         case [
-            null? :v [
-                print "; null"  ; no representation, use comment
+            null? :v [  ; no representation, use comment
+                print ["; null" if isotope? 'v [#-2]]
             ]
 
             free? :v [
@@ -154,7 +153,7 @@ console!: make object! [
         else [
             ; print the first 20 lines of the first 2048 characters of mold
             ;
-            pos: molded: mold/limit :v 2048
+            let pos: let molded: mold/limit get 'v 2048
             loop 20 [
                 pos: next (find pos newline else [break])
             ] then [  ; e.g. didn't break
@@ -164,26 +163,26 @@ console!: make object! [
         ]
     ]
 
-    print-warning: method [s] [print [warning reduce s]]
+    print-warning: meth [s] [print [warning reduce s]]
 
-    print-error: method [e [error!]] [
+    print-error: meth [e [error!]] [
         if :e/file = 'tmp-boot.r [
             e/file: e/line: _  ; errors in console showed this, junk
         ]
         print [e]
     ]
 
-    print-halted: method [] [
+    print-halted: meth [] [
         print "[interrupted by Ctrl-C or HALT instruction]"
     ]
 
-    print-info: method [s] [print [info reduce s]]
+    print-info: meth [s] [print [info reduce s]]
 
-    print-gap: method [] [print newline]
+    print-gap: meth [] [print newline]
 
     === BEHAVIOR (can be overridden) ===
 
-    input-hook: method [
+    input-hook: meth [
         {Receives line input, parse/transform, send back to CONSOLE eval}
 
         return: "null if canceled, otherwise processed text line input"
@@ -192,7 +191,7 @@ console!: make object! [
         ask text!
     ]
 
-    dialect-hook: method [
+    dialect-hook: meth [
         {Receives code block, parse/transform, send back to CONSOLE eval}
         b [block!]
     ][
@@ -226,7 +225,7 @@ console!: make object! [
 
     === HELPERS (could be overridden!) ===
 
-    add-shortcut: method [
+    add-shortcut: meth [
         {Add/Change console shortcut}
         return: <void>
         name [any-word!] "Shortcut name"
@@ -400,7 +399,7 @@ ext-console-impl: function [
                 emit [system/console/print-gap]
                 emit [system/console/print-prompt]
                 emit [reduce [
-                    try system/console/input-hook
+                    try system/console/input-hook  ; can return be NULL
                 ]]  ; gather first line (or null), put in BLOCK!
             ]
             <halt> [
@@ -486,7 +485,7 @@ ext-console-impl: function [
     all [
         error? :result
         result/id = 'no-catch
-        :result/arg2 = :QUIT  ; throw's /NAME
+        :result/arg2 = :quit  ; throw's /NAME
     ] then [
         return switch type of get* 'result/arg1 [
             void! [0]  ; plain QUIT, no /WITH, call that success
@@ -506,7 +505,7 @@ ext-console-impl: function [
     all [
         error? :result
         result/id = 'no-catch
-        :result/arg2 = :HALT  ; throw's /NAME
+        :result/arg2 = :halt  ; throw's /NAME
     ] then [
         if find directives #quit-if-halt [
             return 128 + 2 ; standard cancellation exit status for bash
@@ -538,7 +537,7 @@ ext-console-impl: function [
         in lib 'resume
         error? :result
         result/id = 'no-catch
-        :result/arg2 = :LIB/RESUME  ; throw's /NAME
+        :result/arg2 = :lib/resume  ; throw's /NAME
     ] then [
         assert [match [sym-group! handle!] :result/arg1]
         if not resumable [
@@ -611,7 +610,7 @@ ext-console-impl: function [
     === HANDLE RESULT FROM EXECUTION OF CODE ON USER'S BEHALF ===
 
     if group? prior [
-        emit [system/console/print-result (<*> result)]
+        emit [system/console/print-result (<*> get/any 'result)]
         return <prompt>
     ]
 
@@ -642,19 +641,22 @@ ext-console-impl: function [
 
     if blank? last result [
         ;
-        ; It was aborted.  This comes from ESC on POSIX (which is the ideal
-        ; behavior), Ctrl-D on Windows (because ReadConsole() can't trap ESC),
-        ; Ctrl-D on POSIX (just to be compatible with Windows).
+        ; It was aborted.  This comes from ESC (NULL from ASK TEXT!, + TRY)
         ;
-        emit [system/console/print-result ~]
+        ; Note: At one time it had to be Ctrl-D on Windows, as ReadConsole()
+        ; could not trap escape.  But input was changed to use more granular
+        ; APIs on windows, on a keystroke-by-keystroke basis vs reading a
+        ; whole line at a time.
+        ;
+        emit [system/console/print-result '~void~]
         return <prompt>
     ]
 
     trap [
-        ; Note that LOAD/ALL makes BLOCK! even for a single item,
-        ; e.g. `load/all "word"` => `[word]`
+        ; Note LOAD now makes BLOCK! even for a single item,
+        ; e.g. `load "word"` => `[word]`
         ;
-        code: load/all delimit newline result
+        code: load delimit newline result
         assert [block? code]
 
     ] then error -> [
@@ -705,7 +707,7 @@ ext-console-impl: function [
         ;
         ; Shortcuts like `q => [quit]`, `d => [dump]`
         ;
-        if (bound? code/1) and [set? code/1] [
+        if (bound? code/1) and (set? code/1) [
             ;
             ; Help confused user who might not know about the shortcut not
             ; panic by giving them a message.  Reduce noise for the casual

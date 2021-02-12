@@ -48,12 +48,12 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
     // Actions for an unopened serial port:
     if (not (req->flags & RRF_OPEN)) {
-        switch (VAL_WORD_SYM(verb)) {
+        switch (VAL_WORD_ID(verb)) {
           case SYM_REFLECT: {
             INCLUDE_PARAMS_OF_REFLECT;
 
             UNUSED(ARG(value));
-            REBSYM property = VAL_WORD_SYM(ARG(property));
+            SYMID property = VAL_WORD_ID(ARG(property));
             assert(property != SYM_0);
 
             switch (property) {
@@ -132,12 +132,12 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
     // Actions for an open socket:
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value));
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -166,7 +166,7 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         if (!IS_BINARY(data))
             Init_Binary(data, Make_Binary(32000));
 
-        REBSER *ser = VAL_SERIES_KNOWN_MUTABLE(data);
+        REBBIN *ser = VAL_BINARY_KNOWN_MUTABLE(data);
         req->length = SER_AVAIL(ser); // space available
         if (req->length < 32000 / 2)
             Extend_Series(ser, 32000);
@@ -211,7 +211,7 @@ static REB_R Serial_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
                 len = n;
         }
 
-        Move_Value(CTX_VAR(ctx, STD_PORT_DATA), data); // keep it GC safe
+        Copy_Cell(CTX_VAR(ctx, STD_PORT_DATA), data); // keep it GC safe
         req->length = len;
         req->common.data = VAL_BINARY_AT_KNOWN_MUTABLE(data);
         req->actual = 0;

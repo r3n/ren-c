@@ -28,74 +28,85 @@
 //
 
 
-#if !defined(DEBUG_CHECK_CASTS)
+#define NODE_BYTE(p) \
+    *cast(const REBYTE*, ensure(const REBNOD*, p))
 
-    #define NOD(p) \
-        m_cast(REBNOD*, (const REBNOD*)(p))  // don't check const in C or C++
-
+#ifdef NDEBUG
+    #define IS_FREE_NODE(p) \
+        (did (*cast(const REBYTE*, (p)) & NODE_BYTEMASK_0x40_FREE))
 #else
+    inline static bool IS_FREE_NODE(const void *p) {
+        REBYTE first = *cast(const REBYTE*, p);  // NODE_BYTE asserts on free!
 
-    inline static REBNOD *NOD(nullptr_t p) {
-        UNUSED(p);
-        return nullptr;
-    }
+        if (not (first & NODE_BYTEMASK_0x40_FREE))
+            return false;  // byte access defeats strict alias
 
-    template <
-        typename T,
-        typename T0 = typename std::remove_const<T>::type,
-        typename N = typename std::conditional<
-            std::is_const<T>::value,  // boolean
-            const REBNOD,  // true branch
-            REBNOD  // false branch
-        >::type
-    >
-    inline static N *NOD(T *p) {
-        constexpr bool derived =
-            std::is_same<T0, REBNOD>::value
-            or std::is_same<T0, REBVAL>::value
-            or std::is_same<T0, RELVAL>::value
-            or std::is_same<T0, REBSER>::value
-            or std::is_same<T0, REBSTR>::value
-            or std::is_same<T0, REBARR>::value
-            or std::is_same<T0, REBCTX>::value
-            or std::is_same<T0, REBACT>::value
-            or std::is_same<T0, REBMAP>::value
-            or std::is_same<T0, REBFRM>::value;
-
-        constexpr bool base =
-            std::is_same<T0, void>::value
-            or std::is_same<T0, REBYTE>::value;
-
-        static_assert(
-            derived or base,
-            "NOD() works on void/REBVAL/REBSER/REBSTR/REBARR/REBCTX/REBACT" \
-               "/REBMAP/REBFRM or nullptr"
-        );
-
-        bool b = base;  // needed to avoid compiler constexpr warning
-        if (b and p and (reinterpret_cast<const REBNOD*>(p)->header.bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE
-        )) != (
-            NODE_FLAG_NODE
-        )){
-            panic (p);
-        }
-
-        return reinterpret_cast<N*>(p);
+        assert(first == FREED_SERIES_BYTE or first == FREED_CELL_BYTE);
+        return true;
     }
 #endif
 
 
-#if defined(NDEBUG)
-    #define Is_Node_Cell(n) \
-        (did (FIRST_BYTE((n)->header) & NODE_BYTEMASK_0x01_CELL))
+//=//// MEMORY ALLOCATION AND FREEING MACROS //////////////////////////////=//
+//
+// Rebol's internal memory management is done based on a pooled model, which
+// use Try_Alloc_Mem() and Free_Mem() instead of calling malloc directly.
+// (Comments on those routines explain why this was done--even in an age of
+// modern thread-safe allocators--due to Rebol's ability to exploit extra
+// data in its pool block when a series grows.)
+//
+// Since Free_Mem() requires callers to pass in the size of the memory being
+// freed, it can be tricky.  These macros are modeled after C++'s new/delete
+// and new[]/delete[], and allocations take either a type or a type and a
+// length.  The size calculation is done automatically, and the result is cast
+// to the appropriate type.  The deallocations also take a type and do the
+// calculations.
+//
+// In a C++11 build, an extra check is done to ensure the type you pass in a
+// FREE or FREE_N lines up with the type of pointer being freed.
+//
+
+#define TRY_ALLOC(t) \
+    cast(t *, Try_Alloc_Mem(sizeof(t)))
+
+#define TRY_ALLOC_ZEROFILL(t) \
+    cast(t *, memset(ALLOC(t), '\0', sizeof(t)))
+
+#define TRY_ALLOC_N(t,n) \
+    cast(t *, Try_Alloc_Mem(sizeof(t) * (n)))
+
+#define TRY_ALLOC_N_ZEROFILL(t,n) \
+    cast(t *, memset(TRY_ALLOC_N(t, (n)), '\0', sizeof(t) * (n)))
+
+#ifdef CPLUSPLUS_11
+    #define FREE(t,p) \
+        do { \
+            static_assert( \
+                std::is_same<decltype(p), std::add_pointer<t>::type>::value, \
+                "mismatched FREE type" \
+            ); \
+            Free_Mem(p, sizeof(t)); \
+        } while (0)
+
+    #define FREE_N(t,n,p)   \
+        do { \
+            static_assert( \
+                std::is_same<decltype(p), std::add_pointer<t>::type>::value, \
+                "mismatched FREE_N type" \
+            ); \
+            Free_Mem(p, sizeof(t) * (n)); \
+        } while (0)
 #else
-    inline static bool Is_Node_Cell(REBNOD *n) {
-        REBYTE first = FIRST_BYTE(n->header);
-        assert(first & NODE_BYTEMASK_0x80_NODE);
-        return did (first & NODE_BYTEMASK_0x01_CELL);
-    }
+    #define FREE(t,p) \
+        Free_Mem((p), sizeof(t))
+
+    #define FREE_N(t,n,p)   \
+        Free_Mem((p), sizeof(t) * (n))
 #endif
+
+
+#define Is_Node_Cell(n) \
+    (did (NODE_BYTE(n) & NODE_BYTEMASK_0x01_CELL))
 
 
 // Allocate a node from a pool.  Returned node will not be zero-filled, but
@@ -132,31 +143,31 @@ inline static void *Try_Alloc_Node(REBLEN pool_id)
 
     assert(pool->first);
 
-    REBNOD *node = pool->first;
+    REBPLU *unit = pool->first;
 
-    pool->first = node->next_if_free;
-    if (node == pool->last)
+    pool->first = unit->next_if_free;
+    if (unit == pool->last)
         pool->last = nullptr;
 
     pool->free--;
 
   #ifdef DEBUG_MEMORY_ALIGN
-    if (cast(uintptr_t, node) % sizeof(REBI64) != 0) {
+    if (cast(uintptr_t, unit) % sizeof(REBI64) != 0) {
         printf(
-            "Node address %p not aligned to %d bytes\n",
-            cast(void*, node),
+            "Pool Unit address %p not aligned to %d bytes\n",
+            cast(void*, unit),
             cast(int, sizeof(REBI64))
         );
-        printf("Pool address is %p and pool-first is %p\n",
+        printf("Pool Unit address is %p and pool-first is %p\n",
             cast(void*, pool),
             cast(void*, pool->first)
         );
-        panic (node);
+        panic (unit);
     }
   #endif
 
-    assert(IS_FREE_NODE(node)); // client needs to change to non-free
-    return cast(void*, node);
+    assert(IS_FREE_NODE(cast(REBNOD*, unit)));  // client must make non-free
+    return cast(void*, unit);
 }
 
 
@@ -166,7 +177,7 @@ inline static void *Alloc_Node(REBLEN pool_id) {
         return node;
 
     REBPOL *pool = &Mem_Pools[pool_id];
-    fail (Error_No_Memory(pool->wide * pool->units));
+    fail (Error_No_Memory(pool->wide * pool->num_units));
 }
 
 // Free a node, returning it to its pool.  Once it is freed, its header will
@@ -175,13 +186,13 @@ inline static void *Alloc_Node(REBLEN pool_id) {
 //
 inline static void Free_Node(REBLEN pool_id, void *p)
 {
-    REBNOD* node = cast(REBNOD*, p);
+    REBNOD* node = NOD(p);
 
   #ifdef DEBUG_MONITOR_SERIES
     if (
         pool_id == SER_POOL
-        and not (node->header.bits & NODE_FLAG_CELL)
-        and GET_SERIES_INFO(SER(node), MONITOR_DEBUG)
+        and not Is_Node_Cell(node)
+        and (cast(REBSER*, node)->info.flags.bits & SERIES_INFO_MONITOR_DEBUG)
     ){
         printf(
             "Freeing series %p on tick #%d\n",
@@ -192,13 +203,15 @@ inline static void Free_Node(REBLEN pool_id, void *p)
     }
   #endif
 
-    mutable_FIRST_BYTE(node->header) = FREED_SERIES_BYTE;
+    REBPLU* unit = cast(REBPLU*, node);
+
+    mutable_FIRST_BYTE(unit->headspot) = FREED_SERIES_BYTE;
 
     REBPOL *pool = &Mem_Pools[pool_id];
 
   #ifdef NDEBUG
-    node->next_if_free = pool->first;
-    pool->first = node;
+    unit->next_if_free = pool->first;
+    pool->first = unit;
   #else
     // !!! In R3-Alpha, the most recently freed node would become the first
     // node to hand out.  This is a simple and likely good strategy for
@@ -221,15 +234,15 @@ inline static void Free_Node(REBLEN pool_id, void *p)
         // We don't want Free_Node to fail with an "out of memory" error, so
         // just fall back to the release build behavior in this case.
         //
-        node->next_if_free = pool->first;
-        pool->first = node;
+        unit->next_if_free = pool->first;
+        pool->first = unit;
     }
     else {
         assert(pool->last);
 
-        pool->last->next_if_free = node;
-        pool->last = node;
-        node->next_if_free = nullptr;
+        pool->last->next_if_free = unit;
+        pool->last = unit;
+        unit->next_if_free = nullptr;
     }
   #endif
 
@@ -237,19 +250,15 @@ inline static void Free_Node(REBLEN pool_id, void *p)
 }
 
 
-//=////////////////////////////////////////////////////////////////////////=//
+//=//// POINTER DETECTION (UTF-8, SERIES, FREED SERIES, END) //////////////=//
 //
-// POINTER DETECTION (UTF-8, SERIES, FREED SERIES, END...)
-//
-//=////////////////////////////////////////////////////////////////////////=//
-//
-// Rebol's "nodes" all have a platform-pointer-sized header of bits, which
-// is constructed using byte-order-sensitive bit flags (see FLAG_LEFT_BIT and
-// related definitions).
+// Ren-C's "nodes" (REBVAL and REBSER derivatives) all have a platform-pointer
+// sized header of bits, which is constructed using byte-order-sensitive bit
+// flags (see FLAG_LEFT_BIT and related definitions for how those work).
 //
 // The values for the bits were chosen carefully, so that the leading byte of
-// Rebol structures could be distinguished from the leading byte of a UTF-8
-// string.  This is taken advantage of in the API.
+// REBVAL and REBSER could be distinguished from the leading byte of a UTF-8
+// string, as well as from each other.  This is taken advantage of in the API.
 //
 // During startup, Assert_Pointer_Detection_Working() checks invariants that
 // make this routine able to work.
@@ -267,16 +276,11 @@ enum Reb_Pointer_Detect {
     DETECTED_AS_END = 5 // may be a cell, or made with Endlike_Header()
 };
 
-// !!! Given how often this is called, would a 256 byte table mapping bytes
-// to types be worth it?  The function call could be avoided entirely.
-// Alternately, it could be folded into the UTF-8 detection so that the
-// invalid Rebol-oriented cases gave illegal codepoints...that way, it could
-// already be on its first step of a UTF-8 decode otherwise.
-//
-inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(const void *p) {
+inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(const void *p)
+{
     const REBYTE* bp = cast(const REBYTE*, p);
 
-    switch (bp[0] >> 4) {  // switch on the left 4 bits of the byte
+    switch (bp[0] >> 4) {  // 4 left bits: 0xbNFGK -> Node Free manaGed marKed
       case 0:
       case 1:
       case 2:
@@ -291,25 +295,29 @@ inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(const void *p) {
     // valid starting points for a UTF-8 string)
 
       case 8:  // 0xb1000
-        if (bp[1] == REB_0)
-            return DETECTED_AS_END;  // may be end cell or "endlike" header
-        if (bp[0] & 0x1)
+        if (bp[1] == REB_0) {
+            if (bp[0] & NODE_BYTEMASK_0x01_CELL)  // may be series info flags
+                return DETECTED_AS_END;
+            return DETECTED_AS_SERIES;
+        }
+        if (bp[0] & NODE_BYTEMASK_0x01_CELL)
             return DETECTED_AS_CELL;  // unmanaged
         return DETECTED_AS_SERIES;  // unmanaged
 
-      case 9:  // 0xb1001
+      case 9:  // 0xb1001 - marked bit set, should not see series in mid-GC
+        assert(bp[0] & NODE_BYTEMASK_0x01_CELL);  // must be cell / end header
         if (bp[1] == REB_0)
-            return DETECTED_AS_END;  // has to be an "endlike" header
-        assert(bp[0] & 0x1);  // marked and unmanaged, must be a cell
+            return DETECTED_AS_END;
         return DETECTED_AS_CELL;
 
       case 10:  // 0b1010
       case 11:  // 0b1011
-        if (bp[1] == REB_0)
-            return DETECTED_AS_END;
-        if (bp[0] & 0x1)
-            return DETECTED_AS_CELL; // managed, marked if `case 11`
-        return DETECTED_AS_SERIES; // managed, marked if `case 11`
+        if (bp[1] == REB_0) {
+            if (bp[0] & NODE_BYTEMASK_0x01_CELL)  // may be series info flags
+                return DETECTED_AS_END;  // managed, marked if `case 11`
+            return DETECTED_AS_SERIES;  // series that just has no [1] flags
+        }
+        return DETECTED_AS_SERIES;  // managed, marked if `case 11`
 
     // v-- bit sequences starting with `11` are *usually* legal multi-byte
     // valid starting points for UTF-8, with only the exceptions made for
@@ -330,32 +338,3 @@ inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(const void *p) {
 
     DEAD_END;
 }
-
-
-// Unlike with GET_CELL_FLAG() etc, there's not really anything to be checked
-// on generic nodes (other than having NODE_FLAG_NODE?)  But these macros
-// help make the source a little more readable.
-
-#define SET_NOD_FLAGS(n,f) \
-    ((n)->header.bits |= (f))
-
-#define SET_NOD_FLAG(n,f) \
-    SET_CELL_FLAGS((n), (f))
-
-#define GET_NOD_FLAG(n, f) \
-    (did ((n)->header.bits & (f)))
-
-#define ANY_NOD_FLAGS(n,f) \
-    (((n)->header.bits & (f)) != 0)
-
-#define ALL_NOD_FLAGS(n,f) \
-    (((n)->header.bits & (f)) == (f))
-
-#define CLEAR_NOD_FLAGS(v,f) \
-    ((n)->header.bits &= ~(f))
-
-#define CLEAR_NOD_FLAG(n,f) \
-    CLEAR_NOD_FLAGS((n), (f))
-
-#define NOT_NOD_FLAG(n,f) \
-    (not GET_NOD_FLAG((n), (f)))

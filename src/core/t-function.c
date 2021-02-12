@@ -28,14 +28,14 @@ static bool Same_Action(REBCEL(const*) a, REBCEL(const*) b)
 {
     assert(CELL_KIND(a) == REB_ACTION and CELL_KIND(b) == REB_ACTION);
 
-    if (VAL_ACT_PARAMLIST(a) == VAL_ACT_PARAMLIST(b)) {
+    if (VAL_ACTION_KEYLIST(a) == VAL_ACTION_KEYLIST(b)) {
         //
         // All actions that have the same paramlist are not necessarily the
         // "same action".  For instance, every RETURN shares a common
         // paramlist, but the binding is different in the REBVAL instances
         // in order to know where to "exit from".
         //
-        return VAL_BINDING(a) == VAL_BINDING(b);
+        return VAL_ACTION_BINDING(a) == VAL_ACTION_BINDING(b);
     }
 
     return false;
@@ -59,35 +59,34 @@ REBINT CT_Action(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 //
 //  MAKE_Action: C
 //
-// For REB_ACTION and "make spec", there is a function spec block and then
-// a block of Rebol code implementing that function.  In that case we expect
-// that `def` should be:
+// Ren-C provides the ability to MAKE ACTION! from a FRAME!.  Any values on
+// the public interface which are ~unset~ will be assumed to be unspecialized.
 //
-//     [[spec] [body]]
+// https://forum.rebol.info/t/default-values-and-make-frame/1412
 //
-// !!! This has a potential to redesign as a single block, see concept:
-//
-// https://forum.rebol.info/t/1002
+// It however does not carry forward R3-Alpha's concept of MAKE ACTION! from
+// a BLOCK!, e.g. `make function! copy/deep reduce [spec body]`.  This is
+// because there is no particular advantage to folding the two parameters to
+// FUNC into one block...and it makes spec analysis seem more "cooked in"
+// than being an epicycle of the design of FUNC (which is just an optimized
+// version of something that could be written in usermode).
 //
 REB_R MAKE_Action(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_ACTION);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
-    // MAKE ACTION! on a FRAME! will create an action where the NULLs are
-    // assumed to be unspecialized.
-    // !!! Techniques for passing NULL literally should be examined.
-    //
-    if (IS_FRAME(arg)) {
+    if (IS_FRAME(arg)) {  // will assume ~unset~ fields are unspecialized
         //
-        // Use a copy of the frame's values so original frame is left as is.
-        // !!! Could also expire original frame and steal variables, and ask
-        // user to copy if they care, for efficiency?
+        // !!! This makes a copy of the incoming context.  AS FRAME! does not,
+        // but it expects any specialized frame fields to be hidden, and non
+        // hidden fields are parameter specifications.  Review if there is
+        // some middle ground.
         //
         REBVAL *frame_copy = rebValue("copy", arg, rebEND);
         REBCTX *exemplar = VAL_CONTEXT(frame_copy);
@@ -97,39 +96,14 @@ REB_R MAKE_Action(
             out,
             Make_Action_From_Exemplar(exemplar),
             VAL_FRAME_LABEL(arg),
-            VAL_BINDING(arg)  // is this right?
+            VAL_FRAME_BINDING(arg)
         );
     }
 
-    if (
-        not IS_BLOCK(arg)
-        or VAL_LEN_AT(arg) != 2
-        or not IS_BLOCK(VAL_ARRAY_AT(arg))
-        or not IS_BLOCK(VAL_ARRAY_AT(arg) + 1)
-    ){
+    if (not IS_BLOCK(arg))
         fail (Error_Bad_Make(REB_ACTION, arg));
-    }
 
-    DECLARE_LOCAL (spec);
-    Derelativize(spec, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
-
-    DECLARE_LOCAL (body);
-    Derelativize(body, VAL_ARRAY_AT(arg) + 1, VAL_SPECIFIER(arg));
-
-    // Spec-constructed functions do *not* have definitional returns
-    // added automatically.  They are part of the generators.  So the
-    // behavior comes--as with any other generator--from the projected
-    // code (though round-tripping it via text is not possible in
-    // general in any case due to loss of bindings.)
-    //
-    REBACT *act = Make_Interpreted_Action_May_Fail(
-        spec,
-        body,
-        MKF_MASK_NONE,
-        1  // details capacity, just the slot filled by the relativized body
-    );
-
-    return Init_Action(out, act, ANONYMOUS, UNBOUND);
+    fail ("Ren-C does not support MAKE ACTION! on BLOCK! (see FUNC*/FUNC)");
 }
 
 
@@ -158,9 +132,14 @@ void MF_Action(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
 
-    Pre_Mold(mo, v);
+    Append_Ascii(mo->series, "#[action! ");
 
-    Append_Codepoint(mo->series, '[');
+    option(const REBSTR*) label = VAL_ACTION_LABEL(v);
+    if (label) {
+        Append_Codepoint(mo->series, '{');
+        Append_Spelling(mo->series, unwrap(label));
+        Append_Ascii(mo->series, "} ");
+    }
 
     // !!! The system is no longer keeping the spec of functions, in order
     // to focus on a generalized "meta info object" service.  MOLD of
@@ -170,14 +149,13 @@ void MF_Action(REB_MOLD *mo, REBCEL(const*) v, bool form)
     const bool just_words = false;
     REBARR *parameters = Make_Action_Parameters_Arr(VAL_ACTION(v), just_words);
     Mold_Array_At(mo, parameters, 0, "[]");
-    Free_Unmanaged_Array(parameters);
+    Free_Unmanaged_Series(parameters);
 
     // !!! Previously, ACTION! would mold the body out.  This created a large
     // amount of output, and also many function variations do not have
-    // ordinary "bodies".  Review if Get_Maybe_Fake_Action_Body() should be
-    // used for this case.
-    //
-    Append_Ascii(mo->series, " [...]");
+    // ordinary "bodies".  It's more useful to show the cached name, and maybe
+    // some base64 encoding of a UUID (?)  In the meantime, having the label
+    // of the last word used is actually a lot more useful than most things.
 
     Append_Codepoint(mo->series, ']');
     End_Mold(mo);
@@ -192,7 +170,7 @@ REBTYPE(Action)
     REBVAL *action = D_ARG(1);
     REBACT *act = VAL_ACTION(action);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_COPY: {
         INCLUDE_PARAMS_OF_COPY;
 
@@ -207,17 +185,9 @@ REBTYPE(Action)
 
         // Copying functions creates another handle which executes the same
         // code, yet has a distinct identity.  This means it would not be
-        // HIJACK'd if the function that it was copied from was.
+        // HIJACK'd if the function that it was copied from was hijacked.
 
-        REBARR *proxy_paramlist = Copy_Array_Deep_Flags_Managed(
-            ACT_PARAMLIST(act),
-            SPECIFIED,  // !!! Note: not actually "deep", just typesets
-            SERIES_MASK_PARAMLIST | (
-                SER(act)->header.bits & PARAMLIST_FLAG_IS_NATIVE
-            )
-        );
-        Sync_Paramlist_Archetype(proxy_paramlist);
-        MISC_META_NODE(proxy_paramlist) = NOD(ACT_META(act));
+        REBCTX *meta = ACT_META(act);  // !!! Note: not a copy of meta
 
         // If the function had code, then that code will be bound relative
         // to the original paramlist that's getting hijacked.  So when the
@@ -227,31 +197,41 @@ REBTYPE(Action)
 
         REBLEN details_len = ARR_LEN(ACT_DETAILS(act));
         REBACT *proxy = Make_Action(
-            proxy_paramlist,
+            ACT_SPECIALTY(act),  // not changing the interface
             ACT_DISPATCHER(act),
-            ACT_UNDERLYING(act),  // !!! ^-- see notes above RE: frame pushing
-            ACT_EXEMPLAR(act),  // not changing the specialization
             details_len  // details array capacity
         );
+
+        assert(ACT_META(proxy) == nullptr);
+        mutable_ACT_META(proxy) = meta;
+
+        if (GET_ACTION_FLAG(act, IS_NATIVE))
+            SET_ACTION_FLAG(proxy, IS_NATIVE);
 
         // A new body_holder was created inside Make_Action().  Rare case
         // where we can bit-copy a possibly-relative value.
         //
-        RELVAL *src = ARR_HEAD(ACT_DETAILS(act));
-        RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy));
+      blockscope {
+        RELVAL *src = ARR_HEAD(ACT_DETAILS(act)) + 1;
+        RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy)) + 1;
         for (; NOT_END(src); ++src, ++dest)
-            Blit_Relative(dest, src);
-        TERM_ARRAY_LEN(ACT_DETAILS(proxy), details_len);
+            Copy_Cell(dest, src);
+        SET_SERIES_LEN(ACT_DETAILS(proxy), details_len);
+      }
 
-        Init_Action(D_OUT, proxy, VAL_ACTION_LABEL(action), VAL_BINDING(action));
-        return D_OUT; }
+        return Init_Action(
+            D_OUT,
+            proxy,
+            VAL_ACTION_LABEL(action),  // keep symbol (if any) from original
+            VAL_ACTION_BINDING(action)  // same (e.g. RETURN to same frame)
+        ); }
 
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));
 
         REBVAL *property = ARG(property);
-        REBSYM sym = VAL_WORD_SYM(property);
+        SYMID sym = VAL_WORD_ID(property);
         switch (sym) {
           case SYM_BINDING: {
             if (Did_Get_Binding_Of(D_OUT, action))
@@ -259,10 +239,10 @@ REBTYPE(Action)
             return nullptr; }
 
           case SYM_LABEL: {
-            const REBSTR *label = VAL_ACTION_LABEL(action);
+            option(const REBSYM*) label = VAL_ACTION_LABEL(action);
             if (not label)
                 return nullptr;
-            return Init_Word(D_OUT, label); }
+            return Init_Word(D_OUT, unwrap(label)); }
 
           case SYM_WORDS:
           case SYM_PARAMETERS: {
@@ -272,36 +252,12 @@ REBTYPE(Action)
                 Make_Action_Parameters_Arr(act, just_words)
             ); }
 
-          case SYM_TYPESETS:
-            return Init_Block(
-                D_OUT,
-                Make_Action_Typesets_Arr(act)
-            );
-
           case SYM_BODY:
             Get_Maybe_Fake_Action_Body(D_OUT, action);
             return D_OUT;
 
-          case SYM_TYPES: {
-            REBARR *copy = Make_Array(ACT_NUM_PARAMS(act));
-
-            // The typesets have a symbol in them for the parameters, and
-            // ordinary typesets aren't supposed to have it--that's a
-            // special feature for object keys and paramlists!  So clear
-            // that symbol out before giving it back.
-            //
-            REBVAL *param = ACT_PARAMS_HEAD(act);
-            REBVAL *typeset = SPECIFIC(ARR_HEAD(copy));
-            for (; NOT_END(param); ++param, ++typeset) {
-                assert(IS_PARAM(param));
-                RESET_CELL(typeset, REB_TYPESET, CELL_MASK_NONE);
-                VAL_TYPESET_LOW_BITS(typeset) = VAL_TYPESET_LOW_BITS(param);
-                VAL_TYPESET_HIGH_BITS(typeset) = VAL_TYPESET_HIGH_BITS(param);
-            }
-            TERM_ARRAY_LEN(copy, ACT_NUM_PARAMS(act));
-            assert(IS_END(typeset));
-
-            return Init_Block(D_OUT, copy); }
+          case SYM_TYPES:
+            return Copy_Cell(D_OUT, CTX_ARCHETYPE(ACT_EXEMPLAR(act)));
 
           case SYM_FILE:
           case SYM_LINE: {
@@ -315,15 +271,15 @@ REBTYPE(Action)
                 return nullptr;
 
             const REBARR *a = VAL_ARRAY(ARR_HEAD(details));
-            if (NOT_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED))
+            if (NOT_SUBCLASS_FLAG(ARRAY, a, HAS_FILE_LINE_UNMASKED))
                 return nullptr;
 
             // !!! How to tell URL! vs FILE! ?
             //
-            if (VAL_WORD_SYM(property) == SYM_FILE)
-                Init_File(D_OUT, LINK_FILE(a));
+            if (VAL_WORD_ID(property) == SYM_FILE)
+                Init_File(D_OUT, LINK(Filename, a));
             else
-                Init_Integer(D_OUT, MISC(a).line);
+                Init_Integer(D_OUT, a->misc.line);
 
             return D_OUT; }
 
@@ -356,9 +312,9 @@ REBTYPE(Action)
 REB_R PD_Action(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    UNUSED(opt_setval);
+    UNUSED(setval);
 
     assert(IS_ACTION(pvs->out));
 
@@ -380,15 +336,15 @@ REB_R PD_Action(
     // general path mechanic before reaching this dispatch.  So if it's not
     // a word/refinement or or one of those that evaluated it, then error.
     //
-    const REBSTR *spelling;
+    const REBSYM *symbol;
     if (IS_WORD(picker))
-        spelling = VAL_WORD_SPELLING(picker);
-    else if (IS_REFINEMENT(picker))
-        spelling = VAL_REFINEMENT_SPELLING(picker);
+        symbol = VAL_WORD_SYMBOL(picker);
+    else if (IS_PATH(picker) and IS_REFINEMENT(picker))
+        symbol = VAL_REFINEMENT_SYMBOL(picker);
     else
-        fail (Error_Bad_Refine_Raw(rebUnrelativize(picker)));
+        return R_UNHANDLED;
 
-    Init_Sym_Word(DS_PUSH(), STR_CANON(spelling)); // canonize just once
+    Init_Word(DS_PUSH(), symbol);
 
     return pvs->out; // leave ACTION! value in pvs->out, as-is
 }

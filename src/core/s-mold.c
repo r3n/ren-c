@@ -94,8 +94,8 @@
 REBYTE *Prep_Mold_Overestimated(REB_MOLD *mo, REBLEN num_bytes)
 {
     REBLEN tail = STR_LEN(mo->series);
-    EXPAND_SERIES_TAIL(SER(mo->series), num_bytes);  // terminates at guess
-    return BIN_AT(SER(mo->series), tail);
+    EXPAND_SERIES_TAIL(mo->series, num_bytes);  // terminates at guess
+    return BIN_AT(mo->series, tail);
 }
 
 
@@ -116,7 +116,7 @@ void Pre_Mold_Core(REB_MOLD *mo, REBCEL(const*) v, bool all)
     // comes back as the answer.
     //
     const REBSTR *type_name = Canon(
-        SYM_FROM_KIND(cast(enum Reb_Kind, HEART_BYTE(v)))
+        SYM_FROM_KIND(cast(enum Reb_Kind, CELL_HEART(v)))
     );
     Append_Spelling(mo->series, type_name);
 
@@ -166,7 +166,7 @@ void New_Indented_Line(REB_MOLD *mo)
     if (STR_LEN(mo->series) == 0)
         bp = nullptr;
     else {
-        bp = BIN_LAST(SER(mo->series));  // legal way to check UTF-8
+        bp = BIN_LAST(mo->series);  // legal way to check UTF-8
         if (*bp == ' ' or *bp == '\t')
             *bp = '\n';
         else
@@ -298,7 +298,7 @@ void Mold_Array_At(
         --mo->indent;
 
     if (sep[1] != '\0') {
-        if (GET_ARRAY_FLAG(a, NEWLINE_AT_TAIL))
+        if (Has_Newline_At_Tail(a))  // accommodates varlists, etc. for PROBE
             New_Indented_Line(mo); // but not any indentation from *this* mold
         Append_Codepoint(mo->series, sep[1]);
     }
@@ -314,7 +314,7 @@ void Form_Array_At(
     REB_MOLD *mo,
     const REBARR *array,
     REBLEN index,
-    REBCTX *opt_context
+    option(REBCTX*) context
 ){
     // Form a series (part_mold means mold non-string values):
     REBINT len = ARR_LEN(array) - index;
@@ -325,10 +325,10 @@ void Form_Array_At(
     for (n = 0; n < len;) {
         const RELVAL *item = ARR_AT(array, index + n);
         REBVAL *wval = nullptr;
-        if (opt_context and (IS_WORD(item) or IS_GET_WORD(item))) {
-            wval = Select_Canon_In_Context(
-                CTX_ARCHETYPE(opt_context),
-                VAL_WORD_CANON(item)
+        if (context and (IS_WORD(item) or IS_GET_WORD(item))) {
+            wval = Select_Symbol_In_Context(
+                CTX_ARCHETYPE(unwrap(context)),
+                VAL_WORD_SYMBOL(item)
             );
             if (wval)
                 item = wval;
@@ -342,7 +342,7 @@ void Form_Array_At(
             if (
                 n < len
                 and STR_LEN(mo->series) != 0
-                and *BIN_LAST(SER(mo->series)) != LF
+                and *BIN_LAST(mo->series) != LF
                 and NOT_MOLD_FLAG(mo, MOLD_FLAG_TIGHT)
             ){
                 Append_Codepoint(mo->series, ' ');
@@ -398,10 +398,13 @@ void MF_Unhooked(REB_MOLD *mo, REBCEL(const*) v, bool form)
 //
 // Variation which molds a cell, e.g. no quoting is considered.
 //
-void Mold_Or_Form_Cell(REB_MOLD *mo, REBCEL(const*) cell, bool form)
-{
+void Mold_Or_Form_Cell(
+    REB_MOLD *mo,
+    REBCEL(const*) cell,
+    bool form
+){
     REBSTR *s = mo->series;
-    ASSERT_SERIES_TERM(SER(s));
+    ASSERT_SERIES_TERM_IF_NEEDED(s);
 
     if (C_STACK_OVERFLOWING(&s))
         Fail_Stack_Overflow();
@@ -424,7 +427,7 @@ void Mold_Or_Form_Cell(REB_MOLD *mo, REBCEL(const*) cell, bool form)
     MOLD_HOOK *hook = Mold_Or_Form_Hook_For_Type_Of(cell);
     hook(mo, cell, form);
 
-    ASSERT_SERIES_TERM(SER(s));
+    ASSERT_SERIES_TERM_IF_NEEDED(s);
 }
 
 
@@ -437,6 +440,13 @@ void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
 {
     // Mold hooks take a REBCEL* and not a RELVAL*, so they expect any quotes
     // applied to have already been done.
+
+  #if !defined(NDEBUG)
+    if (IS_UNREADABLE_DEBUG(v)) {  // keylists and paramlists have unreadables
+        Append_Ascii(mo->series, "~unreadable~");
+        return;
+    }
+  #endif
 
     REBLEN depth = VAL_NUM_QUOTES(v);
 
@@ -510,7 +520,7 @@ bool Form_Reduce_Throws(
 
     DECLARE_ARRAY_FEED (feed, array, index, specifier);
 
-    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED);
     Push_Frame(nullptr, f);
 
     bool pending = false;  // pending delimiter output, *if* more non-nulls
@@ -591,12 +601,12 @@ void Push_Mold(REB_MOLD *mo)
 
     assert(mo->series == nullptr);  // Indicates not pushed, see DECLARE_MOLD
 
-    REBSER *s = SER(MOLD_BUF);
-    ASSERT_SERIES_TERM(s);
+    REBSTR *s = MOLD_BUF;
+    ASSERT_SERIES_TERM_IF_NEEDED(s);
 
-    mo->series = STR(s);
-    mo->offset = STR_SIZE(mo->series);
-    mo->index = STR_LEN(mo->series);
+    mo->series = s;
+    mo->offset = STR_SIZE(s);
+    mo->index = STR_LEN(s);
 
     if (GET_MOLD_FLAG(mo, MOLD_FLAG_LIMIT))
         assert(mo->limit != 0);  // !!! Should a limit of 0 be allowed?
@@ -626,7 +636,6 @@ void Push_Mold(REB_MOLD *mo)
         Remake_Series(
             s,
             SER_USED(s) + MIN_COMMON,
-            SER_WIDE(s),
             NODE_FLAG_NODE // NODE_FLAG_NODE means preserve the data
         );
         TERM_STR_LEN_SIZE(mo->series, len, SER_USED(s));
@@ -683,7 +692,7 @@ void Throttle_Mold(REB_MOLD *mo) {
         REBUNI dummy;
         REBCHR(*) cp = SKIP_CHR(&dummy, tail, -(overage));
 
-        SET_STR_LEN_SIZE(
+        TERM_STR_LEN_SIZE(
             mo->series,
             STR_LEN(mo->series) - overage,
             STR_SIZE(mo->series) - (tail - cp)
@@ -707,7 +716,7 @@ void Throttle_Mold(REB_MOLD *mo) {
 REBSTR *Pop_Molded_String(REB_MOLD *mo)
 {
     assert(mo->series != nullptr);  // if null, there was no Push_Mold()
-    ASSERT_SERIES_TERM(SER(mo->series));
+    ASSERT_SERIES_TERM_IF_NEEDED(mo->series);
 
     // Limit string output to a specified size to prevent long console
     // garbage output if MOLD_FLAG_LIMIT was set in Push_Mold().
@@ -718,7 +727,7 @@ REBSTR *Pop_Molded_String(REB_MOLD *mo)
     REBLEN len = STR_LEN(mo->series) - mo->index;
 
     REBSTR *popped = Make_String(size);
-    memcpy(BIN_HEAD(SER(popped)), BIN_AT(SER(mo->series), mo->offset), size);
+    memcpy(BIN_HEAD(popped), BIN_AT(mo->series, mo->offset), size);
     TERM_STR_LEN_SIZE(popped, len, size);
 
     // Though the protocol of Mold_Value does terminate, it only does so if
@@ -740,16 +749,16 @@ REBSTR *Pop_Molded_String(REB_MOLD *mo)
 // !!! This particular use of the mold buffer might undermine tricks which
 // could be used with invalid UTF-8 bytes--for instance.  Review.
 //
-REBSER *Pop_Molded_Binary(REB_MOLD *mo)
+REBBIN *Pop_Molded_Binary(REB_MOLD *mo)
 {
     assert(STR_LEN(mo->series) >= mo->offset);
 
-    ASSERT_SERIES_TERM(SER(mo->series));
+    ASSERT_SERIES_TERM_IF_NEEDED(mo->series);
     Throttle_Mold(mo);
 
     REBSIZ size = STR_SIZE(mo->series) - mo->offset;
-    REBSER *bin = Make_Binary(size);
-    memcpy(BIN_HEAD(bin), BIN_AT(SER(mo->series), mo->offset), size);
+    REBBIN *bin = Make_Binary(size);
+    memcpy(BIN_HEAD(bin), BIN_AT(mo->series, mo->offset), size);
     TERM_BIN_LEN(bin, size);
 
     // Though the protocol of Mold_Value does terminate, it only does so if
@@ -805,7 +814,7 @@ void Drop_Mold_Core(
 //
 void Startup_Mold(REBLEN size)
 {
-    TG_Mold_Stack = Make_Series(10, sizeof(const void*));
+    TG_Mold_Stack = Make_Series(10, FLAG_FLAVOR(MOLDSTACK));
 
     // Most string code tries to optimize "bookmarks" that help map indices
     // to encoded codepoint positions in such a way that when the string
@@ -814,7 +823,7 @@ void Startup_Mold(REBLEN size)
     //
     // !!! Review, seems like the mold buffer logic is broken.  :-/
     //
-    TG_Mold_Buf = Make_String_Core(size, SERIES_FLAG_ALWAYS_DYNAMIC);
+    TG_Mold_Buf = Make_String_Core(size, SERIES_FLAG_DYNAMIC);
 }
 
 
@@ -823,7 +832,7 @@ void Startup_Mold(REBLEN size)
 //
 void Shutdown_Mold(void)
 {
-    Free_Unmanaged_Series(SER(TG_Mold_Buf));
+    Free_Unmanaged_Series(TG_Mold_Buf);
     TG_Mold_Buf = nullptr;
 
     Free_Unmanaged_Series(TG_Mold_Stack);

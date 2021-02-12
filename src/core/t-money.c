@@ -32,12 +32,10 @@
 // Scan and convert money.  Return zero if error.
 //
 const REBYTE *Scan_Money(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
+){
     const REBYTE *end;
 
     if (*cp == '$') {
@@ -79,12 +77,12 @@ REBINT CT_Money(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Money(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_MONEY);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     switch (VAL_TYPE(arg)) {
       case REB_INTEGER:
@@ -95,10 +93,14 @@ REB_R MAKE_Money(
         return Init_Money(out, decimal_to_deci(VAL_DECIMAL(arg)));
 
       case REB_MONEY:
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
       case REB_TEXT: {
-        const REBYTE *bp = Analyze_String_For_Scan(NULL, arg, MAX_SCAN_MONEY);
+        const REBYTE *bp = Analyze_String_For_Scan(
+            nullptr,
+            arg,
+            MAX_SCAN_MONEY
+        );
 
         const REBYTE *end;
         Init_Money(out, string_to_deci(bp, &end));
@@ -199,7 +201,7 @@ REBTYPE(Money)
 {
     REBVAL *v = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_ADD: {
         REBVAL *arg = Math_Arg_For_Money(D_OUT, D_ARG(2), verb);
         return Init_Money(
@@ -258,7 +260,7 @@ REBTYPE(Money)
             else if (IS_DECIMAL(to) or IS_PERCENT(to))
                 Init_Money(temp, decimal_to_deci(VAL_DECIMAL(to)));
             else if (IS_MONEY(to))
-                Move_Value(temp, to);
+                Copy_Cell(temp, to);
             else
                 fail (PAR(to));
         }
@@ -288,7 +290,7 @@ REBTYPE(Money)
       case SYM_EVEN_Q:
       case SYM_ODD_Q: {
         REBINT result = 1 & cast(REBINT, deci_to_int(VAL_MONEY_AMOUNT(v)));
-        if (VAL_WORD_SYM(verb) == SYM_EVEN_Q)
+        if (VAL_WORD_ID(verb) == SYM_EVEN_Q)
             result = not result;
         return Init_Logic(D_OUT, result != 0); }
 

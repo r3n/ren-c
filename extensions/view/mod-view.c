@@ -7,8 +7,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2020 Ren-C Open Source Contributors
 // Copyright 2012 Atronix Engineering
-// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -85,15 +85,11 @@
     #endif
 #endif
 
+#define REBOL_IMPLICIT_END
 #include "sys-core.h"
 
 #include "tmp-mod-view.h"
 
-
-// !!! This was around saying it was "used to detect modal non-OS dialogs".
-// The usage was in the Rebol_Window_Proc() in Atronix's R3 code.
-//
-bool osDialogOpen = false;
 
 #define MAX_FILE_REQ_BUF (16*1024)
 
@@ -119,56 +115,49 @@ REBNATIVE(request_file_p)
 {
     VIEW_INCLUDE_PARAMS_OF_REQUEST_FILE_P;
 
-    // Files to return will be collected and returned on the stack
-    //
-    REBDSP dsp_orig = DSP;
+    REBVAL *results = rebValue("copy []");  // collected in block and returned
 
-    REBCTX *error = NULL;
-
-    osDialogOpen = true;
+    REBVAL *error = nullptr;  // error saved to raise after buffers freed
 
   #ifdef TO_WINDOWS
     OPENFILENAME ofn;
     memset(&ofn, '\0', sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
 
-    ofn.hwndOwner = NULL; // !!! Should be set to something for modality
-    ofn.hInstance = NULL; // !!! Also should be set for context (app type)
+    ofn.hwndOwner = nullptr;  // !!! Should be set to something for modality
+    ofn.hInstance = nullptr;  // !!! Also should be set for context (app type)
 
     WCHAR *lpstrFilter;
     if (REF(filter)) {
-        DECLARE_MOLD (mo);
-        Push_Mold(mo);
-
-        const RELVAL *item;
-        for (item = VAL_ARRAY_AT(ARG(filter)); NOT_END(item); ++item) {
-            Form_Value(mo, item);
-            Append_Codepoint(mo->series, '\0');
-        }
-        Append_Codepoint(mo->series, '\0');
-
-        REBSTR *ser = Pop_Molded_String(mo);
-
-        // !!! We don't really want to be exposing REBSERs to this level of
-        // interface code.  In trying to coax it toward REBVAL-oriented APIs
-        // pretend we built the string as a value (perhaps best as a BINARY!
-        // produced by helper Rebol code).  Note that the series is managed
-        // once it goes through the Init_Text, so it can't be freed.
         //
-        DECLARE_LOCAL (hack);
-        Init_Text(hack, ser);
-        lpstrFilter = rebSpellWide(hack, rebEND);
+        // The technique used is to separate the filters by '\0', and end
+        // with a doubled up `\0\0`.  This can't be done in strings, and
+        // wide character strings can't be easily built in binaries.  So
+        // do the delimiting with tab characters, then do a pass to replace
+        // replace them in the extracted wide character buffer.
+        //
+        rebElide(
+            "for-each item", ARG(filter), "[",
+                "if find item tab [fail {TAB chars not legal in filters}]",
+            "]"
+        );
+        lpstrFilter = rebSpellWide("append delimit tab", ARG(filter), "tab");
+        WCHAR *pwc;
+        for (pwc = lpstrFilter; *pwc != 0; ++pwc) {
+            if (*pwc == '\t')
+                *pwc = '\0';
+        }
     }
     else {
         // Currently the implementation of default filters is in usermode,
         // done by a HIJACK of REQUEST-FILE with an adaptation that tests
         // if no filters are given and supplies a block.
         //
-        lpstrFilter = NULL;
+        lpstrFilter = nullptr;
     }
     ofn.lpstrFilter = lpstrFilter;
 
-    ofn.lpstrCustomFilter = NULL; // would let user save filters they add
+    ofn.lpstrCustomFilter = nullptr; // would let user save filters they add
     ofn.nMaxCustFilter = 0;
 
     // Currently the first filter provided is chosen, though it would be
@@ -178,30 +167,30 @@ REBNATIVE(request_file_p)
 
     WCHAR* lpstrFile = rebAllocN(WCHAR, MAX_FILE_REQ_BUF);
     ofn.lpstrFile = lpstrFile;
-    ofn.lpstrFile[0] = '\0'; // may be filled with ARG(name) below
-    ofn.nMaxFile = MAX_FILE_REQ_BUF - 1; // size in characters, space for NULL
+    ofn.lpstrFile[0] = '\0';  // may be filled with ARG(name) below
+    ofn.nMaxFile = MAX_FILE_REQ_BUF - 1;  // size in characters, space for \0
 
-    ofn.lpstrFileTitle = NULL; // can be used to get file w/o path info...
-    ofn.nMaxFileTitle = 0; // ...but we want the full path
+    ofn.lpstrFileTitle = nullptr;  // can be used to get file w/o path info...
+    ofn.nMaxFileTitle = 0;  // ...but we want the full path
 
     WCHAR *lpstrInitialDir;
     if (REF(file)) {
-        REBLEN path_len = rebUnbox("length of", ARG(file), rebEND);
-        WCHAR *path = rebSpellWide("file-to-local/full", ARG(file), rebEND);
+        unsigned int cch_path = rebUnbox("length of", ARG(file));
+        WCHAR *path = rebSpellWide("file-to-local/full", ARG(file));
 
         // If the last character doesn't indicate a directory, that means
         // we are trying to pre-select a file, which we do by copying the
         // content into the ofn.lpstrFile field.
         //
-        if (path[path_len - 1] != '\\') {
-            REBLEN n;
-            if (path_len + 2 > ofn.nMaxFile)
-                n = ofn.nMaxFile - 2;
+        if (path[cch_path - 1] != '\\') {
+            unsigned int cch;
+            if (cch_path + 2 > ofn.nMaxFile)
+                cch = ofn.nMaxFile - 2;
             else
-                n = path_len;
-            wcsncpy(ofn.lpstrFile, path, n);
-            lpstrFile[n] = '\0';
-            lpstrInitialDir = NULL;
+                cch = cch_path;
+            wcsncpy(ofn.lpstrFile, path, cch);
+            lpstrFile[cch] = '\0';
+            lpstrInitialDir = nullptr;
             rebFree(path);
         }
         else {
@@ -214,14 +203,14 @@ REBNATIVE(request_file_p)
         }
     }
     else
-        lpstrInitialDir = NULL;
+        lpstrInitialDir = nullptr;
     ofn.lpstrInitialDir = lpstrInitialDir;
 
     WCHAR *lpstrTitle;
     if (REF(title))
-        lpstrTitle = rebSpellWide(ARG(title), rebEND);
+        lpstrTitle = rebSpellWide(ARG(title));
     else
-        lpstrTitle = NULL; // Will use "Save As" or "Open" defaults
+        lpstrTitle = nullptr;  // Will use "Save As" or "Open" defaults
     ofn.lpstrTitle = lpstrTitle;
 
     // !!! What about OFN_NONETWORKBUTTON?
@@ -238,10 +227,10 @@ REBNATIVE(request_file_p)
 
     // Currently unused stuff.
     //
-    ofn.lpstrDefExt = NULL;
-    ofn.lCustData = cast(LPARAM, NULL);
-    ofn.lpfnHook = NULL;
-    ofn.lpTemplateName = NULL;
+    ofn.lpstrDefExt = nullptr;
+    ofn.lCustData = (LPARAM)(nullptr);  // !!! cast() macro failing on nullptr
+    ofn.lpfnHook = nullptr;
+    ofn.lpTemplateName = nullptr;
 
     BOOL ret;
     if (REF(save))
@@ -257,79 +246,54 @@ REBNATIVE(request_file_p)
             // don't push anything to the data stack and we'll return blank
         }
         else if (cderr == FNERR_BUFFERTOOSMALL) // ofn.nMaxFile too small
-            error = Error_User("dialog buffer too small for selection");
+            error = rebValue(
+                "make error! {dialog buffer too small for selection}"
+            );
         else
-            error = Error_User("common dialog failure CDERR_XXX");
+            error = rebValue(
+                "make error! {common dialog failure CDERR_XXX}"
+            );
     }
     else {
         if (not REF(multi)) {
-            REBVAL *solo = rebValue(
-                "local-to-file", rebR(rebTextWide(ofn.lpstrFile)),
-                rebEND
+            rebElide(
+                "append", results, "local-to-file",
+                    rebR(rebTextWide(ofn.lpstrFile))
             );
-            Move_Value(DS_PUSH(), solo);
-            rebRelease(solo);
         }
         else {
             const WCHAR *item = ofn.lpstrFile;
 
-            REBLEN item_len = wcslen(item);
-            assert(item_len != 0); // must have at least one item for success
-            if (wcslen(item + item_len + 1) == 0) {
+            unsigned int cch_item = wcslen(item);
+            assert(cch_item != 0);  // must have at least one char for success
+            if (wcslen(item + cch_item + 1) == 0) {
                 //
                 // When there's only one item in a multi-selection scenario,
                 // that item is the filename including path...the lone result.
                 //
-                REBVAL *solo = rebValue(
-                    "local-to-file", rebR(rebTextWide(item)),
-                    rebEND
-                );
-                DS_PUSH();
-                Move_Value(DS_TOP, solo);
-                rebRelease(solo);
+                REBVAL *path = rebLengthedTextWide(item, cch_item);
+                rebElide("append", results, "local-to-file", rebR(path));
             }
             else {
                 // More than one item means the first is a directory, and the
                 // rest are files in that directory.  We want to merge them
                 // together to make fully specified paths.
                 //
-                // !!! Note: This was written pre-libRebol, so it is doing
-                // file string appends with wchar when it could be doing it
-                // in embedded Rebol code.  Rewrite if and when this becomes
-                // a priority to update.
-                //
-                REBVAL *dir = rebValue(
-                    "local-to-file/dir", rebR(rebTextWide(item)),
-                    rebEND
-                );
+                REBVAL *dir = rebLengthedTextWide(item, cch_item);
 
-                item += item_len + 1; // next
+                item += cch_item + 1;  // next
 
-                REBLEN dir_len = rebUnbox("length of", dir, rebEND);
-                WCHAR *dir_wide = rebSpellWide(
-                    "file-to-local/full", dir,
-                rebEND);
+                while ((cch_item = wcslen(item)) != 0) {
+                    REBVAL *file = rebLengthedTextWide(item, cch_item);
 
-                while ((item_len = wcslen(item)) != 0) {
-                    WCHAR *buffer = rebAllocN(
-                        WCHAR, dir_len + item_len + 1 // null terminator
+                    rebElide(
+                        "append", results,
+                            "local-to-file join", dir, rebR(file)
                     );
 
-                    wcscpy(buffer, dir_wide);
-                    wcscat(buffer, item);
-
-                    REBVAL *file = rebValue(
-                        "local-to-file", rebR(rebTextWide(buffer)),
-                        rebEND
-                    );
-                    rebFree(buffer);
-
-                    Move_Value(DS_PUSH(), file);
-
-                    item += item_len + 1; // next
+                    item += cch_item + 1;  // next
                 }
 
-                rebFree(dir_wide);
                 rebRelease(dir);
             }
         }
@@ -341,7 +305,7 @@ REBNATIVE(request_file_p)
     if (REF(filter))
         rebFree(lpstrFilter);
     rebFree(lpstrFile);
-    if (REF(file) && lpstrInitialDir != NULL)
+    if (REF(file) and lpstrInitialDir != nullptr)
         rebFree(lpstrInitialDir);
     if (REF(title))
         rebFree(lpstrTitle);
@@ -353,30 +317,30 @@ REBNATIVE(request_file_p)
     // for the first time or if it's already initialized.
     //
     int argc = 0;
-    if (not gtk_init_check(&argc, NULL))
+    if (not gtk_init_check(&argc, nullptr))
         fail ("gtk_init_check() failed");
 
     UNUSED(REF(filter));  // not implemented in GTK for Atronix R3
 
     char *title;
     if (REF(title))
-        title = rebSpell(ARG(title), rebEND);
+        title = rebSpell(ARG(title));
     else
-        title = NULL;
+        title = nullptr;
 
-    // !!! Using a NULL parent causes console to output:
+    // !!! Using a null parent causes console to output:
     // "GtkDialog mapped without a transient parent. This is discouraged."
     //
-    GtkWindow *parent = NULL;
+    GtkWindow *parent = nullptr;
 
     GtkWidget *dialog = gtk_file_chooser_dialog_new(
-        title == NULL
+        title == nullptr
             ? (REF(save) ? "Save file" : "Open File")
             : title,
         parent,
         REF(save)
             ? GTK_FILE_CHOOSER_ACTION_SAVE
-            : GTK_FILE_CHOOSER_ACTION_OPEN, // or SELECT_FOLDER, CREATE_FOLDER
+            : GTK_FILE_CHOOSER_ACTION_OPEN,  // [SELECT_FOLDER CREATE_FOLDER]
 
         // First button and button response (underscore indicates hotkey)
         "_Cancel",
@@ -386,7 +350,7 @@ REBNATIVE(request_file_p)
         REF(save) ? "_Save" : "_Open",
         GTK_RESPONSE_ACCEPT,
 
-        cast(const char*, NULL) // signal no more buttons
+        cast(const char*, nullptr)  // signal no more buttons
     );
 
     GtkFileChooser *chooser = GTK_FILE_CHOOSER(dialog);
@@ -395,11 +359,11 @@ REBNATIVE(request_file_p)
 
     REBYTE *name;
     if (REF(file)) {
-        name = rebSpell(ARG(file), rebEND);
+        name = rebSpell(ARG(file));
         gtk_file_chooser_set_current_folder(chooser, cast(gchar*, name));
     }
     else
-        name = NULL;
+        name = nullptr;
 
     if (gtk_dialog_run(GTK_DIALOG(dialog)) != GTK_RESPONSE_ACCEPT) {
         //
@@ -412,27 +376,22 @@ REBNATIVE(request_file_p)
         // same as the single file return convention (one string).
 
         if (REF(multi)) {
-            REBYTE *folder = b_cast(
-                gtk_file_chooser_get_current_folder(chooser)
-            );
+            char *folder = gtk_file_chooser_get_current_folder(chooser);
 
-            if (folder == NULL)
-                error = Error_User("folder can't be represented locally");
+            if (folder == nullptr)
+                error = rebValue(
+                    "make error! {folder can't be represented locally}"
+                );
             else {
                 GSList *list = gtk_file_chooser_get_filenames(chooser);
                 GSList *item;
-                for (item = list; item != NULL; item = item->next) {
+                for (item = list; item != nullptr; item = item->next) {
                     //
-                    // !!! The directory seems to already be included...though
-                    // there was code here that tried to add it (?)  If it
-                    // becomes relevant, `folder` is available to prepend.
+                    // Filename is UTF-8, directory seems to be included.
                     //
-                    REBVAL *file = rebValue(
-                        "as file!", rebT(item->data), // UTF-8
-                        rebEND
-                    );
-                    Move_Value(DS_PUSH(), file);
-                    rebRelease(file);
+                    // !!! If not included, `folder` is available to prepend.
+                    //
+                    rebElide("append", files, "as file!", rebT(item->data));
                 }
                 g_slist_free(list);
 
@@ -442,11 +401,10 @@ REBNATIVE(request_file_p)
         else {
             // filename is in UTF-8, directory seems to be included.
             //
-            REBVAL *file = rebValue(
-                "as file!", rebT(gtk_file_chooser_get_filename(chooser)),
-                rebEND
+            rebElide(
+                "append", files, "as file!",
+                    rebT(gtk_file_chooser_get_filename(chooser)
             );
-            Move_Value(DS_PUSH(), file);
             g_free(filename);
         }
     }
@@ -473,19 +431,21 @@ REBNATIVE(request_file_p)
     UNUSED(REF(title));
     UNUSED(REF(filter));
 
-    error = Error_User("REQUEST-FILE only on GTK and Windows at this time");
+    error = rebValue(
+        "make error! {REQUEST-FILE only on GTK and Windows at this time}"
+    );
   #endif
-
-    osDialogOpen = false;
 
     // The error is broken out this way so that any allocated strings can
     // be freed before the failure.
     //
     if (error)
-        fail (error);
+        rebJumps ("fail", rebR(error));
 
-    if (DSP == dsp_orig)
+    if (rebDid("empty?", results)) {
+        rebRelease(results);
         return nullptr;
+    }
 
     if (REF(multi)) {
         //
@@ -493,16 +453,10 @@ REBNATIVE(request_file_p)
         // /MULTI and there's even just one file.  (An empty block might even
         // be better than null for that case?)
         //
-        return Init_Block(D_OUT, Pop_Stack_Values(dsp_orig));
+        return results;
     }
 
-    assert(IS_FILE(DS_TOP));
-    Move_Value(D_OUT, DS_TOP);
-
-    assert(DSP == dsp_orig + 1); // should be only one pushed, so check...
-    DS_DROP_TO(dsp_orig); // ...but use DS_DROP_TO just to be safe in release
-
-    return D_OUT;
+    return rebValue("ensure file! first", rebR(results));
 }
 
 
@@ -561,7 +515,8 @@ REBNATIVE(request_dir_p)
 {
     VIEW_INCLUDE_PARAMS_OF_REQUEST_DIR_P;
 
-    REBCTX *error = NULL;
+    REBVAL *result = nullptr;
+    REBVAL *error = nullptr;
 
   #if defined(USE_WINDOWS_DIRCHOOSER)
     //
@@ -569,7 +524,7 @@ REBNATIVE(request_dir_p)
     // is incompatible with COINIT_MULTITHREADED, the dialog will hang and
     // do nothing.
     //
-    HRESULT hresult = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    HRESULT hresult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (hresult == S_OK) {
         // Worked fine
     }
@@ -580,15 +535,15 @@ REBNATIVE(request_dir_p)
         fail ("Failure during CoInitializeEx()");
 
     BROWSEINFO bi;
-    bi.hwndOwner = NULL;
-    bi.pidlRoot = NULL;
+    bi.hwndOwner = nullptr;
+    bi.pidlRoot = nullptr;
 
     WCHAR display[MAX_PATH];
     display[0] = '\0';
     bi.pszDisplayName = display; // assumed length is MAX_PATH
 
     if (REF(title))
-        bi.lpszTitle = rebSpellWide(ARG(text), rebEND);
+        bi.lpszTitle = rebSpellWide(ARG(title));
     else
         bi.lpszTitle = L"Please, select a directory...";
 
@@ -608,23 +563,19 @@ REBNATIVE(request_dir_p)
     //
     bi.lpfn = ReqDirCallbackProc;
     if (REF(path))
-        bi.lParam = cast(LPARAM, rebSpellWide(ARG(dir), rebEND));
+        bi.lParam = cast(LPARAM, rebSpellWide(ARG(path)));
     else
-        bi.lParam = cast(LPARAM, NULL);
+        bi.lParam = cast(LPARAM, nullptr);
 
-    osDialogOpen = true;
     LPCITEMIDLIST pFolder = SHBrowseForFolder(&bi);
-    osDialogOpen = false;
 
     WCHAR folder[MAX_PATH];
-    if (pFolder == NULL)
-        Init_Blank(D_OUT);
+    if (pFolder == nullptr)
+        assert(result == nullptr);
     else if (not SHGetPathFromIDList(pFolder, folder))
-        error = Error_User("SHGetPathFromIDList failed");
+        error = rebValue("make error! {SHGetPathFromIDList failed}");
     else {
-        REBVAL *file = rebValue("as file!", rebT(folder), rebEND);
-        Move_Value(D_OUT, file);
-        rebRelease(file);
+        result = rebValue("as file!", rebT(folder));
     }
 
     if (REF(title))
@@ -635,11 +586,13 @@ REBNATIVE(request_dir_p)
     UNUSED(REF(title));
     UNUSED(REF(path));
 
-    error = Error_User("Temporary implementation of REQ-DIR only on Windows");
+    error = rebValue(
+        "make error {Temporary implementation of REQ-DIR only on Windows}"
+    );
   #endif
 
-    if (error != NULL)
-        fail (error);
+    if (error != nullptr)
+        rebJumps ("fail", rebR(error));
 
-    return D_OUT;
+    return result;
 }

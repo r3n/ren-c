@@ -56,7 +56,6 @@ state: make object! [
         net:     ; network access
         eval:    ; evaluation limit
         memory:  ; memory limit
-        secure:  ; secure changes
         protect: ; protect function
         debug:   ; debugging features
         envr:    ; read/write
@@ -119,7 +118,6 @@ options: make object! [  ; Options supplied to REBOL during startup
     script: _       ; Filename of script to evaluate
     args: _         ; Command line arguments passed to script
     debug: _        ; debug flags
-    secure: _       ; security policy
     version: _      ; script version needed
 
     dump-size: 68   ; used by dump
@@ -196,11 +194,9 @@ standard: make object! [
     ;
     action-meta: make object! [
         description:
-        return-type:
-        return-note:
         parameter-types:
         parameter-notes:
-            _
+            null
     ]
 
     ; !!! This is the template used for all errors, to which extra fields are
@@ -231,20 +227,23 @@ standard: make object! [
             _
     ]
 
+    ; !!! Historically headers use titlecase keys.  In the current world, that
+    ; leads to a difference from if you use lowercase ones.
+    ;
     header: make object! [
-        title: {Untitled}
-        name:
-        type:
-        version:
-        date:
-        file:
-        author:
-        needs:
-        options:
-        checksum:
-;       compress:
-;       exports:
-;       content:
+        Title: {Untitled}
+        Name:
+        Type:
+        Version:
+        Date:
+        File:
+        Author:
+        Needs:
+        Options:
+        Checksum:
+;       Compress:
+;       Exports:
+;       Content:
             _
     ]
 

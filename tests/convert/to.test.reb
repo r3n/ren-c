@@ -11,11 +11,11 @@
 ; https://forum.rebol.info/t/justifiable-asymmetry-to-on-block/751
 ;
 ([a b c] = to block! 'a/b/c)
-(lit (a b c) = to group! 'a/b/c)
-([a b c] = to block! lit (a b c))
-(lit (a b c) = to group! [a b c])
-(lit a/b/c = to path! [a b c])
-(lit a/b/c = to path! lit (a b c))
+(just (a b c) = to group! 'a/b/c)
+([a b c] = to block! just (a b c))
+(just (a b c) = to group! [a b c])
+(just a/b/c = to path! [a b c])
+(just a/b/c = to path! just (a b c))
 
 ; strings and words can TO-convert to ISSUE!
 [

@@ -46,12 +46,12 @@ REBINT CT_Port(REBCEL(const*) a, REBCEL(const*) b, REBINT strict)
 REB_R MAKE_Port(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_PORT);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     const bool fully = true; // error if not all arguments consumed
 
@@ -153,7 +153,7 @@ REBTYPE(Port)
     // https://github.com/metaeducation/ren-c/issues/311
     //
     if (not IS_PORT(D_ARG(1))) {
-        switch (VAL_WORD_SYM(verb)) {
+        switch (VAL_WORD_ID(verb)) {
 
         case SYM_READ:
         case SYM_WRITE:
@@ -169,7 +169,7 @@ REBTYPE(Port)
             //
             const REBVAL *made = rebValueQ("make port!", D_ARG(1), rebEND);
             assert(IS_PORT(made));
-            Move_Value(D_ARG(1), made);
+            Copy_Cell(D_ARG(1), made);
             rebRelease(made);
             break; }
 

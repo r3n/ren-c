@@ -38,7 +38,7 @@ REBINT CT_Datatype(REBCEL(const*) a, REBCEL(const*) b, bool strict)
             : -1;
 
     if (VAL_TYPE_KIND_OR_CUSTOM(a) == REB_CUSTOM) {
-        if (VAL_TYPE_HOOKS_NODE(a) == VAL_TYPE_HOOKS_NODE(b))
+        if (VAL_TYPE_HOOKS(a) == VAL_TYPE_HOOKS(b))
             return 0;
         return 1;  // !!! all cases of "just return greater" are bad
     }
@@ -53,19 +53,19 @@ REBINT CT_Datatype(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Datatype(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_URL(arg)) {
         REBVAL *custom = Datatype_From_Url(arg);
         if (custom != nullptr)
-            return Move_Value(out, custom);
+            return Copy_Cell(out, custom);
     }
     if (IS_WORD(arg)) {
-        REBSYM sym = VAL_WORD_SYM(arg);
+        SYMID sym = VAL_WORD_ID(arg);
         if (sym == SYM_0 or sym >= SYM_FROM_KIND(REB_MAX))
             goto bad_make;
 
@@ -111,10 +111,10 @@ REBTYPE(Datatype)
 
     REBVAL *arg = D_ARG(2);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
 
     case SYM_REFLECT: {
-        REBSYM sym = VAL_WORD_SYM(arg);
+        SYMID sym = VAL_WORD_ID(arg);
         if (sym == SYM_SPEC) {
             //
             // The "type specs" were loaded as an array, but this reflector
@@ -127,18 +127,13 @@ REBTYPE(Datatype)
 
             assert(CTX_TYPE(context) == REB_OBJECT);
 
-            REBVAL *var = CTX_VARS_HEAD(context);
-            REBVAL *key = CTX_KEYS_HEAD(context);
-
-            // !!! Account for the "invisible" self key in the current
-            // stop-gap implementation of self, still default on MAKE OBJECT!s
-            //
-            assert(VAL_KEY_SYM(key) == SYM_SELF);
-            ++key; ++var;
+            const REBKEY *tail;
+            const REBKEY *key = CTX_KEYS(&tail, context);
+            REBVAR *var = CTX_VARS_HEAD(context);
 
             RELVAL *item = ARR_HEAD(VAL_TYPE_SPEC(type));
 
-            for (; NOT_END(var); ++var, ++key) {
+            for (; key != tail; ++key, ++var) {
                 if (IS_END(item))
                     Init_Blank(var);
                 else {
@@ -208,9 +203,9 @@ REBVAL *Datatype_From_Url(const REBVAL *url) {
 // unconstrained form of the type matches), PARSE recognizes the symbol and
 // enforces it.
 //
-static void Startup_Fake_Type_Constraint(REBSYM sym)
+static void Startup_Fake_Type_Constraint(SYMID sym)
 {
-    const REBSTR *canon = Canon(sym);
+    const REBSYM *canon = Canon(sym);
     REBVAL *char_x = Append_Context(VAL_CONTEXT(Lib_Context), nullptr, canon);
     Init_Sym_Word(char_x, canon);
 }
@@ -221,7 +216,7 @@ static void Startup_Fake_Type_Constraint(REBSYM sym)
 //
 // Called on SYM-WORD!s by PARSE and MATCH.
 //
-bool Matches_Fake_Type_Constraint(const RELVAL *v, enum Reb_Symbol sym) {
+bool Matches_Fake_Type_Constraint(const RELVAL *v, enum Reb_Symbol_Id sym) {
     switch (sym) {
       case SYM_CHAR_X:
         return IS_CHAR(v);
@@ -236,7 +231,7 @@ bool Matches_Fake_Type_Constraint(const RELVAL *v, enum Reb_Symbol sym) {
         return IS_QUOTED_PATH(v);
 
       case SYM_REFINEMENT_X:
-        return IS_REFINEMENT(v);
+        return IS_PATH(v) and IS_REFINEMENT(v);
 
       case SYM_PREDICATE_X:
         return IS_PREDICATE(v);
@@ -261,7 +256,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
 
     RELVAL *word = ARR_HEAD(boot_types);
 
-    if (VAL_WORD_SYM(word) != SYM_NULL)
+    if (VAL_WORD_ID(word) != SYM_NULL)
         panic (word);  // First internal byte type is NULL at 1
 
     REBARR *catalog = Make_Array(REB_MAX - 1);
@@ -297,8 +292,8 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
 
         RESET_CELL(value, REB_DATATYPE, CELL_FLAG_FIRST_IS_NODE);
         VAL_TYPE_KIND_ENUM(value) = kind;
-        VAL_TYPE_SPEC_NODE(value) = NOD(
-            VAL_ARRAY_KNOWN_MUTABLE(ARR_AT(boot_typespecs, n - 2))
+        INIT_VAL_TYPE_SPEC(value,
+            VAL_ARRAY(ARR_AT(boot_typespecs, n - 2))
         );
 
         // !!! The system depends on these definitions, as they are used by
@@ -310,7 +305,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
         // a limited sense.)
         //
         assert(value == Datatype_From_Kind(kind));
-        assert(value == VAL_CONTEXT_VAR(Lib_Context, n));
+        assert(value == CTX_VAR(VAL_CONTEXT(Lib_Context), n));
         SET_CELL_FLAG(value, PROTECTED);
 
         Append_Value(catalog, SPECIFIC(word));
@@ -350,7 +345,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
         Manage_Series(type);
         Init_Custom_Datatype(Alloc_Tail_Array(a), type);
     }
-    TERM_ARRAY_LEN(a, 5);
+    SET_SERIES_LEN(a, 5);
 
     PG_Extension_Types = a;
 
@@ -410,7 +405,7 @@ REBTYP *Hook_Datatype(
 //
 //  Unhook_Datatype: C
 //
-void Unhook_Datatype(REBSER *type)
+void Unhook_Datatype(REBTYP *type)
 {
     // need to fail if not hooked
 
@@ -434,6 +429,6 @@ void Unhook_Datatype(REBSER *type)
 //
 void Shutdown_Datatypes(void)
 {
-    Free_Unmanaged_Array(PG_Extension_Types);
+    Free_Unmanaged_Series(PG_Extension_Types);
     PG_Extension_Types = nullptr;
 }

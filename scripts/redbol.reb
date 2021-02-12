@@ -75,6 +75,20 @@ string!: emulate [text!]
 string?: emulate [:text?]
 to-string: emulate [specialize :to [type: text!]]
 
+; There is no CHAR! "datatype" in Ren-C (ISSUE! and CHAR! are unified)
+; The belief is that TO a char-like thing of 1 should be #"1"
+; Currently AS is serving as the numeric converter.
+;
+to-char: emulate [
+    func [value] [
+        either integer? value [
+            as issue! value
+        ][
+            to issue! value
+        ]
+    ]
+]
+
 paren!: emulate [group!]
 paren?: emulate [:group?]
 to-paren: emulate [specialize :to [type: group!]]
@@ -230,7 +244,7 @@ rewrite-spec-and-body: helper [
         ; add support for an EXIT that's a synonym for returning void.
         ;
         insert body [
-            exit: specialize :return [value: ~unset!~]
+            exit: specialize :return [value: '~unset~]
         ]
         append spec [<local> exit]  ; FUNC needs it (function doesn't...)
     ]
@@ -240,14 +254,32 @@ rewrite-spec-and-body: helper [
 ; once (e.g. a loop or function body) it marks that parameter `<const>`.
 ; That prevents casual mutations.
 ;
-; !!! See notes in RESKINNED for why an ADAPT must be used (for now)
+; !!! This depended on the RESKINNED function, which was removed to make way
+; for more coherent granular parameter tweaking in the spec and function
+; creation with AS FRAME!.  In order to begin implementing that approach
+; correctly, the bad implementation of RESKINNED had to be pulled out.  For
+; the moment, the const parameter is not tweaked in Redbol...but the feature
+; is aiming to come back shortly in much better form.
+;
+
+for-each-nonconst: emulate [
+;    reskinned [
+;        body [block!]  ; no <const> annotation
+;    ] adapt :for-each []  ; see RESKINNED for why this is an ADAPT for now
+
+    :for-each
+]
 
 func-nonconst: emulate [
-    reskinned [body [block!]] adapt :func []
+;    reskinned [body [block!]] adapt :func []
+
+    :func
 ]
 
 function-nonconst: emulate [
-    reskinned [body [block!]] adapt :function []
+;     reskinned [body [block!]] adapt :function []
+
+    :function
 ]
 
 redbol-func: func: emulate [
@@ -330,7 +362,7 @@ apply: emulate [
                 arg: block/1
                 try next block
             ] else [
-                try evaluate/result block (lit arg:)
+                try evaluate/result block (just arg:)
             ]
 
             if refinement? params/1 [
@@ -383,10 +415,12 @@ null: emulate [
 ;
 ; VOID! is also a more capable and interesting type, able to hold a symbol.
 ;
-unset!: ~unset!~
+unset!: void!
 unset?: emulate [:void?]
 
-; NONE is reserved for `if none [x = 1, y = 2] [...]`
+; Note: Ren-C once reserved NONE for `if none [x = 1, y = 2] [...]`
+; Currently that is covered by `ALL .NOT [...]`, but a specialization may
+; wind up being defined for it.
 ;
 none: emulate [:blank]
 none!: emulate [:blank!]
@@ -416,7 +450,7 @@ false?: emulate [:not]  ; better name https://trello.com/c/Cz0qs5d7
 
 comment: emulate [
     func [
-        return: [<opt>] {Not invisible: https://trello.com/c/dWQnsspG}
+        return: <void> {Not invisible: https://trello.com/c/dWQnsspG}
         :discarded [block! any-string! binary! any-scalar!]
     ][
     ]
@@ -478,7 +512,7 @@ set: emulate [
             fail "Can't SET a value to UNSET! unless SET/ANY is used"
         ]
 
-        applique 'set [
+        applique :set [
             target: either any-context? target [words of target] [target]
             value: :value
             some: some
@@ -536,7 +570,7 @@ do: emulate [
 
         if var [  ; DO/NEXT
             if args [fail "Can't use DO/NEXT with ARGS"]
-            source: evaluate/result :source (lit result:)
+            source: evaluate/result :source (just result:)
             set var source  ; DO/NEXT put the *position* in the var
             return :result  ; DO/NEXT returned the *evaluative result*
         ]
@@ -557,7 +591,7 @@ do: emulate [
             ]
             do code
         ] else [
-            applique 'do [
+            applique :do [
                 source: :source
                 args: :args
             ]
@@ -649,14 +683,11 @@ parse: emulate [
         comment [all_PARSE: all]  ; Not used
         all: :lib/all
 
-        switch type of rules [
+        return switch type of rules [
             blank! [split input charset reduce [tab space CR LF]]
             text! [split input to-bitset rules]
         ] else [
-            if not pos: parse/(case_PARSE) input rules [
-                return false
-            ]
-            return tail? pos
+            did parse/(case_PARSE) input rules
         ]
     ]
 ]
@@ -689,7 +720,7 @@ compose: emulate [
     ][
         if not block? :value [return :value]  ; `compose 1` is `1` in Rebol2
 
-        composed: applique 'compose [
+        composed: applique :compose [
             value: :value
             deep: deep
 
@@ -754,7 +785,7 @@ repend: emulate [
     ][
         ; R3-alpha REPEND with block behavior called out
         ;
-        applique 'append/part/dup [
+        applique :append/part/dup [
             series: series
             value: either block? :value [reduce :value] [:value]
             part: part
@@ -771,7 +802,7 @@ join: emulate [
     ][
         ; double-inline of R3-alpha `repend value :rest`
         ;
-        applique 'append [
+        applique :append [
             series: if series? :value [copy value] else [form :value]
             value: if block? :rest [reduce :rest] else [rest]
         ]
@@ -869,7 +900,7 @@ quit: emulate [
         /return "Ren-C is variadic, 0 or 1 arg: https://trello.com/c/3hCNux3z"
             [<opt> any-value!]
     ][
-        applique 'quit [
+        applique :quit [
             value: :return
         ]
     ]
@@ -983,7 +1014,7 @@ compress: emulate [
         /gzip
         /only
     ][
-        if not any [gzip only] [  ; assume caller wants "Rebol compression"
+        any [gzip, only] else [  ; assume caller wants "Rebol compression"
             data: to-binary copy/part data part
             zlib: zdeflate data
 
@@ -1013,7 +1044,7 @@ decompress: emulate [
         /zlib [integer!] "Red refinement (RFC 1951), uncompressed size"
         /deflate [integer!] "Red refinement (RFC 1950), uncompressed size"
     ][
-        if not any [gzip zlib deflate] [
+        any [gzip, zlib, deflate] else [
             ;
             ; Assume data is "Rebol compressed".  Could get more compatibility
             ; by testing for gzip header or otherwise having a fallback, as
@@ -1034,6 +1065,8 @@ decompress: emulate [
 and: emulate [enfixed :intersect]
 or: emulate [enfixed :union]
 xor: emulate [enfixed :difference]
+
+mod: emulate [:modulo]  ; MOD is enfix in Ren-C, MODULO still prefix
 
 ; Ren-C NULL means no branch ran, Rebol2 this is communicated by #[none]
 ; Ren-C ~branched~ when branch ran w/null result, Rebol2 calls that #[unset]
@@ -1067,12 +1100,6 @@ switch: emulate [  ; Ren-C evaluates cases: https://trello.com/c/9ChhSWC4/
     ]
 ]
 
-
-for-each-nonconst: emulate [
-    reskinned [
-        body [block!]  ; no <const> annotation
-    ] adapt :for-each []  ; see RESKINNED for why this is an ADAPT for now
-]
 
 while: emulate [denuller :while]
 foreach: emulate [
@@ -1189,7 +1216,7 @@ append: emulate [oldsplicer :append]
 insert: emulate [oldsplicer :insert]
 change: emulate [oldsplicer :change]
 
-quote: emulate [:lit]
+quote: emulate [:just]
 
 cloaker: helper [function [  ; specialized as CLOAK and DECLOAK
     {Simple and insecure data scrambler, was native C code in Rebol2/R3-Alpha}
@@ -1401,5 +1428,39 @@ call: emulate [  ; brings back the /WAIT switch (Ren-C waits by default)
 ]
 
 
-=== LEAVE AS LAST LINE ===
-void  ; so that `do <redbol>` doesn't show any output
+; Ren-C's LOAD uses "ALL" semantics by default to give back a BLOCK! of code
+; always.  Extracting single values is done with LOAD-VALUE.
+;
+; Historical Redbol is more unpredictable in the name of "convenience":
+;
+;    rebol2> load "1"
+;    == 1
+;
+;    rebol2> load "1 2"
+;    == [1 2]
+;
+; This augments LOAD with the /ALL refinement and tweaks the behavior.
+;
+load: emulate [
+    enclose (augment :load [/all]) func [f <local> try-one-item] [
+        try-one-item: not f/all
+        result: do f  ; now always BLOCK! if LOADing Rebol code
+
+        if try-one-item and (block? result) and (length of result = 1) [
+            return first result  ; "1" loads as `[1]`, change it to `1`
+        ]
+        return result  ; "1 2" loads as `[1 2]`, leave it that way
+    ]
+]
+
+
+=== LEAVE VOID AS LAST LINE ===
+;
+; So that `do <redbol>` doesn't show any output.  While the console displays
+; most voids, by default it won't display ones specifically labeled ~void~
+;
+; !!! This may not be the last word on what signals the console's silence.
+;
+; https://forum.rebol.info/t/1413
+
+'~void~

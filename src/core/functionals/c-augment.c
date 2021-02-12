@@ -7,7 +7,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2019-2020 Ren-C Open Source Contributors
+// Copyright 2019-2021 Ren-C Open Source Contributors
 //
 // See README.md and CREDITS.md for more information.
 //
@@ -51,33 +51,10 @@
 
 #include "sys-core.h"
 
-enum {
-    IDX_AUGMENTER_AUGMENTEE = 0,  // Function with briefer frame to dispatch
-    IDX_AUGMENTER_MAX
-};
-
-
+// See notes why the Augmenter gets away with reusing Specializer_Dispatcher
 //
-//  Augmenter_Dispatcher: C
-//
-// It might seem an augmentation can just run the underlying frame directly,
-// but it needs to switch phases in order to get the frame to report the
-// more limited set of fields that are in effect when the frame runs.  So it
-// does a cheap switch of phase, and a redo without needing new type checking.
-//
-REB_R Augmenter_Dispatcher(REBFRM *f)
-{
-    REBACT *phase = FRM_PHASE(f);
-    REBARR *details = ACT_DETAILS(phase);
-    assert(ARR_LEN(details) == IDX_AUGMENTER_MAX);
-
-    RELVAL *augmentee = ARR_AT(details, IDX_AUGMENTER_AUGMENTEE);
-
-    INIT_FRM_PHASE(f, VAL_ACTION(augmentee));
-    FRM_BINDING(f) = VAL_BINDING(augmentee);
-
-    return R_REDO_UNCHECKED;  // signatures should match
-}
+#define Augmenter_Dispatcher Specializer_Dispatcher
+#define IDX_AUGMENTER_MAX 1
 
 
 //
@@ -86,7 +63,7 @@ REB_R Augmenter_Dispatcher(REBFRM *f)
 //  {Create an ACTION! variant that acts the same, but has added parameters}
 //
 //      return: [action!]
-//      augmentee "Function whose implementation is to be augmented"
+//      action "Function whose implementation is to be augmented"
 //          [action!]
 //      spec "Spec dialect for words to add to the derived function"
 //          [block!]
@@ -96,129 +73,98 @@ REBNATIVE(augment_p)  // see extended definition AUGMENT in %base-defs.r
 {
     INCLUDE_PARAMS_OF_AUGMENT_P;
 
-    REBVAL *augmentee = ARG(augmentee);
+    REBACT *augmentee = VAL_ACTION(ARG(action));
+    option(const REBSTR*) label = VAL_ACTION_LABEL(ARG(action));
+
+    if (ACT_PARTIALS(augmentee))  // !!! TBD
+        fail ("AUGMENT doesn't yet work with reordered/partial functions");
 
     // We reuse the process from Make_Paramlist_Managed_May_Fail(), which
-    // pushes parameters to the stack in groups of three items per parameter.
+    // pushes descriptors to the stack in groups for each parameter.
 
     REBDSP dsp_orig = DSP;
     REBDSP definitional_return_dsp = 0;
 
-    // Start with pushing a cell for the special [0] slot
+    // Start with pushing nothings for the [0] slot
     //
-    Init_Unreadable_Void(DS_PUSH());  // paramlist[0] becomes ACT_ARCHETYPE()
-    Move_Value(DS_PUSH(), EMPTY_BLOCK);  // param_types[0] (object canon)
-    Move_Value(DS_PUSH(), EMPTY_TEXT);  // param_notes[0] (desc, then canon)
+    Init_Void(DS_PUSH(), SYM_VOID);  // key slot (signal for no pushes)
+    Init_Unreadable_Void(DS_PUSH());  // unused
+    Init_Unreadable_Void(DS_PUSH());  // unused
+    Init_Nulled(DS_PUSH());  // description slot
 
     REBFLGS flags = MKF_KEYWORDS;
-    if (GET_ACTION_FLAG(VAL_ACTION(augmentee), HAS_RETURN)) {
+    if (ACT_HAS_RETURN(augmentee)) {
         flags |= MKF_RETURN;
-        definitional_return_dsp = DSP + 1;
+        definitional_return_dsp = DSP + 4;
     }
 
     // For each parameter in the original function, we push a corresponding
     // "triad".
     //
-    REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(augmentee));
-    for (; NOT_END(param); ++param) {
-        Move_Value(DS_PUSH(), param);
-        if (Is_Param_Hidden(param))
-            Seal_Param(DS_TOP);
-        Move_Value(DS_PUSH(), EMPTY_BLOCK);
-        Move_Value(DS_PUSH(), EMPTY_TEXT);
+  blockscope {
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, augmentee);
+    const REBPAR *param = ACT_PARAMS_HEAD(augmentee);
+    for (; key != tail; ++key, ++param) {
+        Init_Word(DS_PUSH(), KEY_SYMBOL(key));
+
+        Copy_Cell(DS_PUSH(), param);
+        if (Is_Param_Hidden(param))  // !!! This should hide locals
+            SET_CELL_FLAG(DS_TOP, STACK_NOTE_LOCAL);
+
+        Init_Nulled(DS_PUSH());  // types (inherits via INHERIT-META)
+        Init_Nulled(DS_PUSH());  // notes (inherits via INHERIT-META)
     }
+  }
 
     // Now we reuse the spec analysis logic, which pushes more parameters to
     // the stack.  This may add duplicates--which will be detected when we
     // try to pop the stack into a paramlist.
     //
-    assert(flags & MKF_RETURN);
     Push_Paramlist_Triads_May_Fail(
         ARG(spec),
         &flags,
-        dsp_orig,
         &definitional_return_dsp
     );
 
+    REBCTX *meta;
     REBARR *paramlist = Pop_Paramlist_With_Meta_May_Fail(
+        &meta,
         dsp_orig,
         flags,
         definitional_return_dsp
     );
 
-    // We have to inject a simple dispatcher to flip the phase to one that has
-    // the more limited frame.  But we have to make an expanded exemplar if
-    // there is one.  (We can't expand the existing exemplar, because more
-    // than one AUGMENT might happen to the same function).  :-/
+    // Usually when you call Make_Action() on a freshly generated paramlist,
+    // it notices that the rootvar is void and hasn't been filled in... so it
+    // makes the frame the paramlist is the varlist of (the exemplar) have a
+    // rootvar pointing to the phase of the newly generated action.
+    //
+    // But since AUGMENT itself doesn't add any new behavior, we can get away
+    // with patching the augmentee's action information (phase and binding)
+    // into the paramlist...and reusing the Specializer_Dispatcher.
 
-    REBCTX *old_exemplar = ACT_EXEMPLAR(VAL_ACTION(augmentee));
-    REBCTX *exemplar;
-    if (not old_exemplar)
-        exemplar = nullptr;
-    else {
-        REBLEN old_len = ARR_LEN(ACT_PARAMLIST(VAL_ACTION(augmentee)));
-        REBLEN delta = ARR_LEN(paramlist) - old_len;
-        assert(delta > 0);
-
-        REBARR *old_varlist = CTX_VARLIST(old_exemplar);
-        assert(ARR_LEN(old_varlist) == old_len);
-
-        REBARR *varlist = Copy_Array_At_Extra_Shallow(
-            old_varlist,
-            0,  // index
-            SPECIFIED,
-            delta,  // extra cells
-            SER(old_varlist)->header.bits
-        );
-        SER(varlist)->info.bits = SER(old_varlist)->info.bits;
-        INIT_VAL_CONTEXT_VARLIST(ARR_HEAD(varlist), varlist);
-
-        // We fill in the added parameters in the specialization as undefined
-        // starters.  This is considered to be "unspecialized".
-        //
-        blockscope {
-            RELVAL *temp = ARR_AT(varlist, old_len);
-            REBLEN i;
-            for (i = 0; i < delta; ++i) {
-                Init_Void(temp, SYM_UNDEFINED);
-                temp = temp + 1;
-            }
-            TERM_ARRAY_LEN(varlist, ARR_LEN(paramlist));
-        }
-
-        // !!! Inefficient, we need to keep the ARG_MARKED_CHECKED bit, but
-        // copying won't keep it by default!  Review folding this into the
-        // copy machinery as part of the stackless copy implementation.  Done
-        // poorly here alongside the copy that should be parameterized.
-        //
-        blockscope {
-            RELVAL *src = ARR_HEAD(old_varlist) + 1;
-            RELVAL *dest = ARR_HEAD(varlist) + 1;
-            REBLEN i;
-            for (i = 1; i < old_len; ++i, ++src, ++dest) {
-                if (GET_CELL_FLAG(src, ARG_MARKED_CHECKED))
-                    SET_CELL_FLAG(dest, ARG_MARKED_CHECKED);
-            }
-        }
-
-        MISC_META_NODE(varlist) = nullptr;  // GC sees, must initialize
-        exemplar = CTX(varlist);
-        INIT_CTX_KEYLIST_SHARED(exemplar, paramlist);
-    }
+    INIT_VAL_FRAME_ROOTVAR(
+        ARR_HEAD(paramlist),
+        paramlist,
+        VAL_ACTION(ARG(action)),
+        VAL_ACTION_BINDING(ARG(action))
+    );
 
     REBACT* augmentated = Make_Action(
         paramlist,
         &Augmenter_Dispatcher,
-        ACT_UNDERLYING(VAL_ACTION(augmentee)),
-        exemplar,
-        1  // size of the ACT_DETAILS array
+        IDX_AUGMENTER_MAX  // same as specialization, just 1 (for archetype)
     );
 
-    Move_Value(
-        ARR_AT(ACT_DETAILS(augmentated), IDX_AUGMENTER_AUGMENTEE),
-        augmentee
-    );
+    assert(ACT_META(augmentated) == nullptr);
+    mutable_ACT_META(augmentated) = meta;
 
-    Init_Action(D_OUT, augmentated, VAL_ACTION_LABEL(augmentee), UNBOUND);
-    return D_OUT;
+    // Keep track that the derived keylist is related to the original, so
+    // that it's possible to tell a frame built for the augmented function is
+    // compatible with the original function (and its ancestors, too)
+    //
+    mutable_LINK(Ancestor, ACT_KEYLIST(augmentated)) = ACT_KEYLIST(augmentee);
+
+    return Init_Action(D_OUT, augmentated, label, UNBOUND);
 }

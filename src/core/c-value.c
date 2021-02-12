@@ -47,28 +47,16 @@ REBNOD *Dump_Value_Debug(const RELVAL *v)
       case REB_NULL:
       case REB_VOID:
       case REB_BLANK:
-      #if defined(DEBUG_TRACK_CELLS)
+      #if defined(DEBUG_TRACK_EXTEND_CELLS)
         printf("REBVAL init");
 
-        #if defined(DEBUG_TRACK_EXTEND_CELLS)
-            #if defined(DEBUG_COUNT_TICKS)
-                printf(" @ tick #%d", cast(unsigned int, v->tick));
-                if (v->touch != 0)
-                    printf(" @ touch #%d", cast(unsigned int, v->touch));
-            #endif
+        printf(" @ tick #%d", cast(unsigned int, v->tick));
+        if (v->touch != 0)
+            printf(" @ touch #%d", cast(unsigned int, v->touch));
 
-            printf(" @ %s:%d\n", v->track.file, v->track.line);
-        #else
-            #if defined(DEBUG_COUNT_TICKS)
-                printf(" @ tick #%d", cast(unsigned int, v->extra.tick));
-            #endif
-
-            printf(
-                " @ %s:%d\n", PAYLOAD(Track, v).file, PAYLOAD(Track, v).line
-            );
-        #endif
+        printf(" @ %s:%ld\n", v->file, cast(unsigned long, v->line));
       #else
-        printf("- no track info (see DEBUG_TRACK_CELLS/DEBUG_COUNT_TICKS)\n");
+        printf("- no track info (see DEBUG_TRACK_EXTEND_CELLS)\n");
       #endif
         fflush(stdout);
         break;
@@ -85,17 +73,14 @@ REBNOD *Dump_Value_Debug(const RELVAL *v)
     fflush(stdout);
 
     if (GET_CELL_FLAG(v, FIRST_IS_NODE))
-        printf("has first node: %p\n", cast(void*, VAL_NODE(v)));
+        printf("has first node: %p\n", cast(void*, VAL_NODE1(v)));
     if (GET_CELL_FLAG(v, SECOND_IS_NODE))
-        printf(
-            "has second node: %p\n",
-            cast(void*, PAYLOAD(Any, (v)).second.node)
-        );
+        printf("has second node: %p\n", cast(void*, VAL_NODE2(v)));
 
     if (not containing)
         return nullptr;
 
-    if (not (containing->header.bits & NODE_FLAG_CELL)) {
+    if (not Is_Node_Cell(containing)) {
         printf(
             "Containing series for value pointer found, %p:\n",
             cast(void*, containing)
@@ -134,7 +119,7 @@ ATTRIBUTE_NO_RETURN void Panic_Value_Debug(const RELVAL *v) {
     }
 
     printf("No containing series for value, panicking for stack dump:\n");
-    Panic_Series_Debug(SER(EMPTY_ARRAY));
+    Panic_Series_Debug(EMPTY_ARRAY);
 }
 
 #endif // !defined(NDEBUG)
@@ -176,7 +161,11 @@ inline static void Probe_Molded_Value(const REBVAL *v)
 //
 //  Probe_Core_Debug: C
 //
-// Use PROBE() to invoke, see notes there.
+// Use PROBE() to invoke from code; this gives more information like line
+// numbers, and in the C++ build will return the input (like the PROBE native
+// function does).
+//
+// Use Probe() to invoke from the C debugger (non-macro, single-arity form).
 //
 void* Probe_Core_Debug(
     const void *p,
@@ -208,27 +197,27 @@ void* Probe_Core_Debug(
         // types in terms of sizing, just to know what they are.
 
         if (SER_WIDE(s) == sizeof(REBYTE)) {
-            if (GET_SERIES_FLAG(s, IS_STRING)) {
-                REBSTR *str = STR(s);
-                if (IS_STR_SYMBOL(str))
+            if (IS_SER_UTF8(s)) {
+                if (IS_SYMBOL(s))
                     Probe_Print_Helper(p, expr, "WORD! series", file, line);
                 else
                     Probe_Print_Helper(p, expr, "STRING! series", file, line);
-                Mold_Text_Series_At(mo, str, 0);  // or could be TAG!, etc.
+                Mold_Text_Series_At(mo, STR(s), 0);  // or could be TAG!, etc.
             }
             else {
+                REBBIN *bin = BIN(s);
                 Probe_Print_Helper(p, expr, "Byte-Size Series", file, line);
 
                 // !!! Duplication of code in MF_Binary
                 //
-                const bool brk = (BIN_LEN(s) > 32);
+                const bool brk = (BIN_LEN(bin) > 32);
                 Append_Ascii(mo->series, "#{");
-                Form_Base16(mo, BIN_HEAD(s), BIN_LEN(s), brk);
+                Form_Base16(mo, BIN_HEAD(bin), BIN_LEN(bin), brk);
                 Append_Ascii(mo->series, "}");
             }
         }
         else if (IS_SER_ARRAY(s)) {
-            if (GET_ARRAY_FLAG(s, IS_VARLIST)) {
+            if (IS_VARLIST(s)) {
                 Probe_Print_Helper(p, expr, "Context Varlist", file, line);
                 Probe_Molded_Value(CTX_ARCHETYPE(CTX(s)));
             }
@@ -237,13 +226,23 @@ void* Probe_Core_Debug(
                 Mold_Array_At(mo, ARR(s), 0, "[]"); // not necessarily BLOCK!
             }
         }
-        else if (s == PG_Canons_By_Hash) {
-            printf("can't probe PG_Canons_By_Hash (TBD: add probing)\n");
-            panic (s);
+        else if (IS_KEYLIST(s)) {
+            assert(SER_WIDE(s) == sizeof(REBKEY));  // ^-- or is byte size
+            Probe_Print_Helper(p, expr, "Keylist Series", file, line);
+            const REBKEY *tail = SER_TAIL(REBKEY, s);
+            const REBKEY *key = SER_HEAD(REBKEY, s);
+            Append_Ascii(mo->series, "<< ");
+            for (; key != tail; ++key) {
+                Mold_Text_Series_At(mo, KEY_SYMBOL(key), 0);
+                Append_Codepoint(mo->series, ' ');
+            }
+            Append_Ascii(mo->series, ">>");
+        }
+        else if (s == PG_Symbols_By_Hash) {
+            printf("can't probe PG_Symbols_By_Hash (TBD: add probing)\n");
         }
         else if (s == GC_Guarded) {
             printf("can't probe GC_Guarded (TBD: add probing)\n");
-            panic (s);
         }
         else
             panic (s);
@@ -256,7 +255,7 @@ void* Probe_Core_Debug(
       case DETECTED_AS_CELL: {
         const REBVAL *v = cast(const REBVAL*, p);
 
-      #if !defined(NDEBUG)  // IS_PARAM() etc. would crash on unreadable void
+      #if !defined(NDEBUG)  // IS_NULLED() asserts on unreadable void
         if (IS_UNREADABLE_DEBUG(v)) {
             Probe_Print_Helper(p, expr, "Value", file, line);
             Append_Ascii(mo->series, "\\\\Unreadable VOID!\\\\");
@@ -264,26 +263,11 @@ void* Probe_Core_Debug(
         }
       #endif
 
-        if (IS_PARAM(v)) {
-            Probe_Print_Helper(p, expr, "Param Cell", file, line);
-
-            const REBSTR *spelling = VAL_KEY_SPELLING(v);
-            Append_Ascii(mo->series, "(");
-            Append_Utf8(
-                mo->series,
-                STR_UTF8(spelling),
-                STR_SIZE(spelling)
-            );
-            Append_Ascii(mo->series, ") ");
-            Append_Ascii(mo->series, "..."); // probe types?
-        }
-        else {
-            Probe_Print_Helper(p, expr, "Value", file, line);
-            if (IS_NULLED(v))
-                Append_Ascii(mo->series, "; null");
-            else
-                Mold_Value(mo, v);
-        }
+        Probe_Print_Helper(p, expr, "Value", file, line);
+        if (IS_NULLED(v))
+            Append_Ascii(mo->series, "; null");
+        else
+            Mold_Value(mo, v);
         break; }
 
       case DETECTED_AS_END:

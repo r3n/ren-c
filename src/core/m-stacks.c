@@ -38,14 +38,14 @@ void Startup_Data_Stack(REBLEN capacity)
     // that indices into the data stack can be unsigned (no need for -1 to
     // mean empty, because 0 can)
     //
-    DS_Array = Make_Array_Core(1, ARRAY_FLAG_NULLEDS_LEGAL);
+    DS_Array = Make_Array_Core(1, FLAG_FLAVOR(DATASTACK) | SERIES_FLAGS_NONE);
     Init_Unreadable_Void(ARR_HEAD(DS_Array));
     SET_CELL_FLAG(ARR_HEAD(DS_Array), PROTECTED);
 
     // The END marker will signal DS_PUSH() that it has run out of space,
     // and it will perform the allocation at that time.
     //
-    TERM_ARRAY_LEN(DS_Array, 1);
+    SET_SERIES_LEN(DS_Array, 1);
     ASSERT_ARRAY(DS_Array);
 
     // Reuse the expansion logic that happens on a DS_PUSH() to get the
@@ -67,7 +67,7 @@ void Shutdown_Data_Stack(void)
     assert(DSP == 0);
     ASSERT_UNREADABLE_IF_DEBUG(ARR_HEAD(DS_Array));
 
-    Free_Unmanaged_Array(DS_Array);
+    Free_Unmanaged_Series(DS_Array);
 }
 
 
@@ -90,14 +90,10 @@ void Startup_Frame_Stack(void)
     TG_Top_Frame = TG_Bottom_Frame = nullptr;
   #endif
 
-    TG_Frame_Feed_End.index = 0;
-    TG_Frame_Feed_End.vaptr = nullptr;
-    TG_Frame_Feed_End.array = EMPTY_ARRAY; // for HOLD flag in Push_Frame
-    TG_Frame_Feed_End.value = END_NODE;
-    TG_Frame_Feed_End.specifier = SPECIFIED;
-    TRASH_POINTER_IF_DEBUG(TG_Frame_Feed_End.pending);
+    DECLARE_ARRAY_FEED (end_feed, EMPTY_ARRAY, 0, SPECIFIED);
+    TG_End_Feed = end_feed;  // used by DECLARE_END_FRAME
 
-    DECLARE_FRAME (f, &TG_Frame_Feed_End, EVAL_MASK_DEFAULT);
+    DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT);
 
     Push_Frame(nullptr, f);
 
@@ -126,6 +122,9 @@ void Shutdown_Frame_Stack(void)
     assert(IS_POINTER_TRASH_DEBUG(TG_Bottom_Frame->prior));
     TG_Bottom_Frame->prior = nullptr;
 
+    Free_Feed(TG_End_Feed);
+    TG_End_Feed = nullptr;
+
   blockscope {
     REBFRM *f = FS_TOP;
 
@@ -146,10 +145,10 @@ void Shutdown_Frame_Stack(void)
   blockscope {
     REBSEG *seg = Mem_Pools[FRM_POOL].segs;
     for (; seg != nullptr; seg = seg->next) {
-        REBLEN n = Mem_Pools[FRM_POOL].units;
-        REBYTE *bp = cast(REBYTE*, seg + 1);
-        for (; n > 0; --n, bp += Mem_Pools[FRM_POOL].wide) {
-            REBFRM *f = cast(REBFRM*, bp);  // ^-- pool size may be rounded up
+        REBLEN n = Mem_Pools[FRM_POOL].num_units;
+        REBYTE *unit = cast(REBYTE*, seg + 1);
+        for (; n > 0; --n, unit += Mem_Pools[FRM_POOL].wide) {
+            REBFRM *f = cast(REBFRM*, unit);  // ^-- pool size may round up
             if (IS_FREE_NODE(f))
                 continue;
           #ifdef DEBUG_COUNT_TICKS
@@ -159,6 +158,29 @@ void Shutdown_Frame_Stack(void)
             );
           #else
             assert(!"** FRAME LEAKED but DEBUG_COUNT_TICKS not enabled");
+          #endif
+        }
+    }
+  }
+  #endif
+
+  #if !defined(NDEBUG)
+  blockscope {
+    REBSEG *seg = Mem_Pools[FED_POOL].segs;
+    for (; seg != nullptr; seg = seg->next) {
+        REBLEN n = Mem_Pools[FED_POOL].num_units;
+        REBYTE *unit = cast(REBYTE*, seg + 1);
+        for (; n > 0; --n, unit += Mem_Pools[FED_POOL].wide) {
+            REBFED *feed = cast(REBFED*, unit);
+            if (IS_FREE_NODE(feed))
+                continue;
+          #ifdef DEBUG_COUNT_TICKS
+            printf(
+                "** FEED LEAKED at tick %lu\n",
+                cast(unsigned long, feed->tick)
+            );
+          #else
+            assert(!"** FEED LEAKED but no DEBUG_COUNT_TICKS enabled\n");
           #endif
         }
     }
@@ -209,7 +231,7 @@ REBCTX *Get_Context_From_Stack(void)
         return VAL_CONTEXT(Lib_Context);
 
     REBARR *details = ACT_DETAILS(phase);
-    REBVAL *context = SPECIFIC(ARR_AT(details, 1));
+    REBVAL *context = DETAILS_AT(details, IDX_NATIVE_CONTEXT);
     return VAL_CONTEXT(context);
 }
 
@@ -227,7 +249,7 @@ REBCTX *Get_Context_From_Stack(void)
 // which could do a push or pop.  (Currently stable w.r.t. pop but there may
 // be compaction at some point.)
 //
-REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
+void Expand_Data_Stack_May_Fail(REBLEN amount)
 {
     REBLEN len_old = ARR_LEN(DS_Array);
 
@@ -242,7 +264,7 @@ REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
     // If adding in the requested amount would overflow the stack limit, then
     // give a data stack overflow error.
     //
-    if (SER_REST(SER(DS_Array)) + amount >= STACK_LIMIT) {
+    if (SER_REST(DS_Array) + amount >= STACK_LIMIT) {
         //
         // Because the stack pointer was incremented and hit the END marker
         // before the expansion, we have to decrement it if failing.
@@ -251,7 +273,7 @@ REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
         Fail_Stack_Overflow(); // !!! Should this be a "data stack" message?
     }
 
-    Extend_Series(SER(DS_Array), amount);
+    Extend_Series(DS_Array, amount);
 
     // Update the pointer used for fast access to the top of the stack that
     // likely was moved by the above allocation (needed before using DS_TOP)
@@ -273,11 +295,10 @@ REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
     // Update the end marker to serve as the indicator for when the next
     // stack push would need to expand.
     //
-    TERM_ARRAY_LEN(DS_Array, len_new);
+    SET_SERIES_LEN(DS_Array, len_new);
     assert(cell == ARR_TAIL(DS_Array));
 
     ASSERT_ARRAY(DS_Array);
-    return DS_TOP;
 }
 
 
@@ -288,6 +309,10 @@ REBVAL *Expand_Data_Stack_May_Fail(REBLEN amount)
 //
 REBARR *Pop_Stack_Values_Core(REBDSP dsp_start, REBFLGS flags)
 {
+  #ifdef DEBUG_EXTANT_STACK_POINTERS
+    assert(TG_Stack_Outstanding == 0);  // in the future, pop may disrupt
+  #endif
+
     REBARR *array = Copy_Values_Len_Shallow_Core(
         DS_AT(dsp_start + 1), // start somewhere in the stack, end at DS_TOP
         SPECIFIED, // data stack should be fully specified--no relative values
@@ -297,25 +322,4 @@ REBARR *Pop_Stack_Values_Core(REBDSP dsp_start, REBFLGS flags)
 
     DS_DROP_TO(dsp_start);
     return array;
-}
-
-
-//
-//  Pop_Stack_Values_Into: C
-//
-// Pops computed values from the stack into an existing ANY-ARRAY.  The
-// index of that array will be updated to the insertion tail (/INTO protocol)
-//
-void Pop_Stack_Values_Into(REBVAL *into, REBDSP dsp_start) {
-    REBLEN len = DSP - dsp_start;
-    REBVAL *values = SPECIFIC(ARR_AT(DS_Array, dsp_start + 1));
-
-    VAL_INDEX_RAW(into) = Insert_Series(
-        VAL_SERIES_ENSURE_MUTABLE(into),
-        VAL_INDEX(into),
-        cast(REBYTE*, values), // stack only holds fully specified REBVALs
-        len // multiplied by width (sizeof(REBVAL)) in Insert_Series
-    );
-
-    DS_DROP_TO(dsp_start);
 }

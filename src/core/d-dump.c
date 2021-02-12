@@ -58,7 +58,7 @@ void Dump_Series(REBSER *s, const char *memo)
     if (s == NULL)
         return;
 
-    printf(" wide: %d\n", SER_WIDE(s));
+    printf(" wide: %d\n", cast(int, SER_WIDE(s)));
     printf(" size: %ld\n", cast(unsigned long, SER_TOTAL_IF_DYNAMIC(s)));
     if (IS_SER_DYNAMIC(s))
         printf(" bias: %d\n", cast(int, SER_BIAS(s)));
@@ -66,10 +66,10 @@ void Dump_Series(REBSER *s, const char *memo)
     printf(" rest: %d\n", cast(int, SER_REST(s)));
 
     // flags includes len if non-dynamic
-    printf(" flags: %lx\n", cast(unsigned long, s->header.bits));
+    printf(" flags: %lx\n", cast(unsigned long, s->leader.bits));
 
     // info includes width
-    printf(" info: %lx\n", cast(unsigned long, s->info.bits));
+    printf(" info: %lx\n", cast(unsigned long, SER_INFO(s)));
 
     fflush(stdout);
 }
@@ -131,18 +131,19 @@ void Dump_Stack(REBFRM *f, REBLEN level)
 
     REBINT n = 1;
     REBVAL *arg = FRM_ARG(f, 1);
-    REBVAL *param = ACT_PARAMS_HEAD(FRM_PHASE(f));
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, FRM_PHASE(f));
 
-    for (; NOT_END(param); ++param, ++arg, ++n) {
+    for (; key != tail; ++key, ++arg, ++n) {
         if (IS_NULLED(arg))
             printf(
                 "    %s:\n",
-                STR_UTF8(VAL_PARAM_SPELLING(param))
+                STR_UTF8(KEY_SYMBOL(key))
             );
         else
             printf(
                 "    %s: %p\n",
-                STR_UTF8(VAL_PARAM_SPELLING(param)),
+                STR_UTF8(KEY_SYMBOL(key)),
                 cast(void*, arg)
             );
     }
@@ -178,7 +179,7 @@ REBNATIVE(dump)
     PROBE(v);
     printf("=> ");
     if (IS_WORD(v)) {
-        const REBVAL *var = Try_Lookup_Word(v, SPECIFIED);
+        const REBVAL* var = try_unwrap(Lookup_Word(v, SPECIFIED));
         if (not var) {
             PROBE("\\unbound\\");
         }

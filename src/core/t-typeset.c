@@ -41,7 +41,7 @@
 // their own reduce before trying to make a typeset out of a block?
 //
 const struct {
-    REBSYM sym;
+    SYMID sym;
     REBU64 bits;
 } Typesets[] = {
     {SYM_ANY_VALUE_X, TS_VALUE},
@@ -90,7 +90,7 @@ void Startup_Typesets(void)
     for (n = 0; Typesets[n].sym != 0; n++) {
         Init_Typeset(DS_PUSH(), Typesets[n].bits);
 
-        Move_Value(
+        Copy_Cell(
             Append_Context(lib, nullptr, Canon(Typesets[n].sym)),
             DS_TOP
         );
@@ -128,34 +128,28 @@ void Shutdown_Typesets(void)
 // reviewed to see if anything actually used it.
 //
 bool Add_Typeset_Bits_Core(
-    RELVAL *typeset,
+    REBPAR *typeset,
     const RELVAL *head,
+    const RELVAL *tail,
     REBSPC *specifier
 ) {
-    assert(IS_TYPESET(typeset) or IS_PARAM(typeset));
+    assert(IS_TYPESET(typeset));
 
     const RELVAL *maybe_word = head;
-    for (; NOT_END(maybe_word); ++maybe_word) {
+    for (; maybe_word != tail; ++maybe_word) {
         const RELVAL *item;
         if (IS_WORD(maybe_word))
             item = Lookup_Word_May_Fail(maybe_word, specifier);
         else
-            item = maybe_word; // wasn't variable
+            item = maybe_word;  // wasn't variable
 
         if (IS_TUPLE(item)) {
-            DECLARE_LOCAL (specific);
-            Derelativize(specific, item, VAL_SEQUENCE_SPECIFIER(item));
-            if (rebDidQ("equal?", specific, "'<...>", rebEND)) {
-                //
-                // !!! The actual final notation for variadics is not decided
-                // on, so there is compatibility for now with the <...> form
-                // from when that was a TAG! vs. a 5-element TUPLE!  While
-                // core sources were changed to `<variadic>`, asking users
-                // to shuffle should only be done once (when final is known).
-                //
-                TYPE_SET(typeset, REB_TS_VARIADIC);
-                continue;
-            }
+            //
+            // !!! This previously called rebDidQ() with "equal?" to check for
+            // the <...> signal for variadics, which is now an odd tuple.
+            // The problem is that you can't call the evaluator while pushing
+            // parameters and typesets to the stack, since the typeset is
+            // in a stack variable.  Review.
         }
 
         if (IS_TAG(item)) {
@@ -188,25 +182,8 @@ bool Add_Typeset_Bits_Core(
             else if (0 == CT_String(item, Root_Invisible_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_INVISIBLE);  // !!! REB_BYTES hack
             }
-            else if (0 == CT_String(item, Root_Output_Tag, strict)) {
-                //
-                // !!! Typeset bits are currently scarce, so output is being
-                // indicated solely by being a refinement and having this
-                // set of potential argument types.  It represents little
-                // risk at time of writing to disrupting existing code during
-                // the multiple return values prototyping stage, because it
-                // only has an effect when you use a SET-BLOCK! to the left.
-                //
-                CLEAR_ALL_TYPESET_BITS(typeset);
-                TYPE_SET(typeset, REB_TS_REFINEMENT);
-                TYPE_SET(typeset, REB_NULL);
-                TYPE_SET(typeset, REB_ISSUE);  // see Is_Blackhole()
-                TYPE_SET(typeset, REB_WORD);
-                TYPE_SET(typeset, REB_PATH);
-                break;
-            }
             else if (0 == CT_String(item, Root_Skip_Tag, strict)) {
-                if (VAL_PARAM_CLASS(typeset) != REB_P_HARD_QUOTE)
+                if (VAL_PARAM_CLASS(typeset) != REB_P_HARD)
                     fail ("Only hard-quoted parameters are <skip>-able");
 
                 TYPE_SET(typeset, REB_TS_SKIPPABLE);
@@ -216,13 +193,19 @@ bool Add_Typeset_Bits_Core(
             else if (0 == CT_String(item, Root_Const_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_CONST);
             }
+            else if (0 == CT_String(item, Root_In_Out_Tag, strict)) {
+                if (VAL_PARAM_CLASS(typeset) != REB_P_OUTPUT)
+                    fail ("Only output parameters can be marked <in-out>");
+
+                TYPE_SET(typeset, REB_TS_IN_OUT);
+            }
             else if (0 == CT_String(item, Root_Modal_Tag, strict)) {
                 //
                 // !!! <modal> is not the general way to make modal args (the
                 // `@arg` notation is used), but the native specs are loaded
                 // by a boostrap r3 that can't read them.
                 //
-                mutable_KIND3Q_BYTE(typeset) = REB_P_MODAL;
+                VAL_TYPESET_PARAM_CLASS_U32(typeset) = REB_P_MODAL;
             }
         }
         else if (IS_DATATYPE(item)) {
@@ -238,7 +221,7 @@ bool Add_Typeset_Bits_Core(
             VAL_TYPESET_HIGH_BITS(typeset) |= VAL_TYPESET_HIGH_BITS(item);
         }
         else if (IS_SYM_WORD(item)) {  // see Startup_Fake_Type_Constraint()
-            switch (VAL_WORD_SYM(item)) {
+            switch (VAL_WORD_ID(item)) {
               case SYM_CHAR_X:
               case SYM_BLACKHOLE_X:
                 TYPE_SET(typeset, REB_ISSUE);
@@ -278,21 +261,30 @@ bool Add_Typeset_Bits_Core(
 REB_R MAKE_Typeset(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_TYPESET);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_TYPESET(arg))
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
     if (!IS_BLOCK(arg)) goto bad_make;
 
+  blockscope {
+    const RELVAL *tail;
+    const RELVAL *at = VAL_ARRAY_AT(&tail, arg);
     Init_Typeset(out, 0);
-    Add_Typeset_Bits_Core(out, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
+    Add_Typeset_Bits_Core(
+        cast_PAR(out),
+        at,
+        tail,
+        VAL_SPECIFIER(arg)
+    );
     return out;
+  }
 
   bad_make:
     fail (Error_Bad_Make(REB_TYPESET, arg));
@@ -313,6 +305,11 @@ REB_R TO_Typeset(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 // Converts typeset value to a block of datatypes, no order is guaranteed.
 //
+// !!! Typesets are likely to be scrapped in their current form; this is just
+// here to try and keep existing code running for now.
+//
+// https://forum.rebol.info/t/the-typeset-representation-problem/1300
+//
 REBARR *Typeset_To_Array(const REBVAL *tset)
 {
     REBDSP dsp_orig = DSP;
@@ -322,11 +319,19 @@ REBARR *Typeset_To_Array(const REBVAL *tset)
         if (TYPE_CHECK(tset, cast(enum Reb_Kind, n))) {
             if (n == REB_NULL) {
                 //
-                // !!! A BLANK! value is currently supported in typesets to
-                // indicate that they take optional values.  This may wind up
-                // as a feature of MAKE ACTION! only.
+                // !!! NULL is used in parameter list typesets to indicate
+                // that they can take optional values.  Hence this can occur
+                // in typesets coming from ACTION!
                 //
-                Init_Blank(DS_PUSH());
+                Copy_Cell(DS_PUSH(), Root_Opt_Tag);
+            }
+            else if (n == REB_CUSTOM) {
+                //
+                // !!! Among TYPESET!'s many design weaknesses, there is no
+                // support in the 64-bit representation for individual
+                // custom types.  So all custom types typecheck together.
+                //
+                Init_Void(DS_PUSH(), SYM_CUSTOM_X);
             }
             else
                 Init_Builtin_Datatype(DS_PUSH(), cast(enum Reb_Kind, n));
@@ -396,7 +401,7 @@ REBTYPE(Typeset)
 {
     REBVAL *v = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_FIND: {
         INCLUDE_PARAMS_OF_FIND;
         UNUSED(ARG(series));  // covered by `v`
@@ -434,7 +439,7 @@ REBTYPE(Typeset)
         else if (not IS_TYPESET(arg))
             fail (arg);
 
-        switch (VAL_WORD_SYM(verb)) {
+        switch (VAL_WORD_ID(verb)) {
           case SYM_UNION:
             VAL_TYPESET_LOW_BITS(v) |= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) |= VAL_TYPESET_HIGH_BITS(arg);

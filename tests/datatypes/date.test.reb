@@ -22,13 +22,13 @@
 (
     did any [
         error? trap [date-d: 1-Jan-0000 - 1]
-        date-d = load mold date-d
+        date-d = load-value mold date-d
     ]
 )
 (
     did any [
         error? trap [date-d: 31-Dec-16383 + 1]
-        date-d = load mold date-d
+        date-d = load-value mold date-d
     ]
 )
 
@@ -36,7 +36,7 @@
     did all [
         error? trap [load "1/11--00"]
         error? trap [load "1/11--0"]
-        (load "1-11-0") = (load "1-11-00")
+        (load-value "1-11-0") = (load-value "1-11-00")
     ]
 )]
 
@@ -59,3 +59,20 @@
         null? :d/zone
     ]
 )]
+
+(
+    [d n]: transcode "1975-04-21/10:20:03.04"
+    did all [
+        date? d
+        n = ""
+        d/year = 1975
+        d/month = 4
+        d/day = 21
+        d/hour = 10
+        d/minute = 20
+        d/second = 3.04
+    ]
+)
+
+(2020-11-24 < 2020-11-25)
+(not 2020-11-24 > 2020-11-25)

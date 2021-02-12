@@ -7,8 +7,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2020 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -21,9 +21,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// FUNC is the basic means for creating a usermode function, implemented by
-// a BLOCK! of code, with another block serving as the "spec" for parameters
-// and HELP information:
+// FUNC is a common means for creating an action from a BLOCK! of code, with
+// another block serving as the "spec" for parameters and HELP:
 //
 //     >> print-sum-twice: func [
 //            {Prints the sum of two integers, and return the sum}
@@ -41,7 +40,7 @@
 //     The sum is 30
 //     The sum is 30
 //
-// Ren-C brings many new abilities not present in historical Rebol:
+// Ren-C brings new abilities not present in historical Rebol:
 //
 // * Return-type checking via `return: [...]` in the spec
 //
@@ -57,17 +56,22 @@
 //   leaving whatever result was in the evaluation previous to the function
 //   call as-is.
 //
-// * A FRAME! object type that bundles together a function instance and its
-//   parameters, which can be invoked or turned into a specialized ACTION!.
-//
 // * Refinements-as-their-own-arguments--which streamlines the evaluator,
 //   saves memory, simplifies naming, and simplifies the FRAME! mechanics.
 //
-// * Many mechanisms for adjusting the behavior or parameterization of
-//   functions without rewriting them, e.g. SPECIALIZE, ADAPT, ENCLOSE,
-//   AUGMENT, CHAIN, and HIJACK.  These derived function generators can be
-//   applied equally well to natives as well as user functions...or to other
-//   derivations.
+//=//// NOTES /////////////////////////////////////////////////////////////=//
+//
+// * R3-Alpha defined FUNC in terms of MAKE ACTION! on a block.  There was
+//   no particular advantage to having an entry point to making functions
+//   from a spec and body that put them both in the same block, so FUNC
+//   serves as a more logical native entry point for that functionality.
+//
+// * While FUNC is intended to be an optimized native due to its commonality,
+//   the belief is still that it should be possible to build an equivalent
+//   (albeit slower) version in usermode out of other primitives.  The current
+//   plan is that those primitives would be MAKE ACTION! from a FRAME!, and
+//   being able to ADAPT a block of code into that frame.  This makes ADAPT
+//   the more foundational operation for fusing interfaces with block bodies.
 //
 
 #include "sys-core.h"
@@ -102,26 +106,25 @@ REB_R Void_Dispatcher(REBFRM *f)
 REB_R Empty_Dispatcher(REBFRM *f)
 {
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-    assert(VAL_LEN_AT(ARR_HEAD(details)) == 0);
+    assert(VAL_LEN_AT(ARR_AT(details, IDX_DETAILS_1)) == 0);  // empty body
     UNUSED(details);
 
-    return Init_Unlabeled_Void(f->out);
+    return Init_Empty_Nulled(f->out);
 }
 
 
 //
-//  Interpreted_Dispatch_Details_0_Throws: C
+//  Interpreted_Dispatch_Details_1_Throws: C
 //
 // Common behavior shared by dispatchers which execute on BLOCK!s of code.
 // Runs the code in the ACT_DETAILS() array of the frame phase for the
 // function instance at the first index (hence "Details 0").
 //
-bool Interpreted_Dispatch_Details_0_Throws(
+bool Interpreted_Dispatch_Details_1_Throws(
     bool *returned,
     REBVAL *spare,
     REBFRM *f
 ){
-    //
     // All callers have the output written into the frame's spare cell.  This
     // is because we don't want to ovewrite the `f->out` contents in the case
     // of a RETURN that wishes to be invisible.  The overwrite should only
@@ -133,15 +136,15 @@ bool Interpreted_Dispatch_Details_0_Throws(
 
     REBACT *phase = FRM_PHASE(f);
     REBARR *details = ACT_DETAILS(phase);
-    RELVAL *body = ARR_AT(details, 0);  // code to run (hence "details 0")
+    RELVAL *body = ARR_AT(details, IDX_DETAILS_1);  // code to run
     assert(IS_BLOCK(body) and IS_RELATIVE(body) and VAL_INDEX(body) == 0);
 
-    if (GET_ACTION_FLAG(phase, HAS_RETURN)) {
-        assert(VAL_PARAM_SYM(ACT_PARAMS_HEAD(phase)) == SYM_RETURN);
+    if (ACT_HAS_RETURN(phase)) {
+        assert(KEY_SYM(ACT_KEYS_HEAD(phase)) == SYM_RETURN);
         REBVAL *cell = FRM_ARG(f, 1);
-        Move_Value(cell, NATIVE_VAL(return));
-        INIT_BINDING(cell, f->varlist);
-        SET_CELL_FLAG(cell, ARG_MARKED_CHECKED);  // necessary?
+        Copy_Cell(cell, NATIVE_VAL(return));
+        INIT_VAL_ACTION_BINDING(cell, CTX(f->varlist));
+        SET_CELL_FLAG(cell, VAR_MARKED_HIDDEN);  // necessary?
     }
 
     // The function body contains relativized words, that point to the
@@ -153,7 +156,7 @@ bool Interpreted_Dispatch_Details_0_Throws(
         if (
             IS_ACTION(label)
             and VAL_ACTION(label) == NATIVE_ACT(unwind)
-            and VAL_BINDING(label) == NOD(f->varlist)
+            and VAL_ACTION_BINDING(label) == CTX(f->varlist)
         ){
             // !!! Historically, UNWIND was caught by the main action
             // evaluation loop.  However, because throws bubble up through
@@ -190,14 +193,21 @@ REB_R Unchecked_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, spare, f)) {
-        Move_Value(f->out, spare);
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
+        Move_Cell(f->out, spare);
         return R_THROWN;
     }
-    UNUSED(returned);  // no additional work to bypass
+    if (not returned)  // assume if it was returned, it was decayed if needed
+        Decay_If_Nulled(spare);
+
     if (IS_ENDISH_NULLED(spare))
         return f->out;  // was invisible
-    return Blit_Specific(f->out, spare);  // keep CELL_FLAG_UNEVALUATED
+
+    return Move_Cell_Core(
+        f->out,
+        spare,
+        CELL_MASK_COPY | CELL_FLAG_UNEVALUATED  // keep unevaluated status
+    );
 }
 
 
@@ -210,8 +220,8 @@ REB_R Voider_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, spare, f)) {
-        Move_Value(f->out, spare);
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
+        Move_Cell(f->out, spare);
         return R_THROWN;
     }
     UNUSED(returned);  // no additional work to bypass
@@ -231,19 +241,26 @@ REB_R Returner_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, spare, f)) {
-        Move_Value(f->out, spare);
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, spare, f)) {
+        Move_Cell(f->out, spare);
         return R_THROWN;
     }
-    UNUSED(returned);  // no additional work to bypass
+    if (not returned)  // assume if it was returned, it was decayed if needed
+        Decay_If_Nulled(spare);
 
     if (IS_ENDISH_NULLED(spare)) {
         FAIL_IF_NO_INVISIBLE_RETURN(f);
         return f->out;  // was invisible
     }
 
-    Blit_Specific(f->out, spare);
+    Move_Cell_Core(
+        f->out,
+        spare,
+        CELL_MASK_COPY | CELL_FLAG_UNEVALUATED
+    );
+
     FAIL_IF_BAD_RETURN_TYPE(f);
+
     return f->out;
 }
 
@@ -256,16 +273,16 @@ REB_R Returner_Dispatcher(REBFRM *f)
 //
 REB_R Elider_Dispatcher(REBFRM *f)
 {
-    assert(f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE);
+    assert(f->out->header.bits & CELL_FLAG_OUT_NOTE_STALE);
 
     REBVAL *discarded = FRM_SPARE(f);  // spare usable during dispatch
 
     bool returned;
-    if (Interpreted_Dispatch_Details_0_Throws(&returned, discarded, f))
+    if (Interpreted_Dispatch_Details_1_Throws(&returned, discarded, f))
         return R_THROWN;
     UNUSED(returned);  // no additional work to bypass
 
-    assert(f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE);
+    assert(f->out->header.bits & CELL_FLAG_OUT_NOTE_STALE);
 
     return f->out;
 }
@@ -280,11 +297,11 @@ REB_R Elider_Dispatcher(REBFRM *f)
 REB_R Commenter_Dispatcher(REBFRM *f)
 {
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
-    RELVAL *body = ARR_HEAD(details);
+    RELVAL *body = ARR_AT(details, IDX_DETAILS_1);
     assert(VAL_LEN_AT(body) == 0);
     UNUSED(body);
 
-    assert(f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE);
+    assert(f->out->header.bits & CELL_FLAG_OUT_NOTE_STALE);
     return f->out;
 }
 
@@ -292,16 +309,23 @@ REB_R Commenter_Dispatcher(REBFRM *f)
 //
 //  Make_Interpreted_Action_May_Fail: C
 //
-// This is the support routine behind both `MAKE ACTION!` and FUNC.
+// This digests the spec block into a `paramlist` for parameter descriptions,
+// along with an associated `keylist` of the names of the parameters and
+// various locals.  A separate object that uses the same keylist is made
+// which maps the parameters to any descriptions that were in the spec.
 //
-// Ren-C's schematic is *very* different from R3-Alpha, whose definition of
-// FUNC was simply:
+// Due to the fact that the typesets in paramlists are "lossy" of information
+// in the source, another object is currently created as well that maps the
+// parameters to the BLOCK! of type information as it appears in the source.
+// Attempts are being made to close the gap between that and the paramlist, so
+// that separate arrays aren't needed for this closely related information:
 //
-//     make function! copy/deep reduce [spec body]
+// https://forum.rebol.info/t/1459
 //
-// Ren-C's `make action!` doesn't need to copy the spec (it does not save
-// it--parameter descriptions are in a meta object).  The body is copied
-// implicitly (as it must be in order to relativize it).
+// The C function dispatcher that is used for the resulting ACTION! varies.
+// For instance, if the body is empty then it picks a dispatcher that does
+// not bother running the code.  And if there's no return type specified,
+// a dispatcher that doesn't check the type is used.
 //
 // There is also a "definitional return" MKF_RETURN option used by FUNC, so
 // the body will introduce a RETURN specific to each action invocation, thus
@@ -335,32 +359,41 @@ REBACT *Make_Interpreted_Action_May_Fail(
     assert(IS_BLOCK(spec) and IS_BLOCK(body));
     assert(details_capacity >= 1);  // relativized body put in details[0]
 
+    REBCTX *meta;
+    REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
+        &meta,
+        spec,
+        &mkf_flags
+    );
+
     REBACT *a = Make_Action(
-        Make_Paramlist_Managed_May_Fail(spec, mkf_flags),
+        paramlist,
         &Empty_Dispatcher,  // will be overwritten if non-[] body
-        nullptr,  // no underlying action (use paramlist)
-        nullptr,  // no specialization exemplar (or inherited exemplar)
         details_capacity  // we fill in details[0], caller fills any extra
     );
+
+    assert(ACT_META(a) == nullptr);
+    mutable_ACT_META(a) = meta;
 
     // We look at the *actual* function flags; e.g. the person may have used
     // the FUNC generator (with MKF_RETURN) but then named a parameter RETURN
     // which overrides it, so the value won't have PARAMLIST_HAS_RETURN.
 
     REBARR *copy;
-    if (IS_END(VAL_ARRAY_AT(body))) {  // optimize empty body case
+    if (VAL_LEN_AT(body) == 0) {  // optimize empty body case
 
-        if (SER(a)->info.bits & ARRAY_INFO_MISC_ELIDER) {
-            ACT_DISPATCHER(a) = &Commenter_Dispatcher;
+        if (mkf_flags & MKF_IS_ELIDER) {
+            INIT_ACT_DISPATCHER(a, &Commenter_Dispatcher);
         }
-        else if (SER(a)->info.bits & ARRAY_INFO_MISC_VOIDER) {
-            ACT_DISPATCHER(a) = &Voider_Dispatcher;  // !!! ^-- see info note
+        else if (mkf_flags & MKF_IS_VOIDER) {
+            INIT_ACT_DISPATCHER(a, &Voider_Dispatcher);  // !!! ^-- see note
         }
-        else if (GET_ACTION_FLAG(a, HAS_RETURN)) {
-            REBVAL *typeset = ACT_PARAMS_HEAD(a);
-            assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
-            if (not TYPE_CHECK(typeset, REB_VOID))  // `do []` returns
-                ACT_DISPATCHER(a) = &Returner_Dispatcher;  // error when run
+        else if (ACT_HAS_RETURN(a)) {
+            const REBPAR *param = ACT_PARAMS_HEAD(a);
+            assert(KEY_SYM(ACT_KEYS_HEAD(a)) == SYM_RETURN);
+
+            if (not TYPE_CHECK(param, REB_VOID))  // `do []` returns
+                INIT_ACT_DISPATCHER(a, &Returner_Dispatcher);  // error later
         }
         else {
             // Keep the Void_Dispatcher passed in above
@@ -372,34 +405,35 @@ REBACT *Make_Interpreted_Action_May_Fail(
     }
     else {  // body not empty, pick dispatcher based on output disposition
 
-        if (SER(a)->info.bits & ARRAY_INFO_MISC_ELIDER)
-            ACT_DISPATCHER(a) = &Elider_Dispatcher; // no f->out mutation
-        else if (SER(a)->info.bits & ARRAY_INFO_MISC_VOIDER) // !!! see note
-            ACT_DISPATCHER(a) = &Voider_Dispatcher; // forces f->out void
-        else if (GET_ACTION_FLAG(a, HAS_RETURN))
-            ACT_DISPATCHER(a) = &Returner_Dispatcher; // type checks f->out
+        if (mkf_flags & MKF_IS_ELIDER)
+            INIT_ACT_DISPATCHER(a, &Elider_Dispatcher);  // no f->out mutation
+        else if (mkf_flags & MKF_IS_VOIDER) // !!! see note
+            INIT_ACT_DISPATCHER(a, &Voider_Dispatcher);  // forces f->out void
+        else if (ACT_HAS_RETURN(a))
+            INIT_ACT_DISPATCHER(a, &Returner_Dispatcher);  // typecheck f->out
         else
-            ACT_DISPATCHER(a) = &Unchecked_Dispatcher; // unchecked f->out
+            INIT_ACT_DISPATCHER(a, &Unchecked_Dispatcher); // unchecked f->out
 
         copy = Copy_And_Bind_Relative_Deep_Managed(
             body,  // new copy has locals bound relatively to the new action
-            ACT_PARAMLIST(a),
-            TS_WORD,
-            did (mkf_flags & MKF_GATHER_LETS) // transitional LET technique
+            a,
+            TS_WORD
         );
     }
 
     // Favor the spec first, then the body, for file and line information.
     //
-    if (GET_ARRAY_FLAG(VAL_ARRAY(spec), HAS_FILE_LINE_UNMASKED)) {
-        LINK_FILE_NODE(copy) = LINK_FILE_NODE(VAL_ARRAY(spec));
-        MISC(copy).line = MISC(VAL_ARRAY(spec)).line;
-        SET_ARRAY_FLAG(copy, HAS_FILE_LINE_UNMASKED);
+    if (GET_SUBCLASS_FLAG(ARRAY, VAL_ARRAY(spec), HAS_FILE_LINE_UNMASKED)) {
+        mutable_LINK(Filename, copy) = LINK(Filename, VAL_ARRAY(spec));
+        copy->misc.line = VAL_ARRAY(spec)->misc.line;
+        SET_SUBCLASS_FLAG(ARRAY, copy, HAS_FILE_LINE_UNMASKED);
     }
-    else if (GET_ARRAY_FLAG(VAL_ARRAY(body), HAS_FILE_LINE_UNMASKED)) {
-        LINK_FILE_NODE(copy) = LINK_FILE_NODE(VAL_ARRAY(body));
-        MISC(copy).line = MISC(VAL_ARRAY(body)).line;
-        SET_ARRAY_FLAG(copy, HAS_FILE_LINE_UNMASKED);
+    else if (
+        GET_SUBCLASS_FLAG(ARRAY, VAL_ARRAY(body), HAS_FILE_LINE_UNMASKED)
+    ){
+        mutable_LINK(Filename, copy) = LINK(Filename, VAL_ARRAY(body));
+        copy->misc.line = VAL_ARRAY(body)->misc.line;
+        SET_SUBCLASS_FLAG(ARRAY, copy, HAS_FILE_LINE_UNMASKED);
     }
     else {
         // Ideally all source series should have a file and line numbering
@@ -467,8 +501,8 @@ REBNATIVE(func_p)
     REBACT *func = Make_Interpreted_Action_May_Fail(
         ARG(spec),
         ARG(body),
-        MKF_RETURN | MKF_KEYWORDS | MKF_GATHER_LETS,
-        1  // details capacity... just the one array slot (will be filled)
+        MKF_RETURN | MKF_KEYWORDS,
+        1 + IDX_DETAILS_1  // archetype and one array slot (will be filled)
     );
 
     return Init_Action(D_OUT, func, ANONYMOUS, UNBOUND);
@@ -490,10 +524,10 @@ REB_R Init_Thrown_Unwind_Value(
     const REBVAL *value,
     REBFRM *frame // required if level is INTEGER! or ACTION!
 ) {
-    Move_Value(out, NATIVE_VAL(unwind));
+    Copy_Cell(out, NATIVE_VAL(unwind));
 
     if (IS_FRAME(level)) {
-        INIT_BINDING(out, VAL_CONTEXT(level));
+        INIT_VAL_FRAME_BINDING(out, VAL_CONTEXT(level));
     }
     else if (IS_INTEGER(level)) {
         REBLEN count = VAL_INT32(level);
@@ -594,11 +628,11 @@ REBNATIVE(return)
     // REBFRM*.  This generic RETURN dispatcher interprets that binding as the
     // FRAME! which this instance is specifically intended to return from.
     //
-    REBNOD *f_binding = FRM_BINDING(f);
+    REBCTX *f_binding = FRM_BINDING(f);
     if (not f_binding)
         fail (Error_Return_Archetype_Raw());  // must have binding to jump to
 
-    REBFRM *target_frame = CTX_FRAME_MAY_FAIL(CTX(f_binding));
+    REBFRM *target_frame = CTX_FRAME_MAY_FAIL(f_binding);
 
     // !!! We only have a REBFRM via the binding.  We don't have distinct
     // knowledge about exactly which "phase" the original RETURN was
@@ -617,19 +651,15 @@ REBNATIVE(return)
     // that an ENCLOSE'd function can't return any types the original function
     // could not.  :-(
     //
-    REBACT *target_fun = FRM_UNDERLYING(target_frame);
+    REBACT *target_fun = target_frame->original;
 
     REBVAL *v = ARG(value);
 
     // Defininitional returns are "locals"--there's no argument type check.
     // So TYPESET! bits in the RETURN param are used for legal return types.
     //
-    REBVAL *typeset = ACT_PARAMS_HEAD(target_fun);
-    assert(
-        VAL_PARAM_CLASS(typeset) == REB_P_LOCAL
-        or VAL_PARAM_CLASS(typeset) == REB_P_SEALED  // !!! review reuse
-    );
-    assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
+    const REBPAR *param = ACT_PARAMS_HEAD(target_fun);
+    assert(KEY_SYM(ACT_KEYS_HEAD(target_fun)) == SYM_RETURN);
 
     // There are two ways you can get an "endish nulled".  One is a plain
     // `RETURN` with nothing following it (which is interpreted as returning
@@ -647,6 +677,11 @@ REBNATIVE(return)
         }
     }
 
+    // The only way to get a function to return a NULL-2 is with RETURN @(...)
+    //
+    if (not REF(vanishable))
+        Decay_If_Nulled(v);
+
     // Check type NOW instead of waiting and letting Eval_Core()
     // check it.  Reasoning is that the error can indicate the callsite,
     // e.g. the point where `return badly-typed-value` happened.
@@ -657,14 +692,12 @@ REBNATIVE(return)
     // take [<opt> any-value!] as its argument, and then report the error
     // itself...implicating the frame (in a way parallel to this native).
     //
-    if (not TYPE_CHECK(typeset, VAL_TYPE(v)))
+    if (not TYPE_CHECK(param, VAL_TYPE(v)))
         fail (Error_Bad_Return_Type(target_frame, VAL_TYPE(v)));
 
   skip_type_check: {
-    assert(f_binding->header.bits & ARRAY_FLAG_IS_VARLIST);
-
-    Move_Value(D_OUT, NATIVE_VAL(unwind)); // see also Make_Thrown_Unwind_Value
-    INIT_BINDING_MAY_MANAGE(D_OUT, f_binding);
+    Copy_Cell(D_OUT, NATIVE_VAL(unwind)); // see also Make_Thrown_Unwind_Value
+    INIT_VAL_ACTION_BINDING(D_OUT, f_binding);
 
     return Init_Thrown_With_Label(D_OUT, v, D_OUT);  // preserves UNEVALUATED
   }

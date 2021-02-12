@@ -96,7 +96,7 @@ DEVICE_CMD Open_Serial(REBREQ *serial)
     );
     if (chars_appended > buf_left)
         rebJumps(
-            "FAIL {Serial path too long for MAX_SERIAL_DEV_PATH}",
+            "fail {Serial path too long for MAX_SERIAL_DEV_PATH}",
             rebEND
         );
 
@@ -236,7 +236,7 @@ DEVICE_CMD Read_Serial(REBREQ *serial)
     rebElide(
         "insert system/ports/system make event! [",
             "type: 'read",
-            "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(serial))),
+            "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, serial)),
         "]",
     rebEND);
 
@@ -279,7 +279,7 @@ DEVICE_CMD Write_Serial(REBREQ *serial)
         rebElide(
             "insert system/ports/system make event! [",
                 "type: 'wrote",
-                "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(serial))),
+                "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, serial)),
             "]",
         rebEND);
 

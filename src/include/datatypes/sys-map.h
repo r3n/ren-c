@@ -38,22 +38,29 @@
 //
 
 #define SERIES_MASK_PAIRLIST \
-    (ARRAY_FLAG_IS_PAIRLIST \
+    (FLAG_FLAVOR(PAIRLIST) \
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* hashlist */)
 
-struct Reb_Map {
-    struct Reb_Array pairlist;  // hashlist is held in ->link.hashlist
-};
 
-// The MAP! datatype uses this.
+#ifdef CPLUSPLUS_11
+    struct Reb_Map : public Reb_Node {
+        struct Reb_Series_Base pairlist;  // hashlist in LINK(Hashlist)
+    };
+#else
+    struct Reb_Map {
+        struct Reb_Series pairlist;
+    };
+#endif
+
+
+// See LINK() macro for how this is used.
 //
-#define LINK_HASHLIST_NODE(s)       LINK(s).custom.node
-#define LINK_HASHLIST(s)            SER(LINK(s).custom.node)
-
+#define LINK_Hashlist_TYPE          REBSER*
+#define LINK_Hashlist_CAST          SER
+#define HAS_LINK_Hashlist           FLAVOR_PAIRLIST
 
 inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
-    assert(GET_ARRAY_FLAG(&(m)->pairlist, IS_PAIRLIST));
-    return (&m_cast(REBMAP*, m)->pairlist);
+    return cast(REBARR*, (&m_cast(REBMAP*, m)->pairlist));
 }
 
 #ifdef __cplusplus
@@ -62,23 +69,17 @@ inline static REBARR *MAP_PAIRLIST(const_if_c REBMAP *m) {
 #endif
 
 #define MAP_HASHLIST(m) \
-    LINK_HASHLIST(MAP_PAIRLIST(m))
+    LINK(Hashlist, MAP_PAIRLIST(m))
 
 #define MAP_HASHES(m) \
     SER_HEAD(MAP_HASHLIST(m))
-
-inline static REBMAP *MAP(void *p) {
-    REBARR *a = ARR(p);
-    assert(GET_ARRAY_FLAG(a, IS_PAIRLIST));
-    return cast(REBMAP*, a);
-}
 
 
 inline static const REBMAP *VAL_MAP(REBCEL(const*) v) {
     assert(CELL_KIND(v) == REB_MAP);
 
-    REBARR *a = ARR(PAYLOAD(Any, v).first.node);
-    if (GET_SERIES_INFO(a, INACCESSIBLE))
+    REBARR *a = ARR(VAL_NODE1(v));
+    if (GET_SERIES_FLAG(a, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
 
     return MAP(a);

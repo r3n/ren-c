@@ -19,7 +19,7 @@
 ; This differs from Rebol2 and Red.
 
 (
-    issue: load "#; ; comment after a one-codepoint issue"
+    issue: load-value "#; ; comment after a one-codepoint issue"
     did all [
         issue? issue
         1 = length of issue
@@ -27,7 +27,7 @@
         ";" = to text! issue
     ]
 )(
-    issue: load "# ; comment after a zero-codepoint issue"
+    issue: load-value "# ; comment after a zero-codepoint issue"
     did all [
         issue? issue
         0 = length of issue
@@ -37,7 +37,7 @@
 )
 
 (
-    q-word: load "'a ; comment after a quoted word"
+    q-word: load-value "'a ; comment after a quoted word"
     did all [
         quoted? q-word
         (first [a]) = unquote q-word
@@ -51,7 +51,7 @@
 ; Semicolons are technically legal in URL (though many things that auto-scan
 ; code to find URLs in text won't include period, semicolon, quotes...)
 (
-    url: load "http://abc;"
+    url: load-value "http://abc;"
     http://abc; = url
 )
 
@@ -60,5 +60,16 @@
     did all [
         b = []
         not new-line? b
+    ]
+)
+
+(['] = transcode "';")
+(
+    data: transcode "';^/a"
+    did all [
+        data = [' a]
+        not new-line? data
+        new-line? next data
+        not new-line? next next data
     ]
 )

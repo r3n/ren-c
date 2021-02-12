@@ -54,7 +54,7 @@
 (error? make error! [type: 'script id: 'bad-func-arg])
 (error? make error! [type: 'script id: 'no-refine])
 (error? make error! [type: 'script id: 'bad-refines])
-(error? make error! [type: 'script id: 'bad-refine])
+(error? make error! [type: 'script id: 'bad-parameter])
 (error? make error! [type: 'script id: 'bad-path-pick])
 (error? make error! [type: 'script id: 'bad-path-poke])
 (error? make error! [type: 'script id: 'bad-field-set])

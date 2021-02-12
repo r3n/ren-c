@@ -4,12 +4,14 @@
 (action! = type of does ["OK"])
 ; minimum
 (action? does [])
-; literal form
-(action? first [#[action! [[] []]]])
+
+; !!! literal form no longer supported
+(error? trap [load "#[action! [[] []]]"])
+
 ; return-less return value tests
 (
     f: does []
-    void? f
+    null? f
 )
 (
     f: does [:abs]
@@ -184,7 +186,7 @@
 )
 (
     f: does [()]
-    void? f
+    null? f
 )
 (
     f: does ['a]
@@ -258,42 +260,95 @@
     f 1
 )
 
-; Argument passing of "get arguments" ("get-args")
+; Argument passing of "hard literal arguments"
 [
     (
-        getf: func [:x] [:x]
+        hard: func ['x] [:x]
         true
     )
 
-    (10 == getf 10)
-    ('a == getf a)
-    (lit 'a == getf 'a)
-    (lit :a == getf :a)
-    (lit a: == getf a:)
-    (lit (10 + 20) == getf (10 + 20))
+    (10 == hard 10)
+    ('a == hard a)
+    (just 'a == hard 'a)
+    (just :a == hard :a)
+    (just a: == hard a:)
+    (just (10 + 20) == hard (10 + 20))
     (
         o: context [f: 10]
-        lit :o/f == getf :o/f
+        just :o/f == hard :o/f
     )
 ]
 
-; Argument passing of "literal arguments" ("lit-args")
+; Argument passing of "medium literal arguments"
 [
     (
-        litf: func ['x] [:x]
+        medium: func [':x <with> got] [got: :x, 1000]
+        Lmedium: enfixed :medium
+
+        got: null
+        test: func [expr [block!]] [
+            got: '~trash~
+            compose [(do expr), (:got)]
+        ]
         true
     )
 
-    (10 == litf 10)
-    ('a == litf a)
-    (lit 'a == litf 'a)
-    (a: 10, 10 == litf :a)
-    (lit a: == litf a:)
-    (30 == litf :(10 + 20))
+    ([1000, 1] = test [medium 1])
+    ([1000, a] = test [medium a])
+    ([1000, 'a] = test [medium 'a])
+    ([1000, 304] = test [medium :(300 + 4)])
+    ([1000, (300 + 4)] = test [medium (300 + 4)])
+    ([1000, o/f] = test [medium o/f])
     (
-        o: context [f: 10]
-        10 == litf :o/f
+        o: context [f: 304]
+        [1000, 304] = test [medium :o/f]
     )
+
+    ; Key point on which MEDIUM and SOFT differ, enfix quote handling
+    (
+        +Q: enfix func ['x [<end> integer!] y] [if x [x + y] else [<null>]]
+        [<null>, 10] = test [medium 10 +Q 20]
+    )
+
+    ([1001, 2] = test [1 + 2 Lmedium])
+    ([1001, <hi>] = test [1 + :(first [<hi>]) Lmedium])
+
+]
+
+; Argument passing of "soft literal arguments"
+[
+    (
+        soft: func [:x <with> got] [got: :x, 1000]
+        Lsoft: enfixed :soft
+
+        got: null
+        test: func [expr [block!]] [
+            got: '~trash~
+            compose [(do expr), (:got)]
+        ]
+        true
+    )
+
+    ([1000, 1] = test [soft 1])
+    ([1000, a] = test [soft a])
+    ([1000, 'a] = test [soft 'a])
+    ([1000, a:] = test [soft a:])
+    ([1000, 304] = test [soft :(300 + 4)])
+    ([1000, (300 + 4)] = test [soft (300 + 4)])
+    ([1000, o/f] = test [soft o/f])
+    (
+        o: context [f: 304]
+        [1000, 304] = test [soft :o/f]
+    )
+
+    ; Key point on which MEDIUM and SOFT differ, enfix quote handling
+    (
+        +Q: enfix func ['x y] [x + y]
+        [1000, 30] = test [soft 10 +Q 20]
+    )
+
+    ([1000, 3] = test [1 + 2 Lsoft])
+    ([1000, 6] = test [1 + :(2 + 3) Lsoft])
 ]
 
 ; basic test for recursive action! invocation
@@ -351,12 +406,6 @@
         1 = f 2
     ]
 )
-[#1528
-    (action? func [self] [])
-]
-[#1756
-    (reeval does [reduce reduce [:self] true])
-]
 [#2025 (
     ; ensure x and y are unset from previous tests, as the test here
     ; is trying to cause an error...
@@ -364,8 +413,8 @@
     unset 'y
 
     body: [x + y]
-    f: make action! reduce [[x] body]
-    g: make action! reduce [[y] body]
+    f: func reduce [x] body
+    g: func reduce [y] body
     error? trap [f 1]
 )]
 [#2044 (

@@ -16,7 +16,7 @@
     file: %simple-save-test.r
     data: "Simple save test produced by %core-tests.r"
     save file data
-    (load file) = data
+    (load-value file) = data
 )
 
 

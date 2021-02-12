@@ -61,8 +61,6 @@ static void Setup_File(REBREQ *file, REBFLGS flags, REBVAL *path)
 
     ReqFile(file)->path = path;
 
-    Secure_Port(Canon(SYM_FILE), file, path /* , file->path */);
-
     // !!! For the moment, assume `path` has a lifetime that will exceed
     // the operation.  This will be easier to ensure once the REQ state is
     // Rebol-structured data, visible to the GC.
@@ -169,18 +167,17 @@ static void Read_File_Port(
 
     struct rebol_devreq *req = Req(file);
 
-    REBSER *ser = Make_Binary(len); // read result buffer
-    TERM_BIN_LEN(ser, len);
-    Init_Binary(out, ser);
+    REBBIN *bin = Make_Binary(len); // read result buffer
+    TERM_BIN_LEN(bin, len);
+    Init_Binary(out, bin);
 
     // Do the read, check for errors:
-    req->common.data = BIN_HEAD(ser);
+    req->common.data = BIN_HEAD(bin);
     req->length = len;
 
     OS_DO_DEVICE_SYNC(file, RDC_READ);
 
-    SET_SERIES_LEN(ser, req->actual);
-    TERM_SEQUENCE(ser);
+    TERM_BIN_LEN(bin, req->actual);
 }
 
 
@@ -309,12 +306,12 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     // !!! R3-Alpha never implemented quite a number of operations on files,
     // including FLUSH, POKE, etc.
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // implicitly comes from `port`
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -392,7 +389,7 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             Cleanup_File(file);
 
             if (rebDid("error?", result, rebEND))
-                rebJumps("FAIL", result, rebEND);
+                rebJumps("fail", result, rebEND);
 
             rebRelease(result); // ignore result
         }
@@ -462,7 +459,7 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             Cleanup_File(file);
 
             if (rebDid("error?", result, rebEND))
-                rebJumps("FAIL", result, rebEND);
+                rebJumps("fail", result, rebEND);
 
             rebRelease(result);
         }
@@ -519,7 +516,7 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             Cleanup_File(file);
 
             if (rebDid("error?", result, rebEND))
-                rebJumps("FAIL", result, rebEND);
+                rebJumps("fail", result, rebEND);
 
             rebRelease(result); // ignore error
         }
@@ -537,7 +534,7 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         assert(result != NULL); // should be synchronous
 
         if (rebDid("error?", result, rebEND))
-            rebJumps("FAIL", result, rebEND);
+            rebJumps("fail", result, rebEND);
 
         rebRelease(result); // ignore result
         RETURN (port); }
@@ -555,7 +552,7 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         REBVAL *result = OS_DO_DEVICE(file, RDC_RENAME);
         assert(result != NULL); // should be synchronous
         if (rebDid("error?", result, rebEND))
-            rebJumps("FAIL", result, rebEND);
+            rebJumps("fail", result, rebEND);
         rebRelease(result); // ignore result
 
         RETURN (ARG(from)); }
@@ -567,13 +564,13 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             REBVAL *cr_result = OS_DO_DEVICE(file, RDC_CREATE);
             assert(cr_result != NULL);
             if (rebDid("error?", cr_result, rebEND))
-                rebJumps("FAIL", cr_result, rebEND);
+                rebJumps("fail", cr_result, rebEND);
             rebRelease(cr_result);
 
             REBVAL *cl_result = OS_DO_DEVICE(file, RDC_CLOSE);
             assert(cl_result != NULL);
             if (rebDid("error?", cl_result, rebEND))
-                rebJumps("FAIL", cl_result, rebEND);
+                rebJumps("fail", cl_result, rebEND);
             rebRelease(cl_result);
         }
 

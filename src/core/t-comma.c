@@ -37,10 +37,10 @@ void MF_Comma(REB_MOLD *mo, REBCEL(const*) v, bool form)
     REBSIZ size = STR_SIZE(mo->series);
     if (
         size > mo->offset + 1
-        and *BIN_AT(SER(mo->series), size - 1) == ' '  // not multibyte char
-        and *BIN_AT(SER(mo->series), size - 2) != ','  // also safe compare
+        and *BIN_AT(mo->series, size - 1) == ' '  // not multibyte char
+        and *BIN_AT(mo->series, size - 2) != ','  // also safe compare
     ){
-        *BIN_AT(SER(mo->series), size - 1) = ',';
+        *BIN_AT(mo->series, size - 1) = ',';
     }
     else
         Append_Codepoint(mo->series, ',');
@@ -68,7 +68,7 @@ REBINT CT_Comma(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 //
 REBTYPE(Comma)
 {
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value)); // taken care of by `unit` above.
@@ -83,7 +83,7 @@ REBTYPE(Comma)
         // So for the moment, we just ad-hoc return nullptr for some that
         // R3-Alpha returned NONE! for.  Review.
         //
-        switch (VAL_WORD_SYM(ARG(property))) {
+        switch (VAL_WORD_ID(ARG(property))) {
           case SYM_INDEX:
           case SYM_LENGTH:
             return nullptr;

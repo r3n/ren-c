@@ -104,9 +104,9 @@ REBNATIVE(as_pair)
 //
 //  {Binds words or words in arrays to the specified context}
 //
-//      return: [action! any-array! any-path! any-word!]
+//      return: [action! any-array! any-path! any-word! quoted!]
 //      value "Value whose binding is to be set (modified) (returned)"
-//          [action! any-array! any-path! any-word!]
+//          [action! any-array! any-path! any-word! quoted!]
 //      target "Target context or a word whose binding should be the target"
 //          [any-word! any-context!]
 //      /copy "Bind and return a deep copy of a block, don't modify original"
@@ -120,13 +120,9 @@ REBNATIVE(bind)
     INCLUDE_PARAMS_OF_BIND;
 
     REBVAL *v = ARG(value);
+    REBLEN num_quotes = Dequotify(v);
 
     REBVAL *target = ARG(target);
-    if (IS_QUOTED(target)) {
-        Dequotify(target);
-        if (not IS_WORD(target))
-            fail ("Only quoted as BIND target is WORD! (replaces ANY-WORD!)");
-    }
 
     REBLEN flags = REF(only) ? BIND_0 : BIND_DEEP;
 
@@ -166,13 +162,13 @@ REBNATIVE(bind)
         // Bind a single word
 
         if (Try_Bind_Word(context, v))
-            RETURN (v);
+            RETURN (Quotify(v, num_quotes));
 
         // not in context, bind/new means add it if it's not.
         //
         if (REF(new) or (IS_SET_WORD(v) and REF(set))) {
-            Append_Context(VAL_CONTEXT(context), v, NULL);
-            RETURN (v);
+            Append_Context(VAL_CONTEXT(context), v, nullptr);
+            RETURN (Quotify(v, num_quotes));
         }
 
         fail (Error_Not_In_Context_Raw(v));
@@ -184,15 +180,18 @@ REBNATIVE(bind)
     // FRAME! that they intend to return from.)
     //
     if (IS_ACTION(v)) {
-        Move_Value(D_OUT, v);
-        INIT_BINDING(D_OUT, VAL_CONTEXT(context));
-        return D_OUT;
+        Copy_Cell(D_OUT, v);
+        INIT_VAL_ACTION_BINDING(D_OUT, VAL_CONTEXT(context));
+        return Quotify(D_OUT, num_quotes);
     }
 
-    if (not ANY_ARRAY_OR_PATH(v))
-        fail (PAR(value)); // QUOTED! could have been any type
+    if (not ANY_ARRAY_OR_PATH(v)) {  // QUOTED! could have wrapped any type
+        Quotify(v, num_quotes);  // put quotes back on
+        fail (Error_Invalid_Arg(frame_, PAR(value)));
+    }
 
     RELVAL *at;
+    const RELVAL *tail;
     if (REF(copy)) {
         REBARR *copy = Copy_Array_Core_Managed(
             VAL_ARRAY(v),
@@ -204,110 +203,101 @@ REBNATIVE(bind)
             TS_ARRAY // types to copy deeply
         );
         at = ARR_HEAD(copy);
+        tail = ARR_TAIL(copy);
         Init_Any_Array(D_OUT, VAL_TYPE(v), copy);
     }
     else {
-        at = VAL_ARRAY_AT_MUTABLE_HACK(v);  // only affects bindings after index
-        Move_Value(D_OUT, v);
+        ENSURE_MUTABLE(v);  // use IN for virtual binding
+        at = VAL_ARRAY_AT_MUTABLE_HACK(&tail, v);  // !!! only *after* index!
+        Copy_Cell(D_OUT, v);
     }
 
     Bind_Values_Core(
         at,
+        tail,
         context,
         bind_types,
         add_midstream_types,
         flags
     );
 
-    return D_OUT;
+    return Quotify(D_OUT, num_quotes);
 }
 
 
 //
 //  in: native [
 //
-//  "Returns the word or block bound into the given context."
+//  "Returns a view of the input bound virtually to the context"
 //
-//      return: [<opt> <requote> any-word! block! group!]
-//      context [any-context! block!]
-//      word [any-word! block! group!] "(modified if series)"
+//      return: [<opt> any-word! any-array!]
+//      context [any-context!]
+//      value [<const> <blank> any-word! any-array!]  ; QUOTED! support?
 //  ]
 //
 REBNATIVE(in)
-//
-// !!! Currently this is just the same as BIND, with the arguments reordered.
-// That may change... IN is proposed to do virtual biding.
-//
-// !!! The argument names here are bad... not necessarily a context and not
-// necessarily a word.  `code` or `source` to be bound in a `target`, perhaps?
 {
     INCLUDE_PARAMS_OF_IN;
 
-    REBVAL *val = ARG(context); // object, error, port, block
-    REBVAL *word = ARG(word);
+    REBCTX *ctx = VAL_CONTEXT(ARG(context));
+    REBVAL *v = ARG(value);
 
-    REBLEN num_quotes = VAL_NUM_QUOTES(word);
-    Dequotify(word);
-
-    DECLARE_LOCAL (safe);
-
-    if (IS_BLOCK(val) || IS_GROUP(val)) {
-        if (IS_WORD(word)) {
-            const REBVAL *v;
-            REBLEN i;
-            for (i = VAL_INDEX(val); i < VAL_LEN_HEAD(val); i++) {
-                Get_Simple_Value_Into(
-                    safe,
-                    VAL_ARRAY_AT_HEAD(val, i),
-                    VAL_SPECIFIER(val)
-                );
-
-                v = safe;
-                if (IS_OBJECT(v)) {
-                    REBLEN index = Find_Canon_In_Context(
-                        v,
-                        VAL_WORD_CANON(word)
-                    );
-                    if (index != 0)
-                        return Init_Any_Word_Bound(
-                            D_OUT,
-                            VAL_TYPE(word),
-                            VAL_WORD_SPELLING(word),
-                            VAL_CONTEXT(v),
-                            index
-                        );
-                }
-            }
+    // !!! Note that BIND of a WORD! in historical Rebol/Red would return the
+    // input word as-is if the word wasn't in the requested context, while
+    // IN would return NONE! on failure.  We carry forward the NULL-failing
+    // here in IN, but BIND's behavior on words may need revisiting.
+    //
+    if (ANY_WORD(v)) {
+        const REBSYM *symbol = VAL_WORD_SYMBOL(v);
+        const bool strict = true;
+        REBLEN index = Find_Symbol_In_Context(ARG(context), symbol, strict);
+        if (index == 0)
             return nullptr;
-        }
-
-        fail (word);
+        return Init_Any_Word_Bound(D_OUT, VAL_TYPE(v), ctx, index);
     }
 
-    REBVAL *context = val;
-
-    // Special form: IN object block
-    if (IS_BLOCK(word) or IS_GROUP(word)) {
-        Bind_Values_Deep(VAL_ARRAY_AT_MUTABLE_HACK(word), context);
-        Quotify(word, num_quotes);
-        RETURN (word);
-    }
-
-    REBLEN index = Find_Canon_In_Context(context, VAL_WORD_CANON(word));
-    if (index == 0)
-        return nullptr;
-
-    Init_Any_Word_Bound(
-        D_OUT,
-        VAL_TYPE(word),
-        VAL_WORD_SPELLING(word),
-        VAL_CONTEXT(context),
-        index
-    );
-    return Quotify(D_OUT, num_quotes);
+    assert(ANY_ARRAY(v));
+    Virtual_Bind_Deep_To_Existing_Context(v, ctx, nullptr, REB_WORD);
+    RETURN (v);
 }
 
 
+//
+//  without: native [
+//
+//  "Remove a virtual binding from a value"
+//
+//      return: [<opt> any-word! any-array!]
+//      context "If integer, then removes that number of virtual bindings"
+//          [integer! any-context!]
+//      value [<const> <blank> any-word! any-array!]  ; QUOTED! support?
+//  ]
+//
+REBNATIVE(without)
+{
+    INCLUDE_PARAMS_OF_IN;
+
+    REBCTX *ctx = VAL_CONTEXT(ARG(context));
+    REBVAL *v = ARG(value);
+
+    // !!! Note that BIND of a WORD! in historical Rebol/Red would return the
+    // input word as-is if the word wasn't in the requested context, while
+    // IN would return NONE! on failure.  We carry forward the NULL-failing
+    // here in IN, but BIND's behavior on words may need revisiting.
+    //
+    if (ANY_WORD(v)) {
+        const REBSYM *symbol = VAL_WORD_SYMBOL(v);
+        const bool strict = true;
+        REBLEN index = Find_Symbol_In_Context(ARG(context), symbol, strict);
+        if (index == 0)
+            return nullptr;
+        return Init_Any_Word_Bound(D_OUT, VAL_TYPE(v), ctx, index);
+    }
+
+    assert(ANY_ARRAY(v));
+    Virtual_Bind_Deep_To_Existing_Context(v, ctx, nullptr, REB_WORD);
+    RETURN (v);
+}
 
 //
 //  use: native [
@@ -322,21 +312,6 @@ REBNATIVE(in)
 //  ]
 //
 REBNATIVE(use)
-//
-// !!! R3-Alpha's USE was written in userspace and was based on building a
-// CLOSURE! that it would DO.  Hence it took advantage of the existing code
-// for tying function locals to a block, and could be relatively short.  This
-// was wasteful in terms of creating an unnecessary function that would only
-// be called once.  The fate of CLOSURE-like semantics is in flux in Ren-C
-// (how much automatic-gathering and indefinite-lifetime will be built-in),
-// yet it's also more efficient to just make a native.
-//
-// As it stands, the code already existed for loop bodies to do this more
-// efficiently.  The hope is that with virtual binding, such constructs will
-// become even more efficient--for loops, BIND, and USE.
-//
-// !!! Should USE allow LIT-WORD!s to mean basically a no-op, just for common
-// interface with the loops?
 {
     INCLUDE_PARAMS_OF_USE;
 
@@ -361,11 +336,11 @@ bool Did_Get_Binding_Of(REBVAL *out, const REBVAL *v)
 {
     switch (VAL_TYPE(v)) {
     case REB_ACTION: {
-        REBNOD *n = VAL_BINDING(v); // see METHOD... RETURNs also have binding
-        if (not n)
+        REBCTX *binding = VAL_ACTION_BINDING(v); // e.g. METHOD, RETURNs
+        if (not binding)
             return false;
 
-        Init_Frame(out, CTX(n), ANONYMOUS);  // !!! Review ANONYMOUS
+        Init_Frame(out, binding, ANONYMOUS);  // !!! Review ANONYMOUS
         break; }
 
     case REB_WORD:
@@ -385,7 +360,7 @@ bool Did_Get_Binding_Of(REBVAL *out, const REBVAL *v)
         // have a longer lifetime than the REBFRM* or other node)
         //
         REBCTX *c = VAL_WORD_CONTEXT(v);
-        Move_Value(out, CTX_ARCHETYPE(c));
+        Copy_Cell(out, CTX_ARCHETYPE(c));
         break; }
 
     default:
@@ -410,13 +385,13 @@ bool Did_Get_Binding_Of(REBVAL *out, const REBVAL *v)
         REBCTX *c = VAL_CONTEXT(out);
         REBFRM *f = CTX_FRAME_IF_ON_STACK(c);
         if (f) {
-            INIT_VAL_CONTEXT_PHASE(out, FRM_PHASE(f));
-            INIT_BINDING(out, FRM_BINDING(f));
+            INIT_VAL_FRAME_PHASE(out, FRM_PHASE(f));
+            INIT_VAL_FRAME_BINDING(out, FRM_BINDING(f));
         }
         else {
             // !!! Assume the canon FRAME! value in varlist[0] is useful?
             //
-            assert(VAL_BINDING(out) == UNBOUND); // canons have no binding
+            assert(VAL_FRAME_BINDING(out) == UNBOUND); // canon, no binding
         }
     }
 
@@ -460,12 +435,12 @@ REBNATIVE(unbind)
     if (ANY_WORD(word))
         Unbind_Any_Word(word);
     else {
-        REBCTX *opt_context = nullptr;
-        Unbind_Values_Core(
-            VAL_ARRAY_AT_ENSURE_MUTABLE(word),
-            opt_context,
-            did REF(deep)
-        );
+        assert(IS_BLOCK(word));
+
+        const RELVAL *tail;
+        RELVAL *at = VAL_ARRAY_AT_ENSURE_MUTABLE(&tail, word);
+        option(REBCTX*) context = nullptr;
+        Unbind_Values_Core(at, tail, context, did REF(deep));
     }
 
     RETURN (word);
@@ -497,26 +472,26 @@ REBNATIVE(collect_words)
     if (REF(deep))
         flags |= COLLECT_DEEP;
 
-    const RELVAL *head = VAL_ARRAY_AT(ARG(block));
+    const RELVAL *tail;
+    const RELVAL *at = VAL_ARRAY_AT(&tail, ARG(block));
     return Init_Block(
         D_OUT,
-        Collect_Unique_Words_Managed(head, flags, ARG(ignore))
+        Collect_Unique_Words_Managed(at, tail, flags, ARG(ignore))
     );
 }
 
 
 inline static void Get_Var_May_Fail(
     REBVAL *out,
-    const RELVAL *source_orig,  // ANY-WORD! or ANY-PATH!
+    const RELVAL *source,  // ANY-WORD! or ANY-PATH! (maybe quoted)
     REBSPC *specifier,
     bool any,  // should a VOID! value be gotten normally vs. error
     bool hard  // should GROUP!s in paths not be evaluated
 ){
-    REBCEL(const*) source = VAL_UNESCAPED(source_orig);
-    enum Reb_Kind kind = CELL_KIND(source);
+    enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(source));
 
     if (ANY_WORD_KIND(kind)) {
-        Move_Value(out, Lookup_Word_May_Fail(source, specifier));
+        Copy_Cell(out, Lookup_Word_May_Fail(source, specifier));
     }
     else if (ANY_SEQUENCE_KIND(kind)) {
         //
@@ -526,9 +501,9 @@ inline static void Get_Var_May_Fail(
         //
         if (Eval_Path_Throws_Core(
             out,
-            CELL_TO_VAL(source),
+            source,  // !!! Review
             specifier,
-            NULL, // not requesting value to set means it's a get
+            nullptr,  // not requesting value to set means it's a get
             EVAL_MASK_DEFAULT
                 | (hard ? EVAL_FLAG_PATH_HARD_QUOTE : EVAL_FLAG_NO_PATH_GROUPS)
         )){
@@ -536,10 +511,13 @@ inline static void Get_Var_May_Fail(
         }
     }
     else
-        fail (Error_Bad_Value_Core(source_orig, specifier));
+        fail (Error_Bad_Value_Core(source, specifier));
 
     if (IS_VOID(out) and not any)
-        fail (Error_Need_Non_Void_Core(source_orig, specifier, out));
+        fail (Error_Need_Non_Void_Core(source, specifier, out));
+
+    if (not any)  // default to not letting NULL-2 out unless /ANY is used
+        Decay_If_Nulled(out);
 }
 
 
@@ -574,9 +552,10 @@ REBNATIVE(get)
 
     REBARR *results = Make_Array(VAL_LEN_AT(source));
     RELVAL *dest = ARR_HEAD(results);
-    const RELVAL *item = VAL_ARRAY_AT(source);
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT(&tail, source);
 
-    for (; NOT_END(item); ++item, ++dest) {
+    for (; item != tail; ++item, ++dest) {
         DECLARE_LOCAL (temp);
         Get_Var_May_Fail(
             temp,  // don't want to write directly into movable memory
@@ -588,10 +567,10 @@ REBNATIVE(get)
         if (IS_NULLED(temp))
             Init_Void(dest, SYM_NULLED);  // blocks can't contain nulls
         else
-            Move_Value(dest, temp);
+            Copy_Cell(dest, temp);
     }
 
-    TERM_ARRAY_LEN(results, VAL_LEN_AT(source));
+    SET_SERIES_LEN(results, VAL_LEN_AT(source));
     return Init_Block(D_OUT, results);
 }
 
@@ -631,17 +610,16 @@ REBNATIVE(get_p)
 // Note this is used by both SET and the SET-BLOCK! data type in %c-eval.c
 //
 void Set_Var_May_Fail(
-    const RELVAL *target_orig,
+    const RELVAL *target,
     REBSPC *target_specifier,
     const RELVAL *setval,
     REBSPC *setval_specifier,
     bool hard
 ){
-    if (Is_Blackhole(target_orig))  // name for a space-bearing ISSUE! ('#')
+    if (Is_Blackhole(target))  // name for a space-bearing ISSUE! ('#')
         return;
 
-    REBCEL(const*) target = VAL_UNESCAPED(target_orig);
-    enum Reb_Kind kind = CELL_KIND(target);
+    enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(target));
 
     if (ANY_WORD_KIND(kind)) {
         REBVAL *var = Sink_Word_May_Fail(target, target_specifier);
@@ -669,7 +647,7 @@ void Set_Var_May_Fail(
         DECLARE_LOCAL (dummy);
         if (Eval_Path_Throws_Core(
             dummy,
-            CELL_TO_VAL(target),
+            target,
             target_specifier,
             specific,
             flags
@@ -680,7 +658,7 @@ void Set_Var_May_Fail(
         DROP_GC_GUARD(specific);
     }
     else
-        fail (Error_Bad_Value_Core(target_orig, target_specifier));
+        fail (Error_Bad_Value_Core(target, target_specifier));
 }
 
 
@@ -733,23 +711,26 @@ REBNATIVE(set)
         RETURN (value);
     }
 
-    const RELVAL *item = VAL_ARRAY_AT(target);
+    const RELVAL *item_tail;
+    const RELVAL *item = VAL_ARRAY_AT(&item_tail, target);
 
+    const RELVAL *v_tail;
     const RELVAL *v;
     if (IS_BLOCK(value) and not REF(single))
-        v = VAL_ARRAY_AT(value);
+        v = VAL_ARRAY_AT(&v_tail, value);
     else {
         Init_True(ARG(single));
         v = value;
+        v_tail = value + 1;
     }
 
     for (
         ;
-        NOT_END(item);
+        item != item_tail;
         ++item, (REF(single) or IS_END(v)) ? NOOP : (++v, NOOP)
      ){
         if (REF(some)) {
-            if (IS_END(v))
+            if (v == v_tail)
                 break; // won't be setting any further values
             if (IS_BLANK(v))
                 continue; // /SOME means treat blanks as no-ops
@@ -758,7 +739,9 @@ REBNATIVE(set)
         Set_Var_May_Fail(
             item,
             VAL_SPECIFIER(target),
-            IS_END(v) ? BLANK_VALUE : v, // R3-Alpha/Red blank after END
+            v == v_tail  // R3-Alpha/Red blank after END
+                ? BLANK_VALUE
+                : v, 
             (IS_BLOCK(value) and not REF(single))
                 ? VAL_SPECIFIER(value)
                 : SPECIFIED,
@@ -961,7 +944,7 @@ REBNATIVE(free)
         fail ("FREE only implemented for ANY-SERIES! at the moment");
 
     REBSER *s = VAL_SERIES_ENSURE_MUTABLE(v);
-    if (GET_SERIES_INFO(s, INACCESSIBLE))
+    if (GET_SERIES_FLAG(s, INACCESSIBLE))
         fail ("Cannot FREE already freed series");
 
     Decay_Series(s);
@@ -990,7 +973,7 @@ REBNATIVE(free_q)
     if (NOT_CELL_FLAG(v, FIRST_IS_NODE))
         return Init_False(D_OUT);
 
-    REBNOD *n = PAYLOAD(Any, v).first.node;
+    REBNOD *n = VAL_NODE1(v);
 
     // If the node is not a series (e.g. a pairing), it cannot be freed (as
     // a freed version of a pairing is the same size as the pairing).
@@ -998,10 +981,10 @@ REBNATIVE(free_q)
     // !!! Technically speaking a PAIR! could be freed as an array could, it
     // would mean converting the node.  Review.
     //
-    if (Is_Node_Cell(n))
+    if (n == nullptr or Is_Node_Cell(n))  // VAL_WORD_CACHE() can be null
         return Init_False(D_OUT);
 
-    return Init_Logic(D_OUT, GET_SERIES_INFO(n, INACCESSIBLE));
+    return Init_Logic(D_OUT, GET_SERIES_FLAG(SER(n), INACCESSIBLE));
 }
 
 
@@ -1020,7 +1003,7 @@ bool Try_As_String(
     assert(strmode == STRMODE_ALL_CODEPOINTS or strmode == STRMODE_NO_CR);
 
     if (ANY_WORD(v)) {  // ANY-WORD! can alias as a read only ANY-STRING!
-        Init_Any_String(out, new_kind, VAL_WORD_SPELLING(v));
+        Init_Any_String(out, new_kind, VAL_WORD_SYMBOL(v));
         Inherit_Const(Quotify(out, quotes), v);
     }
     else if (IS_BINARY(v)) {  // If valid UTF-8, BINARY! aliases as ANY-STRING!
@@ -1042,7 +1025,7 @@ bool Try_As_String(
         const REBSTR *str;
         REBLEN index;
         if (
-            NOT_SERIES_FLAG(bin, IS_STRING)
+            not IS_SER_UTF8(bin)
             or strmode != STRMODE_ALL_CODEPOINTS
         ){
             // If the binary wasn't created as a view on string data to
@@ -1082,16 +1065,15 @@ bool Try_As_String(
 
                 ++num_codepoints;
             }
-            SET_SERIES_FLAG(bin, IS_STRING);
-            SET_SERIES_FLAG(bin, UTF8_NONWORD);
+            mutable_SER_FLAVOR(bin) = FLAVOR_STRING;
             str = STR(bin);
 
-            SET_STR_LEN_SIZE(
+            TERM_STR_LEN_SIZE(
                 m_cast(REBSTR*, str),  // legal for tweaking cached data
                 num_codepoints,
                 BIN_LEN(bin)
             );
-            LINK(bin).bookmarks = nullptr;
+            mutable_LINK(Bookmarks, m_cast(REBBIN*, bin)) = nullptr;
 
             // !!! TBD: cache index/offset
 
@@ -1118,7 +1100,7 @@ bool Try_As_String(
     }
     else if (IS_ISSUE(v)) {
         if (CELL_HEART(cast(REBCEL(const*), v)) != REB_BYTES) {
-            assert(Is_Series_Frozen(SER(VAL_STRING(v))));
+            assert(Is_Series_Frozen(VAL_STRING(v)));
             goto any_string;  // ISSUE! series must be immutable
         }
 
@@ -1133,14 +1115,14 @@ bool Try_As_String(
         assert(size + 1 < sizeof(PAYLOAD(Bytes, v).at_least_8));  // must fit
 
         REBSTR *str = Make_String_Core(size, SERIES_FLAGS_NONE);
-        memcpy(SER_DATA(SER(str)), utf8, size + 1);  // +1 to include '\0'
-        SET_STR_LEN_SIZE(str, len, size);
-        Freeze_Series(SER(str));
+        memcpy(SER_DATA(str), utf8, size + 1);  // +1 to include '\0'
+        TERM_STR_LEN_SIZE(str, len, size);  // !!! SET_STR asserts size, review
+        Freeze_Series(str);
         Init_Any_String(out, new_kind, str);
     }
     else if (ANY_STRING(v)) {
       any_string:
-        Move_Value(out, v);
+        Copy_Cell(out, v);
         mutable_KIND3Q_BYTE(out)
             = mutable_HEART_BYTE(out)
             = new_kind;
@@ -1158,11 +1140,14 @@ bool Try_As_String(
 //
 //  {Aliases underlying data of one value to act as another of same class}
 //
-//      return: [<opt> integer! issue! any-sequence! any-series! any-word!]
+//      return: [
+//          <opt> integer! issue! any-sequence! any-series! any-word!
+//          frame! action!
+//      ]
 //      type [datatype!]
 //      value [
 //          <blank>
-//          integer! issue! any-sequence! any-series! any-word!
+//          integer! issue! any-sequence! any-series! any-word! frame! action!
 //      ]
 //  ]
 //
@@ -1192,8 +1177,8 @@ REBNATIVE(as)
 
               case REB_WORD:
                 assert(
-                    VAL_WORD_SPELLING(v) == PG_Dot_1_Canon
-                    or VAL_WORD_SPELLING(v) == PG_Slash_1_Canon
+                    VAL_WORD_SYMBOL(v) == PG_Dot_1_Canon
+                    or VAL_WORD_SYMBOL(v) == PG_Slash_1_Canon
                 );
                 Init_Block(v, PG_2_Blanks_Array);
                 break;
@@ -1201,20 +1186,20 @@ REBNATIVE(as)
               case REB_GET_WORD: {
                 REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
                 Init_Blank(ARR_HEAD(a));
-                Blit_Relative(ARR_AT(a, 1), v);
+                Copy_Cell(ARR_AT(a, 1), v);
                 mutable_KIND3Q_BYTE(ARR_AT(a, 1)) = REB_WORD;
                 mutable_HEART_BYTE(ARR_AT(a, 1)) = REB_WORD;
-                TERM_ARRAY_LEN(a, 2);
+                SET_SERIES_LEN(a, 2);
                 Init_Block(v, a);
                 break; }
 
               case REB_SYM_WORD: {
                 REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
-                Blit_Relative(ARR_HEAD(a), v);
+                Copy_Cell(ARR_HEAD(a), v);
                 mutable_KIND3Q_BYTE(ARR_HEAD(a)) = REB_WORD;
                 mutable_HEART_BYTE(ARR_HEAD(a)) = REB_WORD;
                 Init_Blank(ARR_AT(a, 1));
-                TERM_ARRAY_LEN(a, 2);
+                SET_SERIES_LEN(a, 2);
                 Init_Block(v, a);
                 break; }
 
@@ -1264,7 +1249,7 @@ REBNATIVE(as)
         }
 
         if (ANY_PATH(v)) {
-            Move_Value(D_OUT, v);
+            Copy_Cell(D_OUT, v);
             mutable_KIND3Q_BYTE(D_OUT)
                 = new_kind;
             return Trust_Const(D_OUT);
@@ -1365,7 +1350,7 @@ REBNATIVE(as)
           any_string: {
             const REBSTR *s = VAL_STRING(v);
 
-            if (not Is_Series_Frozen(SER(s))) {
+            if (not Is_Series_Frozen(s)) {
                 //
                 // We always force strings used with AS to frozen, so that the
                 // effect of freezing doesn't appear to mystically happen just
@@ -1380,7 +1365,7 @@ REBNATIVE(as)
             if (VAL_INDEX(v) != 0)  // can't reuse non-head series AS WORD!
                 goto intern_utf8;
 
-            if (IS_STR_SYMBOL(s)) {
+            if (IS_SYMBOL(s)) {
                 //
                 // This string's content was already frozen and checked, e.g.
                 // the string came from something like `as text! 'some-word`
@@ -1394,7 +1379,7 @@ REBNATIVE(as)
                 goto intern_utf8;
             }
 
-            Init_Any_Word(D_OUT, new_kind, s);
+            Init_Any_Word(D_OUT, new_kind, SYM(s));
             return Inherit_Const(D_OUT, v);
           }
         }
@@ -1412,7 +1397,7 @@ REBNATIVE(as)
                     fail (Error_Alias_Constrains_Raw());
 
             const REBSTR *str;
-            if (IS_SER_STRING(bin) and IS_STR_SYMBOL(STR(bin)))
+            if (IS_SYMBOL(bin))
                 str = STR(bin);
             else {
                 // !!! There isn't yet a mechanic for interning an existing
@@ -1431,11 +1416,11 @@ REBNATIVE(as)
                 // Constrain the input in the way it would be if we were doing
                 // the more efficient reuse.
                 //
-                SET_SERIES_FLAG(bin, IS_STRING);  // might be set already
+                mutable_SER_FLAVOR(bin) = FLAVOR_STRING;
                 Freeze_Series(bin);
             }
 
-            return Inherit_Const(Init_Any_Word(D_OUT, new_kind, str), v);
+            return Inherit_Const(Init_Any_Word(D_OUT, new_kind, SYM(str)), v);
         }
 
         if (not ANY_WORD(v))
@@ -1463,13 +1448,57 @@ REBNATIVE(as)
           any_string_as_binary:
             Init_Binary_At(
                 D_OUT,
-                SER(VAL_STRING(v)),
+                VAL_STRING(v),
                 ANY_WORD(v) ? 0 : VAL_OFFSET(v)
             );
             return Inherit_Const(D_OUT, v);
         }
 
         fail (v); }
+
+      case REB_FRAME: {
+        if (IS_ACTION(v)) {
+            //
+            // We give back the exemplar of the frame, which contains the
+            // parameter descriptions.  Since exemplars are reused, this is
+            // not enough to make the right action out of...so the phase has
+            // to be set to the action that we are returning.
+            //
+            // !!! This loses the label information.  Technically the space
+            // for the varlist could be reclaimed in this case and a label
+            // used, as the read-only frame is archetypal.
+            //
+            RESET_VAL_HEADER(D_OUT, REB_FRAME, CELL_MASK_CONTEXT);
+            INIT_VAL_CONTEXT_VARLIST(D_OUT, ACT_PARAMLIST(VAL_ACTION(v)));
+            mutable_BINDING(D_OUT) = VAL_ACTION_BINDING(v);
+            INIT_VAL_FRAME_PHASE_OR_LABEL(D_OUT, VAL_ACTION(v));
+            return D_OUT;
+        }
+
+        fail (v);
+      }
+
+    case REB_ACTION: {
+      if (IS_FRAME(v)) {
+        //
+        // We want AS ACTION! AS FRAME! of an action to be basically a no-op.
+        // So that means that it uses the dispatcher and details it encoded
+        // in the phase.  This means COPY of a FRAME! needs to create a new
+        // action identity at that moment.  There is no Make_Action() here,
+        // because all frame references to this frame are the same action.
+        //
+        assert(ACT_EXEMPLAR(VAL_FRAME_PHASE(v)) == VAL_CONTEXT(v));
+        Freeze_Array_Shallow(CTX_VARLIST(VAL_CONTEXT(v)));
+        return Init_Action(
+            D_OUT,
+            VAL_FRAME_PHASE(v),
+            ANONYMOUS,  // see note, we might have stored this in varlist slot
+            VAL_FRAME_BINDING(v)
+        );
+      }
+
+      fail (v);
+    }
 
       bad_cast:;
       default:
@@ -1480,7 +1509,7 @@ REBNATIVE(as)
     // Fallthrough for cases where changing the type byte and potentially
     // updating the quotes is enough.
     //
-    Move_Value(D_OUT, v);
+    Copy_Cell(D_OUT, v);
     mutable_KIND3Q_BYTE(D_OUT)
         = mutable_HEART_BYTE(D_OUT)
         = new_kind;
@@ -1664,6 +1693,55 @@ REBNATIVE(null_q)
     INCLUDE_PARAMS_OF_NULL_Q;
 
     return Init_Logic(D_OUT, IS_NULLED(ARG(optional)));
+}
+
+
+//
+//  null-2: native [
+//
+//  {Make the heavy form of NULL (can't be WORD!-fetched, must be ACTION!)}
+//
+//      return: [<opt>]
+//  ]
+//
+REBNATIVE(null_2) {
+    INCLUDE_PARAMS_OF_NULL_2;
+
+    return Init_Heavy_Nulled(D_OUT);
+}
+
+
+//
+//  null-2?: native [
+//
+//  "Tells you if the argument is the heavy isotope of NULL (triggers THEN)"
+//
+//      return: [logic!]
+//      optional [<opt> any-value!]
+//  ]
+//
+REBNATIVE(null_2_q)
+{
+    INCLUDE_PARAMS_OF_NULL_2_Q;
+
+    return Init_Logic(D_OUT, Is_Heavy_Nulled(ARG(optional)));
+}
+
+
+//
+//  isotope?: native [
+//
+//  {Determine if a NULL is an isotope}
+//
+//      return: [logic!]
+//      var [word!]
+//  ]
+//
+REBNATIVE(isotope_q) {
+    INCLUDE_PARAMS_OF_ISOTOPE_Q;
+
+    const REBVAL *var = Lookup_Word_May_Fail(ARG(var), SPECIFIED);
+    return Init_Logic(D_OUT, Is_Heavy_Nulled(var));
 }
 
 

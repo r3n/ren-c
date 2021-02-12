@@ -27,7 +27,7 @@
 // * _Maybe_Stale_ => The evaluation targets an output cell which must be
 //   preloaded or set to END.  If there is no result (e.g. due to being just
 //   comments) then whatever was in that cell will still be there -but- will
-//   carry OUT_MARKED_STALE.  This is just an alias for NODE_FLAG_MARKED, and
+//   carry OUT_NOTE_STALE.  This is just an alias for NODE_FLAG_MARKED, and
 //   it must be cleared off before passing pointers to the cell to a routine
 //   which may interpret that flag differently.
 //
@@ -122,7 +122,7 @@
 
 
 inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
-    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
+    SET_CELL_FLAG(f->out, OUT_NOTE_STALE);
 }
 
 
@@ -217,7 +217,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     REBFLGS initial_flags = f->flags.bits & ~(
         EVAL_FLAG_FULFILL_ONLY  // can be requested or <blank> can trigger
         | EVAL_FLAG_RUNNING_ENFIX  // can be requested with REEVALUATE_CELL
-        | EVAL_FLAG_TOOK_HOLD  // can be set by va_list reification
     );  // should be unchanged on exit
   #endif
 
@@ -231,7 +230,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
         if (GET_EVAL_FLAG(f, FULFILLING_ARG)) {
-            f->out->header.bits |= CELL_FLAG_OUT_MARKED_STALE;
+            f->out->header.bits |= CELL_FLAG_OUT_NOTE_STALE;
             return false;
         }
         CLEAR_FEED_FLAG(f->feed, BARRIER_HIT);  // not an argument, clear flag
@@ -240,8 +239,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     const RELVAL *v;  // shorthand for the value we are switch()-ing on
     TRASH_POINTER_IF_DEBUG(v);
 
-    const REBVAL *gotten;
-    TRASH_POINTER_IF_DEBUG(gotten);
+    option(const REBVAL*) gotten;
+    TRASH_OPTION_IF_DEBUG(gotten);
 
     // Given how the evaluator is written, it's inevitable that there will
     // have to be a test for points to `goto` before running normal eval.
@@ -268,7 +267,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             Push_Action(
                 subframe,
                 VAL_ACTION(f->u.reval.value),
-                VAL_BINDING(f->u.reval.value)
+                VAL_ACTION_BINDING(f->u.reval.value)
             );
             Begin_Enfix_Action(subframe, VAL_ACTION_LABEL(f->u.reval.value));
                 // ^-- invisibles cache NO_LOOKAHEAD
@@ -277,7 +276,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         }
 
         if (NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT))
-            SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
+            SET_CELL_FLAG(f->out, OUT_NOTE_STALE);
 
         v = f->u.reval.value;
         gotten = nullptr;
@@ -309,7 +308,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     }
 
     assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
-    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);  // out won't act as enfix input
+    SET_CELL_FLAG(f->out, OUT_NOTE_STALE);  // out won't act as enfix input
 
     UPDATE_EXPRESSION_START(f);  // !!! See FRM_INDEX() for caveats
 
@@ -346,12 +345,12 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto give_up_backward_quote_priority;
 
     assert(not f_next_gotten);  // Fetch_Next_In_Frame() cleared it
-    f_next_gotten = Try_Lookup_Word(f_next, f_specifier);
+    f_next_gotten = Lookup_Word(f_next, f_specifier);
 
-    if (not f_next_gotten or not IS_ACTION(f_next_gotten))
+    if (not f_next_gotten or not IS_ACTION(unwrap(f_next_gotten)))
         goto give_up_backward_quote_priority;  // note only ACTION! is ENFIXED
 
-    if (GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), IS_BARRIER)) {
+    if (GET_ACTION_FLAG(VAL_ACTION(unwrap(f_next_gotten)), IS_BARRIER)) {
         //
         // In a situation like `foo |`, we want FOO to be able to run...it
         // may take 0 args or it may be able to tolerate END.  But we should
@@ -362,10 +361,13 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto give_up_backward_quote_priority;
     }
 
-    if (NOT_ACTION_FLAG(VAL_ACTION(f_next_gotten), ENFIXED))
+    if (NOT_ACTION_FLAG(VAL_ACTION(unwrap(f_next_gotten)), ENFIXED))
         goto give_up_backward_quote_priority;
 
-    if (NOT_ACTION_FLAG(VAL_ACTION(f_next_gotten), QUOTES_FIRST))
+  blockscope {
+    REBACT *enfixed = VAL_ACTION(unwrap(f_next_gotten));
+
+    if (NOT_ACTION_FLAG(enfixed, QUOTES_FIRST))
         goto give_up_backward_quote_priority;
 
     // If the action soft quotes its left, that means it's aware that its
@@ -373,7 +375,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // material on the left, treat it like it's in a group.
     //
     if (
-        GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), POSTPONES_ENTIRELY)
+        GET_ACTION_FLAG(enfixed, POSTPONES_ENTIRELY)
         or (
             GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)
             and not ANY_SET_KIND(kind_current)  // not SET-WORD!, SET-PATH!...
@@ -381,9 +383,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     ){
         // !!! cache this test?
         //
-        REBVAL *first = First_Unspecialized_Param(VAL_ACTION(f_next_gotten));
+        const REBPAR *first = First_Unspecialized_Param(nullptr, enfixed);
         if (
-            VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE
+            VAL_PARAM_CLASS(first) == REB_P_SOFT
             or VAL_PARAM_CLASS(first) == REB_P_MODAL
         ){
             goto give_up_backward_quote_priority;  // yield as an exemption
@@ -395,8 +397,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // such that `case [condition [...] default [...]]` does not interfere
     // with the BLOCK! on the left, but `x: default [...]` gets the SET-WORD!
     //
-    if (GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), SKIPPABLE_FIRST)) {
-        REBVAL *first = First_Unspecialized_Param(VAL_ACTION(f_next_gotten));
+    if (GET_ACTION_FLAG(enfixed, SKIPPABLE_FIRST)) {
+        const REBPAR *first = First_Unspecialized_Param(nullptr, enfixed);
         if (not TYPE_CHECK(first, kind_current))  // left's kind
             goto give_up_backward_quote_priority;
     }
@@ -424,14 +426,14 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // We make a special exemption for left-stealing arguments, when
         // they have nothing to their right.  They lose their priority
         // and we run the left hand side with them as a priority instead.
-        // This lets us do e.g. `(lit =>)` or `help of`
+        // This lets us do e.g. `(just =>)` or `help of`
         //
         // Swap it around so that what we had put in the f->out goes back
         // to being in the lookback cell and can be used as current.  Then put
         // what was current into f->out so it can be consumed as the first
         // parameter of whatever that was.
 
-        Move_Value(&f->feed->lookback, f->out);
+        Copy_Cell(&f->feed->lookback, f->out);
         Derelativize(f->out, v, f_specifier);
         SET_CELL_FLAG(f->out, UNEVALUATED);
 
@@ -444,14 +446,19 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         goto give_up_backward_quote_priority;  // run PATH!/WORD! normal
     }
+  }
 
     // Wasn't the at-end exception, so run normal enfix with right winning.
     //
   blockscope {
     DECLARE_ACTION_SUBFRAME (subframe, f);
     Push_Frame(f->out, subframe);
-    Push_Action(subframe, VAL_ACTION(gotten), VAL_BINDING(gotten));
-    Begin_Enfix_Action(subframe, VAL_WORD_SPELLING(v));
+    Push_Action(
+        subframe, 
+        VAL_ACTION(unwrap(gotten)),
+        VAL_ACTION_BINDING(unwrap(gotten))
+    );
+    Begin_Enfix_Action(subframe, VAL_WORD_SYMBOL(v));
 
     goto process_action; }
 
@@ -517,7 +524,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
       case REB_ACTION: {
         DECLARE_ACTION_SUBFRAME (subframe, f);
         Push_Frame(f->out, subframe);
-        Push_Action(subframe, VAL_ACTION(v), VAL_BINDING(v));
+        Push_Action(subframe, VAL_ACTION(v), VAL_ACTION_BINDING(v));
         Begin_Prefix_Action(subframe, VAL_ACTION_LABEL(v));
 
         // We'd like `10 -> = 5 + 5` to work, and to do so it reevaluates in
@@ -571,7 +578,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         if (
             GET_EVAL_FLAG(f, FULFILLING_ARG)
-            and GET_CELL_FLAG(f->out, OUT_MARKED_STALE)
+            and GET_CELL_FLAG(f->out, OUT_NOTE_STALE)
             and NOT_END(f_next)
         ){
             gotten = f_next_gotten;
@@ -598,8 +605,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, f_specifier);
 
-        if (IS_ACTION(gotten)) {  // before IS_VOID() is common case
-            REBACT *act = VAL_ACTION(gotten);
+        if (IS_ACTION(unwrap(gotten))) {  // before IS_VOID() is common case
+            REBACT *act = VAL_ACTION(unwrap(gotten));
 
             if (GET_ACTION_FLAG(act, ENFIXED)) {
                 if (
@@ -617,19 +624,20 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
             DECLARE_ACTION_SUBFRAME (subframe, f);
             Push_Frame(f->out, subframe);
-            Push_Action(subframe, act, VAL_BINDING(gotten));
+            Push_Action(subframe, act, VAL_ACTION_BINDING(unwrap(gotten)));
             Begin_Action_Core(
                 subframe,
-                VAL_WORD_SPELLING(v),  // use word as label
+                VAL_WORD_SYMBOL(v),  // use word as label
                 GET_ACTION_FLAG(act, ENFIXED)
             );
             goto process_action;
         }
 
-        if (IS_VOID(gotten))  // need GET/ANY if it's void ("undefined")
-            fail (Error_Need_Non_Void_Core(v, f_specifier, gotten));
+        if (IS_VOID(unwrap(gotten)))  // need GET/ANY if it's void ("undefined")
+            fail (Error_Need_Non_Void_Core(v, f_specifier, unwrap(gotten)));
 
-        Move_Value(f->out, gotten);  // no copy CELL_FLAG_UNEVALUATED
+        Copy_Cell(f->out, unwrap(gotten));  // no copy CELL_FLAG_UNEVALUATED
+        Decay_If_Nulled(f->out);
         break;
 
 
@@ -646,7 +654,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
       set_word_with_out:
 
-        Move_Value(Sink_Word_May_Fail(v, f_specifier), f->out);
+        Copy_Cell(Sink_Word_May_Fail(v, f_specifier), f->out);
         break; }
 
 
@@ -667,13 +675,14 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, f_specifier);
 
-        if (IS_VOID(gotten))
-            fail (Error_Need_Non_Void_Core(v, f_specifier, gotten));
+        if (IS_VOID(unwrap(gotten)))
+            fail (Error_Need_Non_Void_Core(v, f_specifier, unwrap(gotten)));
 
-        Move_Value(f->out, gotten);
+        Copy_Cell(f->out, unwrap(gotten));
+        Decay_If_Nulled(f->out);
 
-        if (IS_ACTION(gotten))  // cache the word's label in the cell
-            INIT_ACTION_LABEL(f->out, VAL_WORD_SPELLING(v));
+        if (IS_ACTION(unwrap(gotten)))  // cache the word's label in the cell
+            INIT_VAL_ACTION_LABEL(f->out, VAL_WORD_SYMBOL(v));
         break;
 
 
@@ -730,18 +739,27 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         assert(
             IS_END(f->out)
-            or GET_CELL_FLAG(f->out, OUT_MARKED_STALE)
+            or GET_CELL_FLAG(f->out, OUT_NOTE_STALE)
             or IS_VOID(f->out)
         );
 
         DECLARE_FEED_AT_CORE (subfeed, v, f_specifier);
 
         // "Maybe_Stale" variant leaves f->out as-is if no result generated
-        // However, it sets OUT_MARKED_STALE in that case (note we may be
+        // However, it sets OUT_NOTE_STALE in that case (note we may be
         // leaving an END in f->out by doing this.)
         //
-        if (Do_Feed_To_End_Maybe_Stale_Throws(f->out, subfeed))
+        // !!! Review why the stale bit was left here.  It must be cleared
+        // if the group evaluation finished, otherwise `any [(10 elide "hi")]`
+        // would result in NULL instead of 10.
+        //
+        if (Do_Feed_To_End_Maybe_Stale_Throws(
+            f->out,
+            subfeed,
+            EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+        )){
             goto return_thrown;
+        }
 
         // We want `3 = (1 + 2 ()) 4` to not treat the 1 + 2 as "stale", thus
         // skipping it and trying to compare `3 = 4`.  But `3 = () 1 + 2`
@@ -757,6 +775,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         }
 
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // `(1)` considered evaluative
+        CLEAR_CELL_FLAG(f->out, OUT_NOTE_STALE);  // any [(10 elide "hi")]
         break; }
 
 
@@ -816,7 +835,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             EVAL_MASK_DEFAULT | EVAL_FLAG_PUSH_PATH_REFINES
         )){
             if (where != f->out)
-                Move_Value(f->out, where);
+                Copy_Cell(f->out, where);
             goto return_thrown;
         }
 
@@ -831,11 +850,15 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             // Plus with GROUP!s in a path, their evaluations can't be undone.
             //
             if (GET_ACTION_FLAG(act, ENFIXED))
-                fail ("Use `<-` to shove left enfix operands into PATH!s");
+                fail ("Use `>-` to shove left enfix operands into PATH!s");
 
             DECLARE_ACTION_SUBFRAME (subframe, f);
             Push_Frame(f->out, subframe);
-            Push_Action(subframe, VAL_ACTION(where), VAL_BINDING(where));
+            Push_Action(
+                subframe,
+                VAL_ACTION(where),
+                VAL_ACTION_BINDING(where)
+            );
             Begin_Prefix_Action(subframe, VAL_ACTION_LABEL(where));
 
             if (where == subframe->out)
@@ -848,9 +871,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             fail (Error_Need_Non_Void_Core(v, f_specifier, where));
 
         if (where != f->out)
-            Move_Value(f->out, where);  // won't move CELL_FLAG_UNEVALUATED
+            Copy_Cell(f->out, where);  // won't move CELL_FLAG_UNEVALUATED
         else
             CLEAR_CELL_FLAG(f->out, UNEVALUATED);
+        Decay_If_Nulled(f->out);
         break; }
 
 
@@ -877,7 +901,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
       case REB_SET_PATH:
       case REB_SET_TUPLE: {
         if (HEART_BYTE(v) == REB_WORD) {
-            assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+            assert(VAL_WORD_ID(v) == SYM__SLASH_1_);
             goto process_set_word;
         }
 
@@ -893,7 +917,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             f->out,
             EVAL_MASK_DEFAULT  // evaluating GROUP!s ok
         )){
-            Move_Value(f->out, f_spare);
+            Copy_Cell(f->out, f_spare);
             goto return_thrown;
         }
 
@@ -918,7 +942,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
       case REB_GET_PATH:
       case REB_GET_TUPLE:
         if (HEART_BYTE(v) == REB_WORD) {
-            assert(VAL_WORD_SYM(v) == SYM__SLASH_1_);
+            assert(VAL_WORD_ID(v) == SYM__SLASH_1_);
             goto process_get_word;
         }
 
@@ -933,6 +957,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         /* assert(NOT_CELL_FLAG(f->out, CELL_FLAG_UNEVALUATED)); */
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);
+        Decay_If_Nulled(f->out);
         break;
 
 
@@ -967,7 +992,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         f_next_gotten = nullptr;  // arbitrary code changes fetched variables
 
         if (Do_Any_Array_At_Throws(f_spare, v, f_specifier)) {
-            Move_Value(f->out, f_spare);
+            Copy_Cell(f->out, f_spare);
             goto return_thrown;
         }
 
@@ -989,7 +1014,11 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             //
             DECLARE_ACTION_SUBFRAME (subframe, f);
             Push_Frame(f->out, subframe);
-            Push_Action(subframe, VAL_ACTION(f_spare), VAL_BINDING(f_spare));
+            Push_Action(
+                subframe,
+                VAL_ACTION(f_spare),
+                VAL_ACTION_BINDING(f_spare)
+            );
             Begin_Prefix_Action(subframe, nullptr);  // no label
 
             goto process_action;
@@ -1044,8 +1073,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (VAL_LEN_AT(v) == 0)
             fail ("SET-BLOCK! must not be empty for now.");
 
-        const RELVAL *check = VAL_ARRAY_AT(v);
-        for (; NOT_END(check); ++check) {
+        const RELVAL *tail;
+        const RELVAL *check = VAL_ARRAY_AT(&tail, v);
+        for (; tail != check; ++check) {
             if (IS_BLANK(check) or IS_WORD(check) or IS_PATH(check))
                 continue;
             if (Is_Blackhole(check))
@@ -1078,22 +1108,20 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (not IS_ACTION(f_spare))
             fail ("SET-BLOCK! is only allowed to have ACTION! on right ATM.");
 
-        // Find all the "output" parameters.  Right now that's any parameter
-        // which is marked as being legal to be word! or path! *specifically*.
-        //
-        const REBU64 ts_out = FLAGIT_KIND(REB_TS_REFINEMENT)
-            | FLAGIT_KIND(REB_NULL)
-            | FLAGIT_KIND(REB_ISSUE)  // for Is_Blackhole() use with SET
-            | FLAGIT_KIND(REB_WORD)
-            | FLAGIT_KIND(REB_PATH);
-
         REBDSP dsp_outputs = DSP;
-        REBVAL *temp = ACT_PARAMS_HEAD(VAL_ACTION(f_spare));
-        for (; NOT_END(temp); ++temp) {
-            if (not TYPE_CHECK_EXACT_BITS(temp, ts_out))
+
+      blockscope {
+        const REBKEY *key_tail;
+        const REBKEY *key = ACT_KEYS(&key_tail, VAL_ACTION(f_spare));
+        const REBPAR *param = ACT_PARAMS_HEAD(VAL_ACTION(f_spare));
+        for (; key != key_tail; ++key, ++param) {
+            if (Is_Param_Hidden(param))
                 continue;
-            Init_Word(DS_PUSH(), VAL_TYPESET_STRING(temp));
+            if (VAL_PARAM_CLASS(param) != REB_P_OUTPUT)
+                continue;
+            Init_Word(DS_PUSH(), KEY_SYMBOL(key));
         }
+      }
 
         DECLARE_LOCAL(outputs);
         Init_Block(outputs, Pop_Stack_Values(dsp_outputs));
@@ -1104,7 +1132,16 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // been preloaded with the words or paths from the left block.
         //
         REBVAL *specialized = rebValue(
-            "enclose specialize", rebQ(f_spare), "collect [ use [block] [",
+            "specialize enclose", rebQ(f_spare), "func [f] [",
+                "for-each output", outputs, "[",
+                    "if f/(output) [",  // void in case func doesn't (null?)
+                        "set f/(output) '~unset~",
+                    "]",
+                "]",
+                "either first", f->out, "@[",
+                    "set first", f->out, "do f",
+                "] @[do f]",
+            "] collect [ use [block] [",
                 "block: next", f->out,
                 "for-each output", outputs, "["
                     "if tail? block [break]",  // no more outputs wanted
@@ -1115,21 +1152,12 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
                     "block: next block",
                 "]",
                 "if not tail? block [fail {Too many multi-returns}]",
-            "] ] func [f] [",
-                "for-each output", outputs, "[",
-                    "if f/(output) [",  // void in case func doesn't (null?)
-                        "set f/(output) ~undefined~",
-                    "]",
-                "]",
-                "either first", f->out, "@[",
-                    "set first", f->out, "do f",
-                "] @[do f]",
-            "]",
+            "] ]",
         rebEND);
 
         DROP_GC_GUARD(outputs);
 
-        Move_Value(f_spare, specialized);
+        Copy_Cell(f_spare, specialized);
         rebRelease(specialized);
 
         // Toss away the pending WORD!/PATH!/ACTION! that was in the execution
@@ -1182,26 +1210,27 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto inert;
 
 
+    //=//// VOID! /////////////////////////////////////////////////////////=//
+    //
+    // To use a VOID! literally in something like an assignment, it should
+    // be quoted:
+    //
+    //     foo: ~unset~  ; will raise an error
+    //     foo: '~unset~  ; will not raise an error
+    //
+    // It was tried to allow voids as inert to be "prettier", but this is not
+    // worth the loss of the value of the alarm that void is meant to raise.
+
+      case REB_VOID:
+        fail (Error_Void_Evaluation_Raw());
+
+
     //=///////////////////////////////////////////////////////////////////=//
     //
     // Treat all the other NOT Is_Bindable() types as inert
     //
     //=///////////////////////////////////////////////////////////////////=//
 
-      case REB_VOID:
-        //
-        // "A void! is a means of giving a hot potato back that is a warning
-        //  something, but you don't want to force an error 'in the moment'...
-        //  in case the returned information wasn't going to be used anyway."
-        //
-        // https://forum.rebol.info/t/947
-        //
-        // So it was thought that voids might be something to error on if
-        // seen by the evaluator.  But in the balance of things, making them
-        // inert is more useful:
-        //
-        // https://forum.rebol.info/t/1383/8
-        //
       case REB_BLANK:
         //
       case REB_LOGIC:
@@ -1258,7 +1287,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
   //=//// END MAIN SWITCH STATEMENT ///////////////////////////////////////=//
 
     // The UNEVALUATED flag is one of the bits that doesn't get copied by
-    // Move_Value() or Derelativize().  Hence it can be overkill to clear it
+    // Copy_Cell() or Derelativize().  Hence it can be overkill to clear it
     // off if one knows a value came from doing those things.  This test at
     // the end checks to make sure that the right thing happened.
     //
@@ -1356,7 +1385,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // words.)  Operations based on VAL_TYPE() or CELL_TYPE() will see it
         // as PATH!, but CELL_KIND() will interpret the cell bits as a word.
         //
-        if (VAL_WORD_SPELLING(f_next) != PG_Slash_1_Canon)
+        if (VAL_WORD_SYMBOL(f_next) != PG_Slash_1_Canon)
             goto finished;  // optimized refinement (see IS_REFINEMENT())
         break; }
 
@@ -1371,9 +1400,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // we can see if it looks up to any kind of ACTION! at all.
 
     if (not f_next_gotten)
-        f_next_gotten = Try_Lookup_Word(f_next, f_specifier);
+        f_next_gotten = Lookup_Word(f_next, f_specifier);
     else
-        assert(f_next_gotten == Try_Lookup_Word(f_next, f_specifier));
+        assert(f_next_gotten == Lookup_Word(f_next, f_specifier));
 
   //=//// NEW EXPRESSION IF UNBOUND, NON-FUNCTION, OR NON-ENFIX ///////////=//
 
@@ -1384,8 +1413,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
     if (
         not f_next_gotten
-        or not IS_ACTION(f_next_gotten)
-        or not GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), ENFIXED)
+        or not IS_ACTION(unwrap(f_next_gotten))
+        or NOT_ACTION_FLAG(VAL_ACTION(unwrap(f_next_gotten)), ENFIXED)
     ){
       lookback_quote_too_late: // run as if starting new expression
 
@@ -1399,13 +1428,16 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// IS WORD ENFIXEDLY TIED TO A FUNCTION (MAY BE "INVISIBLE") ///////=//
 
-    if (GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), QUOTES_FIRST)) {
+  blockscope {
+    REBACT *enfixed = VAL_ACTION(unwrap(f_next_gotten));
+
+    if (GET_ACTION_FLAG(enfixed, QUOTES_FIRST)) {
         //
         // Left-quoting by enfix needs to be done in the lookahead before an
         // evaluation, not this one that's after.  This happens in cases like:
         //
-        //     left-lit: enfix func [:value] [:value]
-        //     lit <something> left-lit
+        //     left-just: enfix func [:value] [:value]
+        //     just <something> just-lit
         //
         // But due to the existence of <end>-able and <skip>-able parameters,
         // the left quoting function might be okay with seeing nothing on the
@@ -1415,8 +1447,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))
             fail (Error_Literal_Left_Path_Raw());
 
-        REBVAL *first = First_Unspecialized_Param(VAL_ACTION(f_next_gotten));
-        if (VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE) {
+        const REBPAR *first = First_Unspecialized_Param(nullptr, enfixed);
+        if (VAL_PARAM_CLASS(first) == REB_P_SOFT) {
             if (GET_FEED_FLAG(f->feed, NO_LOOKAHEAD)) {
                 CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
                 goto finished;
@@ -1428,8 +1460,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
     if (
         GET_EVAL_FLAG(f, FULFILLING_ARG)
-        and not (
-            GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), DEFERS_LOOKBACK)
+        and not (GET_ACTION_FLAG(enfixed, DEFERS_LOOKBACK)
                                        // ^-- `1 + if false [2] else [3]` => 4
 /*            or GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), IS_INVISIBLE)
                                        // ^-- `1 + 2 + comment "foo" 3` => 6 */
@@ -1461,9 +1492,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     if (
         GET_EVAL_FLAG(f, FULFILLING_ARG)
         and (
-            GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), POSTPONES_ENTIRELY)
+            GET_ACTION_FLAG(enfixed, POSTPONES_ENTIRELY)
             or (
-                GET_ACTION_FLAG(VAL_ACTION(f_next_gotten), DEFERS_LOOKBACK)
+                GET_ACTION_FLAG(enfixed, DEFERS_LOOKBACK)
                 and NOT_FEED_FLAG(f->feed, DEFERRING_ENFIX)
             )
         )
@@ -1512,14 +1543,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // of parameter fulfillment.  We want to reuse the f->out value and get it
     // into the new function's frame.
 
-  blockscope {
     DECLARE_ACTION_SUBFRAME (subframe, f);
     Push_Frame(f->out, subframe);
-    Push_Action(subframe,
-        VAL_ACTION(f_next_gotten),
-        VAL_BINDING(f_next_gotten)
-    );
-    Begin_Enfix_Action(subframe, VAL_WORD_SPELLING(f_next));
+    Push_Action(subframe, enfixed, VAL_ACTION_BINDING(unwrap(f_next_gotten)));
+    Begin_Enfix_Action(subframe, VAL_WORD_SYMBOL(f_next));
 
     Fetch_Next_Forget_Lookback(f);  // advances next
     goto process_action; }
@@ -1538,9 +1565,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // Want to keep this flag between an operation and an ensuing enfix in
     // the same frame, so can't clear in Drop_Action(), e.g. due to:
     //
-    //     left-lit: enfix :lit
+    //     left-just: enfix :Just
     //     o: make object! [f: does [1]]
-    //     o/f left-lit  ; want error suggesting >- here, need flag for that
+    //     o/f left-just  ; want error suggesting >- here, need flag for that
     //
     CLEAR_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);
     assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));  // must be consumed
@@ -1548,9 +1575,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
   #if !defined(NDEBUG)
     Eval_Core_Exit_Checks_Debug(f);  // called unless a fail() longjmps
     assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));
-    assert(
-        (f->flags.bits & ~EVAL_FLAG_TOOK_HOLD) == initial_flags
-    );  // any change should be restored, but va_list reification may hold
+    assert(f->flags.bits == initial_flags);  // any change should be restored
   #endif
 
     return false;  // false => not thrown

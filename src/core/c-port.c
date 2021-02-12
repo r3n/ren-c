@@ -51,9 +51,9 @@ REBREQ *Force_Get_Port_State(const REBVAL *port, void *device)
     else {
         assert(IS_BLANK(state));
         req = OS_Make_Devreq(dev);
-        ReqPortCtx(req) = ctx;  // Guarded: SERIES_INFO_MISC_NODE_NEEDS_MARK
+        mutable_MISC(ReqPortCtx, req) = ctx;  // see MISC_NODE_NEEDS_MARK
 
-        Init_Binary(state, SER(req));
+        Init_Binary(state, req);
     }
 
     return req;
@@ -115,16 +115,17 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     // Dispatch object function:
 
   blockscope {
-    REBLEN n = Find_Canon_In_Context(actor, VAL_WORD_CANON(verb));
+    const bool strict = false;
+    REBLEN n = Find_Symbol_In_Context(actor, VAL_WORD_SYMBOL(verb), strict);
 
-    REBVAL *action = (n == 0) ? nullptr : VAL_CONTEXT_VAR(actor, n);
+    REBVAL *action = (n == 0) ? nullptr : CTX_VAR(VAL_CONTEXT(actor), n);
     if (not action or not IS_ACTION(action))
         fail (Error_No_Port_Action_Raw(verb));
 
     if (Redo_Action_Throws_Maybe_Stale(frame_->out, frame_, VAL_ACTION(action)))
         return R_THROWN;
 
-    CLEAR_CELL_FLAG(frame_->out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(frame_->out, OUT_NOTE_STALE);
 
     r = D_OUT; // result should be in frame_->out
   }
@@ -138,7 +139,7 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
   post_process_output:
 
-    if (VAL_WORD_SYM(verb) == SYM_READ) {
+    if (VAL_WORD_ID(verb) == SYM_READ) {
         INCLUDE_PARAMS_OF_READ;
 
         UNUSED(PAR(source));
@@ -171,46 +172,12 @@ REB_R Do_Port_Action(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             assert(IS_TEXT(D_OUT));
 
             DECLARE_LOCAL (temp);
-            Move_Value(temp, D_OUT);
+            Copy_Cell(temp, D_OUT);
             Init_Block(D_OUT, Split_Lines(temp));
         }
     }
 
     return r;
-}
-
-
-//
-//  Secure_Port: C
-//
-// kind: word that represents the type (e.g. 'file)
-// req:  I/O request
-// name: value that holds the original user spec
-// path: the path to compare with
-//
-// !!! SECURE was not implemented in R3-Alpha.  This routine took a translated
-// local path (as a REBSER) which had been expanded fully.  The concept of
-// "local paths" is not something the core is going to be concerned with (e.g.
-// backslash translation), rather something that the OS-specific extension
-// code does.  If security is going to be implemented at a higher-level, then
-// it may have to be in the PORT! code itself.  As it isn't active, it doesn't
-// matter at the moment--but is a placeholder for finding the right place.
-//
-void Secure_Port(
-    const REBSTR *kind,
-    REBREQ *req,
-    const REBVAL *name
-    /* , const REBVAL *path */
-){
-    const REBVAL *path = name;
-    assert(IS_FILE(path)); // !!! relative, untranslated
-    UNUSED(path);
-
-    if (Req(req)->modes & RFM_READ)
-        Check_Security_Placeholder(STR_CANON(kind), SYM_READ, name);
-
-    if (Req(req)->modes & RFM_WRITE)
-        Check_Security_Placeholder(STR_CANON(kind), SYM_WRITE, name);
 }
 
 

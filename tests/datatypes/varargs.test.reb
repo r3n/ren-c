@@ -28,8 +28,8 @@
 )
 
 (
-    f: func [:look [<variadic>]] [to-value first look]
-    blank? applique 'f [look: make varargs! []]
+    f: func ['look [<variadic>]] [to-value first look]
+    blank? applique :f [look: make varargs! []]
 )
 
 ; !!! Experimental behavior of enfixed variadics, is to act as either 0 or 1
@@ -73,7 +73,7 @@
     (28 = do [multiply 3 9 defers])  ; seen as (multiply 3 9) defers))
 ][
     (
-        soft: enfixed function ['v [any-value! <variadic>]] [
+        soft: enfixed function [:v [any-value! <variadic>]] [
             collect [
                 while [not tail? v] [
                     keep/only take v
@@ -85,7 +85,7 @@
 
     ([] = do [soft])
     (
-        a: ~void~
+        a: '~void~
         (trap [a soft])/id = 'need-non-void
     )
     ([7] = do [:(1 + 2) :(3 + 4) soft])
@@ -103,7 +103,7 @@
 
     ([] = do [hard])
     (
-        a: ~void~
+        a: '~void~
         (trap [a hard])/id = 'need-non-void
     )
     ([(3 + 4)] = do [(1 + 2) (3 + 4) hard])
@@ -173,38 +173,3 @@
 
     vblock == nblock
 )
-
-
-; Test MAKE FRAME! from a VARARGS! with a test userspace implementation of the
-; MATCH operation...
-[
-    (userspace-match: function [
-        {Check value using tests (match types, TRUE or FALSE, or filter)}
-
-        return: "Input if it matched, otherwise null (void if falsey match)"
-            [<opt> any-value!]
-        :args [<opt> any-value! <variadic>]
-        :args-normal [<opt> any-value! <variadic>]
-        <local> first-arg
-    ][
-        test: first args
-        switch type of :test [
-            word! path! [
-                if action? get test [
-                    f: make frame! args
-                    first-arg: get in f first parameters of action of f
-                    either-match false do f [return first-arg]
-                    return null
-                ]
-            ]
-        ]
-
-        either-match :(take args) (take args-normal) @null
-    ]
-    true)
-
-    (userspace-match integer! 10 then [true])
-    (userspace-match integer! <tag> else [true])
-    (10 = userspace-match even? 10)
-    (null = userspace-match even? 7)
-]

@@ -189,7 +189,7 @@ make-port*: function [
     ]
 ]
 
-decode-url: _ ; used by sys funcs, defined above, set below
+decode-url: :*parse-url/decode-url  ; wrapped in context, expose main function
 
 ;-- Native Schemes -----------------------------------------------------------
 
@@ -232,14 +232,4 @@ make-scheme: function [
     ]
 
     append system/schemes reduce [scheme/name scheme]
-]
-
-init-schemes: func [
-    "INIT: Init system native schemes and ports."
-][
-    sys/decode-url: lib/decode-url: :sys/*parse-url/decode-url
-
-    system/schemes: make object! 10
-
-    init-schemes: 'done ; only once
 ]

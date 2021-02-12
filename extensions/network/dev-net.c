@@ -290,7 +290,7 @@ DEVICE_CMD Lookup_Socket(REBREQ *sock)
     rebElide(
         "insert system/ports/system make event! [",
             "type: 'lookup",
-            "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(sock))),
+            "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, sock)),
         "]",
     rebEND);
 
@@ -332,7 +332,7 @@ DEVICE_CMD Connect_Socket(REBREQ *sock)
         rebElide(
             "insert system/ports/system make event! [",
                 "type: 'connect",
-                "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(sock))),
+                "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, sock)),
             "]",
         rebEND);
 
@@ -392,7 +392,7 @@ DEVICE_CMD Connect_Socket(REBREQ *sock)
     rebElide(
         "insert system/ports/system make event! [",
             "type: 'connect",
-            "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(sock))),
+            "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, sock)),
         "]",
     rebEND);
 
@@ -429,7 +429,7 @@ DEVICE_CMD Transfer_Socket(REBREQ *sock)
 
     if (not (req->state & RSM_CONNECT) and not (req->modes & RST_UDP))
         rebJumps(
-            "FAIL {RSM_CONNECT must be true in Transfer_Socket() unless UDP}",
+            "fail {RSM_CONNECT must be true in Transfer_Socket() unless UDP}",
             rebEND
         );
 
@@ -441,7 +441,7 @@ DEVICE_CMD Transfer_Socket(REBREQ *sock)
 
     int result;
 
-    const REBVAL *port = CTX_ARCHETYPE(CTX(ReqPortCtx(sock)));
+    const REBVAL *port = CTX_ARCHETYPE(MISC(ReqPortCtx, sock));
 
     assert(req->actual < req->length);  // else we should've returned DR_DONE
 
@@ -703,7 +703,7 @@ DEVICE_CMD Accept_Socket(REBREQ *sock)
     if (req->modes & RST_UDP) {
             rebElide("insert system/ports/system make event! [",
                 "type: 'accept",
-                "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(sock))),
+                "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, sock)),
             "]",
         rebEND);
 
@@ -729,7 +729,7 @@ DEVICE_CMD Accept_Socket(REBREQ *sock)
 
     // Create a new port using ACCEPT
 
-    REBCTX *listener = CTX(ReqPortCtx(sock));
+    REBCTX *listener = MISC(ReqPortCtx, sock);
     REBCTX *connection = Copy_Context_Shallow_Managed(listener);
     PUSH_GC_GUARD(connection);
 
@@ -754,7 +754,7 @@ DEVICE_CMD Accept_Socket(REBREQ *sock)
     ReqNet(sock_new)->remote_port = ntohs(sa.sin_port);
     Get_Local_IP(sock_new);
 
-    ReqPortCtx(sock_new) = connection;
+    mutable_MISC(ReqPortCtx, sock_new) = connection;
 
     rebElide(
         "append ensure block!", CTX_VAR(listener, STD_PORT_CONNECTIONS),

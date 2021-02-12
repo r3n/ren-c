@@ -28,10 +28,6 @@
 //     >> negadd 2 2
 //     == -4
 //
-// Its design is relatively efficient, because it is supported by the action
-// executor directly--which looks for ACTION!s pushed to the stack by
-// dispatchers and assumes that means the calls should be chained.
-//
 // For more complex post-processing which may involve access to the original
 // inputs to the first function (or other memory in the process), consider
 // using ENCLOSE...which is less efficient, but more powerful.
@@ -43,15 +39,81 @@
 #include "sys-core.h"
 
 enum {
-    IDX_CHAINER_PIPELINE = 0,  // Chain of functions to execute
+    IDX_CHAINER_PIPELINE = 1,  // Chain of functions to execute
     IDX_CHAINER_MAX
 };
 
 
 //
+//  Push_Downshifted_Frame: C
+//
+// When a derived function dispatcher receives a frame built for the function
+// it derived from, sometimes it can do some work...update the phase...and
+// keep running in that same REBFRM* allocation.
+//
+// But if it wants to stay in control and do post-processing (as CHAIN does)
+// then it needs to remain linked into the stack.  This function helps to
+// move the built frame into a new frame that can be executed with a new
+// entry to Process_Action().  The ability is also used by RESKINNED.
+//
+REBFRM *Push_Downshifted_Frame(REBVAL *out, REBFRM *f) {
+    DECLARE_FRAME (
+        sub,
+        f->feed,
+        EVAL_MASK_DEFAULT
+            | FLAG_STATE_BYTE(ST_ACTION_DISPATCHING)  // don't typecheck again
+    );
+    Push_Frame(out, sub);
+    assert(sub->varlist == nullptr);
+    sub->varlist = f->varlist;
+    assert(LINK(KeySource, sub->varlist) == NOD(f));
+    INIT_LINK_KEYSOURCE(sub->varlist, NOD(sub));
+    sub->rootvar = SPECIFIC(ARR_HEAD(sub->varlist));
+
+    // !!! This leaks a dummy varlist, could just reuse a global one that
+    // shows as INACCESSIBLE.
+    //
+    f->varlist = Alloc_Singular(
+        FLAG_FLAVOR(VARLIST) | SERIES_FLAG_MANAGED | SERIES_FLAG_INACCESSIBLE
+    );
+    f->rootvar = nullptr;
+
+    sub->key = nullptr;
+    sub->key_tail = nullptr;
+    sub->arg = sub->rootvar + 1;  // !!! enforced by entering Process_Action()
+    sub->param = cast_PAR(END_NODE);
+
+    return sub;
+}
+
+
+//
 //  Chainer_Dispatcher: C
 //
-// When a function created with CHAIN is invoked, this dispatcher is run.
+// The frame built for the CHAIN matches the arguments needed by the first
+// function in the pipeline.  Having the same interface as that function
+// makes a chained function specializable.
+//
+// A first cut at implementing CHAIN did it all within one REBFRM.  It changed
+// the FRM_PHASE() and returned a REDO signal--with actions pushed to the data
+// stack that the evaluator was complicit in processing as "things to run
+// afterward".  This baked awareness of chaining into %c-eval.c, when it is
+// better if the process was localized inside the dispatcher.
+//
+// Handling it inside the dispatcher means the Chainer_Dispatcher() stays on
+// the stack and in control.  This means either unhooking the current `f` and
+// putting a new REBFRM* above it, or stealing the content of the `f` into a
+// new frame to put beneath it.  The latter is chosen to avoid disrupting
+// existing pointers to `f`.
+//
+// (Having a separate frame for the overall chain has an advantage in error
+// messages too, as there is a frame with the label of the function that the
+// user invoked in the stack trace...instead of just the chained item that
+// causes an error.)
+//
+// !!! Note: Stealing the built varlist to give to a new REBFRM for the head
+// of the chain leaves the actual chainer frame with no varlist content.  That
+// means debuggers introspecting the stack may see a "stolen" frame state.
 //
 REB_R Chainer_Dispatcher(REBFRM *f)
 {
@@ -59,23 +121,66 @@ REB_R Chainer_Dispatcher(REBFRM *f)
     assert(ARR_LEN(details) == IDX_CHAINER_MAX);
 
     const REBARR *pipeline = VAL_ARRAY(ARR_AT(details, IDX_CHAINER_PIPELINE));
+    const REBVAL *chained = SPECIFIC(ARR_HEAD(pipeline));
 
-    // The post-processing pipeline has to be "pushed" so it is not forgotten.
-    // Go in reverse order, so the function to apply last is at the bottom of
-    // the stack.
+    Init_Void(FRM_SPARE(f), SYM_UNSET);
+    REBFRM *sub = Push_Downshifted_Frame(FRM_SPARE(f), f);
+
+    INIT_FRM_PHASE(sub, VAL_ACTION(chained));
+    INIT_FRM_BINDING(sub, VAL_ACTION_BINDING(chained));
+
+    sub->original = VAL_ACTION(chained);
+    sub->label = VAL_ACTION_LABEL(chained);
+  #if !defined(NDEBUG)
+    sub->label_utf8 = sub->label
+        ? STR_UTF8(unwrap(sub->label))
+        : "(anonymous)";
+  #endif
+
+    // Now apply the functions that follow.  The original code reused the
+    // frame of the chain, this reuses the subframe.
     //
-    const RELVAL *chained = ARR_LAST(pipeline);
-    for (; chained != ARR_HEAD(pipeline); --chained) {
-        assert(IS_ACTION(chained));
-        Move_Value(DS_PUSH(), SPECIFIC(chained));
+    // (On the head of the chain we start at the dispatching phase since the
+    // frame is already filled, but each step after that uses enfix and
+    // runs from the top.)
+
+    assert(STATE_BYTE(sub) == ST_ACTION_DISPATCHING);
+    while (true) {
+        if (Process_Action_Maybe_Stale_Throws(sub)) {
+            Abort_Frame(sub);
+            Move_Cell(f->out, sub->out);  // move from spare
+            return R_THROWN;
+        }
+
+        // We reuse the subframe's REBFRM structure, but have to drop the
+        // action args, as the paramlist is almost certainly completely
+        // incompatible with the next chain step.
+
+        ++chained;
+        if (IS_END(chained))
+            break;
+
+        Push_Action(sub, VAL_ACTION(chained), VAL_ACTION_BINDING(chained));
+
+        // We use the same mechanism as enfix operations do...give the
+        // next chain step its first argument coming from f->out
+        //
+        // !!! One side effect of this is that unless CHAIN is changed
+        // to check, your chains can consume more than one argument.
+        // This might be interesting or it might be bugs waiting to
+        // happen, trying it out of curiosity for now.
+        //
+        Begin_Prefix_Action(sub, VAL_ACTION_LABEL(chained));
+        assert(NOT_FEED_FLAG(sub->feed, NEXT_ARG_FROM_OUT));
+        SET_FEED_FLAG(sub->feed, NEXT_ARG_FROM_OUT);
+
+        STATE_BYTE(sub) = ST_ACTION_INITIAL_ENTRY;
     }
 
-    // Extract the first function, itself which might be a chain.
-    //
-    INIT_FRM_PHASE(f, VAL_ACTION(chained));
-    FRM_BINDING(f) = VAL_BINDING(chained);
+    Drop_Frame(sub);
 
-    return R_REDO_UNCHECKED;  // signatures should match
+    Copy_Cell(f->out, FRM_SPARE(f));
+    return f->out;
 }
 
 
@@ -96,14 +201,15 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
     REBVAL *out = D_OUT;  // plan ahead for factoring into Chain_Action(out..
 
     REBVAL *pipeline = ARG(pipeline);
-    const RELVAL *first = VAL_ARRAY_AT(pipeline);
+    const RELVAL *tail;
+    const RELVAL *first = VAL_ARRAY_AT(&tail, pipeline);
 
     // !!! Current validation is that all are actions.  Should there be other
     // checks?  (That inputs match outputs in the chain?)  Should it be
     // a dialect and allow things other than functions?
     //
     const RELVAL *check = first;
-    for (; NOT_END(check); ++check) {
+    for (; check != tail; ++check) {
         if (not IS_ACTION(check)) {
             DECLARE_LOCAL (specific);
             Derelativize(specific, check, VAL_SPECIFIER(pipeline));
@@ -111,112 +217,20 @@ REBNATIVE(chain_p)  // see extended definition CHAIN in %base-defs.r
         }
     }
 
-    REBARR *paramlist = Copy_Array_Shallow_Flags(
-        VAL_ACT_PARAMLIST(first),  // same interface as head of the chain
-        SPECIFIED,
-        SERIES_MASK_PARAMLIST | NODE_FLAG_MANAGED  // flags not auto-copied
-    );
-    Sync_Paramlist_Archetype(paramlist);  // [0] cell must hold copied pointer
-    MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
-
+    // The chained function has the same interface as head of the chain.
+    //
+    // !!! Output (RETURN) should match the *tail* of the chain.  Is this
+    // worth a new paramlist?  Should return mechanics be just reviewed in
+    // general, possibly that all actions put the return slot in a separate
+    // sliver that includes the partials?
+    //
     REBACT *chain = Make_Action(
-        paramlist,
+        ACT_SPECIALTY(VAL_ACTION(first)),  // same interface as first action
         &Chainer_Dispatcher,
-        ACT_UNDERLYING(VAL_ACTION(first)),  // same underlying as first action
-        ACT_EXEMPLAR(VAL_ACTION(first)),  // same exemplar as first action
         IDX_CHAINER_MAX  // details array capacity
     );
     Force_Value_Frozen_Deep(pipeline);
-    Move_Value(ARR_AT(ACT_DETAILS(chain), IDX_CHAINER_PIPELINE), pipeline);
+    Copy_Cell(ARR_AT(ACT_DETAILS(chain), IDX_CHAINER_PIPELINE), pipeline);
 
     return Init_Action(out, chain, VAL_ACTION_LABEL(first), UNBOUND);
-}
-
-
-//
-//  Cache_Predicate_Throws: C
-//
-// The concept of a "predicate" is like a CHAIN, where the functions are
-// in a TUPLE! and applied in order (so the reverse of the BLOCK! formulation
-// that was initially implemented).  The TUPLE! is headed with a BLANK!, so
-// it appears to start with a dot.
-//
-// Predicates may be simple -- an already-existing ACTION!, like `.try` -- or
-// they may be compositions, like `.not.equal?` -- and since GROUP!s are legal
-// in TUPLE!, you get a generic escape with `.(func [x] [...])`
-//
-// When a native starts up, it doesn't want to recalculate the predicate
-// each time it is called...so it caches it.
-//
-// !!! User functions may want predicates to have this processing easily
-// also, so `<predicate>` may be an argument tag in the future.
-//
-bool Cache_Predicate_Throws(
-    REBVAL *out,  // if a throw, it is written here
-    REBVAL *predicate  // updated to be the ACTION! (or WORD!-invoking action)
-){
-    if (IS_NULLED(predicate))  // function uses default (IS_TRUTHY(), .equal?)
-        return false;
-
-    if (IS_ACTION(predicate))  // already an action (e.g. passed via APPLY)
-        return false;
-
-    assert(IS_TUPLE(predicate));
-
-    REBARR *items;
-
-    // TUPLE!s are ANY-SEQUENCE! and have compressed implementation forms.
-    // See %sys-sequence.h for more information.  We want optimized handling
-    // of the `.foo` form (with "heart" as a GET-WORD!, not a BLOCK!).
-    //
-    switch (HEART_BYTE(predicate)) {
-      case REB_GET_WORD: {  // representation of a `.foo` single-WORD! form
-        const REBSTR *label = VAL_WORD_SPELLING(predicate);
-        Move_Value(predicate, Lookup_Word_May_Fail(predicate, SPECIFIED));
-        if (not IS_ACTION(predicate))
-            fail ("PREDICATE must look up to an ACTION!");
-        INIT_ACTION_LABEL(predicate, label);
-        return false; }
-
-      case REB_BLOCK:
-        items = ARR(VAL_NODE(predicate));
-        if (not IS_BLANK(ARR_HEAD(items)))
-            goto error_not_blank_head;
-        break;  // fall through to array handling
-
-      default:
-      error_not_blank_head:
-        fail ("PREDICATE! must start with `.` (BLANK! in first position)");
-    }
-
-    // To turn this into input that CHAIN* understands, every step needs to
-    // be an ACTION!.  We avoid re-implementing REDUCE here, and instead
-    // just make a reversed array of GET-items to pass to it.
-
-    REBLEN len = ARR_LEN(items);
-    REBSPC *specifier = VAL_SEQUENCE_SPECIFIER(predicate);
-
-    REBARR *reversed = Make_Array(len - 1);
-
-    RELVAL *dst = ARR_HEAD(reversed);
-    RELVAL *src = ARR_AT(items, len - 1);
-    REBLEN i;
-    for (i = 1; i < len; ++i, --src, ++dst) {
-        if (not IS_WORD(src) and not IS_GROUP(src))
-            fail ("Predicate elements can only be WORD! or GROUP!");
-        Getify(Derelativize(dst, src, specifier));
-    }
-
-    TERM_ARRAY_LEN(reversed, len - 1);
-    Init_Block(out, reversed);
-
-    REBVAL *chain = rebValue(
-        NATIVE_VAL(chain_p), NATIVE_VAL(reduce), out,
-    rebEND);
-
-    Move_Value(predicate, chain);
-    rebRelease(chain);
-
-    UNUSED(out);
-    return false;
 }

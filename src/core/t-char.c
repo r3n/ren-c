@@ -95,12 +95,12 @@ REBINT CT_Issue(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Issue(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_ISSUE);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     switch(VAL_TYPE(arg)) {
       case REB_INTEGER:
@@ -206,7 +206,7 @@ void MF_Issue(REB_MOLD *mo, REBCEL(const*) v, bool form)
     }
 
     if (form) {
-        if (IS_CHAR(v) and VAL_CHAR(v) == 0)
+        if (IS_CHAR_CELL(v) and VAL_CHAR(v) == 0)
             fail (Error_Illegal_Zero_Byte_Raw());  // don't form #, only mold
 
         Append_String_Limit(mo->series, v, len);
@@ -267,9 +267,9 @@ void MF_Issue(REB_MOLD *mo, REBCEL(const*) v, bool form)
 REB_R PD_Issue(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval)
+    if (setval)
         fail ("ISSUE! is immutable, characters can't assign via SET-PATH!");
 
     if (not IS_INTEGER(picker))
@@ -300,14 +300,14 @@ REBTYPE(Issue)
 {
     REBVAL *issue = D_ARG(1);
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     switch (sym) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // same as `v`
 
-        switch (VAL_WORD_SYM(ARG(property))) {
+        switch (VAL_WORD_ID(ARG(property))) {
           case SYM_CODEPOINT:
             if (not IS_CHAR(issue))
                 break;  // must be a single codepoint to use this reflector
@@ -329,7 +329,7 @@ REBTYPE(Issue)
         return R_UNHANDLED; }
 
       case SYM_COPY:  // since copy result is also immutable, Move() suffices
-        return Move_Value(D_OUT, issue);
+        return Copy_Cell(D_OUT, issue);
 
       default:
         break;

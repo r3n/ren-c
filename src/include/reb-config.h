@@ -257,12 +257,6 @@ Special internal defines used by RT, not Host-Kit developers:
     #define DEBUG_TRASH_MEMORY
     #define DEBUG_BALANCE_STATE
 
-    // There is a mode where the track payload exists in all cells, making
-    // them grow by 2 * sizeof(void*): DEBUG_TRACK_EXTEND_CELLS.  This can
-    // tell you about a cell's initialization even if it carries a payload.
-    //
-    #define DEBUG_TRACK_CELLS
-
     // See debugbreak.h and REBNATIVE(c_debug_break)...useful!
     //
     #define INCLUDE_C_DEBUG_BREAK_NATIVE
@@ -322,14 +316,6 @@ Special internal defines used by RT, not Host-Kit developers:
     //
     #define DEBUG_NATIVE_RETURNS
 
-    // This check is for making sure that an ANY-WORD! that has a binding has
-    // a spelling that matches the key it is bound to.  It was checked in
-    // Get_Context_Core() but is a slow check that hasn't really ever had a
-    // problem.  Disabling it for now, to improve debug build performance.
-  #if 0
-    #define DEBUG_BINDING_NAME_MATCH
-  #endif
-
     // It can be nice to see aliases of platform pointers as if they were
     // individual bytes, through union "puns".  Though this behavior is not
     // well defined, it can be useful a lot of the time.
@@ -348,6 +334,43 @@ Special internal defines used by RT, not Host-Kit developers:
     #endif
 
     #define DEBUG_ENABLE_ALWAYS_MALLOC
+
+    // System V ABI for X86 says alignment can be 4 bytes for double.  But
+    // you can change this in the compiler settings.  We should either sync
+    // with that setting or just skip it, and assume that we do enough
+    // checking on the 64-bit builds.
+    // 
+    // https://stackoverflow.com/q/14893802/
+    //
+    // !!! We are overpaying for the ALIGN_SIZE if it's not needed for double,
+    // so perhaps ALIGN_SIZE should be configured in build settings...
+    //
+    #if !defined(TO_WINDOWS_X86) && !defined(TO_LINUX_X86)
+        #define DEBUG_DONT_CHECK_ALIGN
+    #endif
+
+    #ifdef CPLUSPLUS_11
+        //
+        // Each DS_PUSH() on the data stack can potentially move all the
+        // pointers on the stack.  Hence there is a debug setting for managing
+        // these pointers in a special C++ container called STKVAL(*).  This
+        // counts to see how many stack pointers the user has in local
+        // variables, and if that number is not zero then it asserts when a
+        // push or pop is requested, or when the evaluator is invoked.
+        //
+        #define DEBUG_EXTANT_STACK_POINTERS
+    #endif
+
+    // The PG_Reb_Stats structure is only tracked in the debug build, as this
+    // data gathering is a sort of constant "tax" on the system.  While it
+    // might arguably be interesting to non-debug build users who are trying
+    // to optimize their code, the compromise of having to maintain the
+    // numbers suggests those users should be empowered with a debug build if
+    // they are doing such work (they should probably have one for other
+    // reasons; note this has been true of things like Windows NT where there
+    // were indeed "checked" builds given to those who had such interest.)
+    //
+    #define DEBUG_COLLECT_STATS
 #else
     // We may want to test the valgrind build even if it's release so that
     // it checks the R3_ALWAYS_MALLOC environment variable
@@ -355,20 +378,6 @@ Special internal defines used by RT, not Host-Kit developers:
     #if defined(INCLUDE_CALLGRIND_NATIVE)
         #define DEBUG_ENABLE_ALWAYS_MALLOC
     #endif
-#endif
-
-// System V ABI for X86 says alignment can be 4 bytes for double.  However,
-// you can change this in the compiler settings.  We should either sync with
-// that setting or just skip it, and assume that we do enough checking on the
-// 64-bit builds.
-// 
-// https://stackoverflow.com/q/14893802/
-//
-// !!! We are overpaying for the ALIGN_SIZE if it's not needed for double,
-// so perhaps it is that which should be configurable in the build settings...
-//
-#if defined(TO_WINDOWS_X86) || defined(TO_LINUX_X86)
-    #define DEBUG_DONT_CHECK_ALIGN
 #endif
 
 
@@ -384,7 +393,7 @@ Special internal defines used by RT, not Host-Kit developers:
 #endif
 
 #ifdef __SANITIZE_ADDRESS__
-    #ifdef CPLUSPLUS_11
+    #ifdef __cplusplus  // Note: CPLUSPLUS_11 macro not defined yet
         //
         // Cast checks in SER(), NOD(), ARR() are expensive--they ensure that
         // when you cast a void pointer to a REBSER, that the header actually
@@ -417,7 +426,6 @@ Special internal defines used by RT, not Host-Kit developers:
 
 
 #ifdef DEBUG_TRACK_EXTEND_CELLS
-    #define DEBUG_TRACK_CELLS
     #define UNUSUAL_REBVAL_SIZE // sizeof(REBVAL)*2 may be > sizeof(REBSER)
 #endif
 
@@ -433,3 +441,26 @@ Special internal defines used by RT, not Host-Kit developers:
         #error "DEBUG_PRINTF_FAIL_LOCATIONS requires DEBUG_STDIO_OK"
     #endif
 #endif
+
+// It would seem that cells like REB_BLANK which don't use their payloads
+// could just leave them uninitialized...saving time on the assignments.
+//
+// Unfortunately, this is a technically gray area in C.  If you try to
+// copy the memory of that cell (as cells are often copied), it might be a
+// "trap representation".  Reading such representations to copy them...
+// even if not interpreted... is undefined behavior:
+//
+// https://stackoverflow.com/q/60112841
+// https://stackoverflow.com/q/33393569/
+//
+// Odds are it would still work fine if you didn't zero them.  However,
+// compilers will warn you--especially at higher optimization levels--if
+// they notice uninitialized values being used in copies.  This is a bad
+// warning to turn off, because it often points out defective code.
+//
+// So to play it safe and be able to keep warnings on, fields are zeroed out.
+// But it's set up as its own independent flag, so that someone looking
+// to squeak out a tiny bit more optimization could turn this off in a
+// release build.  It would save on a few null assignments.
+//
+#define ZERO_UNUSED_CELL_FIELDS

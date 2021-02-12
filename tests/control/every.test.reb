@@ -47,4 +47,4 @@
     ]
 )
 
-(_ = every x [] [<unused>])
+(null-2? every x [] [<unused>])

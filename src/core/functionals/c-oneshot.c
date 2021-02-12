@@ -44,7 +44,7 @@
 #include "sys-core.h"
 
 enum {
-    IDX_ONESHOT_COUNTER = 0,  // Count that is going down to 0
+    IDX_ONESHOT_COUNTER = 1,  // Count that is going down to 0
     IDX_ONESHOT_MAX
 };
 
@@ -54,13 +54,13 @@ REB_R Downshot_Dispatcher(REBFRM *f)  // runs until count is reached
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_ONESHOT_MAX);
 
-    RELVAL *n = ARR_AT(details, IDX_ONESHOT_COUNTER);
+    RELVAL *n = DETAILS_AT(details, IDX_ONESHOT_COUNTER);
     if (VAL_INT64(n) == 0)
         return nullptr;  // always return null once 0 is reached
     --VAL_INT64(n);
 
-    REBVAL *code = FRM_ARG(f, 1);
-    if (Do_Branch_Throws(f->out, FRM_SPARE(f), code))
+    REBVAL *code = FRM_ARG(f, 2);  // skip the RETURN
+    if (Do_Branch_Throws(f->out, code))
         return R_THROWN;
 
     return f->out;
@@ -72,17 +72,41 @@ REB_R Upshot_Dispatcher(REBFRM *f)  // won't run until count is reached
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_ONESHOT_MAX);
 
-    RELVAL *n = ARR_AT(details, IDX_ONESHOT_COUNTER);
+    RELVAL *n = DETAILS_AT(details, IDX_ONESHOT_COUNTER);
     if (VAL_INT64(n) < 0) {
-        ++VAL_INT64(ARR_HEAD(details));
+        ++VAL_INT64(n);
         return nullptr;  // return null until 0 is reached
     }
 
-    REBVAL *code = FRM_ARG(f, 1);
-    if (Do_Branch_Throws(f->out, FRM_SPARE(f), code))
+    REBVAL *code = FRM_ARG(f, 2);  // skip the RETURN
+    if (Do_Branch_Throws(f->out, code))
         return R_THROWN;
 
     return f->out;
+}
+
+
+//
+//  do-branch: native [
+//
+//  {Sample Interface for a Simplified DO that just runs a Branch}
+//
+//      return: [<opt> any-value!]
+//      branch [any-branch!]
+//  ]
+//
+REBNATIVE(do_branch)
+//
+// !!! This function only exists to serve as the interface for the generated
+// function from N-SHOT.  More thinking is necessary about how to layer DO
+// on top of a foundational DO* (instead of the current way, which has the
+// higher level DO as a native that calls out to helper code for its
+// implementation...)  Revisit.
+{
+    INCLUDE_PARAMS_OF_DO_BRANCH;
+    UNUSED(ARG(branch));
+
+    fail ("DO-BRANCH is theoretical and not part of an API yet.");
 }
 
 
@@ -101,35 +125,9 @@ REBNATIVE(n_shot)
 
     REBI64 n = VAL_INT64(ARG(n));
 
-    REBARR *paramlist = Make_Array_Core(
-        2,
-        SERIES_MASK_PARAMLIST | NODE_FLAG_MANAGED
-    );
-
-    REBVAL *archetype = RESET_CELL(
-        Alloc_Tail_Array(paramlist),
-        REB_ACTION,
-        CELL_MASK_ACTION
-    );
-    VAL_ACT_PARAMLIST_NODE(archetype) = NOD(paramlist);
-    INIT_BINDING(archetype, UNBOUND);
-
-    // !!! Should anything DO would accept be legal, as DOES would run?
-    //
-    Init_Param(
-        Alloc_Tail_Array(paramlist),
-        REB_P_NORMAL,
-        Canon(SYM_VALUE),  // !!! would SYM_CODE be better?
-        FLAGIT_KIND(REB_BLOCK) | FLAGIT_KIND(REB_ACTION)
-    );
-
-    MISC_META_NODE(paramlist) = nullptr;  // !!! auto-generate info for HELP?
-
     REBACT *n_shot = Make_Action(
-        paramlist,
+        ACT_SPECIALTY(NATIVE_ACT(do_branch)),
         n >= 0 ? &Downshot_Dispatcher : &Upshot_Dispatcher,
-        nullptr,  // no underlying action (use paramlist)
-        nullptr,  // no specialization exemplar (or inherited exemplar)
         IDX_ONESHOT_MAX  // details array capacity
     );
     Init_Integer(ARR_AT(ACT_DETAILS(n_shot), IDX_ONESHOT_COUNTER), n);

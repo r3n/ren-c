@@ -72,7 +72,7 @@ REBVAL *Append_Event(void)
     if (!IS_PORT(port)) return 0; // verify it is a port object
 
     // Get queue block:
-    REBVAL *state = VAL_CONTEXT_VAR(port, STD_PORT_STATE);
+    REBVAL *state = CTX_VAR(VAL_CONTEXT(port), STD_PORT_STATE);
     if (!IS_BLOCK(state)) return 0;
 
     // Append to tail if room:
@@ -84,7 +84,7 @@ REBVAL *Append_Event(void)
     }
 
     REBARR *state_array = VAL_ARRAY_KNOWN_MUTABLE(state);
-    TERM_ARRAY_LEN(state_array, VAL_LEN_HEAD(state) + 1);
+    SET_SERIES_LEN(state_array, VAL_LEN_HEAD(state) + 1);
     return Init_Blank(ARR_LAST(state_array));
 }
 
@@ -103,7 +103,7 @@ const REBVAL *Find_Last_Event(REBINT model, uint32_t type)
     if (!IS_PORT(port)) return NULL; // verify it is a port object
 
     // Get queue block:
-    REBVAL *state = VAL_CONTEXT_VAR(port, STD_PORT_STATE);
+    REBVAL *state = CTX_VAR(VAL_CONTEXT(port), STD_PORT_STATE);
     if (!IS_BLOCK(state)) return NULL;
 
     const RELVAL *value = VAL_ARRAY_TAIL(state) - 1;
@@ -140,13 +140,13 @@ REB_R Event_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
     if (!IS_BLOCK(state))
         Init_Block(state, Make_Array(EVENTS_CHUNK - 1));
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
 
     case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // implicit in port
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -184,22 +184,22 @@ REB_R Event_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         // array type dispatcher.  :-/
         //
         DECLARE_LOCAL (save_port);
-        Move_Value(save_port, D_ARG(1));
-        Move_Value(D_ARG(1), state);
+        Copy_Cell(save_port, D_ARG(1));
+        Copy_Cell(D_ARG(1), state);
 
         REB_R r = T_Array(frame_, verb);
         SET_SIGNAL(SIG_EVENT_PORT);
         if (
-            VAL_WORD_SYM(verb) == SYM_INSERT
-            || VAL_WORD_SYM(verb) == SYM_APPEND
-            || VAL_WORD_SYM(verb) == SYM_REMOVE
+            VAL_WORD_ID(verb) == SYM_INSERT
+            || VAL_WORD_ID(verb) == SYM_APPEND
+            || VAL_WORD_ID(verb) == SYM_REMOVE
         ){
             RETURN (save_port);
         }
         return r; }
 
     case SYM_CLEAR:
-        TERM_ARRAY_LEN(VAL_ARRAY_KNOWN_MUTABLE(state), 0);
+        SET_SERIES_LEN(VAL_ARRAY_KNOWN_MUTABLE(state), 0);
         CLR_SIGNAL(SIG_EVENT_PORT);
         RETURN (port);
 
@@ -225,7 +225,7 @@ REB_R Event_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             Free_Req(req);  // synchronous completion, we must free
 
             if (rebDid("error?", result, rebEND))
-                rebJumps("FAIL", result, rebEND);
+                rebJumps("fail", result, rebEND);
 
             assert(false); // !!! can this happen?
             rebRelease(result); // ignore result

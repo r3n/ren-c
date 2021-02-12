@@ -48,26 +48,23 @@ inline static enum Reb_Kind VAL_TYPE_KIND(REBCEL(const*) v) {
     return k;
 }
 
-#define VAL_TYPE_SPEC_NODE(v) \
-    PAYLOAD(Any, (v)).first.node
+#define INIT_VAL_TYPE_SPEC              INIT_VAL_NODE1
+#define VAL_TYPE_SPEC(v)                ARR(VAL_NODE1(v))
 
-#define VAL_TYPE_SPEC(v) \
-    ARR(VAL_TYPE_SPEC_NODE(v))
-
-#define VAL_TYPE_HOOKS_NODE(v) \
-    PAYLOAD(Any, (v)).second.node
-
-#define VAL_TYPE_CUSTOM(v) \
-    SER(VAL_TYPE_HOOKS_NODE(v))
+#define INIT_VAL_TYPE_HOOKS             INIT_VAL_NODE2
+#define VAL_TYPE_CUSTOM(v)              BIN(VAL_NODE2(v))
 
 
 // Built in types have their specs initialized from data in the boot block.
 // We can quickly find them in the lib context, because the types take up
 // the early 64-ish symbol IDs in lib, so just use kind as an index.
 //
-inline static REBVAL *Init_Builtin_Datatype(RELVAL *out, enum Reb_Kind kind) {
+inline static REBVAL *Init_Builtin_Datatype(
+    RELVAL *out,
+    enum Reb_Kind kind
+){
     assert(kind > REB_0 and kind < REB_MAX);
-    Move_Value(out, Datatype_From_Kind(kind));
+    Copy_Cell(out, Datatype_From_Kind(kind));
     assert(VAL_TYPE_KIND(out) == kind);
     assert(GET_CELL_FLAG(out, FIRST_IS_NODE));
     assert(NOT_CELL_FLAG(out, SECOND_IS_NODE));  // only custom types have
@@ -78,15 +75,18 @@ inline static REBVAL *Init_Builtin_Datatype(RELVAL *out, enum Reb_Kind kind) {
 // Custom types have to be registered by extensions.  They are identified by
 // a URL, so that there is a way of MAKE-ing them.
 //
-inline static REBVAL *Init_Custom_Datatype(RELVAL *out, REBTYP *type) {
+inline static REBVAL *Init_Custom_Datatype(
+    RELVAL *out,
+    const REBTYP *type
+){
     RESET_CELL(
         out,
         REB_DATATYPE,
         CELL_FLAG_FIRST_IS_NODE | CELL_FLAG_SECOND_IS_NODE
     );
     VAL_TYPE_KIND_ENUM(out) = REB_CUSTOM;
-    VAL_TYPE_SPEC_NODE(out) = NOD(EMPTY_ARRAY);
-    VAL_TYPE_HOOKS_NODE(out) = NOD(type);
+    INIT_VAL_TYPE_SPEC(out, EMPTY_ARRAY);
+    INIT_VAL_TYPE_HOOKS(out, type);
     return cast(REBVAL*, out);
 }
 
@@ -139,18 +139,19 @@ enum Reb_Type_Hook_Index {
 extern CFUNC* Builtin_Type_Hooks[REB_MAX][IDX_HOOKS_MAX];
 
 
-inline static CFUNC** VAL_TYPE_HOOKS(const RELVAL *type) {
+inline static CFUNC** VAL_TYPE_HOOKS(REBCEL(const*) type) {
+    assert(CELL_KIND(type) == REB_DATATYPE);
     enum Reb_Kind k = VAL_TYPE_KIND_OR_CUSTOM(type);
     if (k != REB_CUSTOM)
         return Builtin_Type_Hooks[k];
-    return cast(CFUNC**, SER_DATA(VAL_TYPE_CUSTOM(type)));
+    return cast(CFUNC**, m_cast(REBYTE*, SER_DATA(VAL_TYPE_CUSTOM(type))));
 }
 
 inline static CFUNC** HOOKS_FOR_TYPE_OF(REBCEL(const*) v) {
     enum Reb_Kind k = CELL_KIND(v);
     if (k != REB_CUSTOM)
         return Builtin_Type_Hooks[k];
-    return cast(CFUNC**, SER_DATA(CELL_CUSTOM_TYPE(v)));
+    return cast(CFUNC**, m_cast(REBYTE*, SER_DATA(CELL_CUSTOM_TYPE(v))));
 }
 
 #define Generic_Hook_For_Type_Of(v) \

@@ -132,7 +132,7 @@ REBYTE *Compress_Alloc_Core(
     REBSIZ *size_out,
     const void* input,
     REBSIZ size_in,
-    enum Reb_Symbol envelope  // SYM_NONE, SYM_ZLIB, or SYM_GZIP
+    enum Reb_Symbol_Id envelope  // SYM_NONE, SYM_ZLIB, or SYM_GZIP
 ){
     z_stream strm;
     strm.zalloc = &zalloc;  // fail() cleans up automatically, see notes
@@ -226,7 +226,7 @@ REBYTE *Decompress_Alloc_Core(
     const void *input,
     REBSIZ size_in,
     int max,
-    enum Reb_Symbol envelope  // SYM_NONE, SYM_ZLIB, SYM_GZIP, or SYM_DETECT
+    enum Reb_Symbol_Id envelope  // SYM_NONE, SYM_ZLIB, SYM_GZIP, or SYM_DETECT
 ){
     z_stream strm;
     strm.zalloc = &zalloc;  // fail() cleans up automatically, see notes
@@ -408,7 +408,7 @@ REBNATIVE(checksum_core)
     const REBYTE *data = VAL_BYTES_LIMIT_AT(&size, ARG(data), len);
 
     uLong crc;  // Note: zlib.h defines "crc32" as "z_crc32"
-    switch (VAL_WORD_SYM(ARG(method))) {
+    switch (VAL_WORD_ID(ARG(method))) {
       case SYM_CRC32:
         crc = crc32_z(0L, data, size);
         break;
@@ -470,11 +470,11 @@ REBNATIVE(deflate)
     REBSIZ size;
     const REBYTE *bp = VAL_BYTES_LIMIT_AT(&size, ARG(data), limit);
 
-    enum Reb_Symbol envelope;
+    enum Reb_Symbol_Id envelope;
     if (not REF(envelope))
         envelope = SYM_NONE;
     else {
-        envelope = cast(enum Reb_Symbol, VAL_WORD_SYM(ARG(envelope)));
+        envelope = cast(enum Reb_Symbol_Id, VAL_WORD_ID(ARG(envelope)));
         switch (envelope) {
           case SYM_ZLIB:
           case SYM_GZIP:
@@ -546,11 +546,11 @@ REBNATIVE(inflate)
         data = VAL_HANDLE_POINTER(REBYTE, ARG(data));
     }
 
-    enum Reb_Symbol envelope;
+    enum Reb_Symbol_Id envelope;
     if (not REF(envelope))
         envelope = SYM_NONE;
     else {
-        envelope = cast(enum Reb_Symbol, VAL_WORD_SYM(ARG(envelope)));
+        envelope = cast(enum Reb_Symbol_Id, VAL_WORD_ID(ARG(envelope)));
         switch (envelope) {
           case SYM_ZLIB:
           case SYM_GZIP:

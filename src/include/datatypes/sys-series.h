@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
@@ -69,6 +69,273 @@
 //
 
 
+
+//=//// LINK AND MISC HELPERS /////////////////////////////////////////////=//
+//
+// The GC has flags LINK_NEEDS_MARKED and MISC_NEEDS_MARKED which allow the
+// varied flavors of series to call out whether they need pointers inside of
+// their node to be further processed for marking.
+//
+// This generality comes at a cost in clarity for the source, because all of
+// the varied meanings which the link and misc fields might have need to be
+// assigned through the same named structure member.  (If they were given
+// different names in the union, the GC couldn't know which union field it
+// was supposed to read to mark.)
+//
+// The LINK() and MISC() macros try to mitigate this by letting callsites
+// that assign and read the link and misc fields of series nodes be different.
+// e.g. the following assigns and reads the same REBNOD* that everything else
+// using the link field does, but documents it is for "bookmark":
+//
+//      REBBMK *bookmark = LINK(Bookmark, series);
+//      mutable_LINK(Bookmark, series) = bookmark;
+//
+// To do this, you must define two macros:
+//
+//      #define LINK_Bookmark_TYPE REBBMK*
+//      #define LINK_Bookmark_CAST (REBBMK*)SER
+//
+// These definitions let us build macros for doing RValue and LValue access
+// under a unique-looking reference, with type safety, expanding to:
+//
+//      REBBMK *bookmark = (REBBMK*)SER((void*)series->link.any.node);
+//      series->link.any.node = ensure(REBBMK*) bookmark;
+//
+// You get the desired properties of being easy to find cases of a particular
+// interpretation of the field, along with type checking on the assignment,
+// and a cast operation that does potentially heavy debug checks on the
+// extractionheavy-checking cast operation on the extraction.  (See
+// DEBUG_CHECK_CASTS for the C++ versions of SER(), ARR(), CTX()...)
+//
+// Note: C casts are used here to gloss the `const` status of the node.  The
+// caller is responsible for storing reads in the right constness for what
+// they know to be stored in the node.
+//
+
+#define LINK(Field, s) \
+    LINK_##Field##_CAST(m_cast(REBNOD*, \
+        ensure_flavor(HAS_LINK_##Field, (s))->link.any.node))
+
+#define MISC(Field, s) \
+    MISC_##Field##_CAST(m_cast(REBNOD*, \
+        ensure_flavor(HAS_MISC_##Field, (s))->misc.any.node))
+
+#define INODE(Field, s) \
+    INODE_##Field##_CAST(m_cast(REBNOD*, \
+        ensure_flavor(HAS_INODE_##Field, (s))->info.node))
+
+#define mutable_LINK(Field, s) \
+    ensured(LINK_##Field##_TYPE, const REBNOD*, \
+        ensure_flavor(HAS_LINK_##Field, (s))->link.any.node)
+
+#define mutable_MISC(Field, s) \
+    ensured(MISC_##Field##_TYPE, const REBNOD*, \
+        ensure_flavor(HAS_MISC_##Field, (s))->misc.any.node)
+
+#define mutable_INODE(Field, s) \
+    ensured(INODE_##Field##_TYPE, const REBNOD*, \
+        ensure_flavor(HAS_INODE_##Field, (s))->info.node)
+
+#define node_LINK(Field, s) \
+    *m_cast(REBNOD**, &(s)->link.any.node)  // const ok for strict alias
+
+#define node_MISC(Field, s) \
+    *m_cast(REBNOD**, &(s)->misc.any.node)  // const ok for strict alias
+
+#define node_INODE(Field, s) \
+    *m_cast(REBNOD**, &(s)->info.node)  // const ok for strict alias
+
+
+//
+// Series header FLAGs (distinct from INFO bits)
+//
+
+#define SET_SERIES_FLAG(s,name) \
+    ((s)->leader.bits |= SERIES_FLAG_##name)
+
+#define GET_SERIES_FLAG(s,name) \
+    (((s)->leader.bits & SERIES_FLAG_##name) != 0)
+
+#define CLEAR_SERIES_FLAG(s,name) \
+    ((s)->leader.bits &= ~SERIES_FLAG_##name)
+
+#define NOT_SERIES_FLAG(s,name) \
+    (((s)->leader.bits & SERIES_FLAG_##name) == 0)
+
+
+//
+// Series INFO bits (distinct from header FLAGs)
+//
+// Only valid for some forms of series (space is used for other purposes in
+// places like action details lists, etc.)
+//
+
+#if !defined(__cplusplus)
+    #define SER_INFO(s) \
+        (s)->info.flags.bits
+#else
+    inline static const uintptr_t &SER_INFO(const REBSER *s) {
+        assert(NOT_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK));
+        return s->info.flags.bits;
+    }
+
+    inline static uintptr_t &SER_INFO(REBSER *s) {
+        assert(NOT_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK));
+        return s->info.flags.bits;
+    }
+#endif
+
+#define SET_SERIES_INFO(s,name) \
+    (SER_INFO(s) |= SERIES_INFO_##name)
+
+#define GET_SERIES_INFO(s,name) \
+    ((SER_INFO(s) & SERIES_INFO_##name) != 0)
+
+#define CLEAR_SERIES_INFO(s,name) \
+    (SER_INFO(s) &= ~SERIES_INFO_##name)
+
+#define NOT_SERIES_INFO(s,name) \
+    ((SER_INFO(s) & SERIES_INFO_##name) == 0)
+
+
+inline static REBSER *ensure_flavor(
+    enum Reb_Series_Flavor flavor,
+    const_if_c REBSER *s
+){
+    if (SER_FLAVOR(s) != flavor) {
+        enum Reb_Series_Flavor actual = SER_FLAVOR(s);
+        USED(actual);
+        panic (s);
+    }
+    assert(SER_FLAVOR(s) == flavor);
+    return m_cast(REBSER*, s);
+}
+
+#ifdef __cplusplus
+    inline static const REBSER *ensure_flavor(
+        enum Reb_Series_Flavor flavor,
+        const REBSER *s
+    ){
+        if (SER_FLAVOR(s) != flavor) {
+            enum Reb_Series_Flavor actual = SER_FLAVOR(s);
+            USED(actual);
+            panic (s);
+        }
+        assert(SER_FLAVOR(s) == flavor);
+        return s;
+    }
+#endif
+
+
+#define GET_SUBCLASS_FLAG(subclass,s,name) \
+    ((ensure_flavor(FLAVOR_##subclass, (s))->leader.bits \
+        & subclass##_FLAG_##name) != 0)
+
+#define NOT_SUBCLASS_FLAG(subclass,s,name) \
+    ((ensure_flavor(FLAVOR_##subclass, (s))->leader.bits \
+        & subclass##_FLAG_##name) == 0)
+
+#define SET_SUBCLASS_FLAG(subclass,s,name) \
+    (ensure_flavor(FLAVOR_##subclass, (s))->leader.bits \
+        |= subclass##_FLAG_##name)
+
+#define CLEAR_SUBCLASS_FLAG(subclass,s,name) \
+    (ensure_flavor(FLAVOR_##subclass, (s))->leader.bits \
+        &= ~subclass##_FLAG_##name)
+
+
+#define IS_SER_DYNAMIC(s) \
+    GET_SERIES_FLAG((s), DYNAMIC)
+
+
+#define SER_WIDE(s) \
+    Wide_For_Flavor(SER_FLAVOR(s))
+
+
+#if !defined(__cplusplus)
+    #define SER_BONUS(s) \
+        (s)->content.dynamic.bonus.node
+#else
+    inline static const struct Reb_Node * const &SER_BONUS(const REBSER *s) {
+        assert(s->leader.bits & SERIES_FLAG_DYNAMIC);
+        return s->content.dynamic.bonus.node;
+    }
+
+    inline static const struct Reb_Node * &SER_BONUS(REBSER *s) {
+        assert(s->leader.bits & SERIES_FLAG_DYNAMIC);
+        return s->content.dynamic.bonus.node;
+    }
+#endif
+
+#define BONUS(Field, s) \
+    BONUS_##Field##_CAST(m_cast(REBNOD*, \
+        SER_BONUS(ensure_flavor(HAS_BONUS_##Field, (s)))))
+
+#define mutable_BONUS(Field, s) \
+    ensured(BONUS_##Field##_TYPE, const REBNOD*, \
+        SER_BONUS(ensure_flavor(HAS_BONUS_##Field, (s))))
+
+#define node_BONUS(Field, s) \
+    *m_cast(REBNOD**, &SER_BONUS(s))  // const ok for strict alias
+
+
+//
+// Bias is empty space in front of head:
+//
+
+inline static bool IS_SER_BIASED(const REBSER *s) {
+    assert(IS_SER_DYNAMIC(s));
+    if (not IS_SER_ARRAY(s))
+        return true;
+    return not IS_VARLIST(s);
+}
+
+inline static REBLEN SER_BIAS(const REBSER *s) {
+    if (not IS_SER_BIASED(s))
+        return 0;
+    return cast(REBLEN, ((s)->content.dynamic.bonus.bias >> 16) & 0xffff);
+}
+
+inline static REBLEN SER_REST(const REBSER *s) {
+    if (IS_SER_DYNAMIC(s))
+        return s->content.dynamic.rest;
+
+    if (IS_SER_ARRAY(s))
+        return 2; // includes info bits acting as trick "terminator"
+
+    assert(sizeof(s->content) % SER_WIDE(s) == 0);
+    return sizeof(s->content) / SER_WIDE(s);
+}
+
+#define MAX_SERIES_BIAS 0x1000
+
+inline static void SER_SET_BIAS(REBSER *s, REBLEN bias) {
+    assert(IS_SER_BIASED(s));
+    s->content.dynamic.bonus.bias =
+        (s->content.dynamic.bonus.bias & 0xffff) | (bias << 16);
+}
+
+inline static void SER_ADD_BIAS(REBSER *s, REBLEN b) {
+    assert(IS_SER_BIASED(s));
+    s->content.dynamic.bonus.bias += b << 16;
+}
+
+inline static void SER_SUB_BIAS(REBSER *s, REBLEN b) {
+    assert(IS_SER_BIASED(s));
+    s->content.dynamic.bonus.bias -= b << 16;
+}
+
+inline static size_t SER_TOTAL(const REBSER *s) {
+    return (SER_REST(s) + SER_BIAS(s)) * SER_WIDE(s);
+}
+
+inline static size_t SER_TOTAL_IF_DYNAMIC(const REBSER *s) {
+    if (not IS_SER_DYNAMIC(s))
+        return 0;
+    return SER_TOTAL(s);
+}
+
+
 //
 // For debugging purposes, it's nice to be able to crash on some kind of guard
 // for tracking the call stack at the point of allocation if we find some
@@ -81,7 +348,7 @@
 //
 #if defined(DEBUG_SERIES_ORIGINS) || defined(DEBUG_COUNT_TICKS)
     inline static void Touch_Series_Debug(void *p) {
-        REBSER *s = SER(p);  // allow REBARR, REBCTX, REBACT...
+        REBSER *s = SER(cast(REBNOD*, p));  // allow REBARR, REBCTX, REBACT...
 
         // NOTE: When series are allocated, the only thing valid here is the
         // header.  Hence you can't tell (for instance) if it's an array or
@@ -124,7 +391,7 @@
     inline static void MONITOR_SERIES(void *p) {
         printf("Adding monitor to %p on tick #%d\n", p, cast(int, TG_Tick));
         fflush(stdout);
-        SET_SERIES_INFO(p, MONITOR_DEBUG);
+        SET_SERIES_INFO(SER(cast(REBNOD*, p)), MONITOR_DEBUG);
     }
 #endif
 
@@ -141,34 +408,11 @@
 //
 
 inline static REBLEN SER_USED(const REBSER *s) {
-    REBYTE len_byte = LEN_BYTE_OR_255(s);
-    return len_byte == 255 ? s->content.dynamic.used : len_byte;
-}
-
-inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
-    if (LEN_BYTE_OR_255(s) == 255)
-        s->content.dynamic.used = used;
-    else {
-        assert(used < sizeof(s->content));
-        mutable_LEN_BYTE_OR_255(s) = used;
-    }
-
-  #if defined(DEBUG_UTF8_EVERYWHERE)
-    //
-    // Low-level series mechanics will manipulate the used field, but that's
-    // at the byte level.  The higher level string mechanics must be used on
-    // strings.
-    //
-    if (GET_SERIES_FLAG(s, IS_STRING)) {
-        MISC(s).length = 0xDECAFBAD;
-        TOUCH_SERIES_IF_DEBUG(s);
-    }
-  #endif
-}
-
-inline static void SET_SERIES_LEN(REBSER *s, REBLEN len) {
-    assert(NOT_SERIES_FLAG(s, IS_STRING));  // use _LEN_SIZE
-    SET_SERIES_USED(s, len);
+    if (IS_SER_DYNAMIC(s))
+        return s->content.dynamic.used;
+    if (IS_SER_ARRAY(s))
+        return IS_END(&s->content.fixed.cells[0]) ? 0 : 1;
+    return USED_BYTE(s);
 }
 
 
@@ -182,9 +426,9 @@ inline static REBYTE *SER_DATA(const_if_c REBSER *s) {
     // The VAL_CONTEXT(), VAL_SERIES(), VAL_ARRAY() extractors do the failing
     // upon extraction--that's meant to catch it before it gets this far.
     //
-    assert(NOT_SERIES_INFO(s, INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(s, INACCESSIBLE));
 
-    return LEN_BYTE_OR_255(s) == 255
+    return IS_SER_DYNAMIC(s)
         ? cast(REBYTE*, s->content.dynamic.data)
         : cast(REBYTE*, &s->content);
 }
@@ -195,7 +439,11 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
         if (IS_FREE_NODE(s))
             printf("SER_DATA_AT asked on freed series\n");
         else
-            printf("SER_DATA_AT asked %d on width=%d\n", w, SER_WIDE(s));
+            printf(
+                "SER_DATA_AT asked %d on width=%d\n",
+                w,
+                cast(int, SER_WIDE(s))
+            );
         panic (s);
     }
   #endif
@@ -203,7 +451,7 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
     // The VAL_CONTEXT(), VAL_SERIES(), VAL_ARRAY() extractors do the failing
     // upon extraction--that's meant to catch it before it gets this far.
     //
-    assert(not (s->info.bits & SERIES_INFO_INACCESSIBLE));
+    assert(NOT_SERIES_FLAG(s, INACCESSIBLE));
 
     return ((w) * (i)) + ( // v-- inlining of SER_DATA
         IS_SER_DYNAMIC(s)
@@ -241,6 +489,88 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
 
 #define SER_HEAD(t,s) \
     SER_AT(t, (s), 0)  // using SER_DATA_AT() vs. just SER_DATA() checks width
+
+
+// If a binary series is a string (or aliased as a string), it must have all
+// modifications keep it with valid UTF-8 content.  That includes having a
+// terminal `\0` byte.  Since there is a special code path for setting the
+// length in the case of aliased binaries, that's what enforces the 0 byte
+// rule...but if a binary is never aliased as a string it may not be
+// terminated.  It's always long enough to carry a terminator...and the
+// debug build sets binary-sized series tails to this byte to make sure that
+// they are formally terminated if they need to be.
+//
+#if !defined(NDEBUG)
+    #define BINARY_BAD_UTF8_TAIL_BYTE 0xFE
+#endif
+
+// !!! Review if SERIES_FLAG_FIXED_SIZE should be calling this routine.  At
+// the moment, fixed size series merely can't expand, but it might be more
+// efficient if they didn't use any "appending" operators to get built.
+//
+inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
+    if (IS_SER_DYNAMIC(s)) {
+        s->content.dynamic.used = used;
+
+        // !!! See notes on TERM_SERIES_IF_NEEDED() for how array termination
+        // is slated to be a debug feature only.
+        //
+        if (IS_SER_ARRAY(s))
+            SET_END(SER_AT(RELVAL, s, used));
+    }
+    else {
+        assert(used < sizeof(s->content));
+
+        // !!! See notes on TERM_SERIES_IF_NEEDED() for how array termination
+        // is slated to be a debug feature only.
+        //
+        if (IS_SER_ARRAY(s)) {
+            if (used == 0)
+                SET_END(SER_HEAD(RELVAL, s));
+            else {
+                assert(used == 1);
+                if (IS_END(SER_HEAD(RELVAL, s)))
+                    Init_Nulled(SER_HEAD(RELVAL, s));  // !!! Unreadable void?
+                assert(IS_END(SER_AT(RELVAL, s, 1)));
+            }
+        }
+        else
+            mutable_USED_BYTE(s) = used;
+    }
+
+  #if !defined(NDEBUG)
+    if (SER_WIDE(s) == 1) {  // presume BINARY! or ANY-STRING! (?)
+        REBYTE *tail = SER_AT(REBYTE, s, used);
+        *tail = BINARY_BAD_UTF8_TAIL_BYTE;  // make missing terminator obvious
+    }
+  #endif
+
+  #if defined(DEBUG_UTF8_EVERYWHERE)
+    //
+    // Low-level series mechanics will manipulate the used field, but that's
+    // at the byte level.  The higher level string mechanics must be used on
+    // strings.
+    //
+    if (IS_NONSYMBOL_STRING(s)) {
+        s->misc.length = 0xDECAFBAD;
+        TOUCH_SERIES_IF_DEBUG(s);
+    }
+  #endif
+}
+
+// See TERM_STRING_LEN_SIZE() for the code that maintains string invariants,
+// including the '\0' termination (this routine will corrupt the tail byte
+// in the debug build to catch violators.)
+//
+inline static void SET_SERIES_LEN(REBSER *s, REBLEN len) {
+    assert(not IS_SER_UTF8(s));  // use _LEN_SIZE
+    SET_SERIES_USED(s, len);
+}
+
+#ifdef CPLUSPLUS_11  // catch cases when calling on REBSTR* directly
+    inline static void SET_SERIES_LEN(REBSTR *s, REBLEN len) = delete;
+#endif
+
 
 inline static REBYTE *SER_DATA_TAIL(size_t w, const_if_c REBSER *s)
   { return SER_DATA_AT(w, s, SER_USED(s)); }
@@ -288,72 +618,47 @@ inline static void EXPAND_SERIES_TAIL(REBSER *s, REBLEN delta) {
         SET_SERIES_USED(s, SER_USED(s) + delta);  // no termination implied
     else
         Expand_Series(s, SER_USED(s), delta);  // currently terminates
+}
 
-    // !!! R3-Alpha had a premise of not terminating arrays when it did not
-    // have to, but the invariants of when termination happened was unclear.
-    // Ren-C has tried to ferret out the places where termination was and
-    // wasn't happening via asserts and address sanitizer; while not "over
-    // terminating" redundantly.  To try and make it clear this does not
-    // terminate, we poison even if it calls into Expand_Series, which
-    // *does* terminate.
-    //
-  #if !defined(NDEBUG)
-    if (IS_SER_ARRAY(s)) {  // trash to ensure termination (if not implicit)
-        RELVAL *tail = SER_TAIL(RELVAL, s);
-        if (
-            (tail->header.bits & NODE_FLAG_CELL)
-            and not (
-                IS_END(tail)
-                and (tail->header.bits & CELL_FLAG_PROTECTED)
-            )
-        ){
-            mutable_SECOND_BYTE(tail->header.bits) = REB_T_TRASH;
+
+//=//// SERIES TERMINATION ////////////////////////////////////////////////=//
+//
+// R3-Alpha had a concept of termination which was that all series had one
+// full-sized unit at their tail which was set to zero bytes.  Ren-C moves
+// away from this concept...it only has terminating '\0' on UTF-8 strings,
+// a reserved terminating *position* on binaries (in case they become
+// aliased as UTF-8 strings), and the debug build terminates arrays in order
+// to catch out-of-bounds accesses more easily:
+//
+// https://forum.rebol.info/t/1445
+//
+// Under this strategy, most of the termination is handled by the functions
+// that deal with their specific subclass (e.g. Make_String()).  But some
+// generic routines that memcpy() data behind the scenes needs to be sure it
+// maintains the invariant that the higher level routines want.
+//
+
+inline static void TERM_SERIES_IF_NECESSARY(REBSER *s)
+{
+    if (SER_WIDE(s) == 1) {
+        if (IS_SER_UTF8(s))
+            *SER_TAIL(REBYTE, s) = '\0';
+        else {
+          #if !defined(NDEBUG)
+            *SER_TAIL(REBYTE, s) = BINARY_BAD_UTF8_TAIL_BYTE;
+          #endif
         }
     }
-    else if (SER_WIDE(s) == 1)  // presume BINARY! or ANY-STRING! (?)
-        *SER_DATA_TAIL(1, s) = 0xFE;  // invalid UTF-8 byte, e.g. poisonous
-    else {
-        // Assume other series (like GC_Mark_Stack) don't necessarily
-        // terminate.
-    }
-  #endif
-}
-
-//
-// Termination
-//
-
-inline static void TERM_SEQUENCE(REBSER *s) {
-    assert(not IS_SER_ARRAY(s));
-    memset(SER_DATA_AT(SER_WIDE(s), s, SER_USED(s)), 0, SER_WIDE(s));
-}
-
-inline static void TERM_SEQUENCE_LEN(REBSER *s, REBLEN len) {
-    SET_SERIES_LEN(s, len);
-    TERM_SEQUENCE(s);
+    else if (IS_SER_DYNAMIC(s) and IS_SER_ARRAY(s))
+        SET_END(SER_TAIL(RELVAL, s));
 }
 
 #ifdef NDEBUG
-    #define ASSERT_SERIES_TERM(s) \
-        NOOP
-
     #define ASSERT_SERIES_TERM_IF_NEEDED(s) \
         NOOP
 #else
-    #define ASSERT_SERIES_TERM(s) \
-        Assert_Series_Term_Core(s)
-
-    inline static void ASSERT_SERIES_TERM_IF_NEEDED(REBSER *s) {
-        if (
-            IS_SER_ARRAY(s)
-            or (
-                SER_WIDE(s) == 1
-                and s != TG_Byte_Buf
-                and s != SER(TG_Mold_Buf)
-            )
-        ){
-            Assert_Series_Term_Core(s);
-        }
+    inline static void ASSERT_SERIES_TERM_IF_NEEDED(const REBSER *s) {
+        Assert_Series_Term_Core(s);
     }
 #endif
 
@@ -420,7 +725,7 @@ inline static REBSER *Manage_Series(REBSER *s)  // give manual series to GC
         panic (s);  // shouldn't manage an already managed series
   #endif
 
-    s->header.bits |= NODE_FLAG_MANAGED;
+    s->leader.bits |= NODE_FLAG_MANAGED;
     Untrack_Manual_Series(s);
     return s;
 }
@@ -428,27 +733,25 @@ inline static REBSER *Manage_Series(REBSER *s)  // give manual series to GC
 #ifdef NDEBUG
     #define ASSERT_SERIES_MANAGED(s)
 #else
-    inline static void ASSERT_SERIES_MANAGED(const void *s) {
+    inline static void ASSERT_SERIES_MANAGED(const REBSER *s) {
         if (NOT_SERIES_FLAG(s, MANAGED))
             panic (s);
     }
 #endif
 
-inline static REBSER *Force_Series_Managed(const_if_c void *p) {
-    REBSER *s = m_cast(REBSER*, SER(p));
+inline static REBSER *Force_Series_Managed(const_if_c REBSER *s) {
     if (NOT_SERIES_FLAG(s, MANAGED))
-        Manage_Series(s);
-    return s;
+        Manage_Series(m_cast(REBSER*, s));
+    return m_cast(REBSER*, s);
 }
 
 #if !defined(__cplusplus)
     #define Force_Series_Managed_Core Force_Series_Managed
 #else
-    inline static REBSER *Force_Series_Managed_Core(void *p)
-      { return Force_Series_Managed(p); }  // mutable series may be unmanaged
+    inline static REBSER *Force_Series_Managed_Core(REBSER *s)
+      { return Force_Series_Managed(s); }  // mutable series may be unmanaged
 
-    inline static REBSER *Force_Series_Managed_Core(const void *p) {
-        const REBSER *s = SER(p);
+    inline static REBSER *Force_Series_Managed_Core(const REBSER *s) {
         ASSERT_SERIES_MANAGED(s);  // const series should already be managed
         return m_cast(REBSER*, s);
     }
@@ -482,27 +785,27 @@ inline static REBSER *Force_Series_Managed(const_if_c void *p) {
 //
 
 static inline bool Is_Series_Black(const REBSER *s) {
-    return GET_SERIES_INFO(s, BLACK);
+    return GET_SERIES_FLAG(s, BLACK);
 }
 
 static inline bool Is_Series_White(const REBSER *s) {
-    return NOT_SERIES_INFO(s, BLACK);
+    return NOT_SERIES_FLAG(s, BLACK);
 }
 
 static inline void Flip_Series_To_Black(const REBSER *s) {
-    assert(NOT_SERIES_INFO(s, BLACK));
-    SET_SERIES_INFO(s, BLACK);
-#if !defined(NDEBUG)
+    assert(NOT_SERIES_FLAG(s, BLACK));
+    SET_SERIES_FLAG(m_cast(REBSER*, s), BLACK);
+  #if !defined(NDEBUG)
     ++TG_Num_Black_Series;
-#endif
+  #endif
 }
 
 static inline void Flip_Series_To_White(const REBSER *s) {
-    assert(GET_SERIES_INFO(s, BLACK));
-    CLEAR_SERIES_INFO(s, BLACK);
-#if !defined(NDEBUG)
+    assert(GET_SERIES_FLAG(s, BLACK));
+    CLEAR_SERIES_FLAG(m_cast(REBSER*, s), BLACK);
+  #if !defined(NDEBUG)
     --TG_Num_Black_Series;
-#endif
+  #endif
 }
 
 
@@ -512,8 +815,13 @@ static inline void Flip_Series_To_White(const REBSER *s) {
 
 inline static void Freeze_Series(const REBSER *s) {  // there is no unfreeze
     assert(not IS_SER_ARRAY(s)); // use Deep_Freeze_Array
-    SET_SERIES_INFO(s, FROZEN_SHALLOW);
-    SET_SERIES_INFO(s, FROZEN_DEEP);  // so generic deep frozen checks faster
+
+    // Mutable cast is all right for this bit.  We set the FROZEN_DEEP flag
+    // even though there is no structural depth here, so that the generic
+    // test for deep-frozenness can be faster.
+    //
+    SET_SERIES_INFO(m_cast(REBSER*, s), FROZEN_SHALLOW);
+    SET_SERIES_INFO(m_cast(REBSER*, s), FROZEN_DEEP);
 }
 
 inline static bool Is_Series_Frozen(const REBSER *s) {
@@ -525,7 +833,7 @@ inline static bool Is_Series_Frozen(const REBSER *s) {
 }
 
 inline static bool Is_Series_Read_Only(const REBSER *s) {  // may be temporary
-    return 0 != (s->info.bits &
+    return 0 != (SER_INFO(s) &
         (SERIES_INFO_HOLD | SERIES_INFO_PROTECTED
         | SERIES_INFO_FROZEN_SHALLOW | SERIES_INFO_FROZEN_DEEP)
     );
@@ -559,48 +867,25 @@ inline static void FAIL_IF_READ_ONLY_SER(REBSER *s) {
     fail (Error_Series_Protected_Raw());
 }
 
-// While ideally error messages would give back data that is bound exactly to
-// the context that was applicable, threading the specifier into many cases
-// can overcomplicate code.  We'd break too many invariants to just say a
-// relativized value is "unbound", so make an expired frame if necessary.
-//
-inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
-    if (not Is_Bindable(v) or IS_SPECIFIC(v))
-        Move_Value(out, SPECIFIC(v));
-    else {  // must be bound to a function
-        REBACT *binding = ACT(VAL_BINDING(v));
-        REBCTX *expired = Make_Expired_Frame_Ctx_Managed(binding);
-
-        Move_Value_Header(out, v);
-        out->payload = v->payload;
-        EXTRA(Binding, out).node = NOD(expired);
-    }
-    return cast(REBVAL*, out);
-}
-
-// This is a super lazy version of unrelativization, which can be used to
-// hand a relative value to something like fail(), since fail will clean up
-// the stray alloc.
-//
-#define rebUnrelativize(v) \
-    Unrelativize(Alloc_Value(), (v))
-
 
 #if defined(NDEBUG)
     #define KNOWN_MUTABLE(v) v
 #else
     inline static const RELVAL* KNOWN_MUTABLE(const RELVAL* v) {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-        REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
+        REBSER *s = SER(VAL_NODE1(v));  // can be pairlist, varlist, etc.
         assert(not Is_Series_Read_Only(s));
         assert(NOT_CELL_FLAG(v, CONST));
         return v;
     }
 #endif
 
+// Forward declaration needed
+inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v);
+
 inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    REBSER *s = SER(VAL_NODE(v));  // can be pairlist, varlist, etc.
+    REBSER *s = SER(VAL_NODE1(v));  // can be pairlist, varlist, etc.
 
     FAIL_IF_READ_ONLY_SER(s);
 
@@ -638,8 +923,8 @@ inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
 // before a command ends.
 //
 
-#define PUSH_GC_GUARD(p) \
-    Push_Guard_Node(NOD(p))
+#define PUSH_GC_GUARD(node) \
+    Push_Guard_Node(node)
 
 inline static void DROP_GC_GUARD(const void *p) {
   #if defined(NDEBUG)
@@ -669,8 +954,8 @@ inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
     enum Reb_Kind k = CELL_HEART(v);
     assert(ANY_SERIES_KIND_EVIL_MACRO);
   #endif
-    const REBSER *s = SER(PAYLOAD(Any, v).first.node);
-    if (GET_SERIES_INFO(s, INACCESSIBLE))
+    const REBSER *s = SER(VAL_NODE1(v));
+    if (GET_SERIES_FLAG(s, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
     return s;
 }
@@ -718,7 +1003,7 @@ inline static REBLEN VAL_LEN_HEAD(REBCEL(const*) v);  // forward decl
 // end of series, VAL_INDEX() does bounds checking and always returns an
 // unsigned REBLEN.
 //
-inline static REBLEN VAL_INDEX(REBCEL(const*) v) { // C++ reference type
+inline static REBLEN VAL_INDEX(REBCEL(const*) v) {
     enum Reb_Kind k = CELL_HEART(v);  // only const access if heart!
     assert(ANY_SERIES_KIND_EVIL_MACRO);
     UNUSED(k);
@@ -735,12 +1020,42 @@ inline static const REBYTE *VAL_DATA_AT(REBCEL(const*) v) {
 }
 
 
+inline static void INIT_SPECIFIER(RELVAL *v, const void *p) {
+    //
+    // can be called on non-bindable series, but p must be nullptr
+
+    const REBSER *binding = SER(p);  // can't (currently) be a cell/pairing
+    mutable_BINDING(v) = binding;
+
+  #if !defined(NDEBUG)
+    if (not binding or IS_SYMBOL(binding))
+        return;  // e.g. UNBOUND (words use strings to indicate unbounds)
+
+    assert(Is_Bindable(v));  // works on partially formed values
+
+    if (GET_SERIES_FLAG(binding, MANAGED)) {
+        assert(
+            IS_DETAILS(binding)  // relative
+            or IS_VARLIST(binding)  // specific
+            or (
+                ANY_ARRAY(v) and IS_PATCH(binding)  // virtual
+            ) or (
+                IS_VARARGS(v) and not IS_SER_DYNAMIC(binding)
+            )  // varargs from MAKE VARARGS! [...], else is a varlist
+        );
+    }
+    else
+        assert(IS_VARLIST(binding));
+  #endif
+}
+
+
 inline static REBVAL *Init_Any_Series_At_Core(
     RELVAL *out,
     enum Reb_Kind type,
     const REBSER *s,  // ensured managed by calling macro
     REBLEN index,
-    REBNOD *binding
+    REBARR *specifier
 ){
   #if !defined(NDEBUG)
     assert(ANY_SERIES_KIND(type));
@@ -755,21 +1070,21 @@ inline static REBVAL *Init_Any_Series_At_Core(
     // that if they were valid UTF-8, they could be aliased as Rebol strings,
     // which are zero terminated.  So it's the rule.
     //
-    ASSERT_SERIES_TERM(s);
+    ASSERT_SERIES_TERM_IF_NEEDED(s);
 
     if (ANY_ARRAY_KIND(type))
         assert(IS_SER_ARRAY(s));
     else if (ANY_STRING_KIND(type))
-        assert(GET_SERIES_FLAG(s, IS_STRING));
+        assert(IS_SER_UTF8(s));
     else {
         // Note: Binaries are allowed to alias strings
     }
   #endif
 
     RESET_CELL(out, type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, s);
+    INIT_VAL_NODE1(out, s);
     VAL_INDEX_RAW(out) = index;
-    INIT_BINDING(out, binding);  // asserts if unbindable type tries to bind
+    INIT_SPECIFIER(out, specifier);  // asserts if unbindable type tries to bind
     return cast(REBVAL*, out);
 }
 
@@ -787,7 +1102,7 @@ inline static REBVAL *Init_Any_Series_At_Core(
 // allocation into a separate routine is not a huge cost.
 //
 // Note: This series will not participate in management tracking!
-// See NODE_FLAG_MANAGED handling in Make_Array_Core() and Make_Series_Core().
+// See NODE_FLAG_MANAGED handling in Make_Array_Core() and Make_Series().
 //
 inline static REBSER *Alloc_Series_Node(REBFLGS flags) {
     assert(not (flags & NODE_FLAG_CELL));
@@ -801,19 +1116,22 @@ inline static REBSER *Alloc_Series_Node(REBFLGS flags) {
     // or array of length 0!  Only one is set here.  The info should be
     // set by the caller, as should a terminator in the internal payload
 
-    s->header.bits = NODE_FLAG_NODE | flags | SERIES_FLAG_8_IS_TRUE;  // #1
+    s->leader.bits = NODE_FLAG_NODE | flags;  // #1
 
   #if !defined(NDEBUG)
-    SAFETRASH_POINTER_IF_DEBUG(s->link_private.trash);  // #2
+    SAFETRASH_POINTER_IF_DEBUG(s->link.trash);  // #2
     memset(  // https://stackoverflow.com/q/57721104/
         cast(char*, &s->content.fixed),
         0xBD,
         sizeof(s->content)
     );  // #3 - #6
-    memset(&s->info, 0xAE, sizeof(s->info));  // #7, caller sets SER_WIDE()
-    SAFETRASH_POINTER_IF_DEBUG(s->link_private.trash);  // #8
+    memset(&s->info, 0xAE, sizeof(s->info));  // #7
+    SAFETRASH_POINTER_IF_DEBUG(s->link.trash);  // #8
 
     TOUCH_SERIES_IF_DEBUG(s);  // tag current C stack as series origin in ASAN
+  #endif
+
+  #if defined(DEBUG_COLLECT_STATS)
     PG_Reb_Stats->Series_Made++;
   #endif
 
@@ -909,7 +1227,11 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN capacity) {
     // SER_SET_BIAS() uses bit masking on an existing value, we are sure
     // here to clear out the whole value for starters.
     //
-    s->content.dynamic.bias = 0;
+    if (IS_SER_BIASED(s))
+        s->content.dynamic.bonus.bias = 0;
+    else {
+        // Leave as trash, or as existing bonus (if called in Expand_Series())
+    }
 
     // The allocation may have returned more than we requested, so we note
     // that in 'rest' so that the series can expand in and use the space.
@@ -936,13 +1258,11 @@ inline static bool Did_Series_Data_Alloc(REBSER *s, REBLEN capacity) {
 // Small series will be allocated from a memory pool.
 // Large series will be allocated from system memory.
 //
-inline static REBSER *Make_Series_Core(
-    REBLEN capacity,
-    REBYTE wide,
-    REBFLGS flags
-){
-    assert(not (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED));
-
+inline static REBSER *Make_Series(REBLEN capacity, REBFLGS flags)
+{
+    size_t wide = Wide_For_Flavor(
+        cast(enum Reb_Series_Flavor, FLAVOR_BYTE(flags))
+    );
     if (cast(REBU64, capacity) * wide > INT32_MAX)
         fail (Error_No_Memory(cast(REBU64, capacity) * wide));
 
@@ -952,31 +1272,32 @@ inline static REBSER *Make_Series_Core(
     // (It technically doesn't need to.)
     //
     REBSER *s = Alloc_Series_Node(flags);
-    s->info.bits =
-        SERIES_INFO_0_IS_TRUE
-        // not SERIES_INFO_1_IS_FALSE
-        // not SERIES_INFO_7_IS_FALSE
-        | FLAG_WIDE_BYTE_OR_0(wide);
+    assert(not IS_SER_ARRAY(s));
+
+    if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK))
+        TRASH_POINTER_IF_DEBUG(s->info.node);
+    else
+        SER_INFO(s) = Endlike_Header(0);
 
     if (
-        (flags & SERIES_FLAG_ALWAYS_DYNAMIC)  // inlining will constant fold
+        (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold
         or (capacity * wide > sizeof(s->content))
     ){
         // Data won't fit in a REBSER node, needs a dynamic allocation.  The
         // capacity given back as the ->rest may be larger than the requested
         // size, because the memory pool reports the full rounded allocation.
 
-        mutable_LEN_BYTE_OR_255(s) = 255;  // dynamic
+        SET_SERIES_FLAG(s, DYNAMIC);
 
         if (not Did_Series_Data_Alloc(s, capacity)) {
-            s->header.bits &= ~NODE_FLAG_MANAGED;
-            s->info.bits |= SERIES_INFO_INACCESSIBLE;
+            CLEAR_SERIES_FLAG(s, MANAGED);
+            SET_SERIES_FLAG(s, INACCESSIBLE);
             GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
 
             fail (Error_No_Memory(capacity * wide));
         }
 
-      #if !defined(NDEBUG)
+      #if defined(DEBUG_COLLECT_STATS)
         PG_Reb_Stats->Series_Memory += capacity * wide;
       #endif
     }
@@ -998,15 +1319,6 @@ inline static REBSER *Make_Series_Core(
 
     return s;
 }
-
-// !!! When series are made they are not terminated, which means that though
-// they are empty they may not be "valid".  Should this be called Alloc_Ser()?
-// Is Make_Series() needed or are there few enough calls it should always take
-// the flags and not have a _Core() variant?
-//
-#define Make_Series(capacity, wide) \
-    Make_Series_Core((capacity), (wide), SERIES_FLAGS_NONE)
-
 
 enum act_modify_mask {
     AM_PART = 1 << 0,

@@ -20,6 +20,12 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// The ordering of types in %types.r encodes properties of the types for
+// efficiency.  So adding or removing a type generally means shuffling their
+// values.  Hence their numbering is subject to change as an implementation
+// detail--and the specific integer values of things like REB_BLOCK should
+// never be exposed through the API.
+//
 // These macros embed specific knowledge of the type ordering.  Basically any
 // changes to %types.r mean having to take into account fixups here.
 //
@@ -42,15 +48,13 @@
 //=//// QUOTED ////////////////////////////////////////////////////////////=//
 //
 // Testing for QUOTED! is special, as it isn't just the REB_QUOTED type, but
-// also multiplexed as values > REB_64.  See %sys-quoted.h
+// also multiplexed as values > REB_QUOTED.  See %sys-quoted.h
 //
-// !!! Review making this test faster as just `k >= REB_QUOTED` by positioning
-// the QUOTED! datatype past all the pseudotypes (e.g. at 63).  This would
-// raise REB_MAX, and inflate all the tables for dispatch to 64 items, which
-// is not really a big deal...but there are likely other consequences.
+// !!! Currently this would register REB_T_UNSAFE as quoted, but it will cause
+// other problems quickly enough that it's not worth asserting here.
 
-inline static bool IS_QUOTED_KIND(REBYTE k)
-  { return k == REB_QUOTED or k >= REB_64; }
+#define IS_QUOTED_KIND(k) \
+  ((k) >= REB_QUOTED)
 
 #define IS_QUOTED(v) \
     IS_QUOTED_KIND(KIND3Q_BYTE(v))
@@ -86,7 +90,7 @@ inline static bool IS_QUOTED_KIND(REBYTE k)
 //
 
 inline static bool ANY_INERT_KIND(REBYTE k) {
-    assert(k >= REB_VOID);  // can't call on end/null
+    assert(k >= REB_BLANK);  // can't call on end/null/void
     return k <= REB_BLOCK;
 }
 
@@ -390,26 +394,6 @@ inline static enum Reb_Kind BLOCKIFY_KIND(REBYTE k) {
     return cast(enum Reb_Kind, k - 3);
 }
 
-
-//=//// "PARAM" CELLS /////////////////////////////////////////////////////=//
-//
-// !!! Due to the scarcity of bytes in cells, yet a desire to use them for
-// parameters, they are a kind of "container" class in the KIND3Q_BYTE() while
-// the actual CELL_KIND (via HEART_BYTE()) is a REB_TYPESET.
-//
-// Making the typeset expression more sophisticated to clearly express a list
-// of parameter flags is something planned for the near future.
-
-inline static bool IS_PARAM_KIND(REBYTE k)
-    { return k >= REB_P_NORMAL and k <= REB_P_SPECIALIZED; }
-
-#define IS_PARAM(v) \
-    IS_PARAM_KIND(KIND3Q_BYTE(v))
-
-inline static bool IS_HIDDEN_PARAM_KIND(REBYTE k) {
-    assert(IS_PARAM_KIND(k));
-    return k >= REB_P_LOCAL;
-}
 
 // If a type can be used with the VAL_UTF8_XXX accessors
 

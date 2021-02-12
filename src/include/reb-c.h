@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -364,30 +364,6 @@
 #endif
 
 
-//=//// C-ONLY CONSTNESS //////////////////////////////////////////////////=//
-//
-// C lacks overloading, which means that having one version of code for const
-// input and another for non-const input requires two entirely different names
-// for the function variations.  That can wind up seeming noisier than is
-// worth it for a compile-time check.  This makes it easier to declare the C++
-// variation for the const case:
-//
-//    // C build mutable result even if const input (mutable case in C++)
-//    Member* Get_Member(const_if_c Object* o) {...}
-//
-//    #ifdef __cplusplus
-//        // C++ build adds protection to the const input case
-//        const Member* Get_Member(const Object *o) {...}
-//    #endif
-//
-
-#ifdef __cplusplus
-    #define const_if_c
-#else
-    #define const_if_c const
-#endif
-
-
 //=//// CASTING MACROS ////////////////////////////////////////////////////=//
 //
 // The following code and explanation is from "Casts for the Masses (in C)":
@@ -398,12 +374,14 @@
 // purpose is static analysis.  This means the cast macros add a headache when
 // stepping through the debugger, and also they consume a measurable amount
 // of runtime.  Hence we sacrifice cast checking in the debug builds...and the
-// release C++ builds on Travis are relied upon to do the proper optimizations
-// as well as report any static analysis errors.  See DEBUG_CHECK_CASTS.
+// release C++ builds are relied upon to do the proper optimizations as well
+// as report any static analysis errors.  See DEBUG_CHECK_CASTS.
 //
 // !!! C++14 gcc release builds seem to trigger bad behavior on cast() to
 // a CFUNC*, and non-C++14 builds are allowing cast of `const void*` to
 // non-const `char` with plain `cast()`.  Investigate as time allows.
+
+#define x_cast(t,v)    ((t)(v))  // not checked for performance, use sparingly
 
 #if !defined(__cplusplus)
     /* These macros are easier-to-spot variants of the parentheses cast.
@@ -432,6 +410,11 @@
      * actual power.  cast becomes a reinterpret_cast for pointers and a
      * static_cast otherwise.  We ensure c_cast added a const and m_cast
      * removed one, and that neither affected volatility.
+     *
+     * NOTE: m_cast_helper() may seem like overkill, but it's actually needed
+     * as a hook point to overload casting with smart pointer types, e.g.
+     * `m_cast(REBCHR(*), some_const_rebchr)`.  Search for overloads of the
+     * m_cast_helper() in certain builds before deciding to simplify this.
      */
     template<typename T, typename V>
     T m_cast_helper(V v) {
@@ -708,6 +691,97 @@
 #endif
 
 
+//=//// OPTIONAL POINTER TRICK ////////////////////////////////////////////=//
+//
+// There are some pointers in the system which can be `nullptr` and others
+// that are not.  To make it clear when a pointer must be tested for null,
+// this gives an annotation that will work in special builds.
+//
+// This is similar to `std::optional` and Rust's `Option` (and uses the Rust
+// term `unwrap` to get access to the "contained" pointer).  However, it
+// just uses `nullptr` for the none state (instead of `std::nullopt` or a
+// `None` type).  Construction and comparison are also more lenient, allowing
+// direct comparison to the contained pointer type.
+//
+// It uses Rust's naming in order to stay out of the way of C++ codebases that
+// do `using std::optional;`  These are also macros, so they can be redefined
+// out of the way even further if needed.
+//
+// Note: This needs special handling in %make-headers.r to recognize the
+// format.  See the `typemacro_parentheses` rule.
+//
+#ifdef DEBUG_CHECK_OPTIONALS
+    //
+    // Trying to use `std::optional` is more trouble than it's worth; we'd
+    // have to deal with the `nullopt` state which overlaps `nullptr`,
+    // and there's all kinds of issues the moment you derive from it.
+    // Just write a simple class specific to the purpose instead.
+    //
+    template<typename TP>
+    struct optional_pointer {
+        static_assert(
+            std::is_pointer<TP>::value,
+            "The intended use of Ren-C's option() is with pointers only"
+        );
+        typedef typename std::remove_pointer<TP>::type T;
+
+        T* p;
+
+        // C++ won't let you default construct objects without a default
+        // constructor.  To be C compatible, it cannot have behavior.
+        //
+        optional_pointer () {}  // garbage (or nullptr if in global scope)
+
+        template <typename X>
+        optional_pointer (X p) : p (p) {}
+
+        template <typename X>
+        optional_pointer (optional_pointer<X> op) : p (op.p) {}
+
+        T* unwrap_helper() const {
+            assert(p != nullptr);  // asserts only on DEBUG_CHECK_OPTIONALS
+            return p;
+        }
+
+        operator bool() const { return p != nullptr; }
+    };
+
+    // Ugly combinatorics.  But yes, it's how std::optional does it too.
+
+    template<typename L, typename R>
+    bool operator==(optional_pointer<L*> left, optional_pointer<R*> right)
+        { return left.p == right.p; }
+
+    template<typename L, typename R>
+    bool operator==(optional_pointer<L*> left, R* right)
+        { return left.p == right; }
+
+    template<typename L, typename R>
+    bool operator==(L* left, optional_pointer<R*> right)
+        { return left == right.p; }
+
+    template<typename L, typename R>
+    bool operator!=(optional_pointer<L*> left, optional_pointer<R*> right)
+        { return left.p != right.p; }
+
+    template<typename L, typename R>
+    bool operator!=(optional_pointer<L*> left, R* right)
+        { return left.p != right; }
+
+    template<typename L, typename R>
+    bool operator!=(L* left, optional_pointer<R*> right)
+        { return left != right.p; }
+
+    #define option(TP) optional_pointer<TP>
+    #define unwrap(v) (v).unwrap_helper()
+    #define try_unwrap(v) (v).p
+#else
+    #define option(T) T
+    #define unwrap(v) (v)
+    #define try_unwrap(v) (v)
+#endif
+
+
 //=//// MEMORY POISONING and POINTER TRASHING /////////////////////////////=//
 //
 // If one wishes to indicate a region of memory as being "off-limits", modern
@@ -757,12 +831,21 @@
 #endif
 
 #ifdef NDEBUG
-    #define TRASH_POINTER_IF_DEBUG(p) \
-        NOOP
-
-    #define TRASH_CFUNC_IF_DEBUG(T,p) \
-        NOOP
+    #define TRASH_POINTER_IF_DEBUG(p)       NOOP
+    #define TRASH_OPTION_IF_DEBUG(o)      NOOP
+    #define TRASH_CFUNC_IF_DEBUG(T,p)       NOOP
 #else
+    #if defined(DEBUG_CHECK_OPTIONALS)
+        #define TRASH_OPTION_IF_DEBUG(o) \
+            TRASH_POINTER_IF_DEBUG((o).p)
+
+        #define IS_OPTION_TRASH_DEBUG(o) \
+            IS_POINTER_TRASH_DEBUG((o).p)
+    #else
+        #define TRASH_OPTION_IF_DEBUG TRASH_POINTER_IF_DEBUG
+        #define IS_OPTION_TRASH_DEBUG IS_POINTER_TRASH_DEBUG
+    #endif
+
     #if defined(__cplusplus) // needed even if not C++11
         template<class T>
         inline static void TRASH_POINTER_IF_DEBUG(T* &p) {
@@ -840,6 +923,66 @@
 
     #define IS_CFUNC_TRASH_DEBUG(T,p) \
         ((p) == cast(T, cast(uintptr_t, 0xDECAFBAD)))
+#endif
+
+
+//=//// TYPE ENSURING HELPERS /////////////////////////////////////////////=//
+//
+// It's useful when building macros to make inline functions that just check
+// a type, for example:
+//
+//      inline static Foo* ensure_foo(Foo* f) { return f; }
+//
+// This has the annoying property that you have to write that function and
+// put it somewhere.  But also, there's a problem with constness... if you
+// want to retain it, you will need two overloads in C++ (and C does not
+// have overloading).
+//
+// This introduces some tools that are no-ops in C.  One is a simple type
+// `ensure` construct:
+//
+//      void *p = ensure(REBSER*, s);
+//
+// Another called `ensurer` lets you put it in the stream of execution without
+// being inside parentheses (it does this with operator `<<` magic):
+//
+//      int x = ensurer(int) "this would fail in a C++ build, for instance";
+//
+// And yet another called `ensured` lets you check an assignment.  This is
+// helpful when you need to do something like assign to a void* and can't
+// do weird cast dereferencing or you'll violate strict aliasing.
+//
+#if !defined(CPLUSPLUS_11) or !defined(DEBUG_CHECK_CASTS)
+    #define ensure(T,v) (v)
+    #define ensurer(T)
+    #define ensured(T,L,left) (left)
+#else
+    template<typename T>
+    struct ensure_reader {
+        template<typename U>
+        T operator<< (U u) { return u; }
+
+        template<typename U>
+        static T check(U u) { return u; }
+    };
+    #define ensure(T,v) ensure_reader<T>::check(v)
+    #define ensurer(T) ensure_reader<T>() <<
+
+    template<typename T, typename L>
+    struct ensure_writer {
+        L &left;
+        ensure_writer(L &left) : left (left) {}
+        void operator=(const T &right) {
+            left = right;
+        }
+    };
+    #define ensured(T,L,left) (ensure_writer<T,L>{(left)})
+        //
+        // ^-- Note: C++17 should be able to infer template arguments from
+        // constructors, so this could just be `ensurer(T,left)`.  There
+        // aren't enough of these to worry about it, yet.
+        //
+        // https://stackoverflow.com/a/984597/
 #endif
 
 

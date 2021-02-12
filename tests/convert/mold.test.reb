@@ -13,7 +13,7 @@
 )
 ; cyclic object
 [#69 (
-    a: make object! [a: self]
+    a: make object! [a: binding of 'a]
     text? mold a
 )]
 ; deep nested block mold
@@ -29,7 +29,7 @@
     ]]
 )]
 [#719
-    ("()" = mold lit ())
+    ("()" = mold just ())
 ]
 
 [#77

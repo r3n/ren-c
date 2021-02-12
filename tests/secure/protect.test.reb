@@ -144,3 +144,26 @@
     obj: make object! [x: 10]
     'series-held = pick trap [do code: [obj/x: (clear code recycle 20)]] 'id
 )
+
+
+; HIDDEN VARIABLES SHOULD STAY HIDDEN
+;
+; The bit indicating hiddenness lives on the variable slot of the context.
+; This puts it at risk of being overwritten by other values...though it is
+; supposed to be protected by masking operations.  Make sure changing the
+; value doesn't un-hide it...
+(
+    obj: make object! [x: 10, y: 20]
+    word: bind 'y obj
+    did all [
+        20 = get word
+        [x y] = words of obj  ; starts out visible
+
+        elide protect/hide 'obj/y
+        [x] = words of obj  ; hidden
+        20 = get word  ; but you can still see it
+
+        set word 30  ; and you can still set it
+        [x] = words of obj  ; still hidden
+    ]
+)

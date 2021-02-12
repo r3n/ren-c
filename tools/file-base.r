@@ -32,10 +32,14 @@ core: [
     functionals/c-does.c
     functionals/c-enclose.c
     functionals/n-function.c
+    functionals/c-generic.c
     functionals/c-hijack.c
+    functionals/c-lambda.c
+    functionals/c-macro.c
+    functionals/c-native.c
     functionals/c-oneshot.c
     functionals/c-reframer.c
-    functionals/c-reskin.c
+    functionals/c-reorder.c
     functionals/c-specialize.c
     functionals/c-typechecker.c
 

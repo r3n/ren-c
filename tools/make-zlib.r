@@ -87,7 +87,7 @@ disable-user-includes: function [
         ] 
     ]
 
-    if inline and [not empty? inline] [
+    if inline and (not empty? inline) [
         fail [
             {Not all headers inlined by make-zlib:} (mold headers) LF
             {If we inline a header, should happen once and only once for each}

@@ -193,8 +193,6 @@ REB_R Call_Core(REBFRM *frame_) {
 
     UNUSED(REF(console));  // !!! This is not paid attention to (?)
 
-    Check_Security_Placeholder(Canon(SYM_CALL), SYM_EXEC, ARG(command));
-
     // Make sure that if the output or error series are STRING! or BINARY!,
     // they are not read-only, before we try appending to them.
     //
@@ -250,7 +248,7 @@ REB_R Call_Core(REBFRM *frame_) {
         REBVAL *text = rebValue(
             "argv-block-to-command*", ARG(command),
         rebEND);
-        Move_Value(ARG(command), text);
+        Copy_Cell(ARG(command), text);
         rebRelease(text);
         goto text_command;
     }

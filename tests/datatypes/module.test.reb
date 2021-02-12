@@ -40,10 +40,9 @@
 )
 
 
-([1 2 3] = load ["1" "2" "3"])
 ([] = load " ")
-(1 = load "1")
-([1] = load "[1]")
+([1] = load "1")
+([[1]] = load "[1]")
 ([1 2 3] = load "1 2 3")
 ([1 2 3] = load/type "1 2 3" null)
 ([1 2 3] = load "rebol [] 1 2 3")
@@ -61,7 +60,7 @@
 ; loaded as [1 2 3], which then evaluates to 3.  The test framework then
 ; considers that "not a logic".
 ;
-; [[rebol [] 1 2 3] = load/all "rebol [] 1 2 3"]
+; ([1 2 3] = load "rebol [] 1 2 3")
 
 ; File variations:
 (equal? read %./ load %./)
@@ -71,7 +70,7 @@
 )
 (
     save %test1.r 1
-    1 = load %test1.r
+    1 = load-value %test1.r
 )
 (
     save %test2.r [1 2]

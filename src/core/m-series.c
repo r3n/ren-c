@@ -41,82 +41,6 @@ void Extend_Series(REBSER *s, REBLEN delta)
 
 
 //
-//  Insert_Series: C
-//
-// Insert a series of values (bytes, longs, reb-vals) into the
-// series at the given index.  Expand it if necessary.  Does
-// not add a terminator to tail.
-//
-REBLEN Insert_Series(
-    REBSER *s,
-    REBLEN index,
-    const REBYTE *data,
-    REBLEN len
-) {
-    if (index > SER_USED(s))
-        index = SER_USED(s);
-
-    Expand_Series(s, index, len); // tail += len
-
-    memcpy(
-        SER_DATA(s) + (SER_WIDE(s) * index),
-        data,
-        SER_WIDE(s) * len
-    );
-
-    return index + len;
-}
-
-
-//
-//  Append_Series: C
-//
-// Append value(s) onto the tail of a series.  The len is
-// the number of units (bytes, REBVALS, etc.) of the data,
-// and does not include the terminator (which will be added).
-// The new tail position will be returned as the result.
-// A terminator will be added to the end of the appended data.
-//
-void Append_Series(REBSER *s, const void *data, REBLEN len)
-{
-    REBLEN used_old = SER_USED(s);
-    REBYTE wide = SER_WIDE(s);
-
-    assert(not IS_SER_ARRAY(s));
-
-    EXPAND_SERIES_TAIL(s, len);
-    memcpy(SER_DATA(s) + (wide * used_old), data, wide * len);
-
-    TERM_SERIES(s);
-}
-
-
-//
-//  Append_Values_Len: C
-//
-// Append value(s) onto the tail of an array.  The len is
-// the number of units and does not include the terminator
-// (which will be added).
-//
-void Append_Values_Len(REBARR *a, const REBVAL *head, REBLEN len)
-{
-    REBLEN old_len = ARR_LEN(a);
-
-    // updates tail, which could move data storage.
-    //
-    EXPAND_SERIES_TAIL(SER(a), len);
-
-    memcpy(    // https://stackoverflow.com/q/57721104/
-        cast(char*, ARR_AT(a, old_len)),
-        cast(const char*, head),
-        sizeof(REBVAL) * len
-    );
-
-    TERM_ARRAY_LEN(a, ARR_LEN(a));
-}
-
-
-//
 //  Copy_Series_Core: C
 //
 // Copy underlying series that *isn't* an "array" (such as STRING!, BINARY!,
@@ -141,20 +65,32 @@ REBSER *Copy_Series_Core(const REBSER *s, REBFLGS flags)
     // propagated.  This includes locks, etc.  But the string flag needs
     // to be copied, for sure.
     //
-    if (GET_SERIES_FLAG(s, IS_STRING)) {
-        assert(not IS_STR_SYMBOL(s));
-        copy = SER(Make_String_Core(used, flags));
+    if (IS_SER_UTF8(s)) {
+        //
+        // Note: If the string was a symbol (aliased via AS) it will lose
+        // that information.
+        //
+        copy = Make_String_Core(used, flags);
         SET_SERIES_USED(copy, used);
-        TERM_SERIES(copy);
-        LINK(copy).bookmarks = nullptr;  // !!! Review: copy these?
-        MISC(copy).length = MISC(s).length;
+        *SER_TAIL(REBYTE, copy) = '\0';
+        mutable_LINK(Bookmarks, copy) = nullptr;  // !!! Review: copy these?
+        copy->misc.length = s->misc.length;
+    }
+    else if (SER_WIDE(s) == 1) {  // non-string BINARY!
+        copy = Make_Series(
+            used + 1,  // term space
+            FLAG_FLAVOR_BYTE(SER_FLAVOR(s)) | flags
+        );
+        SET_SERIES_USED(copy, used);
     }
     else {
-        copy = Make_Series_Core(used + 1, SER_WIDE(s), flags);
-        TERM_SEQUENCE_LEN(copy, SER_USED(s));
+        copy = Make_Series(used, FLAG_FLAVOR_BYTE(SER_FLAVOR(s)) | flags);
+        SET_SERIES_USED(copy, used);
     }
 
     memcpy(SER_DATA(copy), SER_DATA(s), used * SER_WIDE(s));
+
+    ASSERT_SERIES_TERM_IF_NEEDED(copy);
     return copy;
 }
 
@@ -177,17 +113,23 @@ REBSER *Copy_Series_At_Len_Extra(
     const REBSER *s,
     REBLEN index,
     REBLEN len,
-    REBLEN extra
+    REBLEN extra,
+    REBFLGS flags
 ){
     assert(not IS_SER_ARRAY(s));
 
-    REBSER *copy = Make_Series(len + 1 + extra, SER_WIDE(s));
+    REBLEN capacity = len + extra;
+    if (SER_WIDE(s) == 1)
+        ++capacity;
+    REBSER *copy = Make_Series(capacity, flags);
+    assert(SER_WIDE(s) == SER_WIDE(copy));
     memcpy(
         SER_DATA(copy),
         SER_DATA(s) + index * SER_WIDE(s),
-        (len + 1) * SER_WIDE(s)
+        len * SER_WIDE(s)  // !!! Review if +1 copying terminator is worth it
     );
-    TERM_SEQUENCE_LEN(copy, len);
+    SET_SERIES_USED(copy, len);
+    TERM_SERIES_IF_NECESSARY(copy);
     return copy;
 }
 
@@ -198,9 +140,8 @@ REBSER *Copy_Series_At_Len_Extra(
 // Remove a series of values (bytes, longs, reb-vals) from the
 // series at the given index.
 //
-void Remove_Series_Units(REBSER *s, REBSIZ offset, REBINT quantity)
+void Remove_Series_Units(REBSER *s, REBSIZ offset, REBLEN quantity)
 {
-    assert(quantity >= 0);
     if (quantity == 0)
         return;
 
@@ -223,7 +164,6 @@ void Remove_Series_Units(REBSER *s, REBSIZ offset, REBINT quantity)
             SER_SET_BIAS(s, 0);
             s->content.dynamic.rest += quantity;
             s->content.dynamic.data -= SER_WIDE(s) * quantity;
-            TERM_SERIES(s);
         }
         else {
             // Add bias to head:
@@ -245,7 +185,6 @@ void Remove_Series_Units(REBSER *s, REBSIZ offset, REBINT quantity)
                     data,
                     SER_USED(s) * SER_WIDE(s)
                 );
-                TERM_SERIES(s);
             }
             else {
                 SER_SET_BIAS(s, bias);
@@ -258,6 +197,7 @@ void Remove_Series_Units(REBSER *s, REBSIZ offset, REBINT quantity)
                 }
             }
         }
+        TERM_SERIES_IF_NECESSARY(s);  // !!! Review doing more elegantly
         return;
     }
 
@@ -268,21 +208,18 @@ void Remove_Series_Units(REBSER *s, REBSIZ offset, REBINT quantity)
 
     if (quantity + offset >= used_old) {
         SET_SERIES_USED(s, offset);
-        TERM_SERIES(s);
         return;
     }
 
-    // The terminator is not included in the length, because termination may
-    // be implicit (e.g. there may not be a full SER_WIDE() worth of data
-    // at the termination location).  Use TERM_SERIES() instead.
-    //
     REBLEN total = SER_USED(s) * SER_WIDE(s);
-    SET_SERIES_USED(s, used_old - cast(REBLEN, quantity));
-    quantity *= SER_WIDE(s);
 
     REBYTE *data = SER_DATA(s) + start;
-    memmove(data, data + quantity, total - (start + quantity));
-    TERM_SERIES(s);
+    memmove(
+        data,
+        data + (quantity * SER_WIDE(s)),
+        total - (start + (quantity * SER_WIDE(s)))
+    );
+    SET_SERIES_USED(s, used_old - quantity);
 }
 
 
@@ -315,6 +252,8 @@ void Remove_Any_Series_Len(REBVAL *v, REBLEN index, REBINT len)
     }
     else  // ANY-ARRAY! is more straightforward
         Remove_Series_Units(VAL_SERIES_ENSURE_MUTABLE(v), index, len);
+
+    ASSERT_SERIES_TERM_IF_NEEDED(VAL_SERIES(v));
 }
 
 
@@ -337,7 +276,7 @@ void Unbias_Series(REBSER *s, bool keep)
 
     if (keep) {
         memmove(s->content.dynamic.data, data, SER_USED(s) * SER_WIDE(s));
-        TERM_SERIES(s);
+        TERM_SERIES_IF_NECESSARY(s);
     }
 }
 
@@ -351,8 +290,8 @@ void Unbias_Series(REBSER *s, bool keep)
 void Reset_Array(REBARR *a)
 {
     if (IS_SER_DYNAMIC(a))
-        Unbias_Series(SER(a), false);
-    TERM_ARRAY_LEN(a, 0);
+        Unbias_Series(a, false);
+    SET_SERIES_LEN(a, 0);
 }
 
 
@@ -368,12 +307,12 @@ void Clear_Series(REBSER *s)
 
     if (IS_SER_DYNAMIC(s)) {
         Unbias_Series(s, false);
-        CLEAR(s->content.dynamic.data, SER_REST(s) * SER_WIDE(s));
+        memset(s->content.dynamic.data, 0, SER_REST(s) * SER_WIDE(s));
     }
     else
-        CLEAR(cast(REBYTE*, &s->content), sizeof(s->content));
+        memset(cast(REBYTE*, &s->content), 0, sizeof(s->content));
 
-    TERM_SERIES(s);
+    TERM_SERIES_IF_NECESSARY(s);
 }
 
 
@@ -406,23 +345,21 @@ REBYTE *Reset_Buffer(REBSER *buf, REBLEN len)
 void Assert_Series_Term_Core(const REBSER *s)
 {
     if (IS_SER_ARRAY(s)) {
-        //
-        // END values aren't canonized to zero bytes, check IS_END explicitly
-        //
         const RELVAL *tail = ARR_TAIL(ARR(s));
         if (NOT_END(tail))
             panic (tail);
     }
-    else {
-        // If they are terminated, then non-REBVAL-bearing series must have
-        // their terminal element as all 0 bytes (to use this check)
-        //
-        REBSIZ used = SER_USED(s); // counts bytes if UTF-8, not codepoints
-        REBYTE wide = SER_WIDE(s);
-        REBLEN n;
-        for (n = 0; n < wide; n++) {
-            if (0 != SER_DATA(s)[(used * wide) + n])
+    else if (SER_WIDE(s) == 1) {
+        const REBYTE *tail = BIN_TAIL(BIN(s));
+        if (IS_SER_UTF8(s)) {
+            if (*tail != '\0')
                 panic (s);
+        }
+        else {
+          #if !defined(NDEBUG)
+            if (*tail != BINARY_BAD_UTF8_TAIL_BYTE && *tail != '\0')
+                panic (s);
+          #endif
         }
     }
 }
@@ -437,12 +374,13 @@ void Assert_Series_Core(const REBSER *s)
         panic (s);
 
     assert(
-        GET_SERIES_INFO(s, 0_IS_TRUE) // @ NODE_FLAG_NODE
-        and NOT_SERIES_INFO(s, 1_IS_FALSE) // @ NOT(NODE_FLAG_FREE)
-        and NOT_SERIES_INFO(s, 7_IS_FALSE) // @ NODE_FLAG_CELL
+        GET_SERIES_INFO(s, 0_IS_TRUE)  // NODE_FLAG_NODE
+        and NOT_SERIES_INFO(s, 1_IS_FALSE)  // NOT(NODE_FLAG_FREE)
+        and GET_SERIES_INFO(s, 7_IS_TRUE)  // NODE_FLAG_CELL
     );
 
-    assert(SER_USED(s) < SER_REST(s));
+    assert(SER_FLAVOR(s) != FLAVOR_TRASH);
+    assert(SER_USED(s) <= SER_REST(s));
 
     Assert_Series_Term_Core(s);
 }
@@ -462,7 +400,7 @@ ATTRIBUTE_NO_RETURN void Panic_Series_Debug(REBSER *s)
     fflush(stdout);
     fflush(stderr);
 
-    if (s->header.bits & NODE_FLAG_MANAGED)
+    if (s->leader.bits & NODE_FLAG_MANAGED)
         fprintf(stderr, "managed");
     else
         fprintf(stderr, "unmanaged");
@@ -471,7 +409,7 @@ ATTRIBUTE_NO_RETURN void Panic_Series_Debug(REBSER *s)
 
   #if defined(DEBUG_COUNT_TICKS)
     fprintf(stderr, " was likely ");
-    if (s->header.bits & NODE_FLAG_FREE)
+    if (s->leader.bits & NODE_FLAG_FREE)
         fprintf(stderr, "freed");
     else
         fprintf(stderr, "created");

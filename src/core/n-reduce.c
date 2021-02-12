@@ -31,7 +31,7 @@
 //
 //      return: "New array or value"
 //          [<opt> any-value!]
-//      :predicate "Applied after evaluation, default is .NON.NULL"
+//      'predicate "Applied after evaluation, default is .IDENTITY"
 //          [<skip> predicate! action!]
 //      value "GROUP! and BLOCK! evaluate each item, single values evaluate"
 //          [any-value!]
@@ -65,7 +65,7 @@ REBNATIVE(reduce)
     REBDSP dsp_orig = DSP;
 
     DECLARE_FEED_AT (feed, v);
-    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(nullptr, f);
 
@@ -86,56 +86,40 @@ REBNATIVE(reduce)
             continue;  // `reduce [comment "hi"]`
         }
 
-        // Try and do some optimized dispatch for common combinations of
-        // functions with REDUCE (.identity, .try, .opt).  Bear in mind that
-        // the CFUNC* must be checked explicitly vs. the REBACT* identity,
-        // otherwise a HIJACK might be overlooked.
-
-        REBNAT dispatcher = IS_NULLED(predicate)
-            ? nullptr
-            : ACT_DISPATCHER(VAL_ACTION(predicate));
-
-        if (not dispatcher) {  // act as NON NULL, so error on NULLs
-            if (IS_NULLED(D_OUT))
-                fail (Error_Need_Non_Null_Raw(v));
-
-            Move_Value(DS_PUSH(), D_OUT);
-        }
-        else if (dispatcher == &N_identity) {  // NULLs dissolve
-            if (not IS_NULLED(D_OUT))
-                Move_Value(DS_PUSH(), D_OUT);
-        }
-        else if (dispatcher == &N_opt) {  // NULLs and BLANK!s dissolve
-            if (not IS_NULLED_OR_BLANK(D_OUT))
-                Move_Value(DS_PUSH(), D_OUT);
-        }
-        else if (dispatcher == &N_try) {  // turn NULL into BLANK!
-            if (IS_NULLED(D_OUT))
-                Init_Blank(DS_PUSH());
-            else
-                Move_Value(DS_PUSH(), D_OUT);
-        }
-        else if (dispatcher == &N_voidify) {  // turn NULL into VOID!
-            if (IS_NULLED(D_OUT))
-                Init_Void(DS_PUSH(), SYM_NULLED);
-            else
-                Move_Value(DS_PUSH(), D_OUT);
-        }
-        else {  // no optimization for general cases
-            REBVAL *processed = rebValue(ARG(predicate), rebQ(D_OUT), rebEND);
+        if (not IS_NULLED(ARG(predicate))) {  // post-process result if needed
+            REBVAL *processed = rebValue(
+                rebINLINE(predicate), rebQ(D_OUT),
+            rebEND);
             if (processed)
-                Move_Value(DS_PUSH(), processed);
+                Copy_Cell(D_OUT, processed);
+            else
+                Init_Nulled(D_OUT);
             rebRelease(processed);
         }
 
-        if (line)
-            SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
+        // Ren-C breaks with historical precedent in making the default
+        // for REDUCE to not strictly output a number of results equal
+        // to the number of input expressions, as NULL is "non-valued":
+        //
+        //     >> append [<a> <b>] reduce [<c> if false [<d>]]
+        //     == [<a> <b> <c>]  ; two expressions added just one result
+        //
+        // A predicate like .NON.NULL could error on NULLs, or they could
+        // be converted to blanks/etc.  See rationale for the change:
+        //
+        // https://forum.rebol.info/t/what-should-do-do/1426
+        //
+        if (not IS_NULLED(D_OUT)) {
+            Copy_Cell(DS_PUSH(), D_OUT);
+            if (line)
+                SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
+        }
     } while (NOT_END(f_value));
 
     Drop_Frame_Unbalanced(f);  // Drop_Frame() asserts on accumulation
 
     REBFLGS pop_flags = NODE_FLAG_MANAGED | ARRAY_MASK_HAS_FILE_LINE;
-    if (GET_ARRAY_FLAG(VAL_ARRAY(v), NEWLINE_AT_TAIL))
+    if (GET_SUBCLASS_FLAG(ARRAY, VAL_ARRAY(v), NEWLINE_AT_TAIL))
         pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
 
     return Init_Any_Array(
@@ -155,7 +139,7 @@ bool Match_For_Compose(const RELVAL *group, const REBVAL *label) {
     if (VAL_LEN_AT(group) == 0) // you have a pattern, so leave `()` as-is
         return false;
 
-    const RELVAL *first = VAL_ARRAY_AT(group);
+    const RELVAL *first = VAL_ARRAY_ITEM_AT(group);
     if (VAL_TYPE(first) != VAL_TYPE(label))
         return false;
 
@@ -216,7 +200,7 @@ REB_R Compose_To_Stack_Core(
     if (ANY_PATH(composee))
         rebRelease(cast(REBVAL*, m_cast(RELVAL*, any_array)));
 
-    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(nullptr, f);
 
@@ -246,7 +230,7 @@ REB_R Compose_To_Stack_Core(
             // find compositions inside it if /DEEP and it's an array
         }
         else if (not only and Is_Any_Doubled_Group(f_value)) {
-            const RELVAL *inner = VAL_ARRAY_AT(f_value);
+            const RELVAL *inner = VAL_ARRAY_ITEM_AT(f_value);  // 1 item
             if (Match_For_Compose(inner, label)) {
                 doubled_group = true;
                 match = inner;
@@ -267,23 +251,26 @@ REB_R Compose_To_Stack_Core(
             //
             DECLARE_FEED_AT_CORE (subfeed, match, match_specifier);
             if (not IS_NULLED(label))
-                Fetch_Next_In_Feed(subfeed, false);  // wasn't possibly at END
+                Fetch_Next_In_Feed(subfeed);  // wasn't possibly at END
 
             Init_Nulled(out);  // want empty `()` to vanish as a null would
-            if (Do_Feed_To_End_Maybe_Stale_Throws(out, subfeed)) {
+            if (Do_Feed_To_End_Maybe_Stale_Throws(
+                out,
+                subfeed,
+                EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+            )){
                 DS_DROP_TO(dsp_orig);
                 Abort_Frame(f);
                 return R_THROWN;
             }
-            CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
+            CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
 
             REBVAL *insert;
             if (
                 predicate
                 and not doubled_group
-                and VAL_ACTION(predicate) != NATIVE_ACT(identity)
             ){
-                insert = rebValue(predicate, rebQ(out), rebEND);
+                insert = rebValue(rebINLINE(predicate), rebQ(out), rebEND);
             } else
                 insert = IS_NULLED(out) ? nullptr : out;
 
@@ -305,7 +292,8 @@ REB_R Compose_To_Stack_Core(
                 if (quotes != 0 or heart != REB_GROUP)
                     fail ("Currently can only splice plain unquoted GROUP!s");
 
-                const RELVAL *push = VAL_ARRAY_AT(insert);
+                const RELVAL *push_tail;
+                const RELVAL *push = VAL_ARRAY_AT(&push_tail, insert);
                 if (NOT_END(push)) {
                     //
                     // Only proxy newline flag from the template on *first*
@@ -321,7 +309,7 @@ REB_R Compose_To_Stack_Core(
                     else
                         CLEAR_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
 
-                    while (++push, NOT_END(push))
+                    while (++push, push != push_tail)
                         Derelativize(DS_PUSH(), push, VAL_SPECIFIER(insert));
                 }
             }
@@ -335,7 +323,7 @@ REB_R Compose_To_Stack_Core(
                 if (insert == nullptr)
                     Init_Nulled(DS_PUSH());
                 else
-                    Move_Value(DS_PUSH(), insert);  // can't stack eval direct
+                    Copy_Cell(DS_PUSH(), insert);  // can't stack eval direct
 
                 if (heart == REB_SET_GROUP)
                     Setify(DS_TOP);
@@ -413,14 +401,14 @@ REB_R Compose_To_Stack_Core(
 
                     fail (Error_Bad_Sequence_Init(DS_TOP));
                 }
-                Move_Value(DS_PUSH(), temp);
+                Copy_Cell(DS_PUSH(), temp);
             }
             else {
                 REBFLGS pop_flags
                     = NODE_FLAG_MANAGED
                     | ARRAY_MASK_HAS_FILE_LINE;
 
-                if (GET_ARRAY_FLAG(VAL_ARRAY(cell), NEWLINE_AT_TAIL))
+                if (GET_SUBCLASS_FLAG(ARRAY, VAL_ARRAY(cell), NEWLINE_AT_TAIL))
                     pop_flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
 
                 REBARR *popped = Pop_Stack_Values_Core(dsp_deep, pop_flags);
@@ -456,9 +444,9 @@ REB_R Compose_To_Stack_Core(
 //  {Evaluates only contents of GROUP!-delimited expressions in an array}
 //
 //      return: [blackhole! any-array! any-path! any-word! action!]
-//      :predicate [<skip> action!]  ; !!! PATH! may be meant as value (!)
+//      'predicate [<skip> action!]  ; !!! PATH! may be meant as value (!)
 //          "Function to run on composed slots (default: ENBLOCK)"
-//      :label "Distinguish compose groups, e.g. [(plain) (<*> composed)]"
+//      'label "Distinguish compose groups, e.g. [(plain) (<*> composed)]"
 //          [<skip> tag! file!]
 //      value "The template to fill in (no-op if WORD!, ACTION! or SPACE!)"
 //          [blackhole! any-array! any-path! any-word! action!]
@@ -491,7 +479,7 @@ REBNATIVE(compose)
         VAL_SPECIFIER(ARG(value)),
         ARG(label),
         did REF(deep),
-        NULLIFY_NULLED(predicate),
+        REF(predicate),
         did REF(only)
     );
 
@@ -529,7 +517,7 @@ REBNATIVE(compose)
     // flags.  Borrow the one for the tail directly from the input REBARR.
     //
     REBFLGS flags = NODE_FLAG_MANAGED | ARRAY_MASK_HAS_FILE_LINE;
-    if (GET_ARRAY_FLAG(VAL_ARRAY(ARG(value)), NEWLINE_AT_TAIL))
+    if (GET_SUBCLASS_FLAG(ARRAY, VAL_ARRAY(ARG(value)), NEWLINE_AT_TAIL))
         flags |= ARRAY_FLAG_NEWLINE_AT_TAIL;
 
     REBARR *popped = Pop_Stack_Values_Core(dsp_orig, flags);
@@ -547,15 +535,20 @@ enum FLATTEN_LEVEL {
 
 static void Flatten_Core(
     RELVAL *head,
+    const RELVAL *tail,
     REBSPC *specifier,
     enum FLATTEN_LEVEL level
 ) {
     RELVAL *item = head;
-    for (; NOT_END(item); ++item) {
+    for (; item != tail; ++item) {
         if (IS_BLOCK(item) and level != FLATTEN_NOT) {
             REBSPC *derived = Derive_Specifier(specifier, item);
+
+            const RELVAL *sub_tail;
+            RELVAL *sub = VAL_ARRAY_AT_ENSURE_MUTABLE(&sub_tail, item);
             Flatten_Core(
-                VAL_ARRAY_AT_ENSURE_MUTABLE(item),
+                sub,
+                sub_tail,
                 derived,
                 level == FLATTEN_ONCE ? FLATTEN_NOT : FLATTEN_DEEP
             );
@@ -584,8 +577,11 @@ REBNATIVE(flatten)
 
     REBDSP dsp_orig = DSP;
 
+    const RELVAL *tail;
+    RELVAL *at = VAL_ARRAY_AT_ENSURE_MUTABLE(&tail, ARG(block));
     Flatten_Core(
-        VAL_ARRAY_AT_ENSURE_MUTABLE(ARG(block)),
+        at,
+        tail,
         VAL_SPECIFIER(ARG(block)),
         REF(deep) ? FLATTEN_DEEP : FLATTEN_ONCE
     );

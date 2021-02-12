@@ -43,11 +43,11 @@
 
 ; Plain voids cause an error, quoted voids match literal voids
 (
-    foo: ~void~
+    foo: '~void~
     e: trap [parse "a" [foo]]
     e/id = 'need-non-void
 )(
-    foo: quote ~void~
+    foo: quote '~void~
     did parse [~void~] [foo end]
 )
 
@@ -255,15 +255,6 @@
     o/a = s
 )]
 
-; A couple of tests for the problematic DO operation
-
-(did parse [1 + 2] [do [lit 3]])
-(did parse [1 + 2] [do integer!])
-(did parse [1 + 2] [do [integer!]])
-(not parse [1 + 2] [do [lit 100]])
-(did parse [reverse copy [a b c]] [do [into ['c 'b 'a]]])
-(not parse [reverse copy [a b c]] [do [into ['a 'b 'c]]])
-
 ; AHEAD and AND are synonyms
 ;
 (did parse ["aa"] [ahead text! into ["a" "a"]])
@@ -293,12 +284,6 @@
     parse "a" [any [(i: i + 1 j: if i = 2 [[end skip]]) j]]
     i == 2
 )
-
-; Use experimental MATCH to get input on success, see #2165
-; !!! This is a speculative feature, and is not confirmed for Beta/One
-
-("abc" = match parse "abc" ["a" "b" "c"])
-(null? match parse "abc" ["a" "b" "d"])
 
 
 ; GET-GROUP!
@@ -350,12 +335,11 @@
 (did parse [... [a b]] [thru '[a b]])
 (did parse [1 1 1] [some '1])
 
-; Quote level is currently retained by the return value, but not by the
-; captured content.
+; Quote level is not retained by captured content
 ;
 (did all [
-    [_ pos]: parse lit ''[1 + 2] [copy x to end]
-    (lit ''[]) == pos
+    [_ pos]: parse [''[1 + 2]] [into [copy x to end]]
+    [] == pos
     x == [1 + 2]
 ])
 

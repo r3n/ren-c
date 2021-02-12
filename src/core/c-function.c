@@ -26,9 +26,6 @@
 
 
 struct Params_Of_State {
-    REBARR *arr;
-    REBLEN num_visible;
-    RELVAL *dest;
     bool just_words;
 };
 
@@ -38,38 +35,27 @@ struct Params_Of_State {
 // !!! See notes on Is_Param_Hidden() for why caller isn't filtering locals.
 //
 static bool Params_Of_Hook(
-    REBVAL *param,
+    const REBKEY *key,
+    const REBPAR *param,
     REBFLGS flags,
     void *opaque
 ){
     struct Params_Of_State *s = cast(struct Params_Of_State*, opaque);
 
-    if (not (flags & PHF_SORTED_PASS)) {
-        ++s->num_visible;  // first pass we just count unspecialized params
-        return true;
-    }
-
-    if (not s->arr) {  // if first step on second pass, make the array
-        s->arr = Make_Array(s->num_visible);
-        s->dest = ARR_HEAD(s->arr);
-    }
-
-    Init_Any_Word(s->dest, REB_WORD, VAL_PARAM_SPELLING(param));
+    Init_Word(DS_PUSH(), KEY_SYMBOL(key));
 
     if (not s->just_words) {
         if (
             not (flags & PHF_UNREFINED)
             and TYPE_CHECK(param, REB_TS_REFINEMENT)
         ){
-            Refinify(SPECIFIC(s->dest));
+            Refinify(DS_TOP);
         }
 
         switch (VAL_PARAM_CLASS(param)) {
+          case REB_P_RETURN:
+          case REB_P_OUTPUT:
           case REB_P_NORMAL:
-            break;
-
-          case REB_P_HARD_QUOTE:
-            Getify(SPECIFIC(s->dest));
             break;
 
           case REB_P_MODAL:
@@ -77,11 +63,19 @@ static bool Params_Of_Hook(
                 // associated refinement specialized out
             }
             else
-                Symify(SPECIFIC(s->dest));
+                Symify(DS_TOP);
             break;
 
-          case REB_P_SOFT_QUOTE:
-            Quotify(SPECIFIC(s->dest), 1);
+          case REB_P_SOFT:
+            Getify(DS_TOP);
+            break;
+
+          case REB_P_MEDIUM:
+            Quotify(Getify(DS_TOP), 1);
+            break;
+
+          case REB_P_HARD:
+            Quotify(DS_TOP, 1);
             break;
 
           default:
@@ -90,7 +84,6 @@ static bool Params_Of_Hook(
         }
     }
 
-    ++s->dest;
     return true;
 }
 
@@ -102,73 +95,13 @@ static bool Params_Of_Hook(
 REBARR *Make_Action_Parameters_Arr(REBACT *act, bool just_words)
 {
     struct Params_Of_State s;
-    s.arr = nullptr;
-    s.num_visible = 0;
     s.just_words = just_words;
 
+    REBDSP dsp_orig = DSP;
     For_Each_Unspecialized_Param(act, &Params_Of_Hook, &s);
-
-    if (not s.arr)
-        return Make_Array(1); // no unspecialized parameters, empty array
-
-    TERM_ARRAY_LEN(s.arr, s.num_visible);
-    ASSERT_ARRAY(s.arr);
-    return s.arr;
+    return Pop_Stack_Values(dsp_orig);
 }
 
-
-static bool Typesets_Of_Hook(
-    REBVAL *param,
-    REBFLGS flags,
-    void *opaque
-){
-    struct Params_Of_State *s = cast(struct Params_Of_State*, opaque);
-
-    if (not (flags & PHF_SORTED_PASS)) {
-        ++s->num_visible;  // first pass we just count unspecialized params
-        return true;
-    }
-
-    if (not s->arr) {  // if first step on second pass, make the array
-        s->arr = Make_Array(s->num_visible);
-        s->dest = ARR_HEAD(s->arr);
-    }
-
-    // It's already a typeset, but remove the parameter spelling.
-    //
-    // !!! Typesets must be revisited in a world with user-defined types, as
-    // well as to accomodate multiple quoting levels.
-    //
-    Move_Value(s->dest, param);
-    assert(IS_TYPESET(s->dest));
-    VAL_TYPESET_STRING_NODE(s->dest) = nullptr;
-    ++s->dest;
-
-    return true;
-}
-
-//
-//  Make_Action_Typesets_Arr: C
-//
-// Return a block of function arg typesets.
-// Note: skips 0th entry.
-//
-REBARR *Make_Action_Typesets_Arr(REBACT *act)
-{
-    struct Params_Of_State s;
-    s.arr = nullptr;
-    s.num_visible = 0;
-    s.just_words = false;  // (ignored)
-
-    For_Each_Unspecialized_Param(act, &Typesets_Of_Hook, &s);
-
-    if (not s.arr)
-        return Make_Array(1); // no unspecialized parameters, empty array
-
-    TERM_ARRAY_LEN(s.arr, s.num_visible);
-    ASSERT_ARRAY(s.arr);
-    return s.arr;
-}
 
 
 enum Reb_Spec_Mode {
@@ -177,6 +110,14 @@ enum Reb_Spec_Mode {
     SPEC_MODE_WITH // words are "extern"
 };
 
+
+#define KEY_SLOT(dsp)       DS_AT((dsp) - 3)
+#define PARAM_SLOT(dsp)     DS_AT((dsp) - 2)
+#define TYPES_SLOT(dsp)     DS_AT((dsp) - 1)
+#define NOTES_SLOT(dsp)     DS_AT(dsp)
+
+#define PUSH_SLOTS() \
+    do { DS_PUSH(); DS_PUSH(); DS_PUSH(); DS_PUSH(); } while (0)
 
 //
 //  Push_Paramlist_Triads_May_Fail: C
@@ -189,7 +130,6 @@ enum Reb_Spec_Mode {
 void Push_Paramlist_Triads_May_Fail(
     const REBVAL *spec,
     REBFLGS *flags,
-    REBDSP dsp_orig,
     REBDSP *definitional_return_dsp
 ){
     assert(IS_BLOCK(spec));
@@ -198,10 +138,11 @@ void Push_Paramlist_Triads_May_Fail(
 
     bool refinement_seen = false;
 
-    const RELVAL* value = VAL_ARRAY_AT(spec);
+    const RELVAL *tail;
+    const RELVAL *value = VAL_ARRAY_AT(&tail, spec);
 
-    while (NOT_END(value)) {
-        const RELVAL* item = value;  // "faked", e.g. <return> => RETURN:
+    while (value != tail) {
+        const RELVAL* item = value;  // "faked"
         ++value;  // go ahead and consume next
 
     //=//// STRING! FOR FUNCTION DESCRIPTION OR PARAMETER NOTE ////////////=//
@@ -215,21 +156,20 @@ void Push_Paramlist_Triads_May_Fail(
             if (mode == SPEC_MODE_WITH)
                 continue;
 
-            if (IS_PARAM(DS_TOP))
-                Move_Value(DS_PUSH(), EMPTY_BLOCK);  // need block in position
+            STKVAL(*) notes = NOTES_SLOT(DSP);
+            assert(
+                IS_NULLED(notes)  // hasn't been written to yet
+                or IS_TEXT(notes)  // !!! we overwrite, but should we append?
+            );
 
-            if (IS_BLOCK(DS_TOP)) {  // in right spot to push notes/title
-                Init_Text(DS_PUSH(), Copy_String_At(item));
-            }
-            else {  // !!! A string was already pushed.  Should we append?
-                assert(IS_TEXT(DS_TOP));
-                Init_Text(DS_TOP, Copy_String_At(item));
-            }
-
-            if (DS_TOP == DS_AT(dsp_orig + 3))
+            if (IS_VOID(KEY_SLOT(DSP))) {  // no keys seen, act as description
+                Init_Text(notes, Copy_String_At(item));
                 *flags |= MKF_HAS_DESCRIPTION;
-            else
+            }
+            else {
+                Init_Text(notes, Copy_String_At(item));
                 *flags |= MKF_HAS_NOTES;
+            }
 
             continue;
         }
@@ -263,83 +203,71 @@ void Push_Paramlist_Triads_May_Fail(
                 goto process_typeset_block;
             }
             else
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
         }
 
     //=//// BLOCK! OF TYPES TO MAKE TYPESET FROM (PLUS PARAMETER TAGS) ////=//
 
         if (IS_BLOCK(item)) {
           process_typeset_block:
-            if (IS_BLOCK(DS_TOP)) // two blocks of types!
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+            if (IS_VOID(KEY_SLOT(DSP)))  // too early, `func [[integer!] {!}]`
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
-            // You currently can't say `<local> x [integer!]`, because they
-            // are always void when the function runs.  You can't say
-            // `<with> x [integer!]` because "externs" don't have param slots
-            // to store the type in.
-            //
-            // !!! A type constraint on a <with> parameter might be useful,
-            // though--and could be achieved by adding a type checker into
-            // the body of the function.  However, that would be more holistic
-            // than this generation of just a paramlist.  Consider for future.
-            //
-            if (mode != SPEC_MODE_NORMAL)
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+            STKVAL(*) types = TYPES_SLOT(DSP);
 
-            // Save the block for parameter types.
-            //
-            REBVAL* param;
-            if (IS_PARAM(DS_TOP)) {
-                REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
-                Init_Block(
-                    DS_PUSH(),
-                    Copy_Array_At_Deep_Managed(
-                        VAL_ARRAY(item),
-                        VAL_INDEX(item),
-                        derived
-                    )
-                );
+            if (IS_BLOCK(types))  // too many, `func [x [void!] [blank!]]`
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
-                param = DS_TOP - 1;  // volatile if you DS_PUSH()!
+            assert(IS_NULLED(types));
+
+            // You currently can't say `<local> x [integer!]`, because locals
+            // are hidden from the interface, and hidden values (notably
+            // specialized-out values) use the `param` slot for the value,
+            // not type information.  So local has `~unset~ in that slot.
+            //
+            // Even if you could give locals a type, it could only be given
+            // a meaning if it were used to check assignments during the
+            // function.  There's currently no mechanism for doing that.
+            //
+            // You can't say `<with> y [integer!]` either...though it might
+            // be a nice feature to check the type of an imported value at
+            // the time of calling.
+            //
+            if (mode != SPEC_MODE_NORMAL)  // <local> <with>
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
+
+            STKVAL(*) param = PARAM_SLOT(DSP);
+
+            if (
+                GET_CELL_FLAG(param, STACK_NOTE_LOCAL)
+                and VAL_WORD_ID(KEY_SLOT(DSP)) == SYM_RETURN
+            ){
+                continue;  // !!! allow because of RETURN, still figuring... 
             }
-            else {
-                assert(IS_TEXT(DS_TOP));  // !!! are blocks after notes good?
 
-                if (IS_VOID_RAW(DS_TOP - 2)) {
-                    //
-                    // No parameters pushed, e.g. func [[integer!] {<-- bad}]
-                    //
-                    fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
-                }
-
-                assert(IS_PARAM(DS_TOP - 2));
-                param = DS_TOP - 2;
-
-                assert(IS_BLOCK(DS_TOP - 1));
-                if (VAL_ARRAY(DS_TOP - 1) != EMPTY_ARRAY)
-                    fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
-
-                REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
-                Init_Block(
-                    DS_TOP - 1,
-                    Copy_Array_At_Deep_Managed(
-                        VAL_ARRAY(item),
-                        VAL_INDEX(item),
-                        derived
-                    )
-                );
-            }
+            REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
+            Init_Block(
+                types,
+                Copy_Array_At_Deep_Managed(
+                    VAL_ARRAY(item),
+                    VAL_INDEX(item),
+                    derived
+                )
+            );
 
             // Turn block into typeset for parameter at current index.
             // Leaves VAL_TYPESET_SYM as-is.
-            //
+
             bool was_refinement = TYPE_CHECK(param, REB_TS_REFINEMENT);
-            REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
             VAL_TYPESET_LOW_BITS(param) = 0;
             VAL_TYPESET_HIGH_BITS(param) = 0;
+            
+            const RELVAL *types_tail;
+            const RELVAL *types_at = VAL_ARRAY_AT(&types_tail, item);
             Add_Typeset_Bits_Core(
-                param,
-                ARR_HEAD(VAL_ARRAY(item)),
+                cast_PAR(param),
+                types_at,
+                types_tail,
                 derived
             );
             if (was_refinement)
@@ -354,19 +282,20 @@ void Push_Paramlist_Triads_May_Fail(
         bool quoted = false;  // single quoting level used as signal in spec
         if (VAL_NUM_QUOTES(item) > 0) {
             if (VAL_NUM_QUOTES(item) > 1)
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
             quoted = true;
         }
 
         REBCEL(const*) cell = VAL_UNESCAPED(item);
+        enum Reb_Kind kind = CELL_KIND(cell);
 
-        const REBSTR* spelling;
-        Reb_Param_Class pclass = REB_P_DETECT;
+        const REBSYM* symbol = nullptr;  // avoids compiler warning
+        enum Reb_Param_Class pclass = REB_P_DETECT;  // error if not changed
 
         bool refinement = false;  // paths with blanks at head are refinements
-        if (ANY_PATH_KIND(CELL_KIND(cell))) {
+        if (ANY_PATH_KIND(kind)) {
             if (not IS_REFINEMENT_CELL(cell))
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
             refinement = true;
             refinement_seen = true;
@@ -378,64 +307,97 @@ void Push_Paramlist_Triads_May_Fail(
             //
             mode = SPEC_MODE_NORMAL;
 
-            spelling = VAL_REFINEMENT_SPELLING(cell);
-            if (STR_SYMBOL(spelling) == SYM_LOCAL)  // /LOCAL
+            symbol = VAL_REFINEMENT_SYMBOL(cell);
+            if (ID_OF_SYMBOL(symbol) == SYM_LOCAL)  // /LOCAL
                 if (ANY_WORD_KIND(KIND3Q_BYTE(item + 1)))  // END is 0
                     fail (Error_Legacy_Local_Raw(spec));  // -> <local>
 
             if (CELL_KIND(cell) == REB_GET_PATH) {
-                if (not quoted)
-                    pclass = REB_P_HARD_QUOTE;
+                if (quoted)
+                    pclass = REB_P_MEDIUM;
+                else
+                    pclass = REB_P_SOFT;
             }
             else if (CELL_KIND(cell) == REB_PATH) {
                 if (quoted)
-                    pclass = REB_P_SOFT_QUOTE;
+                    pclass = REB_P_HARD;
                 else
                     pclass = REB_P_NORMAL;
             }
         }
-        else if (ANY_WORD_KIND(CELL_KIND(cell))) {
-            spelling = VAL_WORD_SPELLING(cell);
-            if (CELL_KIND(cell) == REB_SET_WORD) {
-                if (not quoted)
-                    pclass = REB_P_LOCAL;
+        else if (ANY_TUPLE_KIND(kind)) {
+            //
+            // !!! Tuples are theorized as a way to "name parameters out of
+            // the way" so there can be an interface name, but then a local
+            // name...so that something like /ALL can be named out of the
+            // way without disrupting use of ALL.  That's not implemented yet,
+            // but it's now another way to name locals.
+            //
+            if (IS_PREDICATE1_CELL(cell) and not quoted) {
+                pclass = REB_P_LOCAL;
+                symbol = VAL_PREDICATE1_SYMBOL(cell);
+            }
+        }
+        else if (ANY_WORD_KIND(kind)) {
+            symbol = VAL_WORD_SYMBOL(cell);
+
+            if (kind == REB_SET_WORD) {
+                //
+                // Outputs are set to refinements, and that includes RETURN,
+                // because if it were set to a local there would be nowhere
+                // to put its type information.  The information is resident
+                // in the unspecialized slot.  This is under review.
+                //
+                if (VAL_WORD_ID(cell) == SYM_RETURN and not quoted) {
+                    refinement = true;  // sets REB_TS_REFINEMENT (optional)
+                    pclass = REB_P_RETURN;
+                }
+                else if (not quoted) {
+                    refinement = true;  // sets REB_TS_REFINEMENT (optional)
+                    pclass = REB_P_OUTPUT;
+                }
             }
             else {
-                if (refinement_seen and mode == SPEC_MODE_NORMAL)
+                if (  // let RETURN: presence indicate you know new rules
+                    refinement_seen and mode == SPEC_MODE_NORMAL
+                    and *definitional_return_dsp == 0
+                ){
                     fail (Error_Legacy_Refinement_Raw(spec));
-
-                if (CELL_KIND(cell) == REB_GET_WORD) {
-                    if (not quoted)
-                        pclass = REB_P_HARD_QUOTE;
                 }
-                else if (CELL_KIND(cell) == REB_WORD) {
+
+                if (kind == REB_GET_WORD) {
                     if (quoted)
-                        pclass = REB_P_SOFT_QUOTE;
+                        pclass = REB_P_MEDIUM;
+                    else
+                        pclass = REB_P_SOFT;
+                }
+                else if (kind == REB_WORD) {
+                    if (quoted)
+                        pclass = REB_P_HARD;
                     else
                         pclass = REB_P_NORMAL;
                 }
-                else if (CELL_KIND(cell) == REB_SYM_WORD) {
+                else if (kind == REB_SYM_WORD) {
                     if (not quoted)
                         pclass = REB_P_MODAL;
                 }
             }
         }
         else
-            fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+            fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
         if (pclass == REB_P_DETECT)  // didn't match
-            fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+            fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
         if (mode != SPEC_MODE_NORMAL) {
             if (pclass != REB_P_NORMAL and pclass != REB_P_LOCAL)
-                fail (Error_Bad_Func_Def_Core(item, VAL_SPECIFIER(spec)));
+                fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
             if (mode == SPEC_MODE_LOCAL)
                 pclass = REB_P_LOCAL;
         }
 
-        const REBSTR* canon = STR_CANON(spelling);
-        if (STR_SYMBOL(canon) == SYM_RETURN and pclass != REB_P_LOCAL) {
+        if (ID_OF_SYMBOL(symbol) == SYM_RETURN and pclass != REB_P_RETURN) {
             //
             // Cancel definitional return if any non-SET-WORD! uses the name
             // RETURN when defining a FUNC.
@@ -454,14 +416,15 @@ void Push_Paramlist_Triads_May_Fail(
         if (mode == SPEC_MODE_WITH)
             continue;
 
-        // In rhythm of TYPESET! BLOCK! TEXT! we want to be on a string spot
-        // at the time of the push of each new typeset.
+        // Pushing description values for a new named element...
         //
-        if (IS_PARAM(DS_TOP))
-            Move_Value(DS_PUSH(), EMPTY_BLOCK);
-        if (IS_BLOCK(DS_TOP))
-            Move_Value(DS_PUSH(), EMPTY_TEXT);
-        assert(IS_TEXT(DS_TOP));
+        PUSH_SLOTS();
+
+        Init_Word(KEY_SLOT(DSP), symbol);
+        Init_Nulled(TYPES_SLOT(DSP));  // may or may not add later
+        Init_Nulled(NOTES_SLOT(DSP));  // may or may not add later
+
+        STKVAL(*) param = PARAM_SLOT(DSP);
 
         // Non-annotated arguments disallow ACTION!, VOID! and NULL.  Not
         // having to worry about ACTION! and NULL means by default, code
@@ -475,26 +438,20 @@ void Push_Paramlist_Triads_May_Fail(
         // But Is_Param_Endable() indicates <end>.
 
         if (pclass == REB_P_LOCAL) {
-            Init_Param(
-                DS_PUSH(),
-                REB_P_LOCAL,
-                spelling,  // don't canonize, see #2258
-                TS_OPT_VALUE
-            );
+            Init_Void(param, SYM_UNSET);
+            SET_CELL_FLAG(param, STACK_NOTE_LOCAL);
         }
         else if (refinement) {
             Init_Param(
-                DS_PUSH(),
+                param,
                 pclass,
-                spelling,  // don't canonize, see #2258
                 FLAGIT_KIND(REB_TS_REFINEMENT)  // must preserve if type block
             );
         }
         else
             Init_Param(
-                DS_PUSH(),
+                param,
                 pclass,
-                spelling,  // don't canonize, see #2258
                 TS_OPT_VALUE  // By default <opt> ANY-VALUE! is legal
             );
 
@@ -508,14 +465,14 @@ void Push_Paramlist_Triads_May_Fail(
         // ...although `return:` is explicitly tolerated ATM for compatibility
         // (despite violating the "pure locals are NULL" premise)
         //
-        if (STR_SYMBOL(canon) == SYM_RETURN) {
+        if (symbol == Canon(SYM_RETURN)) {
             if (*definitional_return_dsp != 0) {
                 DECLARE_LOCAL(word);
-                Init_Word(word, canon);
+                Init_Word(word, symbol);
                 fail (Error_Dup_Vars_Raw(word));  // most dup checks are later
             }
-            if (pclass == REB_P_LOCAL)
-                *definitional_return_dsp = DSP;  // RETURN: explicit, tolerate
+            if (pclass == REB_P_RETURN)
+                *definitional_return_dsp = DSP;  // RETURN: explicit
             else
                 *flags &= ~MKF_RETURN;
         }
@@ -533,18 +490,11 @@ void Push_Paramlist_Triads_May_Fail(
 // as part of this popping process.
 //
 REBARR *Pop_Paramlist_With_Meta_May_Fail(
+    REBCTX **meta,
     REBDSP dsp_orig,
     REBFLGS flags,
     REBDSP definitional_return_dsp
 ){
-    // Go ahead and flesh out the TYPESET! BLOCK! TEXT! triples.
-    //
-    if (IS_PARAM(DS_TOP))
-        Move_Value(DS_PUSH(), EMPTY_BLOCK);
-    if (IS_BLOCK(DS_TOP))
-        Move_Value(DS_PUSH(), EMPTY_TEXT);
-    assert((DSP - dsp_orig) % 3 == 0); // must be a multiple of 3
-
     // Definitional RETURN slots must have their argument value fulfilled with
     // an ACTION! specific to the action called on *every instantiation*.
     // They are marked with special parameter classes to avoid needing to
@@ -557,31 +507,32 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     if (flags & MKF_RETURN) {
         if (definitional_return_dsp == 0) { // no explicit RETURN: pure local
-            //
+            PUSH_SLOTS();
+
+            Init_Word(KEY_SLOT(DSP), Canon(SYM_RETURN));
+            definitional_return_dsp = DSP;
+
+            STKVAL(*) param = PARAM_SLOT(DSP);
+
             // While default arguments disallow ACTION!, VOID!, and NULL...
             // they are allowed to return anything.  Generally speaking, the
             // checks are on the input side, not the output.
             //
             Init_Param(
-                DS_PUSH(),
-                REB_P_LOCAL,
-                Canon(SYM_RETURN),
+                param,
+                REB_P_RETURN,
                 TS_OPT_VALUE
                     | FLAGIT_KIND(REB_TS_INVISIBLE)  // return @() intentional
+                    | FLAGIT_KIND(REB_TS_REFINEMENT)  // need slot for types
             );
-            definitional_return_dsp = DSP;
 
-            Move_Value(DS_PUSH(), EMPTY_BLOCK);
-            Move_Value(DS_PUSH(), EMPTY_TEXT);
+            Init_Nulled(TYPES_SLOT(DSP));
+            Init_Nulled(NOTES_SLOT(DSP));
         }
         else {
-            REBVAL *param = DS_AT(definitional_return_dsp);
             assert(
-                VAL_PARAM_CLASS(param) == REB_P_LOCAL
-                or VAL_PARAM_CLASS(param) == REB_P_SEALED  // !!! review reuse
+                VAL_WORD_ID(KEY_SLOT(definitional_return_dsp)) == SYM_RETURN
             );
-            assert(HEART_BYTE(param) == REB_TYPESET);
-            UNUSED(param);
         }
 
         // definitional_return handled specially when paramlist copied
@@ -592,55 +543,30 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     // Slots, which is length +1 (includes the rootvar or rootparam)
     //
-    REBLEN num_slots = (DSP - dsp_orig) / 3;
-
-    // There should be no more pushes past this point, so a stable pointer
-    // into the stack for the definitional return can be found.
-    //
-    REBVAL *definitional_return =
-        definitional_return_dsp == 0
-            ? nullptr
-            : DS_AT(definitional_return_dsp);
+    assert((DSP - dsp_orig) % 4 == 0);
+    REBLEN num_slots = (DSP - dsp_orig) / 4;
 
     // Must make the function "paramlist" even if "empty", for identity.
     //
-    // !!! In order to facilitate adding to the frame in the copy and
-    // relativize step to add LET variables, don't pass SERIES_FLAG_FIXED_SIZE
-    // in the creation step.  This formats cells in such a way that the
-    // series mechanically cannot be expanded even if the flag is removed.
-    // Instead, add it onto a series allocated as resizable.  This is likely
-    // temporary--as LET mechanics should use some form of "virtual binding".
+    // !!! This is no longer true, since details is the identity.  Review
+    // optimization potential.
     //
     REBARR *paramlist = Make_Array_Core(
         num_slots,
-        SERIES_MASK_PARAMLIST & ~(SERIES_FLAG_FIXED_SIZE)
+        SERIES_MASK_PARAMLIST
     );
-    SET_SERIES_FLAG(paramlist, FIXED_SIZE);
 
-    // Note: not a valid ACTION! paramlist yet, don't use SET_ACTION_FLAG()
-    //
-    if (flags & MKF_IS_VOIDER)
-        SER(paramlist)->info.bits |= ARRAY_INFO_MISC_VOIDER;  // !!! see note
-    if (flags & MKF_IS_ELIDER)
-        SER(paramlist)->info.bits |= ARRAY_INFO_MISC_ELIDER;  // !!! see note
+    REBSER *keylist = Make_Series(
+        (num_slots - 1),  // - 1 archetype
+        SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
+    );
+    mutable_LINK(Ancestor, keylist) = keylist;  // chain ends with self
+
     if (flags & MKF_HAS_RETURN)
-        SER(paramlist)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
-
-  blockscope {
-    REBVAL *archetype = RESET_CELL(
-        ARR_HEAD(paramlist),
-        REB_ACTION,
-        CELL_MASK_ACTION
-    );
-    Sync_Paramlist_Archetype(paramlist);
-    INIT_BINDING(archetype, UNBOUND);
-
-    REBVAL *dest = archetype + 1;
+        paramlist->leader.bits |= VARLIST_FLAG_PARAMLIST_HAS_RETURN;
 
     // We want to check for duplicates and a Binder can be used for that
-    // purpose--but note that a fail () cannot happen while binders are
-    // in effect UNLESS the BUF_COLLECT contains information to undo it!
-    // There's no BUF_COLLECT here, so don't fail while binder in effect.
+    // purpose--but fail() isn't allowed while binders are in effect.
     //
     // (This is why we wait until the parameter list gathering process
     // is over to do the duplicate checks--it can fail.)
@@ -648,46 +574,68 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     struct Reb_Binder binder;
     INIT_BINDER(&binder);
 
-    const REBSTR *duplicate = nullptr;
+    const REBSYM *duplicate = nullptr;
 
-    REBVAL *src = DS_AT(dsp_orig + 1) + 3;
+  blockscope {
+    REBVAL *param = Init_Unreadable_Void(ARR_HEAD(paramlist)) + 1;
+    REBKEY *key = SER_HEAD(REBKEY, keylist);
 
-    if (definitional_return) {
+    if (definitional_return_dsp != 0) {
         assert(flags & MKF_RETURN);
-        Move_Value(dest, definitional_return);
-        ++dest;
+        Init_Key(key, VAL_WORD_SYMBOL(KEY_SLOT(definitional_return_dsp)));
+        ++key;
+
+        Copy_Cell(param, PARAM_SLOT(definitional_return_dsp));
+        ++param;
     }
 
-    // Weird due to Spectre/MSVC: https://stackoverflow.com/q/50399940
-    //
-    for (; src != DS_TOP + 1; src += 3) {
-        if (not Is_Param_Sealed(src)) {  // allow reuse of sealed names
-            if (not Try_Add_Binder_Index(&binder, VAL_PARAM_CANON(src), 1020))
-                duplicate = VAL_PARAM_SPELLING(src);
+    REBDSP dsp = dsp_orig + 8;
+    for (; dsp <= DSP; dsp += 4) {
+        const REBSYM *symbol = VAL_WORD_SYMBOL(KEY_SLOT(dsp));
+
+        STKVAL(*) slot = PARAM_SLOT(dsp);
+        if (not Is_Param_Sealed(cast_PAR(slot))) {  // sealed reusable
+            if (not Try_Add_Binder_Index(&binder, symbol, 1020))
+                duplicate = symbol;
         }
 
-        if (definitional_return and src == definitional_return)
-            continue;
+        if (dsp == definitional_return_dsp)
+            continue;  // was added to the head of the list already
 
-        Move_Value(dest, src);
-        ++dest;
+        Init_Key(key, symbol);
+
+        Copy_Cell(param, slot);
+        if (GET_CELL_FLAG(slot, STACK_NOTE_LOCAL))
+            SET_CELL_FLAG(param, VAR_MARKED_HIDDEN);
+
+      #if !defined(NDEBUG)
+        SET_CELL_FLAG(param, PROTECTED);
+      #endif
+
+        ++key;
+        ++param;
     }
+
+    SET_SERIES_LEN(paramlist, num_slots);
+    Manage_Series(paramlist);
+
+    SET_SERIES_USED(keylist, num_slots - 1);  // no terminator
+    INIT_LINK_KEYSOURCE(paramlist, keylist);
+    mutable_MISC(VarlistMeta, paramlist) = nullptr;
+    mutable_BONUS(Patches, paramlist) = nullptr;
+  }
 
     // Must remove binder indexes for all words, even if about to fail
     //
-    src = DS_AT(dsp_orig + 1) + 3;
-
-    // Weird due to Spectre/MSVC: https://stackoverflow.com/q/50399940
-    //
-    for (; src != DS_TOP + 1; src += 3, ++dest) {
-        if (Is_Param_Sealed(src))
+  blockscope {
+    const REBKEY *tail = SER_TAIL(REBKEY, keylist);
+    const REBKEY *key = SER_HEAD(REBKEY, keylist);
+    const REBPAR *param = SER_AT(REBPAR, paramlist, 1);
+    for (; key != tail; ++key, ++param) {
+        if (Is_Param_Sealed(param))
             continue;
-        if (
-            Remove_Binder_Index_Else_0(&binder, VAL_PARAM_CANON(src))
-            == 0
-        ){
-            assert(duplicate);
-        }
+        if (Remove_Binder_Index_Else_0(&binder, KEY_SYMBOL(key)) == 0)
+            assert(duplicate);  // erroring on this is pending
     }
 
     SHUTDOWN_BINDER(&binder);
@@ -697,9 +645,6 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         Init_Word(word, duplicate);
         fail (Error_Dup_Vars_Raw(word));
     }
-
-    TERM_ARRAY_LEN(paramlist, num_slots);
-    Manage_Array(paramlist);
   }
 
     //=///////////////////////////////////////////////////////////////////=//
@@ -710,21 +655,20 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
     // !!! See notes on ACTION-META in %sysobj.r
 
-    REBCTX *meta = nullptr;
-
     if (flags & (MKF_HAS_DESCRIPTION | MKF_HAS_TYPES | MKF_HAS_NOTES))
-        meta = Copy_Context_Shallow_Managed(VAL_CONTEXT(Root_Action_Meta));
-
-    MISC_META_NODE(paramlist) = NOD(meta);
+        *meta = Copy_Context_Shallow_Managed(VAL_CONTEXT(Root_Action_Meta));
+    else
+        *meta = nullptr;
 
     // If a description string was gathered, it's sitting in the first string
     // slot, the third cell we pushed onto the stack.  Extract it if so.
     //
     if (flags & MKF_HAS_DESCRIPTION) {
-        assert(IS_TEXT(DS_AT(dsp_orig + 3)));
-        Move_Value(
-            CTX_VAR(meta, STD_ACTION_META_DESCRIPTION),
-            DS_AT(dsp_orig + 3)
+        STKVAL(*) description = NOTES_SLOT(dsp_orig + 4);
+        assert(IS_TEXT(description));
+        Copy_Cell(
+            CTX_VAR(*meta, STD_ACTION_META_DESCRIPTION),
+            description
         );
     }
 
@@ -735,60 +679,34 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             num_slots,
             SERIES_MASK_VARLIST | NODE_FLAG_MANAGED
         );
-        MISC_META_NODE(types_varlist) = nullptr;  // GC sees, must initialize
-        INIT_CTX_KEYLIST_SHARED(CTX(types_varlist), paramlist);
+        mutable_MISC(VarlistMeta, types_varlist) = nullptr;
+        mutable_BONUS(Patches, types_varlist) = nullptr;
+        INIT_CTX_KEYLIST_SHARED(CTX(types_varlist), keylist);
 
-        REBVAL *rootvar = RESET_CELL(
-            ARR_HEAD(types_varlist),
-            REB_FRAME,
-            CELL_MASK_CONTEXT
-        );
-        INIT_VAL_CONTEXT_VARLIST(rootvar, types_varlist);  // "canon FRAME!"
-        INIT_VAL_CONTEXT_PHASE(rootvar, ACT(paramlist));
-        INIT_BINDING(rootvar, UNBOUND);
+        RELVAL *rootvar = ARR_HEAD(types_varlist);
+        INIT_VAL_CONTEXT_ROOTVAR(rootvar, REB_OBJECT, types_varlist);
 
-        REBVAL *dest = rootvar + 1;
+        REBVAL *dest = SPECIFIC(rootvar) + 1;
+        const RELVAL *param = ARR_AT(paramlist, 1);
 
-        REBVAL *src = DS_AT(dsp_orig + 2);
-        src += 3;
+        REBDSP dsp = dsp_orig + 8;
+        for (; dsp <= DSP; dsp += 4) {
+            STKVAL(*) types = TYPES_SLOT(dsp);
+            assert(IS_NULLED(types) or IS_BLOCK(types));
 
-        if (definitional_return) {
-            //
-            // We put the return note in the top-level meta information, not
-            // on the local itself (the "return-ness" is a distinct property
-            // of the function from what word is used for RETURN:, and it
-            // is possible to use the word RETURN for a local or refinement
-            // argument while having nothing to do with the exit value of
-            // the function.)
-            //
-            if (NOT_END(VAL_ARRAY_AT(definitional_return + 1))) {
-                Move_Value(
-                    CTX_VAR(meta, STD_ACTION_META_RETURN_TYPE),
-                    &definitional_return[1]
-                );
-            }
+            Copy_Cell(dest, types);
+            if (GET_CELL_FLAG(param, VAR_MARKED_HIDDEN))
+                SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
 
-            Init_Nulled(dest); // clear the local RETURN: var's description
             ++dest;
+            ++param;
         }
+        assert(IS_END(param));
 
-        for (; src <= DS_TOP; src += 3) {
-            assert(IS_BLOCK(src));
-            if (definitional_return and src == definitional_return + 1)
-                continue;
+        SET_SERIES_LEN(types_varlist, num_slots);
 
-            if (IS_END(VAL_ARRAY_AT(src)))
-                Init_Nulled(dest);
-            else
-                Move_Value(dest, src);
-            ++dest;
-        }
-
-        TERM_ARRAY_LEN(types_varlist, num_slots);
-
-        Init_Any_Context(
-            CTX_VAR(meta, STD_ACTION_META_PARAMETER_TYPES),
-            REB_FRAME,
+        Init_Object(
+            CTX_VAR(*meta, STD_ACTION_META_PARAMETER_TYPES),
             CTX(types_varlist)
         );
     }
@@ -800,60 +718,35 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             num_slots,
             SERIES_MASK_VARLIST | NODE_FLAG_MANAGED
         );
-        MISC_META_NODE(notes_varlist) = nullptr;  // GC sees, must initialize
-        INIT_CTX_KEYLIST_SHARED(CTX(notes_varlist), paramlist);
+        mutable_MISC(VarlistMeta, notes_varlist) = nullptr;
+        mutable_BONUS(Patches, notes_varlist) = nullptr;
+        INIT_CTX_KEYLIST_SHARED(CTX(notes_varlist), keylist);
 
-        REBVAL *rootvar = RESET_CELL(
-            ARR_HEAD(notes_varlist),
-            REB_FRAME,
-            CELL_MASK_CONTEXT
-        );
-        INIT_VAL_CONTEXT_VARLIST(rootvar, notes_varlist); // canon FRAME!
-        INIT_VAL_CONTEXT_PHASE(rootvar, ACT(paramlist));
-        INIT_BINDING(rootvar, UNBOUND);
+        RELVAL *rootvar = ARR_HEAD(notes_varlist);
+        INIT_VAL_CONTEXT_ROOTVAR(rootvar, REB_OBJECT, notes_varlist); 
 
-        REBVAL *dest = rootvar + 1;
+        const RELVAL *param = ARR_AT(paramlist, 1);
+        REBVAL *dest = SPECIFIC(rootvar) + 1;
 
-        REBVAL *src = DS_AT(dsp_orig + 3);
-        src += 3;
+        REBDSP dsp = dsp_orig + 8;
+        for (; dsp <= DSP; dsp += 4) {
+            STKVAL(*) notes = NOTES_SLOT(dsp);
+            assert(IS_TEXT(notes) or IS_NULLED(notes));
 
-        if (definitional_return) {
-            //
-            // See remarks on the return type--the RETURN is documented in
-            // the top-level META-OF, not the "incidentally" named RETURN
-            // parameter in the list
-            //
-            if (VAL_LEN_HEAD(definitional_return + 2) == 0)
-                Init_Nulled(CTX_VAR(meta, STD_ACTION_META_RETURN_NOTE));
-            else {
-                Move_Value(
-                    CTX_VAR(meta, STD_ACTION_META_RETURN_NOTE),
-                    &definitional_return[2]
-                );
-            }
+            Copy_Cell(dest, notes);
 
-            Init_Nulled(dest);
+            if (GET_CELL_FLAG(param, VAR_MARKED_HIDDEN))
+                SET_CELL_FLAG(dest, VAR_MARKED_HIDDEN);
             ++dest;
+            ++param;
         }
+        assert(IS_END(param));
 
-        for (; src <= DS_TOP; src += 3) {
-            assert(IS_TEXT(src));
-            if (definitional_return and src == definitional_return + 2)
-                continue;
+        SET_SERIES_LEN(notes_varlist, num_slots);
 
-            if (VAL_LEN_HEAD(src) == 0)
-                Init_Nulled(dest);
-            else
-                Move_Value(dest, src);
-            ++dest;
-        }
-
-        TERM_ARRAY_LEN(notes_varlist, num_slots);
-
-        Init_Frame(
-            CTX_VAR(meta, STD_ACTION_META_PARAMETER_NOTES),
-            CTX(notes_varlist),
-            ANONYMOUS  // !!! this frame is a pun, what should this be?
+        Init_Object(
+            CTX_VAR(*meta, STD_ACTION_META_PARAMETER_NOTES),
+            CTX(notes_varlist)
         );
     }
 
@@ -897,20 +790,17 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 // You don't have to use it if you don't want to...and may overwrite the
 // variable.  But it won't be a void at the start.
 //
-// Note: While paramlists should ultimately carry SERIES_FLAG_FIXED_SIZE,
-// the product of this routine might need to be added to.  And series that
-// are created fixed size have special preparation such that they will trip
-// more asserts.  So the fixed size flag is *not* added here, but ensured
-// in the Make_Action() step.
-//
 REBARR *Make_Paramlist_Managed_May_Fail(
+    REBCTX **meta,
     const REBVAL *spec,
-    REBFLGS flags
+    REBFLGS *flags  // flags may be modified to carry additional information
 ){
     REBDSP dsp_orig = DSP;
     assert(DS_TOP == DS_AT(dsp_orig));
 
     REBDSP definitional_return_dsp = 0;
+
+    PUSH_SLOTS();
 
     // As we go through the spec block, we push TYPESET! BLOCK! TEXT! triples.
     // These will be split out into separate arrays after the process is done.
@@ -920,54 +810,27 @@ REBARR *Make_Paramlist_Managed_May_Fail(
     // the function description--it will be extracted from the slot before
     // it is turned into a rootkey for param_notes.
     //
-    Init_Unreadable_Void(DS_PUSH()); // paramlist[0] becomes ACT_ARCHETYPE()
-    Move_Value(DS_PUSH(), EMPTY_BLOCK); // param_types[0] (object canon)
-    Move_Value(DS_PUSH(), EMPTY_TEXT); // param_notes[0] (desc, then canon)
+    Init_Void(KEY_SLOT(DSP), SYM_VOID);  // signal for no parameters pushed
+    Init_Unreadable_Void(PARAM_SLOT(DSP));  // not used at all
+    Init_Unreadable_Void(TYPES_SLOT(DSP));  // not used at all
+    Init_Nulled(NOTES_SLOT(DSP));  // overwritten if description
 
     // The process is broken up into phases so that the spec analysis code
     // can be reused in AUGMENT.
     //
     Push_Paramlist_Triads_May_Fail(
         spec,
-        &flags,
-        dsp_orig,
+        flags,
         &definitional_return_dsp
     );
-    return Pop_Paramlist_With_Meta_May_Fail(
+    REBARR *paramlist = Pop_Paramlist_With_Meta_May_Fail(
+        meta,
         dsp_orig,
-        flags,
+        *flags,
         definitional_return_dsp
     );
-}
 
-
-
-//
-//  Find_Param_Index: C
-//
-// Find function param word in function "frame".
-//
-// !!! This is semi-redundant with similar functions for Find_Word_In_Array
-// and key finding for objects, review...
-//
-REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
-{
-    const REBSTR *canon = STR_CANON(spelling); // don't recalculate each time
-
-    RELVAL *param = ARR_AT(paramlist, 1);
-    REBLEN len = ARR_LEN(paramlist);
-
-    REBLEN n;
-    for (n = 1; n < len; ++n, ++param) {
-        if (
-            spelling == VAL_PARAM_SPELLING(param)
-            or canon == VAL_PARAM_CANON(param)
-        ){
-            return n;
-        }
-    }
-
-    return 0;
+    return paramlist;
 }
 
 
@@ -988,83 +851,96 @@ REBLEN Find_Param_Index(REBARR *paramlist, REBSTR *spelling)
 // This is where they can store information that will be available when the
 // dispatcher is called.
 //
+// The `specialty` argument is an interface structure that holds information
+// that can be shared between function instances.  It encodes information
+// about the parameter names and types, specialization data, as well as any
+// partial specialization or parameter reordering instructions.  This can
+// take several forms depending on how much detail there is.  See the
+// ACT_SPECIALTY() definition for more information on how this is laid out.
+//
 REBACT *Make_Action(
-    REBARR *paramlist,
-    REBNAT dispatcher, // native C function called by Eval_Core
-    REBACT *opt_underlying, // optional underlying function
-    REBCTX *opt_exemplar, // if provided, should be consistent w/next level
-    REBLEN details_capacity // desired capacity of the ACT_DETAILS() array
+    REBARR *specialty,  // paramlist, exemplar, partials -> exemplar/paramlist
+    REBNAT dispatcher,  // native C function called by Eval_Core
+    REBLEN details_capacity  // capacity of ACT_DETAILS (including archetype)
 ){
-    ASSERT_ARRAY_MANAGED(paramlist);
+    assert(details_capacity >= 1);  // must have room for archetype
 
-    RELVAL *rootparam = ARR_HEAD(paramlist);
-    assert(KIND3Q_BYTE(rootparam) == REB_ACTION); // !!! not fully formed...
-    assert(VAL_ACT_PARAMLIST(rootparam) == paramlist);
-    assert(EXTRA(Binding, rootparam).node == UNBOUND); // archetype
+    REBARR *paramlist;
+    if (IS_PARTIALS(specialty)) {
+        paramlist = CTX_VARLIST(LINK(PartialsExemplar, specialty));
+    }
+    else {
+        assert(IS_VARLIST(specialty));
+        paramlist = specialty;
+    }
+
+    assert(GET_SERIES_FLAG(paramlist, MANAGED));
+    assert(
+        IS_UNREADABLE_DEBUG(ARR_HEAD(paramlist))  // must fill in
+        or CTX_TYPE(CTX(paramlist)) == REB_FRAME
+    );
+
+    // !!! There used to be more validation code needed here when it was
+    // possible to pass a specialization frame separately from a paramlist.
+    // But once paramlists were separated out from the function's identity
+    // array (using ACT_DETAILS() as the identity instead of ACT_KEYLIST())
+    // then all the "shareable" information was glommed up minus redundancy
+    // into the ACT_SPECIALTY().  Here's some of the residual checking, as
+    // a placeholder for more useful consistency checking which might be done.
+    //
+  blockscope {
+    REBSER *keylist = SER(LINK(KeySource, paramlist));
+
+    ASSERT_SERIES_MANAGED(keylist);  // paramlists/keylists, can be shared
+    assert(SER_USED(keylist) + 1 == ARR_LEN(paramlist));
+    if (GET_SUBCLASS_FLAG(VARLIST, paramlist, PARAMLIST_HAS_RETURN)) {
+        const REBKEY *key = SER_AT(const REBKEY, keylist, 0);
+        assert(KEY_SYM(key) == SYM_RETURN);
+        UNUSED(key);
+    }
+  }
 
     // "details" for an action is an array of cells which can be anything
     // the dispatcher understands it to be, by contract.  Terminate it
     // at the given length implicitly.
-
+    //
     REBARR *details = Make_Array_Core(
-        details_capacity,
+        details_capacity,  // leave room for archetype
         SERIES_MASK_DETAILS | NODE_FLAG_MANAGED
     );
-    TERM_ARRAY_LEN(details, details_capacity);
+    RELVAL *archetype = ARR_HEAD(details);
+    RESET_CELL(archetype, REB_ACTION, CELL_MASK_ACTION);
+    INIT_VAL_ACTION_DETAILS(archetype, details);
+    mutable_BINDING(archetype) = UNBOUND;
 
-    VAL_ACTION_DETAILS_OR_LABEL_NODE(rootparam) = NOD(details);
+  #if !defined(NDEBUG)  // notice attempted mutation of the archetype cell
+    SET_CELL_FLAG(archetype, PROTECTED);
+  #endif
 
-    MISC(details).dispatcher = dispatcher; // level of indirection, hijackable
-
-    assert(IS_POINTER_SAFETRASH_DEBUG(LINK(paramlist).trash));
-
-    if (opt_underlying) {
-        LINK_UNDERLYING_NODE(paramlist) = NOD(opt_underlying);
-
-        // Note: paramlist still incomplete, don't use SET_ACTION_FLAG....
-        //
-        if (GET_ACTION_FLAG(opt_underlying, HAS_RETURN))
-            SER(paramlist)->header.bits |= PARAMLIST_FLAG_HAS_RETURN;
-    }
-    else {
-        // To avoid NULL checking when a function is called and looking for
-        // underlying, just use the action's own paramlist if needed.
-        //
-        LINK_UNDERLYING_NODE(paramlist) = NOD(paramlist);
-    }
-
-    if (not opt_exemplar) {
-        //
-        // No exemplar is used as a cue to set the "specialty" to paramlist,
-        // so that Push_Action() can assign f->special directly from it in
-        // dispatch, and be equal to f->param.
-        //
-        LINK_SPECIALTY_NODE(details) = NOD(paramlist);
-    }
-    else {
-        // The parameters of the paramlist should line up with the slots of
-        // the exemplar (though some of these parameters may be hidden due to
-        // specialization, see REB_TS_HIDDEN).
-        //
-        assert(GET_SERIES_FLAG(opt_exemplar, MANAGED));
-        assert(CTX_LEN(opt_exemplar) == ARR_LEN(paramlist) - 1);
-
-        LINK_SPECIALTY_NODE(details) = NOD(CTX_VARLIST(opt_exemplar));
-    }
-
-    // The meta information may already be initialized, since the native
-    // version of paramlist construction sets up the FUNCTION-META information
-    // used by HELP.  If so, it must be a valid REBCTX*.  Otherwise NULL.
+    // Leave rest of the cells in the capacity uninitialized (caller fills in)
     //
-    assert(
-        not MISC_META(paramlist)
-        or GET_ARRAY_FLAG(CTX_VARLIST(MISC_META(paramlist)), IS_VARLIST)
-    );
+    SET_SERIES_LEN(details, details_capacity);
 
-    assert(NOT_ARRAY_FLAG(paramlist, HAS_FILE_LINE_UNMASKED));
-    assert(NOT_ARRAY_FLAG(details, HAS_FILE_LINE_UNMASKED));
+    mutable_LINK_DISPATCHER(details) = cast(CFUNC*, dispatcher);
+    mutable_MISC(DetailsMeta, details) = nullptr;  // caller can fill in
 
-    REBACT *act = ACT(paramlist); // now it's a legitimate REBACT
+    INIT_VAL_ACTION_SPECIALTY_OR_LABEL(archetype, specialty);
+
+    REBACT *act = ACT(details); // now it's a legitimate REBACT
+
+    // !!! We may have to initialize the exemplar rootvar.
+    //
+    REBVAL *rootvar = SER_HEAD(REBVAL, paramlist);
+    if (IS_UNREADABLE_DEBUG(rootvar)) {
+        INIT_VAL_FRAME_ROOTVAR(rootvar, paramlist, act, UNBOUND);
+    }
+
+    // The exemplar needs to be frozen, it can't change after this point.
+    // You can't change the types or parameter conventions of an existing
+    // action...you have to make a new variation.  Note that the exemplar
+    // can be exposed by AS FRAME! of this action...
+    //
+    Freeze_Array_Shallow(paramlist);
 
     // Precalculate cached function flags.  This involves finding the first
     // unspecialized argument which would be taken at a callsite, which can
@@ -1072,21 +948,18 @@ REBACT *Make_Action(
     // the work of doing that is factored into a routine (`PARAMETERS OF`
     // uses it as well).
 
-    if (GET_ACTION_FLAG(act, HAS_RETURN)) {
-        REBVAL *param = ACT_PARAMS_HEAD(act);
-        assert(VAL_PARAM_SYM(param) == SYM_RETURN);
-        UNUSED(param);
-    }
-
-    REBVAL *first_unspecialized = First_Unspecialized_Param(act);
-    if (first_unspecialized) {
-        switch (VAL_PARAM_CLASS(first_unspecialized)) {
+    const REBPAR *first = First_Unspecialized_Param(nullptr, act);
+    if (first) {
+        switch (VAL_PARAM_CLASS(first)) {
+          case REB_P_RETURN:
+          case REB_P_OUTPUT:
           case REB_P_NORMAL:
             break;
 
-          case REB_P_HARD_QUOTE:
           case REB_P_MODAL:
-          case REB_P_SOFT_QUOTE:
+          case REB_P_SOFT:
+          case REB_P_MEDIUM:
+          case REB_P_HARD:
             SET_ACTION_FLAG(act, QUOTES_FIRST);
             break;
 
@@ -1094,7 +967,7 @@ REBACT *Make_Action(
             assert(false);
         }
 
-        if (TYPE_CHECK(first_unspecialized, REB_TS_SKIPPABLE))
+        if (TYPE_CHECK(first, REB_TS_SKIPPABLE))
             SET_ACTION_FLAG(act, SKIPPABLE_FIRST);
     }
 
@@ -1119,26 +992,24 @@ REBACT *Make_Action(
 //
 REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
 {
-    // Since passing SERIES_MASK_VARLIST includes SERIES_FLAG_ALWAYS_DYNAMIC,
+    // Since passing SERIES_MASK_VARLIST includes SERIES_FLAG_DYNAMIC,
     // don't pass it in to the allocation...it needs to be set, but will be
-    // overridden by SERIES_INFO_INACCESSIBLE.
+    // overridden by SERIES_FLAG_INACCESSIBLE.
     //
-    REBARR *varlist = Alloc_Singular(NODE_FLAG_MANAGED);
-    SER(varlist)->header.bits |= SERIES_MASK_VARLIST;
-    SET_SERIES_INFO(varlist, INACCESSIBLE);
-    MISC_META_NODE(varlist) = nullptr;
-
-    RELVAL *rootvar = RESET_CELL(
-        ARR_SINGLE(varlist),
-        REB_FRAME,
-        CELL_MASK_CONTEXT
+    REBARR *varlist = Alloc_Singular(
+        FLAG_FLAVOR(VARLIST) | NODE_FLAG_MANAGED  // !!! not dynamic
     );
-    INIT_VAL_CONTEXT_VARLIST(rootvar, varlist);
-    INIT_VAL_CONTEXT_PHASE(rootvar, a);
-    INIT_BINDING(rootvar, UNBOUND); // !!! is a binding relevant?
+    varlist->leader.bits |= SERIES_MASK_VARLIST;  // !!! adds dynamic
+    CLEAR_SERIES_FLAG(varlist, DYNAMIC);  // !!! removes (review cleaner way)
+    SET_SERIES_FLAG(varlist, INACCESSIBLE);
+    mutable_MISC(VarlistMeta, varlist) = nullptr;
+    // no BONUS (it's INACCESSIBLE, so non-dynamic)
+
+    RELVAL *rootvar = ARR_SINGLE(varlist);
+    INIT_VAL_FRAME_ROOTVAR(rootvar, varlist, a, UNBOUND);  // !!! binding?
 
     REBCTX *expired = CTX(varlist);
-    INIT_CTX_KEYLIST_SHARED(expired, ACT_PARAMLIST(a));
+    INIT_CTX_KEYLIST_SHARED(expired, ACT_KEYLIST(a));
 
     return expired;
 }
@@ -1155,7 +1026,7 @@ REBCTX *Make_Expired_Frame_Ctx_Managed(REBACT *a)
 //
 void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
 {
-    REBSPC *binding = VAL_BINDING(action);
+    REBCTX *binding = VAL_ACTION_BINDING(action);
     REBACT *a = VAL_ACTION(action);
 
     // A Hijacker *might* not need to splice itself in with a dispatcher.
@@ -1165,7 +1036,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
     // the top of the returned body?
     //
     while (ACT_DISPATCHER(a) == &Hijacker_Dispatcher) {
-        a = VAL_ACTION(ARR_HEAD(ACT_DETAILS(a)));
+        a = VAL_ACTION(ARR_AT(ACT_DETAILS(a), 1));
         // !!! Review what should happen to binding
     }
 
@@ -1187,7 +1058,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // Interpreted code, the body is a block with some bindings relative
         // to the action.
 
-        RELVAL *body = ARR_HEAD(details);
+        RELVAL *body = ARR_AT(details, IDX_DETAILS_1);
 
         // The PARAMLIST_HAS_RETURN tricks for definitional return make it
         // seem like a generator authored more code in the action's body...but
@@ -1200,7 +1071,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
             example = Get_System(SYS_STANDARD, STD_PROC_BODY);
             real_body_index = 4;
         }
-        else if (GET_ACTION_FLAG(a, HAS_RETURN)) {
+        else if (ACT_HAS_RETURN(a)) {
             example = Get_System(SYS_STANDARD, STD_FUNC_BODY);
             real_body_index = 4;
         }
@@ -1227,15 +1098,15 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
             // To give it the appearance of executing code in place, we use
             // a GROUP!.
 
-            RELVAL *slot = ARR_AT(fake, real_body_index); // #BODY
+            RELVAL *slot = ARR_AT(fake, real_body_index);  // #BODY
             assert(IS_ISSUE(slot));
 
             // Note: clears VAL_FLAG_LINE
             //
             RESET_VAL_HEADER(slot, REB_GROUP, CELL_FLAG_FIRST_IS_NODE);
-            INIT_VAL_NODE(slot, VAL_ARRAY(body));
+            INIT_VAL_NODE1(slot, VAL_ARRAY(body));
             VAL_INDEX_RAW(slot) = 0;
-            INIT_BINDING(slot, a);  // relative binding
+            INIT_SPECIFIER(slot, a);  // relative binding
 
             maybe_fake_body = fake;
         }
@@ -1244,9 +1115,9 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // body specific to a fabricated expired frame.  See #2221
 
         RESET_VAL_HEADER(out, REB_BLOCK, CELL_FLAG_FIRST_IS_NODE);
-        INIT_VAL_NODE(out, maybe_fake_body);
+        INIT_VAL_NODE1(out, maybe_fake_body);
         VAL_INDEX_RAW(out) = 0;
-        INIT_BINDING(out, Make_Expired_Frame_Ctx_Managed(a));
+        INIT_SPECIFIER(out, Make_Expired_Frame_Ctx_Managed(a));
         return;
     }
 
@@ -1255,16 +1126,16 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
         // The FRAME! stored in the body for the specialization has a phase
         // which is actually the function to be run.
         //
-        REBVAL *frame = SPECIFIC(ARR_HEAD(details));
+        const REBVAL *frame = CTX_ARCHETYPE(ACT_EXEMPLAR(a));
         assert(IS_FRAME(frame));
-        Move_Value(out, frame);
+        Copy_Cell(out, frame);
         return;
     }
 
     if (ACT_DISPATCHER(a) == &Generic_Dispatcher) {
-        REBVAL *verb = SPECIFIC(ARR_HEAD(details));
+        REBVAL *verb = DETAILS_AT(details, 1);
         assert(IS_WORD(verb));
-        Move_Value(out, verb);
+        Copy_Cell(out, verb);
         return;
     }
 
@@ -1294,74 +1165,22 @@ REBTYPE(Fail)
 
 
 //
-//  Generic_Dispatcher: C
-//
-// A "generic" is what R3-Alpha/Rebol2 had called "ACTION!" (until Ren-C took
-// that as the umbrella term for all "invokables").  This kind of dispatch is
-// based on the first argument's type, with the idea being a single C function
-// for the type has a switch() statement in it and can handle many different
-// such actions for that type.
-//
-// (e.g. APPEND copy [a b c] [d] would look at the type of the first argument,
-// notice it was a BLOCK!, and call the common C function for arrays with an
-// append instruction--where that instruction also handles insert, length,
-// etc. for BLOCK!s.)
-//
-// !!! This mechanism is a very primitive kind of "multiple dispatch".  Rebol
-// will certainly need to borrow from other languages to develop a more
-// flexible idea for user-defined types, vs. this very limited concept.
-//
-// https://en.wikipedia.org/wiki/Multiple_dispatch
-// https://en.wikipedia.org/wiki/Generic_function
-// https://stackoverflow.com/q/53574843/
-//
-REB_R Generic_Dispatcher(REBFRM *f)
-{
-    REBACT *phase = FRM_PHASE(f);
-    REBARR *details = ACT_DETAILS(phase);
-    REBVAL *verb = SPECIFIC(ARR_HEAD(details));
-    assert(IS_WORD(verb));
-
-    // !!! It's technically possible to throw in locals or refinements at
-    // any point in the sequence.  So this should really be using something
-    // like a First_Unspecialized_Arg() call.  For now, we just handle the
-    // case of a RETURN: sitting in the first parameter slot.
-    //
-    REBVAL *first_arg = GET_ACTION_FLAG(phase, HAS_RETURN)
-        ? FRM_ARG(f, 2)
-        : FRM_ARG(f, 1);
-
-    return Run_Generic_Dispatch(first_arg, f, verb);
-}
-
-
-//
-//  Dummy_Dispatcher: C
-//
-// Used for frame levels that want a varlist solely for the purposes of tying
-// API handle lifetimes to.  These levels should be ignored by stack walks
-// that the user sees, and this associated dispatcher should never run.
-//
-REB_R Dummy_Dispatcher(REBFRM *f)
-{
-    UNUSED(f);
-    panic ("Dummy_Dispatcher() ran, but it never should get called");
-}
-
-
-//
 //  Get_If_Word_Or_Path_Throws: C
 //
-// Some routines like APPLY and SPECIALIZE are willing to take a WORD! or
-// PATH! instead of just the value type they are looking for, and perform
-// the GET for you.  By doing the GET inside the function, they are able
-// to preserve the symbol:
+// Originally this routine was used by APPLY and SPECIALIZE type routines
+// to allow them to take WORD!s and PATH!s, since there had been no way to
+// get the label for an ACTION! after it had been fetched:
 //
-//     >> applique 'append [value: 'c]
-//     ** Script error: append is missing its series argument
+//     >> applique 'append [value: 'c]  ; APPLIQUE would see the word APPEND
+//     ** Script error: append is missing its series argument  ; so name here
 //
-// If push_refinements is used, then it avoids intermediate specializations...
-// e.g. `specialize :append/dup [part: true]` can be done with one FRAME!.
+// That became unnecessary once the mechanics behind VAL_ACTION_LABEL() were
+// introduced.  So the interfaces were changed to only take ACTION!, so as
+// to be more clear.
+//
+// This function remains as a utility for other purposes.  It is able to push
+// refinements in the process of its fetching, if you want to avoid an
+// intermediate specialization when used in apply-like scenarios.
 //
 bool Get_If_Word_Or_Path_Throws(
     REBVAL *out,
@@ -1369,15 +1188,15 @@ bool Get_If_Word_Or_Path_Throws(
     REBSPC *specifier,
     bool push_refinements
 ) {
-    if (IS_WORD(v) or IS_GET_WORD(v) or IS_SYM_WORD(v)) {
+    if (IS_WORD(v) or IS_GET_WORD(v)) {
       get_as_word:
         Get_Word_May_Fail(out, v, specifier);
         if (IS_ACTION(out))
-            INIT_ACTION_LABEL(out, VAL_WORD_SPELLING(v));
+            INIT_VAL_ACTION_LABEL(out, VAL_WORD_SYMBOL(v));
     }
     else if (
-        IS_PATH(v) or IS_GET_PATH(v) or IS_SYM_PATH(v)
-        or IS_TUPLE(v) or IS_GET_TUPLE(v) or IS_SYM_TUPLE(v)
+        IS_PATH(v) or IS_GET_PATH(v)
+        or IS_TUPLE(v) or IS_GET_TUPLE(v)
     ){
         if (ANY_WORD_KIND(HEART_BYTE(v)))  // e.g. `/`
             goto get_as_word;  // faster than calling Eval_Path_Throws_Core?
@@ -1386,7 +1205,7 @@ bool Get_If_Word_Or_Path_Throws(
             out,
             v,  // !!! may not be array based
             specifier,
-            NULL,  // `setval`: null means don't treat as SET-PATH!
+            nullptr,  // `setval`: null means don't treat as SET-PATH!
             EVAL_MASK_DEFAULT | (push_refinements
                 ? EVAL_FLAG_PUSH_PATH_REFINES  // pushed in reverse order
                 : 0)
@@ -1398,4 +1217,61 @@ bool Get_If_Word_Or_Path_Throws(
         Derelativize(out, v, specifier);
 
     return false;
+}
+
+
+//
+//  tweak: native [
+//
+//  {Modify a special property (currently only for ACTION!)}
+//
+//      return: "Same action identity as input"
+//          [action!]
+//      action "(modified) Action to modify property of"
+//          [action!]
+//      property "Currently must be [defer postpone]"
+//          [word!]
+//      enable [logic!]
+//  ]
+//
+REBNATIVE(tweak)
+{
+    INCLUDE_PARAMS_OF_TWEAK;
+
+    REBACT *act = VAL_ACTION(ARG(action));
+    const REBPAR *first = First_Unspecialized_Param(nullptr, act);
+
+    enum Reb_Param_Class pclass = first
+        ? VAL_PARAM_CLASS(first)
+        : REB_P_NORMAL;  // imagine it as <end>able
+
+    REBFLGS flag;
+
+    switch (VAL_WORD_ID(ARG(property))) {
+      case SYM_BARRIER:   // don't allow being taken as an argument, e.g. |
+        flag = DETAILS_FLAG_IS_BARRIER;
+        break;
+
+      case SYM_DEFER:  // Special enfix behavior used by THEN, ELSE, ALSO...
+        if (pclass != REB_P_NORMAL)
+            fail ("TWEAK defer only actions with evaluative 1st params");
+        flag = DETAILS_FLAG_DEFERS_LOOKBACK;
+        break;
+
+      case SYM_POSTPONE:  // Wait as long as it can to run w/o changing order
+        if (pclass != REB_P_NORMAL and pclass != REB_P_SOFT)
+            fail ("TWEAK postpone only actions with evaluative 1st params");
+        flag = DETAILS_FLAG_POSTPONES_ENTIRELY;
+        break;
+
+      default:
+        fail ("TWEAK currently only supports [barrier defer postpone]");
+    }
+
+    if (VAL_LOGIC(ARG(enable)))
+        ACT_DETAILS(act)->leader.bits |= flag;
+    else
+        ACT_DETAILS(act)->leader.bits &= ~flag;
+
+    RETURN (ARG(action));
 }

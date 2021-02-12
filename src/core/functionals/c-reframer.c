@@ -7,7 +7,7 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// Copyright 2020 Ren-C Open Source Contributors
+// Copyright 2021 Ren-C Open Source Contributors
 //
 // See README.md and CREDITS.md for more information.
 //
@@ -29,7 +29,7 @@
 // parameter to a function, and adds them back for the result:
 //
 //     requote: reframer func [f [frame!]] [
-//         p: first words of f
+//         p: first parameters of f
 //         num-quotes: quotes of f/(p)
 //
 //         f/(p): dequote f/(p)
@@ -37,30 +37,193 @@
 //         return quote/depth do f num-quotes
 //     ]
 //
-//     >> item: first ['''[a b c]]
+//     >> item: just '''[a b c]
+//     == '''[a b c]
 //
 //     >> requote append item <d>  ; append doesn't accept QUOTED! items
 //     == '''[a b c <d>]   ; munging frame and result makes it seem to
 //
-// !!! Due to the way that REFRAMER works today, it cannot support a chain
-// of reframers.  e.g. with MY implemented as a reframer, you couldn't say:
+//=//// NOTES /////////////////////////////////////////////////////////////=//
 //
-//     >> item: my requote append <d>
+// * Enfix handling is not yet implemented, e.g. `requote '''1 + 2`
 //
-// Being able to do so would require some kind of "compound frame" that could
-// allow MY to push through REQUOTE to see APPEND's arguments.  This sounds
-// technically difficult, though perhaps pared down versions could be made
-// in the near term (e.g. in cases like this, where the reframer takes no
-// arguments of its own)
+// * Because reframers need to know the function they are operating on, they
+//   are unable to "see through" a GROUP! to get it, as a group could contain
+//   multiple expressions.  So `requote (append item <d>)` cannot work.
+//
+// * If you "reframe a reframer" at the moment, you will not likely get what
+//   you want...as the arguments you want to inspect will be compacted into
+//   a frame argument.  It may be possible to make a "compound frame" that
+//   captures the user-perceived combination of a reframer and what it's
+//   reframing, but that would be technically difficult.
 //
 
 #include "sys-core.h"
 
 enum {
-    IDX_REFRAMER_SHIM = 0,  // action that can manipulate the reframed frame
-    IDX_REFRAMER_PARAM_INDEX = 1,  // index in shim that receives FRAME!
+    IDX_REFRAMER_SHIM = 1,  // action that can manipulate the reframed frame
+    IDX_REFRAMER_PARAM_INDEX,  // index in shim that receives FRAME!
     IDX_REFRAMER_MAX
 };
+
+
+//
+//  Make_Invokable_From_Feed_Throws: C
+//
+// This builds a frame from a feed *as if* it were going to be used to call
+// an action, but doesn't actually make the call.  Instead it leaves the
+// varlist available for other purposes.
+//
+// If the next item in the feed is not a WORD! or PATH! that look up to an
+// action (nor an ACTION! literally) then the output will be set to a QUOTED!
+// version of what would be evaluated to.  So in the case of NULL, it will be
+// a single quote of nothing.
+//
+bool Make_Invokable_From_Feed_Throws(REBVAL *out, REBFED *feed)
+{
+    if (IS_END(feed->value)) {
+        Quotify(Init_Endish_Nulled(out), 1);
+        return false;
+    }
+
+    if (IS_GROUP(feed->value))  // `requote (append [a b c] #d, <can't-work>)`
+        fail ("Actions made with REFRAMER cannot work with GROUP!s");
+
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+    Push_Frame(out, f);
+
+    if (Get_If_Word_Or_Path_Throws(
+        f->out,  // e.g. parent's spare
+        feed->value,
+        FEED_SPECIFIER(feed),
+        true  // push_refinements = true (DECLARE_FRAME captured original DSP)
+    )){
+        Drop_Frame(f);
+        return true;
+    }
+
+    if (not IS_ACTION(f->out)) {
+        Derelativize(f->out, f_value, f_specifier);
+        Quotify(f->out, 1);
+        Fetch_Next_Forget_Lookback(f);  // we've seen it now
+        Drop_Frame(f);
+        return false;
+    }
+
+    Fetch_Next_Forget_Lookback(f);  // now, onto the arguments...
+
+    option(const REBSTR*) label = VAL_ACTION_LABEL(f->out);
+
+    // !!! Process_Action_Throws() calls Drop_Action() and loses the phase.
+    // It probably shouldn't, but since it does we need the action afterward
+    // to put the phase back.
+    //
+    DECLARE_LOCAL (action);
+    Copy_Cell(action, out);
+    PUSH_GC_GUARD(action);
+
+    // It is desired that any nulls encountered be processed as if they are
+    // not specialized...and gather at the callsite if necessary.
+    //
+    f->flags.bits |=
+        EVAL_FLAG_ERROR_ON_DEFERRED_ENFIX;  // can't deal with ELSE/THEN/etc.
+
+    Push_Action(f, VAL_ACTION(f->out), VAL_ACTION_BINDING(f->out));
+    Begin_Prefix_Action(f, VAL_ACTION_LABEL(f->out));
+
+    // Use this special mode where we ask the dispatcher not to run, just to
+    // gather the args.  Push_Action() checks that it's not set, so we don't
+    // set it until after that.
+    //
+    SET_EVAL_FLAG(f, FULFILL_ONLY);
+
+    assert(FRM_BINDING(f) == VAL_ACTION_BINDING(action));  // no invocation
+
+    if (Process_Action_Throws(f)) {
+        DROP_GC_GUARD(action);
+        return true;
+    }
+
+    // At the moment, Begin_Prefix_Action() marks the frame as having been
+    // invoked...but since it didn't get managed it drops the flag in
+    // Drop_Action().
+    //
+    // !!! The flag is new, as a gambit to try and avoid copying frames for
+    // DO-ing just in order to expire the old identity.  Under development.
+    //
+    assert(NOT_SUBCLASS_FLAG(VARLIST, f->varlist, FRAME_HAS_BEEN_INVOKED));
+
+    assert(NOT_EVAL_FLAG(f, FULFILL_ONLY));  // cleared by the evaluator
+
+    // Drop_Action() clears out the phase and binding.  Put them back.
+    // !!! Should it check EVAL_FLAG_FULFILL_ONLY?
+
+    INIT_FRM_PHASE(f, VAL_ACTION(action));
+    INIT_FRM_BINDING(f, VAL_ACTION_BINDING(action));
+
+    // The function did not actually execute, so no SPC(f) was never handed
+    // out...the varlist should never have gotten managed.  So this context
+    // can theoretically just be put back into the reuse list, or managed
+    // and handed out for other purposes by the caller.
+    //
+    REBARR *varlist = f->varlist;
+    assert(NOT_SERIES_FLAG(varlist, MANAGED));  // not invoked yet
+    f->varlist = nullptr;  // just let it GC, for now
+
+    REBACT *act = VAL_ACTION(action);
+    assert(FRM_BINDING(f) == VAL_ACTION_BINDING(action));
+
+    INIT_LINK_KEYSOURCE(varlist, ACT_KEYLIST(act));
+
+    // May not be at end or thrown, e.g. (x: does+ just y x = 'y)
+    //
+    DROP_GC_GUARD(action);  // before drop to balance at right time
+    Drop_Frame(f);
+
+    // The exemplar may or may not be managed as of yet.  We want it
+    // managed, but Push_Action() does not use ordinary series creation to
+    // make its nodes, so manual ones don't wind up in the tracking list.
+    //
+    SET_SERIES_FLAG(varlist, MANAGED); // can't use Manage_Series
+
+    Init_Frame(out, CTX(varlist), label);
+    return false;
+}
+
+
+//
+//  Make_Frame_From_Feed_Throws: C
+//
+// Making an invokable from a feed might return a QUOTED!, because that is
+// more efficient (and truthful) than creating a FRAME! for the identity
+// function.  However, MAKE FRAME! of a VARARGS! was an experimental feature
+// that has to follow the rules of MAKE FRAME!...e.g. returning a frame.
+// This converts QUOTED!s into frames for the identity function.
+//
+bool Make_Frame_From_Feed_Throws(REBVAL *out, REBFED *feed)
+{
+    if (Make_Invokable_From_Feed_Throws(out, feed))
+        return true;
+
+    if (IS_FRAME(out))
+        return false;
+
+    assert(IS_QUOTED(out));
+    REBCTX *exemplar = Make_Context_For_Action(
+        NATIVE_VAL(identity),
+        DSP,
+        nullptr
+    );
+
+    Unquotify(Copy_Cell(CTX_VAR(exemplar, 2), out), 1);
+
+    // Should we save the WORD! from a variable access to use as the name of
+    // the identity alias?
+    //
+    option(const REBSYM*) label = nullptr;
+    Init_Frame(out, exemplar, label);
+    return false;
+}
 
 
 // The REFRAMER native specializes out the FRAME! argument of the function
@@ -78,82 +241,29 @@ REB_R Reframer_Dispatcher(REBFRM *f)
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(ARR_LEN(details) == IDX_REFRAMER_MAX);
 
-    REBVAL* shim = SPECIFIC(ARR_AT(details, IDX_REFRAMER_SHIM));
+    REBVAL* shim = DETAILS_AT(details, IDX_REFRAMER_SHIM);
     assert(IS_ACTION(shim));
 
-    REBVAL* param_index = SPECIFIC(ARR_AT(details, IDX_REFRAMER_PARAM_INDEX));
+    REBVAL* param_index = DETAILS_AT(details, IDX_REFRAMER_PARAM_INDEX);
     assert(IS_INTEGER(param_index));
 
-    if (IS_END(f_value) or not (IS_WORD(f_value) or IS_PATH(f_value)))
-        fail ("REFRAMER can only currently run on subsequent WORD!/PATH!");
-
-    // First run ahead and make the frame we want from the feed.  We push
-    // the frame so that we can fold the refinements used into it, without
-    // needing to create an intermediate specialized function in the process.
+    // First run ahead and make the frame we want from the feed.
     //
-    // Note: We do not overwrite f->out in case of invisibility.
-
-    DECLARE_FRAME (sub, f->feed, EVAL_MASK_DEFAULT);
-    Push_Frame(f_spare, sub);
-
-    if (Get_If_Word_Or_Path_Throws(
-        sub->out,  // e.g. f_spare
-        f_value,
-        f_specifier,
-        true  // push_refinements = true (DECLARE_FRAME captured original DSP)
-    )){
-        Drop_Frame(sub);
+    // Note: We can't write the value directly into the arg (as this frame
+    // may have been built by a higher level ADAPT or other function that
+    // still holds references, and those references could be reachable by
+    // code that runs to fulfill parameters...which could see partially
+    // filled values).  And we don't want to overwrite f->out in case of
+    // invisibility.  So the frame's spare cell is used.
+    //
+    if (Make_Invokable_From_Feed_Throws(f_spare, f->feed))
         return R_THROWN;
-    }
 
-    if (not IS_ACTION(sub->out))
-        fail (rebUnrelativize(f_value));
-
-    Fetch_Next_Forget_Lookback(sub);  // now, onto the arguments...
-
-    const REBSTR *label = VAL_ACTION_LABEL(sub->out);
-
-    DECLARE_LOCAL (action);
-    Move_Value(action, sub->out);
-    PUSH_GC_GUARD(action);
-
-    REBVAL *first_arg;
-    if (Make_Invocation_Frame_Throws(sub, &first_arg, action)) {
-        DROP_GC_GUARD(action);
-        return R_THROWN;
-    }
-
-    UNUSED(first_arg); // MATCH uses to get its answer faster, we don't need
-
-    REBACT *act = VAL_ACTION(action);
-
-    assert(NOT_SERIES_FLAG(sub->varlist, MANAGED)); // not invoked yet
-    assert(FRM_BINDING(sub) == VAL_BINDING(action));
-
-    REBCTX *stolen = Steal_Context_Vars(CTX(sub->varlist), NOD(act));
-    assert(ACT_NUM_PARAMS(act) == CTX_LEN(stolen));
-
-    INIT_LINK_KEYSOURCE(stolen, NOD(act));
-
-    SET_SERIES_FLAG(sub->varlist, MANAGED); // is inaccessible
-    sub->varlist = nullptr; // just let it GC, for now
-
-    // May not be at end or thrown, e.g. (x: does lit y x = 'y)
-    //
-    DROP_GC_GUARD(action);  // before drop to balance at right time
-    Drop_Frame(sub);
-
-    // The exemplar may or may not be managed as of yet.  We want it
-    // managed, but Push_Action() does not use ordinary series creation to
-    // make its nodes, so manual ones don't wind up in the tracking list.
-    //
-    SET_SERIES_FLAG(stolen, MANAGED); // can't use Manage_Series
-
-    REBVAL *arg = FRM_ARGS_HEAD(f) + VAL_INT32(param_index);
-    Init_Frame(arg, stolen, label);
+    REBVAL *arg = FRM_ARG(f, VAL_INT32(param_index));
+    Copy_Cell(arg, f_spare);
 
     INIT_FRM_PHASE(f, VAL_ACTION(shim));
-    FRM_BINDING(f) = VAL_BINDING(shim);
+    INIT_FRM_BINDING(f, VAL_ACTION_BINDING(shim));
 
     return R_REDO_CHECKED;  // the redo will use the updated phase & binding
 }
@@ -162,12 +272,12 @@ REB_R Reframer_Dispatcher(REBFRM *f)
 //
 //  reframer*: native [
 //
-//  {Make a function that manipulate other actions at the callsite}
+//  {Make a function that manipulates an invocation at the callsite}
 //
 //      return: [action!]
-//      shim "The action that has a FRAME! argument to supply"
+//      shim "The action that has a FRAME! (or QUOTED!) argument to supply"
 //          [action!]
-//      /parameter "Which parameter of the shim gets given the FRAME!"
+//      /parameter "Shim parameter receiving the frame--defaults to last"
 //          [word!]
 //  ]
 //
@@ -175,63 +285,114 @@ REBNATIVE(reframer_p)
 {
     INCLUDE_PARAMS_OF_REFRAMER_P;
 
-    REBVAL *shim = ARG(shim);
+    REBACT *shim = VAL_ACTION(ARG(shim));
+    option(const REBSYM*) label = VAL_ACTION_LABEL(ARG(shim));
 
-    // Make action as a copy of the input function, with enough space to
-    // store the implementation phase and which parameter to fill with the
-    // frame.
-    //
-    REBARR *paramlist = Copy_Array_Shallow_Flags(
-        VAL_ACT_PARAMLIST(shim),  // same interface as head of pipeline
-        SPECIFIED,
-        SERIES_MASK_PARAMLIST
-            | (SER(VAL_ACTION(shim))->header.bits & PARAMLIST_MASK_INHERIT)
-            | NODE_FLAG_MANAGED
+    REBDSP dsp_orig = DSP;
+
+    struct Reb_Binder binder;
+    INIT_BINDER(&binder);
+    REBCTX *exemplar = Make_Context_For_Action_Push_Partials(
+        ARG(shim),
+        dsp_orig,
+        &binder
     );
-    Sync_Paramlist_Archetype(paramlist);  // [0] cell must hold copied pointer
-    MISC_META_NODE(paramlist) = nullptr;  // defaults to being trash
 
-    REBACT *underlying = ACT_UNDERLYING(VAL_ACTION(shim));
+    option(REBCTX*) error = nullptr;  // can't fail() with binder in effect
 
-    REBACT *reframer = Make_Action(
-        paramlist,
+    REBLEN param_index = 0;
+
+    if (DSP != dsp_orig) {
+        error = Error_User("REFRAMER can't use partial specializions ATM");
+        goto cleanup_binder;
+    }
+
+  blockscope {
+    const REBKEY *key;
+    const REBPAR *param;
+    
+    if (REF(parameter)) {
+        const REBSYM *symbol = VAL_WORD_SYMBOL(ARG(parameter));
+        param_index = Get_Binder_Index_Else_0(&binder, symbol);
+        if (param_index == 0) {
+            error = Error_No_Arg(label, symbol);
+            goto cleanup_binder;
+        }
+        key = CTX_KEY(exemplar, param_index);
+        param = cast_PAR(CTX_VAR(exemplar, param_index));
+    }
+    else {
+        param = Last_Unspecialized_Param(&key, shim);
+        param_index = param - ACT_PARAMS_HEAD(shim) + 1;
+    }
+
+    // Make sure the parameter is able to accept FRAME! arguments (the type
+    // checking will ultimately use the same slot we overwrite here!)
+    //
+    if (not TYPE_CHECK(param, REB_FRAME)) {
+        DECLARE_LOCAL (label_word);
+        if (label)
+            Init_Word(label_word, unwrap(label));
+        else
+            Init_Blank(label_word);
+
+        DECLARE_LOCAL (param_word);
+        Init_Word(param_word, KEY_SYMBOL(key));
+
+        error = Error_Expect_Arg_Raw(
+            label_word,
+            Datatype_From_Kind(REB_FRAME),
+            param_word
+        );
+        goto cleanup_binder;
+    }
+  }
+
+  cleanup_binder: {
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, shim);
+    const REBPAR *param = ACT_PARAMS_HEAD(shim);
+    for (; key != tail; ++key, ++param) {
+        if (Is_Param_Hidden(param))
+            continue;
+
+        const REBSYM *symbol = KEY_SYMBOL(key);
+        REBLEN index = Remove_Binder_Index_Else_0(&binder, symbol);
+        assert(index != 0);
+        UNUSED(index);
+    }
+
+    SHUTDOWN_BINDER(&binder);
+
+    if (error)  // once binder is cleaned up, safe to raise errors
+        fail (unwrap(error));
+  }
+
+    // We need the dispatcher to be willing to start the reframing step even
+    // though the frame to be processed isn't ready yet.  So we have to
+    // specialize the argument with something that type checks.  It wants a
+    // FRAME!, so temporarily fill it with the exemplar frame itself.
+    //
+    // !!! An expired frame would be better, or tweaking the argument so it
+    // takes a void and giving it ~pending~; would make bugs more obvious.
+    //
+    REBVAL *var = CTX_VAR(exemplar, param_index);
+    Copy_Cell(var, CTX_ARCHETYPE(exemplar));
+    SET_CELL_FLAG(var, VAR_MARKED_HIDDEN);
+
+    // Make action with enough space to store the implementation phase and
+    // which parameter to fill with the *real* frame instance.
+    //
+    Manage_Series(CTX_VARLIST(exemplar));
+    REBACT *reframer = Alloc_Action_From_Exemplar(
+        exemplar,  // shim minus the frame argument
         &Reframer_Dispatcher,
-        underlying,  // same underlying as shim
-        ACT_EXEMPLAR(VAL_ACTION(shim)),  // same exemplar as shim
         IDX_REFRAMER_MAX  // details array capacity => [shim, param_index]
     );
 
-    // Find the parameter they want to overwrite with the frame, or default
-    // to the last unspecialized parameter.
-    //
-    REBVAL *param = nullptr;
-    if (REF(parameter)) {
-        const REBSTR *canon = VAL_WORD_CANON(REF(parameter));
-        REBVAL *temp = ACT_PARAMS_HEAD(reframer);
-        for (; NOT_END(temp); ++temp) {
-            if (VAL_PARAM_CANON(temp) == canon) {
-                param = temp;
-                break;
-            }
-        }
-    }
-    else {  // default parameter to the last unspecialized one
-        param = Last_Unspecialized_Param(reframer);
-    }
-
-    // Set the type bits so that we can get the dispatcher to the point of
-    // running even though we haven't filled in a frame yet.
-    //
-    if (not param)
-        fail ("Could not find parameter for REFRAMER");
-    TYPE_SET(param, REB_VOID);
-    Hide_Param(param);
-
-    REBLEN param_index = param - ACT_PARAMS_HEAD(reframer);
-
     REBARR *details = ACT_DETAILS(reframer);
-    Move_Value(ARR_AT(details, IDX_REFRAMER_SHIM), shim);
+    Copy_Cell(ARR_AT(details, IDX_REFRAMER_SHIM), ARG(shim));
     Init_Integer(ARR_AT(details, IDX_REFRAMER_PARAM_INDEX), param_index);
 
-    return Init_Action(D_OUT, reframer, VAL_ACTION_LABEL(shim), UNBOUND);
+    return Init_Action(D_OUT, reframer, label, UNBOUND);
 }

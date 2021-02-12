@@ -20,21 +20,17 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// "VOID! is a means of giving a hot potato back that is a warning of
+//  something, but you don't want to force an error 'in the moment'...
+//  in case the returned information wasn't going to be used anyway."
+//
+// https://forum.rebol.info/t/947
+//
 // Void! results are the default for `do []`, and unlike NULL a void! *is*
 // a value...however a somewhat unfriendly one.  While NULLs are falsey, void!
 // is *neither* truthy nor falsey.  Though a void! can be put in an array (a
 // NULL can't) if the evaluator tries to run a void! cell in an array, it will
 // trigger an error.
-//
-// Void! also comes into play in what is known as "voidification" of NULLs.
-// Loops wish to reserve NULL as the return result if there is a BREAK, and
-// conditionals like IF and SWITCH want to reserve NULL to mean there was no
-// branch taken.  So when branches or loop bodies produce null, they need
-// to be converted to some ANY-VALUE!.
-//
-// The console doesn't print anything for void! evaluation results by default,
-// so that routines like HELP won't have additional output than what they
-// print out.
 //
 // In the debug build, it is possible to make an "unreadable" void!.  This
 // will behave neutrally as far as the garbage collector is concerned, so
@@ -47,62 +43,46 @@
 // if that fill in never happens.
 //
 
-inline static REBVAL *Init_Labeled_Void(RELVAL *out, const REBSTR *label) {
-    RESET_CELL(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
-    VAL_NODE(out) = NOD(label);
+inline static REBVAL *Init_Void_Core(
+    RELVAL *out,
+    const REBSTR *label
+){
+    RESET_VAL_HEADER(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
+    INIT_VAL_NODE1(out, label);
+  #ifdef ZERO_UNUSED_CELL_FIELDS
+    EXTRA(Any, out).trash = nullptr;
+    PAYLOAD(Any, out).second.trash = nullptr;
+  #endif
     return cast(REBVAL*, out);
 }
 
 #define Init_Void(out,sym) \
-    Init_Labeled_Void((out), Canon(sym))
+    Init_Void_Core(TRACK_CELL_IF_DEBUG(out), Canon(sym))
 
-inline static REBVAL *Init_Unlabeled_Void(RELVAL *out) {
-    RESET_CELL(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
-    VAL_NODE(out) = nullptr;
-    return cast(REBVAL*, out);
-}
-
-inline static const REBSTR *VAL_VOID_OPT_LABEL(REBCEL(const*) v) {
+inline static const REBSYM* VAL_VOID_LABEL(
+    REBCEL(const*) v
+){
     assert(CELL_KIND(v) == REB_VOID);
     assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    return cast(const REBSTR*, VAL_NODE(v));
+    return cast(const REBSYM*, VAL_NODE1(v));
 }
 
-// Don't let SYM_0 be used for unlabeled void, in case checking for a match
-// with a symbol extracted from a WORD! which has no symbol shorthand.
-//
-inline static bool Is_Void_With_Sym(const RELVAL *v, REBSYM sym) {
+inline static bool Is_Void_With_Sym(const RELVAL *v, SYMID sym) {
     assert(sym != SYM_0);
     if (not IS_VOID(v))
         return false;
-    const REBSTR *label = VAL_VOID_OPT_LABEL(v);
-    if (not label)
-        return false;  // unlabeled
-    return cast(REBLEN, sym) == cast(REBLEN, STR_SYMBOL(label));
+    return cast(REBLEN, sym) == cast(REBLEN, ID_OF_SYMBOL(VAL_VOID_LABEL(v)));
 }
 
 
-// Many loop constructs use BLANK! as a unique signal that the loop body
-// never ran, e.g. `for-each x [] [<unreturned>]` or `loop 0 [<unreturned>]`.
-// It's more valuable to have that signal be unique and have it be falsey
-// than it is to be able to return BLANK! from a loop, so blanks are voidified
-// alongside NULL (reserved for BREAKing)
-//
-inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
-    if (IS_NULLED(cell))
-        Init_Void(cell, SYM_NULLED);
-    else if (IS_BLANK(cell))
-        Init_Void(cell, SYM_BLANKED);
-    return cell;
-}
-
-
-#if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, same as plain VOID!
+#if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, non-crashing VOID!
     #define Init_Unreadable_Void(v) \
-        Init_Unlabeled_Void(v)
+        Init_Void_Core(TRACK_CELL_IF_DEBUG(v), PG_Unreadable_Canon)
 
     #define IS_VOID_RAW(v) \
-        IS_BLANK(v)
+        IS_VOID(v)
+
+    #define IS_UNREADABLE_DEBUG(v) false
 
     #define ASSERT_UNREADABLE_IF_DEBUG(v) \
         assert(IS_VOID(v))  // would have to be a void even if not unreadable
@@ -110,22 +90,20 @@ inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
     #define ASSERT_READABLE_IF_DEBUG(v) \
         NOOP
 #else
-    inline static REBVAL *Init_Unreadable_Void_Debug(
-        RELVAL *out, const char *file, int line
-    ){
-        RESET_CELL_Debug(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE, file, line);
+    inline static REBVAL *Init_Unreadable_Void_Debug(RELVAL *out) {
+        RESET_VAL_HEADER(out, REB_VOID, CELL_FLAG_FIRST_IS_NODE);
 
-        // While SYM_UNREADABLE would be nice here, that prevents usage at
-        // boot time (e.g. data stack initialization).  It's usually clear
+        // While SYM_UNREADABLE might be nice here, that prevents usage at
+        // boot time (e.g. data stack initialization)...and it's a good way
+        // to crash sites that expect normal voids.  It's usually clear
         // from the assert that the void is unreadable, anyway.
         //
-        VAL_NODE(out) = nullptr;  // needs flag for VAL_NODE() to not assert
-        out->extra.tick = -1;  // even non-tick counting builds default to 1
+        INIT_VAL_NODE1(out, nullptr);  // FIRST_IS_NODE needed to do this
         return cast(REBVAL*, out);
     }
 
     #define Init_Unreadable_Void(out) \
-        Init_Unreadable_Void_Debug((out), __FILE__, __LINE__)
+        Init_Unreadable_Void_Debug(TRACK_CELL_IF_DEBUG(out))
 
     #define IS_VOID_RAW(v) \
         (KIND3Q_BYTE_UNCHECKED(v) == REB_VOID)
@@ -133,7 +111,7 @@ inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
     inline static bool IS_UNREADABLE_DEBUG(const RELVAL *v) {
         if (KIND3Q_BYTE_UNCHECKED(v) != REB_VOID)
             return false;
-        return v->extra.tick < 0;
+        return VAL_NODE1(v) == nullptr;
     }
 
     #define ASSERT_UNREADABLE_IF_DEBUG(v) \
@@ -142,3 +120,28 @@ inline static REBVAL *Voidify_If_Nulled_Or_Blank(REBVAL *cell) {
     #define ASSERT_READABLE_IF_DEBUG(v) \
         assert(not IS_UNREADABLE_DEBUG(v))
 #endif
+
+
+// Moving a cell invalidates the old location.  This idea is a potential
+// prelude to being able to do some sort of reference counting on series based
+// on the cells that refer to them tracking when they are overwritten.  In
+// the meantime, setting to unreadable void helps see when a value that isn't
+// thought to be used any more is still being used.
+//
+inline static REBVAL *Move_Cell_Untracked(
+    RELVAL *out,
+    REBVAL *v,
+    REBFLGS copy_mask
+){
+    Copy_Cell_Core(out, v, copy_mask);
+  #if defined(NDEBUG)
+    Init_Unreadable_Void(v);  // no advantage in release build (yet!)
+  #endif
+    return cast(REBVAL*, out);
+}
+
+#define Move_Cell(out,v) \
+    Move_Cell_Untracked(TRACK_CELL_IF_DEBUG(out), (v), CELL_MASK_COPY)
+
+#define Move_Cell_Core(out,v,cell_mask) \
+    Move_Cell_Untracked(TRACK_CELL_IF_DEBUG(out), (v), (cell_mask))

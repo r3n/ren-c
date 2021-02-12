@@ -34,19 +34,19 @@ lib: system/contexts/lib
 
 ; Char constants
 
-NUL:       #"^(NULL)"
+nul: NUL:  #"^(NULL)"
 space:     #" "
-SP:        space
+sp: SP:    space
 backspace: #"^(BACK)"
-BS:        backspace
+bs: BS:    backspace
 tab:       #"^-"
 newline:   #"^/"
 newpage:   #"^l"
 slash:     #"/"
 backslash: #"\"
 escape:    #"^(ESC)"
-CR:        #"^M"
-LF:        newline
+cr: CR:    #"^M"
+lf: LF:    newline
 
 ; Function synonyms
 
@@ -58,6 +58,8 @@ abs: :absolute
 
 ; Note: NULL symbol is in lib context slot 1, is initialized on boot
 blank: _   ; e.g. sometimes `return blank` reads better than `return _`
+
+null-1?: :else?
 
 ; Note: VOID would have to be a function that returned ~void~, since plain
 ; `void: ~void~` would error on access.  In practice, this causes confusion

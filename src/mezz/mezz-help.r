@@ -20,45 +20,24 @@ spec-of: function [
 ][
     meta: try match object! meta-of :action
 
-    specializee: try match action! select meta 'specializee
-    adaptee: try match action! select meta 'adaptee
-    original-meta: try match object! any [
-        meta-of :specializee
-        meta-of :adaptee
-    ]
-
     return collect [
-        keep/line ensure [<opt> text!] any [
-            select meta 'description
-            select original-meta 'description
-        ]
+        keep/line ensure [<opt> text!] select meta 'description
 
-        return-type: try ensure [<opt> block!] any [
-            select meta 'return-type
-            select original-meta 'return-type
-        ]
-        return-note: try ensure [<opt> text!] any [
-            select meta 'return-note
-            select original-meta 'return-note
-        ]
-        if any [return-type return-note] [
+        types: ensure [<opt> frame! object!] select meta 'parameter-types
+        notes: ensure [<opt> frame! object!] select meta 'parameter-notes
+
+        return-type: ensure [<opt> block!] select try types 'return
+        return-note: ensure [<opt> text!] select try notes 'return
+
+        any [return-type, return-note] then [
             keep compose [
-                return: (opt return-type) (opt return-note)
+                return: (return-type) (return-note)
             ]
-        ]
-
-        types: try ensure [<opt> frame!] any [
-            select meta 'parameter-types
-            select original-meta 'parameter-types
-        ]
-        notes: try ensure [<opt> frame!] any [
-            select meta 'parameter-notes
-            select original-meta 'parameter-notes
         ]
 
         for-each param parameters of :action [
             keep compose [
-                (param) (select types param) (select notes param)
+                (param) (select try types param) (select try notes param)
             ]
         ]
     ]
@@ -72,16 +51,16 @@ description-of: function [
     v [<blank> any-value!]
 ][
     switch type of get/any 'v [
-        void! @[null]  ; don't voidify, want actual NULL
+        void! [null]
         any-array! [spaced ["array of length:" length of v]]
         image! [spaced ["size:" v/size]]
-        datatype! @[
+        datatype! [
             spec: ensure object! spec of v  ; "type specs" need simplifying
             opt copy spec/title
         ]
-        action! @[  ; want null when IF doesn't match
-            if meta: meta-of :v @[
-                opt copy get 'meta/description  ; can be BLANK!
+        action! [
+            if meta: meta-of :v [
+                opt copy try get 'meta/description  ; can be BLANK!
             ]
         ]
         gob! [spaced ["offset:" v/offset "size:" v/size]]
@@ -108,13 +87,10 @@ help: function [
         "WORD! whose value to explain, or other HELP target (try HELP HELP)"
     /doc "Open web browser to related documentation."
 ][
-    return: specialize :return [value: ~]  ; unlabeled for no console display
-
     if undefined? 'topic [
         ;
         ; !!! This should lead to a web page that offers help on the nature
-        ; of specific void usages, e.g. to explain what ~branched~ is and
-        ; how to use @[...] branches to avoid it.
+        ; of specific void usages.
         ;
         print [mold get/any 'topic "is a literal VOID! value"]
         return
@@ -145,7 +121,7 @@ help: function [
             To view words and values of a context or object:
 
                 help lib    - the runtime library
-                help self   - your user context
+                help system/contexts/user   - your user context
                 help system - the system object
                 help system/options - special settings
 
@@ -365,16 +341,16 @@ help: function [
     print newline
 
     print "DESCRIPTION:"
-    print [_ _ _ _ any [meta/description {(undocumented)}]]
+    print [_ _ _ _ meta/description else ["(undocumented)"]]
     print [_ _ _ _ (uppercase mold topic) {is an ACTION!}]
 
     print-args: function [list /indent-words] [
         for-each param list [
             type: ensure [<opt> block!] (
-                select try :meta/parameter-types to-word dequote param
+                select try meta/parameter-types to-word dequote param
             )
             note: ensure [<opt> text!] (
-                select try :meta/parameter-notes to-word dequote param
+                select try meta/parameter-notes to-word dequote param
             )
 
             print [_ _ _ _ param (if type [unspaced ["[" type "]"]])]
@@ -384,13 +360,19 @@ help: function [
         ]
     ]
 
+    ; !!! This is imperfect because it will think a parameter named RETURN
+    ; that isn't intended for use as a definitional return is a return type.
+    ; The concepts are still being fleshed out.
+    ;
+    return-type: select try meta/parameter-types 'return
+    return-note: select try meta/parameter-notes 'return
+
     print newline
     print [
-        "RETURNS:"
-        either :meta/return-type [mold :meta/return-type] ["(undocumented)"]
+        "RETURNS:" mold return-type else ["(undocumented)"]
     ]
-    if :meta/return-note [
-        print [_ _ _ _ meta/return-note]
+    if return-note [
+        print [_ _ _ _ return-note]
     ]
 
     if not empty? args [

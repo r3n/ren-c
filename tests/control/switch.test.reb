@@ -13,7 +13,7 @@
 )
 
 (null? switch 2 [1 []])
-(void? switch 1 [1 []])
+(null-2? switch 1 [1 []])
 
 (
     cases: reduce [1 head of insert copy [] trap [1 / 0]]
@@ -43,7 +43,6 @@
 
 ; New feature for specifying comparison functions via a TUPLE!
 
-(<b> = switch 10 .(reduce pick [:greater? :lesser?] 1) [20 [<a>] 5 [<b>]])
-(<a> = switch 10 .(reduce pick [:greater? :lesser?] 2) [20 [<a>] 5 [<b>]])
-(<yep> = switch 10 .greater? [20 [<nope>] 5 [<yep>]])
-(<yep> = switch 10 .> [20 [<nope>] 5 [<yep>]])
+(<b> = switch .reeval.(reduce pick [:greater? :lesser?] 1) 10 [20 [<a>] 5 [<b>]])
+(<a> = switch .reeval.(reduce pick [:greater? :lesser?] 2) 10 [20 [<a>] 5 [<b>]])
+(<yep> = switch .greater? 10 [20 [<nope>] 5 [<yep>]])

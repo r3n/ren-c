@@ -44,12 +44,12 @@
 REB_R MAKE_Fail(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     UNUSED(out);
     UNUSED(kind);
-    UNUSED(opt_parent);
+    UNUSED(parent);
     UNUSED(arg);
 
     fail ("Datatype does not have a MAKE handler registered");
@@ -66,11 +66,11 @@ REB_R MAKE_Fail(
 REB_R MAKE_Unhooked(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     UNUSED(out);
-    UNUSED(opt_parent);
+    UNUSED(parent);
     UNUSED(arg);
 
     const REBVAL *type = Datatype_From_Kind(kind);
@@ -101,9 +101,9 @@ REBNATIVE(make)
     REBVAL *arg = ARG(def);
 
     if (IS_SYM_WORD(type)) {  // hack for MAKE CHAR! 0
-        switch (VAL_WORD_SYM(type)) {
+        switch (VAL_WORD_ID(type)) {
           case SYM_CHAR_X:
-            Move_Value(type, Datatype_From_Kind(REB_ISSUE));
+            Copy_Cell(type, Datatype_From_Kind(REB_ISSUE));
             break;
 
           default:
@@ -127,21 +127,21 @@ REBNATIVE(make)
 
     MAKE_HOOK *hook;
 
-    REBVAL *opt_parent;
+    option(const REBVAL*) parent;
     enum Reb_Kind kind;
     if (IS_DATATYPE(type)) {
         hook = Make_Hook_For_Type(type);
         kind = VAL_TYPE_KIND_OR_CUSTOM(type);
-        opt_parent = nullptr;
+        parent = nullptr;
     }
     else {
         kind = VAL_TYPE(type);
-        opt_parent = type;
+        parent = type;
         hook = Make_Hook_For_Kind(kind);
     }
 
 
-    REB_R r = hook(D_OUT, kind, opt_parent, arg);  // might throw, fail...
+    REB_R r = hook(D_OUT, kind, parent, arg);  // might throw, fail...
     if (r == R_THROWN)
         return r;
     if (r == nullptr or VAL_TYPE(r) != kind)
@@ -197,7 +197,7 @@ REBNATIVE(to)
     REBVAL *type = ARG(type);
 
     if (IS_SYM_WORD(type)) {  // hack for TO CHAR! XXX
-        switch (VAL_WORD_SYM(type)) {
+        switch (VAL_WORD_ID(type)) {
           case SYM_CHAR_X:
             fail ("Convert INTEGER! to codepoint with MAKE ISSUE!, not TO");
 
@@ -266,7 +266,7 @@ REB_R Reflect_Core(REBFRM *frame_)
     REBCEL(const*) cell = VAL_UNESCAPED(v);
     enum Reb_Kind kind = CELL_KIND(cell);
 
-    switch (VAL_WORD_SYM(ARG(property))) {
+    switch (VAL_WORD_ID(ARG(property))) {
       case SYM_0:
         //
         // If a word wasn't in %words.r, it has no integer SYM.  There is
@@ -289,7 +289,7 @@ REB_R Reflect_Core(REBFRM *frame_)
         else
             Init_Builtin_Datatype(D_OUT, kind);
 
-        // `type of lit '''[a b c]` is `'''#[block!]`.  Until datatypes get
+        // `type of just '''[a b c]` is `'''#[block!]`.  Until datatypes get
         // a firm literal notation, you can say `quote quote block!`
         //
         // If the escaping count of the value is zero, this returns it as is.
@@ -349,13 +349,25 @@ REBNATIVE(reflect)
 //  {Infix form of REFLECT which quotes its left (X OF Y => REFLECT Y 'X)}
 //
 //      return: [<opt> any-value!]
-//      :property "Hard quoted so that `integer! = type of 1` works`"
-//          [word! group!]
+//      'property "Will be escapable, ':property (bootstrap permitting)"
+//          [word! get-word! get-path! get-group!]
 //      value "Accepts null so TYPE OF NULL can be returned as null"
 //          [<opt> any-value!]
 //  ]
 //
 REBNATIVE(of)
+//
+// !!! ':PROPERTY is not loadable by the bootstrap executable at time of
+// writing.  But that is desired over 'PROPERTY or :PROPERTY so that both
+// these cases would work:
+//
+//     >> integer! = type of 1
+//     == #[true]
+//
+//     >> integer! = :(second [length type]) of 1
+//     == #[true]
+//
+// For the moment the behavior is manually simulated.
 //
 // Common enough to be worth it to do some kind of optimization so it's not
 // much slower than a REFLECT; e.g. you don't want it building a separate
@@ -365,12 +377,16 @@ REBNATIVE(of)
 
     REBVAL *prop = ARG(property);
 
-    if (IS_GROUP(prop)) {
+    if (ANY_ESCAPABLE_GET(prop)) {  // !!! See note above
         if (Eval_Value_Throws(D_SPARE, prop, SPECIFIED))
             return R_THROWN;
+        if (not IS_WORD(D_SPARE)) {
+            Move_Cell(prop, D_SPARE);
+            fail (Error_Invalid_Arg(frame_, PAR(property)));
+        }
     }
     else
-        Move_Value(D_SPARE, prop);
+        Copy_Cell(D_SPARE, prop);
 
     // !!! Ugly hack to make OF frame-compatible with REFLECT.  If there was
     // a separate dispatcher for REFLECT it could be called with proper
@@ -378,8 +394,8 @@ REBNATIVE(of)
     // fit the type action dispatcher rule... dispatch item in first arg,
     // property in the second.
     //
-    Move_Value(ARG(property), ARG(value));
-    Move_Value(ARG(value), D_SPARE);
+    Copy_Cell(ARG(property), ARG(value));
+    Copy_Cell(ARG(value), D_SPARE);
 
     return Reflect_Core(frame_);
 }
@@ -562,13 +578,11 @@ const REBYTE *Scan_Dec_Buf(
 // Scan and convert a decimal value.  Return zero if error.
 //
 const REBYTE *Scan_Decimal(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len,
     bool dec_only
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
+){
     REBYTE buf[MAX_NUM_LEN + 4];
     REBYTE *ep = buf;
     if (len > MAX_NUM_LEN)
@@ -656,12 +670,10 @@ const REBYTE *Scan_Decimal(
 // Allow preceding + - and any combination of ' marks.
 //
 const REBYTE *Scan_Integer(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
+){
     // Super-fast conversion of zero and one (most common cases):
     if (len == 1) {
         if (*cp == '0') {
@@ -751,7 +763,7 @@ const REBYTE *Scan_Integer(
 // Scan and convert a date. Also can include a time and zone.
 //
 const REBYTE *Scan_Date(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
@@ -990,7 +1002,7 @@ const REBYTE *Scan_Date(
 // Scan and convert a file name.
 //
 const REBYTE *Scan_File(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
@@ -1033,12 +1045,10 @@ const REBYTE *Scan_File(
 // Scan and convert email.
 //
 const REBYTE *Scan_Email(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
+){
     REBSTR *s = Make_String(len * 2);  // !!! guess...use mold buffer instead?
     REBCHR(*) up = STR_HEAD(s);
 
@@ -1105,7 +1115,7 @@ const REBYTE *Scan_Email(
 // on Windows, are expressed as TEXT!.)
 //
 const REBYTE *Scan_URL(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ){
@@ -1119,12 +1129,10 @@ const REBYTE *Scan_URL(
 // Scan and convert a pair
 //
 const REBYTE *Scan_Pair(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
-    TRASH_CELL_IF_DEBUG(out);
-
     REBYTE buf[MAX_NUM_LEN + 4];
 
     bool is_integral;
@@ -1164,7 +1172,7 @@ const REBYTE *Scan_Pair(
     Manage_Pairing(paired);
 
     RESET_CELL(out, REB_PAIR, CELL_FLAG_FIRST_IS_NODE);
-    VAL_PAIR_NODE(out) = NOD(paired);
+    INIT_VAL_PAIR(out, paired);
     return xp;
 }
 
@@ -1175,12 +1183,10 @@ const REBYTE *Scan_Pair(
 // Scan and convert binary strings.
 //
 const REBYTE *Scan_Binary(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN len
 ) {
-    TRASH_CELL_IF_DEBUG(out);
-
     REBINT base = 16;
 
     if (*cp != '#') {
@@ -1215,14 +1221,12 @@ const REBYTE *Scan_Binary(
 // Scan any string that does not require special decoding.
 //
 const REBYTE *Scan_Any(
-    RELVAL *out, // may live in data stack (do not call DS_PUSH(), GC, eval)
+    RELVAL *out,
     const REBYTE *cp,
     REBLEN num_bytes,
     enum Reb_Kind type,
     enum Reb_Strmode strmode
-) {
-    TRASH_CELL_IF_DEBUG(out);
-
+){
     // The range for a curly braced string may span multiple lines, and some
     // files may have CR and LF in the data:
     //
@@ -1274,10 +1278,9 @@ REBNATIVE(scan_net_header)
     REBARR *result = Make_Array(10); // Just a guess at size (use STD_BUF?)
 
     REBVAL *header = ARG(header);
-    REBLEN index = VAL_INDEX(header);
-    const REBSER *utf8 = VAL_SERIES(header);
-
-    const REBYTE *cp = BIN_HEAD(utf8) + index;
+    REBSIZ size;
+    const REBYTE *cp = VAL_BYTES_AT(&size, header);
+    UNUSED(size);  // !!! Review semantics
 
     while (IS_LEX_ANY_SPACE(*cp)) cp++; // skip white space
 
@@ -1304,14 +1307,14 @@ REBNATIVE(scan_net_header)
 
         REBVAL *val = NULL; // rigorous checks worry it could be uninitialized
 
-        const REBSTR *name = Intern_UTF8_Managed(start, cp - start);
+        const REBSYM *name = Intern_UTF8_Managed(start, cp - start);
         RELVAL *item;
 
         cp++;
         // Search if word already present:
         for (item = ARR_HEAD(result); NOT_END(item); item += 2) {
             assert(IS_TEXT(item + 1) || IS_BLOCK(item + 1));
-            if (SAME_STR(VAL_WORD_SPELLING(item), name)) {
+            if (Are_Synonyms(VAL_WORD_SYMBOL(item), name)) {
                 // Does it already use a block?
                 if (IS_BLOCK(item + 1)) {
                     // Block of values already exists:

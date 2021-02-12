@@ -61,7 +61,7 @@ DEVICE_CMD Open_Signal(REBREQ *signal)
     rebElide(
         "insert system/ports/system make event! [",
             "type: 'open",
-            "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(signal))),
+            "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, signal)),
         "]",
     rebEND);
 
@@ -118,7 +118,7 @@ DEVICE_CMD Read_Signal(REBREQ *signal)
     rebElide(
         "insert system/ports/system make event! [",
             "type: 'read",
-            "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(signal))),
+            "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, signal)),
         "]",
     rebEND);
 

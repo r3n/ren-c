@@ -88,7 +88,7 @@
 // void parameters being legal.  The VOID! return type is handled exclusively
 // by the return value, to prevent potential mixups.
 //
-inline static ffi_type *Get_FFType_For_Sym(REBSYM sym) {
+inline static ffi_type *Get_FFType_For_Sym(SYMID sym) {
     switch (sym) {
       case SYM_UINT8: return &ffi_type_uint8;
       case SYM_INT8: return &ffi_type_sint8;
@@ -171,13 +171,13 @@ enum {
     IDX_FIELD_MAX
 };
 
-#define FLD_AT(a, n) \
-    SER_AT(REBVAL, SER(a), (n))  // locate index access
+#define FLD_AT(a,n) \
+    SER_AT(REBVAL, (a), (n))  // locate index access
 
 inline static const REBSTR *FLD_NAME(REBFLD *f) {
     if (IS_BLANK(FLD_AT(f, IDX_FIELD_NAME)))
         return nullptr;
-    return VAL_WORD_SPELLING(FLD_AT(f, IDX_FIELD_NAME));
+    return VAL_WORD_SYMBOL(FLD_AT(f, IDX_FIELD_NAME));
 }
 
 inline static bool FLD_IS_STRUCT(REBFLD *f) {
@@ -187,7 +187,7 @@ inline static bool FLD_IS_STRUCT(REBFLD *f) {
     return false;
 }
 
-inline static REBSYM FLD_TYPE_SYM(REBFLD *f) {
+inline static SYMID FLD_TYPE_SYM(REBFLD *f) {
     if (FLD_IS_STRUCT(f)) {
         //
         // We could return SYM_STRUCT_X for structs, but it's probably better
@@ -197,7 +197,7 @@ inline static REBSYM FLD_TYPE_SYM(REBFLD *f) {
         return SYM_STRUCT_X;
     }
     assert(IS_WORD(FLD_AT(f, IDX_FIELD_TYPE)));
-    return VAL_WORD_SYM(FLD_AT(f, IDX_FIELD_TYPE));
+    return VAL_WORD_ID(FLD_AT(f, IDX_FIELD_TYPE));
 }
 
 inline static REBARR *FLD_FIELDLIST(REBFLD *f) {
@@ -237,7 +237,7 @@ inline static ffi_type* SCHEMA_FFTYPE(const RELVAL *schema) {
         REBFLD *field = VAL_ARRAY_KNOWN_MUTABLE(schema);
         return FLD_FFTYPE(field);
     }
-    return Get_FFType_For_Sym(VAL_WORD_SYM(schema));
+    return Get_FFType_For_Sym(VAL_WORD_ID(schema));
 }
 
 
@@ -262,13 +262,14 @@ inline static bool IS_STRUCT(const RELVAL *v)  // Note: QUOTED! doesn't count
 
 typedef REBARR REBSTU;
 
-#define LINK_SCHEMA_NODE(stu)   LINK(stu).custom.node
-#define LINK_SCHEMA(s)          ARR(LINK_SCHEMA_NODE(s))
+#define LINK_Schema_TYPE        REBFLD*  // ust an alias for REBARR
+#define LINK_Schema_CAST        ARR
+#define HAS_LINK_Scheme         FLAVOR_ARRAY
 
-#define MISC_STU_OFFSET(stu)    MISC(stu).custom.u32
+#define MISC_STU_OFFSET(stu)    (stu)->misc.custom.u32
 
 inline static REBFLD *STU_SCHEMA(REBSTU *stu) {
-    REBFLD *schema = cast(REBARR*, LINK(stu).custom.node);
+    REBFLD *schema = LINK(Schema, stu);
     assert(FLD_IS_STRUCT(schema));
     return schema;
 }
@@ -277,7 +278,7 @@ inline static REBFLD *STU_SCHEMA(REBSTU *stu) {
     SPECIFIC(ARR_SINGLE(stu))  // BINARY! or HANDLE!
 
 #define STU_OFFSET(stu) \
-    MISC(stu).custom.u32
+    (stu)->misc.custom.u32
 
 inline static REBARR *STU_FIELDLIST(REBSTU *stu)
   { return FLD_FIELDLIST(STU_SCHEMA(stu)); }
@@ -325,7 +326,7 @@ inline static bool STU_INACCESSIBLE(REBSTU *stu) {
 // may be a handle instead of a BINARY!.
 
 #define VAL_STRUCT(v) \
-    cast(REBSTU*, VAL_NODE(v))
+    cast(REBSTU*, VAL_NODE1(v))
 
 #define VAL_STRUCT_DATA(v) \
     STU_DATA(VAL_STRUCT(v))
@@ -364,7 +365,7 @@ inline static REBVAL *Init_Struct(RELVAL *out, REBSTU *stu) {
     assert(GET_SERIES_FLAG(stu, MANAGED));
 
     RESET_CUSTOM_CELL(out, EG_Struct_Type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, stu);
+    INIT_VAL_NODE1(out, stu);
     VAL_STRUCT_OFFSET(out) = 0;
     return SPECIFIC(out);
 }
@@ -444,8 +445,8 @@ enum {
     IDX_ROUTINE_MAX
 };
 
-#define RIN_AT(a, n) \
-    SER_AT(REBVAL, SER(a), (n)) // locate index access
+#define RIN_AT(a,n) \
+    SER_AT(REBVAL, (a), (n))  // locate index access
 
 inline static CFUNC *RIN_CFUNC(REBRIN *r)
     { return VAL_HANDLE_CFUNC(RIN_AT(r, IDX_ROUTINE_CFUNC)); }

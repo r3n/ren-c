@@ -38,7 +38,7 @@ static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
     INCLUDE_PARAMS_OF_TRAP;
     UNUSED(ARG(result));
 
-    if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(code)))
+    if (Do_Branch_Throws(D_OUT, ARG(code)))
         return BLANK_VALUE;  // signal thrown without corrupting D_OUT
 
     return nullptr;
@@ -52,10 +52,11 @@ static const REBVAL *Trap_Dangerous(REBFRM *frame_) {
 //
 //      return: "ERROR! if raised, else null"
 //          [<opt> error!]
+//      result: "<output> The optional result of the evaluation"
+//          [<opt> any-value!]
+//
 //      code "Code to execute and monitor"
 //          [block! action!]
-//      /result "The optional output result of the evaluation"
-//          [<output> <opt> any-value!]
 //  ]
 //
 REBNATIVE(trap)
@@ -81,7 +82,7 @@ REBNATIVE(trap)
 static REBVAL *Entrap_Dangerous(REBFRM *frame_) {
     INCLUDE_PARAMS_OF_ENTRAP;
 
-    if (Do_Branch_Throws(D_OUT, D_SPARE, ARG(code))) {
+    if (Do_Branch_Throws(D_OUT, ARG(code))) {
         Init_Error(D_OUT, Error_No_Catch_For_Throw(D_OUT));
         return nullptr;
     }
@@ -89,10 +90,8 @@ static REBVAL *Entrap_Dangerous(REBFRM *frame_) {
     if (IS_NULLED(D_OUT))
         return nullptr; // don't box it up
 
-    REBARR *a = Alloc_Singular(
-        ARRAY_MASK_HAS_FILE_LINE | NODE_FLAG_MANAGED
-    );
-    Move_Value(ARR_SINGLE(a), D_OUT);
+    REBARR *a = Alloc_Singular(ARRAY_MASK_HAS_FILE_LINE | NODE_FLAG_MANAGED);
+    Copy_Cell(ARR_SINGLE(a), D_OUT);
     Init_Block(D_OUT, a);
     return nullptr;
 }
@@ -112,9 +111,6 @@ static REBVAL *Entrap_Dangerous(REBFRM *frame_) {
 REBNATIVE(entrap)
 {
     INCLUDE_PARAMS_OF_ENTRAP;
-
-    if (IS_BLOCK(ARG(code)))
-        Symify(ARG(code));  // request that branch is not voidified
 
     REB_R error = rebRescue(cast(REBDNG*, &Entrap_Dangerous), frame_);
     UNUSED(ARG(code)); // gets used by the above call, via the frame_ pointer

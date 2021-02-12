@@ -1,6 +1,6 @@
 //
-//  File: %sys-frame.h
-//  Summary: {Evaluator "Do State"}
+//  File: %sys-rebfrm.h
+//  Summary: {REBFRM Structure Frame Definition}
 //  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
 //  Homepage: https://github.com/metaeducation/ren-c/
 //
@@ -20,30 +20,19 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// The primary routine that handles DO and EVALUATE is Eval_Core().  It
-// takes a single parameter which holds the running state of the evaluator.
-// This state may be allocated on the C variable stack.
+// This declares the structure used by frames, for use in other structs.
+// See %sys-frame.h for a higher-level description.
 //
-// Eval_Core() is written so that a longjmp to a failure handler above
-// it can do cleanup safely even though intermediate stacks have vanished.
-// This is because Push_Frame and Drop_Frame maintain an independent global
-// list of the frames in effect, so that the Fail_Core() routine can unwind
-// all the associated storage and structures for each frame.
+
+
+// The REBFRM's `varlist` field holds a ready-made varlist for a frame,
+// which may be reused.  However, when a stack frame is dropped it can
+// only be reused by putting it in a place that future pushes can find
+// it.  This is used to link a varlist into the reusable list.
 //
-// Ren-C can not only run the evaluator across a REBARR-style series of
-// input based on index, it can also enumerate through C's `va_list`,
-// providing the ability to pass pointers as REBVAL* in a variadic function
-// call from the C (comma-separated arguments, as with printf()).  Future data
-// sources might also include a REBVAL[] raw C array.
-//
-// To provide even greater flexibility, it allows the very first element's
-// pointer in an evaluation to come from an arbitrary source.  It doesn't
-// have to be resident in the same sequence from which ensuing values are
-// pulled, allowing a free head value (such as an ACTION! REBVAL in a local
-// C variable) to be evaluated in combination from another source (like a
-// va_list or series representing the arguments.)  This avoids the cost and
-// complexity of allocating a series to combine the values together.
-//
+#define LINK_ReuseNext_TYPE         REBARR*
+#define LINK_ReuseNext_CAST         ARR
+#define HAS_LINK_ReuseNext          FLAVOR_VARLIST
 
 
 // See Endlike_Header() for why these are chosen the way they are.  This
@@ -58,21 +47,28 @@ STATIC_ASSERT(EVAL_FLAG_0_IS_TRUE == NODE_FLAG_NODE);
 STATIC_ASSERT(EVAL_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
 
 
-//=//// EVAL_FLAG_2 ///////////////////////////////////////////////////////=//
+//=//// EVAL_FLAG_ALLOCATED_FEED //////////////////////////////////////////=//
 //
-#define EVAL_FLAG_2 \
+// Some frame recursions re-use a feed that already existed, while others will
+// allocate them.  This re-use allows recursions to keep index positions and
+// fetched "gotten" values in sync.  The dynamic allocation means that feeds
+// can be kept alive across contiuations--which wouldn't be possible if they
+// were on the C stack.
+//
+// If a frame allocated a feed, then it has to be freed...which is done when
+// the frame is dropped or aborted.
+//
+#define EVAL_FLAG_ALLOCATED_FEED \
     FLAG_LEFT_BIT(2)
 
 
-//=//// EVAL_FLAG_UNDO_MARKED_STALE ///////////////////////////////////////=//
+//=//// EVAL_FLAG_PATH_MODE ///////////////////////////////////////////////=//
 //
-// Note: This bit is the same as NODE_FLAG_MARKED, so it lines up directly
-// with CELL_FLAG_OUT_MARKED_STALE.
+// The frame is for a PATH! dispatch.  Many of the Eval_Core() flags are not
+// applicable in this case.
 //
-#define EVAL_FLAG_UNDO_MARKED_STALE \
+#define EVAL_FLAG_PATH_MODE \
     FLAG_LEFT_BIT(3)
-
-STATIC_ASSERT(EVAL_FLAG_UNDO_MARKED_STALE == CELL_FLAG_OUT_MARKED_STALE);
 
 
 //=//// EVAL_FLAG_CACHE_NO_LOOKAHEAD //////////////////////////////////////=//
@@ -101,6 +97,8 @@ STATIC_ASSERT(EVAL_FLAG_UNDO_MARKED_STALE == CELL_FLAG_OUT_MARKED_STALE);
 #define EVAL_FLAG_CACHE_NO_LOOKAHEAD \
     FLAG_LEFT_BIT(4)
 
+STATIC_ASSERT(EVAL_FLAG_CACHE_NO_LOOKAHEAD == FEED_FLAG_NO_LOOKAHEAD);
+
 
 //=//// EVAL_FLAG_5 ///////////////////////////////////////////////////////=//
 //
@@ -110,7 +108,7 @@ STATIC_ASSERT(EVAL_FLAG_UNDO_MARKED_STALE == CELL_FLAG_OUT_MARKED_STALE);
 
 //=//// EVAL_FLAG_FULLY_SPECIALIZED ///////////////////////////////////////=//
 //
-// When a null is seen in f->special, the question is whether that is an
+// When a null is seen in f->param, the question is whether that is an
 // intentional "null specialization" or if it means the argument should be
 // gathered normally (if applicable), as it would in a typical invocation.
 // If the frame is considered fully specialized (as with DO F) then there
@@ -202,12 +200,12 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(19)
 
 
-//=//// EVAL_FLAG_PATH_MODE ///////////////////////////////////////////////=//
+//=//// EVAL_FLAG_TYPECHECK_ONLY //////////////////////////////////////////=//
 //
-// The frame is for a PATH! dispatch.  Many of the Eval_Core() flags are not
-// applicable in this case.
+// This is used by <blank> to indicate that once the frame is fulfilled, the
+// only thing that should be done is typechecking...don't run the action.
 //
-#define EVAL_FLAG_PATH_MODE \
+#define EVAL_FLAG_TYPECHECK_ONLY \
     FLAG_LEFT_BIT(20)
 
 
@@ -245,9 +243,9 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
 // cases are designed to operate in isolation, and are incompatible with the
 // idea of enfix operations that stay pending in the evaluation queue, e.g.
 //
-//     match parse "aab" [some "a"] else [print "what should this do?"]
+//     match+ parse "aab" [some "a"] else [print "what should this do?"]
 //
-// MATCH is variadic, and in one step asks to make a frame from the right
+// MATCH+ is variadic, and in one step asks to make a frame from the right
 // hand side.  But it's 99% likely intent of this was to attach the ELSE to
 // the MATCH and not the PARSE.  That looks inconsistent, since the user
 // imagines it's the evaluator running PARSE as a parameter to MATCH (vs.
@@ -281,6 +279,8 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
 #define EVAL_FLAG_FULFILLING_ARG \
     FLAG_LEFT_BIT(25)
 
+STATIC_ASSERT(DETAILS_FLAG_IS_BARRIER == EVAL_FLAG_FULFILLING_ARG);
+
 
 //=//// EVAL_FLAG_NO_RESIDUE //////////////////////////////////////////////=//
 //
@@ -309,19 +309,21 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
 // arguments at the callsite can't be gathered in sequence.  Revisiting them
 // will be necessary.  This flag is set while they are revisited, which is
 // important not only for Eval_Core() to know, but also the GC...since it
-// means it must protect *all* of the arguments--not just up thru f->param.
+// means it must protect *all* of the arguments--not just up thru f->key.
 //
 #define EVAL_FLAG_DOING_PICKUPS \
     FLAG_LEFT_BIT(27)
 
 
-//=//// EVAL_FLAG_TYPECHECK_ONLY //////////////////////////////////////////=//
+//=//// EVAL_FLAG_UNDO_NOTE_STALE /////////////////////////////////////////=//
 //
-// This is used by <blank> to indicate that once the frame is fulfilled, the
-// only thing that should be done is typechecking...don't run the action.
+// Note: This bit is the same as CELL_FLAG_NOTE, so it lines up directly
+// with CELL_FLAG_OUT_NOTE_STALE.
 //
-#define EVAL_FLAG_TYPECHECK_ONLY \
+#define EVAL_FLAG_UNDO_NOTE_STALE \
     FLAG_LEFT_BIT(28)
+
+STATIC_ASSERT(EVAL_FLAG_UNDO_NOTE_STALE == CELL_FLAG_OUT_NOTE_STALE);
 
 
 //=//// EVAL_FLAG_PUSH_PATH_REFINES + EVAL_FLAG_BLAME_PARENT //////////////=//
@@ -365,19 +367,9 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
     FLAG_LEFT_BIT(30)
 
 
-//=//// EVAL_FLAG_TOOK_HOLD ///////////////////////////////////////////////=//
+//=//// EVAL_FLAG_31 //////////////////////////////////////////////////////=//
 //
-// If a frame takes SERIES_INFO_HOLD on an array it is enumerating, it has to
-// remember that it did so it can release it when it is done processing.
-// Note that this has to be a flag on the frame, not the feed--as a feed can
-// be shared among many frames.
-//
-// !!! This is undermined by work in stackless, where a single bit is not
-// sufficient since the stacks do not cleanly unwind:
-//
-// https://forum.rebol.info/t/1317
-//
-#define EVAL_FLAG_TOOK_HOLD \
+#define EVAL_FLAG_31 \
     FLAG_LEFT_BIT(31)
 
 
@@ -407,155 +399,6 @@ STATIC_ASSERT(31 < 32);  // otherwise EVAL_FLAG_XXX too high
 #define NOT_EVAL_FLAG(f,name) \
     ((FRM(f)->flags.bits & EVAL_FLAG_##name) == 0)
 
-
-#define TRASHED_INDEX ((REBLEN)(-3))
-
-
-struct Reb_Feed {
-    //
-    // Sometimes the frame can be advanced without keeping track of the
-    // last cell.  And sometimes the last cell lives in an array that is
-    // being held onto and read only, so its pointer is guaranteed to still
-    // be valid after a fetch.  But there are cases where values are being
-    // read from transient sources that disappear as they go...if that is
-    // the case, and lookback is needed, it is written into this cell.
-    //
-    RELVAL lookback;
-
-    // When feeding cells from a variadic, those cells may wish to mutate the
-    // value in some way... e.g. to add a quoting level.  Rather than
-    // complicate the evaluator itself with flags and switches, each frame
-    // has a holding cell which can optionally be used as the pointer that
-    // is returned by Fetch_Next_in_Frame(), where arbitrary mutations can
-    // be applied without corrupting the value they operate on.
-    //
-    RELVAL fetched;
-
-    union Reb_Header flags;  // quoting level included
-
-    // If the binder isn't NULL, then any words or arrays are bound into it
-    // during the loading process.  
-    //
-    // !!! Note: At the moment a UTF-8 string is seen in the feed, it sets
-    // these fields on-demand, and then runs a scan of the entire rest of the
-    // feed, caching it.  It doesn't have a choice as only one binder can
-    // be in effect at a time, and so it can't run code as it goes.
-    //
-    // Hence these fields aren't in use at the same time as the lookback
-    // at this time; since no evaluations are being done.  They could be put
-    // into a pseudotype cell there, if this situation of scanning-to-end
-    // is a going to stick around.  But it is slow and smarter methods are
-    // going to be necessary.
-    //
-    struct Reb_Binder *binder;
-    REBCTX *lib;  // does not expand, has negative indices in binder
-    REBCTX *context;  // expands, has positive indices in binder
-
-    // A frame may be sourced from a va_list of pointers, or not.  If this is
-    // NULL it is assumed that the values are sourced from a simple array.
-    //
-    va_list *vaptr;
-
-    // The feed could also be coming from a packed array of pointers...this
-    // is used by the C++ interface, which creates a `std::array` on the
-    // C stack of the processed variadic arguments it enumerated.
-    //
-    const void* const *packed;
-
-    // This contains an IS_END() marker if the next fetch should be an attempt
-    // to consult the va_list (if any).  That end marker may be resident in
-    // an array, or if it's a plain va_list source it may be the global END.
-    //
-    const RELVAL *pending;
-
-    // If values are being sourced from an array, this holds the pointer to
-    // that array.  By knowing the array it is possible for error and debug
-    // messages to reach backwards and present more context of where the
-    // error is located.
-    //
-    const REBARR *array;
-
-    // This holds the index of the *next* item in the array to fetch as
-    // f->value for processing.  It's invalid if the frame is for a C va_list.
-    //
-    REBLEN index;
-
-    // This is used for relatively bound words to be looked up to become
-    // specific.  Typically the specifier is extracted from the payload of the
-    // ANY-ARRAY! value that provided the source.array for the call to DO.
-    // It may also be NULL if it is known that there are no relatively bound
-    // words that will be encountered from the source--as in va_list calls.
-    //
-    REBSPC *specifier;
-
-    // This is the "prefetched" value being processed.  Entry points to the
-    // evaluator must load a first value pointer into it...which for any
-    // successive evaluations will be updated via Fetch_Next_In_Frame()--which
-    // retrieves values from arrays or va_lists.  But having the caller pass
-    // in the initial value gives the option of that value being out of band.
-    //
-    // (Hence if one has the series `[[a b c] [d e]]` it would be possible to
-    // have an independent path value `append/only` and NOT insert it in the
-    // series, yet get the effect of `append/only [a b c] [d e]`.  This only
-    // works for one value, but is a convenient no-cost trick for apply-like
-    // situations...as insertions usually have to "slide down" the values in
-    // the series and may also need to perform alloc/free/copy to expand.
-    // It also is helpful since in C, variadic functions must have at least
-    // one non-variadic parameter...and one might want that non-variadic
-    // parameter to be blended in with the variadics.)
-    //
-    // !!! Review impacts on debugging; e.g. a debug mode should hold onto
-    // the initial value in order to display full error messages.
-    //
-    const RELVAL *value;  // is never nullptr (ends w/END cells or rebEND)
-
-    // There is a lookahead step to see if the next item in an array is a
-    // WORD!.  If so it is checked to see if that word is a "lookback word"
-    // (e.g. one that refers to an ACTION! value set with SET/ENFIX).
-    // Performing that lookup has the same cost as getting the variable value.
-    // Considering that the value will need to be used anyway--infix or not--
-    // the pointer is held in this field for WORD!s.
-    //
-    // However, reusing the work is not possible in the general case.  For
-    // instance, this would cause a problem:
-    //
-    //     obj: make object! [x: 10]
-    //     foo: does [append obj [y: 20]]
-    //     do in obj [foo x]
-    //                   ^-- consider the moment of lookahead, here
-    //
-    // Before foo is run, it will fetch x to ->gotten, and see that it is not
-    // a lookback function.  But then when it runs foo, the memory location
-    // where x had been found before may have moved due to expansion.
-    //
-    // Basically any function call invalidates ->gotten, as does obviously any
-    // Fetch_Next_In_Frame (because the position changes).  So it has to be
-    // nulled out fairly often, and checked for null before reuse.
-    //
-    // !!! Review how often gotten has hits vs. misses, and what the benefit
-    // of the feature actually is.
-    //
-    const REBVAL *gotten;
-
-  #if defined(DEBUG_EXPIRED_LOOKBACK)
-    //
-    // On each call to Fetch_Next_In_Feed, it's possible to ask it to give
-    // a pointer to a cell with equivalent data to what was previously in
-    // f->value, but that might not be f->value.  So for all practical
-    // purposes, one is to assume that the f->value pointer died after the
-    // fetch.  If clients are interested in doing "lookback" and examining
-    // two values at the same time (or doing a GC and expecting to still
-    // have the old f->current work), then they must not use the old f->value
-    // but request the lookback pointer from Fetch_Next_In_Frame().
-    //
-    // To help stress this invariant, frames will forcibly expire REBVAL
-    // cells, handing out disposable lookback pointers on each eval.
-    //
-    // !!! Test currently leaks on shutdown, review how to not leak.
-    //
-    RELVAL *stress;
-  #endif
-};
 
 
 // NOTE: The ordering of the fields in `Reb_Frame` are specifically done so
@@ -588,7 +431,7 @@ struct Reb_Frame {
     // Since frames may share source information, this needs to be done with
     // a dereference.
     //
-    struct Reb_Feed *feed;
+    REBFED *feed;
 
     // The frame's "spare" is used for different purposes.  PARSE uses it as a
     // scratch storage space.  Path evaluation uses it as where the calculated
@@ -643,18 +486,21 @@ struct Reb_Frame {
 
     // Functions don't have "names", though they can be assigned to words.
     // However, not all function invocations are through words or paths, so
-    // the label may not be known.  It is NULL to indicate anonymity.
+    // the label may not be known.  Mechanics with labeling try to make sure
+    // that *some* name is known, but a few cases can't be, e.g.:
+    //
+    //     reeval func [x] [print "This function never got a label"]
     //
     // The evaluator only enforces that the symbol be set during function
     // calls--in the release build, it is allowed to be garbage otherwise.
     //
-    const REBSTR *opt_label;
+    option(const REBSYM*) label;
 
     // The varlist is where arguments for the frame are kept.  Though it is
     // ultimately usable as an ordinary CTX_VARLIST() for a FRAME! value, it
     // is different because it is built progressively, with random bits in
     // its pending capacity that are specifically accounted for by the GC...
-    // which limits its marking up to the progress point of `f->param`.
+    // which limits its marking up to the progress point of `f->key`.
     //
     // It starts out unmanaged, so that if no usages by the user specifically
     // ask for a FRAME! value, and the REBCTX* isn't needed to store in a
@@ -673,9 +519,8 @@ struct Reb_Frame {
     // advanced but we'd like to hold the old one...this makes it important
     // to protect it from GC if we have advanced beyond as well!)
     //
-    // Made relative just to have another RELVAL on hand.
-    //
-    const RELVAL *param;
+    const REBKEY *key;
+    const REBKEY *key_tail;
 
     // `arg is the "actual argument"...which holds the pointer to the
     // REBVAL slot in the `arglist` for that corresponding `param`.  These
@@ -708,7 +553,7 @@ struct Reb_Frame {
     // item being dispatched (which would be cleaner, but some cases must
     // look ahead with alternate handling).
     //
-    const REBVAL *special;
+    const REBPAR *param;
 
   union {
     //
@@ -717,6 +562,8 @@ struct Reb_Frame {
     struct {
         RELVAL *cell;
         REBSPC *specifier;
+
+        const RELVAL *picker;
     } ref;
 
     // Used to slip cell to re-evaluate into Eval_Core()
@@ -787,36 +634,13 @@ struct Reb_Frame {
   #endif
 };
 
+// These are needed protoyped by the array code because it wants to put file
+// and line numbers into arrays based on the frame in effect at their time
+// of allocation.
+
+inline static const REBARR *FRM_ARRAY(REBFRM *f);
+inline static bool FRM_IS_VARIADIC(REBFRM *f);
+
 
 #define FS_TOP (TG_Top_Frame + 0) // avoid assign to FS_TOP via + 0
 #define FS_BOTTOM (TG_Bottom_Frame + 0) // avoid assign to FS_BOTTOM via + 0
-
-
-#if !defined(DEBUG_CHECK_CASTS)
-
-    #define FRM(p) \
-        cast(REBFRM*, (p)) // FRM() just does a cast (maybe with added checks)
-
-#else
-
-    template <class T>
-    inline REBFRM *FRM(T *p) {
-        constexpr bool base = std::is_same<T, void>::value
-            or std::is_same<T, REBNOD>::value
-            or std::is_same<T, REBFRM>::value;
-
-        static_assert(base, "FRM() works on void/REBNOD/REBFRM");
-
-        bool b = base;  // needed to avoid compiler constexpr warning
-        if (b and p and (reinterpret_cast<REBNOD*>(p)->header.bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
-        )) != (
-            NODE_FLAG_NODE | NODE_FLAG_CELL
-        )){
-            panic (p);
-        }
-
-        return reinterpret_cast<REBFRM*>(p);
-    }
-
-#endif

@@ -11,7 +11,7 @@
 (
     did any [
         error? trap [t: -596522:0:0 - 1:00]
-        t = load mold t
+        t = load-value mold t
     ]
 )
 
@@ -19,7 +19,7 @@
 (
     did any [
         error? trap [t: 596522:0:0 + 1:00]
-        t = load mold t
+        t = load-value mold t
     ]
 )
 
@@ -54,3 +54,8 @@
 [#1156 (
     8 * 0:00:07 = 0:00:56
 )]
+
+; Primitive exposed as interim workaround for writing NOW/TIME/PRECISE, since
+; MAKE TIME! didn't define a nanosecond format (and may need broader thinking)
+;
+(0:10:20.0304 = make-time-sn 620 30400000)

@@ -37,11 +37,10 @@ void MF_Void(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
     Append_Codepoint(mo->series, '~');
 
-    const REBSTR *label = VAL_VOID_OPT_LABEL(v);
-    if (label) {
-        Append_Utf8(mo->series, STR_UTF8(label), STR_SIZE(label));
-        Append_Codepoint(mo->series, '~');
-    }
+    const REBSTR* label = VAL_VOID_LABEL(v);
+    Append_Utf8(mo->series, STR_UTF8(label), STR_SIZE(label));
+
+    Append_Codepoint(mo->series, '~');
 }
 
 
@@ -53,14 +52,14 @@ void MF_Void(REB_MOLD *mo, REBCEL(const*) v, bool form)
 REB_R MAKE_Void(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    assert(opt_parent == nullptr);
-    UNUSED(opt_parent);
+    assert(not parent);
+    UNUSED(parent);
 
     if (IS_WORD(arg))
-        return Init_Labeled_Void(out, VAL_WORD_SPELLING(arg));
+        return Init_Void_Core(out, VAL_WORD_SYMBOL(arg));
 
     fail (Error_Bad_Make(kind, arg));
 }
@@ -86,14 +85,8 @@ REB_R TO_Void(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
 //
 REBINT CT_Void(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    const REBSTR* label_a = VAL_VOID_OPT_LABEL(a);
-    const REBSTR* label_b = VAL_VOID_OPT_LABEL(b);
-
-    if (label_a == label_b)
-        return 0;  // always equal, in nullptr or non-nullptr case, if same
-
-    if (not label_a or not label_b)
-        return label_a > label_b ? 1 : -1;
+    const REBSYM* label_a = VAL_VOID_LABEL(a);
+    const REBSYM* label_b = VAL_VOID_LABEL(b);
 
     return Compare_Spellings(label_a, label_b, strict);
 }
@@ -106,17 +99,14 @@ REBTYPE(Void)
 {
     REBVAL *voided = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value)); // taken care of by `voided` above.
 
-        switch (VAL_WORD_SYM(ARG(property))) {
-          case SYM_LABEL: {
-            const REBSTR *label = VAL_VOID_OPT_LABEL(voided);
-            if (not label)
-                return nullptr;
-            return Init_Word(D_OUT, label); }
+        switch (VAL_WORD_ID(ARG(property))) {
+          case SYM_LABEL:
+            return Init_Word(D_OUT, VAL_VOID_LABEL(voided));
 
           default:
             break;

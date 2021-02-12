@@ -42,9 +42,9 @@
 
 
 #define VAL_EVENT_TYPE(v) \
-    cast(REBSYM, FIRST_UINT16(EXTRA(Any, (v)).u))
+    cast(SYMID, FIRST_UINT16(EXTRA(Any, (v)).u))
 
-inline static void SET_VAL_EVENT_TYPE(REBVAL *v, REBSYM sym) {
+inline static void SET_VAL_EVENT_TYPE(REBVAL *v, SYMID sym) {
     SET_FIRST_UINT16(EXTRA(Any, (v)).u, sym);
 }
 
@@ -99,10 +99,10 @@ enum {
     mutable_FOURTH_BYTE(EXTRA(Any, (v)).u)
 
 #define VAL_EVENT_NODE(v) \
-    VAL_NODE(v)
+    VAL_NODE1(v)
 
 #define SET_VAL_EVENT_NODE(v,p) \
-    INIT_VAL_NODE((v), (p))
+    INIT_VAL_NODE1((v), (p))
 
 #define VAL_EVENT_DATA(v) \
     PAYLOAD(Any, (v)).second.u
@@ -136,7 +136,7 @@ inline static void SET_VAL_EVENT_Y(REBVAL *v, uint16_t y) {
 // can only have one or the other.
 
 #define VAL_EVENT_KEYSYM(v) \
-    cast(REBSYM, FIRST_UINT16(VAL_EVENT_DATA(v)))
+    cast(SYMID, FIRST_UINT16(VAL_EVENT_DATA(v)))
 
 #define SET_VAL_EVENT_KEYSYM(v,keysym) \
     SET_FIRST_UINT16(VAL_EVENT_DATA(v), (keysym))
@@ -151,11 +151,11 @@ inline static void SET_VAL_EVENT_Y(REBVAL *v, uint16_t y) {
 // EVENT! extension if it is loaded.
 //
 extern REBINT CT_Event(REBCEL(const*) a, REBCEL(const*) b, bool strict);
-extern REB_R MAKE_Event(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
+extern REB_R MAKE_Event(REBVAL *out, enum Reb_Kind kind, option(const REBVAL*) parent, const REBVAL *arg);
 extern REB_R TO_Event(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
 extern void MF_Event(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Event);
-extern REB_R PD_Event(REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval);
+extern REB_R PD_Event(REBPVS *pvs, const RELVAL *picker, option(const REBVAL*) setval);
 
 // !!! The port scheme is also being included in the extension.
 
@@ -190,7 +190,7 @@ inline static REBVAL *Init_Gob(RELVAL *out, REBGOB *g) {
     // !!! HACK... way of getting EG_Gob_Type.
     //
     REBVAL *hack = rebValue("make gob! []", rebEND);
-    Move_Value(out, hack);
+    Copy_Cell(out, hack);
     rebRelease(hack);
 
     mutable_VAL_GOB(out) = g;

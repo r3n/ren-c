@@ -13,8 +13,8 @@
 ; https://trello.com/c/F59eH4MQ
 ; #2011
 (
-    url1: load "http://a.b.c/d?e=f%26"
-    url2: load "http://a.b.c/d?e=f&"
+    url1: load-value "http://a.b.c/d?e=f%26"
+    url2: load-value "http://a.b.c/d?e=f&"
     did all [
         not equal? url1 url2
         url1 == http://a.b.c/d?e=f%26
@@ -26,7 +26,7 @@
 ; https://github.com/metaeducation/ren-c/issues/1046
 ;
 (
-    b: load "[http://example.com/abc{def}]"
+    b: load-value "[http://example.com/abc{def}]"
     did all [
         (length of b) = 1
         (as text! first b) = "http://example.com/abc{def}"
@@ -36,7 +36,7 @@
 [#2380 (
     url: decode-url http://example.com/get?q=ščř#kovtička
     did all [
-        url/scheme == lit 'http  ; Note: DECODE-URL returns BLOCK! with 'http
+        url/scheme == just 'http  ; Note: DECODE-URL returns BLOCK! with 'http
         url/host == "example.com"
         url/path == "/get?q=ščř"
         url/tag == "kovtička"
@@ -44,7 +44,7 @@
 )(
     url: decode-url http://švéd:břéťa@example.com:8080/get?q=ščř#kovtička
     did all [
-        url/scheme == lit 'http
+        url/scheme == just 'http
         url/user == "švéd"
         url/pass == "břéťa"
         url/host == "example.com"
@@ -55,7 +55,7 @@
 )(
     url: decode-url http://host?query
     did all [
-        url/scheme == lit 'http
+        url/scheme == just 'http
         url/host == "host"
         url/path == "?query"
     ]

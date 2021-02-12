@@ -1,5 +1,19 @@
 EXTERN_C REBDEV Dev_Serial;
 
+// Serial Parity
+enum {
+    SERIAL_PARITY_NONE,
+    SERIAL_PARITY_ODD,
+    SERIAL_PARITY_EVEN
+};
+
+// Serial Flow Control
+enum {
+    SERIAL_FLOW_CONTROL_NONE,
+    SERIAL_FLOW_CONTROL_HARDWARE,
+    SERIAL_FLOW_CONTROL_SOFTWARE
+};
+
 struct devreq_serial {
     struct rebol_devreq devreq;
     REBVAL *path;           //device path string (in OS local format)

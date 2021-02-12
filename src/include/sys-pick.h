@@ -69,13 +69,13 @@
 
 
 #define PVS_OPT_SETVAL(pvs) \
-    pvs->special
+    pvs->param
 
 #define PVS_IS_SET_PATH(pvs) \
     (PVS_OPT_SETVAL(pvs) != nullptr)
 
 #define PVS_PICKER(pvs) \
-    pvs->param
+    pvs->u.ref.picker
 
 inline static bool Get_Path_Throws_Core(
     REBVAL *out,
@@ -86,7 +86,7 @@ inline static bool Get_Path_Throws_Core(
         out,
         any_path,  // !!! may not be array-based
         specifier,
-        NULL, // not requesting value to set means it's a get
+        nullptr, // not requesting value to set means it's a get
         EVAL_MASK_DEFAULT  // "Throws"() so it shouldn't be inert on groups
     );
 }
@@ -103,7 +103,7 @@ inline static void Get_Path_Core(
         out,
         any_path,  // !!! may not be array-based
         specifier,
-        NULL, // not requesting value to set means it's a get
+        nullptr,  // not requesting value to set means it's a get
         EVAL_MASK_DEFAULT | EVAL_FLAG_NO_PATH_GROUPS
     )){
         panic (out); // shouldn't be possible... no executions!

@@ -17,6 +17,32 @@ REBOL [
 ]
 
 
+; We are in the evaluation period of deciding if JUST is a more literate short
+; term than LIT for getting values literally.  But LIT is used some places
+; (like <json>) so keep it for compatibility until a decision is reached.
+; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
+;
+lit: :just
+
+
+; See notes on the future where FUNC and FUNCTION are synonyms (same will be
+; true of METH and METHOD:
+;
+; https://forum.rebol.info/t/rethinking-auto-gathered-set-word-locals/1150
+;
+method: func [/dummy] [
+    fail @dummy [
+        {The distinction between FUNC vs. FUNCTION, and METH vs. METHOD was}
+        {the gathering of SET-WORD! as locals.  This behavior led to many}
+        {problems with gathering irrelevant locals in the frame (e.g. any}
+        {object fields for MAKE OBJECT! [KEY: ...]), and also made it hard}
+        {to abstract functions.  With virtual binding, there is now LET...}
+        {which has some runtime cost but is much more versatile.  If you}
+        {don't want to pay the cost then use <local> in the spec.}
+    ]
+]
+
+
 REBOL: function [] [
     fail @return [
         "The REBOL [] header of a script must be interpreted by LOAD (and"
@@ -242,7 +268,7 @@ rejoin: func [
 forever: :cycle
 
 
-apply: func [dummy:] [
+apply: func [.dummy] [
     fail @dummy [
         {APPLY is being reverted to a reimagination of the positional}
         {APPLY from Rebol2/R3-Alpha, but with a different way of dealing with}

@@ -38,9 +38,9 @@
 #else
     // C++ has reference types--use them and add extra assert it's a date
 
-    inline static REBYMD VAL_DATE(REBCEL(const*) v) {
+    inline static const REBYMD & VAL_DATE(REBCEL(const*) v) {
         assert(CELL_KIND(v) == REB_DATE);
-        return EXTRA(Date, v).ymdz; // mutable reference
+        return EXTRA(Date, v).ymdz;
     }
 
     inline static REBYMD & VAL_DATE(RELVAL *v) {
@@ -161,7 +161,10 @@ inline static REBI64 VAL_NANO(REBCEL(const*) v) {
 #define TIME_IN_DAY \
     SEC_TIME(cast(REBI64, SECS_IN_DAY))
 
-inline static REBVAL *Init_Time_Nanoseconds(RELVAL *v, REBI64 nanoseconds) {
+inline static REBVAL *Init_Time_Nanoseconds(
+    RELVAL *v,
+    REBI64 nanoseconds
+){
     RESET_CELL(v, REB_TIME, CELL_MASK_NONE);
     PAYLOAD(Time, v).nanoseconds = nanoseconds;
     return cast(REBVAL*, v);

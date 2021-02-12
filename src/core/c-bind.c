@@ -38,16 +38,15 @@
 void Bind_Values_Inner_Loop(
     struct Reb_Binder *binder,
     RELVAL *head,
+    const RELVAL *tail,
     REBCTX *context,
     REBU64 bind_types, // !!! REVIEW: force word types low enough for 32-bit?
     REBU64 add_midstream_types,
     REBFLGS flags
 ){
-    for (; NOT_END(head); ++head) {
-        REBCEL(const*) cell = VAL_UNESCAPED(head); // may equal v, e.g. `\x`
-        enum Reb_Kind kind = CELL_KIND(cell);
-        UNUSED(kind);  // !!! TBD: be influenced by KIND vs HEART?
-
+    RELVAL *v = head;
+    for (; v != tail; ++v) {
+        REBCEL(const*) cell = VAL_UNESCAPED(v);
         enum Reb_Kind heart = CELL_HEART(cell);
 
         // !!! Review use of `heart` bit here, e.g. when a REB_PATH has an
@@ -57,8 +56,8 @@ void Bind_Values_Inner_Loop(
         REBU64 type_bit = FLAGIT_KIND(heart);
 
         if (type_bit & bind_types) {
-            const REBSTR *canon = VAL_WORD_CANON(cell);
-            REBINT n = Get_Binder_Index_Else_0(binder, canon);
+            const REBSYM *symbol = VAL_WORD_SYMBOL(cell);
+            REBINT n = Get_Binder_Index_Else_0(binder, symbol);
             if (n > 0) {
                 //
                 // A binder index of 0 should clearly not be bound.  But
@@ -71,31 +70,34 @@ void Bind_Values_Inner_Loop(
                 // We're overwriting any previous binding, which may have
                 // been relative.
 
-                REBLEN depth = Dequotify(head); // must ensure new cell
-                INIT_BINDING_MAY_MANAGE(head, NOD(context));
-                INIT_WORD_INDEX(head, n);
-                Quotify(head, depth); // new cell made for higher escapes
+                INIT_VAL_WORD_BINDING(v, CTX_VARLIST(context));
+                INIT_VAL_WORD_PRIMARY_INDEX(v, n);
             }
             else if (type_bit & add_midstream_types) {
                 //
                 // Word is not in context, so add it if option is specified
                 //
-                REBLEN depth = Dequotify(head); // must ensure new cell
-                Append_Context(context, head, 0);
-                Add_Binder_Index(binder, canon, VAL_WORD_INDEX(head));
-                Quotify(head, depth); // new cell made for higher escapes
+                Append_Context(context, v, nullptr);
+                Add_Binder_Index(binder, symbol, VAL_WORD_INDEX(v));
             }
         }
         else if (flags & BIND_DEEP) {
-            if (ANY_ARRAY_KIND(heart))
+            if (ANY_ARRAY_KIND(heart)) {
+                const RELVAL *sub_tail;
+                RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(
+                    &sub_tail,
+                    VAL_UNESCAPED(v)
+                );
                 Bind_Values_Inner_Loop(
                     binder,
-                    VAL_ARRAY_AT_MUTABLE_HACK(CELL_TO_VAL(cell)),
+                    sub_at,
+                    sub_tail,
                     context,
                     bind_types,
                     add_midstream_types,
                     flags
                 );
+            }
         }
     }
 }
@@ -113,6 +115,7 @@ void Bind_Values_Inner_Loop(
 //
 void Bind_Values_Core(
     RELVAL *head,
+    const RELVAL *tail,
     const RELVAL *context,
     REBU64 bind_types,
     REBU64 add_midstream_types,
@@ -121,32 +124,39 @@ void Bind_Values_Core(
     struct Reb_Binder binder;
     INIT_BINDER(&binder);
 
+    REBCTX *c = VAL_CONTEXT(context);
+
     // Associate the canon of a word with an index number.  (This association
     // is done by poking the index into the REBSER of the series behind the
     // ANY-WORD!, so it must be cleaned up to not break future bindings.)
     //
   blockscope {
     REBLEN index = 1;
-    REBVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
-    for (; NOT_END(key); key++, index++)
-        if (not Is_Param_Sealed(key))
-            Add_Binder_Index(&binder, VAL_KEY_CANON(key), index);
+    const REBKEY *key_tail;
+    const REBKEY *key = CTX_KEYS(&key_tail, c);
+    const REBVAR *var = CTX_VARS_HEAD(c);
+    for (; key != key_tail; key++, var++, index++)
+        if (not Is_Var_Hidden(var))
+            Add_Binder_Index(&binder, KEY_SYMBOL(key), index);
   }
 
     Bind_Values_Inner_Loop(
         &binder,
         head,
-        VAL_CONTEXT(context),
+        tail,
+        c,
         bind_types,
         add_midstream_types,
         flags
     );
 
   blockscope {  // Reset all the binder indices to zero
-    RELVAL *key = VAL_CONTEXT_KEYS_HEAD(context);
-    for (; NOT_END(key); key++)
-        if (not Is_Param_Sealed(key))
-            Remove_Binder_Index(&binder, VAL_KEY_CANON(key));
+    const REBKEY *key_tail;
+    const REBKEY *key = CTX_KEYS(&key_tail, c);
+    const REBVAR *var = CTX_VARS_HEAD(c);
+    for (; key != key_tail; ++key, ++var)
+        if (not Is_Var_Hidden(var))
+            Remove_Binder_Index(&binder, KEY_SYMBOL(key));
   }
 
     SHUTDOWN_BINDER(&binder);
@@ -160,27 +170,34 @@ void Bind_Values_Core(
 // bound to a particular target (if target is NULL, then all
 // words will be unbound regardless of their VAL_WORD_CONTEXT).
 //
-void Unbind_Values_Core(RELVAL *head, REBCTX *context, bool deep)
-{
+void Unbind_Values_Core(
+    RELVAL *head,
+    const RELVAL *tail,
+    option(REBCTX*) context,
+    bool deep
+){
     RELVAL *v = head;
-    for (; NOT_END(v); ++v) {
+    for (; v != tail; ++v) {
         //
         // !!! We inefficiently dequote all values just to make sure we don't
         // damage shared bindings; review more efficient means of doing this.
         //
-        REBLEN num_quotes = Dequotify(v);
-        enum Reb_Kind heart = CELL_HEART(cast(REBCEL(const*), v));
+        enum Reb_Kind heart = CELL_HEART(VAL_UNESCAPED(v));
 
         if (
             ANY_WORD_KIND(heart)
-            and (not context or VAL_BINDING(v) == NOD(context))
+            and (
+                not context
+                or VAL_WORD_BINDING(v) == CTX_VARLIST(unwrap(context))
+            )
         ){
             Unbind_Any_Word(v);
         }
-        else if (ANY_ARRAY_KIND(heart) and deep)
-            Unbind_Values_Core(VAL_ARRAY_AT_MUTABLE_HACK(v), context, true);
-
-        Quotify(v, num_quotes);
+        else if (ANY_ARRAY_KIND(heart) and deep) {
+            const RELVAL *sub_tail;
+            RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(&sub_tail, v);
+            Unbind_Values_Core(sub_at, sub_tail, context, true);
+        }
     }
 }
 
@@ -193,35 +210,338 @@ void Unbind_Values_Core(RELVAL *head, REBCTX *context, bool deep)
 //
 REBLEN Try_Bind_Word(const RELVAL *context, REBVAL *word)
 {
-    REBLEN n = Find_Canon_In_Context(context, VAL_WORD_CANON(word));
+    const bool strict = true;
+    REBLEN n = Find_Symbol_In_Context(
+        context,
+        VAL_WORD_SYMBOL(word),
+        strict
+    );
     if (n != 0) {
-        INIT_BINDING(word, VAL_CONTEXT(context));
-        INIT_WORD_INDEX(word, n);  // ^-- may have been relative bind before
+        INIT_VAL_WORD_BINDING(word, CTX_VARLIST(VAL_CONTEXT(context)));
+        INIT_VAL_WORD_PRIMARY_INDEX(word, n);  // ^-- may have been relative
     }
     return n;
 }
 
 
 //
+//  Make_Let_Patch: C
+//
+// Efficient form of "mini-object" allocation that can hold exactly one
+// variable.  Unlike a context, it does not have the ability to hold an
+// archetypal form of that context...because the only value cell in the
+// singular array is taken for the variable content itself.
+//
+REBARR *Make_Let_Patch(
+    const REBSYM *symbol,
+    REBSPC *specifier
+){
+    // We create a virtual binding patch to link into the binding.  The
+    // difference with this patch is that its singular value is the value
+    // of a new variable.
+
+    REBARR *patch = Alloc_Singular(
+        //
+        // LINK is the symbol that the virtual binding matches.
+        //
+        // MISC is a node, but it's used for linking patches to variants
+        // with different chains underneath them...and shouldn't keep that
+        // alternate version alive.  So no SERIES_FLAG_MISC_NODE_NEEDS_MARK.
+        //
+        FLAG_FLAVOR(PATCH)
+            | PATCH_FLAG_LET
+            | NODE_FLAG_MANAGED
+            | SERIES_FLAG_LINK_NODE_NEEDS_MARK
+            | SERIES_FLAG_INFO_NODE_NEEDS_MARK
+    );
+
+    Init_Void(ARR_SINGLE(patch), SYM_UNSET);  // start variable off as unset
+
+    // The way it is designed, the list of patches terminates in either a
+    // nullptr or a context pointer that represents the specifying frame for
+    // the chain.  So we can simply point to the existing specifier...whether
+    // it is a patch, a frame context, or nullptr.
+    //
+    assert(not specifier or GET_SERIES_FLAG(specifier, MANAGED));
+    mutable_INODE(NextPatch, patch) = specifier;
+
+    // A circularly linked list of variations of this patch with different
+    // NextPatch() data is maintained, to assist in avoiding creating
+    // unnecessary duplicates.  But since this is an absolutely new instance
+    // (from a LET) we won't find any existing chains for this.
+    //
+    mutable_MISC(Variant, patch) = patch;
+
+    // Store the symbol so the patch knows it.
+    //
+    mutable_LINK(PatchSymbol, patch) = symbol;
+
+    return patch;
+}
+
+
+//
 //  let: native [
 //
-//  {LET is noticed by FUNC to mean "create a local binding"}
+//  {Dynamically add a new binding into the stream of evaluation}
 //
-//      return: [<invisible>]
-//      :word [<skip> word!]
+//      return: "Vanishes if argument is a SET form, else gives the new vars"
+//          [<invisible> word! block!]
+//      :vars "Variable(s) to create, GROUP!s must evaluate to BLOCK! or WORD!"
+//          [<variadic> word! block! set-word! set-block! group! set-group!]
 //  ]
 //
 REBNATIVE(let)
-//
-// !!! Currently LET is a no-op, but in the future should be able to inject
-// new bindings into a code stream as it goes.  The mechanisms for that are
-// not yet designed, hence the means for creating new variables is actually
-// parallel to how SET-WORD!s were scanned for in R3-Alpha's FUNCTION.
 {
     INCLUDE_PARAMS_OF_LET;
-    UNUSED(ARG(word));  // just skip over WORD!s (vs. look them up)
 
-    RETURN_INVISIBLE;
+    // Though LET shows as a variadic function on its interface, it does not
+    // need to use the variadic argument...since it is a native (and hence
+    // can access the frame and feed directly).
+    //
+    UNUSED(ARG(vars));
+    REBFRM *f = frame_;
+
+    if (IS_END(f_value))  // e.g. `(let)`
+        fail ("LET needs argument");
+
+    // A first level of indirection is permitted since LET allows the syntax
+    // `let (word_or_block): <whatever>`.  Handle those groups in such a way
+    // that it updates `f_value` itself to reflect the group product.
+    //
+    // For convenience, double-set is allowed.  e.g.
+    //
+    //     block: just [x y]:
+    //     (block): <whatever>  ; no real reason to prohibit this
+    //
+    // But be conservative in what the product of these GROUP!s can be, since
+    // there are conflicting demands where we want `(thing):` to be equivalent
+    // to `[(thing)]:`, while at the same time we don't want to wind up with
+    // "mixed decorations" where `('@thing):` would become both SET!-like and
+    // SYM!-like.
+    //
+    REBSPC *f_value_specifier;  // f_value may become specified by this
+    if (IS_GROUP(f_value) or IS_SET_GROUP(f_value)) {
+        if (Do_Any_Array_At_Throws(D_SPARE, f_value, f_specifier)) {
+            Move_Cell(D_OUT, D_SPARE);
+            return R_THROWN;
+        }
+
+        switch (VAL_TYPE(D_SPARE)) {
+          case REB_WORD:
+          case REB_BLOCK:
+            if (IS_SET_GROUP(f_value))
+                Setify(D_SPARE);  // convert `(word):` to be SET-WORD!
+            break;
+
+          case REB_SET_WORD:
+          case REB_SET_BLOCK:
+            if (IS_SET_GROUP(f_value)) {
+                // Allow `(set-word):` to ignore the "redundant colon"
+            }
+            break;
+
+          default:
+            fail ("LET GROUP! limited to WORD! and BLOCK!");
+        }
+
+        // Move the evaluative product into the feed's "fetched" slot and
+        // re-point f_value at it.  (Note that f_value may have been in the
+        // fetched slot originally--we may be overwriting the GROUP! that was
+        // just evaluated.  But we don't need it anymore.)
+        //
+        Move_Cell(&f->feed->fetched, D_SPARE);
+        f_value = &f->feed->fetched;
+        f_value_specifier = SPECIFIED;
+    }
+    else {
+        f_value_specifier = f_specifier;  // not group, so handle as-is
+    }
+
+    // !!! Should it be allowed to write `let 'x: <whatever>` and have it
+    // act as if you had written `x: <whatever>`, e.g. no LET behavior at
+    // all?  This may seem useless, but it could be useful in generated
+    // code to "escape out of" a LET in some boilerplate.  And it would be
+    // consistent with the behavior of `let ['x]: <whatever>`
+    //
+    if (IS_QUOTED(f_value))
+        fail ("QUOTED! escapes not currently supported at top level of LET");
+
+    // We are going to be adding new "patches" as linked list elements onto
+    // the binding that the frame is using.  Since there are a lot of
+    // "specifiers" involved with the elements in the let dialect, give this
+    // a weird-but-relevant name of "bindings".
+    //
+    REBSPC *bindings = f_specifier;
+    if (bindings and NOT_SERIES_FLAG(bindings, MANAGED))
+        SET_SERIES_FLAG(bindings, MANAGED);  // natives don't always manage
+
+    // !!! Right now what is permitted is conservative, due to things like the
+    // potential confusion when someone writes:
+    //
+    //     word: just :b
+    //     let [a (word) c]: transcode "<whatever>"
+    //
+    // They could reasonably think that this would behave as if they had
+    // written in source `let [a :b c]: transcode <whatever>`.  If that meant
+    // to look up the word B to find out were to actually write, we wouldn't
+    // want to create a LET binding for B...but for what B looked up to.
+    //
+    // Bias it so that if you want something to just "pass through the LET"
+    // that you use a quote mark on it, and the LET will ignore it.
+    //
+    if (IS_WORD(f_value)) {
+        const REBSYM *symbol = VAL_WORD_SYMBOL(f_value);
+        bindings = Make_Let_Patch(symbol, bindings);
+        Init_Word(D_OUT, symbol);
+        INIT_VAL_WORD_BINDING(D_OUT, bindings);
+    }
+    else if (IS_SET_WORD(f_value)) {
+        const REBSYM *symbol = VAL_WORD_SYMBOL(f_value);
+        bindings = Make_Let_Patch(symbol, bindings);
+    }
+    else if (IS_BLOCK(f_value) or IS_SET_BLOCK(f_value)) {
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, f_value);
+        REBSPC *item_specifier = Derive_Specifier(f_value_specifier, f_value);
+
+        // Making a LET binding patch for each item we are enumerating has
+        // another opportunity for escaping.  Items inside a BLOCK! can be
+        // evaluated to get the word to set.  Used with multi-return:
+        //
+        //     words: [foo position]
+        //     let [value /position (second words) 'error]: transcode "abc"
+        //
+        // Several things to notice:
+        //
+        // * The evaluation of `(second words)` must be done by the LET in
+        //   order to see the word it is creating a binding for.  That should
+        //   not run twice, so the LET must splice the evaluated block into
+        //   the input feed so TRANSCODE will see the product.  That means
+        //   making a new block.
+        //
+        // * The multi-return dialect is planned to be able to use things like
+        //   refinement names to reinforce the name of what is being returned.
+        //   This doesn't have any meaning to LET and must be skipped...yet
+        //   retained in the product.
+        //
+        // * It's planned that quoted words be handled as a way to pass through
+        //   things with their existing binding, skipping the LET but still
+        //   being in the block.  Since LET ascribes meaning to this in a
+        //   dialect sense, `'error` should probably become `error` in the
+        //   output.  This limits the potential meanings for quoted words in
+        //   the multi-return dialect since it is assumed to work with LET.  But
+        //   simply dequoting the item permits quoted things to have meaning.
+        //
+        REBDSP dsp_orig = DSP;
+
+        bool need_copy = false;
+
+        for (; item != tail; ++item) {
+            const RELVAL *temp = item;
+            REBSPC *temp_specifier = item_specifier;
+
+            // Unquote and ignore anything that is quoted.  This is to assume
+            // it's for the multiple return dialect--not LET.
+            //
+            if (IS_QUOTED(temp)) {
+                Derelativize(DS_PUSH(), temp, temp_specifier);
+                Unquotify(DS_TOP, 1);
+                need_copy = true;
+                continue;  // do not make binding
+            }
+
+            // If there's a non-quoted GROUP! we evaluate it, as intended
+            // for the LET.
+            //
+            if (IS_GROUP(temp)) {
+                if (Do_Any_Array_At_Throws(D_SPARE, temp, item_specifier)) {
+                    Move_Cell(D_OUT, D_SPARE);
+                    return R_THROWN;
+                }
+                temp = D_SPARE;
+                temp_specifier = SPECIFIED;
+
+                need_copy = true;
+            }
+
+            switch (VAL_TYPE(temp)) {
+              case REB_WORD:
+              case REB_SET_WORD: {
+                Derelativize(DS_PUSH(), temp, temp_specifier);
+                const REBSYM *symbol = VAL_WORD_SYMBOL(temp);
+                bindings = Make_Let_Patch(symbol, bindings);
+                break; }
+
+              default:
+                fail (Derelativize(D_OUT, temp, temp_specifier));
+            }
+        }
+
+        // !!! There probably needs to be a protocol where cells that are in
+        // the feed as a fully specified cell are assumed to not need to be
+        // specified again.  Otherwise, we run into the problem that doing
+        // something like `let [x 'x]: <whatever>` would produce a block like
+        // `[x x]` and then add a specifier to it that specifies both.  This
+        // would mean not only GROUP!s would imply making a new block.
+        //
+        if (need_copy) {
+            Init_Any_Array(
+                &f->feed->fetched,
+                VAL_TYPE(f_value),
+                Pop_Stack_Values_Core(dsp_orig, NODE_FLAG_MANAGED)
+            );
+            f_value = &f->feed->fetched;
+        }
+        else
+            DS_DROP_TO(dsp_orig);
+    }
+
+    // Going forward we want the feed's binding to include the LETs.  Note
+    // that this can create the problem of applying the binding twice; this
+    // needs systemic review.
+    //
+    mutable_BINDING(FEED_SINGLE(f->feed)) = bindings;
+
+    // If the expression is a SET-WORD!, e.g. `let x: 1 + 2`, then the LET
+    // vanishes and leaves behind the `x: 1 + 2` for the ensuing evaluation.
+    //
+    if (IS_SET_WORD(f_value) or IS_SET_BLOCK(f_value))
+        RETURN_INVISIBLE;
+
+    assert(IS_WORD(f_value) or IS_BLOCK(f_value));
+    Derelativize(D_OUT, f_value, f_specifier);
+    Fetch_Next_In_Feed(f->feed);  // skip over the word
+    return D_OUT;  // return the WORD! or BLOCK!
+}
+
+
+//
+//  add-let-binding: native [
+//
+//  {Experimental function for adding a new variable binding to a frame}
+//
+//      return: [any-word!]
+//      frame [frame!]
+//      word [any-word!]
+//  ]
+//
+REBNATIVE(add_let_binding) {
+    INCLUDE_PARAMS_OF_ADD_LET_BINDING;
+
+    REBFRM *f = CTX_FRAME_IF_ON_STACK(VAL_CONTEXT(ARG(frame)));
+
+    if (f_specifier)
+        SET_SERIES_FLAG(f_specifier, MANAGED);
+    REBSPC *patch = Make_Let_Patch(VAL_WORD_SYMBOL(ARG(word)), f_specifier);
+
+    mutable_BINDING(FEED_SINGLE(f->feed)) = patch;
+
+    Move_Cell(D_OUT, ARG(word));
+    INIT_VAL_WORD_BINDING(D_OUT, patch);
+    INIT_VAL_WORD_PRIMARY_INDEX(D_OUT, 1);
+
+    return D_OUT;
 }
 
 
@@ -239,35 +559,14 @@ REBNATIVE(let)
 //
 static void Clonify_And_Bind_Relative(
     REBVAL *v,  // Note: incoming value is not relative
-    const RELVAL *src,
     REBFLGS flags,
     REBU64 deep_types,
     struct Reb_Binder *binder,
-    REBARR *paramlist,
-    REBU64 bind_types,
-    REBLEN *param_num  // if not null, gathering LETs (next index for LET)
+    REBACT *relative,
+    REBU64 bind_types
 ){
     if (C_STACK_OVERFLOWING(&bind_types))
         Fail_Stack_Overflow();
-
-    if (param_num and IS_WORD(src) and VAL_WORD_SYM(src) == SYM_LET) {
-        if (IS_WORD(src + 1) or IS_SET_WORD(src + 1)) {
-            const REBSTR *canon = VAL_WORD_CANON(src + 1);
-            if (Try_Add_Binder_Index(binder, canon, *param_num)) {
-                Init_Word(DS_PUSH(), canon);
-                ++(*param_num);
-            }
-            else {
-                // !!! Should double LETs be an error?  With virtual binding
-                // it would override, but we can't do that now...so it may
-                // be better to just prohibit it.
-            }
-        }
-
-        // !!! We don't actually add the new words as we go, but rather all at
-        // once from the stack.  This may be superfluous, and we could use
-        // regular appends and trust the expansion logic.
-    }
 
     assert(flags & NODE_FLAG_MANAGED);
 
@@ -294,8 +593,6 @@ static void Clonify_And_Bind_Relative(
         // Objects and series get shallow copied at minimum
         //
         REBSER *series;
-        const RELVAL *sub_src;
-
         bool would_need_deep;
 
         if (ANY_CONTEXT_KIND(heart)) {
@@ -303,26 +600,21 @@ static void Clonify_And_Bind_Relative(
                 v,
                 CTX_VARLIST(Copy_Context_Shallow_Managed(VAL_CONTEXT(v)))
             );
-            series = SER(CTX_VARLIST(VAL_CONTEXT(v)));
-            sub_src = BLANK_VALUE;  // don't try to look for LETs
+            series = CTX_VARLIST(VAL_CONTEXT(v));
 
             would_need_deep = true;
         }
         else if (ANY_ARRAY_KIND(heart)) {
-            series = SER(
-                Copy_Array_At_Extra_Shallow(
-                    VAL_ARRAY(v),
-                    0, // !!! what if VAL_INDEX() is nonzero?
-                    VAL_SPECIFIER(v),
-                    0,
-                    NODE_FLAG_MANAGED
-                )
+            series = Copy_Array_At_Extra_Shallow(
+                VAL_ARRAY(v),
+                0, // !!! what if VAL_INDEX() is nonzero?
+                VAL_SPECIFIER(v),
+                0,
+                NODE_FLAG_MANAGED
             );
 
-            INIT_VAL_NODE(v, series);  // copies args
-            INIT_BINDING(v, UNBOUND);  // copied w/specifier--not relative
-
-            sub_src = VAL_ARRAY_AT(v);  // look for LETs
+            INIT_VAL_NODE1(v, series);  // copies args
+            INIT_SPECIFIER(v, UNBOUND);  // copied w/specifier--not relative
 
             // See notes in Clonify()...need to copy immutable paths so that
             // binding pointers can be changed in the "immutable" copy.
@@ -337,14 +629,12 @@ static void Clonify_And_Bind_Relative(
                 VAL_SERIES(v),
                 NODE_FLAG_MANAGED
             );
-            INIT_VAL_NODE(v, series);
-            sub_src = BLANK_VALUE;  // don't try to look for LETs
+            INIT_VAL_NODE1(v, series);
 
             would_need_deep = false;
         }
         else {
             would_need_deep = false;
-            sub_src = nullptr;
             series = nullptr;
         }
 
@@ -353,16 +643,15 @@ static void Clonify_And_Bind_Relative(
         //
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
             REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
-            for (; NOT_END(sub); ++sub, ++sub_src)
+            RELVAL *sub_tail = ARR_TAIL(ARR(series));
+            for (; sub != sub_tail; ++sub)
                 Clonify_And_Bind_Relative(
                     sub,
-                    sub_src,
                     flags,
                     deep_types,
                     binder,
-                    paramlist,
-                    bind_types,
-                    param_num
+                    relative,
+                    bind_types
                 );
         }
     }
@@ -377,22 +666,14 @@ static void Clonify_And_Bind_Relative(
     // !!! Review use of `heart` here, in terms of meaning
     //
     if (FLAGIT_KIND(heart) & bind_types) {
-        REBINT n = Get_Binder_Index_Else_0(binder, VAL_WORD_CANON(v));
+        REBINT n = Get_Binder_Index_Else_0(binder, VAL_WORD_SYMBOL(v));
         if (n != 0) {
             //
-            // Word's canon symbol is in frame.  Relatively bind it.
-            // (clear out existing binding flags first).
+            // Word' symbol is in frame.  Relatively bind it.  Note that the
+            // action bound to can be "incomplete" (LETs still gathering)
             //
-            Unbind_Any_Word(v);
-            INIT_BINDING(v, paramlist); // incomplete func
-
-            // !!! Right now we don't actually add the parameters as we go.
-            // This means INIT_WORD_INDEX() will complain when binding the
-            // LET cases because it doesn't see a corresponding key.  The
-            // efficiency may not be worth not just trusting the expansion
-            // logic--review.  For now, don't check when we set the index.
-            //
-            INIT_WORD_INDEX_UNCHECKED(v, n);
+            INIT_VAL_WORD_BINDING(v, ACT_DETAILS(relative));
+            INIT_VAL_WORD_PRIMARY_INDEX(v, n);
         }
     }
     else if (ANY_ARRAY_OR_PATH_KIND(heart)) {
@@ -403,7 +684,7 @@ static void Clonify_And_Bind_Relative(
         // easiest to debug if there is a clear mark on arrays that are
         // part of a deep copy of a function body either way.
         //
-        INIT_BINDING(v, paramlist); // incomplete func
+        INIT_SPECIFIER(v, relative);  // "incomplete func" (LETs gathering?)
     }
 
     Quotify_Core(v, num_quotes);  // Quotify() won't work on RELVAL*
@@ -423,9 +704,8 @@ static void Clonify_And_Bind_Relative(
 //
 REBARR *Copy_And_Bind_Relative_Deep_Managed(
     const REBVAL *body,
-    REBARR *paramlist,  // body of function is not actually ready yet
-    REBU64 bind_types,
-    bool gather_lets
+    REBACT *relative,
+    REBU64 bind_types
 ){
     struct Reb_Binder binder;
     INIT_BINDER(&binder);
@@ -433,14 +713,19 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     REBLEN param_num = 1;
 
   blockscope {  // Setup binding table from the argument word list
-    RELVAL *param = ARR_AT(paramlist, 1);  // [0] is ACT_ARCHETYPE() ACTION!
-    for (; NOT_END(param); ++param, ++param_num) {
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, relative);
+    const REBPAR *param = ACT_PARAMS_HEAD(relative);
+    for (; key != tail; ++key, ++param, ++param_num) {
         if (Is_Param_Sealed(param))
             continue;
-        Add_Binder_Index(&binder, VAL_KEY_CANON(param), param_num);
+        Add_Binder_Index(&binder, KEY_SYMBOL(key), param_num);
     }
   }
 
+    REBARR *copy;
+
+  blockscope {
     const REBARR *original = VAL_ARRAY(body);
     REBLEN index = VAL_INDEX(body);
     REBSPC *specifier = VAL_SPECIFIER(body);
@@ -455,11 +740,9 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 
     REBLEN len = tail - index;
 
-    REBDSP dsp_orig = DSP;
-
     // Currently we start by making a shallow copy and then adjust it
 
-    REBARR *copy = Make_Array_For_Copy(len, flags, original);
+    copy = Make_Array_For_Copy(len, flags, original);
 
     const RELVAL *src = ARR_AT(original, index);
     RELVAL *dest = ARR_HEAD(copy);
@@ -467,67 +750,26 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
     for (; count < len; ++count, ++dest, ++src) {
         Clonify_And_Bind_Relative(
             Derelativize(dest, src, specifier),
-            src,
             flags | NODE_FLAG_MANAGED,
             deep_types,
             &binder,
-            paramlist,
-            bind_types,
-            gather_lets
-                ? &param_num  // next bind index for a LET to use
-                : nullptr
+            relative,
+            bind_types
         );
     }
 
-    TERM_ARRAY_LEN(copy, len);
-
-    if (gather_lets) {
-        //
-        // Extend the paramlist with any LET variables we gathered...
-        //
-        REBLEN num_lets = DSP - dsp_orig;
-        if (num_lets != 0) {
-            //
-            // !!! We can only clear this flag because Make_Paramlist_Managed()
-            // created the array *without* SERIES_FLAG_FIXED_SIZE, but then
-            // added it after the fact.  If at Make_Array() time you pass in the
-            // flag, then the cells will be formatted such that the flag cannot
-            // be taken off.
-            //
-            assert(GET_SERIES_FLAG(paramlist, FIXED_SIZE));
-            CLEAR_SERIES_FLAG(paramlist, FIXED_SIZE);
-
-            REBLEN old_paramlist_len = ARR_LEN(paramlist);
-            EXPAND_SERIES_TAIL(SER(paramlist), num_lets);
-            RELVAL *param = ARR_AT(paramlist, old_paramlist_len);
-
-            REBDSP dsp = dsp_orig;
-            while (dsp != DSP) {
-                const REBSTR *spelling = VAL_WORD_SPELLING(DS_AT(dsp + 1));
-                Init_Param(
-                    param,
-                    REB_P_LOCAL,
-                    spelling,
-                    FLAGIT_KIND(REB_VOID)
-                );
-                ++dsp;
-                ++param;
-
-                // Will be removed from binder below
-            }
-            DS_DROP_TO(dsp_orig);
-
-            TERM_ARRAY_LEN(paramlist, old_paramlist_len + num_lets);
-            SET_SERIES_FLAG(paramlist, FIXED_SIZE);
-        }
-    }
+    SET_SERIES_LEN(copy, len);
+  }
 
   blockscope {  // Reset binding table
-    RELVAL *param = ARR_AT(paramlist, 1);  // [0] is ACT_ARCHETYPE() ACTION!
-    for (; NOT_END(param); param++) {
+    const REBKEY *tail;
+    const REBKEY *key = ACT_KEYS(&tail, relative);
+    const REBPAR *param = ACT_PARAMS_HEAD(relative);
+    for (; key != tail; ++key, ++param) {
         if (Is_Param_Sealed(param))
             continue;
-        Remove_Binder_Index(&binder, VAL_KEY_CANON(param));
+
+        Remove_Binder_Index(&binder, KEY_SYMBOL(key));
     }
   }
 
@@ -544,27 +786,28 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
 //
 void Rebind_Values_Deep(
     RELVAL *head,
-    REBCTX *src,
-    REBCTX *dst,
-    struct Reb_Binder *opt_binder
+    const RELVAL *tail,
+    REBCTX *from,
+    REBCTX *to,
+    option(struct Reb_Binder*) binder
 ) {
     RELVAL *v = head;
-    for (; NOT_END(v); ++v) {
+    for (; v != tail; ++v) {
         if (ANY_ARRAY_OR_PATH(v)) {
-            Rebind_Values_Deep(
-                VAL_ARRAY_AT_MUTABLE_HACK(v),
-                src,
-                dst,
-                opt_binder
-            );
+            const RELVAL *sub_tail;
+            RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(&sub_tail, v);
+            Rebind_Values_Deep(sub_at, sub_tail, from, to, binder);
         }
-        else if (ANY_WORD(v) and VAL_BINDING(v) == NOD(src)) {
-            INIT_BINDING(v, dst);
+        else if (ANY_WORD(v) and VAL_WORD_BINDING(v) == CTX_VARLIST(from)) {
+            INIT_VAL_WORD_BINDING(v, CTX_VARLIST(to));
 
-            if (opt_binder != NULL) {
-                INIT_WORD_INDEX(
+            if (binder) {
+                INIT_VAL_WORD_PRIMARY_INDEX(
                     v,
-                    Get_Binder_Index_Else_0(opt_binder, VAL_WORD_CANON(v))
+                    Get_Binder_Index_Else_0(
+                        unwrap(binder),
+                        VAL_WORD_SYMBOL(v)
+                    )
                 );
             }
         }
@@ -577,15 +820,15 @@ void Rebind_Values_Deep(
             // binding pointer (in the function's value cell) is changed to
             // be this object.
             //
-            REBSPC *binding = VAL_BINDING(v);
-            if (binding == UNBOUND) {
+            REBCTX *stored = VAL_ACTION_BINDING(v);
+            if (stored == UNBOUND) {
                 //
                 // Leave NULL bindings alone.  Hence, unlike in R3-Alpha, an
                 // ordinary FUNC won't forward its references.  An explicit
                 // BIND to an object must be performed, or METHOD should be
                 // used to do it implicitly.
             }
-            else if (REB_FRAME == CTX_TYPE(CTX(binding))) {
+            else if (REB_FRAME == CTX_TYPE(stored)) {
                 //
                 // Leave bindings to frame alone, e.g. RETURN's definitional
                 // reference...may be an unnecessary optimization as they
@@ -593,9 +836,8 @@ void Rebind_Values_Deep(
                 // frames" (would that ever make sense?)
             }
             else {
-                REBCTX *stored = CTX(binding);
-                if (Is_Overriding_Context(stored, dst))
-                    INIT_BINDING(v, dst);
+                if (Is_Overriding_Context(stored, to))
+                    INIT_VAL_ACTION_BINDING(v, to);
                 else {
                     // Could be bound to a reified frame context, or just
                     // to some other object not related to this derivation.
@@ -626,7 +868,7 @@ void Rebind_Values_Deep(
 // The context is effectively an ordinary object, and outlives the loop:
 //
 //     x-word: none
-//     for-each x [1 2 3] [x-word: 'x | break]
+//     for-each x [1 2 3] [x-word: 'x, break]
 //     get x-word  ; returns 3
 //
 // Ren-C adds a feature of letting LIT-WORD!s be used to indicate that the
@@ -634,96 +876,53 @@ void Rebind_Values_Deep(
 // LIT-WORD! specified.  If all loop variables are of this form, then no
 // copy will be made.
 //
-// !!! Ren-C managed to avoid deep copying function bodies yet still get
-// "specific binding" by means of "relative values" (RELVALs) and specifiers.
-// Extending this approach is hoped to be able to avoid the deep copy, and
-// the speculative name of "virtual binding" is given to this routine...even
-// though it is actually copying.
-//
-// !!! With stack-backed contexts in Ren-C, it may be the case that the
-// chunk stack is used as backing memory for the loop, so it can be freed
-// when the loop is over and word lookups will error.
-//
-// !!! Since a copy is made at time of writing (as opposed to using a binding
-// "view" of the same underlying data), the locked status of series is not
-// mirrored.  A short term remedy might be to parameterize copying such that
-// it mirrors the locks, but longer term remedy will hopefully be better.
+// !!! Loops should probably free their objects by default when finished
 //
 void Virtual_Bind_Deep_To_New_Context(
     REBVAL *body_in_out, // input *and* output parameter
     REBCTX **context_out,
     const REBVAL *spec
-) {
+){
     assert(IS_BLOCK(body_in_out) or IS_SYM_BLOCK(body_in_out));
 
     REBLEN num_vars = IS_BLOCK(spec) ? VAL_LEN_AT(spec) : 1;
     if (num_vars == 0)
-        fail (spec);
+        fail (spec);  // !!! should fail() take unstable?
 
+    const RELVAL *tail;
     const RELVAL *item;
+
     REBSPC *specifier;
     bool rebinding;
-    if (IS_BLOCK(spec)) {
-        item = VAL_ARRAY_AT(spec);
+    if (IS_BLOCK(spec)) {  // walk the block for errors BEFORE making binder
         specifier = VAL_SPECIFIER(spec);
+        item = VAL_ARRAY_AT(&tail, spec);
+
+        const RELVAL *check = item;
 
         rebinding = false;
-        for (; NOT_END(item); ++item) {
-            if (IS_BLANK(item)) {
+        for (; check != tail; ++check) {
+            if (IS_BLANK(check)) {
                 // Will be transformed into dummy item, no rebinding needed
             }
-            else if (IS_WORD(item))
+            else if (IS_WORD(check))
                 rebinding = true;
-            else if (not IS_QUOTED_WORD(item)) {
+            else if (not IS_QUOTED_WORD(check)) {
                 //
                 // Better to fail here, because if we wait until we're in
                 // the middle of building the context, the managed portion
                 // (keylist) would be incomplete and tripped on by the GC if
                 // we didn't do some kind of workaround.
                 //
-                fail (Error_Bad_Value_Core(item, specifier));
+                fail (Error_Bad_Value_Core(check, specifier));
             }
         }
-
-        item = VAL_ARRAY_AT(spec);
     }
     else {
         item = spec;
+        tail = spec;
         specifier = SPECIFIED;
         rebinding = IS_WORD(item);
-    }
-
-    // If we need to copy the body, do that *first*, because copying can
-    // fail() (out of memory, or cyclical recursions, etc.) and that can't
-    // happen while a binder is in effect unless we PUSH_TRAP to catch and
-    // correct for it, which has associated cost.
-    //
-    if (rebinding) {
-        //
-        // Note that this deep copy of the block isn't exactly semantically
-        // the same, because it's truncated before the index.  You cannot
-        // go BACK on it before the index.
-        //
-        bool in_const = GET_CELL_FLAG(body_in_out, CONST);
-        Init_Any_Array(
-            body_in_out,
-            VAL_TYPE(body_in_out),
-            Copy_Array_Core_Managed(
-                VAL_ARRAY(body_in_out),
-                VAL_INDEX(body_in_out), // at
-                VAL_SPECIFIER(body_in_out),
-                ARR_LEN(VAL_ARRAY(body_in_out)), // tail
-                0, // extra
-                ARRAY_MASK_HAS_FILE_LINE, // flags
-                TS_ARRAY | TS_PATH // types to copy deeply
-            )
-        );
-
-        if (in_const)  // preserve CONST-ness of the original body
-            Constify(body_in_out);
-    }
-    else {
-        // Just leave body_in_out as it is, and make the context
     }
 
     // Keylists are always managed, but varlist is unmanaged by default (so
@@ -742,30 +941,32 @@ void Virtual_Bind_Deep_To_New_Context(
     if (rebinding)
         INIT_BINDER(&binder);
 
-    const REBSTR *duplicate = nullptr;
+    const REBSYM *duplicate = nullptr;
 
-    REBVAL *key = CTX_KEYS_HEAD(c);
-    REBVAL *var = CTX_VARS_HEAD(c);
-
-    REBSYM dummy_sym = SYM_DUMMY1;
+    SYMID dummy_sym = SYM_DUMMY1;
 
     REBLEN index = 1;
     while (index <= num_vars) {
+        const REBSYM *symbol;
+
         if (IS_BLANK(item)) {
             if (dummy_sym == SYM_DUMMY9)
                 fail ("Current limitation: only up to 9 BLANK! keys");
-            Init_Context_Key(key, Canon(dummy_sym));
-            Hide_Param(key);
-            dummy_sym = cast(REBSYM, cast(int, dummy_sym) + 1);
 
+            symbol = Canon(dummy_sym);
+            dummy_sym = cast(SYMID, cast(int, dummy_sym) + 1);
+
+            REBVAL *var = Append_Context(c, nullptr, symbol);
             Init_Blank(var);
-            SET_CELL_FLAG(var, BIND_MARKED_REUSE);
+            Hide_Param(var);
+            SET_CELL_FLAG(var, BIND_NOTE_REUSE);
             SET_CELL_FLAG(var, PROTECTED);
 
             goto add_binding_for_check;
         }
         else if (IS_WORD(item)) {
-            Init_Context_Key(key, VAL_WORD_SPELLING(item));
+            symbol = VAL_WORD_SYMBOL(item);
+            REBVAL *var = Append_Context(c, nullptr, symbol);
 
             // !!! For loops, nothing should be able to be aware of this
             // synthesized variable until the loop code has initialized it
@@ -778,17 +979,16 @@ void Virtual_Bind_Deep_To_New_Context(
 
             assert(rebinding); // shouldn't get here unless we're rebinding
 
-            if (not Try_Add_Binder_Index(
-                &binder, VAL_PARAM_CANON(key), index
-            )){
+            if (not Try_Add_Binder_Index(&binder, symbol, index)) {
+                //
                 // We just remember the first duplicate, but we go ahead
                 // and fill in all the keylist slots to make a valid array
                 // even though we plan on failing.  Duplicates count as a
                 // problem even if they are LIT-WORD! (negative index) as
                 // `for-each [x 'x] ...` is paradoxical.
                 //
-                if (duplicate == NULL)
-                    duplicate = VAL_PARAM_SPELLING(key);
+                if (duplicate == nullptr)
+                    duplicate = symbol;
             }
         }
         else {
@@ -805,11 +1005,15 @@ void Virtual_Bind_Deep_To_New_Context(
             // itself into the slot, and give it NODE_FLAG_MARKED...then
             // hide it from the context and binding.
             //
-            Init_Context_Key(key, VAL_WORD_SPELLING(VAL_UNESCAPED(item)));
-            Hide_Param(key);
+            symbol = VAL_WORD_SYMBOL(VAL_UNESCAPED(item));
+
+          blockscope {
+            REBVAL *var = Append_Context(c, nullptr, symbol);
+            Hide_Param(var);
             Derelativize(var, item, specifier);
-            SET_CELL_FLAG(var, BIND_MARKED_REUSE);
+            SET_CELL_FLAG(var, BIND_NOTE_REUSE);
             SET_CELL_FLAG(var, PROTECTED);
+          }
 
           add_binding_for_check:
 
@@ -827,15 +1031,13 @@ void Virtual_Bind_Deep_To_New_Context(
             // process will ignore.
             //
             if (rebinding) {
-                REBINT stored = Get_Binder_Index_Else_0(
-                    &binder, VAL_PARAM_CANON(key)
-                );
+                REBINT stored = Get_Binder_Index_Else_0(&binder, symbol);
                 if (stored > 0) {
-                    if (duplicate == NULL)
-                        duplicate = VAL_PARAM_SPELLING(key);
+                    if (duplicate == nullptr)
+                        duplicate = symbol;
                 }
                 else if (stored == 0) {
-                    Add_Binder_Index(&binder, VAL_PARAM_CANON(key), -1);
+                    Add_Binder_Index(&binder, symbol, -1);
                 }
                 else {
                     assert(stored == -1);
@@ -843,15 +1045,9 @@ void Virtual_Bind_Deep_To_New_Context(
             }
         }
 
-        key++;
-        var++;
-
         ++item;
         ++index;
     }
-
-    TERM_ARRAY_LEN(CTX_VARLIST(c), num_vars + 1);
-    TERM_ARRAY_LEN(CTX_KEYLIST(c), num_vars + 1);
 
     // As currently written, the loop constructs which use these contexts
     // will hold pointers into the arrays across arbitrary user code running.
@@ -869,7 +1065,7 @@ void Virtual_Bind_Deep_To_New_Context(
     // things unless they are stack-based.  Virtual bindings will be, but
     // contexts like this won't.
     //
-    Manage_Array(CTX_VARLIST(c));
+    Manage_Series(CTX_VARLIST(c));
 
     if (not rebinding)
         return; // nothing else needed to do
@@ -880,31 +1076,32 @@ void Virtual_Bind_Deep_To_New_Context(
         // but we want to reuse the binder we had anyway for detecting the
         // duplicates.
         //
-        Bind_Values_Inner_Loop(
-            &binder,
-            VAL_ARRAY_AT_MUTABLE_HACK(body_in_out),
+        Virtual_Bind_Deep_To_Existing_Context(
+            body_in_out,
             c,
-            TS_WORD,
-            0,
-            BIND_DEEP
+            &binder,
+            REB_WORD
         );
     }
 
     // Must remove binder indexes for all words, even if about to fail
     //
-    key = CTX_KEYS_HEAD(c);
-    var = CTX_VARS_HEAD(c); // only needed for debug, optimized out
-    for (; NOT_END(key); ++key, ++var) {
+  blockscope {
+    const REBKEY *key_tail;
+    const REBKEY *key = CTX_KEYS(&key_tail, c);
+    REBVAL *var = CTX_VARS_HEAD(c); // only needed for debug, optimized out
+    for (; key != key_tail; ++key, ++var) {
         REBINT stored = Remove_Binder_Index_Else_0(
-            &binder, VAL_PARAM_CANON(key)
+            &binder, KEY_SYMBOL(key)
         );
         if (stored == 0)
             assert(duplicate);
         else if (stored > 0)
-            assert(NOT_CELL_FLAG(var, BIND_MARKED_REUSE));
+            assert(NOT_CELL_FLAG(var, BIND_NOTE_REUSE));
         else
-            assert(GET_CELL_FLAG(var, BIND_MARKED_REUSE));
+            assert(GET_CELL_FLAG(var, BIND_NOTE_REUSE));
     }
+  }
 
     SHUTDOWN_BINDER(&binder);
 
@@ -913,6 +1110,42 @@ void Virtual_Bind_Deep_To_New_Context(
         Init_Word(word, duplicate);
         fail (Error_Dup_Vars_Raw(word));
     }
+}
+
+
+//
+//  Virtual_Bind_Deep_To_Existing_Context: C
+//
+void Virtual_Bind_Deep_To_Existing_Context(
+    REBVAL *any_array,
+    REBCTX *context,
+    struct Reb_Binder *binder,
+    enum Reb_Kind kind
+){
+    // Most of the time if the context isn't trivially small then it's
+    // probably best to go ahead and cache bindings.
+    //
+    UNUSED(binder);
+
+/*
+    // Bind any SET-WORD!s in the supplied code block into the FRAME!, so
+    // e.g. APPLY 'APPEND [VALUE: 10]` will set VALUE in exemplar to 10.
+    //
+    // !!! Today's implementation mutates the bindings on the passed-in block,
+    // like R3-Alpha's MAKE OBJECT!.  See Virtual_Bind_Deep_To_New_Context()
+    // for potential future directions.
+    //
+    Bind_Values_Inner_Loop(
+        &binder,
+        VAL_ARRAY_AT_MUTABLE_HACK(ARG(def)),  // mutates bindings
+        exemplar,
+        FLAGIT_KIND(REB_SET_WORD),  // types to bind (just set-word!),
+        0,  // types to "add midstream" to binding as we go (nothing)
+        BIND_DEEP
+    );
+ */
+
+    Virtual_Bind_Patchify(any_array, context, kind);
 }
 
 
@@ -936,10 +1169,11 @@ void Init_Interning_Binder(
     // Use positive numbers for all the keys in the context.
     //
   blockscope {
-    REBVAL *key = CTX_KEYS_HEAD(ctx);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, ctx);
     REBINT index = 1;
-    for (; NOT_END(key); ++key, ++index)
-        Add_Binder_Index(binder, VAL_KEY_CANON(key), index);  // positives
+    for (; key != tail; ++key, ++index)
+        Add_Binder_Index(binder, KEY_SYMBOL(key), index);  // positives
   }
 
     // For all the keys that aren't in the supplied context but *are* in lib,
@@ -948,13 +1182,14 @@ void Init_Interning_Binder(
     // new positive index.
     //
     if (ctx != VAL_CONTEXT(Lib_Context)) {
-        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
+        const REBKEY *tail;
+        const REBKEY *key = CTX_KEYS(&tail, VAL_CONTEXT(Lib_Context));
         REBINT index = 1;
-        for (; NOT_END(key); ++key, ++index) {
-            const REBSTR *canon = VAL_KEY_CANON(key);
-            REBINT n = Get_Binder_Index_Else_0(binder, canon);
+        for (; key != tail; ++key, ++index) {
+            const REBSYM *symbol = KEY_SYMBOL(key);
+            REBINT n = Get_Binder_Index_Else_0(binder, symbol);
             if (n == 0)
-                Add_Binder_Index(binder, canon, - index);
+                Add_Binder_Index(binder, symbol, - index);
         }
     }
 }
@@ -971,10 +1206,11 @@ void Shutdown_Interning_Binder(struct Reb_Binder *binder, REBCTX *ctx)
     // All of the user context keys should be positive, and removable
     //
   blockscope {
-    REBVAL *key = CTX_KEYS_HEAD(ctx);
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, ctx);
     REBINT index = 1;
-    for (; NOT_END(key); ++key, ++index) {
-        REBINT n = Remove_Binder_Index_Else_0(binder, VAL_KEY_CANON(key));
+    for (; key != tail; ++key, ++index) {
+        REBINT n = Remove_Binder_Index_Else_0(binder, KEY_SYMBOL(key));
         assert(n == index);
         UNUSED(n);
     }
@@ -984,10 +1220,11 @@ void Shutdown_Interning_Binder(struct Reb_Binder *binder, REBCTX *ctx)
     // find them in the list any more.
     //
     if (ctx != VAL_CONTEXT(Lib_Context)) {
-        REBVAL *key = VAL_CONTEXT_KEYS_HEAD(Lib_Context);
+        const REBKEY *tail;
+        const REBKEY *key = CTX_KEYS(&tail, VAL_CONTEXT(Lib_Context));
         REBINT index = 1;
-        for (; NOT_END(key); ++key, ++index) {
-            REBINT n = Remove_Binder_Index_Else_0(binder, VAL_KEY_CANON(key));
+        for (; key != tail; ++key, ++index) {
+            REBINT n = Remove_Binder_Index_Else_0(binder, KEY_SYMBOL(key));
             assert(n == 0 or n == -index);
             UNUSED(n);
         }

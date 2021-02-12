@@ -24,7 +24,7 @@
 // Ren-C's philosophy of DO is that the argument to it represents a place to
 // find source code.  Hence `DO 3` does not evaluate to the number 3, any
 // more than `DO "print hello"` would evaluate to `"print hello"`.  If a
-// generalized evaluator is needed, use the special-purpose function EVAL.
+// generalized evaluator is needed, use the special-purpose REEVAL(UATE).
 //
 // Note that although the code for running blocks and frames is implemented
 // here as C, the handler for processing STRING!, FILE!, TAG!, URL!, etc. is
@@ -65,9 +65,9 @@ REBNATIVE(reeval)
         ARG(value),
         flags,
         enfix
-    ))
+    )){
         return R_THROWN;
-
+    }
     return D_OUT;  // don't clear stale flag...act invisibly
 }
 
@@ -79,9 +79,9 @@ REBNATIVE(reeval)
 //
 //      return: [<opt> any-value!]
 //          "REVIEW: How might this handle shoving enfix invisibles?"
-//      'left [<end> <opt> any-value!]
+//      :left [<end> <opt> any-value!]
 //          "Requests parameter convention based on enfixee's first argument"
-//      :right [<variadic> <end> any-value!]
+//      'right [<variadic> <end> any-value!]
 //          "(uses magic -- SHOVE can't be written easily in usermode yet)"
 //      /prefix "Force either prefix or enfix behavior (vs. acting as is)"
 //          [logic!]
@@ -145,7 +145,7 @@ REBNATIVE(shove)
             return R_THROWN;
         }
 
-        Move_Value(shovee, D_OUT);
+        Copy_Cell(shovee, D_OUT);
     }
     else if (IS_GROUP(f_value)) {
         if (Do_Any_Array_At_Throws(D_OUT, f_value, f_specifier))
@@ -153,10 +153,10 @@ REBNATIVE(shove)
         if (IS_END(D_OUT))  // !!! need SHOVE frame for type error
             fail ("GROUP! passed to SHOVE did not evaluate to content");
 
-        Move_Value(shovee, D_OUT);  // Note: can't eval directly into arg slot
+        Copy_Cell(shovee, D_OUT);  // Note: can't eval directly into arg slot
     }
     else
-        Move_Value(shovee, SPECIFIC(f_value));
+        Copy_Cell(shovee, SPECIFIC(f_value));
 
     if (not IS_ACTION(shovee) and not ANY_SET_KIND(VAL_TYPE(shovee)))
         fail ("SHOVE's immediate right must be ACTION! or SET-XXX! type");
@@ -194,13 +194,13 @@ REBNATIVE(shove)
 
     if (REF(set)) {
         if (IS_SET_WORD(left)) {
-            Move_Value(D_OUT, Lookup_Word_May_Fail(left, SPECIFIED));
+            Copy_Cell(D_OUT, Lookup_Word_May_Fail(left, SPECIFIED));
         }
         else if (IS_SET_PATH(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
             composed_set_path = rebValueQ("compose", left, rebEND);
             REBVAL *temp = rebValueQ("get/hard", composed_set_path, rebEND);
-            Move_Value(D_OUT, temp);
+            Copy_Cell(D_OUT, temp);
             rebRelease(temp);
         }
         else
@@ -217,7 +217,7 @@ REBNATIVE(shove)
             return R_THROWN;
     }
     else {
-        Move_Value(D_OUT, left);
+        Copy_Cell(D_OUT, left);
         if (GET_CELL_FLAG(left, UNEVALUATED))
             SET_CELL_FLAG(D_OUT, UNEVALUATED);
     }
@@ -236,11 +236,11 @@ REBNATIVE(shove)
         return R_THROWN;
     }
 
-    assert(NOT_CELL_FLAG(D_OUT, OUT_MARKED_STALE));  // !!! can this happen?
+    assert(NOT_CELL_FLAG(D_OUT, OUT_NOTE_STALE));  // !!! can this happen?
 
     if (REF(set)) {
         if (IS_SET_WORD(left)) {
-            Move_Value(Sink_Word_May_Fail(left, SPECIFIED), D_OUT);
+            Copy_Cell(Sink_Word_May_Fail(left, SPECIFIED), D_OUT);
         }
         else if (IS_SET_PATH(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
@@ -280,6 +280,7 @@ REBNATIVE(shove)
 //          action!  ; will only run arity 0 actions (avoids DO variadic)
 //          frame!  ; acts like APPLY (voids are optionals, not unspecialized)
 //          varargs!  ; simulates as if frame! or block! is being executed
+//          quoted!  ; removes quote level
 //      ]
 //      /args "Sets system/script/args if doing a script (usually a TEXT!)"
 //          [any-value!]
@@ -320,8 +321,13 @@ REBNATIVE(do)
       case REB_SYM_GROUP:
       case REB_GET_GROUP: {  // `do '()` and `do '(comment "hi")` vanish
         DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
-        if (Do_Feed_To_End_Maybe_Stale_Throws(D_OUT, feed))
+        if (Do_Feed_To_End_Maybe_Stale_Throws(
+            D_OUT,
+            feed,
+            EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+        )){
             return R_THROWN;
+        }
         return D_OUT; }  // may be stale, which would mean invisible
 
       case REB_VARARGS: {
@@ -374,7 +380,7 @@ REBNATIVE(do)
         if (threw)
             return R_THROWN;
 
-        CLEAR_CELL_FLAG(D_OUT, OUT_MARKED_STALE);
+        CLEAR_CELL_FLAG(D_OUT, OUT_NOTE_STALE);
         return D_OUT; }
 
       case REB_BINARY:
@@ -419,7 +425,7 @@ REBNATIVE(do)
         // Ren-C will only run arity 0 functions from DO, otherwise REEVAL
         // must be used.  Look for the first non-local parameter to tell.
         //
-        if (First_Unspecialized_Param(VAL_ACTION(source)))
+        if (First_Unspecialized_Param(nullptr, VAL_ACTION(source)))
             fail (Error_Do_Arity_Non_Zero_Raw());
 
         if (Eval_Value_Throws(D_OUT, source, SPECIFIED))
@@ -427,47 +433,29 @@ REBNATIVE(do)
         return D_OUT; }
 
       case REB_FRAME: {
-        REBCTX *c = VAL_CONTEXT(source); // checks for INACCESSIBLE
-        REBACT *phase = VAL_PHASE_ELSE_ARCHETYPE(source);
-
-        if (CTX_FRAME_IF_ON_STACK(c)) // see REDO for tail-call recursion
+        if (IS_FRAME_PHASED(source))  // see REDO for tail-call recursion
             fail ("Use REDO to restart a running FRAME! (not DO)");
 
-        // To DO a FRAME! will "steal" its data.  If a user wishes to use a
-        // frame multiple times, they must say DO COPY FRAME, so that the
-        // data is stolen from the copy.  This allows for efficient reuse of
-        // the context's memory in the cases where a copy isn't needed.
+        REBCTX *c = VAL_CONTEXT(source); // checks for INACCESSIBLE
+
+        REBARR *varlist = CTX_VARLIST(c);
+        if (GET_SUBCLASS_FLAG(VARLIST, varlist, FRAME_HAS_BEEN_INVOKED))
+            fail (Error_Stale_Frame_Raw());
 
         REBFLGS flags = EVAL_MASK_DEFAULT
-            | EVAL_FLAG_FULLY_SPECIALIZED;
+            | EVAL_FLAG_FULLY_SPECIALIZED
+            | FLAG_STATE_BYTE(ST_ACTION_TYPECHECKING);
 
         DECLARE_END_FRAME (f, flags);
-
-        assert(CTX_KEYS_HEAD(c) == ACT_PARAMS_HEAD(phase));
-        f->param = CTX_KEYS_HEAD(c);
-        REBCTX *stolen = Steal_Context_Vars(c, NOD(phase));
-        INIT_LINK_KEYSOURCE(stolen, NOD(f));  // changes CTX_KEYS_HEAD()
-
-        // Its data stolen, the context's node should now be GC'd when
-        // references in other FRAME! value cells have all gone away.
-        //
-        assert(GET_SERIES_FLAG(c, MANAGED));
-        assert(GET_SERIES_INFO(c, INACCESSIBLE));
-
         Push_Frame(D_OUT, f);
-        f->varlist = CTX_VARLIST(stolen);
-        f->rootvar = CTX_ROOTVAR(stolen);
-        f->arg = f->rootvar + 1;
-        // f->param set above
-        f->special = f->arg;
 
-        assert(FRM_PHASE(f) == phase);
-        FRM_BINDING(f) = VAL_BINDING(source); // !!! should archetype match?
+        f->varlist = varlist;
+        f->rootvar = CTX_ROOTVAR(c);
+        INIT_LINK_KEYSOURCE(varlist, NOD(f));
 
-        // Some FRAME! values sneakily hide a label where the VAL_PHASE()
-        // would be (if they can get away with it, e.g. the phase can be
-        // assumed to be the main phase from the keylist).
-        //
+        assert(FRM_PHASE(f) == CTX_FRAME_ACTION(c));
+        INIT_FRM_BINDING(f, VAL_FRAME_BINDING(source));
+
         Begin_Prefix_Action(f, VAL_FRAME_LABEL(source));
 
         bool threw = Process_Action_Throws(f);
@@ -479,6 +467,10 @@ REBNATIVE(do)
             return R_THROWN; // prohibits recovery from exits
 
         return D_OUT; }
+
+      case REB_QUOTED:
+        Copy_Cell(D_OUT, ARG(source));
+        return Unquotify(D_OUT, 1);
 
       default:
         break;
@@ -495,6 +487,9 @@ REBNATIVE(do)
 //
 //      return: "Next position (quoted if result requested and invisible)"
 //          [<opt> quoted! block! group! varargs!]
+//      result: "<output> Value from the step (invisibles quote return pos)"
+//          [<opt> any-value!]
+//
 //      source [
 //          <blank>  ; useful for `evaluate try ...` scenarios when no match
 //          quoted!  ; accepts quoted source (may carry bit from prior eval)
@@ -502,8 +497,6 @@ REBNATIVE(do)
 //          group!  ; same as block (or should it have some other nuance?)
 //          varargs!  ; simulates as if frame! or block! is being executed
 //      ]
-//      /result "Value from the step (VOID! + quoted return pos if invisible)"
-//          [<output> <opt> any-value!]
 //  ]
 //
 REBNATIVE(evaluate)
@@ -522,25 +515,51 @@ REBNATIVE(evaluate)
     switch (VAL_TYPE(source)) {
       case REB_BLOCK:
       case REB_GROUP: {
-        REBLEN index;
         if (VAL_LEN_AT(source) == 0) {  // `evaluate []` should return null
             Init_Nulled(D_OUT);
-            Init_Unlabeled_Void(D_SPARE);
+            Init_Empty_Nulled(D_SPARE);
         }
         else {
-            if (Eval_Step_In_Any_Array_At_Throws(
-                D_SPARE,
-                &index,
-                source,
-                SPECIFIED,
-                EVAL_MASK_DEFAULT
-            )){
-                Move_Value(D_OUT, D_SPARE);
-                return R_THROWN;
+            DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
+            assert(NOT_END(feed->value));  // checked for VAL_LEN_AT() == 0
+
+            DECLARE_FRAME (
+                f,
+                feed,
+                EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+            );
+
+            SET_END(D_SPARE);
+            Push_Frame(D_SPARE, f);
+            bool threw = Eval_Throws(f);  // only one step of evaluation
+
+            if (not threw) {
+                Copy_Cell(D_OUT, source);
+
+                VAL_INDEX_UNBOUNDED(D_OUT) = FRM_INDEX(f);  // new index
+
+                // There may have been a LET statement in the code.  If there
+                // was, then we have to incorporate the binding it added into
+                // the reported state *somehow*.  Right now we add it to the
+                // block we give back...though this gives rise to questionable
+                // properties, such as if the user goes backward in the block
+                // and were to evaluate it again:
+                //
+                // https://forum.rebol.info/t/1496
+                //
+                // Right now we can politely ask "don't do that", but better
+                // would probably be to make EVALUATE return something with
+                // more limited privileges... more like a FRAME!/VARARGS!.
+                //
+                INIT_BINDING_MAY_MANAGE(D_OUT, f_specifier);
             }
 
-            Move_Value(D_OUT, source);
-            VAL_INDEX_UNBOUNDED(D_OUT) = index;
+            Drop_Frame(f);
+
+            if (threw) {
+                Move_Cell(D_OUT, D_SPARE);
+                return R_THROWN;
+            }
 
             if (IS_END(D_SPARE)) {
                 //
@@ -554,12 +573,8 @@ REBNATIVE(evaluate)
                 //
                 // https://forum.rebol.info/t/1173/
                 //
-                Init_Unlabeled_Void(D_SPARE);
+                Init_Empty_Nulled(D_SPARE);
                 Quotify(D_OUT, 1);  // void-is-invisible signal on array
-            }
-            else {
-                Move_Value(D_OUT, source);
-                VAL_INDEX_UNBOUNDED(D_OUT) = index;
             }
         }
         break; }  // update variable
@@ -589,7 +604,7 @@ REBNATIVE(evaluate)
                 // having BLANK! mean "thrown" may evolve into a convention.
                 //
                 Init_Unreadable_Void(position);
-                Move_Value(D_OUT, D_SPARE);
+                Move_Cell(D_OUT, D_SPARE);
                 return R_THROWN;
             }
 
@@ -614,7 +629,7 @@ REBNATIVE(evaluate)
 
             REBFLGS flags = EVAL_MASK_DEFAULT;
             if (Eval_Step_In_Subframe_Throws(D_SPARE, f, flags)) {
-                Move_Value(D_OUT, D_SPARE);
+                Move_Cell(D_OUT, D_SPARE);
                 return R_THROWN;
             }
 
@@ -622,7 +637,7 @@ REBNATIVE(evaluate)
                 return nullptr;
         }
 
-        Move_Value(D_OUT, source);  // VARARGS! will have updated position
+        Copy_Cell(D_OUT, source);  // VARARGS! will have updated position
         break; }  // update variable
 
       default:
@@ -637,30 +652,6 @@ REBNATIVE(evaluate)
         );
 
     return D_OUT;
-}
-
-
-//
-//  sync-invisibles: native [
-//
-//  {If an evaluatable source has pending invisibles, execute and advance}
-//
-//      return: [<opt> block! group! varargs!]
-//      source [block! group!]
-//  ]
-//
-REBNATIVE(sync_invisibles)
-{
-    INCLUDE_PARAMS_OF_SYNC_INVISIBLES;
-
-    // !!! This hasn't been implemented yet.  It is probably best done as
-    // an adaptation of Eval_Core() with some kind of mode flag, and
-    // would take some redesign to do efficiently.
-
-    if (VAL_LEN_AT(ARG(source)) == 0)
-        return nullptr;
-
-    RETURN (ARG(source));
 }
 
 
@@ -694,7 +685,7 @@ REBNATIVE(redo)
         if (not IS_FRAME(D_OUT))
             fail ("Context of restartee in REDO is not a FRAME!");
 
-        Move_Value(restartee, D_OUT);
+        Copy_Cell(restartee, D_OUT);
     }
 
     REBCTX *c = VAL_CONTEXT(restartee);
@@ -716,19 +707,19 @@ REBNATIVE(redo)
     //
     if (REF(other)) {
         REBVAL *sibling = ARG(other);
-        if (FRM_UNDERLYING(f) != ACT_UNDERLYING(VAL_ACTION(sibling)))
+        if (ACT_KEYLIST(f->original) != ACT_KEYLIST(VAL_ACTION(sibling)))
             fail ("/OTHER function passed to REDO has incompatible FRAME!");
 
-        INIT_VAL_CONTEXT_PHASE(restartee, VAL_ACTION(sibling));
-        INIT_BINDING(restartee, VAL_BINDING(sibling));
+        INIT_VAL_FRAME_PHASE(restartee, VAL_ACTION(sibling));
+        INIT_VAL_FRAME_BINDING(restartee, VAL_ACTION_BINDING(sibling));
     }
 
     // We need to cooperatively throw a restart instruction up to the level
     // of the frame.  Use REDO as the throw label that Eval_Core() will
     // identify for that behavior.
     //
-    Move_Value(D_OUT, NATIVE_VAL(redo));
-    INIT_BINDING(D_OUT, c);
+    Copy_Cell(D_OUT, NATIVE_VAL(redo));
+    INIT_VAL_ACTION_BINDING(D_OUT, c);
 
     // The FRAME! contains its ->phase and ->binding, which should be enough
     // to restart the phase at the point of parameter checking.  Make that
@@ -744,8 +735,8 @@ REBNATIVE(redo)
 //  {Invoke an ACTION! with all required arguments specified}
 //
 //      return: [<opt> any-value!]
-//      applicand "Literal action, or location to find one (preserves name)"
-//          [action! word! path!]
+//      applicand "Action to apply"
+//          [action!]
 //      def "Frame definition block (will be bound and evaluated)"
 //          [block!]
 //      /opt "Treat nulls as unspecialized <<experimental!>>"
@@ -757,29 +748,15 @@ REBNATIVE(applique)
 
     REBVAL *applicand = ARG(applicand);
 
-    // Need to do this up front, because it captures f->dsp.  Note that the
-    // EVAL_FLAG_PROCESS_ACTION causes the evaluator to jump straight to the
-    // point in the switch() where a function is invoked.
+    // Need to do this up front, because it captures f->dsp.
     //
-    DECLARE_END_FRAME (f, EVAL_MASK_DEFAULT);
+    DECLARE_END_FRAME (
+        f,
+        EVAL_MASK_DEFAULT
+            | FLAG_STATE_BYTE(ST_ACTION_TYPECHECKING)  // skips fulfillment
+    );
 
-    // Argument can be a literal action (APPLY :APPEND) or a WORD!/PATH!.
-    // If it is a path, we push the refinements to the stack so they can
-    // be taken into account, e.g. APPLY 'APPEND/ONLY/DUP pushes /ONLY, /DUP
-    //
-    REBDSP lowest_ordered_dsp = DSP;
-    if (Get_If_Word_Or_Path_Throws(
-        D_OUT,
-        applicand,
-        SPECIFIED,
-        true // push_refinements, don't specialize ACTION! on 'APPEND/ONLY/DUP
-    )){
-        return R_THROWN;
-    }
-
-    if (not IS_ACTION(D_OUT))
-        fail (PAR(applicand));
-    Move_Value(applicand, D_OUT);
+    REBDSP lowest_ordered_dsp = DSP;  // could push refinements here
 
     // Make a FRAME! for the ACTION!, weaving in the ordered refinements
     // collected on the stack (if any).  Any refinements that are used in
@@ -794,41 +771,32 @@ REBNATIVE(applique)
         f->dsp_orig, // lowest_ordered_dsp of refinements to weave in
         &binder
     );
-    Manage_Array(CTX_VARLIST(exemplar)); // binding code into it
+    REBARR *varlist = CTX_VARLIST(exemplar);
+    Manage_Series(varlist); // binding code into it
 
-    // Bind any SET-WORD!s in the supplied code block into the FRAME!, so
-    // e.g. APPLY 'APPEND [VALUE: 10]` will set VALUE in exemplar to 10.
-    //
-    // !!! Today's implementation mutates the bindings on the passed-in block,
-    // like R3-Alpha's MAKE OBJECT!.  See Virtual_Bind_Deep_To_New_Context()
-    // for potential future directions.
-    //
-    Bind_Values_Inner_Loop(
-        &binder,
-        VAL_ARRAY_AT_MUTABLE_HACK(ARG(def)),  // mutates bindings
+    Virtual_Bind_Deep_To_Existing_Context(
+        ARG(def),
         exemplar,
-        FLAGIT_KIND(REB_SET_WORD),  // types to bind (just set-word!),
-        0,  // types to "add midstream" to binding as we go (nothing)
-        BIND_DEEP
+        &binder,
+        REB_SET_WORD
     );
 
     // Reset all the binder indices to zero, balancing out what was added.
     //
-    REBVAL *key = CTX_KEYS_HEAD(exemplar);
-    REBVAL *var = CTX_VARS_HEAD(exemplar);
-    for (; NOT_END(key); key++, ++var) {
-        if (Is_Param_Hidden(key))
+    const REBKEY *tail;
+    const REBKEY *key = CTX_KEYS(&tail, exemplar);
+    REBVAR *var = CTX_VARS_HEAD(exemplar);
+    for (; key != tail; key++, ++var) {
+        if (Is_Var_Hidden(var))
             continue; // was part of a specialization internal to the action
 
         // !!! This is another case where if you want to literaly apply
-        // with ~undefined~ you have to manually hide the frame key.
+        // with ~unset~ you have to manually hide the frame key.
         //
-        if (Is_Void_With_Sym(var, SYM_UNDEFINED))
+        if (Is_Void_With_Sym(var, SYM_UNSET))
             Init_Nulled(var);
 
-        if (GET_CELL_FLAG(var, ARG_MARKED_CHECKED))
-            continue;  // refined in argument
-        Remove_Binder_Index(&binder, VAL_KEY_CANON(key));
+        Remove_Binder_Index(&binder, KEY_SYMBOL(key));
     }
     SHUTDOWN_BINDER(&binder); // must do before running code that might BIND
 
@@ -839,18 +807,8 @@ REBNATIVE(applique)
     bool def_threw = Do_Any_Array_At_Throws(temp, ARG(def), SPECIFIED);
     DROP_GC_GUARD(exemplar);
 
-    assert(CTX_KEYS_HEAD(exemplar) == ACT_PARAMS_HEAD(VAL_ACTION(applicand)));
-    f->param = CTX_KEYS_HEAD(exemplar);
-    REBCTX *stolen = Steal_Context_Vars(
-        exemplar,
-        NOD(VAL_ACTION(applicand))
-    );
-    INIT_LINK_KEYSOURCE(stolen, NOD(f));  // changes CTX_KEYS_HEAD result
-
-    if (def_threw) {
-        Free_Unmanaged_Array(CTX_VARLIST(stolen)); // could TG_Reuse it
+    if (def_threw)
         RETURN (temp);
-    }
 
     if (not REF(opt)) {
         //
@@ -864,13 +822,13 @@ REBNATIVE(applique)
     }
 
     Push_Frame(D_OUT, f);
-    f->varlist = CTX_VARLIST(stolen);
-    f->rootvar = CTX_ROOTVAR(stolen);
-    f->arg = f->rootvar + 1;
-    // f->param assigned above
-    f->special = f->arg; // signal only type-check the existing data
+
+    f->varlist = varlist;
+    f->rootvar = CTX_ROOTVAR(exemplar);
+    INIT_LINK_KEYSOURCE(varlist, NOD(f));
+
     INIT_FRM_PHASE(f, VAL_ACTION(applicand));
-    FRM_BINDING(f) = VAL_BINDING(applicand);
+    INIT_FRM_BINDING(f, VAL_ACTION_BINDING(applicand));
 
     Begin_Prefix_Action(f, VAL_ACTION_LABEL(applicand));
 

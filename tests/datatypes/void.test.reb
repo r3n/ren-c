@@ -2,111 +2,104 @@
 
 (not void? 1)
 
-; Unlabeled VOID! (console hides as eval result, so no `== ~`, just vanishes)
-;
-(void? ~)
-(null = label of ~)
-
 ; Labeled VOID!s can be literal, or created from WORD!
 (
     v: make void! 'labeled
     did all [
         void? get/any 'v
         undefined? 'v
-        ~labeled~ = get/any 'v
+        '~labeled~ = get/any 'v
         'labeled = label of get/any 'v
     ]
 )
 
-; ~void~ is the de-facto stanard for the return value of functions when
-; they are not supposed to return a usable value
+; Plain ~ is not a void, but a WORD!.  But things like ~~~ are not WORD!,
+; because that would be ambiguous with a VOID! with the word-label of ~.
+; So ~ is the only "~-word"
+;
+(word? first [~])
+('scan-invalid = ((trap [load-value "~~"])/id))
+(void? first [~~~])
+('~ = label of '~~~)
+
+; NULL is the response for when there is no content:
+; https://forum.rebol.info/t/what-should-do-do/1426
+;
+(null? do [])
+(
+    foo: func [] []
+    null? foo
+)
+(null? applique :foo [])
+(null? do :foo)
+
+; ~void~ is the convention for what you get by RETURN with no argument, or
+; if the spec says <void> any result.
+(
+    foo: func [return: <void>] []
+    '~void~ = foo
+)(
+    foo: func [] [return]
+    '~void~ = foo
+)
+('~void~ = applique :foo [])
+('~void~ = do :foo)
 (
     data: [a b c]
     f: func [return: <void>] [append data [1 2 3]]
-    ~void~ = f
+    '~void~ = f
 )
 
-; ~ is the response for when there is no content; this applies to functions as
-; well if they do not explicitly force to void.
-;
-(~ = do [])
-(
-    foo: func [] []
-    ~ = foo
-)
-(~ = applique 'foo [])
-(~ = do :foo)
-
-; ~void~ is the more formal convention for what you get by RETURN with no
-; argument, or if the spec says <void> any result.
-(
-    foo: func [return: <void>] []
-    ~void~ = foo
-)(
-    foo: func [] [return]
-    ~void~ = foo
-)
-(~void~ = applique 'foo [])
-(~void~ = do :foo)
-
-; ~undefined~ is the type of locals before they are assigned
+; ~unset~ is the type of locals before they are assigned
 (
     f: func [<local> loc] [get/any 'loc]
-    f = ~undefined~
+    f = '~unset~
 )
 
-; ~undefined~ is the type of things that just were never declared
+; ~unset~ is also the type of things that just were never declared
 (
-    ~undefined~ = get/any 'asiieiajiaosdfbjakbsjxbjkchasdf
+    '~unset~ = get/any 'asiieiajiaosdfbjakbsjxbjkchasdf
 )
 
 ; MATCH will match a void as-is, but falsey inputs produce ~matched~
 [
-    (~preserved~ = match void! ~preserved~)
-    (~matched~ = match null null)
+    ('~preserved~ = match void! '~preserved~)
+    ('~matched~ = match null null)
 ]
 
-; CYCLE differentiates a STOP result from BREAK with STOPPED
+; CYCLE once differentiated a STOP result from BREAK with ~stopped~, but now
+; it uses NULL-2 for similar purposes.
 [
-    (~stopped~ = cycle [stop])
-    (~custom~ = cycle [stop ~custom~])
+    (null-2 = cycle [stop])
     (null = cycle [break])
-]
-
-; ~branched~ is used both as a way to give conditionals whose branches yield
-; NULL a non-null result, as well as a "relabeling" of voids that are in
-; the branch.  To avoid the relabeling, use the @ forms of branch.
-[
-    (~branched~ = if true [null])
-    (~branched~ = if true [])
-    (~branched~ = if true [~overwritten~])
-
-    (null = if true @[null])
-    (~ = if true @[])
-    (~untouched~ = if true @[~untouched~])
 ]
 
 ; ~quit~ is the label of the VOID! you get by default from QUIT
 ; Note: DO of BLOCK! does not catch quits, so TEXT! is used here.
 [
     (1 = do "quit 1")
-    (~quit~ = do "quit")
-    (~unmodified~ = do "quit ~unmodified~")
+    ('~quit~ = do "quit")
+    ('~unmodified~ = do "quit '~unmodified~")
 ]
 
 ; It's tougher to write generic routines that handle VOID! than to error on
 ; them, but a good general routine should probably do it.
 ;
-([~abc~ ~def~] = collect [keep ~abc~, keep ~def~])
+([~abc~ ~def~] = collect [keep '~abc~, keep '~def~])
 
 ; Erroring modes of VOID! are being fetched by WORD! and logic tests.
 ; They are inert values otherwise, so PARSE should treat them such.
 ;
-(did parse [~foo~ ~foo~] [some ~foo~])  ; acceptable
+; !!! Review: PARSE should probably error on rules like `some ~foo~`, and
+; there needs to be a mechanism to indicate that it's okay for a rule to
+; literally match ~unset~ vs. be a typo.
+;
+(did parse [~foo~ ~foo~] [some '~foo~])  ; acceptable
+(did parse [~foo~ ~foo~] [some ~foo~])  ; !!! shady, rethink
 (
-    foo: ~foo~
+    foo: '~foo~
     e: trap [
-        parse [~foo~ ~foo~] [some foo]  ; not acceptable
+        parse [~foo~ ~foo~] [some foo]  ; not acceptable  !!! how to overcome?
     ]
     e/id = 'need-non-void
 )
@@ -121,11 +114,11 @@
 ]
 
 
-(error? trap [a: ~void~ a])
-(not error? trap [set 'a ~void~])
+(error? trap [a: '~void~, a])
+(not error? trap [set 'a '~void~])
 
 (
-    a-value: ~void~
+    a-value: '~void~
     e: trap [a-value]
     e/id = 'need-non-void
 )

@@ -1,14 +1,15 @@
 ; functions/control/do.r
 
-; Empty BLOCK! forms will return void if empty
+; Empty BLOCK! forms will return NULL if empty
 ; Empty GROUP! forms will vaporize
+; !!! Review: probably a better idea to use REEVAL for this.
 [
-    (void? (1 + 2, do []))
-    (void? (1 + 2, do @[]))
-    (void? (1 + 2, do :[]))
-    (void? (1 + 2, do [comment "hi"]))
-    (void? (1 + 2, do @[comment "hi"]))
-    (void? (1 + 2, do :[comment "hi"]))
+    (null? (1 + 2, do []))
+    (null? (1 + 2, do @[]))
+    (null? (1 + 2, do :[]))
+    (null? (1 + 2, do [comment "hi"]))
+    (null? (1 + 2, do @[comment "hi"]))
+    (null? (1 + 2, do :[comment "hi"]))
 
     (3 = (1 + 2, do '()))
     (3 = (1 + 2, do @()))
@@ -126,7 +127,7 @@
 )
 (0:00 == do [0:00])
 (0.0.0 == do [0.0.0])
-(void? do [()])
+(null? do [()])
 ('a == do ['a])
 ; do block end
 (
@@ -164,7 +165,7 @@
     all [
         lit-path? a-value
         path? reeval :a-value
-        (as path! :a-value) == (reeval :a-value)
+        (as path! unquote :a-value) == (reeval :a-value)
     ]
 )]
 
@@ -173,7 +174,7 @@
     all [
         lit-word? a-value
         word? reeval :a-value
-        (to-word :a-value) == (reeval :a-value)
+        (to-word unquote :a-value) == (reeval :a-value)
     ]
 )
 (true = reeval true)
@@ -209,7 +210,7 @@
     a-value: "1"
     1 == do :a-value
 )
-(void? do "")
+(null? do "")
 (1 = do "1")
 (3 = do "1 2 3")
 (
@@ -265,7 +266,7 @@
     value: <overwritten>
     did all [
         null? [_ value]: evaluate []
-        undefined? 'value
+        null? value
     ]
 )
 (

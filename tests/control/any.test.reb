@@ -347,3 +347,16 @@
     blk: [any blk]
     error? trap blk
 )
+
+; PREDICATES
+
+(10 = any .even? [1 + 2 3 + 4 5 + 5 6 + 7])
+(10 = any .not.odd? [1 + 2 3 + 4 5 + 5 6 + 7])
+(10 = any .even? [1 + 2, comment "Hello", 3 + 4, 5 + 5, 6 + 7])
+(10 = any .not.odd? [1 + 2, 3 + 4 comment "No Comma" 5 + 5, 6 + 7])
+
+(_ = any .not [1 _ 2])
+(null-2? any .not [1 null 2])
+("this is why" = any .not [1 null 2] then ["this is why"])
+
+(10 = any [(10 elide "stale")])

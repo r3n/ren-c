@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -30,7 +30,7 @@
 // * With those types defined, it includes %tmp-internals.h - which is all
 //   all the non-inline "internal API" functions.  This list of function
 //   prototypes is generated automatically by a Rebol script that scans the
-//   %.c files during the build process. 
+//   %.c files during the build process.
 //
 // * Next it starts including various headers in a specific order.  These
 //   build on the data definitions and call into the internal API.  Since they
@@ -57,6 +57,7 @@
 // Addressing that is an ongoing process.
 //
 
+#include "tmp-version.h"  // historical 5 numbers in a TUPLE! (see %systems.r)
 #include "reb-config.h"
 
 
@@ -164,17 +165,46 @@
 #define MAX_EXPAND_LIST 5       // number of series-1 in Prior_Expand list
 
 
+//=//// FORWARD-DECLARE TYPES USED IN %tmp-internals.h ////////////////////=//
+//
 // This does all the forward definitions that are necessary for the compiler
 // to be willing to build %tmp-internals.h.  Some structures are fully defined
-// and some are only forward declared.
+// and some are only forward declared.  See notes in %structs/README.md
 //
-#include "reb-defs.h"
+
+#include "reb-defs.h"  // basic typedefs like REBYTE
+
+#include "structs/sys-rebnod.h"
+#include "mem-pools.h"
+
+#include "tmp-kinds.h"  // Defines `enum Reb_Kind` (REB_BLOCK, REB_TEXT, etc)
+#include "sys-ordered.h"  // changing the type enum *must* update these macros
+
+#include "structs/sys-rebcel.h"
+#include "structs/sys-rebval.h"  // low level Rebol cell structure definition
+
+#include "sys-flavor.h"  // series subclass byte (uses sizeof(REBVAL))
+
+#include "structs/sys-rebser.h"  // series structure definition, embeds REBVAL
+
+#include "structs/sys-rebarr.h"  // array structure (REBSER subclass)
+#include "structs/sys-rebact.h"  // action structure
+#include "structs/sys-rebctx.h"  // context structure
+
+#include "structs/sys-rebchr.h"  // REBCHR(*) is REBYTE* in validated UTF8
+
+#include "structs/sys-rebfed.h"  // REBFED (feed) definition
+#include "structs/sys-rebjmp.h"  // Jump state (for TRAP)
+#include "structs/sys-rebfrm.h"  // C struct for running frame, uses REBFED
 
 
-// Small integer symbol IDs, e.g. SYM_THRU or SYM_ON, for built-in words so
-// that they can be used in C switch() statements.
+// (Note: %sys-do.h needs to call into the scanner if Fetch_Next_In_Frame() is
+// to be inlined at all--at its many time-critical callsites--so the scanner
+// has to be in the internal API)
 //
-#include "tmp-symbols.h"
+#include "sys-scan.h"
+
+#include "sys-hooks.h"  // function pointer definitions
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -191,25 +221,11 @@
 //
 // See %make/make-headers.r for the generation of this list.
 //
+#include "tmp-symid.h"  // small integer IDs for words (e.g. SYM_THRU, SYM_ON)
 #include "tmp-internals.h"
 
-
-#include "tmp-version.h"  // historical 5 numbers in a TUPLE! (see %systems.r)
-
 #include "sys-panic.h"  // "blue screen of death"-style termination
-
-#include "mem-pools.h"
-
-#include "sys-rebnod.h"
-
-#include "sys-rebval.h"  // low level Rebol cell structure definition
-#include "sys-rebser.h"  // series structure definition (embeds REBVAL)
-#include "sys-rebarr.h"  // array structure definition (subclass of REBSER)
-#include "sys-rebact.h"  // action structure definition (subclass of REBSER)
-#include "sys-rebctx.h"  // context structure definition (subclass of REBSER)
-
-#include "sys-state.h"
-#include "sys-rebfrm.h"  // REBFRM definition (also used by value)
+#include "sys-casts.h"  // coercion macros like SER(), uses panic() to alert
 
 #include "sys-mold.h"
 
@@ -282,11 +298,7 @@ enum {
     //
     MKF_IS_VOIDER = 1 << 6,
     MKF_IS_ELIDER = 1 << 7,
-    MKF_HAS_RETURN = 1 << 8,
-
-    // Gather "LET" statements, done during body relativization
-    //
-    MKF_GATHER_LETS = 1 << 9
+    MKF_HAS_RETURN = 1 << 8
 };
 
 #define MKF_MASK_NONE 0 // no special handling (e.g. MAKE ACTION!)
@@ -368,9 +380,12 @@ extern void reb_qsort_r(void *a, size_t n, size_t es, void *thunk, cmp_t *cmp);
 #include "sys-node.h"
 
 
-// Lives in %sys-bind.h, but needed for Move_Value() and Derelativize()
+// Lives in %sys-bind.h, but needed for Copy_Cell() and Derelativize()
 //
-inline static void INIT_BINDING_MAY_MANAGE(RELVAL *out, REBNOD* binding);
+inline static void INIT_BINDING_MAY_MANAGE(
+    RELVAL *out,
+    const REBSER* binding
+);
 
 #include "datatypes/sys-track.h"
 #include "datatypes/sys-value.h"  // these defines don't need series accessors
@@ -427,18 +442,21 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 
 #include "sys-protect.h"
 
-#include "datatypes/sys-datatype.h"
 
 #include "datatypes/sys-binary.h"  // BIN_XXX(), etc. used by strings
-#include "datatypes/sys-char.h"  // use Init_Integer() for bad codepoint error
-#include "datatypes/sys-string.h"  // REBSYM needed for typesets
-#include "datatypes/sys-word.h"
-#include "datatypes/sys-void.h"  // REBSYM needed
-#include "datatypes/sys-token.h"
 
+#include "datatypes/sys-datatype.h"  // uses BIN()
+
+#include "datatypes/sys-char.h"  // use Init_Integer() for bad codepoint error
+#include "datatypes/sys-string.h"  // SYMID needed for typesets
+
+#include "sys-symbol.h"
+#include "datatypes/sys-void.h"  // SYMID needed
 
 #include "datatypes/sys-pair.h"
-#include "datatypes/sys-quoted.h"  // requires pairings for cell storage
+#include "datatypes/sys-quoted.h"  // pairings for storage, void used as well
+
+#include "datatypes/sys-word.h"  // needs to know about QUOTED! for binding
 
 #include "datatypes/sys-action.h"
 #include "datatypes/sys-typeset.h"  // needed for keys in contexts
@@ -448,7 +466,9 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 
 #include "sys-stack.h"
 
+#include "sys-patch.h"
 #include "sys-bind.h" // needs DS_PUSH() and DS_TOP from %sys-stack.h
+#include "datatypes/sys-token.h"
 #include "datatypes/sys-sequence.h"  // also needs DS_PUSH()
 
 #include "sys-roots.h"
@@ -469,21 +489,3 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #include "sys-do.h"  // higher-level evaluate-until-end API
 
 #include "sys-pick.h"
-
-
-// !!! The SECURE dialect and subsystem is now in an extension.  But
-// because SECURE was never fully implemented, it is really just a stub
-// implementation.  The `_Placeholder` name helps keep every callsite
-// from having to be documented that it's effectively a no-op.
-//
-inline static void Check_Security_Placeholder(
-    const REBSTR *subsystem,
-    enum Reb_Symbol policy,
-    const REBVAL *value
-){
-    /* see Check_Security() in the SECURE Extension */
-
-    UNUSED(subsystem);
-    UNUSED(policy);
-    UNUSED(value);
-}

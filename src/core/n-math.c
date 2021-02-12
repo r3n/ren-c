@@ -701,8 +701,8 @@ REBNATIVE(same_q)
     if (ANY_WORD(v1))  // !!! "same" was spelling -and- binding in R3-Alpha
         return Init_Logic(
             D_OUT,
-            VAL_WORD_SPELLING(v1) == VAL_WORD_SPELLING(v2)
-                and VAL_BINDING(v1) == VAL_BINDING(v2)
+            VAL_WORD_SYMBOL(v1) == VAL_WORD_SYMBOL(v2)
+                and VAL_WORD_BINDING(v1) == VAL_WORD_BINDING(v2)
         );
 
     if (IS_DECIMAL(v1) or IS_PERCENT(v1)) {
@@ -853,15 +853,18 @@ REBNATIVE(maximum)
     }
     else {
         DECLARE_LOCAL (coerced1);
-        Move_Value(coerced1, value1);
+        Copy_Cell(coerced1, value1);
         DECLARE_LOCAL (coerced2);
-        Move_Value(coerced2, value2);
+        Copy_Cell(coerced2, value2);
 
         bool strict = false;
-        if (-1 == Compare_Modify_Values(coerced1, coerced2, strict))
-            Move_Value(D_OUT, value1);
-        else
-            Move_Value(D_OUT, value2);
+        REBINT diff = Compare_Modify_Values(coerced1, coerced2, strict);
+        if (diff == 1)
+            Copy_Cell(D_OUT, value1);
+        else {
+            assert(diff == 0 or diff == -1);
+            Copy_Cell(D_OUT, value2);
+        }
     }
     return D_OUT;
 }
@@ -888,15 +891,18 @@ REBNATIVE(minimum)
     }
     else {
         DECLARE_LOCAL (coerced1);
-        Move_Value(coerced1, value1);
+        Copy_Cell(coerced1, value1);
         DECLARE_LOCAL (coerced2);
-        Move_Value(coerced2, value2);
+        Copy_Cell(coerced2, value2);
 
         bool strict = false;
-        if (1 == Compare_Modify_Values(coerced1, coerced2, strict))
-            Move_Value(D_OUT, value1);
-        else
-            Move_Value(D_OUT, value2);
+        REBINT diff = Compare_Modify_Values(coerced1, coerced2, strict);
+        if (diff == -1)
+            Copy_Cell(D_OUT, value1);
+        else {
+            assert(diff == 0 or diff == 1);
+            Copy_Cell(D_OUT, value2);
+        }
     }
     return D_OUT;
 }
@@ -913,8 +919,8 @@ inline static REBVAL *Init_Zeroed_Hack(RELVAL *out, enum Reb_Kind kind) {
     }
     else {
         RESET_CELL(out, kind, CELL_MASK_NONE);
-        CLEAR(&out->extra, sizeof(union Reb_Value_Extra));
-        CLEAR(&out->payload, sizeof(union Reb_Value_Payload));
+        memset(&out->extra, 0, sizeof(union Reb_Value_Extra));
+        memset(&out->payload, 0, sizeof(union Reb_Value_Payload));
     }
     return cast(REBVAL*, out);
 }
@@ -978,10 +984,7 @@ REBNATIVE(zero_q)
     enum Reb_Kind type = VAL_TYPE(v);
 
     if (type == REB_ISSUE)  // special case, `#` represents the '\0' codepoint
-        return Init_Logic(
-            D_OUT,
-            IS_CHAR(cast(REBCEL(const*), v)) and VAL_CHAR(v) == 0
-        );
+        return Init_Logic(D_OUT, IS_CHAR(v) and VAL_CHAR(v) == 0);
 
     if (not ANY_SCALAR_KIND(type))
         return Init_False(D_OUT);

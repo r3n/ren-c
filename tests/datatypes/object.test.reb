@@ -82,17 +82,45 @@
     append o compose [b: "b" b: (c)]
     same? c o/b
 )
+
+; SELF was a word added automatically by the system, which had some strange
+; internal guts.  This made it a "reserved word", which is against the
+; principles of the core.  While object generators may choose to make a
+; SELF (the way FUNC chooses to define RETURN), it's no longer built in.
+; So these scenarios no longer apply:
+;
+; [#2076 (
+;     o: make object! [x: 10]
+;     e: trap [append o [self: 1]]
+;     e/id = 'hidden
+; )]
+;
+; [#187 (
+;     o: make object! [self]
+;     [] = words of o
+; )]
+;
+; [#1553 (
+;    o: make object! [a: _]
+;    same? (binding of in o 'self) (binding of in o 'a)
+; )]
+;
+; [#1756
+;     (reeval does [reduce reduce [:self] true])
+; ]
+;
+; [#1528
+;     (action? func [self] [])
+; ]
 (
     o: make object! []
     append o 'self
-    true
-)
-(
+    '~unset~ = get/any 'o/self
+)(
     o: make object! []
-    ; currently disallowed..."would expose or modify hidden values"
-    error? trap [append o [self: 1]]
+    append o [self: 1]
+    o/self = 1
 )
-
 
 
 ; Change from R3-Alpha, FUNC and FUNCTION do not by default participate in
@@ -105,7 +133,7 @@
 
     o2/b = 10
 )(
-    o1: make object! [a: 10 b: method [] [f: func [] [a] f]]
+    o1: make object! [a: 10 b: meth [] [f: func [] [a] f]]
     o2: make o1 [a: 20]
 
     o2/b = 20
@@ -126,13 +154,13 @@
         ]
         repeat n 256 [
             ;
-            ; fun-1: method [] [var-1]
-            ; fun-2: method [] [var-1 + var-2]
+            ; fun-1: meth [] [var-1]
+            ; fun-2: meth [] [var-1 + var-2]
             ; ...
-            ; fun-256: method [] [var-1 + var-2 ... + var-256]
+            ; fun-256: meth [] [var-1 + var-2 ... + var-256]
             ;
             keep compose [
-                (as word! unspaced ["meth-" n]): method [] (collect [
+                (as word! unspaced ["meth-" n]): meth [] (collect [
                     repeat i n [
                         keep compose [
                             (as word! unspaced ["var-" i]) (if i <> n ['+])
@@ -165,21 +193,6 @@
     (o/b)/1 = 'o
 )]
 
-[#2076 (
-    o: make object! [x: 10]
-    e: trap [append o [self: 1]]
-    e/id = 'hidden
-)]
-
-[#187 (
-    o: make object! [self]
-    [] = words of o
-)]
-
-[#1553 (
-    o: make object! [a: _]
-    same? (binding of in o 'self) (binding of in o 'a)
-)]
 
 [
     https://github.com/metaeducation/ren-c/issues/907

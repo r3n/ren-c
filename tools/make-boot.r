@@ -109,7 +109,7 @@ comment [
 (e-version: make-emitter "Version Information"
     make-file [(prep-dir) include/tmp-version.h])
 
-version: load %version.r
+version: load-value %version.r
 version: to tuple! reduce [
     version/1 version/2 version/3 config/id/2 config/id/3
  ]
@@ -146,8 +146,8 @@ e-version/write-emitted
 ; recompiled with changes to the core.  These symbols aren't in libRebol,
 ; however, so it only affects clients of the core API for now.
 
-(e-symbols: make-emitter "Symbol Numbers"
-    make-file [(prep-dir) include/tmp-symbols.h])
+(e-symbols: make-emitter "Symbol ID (SYMID) Enumeration Type and Values"
+    make-file [(prep-dir) include/tmp-symid.h])
 
 syms: copy []
 
@@ -238,22 +238,15 @@ e-types/emit {
 
         REB_0 = REB_0_END,  /* REB_0 when used for signals besides ENDness */
         REB_TS_ENDABLE = REB_0,  /* bit set in typesets for endability */
-        REB_P_DETECT = REB_0,  /* detect paramclass from vararg */
-
-        /*** TEMP FAKERY TO HAVE A TYPESET BIT FOR INVISIBILITY ***/
-
-        REB_TS_INVISIBLE = REB_BYTES,  /* can never occur in KIND3Q_BYTE */
 
         /*** PSEUDOTYPES ***/
 
         PSEUDOTYPE_ONE = REB_MAX,
         REB_R_THROWN = PSEUDOTYPE_ONE,
-        REB_P_NORMAL = PSEUDOTYPE_ONE,
         REB_TS_VARIADIC = PSEUDOTYPE_ONE,
 
         PSEUDOTYPE_TWO,
         REB_R_INVISIBLE = PSEUDOTYPE_TWO,
-        REB_P_HARD_QUOTE = PSEUDOTYPE_TWO,
         REB_TS_SKIPPABLE = PSEUDOTYPE_TWO,
       #if defined(DEBUG_TRASH_MEMORY)
         REB_T_TRASH = PSEUDOTYPE_TWO,  /* identify trash in debug build */
@@ -261,26 +254,21 @@ e-types/emit {
 
         PSEUDOTYPE_THREE,
         REB_R_REDO = PSEUDOTYPE_THREE,
-        REB_P_MODAL = PSEUDOTYPE_THREE,  /* can act like REB_P_HARD_QUOTE */
-        REB_TS_3 = PSEUDOTYPE_THREE,
+        REB_TS_INVISIBLE = PSEUDOTYPE_THREE,
 
         PSEUDOTYPE_FOUR,
         REB_R_REFERENCE = PSEUDOTYPE_FOUR,
-        REB_P_SOFT_QUOTE = PSEUDOTYPE_FOUR,
-        REB_TS_4 = PSEUDOTYPE_FOUR,
+        REB_TS_IN_OUT = PSEUDOTYPE_FOUR,
 
         PSEUDOTYPE_FIVE,
         REB_R_IMMEDIATE = PSEUDOTYPE_FIVE,
-        REB_P_LOCAL = PSEUDOTYPE_FIVE,
         REB_TS_NOOP_IF_BLANK = PSEUDOTYPE_FIVE,
 
         PSEUDOTYPE_SIX,
-        REB_P_SEALED = PSEUDOTYPE_SIX,
         REB_G_XYF = PSEUDOTYPE_SIX,  /* used by GOB, compact 2xfloat */
         REB_TS_CONST = PSEUDOTYPE_SIX,
 
         PSEUDOTYPE_SEVEN,
-        REB_P_SPECIALIZED = PSEUDOTYPE_SEVEN,
         REB_V_SIGN_INTEGRAL_WIDE = PSEUDOTYPE_SEVEN,  /* used by VECTOR! */
         REB_TS_REFINEMENT = PSEUDOTYPE_SEVEN,
 
@@ -449,6 +437,10 @@ hookname: enfixed func [
 ][
     if t/(column) = 0 [return "nullptr"]
 
+    ; The CSCAPE mechanics lowercase all strings.  Uppercase it back.
+    ;
+    prefix: uppercase copy prefix
+
     unspaced [prefix propercase-of (switch ensure word! t/(column) [
         '+ [as text! t/name]  ; type has its own unique hook
         '* [t/class]        ; type uses common hook for class
@@ -537,7 +529,14 @@ change/only at-value platform reduce [
     any [config/build-label ""]
 ]
 
+; If debugging something code in %sysobj.r, the C-DEBUG-BREAK should only
+; apply in the non-bootstrap case.
+;
+c-debug-break: :nihil
+
 ob: make object! boot-sysobj
+
+c-debug-break: :lib/c-debug-break
 
 make-obj-defs: function [
     {Given a Rebol OBJECT!, write C structs that can access its raw variables}
@@ -548,15 +547,9 @@ make-obj-defs: function [
     obj
     prefix
     depth
-    /selfless
 ][
     items: collect [
-        either selfless [
-            n: 1
-        ][
-            keep cscape/with {${PREFIX}_SELF = 1} [prefix]
-            n: 2
-        ]
+        n: 1
 
         for-each field words-of obj [
             keep cscape/with {${PREFIX}_${FIELD} = $<n>} [prefix field n]
@@ -628,7 +621,6 @@ evks: collect [
     make-file [(prep-dir) include/tmp-error-funcs.h])
 
 fields: collect [
-    keep {RELVAL self}
     for-each word words-of ob/standard/error [
         either word = 'near [
             keep {/* near/far are old C keywords */ RELVAL nearest}
@@ -699,7 +691,14 @@ for-each [sw-cat list] boot-errors [
             args: ["rebEND"]
         ] else [
             params: collect [
-                count-up i arity [keep unspaced ["const REBVAL *arg" i]]
+                ;
+                ; Stack values (`unstable`) are allowed as arguments to the
+                ; error generator, as they are copied before any evaluator
+                ; calls are made.
+                ;
+                count-up i arity [
+                    keep unspaced ["const REBVAL *arg" i]
+                ]
             ]
             args: collect [
                 count-up i arity [keep unspaced ["arg" i]]
@@ -764,7 +763,7 @@ sctx: make object! collect [
         keep "stub proxy for %sys-base.r item"
     ]
 ]
-make-obj-defs/selfless e-sysctx sctx "SYS_CTX" 1
+make-obj-defs e-sysctx sctx "SYS_CTX" 1
 
 num: 1
 e-sysctx/emit newline
@@ -955,11 +954,11 @@ e-symbols/emit {
      *
      * Note: SYM_0 is not a symbol of the string "0".  It's the "SYM" constant
      * that is returned for any interning that *does not have* a compile-time
-     * constant assigned to it.  Since VAL_WORD_SYM() will return SYM_0 for
+     * constant assigned to it.  Since VAL_WORD_ID() will return SYM_0 for
      * all user (and extension) defined words, don't try to check equality
-     * with `VAL_WORD_SYM(word1) == VAL_WORD_SYM(word2)`.
+     * with `VAL_WORD_ID(word1) == VAL_WORD_ID(word2)`.
      */
-    enum Reb_Symbol {
+    enum Reb_Symbol_Id {
         SYM_0 = 0,
         $(Syms),
     };

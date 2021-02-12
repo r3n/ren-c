@@ -53,7 +53,7 @@
 // coverity[+kill]
 //
 ATTRIBUTE_NO_RETURN void Panic_Core(
-    const void *p, // REBSER* (array, context, etc), REBVAL*, or UTF-8 char*
+    const void *p,  // REBSER*, REBVAL*, or UTF-8 char*
     REBTCK tick,
     const char *file, // UTF8
     int line
@@ -134,9 +134,9 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
             PROBE(s);
         #endif
 
-        if (GET_ARRAY_FLAG(s, IS_VARLIST)) {
+        if (IS_VARLIST(s)) {
             printf("Series VARLIST detected.\n");
-            REBCTX *context = CTX(s);
+            REBCTX *context = cast(REBCTX*, s);  // CTX() does too much checking!
             if (KIND3Q_BYTE_UNCHECKED(CTX_ARCHETYPE(context)) == REB_ERROR) {
                 printf("...and that VARLIST is of an ERROR!...");
                 PROBE(context);

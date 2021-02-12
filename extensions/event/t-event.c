@@ -68,7 +68,7 @@ REBINT CT_Event(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 //
 static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
 {
-    switch (VAL_WORD_SYM(word)) {
+    switch (VAL_WORD_ID(word)) {
       case SYM_TYPE: {
         //
         // !!! Rather limiting symbol-to-integer transformation for event
@@ -77,7 +77,7 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
         if (not IS_WORD(val) and not IS_QUOTED_WORD(val))
             return false;
 
-        REBSYM type_sym = VAL_WORD_SYM(val);
+        SYMID type_sym = VAL_WORD_ID(val);
 
         RELVAL *typelist = Get_System(SYS_VIEW, VIEW_EVENT_TYPES);
         assert(IS_BLOCK(typelist));
@@ -144,7 +144,7 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
             assert(IS_BLOCK(event_keys));
             UNUSED(event_keys);  // we can use any key name, but...
 
-            REBSYM sym = VAL_WORD_SYM(val);  // ...has to be symbol (for now)
+            SYMID sym = VAL_WORD_ID(val);  // ...has to be symbol (for now)
             if (sym == SYM_0)
                 fail ("EVENT! only takes keys that are compile-time symbols");
 
@@ -171,12 +171,13 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
         mutable_VAL_EVENT_FLAGS(event)
             &= ~(EVF_DOUBLE | EVF_CONTROL | EVF_SHIFT);
 
-        const RELVAL *item;
-        for (item = ARR_HEAD(VAL_ARRAY(val)); NOT_END(item); ++item) {
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, val);
+        for (; item != tail; ++item) {
             if (not IS_WORD(item))
                 continue;
 
-            switch (VAL_WORD_SYM(item)) {
+            switch (VAL_WORD_ID(item)) {
             case SYM_CONTROL:
                 mutable_VAL_EVENT_FLAGS(event) |= EVF_CONTROL;
                 break;
@@ -206,24 +207,29 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
 //
 //  Set_Event_Vars: C
 //
-void Set_Event_Vars(REBVAL *evt, const RELVAL *head, REBSPC *specifier)
-{
+void Set_Event_Vars(
+    REBVAL *evt,
+    const RELVAL *block,
+    REBSPC *specifier
+){
     DECLARE_LOCAL (var);
     DECLARE_LOCAL (val);
 
-    while (NOT_END(head)) {
-        Derelativize(var, head, specifier);
-        ++head;
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT(&tail, block);
+    while (item != tail) {
+        Derelativize(var, item, specifier);
+        ++item;
 
         if (not IS_SET_WORD(var))
             fail (var);
 
-        if (IS_END(head))
+        if (item == tail)
             Init_Blank(val);
         else
-            Get_Simple_Value_Into(val, head, specifier);
+            Get_Simple_Value_Into(val, item, specifier);
 
-        ++head;
+        ++item;
 
         if (!Set_Event_Var(evt, var, val))
             fail (Error_Bad_Field_Set_Raw(var, Type_Of(val)));
@@ -239,19 +245,19 @@ void Set_Event_Vars(REBVAL *evt, const RELVAL *head, REBSPC *specifier)
 static REBVAL *Get_Event_Var(
     RELVAL *out,
     REBCEL(const*) v,
-    const REBSTR *canon
+    const REBSYM *symbol
 ){
-    switch (STR_SYMBOL(canon)) {
+    switch (ID_OF_SYMBOL(symbol)) {
       case SYM_TYPE: {
         if (VAL_EVENT_TYPE(v) == SYM_NONE)  // !!! Should this ever happen?
             return nullptr;
 
-        REBSYM typesym = VAL_EVENT_TYPE(v);
+        SYMID typesym = VAL_EVENT_TYPE(v);
         return Init_Word(out, Canon(typesym)); }
 
       case SYM_PORT: {
         if (VAL_EVENT_MODEL(v) == EVM_GUI)  // "most events are for the GUI"
-            return Move_Value(out, Get_System(SYS_VIEW, VIEW_EVENT_PORT));
+            return Copy_Cell(out, Get_System(SYS_VIEW, VIEW_EVENT_PORT));
 
         if (VAL_EVENT_MODEL(v) == EVM_PORT)
             return Init_Port(out, CTX(VAL_EVENT_NODE(v)));
@@ -260,14 +266,14 @@ static REBVAL *Get_Event_Var(
             return Init_Object(out, CTX(VAL_EVENT_NODE(v)));
 
         if (VAL_EVENT_MODEL(v) == EVM_CALLBACK)
-            return Move_Value(out, Get_System(SYS_PORTS, PORTS_CALLBACK));
+            return Copy_Cell(out, Get_System(SYS_PORTS, PORTS_CALLBACK));
 
         assert(VAL_EVENT_MODEL(v) == EVM_DEVICE);  // holds IO request w/PORT!
         REBREQ *req = cast(REBREQ*, VAL_EVENT_NODE(v));
-        if (not req or not ReqPortCtx(req))
+        if (not req or not MISC(ReqPortCtx, req))
             return nullptr;
 
-        return Init_Port(out, CTX(ReqPortCtx(req))); }
+        return Init_Port(out, MISC(ReqPortCtx, req)); }
 
       case SYM_WINDOW:
       case SYM_GOB: {
@@ -352,18 +358,18 @@ static REBVAL *Get_Event_Var(
 REB_R MAKE_Event(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_EVENT);
     UNUSED(kind);
 
-    if (opt_parent) {  // faster shorthand for COPY and EXTEND
+    if (parent) {  // faster shorthand for COPY and EXTEND
         if (not IS_BLOCK(arg))
             fail (Error_Bad_Make(REB_EVENT, arg));
 
-        Move_Value(out, opt_parent);  // !!! "shallow" clone of the event
-        Set_Event_Vars(out, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
+        Copy_Cell(out, unwrap(parent));  // !!! "shallow" event clone
+        Set_Event_Vars(out, arg, VAL_SPECIFIER(arg));
         return out;
     }
 
@@ -371,12 +377,12 @@ REB_R MAKE_Event(
         fail (Error_Unexpected_Type(REB_EVENT, VAL_TYPE(arg)));
 
     RESET_CELL(out, REB_EVENT, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, nullptr);
+    INIT_VAL_NODE1(out, nullptr);
     SET_VAL_EVENT_TYPE(out, SYM_NONE);  // SYM_0 shouldn't be used
     mutable_VAL_EVENT_FLAGS(out) = EVF_MASK_NONE;
     mutable_VAL_EVENT_MODEL(out) = EVM_PORT;  // ?
 
-    Set_Event_Vars(out, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg));
+    Set_Event_Vars(out, arg, VAL_SPECIFIER(arg));
     return out;
 }
 
@@ -400,16 +406,16 @@ REB_R TO_Event(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R PD_Event(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     if (IS_WORD(picker)) {
-        if (opt_setval == NULL) {
+        if (not setval) {
             return Get_Event_Var(
-                pvs->out, pvs->out, VAL_WORD_CANON(picker)
+                pvs->out, pvs->out, VAL_WORD_SYMBOL(picker)
             );
         }
         else {
-            if (!Set_Event_Var(pvs->out, picker, opt_setval))
+            if (!Set_Event_Var(pvs->out, picker, unwrap(setval)))
                 return R_UNHANDLED;
 
             return R_INVISIBLE;
@@ -440,7 +446,7 @@ void MF_Event(REB_MOLD *mo, REBCEL(const*) v, bool form)
     UNUSED(form);
 
     REBLEN field;
-    REBSYM fields[] = {
+    SYMID fields[] = {
         SYM_TYPE, SYM_PORT, SYM_GOB, SYM_OFFSET, SYM_KEY,
         SYM_FLAGS, SYM_CODE, SYM_DATA, SYM_0
     };

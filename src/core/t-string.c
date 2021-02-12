@@ -24,6 +24,8 @@
 
 #include "sys-core.h"
 
+#include "sys-zlib.h"  // for crc32_z()
+
 #include "sys-int-funcs.h"
 
 #include "datatypes/sys-money.h"
@@ -160,11 +162,11 @@ static void reverse_string(REBSTR *str, REBLEN index, REBLEN len)
 REB_R MAKE_String(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL* opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *def
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_INTEGER(def)) {  // new string with given integer capacity
         //
@@ -381,7 +383,7 @@ static int Compare_Chr(void *thunk, const void *v1, const void *v2)
 REB_R PD_String(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     // Note: There was some more careful management of overflow here in the
     // PICK and POKE actions, before unification.  But otherwise the code
@@ -399,7 +401,7 @@ REB_R PD_String(
         }
     */
 
-    if (opt_setval == NULL) { // PICK-ing
+    if (not setval) { // PICK-ing
         const REBSTR *s = VAL_STRING(pvs->out);
         if (IS_INTEGER(picker) or IS_DECIMAL(picker)) { // #2312
             REBINT n = Int32(picker);
@@ -447,11 +449,11 @@ REB_R PD_String(
         fail (Error_Out_Of_Range(SPECIFIC(picker)));
 
 
-    if (IS_CHAR(opt_setval)) {
-        Move_Value(pvs->out, opt_setval);
+    if (IS_CHAR(unwrap(setval))) {
+        Copy_Cell(pvs->out, unwrap(setval));
     }
-    else if (IS_INTEGER(opt_setval)) {
-        Init_Char_May_Fail(pvs->out, Int32(opt_setval));
+    else if (IS_INTEGER(unwrap(setval))) {
+        Init_Char_May_Fail(pvs->out, Int32(unwrap(setval)));
     }
     else {
         // !!! This used to allow setting to a string to set to the first
@@ -536,12 +538,12 @@ void Mold_Uni_Char(REB_MOLD *mo, REBUNI c, bool parened)
         if (parened or c == 0x1E or c == 0xFEFF) {
             REBLEN len_old = STR_LEN(buf);
             REBSIZ size_old = STR_SIZE(buf);
-            EXPAND_SERIES_TAIL(SER(buf), 7);  // worst case: ^(1234)
+            EXPAND_SERIES_TAIL(buf, 7);  // worst case: ^(1234)
             TERM_STR_LEN_SIZE(buf, len_old, size_old);
 
             Append_Ascii(buf, "^(");
 
-            REBYTE *bp = BIN_TAIL(SER(buf));
+            REBYTE *bp = BIN_TAIL(buf);
             REBYTE *ep = Form_Uni_Hex(bp, c); // !!! Make a mold...
             TERM_STR_LEN_SIZE(
                 buf,
@@ -801,7 +803,7 @@ REBTYPE(String)
     REBVAL *v = D_ARG(1);
     assert(ANY_STRING(v));
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     REBLEN index = VAL_INDEX(v);
     REBLEN tail = VAL_LEN_HEAD(v);
@@ -811,7 +813,7 @@ REBTYPE(String)
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // accounted for by `v`
 
-        if (VAL_WORD_SYM(ARG(property)) == SYM_SIZE) {
+        if (VAL_WORD_ID(ARG(property)) == SYM_SIZE) {
             REBSIZ size;
             VAL_UTF8_SIZE_AT(&size, v);
             return Init_Integer(D_OUT, size);
@@ -849,9 +851,9 @@ REBTYPE(String)
         REBSIZ offset = VAL_OFFSET_FOR_INDEX(v, index);
         REBSIZ size_old = STR_SIZE(s);
 
-        Remove_Series_Units(SER(s), offset, size);  // should keep terminator
+        Remove_Series_Units(s, offset, size);  // !!! at one time, kept term
         Free_Bookmarks_Maybe_Null(s);
-        SET_STR_LEN_SIZE(s, tail - len, size_old - size);  // no term needed
+        TERM_STR_LEN_SIZE(s, tail - len, size_old - size);
 
         RETURN (v); }
 
@@ -867,7 +869,7 @@ REBTYPE(String)
         UNUSED(REF(only)); // all strings appends are /ONLY...currently unused
 
         REBLEN len; // length of target
-        if (VAL_WORD_SYM(verb) == SYM_CHANGE)
+        if (VAL_WORD_ID(verb) == SYM_CHANGE)
             len = Part_Len_May_Modify_Index(v, ARG(part));
         else
             len = Part_Limit_Append_Insert(ARG(part));
@@ -889,7 +891,7 @@ REBTYPE(String)
 
         VAL_INDEX_RAW(v) = Modify_String_Or_Binary(  // does read-only check
             v,
-            cast(enum Reb_Symbol, sym),
+            cast(enum Reb_Symbol_Id, sym),
             ARG(value),
             flags,
             len,
@@ -1012,7 +1014,7 @@ REBTYPE(String)
         // the head of the series).  One of many behaviors worth reviewing.
         //
         if (index == 0 and IS_SER_DYNAMIC(s))
-            Unbias_Series(SER(s), false);
+            Unbias_Series(s, false);
 
         Free_Bookmarks_Maybe_Null(s);  // review!
         REBSIZ offset = VAL_OFFSET_FOR_INDEX(v, index);
@@ -1065,7 +1067,7 @@ REBTYPE(String)
 
         REBSTR *str = VAL_STRING_ENSURE_MUTABLE(v);
 
-        Move_Value(D_OUT, v);  // save before index adjustment
+        Copy_Cell(D_OUT, v);  // save before index adjustment
         REBINT len = Part_Len_May_Modify_Index(v, ARG(part));
         if (len > 0)
             reverse_string(str, VAL_INDEX(v), len);
@@ -1079,7 +1081,7 @@ REBTYPE(String)
         UNUSED(PAR(series));
 
         if (REF(all))
-            fail (Error_Bad_Refine_Raw(ARG(all)));
+            fail (Error_Bad_Refines_Raw());
 
         if (not Is_String_Definitely_ASCII(VAL_STRING(v)))
             fail ("UTF-8 Everywhere: String sorting temporarily unavailable");
@@ -1090,9 +1092,9 @@ REBTYPE(String)
         // interest, maybe common case.
 
         if (REF(compare))
-            fail (Error_Bad_Refine_Raw(PAR(compare))); // !!! not in R3-Alpha
+            fail (Error_Bad_Refines_Raw());  // !!! not in R3-Alpha
 
-        Move_Value(D_OUT, v);  // before index modification
+        Copy_Cell(D_OUT, v);  // before index modification
         REBLEN len = Part_Len_May_Modify_Index(v, ARG(part));
         if (len <= 1)
             return D_OUT;
@@ -1138,7 +1140,7 @@ REBTYPE(String)
 
             REBSIZ utf8_size;
             REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
-            Set_Random(Compute_CRC24(utf8, utf8_size));
+            Set_Random(crc32_z(0L, utf8, utf8_size));
             return Init_Void(D_OUT, SYM_VOID);
         }
 

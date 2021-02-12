@@ -18,7 +18,7 @@ dump: function [
     return: <elide>
         "Doesn't return anything, not even void (so like a COMMENT)"
     :value [any-value!]
-    :extra "Optional variadic data for SET-WORD!, e.g. `dump x: 1 + 2`"
+    'extra "Optional variadic data for SET-WORD!, e.g. `dump x: 1 + 2`"
         [any-value! <variadic>]
     /prefix "Put a custom marker at the beginning of each output line"
         [text!]
@@ -38,7 +38,7 @@ dump: function [
             null? :val ["\null\"]
             object? :val [unspaced ["make object! [" (summarize-obj val) "]"]]
         ] else [
-            trunc: ~void~
+            trunc: '~void~
             append (
                 mold/limit/truncated :val system/options/dump-size 'trunc
             ) if trunc ["..."]
@@ -50,7 +50,7 @@ dump: function [
             refinement!  ; treat as label, /a no shift and shorter than "a"
             text! [  ; good for longer labeling when you need spaces/etc.
                 print unspaced [
-                    elide trunc: ~void~
+                    elide trunc: '~void~
                     mold/limit/truncated item system/options/dump-size 'trunc
                     if trunc ["..."]
                 ]
@@ -80,7 +80,7 @@ dump: function [
 
     case [
         swp: match [set-word! set-path!] :value [ ; `dump x: 1 + 2`
-            pos: evaluate/result extra (lit result:)
+            pos: evaluate/result extra (just result:)
             set swp :result
             print [swp, result]
         ]
@@ -88,7 +88,7 @@ dump: function [
         b: match block! :value [
             while [not tail? b] [
                 if swp: match [set-word! set-path!] :b/1 [ ; `dump [x: 1 + 2]`
-                    b: evaluate/result b (lit result:)
+                    b: evaluate/result b (just result:)
                     print [swp, result]
                 ] else [
                     dump-one b/1

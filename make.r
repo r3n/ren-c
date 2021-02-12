@@ -93,18 +93,17 @@ for-each [name value] options [
             while [config] [
                 set [path: f:] split-path config
                 bak: system/options/current-path
-                cd :path
+                change-dir path
                 user-config/config: _
                 user-config: make user-config load f
                 config: try attempt [clean-path user-config/config]
-                cd :bak
+                change-dir bak
             ]
         ]
         'EXTENSIONS [
-            ; [+|-|*] [NAME {+|-|*|[modules]}]... 
+            ; [+|-|*] [NAME {+|-|*|[modules]}]...
             use [ext-file user-ext][
                 user-ext: load value
-                if word? user-ext [user-ext: reduce [user-ext]]
                 if not block? user-ext [
                     fail [
                         "Selected extensions must be a block, not"
@@ -124,7 +123,7 @@ for-each [name value] options [
         ]
     ] else [
         set in user-config (to-word replace/all to text! name #"_" #"-")
-            attempt [load value] else [value]
+            attempt [load-value value] else [value]
     ]
 ]
 
@@ -190,6 +189,13 @@ gen-obj: func [
     ; to 0 to work in MSVC.  Disable the warning for now.
     ;
     append flags <msc:/wd4574>
+
+    ; Building as C++ using nmake seems to trigger this warning to say there
+    ; is no exception handling policy in place.  We don't use C++ exceptions
+    ; in the C++ build, so we ignore the warning...but if exceptions were used
+    ; there'd have to be an implementation choice made there.
+    ;
+    append flags <msc:/wd4577>
 
     ; There's a warning on reinterpret_cast between related classes, trying to
     ; suggest you use static_cast instead.  This complicates the `cast` macro
@@ -284,7 +290,7 @@ gen-obj: func [
                 ; builds use unsigned chars.
                 ;
                 <gnu:-funsigned-char>
- 
+
                 ; MSVC never bumped the __cplusplus version past 1997, even if
                 ; you compile with C++17.  Hence CPLUSPLUS_11 is used by Rebol
                 ; code as the switch for most C++ behaviors, and we have to
@@ -688,7 +694,7 @@ extension-class: make object! [
     sequence: _ ; the sequence in which the extension should be loaded
     visited: false
 
-    directory: method [
+    directory: meth [
         return: [text!]  ; Should this be [file!]?
     ][
         lowercase to text! name  ; !!! Should remember where it was found
@@ -912,7 +918,7 @@ EXAMPLES:
     extensions: +
     => enable all extensions as builtin
     extensions: "- gif + jpg * png [lodepng]"
-    => disable all extensions but gif (builtin),jpg and png (dynamic)^/ 
+    => disable all extensions but gif (builtin),jpg and png (dynamic)^/
 CURRENT VALUE:
     }
     indent mold user-config/extensions
@@ -1134,7 +1140,7 @@ switch user-config/debug [
             "NDEBUG"  ; disable assert(), and many other general debug checks
 
             ; Include debugging features which do not in-and-of-themselves
-            ; affect runtime performance (DEBUG_TRACK_CELLS would be an
+            ; affect runtime performance (DEBUG_TRACK_EXTEND_CELLS would be an
             ; example of something that significantly affects runtime, and
             ; even things like DEBUG_FRAME_LABELS adds a tiny bit!)
             ;
@@ -1455,9 +1461,9 @@ process-module: func [
                             output: lib
                         ]
                     ]
-                    (object? lib) and [
+                    (object? lib) and (
                         find [#dynamic-extension #static-extension] lib/class
-                    ][
+                    )[
                         lib
                     ]
                     fail ["unrecognized library" lib "in module" mod]
@@ -1557,7 +1563,7 @@ sort/compare builtin-extensions func [a b] [a/sequence < b/sequence]
 vars: reduce [
     reb-tool: make rebmake/var-class [
         name: {REBOL_TOOL}
-        if not any [
+        any [
             'file = exists? value: system/options/boot
             all [
                 user-config/rebol-tool
@@ -1567,11 +1573,19 @@ vars: reduce [
                 {r3-make}
                 rebmake/target-platform/exe-suffix
             ]
-        ] [fail "^/^/!! Cannot find a valid REBOL_TOOL !!^/"]
+        ] else [
+            fail "^/^/!! Cannot find a valid REBOL_TOOL !!^/"
+        ]
+
+        ; Originally this didn't transform to a local file path (e.g. with
+        ; backslashes instead of slashes on Windows).  There was some reason it
+        ; worked in visual studio, but not with nmake.
+        ;
+        value: file-to-local value
     ]
     make rebmake/var-class [
         name: {REBOL}
-        value: {$(REBOL_TOOL) -qs}
+        value: {$(REBOL_TOOL) -q}
     ]
     make rebmake/var-class [
         name: {T}

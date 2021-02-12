@@ -271,7 +271,7 @@ enum CharColumnEncoding char_column_encoding = CHAR_COL_UCS2;
 //
 //  {Set the encoding for CHAR, CHAR(n), VARCHAR(n), LONGVARCHAR fields}
 //
-//      return: <void>
+//      return: [void!]
 //      encoding "Either UTF-8, Latin-1, or UCS-2"
 //          [word!]
 //  ]

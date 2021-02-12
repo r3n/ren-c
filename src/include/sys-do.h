@@ -49,9 +49,10 @@
 //
 inline static bool Do_Feed_To_End_Maybe_Stale_Throws(
     REBVAL *out,  // must be initialized, unchanged if all empty/invisible
-    struct Reb_Feed *feed  // feed mechanics always call va_end() if va_list
+    REBFED *feed,  // feed mechanics always call va_end() if va_list
+    REBFLGS flags
 ){
-    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+    DECLARE_FRAME (f, feed, flags);
 
     bool threw;
     Push_Frame(out, f);
@@ -73,10 +74,14 @@ inline static bool Do_Any_Array_At_Throws(
 
     // ^-- Voidify out *after* feed initialization (if any_array == out)
     //
-    Init_Unlabeled_Void(out);
+    Init_Empty_Nulled(out);
 
-    bool threw = Do_Feed_To_End_Maybe_Stale_Throws(out, feed);
-    CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
+    bool threw = Do_Feed_To_End_Maybe_Stale_Throws(
+        out,
+        feed,
+        EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+    );
+    CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
     return threw;
 }
 
@@ -90,23 +95,27 @@ inline static bool Do_Any_Array_At_Throws(
 //
 inline static bool Do_At_Mutable_Maybe_Stale_Throws(
     REBVAL *out,
-    const RELVAL *opt_first,  // optional element to inject *before* the array
+    option(const RELVAL*) first,  // element to inject *before* the array
     REBARR *array,
     REBLEN index,
-    REBSPC *specifier  // must match array, but also opt_first if relative
+    REBSPC *specifier  // must match array, but also first if relative
 ){
-    struct Reb_Feed feed_struct;  // opt_first so can't use DECLARE_ARRAY_FEED
-    struct Reb_Feed *feed = &feed_struct;
+    // need to pass `first` parameter, so can't use DECLARE_ARRAY_FEED
+    REBFED *feed = Alloc_Feed();  // need `first`
     Prep_Array_Feed(
         feed,
-        opt_first,
+        first,
         array,
         index,
         specifier,
         FEED_MASK_DEFAULT  // different: does not 
     );
 
-    return Do_Feed_To_End_Maybe_Stale_Throws(out, feed);
+    return Do_Feed_To_End_Maybe_Stale_Throws(
+        out,
+        feed,
+        EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED
+    );
 }
 
 inline static bool Do_At_Mutable_Throws(
@@ -115,7 +124,7 @@ inline static bool Do_At_Mutable_Throws(
     REBLEN index,
     REBSPC *specifier
 ){
-    Init_Unlabeled_Void(out);
+    Init_Empty_Nulled(out);
 
     bool threw = Do_At_Mutable_Maybe_Stale_Throws(
         out,
@@ -124,7 +133,7 @@ inline static bool Do_At_Mutable_Throws(
         index,
         specifier
     );
-    CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
     return threw;
 }
 
@@ -171,14 +180,15 @@ inline static bool RunQ_Throws(
 //
 inline static bool Do_Branch_Core_Throws(
     REBVAL *out,
-    REBVAL *cell,  // mutable temporary scratch cell, only if SYM-GROUP! legal
     const REBVAL *branch,
     const REBVAL *condition  // can be END, but use nullptr vs. a NULLED cell!
 ){
     assert(branch != out and condition != out);
 
+    DECLARE_LOCAL (cell);
+
     enum Reb_Kind kind = VAL_TYPE(branch);
-    bool voidify = not (kind == REB_QUOTED or ANY_SYM_KIND(kind));
+    bool as_is = (kind == REB_QUOTED or ANY_SYM_KIND(kind));
 
   redo:
 
@@ -188,7 +198,7 @@ inline static bool Do_Branch_Core_Throws(
         break;
 
       case REB_QUOTED:
-        Unquotify(Move_Value(out, branch), 1);
+        Unquotify(Copy_Cell(out, branch), 1);
         break;
 
       case REB_BLOCK:
@@ -197,21 +207,23 @@ inline static bool Do_Branch_Core_Throws(
             return true;
         break;
 
-      case REB_ACTION:
-        if (RunQ_Throws(
+      case REB_ACTION: {
+        PUSH_GC_GUARD(branch);  // may be stored in `cell`, needs protection
+        bool threw = RunQ_Throws(
             out,
             false, // !fully, e.g. arity-0 functions can ignore condition
             rebU(branch),
             condition, // may be an END marker, if not Do_Branch_With() case
             rebEND // ...but if condition wasn't an END marker, we need one
-        )){
+        );
+        DROP_GC_GUARD(branch);
+        if (threw)
             return true;
-        }
-        break;
+        break; }
 
       case REB_SYM_WORD:
       case REB_SYM_PATH:
-        Plainify(Move_Value(cell, branch));
+        Plainify(Copy_Cell(cell, branch));
         if (Eval_Value_Throws(out, cell, SPECIFIED))
             return true;
         break;
@@ -231,28 +243,27 @@ inline static bool Do_Branch_Core_Throws(
     }
 
     // If we're not returning the branch result purely "as-is" then we change
-    // not just NULL to `~branched~`, but also any other void.  So:
+    // NULL to NULL-2:
     //
     //     >> if true [null]
-    //     == ~branched~
+    //     ; null-2
     //
-    //     >> if true [print "relabeled"]
-    //     test
-    //     == ~branched~
+    // To get things to pass through unmodified, you have to use the @ forms:
     //
-    // To get the original void label, you have to use the @ forms:
+    //     >> if true @[null]
+    //     ; null
     //
-    //     >> if true @[print "not relabeled"]
-    //     == ~void~  ; specific void result of PRINT
+    // The corollary is that RETURN will strip off the isotope status of
+    // values unless the RETURN @(...) form is used.
     //
-    if (voidify and IS_NULLED_OR_VOID(out))
-        Init_Void(out, SYM_BRANCHED);
+    if (not as_is)
+        Isotopify_If_Nulled(out);
 
     return false;
 }
 
-#define Do_Branch_With_Throws(out,cell,branch,condition) \
-    Do_Branch_Core_Throws((out), (cell), (branch), NULLIFY_NULLED(condition))
+#define Do_Branch_With_Throws(out,branch,condition) \
+    Do_Branch_Core_Throws((out), (branch), NULLIFY_NULLED(condition))
 
-#define Do_Branch_Throws(out,cell,branch) \
-    Do_Branch_Core_Throws((out), (cell), (branch), END_NODE)
+#define Do_Branch_Throws(out,branch) \
+    Do_Branch_Core_Throws((out), (branch), END_NODE)

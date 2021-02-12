@@ -50,7 +50,7 @@
     [a b c 10 10] = do f
 )
 (
-    f: make frame! 'append/only
+    f: make frame! :append/only
     f/series: copy [a b c]
     f/value: [d e f]
     [a b c [d e f]] = do f
@@ -77,13 +77,13 @@
     )
 
     (r = apd copy xy abc 2 3)
-    (r = applique 'apd [series: copy xy, value: abc, part: 2, dup: 3])
+    (r = applique :apd [series: copy xy, value: abc, part: 2, dup: 3])
 
     (r = apd3 copy xy abc 2)
-    (r = applique 'apd3 [series: copy xy, value: abc, part: 2])
+    (r = applique :apd3 [series: copy xy, value: abc, part: 2])
 
     (r = ap2d copy xy abc 3)
-    (r = applique 'ap2d [series: copy xy, value: abc, dup: 3])
+    (r = applique :ap2d [series: copy xy, value: abc, dup: 3])
 ]
 
 [
@@ -99,17 +99,17 @@
     )
 
     (r = adp copy xy abc 3 2)
-    (r = applique 'adp [series: copy xy, value: abc, dup: 3, part: 2])
+    (r = applique :adp [series: copy xy, value: abc, dup: 3, part: 2])
 
     (r = adp2 copy xy abc 3)
-    (r = applique 'adp2 [series: copy xy, value: abc, dup: 3])
+    (r = applique :adp2 [series: copy xy, value: abc, dup: 3])
 
     (r = ad3p copy xy abc 2)
-    (r = applique 'ad3p [series: copy xy, value: abc, part: 2])
+    (r = applique :ad3p [series: copy xy, value: abc, part: 2])
 ]
 
 (
-    aopd3: specialize lit (specialize :append/only [])/part [
+    aopd3: specialize :append/only [
         dup: 3
         part: 1
     ]
@@ -118,7 +118,7 @@
 
     did all [
         , r = aopd3 copy [a b c] [d e]
-        , r = applique 'aopd3 [series: copy [a b c] value: [d e]]
+        , r = applique :aopd3 [series: copy [a b c] value: [d e]]
     ]
 )
 
@@ -128,9 +128,12 @@
     for-each code [
         [specialize :append/only/only []]
         [specialize :append/asdf []]
-        [specialize lit (specialize :append/only [])/only []]
+        [
+            apo: specialize :append/only []
+            specialize :apo/only []
+        ]
     ][
-        is-bad: me and ['bad-refine = (trap [do code])/id]
+        is-bad: me and ('bad-parameter = (trap [do code])/id)
     ]
 
     is-bad
@@ -153,8 +156,8 @@
 ; and other enfix situations.
 [
     (
-        foo: function [/A [integer!] :/B [<skip> word!]] [
-            reduce [/A (try A) /B (try :B)]
+        foo: function [/A [integer!] '/B [<skip> word!]] [
+            reduce [/A (try A) /B (try B)]
         ]
         foob: enfixed :foo/b
         true

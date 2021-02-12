@@ -92,7 +92,7 @@ REBNATIVE(builtin_extensions)
         COLLATE_CFUNC *collator = Builtin_Extension_Collators[i];
         REBVAL *details = (*collator)();
         assert(IS_BLOCK(details) and VAL_LEN_AT(details) == IDX_COLLATOR_MAX);
-        Move_Value(Alloc_Tail_Array(list), details);
+        Copy_Cell(Alloc_Tail_Array(list), details);
         rebRelease(details);
     }
     return Init_Block(Alloc_Value(), list);
@@ -153,7 +153,7 @@ REBNATIVE(load_extension)
         details = VAL_ARRAY(details_block);
         rebRelease(details_block);
 
-        Move_Value(lib, lib_api);
+        Copy_Cell(lib, lib_api);
         rebRelease(lib_api);
     }
 
@@ -171,11 +171,11 @@ REBNATIVE(load_extension)
     // to enhancement.  So trying a monolithic rewrite for starters.
 
     const REBVAL *script_compressed
-        = SPECIFIC(ARR_AT(details, IDX_COLLATOR_SCRIPT));
+        = DETAILS_AT(details, IDX_COLLATOR_SCRIPT);
     const REBVAL *specs_compressed
-        = SPECIFIC(ARR_AT(details, IDX_COLLATOR_SPECS));
+        = DETAILS_AT(details, IDX_COLLATOR_SPECS);
     const REBVAL *dispatchers_handle
-        = SPECIFIC(ARR_AT(details, IDX_COLLATOR_DISPATCHERS));
+        = DETAILS_AT(details, IDX_COLLATOR_DISPATCHERS);
 
     REBLEN num_natives = VAL_HANDLE_LEN(dispatchers_handle);
     REBNAT *dispatchers = VAL_HANDLE_POINTER(REBNAT, dispatchers_handle);
@@ -190,7 +190,7 @@ REBNATIVE(load_extension)
     );
 
     REBARR *specs = Scan_UTF8_Managed(
-        Canon(SYM___ANONYMOUS__), // !!! Name of DLL if available?
+        ANONYMOUS,  // !!! Name of DLL if available?
         specs_utf8,
         specs_size
     );
@@ -201,7 +201,7 @@ REBNATIVE(load_extension)
     // This is something that raises questions, but go ahead and bind them
     // into lib for the time being (don't add any new words).
     //
-    Bind_Values_Deep(ARR_HEAD(specs), Lib_Context);
+    Bind_Values_Deep(ARR_HEAD(specs), ARR_TAIL(specs), Lib_Context);
 
     // Some of the things being tacked on here (like the DLL info etc.) should
     // reside in the META OF portion, vs. being in-band in the module itself.
@@ -229,7 +229,7 @@ REBNATIVE(load_extension)
         // normal module export...also Make_Native() doesn't understand it
         //
         bool is_export;
-        if (IS_WORD(item) and VAL_WORD_SYM(item) == SYM_EXPORT) {
+        if (IS_WORD(item) and VAL_WORD_ID(item) == SYM_EXPORT) {
             is_export = true;
             ++item;
         }
@@ -268,9 +268,14 @@ REBNATIVE(load_extension)
         // the list of the exports and pass it to the module code.
         //
         if (is_export) {
-            Init_Word(DS_PUSH(), VAL_WORD_SPELLING(name));
-            if (0 == Try_Bind_Word(module, DS_TOP))
+            //
+            // We don't want to necessarily make binding work on stack values.
+            // So get to stack by way of the spare cell.
+            //
+            Init_Word(D_SPARE, VAL_WORD_SYMBOL(name));
+            if (0 == Try_Bind_Word(module, D_SPARE))
                 panic ("Couldn't bind word just added -- problem");
+            Copy_Cell(DS_PUSH(), D_SPARE);
         }
     }
 
@@ -450,7 +455,7 @@ REBVAL *rebCollateExtension_internal(
         dispatchers,
         dispatchers_len
     );
-    TERM_ARRAY_LEN(a, IDX_COLLATOR_MAX);
+    SET_SERIES_LEN(a, IDX_COLLATOR_MAX);
 
     return Init_Block(Alloc_Value(), a);
 }

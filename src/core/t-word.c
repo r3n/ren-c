@@ -30,7 +30,7 @@
 //
 // Used in CT_Word() and CT_Void()
 //
-REBINT Compare_Spellings(const REBSTR *a, const REBSTR *b, bool strict)
+REBINT Compare_Spellings(const REBSYM *a, const REBSYM *b, bool strict)
 {
     if (strict) {
         if (a == b)
@@ -51,7 +51,7 @@ REBINT Compare_Spellings(const REBSTR *a, const REBSTR *b, bool strict)
     else {
         // Different cases acceptable, only check for a canon match
         //
-        if (STR_CANON(a) == STR_CANON(b))
+        if (Are_Synonyms(a, b))
             return 0;
 
         // !!! "They must differ by case...."  This needs to account for
@@ -77,8 +77,8 @@ REBINT Compare_Spellings(const REBSTR *a, const REBSTR *b, bool strict)
 REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     return Compare_Spellings(
-        VAL_WORD_SPELLING(a),
-        VAL_WORD_SPELLING(b),
+        VAL_WORD_SYMBOL(a),
+        VAL_WORD_SYMBOL(b),
         strict
     );
 }
@@ -90,11 +90,11 @@ REBINT CT_Word(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Word(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (ANY_WORD(arg)) {
         //
@@ -103,13 +103,13 @@ REB_R MAKE_Word(
         // true since EXTRA(Binding, ...) conveys the entire bind state.
         // Rethink what it means to preserve the bits vs. not.
         //
-        Move_Value(out, arg);
+        Copy_Cell(out, arg);
         mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = kind;
         return out;
     }
 
     if (ANY_STRING(arg)) {
-        if (Is_Series_Frozen(SER(VAL_STRING(arg))))
+        if (Is_Series_Frozen(VAL_STRING(arg)))
             goto as_word;  // just reuse AS mechanics on frozen strings
 
         // Otherwise, we'll have to copy the data for a TO conversion
@@ -131,7 +131,7 @@ REB_R MAKE_Word(
         //
       as_word: {
         REBVAL *as = rebValue("as", Datatype_From_Kind(kind), arg, rebEND);
-        Move_Value(out, as);
+        Copy_Cell(out, as);
         rebRelease(as);
 
         return out;
@@ -196,7 +196,7 @@ REB_R TO_Word(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 
 inline static void Mold_Word(REB_MOLD *mo, REBCEL(const*) v)
 {
-    const REBSTR *spelling = VAL_WORD_SPELLING(v);
+    const REBSTR *spelling = VAL_WORD_SYMBOL(v);
     Append_Utf8(mo->series, STR_UTF8(spelling), STR_SIZE(spelling));
 }
 
@@ -254,17 +254,17 @@ REBTYPE(Word)
     REBVAL *v = D_ARG(1);
     assert(ANY_WORD(v));
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value));
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
         case SYM_LENGTH: {
-            const REBSTR *spelling = VAL_WORD_SPELLING(v);
+            const REBSTR *spelling = VAL_WORD_SYMBOL(v);
             const REBYTE *bp = STR_HEAD(spelling);
             REBSIZ size = STR_SIZE(spelling);
             REBLEN len = 0;

@@ -92,15 +92,19 @@ load-header: function [
 
     return: "header OBJECT! if present, or error WORD!"
         [<opt> object! word!]
+    body: "<output>"
+        [binary! block!]
+    line: "<output>"
+        [integer!]
+    final: "<output>"
+        [<output> binary!]
+
     source "Source code (text! will be UTF-8 encoded)"
         [binary! text!]
     /file "Where source is being loaded from"
         [file! url!]
     /only "Only process header, don't decompress body"
     /required "Script header is required"
-    /body [<output> binary! block!]
-    /line [<output> integer!]
-    /final [<output> binary!]
 
     <static>
     non-ws (make bitset! [not 1 - 32])
@@ -159,15 +163,11 @@ load-header: function [
 
     ; get 'rebol keyword
 
-    let key
-    let rest
-    [key rest]: transcode/file/line data file 'line
+    let [key rest]: transcode/file/line data file 'line
 
     ; get header block
 
-    let hdr
-    let error
-    [hdr rest error]: transcode/file/line rest file 'line
+    let [hdr 'rest error]: transcode/file/line rest file 'line
 
     if error [fail error]
 
@@ -233,7 +233,6 @@ load-header: function [
     ] else [
         ; block-embedded script, only script compression
 
-        let data
         data: transcode data  ; decode embedded script
         rest: skip data 2  ; !!! what is this skipping ("hdr/length" ??)
 
@@ -257,19 +256,16 @@ load-header: function [
 load: function [
     {Loads code or data from a file, URL, text string, or binary.}
 
-    return: "Loaded code (may be single-value if /header or /all not used)"
+    return: "BLOCK! if Rebol code, otherwise value(s) appropriate for codec"
         [any-value!]
-    source "Source or block of sources"
-        [file! url! text! binary! block!]
-    /header "Request the Rebol header object be returned as well"
-        [<output> object!]
-    /all "Load all values (cannot be used with /HEADER)"  ; use all_LOAD
+    header: "<output> Request the Rebol header object be returned as well"
+        [object!]
+
+    source "Source of the information being loaded"
+        [file! url! text! binary!]
     /type "E.g. rebol, text, markup, jpeg... (by default, auto-detected)"
         [word!]
 ][
-    all_LOAD: :all
-    all: :lib/all
-
     ; Note that code or data can be embedded in other datatypes, including
     ; not just text, but any binary data, including images, etc. The type
     ; argument can be used to control how the raw source is converted.
@@ -282,23 +278,6 @@ load: function [
     ;
     ; Note that IMPORT has its own loader, and does not use LOAD directly.
     ; /TYPE with anything other than 'EXTENSION disables extension loading.
-
-    all [header, all_LOAD] then [
-        fail "Cannot use /ALL and /HEADER refinements together"
-    ]
-
-    if block? source [
-        ; A BLOCK! means multiple sources, calls LOAD recursively for each
-
-        return map-each s source [
-            applique 'load [
-                source: s
-                header: header
-                all: all_LOAD
-                type: :type
-            ]
-        ]
-    ]
 
     ; Detect file type, and decode the data
 
@@ -356,17 +335,15 @@ load: function [
 
     ; Try to load the header, handle error
 
-    if not all_LOAD [
-        hdr: line: _  ; for SET-WORD! gathering, evolving...
-        either object? data [
-            fail "Code has not been updated for LOAD-EXT-MODULE"
-            load-ext-module data
-        ][
-            [hdr data line]: load-header/file data file
-        ]
-
-        if word? hdr [cause-error 'syntax hdr source]
+    hdr: line: _  ; for SET-WORD! gathering, evolving...
+    either object? data [
+        fail "Code has not been updated for LOAD-EXT-MODULE"
+        load-ext-module data
+    ][
+        [hdr data line]: load-header/file data file
     ]
+
+    if word? hdr [cause-error 'syntax hdr source]
 
     ensure [blank! object!] hdr: default [_]
     ensure [binary! block! text!] data
@@ -380,7 +357,7 @@ load: function [
 
     ; Bind code to user context
 
-    none [
+    all .not [
         'unbound = type
         'module = select hdr 'type
         find try get 'hdr/options 'unbound
@@ -388,25 +365,27 @@ load: function [
         data: intern data
     ]
 
-    ; If appropriate and possible, return singular data value.
-    ;
-    ; !!! How good an idea is this, really?  People are used to saying
-    ; load "10" and getting `10`, not `[10]`.  But it seems like this makes
-    ; the process have some variability to it that makes it a poor default.
-    ;
-    none [
-        all_LOAD
-        header  ; technically doesn't prevent returning single value (?)
-        (length of data) <> 1
-    ] then [
-        data: first data
-    ]
-
     if header [
         set header opt hdr
     ]
     return :data
 ]
+
+load-value: redescribe [
+    {Do a LOAD of a single value}
+](
+    chain [
+        :load
+            |
+        func [x] [
+            assert [block? x]
+            if 1 <> length of x [
+                fail ["LOAD-VALUE got length" length of x "block, not 1"]
+            ]
+            first x
+        ]
+    ]
+)
 
 
 do-needs: function [
@@ -483,14 +462,14 @@ do-needs: function [
     ; Temporary object to collect exports of "mixins" (private modules).
     ; Don't bother if returning all the modules in a block, or if in user mode.
     ;
-    if no-user and [not block] [
+    if no-user and (not block) [
         mixins: make object! 0  ; Minimal length since it may persist later
     ]
 
     ; Import the modules:
     ;
     mods: map-each [name vers hash] mods [
-        mod: applique 'import [
+        mod: applique :import [
             module: name
 
             version: true  ; !!! automatic from VERS?
@@ -563,7 +542,7 @@ load-module: func [
     switch type of source [
         word! [ ; loading the preloaded
             if name [
-                cause-error 'script 'bad-refine /as  ; no renaming
+                cause-error 'script 'bad-parameter /as  ; no renaming
             ]
 
             ; Return blank if no module of that name found
@@ -616,7 +595,7 @@ load-module: func [
             if let tmp: find/skip next system/modules mod: source 2 [
                 if name [
                     ; already imported
-                    cause-error 'script 'bad-refine /as
+                    cause-error 'script 'bad-parameter /as
                 ]
 
                 all [
@@ -633,7 +612,7 @@ load-module: func [
 
         block! [
             if any [version name] [
-                cause-error 'script 'bad-refines blank
+                cause-error 'script 'bad-parameter blank
             ]
 
             data: make block! length of source
@@ -658,7 +637,7 @@ load-module: func [
             ]
 
             return map-each [mod ver name] source [
-                applique 'load-module [
+                applique :load-module [
                     source: mod
                     version: version
                     as: name
@@ -749,7 +728,7 @@ load-module: func [
     let pos
     all [
         override?: not no-lib  ; set to false later if existing module is used
-        set [name0: mod0:] pos: try find/skip system/modules name 2
+        set [name0 mod0] pos: try find/skip system/modules name 2
     ]
     then [  ; Get existing module's info
 
@@ -921,16 +900,16 @@ import: function [
     ;
     if block? module [
         assert [not version] ; can only apply to one module
-        return applique 'do-needs [
+        return applique :do-needs [
             needs: module
-            no-share: :no-share
-            no-lib: :no-lib
-            no-user: :no-user
+            no-share: no-share
+            no-lib: no-lib
+            no-user: no-user
             block: #
         ]
     ]
 
-    set [name: mod:] applique 'load-module [
+    set [name: mod:] applique :load-module [
         source: module
         version: version
         no-share: no-share
@@ -951,12 +930,12 @@ import: function [
 
             for-each path system/options/module-paths [
                 if set [name: mod:] (
-                    applique 'load-module [
-                        source: path/:file
+                    applique :load-module [
+                        source: join path file  ; Note: %% not defined yet
                         version: version
-                        no-share: :no-share
-                        no-lib: :no-lib
-                        import: true
+                        no-share: no-share
+                        no-lib: no-lib
+                        import: #
                     ]
                 ) [
                     break
@@ -1009,4 +988,4 @@ import: function [
 ]
 
 
-export [load import]
+export [load load-value import]

@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
@@ -93,6 +93,29 @@
 #define SERIES_FLAG_ROOT NODE_FLAG_ROOT
 #define SERIES_FLAG_MARKED NODE_FLAG_MARKED
 
+//=//// SERIES_FLAG_LINK_NODE_NEEDS_MARK //////////////////////////////////=//
+//
+// This indicates that a series's LINK() field is the `custom` node element,
+// and should be marked (if not null).
+//
+// Note: Even if this flag is not set, *link.any might still be a node*...
+// just not one that should be marked.
+//
+#define SERIES_FLAG_LINK_NODE_NEEDS_MARK \
+    NODE_FLAG_GC_ONE
+
+
+//=//// SERIES_FLAG_MISC_NODE_NEEDS_MARK //////////////////////////////////=//
+//
+// This indicates that a series's MISC() field is the `custom` node element,
+// and should be marked (if not null).
+//
+// Note: Even if this flag is not set, *misc.any might still be a node*...
+// just not one that should be marked.
+//
+#define SERIES_FLAG_MISC_NODE_NEEDS_MARK \
+    NODE_FLAG_GC_TWO
+
 
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -117,11 +140,20 @@
     0 // helps locate places that want to say "no flags"
 
 
-// Detect_Rebol_Pointer() uses the fact that this bit is 0 for series headers
-// to discern between REBSER, REBVAL, and END.  If push comes to shove that
-// could be done differently, and this bit retaken.
+//=//// SERIES_FLAG_INACCESSIBLE //////////////////////////////////////////=//
 //
-#define SERIES_FLAG_8_IS_TRUE FLAG_LEFT_BIT(8) // CELL_FLAG_NOT_END
+// An inaccessible series is one which may still have extant references, but
+// the data is no longer available.  That can happen implicitly or because
+// of a manual use of the FREE operation.
+//
+// It would be costly if all series access operations had to check the
+// accessibility bit.  Instead, the general pattern is that code that extracts
+// series from values, e.g. VAL_ARRAY(), performs a check to make sure that
+// the series is accessible at the time of extraction.  Subsequent access of
+// the extracted series is then unchecked.
+//
+#define SERIES_FLAG_INACCESSIBLE \
+    FLAG_LEFT_BIT(8)
 
 
 //=//// SERIES_FLAG_FIXED_SIZE ////////////////////////////////////////////=//
@@ -170,83 +202,128 @@
     FLAG_LEFT_BIT(10)
 
 
-//=//// SERIES_FLAG_ALWAYS_DYNAMIC ////////////////////////////////////////=//
+//=//// SERIES_FLAG_DYNAMIC ///////////////////////////////////////////////=//
 //
 // The optimization which uses small series will fit the data into the series
-// node if it is small enough.  But doing this requires a test on SER_USED()
-// and SER_DATA() to see if the small optimization is in effect.  Some
-// code is more interested in the performance gained by being able to assume
-// where to look for the data pointer and the length (e.g. paramlists and
-// context varlists/keylists).  Passing this flag into series creation
-// routines will avoid creating the shortened form.
+// node if it is small enough.  This flag is set when a series uses its
+// `content` for tracking information instead of the actual data itself.
 //
-// Note: Currently SERIES_INFO_INACCESSIBLE overrides this, but does not
+// It can also be passed in at series creation time to force an allocation to
+// be dynamic.  This is because some code is more interested in performance
+// gained by being able to assume where to look for the data pointer and the
+// length (e.g. paramlists and context varlists/keylists).  So passing this
+// flag into series creation routines avoids creating the shortened form.
+//
+// Note: Currently SERIES_FLAG_INACCESSIBLE overrides this, but does not
 // remove the flag...e.g. there can be inaccessible contexts that carry the
 // SERIES_FLAG_ALWAYS_DYNAMIC bit but no longer have an allocation.
 //
-#define SERIES_FLAG_ALWAYS_DYNAMIC \
+#define SERIES_FLAG_DYNAMIC \
     FLAG_LEFT_BIT(11)
 
 
-//=//// SERIES_FLAG_IS_STRING /////////////////////////////////////////////=//
+//=//// SERIES_FLAG_INFO_NODE_NEEDS_MARK //////////////////////////////////=//
 //
-// Indicates the series holds a UTF-8 encoded string.  Ren-C strings follow
-// the "UTF-8 Everywhere" manifesto, where they are not decoded into a fixed
-// number of bytes per character array, but remain in UTF8 at all times:
+// Bits are hard to come by in a REBSER, especially a singular REBSER which
+// uses the cell content for an arbitrary value (e.g. API handles).  The
+// space for the INFO bits is thus sometimes claimed for a node, which may
+// need marking.
 //
-// http://utf8everywhere.org/
+// !!! Future plans involve being able to dynamically switch out the info
+// bits for a node, e.g. to hold a lock.  Then the info bits would be moved
+// to the lock--which might itself be a feed or frame (to avoid making a new
+// identity).  Those features are just ideas for the moment, but if they came
+// to pass this bit would also be synonymous with SERIES_FLAG_HOLD.
 //
-// There are two varieties of string series, those used by ANY-STRING! and
-// those used by ANY-WORD!, tested with IS_STR_SYMBOL().  While they store
-// their content the same, they use the MISC() and LINK() fields of the series
-// node differently.
-//
-#define SERIES_FLAG_IS_STRING \
+#define SERIES_FLAG_INFO_NODE_NEEDS_MARK \
     FLAG_LEFT_BIT(12)
 
 
-//=//// SERIES_FLAG_UTF8_NONWORD //////////////////////////////////////////=//
+//=//// SERIES_FLAG_13 ////////////////////////////////////////////////////=//
 //
-// !!! Temporary flag to be used while a backing store for an ANY-STRING! is
-// separate from the SERIES_FLAG_UTF8_STRING.
-//
-#define SERIES_FLAG_UTF8_NONWORD \
+#define SERIES_FLAG_13 \
     FLAG_LEFT_BIT(13)
 
 
-//=//// SERIES_FLAG_LINK_NODE_NEEDS_MARK //////////////////////////////////=//
+//=//// SERIES_FLAG_BLACK /////////////////////////////////////////////////=//
 //
-// This indicates that a series's LINK() field is the `custom` node element,
-// and should be marked (if not null).
+// This is a generic bit for the "coloring API", e.g. Is_Series_Black(),
+// Flip_Series_White(), etc.  These let native routines engage in marking
+// and unmarking nodes without potentially wrecking the garbage collector by
+// reusing NODE_FLAG_MARKED.  Purposes could be for recursion protection or
+// other features, to avoid having to make a map from REBSER to bool.
 //
-// Note: Even if this flag is not set, *link.custom might still be a node*...
-// just not one that should be marked.
+// !!! Not clear if this belongs in the SERIES_FLAG_XXX or not, but moving
+// it here for now.
 //
-#define SERIES_FLAG_LINK_NODE_NEEDS_MARK \
+#define SERIES_FLAG_BLACK \
     FLAG_LEFT_BIT(14)
 
 
-//=//// SERIES_FLAG_MISC_NODE_NEEDS_MARK //////////////////////////////////=//
+//=//// SERIES_FLAG_15 ////////////////////////////////////////////////////=//
 //
-// This indicates that a series's MISC() field is the `custom` node element,
-// and should be marked (if not null).
-//
-// Note: Even if this flag is not set, *misc.custom might still be a node*...
-// just not one that should be marked.
-//
-#define SERIES_FLAG_MISC_NODE_NEEDS_MARK \
+#define SERIES_FLAG_15 \
     FLAG_LEFT_BIT(15)
 
 
+//=//// BITS 16-23: SERIES SUBCLASS ("FLAVOR") ////////////////////////////=//
+//
+// Series subclasses keep a byte to tell which kind they are.  The byte is an
+// enum which is ordered in a way that offers information (e.g. all the
+// arrays are in a range, all the series with wide size of 1 are together...)
+//
 
-//=/////// ^-- STOP GENERIC SERIES FLAGS AT FLAG_LEFT_BIT(15) --^ /////////=//
+#define FLAG_FLAVOR_BYTE(flavor)        FLAG_THIRD_BYTE(flavor)
+#define FLAG_FLAVOR(name)               FLAG_FLAVOR_BYTE(FLAVOR_##name)
 
-// If a series is not an array, then the rightmost 16 bits of the series flags
-// are used to store an arbitrary per-series-type 16 bit number.  Right now,
-// that's used by the string series to save their REBSYM id integer (if they
-// have one).
+inline static REBYTE FLAVOR_BYTE(uintptr_t flags)
+  { return THIRD_BYTE(flags); }
 
-//=/////// SEE %sys-rebarr.h for the ARRAY_FLAG_XXX definitions here //////=//
+#define SER_FLAVOR(s) \
+    x_cast(enum Reb_Series_Flavor, THIRD_BYTE((s)->leader))
+
+#define mutable_SER_FLAVOR(s) \
+    mutable_THIRD_BYTE((s)->leader)
+
+
+//=//// BITS 24-31: SUBCLASS FLAGS ////////////////////////////////////////=//
+//
+// These flags are those that differ based on which series subclass is used.
+//
+// This space is used currently for array flags to store things like whether
+// the array ends in a newline.  It's a hodepodge of other bits which were
+// rehomed while organizing the flavor bits.  These positions now have the
+// ability to be more thought out after the basics of flavors are solved.
+//
+
+#define SERIES_FLAG_24 FLAG_LEFT_BIT(24)
+#define SERIES_FLAG_25 FLAG_LEFT_BIT(25)
+#define SERIES_FLAG_26 FLAG_LEFT_BIT(26)
+#define SERIES_FLAG_27 FLAG_LEFT_BIT(27)
+#define SERIES_FLAG_28 FLAG_LEFT_BIT(28)
+#define SERIES_FLAG_29 FLAG_LEFT_BIT(29)
+#define SERIES_FLAG_30 FLAG_LEFT_BIT(30)
+#define SERIES_FLAG_31 FLAG_LEFT_BIT(31)
+
+
+//=//// BITS 24-31: SUBCLASS FLAGS ////////////////////////////////////////=//
+//
+// These flags are those that differ based on which series subclass is used.
+//
+// This space is used currently for array flags to store things like whether
+// the array ends in a newline.  It's a hodepodge of other bits which were
+// rehomed while organizing the flavor bits.  These positions now have the
+// ability to be more thought out after the basics of flavors are solved.
+//
+
+#define SERIES_FLAG_24 FLAG_LEFT_BIT(24)
+#define SERIES_FLAG_25 FLAG_LEFT_BIT(25)
+#define SERIES_FLAG_26 FLAG_LEFT_BIT(26)
+#define SERIES_FLAG_27 FLAG_LEFT_BIT(27)
+#define SERIES_FLAG_28 FLAG_LEFT_BIT(28)
+#define SERIES_FLAG_29 FLAG_LEFT_BIT(29)
+#define SERIES_FLAG_30 FLAG_LEFT_BIT(30)
+#define SERIES_FLAG_31 FLAG_LEFT_BIT(31)
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -269,32 +346,19 @@ STATIC_ASSERT(SERIES_INFO_0_IS_TRUE == NODE_FLAG_NODE);
 STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
 
 
-//=//// SERIES_INFO_MISC_BIT //////////////////////////////////////////////=//
+//=//// SERIES_INFO_AUTO_LOCKED ///////////////////////////////////////////=//
 //
-// !!! Due to ARRAY_FLAG_XXX being in short supply, a series info bit is used
-// to pass back that Make_Paramlist() noticed a function was in need of a
-// voider dispatcher.  Unlike other properties that are meaningful to cache,
-// this is used once and thrown away.  There's other ways it could be passed
-// back, this is just an easy way for now--review.
+// Some operations lock series automatically, e.g. to use a piece of data as
+// map keys.  This approach was chosen after realizing that a lot of times,
+// users don't care if something they use as a key gets locked.  So instead
+// of erroring by telling them they can't use an unlocked series as a map key,
+// this locks it but changes the SERIES_FLAG_HAS_FILE_LINE to implicate the
+// point where the locking occurs.
 //
-// Note: Same bit position as NODE_FLAG_MANAGED in flags, if that is relevant.
+// !!! The file-line feature is pending.
 //
-#define SERIES_INFO_MISC_BIT \
+#define SERIES_INFO_AUTO_LOCKED \
     FLAG_LEFT_BIT(2)
-
-
-//=//// SERIES_INFO_BLACK /////////////////////////////////////////////////=//
-//
-// This is a generic bit for the "coloring API", e.g. Is_Series_Black(),
-// Flip_Series_White(), etc.  These let native routines engage in marking
-// and unmarking nodes without potentially wrecking the garbage collector by
-// reusing NODE_FLAG_MARKED.  Purposes could be for recursion protection or
-// other features, to avoid having to make a map from REBSER to bool.
-//
-// Note: Same bit as NODE_FLAG_MARKED, interesting but irrelevant.
-//
-#define SERIES_INFO_BLACK \
-    FLAG_LEFT_BIT(3)
 
 
 //=//// SERIES_INFO_PROTECTED /////////////////////////////////////////////=//
@@ -309,15 +373,7 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
 // ends up affecting all values with that series in the payload.
 //
 #define SERIES_INFO_PROTECTED \
-    FLAG_LEFT_BIT(4)
-
-
-//=//// SERIES_INFO_MISC2_BIT /////////////////////////////////////////////=//
-//
-// See remarks on SERIES_INFO_MISC_BIT.  Similar situation.
-//
-#define SERIES_INFO_MISC2_BIT \
-    FLAG_LEFT_BIT(5)
+    FLAG_LEFT_BIT(3)
 
 
 //=//// SERIES_INFO_FROZEN_DEEP ///////////////////////////////////////////=//
@@ -335,117 +391,7 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
 // value in the series data...then by that point it cannot be enforced.
 //
 #define SERIES_INFO_FROZEN_DEEP \
-    FLAG_LEFT_BIT(6)
-
-
-#define SERIES_INFO_7_IS_FALSE FLAG_LEFT_BIT(7) // is NOT a cell
-STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
-
-
-//=//// BITS 8-15 ARE FOR SER_WIDE() //////////////////////////////////////=//
-
-// The "width" is the size of the individual elements in the series.  For an
-// ANY-ARRAY this is always 0, to indicate IS_END() for arrays of length 0-1
-// (singulars) which can be held completely in the content bits before the
-// ->info field.  Hence this is also used for IS_SER_ARRAY()
-
-#define FLAG_WIDE_BYTE_OR_0(wide) \
-    FLAG_SECOND_BYTE(wide)
-
-#define WIDE_BYTE_OR_0(s) \
-    SECOND_BYTE((s)->info.bits)
-
-#define mutable_WIDE_BYTE_OR_0(s) \
-    mutable_SECOND_BYTE((s)->info.bits)
-
-
-//=//// BITS 16-23 ARE SER_USED() FOR NON-DYNAMIC SERIES //////////////////=//
-
-// 255 indicates that this series has a dynamically allocated portion.  If it
-// is another value, then it's the length of content which is found directly
-// in the series node's embedded Reb_Series_Content.
-//
-// (See also: SERIES_FLAG_ALWAYS_DYNAMIC to prevent creating embedded data.)
-//
-
-#define FLAG_LEN_BYTE_OR_255(len) \
-    FLAG_THIRD_BYTE(len)
-
-#define LEN_BYTE_OR_255(s) \
-    THIRD_BYTE((s)->info)
-
-#define mutable_LEN_BYTE_OR_255(s) \
-    mutable_THIRD_BYTE((s)->info)
-
-
-//=//// SERIES_INFO_AUTO_LOCKED ///////////////////////////////////////////=//
-//
-// Some operations lock series automatically, e.g. to use a piece of data as
-// map keys.  This approach was chosen after realizing that a lot of times,
-// users don't care if something they use as a key gets locked.  So instead
-// of erroring by telling them they can't use an unlocked series as a map key,
-// this locks it but changes the SERIES_FLAG_HAS_FILE_LINE to implicate the
-// point where the locking occurs.
-//
-// !!! The file-line feature is pending.
-//
-#define SERIES_INFO_AUTO_LOCKED \
-    FLAG_LEFT_BIT(24)
-
-
-//=//// SERIES_INFO_INACCESSIBLE //////////////////////////////////////////=//
-//
-// Currently this used to note when a CONTEXT_INFO_STACK series has had its
-// stack level popped (there's no data to lookup for words bound to it).
-//
-// !!! This is currently redundant with checking if a CONTEXT_INFO_STACK
-// series has its `misc.f` (REBFRM) nulled out, but it means both can be
-// tested at the same time with a single bit.
-//
-// !!! It is conceivable that there would be other cases besides frames that
-// would want to expire their contents, and it's also conceivable that frames
-// might want to *half* expire their contents (e.g. have a hybrid of both
-// stack and dynamic values+locals).  These are potential things to look at.
-//
-#define SERIES_INFO_INACCESSIBLE \
-    FLAG_LEFT_BIT(25)
-
-
-//=//// SERIES_INFO_26 ////////////////////////////////////////////////////=//
-//
-#define SERIES_INFO_26 \
-    FLAG_LEFT_BIT(26)
-
-
-//=//// SERIES_INFO_STRING_CANON //////////////////////////////////////////=//
-//
-// This is used to indicate when a SERIES_FLAG_UTF8_STRING series represents
-// the canon form of a word.  This doesn't mean anything special about the
-// case of its letters--just that it was loaded first.  Canon forms can be
-// GC'd and then delegate the job of being canon to another spelling.
-//
-// A canon string is unique because it does not need to store a pointer to
-// its canon form.  So it can use the REBSER.misc field for the purpose of
-// holding an index during binding.
-//
-#define SERIES_INFO_STRING_CANON \
-    FLAG_LEFT_BIT(27)
-
-
-//=//// SERIES_INFO_KEYLIST_SHARED ////////////////////////////////////////=//
-//
-// This is indicated on the keylist array of a context when that same array
-// is the keylist for another object.  If this flag is set, then modifying an
-// object using that keylist (such as by adding a key/value pair) will require
-// that object to make its own copy.
-//
-// Note: This flag did not exist in R3-Alpha, so all expansions would copy--
-// even if expanding the same object by 1 item 100 times with no sharing of
-// the keylist.  That would make 100 copies of an arbitrary long keylist that
-// the GC would have to clean up.
-//
-#define SERIES_INFO_KEYLIST_SHARED \
-    FLAG_LEFT_BIT(28)
+    FLAG_LEFT_BIT(4)
 
 
 //=//// SERIES_INFO_HOLD //////////////////////////////////////////////////=//
@@ -459,12 +405,12 @@ STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
 // It will be released when the execution is finished, which distinguishes it
 // from SERIES_INFO_FROZEN_DEEP, which will never be cleared once set.
 //
-// Note: This is set to be the same bit as PARAMLIST_FLAG_NATIVE in order to
+// Note: This is set to be the same bit as DETAILS_FLAG_IS_NATIVE in order to
 // make it possible to use non-branching masking to set a frame to read-only
 // as far as usermode operations are concerned.
 //
 #define SERIES_INFO_HOLD \
-    FLAG_LEFT_BIT(29)
+    FLAG_LEFT_BIT(5)
 
 
 //=//// SERIES_INFO_FROZEN_SHALLOW ////////////////////////////////////////=//
@@ -472,7 +418,7 @@ STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
 // A series can be locked permanently, but only at its own top level.
 //
 #define SERIES_INFO_FROZEN_SHALLOW \
-    FLAG_LEFT_BIT(30)
+    FLAG_LEFT_BIT(6)
 
 
 #ifdef DEBUG_MONITOR_SERIES
@@ -483,16 +429,63 @@ STATIC_ASSERT(SERIES_INFO_7_IS_FALSE == NODE_FLAG_CELL);
     // messed with.  Setting this bit on it asks for a notice.
     //
     #define SERIES_INFO_MONITOR_DEBUG \
-        FLAG_LEFT_BIT(31)
+        FLAG_LEFT_BIT(7)  // !!! Overlap because not currently used, review
 #endif
+
+// !!! Currently we lie here and act like a cell, because it allows the
+// END marker trick to work without sacrificing a SERIES_FLAG.
+//
+#define SERIES_INFO_7_IS_TRUE FLAG_LEFT_BIT(7)
+STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
+
+
+//=//// BITS 8-15 ARE SER_USED() FOR NON-DYNAMIC NON-ARRAYS ///////////////=//
+
+// SERIES_FLAG_DYNAMIC indicates that a series has a dynamically allocated
+// portion, and it has a whole uintptr_t to use for the length.  However, if
+// that flag is not set the payload is small, fitting in Reb_Series_Content
+// where the allocation tracking information would be.
+//
+// If the data is an array, then the length can only be 0 or 1, since the
+// tracking information is the same size as a cell.  This can be encoded by
+// having the cell be END or non-END to know the length.
+//
+// For binaries and other non-arrays the length has to be stored somewhere.
+// The third byte of the INFO is set aside for the purpose.
+//
+// !!! Currently arrays leverage this as 0 for a terminator of the singular
+// array case.  However, long term zero termination of arrays is not being
+// kept as a redundancy with the length.  It is costly to update and takes
+// additional space from rounding up.
+//
+
+#define FLAG_USED_BYTE(len) \
+    FLAG_SECOND_BYTE(len)
+
+#define FLAG_USED_BYTE_ARRAY() \
+    FLAG_SECOND_BYTE(0)  // must be zero
+
+#define USED_BYTE(s) \
+    SECOND_BYTE(SER_INFO(s))
+
+#define mutable_USED_BYTE(s) \
+    mutable_SECOND_BYTE(SER_INFO(s))
+
+
+//=//// BITS 16-31 ARE SYMID FOR SYMBOLS //////////////////////////////////=//
+//
+// These bits are currently unused by other types.  One reason to avoid using
+// them is the concept that the INFO slot will be used to hold locking info
+// for series, which would require a full pointer.
+//
+
 
 
 // ^-- STOP AT FLAG_LEFT_BIT(31) --^
 //
 // While 64-bit systems have another 32-bits available in the header, core
 // functionality shouldn't require using them...only optimization features.
-//
-STATIC_ASSERT(31 < 32);
+
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -507,10 +500,12 @@ STATIC_ASSERT(31 < 32);
 // REBSER to be distinguished from a REBVAL or a UTF-8 string and not run
 // afoul of strict aliasing requirements.
 //
-// There are 3 basic layouts which can be overlaid inside the union:
+// There are 3 basic layouts which can be overlaid inside the union (the
+// "leader" is the "header" with a different name to avoid uses which might
+// alias with bits initialized through REBVAL->header):
 //
-//      Dynamic: [header link [allocation tracking] info misc]
-//     Singular: [header link [REBVAL cell] info misc]
+//      Dynamic: [leader link [allocation tracking] info misc]
+//     Singular: [leader link [REBVAL cell] info misc]
 //      Pairing: [[REBVAL cell] [REBVAL cell]]
 //
 // The singular form has space the *size* of a cell, but can be addressed as
@@ -545,6 +540,25 @@ STATIC_ASSERT(31 < 32);
 // and sweeping.
 //
 
+
+union Reb_Series_Bonus {
+    //
+    // In R3-Alpha, the bias was not a full REBLEN but was limited in range to
+    // 16 bits or so.  This means 16 info bits are likely available if needed
+    // for dynamic series...though it would complicate the logic for biasing
+    // to have to notice when you TAKE 65535 units from the head of a larger
+    // series and need to allocate a new pointer (though this needs to be
+    // done anyway, otherwise memory is wasted).
+    //
+    REBLEN bias;
+
+    // Series nodes that do not use bias (e.g. context varlists) can use the
+    // bonus slot for other information.
+    //
+    const REBNOD *node;
+};
+
+
 struct Reb_Series_Dynamic {
     //
     // `data` is the "head" of the series data.  It might not point directly
@@ -570,11 +584,9 @@ struct Reb_Series_Dynamic {
     REBLEN rest;
 
     // This is the 4th pointer on 32-bit platforms which could be used for
-    // something when a series is dynamic.  Previously the bias was not
-    // a full REBLEN but was limited in range to 16 bits or so.  This means
-    // 16 info bits are likely available if needed for dynamic series.
+    // something when a series is dynamic.
     //
-    REBLEN bias;
+    union Reb_Series_Bonus bonus;
 };
 
 
@@ -586,18 +598,22 @@ union Reb_Series_Content {
     //
     struct Reb_Series_Dynamic dynamic;
 
-    // If LEN_BYTE_OR_255() != 255, 0 or 1 length arrays can be held in
-    // the series node.  This trick is accomplished via "implicit termination"
-    // in the ->info bits that come directly after ->content.  For how this is
-    // done, see Endlike_Header()
+    // If not(SERIES_FLAG_DYNAMIC), then 0 or 1 length arrays can be held in
+    // the series node.  If the single cell holds an END, it's 0 length...
+    // otherwise it's length 1.
+    //
+    // !!! At time of writing this trick requires "implicit termination" in
+    // the ->info bits that come directly after ->content.  For how this is
+    // done, see Endlike_Header().  This is being phased out, enumerating
+    // based on a tail pointer from the stored length.
     //
     union {
-        // Due to strict aliasing requirements, this has to be a RELVAL to
-        // read cell data.  Unfortunately this means Reb_Series_Content can't
-        // be copied by simple assignment, because in the C++ build it is
-        // disallowed to say (`*value1 = *value2;`).  Use memcpy().
+        // Due to strict aliasing requirements, this has to be initialized
+        // as a value to read cell data.  It is a Reb_Cell in order to let
+        // series nodes be memcpy()'d as part of their mechanics, but this
+        // should not be used to actually "move" cells!  Use Copy_Cell()
         //
-        RELVAL values[1];
+        REBRAW cells[1];
 
       #if defined(DEBUG_USE_UNION_PUNS)
         char utf8_pun[sizeof(RELVAL)];  // debug watchlist insight into UTF-8
@@ -607,7 +623,7 @@ union Reb_Series_Content {
 };
 
 #define SER_CELL(s) \
-    (&(s)->content.fixed.values[0]) // unchecked ARR_SINGLE(), used for init
+    cast(RELVAL*, &(s)->content.fixed.cells[0])  // unchecked ARR_SINGLE()
 
 
 union Reb_Series_Link {
@@ -621,24 +637,6 @@ union Reb_Series_Link {
     void *trash;
   #endif
 
-    // For a writable REBSTR, a list of entities that cache the mapping from
-    // index to character offset is maintained.  Without some help, it would
-    // be necessary to search from the head or tail of the string, character
-    // by character, to turn an index into an offset.  This is prohibitive.
-    //
-    // These bookmarks must be kept in sync.  How many bookmarks are kept
-    // should be reigned in proportionally to the length of the series.  As
-    // a first try of this strategy, singular arrays are being used.
-    //
-    REBBMK *bookmarks;
-
-    // The REBFRM's `varlist` field holds a ready-made varlist for a frame,
-    // which may be reused.  However, when a stack frame is dropped it can
-    // only be reused by putting it in a place that future pushes can find
-    // it.  This is used to link a varlist into the reusable list.
-    //
-    REBARR *reuse;
-
     // For LIBRARY!, the file descriptor.  This is set to NULL when the
     // library is not loaded.
     //
@@ -647,15 +645,12 @@ union Reb_Series_Link {
     //
     void *fd;
 
-    // If a REBSER is used by a custom cell type, it can use the LINK()
-    // field how it likes.  But if it is a node and needs to be GC-marked,
-    // it has to tell the system with SERIES_INFO_LINK_NODE_NEEDS_MARK.
+    // If a REBNOD* is stored in the link field, it has to use this union
+    // member for SERIES_INFO_LINK_NODE_NEEDS_MARK to see it.  To help make
+    // the reference sites be unique for each purpose and still be type safe,
+    // see the LINK() macro helpers.
     //
-    // Notable uses by extensions:
-    // 1. `parent` GOB of GOB! details
-    // 2. `next_req` REBREQ* of a REBREQ
-    //
-    union Reb_Any custom;
+    union Reb_Any any;
 };
 
 
@@ -707,32 +702,6 @@ union Reb_Series_Misc {
         int low:16;
     } bind_index;
 
-    // When copying arrays, it's necessary to keep a map from source series
-    // to their corresponding new copied series.  This allows multiple
-    // appearances of the same identities in the source to give corresponding
-    // appearances of the same *copied* identity in the target, and also is
-    // integral to avoiding problems with cyclic structures.
-    //
-    // As with the `bind_index` above, the cheapest way to build such a map is
-    // to put the forward into the series node itself.  However, when copying
-    // a generic series the bits are all used up.  So the ->misc field is
-    // temporarily "co-opted"...its content taken out of the node and put into
-    // the forwarding entry.  Then the index of the forwarding entry is put
-    // here.  At the end of the copy, all the ->misc fields are restored.
-    //
-    // !!! This feature was in a development branch that has stalled, but the
-    // field is kept here to keep track of the idea.
-    //
-    REBDSP forwarding;
-
-    // native dispatcher code, see Reb_Function's body_holder
-    //
-    REBNAT dispatcher;
-
-    // Used on arrays for special instructions to Fetch_Next_In_Frame().
-    //
-    enum Reb_Api_Opcode opcode;
-
     // some HANDLE!s use this for GC finalization
     //
     CLEANUP_CFUNC *cleaner;
@@ -742,37 +711,55 @@ union Reb_Series_Misc {
     // to affect all values, it has to be stored somewhere that all
     // REBVALs would see a change--hence the field is in the series.
     //
-    // !!! This could be a SERIES_FLAG, e.g. BITSET_FLAG_IS_NEGATED
-    //
     bool negated;
 
     // rebQ() and rebU() use this with ARRAY_FLAG_INSTRUCTION_ADJUST_QUOTING.
     //
     int quoting_delta;
 
-    // If a REBSER is used by a custom cell type, it can use the MISC()
-    // field how it likes.  But if it is a node and needs to be GC-marked,
-    // it has to tell the system with SERIES_INFO_MISC_NODE_NEEDS_MARK.
+    // If a REBNOD* is stored in the misc field, it has to use this union
+    // member for SERIES_INFO_MISC_NODE_NEEDS_MARK to see it.  To help make
+    // the reference sites be unique for each purpose and still be type safe,
+    // see the MISC() macro helpers.
     //
-    // Notable uses by extensions:
-    // 1. `owner` of GOB! node
-    // 2. `port_ctx` of REBREQ ("link back to REBOL PORT! object")
-    //
-    union Reb_Any custom;
+    union Reb_Any any;
 };
 
 
-struct Reb_Series {
+// Some series flags imply the INFO is used not for flags, but for another
+// markable pointer.  This is not legal for any series that needs to encode
+// its SER_WIDE(), so only strings and arrays can pull this trick...when
+// they are used to implement internal structures.
+//
+union Reb_Series_Info {
     //
+    // Using a union lets us see the underlying `uintptr_t` type-punned in
+    // debug builds as bytes/bits.
+    //
+    union Reb_Header flags;
+
+    const REBNOD *node;
+};
+
+
+#ifdef CPLUSPLUS_11
+    struct Reb_Series_Base
+#else
+    struct Reb_Series
+#endif
+{
     // See the description of SERIES_FLAG_XXX for the bits in this header.
-    // It is designed in such a way as to have compatibility with REBVAL's
-    // header, but be wary of "Strict Aliasing" when making use of that:
-    // If a type is a REBSER* it cannot be safely read from a REBVAL*.
-    // Tricks have to be used:
+    // It is in the same position as a REBVAL* header, and the first byte
+    // can be read via NODE_BYTE() to determine which it is.  However, it is
+    // not called `header` because that would suggest you could have a pointer
+    // and not know if it was a REBVAL* or REBSER* and read/write it safely...
+    // you cannot do that because of "strict aliasing":
     //
     // https://stackoverflow.com/q/51846048/
     //
-    union Reb_Header header;
+    // So the series header is called "leader" to make accidents less likely.
+    //
+    union Reb_Header leader;
 
     // The `link` field is generally used for pointers to something that
     // when updated, all references to this series would want to be able
@@ -787,7 +774,7 @@ struct Reb_Series {
     //
     // Use the LINK() macro to acquire this field...don't access directly.
     //
-    union Reb_Series_Link link_private;
+    union Reb_Series_Link link;
 
     // `content` is the sizeof(REBVAL) data for the series, which is thus
     // 4 platform pointers in size.  If the series is small enough, the header
@@ -798,7 +785,7 @@ struct Reb_Series {
     union Reb_Series_Content content;
 
     // `info` consists of bits that could apply equally to any series, and
-    // that may need to be tested together as a group.  Make_Series_Core()
+    // that may need to be tested together as a group.  Make_Series()
     // calls presume all the info bits are initialized to zero, so any flag
     // that controls the allocation should be a SERIES_FLAG_XXX instead.
     //
@@ -812,218 +799,69 @@ struct Reb_Series {
     // interesting added caching feature or otherwise that would use
     // it, while not making any feature specifically require a 64-bit CPU.
     //
-    union Reb_Header info;
+    union Reb_Series_Info info;
 
     // This is the second pointer-sized piece of series data that is used
-    // for various purposes.  It is similar to ->link, however at some points
-    // it can be temporarily "corrupted", since copying extracts it into a
-    // forwarding entry and co-opts `misc.forwarding` to point to that entry.
-    // It can be recovered...but one must know one is copying and go through
-    // the forwarding.
+    // for various purposes, similar to link.
     //
-    // Currently it is assumed no one needs the ->misc while forwarding is in
-    // effect...but the MISC() macro checks that.  Don't access this directly.
-    //
-    // !!! The forwarding feature is on a branch that stalled, but the notes
-    // are kept here as a reminder of it--and why MISC() should be used.
-    //
-    union Reb_Series_Misc misc_private;
+    union Reb_Series_Misc misc;
 
-#if defined(DEBUG_SERIES_ORIGINS) || defined(DEBUG_COUNT_TICKS)
-    intptr_t *guard; // intentionally alloc'd and freed for use by Panic_Series
-    uintptr_t tick; // also maintains sizeof(REBSER) % sizeof(REBI64) == 0
-#endif
+  #if defined(DEBUG_SERIES_ORIGINS) || defined(DEBUG_COUNT_TICKS)
+    intptr_t *guard;  // intentionally alloc'd and freed for use by panic()
+    uintptr_t tick;  // also maintains sizeof(REBSER) % sizeof(REBI64) == 0
+  #endif
 };
 
 
-// No special assertion needed for link at this time, since it is never
-// co-opted for other purposes.
+// In C++, REBSTR and REBARR are declared as derived from REBSER.  This gives
+// desirable type checking properties (like being able to pass an array to
+// a routine that needs a series, but not vice versa).  And it also means
+// that the fields are available.
 //
-#define LINK(s) \
-    m_cast(REBSER*, SER(s))->link_private
-
-
-// A pending feature is that the series `->misc` field be used to track if
-// a series is being forwarded as part of a group of copied series.  The C++
-// build could do a check in that case.
+// In order for the inheritance to be known, these definitions cannot occur
+// until Reb_Series is fully defined.  So this is the earliest it can be done:
 //
-#if defined(CPLUSPLUS_11)
-    inline static union Reb_Series_Misc& Get_Series_Misc(const REBSER *s) {
-        //
-        // It would be nice here if we could do some kind of check like
-        // `assert(not IS_POINTER_FREETRASH_DEBUG(s->misc_private.trash))`
-        // but that would invoke undefined behavior (disengaged union access
-        // once another field is assigned).  Valgrind and UBSAN complain.
-        //
-        return m_cast(REBSER*, s)->misc_private;
-    }
+// https://stackoverflow.com/q/2159390/
+//
+#ifdef __cplusplus
+    struct Reb_Series : public Reb_Node, public Reb_Series_Base {};
 
-    #define MISC(s) \
-        Get_Series_Misc(SER(s))
+    struct Reb_Binary : public Reb_Series {};
+    typedef struct Reb_Binary REBBIN;
+
+    struct Reb_String : public Reb_Binary {};  // strings can act as binaries
+    typedef struct Reb_String REBSTR;
+
+    struct Reb_Symbol : public Reb_String {};  // word-constrained strings
+    typedef struct Reb_Symbol REBSYM;
+
+    struct Reb_Bookmark_List : public Reb_Series {};
+    typedef struct Reb_Bookmark_List REBBMK;  // list of UTF-8 index=>offsets
+
 #else
-    #define MISC(s) \
-        SER(s)->misc_private
+    typedef struct Reb_Series REBBIN;
+    typedef struct Reb_Series REBSTR;
+    typedef struct Reb_Series REBSYM;
+    typedef struct Reb_Series REBBMK;
 #endif
 
 
-#if !defined(DEBUG_CHECK_CASTS)
-
-    #define SER(p) \
-        m_cast(REBSER*, (const REBSER*)(p))  // don't check const in C or C++
-
-#else
-
-    template <
-        typename T,
-        typename T0 = typename std::remove_const<T>::type,
-        typename S = typename std::conditional<
-            std::is_const<T>::value,  // boolean
-            const REBSER,  // true branch
-            REBSER  // false branch
-        >::type
-    >
-    inline S *SER(T *p) {
-        constexpr bool derived = std::is_same<T0, REBSER>::value
-            or std::is_same<T0, REBSTR>::value
-            or std::is_same<T0, REBARR>::value
-            or std::is_same<T0, REBCTX>::value
-            or std::is_same<T0, REBACT>::value
-            or std::is_same<T0, REBMAP>::value;
-
-        constexpr bool base = std::is_same<T0, void>::value
-            or std::is_same<T0, REBNOD>::value;
-
-        static_assert(
-            derived or base, 
-            "SER() works on "
-                "void/REBNOD/REBSER/REBSTR/REBARR/REBCTX/REBACT/REBMAP"
-        );
-
-        bool b = base;  // needed to avoid compiler constexpr warning
-        if (b and p and ((reinterpret_cast<const REBNOD*>(p)->header.bits & (
-            NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
-        )) != (
-            NODE_FLAG_NODE
-        ))){
-            panic (p);
-        }
-
-        return reinterpret_cast<S*>(p);
-    }
-
-#endif
-
-
+// We want to be able to enumerate keys by incrementing across them.  The
+// things we increment across aren't REBSER nodes, but pointers to REBSER
+// nodes for the strings... so a "key" is a pointer.
 //
-// Series header FLAGs (distinct from INFO bits)
+typedef const REBSYM *REBKEY;
+
+
+//=//// DON'T PUT ANY CODE (OR MACROS THAT MAY NEED CODE) IN THIS FILE! ///=//
 //
-
-#define SET_SERIES_FLAG(s,name) \
-    (m_cast(REBSER*, SER(s))->header.bits |= SERIES_FLAG_##name)
-
-#define GET_SERIES_FLAG(s,name) \
-    ((SER(s)->header.bits & SERIES_FLAG_##name) != 0)
-
-#define CLEAR_SERIES_FLAG(s,name) \
-    (m_cast(REBSER*, SER(s))->header.bits &= ~SERIES_FLAG_##name)
-
-#define NOT_SERIES_FLAG(s,name) \
-    ((SER(s)->header.bits & SERIES_FLAG_##name) == 0)
-
-
+// The %tmp-internals.h file has not been included, and hence none of the
+// prototypes (even for things like Panic_Core()) are available.
 //
-// Series INFO bits (distinct from header FLAGs)
+// Even if a macro seems like it doesn't need code right at this moment, you
+// might want to put some instrumentation into it, and that becomes a pain of
+// manual forward declarations.
 //
-
-#define SET_SERIES_INFO(s,name) \
-    (m_cast(REBSER*, SER(s))->info.bits |= SERIES_INFO_##name)
-
-#define GET_SERIES_INFO(s,name) \
-    ((SER(s)->info.bits & SERIES_INFO_##name) != 0)
-
-#define CLEAR_SERIES_INFO(s,name) \
-    (m_cast(REBSER*, SER(s))->info.bits &= ~SERIES_INFO_##name)
-
-#define NOT_SERIES_INFO(s,name) \
-    ((SER(s)->info.bits & SERIES_INFO_##name) == 0)
-
-
-
-#define IS_SER_ARRAY(s) \
-    (WIDE_BYTE_OR_0(SER(s)) == 0)
-
-#define IS_SER_DYNAMIC(s) \
-    (LEN_BYTE_OR_255(SER(s)) == 255)
-
-// These are series implementation details that should not be used by most
-// code.  But in order to get good inlining, they have to be in the header
-// files (of the *internal* API, not of libRebol).  Generally avoid it.
+// So keep this file limited to structs and constants.  It's too long already.
 //
-// !!! Can't `assert((w) < MAX_SERIES_WIDE)` without triggering "range of
-// type makes this always false" warning; C++ build could sense if it's a
-// REBYTE and dodge the comparison if so.
-//
-
-#define MAX_SERIES_WIDE 0x100
-
-inline static REBYTE SER_WIDE(const REBSER *s) {
-    //
-    // Arrays use 0 width as a strategic choice, so that the second byte of
-    // the ->info flags is 0.  See Endlike_Header() for why.
-    //
-    REBYTE wide = WIDE_BYTE_OR_0(s);
-    if (wide == 0) {
-        assert(IS_SER_ARRAY(s));
-        return sizeof(REBVAL);
-    }
-    return wide;
-}
-
-
-//
-// Bias is empty space in front of head:
-//
-
-inline static REBLEN SER_BIAS(const REBSER *s) {
-    assert(IS_SER_DYNAMIC(s));
-    return cast(REBLEN, ((s)->content.dynamic.bias >> 16) & 0xffff);
-}
-
-inline static REBLEN SER_REST(const REBSER *s) {
-    if (LEN_BYTE_OR_255(s) == 255)
-        return s->content.dynamic.rest;
-
-    if (IS_SER_ARRAY(s))
-        return 2; // includes info bits acting as trick "terminator"
-
-    assert(sizeof(s->content) % SER_WIDE(s) == 0);
-    return sizeof(s->content) / SER_WIDE(s);
-}
-
-#define MAX_SERIES_BIAS 0x1000
-
-inline static void SER_SET_BIAS(REBSER *s, REBLEN bias) {
-    assert(IS_SER_DYNAMIC(s));
-    s->content.dynamic.bias =
-        (s->content.dynamic.bias & 0xffff) | (bias << 16);
-}
-
-inline static void SER_ADD_BIAS(REBSER *s, REBLEN b) {
-    assert(IS_SER_DYNAMIC(s));
-    s->content.dynamic.bias += b << 16;
-}
-
-inline static void SER_SUB_BIAS(REBSER *s, REBLEN b) {
-    assert(IS_SER_DYNAMIC(s));
-    s->content.dynamic.bias -= b << 16;
-}
-
-inline static size_t SER_TOTAL(const REBSER *s) {
-    return (SER_REST(s) + SER_BIAS(s)) * SER_WIDE(s);
-}
-
-inline static size_t SER_TOTAL_IF_DYNAMIC(const REBSER *s) {
-    if (not IS_SER_DYNAMIC(s))
-        return 0;
-    return SER_TOTAL(s);
-}
+//=////////////////////////////////////////////////////////////////////////=//

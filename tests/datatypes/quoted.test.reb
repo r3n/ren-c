@@ -5,16 +5,16 @@
 
 (
     unset 'a
-    set lit '''''a <seta>
-    <seta> = get lit ''a
+    set just '''''a <seta>
+    <seta> = get dequote just ''a
 )(
     unset 'a
-    set lit 'a <seta>
-    <seta> = get lit '''''''a
+    set just 'a <seta>
+    <seta> = get dequote just '''''''a
 )(
     unset [a b]
-    set ['''''a ''b] [<seta> <setb>]
-    [<seta> <setb>] = get ['a '''''''b]
+    set reduce dequote ['''''a ''b] [<seta> <setb>]
+    [<seta> <setb>] = get reduce [dequote 'a dequote '''''''b]
 )
 
 ; Test basic binding, e.g. to make sure functions detect SET-WORD!
@@ -38,14 +38,14 @@
 
 (
     x: 10
-    set lit 'x: 20
+    set just 'x: 20
     x = 20
 )(
     x: 10
     y: _
     foo: function [] [
-        set lit 'x: 20
-        set lit 'y x
+        set just 'x: 20
+        set just 'y x
     ]
     foo
     (x = 10) and (y = 20)
@@ -55,14 +55,14 @@
 
 (
     x: 10
-    set lit ''''''x: 20
+    set just ''''''x: 20
     x = 20
 )(
     x: 10
     y: _
     foo: function [] [
-        set lit '''''''x: 20
-        set lit '''''''y x
+        set just '''''''x: 20
+        set just '''''''y x
     ]
     foo
     (x = 10) and (y = 20)
@@ -81,7 +81,7 @@
     word: ''''''''''a:
     w1: bind word o1
     w2: bind word o2
-    (0 = get word) and (1 = get w1) and (2 = get w2)
+    (0 = get dequote word) and (1 = get dequote w1) and (2 = get dequote w2)
 )(
     foo: function [] [
         a: 0
@@ -90,7 +90,7 @@
         word: ''''''''''a:
         w1: bind word o1
         w2: bind word o2
-        (0 = get word) and (1 = get w1) and (2 = get w2)
+        (0 = get dequote word) and (1 = get dequote w1) and (2 = get dequote w2)
     ]
     foo
 )
@@ -108,46 +108,53 @@
     ['1 '(2 + 3) '[4 + 5] 'a/+/b 'c/+/d: ':e/+/f]
 )
 
-(lit '[a b c] = quote [a b c])
-(lit '(a b c) == quote lit (a b c))
-(not (lit '[A B C] == quote [a b c]))
+(just '[a b c] = quote [a b c])
+(just '(a b c) == quote just (a b c))
+(not (just '[A B C] == quote [a b c]))
 ('''[a b c] !== '''''[a b c])
 ('''[a b c] == '''[a b c])
 ('''[a b c] = '''''[a b c])
 
+; No quote levels is legal for QUOTE to add also, if /DEPTH is 0
+[
+    (null = quote/depth null 0)
+    (<x> = quote/depth <x> 0)
+]
 
-(quoted! = kind of lit 'foo)  ; low level "KIND"
-((quote word!) = type of lit 'foo)  ; higher-level "TYPE"
-((type of lit ''[a b c]) = quote/depth block! 2)
+(quoted! = kind of just 'foo)  ; low level "KIND"
+((quote word!) = type of just 'foo)  ; higher-level "TYPE"
+((type of just ''[a b c]) = quote/depth block! 2)
 
 
 ; REQUOTE is a reframing action that removes quoting levels and then puts
 ; them back on to the result.
 
-((lit ''''3) == requote add lit ''''1 2)
+((just ''''3) == requote add just ''''1 2)
 
-((lit '''[b c d]) == requote find ''''[a b c d] 'b)
+((just '''[b c d]) == requote find ''''[a b c d] 'b)
 
 (null == requote find ''''[a b c d] 'q)  ; nulls exempt
 
-((lit '(1 2 3 <four>)) == requote append ''(1 2 3) <four>)
+((just '(1 2 3 <four>)) == requote append ''(1 2 3) <four>)
 
-('''a/b/c/d/e/f = requote join lit '''a/b/c 'd/e/f)
+('''a/b/c/d/e/f = requote join just '''a/b/c 'd/e/f)
+
+((just '[1]) = (requote parse just '[1] [some integer!]))
 
 
 ; COPY should be implemented for all types, QUOTED! included.
 ;
-((lit '''[a b c]) == copy lit '''[a b c])
+((just '''[a b c]) == copy just '''[a b c])
 
 
 ; All escaped values are truthy, regardless of what it is they are escaping
 
-(did lit '_)
-(did lit '#[false])
-(did lit ')
-(did lit ''''''''_)
-(did lit ''''''''#[false])
-(did lit '''''''')
+(did just '_)
+(did just '#[false])
+(did just ')
+(did just ''''''''_)
+(did just ''''''''#[false])
+(did just '''''''')
 
 
 ; An escaped word that can't fit in a cell and has to do an additional
@@ -164,16 +171,16 @@
     w2: bind word o2
     did all [
         a = 0
-        1 = get w1
-        2 = get w2
+        1 = get dequote w1
+        2 = get dequote w2
     ]
 )
 
-; Smoke test for literalizing items of every type
+; Smoke test for quoting items of every type
 
 (
     for-each item compose [
-        (quote :+)
+        (:+)
         word
         set-word:
         :get-word
@@ -183,7 +190,7 @@
         pa/th
         set/pa/th
         :get/pa/th
-        (lit (group))
+        (just (group))
         [block]
         #{AE1020BD0304EA}
         "text"
@@ -227,6 +234,8 @@
         (e2: trap [equal2: :lit-item = :lit-item]) also [
             e2/where: e2/near: _
         ]
+        if e1 [e1/line: null]  ; ignore line difference (file should be same)
+        if e2 [e2/line: null]
         if :e1 != :e2 [
             print mold type of get/any 'item
             print mold e1
@@ -244,7 +253,7 @@
 
 (
     did all [
-        void? x: ~void~
+        void? x: '~void~
         void? get/any 'x
     ]
 )

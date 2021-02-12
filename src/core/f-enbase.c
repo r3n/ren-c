@@ -169,24 +169,20 @@ static const REBYTE Enbase64[64] =
 //
 //  Decode_Base2: C
 //
-static REBSER *Decode_Base2(const REBYTE **src, REBLEN len, REBYTE delim)
+static REBBIN *Decode_Base2(const REBYTE **src, REBLEN len, REBYTE delim)
 {
-    REBYTE *bp;
-    const REBYTE *cp;
     REBLEN count = 0;
     REBLEN accum = 0;
-    REBYTE lex;
-    REBSER *ser;
 
-    ser = Make_Binary(len >> 3);
-    bp = BIN_HEAD(ser);
-    cp = *src;
+    REBBIN *bin = Make_Binary(len >> 3);
+    REBYTE *bp = BIN_HEAD(bin);
+    const REBYTE *cp = *src;
 
     for (; len > 0; cp++, len--) {
 
         if (delim && *cp == delim) break;
 
-        lex = Lex_Map[*cp];
+        REBYTE lex = Lex_Map[*cp];
 
         if (lex >= LEX_NUMBER) {
 
@@ -204,13 +200,11 @@ static REBSER *Decode_Base2(const REBYTE **src, REBLEN len, REBYTE delim)
     }
     if (count) goto err; // improper modulus
 
-    *bp = 0;
-    SET_SERIES_LEN(ser, bp - BIN_HEAD(ser));
-    ASSERT_SERIES_TERM(ser);
-    return ser;
+    TERM_BIN_LEN(bin, bp - BIN_HEAD(bin));
+    return bin;
 
 err:
-    Free_Unmanaged_Series(ser);
+    Free_Unmanaged_Series(bin);
     *src = cp;
     return 0;
 }
@@ -219,28 +213,23 @@ err:
 //
 //  Decode_Base16: C
 //
-static REBSER *Decode_Base16(const REBYTE **src, REBLEN len, REBYTE delim)
+static REBBIN *Decode_Base16(const REBYTE **src, REBLEN len, REBYTE delim)
 {
-    REBYTE *bp;
-    const REBYTE *cp;
     REBLEN count = 0;
     REBLEN accum = 0;
-    REBYTE lex;
-    REBINT val;
-    REBSER *ser;
 
-    ser = Make_Binary(len / 2);
-    bp = BIN_HEAD(ser);
-    cp = *src;
+    REBBIN *bin = Make_Binary(len / 2);
+    REBYTE *bp = BIN_HEAD(bin);
+    const REBYTE *cp = *src;
 
     for (; len > 0; cp++, len--) {
 
         if (delim && *cp == delim) break;
 
-        lex = Lex_Map[*cp];
+        REBYTE lex = Lex_Map[*cp];
 
         if (lex > LEX_WORD) {
-            val = lex & LEX_VALUE; // char num encoded into lex
+            REBINT val = lex & LEX_VALUE;  // char num encoded into lex
             if (!val && lex < LEX_NUMBER) goto err;  // invalid char (word but no val)
             accum = (accum << 4) + val;
             if (count++ & 1) *bp++ = cast(REBYTE, accum);
@@ -249,13 +238,11 @@ static REBSER *Decode_Base16(const REBYTE **src, REBLEN len, REBYTE delim)
     }
     if (count & 1) goto err; // improper modulus
 
-    *bp = 0;
-    SET_SERIES_LEN(ser, bp - BIN_HEAD(ser));
-    ASSERT_SERIES_TERM(ser);
-    return ser;
+    TERM_BIN_LEN(bin, bp - BIN_HEAD(bin));
+    return bin;
 
 err:
-    Free_Unmanaged_Series(ser);
+    Free_Unmanaged_Series(bin);
     *src = cp;
     return 0;
 }
@@ -264,20 +251,17 @@ err:
 //
 //  Decode_Base64: C
 //
-static REBSER *Decode_Base64(const REBYTE **src, REBLEN len, REBYTE delim)
+static REBBIN *Decode_Base64(const REBYTE **src, REBLEN len, REBYTE delim)
 {
-    REBYTE *bp;
-    const REBYTE *cp;
     REBLEN flip = 0;
     REBLEN accum = 0;
-    REBYTE lex;
-    REBSER *ser;
 
     // Allocate buffer large enough to hold result:
     // Accounts for e bytes decoding into 3 bytes.
-    ser = Make_Binary(((len + 3) * 3) / 4);
-    bp = BIN_HEAD(ser);
-    cp = *src;
+
+    REBBIN *bin = Make_Binary(((len + 3) * 3) / 4);
+    REBYTE *bp = BIN_HEAD(bin);
+    const REBYTE *cp = *src;
 
     for (; len > 0; cp++, len--) {
 
@@ -290,7 +274,7 @@ static REBSER *Decode_Base64(const REBYTE **src, REBLEN len, REBYTE delim)
             goto err;
         }
 
-        lex = Debase64[*cp];
+        REBYTE lex = Debase64[*cp];
 
         if (lex < BIN_SPACE) {
 
@@ -327,13 +311,11 @@ static REBSER *Decode_Base64(const REBYTE **src, REBLEN len, REBYTE delim)
 
     if (flip) goto err;
 
-    *bp = 0;
-    SET_SERIES_LEN(ser, bp - BIN_HEAD(ser));
-    ASSERT_SERIES_TERM(ser);
-    return ser;
+    TERM_BIN_LEN(bin, bp - BIN_HEAD(bin));
+    return bin;
 
 err:
-    Free_Unmanaged_Series(ser);
+    Free_Unmanaged_Series(bin);
     *src = cp;
     return 0;
 }
@@ -403,7 +385,7 @@ void Form_Base2(REB_MOLD *mo, const REBYTE *src, REBLEN len, bool brk)
             Append_Codepoint(mo->series, LF);
     }
 
-    if (*BIN_TAIL(SER(mo->series)) != LF && len > 9 && brk)
+    if (*BIN_TAIL(mo->series) != LF && len > 9 && brk)
         Append_Codepoint(mo->series, LF);
 }
 
@@ -433,7 +415,7 @@ void Form_Base16(REB_MOLD *mo, const REBYTE *src, REBLEN len, bool brk)
             Append_Codepoint(mo->series, LF);
     }
 
-    if (brk and (len >= 32) and *BIN_LAST(SER(mo->series)) != LF)
+    if (brk and (len >= 32) and *BIN_LAST(mo->series) != LF)
         Append_Codepoint(mo->series, LF);
 }
 
@@ -493,6 +475,6 @@ void Form_Base64(REB_MOLD *mo, const REBYTE *src, REBLEN len, bool brk)
         Append_Codepoint(s, '=');
     }
 
-    if (brk and x > 49 and *BIN_LAST(SER(s)) != LF)
+    if (brk and x > 49 and *BIN_LAST(s) != LF)
         Append_Codepoint(s, LF);
 }

@@ -562,9 +562,9 @@ REBNATIVE(enline)
     if (delta == 0)
         RETURN (ARG(string)); // nothing to do
 
-    REBLEN old_len = MISC(s).length;
-    EXPAND_SERIES_TAIL(SER(s), delta);  // corrupts MISC(str).length
-    MISC(s).length = old_len + delta;  // just adding CR's
+    REBLEN old_len = s->misc.length;
+    EXPAND_SERIES_TAIL(s, delta);  // corrupts str->misc.length
+    s->misc.length = old_len + delta;  // just adding CR's
 
     // One feature of using UTF-8 for strings is that CR/LF substitution can
     // stay a byte-oriented process..because UTF-8 doesn't reuse bytes in the
@@ -825,7 +825,7 @@ REBNATIVE(to_hex)
     // UTF-8 Everywhere unification of ANY-WORD! and ANY-STRING! is done.
     //
     assert(len == STR_SIZE(mo->series) - mo->offset);
-    if (NULL == Scan_Issue(D_OUT, BIN_AT(SER(mo->series), mo->offset), len))
+    if (NULL == Scan_Issue(D_OUT, BIN_AT(mo->series, mo->offset), len))
         fail (PAR(value));
 
     Drop_Mold(mo);
@@ -848,6 +848,13 @@ REBNATIVE(find_script)
 
     REBVAL *arg = ARG(script);
 
+    // !!! The scanner requires binaries to end with '\0' at this time.  It
+    // should be able to take a length limit.  Hack around the problem by
+    // forcing termination on the binary.
+    //
+    if (IS_BINARY(arg))  // see BINARY_BAD_UTF8_TAIL_BYTE
+        TERM_BIN(m_cast(REBBIN*, VAL_BINARY(arg)));
+
     REBSIZ size;
     const REBYTE *bp = VAL_BYTES_AT(&size, arg);
 
@@ -855,7 +862,7 @@ REBNATIVE(find_script)
     if (offset == -1)
         return nullptr;
 
-    Move_Value(D_OUT, arg);
+    Copy_Cell(D_OUT, arg);
 
     if (IS_BINARY(arg)) {  // may not all be valid UTF-8
         VAL_INDEX_RAW(D_OUT) += offset;
@@ -916,7 +923,7 @@ REBNATIVE(invalid_utf8_q)
     for (; utf8 != end; utf8 += trail) {
         trail = trailingBytesForUTF8[*utf8] + 1;
         if (utf8 + trail > end or not isLegalUTF8(utf8, trail)) {
-            Move_Value(D_OUT, arg);
+            Copy_Cell(D_OUT, arg);
             VAL_INDEX_RAW(D_OUT) = utf8 - BIN_HEAD(VAL_BINARY(arg));
             return D_OUT;
         }

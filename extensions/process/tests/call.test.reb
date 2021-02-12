@@ -58,7 +58,7 @@
 [
     (did echoer: enclose specialize :call/input/output [
         command: spaced [
-            file-to-local system/options/boot {--suppress "*"} {-qs}
+            file-to-local system/options/boot {--suppress "*"} {-q}
             {--do} {"write-stdout read system/ports/input"}
         ]
     ] function [frame [frame!]] [

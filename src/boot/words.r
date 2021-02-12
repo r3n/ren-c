@@ -39,12 +39,11 @@ datatypes
 ; more communicative.  These are standard symbols passed to Init_Void().
 ;
 void
-undefined
+unset
 nulled
 blanked
-branched
-stopped
 matched
+unreadable  ; only release build uses, debug build uses NULL as the label
 
 
 ; ...note that the words for types are created programmatically before
@@ -54,7 +53,6 @@ matched
 ;=== LEGACY HELPERS ===
 
 none  ; !!! for LOAD #[none]
-unset  ; !!! for LOAD #[unset]
 image!  ; !!! for LOAD #[image! [...]] (used in tests), and molding, temporary
 vector!  ; !!! for molding, temporary
 gob!  ; !!! for molding, temporary
@@ -79,7 +77,6 @@ poke
 
 enfix
 native
-self
 blank
 true
 false
@@ -113,7 +110,6 @@ spec
 body
 words
 parameters
-typesets
 values
 types
 title
@@ -126,14 +122,10 @@ label
 
 value ; used by TYPECHECKER to name the argument of the generated function
 
-; !!! See notes on FUNCTION-META and SPECIALIZER-META in %sysobj.r
+; See notes on ACTION-META in %sysobj.r
 description
-return-type
-return-note
 parameter-types
 parameter-notes
-specializee
-specializee-name
 
 x
 y
@@ -222,9 +214,8 @@ break
 skip
 to
 thru
-quote
-literal  ; should both LIT and LITERAL be supported, or just LIT?
-lit
+quote  ; !!! kept for compatibility, but use JUST instead
+just
 lit-word!  ; !!! simulated datatype constraint (a QUOTED! like 'x)
 lit-path!  ; !!! simulated datatype costraint (a QUOTED! like 'x/y)
 refinement!  ; !!! simulated datatype constraint (a PATH! like `/word`)
@@ -256,16 +247,6 @@ dummy6
 dummy7
 dummy8
 dummy9
-
-; !!! The best implementation concept for LET would be a runtime concept
-; where only those instances of LET in an evaluation stream could somehow add
-; dynamically to a running context, while inert ones would not.  e.g.
-; code like `data: [let x:]` would not create memory for an x variable unless
-; you actually `do data`.  But as an interim step before the "virtual binding"
-; needed for that exists, LET is searched for as a keyword by FUNC at
-; function creation time, much like SET-WORD!s were looked for before.
-;
-let
 
 ; !!! Legacy: Used to report an error on usage of /LOCAL when <local> was
 ; intended.  Should be removed from code when the majority of such uses have
@@ -360,37 +341,6 @@ fullscreen
 
 *port-modes*
 
-; posix signal names
-all
-sigalrm
-sigabrt
-sigbus
-sigchld
-sigcont
-sigfpe
-sighup
-sigill
-sigint
-sigkill
-sigpipe
-sigquit
-sigsegv
-sigstop
-sigterm
-sigtstp
-sigttin
-sigttou
-sigusr1
-sigusr2
-sigpoll
-sigprof
-sigsys
-sigtrap
-sigurg
-sigvtalrm
-sigxcpu
-sigxfsz
-
 bits
 
 uid
@@ -402,10 +352,6 @@ pid
 ;call/info
 id
 exit-code
-
-; used when a function is executed but not looked up through a word binding
-; (product of literal or evaluation) so no name is known for it
---anonymous--
 
 ; used to signal situations where information that would be available in
 ; a debug build has been elided

@@ -6,8 +6,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information
@@ -53,6 +53,42 @@
 //
 
 
+#if !defined(CPLUSPLUS_11)
+    //
+    // In plain C builds, there's no such thing as "base classes".  So the
+    // only way to make a function that can accept either a REBSER* or a
+    // REBVAL* without knowing which is to use a `void*`.  So the REBNOD is
+    // defined as `void`, and the C++ build is trusted to do the more strict
+    // type checking.
+    //
+    struct Reb_Node { REBYTE first; };  // REBNOD is void*, but define struct
+    typedef void REBNOD;
+#else
+    // If we were willing to commit to building with a C++ compiler, we'd
+    // want to make the Reb_Node contain the common `header` bits that REBSER
+    // and REBVAL would share.  But since we're not, we instead make a less
+    // invasive empty base class, that doesn't disrupt the memory layout of
+    // derived classes due to the "Empty Base Class Optimization":
+    //
+    // https://en.cppreference.com/w/cpp/language/ebo
+    //
+    // The optimization hits a tricky case with REBCTX (or REBACT/REBMAP).
+    // e.g. in order to not be able to mistakenly pass a REBCTX* to a routine
+    // that is expecting a REBARR*, REBCTX is not derived from REBARR...rather
+    // it is declared as a structure containing a single REBARR.  But if we
+    // add REBNOD as a base class of REBCTX, then it will contain a member
+    // derived from REBNOD as well.
+    //
+    // Avoiding this means having a more fundamental form of REBSER that does
+    // not derive from REBNOD, which REBCTX then contains.  After that it can
+    // safely derive from REBNOD...while still being unwilling to directly
+    // coerce itself to a REBARR.
+    //
+    struct Reb_Node {};  // used as empty base class for REBSER + REBVAL
+    typedef struct Reb_Node REBNOD;
+#endif
+
+
 //=////////////////////////////////////////////////////////////////////=///=//
 //
 // BYTE-ORDER SENSITIVE BIT FLAGS & MASKING
@@ -91,6 +127,15 @@
 
 #define PLATFORM_BITS \
     (sizeof(uintptr_t) * 8)
+
+// !!! Originally the REBFLGS type was a `uint_fast32_t`.  However, there were
+// several cases of the type being used with these macros...which only work
+// with platform sized ints.  If the callsites that use REBFLGS are all
+// changed to not hold things like NODE_FLAG_XXX then this could be changed
+// back, but until then it has to be uintptr_t (which is likely defined to be
+// the same as uint_fast32_t on most platforms anyway).
+//
+typedef uintptr_t REBFLGS;
 
 #if defined(ENDIAN_BIG) // Byte w/most significant bit first
 
@@ -215,79 +260,72 @@ inline static uintptr_t FLAG_SECOND_UINT16(uint16_t u)
 #ifdef DEBUG_USE_BITFIELD_HEADER_PUNS
     struct Reb_Series_Header_Pun {
         int _07_cell_always_false:1;
-        int _06_stack:1;
-        int _05_root:1;
-        int _04_transient:1;
+        int _06_root:1;
+        int _05_misc_needs_mark:1;
+        int _04_link_needs_mark:1;
         int _03_marked:1;
         int _02_managed:1;
         int _01_free:1;
         int _00_node_always_true:1;
 
-        int _15_unused:1;
-        int _14_unused:1;
-        int _13_has_dynamic:1;
-        int _12_is_array:1;
-        int _11_power_of_two:1;
-        int _10_utf8_string:1;
+        int _15_flag_15:1;
+        int _14_black:1;
+        int _13_flag_13:1;
+        int _12_flag_12:1;
+        int _11_dynamic:1;
+        int _10_power_of_two:1;
         int _09_fixed_size:1;
-        int _08_not_end_always_true:1;
+        int _08_inaccessible:1;
 
-        int _23_array_unused:1;
-        int _22_array_tail_newline;
-        int _21_array_unused:1;
-        int _20_array_pairlist:1;
-        int _19_array_varlist:1;
-        int _18_array_paramlist:1;
-        int _17_array_nulleds_legal:1;
-        int _16_array_file_line:1;
+        unsigned int _16to23_flavor:8;
+
+        int _31_subclass:1;
+        int _30_subclass:1;
+        int _29_subclass:1;
+        int _28_subclass:1;
+        int _27_subclass:1;
+        int _26_subclass:1;
+        int _25_subclass:1;
+        int _24_subclass:1;
     }__attribute__((packed));
 
     struct Reb_Info_Header_Pun {
         int _07_cell_always_false:1;
-        int _06_frozen:1;
+        int _06_frozen_shallow:1;
         int _05_hold:1;
-        int _04_protected:1;
-        int _03_black:1;
-        int _02_unused:1;
+        int _04_frozen_deep:1;
+        int _03_protected:1;
+        int _02_auto_locked:1;
         int _01_free_always_false:1;
         int _00_node_always_true:1;
 
-        unsigned int _08to15_wide:8;
+        unsigned int _08to15_used:8;
 
-        unsigned int _16to23_len_if_non_dynamic:8;
-
-        int _31_unused:1;
-        int _30_unused:1;
-        int _29_api_release:1;
-        int _28_shared_keylist:1;
-        int _27_string_canon:1;
-        int _26_frame_failed:1;
-        int _25_inaccessible:1;
-        int _24_auto_locked:1;
+        unsigned int _16to31_symid_if_sym:8;
     }__attribute__((packed));
 
     struct Reb_Value_Header_Pun {
         int _07_cell_always_true:1;
-        int _06_stack:1;
-        int _05_root:1;
-        int _04_transient:1;
+        int _06_root:1;
+        int _05_second_needs_mark:1;
+        int _04_first_needs_mark:1;
         int _03_marked:1;
         int _02_managed:1;
         int _01_free:1;
         int _00_node_always_true:1;
 
-        unsigned int _08to15_kind:8;
+        unsigned int _08to15_kind3q:8;
 
-        int _23_unused:1;
-        int _22_eval_flip:1;
-        int _21_enfixed:1;
-        int _20_unevaluated:1;
-        int _19_newline_before:1;
-        int _18_falsey:1;
-        int _17_thrown:1;
-        int _16_protected:1;
+        unsigned int _16to23_heart:8;
 
-        unsigned int _24to31_type_specific_bits:8;
+        int _31_explicitly_mutable:1;
+        int _30_const:1;
+        int _29_newline_before:1;
+        int _28_note:1;
+        int _27_unevaluated:1;
+        int _26_cell:1;
+        int _25_cell:1;
+        int _24_protected:1;
     }__attribute__((packed));
 #endif
 
@@ -315,13 +353,6 @@ inline static uintptr_t FLAG_SECOND_UINT16(uint16_t u)
 // able to signal the IS_END() test for REBVAL.  See Endlike_Header()
 //
 
-// If this turns out not to be true on some weird platform (e.g. you have an
-// integer type faster than an integer the size of a pointer that is *bigger*
-// than a pointer) then there needs to be a #define to disable uint_fast32_t
-// for the `bits` field of the header below.
-//
-STATIC_ASSERT(sizeof(uint_fast32_t) <= sizeof(uintptr_t));
-
 union Reb_Header {
     //
     // unsigned integer that's the size of a platform pointer (e.g. 32-bits on
@@ -331,13 +362,11 @@ union Reb_Header {
     // !!! Future application of the 32 unused header bits on 64-bit machines
     // might add some kind of optimization or instrumentation.
     //
-    uintptr_t capacity;  // how big we want this union to be for cell rules
-
-    // uintptr_t may not be the fastest type for operating on 32 bits.  So
-    // we do our accesses through whatever is, while making sure the header
-    // itself is the right size.
-
-    uint_fast32_t bits;
+    // !!! uintptr_t may not be the fastest type for operating on 32-bits.
+    // But using a `uint_fast32_t` would prohibit 64-bit platforms from
+    // exploiting the additional bit space (due to strict aliasing).
+    //
+    uintptr_t bits;
 
     // !!! For some reason, at least on 64-bit Ubuntu, TCC will bloat the
     // header structure to be 16 bytes instead of 8 if you put a 4 byte char
@@ -425,44 +454,38 @@ union Reb_Header {
 #define NODE_BYTEMASK_0x10_MARKED 0x10
 
 
-//=//// NODE_FLAG_4 (fifth-leftmost bit) //////////////////////////////////=//
+//=//// NODE_FLAG_GC_ONE / NODE_FLAG_GC_TWO (fifth/sixth-leftmost bit) ////=//
 //
-// !!! This bit is reclaimed from a scrapped idea of distinguishing cells on
-// the data stack in particular, as not requiring persistent reification of
-// frames.  Besides adding complexity, the idea is incompatible with a
-// stackless model...which rearranges the data stack as will when suspending
-// or resuming stacks.
+// Both REBVAL* and REBSER* nodes have two slots in them which can be called
+// out for attention from the GC.  Though these bits are scarce, sacrificing
+// them means not needing to do a switch() on the REB_TYPE of the cell to
+// know how to mark them.
 //
-#define NODE_FLAG_4 \
+// The third potentially-node-holding slot in a cell ("Extra") is deemed
+// whether to be marked or not by the ordering in the %types.r file.  So no
+// bit is needed for that.
+//
+#define NODE_FLAG_GC_ONE \
     FLAG_LEFT_BIT(4)
-#define NODE_BYTEMASK_0x08_FOUR 0x08
+#define NODE_BYTEMASK_0x08_GC_ONE 0x08
+
+#define NODE_FLAG_GC_TWO \
+    FLAG_LEFT_BIT(5)
+#define NODE_BYTEMASK_0x04_GC_TWO 0x04
 
 
-//=//// NODE_FLAG_ROOT (sixth-leftmost bit) ///////////////////////////////=//
+//=//// NODE_FLAG_ROOT (seventh-leftmost bit) /////////////////////////////=//
 //
 // Means the node should be treated as a root for GC purposes.  If the node
 // also has NODE_FLAG_CELL, that means the cell must live in a "pairing"
-// REBSER-sized structure for two cells.  This indicates it is an API handle.
+// REBSER-sized structure for two cells.
 //
 // This flag is masked out by CELL_MASK_COPIED, so that when values are moved
 // into or out of API handle cells the flag is left untouched.
 //
 #define NODE_FLAG_ROOT \
-    FLAG_LEFT_BIT(5)
-#define NODE_BYTEMASK_0x04_ROOT 0x04
-
-
-//=//// NODE_FLAG_6 (seventh-leftmost bit) ////////////////////////////////=//
-//
-// !!! This bit was recovered from a scrapped concept of marking cells based
-// on their projected lifetimes, to limit the amount of REBFRM* reification
-// as REBARR* varlists that needed to be monitored by GC.  It was a complex
-// idea for an optimization to start with, but a "stackless" model undermines
-// the notion of such lifetimes.
-//
-#define NODE_FLAG_6 \
     FLAG_LEFT_BIT(6)
-#define NODE_BYTEMASK_0x02_SIX 0x02
+#define NODE_BYTEMASK_0x02_ROOT 0x02
 
 
 //=//// NODE_FLAG_CELL (eighth-leftmost bit) //////////////////////////////=//
@@ -496,105 +519,3 @@ union Reb_Header {
 //
 #define FREED_SERIES_BYTE 192
 #define FREED_CELL_BYTE 193
-
-
-//=//// NODE STRUCTURE ////////////////////////////////////////////////////=//
-//
-// Though the name Node is used for a superclass that can be "in use" or
-// "free", this is the definition of the structure for its layout when it
-// has NODE_FLAG_FREE set.  In that case, the memory manager will set the
-// header bits to have the leftmost byte as FREED_SERIES_BYTE, and use the
-// pointer slot right after the header for its linked list of free nodes.
-//
-
-struct Reb_Node {
-    union Reb_Header header; // leftmost byte FREED_SERIES_BYTE if free
-
-    struct Reb_Node *next_if_free; // if not free, entire node is available
-
-    // Size of a node must be a multiple of 64-bits.  This is because there
-    // must be a baseline guarantee for node allocations to be able to know
-    // where 64-bit alignment boundaries are.
-    //
-    /* REBI64 payload[N];*/
-};
-
-#ifdef NDEBUG
-    #define IS_FREE_NODE(p) \
-        (did (FIRST_BYTE(cast(const struct Reb_Node*, (p))->header) \
-            & NODE_BYTEMASK_0x40_FREE))  // byte access defeats strict alias
-#else
-    inline static bool IS_FREE_NODE(const void *p) {
-        REBYTE first = FIRST_BYTE(cast(const struct Reb_Node*, p)->header);
-
-        if (not (first & NODE_BYTEMASK_0x40_FREE))
-            return false;  // byte access defeats strict alias
-
-        assert(first == FREED_SERIES_BYTE or first == FREED_CELL_BYTE);
-        return true;
-    }
-#endif
-
-
-//=//// MEMORY ALLOCATION AND FREEING MACROS //////////////////////////////=//
-//
-// Rebol's internal memory management is done based on a pooled model, which
-// use Try_Alloc_Mem() and Free_Mem() instead of calling malloc directly.
-// (Comments on those routines explain why this was done--even in an age of
-// modern thread-safe allocators--due to Rebol's ability to exploit extra
-// data in its pool block when a series grows.)
-//
-// Since Free_Mem() requires callers to pass in the size of the memory being
-// freed, it can be tricky.  These macros are modeled after C++'s new/delete
-// and new[]/delete[], and allocations take either a type or a type and a
-// length.  The size calculation is done automatically, and the result is cast
-// to the appropriate type.  The deallocations also take a type and do the
-// calculations.
-//
-// In a C++11 build, an extra check is done to ensure the type you pass in a
-// FREE or FREE_N lines up with the type of pointer being freed.
-//
-
-#define TRY_ALLOC(t) \
-    cast(t *, Try_Alloc_Mem(sizeof(t)))
-
-#define TRY_ALLOC_ZEROFILL(t) \
-    cast(t *, memset(ALLOC(t), '\0', sizeof(t)))
-
-#define TRY_ALLOC_N(t,n) \
-    cast(t *, Try_Alloc_Mem(sizeof(t) * (n)))
-
-#define TRY_ALLOC_N_ZEROFILL(t,n) \
-    cast(t *, memset(TRY_ALLOC_N(t, (n)), '\0', sizeof(t) * (n)))
-
-#ifdef CPLUSPLUS_11
-    #define FREE(t,p) \
-        do { \
-            static_assert( \
-                std::is_same<decltype(p), std::add_pointer<t>::type>::value, \
-                "mismatched FREE type" \
-            ); \
-            Free_Mem(p, sizeof(t)); \
-        } while (0)
-
-    #define FREE_N(t,n,p)   \
-        do { \
-            static_assert( \
-                std::is_same<decltype(p), std::add_pointer<t>::type>::value, \
-                "mismatched FREE_N type" \
-            ); \
-            Free_Mem(p, sizeof(t) * (n)); \
-        } while (0)
-#else
-    #define FREE(t,p) \
-        Free_Mem((p), sizeof(t))
-
-    #define FREE_N(t,n,p)   \
-        Free_Mem((p), sizeof(t) * (n))
-#endif
-
-#define CLEAR(m, s) \
-    memset((void*)(m), 0, s)
-
-#define CLEARS(m) \
-    memset((void*)(m), 0, sizeof(*m))

@@ -58,35 +58,6 @@
 #define kind_current KIND_BYTE_UNCHECKED(v)
 
 
-//=//// ARGUMENT LOOP MODES ///////////////////////////////////////////////=//
-//
-// f->special is kept in sync with either:
-//
-// * f->param to indicate ordinary argument fulfillment for all the relevant
-//   args, refinements, and refinement args of the function.
-//
-// * some other pointer to an array of REBVAL which is the same length as the
-//   argument list.  Any non-null values in that array should be used in lieu
-//   of an ordinary argument...e.g. that argument has been "specialized".
-//
-// All the states can be incremented across the length of the frame.  This
-// means `++f->special` can be done without checking for null values.
-//
-// Additionally, in the f->param state, f->special will never register as
-// anything other than a parameter.  This can speed up some checks, such as
-// where `IS_NULLED(f->special)` can only match the other cases.
-//
-// Done with macros for speed in the debug build (which does not inline).
-// The name of the trigger condition is included since reinforcing what's true
-// at the callsite is good to help understand the state.
-
-#define SPECIAL_IS_PARAM_SO_UNSPECIALIZED \
-    (f->special == f->param)
-
-#define SPECIAL_IS_ARBITRARY_SO_SPECIALIZED \
-    (f->special != f->param and f->special != f->arg)
-
-
 #ifdef DEBUG_EXPIRED_LOOKBACK
     #define CURRENT_CHANGES_IF_FETCH_NEXT \
         (f->feed->stress != nullptr)
@@ -97,7 +68,7 @@
 
 
 inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
-    SET_CELL_FLAG(f->out, OUT_MARKED_STALE);
+    SET_CELL_FLAG(f->out, OUT_NOTE_STALE);
 }
 
 
@@ -106,7 +77,7 @@ inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
 // noticing when to defer enfix:
 //
 //     foo: func [...] [
-//          return lit 1 then ["this needs to be returned"]
+//          return just 1 then ["this needs to be returned"]
 //     ]
 //
 // If the first time the THEN was seen was not after the 1, but when the
@@ -124,15 +95,15 @@ bool Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
     if (not IS_WORD(feed->value))
         return false;
 
-    feed->gotten = Try_Lookup_Word(feed->value, feed->specifier);
+    feed->gotten = Lookup_Word(feed->value, FEED_SPECIFIER(feed));
 
-    if (not feed->gotten or not IS_ACTION(feed->gotten))
+    if (not feed->gotten or not IS_ACTION(unwrap(feed->gotten)))
         return false;
 
-    if (NOT_ACTION_FLAG(VAL_ACTION(feed->gotten), ENFIXED))
+    if (NOT_ACTION_FLAG(VAL_ACTION(unwrap(feed->gotten)), ENFIXED))
         return false;
 
-    if (GET_ACTION_FLAG(VAL_ACTION(feed->gotten), DEFERS_LOOKBACK))
+    if (GET_ACTION_FLAG(VAL_ACTION(unwrap(feed->gotten)), DEFERS_LOOKBACK))
         SET_FEED_FLAG(feed, DEFERRING_ENFIX);
     return true;
 }
@@ -143,14 +114,11 @@ bool Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
 //
 static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     switch (VAL_TYPE(f->out)) {
-      case REB_SYM_WORD:
-      case REB_SYM_PATH:
-        Getify(f->out);  // don't run @append or @append/only
-        goto enable_modal;
-
-      case REB_SYM_GROUP:
-      case REB_SYM_BLOCK:
-        Plainify(f->out);  // run GROUP!, pass block as-is
+      case REB_SYM_WORD:  // run @APPEND
+      case REB_SYM_PATH:  // run @APPEND/ONLY
+      case REB_SYM_GROUP:  // run @(GR O UP)
+      case REB_SYM_BLOCK:  // pass @[BL O CK] as-is
+        Plainify(f->out);
         goto enable_modal;
 
       default:
@@ -164,19 +132,26 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     // not followed by a refinement.  That would cost
     // extra, but avoid the test on every call.
     //
-    const RELVAL *enable = f->param + 1;
-    if (
-        IS_END(enable)
-        or not TYPE_CHECK(enable, REB_TS_REFINEMENT)
-    ){
-        fail ("Refinement must follow modal parameter");
+    const REBPAR *enable = f->param + 1;
+    if (IS_END(enable))
+        fail ("Modal parameter can't be at end of parameter list");
+
+    if (Is_Param_Hidden(enable)) {
+        if (not (IS_NULLED(enable) or Is_Blackhole(enable)))
+            fail ("Specialized refinement following modal can't take args");
     }
-    if (not Is_Typeset_Empty(enable))
-        fail ("Modal refinement cannot take arguments");
+    else {
+        if (not (
+            TYPE_CHECK(enable, REB_TS_REFINEMENT)
+            and Is_Typeset_Empty(enable)
+        )){
+            fail ("Refinement must follow modal parameter");
+        }
+    }
 
     // Signal refinement as being in use.
     //
-    Init_Sym_Word(DS_PUSH(), VAL_PARAM_CANON(enable));
+    Init_Word(DS_PUSH(), KEY_SYMBOL(f->key + 1));
   }
 
   skip_enable_modal:
@@ -185,7 +160,7 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     // value existed, the parameter had to act quoted.  Eval.
     //
     if (Eval_Value_Maybe_End_Throws(f->arg, f->out, SPECIFIED)) {
-        Move_Value(f->arg, f->out);
+        Copy_Cell(f->out, f->arg);
         return true;
     }
 
@@ -209,8 +184,19 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     Do_Process_Action_Checks_Debug(f);
   #endif
 
-    if (f->special == f->arg)  // !!! now, a bad way to say "type check"
+    if (not Is_Action_Frame_Fulfilling(f))
+        goto dispatch;  // STATE_BYTE() belongs to the dispatcher if key=null
+
+    switch (STATE_BYTE(f)) {
+      case ST_ACTION_INITIAL_ENTRY:
+        goto fulfill;
+
+      case ST_ACTION_TYPECHECKING:
         goto typecheck_then_dispatch;
+
+      default:
+        assert(false);
+    }
 
   fulfill:
 
@@ -218,7 +204,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
     assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));
 
-    for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
+    for (; f->key != f->key_tail; ++f->key, ++f->arg, ++f->param) {
 
   //=//// CONTINUES (AT TOP SO GOTOS DO NOT CROSS INITIALIZATIONS /////////=//
 
@@ -231,7 +217,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
-            f->param = END_NODE;  // don't need f->param in paramlist
+            f->key = nullptr;  // don't need f->key
+            f->key_tail = nullptr;
             goto fulfill_and_any_pickups_done;
         }
         continue;
@@ -251,27 +238,31 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // come from argument fulfillment.  If there is an exemplar, they are
         // set from that, otherwise they are undefined.
         //
-        if (Is_Param_Hidden(f->param)) {
-            if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED) {  // no exemplar
-                Init_Void(f->arg, SYM_UNDEFINED);
-                SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-            }
-            else {
-                // !!! Previously we assumed type checking was done at the
-                // time of specialization.  This is in preparation for when
-                // type checking might be an expensive proposition.  We might
-                // check here without erroring, patching back the bit onto
-                // `f->special`...which could contain type checking to this
-                // file and not burden SPECIALIZE/etc.  But we wouldn't want
-                // to raise an error unless the type check loop runs.
-                //
-                Move_Value(f->arg, f->special);
-            }
+        if (Is_Param_Hidden(f->param)) {  // hidden includes local
+            //
+            // For specialized cases, we assume type checking was done
+            // when the parameter is hidden.  It cannot be manipulated
+            // from the outside (e.g. by REFRAMER) so there is no benefit
+            // to deferring the check, only extra cost on each invocation.
+            //
+            // !!! At one point, this would copy the hidden bit, so that the
+            // local itself carried the flag.  However, using the local bit
+            // for values actually in the frame creates an issue that the
+            // higher level phases were hiding parameters from specialization
+            // that lower levels should see.  Review.
+            //
+            Copy_Cell(f->arg, f->param);
+
             goto continue_fulfilling;
         }
 
-  //=//// A /REFINEMENT ARG ///////////////////////////////////////////////=//
+        assert(IS_TYPESET(f->param));
 
+  //=//// CHECK FOR ORDER OVERRIDE ////////////////////////////////////////=//
+
+        // Parameters are fulfilled in either 1 or 2 passes, depending on
+        // whether the path uses any "refinements".
+        //
         // Refinements can be tricky because the "visitation order" of the
         // parameters while walking across the parameter array might not
         // match the "consumption order" of the expressions that need to
@@ -285,53 +276,23 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // The first PATH! pushes /B to the top of stack, with /C below.
         // The second PATH! pushes /C to the top of stack, with /B below
         //
-        // If the refinements can be popped off the stack in the order
-        // that they are encountered, then this can be done in one pass.
-        // Otherwise a second pass is needed.  But it is accelerated by
-        // storing the parameter indices to revisit in the binding of the
-        // words (e.g. /B and /C above) on the data stack.
+        // While historically Rebol paths for invoking functions could only
+        // use refinements for optional parameters, Ren-C leverages the same
+        // two-pass mechanism to implement the reordering of non-optional
+        // parameters at the callsite.
 
-        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
-            assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));  // jump lower
+        if (DSP != f->dsp_orig) {  // reorderings or refinements pushed
+            STKVAL(*) ordered = DS_TOP;
+            STKVAL(*) lowest_ordered = DS_AT(f->dsp_orig);
+            const REBSTR *param_symbol = KEY_SYMBOL(f->key);
 
-            if (SPECIAL_IS_PARAM_SO_UNSPECIALIZED)  // args from callsite
-                goto unspecialized_refinement;  // most common case (?)
-
-            // A non-checked SYM-WORD! with binding indicates a partial
-            // refinement with parameter index that needs to be pushed
-            // to top of stack, hence HIGHER priority for fulfilling
-            // @ the callsite than any refinements added by a PATH!.
-            //
-            if (IS_SYM_WORD(f->special)) {
-                REBLEN partial_index = VAL_WORD_INDEX(f->special);
-                REBSTR *partial_canon = VAL_STORED_CANON(f->special);
-
-                Init_Sym_Word(DS_PUSH(), partial_canon);
-                INIT_BINDING(DS_TOP, f->varlist);
-                INIT_WORD_INDEX(DS_TOP, partial_index);
-            }
-            else
-                assert(Is_Void_With_Sym(f->special, SYM_UNDEFINED));
-
-  //=//// UNSPECIALIZED REFINEMENT SLOT ///////////////////////////////////=//
-
-    // We want to fulfill all normal parameters before any refinements
-    // that take arguments.  Ren-C allows normal parameters *after* any
-    // refinement, that are not "refinement arguments".  So a refinement
-    // that takes an argument must always fulfill using "pickups".
-
-          unspecialized_refinement: {
-
-            REBVAL *ordered = DS_TOP;  // v-- #2258
-            const REBSTR *param_canon = VAL_PARAM_CANON(f->param);
-
-            for (; ordered != DS_AT(f->dsp_orig); --ordered) {
-                if (VAL_STORED_CANON(ordered) != param_canon)
+            for (; ordered != lowest_ordered; --ordered) {
+                if (VAL_WORD_SYMBOL(ordered) != param_symbol)
                     continue;
 
                 REBLEN offset = f->arg - FRM_ARGS_HEAD(f);
-                INIT_BINDING(ordered, f->varlist);
-                INIT_WORD_INDEX(ordered, offset + 1);
+                INIT_VAL_WORD_BINDING(ordered, f->varlist);
+                INIT_VAL_WORD_PRIMARY_INDEX(ordered, offset + 1);
 
                 if (Is_Typeset_Empty(f->param)) {
                     //
@@ -339,24 +300,19 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     // for this one.  But we did need to set its index
                     // so we knew it was valid (errors later if not set).
                     //
-                    goto used_refinement;
+                    Init_Blackhole(f->arg);  // # means refinement used
+                    goto continue_fulfilling;
                 }
 
                 goto skip_fulfilling_arg_for_now;
             }
+        }
 
-            goto unused_refinement; }  // not in path, not specialized yet
+  //=//// A /REFINEMENT ARG ///////////////////////////////////////////////=//
 
-          unused_refinement:  // Note: might get pushed by a later slot
-
+        if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
+            assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));  // jump lower
             Init_Nulled(f->arg);  // null means refinement not used
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
-            goto continue_fulfilling;
-
-          used_refinement:  // can hit this on redo, copy its argument
-
-            Init_Blackhole(f->arg);  // # means refinement used
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             goto continue_fulfilling;
         }
 
@@ -364,15 +320,14 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
       fulfill_arg: ;  // semicolon needed--next statement is declaration
 
-        Reb_Param_Class pclass = VAL_PARAM_CLASS(f->param);
-        assert(pclass != REB_P_LOCAL);  // should have been handled by hidden
+        enum Reb_Param_Class pclass = VAL_PARAM_CLASS(f->param);
 
   //=//// HANDLE IF NEXT ARG IS IN OUT SLOT (e.g. ENFIX, CHAIN) ///////////=//
 
         if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
             CLEAR_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
 
-            if (GET_CELL_FLAG(f->out, OUT_MARKED_STALE)) {
+            if (GET_CELL_FLAG(f->out, OUT_NOTE_STALE)) {
                 //
                 // Something like `lib/help left-lit` is allowed to work,
                 // but if it were just `obj/int-value left-lit` then the
@@ -402,7 +357,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     goto continue_fulfilling;
                 }
 
-                // The OUT_MARKED_STALE flag is also used by BAR! to keep
+                // The OUT_NOTE_STALE flag is also used by BAR! to keep
                 // a result in f->out, so that the barrier doesn't destroy
                 // data in cases like `(1 + 2 | comment "hi")` => 3, but
                 // left enfix should treat that just like an end.
@@ -426,15 +381,16 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             }
             else switch (pclass) {
               case REB_P_NORMAL:
+              case REB_P_OUTPUT:
                 enfix_normal_handling:
 
-                Move_Value(f->arg, f->out);
+                Copy_Cell(f->arg, f->out);
                 if (GET_CELL_FLAG(f->out, UNEVALUATED))
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
                 break;
 
-              case REB_P_HARD_QUOTE:
-                if (not GET_CELL_FLAG(f->out, UNEVALUATED)) {
+              case REB_P_HARD:
+                if (NOT_CELL_FLAG(f->out, UNEVALUATED)) {
                     //
                     // This can happen e.g. with `x: 10 | x >- lit`.  We
                     // raise an error in this case, while still allowing
@@ -447,12 +403,12 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
                 // Is_Param_Skippable() accounted for in pre-lookback
 
-                Move_Value(f->arg, f->out);
+                Copy_Cell(f->arg, f->out);
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
                 break;
 
               case REB_P_MODAL: {
-                if (not GET_CELL_FLAG(f->out, UNEVALUATED))
+                if (NOT_CELL_FLAG(f->out, UNEVALUATED))
                     goto enfix_normal_handling;
 
                 if (Handle_Modal_In_Out_Throws(f))
@@ -460,22 +416,34 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
                 break; }
 
-              case REB_P_SOFT_QUOTE:
+              case REB_P_SOFT:
                 //
-                // Note: This permits f->out to not carry the UNEVALUATED
+                // SOFT permits f->out to not carry the UNEVALUATED
                 // flag--enfixed operations which have evaluations on
                 // their left are treated as if they were in a GROUP!.
                 // This is important to `1 + 2 ->- lib/* 3` being 9, while
                 // also allowing `1 + x: ->- lib/default [...]` to work.
+                //
+                goto escapable;
 
-                if (IS_QUOTABLY_SOFT(f->out)) {
+              case REB_P_MEDIUM:
+                //
+                // MEDIUM escapability means that it only allows the escape
+                // of one unit.  Thus when reaching this point, it must carry
+                // the UENEVALUATED FLAG.
+                //
+                assert(GET_CELL_FLAG(f->out, UNEVALUATED));
+                goto escapable;
+
+              escapable:
+                if (ANY_ESCAPABLE_GET(f->out)) {
                     if (Eval_Value_Throws(f->arg, f->out, SPECIFIED)) {
-                        Move_Value(f->out, f->arg);
+                        Copy_Cell(f->out, f->arg);
                         goto abort_action;
                     }
                 }
                 else {
-                    Move_Value(f->arg, f->out);
+                    Copy_Cell(f->arg, f->out);
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
                 }
                 break;
@@ -583,6 +551,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   //=//// REGULAR ARG-OR-REFINEMENT-ARG (consumes 1 EVALUATE's worth) /////=//
 
           case REB_P_NORMAL:
+          case REB_P_OUTPUT:
           normal_handling: {
             if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
                 Init_Endish_Nulled(f->arg);
@@ -592,8 +561,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             REBFLGS flags = EVAL_MASK_DEFAULT
                 | EVAL_FLAG_FULFILLING_ARG;
 
+            if (IS_VOID(f_next))  // Eval_Step() has callers test this
+                fail (Error_Void_Evaluation_Raw());  // must be quoted
+
             if (Eval_Step_In_Subframe_Throws(f->arg, f, flags)) {
-                Move_Value(f->out, f->arg);
+                Copy_Cell(f->out, f->arg);
                 goto abort_action;
             }
 
@@ -603,31 +575,26 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// HARD QUOTED ARG-OR-REFINEMENT-ARG ///////////////////////////////=//
 
-          case REB_P_HARD_QUOTE:
+          case REB_P_HARD:
             if (not Is_Param_Skippable(f->param))
                 Literal_Next_In_Frame(f->arg, f);  // CELL_FLAG_UNEVALUATED
             else {
                 if (not Typecheck_Including_Constraints(f->param, f_next)) {
                     assert(Is_Param_Endable(f->param));
                     Init_Endish_Nulled(f->arg);  // not EVAL_FLAG_BARRIER_HIT
-                    SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
                     goto continue_fulfilling;
                 }
                 Literal_Next_In_Frame(f->arg, f);
-                SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
             }
 
             // Have to account for enfix deferrals in cases like:
             //
-            //     return lit 1 then (x => [x + 1])
+            //     return just 1 then (x => [x + 1])
             //
             Lookahead_To_Sync_Enfix_Defer_Flag(f->feed);
 
-            if (GET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
-                goto continue_fulfilling;
-
-            break;
+            goto continue_fulfilling;
 
   //=//// MODAL ARG  //////////////////////////////////////////////////////=//
 
@@ -652,14 +619,14 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // Quotes from the right already "win" over quotes from the left, in
     // a case like `help left-quoter` where they point at teach other.
     // But there's also an issue where something sits between quoting
-    // constructs like the `[x]` in between the `else` and `->`:
+    // constructs like the `x` in between the `else` and `->`:
     //
-    //     if condition [...] else [x] -> [...]
+    //     if condition [...] else x -> [...]
     //
-    // Here the neutral [x] is meant to be a left argument to the lambda,
+    // Here the neutral `x` is meant to be a left argument to the lambda,
     // producing the effect of:
     //
-    //     if condition [...] else ([x] -> [...])
+    //     if condition [...] else (`x` -> [...])
     //
     // To get this effect, we need a different kind of deferment that
     // hops over a unit of material.  Soft quoting is unique in that it
@@ -672,7 +639,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // notice a quoting enfix construct afterward looking left, we call
     // into a nested evaluator before finishing the operation.
 
-          case REB_P_SOFT_QUOTE:
+          case REB_P_SOFT:
+          case REB_P_MEDIUM:
             Literal_Next_In_Frame(f->arg, f);  // CELL_FLAG_UNEVALUATED
 
             // See remarks on Lookahead_To_Sync_Enfix_Defer_Flag().  We
@@ -688,8 +656,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // https://forum.rebol.info/t/1361
             //
             if (
-                Lookahead_To_Sync_Enfix_Defer_Flag(f->feed) and
-                GET_ACTION_FLAG(VAL_ACTION(f->feed->gotten), QUOTES_FIRST)
+                Lookahead_To_Sync_Enfix_Defer_Flag(f->feed) and  // ensure got
+                (pclass == REB_P_SOFT and GET_ACTION_FLAG(
+                    VAL_ACTION(unwrap(f->feed->gotten)),  // ensured
+                    QUOTES_FIRST
+                ))
             ){
                 // We need to defer and let the right hand quote that is
                 // quoting leftward win.  We use ST_EVALUATOR_LOOKING_AHEAD
@@ -701,6 +672,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     | FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
                     | EVAL_FLAG_INERT_OPTIMIZATION;
 
+                if (IS_VOID(f_next))  // Eval_Step() has callers test this
+                    fail (Error_Void_Evaluation_Raw());  // must be quoted
+
                 DECLARE_FRAME (subframe, f->feed, flags);
 
                 Push_Frame(f->arg, subframe);
@@ -708,19 +682,19 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 Drop_Frame(subframe);
 
                 if (threw) {
-                    Move_Value(f->out, f->arg);
+                    Copy_Cell(f->out, f->arg);
                     goto abort_action;
                 }
             }
-            else if (IS_QUOTABLY_SOFT(f->arg)) {
+            else if (ANY_ESCAPABLE_GET(f->arg)) {
                 //
                 // We did not defer the quoted argument.  If the argument
                 // is something like a GROUP!, GET-WORD!, or GET-PATH!...
                 // it has to be evaluated.
                 //
-                Move_Value(f_spare, f->arg);
+                Copy_Cell(f_spare, f->arg);
                 if (Eval_Value_Throws(f->arg, f_spare, f_specifier)) {
-                    Move_Value(f->out, f->arg);
+                    Copy_Cell(f->out, f->arg);
                     goto abort_action;
                 }
             }
@@ -739,7 +713,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         //
         assert(NOT_FEED_FLAG(f->feed, NO_LOOKAHEAD));
 
-        assert(pclass != REB_P_LOCAL);
         assert(NOT_EVAL_FLAG(f, FULLY_SPECIALIZED));
 
         goto continue_fulfilling;
@@ -756,16 +729,15 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // second time through, and we were just jumping up to check the
     // parameters in response to a R_REDO_CHECKED; if so, skip this.
     //
-    if (DSP != f->dsp_orig and IS_SYM_WORD(DS_TOP)) {
+    if (DSP != f->dsp_orig and IS_WORD(DS_TOP)) {
 
       next_pickup:
 
-        assert(IS_SYM_WORD(DS_TOP));
+        assert(IS_WORD(DS_TOP));
 
         if (not IS_WORD_BOUND(DS_TOP)) {  // the loop didn't index it
-            mutable_KIND3Q_BYTE(DS_TOP) = REB_WORD;
-            mutable_HEART_BYTE(DS_TOP) = REB_WORD;
-            fail (Error_Bad_Refine_Raw(DS_TOP));  // so duplicate or junk
+            Refinify(DS_TOP);  // used as refinement, so report that way
+            fail (Error_Bad_Parameter_Raw(DS_TOP));  // so duplicate or junk
         }
 
         // FRM_ARGS_HEAD offsets are 0-based, while index is 1-based.
@@ -773,19 +745,19 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         //
         REBINT offset =
             VAL_WORD_INDEX(DS_TOP) - (f->arg - FRM_ARGS_HEAD(f)) - 1;
-        f->param += offset;
+        f->key += offset;
         f->arg += offset;
-        f->special += offset;
+        f->param += offset;
 
-        assert(VAL_STORED_CANON(DS_TOP) == VAL_PARAM_CANON(f->param));
-        assert(TYPE_CHECK(f->param, REB_TS_REFINEMENT));
+        assert(VAL_WORD_SYMBOL(DS_TOP) == KEY_SYMBOL(f->key));
         DS_DROP();
 
         if (Is_Typeset_Empty(f->param)) {  // no callsite arg, just drop
             if (DSP != f->dsp_orig)
                 goto next_pickup;
 
-            f->param = END_NODE;  // don't need f->param in paramlist
+            f->key = nullptr;  // don't need f->key
+            f->key_tail = nullptr;
             goto fulfill_and_any_pickups_done;
         }
 
@@ -797,15 +769,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   fulfill_and_any_pickups_done:
 
     CLEAR_EVAL_FLAG(f, DOING_PICKUPS);  // reevaluate may set flag again
-    assert(IS_END(f->param));  // signals !Is_Action_Frame_Fulfilling()
-
-    if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
-        if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))
-            fail (Error_Literal_Left_Path_Raw());
-    }
+    f->key = nullptr;  // signals !Is_Action_Frame_Fulfilling()
+    f->key_tail = nullptr;
 
     if (GET_EVAL_FLAG(f, FULFILL_ONLY)) {  // only fulfillment, no typecheck
-        assert(GET_CELL_FLAG(f->out, OUT_MARKED_STALE));  // didn't touch out
+        assert(GET_CELL_FLAG(f->out, OUT_NOTE_STALE));  // didn't touch out
         goto skip_output_check;
     }
 
@@ -824,17 +792,20 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   typecheck_then_dispatch:
     Expire_Out_Cell_Unless_Invisible(f);
 
-    f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
+    f->key = ACT_KEYS(&f->key_tail, FRM_PHASE(f));
     f->arg = FRM_ARGS_HEAD(f);
+    f->param = ACT_PARAMS_HEAD(FRM_PHASE(f));
 
-    for (; NOT_END(f->param); ++f->param, ++f->arg) {
+    for (; f->key != f->key_tail; ++f->key, ++f->arg, ++f->param) {
         assert(NOT_END(f->arg));  // all END fulfilled as Init_Endish_Nulled()
-/*        if (VAL_PARAM_CLASS(f->param) == REB_P_LOCAL) {
-            if (not IS_VOID(f->arg) and not IS_ACTION(f->arg))  // !!! TEMP TO TRY BOOT
-                fail ("locals must be void");
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+
+        // Note that if you have a redo situation as with an ENCLOSE, a
+        // specialized out parameter becomes visible in the frame and can be
+        // modified.  Even though it's hidden, it may need to be typechecked
+        // again, unless it was fully hidden.
+        //
+        if (GET_CELL_FLAG(f->param, VAR_MARKED_HIDDEN))
             continue;
-        } */
 
         // We can't a-priori typecheck the variadic argument, since the values
         // aren't calculated until the function starts running.  Instead we
@@ -850,9 +821,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // Actual argument must be a VARARGS!
             //
             if (not IS_VARARGS(f->arg))
-                fail (Error_Not_Varargs(f, f->param, VAL_TYPE(f->arg)));
+                fail (Error_Not_Varargs(f, f->key, f->param, VAL_TYPE(f->arg)));
 
-            VAL_VARARGS_PHASE_NODE(f->arg) = NOD(FRM_PHASE(f));
+            INIT_VAL_VARARGS_PHASE(f->arg, FRM_PHASE(f));
 
             // Store the offset so that both the arg and param locations can
             // quickly be recovered, while using only a single slot in the
@@ -864,9 +835,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     ? -(f->arg - FRM_ARGS_HEAD(f) + 1)
                     : f->arg - FRM_ARGS_HEAD(f) + 1;
 
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             continue;
         }
+
+        if (VAL_PARAM_CLASS(f->param) == REB_P_RETURN)
+            continue;  // !!! hack
 
         // Refinements have a special rule beyond plain type checking, in that
         // they don't just want an ISSUE! or NULL, they want # or NULL.
@@ -874,12 +847,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
             if (
                 GET_EVAL_FLAG(f, FULLY_SPECIALIZED)
-                and Is_Void_With_Sym(f->arg, SYM_UNDEFINED)
+                and Is_Void_With_Sym(f->arg, SYM_UNSET)
             ){
                 Init_Nulled(f->arg);
-                SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             }
-            else if (NOT_CELL_FLAG(f->arg, ARG_MARKED_CHECKED))
+            else
                 Typecheck_Refinement(f->param, f->arg);
             continue;
         }
@@ -906,9 +878,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             // Note: `1 + comment "foo"` => `1 +`, arg is END
             //
             if (not Is_Param_Endable(f->param))
-                fail (Error_No_Arg(f, f->param));
+                fail (Error_No_Arg(f->label, KEY_SYMBOL(f->key)));
 
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             continue;
         }
 
@@ -918,7 +889,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             kind_byte == REB_BLANK  // v-- e.g. <blank> param
             and TYPE_CHECK(f->param, REB_TS_NOOP_IF_BLANK)
         ){
-            SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
             SET_EVAL_FLAG(f, TYPECHECK_ONLY);
             continue;
         }
@@ -938,13 +908,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             continue;
         }
 
-        if (VAL_PARAM_SYM(f->param) == SYM_RETURN)
+        if (KEY_SYM(f->key) == SYM_RETURN)
             continue;  // !!! let whatever go for now
 
         if (not Typecheck_Including_Constraints(f->param, f->arg))
-            fail (Error_Arg_Type(f, f->param, VAL_TYPE(f->arg)));
-
-        SET_CELL_FLAG(f->arg, ARG_MARKED_CHECKED);
+            fail (Error_Arg_Type(f, f->key, VAL_TYPE(f->arg)));
     }
 
 
@@ -952,26 +920,31 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   dispatch:
 
+    if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
+        if (GET_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH))  // see notes on flag
+            fail (Error_Literal_Left_Path_Raw());
+    }
+
     // This happens if you have something intending to act as enfix but
     // that does not consume arguments, e.g. `x: enfixed func [] []`.
     // An enfixed function with no arguments might sound dumb, but it allows
     // a 0-arity function to run in the same evaluation step as the left
     // hand side.  This is how expression work (see `|:`)
     //
-    assert(NOT_EVAL_FLAG(f, UNDO_MARKED_STALE));
+    assert(NOT_EVAL_FLAG(f, UNDO_NOTE_STALE));
     if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)) {
         assert(GET_EVAL_FLAG(f, RUNNING_ENFIX));
         CLEAR_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
-        f->out->header.bits |= CELL_FLAG_OUT_MARKED_STALE;  // won't undo this
+        f->out->header.bits |= CELL_FLAG_OUT_NOTE_STALE;  // won't undo this
     }
     else if (GET_EVAL_FLAG(f, RUNNING_ENFIX) and NOT_END(f->out))
-        SET_EVAL_FLAG(f, UNDO_MARKED_STALE);
+        SET_EVAL_FLAG(f, UNDO_NOTE_STALE);
 
-    assert(IS_END(f->param));
+    assert(not Is_Action_Frame_Fulfilling(f));
     assert(
         IS_END(f_next)
         or FRM_IS_VARIADIC(f)
-        or IS_VALUE_IN_ARRAY_DEBUG(f->feed->array, f_next)
+        or IS_VALUE_IN_ARRAY_DEBUG(FEED_ARRAY(f->feed), f_next)
     );
 
     if (GET_EVAL_FLAG(f, TYPECHECK_ONLY)) {  // <blank> uses this
@@ -991,12 +964,14 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // in its argument slots that the C won't recognize.  Usermode code that
     // gets its hands on a native's FRAME! (e.g. for debug viewing) can't be
     // allowed to change the frame values to other bit patterns out from
-    // under the C or it could result in a crash.  By making the IS_NATIVE
-    // flag the same as the HOLD info bit, we can make sure the frame gets
-    // marked protected if it's a native...without needing an if() branch.
+    // under the C or it could result in a crash.
     //
-    STATIC_ASSERT(PARAMLIST_FLAG_IS_NATIVE == SERIES_INFO_HOLD);
-    SER(f->varlist)->info.bits |= SER(phase)->header.bits & SERIES_INFO_HOLD;
+    // !!! Once the IS_NATIVE flag was the same as the HOLD info bit, but that
+    // trick got shaken up with flag reordering.  Review.
+    //
+    /*STATIC_ASSERT(DETAILS_FLAG_IS_NATIVE == SERIES_INFO_HOLD);*/
+    if (GET_ACTION_FLAG(phase, IS_NATIVE))
+        SER_INFO(f->varlist) |= SERIES_INFO_HOLD;
 
     REBNAT dispatcher = ACT_DISPATCHER(phase);
 
@@ -1005,7 +980,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     if (r == f->out) {
         //
         // common case; we'll want to clear the UNEVALUATED flag if it's
-        // not an invisible return result (other cases Move_Value())
+        // not an invisible return result (other cases Copy_Cell())
         //
     }
     else if (not r) {  // API and internal code can both return `nullptr`
@@ -1031,7 +1006,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (IS_ACTION(label)) {
             if (
                 VAL_ACTION(label) == NATIVE_ACT(unwind)
-                and VAL_BINDING(label) == NOD(f->varlist)
+                and VAL_ACTION_BINDING(label) == CTX(f->varlist)
+                    // !!! Note f->varlist may be INACCESSIBLE here
+                    // e.g. this happens with RETURN during ENCLOSE
             ){
                 // Eval_Core catches unwinds to the current frame, so throws
                 // where the "/name" is the JUMP native with a binding to
@@ -1048,7 +1025,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             }
             else if (
                 VAL_ACTION(label) == NATIVE_ACT(redo)
-                and VAL_BINDING(label) == NOD(f->varlist)
+                and VAL_ACTION_BINDING(label) == CTX(f->varlist)
             ){
                 // This was issued by REDO, and should be a FRAME! with
                 // the phase and binding we are to resume with.
@@ -1072,36 +1049,24 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // !!! Consider folding this pass into an option for the
                 // typechecking loop itself.
                 //
-                REBACT *redo_phase = VAL_PHASE_ELSE_ARCHETYPE(f->out);
+                REBACT *redo_phase = VAL_FRAME_PHASE(f->out);
+                f->key = ACT_KEYS(&f->key_tail, redo_phase);
                 f->param = ACT_PARAMS_HEAD(redo_phase);
-                f->special = ACT_SPECIALTY_HEAD(redo_phase);
                 f->arg = FRM_ARGS_HEAD(f);
-                for (; NOT_END(f->param); ++f->param, ++f->arg, ++f->special) {
-                    switch (VAL_PARAM_CLASS(f->param)) {
-                      case REB_P_LOCAL:
-                        Init_Void(f->arg, SYM_UNDEFINED);
-                        break;
-                      
-                      case REB_P_SEALED:
-                        if (f->param == f->special)  // sealed local
-                            Init_Void(f->arg, SYM_UNDEFINED);
-                        else
-                            Blit_Specific(f->arg, f->special);
-                        break;
-
-                      case REB_P_SPECIALIZED:
-                        assert(f->param != f->special);
-                        Blit_Specific(f->arg, f->special);
-                        break;
-
-                      default:
-                        break;
+                for (; f->key != f->key_tail; ++f->key, ++f->arg, ++f->param) {
+                    if (Is_Param_Hidden(f->param)) {
+                        Copy_Cell_Core(
+                            f->arg,
+                            f->param,
+                            CELL_MASK_COPY | CELL_FLAG_VAR_MARKED_HIDDEN
+                        );
+                        assert(GET_CELL_FLAG(f->arg, VAR_MARKED_HIDDEN));
                     }
                 }
 
                 INIT_FRM_PHASE(f, redo_phase);
-                FRM_BINDING(f) = VAL_BINDING(f->out);
-                CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
+                INIT_FRM_BINDING(f, VAL_FRAME_BINDING(f->out));
+                CLEAR_EVAL_FLAG(f, UNDO_NOTE_STALE);
                 goto typecheck_then_dispatch;
             }
         }
@@ -1116,7 +1081,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // run the f->phase again.  The dispatcher may have changed the
         // value of what f->phase is, for instance.
 
-        CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
+        CLEAR_EVAL_FLAG(f, UNDO_NOTE_STALE);
 
         if (not EXTRA(Any, r).flag)  // R_REDO_UNCHECKED
             goto dispatch;
@@ -1130,7 +1095,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   //=//// CHECK FOR INVISIBILITY (STALE OUTPUT) ///////////////////////////=//
 
-    if (not (f->out->header.bits & CELL_FLAG_OUT_MARKED_STALE))
+    if (not (f->out->header.bits & CELL_FLAG_OUT_NOTE_STALE))
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);
     else {
         // We didn't know before we ran the enfix function if it was going
@@ -1138,15 +1103,15 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         // are supposed to do so.
         //
         STATIC_ASSERT(
-            EVAL_FLAG_UNDO_MARKED_STALE == CELL_FLAG_OUT_MARKED_STALE
+            EVAL_FLAG_UNDO_NOTE_STALE == CELL_FLAG_OUT_NOTE_STALE
         );
-        f->out->header.bits ^= (f->flags.bits & EVAL_FLAG_UNDO_MARKED_STALE);
+        f->out->header.bits ^= (f->flags.bits & EVAL_FLAG_UNDO_NOTE_STALE);
 
         // If a "good" output is in `f->out`, the invisible should have
         // had no effect on it.  So jump to the position after output
         // would be checked by a normal function.
         //
-        if (NOT_CELL_FLAG(f->out, OUT_MARKED_STALE) or IS_END(f_next)) {
+        if (NOT_CELL_FLAG(f->out, OUT_NOTE_STALE) or IS_END(f_next)) {
             //
             // Note: could be an END that is not "stale", example:
             //
@@ -1198,49 +1163,16 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
   skip_output_check:
 
-    CLEAR_EVAL_FLAG(f, UNDO_MARKED_STALE);
-
-    // If we have functions pending to run on the outputs (e.g. this was
-    // the result of a CHAIN) we can run those chained functions in the
-    // same REBFRM, for efficiency.
-    //
-    while (DSP != f->dsp_orig) {
-        //
-        // We want to keep the label that the function was invoked with,
-        // because the other phases in the chain are implementation
-        // details...and if there's an error, it should still show the
-        // name the user invoked the function with.  But we have to drop
-        // the action args, as the paramlist is likely be completely
-        // incompatible with this next chain step.
-        //
-        Drop_Action(f);
-        Push_Action(f, VAL_ACTION(DS_TOP), VAL_BINDING(DS_TOP));
-
-        // We use the same mechanism as enfix operations do...give the
-        // next chain step its first argument coming from f->out
-        //
-        // !!! One side effect of this is that unless CHAIN is changed
-        // to check, your chains can consume more than one argument.
-        // This might be interesting or it might be bugs waiting to
-        // happen, trying it out of curiosity for now.
-        //
-        Begin_Prefix_Action(f, VAL_ACTION_LABEL(DS_TOP));
-        assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
-        SET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
-
-        DS_DROP();
-
-        goto fulfill;
-    }
+    CLEAR_EVAL_FLAG(f, UNDO_NOTE_STALE);
 
     Drop_Action(f);
 
     // Want to keep this flag between an operation and an ensuing enfix in
     // the same frame, so can't clear in Drop_Action(), e.g. due to:
     //
-    //     left-lit: enfix :lit
+    //     left-just: enfix :just
     //     o: make object! [f: does [1]]
-    //     o/f left-lit  ; want error suggesting -> here, need flag for that
+    //     o/f left-just  ; want error suggesting -> here, need flag for that
     //
     CLEAR_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);
     assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));  // must be consumed

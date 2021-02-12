@@ -253,7 +253,8 @@ proto-parser: context [
         ;     { ...
         ;
         typemacro-parentheses: [
-            "(*)" | "(const*)"
+            "option(" thru ")"
+            | "(*)" | "(const*)"
             | "(const *)" (fail "use (const*) not (const *)")
         ]
 

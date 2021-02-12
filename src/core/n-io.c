@@ -22,6 +22,16 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 
+// !!! It is difficult to debug booting the emscripten build without some
+// form of IO available.  printf() will write to the JS console in the JS
+// build, so leverage that in WRITE-STDOUT.
+//
+#ifdef TO_EMSCRIPTEN
+    #if !defined(DEBUG_STDIO_OK)
+        #define DEBUG_STDIO_OK
+    #endif
+#endif
+
 #include "sys-core.h"
 
 
@@ -39,11 +49,8 @@ REBNATIVE(form)
     INCLUDE_PARAMS_OF_FORM;
 
     REBVAL *v = ARG(value);
-    if (IS_VOID(v)) {
-        DECLARE_LOCAL (word);
-        Init_Word(word, VAL_PARAM_SPELLING(PAR(value)));
-        fail (Error_Need_Non_Void_Core(word, SPECIFIED, v));
-    }
+    if (IS_VOID(v))
+        fail (ARG(value));
 
     return Init_Text(D_OUT, Copy_Form_Value(v, 0));
 }
@@ -54,21 +61,27 @@ REBNATIVE(form)
 //
 //  "Converts a value to a REBOL-readable string."
 //
-//      return: [text!]
+//      return: "NULL if input is NULL"
+//          [<opt> text!]
+//      truncated: "<output> Whether the mold was truncated"
+//          [logic!]
+//
 //      value "The value to mold"
-//          [any-value!]
+//          [<opt> any-value!]
 //      /only "For a block value, mold only its contents, no outer []"
 //      /all "Use construction syntax"
 //      /flat "No indentation"
 //      /limit "Limit to a certain length"
 //          [integer!]
-//      /truncated "Whether the mold was truncated"
-//          [<output> logic!]
 //  ]
 //
 REBNATIVE(mold)
 {
     INCLUDE_PARAMS_OF_MOLD;
+
+    REBVAL *v = ARG(value);
+    if (IS_NULLED(v))
+        return nullptr;
 
     DECLARE_MOLD (mo);
     if (REF(all))
@@ -82,10 +95,10 @@ REBNATIVE(mold)
 
     Push_Mold(mo);
 
-    if (REF(only) and IS_BLOCK(ARG(value)))
+    if (REF(only) and IS_BLOCK(v))
         SET_MOLD_FLAG(mo, MOLD_FLAG_ONLY);
 
-    Mold_Value(mo, ARG(value));
+    Mold_Value(mo, v);
 
     REBSTR *popped = Pop_Molded_String(mo);  // sets MOLD_FLAG_TRUNCATED
 
@@ -121,20 +134,24 @@ REBNATIVE(write_stdout)
 
     REBVAL *v = ARG(value);
 
-  #if defined(NDEBUG)
+  #if !defined(DEBUG_STDIO_OK)
     UNUSED(v);
-    fail ("Boot cannot print output in release build, must load I/O module");
+    fail ("Boot WRITE-STDOUT needs DEBUG_STDIO_OK or loaded I/O module");
   #else
-    if (IS_BINARY(v)) {
-        PROBE(v);
-    }
-    else if (IS_TEXT(v)) {
-        printf("%s", cast(const char*, STR_HEAD(VAL_STRING(v))));
+    if (IS_TEXT(v)) {
+        printf("WRITE-STDOUT: %s\n", cast(const char*, STR_HEAD(VAL_STRING(v))));
         fflush(stdout);
     }
+    else if (IS_CHAR(v)) {
+        printf("WRITE-STDOUT: char %lu\n", cast(unsigned long, VAL_CHAR(v)));
+    }
     else {
-        assert(IS_CHAR(v));
-        printf("%s", VAL_CHAR_ENCODED(v));
+        assert(IS_BINARY(v));
+      #ifdef DEBUG_HAS_PROBE
+        PROBE(v);
+      #else
+        fail ("Boot WRITE-STDOUT received BINARY!, needs DEBUG_HAS_PROBE");
+      #endif
     }
     return Init_Void(D_OUT, SYM_VOID);
   #endif
@@ -162,7 +179,9 @@ REBNATIVE(new_line)
     bool mark = VAL_LOGIC(ARG(mark));
 
     REBVAL *pos = ARG(position);
-    RELVAL *item = VAL_ARRAY_AT_ENSURE_MUTABLE(pos);
+    const RELVAL *tail;
+    RELVAL *item = VAL_ARRAY_AT_ENSURE_MUTABLE(&tail, pos);
+    REBARR *a = VAL_ARRAY_KNOWN_MUTABLE(pos);  // need if setting flag at tail
 
     REBINT skip;
     if (REF(all))
@@ -177,16 +196,16 @@ REBNATIVE(new_line)
 
     REBLEN n;
     for (n = 0; true; ++n, ++item) {
-        if (skip != 0 and (n % skip != 0))
-            continue;
-
-        if (IS_END(item)) {  // no cell at tail; use flag on array
+        if (item == tail) {  // no cell at tail; use flag on array
             if (mark)
-                SET_ARRAY_FLAG(VAL_ARRAY(pos), NEWLINE_AT_TAIL);
+                SET_SUBCLASS_FLAG(ARRAY, a, NEWLINE_AT_TAIL);
             else
-                CLEAR_ARRAY_FLAG(VAL_ARRAY(pos), NEWLINE_AT_TAIL);
+                CLEAR_SUBCLASS_FLAG(ARRAY, a, NEWLINE_AT_TAIL);
             break;
         }
+
+        if (skip != 0 and (n % skip != 0))
+            continue;
 
         if (mark)
             SET_CELL_FLAG(item, NEWLINE_BEFORE);
@@ -217,12 +236,13 @@ REBNATIVE(new_line_q)
 
     const REBARR *arr;
     const RELVAL *item;
+    const RELVAL *tail;
 
     if (IS_VARARGS(pos)) {
         REBFRM *f;
         REBVAL *shared;
         if (Is_Frame_Style_Varargs_May_Fail(&f, pos)) {
-            if (not f->feed->array) {
+            if (FRM_IS_VARIADIC(f)) {
                 //
                 // C va_args input to frame, as from the API, but not in the
                 // process of using string components which *might* have
@@ -232,16 +252,16 @@ REBNATIVE(new_line_q)
                 //    bool case_one = rebDid("new-line?", "[\n]");
                 //    bool case_two = rebDid(new_line_q, "[\n]");
                 //
-                assert(f->feed->index == TRASHED_INDEX);
                 return Init_Logic(D_OUT, false);
             }
 
-            arr = f->feed->array;
+            arr = f_array;
             item = f->feed->value;
+            tail = f->feed->value + 1;  // !!! Review
         }
         else if (Is_Block_Style_Varargs(&shared, pos)) {
             arr = VAL_ARRAY(shared);
-            item = VAL_ARRAY_AT(shared);
+            item = VAL_ARRAY_AT(&tail, shared);
         }
         else
             panic ("Bad VARARGS!");
@@ -249,13 +269,13 @@ REBNATIVE(new_line_q)
     else {
         assert(IS_GROUP(pos) or IS_BLOCK(pos));
         arr = VAL_ARRAY(pos);
-        item = VAL_ARRAY_AT(pos);
+        item = VAL_ARRAY_AT(&tail, pos);
     }
 
-    if (NOT_END(item))
+    if (item != tail)
         return Init_Logic(D_OUT, GET_CELL_FLAG(item, NEWLINE_BEFORE));
 
-    return Init_Logic(D_OUT, GET_ARRAY_FLAG(arr, NEWLINE_AT_TAIL));
+    return Init_Logic(D_OUT, GET_SUBCLASS_FLAG(ARRAY, arr, NEWLINE_AT_TAIL));
 }
 
 

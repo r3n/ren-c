@@ -264,8 +264,8 @@ make-file: func [
         #":" = second result
         drive: first path
         any [
-            (#"A" <= drive) and [#"Z" >= drive]
-            (#"a" <= drive) and [#"z" >= drive]
+            (#"A" <= drive) and (#"Z" >= drive)
+            (#"a" <= drive) and (#"z" >= drive)
         ]
     ] then [
         insert result #"/"

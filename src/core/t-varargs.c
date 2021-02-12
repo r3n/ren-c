@@ -48,7 +48,7 @@ inline static bool Vararg_Op_If_No_Advance_Handled(
     enum Reb_Vararg_Op op,
     const RELVAL *opt_look, // the first value in the varargs input
     REBSPC *specifier,
-    Reb_Param_Class pclass
+    enum Reb_Param_Class pclass
 ){
     if (IS_END(opt_look)) {
         Init_For_Vararg_End(out, op); // exhausted
@@ -74,7 +74,9 @@ inline static bool Vararg_Op_If_No_Advance_Handled(
         // and the rules apply.  Note the raw check is faster, no need to
         // separately test for IS_END()
 
-        const REBVAL *child_gotten = Try_Lookup_Word(opt_look, specifier);
+        const REBVAL *child_gotten = try_unwrap(
+            Lookup_Word(opt_look, specifier)
+        );
 
         if (child_gotten and VAL_TYPE(child_gotten) == REB_ACTION) {
             if (GET_ACTION_FLAG(VAL_ACTION(child_gotten), ENFIXED)) {
@@ -98,7 +100,7 @@ inline static bool Vararg_Op_If_No_Advance_Handled(
     }
 
     if (op == VARARG_OP_FIRST) {
-        if (pclass != REB_P_HARD_QUOTE)
+        if (pclass != REB_P_HARD)
             fail (Error_Varargs_No_Look_Raw()); // hard quote only
 
         Derelativize(out, opt_look, specifier);
@@ -136,17 +138,18 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
     REBVAL *out,
     enum Reb_Vararg_Op op,
     const RELVAL *vararg,
-    enum Reb_Kind pclass // use REB_P_DETECT to use what's in the vararg
+    enum Reb_Param_Class pclass  // REB_P_DETECT to use what's in the vararg
 ){
     TRASH_CELL_IF_DEBUG(out);
 
-    const RELVAL *param = Param_For_Varargs_Maybe_Null(vararg);
+    const REBKEY *key;
+    const REBPAR *param = Param_For_Varargs_Maybe_Null(&key, vararg);
     if (pclass == REB_P_DETECT)
         pclass = VAL_PARAM_CLASS(param);
 
     REBVAL *arg; // for updating CELL_FLAG_UNEVALUATED
 
-    REBFRM *opt_vararg_frame;
+    option(REBFRM*) vararg_frame;
 
     REBFRM *f;
     REBVAL *shared;
@@ -157,13 +160,13 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         // MAKE ANY-ARRAY! on a varargs (which reified the varargs into an
         // array during that creation, flattening its entire output).
 
-        opt_vararg_frame = NULL;
-        arg = NULL; // no corresponding varargs argument either
+        vararg_frame = nullptr;
+        arg = nullptr; // no corresponding varargs argument either
 
         if (Vararg_Op_If_No_Advance_Handled(
             out,
             op,
-            IS_END(shared) ? END_NODE : VAL_ARRAY_AT(shared),
+            IS_END(shared) ? END_NODE : VAL_ARRAY_ITEM_AT(shared),
             IS_END(shared) ? SPECIFIED : VAL_SPECIFIER(shared),
             pclass
         )){
@@ -204,15 +207,19 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
                 // be ready to use again we're throwing it away, and need to
                 // effectively "undo the prefetch" by taking it down by 1.
                 //
-                assert(f_temp->feed->index > 0);
-                VAL_INDEX_UNBOUNDED(shared) = f_temp->feed->index - 1;
+                assert(FRM_INDEX(f_temp) > 0);
+                VAL_INDEX_UNBOUNDED(shared) = FRM_INDEX(f_temp) - 1;
             }
 
             Drop_Frame(f_temp);
             break; }
 
-        case REB_P_HARD_QUOTE:
-            Derelativize(out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared));
+        case REB_P_HARD:
+            Derelativize(
+                out,
+                VAL_ARRAY_ITEM_AT(shared),
+                VAL_SPECIFIER(shared)
+            );
             SET_CELL_FLAG(out, UNEVALUATED);
             VAL_INDEX_UNBOUNDED(shared) += 1;
             break;
@@ -220,16 +227,23 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         case REB_P_MODAL:
             fail ("Variadic modal parameters not yet implemented");
 
-        case REB_P_SOFT_QUOTE:
-            if (IS_QUOTABLY_SOFT(VAL_ARRAY_AT(shared))) {
+        case REB_P_MEDIUM:
+            fail ("Variadic medium parameters not yet implemented");
+
+        case REB_P_SOFT:
+            if (ANY_ESCAPABLE_GET(VAL_ARRAY_ITEM_AT(shared))) {
                 if (Eval_Value_Throws(
-                    out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared)
+                    out, VAL_ARRAY_ITEM_AT(shared), VAL_SPECIFIER(shared)
                 )){
                     return true;
                 }
             }
             else { // not a soft-"exception" case, quote ordinarily
-                Derelativize(out, VAL_ARRAY_AT(shared), VAL_SPECIFIER(shared));
+                Derelativize(
+                    out,
+                    VAL_ARRAY_ITEM_AT(shared),
+                    VAL_SPECIFIER(shared)
+                );
                 SET_CELL_FLAG(out, UNEVALUATED);
             }
             VAL_INDEX_UNBOUNDED(shared) += 1;
@@ -252,14 +266,16 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         //
         assert(not Is_Varargs_Enfix(vararg));
 
-        opt_vararg_frame = f;
+        vararg_frame = f;
         if (VAL_VARARGS_SIGNED_PARAM_INDEX(vararg) < 0)
             arg = FRM_ARG(f, - VAL_VARARGS_SIGNED_PARAM_INDEX(vararg));
         else
             arg = FRM_ARG(f, VAL_VARARGS_SIGNED_PARAM_INDEX(vararg));
 
         bool hit_barrier = GET_FEED_FLAG(f->feed, BARRIER_HIT)
-            and (pclass != REB_P_SOFT_QUOTE) and (pclass != REB_P_HARD_QUOTE);
+            and (pclass != REB_P_SOFT)
+            and (pclass != REB_P_MEDIUM)
+            and (pclass != REB_P_HARD);
 
         if (Vararg_Op_If_No_Advance_Handled(
             out,
@@ -267,7 +283,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
             hit_barrier
                 ? END_NODE
                 : cast(const RELVAL *, f->feed->value), // might be END
-            f->feed->specifier,
+            f_specifier,
             pclass
         )){
             goto type_check_and_return;
@@ -284,16 +300,17 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
                 return true;
             break; }
 
-        case REB_P_HARD_QUOTE:
+        case REB_P_HARD:
             Literal_Next_In_Frame(out, f);
             break;
 
-        case REB_P_SOFT_QUOTE:
-            if (IS_QUOTABLY_SOFT(f->feed->value)) {
+        case REB_P_MEDIUM:  // !!! Review nuance
+        case REB_P_SOFT:
+            if (ANY_ESCAPABLE_GET(f_value)) {
                 if (Eval_Value_Throws(
                     SET_END(out),
-                    f->feed->value,
-                    f->feed->specifier
+                    f_value,
+                    f_specifier
                 )){
                     return true;
                 }
@@ -328,10 +345,10 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         // binding.  So that means only one frame can be pointed to per
         // vararg.  Revisit the question of how to give better errors.
         //
-        if (opt_vararg_frame == NULL)
+        if (not vararg_frame)
             fail (out);
 
-        fail (Error_Arg_Type(opt_vararg_frame, param, VAL_TYPE(out)));
+        fail (Error_Arg_Type(unwrap(vararg_frame), key, VAL_TYPE(out)));
     }
 
     if (arg) {
@@ -353,12 +370,12 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
 REB_R MAKE_Varargs(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_VARARGS);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     // With MAKE VARARGS! on an ANY-ARRAY!, the array is the backing store
     // (shared) that the varargs interface cannot affect, but changes to
@@ -373,15 +390,15 @@ REB_R MAKE_Varargs(
         // should be an END marker (not an array at its end)
         //
         REBARR *array1 = Alloc_Singular(NODE_FLAG_MANAGED);
-        if (IS_END(VAL_ARRAY_AT(arg)))
+        if (VAL_LEN_AT(arg) == 0)
             SET_END(ARR_SINGLE(array1));
         else
-            Move_Value(ARR_SINGLE(array1), arg);
+            Copy_Cell(ARR_SINGLE(array1), arg);
 
         RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
-        VAL_VARARGS_PHASE_NODE(out) = nullptr;
+        INIT_VAL_VARARGS_PHASE(out, nullptr);
         UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));  // trashes in C++11
-        INIT_BINDING(out, array1);
+        INIT_VAL_VARARGS_BINDING(out, array1);
 
         return out;
     }
@@ -414,9 +431,9 @@ REB_R TO_Varargs(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R PD_Varargs(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    UNUSED(opt_setval);
+    UNUSED(setval);
 
     if (not IS_INTEGER(picker))
         fail (rebUnrelativize(picker));
@@ -425,7 +442,7 @@ REB_R PD_Varargs(
         fail (Error_Varargs_No_Look_Raw());
 
     DECLARE_LOCAL (location);
-    Move_Value(location, pvs->out);
+    Copy_Cell(location, pvs->out);
 
     if (Do_Vararg_Op_Maybe_End_Throws(
         pvs->out,
@@ -453,12 +470,12 @@ REBTYPE(Varargs)
 {
     REBVAL *value = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
     case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // already have `value`
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -521,7 +538,7 @@ REBTYPE(Varargs)
             }
             if (IS_END(D_OUT))
                 break;
-            Move_Value(DS_PUSH(), D_OUT);
+            Move_Cell(DS_PUSH(), D_OUT);
         }
 
         // !!! What if caller wanted a REB_GROUP, REB_PATH, or an /INTO?
@@ -551,9 +568,9 @@ REBINT CT_Varargs(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     // expired varargs, because the expired stub should be kept alive as
     // long as its identity is needed).
     //
-    if (VAL_BINDING(a) == VAL_BINDING(b))
+    if (VAL_VARARGS_BINDING(a) == VAL_VARARGS_BINDING(b))
         return 0;
-    return VAL_BINDING(a) > VAL_BINDING(b) ? 1 : -1;
+    return VAL_VARARGS_BINDING(a) > VAL_VARARGS_BINDING(b) ? 1 : -1;
 }
 
 
@@ -573,10 +590,11 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
 
     Append_Codepoint(mo->series, '[');
 
-    Reb_Param_Class pclass;
-    const RELVAL *param = Param_For_Varargs_Maybe_Null(v);
+    enum Reb_Param_Class pclass;
+    const REBKEY *key;
+    const REBPAR *param = Param_For_Varargs_Maybe_Null(&key, v);
     if (param == NULL) {
-        pclass = REB_P_HARD_QUOTE;
+        pclass = REB_P_HARD;
         Append_Ascii(mo->series, "???"); // never bound to an argument
     }
     else {
@@ -587,13 +605,18 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
             kind = REB_WORD;
             break;
 
-        case REB_P_HARD_QUOTE:
-            kind = REB_GET_WORD;
-            break;
-
-        case REB_P_SOFT_QUOTE:
+        case REB_P_HARD:
             kind = REB_WORD;
             quoted = true;
+            break;
+
+        case REB_P_MEDIUM:
+            kind = REB_GET_WORD;
+            quoted = true;
+            break;
+
+        case REB_P_SOFT:
+            kind = REB_GET_WORD;
             break;
 
         default:
@@ -601,7 +624,7 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
         };
 
         DECLARE_LOCAL (param_word);
-        Init_Any_Word(param_word, kind, VAL_PARAM_SPELLING(param));
+        Init_Any_Word(param_word, kind, KEY_SYMBOL(key));
         if (quoted)
             Quotify(param_word, 1);
         Mold_Value(mo, param_word);
@@ -614,7 +637,7 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     if (Is_Block_Style_Varargs(&shared, v)) {
         if (IS_END(shared))
             Append_Ascii(mo->series, "[]");
-        else if (pclass == REB_P_HARD_QUOTE)
+        else if (pclass == REB_P_HARD)
             Mold_Value(mo, shared); // full feed can be shown if hard quoted
         else
             Append_Ascii(mo->series, "[...]"); // can't look ahead
@@ -628,7 +651,7 @@ void MF_Varargs(REB_MOLD *mo, REBCEL(const*) v, bool form) {
         ){
             Append_Ascii(mo->series, "[]");
         }
-        else if (pclass == REB_P_HARD_QUOTE) {
+        else if (pclass == REB_P_HARD) {
             Append_Ascii(mo->series, "[");
             Mold_Value(mo, f->feed->value); // one value shown if hard quoted
             Append_Ascii(mo->series, " ...]");
@@ -658,7 +681,7 @@ REBNATIVE(variadic_q)
 {
     INCLUDE_PARAMS_OF_VARIADIC_Q;
 
-    REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(ARG(action)));
+    const REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(ARG(action)));
     for (; NOT_END(param); ++param) {
         if (Is_Param_Variadic(param))
             return Init_True(D_OUT);

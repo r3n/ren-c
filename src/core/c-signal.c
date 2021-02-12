@@ -79,8 +79,6 @@ bool Do_Signals_Throws(REBVAL *out)
     // the Eval_Count to 1 for a specific signal.  Review.
     //
     Eval_Cycles += Eval_Dose - Eval_Count;
-    if (Eval_Limit != 0 and Eval_Cycles > Eval_Limit)
-        Check_Security_Placeholder(Canon(SYM_EVAL), SYM_EXEC, 0);
 
     Eval_Count = Eval_Dose;
 

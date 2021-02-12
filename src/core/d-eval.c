@@ -93,10 +93,10 @@ void Dump_Frame_Location(const RELVAL *v, REBFRM *f)
             Reify_Va_To_Array_In_Frame(f, truncated);
         }
 
-        Init_Any_Series_At_Core(
+        Init_Any_Array_At_Core(
             dump,
             REB_BLOCK,
-            SER(f->feed->array),
+            f_array,
             cast(REBLEN, f_index),
             f_specifier
         );
@@ -120,23 +120,20 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
     // on the data stack or mold stack/etc.  See Drop_Frame() for the actual
     // balance check.
 
+  #ifdef DEBUG_EXTANT_STACK_POINTERS
+    assert(TG_Stack_Outstanding == 0);
+  #endif
+
     // See notes on f->feed->gotten about the coherence issues in the face
     // of arbitrary function execution.
     //
     if (f_next_gotten) {
         assert(IS_WORD(f_next));
-        assert(Try_Lookup_Word(f_next, f_specifier) == f_next_gotten);
+        assert(Lookup_Word(f_next, f_specifier) == f_next_gotten);
     }
 
     assert(f == FS_TOP);
     assert(DSP == f->dsp_orig);
-
-    if (f->feed->array) {
-        assert(not IS_POINTER_TRASH_DEBUG(f->feed->array));
-        assert(f->feed->index != TRASHED_INDEX);
-    }
-    else
-        assert(f->feed->index == TRASHED_INDEX);
 
     // If this fires, it means that Flip_Series_To_White was not called an
     // equal number of times after Flip_Series_To_Black, which means that
@@ -148,11 +145,11 @@ static void Eval_Core_Shared_Checks_Debug(REBFRM *f) {
     // and if we're not running a function then f->original should be null.
     //
     assert(not f->original);
-    assert(IS_POINTER_TRASH_DEBUG(f->opt_label));
+    assert(IS_POINTER_TRASH_DEBUG(unwrap(f->label)));
 
     if (f->varlist) {
         assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
-        assert(NOT_SERIES_INFO(f->varlist, INACCESSIBLE));
+        assert(NOT_SERIES_FLAG(f->varlist, INACCESSIBLE));
     }
 
     //=//// ^-- ABOVE CHECKS *ALWAYS* APPLY ///////////////////////////////=//
@@ -212,11 +209,11 @@ void Eval_Core_Expression_Checks_Debug(REBFRM *f)
 
     // Trash fields that GC won't be seeing unless Is_Action_Frame()
     //
-    TRASH_POINTER_IF_DEBUG(f->param);
+    TRASH_POINTER_IF_DEBUG(f->key);
     TRASH_POINTER_IF_DEBUG(f->arg);
-    TRASH_POINTER_IF_DEBUG(f->special);
+    TRASH_POINTER_IF_DEBUG(f->param);
 
-    assert(not f->varlist or NOT_SERIES_INFO(f->varlist, INACCESSIBLE));
+    assert(not f->varlist or NOT_SERIES_FLAG(f->varlist, INACCESSIBLE));
 
     // Mutate va_list sources into arrays at fairly random moments in the
     // debug build.  It should be able to handle it at any time.
@@ -236,11 +233,15 @@ void Do_Process_Action_Checks_Debug(REBFRM *f) {
     assert(IS_FRAME(f->rootvar));
     assert(f->arg == f->rootvar + 1);
 
-    REBACT *phase = VAL_PHASE_ELSE_ARCHETYPE(f->rootvar);
+  #ifdef DEBUG_EXTANT_STACK_POINTERS
+    assert(TG_Stack_Outstanding == 0);
+  #endif
+
+    REBACT *phase = VAL_FRAME_PHASE(f->rootvar);
 
     //=//// v-- BELOW CHECKS ONLY APPLY WHEN FRM_PHASE() is VALID ////////=//
 
-    assert(GET_ARRAY_FLAG(ACT_PARAMLIST(phase), IS_PARAMLIST));
+    assert(IS_DETAILS(ACT_DETAILS(phase)));
 }
 
 
@@ -250,7 +251,7 @@ void Do_Process_Action_Checks_Debug(REBFRM *f) {
 void Do_After_Action_Checks_Debug(REBFRM *f) {
     assert(not Is_Evaluator_Throwing_Debug());
 
-    if (GET_SERIES_INFO(f->varlist, INACCESSIBLE)) // e.g. ENCLOSE
+    if (GET_SERIES_FLAG(f->varlist, INACCESSIBLE))  // e.g. ENCLOSE
         return;
 
     REBACT *phase = FRM_PHASE(f);
@@ -263,19 +264,20 @@ void Do_After_Action_Checks_Debug(REBFRM *f) {
     // !!! PG_Dispatcher() should do this, so every phase gets checked.
     //
   #ifdef DEBUG_NATIVE_RETURNS
-    if (GET_ACTION_FLAG(phase, HAS_RETURN)) {
-        REBVAL *typeset = ACT_PARAMS_HEAD(phase);
-        assert(VAL_PARAM_SYM(typeset) == SYM_RETURN);
-        if (GET_CELL_FLAG(f->out, OUT_MARKED_STALE)) {
-            if (not TYPE_CHECK(typeset, REB_TS_INVISIBLE)) {
+    if (ACT_HAS_RETURN(phase)) {
+        const REBKEY *key = ACT_KEYS_HEAD(phase);
+        const REBPAR *param = ACT_PARAMS_HEAD(phase);
+        assert(KEY_SYM(key) == SYM_RETURN);
+        if (GET_CELL_FLAG(f->out, OUT_NOTE_STALE)) {
+            if (not TYPE_CHECK(param, REB_TS_INVISIBLE)) {
                 printf("Native code violated return type contract!\n");
                 panic (Error_Bad_Invisible(f));
             }
         }
         else if (
-            not Typecheck_Including_Constraints(typeset, f->out)
+            not Typecheck_Including_Constraints(param, f->out)
             and not (
-                TYPE_CHECK(typeset, REB_TS_INVISIBLE)
+                TYPE_CHECK(param, REB_TS_INVISIBLE)
                 and GET_EVAL_FLAG(f, RUNNING_ENFIX)
             )  // exemption, e.g. `1 comment "hi" + 2` infix non-stale
         ){
@@ -294,12 +296,9 @@ void Eval_Core_Exit_Checks_Debug(REBFRM *f) {
     Eval_Core_Shared_Checks_Debug(f);
 
     if (NOT_END(f_next) and not FRM_IS_VARIADIC(f)) {
-        if (f_index > ARR_LEN(f->feed->array)) {
-            assert(
-                (f->feed->pending and IS_END(f->feed->pending))
-                or Is_Evaluator_Throwing_Debug()
-            );
-            assert(f_index == ARR_LEN(f->feed->array) + 1);
+        if (f_index > ARR_LEN(f_array)) {
+            assert(Is_Evaluator_Throwing_Debug());
+            assert(f_index == ARR_LEN(f_array) + 1);
         }
     }
 

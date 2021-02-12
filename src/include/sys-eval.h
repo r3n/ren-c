@@ -43,9 +43,9 @@
 // * The usermode EVALUATE action is able to avoid overwriting the previous
 //   value if the final evaluation step has nothing in it.  That's based on
 //   the ability exposed here through the "Maybe_Stale" variations of the
-//   Eval_XXX() routines.  Care should be taken not to allow OUT_MARKED_STALE
+//   Eval_XXX() routines.  Care should be taken not to allow OUT_NOTE_STALE
 //   to leak and clear it on the cell (it is NODE_FLAG_MARKED and could be
-//   misinterpreted--very easily so as ARG_MARKED_CHECKED!)
+//   misinterpreted--very easily so as VAR_MARKED_HIDDEN!)
 //
 // * The usermode REEVAL function chooses to make `reeval comment "hi"` VOID!
 //   rather than to raise an error.  However, the non-"Maybe_Stale" versions
@@ -108,7 +108,7 @@ enum {
 };
 
 
-// Simple helper for Eval_Maybe_Stale_Throws() that clears OUT_MARKED_STALE
+// Simple helper for Eval_Maybe_Stale_Throws() that clears OUT_NOTE_STALE
 // (an alias for NODE_FLAG_MARKED that is used for generic purposes and may be
 // misinterpreted if it leaked.)
 //
@@ -118,7 +118,7 @@ enum {
 inline static bool Eval_Throws(REBFRM *f) {
     if (Eval_Maybe_Stale_Throws(f))
         return true;
-    CLEAR_CELL_FLAG(f->out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(f->out, OUT_NOTE_STALE);
     return false;
 }
 
@@ -130,7 +130,7 @@ inline static bool Eval_Throws(REBFRM *f) {
 //
 inline static bool Did_Init_Inert_Optimize_Complete(
     REBVAL *out,
-    struct Reb_Feed *feed,
+    REBFED *feed,
     REBFLGS *flags
 ){
     assert(SECOND_BYTE(*flags) == 0);  // we might set the STATE_BYTE
@@ -144,27 +144,27 @@ inline static bool Did_Init_Inert_Optimize_Complete(
     Literal_Next_In_Feed(out, feed);
 
     if (KIND3Q_BYTE_UNCHECKED(feed->value) == REB_WORD) {
-        feed->gotten = Try_Lookup_Word(feed->value, feed->specifier);
+        feed->gotten = Lookup_Word(feed->value, FEED_SPECIFIER(feed));
         if (
             not feed->gotten
-            or not IS_ACTION(feed->gotten)
+            or not IS_ACTION(unwrap(feed->gotten))
         ){
             CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
             return true;  // not action
         }
 
-        if (GET_ACTION_FLAG(VAL_ACTION(feed->gotten), IS_BARRIER)) {
+        if (GET_ACTION_FLAG(VAL_ACTION(unwrap(feed->gotten)), IS_BARRIER)) {
             SET_FEED_FLAG(feed, BARRIER_HIT);
             CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
             return true;  // is barrier
         }
 
-        if (NOT_ACTION_FLAG(VAL_ACTION(feed->gotten), ENFIXED)) {
+        if (NOT_ACTION_FLAG(VAL_ACTION(unwrap(feed->gotten)), ENFIXED)) {
             CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
             return true;  // not enfixed
         }
 
-        REBACT *action = VAL_ACTION(feed->gotten);
+        REBACT *action = VAL_ACTION(unwrap(feed->gotten));
         if (GET_ACTION_FLAG(action, QUOTES_FIRST)) {
             //
             // Quoting defeats NO_LOOKAHEAD but only on soft quotes.
@@ -178,8 +178,10 @@ inline static bool Did_Init_Inert_Optimize_Complete(
 
             CLEAR_FEED_FLAG(feed, NO_LOOKAHEAD);
 
-            REBVAL *first = First_Unspecialized_Param(action);  // cache test?
-            if (VAL_PARAM_CLASS(first) == REB_P_SOFT_QUOTE)
+            // !!! Cache this test?
+            //
+            const REBPAR *first = First_Unspecialized_Param(nullptr, action);
+            if (VAL_PARAM_CLASS(first) == REB_P_SOFT)
                 return true;  // don't look back, yield the lookahead
 
             *flags |=
@@ -198,7 +200,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
         // So we have to do that check here.
         //
         if (GET_ACTION_FLAG(action, SKIPPABLE_FIRST)) {
-            REBVAL *first = First_Unspecialized_Param(action);
+            const REBPAR *first = First_Unspecialized_Param(nullptr, action);
             if (not TYPE_CHECK(first, KIND3Q_BYTE(out)))
                 return true;  // didn't actually want this parameter type
         }
@@ -218,7 +220,7 @@ inline static bool Did_Init_Inert_Optimize_Complete(
         return true;  // paths do enfix processing if '/'
 
     if (HEART_BYTE(feed->value) == REB_WORD) {
-        if (VAL_WORD_SPELLING(feed->value) == PG_Slash_1_Canon) {
+        if (VAL_WORD_SYMBOL(feed->value) == PG_Slash_1_Canon) {
             *flags |=
                 FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
                 | EVAL_FLAG_INERT_OPTIMIZATION;
@@ -249,7 +251,7 @@ inline static bool Eval_Step_Maybe_Stale_Throws(
 inline static bool Eval_Step_Throws(REBVAL *out, REBFRM *f) {
     SET_END(out);
     bool threw = Eval_Step_Maybe_Stale_Throws(out, f);
-    CLEAR_CELL_FLAG(out, OUT_MARKED_STALE);
+    CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
     return threw;
 }
 
@@ -321,7 +323,7 @@ inline static bool Eval_Step_In_Any_Array_At_Throws(
         return false;
     }
 
-    DECLARE_FRAME (f, feed, flags);
+    DECLARE_FRAME (f, feed, flags | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(out, f);
     bool threw = Eval_Throws(f);
@@ -329,7 +331,7 @@ inline static bool Eval_Step_In_Any_Array_At_Throws(
     if (threw)
         *index_out = TRASHED_INDEX;
     else
-        *index_out = f->feed->index - 1;
+        *index_out = FRM_INDEX(f);
 
     Drop_Frame(f);
 
@@ -364,16 +366,20 @@ inline static bool Eval_Step_In_Va_Throws_Core(
 ){
     DECLARE_VA_FEED (feed, p, vaptr, feed_flags);
 
-    DECLARE_FRAME (f, feed, eval_flags);
+    DECLARE_FRAME (f, feed, eval_flags | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(out, f);
     bool threw = Eval_Throws(f);
+
+    bool too_many = (eval_flags & EVAL_FLAG_NO_RESIDUE)
+        and NOT_END(feed->value);  // feed will be freed in Drop_Frame()
+
     Drop_Frame(f); // will va_end() if not reified during evaluation
 
     if (threw)
         return true;
 
-    if ((eval_flags & EVAL_FLAG_NO_RESIDUE) and NOT_END(feed->value))
+    if (too_many)
         fail (Error_Apply_Too_Many_Raw());
 
     // A va_list-based feed has a lookahead, and also may be spooled due to
@@ -400,18 +406,18 @@ inline static bool Eval_Value_Maybe_End_Throws(
 
     SET_END(out);
 
-    struct Reb_Feed feed_struct;  // opt_first so can't use DECLARE_ARRAY_FEED
-    struct Reb_Feed *feed = &feed_struct;
+    // Passes `first` so can't use DECLARE_ARRAY_FEED
+    REBFED *feed = Alloc_Feed();
     Prep_Array_Feed(
         feed,
-        value,  // opt_first--in this case, the only value in the feed...
+        value,  // first--in this case, the only value in the feed...
         EMPTY_ARRAY,  // ...because we're using the empty array after that
         0,  // ...at index 0
         specifier,
         FEED_MASK_DEFAULT | (value->header.bits & FEED_FLAG_CONST)
     );
 
-    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
+    DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(out, f);
     bool threw = Eval_Throws(f);
@@ -421,13 +427,15 @@ inline static bool Eval_Value_Maybe_End_Throws(
 }
 
 
+// Evaluate one cell (e.g. a BLOCK! here would just evaluate to itself!)
+//
 // The callsites for Eval_Value_Throws() generally expect an evaluative
 // result (at least null).  They might be able to give a better error, but
 // they pretty much all need to give an error.
 //
 inline static bool Eval_Value_Throws(
     REBVAL *out,
-    const RELVAL *value,  // e.g. a BLOCK! here would just evaluate to itself!
+    const RELVAL *value,  // note this is not `unstable`, direct pointer used
     REBSPC *specifier
 ){
     if (Eval_Value_Maybe_End_Throws(out, value, specifier))

@@ -32,7 +32,7 @@
 )]
 
 [#1477 (
-    set-slash: load "/:"
+    set-slash: load-value "/:"
     did all [
         set-path? set-slash
         '/: = set-slash

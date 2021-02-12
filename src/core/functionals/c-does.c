@@ -37,23 +37,19 @@
 // (Those who prefer getting RETURNs can just do `FUNC [] [...]`, this offers
 // a unique alternative to that.)
 //
-// Further, it tries to allow you to specialize all of a function's arguments
-// at once inline:
+//=//// NOTES ////////////////////////////////////////////////////////////=//
 //
-//     >> c: does catch [throw <like-this>]
-//
-//     >> c
-//     == <like-this>
-//
-// !!! The fast specialization behavior of DOES is semi-related to POINTFREE,
-// and was initially introduced for its potential usage in code golf.  This
-// feature has not been extensively used or tested.  Review.
+// * One experimental feature was removed, to allow specialization by example.
+//   For instance `c: does catch [throw <like-this>]`.  This was inspired by
+//   code golf.  However, it altered the interface (to quote its argument and
+//   be variadic) and it also brought in distracting complexity that is better
+//   kept in the implementations of REFRAMER and POINTFREE.
 //
 
 #include "sys-core.h"
 
 enum {
-    IDX_DOES_BLOCK = 0,  // Special case of BLOCK! to be executed
+    IDX_DOES_BLOCK = 1,  // Special case of BLOCK! to be executed
     IDX_DOES_MAX
 };
 
@@ -83,6 +79,8 @@ REB_R Block_Dispatcher(REBFRM *f)
         // ^-- note not a `const RELVAL *block`, may get updated!
     assert(IS_BLOCK(block) and VAL_INDEX(block) == 0);
 
+    const REBARR *body = VAL_ARRAY(block);
+
     if (IS_SPECIFIC(block)) {
         if (FRM_BINDING(f) == UNBOUND) {
             if (Do_Any_Array_At_Throws(f->out, SPECIFIC(block), SPECIFIED))
@@ -107,25 +105,24 @@ REB_R Block_Dispatcher(REBFRM *f)
         // Derelativize()'d out to make it specific, and then re-relativized
         // through a copy on behalf of o2/b.
 
-        REBARR *body_array = Copy_And_Bind_Relative_Deep_Managed(
+        REBARR *relativized = Copy_And_Bind_Relative_Deep_Managed(
             SPECIFIC(block),
-            ACT_PARAMLIST(FRM_PHASE(f)),
-            TS_WORD,
-            false  // do not gather LETs
+            FRM_PHASE(f),
+            TS_WORD
         );
 
         // Preserve file and line information from the original, if present.
         //
-        if (GET_ARRAY_FLAG(VAL_ARRAY(block), HAS_FILE_LINE_UNMASKED)) {
-            LINK_FILE_NODE(body_array) = LINK_FILE_NODE(VAL_ARRAY(block));
-            MISC(body_array).line = MISC(VAL_ARRAY(block)).line;
-            SET_ARRAY_FLAG(body_array, HAS_FILE_LINE_UNMASKED);
+        if (GET_SUBCLASS_FLAG(ARRAY, body, HAS_FILE_LINE_UNMASKED)) {
+            mutable_LINK(Filename, relativized) = LINK(Filename, body);
+            relativized->misc.line = body->misc.line;
+            SET_SUBCLASS_FLAG(ARRAY, relativized, HAS_FILE_LINE_UNMASKED);
         }
 
         // Update block cell as a relativized copy (we won't do this again).
         //
         REBACT *phase = FRM_PHASE(f);
-        Init_Relative_Block(block, phase, body_array);
+        Init_Relative_Block(block, phase, relativized);
     }
 
     assert(IS_RELATIVE(block));
@@ -138,53 +135,59 @@ REB_R Block_Dispatcher(REBFRM *f)
 
 
 //
+//  surprise: native [
+//
+//  {Generate a surprise ANY-VALUE!}
+//
+//  ]
+//
+REBNATIVE(surprise)
+//
+// !!! DOES needed a specialization for block that had no arguments an no
+// constraint on the return value.  That's a pretty weird function spec, and
+// the only thing I could think of was something that just surprises you with
+// a random value.  Neat idea, but writing it isn't the purpose...getting the
+// spec was, so it's punted on for now and used as NATIVE_ACT(surprise) below.
+{
+    INCLUDE_PARAMS_OF_SURPRISE;
+    return nullptr;  // It just returned null.  Surprised?
+}
+
+
+//
 //  does: native [
 //
-//  {Specializes DO for a value (or for args of another named function)}
+//  {Make action that will DO a value (more optimized than SPECIALIZE :DO)}
 //
 //      return: [action!]
-//      'specializee [any-value!]
-//          {WORD! or PATH! names function to specialize, else arg to DO}
-//      :args [any-value! <variadic>]
-//          {arguments which will be consumed to fulfill a named function}
+//      source "Note: Will LOCK source if a BLOCK! (review behavior)"
+//          [any-value!]
 //  ]
 //
 REBNATIVE(does)
+//
+// !!! Note: `does [...]` and `does [do [...]]` are not exactly the same.  The
+// generated ACTION! of the first form uses Block_Dispatcher() and does
+// on-demand relativization, so it's "kind of like" a `func []` in forwarding
+// references to members of derived objects.  Also, it is optimized to not run
+// the block with the DO native...hence a HIJACK of DO won't be triggered by
+// invocations of the first form.
+//
+// !!! There were more experimental behaviors that were culled, like quoting
+// the first argument and acting on it to get `foo: does append block <foo>`
+// notation without a block.  This concept from code golf was thought to
+// possibly be useful and "natural" for other cases.  However, that idea
+// has been generalized through REFRAMER, so those who wish to experiemnt
+// with it can do it that way.
 {
     INCLUDE_PARAMS_OF_DOES;
 
-    REBVAL *specializee = ARG(specializee);
+    REBVAL *source = ARG(source);
 
-    if (IS_BLOCK(specializee)) {
-        REBARR *paramlist = Make_Array_Core(
-            1,  // archetype only...DOES always makes action with no arguments
-            SERIES_MASK_PARAMLIST
-        );
-
-        REBVAL *archetype = RESET_CELL(
-            Alloc_Tail_Array(paramlist),
-            REB_ACTION,
-            CELL_MASK_ACTION
-        );
-        VAL_ACT_PARAMLIST_NODE(archetype) = NOD(paramlist);
-        INIT_BINDING(archetype, UNBOUND);
-        TERM_ARRAY_LEN(paramlist, 1);
-
-        MISC_META_NODE(paramlist) = nullptr;  // REDESCRIBE can add help
-
-        // `does [...]` and `does do [...]` are not exactly the same.  The
-        // generated ACTION! of the first form uses Block_Dispatcher() and
-        // does on-demand relativization, so it's "kind of like" a `func []`
-        // in forwarding references to members of derived objects.  Also, it
-        // is optimized to not run the block with the DO native...hence a
-        // HIJACK of DO won't be triggered by invocations of the first form.
-        //
-        Manage_Array(paramlist);
+    if (IS_BLOCK(source)) {
         REBACT *doer = Make_Action(
-            paramlist,
+            ACT_SPECIALTY(NATIVE_ACT(surprise)),  // same, no args
             &Block_Dispatcher,  // **SEE COMMENTS**, not quite like plain DO!
-            nullptr,  // no underlying action (use paramlist)
-            nullptr,  // no specialization exemplar (or inherited exemplar)
             IDX_DOES_MAX  // details array capacity
         );
 
@@ -192,58 +195,28 @@ REBNATIVE(does)
         // things invariant we have to lock it.
         //
         RELVAL *body = ARR_AT(ACT_DETAILS(doer), IDX_DOES_BLOCK);
-        Force_Value_Frozen_Deep(specializee);
-        Move_Value(body, specializee);
+        Force_Value_Frozen_Deep(source);
+        Copy_Cell(body, source);
 
         return Init_Action(D_OUT, doer, ANONYMOUS, UNBOUND);
     }
 
-    REBCTX *exemplar;
-    const REBSTR *label;
-    if (
-        GET_CELL_FLAG(specializee, UNEVALUATED)
-        and (IS_WORD(specializee) or IS_PATH(specializee))
-    ){
-        if (Make_Frame_From_Varargs_Throws(
-            D_OUT,
-            specializee,
-            ARG(args)
-        )){
-            return R_THROWN;
-        }
-        exemplar = VAL_CONTEXT(D_OUT);
-        label = VAL_FRAME_LABEL(D_OUT);
-    }
-    else {
-        // On all other types, we just make it act like a specialized call to
-        // DO for that value.  But since we're manually specializing it, we
-        // are responsible for type-checking...the evaluator expects any
-        // specialization process to do so (otherwise it would have to pay
-        // for type checking on each call).
-        //
-        // !!! The error reports that DOES doesn't accept the type for its
-        // specializee argument, vs. that DO doesn't accept it.
-        //
-        REBVAL *typeset = ACT_PARAM(NATIVE_ACT(do), 1);
-        REBVAL *param = PAR(specializee);
-        if (not TYPE_CHECK(typeset, VAL_TYPE(specializee)))
-            fail (Error_Arg_Type(frame_, param, VAL_TYPE(specializee)));
+    // On all other types, we just make it act like a specialized call to
+    // DO for that value.
 
-        exemplar = Make_Context_For_Action(
-            NATIVE_VAL(do),
-            DSP,  // lower dsp would be if we wanted to add refinements
-            nullptr  // don't set up a binder; just poke specializee in frame
-        );
-        assert(GET_SERIES_FLAG(exemplar, MANAGED));
+    REBCTX *exemplar = Make_Context_For_Action(
+        NATIVE_VAL(do),
+        DSP,  // lower dsp would be if we wanted to add refinements
+        nullptr  // don't set up a binder; just poke specializee in frame
+    );
+    assert(GET_SERIES_FLAG(CTX_VARLIST(exemplar), MANAGED));
 
-        // Put argument into DO's *second* frame slot (first is RETURN)
-        //
-        assert(VAL_KEY_SYM(CTX_KEY(exemplar, 1)) == SYM_RETURN);
-        Move_Value(CTX_VAR(exemplar, 2), specializee);
-        SET_CELL_FLAG(CTX_VAR(exemplar, 2), ARG_MARKED_CHECKED);
-        Move_Value(specializee, NATIVE_VAL(do));
-        label = ANONYMOUS;
-    }
+    // Put argument into DO's *second* frame slot (first is RETURN)
+    //
+    assert(KEY_SYM(CTX_KEY(exemplar, 1)) == SYM_RETURN);
+    Copy_Cell(CTX_VAR(exemplar, 2), source);
+
+    const REBSTR *label = ANONYMOUS;  // !!! Better answer?
 
     REBACT *doer = Make_Action_From_Exemplar(exemplar);
     return Init_Action(D_OUT, doer, label, UNBOUND);

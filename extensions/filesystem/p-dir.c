@@ -52,7 +52,7 @@ static REBARR *Read_Dir_May_Fail(REBREQ *dir)
         if (req->flags & RRF_DONE)
             break;
 
-        Move_Value(DS_PUSH(), ReqFile(file)->path);
+        Copy_Cell(DS_PUSH(), ReqFile(file)->path);
 
         // Assume the file.devreq gets blown away on each loop, so there's
         // nowhere to free the file->path unless we do it here.
@@ -84,14 +84,12 @@ static REBARR *Read_Dir_May_Fail(REBREQ *dir)
 static void Init_Dir_Path(
     REBREQ *dir,
     const REBVAL *path,
-    REBSYM policy
+    SYMID policy
 ){
     UNUSED(policy);
 
     struct rebol_devreq *req = Req(dir);
     req->modes |= RFM_DIR;
-
-    Secure_Port(Canon(SYM_FILE), dir, path /* , dir->path */);
 
     ReqFile(dir)->path = path;
 }
@@ -120,16 +118,13 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
     REBVAL *state = CTX_VAR(ctx, STD_PORT_STATE); // BLOCK! means port open
 
-    //const REBYTE *flags = Security_Policy(SYM_FILE, path);
-
-
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
 
     case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
 
         UNUSED(ARG(value)); // implicitly supplied as `port`
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
 
         switch (property) {
         case SYM_LENGTH: {
@@ -161,7 +156,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         if (not IS_BLOCK(state)) {     // !!! ignores /SKIP and /PART, for now
             REBREQ *dir = OS_Make_Devreq(&Dev_File);
-            ReqPortCtx(dir) = ctx;
+            mutable_MISC(ReqPortCtx, dir) = ctx;
 
             Init_Dir_Path(dir, path, SYM_READ);
             Init_Block(D_OUT, Read_Dir_May_Fail(dir));
@@ -196,7 +191,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
       create:;
 
         REBREQ *dir = OS_Make_Devreq(&Dev_File);
-        ReqPortCtx(dir) = ctx;
+        mutable_MISC(ReqPortCtx, dir) = ctx;
 
         Init_Dir_Path(dir, path, SYM_WRITE); // Sets RFM_DIR too
 
@@ -212,7 +207,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         rebRelease(result); // ignore result
 
-        if (VAL_WORD_SYM(verb) != SYM_CREATE)
+        if (VAL_WORD_ID(verb) != SYM_CREATE)
             Init_Blank(state);
 
         RETURN (port); }
@@ -224,7 +219,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             fail (Error_Already_Open_Raw(path));
 
         REBREQ *dir = OS_Make_Devreq(&Dev_File);
-        ReqPortCtx(dir) = ctx;
+        mutable_MISC(ReqPortCtx, dir) = ctx;
 
         Init_Dir_Path(dir, path, SYM_WRITE); // Sets RFM_DIR
 
@@ -248,7 +243,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         Init_Blank(state);
 
         REBREQ *dir = OS_Make_Devreq(&Dev_File);
-        ReqPortCtx(dir) = ctx;
+        mutable_MISC(ReqPortCtx, dir) = ctx;
 
         Init_Dir_Path(dir, path, SYM_WRITE);
 
@@ -283,7 +278,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             goto create;
 
         REBREQ *dir = OS_Make_Devreq(&Dev_File);
-        ReqPortCtx(dir) = ctx;
+        mutable_MISC(ReqPortCtx, dir) = ctx;
 
         Init_Dir_Path(dir, path, SYM_READ);
         Init_Block(state, Read_Dir_May_Fail(dir));
@@ -299,7 +294,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         Init_Blank(state);
 
         REBREQ *dir = OS_Make_Devreq(&Dev_File);
-        ReqPortCtx(dir) = ctx;
+        mutable_MISC(ReqPortCtx, dir) = ctx;
 
         Init_Dir_Path(dir, path, SYM_READ);
         REBVAL *result = OS_DO_DEVICE(dir, RDC_QUERY);

@@ -207,8 +207,9 @@ static void Process_Block_Helper(
         "ensure block! select", config, "as word!", rebT(label),
     rebEND);
 
-    const RELVAL *text;
-    for (text = VAL_ARRAY_AT(block); NOT_END(text); ++text)
+    const RELVAL *tail;
+    const RELVAL *text = VAL_ARRAY_AT(&tail, block);
+    for (; text != tail; ++text)
         Process_Text_Helper_Core(some_tcc_api, state, SPECIFIC(text), label);
 
     rebRelease(block);
@@ -313,18 +314,26 @@ REBNATIVE(make_native)
 
     REBVAL *source = ARG(source);
 
+    REBCTX *meta;
+    REBFLGS flags = MKF_MASK_NONE;  // natives can't use <elide>, <void>
+    REBARR *paramlist = Make_Paramlist_Managed_May_Fail(
+        &meta,
+        ARG(spec),
+        &flags
+    );
     REBACT *native = Make_Action(
-        Make_Paramlist_Managed_May_Fail(ARG(spec), MKF_MASK_NONE),
+        paramlist,
         &Pending_Native_Dispatcher, // will be replaced e.g. by COMPILE
-        nullptr, // no facade (use paramlist)
-        nullptr, // no specialization exemplar (or inherited exemplar)
         IDX_TCC_NATIVE_MAX // details len [source module linkname tcc_state]
     );
+
+    assert(ACT_META(native) == nullptr);
+    mutable_ACT_META(native) = meta;
 
     REBARR *details = ACT_DETAILS(native);
 
     if (Is_Series_Frozen(VAL_SERIES(source)))
-        Move_Value(ARR_AT(details, IDX_NATIVE_BODY), source); // no copy
+        Copy_Cell(ARR_AT(details, IDX_NATIVE_BODY), source); // no copy
     else {
         Init_Text(
             ARR_AT(details, IDX_NATIVE_BODY),
@@ -336,7 +345,7 @@ REBNATIVE(make_native)
     // look for bindings.  For the moment, set user natives to use the user
     // context...it could be a parameter of some kind (?)
     //
-    Move_Value(
+    Copy_Cell(
         ARR_AT(details, IDX_NATIVE_CONTEXT),
         Get_System(SYS_CONTEXTS, CTX_USER)
     );
@@ -345,7 +354,7 @@ REBNATIVE(make_native)
         REBVAL *linkname = ARG(linkname);
 
         if (Is_Series_Frozen(VAL_SERIES(linkname)))
-            Move_Value(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
+            Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
         else {
             Init_Text(
                 ARR_AT(details, IDX_TCC_NATIVE_LINKNAME),
@@ -357,13 +366,12 @@ REBNATIVE(make_native)
         // Auto-generate a linker name based on the numeric value of the
         // paramlist pointer.  Just "N_" followed by the hexadecimal value.
 
-        REBARR *paramlist = ACT_PARAMLIST(native);  // unique for this action!
-        intptr_t heapaddr = cast(intptr_t, paramlist);
+        intptr_t heapaddr = cast(intptr_t, details);
         REBVAL *linkname = rebValue(
             "unspaced [{N_} as text! to-hex", rebI(heapaddr), "]",
         rebEND);
 
-        Move_Value(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
+        Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
         rebRelease(linkname);
     }
 
@@ -488,8 +496,9 @@ REBNATIVE(compile_p)
     REBDSP dsp_orig = DSP;  // natives are pushed to the stack
 
     if (REF(files)) {
-        const RELVAL *item;
-        for (item = VAL_ARRAY_AT(compilables); NOT_END(item); ++item) {
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, compilables);
+        for (; item != tail; ++item) {
             if (not IS_TEXT(item))
                 fail ("If COMPILE*/FILES, compilables must be TEXT! paths");
 
@@ -515,8 +524,9 @@ REBNATIVE(compile_p)
         DECLARE_MOLD (mo);  // Note: mold buffer is UTF-8
         Push_Mold(mo);
 
-        const RELVAL *item;
-        for (item = VAL_ARRAY_AT(compilables); NOT_END(item); ++item) {
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, compilables);
+        for (; item != tail; ++item) {
             if (IS_ACTION(item)) {
                 assert(Is_User_Native(VAL_ACTION(item)));
 
@@ -524,7 +534,7 @@ REBNATIVE(compile_p)
                 // back and fill in its dispatcher and TCC_State after the
                 // compilation...
                 //
-                Move_Value(DS_PUSH(), SPECIFIC(item));
+                Copy_Cell(DS_PUSH(), SPECIFIC(item));
 
                 REBARR *details = ACT_DETAILS(VAL_ACTION(item));
                 RELVAL *source = ARR_AT(details, IDX_NATIVE_BODY);
@@ -582,7 +592,7 @@ REBNATIVE(compile_p)
         if (
             tcc_compile_string(
                 state,
-                cs_cast(BIN_AT(SER(mo->series), mo->offset))
+                cs_cast(BIN_AT(mo->series, mo->offset))
             ) < 0
         ){
             rebJumps ("fail [",
@@ -648,10 +658,10 @@ REBNATIVE(compile_p)
     // their function pointers to substitute in for the dispatcher.
     //
     while (DSP != dsp_orig) {
-        REBVAL *native = DS_TOP;
-        assert(IS_ACTION(native) and Is_User_Native(VAL_ACTION(native)));
+        REBACT *action = VAL_ACTION(DS_TOP);  // stack will hold action live
+        assert(Is_User_Native(action));  // can't cache stack pointer, extract
 
-        REBARR *details = ACT_DETAILS(VAL_ACTION(native));
+        REBARR *details = ACT_DETAILS(action);
         REBVAL *linkname = SPECIFIC(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME));
 
         char *name_utf8 = rebSpell("ensure text!", linkname, rebEND);
@@ -669,8 +679,8 @@ REBNATIVE(compile_p)
         assert(sizeof(c_func) == sizeof(void*));
         memcpy(&c_func, &sym, sizeof(c_func));
 
-        ACT_DISPATCHER(VAL_ACTION(native)) = c_func;
-        Move_Value(ARR_AT(details, IDX_TCC_NATIVE_STATE), handle);
+        ACT_DISPATCHER(action) = c_func;
+        Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_STATE), handle);
 
         DS_DROP();
     }

@@ -46,15 +46,15 @@ REBINT CT_Pair(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Pair(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_PAIR);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_PAIR(arg))
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
     if (IS_TEXT(arg)) {
         //
@@ -78,14 +78,16 @@ REB_R MAKE_Pair(
         y = arg;
     }
     else if (IS_BLOCK(arg)) {
-        const RELVAL *item = VAL_ARRAY_AT(arg);
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, arg);
 
         if (ANY_NUMBER(item))
             x = item;
         else
             goto bad_make;
 
-        if (IS_END(++item))
+        ++item;
+        if (item == tail)
             goto bad_make;
 
         if (ANY_NUMBER(item))
@@ -93,7 +95,8 @@ REB_R MAKE_Pair(
         else
             goto bad_make;
 
-        if (not IS_END(++item))
+        ++item;
+        if (item != tail)
             goto bad_make;
     }
     else
@@ -146,14 +149,14 @@ void Min_Max_Pair(REBVAL *out, const REBVAL *a, const REBVAL *b, bool maxed)
 REB_R PD_Pair(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     REBINT n = 0;
 
     if (IS_WORD(picker)) {
-        if (VAL_WORD_SYM(picker) == SYM_X)
+        if (VAL_WORD_ID(picker) == SYM_X)
             n = 1;
-        else if (VAL_WORD_SYM(picker) == SYM_Y)
+        else if (VAL_WORD_ID(picker) == SYM_Y)
             n = 2;
         else
             return R_UNHANDLED;
@@ -166,11 +169,11 @@ REB_R PD_Pair(
     else
         return R_UNHANDLED;
 
-    if (not opt_setval) {
+    if (not setval) {
         if (n == 1)
-            Move_Value(pvs->out, VAL_PAIR_X(pvs->out));
+            Copy_Cell(pvs->out, VAL_PAIR_X(pvs->out));
         else
-            Move_Value(pvs->out, VAL_PAIR_Y(pvs->out));
+            Copy_Cell(pvs->out, VAL_PAIR_Y(pvs->out));
         return pvs->out;
     }
 
@@ -181,13 +184,13 @@ REB_R PD_Pair(
     // rendering formats for other-valued pairs has been proposed.  So only
     // integers and decimals are accepted for now.
     //
-    if (not IS_INTEGER(opt_setval) and not IS_DECIMAL(opt_setval))
+    if (not IS_INTEGER(unwrap(setval)) and not IS_DECIMAL(unwrap(setval)))
         return R_UNHANDLED;
 
     if (n == 1)
-        Move_Value(VAL_PAIR_X(pvs->out), opt_setval);
+        Copy_Cell(VAL_PAIR_X(pvs->out), unwrap(setval));
     else
-        Move_Value(VAL_PAIR_Y(pvs->out), opt_setval);
+        Copy_Cell(VAL_PAIR_Y(pvs->out), unwrap(setval));
 
     // Using R_IMMEDIATE means that although we've updated pvs->out, we'll
     // leave it to the path dispatch to figure out if that can be written back
@@ -240,7 +243,7 @@ REBTYPE(Pair)
     REBVAL *x2 = nullptr;
     REBVAL *y2 = nullptr;
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REVERSE:
         return Init_Pair(D_OUT, VAL_PAIR_Y(v), VAL_PAIR_X(v));
 
@@ -271,14 +274,14 @@ REBTYPE(Pair)
         FRM_LABEL(frame_)
     );
 
-    Move_Value(D_ARG(1), x1);
+    Copy_Cell(D_ARG(1), x1);
     if (x2)
-        Move_Value(D_ARG(2), x2);  // use extracted arg x instead of pair arg
+        Copy_Cell(D_ARG(2), x2);  // use extracted arg x instead of pair arg
     REBVAL *x_frame = rebValueQ("copy", frame, rebEND);
 
-    Move_Value(D_ARG(1), y1);
+    Copy_Cell(D_ARG(1), y1);
     if (y2)
-        Move_Value(D_ARG(2), y2);  // use extracted arg y instead of pair arg
+        Copy_Cell(D_ARG(2), y2);  // use extracted arg y instead of pair arg
     REBVAL *y_frame = rebValueQ("copy", frame, rebEND);
 
     return rebValue(

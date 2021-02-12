@@ -87,7 +87,7 @@ static REBINT Set_Serial_Settings(int ttyfd, REBREQ *req)
     struct termios attr;
     struct devreq_serial *serial = ReqSerial(req);
     REBINT speed = serial->baud;
-    CLEARS(&attr);
+    memset(&attr, 0, sizeof(attr));
 #ifdef DEBUG_SERIAL
     printf("setting attributes: speed %d\n", speed);
 #endif
@@ -282,7 +282,7 @@ DEVICE_CMD Read_Serial(REBREQ *serial)
     rebElide(
         "insert system/ports/system make event! [",
             "type: 'read",
-            "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(serial))),
+            "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, serial)),
         "]",
     rebEND);
 
@@ -323,7 +323,7 @@ DEVICE_CMD Write_Serial(REBREQ *serial)
         rebElide(
             "insert system/ports/system make event! [",
                 "type: 'wrote",
-                "port:", CTX_ARCHETYPE(CTX(ReqPortCtx(serial))),
+                "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, serial)),
             "]",
         rebEND);
 

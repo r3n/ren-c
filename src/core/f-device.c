@@ -50,9 +50,9 @@ static int Poll_Default(REBDEV *dev)
 
     bool change = false;
 
-    REBREQ **prior = &dev->pending;
-    REBREQ *req;
-    for (req = *prior; req; req = *prior) {
+    REBNOD **prior = &dev->pending;
+    REBREQ *req = BIN(m_cast(REBNOD*, *prior));
+    for (; req != nullptr; req = BIN(m_cast(REBNOD*, *prior))) {
         assert(Req(req)->command < RDC_MAX);
 
         // Call command again:
@@ -61,15 +61,15 @@ static int Poll_Default(REBDEV *dev)
         int result = dev->commands[Req(req)->command](req);
 
         if (result == DR_DONE) { // if done, remove from pending list
-            *prior = NextReq(req);
-            NextReq(req) = nullptr;
+            *prior = LINK(ReqNext, req);
+            mutable_LINK(ReqNext, req) = nullptr;
             Req(req)->flags &= ~RRF_PENDING;
             change = true;
         }
         else {
             assert(result == DR_PEND);
 
-            prior = &NextReq(req);
+            prior = &node_LINK(ReqNext, req);
             if (Req(req)->flags & RRF_ACTIVE)
                 change = true;
         }
@@ -85,20 +85,20 @@ static int Poll_Default(REBDEV *dev)
 // Attach a request to a device's pending or accept list.
 // Node is a pointer to the head pointer of the req list.
 //
-void Attach_Request(REBREQ **node, REBREQ *req)
+void Attach_Request(REBNOD **node, REBREQ *req)
 {
-    REBREQ *r;
+    REBNOD *r;
 
     // See if its there, and get last req:
     for (r = *node; r; r = *node) {
         if (r == req) return; // already in list
-        node = &NextReq(r);
+        node = &node_LINK(ReqNext, BIN(r));
     }
 
     // Link the new request to end:
     *node = req;
     Force_Req_Managed(req);
-    NextReq(req) = nullptr;
+    mutable_LINK(ReqNext, req) = nullptr;
     Req(req)->flags |= RRF_PENDING;
 }
 
@@ -109,18 +109,18 @@ void Attach_Request(REBREQ **node, REBREQ *req)
 // Detach a request to a device's pending or accept list.
 // If it is not in list, then no harm done.
 //
-void Detach_Request(REBREQ **node, REBREQ *req)
+void Detach_Request(REBNOD **node, REBREQ *req)
 {
-    REBREQ *r;
+    REBNOD *r;
 
     for (r = *node; r; r = *node) {
         if (r == req) {
-            *node = NextReq(req);
-            NextReq(req) = nullptr;
+            *node = LINK(ReqNext, req);
+            mutable_LINK(ReqNext, req) = nullptr;
             Req(req)->flags |= RRF_PENDING;
             return;
         }
-        node = &NextReq(r);
+        node = &node_LINK(ReqNext, BIN(r));
     }
 }
 
@@ -152,11 +152,11 @@ REBVAL *OS_Do_Device(REBREQ *req)
 {
     REBDEV *dev = Req(req)->device;
     if (dev == NULL)
-        rebJumps("FAIL {Rebol Device Not Found}", rebEND);
+        rebJumps("fail {Rebol Device Not Found}", rebEND);
 
     if (not (dev->flags & RDF_INIT)) {
         if (dev->flags & RDO_MUST_INIT)
-            rebJumps("FAIL {Rebol Device Uninitialized}", rebEND);
+            rebJumps("fail {Rebol Device Uninitialized}", rebEND);
 
         if (
             !dev->commands[RDC_INIT]
@@ -167,7 +167,7 @@ REBVAL *OS_Do_Device(REBREQ *req)
     }
 
     if (dev->commands[Req(req)->command] == NULL)
-        rebJumps("FAIL {Invalid Command for Rebol Device}", rebEND);
+        rebJumps("fail {Invalid Command for Rebol Device}", rebEND);
 
     // !!! R3-Alpha had it so when an error was raised from a "device request"
     // it would give back DR_ERROR and the caller would have to interpret an
@@ -227,8 +227,8 @@ REBREQ *OS_Make_Devreq(REBDEV *dev)
     memset(BIN_HEAD(req), 0, dev->req_size);
     TERM_BIN_LEN(req, dev->req_size);
 
-    LINK(req).custom.node = nullptr;
-    MISC(req).custom.node = nullptr;
+    mutable_LINK(ReqNext, req) = nullptr;
+    mutable_MISC(ReqPortCtx, req) = nullptr;
 
     Req(req)->device = dev;
 
@@ -308,7 +308,7 @@ int OS_Quit_Devices(int flags)
         // we want to, they have to be freed.
         //
         while (dev->pending)
-            Detach_Request(&dev->pending, dev->pending);
+            Detach_Request(&dev->pending, BIN(m_cast(REBNOD*, dev->pending)));
     }
 
     return 0;

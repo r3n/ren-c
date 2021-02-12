@@ -131,7 +131,7 @@ REBNATIVE(_not_)  // see TO-C-NAME
 //
 //      return: [logic!]
 //      left [<opt> any-value!]
-//      :right "Right is evaluated if left is true, or if GET-GROUP!"
+//      'right "Right is evaluated if left is true, or if GET-GROUP!"
 //          [group! get-group! sym-path! sym-word!]
 //  ]
 //
@@ -157,7 +157,7 @@ REBNATIVE(_and_)  // see TO-C-NAME
     if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
         mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
+    if (Do_Branch_With_Throws(D_OUT, right, left))
         return R_THROWN;
 
     return Init_Logic(D_OUT, IS_TRUTHY(D_OUT));
@@ -170,7 +170,7 @@ REBNATIVE(_and_)  // see TO-C-NAME
 //
 //      return: [logic!]
 //      left [<opt> any-value!]
-//      :right "Right is evaluated if left is false, or if GET-GROUP!"
+//      'right "Right is evaluated if left is false, or if GET-GROUP!"
 //          [group! get-group! sym-path! sym-word!]
 //  ]
 //
@@ -196,7 +196,7 @@ REBNATIVE(_or_)  // see TO-C-NAME
     if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
         mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
+    if (Do_Branch_With_Throws(D_OUT, right, left))
         return R_THROWN;
 
     return Init_Logic(D_OUT, IS_TRUTHY(D_OUT));
@@ -210,7 +210,7 @@ REBNATIVE(_or_)  // see TO-C-NAME
 //
 //      return: [logic!]
 //      left [<opt> any-value!]
-//      :right "Always evaluated, but is a GROUP! for consistency with AND/OR"
+//      'right "Always evaluated, but is a GROUP! for consistency with AND/OR"
 //          [group! get-group! sym-path! sym-word!]
 //  ]
 //
@@ -228,7 +228,7 @@ REBNATIVE(_xor_)  // see TO-C-NAME
     if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
         mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
 
-    if (Do_Branch_With_Throws(D_OUT, D_SPARE, right, left))
+    if (Do_Branch_With_Throws(D_OUT, right, left))
         return R_THROWN;
 
     if (IS_FALSEY(left))
@@ -285,12 +285,12 @@ REBINT CT_Logic(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Logic(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_LOGIC);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     // As a construction routine, MAKE takes more liberties in the
     // meaning of its parameters, so it lets zero values be false.
@@ -367,7 +367,7 @@ REBTYPE(Logic)
     bool b1 = VAL_LOGIC(D_ARG(1));
     bool b2;
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
 
     case SYM_BITWISE_AND:
         b2 = Math_Arg_For_Logic(D_ARG(2));

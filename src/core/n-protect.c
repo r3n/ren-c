@@ -130,13 +130,13 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
     REBVAL *var = CTX_VAR(context, index);
 
     // Due to the fact that not all the bits in a value header are copied when
-    // Move_Value is done, it's possible to set the protection status of a
+    // Copy_Cell is done, it's possible to set the protection status of a
     // variable on the value vs. the key.  This means the keylist does not
     // have to be modified, and hence it doesn't have to be made unique
     // from any objects that were sharing it.
     //
     if (flags & PROT_WORD) {
-        ASSERT_CELL_READABLE_EVIL_MACRO(var, __FILE__, __LINE__);
+        assert(READABLE(var));
         if (flags & PROT_SET)
             var->header.bits |= CELL_FLAG_PROTECTED;
         else
@@ -145,15 +145,12 @@ static void Protect_Key(REBCTX *context, REBLEN index, REBFLGS flags)
 
     if (flags & PROT_HIDE) {
         //
-        // !!! For the moment, hiding is still implemented via typeset flags.
-        // Since PROTECT/HIDE is something of an esoteric feature, keep it
-        // that way for now, even though it means the keylist has to be
-        // made unique.
-
-        REBVAL *key = CTX_KEY(Force_Keylist_Unique(context), index);
+        // R3-Alpha implemented hiding via typeset flags, which would have
+        // meant making a new keylist.  Ren-C does this with a flag that lives
+        // in the cell of the variable; see `Is_Param_Hidden()`.
 
         if (flags & PROT_SET)
-            Hide_Param(key);
+            var->header.bits |= CELL_FLAG_VAR_MARKED_HIDDEN;
         else
             fail ("Un-hiding is not supported");
     }
@@ -170,7 +167,7 @@ void Protect_Value(const RELVAL *v, REBFLGS flags)
     if (ANY_SERIES(v))
         Protect_Series(VAL_SERIES(v), VAL_INDEX(v), flags);
     else if (IS_MAP(v))
-        Protect_Series(SER(MAP_PAIRLIST(VAL_MAP(v))), 0, flags);
+        Protect_Series(MAP_PAIRLIST(VAL_MAP(v)), 0, flags);
     else if (ANY_CONTEXT(v))
         Protect_Context(VAL_CONTEXT(v), flags);
 }
@@ -181,8 +178,10 @@ void Protect_Value(const RELVAL *v, REBFLGS flags)
 //
 // Anything that calls this must call Uncolor() when done.
 //
-void Protect_Series(const REBSER *s, REBLEN index, REBFLGS flags)
+void Protect_Series(const REBSER *s_const, REBLEN index, REBFLGS flags)
 {
+    REBSER *s = m_cast(REBSER*, s_const);  // mutate flags only
+
     if (Is_Series_Black(s))
         return; // avoid loop
 
@@ -218,27 +217,29 @@ void Protect_Series(const REBSER *s, REBLEN index, REBFLGS flags)
 //
 void Protect_Context(REBCTX *c, REBFLGS flags)
 {
-    if (Is_Series_Black(SER(c)))
+    REBARR *varlist = m_cast(REBARR*, CTX_VARLIST(c));  // mutate flags only
+
+    if (Is_Series_Black(varlist))
         return; // avoid loop
 
     if (flags & PROT_SET) {
         if (flags & PROT_FREEZE) {
             if (flags & PROT_DEEP)
-                SET_SERIES_INFO(c, FROZEN_DEEP);
-            SET_SERIES_INFO(c, FROZEN_SHALLOW);
+                SET_SERIES_INFO(varlist, FROZEN_DEEP);
+            SET_SERIES_INFO(varlist, FROZEN_SHALLOW);
         }
         else
-            SET_SERIES_INFO(c, PROTECTED);
+            SET_SERIES_INFO(varlist, PROTECTED);
     }
     else {
         assert(not (flags & PROT_FREEZE));
-        CLEAR_SERIES_INFO(CTX_VARLIST(c), PROTECTED);
+        CLEAR_SERIES_INFO(varlist, PROTECTED);
     }
 
     if (not (flags & PROT_DEEP))
         return;
 
-    Flip_Series_To_Black(SER(CTX_VARLIST(c))); // for recursion
+    Flip_Series_To_Black(varlist); // for recursion
 
     REBVAL *var = CTX_VARS_HEAD(c);
     for (; NOT_END(var); ++var)
@@ -299,8 +300,6 @@ static REB_R Protect_Unprotect_Core(REBFRM *frame_, REBFLGS flags)
 
     // flags has PROT_SET bit (set or not)
 
-    Check_Security_Placeholder(Canon(SYM_PROTECT), SYM_WRITE, value);
-
     if (REF(deep))
         flags |= PROT_DEEP;
     //if (REF(words))
@@ -313,21 +312,23 @@ static REB_R Protect_Unprotect_Core(REBFRM *frame_, REBFLGS flags)
 
     if (IS_BLOCK(value)) {
         if (REF(words)) {
-            const RELVAL *val;
-            for (val = VAL_ARRAY_AT(value); NOT_END(val); val++) {
+            const RELVAL *tail;
+            const RELVAL *item = VAL_ARRAY_AT(&tail, value);
+            for (; item != tail; ++item) {
                 DECLARE_LOCAL (word); // need binding, can't pass RELVAL
-                Derelativize(word, val, VAL_SPECIFIER(value));
+                Derelativize(word, item, VAL_SPECIFIER(value));
                 Protect_Word_Value(word, flags);  // will unmark if deep
             }
             RETURN (ARG(value));
         }
         if (REF(values)) {
             REBVAL *var;
-            const RELVAL *item;
+            const RELVAL *tail;
+            const RELVAL *item = VAL_ARRAY_AT(&tail, value);
 
             DECLARE_LOCAL (safe);
 
-            for (item = VAL_ARRAY_AT(value); NOT_END(item); ++item) {
+            for (; item != tail; ++item) {
                 if (IS_WORD(item)) {
                     //
                     // Since we *are* PROTECT we allow ourselves to get mutable
@@ -343,7 +344,7 @@ static REB_R Protect_Unprotect_Core(REBFRM *frame_, REBFLGS flags)
                     var = safe;
                 }
                 else {
-                    Move_Value(safe, value);
+                    Copy_Cell(safe, value);
                     var = safe;
                 }
 
@@ -454,8 +455,8 @@ bool Is_Value_Frozen_Deep(const RELVAL *v) {
     if (NOT_CELL_FLAG(cell, FIRST_IS_NODE))
         return true;  // payloads that live in cell are immutable
 
-    REBNOD *node = VAL_NODE(cell);
-    if (node->header.bits & NODE_BYTEMASK_0x01_CELL)
+    REBNOD *node = VAL_NODE1(cell);
+    if (node == nullptr or Is_Node_Cell(node))
         return true;  // !!! Will all non-quoted Pairings be frozen?
 
     // Frozen deep should be set even on non-arrays, e.g. all frozen shallow
@@ -485,7 +486,7 @@ REBNATIVE(locked_q)
 //
 //  Force_Value_Frozen: C
 //
-// !!! The concept behind `opt_locker` is that it might be able to give the
+// !!! The concept behind `locker` is that it might be able to give the
 // user more information about why data would be automatically locked, e.g.
 // if locked for reason of using as a map key...for instance.  It could save
 // the map, or the file and line information for the interpreter at that
@@ -499,7 +500,7 @@ REBNATIVE(locked_q)
 void Force_Value_Frozen_Core(
     const RELVAL *v,
     bool deep,
-    REBSER *opt_locker
+    option(REBSER*) locker
 ){
     if (Is_Value_Frozen_Deep(v))
         return;
@@ -508,26 +509,29 @@ void Force_Value_Frozen_Core(
     enum Reb_Kind kind = CELL_KIND(cell);
 
     if (ANY_ARRAY_KIND(kind)) {
+        REBARR *a = m_cast(REBARR*, VAL_ARRAY(cell));  // mutate flags only
         if (deep)
-            Freeze_Array_Deep(m_cast(REBARR*, VAL_ARRAY(cell)));
+            Freeze_Array_Deep(a);
         else
-            Freeze_Array_Shallow(m_cast(REBARR*, VAL_ARRAY(cell)));
-        if (opt_locker)
-            SET_SERIES_INFO(VAL_ARRAY(cell), AUTO_LOCKED);
+            Freeze_Array_Shallow(a);
+        if (locker)
+            SET_SERIES_INFO(a, AUTO_LOCKED);
     }
     else if (ANY_CONTEXT_KIND(kind)) {
+        REBCTX *c = VAL_CONTEXT(cell);
         if (deep)
-            Deep_Freeze_Context(VAL_CONTEXT(cell));
+            Deep_Freeze_Context(c);
         else
             fail ("What does a shallow freeze of a context mean?");
-        if (opt_locker)
-            SET_SERIES_INFO(VAL_CONTEXT(cell), AUTO_LOCKED);
+        if (locker)
+            SET_SERIES_INFO(m_cast(REBARR*, CTX_VARLIST(c)), AUTO_LOCKED);
     }
     else if (ANY_SERIES_KIND(kind)) {
-        Freeze_Series(VAL_SERIES(cell));
+        REBSER *s = m_cast(REBSER*, VAL_SERIES(cell));  // mutate flags only
+        Freeze_Series(s);
         UNUSED(deep);
-        if (opt_locker)
-            SET_SERIES_INFO(VAL_SERIES(cell), AUTO_LOCKED);
+        if (locker)
+            SET_SERIES_INFO(s, AUTO_LOCKED);
     } else
         fail (Error_Invalid_Type(kind)); // not yet implemented
 }

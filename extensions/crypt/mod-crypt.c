@@ -65,7 +65,6 @@
 #include "tmp-mod-crypt.h"
 
 
-
 // Most routines in mbedTLS return either `void` or an `int` code which is
 // 0 on success and negative numbers on error.  This macro helps generalize
 // the pattern of trying to build a result and having a cleanup (similar
@@ -158,7 +157,7 @@ int get_random(void *p_rng, unsigned char *output, size_t output_len)
 //
 //      return: "Warning: likely to be changed to always be BINARY!"
 //          [binary! integer!]  ; see note below
-//      :settings "Temporarily literal word, evaluative after /METHOD purged"
+//      'settings "Temporarily literal word, evaluative after /METHOD purged"
 //          [<skip> lit-word!]
 //      data "Input data to digest (TEXT! is interpreted as UTF-8 bytes)"
 //          [binary! text!]
@@ -229,9 +228,15 @@ REBNATIVE(checksum)
     // Look up some internally available methods.
     //
     if (0 == strcmp(method_name, "CRC24")) {
+        //
+        // See %crc24-unused.c for explanation; all internal fast hashes now
+        // use zlib's crc32_z(), since it is a sunk cost.
+        //
+        fail ("CRC24 is currently disabled, speak up if you actually use it");
+        /*
         rebFree(method_name);
         Init_Integer(D_SPARE, Compute_CRC24(data, size));
-        return rebValue("enbin [le + 3]", D_SPARE, rebEND);
+        return rebValue("enbin [le + 3]", D_SPARE, rebEND); */
     }
     if (0 == strcmp(method_name, "CRC32")) {
         //
@@ -381,7 +386,7 @@ REBNATIVE(rc4_key)
 //
 //  "Encrypt/decrypt data (modifies) using RC4 algorithm."
 //
-//      return: <void>
+//      return: [void!]
 //      ctx "Stream cipher context"
 //          [handle!]
 //      data "Data to encrypt/decrypt (modified)"
@@ -446,6 +451,7 @@ static int Mpi_From_Binary(mbedtls_mpi* X, const REBVAL *binary)
 //
 //  "Encrypt/decrypt data using the RSA algorithm."
 //
+//      return: [binary!]
 //      data [binary!]
 //      key-object [object!]
 //      /decrypt "Decrypts the data (default is to encrypt)"

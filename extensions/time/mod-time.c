@@ -61,7 +61,7 @@ REBNATIVE(now)
     assert(Does_Date_Have_Time(timestamp));
     assert(Does_Date_Have_Zone(timestamp));
 
-    Move_Value(D_OUT, timestamp);
+    Copy_Cell(D_OUT, timestamp);
     rebRelease(timestamp);
 
     if (not REF(precise)) {

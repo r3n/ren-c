@@ -219,7 +219,7 @@ static void Set_Vector_At(REBCEL(const*) vec, REBLEN n, const RELVAL *set) {
   out_of_range:;
 
     rebJumps(
-        "FAIL [",
+        "fail [",
             SPECIFIC(set), "{out of range for}",
                 "unspaced [", rebI(bitsize), "{-bit}]",
                 rebT(sign ? "signed" : "unsigned"),
@@ -230,18 +230,18 @@ static void Set_Vector_At(REBCEL(const*) vec, REBLEN n, const RELVAL *set) {
 }
 
 
-void Set_Vector_Row(REBCEL(const*) vec, const REBVAL *blk) // !!! can not be BLOCK!?
-{
+void Set_Vector_Row(
+    REBCEL(const*) vec,
+    const REBVAL *blk   // !!! "can not be BLOCK!?"
+){
     REBLEN idx = VAL_INDEX(blk);
 
     if (IS_BLOCK(blk)) {
-        REBLEN len;
-        const RELVAL *val = VAL_ARRAY_LEN_AT(&len, blk);
+        const RELVAL *tail;
+        const RELVAL *val = VAL_ARRAY_AT(&tail, blk);
 
         REBLEN n = 0;
-        for (; NOT_END(val); val++) {
-            //if (n >= ser->tail) Expand_Vector(ser);
-
+        for (; val != tail; ++val) {
             Set_Vector_At(vec, n++, val);
         }
     }
@@ -277,7 +277,7 @@ REBARR *Vector_To_Array(const REBVAL *vect)
     for (n = VAL_INDEX(vect); n < VAL_LEN_HEAD(vect); ++n, ++dest)
         Get_Vector_At(dest, vect, n);
 
-    TERM_ARRAY_LEN(arr, len);
+    SET_SERIES_LEN(arr, len);
     assert(IS_END(dest));
 
     return arr;
@@ -366,9 +366,13 @@ void Shuffle_Vector(REBVAL *vect, bool secure)
 //         size:       integer units
 //         init:        block of values
 //
-bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
-{
-    const RELVAL *item = head;
+bool Make_Vector_Spec(
+    REBVAL *out,
+    const RELVAL *block,
+    REBSPC *specifier
+){
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT(&tail, block);
 
     // The specifier would be needed if variables were going to be looked
     // up, but isn't required for just symbol comparisons or extracting
@@ -377,18 +381,18 @@ bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
     UNUSED(specifier);
 
     bool sign = true;  // default to signed, not unsigned
-    if (IS_WORD(item) and VAL_WORD_SYM(item) == SYM_UNSIGNED) {
+    if (item != tail and IS_WORD(item) and VAL_WORD_ID(item) == SYM_UNSIGNED) {
         sign = false;
         ++item;
     }
 
     bool integral = false;  // default to integer, not floating point
-    if (not IS_WORD(item))
+    if (item == tail or not IS_WORD(item))
         return false;
     else {
-        if (VAL_WORD_SYM(item) == SYM_INTEGER_X)  // e_X_clamation (INTEGER!)
+        if (VAL_WORD_ID(item) == SYM_INTEGER_X)  // e_X_clamation (INTEGER!)
             integral = true;
-        else if (VAL_WORD_SYM(item) == SYM_DECIMAL_X) {  // (DECIMAL!)
+        else if (VAL_WORD_ID(item) == SYM_DECIMAL_X) {  // (DECIMAL!)
             integral = false;
             if (not sign)
                 return false;  // C doesn't have unsigned floating points
@@ -399,7 +403,7 @@ bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
     }
 
     REBYTE bitsize;
-    if (not IS_INTEGER(item))
+    if (item == tail or not IS_INTEGER(item))
         return false;  // bit size required, no defaulting
     else {
         REBLEN i = Int32(item);
@@ -415,7 +419,7 @@ bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
     }
 
     REBYTE len = 1;  // !!! default len to 1...why?
-    if (NOT_END(item) && IS_INTEGER(item)) {
+    if (item != tail and IS_INTEGER(item)) {
         if (Int32(item) < 0)
             return false;
         len = Int32(item);
@@ -425,7 +429,7 @@ bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
         len = 1;
 
     const REBVAL *iblk;
-    if (NOT_END(item) and (IS_BLOCK(item) or IS_BINARY(item))) {
+    if (item != tail and (IS_BLOCK(item) or IS_BINARY(item))) {
         REBLEN init_len = VAL_LEN_AT(item);
         if (IS_BINARY(item) and integral)  // !!! What was this about?
             return false;
@@ -443,19 +447,18 @@ bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
     // like vectors will be positional.  VAL_VECTOR_INDEX() always 0 for now.
     //
     REBLEN index = 0;  // default index offset inside returned REBVAL to 0
-    if (NOT_END(item) and IS_INTEGER(item)) {
+    if (item != tail and IS_INTEGER(item)) {
         index = (Int32s(item, 1) - 1);
         ++item;
     }
 
-    if (NOT_END(item))
+    if (item != tail)
         fail ("Too many arguments in MAKE VECTOR! block");
 
     REBLEN num_bytes = len * (bitsize / 8);
-    REBSER *bin = Make_Binary(num_bytes);
-    CLEAR(BIN_HEAD(bin), num_bytes);  // !!! 0 bytes -> 0 int/float?
-    SET_SERIES_LEN(bin, num_bytes);
-    TERM_SERIES(bin);
+    REBBIN *bin = Make_Binary(num_bytes);
+    memset(BIN_HEAD(bin), 0, num_bytes);  // !!! 0 bytes -> 0 int/float?
+    TERM_BIN_LEN(bin, num_bytes);
 
     Init_Vector(out, bin, sign, integral, bitsize);
     UNUSED(index);  // !!! Not currently used, may (?) be added later
@@ -473,7 +476,7 @@ bool Make_Vector_Spec(REBVAL *out, const RELVAL *head, REBSPC *specifier)
 REB_R TO_Vector(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 {
     if (IS_BLOCK(arg)) {
-        if (Make_Vector_Spec(out, VAL_ARRAY_AT(arg), VAL_SPECIFIER(arg)))
+        if (Make_Vector_Spec(out, arg, VAL_SPECIFIER(arg)))
             return out;
     }
     fail (Error_Bad_Make(kind, arg));
@@ -486,11 +489,11 @@ REB_R TO_Vector(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 REB_R MAKE_Vector(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_INTEGER(arg) or IS_DECIMAL(arg)) {  // e.g. `make vector! 100`
         REBINT len = Int32s(arg, 0);
@@ -499,10 +502,9 @@ REB_R MAKE_Vector(
 
         REBYTE bitsize = 32;
         REBLEN num_bytes = (len * bitsize) / 8;
-        REBSER *bin = Make_Binary(num_bytes);
-        CLEAR(BIN_HEAD(bin), num_bytes);
-        SET_SERIES_LEN(bin, num_bytes);
-        TERM_SERIES(bin);
+        REBBIN *bin = Make_Binary(num_bytes);
+        memset(BIN_HEAD(bin), 0, num_bytes);
+        TERM_BIN_LEN(bin, num_bytes);
 
         const bool sign = true;
         const bool integral = true;
@@ -601,10 +603,10 @@ void Poke_Vector_Fail_If_Read_Only(
 REB_R PD_Vector(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval) {
-        Poke_Vector_Fail_If_Read_Only(pvs->out, picker, opt_setval);
+    if (setval) {
+        Poke_Vector_Fail_If_Read_Only(pvs->out, picker, unwrap(setval));
         return R_INVISIBLE;
     }
 
@@ -620,12 +622,12 @@ REBTYPE(Vector)
 {
     REBVAL *v = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // same as `v`
 
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         switch (property) {
           case SYM_LENGTH:
             return Init_Integer(D_OUT, VAL_VECTOR_LEN_AT(v));
@@ -643,10 +645,10 @@ REBTYPE(Vector)
         if (REF(part) or REF(deep) or REF(types))
             fail (Error_Bad_Refines_Raw());
 
-        REBBIN *bin = Copy_Series_Core(
+        REBBIN *bin = BIN(Copy_Series_Core(
             VAL_BINARY(VAL_VECTOR_BINARY(v)),
             NODE_FLAG_MANAGED
-        );
+        ));
 
         return Init_Vector(
             D_OUT,

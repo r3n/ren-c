@@ -28,8 +28,8 @@
 // Ren-C has a generic QUOTED! datatype, a container which can be arbitrarily
 // deep in escaping.  This faciliated a more succinct way to QUOTE, as well as
 // new features.  It also cleared up a naming issue (1 is a "literal integer",
-// not `'1`).  They are "quoted", while LITERAL and LIT take the place of the
-// former QUOTE operator (e.g. `lit 1` => `1`).
+// not `'1`).  They are "quoted", while JUST takes the place of the former
+// QUOTE operator (e.g. `just 1` => `1`).
 //
 
 #include "sys-core.h"
@@ -61,14 +61,14 @@ REBINT CT_Quoted(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Quoted(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_QUOTED);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
-    return Quotify(Move_Value(out, arg), 1);
+    return Quotify(Copy_Cell(out, arg), 1);
 }
 
 
@@ -91,7 +91,7 @@ REB_R TO_Quoted(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
 // like any other path.  So it seems types wrapped in QUOTED! should respond
 // more or less like their non-quoted counterparts...
 //
-//     >> first lit '[a b c]
+//     >> first just '[a b c]
 //     == a
 //
 // !!! It might be interesting if the answer were 'a instead, adding on a
@@ -102,13 +102,13 @@ REB_R TO_Quoted(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
 REB_R PD_Quoted(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     UNUSED(picker);
-    UNUSED(opt_setval);
+    UNUSED(setval);
 
     if (KIND3Q_BYTE(pvs->out) == REB_QUOTED)
-        Move_Value(pvs->out, VAL_QUOTED_PAYLOAD_CELL(pvs->out));
+        Copy_Cell(pvs->out, VAL_QUOTED_PAYLOAD_CELL(pvs->out));
     else {
         assert(KIND3Q_BYTE(pvs->out) >= REB_MAX);
         mutable_KIND3Q_BYTE(pvs->out) %= REB_64;
@@ -133,7 +133,7 @@ REB_R PD_Quoted(
 // on QUOTED!.  e.g. "do whatever the non-quoted version would do, then add
 // the quotedness onto the result".
 //
-//     >> add lit '''1 2
+//     >> add (just '''1) 2
 //     == '''3
 //
 // While a bit outlandish for ADD, it might seem to make more sense for FIND
@@ -148,7 +148,7 @@ REBTYPE(Quoted)
 {
     // Note: SYM_REFLECT is handled directly in the REFLECT native
     //
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_COPY: {  // D_ARG(1) skips RETURN in first arg slot
         REBLEN num_quotes = Dequotify(D_ARG(1));
         REB_R r = Run_Generic_Dispatch(D_ARG(1), frame_, verb);
@@ -166,33 +166,35 @@ REBTYPE(Quoted)
 
 
 //
-//  literal: native/body [
+//  just: native/body [
 //
 //  "Returns value passed in without evaluation"
 //
-//      return: {The input value, verbatim--unless /SOFT and soft quoted type}
+//      return: "Input value, verbatim--unless /SOFT and soft quoted type"
 //          [<opt> any-value!]
-//      :value {Value to quote, <opt> is impossible (see UNEVAL)}
-//          [any-value!]
-//      /soft {Evaluate if a GROUP!, GET-WORD!, or GET-PATH!}
+//      'value [any-value!]
+//      /soft "Evaluate if a GET-GROUP!, GET-WORD!, or GET-PATH!"
 //  ][
-//      if soft and [match [group! get-word! get-path!] :value] [
+//      if soft and (match [get-group! get-word! get-path!] :value) [
 //          reeval value
 //      ] else [
 //          :value  ; also sets unevaluated bit, how could a user do so?
 //      ]
 //  ]
 //
-REBNATIVE(literal) // aliased in %base-defs.r as LIT
+REBNATIVE(just)
 {
-    INCLUDE_PARAMS_OF_LITERAL;
+    INCLUDE_PARAMS_OF_JUST;
 
     REBVAL *v = ARG(value);
 
-    if (REF(soft) and IS_QUOTABLY_SOFT(v))
-        fail ("LITERAL/SOFT not currently implemented, should clone EVAL");
+    if (REF(soft) and ANY_ESCAPABLE_GET(v)) {
+        if (Eval_Value_Throws(D_OUT, v, SPECIFIED))
+            return R_THROWN;
+        return D_OUT;  // Don't set UNEVALUATED flag
+    }
 
-    Move_Value(D_OUT, v);
+    Copy_Cell(D_OUT, v);
     SET_CELL_FLAG(D_OUT, UNEVALUATED);
     return D_OUT;
 }
@@ -203,7 +205,8 @@ REBNATIVE(literal) // aliased in %base-defs.r as LIT
 //
 //  {Constructs a quoted form of the evaluated argument}
 //
-//      return: [quoted!]
+//      return: "Quoted value (if depth = 0, may not be quoted)"
+//          [<opt> any-value!]
 //      optional [<opt> any-value!]
 //      /depth "Number of quoting levels to apply (default 1)"
 //          [integer!]
@@ -217,7 +220,7 @@ REBNATIVE(quote)
     if (depth < 0)
         fail (PAR(depth));
 
-    return Quotify(Move_Value(D_OUT, ARG(optional)), depth);
+    return Quotify(Copy_Cell(D_OUT, ARG(optional)), depth);
 }
 
 
@@ -248,7 +251,7 @@ REBNATIVE(unquote)
     if (cast(REBLEN, depth) > VAL_NUM_QUOTES(v))
         fail ("Value not quoted enough for unquote depth requested");
 
-    return Unquotify(Move_Value(D_OUT, v), depth);
+    return Unquotify(Copy_Cell(D_OUT, v), depth);
 }
 
 

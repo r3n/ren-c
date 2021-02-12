@@ -146,12 +146,12 @@ REBVAL *Init_Decimal_Bits(RELVAL *out, const REBYTE *bp)
 REB_R MAKE_Decimal(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_DECIMAL or kind == REB_PERCENT);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     REBDEC d;
 
@@ -469,7 +469,7 @@ REBTYPE(Decimal)
 
     REBDEC d1 = VAL_DECIMAL(val);
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     // !!! This used to use IS_BINARY_ACT() which is no longer available with
     // symbol-based dispatch.  Consider doing this another way.
@@ -493,9 +493,9 @@ REBTYPE(Decimal)
             sym == SYM_ADD ||
             sym == SYM_MULTIPLY
         )){
-            Move_Value(D_OUT, D_ARG(2));
-            Move_Value(D_ARG(2), D_ARG(1));
-            Move_Value(D_ARG(1), D_OUT);
+            Copy_Cell(D_OUT, D_ARG(2));
+            Copy_Cell(D_ARG(2), D_ARG(1));
+            Copy_Cell(D_ARG(1), D_OUT);
             return Run_Generic_Dispatch(D_ARG(1), frame_, verb);
         }
 
@@ -582,7 +582,7 @@ REBTYPE(Decimal)
     switch (sym) {
 
     case SYM_COPY:
-        return Move_Value(D_OUT, val);
+        return Copy_Cell(D_OUT, val);
 
     case SYM_NEGATE:
         d1 = -d1;

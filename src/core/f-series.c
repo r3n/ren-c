@@ -46,13 +46,13 @@ REB_R Series_Common_Action_Maybe_Unhandled(
 
     REBFLGS sop_flags;  // "SOP_XXX" Set Operation Flags
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
     switch (sym) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(PAR(value));  // covered by `value`
 
-        REBSYM property = VAL_WORD_SYM(ARG(property));
+        SYMID property = VAL_WORD_ID(ARG(property));
         assert(property != SYM_0);
 
         switch (property) {
@@ -66,12 +66,12 @@ REB_R Series_Common_Action_Maybe_Unhandled(
             return Init_Integer(D_OUT, len_head - VAL_INDEX_RAW(v)); }
 
           case SYM_HEAD:
-            Move_Value(D_OUT, v);
+            Copy_Cell(D_OUT, v);
             VAL_INDEX_RAW(D_OUT) = 0;
             return Trust_Const(D_OUT);
 
           case SYM_TAIL:
-            Move_Value(D_OUT, v);
+            Copy_Cell(D_OUT, v);
             VAL_INDEX_RAW(D_OUT) = VAL_LEN_HEAD(v);
             return Trust_Const(D_OUT);
 
@@ -94,17 +94,17 @@ REB_R Series_Common_Action_Maybe_Unhandled(
             const REBSER *s = VAL_SERIES(v);
             if (not IS_SER_ARRAY(s))
                 return nullptr;
-            if (NOT_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED))
+            if (NOT_SUBCLASS_FLAG(ARRAY, s, HAS_FILE_LINE_UNMASKED))
                 return nullptr;
-            return Init_File(D_OUT, LINK_FILE(s)); }
+            return Init_File(D_OUT, LINK(Filename, s)); }
 
           case SYM_LINE: {
             const REBSER *s = VAL_SERIES(v);
             if (not IS_SER_ARRAY(s))
                 return nullptr;
-            if (NOT_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED))
+            if (NOT_SUBCLASS_FLAG(ARRAY, s, HAS_FILE_LINE_UNMASKED))
                 return nullptr;
-            return Init_Integer(D_OUT, MISC(s).line); }
+            return Init_Integer(D_OUT, s->misc.line); }
 
           default:
             break;
@@ -455,6 +455,9 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool strict)
 
       case REB_HANDLE:
         return CT_Handle(s, t, strict);
+
+      case REB_COMMA:
+        return CT_Comma(s, t, strict);
 
       default:
         break;

@@ -82,8 +82,8 @@ boot-banner: [
     "REBOL 3.0 (Ren-C branch)"
     -
     = Copyright: "2012 REBOL Technologies"
-    = Copyright: "2012-2017 Ren-C Open Source Contributors"
-    = "" "Apache 2.0 License, see LICENSE."
+    = Copyright: "2012-2021 Ren-C Open Source Contributors"
+    = "" "Licensed Under LGPL 3.0, see LICENSE."
     = Website:  "http://github.com/metaeducation/ren-c"
     -
     = Version:   system/version
@@ -145,16 +145,9 @@ usage: function [
         --import file    Import a module prior to script
         --quiet (-q)     No startup banners or information
         --resources dir  Manually set where Rebol resources directory lives
-        --secure policy  Can be: none allow ask throw quit
         --suppress ""    Suppress any found start-up scripts  Use "*" to suppress all.
         --trace (-t)     Enable trace mode during boot
         --verbose        Show detailed startup information
-
-    Other quick options:
-
-        -s               No security
-        +s               Full security
-        -qs              Quiet and secure (combining other switches not implemented yet)
 
     Examples:
 
@@ -208,12 +201,13 @@ get-current-exec:
 file-to-local:
 local-to-file:
 what-dir:
-change-dir: ~undefined~
+change-dir: '~unset~
 
 
 main-startup: function [
     "Usermode command-line processing: handles args, security, scripts"
 
+    return: [<opt> any-value!] "!!! Narrow down return type?"
     argv {Raw command line argument block received by main() as STRING!s}
         [block!]
     <with>
@@ -334,17 +328,6 @@ main-startup: function [
         ;
         ; ...adaptation falls through to our copy of the original PANIC-VALUE
     ]
-
-    ; can only output do not assume they have any ability to write out
-    ; information to the user, because the
-
-    ; Currently there is just one monolithic "initialize all schemes", e.g.
-    ; FILE:// and HTTP:// and CONSOLE:// -- this will need to be broken down
-    ; into finer granularity.  Formerly all of them were loaded at the end
-    ; of Startup_Core(), but one small step is to push the decision into the
-    ; host...which loads them all, but should be more selective.
-    ;
-    sys/init-schemes
 
     system/product: 'core
 
@@ -585,24 +568,6 @@ main-startup: function [
                 o/quiet: true
             )
         |
-            "-qs" end (
-                ; !!! historically you could combine switches when used with
-                ; a single dash, but this feature should be part of a better
-                ; thought out implementation.  For now, any historically
-                ; significant combinations (e.g. used in make.r) will
-                ; be supported manually.  This is "quiet unsecure"
-                ;
-                o/quiet: true
-                o/secure: 'allow
-            )
-        |
-            "-cs" end (
-                ; every tutorial on Rebol CGI shows these flags.
-                o/secure: 'allow
-                o/quiet: true
-                o/cgi: true
-            )
-        |
             "--resources" end (
                 o/resources: (to-dir param-or-die "RESOURCES") else [
                     die "RESOURCES directory not found"
@@ -617,22 +582,6 @@ main-startup: function [
                 ] else [
                     make block! param
                 ]
-            )
-        |
-            "--secure" end (
-                o/secure: to word! param-or-die "SECURE"
-                if o/secure <> 'allow [
-                    die "SECURE is disabled (never finished for R3-Alpha)"
-                ]
-            )
-        |
-            "-s" end (
-                o/secure: 'allow  ; "secure-min"
-            )
-        |
-            "+s" end (
-                o/secure: 'quit  ; "secure-max"
-                die "SECURE is disabled (never finished for R3-Alpha)"
             )
         |
             "--script" end (
@@ -711,7 +660,7 @@ main-startup: function [
 
     if any [boot-embedded o/script] [o/quiet: true]
 
-    ; Set option/paths for /path, /boot, /home, and script path (for SECURE)
+    ; Set option/paths for /path, /boot, /home, and script path
     o/path: what-dir  ;dirize any [o/path o/home]
 
     ; !!! this was commented out.  Is it important?
@@ -719,7 +668,7 @@ main-startup: function [
         if slash <> first o/boot [o/boot: clean-path o/boot]
     ]
 
-    if file? o/script [ ; Get the path (needed for SECURE setup)
+    if file? o/script [  ; Get the path
         script-path: split-path o/script
         case [
             slash = first first script-path []      ; absolute
@@ -736,7 +685,7 @@ main-startup: function [
 
 
     for-each [spec body] host-prot [module spec body]
-    host-prot: 'done
+    host-prot: '~host-protocols-registered~  ; frees up data for GC
 
     ;
     ; start-up scripts, o/loaded tracks which ones are loaded (with full path)
@@ -766,12 +715,12 @@ main-startup: function [
         o/resources
         not find o/suppress %user.reb
         elide (loud-print ["Checking for user.reb file in" o/resources])
-        exists? o/resources/user.reb
+        exists? join o/resources %user.reb
     ] then [
         trap [
-            do o/resources/user.reb
-            append o/loaded o/resources/user.reb
-            loud-print ["Finished evaluating script:" o/resources/user.reb]
+            do join o/resources %user.reb
+            append o/loaded join o/resources %user.reb
+            loud-print ["Finished evaluating:" join o/resources %user.reb]
         ] then e -> [
             die/error "Error found in user.reb script" e
         ]
@@ -844,7 +793,7 @@ main-startup: function [
         emit [do/only/args (<*> o/script) (<*> script-args)]
     ]
 
-    main-startup: 'done
+    main-startup: '~main-startup-done~  ; free function for GC
 
     if quit-when-done [
         emit [quit 0]

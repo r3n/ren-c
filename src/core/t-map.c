@@ -51,14 +51,16 @@ REBINT CT_Map(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REBMAP *Make_Map(REBLEN capacity)
 {
     REBARR *pairlist = Make_Array_Core(capacity * 2, SERIES_MASK_PAIRLIST);
-    LINK_HASHLIST_NODE(pairlist) = NOD(Make_Hash_Series(capacity));
+    mutable_LINK(Hashlist, pairlist) = Make_Hash_Series(capacity);
 
     return MAP(pairlist);
 }
 
 
-static REBCTX *Error_Conflicting_Key(const RELVAL *key, REBSPC *specifier)
-{
+static REBCTX *Error_Conflicting_Key(
+    const RELVAL *key,
+    REBSPC *specifier
+){
     DECLARE_LOCAL (specific);
     Derelativize(specific, key, specifier);
     return Error_Conflicting_Key_Raw(specific);
@@ -81,7 +83,7 @@ static REBCTX *Error_Conflicting_Key(const RELVAL *key, REBSPC *specifier)
 REBINT Find_Key_Hashed(
     REBARR *array,
     REBSER *hashlist,
-    const RELVAL *key, // !!! assumes key is followed by value(s) via ++
+    const RELVAL *key,  // !!! assumes ++key finds the values
     REBSPC *specifier,
     REBLEN wide,
     bool strict,
@@ -120,14 +122,14 @@ REBINT Find_Key_Hashed(
     REBLEN n;
     while ((n = indexes[slot]) != 0) {
         RELVAL *k = ARR_AT(array, (n - 1) * wide); // stored key
-        if (0 == Cmp_Value(k, key, true)) { // exact match
+        if (0 == Cmp_Value(k, key, true)) {
             if (strict)
                 return slot; // don't need to check synonyms, stop looking
             goto found_synonym; // confirm exact match is the only match
         }
 
-        if (not strict) {
-            if (0 == Cmp_Value(k, key, false)) { // non-strict match
+        if (not strict) {  // now do the non strict match (false)
+            if (0 == Cmp_Value(k, key, false)) {
 
               found_synonym:;
 
@@ -197,13 +199,13 @@ static void Rehash_Map(REBMAP *map)
             //
             // It's a "zombie", move last key to overwrite it
             //
-            Move_Value(
+            Copy_Cell(
                 key, SPECIFIC(ARR_AT(pairlist, ARR_LEN(pairlist) - 2))
             );
-            Move_Value(
+            Copy_Cell(
                 &key[1], SPECIFIC(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))
             );
-            SET_ARRAY_LEN_NOTERM(pairlist, ARR_LEN(pairlist) - 2);
+            SET_SERIES_LEN(pairlist, ARR_LEN(pairlist) - 2);
         }
 
         REBLEN hash = Find_Key_Hashed(
@@ -214,7 +216,7 @@ static void Rehash_Map(REBMAP *map)
         // discard zombies at end of pairlist
         //
         while (IS_NULLED(ARR_AT(pairlist, ARR_LEN(pairlist) - 1))) {
-            SET_ARRAY_LEN_NOTERM(pairlist, ARR_LEN(pairlist) - 2);
+            SET_SERIES_LEN(pairlist, ARR_LEN(pairlist) - 2);
         }
     }
 }
@@ -233,7 +235,6 @@ void Expand_Hash(REBSER *ser)
     Remake_Series(
         ser,
         prime + 1,
-        SER_WIDE(ser),
         SERIES_FLAG_POWER_OF_2  // not(NODE_FLAG_NODE) => don't keep data
     );
 
@@ -320,7 +321,7 @@ REBLEN Find_Map_Entry(
 REB_R PD_Map(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
     assert(IS_MAP(pvs->out));
 
@@ -336,14 +337,14 @@ REB_R PD_Map(
     //
     const bool cased = false;
 
-    if (opt_setval) {
+    if (setval) {
         REBMAP *m = VAL_MAP_ENSURE_MUTABLE(pvs->out);
 
         REBINT n = Find_Map_Entry(
             m,  // modified (if not located in map)
             picker,
             SPECIFIED,
-            opt_setval,  // value to set
+            unwrap(setval),  // value to set
             SPECIFIED,
             cased
         );
@@ -367,11 +368,13 @@ REB_R PD_Map(
     if (n == 0)
         return nullptr;
 
-    const REBVAL *val = SPECIFIC(ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1));
+    const REBVAL *val = SPECIFIC(
+        ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1)
+    );
     if (IS_NULLED(val))  // zombie entry, means unused
         return nullptr;
 
-    return Move_Value(pvs->out, val); // RETURN (...) uses `frame_`, not `pvs`
+    return Copy_Cell(pvs->out, val); // RETURN (...) uses `frame_`, not `pvs`
 }
 
 
@@ -381,14 +384,15 @@ REB_R PD_Map(
 static void Append_Map(
     REBMAP *map,
     const RELVAL *head,
+    const RELVAL *tail,
     REBSPC *specifier,
     REBLEN len
-) {
+){
     const RELVAL *item = head;
     REBLEN n = 0;
 
-    while (n < len && NOT_END(item)) {
-        if (IS_END(item + 1)) {
+    while (n < len and item != tail) {
+        if (item + 1 == tail) {
             //
             // Keys with no value not allowed, e.g. `make map! [1 "foo" 2]`
             //
@@ -417,11 +421,11 @@ static void Append_Map(
 REB_R MAKE_Map(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (ANY_NUMBER(arg)) {
         return Init_Map(out, Make_Map(Int32s(arg, 0)));
@@ -446,10 +450,12 @@ inline static REBMAP *Copy_Map(const REBMAP *map, REBU64 types) {
     // a literal copy of the hashlist can still be used, as a start (needs
     // its own copy so new map's hashes will reflect its own mutations)
     //
-    LINK_HASHLIST_NODE(copy) = NOD(Copy_Series_Core(
+    REBSER *hashlist = Copy_Series_Core(
         MAP_HASHLIST(map),
-        SERIES_FLAGS_NONE // !!! No NODE_FLAG_MANAGED?
-    ));
+        SERIES_FLAGS_NONE | FLAG_FLAVOR(HASHLIST)
+            // ^-- !!! No NODE_FLAG_MANAGED?
+    );
+    mutable_LINK(Hashlist, copy) = hashlist;
 
     if (types == 0)
         return MAP(copy); // no types have deep copy requested, shallow is OK
@@ -460,7 +466,7 @@ inline static REBMAP *Copy_Map(const REBMAP *map, REBU64 types) {
     //
     assert(ARR_LEN(copy) % 2 == 0); // should be [key value key value]...
 
-    REBVAL *key = SPECIFIC(ARR_HEAD(copy)); // all keys/values are specified
+    REBVAL *key = SPECIFIC(ARR_HEAD(copy));  // keys/vals specified
     for (; NOT_END(key); key += 2) {
         assert(Is_Value_Frozen_Deep(key));  // immutable key
 
@@ -488,12 +494,13 @@ REB_R TO_Map(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
         //
         // make map! [word val word val]
         //
-        REBLEN len;
-        const RELVAL *at = VAL_ARRAY_LEN_AT(&len, arg);
+        REBLEN len = VAL_LEN_AT(arg);
+        const RELVAL *tail;
+        const RELVAL *at = VAL_ARRAY_AT(&tail, arg);
         REBSPC *specifier = VAL_SPECIFIER(arg);
 
         REBMAP *map = Make_Map(len / 2); // [key value key value...] + END
-        Append_Map(map, at, specifier, len);
+        Append_Map(map, at, tail, specifier, len);
         Rehash_Map(map);
         return Init_Map(out, map);
     }
@@ -528,17 +535,17 @@ REBARR *Map_To_Array(const REBMAP *map, REBINT what)
     for (; NOT_END(val); val += 2) {
         if (not IS_NULLED(val + 1)) {  // can't be END
             if (what <= 0) {
-                Move_Value(dest, &val[0]);
+                Copy_Cell(dest, &val[0]);
                 ++dest;
             }
             if (what >= 0) {
-                Move_Value(dest, &val[1]);
+                Copy_Cell(dest, &val[1]);
                 ++dest;
             }
         }
     }
 
-    TERM_ARRAY_LEN(a, dest - ARR_HEAD(a));
+    SET_SERIES_LEN(a, dest - ARR_HEAD(a));
     assert(IS_END(dest));
     return a;
 }
@@ -555,37 +562,30 @@ REBCTX *Alloc_Context_From_Map(const REBMAP *map)
     // a bit haphazard to have `make object! make map! [x 10 <y> 20]` and
     // just throw out the <y> 20 case...
 
-    const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     REBLEN count = 0;
 
+  blockscope {
+    const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1))
             ++count;
     }
+  }
 
     // See Alloc_Context() - cannot use it directly because no Collect_Words
 
-    REBCTX *context = Alloc_Context(REB_OBJECT, count);
-    REBVAL *key = CTX_KEYS_HEAD(context);
-    REBVAL *var = CTX_VARS_HEAD(context);
+    REBCTX *c = Alloc_Context(REB_OBJECT, count);
 
-    mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
 
     for (; NOT_END(mval); mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1)) {
-            Init_Context_Key(key, VAL_WORD_SPELLING(mval));
-            ++key;
-            Move_Value(var, &mval[1]);
-            ++var;
+            REBVAL *var = Append_Context(c, nullptr, VAL_WORD_SYMBOL(mval));
+            Copy_Cell(var, &mval[1]);
         }
     }
 
-    TERM_ARRAY_LEN(CTX_VARLIST(context), count + 1);
-    TERM_ARRAY_LEN(CTX_KEYLIST(context), count + 1);
-    assert(IS_END(key));
-    assert(IS_END(var));
-
-    return context;
+    return c;
 }
 
 
@@ -647,7 +647,7 @@ REBTYPE(Map)
 {
     REBVAL *map = D_ARG(1);
 
-    switch (VAL_WORD_SYM(verb)) {
+    switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {
         INCLUDE_PARAMS_OF_REFLECT;
         UNUSED(ARG(value));  // covered by `v`
@@ -655,7 +655,7 @@ REBTYPE(Map)
         const REBMAP *m = VAL_MAP(map);
 
         REBVAL *property = ARG(property);
-        switch (VAL_WORD_SYM(property)) {
+        switch (VAL_WORD_ID(property)) {
           case SYM_LENGTH:
             return Init_Integer(D_OUT, Length_Map(m));
 
@@ -701,12 +701,12 @@ REBTYPE(Map)
         if (n == 0)
             return nullptr;
 
-        Move_Value(
+        Copy_Cell(
             D_OUT,
             SPECIFIC(ARR_AT(MAP_PAIRLIST(m), ((n - 1) * 2) + 1))
         );
 
-        if (VAL_WORD_SYM(verb) == SYM_FIND)
+        if (VAL_WORD_ID(verb) == SYM_FIND)
             return IS_NULLED(D_OUT) ? nullptr : Init_True(D_OUT);
 
         return D_OUT; }
@@ -745,9 +745,10 @@ REBTYPE(Map)
             fail (PAR(value));
 
         REBLEN len = Part_Len_May_Modify_Index(value, ARG(part));
-        const RELVAL *at = VAL_ARRAY_AT(value);  // w/modified index
+        const RELVAL *tail;
+        const RELVAL *at = VAL_ARRAY_AT(&tail, value);  // w/modified index
 
-        Append_Map(m, at, VAL_SPECIFIER(value), len);
+        Append_Map(m, at, tail, VAL_SPECIFIER(value), len);
 
         return Init_Map(D_OUT, m); }
 

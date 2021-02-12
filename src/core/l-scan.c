@@ -311,6 +311,8 @@ static const REBYTE *Scan_UTF8_Char_Escapable(REBUNI *out, const REBYTE *bp)
     REBYTE lex;
 
     REBYTE c = *bp;
+    if (c == '\0')
+        return nullptr;  // signal error if end of string
 
     if (c >= 0x80) {  // multibyte sequence
         if (not (bp = Back_Scan_UTF8_Char(out, bp, nullptr)))
@@ -659,7 +661,11 @@ static void Update_Error_Near_For_Line(
     ERROR_VARS *vars = ERR_VARS(error);
     Init_Text(&vars->nearest, Pop_Molded_String(mo));
 
-    Init_Word(&vars->file, ss->file);
+    if (ss->file)
+        Init_File(&vars->file, ss->file);
+    else
+        Init_Nulled(&vars->file);
+
     Init_Integer(&vars->line, ss->line);
 }
 
@@ -984,10 +990,10 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             return TOKEN_END;  // ...so end of utf-8 input was *the* end
 
         const void *p;
-        if (ss->feed->vaptr)
-            p = va_arg(*ss->feed->vaptr, const void*);
+        if (FEED_VAPTR(ss->feed))
+            p = va_arg(*unwrap(FEED_VAPTR(ss->feed)), const void*);
         else
-            p = *ss->feed->packed++;
+            p = *FEED_PACKED(ss->feed)++;
 
         if (not p or Detect_Rebol_Pointer(p) != DETECTED_AS_UTF8) {
             //
@@ -1002,12 +1008,12 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             // suggests we might need a better way of doing things, but it
             // shows the general gist for now.
             //
-            Detect_Feed_Pointer_Maybe_Fetch(ss->feed, p, false);
+            Detect_Feed_Pointer_Maybe_Fetch(ss->feed, p);
 
             if (IS_END(ss->feed->value))
                 return TOKEN_END;
 
-            Derelativize(DS_PUSH(), ss->feed->value, ss->feed->specifier);
+            Derelativize(DS_PUSH(), ss->feed->value, FEED_SPECIFIER(ss->feed));
 
             if (level->newline_pending) {
                 level->newline_pending = false;
@@ -1028,7 +1034,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
             // context for the error-causing input.
             //
             if (not ss->line_head) {
-                assert(ss->feed->vaptr or ss->feed->packed);
+                assert(FEED_VAPTR(ss->feed) or FEED_PACKED(ss->feed));
                 assert(not level->start_line_head);
                 level->start_line_head = ss->line_head = ss->begin;
             }
@@ -1198,12 +1204,24 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
 
           case LEX_DELIMIT_TILDE: {
             ++cp;
-            if (IS_LEX_DELIMIT(*cp)) {  // nameless void, e.g. `~`
+            if (*cp == '~') {  // only legal multi-tilde is the `~~~` VOID!
+                ++cp;
+                if (*cp != '~') {
+                    ss->end = cp;
+                    fail (Error_Syntax(ss, TOKEN_VOID));
+                }
+                ++cp;
+                if (*cp == '~' or not IS_LEX_DELIMIT(*cp)) {
+                    ss->end = cp;
+                    fail (Error_Syntax(ss, TOKEN_VOID));
+                }
                 ss->end = cp;
                 return TOKEN_VOID;
             }
-            if (*cp == '~')  // `~~` couldn't be converted to WORD!
-                fail (Error_Syntax(ss, TOKEN_VOID));
+            if (IS_LEX_DELIMIT(*cp)) {
+                ss->end = cp;
+                return TOKEN_WORD;  // single `~` is a WORD!
+            }
             for (; *cp != '~'; ++cp) {
                 if (IS_LEX_DELIMIT(*cp)) {
                     ss->end = cp;
@@ -1669,7 +1687,7 @@ void Init_Va_Scan_Level_Core(
     const REBSTR *file,
     REBLIN line,
     const REBYTE *opt_begin,  // preload the scanner outside the va_list
-    struct Reb_Feed *feed
+    REBFED *feed
 ){
     level->ss = ss;
     ss->feed = feed;
@@ -1879,15 +1897,11 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         break;
 
       case TOKEN_VOID: {
-        assert(len != 0);
-        if (len == 1)
-            Init_Unlabeled_Void(DS_PUSH());
-        else {
-            assert(*bp == '~');
-            assert(bp[len - 1] == '~');
-            const REBSTR *label = Intern_UTF8_Managed(bp + 1, len - 2);
-            Init_Labeled_Void(DS_PUSH(), label);
-        }
+        assert(len >= 3);
+        assert(*bp == '~');
+        assert(bp[len - 1] == '~');
+        const REBSTR *label = Intern_UTF8_Managed(bp + 1, len - 2);
+        Init_Void_Core(DS_PUSH(), label);
         break; }
 
       case TOKEN_COMMA:
@@ -1964,10 +1978,11 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         if (prefix_pending != TOKEN_END)  // can't do @'foo: or :'foo
             fail (Error_Syntax(ss, token));
 
-        if (IS_LEX_ANY_SPACE(*ep) or *ep == ']' or *ep == ')') {
+        if (IS_LEX_ANY_SPACE(*ep) or *ep == ']' or *ep == ')' or *ep == ';') {
             //
             // If we have something like ['''] there won't be another token
             // push coming along to apply the quotes to, so quote a null.
+            // This also applies to comments.
             //
             assert(quotes_pending == 0);
             Quotify(Init_Nulled(DS_PUSH()), len);
@@ -2030,7 +2045,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         if (level->mode == ']')
             goto done;
 
-        if (Is_Dot_Or_Slash(level->mode)) {  // implicit end, e.g. [lit /]
+        if (Is_Dot_Or_Slash(level->mode)) {  // implicit end, e.g. [just /]
             Init_Blank(DS_PUSH());
             --ss->begin;
             --ss->end;
@@ -2048,7 +2063,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         if (level->mode == ')')
             goto done;
 
-        if (Is_Dot_Or_Slash(level->mode)) {  // implicit end e.g. (lit /)
+        if (Is_Dot_Or_Slash(level->mode)) {  // implicit end e.g. (just /)
             Init_Blank(DS_PUSH());
             --ss->begin;
             --ss->end;
@@ -2063,32 +2078,32 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         fail (Error_Extra(ss, ')')); }
 
       case TOKEN_INTEGER:
+        //
+        // We treat `10.20.30` as a TUPLE!, but `10.20` has a cultural lock on
+        // being a DECIMAL! number.  Due to the overlap, Locate_Token() does
+        // not have enough information in hand to discern TOKEN_DECIMAL; it
+        // just returns TOKEN_INTEGER and the decision is made here.
+        //
+        // (Imagine we're in a tuple scan and INTEGER! 10 was pushed, and are
+        // at "20.30" in the 10.20.30 case.  Locate_Token() would need access
+        // to level->mode to know that the tuple scan was happening, else
+        // it would have to conclude "20.30" was TOKEN_DECIMAL.  Deeper study
+        // would be needed to know if giving Locate_Token() more information
+        // is wise.  But that study would likely lead to the conclusion that
+        // the whole R3-Alpha scanner concept needs a full rewrite!)
+        //
+        // Note: We can't merely start with assuming it's a TUPLE!, scan the
+        // values, and then decide it's a DECIMAL! when the tuple is popped
+        // if it's two INTEGER!.  Because the integer scanning will lose
+        // leading digits on the second number (1.002 would become 1.2).
+        //
         if (
-            (*ep == '.' or *ep == ',')
-            and not Is_Dot_Or_Slash(level->mode)
-            and IS_LEX_NUMBER(ep[1])
+            (*ep == '.' or *ep == ',')  // still allow `1,2` as `1.2` synonym
+            and not Is_Dot_Or_Slash(level->mode)  // not in PATH!/TUPLE! (yet)
+            and IS_LEX_NUMBER(ep[1])  // If # digit, we're seeing `###.#???`
         ){
-            // If we're scanning a TUPLE!, then we're at the head of it.
-            // But it could also be a DECIMAL!.
-            //
-            // We can't merely start with assuming it's a TUPLE!, scan
-            // two integers, and then decide it's a DECIMAL! if both are
-            // integer.  Because integer scanning will lose leading digits
-            // on the second number (1.002 would become 1.2 as a decimal).
-            //
-            // So we scan ahead to see if it's a case followed by just
-            // one dot, and is actually a DECIMAL!.  We don't want
-            // Locate_Token() to do this, because if as we scanned the
-            // tuple one element at a time it looked ahead to see if only
-            // one dot was ahead of it...all TUPLE!s would seem to end
-            // with a DECIMAL!.  It has to be done uniquely when looking
-            // at the first element.
-            //
-            // For Locate_Token() to realize if it was at the head it
-            // would have to use `level->mode`, which it was not designed
-            // to do.  This is one of the many things that should be
-            // revisited with a state-machine-based proper rewrite of the
-            // R3 scanner, but this is just a patch to prove the concept.
+            // If we will be scanning a TUPLE!, then we're at the head of it.
+            // But it could also be a DECIMAL! if there aren't any more dots.
             //
             const REBYTE *temp = ep + 1;
             REBLEN temp_len = len + 1;
@@ -2100,31 +2115,12 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     goto scan_decimal;
                 }
             }
-            goto scan_integer;
         }
-        else if (*ep == '-') {
-            token = TOKEN_DATE;
-            while (*ep == '/' or IS_LEX_NOT_DELIMIT(*ep))
-                ++ep;
-            len = cast(REBLEN, ep - bp);
-            if (ep != Scan_Date(DS_PUSH(), bp, len))
-                fail (Error_Syntax(ss, token));
 
-            ss->begin = ep;
-        }
-        else if (*ep == '/') {
-            //
-            // Historically  might be PATH!, or might be DATE!.  But the
-            // date format of 1/2/3 is inferior to 12-Dec-2012, and we
-            // want things like 1/2 to be a PATH! (good for fractions)
-            //
-            goto scan_integer;
-        }
-        else {
-          scan_integer:
-            if (ep != Scan_Integer(DS_PUSH(), bp, len))
-                fail (Error_Syntax(ss, token));
-        }
+        // Wasn't beginning of a DECIMAL!, so scan as a normal INTEGER!
+        //
+        if (ep != Scan_Integer(DS_PUSH(), bp, len))
+            fail (Error_Syntax(ss, token));
         break;
 
       case TOKEN_DECIMAL:
@@ -2138,7 +2134,12 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
         if (bp[len - 1] == '%') {
             RESET_VAL_HEADER(DS_TOP, REB_PERCENT, CELL_MASK_NONE);
-            VAL_DECIMAL(DS_TOP) /= 100.0;
+
+            // !!! DEBUG_EXTANT_STACK_POINTERS can't resolve if this is
+            // a REBCEL(const*) or REBVAL* overload with DEBUG_CHECK_CASTS.
+            // Have to cast explicitly, use VAL()
+            //
+            VAL_DECIMAL(VAL(DS_TOP)) /= 100.0;
         }
         break;
 
@@ -2168,7 +2169,8 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
       case TOKEN_DATE:
         while (*ep == '/' and level->mode != '/') {  // Is date/time?
             ep++;
-            while (IS_LEX_NOT_DELIMIT(*ep)) ep++;
+            while (*ep == '.' or IS_LEX_NOT_DELIMIT(*ep))
+                ++ep;
             len = cast(REBLEN, ep - bp);
             if (len > 50) {
                 // prevent infinite loop, should never be longer than this
@@ -2240,7 +2242,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         // just Lib_Context?  Not binding would break functions entirely,
         // but they can't round-trip anyway.  See #2262.
         //
-        Bind_Values_All_Deep(ARR_HEAD(array), Lib_Context);
+        Bind_Values_All_Deep(ARR_HEAD(array), ARR_TAIL(array), Lib_Context);
 
         if (ARR_LEN(array) == 0 or not IS_WORD(ARR_HEAD(array))) {
             DECLARE_LOCAL (temp);
@@ -2248,7 +2250,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             fail (Error_Malconstruct_Raw(temp));
         }
 
-        REBSYM sym = VAL_WORD_SYM(ARR_HEAD(array));
+        SYMID sym = VAL_WORD_ID(ARR_HEAD(array));
         if (
             IS_KIND_SYM(sym)
             or sym == SYM_IMAGE_X
@@ -2305,7 +2307,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             }
             DROP_GC_GUARD(array);
 
-            Move_Value(DS_PUSH(), cell);
+            Copy_Cell(DS_PUSH(), cell);
             DROP_GC_GUARD(cell);
         }
         else {
@@ -2359,7 +2361,8 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
     // are into the user context (which we will expand).
     //
     if (ss->feed and ss->feed->binder and ANY_WORD(DS_TOP)) {
-        //
+        struct Reb_Binder *binder = unwrap(ss->feed->binder);
+
         // We don't initialize the binder until the first WORD! seen.
         //
         if (not ss->feed->context) {
@@ -2369,52 +2372,44 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     ? VAL_CONTEXT(Lib_Context)
                     : nullptr;
 
-            Init_Interning_Binder(ss->feed->binder, ss->feed->context);
+            Init_Interning_Binder(binder, unwrap(ss->feed->context));
         }
 
-        const REBSTR *canon = VAL_WORD_CANON(DS_TOP);
-        REBINT n = Get_Binder_Index_Else_0(ss->feed->binder, canon);
+        REBCTX *context = unwrap(ss->feed->context);
+        REBCTX *lib = try_unwrap(ss->feed->lib);
+
+        const REBSYM *symbol = VAL_WORD_SYMBOL(DS_TOP);
+        REBINT n = Get_Binder_Index_Else_0(binder, symbol);
         if (n > 0) {
             //
             // Exists in user context at the given positive index.
             //
-            INIT_BINDING(DS_TOP, ss->feed->context);
-            INIT_WORD_INDEX(DS_TOP, n);
+            INIT_VAL_WORD_BINDING(DS_TOP, CTX_VARLIST(context));
+            INIT_VAL_WORD_PRIMARY_INDEX(DS_TOP, n);
         }
         else if (n < 0) {
             //
             // Index is the negative of where the value exists in lib.
             // A proxy needs to be imported from lib to context.
             //
-            Expand_Context(ss->feed->context, 1);
-            Move_Var(  // preserve enfix state
-                Append_Context(ss->feed->context, DS_TOP, 0),
-                CTX_VAR(ss->feed->lib, -n)  // -n is positive
+            Expand_Context(context, 1);
+            Copy_Cell(
+                Append_Context(context, DS_TOP, nullptr),
+                CTX_VAR(lib, -n)  // -n is positive
             );
-            REBINT check = Remove_Binder_Index_Else_0(
-                ss->feed->binder,
-                canon
-            );
+            REBINT check = Remove_Binder_Index_Else_0(binder, symbol);
             assert(check == n);  // n is negative
             UNUSED(check);
-            Add_Binder_Index(
-                ss->feed->binder,
-                canon,
-                VAL_WORD_INDEX(DS_TOP)
-            );
+            Add_Binder_Index(binder, symbol, VAL_WORD_INDEX(DS_TOP));
         }
         else {
             // Doesn't exist in either lib or user, create a new binding
             // in user (this is not the preferred behavior for modules
             // and isolation, but going with it for the API for now).
             //
-            Expand_Context(ss->feed->context, 1);
-            Append_Context(ss->feed->context, DS_TOP, 0);
-            Add_Binder_Index(
-                ss->feed->binder,
-                canon,
-                VAL_WORD_INDEX(DS_TOP)
-            );
+            Expand_Context(context, 1);
+            Append_Context(context, DS_TOP, nullptr);
+            Add_Binder_Index(binder, symbol, VAL_WORD_INDEX(DS_TOP));
         }
     }
 
@@ -2525,8 +2520,9 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         // For interim compatibility, allow GET-WORD! at LOAD-time by
         // mutating it into a single element GROUP!.
         //
-        REBVAL *head = DS_AT(dsp_path_head);
-        REBVAL *cleanup = head + 1;
+      blockscope {
+        STKVAL(*) head = DS_AT(dsp_path_head);
+        STKVAL(*) cleanup = head + 1;
         for (; cleanup <= DS_TOP; ++cleanup) {
             if (IS_GET_WORD(cleanup)) {
                 REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);
@@ -2534,10 +2530,11 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                     = mutable_HEART_BYTE(cleanup)
                     = REB_GET_WORD;
 
-                Move_Value(ARR_SINGLE(a), cleanup);
+                Copy_Cell(ARR_SINGLE(a), cleanup);
                 Init_Group(cleanup, a);
             }
         }
+      }
 
         // Run through the generalized pop path code, which does any
         // applicable compression...and validates the array.
@@ -2553,7 +2550,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
         assert(ANY_SEQUENCE(temp));  // Should be >= 2 elements, no decaying
 
-        Move_Value(DS_PUSH(), temp);
+        Copy_Cell(DS_PUSH(), temp);
 
         // !!! Temporarily raise attention to usage like `.5` or `5.` to guide
         // people that these are contentious with tuples.  There is no way
@@ -2561,7 +2558,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         // including the zero.  This doesn't put any decision in stone, but
         // reserves the right to make a decision at a later time.
         //
-        if (VAL_SEQUENCE_LEN(DS_TOP) == 2) {
+        if (IS_TUPLE(DS_TOP) and VAL_SEQUENCE_LEN(DS_TOP) == 2) {
             if (
                 IS_INTEGER(VAL_SEQUENCE_AT(temp, DS_TOP, 0))
                 and IS_BLANK(VAL_SEQUENCE_AT(temp, DS_TOP, 1))
@@ -2580,12 +2577,13 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         //
         if (
             GET_CELL_FLAG(DS_TOP, FIRST_IS_NODE)
-            and IS_SER_ARRAY(VAL_NODE(DS_TOP))
+            and VAL_NODE1(DS_TOP) != nullptr  // null legal in node slots ATM
+            and IS_SER_ARRAY(SER(VAL_NODE1(DS_TOP)))
         ){
-            REBARR *a = ARR(VAL_NODE(DS_TOP));
-            MISC(a).line = ss->line;
-            LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss->file));
-            SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
+            REBARR *a = ARR(VAL_NODE1(DS_TOP));
+            a->misc.line = ss->line;
+            mutable_LINK(Filename, a) = ss->file;
+            SET_SUBCLASS_FLAG(ARRAY, a, HAS_FILE_LINE_UNMASKED);
             SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
             // !!! Does this mean anything for paths?  The initial code
@@ -2593,7 +2591,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             // are currently being used to solidify paths.
             //
             if (level->newline_pending)
-                SET_ARRAY_FLAG(a, NEWLINE_AT_TAIL);
+                SET_SUBCLASS_FLAG(ARRAY, a, NEWLINE_AT_TAIL);
         }
 
         if (token == TOKEN_TUPLE) {
@@ -2763,7 +2761,7 @@ bool Scan_To_Stack_Relaxed_Failed(SCAN_LEVEL *level) {
         // and if this becomes a problem, implement ss->limit.
         //
         REBLEN limit = ss->begin - ss_before.begin;
-        REBSER *bin = Make_Binary(limit);
+        REBBIN *bin = Make_Binary(limit);
         memcpy(BIN_HEAD(bin), ss_before.begin, limit);
         TERM_BIN_LEN(bin, limit);
 
@@ -2778,7 +2776,7 @@ bool Scan_To_Stack_Relaxed_Failed(SCAN_LEVEL *level) {
 
     ss->begin = ss->end;  // skip malformed token
 
-    Move_Value(DS_PUSH(), error);
+    Copy_Cell(DS_PUSH(), error);
     rebRelease(error);
     return true;
 }
@@ -2823,9 +2821,9 @@ static REBARR *Scan_Child_Array(SCAN_LEVEL *parent, REBYTE mode)
 
     // Tag array with line where the beginning bracket/group/etc. was found
     //
-    MISC(a).line = ss->line;
-    LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss->file));
-    SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
+    a->misc.line = ss->line;
+    mutable_LINK(Filename, a) = ss->file;
+    SET_SUBCLASS_FLAG(ARRAY, a, HAS_FILE_LINE_UNMASKED);
     SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
     --ss->depth;
@@ -2854,9 +2852,9 @@ REBARR *Scan_UTF8_Managed(const REBSTR *file, const REBYTE *utf8, REBSIZ size)
             | (level.newline_pending ? ARRAY_FLAG_NEWLINE_AT_TAIL : 0)
     );
 
-    MISC(a).line = ss.line;
-    LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss.file));
-    SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
+    a->misc.line = ss.line;
+    mutable_LINK(Filename, a) = ss.file;
+    SET_SUBCLASS_FLAG(ARRAY, a, HAS_FILE_LINE_UNMASKED);
     SET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK);
 
     return a;
@@ -2872,7 +2870,7 @@ REBINT Scan_Header(const REBYTE *utf8, REBLEN len)
 {
     SCAN_LEVEL level;
     SCAN_STATE ss;
-    const REBSTR *file= Canon(SYM___ANONYMOUS__);
+    const REBSTR *file = ANONYMOUS;
     const REBLIN start_line = 1;
     Init_Scan_Level(&level, &ss, file, start_line, utf8, len);
 
@@ -2922,12 +2920,13 @@ void Shutdown_Scanner(void)
 //
 //      return: "Transcoded value (or block of values)"
 //          [<opt> any-value!]
+//      next: "<output> Translate one value and give back next position"
+//          [<opt> text! binary!]
+//      relax: "<output> Try to trap errors and skip token (toplevel only)"
+//          [<opt> error!]
+//
 //      source "If BINARY!, must be Unicode UTF-8 encoded"
 //          [text! binary!]
-//      /next "Translate next complete value and give back next position"
-//          [<output> <opt> text! binary!]
-//      /relax "Return an error and skip token if possible (top level only)"
-//          [<output> <opt> error!]
 //      /file "File to be associated with BLOCK!s and GROUP!s in source"
 //          [file! url!]
 //      /line "Line number for start of scan, word variable will be updated"
@@ -2954,11 +2953,24 @@ REBNATIVE(transcode)
 
     REBVAL *source = ARG(source);
 
-    // !!! Should the base name and extension be stored, or whole path?
-    //
-    const REBSTR *file = REF(file)
-        ? Intern_Any_String_Managed(ARG(file))
-        : Canon(SYM___ANONYMOUS__);
+    const REBSTR *file;
+    if (REF(file)) {
+        //
+        // Originally, interning was used on the file to avoid redundancy.
+        // However, that meant the interning mechanic was being given strings
+        // that were not necessarily valid WORD! symbols.  There's probably
+        // not *that* much redundancy of files being scanned, and plain old
+        // freezing can keep the user from changing the passed in filename
+        // after-the-fact (making a copy would likely be wasteful, so let
+        // them copy if they care to change the string later).
+        //
+        // !!! Should the base name and extension be stored, or whole path?
+        //
+        file = VAL_STRING(ARG(file));
+        Freeze_Series(file);
+    }
+    else
+        file = ANONYMOUS;
 
     const REBVAL *line_number;
     if (ANY_WORD(ARG(line)))
@@ -3000,7 +3012,7 @@ REBNATIVE(transcode)
         if (not Is_Blackhole(REF(relax))) {
             REBVAL *var = Lookup_Mutable_Word_May_Fail(ARG(relax), SPECIFIED);
             if (failed)
-                Move_Value(var, DS_TOP);
+                Copy_Cell(var, DS_TOP);
             else
                 Init_Nulled(var);
         }
@@ -3015,7 +3027,7 @@ REBNATIVE(transcode)
         if (DSP == dsp_orig)
             Init_Nulled(D_OUT);
         else {
-            Move_Value(D_OUT, DS_TOP);
+            Copy_Cell(D_OUT, DS_TOP);
             DS_DROP();
         }
         assert(DSP == dsp_orig);
@@ -3026,9 +3038,9 @@ REBNATIVE(transcode)
             NODE_FLAG_MANAGED
                 | (level.newline_pending ? ARRAY_FLAG_NEWLINE_AT_TAIL : 0)
         );
-        MISC(a).line = ss.line;
-        LINK_FILE_NODE(a) = NOD(m_cast(REBSTR*, ss.file));
-        SER(a)->header.bits |= ARRAY_MASK_HAS_FILE_LINE;
+        a->misc.line = ss.line;
+        mutable_LINK(Filename, a) = ss.file;
+        a->leader.bits |= ARRAY_MASK_HAS_FILE_LINE;
 
         Init_Block(D_OUT, a);
     }
@@ -3041,10 +3053,14 @@ REBNATIVE(transcode)
     //
     if (REF(next) and not Is_Blackhole(ARG(next))) {
         REBVAL *var = Sink_Word_May_Fail(ARG(next), SPECIFIED);
-        Move_Value(var, source);
+        Copy_Cell(var, source);
 
-        if (IS_BINARY(var))
-            VAL_INDEX_UNBOUNDED(var) = ss.end - BIN_HEAD(VAL_BINARY(var));
+        if (IS_BINARY(var)) {
+            if (ss.begin)
+                VAL_INDEX_UNBOUNDED(var) = ss.begin - BIN_HEAD(VAL_BINARY(var));
+            else
+                VAL_INDEX_UNBOUNDED(var) = BIN_LEN(VAL_BINARY(var));
+        }
         else {
             assert(IS_TEXT(var));
 
@@ -3058,10 +3074,10 @@ REBNATIVE(transcode)
             // (It would probably be better if the scanner kept count, though
             // maybe that would make it slower when this isn't needed?)
             //
-            if (ss.begin != 0)
+            if (ss.begin)
                 VAL_INDEX_RAW(var) += Num_Codepoints_For_Bytes(bp, ss.begin);
             else
-                VAL_INDEX_RAW(var) += BIN_TAIL(VAL_SERIES(var)) - bp;
+                VAL_INDEX_RAW(var) += BIN_TAIL(VAL_STRING(var)) - bp;
         }
     }
 
@@ -3084,7 +3100,7 @@ const REBYTE *Scan_Any_Word(
 ) {
     SCAN_LEVEL level;
     SCAN_STATE ss;
-    const REBSTR *file = Canon(SYM___ANONYMOUS__);
+    const REBSTR *file = ANONYMOUS;
     const REBLIN start_line = 1;
 
     // !!! We use UNLIMITED here instead of `size` because the R3-Alpha

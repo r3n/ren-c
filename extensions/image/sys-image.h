@@ -33,18 +33,26 @@
 //   is made.  A `make image!` that did not use a foreign source could
 //   optimize this and consider it the binary owner, at same cost as R3-Alpha.
 
+#define LINK_Width_TYPE         intptr_t
+#define LINK_Width_CAST         (intptr_t)
+#define HAS_LINK_Width          FLAVOR_ARRAY
+
+#define MISC_Height_TYPE        intptr_t
+#define MISC_Height_CAST        (intptr_t)
+#define HAS_MISC_Height         FLAVOR_ARRAY
+
 extern REBTYP* EG_Image_Type;
 
 inline static REBVAL *VAL_IMAGE_BIN(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
-    return cast(REBVAL*, ARR_SINGLE(ARR(PAYLOAD(Any, v).first.node)));
+    return cast(REBVAL*, ARR_SINGLE(ARR(VAL_NODE1(v))));
 }
 
 #define VAL_IMAGE_WIDTH(v) \
-    LINK(ARR(PAYLOAD(Any, v).first.node)).custom.i
+    ARR(VAL_NODE1(v))->link.any.i
 
 #define VAL_IMAGE_HEIGHT(v) \
-    MISC(ARR(PAYLOAD(Any, v).first.node)).custom.i
+    ARR(VAL_NODE1(v))->misc.any.i
 
 inline static REBYTE *VAL_IMAGE_HEAD(REBCEL(const*) v) {
     assert(CELL_CUSTOM_TYPE(v) == EG_Image_Type);
@@ -98,11 +106,12 @@ inline static REBVAL *Init_Image(
 
     REBARR *a = Alloc_Singular(NODE_FLAG_MANAGED);
     Init_Binary(ARR_SINGLE(a), bin);
-    LINK(a).custom.i = width;  // see notes on why this isn't put on bin...
-    MISC(a).custom.i = height;  // (...it would corrupt shared series!)
 
     RESET_CUSTOM_CELL(out, EG_Image_Type, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(out, a);
+    INIT_VAL_NODE1(out, a);
+
+    VAL_IMAGE_WIDTH(out) = width;  // see why this isn't put on bin...
+    VAL_IMAGE_HEIGHT(out) = height;  // (...it would corrupt shared series!)
 
     assert(VAL_IMAGE_POS(out) == 0);  // !!! sketchy concept, is in BINARY!
 
@@ -126,8 +135,7 @@ inline static REBVAL *Init_Image_Black_Opaque(RELVAL *out, REBLEN w, REBLEN h)
 {
     REBSIZ size = (w * h) * 4;  // RGBA pixels, 4 bytes each
     REBBIN *bin = Make_Binary(size);
-    SET_SERIES_LEN(bin, size);
-    TERM_SERIES(bin);
+    TERM_BIN_LEN(bin, size);
     Manage_Series(bin);
 
     RESET_IMAGE(SER_DATA(bin), (w * h));  // length in 'pixels'
@@ -140,8 +148,8 @@ inline static REBVAL *Init_Image_Black_Opaque(RELVAL *out, REBLEN w, REBLEN h)
 // IMAGE! extension if it is loaded.
 //
 extern REBINT CT_Image(REBCEL(const*) a, REBCEL(const*) b, bool strict);
-extern REB_R MAKE_Image(REBVAL *out, enum Reb_Kind kind, const REBVAL *opt_parent, const REBVAL *arg);
+extern REB_R MAKE_Image(REBVAL *out, enum Reb_Kind kind, option(const REBVAL*) parent, const REBVAL *arg);
 extern REB_R TO_Image(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg);
 extern void MF_Image(REB_MOLD *mo, REBCEL(const*) v, bool form);
 extern REBTYPE(Image);
-extern REB_R PD_Image(REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval);
+extern REB_R PD_Image(REBPVS *pvs, const RELVAL *picker, option(const REBVAL*) setval);

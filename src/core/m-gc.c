@@ -65,7 +65,21 @@
 #include "sys-int-funcs.h"
 
 
+// The reason the LINK() and MISC() macros are so weird is because regardless
+// of who assigns the fields, the GC wants to be able to mark them.  So the
+// same generic field must be used for all cases...which those macros help
+// to keep distinct for comprehensibility purposes.
 //
+// But access via the GC just sees the fields as their generic nodes (though
+// through a non-const point of view, to mark them).
+
+#define LINK_Node_TYPE      REBNOD*
+#define LINK_Node_CAST
+
+#define MISC_Node_TYPE      REBNOD*
+#define MISC_Node_CAST
+
+
 // !!! In R3-Alpha, the core included specialized structures which required
 // their own GC participation.  This is because rather than store their
 // properties in conventional Rebol types (like an OBJECT!) they wanted to
@@ -96,19 +110,17 @@ static void Mark_Devices_Deep(void);
     assert(SER_USED(GC_Mark_Stack) == 0)
 
 
-static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v);
+static void Queue_Mark_Opt_Value_Deep(const RELVAL *v);
 
-inline static void Queue_Mark_Opt_Value_Deep(const RELVAL *v)
-{
-    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
-    Queue_Mark_Opt_End_Cell_Deep(v);  // nulled cell & unreadable void are ok
+inline static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v) {
+    if (KIND3Q_BYTE_UNCHECKED(v) != REB_0_END)  // faster than NOT_END()
+        Queue_Mark_Opt_Value_Deep(v);
 }
 
 inline static void Queue_Mark_Value_Deep(const RELVAL *v)
 {
-    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
     assert(KIND3Q_BYTE_UNCHECKED(v) != REB_NULL);  // faster than IS_NULLED()
-    Queue_Mark_Opt_End_Cell_Deep(v);  // unreadable void is ok
+    Queue_Mark_Opt_Value_Deep(v);  // unreadable void is ok
 }
 
 
@@ -181,19 +193,24 @@ static void Queue_Mark_Node_Deep(void *p)
     }
 
     REBSER *s = SER(p);
-    if (GET_SERIES_INFO(s, INACCESSIBLE)) {
+    if (GET_SERIES_FLAG(s, INACCESSIBLE)) {
         //
         // !!! All inaccessible nodes should be collapsed and canonized into
-        // a universal inaccessible node so the stub can be freed.  For now,
-        // just collapse each stub to make it uniform like that canon form.
+        // a universal inaccessible node so the stub can be freed.  But since
+        // bound words depend on contexts to supply their spellings (to free
+        // up space in the word cell), we'd need to notice inaccessible word
+        // bindings and move their spellings back into them.  (This would
+        // make them decay to being unbound, which causes an error, but it
+        // would be more helpful to have a flag to indicate their binding
+        // went stale...some other cell flag?)  For now, just leave it.
         //
-        TRASH_POINTER_IF_DEBUG(MISC(s).trash);
-        TRASH_POINTER_IF_DEBUG(LINK(s).trash);
+        /*TRASH_POINTER_IF_DEBUG(s->misc.trash);
+        TRASH_POINTER_IF_DEBUG(s->link.trash);
         s->header.bits &= ~(
             SERIES_FLAG_LINK_NODE_NEEDS_MARK
                 | SERIES_FLAG_MISC_NODE_NEEDS_MARK
-        );
-        s->header.bits |= NODE_FLAG_MARKED;
+        );*/
+        s->leader.bits |= NODE_FLAG_MARKED;
         return;
     }
 
@@ -207,16 +224,75 @@ static void Queue_Mark_Node_Deep(void *p)
     }
   #endif
 
-    s->header.bits |= NODE_FLAG_MARKED; // may be already set
+    s->leader.bits |= NODE_FLAG_MARKED;  // may be already set
 
-    if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and LINK(s).custom.node)
-        Queue_Mark_Node_Deep(LINK(s).custom.node);
+    if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK) and node_LINK(Node, s)) {
+        //
+        // !!! The keysource for varlists can be set to a REBFRM*, which acts
+        // like a cell because the flag is set to being an "endlike header".
+        // The DEBUG_CHECK_CASTS noticed that this was marking an END when
+        // casting as a SER().  It wasn't entirely obvious what was going on,
+        // but this makes it clearer so that a more elegant fix can be made.
+        //
+        if (Is_Node_Cell(node_LINK(Node, s)))
+            if (IS_VARLIST(s))
+                goto skip_mark_rebfrm_link;
 
-    if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and MISC(s).custom.node)
-        Queue_Mark_Node_Deep(MISC(s).custom.node);
+        REBSER *link = SER(node_LINK(Node, s));
+        Queue_Mark_Node_Deep(link);
+
+        // Keylist series need to be marked.
+        //
+        // !!! Review efficiency, this may need a separate flag for "has
+        // pointers that need marking", such lists are used elsewhere.
+        //
+        if (IS_KEYLIST(link)) {
+            REBKEY *tail = SER_TAIL(REBKEY, link);
+            REBKEY *key = SER_HEAD(REBKEY, link);
+            for (; key != tail; ++key)
+                m_cast(REBSYM*, KEY_SYMBOL(key))->leader.bits
+                    |= NODE_FLAG_MARKED;
+        }
+    }
+
+  skip_mark_rebfrm_link:
+    if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK) and node_MISC(Node, s))
+        Queue_Mark_Node_Deep(node_MISC(Node, s));
+
+  //=//// MARK INODE (if not using slot for `info`) ///////////////////////=//
+
+    if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK)) {
+        REBNOD *inode = node_INODE(Node, s);
+        if (inode) {
+          #if !defined(NDEBUG)
+            if (IS_POINTER_TRASH_DEBUG(inode))
+                panic (s);
+          #endif
+            Queue_Mark_Node_Deep(inode);
+        }
+    }
 
     if (IS_SER_ARRAY(s)) {
+        REBARR *a = ARR(s);
+
+    //=//// MARK BONUS (if not using slot for `bias`) /////////////////////=//
+
+        // Whether the bonus slot needs to be marked is dictated by internal
+        // series type, not an extension-usable flag (due to flag scarcity).
         //
+        if (IS_SER_DYNAMIC(a) and not IS_SER_BIASED(a)) {
+            REBNOD *bonus = node_BONUS(Node, a);
+            if (bonus) {
+              #if !defined(NDEBUG)
+                if (IS_POINTER_TRASH_DEBUG(bonus))
+                    panic (a);
+              #endif
+                Queue_Mark_Node_Deep(bonus);
+            }
+        }
+
+    //=//// MARK ARRAY ELEMENT CELLS (if array) ///////////////////////////=//
+
         // Submits the array into the deferred stack to be processed later
         // with Propagate_All_GC_Marks().  If it were not queued and just used
         // recursion (as R3-Alpha did) then deeply nested arrays could
@@ -230,27 +306,27 @@ static void Queue_Mark_Node_Deep(void *p)
         //
         if (SER_FULL(GC_Mark_Stack))
             Extend_Series(GC_Mark_Stack, 8);
-        *SER_AT(REBARR*, GC_Mark_Stack, SER_USED(GC_Mark_Stack)) = ARR(s);
+        *SER_AT(REBARR*, GC_Mark_Stack, SER_USED(GC_Mark_Stack)) = a;
         SET_SERIES_USED(GC_Mark_Stack, SER_USED(GC_Mark_Stack) + 1);  // !term
     }
 }
 
 
 //
-//  Queue_Mark_Opt_End_Cell_Deep: C
+//  Queue_Mark_Opt_Value_Deep: C
 //
 // If a slot is not supposed to allow END, use Queue_Mark_Opt_Value_Deep()
 // If a slot allows neither END nor NULLED cells, use Queue_Mark_Value_Deep()
 //
-static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v)
+static void Queue_Mark_Opt_Value_Deep(const RELVAL *v)
 {
+    assert(KIND3Q_BYTE_UNCHECKED(v) != REB_0_END);  // faster than NOT_END()
+
     // We mark based on the type of payload in the cell, e.g. its "unescaped"
     // form.  So if '''a fits in a WORD! (despite being a QUOTED!), we want
     // to mark the cell as if it were a plain word.  Use the CELL_KIND.
     //
     enum Reb_Kind heart = cast(enum Reb_Kind, HEART_BYTE(v));
-    if (heart == REB_0_END)
-        return;  // no cell bits can be interpreted
 
   #if !defined(NDEBUG)  // see Queue_Mark_Node_Deep() for notes on recursion
     assert(not in_mark);
@@ -258,16 +334,17 @@ static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v)
   #endif
 
     if (IS_BINDABLE_KIND(heart)) {
-        REBNOD *binding = EXTRA(Binding, v).node;
-        if (binding != UNBOUND and (binding->header.bits & NODE_FLAG_MANAGED))
-            Queue_Mark_Node_Deep(ARR(binding));
+        REBSER *binding = BINDING(v);
+        if (binding != UNBOUND)
+            if (NODE_BYTE(binding) & NODE_BYTEMASK_0x20_MANAGED)
+                Queue_Mark_Node_Deep(binding);
     }
 
-    if (GET_CELL_FLAG(v, FIRST_IS_NODE) and PAYLOAD(Any, v).first.node)
-        Queue_Mark_Node_Deep(PAYLOAD(Any, v).first.node);
+    if (GET_CELL_FLAG(v, FIRST_IS_NODE) and VAL_NODE1(v))
+        Queue_Mark_Node_Deep(VAL_NODE1(v));
 
-    if (GET_CELL_FLAG(v, SECOND_IS_NODE) and PAYLOAD(Any, v).second.node)
-        Queue_Mark_Node_Deep(PAYLOAD(Any, v).second.node);
+    if (GET_CELL_FLAG(v, SECOND_IS_NODE) and VAL_NODE2(v))
+        Queue_Mark_Node_Deep(VAL_NODE2(v));
 
   #if !defined(NDEBUG)
     in_mark = false;
@@ -308,24 +385,23 @@ static void Propagate_All_GC_Marks(void)
         // We should have marked this series at queueing time to keep it from
         // being doubly added before the queue had a chance to be processed
          //
-        assert(SER(a)->header.bits & NODE_FLAG_MARKED);
+        assert(a->leader.bits & NODE_FLAG_MARKED);
 
         RELVAL *v = ARR_HEAD(a);
-        for (; NOT_END(v); ++v) {
+        const RELVAL *tail = ARR_TAIL(a);
+        for (; v != tail; ++v) {
             Queue_Mark_Opt_Value_Deep(v);
 
           #if !defined(NDEBUG)
             //
             // Nulls are illegal in most arrays, but context varlists use
-            // "nulled cells" to denote that the variable is not set.  Also
-            // reified C va_lists as Eval_Core() sources can have them.
+            // "nulled cells" to denote that the variable is not set.
             //
             if (
                 KIND3Q_BYTE_UNCHECKED(v) == REB_NULL
-                and NOT_ARRAY_FLAG(a, IS_VARLIST)
-                and NOT_ARRAY_FLAG(a, NULLEDS_LEGAL)
+                and not (IS_VARLIST(a) or IS_PATCH(a))
             ){
-                panic(a);
+                panic (a);
             }
           #endif
         }
@@ -368,56 +444,54 @@ void Reify_Va_To_Array_In_Frame(
         Init_Word(DS_TOP, Canon(SYM___OPTIMIZED_OUT__));
     }
 
-    if (NOT_END(f->feed->value)) {
-        assert(f->feed->pending == END_NODE);
+    REBLEN index;
 
+    if (NOT_END(f_value)) {
         do {
-            Derelativize(DS_PUSH(), f->feed->value, f->feed->specifier);
+            Derelativize(DS_PUSH(), f_value, f_specifier);
             assert(not IS_NULLED(DS_TOP));
             Fetch_Next_Forget_Lookback(f);
-        } while (NOT_END(f->feed->value));
+        } while (NOT_END(f_value));
 
         if (truncated)
-            f->feed->index = 2;  // skip the --optimized-out--
+            index = 2;  // skip the --optimized-out--
         else
-            f->feed->index = 1;  // position at start of the extracted values
+            index = 1;  // position at start of the extracted values
     }
     else {
-        assert(IS_POINTER_TRASH_DEBUG(f->feed->pending));
+        assert(FEED_PENDING(f->feed) == nullptr);
 
         // Leave at end of frame, but give back the array to serve as
         // notice of the truncation (if it was truncated)
         //
-        f->feed->index = 0;
+        index = 0;
     }
 
     // feeding forward should have called va_end
     //
-    assert(not f->feed->vaptr and not f->feed->packed);
+    assert(not FEED_IS_VARIADIC(f->feed));
 
     if (DSP == dsp_orig)
-        f->feed->array = EMPTY_ARRAY;  // don't bother making new empty array
+        Init_Block(FEED_SINGLE(f->feed), EMPTY_ARRAY);  // no new array needed
     else {
         REBARR *a = Pop_Stack_Values_Core(dsp_orig, SERIES_FLAG_MANAGED);
-        f->feed->array = a;  // held alive while frame running
+        Init_Any_Array_At(FEED_SINGLE(f->feed), REB_BLOCK, a, index);
     }
 
     if (truncated)
-        f->feed->value = ARR_AT(f->feed->array, 1);  // skip `--optimized--`
+        f->feed->value = ARR_AT(f_array, 1);  // skip trunc
     else
-        f->feed->value = ARR_HEAD(f->feed->array);
+        f->feed->value = ARR_HEAD(f_array);
 
     // The array just popped into existence, and it's tied to a running
     // frame...so safe to say we're holding it (if not at the end).
     //
-    if (IS_END(f->feed->value))
-        TRASH_POINTER_IF_DEBUG(f->feed->pending);
+    if (IS_END(f_value))
+        assert(FEED_PENDING(f->feed) == nullptr);
     else {
-        f->feed->pending = f->feed->value + 1;
-
-        assert(NOT_EVAL_FLAG(f, TOOK_HOLD));
-        SET_SERIES_INFO(f->feed->array, HOLD);
-        SET_EVAL_FLAG(f, TOOK_HOLD);
+        assert(NOT_FEED_FLAG(f->feed, TOOK_HOLD));
+        SET_SERIES_INFO(m_cast(REBARR*, f_array), HOLD);
+        SET_FEED_FLAG(f->feed, TOOK_HOLD);
     }
 }
 
@@ -443,52 +517,59 @@ static void Mark_Root_Series(void)
 {
     REBSEG *seg;
     for (seg = Mem_Pools[SER_POOL].segs; seg; seg = seg->next) {
-        REBSER *s = cast(REBSER *, seg + 1);
-        REBLEN n;
-        for (n = Mem_Pools[SER_POOL].units; n > 0; --n, ++s) {
+        REBYTE *unit = cast(REBYTE*, seg + 1);
+        REBLEN n = Mem_Pools[SER_POOL].num_units;
+        for (; n > 0; --n, unit += sizeof(REBSER)) {
             //
             // !!! A smarter switch statement here could do this more
             // optimally...see the sweep code for an example.
             //
-            if (IS_FREE_NODE(s))
+            REBYTE nodebyte = *unit;
+            if (nodebyte & NODE_BYTEMASK_0x40_FREE)
                 continue;
 
-            if (s->header.bits & NODE_FLAG_ROOT) {
+            assert(nodebyte & NODE_BYTEMASK_0x80_NODE);
+
+            if (nodebyte & NODE_BYTEMASK_0x02_ROOT) {
                 //
                 // This came from Alloc_Value(); all references should be
                 // from the C stack, only this visit should be marking it.
                 //
-                assert(not (s->header.bits & NODE_FLAG_MARKED));
-                assert(not IS_SER_DYNAMIC(s));
+                REBARR *a = ARR(cast(void*, unit));
 
-                if (not (s->header.bits & NODE_FLAG_MANAGED)) {
+                assert(not (a->leader.bits & NODE_FLAG_MARKED));
+
+                if (not (a->leader.bits & NODE_FLAG_MANAGED)) {
                     // if it's not managed, don't mark it (don't have to?)
                 }
                 else  // Note that Mark_Frame_Stack_Deep() will mark the owner
-                    s->header.bits |= NODE_FLAG_MARKED;
+                    a->leader.bits |= NODE_FLAG_MARKED;
 
                 // Note: Eval_Core() might target API cells, uses END
                 //
-                Queue_Mark_Opt_End_Cell_Deep(ARR_SINGLE(ARR(s)));
+                Queue_Mark_Opt_End_Cell_Deep(ARR_SINGLE(a));
                 continue;
             }
 
-            if (s->header.bits & NODE_FLAG_CELL) { // a pairing
-                if (s->header.bits & NODE_FLAG_MANAGED)
+            if (nodebyte & NODE_BYTEMASK_0x01_CELL) {  // a pairing
+                REBVAL *paired = VAL(cast(void*, unit));
+                if (paired->header.bits & NODE_FLAG_MANAGED)
                     continue; // PAIR! or other value will mark it
 
                 assert(!"unmanaged pairings not believed to exist yet");
-                REBVAL *paired = cast(REBVAL*, s);
                 Queue_Mark_Opt_Value_Deep(paired);
                 Queue_Mark_Opt_Value_Deep(PAIRING_KEY(paired));
             }
 
+            REBSER *s = SER(cast(void*, unit));
             if (IS_SER_ARRAY(s)) {
-                if (s->header.bits & NODE_FLAG_MANAGED)
+                if (s->leader.bits & NODE_FLAG_MANAGED)
                     continue; // BLOCK! should mark it
 
-                if (GET_ARRAY_FLAG(s, IS_VARLIST))
-                    if (CTX_TYPE(CTX(s)) == REB_FRAME)
+                REBARR *a = ARR(s);
+
+                if (IS_VARLIST(a))
+                    if (CTX_TYPE(CTX(a)) == REB_FRAME)
                         continue;  // Mark_Frame_Stack_Deep() etc. mark it
 
                 // This means someone did something like Make_Array() and then
@@ -501,19 +582,19 @@ static void Mark_Root_Series(void)
                 // Manage and use PUSH_GC_GUARD and DROP_GC_GUARD on them.
                 //
                 assert(
-                    NOT_ARRAY_FLAG(s, IS_VARLIST)
-                    and NOT_ARRAY_FLAG(s, IS_PARAMLIST)
-                    and NOT_ARRAY_FLAG(s, IS_PAIRLIST)
+                    not IS_VARLIST(a)
+                    and not IS_DETAILS(a)
+                    and not IS_PAIRLIST(a)
                 );
 
-                if (GET_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK))
-                    if (LINK(s).custom.node)
-                        Queue_Mark_Node_Deep(LINK(s).custom.node);
-                if (GET_SERIES_FLAG(s, MISC_NODE_NEEDS_MARK))
-                    if (MISC(s).custom.node)
-                        Queue_Mark_Node_Deep(MISC(s).custom.node);
+                if (GET_SERIES_FLAG(a, LINK_NODE_NEEDS_MARK))
+                    if (node_LINK(Node, a))
+                        Queue_Mark_Node_Deep(node_LINK(Node, a));
+                if (GET_SERIES_FLAG(a, MISC_NODE_NEEDS_MARK))
+                    if (node_MISC(Node, a))
+                        Queue_Mark_Node_Deep(node_MISC(Node, a));
 
-                RELVAL *item = ARR_HEAD(cast(REBARR*, s));
+                RELVAL *item = SER_HEAD(RELVAL, a);
                 for (; NOT_END(item); ++item)
                     Queue_Mark_Value_Deep(item);
             }
@@ -547,7 +628,7 @@ static void Mark_Data_Stack(void)
     REBVAL *head = SPECIFIC(ARR_HEAD(DS_Array));
     ASSERT_UNREADABLE_IF_DEBUG(head);  // DS_AT(0) is deliberately invalid
 
-    REBVAL *stackval = DS_TOP;
+    REBVAL *stackval = DS_Movable_Top;
     for (; stackval != head; --stackval)  // stop before DS_AT(0)
         Queue_Mark_Value_Deep(stackval);
 
@@ -568,7 +649,7 @@ static void Mark_Symbol_Series(void)
     assert(IS_POINTER_TRASH_DEBUG(*canon)); // SYM_0 for all non-builtin words
     ++canon;
     for (; *canon != nullptr; ++canon)
-        SER(*canon)->header.bits |= NODE_FLAG_MARKED;
+        (*canon)->leader.bits |= NODE_FLAG_MARKED;
 
     ASSERT_NO_GC_MARKS_PENDING(); // doesn't ues any queueing
 }
@@ -586,8 +667,10 @@ static void Mark_Symbol_Series(void)
 static void Mark_Natives(void)
 {
     REBLEN n;
-    for (n = 0; n < Num_Natives; ++n)
-        Queue_Mark_Node_Deep(Natives[n]);
+    for (n = 0; n < Num_Natives; ++n) {
+        if (Natives[n])  // checking allows recycle during Startup_Natives()
+            Queue_Mark_Node_Deep(Natives[n]);
+    }
 
     Propagate_All_GC_Marks();
 }
@@ -626,10 +709,7 @@ static void Mark_Guarded_Nodes(void)
 // Mark values being kept live by all call frames.  If a function is running,
 // then this will keep the function itself live, as well as the arguments.
 // There is also an "out" slot--which may point to an arbitrary REBVAL cell
-// on the C stack.  The out slot is initialized to an END marker at the
-// start of every function call, so that it won't be uninitialized bits
-// which would crash the GC...but it must be turned into a value (or a void)
-// by the time the function is finished running.
+// on the C stack (and must contain valid GC-readable bits at all times).
 //
 // Since function argument slots are not pre-initialized, how far the function
 // has gotten in its fulfillment must be taken into account.  Only those
@@ -644,11 +724,14 @@ static void Mark_Frame_Stack_Deep(void)
 
     while (true) { // mark all frames (even FS_BOTTOM)
         //
-        // Note: f->feed->pending should either live in f->feed->array, or
+        // Note: MISC_PENDING() should either live in FEED_ARRAY(), or
         // it may be trash (e.g. if it's an apply).  GC can ignore it.
         //
-        if (f->feed->array)
-            Queue_Mark_Node_Deep(m_cast(REBARR*, f->feed->array));
+        REBARR *singular = FEED_SINGULAR(f->feed);
+        do {
+            Queue_Mark_Value_Deep(ARR_SINGLE(singular));
+            singular = LINK(Splice, singular);
+        } while (singular);
 
         // END is possible, because the frame could be sitting at the end of
         // a block when a function runs, e.g. `do [zero-arity]`.  That frame
@@ -662,17 +745,14 @@ static void Mark_Frame_Stack_Deep(void)
         // code that a frame runs that might disrupt that relationship so it
         // would fetch differently should have meant clearing ->gotten.
         //
-        if (f->feed->gotten)
-            assert(
-                f->feed->gotten
-                == Try_Lookup_Word(f->feed->value, f->feed->specifier)
-            );
+        if (f_gotten)
+            assert(f_gotten == Lookup_Word(f_value, f_specifier));
 
         if (
-            f->feed->specifier != SPECIFIED
-            and (f->feed->specifier->header.bits & NODE_FLAG_MANAGED)
+            f_specifier != SPECIFIED
+            and (f_specifier->leader.bits & NODE_FLAG_MANAGED)
         ){
-            Queue_Mark_Node_Deep(CTX(f->feed->specifier));
+            Queue_Mark_Node_Deep(f_specifier);
         }
 
         // f->out can be nullptr at the moment, when a frame is created that
@@ -699,15 +779,15 @@ static void Mark_Frame_Stack_Deep(void)
 
         Queue_Mark_Node_Deep(f->original);  // never nullptr
 
-        if (f->opt_label)  // nullptr if anonymous
-            Queue_Mark_Node_Deep(m_cast(REBSTR*, f->opt_label));
+        if (f->label)  // nullptr if anonymous
+            Queue_Mark_Node_Deep(m_cast(REBSYM*, unwrap(f->label)));
 
         // special can be used to GC protect an arbitrary value while a
         // function is running, currently.  nullptr is permitted as well
         // (e.g. path frames use nullptr to indicate no set value on a path)
         //
-        if (f->special)
-            Queue_Mark_Opt_End_Cell_Deep(f->special);
+        if (f->param)
+            Queue_Mark_Opt_End_Cell_Deep(f->param);
 
         if (f->varlist and GET_SERIES_FLAG(f->varlist, MANAGED)) {
             //
@@ -715,12 +795,12 @@ static void Mark_Frame_Stack_Deep(void)
             // then it can just be marked normally...no need to do custom
             // partial parameter traversal.
             //
-            assert(IS_END(f->param)); // done walking
-            Queue_Mark_Node_Deep(CTX(f->varlist));
+            assert(not Is_Action_Frame_Fulfilling(f));
+            Queue_Mark_Node_Deep(f->varlist);  // may not pass CTX() test
             goto propagate_and_continue;
         }
 
-        if (f->varlist and GET_SERIES_INFO(f->varlist, INACCESSIBLE)) {
+        if (f->varlist and GET_SERIES_FLAG(f->varlist, INACCESSIBLE)) {
             //
             // This happens in Encloser_Dispatcher(), where it can capture a
             // varlist that may not be managed (e.g. if there were no ADAPTs
@@ -740,14 +820,15 @@ static void Mark_Frame_Stack_Deep(void)
         //
         REBACT *phase; // goto would cross initialization
         phase = FRM_PHASE(f);
-        REBVAL *param;
-        param = ACT_PARAMS_HEAD(phase);
+        const REBKEY *key;
+        const REBKEY *tail;
+        key = ACT_KEYS(&tail, phase);
 
         REBVAL *arg;
-        for (arg = FRM_ARGS_HEAD(f); NOT_END(param); ++param, ++arg) {
-            if (param == f->param) {
+        for (arg = FRM_ARGS_HEAD(f); key != tail; ++key, ++arg) {
+            if (key == f->key) {
                 //
-                // When param and f->param match, that means that arg is the
+                // When key and f->key match, that means that arg is the
                 // output slot for some other frame's f->out.  Let that frame
                 // do the marking (which tolerates END, an illegal state for
                 // prior arg slots we've visited...unless deferred!)
@@ -793,7 +874,7 @@ static REBLEN Sweep_Series(void)
 
     REBSEG *seg = Mem_Pools[SER_POOL].segs;
     for (; seg != nullptr; seg = seg->next) {
-        REBLEN n = Mem_Pools[SER_POOL].units;
+        REBLEN n = Mem_Pools[SER_POOL].num_units;
 
         // We use a generic byte pointer (unsigned char*) to dodge the rules
         // for strict aliasing, as the pool may contain pairs of REBVAL from
@@ -804,10 +885,10 @@ static REBLEN Sweep_Series(void)
         // DEBUG_TRACK_EXTEND_CELLS, then this will be processing the REBSER
         // nodes only--see loop lower down for the pairing pool enumeration.
 
-        REBYTE *bp = cast(REBYTE*, seg + 1);
+        REBYTE *unit = cast(REBYTE*, seg + 1);
 
-        for (; n > 0; --n, bp += sizeof(REBSER)) {
-            switch (*bp >> 4) {
+        for (; n > 0; --n, unit += sizeof(REBSER)) {
+            switch (*unit >> 4) {
               case 0:
               case 1:  // 0x1
               case 2:  // 0x2
@@ -821,7 +902,7 @@ static REBLEN Sweep_Series(void)
                 // reserved for UTF-8 strings (corresponding to valid ASCII
                 // values in the first byte).
                 //
-                panic (bp);
+                panic (unit);
 
             // v-- Everything below here has NODE_FLAG_NODE set (0x8)
 
@@ -842,7 +923,7 @@ static REBLEN Sweep_Series(void)
                 // 0x8 + 0x1: marked but not managed, this can't happen,
                 // because the marking itself asserts nodes are managed.
                 //
-                panic (bp);
+                panic (unit);
 
               case 10:
                 // 0x8 + 0x2: managed but didn't get marked, should be GC'd
@@ -851,12 +932,12 @@ static REBLEN Sweep_Series(void)
                 // as part of the switch, but see its definition for why it
                 // is at position 8 from left and not an earlier bit.
                 //
-                if (*bp & NODE_BYTEMASK_0x01_CELL) {
-                    assert(not (*bp & NODE_BYTEMASK_0x04_ROOT));
-                    Free_Node(SER_POOL, NOD(bp));  // Free_Pairing for manuals
+                if (*unit & NODE_BYTEMASK_0x01_CELL) {
+                    assert(not (*unit & NODE_BYTEMASK_0x02_ROOT));
+                    Free_Node(SER_POOL, NOD(unit));  // Free_Pairing manual
                 }
                 else {
-                    REBSER *s = cast(REBSER*, bp);
+                    REBSER *s = cast(REBSER*, unit);
                     GC_Kill_Series(s);
                 }
                 ++count;
@@ -866,7 +947,7 @@ static REBLEN Sweep_Series(void)
                 // 0x8 + 0x2 + 0x1: managed and marked, so it's still live.
                 // Don't GC it, just clear the mark.
                 //
-                *bp &= ~NODE_BYTEMASK_0x10_MARKED;
+                *unit &= ~NODE_BYTEMASK_0x10_MARKED;
                 break;
 
             // v-- Everything below this line has the two leftmost bits set
@@ -877,13 +958,13 @@ static REBLEN Sweep_Series(void)
               case 12:
                 // 0x8 + 0x4: free node, uses special illegal UTF-8 byte
                 //
-                assert(*bp == FREED_SERIES_BYTE);
+                assert(*unit == FREED_SERIES_BYTE);
                 break;
 
               case 13:
               case 14:
               case 15:
-                panic (bp);  // 0x8 + 0x4 + ... reserved for UTF-8
+                panic (unit);  // 0x8 + 0x4 + ... reserved for UTF-8
             }
         }
     }
@@ -896,7 +977,7 @@ static REBLEN Sweep_Series(void)
   #ifdef UNUSUAL_REBVAL_SIZE
     for (seg = Mem_Pools[PAR_POOL].segs; seg != NULL; seg = seg->next) {
         REBVAL *v = cast(REBVAL*, seg + 1);
-        REBLEN n = Mem_Pools[PAR_POOL].units;
+        REBLEN n = Mem_Pools[PAR_POOL].num_units;
         for (; n > 0; --n, v += 2) {
             if (v->header.bits & NODE_FLAG_FREE) {
                 assert(FIRST_BYTE(v->header) == FREED_SERIES_BYTE);
@@ -936,37 +1017,39 @@ REBLEN Fill_Sweeplist(REBSER *sweeplist)
 
     REBSEG *seg;
     for (seg = Mem_Pools[SER_POOL].segs; seg != NULL; seg = seg->next) {
-        REBSER *s = cast(REBSER*, seg + 1);
-        REBLEN n;
-        for (n = Mem_Pools[SER_POOL].units; n > 0; --n, ++s) {
-            switch (FIRST_BYTE(s->header) >> 4) {
-            case 9: // 0x8 + 0x1
+        REBYTE *unit = cast(REBYTE*, seg + 1);
+        REBLEN n = Mem_Pools[SER_POOL].num_units;
+        for (; n > 0; --n, unit += sizeof(REBSER)) {
+            switch (*unit >> 4) {
+              case 9: {  // 0x8 + 0x1
+                REBSER *s = SER(cast(void*, unit));
                 ASSERT_SERIES_MANAGED(s);
-                if (s->header.bits & NODE_FLAG_MARKED)
-                    s->header.bits &= ~NODE_FLAG_MARKED;
+                if (s->leader.bits & NODE_FLAG_MARKED)
+                    s->leader.bits &= ~NODE_FLAG_MARKED;
                 else {
                     EXPAND_SERIES_TAIL(sweeplist, 1);
-                    *SER_AT(REBNOD*, sweeplist, count) = NOD(s);
+                    *SER_AT(REBNOD*, sweeplist, count) = s;
                     ++count;
                 }
-                break;
+                break; }
 
-            case 11: // 0x8 + 0x2 + 0x1
+              case 11: {  // 0x8 + 0x2 + 0x1
                 //
                 // It's a cell which is managed where the value is not an END.
                 // This is a managed pairing, so mark bit should be heeded.
                 //
                 // !!! It is a REBNOD, but *not* a "series".
                 //
-                ASSERT_SERIES_MANAGED(s);
-                if (s->header.bits & NODE_FLAG_MARKED)
-                    s->header.bits &= ~NODE_FLAG_MARKED;
+                REBVAL *pairing = VAL(cast(void*, unit));
+                assert(pairing->header.bits & NODE_FLAG_MANAGED);
+                if (pairing->header.bits & NODE_FLAG_MARKED)
+                    pairing->header.bits &= ~NODE_FLAG_MARKED;
                 else {
                     EXPAND_SERIES_TAIL(sweeplist, 1);
-                    *SER_AT(REBNOD*, sweeplist, count) = NOD(s);
+                    *SER_AT(REBNOD*, sweeplist, count) = NOD(pairing);
                     ++count;
                 }
-                break;
+                break; }
             }
         }
     }
@@ -1023,17 +1106,11 @@ REBLEN Recycle_Core(bool shutdown, REBSER *sweeplist)
 
     ASSERT_NO_GC_MARKS_PENDING();
 
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     PG_Reb_Stats->Recycle_Counter++;
     PG_Reb_Stats->Recycle_Series = Mem_Pools[SER_POOL].free;
     PG_Reb_Stats->Mark_Count = 0;
   #endif
-
-    // WARNING: This terminates an existing open block.  This could be a
-    // problem if code is building a new value at the tail, but has not yet
-    // updated the TAIL marker.
-    //
-    TERM_ARRAY_LEN(BUF_COLLECT, ARR_LEN(BUF_COLLECT));
 
     // The TG_Reuse list consists of entries which could grow to arbitrary
     // length, and which aren't being tracked anywhere.  Cull them during GC
@@ -1042,8 +1119,8 @@ REBLEN Recycle_Core(bool shutdown, REBSER *sweeplist)
     //
     while (TG_Reuse) {
         REBARR *varlist = TG_Reuse;
-        TG_Reuse = LINK(TG_Reuse).reuse;
-        GC_Kill_Series(SER(varlist)); // no track for Free_Unmanaged_Series()
+        TG_Reuse = LINK(ReuseNext, TG_Reuse);
+        GC_Kill_Series(varlist); // no track for Free_Unmanaged_Series()
     }
 
     // MARKING PHASE: the "root set" from which we determine the liveness
@@ -1085,13 +1162,13 @@ REBLEN Recycle_Core(bool shutdown, REBSER *sweeplist)
     else
         count += Sweep_Series();
 
-#if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     // Compute new stats:
     PG_Reb_Stats->Recycle_Series
         = Mem_Pools[SER_POOL].free - PG_Reb_Stats->Recycle_Series;
     PG_Reb_Stats->Recycle_Series_Total += PG_Reb_Stats->Recycle_Series;
     PG_Reb_Stats->Recycle_Prior_Eval = Eval_Cycles;
-#endif
+  #endif
 
     // !!! This reset of the "ballast" is the original code from R3-Alpha:
     //
@@ -1162,7 +1239,7 @@ REBLEN Recycle(void)
 void Push_Guard_Node(const REBNOD *node)
 {
   #if !defined(NDEBUG)
-    if (FIRST_BYTE(node->header) & NODE_BYTEMASK_0x01_CELL) {
+    if (NODE_BYTE(node) & NODE_BYTEMASK_0x01_CELL) {
         //
         // It is a value.  Cheap check: require that it already contain valid
         // data when the guard call is made (even if GC isn't necessarily
@@ -1216,13 +1293,12 @@ void Startup_GC(void)
 
     // Temporary series and values protected from GC. Holds node pointers.
     //
-    GC_Guarded = Make_Series(15, sizeof(REBNOD*));
+    GC_Guarded = Make_Series(15, FLAG_FLAVOR(NODELIST));
 
     // The marking queue used in lieu of recursion to ensure that deeply
     // nested structures don't cause the C stack to overflow.
     //
-    GC_Mark_Stack = Make_Series(100, sizeof(const REBNOD*));
-    TERM_SEQUENCE(GC_Mark_Stack);
+    GC_Mark_Stack = Make_Series(100, FLAG_FLAVOR(NODELIST));
 }
 
 
@@ -1252,7 +1328,7 @@ static void Mark_Devices_Deep(void)
         if (not dev->pending)
             continue;
 
-        REBSER *req = SER(dev->pending);
+        REBNOD *req = m_cast(REBNOD*, dev->pending);
 
         // This used to walk the ->next field of the REBREQ explicitly, and
         // mark the port pointers internal to the REBREQ.  Following the

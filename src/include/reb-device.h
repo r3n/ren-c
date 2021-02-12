@@ -44,6 +44,14 @@
 //
 
 
+#define LINK_ReqNext_TYPE       REBREQ*  // alias for REBBIN
+#define LINK_ReqNext_CAST       BIN
+#define HAS_LINK_ReqNext        FLAVOR_BINARY
+
+#define MISC_ReqPortCtx_TYPE    REBCTX*
+#define MISC_ReqPortCtx_CAST    CTX
+#define HAS_MISC_ReqPortCtx     FLAVOR_BINARY
+
 enum Reb_Device_Command {
     RDC_INIT,       // init device driver resources
     RDC_QUIT,       // cleanup device driver resources
@@ -121,19 +129,6 @@ enum {
     RDM_NULL = 1 << 0 // !!! "Null device", can this just be a boolean?
 };
 
-// Serial Parity
-enum {
-    SERIAL_PARITY_NONE,
-    SERIAL_PARITY_ODD,
-    SERIAL_PARITY_EVEN
-};
-
-// Serial Flow Control
-enum {
-    SERIAL_FLOW_CONTROL_NONE,
-    SERIAL_FLOW_CONTROL_HARDWARE,
-    SERIAL_FLOW_CONTROL_SOFTWARE
-};
 
 // Commands:
 typedef int32_t (*DEVICE_CMD_CFUNC)(REBREQ *req);
@@ -147,7 +142,7 @@ struct rebol_device {
     DEVICE_CMD_CFUNC *commands; // command dispatch table
     uint32_t max_command;   // keep commands in bounds
     uint32_t req_size;      // size of the request state
-    REBREQ *pending;        // pending requests
+    REBNOD *pending;        // pending requests (actually a REBREQ*)
     uint32_t flags;         // state: open, signal
 
     REBDEV *next;  // next in linked list of registered devices
@@ -206,29 +201,6 @@ inline static struct rebol_devreq *Req(REBREQ *req) {
 }
 
 
-// Get `next_req` field hidden in REBSER structure LINK().
-// Being in this spot (instead of inside the binary content of the request)
-// means the chain of requests can be followed by GC.
-//
-inline static void **AddrOfNextReq(REBREQ *req) {
-    ASSERT_REBREQ(req);
-    return cast(void**, &LINK(req).custom.node);  // NextReq() dereferences
-}
-#define NextReq(req) \
-    *cast(REBREQ**, AddrOfNextReq(req))
-
-
-// Get `port_ctx` field hidden in REBSER structure MISC().
-// Being in this spot (instead of inside the binary content of the request)
-// means the chain of requests can be followed by GC.
-//
-inline static void **AddrOfReqPortCtx(REBREQ *req) {
-    ASSERT_REBREQ(req);
-    return cast(void**, &MISC(req).custom.node);  // ReqPortCtx() dereferences
-}
-#define ReqPortCtx(req) \
-    *cast(REBCTX**, AddrOfReqPortCtx(req))  // !!! Transitional hack
-
 
 // !!! Transitional - Lifetime management of REBREQ in R3-Alpha was somewhat
 // unclear, with them being created sometimes on the stack, and sometimes
@@ -279,6 +251,6 @@ inline static void OS_DO_DEVICE_SYNC(
     REBVAL *result = OS_DO_DEVICE(req, command);
     assert(result != NULL);  // should be synchronous
     if (rebDid("error?", result, rebEND))
-        rebJumps("FAIL", result, rebEND);
+        rebJumps("fail", result, rebEND);
     rebRelease(result);  // ignore result
 }

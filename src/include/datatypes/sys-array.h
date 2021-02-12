@@ -28,7 +28,7 @@
 // In Ren-C, there is an implicit END marker just past the last cell in the
 // capacity.  Allowing a SET_END() on this position could corrupt the END
 // signaling slot, which only uses a bit out of a Reb_Header sized item to
-// signal.  Use TERM_ARRAY_LEN() to safely terminate arrays and respect not
+// signal.  Use SET_SERIES_LEN() to safely terminate arrays and respect not
 // writing if it's past capacity.
 //
 // While many operations are shared in common with REBSER, there is a
@@ -46,6 +46,35 @@
 //
 
 
+// !!! We generally want to use LINK(Filename, x) but that uses the STR()
+// macro which is not defined in this file.  There's a bit of a circular
+// dependency since %sys-string.h uses arrays for bookmarks; so having a
+// special operation here is an easy workaround that still lets us make a
+// lot of this central code inlinable.
+//
+#define LINK_FILENAME_HACK(s) \
+    cast(const REBSTR*, s->link.any.node)
+
+
+inline static bool Has_Newline_At_Tail(const REBARR *a) {
+    if (SER_FLAVOR(a) != FLAVOR_ARRAY)
+        return false;  // only plain arrays can have newlines
+
+    // Using GET_SUBCLASS_FLAG() would redundantly check it's a plain array.
+    //
+    return did (a->leader.bits & ARRAY_FLAG_NEWLINE_AT_TAIL);
+}
+
+inline static bool Has_File_Line(const REBARR *a) {
+    if (SER_FLAVOR(a) != FLAVOR_ARRAY)
+        return false;  // only plain arrays can have newlines
+
+    // Using GET_SUBCLASS_FLAG() would redundantly check it's a plain array.
+    //
+    return did (a->leader.bits & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED);
+}
+
+
 // HEAD, TAIL, and LAST refer to specific value pointers in the array.  An
 // empty array should have an END marker in its head slot, and since it has
 // no last value then ARR_LAST should not be called (this is checked in
@@ -54,38 +83,38 @@
 // valid for writing a full REBVAL.
 
 inline static RELVAL *ARR_AT(const_if_c REBARR *a, REBLEN n)
-  { return SER_AT(RELVAL, SER(a), n); }
+  { return SER_AT(RELVAL, a, n); }
 
 inline static RELVAL *ARR_HEAD(const_if_c REBARR *a)
-  { return SER_HEAD(RELVAL, SER(a)); }
+  { return SER_HEAD(RELVAL, a); }
 
 inline static RELVAL *ARR_TAIL(const_if_c REBARR *a)
-  { return SER_TAIL(RELVAL, SER(a)); }
+  { return SER_TAIL(RELVAL, a); }
 
 inline static RELVAL *ARR_LAST(const_if_c REBARR *a)
-  { return SER_LAST(RELVAL, SER(a)); }
+  { return SER_LAST(RELVAL, a); }
 
 inline static RELVAL *ARR_SINGLE(const_if_c REBARR *a) {
     assert(not IS_SER_DYNAMIC(a));
-    return cast(RELVAL*, &SER(a)->content.fixed);
+    return cast(RELVAL*, &a->content.fixed);
 }
 
 #ifdef __cplusplus
     inline static const RELVAL *ARR_AT(const REBARR *a, REBLEN n)
-        { return SER_AT(const RELVAL, SER(a), n); }
+        { return SER_AT(const RELVAL, a, n); }
 
     inline static const RELVAL *ARR_HEAD(const REBARR *a)
-        { return SER_HEAD(const RELVAL, SER(a)); }
+        { return SER_HEAD(const RELVAL, a); }
 
     inline static const RELVAL *ARR_TAIL(const REBARR *a)
-        { return SER_TAIL(const RELVAL, SER(a)); }
+        { return SER_TAIL(const RELVAL, a); }
 
     inline static const RELVAL *ARR_LAST(const REBARR *a)
-        { return SER_LAST(const RELVAL, SER(a)); }
+        { return SER_LAST(const RELVAL, a); }
 
     inline static const RELVAL *ARR_SINGLE(const REBARR *a) {
         assert(not IS_SER_DYNAMIC(a));
-        return cast(const RELVAL*, &SER(a)->content.fixed);
+        return cast(const RELVAL*, &a->content.fixed);
     }
 #endif
 
@@ -108,59 +137,19 @@ inline static REBARR *Singular_From_Cell(const RELVAL *v) {
 // and its terminator.  Many routines seek to choose the precise moment to
 // sync these independently for performance reasons (for better or worse).
 //
-#define ARR_LEN(a) \
-    SER_USED(SER(a))
+inline static REBLEN ARR_LEN(const REBARR *a)
+  { return SER_USED(a); }
 
-
-// Set length and also terminate.  This routine avoids conditionality in the
-// release build, which means it may overwrite a signal byte in a "read-only"
-// end (such as an Endlike_Header).  Not branching is presumed to perform
-// better, but cells that weren't ends already are writability checked.
-//
-// !!! Review if SERIES_FLAG_FIXED_SIZE should be calling this routine.  At
-// the moment, fixed size series merely can't expand, but it might be more
-// efficient if they didn't use any "appending" operators to get built.
-//
-inline static void TERM_ARRAY_LEN(REBARR *a, REBLEN len) {
-    assert(len < SER_REST(SER(a)));
-    SET_SERIES_LEN(SER(a), len);
-
-  #if !defined(NDEBUG)
-    if (NOT_END(ARR_AT(a, len)))
-        ASSERT_CELL_WRITABLE_EVIL_MACRO(ARR_AT(a, len), __FILE__, __LINE__);
-  #endif
-    mutable_SECOND_BYTE(ARR_AT(a, len)->header.bits) = REB_0_END;
-}
-
-inline static void SET_ARRAY_LEN_NOTERM(REBARR *a, REBLEN len) {
-    SET_SERIES_LEN(SER(a), len); // call out non-terminating usages
-}
 
 inline static void RESET_ARRAY(REBARR *a) {
-    TERM_ARRAY_LEN(a, 0);
+    SET_SERIES_LEN(a, 0);
 }
-
-inline static void TERM_SERIES(REBSER *s) {
-    if (IS_SER_ARRAY(s))
-        TERM_ARRAY_LEN(ARR(s), ARR_LEN(s));
-    else
-        TERM_SEQUENCE(s);
-}
-
-
-// !!! PLEASE NOTE: !!! These variants do not cast the result to ARR() in
-// order to chain it, because `gcc (Ubuntu/Linaro 4.6.3-1ubuntu5) 4.6.3`
-// complained about "value computed but not used".  The chaining feature
-// wasn't really being used anyway, so it wasn't worth it to workaround.
-//
-#define Manage_Array(a)             Manage_Series(SER(a))  // SEE NOTE
-#define Force_Array_Managed(a)     Force_Series_Managed(SER(a))  // SEE NOTE
 
 
 //
 // REBVAL cells cannot be written to unless they carry CELL_FLAG_CELL, and
 // have been "formatted" to convey their lifetime (stack or array).  This
-// helps debugging, but is also important information needed by Move_Value()
+// helps debugging, but is also important information needed by Copy_Cell()
 // for deciding if the lifetime of a target cell requires the "reification"
 // of any temporary referenced structures into ones managed by the GC.
 //
@@ -187,7 +176,7 @@ inline static void Prep_Array(
         // expansion and un-prepping them on every shrink.
         //
         REBLEN n;
-        for (n = 0; n < SER(a)->content.dynamic.rest - 1; ++n, ++prep)
+        for (n = 0; n < a->content.dynamic.rest - 1; ++n, ++prep)
             Prep_Cell(prep);
     }
     else {
@@ -201,16 +190,15 @@ inline static void Prep_Array(
         // about the bits in the excess capacity.  But set them to trash in
         // the debug build.
         //
-        prep->header = Endlike_Header(0); // unwritable
-        TRACK_CELL_IF_DEBUG_EVIL_MACRO(prep, __FILE__, __LINE__);
+        prep->header.bits = Endlike_Header(0); // unwritable
+        USED(TRACK_CELL_IF_DEBUG(prep));
       #if !defined(NDEBUG)
-        while (n < SER(a)->content.dynamic.rest) { // no -1 (n is 1-based)
+        while (n < a->content.dynamic.rest) { // no -1 (n is 1-based)
             ++n;
-            ++prep;
+            prep = TRACK_CELL_IF_DEBUG(prep + 1);
             prep->header.bits =
                 FLAG_KIND3Q_BYTE(REB_T_TRASH)
                 | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
-            TRACK_CELL_IF_DEBUG_EVIL_MACRO(prep, __FILE__, __LINE__);
         }
       #endif
 
@@ -218,7 +206,7 @@ inline static void Prep_Array(
         // It may not be necessary, but doing it for now to have an easier
         // invariant to work with.  Review.
         //
-        prep = ARR_AT(a, SER(a)->content.dynamic.rest - 1);
+        prep = ARR_AT(a, a->content.dynamic.rest - 1);
         // fallthrough
     }
 
@@ -228,30 +216,32 @@ inline static void Prep_Array(
     // sure no code depends on a full cell in the last location,  make it
     // an unwritable end--to leave flexibility to use the rest of the cell.
     //
-    prep->header = Endlike_Header(0);
-    TRACK_CELL_IF_DEBUG_EVIL_MACRO(prep, __FILE__, __LINE__);
+    prep->header.bits = Endlike_Header(0);
+    USED(TRACK_CELL_IF_DEBUG(prep));
 }
 
 
 // Make a series that is the right size to store REBVALs (and marked for the
 // garbage collector to look into recursively).  ARR_LEN() will be 0.
 //
-inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
+inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
+{
     const REBLEN wide = sizeof(REBVAL);
 
     REBSER *s = Alloc_Series_Node(flags);
+    assert(IS_SER_ARRAY(s));  // flavor should have been an array flavor
 
     if (
-        (flags & SERIES_FLAG_ALWAYS_DYNAMIC)  // inlining will constant fold
+        (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold
         or capacity > 1
     ){
         capacity += 1;  // account for cell needed for terminator (END)
 
-        s->info = Endlike_Header(FLAG_LEN_BYTE_OR_255(255));  // dynamic
+        SET_SERIES_FLAG(s, DYNAMIC);
 
-        if (not Did_Series_Data_Alloc(s, capacity)) {  // expects LEN_BYTE=255
-            s->header.bits &= ~NODE_FLAG_MANAGED;  // can't kill if managed
-            s->info.bits |= SERIES_INFO_INACCESSIBLE;
+        if (not Did_Series_Data_Alloc(s, capacity)) {  // expects USED_BYTE=255
+            s->leader.bits &= ~NODE_FLAG_MANAGED;  // can't kill if managed
+            SET_SERIES_FLAG(s, INACCESSIBLE);
             GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
 
             fail (Error_No_Memory(capacity * wide));
@@ -260,20 +250,21 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
         Prep_Array(ARR(s), capacity);
         SET_END(ARR_HEAD(ARR(s)));
 
-      #if !defined(NDEBUG)
+      #if defined(DEBUG_COLLECT_STATS)
         PG_Reb_Stats->Series_Memory += capacity * wide;
       #endif
     }
     else {
-        RELVAL *cell = SER_CELL(s);
+        RELVAL *cell = TRACK_CELL_IF_DEBUG(SER_CELL(s));
         cell->header.bits = CELL_MASK_PREP_END;
-        TRACK_CELL_IF_DEBUG_EVIL_MACRO(cell, "<<make>>", 0);
-
-        s->info = Endlike_Header(
-            FLAG_WIDE_BYTE_OR_0(0)  // implicit termination
-                | FLAG_LEN_BYTE_OR_255(0)
-        );
     }
+
+    if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK))
+        TRASH_POINTER_IF_DEBUG(s->info.node);
+    else 
+        SER_INFO(s) = Endlike_Header(
+            FLAG_USED_BYTE_ARRAY()  // reserved for future use
+        );
 
     // It is more efficient if you know a series is going to become managed to
     // create it in the managed state.  But be sure no evaluations are called
@@ -293,22 +284,25 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags) {
     // Arrays created at runtime default to inheriting the file and line
     // number from the array executing in the current frame.
     //
-    if (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED) { // most callsites fold
+    if (
+        FLAVOR_BYTE(flags) == FLAVOR_ARRAY
+        and (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED)  // hope callsites fold
+    ){
         assert(flags & SERIES_FLAG_LINK_NODE_NEEDS_MARK);
         if (
-            FS_TOP->feed->array and
-            GET_ARRAY_FLAG(FS_TOP->feed->array, HAS_FILE_LINE_UNMASKED)
+            not FRM_IS_VARIADIC(FS_TOP) and
+            GET_SUBCLASS_FLAG(ARRAY, FRM_ARRAY(FS_TOP), HAS_FILE_LINE_UNMASKED)
         ){
-            LINK_FILE_NODE(s) = LINK_FILE_NODE(FS_TOP->feed->array);
-            MISC(s).line = MISC(FS_TOP->feed->array).line;
+            mutable_LINK(Filename, s) = LINK_FILENAME_HACK(FRM_ARRAY(FS_TOP));
+            s->misc.line = FRM_ARRAY(FS_TOP)->misc.line;
         }
         else {
-            CLEAR_ARRAY_FLAG(s, HAS_FILE_LINE_UNMASKED);
+            CLEAR_SUBCLASS_FLAG(ARRAY, s, HAS_FILE_LINE_UNMASKED);
             CLEAR_SERIES_FLAG(s, LINK_NODE_NEEDS_MARK);
         }
     }
 
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_COLLECT_STATS)
     PG_Reb_Stats->Blocks++;
   #endif
 
@@ -331,7 +325,7 @@ inline static REBARR *Make_Array_For_Copy(
     REBFLGS flags,
     const REBARR *original
 ){
-    if (original and GET_ARRAY_FLAG(original, NEWLINE_AT_TAIL)) {
+    if (original and Has_Newline_At_Tail(original)) {
         //
         // All of the newline bits for cells get copied, so it only makes
         // sense that the bit for newline on the tail would be copied too.
@@ -340,16 +334,17 @@ inline static REBARR *Make_Array_For_Copy(
     }
 
     if (
-        (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED)
-        and (original and GET_ARRAY_FLAG(original, HAS_FILE_LINE_UNMASKED))
+        FLAVOR_BYTE(flags) == FLAVOR_ARRAY
+        and (flags & ARRAY_FLAG_HAS_FILE_LINE_UNMASKED)
+        and (original and Has_File_Line(original))
     ){
         REBARR *a = Make_Array_Core(
             capacity,
             flags & ~ARRAY_FLAG_HAS_FILE_LINE_UNMASKED
         );
-        LINK_FILE_NODE(a) = LINK_FILE_NODE(original);
-        MISC(a).line = MISC(original).line;
-        SET_ARRAY_FLAG(a, HAS_FILE_LINE_UNMASKED);
+        mutable_LINK(Filename, a) = LINK_FILENAME_HACK(original);
+        a->misc.line = original->misc.line;
+        SET_SUBCLASS_FLAG(ARRAY, a, HAS_FILE_LINE_UNMASKED);
         return a;
     }
 
@@ -366,14 +361,12 @@ inline static REBARR *Make_Array_For_Copy(
 // For `flags`, be sure to consider if you need ARRAY_FLAG_HAS_FILE_LINE.
 //
 inline static REBARR *Alloc_Singular(REBFLGS flags) {
-    assert(not (flags & SERIES_FLAG_ALWAYS_DYNAMIC));
-    REBARR *a = Make_Array_Core(1, flags | SERIES_FLAG_FIXED_SIZE);
-    mutable_LEN_BYTE_OR_255(SER(a)) = 1; // non-dynamic length (default was 0)
-    return a;
+    assert(not (flags & SERIES_FLAG_DYNAMIC));
+    return Make_Array_Core(1, flags | SERIES_FLAG_FIXED_SIZE);
 }
 
 #define Append_Value(a,v) \
-    Move_Value(Alloc_Tail_Array(a), (v))
+    Copy_Cell(Alloc_Tail_Array(a), (v))
 
 #define Append_Value_Core(a,v,s) \
     Derelativize(Alloc_Tail_Array(a), (v), (s))
@@ -446,10 +439,6 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
     );
 }
 
-#define Free_Unmanaged_Array(a) \
-    Free_Unmanaged_Series(SER(a))
-
-
 
 //=////////////////////////////////////////////////////////////////////////=//
 //
@@ -466,12 +455,6 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
 #define EMPTY_ARRAY \
     PG_Empty_Array // Note: initialized from VAL_ARRAY(Root_Empty_Block)
 
-#define EMPTY_TEXT \
-    Root_Empty_Text
-
-#define EMPTY_BINARY \
-    Root_Empty_Binary
-
 
 // These operations do not need to take the value's index position into
 // account; they strictly operate on the array series
@@ -479,10 +462,10 @@ inline static REBARR* Copy_Array_At_Extra_Deep_Flags_Managed(
 inline static const REBARR *VAL_ARRAY(REBCEL(const*) v) {
     assert(ANY_ARRAY_KIND(CELL_HEART(v)));
 
-    const REBARR *a = ARR(PAYLOAD(Any, v).first.node);
-    if (GET_SERIES_INFO(a, INACCESSIBLE))
+    const REBARR *a = ARR(VAL_NODE1(v));
+    if (GET_SERIES_FLAG(a, INACCESSIBLE))
         fail (Error_Series_Data_Freed_Raw());
-    return ARR(a);
+    return a;
 }
 
 #define VAL_ARRAY_ENSURE_MUTABLE(v) \
@@ -501,7 +484,7 @@ inline static const REBARR *VAL_ARRAY(REBCEL(const*) v) {
 // arrays meaningfully, it should work with VAL_INDEX_UNBOUNDED().
 //
 inline static const RELVAL *VAL_ARRAY_LEN_AT(
-    REBLEN *len_at_out,
+    option(REBLEN*) len_at_out,
     REBCEL(const*) v
 ){
     const REBARR *arr = VAL_ARRAY(v);
@@ -510,21 +493,53 @@ inline static const RELVAL *VAL_ARRAY_LEN_AT(
     if (i < 0 or i > cast(REBIDX, len))
         fail (Error_Index_Out_Of_Range_Raw());
     if (len_at_out)  // inlining should remove this if() for VAL_ARRAY_AT()
-        *len_at_out = len - i;
+        *unwrap(len_at_out) = len - i;
     return ARR_AT(arr, i);
 }
 
-#define VAL_ARRAY_AT(v) \
-    VAL_ARRAY_LEN_AT(nullptr, (v))
+inline static const RELVAL *VAL_ARRAY_AT(
+    option(const RELVAL**) tail_out,
+    REBCEL(const*) v
+){
+    const REBARR *arr = VAL_ARRAY(v);
+    REBIDX i = VAL_INDEX_RAW(v);  // VAL_ARRAY() already checks it's series
+    REBLEN len = ARR_LEN(arr);
+    if (i < 0 or i > cast(REBIDX, len))
+        fail (Error_Index_Out_Of_Range_Raw());
+    const RELVAL *at = ARR_AT(arr, i);
+    if (tail_out)  // inlining should remove this if() for no tail
+        *unwrap(tail_out) = at + (len - i);
+    return at;
+}
 
-#define VAL_ARRAY_AT_ENSURE_MUTABLE(v) \
-    m_cast(RELVAL*, VAL_ARRAY_AT(ENSURE_MUTABLE(v)))
+inline static const RELVAL *VAL_ARRAY_AT_HEAD_T(
+    option(const RELVAL**) tail_out,
+    REBCEL(const*) v
+){
+    const REBARR *arr = VAL_ARRAY(v);
+    REBIDX i = VAL_INDEX_RAW(v);  // VAL_ARRAY() already checks it's series
+    const RELVAL *at = ARR_AT(arr, i);
+    if (tail_out) {  // inlining should remove this if() for no tail
+        REBLEN len = ARR_LEN(arr);
+        *unwrap(tail_out) = at + len;
+    }
+    return at;
+}
 
-#define VAL_ARRAY_KNOWN_MUTABLE_AT(v) \
-    m_cast(RELVAL*, VAL_ARRAY_AT(KNOWN_MUTABLE(v)))
+inline static const RELVAL *VAL_ARRAY_ITEM_AT(REBCEL(const*) v) {
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT(&tail, v);
+    assert(item != tail);  // should be a valid value
+    return item;
+}
 
-#define VAL_ARRAY_KNOWN_MUTABLE_LEN_AT(len_out,v) \
-    m_cast(RELVAL*, VAL_ARRAY_LEN_AT((len_out), KNOWN_MUTABLE(v)))
+
+#define VAL_ARRAY_AT_ENSURE_MUTABLE(tail_out,v) \
+    m_cast(RELVAL*, VAL_ARRAY_AT((tail_out), ENSURE_MUTABLE(v)))
+
+#define VAL_ARRAY_KNOWN_MUTABLE_AT(tail_out,v) \
+    m_cast(RELVAL*, VAL_ARRAY_AT((tail_out), KNOWN_MUTABLE(v)))
+
 
 // !!! R3-Alpha introduced concepts of immutable series with PROTECT, but
 // did not consider the protected status to apply to binding.  Ren-C added
@@ -535,11 +550,11 @@ inline static const RELVAL *VAL_ARRAY_LEN_AT(
 // some of the thinking on this topic.  Until it's solved, binding-related
 // calls to this function get mutable access on non-mutable series.  :-/
 //
-#define VAL_ARRAY_AT_MUTABLE_HACK(v) \
-    m_cast(RELVAL*, VAL_ARRAY_AT(v))
+#define VAL_ARRAY_AT_MUTABLE_HACK(tail_out,v) \
+    m_cast(RELVAL*, VAL_ARRAY_AT((tail_out), (v)))
 
-inline static const RELVAL *VAL_ARRAY_TAIL(const RELVAL *v)
-  { return ARR_TAIL(VAL_ARRAY(v)); }
+#define VAL_ARRAY_TAIL(v) \
+  ARR_TAIL(VAL_ARRAY(v))
 
 
 // !!! VAL_ARRAY_AT_HEAD() is a leftover from the old definition of
@@ -553,7 +568,10 @@ inline static const RELVAL *VAL_ARRAY_TAIL(const RELVAL *v)
 // head because it's taking an index.  So  it looks weird enough to suggest
 // looking here for what the story is.
 //
-inline static const RELVAL *VAL_ARRAY_AT_HEAD(const RELVAL *v, REBLEN n) {
+inline static const RELVAL *VAL_ARRAY_AT_HEAD(
+    const RELVAL *v,
+    REBLEN n
+){
     const REBARR *a = VAL_ARRAY(v);  // debug build checks it's ANY-ARRAY!
     if (n > ARR_LEN(a))
         fail (Error_Index_Out_Of_Range_Raw());
@@ -570,7 +588,7 @@ inline static REBVAL *Init_Any_Array_At_Core(
     enum Reb_Kind kind,
     const_if_c REBARR *array,
     REBLEN index,
-    REBNOD *binding
+    REBARR *binding
 ){
     return Init_Any_Series_At_Core(
         out,
@@ -587,9 +605,9 @@ inline static REBVAL *Init_Any_Array_At_Core(
         enum Reb_Kind kind,
         const REBARR *array,  // all const arrays should be already managed
         REBLEN index,
-        REBNOD *binding
+        REBARR *binding
     ){
-        return Init_Any_Series_At_Core(out, kind, SER(array), index, binding);
+        return Init_Any_Series_At_Core(out, kind, array, index, binding);
     }
 #endif
 
@@ -610,10 +628,10 @@ inline static RELVAL *Init_Relative_Block_At(
     REBLEN index
 ){
     RELVAL *block = RESET_CELL(out, REB_BLOCK, CELL_FLAG_FIRST_IS_NODE);
-    INIT_VAL_NODE(block, array);
+    INIT_VAL_NODE1(block, array);
     VAL_INDEX_RAW(block) = index;
-    INIT_BINDING(block, action);
-    return block;
+    INIT_SPECIFIER(block, action);
+    return out;
 }
 
 #define Init_Relative_Block(out,action,array) \
@@ -634,28 +652,20 @@ inline static RELVAL *Init_Relative_Block_At(
 //
 inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {
     assert(ANY_GROUP_KIND(CELL_HEART(group)));
-    const RELVAL *inner = VAL_ARRAY_AT(group);
-    if (KIND3Q_BYTE(inner) != REB_GROUP or NOT_END(inner + 1))
-        return false; // plain (...) GROUP!
-    return true; // a ((...)) GROUP!, inject as rule
+    const RELVAL *tail;
+    const RELVAL *inner = VAL_ARRAY_AT(&tail, group);
+    if (inner + 1 != tail)  // should be exactly one item
+        return false;
+    return IS_GROUP(inner);  // if true, it's a ((...)) GROUP!
 }
 
 
 #ifdef NDEBUG
-    #define ASSERT_ARRAY(s) \
-        NOOP
-
-    #define ASSERT_ARRAY_MANAGED(array) \
-        NOOP
-
-    #define ASSERT_SERIES(s) \
-        NOOP
+    #define ASSERT_ARRAY(s)     NOOP
+    #define ASSERT_SERIES(s)    NOOP
 #else
     #define ASSERT_ARRAY(s) \
         Assert_Array_Core(s)
-
-    #define ASSERT_ARRAY_MANAGED(array) \
-        ASSERT_SERIES_MANAGED(SER(array))
 
     static inline void ASSERT_SERIES(const REBSER *s) {
         if (IS_SER_ARRAY(s))
@@ -667,3 +677,6 @@ inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {
     #define IS_VALUE_IN_ARRAY_DEBUG(a,v) \
         (ARR_LEN(a) != 0 and (v) >= ARR_HEAD(a) and (v) < ARR_TAIL(a))
 #endif
+
+
+#undef LINK_FILENAME_HACK  // later files shoul use LINK(Filename, x)

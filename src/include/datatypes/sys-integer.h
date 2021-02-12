@@ -40,7 +40,7 @@
 #else
     // allows an assert, but also lvalue: `VAL_INT64(v) = xxx`
     //
-    inline static REBI64 VAL_INT64(REBCEL(const*) v) { // C++ reference type
+    inline static REBI64 VAL_INT64(REBCEL(const*) v) {
         assert(CELL_KIND(v) == REB_INTEGER);
         return PAYLOAD(Integer, v).i64;
     }
@@ -50,11 +50,17 @@
     }
 #endif
 
-inline static REBVAL *Init_Integer(RELVAL *out, REBI64 i64) {
+inline static REBVAL *Init_Integer_Core(RELVAL *out, REBI64 i64) {
     RESET_CELL(out, REB_INTEGER, CELL_MASK_NONE);
     PAYLOAD(Integer, out).i64 = i64;
+  #ifdef ZERO_UNUSED_CELL_FIELDS
+    EXTRA(Any, out).trash = nullptr;
+  #endif
     return cast(REBVAL*, out);
 }
+
+#define Init_Integer(out,i64) \
+    Init_Integer_Core(TRACK_CELL_IF_DEBUG(out), (i64))
 
 inline static int32_t VAL_INT32(REBCEL(const*) v) {
     if (VAL_INT64(v) > INT32_MAX or VAL_INT64(v) < INT32_MIN)

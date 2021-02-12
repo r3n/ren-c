@@ -58,39 +58,50 @@
 #define VAL_VARARGS_SIGNED_PARAM_INDEX(v) \
     PAYLOAD(Any, (v)).first.i
 
-#define VAL_VARARGS_PHASE_NODE(v) \
-    PAYLOAD(Any, (v)).second.node
+#define INIT_VAL_VARARGS_PHASE          INIT_VAL_NODE2
+#define VAL_VARARGS_PHASE(v)            ACT(VAL_NODE2(v))
 
-#define VAL_VARARGS_PHASE(v) \
-    ACT(VAL_VARARGS_PHASE_NODE(v))
+inline static REBARR *VAL_VARARGS_BINDING(REBCEL(const*) v) {
+    assert(CELL_HEART(v) == REB_VARARGS);
+    return ARR(BINDING(v));  // may be varlist or plain array
+}
+
+inline static void INIT_VAL_VARARGS_BINDING(
+    RELVAL *v,
+    REBARR *binding  // either an array or a frame varlist
+){
+    assert(IS_VARARGS(v));
+    mutable_BINDING(v) = binding;
+}
+
 
 inline static REBVAL *Init_Varargs_Untyped_Normal(RELVAL *out, REBFRM *f) {
     RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
-    INIT_BINDING(out, f->varlist);  // frame-based VARARGS!
+    mutable_BINDING(out) = f->varlist;  // frame-based VARARGS!
     UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));
-    VAL_VARARGS_PHASE_NODE(out) = nullptr;  // set in typecheck
+    INIT_VAL_VARARGS_PHASE(out, nullptr);  // set in typecheck
     return cast(REBVAL*, out);
 }
 
 inline static REBVAL *Init_Varargs_Untyped_Enfix(
     RELVAL *out,
-    const REBVAL *single
+    const REBVAL *left
 ){
-    REBARR *array1;
-    if (IS_END(single))
-        array1 = EMPTY_ARRAY;
+    REBARR *feed;
+    if (IS_END(left))
+        feed = EMPTY_ARRAY;
     else {
-        REBARR *feed = Alloc_Singular(NODE_FLAG_MANAGED);
-        Move_Value(ARR_SINGLE(feed), single);
+        REBARR *singular = Alloc_Singular(NODE_FLAG_MANAGED);
+        Copy_Cell(ARR_SINGLE(singular), left);
 
-        array1 = Alloc_Singular(NODE_FLAG_MANAGED);
-        Init_Block(ARR_SINGLE(array1), feed);  // index 0
+        feed = Alloc_Singular(FLAG_FLAVOR(FEED) | NODE_FLAG_MANAGED);
+        Init_Block(ARR_SINGLE(feed), singular);  // index 0
     }
 
     RESET_CELL(out, REB_VARARGS, CELL_MASK_VARARGS);
-    INIT_BINDING(out, array1);
+    INIT_VAL_VARARGS_BINDING(out, feed);
     UNUSED(VAL_VARARGS_SIGNED_PARAM_INDEX(out));
-    VAL_VARARGS_PHASE_NODE(out) = nullptr;  // set in typecheck
+    INIT_VAL_VARARGS_PHASE(out, nullptr);  // set in typecheck
     return cast(REBVAL*, out);
 }
 
@@ -101,16 +112,17 @@ inline static bool Is_Block_Style_Varargs(
 ){
     assert(CELL_KIND(vararg) == REB_VARARGS);
 
-    if (EXTRA(Binding, vararg).node->header.bits & ARRAY_FLAG_IS_VARLIST) {
-        *shared_out = nullptr; // avoid compiler warning in -Og build
-        return false; // it's an ordinary vararg, representing a FRAME!
+    REBARR *binding = ARR(BINDING(vararg));
+    if (IS_VARLIST(binding)) {
+        *shared_out = nullptr;  // avoid compiler warning in -Og build
+        return false;  // it's an ordinary vararg, representing a FRAME!
     }
 
     // Came from MAKE VARARGS! on some random block, hence not implicitly
     // filled by the evaluator on a <variadic> parameter.  Should be a singular
     // array with one BLOCK!, that is the actual array and index to advance.
     //
-    REBARR *array1 = ARR(EXTRA(Binding, vararg).node);
+    REBARR *array1 = binding;
     *shared_out = SPECIFIC(ARR_HEAD(array1));
     assert(
         IS_END(*shared_out)
@@ -127,11 +139,12 @@ inline static bool Is_Frame_Style_Varargs_Maybe_Null(
 ){
     assert(CELL_KIND(vararg) == REB_VARARGS);
 
-    if (EXTRA(Binding, vararg).node->header.bits & ARRAY_FLAG_IS_VARLIST) {
+    REBARR *binding = ARR(BINDING(vararg));
+    if (IS_VARLIST(binding)) {
         // "Ordinary" case... use the original frame implied by the VARARGS!
         // (so long as it is still live on the stack)
 
-        *f_out = CTX_FRAME_IF_ON_STACK(CTX(EXTRA(Binding, vararg).node));
+        *f_out = CTX_FRAME_IF_ON_STACK(CTX(binding));
         return true;
     }
 
@@ -172,27 +185,44 @@ inline static bool Is_Frame_Style_Varargs_May_Fail(
     (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0)
 
 
-inline static const REBVAL *Param_For_Varargs_Maybe_Null(REBCEL(const*) v) {
+inline static const REBPAR *Param_For_Varargs_Maybe_Null(
+    const REBKEY **key,
+    REBCEL(const*) v
+){
     assert(CELL_KIND(v) == REB_VARARGS);
 
     REBACT *phase = VAL_VARARGS_PHASE(v);
     if (phase) {
-        REBARR *paramlist = ACT_PARAMLIST(phase);
-        if (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0) // e.g. enfix
-            return cast(REBVAL*, ARR_AT(
+        REBARR *paramlist = CTX_VARLIST(ACT_EXEMPLAR(phase));
+        if (VAL_VARARGS_SIGNED_PARAM_INDEX(v) < 0) {  // e.g. enfix
+            if (key)
+                *key = ACT_KEY(
+                    phase,
+                    (- VAL_VARARGS_SIGNED_PARAM_INDEX(v)) - 1
+                );
+            return cast(REBPAR*, ARR_AT(
                 paramlist,
                 - VAL_VARARGS_SIGNED_PARAM_INDEX(v)
             ));
-        return cast(REBVAL*, ARR_AT(
+        }
+
+        *key = ACT_KEY(
+            phase,
+            VAL_VARARGS_SIGNED_PARAM_INDEX(v) - 1
+        );
+        return cast(REBPAR*, ARR_AT(
             paramlist,
             VAL_VARARGS_SIGNED_PARAM_INDEX(v)
         ));
     }
 
+    if (key)
+        *key = nullptr;
+
     // A vararg created from a block AND never passed as an argument so no
     // typeset or quoting settings available.  Treat as "normal" parameter.
     //
-    assert(not (EXTRA(Binding, v).node->header.bits & ARRAY_FLAG_IS_VARLIST));
+    assert(not IS_VARLIST(BINDING(v)));
     return nullptr;
 }
 

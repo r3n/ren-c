@@ -60,7 +60,7 @@
         "a.1.(x)/[a b c]/<d>.2"  ->  [(a 1 @(x)) @[a b c] (<d> 2)]
 
         "~/projects/"  ->  [~ projects _]
-        "~a~.~b~/~c~"  ->  [(~a~ ~b~) ~c~]
+        "~a~.~b~/~c~"  !!  <scan-invalid>
 
         ; === Bad Path Element Tests ===
         ;

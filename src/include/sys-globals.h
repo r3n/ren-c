@@ -25,17 +25,8 @@
 PVAR REBINT PG_Boot_Phase;  // To know how far in the boot we are.
 PVAR REBINT PG_Boot_Level;  // User specified startup level
 
-// PG_Reb_Stats - Various statistics about memory, etc.  This is only tracked
-// in the debug build, as this data gathering is a sort of constant "tax" on
-// the system.  While it might arguably be interesting to non-debug build
-// users who are trying to optimize their code, the compromise of having to
-// maintain the numbers suggests those users should be empowered with a debug
-// build if they are doing such work (they should probably have one for other
-// reasons; note this has been true of things like Windows NT where there were
-// indeed "checked" builds given to those who had such interest.)
-//
-#if !defined(NDEBUG)
-    PVAR REB_STATS *PG_Reb_Stats;
+#if defined(DEBUG_COLLECT_STATS)
+    PVAR REB_STATS *PG_Reb_Stats;  // Various statistics about memory, etc.
 #endif
 
 PVAR REBU64 PG_Mem_Usage;   // Overall memory used
@@ -50,16 +41,17 @@ PVAR REBU64 PG_Mem_Limit;   // Memory limit set by SECURE
 // forms of words are created, and removed when they are GC'd.  It is scaled
 // according to the total number of canons in the system.
 //
-PVAR const REBSTR *PG_Slash_1_Canon;  // Preallocated "fake" word for `/`
-PVAR const REBSTR *PG_Dot_1_Canon;  // Preallocated "fake" word for `.`
+PVAR const REBSYM *PG_Slash_1_Canon;  // Preallocated "fake" word for `/`
+PVAR const REBSYM *PG_Dot_1_Canon;  // Preallocated "fake" word for `.`
+PVAR const REBSYM *PG_Unreadable_Canon;  // Preallocated ~unreadable~ void
 
 PVAR REBSER *PG_Symbol_Canons; // Canon symbol pointers for words in %words.r
-PVAR REBSER *PG_Canons_By_Hash; // Canon REBSER pointers indexed by hash
-PVAR REBLEN PG_Num_Canon_Slots_In_Use; // Total canon hash slots (+ deleteds)
+PVAR REBSER *PG_Symbols_By_Hash; // Symbol REBSTR pointers indexed by hash
+PVAR REBLEN PG_Num_Symbol_Slots_In_Use; // Total symbol hash slots (+deleteds)
 #if !defined(NDEBUG)
-    PVAR REBLEN PG_Num_Canon_Deleteds; // Deleted canon hash slots "in use"
+    PVAR REBLEN PG_Num_Symbol_Deleteds; // Deleted symbol hash slots "in use"
 #endif
-PVAR const REBSTR *PG_Bar_Canon;  // fast canon value for testing for `|`
+PVAR const REBSYM *PG_Bar_Canon;  // fast canon value for testing for `|`
 
 PVAR REBVAL *Lib_Context;
 PVAR REBVAL *Sys_Context;
@@ -123,7 +115,7 @@ PVAR REBVAL *Root_Blank_Tag; // marks that passing blank won't run the action
 PVAR REBVAL *Root_Local_Tag; // marks beginning of a list of "pure locals"
 PVAR REBVAL *Root_Skip_Tag; // marks a hard quote as "skippable" if wrong type
 PVAR REBVAL *Root_Const_Tag; // pass a CONST version of the input argument
-PVAR REBVAL *Root_Output_Tag;  // argument goes to set-block! output
+PVAR REBVAL *Root_In_Out_Tag;  // output followed by input alias in frame
 PVAR REBVAL *Root_Invisible_Tag;  // return value can be invisible
 PVAR REBVAL *Root_Elide_Tag;  // will make any return result act invisibly
 PVAR REBVAL *Root_Modal_Tag;  // !!! needed for bootstrap, vs @arg modal
@@ -190,8 +182,7 @@ TVAR REBSER **Prior_Expand; // Track prior series expansions (acceleration)
 
 TVAR REBSER *TG_Mold_Stack; // Used to prevent infinite loop in cyclical molds
 
-TVAR REBARR *TG_Buf_Collect; // for collecting object keys or words
-TVAR REBSER *TG_Byte_Buf; // temporary byte buffer used mainly by raw print
+TVAR REBBIN *TG_Byte_Buf; // temporary byte buffer used mainly by raw print
 TVAR REBSTR *TG_Mold_Buf; // temporary UTF8 buffer - used mainly by mold
 
 TVAR REBSER *GC_Manuals;    // Manually memory managed (not by GC)
@@ -205,6 +196,10 @@ TVAR uintptr_t TG_Stack_Limit;    // Limit address for CPU stack.
     TVAR intptr_t TG_Num_Black_Series;
 #endif
 
+#ifdef DEBUG_EXTANT_STACK_POINTERS
+    TVAR REBLEN TG_Stack_Outstanding;  // how many DS_AT()/DS_TOP refs extant
+#endif
+
 // Each time Eval_Core is called a Reb_Frame* is pushed to the "frame stack".
 // Some pushed entries will represent groups or paths being executed, and
 // some will represent functions that are gathering arguments...hence they
@@ -214,7 +209,7 @@ TVAR uintptr_t TG_Stack_Limit;    // Limit address for CPU stack.
 //
 TVAR REBFRM *TG_Top_Frame;
 TVAR REBFRM *TG_Bottom_Frame;
-TVAR struct Reb_Feed TG_Frame_Feed_End;
+TVAR REBFED *TG_End_Feed;
 
 
 // When Drop_Frame() happens, it may have an allocated varlist REBARR that

@@ -521,6 +521,7 @@
         test a-value b-value
         not null? for-each [w v] a-value [
             if not test :v select b-value w [break]
+            true
         ]
 )(
     a-value: construct/only [
@@ -540,22 +541,23 @@
         test a-value b-value
         not null? for-each [w v] a-value [
             if not test :v select b-value w [break]
+            true
         ]
 )]
 
 ; VOID is legal to test with equality (as is UNSET! in R3-Alpha/Red)
 [
-    (equal? ~void~ ~void~)
-    (not-equal? ~void~ blank)
-    (not-equal? blank ~void~)
-    (equal? (equal? blank ~void~) (equal? ~void~ blank))
-    (not (~void~ = blank))
-    (~void~ <> blank)
-    (not (blank = ~void~))
-    (blank != ~void~)
-    (~void~ = ~void~)
-    (not (~void~ != ~void~))
-    (equal? (blank = ~void~) (~void~ = blank))
+    (equal? '~void~ '~void~)
+    (not-equal? '~void~ blank)
+    (not-equal? blank '~void~)
+    (equal? (equal? blank '~void~) (equal? '~void~ blank))
+    (not ('~void~ = blank))
+    ('~void~ <> blank)
+    (not (blank = '~void~))
+    (blank != '~void~)
+    ('~void~ = '~void~)
+    (not ('~void~ != '~void~))
+    (equal? (blank = '~void~) ('~void~ = blank))
 ]
 
 ; NULL is legal to test with equality (as is UNSET! in R3-Alpha/Red)
@@ -615,7 +617,7 @@
 ; Error in R2 (could be fixed).
 (not equal? make port! http:// make port! http://)
 [#859 (
-    a: copy lit ()
+    a: copy just ()
     insert/only a a
     error? trap [do a]
 )]

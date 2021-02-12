@@ -41,17 +41,6 @@
 typedef unsigned char REBYTE; // don't change to uint8_t, see note
 
 
-// Defines `enum Reb_Kind`, which is the enumeration of low-level cell types
-// in Rebol (e.g. REB_BLOCK, REB_TEXT, etc.)
-//
-// The ordering encodes properties of the types for efficiency, so adding or
-// removing a type generally means shuffling their values.  They are generated
-// from a table and the numbers should not be exported to clients.
-//
-#include "tmp-kinds.h"
-#include "sys-ordered.h"  // shuffling types *must* consider these macros!
-
-
 //=//// REBOL NUMERIC TYPES ("REBXXX") ////////////////////////////////////=//
 //
 // The 64-bit build modifications to R3-Alpha after its open sourcing changed
@@ -74,7 +63,6 @@ typedef int64_t REBI64; // 64 bit integer
 typedef uint64_t REBU64; // 64 bit unsigned integer
 typedef float REBD32; // 32 bit decimal
 typedef double REBDEC; // 64 bit decimal
-typedef uint_fast32_t REBFLGS; // unsigned used for working with bit flags
 typedef uintptr_t REBLIN; // type used to store line numbers in Rebol files
 typedef uintptr_t REBTCK; // type the debug build uses for evaluator "ticks"
 
@@ -109,97 +97,26 @@ typedef uint_fast32_t REBUNI;
 //=//// MEMORY POOLS //////////////////////////////////////////////////////=//
 //
 typedef struct rebol_mem_pool REBPOL;
-typedef struct Reb_Node REBNOD;
+
+struct Reb_Pool_Unit;
+typedef struct Reb_Pool_Unit REBPLU;
 
 
-//=//// RELATIVE VALUES ///////////////////////////////////////////////////=//
+
+//=//// SERIES AND NON-INHERITED SUBCLASS DEFINITIONS /////////////////////=//
 //
-// Note that in the C build, %rebol.h forward-declares `struct Reb_Value` and
-// then #defines REBVAL to that.
+// The C++ build defines Reb_Array, Reb_Binary, and Reb_String as being
+// derived from Reb_Series.  This affords convenience by having it possible
+// to pass the derived class to something taking a base class, but not vice
+// versa.  However, you cannot forward-declare inheritance:
 //
-#if !defined(CPLUSPLUS_11)
-    #define RELVAL \
-        struct Reb_Value // same as REBVAL, no checking in C build
-#else
-    struct Reb_Relative_Value; // won't implicitly downcast to REBVAL
-    #define RELVAL \
-        struct Reb_Relative_Value // *might* be IS_RELATIVE()
-#endif
-
-
-//=//// ESCAPE-ALIASABLE CELLS ////////////////////////////////////////////=//
+// https://stackoverflow.com/q/2159390/
 //
-// The system uses a trick in which the type byte is bumped by multiples of
-// 64 to indicate up to 3 levels of escaping.  VAL_TYPE() will report these
-// as being REB_QUOTED, but the entire payload for them is in the cell.
+// Hence, those derived definitions have to be in %sys-rebser.h.
 //
-// Most of the time, routines want to see these as being QUOTED!.  But some
-// lower-level routines (like molding or comparison) want to be able to act
-// on them in-place witout making a copy.  To ensure they see the value for
-// the "type that it is" and use CELL_KIND() and not VAL_TYPE(), this alias
-// for RELVAL prevents VAL_TYPE() operations.
-//
-// Because a REBCEL can be linked to by a QUOTED!, it's important not to
-// modify the potentially-shared escaped data.  So all REBCEL* should be
-// const.  That's enforced in the C++ debug build, and a wrapping class is
-// used for the pointer to make sure one doesn't assume it lives in an array
-// and try to do pointer math on it...since it may be a singular allocation.
-//
-#if !defined(CPLUSPLUS_11)
-
-    #define REBCEL(const_star) \
-        const struct Reb_Value *  // same as RELVAL, no checking in C build
-
-#elif !defined(DEBUG_CHECK_CASTS)
-    //
-    // The %sys-internals.h API is used by core extensions, and we may want
-    // to build the executable with C++ but an extension with C.  If there
-    // are "trick" pointer types that are classes with methods passed in
-    // the API, that would inhibit such an implementation.
-    //
-    // Making it easy to configure such a mixture isn't a priority at this
-    // time.  But just make sure some C++ builds are possible without
-    // using the active pointer class.  Choose debug builds for now.
-    //
-    struct Reb_Cell;  // won't implicitly downcast to RELVAL
-    #define REBCEL(const_star) \
-        const struct Reb_Cell *  // not a class instance in %sys-internals.h
-#else
-    // This heavier wrapper form of Reb_Cell() can be costly...empirically
-    // up to 10% of the runtime, since it's called so often.  But it protects
-    // against pointer arithmetic on REBCEL().
-    //
-    struct Reb_Cell;  // won't implicitly downcast to RELVAL
-    template<typename T>
-    struct RebcellPtr {
-        T p;
-        static_assert(
-            std::is_same<const Reb_Cell*, T>::value,
-            "Instantiations of REBCEL only work as REBCEL(const*)"
-        );
-
-        RebcellPtr () { }
-        RebcellPtr (const Reb_Cell *p) : p (p) {}
-
-        const Reb_Cell **operator&() { return &p; }
-        const Reb_Cell *operator->() { return p; }
-        const Reb_Cell &operator*() { return *p; }
-
-        operator const Reb_Cell* () { return p; }
-
-        explicit operator const Reb_Value* ()
-          { return reinterpret_cast<const Reb_Value*>(p); }
-
-        explicit operator const Reb_Relative_Value* ()
-          { return reinterpret_cast<const Reb_Relative_Value*>(p); }
-    };
-    #define REBCEL(const_star) \
-        struct RebcellPtr<Reb_Cell const_star>
-#endif
-
-
-
-//=//// SERIES SUBCLASSES /////////////////////////////////////////////////=//
+// Aggregate types that are logically collections of multiple series do not
+// inherit.  You have to specify which series you want to extract, e.g.
+// GET_SERIES_FLAG(CTX_VARLIST(context)), not just GET_SERIES_FLAG(context).
 //
 // Note that because the Reb_Series structure includes a Reb_Value by value,
 // the %sys-rebser.h must be included *after* %sys-rebval.h; however the
@@ -208,14 +125,6 @@ typedef struct Reb_Node REBNOD;
 
 struct Reb_Series;
 typedef struct Reb_Series REBSER;
-
-typedef REBSER REBBIN;  // generic binary series, e.g. for BINARY! (byte-size)
-
-struct Reb_String;
-typedef struct Reb_String REBSTR;  // see %sys-string.h
-
-struct Reb_Array;
-typedef struct Reb_Array REBARR;  // array of value cells
 
 struct Reb_Context;
 typedef struct Reb_Context REBCTX;
@@ -226,15 +135,12 @@ typedef struct Reb_Action REBACT;
 struct Reb_Map;
 typedef struct Reb_Map REBMAP;
 
-typedef REBSER REBBMK;  // "bookmark" (list of UTF-8 index=>offsets)
-
-typedef REBSER REBTYP;  // Rebol Type (list of hook function pointers)
-
+struct Reb_Bookmark {
+    REBLEN index;
+    REBSIZ offset;
+};
 
 //=//// BINDING ///////////////////////////////////////////////////////////=//
-
-struct Reb_Node;
-typedef struct Reb_Node REBSPC;
 
 struct Reb_Binder;
 struct Reb_Collector;
@@ -252,6 +158,7 @@ struct Reb_Frame;
 typedef struct Reb_Frame REBFRM;
 typedef struct Reb_Frame REBPVS;
 
+struct Reb_Feed;
 typedef struct Reb_Feed REBFED;
 
 struct Reb_State;
@@ -261,54 +168,21 @@ struct Reb_State;
 typedef uint_fast32_t REBDSP; // Note: 0 for empty stack ([0] entry is trash)
 
 
-// The REB_R type is a REBVAL* but with the idea that it is legal to hold
-// types like REB_R_THROWN, etc.  This helps document interface contract.
-//
-typedef REBVAL *REB_R;
+//=//// PARAMETER CLASSES ////////////////////////////////////////////////=//
 
+enum Reb_Param_Class {
+    REB_P_NORMAL,
+    REB_P_RETURN,
+    REB_P_OUTPUT,
+    REB_P_MODAL,  /* can act like REB_P_HARD */
+    REB_P_SOFT,
+    REB_P_MEDIUM,
+    REB_P_HARD,
 
-//=//// TYPE HOOKS ///////////////////////////////////////////////////////=//
+    REB_P_DETECT,
+    REB_P_LOCAL
+};
 
-
-
-// PER-TYPE COMPARE HOOKS, to support GREATER?, EQUAL?, LESSER?...
-//
-// Every datatype should have a comparison function, because otherwise a
-// block containing an instance of that type cannot SORT.  Like the
-// generic dispatchers, compare hooks are done on a per-class basis, with
-// no overrides for individual types (only if they are the only type in
-// their class).
-//
-typedef REBINT (COMPARE_HOOK)(REBCEL(const*) a, REBCEL(const*) b, bool strict);
-
-
-// PER-TYPE MAKE HOOKS: for `make datatype def`
-//
-// These functions must return a REBVAL* to the type they are making
-// (either in the output cell given or an API cell)...or they can return
-// R_THROWN if they throw.  (e.g. `make object! [return]` can throw)
-//
-typedef REB_R (MAKE_HOOK)(
-    REBVAL *out,
-    enum Reb_Kind kind,
-    const REBVAL *opt_parent,
-    const REBVAL *def
-);
-
-
-// PER-TYPE TO HOOKS: for `to datatype value`
-//
-// These functions must return a REBVAL* to the type they are making
-// (either in the output cell or an API cell).  They are NOT allowed to
-// throw, and are not supposed to make use of any binding information in
-// blocks they are passed...so no evaluations should be performed.
-//
-// !!! Note: It is believed in the future that MAKE would be constructor
-// like and decided by the destination type, while TO would be "cast"-like
-// and decided by the source type.  For now, the destination decides both,
-// which means TO-ness and MAKE-ness are a bit too similar.
-//
-typedef REB_R (TO_HOOK)(REBVAL*, enum Reb_Kind, const REBVAL*);
 
 
 //=//// STRING MODES //////////////////////////////////////////////////////=//
@@ -346,74 +220,6 @@ struct rebol_mold;
 typedef struct rebol_mold REB_MOLD;
 
 
-// PER-TYPE MOLD HOOKS: for `mold value` and `form value`
-//
-// Note: ERROR! may be a context, but it has its own special FORM-ing
-// beyond the class (falls through to ANY-CONTEXT! for mold), and BINARY!
-// has a different handler than strings.  So not all molds are driven by
-// their class entirely.
-//
-typedef void (MOLD_HOOK)(REB_MOLD *mo, REBCEL(const*) v, bool form);
-
-
-//=//// PARAMETER ENUMERATION /////////////////////////////////////////////=//
-//
-// Parameter lists of composed/derived functions still must have compatible
-// frames with their underlying C code.  This makes parameter enumeration of
-// a derived function a 2-pass process that is a bit tricky.
-//
-// !!! Due to a current limitation of the prototype scanner, a function type
-// can't be used directly in a function definition and have it be picked up
-// for %tmp-internals.h, it has to be a typedef.
-//
-typedef enum {
-    PHF_SORTED_PASS = 1 << 0,
-    PHF_UNREFINED = 1 << 1,  // a /refinement that takes an arg, made "normal"
-    PHF_DEMODALIZED = 1 << 2  // an @param with its refinement specialized out
-} Reb_Param_Hook_Flags;
-#define PHF_MASK_NONE 0
-typedef bool (PARAM_HOOK)(REBVAL *v, REBFLGS flags, void *opaque);
-
-
-// These definitions are needed in %sys-rebval.h, and can't be put in
-// %sys-rebact.h because that depends on Reb_Array, which depends on
-// Reb_Series, which depends on values... :-/
-
-// C function implementing a native ACTION!
-//
-typedef REB_R (*REBNAT)(REBFRM *frame_);
-#define REBNATIVE(n) \
-    REB_R N_##n(REBFRM *frame_)
-
-//
-// PER-TYPE GENERIC HOOKS: e.g. for `append value x` or `select value y`
-//
-// This is using the term in the sense of "generic functions":
-// https://en.wikipedia.org/wiki/Generic_function
-//
-// The current assumption (rightly or wrongly) is that the handler for
-// a generic action (e.g. APPEND) doesn't need a special hook for a
-// specific datatype, but that the class has a common function.  But note
-// any behavior for a specific type can still be accomplished by testing
-// the type passed into that common hook!
-//
-typedef REB_R (GENERIC_HOOK)(REBFRM *frame_, const REBVAL *verb);
-#define REBTYPE(n) \
-    REB_R T_##n(REBFRM *frame_, const REBVAL *verb)
-
-
-// PER-TYPE PATH HOOKS: for `a/b`, `:a/b`, `a/b:`, `pick a b`, `poke a b`
-//
-typedef REB_R (PATH_HOOK)(
-    REBPVS *pvs, const RELVAL *picker, const REBVAL *opt_setval
-);
-
-
-// Port hook: for implementing generic ACTION!s on a PORT! class
-//
-typedef REB_R (PORT_HOOK)(REBFRM *frame_, REBVAL *port, const REBVAL *verb);
-
-
 //=//// VARIADIC OPERATIONS ///////////////////////////////////////////////=//
 //
 // These 3 operations are the current legal set of what can be done with a
@@ -428,30 +234,6 @@ enum Reb_Vararg_Op {
     VARARG_OP_TAIL_Q, // tail?
     VARARG_OP_FIRST, // "lookahead"
     VARARG_OP_TAKE // doesn't modify underlying data stream--advances index
-};
-
-
-// REBCHR(*) is defined in %sys-scan.h, along with SCAN_STATE, and both are
-// referenced by internal API functions.
-//
-// (Note: %sys-do.h needs to call into the scanner if Fetch_Next_In_Frame() is
-// to be inlined at all--at its many time-critical callsites--so the scanner
-// has to be in the internal API)
-//
-#include "sys-scan.h"
-
-
-//=//// API OPCODES ///////////////////////////////////////////////////////=//
-//
-// The libRebol API can take REBVAL*, or UTF-8 strings of raw textual material
-// to scan and bind, or it can take a REBARR* of an "API instruction".
-//
-// These opcodes must be visible to the REBSER definition, as they live in
-// the `MISC()` section.
-//
-
-enum Reb_Api_Opcode {
-    API_OPCODE_UNUSED  // !!! Not currently used, review
 };
 
 
@@ -481,15 +263,6 @@ typedef struct rebol_time_fields {
 
 
 
-// To help document places in the core that are complicit in the "extension
-// hack", alias arrays being used for the FFI and GOB to another name.
-//
-typedef REBARR REBGOB;
-
-typedef REBARR REBSTU;
-typedef REBARR REBFLD;
-
-
 //=//// R3-ALPHA DEVICE / DEVICE REQUEST //////////////////////////////////=//
 //
 // In order to decouple the interpreter from R3-Alpha's device model (and
@@ -499,6 +272,6 @@ typedef REBARR REBFLD;
 // array, or using LINK()/MISC() with SERIES_INFO_XXX_IS_CUSTOM_NODE.
 //
 struct Reb_Request;
-#define REBREQ struct Reb_Series
+#define REBREQ REBBIN
 struct rebol_device;
 #define REBDEV struct rebol_device

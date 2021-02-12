@@ -34,56 +34,41 @@
 //
 REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    REBYMD dat_a = VAL_DATE(a);
-    REBYMD dat_b = VAL_DATE(b);
+    // If the dates are in different time zones, they have to be canonized
+    // to compare them.
+    //
+    // !!! How should dates and times without time zones be treated?  It
+    // seems bad to make them dependent on the system time zone.
+    //
+    // !!! This comparison doesn't know if it's being asked on behalf of
+    // equality or not; and `strict` is passed in as true for plain > and <.
+    // In those cases, strictness needs to be accurate for inequality but
+    // never side for exact equality unless they really are equal (time zones
+    // and all).  This is suboptimal, a redesign is needed:
+    //
+    // https://forum.rebol.info/t/comparison-semantics/1318
+    //
+    REBINT tiebreaker = 0;
 
-    if (strict) {
-        if (Does_Date_Have_Zone(a)) {
-            if (not Does_Date_Have_Zone(b))
-                return 1;  // can't be equal
+    DECLARE_LOCAL (adjusted_a);
+    DECLARE_LOCAL (adjusted_b);
+    if (VAL_DATE(a).zone != VAL_DATE(b).zone) {
+        tiebreaker = VAL_DATE(a).zone > VAL_DATE(b).zone ? 1 : -1;
 
-            if (
-                dat_a.year != dat_b.year
-                or dat_a.month != dat_b.month
-                or dat_a.day != dat_b.year
-                or dat_a.zone != dat_b.zone
-            ){
-                return 1;  // both have zones, all bits must be equal
-            }
-        }
-        else {
-            if (Does_Date_Have_Zone(b))
-                return 1;  // a doesn't have, b does, can't be equal
+        Dequotify(Copy_Cell(adjusted_a, SPECIFIC(CELL_TO_VAL(a))));
+        Dequotify(Copy_Cell(adjusted_b, SPECIFIC(CELL_TO_VAL(b))));
 
-            if (
-                dat_a.year != dat_b.year
-                or dat_a.month != dat_b.month
-                or dat_a.day != dat_b.day
-                // old code here ignored .zone
-            ){
-                return 1;  // canonized to 0 zone not equal
-            }
-        }
+        const bool to_utc = true;
+        Adjust_Date_Zone(adjusted_a, to_utc);
+        Adjust_Date_Zone(adjusted_a, to_utc);
 
-        if (Does_Date_Have_Time(a)) {
-            if (not Does_Date_Have_Time(b))
-                return 1;  // can't be equal;
-
-            if (VAL_NANO(a) != VAL_NANO(b))
-                return 1;  // both have times, all bits must be equal
-        }
-        else {
-            if (Does_Date_Have_Time(b))
-                return 1; // a doesn't have, b, does, can't be equal
-
-            // neither have times so equal
-        }
-        return 0;
+        a = adjusted_a;
+        b = adjusted_b;
     }
 
-    REBINT diff = Diff_Date(VAL_DATE(a), VAL_DATE(b));
-    if (diff != 0)
-        return diff;
+    REBINT days_diff = Diff_Date(VAL_DATE(a), VAL_DATE(b));  // delta in days
+    if (days_diff != 0)
+        return days_diff > 0 ? 1 : -1;
 
     if (not Does_Date_Have_Time(a)) {
         if (not Does_Date_Have_Time(b))
@@ -95,7 +80,10 @@ REBINT CT_Date(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     if (not Does_Date_Have_Time(b))
         return 1;  // a is bigger if no time on b
 
-    return CT_Time(a, b, strict);
+    REBINT time_ct = CT_Time(a, b, strict);  // guaranteed [-1 0 1]
+    if (time_ct == 0 and strict)
+        return tiebreaker;  // don't allow equal unless time zones equal
+    return time_ct;
 }
 
 
@@ -108,7 +96,7 @@ void MF_Date(REB_MOLD *mo, REBCEL(const*) v_orig, bool form)
     // make a copy that we can tweak during the emit process
 
     DECLARE_LOCAL (v);
-    Move_Value(v, SPECIFIC(CELL_TO_VAL(v_orig)));
+    Copy_Cell(v, SPECIFIC(CELL_TO_VAL(v_orig)));
 
     if (
         VAL_MONTH(v) == 0
@@ -271,7 +259,7 @@ REBINT Diff_Date(REBYMD d1, REBYMD d2)
 REBLEN Week_Day(REBYMD date)
 {
     REBYMD year1;
-    CLEARS(&year1);
+    memset(&year1, 0, sizeof(REBYMD));
     year1.day = 1;
     year1.month = 1;
 
@@ -435,15 +423,15 @@ void Subtract_Date(REBVAL *d1, REBVAL *d2, REBVAL *result)
 REB_R MAKE_Date(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_DATE);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     if (IS_DATE(arg))
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
     if (IS_TEXT(arg)) {
         REBSIZ size;
@@ -558,14 +546,14 @@ REB_R TO_Date(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
 }
 
 
-static REBINT Int_From_Date_Arg(const REBVAL *opt_poke) {
-    if (IS_INTEGER(opt_poke) or IS_DECIMAL(opt_poke))
-        return Int32s(opt_poke, 0);
+static REBINT Int_From_Date_Arg(const REBVAL *poke) {
+    if (IS_INTEGER(poke) or IS_DECIMAL(poke))
+        return Int32s(poke, 0);
 
-    if (IS_BLANK(opt_poke))
+    if (IS_BLANK(poke))
         return 0;
 
-    fail (opt_poke);
+    fail (poke);
 }
 
 
@@ -573,14 +561,14 @@ static REBINT Int_From_Date_Arg(const REBVAL *opt_poke) {
 //  Pick_Or_Poke_Date: C
 //
 void Pick_Or_Poke_Date(
-    REBVAL *opt_out,
+    option(REBVAL*) opt_out,
     REBVAL *v,
     const RELVAL *picker,
-    const REBVAL *opt_poke
+    option(const REBVAL*) opt_poke
 ){
-    REBSYM sym;
+    SYMID sym;
     if (IS_WORD(picker)) {
-        sym = VAL_WORD_SYM(picker); // error later if SYM_0 or not a match
+        sym = VAL_WORD_ID(picker); // error later if SYM_0 or not a match
     }
     else if (IS_INTEGER(picker)) {
         switch (Int32(picker)) {
@@ -603,115 +591,117 @@ void Pick_Or_Poke_Date(
     else
         fail (rebUnrelativize(picker));
 
-    if (opt_poke == NULL) {
-        assert(opt_out != NULL);
-        TRASH_CELL_IF_DEBUG(opt_out);
+    if (not opt_poke) {
+        assert(opt_out);
+        REBVAL *out = unwrap(opt_out);
+        TRASH_CELL_IF_DEBUG(out);
 
         switch (sym) {
         case SYM_YEAR:
-            Init_Integer(opt_out, VAL_YEAR(v));
+            Init_Integer(out, VAL_YEAR(v));
             break;
 
         case SYM_MONTH:
-            Init_Integer(opt_out, VAL_MONTH(v));
+            Init_Integer(out, VAL_MONTH(v));
             break;
 
         case SYM_DAY:
-            Init_Integer(opt_out, VAL_DAY(v));
+            Init_Integer(out, VAL_DAY(v));
             break;
 
         case SYM_TIME:
             if (not Does_Date_Have_Time(v))
-                Init_Nulled(opt_out);
+                Init_Nulled(out);
             else {
-                Move_Value(opt_out, v); // want v's adjusted VAL_NANO()
-                Adjust_Date_Zone(opt_out, false);
-                RESET_VAL_HEADER(opt_out, REB_TIME, CELL_MASK_NONE);
+                Copy_Cell(out, v); // want v's adjusted VAL_NANO()
+                Adjust_Date_Zone(out, false);
+                RESET_VAL_HEADER(out, REB_TIME, CELL_MASK_NONE);
             }
             break;
 
         case SYM_ZONE:
             if (not Does_Date_Have_Zone(v)) {
-                Init_Nulled(opt_out);
+                Init_Nulled(out);
             }
             else {
                 assert(Does_Date_Have_Time(v));
 
                 Init_Time_Nanoseconds(
-                    opt_out,
+                    out,
                     cast(int64_t, VAL_ZONE(v)) * ZONE_MINS * MIN_SEC
                 );
             }
             break;
 
         case SYM_DATE: {
-            Move_Value(opt_out, v);
+            Copy_Cell(out, v);
 
             const bool to_utc = false;
-            Adjust_Date_Zone(opt_out, to_utc); // !!! necessary?
+            Adjust_Date_Zone(out, to_utc); // !!! necessary?
 
-            PAYLOAD(Time, opt_out).nanoseconds = NO_DATE_TIME;
-            VAL_DATE(opt_out).zone = NO_DATE_ZONE;
+            PAYLOAD(Time, out).nanoseconds = NO_DATE_TIME;
+            VAL_DATE(out).zone = NO_DATE_ZONE;
             break; }
 
         case SYM_WEEKDAY:
-            Init_Integer(opt_out, Week_Day(VAL_DATE(v)));
+            Init_Integer(out, Week_Day(VAL_DATE(v)));
             break;
 
         case SYM_JULIAN:
         case SYM_YEARDAY:
-            Init_Integer(opt_out, cast(REBINT, Julian_Date(VAL_DATE(v))));
+            Init_Integer(out, cast(REBINT, Julian_Date(VAL_DATE(v))));
             break;
 
         case SYM_UTC: {
-            Move_Value(opt_out, v);
-            VAL_DATE(opt_out).zone = 0;
+            Copy_Cell(out, v);
+            VAL_DATE(out).zone = 0;
             const bool to_utc = true;
-            Adjust_Date_Zone(opt_out, to_utc);
+            Adjust_Date_Zone(out, to_utc);
             break; }
 
         case SYM_HOUR:
             if (not Does_Date_Have_Time(v))
-                Init_Nulled(opt_out);
+                Init_Nulled(out);
             else {
                 REB_TIMEF time;
                 Split_Time(VAL_NANO(v), &time);
-                Init_Integer(opt_out, time.h);
+                Init_Integer(out, time.h);
             }
             break;
 
         case SYM_MINUTE:
             if (not Does_Date_Have_Time(v))
-                Init_Nulled(opt_out);
+                Init_Nulled(out);
             else {
                 REB_TIMEF time;
                 Split_Time(VAL_NANO(v), &time);
-                Init_Integer(opt_out, time.m);
+                Init_Integer(out, time.m);
             }
             break;
 
         case SYM_SECOND:
             if (not Does_Date_Have_Time(v))
-                Init_Nulled(opt_out);
+                Init_Nulled(out);
             else {
                 REB_TIMEF time;
                 Split_Time(VAL_NANO(v), &time);
                 if (time.n == 0)
-                    Init_Integer(opt_out, time.s);
+                    Init_Integer(out, time.s);
                 else
                     Init_Decimal(
-                        opt_out,
+                        out,
                         cast(REBDEC, time.s) + (time.n * NANO)
                     );
             }
             break;
 
         default:
-            Init_Nulled(opt_out); // "out of range" PICK semantics
+            Init_Nulled(out); // "out of range" PICK semantics
         }
     }
     else {
-        assert(opt_out == NULL);
+        assert(not opt_out);
+        const REBVAL *poke = unwrap(opt_poke);
 
         // Here the desire is to modify the incoming date directly.  This is
         // done by changing the components that need to change which were
@@ -730,36 +720,36 @@ void Pick_Or_Poke_Date(
 
         switch (sym) {
         case SYM_YEAR:
-            year = Int_From_Date_Arg(opt_poke);
+            year = Int_From_Date_Arg(poke);
             break;
 
         case SYM_MONTH:
-            month = Int_From_Date_Arg(opt_poke) - 1;
+            month = Int_From_Date_Arg(poke) - 1;
             break;
 
         case SYM_DAY:
-            day = Int_From_Date_Arg(opt_poke) - 1;
+            day = Int_From_Date_Arg(poke) - 1;
             break;
 
         case SYM_TIME:
-            if (IS_NULLED(opt_poke)) { // clear out the time component
+            if (IS_NULLED(poke)) { // clear out the time component
                 PAYLOAD(Time, v).nanoseconds = NO_DATE_TIME;
                 VAL_DATE(v).zone = NO_DATE_ZONE;
                 return;
             }
 
-            if (IS_TIME(opt_poke) or IS_DATE(opt_poke))
-                secs = VAL_NANO(opt_poke);
-            else if (IS_INTEGER(opt_poke))
-                secs = Int_From_Date_Arg(opt_poke) * SEC_SEC;
-            else if (IS_DECIMAL(opt_poke))
-                secs = DEC_TO_SECS(VAL_DECIMAL(opt_poke));
+            if (IS_TIME(poke) or IS_DATE(poke))
+                secs = VAL_NANO(poke);
+            else if (IS_INTEGER(poke))
+                secs = Int_From_Date_Arg(poke) * SEC_SEC;
+            else if (IS_DECIMAL(poke))
+                secs = DEC_TO_SECS(VAL_DECIMAL(poke));
             else
-                fail (opt_poke);
+                fail (poke);
             break;
 
         case SYM_ZONE:
-            if (IS_NULLED(opt_poke)) { // clear out the zone component
+            if (IS_NULLED(poke)) { // clear out the zone component
                 VAL_DATE(v).zone = NO_DATE_ZONE;
                 return;
             }
@@ -767,14 +757,14 @@ void Pick_Or_Poke_Date(
             if (not Does_Date_Have_Time(v))
                 fail ("Can't set /ZONE in a DATE! with no time component");
 
-            if (IS_TIME(opt_poke))
-                tz = cast(REBINT, VAL_NANO(opt_poke) / (ZONE_MINS * MIN_SEC));
-            else if (IS_DATE(opt_poke))
-                tz = VAL_ZONE(opt_poke);
+            if (IS_TIME(poke))
+                tz = cast(REBINT, VAL_NANO(poke) / (ZONE_MINS * MIN_SEC));
+            else if (IS_DATE(poke))
+                tz = VAL_ZONE(poke);
             else
-                tz = Int_From_Date_Arg(opt_poke) * (60 / ZONE_MINS);
+                tz = Int_From_Date_Arg(poke) * (60 / ZONE_MINS);
             if (tz > MAX_ZONE or tz < -MAX_ZONE)
-                fail (Error_Out_Of_Range(opt_poke));
+                fail (Error_Out_Of_Range(poke));
             break;
 
         case SYM_JULIAN:
@@ -783,11 +773,11 @@ void Pick_Or_Poke_Date(
             fail (rebUnrelativize(picker));
 
         case SYM_DATE:
-            if (!IS_DATE(opt_poke))
-                fail (opt_poke);
-            VAL_DATE(v) = VAL_DATE(opt_poke);
+            if (not IS_DATE(poke))
+                fail (poke);
+            VAL_DATE(v) = VAL_DATE(poke);
 
-            assert(Does_Date_Have_Zone(opt_poke) == Does_Date_Have_Zone(v));
+            assert(Does_Date_Have_Zone(poke) == Does_Date_Have_Zone(v));
             return;
 
         case SYM_HOUR: {
@@ -796,7 +786,7 @@ void Pick_Or_Poke_Date(
 
             REB_TIMEF time;
             Split_Time(secs, &time);
-            time.h = Int_From_Date_Arg(opt_poke);
+            time.h = Int_From_Date_Arg(poke);
             secs = Join_Time(&time, false);
             break; }
 
@@ -806,7 +796,7 @@ void Pick_Or_Poke_Date(
 
             REB_TIMEF time;
             Split_Time(secs, &time);
-            time.m = Int_From_Date_Arg(opt_poke);
+            time.m = Int_From_Date_Arg(poke);
             secs = Join_Time(&time, false);
             break; }
 
@@ -816,15 +806,15 @@ void Pick_Or_Poke_Date(
 
             REB_TIMEF time;
             Split_Time(secs, &time);
-            if (IS_INTEGER(opt_poke)) {
-                time.s = Int_From_Date_Arg(opt_poke);
+            if (IS_INTEGER(poke)) {
+                time.s = Int_From_Date_Arg(poke);
                 time.n = 0;
             }
             else {
                 //if (f < 0.0) fail (Error_Out_Of_Range(setval));
-                time.s = cast(REBINT, VAL_DECIMAL(opt_poke));
+                time.s = cast(REBINT, VAL_DECIMAL(poke));
                 time.n = cast(REBINT,
-                    (VAL_DECIMAL(opt_poke) - time.s) * SEC_SEC);
+                    (VAL_DECIMAL(poke) - time.s) * SEC_SEC);
             }
             secs = Join_Time(&time, false);
             break; }
@@ -861,23 +851,23 @@ void Pick_Or_Poke_Date(
 REB_R PD_Date(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval != NULL) {
+    if (setval) {
         //
         // Updates pvs->out; R_IMMEDIATE means path dispatch will write it
         // back to whatever the originating variable location was, or error
         // if it didn't come from a variable.
         //
-        Pick_Or_Poke_Date(NULL, pvs->out, picker, opt_setval);
+        Pick_Or_Poke_Date(nullptr, pvs->out, picker, setval);
         return R_IMMEDIATE;
     }
 
     // !!! The date picking as written can't both read and write the out cell.
     //
     DECLARE_LOCAL (temp);
-    Move_Value(temp, pvs->out);
-    Pick_Or_Poke_Date(pvs->out, temp, picker, NULL);
+    Copy_Cell(temp, pvs->out);
+    Pick_Or_Poke_Date(pvs->out, temp, picker, nullptr);
     return pvs->out;
 }
 
@@ -890,7 +880,7 @@ REBTYPE(Date)
     REBVAL *v = D_ARG(1);
     assert(IS_DATE(v));
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     REBYMD date = VAL_DATE(v);
     REBLEN day = VAL_DAY(v) - 1;
@@ -1090,5 +1080,41 @@ REBNATIVE(make_date_ymdsnz)
         = SECS_TO_NANO(VAL_INT64(ARG(seconds))) + nano;
 
     assert(Does_Date_Have_Time(D_OUT));
+    return D_OUT;
+}
+
+
+//
+//  make-time-sn: native [
+//
+//  {Make a TIME! from Seconds and Nanoseconds}
+//
+//      return: [time!]
+//      seconds "3600 for each hour, 60 for each minute"
+//          [integer!]
+//      nano "Nanoseconds"
+//          [blank! integer!]
+//  ]
+//
+REBNATIVE(make_time_sn)
+//
+// !!! The MAKE TIME! as defined by historical Rebol lacked granularity to
+// to add fractions of seconds (it was `make time! [hour minutes seconds]`).
+// This primitive is added to facilitate implementation of NOW/TIME/PRECISE
+// in the near term without committing anything new about MAKE TIME! [].
+//
+// https://github.com/rebol/rebol-issues/issues/2313
+//
+// !!! Is there a reason why time zones can only be put on times when they
+// are coupled with a DATE! ?
+{
+    INCLUDE_PARAMS_OF_MAKE_TIME_SN;
+
+    RESET_CELL(D_OUT, REB_TIME, CELL_MASK_NONE);
+
+    REBI64 nano = IS_BLANK(ARG(nano)) ? 0 : VAL_INT64(ARG(nano));
+    PAYLOAD(Time, D_OUT).nanoseconds
+        = SECS_TO_NANO(VAL_INT64(ARG(seconds))) + nano;
+
     return D_OUT;
 }

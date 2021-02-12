@@ -71,7 +71,6 @@ REBI64 Join_Time(REB_TIMEF *tf, bool neg)
 //
 const REBYTE *Scan_Time(RELVAL *out, const REBYTE *cp, REBLEN len)
 {
-    TRASH_CELL_IF_DEBUG(out);
     cast(void, len); // !!! should len be paid attention to?
 
     bool neg;
@@ -237,16 +236,16 @@ REBINT CT_Time(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 REB_R MAKE_Time(
     REBVAL *out,
     enum Reb_Kind kind,
-    const REBVAL *opt_parent,
+    option(const REBVAL*) parent,
     const REBVAL *arg
 ){
     assert(kind == REB_TIME);
-    if (opt_parent)
-        fail (Error_Bad_Make_Parent(kind, opt_parent));
+    if (parent)
+        fail (Error_Bad_Make_Parent(kind, unwrap(parent)));
 
     switch (VAL_TYPE(arg)) {
     case REB_TIME: // just copy it (?)
-        return Move_Value(out, arg);
+        return Copy_Cell(out, arg);
 
     case REB_TEXT: { // scan using same decoding as LOAD would
         REBSIZ size;
@@ -364,7 +363,7 @@ void Pick_Time(REBVAL *out, const REBVAL *value, const RELVAL *picker)
 {
     REBINT i;
     if (IS_WORD(picker)) {
-        switch (VAL_WORD_SYM(picker)) {
+        switch (VAL_WORD_ID(picker)) {
         case SYM_HOUR:   i = 0; break;
         case SYM_MINUTE: i = 1; break;
         case SYM_SECOND: i = 2; break;
@@ -409,7 +408,7 @@ void Poke_Time_Immediate(
 ) {
     REBINT i;
     if (IS_WORD(picker)) {
-        switch (VAL_WORD_SYM(picker)) {
+        switch (VAL_WORD_ID(picker)) {
         case SYM_HOUR:   i = 0; break;
         case SYM_MINUTE: i = 1; break;
         case SYM_SECOND: i = 2; break;
@@ -469,16 +468,16 @@ void Poke_Time_Immediate(
 REB_R PD_Time(
     REBPVS *pvs,
     const RELVAL *picker,
-    const REBVAL *opt_setval
+    option(const REBVAL*) setval
 ){
-    if (opt_setval) {
+    if (setval) {
         //
         // Returning R_IMMEDIATE means that we aren't actually changing a
         // variable directly, and it will be up to the caller to decide if
         // they can meaningfully determine what variable to copy the update
         // we're making to.
         //
-        Poke_Time_Immediate(pvs->out, picker, opt_setval);
+        Poke_Time_Immediate(pvs->out, picker, unwrap(setval));
         return R_IMMEDIATE;
     }
 
@@ -496,7 +495,7 @@ REBTYPE(Time)
 
     REBI64 secs = VAL_NANO(v);
 
-    REBSYM sym = VAL_WORD_SYM(verb);
+    SYMID sym = VAL_WORD_ID(verb);
 
     if (
         sym == SYM_ADD
@@ -541,7 +540,7 @@ REBTYPE(Time)
         else if (type == REB_INTEGER) {     // handle TIME - INTEGER cases
             REBI64 num = VAL_INT64(arg);
 
-            switch (VAL_WORD_SYM(verb)) {
+            switch (VAL_WORD_ID(verb)) {
               case SYM_ADD:
                 secs = Add_Max(REB_TIME, secs, num * SEC_SEC, MAX_TIME);
                 return Init_Time_Nanoseconds(D_OUT, secs);
@@ -576,7 +575,7 @@ REBTYPE(Time)
         else if (type == REB_DECIMAL) {     // handle TIME - DECIMAL cases
             REBDEC dec = VAL_DECIMAL(arg);
 
-            switch (VAL_WORD_SYM(verb)) {
+            switch (VAL_WORD_ID(verb)) {
               case SYM_ADD:
                 secs = Add_Max(
                     REB_TIME,
@@ -620,9 +619,9 @@ REBTYPE(Time)
             // date dispatcher already.  Instead of repeating the code here in
             // the time dispatcher, swap the arguments and call DATE's version.
             //
-            Move_Value(D_SPARE, v);
-            Move_Value(D_ARG(1), arg);
-            Move_Value(D_ARG(2), D_SPARE);
+            Copy_Cell(D_SPARE, v);
+            Copy_Cell(D_ARG(1), arg);
+            Copy_Cell(D_ARG(2), D_SPARE);
             return T_Date(frame_, verb);
         }
         fail (Error_Math_Args(REB_TIME, verb));

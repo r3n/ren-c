@@ -89,6 +89,7 @@
 %context/unset.test.reb
 %context/use.test.reb
 %context/valueq.test.reb
+%context/virtual-bind.test.reb
 
 %control/all.test.reb
 %control/any.test.reb
@@ -157,12 +158,12 @@
 %functions/hijack.test.reb
 %functions/invisible.test.reb
 %functions/let.test.reb
+%functions/macro.test.reb
 %functions/modal.test.reb
 %functions/multi.test.reb
 %functions/native.test.reb
 %functions/oneshot.test.reb
 %functions/predicate.test.reb
-%functions/redescribe.test.reb
 %functions/redo.test.reb
 %functions/reframer.test.reb
 %functions/specialize.test.reb
@@ -205,6 +206,7 @@
 %misc/help.test.reb
 %misc/fail.test.reb
 %misc/make-file.test.reb
+%misc/shell.test.reb
 
 %network/http.test.reb
 
@@ -242,6 +244,7 @@
 %series/last.test.reb
 %series/lengthq.test.reb
 %series/next.test.reb
+%series/only.test.reb
 %series/ordinals.test.reb
 %series/pick.test.reb
 %series/poke.test.reb
