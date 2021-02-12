@@ -12,56 +12,84 @@ REBOL [
 ]
 
 
-clean-path: function [
-    {Returns new directory path with `//` `.` and `..` processed.}
+clean-path: func [
+    {Returns new directory path with `.` and `..` processed.}
 
-    file [file! url! text!]
+    path [file! url! text!]
     /only "Do not prepend current directory"
     /dir "Add a trailing / if missing"
 ][
-    file: case [
-        any [only, not file? file] [
-            copy file
+    let scheme: _
+
+    let target
+    case [
+        url? path [
+            scheme: make (make object! [
+                scheme: user: pass: host: port-id: path: _
+            ]) decode-url path
+
+            target: either scheme/path [
+                to file! scheme/path
+            ][
+                copy %/
+            ]
         ]
 
-        #"/" = first file [
-            file: next file
-            out: next what-dir
-            while [
-                all [
-                    #"/" = first file
-                    f: find/tail out #"/"
-                ]
-            ][
-                file: next file
-                out: f
-            ]
-            append clear out file
+        any [
+            only
+            text? path
+            #"/" = first path
+        ][
+            target: copy path
         ]
-    ] else [
-        append what-dir file
+
+        file? path [
+            if url? let current: what-dir [
+                scheme: make (make object! [
+                    scheme: user: pass: host: port-id: path: _
+                ]) decode-url current
+
+                current: any [
+                    scheme/path
+                    copy %/
+                ]
+            ]
+
+            target: to file! unspaced [current path]
+        ]
     ]
 
-    all [dir, not dir? file] then [append file #"/"]
+    if all [dir, #"/" <> last target] [
+        append target #"/"
+    ]
 
-    out: make type of file length of file ; same datatype
-    count: 0 ; back dir counter
+    path: make type of target length of target
 
-    parse reverse file [
+    let count: 0
+    let part
+    parse reverse target [
         some [
-            "../" (count: me + 1)
-            | "./"
-            | "/" (
-                any [not file? file, #"/" <> last out] then [
-                    append out #"/"
+            "../"
+            (count: me + 1)
+            |
+            "./"
+            |
+            "/"
+            (
+                if any [
+                    not file? target
+                    #"/" <> last path
+                ][
+                    append path #"/"
                 ]
             )
-            | copy f [to "/" | to end] (
-                if count > 0 [
+            |
+            copy part: [to "/" | to end] (
+                either count > 0 [
                     count: me - 1
-                ] else [
-                    if not find ["" "." ".."] as text! f [
-                        append out f
+                ][
+                    if not find ["" "." ".."] as text! part [
+                        append path part
                     ]
                 ]
             )
@@ -69,11 +97,35 @@ clean-path: function [
         end
     ]
 
-    all [#/ = last out, #/ <> last file] then [
-        remove back tail of out
+    if all [
+        #"/" = last path
+        #"/" <> last target
+    ][
+        remove back tail of path
     ]
 
-    reverse out
+    reverse path
+
+    if not scheme [
+        return path
+    ]
+    
+    return to url! head insert path unspaced [
+        form scheme/scheme "://"
+        if scheme/user [
+            unspaced [
+                scheme/user
+                if scheme/pass [
+                    unspaced [":" scheme/pass]
+                ]
+                "@"
+            ]
+        ]
+        scheme/host
+        if scheme/port-id [
+            unspaced [":" scheme/port-id]
+        ]
+    ]
 ]
 
 
