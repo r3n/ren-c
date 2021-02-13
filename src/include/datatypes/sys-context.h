@@ -314,6 +314,12 @@ inline static const REBKEY *CTX_KEYS(const REBKEY ** tail, REBCTX *c) {
     return SER_HEAD(REBKEY, keylist);
 }
 
+inline static REBVAR *CTX_VARS(const REBVAR ** tail, REBCTX *c) {
+    REBVAR *head = CTX_VARS_HEAD(c);
+    *tail = head + cast(REBSER*, (c))->content.dynamic.used - 1;
+    return head;
+}
+
 
 //=//// FRAME! REBCTX* <-> REBFRM* STRUCTURE //////////////////////////////=//
 //

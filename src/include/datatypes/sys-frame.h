@@ -736,8 +736,9 @@ inline static void Push_Action(
     //
     REBARR *partials = try_unwrap(ACT_PARTIALS(act));
     if (partials) {
+        const RELVAL *word_tail = ARR_TAIL(partials);
         const REBVAL *word = SPECIFIC(ARR_HEAD(partials));
-        for (; NOT_END(word); ++word)
+        for (; word != word_tail; ++word)
             Copy_Cell(DS_PUSH(), word);
     }
 

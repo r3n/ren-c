@@ -331,8 +331,9 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         // !!! Optimization abandoned
 
         assert(ARR_LEN(a) >= 2);
-        RELVAL *item = ARR_HEAD(a);
-        for (; NOT_END(item); ++item)
+        const RELVAL *tail = ARR_TAIL(a);
+        const RELVAL *item = ARR_HEAD(a);
+        for (; item != tail; ++item)
             assert(not ANY_PATH_KIND(KIND3Q_BYTE_UNCHECKED(item)));
         assert(Is_Marked(a));
         break; }

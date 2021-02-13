@@ -272,14 +272,14 @@ REB_R MAKE_Time(
         return Init_Time_Nanoseconds(out, DEC_TO_SECS(VAL_DECIMAL(arg)));
 
     case REB_BLOCK: { // [hh mm ss]
-        REBLEN len;
-        const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
+        const RELVAL *tail;
+        const RELVAL *item = VAL_ARRAY_AT(&tail, arg);
 
-        if (len > 3)
-            goto no_time;
+        if (item == tail)
+            goto no_time;  // must have at least hours
 
         if (not IS_INTEGER(item))
-            goto no_time;
+            goto no_time;  // hours must be integer
 
         bool neg;
         REBI64 i = Int32(item);
@@ -294,7 +294,7 @@ REB_R MAKE_Time(
         if (secs > MAX_SECONDS)
             goto no_time;
 
-        if (NOT_END(++item)) {
+        if (tail != ++item) {  // minutes
             if (not IS_INTEGER(item))
                 goto no_time;
 
@@ -304,34 +304,42 @@ REB_R MAKE_Time(
             secs += i * 60;
             if (secs > MAX_SECONDS)
                 goto no_time;
+        }
 
-            if (NOT_END(++item)) {
-                if (IS_INTEGER(item)) {
-                    if ((i = Int32(item)) < 0)
-                        goto no_time;
+        if (item != tail and tail != ++item) {  // seconds
+            if (IS_INTEGER(item)) {
+                if ((i = Int32(item)) < 0)
+                    goto no_time;
 
-                    secs += i;
-                    if (secs > MAX_SECONDS)
-                        goto no_time;
-                }
-                else if (IS_DECIMAL(item)) {
-                    if (
-                        secs + cast(REBI64, VAL_DECIMAL(item)) + 1
-                        > MAX_SECONDS
-                    ){
-                        goto no_time;
-                    }
-
-                    // added in below
-                }
-                else
+                secs += i;
+                if (secs > MAX_SECONDS)
                     goto no_time;
             }
+            else if (IS_DECIMAL(item)) {
+                if (
+                    secs + cast(REBI64, VAL_DECIMAL(item)) + 1
+                    > MAX_SECONDS
+                ){
+                    goto no_time;
+                }
+
+                // added in below
+            }
+            else
+                goto no_time;
         }
 
         REBI64 nano = secs * SEC_SEC;
-        if (IS_DECIMAL(item))
+
+        if (item != tail and tail != ++item) {
+            if (not IS_DECIMAL(item))
+                goto no_time;
+
             nano += DEC_TO_SECS(VAL_DECIMAL(item));
+        }
+
+        if (item != tail and ++item != tail)
+            goto no_time;  // more than 4 items of initialization
 
         if (neg)
             nano = -nano;

@@ -681,8 +681,12 @@ REBNATIVE(variadic_q)
 {
     INCLUDE_PARAMS_OF_VARIADIC_Q;
 
-    const REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(ARG(action)));
-    for (; NOT_END(param); ++param) {
+    REBACT *action = VAL_ACTION(ARG(action));
+
+    const REBKEY *key_tail;
+    const REBKEY *key = ACT_KEYS(&key_tail, action);
+    const REBVAL *param = ACT_PARAMS_HEAD(action);
+    for (; key != key_tail; ++param, ++key) {
         if (Is_Param_Variadic(param))
             return Init_True(D_OUT);
     }

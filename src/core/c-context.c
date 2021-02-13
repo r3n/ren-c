@@ -589,8 +589,9 @@ REBCTX *Make_Context_Detect_Managed(
         // strings, replace their series components with deep copies.
         //
         REBVAL *dest = CTX_VARS_HEAD(context);
-        REBVAL *src = CTX_VARS_HEAD(unwrap(parent));
-        for (; NOT_END(src); ++dest, ++src) {
+        const REBVAR *src_tail;
+        REBVAL *src = CTX_VARS(&src_tail, unwrap(parent));
+        for (; src != src_tail; ++dest, ++src) {
             REBFLGS flags = NODE_FLAG_MANAGED;  // !!! Review, what flags?
             Copy_Cell(dest, src);
             Clonify(dest, flags, TS_CLONE);

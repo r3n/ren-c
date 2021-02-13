@@ -124,8 +124,9 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     //
     REBARR *specialty = ACT_SPECIALTY(act);
     if (IS_PARTIALS(specialty)) {
+        const RELVAL *word_tail = ARR_TAIL(specialty);
         const REBVAL *word = SPECIFIC(ARR_HEAD(specialty));
-        for (; NOT_END(word); ++word)
+        for (; word != word_tail; ++word)
             Copy_Cell(DS_PUSH(), word);
     }
 
@@ -560,8 +561,9 @@ void For_Each_Unspecialized_Param(
         REBFLGS flags = 0;
 
         if (partials) {  // even normal parameters can appear in partials
+            const RELVAL *partial_tail = ARR_TAIL(unwrap(partials));
             REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
-            for (; NOT_END(partial); ++partial) {
+            for (; partial != partial_tail; ++partial) {
                 if (Are_Synonyms(
                     VAL_WORD_SYMBOL(partial),
                     KEY_SYMBOL(key)
@@ -610,11 +612,11 @@ void For_Each_Unspecialized_Param(
     // Finally, output any fully unspecialized refinements
 
   blockscope {
-    const REBKEY *tail;
-    const REBKEY *key = ACT_KEYS(&tail, act);
+    const REBKEY *key_tail;
+    const REBKEY *key = ACT_KEYS(&key_tail, act);
     const REBPAR *param = ACT_PARAMS_HEAD(act);
 
-    for (; key != tail; ++key, ++param) {
+    for (; key != key_tail; ++key, ++param) {
         if (Is_Param_Hidden(param))
             continue;
 
@@ -626,8 +628,9 @@ void For_Each_Unspecialized_Param(
         }
 
         if (partials) {
+            const RELVAL *partial_tail = ARR_TAIL(unwrap(partials));
             REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
-            for (; NOT_END(partial); ++partial) {
+            for (; partial != partial_tail; ++partial) {
                 if (Are_Synonyms(
                     VAL_WORD_SYMBOL(partial),
                     KEY_SYMBOL(key)

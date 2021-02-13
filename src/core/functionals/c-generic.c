@@ -190,7 +190,7 @@ REBARR *Startup_Generics(const REBVAL *boot_generics)
     REBDSP dsp_orig = DSP;
 
     RELVAL *item = head;
-    for (; NOT_END(item); ++item)
+    for (; item != tail; ++item)
         if (IS_SET_WORD(item)) {
             Derelativize(DS_PUSH(), item, specifier);
             mutable_KIND3Q_BYTE(DS_TOP) = REB_WORD; // change pushed to WORD!

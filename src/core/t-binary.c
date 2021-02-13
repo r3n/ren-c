@@ -996,7 +996,9 @@ REBNATIVE(debin)
     const REBYTE *bin_data = VAL_BINARY_SIZE_AT(&bin_size, ARG(binary));
 
     REBVAL* settings = rebValue("compose", ARG(settings), rebEND);
-    if (VAL_LEN_AT(settings) != 2 and VAL_LEN_AT(settings) != 3)
+
+    REBLEN arity = VAL_LEN_AT(settings);
+    if (arity != 2 and arity != 3)
         fail("DEBIN requires array of length 2 or 3 for settings for now");
     bool little = rebDid(
         "switch first", settings, "[",
@@ -1012,10 +1014,10 @@ REBNATIVE(debin)
         "]",
         rebEND);
     REBLEN num_bytes;
-    const RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
-    if (IS_END(third))
+    if (arity == 2)
         num_bytes = bin_size;
     else {
+        const RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
         if (not IS_INTEGER(third))
             fail ("Third element of DEBIN settings must be an integer}");
         num_bytes = VAL_INT32(third);

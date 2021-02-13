@@ -276,11 +276,11 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
             if (num_pending == 0)
                 return nullptr; // has no pending ports!
             timeout = ALL_BITS; // no timeout provided
-            val = END_NODE;
+            val = nullptr;
         }
     }
 
-    if (NOT_END(val)) {
+    if (val != nullptr) {
         switch (VAL_TYPE(val)) {
           case REB_INTEGER:
           case REB_DECIMAL:

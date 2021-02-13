@@ -204,8 +204,9 @@ void Protect_Series(const REBSER *s_const, REBLEN index, REBFLGS flags)
 
     Flip_Series_To_Black(s); // recursion protection
 
+    const RELVAL *val_tail = ARR_TAIL(ARR(s));
     const RELVAL *val = ARR_AT(ARR(s), index);
-    for (; NOT_END(val); val++)
+    for (; val != val_tail; val++)
         Protect_Value(val, flags);
 }
 
@@ -241,8 +242,9 @@ void Protect_Context(REBCTX *c, REBFLGS flags)
 
     Flip_Series_To_Black(varlist); // for recursion
 
-    REBVAL *var = CTX_VARS_HEAD(c);
-    for (; NOT_END(var); ++var)
+    const REBVAR *var_tail;
+    REBVAL *var = CTX_VARS(&var_tail, c);
+    for (; var != var_tail; ++var)
         Protect_Value(var, flags);
 }
 

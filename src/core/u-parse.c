@@ -855,8 +855,9 @@ static REBIXO To_Thru_Block_Rule(
         VAL_INDEX_RAW(iter) <= cast(REBIDX, P_INPUT_LEN);
         ++VAL_INDEX_RAW(iter)
     ){  // see note
+        const RELVAL *blk_tail = ARR_TAIL(VAL_ARRAY(rule_block));
         const RELVAL *blk = ARR_HEAD(VAL_ARRAY(rule_block));
-        for (; NOT_END(blk); blk++) {
+        for (; blk != blk_tail; blk++) {
             if (IS_BAR(blk))
                 fail (Error_Parse_Rule());  // !!! Shouldn't `TO [|]` succeed?
 
@@ -1054,7 +1055,7 @@ static REBIXO To_Thru_Block_Rule(
 
             do {
                 ++blk;
-                if (IS_END(blk))
+                if (blk == blk_tail)
                     goto next_input_position;
             } while (not IS_BAR(blk));
         }

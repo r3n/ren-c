@@ -791,41 +791,40 @@ REBCTX *Make_Error_Managed_Core(
         types
     );
 
-    const RELVAL *msg_item =
-        IS_TEXT(message)
-            ? cast(const RELVAL*, END_NODE)  // gcc/g++ 2.95 needs (bug)
-            : ARR_HEAD(VAL_ARRAY(message));
-
     // Arrays from errors.r look like `["The value" :arg1 "is not" :arg2]`
     // They can also be a single TEXT! (which will just bypass this loop).
     //
-    for (; NOT_END(msg_item); ++msg_item) {
-        if (IS_GET_WORD(msg_item)) {
-            const REBSYM *symbol = VAL_WORD_SYMBOL(msg_item);
-            REBVAL *var = Append_Context(error, nullptr, symbol);
+    if (not IS_TEXT(message)) {
+        const RELVAL *msg_tail;
+        const RELVAL *msg_item = VAL_ARRAY_AT(&msg_tail, message);
 
-            const void *p = va_arg(*vaptr, const void*);
+        for (; msg_item != msg_tail; ++msg_item) {
+            if (IS_GET_WORD(msg_item)) {
+                const REBSYM *symbol = VAL_WORD_SYMBOL(msg_item);
+                REBVAL *var = Append_Context(error, nullptr, symbol);
 
-            if (p == nullptr) {
-                //
-                // !!! Variadic Error() predates rebNull...but should possibly
-                // be adapted to take nullptr instead of "nulled cells".  For
-                // the moment, though, it still takes nulled cells.
-                //
-                assert(!"nullptr passed to Make_Error_Managed_Core()");
-                Init_Nulled(var);
-            }
-            else if (IS_END(p)) {
-                assert(!"Not enough arguments in Make_Error_Managed_Core()");
-                Init_Void(var, SYM_END);
-            }
-            else if (IS_RELATIVE(cast(const RELVAL*, p))) {
-                assert(!"Relative argument in Make_Error_Managed_Core()");
-                Init_Void(var, SYM_VOID);
-            }
-            else {
-                const REBVAL *arg = cast(const REBVAL*, p);
-                Copy_Cell(var, arg);
+                const void *p = va_arg(*vaptr, const void*);
+
+                if (p == nullptr) {
+                    //
+                    // !!! Should variadic error take `nullptr` instead of
+                    // "nulled cells"?
+                    //
+                    assert(!"nullptr passed to Make_Error_Managed_Core()");
+                    Init_Nulled(var);
+                }
+                else if (IS_END(p)) {
+                    assert(!"Not enough arguments in Make_Error_Managed()");
+                    Init_Void(var, SYM_END);
+                }
+                else if (IS_RELATIVE(cast(const RELVAL*, p))) {
+                    assert(!"Relative argument in Make_Error_Managed()");
+                    Init_Void(var, SYM_VOID);
+                }
+                else {
+                    const REBVAL *arg = cast(const REBVAL*, p);
+                    Copy_Cell(var, arg);
+                }
             }
         }
     }

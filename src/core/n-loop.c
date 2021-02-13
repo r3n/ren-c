@@ -405,7 +405,8 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
         //
         // ANY-CONTEXT! and MAP! allow one var (keys) or two vars (keys/vals)
         //
-        REBVAL *pseudo_var = CTX_VAR(les->pseudo_vars_ctx, 1);
+        const REBVAR *pseudo_tail;
+        REBVAL *pseudo_var = CTX_VARS(&pseudo_tail, les->pseudo_vars_ctx);
         for (; NOT_END(pseudo_var); ++pseudo_var) {
             REBVAL *var = Real_Var_From_Pseudo(pseudo_var);
 
@@ -1255,8 +1256,9 @@ static REB_R Remove_Each_Core(struct Remove_Each_State *res)
     while (index < len) {
         assert(res->start == index);
 
-        REBVAL *var = CTX_VAR(res->context, 1);  // not movable, see #2274
-        for (; NOT_END(var); ++var) {
+        const REBVAR *var_tail;
+        REBVAL *var = CTX_VARS(&var_tail, res->context);  // fixed (#2274)
+        for (; var != var_tail; ++var) {
             if (index == len) {
                 //
                 // The second iteration here needs x = #"c" and y as void.

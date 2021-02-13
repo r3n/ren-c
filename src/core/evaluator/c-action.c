@@ -132,9 +132,10 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     // not followed by a refinement.  That would cost
     // extra, but avoid the test on every call.
     //
-    const REBPAR *enable = f->param + 1;
-    if (IS_END(enable))
+    if (f->key + 1 == f->key_tail)
         fail ("Modal parameter can't be at end of parameter list");
+
+    const REBPAR *enable = f->param + 1;
 
     if (Is_Param_Hidden(enable)) {
         if (not (IS_NULLED(enable) or Is_Blackhole(enable)))

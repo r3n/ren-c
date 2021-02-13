@@ -222,8 +222,9 @@ void Clonify(
         // copied series and "clonify" the values in it.
         //
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
+            const RELVAL *sub_tail = ARR_TAIL(ARR(series));
             REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
-            for (; NOT_END(sub); ++sub)
+            for (; sub != sub_tail; ++sub)
                 Clonify(sub, flags, deep_types);
         }
     }
@@ -317,10 +318,11 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
     const REBFLGS flags = NODE_FLAG_MANAGED;
 
     REBARR *copy = Make_Array_For_Copy(ARR_LEN(original), flags, original);
+    const RELVAL *src_tail = ARR_TAIL(original);
     const RELVAL *src = ARR_HEAD(original);
     RELVAL *dest = ARR_HEAD(copy);
 
-    for (; NOT_END(src); ++src, ++dest) {
+    for (; src != src_tail; ++src, ++dest) {
         if (not IS_RELATIVE(src)) {
             Copy_Cell(dest, SPECIFIC(src));
             continue;
@@ -387,8 +389,9 @@ void Uncolor_Array(const REBARR *a)
 
     Flip_Series_To_White(a);
 
-    const RELVAL *v;
-    for (v = ARR_HEAD(a); NOT_END(v); ++v) {
+    const RELVAL *tail = ARR_TAIL(a);
+    const RELVAL *v = ARR_HEAD(a);
+    for (; v != tail; ++v) {
         if (ANY_PATH(v) or ANY_ARRAY(v) or IS_MAP(v) or ANY_CONTEXT(v))
             Uncolor(v);
     }

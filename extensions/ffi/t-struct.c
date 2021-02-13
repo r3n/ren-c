@@ -293,9 +293,9 @@ static bool same_fields(REBARR *tgt_fieldlist, REBARR *src_fieldlist)
     RELVAL *tgt_item = ARR_HEAD(tgt_fieldlist);
     RELVAL *tgt_tail = ARR_TAIL(tgt_fieldlist);
     RELVAL *src_item = ARR_HEAD(src_fieldlist);
-    RELVAL *src_tial = ARR_TAIL(src_fieldlist);
+    RELVAL *src_tail = ARR_TAIL(src_fieldlist);
 
-    for (; src_item != tail; ++src_item, ++tgt_item) {
+    for (; src_item != src_tail; ++src_item, ++tgt_item) {
         REBFLD *src_field = VAL_ARRAY_KNOWN_MUTABLE(src_item);
         REBFLD *tgt_field = VAL_ARRAY_KNOWN_MUTABLE(tgt_item);
 
@@ -328,7 +328,7 @@ static bool same_fields(REBARR *tgt_fieldlist, REBARR *src_fieldlist)
         assert(FLD_WIDE(tgt_field) == FLD_WIDE(src_field));
     }
 
-    assert(IS_END(tgt_item));
+    assert(tgt_item == tgt_tail);
 
     return true;
 }

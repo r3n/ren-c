@@ -220,6 +220,7 @@ REBNATIVE(load_extension)
 
     REBDSP dsp_orig = DSP; // for accumulating exports
 
+    const RELVAL *tail = ARR_TAIL(specs);
     RELVAL *item = ARR_HEAD(specs);
     REBLEN i;
     for (i = 0; i < num_natives; ++i) {
@@ -248,6 +249,7 @@ REBNATIVE(load_extension)
         //
         REBVAL *native = Make_Native(
             &item, // gets advanced/incremented
+            tail,
             SPECIFIED,
             dispatchers[i],
             module

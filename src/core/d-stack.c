@@ -41,8 +41,9 @@
 //
 void Collapsify_Array(REBARR *array, REBSPC *specifier, REBLEN limit)
 {
+    const RELVAL *tail = ARR_TAIL(array);
     RELVAL *item = ARR_HEAD(array);
-    for (; NOT_END(item); ++item) {
+    for (; item != tail; ++item) {
         if (ANY_ARRAY(item) and VAL_LEN_AT(item) > limit) {
             REBSPC *derived = Derive_Specifier(specifier, item);
             REBARR *copy = Copy_Array_At_Max_Shallow(
@@ -118,8 +119,9 @@ REBVAL *Init_Near_For_Frame(RELVAL *out, REBFRM *f)
         start = 0;
 
     REBLEN count = 0;
+    const RELVAL *tail = ARR_TAIL(FRM_ARRAY(f));
     const RELVAL *item = ARR_AT(FRM_ARRAY(f), start);
-    for (; NOT_END(item) and count < 6; ++item, ++count) {
+    for (; item != tail and count < 6; ++item, ++count) {
         assert(not IS_NULLED(item));  // can't be in arrays, API won't splice
         Derelativize(DS_PUSH(), item, f_specifier);
 
@@ -135,7 +137,7 @@ REBVAL *Init_Near_For_Frame(RELVAL *out, REBFRM *f)
         }
     }
 
-    if (NOT_END(item))
+    if (item != tail)
         Init_Word(DS_PUSH(), Canon(SYM_ELLIPSIS));
 
     // !!! This code can be called on an executing frame, such as when an

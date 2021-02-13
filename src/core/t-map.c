@@ -466,11 +466,13 @@ inline static REBMAP *Copy_Map(const REBMAP *map, REBU64 types) {
     //
     assert(ARR_LEN(copy) % 2 == 0); // should be [key value key value]...
 
+    const RELVAL *tail = ARR_TAIL(copy);
     REBVAL *key = SPECIFIC(ARR_HEAD(copy));  // keys/vals specified
-    for (; NOT_END(key); key += 2) {
+    for (; key != tail; key += 2) {
         assert(Is_Value_Frozen_Deep(key));  // immutable key
 
         REBVAL *v = key + 1;
+        assert(v != tail);
         if (IS_NULLED(v))
             continue; // "zombie" map element (not present)
 
@@ -531,8 +533,9 @@ REBARR *Map_To_Array(const REBMAP *map, REBINT what)
     REBARR *a = Make_Array(count * ((what == 0) ? 2 : 1));
 
     RELVAL *dest = ARR_HEAD(a);
+    const RELVAL *val_tail = ARR_TAIL(MAP_PAIRLIST(map));
     const REBVAL *val = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
-    for (; NOT_END(val); val += 2) {
+    for (; val != val_tail; val += 2) {
         if (not IS_NULLED(val + 1)) {  // can't be END
             if (what <= 0) {
                 Copy_Cell(dest, &val[0]);
@@ -546,7 +549,6 @@ REBARR *Map_To_Array(const REBMAP *map, REBINT what)
     }
 
     SET_SERIES_LEN(a, dest - ARR_HEAD(a));
-    assert(IS_END(dest));
     return a;
 }
 
@@ -565,8 +567,9 @@ REBCTX *Alloc_Context_From_Map(const REBMAP *map)
     REBLEN count = 0;
 
   blockscope {
+    const RELVAL *mval_tail = ARR_TAIL(MAP_PAIRLIST(map));
     const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
-    for (; NOT_END(mval); mval += 2) {  // note mval must not be END
+    for (; mval != mval_tail; mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1))
             ++count;
     }
@@ -576,9 +579,10 @@ REBCTX *Alloc_Context_From_Map(const REBMAP *map)
 
     REBCTX *c = Alloc_Context(REB_OBJECT, count);
 
+    const RELVAL *mval_tail = ARR_TAIL(MAP_PAIRLIST(map));
     const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
 
-    for (; NOT_END(mval); mval += 2) {  // note mval must not be END
+    for (; mval != mval_tail; mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1)) {
             REBVAL *var = Append_Context(c, nullptr, VAL_WORD_SYMBOL(mval));
             Copy_Cell(var, &mval[1]);
@@ -614,8 +618,10 @@ void MF_Map(REB_MOLD *mo, REBCEL(const*) v, bool form)
     //
     mo->indent++;
 
+    const RELVAL *tail = ARR_TAIL(MAP_PAIRLIST(m));
     const RELVAL *key = ARR_HEAD(MAP_PAIRLIST(m));
-    for (; NOT_END(key); key += 2) {  // note value slot must not be END
+    for (; key != tail; key += 2) {  // note value slot must not be END
+        assert(key + 1 != tail);
         if (IS_NULLED(key + 1))
             continue; // if value for this key is void, key has been removed
 

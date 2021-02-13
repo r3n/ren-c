@@ -82,8 +82,9 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
         return cast(REBVAL*, out);
     }
 
+    const RELVAL *tail = ARR_TAIL(a);
     const RELVAL *v = ARR_HEAD(a);
-    for (; NOT_END(v); ++v) {
+    for (; v != tail; ++v) {
         if (not Is_Valid_Sequence_Element(kind, v)) {
             Derelativize(out, v, specifier);
             return nullptr;

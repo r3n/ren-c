@@ -701,7 +701,6 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             ++dest;
             ++param;
         }
-        assert(IS_END(param));
 
         SET_SERIES_LEN(types_varlist, num_slots);
 
@@ -740,7 +739,6 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
             ++dest;
             ++param;
         }
-        assert(IS_END(param));
 
         SET_SERIES_LEN(notes_varlist, num_slots);
 

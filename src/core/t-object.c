@@ -547,8 +547,9 @@ REBCTX *Copy_Context_Extra_Managed(
     // Now copy the actual vars in the context, from wherever they may be
     // (might be in an array, or might be in the chunk stack for FRAME!)
     //
-    REBVAL *src = CTX_VARS_HEAD(original);
-    for (; NOT_END(src); ++src, ++dest) {
+    const REBVAR *src_tail;
+    REBVAL *src = CTX_VARS(&src_tail, original);
+    for (; src != src_tail; ++src, ++dest) {
         Copy_Cell_Core(  // trying to duplicate slot precisely
             dest,
             src,

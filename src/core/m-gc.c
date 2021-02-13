@@ -150,14 +150,6 @@ static void Queue_Mark_Pairing_Deep(REBVAL *paired)
     Queue_Mark_Opt_Value_Deep(paired);
     Queue_Mark_Opt_Value_Deep(PAIRING_KEY(paired));
 
-    // Caution note: We are writing this bit through the uint_fast32_t `bits`
-    // of a REBVAL* header pointer, but we visit the series pool with a
-    // REBSER*.  It would be unsafe to read it back via the `bits` field and
-    // expect it to work -except- we are reading as a byte, and byte access
-    // gets past strict aliasing.  Watch out for any non-byte accesses that
-    // try to work with this flag.  (Perhaps all MARKED access should go
-    // through a byte-oriented API, as with IS_END()?)
-    //
     paired->header.bits |= NODE_FLAG_MARKED;
 
   #if !defined(NDEBUG)
@@ -594,8 +586,9 @@ static void Mark_Root_Series(void)
                     if (node_MISC(Node, a))
                         Queue_Mark_Node_Deep(node_MISC(Node, a));
 
-                RELVAL *item = SER_HEAD(RELVAL, a);
-                for (; NOT_END(item); ++item)
+                const RELVAL *item_tail = ARR_TAIL(a);
+                RELVAL *item = ARR_HEAD(a);
+                for (; item != item_tail; ++item)
                     Queue_Mark_Value_Deep(item);
             }
 

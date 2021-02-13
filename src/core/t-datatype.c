@@ -127,14 +127,16 @@ REBTYPE(Datatype)
 
             assert(CTX_TYPE(context) == REB_OBJECT);
 
-            const REBKEY *tail;
-            const REBKEY *key = CTX_KEYS(&tail, context);
+            const REBKEY *key_tail;
+            const REBKEY *key = CTX_KEYS(&key_tail, context);
+
             REBVAR *var = CTX_VARS_HEAD(context);
 
+            const RELVAL *item_tail = ARR_TAIL(VAL_TYPE_SPEC(type));
             RELVAL *item = ARR_HEAD(VAL_TYPE_SPEC(type));
 
-            for (; key != tail; ++key, ++var) {
-                if (IS_END(item))
+            for (; key != key_tail; ++key, ++var) {
+                if (item == item_tail)
                     Init_Blank(var);
                 else {
                     // typespec array does not contain relative values
@@ -254,6 +256,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
     if (ARR_LEN(boot_types) != REB_MAX - 1)  // exclude REB_0_END
         panic (boot_types);  // other types/internals should have a WORD!
 
+    const RELVAL *word_tail = ARR_TAIL(boot_types);
     RELVAL *word = ARR_HEAD(boot_types);
 
     if (VAL_WORD_ID(word) != SYM_NULL)
@@ -262,7 +265,7 @@ REBARR *Startup_Datatypes(REBARR *boot_types, REBARR *boot_typespecs)
     REBARR *catalog = Make_Array(REB_MAX - 1);
 
     REBINT n;
-    for (n = 1; NOT_END(word); word++, n++) {
+    for (n = 1; word != word_tail; ++word, ++n) {
         enum Reb_Kind kind = cast(enum Reb_Kind, n);
         REBVAL *value = Append_Context(
             VAL_CONTEXT(Lib_Context),

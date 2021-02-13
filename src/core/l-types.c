@@ -1308,11 +1308,14 @@ REBNATIVE(scan_net_header)
         REBVAL *val = NULL; // rigorous checks worry it could be uninitialized
 
         const REBSYM *name = Intern_UTF8_Managed(start, cp - start);
-        RELVAL *item;
 
         cp++;
         // Search if word already present:
-        for (item = ARR_HEAD(result); NOT_END(item); item += 2) {
+
+        const RELVAL *item_tail = ARR_TAIL(result);
+        RELVAL *item = ARR_HEAD(result);
+
+        for (; item != item_tail; item += 2) {
             assert(IS_TEXT(item + 1) || IS_BLOCK(item + 1));
             if (Are_Synonyms(VAL_WORD_SYMBOL(item), name)) {
                 // Does it already use a block?
@@ -1337,7 +1340,7 @@ REBNATIVE(scan_net_header)
             }
         }
 
-        if (IS_END(item)) { // didn't break, add space for new word/value
+        if (item == item_tail) {  // didn't break, add space for new word/value
             Init_Set_Word(Alloc_Tail_Array(result), name);
             val = Init_Unreadable_Void(Alloc_Tail_Array(result));
         }

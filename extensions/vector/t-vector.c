@@ -278,7 +278,7 @@ REBARR *Vector_To_Array(const REBVAL *vect)
         Get_Vector_At(dest, vect, n);
 
     SET_SERIES_LEN(arr, len);
-    assert(IS_END(dest));
+    assert(dest == ARR_TAIL(arr));
 
     return arr;
 }

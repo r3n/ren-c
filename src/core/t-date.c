@@ -445,92 +445,90 @@ REB_R MAKE_Date(
         goto bad_make;
 
   blockscope {
-    REBLEN len;
-    const RELVAL *item = VAL_ARRAY_LEN_AT(&len, arg);
+    const RELVAL *tail;
+    const RELVAL *item = VAL_ARRAY_AT(&tail, arg);
 
-    if (len >= 3) {
-        if (not IS_INTEGER(item))
-            goto bad_make;
+    if (item == tail or not IS_INTEGER(item))
+        goto bad_make;
 
-        REBLEN day = Int32s(item, 1);
+    REBLEN day = Int32s(item, 1);
 
+    ++item;
+    if (item == tail or not IS_INTEGER(item))
+        goto bad_make;
+
+    REBLEN month = Int32s(item, 1);
+
+    ++item;
+    if (item == tail or not IS_INTEGER(item))
+        goto bad_make;
+
+    REBLEN year;
+    if (day > 99) {
+        year = day;
+        day = Int32s(item, 1);
         ++item;
-        if (not IS_INTEGER(item))
-            goto bad_make;
-
-        REBLEN month = Int32s(item, 1);
-
+    }
+    else {
+        year = Int32s(item, 0);
         ++item;
-        if (not IS_INTEGER(item))
+    }
+
+    if (month < 1 or month > 12)
+        goto bad_make;
+
+    if (year > MAX_YEAR or day < 1 or day > Month_Max_Days[month-1])
+        goto bad_make;
+
+    // Check February for leap year or century:
+    if (month == 2 and day == 29) {
+        if (((year % 4) != 0) or        // not leap year
+            ((year % 100) == 0 and       // century?
+            (year % 400) != 0)) goto bad_make; // not leap century
+    }
+
+    day--;
+    month--;
+
+    REBI64 secs;
+    REBINT tz;
+    if (item == tail) {
+        secs = NO_DATE_TIME;
+        tz = NO_DATE_ZONE;
+    }
+    else {
+        if (not IS_TIME(item))
             goto bad_make;
 
-        REBLEN year;
-        if (day > 99) {
-            year = day;
-            day = Int32s(item, 1);
-            ++item;
-        }
-        else {
-            year = Int32s(item, 0);
-            ++item;
-        }
+        secs = VAL_NANO(item);
+        ++item;
 
-        if (month < 1 or month > 12)
-            goto bad_make;
-
-        if (year > MAX_YEAR or day < 1 or day > Month_Max_Days[month-1])
-            goto bad_make;
-
-        // Check February for leap year or century:
-        if (month == 2 and day == 29) {
-            if (((year % 4) != 0) or        // not leap year
-                ((year % 100) == 0 and       // century?
-                (year % 400) != 0)) goto bad_make; // not leap century
-        }
-
-        day--;
-        month--;
-
-        REBI64 secs;
-        REBINT tz;
-        if (IS_END(item)) {
-            secs = NO_DATE_TIME;
+        if (item == tail)
             tz = NO_DATE_ZONE;
-        }
         else {
             if (not IS_TIME(item))
                 goto bad_make;
 
-            secs = VAL_NANO(item);
+            tz = cast(REBINT, VAL_NANO(item) / (ZONE_MINS * MIN_SEC));
+            if (tz < -MAX_ZONE or tz > MAX_ZONE)
+                fail (Error_Out_Of_Range(SPECIFIC(item)));
             ++item;
 
-            if (IS_END(item))
-                tz = NO_DATE_ZONE;
-            else {
-                if (not IS_TIME(item))
-                    goto bad_make;
-
-                tz = cast(REBINT, VAL_NANO(item) / (ZONE_MINS * MIN_SEC));
-                if (tz < -MAX_ZONE or tz > MAX_ZONE)
-                    fail (Error_Out_Of_Range(SPECIFIC(item)));
-                ++item;
-            }
+            if (item != tail)
+                goto bad_make;
         }
-
-        if (NOT_END(item))
-            goto bad_make;
-
-        if (secs != NO_DATE_TIME)
-            Normalize_Time(&secs, &day);
-
-        RESET_CELL(out, REB_DATE, CELL_MASK_NONE);
-        VAL_DATE(out) = Normalize_Date(day, month, year, tz);
-        PAYLOAD(Time, out).nanoseconds = secs;
-
-        const bool to_utc = true;
-        Adjust_Date_Zone(out, to_utc);
-        return out;
     }
+
+    if (secs != NO_DATE_TIME)
+        Normalize_Time(&secs, &day);
+
+    RESET_CELL(out, REB_DATE, CELL_MASK_NONE);
+    VAL_DATE(out) = Normalize_Date(day, month, year, tz);
+    PAYLOAD(Time, out).nanoseconds = secs;
+
+    const bool to_utc = true;
+    Adjust_Date_Zone(out, to_utc);
+    return out;
   }
 
   bad_make:

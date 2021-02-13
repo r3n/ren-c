@@ -121,6 +121,7 @@ REB_R Chainer_Dispatcher(REBFRM *f)
     assert(ARR_LEN(details) == IDX_CHAINER_MAX);
 
     const REBARR *pipeline = VAL_ARRAY(ARR_AT(details, IDX_CHAINER_PIPELINE));
+    const RELVAL *chained_tail = ARR_TAIL(pipeline);
     const REBVAL *chained = SPECIFIC(ARR_HEAD(pipeline));
 
     Init_Void(FRM_SPARE(f), SYM_UNSET);
@@ -157,7 +158,7 @@ REB_R Chainer_Dispatcher(REBFRM *f)
         // incompatible with the next chain step.
 
         ++chained;
-        if (IS_END(chained))
+        if (chained == chained_tail)
             break;
 
         Push_Action(sub, VAL_ACTION(chained), VAL_ACTION_BINDING(chained));
