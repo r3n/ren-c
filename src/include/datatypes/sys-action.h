@@ -154,7 +154,7 @@
     cast(REBVAL*, &PG_R_Immediate)
 
 #define R_UNHANDLED \
-    cast(REBVAL*, &PG_End_Node)
+    cast(REBVAL*, &PG_End_Cell)
 
 
 #define CELL_MASK_ACTION \

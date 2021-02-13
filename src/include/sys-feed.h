@@ -319,7 +319,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
         break; }
 
       case DETECTED_AS_END: {  // end of variadic input, so that's it for this
-        feed->value = END_NODE;
+        feed->value = END_CELL;
 
         // The va_end() is taken care of here, or if there is a throw/fail it
         // is taken care of by Abort_Frame_Core()

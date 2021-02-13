@@ -251,9 +251,8 @@ static void Shutdown_Action_Spec_Tags(void)
 //
 static void Startup_End_Node(void)
 {
-    PG_End_Node.header.bits = Endlike_Header(0);  // no NODE_FLAG_CELL, R/O
-    USED(TRACK_CELL_IF_DEBUG(&PG_End_Node));
-    assert(IS_END(END_NODE));  // sanity check
+    SET_END(Prep_Cell(&PG_End_Cell));
+    assert(IS_END(END_CELL));  // sanity check
 }
 
 

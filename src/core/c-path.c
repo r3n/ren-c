@@ -305,7 +305,7 @@ bool Next_Path_Throws(REBPVS *pvs)
 
         const REBVAL *r = hook(pvs, PVS_PICKER(pvs), nullptr);  // no "setval"
 
-        if (r and r != END_NODE) {
+        if (r and r != END_CELL) {
             assert(r->header.bits & NODE_FLAG_CELL);
             /* assert(not (r->header.bits & NODE_FLAG_ROOT)); */
         }

@@ -521,14 +521,21 @@ inline static RELVAL *Prep_Cell_Core(RELVAL *c) {
 // to look at the length (though the length in the series header is maintained
 // in sync, also).
 //
-// Ren-C changed this so that END is not a user-exposed data type, and that
-// it's not a requirement for the byte sequence containing the end byte be
-// the full size of a cell.  The type byte (which is 0 for an END) lives in
-// the second byte, hence two bytes are sufficient to indicate a terminator.
+// Ren-C changed this to not redundantly terminate along with the length.
+// Enumerations are stopped not by an end signal, but rather keep traversing
+// until they hit the tail location.  This makes such traversals require an
+// extra variable--but, besides saving on memory (one less cell per array)
+// it also doesn't require dereferencing a pointer to see if it's an end
+// or not.  Hence the performance implications are likely negligible.
+//
+// However, there still needs to be some sort of signal that a variadic feed
+// is terminated... because C variadics do not have a length.  C's nullptr
+// of 0 value can't be used for this, as it's used to represent the null
+// state.  So values with type byte 0 for an END are used instead.
 //
 
-#define END_NODE \
-    cast(const REBVAL*, &PG_End_Node) // rebEND is char*, not REBVAL* aligned!
+#define END_CELL \
+    c_cast(const REBVAL*, &PG_End_Cell)
 
 #if defined(DEBUG_TRACK_EXTEND_CELLS) || defined(DEBUG_CELL_WRITABILITY)
     inline static REBVAL *SET_END_Debug(RELVAL *v) {

@@ -266,4 +266,4 @@ inline static bool Do_Branch_Core_Throws(
     Do_Branch_Core_Throws((out), (branch), NULLIFY_NULLED(condition))
 
 #define Do_Branch_Throws(out,branch) \
-    Do_Branch_Core_Throws((out), (branch), END_NODE)
+    Do_Branch_Core_Throws((out), (branch), END_CELL)

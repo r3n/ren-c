@@ -354,7 +354,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // from the global empty array.
                 //
                 if (Is_Param_Variadic(f->param)) {
-                    Init_Varargs_Untyped_Enfix(f->arg, END_NODE);
+                    Init_Varargs_Untyped_Enfix(f->arg, END_CELL);
                     goto continue_fulfilling;
                 }
 

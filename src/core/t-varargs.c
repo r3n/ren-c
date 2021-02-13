@@ -166,7 +166,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         if (Vararg_Op_If_No_Advance_Handled(
             out,
             op,
-            IS_END(shared) ? END_NODE : VAL_ARRAY_ITEM_AT(shared),
+            IS_END(shared) ? END_CELL : VAL_ARRAY_ITEM_AT(shared),
             IS_END(shared) ? SPECIFIED : VAL_SPECIFIER(shared),
             pclass
         )){
@@ -281,7 +281,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
             out,
             op,
             hit_barrier
-                ? END_NODE
+                ? END_CELL
                 : cast(const RELVAL *, f->feed->value), // might be END
             f_specifier,
             pclass

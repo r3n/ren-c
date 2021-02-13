@@ -347,8 +347,8 @@ REB_R MAKE_Context(
     if (ANY_NUMBER(arg)) {
         REBCTX *context = Make_Context_Detect_Managed(
             kind,
-            END_NODE,  // values to scan for toplevel set-words (empty)
-            END_NODE,
+            END_CELL,  // values to scan for toplevel set-words (empty)
+            END_CELL,
             parent_ctx
         );
 

@@ -80,7 +80,7 @@ PVAR REB_OPTS *Reb_Opts;
 
 // These are some canon BLANK, TRUE, and FALSE values (and nulled/end cells).
 
-PVAR RELVAL PG_End_Node;
+PVAR REBVAL PG_End_Cell;
 PVAR REBVAL PG_Nulled_Cell;
 
 PVAR REBVAL PG_Blank_Value;
