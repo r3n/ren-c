@@ -501,19 +501,14 @@ void Set_Location_Of_Error(
         break;
     }
 
-    // Look for nearest frame above that has file and line information.
-    //
-    while (f != FS_BOTTOM) {
+    if (f != FS_BOTTOM) {  // found a frame with file and line information
         const REBSTR *file = LINK(Filename, FRM_ARRAY(f));
         REBLIN line = FRM_ARRAY(f)->misc.line;
 
-        if (file) {
+        if (file)
             Init_File(&vars->file, file);
-            if (line != 0)
-                Init_Integer(&vars->line, line);
-            break;
-        }
-        f = f->prior;
+        if (line != 0)
+            Init_Integer(&vars->line, line);
     }
 }
 
