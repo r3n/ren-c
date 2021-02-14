@@ -473,16 +473,13 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
     }
 #endif
 
-//
+
 // In general, requesting a pointer into the series data requires passing in
 // a type which is the correct size for the series.  A pointer is given back
 // to that type.
 //
 // Note that series indexing in C is zero based.  So as far as SERIES is
 // concerned, `SER_HEAD(t, s)` is the same as `SER_AT(t, s, 0)`
-//
-// Use C-style cast instead of cast() macro, as it will always be safe and
-// this is used very frequently.
 
 #define SER_AT(t,s,i) \
     cast(t*, SER_DATA_AT(sizeof(t), (s), (i)))
@@ -1270,13 +1267,7 @@ inline static REBSER *Make_Series(REBLEN capacity, REBFLGS flags)
     if (cast(REBU64, capacity) * wide > INT32_MAX)
         fail (Error_No_Memory(cast(REBU64, capacity) * wide));
 
-    // Non-array series nodes do not need their info bits to conform to the
-    // rules of Endlike_Header(), so plain assignment can be used with a
-    // non-zero second byte.  However, it obeys the fixed info bits for now.
-    // (It technically doesn't need to.)
-    //
     REBSER *s = Alloc_Series_Node(flags);
-    assert(not IS_SER_ARRAY(s));
 
     if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK))
         TRASH_POINTER_IF_DEBUG(s->info.node);

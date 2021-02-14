@@ -207,62 +207,24 @@ inline static void Prep_Array(
 //
 inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
 {
-    const REBLEN wide = sizeof(REBVAL);
+  #ifdef DEBUG_TERM_ARRAYS
+    if (capacity > 1 or (flags & SERIES_FLAG_DYNAMIC))  // space for term
+        capacity += 1;  // account for cell needed for terminator (END)
+  #endif
 
-    REBSER *s = Alloc_Series_Node(flags);
+    REBSER *s = Make_Series(capacity, flags);
     assert(IS_SER_ARRAY(s));  // flavor should have been an array flavor
 
-    if (
-        (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold
-        or capacity > 1
-    ){
-      #ifdef DEBUG_TERM_ARRAYS
-        capacity += 1;  // account for cell needed for terminator (END)
-      #endif
-
-        SET_SERIES_FLAG(s, DYNAMIC);
-
-        if (not Did_Series_Data_Alloc(s, capacity)) {  // expects USED_BYTE=255
-            s->leader.bits &= ~NODE_FLAG_MANAGED;  // can't kill if managed
-            SET_SERIES_FLAG(s, INACCESSIBLE);
-            GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
-
-            fail (Error_No_Memory(capacity * wide));
-        }
-
+    if (IS_SER_DYNAMIC(s)) {
         Prep_Array(ARR(s), capacity);
 
       #ifdef DEBUG_TERM_ARRAYS
         Init_Trash_Debug(ARR_HEAD(ARR(s)));
       #endif
-
-      #if defined(DEBUG_COLLECT_STATS)
-        PG_Reb_Stats->Series_Memory += capacity * wide;
-      #endif
     }
     else {
         RELVAL *cell = TRACK_CELL_IF_DEBUG(SER_CELL(s));
         cell->header.bits = CELL_MASK_PREP_END;
-    }
-
-    if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK))
-        TRASH_POINTER_IF_DEBUG(s->info.node);
-    else 
-        SER_INFO(s) = SERIES_INFO_MASK_NONE;
-
-    // It is more efficient if you know a series is going to become managed to
-    // create it in the managed state.  But be sure no evaluations are called
-    // before it's made reachable by the GC, or use PUSH_GC_GUARD().
-    //
-    // !!! Code duplicated in Make_Series_Core ATM.
-    //
-    if (not (flags & NODE_FLAG_MANAGED)) {  // most callsites const fold this
-        if (SER_FULL(GC_Manuals))
-            Extend_Series(GC_Manuals, 8);
-
-        cast(REBSER**, GC_Manuals->content.dynamic.data)[
-            GC_Manuals->content.dynamic.used++
-        ] = s;  // start with NODE_FLAG_MANAGED to not need to remove later
     }
 
     // Arrays created at runtime default to inheriting the file and line
