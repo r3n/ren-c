@@ -888,7 +888,7 @@ static REBIXO To_Thru_Block_Rule(
                         or cmd == SYM_QUOTE // temporarily same for bootstrap
                     ){
                         rule = ++blk;  // next rule is the literal value
-                        if (IS_END(rule))
+                        if (rule == blk_tail)
                             fail (Error_Parse_Rule());
                     }
                     else

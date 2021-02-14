@@ -387,10 +387,12 @@ inline static void INIT_BINDING_MAY_MANAGE(
     const REBSER* binding
 );
 
-#include "datatypes/sys-track.h"
+#include "sys-track.h"
 #include "datatypes/sys-value.h"  // these defines don't need series accessors
 
-#include "datatypes/sys-nulled.h"
+#include "sys-end.h"  // notably *not* a datatype (and not user exposed)
+#include "sys-nulled.h"  // not a datatype, but it is exposed to the user
+
 #include "datatypes/sys-blank.h"
 #include "datatypes/sys-comma.h"
 

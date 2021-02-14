@@ -422,6 +422,7 @@ Special internal defines used by RT, not Host-Kit developers:
     //
     #if !defined(NDEBUG)
         #define DEBUG_TERM_ARRAYS
+        #define DEBUG_CHECK_ENDS
     #endif
 #endif
 
