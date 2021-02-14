@@ -1713,7 +1713,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         DECLARE_VA_FEED (feed, p, vaptr, feed_flags);
 
         while (NOT_END(feed->value)) {
-            Quotify(Copy_Cell(DS_PUSH(), SPECIFIC(feed->value)), 1);
+            Quotify(Copy_Cell(DS_PUSH(), SPECIFIC(unwrap(feed->value))), 1);
             Fetch_Next_In_Feed(feed);
         }
 

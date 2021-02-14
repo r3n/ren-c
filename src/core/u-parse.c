@@ -336,7 +336,7 @@ static bool Subparse_Throws(
     }
 
     if (inside)
-        Copy_Cell(Prep_Cell(ARG(inside)), CTX_ARCHETYPE(inside));
+        Copy_Cell(Prep_Cell(ARG(inside)), CTX_ARCHETYPE(unwrap(inside)));
     else
         Init_Nulled(Prep_Cell(ARG(inside)));
 
