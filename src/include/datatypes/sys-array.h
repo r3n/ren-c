@@ -190,7 +190,7 @@ inline static void Prep_Array(
         // about the bits in the excess capacity.  But set them to trash in
         // the debug build.
         //
-        prep->header.bits = Endlike_Header(0); // unwritable
+        prep->header.bits = CELL_MASK_POISON;  // unwritable and unreadable
         USED(TRACK_CELL_IF_DEBUG(prep));
       #if !defined(NDEBUG)
         while (n < a->content.dynamic.rest) { // no -1 (n is 1-based)
@@ -216,7 +216,7 @@ inline static void Prep_Array(
     // sure no code depends on a full cell in the last location,  make it
     // an unwritable end--to leave flexibility to use the rest of the cell.
     //
-    prep->header.bits = Endlike_Header(0);
+    prep->header.bits = CELL_MASK_POISON;
     USED(TRACK_CELL_IF_DEBUG(prep));
 }
 
@@ -262,9 +262,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
     if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK))
         TRASH_POINTER_IF_DEBUG(s->info.node);
     else 
-        SER_INFO(s) = Endlike_Header(
-            FLAG_USED_BYTE_ARRAY()  // reserved for future use
-        );
+        SER_INFO(s) = SERIES_INFO_MASK_NONE;
 
     // It is more efficient if you know a series is going to become managed to
     // create it in the managed state.  But be sure no evaluations are called

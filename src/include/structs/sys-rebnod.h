@@ -337,7 +337,7 @@ inline static uintptr_t FLAG_SECOND_UINT16(uint16_t u)
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Assignments to bits and fields in the header are done through a native
-// platform-sized integer...while still being able to control the underlying
+// pointer-sized integer...while still being able to control the underlying
 // ordering of those bits in memory.  See FLAG_LEFT_BIT() in %reb-c.h for how
 // this is achieved.
 //
@@ -347,10 +347,6 @@ inline static uintptr_t FLAG_SECOND_UINT16(uint16_t u)
 // bytes", which may never legally start a UTF-8 string:
 //
 // https://en.wikipedia.org/wiki/UTF-8#Codepage_layout
-//
-// There are applications of Reb_Header as an "implicit terminator".  Such
-// header patterns don't actually start valid REBNODs, but have a bit pattern
-// able to signal the IS_END() test for REBVAL.  See Endlike_Header()
 //
 
 union Reb_Header {
@@ -493,10 +489,7 @@ union Reb_Header {
 // If this bit is set in the header, it indicates the slot the header is for
 // is `sizeof(REBVAL)`.
 //
-// In the debug build, it provides safety for all value writing routines,
-// including avoiding writing over "implicit END markers".  For details, see
-// Endlike_Header().
-//
+// In the debug build, it provides some safety for all value writing routines.
 // In the release build, it distinguishes "pairing" nodes (holders for two
 // REBVALs in the same pool as ordinary REBSERs) from an ordinary REBSER node.
 // Plain REBSERs have the cell mask clear, while pairing values have it set.

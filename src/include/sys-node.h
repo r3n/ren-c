@@ -273,7 +273,7 @@ enum Reb_Pointer_Detect {
     DETECTED_AS_CELL = 3,
     DETECTED_AS_FREED_CELL = 4,
 
-    DETECTED_AS_END = 5 // may be a cell, or made with Endlike_Header()
+    DETECTED_AS_END = 5  // may be a cell, or a rebEND signal
 };
 
 inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(const void *p)

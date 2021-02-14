@@ -669,9 +669,7 @@ inline static void Push_Action(
             SERIES_MASK_VARLIST
                 | SERIES_FLAG_FIXED_SIZE // FRAME!s don't expand ATM
         );
-        SER_INFO(s) = Endlike_Header(
-            FLAG_USED_BYTE_ARRAY()  // reserved for future use
-        );
+        SER_INFO(s) = SERIES_INFO_MASK_NONE;
         INIT_LINK_KEYSOURCE(ARR(s), NOD(f)); // maps varlist back to f
         mutable_MISC(VarlistMeta, s) = nullptr;
         mutable_BONUS(Patches, s) = nullptr;
@@ -710,7 +708,7 @@ inline static void Push_Action(
     RELVAL *ultimate = TRACK_CELL_IF_DEBUG(
         ARR_AT(f->varlist, s->content.dynamic.rest - 1)
     );
-    ultimate->header.bits = Endlike_Header(0); // unreadable
+    ultimate->header.bits = CELL_MASK_POISON;  // unreadable and unwritable
 
   #if !defined(NDEBUG)
     RELVAL *prep = ultimate - 1;
@@ -841,8 +839,7 @@ inline static void Drop_Action(REBFRM *f) {
 
         assert(
             0 == (SER_INFO(f->varlist) & ~(  // <- note bitwise not
-                SERIES_INFO_0_IS_TRUE  // parallels NODE_FLAG_NODE
-                    | SERIES_INFO_7_IS_TRUE
+                SERIES_INFO_0_IS_FALSE
                     | FLAG_USED_BYTE(255)  // mask out non-dynamic-len
         )));
     }

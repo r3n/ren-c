@@ -1376,8 +1376,10 @@ void Assert_Array_Core(const REBARR *a)
         }
     }
 
-    if (NOT_END(item))
+  #if defined(DEBUG_TERM_SERIES)
+    if (not IS_TRASH_DEBUG(item))
         panic (item);
+  #endif
 
     if (IS_SER_DYNAMIC(a)) {
         REBLEN rest = SER_REST(a);

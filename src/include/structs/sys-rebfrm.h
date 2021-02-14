@@ -35,11 +35,9 @@
 #define HAS_LINK_ReuseNext          FLAVOR_VARLIST
 
 
-// See Endlike_Header() for why these are chosen the way they are.  This
-// means that the Reb_Frame->flags field can function as an implicit END for
-// Reb_Frame->cell, as well as be distinguished from a REBVAL*, a REBSER*, or
-// a UTF8 string.
-//
+// !!! A REBFRM* answers that it is a node, and a cell.  This is questionable
+// and should be reviewed now that many features no longer depend on it.
+
 #define EVAL_FLAG_0_IS_TRUE FLAG_LEFT_BIT(0) // IS a node
 STATIC_ASSERT(EVAL_FLAG_0_IS_TRUE == NODE_FLAG_NODE);
 
@@ -419,7 +417,7 @@ struct Reb_Frame {
     // Note: In order to use the memory pools, this must be in first position,
     // and it must not have the NODE_FLAG_FREE bit set when in use.
     //
-    union Reb_Header flags;  // See Endlike_Header()
+    union Reb_Header flags;
 
     // This is the source from which new values will be fetched.  In addition
     // to working with an array, it is also possible to feed the evaluator

@@ -651,9 +651,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
         SERIES_MASK_VARLIST
             | SERIES_FLAG_FIXED_SIZE
     );
-    SER_INFO(copy) = Endlike_Header(
-        FLAG_USED_BYTE_ARRAY()  // reserved for future use
-    );
+    SER_INFO(copy) = SERIES_INFO_MASK_NONE;
     TRASH_POINTER_IF_DEBUG(node_LINK(KeySource, copy)); // needs update
     memcpy(  // https://stackoverflow.com/q/57721104/
         cast(char*, &copy->content),

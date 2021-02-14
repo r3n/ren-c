@@ -515,8 +515,10 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
         // !!! See notes on TERM_SERIES_IF_NEEDED() for how array termination
         // is slated to be a debug feature only.
         //
+      #ifdef DEBUG_TERM_ARRAYS
         if (IS_SER_ARRAY(s))
-            SET_END(SER_AT(RELVAL, s, used));
+            TRASH_CELL_IF_DEBUG(SER_AT(RELVAL, s, used));
+      #endif
     }
     else {
         assert(used < sizeof(s->content));
@@ -531,7 +533,6 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
                 assert(used == 1);
                 if (IS_END(SER_HEAD(RELVAL, s)))
                     Init_Nulled(SER_HEAD(RELVAL, s));  // !!! Unreadable void?
-                assert(IS_END(SER_AT(RELVAL, s, 1)));
             }
         }
         else
@@ -649,8 +650,11 @@ inline static void TERM_SERIES_IF_NECESSARY(REBSER *s)
           #endif
         }
     }
-    else if (IS_SER_DYNAMIC(s) and IS_SER_ARRAY(s))
-        SET_END(SER_TAIL(RELVAL, s));
+    else if (IS_SER_DYNAMIC(s) and IS_SER_ARRAY(s)) {
+      #if defined(DEBUG_TERM_SERIES)
+        SET_TRASH_IF_DEBUG(SER_TAIL(RELVAL, s));
+      #endif
+    }
 }
 
 #ifdef NDEBUG
@@ -1277,7 +1281,7 @@ inline static REBSER *Make_Series(REBLEN capacity, REBFLGS flags)
     if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK))
         TRASH_POINTER_IF_DEBUG(s->info.node);
     else
-        SER_INFO(s) = Endlike_Header(0);
+        SER_INFO(s) = SERIES_INFO_MASK_NONE;
 
     if (
         (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold

@@ -336,14 +336,30 @@ inline static REBYTE FLAVOR_BYTE(uintptr_t flags)
 // bits.  These are the info bits, which are more likely to be changed over
 // the lifetime of the series--defaulting to FALSE.
 //
-// See Endlike_Header() for why the reserved bits are chosen the way they are.
+// !!! The current main application of series info is a byte's worth of space
+// for the SER_USED() of series content that fits in the cell area, and
+// flags pertaining to locking.  The idea of "popping out" that series info
+// upon a hold lock being taken--such that the info bits move and the slot
+// holds a locking pointer--is currently being thught about.  See the INODE()
+// for the beginnings of that.
+
+
+//=//// SERIES_INFO_0_IS_FALSE ////////////////////////////////////////////=//
 //
+// The INFO bits are resident immediately after the content description, and
+// in the case of singular arrays a node is stored in the cell itself.  An
+// array traversal might step outside the bounds, so it's easiest just to say
+// the location is not a node to avoid writing it.
+//
+#define SERIES_INFO_0_IS_FALSE \
+    FLAG_LEFT_BIT(0)
+STATIC_ASSERT(SERIES_INFO_0_IS_FALSE == NODE_FLAG_NODE);
 
-#define SERIES_INFO_0_IS_TRUE FLAG_LEFT_BIT(0) // IS a node
-STATIC_ASSERT(SERIES_INFO_0_IS_TRUE == NODE_FLAG_NODE);
 
-#define SERIES_INFO_1_IS_FALSE FLAG_LEFT_BIT(1) // is NOT free
-STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
+//=//// SERIES_INFO_1 /////////////////////////////////////////////////////=//
+//
+#define SERIES_INFO_1 \
+    FLAG_LEFT_BIT(1)
 
 
 //=//// SERIES_INFO_AUTO_LOCKED ///////////////////////////////////////////=//
@@ -428,15 +444,12 @@ STATIC_ASSERT(SERIES_INFO_1_IS_FALSE == NODE_FLAG_FREE);
     // Simple feature for tracking when a series gets freed or otherwise
     // messed with.  Setting this bit on it asks for a notice.
     //
+    // !!! Hasn't been used in a while, so feature has atrophied.  Consider
+    // updating it.
+    //
     #define SERIES_INFO_MONITOR_DEBUG \
-        FLAG_LEFT_BIT(7)  // !!! Overlap because not currently used, review
+        FLAG_LEFT_BIT(7)
 #endif
-
-// !!! Currently we lie here and act like a cell, because it allows the
-// END marker trick to work without sacrificing a SERIES_FLAG.
-//
-#define SERIES_INFO_7_IS_TRUE FLAG_LEFT_BIT(7)
-STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
 
 
 //=//// BITS 8-15 ARE SER_USED() FOR NON-DYNAMIC NON-ARRAYS ///////////////=//
@@ -462,9 +475,6 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
 #define FLAG_USED_BYTE(len) \
     FLAG_SECOND_BYTE(len)
 
-#define FLAG_USED_BYTE_ARRAY() \
-    FLAG_SECOND_BYTE(0)  // must be zero
-
 #define USED_BYTE(s) \
     SECOND_BYTE(SER_INFO(s))
 
@@ -486,6 +496,7 @@ STATIC_ASSERT(SERIES_INFO_7_IS_TRUE == NODE_FLAG_CELL);
 // While 64-bit systems have another 32-bits available in the header, core
 // functionality shouldn't require using them...only optimization features.
 
+#define SERIES_INFO_MASK_NONE 0
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -601,11 +612,6 @@ union Reb_Series_Content {
     // If not(SERIES_FLAG_DYNAMIC), then 0 or 1 length arrays can be held in
     // the series node.  If the single cell holds an END, it's 0 length...
     // otherwise it's length 1.
-    //
-    // !!! At time of writing this trick requires "implicit termination" in
-    // the ->info bits that come directly after ->content.  For how this is
-    // done, see Endlike_Header().  This is being phased out, enumerating
-    // based on a tail pointer from the stored length.
     //
     union {
         // Due to strict aliasing requirements, this has to be initialized
