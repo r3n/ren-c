@@ -849,11 +849,11 @@ module: func [
     ; it temporarily.
     ;
     if lit-word? spec/name [
-        spec/name: as word! spec/name
+        spec/name: as word! dequote spec/name
         ;fail ["Ren-C module Name:" (spec/name) "must be WORD!, not LIT-WORD!"]
     ]
     if lit-word? spec/type [
-        spec/type: as word! spec/type
+        spec/type: as word! dequote spec/type
         ;fail ["Ren-C module Type:" (spec/type) "must be WORD!, not LIT-WORD!"]
     ]
 
