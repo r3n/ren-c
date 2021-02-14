@@ -651,8 +651,8 @@ inline static void TERM_SERIES_IF_NECESSARY(REBSER *s)
         }
     }
     else if (IS_SER_DYNAMIC(s) and IS_SER_ARRAY(s)) {
-      #if defined(DEBUG_TERM_SERIES)
-        SET_TRASH_IF_DEBUG(SER_TAIL(RELVAL, s));
+      #ifdef DEBUG_TERM_ARRAYS
+        Init_Trash_Debug(SER_TAIL(RELVAL, s));
       #endif
     }
 }

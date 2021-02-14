@@ -1072,16 +1072,20 @@ void Assert_Context_Core(REBCTX *c)
         if (not IS_SYMBOL(*key))
             panic (*key);
 
-        if (IS_END(var)) {
+      #ifdef DEBUG_TERM_ARRAYS
+        if (IS_TRASH_DEBUG(var)) {
             printf("** Early var end at index: %d\n", cast(int, n));
             panic (c);
         }
+      #endif
     }
 
-    if (NOT_END(var)) {
+  #ifdef DEBUG_TERM_ARRAYS
+    if (not IS_TRASH_DEBUG(var)) {
         printf("** Missing var end at index: %d\n", cast(int, n));
         panic (var);
     }
+  #endif
 }
 
 #endif

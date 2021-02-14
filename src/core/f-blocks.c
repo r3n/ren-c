@@ -135,7 +135,7 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
 // values we are operating on here live inside of an array.
 //
 void Clonify(
-    REBVAL *v,
+    RELVAL *v,
     REBFLGS flags,
     REBU64 deep_types
 ){
@@ -223,7 +223,7 @@ void Clonify(
         //
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
             const RELVAL *sub_tail = ARR_TAIL(ARR(series));
-            REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
+            RELVAL *sub = ARR_HEAD(ARR(series));
             for (; sub != sub_tail; ++sub)
                 Clonify(sub, flags, deep_types);
         }

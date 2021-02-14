@@ -642,11 +642,11 @@ static void Clonify_And_Bind_Relative(
         // copied series and "clonify" the values in it.
         //
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
-            REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
+            RELVAL *sub = ARR_HEAD(ARR(series));
             RELVAL *sub_tail = ARR_TAIL(ARR(series));
             for (; sub != sub_tail; ++sub)
                 Clonify_And_Bind_Relative(
-                    sub,
+                    SPECIFIC(sub),
                     flags,
                     deep_types,
                     binder,

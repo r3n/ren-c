@@ -1369,31 +1369,25 @@ void Assert_Array_Core(const REBARR *a)
             panic (a);
         }
         if (KIND3Q_BYTE_UNCHECKED(item) % REB_64 >= REB_MAX) {
-            if (HEART_BYTE(item) != REB_TYPESET) {  // allow for REB_P classes
-                printf("Invalid KIND3Q_BYTE at index %d\n", cast(int, i));
-                panic (a);
-            }
+            printf("Invalid KIND3Q_BYTE at index %d\n", cast(int, i));
+            panic (a);
         }
     }
 
-  #if defined(DEBUG_TERM_SERIES)
-    if (not IS_TRASH_DEBUG(item))
-        panic (item);
-  #endif
-
     if (IS_SER_DYNAMIC(a)) {
         REBLEN rest = SER_REST(a);
+      #ifdef DEBUG_TERM_ARRAYS
         assert(rest > 0 and rest > i);
+        rest = rest - 1;
+      #endif
 
-        for (; i < rest - 1; ++i, ++item) {
+        for (; i < rest; ++i, ++item) {
             const bool unwritable = not (item->header.bits & NODE_FLAG_CELL);
             if (GET_SERIES_FLAG(a, FIXED_SIZE)) {
-              #if !defined(NDEBUG)
                 if (not unwritable) {
                     printf("Writable cell found in fixed-size array rest\n");
                     panic (a);
                 }
-              #endif
             }
             else {
                 if (unwritable) {
@@ -1402,8 +1396,12 @@ void Assert_Array_Core(const REBARR *a)
                 }
             }
         }
-        assert(item == ARR_AT(a, rest - 1));
-    }
 
+      #ifdef DEBUG_TERM_ARRAYS
+        if (NOT_SERIES_FLAG(a, FIXED_SIZE) and not IS_TRASH_DEBUG(item))
+            panic (item);
+      #endif
+    }
 }
+
 #endif

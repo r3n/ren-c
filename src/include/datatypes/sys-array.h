@@ -163,7 +163,7 @@ inline static void RESET_ARRAY(REBARR *a) {
 //
 inline static void Prep_Array(
     REBARR *a,
-    REBLEN capacity_plus_one // Expand_Series passes 0 on dynamic reallocation
+    REBLEN capacity  // Expand_Series passes 0 on dynamic reallocation
 ){
     assert(IS_SER_DYNAMIC(a));
 
@@ -176,48 +176,29 @@ inline static void Prep_Array(
         // expansion and un-prepping them on every shrink.
         //
         REBLEN n;
-        for (n = 0; n < a->content.dynamic.rest - 1; ++n, ++prep)
+        for (n = 0; n < a->content.dynamic.rest; ++n, ++prep)
             Prep_Cell(prep);
+
+      #ifdef DEBUG_TERM_ARRAYS  // allocation deliberately oversized by 1
+        Init_Trash_Debug(ARR_AT(a, a->content.dynamic.rest - 1));
+      #endif
     }
     else {
-        assert(capacity_plus_one != 0);
-
         REBLEN n;
-        for (n = 1; n < capacity_plus_one; ++n, ++prep)
+        for (n = 0; n < capacity; ++n, ++prep)
             Prep_Cell(prep);  // have to prep cells in useful capacity
 
         // If an array isn't expandable, let the release build not worry
-        // about the bits in the excess capacity.  But set them to trash in
+        // about the bits in the excess capacity.  But poison them in
         // the debug build.
         //
-        prep->header.bits = CELL_MASK_POISON;  // unwritable and unreadable
-        USED(TRACK_CELL_IF_DEBUG(prep));
       #if !defined(NDEBUG)
-        while (n < a->content.dynamic.rest) { // no -1 (n is 1-based)
-            ++n;
-            prep = TRACK_CELL_IF_DEBUG(prep + 1);
-            prep->header.bits =
-                FLAG_KIND3Q_BYTE(REB_T_TRASH)
-                | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
+        for (; n < a->content.dynamic.rest; ++n, ++prep) {
+            USED(TRACK_CELL_IF_DEBUG(prep));
+            prep->header.bits = CELL_MASK_POISON;  // unwritable + unreadable
         }
       #endif
-
-        // Currently, release build also puts an unreadable end at capacity.
-        // It may not be necessary, but doing it for now to have an easier
-        // invariant to work with.  Review.
-        //
-        prep = ARR_AT(a, a->content.dynamic.rest - 1);
-        // fallthrough
     }
-
-    // Although currently all dynamically allocated arrays use a full REBVAL
-    // cell for the end marker, it could use everything except the second byte
-    // of the first `uintptr_t` (which must be zero to denote end).  To make
-    // sure no code depends on a full cell in the last location,  make it
-    // an unwritable end--to leave flexibility to use the rest of the cell.
-    //
-    prep->header.bits = CELL_MASK_POISON;
-    USED(TRACK_CELL_IF_DEBUG(prep));
 }
 
 
@@ -235,7 +216,9 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
         (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold
         or capacity > 1
     ){
+      #ifdef DEBUG_TERM_ARRAYS
         capacity += 1;  // account for cell needed for terminator (END)
+      #endif
 
         SET_SERIES_FLAG(s, DYNAMIC);
 
@@ -248,7 +231,10 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
         }
 
         Prep_Array(ARR(s), capacity);
-        SET_END(ARR_HEAD(ARR(s)));
+
+      #ifdef DEBUG_TERM_ARRAYS
+        Init_Trash_Debug(ARR_HEAD(ARR(s)));
+      #endif
 
       #if defined(DEBUG_COLLECT_STATS)
         PG_Reb_Stats->Series_Memory += capacity * wide;

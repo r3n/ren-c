@@ -533,7 +533,7 @@ REBCTX *Copy_Context_Extra_Managed(
         SERIES_MASK_VARLIST | NODE_FLAG_MANAGED,
         nullptr // original_array, N/A because LINK()/MISC() used otherwise
     );
-    REBVAL *dest = SPECIFIC(ARR_HEAD(varlist));
+    RELVAL *dest = ARR_HEAD(varlist);
 
     // The type information and fields in the rootvar (at head of the varlist)
     // get filled in with a copy, but the varlist needs to be updated in the

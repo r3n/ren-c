@@ -655,20 +655,21 @@ inline static bool IS_RELATIVE(const RELVAL *v) {
 // one is sure that the value is specific, and `cast(REBVAL*, v`) is a better
 // choice for efficiency.  This applies to things like `Copy_Cell()`, which
 // is called often and already knew its input was a REBVAL* to start with.
+//
+// Also, if you are enumerating an array of items you "know to be specific"
+// then you have to worry about if the array is empty:
+//
+//     REBVAL *head = SPECIFIC(ARR_HEAD(a));  // !!! a might be tail!
+//
 
 inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
-    //
-    // Note: END is tolerated to help in specified array enumerations, e.g.
-    //
-    //     REBVAL *head = SPECIFIC(ARR_HEAD(specified_array));  // may be end
-    //
-    assert(IS_END(v) or IS_SPECIFIC(v));
+    assert(IS_SPECIFIC(v));
     return m_cast(REBVAL*, cast(const REBVAL*, v));
 }
 
 #if defined(__cplusplus)
     inline static const REBVAL *SPECIFIC(const RELVAL *v) {
-        assert(IS_END(v) or IS_SPECIFIC(v));  // ^-- see note about END
+        assert(IS_SPECIFIC(v));
         return cast(const REBVAL*, v);
     }
 

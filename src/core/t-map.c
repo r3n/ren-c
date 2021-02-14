@@ -534,15 +534,15 @@ REBARR *Map_To_Array(const REBMAP *map, REBINT what)
 
     RELVAL *dest = ARR_HEAD(a);
     const RELVAL *val_tail = ARR_TAIL(MAP_PAIRLIST(map));
-    const REBVAL *val = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    const RELVAL *val = ARR_HEAD(MAP_PAIRLIST(map));
     for (; val != val_tail; val += 2) {
         if (not IS_NULLED(val + 1)) {  // can't be END
             if (what <= 0) {
-                Copy_Cell(dest, &val[0]);
+                Copy_Cell(dest, SPECIFIC(&val[0]));
                 ++dest;
             }
             if (what >= 0) {
-                Copy_Cell(dest, &val[1]);
+                Copy_Cell(dest, SPECIFIC(&val[1]));
                 ++dest;
             }
         }
@@ -568,7 +568,7 @@ REBCTX *Alloc_Context_From_Map(const REBMAP *map)
 
   blockscope {
     const RELVAL *mval_tail = ARR_TAIL(MAP_PAIRLIST(map));
-    const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    const RELVAL *mval = ARR_HEAD(MAP_PAIRLIST(map));
     for (; mval != mval_tail; mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1))
             ++count;
@@ -580,12 +580,12 @@ REBCTX *Alloc_Context_From_Map(const REBMAP *map)
     REBCTX *c = Alloc_Context(REB_OBJECT, count);
 
     const RELVAL *mval_tail = ARR_TAIL(MAP_PAIRLIST(map));
-    const REBVAL *mval = SPECIFIC(ARR_HEAD(MAP_PAIRLIST(map)));
+    const RELVAL *mval = ARR_HEAD(MAP_PAIRLIST(map));
 
     for (; mval != mval_tail; mval += 2) {  // note mval must not be END
         if (ANY_WORD(mval) and not IS_NULLED(mval + 1)) {
             REBVAL *var = Append_Context(c, nullptr, VAL_WORD_SYMBOL(mval));
-            Copy_Cell(var, &mval[1]);
+            Copy_Cell(var, SPECIFIC(mval + 1));
         }
     }
 

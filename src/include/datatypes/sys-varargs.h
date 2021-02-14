@@ -123,10 +123,10 @@ inline static bool Is_Block_Style_Varargs(
     // array with one BLOCK!, that is the actual array and index to advance.
     //
     REBARR *array1 = binding;
-    *shared_out = SPECIFIC(ARR_HEAD(array1));
+    *shared_out = cast(REBVAL*, ARR_SINGLE(array1));
     assert(
         IS_END(*shared_out)
-        or (IS_BLOCK(*shared_out) and ARR_LEN(array1) == 1)
+        or (IS_SPECIFIC(cast(RELVAL*, *shared_out)) and IS_BLOCK(*shared_out))
     );
 
     return true;

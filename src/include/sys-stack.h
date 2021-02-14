@@ -207,7 +207,7 @@ inline static STKVAL(*) DS_PUSH(void) {
   #endif
     ++DS_Index;
     ++DS_Movable_Top;
-    if (IS_END(DS_Movable_Top))
+    if (DS_Movable_Top == DS_Movable_Tail)
         Expand_Data_Stack_May_Fail(STACK_EXPAND_BASIS);
     else
         TRASH_CELL_IF_DEBUG(DS_Movable_Top);

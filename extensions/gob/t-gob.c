@@ -276,6 +276,11 @@ static void Insert_Gobs(
         }
     }
 
+  #ifdef DEBUG_TERM_ARRAYS
+    if (IS_SER_DYNAMIC(pane))
+        Init_Trash_Debug(ARR_TAIL(pane));
+  #endif
+
     Init_Block(ARR_AT(gob, IDX_GOB_PANE), pane); // may alrady have been set
 }
 

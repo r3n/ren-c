@@ -662,7 +662,7 @@ REBNATIVE(compile_p)
         assert(Is_User_Native(action));  // can't cache stack pointer, extract
 
         REBARR *details = ACT_DETAILS(action);
-        REBVAL *linkname = SPECIFIC(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME));
+        REBVAL *linkname = DETAILS_AT(details, IDX_TCC_NATIVE_LINKNAME);
 
         char *name_utf8 = rebSpell("ensure text!", linkname, rebEND);
         void *sym = tcc_get_symbol(state, name_utf8);

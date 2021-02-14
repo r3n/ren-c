@@ -125,9 +125,9 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     REBARR *specialty = ACT_SPECIALTY(act);
     if (IS_PARTIALS(specialty)) {
         const RELVAL *word_tail = ARR_TAIL(specialty);
-        const REBVAL *word = SPECIFIC(ARR_HEAD(specialty));
+        const RELVAL *word = ARR_HEAD(specialty);
         for (; word != word_tail; ++word)
-            Copy_Cell(DS_PUSH(), word);
+            Copy_Cell(DS_PUSH(), SPECIFIC(word));
     }
 
     const REBKEY *tail;
@@ -562,7 +562,7 @@ void For_Each_Unspecialized_Param(
 
         if (partials) {  // even normal parameters can appear in partials
             const RELVAL *partial_tail = ARR_TAIL(unwrap(partials));
-            REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
+            const RELVAL *partial = ARR_HEAD(unwrap(partials));
             for (; partial != partial_tail; ++partial) {
                 if (Are_Synonyms(
                     VAL_WORD_SYMBOL(partial),
@@ -598,8 +598,8 @@ void For_Each_Unspecialized_Param(
         // the highest priority are at *top* of stack, so we have to go
         // "downward" in the push order...e.g. the reverse of the array.
 
-        REBVAL *partial = SPECIFIC(ARR_TAIL(unwrap(partials)));
-        REBVAL *head = SPECIFIC(ARR_HEAD(unwrap(partials)));
+        RELVAL *partial = ARR_TAIL(unwrap(partials));
+        RELVAL *head = ARR_HEAD(unwrap(partials));
         for (; partial-- != head; ) {
             const REBKEY *key = ACT_KEY(act, VAL_WORD_INDEX(partial));
             const REBPAR *param = ACT_PARAM(act, VAL_WORD_INDEX(partial));
@@ -629,7 +629,7 @@ void For_Each_Unspecialized_Param(
 
         if (partials) {
             const RELVAL *partial_tail = ARR_TAIL(unwrap(partials));
-            REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
+            const RELVAL *partial = ARR_HEAD(unwrap(partials));
             for (; partial != partial_tail; ++partial) {
                 if (Are_Synonyms(
                     VAL_WORD_SYMBOL(partial),

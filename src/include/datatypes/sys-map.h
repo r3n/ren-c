@@ -93,10 +93,11 @@ inline static const REBMAP *VAL_MAP(REBCEL(const*) v) {
 
 inline static REBLEN Length_Map(const REBMAP *map)
 {
+    const RELVAL *tail = ARR_TAIL(MAP_PAIRLIST(map));
     const REBVAL *v = cast(const REBVAL*, ARR_HEAD(MAP_PAIRLIST(map)));
 
     REBLEN count = 0;
-    for (; NOT_END(v); v += 2) {
+    for (; v != tail; v += 2) {
         if (not IS_NULLED(v + 1))
             ++count;
     }

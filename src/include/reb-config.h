@@ -413,6 +413,16 @@ Special internal defines used by RT, not Host-Kit developers:
     // explicitly...only Address Sanitizer can be detected here.
     //
     #define DEBUG_SERIES_ORIGINS
+#else
+    // In order to make sure that a good mix of debug settings get tested,
+    // this does array termination checks on non-sanitizer debug builds.
+    // Arrays are not usually marked at their tails (unlike R3-Alpha which
+    // used END! cells to terminate)...but the residual functionality can
+    // help catch overruns when they occur.
+    //
+    #if !defined(NDEBUG)
+        #define DEBUG_TERM_ARRAYS
+    #endif
 #endif
 
 #ifdef DEBUG_MEMORY_ALIGN

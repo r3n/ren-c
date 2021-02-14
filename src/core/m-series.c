@@ -345,10 +345,12 @@ REBYTE *Reset_Buffer(REBSER *buf, REBLEN len)
 void Assert_Series_Term_Core(const REBSER *s)
 {
     if (IS_SER_ARRAY(s)) {
-      #if defined(DEBUG_TERM_SERIES)
-        const RELVAL *tail = ARR_TAIL(ARR(s));
-        if (not IS_TRASH_DEBUG(tail))
-            panic (tail);
+      #ifdef DEBUG_TERM_ARRAYS
+        if (IS_SER_DYNAMIC(s)) {
+            const RELVAL *tail = ARR_TAIL(ARR(s));
+            if (not IS_TRASH_DEBUG(tail))
+                panic (tail);
+        }
       #endif
     }
     else if (SER_WIDE(s) == 1) {

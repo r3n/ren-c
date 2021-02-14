@@ -618,7 +618,7 @@ static void Mark_Root_Series(void)
 //
 static void Mark_Data_Stack(void)
 {
-    REBVAL *head = SPECIFIC(ARR_HEAD(DS_Array));
+    const RELVAL *head = ARR_HEAD(DS_Array);
     ASSERT_UNREADABLE_IF_DEBUG(head);  // DS_AT(0) is deliberately invalid
 
     REBVAL *stackval = DS_Movable_Top;
@@ -775,11 +775,11 @@ static void Mark_Frame_Stack_Deep(void)
         if (f->label)  // nullptr if anonymous
             Queue_Mark_Node_Deep(m_cast(REBSYM*, unwrap(f->label)));
 
-        // special can be used to GC protect an arbitrary value while a
+        // param can be used to GC protect an arbitrary value while a
         // function is running, currently.  nullptr is permitted as well
         // (e.g. path frames use nullptr to indicate no set value on a path)
         //
-        if (f->param)
+        if (f->key != f->key_tail and f->param)
             Queue_Mark_Opt_End_Cell_Deep(f->param);
 
         if (f->varlist and GET_SERIES_FLAG(f->varlist, MANAGED)) {

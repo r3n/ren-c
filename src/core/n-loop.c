@@ -407,7 +407,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
         //
         const REBVAR *pseudo_tail;
         REBVAL *pseudo_var = CTX_VARS(&pseudo_tail, les->pseudo_vars_ctx);
-        for (; NOT_END(pseudo_var); ++pseudo_var) {
+        for (; pseudo_var != pseudo_tail; ++pseudo_var) {
             REBVAL *var = Real_Var_From_Pseudo(pseudo_var);
 
             // Even if data runs out, we could still have one last loop body
@@ -1155,7 +1155,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
                 --len;
                 ++count;
             }
-            if (IS_END(src)) {
+            if (src == tail) {
                 SET_SERIES_LEN(VAL_ARRAY_KNOWN_MUTABLE(res->data), len);
                 return count;
             }
