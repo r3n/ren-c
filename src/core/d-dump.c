@@ -40,7 +40,7 @@
 
 #include "sys-core.h"
 
-#if !defined(NDEBUG)
+#if defined(DEBUG_HAS_PROBE)  // !!! separate switch, DEBUG_HAS_DUMP?
 
 #ifdef _MSC_VER
 #define snprintf _snprintf
@@ -102,54 +102,32 @@ void Dump_Info(void)
 //
 //  Dump_Stack: C
 //
-// Prints stack counting levels from the passed in number.  Pass 0 to start.
+// Simple debug routine to list the function names on the stack and what the
+// current feed value is.
 //
-void Dump_Stack(REBFRM *f, REBLEN level)
+void Dump_Stack(REBFRM *f)
 {
-    printf("\n");
-
     if (f == FS_BOTTOM) {
-        printf("*STACK[] - NO FRAMES*\n");
+        printf("<FS_BOTTOM>\n");
         fflush(stdout);
         return;
     }
 
-    printf(
-        "STACK[%d](%s) - %d\n",
-        cast(int, level),
-        Frame_Label_Or_Anonymous_UTF8(f),
-        KIND3Q_BYTE(f->feed->value)
+    const char *label; 
+    if (not Is_Action_Frame(f))
+        label = "<eval>";
+    else if (not f->label)
+        label = "<anonymous>";
+    else
+        label = STR_UTF8(f->label);
+
+    printf("LABEL: %s @ FILE: %s @ LINE: %d\n",
+        label,
+        FRM_FILE_UTF8(f),
+        FRM_LINE(f)
     );
 
-    if (not Is_Action_Frame(f)) {
-        printf("(no function call pending or in progress)\n");
-        fflush(stdout);
-        return;
-    }
-
-    fflush(stdout);
-
-    REBINT n = 1;
-    REBVAL *arg = FRM_ARG(f, 1);
-    const REBKEY *tail;
-    const REBKEY *key = ACT_KEYS(&tail, FRM_PHASE(f));
-
-    for (; key != tail; ++key, ++arg, ++n) {
-        if (IS_NULLED(arg))
-            printf(
-                "    %s:\n",
-                STR_UTF8(KEY_SYMBOL(key))
-            );
-        else
-            printf(
-                "    %s: %p\n",
-                STR_UTF8(KEY_SYMBOL(key)),
-                cast(void*, arg)
-            );
-    }
-
-    if (f->prior != FS_BOTTOM)
-        Dump_Stack(f->prior, level + 1);
+    Dump_Stack(f->prior);
 }
 
 
