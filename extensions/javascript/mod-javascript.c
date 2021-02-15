@@ -145,8 +145,12 @@
     //
     #undef EM_ASM
     #define EM_ASM(code, ...) \
-        TRACE("EM_ASM(%s)", #code); \
-        ((void)emscripten_asm_const_int(#code _EM_ASM_PREP_ARGS(__VA_ARGS__)))
+        do { \
+            TRACE("EM_ASM(%s)", #code); \
+            (void)emscripten_asm_const_int( \
+                #code _EM_ASM_PREP_ARGS(__VA_ARGS__) \
+            ); \
+        } while (0)
 #else
     // assert() is defined as a noop in release builds already
 

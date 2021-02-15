@@ -67,6 +67,7 @@ REBNATIVE(test_librebol)
 
     SET_CELL_FLAG(Init_Integer(DS_PUSH(), 2), NEWLINE_BEFORE);
     intptr_t getter = rebUnboxInteger("api-transient {Hello}", rebEND);
+    Recycle();  // transient should survive a recycle
     REBNOD *getter_node = cast(REBNOD*, cast(void*, getter));
     Init_Logic(DS_PUSH(), rebDidQ("{Hello} =", getter_node, rebEND));
 
