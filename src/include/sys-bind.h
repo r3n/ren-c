@@ -1148,6 +1148,13 @@ inline static REBSPC *Derive_Specifier_Core(
 
     if (IS_VARLIST(old)) {
         //
+        // If the specifier is only for providing resolutions of variables in
+        // functions, an array specified by a frame isn't going to need that.
+        // This is kind of like dealing with something specified.
+        //
+        if (IS_VARLIST(specifier))  // superfluous additional specification
+            return old;
+
         // If the array cell is already holding a frame, then it intends to
         // broadcast that down for resolving relative values underneath it.
         // We can only pass thru the incoming specifier if it is compatible.
