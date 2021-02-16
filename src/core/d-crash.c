@@ -60,16 +60,16 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
 ){
     GC_Disabled = true;  // crashing is a legitimate reason to disable the GC
 
-  #if defined(NDEBUG)
-    UNUSED(tick);
-    UNUSED(file);
-    UNUSED(line);
-  #else
+  #if defined(DEBUG_FANCY_PANIC)
     printf("C Source File %s, Line %d, Pointer %p\n", file, line, p);
     printf("At evaluator tick: %lu\n", cast(unsigned long, tick));
 
     fflush(stdout);  // release builds don't use <stdio.h>, but debug ones do
     fflush(stderr);  // ...so be helpful and flush any lingering debug output
+  #else
+    UNUSED(tick);
+    UNUSED(file);
+    UNUSED(line);
   #endif
 
     // Delivering a panic should not rely on printf()/etc. in release build.
@@ -124,7 +124,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
 
       case DETECTED_AS_SERIES: {
         REBSER *s = m_cast(REBSER*, cast(const REBSER*, p)); // don't mutate
-      #if !defined(NDEBUG)
+      #if defined(DEBUG_FANCY_PANIC)
         #if 0
             //
             // It can sometimes be useful to probe here if the series is
@@ -150,41 +150,49 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
         break; }
 
       case DETECTED_AS_FREED_SERIES:
-      #if defined(NDEBUG)
-        strncat(buf, "freed series", PANIC_BUF_SIZE - strsize(buf));
-      #else
+      #if defined(DEBUG_FANCY_PANIC)
         Panic_Series_Debug(m_cast(REBSER*, cast(const REBSER*, p)));
+      #else
+        strncat(buf, "freed series", PANIC_BUF_SIZE - strsize(buf));
       #endif
         break;
 
       case DETECTED_AS_CELL:
       case DETECTED_AS_END: {
         const REBVAL *v = cast(const REBVAL*, p);
-      #if defined(NDEBUG)
-        UNUSED(v);
-        strncat(buf, "value", PANIC_BUF_SIZE - strsize(buf));
-      #else
+      #if defined(DEBUG_FANCY_PANIC)
         if (KIND3Q_BYTE_UNCHECKED(v) == REB_ERROR) {
             printf("...panicking on an ERROR! value...");
             PROBE(v);
         }
         Panic_Value_Debug(v);
+      #else
+        UNUSED(v);
+        strncat(buf, "value", PANIC_BUF_SIZE - strsize(buf));
       #endif
         break; }
 
       case DETECTED_AS_FREED_CELL:
-      #if defined(NDEBUG)
-        strncat(buf, "freed cell", PANIC_BUF_SIZE - strsize(buf));
-      #else
+      #if defined(DEBUG_FANCY_PANIC)
         Panic_Value_Debug(cast(const RELVAL*, p));
+      #else
+        strncat(buf, "freed cell", PANIC_BUF_SIZE - strsize(buf));
       #endif
         break;
     }
 
-  #if !defined(NDEBUG)
+  #if defined(DEBUG_FANCY_PANIC)
     printf("%s\n", Str_Panic_Title);
     printf("%s\n", buf);
     fflush(stdout);
+  #endif
+
+  #if !defined(NDEBUG)
+    //
+    // Note: Emscripten actually gives a more informative stack trace in
+    // its debug build through plain exit().  It has DEBUG_FANCY_PANIC but
+    // also defines NDEBUG to turn off asserts.
+    //
     debug_break();  // try to hook up to a C debugger - see %debug_break.h
   #endif
 

@@ -108,6 +108,7 @@ cflags: compose [
 
         {-DDEBUG_STDIO_OK}
         {-DDEBUG_HAS_PROBE}
+        {-DDEBUG_FANCY_PANIC}
         {-DDEBUG_COUNT_TICKS}
         {-DDEBUG_PRINTF_FAIL_LOCATIONS}
 

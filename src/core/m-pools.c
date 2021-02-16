@@ -477,7 +477,7 @@ bool Try_Fill_Pool(REBPOL *pool)
 }
 
 
-#if !defined(NDEBUG)
+#if defined(DEBUG_FANCY_PANIC)
 
 //
 //  Try_Find_Containing_Node_Debug: C

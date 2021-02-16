@@ -64,7 +64,13 @@
 #endif
 
 #if defined(DEBUG_COUNT_TICKS)
-    #ifdef NDEBUG
+    #ifdef DEBUG_FANCY_PANIC
+        #define panic(v) \
+            Panic_Core((v), TG_Tick, __FILE__, __LINE__)
+
+        #define panic_at(v,file,line) \
+            Panic_Core((v), TG_Tick, (file), (line))
+    #else
         #define panic(v) \
             Panic_Core((v), TG_Tick, NULL, 0)
 
@@ -72,15 +78,16 @@
             UNUSED(file); \
             UNUSED(line); \
             panic(v)
-    #else
-        #define panic(v) \
-            Panic_Core((v), TG_Tick, __FILE__, __LINE__)
 
-        #define panic_at(v,file,line) \
-            Panic_Core((v), TG_Tick, (file), (line))
     #endif
 #else
-    #ifdef NDEBUG
+    #ifdef DEBUG_FANCY_PANIC
+        #define panic(v) \
+            Panic_Core((v), 0, __FILE__, __LINE__)
+
+        #define panic_at(v,file,line) \
+            Panic_Core((v), 0, (file), (line))
+    #else
         #define panic(v) \
             Panic_Core((v), 0, NULL, 0)
 
@@ -88,12 +95,6 @@
             UNUSED(file); \
             UNUSED(line); \
             panic(v)
-    #else
-        #define panic(v) \
-            Panic_Core((v), 0, __FILE__, __LINE__)
-
-        #define panic_at(v,file,line) \
-            Panic_Core((v), 0, (file), (line))
     #endif
 #endif
 

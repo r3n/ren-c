@@ -385,6 +385,10 @@ void Assert_Series_Core(const REBSER *s)
     Assert_Series_Term_Core(s);
 }
 
+#endif
+
+
+#if defined(DEBUG_FANCY_PANIC)
 
 //
 //  Panic_Series_Debug: C

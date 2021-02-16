@@ -29,7 +29,7 @@
 #include "sys-core.h"
 
 
-#if !defined(NDEBUG)
+#if defined(DEBUG_FANCY_PANIC)  // !!! Separate setting for Dump routines?
 
 //
 //  Dump_Value_Debug: C
