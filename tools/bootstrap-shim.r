@@ -154,7 +154,14 @@ collect-lets: func [
     return lets
 ]
 
-let: :nihil
+
+let: func [
+    return: []  ; old-style invisibility
+    :look [any-value! <...>]  ; old-style variadic
+][
+    if word? first look [take look]  ; otherwise leave SET-WORD! to runs
+]
+
 
 modernize-action: function [
     "Account for <blank> annotation, refinements as own arguments"
