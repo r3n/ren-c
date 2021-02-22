@@ -652,8 +652,14 @@ inline static void Push_Action(
         or Did_Reuse_Varlist_Of_Unknown_Size(f, num_args)  // want `num_args`
     ){
         s = f->varlist;
-        if (s->content.dynamic.rest >= num_args + 1 + 1) // +roovar, +end
+      #ifdef DEBUG_TERM_ARRAYS
+        if (s->content.dynamic.rest >= num_args + 1 + 1)  // +rootvar, +end
             goto sufficient_allocation;
+      #else
+        if (s->content.dynamic.rest >= num_args + 1)  // +rootvar
+            goto sufficient_allocation;
+      #endif
+
             
         // It wasn't big enough for `num_args`, so we free the data.
         // But at least we can reuse the series node.
@@ -700,24 +706,22 @@ inline static void Push_Action(
     INIT_VAL_FRAME_BINDING(f->rootvar, binding);  // FRM_BINDING()
 
     s->content.dynamic.used = num_args + 1;
-    RELVAL *tail = TRACK_CELL_IF_DEBUG(ARR_TAIL(f->varlist));
-    tail->header.bits = FLAG_KIND3Q_BYTE(REB_0);  // no NODE_FLAG_CELL
 
-    // Current invariant for all arrays (including fixed size), last cell in
-    // the allocation is an end.
-    RELVAL *ultimate = TRACK_CELL_IF_DEBUG(
-        ARR_AT(f->varlist, s->content.dynamic.rest - 1)
-    );
-    ultimate->header.bits = CELL_MASK_POISON;  // unreadable and unwritable
-
-  #if !defined(NDEBUG)
-    RELVAL *prep = ultimate - 1;
-    for (; prep > tail; --prep) {
+  #if !defined(NDEBUG)  // poison cells past usable range
+  blockscope {
+    RELVAL *tail = ARR_TAIL(f->varlist);
+    RELVAL *prep = ARR_AT(f->varlist, s->content.dynamic.rest - 1);
+    for (; prep >= tail; --prep) {
         USED(TRACK_CELL_IF_DEBUG(prep));
         prep->header.bits =
-            FLAG_KIND3Q_BYTE(REB_T_TRASH)
-            | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
+            FLAG_KIND3Q_BYTE(REB_T_TRASH)  // notice no NODE_FLAG_CELL
+            | FLAG_HEART_BYTE(REB_T_TRASH);  // so unreadable and unwritable
     }
+  }
+  #endif
+
+  #ifdef DEBUG_TERM_ARRAYS  // expects cell is trash (e.g. a cell) not poison
+    Init_Trash_Debug(Prep_Cell(ARR_TAIL(f->varlist)));
   #endif
 
     // Each layer of specialization of a function can only add specializations

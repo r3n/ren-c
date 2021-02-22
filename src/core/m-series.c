@@ -348,6 +348,8 @@ void Assert_Series_Term_Core(const REBSER *s)
       #ifdef DEBUG_TERM_ARRAYS
         if (IS_SER_DYNAMIC(s)) {
             const RELVAL *tail = ARR_TAIL(ARR(s));
+            if (not (tail->header.bits & NODE_FLAG_CELL))
+                panic (s);
             if (not IS_TRASH_DEBUG(tail))
                 panic (tail);
         }

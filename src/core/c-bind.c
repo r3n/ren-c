@@ -1056,7 +1056,14 @@ void Virtual_Bind_Deep_To_New_Context(
     //
     // https://github.com/rebol/rebol-issues/issues/2274
     //
-    SET_SERIES_FLAG(CTX_VARLIST(c), DONT_RELOCATE);
+    // !!! Because SERIES_FLAG_DONT_RELOCATE is just a synonym for
+    // SERIES_FLAG_FIXED_SIZE at this time, it means that there has to be
+    // unwritable cells in the extra capacity, to help catch overwrites.  If
+    // we wait too late to add the flag, that won't be true...but if we pass
+    // it on creation we can't make the context via Append_Context().  Review
+    // this mechanic; and for now forego the protection.
+    //
+    /* SET_SERIES_FLAG(CTX_VARLIST(c), DONT_RELOCATE); */
 
     // !!! In virtual binding, there would not be a Bind_Values call below;
     // so it wouldn't necessarily be required to manage the augmented

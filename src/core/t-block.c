@@ -1364,10 +1364,6 @@ void Assert_Array_Core(const REBARR *a)
     REBLEN i;
     REBLEN len = ARR_LEN(a);
     for (i = 0; i < len; ++i, ++item) {
-        if (IS_END(item)) {
-            printf("Premature array end at index %d\n", cast(int, i));
-            panic (a);
-        }
         if (KIND3Q_BYTE_UNCHECKED(item) % REB_64 >= REB_MAX) {
             printf("Invalid KIND3Q_BYTE at index %d\n", cast(int, i));
             panic (a);
@@ -1376,8 +1372,12 @@ void Assert_Array_Core(const REBARR *a)
 
     if (IS_SER_DYNAMIC(a)) {
         REBLEN rest = SER_REST(a);
+
       #ifdef DEBUG_TERM_ARRAYS
         assert(rest > 0 and rest > i);
+        if (NOT_SERIES_FLAG(a, FIXED_SIZE) and not IS_TRASH_DEBUG(item))
+            panic (item);
+        ++item;
         rest = rest - 1;
       #endif
 
@@ -1396,11 +1396,6 @@ void Assert_Array_Core(const REBARR *a)
                 }
             }
         }
-
-      #ifdef DEBUG_TERM_ARRAYS
-        if (NOT_SERIES_FLAG(a, FIXED_SIZE) and not IS_TRASH_DEBUG(item))
-            panic (item);
-      #endif
     }
 }
 

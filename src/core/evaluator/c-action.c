@@ -719,7 +719,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         goto continue_fulfilling;
     }
 
-    assert(IS_END(f->arg));  // arg can otherwise point to any arg cell
+  #ifdef DEBUG_TERM_ARRAYS
+    assert(IS_TRASH_DEBUG(f->arg));  // arg can otherwise point to any arg cell
+  #endif
 
     // There may have been refinements that were skipped because the
     // order of definition did not match the order of usage.  They were
