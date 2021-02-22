@@ -114,11 +114,16 @@ inline static REBVAL *Init_Any_Word_Core(
 inline static REBVAL *Init_Any_Word_Bound_Core(
     RELVAL *out,
     enum Reb_Kind type,
-    REBCTX *context,  // spelling determined by context and index
-    REBLEN index
+    REBARR *binding,  // spelling determined by linked-to thing
+    REBLEN index  // must be 1 if LET patch
 ){
+    assert(
+        IS_VARLIST(binding)
+        or (GET_SUBCLASS_FLAG(PATCH, binding, LET) and index == 1)
+    );
+
     RESET_VAL_HEADER(out, type, CELL_FLAG_FIRST_IS_NODE);
-    mutable_BINDING(out) = context;
+    mutable_BINDING(out) = binding;
     VAL_WORD_INDEXES_U32(out) = index;
     INIT_VAL_WORD_CACHE(out, SPECIFIED);
 
@@ -127,7 +132,11 @@ inline static REBVAL *Init_Any_Word_Bound_Core(
 
 #define Init_Any_Word_Bound(out,type,context,index) \
     Init_Any_Word_Bound_Core( \
-        TRACK_CELL_IF_DEBUG(out), (type), (context), (index))
+        TRACK_CELL_IF_DEBUG(out), (type), CTX_VARLIST(context), (index))
+
+#define Init_Any_Word_Patched(out,type,let) \
+    Init_Any_Word_Bound_Core( \
+        TRACK_CELL_IF_DEBUG(out), (type), (let), 1)
 
 
 // Helper calls strsize() so you can more easily use literals at callsite.

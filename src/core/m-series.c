@@ -377,8 +377,6 @@ void Assert_Series_Core(const REBSER *s)
     if (IS_FREE_NODE(s))
         panic (s);
 
-    assert(NOT_SERIES_INFO(s, 0_IS_FALSE));  // NOT(NODE_FLAG_NODE)
-
     assert(SER_FLAVOR(s) != FLAVOR_TRASH);
     assert(SER_USED(s) <= SER_REST(s));
 

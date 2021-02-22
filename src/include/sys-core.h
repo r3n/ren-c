@@ -190,6 +190,7 @@
 #include "structs/sys-rebarr.h"  // array structure (REBSER subclass)
 #include "structs/sys-rebact.h"  // action structure
 #include "structs/sys-rebctx.h"  // context structure
+#include "structs/sys-rebpat.h"  // virtual binding patch definitions
 
 #include "structs/sys-rebchr.h"  // REBCHR(*) is REBYTE* in validated UTF8
 

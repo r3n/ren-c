@@ -121,3 +121,35 @@
         demo2 = <two>
     ]
 )
+
+(
+    bar: func [] [
+        let x: 10
+        let y: [x + z]
+
+        let foo: func [] compose [let z: 20, ((y))]
+        foo
+    ]
+    bar = 30
+)
+
+(
+    bar: func [] [
+        let x: 10
+        let y: [x + z]
+
+        let foo: func [] compose [let z: 20, (y)]
+        func [] compose collect [keep [let z: 2000], keep y, keep [do (y)]]
+    ]
+    baz: bar
+    baz = 2010
+)
+
+; we want to create a situation where two LET based chains of patches need
+; to be merged.  Such merging only is necessary when a specifier is being
+; derived, e.g. the meeting of two blocks with LET chains in their binding.
+(
+    block1: do [let x: 10, [x + y]]
+    block2: do compose/deep [let y: 20, [(block1)]]
+    30 = do first block2
+)

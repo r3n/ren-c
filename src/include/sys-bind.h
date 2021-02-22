@@ -553,6 +553,16 @@ inline static option(REBARR*) Get_Word_Container(
                 goto skip_hit_patch;
             }
 
+            REBARR *overbind;  // avoid goto-past-initialization warning
+            overbind = ARR(BINDING(ARR_SINGLE(specifier)));
+            if (not IS_VARLIST(overbind)) {  // a patch-formed LET overload
+                if (LINK(PatchSymbol, overbind) == spelling) {
+                    *index_out = 1;
+                    return overbind;  // don't update mondex, useless
+                }
+                goto skip_hit_patch;
+            }
+
             if (
                 IS_SET_WORD(ARR_SINGLE(specifier))
                 and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
@@ -561,7 +571,7 @@ inline static option(REBARR*) Get_Word_Container(
             }
 
           blockscope {
-            REBCTX *overload = CTX(BINDING(ARR_SINGLE(specifier)));
+            REBCTX *overload = CTX(overbind);
 
             // Length at time of virtual bind is cached by index.  This avoids
             // allowing untrustworthy cache states.
@@ -614,6 +624,16 @@ inline static option(REBARR*) Get_Word_Container(
                 goto skip_miss_patch;
             }
 
+            REBARR *overbind;  // avoid goto-past-initialization warning
+            overbind = ARR(BINDING(ARR_SINGLE(specifier)));
+            if (not IS_VARLIST(overbind)) {  // a patch-formed LET overload
+                if (LINK(PatchSymbol, overbind) == spelling) {
+                    *index_out = 1;
+                    return overbind;  // don't update mondex, useless
+                }
+                goto skip_miss_patch;
+            }
+
             if (
                 IS_SET_WORD(ARR_SINGLE(specifier))
                 and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
@@ -622,7 +642,7 @@ inline static option(REBARR*) Get_Word_Container(
             }
 
           blockscope {
-            REBCTX *overload = CTX(BINDING(ARR_SINGLE(specifier)));
+            REBCTX *overload = CTX(overbind);
 
             // Length at time of virtual bind is cached by index.  This avoids
             // allowing untrustworthy cache states.
@@ -1034,31 +1054,61 @@ inline static REBARR *Merge_Patches_May_Reuse(
     assert(IS_PATCH(parent));
     assert(IS_PATCH(child));
 
-    // If we find the child already accounted for in the parent, we're done.
-    // Recursions should notice this case and return up to make a no-op.
-    //
-    if (NextPatch(parent) == child) {
-        SET_SUBCLASS_FLAG(PATCH, parent, REUSED);
-        return parent;  // reused existing
-    }
-
     // If we get to the end of the merge chain and don't find the child, then
     // we're going to need a patch that incorporates it.
     //
     REBARR *next;
+    bool was_next_reused;
     if (NextPatch(parent) == nullptr or IS_VARLIST(NextPatch(parent))) {
         next = child;
-        SET_SUBCLASS_FLAG(PATCH, next, REUSED);
+        was_next_reused = true;
     }
-    else
+    else {
         next = Merge_Patches_May_Reuse(NextPatch(parent), child);
+        was_next_reused = GET_SUBCLASS_FLAG(PATCH, next, REUSED);
+    }
+
+    // If we have to make a new patch due to non-reuse, then we cannot make
+    // one out of a LET, since the patch *is* the variable.  It's actually
+    // uncommon for this to happen, but here's an example of how to force it:
+    //
+    //     block1: do [let x: 10, [x + y]]
+    //     block2: do compose/deep [let y: 20, [(block1)]]
+    //     30 = do first block2
+    //
+    // So we have to make a new patch that points to the LET, or promote it
+    // (using node-identity magic) into an object.  We point at the LET.
+    //
+    REBARR *binding;
+    REBLEN limit;
+    enum Reb_Kind kind;
+    if (GET_SUBCLASS_FLAG(PATCH, parent, LET)) {
+        binding = parent;
+        limit = 1;
+
+        // !!! LET bindings do not have anywhere to put the subclass info of
+        // whether they only apply to SET-WORD!s or things like that, so they
+        // are always assumed to be "universal bindings".  More granular
+        // forms of LET would need to get more bits somehow...either by
+        // being a different "flavor" or by making a full object.  We might
+        // have just gone ahead and done that here, but having to make an
+        // object would bloat things considerably.  Try allowing LET patches
+        // to act as the storage to point at by other patches for now.
+        //
+        kind = REB_WORD;
+    }
+    else {
+        binding = ARR(BINDING(ARR_SINGLE(parent)));
+        limit = VAL_WORD_INDEX(ARR_SINGLE(parent));
+        kind = VAL_TYPE(ARR_SINGLE(parent));
+    }
 
     return Make_Patch_Core(
-        CTX(BINDING(ARR_SINGLE(parent))),
-        VAL_WORD_INDEX(ARR_SINGLE(parent)),
+        binding,
+        limit,
         next,
-        VAL_TYPE(ARR_SINGLE(parent)),
-        GET_SUBCLASS_FLAG(PATCH, next, REUSED)
+        kind,
+        was_next_reused
     );
 }
 
