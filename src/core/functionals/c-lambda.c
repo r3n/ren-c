@@ -72,6 +72,13 @@ REB_R Lambda_Dispatcher(REBFRM *f)
     // We have to use Make_Or_Reuse_Patch() here, because it could be the
     // case that a higher level wrapper used the frame and virtually bound it.
     //
+    // !!! Currently, since we are evaluating the block with its own virtual
+    // binding being taken into account, using that block's binding as the
+    // `next` (VAL_SPECIFIER(block)) means it's redundant when creating the
+    // feed, since it tries to apply this specifier on top of that *again*.
+    // The merging notices the redundancy and doesn't create a new specifier
+    // which is good...but this is still inefficient.  This all needs review.
+    //
     REBSPC *specifier = Make_Or_Reuse_Patch(
         CTX(f->varlist),
         CTX_LEN(CTX(f->varlist)),

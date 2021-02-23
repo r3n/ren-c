@@ -1054,6 +1054,19 @@ inline static REBARR *Merge_Patches_May_Reuse(
     assert(IS_PATCH(parent));
     assert(IS_PATCH(child));
 
+    // Case of already incorporating.  Came up with:
+    //
+    //    1 then x -> [2 also y -> [3]]
+    //
+    // A virtual link for Y is added on top of the virtual link for X that
+    // resides on the [3] block.  But then feed generation for [3] tries to
+    // apply the Y virtual link again.  !!! Review if that's just inefficient.
+    //
+    if (NextPatch(parent) == child) {
+        SET_SUBCLASS_FLAG(PATCH, parent, REUSED);
+        return parent;
+    }
+
     // If we get to the end of the merge chain and don't find the child, then
     // we're going to need a patch that incorporates it.
     //
