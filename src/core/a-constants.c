@@ -56,7 +56,7 @@ const char Str_REBOL[] = "REBOL";
 // A panic() indicates a serious malfunction, and should not make use of
 // Rebol-structured error message delivery in the release build.
 
-const char Str_Panic_Title[] = "Rebol Internal Error";
+const char Str_Panic_Title[] = "PANIC! (Internal Error)";
 
 const char Str_Panic_Directions[] = {
     "If you need to file a bug in the issue tracker, please give thorough\n"

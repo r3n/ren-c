@@ -172,6 +172,10 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     }
     else {  // !!! Reusing the frame, would inert optimization be worth it?
         do {
+            // !!! If reevaluating, this will forget that we are doing so.
+            //
+            STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
+
             if (Eval_Maybe_Stale_Throws(f))  // reuse `f`
                 return true;
 
@@ -217,6 +221,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     REBFLGS initial_flags = f->flags.bits & ~(
         EVAL_FLAG_FULFILL_ONLY  // can be requested or <blank> can trigger
         | EVAL_FLAG_RUNNING_ENFIX  // can be requested with REEVALUATE_CELL
+        | FLAG_STATE_BYTE(255)  // state is forgettable
     );  // should be unchanged on exit
   #endif
 
@@ -1575,7 +1580,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
   #if !defined(NDEBUG)
     Eval_Core_Exit_Checks_Debug(f);  // called unless a fail() longjmps
     assert(NOT_EVAL_FLAG(f, DOING_PICKUPS));
-    assert(f->flags.bits == initial_flags);  // any change should be restored
+    assert(
+        (f->flags.bits & ~FLAG_STATE_BYTE(255)) == initial_flags
+    );  // any change should be restored
   #endif
 
     return false;  // false => not thrown

@@ -26,7 +26,6 @@
 
 
 // Size of crash buffers
-#define PANIC_TITLE_BUF_SIZE 80
 #define PANIC_BUF_SIZE 512
 
 #ifdef HAVE_EXECINFO_AVAILABLE
@@ -74,10 +73,7 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
 
     // Delivering a panic should not rely on printf()/etc. in release build.
 
-    char title[PANIC_TITLE_BUF_SIZE + 1]; // account for null terminator
-    char buf[PANIC_BUF_SIZE + 1]; // "
-
-    title[0] = '\0';
+    char buf[PANIC_BUF_SIZE + 1];
     buf[0] = '\0';
 
   #if !defined(NDEBUG) && 0
@@ -99,8 +95,6 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
     backtrace_symbols_fd(backtrace_buf, n_backtrace, STDERR_FILENO);
     fflush(stdout);
   #endif
-
-    strncat(title, "PANIC()", PANIC_TITLE_BUF_SIZE - 0);
 
     strncat(buf, Str_Panic_Directions, PANIC_BUF_SIZE - 0);
 
