@@ -1872,13 +1872,6 @@ REBNATIVE(subparse)
               case SYM_RETURN:
                 fail ("RETURN removed from PARSE, use (THROW ...)");
 
-              case SYM_MARK: {
-                FETCH_NEXT_RULE(f);  // skip the MARK word
-                // !!! what about `mark @(first [x])` ?
-                Handle_Mark_Rule(f, P_RULE, P_RULE_SPECIFIER);
-                FETCH_NEXT_RULE(f);  // e.g. skip the `x` in `mark x`
-                goto pre_rule; }
-
               case SYM_SEEK: {
                 FETCH_NEXT_RULE(f);  // skip the SEEK word
                 // !!! what about `seek @(first x)` ?
@@ -1908,8 +1901,21 @@ REBNATIVE(subparse)
                 //
                 // if (flags != 0) fail (Error_Parse_Rule());
 
-                Handle_Mark_Rule(f, rule, P_RULE_SPECIFIER);
-                FETCH_NEXT_RULE(f);
+                if (false) {  // Redbol emulation 
+                    Handle_Mark_Rule(f, rule, P_RULE_SPECIFIER);
+                    FETCH_NEXT_RULE(f);
+                }
+                else {
+                    FETCH_NEXT_RULE_KEEP_LAST(&set_or_copy_word, f);
+
+                    // As an interim measure, permit `pos: here` to act as
+                    // setting the position, just as `pos:` did historically.
+                    //
+                    if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_HERE)
+                        FETCH_NEXT_RULE(f);
+
+                    Handle_Mark_Rule(f, set_or_copy_word, P_RULE_SPECIFIER);
+                }
                 goto pre_rule;
             }
 

@@ -345,17 +345,18 @@
 
 
 ; As alternatives to using SET-WORD! to set the parse position and GET-WORD!
-; to get the parse position, Ren-C has MARK and SEEK.  One ability this
-; gives is to mark a variable without having it be a SET-WORD! and thus
-; gathered by FUNCTION.  It also allows seeking to integer positions.
+; to get the parse position, Ren-C has keywords HERE and SEEK.  HERE has
+; precedent in Topaz:
+;
+; https://github.com/giesse/red-topaz-parse
 ;
 ; Unlike R3-Alpha, changing the series being parsed is not allowed.
-;
-; !!! Feature does not currently allow marking a synthesized variable, or
-; seeking a synthesized variable, e.g. `mark @(...)` or `seek @(...)`
 (
     did all [
-        parse "aabbcc" [some "a" mark x some "b" mark y: :x copy z to end]
+        parse "aabbcc" [
+            some "a", x: here, some "b", y: here
+            seek x, copy z to end
+        ]
         x = "bbcc"
         y = "cc"
         z = "bbcc"

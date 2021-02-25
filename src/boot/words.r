@@ -184,6 +184,7 @@ subparse  ; recursions of parse use this for REBNATIVE(subparse) in backtrace
 ; index numbers are used by PARSE to detect keywords.
 ;
 set  ; must be first first (SYM_SET referred to by GET_VAR() in %u-parse.c)
+let
 copy
 collect  ; Variant in Red, but Ren-C's acts SET-like, suggested by @rgchris
 keep
@@ -203,7 +204,7 @@ reject
 while
 limit
 seek  ; Ren-C addition
-mark  ; Ren-C addition
+here  ; Ren-C addition
 ??
 |
 accept
