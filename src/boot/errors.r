@@ -223,6 +223,7 @@ Script: [
     parse-variable:     [{PARSE - expected a variable, not:} :arg1]
     parse-command:      [{PARSE - command cannot be used as variable:} :arg1]
     parse-series:       [{PARSE - input must be a series:} :arg1]
+    parse-multiple-set: {PARSE - SET can capture at most one value}
 
     bad-library:        {bad library (already closed?)}
     only-callback-ptr:  {Only callback functions may be passed by FFI pointer}

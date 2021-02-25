@@ -2440,8 +2440,10 @@ REBNATIVE(subparse)
                 // is collecting items in a neutral container.  It is less
                 // obvious what marking a position should do.
             }
-            else if ((P_FLAGS & PF_SET) and (count != 0)) {  // 0 => no-op
-                //
+            else if (P_FLAGS & PF_SET) {
+                if (count > 1)
+                    fail (Error_Parse_Multiple_Set_Raw());
+
                 // We waited to eval the SET-GROUP! until we knew we had
                 // something we wanted to set.  Do so, and then go through
                 // a normal setting procedure.
@@ -2467,7 +2469,14 @@ REBNATIVE(subparse)
                     set_or_copy_word = D_SPARE;
                 }
 
-                if (IS_SER_ARRAY(P_INPUT)) {
+                if (count == 0) {
+                    Init_Nulled(
+                        Sink_Word_May_Fail(set_or_copy_word, P_RULE_SPECIFIER)
+                    );
+                }
+                else if (IS_SER_ARRAY(P_INPUT)) {
+                    assert(count == 1);  // check for > 1 would have errored
+
                     Derelativize(
                         Sink_Word_May_Fail(set_or_copy_word, P_RULE_SPECIFIER),
                         ARR_AT(ARR(P_INPUT), begin),
@@ -2475,6 +2484,8 @@ REBNATIVE(subparse)
                     );
                 }
                 else {
+                    assert(count == 1);  // check for > 1 would have errored
+
                     REBVAL *var = Sink_Word_May_Fail(
                         set_or_copy_word, P_RULE_SPECIFIER
                     );
@@ -2498,7 +2509,7 @@ REBNATIVE(subparse)
                         Copy_Cell(var, DS_TOP);
                         DS_DROP();
                         if (DSP != f->dsp_orig)
-                            fail ("SET for datatype only allows 1 value");
+                            fail (Error_Parse_Multiple_Set_Raw());
                     }
                     else if (P_TYPE == REB_BINARY)
                         Init_Integer(var, *BIN_AT(BIN(P_INPUT), begin));

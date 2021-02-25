@@ -522,3 +522,27 @@
     byteset: make bitset! [0 16 32]
     did parse #{001020} [some byteset]
 )
+
+; A SET of zero elements gives NULL, a SET of > 1 elements is an error
+[(
+    x: <before>
+    did all [
+        [1] = parse [1] [set x opt text! integer!]
+        x = null
+    ]
+)(
+    x: <before>
+    did all [
+        ["a" 1] = parse ["a" 1] [set x some text! integer!]
+        x = "a"
+    ]
+)(
+    x: <before>
+    e: trap [
+        ["a" "b" 1] = parse ["a" "b" 1] [set x some text! integer!]
+    ]
+    did all [
+        e/id = 'parse-multiple-set
+        x = <before>
+    ]
+)]

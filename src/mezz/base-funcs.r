@@ -195,7 +195,7 @@ func: func* [
         false  ; failing here means rolling over to next rule
     |
         <local>
-        any [set var: word! (other: _) opt set other: group! (
+        any [set var: word! set other: opt group! (
             append new-spec to tuple! var
             append exclusions var
             if other [
