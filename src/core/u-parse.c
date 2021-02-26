@@ -1556,6 +1556,7 @@ REBNATIVE(subparse)
                 P_FLAGS |= PF_COPY;
                 goto set_or_copy_pre_rule;
 
+              case SYM_LET:
               case SYM_SET:
                 P_FLAGS |= PF_SET;
                 goto set_or_copy_pre_rule;
@@ -1569,6 +1570,21 @@ REBNATIVE(subparse)
 
                 if (VAL_CMD(P_RULE))  // set set [...]
                     fail (Error_Parse_Command(f));
+
+                // We need to add a new binding before we derelativize w.r.t.
+                // the in-effect specifier.
+                //
+                if (cmd == SYM_LET) {
+                    mutable_BINDING(FEED_SINGLE(f->feed)) = Make_Let_Patch(
+                        VAL_WORD_SYMBOL(P_RULE),
+                        P_RULE_SPECIFIER
+                    );
+                    if (IS_WORD(P_RULE)) {  // no further action
+                        P_FLAGS &= ~PF_SET;
+                        FETCH_NEXT_RULE(f);
+                        goto pre_rule;
+                    }
+                }
 
                 FETCH_NEXT_RULE_KEEP_LAST(&set_or_copy_word, f);
                 goto pre_rule;

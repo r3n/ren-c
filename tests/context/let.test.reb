@@ -208,3 +208,27 @@
         20 = do compose [let x: 20, reeval 'x]  ; sanity check
     )
 ]
+
+; LET is also a PARSE keyword.  It means the variable will only be visible
+; inside the rules and subrules
+(
+    x: <before>
+    did all [
+        #a = catch [
+            parse "a" [let x: skip (throw x)]
+        ]
+        x = <before>
+    ]
+)
+
+; LET in parse with a non-set works like LET usually does; declares but leaves
+; as unset.
+(
+    x: <before>
+    did all [
+        10 = catch [
+            parse "a" [let x (x: 10) "a" (throw x)]
+        ]
+        x = <before>
+    ]
+)
