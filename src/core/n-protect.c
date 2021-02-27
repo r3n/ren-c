@@ -534,6 +534,8 @@ void Force_Value_Frozen_Core(
         UNUSED(deep);
         if (locker)
             SET_SERIES_INFO(s, AUTO_LOCKED);
+    } else if (kind == REB_ACTION) {
+        // No freezing needed
     } else
         fail (Error_Invalid_Type(kind)); // not yet implemented
 }
