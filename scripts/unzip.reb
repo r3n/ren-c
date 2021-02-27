@@ -106,26 +106,31 @@ ctx-zip: context [
         ]
     ]
 
-    zip-entry: function [
+    zip-entry: func [
         {Compresses a file}
-        return: [block!]
-            {[local file header + compressed file, central directory entry]}
-        name [file!]
-            "Name of file"
-        date [date!]
-            "Modification date of file"
-        data [binary!]
-            "Data to compress"
-        offset [integer!]
-            "Offset where the compressed entry will be stored in the file"
+
+        return: "local header"
+            [binary!]
+        central-dir-entry: "Central Directory entry"
+            [binary!]
+
+        name "Name of file"
+            [file!]
+        date "Modification date of file"
+            [date!]
+        data "Data to compress"
+            [binary!]
+        offset "Offset where the compressed entry will be stored in the file"
+            [integer!]
     ][
         ; info on data before compression
-        crc: checksum-core 'crc32 data
+        let crc: checksum-core 'crc32 data
 
-        uncompressed-size: to-ilong length of data
+        let uncompressed-size: to-ilong length of data
 
-        compressed-data: deflate data
+        let compressed-data: deflate data
 
+        let method
         if (length of compressed-data) < (length of data) [
             method: 'deflate
         ] else [
@@ -135,53 +140,53 @@ ctx-zip: context [
             compressed-data: data
         ]
 
-        compressed-size: to-ilong length of compressed-data
+        let compressed-size: to-ilong length of compressed-data
 
-        return reduce [
-            ; local file entry
-            join-all [
-                local-file-sig
-                #{0A00}  ; version (both Mac OS Zip and Linux Zip put #{0A00})
-                #{0000}  ; flags
-                switch method ['store [#{0000}] 'deflate [#{0800}] fail]
-                to-msdos-time date/time
-                to-msdos-date date/date
-                crc  ; crc-32
-                compressed-size
-                uncompressed-size
-                to-ishort length of name  ; filename length
-                #{0000}  ; extrafield length
-                name  ; filename
-                comment <extrafield>  ; not used
-                compressed-data
-            ]
+        ; central-dir file entry.  note that the file attributes are
+        ; interpreted based on the OS of origin--can't say Amiga :-(
+        ;
+        assert [central-dir-entry]  ; currently expects you request it
+        set central-dir-entry join-all [
+            central-file-sig
+            #{1E}  ; version of zip spec this encoder speaks (#{1E}=3.0)
+            #{03}  ; OS of origin: 0=DOS, 3=Unix, 7=Mac, 1=Amiga...
+            #{0A00}  ; minimum spec version for decoder (#{0A00}=1.0)
+            #{0000}  ; flags
+            switch method ['store [#{0000}] 'deflate [#{0800}] fail]
+            to-msdos-time date/time
+            to-msdos-date date/date
+            crc  ; crc-32
+            compressed-size
+            uncompressed-size
+            to-ishort length of name  ; filename length
+            #{0000}  ; extrafield length
+            #{0000}  ; filecomment length
+            #{0000}  ; disknumber start
+            #{0100}  ; internal attributes (Mac puts #{0100} vs. #{0000})
+            #{0000A481}  ; external attributes, this is `-rw-r--r--`
+            to-ilong offset  ; header offset
+            name  ; filename
+            comment <extrafield>  ; not used
+            comment <filecomment>  ; not used
+        ]
 
-            ; central-dir file entry.  note that the file attributes are
-            ; interpreted based on the OS of origin--can't say Amiga :-(
-            ;
-            join-all [
-                central-file-sig
-                #{1E}  ; version of zip spec this encoder speaks (#{1E}=3.0)
-                #{03}  ; OS of origin: 0=DOS, 3=Unix, 7=Mac, 1=Amiga...
-                #{0A00}  ; minimum spec version for decoder (#{0A00}=1.0)
-                #{0000}  ; flags
-                switch method ['store [#{0000}] 'deflate [#{0800}] fail]
-                to-msdos-time date/time
-                to-msdos-date date/date
-                crc  ; crc-32
-                compressed-size
-                uncompressed-size
-                to-ishort length of name  ; filename length
-                #{0000}  ; extrafield length
-                #{0000}  ; filecomment length
-                #{0000}  ; disknumber start
-                #{0100}  ; internal attributes (Mac puts #{0100} vs. #{0000})
-                #{0000A481}  ; external attributes, this is `-rw-r--r--`
-                to-ilong offset  ; header offset
-                name  ; filename
-                comment <extrafield>  ; not used
-                comment <filecomment>  ; not used
-            ]
+        ; local file entry
+        ;
+        return join-all [
+            local-file-sig
+            #{0A00}  ; version (both Mac OS Zip and Linux Zip put #{0A00})
+            #{0000}  ; flags
+            switch method ['store [#{0000}] 'deflate [#{0800}] fail]
+            to-msdos-time date/time
+            to-msdos-date date/date
+            crc  ; crc-32
+            compressed-size
+            uncompressed-size
+            to-ishort length of name  ; filename length
+            #{0000}  ; extrafield length
+            name  ; filename
+            comment <extrafield>  ; not used
+            compressed-data
         ]
     ]
 
@@ -201,7 +206,7 @@ ctx-zip: context [
         ]
     ]
 
-    zip: function [
+    zip: func [
         {Build zip archive from a file or dialected data specification block}
 
         return: "Number of entries in archive"
@@ -214,17 +219,19 @@ ctx-zip: context [
         /verbose "Lists files while compressing"
         /only "Include the root source directory"
     ][
-        info: if not verbose [:elide] else [:print]
+        let info: if not verbose [:elide] else [:print]
 
         if match [file! url!] where [
             where: open/write where
         ]
 
-        out: func [value] [append where value]
+        let out: func [value] [append where value]
 
-        offset: num-entries: 0
-        central-directory: copy #{}
+        let offset: 0
+        let num-entries: 0
+        let central-directory: copy #{}
 
+        let root
         all [not only, file? source, dir? source] then [
             root: source
             source: read source
@@ -234,17 +241,17 @@ ctx-zip: context [
 
         source: to block! source
         iterate source [
-            name: source/1
-            root+name: if find "\/" name/1 [
+            let name: source/1
+            let root+name: if find "\/" name/1 [
                 info ["Warning: absolute path" name]
                 name
             ] else [%% (root)/(name)]
 
-            no-modes: did any [url? root+name, dir? root+name]
+            let no-modes: did any [url? root+name, dir? root+name]
 
             all [deep, dir? name] then [
                 name: dirize name
-                files: ensure block! read root+name
+                let files: ensure block! read root+name
                 for-each file files [
                     append source %% (name)/(file)
                 ]
@@ -260,9 +267,9 @@ ctx-zip: context [
             ; won't find the function that didn't exist at module load time,
             ; so use LIB/NOW to force lookup through LIB.
             ;
-            date: lib/now  ; !!! Each file has slightly later compress date?
+            let date: lib/now  ; !!! Each file has slightly later date?
 
-            data: if match [binary! text!] :source/2 [  ; next is data to use
+            let data: if match [binary! text!] :source/2 [  ; next is data
                 first (source: next source)
             ] else [  ; otherwise data comes from reading the location itself
                 if dir? name [
@@ -280,7 +287,7 @@ ctx-zip: context [
             name: to-path-file name
             info [name]
 
-            set [file-entry: dir-entry:] zip-entry name date data offset
+            let [file-entry dir-entry]: zip-entry name date data offset
 
             append central-directory dir-entry
 
@@ -307,8 +314,8 @@ ctx-zip: context [
     unzip: function [
         {Decompresses a zip archive to a directory or a block}
 
-        return: [void! block!]
-            "If `where` was a block, then position after archive insertion"
+        return: "If `where` was a block, then position after archive insertion"
+            [void! block!]
         where "Where to decompress it"
             [file! block!]
         source "Archive to decompress (only STORE and DEFLATE supported)"
@@ -342,7 +349,7 @@ ctx-zip: context [
                 (flag: (0 <= local-header-offset: get-ilong local-header-offset))
                 flag
                 (local-header: at source local-header-offset + 1)
-                :local-header
+                seek local-header
                 copy tmp: 4 skip
                 (flag: (tmp = local-file-sig))
                 flag
@@ -353,7 +360,7 @@ ctx-zip: context [
                 flag
                 2 skip
                 copy name: name-length skip
-                :central-header 42 skip
+                seek central-header 42 skip
                 copy tmp: name-length skip
                 (flag: (name = tmp))
                 flag
@@ -362,7 +369,7 @@ ctx-zip: context [
                     name: to-file name
                     info [name]
                 )
-                :central-header
+                seek central-header
                 (num-entries: me + 1)
                 2 skip ; version made by
                 copy version: 2 skip ; version to extract
@@ -485,7 +492,7 @@ ctx-zip: context [
                 )
             |   (?? "FAILED")
             ]
-            :central-header
+            seek central-header
         ]]
 
         if block? where [return where]
