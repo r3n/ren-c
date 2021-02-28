@@ -534,7 +534,7 @@ void Force_Value_Frozen_Core(
         UNUSED(deep);
         if (locker)
             SET_SERIES_INFO(s, AUTO_LOCKED);
-    } else if (kind == REB_ACTION) {
+    } else if (kind == REB_ACTION or kind == REB_DATATYPE) {
         // No freezing needed
     } else
         fail (Error_Invalid_Type(kind)); // not yet implemented
