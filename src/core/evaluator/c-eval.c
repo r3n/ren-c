@@ -1153,21 +1153,31 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // been preloaded with the words or paths from the left block.
         //
         REBVAL *specialized = rebValue(
-            "specialize enclose", rebQ(f_spare), "func [f] [",
-                "for-each output", outputs, "[",
-                    "if f/(output) [",  // void in case func doesn't (null?)
-                        "set f/(output) '~unset~",
+            //
+            // !!! Unfortunately we need an alias for the outputs to fetch
+            // via WORD!, because there's no way to do something like a
+            // FOR-EACH over the outputs without having that put in the
+            // bindings.  So if the outputs contain F for instance, they'd
+            // get overwritten by the F argument to the function because the
+            // array is in place.
+            //
+            "let outputs:", outputs,
+
+            "specialize enclose", rebQ(f_spare), "func [frame] [",
+                "for-each o outputs [",
+                    "if frame/(o) [",  // void in case func doesn't (null?)
+                        "set frame/(o) '~unset~",
                     "]",
                 "]",
                 "either first", f->out, "@[",
-                    "set first", f->out, "do f",
-                "] @[do f]",
+                    "set first", f->out, "do frame",
+                "] @[do frame]",
             "] collect [ use [block] [",
                 "block: next", f->out,
-                "for-each output", outputs, "["
+                "for-each o outputs [",
                     "if tail? block [break]",  // no more outputs wanted
                     "if block/1 [",  // interested in this result
-                        "keep setify output",
+                        "keep setify o",
                         "keep quote compose block/1",  // pre-compose, safety
                     "]",
                     "block: next block",
