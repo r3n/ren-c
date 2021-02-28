@@ -220,9 +220,13 @@ default-combinators: make map! reduce [
     'skip func [
         {Skip one item, succeeding so long as input isn't at END}
         return: [<opt> any-series!]
+        result: [any-value!]
         input [any-series!]
     ][
         if tail? input [return null]
+        if result [
+            set result input/1
+        ]
         return next input
     ]
 
@@ -262,7 +266,18 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    'seek func [  ; !!! This will replace the GET-WORD! concept
+    'here func [
+         return: [<opt> any-series!]
+         result: [any-series!]
+         input [any-series!]
+    ][
+        if result [  ; don't assume SET-WORD! on left (for generality)
+            set result input
+        ]
+        return input
+    ]
+
+    'seek func [
          return: [<opt> any-series!]
          input [any-series!]
          'var [word! path! integer!]
@@ -276,39 +291,44 @@ default-combinators: make map! reduce [
         return get var
     ]
 
-    === {ASSIGNING KEYWORDS} ===
-
-    'copy func [
-        {(Old style) Copy input series elements into a SET-WORD! or WORD!}
+    'between func [
         return: [<opt> any-series!]
-        input [any-series!]
-        'target [word! set-word!]
-        parser [action!]
+        result: [any-series!]
+        input [<opt> any-series!]
+        parser-left [action!]
+        parser-right [action!]
     ][
-        if let pos: parser input [
-            set target copy/part input pos
-            return pos
+        if not let start: parser-left input [return null]
+
+        let limit: start
+        cycle [
+            if input: parser-right limit [  ; found it
+                if result [
+                    set result copy/part start limit
+                ]
+                return input
+            ]
+            if tail? limit [return null]
+            limit: next limit
         ]
         return null
     ]
 
-    'set func [
-        {(Old style) Take single input element into a SET-WORD! or WORD!}
+    === {ASSIGNING KEYWORDS} ===
+
+    'copy func [
+        {Copy from the current parse position through a rule}
         return: [<opt> any-series!]
+        result: [any-series!]
         input [any-series!]
-        'target [word! set-word!]
         parser [action!]
     ][
         if let pos: parser input [
-            if pos = input [  ; no advancement
-                set target null
-                return pos
+            if not result [
+                fail "COPY must be used with a SET-WORD! in UPARSE"
             ]
-            if pos = next input [  ; one unit of advancement
-                set target input/1
-                return pos
-            ]
-            fail "SET in UPARSE can only set up to one element"
+            set result copy/part input pos
+            return pos
         ]
         return null
     ]
@@ -335,33 +355,27 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    === {SET-WORD! and GET-WORD! COMBINATORS} ===
+    === {SET-WORD! COMBINATOR} ===
 
-    ; This is the handling for sets and gets that are standalone...e.g. not
-    ; otherwise quoted as arguments to combinators (like COPY X: SOME "A").
-    ; For starters, we implement the historical behavior of saving the parse
-    ; position into the variable or restoring it.
+    ; The concept behind Ren-C's SET-WORD! in PARSE is that some parse
+    ; combinators are able to yield a result in addition to updating the
+    ; position of the parse input.  If these appear to the right of a
+    ; set-word, then the set word will be assigned on a match.
 
     set-word! func [
         return: [any-series!]
         input [any-series!]
         value [set-word!]
+        parser [action!]
     ][
-        set value input
-        return input  ; don't change position
-    ]
-
-    get-word! func [
-        return: [<opt> any-series!]
-        input [any-series!]
-        value [get-word!]
-    ][
-        ; Restriction: seeks must be within the same series.
-        ;
-        if not same? head input head get value [
-            fail "SEEK (via GET-WORD!) in UPARSE must be in the same series"
+        if not find (parameters of :parser) '/result [
+            fail "SET-WORD! in UPARSE needs result-bearing combinator"
         ]
-        return get value
+        if not let ['input temp]: parser input [
+            return null
+        ]
+        set value temp
+        return input  ; don't change position
     ]
 
     === {TEXT! COMBINATOR} ===
@@ -525,13 +539,6 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    'fail func [  ; !!! LEGACY, should only be in compatibility, use FALSE
-         return: [<opt>]
-         input [any-array!]
-    ][
-        return null
-    ]
-
     === {INTEGER! COMBINATOR} ===
 
     ; !!! There's currently no way for an integer to be used to represent a
@@ -569,11 +576,15 @@ default-combinators: make map! reduce [
 
     datatype! func [
          return: [<opt> any-series!]
+         result: [any-value!]
          input [any-series!]
          value [datatype!]
     ][
         either any-array? input [
             if value = type of input/1 [
+                if result [
+                    set result input/1
+                ]
                 return next input
             ]
             return null
@@ -759,6 +770,9 @@ combinatorize: func [
                 ; All combinators should have an input.  But the
                 ; idea is that we leave this unspecialized.
             ]
+            param = '/result [
+                ; Actually a return value.  These are still being figured out.
+            ]
             param = 'value [
                 f/value: value
             ]
@@ -914,20 +928,126 @@ uparse: func [
 ]
 
 
-=== {REBOL2/R3-ALPHA/RED COMPATIBILITY} ===
-
-; One of the early applications of UPARSE is to be able to implement backward
-; compatible parse behavior by means of a series of tweaks.
-;
-; !!! Adjustments to the combinators not done yet, just a placeholder for
-; showing how it would be done.
+=== {AND COMPATIBILITY} ===
 
 ; We do add AND as a backwards compatible form of AHEAD...even to the default
 ; for now (it has no competing meaning)
 ;
 default-combinators/('and): :default-combinators/('ahead)
 
+
+=== {REBOL2/R3-ALPHA/RED COMPATIBILITY} ===
+
+; One of the early applications of UPARSE is to be able to implement backward
+; compatible parse behavior by means of a series of tweaks.
+
 redbol-combinators: copy default-combinators
+
+append redbol-combinators reduce [
+
+    === {OLD STYLE SET AND COPY COMBINATORS} ===
+
+    ; Historical Rebol's PARSE had SET and COPY keywords which would take
+    ; a WORD! as their first argument, and then a rule.  This was done because
+    ; the SET-WORD! was taken for capturing the parse position into a
+    ; variable.  That idea was first overturned by a JavaScript implementation
+    ; of Rebol called Topaz, using SET-WORD! for generic captures of data
+    ; out of the parse input:
+    ;
+    ; https://github.com/giesse/red-topaz-parse
+    ;
+    ; Ren-C goes along with this change, including that the position is
+    ; captured by `pos: here` instead of simply by `pos:`.  However, the
+    ; concept of how combinators can produce a result to be captured is
+    ; rethought.
+
+    'copy func [
+        {(Old style) Copy input series elements into a SET-WORD! or WORD!}
+        return: [<opt> any-series!]
+        input [any-series!]
+        'target [word! set-word!]
+        parser [action!]
+    ][
+        if let pos: parser input [
+            set target copy/part input pos
+            return pos
+        ]
+        return null
+    ]
+
+    'set func [
+        {(Old style) Take single input element into a SET-WORD! or WORD!}
+        return: [<opt> any-series!]
+        input [any-series!]
+        'target [word! set-word!]
+        parser [action!]
+    ][
+        if let pos: parser input [
+            if pos = input [  ; no advancement
+                set target null
+                return pos
+            ]
+            if pos = next input [  ; one unit of advancement
+                set target input/1
+                return pos
+            ]
+            fail "SET in UPARSE can only set up to one element"
+        ]
+        return null
+    ]
+
+    === {OLD STYLE SET-WORD! AND GET-WORD! BEHAVIOR} ===
+
+    ; This is the handling for sets and gets that are standalone...e.g. not
+    ; otherwise quoted as arguments to combinators (like COPY X: SOME "A").
+    ; These implement the historical behavior of saving the parse position
+    ; into the variable or restoring it.
+
+    set-word! func [
+        return: [any-series!]
+        input [any-series!]
+        value [set-word!]
+    ][
+        set value input
+        return input  ; don't change position
+    ]
+
+    get-word! func [
+        return: [<opt> any-series!]
+        input [any-series!]
+        value [get-word!]
+    ][
+        ; Restriction: seeks must be within the same series.
+        ;
+        if not same? head input head get value [
+            fail "SEEK (via GET-WORD!) in UPARSE must be in the same series"
+        ]
+        return get value
+    ]
+
+    === {OLD-STYLE FAIL INSTRUCTION} ===
+
+    ; In Ren-C, the FAIL word is taken to generally relate to raising errors.
+    ; PARSE was using it to mean a forced mismatch.
+    ;
+    ; Ren-C rethinks this so that logic #[false] is used to indicate a match
+    ; has failed, and to roll over to the next alternate (if any).  By making
+    ; the logic #[true] mean "keep parsing", this allows evaluated expressions
+    ; that are substituted into the parse stream via GET-GROUP! to control
+    ; whether parsing continues or not.
+
+    'fail func [
+         return: [<opt>]
+         input [any-array!]
+    ][
+        return null
+    ]
+
+]
+
+; Kill off any new combinators.
+
+redbol-combinators/('between): null
 
 uparse2: specialize :uparse [
     combinators: redbol-combinators

@@ -391,7 +391,7 @@ static void Propagate_All_GC_Marks(void)
             //
             if (
                 KIND3Q_BYTE_UNCHECKED(v) == REB_NULL
-                and not (IS_VARLIST(a) or IS_PATCH(a))
+                and not (IS_VARLIST(a) or IS_PATCH(a) or IS_PAIRLIST(a))
             ){
                 panic (a);
             }
