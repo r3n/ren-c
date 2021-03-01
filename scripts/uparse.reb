@@ -563,16 +563,21 @@ default-combinators: make map! reduce [
 
     ; Traditionally you could only use a datatype with ANY-ARRAY! types,
     ; but since Ren-C uses UTF-8 Everywhere it makes it practical to merge in
-    ; transcoding...though it's not yet understood how that would work as
-    ; a combinator protocol:
+    ; transcoding:
     ;
-    ;     parse "1020" [set value integer!]
+    ;     >> uparse "{Neat!} 1020" [t: text! i: integer!]
+    ;     == "{Neat!} 1020"
     ;
-    ; The problem is that INTEGER! as a rule would give back the range, but
-    ; not the transcoded value.  Perhaps a special TRANSCODE combinator that
-    ; hooks in differently would be needed.  But there are other big questions
-    ; about how paradigm-shifting COLLECT and KEEP would work, among other
-    ; things...so more sophisticated design is needed here.
+    ;     >> t
+    ;     == "Neat!"
+    ;
+    ;     >> i
+    ;     == 1020
+    ;
+    ; !!! TYPESET! is on somewhat shaky ground as "a thing", so it has to
+    ; be thought about as to how `s: any-series!` or `v: any-value!` might
+    ; work.  It could be that there's a generic TRANSCODE operation and
+    ; then you can filter the result of that.
 
     datatype! func [
          return: [<opt> any-series!]
@@ -589,7 +594,17 @@ default-combinators: make map! reduce [
             ]
             return null
         ][
-            fail "TRANSCODE feature for DATATYPE! not understood yet."
+            let [item 'input error]: transcode input
+            if error [
+                return null
+            ]
+            if value != type of item [
+                return null
+            ]
+            if result [
+                set result item
+            ]
+            return input
         ]
     ]
 
