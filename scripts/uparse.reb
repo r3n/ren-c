@@ -60,7 +60,7 @@ Rebol [
 ; with "A", to get the parser `opt some "a"`.
 ;
 ; But if a parameter to a combinator is marked as quoted, then that will take
-; a value from the callsite literally.  
+; a value from the callsite literally.
 ;
 ; !!! We use a MAP! here instead of an OBJECT! because if it were MAKE OBJECT!
 ; then the parse keywords would override the Rebol functions (so you couldn't
@@ -75,10 +75,23 @@ default-combinators: make map! reduce [
     'opt func [
         {If the parser given as a parameter fails, return input undisturbed}
         return: [any-series!]
+        result: [<opt> any-value!]
         input [any-series!]
         parser [action!]
     ][
-        return any [parser input, input]
+        ; If the argument given as a rule has a result, then OPT will also.
+        ;
+        let f: make frame! :parser
+        f/input: input
+        if find f 'result [
+            f/result: result
+        ]
+
+        return any [
+            do f  ; success means nested parser should have set result
+            elide if result [set result null]  ; on failure OPT nulls result
+            input
+        ]
     ]
 
     'end func [
@@ -363,7 +376,7 @@ default-combinators: make map! reduce [
     ; set-word, then the set word will be assigned on a match.
 
     set-word! func [
-        return: [any-series!]
+        return: [<opt> any-series!]
         input [any-series!]
         value [set-word!]
         parser [action!]
@@ -372,10 +385,14 @@ default-combinators: make map! reduce [
             fail "SET-WORD! in UPARSE needs result-bearing combinator"
         ]
         if not let ['input temp]: parser input [
+            ;
+            ; A failed rule leaves the set target word at whatever value it
+            ; was before the set.
+            ;
             return null
         ]
-        set value temp
-        return input  ; don't change position
+        set value temp  ; success means change variable
+        return input
     ]
 
     === {TEXT! COMBINATOR} ===
@@ -677,6 +694,8 @@ default-combinators: make map! reduce [
 
     block! func [
         return: [<opt> any-series!]
+        result: [<opt> any-value!]
+
         p [frame!]
         input [any-series!]
         value [block!]
@@ -684,6 +703,7 @@ default-combinators: make map! reduce [
         let rules: value
         let pos: input
 
+        let at-least-one-success: false
         while [not tail? rules] [
             if p/verbose [
                 print ["RULE:" mold/limit rules 60]
@@ -705,13 +725,27 @@ default-combinators: make map! reduce [
                 return pos
             ]
 
+            all [at-least-one-success, result] then [
+                fail "SET-WORD! result requested, but more than one match"
+            ]
+
             ; Do one "Parse Step".  This involves turning whatever is at the
             ; next parse position into an ACTION!, then running it.
             ;
             let [action 'rules]: parsify p rules
+            let f: make frame! :action
+            f/input: pos
+            if result [
+                if not find f 'result [
+                    fail ["Rule does not have result to use with SET-WORD!"]
+                ]
+                f/result: result
+            ]
 
-            if not pos: action pos [
-                ;
+            if pos: do f [
+                at-least-one-success: true
+            ] else [
+
                 ; If we fail a match, we skip ahead to the next alternate rule
                 ; by looking for an `|`, resetting the input position to where
                 ; it was when we started.  If there are no more `|` then all
@@ -1019,7 +1053,7 @@ append redbol-combinators reduce [
     ; into the variable or restoring it.
 
     set-word! func [
-        return: [any-series!]
+        return: [<opt> any-series!]
         input [any-series!]
         value [set-word!]
     ][
