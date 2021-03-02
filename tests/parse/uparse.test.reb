@@ -103,13 +103,39 @@
 )(
     x: <before>
     did all [  ; semi-nonsensical use of BETWEEN just because it takes 2 rules
-        uparse "(abc)" [x: collect between keep "(" keep ")"]
+        uparse "(abc)" [x: collect between keep copy "(" keep copy ")"]
         x = ["(" ")"]
     ]
 )(
     x: <before>
     did all [  ; semi-nonsensical use of BETWEEN just because it takes 2 rules
-        not uparse "(abc}" [x: collect between keep "(" keep ")"]
+        not uparse "(abc}" [x: collect between keep copy "(" keep copy ")"]
         x = <before>
+    ]
+)]
+
+; EMIT is a new idea to try and make it easier to use PARSE rules to bubble
+; up objects.  It works with a GATHER and SET-WORD! to capture into a
+; variable, but even goes so far as to make it so the overall parse result
+; can be changed to an object if you use it.
+;
+; !!! That might be a lame idea, revisit.
+[(
+    obj: uparse [1 <foo>] [emit i: integer!, emit t: tag!]
+    did all [
+        obj/i = 1
+        obj/t = <foo>
+    ]
+)(
+    uparse [* * * 1 <foo> * * *] [
+        some '*
+        g: gather [
+            emit i: integer!, emit t: text! | emit i: integer!, emit t: tag!
+        ]
+        some '*
+    ]
+    did all [
+        g/i = 1
+        g/t = <foo>
     ]
 )]

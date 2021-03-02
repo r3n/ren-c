@@ -442,10 +442,86 @@ default-combinators: make map! reduce [
         parser [action!]
     ][
         assert [state/collecting]
-        if not let limit: parser input [
+
+        let f: make frame! :parser
+        if not in f 'result [
+            fail "Can't use KEEP with PARSER that doesn't have a RESULT:"
+        ]
+        let temp
+        f/result: 'temp
+        f/input: input
+        if not let limit: do f [
             return null
         ]
-        append state/collecting copy/part input limit
+
+        append state/collecting temp
+
+        return limit
+    ]
+
+    === {GATHER AND EMIT} ===
+
+    ; With gather, the idea is to do more of a "bubble-up" type of strategy
+    ; for creating objects with labeled fields.  Also, the idea that PARSE
+    ; itself would switch modes.
+
+    'gather combinator [
+        result: [any-series!]
+        parser [action!]
+    ][
+        let made-state: did if not state/gathering [
+            state/gathering: make block! 10
+        ]
+
+        let gather-base: tail state/gathering
+        if not input: parser input [
+            ;
+            ; Although the block rules roll back, GATHER might be used with
+            ; other combinators that run more than one rule...and one rule
+            ; might succeed, then the next fail:
+            ;
+            ;     uparse "(abc>" [x: gather between emit x: "(" emit y: ")"]
+            ;
+            clear gather-base
+            if made-state [
+                state/gathering: null
+            ]
+            return null
+        ]
+        if result [
+            set result make object! gather-base
+        ]
+        either made-state [
+            state/gathering: null  ; eliminate entirely
+        ][
+            clear gather-base  ; clear only from the marked position
+        ]
+        return input
+    ]
+
+    'emit combinator [
+        'target [set-word!]
+        parser [action!]
+    ][
+        ; !!! Experiment to allow a top-level accrual, to make EMIT more
+        ; efficient by becoming the result of the PARSE.
+        ;
+        if not state/gathering [
+            state/gathering: make block! 10
+        ]
+
+        let f: make frame! :parser
+        if not in f 'result [
+            fail "Can't use EMIT with PARSER that doesn't have a RESULT:"
+        ]
+        let temp
+        f/result: 'temp
+        f/input: input
+        if not let limit: do f [
+            return null
+        ]
+        append state/gathering target
+        append state/gathering quote temp
         return limit
     ]
 
@@ -753,6 +829,7 @@ default-combinators: make map! reduce [
         let pos: input
 
         let collect-baseline: tail try state/collecting  ; see COLLECT
+        let gather-baseline: tail try state/gathering  ; see GATHER
 
         let at-least-one-success: false
         while [not tail? rules] [
@@ -801,6 +878,14 @@ default-combinators: make map! reduce [
                         clear collect-baseline
                     ] else [
                         clear state/collecting  ; no mark, must have been empty
+                    ]
+                ]
+
+                if state/gathering [  ; toss gathered values from this pass
+                    if gather-baseline [  ; we marked how far along we were
+                        clear gather-baseline
+                    ] else [
+                        clear state/gathering  ; no mark, must have been empty
                     ]
                 ]
 
@@ -983,8 +1068,8 @@ parsify: func [
 
 
 uparse: func [
-    return: "Input if the parse succeeded, or NULL otherwise"
-        [<opt> any-series!]
+    return: "Input or gathered object if the parse succeeded, NULL otherwise"
+        [<opt> any-series! object!]
     progress: "Partial progress if requested"
         [<opt> any-series!]
     furthest: "Furthest input point reached by the parse"
@@ -1000,7 +1085,7 @@ uparse: func [
 
     /verbose "Print some additional debug information"
 
-    <local> collecting (null)
+    <local> collecting (null) gathering (null)
 ][
     combinators: default [default-combinators]
 
@@ -1031,16 +1116,25 @@ uparse: func [
     ;
     if progress [
         set progress pos
-        return if pos [series]
+        return if pos [
+            either gathering [
+                make object! gathering
+            ][
+                series
+            ]
+        ]
     ]
 
     ; Note: SERIES may change during the process of the PARSE.  This means
     ; we don't want to precalculate TAIL SERIES, since the tail may change.
     ;
-    if pos = tail series [
-        return series
+    return if pos = tail series [
+        either gathering [
+            make object! gathering
+        ][
+            series
+        ]
     ]
-    return null
 ]
 
 
