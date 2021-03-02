@@ -66,6 +66,25 @@
     ]
 )
 
+; HERE follows Topaz precedent as the new means of capturing positions
+; (e.g. POS: HERE).  But it is useful for other purposes, when a rule is
+; needed for capturing the current position.
+[(
+    did all [
+        parse "aaabbb" [some "a", pos: here, some "b"]
+        pos = "bbb"
+    ]
+)(
+     did all [
+         uparse "<<<stuff>>>" [
+             left: copy some "<"
+             (n: length of left)
+             x: between here n ">"
+         ]
+         x = "stuff"
+     ]
+)]
+
 ; COLLECT is currently implemented to conspire with the BLOCK! combinator to
 ; do rollback between its alternates.  But since anyone can write combinators
 ; that do alternates (in theory), those would have to participate in the

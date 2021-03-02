@@ -50,9 +50,16 @@ Rebol [
     }
 ]
 
-; A combinator is a function that takes in an input series as well as some
-; parameters, and decides whether to advance the input or return NULL to
-; signal the failure of a match.
+; All combinators receive the INPUT to be processed.  They are also given an
+; object representing the STATE of the parse (currently that is just the
+; FRAME! of the main UPARSE call which triggered the operation, so any of the
+; locals or parameters to that can be accessed, e.g. the list of /COMBINATORS)
+;
+; The goal of a combinator is to decide whether to match (by returning a
+; new position in the series) or fail to match (by returning a NULL)
+;
+; Additional parameters to a combinator are fulfilled by the parse engine by
+; looking at the ensuing rules in the rule block.
 ;
 ; One of the parameter types that can be given to these functions are another
 ; parser, to combine them (hence "parser combinator").  So you can take a
@@ -62,6 +69,66 @@ Rebol [
 ; But if a parameter to a combinator is marked as quoted, then that will take
 ; a value from the callsite literally.
 ;
+; A special COMBINATOR generator is used.  This saves on repetition of
+; parameters and also lets the engine get its hooks into the execution of
+; parsers...for instance to diagnose the furthest point the parsing reached.
+
+combinator: func [
+    {Make a stylized ACTION! that fulfills the interface of a combinator}
+
+    spec [block!]
+    body [block!]
+
+    <static> wrapper (
+        func [
+            {Enclosing function for hooking all combinators}
+            f [frame!]
+        ][
+            ; This hook lets us run code before and after each execution of
+            ; the combinator.  That offers lots of potential, but for now
+            ; we just use it to notice the furthest parse point reached.
+            ;
+            let state: f/state
+            let result: do f
+            elide all [
+                state/furthest
+                result
+                (index? result) > (index? get state/furthest)
+                set state/furthest result
+            ]
+        ]
+    )
+][
+    let action: func compose [
+        ; Get the text description if given
+        ((if text? spec/1 [spec/1, elide spec: my next]))
+
+        return: [<opt> any-series!]
+
+        ; Get the RESULT: definition if there is one
+        ;
+        ((if set-word? spec/1 [
+            assert [spec/1 = 'result:]
+            assert [block? spec/2]
+            reduce [spec/1 spec/2]
+            elide spec: my skip 2
+        ]))
+
+        state [frame!]
+        input [any-series!]
+
+        ; Whatever arguments the combinator takes, if any
+        ;
+        ((spec))
+    ] body
+
+    ; Enclosing with the wrapper permits us to inject behavior before and
+    ; after each combinator is executed.
+    ;
+    enclose :action :wrapper
+]
+
+
 ; !!! We use a MAP! here instead of an OBJECT! because if it were MAKE OBJECT!
 ; then the parse keywords would override the Rebol functions (so you couldn't
 ; use ANY inside the implementation of a combinator, because there's a
@@ -72,11 +139,9 @@ default-combinators: make map! reduce [
 
     === {BASIC KEYWORDS} ===
 
-    'opt func [
+    'opt combinator [
         {If the parser given as a parameter fails, return input undisturbed}
-        return: [any-series!]
         result: [<opt> any-value!]
-        input [any-series!]
         parser [action!]
     ][
         ; If the argument given as a rule has a result, then OPT will also.
@@ -94,20 +159,16 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    'end func [
+    'end combinator [
         {Only match if the input is at the end}
-        return: [<opt> any-series!]
-        input [any-series!]
         ; Note: no arguments besides the input (neither parsers nor literals)
     ][
         if tail? input [return input]
         return null
     ]
 
-    'not func [
+    'not combinator [
         {Fail if the parser rule given succeeds, else continue}
-        return: [<opt> any-series!]
-        input [any-series!]
         parser [action!]
     ][
         if parser input [
@@ -116,10 +177,8 @@ default-combinators: make map! reduce [
         return input
     ]
 
-    'ahead func [
+    'ahead combinator [
         {Leave the parse position at the same location, but fail if no match}
-        return: [<opt> any-series!]
-        input [any-series!]
         parser [action!]
     ][
         if not parser input [
@@ -130,10 +189,8 @@ default-combinators: make map! reduce [
 
     === {LOOPING CONSTRUCT KEYWORDS} ===
 
-    'any func [
+    'any combinator [
         {Any number of matches (including 0)}
-        return: [<opt> any-series!]
-        input [any-series!]
         parser [action!]
     ][
         let pos: input
@@ -154,10 +211,8 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    'some func [
+    'some combinator [
         {Must run at least one match}
-        return: [<opt> any-series!]
-        input [any-series!]
         parser [action!]
     ][
         if let pos: parser input [
@@ -170,10 +225,8 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    'while func [
+    'while combinator [
         {Keep matching while rule doesn't fail, regardless of hitting end}
-        return: [<opt> any-series!]
-        input [any-series!]
         parser [action!]
     ][
         let pos: input
@@ -194,10 +247,8 @@ default-combinators: make map! reduce [
 
     === {MUTATING KEYWORDS} ===
 
-    'change func [
+    'change combinator [
         {Substitute a match with new data}
-        return: [<opt> any-series!]
-        input [any-series!]
         parser [action!]
         'data [<opt> any-value!]
     ][
@@ -207,10 +258,8 @@ default-combinators: make map! reduce [
         return change/part input data limit  ; CHANGE returns change's tail
     ]
 
-    'remove func [
+    'remove combinator [
         {Remove data that matches a parse rule}
-        return: [<opt> any-series!]
-        input [any-series!]
         parser [action!]
     ][
         if not let limit: parser input [
@@ -219,10 +268,8 @@ default-combinators: make map! reduce [
         return remove/part input limit  ; REMOVE returns its initial position
     ]
 
-    'insert func [
+    'insert combinator [
         {Unconditionally insert literal data into the input series}
-        return: [any-series!]
-        input [any-series!]
         'data [any-value!]
     ][
         return insert input data
@@ -230,11 +277,9 @@ default-combinators: make map! reduce [
 
     === {SEEKING KEYWORDS} ===
 
-    'skip func [
+    'skip combinator [
         {Skip one item, succeeding so long as input isn't at END}
-        return: [<opt> any-series!]
         result: [any-value!]
-        input [any-series!]
     ][
         if tail? input [return null]
         if result [
@@ -243,10 +288,8 @@ default-combinators: make map! reduce [
         return next input
     ]
 
-    'to func [
+    'to combinator [
         {Match up TO a certain rule (result position before succeeding rule)}
-        return: [<opt> any-series!]
-        input [any-series!]
         parser [action!]
     ][
         cycle [
@@ -260,10 +303,8 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    'thru func [
+    'thru combinator [
         {Match up THRU a certain rule (result position after succeeding rule)}
-        return: [<opt> any-series!]
-        input [any-series!]
         parser [action!]
     ][
         let pos
@@ -279,10 +320,8 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    'here func [
-         return: [<opt> any-series!]
+    'here combinator [
          result: [any-series!]
-         input [any-series!]
     ][
         if result [  ; don't assume SET-WORD! on left (for generality)
             set result input
@@ -290,9 +329,7 @@ default-combinators: make map! reduce [
         return input
     ]
 
-    'seek func [
-         return: [<opt> any-series!]
-         input [any-series!]
+    'seek combinator [
          'var [word! path! integer!]
     ][
         if integer? var [
@@ -304,10 +341,8 @@ default-combinators: make map! reduce [
         return get var
     ]
 
-    'between func [
-        return: [<opt> any-series!]
+    'between combinator [
         result: [any-series!]
-        input [<opt> any-series!]
         parser-left [action!]
         parser-right [action!]
     ][
@@ -329,11 +364,9 @@ default-combinators: make map! reduce [
 
     === {ASSIGNING KEYWORDS} ===
 
-    'copy func [
+    'copy combinator [
         {Copy from the current parse position through a rule}
-        return: [<opt> any-series!]
         result: [any-series!]
-        input [any-series!]
         parser [action!]
     ][
         if let pos: parser input [
@@ -348,10 +381,8 @@ default-combinators: make map! reduce [
 
     === {INTO KEYWORD} ===
 
-    'into func [
+    'into combinator [
         {Perform a recursion into another datatype with a rule}
-        return: [<opt> any-array!]
-        input [any-array!]
         parser [action!]
     ][
         if not any-series? input/1 [
@@ -380,21 +411,18 @@ default-combinators: make map! reduce [
     ; working option...but a more general architecture for designing features
     ; that want "rollback" is desired.
 
-    'collect func [
-        return: [<opt> any-series!]
+    'collect combinator [
         result: [any-series!]
-        p [frame!]
-        input [any-series!]
         parser [action!]
     ][
-        if not p/collecting [
-            p/collecting: make block! 10
+        if not state/collecting [
+            state/collecting: make block! 10
         ]
         
-        let collect-base: tail p/collecting
+        let collect-base: tail state/collecting
         if not input: parser input [
             ;
-            ; Although the block rules roll back, keep might be used with
+            ; Although the block rules roll back, COLLECT might be used with
             ; other combinators that run more than one rule...and one rule
             ; might succeed, then the next fail:
             ;
@@ -410,17 +438,14 @@ default-combinators: make map! reduce [
         return input
     ]
 
-    'keep func [
-        return: [<opt> any-series!]
-        p [frame!]
-        input [any-series!]
+    'keep combinator [
         parser [action!]
     ][
-        assert [p/collecting]
+        assert [state/collecting]
         if not let limit: parser input [
             return null
         ]
-        append p/collecting copy/part input limit
+        append state/collecting copy/part input limit
         return limit
     ]
 
@@ -431,9 +456,7 @@ default-combinators: make map! reduce [
     ; position of the parse input.  If these appear to the right of a
     ; set-word, then the set word will be assigned on a match.
 
-    set-word! func [
-        return: [<opt> any-series!]
-        input [any-series!]
+    set-word! combinator [
         value [set-word!]
         parser [action!]
     ][
@@ -456,10 +479,7 @@ default-combinators: make map! reduce [
     ; For now we just make text act as FIND/MATCH, though this needs to be
     ; sensitive to whether we are operating on blocks or text/binary.
 
-    text! func [
-        return: [<opt> any-series!]
-        p [frame!]
-        input [any-series!]
+    text! combinator [
         value [text!]
     ][
         case [
@@ -468,7 +488,7 @@ default-combinators: make map! reduce [
                 return null
             ]
             any-string? input [
-                return find/match/(if p/case 'case) input value
+                return find/match/(if state/case 'case) input value
             ]
             true [
                 assert [binary? input]
@@ -484,9 +504,7 @@ default-combinators: make map! reduce [
     ; it good for representing characters, but it can also represent short
     ; strings.  It matches case-sensitively.
 
-    issue! func [
-        return: [any-series!]
-        input [any-series!]
+    issue! combinator [
         value [issue!]
     ][
         case [
@@ -511,9 +529,7 @@ default-combinators: make map! reduce [
     ; may not be desirable.  Also you could match partial characters and
     ; then not be able to set a string position.  So we don't do that.
 
-    binary! func [
-        return: [any-series!]
-        input [any-series!]
+    binary! combinator [
         value [issue!]
     ][
         case [
@@ -535,9 +551,7 @@ default-combinators: make map! reduce [
 
     ; Does not advance the input, just runs the group.
 
-    group! func [
-        return: [any-series!]
-        input [any-series!]
+    group! combinator [
         value [group!]
     ][
         do value
@@ -551,9 +565,7 @@ default-combinators: make map! reduce [
     ; a sort of "INTO" switch that could change the way the input is being
     ; viewed, e.g. being able to do INTO BINARY! on a TEXT! (?)
 
-    bitset! func [
-        return: [<opt> any-series!]
-        input [any-series!]
+    bitset! combinator [
         value [bitset!]
     ][
         case [
@@ -582,10 +594,7 @@ default-combinators: make map! reduce [
     ; Recognizes the value literally.  Test making it work only on the
     ; ANY-ARRAY! type, just to see if type checking can work.
 
-    quoted! func [
-         return: [<opt> any-array!]
-         p [frame!]
-         input [any-array!]
+    quoted! combinator [
          value [quoted!]
     ][
         if :input/1 = unquote value [
@@ -601,9 +610,7 @@ default-combinators: make map! reduce [
     ; not match".  When combined with GET-GROUP!, this fully replaces the
     ; need for the IF construct.
 
-    logic! func [
-         return: [<opt> any-series!]
-         input [any-series!]
+    logic! combinator [
          value [logic!]
     ][
         if value [
@@ -618,9 +625,7 @@ default-combinators: make map! reduce [
     ; range of matches, e.g. between 1 and 10.  This would need skippable
     ; parameters.  For now we just go for a plain repeat count.
 
-    integer! func [
-         return: [<opt> any-series!]
-         input [any-series!]
+    integer! combinator [
          value [integer!]
          parser [action!]
     ][
@@ -652,10 +657,8 @@ default-combinators: make map! reduce [
     ; work.  It could be that there's a generic TRANSCODE operation and
     ; then you can filter the result of that.
 
-    datatype! func [
-         return: [<opt> any-series!]
+    datatype! combinator [
          result: [any-value!]
-         input [any-series!]
          value [datatype!]
     ][
         either any-array? input [
@@ -687,9 +690,7 @@ default-combinators: make map! reduce [
     ; held by the variable.  So if it holds a block, it does not act as
     ; a rule...but as the actual value itself.
 
-    sym-word! func [
-         return: [<opt> any-series!]
-         input [any-series!]
+    sym-word! combinator [
          value [sym-word!]
     ][
         either any-array? input [
@@ -702,9 +703,7 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    sym-path! func [
-         return: [<opt> any-series!]
-         input [any-series!]
+    sym-path! combinator [
          value [sym-path!]
     ][
         either any-array? input [
@@ -717,9 +716,7 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    sym-group! func [
-         return: [<opt> any-series!]
-         input [any-series!]
+    sym-group! combinator [
          value [sym-group!]
     ][
         either any-array? input [
@@ -748,22 +745,18 @@ default-combinators: make map! reduce [
     ; function...rather than being able to build a small function for each
     ; step that could short circuit before the others were needed.)
 
-    block! func [
-        return: [<opt> any-series!]
+    block! combinator [
         result: [<opt> any-value!]
-
-        p [frame!]
-        input [any-series!]
         value [block!]
     ][
         let rules: value
         let pos: input
 
-        let collect-baseline: tail try p/collecting  ; see COLLECT
+        let collect-baseline: tail try state/collecting  ; see COLLECT
 
         let at-least-one-success: false
         while [not tail? rules] [
-            if p/verbose [
+            if state/verbose [
                 print ["RULE:" mold/limit rules 60]
                 print ["INPUT:" mold/limit pos 60]
                 print "---"
@@ -790,7 +783,7 @@ default-combinators: make map! reduce [
             ; Do one "Parse Step".  This involves turning whatever is at the
             ; next parse position into an ACTION!, then running it.
             ;
-            let [action 'rules]: parsify p rules
+            let [action 'rules]: parsify state rules
             let f: make frame! :action
             f/input: pos
             if result [
@@ -803,11 +796,11 @@ default-combinators: make map! reduce [
             if pos: do f [
                 at-least-one-success: true
             ] else [
-                if p/collecting [  ; toss collected values from this pass
+                if state/collecting [  ; toss collected values from this pass
                     if collect-baseline [  ; we marked how far along we were
                         clear collect-baseline
                     ] else [
-                        clear p/collecting  ; no mark, so must have been empty
+                        clear state/collecting  ; no mark, must have been empty
                     ]
                 ]
 
@@ -856,7 +849,7 @@ combinatorize: func [
     advanced: [block!]
 
     rules [block!]
-    p "Parse State" [frame!]
+    state "Parse State" [frame!]
     c "Combinator" [action!]
     /value "Initiating value (if datatype)" [any-value!]
 ][
@@ -890,8 +883,8 @@ combinatorize: func [
             param = 'value [
                 f/value: value
             ]
-            param = 'p [  ; taking the UPARSE frame is optional
-                f/p: p
+            param = 'state [  ; the "state" is currently the UPARSE frame
+                f/state: state
             ]
             quoted? param [  ; literal element captured from rules
                 let r: non-comma rules/1
@@ -905,7 +898,7 @@ combinatorize: func [
                 ; This could be more conservative to stop calling
                 ; functions.  For now, just work around it.
                 ;
-                let [temp 'rules]: parsify p rules
+                let [temp 'rules]: parsify state rules
                 f/(param): :temp
             ]
         ]
@@ -924,7 +917,7 @@ parsify: func [
     advanced: "Rules position advanced past the elements used for the action"
         [block!]
 
-    p "Parse context"
+    state "Parse state"
         [frame!]
     rules "Parse rules to (partially) convert to a combinator action"
         [block!]
@@ -953,8 +946,8 @@ parsify: func [
         ]
 
         word? :r [
-            if let c: select p/combinators r [
-                let [f 'rules]: combinatorize rules p :c
+            if let c: select state/combinators r [
+                let [f 'rules]: combinatorize rules state :c
 
                 set advanced rules  ; !!! Should `[:advanced]: ...` be ok?
                 return make action! f
@@ -977,11 +970,11 @@ parsify: func [
     ; arguments.  Does this mean the block rule has to hardcode handling of
     ; integers, or that when we do these rules they may have skippable types?
 
-    if not let c: select p/combinators kind of :r [
+    if not let c: select state/combinators kind of :r [
         fail ["Unhandled type in PARSIFY:" kind of :r]
     ]
 
-    let [f 'rules]: combinatorize/value rules p :c r
+    let [f 'rules]: combinatorize/value rules state :c r
 
     set advanced rules
 
@@ -994,6 +987,8 @@ uparse: func [
         [<opt> any-series!]
     progress: "Partial progress if requested"
         [<opt> any-series!]
+    furthest: "Furthest input point reached by the parse"
+        [any-series!]
 
     series "Input series"
         [any-series!]
@@ -1009,18 +1004,23 @@ uparse: func [
 ][
     combinators: default [default-combinators]
 
+    ; The COMBINATOR definition makes a function which is hooked with code
+    ; that will mark the furthest point reached by any match.
+    ;
+    if furthest [
+        set furthest series
+    ]
+
     ; Each UPARSE operation can have a different set of combinators in
     ; effect.  So it's necessary to need to have some way to get at that
     ; information.  For now, we use the FRAME! of the parse itself as the
     ; way that data is threaded...as it gives access to not just the
     ; combinators, but also the /VERBOSE or other settings...we can add more.
     ;
-    let p: binding of 'return
+    let state: binding of 'return
 
     let f: make frame! :combinators/(block!)
-    if in f 'p [  ; combinators are allowed to not take parser state
-        f/p: p
-    ]
+    f/state: state
     f/input: series
     f/value: rules
     let pos: do f
@@ -1077,10 +1077,8 @@ append redbol-combinators reduce [
     ; concept of how combinators can produce a result to be captured is
     ; rethought.
 
-    'copy func [
+    'copy combinator [
         {(Old style) Copy input series elements into a SET-WORD! or WORD!}
-        return: [<opt> any-series!]
-        input [any-series!]
         'target [word! set-word!]
         parser [action!]
     ][
@@ -1091,10 +1089,8 @@ append redbol-combinators reduce [
         return null
     ]
 
-    'set func [
+    'set combinator [
         {(Old style) Take single input element into a SET-WORD! or WORD!}
-        return: [<opt> any-series!]
-        input [any-series!]
         'target [word! set-word!]
         parser [action!]
     ][
@@ -1119,18 +1115,14 @@ append redbol-combinators reduce [
     ; These implement the historical behavior of saving the parse position
     ; into the variable or restoring it.
 
-    set-word! func [
-        return: [<opt> any-series!]
-        input [any-series!]
+    set-word! combinator [
         value [set-word!]
     ][
         set value input
         return input  ; don't change position
     ]
 
-    get-word! func [
-        return: [<opt> any-series!]
-        input [any-series!]
+    get-word! combinator [
         value [get-word!]
     ][
         ; Restriction: seeks must be within the same series.
@@ -1152,13 +1144,10 @@ append redbol-combinators reduce [
     ; that are substituted into the parse stream via GET-GROUP! to control
     ; whether parsing continues or not.
 
-    'fail func [
-         return: [<opt>]
-         input [any-array!]
+    'fail combinator [
     ][
         return null
     ]
-
 ]
 
 ; Kill off any new combinators.
