@@ -65,3 +65,32 @@
         i = 1020
     ]
 )
+
+; COLLECT is currently implemented to conspire with the BLOCK! combinator to
+; do rollback between its alternates.  But since anyone can write combinators
+; that do alternates (in theory), those would have to participate in the
+; protocol of rollback too.
+;
+; Test the very non-generic rollback mechanism.  The only two constructs that
+; do any rollback are BLOCK! and COLLECT itself.
+[(
+    x: <before>
+    did all [
+        uparse [1 2] [x: collect [
+            keep integer! keep tag! | keep integer! keep integer!
+        ]]
+        x = [1 2]
+    ]
+)(
+    x: <before>
+    did all [  ; semi-nonsensical use of BETWEEN just because it takes 2 rules
+        uparse "(abc)" [x: collect between keep "(" keep ")"]
+        x = ["(" ")"]
+    ]
+)(
+    x: <before>
+    did all [  ; semi-nonsensical use of BETWEEN just because it takes 2 rules
+        not uparse "(abc}" [x: collect between keep "(" keep ")"]
+        x = <before>
+    ]
+)]

@@ -368,6 +368,62 @@ default-combinators: make map! reduce [
         return null
     ]
 
+    === {COLLECT AND KEEP} ===
+
+    ; The COLLECT feature was first added by Red.  However, it did not use
+    ; rollback across any KEEPs that happened when a parse rule failed, which
+    ; makes the feature of limited use.
+    ;
+    ; This is a kind of lousy implementation that leverages a baked-in
+    ; mechanism to manage collecting where the UPARSE holds the collect buffer
+    ; and the block combinator is complicit.  It's just to show a first
+    ; working option...but a more general architecture for designing features
+    ; that want "rollback" is desired.
+
+    'collect func [
+        return: [<opt> any-series!]
+        result: [any-series!]
+        p [frame!]
+        input [any-series!]
+        parser [action!]
+    ][
+        if not p/collecting [
+            p/collecting: make block! 10
+        ]
+        
+        let collect-base: tail p/collecting
+        if not input: parser input [
+            ;
+            ; Although the block rules roll back, keep might be used with
+            ; other combinators that run more than one rule...and one rule
+            ; might succeed, then the next fail:
+            ;
+            ;     uparse "(abc>" [x: collect between keep "(" keep ")"]
+            ;
+            clear collect-base
+            return null
+        ]
+        if result [
+            set result copy collect-base
+        ]
+        clear collect-base
+        return input
+    ]
+
+    'keep func [
+        return: [<opt> any-series!]
+        p [frame!]
+        input [any-series!]
+        parser [action!]
+    ][
+        assert [p/collecting]
+        if not let limit: parser input [
+            return null
+        ]
+        append p/collecting copy/part input limit
+        return limit
+    ]
+
     === {SET-WORD! COMBINATOR} ===
 
     ; The concept behind Ren-C's SET-WORD! in PARSE is that some parse
@@ -703,6 +759,8 @@ default-combinators: make map! reduce [
         let rules: value
         let pos: input
 
+        let collect-baseline: tail try p/collecting  ; see COLLECT
+
         let at-least-one-success: false
         while [not tail? rules] [
             if p/verbose [
@@ -745,6 +803,13 @@ default-combinators: make map! reduce [
             if pos: do f [
                 at-least-one-success: true
             ] else [
+                if p/collecting [  ; toss collected values from this pass
+                    if collect-baseline [  ; we marked how far along we were
+                        clear collect-baseline
+                    ] else [
+                        clear p/collecting  ; no mark, so must have been empty
+                    ]
+                ]
 
                 ; If we fail a match, we skip ahead to the next alternate rule
                 ; by looking for an `|`, resetting the input position to where
@@ -939,6 +1004,8 @@ uparse: func [
     /case "Do case-sensitive matching"
 
     /verbose "Print some additional debug information"
+
+    <local> collecting (null)
 ][
     combinators: default [default-combinators]
 
