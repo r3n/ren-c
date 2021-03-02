@@ -294,7 +294,7 @@ REB_R Compose_To_Stack_Core(
 
                 const RELVAL *push_tail;
                 const RELVAL *push = VAL_ARRAY_AT(&push_tail, insert);
-                if (NOT_END(push)) {
+                if (push != push_tail) {
                     //
                     // Only proxy newline flag from the template on *first*
                     // value spliced in (it may have its own newline flag)
