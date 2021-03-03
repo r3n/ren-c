@@ -32,6 +32,7 @@ REBOL [
     }
 ]
 
+
 ; !!! The general workings of modules is to scan them for top-level set-words,
 ; and then bind the module itself to those words.  This module is redefining
 ; the workings of the system fundamentally.  While doing those definitions
@@ -668,6 +669,16 @@ also: emulate [
     ]
 ]
 
+
+; PARSE is different in Ren-C than in historical Rebol.  However, the goal is
+; to have it run on a framework that's easily twistable for compatibility or
+; new features by building on top of something called UPARSE:
+;
+; https://forum.rebol.info/t/introducing-uparse-the-hackable-usermode-parse/1529
+;
+; UPARSE is in early development at time of writing and is very slow.  But the
+; goal is to speed it up over time.  But Redbol uses it today anyway.
+
 parse: emulate [
     function [
         {Non-block rules replaced by SPLIT: https://trello.com/c/EiA56IMR}
@@ -687,7 +698,7 @@ parse: emulate [
             blank! [split input charset reduce [tab space CR LF]]
             text! [split input to-bitset rules]
         ] else [
-            did parse/(case_PARSE) input rules
+            did uparse2/(case_PARSE) input rules
         ]
     ]
 ]

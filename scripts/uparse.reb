@@ -625,13 +625,32 @@ default-combinators: make map! reduce [
 
     === {GROUP! COMBINATOR} ===
 
-    ; Does not advance the input, just runs the group.
+    ; GROUP! does not advance the input, just runs the group.
+    ;
+    ; This currently tests the idea that the GROUP! combinator has no result
+    ; value, hence you can't use it with `keep (1 + 2)` or `x: (1 + 2)`.
+    ; That helps to avoid situations where you might write:
+    ;
+    ;     x: [(print "testing for integer...") integer! | text!]
+    ;
+    ; The problem is that if GROUP! is seen as coming up with values, you
+    ; wouldn't necessarily want to ignore it.
 
     group! combinator [
         value [group!]
     ][
         do value
         return input  ; just give back same input passed in
+    ]
+
+    'do combinator [
+        result: [<opt> any-value!]
+        'arg [any-value!]
+    ][
+        if result [
+            set result do arg
+        ]
+        return input  ; input is unchanged, no rules involved
     ]
 
     === {BITSET! COMBINATOR} ===
@@ -801,7 +820,7 @@ default-combinators: make map! reduce [
             ]
             return null
         ][
-            fail "SYM-GORUP! feature only available for arrays right now."
+            fail "SYM-GROUP! feature only available for arrays right now."
         ]
     ]
 
@@ -1247,6 +1266,14 @@ append redbol-combinators reduce [
 ; Kill off any new combinators.
 
 redbol-combinators/('between): null
+redbol-combinators/('emit): null
+
+; Red has COLLECT and KEEP, with different semantics--no rollback, and the
+; overall parse result changes to the collect result vs. setting a variable.
+; That could be emulated.
+;
+redbol-combinators/('collect): null
+redbol-combinators/('keep): null
 
 uparse2: specialize :uparse [
     combinators: redbol-combinators
