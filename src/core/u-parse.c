@@ -1556,11 +1556,11 @@ REBNATIVE(subparse)
                 P_FLAGS |= PF_COPY;
                 goto set_or_copy_pre_rule;
 
-              case SYM_LET:
               case SYM_SET:
                 P_FLAGS |= PF_SET;
                 goto set_or_copy_pre_rule;
 
+              case SYM_LET:
               set_or_copy_pre_rule:
 
                 FETCH_NEXT_RULE(f);
@@ -1580,21 +1580,20 @@ REBNATIVE(subparse)
                         P_RULE_SPECIFIER
                     );
                     if (IS_WORD(P_RULE)) {  // no further action
-                        P_FLAGS &= ~PF_SET;
                         FETCH_NEXT_RULE(f);
                         goto pre_rule;
                     }
+                    goto handle_set;
                 }
 
                 FETCH_NEXT_RULE_KEEP_LAST(&set_or_copy_word, f);
                 goto pre_rule;
 
               case SYM_COLLECT: {
-                FETCH_NEXT_RULE(f);
-                if (not (IS_WORD(P_RULE) or IS_SET_WORD(P_RULE)))
-                    fail (Error_Parse_Variable(f));
+                fail ("COLLECT should only follow a SET-WORD! in PARSE");
 
-                FETCH_NEXT_RULE_KEEP_LAST(&set_or_copy_word, f);
+              handle_collect:
+                FETCH_NEXT_RULE(f);
 
                 REBARR *collection = Make_Array_Core(
                     10,  // !!! how big?
@@ -1921,6 +1920,7 @@ REBNATIVE(subparse)
                 //
                 // https://github.com/rebol/rebol-issues/issues/2269
 
+            handle_set:
                 FETCH_NEXT_RULE_KEEP_LAST(&set_or_copy_word, f);
 
                 // As an interim measure, permit `pos: here` to act as
@@ -1930,6 +1930,8 @@ REBNATIVE(subparse)
                 //
                 if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_HERE)
                     FETCH_NEXT_RULE(f);
+                else if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_COLLECT)
+                    goto handle_collect;
                 else
                     fail ("PARSE SET-WORD! only usable with HERE for now");
 

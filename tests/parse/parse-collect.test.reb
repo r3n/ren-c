@@ -8,32 +8,32 @@
 ; (like a SET or COPY) instead of affecting the return result.
 
 (did all [
-    parse [1 2 3] [collect x [keep [some integer!]]]
+    parse [1 2 3] [x: collect [keep [some integer!]]]
     x = [1 2 3]
 ])
 (did all [
-    parse [1 2 3] [collect x [some [keep integer!]]]
+    parse [1 2 3] [x: collect [some [keep integer!]]]
     x = [1 2 3]
 ])
 (did all [
-    parse [1 2 3] [collect x [keep only [some integer!]]]
+    parse [1 2 3] [x: collect [keep only [some integer!]]]
     x = [[1 2 3]]
 ])
 (did all [
-    parse [1 2 3] [collect x [some [keep only integer!]]]
+    parse [1 2 3] [x: collect [some [keep only integer!]]]
     x = [[1] [2] [3]]
 ])
 
 ; Collecting non-array series fragments
 
 (did all [
-    [_ pos]: parse "aaabbb" [collect x [keep [some "a"]]]
+    [_ pos]: parse "aaabbb" [x: collect [keep [some "a"]]]
     "bbb" = pos
     x = ["aaa"]
 ])
 (did all [
     [_ pos]: parse "aaabbbccc" [
-        collect x [keep [some "a"] some "b" keep [some "c"]]
+        x: collect [keep [some "a"] some "b" keep [some "c"]]
     ]
     "" = pos
     x = ["aaa" "ccc"]
@@ -43,7 +43,7 @@
 
 (did all [
     [_ pos]: parse [1 2 3] [
-        collect x [
+        x: collect [
             keep integer! keep integer! keep text!
             |
             keep integer! keep [some integer!]
@@ -58,7 +58,7 @@
 
 (did all [
     x: <before>
-    null = parse [1 2] [collect x [keep integer! keep text!]]
+    null = parse [1 2] [x: collect [keep integer! keep text!]]
     x = <before>
 ])
 
@@ -66,9 +66,9 @@
 
 (did all [
     did parse [1 2 3 4] [
-        collect a [
+        a: collect [
             keep integer!
-            collect b [keep [2 integer!]]
+            b: collect [keep [2 integer!]]
             keep integer!
         ]
         end
@@ -84,7 +84,7 @@
 ;
 (did all [
     [_ pos]: parse [1 2 3] [
-        collect x [
+        x: collect [
             keep integer!
             keep :[second [A [<pick> <me>] B]]
             keep integer!
@@ -95,7 +95,7 @@
 ])
 (did all [
     [_ pos]: parse [1 2 3] [
-        collect x [
+        x: collect [
             keep integer!
             keep only :[second [A [<pick> <me>] B]]
             keep integer!
@@ -105,7 +105,7 @@
     x = [1 [<pick> <me>] 2]
 ])
 (did all [
-    parse [1 2 3] [collect x [keep only :[[a b c]]] to end]
+    parse [1 2 3] [x: collect [keep only :[[a b c]]] to end]
     x = [[a b c]]
 ])
 
@@ -114,23 +114,22 @@
     https://github.com/metaeducation/ren-c/issues/935
 
     (did all [
-        did parse "aaabbb" [collect x [keep some "a" keep some "b"]]
+        did parse "aaabbb" [x: collect [keep some "a" keep some "b"]]
         x = ["aaa" "bbb"]
     ])
 
     (did all [
-        parse "aaabbb" [collect x [keep to "b"] to end]
+        parse "aaabbb" [x: collect [keep to "b"] to end]
         x = ["aaa"]
     ])
 
     (did all [
         parse "aaabbb" [
-            collect outer [
-                some [collect inner keep some "a" | keep some "b"]
+            outer: collect [
+                some [inner: collect keep some "a" | keep some "b"]
             ]
         ]
         outer = ["bbb"]
         inner = ["aaa"]
     ])
 ]
-
