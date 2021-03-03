@@ -194,7 +194,6 @@ opt
 not  ; turned to _not_ for SYM__NOT_, see TO-C-NAME for why this is weird
 and  ; turned to _and_ for SYM__AND_, see TO-C-NAME for why this is weird
 ahead  ; Ren-C addition (also in Red)
-then
 remove
 insert
 change

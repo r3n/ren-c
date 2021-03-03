@@ -230,8 +230,8 @@ enum parse_flags {
     PF_SET = 1 << 3,
     PF_COPY = 1 << 4,
     PF_NOT = 1 << 5,
-    PF_NOT2 = 1 << 6,
-    PF_THEN = 1 << 7,
+    PF_NOT2 = 1 << 6,  // #1246
+    PF_7 = 1 << 7,
     PF_AHEAD = 1 << 8,
     PF_REMOVE = 1 << 9,
     PF_INSERT = 1 << 10,
@@ -1787,11 +1787,6 @@ REBNATIVE(subparse)
                 FETCH_NEXT_RULE(f);
                 goto pre_rule;
 
-              case SYM_THEN:
-                P_FLAGS |= PF_THEN;
-                FETCH_NEXT_RULE(f);
-                goto pre_rule;
-
               case SYM_REMOVE:
                 P_FLAGS |= PF_REMOVE;
                 FETCH_NEXT_RULE(f);
@@ -2398,14 +2393,8 @@ REBNATIVE(subparse)
             }
         }
 
-        if (IS_NULLED(ARG(position))) {
-            if (P_FLAGS & PF_THEN) {
-                FETCH_TO_BAR_OR_END(f);
-                if (NOT_END(P_RULE))
-                    FETCH_NEXT_RULE(f);
-            }
-        }
-        else {
+        if (not IS_NULLED(ARG(position))) {
+            //
             // Set count to how much input was advanced
             //
             count = (begin > P_POS) ? 0 : P_POS - begin;

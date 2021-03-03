@@ -189,16 +189,6 @@
     i == 2
 )]
 
-; THEN rule
-
-[#1267 (
-    b: "abc"
-    c: ["a" | "b"]
-    a2: [any [b, e: here, (d: [seek e]) then fail | [c | (d: [fail]) fail]] d]
-    a4: [any [b then e: here (d: [seek e]) fail | [c | (d: [fail]) fail]] d]
-    equal? parse "aaaaabc" a2 parse "aaaaabc" a4
-)]
-
 ; NOT rule
 
 [#1246
