@@ -635,6 +635,10 @@ default-combinators: make map! reduce [
     ;
     ; The problem is that if GROUP! is seen as coming up with values, you
     ; wouldn't necessarily want to ignore it.
+    ;
+    ; !!! GET-BLOCK! acted like DO in initial Ren-C.  It's preserved here
+    ; for tests, but given how short a word DO is, that doesn't take it
+    ; down by much...especially not `do 'x` as `:['x]`.  Review.
 
     group! combinator [
         value [group!]
@@ -646,6 +650,16 @@ default-combinators: make map! reduce [
     'do combinator [
         result: [<opt> any-value!]
         'arg [any-value!]
+    ][
+        if result [
+            set result do arg
+        ]
+        return input  ; input is unchanged, no rules involved
+    ]
+
+    get-block! combinator [
+        result: [<opt> any-value!]
+        value [get-block!]
     ][
         if result [
             set result do arg
@@ -690,7 +704,7 @@ default-combinators: make map! reduce [
     ; ANY-ARRAY! type, just to see if type checking can work.
 
     quoted! combinator [
-         value [quoted!]
+        value [quoted!]
     ][
         if :input/1 = unquote value [
             return next input
@@ -824,6 +838,27 @@ default-combinators: make map! reduce [
         ]
     ]
 
+    === {INVISIBLE COMBINATORS} ===
+
+    ; If BLOCK! is asked for a result, it will accumulate results from any
+    ; result-bearing rules it hits as it goes.  Not all rules give results
+    ; by default--such as GROUP! or literals for instance.  If something
+    ; gives a result and you do not want it to, use ELIDE.
+
+    'elide combinator [
+        {Transform a result-bearing combinator into one that has no result}
+        parser [action!]
+    ][
+        return parser input
+    ]
+
+    'comment combinator [
+        {Comment out an arbitrary amount of PARSE material}
+        'ignored [block! text! tag! issue!]
+    ][
+        return input
+    ]
+
     === {BLOCK! COMBINATOR} ===
 
     ; Handling of BLOCK! is the most complex combinator.  It is processed as
@@ -850,7 +885,9 @@ default-combinators: make map! reduce [
         let collect-baseline: tail try state/collecting  ; see COLLECT
         let gather-baseline: tail try state/gathering  ; see GATHER
 
-        let at-least-one-success: false
+        if result [
+            set result <nothing>
+        ]
         while [not tail? rules] [
             if state/verbose [
                 print ["RULE:" mold/limit rules 60]
@@ -872,26 +909,29 @@ default-combinators: make map! reduce [
                 return pos
             ]
 
-            all [at-least-one-success, result] then [
-                fail "SET-WORD! result requested, but more than one match"
-            ]
-
             ; Do one "Parse Step".  This involves turning whatever is at the
             ; next parse position into an ACTION!, then running it.
             ;
             let [action 'rules]: parsify state rules
             let f: make frame! :action
+            let r
+            let use-result: all [result, in f 'result]
             f/input: pos
-            if result [
-                if not find f 'result [
-                    fail ["Rule does not have result to use with SET-WORD!"]
-                ]
-                f/result: result
+            if use-result [ ; non-result bearing cases ignored
+                f/result: 'r
             ]
 
             if pos: do f [
-                at-least-one-success: true
+                if use-result [
+                    if <nothing> = get result [
+                        set result copy []
+                    ]
+                    append/only get result r  ; might be null, ignore
+                ]
             ] else [
+                if result [  ; forget accumulated results
+                    set result <nothing>
+                ]
                 if state/collecting [  ; toss collected values from this pass
                     if collect-baseline [  ; we marked how far along we were
                         clear collect-baseline
@@ -923,6 +963,19 @@ default-combinators: make map! reduce [
                     return null
                 ]
             ]
+        ]
+
+        ; This behavior is a bit questionable, as a BLOCK! rule is accruing
+        ; results yet sometimes giving back a BLOCK! and extracting a single
+        ; item.  Likely not good.  Review
+        ;
+        case [
+            not result []
+            <nothing> = get result [
+                fail "BLOCK! combinator did not yield any results"
+            ]
+            0 = length of get result [set result null]
+            1 = length of get result [set result first get result]
         ]
         return pos
     ]
@@ -1266,6 +1319,7 @@ append redbol-combinators reduce [
 ; Kill off any new combinators.
 
 redbol-combinators/('between): null
+redbol-combinators/('gather): null
 redbol-combinators/('emit): null
 
 ; Red has COLLECT and KEEP, with different semantics--no rollback, and the

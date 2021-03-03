@@ -133,3 +133,15 @@
         inner = ["aaa"]
     ])
 ]
+
+; Because COLLECT works with a SET-WORD! on the left, it also works with
+; LET, so it can limit the scope of a variable
+(
+    x: <x>
+    y: <y>
+    did all [
+        parse "aaa" [let x: collect [some [keep "a"]], (y: x)]
+        x = <x>
+        y = ["a" "a" "a"]
+    ]
+)
