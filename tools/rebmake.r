@@ -1176,9 +1176,9 @@ generator-class: make object! [
         ; !!! These were previously static, but bootstrap executable's non
         ; gathering function form could not handle statics.
         ;
-        letter: charset [#"a" - #"z" #"A" - #"Z"]
-        digit: charset "0123456789"
-        localize: func [v][either file? v [file-to-local v][v]]
+        let letter: charset [#"a" - #"z" #"A" - #"Z"]
+        let digit: charset "0123456789"
+        let localize: func [v][either file? v [file-to-local v][v]]
 
         if object? cmd [
             assert [
@@ -1201,7 +1201,10 @@ generator-class: make object! [
                         [
                             "$(" copy name: some [letter | digit | #"_"] ")"
                             | "$" copy name: letter
-                        ] (val: localize select vars name | stop: false)
+                        ] (
+                            val: localize select vars name
+                            stop: false
+                        )
                     ] val
                     | skip
                 ]
