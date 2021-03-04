@@ -428,7 +428,7 @@ system-libraries: make object! [
 ]
 
 
-for-each-system: function [
+for-each-system: func [
     {Use PARSE to enumerate the systems, and set 'var to a record object}
 
     return: <void>
@@ -436,7 +436,7 @@ for-each-system: function [
     body [block! action!]
         {Body of code to run for each system}
 ][
-    s: make object! [
+    let s: make object! [
         platform-name: _
         platform-number: _
         id: _
@@ -565,12 +565,12 @@ use [
 ]
 
 
-config-system: function [
+config-system: func [
     {Return build configuration information}
     hint [blank! text! tuple!]
         {Version ID (blank means guess)}
 ][
-    version: switch type of hint [
+    let version: switch type of hint [
         blank! [  ; Try same version as this r3-make was built with
             to tuple! reduce [0 system/version/4 system/version/5]
         ]
@@ -582,7 +582,7 @@ config-system: function [
         fail ["Expected OS_ID tuple like 0.3.1, not:" version]
     ]
 
-    result: _
+    let result: _
     for-each-system s [
         if s/id = version [
             result: copy s  ; could RETURN, but sanity-check whole table

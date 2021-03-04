@@ -44,7 +44,7 @@ default-linker: _
 default-strip: _
 target-platform: _
 
-map-files-to-local: function [
+map-files-to-local: func [
     return: [block!]
     files [file! block!]
 ][
@@ -88,20 +88,21 @@ filter-flag: function [
     ]
 ]
 
-run-command: function [
+run-command: func [
     cmd [block! text!]
 ][
-    x: copy ""
+    let x: copy ""
     call/shell/output cmd x
     trim/with x "^/^M"
 ]
 
-pkg-config: function [
+pkg-config: func [
     return: [text! block!]
     pkg [any-string!]
     var [word!]
     lib [any-string!]
 ][
+    let [dlm opt]
     switch var [
         'includes [
             dlm: "-I"
@@ -126,10 +127,11 @@ pkg-config: function [
         fail ["Unsupported pkg-config word:" var]
     ]
 
-    x: run-command spaced reduce [pkg opt lib]
+    let x: run-command spaced reduce [pkg opt lib]
     ;dump x
     either dlm [
-        ret: make block! 1
+        let ret: make block! 1
+        let item
         parse x [
             some [
                 thru dlm

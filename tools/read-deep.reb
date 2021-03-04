@@ -20,11 +20,11 @@ REBOL [
 ; each returned file.
 ;
 
-read-deep-seq: function [
+read-deep-seq: func [
     {Iterative read deep.}
     queue [block!]
 ][
-    item: take queue
+    let item: take queue
 
     if equal? #"/" last item [
         insert queue map-each x read item [join item x]
@@ -36,7 +36,7 @@ read-deep-seq: function [
 ; read-deep provide convenience over read-deep-seq.
 ;
 
-read-deep: function [
+read-deep: func [
     {Return files and folders using recursive read strategy.}
 
     root [file! url! block!]
@@ -44,11 +44,11 @@ read-deep: function [
     /strategy "TAKEs next item from queue, building the queue as necessary"
         [action!]
 ][
-    taker: strategy: default [:read-deep-seq]
+    let taker: let strategy: default [:read-deep-seq]
 
-    result: copy []
+    let result: copy []
 
-    queue: blockify root
+    let queue: blockify root
 
     while [not tail? queue] [
         append result taker queue  ; Possible null
@@ -56,7 +56,7 @@ read-deep: function [
 
     if not full [
         remove result ; No need for root in result.
-        len: length of root
+        let len: length of root
         for i 1 length of result 1 [
             ; Strip off root path from locked paths.
             poke result i copy skip result/:i len

@@ -12,21 +12,23 @@ REBOL [
     Purpose: {Functions operating on lines of text.}
 ]
 
-decode-lines: function [
+decode-lines: func [
     {Decode text encoded using a line prefix e.g. comments (modifies).}
     text [text!]
     line-prefix [text! block!] {Usually "**" or "//". Matched using parse.}
     indent [text! block!] {Usually "  ". Matched using parse.}
 ] [
-    pattern: compose/only [(line-prefix)]
+    let pattern: compose/only [(line-prefix)]
     if not empty? indent [append pattern compose/only [opt (indent)]]
-    line: [
+
+    let [pos rest]
+    let line-rule: [
         pos: here pattern rest: here
         (rest: remove/part pos rest)
         seek :rest  ; GET-WORD! for bootstrap (SEEK is no-op)
         thru newline
     ]
-    parse text [any line end] else [
+    parse text [any line-rule end] else [
         fail [
             {Expected line} (try text-line-of text pos)
             {to begin with} (mold line-prefix)
@@ -38,16 +40,17 @@ decode-lines: function [
 ]
 
 encode-lines: func [
-    {Encode text using a line prefix (e.g. comments).}
+    {Encode text using a line prefix (e.g. comments)}
+
     text [text!]
-    line-prefix [text!] {Usually "**" or "//".}
-    indent [text!] {Usually "  ".}
-    <local> bol pos
-][
+    line-prefix [text!] {Usually "**" or "//"}
+    indent [text!] {Usually "  "}
+] [
     ; Note: Preserves newline formatting of the block.
 
     ; Encode newlines.
-    bol: join line-prefix indent
+    let bol: join line-prefix indent
+    let pos
     parse text [
         any [
             thru newline pos: here
@@ -70,18 +73,18 @@ encode-lines: func [
     text
 ]
 
-for-each-line: function [
-    {Iterate over text lines.}
+for-each-line: func [
+    {Iterate over text lines}
 
-    'record [word!]
-        {Word set to metadata for each line.}
-    text [text!]
-        {Text with lines.}
-    body [block!]
-        {Block to evaluate each time.}
-][
+    'record "Word set to metadata for each line"
+        [word!]
+    text "Text with lines"
+        [text!]
+    body "Block to evaluate each time"
+        [block!]
+] [
     while [not tail? text] [
-        eol: any [
+        let eol: any [
             find text newline
             tail of text
         ]
@@ -95,17 +98,18 @@ for-each-line: function [
     ]
 ]
 
-lines-exceeding: function [  ; !!! Doesn't appear used, except in tests (?)
+lines-exceeding: func [  ; !!! Doesn't appear used, except in tests (?)
     {Return the line numbers of lines exceeding line-length.}
 
-    return: [<opt> block!]
-        "Returns null if no lines (is this better than returning []?)"
+    return: "Returns null if no lines (is this better than returning []?)"
+        [<opt> block!]
     line-length [integer!]
     text [text!]
-][
-    line-list: line: _
+] [
+    let line-list: _
+    let line: _
 
-    count-line: [
+    count-line-rule: [
         (
             line: 1 + any [line 0]
             if line-length < subtract index-of eol index of bol [
@@ -114,8 +118,9 @@ lines-exceeding: function [  ; !!! Doesn't appear used, except in tests (?)
         )
     ]
 
+    let [eol bol]
     parse text [
-        any [bol: here to newline eol: here skip count-line]
+        any [bol: here to newline eol: here skip count-line-rule]
         bol: here skip to end eol: here count-line
         end
     ]
@@ -123,19 +128,19 @@ lines-exceeding: function [  ; !!! Doesn't appear used, except in tests (?)
     opt line-list
 ]
 
-text-line-of: function [
+text-line-of: func [
     {Returns line number of position within text}
 
-    return: [<opt> integer!]
-        "Line 0 does not exist, and no counting is performed for empty text"
-    position [text! binary!]
-        "Position, where newline is considered the last character of a line"
-][
-    text: head of position
-    idx: index of position
-    line: 0
+    return: "Line 0 does not exist, no counting is performed for empty text"
+        [<opt> integer!]
+    position "Position (newline is considered the last character of a line)"
+        [text! binary!]
+] [
+    let text: head of position
+    let idx: index of position
+    let line: 0
 
-    advance: [skip (line: line + 1)]
+    let advance-rule: [skip (line: line + 1)]
 
     parse text [
         any [
@@ -146,9 +151,9 @@ text-line-of: function [
             ;
             if (lesser? index of cursor idx)
 
-            advance
+            advance-rule
         ]
-        advance
+        advance-rule
         end
     ]
 
@@ -156,34 +161,38 @@ text-line-of: function [
     line
 ]
 
-text-location-of: function [
+text-location-of: func [
     {Returns line and column of position within text.}
     position [text! binary!]
 ] [
-
     ; Here newline is considered last character of a line.
     ; No counting performed for empty text.
     ; Line 0 does not exist.
 
-    text: head of position
-    idx: index of position
-    line: 0
+    let text: head of position
+    let idx: index of position
+    let line: 0
 
-    advance: [eol: here skip (line: line + 1)]
+    advance-rule: [eol: here skip (line: line + 1)]
 
     parse text [
         any [
-            to newline cursor:
-            ((lesser? index of cursor idx))
-            advance
+            to newline cursor: here
+
+            ; !!! IF is deprecated in PARSE, but this code is expected to work
+            ; in bootstrap.
+            ;
+            if (lesser? index of cursor idx)
+
+            advance-rule
         ]
-        advance
+        advance-rule
         end
     ]
 
     if zero? line [line: _] else [
         line: reduce [line 1 + subtract index? position index? eol]
     ]
-   
+
     line
 ]

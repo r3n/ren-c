@@ -46,13 +46,15 @@ loud-print: redescribe [
     enclose :print func [f] [if system/options/verbose [do f]]
 )
 
-make-banner: function [
+make-banner: func [
     "Build startup banner."
     fmt [block!]
 ][
-    str: make text! 200
-    star: append/dup make text! 74 #"*" 74
-    spc: format ["**" 70 "**"] ""
+    let str: make text! 200
+    let star: append/dup make text! 74 #"*" 74
+    let spc: format ["**" 70 "**"] ""
+
+    let [a b s]
     parse fmt [
         some [
             [
@@ -100,7 +102,7 @@ boot-banner: [
     *
 ]
 
-about: function [
+about: func [
     "Information about REBOL"
     return: <void>
 ][
@@ -116,7 +118,7 @@ about: function [
 ; like an ordinary ACTION!, and all the proxying is handled for the user.
 ; Work done on the dialect here could be shared in common.
 ;
-usage: function [
+usage: func [
     "Prints command-line arguments."
     return: <void>
 ][
@@ -164,14 +166,14 @@ usage: function [
     }
 ]
 
-license: function [
+license: func [
     "Prints the REBOL/core license agreement."
     return: <void>
 ][
     print system/license
 ]
 
-host-script-pre-load: function [
+host-script-pre-load: func [
     {Code registered as a hook when a module or script are loaded}
     return: <void>
     is-module [logic!]
@@ -204,7 +206,7 @@ what-dir:
 change-dir: '~unset~
 
 
-main-startup: function [
+main-startup: func [
     "Usermode command-line processing: handles args, security, scripts"
 
     return: [<opt> any-value!] "!!! Narrow down return type?"
@@ -233,9 +235,9 @@ main-startup: function [
     ; We hook the RETURN function so that it actually returns an instruction
     ; that the code can build up from multiple EMIT statements.
 
-    instruction: copy []
+    let instruction: copy []
 
-    emit: function [
+    let emit: func [
         {Builds up sandboxed code to submit to C, hooked RETURN will finalize}
 
         item "ISSUE! directive, TEXT! comment, (<*> composed) code BLOCK!"
@@ -258,7 +260,7 @@ main-startup: function [
         ]
     ]
 
-    return: function [
+    return: func [
         {Hooked RETURN function which finalizes any gathered EMIT lines}
 
         state "Describes the RESULT that the next call to HOST-CONSOLE gets"
@@ -360,7 +362,7 @@ main-startup: function [
 
     === HELPER FUNCTIONS ===
 
-    die: func [
+    let die: func [
         {A graceful way to "FAIL" during startup}
 
         reason "Error message"
@@ -381,7 +383,7 @@ main-startup: function [
         return <die>
     ]
 
-    to-dir: function [
+    let to-dir: func [
         {Convert string path to absolute dir! path}
 
         return: "Null if not found"
@@ -395,11 +397,11 @@ main-startup: function [
         ]
     ]
 
-    get-home-path: function [
+    let get-home-path: func [
         {Return HOME path (e.g. $HOME on *nix)}
         return: [<opt> file!]
     ][
-        get-env: attempt [:system/modules/Process/get-env] else [
+        let get-env: attempt [:system/modules/Process/get-env] else [
             loud-print [
                 "Interpreter not built with GET-ENV, can't detect HOME dir" LF
                 "(Build with Process extension enabled to address this)"
@@ -410,20 +412,20 @@ main-startup: function [
         return to-dir try any [
             get-env 'HOME
             all [
-                homedrive: get-env 'HOMEDRIVE
-                homepath: get-env 'HOMEPATH
+                let homedrive: get-env 'HOMEDRIVE
+                let homepath: get-env 'HOMEPATH
                 join homedrive homepath
             ]
         ]
     ]
 
-    get-resources-path: function [
+    let get-resources-path: func [
         {Return platform specific resources path.}
         return: [<opt> file!]
     ][
         ; lives under systems/options/home
 
-        path: join o/home switch system/platform/1 [
+        let path: join o/home switch system/platform/1 [
             'Windows [%REBOL/]
         ] else [
             %.rebol/  ; default *nix (covers Linux, MacOS (OS X) and Unix)
@@ -438,17 +440,17 @@ main-startup: function [
     ; NB. Above can be overridden by --home option
     ; TBD - check perms are correct (SECURITY)
     all [
-        home-dir: try get-home-path
+        let home-dir: try get-home-path
         system/user/home: o/home: home-dir
-        resources-dir: try get-resources-path
+        let resources-dir: try get-resources-path
         o/resources: resources-dir
     ]
 
     sys/script-pre-load-hook: :host-script-pre-load
 
-    do-string: _  ; will be set if a string is given with --do
+    let do-string: _  ; will be set if a string is given with --do
 
-    quit-when-done: _  ; by default run CONSOLE
+    let quit-when-done: _  ; by default run CONSOLE
 
     ; Process the option syntax out of the command line args in order to get
     ; the intended arguments.  TAKEs each option string as it goes so the
@@ -470,7 +472,7 @@ main-startup: function [
         o/bin: first split-path o/boot
     ]
 
-    param-or-die: func [
+    let param-or-die: func [
         {Take --option argv and then check if param arg is present, else die}
         option [text!] {Command-line option (switch) used}
     ][
@@ -503,11 +505,11 @@ main-startup: function [
     comment [emit #countdown-if-error]
     emit #die-if-error
 
-    is-script-implicit: true
+    let is-script-implicit: true
 
     while [not tail? argv] [
 
-        is-option: did parse/case argv/1 [
+        let is-option: did parse/case argv/1 [
 
             ["--" end] (
                 ; Double-dash means end of command line arguments, and the
@@ -575,7 +577,7 @@ main-startup: function [
             )
         |
             "--suppress" end (
-                param: param-or-die "SUPPRESS"
+                let param: param-or-die "SUPPRESS"
                 o/suppress: if param = "*" [
                     ; suppress all known start-up files
                     [%rebol.reb %user.reb %console-skin.reb]
@@ -656,9 +658,9 @@ main-startup: function [
     o/args: argv  ; whatever's left is positional args
 
 
-    boot-embedded: get-encap system/options/boot
+    let boot-embedded: get-encap system/options/boot
 
-    if any [boot-embedded o/script] [o/quiet: true]
+    if any [boot-embedded, o/script] [o/quiet: true]
 
     ; Set option/paths for /path, /boot, /home, and script path
     o/path: what-dir  ;dirize any [o/path o/home]
@@ -669,7 +671,7 @@ main-startup: function [
     ]
 
     if file? o/script [  ; Get the path
-        script-path: split-path o/script
+        let script-path: split-path o/script
         case [
             slash = first first script-path []      ; absolute
             %./ = first script-path [script-path/1: o/path]   ; curr dir
@@ -679,7 +681,7 @@ main-startup: function [
     ]
 
     ; Convert command line arg strings as needed:
-    script-args: o/args ; save for below
+    let script-args: o/args  ; save for below
 
     ; version, import, secure are all of valid type or blank
 
@@ -726,6 +728,7 @@ main-startup: function [
         ]
     ]
 
+    let [code header]
     switch type of boot-embedded [
         blank! [
             false  ; signal that there's no embedded code
@@ -744,7 +747,7 @@ main-startup: function [
             ;
             o/encap: boot-embedded
 
-            main: select boot-embedded %main.reb
+            let main: select boot-embedded %main.reb
             if not binary? main [
                 die "Could not find %main.reb in encapped zip file"
             ]

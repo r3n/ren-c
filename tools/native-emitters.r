@@ -14,14 +14,15 @@ REBOL [
     Needs: 2.100.100
 ]
 
-emit-native-proto: function [
+emit-native-proto: func [
     "Emit native prototypes to @unsorted-buffer"
     return: <void>
     proto
     <with> proto-count
 ][
-    line: try text-line-of proto-parser/parse-position
+    let line: try text-line-of proto-parser/parse-position
 
+    let [spec name]
     all [
         block? proto-parser/data
         parse proto-parser/data [
