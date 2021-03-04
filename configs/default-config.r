@@ -46,7 +46,6 @@ extensions: make map! [
     UTF +
     Vector +
     View +
-    ZeroMQ -
 ]
 
 rebol-tool: _ ; fallback value if system/options/boot fails

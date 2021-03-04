@@ -91,7 +91,6 @@ extensions: make map! [
     UTF -
     Vector -
     View -
-    ZeroMQ -
 ]
 
 
