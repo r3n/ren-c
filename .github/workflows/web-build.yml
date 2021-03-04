@@ -1,5 +1,5 @@
 #
-# main.yml
+# web-build.yml
 #
 # GitHub Actions Workflow for building the Wasm version of Ren-C.  It builds
 # all pull requests to master, but only deploys commits that are accepted to
@@ -8,27 +8,18 @@
 # Deployments will become "live" in the Web REPL demonstration directly from
 # this action...but only if they are "greenlit" after running a test in a
 # headless Firefox browser that is automated via Python and "Marionette".
-#
-# Bash Style Ideas:
-#
-# https://ae1020.github.io/thoughts-on-bash-style/
-#
-# Links for future investigation:
-#
-# https://github.com/fkirc/skip-duplicate-actions
-#
 
-name: CI
+name: Web Build
 
 
 # Controls when the action will run.  Currently we use the default to trigger
 # the workflow on push or pull request events, but only for the master branch.
 #
 on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+  # push:
+  #   branches: [ master ]
+  # pull_request:
+  #   branches: [ master ]
 
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
@@ -156,9 +147,6 @@ jobs:
     - name: Output System Information
       run: |
         echo "Current directory is: $(pwd)"
-        ls
-        echo "Parent directory contents:"
-        ls
         echo "EMCC version check:"
         emcc -v
 
@@ -234,7 +222,7 @@ jobs:
         make
 
 
-  #### DEPLOY STEPS #########################################################
+  #### UPLOAD STEPS ##########################################################
 
     # We only want to build pull requests, we do not want to upload them to
     # the AWS server.  Deployment should happen only once a commit has been
@@ -252,6 +240,8 @@ jobs:
     # has to be qualified with an `if: github.ref == 'refs/heads/master'`.
     # Though the latter is not *ideal*, it's good enough for government work.
     #
+    # Note: Steps will be stopped by default if any fail, but you can turn
+    # a step back on with an `if: failure()` condition.
 
 
     # Move build products into a directory corresponding to the OS_ID, to
@@ -352,6 +342,8 @@ jobs:
         for i in $OS_ID/*; do upload $i; done
 
 
+  #### TESTING STEPS #########################################################
+
     # Check the deployment before "green-lighting" the %last-deploy.short-hash
     #
     # We do this currently in the web builds with a "headless" Firefox (e.g.
@@ -436,6 +428,8 @@ jobs:
         #
         python3 test-repl-ff.py --shorthash "${GIT_COMMIT_SHORT}"
 
+
+  #### GREENLIGHT STEP (MARK THE UPLOADED BUILD AS CURRENT) ##################
 
     # Each ${OS_ID} directory contains several builds for recent commits.
     # Since they are served statically from S3, we don't have a query to

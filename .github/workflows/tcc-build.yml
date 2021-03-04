@@ -1,0 +1,296 @@
+#
+# tcc-build.yml
+#
+# GitHub Actions Workflow for using TCC to build Ren-C with the TCC extension,
+# and then use that executable to bootstrap.  A demonstration of this ability
+# was first made in July 2019, video here:
+#
+# https://youtu.be/PT3GOe1pj9I?t=163
+#
+# The bootstrapping executable is not deployed to AWS for downloading, as it's
+# more a stunt than being intended for use (since there's not much
+# optimization in TCC, it's better to build with GCC or Clang).
+#
+
+name: TCC Build
+
+
+# Controls when the action will run.  Because the bootstrap currently eats
+# a lot of cycles, we could use up our GitHub Actions quota quickly if every
+# build ran it.  (It's slow because the first interpreter was compiled with
+# TCC and with asserts/debug info, and then the second interpreter is building
+# using that.  We could turn off the debug info, but it's better to have it
+# on so we can catch anomalies...hence slow is the best option here.)
+#
+# So right now it's set up to be only triggered manually from the Actions tab,
+# and we can just remember to do it now and again.
+#
+# We could also limit it based on the commit message, e.g.
+#
+#    if: "contains(github.event.head_commit.message, 'TCC')
+#
+# This could be done at the whole job level, or on individual steps.
+#
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  workflow_dispatch:  # Allows running this workflow manually from Actions tab
+
+
+# Environment variables can be set per step, per job, or for entire workflow.
+# But if you want to dynamically set a variable that survives between steps,
+# you have to use the syntax:
+#
+#     echo "VAR=value" >> $GITHUB_ENV
+#
+# It will be available in the ensuing steps (though not the current one).
+#
+# https://docs.github.com/en/free-pro-team@latest/actions/reference/environment-variables
+#
+# Note: If you see files advocating for a syntax like `::set-env::` that is
+# a deprecated method:
+#
+# https://github.blog/changelog/2020-10-01-github-actions-deprecating-set-env-and-add-path-commands/
+#
+env:
+  AWS_S3_BUCKET_NAME: metaeducation
+
+
+# Each "Job" runs in its own VM, and a workflow run is made up of one or more
+# jobs that can run sequentially or in parallel.
+#
+# Jobs are isolated from one another (outside of any data they might exchange
+# indirectly through uploading and downloading from the network).  This means
+# you can't have a "build job" and a "deploy job" that uploads the build
+# products of that job, since the deploy wouldn't have access to any of the
+# files that were built.  "Steps" must be used.
+#
+jobs:
+  tcc-build:  # Name of this workflow's only job
+
+    # The type of runner that the job will run on.  Options listed here:
+    #
+    # https://github.com/actions/virtual-environments#available-environments
+    #
+    runs-on: ubuntu-20.04
+
+
+    # The "matrix" ability of GitHub actions lets you permute some standard
+    # properties (like versions of node.js), but it doesn't directly let you
+    # set a matrix of environment variables.  You have to go through a level
+    # of indirection to set "matrix include variables", and then adjust those
+    # in a job step to be environment variables.
+    #
+    # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-environment-variables-in-a-matrix
+    #
+    # Note: This matrix once included `0.16.2` for a pthreads enabled build,
+    # but that was omitted for simplicity.  The matrix scaffolding is left
+    # here to show how it would be done if another build variation was needed.
+    #
+    strategy:
+      matrix:
+       include:
+         - os-id: 0.4.40  # 64-bit Linux (can run executable on this container)
+           config-file: tcc.r
+
+
+    # Steps are a sequence of tasks that will be executed within a single VM
+    # as part of the job.
+    #
+    # If a step fails, then the default behavior is for the subsequent steps
+    # to not run, though this can be overridden with an `if:` property, which
+    # is granular enough to allow running only if particular other steps
+    # have completed:
+    #
+    # https://docs.github.com/en/free-pro-team@latest/actions/reference/context-and-expression-syntax-for-github-actions#job-status-check-functions
+    # https://stackoverflow.com/a/61832535
+    #
+    # Each step has its own isolated environment variables, but it is possible
+    # to export state seen by future steps (see `environment:` notes above)
+    #
+    # The exit status of a step is the result of the last executed command in
+    # that step, or the parameter to `exit` if the step ends prematurely.
+    #
+    # A step that only contains `uses:` is a means of incorporating a fragment
+    # of GitHub action code published in a separate repository.  Link to that
+    # repository in a comment so that the options (if any) are at hand.
+    #
+    steps:  # (no indentatation needed below; so indent the minimum!)
+
+
+  ##### BUILD STEPS ##########################################################
+
+    # We build both pull requests and commits to master.  So the build steps
+    # are run unconditionally (no `if:` qualifiers)
+
+
+    # The checkout action checks-out your repository under $GITHUB_WORKSPACE
+    #
+    # https://github.com/actions/checkout
+    #
+    # Note: This strangely starts you up in a directory:
+    #
+    #      /home/runner/work/ren-c/ren-c
+    #
+    # The parent directory appears to contain the same files.  It's not clear
+    # why it's done this way...but presumably it's on purpose.
+    #
+    - uses: actions/checkout@v2
+
+
+    # See note in `strategy: matrix:` about why we have to do this.
+    #
+    - name: Convert Matrix Variables To Environment Variables
+      run: |
+        echo "OS_ID=${{ matrix.os-id }}" >> $GITHUB_ENV
+        echo "CONFIG_FILE=${{ matrix.config-file }}" >> $GITHUB_ENV
+
+
+    # Refer to the %extensions/tcc/README.md for an explanation of what's in
+    # the `tcc` and `libtcc-dev` packages, and the little group of files they
+    # use to patch over the GCC include and lib files so it can use them.
+    #
+    # Knowing the magic path here to set CONFIG_TCCDIR is really something
+    # that could change arbitrarily based on how the packages install.  But
+    # this seems to be right on 64-bit Ubuntu for the versions we've tried.
+    # (Building TCC from source could obviously put the files somewhere else.)
+    #
+    - name: Install TinyC (tcc) and its LibC Helper Includes and Lib
+      run: |
+        sudo apt install tcc libtcc-dev
+        echo "CONFIG_TCCDIR=/usr/lib/x86_64-linux-gnu/tcc/" >> $GITHUB_ENV
+
+
+    # Show a little bit of sanity check information
+    #
+    - name: Output System Information
+      run: |
+        echo "Current directory is: $(pwd)"
+        echo "GCC version check:"
+        tcc -vv
+
+
+    # Grab abbreviated and full git commit ID into environment variables.
+    # The full commit is passed to make to build into the binary, and the
+    # abbreviated commit is used to name the executable.
+    #
+    # http://stackoverflow.com/a/42549385
+    #
+    # (While GitHub Actions may offer this, good to have it done in an
+    # agnostic fashion so the script is more portable)
+    #
+    - name: Grab Git Hash and Short Hash Into Environment Variables
+      run: |
+        git_commit="$(git show --format="%H" --no-patch)"
+        echo "git_commit is $git_commit"
+        git_commit_short="$(git show --format="%h" --no-patch)"
+        echo "git_commit_short is $git_commit_short"
+        echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
+        echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+
+
+    # !!! Ideally this would use the same step that clients can use to build
+    # the system with `make.sh`.  Unfortunately, something about the GitHub
+    # Ubuntus do not like the old bootstrap executable.  Make sure the
+    # ordinary path works, but for the moment patch over it just to get
+    # to a point where the action works.
+    #
+    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE
+      run: |
+        repo_dir=$(pwd)/
+        source tools/bash/fetch-prebuilt.sh
+        r3make=$(fetch_prebuilt)
+        echo "R3MAKE is set to $r3make"
+        echo "But that executable won't run on GitHub for some reason"
+        # "$r3make" --do "print {TESTING 1 2 3}"  # NOT WORKING, dunno why
+        cd prebuilt
+        wget http://hostilefork.com/media/shared/github/r3-linux-dec-2020
+        chmod +x r3-linux-dec-2020
+        r3make=$(pwd)/r3-linux-dec-2020
+        echo "So now R3MAKE is $r3make"
+        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
+
+
+    # We are able to use either the makefile version of the build or the
+    # fully Ren-C driven form with CALL.  Both should be tested, but right
+    # now this is using the makefile version for the web builds.
+    #
+    - name: Compile an R3 Interpreter Using the Installed TinyC Compiler
+      run: |
+        mkdir build
+        cd build
+
+        # !!! optimization is currently hardcoded in the web build config
+        # files as `s`.  Review if `z` would be better (it cannot be passed
+        # in the options here at time of writing, and would be ignored even
+        # if it could be due to that ldflags config hardcoding).
+        #
+        "$R3MAKE" ../make.r \
+            config=../configs/$CONFIG_FILE \
+            target=makefile \
+            standard=c \
+            os_id=$OS_ID \
+            debug=none \
+            git_commit="$GIT_COMMIT" \
+            rigorous=no \
+            static=no \
+            extensions="TCC +"
+
+        make prep
+        make folders
+        make
+
+
+  #### BOOTSTRAP STEPS #######################################################
+
+    # Here we want to pull of the trick of using the single produced exe
+    # to download the .ZIP file from GitHub (using the network layer, HTTP,
+    # and TLS cryptography all implemented in Ren-C)...and then unzip it
+    # using the usermode .ZIP code, and then build it.
+    #
+    # To help reinforce the validity of the stunt, remove anything that could
+    # be interpreted as helping...including the TCC compiler we just used,
+    # and the source code we cloned.
+
+    - name: Delete Ren-C Source Cloned With Git (let Bootstrap EXE Fetch It)
+      run: |
+        export TOP_DIR=$(pwd)
+        mv build/r3 ../r3-with-tcc
+        cd ..
+        rm -rf $TOP_DIR
+        mkdir $TOP_DIR
+        mv r3-with-tcc $TOP_DIR
+
+
+    - name: Uninstall Prebuilt R3, TinyC, GCC, wget, etc. (Mimic Clean System)
+      run: |
+        sudo apt remove tcc gcc clang wget curl
+
+
+    # Note: The BOOTSTRAP command downloads a ZIP file from GitHub.  The
+    # format of such zip files is that they contain a single directory of
+    # `$PROJECT-$BRANCH`, so it uncompresses the sources into a subdirectory
+    # here of %ren-c-master/
+    #
+    # Then BOOTSTRAP will make a %build/ directory underneath that, where
+    # the build products will be put.
+    #
+    - name: Use R3 We Built to Download Source Over HTTPS, Unzip, and Compile!
+      run: |
+        ./r3-with-tcc --do "bootstrap"
+
+
+  #### TESTING STEPS #########################################################
+
+    - name: Fibonnacci Test
+      run: |
+        echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR}"
+        export LIBREBOL_INCLUDE_DIR="$(pwd)/build/prep/include/"
+
+        cd ren-c-master
+        cd build
+
+        ./r3 ../extensions/tcc/tests/fib.r
