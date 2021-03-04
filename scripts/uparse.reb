@@ -148,8 +148,12 @@ default-combinators: make map! reduce [
         ;
         let f: make frame! :parser
         f/input: input
-        if find f 'result [
-            f/result: result
+        if result [
+            either find f 'result [
+                f/result: result
+            ][
+                fail "Result requested from OPT but rule used has no result"
+            ]
         ]
 
         return any [
