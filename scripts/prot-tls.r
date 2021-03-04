@@ -1616,23 +1616,25 @@ do-commands: func [
     let arg
     parse commands [
         some [
-            set cmd [
-                <client-hello> (
+            ; redundant `set cmd`, consider how ELIDE might improve it
+            ; https://forum.rebol.info/t/1534/5
+            [
+                set cmd <client-hello> (
                     client-hello/version ctx [1.0 1.2]  ; min/max versioning
                 )
-                | <client-key-exchange> (
+                | set cmd <client-key-exchange> (
                     client-key-exchange ctx
                 )
-                | <change-cipher-spec> (
+                | set cmd <change-cipher-spec> (
                     change-cipher-spec ctx
                 )
-                | <finished> (
+                | set cmd <finished> (
                     encrypted-handshake-msg ctx finished ctx
                 )
-                | #application set arg [text! | binary!] (
+                | set cmd #application set arg [text! | binary!] (
                     application-data ctx arg
                 )
-                | <close-notify> (
+                | set cmd <close-notify> (
                     alert-close-notify ctx
                 )
             ] (
