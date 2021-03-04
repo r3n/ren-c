@@ -679,7 +679,7 @@ REBNATIVE(compile_p)
         assert(sizeof(c_func) == sizeof(void*));
         memcpy(&c_func, &sym, sizeof(c_func));
 
-        ACT_DISPATCHER(action) = c_func;
+        INIT_ACT_DISPATCHER(action, c_func);
         Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_STATE), handle);
 
         DS_DROP();
