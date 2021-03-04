@@ -82,7 +82,6 @@ extensions: make map! [
     ODBC -
     PNG -
     Process -
-    Serial -
     Signal -
     Stdio -
     TCC -
