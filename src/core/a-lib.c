@@ -2084,6 +2084,17 @@ REBVAL *RL_rebError_OS(int errnum)  // see also convenience macro rebFail_OS()
     buf[0] = cast(char, 255);  // never valid in UTF-8 sequences
     int old_errno = errno;
     intptr_t r = cast(intptr_t, strerror_r(errnum, buf, MAX_POSIX_ERROR_LEN));
+
+    // !!! TCC appears to use the `int` returning form of strerror_r().  But
+    // it appears to return a random positive or negative value.  It simply
+    // appears to be broken.  More research would be needed, but we can just
+    // give up an go with strerror.  Leaving in the call to strerror_r() to
+    // show that it's there...and it links in TCC.
+    //
+  #if defined(__TINYC__)
+    r = cast(intptr_t, strerror(errnum));
+  #endif
+
     int new_errno = errno;
 
     if (r == -1 or new_errno != old_errno) {
@@ -2124,7 +2135,10 @@ REBVAL *RL_rebError_OS(int errnum)  // see also convenience macro rebFail_OS()
         else
             error = Error_User(buf);
     }
-    else if (r < 256) {  // extremely unlikely to be a string buffer pointer
+    else if (  // small + or - numbers very unlikely to be string buffer
+        (r > 0 and r < 256)
+        or (r < 0 and - r < 256)
+    ){
         assert(false);
         error = Error_User("Unknown POSIX strerror_r error result code");
     }
