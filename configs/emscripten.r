@@ -71,7 +71,6 @@ extensions: make map! [
     DNS -
     Event -
     Filesystem -
-    FFI -
     GIF -
     Gob -
     Image -

@@ -28,7 +28,6 @@ extensions: make map! [
     DNS +
     Event +
     Filesystem +
-    FFI -
     GIF +
     Gob +
     JavaScript -
@@ -77,11 +76,6 @@ rigorous: no
 
 static: no
 pkg-config: try get-env "PKGCONFIG" ;path to pkg-config, or default
-
-; The original default for WITH-FFI was 'dynamic, but this would cause it to
-; try building the FFI on all configurations.
-;
-with-ffi: no
 
 odbc-requires-ltdl: no
 
