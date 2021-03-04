@@ -202,7 +202,7 @@ for-each api api-objects [do in api [
         /inline
         <with> returns wrapper-params
     ][
-        Q: try if Q ["Q"]
+        q: try if Q ["Q"]  ; !!! case-sensitive concession, temporary (?)
         inline: try if inline ["_inline"]
 
         returns: default ["void"]
@@ -219,7 +219,7 @@ for-each api api-objects [do in api [
         } compose [
             wrapper-params  ; "global" where q is undefined, must be first
             (api)
-            Q  ; !!! Binding to all words in contexts
+            q  ; !!! Binding to all words in contexts
         ]
     ]
 
@@ -228,7 +228,7 @@ for-each api api-objects [do in api [
         /Q
         <with> returns wrapper-params
     ][
-        Q: try if Q ["Q"]
+        q: try if Q ["Q"]  ; !!! case-sensitive concession, temporary (?)
 
         returns: default ["void"]
 
@@ -245,7 +245,7 @@ for-each api api-objects [do in api [
         } compose [
             wrapper-params  ; "global" where q is undefined, must be first
             (api)
-            Q  ; !!! Binding to all words in contexts
+            q  ; !!! Binding to all words in contexts
         ]
     ]
 
