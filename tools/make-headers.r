@@ -247,7 +247,7 @@ sys-globals-parser: context [
 
         rule: [
             any [
-                parse-position:
+                parse-position: here
                 segment
             ]
         ]

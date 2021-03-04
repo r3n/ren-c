@@ -1002,7 +1002,7 @@ parse user-config/toolset [
                 set-exec-path rebmake/default-strip strip-exec
             ]
         )
-        | pos: (
+        | pos: here (
             if not tail? pos [fail ["failed to parse toolset at:" mold pos]]
         )
     ] end

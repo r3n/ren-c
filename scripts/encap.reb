@@ -623,7 +623,7 @@ pe-format: context [
     pos: _
 
     DOS-header-rule: gen-rule [
-        ["MZ" | fail-at: (err: 'missing-dos-signature) fail]
+        ["MZ" | fail-at: here (err: 'missing-dos-signature) fail]
         u16-le (last-size: u16)
         u16-le (n-blocks: u16)
         u16-le (n-reloc: u16)
@@ -645,7 +645,7 @@ pe-format: context [
     ] DOS-header
 
     PE-header-rule: [
-        "PE" #{0000} | fail-at: (err: 'missing-PE-signature) fail
+        "PE" #{0000} | fail-at: here, (err: 'missing-PE-signature) fail
     ]
 
     COFF-header: _
@@ -681,7 +681,7 @@ pe-format: context [
         and [#{0b01} (signature: 'exe-32)
              | #{0b02} (signature: 'exe-64)
              | #{0701} (signature: 'ROM)
-             | fail-at: (err: 'missing-image-signature) fail
+             | fail-at: here, (err: 'missing-image-signature) fail
         ]
         u16-le (signature-value: u16)
         copy major-linker-version skip  ; 1 byte

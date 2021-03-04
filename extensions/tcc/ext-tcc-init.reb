@@ -455,7 +455,7 @@ c99: function [
         known-extension-rule: ["." ["c" | "a" | "o"] ahead [space | end]]
 
         rule: [
-            last-pos:  ; Save for errors
+            last-pos: here  ; Save for errors
 
             "-c" (  ; just compile (no link phase)
                 keep compose [output-type (outtype: 'OBJ)]

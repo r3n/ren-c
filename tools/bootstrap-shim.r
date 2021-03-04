@@ -30,6 +30,12 @@ REBOL [
     }
 ]
 
+; Define HERE and SEEK as no-ops for compatibility in parse
+; https://forum.rebol.info/t/parse-bootstrap-compatibility-strategy/1533
+;
+here: []
+seek: []
+
 ; The snapshotted Ren-C existed right before <blank> was legal to mark an
 ; argument as meaning a function returns null if that argument is blank.
 ; See if this causes an error, and if so assume it's the old Ren-C, not a

@@ -683,7 +683,7 @@ for-each [sw-cat list] boot-errors [
         ;
         f-name: uppercase/part to-c-name id 1
         parse f-name [
-            any ["_" w: (uppercase/part w 1) | skip] end
+            any ["_" w: here (uppercase/part w 1) | skip] end
         ]
 
         if arity = 0 [

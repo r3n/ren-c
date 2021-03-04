@@ -52,9 +52,9 @@ cscape: function [
     num-text: to text! num  ; CHANGE won't take GROUP! to evaluate, #1279
 
     list: collect* [
-        parse string [(col: 0) start: any [
+        parse string [(col: 0) start: here any [
             [
-                (prefix: _ suffix: _) finish:
+                (prefix: _ suffix: _) finish: here
 
                 "${" change [copy expr: [to "}"]] num-text skip (
                     mode: #cname
@@ -87,7 +87,7 @@ cscape: function [
                 num-text: to text! num
             )
                 |
-            newline (col: 0 prefix: _ suffix: _) start:
+            newline (col: 0 prefix: _ suffix: _) start: here
                 |
             skip (col: col + 1)
         ] end]
@@ -183,7 +183,7 @@ cscape: function [
     ; intelligence, they should use "".
     ;
     parse string [
-        (nonwhite: removed: false) start-line:
+        (nonwhite: removed: false) start-line: here
         while [
             space
             |
@@ -197,11 +197,11 @@ cscape: function [
                     removed
                 ])
 
-                :start-line remove thru [newline | end]
+                seek :start-line remove thru [newline | end]
                 |
                 skip
             ]
-            (nonwhite: removed: false) start-line:
+            (nonwhite: removed: false) start-line: here
             |
             remove "/* _ */" (removed: true) opt remove space
             |
