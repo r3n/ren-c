@@ -620,8 +620,8 @@ bootstrap: func [
     ;
     let status: lib/call compose [
         (system/options/boot) "make.r"
-            "CONFIG=configs/bootstrap.r"
-            "DEBUG=normal"  ; assert()s and symbols
+            "config=configs/bootstrap.r"
+            "debug=normal"  ; assert()s and symbols
     ]
     if status != 0 [
         fail ["BOOTSTRAP command failed with exit status:" status]
