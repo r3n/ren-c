@@ -579,10 +579,12 @@ bootstrap: function [
     lib/set-env "CONFIG_TCCDIR" unspaced [what-dir "/tccencap"]
 
     cd ren-c-master
-    lib/call "mkdir build"
-    cd %build
-    lib/call compose [
-        (system/options/boot) "../make.r" "CONFIG=../configs/bootstrap.r"
+
+    let status: lib/call compose [
+        (system/options/boot) "make.r" "CONFIG=configs/bootstrap.r"
+    ]
+    if status != 0 [
+        fail ["BOOTSTRAP command failed with exit status:" status]
     ]
 ]
 
