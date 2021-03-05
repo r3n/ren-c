@@ -265,6 +265,11 @@ jobs:
         mv r3-with-tcc $TOP_DIR
 
 
+    # Note: We don't uninstall `libtcc-dev` because we are choosing to build
+    # the TCC extension into the executable we are building with r3-with-tcc.
+    # One doesn't have to do that, but by doing so we prove this bootstrapping
+    # could continue on indefinitely...
+
     - name: Uninstall Prebuilt R3, TinyC, GCC, wget, etc. (Mimic Clean System)
       run: |
         sudo apt remove tcc gcc clang wget curl
@@ -280,7 +285,7 @@ jobs:
     #
     - name: Use R3 We Built to Download Source Over HTTPS, Unzip, and Compile!
       run: |
-        ./r3-with-tcc --do "bootstrap"
+        ./r3-with-tcc --do "bootstrap/options" -- debug=normal extensions="TCC +"
 
 
   #### TESTING STEPS #########################################################

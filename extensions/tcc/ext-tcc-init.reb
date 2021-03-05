@@ -596,6 +596,7 @@ c99: func [
 
 bootstrap: func [
     {Download Rebol sources from GitHub and build using TCC}
+    /options "Use SYSTEM/OPTIONS/ARGS to get additional make.r options"
 ][
     ; We fetch the .ZIP file of the master branch from GitHub.  Note that this
     ; actually contains a subdirectory called `ren-c-master` which the
@@ -621,7 +622,7 @@ bootstrap: func [
     let status: lib/call compose [
         (system/options/boot) "make.r"
             "config=configs/bootstrap.r"
-            "debug=normal"  ; assert()s and symbols
+            ((if options [system/options/args]))
     ]
     if status != 0 [
         fail ["BOOTSTRAP command failed with exit status:" status]
