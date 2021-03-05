@@ -443,14 +443,29 @@ REB_R Call_Core(REBFRM *frame_) {
         if (REF(shell)) {
             const char *sh = getenv("SHELL");
 
-            if (sh == nullptr) {  // shell does not exist
-                int err = 2;
-                if (write(info_pipe[W], &err, sizeof(err)) == -1) {
-                    //
-                    // Nothing we can do, but need to stop compiler warning
-                    // (cast to void is insufficient for warn_unused_result)
-                }
-                exit(EXIT_FAILURE);
+            if (sh == nullptr) {
+                //
+                // !!! Convention usually says the $SHELL is set.  But the
+                // GitHub Actions environment is a case that does not seem
+                // to pass it through to processes called in steps, e.g.
+                //
+                //     echo "SHELL is $SHELL"  # this shows /bin/bash
+                //     ./r3 --do "print get-env {SHELL}"  # shows nothing
+                //
+                // Other environment variables work all right, so it seems
+                // something is off about $SHELL in particular.
+                //
+                // But it could certainly be unset manually.  On Windows we
+                // just guess at it as `cmd.exe`, so it doesn't seem that much
+                // worse to just guess `sh`.  This is usually symlinked to
+                // bash or something roughly compatible (e.g. dash).
+                //
+                // Since we're in a fork() here, it would take some figuring
+                // to set up a warning that this is happening.  Probably the
+                // better approach is to do this processing in usermode
+                // before we get to this point.  Review.
+                //
+                sh = "sh";
             }
 
             const char ** argv_new = rebAllocN(
