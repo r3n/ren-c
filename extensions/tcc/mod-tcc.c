@@ -445,17 +445,6 @@ REBNATIVE(compile_p)
     //
     Process_Block_Helper(tcc_add_include_path, state, config, "include-path");
 
-    // Add library paths (same as using `-L` in the options?)
-    //
-    Process_Block_Helper(tcc_add_library_path, state, config, "library-path");
-
-    // Add individual library files (same as using -l in the options?  e.g.
-    // the actual file is "libxxx.a" but you'd pass just `xxx` here)
-    //
-    // !!! Does this work for fully specified file paths as well?
-    //
-    Process_Block_Helper(tcc_add_library, state, config, "library");
-
     // Though it is called `tcc_set_lib_path()`, it says it sets CONFIG_TCCDIR
     // at runtime of the built code, presumably so libtcc1.a can be found.
     //
@@ -602,6 +591,23 @@ REBNATIVE(compile_p)
 
         Drop_Mold(mo);  // discard the combined source (no longer needed)
     }
+
+  //=//// LINKING STEPS (Libraries) ///////////////////////////////////////=//
+
+    // TCC compiles the code first, so it knows what symbols it needs...and
+    // only then can it narrow down which symbols in a library it needs.  So
+    // these steps have to come *after* the compilation.
+
+    // Add library paths (same as using `-L` in the options?)
+    //
+    Process_Block_Helper(tcc_add_library_path, state, config, "library-path");
+    
+    // Add individual library files (same as using -l in the options?  e.g.
+    // the actual file is "libxxx.a" but you'd pass just `xxx` here)
+    //
+    // !!! Does this work for fully specified file paths as well?
+    //
+    Process_Block_Helper(tcc_add_library, state, config, "library");
 
     // We could export just one symbol ("RL" for the Ext_Lib RL_LIB table) and
     // tell the API to use indirect calls like RL->rebXXX with #define REB_EXT
