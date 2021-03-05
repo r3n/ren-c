@@ -40,7 +40,7 @@ REBOL [
 ]
 
 
-compile: function [
+compile: func [
     {Compiles one or more native functions at the same time, with options.}
 
     return: <void>
@@ -76,7 +76,7 @@ compile: function [
     ; https://github.com/rebol/rebol-issues/issues/2334
 
     settings: default [[]]
-    config: make object! [
+    let config: make object! [
         options: copy []  ; block! of text!s (compiler switches)
         include-path: copy []  ; block! of text!s (local directories)
         library-path: copy []  ; block! of text!s (local directories)
@@ -87,7 +87,7 @@ compile: function [
         output-file: _  ; not needed if MEMORY
     ]
 
-    b: settings
+    let b: settings
     while [not tail? b] [
         var: (select config try match word! key: b/1) else [
             fail [{COMPILE/OPTIONS parameter} key {is not supported}]
@@ -97,7 +97,7 @@ compile: function [
             fail [{Missing argument to} key {in COMPILE}]
         ]
 
-        arg: b/1
+        let arg: b/1
         b: next b
 
         if block? var [  ; at present, this always means multiple paths
@@ -310,7 +310,7 @@ compile: function [
     ; would be to encap the executable you already have as a copy with the
     ; natives loaded into it.
 
-    librebol: false
+    let librebol: false
 
     compilables: map-each item compilables [
         item: maybe if match [word! path!] :item [get item]
@@ -401,7 +401,7 @@ compile: function [
     config/runtime-path: my file-to-local/full
     config/librebol-path: '~taken-into-account~  ; COMPILE* does not read
 
-    result: applique :compile* [
+    let result: applique :compile* [
         compilables: compilables
         config: config
         files: files
@@ -418,7 +418,7 @@ compile: function [
 ]
 
 
-c99: function [
+c99: func [
     {http://pubs.opengroup.org/onlinepubs/9699919799/utilities/c99.html}
 
     return: "Exit status code (try to match gcc/tcc)"
@@ -429,32 +429,35 @@ c99: function [
     /runtime "Alternate way of specifying CONFIG_TCCDIR environment variable"
         [text! file!]
 ][
-    command: default [system/options/args]
-    command: spaced command
+    command: spaced any [command, system/options/args]
 
-    compilables: copy []
+    let compilables: copy []
 
-    nonspacedot: complement charset reduce [space tab cr lf "."]
+    let nonspacedot: complement charset reduce [space tab cr lf "."]
 
-    infile: _  ; set to <multi> if multiple input files
-    outfile: _
+    let infile: _  ; set to <multi> if multiple input files
+    let outfile: _
 
-    outtype: _  ; default will be EXE (also overridden if `-c` or `-E`)
+    let outtype: _  ; default will be EXE (also overridden if `-c` or `-E`)
 
-    settings: collect [
-        option-no-arg-rule: [copy option: to [space | end] (
+    let settings: collect [
+        let option-no-arg-rule: [copy option: to [space | end] (
             keep compose [options (option)]
         )]
 
-        option-with-arg-rule: [
+        let option
+        let option-with-arg-rule: [
             opt space copy option: to [space | end] (
                 keep compose [options (option)]
             )
         ]
 
-        known-extension-rule: ["." ["c" | "a" | "o"] ahead [space | end]]
+        let known-extension-rule: ["." ["c" | "a" | "o"] ahead [space | end]]
 
-        rule: [
+        let filename
+        let temp
+        let last-pos
+        let rule: [
             last-pos: here  ; Save for errors
 
             "-c" (  ; just compile (no link phase)
@@ -474,25 +477,25 @@ c99: function [
             option-no-arg-rule
             |
             "-I"  ; add directory to search for #include files
-            opt space copy incpath: to [space | end] (
-                keep compose [include-path (incpath)]
+            opt space copy temp: to [space | end] (
+                keep compose [include-path (temp)]
             )
             |
             "-L"  ; add directory to search for library files
-            opt space copy libpath: to [space | end] (
-                keep compose [library-path (libpath)]
+            opt space copy temp: to [space | end] (
+                keep compose [library-path (temp)]
             )
             |
             "-l"  ; add library (-llibrary means search for "liblibrary.a")
-            opt space copy libname: to [space | end] (
-                keep compose [library (libname)]
+            opt space copy temp: to [space | end] (
+                keep compose [library (temp)]
             )
             |
             ahead "-O"  ; optimization level
             option-with-arg-rule
             |
             "-o"  ; output file (else default should be "a.out")
-            opt space copy outfile to [space | end] (  ; overwrites a.out
+            opt space copy outfile: to [space | end] (  ; overwrites a.out
                 keep compose [output-file (outfile)]
             )
             |
@@ -549,7 +552,7 @@ c99: function [
             ]
             'OBJ [
                 if infile != <multi> [
-                    parse infile [to [".c" end] replace ".c" ".o"] else [
+                    parse copy infile [to [".c" end] change ".c" ".o"] else [
                         fail "Input file must end in `.c` for use with -c"
                     ]
                 ]
@@ -562,6 +565,7 @@ c99: function [
     ]
 
     if inspect [
+        print mold compilables
         print mold settings
     ]
 
