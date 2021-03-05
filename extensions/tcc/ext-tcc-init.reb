@@ -570,16 +570,30 @@ c99: function [
 ]
 
 
-bootstrap: function [
+bootstrap: func [
     {Download Rebol sources from GitHub and build using TCC}
 ][
-    unzip/quiet %. https://codeload.github.com/metaeducation/ren-c/zip/master
+    ; We fetch the .ZIP file of the master branch from GitHub.  Note that this
+    ; actually contains a subdirectory called `ren-c-master` which the
+    ; source files are in.  We change into that directory.
+    ;
+    let zipped-url: https://codeload.github.com/metaeducation/ren-c/zip/master
+    print ["Downloading and Unzipping Source From:" zipped-url]
+    unzip/quiet %. zipped-url
 
+    ; We'd like to bundle the contents of the CONFIG_TCCDIR into the
+    ; executable as part of the build process for the TCC extension.  The
+    ; best way to do that would be a .ZIP file via the encap facility.  Since
+    ; that hasn't been done, use fetching from a web build as a proxy for it.
+    ;
     unzip/quiet %./tccencap https://metaeducation.s3.amazonaws.com/travis-builds/0.4.40/r3-06ac629-debug-cpp-tcc-encap.zip
-    lib/set-env "CONFIG_TCCDIR" unspaced [what-dir "/tccencap"]
+    lib/set-env "CONFIG_TCCDIR" file-to-local make-file [(what-dir) %tccencap/]
 
     cd ren-c-master
 
+    ; make.r will notice we are in the same directory as itself, and so it
+    ; will make a %build/ subdirectory to do the building in.
+    ;
     let status: lib/call compose [
         (system/options/boot) "make.r" "CONFIG=configs/bootstrap.r"
     ]
