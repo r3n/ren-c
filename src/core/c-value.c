@@ -43,27 +43,18 @@ REBNOD *Dump_Value_Debug(const RELVAL *v)
 
     REBNOD *containing = Try_Find_Containing_Node_Debug(v);
 
-    switch (KIND3Q_BYTE_UNCHECKED(v)) {
-      case REB_NULL:
-      case REB_VOID:
-      case REB_BLANK:
-      #if defined(DEBUG_TRACK_EXTEND_CELLS)
-        printf("REBVAL init");
+  #if defined(DEBUG_TRACK_EXTEND_CELLS)
+    printf("REBVAL init");
 
-        printf(" @ tick #%d", cast(unsigned int, v->tick));
-        if (v->touch != 0)
-            printf(" @ touch #%d", cast(unsigned int, v->touch));
+    printf(" @ tick #%d", cast(unsigned int, v->tick));
+    if (v->touch != 0)
+        printf(" @ touch #%d", cast(unsigned int, v->touch));
 
-        printf(" @ %s:%ld\n", v->file, cast(unsigned long, v->line));
-      #else
-        printf("- no track info (see DEBUG_TRACK_EXTEND_CELLS)\n");
-      #endif
-        fflush(stdout);
-        break;
-
-      default:
-        break;
-    }
+    printf(" @ %s:%ld\n", v->file, cast(unsigned long, v->line));
+  #else
+    printf("- no track info (see DEBUG_TRACK_EXTEND_CELLS)\n");
+  #endif
+    fflush(stdout);
 
     printf("kind_byte=%d\n", cast(int, KIND3Q_BYTE_UNCHECKED(v)));
 
