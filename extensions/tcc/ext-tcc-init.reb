@@ -619,7 +619,9 @@ bootstrap: func [
     ; will make a %build/ subdirectory to do the building in.
     ;
     let status: lib/call compose [
-        (system/options/boot) "make.r" "CONFIG=configs/bootstrap.r"
+        (system/options/boot) "make.r"
+            "CONFIG=configs/bootstrap.r"
+            "DEBUG=normal"  ; assert()s and symbols
     ]
     if status != 0 [
         fail ["BOOTSTRAP command failed with exit status:" status]

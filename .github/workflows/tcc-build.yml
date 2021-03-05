@@ -285,7 +285,23 @@ jobs:
 
   #### TESTING STEPS #########################################################
 
-    - name: Fibonnacci Test
+    - name: Basic Smoke Test (Print A Message And Quit)
+      run: |
+        cd ren-c-master
+        cd build
+
+        ./r3 --do "print {Hello, Bootstrapped World!}"
+
+
+    - name: HTTPS Read Test (If This Works, A Lot Of Things Are Working)
+      run: |
+        cd ren-c-master
+        cd build
+
+        ./r3 --do "quit either find to-text read https://example.com {<h1>Example Domain</h1>} [0] [1]"
+
+
+    - name: Fibonnacci Test (Build a New Native From String of C Code)
       run: |
         echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR}"
         export LIBREBOL_INCLUDE_DIR="$(pwd)/build/prep/include/"
