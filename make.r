@@ -16,8 +16,6 @@ REBOL [
 do %tools/common.r  ; Note: sets up `repo-dir`
 do %tools/systems.r
 
-file-base: make object! load make-file [(repo-dir) tools/file-base.r]
-
 ; See notes on %rebmake.r for why it is not a module at this time, due to the
 ; need to have it inherit the shim behaviors of IF, CASE, FILE-TO-LOCAL, etc.
 ;
@@ -28,7 +26,7 @@ else [
     do %tools/rebmake.r
 ]
 
-=== GLOBALS ===
+=== {ADJUST TO AN OUT-OF-SOURCE BUILD IF RUN FROM REPOSITORY's DIRECTORY} ===
 
 ; When you run a Rebol script, the `current-path` is the directory where the
 ; script is.  %make.r lives in `repo-dir`
@@ -48,23 +46,34 @@ if repo-dir = system/options/path [
     launched-from-root: false
 ]
 
-change-dir output-dir  ; Change current directory to where we're writing data
-
-
-; We relativize `repo-dir` to the output directory, where the build process
-; is being run.  Using relative paths helps gloss over the Windows and Linux
-; differences on file paths.
-;
-repo-dir: relative-to-path repo-dir output-dir
-
 tools-dir: make-file [(repo-dir) tools /]
 src-dir: make-file [(repo-dir) src /]
+
+
+=== {GLOBALS} ===
 
 ; Start out with a default configuration (may be overridden)
 ;
 user-config: make object! load make-file [(repo-dir) configs/default-config.r]
 
-=== PROCESS ARGS ===
+; The file list for the core .c files comes from %file-base.r, while the
+; file list for extensions comes from that extension's %make-spec.r
+;
+file-base: make object! load make-file [(repo-dir) tools/file-base.r]
+
+
+=== {SPLIT ARGS INTO OPTIONS AND COMMANDS} ===
+
+; The current-directory will be started out as being wherever make.r is, e.g.
+; the repo-dir.  But the user probably wants command line arguments relative
+; to what the directory was when they ran the interpeter.
+;
+; For the duration of command line argument processing, switch the directory
+; to system/options/path, so relative arguments are to that.
+;
+; https://forum.rebol.info/t/1541
+
+change-dir system/options/path
 
 ; args are:
 ; [OPTION | COMMAND] ...
@@ -83,8 +92,6 @@ if commands: try find args '| [
 else [
     options: args
 ]
-
-; now args are split into options and commands
 
 for-each [name value] options [
     switch name [
@@ -127,11 +134,33 @@ for-each [name value] options [
     ]
 ]
 
-=== PROCESS COMMANDS ===
+
+=== {CHANGE DIRECTORY} ===
+
+; The baseline directory we are in during the build is where we are writing
+; the output products.
+;
+; But we don't want to actually change to that directory until all the paths
+; in the command line were processed, because that was the user's concept of
+; where `../` or other relative paths were relative to.
+
+change-dir output-dir
+
+; We relativize `repo-dir` to the output directory, where the build process
+; is being run.  Using relative paths helps gloss over some Windows and Linux
+; differences on file paths.  It's also more readable to have short filenames
+; like `..\src\foo.c` instead of `C:\Wherever\Deep\Path\src\foo.c` on
+; compiliation command lines.
+;
+repo-dir: relative-to-path repo-dir output-dir
+
+
+=== {PROCESS COMMANDS} ===
 
 if commands [user-config/target: load commands]
 
-=== MODULES AND EXTENSIONS ===
+
+=== {MODULES AND EXTENSIONS} ===
 
 system-config: config-system user-config/os-id
 rebmake/set-target-platform system-config/os-base
@@ -746,7 +775,8 @@ use [extension-dir entry][
 
 extension-names: map-each x available-extensions [to-lit-word x/name]
 
-=== TARGETS ===
+
+=== {TARGETS} ===
 
 ; Collected here so they can be used with `--help targets`
 
@@ -834,7 +864,8 @@ for-each x targets [
     ]
 ]
 
-=== HELP ===
+
+=== {HELP} ===
 
 indent: func [
     text [text!]
@@ -956,7 +987,8 @@ iterate commands [
     ]
 ]
 
-=== GO! ===
+
+=== {GO!} ===
 
 if launched-from-root [
     print ["Launched from root dir, so building in:" output-dir]
