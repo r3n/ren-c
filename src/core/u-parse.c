@@ -2106,9 +2106,10 @@ REBNATIVE(subparse)
                 if (not subrule)  // capture only on iteration #1
                     FETCH_NEXT_RULE_KEEP_LAST(&subrule, f);
 
+                const RELVAL *input_tail = ARR_TAIL(ARR(P_INPUT));
                 const RELVAL *cmp = ARR_AT(ARR(P_INPUT), P_POS);
 
-                if (IS_END(cmp))
+                if (cmp == input_tail)
                     i = END_FLAG;
                 else if (
                     0 == Cmp_Value(cmp, subrule, did (P_FLAGS & AM_FIND_CASE))
@@ -2157,9 +2158,10 @@ REBNATIVE(subparse)
                 if (not subrule)  // capture only on iteration #1
                     FETCH_NEXT_RULE_KEEP_LAST(&subrule, f);
 
+                const RELVAL *input_tail = ARR_TAIL(ARR(P_INPUT));
                 const RELVAL *cmp = ARR_AT(ARR(P_INPUT), P_POS);
 
-                if (IS_END(cmp))
+                if (cmp == input_tail)
                     i = END_FLAG;
                 else {
                     DECLARE_LOCAL (temp);
@@ -2197,8 +2199,9 @@ REBNATIVE(subparse)
                 if (not IS_SER_ARRAY(P_INPUT))
                     fail (Error_Parse_Rule());
 
+                const RELVAL *input_tail = ARR_TAIL(ARR(P_INPUT));
                 const RELVAL *into = ARR_AT(ARR(P_INPUT), P_POS);
-                if (IS_END(into)) {
+                if (into == input_tail) {
                     i = END_FLAG;  // `parse [] [into [...]]`, rejects
                     break;
                 }
