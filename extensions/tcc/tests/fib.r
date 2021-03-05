@@ -49,7 +49,14 @@ rebol-fib: function [
 ]
 
 compilables: [
-    {#include <stdio.h>}  ; test availability of C standard library
+    ;
+    ; We get two tests in one here...we test the availability of the
+    ; C standard library, and also handling of #define with quotes
+    ; embedded in them (it's a tricky case that trips up mbedTLS if
+    ; you don't support it correctly).
+    ;
+    {#include STDIO_INCLUDE} 
+
     c-fib
 ]
 
@@ -64,6 +71,14 @@ opts: [
     ; slash is tolerated as that is CONFIG_TCCDIR convention in TCC.
     ;
     ;;runtime-path %/home/hostilefork/Projects/tcc
+
+    ; TCC expects options strings to have the backslashes in them.  This
+    ; is needed because plain quotes are used for filenames that have
+    ; spaces in them.  Note that the C99 command line emulation must
+    ; therefore add these quotes in for #defines, since the shell will
+    ; strip out any backslashes provided.
+    ;
+    options {-DSTDIO_INCLUDE=\"stdio.h\"}
 ]
 
 compile/inspect/settings compilables opts  ; print out for verbose info

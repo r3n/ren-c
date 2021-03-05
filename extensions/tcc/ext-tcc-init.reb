@@ -77,7 +77,17 @@ compile: func [
 
     settings: default [[]]
     let config: make object! [
-        options: copy []  ; block! of text!s (compiler switches)
+        ;
+        ; This is a BLOCK! of TEXT!s (compiler switches).
+        ;
+        ; NOTE: Any double-quotes in this list are assumed to be for wrapping
+        ; filenames with spaces in them.  So if you want a literal double
+        ; quote in a -D instruction for a #define, it must be escaped with
+        ; a backslash here.  The C99 command has to throw them in, because
+        ; they would have been taken out by the shell processing.
+        ;
+        options: copy []
+
         include-path: copy []  ; block! of text!s (local directories)
         library-path: copy []  ; block! of text!s (local directories)
         library: copy []  ; block of text!s (local filenames)
@@ -448,6 +458,16 @@ c99: func [
         let option
         let option-with-arg-rule: [
             opt space copy option: to [space | end] (
+                ;
+                ; If you do something like `option {-DSTDIO_H="stdio.h"}, TCC
+                ; seems to process it like `-DSTDIO_H=stdio.h` which won't
+                ; work with `#include STDIO_H`.  But if the command line had
+                ; said `-DSTDIO_H=\"stdio.h\"` we would be receiving it
+                ; after the shell processed it, so those quotes would be
+                ; unescaped here.  Add the escaping back in for TCC.
+                ;
+                replace/all option {"} {\"}
+
                 keep compose [options (option)]
             )
         ]
