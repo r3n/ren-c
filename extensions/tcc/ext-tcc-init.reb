@@ -434,7 +434,7 @@ c99: function [
 
     compilables: copy []
 
-    nonspacedot: negate charset reduce [space tab cr lf "."]
+    nonspacedot: complement charset reduce [space tab cr lf "."]
 
     infile: _  ; set to <multi> if multiple input files
     outfile: _
