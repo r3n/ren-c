@@ -573,9 +573,9 @@ c99: function [
 bootstrap: function [
     {Download Rebol sources from GitHub and build using TCC}
 ][
-    unzip %. https://codeload.github.com/metaeducation/ren-c/zip/master
+    unzip/quiet %. https://codeload.github.com/metaeducation/ren-c/zip/master
 
-    unzip %./tccencap https://metaeducation.s3.amazonaws.com/travis-builds/0.4.40/r3-06ac629-debug-cpp-tcc-encap.zip
+    unzip/quiet %./tccencap https://metaeducation.s3.amazonaws.com/travis-builds/0.4.40/r3-06ac629-debug-cpp-tcc-encap.zip
     lib/set-env "CONFIG_TCCDIR" unspaced [what-dir "/tccencap"]
 
     cd ren-c-master
