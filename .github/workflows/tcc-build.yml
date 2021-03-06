@@ -32,10 +32,10 @@ name: TCC Build
 # This could be done at the whole job level, or on individual steps.
 #
 on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+  # push:
+  #   branches: [ master ]
+  # pull_request:
+  #   branches: [ master ]
 
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
@@ -288,6 +288,25 @@ jobs:
         ./r3-with-tcc --do "bootstrap/options" -- debug=normal extensions="TCC +"
 
 
+    # We uninstalled TCC, which had libtcc1.a and some header overloads we
+    # require.  To better understand "compiler intrinsics" and why those files
+    # are necessary, see the TCC extension's README.md.
+    #
+    # https://github.com/metaeducation/ren-c/blob/master/extensions/tcc/README.md
+    #
+    # Ideally these would be encapped into executables that are built with the
+    # TCC extension.  Right now we settle for a .zip file which is downloaded
+    # as part of the BOOTSTRAP command, and put in the %tccencap/ directory.
+    # Set that to the CONFIG_TCCDIR.
+    #
+    # Long-term, this would be handled behind-the-scenes so the user would
+    # not have to see it.
+    #
+    - name: Set CONFIG_TCCDIR Environment Variable
+      run: |
+        echo "CONFIG_TCCDIR=$(pwd)/tccencap/" >> $GITHUB_ENV
+
+
   #### TESTING STEPS #########################################################
 
     - name: Basic Smoke Test (Print A Message And Quit)
@@ -306,6 +325,16 @@ jobs:
         ./r3 --do "quit either find to-text read https://example.com {<h1>Example Domain</h1>} [0] [1]"
 
 
+    # In order to build user natives, one of the headers available to the
+    # process needs to be `librebol.h`.  We don't use a fixed version in the
+    # `tccencap` that BOOTSTRAP from the web, because we'd like an up to the
+    # minute version from the build we just made.
+    #
+    # The long-term answer to this is for that encapping process to include
+    # the librebol.h and the precise libtcc files from the build.  So a test
+    # like this would effectively be using the file it just made, just like
+    # we are doing here.
+    #
     - name: Fibonnacci Test (Build a New Native From String of C Code)
       run: |
         echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR}"

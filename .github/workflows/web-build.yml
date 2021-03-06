@@ -16,10 +16,10 @@ name: Web Build
 # the workflow on push or pull request events, but only for the master branch.
 #
 on:
-  # push:
-  #   branches: [ master ]
-  # pull_request:
-  #   branches: [ master ]
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
 
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
