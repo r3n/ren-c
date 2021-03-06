@@ -55,6 +55,26 @@ ndk-version: make object! [major: minor: patch: _]
 )
 
 
+; https://developer.android.com/ndk/guides/other_build_systems
+;
+; Pathological cases could arise where you want to use a Windows system to
+; build the prep files to go take and put on a Linux system that you are
+; going to use to cross-compile to produce an interpreter for Android.  But
+; for now let's just assume that if you're cross-compiling to Android and
+; you are on a Windows machine, you intend to run the make on Windows.  (!)
+;
+detect-ndk-host: func [
+    return: [word!]
+] [
+    switch let os: system/version/4 [
+        2 ['darwin-x86_64]  ; Mac
+        3 ['windows-x86_64]  ; Windows  !!! 32-bit is just `windows`, ignore atm
+        4 ['linux-x86_64]  ; Linux
+        fail ["Unsupported Cross-Compilation Host:" system/version]
+    ]
+]
+
+
 ; The Android NDK was changed to use clang as of 18b, prior to that it was gcc.
 ;
 ; https://android.googlesource.com/platform/ndk.git/+/master/docs/ClangMigration.md
@@ -71,8 +91,8 @@ tool-for-host: func [
     /host [word!] "defaults to detecting current system, e.g. linux-x86_64"
     /abi [word!] "defaults to 32-bit ARM (arm-linux-androideabi)"
 ] [
-    abi: default ['arm-linux-androideabi]
-    host: default ['linux-x86_64]  ; !!! Better detect (Windows, Mac...)
+    host: default [detect-ndk-host]
+    abi: default ['arm-linux-androideabi]  ; But ARM64 is up-and-coming... :-/
 
     let path: either ndk-version/major < 18 [  ; GCC build still available
         ;
@@ -231,7 +251,7 @@ sysroot-for-link: func [
     return: [text!]
     /host [word!] "defaults to detecting current system, e.g. linux-x86_64"
 ] [
-    host: default ['linux-x86_64]  ; improve detection...
+    host: default [detect-ndk-host]
 
     let path: spaced [
         "--sysroot" (file-to-local either ndk-version/major < 18 [

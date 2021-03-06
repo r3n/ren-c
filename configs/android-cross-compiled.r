@@ -5,8 +5,8 @@ REBOL [
 
 
 toolset: compose [
-    gcc (tool-for-host/host <compiler> 'linux-x86_64)
-    ld  (tool-for-host/host <linker> 'linux-x86_64)
+    gcc (tool-for-host <compiler>)  ; detect /host as current OS
+    ld  (tool-for-host <linker>)    ; same
 ]
 
 
