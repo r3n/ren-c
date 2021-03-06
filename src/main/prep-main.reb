@@ -59,12 +59,12 @@ for-each file [
     ; We go ahead and LOAD the header in this case, so we can write only the
     ; module fields we care about ("Description" is not needed, for instance.)
     ;
-    header: load header
+    header: ensure block! load header  ; Loaded as BLOCK!, not object
 
     append/line buf mold/flat compose [
-        Title: (header/title)
-        Version: (header/version)
-        Name: (header/name)
+        Title: (non null header/Title)  ; !!! Affected by case-sensitivity
+        Version: (non null header/Version)
+        Name: (non null header/Name)
     ]
 
     append/line buf "["

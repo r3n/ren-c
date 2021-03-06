@@ -640,12 +640,12 @@ REB_R PD_Array(
         //
         n = -1;
 
-        const REBSTR *symbol = VAL_WORD_SYMBOL(picker);
+        const REBSYM *symbol = VAL_WORD_SYMBOL(picker);
         const RELVAL *tail;
         const RELVAL *item = VAL_ARRAY_AT(&tail, pvs->out);
         REBLEN index = VAL_INDEX(pvs->out);
         for (; item != tail; ++item, ++index) {
-            if (ANY_WORD(item) and symbol == VAL_WORD_SYMBOL(item)) {
+            if (ANY_WORD(item) and Are_Synonyms(symbol, VAL_WORD_SYMBOL(item))) {
                 n = index + 1;
                 break;
             }
@@ -679,6 +679,10 @@ REB_R PD_Array(
         if (setval)
             return R_UNHANDLED;
 
+        // !!! Right now this allows selecting words out of blocks to be
+        // null if not present...which is inconsistent with selecting words
+        // out of objects.  Review.
+        //
         return nullptr;
     }
 

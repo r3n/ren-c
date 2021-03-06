@@ -108,6 +108,17 @@ print: func [value] [
     lib/print either value == newline [""][value]
 ]
 
+
+; NON is a new helpful opposite to ENSURE
+;
+non: func [type [<opt> datatype!] value [<opt> any-value!]] [
+    if :type = type of :value [
+        fail ["NON Didn't Expect Value to be of type" type else [<null>]]
+    ]
+    return :value
+]
+
+
 ; Enfixedness was conceived as not a property of an action itself, but of a
 ; particular relationship between a word and an action.  While this had some
 ; benefits, it became less and less relevant in a world of "opportunistic

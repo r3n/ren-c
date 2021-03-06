@@ -66,3 +66,15 @@
     counter: function [<static> n (0)] [n: n + 1]
     [1 2 3 4 5] = array/initial 5 :counter
 )
+
+; !!! Right now, picking out of range (positive or negative) is null, while
+; picking by word is also null.  This is inconsistent with objects.  Review.
+[
+    (did block: [ae #{BD}])
+
+    (block/-304 = null)
+    (block/1020 = null)
+    (block/ae = #{BD})
+    (block/AE = #{BD})
+    (block/xy = null)
+]

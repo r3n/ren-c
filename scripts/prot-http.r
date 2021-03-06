@@ -193,7 +193,7 @@ make-http-request: func [
     result: unspaced [
         uppercase form method _
             either file? target [next mold target] [target]
-            _ either headers/host ["HTTP/1.1"] ["HTTP/1.0"] CR LF
+            _ either find headers 'Host: ["HTTP/1.1"] ["HTTP/1.0"] CR LF
     ]
     for-each [word string] headers [
         append result unspaced [mold word _ string CR LF]
