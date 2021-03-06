@@ -64,15 +64,11 @@ jobs:
 
     # The "matrix" ability of GitHub actions lets you permute some standard
     # properties (like versions of node.js), but it doesn't directly let you
-    # set a matrix of environment variables.  You have to go through a level
-    # of indirection to set "matrix include variables", and then adjust those
-    # in a job step to be environment variables.
+    # set environment variables.  You use ${{ matrix.var }} to access them.
+    # These could be captured into environment variables, but it's probably
+    # clearer to leave it to tell that it varies per-build configuration.
     #
     # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-environment-variables-in-a-matrix
-    #
-    # Note: This matrix once included `0.16.2` for a pthreads enabled build,
-    # but that was omitted for simplicity.  The matrix scaffolding is left
-    # here to show how it would be done if another build variation was needed.
     #
     strategy:
       matrix:
@@ -111,6 +107,11 @@ jobs:
     # are run unconditionally (no `if:` qualifiers)
 
 
+    - name: Save matrix.os-id Into OS_ID Environment Variable
+      run: |
+        echo "OS_ID=${{ matrix.os-id }}" >> $GITHUB_ENV
+
+
     # The checkout action checks-out your repository under $GITHUB_WORKSPACE
     #
     # https://github.com/actions/checkout
@@ -138,14 +139,6 @@ jobs:
     # why we use the commit hash here instead of the label `v7`.
     #
     - uses: mymindstorm/setup-emsdk@f9068d69f3908ddd991f32b8c8818d5781fe0c78
-
-
-    # See note in `strategy: matrix:` about why we have to do this.
-    #
-    - name: Convert Matrix Variables To Environment Variables
-      run: |
-        echo "OS_ID=${{ matrix.os-id }}" >> $GITHUB_ENV
-        echo "CONFIG_FILE=${{ matrix.config-file }}" >> $GITHUB_ENV
 
 
     # Show a little bit of sanity check information
@@ -218,7 +211,7 @@ jobs:
         # diagnostic changes the hash to maybe a WORD!
         #
         "$R3MAKE" ../make.r \
-            config=../configs/$CONFIG_FILE \
+            config=../configs/${{ matrix.config-file }} \
             target=makefile \
             standard=c \
             os_id=$OS_ID \

@@ -80,15 +80,11 @@ jobs:
 
     # The "matrix" ability of GitHub actions lets you permute some standard
     # properties (like versions of node.js), but it doesn't directly let you
-    # set a matrix of environment variables.  You have to go through a level
-    # of indirection to set "matrix include variables", and then adjust those
-    # in a job step to be environment variables.
+    # set environment variables.  You use ${{ matrix.var }} to access them.
+    # These could be captured into environment variables, but it's probably
+    # clearer to leave it to tell that it varies per-build configuration.
     #
     # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-environment-variables-in-a-matrix
-    #
-    # Note: This matrix once included `0.16.2` for a pthreads enabled build,
-    # but that was omitted for simplicity.  The matrix scaffolding is left
-    # here to show how it would be done if another build variation was needed.
     #
     strategy:
       matrix:
@@ -146,15 +142,6 @@ jobs:
     # why it's important that we trust GitHub's official "actions" account.
     #
     - uses: actions/checkout@v2
-
-
-    # See note in `strategy: matrix:` about why we have to do this.
-    #
-    - name: Convert Matrix Variables To Environment Variables
-      run: |
-        echo "OS_ID=${{ matrix.os-id }}" >> $GITHUB_ENV
-        echo "CONFIG_FILE=${{ matrix.config-file }}" >> $GITHUB_ENV
-        echo "DEBUG=${{ matrix.debug }}" >> $GITHUB_ENV
 
 
     # Refer to the TCC Extension's README.md for an explanation of what's in
@@ -246,11 +233,11 @@ jobs:
         # diagnostic changes the hash to maybe a WORD!
         #
         "$R3MAKE" ../make.r \
-            config=../configs/$CONFIG_FILE \
+            config=../configs/${{ matrix.config-file }} \
             target=makefile \
             standard=c \
-            os_id=$OS_ID \
-            debug=$DEBUG \
+            os_id=${{ matrix.os-id }} \
+            debug=${{ matrix.debug }} \
             git_commit="{$GIT_COMMIT}" \
             rigorous=no \
             static=no \
@@ -302,7 +289,7 @@ jobs:
     #
     - name: Use R3 We Built to Download Source Over HTTPS, Unzip, and Compile!
       run: |
-        ./r3-with-tcc --do "bootstrap/options" -- debug=$DEBUG extensions="TCC +"
+        ./r3-with-tcc --do "bootstrap/options" -- debug=${{ matrix.debug }} extensions="TCC +"
 
 
     # We uninstalled TCC, which had libtcc1.a and some header overloads we
