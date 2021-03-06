@@ -1,0 +1,302 @@
+#
+# windows-build.yml
+#
+# This does Windows builds on GitHub's Windows Server container, using the
+# Microsoft CL.EXE and LINK.EXE.
+#
+# While the default shell is PowerShell for Windows Actions, we are able to
+# override that and use bash...which makes more sense when trying to maintain
+# similar simple scripts on several platorms.
+#
+
+name: Windows Build
+
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  workflow_dispatch:  # Allows running this workflow manually from Actions tab
+
+
+# Environment variables can be set per step, per job, or for entire workflow.
+# But if you want to dynamically set a variable that survives between steps,
+# you have to use the syntax:
+#
+#     echo "VAR=value" >> $GITHUB_ENV
+#
+# It will be available in the ensuing steps (though not the current one).
+#
+# https://docs.github.com/en/free-pro-team@latest/actions/reference/environment-variables
+#
+# Note: If you see files advocating for a syntax like `::set-env::` that is
+# a deprecated method:
+#
+# https://github.blog/changelog/2020-10-01-github-actions-deprecating-set-env-and-add-path-commands/
+#
+env:
+  AWS_S3_BUCKET_NAME: metaeducation
+
+
+# Windows containers default to using PowerShell.  But you can use bash, and
+# that just seems like the sanest choice since this is a cross platform project
+# and all the other workflows are in bash.
+#
+defaults:
+  run:
+    shell: bash
+
+
+# Each "Job" runs in its own VM, and a workflow run is made up of one or more
+# jobs that can run sequentially or in parallel.
+#
+# Jobs are isolated from one another (outside of any data they might exchange
+# indirectly through uploading and downloading from the network).  This means
+# you can't have a "build job" and a "deploy job" that uploads the build
+# products of that job, since the deploy wouldn't have access to any of the
+# files that were built.  "Steps" must be used.
+#
+jobs:
+  windows-build:  # Name of this workflow's only job
+
+    # The type of runner that the job will run on.  Options listed here:
+    #
+    # https://github.com/actions/virtual-environments#available-environments
+    #
+    # Options for windows are windows-2019, windows-2016...
+    #
+    runs-on: windows-2016
+
+
+    # The "matrix" ability of GitHub actions lets you permute some standard
+    # properties (like versions of node.js), but it doesn't directly let you
+    # set environment variables.  You use ${{ matrix.var }} to access them.
+    # These could be captured into environment variables, but it's probably
+    # clearer to leave it to tell that it varies per-build configuration.
+    #
+    # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-environment-variables-in-a-matrix
+    #
+    # Note: This matrix once included `0.16.2` for a pthreads enabled build,
+    # but that was omitted for simplicity.  The matrix scaffolding is left
+    # here to show how it would be done if another build variation was needed.
+    #
+    strategy:
+      matrix:
+       include:
+         - os-id: 0.3.40  # 64-bit Target (built on this 64-bit platform)
+           config-file: vs2019-x64.r
+           standard: c
+           debug: none
+           extensions: "View -"  # View requires C99, disable it
+
+         - os-id: 0.3.01  # 32-bit Target (built on this 64-bit platform)
+           config-file: vs2019-x86.r
+           standard: c++17  # c++11 is "default", no option for it
+           debug: normal
+           extensions: "ODBC +"
+
+
+    # Steps are a sequence of tasks that will be executed within a single VM
+    # as part of the job.
+    #
+    # If a step fails, then the default behavior is for the subsequent steps
+    # to not run, though this can be overridden with an `if:` property, which
+    # is granular enough to allow running only if particular other steps
+    # have completed:
+    #
+    # https://docs.github.com/en/free-pro-team@latest/actions/reference/context-and-expression-syntax-for-github-actions#job-status-check-functions
+    # https://stackoverflow.com/a/61832535
+    #
+    # Each step has its own isolated environment variables, but it is possible
+    # to export state seen by future steps (see `environment:` notes above)
+    #
+    # The exit status of a step is the result of the last executed command in
+    # that step, or the parameter to `exit` if the step ends prematurely.
+    #
+    # A step that only contains `uses:` is a means of incorporating a fragment
+    # of GitHub action code published in a separate repository.  Link to that
+    # repository in a comment so that the options (if any) are at hand.
+    #
+    steps:  # (no indentatation needed below; so indent the minimum!)
+
+
+  ##### BUILD STEPS ##########################################################
+
+    # We build both pull requests and commits to master.  So the build steps
+    # are run unconditionally (no `if:` qualifiers)
+
+
+    # The GitHub checkout action defaults to translating LF to CR/LF in files:
+    #
+    # https://github.com/actions/checkout/issues/135
+    #
+    # However, Ren-C is taking the long view on this and prohibiting CR/LF in
+    # source by default.
+    #
+    # https://forum.rebol.info/t/newlina-non-grata/1207
+    # https://forum.rebol.info/t/1264
+    #
+    - name: Disable LF to CRLF Auto Translation In Git
+      run: |
+        git config --global core.autocrlf false
+        git config --global core.eol lf
+
+
+    # The checkout action checks-out your repository under $GITHUB_WORKSPACE
+    #
+    # https://github.com/actions/checkout
+    #
+    # Note: This strangely starts you up in a directory:
+    #
+    #      /home/runner/work/ren-c/ren-c
+    #
+    # The parent directory appears to contain the same files.  It's not clear
+    # why it's done this way...but presumably it's on purpose.
+    #
+    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
+    # why it's important that we trust GitHub's official "actions" account.
+    #
+    - uses: actions/checkout@v2
+
+
+    # By default you can't call MSVC Compilation from the command line.  Use
+    # an action that is written to address that.
+    #
+    # https://github.com/ilammy/msvc-dev-cmd
+    #
+    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
+    # why it's important that we use a hash here instead of the `v1` tag.
+    #
+    - name: Enable CL.EXE C Compiler and Other Dev Tools From a Command Prompt
+      uses: ilammy/msvc-dev-cmd@aa2e60900e4cc1eda092dd8f53dab2b32efeacf5
+
+
+    # For some reason, a GNU-based linker in /usr/bin/link is ahead of the
+    # path specification for the MS link.exe.  Unsure how to work around that,
+    # so just try deleting it
+    #
+    - name: Delete Unused GNU-based Linker to Stop It From Interfering
+      run: |
+        rm /usr/bin/link.exe
+
+
+    # Show a little bit of sanity check information.  MSC is weird because you
+    # can't ask for the version specifically, you just call it with no args:
+    #
+    # https://stackoverflow.com/q/1233312/
+    #
+    - name: Output System Information
+      run: |
+        echo "MSC (cl.exe) version check:"
+        cl
+
+
+    # Grab abbreviated and full git commit ID into environment variables.
+    # The full commit is passed to make to build into the binary, and the
+    # abbreviated commit is used to name the executable.
+    #
+    # http://stackoverflow.com/a/42549385
+    #
+    # (While GitHub Actions may offer this, good to have it done in an
+    # agnostic fashion so the script is more portable)
+    #
+    - name: Grab Git Hash and Short Hash Into Environment Variables
+      run: |
+        git_commit="$(git show --format="%H" --no-patch)"
+        echo "git_commit is $git_commit"
+        git_commit_short="$(git show --format="%h" --no-patch)"
+        echo "git_commit_short is $git_commit_short"
+        echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
+        echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+
+
+    # !!! Ideally this would use the same step that clients can use to build
+    # the system with `make.sh`.  Unfortunately, something about the GitHub
+    # Ubuntus do not like the old bootstrap executable.  Make sure the
+    # ordinary path works, but for the moment patch over it just to get
+    # to a point where the action works.
+    #
+    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE
+      run: |
+        curl https://s3.amazonaws.com/r3bootstraps/r3-windows-x86-8994d23.exe -o r3make.exe
+        echo "R3MAKE=$(pwd)\r3make.exe" >> $GITHUB_ENV  # pass to next step
+
+
+    # We are able to use either the makefile version of the build or the
+    # fully Ren-C driven form with CALL.  Both should be tested, but right
+    # now this is using the makefile version for the web builds.
+    #
+    - name: Use Rebmake to Generate an NMAKE Makefile
+      run: |
+        mkdir build
+        cd build
+
+        # We use a makefile target here because the bootstrap process itself
+        # enforces using the no-makefile form.  So we just exercise more code
+        # by doing this, even though it's a little more long winded.
+        #
+        # NOTE: The GIT_COMMIT must be in {} not just "" that the shell might
+        # get rid of.  Or you get weird bugs when the hex starts with numbers
+        # and doesn't make a WORD!.  Frustrating to debug because each
+        # diagnostic changes the hash to maybe a WORD!
+        #
+        "$R3MAKE" ../make.r \
+            config=../configs/${{ matrix.config-file }} \
+            target=nmake \
+            standard=${{ matrix.standard }} \
+            os_id=${{ matrix.os-id }} \
+            debug=${{ matrix.debug }} \
+            git_commit="{$GIT_COMMIT}" \
+            rigorous=no \
+            static=no \
+            extensions="${{ matrix.extensions }}"
+
+
+    - name: Make Build Folders
+      run: |
+        cd build
+        nmake folders
+
+
+    - name: Prep the Build By Making Various Auto-Generated .h and .c Files
+      run: |
+        cd build
+        nmake prep
+
+
+    # If something goes wrong in the prep process, this allows you to download
+    # a prep file to look at it.
+    #
+    # https://github.com/actions/upload-artifact
+    #
+    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
+    # why it's important that we trust GitHub's official "actions" account.
+    #
+    - name: Optional Download of Any Prep Files For Inspection
+      if: false  # Change this to true to download a file
+      uses: actions/upload-artifact@v2
+      with:
+        name: tmp-internals.h
+        path: build/prep/include/tmp-internals.h
+
+
+    - name: Compile and Link the C Files
+      run: |
+        cd build
+        nmake
+
+
+    - name: Basic Smoke Test (Print A Message And Quit)
+      run: |
+        cd build
+
+        ./r3.exe --do "print {Hello, Bootstrapped World!}"
+
+
+    - name: HTTPS Read Test (If This Works, A Lot Of Things Are Working)
+      run: |
+        cd build
+
+        ./r3.exe --do "quit either find to-text read https://example.com {<h1>Example Domain</h1>} [0] [1]"

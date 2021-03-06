@@ -15,6 +15,7 @@ name: Web Build
 # Controls when the action will run.  Currently we use the default to trigger
 # the workflow on push or pull request events, but only for the master branch.
 #
+# !!! Temporarily commented out while working on Windows build
 on:
   push:
     branches: [ master ]
