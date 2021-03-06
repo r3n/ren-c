@@ -240,13 +240,18 @@ jobs:
         # enforces using the no-makefile form.  So we just exercise more code
         # by doing this, even though it's a little more long winded.
         #
+        # NOTE: The GIT_COMMIT must be in {} not just "" that the shell might
+        # get rid of.  Or you get weird bugs when the hex starts with numbers
+        # and doesn't make a WORD!.  Frustrating to debug because each
+        # diagnostic changes the hash to maybe a WORD!
+        #
         "$R3MAKE" ../make.r \
             config=../configs/$CONFIG_FILE \
             target=makefile \
             standard=c \
             os_id=$OS_ID \
             debug=$DEBUG \
-            git_commit="$GIT_COMMIT" \
+            git_commit="{$GIT_COMMIT}" \
             rigorous=no \
             static=no \
             extensions="TCC +"
