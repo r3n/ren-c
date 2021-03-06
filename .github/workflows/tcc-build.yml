@@ -95,6 +95,10 @@ jobs:
        include:
          - os-id: 0.4.40  # 64-bit Linux (can run executable on this container)
            config-file: tcc.r
+           debug: none
+         - os-id: 0.4.40  # 64-bit Linux (can run executable on this container)
+           config-file: tcc.r
+           debug: normal
 
 
     # Steps are a sequence of tasks that will be executed within a single VM
@@ -147,20 +151,26 @@ jobs:
       run: |
         echo "OS_ID=${{ matrix.os-id }}" >> $GITHUB_ENV
         echo "CONFIG_FILE=${{ matrix.config-file }}" >> $GITHUB_ENV
+        echo "DEBUG=${{ matrix.debug }}" >> $GITHUB_ENV
 
 
-    # Refer to the %extensions/tcc/README.md for an explanation of what's in
+    # Refer to the TCC Extension's README.md for an explanation of what's in
     # the `tcc` and `libtcc-dev` packages, and the little group of files they
     # use to patch over the GCC include and lib files so it can use them.
     #
+    # https://github.com/metaeducation/ren-c/blob/master/extensions/tcc/README.md
+    #
+    - name: Install TinyC (tcc) and its LibC Helper Includes and Lib
+      run: |
+        sudo apt install tcc libtcc-dev
+
     # Knowing the magic path here to set CONFIG_TCCDIR is really something
     # that could change arbitrarily based on how the packages install.  But
     # this seems to be right on 64-bit Ubuntu for the versions we've tried.
     # (Building TCC from source could obviously put the files somewhere else.)
     #
-    - name: Install TinyC (tcc) and its LibC Helper Includes and Lib
+    - name: Set CONFIG_TCCDIR During First Phase To Use Ubuntu's TCC Files
       run: |
-        sudo apt install tcc libtcc-dev
         echo "CONFIG_TCCDIR=/usr/lib/x86_64-linux-gnu/tcc/" >> $GITHUB_ENV
 
 
@@ -169,7 +179,7 @@ jobs:
     - name: Output System Information
       run: |
         echo "Current directory is: $(pwd)"
-        echo "GCC version check:"
+        echo "TCC version check:"
         tcc -vv
 
 
@@ -223,17 +233,16 @@ jobs:
         mkdir build
         cd build
 
-        # !!! optimization is currently hardcoded in the web build config
-        # files as `s`.  Review if `z` would be better (it cannot be passed
-        # in the options here at time of writing, and would be ignored even
-        # if it could be due to that ldflags config hardcoding).
+        # We use a makefile target here because the bootstrap process itself
+        # enforces using the no-makefile form.  So we just exercise more code
+        # by doing this, even though it's a little more long winded.
         #
         "$R3MAKE" ../make.r \
             config=../configs/$CONFIG_FILE \
             target=makefile \
             standard=c \
             os_id=$OS_ID \
-            debug=none \
+            debug=$DEBUG \
             git_commit="$GIT_COMMIT" \
             rigorous=no \
             static=no \
@@ -285,7 +294,7 @@ jobs:
     #
     - name: Use R3 We Built to Download Source Over HTTPS, Unzip, and Compile!
       run: |
-        ./r3-with-tcc --do "bootstrap/options" -- debug=normal extensions="TCC +"
+        ./r3-with-tcc --do "bootstrap/options" -- debug=$DEBUG extensions="TCC +"
 
 
     # We uninstalled TCC, which had libtcc1.a and some header overloads we
@@ -302,9 +311,20 @@ jobs:
     # Long-term, this would be handled behind-the-scenes so the user would
     # not have to see it.
     #
-    - name: Set CONFIG_TCCDIR Environment Variable
+    # Also, in order to build user natives, one of the headers used by the
+    # process needs to be `librebol.h`.  We don't use a fixed version in the
+    # `tccencap` that BOOTSTRAP from the web, because we'd like an up to the
+    # minute version from the build we just made.
+    #
+    # The long-term answer to this is for that encapping process to include
+    # the librebol.h and the precise libtcc files from the build.  So a test
+    # like this would effectively be using the file it just made, just like
+    # we are doing here.
+    #
+    - name: Set CONFIG_TCCDIR and LIBREBOL_INCLUDE_DIR for Test Phase
       run: |
         echo "CONFIG_TCCDIR=$(pwd)/tccencap/" >> $GITHUB_ENV
+        echo "LIBREBOL_INCLUDE_DIR=$(pwd)/ren-c-master/build/prep/include/" >> $GITHUB_ENV
 
 
   #### TESTING STEPS #########################################################
@@ -325,20 +345,10 @@ jobs:
         ./r3 --do "quit either find to-text read https://example.com {<h1>Example Domain</h1>} [0] [1]"
 
 
-    # In order to build user natives, one of the headers available to the
-    # process needs to be `librebol.h`.  We don't use a fixed version in the
-    # `tccencap` that BOOTSTRAP from the web, because we'd like an up to the
-    # minute version from the build we just made.
-    #
-    # The long-term answer to this is for that encapping process to include
-    # the librebol.h and the precise libtcc files from the build.  So a test
-    # like this would effectively be using the file it just made, just like
-    # we are doing here.
-    #
     - name: Fibonnacci Test (Build a New Native From String of C Code)
       run: |
         echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR}"
-        export LIBREBOL_INCLUDE_DIR="$(pwd)/build/prep/include/"
+        echo "Note: LIBREBOL_INCLUDE_DIR is ${LIBREBOL_INCLUDE_DIR}"
 
         cd ren-c-master
         cd build
