@@ -122,6 +122,9 @@ jobs:
     # The parent directory appears to contain the same files.  It's not clear
     # why it's done this way...but presumably it's on purpose.
     #
+    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
+    # why it's important that we trust GitHub's official "actions" account.
+    #
     - uses: actions/checkout@v2
 
 
@@ -131,7 +134,10 @@ jobs:
     #
     # https://github.com/mymindstorm/setup-emsdk
     #
-    - uses: mymindstorm/setup-emsdk@v7
+    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
+    # why we use the commit hash here instead of the label `v7`.
+    #
+    - uses: mymindstorm/setup-emsdk@f9068d69f3908ddd991f32b8c8818d5781fe0c78
 
 
     # See note in `strategy: matrix:` about why we have to do this.
@@ -298,6 +304,9 @@ jobs:
     # to publish any passwords publicly:
     #
     # https://github.com/aws-actions/configure-aws-credentials
+    #
+    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
+    # why it's important that we trust Amazon's official "aws-actions" account.
     #
     - name: Configure AWS Credentials
       if: github.ref == 'refs/heads/master'  # see notes on DEPLOY STEPS

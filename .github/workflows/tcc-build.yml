@@ -142,6 +142,9 @@ jobs:
     # The parent directory appears to contain the same files.  It's not clear
     # why it's done this way...but presumably it's on purpose.
     #
+    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
+    # why it's important that we trust GitHub's official "actions" account.
+    #
     - uses: actions/checkout@v2
 
 
