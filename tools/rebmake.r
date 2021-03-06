@@ -353,11 +353,12 @@ application-class: make project-class [
             linker
             default-linker
         ]
-        ld/command
+        ld/command/debug
             output
             depends
             searches
             ldflags
+            debug
     ]
 
 ]
@@ -591,7 +592,7 @@ cl: make compiler-class [
     ][
         collect-text [
             keep ("cl" unless file-to-local/pass exec-file)
-            keep "/nologo"  ; don't show startup banner
+            keep "/nologo"  ; don't show startup banner (must be lowercase)
             keep either E ["/P"]["/c"]
 
             if I [
@@ -700,6 +701,7 @@ ld: make linker-class [
         searches [block! blank!]
         ldflags [block! any-string! blank!]
         /dynamic
+        /debug [logic!]
     ][
         let suffix: either dynamic [
             target-platform/dll-suffix
@@ -807,6 +809,7 @@ llvm-link: make linker-class [
         searches [block! blank!]
         ldflags [block! any-string! blank!]
         /dynamic
+        /debug [logic!]
     ][
         let suffix: either dynamic [
             target-platform/dll-suffix
@@ -890,6 +893,7 @@ link: make linker-class [
         searches [block! blank!]
         ldflags [block! any-string! blank!]
         /dynamic
+        /debug [logic!]
     ][
         let suffix: either dynamic [
             target-platform/dll-suffix
@@ -898,7 +902,11 @@ link: make linker-class [
         ]
         collect-text [
             keep (file-to-local/pass exec-file else [{link}])
-            keep "/NOLOGO"
+
+            ; https://docs.microsoft.com/en-us/cpp/build/reference/debug-generate-debug-info
+            if debug [keep "/DEBUG"]
+
+            keep "/NOLOGO"  ; don't show startup banner (link takes uppercase!)
             if dynamic [keep "/DLL"]
 
             output: file-to-local output
