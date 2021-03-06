@@ -577,7 +577,8 @@ check-data: function [
             out: port/data
 
             while [parse data [
-                copy chunk-size some hex-digits thru crlfbin mk1: to end
+                copy chunk-size: some hex-digits, thru crlfbin
+                mk1: here, to end
             ]][
                 ; The chunk size is in the byte stream as ASCII chars
                 ; forming a hex string.  DEBASE to get a BINARY! and then
@@ -611,7 +612,9 @@ check-data: function [
                     break
                 ]
                 else [
-                    parse mk1 [chunk-size skip mk2: crlfbin to end] else [
+                    parse mk1 [
+                        chunk-size skip, mk2: here, crlfbin, to end
+                    ] else [
                         break
                     ]
 
