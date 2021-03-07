@@ -49,6 +49,13 @@ seek: []
 trap [
     func [i [<blank> integer!]] [...]
 ] else [
+    ;
+    ; While things are in flux with MAKE-FILE, do it in order to sync any
+    ; bootstrapping executables more recent than the one that didn't have it.
+    ; It will overwrite the MAKE-FILE that's built in.
+    ;
+    do %../scripts/make-file.r  ; Experimental!  Trying to replace PD_File...
+
     ; OPT has behavior of turning NULLs into VOID! to keep you from optioning
     ; something you don't need to, but with refinement changes bootstrap code
     ; would get ugly if it had to turn every OPT of a refinement into OPT TRY.
