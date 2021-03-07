@@ -52,14 +52,14 @@ src-dir: make-file [(repo-dir) src /]
 
 === {GLOBALS} ===
 
-; Start out with a default configuration (may be overridden)
-;
-user-config: make object! load make-file [(repo-dir) configs/default-config.r]
-
 ; The file list for the core .c files comes from %file-base.r, while the
 ; file list for extensions comes from that extension's %make-spec.r
 ;
 file-base: make object! load make-file [(repo-dir) tools/file-base.r]
+
+; Start out with a default configuration (may be overridden)
+;
+user-config: make object! load make-file [(repo-dir) configs/default-config.r]
 
 
 === {SPLIT ARGS INTO OPTIONS AND COMMANDS} ===
@@ -95,17 +95,41 @@ else [
 
 for-each [name value] options [
     switch name [
-        'CONFIG 'LOAD 'DO [
+        'CONFIG [
+            ; A config file can inherit from other configurations with the
+            ; `Inherits: %some-config.r` header option.
+            ;
             config: to-file value
-            while [config] [
-                set [path: f:] split-path config
-                bak: system/options/current-path
+
+            saved-dir: what-dir
+
+            ; Because the goal is to create an OBJECT! from the top-level
+            ; declarations in the file, this has to build an inheritance stack.
+            ; It must tunnel to the innermost configs and run those first...
+            ; otherwise, the outermost configs wouldn't have the innermost
+            ; config fields visible when the run.
+            ;
+            config-stack: copy []
+            while [:config] [
+                set [path: file:] split-path config
                 change-dir path
-                user-config/config: _
-                user-config: make user-config load f
-                config: try attempt [clean-path user-config/config]
-                change-dir bak
+                append/only config-stack transcode read file
+
+                ; !!! LOAD has changed between bootstrap versions, for the
+                ; handling of the /HEADER.  This hacks it together by doing a
+                ; transcode + intern.  Revisit and use actual LOAD with mods in
+                ; the bootstrap shim.  `Inherits:` may actually be good as
+                ; a first-class module feature, not config-specific.
+                ;
+                assert ['REBOL = first last config-stack]
+                config: select ensure block! second last config-stack 'Inherits
+                take/part last config-stack 2  ; drop the REBOL [...] header
             ]
+            while [not empty? config-stack] [
+                user-config: make user-config intern take/last config-stack
+            ]
+
+            change-dir saved-dir
         ]
         'EXTENSIONS [
             ; [+|-|*] [NAME {+|-|*|[modules]}]...
