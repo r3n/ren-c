@@ -1,5 +1,7 @@
 #
-# web-build.yml
+# File: %web-build.yml
+#
+#=============================================================================#
 #
 # GitHub Actions Workflow for building the Wasm version of Ren-C.  It builds
 # all pull requests to master, but only deploys commits that are accepted to
@@ -8,6 +10,15 @@
 # Deployments will become "live" in the Web REPL demonstration directly from
 # this action...but only if they are "greenlit" after running a test in a
 # headless Firefox browser that is automated via Python and "Marionette".
+#
+#====# PLEASE READ THE README #===============================================#
+#
+# Whenever this file says "See README", that is referring to the notes in the
+# %.github/workflows/README.md file.  If something appears in multiple GitHub
+# Workflow files, it's best to document it there instead of repeating it:
+#
+# https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
+#
 
 name: Web Build
 
@@ -47,11 +58,7 @@ env:
 # Each "Job" runs in its own VM, and a workflow run is made up of one or more
 # jobs that can run sequentially or in parallel.
 #
-# Jobs are isolated from one another (outside of any data they might exchange
-# indirectly through uploading and downloading from the network).  This means
-# you can't have a "build job" and a "deploy job" that uploads the build
-# products of that job, since the deploy wouldn't have access to any of the
-# files that were built.  "Steps" must be used.
+# See README: Jobs
 #
 jobs:
   web-build:  # Name of this workflow's only job
@@ -63,13 +70,7 @@ jobs:
     runs-on: ubuntu-20.04
 
 
-    # The "matrix" ability of GitHub actions lets you permute some standard
-    # properties (like versions of node.js), but it doesn't directly let you
-    # set environment variables.  You use ${{ matrix.var }} to access them.
-    # These could be captured into environment variables, but it's probably
-    # clearer to leave it to tell that it varies per-build configuration.
-    #
-    # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-environment-variables-in-a-matrix
+    # See README: Build Matrix
     #
     strategy:
       matrix:
@@ -81,28 +82,12 @@ jobs:
     # Steps are a sequence of tasks that will be executed within a single VM
     # as part of the job.
     #
-    # If a step fails, then the default behavior is for the subsequent steps
-    # to not run, though this can be overridden with an `if:` property, which
-    # is granular enough to allow running only if particular other steps
-    # have completed:
-    #
-    # https://docs.github.com/en/free-pro-team@latest/actions/reference/context-and-expression-syntax-for-github-actions#job-status-check-functions
-    # https://stackoverflow.com/a/61832535
-    #
-    # Each step has its own isolated environment variables, but it is possible
-    # to export state seen by future steps (see `environment:` notes above)
-    #
-    # The exit status of a step is the result of the last executed command in
-    # that step, or the parameter to `exit` if the step ends prematurely.
-    #
-    # A step that only contains `uses:` is a means of incorporating a fragment
-    # of GitHub action code published in a separate repository.  Link to that
-    # repository in a comment so that the options (if any) are at hand.
+    # See README: Steps
     #
     steps:  # (no indentatation needed below; so indent the minimum!)
 
 
-  ##### BUILD STEPS ##########################################################
+  #====# BUILD STEPS #========================================================#
 
     # We build both pull requests and commits to master.  So the build steps
     # are run unconditionally (no `if:` qualifiers)
@@ -113,19 +98,10 @@ jobs:
         echo "OS_ID=${{ matrix.os-id }}" >> $GITHUB_ENV
 
 
-    # The checkout action checks-out your repository under $GITHUB_WORKSPACE
-    #
     # https://github.com/actions/checkout
     #
-    # Note: This strangely starts you up in a directory:
-    #
-    #      /home/runner/work/ren-c/ren-c
-    #
-    # The parent directory appears to contain the same files.  It's not clear
-    # why it's done this way...but presumably it's on purpose.
-    #
-    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
-    # why it's important that we trust GitHub's official "actions" account.
+    # See README: Checkout Action
+    # See README: IMPORTANT - Security Of Trusted Actions
     #
     - uses: actions/checkout@v2
 
@@ -136,8 +112,7 @@ jobs:
     #
     # https://github.com/mymindstorm/setup-emsdk
     #
-    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
-    # why we use the commit hash here instead of the label `v7`.
+    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
     #
     - uses: mymindstorm/setup-emsdk@f9068d69f3908ddd991f32b8c8818d5781fe0c78
 
@@ -155,10 +130,7 @@ jobs:
     # The full commit is passed to make to build into the binary, and the
     # abbreviated commit is used to name the executable.
     #
-    # http://stackoverflow.com/a/42549385
-    #
-    # (While GitHub Actions may offer this, good to have it done in an
-    # agnostic fashion so the script is more portable)
+    # See README: Portably Capturing Git Hashes
     #
     - name: Grab Git Hash and Short Hash Into Environment Variables
       run: |
@@ -227,7 +199,7 @@ jobs:
         make
 
 
-  #### UPLOAD STEPS ##########################################################
+  #====# UPLOAD STEPS #=======================================================#
 
     # We only want to build pull requests, we do not want to upload them to
     # the AWS server.  Deployment should happen only once a commit has been
@@ -304,8 +276,7 @@ jobs:
     #
     # https://github.com/aws-actions/configure-aws-credentials
     #
-    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
-    # why it's important that we trust Amazon's official "aws-actions" account.
+    # See README: IMPORTANT - Security Of Trusted Actions
     #
     - name: Configure AWS Credentials
       if: github.ref == 'refs/heads/master'  # see notes on DEPLOY STEPS
@@ -350,7 +321,7 @@ jobs:
         for i in $OS_ID/*; do upload $i; done
 
 
-  #### TESTING STEPS #########################################################
+  #====# TESTING STEPS #======================================================#
 
     # Check the deployment before "green-lighting" the %last-deploy.short-hash
     #
@@ -378,7 +349,7 @@ jobs:
     # It is "planned for the future".  :-/
     #
     - name: Test ReplPad Against Uploaded Lib By Running In Headless Firefox
-      if: github.ref == 'refs/heads/master'  # see notes on DEPLOY STEPS
+      if: github.ref == 'refs/heads/master'  # see notes on UPLOAD STEPS
       run: |
         sudo apt-get install net-tools  # for netstat, diagnose network issues
 
@@ -437,7 +408,7 @@ jobs:
         python3 test-repl-ff.py --shorthash "${GIT_COMMIT_SHORT}"
 
 
-  #### GREENLIGHT STEP (MARK THE UPLOADED BUILD AS CURRENT) ##################
+  #====# GREENLIGHT STEP (MARK THE UPLOADED BUILD AS CURRENT) #===============#
 
     # Each ${OS_ID} directory contains several builds for recent commits.
     # Since they are served statically from S3, we don't have a query to

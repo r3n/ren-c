@@ -1,5 +1,7 @@
 #
-# windows-build.yml
+# File: %windows-build.yml
+#
+#=============================================================================#
 #
 # This does Windows builds on GitHub's Windows Server container, using the
 # Microsoft CL.EXE and LINK.EXE.
@@ -7,6 +9,14 @@
 # While the default shell is PowerShell for Windows Actions, we are able to
 # override that and use bash...which makes more sense when trying to maintain
 # similar simple scripts on several platorms.
+#
+#====# PLEASE READ THE README #===============================================#
+#
+# Whenever this file says "See README", that is referring to the notes in the
+# %.github/workflows/README.md file.  If something appears in multiple GitHub
+# Workflow files, it's best to document it there instead of repeating it:
+#
+# https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
 #
 
 name: Windows Build
@@ -52,11 +62,7 @@ defaults:
 # Each "Job" runs in its own VM, and a workflow run is made up of one or more
 # jobs that can run sequentially or in parallel.
 #
-# Jobs are isolated from one another (outside of any data they might exchange
-# indirectly through uploading and downloading from the network).  This means
-# you can't have a "build job" and a "deploy job" that uploads the build
-# products of that job, since the deploy wouldn't have access to any of the
-# files that were built.  "Steps" must be used.
+# See README: Jobs
 #
 jobs:
   windows-build:  # Name of this workflow's only job
@@ -65,22 +71,10 @@ jobs:
     #
     # https://github.com/actions/virtual-environments#available-environments
     #
-    # Options for windows are windows-2019, windows-2016...
-    #
-    runs-on: windows-2016
+    runs-on: windows-2016  # [windows-2019 windows-2016 windows-latest]
 
 
-    # The "matrix" ability of GitHub actions lets you permute some standard
-    # properties (like versions of node.js), but it doesn't directly let you
-    # set environment variables.  You use ${{ matrix.var }} to access them.
-    # These could be captured into environment variables, but it's probably
-    # clearer to leave it to tell that it varies per-build configuration.
-    #
-    # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-environment-variables-in-a-matrix
-    #
-    # Note: This matrix once included `0.16.2` for a pthreads enabled build,
-    # but that was omitted for simplicity.  The matrix scaffolding is left
-    # here to show how it would be done if another build variation was needed.
+    # See README: Build Matrix
     #
     strategy:
       matrix:
@@ -101,28 +95,12 @@ jobs:
     # Steps are a sequence of tasks that will be executed within a single VM
     # as part of the job.
     #
-    # If a step fails, then the default behavior is for the subsequent steps
-    # to not run, though this can be overridden with an `if:` property, which
-    # is granular enough to allow running only if particular other steps
-    # have completed:
-    #
-    # https://docs.github.com/en/free-pro-team@latest/actions/reference/context-and-expression-syntax-for-github-actions#job-status-check-functions
-    # https://stackoverflow.com/a/61832535
-    #
-    # Each step has its own isolated environment variables, but it is possible
-    # to export state seen by future steps (see `environment:` notes above)
-    #
-    # The exit status of a step is the result of the last executed command in
-    # that step, or the parameter to `exit` if the step ends prematurely.
-    #
-    # A step that only contains `uses:` is a means of incorporating a fragment
-    # of GitHub action code published in a separate repository.  Link to that
-    # repository in a comment so that the options (if any) are at hand.
+    # See README: Steps
     #
     steps:  # (no indentatation needed below; so indent the minimum!)
 
 
-  ##### BUILD STEPS ##########################################################
+  #====# BUILD STEPS #========================================================#
 
     # We build both pull requests and commits to master.  So the build steps
     # are run unconditionally (no `if:` qualifiers)
@@ -144,19 +122,10 @@ jobs:
         git config --global core.eol lf
 
 
-    # The checkout action checks-out your repository under $GITHUB_WORKSPACE
-    #
     # https://github.com/actions/checkout
     #
-    # Note: This strangely starts you up in a directory:
-    #
-    #      /home/runner/work/ren-c/ren-c
-    #
-    # The parent directory appears to contain the same files.  It's not clear
-    # why it's done this way...but presumably it's on purpose.
-    #
-    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
-    # why it's important that we trust GitHub's official "actions" account.
+    # See README: Checkout Action
+    # See README: IMPORTANT - Security Of Trusted Actions
     #
     - uses: actions/checkout@v2
 
@@ -166,8 +135,7 @@ jobs:
     #
     # https://github.com/ilammy/msvc-dev-cmd
     #
-    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
-    # why it's important that we use a hash here instead of the `v1` tag.
+    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
     #
     - name: Enable CL.EXE C Compiler and Other Dev Tools From a Command Prompt
       uses: ilammy/msvc-dev-cmd@aa2e60900e4cc1eda092dd8f53dab2b32efeacf5
@@ -175,7 +143,9 @@ jobs:
 
     # For some reason, a GNU-based linker in /usr/bin/link is ahead of the
     # path specification for the MS link.exe.  Unsure how to work around that,
-    # so just try deleting it
+    # so just try deleting it.
+    #
+    # https://github.com/ilammy/msvc-dev-cmd/issues/25
     #
     - name: Delete Unused GNU-based Linker to Stop It From Interfering
       run: |
@@ -197,10 +167,7 @@ jobs:
     # The full commit is passed to make to build into the binary, and the
     # abbreviated commit is used to name the executable.
     #
-    # http://stackoverflow.com/a/42549385
-    #
-    # (While GitHub Actions may offer this, good to have it done in an
-    # agnostic fashion so the script is more portable)
+    # See README: Portably Capturing Git Hashes
     #
     - name: Grab Git Hash and Short Hash Into Environment Variables
       run: |
@@ -271,8 +238,7 @@ jobs:
     #
     # https://github.com/actions/upload-artifact
     #
-    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
-    # why it's important that we trust GitHub's official "actions" account.
+    # See README: IMPORTANT - Security Of Trusted Actions
     #
     - name: Optional Download of Any Prep Files For Inspection
       if: false  # Change this to true to download a file
@@ -286,6 +252,9 @@ jobs:
       run: |
         cd build
         nmake
+
+
+  #===# TESTING STEPS #=======================================================#
 
 
     - name: Basic Smoke Test (Print A Message And Quit)

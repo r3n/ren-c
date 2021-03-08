@@ -1,11 +1,21 @@
 #
-# android-build.yml
+# File: %android-build.yml
+#
+#=============================================================================#
 #
 # The Android build of Ren-C is designed to be packaged as a webserver, so
 # that it can provide a "backdoor" of native services to a browser on a phone
 # which is running another interpreter as the WebAssembly version for the UI.
 #
 # https://www.youtube.com/watch?v=r5kccBehMMg
+#
+#====# PLEASE READ THE README #===============================================#
+#
+# Whenever this file says "See README", that is referring to the notes in the
+# %.github/workflows/README.md file.  If something appears in multiple GitHub
+# Workflow files, it's best to document it there instead of repeating it:
+#
+# https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
 #
 
 name: Android Build
@@ -23,28 +33,13 @@ on:
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
 
-# Environment variables can be set per step, per job, or for entire workflow.
-# But if you want to dynamically set a variable that survives between steps,
-# you have to use the syntax:
-#
-#     echo "VAR=value" >> $GITHUB_ENV
-#
-# It will be available in the ensuing steps (though not the current one).
-#
-# https://docs.github.com/en/free-pro-team@latest/actions/reference/environment-variables
-#
-# Note: If you see files advocating for a syntax like `::set-env::` that is
-# a deprecated method:
-#
-# https://github.blog/changelog/2020-10-01-github-actions-deprecating-set-env-and-add-path-commands/
-#
-env:
-  AWS_S3_BUCKET_NAME: metaeducation
-
-
 # Windows containers default to using PowerShell.  But you can use bash, and
 # so we can potentially write code that works on Windows and MacOS hosts as
 # well as Linux hosts in this single workflow.
+#
+# !!! Currently we're only testing cross-compilation on Linux and MacOS, but
+# since the NDK is offered on Windows as well we should make sure that works
+# when time permits.
 #
 defaults:
   run:
@@ -54,29 +49,19 @@ defaults:
 # Each "Job" runs in its own VM, and a workflow run is made up of one or more
 # jobs that can run sequentially or in parallel.
 #
-# Jobs are isolated from one another (outside of any data they might exchange
-# indirectly through uploading and downloading from the network).  This means
-# you can't have a "build job" and a "deploy job" that uploads the build
-# products of that job, since the deploy wouldn't have access to any of the
-# files that were built.  "Steps" must be used.
+# See README: Jobs
 #
 jobs:
   android-build:  # Name of this workflow's only job
 
 
-    # The "matrix" ability of GitHub actions lets you permute some standard
-    # properties (like versions of node.js), but it doesn't directly let you
-    # set environment variables.  You use ${{ matrix.var }} to access them.
-    # These could be captured into environment variables, but it's probably
-    # clearer to leave it to tell that it varies per-build configuration.
-    #
-    # https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-environment-variables-in-a-matrix
+    # See README: Build Matrix
     #
     strategy:
       matrix:
        include:  # put in order of visibility importance (shown in UI)
 
-         - ndk-version: r13  # old gcc-based version (used in 2019 demo)
+         - ndk-revision: r13  # old gcc-based version (used in 2019 demo)
            os: ubuntu-20.04
            standard: c99
            debug: normal
@@ -84,13 +69,28 @@ jobs:
            os-id: 0.13.2
            config-file: android-cross-compiled.r  # Build ARM with x64 compiler
 
-         - ndk-version: r21d  # clang-based version (circa March 2021)
+         - ndk-revision: r21d  # clang-based version (circa March 2021)
            os: macos-latest
            standard: c99
            debug: normal
            extensions: ""
            os-id: 0.13.2
            config-file: android-cross-compiled.r  # Build ARM with x64 compiler
+
+
+    # We want non-Github-Actions-specific syntax in our steps (e.g. `$FOO`
+    # and not `${{ matrix.foo }}`), so proxy matrix vars to environment vars.
+    #
+    # See README: Environment Variables
+    #
+    env:
+      AWS_S3_BUCKET_NAME: metaeducation
+      NDK_REVISION: ${{ matrix.ndk-revision }}
+      STANDARD: ${{ matrix.standard }}
+      DEBUG: ${{ matrix.debug }}
+      EXTENSIONS: ${{ matrix.extensions }}
+      OS_ID: ${{ matrix.os-id }}
+      CONFIG_FILE: ${{ matrix.config-file }}
 
 
     # The type of runner that the job will run on.  Options listed here:
@@ -103,53 +103,64 @@ jobs:
     # Steps are a sequence of tasks that will be executed within a single VM
     # as part of the job.
     #
-    # If a step fails, then the default behavior is for the subsequent steps
-    # to not run, though this can be overridden with an `if:` property, which
-    # is granular enough to allow running only if particular other steps
-    # have completed:
-    #
-    # https://docs.github.com/en/free-pro-team@latest/actions/reference/context-and-expression-syntax-for-github-actions#job-status-check-functions
-    # https://stackoverflow.com/a/61832535
-    #
-    # Each step has its own isolated environment variables, but it is possible
-    # to export state seen by future steps (see `environment:` notes above)
-    #
-    # The exit status of a step is the result of the last executed command in
-    # that step, or the parameter to `exit` if the step ends prematurely.
-    #
-    # A step that only contains `uses:` is a means of incorporating a fragment
-    # of GitHub action code published in a separate repository.  Link to that
-    # repository in a comment so that the options (if any) are at hand.
+    # See README: Steps
     #
     steps:  # (no indentatation needed below; so indent the minimum!)
 
 
-  ##### BUILD STEPS ##########################################################
+  #====# BUILD STEPS #========================================================#
 
     # We build both pull requests and commits to master.  So the build steps
     # are run unconditionally (no `if:` qualifiers)
 
 
-    - name: Save matrix.os-id Into OS_ID Environment Variable
-      run: |
-        echo "OS_ID=${{ matrix.os-id }}" >> $GITHUB_ENV
-
-
-    # The checkout action checks-out your repository under $GITHUB_WORKSPACE
-    #
     # https://github.com/actions/checkout
     #
-    # Note: This strangely starts you up in a directory:
-    #
-    #      /home/runner/work/ren-c/ren-c
-    #
-    # The parent directory appears to contain the same files.  It's not clear
-    # why it's done this way...but presumably it's on purpose.
-    #
-    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
-    # why it's important that we trust GitHub's official "actions" account.
+    # See README: Checkout Action
+    # See README: IMPORTANT - Security Of Trusted Actions
     #
     - uses: actions/checkout@v2
+
+
+    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE (OS X version)
+      if: matrix.os == 'macos-latest'  # not `${{ matrix.os }} == ...`
+      run: |
+        echo "OS is ${{ matrix.os }}"
+        repo_dir=$(pwd)/
+        source tools/bash/fetch-prebuilt.sh
+        r3make=$(fetch_prebuilt)
+        echo "R3MAKE is set to $r3make"
+        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
+
+
+    # !!! Ideally this would use the same step that clients can use to build
+    # the system with `make.sh`.  Unfortunately, something about the GitHub
+    # Ubuntus do not like the old bootstrap executable.  Make sure the
+    # ordinary path works, but for the moment patch over it just to get
+    # to a point where the action works.
+    #
+    # See README: If Statements
+    #
+    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE (Linux version)
+      if: matrix.os == 'ubuntu-20.04'  # not `${{ matrix.os }} == ...`
+      run: |
+        echo "OS is ${{ matrix.os }}"
+        repo_dir=$(pwd)/
+        cd prebuilt
+        wget http://hostilefork.com/media/shared/github/r3-linux-dec-2020
+        chmod +x r3-linux-dec-2020
+        r3make=$(pwd)/r3-linux-dec-2020
+        echo "R3MAKE is set to $r3make"
+        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
+
+
+    # Test to make sure the R3-MAKE works, because otherwise everything else
+    # is wasting time...the build won't run.  GitHub checks the run result
+    # and will stop the workflow if it's not 0.
+    #
+    - name: "Sanity check that R3-MAKE is Working"
+      run: |
+        "$R3MAKE" --do "print {Hello from R3-MAKE} quit 0"
 
 
     # Building for Android requires having a compiler that can build for ARM,
@@ -166,14 +177,13 @@ jobs:
     #
     # https://developer.android.com/ndk/downloads/revision_history
     #
-    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
-    # why it's important that we use the hash for untrusted sources.
+    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
     #
     - name: Install the Android NDK (Native Development Kit)
       id: setup-ndk
       uses: nttld/setup-ndk@66168bc2be149f117859da845149dee8b763e6c9
       with:
-        ndk-version: ${{ matrix.ndk-version }}
+        ndk-version: ${{ matrix.ndk-revision }}
 
 
     # To find out where the `setup-ndk` action installed the NDK, you have to
@@ -184,6 +194,8 @@ jobs:
     # ANDROID_SDK_ROOT.  So we use ANDROID_NDK_ROOT for consistency, and since
     # simply NDK or ANDROID_NDK don't communicate well that it's a directory
     # (could be a flag, could be a version number, etc.)
+    #
+    # See README: Environment Variables
     #
     - name: Set ANDROID_NDK_ROOT Environment Variable
       run: |
@@ -210,10 +222,7 @@ jobs:
     # The full commit is passed to make to build into the binary, and the
     # abbreviated commit is used to name the executable.
     #
-    # http://stackoverflow.com/a/42549385
-    #
-    # (While GitHub Actions may offer this, good to have it done in an
-    # agnostic fashion so the script is more portable)
+    # See README: Portably Capturing Git Hashes
     #
     - name: Grab Git Hash and Short Hash Into Environment Variables
       run: |
@@ -223,34 +232,6 @@ jobs:
         echo "git_commit_short is $git_commit_short"
         echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
         echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
-
-
-    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE (OS X version)
-      if: ${{ matrix.os }} == "macos-latest"
-      run: |
-        repo_dir=$(pwd)/
-        source tools/bash/fetch-prebuilt.sh
-        r3make=$(fetch_prebuilt)
-        echo "R3MAKE is set to $r3make"
-        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
-
-
-    # !!! Ideally this would use the same step that clients can use to build
-    # the system with `make.sh`.  Unfortunately, something about the GitHub
-    # Ubuntus do not like the old bootstrap executable.  Make sure the
-    # ordinary path works, but for the moment patch over it just to get
-    # to a point where the action works.
-    #
-    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE (Linux version)
-      if: ${{ matrix.os }} == "ubuntu-20.04"
-      run: |
-        repo_dir=$(pwd)/
-        cd prebuilt
-        wget http://hostilefork.com/media/shared/github/r3-linux-dec-2020
-        chmod +x r3-linux-dec-2020
-        r3make=$(pwd)/r3-linux-dec-2020
-        echo "R3MAKE is set to $r3make"
-        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
 
 
     # We are able to use either the makefile version of the build or the
@@ -288,12 +269,12 @@ jobs:
         make
 
 
-  #### TESTING STEPS #########################################################
+  #====# TESTING STEPS #======================================================#
+
 
     # https://github.com/ReactiveCircus/android-emulator-runner
     #
-    # IMPORTANT: See %.github/workflows/README.md section `Action Security` for
-    # why it's important that we use the hash for untrusted sources.
+    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
     #
     - name: Run Android Emulator
       uses: reactivecircus/android-emulator-runner@d2799957d660add41c61a5103e2fbb9e2889eb73
