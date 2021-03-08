@@ -9,6 +9,10 @@
 #
 # https://www.youtube.com/watch?v=r5kccBehMMg
 #
+# !!! Currently we're only testing cross-compilation on Linux and MacOS, but
+# since the NDK is offered on Windows as well we should make sure that works
+# when time permits.
+#
 #====# PLEASE READ THE README #===============================================#
 #
 # Whenever this file says "See README", that is referring to the notes in the
@@ -33,13 +37,9 @@ on:
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
 
-# Windows containers default to using PowerShell.  But you can use bash, and
-# so we can potentially write code that works on Windows and MacOS hosts as
-# well as Linux hosts in this single workflow.
+# Standardize to use bash on all platforms.
 #
-# !!! Currently we're only testing cross-compilation on Linux and MacOS, but
-# since the NDK is offered on Windows as well we should make sure that works
-# when time permits.
+# See README: Using The Strict Erroring Bash Shell
 #
 defaults:
   run:
@@ -61,13 +61,13 @@ jobs:
       matrix:
        include:  # put in order of visibility importance (shown in UI)
 
-#         - ndk-revision: r13  # old gcc-based version (used in 2019 demo)
-#           os: ubuntu-20.04
-#           standard: c99
-#           debug: normal
-#           extensions: ""
-#           os-id: 0.13.2
-#           config-file: android-cross-compiled.r  # Build ARM with x64 compiler
+         - ndk-revision: r13  # old gcc-based version (used in 2019 demo)
+           os: ubuntu-20.04
+           standard: c99
+           debug: normal
+           extensions: ""
+           os-id: 0.13.2
+           config-file: android-cross-compiled.r  # Build ARM with x64 compiler
 
          - ndk-revision: r21d  # clang-based version (circa March 2021)
            os: macos-latest
@@ -186,43 +186,6 @@ jobs:
         curl http://hostilefork.com/media/shared/android/r3-android29-mar-2021 -o r3
 
 
-    # https://github.com/ReactiveCircus/android-emulator-runner
-    #
-    # Starting and stopping the emulator is extremely slow.  The first time
-    # is always a "cold boot", and takes about 201 seconds to start.  If you
-    # don't set the `-no-snapshot` emulator option then subsequent startups
-    # can be around 152 seconds.
-    #
-    # Given how slow it is, we try to do as much as we can in one emulator
-    # session.  The way the emulator-runner works is that it runs the commands
-    # line-by-line, and any of them that return a non-zero result will stop the
-    # whole step.  Output printed to standard output in the android executable
-    # will be relayed back by `adb shell` so it can be read in the output log.
-    #
-    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
-    #
-    - name: Poke R3 Executable Into Android Emulator And Run Commands
-      uses: hostilefork/android-emulator-runner@dont-wrap-script
-      env:
-        R3-ARM: adb shell /data/local/tmp/r3
-      with:
-        api-level: ${{ env.EMULATOR_API_LEVEL }}
-        arch: ${{ env.EMULATOR_ARCH }}
-        target: ${{ env.EMULATOR_TARGET }}
-        emulator-options: ${{ env.EMULATOR_OPTIONS }}
-        #
-        # The script must backslash escape single and double quotes.  (This is
-        # true if you call `adb shell` on Linux and Windows, not just here on
-        # the headless test device.)
-        #
-        script: |
-          adb push ./r3 /data/local/tmp/r3
-          adb shell chmod +x /data/local/tmp/r3
-
-          $R3-ARM --do \"print [{Hello} \'World]\"
-          $R3-ARM --do \"print mold/limit as text read https://example.com\"
-
-
   #====# BUILD STEPS #========================================================#
 
     # We build both pull requests and commits to master.  So the build steps
@@ -237,6 +200,8 @@ jobs:
     - uses: actions/checkout@v2
 
 
+    # See README: If Statements
+    #
     - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE (OS X version)
       if: matrix.os == 'macos-latest'  # not `${{ matrix.os }} == ...`
       run: |
@@ -384,17 +349,57 @@ jobs:
         make
 
 
-  #====# TESTING STEPS #======================================================#
+  #====# TESTING STEP #=======================================================#
+  #
+  # Starting and stopping the emulator is extremely slow.  The first time
+  # is always a "cold boot", and takes about 201 seconds to start.  If you
+  # don't set the `-no-snapshot` emulator option then subsequent startups
+  # can be around 152 seconds.
+  #
+  # Given how slow it is, we try to do as much as we can in one emulator
+  # session.  The way the emulator-runner works is that it runs the commands
+  # line-by-line, and any of them that return a non-zero result will stop the
+  # whole step.  Output printed to standard output in the android executable
+  # will be relayed back by `adb shell` so it can be read in the output log.
+  #
+  #===========================================================================#
 
 
     # https://github.com/ReactiveCircus/android-emulator-runner
     #
+    # The definitions of the environment variables explain why they are chosen
+    # as they are.  They are broken out to make it easier to reuse if the
+    # emulator is invoked multiple times.
+    #
+    # Currently we are using a patched version of the android emulator runner,
+    # which fixes issues related to quote escaping:
+    #
+    # https://github.com/ReactiveCircus/android-emulator-runner/pull/134
+    #
+    # We also only do the test on the MacOS version, because the Linux version
+    # has no HAXM acceleration on GitHub, and is painfully slow right now.
+    #
+    # See README: If Statements
     # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
     #
-    - name: Run Android Emulator
-      uses: reactivecircus/android-emulator-runner@d2799957d660add41c61a5103e2fbb9e2889eb73
+    - name: Poke R3 Executable Into Android Emulator And Run Commands
+      if: matrix.os == 'macos-latest'  # not `${{ matrix.os }} == ...`
+      uses: hostilefork/android-emulator-runner@dont-wrap-script
+      env:
+        R3: adb shell /data/local/tmp/r3
       with:
-        api-level: 29
-        emulator-options: -writable-system
-        script: |  # try comments after proven to work
-          echo "TBD"
+        api-level: ${{ env.EMULATOR_API_LEVEL }}
+        arch: ${{ env.EMULATOR_ARCH }}
+        target: ${{ env.EMULATOR_TARGET }}
+        emulator-options: ${{ env.EMULATOR_OPTIONS }}
+        #
+        # The script must backslash escape single and double quotes.  (This is
+        # true if you call `adb shell` on Linux and Windows, not just here on
+        # the headless test device.)
+        #
+        script: |
+          adb push build/r3 /data/local/tmp/r3
+          adb shell chmod +x /data/local/tmp/r3
+
+          $R3 --do \"print [{Hello} \'World]\"
+          $R3 --do \"print mold/limit as text! read https://example.com\"

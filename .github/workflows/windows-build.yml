@@ -40,13 +40,13 @@ env:
   AWS_S3_BUCKET_NAME: metaeducation
 
 
-# Windows containers default to using PowerShell.  But you can use bash, and
-# that just seems like the sanest choice since this is a cross platform project
-# and all the other workflows are in bash.
+# Standardize to use bash on all platforms.
+#
+# See README: Using The Strict Erroring Bash Shell
 #
 defaults:
   run:
-    shell: bash
+    shell: bash -e
 
 
 # Each "Job" runs in its own VM, and a workflow run is made up of one or more

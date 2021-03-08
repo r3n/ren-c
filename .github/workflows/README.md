@@ -45,6 +45,36 @@ Amazon, or specifically the GitHub service itself.
 We'll assume that it's okay to use those actions by tag, without any commit
 hash or need for extra review.
 
+
+## Using The Strict Erroring Bash Shell
+
+GitHub Actions fortunately has bash on the Windows Server containers.  While
+there might be some theoretical benefit to PowerShell (the default), having
+cross-platform code it just makes more sense to keep all the files as bash.
+
+By default, bash does not speak up when an error happens in the middle of
+lines of shell code.  So the only error you would get from a long `run` code
+for a step would be if the last line had a nonzero exit code (or if something
+explicitly called exit(1) at an earlier time).
+
+    $ bash -e -c "cd asdfasdf; echo 'got here despite error'"
+    bash: line 0: cd: asdfasdf: No such file or directory
+    got here despite error
+
+Fortunately, there's a `-e` feature which overrides this behavior, and stops
+on the first error:
+
+    $ bash -e -c "cd asdfasdf; echo 'will not get here'"
+    bash: line 0: cd: asdfasdf: No such file or directory
+
+It's much better to use that and use switches to suppress the failing cases
+that are supposed to fail.  This is enabled by default when you use the
+`shell: bash` option, acts like: `bash --noprofile --norc -eo pipefail {0}`
+
+https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#using-a-specific-shell
+
+Be sure to preserve the `-e` setting if customizing the bash command further.
+
 ## Checkout Action
 
 The checkout action checks-out your repository under $GITHUB_WORKSPACE

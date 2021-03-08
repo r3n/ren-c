@@ -45,6 +45,15 @@ env:
   AWS_S3_BUCKET_NAME: metaeducation
 
 
+# Standardize to use bash on all platforms.
+#
+# See README: Using The Strict Erroring Bash Shell
+#
+defaults:
+  run:
+    shell: bash -e
+
+
 # Each "Job" runs in its own VM, and a workflow run is made up of one or more
 # jobs that can run sequentially or in parallel.
 #
