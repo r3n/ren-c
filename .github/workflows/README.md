@@ -52,6 +52,15 @@ GitHub Actions fortunately has bash on the Windows Server containers.  While
 there might be some theoretical benefit to PowerShell (the default), having
 cross-platform code it just makes more sense to keep all the files as bash.
 
+USING BASH ON WINDOWS TAMPERS WITH THE PATH.  This causes strange effects like
+there being visibility of GNU's symlink tool /usr/bin/link that is found
+instead of the MS compiler's LINK.EXE
+
+https://github.com/ilammy/msvc-dev-cmd/issues/25
+
+For this project, it's considered worth it to work around issues with that
+when it comes up...for the sake of consistency across the scripts.
+
 By default, bash does not speak up when an error happens in the middle of
 lines of shell code.  So the only error you would get from a long `run` code
 for a step would be if the last line had a nonzero exit code (or if something

@@ -46,7 +46,7 @@ env:
 #
 defaults:
   run:
-    shell: bash -e
+    shell: bash
 
 
 # Each "Job" runs in its own VM, and a workflow run is made up of one or more
@@ -131,15 +131,15 @@ jobs:
       uses: ilammy/msvc-dev-cmd@aa2e60900e4cc1eda092dd8f53dab2b32efeacf5
 
 
-    # For some reason, a GNU-based linker in /usr/bin/link is ahead of the
-    # path specification for the MS link.exe.  Unsure how to work around that,
-    # so just try deleting it.
+    # Using bash as the shell means a symlink tool /usr/bin/link gets in the
+    # path before MS's LINK.EXE.  It's not clear what the best workaround for
+    # this is, so just move it out of the way for now.  Other ideas here:
     #
     # https://github.com/ilammy/msvc-dev-cmd/issues/25
     #
-    - name: Delete Unused GNU-based Linker to Stop It From Interfering
+    - name: Rename GNU-based Symlink Utility `link` So LINK.EXE Is In Path
       run: |
-        rm /usr/bin/link.exe
+        mv /usr/bin/link.exe /usr/bin/gnu-link
 
 
     # Show a little bit of sanity check information.  MSC is weird because you

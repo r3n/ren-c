@@ -42,10 +42,16 @@ name: TCC Build
 # This could be done at the whole job level, or on individual steps.
 #
 on:
-  # push:
-  #   branches: [ master ]
-  # pull_request:
-  #   branches: [ master ]
+  push:
+    branches: [
+      #master
+      tcc
+    ]
+  pull_request:
+    branches: [
+      #master,
+      tcc
+    ]
 
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
@@ -65,7 +71,7 @@ env:
 #
 defaults:
   run:
-    shell: bash -e
+    shell: bash
 
 
 # Each "Job" runs in its own VM, and a workflow run is made up of one or more

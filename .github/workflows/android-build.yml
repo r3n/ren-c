@@ -30,9 +30,15 @@ name: Android Build
 #
 on:
   push:
-    branches: [ master ]
+    branches: [
+      #master
+      android
+    ]
   pull_request:
-    branches: [ master ]
+    branches: [
+      #master,
+      android
+    ]
 
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
