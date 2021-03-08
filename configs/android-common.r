@@ -5,22 +5,27 @@ REBOL [
 os-id: 0.13.2
 
 
-; There are Android NDK (r)evisions like `r13` or `r21d`, which is how you
-; specify which version of the kit you want to install:
+; The Android NDK is the dev kit for building C/C++ programs for Android.
+; (The Android SDK is for building Java programs, plus tools like emulators.)
+;
+; Regardless of whether you are cross-compiling from Windows/Mac/Linux or
+; building on a phone itself, an NDK version must be installed.  There is no
+; standardized environment variable for NDK installs, we use ANDROID_NDK_ROOT
+; because it lines up well with the SDK's standardized ANDROID_SDK_ROOT.
+;
+; NDK (r)evisions have labels like `r13` or `r21d`.  This label is not to be
+; confused with the "API Level" numbers...each NDK offers multiple API levels:
 ;
 ; https://developer.android.com/ndk/downloads/revision_history
 ;
-; Regardless of whether you are cross-compiling from Windows/Mac/Linux or
-; building on a phone itself, an NDK version must be installed.
-;
-ndk-dir: local-to-file try get-env "ANDROID_NDK_DIR" else [
-    fail "ANDROID_NDK_DIR environment variable must be set to build for Android"
+ndk-root: local-to-file try get-env "ANDROID_NDK_ROOT" else [
+    fail "Must set ANDROID_NDK_ROOT environment variable to build for Android"
 ]
 (
-    if #"/" <> last ndk-dir [
-        print "ANDROID_NDK_DIR environment variable doesn't end in slash"
-        print "(Allowing it...but Rebol convention is directories end in slash)"
-        append ndk-dir #"/"
+    if #"/" <> last ndk-root [
+        print "ANDROID_NDK_ROOT environment variable doesn't end in slash"
+        print "(Allowing it, but Rebol convention is directories end in slash)"
+        append ndk-root #"/"
     ]
 )
 
@@ -38,14 +43,14 @@ ndk-dir: local-to-file try get-env "ANDROID_NDK_DIR" else [
 ndk-version: make object! [major: minor: patch: _]
 (
     use [major minor patch] [
-        parse as text! read make-file [(ndk-dir) source.properties] [
+        parse as text! read make-file [(ndk-root) source.properties] [
             thru "Pkg.Revision = "
             copy major: to "." skip (major: to integer! major)
             copy minor: to "." skip (minor: to integer! minor)
             copy patch: to [end | newline] (patch: to integer! patch)
             to end
         ] else [
-            fail "Couldn't parse source.properties in ANDROID_NDK_DIR directory"
+            fail "Can't parse source.properties in ANDROID_NDK_ROOT directory"
         ]
         print ["NDK VERSION DETECTED:" unspaced [major "." minor "." patch]]
         ndk-version/major: major
@@ -68,7 +73,7 @@ detect-ndk-host: func [
 ] [
     switch let os: system/version/4 [
         2 ['darwin-x86_64]  ; Mac
-        3 ['windows-x86_64]  ; Windows  !!! 32-bit is just `windows`, ignore atm
+        3 ['windows-x86_64]  ; Windows  !!! 32bit is just `windows`, ignore atm
         4 ['linux-x86_64]  ; Linux
         fail ["Unsupported Cross-Compilation Host:" system/version]
     ]
@@ -99,7 +104,7 @@ tool-for-host: func [
         ; !!! Review the 4.9 non-sequitur in this older method.  What's that?
         ;
         make-file [
-            (ndk-dir) toolchains / (abi) "-4.9" / prebuilt /
+            (ndk-root) toolchains / (abi) "-4.9" / prebuilt /
                 (host) / bin /
                     (abi) -gcc
         ]
@@ -120,7 +125,7 @@ tool-for-host: func [
         ]
 
         make-file [
-            (ndk-dir) toolchains/llvm/prebuilt / (host) /bin/
+            (ndk-root) toolchains/llvm/prebuilt / (host) /bin/
                 (abi) (android-api-level) "-clang"
         ]
 
@@ -210,13 +215,13 @@ sysroot-for-compile: func [
                 ;
                 ; Old convention: per-API-Level header files
                 ;
-                (ndk-dir) platforms / android- (android-api-level) /arch-arm
+                (ndk-root) platforms / android- (android-api-level) /arch-arm
             ]
         ][
             ; New convention: headers unified, with differences controlled by
             ; the preprocessor defines, e.g. `-D__ANDROID_API__=29`
             ;
-            make-file [(ndk-dir) sysroot]
+            make-file [(ndk-root) sysroot]
         ])
     ]
 
@@ -259,12 +264,12 @@ sysroot-for-link: func [
             ; Old convention: linker sysroot lives in %platforms/
             ;
             make-file [
-                (ndk-dir) platforms / android- (android-api-level) /arch-arm
+                (ndk-root) platforms / android- (android-api-level) /arch-arm
             ]
         ][
             ; New convention: linker sysroot lives in %toolchains/llvm/
             ;
-            make-file [(ndk-dir) toolchains/llvm/prebuilt / (host) / sysroot /]
+            make-file [(ndk-root) toolchains/llvm/prebuilt / (host) / sysroot /]
         ])
     ]
 

@@ -160,7 +160,7 @@ jobs:
     # https://github.com/nttld/setup-ndk
     #
     # There is a known layout to the folders, so the Android config can find
-    # the compiler relative to the ANDROID_NDK_DIR installation path.
+    # the compiler relative to the ANDROID_NDK_ROOT installation path.
     #
     # Android [r]evisions (e.g. r13, r21d) are described in this history list:
     #
@@ -179,9 +179,15 @@ jobs:
     # To find out where the `setup-ndk` action installed the NDK, you have to
     # look at the output variables for that step.
     #
-    - name: Set ANDROID_NDK_DIR Environment Variable
+    # There is no "official" standard environment variable for the C/C++ NDK.
+    # But the Java SDK has one that the command line tools look for, and it's
+    # ANDROID_SDK_ROOT.  So we use ANDROID_NDK_ROOT for consistency, and since
+    # simply NDK or ANDROID_NDK don't communicate well that it's a directory
+    # (could be a flag, could be a version number, etc.)
+    #
+    - name: Set ANDROID_NDK_ROOT Environment Variable
       run: |
-        echo "ANDROID_NDK_DIR=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
+        echo "ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
 
 
     # Show a little bit of sanity check information.
@@ -195,7 +201,7 @@ jobs:
     - name: Output System Information
       run: |
         echo "Installed NDK Version: $ANDROID_NDK_VERSION"
-        echo "NDK Is In Directory: $ANDROID_NDK_DIR"
+        echo "NDK Is In Directory: $ANDROID_NDK_ROOT"
 
         echo "Current directory is: $(pwd)"
 
@@ -219,17 +225,30 @@ jobs:
         echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
 
 
+    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE (OS X version)
+      if: ${{ matrix.os }} == "macos-latest"
+      run: |
+        repo_dir=$(pwd)/
+        source tools/bash/fetch-prebuilt.sh
+        r3make=$(fetch_prebuilt)
+        echo "R3MAKE is set to $r3make"
+        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
+
+
     # !!! Ideally this would use the same step that clients can use to build
     # the system with `make.sh`.  Unfortunately, something about the GitHub
     # Ubuntus do not like the old bootstrap executable.  Make sure the
     # ordinary path works, but for the moment patch over it just to get
     # to a point where the action works.
     #
-    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE
+    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE (Linux version)
+      if: ${{ matrix.os }} == "ubuntu-20.04"
       run: |
         repo_dir=$(pwd)/
-        source tools/bash/fetch-prebuilt.sh
-        r3make=$(fetch_prebuilt)
+        cd prebuilt
+        wget http://hostilefork.com/media/shared/github/r3-linux-dec-2020
+        chmod +x r3-linux-dec-2020
+        r3make=$(pwd)/r3-linux-dec-2020
         echo "R3MAKE is set to $r3make"
         echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
 
