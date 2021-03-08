@@ -50,6 +50,9 @@ on:
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
 
+# The env context declares environment variables in a way they can also be
+# used in places that aren't shell code, e.g. an `if:` clause.
+#
 # See README: Environment Variables
 #
 env:

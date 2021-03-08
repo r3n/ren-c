@@ -61,13 +61,13 @@ jobs:
       matrix:
        include:  # put in order of visibility importance (shown in UI)
 
-         - ndk-revision: r13  # old gcc-based version (used in 2019 demo)
-           os: ubuntu-20.04
-           standard: c99
-           debug: normal
-           extensions: ""
-           os-id: 0.13.2
-           config-file: android-cross-compiled.r  # Build ARM with x64 compiler
+#         - ndk-revision: r13  # old gcc-based version (used in 2019 demo)
+#           os: ubuntu-20.04
+#           standard: c99
+#           debug: normal
+#           extensions: ""
+#           os-id: 0.13.2
+#           config-file: android-cross-compiled.r  # Build ARM with x64 compiler
 
          - ndk-revision: r21d  # clang-based version (circa March 2021)
            os: macos-latest
@@ -78,8 +78,8 @@ jobs:
            config-file: android-cross-compiled.r  # Build ARM with x64 compiler
 
 
-    # We want non-Github-Actions-specific syntax in our steps (e.g. `$FOO`
-    # and not `${{ matrix.foo }}`), so proxy matrix vars to environment vars.
+    # The env context declares environment variables in a way they can also be
+    # used in places that aren't shell code, e.g. an `if:` clause.
     #
     # See README: Environment Variables
     #
@@ -91,6 +91,73 @@ jobs:
       EXTENSIONS: ${{ matrix.extensions }}
       OS_ID: ${{ matrix.os-id }}
       CONFIG_FILE: ${{ matrix.config-file }}
+
+      # If you override one emulator option with the emulator GitHub Action,
+      # you have to override them all.
+      #
+      # An important choice is to take off the `-no-snapshot` switch, because
+      # we want to run multiple invocations of the emulator action.  We don't
+      # want it to cold boot between these invocations, so letting it save
+      # its state makes the startup much faster.
+      #
+      # We also add `-writable-system`, so that if you use adb shell to run
+      # `sudo root; sudo remount` then %/system will be writable.  This isn't
+      # critical at the moment since we can write to `/data/local/tmp`, which
+      # is apparently the preferred place for writing test files.  But it may
+      # come in handy at some point.
+      #
+      # https://github.com/ReactiveCircus/android-emulator-runner
+      #
+      EMULATOR_OPTIONS: >-  # see README: YAML >- To Make One Line From Many
+          -no-window
+          -gpu swiftshader_indirect
+          -noaudio
+          -no-boot-anim
+          -writable-system
+
+      # Google has deprecated the emulation of ARM Android hardware on the
+      # desktop emulator application itself.  Instead, x86-based Androids
+      # actually do the translation of ARM binaries...and then the emulator
+      # can run x86 Android on top of the (often) x86 host processor.  But
+      # that translation started in Android 11 with API Level 30.  If you go
+      # back to API level 29, an ARM binary won't be handled and you will
+      # get a message like:
+      #
+      #    /data/local/tmp/r3: not executable: 32-bit ELF file
+      #
+      # https://github.com/ReactiveCircus/android-emulator-runner
+      #
+      EMULATOR_API_LEVEL: 30
+
+      # The host is OS X 64-bit, so that raises the question of whether it's
+      # better to emulate an x86 or x86_64 device:
+      #
+      #        x86 boot time: 214147 ms
+      #     x86_64 boot time: 201991 ms
+      #
+      # A little faster to go with x86_64, but not so much that it would be
+      # a big deal if some bug on x86_64 emulation forced us back to x86.
+      #
+      # https://github.com/ReactiveCircus/android-emulator-runner
+      #
+      EMULATOR_ARCH: x86_64  # [x86 x86_64]
+
+      # Since we need at least API level 30 for ARM translation, we find that
+      # here is no `default` x86 or x86_64 image for android-30.  The only
+      # entries in `sdkmanager --list` are these four:
+      #
+      #    system-images;android-30;google_apis;x86
+      #    system-images;android-30;google_apis;x86_64
+      #    system-images;android-30;google_apis_playstore;x86
+      #    system-images;android-30;google_apis_playstore;x86_64
+      #
+      # Presumably Google just no longer feels it worth it the hassle of
+      # having separately downloadable Androids without things like their
+      # Maps components and such (because storage is cheap?)
+      #
+      # https://github.com/ReactiveCircus/android-emulator-runner
+      #
+      EMULATOR_TARGET: google_apis  # [default google_apis playstore]
 
 
     # The type of runner that the job will run on.  Options listed here:
@@ -106,6 +173,54 @@ jobs:
     # See README: Steps
     #
     steps:  # (no indentatation needed below; so indent the minimum!)
+
+
+  #====# FRONTLOAD EMULATOR TINKERING #=======================================#
+
+    # !!! While trying to see if the emulator can get to work, cut to the chase
+    # with a premade android executable.
+
+
+    - name: Grab an r3 Android Built Recently
+      run: |
+        curl http://hostilefork.com/media/shared/android/r3-android29-mar-2021 -o r3
+
+
+    # https://github.com/ReactiveCircus/android-emulator-runner
+    #
+    # Starting and stopping the emulator is extremely slow.  The first time
+    # is always a "cold boot", and takes about 201 seconds to start.  If you
+    # don't set the `-no-snapshot` emulator option then subsequent startups
+    # can be around 152 seconds.
+    #
+    # Given how slow it is, we try to do as much as we can in one emulator
+    # session.  The way the emulator-runner works is that it runs the commands
+    # line-by-line, and any of them that return a non-zero result will stop the
+    # whole step.  Output printed to standard output in the android executable
+    # will be relayed back by `adb shell` so it can be read in the output log.
+    #
+    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
+    #
+    - name: Poke R3 Executable Into Android Emulator And Run Commands
+      uses: hostilefork/android-emulator-runner@dont-wrap-script
+      env:
+        R3-ARM: adb shell /data/local/tmp/r3
+      with:
+        api-level: ${{ env.EMULATOR_API_LEVEL }}
+        arch: ${{ env.EMULATOR_ARCH }}
+        target: ${{ env.EMULATOR_TARGET }}
+        emulator-options: ${{ env.EMULATOR_OPTIONS }}
+        #
+        # The script must backslash escape single and double quotes.  (This is
+        # true if you call `adb shell` on Linux and Windows, not just here on
+        # the headless test device.)
+        #
+        script: |
+          adb push ./r3 /data/local/tmp/r3
+          adb shell chmod +x /data/local/tmp/r3
+
+          $R3-ARM --do \"print [{Hello} \'World]\"
+          $R3-ARM --do \"print mold/limit as text read https://example.com\"
 
 
   #====# BUILD STEPS #========================================================#
@@ -280,4 +395,6 @@ jobs:
       uses: reactivecircus/android-emulator-runner@d2799957d660add41c61a5103e2fbb9e2889eb73
       with:
         api-level: 29
-        script: echo "Hello?"  # ./gradlew connectedCheck
+        emulator-options: -writable-system
+        script: |  # try comments after proven to work
+          echo "TBD"

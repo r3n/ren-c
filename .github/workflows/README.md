@@ -150,6 +150,10 @@ https://docs.github.com/en/actions/reference/context-and-expression-syntax-for-g
 
 ## Build Matrix
 
+(Note: We want non-Github-Actions-specific syntax in our steps--e.g. `$FOO`
+and not `${{ matrix.foo }}`--so proxy matrix vars to environment vars when
+that is feasible.)
+
 The build matrix is where you can either explicitly give a full list of
 variables for a build permutation with `include`:
 
@@ -184,3 +188,18 @@ While GitHub Actions may offer this, good to have it done in an agnostic
 fashion so the script is more portable.
 
 http://stackoverflow.com/a/42549385
+
+
+## YAML >- To Make One Line From Many
+
+This operator is useful if you're writing something that is getting too long
+to be on one line...but adding newlines to it would break things:
+
+    Key: >-
+      this is my very very very
+      long string
+
+This produces `this is my very very very long string`.  If you want a newline
+at the end, then use `>` instead of `>-`
+
+https://stackoverflow.com/a/21699210
