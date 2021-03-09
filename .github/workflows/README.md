@@ -84,6 +84,34 @@ https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#
 
 Be sure to preserve the `-e` setting if customizing the bash command further.
 
+
+# Ren-C Code As Step
+
+Because GitHub Actions lets you customize the shell, we can actually make the
+`run:` portion be Ren-C code.  This lets you cleanly span code across many
+lines, and avoids the hassles that come from needing to escape quotes and
+apostrophes when you call from bash, e.g. `r3 --do "print \"This Sucks\""`
+
+  step:
+    shell: r3 {0}
+    run: |
+      print "Hello, Ren-C As Shell World!"
+      print ['apostrophes-dont-need-escaping "...and neither do double quotes"]
+
+Specifying the shell as `r3 --do {0}` or `r3 --do "{0}"` doesn't work.  It's
+not completely clear why this works...but perhaps it is feeding it from the
+standard input device (as if you had typed the script).  Either way, it's
+better...because if you had to pass the arguments on the command line you would
+be getting problems with the escaping.
+
+On Windows, it seems the shell path is unconditionally prepended with:
+
+  C:/Program Files/Git/usr/bin/
+
+Most likely because that is the location where the main `shell:` is, and this
+is being inherited by `step:`/`shell:`.  Until that is fixed, you have to copy
+any shell program you want to use to that location.
+
 ## Checkout Action
 
 The checkout action checks-out your repository under $GITHUB_WORKSPACE

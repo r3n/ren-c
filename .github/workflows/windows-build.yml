@@ -23,12 +23,23 @@ name: Windows Build
 
 
 on:
-  # push:
-  #   branches: [ master ]
-  # pull_request:
-  #   branches: [ master ]
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
 
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
+#    logLevel:
+#      description: 'Log level'
+#      required: true
+#      default: 'warning'
+#    tags:
+#      description: 'workflow_dispatch/tags/description'
+
+  # https://github.blog/changelog/2020-07-06-github-actions-manual-triggers-with-workflow_dispatch/
+  #
+
+
 
 
 # The env context declares environment variables in a way they can also be
@@ -242,6 +253,14 @@ jobs:
       run: |
         cd build
         nmake
+        echo "R3BUILT=$(pwd)/r3" >> $GITHUB_ENV
+
+
+    # See README: Ren-C Code As Step
+    #
+    - name: Copy Built R3 To Where It Can Be Used As A Shell
+      run: |
+        cp build/r3 "C:/Program Files/Git/usr/bin/r3built.EXE"
 
 
   #===# TESTING STEPS #=======================================================#
@@ -249,13 +268,17 @@ jobs:
 
     - name: Basic Smoke Test (Print A Message And Quit)
       run: |
-        cd build
-
-        ./r3.exe --do "print {Hello, Bootstrapped World!}"
+        "$R3BUILT" --do "print {hi}"
 
 
     - name: HTTPS Read Test (If This Works, A Lot Of Things Are Working)
+      shell: r3built {0}  # See README: Ren-C Code As Step
       run: |
-        cd build
-
-        ./r3.exe --do "quit either find to-text read https://example.com {<h1>Example Domain</h1>} [0] [1]"
+        print {== Hello From R3 HTTPS Read Test! ==}
+        parse as text! read https://example.com [
+            thru <h1> copy header: to </h1> to end
+        ] else [
+            fail "Couldn't Capture Page Title"
+        ]
+        assert [header = "Example Domain"]
+        print ["Succeeded:" header]
