@@ -272,7 +272,7 @@ jobs:
 
 
     - name: HTTPS Read Test (If This Works, A Lot Of Things Are Working)
-      shell: r3built {0}  # See README: Ren-C Code As Step
+      shell: r3built --fragment {0}  # See README: Ren-C Code As Step
       run: |
         print {== Hello From R3 HTTPS Read Test! ==}
         parse as text! read https://example.com [

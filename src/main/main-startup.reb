@@ -135,7 +135,8 @@ usage: func [
 
         --do expr        Evaluate expression (quoted)
         --help (-?)      Display this usage information
-        --script file    Implicitly provide script to run
+        --script file    Explicitly provide script to run, change working dir
+        --fragment file  Run without changing directory, CR+LF ok on Windows
         --version (-v)   Display version only (then quit)
         --               End of options (treat remainder as script args)
 
@@ -593,6 +594,34 @@ main-startup: func [
                 is-script-implicit: false  ; not the first post-option arg
             )
         |
+            ; Added initially for GitHub actions.  Concept is that it takes
+            ; a filename and runs it with "shell semantics", e.g. how bash
+            ; would work.  The code is loaded from the file and run as a string,
+            ; not through the DO %FILE mechanics that change the directory.
+            ;
+            "--fragment" end (
+                let code: read local-to-file param-or-die "FRAGMENT"
+                is-script-implicit: false  ; must use --script
+
+                o/quiet: true  ; don't print banner, just run code string
+                quit-when-done: default [true]  ; override blank, not false
+
+                ; !!! Here we make a concession to Windows CR LF, only when
+                ; running code fragments.  This was added because when you use
+                ; a custom shell in GitHub actions, it takes a piece out of the
+                ; yaml file (which has no CR LF) and puts it in a temporary
+                ; file which does have CR LF on Windows.  This would be
+                ; difficult to work around.
+                ;
+                if system/version/4 = 3 [  ; Windows
+                    code: deline code  ; Removes CR or leaves as-is
+                ] else [
+                    code: as text! code
+                ]
+                emit {Use /ONLY so that QUIT/WITH quits, vs. return DO value}
+                emit [do/only (code)]
+            )
+        |
             ["-t" | "--trace"] end (
                 trace on  ; did they mean trace just the script/DO code?
             )
@@ -610,12 +639,12 @@ main-startup: func [
                 ; No window; not currently applicable
             )
         |
-            [copy cli-option: [["--" | "-" | "+"] to end ]] (
+            [let cli-option copy cli-option: [["--" | "-" | "+"] to end] (
                 die [
                     "Unknown command line option:" cli-option LF
                     {!! For a full list of command-line options use: --help}
                 ]
-            )
+            )]
         ]
 
         if not is-option [break]

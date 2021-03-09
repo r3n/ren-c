@@ -93,7 +93,7 @@ lines, and avoids the hassles that come from needing to escape quotes and
 apostrophes when you call from bash, e.g. `r3 --do "print \"This Sucks\""`
 
   step:
-    shell: r3 {0}
+    shell: r3 --fragment {0}  # fragment will tolerate CR+LF, won't change dir
     run: |
       print "Hello, Ren-C As Shell World!"
       print ['apostrophes-dont-need-escaping "...and neither do double quotes"]
@@ -103,6 +103,12 @@ not completely clear why this works...but perhaps it is feeding it from the
 standard input device (as if you had typed the script).  Either way, it's
 better...because if you had to pass the arguments on the command line you would
 be getting problems with the escaping.
+
+The file won't have a header, and on Windows GitHub will add CR LF to the code
+even if the original YAML file had plain LF endings.  To support this need
+the `--fragment` option was added.  We do not want actual distributed scripts
+that make it beyond one individual's use to be carrying CR LF in them, so this
+helps tie the tolerances together with this ad hoc nature.
 
 On Windows, it seems the shell path is unconditionally prepended with:
 
