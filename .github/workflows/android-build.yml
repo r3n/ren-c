@@ -25,21 +25,23 @@
 name: Android Build
 
 
-# Controls when the action will run.  Currently we use the default to trigger
-# the workflow on push or pull request events, but only for the master branch.
+# Note: These builds are particularly slow because the first interpreter was
+# compiled with TCC and with asserts/debug info, and then the second interpreter
+# is building using that.  We could turn off the debug info, but it's better to
+# have it on so we can catch anomalies.
+#
+# See README: When To Trigger Builds
 #
 on:
   push:
     branches: [
-      #master
-      android
+      #master,
+      android  # pushing to android won't build other workflows, use to debug
     ]
   pull_request:
     branches: [
-      #master,
-      android
+      master
     ]
-
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
 

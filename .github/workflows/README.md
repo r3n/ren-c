@@ -45,7 +45,34 @@ Amazon, or specifically the GitHub service itself.
 We'll assume that it's okay to use those actions by tag, without any commit
 hash or need for extra review.
 
+# When To Trigger Builds
 
+We try to keep the builds somewhat reined in...to stay on the good side of
+GitHub and not exceed any quotas, and to conserve planetary energy (if for no
+other reason).
+
+It's set to be possible to trigger any workflow at any time manually (unclear
+why anyone would ever *not* enable that feature):
+
+https://github.blog/changelog/2020-07-06-github-actions-manual-triggers-with-workflow_dispatch/
+
+Then, in order to make it easy to debug a particular failing workflow, each one
+responds to changes on a named branch that no other one does.  This makes it
+easy to push to a branch with that name while working out problems in just
+that workflow.
+
+Pull requests to master are fairly rare at this point in time.  So that is used
+as a trigger to do a "kitchen sink" build of all the workflows.  That's costly
+but infrequent.
+
+Pushes to master do a couple of builds always--such as the web build and the
+Windows builds.
+
+Note that we could also use `if` conditions to control this, e.g.
+
+    if: contains(github.event.head_commit.message, 'TCC')
+
+This could be done at the whole job level, or on individual steps.
 ## Using The Strict Erroring Bash Shell
 
 GitHub Actions fortunately has bash on the Windows Server containers.  While

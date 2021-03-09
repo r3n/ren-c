@@ -25,34 +25,18 @@
 name: TCC Build
 
 
-# Controls when the action will run.  Because the bootstrap currently eats
-# a lot of cycles, we could use up our GitHub Actions quota quickly if every
-# build ran it.  (It's slow because the first interpreter was compiled with
-# TCC and with asserts/debug info, and then the second interpreter is building
-# using that.  We could turn off the debug info, but it's better to have it
-# on so we can catch anomalies...hence slow is the best option here.)
-#
-# So right now it's set up to be only triggered manually from the Actions tab,
-# and we can just remember to do it now and again.
-#
-# We could also limit it based on the commit message, e.g.
-#
-#    if: contains(github.event.head_commit.message, 'TCC')
-#
-# This could be done at the whole job level, or on individual steps.
+# See README: When To Trigger Builds
 #
 on:
   push:
     branches: [
-      #master
-      tcc
+      #master,
+      tcc  # pushing to tcc won't build other workflows, use to debug
     ]
   pull_request:
     branches: [
-      #master,
-      tcc
+      master
     ]
-
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
 

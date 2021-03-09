@@ -22,24 +22,19 @@
 name: Windows Build
 
 
+# See README: When To Trigger Builds
+#
 on:
   push:
-    branches: [master]
+    branches: [
+      master,
+      windows  # pushing to windows won't build other workflows, use to debug
+    ]
   pull_request:
-    branches: [master]
-
+    branches: [
+      master
+    ]
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
-#    logLevel:
-#      description: 'Log level'
-#      required: true
-#      default: 'warning'
-#    tags:
-#      description: 'workflow_dispatch/tags/description'
-
-  # https://github.blog/changelog/2020-07-06-github-actions-manual-triggers-with-workflow_dispatch/
-  #
-
-
 
 
 # The env context declares environment variables in a way they can also be

@@ -23,21 +23,18 @@
 name: Web Build
 
 
-# Controls when the action will run.  Currently we use the default to trigger
-# the workflow on push or pull request events, but only for the master branch.
+# See README: When To Trigger Builds
 #
 on:
   push:
     branches: [
-      #master
-      web
+      master,  # The web build is top priority, needs to always be checked!
+      web  # pushing to windows won't build other workflows, use to debug
     ]
   pull_request:
     branches: [
-      #master,
-      web
+      master
     ]
-
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
 
