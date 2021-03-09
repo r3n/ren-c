@@ -114,13 +114,26 @@
 
     static bool PG_JS_Trace = false;  // Turned on/off with JS-TRACE native
 
+    inline static void Javascript_Trace_Helper_Debug(const char *buf) {
+        if (PG_JS_Trace) {
+            printf("@%ld: ", cast(long, TG_Tick));  // tick count prefix
+            printf("%.s", buf);
+            printf("\n");  // console.log() won't show up until newline
+            fflush(stdout);  // just to be safe
+        }
+    }
+
+    // Caution: trace buffer not thread safe (interpreter is not thread safe
+    // anyway, but JS extension at one time did use threads in a way that
+    // didn't run the interpreter in parallel but ran some C code in parallel
+    // that might have called trace.  That feature was removed, though.)
+    //
+    #define JS_TRACE_BUF_SIZE 2048
+    static char js_trace_buf_debug[JS_TRACE_BUF_SIZE];
     #define TRACE(...)  /* variadic, but emscripten is at least C99! :-) */ \
-        do { if (PG_JS_Trace) { \
-            printf("@%ld: ", cast(long, TG_Tick));  /* tick count prefix */ \
-            printf(__VA_ARGS__); \
-            printf("\n");  /* console.log() won't show up until newline */ \
-            fflush(stdout);  /* just to be safe */ \
-        } } while (0)
+        Javascript_Trace_Helper_Debug( \
+            (snprintf(js_trace_buf_debug, JS_TRACE_BUF_SIZE, __VA_ARGS__), \
+                js_trace_buf_debug))
 
     // TRASH_POINTER_IF_DEBUG() is defined in release builds as a no-op, but
     // it's kind of complicated.  For the purposes in this file these END
@@ -141,16 +154,24 @@
     //
     // Fortunately the definitions for EM_ASM() are pretty simple, so writing
     // them again is fine...just needs to change if emscripten.h does.
-    // (Note that EM_ASM_INT would require changes to TRACE() as implemented)
     //
     #undef EM_ASM
     #define EM_ASM(code, ...) \
-        do { \
-            TRACE("EM_ASM(%s)", #code); \
+        ( \
+            TRACE("EM_ASM(%s)", #code), \
             (void)emscripten_asm_const_int( \
-                #code _EM_ASM_PREP_ARGS(__VA_ARGS__) \
-            ); \
-        } while (0)
+                CODE_EXPR(#code) _EM_ASM_PREP_ARGS(__VA_ARGS__) \
+            ) \
+        )
+
+    #undef EM_ASM_INT
+    #define EM_ASM_INT(code, ...) \
+        ( \
+            TRACE("EM_ASM_INT(%s)", #code), \
+            emscripten_asm_const_int( \
+                CODE_EXPR(#code) _EM_ASM_PREP_ARGS(__VA_ARGS__) \
+            ) \
+        )
 #else
     // assert() is defined as a noop in release builds already
 
