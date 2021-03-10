@@ -86,13 +86,13 @@ jobs:
            config-file: android-cross-compiled.r  # Build ARM with x64 compiler
 
 
-    # The env context declares environment variables in a way they can also be
-    # used in places that aren't shell code, e.g. an `if:` clause.
-    #
     # See README: Environment Variables
     #
     env:
       AWS_S3_BUCKET_NAME: metaeducation
+
+      # See README: Minimize GitHub-Specific Syntax
+      #
       NDK_REVISION: ${{ matrix.ndk-revision }}
       STANDARD: ${{ matrix.standard }}
       DEBUG: ${{ matrix.debug }}
@@ -183,29 +183,30 @@ jobs:
     steps:  # (no indentatation needed below; so indent the minimum!)
 
 
-  #====# FRONTLOAD EMULATOR TINKERING #=======================================#
-
-    # !!! While trying to see if the emulator can get to work, cut to the chase
-    # with a premade android executable.
-
-
-    - name: Grab an r3 Android Built Recently
-      run: |
-        curl http://hostilefork.com/media/shared/android/r3-android29-mar-2021 -o r3
-
-
-  #====# BUILD STEPS #========================================================#
-
-    # We build both pull requests and commits to master.  So the build steps
-    # are run unconditionally (no `if:` qualifiers)
+  #====# CHECKOUT STEPS #=====================================================#
 
 
     # https://github.com/actions/checkout
     #
     # See README: Checkout Action
-    # See README: IMPORTANT - Security Of Trusted Actions
     #
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v2  # See README: Trusted Actions
+
+
+    # The full commit is passed to make to build into the binary, and the
+    # abbreviated commit is used to name the executable.
+    #
+    # See README: Portably Capturing Git Hashes
+    #
+    - name: Grab Git Hash and Short Hash Into Environment Variables
+      run: |
+        git_commit="$(git show --format="%H" --no-patch)"
+        git_commit_short="$(git show --format="%h" --no-patch)"
+        echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
+        echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+
+
+  #====# TOOLCHAIN INSTALLATION STEPS #=======================================#
 
 
     # See README: If Statements
@@ -242,13 +243,9 @@ jobs:
         echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
 
 
-    # Test to make sure the R3-MAKE works, because otherwise everything else
-    # is wasting time...the build won't run.  GitHub checks the run result
-    # and will stop the workflow if it's not 0.
-    #
-    - name: "Sanity check that R3-MAKE is Working"
+    - name: Stop the build early if the R3MAKE is no good
       run: |
-        "$R3MAKE" --do "print {Hello from R3-MAKE} quit 0"
+        "$R3MAKE" --do "print {R3MAKE is Working} quit 0"
 
 
     # Building for Android requires having a compiler that can build for ARM,
@@ -306,55 +303,55 @@ jobs:
         echo "Current directory is: $(pwd)"
 
 
-    # Grab abbreviated and full git commit ID into environment variables.
-    # The full commit is passed to make to build into the binary, and the
-    # abbreviated commit is used to name the executable.
-    #
-    # See README: Portably Capturing Git Hashes
-    #
-    - name: Grab Git Hash and Short Hash Into Environment Variables
-      run: |
-        git_commit="$(git show --format="%H" --no-patch)"
-        echo "git_commit is $git_commit"
-        git_commit_short="$(git show --format="%h" --no-patch)"
-        echo "git_commit_short is $git_commit_short"
-        echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
-        echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+  #====# BUILD STEPS #========================================================#
 
 
-    # We are able to use either the makefile version of the build or the
-    # fully Ren-C driven form with CALL.  Both should be tested, but right
-    # now this is using the makefile version.
+    # See README: {Braces} For %make.r String Parameters
     #
     - name: Build Using The NDK
       run: |
         mkdir build
         cd build
 
-        # !!! optimization is currently hardcoded in the web build config
-        # files as `s`.  Review if `z` would be better (it cannot be passed
-        # in the options here at time of writing, and would be ignored even
-        # if it could be due to that ldflags config hardcoding).
-        #
-        # NOTE: The GIT_COMMIT must be in {} not just "" that the shell might
-        # get rid of.  Or you get weird bugs when the hex starts with numbers
-        # and doesn't make a WORD!.  Frustrating to debug because each
-        # diagnostic changes the hash to maybe a WORD!
-        #
         "$R3MAKE" ../make.r \
-            config=../configs/${{ matrix.config-file }} \
+            config="../configs/$CONFIG_FILE" \
             target=makefile \
-            standard=${{ matrix.standard }} \
+            standard=$STANDARD \
             os_id=$OS_ID \
-            debug=${{ matrix.debug }} \
+            debug=$DEBUG \
             git_commit="{$GIT_COMMIT}" \
             rigorous=no \
             static=no \
-            extensions=${{ matrix.extensions }}
+            extensions="$EXTENSIONS"
 
-        make prep
+
+    - name: Create Folders For Build Products (Compiler Won't Create Them)
+      run: |
+        cd build
         make folders
+
+
+    - name: Prep the Build By Making Various Auto-Generated .h and .c Files
+      run: |
+        cd build
+        make prep
+
+
+    # https://github.com/actions/upload-artifact
+    #
+    - name: Optional Download of Prep Files Before They Can Cause Build Failure
+      if: false  # Change this to true to download a file
+      uses: actions/upload-artifact@v2  # See README: Trusted Actions
+      with:
+        name: tmp-internals.h
+        path: build/prep/include/tmp-internals.h
+
+
+    - name: Cross-Compile and Link the C Files to into an ARM-Based R3
+      run: |
+        cd build
         make
+        echo "R3BUILT=$(pwd)/r3" >> $GITHUB_ENV
 
 
   #====# TESTING STEP #=======================================================#
@@ -394,20 +391,20 @@ jobs:
       if: matrix.os == 'macos-latest'  # not `${{ matrix.os }} == ...`
       uses: hostilefork/android-emulator-runner@dont-wrap-script
       env:
-        R3: adb shell /data/local/tmp/r3
+        ADB_R3: adb shell /data/local/tmp/r3  # "Android DeBug" remotely
       with:
         api-level: ${{ env.EMULATOR_API_LEVEL }}
         arch: ${{ env.EMULATOR_ARCH }}
         target: ${{ env.EMULATOR_TARGET }}
         emulator-options: ${{ env.EMULATOR_OPTIONS }}
         #
-        # The script must backslash escape single and double quotes.  (This is
-        # true if you call `adb shell` on Linux and Windows, not just here on
-        # the headless test device.)
+        # When you call `adb shell` on Linux and Windows, you need to escape
+        # single and double quotes with backslash if they need to appear
+        # literally in the shell command line.
         #
         script: |
-          adb push build/r3 /data/local/tmp/r3
+          adb push "$R3BUILT" /data/local/tmp/r3
           adb shell chmod +x /data/local/tmp/r3
 
-          $R3 --do \"print [{Hello} \'World]\"
-          $R3 --do \"print mold/limit as text! read https://example.com\"
+          $ADB_R3 --do \"print [{Hello} \'World]\"
+          $ADB_R3 --do \"print mold/limit as text! read https://example.com\"

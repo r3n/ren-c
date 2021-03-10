@@ -13,7 +13,7 @@ There's a bit of ambiguity in how GitHub uses the term "Action".  Our terms:
 * **GitHub Workflow** - A process documented in a .yml file for performing
   tasks on a source repository.  This directory contains several workflows.
 
-## IMPORTANT - Avoid Lock-In Where Possible
+## IMPORTANT - Minimize GitHub-Specific Syntax
 
 At time of writing, GitHub CI is excellent.  However, our initial service
 provider (Travis CI) had been excellent at one time, and then became terrible:
@@ -22,10 +22,12 @@ https://forum.rebol.info/t/goodbye-travis-but-its-not-all-despair/1421
 
 So while working with GitHub CI, always keep in mind the question of how
 easy switching to another service would be.  Wherever possible, make sure that
-workflow steps could be run if copy-pasted into a local terminal.  This means
-using plain old $ENVIRONMENT_VARIABLES instead of ${{ github.syntax }}, and
-if you have to use GitHub-specific features then clearly isolate them into
-their own step.
+workflow steps could be run if copy-pasted into a local terminal.
+
+Hence don't use special things like ${{ github.syntax }} where possible.
+Instead, capture these into plain old $ENVIRONMENT_VARIABLES.  And isolate any
+GitHub-specific features into their own step.  All build matrix variables
+should be proxied into environment variables at the start of the sript.
 
 ## !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
 
@@ -58,7 +60,7 @@ given at least a cursory inspection each time that commit is updated.
 
 YCombinator thread: https://news.ycombinator.com/item?id=21844805
 
-## IMPORTANT - Security Of Trusted Actions
+## Trusted Actions
 
 GitHub has verified accounts that host Actions, for entities like Microsoft,
 Amazon, or specifically the GitHub service itself.
@@ -224,7 +226,7 @@ The exit status of a step is the result of the last executed command in
 that step, or the parameter to `exit` if the step ends prematurely.
 
 A step that only contains `uses:` is a means of running reusable code published
-in aseparate repository (a "GitHub Action").  Please see notes above regarding
+in a separate repository (a "GitHub Action").  Please see notes above regarding
 cautions about that.  Also, always link to the repository for a used action in
 a comment so that the options (if any) are at hand.
 
@@ -308,9 +310,34 @@ https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-synta
 ## Portably Capturing Git Hashes
 
 While GitHub CI may offer this, good to have it done in an agnostic fashion so
-the script is more portable.
+the script is more portable.  First we capture temporarily into lowercase
+environment variables that are only visible within the step:
 
 http://stackoverflow.com/a/42549385
+
+    git_commit="$(git show --format="%H" --no-patch)"
+    git_commit_short="$(git show --format="%h" --no-patch)"
+
+Next we export those into uppercase environment variables that are visible in
+the next steps:
+
+    echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
+    echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+
+
+## {Braces} For %make.r String Parameters
+
+At time of writing, %make.r uses LOAD-VALUE to load its arguments.  This is
+so that it gets numeric or tuple values as tuples, and words as words.
+
+But string parameters like the GIT_COMMIT present a problem, because they
+aren't received with quotes or braces around them.  Strangely, the git commit
+is sometimes a valid word and sometimes not...depending on whether it starts
+with a letter or a digit.  This can lead to frustrating debug situations as
+diagnostic code changes the hash!
+
+The ergonomics need improvement.  For now, the commit needs to be passed in
+braces or escaped quotes to be received as a string.
 
 ## YAML >- To Make One Line From Many
 
@@ -336,4 +363,3 @@ https://www.drone.io/
 This tool for skipping actions looked interesting:
 
 https://github.com/fkirc/skip-duplicate-actions
-

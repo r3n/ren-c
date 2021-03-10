@@ -37,15 +37,6 @@ on:
   workflow_dispatch:  # Allows running this workflow manually from Actions tab
 
 
-# The env context declares environment variables in a way they can also be
-# used in places that aren't shell code, e.g. an `if:` clause.
-#
-# See README: Environment Variables
-#
-env:
-  AWS_S3_BUCKET_NAME: metaeducation
-
-
 # Standardize to use bash on all platforms.
 #
 # See README: Using The Strict Erroring Bash Shell
@@ -79,6 +70,17 @@ jobs:
            config-file: emscripten.r
 
 
+    # See README: Environment Variables
+    #
+    env:
+      AWS_S3_BUCKET_NAME: metaeducation
+
+      # See README: Minimize GitHub-Specific Syntax
+      #
+      OS_ID: ${{ matrix.os-id }}
+      CONFIG_FILE: ${{ matrix.config-file }}
+
+
     # Steps are a sequence of tasks that will be executed within a single VM
     # as part of the job.
     #
@@ -87,46 +89,16 @@ jobs:
     steps:  # (no indentatation needed below; so indent the minimum!)
 
 
-  #====# BUILD STEPS #========================================================#
-
-    # We build both pull requests and commits to master.  So the build steps
-    # are run unconditionally (no `if:` qualifiers)
-
-
-    - name: Save matrix.os-id Into OS_ID Environment Variable
-      run: |
-        echo "OS_ID=${{ matrix.os-id }}" >> $GITHUB_ENV
+  #====# CHECKOUT STEPS #=====================================================#
 
 
     # https://github.com/actions/checkout
     #
     # See README: Checkout Action
-    # See README: IMPORTANT - Security Of Trusted Actions
     #
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v2  # See README: Trusted Actions
 
 
-    # This action will install the Emscripten SDK, which makes the `emcc`
-    # compilation command available.  This compiler takes in C files and will
-    # emit wasm, for producing libr3.js
-    #
-    # https://github.com/mymindstorm/setup-emsdk
-    #
-    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
-    #
-    - uses: mymindstorm/setup-emsdk@f9068d69f3908ddd991f32b8c8818d5781fe0c78
-
-
-    # Show a little bit of sanity check information
-    #
-    - name: Output System Information
-      run: |
-        echo "Current directory is: $(pwd)"
-        echo "EMCC version check:"
-        emcc -v
-
-
-    # Grab abbreviated and full git commit ID into environment variables.
     # The full commit is passed to make to build into the binary, and the
     # abbreviated commit is used to name the executable.
     #
@@ -135,11 +107,12 @@ jobs:
     - name: Grab Git Hash and Short Hash Into Environment Variables
       run: |
         git_commit="$(git show --format="%H" --no-patch)"
-        echo "git_commit is $git_commit"
         git_commit_short="$(git show --format="%h" --no-patch)"
-        echo "git_commit_short is $git_commit_short"
         echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
         echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+
+
+  #====# TOOLCHAIN INSTALLATION STEPS #=======================================#
 
 
     # !!! Ideally this would use the same step that clients can use to build
@@ -164,27 +137,48 @@ jobs:
         echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
 
 
-    # We are able to use either the makefile version of the build or the
-    # fully Ren-C driven form with CALL.  Both should be tested, but right
-    # now this is using the makefile version for the web builds.
+    - name: Stop the build early if the R3MAKE is no good
+      run: |
+        "$R3MAKE" --do "print {R3MAKE is Working} quit 0"
+
+
+    # This action will install the Emscripten SDK, which makes the `emcc`
+    # compilation command available.  This compiler takes in C files and will
+    # emit wasm, for producing libr3.js
     #
-    - name: Perform Emscripten-Based Build To Make .wasm and .js Files
+    # https://github.com/mymindstorm/setup-emsdk
+    #
+    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
+    #
+    - uses: mymindstorm/setup-emsdk@f9068d69f3908ddd991f32b8c8818d5781fe0c78
+
+
+    # Show a little bit of sanity check information
+    #
+    - name: Output System Information
+      run: |
+        echo "Current directory is: $(pwd)"
+        echo "EMCC version check:"
+        emcc -v
+
+
+  #====# BUILD STEPS #========================================================#
+
+
+    # !!! optimization is currently hardcoded in the web build config files as
+    # `s`.  Review if `z` would be better (it cannot be passed in the options
+    # here at time of writing, and would be ignored even if it could be due to
+    # that ldflags config hardcoding).
+    #
+    # See README: {Braces} For %make.r String Parameters
+    #
+    - name: Generate Makefile for Emscripten-Based Build
       run: |
         mkdir build
         cd build
 
-        # !!! optimization is currently hardcoded in the web build config
-        # files as `s`.  Review if `z` would be better (it cannot be passed
-        # in the options here at time of writing, and would be ignored even
-        # if it could be due to that ldflags config hardcoding).
-        #
-        # NOTE: The GIT_COMMIT must be in {} not just "" that the shell might
-        # get rid of.  Or you get weird bugs when the hex starts with numbers
-        # and doesn't make a WORD!.  Frustrating to debug because each
-        # diagnostic changes the hash to maybe a WORD!
-        #
         "$R3MAKE" ../make.r \
-            config=../configs/${{ matrix.config-file }} \
+            config="../configs/$CONFIG_FILE" \
             target=makefile \
             standard=c \
             os_id=$OS_ID \
@@ -194,8 +188,32 @@ jobs:
             static=no \
             extensions=""
 
-        make prep
+
+    - name: Create Folders For Build Products (Compiler Won't Create Them)
+      run: |
+        cd build
         make folders
+
+
+    - name: Prep the Build By Making Various Auto-Generated .h and .c Files
+      run: |
+        cd build
+        make prep
+
+
+    # https://github.com/actions/upload-artifact
+    #
+    - name: Optional Download of Prep Files Before They Can Cause Build Failure
+      if: false  # Change this to true to download a file
+      uses: actions/upload-artifact@v2  # See README: Trusted Actions
+      with:
+        name: tmp-internals.h
+        path: build/prep/include/tmp-internals.h
+
+
+    - name: Compile and Link the C Sources to To Make .wasm and .js Files
+      run: |
+        cd build
         make
 
 
@@ -276,7 +294,7 @@ jobs:
     #
     # https://github.com/aws-actions/configure-aws-credentials
     #
-    # See README: IMPORTANT - Security Of Trusted Actions
+    # See README: Trusted Actions
     #
     - name: Configure AWS Credentials
       if: github.ref == 'refs/heads/master'  # see notes on DEPLOY STEPS
