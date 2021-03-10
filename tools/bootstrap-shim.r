@@ -67,7 +67,7 @@ trap [
     ]
 
     ; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
-    ; bootstrap executable on github actions doesn't have this change
+    ; bootstrap executable on GitHub CI doesn't have this change
     ;
     if undefined? 'just [
         just: :literal

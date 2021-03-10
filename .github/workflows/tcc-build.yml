@@ -3,9 +3,9 @@
 #
 #=============================================================================#
 #
-# GitHub Actions Workflow for using TCC to build Ren-C with the TCC extension,
-# and then use that executable to bootstrap.  A demonstration of this ability
-# was first made in July 2019, video here:
+# GitHub Workflow for using TCC to build Ren-C with the TCC extension, and then
+# use that executable to bootstrap.  A demonstration of this ability was first
+# made in July 2019, video here:
 #
 # https://youtu.be/PT3GOe1pj9I?t=163
 #

@@ -3,9 +3,8 @@
 #
 #=============================================================================#
 #
-# GitHub Actions Workflow for building the Wasm version of Ren-C.  It builds
-# all pull requests to master, but only deploys commits that are accepted to
-# the master branch.
+# GitHub Workflow for building the Wasm version of Ren-C.  It *builds* all pull
+# requests to master, but only *deploys* commits that are actually merged in.
 #
 # Deployments will become "live" in the Web REPL demonstration directly from
 # this action...but only if they are "greenlit" after running a test in a
@@ -29,7 +28,7 @@ on:
   push:
     branches: [
       master,  # The web build is top priority, needs to always be checked!
-      web  # pushing to windows won't build other workflows, use to debug
+      web  # pushing to web won't build other workflows, use to debug
     ]
   pull_request:
     branches: [

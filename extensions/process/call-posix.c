@@ -446,8 +446,8 @@ REB_R Call_Core(REBFRM *frame_) {
             if (sh == nullptr) {
                 //
                 // !!! Convention usually says the $SHELL is set.  But the
-                // GitHub Actions environment is a case that does not seem
-                // to pass it through to processes called in steps, e.g.
+                // GitHub CI environment is a case that does not seem to pass
+                // it through to processes called in steps, e.g.
                 //
                 //     echo "SHELL is $SHELL"  # this shows /bin/bash
                 //     ./r3 --do "print get-env {SHELL}"  # shows nothing

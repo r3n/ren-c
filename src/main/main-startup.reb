@@ -594,10 +594,10 @@ main-startup: func [
                 is-script-implicit: false  ; not the first post-option arg
             )
         |
-            ; Added initially for GitHub actions.  Concept is that it takes
-            ; a filename and runs it with "shell semantics", e.g. how bash
-            ; would work.  The code is loaded from the file and run as a string,
-            ; not through the DO %FILE mechanics that change the directory.
+            ; Added initially for GitHub CI.  Concept is that it takes a
+            ; filename and runs it with "shell semantics", e.g. how bash would
+            ; work.  The code is loaded from the file and run as a string, not
+            ; through the DO %FILE mechanics that change the directory.
             ;
             "--fragment" end (
                 let code: read local-to-file param-or-die "FRAGMENT"
@@ -608,7 +608,7 @@ main-startup: func [
 
                 ; !!! Here we make a concession to Windows CR LF, only when
                 ; running code fragments.  This was added because when you use
-                ; a custom shell in GitHub actions, it takes a piece out of the
+                ; a custom shell in GitHub CI, it takes a piece out of the
                 ; yaml file (which has no CR LF) and puts it in a temporary
                 ; file which does have CR LF on Windows.  This would be
                 ; difficult to work around.

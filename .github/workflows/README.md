@@ -1,18 +1,39 @@
-# GitHub Actions
+# GitHub Workflows for the Ren-C Project
 
-Bash Style Ideas:
+This file documents the conventions used for the Continuous Integration service
+offered by GitHub.
 
-https://ae1020.github.io/thoughts-on-bash-style/
+There's a bit of ambiguity in how GitHub uses the term "Action".  Our terms:
 
-Links for future investigation:
+* **GitHub CI** - The service as a whole.
 
-https://github.com/fkirc/skip-duplicate-actions
+* **GitHub Action** - A reusable component, typically written in Node.js, that
+  can be run as a step with the `uses:` tag.
+
+* **GitHub Workflow** - A process documented in a .yml file for performing
+  tasks on a source repository.  This directory contains several workflows.
+
+## IMPORTANT - Avoid Lock-In Where Possible
+
+At time of writing, GitHub CI is excellent.  However, our initial service
+provider (Travis CI) had been excellent at one time, and then became terrible:
+
+https://forum.rebol.info/t/goodbye-travis-but-its-not-all-despair/1421
+
+So while working with GitHub CI, always keep in mind the question of how
+easy switching to another service would be.  Wherever possible, make sure that
+workflow steps could be run if copy-pasted into a local terminal.  This means
+using plain old $ENVIRONMENT_VARIABLES instead of ${{ github.syntax }}, and
+if you have to use GitHub-specific features then clearly isolate them into
+their own step.
 
 ## !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
 
-GitHub Actions has a very convenient feature with the `uses:` clause, that lets
-you reuse script code that others have posted on GitHub to do convenient setup
-work.  But this running of arbitrary code can have a lot of failure modes.
+The GitHub CI has a very convenient feature with the `uses:` clause, that lets
+you reuse script code (a "GitHub Action") that others publish to do convenient
+setup work.
+
+**But running third party code can have a lot of failure modes!**
 
 * If you provide credentials to the container, those credentials can be abused
   by a malicious action.  If you make it possible for the container to upload
@@ -48,36 +69,39 @@ hash or need for extra review.
 # When To Trigger Builds
 
 We try to keep the builds somewhat reined in...to stay on the good side of
-GitHub and not exceed any quotas, and to conserve planetary energy (if for no
-other reason).
+GitHub and not exceed any quotas.  (If for no other reason, it's good to
+exercise restraint to conserve planetary energy.)
 
 It's set to be possible to trigger any workflow at any time manually (unclear
 why anyone would ever *not* enable that feature):
 
 https://github.blog/changelog/2020-07-06-github-actions-manual-triggers-with-workflow_dispatch/
 
-Then, in order to make it easy to debug a particular failing workflow, each one
-responds to changes on a named branch that no other one does.  This makes it
-easy to push to a branch with that name while working out problems in just
-that workflow.
+Then, in order to make it easy to debug problems, each workflow names a branch
+that it will respond to that no other workflow does.  You can push to the
+branch with that name while working out problems in that workflow...which can
+be a process that takes many, many commits.
 
 Pull requests to master are fairly rare at this point in time.  So that is used
 as a trigger to do a "kitchen sink" build of all the workflows.  That's costly
-but infrequent.
+but infrequent, and happens often enough to keep less critical builds working.
 
-Pushes to master do a couple of builds always--such as the web build and the
-Windows builds.
+Pushes to master do a couple of builds unconditionally--such as the web build
+and the Windows builds.
 
 Note that we could also use `if` conditions to control this, e.g.
 
     if: contains(github.event.head_commit.message, 'TCC')
 
 This could be done at the whole job level, or on individual steps.
+
 ## Using The Strict Erroring Bash Shell
 
-GitHub Actions fortunately has bash on the Windows Server containers.  While
-there might be some theoretical benefit to PowerShell (the default), having
+GitHub CI fortunately has bash on the Windows Server containers.  While there
+might be some theoretical benefit to PowerShell (the default), having
 cross-platform code it just makes more sense to keep all the files as bash.
+
+https://ae1020.github.io/thoughts-on-bash-style/
 
 USING BASH ON WINDOWS TAMPERS WITH THE PATH.  This causes strange effects like
 there being visibility of GNU's symlink tool /usr/bin/link that is found
@@ -85,8 +109,8 @@ instead of the MS compiler's LINK.EXE
 
 https://github.com/ilammy/msvc-dev-cmd/issues/25
 
-For this project, it's considered worth it to work around issues with that
-when it comes up...for the sake of consistency across the scripts.
+For this project, it's considered worth it to work around such issues when they
+come up...for the sake of consistency across the scripts.
 
 By default, bash does not speak up when an error happens in the middle of
 lines of shell code.  So the only error you would get from a long `run` code
@@ -103,21 +127,22 @@ on the first error:
     $ bash -e -c "cd asdfasdf; echo 'will not get here'"
     bash: line 0: cd: asdfasdf: No such file or directory
 
-It's much better to use that and use switches to suppress the failing cases
-that are supposed to fail.  This is enabled by default when you use the
-`shell: bash` option, acts like: `bash --noprofile --norc -eo pipefail {0}`
+This is enabled by default in GitHub CI when you use the `shell: bash` option.
+It acts like:
+
+    bash --noprofile --norc -eo pipefail {0}
 
 https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#using-a-specific-shell
 
-Be sure to preserve the `-e` setting if customizing the bash command further.
-
+Be sure to preserve the `-e` setting if customizing the bash command further,
+and when using alternative shells consider how to make them error as well.
 
 # Ren-C Code As Step
 
-Because GitHub Actions lets you customize the shell, we can actually make the
-`run:` portion be Ren-C code.  This lets you cleanly span code across many
-lines, and avoids the hassles that come from needing to escape quotes and
-apostrophes when you call from bash, e.g. `r3 --do "print \"This Sucks\""`
+Because GitHub CI lets you customize the shell, we can actually make the `run:`
+portion be Ren-C code.  This lets you cleanly span code across many lines, and
+avoids the hassles that come from needing to escape quotes and apostrophes when
+you call from bash, e.g. `r3 --do "print \"This Sucks\""`
 
   step:
     shell: r3 --fragment {0}  # fragment will tolerate CR+LF, won't change dir
@@ -136,6 +161,8 @@ even if the original YAML file had plain LF endings.  To support this need
 the `--fragment` option was added.  We do not want actual distributed scripts
 that make it beyond one individual's use to be carrying CR LF in them, so this
 helps tie the tolerances together with this ad hoc nature.
+
+https://forum.rebol.info/t/using-ren-c-as-the-shell-in-github-ci/1547
 
 On Windows, it seems the shell path is unconditionally prepended with:
 
@@ -196,10 +223,10 @@ export state seen by future steps (see `Environment Variables` below).
 The exit status of a step is the result of the last executed command in
 that step, or the parameter to `exit` if the step ends prematurely.
 
-A step that only contains `uses:` is a means of incorporating a fragment
-of GitHub action code published in a separate repository.  Please see notes
-above regarding cautions about that.  Also, always link to the repository for
-a used action in a comment so that the options (if any) are at hand.
+A step that only contains `uses:` is a means of running reusable code published
+in aseparate repository (a "GitHub Action").  Please see notes above regarding
+cautions about that.  Also, always link to the repository for a used action in
+a comment so that the options (if any) are at hand.
 
 ## Environment Variables
 
@@ -250,10 +277,6 @@ https://docs.github.com/en/actions/reference/context-and-expression-syntax-for-g
 
 ## Build Matrix
 
-(Note: We want non-Github-Actions-specific syntax in our steps--e.g. `$FOO`
-and not `${{ matrix.foo }}`--so proxy matrix vars to environment vars when
-that is feasible.)
-
 The build matrix is where you can either explicitly give a full list of
 variables for a build permutation with `include`:
 
@@ -275,20 +298,19 @@ permutation of builds.  So this is a more compact way of saying the above:
         - var1: [a, b]
         - var2: common
 
-The variables set here are GitHub Actions variables, not environment variables.
+The variables set here are GitHub CI variables, not environment variables.
 That means they have to be accessed with ${{ var1 }} syntax.  In order to avoid
-tying too much of the process to run only on GitHub actions, it's best to
-capture them into environment variables.
+tying too much of the process to run only on GitHub CI, it's best to capture
+them into environment variables.
 
 https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#using-environment-variables-in-a-matrix
 
 ## Portably Capturing Git Hashes
 
-While GitHub Actions may offer this, good to have it done in an agnostic
-fashion so the script is more portable.
+While GitHub CI may offer this, good to have it done in an agnostic fashion so
+the script is more portable.
 
 http://stackoverflow.com/a/42549385
-
 
 ## YAML >- To Make One Line From Many
 
@@ -303,3 +325,15 @@ This produces `this is my very very very long string`.  If you want a newline
 at the end, then use `>` instead of `>-`
 
 https://stackoverflow.com/a/21699210
+
+## Further Research
+
+When considering whether to host our own runners or use GitHub CI, the most
+interesting alternative to try at time of writing seemed to be Drone CI:
+
+https://www.drone.io/
+
+This tool for skipping actions looked interesting:
+
+https://github.com/fkirc/skip-duplicate-actions
+
