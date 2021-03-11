@@ -550,6 +550,52 @@ dequote: func [x] [
     ] else [x]
 ]
 
+
+; Temporarily work around MATCH usage bug in bootstrap unzip:
+;
+;    data: if match [file! url! blank!] try :source/2 [
+;
+; If there is no SOURCE/2, it gets NULL...which it turns into a blank because
+; there was no <opt> in match.
+;
+; But then if that blank matches, it gives a VOID! so you don't get misled
+; in tests exactly like this one.  (!)
+;
+; Temporarily make void matches just return true for duration of the zip.
+; Also, make PRINT accept FILE! and TEXT! so the /VERBOSE option will work.
+;
+zip: enclose :zip func [f] [
+    let old-match: :match
+    let old-print: :print
+
+    if f/verbose [
+        fail "/VERBOSE not working due to PRINT problem, broken in bootstrap"
+    ]
+
+    ; !!! This workaround is crashing the bootstrap EXE, let it go for now
+    ;lib/print: adapt :print [
+    ;    if match [file! text!] :line [
+    ;        line: reduce [line]
+    ;    ]
+    ;]
+
+    lib/match: func [type value [<opt> any-value!]] [
+        let answer
+        if void? set* 'answer match type value [
+            return true
+        ]
+        return get 'answer
+    ]
+
+    let result: do f
+
+    lib/match: :old-match
+    ;lib/print: :old-print
+
+    return result
+]
+
+
 ; This experimental MAKE-FILE is targeting behavior that should be in the
 ; system core eventually.  Despite being very early in its design, it's
 ; being built into new Ren-Cs to be tested...but bootstrap doesn't have it.

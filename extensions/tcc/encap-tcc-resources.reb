@@ -145,6 +145,10 @@ encap: compose [
 
 
 print ["MAKING ZIP FILE:" make-file [(output-dir) tcc-encap.zip]]
-zip/deep/verbose make-file [(output-dir) tcc-encap.zip] encap
+
+; !!! The /VERBOSE option in the bootstrap build fails because it uses PRINT
+; on a plain FILE! that's not in a block.  Review.
+;
+zip/deep make-file [(output-dir) tcc-encap.zip] encap
 
 print ["(ULTIMATELY WE WANT TO ENCAP THAT DIRECTLY INTO THE TCC EXTENSION)"]
