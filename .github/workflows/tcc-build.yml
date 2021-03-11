@@ -313,6 +313,14 @@ jobs:
     # like this would effectively be using the file it just made, just like
     # we are doing here.
     #
+    # Modifications have been proposed which would make the "Standalone
+    # Building" feature for Rebol better:
+    #
+    # http://lists.nongnu.org/archive/html/tinycc-devel/2018-12/msg00011.html
+    #
+    # But given priorities, there are not enough Rebol dev resources to
+    # develop and maintain a separate fork of TCC for that.
+    #
     - name: Set CONFIG_TCCDIR and LIBREBOL_INCLUDE_DIR for Test Phase
       run: |
         echo "CONFIG_TCCDIR=$(pwd)/tccencap/" >> $GITHUB_ENV
@@ -336,4 +344,4 @@ jobs:
         echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR}"
         echo "Note: LIBREBOL_INCLUDE_DIR is ${LIBREBOL_INCLUDE_DIR}"
 
-        "$R3TWO" extensions/tcc/tests/fib.r
+        "$R3TWO" ren-c-master/extensions/tcc/tests/fib.r

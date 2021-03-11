@@ -127,6 +127,8 @@ registering hooks to fulfill library requests or include files:
 
 http://lists.nongnu.org/archive/html/tinycc-devel/2018-12/msg00011.html
 
+(A copy of this suggestion is included at the bottom of this file.)
+
 That would provide a workaround for letting a host who has embedded blobs
 for headers and libs provide those to the build process.
 
@@ -178,3 +180,56 @@ optimized.  It's not a priority, but a curious experimenter might try to mimic
 TCC's POSIX command line features via PARSE as a first step:
 
 http://pubs.opengroup.org/onlinepubs/9699919799/utilities/c99.html
+
+### Cache of Improvement Suggestion
+
+Put here in case the mailing list link goes missing.
+
+> I have a suggestion (that may have been made before?) which would
+> allow libtcc API users to register callbacks that fulfill headers or
+> includes from binary blobs they have on hand.  For instance:
+>
+>    const char *tcc_include_callback(
+>        void *opaque,
+>        const char *include,
+>        int quoted // e.g. 1 for "foo.h" and 0 for <foo.h>
+>    ){
+>        if (!quoted && !strcmp(include, "stdarg.h"))
+>             return embedded_stdarg;
+>        return NULL; // not a match, use default handling
+>     }
+>
+>    const char* tcc_lib_callback(
+>        void *opaque,
+>        const char *lib
+>    ){
+>         if (!strcmp(lib, "libtcc1.a"))
+>              return embedded_libtcc1;
+>         return NULL; // not a match, use default handling
+>    }
+>
+>    tcc_set_include_func(state, opaque, &tcc_include_callback);
+>    tcc_set_lib_func(state, opaque, &tcc_lib_callback);
+>
+> An interpreter I work on currently achieves this with a more narrow
+> method.  That method also involves adding to the TCC API...but it's
+> more invasive.  The API exports a table of everything that's in
+> libtcc1.a, along with its symbol name, e.g.:
+>
+>    int n = 0;
+>    for (n = 0; tcc_libtcc1_names[n] != NULL; ++n)
+>        tcc_add_symbol(tcc_libtcc1_names[n], tcc_libtcc1_funcs[n]);
+>
+> That's less general, and adds a "large" table to libtcc that not
+> everyone may want to use.  My alternate proposal seems lighter,
+> probably wouldn't be as disruptive to the build process, and would
+> help solve some other problems.
+>
+> The main thing I'd like to avoid is not being stuck with a dependency
+> that is a fork of TCC which is not being maintained (...by the "mob"?
+> :-P)  So I'm wondering if there's any chance of getting such a feature
+> approved by the people who are committing to and tending TCC on a
+> regular basis.  Or perhaps another feature which satisfies the desire?
+>
+> I'd be happy to be involved in adding and testing such a thing, if
+> people felt it is the kind of thing that would be a good change.

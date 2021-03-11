@@ -45,20 +45,6 @@
 
 #include "libtcc.h"
 
-#if defined(NEEDS_FAKE_STRTOLD)
-    //
-    // strtold() was added in C99.  Some older Android NDKs don't have it, but
-    // TCC depends upon it.  It defines it as an extern in %tcc.h with
-    // different return type than Android NDK's strtod, hence you can't
-    // do `-Dstrtold-strtod` without getting a conflicting definition warning.
-    //
-    // This proxy definition can get past the linker error, and keeps the
-    // workaround isolated to the TCC extension.
-    //
-    long double strtold (const char *nptr, char **endptr) {
-        return strtod(nptr, endptr);
-    }
-#endif
 
 #if defined(TCC_RELOCATE_AUTO)
     #define tcc_relocate_auto(s) \
@@ -279,7 +265,7 @@ REB_R Pending_Native_Dispatcher(REBFRM *f) {
     // known correct COMPILE Rebol function has to be done (NATIVE_VAL() is
     // not in extensions yet, and may not be, so no NATIVE_VAL(compile).)
     //
-    rebElide("compile [", action, "]", rebEND);
+    rebElide("compile [", rebQ(action), "]", rebEND);
     //
     // ^-- !!! Today's COMPILE doesn't return a result on success (just fails
     // on errors), but if it changes to return one consider what to do.
@@ -601,7 +587,7 @@ REBNATIVE(compile_p)
     // Add library paths (same as using `-L` in the options?)
     //
     Process_Block_Helper(tcc_add_library_path, state, config, "library-path");
-    
+
     // Add individual library files (same as using -l in the options?  e.g.
     // the actual file is "libxxx.a" but you'd pass just `xxx` here)
     //

@@ -991,6 +991,6 @@ e-table/write-emitted
 ; The JavaScript extension actually mutates the API table, so run the TCC hook
 ; first...
 ;
-do make-file [(repo-dir) tools/../extensions/tcc/prep-libr3-tcc.reb]
+do make-file [(repo-dir) extensions/tcc/tools/prep-libr3-tcc.reb]
 
-do make-file [(repo-dir) tools/../extensions/javascript/prep-libr3-js.reb]
+do make-file [(repo-dir) extensions/javascript/tools/prep-libr3-js.reb]

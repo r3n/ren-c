@@ -49,14 +49,6 @@ libtcc-lib-dir: try any [
 
 
 cflags: compose [
-    ;
-    ; strtold() is used by TCC in non-Windows builds.  It was a C99 addition,
-    ; and Android NDKs (at least older ones) do not have it, so the link
-    ; step would fail if someone didn't define it.  So this flag controls
-    ; having the TCC extension define a function that just runs strtod().
-    ;
-    (if "1" = get-env "NEEDS_FAKE_STRTOLD" ["-DNEEDS_FAKE_STRTOLD"])
-
     (if libtcc-include-dir [
         unspaced [{-I} {"} file-to-local libtcc-include-dir {"}]
     ])

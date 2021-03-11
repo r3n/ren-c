@@ -67,23 +67,28 @@ jobs:
     #
     strategy:
       matrix:
-       include:  # put in order of visibility importance (shown in UI)
+        include:  # put in order of visibility importance (shown in UI)
 
-         - ndk-revision: r13  # old gcc-based version (used in 2019 demo)
-           os: ubuntu-20.04
-           standard: c99
-           debug: normal
-           extensions: ""
-           os-id: 0.13.2
-           config-file: android-cross-compiled.r  # Build ARM with x64 compiler
+        #- ndk-revision: r13  # old gcc-based version (used in 2019 demo)
+        #  os: ubuntu-20.04
+        #  standard: c99
+        #  debug: normal
+        #  extensions: "TCC +"
+        #  os-id: 0.13.2
+        #  config-file: android-cross-compiled.r  # Build ARM with x64 compiler
 
-         - ndk-revision: r21d  # clang-based version (circa March 2021)
-           os: macos-latest
-           standard: c99
-           debug: normal
-           extensions: ""
-           os-id: 0.13.2
-           config-file: android-cross-compiled.r  # Build ARM with x64 compiler
+        - os: macos-latest
+          #
+          # versions since r18 are entirely clang-based
+          # r21 is current circa March 2021
+          # leaving off last letter means get latest patch version (e.g. r21e)
+          #
+          ndk-revision: r21
+          standard: c99
+          debug: normal
+          extensions: "TCC +"
+          os-id: 0.13.2
+          config-file: android-cross-compiled.r  # Build ARM with x64 compiler
 
 
     # See README: Environment Variables
@@ -109,10 +114,10 @@ jobs:
       # its state makes the startup much faster.
       #
       # We also add `-writable-system`, so that if you use adb shell to run
-      # `sudo root; sudo remount` then %/system will be writable.  This isn't
-      # critical at the moment since we can write to `/data/local/tmp`, which
-      # is apparently the preferred place for writing test files.  But it may
-      # come in handy at some point.
+      # `adb root; adb remount` then %/system will be writable (works in
+      # API Level 30, seems to not work in older cases).  Without this
+      # setting, the only place you can write to is `/data/local/tmp` (and
+      # mounted SD cards?)
       #
       # https://github.com/ReactiveCircus/android-emulator-runner
       #
@@ -287,6 +292,17 @@ jobs:
         echo "ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
 
 
+    # Once we have the cross compiler, build the TCC library for ARM if this
+    # build is using the TCC extension.  (`sudo apt install libtcc-dev` would
+    # give us something doubly incorrect...an x86_64 library for building
+    # strings of Ccode into x86_64 machine code.)
+    #
+    - name: Cross-Compile libtcc.a if Making an R3 That Can Compile C Code
+      run: |
+        source extensions/tcc/tools/build-libtcc-helper.sh
+        echo "CONFIG_TCCDIR=$(pwd)/tcc" >> $GITHUB_ENV
+
+
     # Show a little bit of sanity check information.
     #
     # !!! Here is where we would usually do something like `gcc -v` to get
@@ -308,7 +324,7 @@ jobs:
 
     # See README: {Braces} For %make.r String Parameters
     #
-    - name: Build Using The NDK
+    - name: Generate Makefile for Cross-Compiling to ARM
       run: |
         mkdir build
         cd build
@@ -354,6 +370,22 @@ jobs:
         echo "R3BUILT=$(pwd)/r3" >> $GITHUB_ENV
 
 
+    # !!! Unfortunately, the MacOS bootstrap executable seems to be creating
+    # corrupt zip files.  The problem is sorted out in newer builds, but we
+    # don't have a newer bootstrap build at time of writing.  Since it's just
+    # creating a zip file in a fairly easy way, we punt on calling the script
+    # and do it with the unix command line utility.
+    #
+    - name: Make a .ZIP File of the Encap Resources for TCC
+      run: |
+        # "${R3MAKE}" extensions/tcc/encap-tcc-resources.reb OS_ID=0.13.2
+
+        cp build/prep/include/rebol.h tcc/
+        cd tcc
+        zip -r tcc-encap.zip include/ rebol.h libtcc1.a
+        mv tcc-encap.zip ../build/
+
+
   #====# TESTING STEP #=======================================================#
   #
   # Starting and stopping the emulator is extremely slow.  The first time
@@ -382,7 +414,10 @@ jobs:
     # https://github.com/ReactiveCircus/android-emulator-runner/pull/134
     #
     # We also only do the test on the MacOS version, because the Linux version
-    # has no HAXM acceleration on GitHub, and is painfully slow right now.
+    # has no HAXM acceleration on GitHub.  It boots extremely slowly, and
+    # once you wait for it to boot (about 7x as long) it doesn't seem to work:
+    #
+    #    Failure calling service settings: Broken pipe (32)
     #
     # See README: If Statements
     # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
@@ -392,6 +427,7 @@ jobs:
       uses: hostilefork/android-emulator-runner@dont-wrap-script
       env:
         ADB_R3: adb shell /data/local/tmp/r3  # "Android DeBug" remotely
+        TMP: /data/local/tmp
       with:
         api-level: ${{ env.EMULATOR_API_LEVEL }}
         arch: ${{ env.EMULATOR_ARCH }}
@@ -402,9 +438,20 @@ jobs:
         # single and double quotes with backslash if they need to appear
         # literally in the shell command line.
         #
+        # !!! `adb root; adb remount` should be able to remount and make
+        # %/system writable, since we are using -writable-system.  But that
+        # causes `error: closed` and the emulator stops.  So we have to write
+        # to the special writable location %/data/local/tmp
+        #
         script: |
-          adb push "$R3BUILT" /data/local/tmp/r3
-          adb shell chmod +x /data/local/tmp/r3
+          adb push "$R3BUILT" $TMP/r3
+          adb shell chmod +x $TMP/r3
 
           $ADB_R3 --do \"print [{Hello} \'World]\"
-          $ADB_R3 --do \"print mold/limit as text! read https://example.com\"
+          $ADB_R3 --do \"print mold/limit as text! read https://example.com 200\"
+
+          adb push build/tcc-encap.zip $TMP/tcc-encap.zip
+          $ADB_R3 --do \"cd $TMP/, unzip %tcc/ %tcc-encap.zip\"
+
+          adb push extensions/tcc/tests/call-librebol.r $TMP/call-librebol.r
+          $ADB_R3 $TMP/call-librebol.r tcc/
