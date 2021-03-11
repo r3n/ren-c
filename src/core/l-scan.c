@@ -1905,6 +1905,17 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         break; }
 
       case TOKEN_COMMA:
+        if (level->mode == '/' or level->mode == '.') {
+            //
+            // We only see a comma during a PATH! or TUPLE! scan in cases where
+            // a blank is needed.  So we'll get here with [/a/, xxx] but won't
+            // get here with [/a, xxx]
+            //
+            Init_Blank(DS_PUSH());
+            ss->end = ss->begin = ep = bp;  // let parent see `,`
+            goto done;
+        }
+
         Init_Comma(DS_PUSH());
         break;
 
