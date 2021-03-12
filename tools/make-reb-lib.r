@@ -47,7 +47,7 @@ api-objects: make block! 50
 
 map-each-api: func [code [block!]] [
     map-each api api-objects compose/only [
-        do in api (code)  ; want API variable visible to `code` while running 
+        do in api (code)  ; want API variable visible to `code` while running
     ]
 ]
 
@@ -392,16 +392,33 @@ e-lib/emit {
      * since variadic macros don't work.  They will also need shims for
      * stdint.h and stdbool.h included.
      */
-    #include <stdlib.h>  /* for size_t */
-    #include <stdarg.h>  /* for va_list, va_start() in inline functions */
-    #if !defined(_PSTDINT_H_INCLUDED) && !defined(LIBREBOL_NO_STDINT)
-        #include <stdint.h>  /* for uintptr_t, int64_t, etc. */
-    #endif
-    #if !defined(_PSTDBOOL_H_INCLUDED) && !defined(LIBREBOL_NO_STDBOOL)
-        #if !defined(__cplusplus)
-            #include <stdbool.h>  /* for bool, true, false (if C99) */
+    #if defined(LIBREBOL_NO_STDLIB)
+        /*
+         * This file won't compile without definitions for uintptr_t and
+         * bool, so make those as a minimum.  They have to be binary compatible
+         * with how the library was compiled...these are just guesses.
+         */
+        #define int64_t long long  /* used for integers */
+        #define uint32_t unsigned int  /* used for codepoint (use int?) */
+        #define uintptr_t unsigned int  /* used for ticks */
+        #define bool _Bool  /* actually part of C99 compiler */
+    #else
+        #include <stdlib.h>  /* for size_t */
+        #if !defined(_PSTDINT_H_INCLUDED) && !defined(LIBREBOL_NO_STDINT)
+            #include <stdint.h>  /* for uintptr_t, int64_t, etc. */
+        #endif
+        #if !defined(_PSTDBOOL_H_INCLUDED) && !defined(LIBREBOL_NO_STDBOOL)
+            #if !defined(__cplusplus)
+                #include <stdbool.h>  /* for bool, true, false (if C99) */
+            #endif
         #endif
     #endif
+
+    /*
+     * No matter what, you need stdarg.h for va_list...TCC extension provides
+     * its own version.
+     */
+    #include <stdarg.h>  /* for va_list, va_start() in inline functions */
 
     /*
      * !!! Needed by following two macros.
@@ -501,7 +518,9 @@ e-lib/emit {
      * client code.  If the client code is on Windows, use WCHAR.  If it's in
      * a unixodbc client use SQLWCHAR.  But use UTF-8 if you possibly can.
      */
-    #ifdef TO_WINDOWS
+    #if defined(LIBREBOL_NO_STDLIB)
+        #define REBWCHAR unsigned int  /* Windows-specific API */
+    #elif defined(TO_WINDOWS)
         #define REBWCHAR wchar_t
     #else
         #define REBWCHAR uint16_t

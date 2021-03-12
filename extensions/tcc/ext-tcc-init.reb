@@ -59,6 +59,7 @@ compile: func [
     }
     /files "COMPILABLES represents a list of disk files (TEXT! paths)"
     /inspect "Return the C source code as text, but don't compile it"
+    /nostdlib "Do not include <stdlib.h> automatically with librebol"
 ][
     ; !!! Due to module dependencies there's some problem with GET-ENV not
     ; being available in some builds.  It gets added to lib but is somehow not
@@ -355,9 +356,41 @@ compile: func [
              */
             #define LIBREBOL_NO_STDINT
             #include <stddef.h>
-            #define REBOL_IMPLICIT_END  /* TCC can do C99 macros, use them! */
             #include "rebol.h"
         }
+
+        ; The nostdlib feature is specific to a bare-bones demo environment
+        ; with only the r3 executable and the TCC-specific encap files.  The
+        ; C code in such a environment will depend on libRebol for input and
+        ; output, e.g. `rebElide("print")` vs. printf().
+        ;
+        ; While this may sound limiting in terms of "C as exposure to native
+        ; functionality" it has two main applications:
+        ;
+        ; * Making it easy to test that compilation is working on devices in
+        ;   CI tests without having to install a toolchain; especially useful
+        ;   in ARM emulation.
+        ;
+        ; * Offering C as raw access to assembly for algorithms like crypto
+        ;   and hashes, which really just need the math part of C.
+        ;
+        ; Note that libRebol provides memory allocation via rebAlloc() and
+        ; rebFree(), so it's possible to write code that is not completely
+        ; trivial...though you'd run into walls by not having the likes of
+        ; memcpy() or memmove().  :-/  Long story short: useful for testing.
+        ;
+        if nostdlib [
+            ;
+            ; Needs to go before the librebol inclusion that was put at the
+            ; head of the compilables above!
+            ;
+            insert compilables trim/auto mutable {#define LIBREBOL_NO_STDLIB}
+
+            ; TCC adds -lc (by calling `tcc_add_library_err(s1, "c");`) by
+            ; default during link, unless you override it with this switch.
+            ;
+            append config/options "-nostdlib"
+        ]
 
         ; We want to embed and ship "rebol.h" automatically.  But as a first
         ; step, try overriding with the LIBREBOL_INCLUDE_DIR environment
