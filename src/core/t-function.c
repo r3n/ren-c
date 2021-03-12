@@ -88,7 +88,7 @@ REB_R MAKE_Action(
         // hidden fields are parameter specifications.  Review if there is
         // some middle ground.
         //
-        REBVAL *frame_copy = rebValue("copy", arg, rebEND);
+        REBVAL *frame_copy = rebValue("copy", arg);
         REBCTX *exemplar = VAL_CONTEXT(frame_copy);
         rebRelease(frame_copy);
 

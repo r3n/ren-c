@@ -139,14 +139,14 @@ REBNATIVE(load_extension)
     else { // It's a DLL, must locate and call its RX_Collate() function
         assert(IS_FILE(ARG(where)));
 
-        REBVAL *lib_api = rebValue("make library!", ARG(where), rebEND);
+        REBVAL *lib_api = rebValue("make library!", ARG(where));
 
         REBVAL *details_block = rebValue(
-            "run-library-collator", lib_api, "{RX_Collate}",
-        rebEND);
+            "run-library-collator", lib_api, "{RX_Collate}"
+        );
 
         if (not details_block or not IS_BLOCK(details_block)) {
-            rebElide("close", lib_api, rebEND);
+            rebElide("close", lib_api);
             fail (Error_Bad_Extension_Raw(ARG(where)));
         }
 
@@ -289,7 +289,7 @@ REBNATIVE(load_extension)
     // Now we have an empty context that has natives in it.  Ultimately what
     // we want is to run the init code for a module.
     //
-    REBVAL *script_bin = rebValue("gunzip", script_compressed, rebEND);
+    REBVAL *script_bin = rebValue("gunzip", script_compressed);
 
     // Module loading mechanics are supposed to be mostly done in usermode,
     // so try and honor that.  This means everything about whether the module
@@ -298,8 +298,8 @@ REBNATIVE(load_extension)
     // do that here.
     //
     rebElide(
-        "sys/load-module/into/exports", rebR(script_bin), module, exports,
-    rebEND);
+        "sys/load-module/into/exports", rebR(script_bin), module, exports
+    );
 
     // !!! Ideally we would be passing the lib, path,
 

@@ -888,22 +888,22 @@ REBNATIVE(enbin)
 {
     INCLUDE_PARAMS_OF_ENBIN;
 
-    REBVAL *settings = rebValue("compose", ARG(settings), rebEND);
+    REBVAL *settings = rebValue("compose", ARG(settings));
     if (VAL_LEN_AT(settings) != 3)
         fail ("ENBIN requires array of length 3 for settings for now");
     bool little = rebDid(
         "switch first", settings, "[",
             "'BE [false] 'LE [true]",
             "fail {First element of ENBIN settings must be BE or LE}",
-        "]",
-        rebEND);
+        "]"
+    );
     REBLEN index = VAL_INDEX(settings);
     bool no_sign = rebDid(
         "switch second", settings, "[",
             "'+ [true] '+/- [false]",
             "fail {Second element of ENBIN settings must be + or +/-}",
-        "]",
-        rebEND);
+        "]"
+    );
     const RELVAL *third = VAL_ARRAY_AT_HEAD(settings, index + 2);
     if (not IS_INTEGER(third))
         fail ("Third element of ENBIN settings must be an integer}");
@@ -952,20 +952,20 @@ REBNATIVE(enbin)
         ++n;
     }
     if (i != 0)
-        rebJumps (
-            "fail [", ARG(value), "{exceeds}", rebI(num_bytes), "{bytes}]",
-        rebEND);
+        rebJumps(
+            "fail [", ARG(value), "{exceeds}", rebI(num_bytes), "{bytes}]"
+        );
 
     // The process of byte production of a positive number shouldn't give us
     // something with the high bit set in a signed representation.
     //
     if (not no_sign and not negative and *(bp - delta) >= 0x80)
-        rebJumps (
+        rebJumps(
             "fail [",
                 ARG(value), "{aliases a negative value with signed}",
                 "{encoding of only}", rebI(num_bytes), "{bytes}",
-            "]",
-        rebEND);
+            "]"
+        );
 
     TERM_BIN_LEN(bin, num_bytes);
     return Init_Binary(D_OUT, bin);
@@ -995,7 +995,7 @@ REBNATIVE(debin)
     REBSIZ bin_size;
     const REBYTE *bin_data = VAL_BINARY_SIZE_AT(&bin_size, ARG(binary));
 
-    REBVAL* settings = rebValue("compose", ARG(settings), rebEND);
+    REBVAL* settings = rebValue("compose", ARG(settings));
 
     REBLEN arity = VAL_LEN_AT(settings);
     if (arity != 2 and arity != 3)
@@ -1004,15 +1004,15 @@ REBNATIVE(debin)
         "switch first", settings, "[",
             "'BE [false] 'LE [true]",
             "fail {First element of DEBIN settings must be BE or LE}",
-        "]",
-        rebEND);
+        "]"
+    );
     REBLEN index = VAL_INDEX(settings);
     bool no_sign = rebDid(
         "switch second", settings, "[",
             "'+ [true] '+/- [false]",
             "fail {Second element of DEBIN settings must be + or +/-}",
-        "]",
-        rebEND);
+        "]"
+    );
     REBLEN num_bytes;
     if (arity == 2)
         num_bytes = bin_size;

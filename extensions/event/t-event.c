@@ -108,7 +108,7 @@ static bool Set_Event_Var(REBVAL *event, const RELVAL *word, const REBVAL *val)
 
       case SYM_WINDOW:
       case SYM_GOB:
-        if (rebDid("gob?", val, rebEND)) {  // optimized to extract GOB's node
+        if (rebDid("gob?", val)) {  // optimized to extract GOB's node
             mutable_VAL_EVENT_MODEL(event) = EVM_GUI;
             SET_VAL_EVENT_NODE(event, VAL_GOB(val));
             break;

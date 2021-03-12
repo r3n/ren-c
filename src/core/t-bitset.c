@@ -690,19 +690,19 @@ REBTYPE(Bitset)
         REBVAL *action;
         switch (sym) {
           case SYM_INTERSECT:
-            action = rebValue(":bitwise-and", rebEND);
+            action = rebValue(":bitwise-and");
             break;
 
           case SYM_UNION:
-            action = rebValue(":bitwise-or", rebEND);
+            action = rebValue(":bitwise-or");
             break;
 
           case SYM_DIFFERENCE:
-            action = rebValue(":bitwise-xor", rebEND);
+            action = rebValue(":bitwise-xor");
             break;
 
           case SYM_EXCLUDE:
-            action = rebValue(":bitwise-and-not", rebEND);
+            action = rebValue(":bitwise-and-not");
             break;
 
           default:
@@ -710,9 +710,7 @@ REBTYPE(Bitset)
             assert(false);
         }
 
-        REBVAL *processed = rebValue(
-            rebR(action), rebQ(v), rebQ(arg),
-        rebEND);
+        REBVAL *processed = rebValue(rebR(action), rebQ(v), rebQ(arg));
 
         REBBIN *bits = VAL_BINARY_KNOWN_MUTABLE(processed);
         rebRelease(processed);

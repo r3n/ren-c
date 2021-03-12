@@ -544,7 +544,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 break;
 
               case REB_ACTION: {
-                REBVAL *generated = rebValue(les->data, rebEND);
+                REBVAL *generated = rebValue(les->data);
                 if (generated) {
                     if (var)
                         Copy_Cell(var, generated);
@@ -641,7 +641,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         // as part of an overall vetting of "generic iteration" (which this
         // is a poor substitute for).
         //
-        REBVAL *block = rebValueQ("as block!", ARG(data), rebEND);
+        REBVAL *block = rebValueQ("as block!", ARG(data));
         Copy_Cell(ARG(data), block);
         rebRelease(block);
     }
@@ -740,7 +740,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         assert(IS_ERROR(r));
         if (mode == LOOP_MAP_EACH or mode == LOOP_MAP_EACH_SPLICED)
             DS_DROP_TO(dsp_orig);
-        rebJumps ("fail", rebR(r), rebEND);
+        rebJumps ("fail", rebR(r));
     }
 
     // Otherwise, nullptr signals result in les.out (a.k.a. D_OUT)
@@ -1489,7 +1489,7 @@ REBNATIVE(remove_each)
         REBLEN removals = Finalize_Remove_Each(&res);
         UNUSED(removals);
 
-        rebJumps("fail", rebR(r), rebEND);
+        rebJumps("fail", rebR(r));
     }
 
     if (res.broke)
@@ -1679,7 +1679,7 @@ REBNATIVE(until)
                 return D_OUT;  // body evaluated truthily, return value
         }
         else {
-            if (rebDid(rebINLINE(predicate), rebQ(D_OUT), rebEND))
+            if (rebDid(rebINLINE(predicate), rebQ(D_OUT)))
                 return D_OUT;
         }
 

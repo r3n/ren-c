@@ -46,7 +46,7 @@ EXTERN_C REBDEV Dev_StdIO;
 REBVAL *Line_History;  // Prior input lines (BLOCK!)
 int Line_History_Index;  // Current position in the line history
 #define Line_Count \
-    rebUnboxInteger("length of", Line_History, rebEND)
+    rebUnboxInteger("length of", Line_History)
 
 #if defined(REBOL_SMART_CONSOLE)
 
@@ -84,13 +84,13 @@ REBVAL *Read_Line(STD_TERM *t)
 
         if (e == nullptr) {
             rebJumps(
-                "fail {nullptr interruption of terminal not done yet}",
-            rebEND);
+                "fail {nullptr interruption of terminal not done yet}"
+            );
         }
-        else if (rebDid("void?", rebQ(e), rebEND)) {
+        else if (rebDid("void?", rebQ(e))) {
             line = rebVoid();
         }
-        else if (rebDidQ(e, "= newline", rebEND)) {
+        else if (rebDidQ(e, "= newline")) {
             //
             // !!! This saves a line in the "history", but it's not clear
             // exactly long term what level this history should cut into
@@ -99,18 +99,18 @@ REBVAL *Read_Line(STD_TERM *t)
             // If max history, drop oldest line (but not first empty line)
             //
             if (Line_Count >= MAX_HISTORY)
-                rebElide("remove next", Line_History, rebEND);
+                rebElide("remove next", Line_History);
 
             // We don't want the terminal's whole line buffer--just the part
             // after any prompt that was already on the line.
             //
             line = rebValue(
-                "copy skip", rebR(Term_Buffer(t)), rebI(original_column),
-            rebEND);
+                "copy skip", rebR(Term_Buffer(t)), rebI(original_column)
+            );
 
-            rebElide("append", Line_History, "copy", line, rebEND);
+            rebElide("append", Line_History, "copy", line);
         }
-        else if (rebDidQ("match [text! char!]", e, rebEND)) {  // printable
+        else if (rebDidQ("match [text! char!]", e)) {  // printable
             //
             // Because we are using the "buffered" mode, the terminal will
             // accrue TEXT! in a batch until an "unbufferable" key event
@@ -119,7 +119,7 @@ REBVAL *Read_Line(STD_TERM *t)
             //
             Term_Insert(t, e);
         }
-        else if (rebDidQ("word?", e, rebEND)) {  // recognized "virtual key"
+        else if (rebDidQ("word?", e)) {  // recognized "virtual key"
             uint32_t c = rebUnboxChar(
                 "switch", rebQ(e), "[",
                     "'escape [#E]",
@@ -144,8 +144,8 @@ REBVAL *Read_Line(STD_TERM *t)
 
                     "'clear [#c]",
 
-                "] else [#]",  // unboxes as '\0'
-            rebEND);
+                "] else [#]"  // unboxes as '\0'
+            );
 
             switch (c) {
               case 0:  // Ignored (e.g. unknown Ctrl-XXX)
@@ -179,13 +179,13 @@ REBVAL *Read_Line(STD_TERM *t)
                 }
                 else {
                     REBVAL *recall = rebValue(
-                        "pick", Line_History, rebI(Line_History_Index + 1),
-                    rebEND);
+                        "pick", Line_History, rebI(Line_History_Index + 1)
+                    );
 
                     Term_Insert(t, recall);
 
                   #if !defined(NDEBUG)
-                    int len = rebUnboxInteger("length of", recall, rebEND);
+                    int len = rebUnboxInteger("length of", recall);
                     assert(Term_Pos(t) == len + original_column);
                   #endif
 
@@ -199,9 +199,7 @@ REBVAL *Read_Line(STD_TERM *t)
                 break;
 
               case 'R': {  // RIGHT
-                int len = rebUnboxInteger(
-                    "length of", rebR(Term_Buffer(t)), rebEND
-                );
+                int len = rebUnboxInteger("length of", rebR(Term_Buffer(t)));
                 if (Term_Pos(t) < len)
                     Move_Cursor(t, 1);
                 break; }
@@ -212,9 +210,7 @@ REBVAL *Read_Line(STD_TERM *t)
                 break;
 
               case 'd': {  // delete
-                int len = rebUnboxInteger(
-                    "length of", rebR(Term_Buffer(t)), rebEND
-                );
+                int len = rebUnboxInteger("length of", rebR(Term_Buffer(t)));
                 if (Term_Pos(t) < len)
                     Delete_Char(t, false);
                 break; }
@@ -224,9 +220,7 @@ REBVAL *Read_Line(STD_TERM *t)
                 break;
 
               case 'e': {  // end
-                int len = rebUnboxInteger(
-                    "length of", rebR(Term_Buffer(t)),
-                rebEND);
+                int len = rebUnboxInteger("length of", rebR(Term_Buffer(t)));
                 Term_Seek(t, len);
                 break; }
 
@@ -239,12 +233,10 @@ REBVAL *Read_Line(STD_TERM *t)
                 // Protocol for TAB-COMPLETE is currently to edit the string
                 // you give it directly, and return the new position.
                 //
-                REBVAL *buffer_copy = rebValue(
-                    "copy", rebR(Term_Buffer(t)),
-                rebEND);
+                REBVAL *buffer_copy = rebValue("copy", rebR(Term_Buffer(t)));
                 int new_pos = rebUnboxInteger(
-                    "tab-complete", buffer_copy, rebI(Term_Pos(t)),
-                rebEND);
+                    "tab-complete", buffer_copy, rebI(Term_Pos(t))
+                );
                 Term_Seek(t, original_column);
                 Term_Clear_To_End(t);
                 Term_Insert(t, buffer_copy);  // cursor at end of insertion
@@ -254,11 +246,11 @@ REBVAL *Read_Line(STD_TERM *t)
 
               default:
                 rebJumps(
-                    "fail {Invalid key press returned from console}",
-                rebEND);
+                    "fail {Invalid key press returned from console}"
+                );
             }
         }
-        else if (rebDidQ("issue?", e, rebEND)) {  // unrecognized key
+        else if (rebDidQ("issue?", e)) {  // unrecognized key
             //
             // When an unrecognized key is hit, people may want to know that
             // at least the keypress was received.  Or not.  For now, output
@@ -269,7 +261,7 @@ REBVAL *Read_Line(STD_TERM *t)
             // the terminal, so that people could see what the key registered
             // as on their machine and configure the console to respond to it.
             //
-            REBVAL *text = rebValue("as text!", e, rebEND);
+            REBVAL *text = rebValue("as text!", e);
             Term_Insert(t, text);
             rebRelease(text);
         }
@@ -281,7 +273,7 @@ REBVAL *Read_Line(STD_TERM *t)
     // of what the user contributed.  We print one out whether we got a whole
     // line or not (e.g. ESCAPE or HALT) to keep the visual flow.
     //
-    rebElide("write-stdout newline", rebEND);
+    rebElide("write-stdout newline");
 
     return line;
 }
@@ -333,23 +325,23 @@ REB_R Console_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             OS_DO_DEVICE_SYNC(req, RDC_OPEN);
 
         if (Req(req)->modes & RDM_NULL)
-            return rebValue("copy #{}", rebEND);
+            return rebValue("copy #{}");
 
       #if defined(REBOL_SMART_CONSOLE)
         if (Term_IO) {  // e.g. no redirection (Term_IO is null if so)
             REBVAL *result = Read_Line(Term_IO);
-            if (rebDid("void?", rebQ(result), rebEND)) {  // HALT received
+            if (rebDid("void?", rebQ(result))) {  // HALT received
                 rebRelease(result);
                 return rebVoid();
             }
-            if (rebDid("blank?", result, rebEND)) {  // ESCAPE received
+            if (rebDid("blank?", result)) {  // ESCAPE received
                 rebRelease(result);
                 return rebValue(
-                    "const to binary!", rebR(rebChar(ESC)),
-                rebEND);
+                    "const to binary!", rebR(rebChar(ESC))
+                );
             }
-            assert(rebDid("text?", result, rebEND));
-            return rebValue("as binary!", rebR(result), rebEND);
+            assert(rebDid("text?", result));
+            return rebValue("as binary!", rebR(result));
         }
       #endif
 
@@ -391,7 +383,7 @@ REB_R Console_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         // Give back a BINARY! which is as large as the portion of the buffer
         // actually used, and clear the buffer for reuse.
         //
-        return rebValueQ("copy", data, "elide clear", data, rebEND); }
+        return rebValueQ("copy", data, "elide clear", data); }
 
       case SYM_OPEN:
         Req(req)->flags |= RRF_OPEN;

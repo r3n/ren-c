@@ -209,7 +209,7 @@ REB_R MAKE_Decimal(
         PUSH_GC_GUARD(numerator);  // might be GROUP!, so (1.2)/4
         PUSH_GC_GUARD(denominator);
 
-        REBVAL *quotient = rebValue("divide", numerator, denominator, rebEND);
+        REBVAL *quotient = rebValue("divide", numerator, denominator);
 
         DROP_GC_GUARD(denominator);
         DROP_GC_GUARD(numerator);

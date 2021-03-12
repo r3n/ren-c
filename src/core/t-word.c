@@ -130,7 +130,7 @@ REB_R MAKE_Word(
         // Run the same mechanics that AS WORD! would, since it's immutable.
         //
       as_word: {
-        REBVAL *as = rebValue("as", Datatype_From_Kind(kind), arg, rebEND);
+        REBVAL *as = rebValue("as", Datatype_From_Kind(kind), arg);
         Copy_Cell(out, as);
         rebRelease(as);
 

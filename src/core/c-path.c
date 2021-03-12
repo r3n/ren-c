@@ -1079,8 +1079,8 @@ REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         // (Inefficient!  But just see how it feels before optimizing.)
         //
         return rebValue(
-            "as", Datatype_From_Kind(kind), "load-value", arg,
-        rebEND);
+            "as", Datatype_From_Kind(kind), "load-value", arg
+        );
     }
 
     if (ANY_PATH_KIND(arg_kind)) {  // e.g. `to set-path! 'a/b/c`

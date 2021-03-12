@@ -179,11 +179,11 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
             return;
         }
         REBVAL *sign = (*bp >= 0x80)
-            ? rebValue("''+/-", rebEND)
-            : rebValue("''+", rebEND);
-        REBVAL *result = rebValue(
-            "debin [be", rebR(sign), "]", value,
-            rebEND);
+            ? rebValue("''+/-")
+            : rebValue("''+");
+
+        REBVAL *result = rebValue("debin [be", rebR(sign), "]", value);
+
         Copy_Cell(out, result);
         rebRelease(result);
         return;

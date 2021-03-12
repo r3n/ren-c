@@ -314,7 +314,7 @@ REB_R MAKE_Array(
         //
         REBDSP dsp_orig = DSP;
         while (true) {
-            REBVAL *generated = rebValue(arg, rebEND);
+            REBVAL *generated = rebValue(arg);
             if (not generated)
                 break;
             Copy_Cell(DS_PUSH(), generated);

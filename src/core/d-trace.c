@@ -60,7 +60,7 @@ void Trace_Value(
 
     rebElide("print [",
         "{Parse}", rebT(label), "{:}", molded,
-    "]", rebEND);
+    "]");
 
     DROP_GC_GUARD(molded);
 }
@@ -72,13 +72,13 @@ void Trace_Value(
 void Trace_Parse_Input(const REBVAL *str)
 {
     if (IS_END(str)) {
-        rebElide("print {Parse Input: ** END **}", rebEND);
+        rebElide("print {Parse Input: ** END **}");
         return;
     }
 
     rebElide("print [",
         "{Parse input:} mold/limit", str, "60"
-    "]", rebEND);
+    "]");
 }
 
 

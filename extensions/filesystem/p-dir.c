@@ -200,7 +200,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         Free_Req(dir);
 
-        if (rebDid("error?", result, rebEND)) {
+        if (rebDid("error?", result)) {
             rebRelease(result); // !!! throws away details
             fail (Error_No_Create_Raw(path)); // higher level error
         }
@@ -231,7 +231,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         Free_Req(dir);
 
-        if (rebDid("error?", result, rebEND)) {
+        if (rebDid("error?", result)) {
             rebRelease(result); // !!! throws away details
             fail (Error_No_Rename_Raw(path)); // higher level error
         }
@@ -254,7 +254,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         Free_Req(dir);
 
-        if (rebDid("error?", result, rebEND)) {
+        if (rebDid("error?", result)) {
             rebRelease(result); // !!! throws away details
             fail (Error_No_Delete_Raw(path)); // higher level error
         }
@@ -300,7 +300,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         REBVAL *result = OS_DO_DEVICE(dir, RDC_QUERY);
         assert(result != NULL); // should be synchronous
 
-        if (rebDid("error?", result, rebEND)) {
+        if (rebDid("error?", result)) {
             Free_Req(dir);
             rebRelease(result); // !!! R3-Alpha threw out error, returns null
             return nullptr;

@@ -177,8 +177,8 @@ REBVAL *Datatype_From_Url(const REBVAL *url) {
             "http://datatypes.rebol.info/gob [3]",
             "http://datatypes.rebol.info/struct [4]",
             "-1",
-        "]",
-    rebEND);
+        "]"
+    );
 
     if (i != -1)
         return cast(REBVAL*, ARR_AT(PG_Extension_Types, i));

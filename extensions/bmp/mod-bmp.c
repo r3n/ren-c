@@ -569,8 +569,8 @@ REBNATIVE(decode_bmp)
         "make image! compose [",
             "(make pair! [", rebI(w), rebI(h), "])",
             binary,
-        "]",
-    rebEND);
+        "]"
+    );
 
     rebRelease(binary);
 
@@ -603,13 +603,13 @@ REBNATIVE(encode_bmp)
     BITMAPFILEHEADER bmfh;
     BITMAPINFOHEADER bmih;
 
-    REBVAL *size = rebValueQ("pick", ARG(image), "'size", rebEND);
-    int32_t w = rebUnboxIntegerQ("pick", size, "'x", rebEND);
-    int32_t h = rebUnboxIntegerQ("pick", size, "'y", rebEND);
+    REBVAL *size = rebValueQ("pick", ARG(image), "'size");
+    int32_t w = rebUnboxIntegerQ("pick", size, "'x");
+    int32_t h = rebUnboxIntegerQ("pick", size, "'y");
     rebRelease(size);
 
     size_t binsize;
-    REBYTE *image_bytes = rebBytes(&binsize, "bytes of", ARG(image), rebEND);
+    REBYTE *image_bytes = rebBytes(&binsize, "bytes of", ARG(image));
     assert(cast(int32_t, binsize) == w * h * 4);
 
     memset(&bmfh, 0, sizeof(bmfh));

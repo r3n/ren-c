@@ -46,10 +46,10 @@
 //             item2, "| print {Close brace separate from content}\n",
 //         "] else [\n",
 //             item3, "| print {Close brace with content}]\n",
-//         rebEND
+//         rebEND  // see note, optional in C99 and C++11
 //     );
 //
-// (The rebEND is needed by the variadic processing, but C99-based macros or
+// (Note: rebEND is needed by the variadic processing, but C99-based macros or
 // other language bindings can inject it automatically...only C89 has no way
 // to work around it.)
 //
@@ -248,8 +248,7 @@ void RL_rebFree(void *ptr)
             "PANIC [",
                 "{rebFree() mismatched with allocator!}"
                 "{Did you mean to use free() instead of rebFree()?}",
-            "]",
-            rebEND
+            "]"
         );
     }
 

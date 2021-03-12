@@ -136,9 +136,7 @@ static bool Try_Init_Startupinfo_Sink(
         break;
 
       case REB_FILE: {  // write to file
-        WCHAR *local_wide = rebSpellWideQ(
-            "file-to-local", arg,
-        rebEND);
+        WCHAR *local_wide = rebSpellWideQ("file-to-local", arg);
 
         // !!! This was done in two steps, is this necessary?
 
@@ -227,14 +225,14 @@ REB_R Call_Core(REBFRM *frame_) {
 
       text_command:
 
-        call = rebSpellWideQ(ARG(command), rebEND);
+        call = rebSpellWideQ(ARG(command));
 
         argc = 1;
         argv = rebAllocN(const REBWCHAR*, (argc + 1));
 
         // !!! Make two copies because it frees cmd and all the argv.  Review.
         //
-        argv[0] = rebSpellWideQ(ARG(command), rebEND);
+        argv[0] = rebSpellWideQ(ARG(command));
         argv[1] = nullptr;
     }
     else if (IS_BLOCK(ARG(command))) {
@@ -245,9 +243,7 @@ REB_R Call_Core(REBFRM *frame_) {
         //
         // https://github.com/rebol/rebol-issues/issues/2225
 
-        REBVAL *text = rebValue(
-            "argv-block-to-command*", ARG(command),
-        rebEND);
+        REBVAL *text = rebValue("argv-block-to-command*", ARG(command));
         Copy_Cell(ARG(command), text);
         rebRelease(text);
         goto text_command;
@@ -337,15 +333,15 @@ REB_R Call_Core(REBFRM *frame_) {
         // Pipes and file redirects are generally understood in Windows to
         // *not* use those encodings, and transmit raw bytes.
         //
-        inbuf_size = rebSpellIntoQ(nullptr, 0, ARG(input), rebEND);
+        inbuf_size = rebSpellIntoQ(nullptr, 0, ARG(input));
         inbuf = rebAllocN(char, inbuf_size + 1);
-        size_t check = rebSpellIntoQ(inbuf, inbuf_size, ARG(input), rebEND);
+        size_t check = rebSpellIntoQ(inbuf, inbuf_size, ARG(input));
         assert(check == inbuf_size);
         UNUSED(check);
         goto input_via_buffer; }
 
       case REB_BINARY:  // feed standard input from BINARY! (full-band)
-        inbuf = s_cast(rebBytes(&inbuf_size, ARG(input), rebEND));
+        inbuf = s_cast(rebBytes(&inbuf_size, ARG(input)));
 
       input_via_buffer:
 
@@ -363,7 +359,7 @@ REB_R Call_Core(REBFRM *frame_) {
         break;
 
       case REB_FILE: {  // feed standard input from file contents
-        WCHAR *local_wide = rebSpellWideQ("file-to-local", ARG(input), rebEND);
+        WCHAR *local_wide = rebSpellWideQ("file-to-local", ARG(input));
 
         hInputRead = CreateFile(
             local_wide,
@@ -699,12 +695,12 @@ REB_R Call_Core(REBFRM *frame_) {
     //
     if (IS_TEXT(ARG(output))) {
         REBVAL *output_val = rebRepossess(outbuf, outbuf_used);
-        rebElide("insert", ARG(output), "deline", output_val, rebEND);
+        rebElide("insert", ARG(output), "deline", output_val);
         rebRelease(output_val);
     }
     else if (IS_BINARY(ARG(output))) {
         REBVAL *output_val = rebRepossess(outbuf, outbuf_used);
-        rebElide("insert", ARG(output), output_val, rebEND);
+        rebElide("insert", ARG(output), output_val);
         rebRelease(output_val);
     }
     else
@@ -712,12 +708,12 @@ REB_R Call_Core(REBFRM *frame_) {
 
     if (IS_TEXT(ARG(error))) {
         REBVAL *error_val = rebRepossess(errbuf, errbuf_used);
-        rebElide("insert", ARG(error), "deline", error_val, rebEND);
+        rebElide("insert", ARG(error), "deline", error_val);
         rebRelease(error_val);
     }
     else if (IS_BINARY(ARG(error))) {
         REBVAL *error_val = rebRepossess(errbuf, errbuf_used);
-        rebElide("append", ARG(error), error_val, rebEND);
+        rebElide("append", ARG(error), error_val);
         rebRelease(error_val);
     }
     else

@@ -45,8 +45,8 @@ enum Transport_Types {
 static void Query_Net(REBVAL *out, REBVAL *port, struct devreq_net *sock)
 {
     REBVAL *info = rebValueQ(
-        "copy ensure object! (", port, ")/scheme/info", rebEND
-    ); // shallow copy
+        "copy ensure object! (", port, ")/scheme/info"
+    );  // shallow copy
 
     REBCTX *ctx = VAL_CONTEXT(info);
 
@@ -173,8 +173,8 @@ static REB_R Transport_Actor(
                 REBVAL *l_result = OS_DO_DEVICE(sock, RDC_LOOKUP);
 
                 assert(l_result != nullptr);
-                if (rebDid("error?", l_result, rebEND))
-                    rebJumps("fail", l_result, rebEND);
+                if (rebDid("error?", l_result))
+                    rebJumps("fail", l_result);
                 rebRelease(l_result); // ignore result
 
                 RETURN (port);
@@ -359,8 +359,8 @@ static REB_R Transport_Actor(
             // Request pending
         }
         else {
-            if (rebDid("error?", result, rebEND))
-                rebJumps("fail", result, rebEND);
+            if (rebDid("error?", result))
+                rebJumps("fail", result);
 
             // a note said "recv CAN happen immediately"
             //
@@ -410,8 +410,8 @@ static REB_R Transport_Actor(
         //
         TRASH_POINTER_IF_DEBUG(req->common.data);
         req->common.binary = rebValue(
-            "as binary! copy/part", data, rebQ(REF(part)),
-        rebEND);
+            "as binary! copy/part", data, rebQ(REF(part))
+        );
 
         // Because requests can be handled asynchronously, we won't
         // necessarily free the handle before WRITE ends.  Unmanage it.
@@ -428,8 +428,8 @@ static REB_R Transport_Actor(
             // Write pending !!! old comment said "do we get here?"
         }
         else {
-            if (rebDid("error?", result, rebEND))
-                rebJumps("fail", result, rebEND);
+            if (rebDid("error?", result))
+                rebJumps("fail", result);
 
             // Note here said "send CAN happen immediately"
             //
@@ -448,8 +448,8 @@ static REB_R Transport_Actor(
         return rebValueQ(
             "take/part/(", REF(deep), ")/(", REF(last), ")",
                 CTX_VAR(ctx, STD_PORT_CONNECTIONS),
-                REF(part),
-        rebEND); }
+                REF(part)
+        ); }
 
       case SYM_PICK: {
         fail (
@@ -483,8 +483,8 @@ static REB_R Transport_Actor(
             // Asynchronous connect, this happens in TCP_Actor
         }
         else {
-            if (rebDid("error?", result, rebEND))
-                rebJumps("lib/fail", result, rebEND);
+            if (rebDid("error?", result))
+                rebJumps("lib/fail", result);
 
             // This can happen with UDP, which is connectionless so it
             // returns DR_DONE.
@@ -604,7 +604,7 @@ REBNATIVE(set_udp_multicast)
 
     struct rebol_devreq *req = Req(sock);
     if (not (req->modes & RST_UDP)) // !!! other checks?
-        rebJumps("fail {SET-UDP-MULTICAST used on non-UDP port}", rebEND);
+        rebJumps("fail {SET-UDP-MULTICAST used on non-UDP port}");
 
     struct ip_mreq mreq;
     Get_Tuple_Bytes(&mreq.imr_multiaddr.s_addr, ARG(group), 4);
@@ -647,7 +647,7 @@ REBNATIVE(set_udp_ttl)
     struct rebol_devreq *req = Req(sock);
 
     if (not (req->modes & RST_UDP)) // !!! other checks?
-        rebJumps("fail {SET-UDP-TTL used on non-UDP port}", rebEND);
+        rebJumps("fail {SET-UDP-TTL used on non-UDP port}");
 
     int ttl = VAL_INT32(ARG(ttl));
     int result = setsockopt(

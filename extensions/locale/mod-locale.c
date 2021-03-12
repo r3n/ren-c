@@ -63,7 +63,7 @@ REBNATIVE(locale)
             "territory*", rebI(LOCALE_SCOUNTRY),
         "]", rebQ(cat), "else [",
             "fail [{Invalid locale category:}", rebQ(cat), "]",
-        "]", rebEND // !!! review using fail with ID-based errors
+        "]"  // !!! review using fail with ID-based errors
     );
 
     // !!! MS docs say: "For interoperability reasons, the application should
@@ -155,18 +155,18 @@ REBNATIVE(setlocale)
             "paper", rebI(LC_PAPER), // GNU extension
             "telephone", rebI(LC_TELEPHONE), // GNU extension
             "time", rebI(LC_TIME),
-        "]", rebEND
+        "]"
     );
 
-    int cat = rebUnboxQ("-1 unless select", map, ARG(category), rebEND);
+    int cat = rebUnboxQ("select", map, ARG(category), "else [-1]");
     rebRelease(map);
 
     if (cat == -1)
         rebJumpsQ(
-            "fail [{Invalid locale category:}", ARG(category), "]",
-        rebEND);
+            "fail [{Invalid locale category:}", ARG(category), "]"
+        );
 
-    char *value_utf8 = rebSpell(ARG(value), rebEND);
+    char *value_utf8 = rebSpell(ARG(value));
     const char *result = setlocale(cat, value_utf8);
     rebFree(value_utf8);
 

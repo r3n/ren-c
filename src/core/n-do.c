@@ -198,8 +198,8 @@ REBNATIVE(shove)
         }
         else if (IS_SET_PATH(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
-            composed_set_path = rebValueQ("compose", left, rebEND);
-            REBVAL *temp = rebValueQ("get/hard", composed_set_path, rebEND);
+            composed_set_path = rebValueQ("compose", left);
+            REBVAL *temp = rebValueQ("get/hard", composed_set_path);
             Copy_Cell(D_OUT, temp);
             rebRelease(temp);
         }
@@ -244,9 +244,7 @@ REBNATIVE(shove)
         }
         else if (IS_SET_PATH(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
-            rebElideQ(
-                "set/hard", composed_set_path, NULLIFY_NULLED(D_OUT),
-            rebEND);
+            rebElideQ("set/hard", composed_set_path, NULLIFY_NULLED(D_OUT));
             rebRelease(composed_set_path);
         }
         else

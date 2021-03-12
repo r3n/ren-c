@@ -1188,7 +1188,7 @@ REBNATIVE(default)
                 return D_OUT;  // count it as "already set"
         }
         else {
-            if (rebDid(rebINLINE(predicate), rebQ(D_OUT), rebEND))
+            if (rebDid(rebINLINE(predicate), rebQ(D_OUT)))
                 return D_OUT;
         }
     }
@@ -1249,9 +1249,7 @@ REBNATIVE(catch)
 
     if (not Do_Any_Array_At_Throws(D_OUT, ARG(block), SPECIFIED)) {
         if (REF(result))
-            rebElide(
-                NATIVE_VAL(set), rebQ(REF(result)), rebQ(D_OUT),
-            rebEND);
+            rebElide(NATIVE_VAL(set), rebQ(REF(result)), rebQ(D_OUT));
 
         return nullptr;  // no throw means just return null
     }

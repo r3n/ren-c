@@ -148,10 +148,10 @@ REB_R Call_Core(REBFRM *frame_) {
         goto null_input_buffer;
 
       case REB_TEXT: {
-        inbuf_size = rebSpellIntoQ(nullptr, 0, ARG(input), rebEND);
+        inbuf_size = rebSpellIntoQ(nullptr, 0, ARG(input));
         inbuf = rebAllocN(char, inbuf_size);
         size_t check;
-        check = rebSpellIntoQ(inbuf, inbuf_size, ARG(input), rebEND);
+        check = rebSpellIntoQ(inbuf, inbuf_size, ARG(input));
         UNUSED(check);
         break; }
 
@@ -159,14 +159,13 @@ REB_R Call_Core(REBFRM *frame_) {
         size_t size;
         inbuf = s_cast(rebBytes(  // !!! why fileNAME size passed in???
             &size,
-            "file-to-local", ARG(input),
-            rebEND
+            "file-to-local", ARG(input)
         ));
         inbuf_size = size;
         break; }
 
       case REB_BINARY: {
-        inbuf = s_cast(rebBytes(&inbuf_size, ARG(input), rebEND));
+        inbuf = s_cast(rebBytes(&inbuf_size, ARG(input)));
         break; }
 
       default:
@@ -199,21 +198,21 @@ REB_R Call_Core(REBFRM *frame_) {
         //
         if (not REF(shell)) {
             REBVAL *block = rebValue(
-                "parse-command-to-argv*", ARG(command), rebEND
+                "parse-command-to-argv*", ARG(command)
             );
             Copy_Cell(ARG(command), block);
             rebRelease(block);
             goto block_command;
         }
 
-        cmd = rebSpell(ARG(command), rebEND);
+        cmd = rebSpell(ARG(command));
 
         argc = 1;
         argv = rebAllocN(const char*, (argc + 1));
 
         // !!! Make two copies because it frees cmd and all the argv.  Review.
         //
-        argv[0] = rebSpell(ARG(command), rebEND);
+        argv[0] = rebSpell(ARG(command));
         argv[1] = nullptr;
     }
     else if (IS_BLOCK(ARG(command))) {
@@ -233,7 +232,7 @@ REB_R Call_Core(REBFRM *frame_) {
             const RELVAL *param = VAL_ARRAY_AT_HEAD(block, i);
             if (not IS_TEXT(param))  // usermode layer ensures FILE! converted
                 fail (PAR(command));
-            argv[i] = rebSpell(SPECIFIC(param), rebEND);
+            argv[i] = rebSpell(SPECIFIC(param));
         }
         argv[argc] = nullptr;
     }
@@ -325,7 +324,7 @@ REB_R Call_Core(REBFRM *frame_) {
             close(stdin_pipe[R]);
         }
         else if (IS_FILE(ARG(input))) {
-            char *local_utf8 = rebSpell("file-to-local", ARG(input), rebEND);
+            char *local_utf8 = rebSpell("file-to-local", ARG(input));
 
             int fd = open(local_utf8, O_RDONLY);
 
@@ -362,7 +361,7 @@ REB_R Call_Core(REBFRM *frame_) {
             close(stdout_pipe[W]);
         }
         else if (IS_FILE(ARG(output))) {
-            char *local_utf8 = rebSpell("file-to-local", ARG(output), rebEND);
+            char *local_utf8 = rebSpell("file-to-local", ARG(output));
 
             int fd = open(local_utf8, O_CREAT | O_WRONLY, 0666);
 
@@ -397,7 +396,7 @@ REB_R Call_Core(REBFRM *frame_) {
             close(stderr_pipe[W]);
         }
         else if (IS_FILE(ARG(error))) {
-            char *local_utf8 = rebSpell("file-to-local", ARG(error), rebEND);
+            char *local_utf8 = rebSpell("file-to-local", ARG(error));
 
             int fd = open(local_utf8, O_CREAT | O_WRONLY, 0666);
 
@@ -838,7 +837,7 @@ REB_R Call_Core(REBFRM *frame_) {
         assert(false);
         if (infobuf)
             rebFree(infobuf);
-        rebJumps("fail {Child process is stopped}", rebEND);
+        rebJumps("fail {Child process is stopped}");
     }
     else {
         non_errno_ret = -2048;  // !!! randomly picked
@@ -884,11 +883,11 @@ REB_R Call_Core(REBFRM *frame_) {
             "fail [",
                 "{Child process is terminated by signal:}",
                 rebI(non_errno_ret),
-            "]", rebEND
+            "]"
         );
     }
     else if (non_errno_ret < 0)
-        rebJumps("fail {Unknown error happened in CALL}", rebEND);
+        rebJumps("fail {Unknown error happened in CALL}");
 
 
     // Call may not succeed if r != 0, but we still have to run cleanup
@@ -907,12 +906,12 @@ REB_R Call_Core(REBFRM *frame_) {
 
     if (IS_TEXT(ARG(output))) {
         REBVAL *output_val = rebRepossess(outbuf, outbuf_used);
-        rebElide("insert", ARG(output), output_val, rebEND);
+        rebElide("insert", ARG(output), output_val);
         rebRelease(output_val);
     }
     else if (IS_BINARY(ARG(output))) {  // same (but could be different...)
         REBVAL *output_val = rebRepossess(outbuf, outbuf_used);
-        rebElide("insert", ARG(output), output_val, rebEND);
+        rebElide("insert", ARG(output), output_val);
         rebRelease(output_val);
     }
     else
@@ -920,12 +919,12 @@ REB_R Call_Core(REBFRM *frame_) {
 
     if (IS_TEXT(ARG(error))) {
         REBVAL *error_val = rebRepossess(errbuf, errbuf_used);
-        rebElide("insert", ARG(error), error_val, rebEND);
+        rebElide("insert", ARG(error), error_val);
         rebRelease(error_val);
     }
     else if (IS_BINARY(ARG(error))) {  // same (but could be different...)
         REBVAL *error_val = rebRepossess(errbuf, errbuf_used);
-        rebElide("insert", ARG(error), error_val, rebEND);
+        rebElide("insert", ARG(error), error_val);
         rebRelease(error_val);
     }
     else

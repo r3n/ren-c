@@ -72,7 +72,7 @@
             "{tcc extension was built with an older libtcc that was assumed}"
             "{to not have tcc_set_options() (it lacked TCC_RELOCATE_AUTO).}"
             "{You'll need to rebuild the tcc extension with a newer lib.}"
-        "]", rebEND);
+        "]");
     }
 #endif
 
@@ -133,7 +133,7 @@ static void Error_Reporting_Hook(
 
     rebJumps ("fail [",
         "{TCC errors/warnings, '-w' to stop warnings:}", rebT(msg_utf8),
-    "]", rebEND);
+    "]");
 }
 
 
@@ -152,14 +152,14 @@ static void Process_Text_Helper_Core(
 ){
     assert(IS_TEXT(text));
 
-    char* utf8 = rebSpell(text, rebEND);
+    char* utf8 = rebSpell(text);
     int status = some_tcc_api(state, utf8);
     rebFree(utf8);
 
     if (status < 0)  // !!! When is this called vs. Error_Reporting_Hook?
         rebJumps ("fail [",
             "{TCC}", rebT(label), "{rejected:}", text,
-        "]", rebEND);
+        "]");
 }
 static void Process_Text_Helper(
     TCC_CSTR_API some_tcc_api,
@@ -169,7 +169,7 @@ static void Process_Text_Helper(
 ){
     REBVAL *text = rebValue(
         "opt ensure [blank! text!] select", config, "as word!", rebT(label),
-    rebEND);
+    );
 
     if (text) {
         Process_Text_Helper_Core(some_tcc_api, state, text, label);
@@ -191,7 +191,7 @@ static void Process_Block_Helper(
 ){
     REBVAL *block = rebValue(
         "ensure block! select", config, "as word!", rebT(label),
-    rebEND);
+    );
 
     const RELVAL *tail;
     const RELVAL *text = VAL_ARRAY_AT(&tail, block);
@@ -217,7 +217,7 @@ static void Add_API_Symbol_Helper(
     if (tcc_add_symbol(state, symbol, void_ptr) < 0)
         rebJumps ("fail [",
             "{tcc_add_symbol failed for}", rebT(symbol),
-        "]", rebEND);
+        "]");
 }
 
 
@@ -265,7 +265,7 @@ REB_R Pending_Native_Dispatcher(REBFRM *f) {
     // known correct COMPILE Rebol function has to be done (NATIVE_VAL() is
     // not in extensions yet, and may not be, so no NATIVE_VAL(compile).)
     //
-    rebElide("compile [", rebQ(action), "]", rebEND);
+    rebElide("compile [", rebQ(action), "]");
     //
     // ^-- !!! Today's COMPILE doesn't return a result on success (just fails
     // on errors), but if it changes to return one consider what to do.
@@ -355,7 +355,7 @@ REBNATIVE(make_native)
         intptr_t heapaddr = cast(intptr_t, details);
         REBVAL *linkname = rebValue(
             "unspaced [{N_} as text! to-hex", rebI(heapaddr), "]",
-        rebEND);
+        );
 
         Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
         rebRelease(linkname);
@@ -456,12 +456,12 @@ REBNATIVE(compile_p)
             "'PREPROCESS [", rebI(TCC_OUTPUT_PREPROCESS), "]",
             "-1",
         "]",
-    rebEND);
+    );
 
     if (tcc_set_output_type(state, output_type) < 0)
         rebJumps("fail [",
             "{TCC failed to set output to} pick", config, "'output-type",
-        "]", rebEND);
+        "]");
 
 
   //=//// SPECIFY USER NATIVES (OR DISK FILES) TO COMPILE /////////////////=//
@@ -477,7 +477,7 @@ REBNATIVE(compile_p)
             if (not IS_TEXT(item))
                 fail ("If COMPILE*/FILES, compilables must be TEXT! paths");
 
-            char *filename_utf8 = rebSpell(SPECIFIC(item), rebEND);
+            char *filename_utf8 = rebSpell(SPECIFIC(item));
             tcc_add_file(state, filename_utf8);
             rebFree(filename_utf8);
         }
@@ -572,7 +572,7 @@ REBNATIVE(compile_p)
         ){
             rebJumps ("fail [",
                 "{TCC failed to compile the code}", compilables,
-            "]", rebEND);
+            "]");
         }
 
         Drop_Mold(mo);  // discard the combined source (no longer needed)
@@ -637,8 +637,8 @@ REBNATIVE(compile_p)
         assert(DSP == dsp_orig);  // no user natives if outputting file!
 
         char *output_file_utf8 = rebSpell(
-            "ensure text! pick", config, "'output-file",
-        rebEND);
+            "ensure text! pick", config, "'output-file"
+        );
 
         if (tcc_output_file(state, output_file_utf8) < 0)
             fail ("TCC failed to output the file");
@@ -656,14 +656,14 @@ REBNATIVE(compile_p)
         REBARR *details = ACT_DETAILS(action);
         REBVAL *linkname = DETAILS_AT(details, IDX_TCC_NATIVE_LINKNAME);
 
-        char *name_utf8 = rebSpell("ensure text!", linkname, rebEND);
+        char *name_utf8 = rebSpell("ensure text!", linkname);
         void *sym = tcc_get_symbol(state, name_utf8);
         rebFree(name_utf8);
 
         if (not sym)
             rebJumps ("fail [",
                 "{TCC failed to find symbol:}", linkname,
-            "]", rebEND);
+            "]");
 
         // Circumvent ISO C++ forbidding cast between function/data pointers
         //

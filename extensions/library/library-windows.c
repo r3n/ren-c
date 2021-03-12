@@ -47,7 +47,7 @@ void *Open_Library(const REBVAL *path)
     // default.  So if %foo is passed in, you don't want to prepend the
     // current dir to make it absolute, because it will *only* look there.
     //
-    WCHAR *path_utf8 = rebSpellWide("file-to-local", path, rebEND);
+    WCHAR *path_utf8 = rebSpellWide("file-to-local", path);
 
     void *dll = LoadLibraryW(path_utf8);
 

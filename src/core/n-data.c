@@ -741,7 +741,7 @@ REBNATIVE(set)
             VAL_SPECIFIER(target),
             v == v_tail  // R3-Alpha/Red blank after END
                 ? BLANK_VALUE
-                : v, 
+                : v,
             (IS_BLOCK(value) and not REF(single))
                 ? VAL_SPECIFIER(value)
                 : SPECIFIED,
@@ -875,7 +875,7 @@ REBNATIVE(enfixed)
             " https://forum.rebol.info/t/1156"
         );
 
-    REBVAL *copy = rebValueQ("copy", ARG(action), rebEND);
+    REBVAL *copy = rebValueQ("copy", ARG(action));
     SET_ACTION_FLAG(VAL_ACTION(copy), ENFIXED);
     return copy;
 }

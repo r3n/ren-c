@@ -183,9 +183,7 @@ static int Get_File_Info(REBREQ *file)
     //
     // https://superuser.com/questions/240743/
     //
-    char *path_utf8 = rebSpell(
-        "file-to-local/full", ReqFile(file)->path,
-    rebEND);
+    char *path_utf8 = rebSpell("file-to-local/full", ReqFile(file)->path);
 
     struct stat info;
     int stat_result = stat(path_utf8, &info);
@@ -260,7 +258,7 @@ static int Read_Directory(REBREQ *dir, REBREQ *file)
 
     // Note: /WILD append of * is not necessary on POSIX
     //
-    char *dir_utf8 = rebSpell("file-to-local", ReqFile(dir)->path, rebEND);
+    char *dir_utf8 = rebSpell("file-to-local", ReqFile(dir)->path);
 
     // If no dir handle, open the dir:
     //
@@ -331,7 +329,7 @@ static int Read_Directory(REBREQ *dir, REBREQ *file)
         "applique :local-to-file [",
             "path:", rebT(file_utf8),
             "dir: if", rebL(file_req->modes & RFM_DIR), "'#",
-        "]", rebEND
+        "]"
     );
 
     // !!! We currently unmanage this, because code using the API may
@@ -398,7 +396,7 @@ DEVICE_CMD Open_File(REBREQ *file)
             "path:", ReqFile(file)->path,
             "wild: if", rebL(req->modes & RFM_DIR), "'#",  // !!! necessary?
             "full: #",
-        "]", rebEND
+        "]"
     );
 
     struct stat info;
@@ -628,8 +626,7 @@ DEVICE_CMD Create_File(REBREQ *file)
         return Open_File(file);
 
     char *path_utf8 = rebSpell(
-        "file-to-local/full/no-tail-slash", ReqFile(file)->path,
-        rebEND
+        "file-to-local/full/no-tail-slash", ReqFile(file)->path
     );
 
     int mkdir_result = mkdir(path_utf8, 0777);
@@ -656,8 +653,8 @@ DEVICE_CMD Delete_File(REBREQ *file)
     struct rebol_devreq *req = Req(file);
 
     char *path_utf8 = rebSpell(
-        "file-to-local/full", ReqFile(file)->path,
-        rebEND // leave tail slash on for directory removal
+        "file-to-local/full", ReqFile(file)->path
+        // leave tail slash on for directory removal
     );
 
     int removal_result;
@@ -688,13 +685,9 @@ DEVICE_CMD Rename_File(REBREQ *file)
     REBVAL *to = cast(REBVAL*, req->common.data); // !!! hack!
 
     char *from_utf8 = rebSpell(
-        "file-to-local/full/no-tail-slash", ReqFile(file)->path,
-        rebEND
+        "file-to-local/full/no-tail-slash", ReqFile(file)->path
     );
-    char *to_utf8 = rebSpell(
-        "file-to-local/full/no-tail-slash", to,
-        rebEND
-    );
+    char *to_utf8 = rebSpell("file-to-local/full/no-tail-slash", to);
 
     int rename_result = rename(from_utf8, to_utf8);
 
@@ -800,7 +793,7 @@ REBVAL *File_Time_To_Rebol(REBREQ *file)
         ),  // secs
         rebI(0),  // nanoseconds (file times don't have this)
         rebI(zone),  // zone
-    ")", rebEND);
+    ")");
 }
 
 
@@ -819,10 +812,7 @@ REBVAL *Get_Current_Dir_Value(void)
         return rebBlank();
     }
 
-    REBVAL *result = rebValue(
-        "local-to-file/dir", rebT(path),
-        rebEND
-    );
+    REBVAL *result = rebValue("local-to-file/dir", rebT(path));
 
     rebFree(path);
     return result;
@@ -837,7 +827,7 @@ REBVAL *Get_Current_Dir_Value(void)
 //
 bool Set_Current_Dir_Value(const REBVAL *path)
 {
-    char *path_utf8 = rebSpell("file-to-local/full", path, rebEND);
+    char *path_utf8 = rebSpell("file-to-local/full", path);
 
     int chdir_result = chdir(path_utf8);
 
@@ -868,8 +858,8 @@ bool Set_Current_Dir_Value(const REBVAL *path)
         char *path_utf8 = rebAllocN(char, path_size);
 
         int r = _NSGetExecutablePath(path_utf8, &path_size);
-        if (r == -1) { // buffer is too small
-            assert(path_size > 1024); // path_size should now hold needed size
+        if (r == -1) {  // buffer is too small
+            assert(path_size > 1024);  // path_size should now hold needed size
 
             rebFree(path_utf8);
             path_utf8 = rebAllocN(char, path_size);
@@ -887,17 +877,15 @@ bool Set_Current_Dir_Value(const REBVAL *path)
         char *resolved_path_utf8 = realpath(path_utf8, NULL);
         if (resolved_path_utf8) {
             REBVAL *result = rebValue(
-                "local-to-file", rebT(resolved_path_utf8),
-                rebEND
+                "local-to-file", rebT(resolved_path_utf8)
             );
             rebFree(path_utf8);
-            free(resolved_path_utf8); // NOTE: realpath() uses malloc()
+            free(resolved_path_utf8);  // NOTE: realpath() uses malloc()
             return result;
         }
 
         REBVAL *result = rebValue(
-            "local-to-file", rebT(path_utf8), // just return unresolved path
-            rebEND
+            "local-to-file", rebT(path_utf8),  // just return unresolved path
         );
         rebFree(path_utf8);
         return result;
@@ -926,12 +914,12 @@ bool Set_Current_Dir_Value(const REBVAL *path)
           #if defined(PROC_EXEC_PATH)
             buffer = NULL;
             self = PROC_EXEC_PATH;
-          #else //HAVE_PROC_PATHNAME
+          #else  //HAVE_PROC_PATHNAME
             int mib[4] = {
                 CTL_KERN,
                 KERN_PROC,
                 KERN_PROC_PATHNAME,
-                -1 //current process
+                -1  //current process
             };
             buffer = rebAllocN(char, PATH_MAX + 1);
             size_t len = PATH_MAX + 1;
@@ -955,10 +943,7 @@ bool Set_Current_Dir_Value(const REBVAL *path)
 
         path_utf8[r] = '\0';
 
-        REBVAL *result = rebValue(
-            "local-to-file", rebT(path_utf8),
-            rebEND
-        );
+        REBVAL *result = rebValue("local-to-file", rebT(path_utf8));
         rebFree(path_utf8);
         return result;
       #endif

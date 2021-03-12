@@ -224,8 +224,8 @@ REB_R Event_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         else {
             Free_Req(req);  // synchronous completion, we must free
 
-            if (rebDid("error?", result, rebEND))
-                rebJumps("fail", result, rebEND);
+            if (rebDid("error?", result))
+                rebJumps("fail", result);
 
             assert(false); // !!! can this happen?
             rebRelease(result); // ignore result

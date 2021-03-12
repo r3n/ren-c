@@ -108,7 +108,7 @@ inline static bool Do_At_Mutable_Maybe_Stale_Throws(
         array,
         index,
         specifier,
-        FEED_MASK_DEFAULT  // different: does not 
+        FEED_MASK_DEFAULT  // different: does not
     );
 
     return Do_Feed_To_End_Maybe_Stale_Throws(
@@ -213,8 +213,8 @@ inline static bool Do_Branch_Core_Throws(
             out,
             false, // !fully, e.g. arity-0 functions can ignore condition
             rebU(branch),
-            condition, // may be an END marker, if not Do_Branch_With() case
-            rebEND // ...but if condition wasn't an END marker, we need one
+            condition,  // may be an END marker, if not Do_Branch_With() case
+            rebEND
         );
         DROP_GC_GUARD(branch);
         if (threw)

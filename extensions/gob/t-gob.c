@@ -376,10 +376,10 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
 
       case SYM_IMAGE:
         CLR_GOB_OPAQUE(gob);
-        if (rebDid("image?", val, rebEND)) {
-            REBVAL *size = rebValue("pick", val, "'size", rebEND);
-            int32_t w = rebUnboxInteger("pick", size, "'x", rebEND);
-            int32_t h = rebUnboxInteger("pick", size, "'y", rebEND);
+        if (rebDid("image?", val)) {
+            REBVAL *size = rebValue("pick", val, "'size");
+            int32_t w = rebUnboxInteger("pick", size, "'x");
+            int32_t h = rebUnboxInteger("pick", size, "'y");
             rebRelease(size);
 
             GOB_W(gob) = cast(REBD32, w);
@@ -544,7 +544,7 @@ static REBVAL *Get_GOB_Var(
 
       case SYM_IMAGE:
         if (GOB_TYPE(gob) == GOBT_IMAGE) {
-            assert(rebDid("image?", GOB_CONTENT(gob), rebEND));
+            assert(rebDid("image?", GOB_CONTENT(gob)));
             return Copy_Cell(out, GOB_CONTENT(gob));
         }
         return Init_Blank(out);
@@ -854,8 +854,8 @@ REB_R PD_Gob(
         return rebValueQ(
             rebU(NATIVE_VAL(pick)),
                 SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)),
-                SPECIFIC(picker),
-        rebEND);
+                SPECIFIC(picker)
+        );
 
     return R_UNHANDLED;
 }
@@ -1051,8 +1051,8 @@ REBTYPE(Gob)
                 "part:", rebQ(REF(part)),
                 "deep:", rebQ(REF(deep)),
                 "last:", rebQ(REF(last)),
-            "]",
-        rebEND); }
+            "]"
+        ); }
 
     case SYM_AT:
         index--;
@@ -1072,8 +1072,8 @@ REBTYPE(Gob)
 
     case SYM_REVERSE:
         return rebValueQ(
-            "reverse", SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)),
-        rebEND);
+            "reverse", SPECIFIC(ARR_AT(gob, IDX_GOB_PANE))
+        );
 
     default:
         break;

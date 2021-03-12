@@ -291,8 +291,8 @@ DEVICE_CMD Lookup_Socket(REBREQ *sock)
         "insert system/ports/system make event! [",
             "type: 'lookup",
             "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, sock)),
-        "]",
-    rebEND);
+        "]"
+    );
 
     return DR_DONE;
 }
@@ -333,8 +333,8 @@ DEVICE_CMD Connect_Socket(REBREQ *sock)
             "insert system/ports/system make event! [",
                 "type: 'connect",
                 "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, sock)),
-            "]",
-        rebEND);
+            "]"
+        );
 
         if (req->modes & RST_LISTEN)
             return Listen_Socket(sock);
@@ -393,8 +393,8 @@ DEVICE_CMD Connect_Socket(REBREQ *sock)
         "insert system/ports/system make event! [",
             "type: 'connect",
             "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, sock)),
-        "]",
-    rebEND);
+        "]"
+    );
 
     return DR_DONE;
 }
@@ -429,8 +429,7 @@ DEVICE_CMD Transfer_Socket(REBREQ *sock)
 
     if (not (req->state & RSM_CONNECT) and not (req->modes & RST_UDP))
         rebJumps(
-            "fail {RSM_CONNECT must be true in Transfer_Socket() unless UDP}",
-            rebEND
+            "fail {RSM_CONNECT must be true in Transfer_Socket() unless UDP}"
         );
 
     struct sockaddr_in remote_addr;
@@ -478,8 +477,8 @@ DEVICE_CMD Transfer_Socket(REBREQ *sock)
                 "insert system/ports/system make event! [",
                     "type: 'wrote",
                     "port:", port,
-                "]",
-            rebEND);
+                "]"
+            );
 
             return DR_DONE;
         }
@@ -551,8 +550,8 @@ DEVICE_CMD Transfer_Socket(REBREQ *sock)
                 "insert system/ports/system make event! [",
                     "type: 'read",
                     "port:", port,
-                "]",
-            rebEND);
+                "]"
+            );
 
             finished = true;  // we'll return DR_DONE (not yet, if closing...)
         }
@@ -566,8 +565,8 @@ DEVICE_CMD Transfer_Socket(REBREQ *sock)
                 "insert system/ports/system make event! [",
                     "type: 'close",
                     "port:", port,
-                "]",
-            rebEND);
+                "]"
+            );
 
             return Close_Socket(sock);
         }
@@ -598,8 +597,8 @@ DEVICE_CMD Transfer_Socket(REBREQ *sock)
         "insert system/ports/system make event! [",
             "type: 'error",
             "port:", port,
-        "]",
-    rebEND);
+        "]"
+    );
 
     // The default awake handlers will just FAIL on the error, but this
     // can be overridden.
@@ -701,11 +700,10 @@ DEVICE_CMD Accept_Socket(REBREQ *sock)
     // must be accepted, however, to recvfrom() data in the future.
     //
     if (req->modes & RST_UDP) {
-            rebElide("insert system/ports/system make event! [",
-                "type: 'accept",
-                "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, sock)),
-            "]",
-        rebEND);
+        rebElide("insert system/ports/system make event! [",
+            "type: 'accept",
+            "port:", CTX_ARCHETYPE(MISC(ReqPortCtx, sock)),
+        "]");
 
         return DR_PEND;
     }
@@ -758,8 +756,7 @@ DEVICE_CMD Accept_Socket(REBREQ *sock)
 
     rebElide(
         "append ensure block!", CTX_VAR(listener, STD_PORT_CONNECTIONS),
-        CTX_ARCHETYPE(connection), // will GC protect during run
-        rebEND
+        CTX_ARCHETYPE(connection)  // will GC protect during run
     );
 
     DROP_GC_GUARD(connection);
@@ -771,8 +768,8 @@ DEVICE_CMD Accept_Socket(REBREQ *sock)
         "insert system/ports/system make event! [",
             "type: 'accept",
             "port:", CTX_ARCHETYPE(listener),
-        "]",
-    rebEND);
+        "]"
+    );
 
     // Even though we signalled, we keep the listen pending to
     // accept additional connections.

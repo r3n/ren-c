@@ -87,9 +87,7 @@ REBNATIVE(reduce)
         }
 
         if (not IS_NULLED(ARG(predicate))) {  // post-process result if needed
-            REBVAL *processed = rebValue(
-                rebINLINE(predicate), rebQ(D_OUT),
-            rebEND);
+            REBVAL *processed = rebValue(rebINLINE(predicate), rebQ(D_OUT));
             if (processed)
                 Copy_Cell(D_OUT, processed);
             else
@@ -189,7 +187,7 @@ REB_R Compose_To_Stack_Core(
         DECLARE_LOCAL (temp);
         Derelativize(temp, composee, specifier);
         PUSH_GC_GUARD(temp);
-        any_array = rebValueQ("as block!", temp, rebEND);
+        any_array = rebValueQ("as block!", temp);
         DROP_GC_GUARD(temp);
     }
     else
@@ -270,7 +268,7 @@ REB_R Compose_To_Stack_Core(
                 predicate
                 and not doubled_group
             ){
-                insert = rebValue(rebINLINE(predicate), rebQ(out), rebEND);
+                insert = rebValue(rebINLINE(predicate), rebQ(out));
             } else
                 insert = IS_NULLED(out) ? nullptr : out;
 

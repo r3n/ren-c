@@ -885,4 +885,4 @@ void Term_Beep(STD_TERM *t)
     Write_Char(BEL, 1);
 }
 
-#endif  // end guard against readline in pre-C99 compilers (would need rebEND)
+#endif  // end smart console branch

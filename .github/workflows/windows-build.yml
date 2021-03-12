@@ -69,7 +69,7 @@ jobs:
 
          - os-id: 0.3.40  # 64-bit Target (built on this 64-bit platform)
            config-file: vs2019-x64.r
-           standard: c
+           standard: c99
            debug: none
            extensions: View -  # View requires C99, disable it
 

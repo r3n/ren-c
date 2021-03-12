@@ -546,7 +546,7 @@ REBNATIVE(what_dir)
         fail (current_path);
     }
 
-    return rebValue("copy", current_path, rebEND);  // caller mutates, copy
+    return rebValue("copy", current_path);  // caller mutates, copy
 }
 
 

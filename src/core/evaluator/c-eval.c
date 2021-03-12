@@ -475,7 +475,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     DECLARE_ACTION_SUBFRAME (subframe, f);
     Push_Frame(f->out, subframe);
     Push_Action(
-        subframe, 
+        subframe,
         VAL_ACTION(unwrap(gotten)),
         VAL_ACTION_BINDING(unwrap(gotten))
     );
@@ -1183,8 +1183,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
                     "block: next block",
                 "]",
                 "if not tail? block [fail {Too many multi-returns}]",
-            "] ]",
-        rebEND);
+            "] ]"
+        );
 
         DROP_GC_GUARD(outputs);
 

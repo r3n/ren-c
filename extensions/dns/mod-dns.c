@@ -122,10 +122,10 @@ static REB_R DNS_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         }
         else if (IS_TEXT(host)) {
             REBVAL *tuple = rebValue(
-                "match tuple! first transcode", host,
-            rebEND);  // W3C says non-IP hosts can't end with number in tuple
+                "match tuple! first transcode", host
+            );  // W3C says non-IP hosts can't end with number in tuple
             if (tuple) {
-                if (rebDidQ("integer? last", tuple, rebEND)) {
+                if (rebDidQ("integer? last", tuple)) {
                     Copy_Cell(host, tuple);
                     rebRelease(tuple);
                     goto reverse_lookup;
@@ -133,7 +133,7 @@ static REB_R DNS_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
                 rebRelease(tuple);
             }
 
-            char *name = rebSpell(host, rebEND);
+            char *name = rebSpell(host);
 
             // example.com => 93.184.216.34
             HOSTENT *he = gethostbyname(name);
@@ -153,19 +153,13 @@ static REB_R DNS_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             return Init_Nulled(D_OUT);  // "expected" failures, signal w/null
 
           case NO_RECOVERY:
-            rebJumps(
-                "fail {A nonrecoverable name server error occurred}",
-                rebEND
-            );
+            rebJumps("fail {A nonrecoverable name server error occurred}");
 
           case TRY_AGAIN:
-            rebJumps(
-                "fail {Temporary error on authoritative name server}",
-                rebEND
-            );
+            rebJumps("fail {Temporary error on authoritative name server}");
 
           default:
-            rebJumps("fail {Unknown host error}", rebEND);
+            rebJumps("fail {Unknown host error}");
         } }
 
       case SYM_OPEN: {

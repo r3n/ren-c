@@ -35,6 +35,6 @@ REBVAL *Get_Current_Datetime_Value(void)
         ),  // "secs"
         rebI(1000000 * stime.wMilliseconds), // nano
         rebI(-tzone.Bias),  // zone
-    ")", rebEND);
+    ")");
 }
 

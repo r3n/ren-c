@@ -41,7 +41,6 @@
     #undef IS_ERROR
 #endif
 
-#define REBOL_IMPLICIT_END  // don't require rebEND in API calls (C99 or C++)
 #include "sys-core.h"
 
 #include "tmp-mod-odbc.h"

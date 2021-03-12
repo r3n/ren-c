@@ -224,8 +224,7 @@ static void Set_Vector_At(REBCEL(const*) vec, REBLEN n, const RELVAL *set) {
                 "unspaced [", rebI(bitsize), "{-bit}]",
                 rebT(sign ? "signed" : "unsigned"),
                 "{VECTOR! type}"
-        "]",
-        rebEND
+        "]"
     );
 }
 

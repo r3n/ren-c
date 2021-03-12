@@ -259,8 +259,8 @@ REBNATIVE(decode_png)
         "make image! compose [",
             "(make pair! [", rebI(w), rebI(h), "])",
             binary,
-        "]",
-    rebEND);
+        "]"
+    );
 
     rebRelease(binary);
 
@@ -316,13 +316,13 @@ REBNATIVE(encode_png)
     //
     state.encoder.auto_convert = 0;
 
-    REBVAL *size = rebValue("pick", image, "'size", rebEND);
-    REBLEN width = rebUnboxInteger("pick", size, "'x", rebEND);
-    REBLEN height = rebUnboxInteger("pick", size, "'y", rebEND);
+    REBVAL *size = rebValue("pick", image, "'size");
+    REBLEN width = rebUnboxInteger("pick", size, "'x");
+    REBLEN height = rebUnboxInteger("pick", size, "'y");
     rebRelease(size);
 
     size_t binsize;
-    REBYTE *image_bytes = rebBytes(&binsize, "bytes of", image, rebEND);
+    REBYTE *image_bytes = rebBytes(&binsize, "bytes of", image);
 
     size_t encoded_size;
     REBYTE *encoded_bytes = NULL;

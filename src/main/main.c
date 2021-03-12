@@ -58,7 +58,6 @@
 // debug situations to have access to PROBE() and other internal features.
 //
 #if !defined(DEBUG_MAIN_USING_SYS_CORE)
-    #define REBOL_EXPLICIT_END  // for building w/pre-C99 compilers--see notes
     #include "rebol.h"  // note: includes pstdint.h and pstdbool.h by default
 #else
     #undef IS_ERROR  // windows.h has its own definition of this macro
@@ -193,7 +192,7 @@ int main(int argc, char *argv_ansi[])
     // That way the command line argument processing can be taken care of by
     // PARSE in the MAIN-STARTUP user function, instead of C code!
     //
-    REBVAL *argv_block = rebValue("copy []", rebEND);
+    REBVAL *argv_block = rebValue("copy []");
 
   #ifdef TO_WINDOWS
     //
@@ -215,8 +214,8 @@ int main(int argc, char *argv_ansi[])
         // needing more than two bytes to be represented will cause a failure.
         //
         rebElide(
-            "append", argv_block, rebR(rebTextWide(argv_ucs2[i])),
-        rebEND);
+            "append", argv_block, rebR(rebTextWide(argv_ucs2[i]))
+        );
     }
   #else
     // Just take the ANSI C "char*" args...which should ideally be in UTF-8.
@@ -226,7 +225,7 @@ int main(int argc, char *argv_ansi[])
         if (argv_ansi[i] == nullptr)
             continue;  // !!! R3-Alpha commented here saying "shell bug" (?)
 
-        rebElide("append", argv_block, rebT(argv_ansi[i]), rebEND);
+        rebElide("append", argv_block, rebT(argv_ansi[i]));
     }
   #endif
 
@@ -239,8 +238,8 @@ int main(int argc, char *argv_ansi[])
             m_cast(unsigned char*, &Main_Startup_Code[0]),
             MAIN_STARTUP_SIZE,
             nullptr
-        )),
-    rebEND);
+        ))
+    );
 
     // !!! The startup code isn't really set up to run as a Module, though it
     // probably should be.  This is a carry-over of what some %sys-core.h
@@ -263,11 +262,11 @@ int main(int argc, char *argv_ansi[])
             "bind/only/set code lib",  // only ADD top level set-word!s to lib
             "bind code lib",  // but BIND to anything else that exists in lib
             "do code",
-        "]",
-    rebEND);
+        "]"
+    );
 
-    if (rebNot("action?", rebQ(main_startup), rebEND))
-        rebJumps("panic-value", rebQ(main_startup), rebEND);  // terminates
+    if (rebNot("action?", rebQ(main_startup)))
+        rebJumps("panic-value", rebQ(main_startup));  // terminates
 
     // This runs the MAIN-STARTUP, which returns *requests* to execute
     // arbitrary code by way of its return results.  The ENTRAP is thus here
@@ -276,14 +275,14 @@ int main(int argc, char *argv_ansi[])
     REBVAL *trapped = rebValue(
         "entrap [",  // MAIN-STARTUP action! takes one argument (argv[])
             main_startup, rebR(argv_block),
-        "]",
-    rebEND);
+        "]"
+    );
     rebRelease(main_startup);
 
-    if (rebDid("error?", trapped, rebEND))  // error in MAIN-STARTUP itself
-        rebJumps("panic", trapped, rebEND);  // terminates
+    if (rebDid("error?", trapped))  // error in MAIN-STARTUP itself
+        rebJumps("panic", trapped);  // terminates
 
-    REBVAL *code = rebValue("first", trapped, rebEND); // entrap's output
+    REBVAL *code = rebValue("first", trapped); // entrap's output
     rebRelease(trapped);  // don't need the outer block any more
 
     // !!! For the moment, the CONSOLE extension does all the work of running
@@ -294,9 +293,9 @@ int main(int argc, char *argv_ansi[])
     // kinds of errors.  Hence there is a /PROVOKE refinement to CONSOLE
     // which feeds it an instruction, as if the console gave it to itself.
 
-    REBVAL *result = rebValue("console/provoke", rebR(code), rebEND);
+    REBVAL *result = rebValue("console/provoke", rebR(code));
 
-    int exit_status = rebUnboxInteger(rebR(result), rebEND);
+    int exit_status = rebUnboxInteger(rebR(result));
 
     const bool clean = false;  // process exiting, not necessary
     rebShutdown(clean);  // Note: debug build runs a clean shutdown anyway

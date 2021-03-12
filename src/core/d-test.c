@@ -57,30 +57,25 @@ REBNATIVE(test_librebol)
   #else
     REBDSP dsp_orig = DSP;
 
-    // Note: rebEND is not needed when using the API unless using C89
-    // compatibility mode (#define REBOL_EXPLICIT_END).  That mode is off by
-    // default when you `#include "rebol.h`, but the core interpreter is built
-    // with it...so that it still builds with C89 compilers.
-
     SET_CELL_FLAG(Init_Integer(DS_PUSH(), 1), NEWLINE_BEFORE);
-    Init_Logic(DS_PUSH(), 3 == rebUnboxInteger("1 +", rebI(2), rebEND));
+    Init_Logic(DS_PUSH(), 3 == rebUnboxInteger("1 +", rebI(2)));
 
     SET_CELL_FLAG(Init_Integer(DS_PUSH(), 2), NEWLINE_BEFORE);
-    intptr_t getter = rebUnboxInteger("api-transient {Hello}", rebEND);
+    intptr_t getter = rebUnboxInteger("api-transient {Hello}");
     Recycle();  // transient should survive a recycle
     REBNOD *getter_node = cast(REBNOD*, cast(void*, getter));
-    Init_Logic(DS_PUSH(), rebDidQ("{Hello} =", getter_node, rebEND));
+    Init_Logic(DS_PUSH(), rebDidQ("{Hello} =", getter_node));
 
     SET_CELL_FLAG(Init_Integer(DS_PUSH(), 3), NEWLINE_BEFORE);
-    REBVAL *macro = rebValue("macro [x] [[append x first]]", rebEND);
-    REBVAL *mtest1 = rebValue(macro, "[1 2 3]", "[d e f]", rebEND);
+    REBVAL *macro = rebValue("macro [x] [[append x first]]");
+    REBVAL *mtest1 = rebValue(macro, "[1 2 3]", "[d e f]");
     Copy_Cell(DS_PUSH(), mtest1);
     rebRelease(mtest1);
 
     SET_CELL_FLAG(Init_Integer(DS_PUSH(), 4), NEWLINE_BEFORE);
-    REBVAL *numbers = rebValue("[1 2 3]", rebEND);
-    REBVAL *letters = rebValue("[d e f]", rebEND);
-    REBVAL *mtest2 = rebValue(macro, rebR(numbers), rebR(letters), rebEND);
+    REBVAL *numbers = rebValue("[1 2 3]");
+    REBVAL *letters = rebValue("[d e f]");
+    REBVAL *mtest2 = rebValue(macro, rebR(numbers), rebR(letters));
     Copy_Cell(DS_PUSH(), mtest2);
     rebRelease(mtest2);
 

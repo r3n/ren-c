@@ -218,7 +218,7 @@ static REBVAL *Run_Sandboxed_Group(REBVAL *group) {
     //
     // So don't add superfluous libRebol calls here, except to debug.
     //
-    return rebQuoteInterruptible(group, rebEND);  // ownership gets proxied
+    return rebQuoteInterruptible(group);  // ownership gets proxied
 }
 
 
@@ -254,9 +254,9 @@ REBNATIVE(console)
     // nested sessions which might have a different skin.  So save whatever
     // the console object was if it is being overridden.
 
-    REBVAL *old_console = rebValue(":system/console", rebEND);
+    REBVAL *old_console = rebValue(":system/console");
     if (REF(skin))
-        rebElide("system/console: _", rebEND);  // !!! needed for now
+        rebElide("system/console: _");  // !!! needed for now
 
     // We only enable halting (e.g. Ctrl-C, or Escape, or whatever) when user
     // code is running...not when the HOST-CONSOLE function itself is, or
@@ -273,7 +273,7 @@ REBNATIVE(console)
 
     REBVAL *code;
     if (REF(provoke)) {
-        code = rebArg("provoke", rebEND);  // fetch as an API handle
+        code = rebArg("provoke");  // fetch as an API handle
         goto provoked;
     }
     else {
@@ -300,13 +300,13 @@ REBNATIVE(console)
                 result,  // prior result quoted, or error (or blank!)
                 rebL(did REF(resumable)),
                 REF(skin),
-            "]", rebEND
+            "]"
         );
 
         rebRelease(code);
         rebRelease(result);
 
-        if (rebDidQ("error?", trapped, rebEND)) {
+        if (rebDidQ("error?", trapped)) {
             //
             // If the HOST-CONSOLE function has any of its own implementation
             // that could raise an error (or act as an uncaught throw) it
@@ -318,35 +318,35 @@ REBNATIVE(console)
             // it might have generated (a BLOCK!) asking itself to crash.
 
             if (no_recover)
-                rebJumpsQ("PANIC", trapped, rebEND);
+                rebJumpsQ("PANIC", trapped);
 
-            code = rebValueQ("[#host-console-error]", rebEND);
+            code = rebValueQ("[#host-console-error]");
             result = trapped;
             no_recover = true;  // no second chances until user code runs
             goto recover;
         }
 
-        code = rebValueQ("first", trapped, rebEND);  // entrap []'s the output
+        code = rebValueQ("first", trapped);  // entrap []'s the output
         rebRelease(trapped); // don't need the outer block any more
 
       provoked:
 
-        if (rebDidQ("integer?", code, rebEND))
+        if (rebDidQ("integer?", code))
             break;  // when HOST-CONSOLE returns INTEGER! it means exit code
 
-        if (rebDidQ("match [sym-group! handle!]", code, rebEND)) {
+        if (rebDidQ("match [sym-group! handle!]", code)) {
             assert(REF(resumable));
             break;
         }
 
-        bool is_console_instruction = rebDidQ("block?", code, rebEND);
+        bool is_console_instruction = rebDidQ("block?", code);
         REBVAL *group;
 
         if (is_console_instruction) {
-            group = rebValueQ("as group!", code, rebEND);  // to run without DO
+            group = rebValueQ("as group!", code);  // to run without DO
         }
         else {
-            group = rebValueQ(code, rebEND);  // rebRelease() w/o affecting code
+            group = rebValueQ(code);  // rebRelease() w/o affecting code
 
             // If they made it to a user mode instruction, the console skin
             // must not be broken beyond all repair.  So re-enable recovery.
@@ -370,7 +370,7 @@ REBNATIVE(console)
     if (was_halting_enabled)
         Enable_Halting();
 
-    rebElideQ("system/console:", rebR(old_console), rebEND);
+    rebElideQ("system/console:", rebR(old_console));
 
     return code;  // http://stackoverflow.com/q/1101957/
 }

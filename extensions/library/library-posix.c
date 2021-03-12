@@ -69,14 +69,14 @@ void *Open_Library(const REBVAL *path)
     //
     // So don't use FILE-TO-LOCAL/FULL...
     //
-    char *path_utf8 = rebSpell("file-to-local", path, rebEND);
+    char *path_utf8 = rebSpell("file-to-local", path);
 
     void *dll = dlopen(path_utf8, RTLD_LAZY/*|RTLD_GLOBAL*/);
 
     rebFree(path_utf8);
 
     if (not dll) // dlerror() gives const char*
-        rebJumps("fail", rebT(dlerror()), rebEND);
+        rebJumps("fail", rebT(dlerror()));
 
     return dll;
   #endif

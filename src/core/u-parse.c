@@ -445,20 +445,20 @@ static void Print_Parse_Index(REBFRM *frame_) {
     //
     if (IS_END(P_RULE)) {
         if (P_POS >= cast(REBIDX, P_INPUT_LEN))
-            rebElide("print {[]: ** END **}", rebEND);
+            rebElide("print {[]: ** END **}");
         else
-            rebElide("print [{[]:} mold", input, "]", rebEND);
+            rebElide("print [{[]:} mold", input, "]");
     }
     else {
         DECLARE_LOCAL (rule);
         Derelativize(rule, P_RULE, P_RULE_SPECIFIER);
 
         if (P_POS >= cast(REBIDX, P_INPUT_LEN))
-            rebElide("print [mold", rule, "{** END **}]", rebEND);
+            rebElide("print [mold", rule, "{** END **}]");
         else {
             rebElide("print ["
                 "mold", rule, "{:} mold", input,
-            "]", rebEND);
+            "]");
         }
     }
 }
@@ -1682,9 +1682,7 @@ REBNATIVE(subparse)
                         );
                     }
                     else
-                        rebElide(
-                            "append", ARG(collection), rebQ(D_OUT),
-                        rebEND);
+                        rebElide("append", ARG(collection), rebQ(D_OUT));
 
                     SET_END(D_OUT);  // since we didn't throw, put it back
 
@@ -2214,7 +2212,7 @@ REBNATIVE(subparse)
                     // !!! Review faster way of sharing the AS transform.
                     //
                     Derelativize(D_SPARE, into, P_INPUT_SPECIFIER);
-                    into = rebValueQ("as block!", D_SPARE, rebEND);
+                    into = rebValueQ("as block!", D_SPARE);
                 }
                 else if (
                     not ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(into)))
@@ -2772,7 +2770,7 @@ REBNATIVE(parse)
             // it got in the input before failing.
             //
             Init_Void(D_SPARE, SYM_VOID);
-            rebElideQ("set", progress, D_SPARE, rebEND);
+            rebElideQ("set", progress, D_SPARE);
         }
         return nullptr;
     }
@@ -2803,7 +2801,7 @@ REBNATIVE(parse)
     VAL_INDEX_UNBOUNDED(D_SPARE) = index;  // cell guaranteed not REB_QUOTED
     Quotify(D_SPARE, num_quotes);  // put quotes back
 
-    rebElideQ("set", progress, D_SPARE, rebEND);
+    rebElideQ("set", progress, D_SPARE);
 
     RETURN (ARG(input));  // main return value is input at original position
 }

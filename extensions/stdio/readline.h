@@ -39,25 +39,9 @@
 /* #include %reb-c.h */
 
 
-// If a POSIX system does not offer Termios features, we assume it might also
-// be old enough (or simple/embedded) to not support C99 and variadic macros.
-// Without variadic macros, we have to use REBOL_EXPLICIT_END and it makes the
-// code less pleasant.  We tie the two things together to say that there is
-// no concern for a "smart-terminal-based C89 build"...if you can only build
-// with C89 then another aspect of that constraint is that you aren't going
-// to get features like command history or tab completion.
-//
-#if !defined(__STDC_VERSION__) && !defined(__cplusplus)
-    // ...compiler doesn't follow the foundational standard of spec versioning
-    // e.g. too old to be at or after C99 or C++11 (--std=gnu89 acts like this)
-#elif defined (__STDC_VERSION__) && __STDC_VERSION__ < 199901L
-    // ...claims to be a C compiler, but too old to guarantee variadic macros
-#elif defined(__cplusplus) && !defined(CPLUSPLUS_11)
-    // ...C++11 standardized variadic macros in sync with C99's version...
-#elif !defined(TO_WINDOWS) and defined(NO_TTY_ATTRIBUTES)
-    // ...couldn't do terminal code even if we bothered with C89 support...
+#if !defined(TO_WINDOWS) && defined(NO_TTY_ATTRIBUTES)
+    // ...Linux with no terminal functions ...
 #else
-// ...good enough to use both REBOL_IMPLICIT_END and terminal functions...
 
 #define REBOL_SMART_CONSOLE
 
@@ -127,4 +111,4 @@ extern REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered);
 extern void Term_Abandon_Pending_Events(STD_TERM *t);
 
 
-#endif  // end guard against readline in pre-C99 compilers (would need rebEND)
+#endif  // end smart console branch

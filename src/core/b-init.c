@@ -717,7 +717,7 @@ static REBVAL *Startup_Mezzanine(BOOT_BLK *boot)
         result,
         true, // fully = true (error if all arguments aren't consumed)
         rebU(finish_init), // %sys-start.r function to call
-        SPECIFIC(&boot->mezz), // boot-mezz argument
+        SPECIFIC(&boot->mezz),  // boot-mezz argument
         rebEND
     )){
         fail (Error_No_Catch_For_Throw(result));

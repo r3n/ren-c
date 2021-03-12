@@ -72,9 +72,6 @@
 #include <stdlib.h>  // size_t and other types used in rebol.h
 #include "pstdint.h"  // polyfill <stdint.h> for pre-C99/C++11 compilers
 #include "pstdbool.h"  // polyfill <stdbool.h> for pre-C99/C++11 compilers
-#if !defined(REBOL_IMPLICIT_END)
-    #define REBOL_EXPLICIT_END  // ensure core compiles with pre-C99/C++11
-#endif
 #include "rebol.h"
 
 // assert() is enabled by default; disable with `#define NDEBUG`
@@ -350,7 +347,7 @@ extern void reb_qsort_r(void *a, size_t n, size_t es, void *thunk, cmp_t *cmp);
 // Despite this basic work for threading, greater issues were not hammered
 // out.  And so this separation really just caused problems when two different
 // threads wanted to work with the same data (at different times).  Such a
-// feature is better implemented as in the V8 JavaScript engine as "isolates"  
+// feature is better implemented as in the V8 JavaScript engine as "isolates"
 
 #ifdef __cplusplus
     #define PVAR extern "C" RL_API
