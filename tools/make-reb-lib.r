@@ -739,7 +739,16 @@ e-lib/emit {
            */
           #define REBOL_IMPLICIT_END
 
-          #if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+          #ifdef _MSC_VER
+            /*
+             * MS doesn't define __STDC_VERSION__ at all, but implement some of
+             * C99 and C11 anyway.  Trigger an informative error here if C99
+             * macro expansion doesn't work...
+             */
+             #define YourMSVCIsTooOldIfThisErrors(...) (__VA_ARGS__ + 2)
+            inline static int MSVCAgeTest(void)
+              { return YourMSVCIsTooOldIfThisErrors(1); }
+          #elif defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
             /* C99 or above */
           #elif defined(__cplusplus) && __cplusplus >= 201103L
             /* C++11 or above, if following the standard (VS2017 does not) */

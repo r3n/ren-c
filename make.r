@@ -291,7 +291,14 @@ gen-obj: func [
             _
         ]
         'gnu89 'c99 'gnu99 'c11 [
-            to tag! unspaced ["gnu:--std=" standard]
+            reduce [
+                to tag! unspaced ["gnu:--std=" standard]
+                ;
+                ; Note: MSVC does not have any conformance to C99 or C11 at
+                ; time of writing, and will complain about /std:c99 ... it only
+                ; supports /std:c++11 and /std:c++17 so we basically have to
+                ; just ignore the C versioning in MSVC.
+            ]
         ]
         'c++ [
             cfg-cplusplus: cplusplus: true
