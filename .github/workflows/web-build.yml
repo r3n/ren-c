@@ -180,7 +180,7 @@ jobs:
         "$R3MAKE" ../make.r \
             config="../configs/$CONFIG_FILE" \
             target=makefile \
-            standard=c99 \
+            standard=gnu99 \
             os_id=$OS_ID \
             debug=none \
             git_commit="{$GIT_COMMIT}" \
