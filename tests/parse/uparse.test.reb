@@ -207,3 +207,28 @@
         x = [any any any]
     ]
 )]
+
+; CHANGE is rethought in UPARSE to work with value-bearing rules.  The rule
+; gets the same input that the first argument did.
+;
+[(
+    str: "aaa"
+    did all [
+        uparse str [change [some "a"] @(if true ["literally"])]
+        str = "literally"
+    ]
+)(
+    str: "(aaa)"
+    did all [
+        uparse str [
+            change [between "(" ")"] [
+                collect [
+                    "("
+                    some ["a", (print "Hi"), keep @(<a>)]
+                    ")"
+                ]
+            ]
+        ]
+        str = "<a><a><a>"
+    ]
+)]

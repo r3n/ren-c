@@ -251,15 +251,35 @@ default-combinators: make map! reduce [
 
     === {MUTATING KEYWORDS} ===
 
+    ; Topaz moved away from the idea that PARSE was used for doing mutations
+    ; entirely.  It does complicate the implementation to be changing positions
+    ; out from under things...so it should be considered carefully.
+    ;
+    ; UPARSE continues with the experiment, but does things a bit differently.
+    ; Here CHANGE is designed to be used with value-bearing rules, and the
+    ; value-bearing rule is run against the same position as the start of
+    ; the input.
+    ;
+    ; !!! Review what happens if the input rule can modify, too.
+
     'change combinator [
         {Substitute a match with new data}
         parser [action!]
-        'data [<opt> any-value!]
+        replacer [action!]  ; !!! How to say result is used here?
     ][
-        if not let limit: parser input [
+        if not find (parameters of :replacer) '/result [
+            fail "CHANGE needs result-bearing combinator as second argument"
+        ]
+
+        if not let limit: parser input [  ; first look for end position
             return null
         ]
-        return change/part input data limit  ; CHANGE returns change's tail
+
+        if not let ['# replacement]: replacer input [  ; then get replacement
+            return null
+        ]
+
+        return change/part input replacement limit  ; CHANGE returns tail
     ]
 
     'remove combinator [
