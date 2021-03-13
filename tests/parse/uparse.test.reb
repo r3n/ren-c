@@ -6,6 +6,34 @@
 ; using a different set of combinators.  Those combinators can be chosen for
 ; new features, or just to get compatibility with Rebol2/R3-Alpha/Red parse.
 
+; SYM-XXX! are value-bearing rules that do not advance the input and get their
+; argument literally.  They succeed unless their result is null (if you want
+; success in that case with a null result, combine with OPT rule).
+[(
+    three: 3
+    did all [
+        "" = uparse "" [x: @three]
+        x = 3
+    ]
+)(
+    did all [
+        "" = uparse "" [x: @(1 + 2)]
+        x = 3
+    ]
+)(
+    x: <before>
+    did all [
+        not uparse "" [x: @(null)]
+        x = <before>
+    ]
+)(
+    x: <before>
+    did all [
+        "" = uparse "" [x: opt @(null)]
+        x = null
+    ]
+)]
+
 ; One key feature of UPARSE is that rule chaining is done in such a way that
 ; it delegates the recognition to the parse engine, meaning that rules do not 
 ; have to be put into blocks as often.
@@ -111,6 +139,16 @@
     did all [  ; semi-nonsensical use of BETWEEN just because it takes 2 rules
         not uparse "(abc}" [x: collect between keep across "(" keep across ")"]
         x = <before>
+    ]
+)(
+    x: <before>
+    did all [
+        uparse "aaa" [x: collect [some [
+            keep opt @(if false [<not kept>])
+            keep skip
+            keep @(if true [<kept>])
+        ]]]
+        x = [#a <kept> #a <kept> #a <kept>]
     ]
 )]
 

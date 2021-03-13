@@ -441,7 +441,7 @@ default-combinators: make map! reduce [
         if not state/collecting [
             state/collecting: make block! 10
         ]
-        
+
         let collect-base: tail state/collecting
         if not input: parser input [
             ;
@@ -818,47 +818,63 @@ default-combinators: make map! reduce [
 
     === {SYM-XXX! COMBINATORS} ===
 
-    ; The concept behind SYM-XXX! is to match exactly the thing that is
-    ; held by the variable.  So if it holds a block, it does not act as
-    ; a rule...but as the actual value itself.
+    ; The concept behind SYM-XXX! is to be a value-bearing rule which is not
+    ; tied to the input.  You could thus say `keep @('stuff)` and it would not
+    ; mean that `stuff` needed to appear in the input.
+    ;
+    ; A NULL is interpreted as the rule failing.  If you want to avoid that,
+    ; then say e.g. `keep opt @(null)`.
 
     sym-word! combinator [
-         value [sym-word!]
+        result: [any-value!]
+        value [sym-word!]
     ][
-        either any-array? input [
-            if input/1 = get value [  ; use SYM-GROUP! for unsets
-                return next input
-            ]
-            return null
-        ][
-            fail "SYM-WORD! feature only available for arrays right now."
+        if not result [
+            fail "SYM-XXX rules can only be used in value-bearing contexts"
         ]
+        if null? set result get value [
+            return null
+        ]
+        return input
     ]
 
     sym-path! combinator [
-         value [sym-path!]
+        result: [any-value!]
+        value [sym-path!]
     ][
-        either any-array? input [
-            if input/1 = get value [  ; use SYM-GROUP! for unsets
-                return next input
-            ]
-            return null
-        ][
-            fail "SYM-PATH! feature only available for arrays right now."
+        if not result [
+            fail "SYM-XXX rules can only be used in value-bearing contexts"
         ]
+        if null? set result get value [
+            return null
+        ]
+        return input
     ]
 
     sym-group! combinator [
-         value [sym-group!]
+        result: [any-value!]
+        value [sym-group!]
     ][
-        either any-array? input [
-            if input/1 = do value [  ; could evaluate to an unset
-                return next input
-            ]
-            return null
-        ][
-            fail "SYM-GROUP! feature only available for arrays right now."
+        if not result [
+            fail "SYM-XXX rules can only be used in value-bearing contexts"
         ]
+        if null? set result do value [
+            return null
+        ]
+        return input
+    ]
+
+    sym-block! combinator [
+        result: [any-value!]
+        value [sym-block!]
+    ][
+        if not result [
+            fail "SYM-XXX rules can only be used in value-bearing contexts"
+        ]
+        if null? set result as block! value [  ; !!! should it copy?
+            return null
+        ]
+        return input
     ]
 
     === {INVISIBLE COMBINATORS} ===
