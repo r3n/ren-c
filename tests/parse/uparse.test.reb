@@ -77,7 +77,7 @@
 )(
      did all [
          uparse "<<<stuff>>>" [
-             left: copy some "<"
+             left: across some "<"
              (n: length of left)
              x: between here n ">"
          ]
@@ -103,13 +103,13 @@
 )(
     x: <before>
     did all [  ; semi-nonsensical use of BETWEEN just because it takes 2 rules
-        uparse "(abc)" [x: collect between keep copy "(" keep copy ")"]
+        uparse "(abc)" [x: collect between keep across "(" keep across ")"]
         x = ["(" ")"]
     ]
 )(
     x: <before>
     did all [  ; semi-nonsensical use of BETWEEN just because it takes 2 rules
-        not uparse "(abc}" [x: collect between keep copy "(" keep copy ")"]
+        not uparse "(abc}" [x: collect between keep across "(" keep across ")"]
         x = <before>
     ]
 )]

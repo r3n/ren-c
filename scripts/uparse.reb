@@ -281,17 +281,6 @@ default-combinators: make map! reduce [
 
     === {SEEKING KEYWORDS} ===
 
-    'skip combinator [
-        {Skip one item, succeeding so long as input isn't at END}
-        result: [any-value!]
-    ][
-        if tail? input [return null]
-        if result [
-            set result input/1
-        ]
-        return next input
-    ]
-
     'to combinator [
         {Match up TO a certain rule (result position before succeeding rule)}
         parser [action!]
@@ -366,18 +355,48 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    === {ASSIGNING KEYWORDS} ===
+    === {VALUE-BEARING KEYWORDS} ===
 
-    'copy combinator [
+    ; Historically SKIP was used to match one item of input.  But the word
+    ; wasn't a great fit, as it could be used with assignment to actually
+    ; capture the value...which is the opposite of skipping.  You might call
+    ; it ACCEPT or MATCH or something more in that vein, but every choice has
+    ; some downsides.
+    ;
+    ; This is under scrutiny.  `*` was chosen in Topaz, but that means "match
+    ; any number of" in RegEx and wildcarding.  So it's a poor choice.  Other
+    ; candidates are ?, _, etc.
+
+    'skip combinator [
+        {Match one series item in input, succeeding so long as it's not at END}
+        result: [any-value!]
+    ][
+        if tail? input [return null]
+        if result [
+            set result input/1
+        ]
+        return next input
+    ]
+
+    ; Historically Rebol used COPY to mean "match across a span of rules and
+    ; then copy from the first position to the tail of the match".  That could
+    ; have assignments done inside, which extract some values and omit others.
+    ; You could thus end up with `y: copy x: ...` and wind up with x and y
+    ; being different things, which is not intuitive.
+    ;
+    ; Using the name ACROSS is a bit more clear that it's not
+
+    'across combinator [
         {Copy from the current parse position through a rule}
         result: [any-series!]
         parser [action!]
     ][
         if let pos: parser input [
-            if not result [
-                fail "COPY must be used with a SET-WORD! in UPARSE"
+            if result [
+                set result copy/part input pos
+            ] else [  ; !!! is it necessary to fail here?
+                fail "ACROSS must be used with a SET-WORD! in UPARSE"
             ]
-            set result copy/part input pos
             return pos
         ]
         return null
