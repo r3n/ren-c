@@ -137,7 +137,7 @@ combinator: func [
 ;
 default-combinators: make map! reduce [
 
-    === {BASIC KEYWORDS} ===
+    === BASIC KEYWORDS ===
 
     'opt combinator [
         {If the parser given as a parameter fails, return input undisturbed}
@@ -191,7 +191,7 @@ default-combinators: make map! reduce [
         return input
     ]
 
-    === {LOOPING CONSTRUCT KEYWORDS} ===
+    === LOOPING CONSTRUCT KEYWORDS ===
 
     'any combinator [
         {Any number of matches (including 0)}
@@ -249,7 +249,7 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    === {MUTATING KEYWORDS} ===
+    === MUTATING KEYWORDS ===
 
     ; Topaz moved away from the idea that PARSE was used for doing mutations
     ; entirely.  It does complicate the implementation to be changing positions
@@ -299,7 +299,7 @@ default-combinators: make map! reduce [
         return insert input data
     ]
 
-    === {SEEKING KEYWORDS} ===
+    === SEEKING KEYWORDS ===
 
     'to combinator [
         {Match up TO a certain rule (result position before succeeding rule)}
@@ -375,7 +375,7 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    === {VALUE-BEARING KEYWORDS} ===
+    === VALUE-BEARING KEYWORDS ===
 
     ; Historically SKIP was used to match one item of input.  But the word
     ; wasn't a great fit, as it could be used with assignment to actually
@@ -422,7 +422,7 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    === {INTO KEYWORD} ===
+    === INTO KEYWORD ===
 
     ; Rebol2 had a INTO combinator which only took one argument: a rule to use
     ; when processing the nested input.  There was a popular proposal that
@@ -486,7 +486,7 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    === {COLLECT AND KEEP} ===
+    === COLLECT AND KEEP ===
 
     ; The COLLECT feature was first added by Red.  However, it did not use
     ; rollback across any KEEPs that happened when a parse rule failed, which
@@ -546,7 +546,7 @@ default-combinators: make map! reduce [
         return limit
     ]
 
-    === {GATHER AND EMIT} ===
+    === GATHER AND EMIT ===
 
     ; With gather, the idea is to do more of a "bubble-up" type of strategy
     ; for creating objects with labeled fields.  Also, the idea that PARSE
@@ -612,7 +612,7 @@ default-combinators: make map! reduce [
         return limit
     ]
 
-    === {SET-WORD! COMBINATOR} ===
+    === SET-WORD! COMBINATOR ===
 
     ; The concept behind Ren-C's SET-WORD! in PARSE is that some parse
     ; combinators are able to yield a result in addition to updating the
@@ -637,7 +637,7 @@ default-combinators: make map! reduce [
         return input
     ]
 
-    === {TEXT! COMBINATOR} ===
+    === TEXT! COMBINATOR ===
 
     ; For now we just make text act as FIND/MATCH, though this needs to be
     ; sensitive to whether we are operating on blocks or text/binary.
@@ -660,7 +660,7 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    === {TOKEN! COMBINATOR (currently ISSUE! and CHAR!)} ===
+    === TOKEN! COMBINATOR (currently ISSUE! and CHAR!) ===
 
     ; The TOKEN! type is an optimized immutable form of string that will
     ; often be able to fit into a cell with no series allocation.  This makes
@@ -685,7 +685,7 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    === {BINARY! COMBINATOR} ===
+    === BINARY! COMBINATOR ===
 
     ; Arbitrary matching of binary against text is a bit of a can of worms,
     ; because if we AS alias it then that would constrain the binary...which
@@ -710,7 +710,7 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    === {GROUP! COMBINATOR} ===
+    === GROUP! COMBINATOR ===
 
     ; GROUP! does not advance the input, just runs the group.
     ;
@@ -754,7 +754,7 @@ default-combinators: make map! reduce [
         return input  ; input is unchanged, no rules involved
     ]
 
-    === {BITSET! COMBINATOR} ===
+    === BITSET! COMBINATOR ===
 
     ; There is some question here about whether a bitset used with a BINARY!
     ; can be used to match UTF-8 characters, or only bytes.  This may suggest
@@ -785,7 +785,7 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    === {QUOTED! COMBINATOR} ===
+    === QUOTED! COMBINATOR ===
 
     ; Recognizes the value literally.  Test making it work only on the
     ; ANY-ARRAY! type, just to see if type checking can work.
@@ -799,7 +799,7 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    === {LOGIC! COMBINATOR} ===
+    === LOGIC! COMBINATOR ===
 
     ; Handling of LOGIC! in Ren-C replaces the idea of FAIL, because a logic
     ; #[true] is treated as "continue parsing" while #[false] is "rule did
@@ -815,7 +815,7 @@ default-combinators: make map! reduce [
         return null
     ]
 
-    === {INTEGER! COMBINATOR} ===
+    === INTEGER! COMBINATOR ===
 
     ; !!! There's currently no way for an integer to be used to represent a
     ; range of matches, e.g. between 1 and 10.  This would need skippable
@@ -833,7 +833,7 @@ default-combinators: make map! reduce [
         return input
     ]
 
-    === {DATATYPE! COMBINATOR} ===
+    === DATATYPE! COMBINATOR ===
 
     ; Traditionally you could only use a datatype with ANY-ARRAY! types,
     ; but since Ren-C uses UTF-8 Everywhere it makes it practical to merge in
@@ -880,7 +880,7 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    === {SYM-XXX! COMBINATORS} ===
+    === SYM-XXX! COMBINATORS ===
 
     ; The concept behind SYM-XXX! is to be a value-bearing rule which is not
     ; tied to the input.  You could thus say `keep @('stuff)` and it would not
@@ -941,12 +941,15 @@ default-combinators: make map! reduce [
         return input
     ]
 
-    === {INVISIBLE COMBINATORS} ===
+    === INVISIBLE COMBINATORS ===
 
     ; If BLOCK! is asked for a result, it will accumulate results from any
     ; result-bearing rules it hits as it goes.  Not all rules give results
     ; by default--such as GROUP! or literals for instance.  If something
     ; gives a result and you do not want it to, use ELIDE.
+    ;
+    ; !!! Suggestion has made that ELIDE actually be SKIP.  This sounds good,
+    ; but would require SKIP as "match next item" having another name.
 
     'elide combinator [
         {Transform a result-bearing combinator into one that has no result}
@@ -962,7 +965,7 @@ default-combinators: make map! reduce [
         return input
     ]
 
-    === {BLOCK! COMBINATOR} ===
+    === BLOCK! COMBINATOR ===
 
     ; Handling of BLOCK! is the most complex combinator.  It is processed as
     ; a set of alternatives separated by `|`.  The bar is treated specially
@@ -1313,7 +1316,7 @@ uparse: func [
 ]
 
 
-=== {AND COMPATIBILITY} ===
+=== AND COMPATIBILITY ===
 
 ; We do add AND as a backwards compatible form of AHEAD...even to the default
 ; for now (it has no competing meaning)
@@ -1321,7 +1324,7 @@ uparse: func [
 default-combinators/('and): :default-combinators/('ahead)
 
 
-=== {REBOL2/R3-ALPHA/RED COMPATIBILITY} ===
+=== REBOL2/R3-ALPHA/RED COMPATIBILITY ===
 
 ; One of the early applications of UPARSE is to be able to implement backward
 ; compatible parse behavior by means of a series of tweaks.
@@ -1330,7 +1333,7 @@ redbol-combinators: copy default-combinators
 
 append redbol-combinators reduce [
 
-    === {OLD STYLE SET AND COPY COMBINATORS} ===
+    === OLD STYLE SET AND COPY COMBINATORS ===
 
     ; Historical Rebol's PARSE had SET and COPY keywords which would take
     ; a WORD! as their first argument, and then a rule.  This was done because
@@ -1377,7 +1380,7 @@ append redbol-combinators reduce [
         return null
     ]
 
-    === {OLD STYLE SET-WORD! AND GET-WORD! BEHAVIOR} ===
+    === OLD STYLE SET-WORD! AND GET-WORD! BEHAVIOR ===
 
     ; This is the handling for sets and gets that are standalone...e.g. not
     ; otherwise quoted as arguments to combinators (like COPY X: SOME "A").
@@ -1402,7 +1405,7 @@ append redbol-combinators reduce [
         return get value
     ]
 
-    === {OLD-STYLE FAIL INSTRUCTION} ===
+    === OLD-STYLE FAIL INSTRUCTION ===
 
     ; In Ren-C, the FAIL word is taken to generally relate to raising errors.
     ; PARSE was using it to mean a forced mismatch.
