@@ -404,20 +404,64 @@ default-combinators: make map! reduce [
 
     === {INTO KEYWORD} ===
 
+    ; Rebol2 had a INTO combinator which only took one argument: a rule to use
+    ; when processing the nested input.  There was a popular proposal that
+    ; INTO would take a datatype, which would help simplify a common pattern:
+    ;
+    ;     ahead text! into [some "a"]  ; arity-1 form
+    ;     =>
+    ;     into text! [some "a"]  ; arity-2 form
+    ;
+    ; The belief being that wanting to test the type you were going "INTO" was
+    ; needed more often than not, and that at worst it would incentivize adding
+    ; the type as a comment.  Neither R3-Alpha nor Red adopted this proposal
+    ; (but Topaz did).
+    ;
+    ; UPARSE reframes this not to take just a datatype, but a "value-bearing
+    ; rule".  This means you can use it with generated data that is not
+    ; strictly resident in the series:
+    ;
+    ;     uparse "((aaaa)))" [into [between some "(" some ")"] [some "a"]]
+    ;
+    ; Because any value-bearing rule can be used, SYM-WORD! is also legal,
+    ; which lets you break the rules up for legibility (and avoids interpreting
+    ; arrays as rules themselves)
+    ;
+    ;     uparse [| | any any any | | |] [
+    ;          content: between some '| some '|
+    ;          into @content [some 'any]
+    ;     ]
+
     'into combinator [
         {Perform a recursion into another datatype with a rule}
-        parser [action!]
+        parser [action!]  ; !!! Easier expression of value-bearing parser?
+        subparser [action!]
     ][
-        if not any-series? input/1 [
+        if not find (parameters of :parser) '/result [
+            fail "INTO needs result-bearing combinator as first argument"
+        ]
+        if not let ['input subseries]: parser input [
+            ;
+            ; If the parser in the first argument can't get a value to subparse
+            ; then we don't process it.
+            ;
+            ; !!! Review: should we allow non-value-bearing parsers that just
+            ; set limits on the input?
+            ;
+            print "no deal"
+            return null
+        ]
+
+        if not any-series? :subseries [
             fail "Need ANY-SERIES! datatype for use with INTO in UPARSE"
         ]
 
         ; If the entirety of the item at the input array is matched by the
         ; supplied parser rule, then we advance past the item.
         ;
-        let pos: parser input/1
-        if pos = tail input/1 [
-            return next input
+        let pos: subparser subseries
+        if pos = tail subseries [
+            return input
         ]
         return null
     ]

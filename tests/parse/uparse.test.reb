@@ -35,11 +35,11 @@
 )]
 
 ; One key feature of UPARSE is that rule chaining is done in such a way that
-; it delegates the recognition to the parse engine, meaning that rules do not 
+; it delegates the recognition to the parse engine, meaning that rules do not
 ; have to be put into blocks as often.
 [
-    (["aaaa"] = uparse ["aaaa"] [into some 2 "a"])
-    (null = uparse ["aaaa"] [into some 3 "a"])
+    (["aaaa"] = uparse ["aaaa"] [into text! some 2 "a"])
+    (null = uparse ["aaaa"] [into text! some 3 "a"])
 ]
 
 ; BETWEEN is a new combinator that lets you capture between rules.
@@ -175,5 +175,35 @@
     did all [
         g/i = 1
         g/t = <foo>
+    ]
+)]
+
+; UPARSE INTO is arity-2, permitting use of a value-bearing rule to produce
+; the thing to recurse the parser into...which can generate a new series, as
+; well as pick one out of a block.
+[(
+    did all [
+        uparse ["aaa"] [into text! [x: across some "a"]]
+        x = "aaa"
+    ]
+)(
+    did all [
+        uparse ["aaa"] [into skip [x: across some "a"]]
+        x = "aaa"
+    ]
+)(
+    did all [
+        uparse "((aaa)))" [
+            into [between some "(" some ")"] [x: across some "a"]
+        ]
+        x = "aaa"
+    ]
+)(
+    did all [
+        uparse [| | any any any | | |] [
+            content: between some '| some '|
+            into @content [x: across some 'any]
+        ]
+        x = [any any any]
     ]
 )]
