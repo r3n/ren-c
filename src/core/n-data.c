@@ -1112,7 +1112,7 @@ bool Try_As_String(
         REBLEN len;
         REBSIZ size;
         REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT(&len, &size, v);
-        assert(size + 1 < sizeof(PAYLOAD(Bytes, v).at_least_8));  // must fit
+        assert(size + 1 <= sizeof(PAYLOAD(Bytes, v).at_least_8));  // must fit
 
         REBSTR *str = Make_String_Core(size, SERIES_FLAGS_NONE);
         memcpy(SER_DATA(str), utf8, size + 1);  // +1 to include '\0'
