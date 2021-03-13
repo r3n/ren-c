@@ -78,15 +78,16 @@
     b = [2 3]
 ])
 
-; GET-BLOCK! can be used to keep material that did not originate from the
-; input series or a match rule.  It does a REDUCE to more closely parallel
-; the behavior of a GET-BLOCK! in the ordinary evaluator.
+; SYM-GROUP! can be used to keep material that did not originate from the
+; input series or a match rule.
+;
+; !!! This is extended in UPARSE to the other SYM-XXX! types.
 ;
 (did all [
     [_ pos]: parse [1 2 3] [
         x: collect [
             keep integer!
-            keep :[second [A [<pick> <me>] B]]
+            keep @(second [A [<pick> <me>] B])
             keep integer!
         ]
     ]
@@ -97,7 +98,7 @@
     [_ pos]: parse [1 2 3] [
         x: collect [
             keep integer!
-            keep only :[second [A [<pick> <me>] B]]
+            keep only @(second [A [<pick> <me>] B])
             keep integer!
         ]
     ]
@@ -105,7 +106,7 @@
     x = [1 [<pick> <me>] 2]
 ])
 (did all [
-    parse [1 2 3] [x: collect [keep only :[[a b c]]] to end]
+    parse [1 2 3] [x: collect [keep only @([a b c]) to end]
     x = [[a b c]]
 ])
 

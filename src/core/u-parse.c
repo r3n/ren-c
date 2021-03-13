@@ -8,7 +8,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Ren-C Open Source Contributors
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -19,7 +19,28 @@
 //
 // https://www.gnu.org/licenses/lgpl-3.0.html
 //
-//=////////////////////////////////////////////////////////////////////////=//
+//=//// !!! NOTICE !!! /////////////////////////////////////////////////////=//
+//
+// The PARSE code in R3-Alpha was a fairly organic codebase, and was largely
+// concerned with being performant (to make it a viable competitor to things
+// like RegEx).  Since it did flag-fiddling in lieu of enforcing a generalized
+// architecture, there were significant irregularities...and compositions of
+// rules that seemed like they should be legal wouldn't work.  Many situations
+// that should have been errors would be ignored or have strange behaviors.
+//
+// The code was patched to make its workings clearer over time in Ren-C, and
+// to try and eliminate mechanical bugs (such as bad interactions with the GC).
+// But the basic method was not attacked from the ground up.  Recursions of
+// the parser were unified with the frame model of recursing the evaluator...
+// but that was the only true big change.
+//
+// However, a full redesign has been started with %scripts/uparse.reb.  This
+// is in the spirit of "parser combinators" as defined in many other languages,
+// but brings in the PARSE dialect's succinct symbolic nature.  That design is
+// extremely slow, however--and will need to be merged in with some of the
+// ideas in this file.
+//
+//=/////////////////////////////////////////////////////////////////////////=//
 //
 // As a major operational difference from R3-Alpha, each recursion in Ren-C's
 // PARSE runs using a "Rebol Stack Frame"--similar to how the DO evaluator
@@ -45,14 +66,6 @@
 //
 // But as far as a debugging tool is concerned, the "where" of each frame
 // in the call stack is what you would expect.
-//
-// !!! The PARSE code in R3-Alpha had gone through significant churn, and
-// had a number of cautionary remarks and calls for review.  During Ren-C
-// development, several edge cases emerged about interactions with the
-// garbage collector or throw mechanics...regarding responsibility for
-// temporary values or other issues.  The code has become more clear in many
-// ways, though it is also more complex due to the frame mechanics...and is
-// under ongoing cleanup as time permits.
 //
 
 #include "sys-core.h"
@@ -1657,11 +1670,11 @@ REBNATIVE(subparse)
 
                 rule = Get_Parse_Value(P_SAVE, P_RULE, P_RULE_SPECIFIER);
 
-                if (IS_GET_BLOCK(rule)) {
+                if (IS_SYM_GROUP(rule)) {
                     //
-                    // !!! Experimental use of GET-BLOCK! to mean ordinary
-                    // evaluation of material that is not matched as
-                    // a PARSE rule.
+                    // !!! SYM-GROUP! means ordinary evaluation of material
+                    // that is not matched as a PARSE rule; this is an idea
+                    // which is generalized in UPARSE
                     //
                     assert(IS_END(D_OUT));  // should be true until finish
                     if (Do_Any_Array_At_Throws(

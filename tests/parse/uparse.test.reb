@@ -218,17 +218,19 @@
         str = "literally"
     ]
 )(
-    str: "(aaa)"
+    str: "(aba)"
     did all [
         uparse str [
-            change [between "(" ")"] [
+            "("
+            change [to ")"] [
                 collect [
                     "("
-                    some ["a", (print "Hi"), keep @(<a>)]
+                    some ["a" keep @("A") | skip]
                     ")"
                 ]
             ]
+            ")"
         ]
-        str = "<a><a><a>"
+        str = "(AA)"
     ]
 )]
