@@ -193,40 +193,87 @@ default-combinators: make map! reduce [
 
     === LOOPING CONSTRUCT KEYWORDS ===
 
+    ; Note that the distinction between ANY and WHILE is that ANY stops running
+    ; when it reaches the end.  WHILE keeps running until active failure.
+    ;
+    ;     >> uparse "a" [any [opt "a"]]
+    ;     == "a"
+    ;
+    ;     >> uparse "a" [while [opt "a"]]
+    ;     ; infinite loop
+    ;
+    ; https://github.com/metaeducation/rebol-issues/issues/1268
+
     'any combinator [
         {Any number of matches (including 0)}
+        result: [block!]
         parser [action!]
     ][
         let pos: input
-        cycle [
-            ;
-            ; Note that the distinction between ANY and WHILE is that ANY
-            ; stops running when it reaches the end.  WHILE keeps running
-            ; until something actively fails.
-            ;
-            ;     >> uparse "a" [any [opt "a"]]
-            ;     == "a"
-            ;
-            ; https://github.com/metaeducation/rebol-issues/issues/1268
-            ;
-            if tail? pos: any [parser pos, return pos] [
-                return pos
+
+        if result [
+            if not find (parameters of :parser) '/result [
+                fail "Can't get result from ANY with non-value-bearing rule"
+            ]
+            set result collect [
+                let temp
+                cycle [
+                    if not [pos temp]: parser input [
+                        stop  ; don't return yet (need to finish collect)
+                    ]
+                    keep :temp
+                    if tail? input: pos [
+                        stop  ; don't return yet (need to finish collect)
+                    ]
+                ]
+            ]
+        ] else [
+            cycle [
+                if tail? input: any [parser input, return input] [
+                    stop
+                ]
             ]
         ]
+        return input
     ]
 
     'some combinator [
         {Must run at least one match}
+        result: [block!]
         parser [action!]
     ][
-        if let pos: parser input [
+        let pos
+        if result [
+            if not find (parameters of :parser) '/result [
+                fail "Can't get result from SOME with non-value-bearing rule"
+            ]
+            set result collect [
+                let temp
+                if not [input temp]: parser input [
+                    return null
+                ]
+                keep :temp
+                cycle [
+                    if not [pos temp]: parser input [
+                        stop
+                    ]
+                    keep :temp
+                    if tail? input: pos [
+                        stop  ; don't return yet (need to finish collect)
+                    ]
+                ]
+            ]
+        ] else [
+            if not input: parser input [
+                return null
+            ]
             cycle [
-                if tail? pos: any [parser pos, return pos] [
-                    return pos
+                if tail? input: any [parser input, return input] [
+                    stop
                 ]
             ]
         ]
-        return null
+        return input
     ]
 
     'while combinator [
@@ -235,16 +282,6 @@ default-combinators: make map! reduce [
     ][
         let pos: input
         cycle [
-            ;
-            ; Note that the distinction between ANY and WHILE is that ANY
-            ; stops running when it reaches the end.  WHILE keeps running
-            ; until something actively fails.
-            ;
-            ;     >> uparse "a" [while [opt "a"]]
-            ;     ; infinite loop
-            ;
-            ; https://github.com/metaeducation/rebol-issues/issues/1268
-            ;
             pos: any [parser pos, return pos]
         ]
     ]
@@ -641,23 +678,47 @@ default-combinators: make map! reduce [
 
     ; For now we just make text act as FIND/MATCH, though this needs to be
     ; sensitive to whether we are operating on blocks or text/binary.
+    ;
+    ; !!! We presume that it's value-bearing, and gives back the value it
+    ; matched against.  If you don't want it, you have to ELIDE it.  Note this
+    ; value is the rule in the string and binary case, but the item in the
+    ; data in the block case.
 
     text! combinator [
+        result: [text!]
         value [text!]
     ][
         case [
             any-array? input [
-                if input/1 = value [return next input]
-                return null
+                if input/1 <> value [
+                    return null
+                ]
+                if result [  ; in this case, we want the array's value
+                    set result input/1
+                ]
+                return next input
             ]
+
+            ; for both of these cases, we have to use the rule, since there's
+            ; no isolated value to capture.  Should we copy it?
+
             any-string? input [
-                return find/match/(if state/case 'case) input value
+                if not input: find/match/(if state/case 'case) input value [
+                    return null
+                ]
             ]
             true [
                 assert [binary? input]
-                return find/match input as binary! value
+                if not input: find/match input as binary! value [
+                    return null
+                ]
             ]
         ]
+
+        if result [
+            set result value
+        ]
+        return input
     ]
 
     === TOKEN! COMBINATOR (currently ISSUE! and CHAR!) ===
@@ -791,9 +852,13 @@ default-combinators: make map! reduce [
     ; ANY-ARRAY! type, just to see if type checking can work.
 
     quoted! combinator [
+        result: [any-value!]
         value [quoted!]
     ][
         if :input/1 = unquote value [
+            if result [
+                set result input/1
+            ]
             return next input
         ]
         return null

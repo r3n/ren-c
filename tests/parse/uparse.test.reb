@@ -34,6 +34,53 @@
     ]
 )]
 
+
+; SOME and ANY have become value-bearing; they give back blocks if they match.
+[(
+    x: _
+    did all [
+        uparse "aaa" [x: any "a"]
+        x = ["a" "a" "a"]
+    ]
+)(
+    x: _
+    did all [
+        uparse "aaa" [x: any "b", any "a"]
+        x = []
+    ]
+)(
+    x: _
+    did all [
+        uparse "aaa" [x: opt some "b", any "a"]
+        x = null
+    ]
+)(
+    x: _
+    did all [
+        uparse "aaa" [x: opt some "a"]
+        x = ["a" "a" "a"]
+    ]
+)]
+
+
+; A TEXT! rule will capture the actual match in a block.  But for a string, it
+; will capture the *rule*.
+[(
+    rule: [x: "a"]
+    did all [
+        uparse "a" rule
+        same? x second rule
+    ]
+)(
+    data: ["a"]
+    rule: [x: "a"]
+    did all [
+        uparse data rule
+        same? x first data
+    ]
+)]
+
+
 ; One key feature of UPARSE is that rule chaining is done in such a way that
 ; it delegates the recognition to the parse engine, meaning that rules do not
 ; have to be put into blocks as often.
@@ -105,7 +152,7 @@
 )(
      did all [
          uparse "<<<stuff>>>" [
-             left: across some "<"
+             left: some "<"
              (n: length of left)
              x: between here n ">"
          ]
@@ -131,13 +178,13 @@
 )(
     x: <before>
     did all [  ; semi-nonsensical use of BETWEEN just because it takes 2 rules
-        uparse "(abc)" [x: collect between keep across "(" keep across ")"]
+        uparse "(abc)" [x: collect between keep "(" keep ")"]
         x = ["(" ")"]
     ]
 )(
     x: <before>
     did all [  ; semi-nonsensical use of BETWEEN just because it takes 2 rules
-        not uparse "(abc}" [x: collect between keep across "(" keep across ")"]
+        not uparse "(abc}" [x: collect between "(" keep ")"]
         x = <before>
     ]
 )(
@@ -202,7 +249,7 @@
     did all [
         uparse [| | any any any | | |] [
             content: between some '| some '|
-            into @content [x: across some 'any]
+            into @content [x: some 'any]
         ]
         x = [any any any]
     ]
@@ -224,9 +271,7 @@
             "("
             change [to ")"] [
                 collect [
-                    "("
                     some ["a" keep @("A") | skip]
-                    ")"
                 ]
             ]
             ")"
