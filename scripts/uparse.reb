@@ -193,14 +193,11 @@ default-combinators: make map! reduce [
 
     === LOOPING CONSTRUCT KEYWORDS ===
 
-    ; Note that the distinction between ANY and WHILE is that ANY stops running
-    ; when it reaches the end.  WHILE keeps running until active failure.
-    ;
-    ;     >> uparse "a" [any [opt "a"]]
-    ;     == "a"
-    ;
-    ;     >> uparse "a" [while [opt "a"]]
-    ;     ; infinite loop
+    ; There was a concept that SOME and ANY would stop if they reached the
+    ; tail of the series, requiring a separate WHILE to continue iterating
+    ; even at the end.  It's not clear why `any [opt "a"]` shouldn't be an
+    ; infinite loop...so for the sake of simplicity we'll try having it do
+    ; that and not check the end.
     ;
     ; https://github.com/metaeducation/rebol-issues/issues/1268
 
@@ -222,16 +219,12 @@ default-combinators: make map! reduce [
                         stop  ; don't return yet (need to finish collect)
                     ]
                     keep :temp
-                    if tail? input: pos [
-                        stop  ; don't return yet (need to finish collect)
-                    ]
+                    input: pos
                 ]
             ]
         ] else [
             cycle [
-                if tail? input: any [parser input, return input] [
-                    stop
-                ]
+                input: any [parser input, stop]
             ]
         ]
         return input
@@ -258,9 +251,7 @@ default-combinators: make map! reduce [
                         stop
                     ]
                     keep :temp
-                    if tail? input: pos [
-                        stop  ; don't return yet (need to finish collect)
-                    ]
+                    input: pos
                 ]
             ]
         ] else [
@@ -268,22 +259,10 @@ default-combinators: make map! reduce [
                 return null
             ]
             cycle [
-                if tail? input: any [parser input, return input] [
-                    stop
-                ]
+                input: any [parser input, stop]
             ]
         ]
         return input
-    ]
-
-    'while combinator [
-        {Keep matching while rule doesn't fail, regardless of hitting end}
-        parser [action!]
-    ][
-        let pos: input
-        cycle [
-            pos: any [parser pos, return pos]
-        ]
     ]
 
     === MUTATING KEYWORDS ===

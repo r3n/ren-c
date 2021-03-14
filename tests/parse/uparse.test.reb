@@ -312,4 +312,24 @@
         uparse [] [x: opt [integer!]]
         x = null
     ]
+)
+
+(
+    did all [
+        uparse [1 2 3] [x: [some integer!]]
+        x = [1 2 3]
+    ]
+)]
+
+; SOME can call generators, terminating on the null
+[(
+    gen: func [<static> n (0)] [
+        if n < 3 [return n: n + 1]
+        return null
+    ]
+
+    did all [
+        "a" = uparse "a" ["a", data: some @(gen)]
+        data = [1 2 3]
+    ]
 )]
