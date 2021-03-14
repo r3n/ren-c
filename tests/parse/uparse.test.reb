@@ -279,3 +279,37 @@
         str = "(AA)"
     ]
 )]
+
+; !!! Mixing SET-WORD! and BLOCK! is currently up in the air, in terms of
+; exactly how it should work.
+[(
+    x: <before>
+    did all [
+        uparse [1 "hello"] [x: [tag! | integer!] text!]
+        x = 1  ; not [1]
+    ]
+)(
+    x: <before>
+    did all [
+        uparse [1 "hello"] [x: [tag! integer! | integer! text!]]
+        x = [1 "hello"]
+    ]
+)(
+    x: <before>
+    did all [
+        uparse [] [x: [opt integer!]]
+        x = null
+    ]
+)(
+    x: <before>
+    did all [
+        not uparse [] [x: [integer!]]
+        x = <before>
+    ]
+)(
+    x: <before>
+    did all [
+        uparse [] [x: opt [integer!]]
+        x = null
+    ]
+)]
