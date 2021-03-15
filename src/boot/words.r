@@ -185,7 +185,8 @@ subparse  ; recursions of parse use this for REBNATIVE(subparse) in backtrace
 ;
 set  ; must be first first (SYM_SET referred to by GET_VAR() in %u-parse.c)
 let
-copy
+copy  ; `copy x rule` deprecated, use `x: across rule` for this intent
+across
 collect  ; Variant in Red, but Ren-C's acts SET-like, suggested by @rgchris
 keep
 some

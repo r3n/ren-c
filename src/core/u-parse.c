@@ -1936,10 +1936,15 @@ REBNATIVE(subparse)
                 //
                 if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_HERE)
                     FETCH_NEXT_RULE(f);
+                else if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_ACROSS) {
+                    FETCH_NEXT_RULE(f);
+                    P_FLAGS |= PF_COPY;
+                    goto pre_rule;
+                }
                 else if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_COLLECT)
                     goto handle_collect;
                 else
-                    fail ("PARSE SET-WORD! only usable with HERE for now");
+                    fail ("PARSE SET-WORD! usable with HERE, COLLECT, ACROSS");
 
                 Handle_Mark_Rule(f, set_or_copy_word, P_RULE_SPECIFIER);
                 goto pre_rule;
