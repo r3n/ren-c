@@ -438,6 +438,30 @@ default-combinators: make map! reduce [
         return null
     ]
 
+    === RETURN KEYWORD ===
+
+    ; RETURN was removed for a time in Ren-C due to concerns about how it
+    ; "contaminated" the interface...when the goal was to make PARSE return
+    ; progress in a series:
+
+    'return combinator [
+        {Return a value explicitly from the parse}
+        parser [action!]
+    ][
+        if not find (parameters of :parser) '/result [
+            fail "RETURN needs result-bearing combinator"
+        ]
+        if not let ['input value]: parser input [
+            return null
+        ]
+
+        ; !!! STATE is filled in as the frame of the top-level UPARSE call.  If
+        ; we UNWIND then we bypass any of its handling code, so it won't set
+        ; the /PROGRESS etc.  Review.
+        ;
+        unwind state value
+    ]
+
     === INTO KEYWORD ===
 
     ; Rebol2 had a INTO combinator which only took one argument: a rule to use
@@ -1290,8 +1314,8 @@ parsify: func [
 
 
 uparse: func [
-    return: "Input or gathered object if the parse succeeded, NULL otherwise"
-        [<opt> any-series! object!]
+    return: "Input or explicit RETURN if parse succeeded, NULL otherwise"
+        [<opt> any-value!]
     progress: "Partial progress if requested"
         [<opt> any-series!]
     furthest: "Furthest input point reached by the parse"

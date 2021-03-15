@@ -394,7 +394,10 @@ inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
 //
 
 inline static void INIT_VAL_FRAME_BINDING(RELVAL *v, REBCTX *binding) {
-    assert(IS_FRAME(v));  // may be marked protected (e.g. archetype)
+    assert(
+        IS_FRAME(v)  // may be marked protected (e.g. archetype)
+        or IS_ACTION(v)  // used by UNWIND
+    );
     EXTRA(Binding, v) = binding;
 }
 

@@ -223,6 +223,20 @@
         g/i = 1
         g/t = <foo>
     ]
+)(
+    let result
+    uparse "aaabbb" [
+       result: gather [
+            emit x: collect some ["a", keep @(<a>)]
+            emit y: collect some ["b", keep @(<b>)]
+       ]
+    ] else [
+       fail "Parse failed"
+    ]
+    did all [
+        result.x = [<a> <a> <a>]
+        result.y = [<b> <b> <b>]
+    ]
 )]
 
 ; UPARSE INTO is arity-2, permitting use of a value-bearing rule to produce
@@ -331,5 +345,24 @@
     did all [
         "a" = uparse "a" ["a", data: some @(gen)]
         data = [1 2 3]
+    ]
+)]
+
+; RETURN was removed from Ren-C PARSE but is being re-added to UPARSE, as
+; it seems useful enough to outweigh the interface complexity.
+[(
+    10 = uparse [aaa] [return @(10)]
+)(
+    let result: uparse "aaabbb" [
+        return gather [
+            emit x: collect some ["a", keep @(<a>)]
+            emit y: collect some ["b", keep @(<b>)]
+        ]
+    ] else [
+        fail "Parse failed"
+    ]
+    did all [
+        result.x = [<a> <a> <a>]
+        result.y = [<b> <b> <b>]
     ]
 )]
