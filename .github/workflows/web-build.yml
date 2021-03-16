@@ -343,87 +343,24 @@ jobs:
 
     # Check the deployment before "green-lighting" the %last-deploy.short-hash
     #
-    # We do this currently in the web builds with a "headless" Firefox (e.g.
-    # no GUI Window), automated through the Python's `marionette_driver`:
-    #
-    # https://firefox-source-docs.mozilla.org/python/marionette_driver.html
-    #
-    # The Marionette httpd server for control exists only in Firefox (with
-    # a default port 2828) and is only enabled if you use `-marionette`.
-    #
-    # https://vakila.github.io/blog/marionette-act-i-automation/
-    #
-    # Comparable-but-incompatible APIs to control running browsers exist for
-    # Chrome and others.  The W3C's "WebDriver" initiative standardizes a
-    # "ODBC for browser control" which translates a common API into calls
-    # with plugins for each particular browser.  The layer is bulky and is
-    # typically used with "Selenium" which is even bulkier.  To be lighter
-    # we just use Python with raw Marionette.
-    #
-    # Long term we might have to do more than this simple test, but in the
-    # 80/20 rule it's going to deliver on catching most of the breakages.
-    #
-    # !!! WebSocket support in Ren-C would allow avoiding this Python usage.
-    # It is "planned for the future".  :-/
+    # The ren-c-action is able to deploy a web browser and use the commit of
+    # a non-greenlit hash.  It does this via a local Firefox, which it talks
+    # to through Python equipped with the "Marionette" protocol.  (Ren-C can't
+    # be used at time of writing, because it lacks websockets...which are
+    # needed to remote-control Firefox).
     #
     - name: Test ReplPad Against Uploaded Lib By Running In Headless Firefox
-      if: github.ref == 'refs/heads/master'  # see notes on UPLOAD STEPS
-      run: |
-        sudo apt-get install net-tools  # for netstat, diagnose network issues
-
-        pip3 install marionette-driver --user  # Python Install Package
-
-        # Create a Firefox profile in the current directory that we can tweak
-        # (as finding the default one's auto-generated name is a pain)
-        #
-        firefox -headless -CreateProfile "ff-profile $(pwd)/ff-profile"
-
-        # The way to set `about:config` flags in preferences is via %user.js
-        #
-        # https://askubuntu.com/a/313662/137769
-        # http://kb.mozillazine.org/User.js_file
-        #
-        # The Marionette port for control defaults to 2828, and can be
-        # overridden on the command line by `--marionette-port <port>`.  But
-        # to show another place to set it, here's the profile setting.
-        #
-        # Yaml and HereDoc aren't always compatible, so we use plain ECHO
-        # instead to make our user.js file:
-        #
-        # https://en.wikipedia.org/wiki/Here_document#Unix_shells
-        # https://travis-ci.community/t/2756
-        {
-            # !!! At one time we turned on shared_memory for the pthreads
-            # build.  But the pthreads build has been scrapped.  There's not
-            # really a need to turn shared memory off, but do it just to show
-            # another setting...and that we don't require it.
-            #
-            echo "user_pref(\"javascript.options.shared_memory\", false);"
-            echo "user_pref(\"marionette.port\", 2828);"  # should be default
-        } > $(pwd)/ff-profile/user.js
-
-        # We keep the Python test script for the browser build in the GitHub
-        # replpad-js repository.  Fetch it.
-        #
-        wget https://raw.githubusercontent.com/hostilefork/replpad-js/master/tests/test-repl-ff.py
-
-        # Start Firefox headless with the marionette automation enabled
-        # (the `&` starts it in the background)
-        #
-        firefox -headless --profile ff-profile -marionette  &
-        sleep 5  # Give Firefox time to spin up (should be in cache now)
-
-        echo "Running netstat -lntu: Marionette should be listening on 2828"
-        netstat -lntu
-        ps aux | grep firefox
-
-        # Run the script.  The result will be 0 if the test was sucessful.
-        # Note that we ask the REPL to be instantiated with the libr3.js we
-        # just uploaded that has not been "greenlit" by uploading the
-        # `last-deploy.short-hash`...so we must pass the current commit in
-        # explicitly to be asked for in the URL.
-        #
-        python3 test-repl-ff.py --shorthash "${GIT_COMMIT_SHORT}"
+      if: github.ref == 'refs/heads/master'  # see notes on DEPLOY STEPS
+      uses: metaeducation/ren-c-action@release
+      with:
+        web: true
+        commit: ${{ env.GIT_COMMIT_SHORT }}
+        timeout: 10
+        script: |
+          x: 10
+          watch x
+          assert [10 = watch 1]
+          redbol
 
 
   #====# GREENLIGHT STEP (MARK THE UPLOADED BUILD AS CURRENT) #===============#
