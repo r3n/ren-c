@@ -366,3 +366,55 @@
         result.y = [<b> <b> <b>]
     ]
 )]
+
+; NOT NOT should be equivalent to AHEAD
+; Red at time of writing has trouble with this
+; As does Haskell Parsec, e.g. (notFollowedBy . notFollowedBy != lookAhead)
+; https://github.com/haskell/parsec/issues/8
+[
+    ("a" = uparse "a" [[not not "a"] "a"])
+]
+
+[(
+    x: uparse "baaabccc" [into [between "b" "b"] [some "a" end] to end]
+    x == "baaabccc"
+)(
+    x: uparse "baaabccc" [into [between "b" "b"] ["a" end] to end]
+    x = null
+)(
+    x: uparse "baaabccc" [into [between "b" "b"] ["a"] to end]
+    x = null
+)(
+    x: uparse "baaabccc" [into [between "b" "b"] ["a" to end] "c" to end]
+    x = "baaabccc"
+)(
+    x: uparse "aaabccc" [into [across to "b"] [some "a"] to end]
+    x = "aaabccc"
+)]
+
+; INTO can be mixed with HERE to parse into the same series
+[(
+    x: uparse "aaabbb" [
+        some "a"
+        into here ["bbb" (b: "yep, Bs")]
+        "bbb" (bb: "Bs again")
+    ]
+    did all [
+        x = "aaabbb"
+        b = "yep, Bs"
+        bb = "Bs again"
+    ]
+)(
+    x: uparse "aaabbbccc" [
+        some "a"
+        into here ["bbb" to end (b: "yep, Bs")]
+        "bbb" (bb: "Bs again")
+        "ccc" (c: "Here be Cs")
+    ]
+    did all [
+        x = "aaabbbccc"
+        b = "yep, Bs"
+        bb = "Bs again"
+        c = "Here be Cs"
+    ]
+)]
