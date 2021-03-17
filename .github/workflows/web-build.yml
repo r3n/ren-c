@@ -54,8 +54,6 @@ defaults:
 jobs:
   web-build:  # Name of this workflow's only job
 
-    # The type of runner that the job will run on.  Options listed here:
-    #
     # https://github.com/actions/virtual-environments#available-environments
     #
     runs-on: ubuntu-20.04

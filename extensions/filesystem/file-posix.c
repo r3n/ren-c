@@ -885,7 +885,7 @@ bool Set_Current_Dir_Value(const REBVAL *path)
         }
 
         REBVAL *result = rebValue(
-            "local-to-file", rebT(path_utf8),  // just return unresolved path
+            "local-to-file", rebT(path_utf8)  // just return unresolved path
         );
         rebFree(path_utf8);
         return result;

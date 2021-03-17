@@ -1,14 +1,9 @@
 #
-# File: %windows-build.yml
+# File: %macos-build.yml
 #
 #=============================================================================#
 #
-# This does Windows builds on GitHub's Windows Server container, using the
-# Microsoft CL.EXE and LINK.EXE.
-#
-# While the default shell is PowerShell for Windows Actions, we are able to
-# override that and use bash...which makes more sense when trying to maintain
-# similar simple scripts on several platorms.
+# This does MacOS builds on GitHub's Ubuntu container, using clang.
 #
 #====# PLEASE READ THE README #===============================================#
 #
@@ -19,7 +14,7 @@
 # https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
 #
 
-name: Windows Build
+name: MacOS Build
 
 
 # See README: When To Trigger Builds
@@ -27,7 +22,8 @@ name: Windows Build
 on:
   push:
     branches: [
-      windows  # pushing to windows won't build other workflows, use to debug
+      # master,
+      macos  # pushing to macos won't build other workflows, use to debug
     ]
   pull_request:
     branches: [
@@ -51,11 +47,11 @@ defaults:
 # See README: Jobs
 #
 jobs:
-  windows-build:  # Name of this workflow's only job
+  macos-build:  # Name of this workflow's only job
 
     # https://github.com/actions/virtual-environments#available-environments
     #
-    runs-on: windows-2016
+    runs-on: macos-latest
 
 
     # See README: Build Matrix
@@ -64,26 +60,22 @@ jobs:
       matrix:
        include:
 
-         - os-id: 0.3.40  # 64-bit Target (built on this 64-bit platform)
-           config-file: vs2019-x64.r
-           standard: c99
+         - os-id: 0.2.40  # 64-bit Target (built on this 64-bit platform)
+           config-file: generic.r
+           standard: gnu99  # used for sigjmp_buf (signal safety)
            debug: none
-           extensions: View -  # View requires C99, disable it
+           extensions: ""
            variation: ""
 
-         - os-id: 0.3.40  # 64-bit Target (built on this 64-bit platform)
-           config-file: vs2019-x64.r
-           standard: c99
-           debug: normal
-           extensions: "ODBC +"  # View requires C99, disable it
-           variation: "-debug"
-
-         - os-id: 0.3.01  # 32-bit Target (built on this 64-bit platform)
-           config-file: vs2019-x86.r
-           standard: c++17  # c++11 is "default", no option for it
+         - os-id: 0.2.40  # 64-bit Target (built on this 64-bit platform)
+           config-file: generic.r
+           standard: gnu99  # used for sigjmp_buf (signal safety)
            debug: normal
            extensions: "ODBC +"
-           variation: "-debug"
+           variation: "-debug"  # !!! Maybe -debug-odbc ?
+
+        # MacOS has fully deprecated 32-bit targets...we'll assume that the
+        # Windows/Linux/ARM 32-bit variants cover testing of 32-bit enough.
 
 
     # See README: Environment Variables
@@ -112,22 +104,6 @@ jobs:
   #====# CHECKOUT STEPS #=====================================================#
 
 
-    # GitHub CI checkout on Windows auto translates LF to CR/LF in files:
-    #
-    # https://github.com/actions/checkout/issues/135
-    #
-    # However, Ren-C is taking the long view on this and prohibiting CR/LF in
-    # source by default.
-    #
-    # https://forum.rebol.info/t/newlina-non-grata/1207
-    # https://forum.rebol.info/t/1264
-    #
-    - name: Disable LF to CRLF Auto Translation In Git
-      run: |
-        git config --global core.autocrlf false
-        git config --global core.eol lf
-
-
     # https://github.com/actions/checkout
     #
     # See README: Checkout Action
@@ -151,12 +127,13 @@ jobs:
   #====# TOOLCHAIN INSTALLATION STEPS #=======================================#
 
 
-    # !!! See if fetch_prebuilt could adapt to working with Windows bash (?)
-    #
     - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE
       run: |
-        curl https://s3.amazonaws.com/r3bootstraps/r3-windows-x86-8994d23.exe -o r3make.exe
-        echo "R3MAKE=$(pwd)\r3make.exe" >> $GITHUB_ENV  # pass to next step
+        repo_dir=$(pwd)/
+        source tools/bash/fetch-prebuilt.sh
+        r3make=$(fetch_prebuilt)
+        echo "R3MAKE is set to $r3make"
+        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
 
 
     - name: Stop the build early if the R3MAKE is no good
@@ -164,37 +141,29 @@ jobs:
         "$R3MAKE" --do "print {R3MAKE is Working} quit 0"
 
 
-    # By default you can't call MSVC Compilation from the command line.  Use
-    # an action that is written to address that.
+    # The ODBC executable is built with debug included, to make the workflow
+    # that uses it for testing ODBC more rigorous.
     #
-    # https://github.com/ilammy/msvc-dev-cmd
-    #
-    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
-    #
-    - name: Enable CL.EXE C Compiler and Other Dev Tools From a Command Prompt
-      uses: ilammy/msvc-dev-cmd@aa2e60900e4cc1eda092dd8f53dab2b32efeacf5
-
-
-    # Using bash as the shell means a symlink tool /usr/bin/link gets in the
-    # path before MS's LINK.EXE.  It's not clear what the best workaround for
-    # this is, so just move it out of the way for now.  Other ideas here:
-    #
-    # https://github.com/ilammy/msvc-dev-cmd/issues/25
-    #
-    - name: Rename GNU-based Symlink Utility `link` So LINK.EXE Is In Path
+    - name: Get ODBC if Needed
+      if: (env.OS_ID == '0.4.40') && (env.DEBUG == 'normal')
       run: |
-        mv /usr/bin/link.exe /usr/bin/gnu-link
+        # When brew updates automatically, it generates an unsightly amount of
+        # output if it does so during a `brew install`.  So redirect the
+        # hundreds of lines to /dev/null to shorten the log.
+        #
+        # https://github.com/Homebrew/legacy-homebrew/issues/35662
+        #
+        brew update > /dev/null
+
+        brew install unixodbc
 
 
-    # Show a little bit of sanity check information.  MSC is weird because you
-    # can't ask for the version specifically, you just call it with no args:
-    #
-    # https://stackoverflow.com/q/1233312/
+    # Show a little bit of sanity check information.
     #
     - name: Output System Information
       run: |
-        echo "MSC (cl.exe) version check:"
-        cl
+        echo "Clang version check:"
+        clang -v
 
 
   #====# BUILD STEPS #========================================================#
@@ -202,14 +171,14 @@ jobs:
 
     # See README: {Braces} For %make.r String Parameters
     #
-    - name: Use Rebmake to Generate an NMAKE Makefile
+    - name: Use Rebmake to Generate a makefile
       run: |
         mkdir build
         cd build
 
         "$R3MAKE" ../make.r \
             config="../configs/$CONFIG_FILE" \
-            target=nmake \
+            target=makefile \
             standard=$STANDARD \
             os_id=$OS_ID \
             debug=$DEBUG \
@@ -222,13 +191,13 @@ jobs:
     - name: Create Folders For Build Products (Compiler Won't Create Them)
       run: |
         cd build
-        nmake folders
+        make folders
 
 
     - name: Prep the Build By Making Various Auto-Generated .h and .c Files
       run: |
         cd build
-        nmake prep
+        make prep
 
 
     # https://github.com/actions/upload-artifact
@@ -244,7 +213,7 @@ jobs:
     - name: Compile and Link the C Files to into R3BUILT
       run: |
         cd build
-        nmake
+        make
         echo "R3BUILT=$(pwd)/r3" >> $GITHUB_ENV
 
 
@@ -252,7 +221,7 @@ jobs:
     #
     - name: Copy Built R3 To Where It Can Be Used As A Shell
       run: |
-        cp build/r3 "C:/Program Files/Git/usr/bin/r3built.EXE"
+        sudo cp build/r3 /usr/bin/r3built
 
 
   #====# TESTING STEPS #======================================================#
@@ -308,10 +277,10 @@ jobs:
       if: github.ref == 'refs/heads/master'  # see notes on DEPLOY STEPS
       run: |
         cd build
-        NEW_NAME="r3-${GIT_COMMIT_SHORT}${VARIATION}.exe"
+        NEW_NAME="r3-${GIT_COMMIT_SHORT}${VARIATION}"
         OPT_TYPE=""  # e.g. "--content-type application/wasm"
 
-        local=r3.exe
+        local=r3
         remote=s3://${AWS_S3_BUCKET_NAME}/travis-builds/${OS_ID}/${NEW_NAME}
         aws s3 cp $local $remote $OPT_TYPE
 
@@ -330,3 +299,9 @@ jobs:
 
         remote=s3://${AWS_S3_BUCKET_NAME}/travis-builds/${OS_ID}/$local
         aws s3 cp $local $remote  # upload
+
+
+  #====# BOOTSTRAP STEP #=====================================================#
+
+
+    # We should check for bootstrap capability

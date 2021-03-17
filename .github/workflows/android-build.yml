@@ -69,21 +69,33 @@ jobs:
       matrix:
         include:  # put in order of visibility importance (shown in UI)
 
-        #- ndk-revision: r13  # old gcc-based version (used in 2019 demo)
-        #  os: ubuntu-20.04
-        #  standard: c99
-        #  debug: normal
-        #  extensions: "TCC +"
-        #  os-id: 0.13.2
-        #  config-file: android-cross-compiled.r  # Build ARM with x64 compiler
+        - os: ubuntu-20.04
+          #
+          # !!! versions prior to r16 only offered a gcc-based toolchain
+          # circa 2021, this is completely deprecated, however it was being
+          # used at the time of the 2019 demo.  When migrating to GitHub
+          # actions it seemed to make sense to get what was already working
+          # going vs. going headfirst into a new toolchain at a very new NDK
+          # version on a completely different platform for emulation (MacOS).
+          # So this old version was made to work first.  It doesn't make that
+          # much sense priority-wise to worry about such an "old" SDK, but
+          # as long as it's not too much trouble to keep working it adds to
+          # the variety of platforms the core can compile for...and helps
+          # point out any incursions of new dependencies that slip in.
+          #
+          ndk-revision: r13  # released Oct 2016
+          standard: c99
+          debug: normal
+          extensions: "TCC +"
+          os-id: 0.13.2
+          config-file: android-cross-compiled.r  # Build ARM with x64 compiler
 
         - os: macos-latest
           #
           # versions since r18 are entirely clang-based
-          # r21 is current circa March 2021
           # leaving off last letter means get latest patch version (e.g. r21e)
           #
-          ndk-revision: r21
+          ndk-revision: r21  # released Jan 2021
           standard: c99
           debug: normal
           extensions: "TCC +"
@@ -173,8 +185,6 @@ jobs:
       EMULATOR_TARGET: google_apis  # [default google_apis playstore]
 
 
-    # The type of runner that the job will run on.  Options listed here:
-    #
     # https://github.com/actions/virtual-environments#available-environments
     #
     runs-on: ${{ matrix.os }}
