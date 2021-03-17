@@ -679,7 +679,7 @@ REBVAL *RL_rebLengthedTextWide(const REBWCHAR *wstr, unsigned int num_chars)
 //
 //  rebTextWide: RL_API
 //
-// Imports a TEXT! from UCS2 (no UTF16 multi-wchar-encoding, at least not yet)
+// Imports a TEXT! from UTF-16 (potentially multi-wchar-per-codepint encoding)
 //
 REBVAL *RL_rebTextWide(const REBWCHAR *wstr)
 {
@@ -688,9 +688,20 @@ REBVAL *RL_rebTextWide(const REBWCHAR *wstr)
     DECLARE_MOLD (mo);
     Push_Mold(mo);
 
-    for (; *wstr != 0; ++wstr)
-        Append_Codepoint(mo->series, *wstr);
-
+    while (*wstr != 0) {
+        if (*wstr >= UNI_SUR_HIGH_START and *wstr <= UNI_SUR_HIGH_END) {
+            assert (
+                *(wstr + 1) >= UNI_SUR_LOW_START
+                and *(wstr + 1) <= UNI_SUR_LOW_END
+            );
+            Append_Codepoint(mo->series, Decode_UTF16_Pair(wstr));
+            wstr += 2;
+        }
+        else {
+            Append_Codepoint(mo->series, *wstr);
+            ++wstr;
+        }
+    }
     return Init_Text(Alloc_Value(), Pop_Molded_String(mo));
 }
 
@@ -1154,7 +1165,7 @@ static size_t Spell_Into(
 
     REBSIZ limit = MIN(buf_size, utf8_size);
     memcpy(buf, utf8, limit);
-    buf[limit] = '\0';
+    buf[limit] = 0;
     return utf8_size;
 }
 
@@ -1218,49 +1229,63 @@ char *RL_rebSpell(
 //
 static unsigned int Spell_Into_Wide(
     REBWCHAR *buf,
-    unsigned int buf_chars,  // chars buf can hold (not including terminator)
+    unsigned int buf_wchars,  // chars buf can hold (not including terminator)
     const REBVAL *v
 ){
     if (not ANY_UTF8(v))
         fail ("rebSpell() APIs require UTF-8 types (strings, words, tokens)");
 
-    REBLEN len;
-    REBCHR(const*) cp = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, v);
+    if (not buf)  // querying for size
+        assert(buf_wchars == 0);
 
-    if (not buf) {  // querying for size
-        assert(buf_chars == 0);
-        return len;  // caller must now allocate buffer of len + 1
-    }
+    unsigned int num_wchars = 0;  // some codepoints need 2 wchars
 
-    REBLEN limit = MIN(buf_chars, len);
+    REBCHR(const*) cp = VAL_UTF8_AT(v);
 
     REBUNI c;
     cp = NEXT_CHR(&c, cp);
 
-    REBLEN i;
-    for (i = 0; i < limit; cp = NEXT_CHR(&c, cp), ++i) {
-        if (c > 0xFFFF)  // !!! Should we do multi-wchar UTF16 encoding?
-            fail ("Codepoint too high for REBWCHAR in rebSpellIntoWide()");
+    REBLEN i = 0;
+    while (c != '\0' and i < buf_wchars) {
+        if (c <= 0xFFFF) {
+            buf[i] = c;
+            ++i;
+            ++num_wchars;
+        }
+        else {  // !!! Should there be a UCS-2 version that fails here?
+            if (i == buf_wchars - 1)
+                break;  // not enough space for surrogate pair
 
-        buf[i] = c;
+            Encode_UTF16_Pair(c, &buf[i]);
+            i += 2;
+            num_wchars += 2;
+        }
+        cp = NEXT_CHR(&c, cp);
     }
 
-    buf[i] = 0;
-    return len;
+    if (buf)
+        buf[i] = 0;
+
+    while (c != '\0') {  // count residual wchars there was no capacity for
+        if (c <= 0xFFFF)
+            num_wchars += 1;  // fits in one 16-bit wchar
+        else
+            num_wchars += 2;  // requires surrogate pair to represent
+
+        cp = NEXT_CHR(&c, cp);
+    }
+
+    return num_wchars;  // if allocating, caller needs space for num_wchars + 1
 }
 
 
 //
 //  rebSpellIntoWide: RL_API
 //
-// Extract UCS-2 data from an ANY-STRING! or ANY-WORD!.  Note this is *not*
-// UTF-16, so codepoints that require more than two bytes to represent will
-// cause errors.
-//
-// !!! Although the rebSpellInto API deals in bytes, this deals in count of
-// characters.  (The use of REBLEN instead of REBSIZ indicates this.)  It may
-// be more useful for the wide string APIs to do this so leaving it that way
-// for now.
+// Extract UTF-16 data from an ANY-STRING! or ANY-WORD!.  Note this is *not*
+// UCS-2, so codepoints that won't fit in one WCHAR will take up two WCHARs
+// by means of a surrogate pair.  Hence the returned value is a count of
+// wchar units...not *necesssarily* a length in codepoints.
 //
 unsigned int RL_rebSpellIntoWide(
     unsigned char quotes,
@@ -1280,15 +1305,8 @@ unsigned int RL_rebSpellIntoWide(
 //
 //  rebSpellWide: RL_API
 //
-// Gives the spelling as WCHARs.  If length in codepoints is needed, use
-// a separate LENGTH OF call.
-//
-// !!! Unlike with rebSpell(), there is not an alternative for getting
-// the size in UTF-16-encoded characters, just the LENGTH OF result.  While
-// that works for UCS-2 (where all codepoints are two bytes), it would not
-// work if Rebol supported UTF-16.  Which it may never do in the core or
-// API (possible solutions could include usermode UTF-16 conversion to binary,
-// and extraction of that with rebBytes(), then dividing the size by 2).
+// Gives the spelling as WCHARs.  The result is UTF-16, so some codepoints
+// won't fit in single WCHARs.
 //
 REBWCHAR *RL_rebSpellWide(
     unsigned char quotes,

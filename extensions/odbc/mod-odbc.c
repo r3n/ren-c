@@ -254,16 +254,19 @@ static void cleanup_henv(const REBVAL *v) {
 //
 enum CharColumnEncoding {
     CHAR_COL_UTF8,
-    CHAR_COL_UCS2,
+    //
+    // !!! Should we offer a CHAR_COL_UCS2, which errors if you use any
+    // codepoints higher than 0xFFFF ?  (Right now that just uses UTF-16.)
+    //
+    CHAR_COL_UTF16,
     CHAR_COL_LATIN1
 };
 
-// !!! For now, default to the most conservative choice...which is to let the
+// For now, default to the most conservative choice...which is to let the
 // driver/driver-manager do the translation from wide characters, but that is
-// inefficient (UCS-2, when Rebol string encoding is "UTF-8 Everywhere").  It
-// also disallows codepoints higher than 65535.
+// less efficient than doing UTF-8
 //
-enum CharColumnEncoding char_column_encoding = CHAR_COL_UCS2;
+enum CharColumnEncoding char_column_encoding = CHAR_COL_UTF16;
 
 //
 //  export odbc-set-char-encoding: native [
@@ -284,10 +287,11 @@ REBNATIVE(odbc_set_char_encoding)
     char_column_encoding = cast(enum CharColumnEncoding, rebUnboxInteger(
         "switch", rebQ(ARG(encoding)), "[",
             "'utf-8 [", rebI(CHAR_COL_UTF8), "]",
-            "'ucs-2 [", rebI(CHAR_COL_UCS2), "]",
+            "'ucs-2 [", rebI(CHAR_COL_UTF16), "]",  // TBD: limited codepoints
+            "'utf-16 [", rebI(CHAR_COL_UTF16), "]",
             "'latin-1 [", rebI(CHAR_COL_LATIN1), "]",
         "] else [",
-            "fail {ENCODING must be UTF-8, UCS-2, or LATIN-1}"
+            "fail {ENCODING must be UTF-8, UCS-2, UTF-16, or LATIN-1}"
         "]"
     ));
 
@@ -315,14 +319,18 @@ REBNATIVE(open_connection)
 {
     ODBC_INCLUDE_PARAMS_OF_OPEN_CONNECTION;
 
-    // We treat ODBC's SQLWCHAR type (wide SQL char) as 2 bytes UCS2, even on
-    // platforms where wchar_t is larger.  This gives unixODBC compatibility:
+    // We treat ODBC's SQLWCHAR type (wide SQL char) as 2 bytes per wchar, even
+    //on  platforms where wchar_t is larger.  This gives unixODBC compatibility:
     //
     // https://stackoverflow.com/a/7552533/211160
     //
     // "unixODBC follows MS ODBC Driver manager and has SQLWCHARs as 2 bytes
     //  UCS-2 encoded. iODBC I believe uses wchar_t (this is based on
     //  attempting to support iODBC in DBD::ODBC)"
+    //
+    // Ren-C supports the full unicode range of codepoints, so if codepoints
+    // bigger than 0xFFFF are used then they are encoded as surrogate pairs.
+    // UCS-2 constraint can be added to error rather than tolerate this.
     //
     assert(sizeof(SQLWCHAR) == sizeof(REBWCHAR));
 
@@ -639,8 +647,8 @@ SQLRETURN ODBC_BindParameter(
             p->buffer = utf8;
             break; }
 
-          case CHAR_COL_UCS2:
-            goto encode_as_ucs2;  // if driver can't handle UTF-8
+          case CHAR_COL_UTF16:
+            goto encode_as_utf16;  // if driver can't handle UTF-8
 
           case CHAR_COL_LATIN1: {
             REBVAL *temp = rebValue(
@@ -672,22 +680,26 @@ SQLRETURN ODBC_BindParameter(
         // !!! We also jump here if we don't trust the driver's UTF-8 ability
         // with a SQL_C_CHAR field.  See notes.
         //
-      encode_as_ucs2:
+      encode_as_utf16:
       case SQL_C_WCHAR: {  // TEXT! when target column is NCHAR
         //
         // Call to get the length of how big a buffer to make, then a second
         // call to fill the buffer after its made.
         //
-        REBLEN len_no_term = rebSpellIntoWideQ(nullptr, 0, v);
-        SQLWCHAR *chars = rebAllocN(SQLWCHAR, len_no_term + 1);
-        REBLEN len_check = rebSpellIntoWideQ(chars, len_no_term, v);
-        assert(len_check == len_no_term);
-        UNUSED(len_check);
+        // Note: Some ODBC drivers may not support UTF16 and only UCS2.  This
+        // means it could give bad displays or length calculations if
+        // codepoints > 0xFFFF are used.
+        //
+        unsigned int num_wchars_no_term = rebSpellIntoWideQ(nullptr, 0, v);
+        SQLWCHAR *chars = rebAllocN(SQLWCHAR, num_wchars_no_term + 1);
+        unsigned int check = rebSpellIntoWideQ(chars, num_wchars_no_term, v);
+        assert(check == num_wchars_no_term);
+        UNUSED(check);
 
         sql_type = SQL_WVARCHAR;
-        p->buffer_size = sizeof(SQLWCHAR) * len_no_term;
+        p->buffer_size = sizeof(SQLWCHAR) * num_wchars_no_term;
         p->buffer = chars;
-        p->length = p->column_size = cast(SQLSMALLINT, 2 * len_no_term);
+        p->length = p->column_size = cast(SQLSMALLINT, 2 * num_wchars_no_term);
         break; }
 
       case SQL_C_BINARY: {  // BINARY!
@@ -1002,8 +1014,8 @@ void ODBC_DescribeResults(
 
           case SQL_CHAR:
           case SQL_VARCHAR:
-            if (char_column_encoding == CHAR_COL_UCS2)
-                goto decode_as_ucs2;  // !!! see notes on CHAR_COL_UCS2
+            if (char_column_encoding == CHAR_COL_UTF16)
+                goto decode_as_utf16;  // !!! see notes on CHAR_COL_UTF16
 
             col->c_type = SQL_C_CHAR;
 
@@ -1015,7 +1027,7 @@ void ODBC_DescribeResults(
             col->buffer_size = col->column_size + 1;
             break;
 
-          decode_as_ucs2:
+          decode_as_utf16:
           case SQL_WCHAR:
           case SQL_WVARCHAR:
             col->c_type = SQL_C_WCHAR;
@@ -1026,8 +1038,8 @@ void ODBC_DescribeResults(
             break;
 
           case SQL_LONGVARCHAR:
-            if (char_column_encoding == CHAR_COL_UCS2)
-                goto decode_as_long_ucs2;  // !!! see notes on CHAR_COL_UCS2
+            if (char_column_encoding == CHAR_COL_UTF16)
+                goto decode_as_long_utf16;  // !!! see notes on CHAR_COL_UTF16
 
             col->c_type = SQL_C_CHAR;
 
@@ -1047,7 +1059,7 @@ void ODBC_DescribeResults(
             col->buffer_size = (32700 + 1);
             break;
 
-          decode_as_long_ucs2:
+          decode_as_long_utf16:
           case SQL_WLONGVARCHAR:
             col->c_type = SQL_C_WCHAR;
 
@@ -1418,8 +1430,8 @@ REBVAL *ODBC_Column_To_Rebol_Value(COLUMN *col)
                 col->length
             );
 
-          case CHAR_COL_UCS2:
-            assert(!"UCS-2 should have requested SQL_C_WCHAR");
+          case CHAR_COL_UTF16:
+            assert(!"UTF-16/UCS-2 should have requested SQL_C_WCHAR");
             break;
 
           case CHAR_COL_LATIN1: {

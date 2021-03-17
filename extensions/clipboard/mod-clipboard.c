@@ -148,7 +148,9 @@ static REB_R Clipboard_Actor(
         // sufficienctly sized handle, decode Rebol STRING! into it, transfer
         // ownership of that handle to the clipboard.
 
-        HANDLE h = GlobalAlloc(GHND, sizeof(WCHAR) * (len + 1));
+        unsigned int num_wchars = rebSpellIntoWideQ(nullptr, 0, data);
+
+        HANDLE h = GlobalAlloc(GHND, sizeof(WCHAR) * (num_wchars + 1));
         if (h == NULL) // per documentation, not INVALID_HANDLE_VALUE
             rebJumps("fail {GlobalAlloc() fail on clipboard write}");
 
@@ -158,9 +160,10 @@ static REB_R Clipboard_Actor(
 
         // Extract text as UTF-16
         //
-        REBINT len_check = rebSpellIntoWideQ(wide, len, data);
-        assert(len <= len_check); // may only be writing /PART of the string
-        UNUSED(len_check);
+        REBINT check = rebSpellIntoWideQ(wide, num_wchars, data);
+        assert(check == cast(REBINT, num_wchars));
+        assert(len <= check); // may only be writing /PART of the string
+        UNUSED(check);
 
         GlobalUnlock(h);
 

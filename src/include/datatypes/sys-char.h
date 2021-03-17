@@ -153,6 +153,25 @@ inline static void Encode_UTF8_Char(
     }
 }
 
+inline static void Encode_UTF16_Pair(REBUNI codepoint, REBWCHAR *units)
+{
+    uint32_t adjusted;
+    assert(0x10000 <= codepoint and codepoint <= UNI_MAX_UTF16);
+    adjusted = (codepoint - 0x10000);
+    units[0] = UNI_SUR_HIGH_START | (adjusted >> 10);
+    units[1] = UNI_SUR_LOW_START | (adjusted & 0x3FF);
+}
+
+inline static REBUNI Decode_UTF16_Pair(const REBWCHAR *units)
+{
+    uint32_t adjusted;
+    assert(UNI_SUR_HIGH_START <= units[0] and units[0] <= UNI_SUR_HIGH_END);
+    assert(UNI_SUR_LOW_START <= units[1] and units[1] <= UNI_SUR_LOW_END);
+    adjusted = 0x10000;
+    adjusted += (units[0] & 0x03FF) << 10;
+    adjusted += (units[1] & 0x03FF);
+    return adjusted;
+}
 
 #define SPACE_VALUE \
     Root_Space_Char
